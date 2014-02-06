@@ -573,7 +573,7 @@ static int flask_security_setavc_threshold(char *buf, uint32_t count)
 static int flask_security_set_bool(char *buf, uint32_t count)
 {
     int length = -EFAULT;
-    int i, new_value;
+    unsigned int i, new_value;
 
     spin_lock(&sel_sem);
 
@@ -583,6 +583,9 @@ static int flask_security_set_bool(char *buf, uint32_t count)
 
     length = -EINVAL;
     if ( sscanf(buf, "%d %d", &i, &new_value) != 2 )
+        goto out;
+
+    if ( i >= bool_num )
         goto out;
 
     if ( new_value )
@@ -734,10 +737,6 @@ static int flask_security_load(char *buf, uint32_t count)
 
     spin_lock(&sel_sem);
 
-    length = domain_has_security(current->domain, SECURITY__LOAD_POLICY);
-    if ( length )
-        goto out;
-
     length = security_load_policy(buf, count);
     if ( length )
         goto out;
@@ -853,7 +852,15 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
     if ( op->cmd > FLASK_LAST)
         return -EINVAL;
 
-    if ( op->size > MAX_POLICY_SIZE )
+    if ( op->cmd == FLASK_LOAD )
+    {
+        rc = domain_has_security(current->domain, SECURITY__LOAD_POLICY);
+        if ( rc )
+            return rc;
+        if ( op->size > MAX_POLICY_SIZE )
+            return -EINVAL;
+    }
+    else if ( op->size >= PAGE_SIZE )
         return -EINVAL;
 
     if ( (op->buf == NULL && op->size != 0) || 

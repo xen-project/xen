@@ -1991,7 +1991,7 @@ int security_get_bool_value(int bool)
     POLICY_RDLOCK;
 
     len = policydb.p_bools.nprim;
-    if ( bool >= len )
+    if ( bool >= len || bool < 0 )
     {
         rc = -EFAULT;
         goto out;
