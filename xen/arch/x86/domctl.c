@@ -819,7 +819,13 @@ long arch_do_domctl(
 
         if ( domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext )
         {
+            if ( v == current ) /* no vcpu_pause() */
+                break;
+
             evc->size = sizeof(*evc);
+
+            vcpu_pause(v);
+
             if ( is_pv_domain(d) )
             {
                 evc->sysenter_callback_cs      =
@@ -849,6 +855,7 @@ long arch_do_domctl(
             evc->vmce.mci_ctl2_bank1 = v->arch.vmce.bank[1].mci_ctl2;
 
             ret = 0;
+            vcpu_unpause(v);
             copyback = 1;
         }
         else

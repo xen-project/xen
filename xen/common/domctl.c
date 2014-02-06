@@ -675,11 +675,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         struct vcpu         *v;
 
         ret = -EINVAL;
-        if ( op->u.vcpucontext.vcpu >= d->max_vcpus )
-            goto getvcpucontext_out;
-
-        ret = -ESRCH;
-        if ( (v = d->vcpu[op->u.vcpucontext.vcpu]) == NULL )
+        if ( op->u.vcpucontext.vcpu >= d->max_vcpus ||
+             (v = d->vcpu[op->u.vcpucontext.vcpu]) == NULL ||
+             v == current ) /* no vcpu_pause() */
             goto getvcpucontext_out;
 
         ret = -ENODATA;
@@ -694,14 +692,12 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( (c.nat = xmalloc(struct vcpu_guest_context)) == NULL )
             goto getvcpucontext_out;
 
-        if ( v != current )
-            vcpu_pause(v);
+        vcpu_pause(v);
 
         arch_get_info_guest(v, c);
         ret = 0;
 
-        if ( v != current )
-            vcpu_unpause(v);
+        vcpu_unpause(v);
 
 #ifdef CONFIG_COMPAT
         if ( !is_pv_32on64_vcpu(v) )
