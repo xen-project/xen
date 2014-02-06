@@ -53,6 +53,7 @@ static DEFINE_SPINLOCK(sel_sem);
 /* global data for booleans */
 static int bool_num = 0;
 static int *bool_pending_values = NULL;
+static size_t bool_maxstr;
 static int flask_security_make_bools(void);
 
 extern int ss_initialized;
@@ -71,9 +72,15 @@ static int domain_has_security(struct domain *d, u32 perms)
                         perms, NULL);
 }
 
-static int flask_copyin_string(XEN_GUEST_HANDLE_PARAM(char) u_buf, char **buf, uint32_t size)
+static int flask_copyin_string(XEN_GUEST_HANDLE_PARAM(char) u_buf, char **buf,
+                               size_t size, size_t max_size)
 {
-    char *tmp = xmalloc_bytes(size + 1);
+    char *tmp;
+
+    if ( size > max_size )
+        return -ENOENT;
+
+    tmp = xmalloc_array(char, size + 1);
     if ( !tmp )
         return -ENOMEM;
 
@@ -99,7 +106,7 @@ static int flask_security_user(struct xen_flask_userlist *arg)
     if ( rv )
         return rv;
 
-    rv = flask_copyin_string(arg->u.user, &user, arg->size);
+    rv = flask_copyin_string(arg->u.user, &user, arg->size, PAGE_SIZE);
     if ( rv )
         return rv;
 
@@ -210,7 +217,7 @@ static int flask_security_context(struct xen_flask_sid_context *arg)
     if ( rv )
         return rv;
 
-    rv = flask_copyin_string(arg->context, &buf, arg->size);
+    rv = flask_copyin_string(arg->context, &buf, arg->size, PAGE_SIZE);
     if ( rv )
         return rv;
 
@@ -303,7 +310,7 @@ static int flask_security_resolve_bool(struct xen_flask_boolean *arg)
     if ( arg->bool_id != -1 )
         return 0;
 
-    rv = flask_copyin_string(arg->name, &name, arg->size);
+    rv = flask_copyin_string(arg->name, &name, arg->size, bool_maxstr);
     if ( rv )
         return rv;
 
@@ -334,7 +341,7 @@ static int flask_security_set_bool(struct xen_flask_boolean *arg)
         int num;
         int *values;
 
-        rv = security_get_bools(&num, NULL, &values);
+        rv = security_get_bools(&num, NULL, &values, NULL);
         if ( rv != 0 )
             goto out;
 
@@ -440,7 +447,7 @@ static int flask_security_make_bools(void)
     
     xfree(bool_pending_values);
     
-    ret = security_get_bools(&num, NULL, &values);
+    ret = security_get_bools(&num, NULL, &values, &bool_maxstr);
     if ( ret != 0 )
         goto out;
 

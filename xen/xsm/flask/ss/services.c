@@ -1850,7 +1850,7 @@ int security_find_bool(const char *name)
     return rv;
 }
 
-int security_get_bools(int *len, char ***names, int **values)
+int security_get_bools(int *len, char ***names, int **values, size_t *maxstr)
 {
     int i, rc = -ENOMEM;
 
@@ -1858,6 +1858,8 @@ int security_get_bools(int *len, char ***names, int **values)
     if ( names )
         *names = NULL;
     *values = NULL;
+    if ( maxstr )
+        *maxstr = 0;
 
     *len = policydb.p_bools.nprim;
     if ( !*len )
@@ -1879,16 +1881,17 @@ int security_get_bools(int *len, char ***names, int **values)
 
     for ( i = 0; i < *len; i++ )
     {
-        size_t name_len;
+        size_t name_len = strlen(policydb.p_bool_val_to_name[i]);
+
         (*values)[i] = policydb.bool_val_to_struct[i]->state;
         if ( names ) {
-            name_len = strlen(policydb.p_bool_val_to_name[i]) + 1;
-            (*names)[i] = (char*)xmalloc_array(char, name_len);
+            (*names)[i] = xmalloc_array(char, name_len + 1);
             if ( !(*names)[i] )
                 goto err;
-            strlcpy((*names)[i], policydb.p_bool_val_to_name[i], name_len);
-            (*names)[i][name_len - 1] = 0;
+            strlcpy((*names)[i], policydb.p_bool_val_to_name[i], name_len + 1);
         }
+        if ( maxstr && name_len > *maxstr )
+            *maxstr = name_len;
     }
     rc = 0;
 out:
@@ -2006,7 +2009,7 @@ static int security_preserve_bools(struct policydb *p)
     struct cond_bool_datum *booldatum;
     struct cond_node *cur;
 
-    rc = security_get_bools(&nbools, &bnames, &bvalues);
+    rc = security_get_bools(&nbools, &bnames, &bvalues, NULL);
     if ( rc )
         goto out;
     for ( i = 0; i < nbools; i++ )
