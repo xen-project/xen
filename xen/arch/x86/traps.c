@@ -2382,15 +2382,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_FS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            if ( wrmsr_safe(MSR_FS_BASE, msr_content) )
-                goto fail;
+            wrfsbase(msr_content);
             v->arch.pv_vcpu.fs_base = msr_content;
             break;
         case MSR_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            if ( wrmsr_safe(MSR_GS_BASE, msr_content) )
-                goto fail;
+            wrgsbase(msr_content);
             v->arch.pv_vcpu.gs_base_kernel = msr_content;
             break;
         case MSR_SHADOW_GS_BASE:
@@ -2535,15 +2533,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_FS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            regs->eax = v->arch.pv_vcpu.fs_base & 0xFFFFFFFFUL;
-            regs->edx = v->arch.pv_vcpu.fs_base >> 32;
-            break;
+            val = cpu_has_fsgsbase ? __rdfsbase() : v->arch.pv_vcpu.fs_base;
+            goto rdmsr_writeback;
         case MSR_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            regs->eax = v->arch.pv_vcpu.gs_base_kernel & 0xFFFFFFFFUL;
-            regs->edx = v->arch.pv_vcpu.gs_base_kernel >> 32;
-            break;
+            val = cpu_has_fsgsbase ? __rdgsbase()
+                                   : v->arch.pv_vcpu.gs_base_kernel;
+            goto rdmsr_writeback;
         case MSR_SHADOW_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;

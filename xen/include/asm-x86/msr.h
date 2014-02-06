@@ -98,18 +98,40 @@ static inline int wrmsr_safe(unsigned int msr, uint64_t val)
 			  : "=a" (low), "=d" (high) \
 			  : "c" (counter))
 
+static inline unsigned long __rdfsbase(void)
+{
+    unsigned long base;
+
+#ifdef HAVE_GAS_FSGSBASE
+    asm volatile ( "rdfsbase %0" : "=r" (base) );
+#else
+    asm volatile ( ".byte 0xf3, 0x48, 0x0f, 0xae, 0xc0" : "=a" (base) );
+#endif
+
+    return base;
+}
+
+static inline unsigned long __rdgsbase(void)
+{
+    unsigned long base;
+
+#ifdef HAVE_GAS_FSGSBASE
+    asm volatile ( "rdgsbase %0" : "=r" (base) );
+#else
+    asm volatile ( ".byte 0xf3, 0x48, 0x0f, 0xae, 0xc8" : "=a" (base) );
+#endif
+
+    return base;
+}
+
 static inline unsigned long rdfsbase(void)
 {
     unsigned long base;
 
     if ( cpu_has_fsgsbase )
-#ifdef HAVE_GAS_FSGSBASE
-        asm volatile ( "rdfsbase %0" : "=r" (base) );
-#else
-        asm volatile ( ".byte 0xf3, 0x48, 0x0f, 0xae, 0xc0" : "=a" (base) );
-#endif
-    else
-        rdmsrl(MSR_FS_BASE, base);
+        return __rdfsbase();
+
+    rdmsrl(MSR_FS_BASE, base);
 
     return base;
 }
@@ -119,13 +141,9 @@ static inline unsigned long rdgsbase(void)
     unsigned long base;
 
     if ( cpu_has_fsgsbase )
-#ifdef HAVE_GAS_FSGSBASE
-        asm volatile ( "rdgsbase %0" : "=r" (base) );
-#else
-        asm volatile ( ".byte 0xf3, 0x48, 0x0f, 0xae, 0xc8" : "=a" (base) );
-#endif
-    else
-        rdmsrl(MSR_GS_BASE, base);
+        return __rdgsbase();
+
+    rdmsrl(MSR_GS_BASE, base);
 
     return base;
 }

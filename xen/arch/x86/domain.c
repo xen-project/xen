@@ -1251,6 +1251,15 @@ static void save_segments(struct vcpu *v)
     regs->fs = read_segment_register(fs);
     regs->gs = read_segment_register(gs);
 
+    if ( cpu_has_fsgsbase && !is_pv_32bit_vcpu(v) )
+    {
+        v->arch.pv_vcpu.fs_base = __rdfsbase();
+        if ( v->arch.flags & TF_kernel_mode )
+            v->arch.pv_vcpu.gs_base_kernel = __rdgsbase();
+        else
+            v->arch.pv_vcpu.gs_base_user = __rdgsbase();
+    }
+
     if ( regs->ds )
         dirty_segment_mask |= DIRTY_DS;
 

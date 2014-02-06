@@ -257,6 +257,13 @@ void toggle_guest_mode(struct vcpu *v)
 {
     if ( is_pv_32bit_vcpu(v) )
         return;
+    if ( cpu_has_fsgsbase )
+    {
+        if ( v->arch.flags & TF_kernel_mode )
+            v->arch.pv_vcpu.gs_base_kernel = __rdgsbase();
+        else
+            v->arch.pv_vcpu.gs_base_user = __rdgsbase();
+    }
     v->arch.flags ^= TF_kernel_mode;
     asm volatile ( "swapgs" );
     update_cr3(v);
