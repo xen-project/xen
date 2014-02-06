@@ -111,12 +111,26 @@ static inline int send_notify(struct libxenvchan *ctrl, uint8_t bit)
 		return 0;
 }
 
+/*
+ * Get the amount of buffer space available, and do nothing about
+ * notifications.
+ */
+static inline int raw_get_data_ready(struct libxenvchan *ctrl)
+{
+	uint32_t ready = rd_prod(ctrl) - rd_cons(ctrl);
+	if (ready >= rd_ring_size(ctrl))
+		/* We have no way to return errors.  Locking up the ring is
+		 * better than the alternatives. */
+		return 0;
+	return ready;
+}
+
 /**
  * Get the amount of buffer space available and enable notifications if needed.
  */
 static inline int fast_get_data_ready(struct libxenvchan *ctrl, size_t request)
 {
-	int ready = rd_prod(ctrl) - rd_cons(ctrl);
+	int ready = raw_get_data_ready(ctrl);
 	if (ready >= request)
 		return ready;
 	/* We plan to consume all data; please tell us if you send more */
@@ -126,7 +140,7 @@ static inline int fast_get_data_ready(struct libxenvchan *ctrl, size_t request)
 	 * will not get notified even though the actual amount of data ready is
 	 * above request. Reread rd_prod to cover this case.
 	 */
-	return rd_prod(ctrl) - rd_cons(ctrl);
+	return raw_get_data_ready(ctrl);
 }
 
 int libxenvchan_data_ready(struct libxenvchan *ctrl)
@@ -135,7 +149,21 @@ int libxenvchan_data_ready(struct libxenvchan *ctrl)
 	 * when it changes
 	 */
 	request_notify(ctrl, VCHAN_NOTIFY_WRITE);
-	return rd_prod(ctrl) - rd_cons(ctrl);
+	return raw_get_data_ready(ctrl);
+}
+
+/**
+ * Get the amount of buffer space available, and do nothing
+ * about notifications
+ */
+static inline int raw_get_buffer_space(struct libxenvchan *ctrl)
+{
+	uint32_t ready = wr_ring_size(ctrl) - (wr_prod(ctrl) - wr_cons(ctrl));
+	if (ready > wr_ring_size(ctrl))
+		/* We have no way to return errors.  Locking up the ring is
+		 * better than the alternatives. */
+		return 0;
+	return ready;
 }
 
 /**
@@ -143,7 +171,7 @@ int libxenvchan_data_ready(struct libxenvchan *ctrl)
  */
 static inline int fast_get_buffer_space(struct libxenvchan *ctrl, size_t request)
 {
-	int ready = wr_ring_size(ctrl) - (wr_prod(ctrl) - wr_cons(ctrl));
+	int ready = raw_get_buffer_space(ctrl);
 	if (ready >= request)
 		return ready;
 	/* We plan to fill the buffer; please tell us when you've read it */
@@ -153,7 +181,7 @@ static inline int fast_get_buffer_space(struct libxenvchan *ctrl, size_t request
 	 * will not get notified even though the actual amount of buffer space
 	 * is above request. Reread wr_cons to cover this case.
 	 */
-	return wr_ring_size(ctrl) - (wr_prod(ctrl) - wr_cons(ctrl));
+	return raw_get_buffer_space(ctrl);
 }
 
 int libxenvchan_buffer_space(struct libxenvchan *ctrl)
@@ -162,7 +190,7 @@ int libxenvchan_buffer_space(struct libxenvchan *ctrl)
 	 * when it changes
 	 */
 	request_notify(ctrl, VCHAN_NOTIFY_READ);
-	return wr_ring_size(ctrl) - (wr_prod(ctrl) - wr_cons(ctrl));
+	return raw_get_buffer_space(ctrl);
 }
 
 int libxenvchan_wait(struct libxenvchan *ctrl)
@@ -176,6 +204,8 @@ int libxenvchan_wait(struct libxenvchan *ctrl)
 
 /**
  * returns -1 on error, or size on success
+ *
+ * caller must have checked that enough space is available
  */
 static int do_send(struct libxenvchan *ctrl, const void *data, size_t size)
 {
@@ -248,6 +278,11 @@ int libxenvchan_write(struct libxenvchan *ctrl, const void *data, size_t size)
 	}
 }
 
+/**
+ * returns -1 on error, or size on success
+ *
+ * caller must have checked that enough data is available
+ */
 static int do_recv(struct libxenvchan *ctrl, void *data, size_t size)
 {
 	int real_idx = rd_cons(ctrl) & (rd_ring_size(ctrl) - 1);
