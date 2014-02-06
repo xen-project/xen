@@ -3,6 +3,10 @@
 
 struct vfp_state
 {
+    uint64_t fpregs[64];
+    uint32_t fpcr;
+    uint32_t fpexc32_el2;
+    uint32_t fpsr;
 };
 
 #endif /* _ARM_ARM64_VFP_H */
