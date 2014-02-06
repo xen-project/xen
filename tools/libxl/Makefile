@@ -130,7 +130,7 @@ all: $(CLIENTS) $(TEST_PROGS) \
 	$(AUTOSRCS) $(AUTOINCS)
 
 $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS) \
-		$(LIBXL_TEST_OBJS): \
+		$(LIBXL_TEST_OBJS) $(TEST_PROG_OBJS): \
 	$(AUTOINCS) libxl.api-ok
 
 %.c %.h:: %.y
@@ -175,8 +175,9 @@ libxl_internal.h: _libxl_types_internal.h _paths.h
 libxl_internal_json.h: _libxl_types_internal_json.h
 xl.h: _paths.h
 
-$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS): libxl.h
-$(LIBXL_OBJS): libxl_internal.h
+$(LIBXL_OBJS) $(LIBXL_TEST_OBJS) $(LIBXLU_OBJS) \
+	$(XL_OBJS) $(TEST_PROG_OBJS) $(SAVE_HELPER_OBJS): libxl.h
+$(LIBXL_OBJS) $(LIBXL_TEST_OBJS): libxl_internal.h
 
 _libxl_type%.h _libxl_type%_json.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
 	$(PYTHON) gentypes.py libxl_type$*.idl __libxl_type$*.h __libxl_type$*_json.h __libxl_type$*.c
