@@ -35,6 +35,19 @@
 
 #include "caml_xentoollog.h"
 
+/*
+ * Starting with ocaml-3.09.3, CAMLreturn can only be used for ``value''
+ * types. CAMLreturnT was only added in 3.09.4, so we define our own
+ * version here if needed.
+ */
+#ifndef CAMLreturnT
+#define CAMLreturnT(type, result) do { \
+    type caml__temp_result = (result); \
+    caml_local_roots = caml__frame; \
+    return (caml__temp_result); \
+} while (0)
+#endif
+
 /* The following is equal to the CAMLreturn macro, but without the return */
 #define CAMLdone do{ \
 caml_local_roots = caml__frame; \
