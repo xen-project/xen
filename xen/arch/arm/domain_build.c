@@ -209,12 +209,15 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
             return res;
     }
 
-    if ( dt_node_path_is_equal(node, "/chosen") && bootargs )
+    if ( dt_node_path_is_equal(node, "/chosen") )
     {
-        res = fdt_property(kinfo->fdt, "bootargs", bootargs,
-                           strlen(bootargs) + 1);
-        if ( res )
-            return res;
+        if ( bootargs )
+        {
+            res = fdt_property(kinfo->fdt, "bootargs", bootargs,
+                               strlen(bootargs) + 1);
+            if ( res )
+                return res;
+        }
 
         /*
          * If the bootloader provides an initrd, we must create a placeholder
