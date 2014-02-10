@@ -984,6 +984,7 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
     const struct acpi_ivrs_header *ivrs_block;
     unsigned long length;
     unsigned int apic;
+    bool_t sb_ioapic = !iommu_intremap;
     int error = 0;
 
     BUG_ON(!table);
@@ -1017,8 +1018,15 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
     /* Each IO-APIC must have been mentioned in the table. */
     for ( apic = 0; !error && iommu_intremap && apic < nr_ioapics; ++apic )
     {
-        if ( !nr_ioapic_entries[apic] ||
-             ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx )
+        if ( !nr_ioapic_entries[apic] )
+            continue;
+
+        if ( !ioapic_sbdf[IO_APIC_ID(apic)].seg &&
+             /* SB IO-APIC is always on this device in AMD systems. */
+             ioapic_sbdf[IO_APIC_ID(apic)].bdf == PCI_BDF(0, 0x14, 0) )
+            sb_ioapic = 1;
+
+        if ( ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx )
             continue;
 
         if ( !test_bit(IO_APIC_ID(apic), ioapic_cmdline) )
@@ -1039,6 +1047,14 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
             printk(XENLOG_ERR "IVHD Error: Out of memory\n");
             error = -ENOMEM;
         }
+    }
+
+    if ( !error && !sb_ioapic )
+    {
+        if ( amd_iommu_perdev_intremap )
+            error = -ENXIO;
+        printk("%sNo southbridge IO-APIC found in IVRS table\n",
+               amd_iommu_perdev_intremap ? XENLOG_ERR : XENLOG_WARNING);
     }
 
     return error;
