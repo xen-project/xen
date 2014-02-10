@@ -249,9 +249,6 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
     store_port   = dominfo.getStorePort()
     console_port = dominfo.getConsolePort()
 
-    assert store_port
-    assert console_port
-
     # if hvm, pass mem size to calculate the store_mfn
     if is_hvm:
         apic = int(dominfo.info['platform'].get('apic', 0))
@@ -263,6 +260,9 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
         pae  = 0
 
     try:
+        assert store_port
+        assert console_port
+
         restore_image = image.create(dominfo, dominfo.info)
         memory = restore_image.getRequiredAvailableMemory(
             dominfo.info['memory_dynamic_max'] / 1024)
