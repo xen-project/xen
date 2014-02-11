@@ -351,6 +351,10 @@ int xc_dom_gnttab_seed(xc_interface *xch, domid_t domid,
         return -1;
     }
 
+    /* Guest shouldn't really touch its grant table until it has
+     * enabled its caches. But lets be nice. */
+    xc_domain_cacheflush(xch, domid, gnttab_gmfn, 1);
+
     return 0;
 }
 

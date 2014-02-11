@@ -17,6 +17,10 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
 /* Inline ASM to flush dcache on register R (may be an inline asm operand) */
 #define __flush_xen_dcache_one(R) "dc cvac, %" #R ";"
 
+/* Inline ASM to clean and invalidate dcache on register R (may be an
+ * inline asm operand) */
+#define __clean_and_invalidate_xen_dcache_one(R) "dc  civac, %" #R ";"
+
 /*
  * Flush all hypervisor mappings from the TLB
  * This is needed after changing Xen code mappings.

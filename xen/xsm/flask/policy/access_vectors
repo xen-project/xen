@@ -196,6 +196,8 @@ class domain2
     setclaim
 # XEN_DOMCTL_set_max_evtchn
     set_max_evtchn
+# XEN_DOMCTL_cacheflush
+    cacheflush
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains

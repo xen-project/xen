@@ -346,6 +346,9 @@ static inline uint32_t cacheattr_to_pte_flags(uint32_t cacheattr)
     return ((cacheattr & 4) << 5) | ((cacheattr & 3) << 3);
 }
 
+/* No cache maintenance required on x86 architecture. */
+static inline void flush_page_to_ram(unsigned long mfn) {}
+
 /* return true if permission increased */
 static inline bool_t
 perms_strictly_increased(uint32_t old_flags, uint32_t new_flags)

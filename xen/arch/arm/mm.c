@@ -342,6 +342,18 @@ unsigned long domain_page_map_to_mfn(const void *ptr)
 }
 #endif
 
+void flush_page_to_ram(unsigned long mfn)
+{
+    void *p, *v = map_domain_page(mfn);
+
+    dsb();           /* So the CPU issues all writes to the range */
+    for ( p = v; p < v + PAGE_SIZE ; p += cacheline_bytes )
+        asm volatile (__clean_and_invalidate_xen_dcache_one(0) : : "r" (p));
+    dsb();           /* So we know the flushes happen before continuing */
+
+    unmap_domain_page(v);
+}
+
 void __init arch_init_memory(void)
 {
     /*

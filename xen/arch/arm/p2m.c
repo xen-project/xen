@@ -8,6 +8,7 @@
 #include <asm/gic.h>
 #include <asm/event.h>
 #include <asm/hardirq.h>
+#include <asm/page.h>
 
 /* First level P2M is 2 consecutive pages */
 #define P2M_FIRST_ORDER 1
@@ -228,6 +229,7 @@ enum p2m_operation {
     ALLOCATE,
     REMOVE,
     RELINQUISH,
+    CACHEFLUSH,
 };
 
 static int apply_p2m_changes(struct domain *d,
@@ -379,6 +381,15 @@ static int apply_p2m_changes(struct domain *d,
                     memset(&pte, 0x00, sizeof(pte));
                     write_pte(&third[third_table_offset(addr)], pte);
                     count++;
+                }
+                break;
+
+            case CACHEFLUSH:
+                {
+                    if ( !pte.p2m.valid || !p2m_is_ram(pte.p2m.type) )
+                        break;
+
+                    flush_page_to_ram(pte.p2m.base);
                 }
                 break;
         }
@@ -622,6 +633,20 @@ int relinquish_p2m_mapping(struct domain *d)
                               pfn_to_paddr(p2m->max_mapped_gfn),
                               pfn_to_paddr(INVALID_MFN),
                               MATTR_MEM, p2m_invalid);
+}
+
+int p2m_cache_flush(struct domain *d, xen_pfn_t start_mfn, xen_pfn_t end_mfn)
+{
+    struct p2m_domain *p2m = &d->arch.p2m;
+
+    start_mfn = MAX(start_mfn, p2m->lowest_mapped_gfn);
+    end_mfn = MIN(end_mfn, p2m->max_mapped_gfn);
+
+    return apply_p2m_changes(d, CACHEFLUSH,
+                             pfn_to_paddr(start_mfn),
+                             pfn_to_paddr(end_mfn),
+                             pfn_to_paddr(INVALID_MFN),
+                             MATTR_MEM, p2m_invalid);
 }
 
 unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)

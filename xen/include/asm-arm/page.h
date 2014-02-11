@@ -253,6 +253,9 @@ static inline void flush_xen_dcache_va_range(void *p, unsigned long size)
             : : "r" (_p), "m" (*_p));                                   \
 } while (0)
 
+/* Flush the dcache for an entire page. */
+void flush_page_to_ram(unsigned long mfn);
+
 /* Print a walk of an arbitrary page table */
 void dump_pt_walk(lpae_t *table, paddr_t addr);
 

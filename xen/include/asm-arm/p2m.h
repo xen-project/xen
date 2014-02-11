@@ -78,6 +78,9 @@ void p2m_load_VTTBR(struct domain *d);
 /* Look up the MFN corresponding to a domain's PFN. */
 paddr_t p2m_lookup(struct domain *d, paddr_t gpfn, p2m_type_t *t);
 
+/* Clean & invalidate caches corresponding to a region of guest address space */
+int p2m_cache_flush(struct domain *d, xen_pfn_t start_mfn, xen_pfn_t end_mfn);
+
 /* Setup p2m RAM mapping for domain d from start-end. */
 int p2m_populate_ram(struct domain *d, paddr_t start, paddr_t end);
 /* Map MMIO regions in the p2m: start_gaddr and end_gaddr is the range

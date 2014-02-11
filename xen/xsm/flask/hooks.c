@@ -730,6 +730,9 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_set_max_evtchn:
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__SET_MAX_EVTCHN);
 
+    case XEN_DOMCTL_cacheflush:
+        return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__CACHEFLUSH);
+
     default:
         printk("flask_domctl: Unknown op %d\n", cmd);
         return -EPERM;
@@ -1599,3 +1602,13 @@ static __init int flask_init(void)
 }
 
 xsm_initcall(flask_init);
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

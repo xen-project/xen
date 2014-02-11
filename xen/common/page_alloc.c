@@ -710,6 +710,11 @@ static struct page_info *alloc_heap_pages(
         /* Initialise fields which have other uses for free pages. */
         pg[i].u.inuse.type_info = 0;
         page_set_owner(&pg[i], NULL);
+
+        /* Ensure cache and RAM are consistent for platforms where the
+         * guest can control its own visibility of/through the cache.
+         */
+        flush_page_to_ram(page_to_mfn(&pg[i]));
     }
 
     spin_unlock(&heap_lock);

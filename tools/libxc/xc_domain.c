@@ -48,6 +48,16 @@ int xc_domain_create(xc_interface *xch,
     return 0;
 }
 
+int xc_domain_cacheflush(xc_interface *xch, uint32_t domid,
+                         xen_pfn_t start_pfn, xen_pfn_t nr_pfns)
+{
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_cacheflush;
+    domctl.domain = (domid_t)domid;
+    domctl.u.cacheflush.start_pfn = start_pfn;
+    domctl.u.cacheflush.nr_pfns = nr_pfns;
+    return do_domctl(xch, &domctl);
+}
 
 int xc_domain_pause(xc_interface *xch,
                     uint32_t domid)

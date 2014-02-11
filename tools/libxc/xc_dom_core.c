@@ -603,6 +603,8 @@ void xc_dom_unmap_one(struct xc_dom_image *dom, xen_pfn_t pfn)
         prev->next = phys->next;
     else
         dom->phys_pages = phys->next;
+
+    xc_domain_cacheflush(dom->xch, dom->guest_domid, phys->first, phys->count);
 }
 
 void xc_dom_unmap_all(struct xc_dom_image *dom)

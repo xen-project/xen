@@ -628,6 +628,7 @@ int xc_copy_to_domain_page(xc_interface *xch,
         return -1;
     memcpy(vaddr, src_page, PAGE_SIZE);
     munmap(vaddr, PAGE_SIZE);
+    xc_domain_cacheflush(xch, domid, dst_pfn, 1);
     return 0;
 }
 
@@ -641,6 +642,7 @@ int xc_clear_domain_page(xc_interface *xch,
         return -1;
     memset(vaddr, 0, PAGE_SIZE);
     munmap(vaddr, PAGE_SIZE);
+    xc_domain_cacheflush(xch, domid, dst_pfn, 1);
     return 0;
 }
 

@@ -885,6 +885,17 @@ struct xen_domctl_set_max_evtchn {
 typedef struct xen_domctl_set_max_evtchn xen_domctl_set_max_evtchn_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_max_evtchn_t);
 
+/*
+ * ARM: Clean and invalidate caches associated with given region of
+ * guest memory.
+ */
+struct xen_domctl_cacheflush {
+    /* IN: page range to flush. */
+    xen_pfn_t start_pfn, nr_pfns;
+};
+typedef struct xen_domctl_cacheflush xen_domctl_cacheflush_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_cacheflush_t);
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -954,6 +965,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_setnodeaffinity               68
 #define XEN_DOMCTL_getnodeaffinity               69
 #define XEN_DOMCTL_set_max_evtchn                70
+#define XEN_DOMCTL_cacheflush                    71
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -1012,6 +1024,7 @@ struct xen_domctl {
         struct xen_domctl_set_max_evtchn    set_max_evtchn;
         struct xen_domctl_gdbsx_memio       gdbsx_guest_memio;
         struct xen_domctl_set_broken_page_p2m set_broken_page_p2m;
+        struct xen_domctl_cacheflush        cacheflush;
         struct xen_domctl_gdbsx_pauseunp_vcpu gdbsx_pauseunp_vcpu;
         struct xen_domctl_gdbsx_domstatus   gdbsx_domstatus;
         uint8_t                             pad[128];

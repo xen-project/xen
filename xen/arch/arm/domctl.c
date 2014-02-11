@@ -17,6 +17,20 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
 {
     switch ( domctl->cmd )
     {
+    case XEN_DOMCTL_cacheflush:
+    {
+        unsigned long s = domctl->u.cacheflush.start_pfn;
+        unsigned long e = s + domctl->u.cacheflush.nr_pfns;
+
+        if ( domctl->u.cacheflush.nr_pfns > (1U<<MAX_ORDER) )
+            return -EINVAL;
+
+        if ( e < s )
+            return -EINVAL;
+
+        return p2m_cache_flush(d, s, e);
+    }
+
     default:
         return subarch_do_domctl(domctl, d, u_domctl);
     }
