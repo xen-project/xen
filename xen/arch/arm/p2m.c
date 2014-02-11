@@ -230,7 +230,7 @@ enum p2m_operation {
     RELINQUISH,
 };
 
-static int create_p2m_entries(struct domain *d,
+static int apply_p2m_changes(struct domain *d,
                      enum p2m_operation op,
                      paddr_t start_gpaddr,
                      paddr_t end_gpaddr,
@@ -438,8 +438,8 @@ int p2m_populate_ram(struct domain *d,
                      paddr_t start,
                      paddr_t end)
 {
-    return create_p2m_entries(d, ALLOCATE, start, end,
-                              0, MATTR_MEM, p2m_ram_rw);
+    return apply_p2m_changes(d, ALLOCATE, start, end,
+                             0, MATTR_MEM, p2m_ram_rw);
 }
 
 int map_mmio_regions(struct domain *d,
@@ -447,8 +447,8 @@ int map_mmio_regions(struct domain *d,
                      paddr_t end_gaddr,
                      paddr_t maddr)
 {
-    return create_p2m_entries(d, INSERT, start_gaddr, end_gaddr,
-                              maddr, MATTR_DEV, p2m_mmio_direct);
+    return apply_p2m_changes(d, INSERT, start_gaddr, end_gaddr,
+                             maddr, MATTR_DEV, p2m_mmio_direct);
 }
 
 int guest_physmap_add_entry(struct domain *d,
@@ -457,20 +457,20 @@ int guest_physmap_add_entry(struct domain *d,
                             unsigned long page_order,
                             p2m_type_t t)
 {
-    return create_p2m_entries(d, INSERT,
-                              pfn_to_paddr(gpfn),
-                              pfn_to_paddr(gpfn + (1 << page_order)),
-                              pfn_to_paddr(mfn), MATTR_MEM, t);
+    return apply_p2m_changes(d, INSERT,
+                             pfn_to_paddr(gpfn),
+                             pfn_to_paddr(gpfn + (1 << page_order)),
+                             pfn_to_paddr(mfn), MATTR_MEM, t);
 }
 
 void guest_physmap_remove_page(struct domain *d,
                                unsigned long gpfn,
                                unsigned long mfn, unsigned int page_order)
 {
-    create_p2m_entries(d, REMOVE,
-                       pfn_to_paddr(gpfn),
-                       pfn_to_paddr(gpfn + (1<<page_order)),
-                       pfn_to_paddr(mfn), MATTR_MEM, p2m_invalid);
+    apply_p2m_changes(d, REMOVE,
+                      pfn_to_paddr(gpfn),
+                      pfn_to_paddr(gpfn + (1<<page_order)),
+                      pfn_to_paddr(mfn), MATTR_MEM, p2m_invalid);
 }
 
 int p2m_alloc_table(struct domain *d)
@@ -618,7 +618,7 @@ int relinquish_p2m_mapping(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
 
-    return create_p2m_entries(d, RELINQUISH,
+    return apply_p2m_changes(d, RELINQUISH,
                               pfn_to_paddr(p2m->next_gfn_to_relinquish),
                               pfn_to_paddr(p2m->max_mapped_gfn),
                               pfn_to_paddr(INVALID_MFN),
