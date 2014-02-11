@@ -234,7 +234,7 @@ the Linux tpmfront driver. Add the following line:
 
 vtpm=["backend=domu-vtpm"]
 
-Currently only paravirtualized guests are supported.
+Currently only Linux guests are supported (PV or HVM with PV drivers).
 
 Launching and shut down:
 ------------------------
@@ -280,14 +280,8 @@ You should also see the command being sent to the vtpm console as well
 as the vtpm saving its state. You should see the vtpm key being
 encrypted and stored on the vtpmmgr console.
 
-To shutdown the guest and its vtpm, you just have to shutdown the guest
-normally. As soon as the guest vm disconnects, the vtpm will shut itself
-down automatically.
-
-On guest:
-# shutdown -h now
-
-You may wish to write a script to start your vtpm and guest together.
+You may wish to write a script to start your vtpm and guest together and
+to destroy the vtpm when the guest shuts down.
 
 ------------------------------
 INTEGRATION WITH PV-GRUB
