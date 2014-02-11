@@ -1902,6 +1902,7 @@ err:
     {
         for ( i = 0; i < *len; i++ )
             xfree((*names)[i]);
+        xfree(*names);
     }
     xfree(*values);
     goto out;
@@ -2011,7 +2012,7 @@ static int security_preserve_bools(struct policydb *p)
 
     rc = security_get_bools(&nbools, &bnames, &bvalues, NULL);
     if ( rc )
-        goto out;
+        return rc;
     for ( i = 0; i < nbools; i++ )
     {
         booldatum = hashtab_search(p->p_bools.table, bnames[i]);
