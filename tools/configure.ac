@@ -46,6 +46,7 @@ m4_include([../m4/pthread.m4])
 m4_include([../m4/ptyfuncs.m4])
 m4_include([../m4/extfs.m4])
 m4_include([../m4/fetcher.m4])
+m4_include([../m4/ax_compare_version.m4])
 
 # Enable/disable options
 AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
@@ -161,6 +162,12 @@ AS_IF([test "x$ocamltools" = "xy"], [
         AS_IF([test "x$enable_ocamltools" = "xyes"], [
             AC_MSG_ERROR([Ocaml tools enabled, but unable to find Ocaml])])
         ocamltools="n"
+    ], [
+        AX_COMPARE_VERSION([$OCAMLVERSION], [lt], [3.09.3], [
+            AS_IF([test "x$enable_ocamltools" = "xyes"], [
+                AC_MSG_ERROR([Your version of OCaml: $OCAMLVERSION is not supported])])
+            ocamltools="n"
+        ])
     ])
 ])
 AS_IF([test "x$xsmpolicy" = "xy"], [
