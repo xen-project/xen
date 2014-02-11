@@ -257,8 +257,6 @@ struct arch_vcpu
     uint64_t event_mask;
     uint64_t lr_mask;
 
-    bool_t default_cache;
-
     struct {
         /*
          * SGIs and PPIs are per-VCPU, SPIs are domain global and in

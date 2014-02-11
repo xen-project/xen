@@ -19,7 +19,6 @@
 #include <xen/errno.h>
 #include <xen/bitops.h>
 #include <xen/grant_table.h>
-#include <xen/stdbool.h>
 
 #include <asm/current.h>
 #include <asm/event.h>
@@ -219,11 +218,6 @@ static void ctxt_switch_to(struct vcpu *n)
         hcr &= ~HCR_RW;
     else
         hcr |= HCR_RW;
-
-    if ( n->arch.default_cache )
-        hcr |= (HCR_TVM|HCR_DC);
-    else
-        hcr &= ~(HCR_TVM|HCR_DC);
 
     WRITE_SYSREG(hcr, HCR_EL2);
     isb();
@@ -477,7 +471,6 @@ int vcpu_initialise(struct vcpu *v)
         return rc;
 
     v->arch.sctlr = SCTLR_GUEST_INIT;
-    v->arch.default_cache = true;
 
     /*
      * By default exposes an SMP system with AFF0 set to the VCPU ID
