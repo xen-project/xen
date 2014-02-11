@@ -364,9 +364,10 @@ static int flask_security_set_bool(struct xen_flask_boolean *arg)
     else
     {
         if ( !bool_pending_values )
-            flask_security_make_bools();
-
-        if ( arg->bool_id >= bool_num )
+            rv = flask_security_make_bools();
+        if ( !rv && arg->bool_id >= bool_num )
+            rv = -ENOENT;
+        if ( rv )
             goto out;
 
         bool_pending_values[arg->bool_id] = !!(arg->new_value);
