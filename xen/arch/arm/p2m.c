@@ -388,7 +388,7 @@ static int apply_p2m_changes(struct domain *d,
         {
             if ( hypercall_preempt_check() )
             {
-                p2m->next_gfn_to_relinquish = addr >> PAGE_SHIFT;
+                p2m->lowest_mapped_gfn = addr >> PAGE_SHIFT;
                 rc = -EAGAIN;
                 goto out;
             }
@@ -415,8 +415,7 @@ static int apply_p2m_changes(struct domain *d,
         unsigned long egfn = paddr_to_pfn(end_gpaddr);
 
         p2m->max_mapped_gfn = MAX(p2m->max_mapped_gfn, egfn);
-        /* Use next_gfn_to_relinquish to store the lowest gfn mapped */
-        p2m->next_gfn_to_relinquish = MIN(p2m->next_gfn_to_relinquish, sgfn);
+        p2m->lowest_mapped_gfn = MIN(p2m->lowest_mapped_gfn, sgfn);
     }
 
     rc = 0;
@@ -606,7 +605,7 @@ int p2m_init(struct domain *d)
     p2m->first_level = NULL;
 
     p2m->max_mapped_gfn = 0;
-    p2m->next_gfn_to_relinquish = ULONG_MAX;
+    p2m->lowest_mapped_gfn = ULONG_MAX;
 
 err:
     spin_unlock(&p2m->lock);
@@ -619,7 +618,7 @@ int relinquish_p2m_mapping(struct domain *d)
     struct p2m_domain *p2m = &d->arch.p2m;
 
     return apply_p2m_changes(d, RELINQUISH,
-                              pfn_to_paddr(p2m->next_gfn_to_relinquish),
+                              pfn_to_paddr(p2m->lowest_mapped_gfn),
                               pfn_to_paddr(p2m->max_mapped_gfn),
                               pfn_to_paddr(INVALID_MFN),
                               MATTR_MEM, p2m_invalid);

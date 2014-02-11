@@ -24,9 +24,11 @@ struct p2m_domain {
      */
     unsigned long max_mapped_gfn;
 
-    /* When releasing mapped gfn's in a preemptible manner, recall where
-     * to resume the search */
-    unsigned long next_gfn_to_relinquish;
+    /* Lowest mapped gfn in the p2m. When releasing mapped gfn's in a
+     * preemptible manner this is update to track recall where to
+     * resume the search. Apart from during teardown this can only
+     * decrease. */
+    unsigned long lowest_mapped_gfn;
 };
 
 /* List of possible type for each page in the p2m entry.
