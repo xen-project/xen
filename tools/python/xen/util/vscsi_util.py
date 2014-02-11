@@ -66,6 +66,9 @@ def _vscsi_get_hctl_by(phyname, scsi_devices):
     if re.match('/dev/sd[a-z]+([1-9]|1[0-5])?$', phyname):
         # sd driver
         name = re.sub('(^/dev/)|([1-9]|1[0-5])?$', '', phyname)
+    elif re.match('/dev/sr[0-9]+$', phyname):
+        # sr driver
+        name = re.sub('^/dev/', '', phyname)
     elif re.match('/dev/sg[0-9]+$', phyname):
         # sg driver
         name = re.sub('^/dev/', '', phyname)
