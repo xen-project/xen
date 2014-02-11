@@ -24,7 +24,7 @@ static unsigned long raw_copy_to_guest_helper(void *to, const void *from,
         p += offset;
         memcpy(p, from, size);
         if ( flush_dcache )
-            flush_xen_dcache_va_range(p, size);
+            clean_xen_dcache_va_range(p, size);
 
         unmap_domain_page(p - offset);
         len -= size;

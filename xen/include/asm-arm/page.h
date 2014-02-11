@@ -229,26 +229,26 @@ extern size_t cacheline_bytes;
 /* Function for flushing medium-sized areas.
  * if 'range' is large enough we might want to use model-specific
  * full-cache flushes. */
-static inline void flush_xen_dcache_va_range(void *p, unsigned long size)
+static inline void clean_xen_dcache_va_range(void *p, unsigned long size)
 {
     void *end;
     dsb();           /* So the CPU issues all writes to the range */
     for ( end = p + size; p < end; p += cacheline_bytes )
-        asm volatile (__flush_xen_dcache_one(0) : : "r" (p));
+        asm volatile (__clean_xen_dcache_one(0) : : "r" (p));
     dsb();           /* So we know the flushes happen before continuing */
 }
 
 /* Macro for flushing a single small item.  The predicate is always
  * compile-time constant so this will compile down to 3 instructions in
  * the common case. */
-#define flush_xen_dcache(x) do {                                        \
+#define clean_xen_dcache(x) do {                                        \
     typeof(x) *_p = &(x);                                               \
     if ( sizeof(x) > MIN_CACHELINE_BYTES || sizeof(x) > alignof(x) )    \
-        flush_xen_dcache_va_range(_p, sizeof(x));                       \
+        clean_xen_dcache_va_range(_p, sizeof(x));                       \
     else                                                                \
         asm volatile (                                                  \
             "dsb sy;"   /* Finish all earlier writes */                 \
-            __flush_xen_dcache_one(0)                                   \
+            __clean_xen_dcache_one(0)                                   \
             "dsb sy;"   /* Finish flush before continuing */            \
             : : "r" (_p), "m" (*_p));                                   \
 } while (0)

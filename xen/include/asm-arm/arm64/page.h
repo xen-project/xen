@@ -15,7 +15,7 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
 }
 
 /* Inline ASM to flush dcache on register R (may be an inline asm operand) */
-#define __flush_xen_dcache_one(R) "dc cvac, %" #R ";"
+#define __clean_xen_dcache_one(R) "dc cvac, %" #R ";"
 
 /* Inline ASM to clean and invalidate dcache on register R (may be an
  * inline asm operand) */
