@@ -487,13 +487,13 @@
  * it's less than the number provided by the backend. The indirect_grefs field
  * in blkif_request_indirect should be filled by the frontend with the
  * grant references of the pages that are holding the indirect segments.
- * This pages are filled with an array of blkif_request_segment_aligned
- * that hold the information about the segments. The number of indirect
- * pages to use is determined by the maximum number of segments
- * an indirect request contains. Every indirect page can contain a maximum
- * of 512 segments (PAGE_SIZE/sizeof(blkif_request_segment_aligned)),
- * so to calculate the number of indirect pages to use we have to do
- * ceil(indirect_segments/512).
+ * These pages are filled with an array of blkif_request_segment that hold the
+ * information about the segments. The number of indirect pages to use is
+ * determined by the number of segments an indirect request contains. Every
+ * indirect page can contain a maximum of
+ * (PAGE_SIZE / sizeof(struct blkif_request_segment)) segments, so to
+ * calculate the number of indirect pages to use we have to do
+ * ceil(indirect_segments / (PAGE_SIZE / sizeof(struct blkif_request_segment))).
  *
  * If a backend does not recognize BLKIF_OP_INDIRECT, it should *not*
  * create the "feature-max-indirect-segments" node!
@@ -568,14 +568,6 @@ struct blkif_request_indirect {
 #endif
 };
 typedef struct blkif_request_indirect blkif_request_indirect_t;
-
-struct blkif_request_segment_aligned {
-    grant_ref_t gref;            /* reference to I/O buffer frame        */
-    /* @first_sect: first sector in frame to transfer (inclusive).   */
-    /* @last_sect: last sector in frame to transfer (inclusive).     */
-    uint8_t     first_sect, last_sect;
-    uint16_t    _pad; /* padding to make it 8 bytes, so it's cache-aligned */
-};
 
 struct blkif_response {
     uint64_t        id;              /* copied from request */
