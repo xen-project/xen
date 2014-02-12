@@ -2603,7 +2603,6 @@ long do_tmem_op(tmem_cli_op_t uops)
     bool_t succ_get = 0, succ_put = 0;
     bool_t non_succ_get = 0, non_succ_put = 0;
     bool_t flush = 0, flush_obj = 0;
-    bool_t write_lock_set = 0, read_lock_set = 0;
 
     if ( !tmem_initialized )
         return -ENODEV;
@@ -2626,114 +2625,105 @@ long do_tmem_op(tmem_cli_op_t uops)
         return -EFAULT;
     }
 
+    /* Acquire wirte lock for all command at first */
+    write_lock(&tmem_rwlock);
+
     if ( op.cmd == TMEM_CONTROL )
     {
-        write_lock(&tmem_rwlock);
-        write_lock_set = 1;
         rc = do_tmem_control(&op);
-        goto out;
-    } else if ( op.cmd == TMEM_AUTH ) {
-        write_lock(&tmem_rwlock);
-        write_lock_set = 1;
+    }
+    else if ( op.cmd == TMEM_AUTH )
+    {
         rc = tmemc_shared_pool_auth(op.u.creat.arg1,op.u.creat.uuid[0],
                          op.u.creat.uuid[1],op.u.creat.flags);
-        goto out;
-    } else if ( op.cmd == TMEM_RESTORE_NEW ) {
-        write_lock(&tmem_rwlock);
-        write_lock_set = 1;
+    }
+    else if ( op.cmd == TMEM_RESTORE_NEW )
+    {
         rc = do_tmem_new_pool(op.u.creat.arg1, op.pool_id, op.u.creat.flags,
                          op.u.creat.uuid[0], op.u.creat.uuid[1]);
-        goto out;
     }
+    else {
+    /*
+	 * For other commands, create per-client tmem structure dynamically on
+	 * first use by client.
+	 */
+        if ( client == NULL )
+        {
+            if ( (client = client_create(current->domain->domain_id)) == NULL )
+            {
+                tmem_client_err("tmem: can't create tmem structure for %s\n",
+                               tmem_client_str);
+                rc = -ENOMEM;
+                goto out;
+            }
+        }
 
-    /* create per-client tmem structure dynamically on first use by client */
-    if ( client == NULL )
-    {
-        write_lock(&tmem_rwlock);
-        write_lock_set = 1;
-        if ( (client = client_create(current->domain->domain_id)) == NULL )
+        if ( op.cmd == TMEM_NEW_POOL || op.cmd == TMEM_DESTROY_POOL )
         {
-            tmem_client_err("tmem: can't create tmem structure for %s\n",
-                           tmem_client_str);
-            rc = -ENOMEM;
-            goto out;
+            if ( op.cmd == TMEM_NEW_POOL )
+                rc = do_tmem_new_pool(TMEM_CLI_ID_NULL, 0, op.u.creat.flags,
+                                op.u.creat.uuid[0], op.u.creat.uuid[1]);
+	        else
+                rc = do_tmem_destroy_pool(op.pool_id);
         }
-    }
-
-    if ( op.cmd == TMEM_NEW_POOL || op.cmd == TMEM_DESTROY_POOL )
-    {
-        if ( !write_lock_set )
-        {
-            write_lock(&tmem_rwlock);
-            write_lock_set = 1;
-        }
-    }
-    else
-    {
-        if ( !write_lock_set )
-        {
-            read_lock(&tmem_rwlock);
-            read_lock_set = 1;
-        }
-        if ( ((uint32_t)op.pool_id >= MAX_POOLS_PER_DOMAIN) ||
-             ((pool = client->pools[op.pool_id]) == NULL) )
-        {
-            tmem_client_err("tmem: operation requested on uncreated pool\n");
-            rc = -ENODEV;
-            goto out;
-        }
-    }
-
-    oidp = (struct oid *)&op.u.gen.oid[0];
-    switch ( op.cmd )
-    {
-    case TMEM_NEW_POOL:
-        rc = do_tmem_new_pool(TMEM_CLI_ID_NULL, 0, op.u.creat.flags,
-                              op.u.creat.uuid[0], op.u.creat.uuid[1]);
-        break;
-    case TMEM_PUT_PAGE:
-        if (tmem_ensure_avail_pages())
-            rc = do_tmem_put(pool, oidp, op.u.gen.index, op.u.gen.cmfn,
-                        tmem_cli_buf_null);
         else
-            rc = -ENOMEM;
-        if (rc == 1) succ_put = 1;
-        else non_succ_put = 1;
-        break;
-    case TMEM_GET_PAGE:
-        rc = do_tmem_get(pool, oidp, op.u.gen.index, op.u.gen.cmfn,
-                        tmem_cli_buf_null);
-        if (rc == 1) succ_get = 1;
-        else non_succ_get = 1;
-        break;
-    case TMEM_FLUSH_PAGE:
-        flush = 1;
-        rc = do_tmem_flush_page(pool, oidp, op.u.gen.index);
-        break;
-    case TMEM_FLUSH_OBJECT:
-        rc = do_tmem_flush_object(pool, oidp);
-        flush_obj = 1;
-        break;
-    case TMEM_DESTROY_POOL:
-        flush = 1;
-        rc = do_tmem_destroy_pool(op.pool_id);
-        break;
-    default:
-        tmem_client_warn("tmem: op %d not implemented\n", op.cmd);
-        rc = -ENOSYS;
-        break;
-    }
+        {
+            if ( ((uint32_t)op.pool_id >= MAX_POOLS_PER_DOMAIN) ||
+                 ((pool = client->pools[op.pool_id]) == NULL) )
+            {
+                tmem_client_err("tmem: operation requested on uncreated pool\n");
+                rc = -ENODEV;
+                goto out;
+            }
+            /* Commands only need read lock */
+            write_unlock(&tmem_rwlock);
+            read_lock(&tmem_rwlock);
 
+            oidp = (struct oid *)&op.u.gen.oid[0];
+            switch ( op.cmd )
+            {
+            case TMEM_NEW_POOL:
+            case TMEM_DESTROY_POOL:
+                BUG(); /* Done earlier. */
+                break;
+            case TMEM_PUT_PAGE:
+                if (tmem_ensure_avail_pages())
+                    rc = do_tmem_put(pool, oidp, op.u.gen.index, op.u.gen.cmfn,
+                                tmem_cli_buf_null);
+                else
+                    rc = -ENOMEM;
+                if (rc == 1) succ_put = 1;
+                else non_succ_put = 1;
+                break;
+            case TMEM_GET_PAGE:
+                rc = do_tmem_get(pool, oidp, op.u.gen.index, op.u.gen.cmfn,
+                                tmem_cli_buf_null);
+                if (rc == 1) succ_get = 1;
+                else non_succ_get = 1;
+                break;
+            case TMEM_FLUSH_PAGE:
+                flush = 1;
+                rc = do_tmem_flush_page(pool, oidp, op.u.gen.index);
+                break;
+            case TMEM_FLUSH_OBJECT:
+                rc = do_tmem_flush_object(pool, oidp);
+                flush_obj = 1;
+                break;
+            default:
+                tmem_client_warn("tmem: op %d not implemented\n", op.cmd);
+                rc = -ENOSYS;
+                break;
+            }
+            read_unlock(&tmem_rwlock);
+            if ( rc < 0 )
+                errored_tmem_ops++;
+            return rc;
+        }
+    }
 out:
+    write_unlock(&tmem_rwlock);
     if ( rc < 0 )
         errored_tmem_ops++;
-    if ( write_lock_set )
-        write_unlock(&tmem_rwlock);
-    else if ( read_lock_set )
-        read_unlock(&tmem_rwlock);
-    else 
-        ASSERT(0);
-
     return rc;
 }
 
