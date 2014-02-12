@@ -1108,7 +1108,7 @@ static int shared_pool_quit(struct tmem_pool *pool, domid_t cli_id)
 }
 
 /* flush all data (owned by cli_id) from a pool and, optionally, free it */
-static void pool_flush(struct tmem_pool *pool, domid_t cli_id, bool_t destroy)
+static void pool_flush(struct tmem_pool *pool, domid_t cli_id)
 {
     ASSERT(pool != NULL);
     if ( (is_shared(pool)) && (shared_pool_quit(pool,cli_id) > 0) )
@@ -1117,23 +1117,19 @@ static void pool_flush(struct tmem_pool *pool, domid_t cli_id, bool_t destroy)
            tmem_cli_id_str, cli_id, pool->pool_id, tmem_cli_id_str,pool->client->cli_id);
         return;
     }
-    tmem_client_info("%s %s-%s tmem pool %s=%d pool_id=%d\n",
-                    destroy ? "destroying" : "flushing",
+    tmem_client_info("Destroying %s-%s tmem pool %s=%d pool_id=%d\n",
                     is_persistent(pool) ? "persistent" : "ephemeral" ,
                     is_shared(pool) ? "shared" : "private",
                     tmem_cli_id_str, pool->client->cli_id, pool->pool_id);
     if ( pool->client->live_migrating )
     {
-        tmem_client_warn("can't %s pool while %s is live-migrating\n",
-               destroy?"destroy":"flush", tmem_client_str);
+        tmem_client_warn("can't destroy pool while %s is live-migrating\n",
+                    tmem_client_str);
         return;
     }
     pool_destroy_objs(pool, TMEM_CLI_ID_NULL);
-    if ( destroy )
-    {
-        pool->client->pools[pool->pool_id] = NULL;
-        pool_free(pool);
-    }
+    pool->client->pools[pool->pool_id] = NULL;
+    pool_free(pool);
 }
 
 /************ CLIENT MANIPULATION OPERATIONS **************************/
@@ -1201,7 +1197,7 @@ static void client_free(struct client *client)
 }
 
 /* flush all data from a client and, optionally, free it */
-static void client_flush(struct client *client, bool_t destroy)
+static void client_flush(struct client *client)
 {
     int i;
     struct tmem_pool *pool;
@@ -1210,12 +1206,10 @@ static void client_flush(struct client *client, bool_t destroy)
     {
         if ( (pool = client->pools[i]) == NULL )
             continue;
-        pool_flush(pool,client->cli_id,destroy);
-        if ( destroy )
-            client->pools[i] = NULL;
+        pool_flush(pool, client->cli_id);
+        client->pools[i] = NULL;
     }
-    if ( destroy )
-        client_free(client);
+    client_free(client);
 }
 
 static bool_t client_over_quota(struct client *client)
@@ -1832,7 +1826,7 @@ static int do_tmem_destroy_pool(uint32_t pool_id)
     if ( (pool = client->pools[pool_id]) == NULL )
         return 0;
     client->pools[pool_id] = NULL;
-    pool_flush(pool,client->cli_id,1);
+    pool_flush(pool, client->cli_id);
     return 1;
 }
 
@@ -2775,7 +2769,7 @@ void tmem_destroy(void *v)
 
     printk("tmem: flushing tmem pools for %s=%d\n",
            tmem_cli_id_str, client->cli_id);
-    client_flush(client, 1);
+    client_flush(client);
 
     write_unlock(&tmem_rwlock);
 }
