@@ -3384,6 +3384,15 @@ static void list_vm(void)
     libxl_vminfo_list_free(info, nb_vm);
 }
 
+static void core_dump_domain(uint32_t domid, const char *filename)
+{
+    int rc;
+
+    rc=libxl_domain_core_dump(ctx, domid, filename, NULL);
+    if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n",rc);exit(-1); }
+}
+
+#ifndef LIBXL_HAVE_NO_SUSPEND_RESUME
 static void save_domain_core_begin(uint32_t domid,
                                    const char *override_config_file,
                                    uint8_t **config_data_r,
@@ -3775,14 +3784,6 @@ static void migrate_domain(uint32_t domid, const char *rune, int debug,
     exit(-ERROR_BADFAIL);
 }
 
-static void core_dump_domain(uint32_t domid, const char *filename)
-{
-    int rc;
-
-    rc=libxl_domain_core_dump(ctx, domid, filename, NULL);
-    if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n",rc);exit(-1); }
-}
-
 static void migrate_receive(int debug, int daemonize, int monitor,
                             int send_fd, int recv_fd, int remus)
 {
@@ -4102,6 +4103,7 @@ int main_migrate(int argc, char **argv)
     migrate_domain(domid, rune, debug, config_filename);
     return 0;
 }
+#endif
 
 int main_dump_core(int argc, char **argv)
 {
@@ -7248,6 +7250,7 @@ done:
     return ret;
 }
 
+#ifndef LIBXL_HAVE_NO_SUSPEND_RESUME
 int main_remus(int argc, char **argv)
 {
     uint32_t domid;
@@ -7341,6 +7344,7 @@ int main_remus(int argc, char **argv)
     close(send_fd);
     return -ERROR_FAIL;
 }
+#endif
 
 int main_devd(int argc, char **argv)
 {

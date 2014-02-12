@@ -431,6 +431,20 @@
  */
 #define LIBXL_HAVE_SIGCHLD_SHARING 1
 
+/*
+ * LIBXL_HAVE_NO_SUSPEND_RESUME
+ *
+ * Is this is defined then the platform has no support for saving,
+ * restoring or migrating a domain. In this case the related functions
+ * should be expected to return failure. That is:
+ *  - libxl_domain_suspend
+ *  - libxl_domain_resume
+ *  - libxl_domain_remus_start
+ */
+#if defined(__arm__) || defined(__aarch64__)
+#define LIBXL_HAVE_NO_SUSPEND_RESUME 1
+#endif
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */

@@ -43,10 +43,12 @@ int main_pciattach(int argc, char **argv);
 int main_pciassignable_add(int argc, char **argv);
 int main_pciassignable_remove(int argc, char **argv);
 int main_pciassignable_list(int argc, char **argv);
+#ifndef LIBXL_HAVE_NO_SUSPEND_RESUME
 int main_restore(int argc, char **argv);
 int main_migrate_receive(int argc, char **argv);
 int main_save(int argc, char **argv);
 int main_migrate(int argc, char **argv);
+#endif
 int main_dump_core(int argc, char **argv);
 int main_pause(int argc, char **argv);
 int main_unpause(int argc, char **argv);
@@ -104,7 +106,9 @@ int main_cpupoolnumasplit(int argc, char **argv);
 int main_getenforce(int argc, char **argv);
 int main_setenforce(int argc, char **argv);
 int main_loadpolicy(int argc, char **argv);
+#ifndef LIBXL_HAVE_NO_SUSPEND_RESUME
 int main_remus(int argc, char **argv);
+#endif
 int main_devd(int argc, char **argv);
 
 void help(const char *command);
