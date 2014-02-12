@@ -654,6 +654,13 @@ static void pgp_free_data(struct tmem_page_descriptor *pgp, struct tmem_pool *po
     pgp->size = -1;
 }
 
+static void __pgp_free(struct tmem_page_descriptor *pgp, struct tmem_pool *pool)
+{
+    pgp->us.obj = NULL;
+    pgp->index = -1;
+    tmem_free(pgp, pool);
+}
+
 static void pgp_free(struct tmem_page_descriptor *pgp)
 {
     struct tmem_pool *pool = NULL;
@@ -678,30 +685,22 @@ static void pgp_free(struct tmem_page_descriptor *pgp)
         pgp->pool_id = pool->pool_id;
         return;
     }
-    pgp->us.obj = NULL;
-    pgp->index = -1;
-    tmem_free(pgp, pool);
+    __pgp_free(pgp, pool);
 }
 
-static void pgp_free_from_inv_list(struct client *client, struct tmem_page_descriptor *pgp)
-{
-    struct tmem_pool *pool = client->pools[pgp->pool_id];
-
-    pgp->us.obj = NULL;
-    pgp->index = -1;
-    tmem_free(pgp, pool);
-}
-
-/* remove the page from appropriate lists but not from parent object */
-static void pgp_delist(struct tmem_page_descriptor *pgp)
+/* remove pgp from global/pool/client lists and free it */
+static void pgp_delist_free(struct tmem_page_descriptor *pgp)
 {
     struct client *client;
+    uint64_t life;
 
     ASSERT(pgp != NULL);
     ASSERT(pgp->us.obj != NULL);
     ASSERT(pgp->us.obj->pool != NULL);
     client = pgp->us.obj->pool->client;
     ASSERT(client != NULL);
+
+    /* Delist pgp */
     if ( !is_persistent(pgp->us.obj->pool) )
     {
         spin_lock(&eph_lists_spinlock);
@@ -714,7 +713,9 @@ static void pgp_delist(struct tmem_page_descriptor *pgp)
         ASSERT(global_eph_count >= 0);
         list_del_init(&pgp->global_eph_pages);
         spin_unlock(&eph_lists_spinlock);
-    } else {
+    }
+    else
+    {
         if ( client->live_migrating )
         {
             spin_lock(&pers_lists_spinlock);
@@ -723,26 +724,18 @@ static void pgp_delist(struct tmem_page_descriptor *pgp)
             if ( pgp != pgp->us.obj->pool->cur_pgp )
                 list_del_init(&pgp->us.pool_pers_pages);
             spin_unlock(&pers_lists_spinlock);
-        } else {
+        }
+        else
+        {
             spin_lock(&pers_lists_spinlock);
             list_del_init(&pgp->us.pool_pers_pages);
             spin_unlock(&pers_lists_spinlock);
         }
     }
-}
-
-/* remove page from lists (but not from parent object) and free it */
-static void pgp_delete(struct tmem_page_descriptor *pgp)
-{
-    uint64_t life;
-
-    ASSERT(pgp != NULL);
-    ASSERT(pgp->us.obj != NULL);
-    ASSERT(pgp->us.obj->pool != NULL);
     life = get_cycles() - pgp->timestamp;
     pgp->us.obj->pool->sum_life_cycles += life;
-    pgp_delist(pgp);
-    ASSERT(pgp_lookup_in_obj(pgp->us.obj,pgp->index) == NULL);
+
+    /* free pgp */
     pgp_free(pgp);
 }
 
@@ -751,12 +744,8 @@ static void pgp_destroy(void *v)
 {
     struct tmem_page_descriptor *pgp = (struct tmem_page_descriptor *)v;
 
-    ASSERT_SPINLOCK(&pgp->us.obj->obj_spinlock);
-    pgp_delist(pgp);
-    ASSERT(pgp->us.obj != NULL);
     pgp->us.obj->pgp_count--;
-    ASSERT(pgp->us.obj->pgp_count >= 0);
-    pgp_free(pgp);
+    pgp_delist_free(pgp);
 }
 
 static int pgp_add_to_obj(struct tmem_object_root *obj, uint32_t index, struct tmem_page_descriptor *pgp)
@@ -1330,6 +1319,7 @@ static int tmem_evict(void)
     goto out;
 
 found:
+    /* Delist */
     list_del_init(&pgp->us.client_eph_pages);
     client->eph_count--;
     list_del_init(&pgp->global_eph_pages);
@@ -1533,7 +1523,7 @@ failed_dup:
 cleanup:
     pgpfound = pgp_delete_from_obj(obj, pgp->index);
     ASSERT(pgpfound == pgp);
-    pgp_delete(pgpfound);
+    pgp_delist_free(pgpfound);
     if ( obj->pgp_count == 0 )
     {
         write_lock(&pool->pool_rwlock);
@@ -1696,7 +1686,7 @@ del_pgp_from_obj:
     pgp_delete_from_obj(obj, pgp->index);
 
 free_pgp:
-    pgp_delete(pgp);
+    pgp_free(pgp);
 unlock_obj:
     if ( newobj )
     {
@@ -1755,7 +1745,7 @@ static int do_tmem_get(struct tmem_pool *pool, struct oid *oidp, uint32_t index,
     {
         if ( !is_shared(pool) )
         {
-            pgp_delete(pgp);
+            pgp_delist_free(pgp);
             if ( obj->pgp_count == 0 )
             {
                 write_lock(&pool->pool_rwlock);
@@ -1805,7 +1795,7 @@ static int do_tmem_flush_page(struct tmem_pool *pool, struct oid *oidp, uint32_t
         spin_unlock(&obj->obj_spinlock);
         goto out;
     }
-    pgp_delete(pgp);
+    pgp_delist_free(pgp);
     if ( obj->pgp_count == 0 )
     {
         write_lock(&pool->pool_rwlock);
@@ -2378,7 +2368,7 @@ static int tmemc_save_subop(int cli_id, uint32_t pool_id,
         if ( !list_empty(&client->persistent_invalidated_list) )
             list_for_each_entry_safe(pgp,pgp2,
               &client->persistent_invalidated_list, client_inv_pages)
-                pgp_free_from_inv_list(client,pgp);
+                __pgp_free(pgp, client->pools[pgp->pool_id]);
         client->frozen = client->was_frozen;
         rc = 0;
         break;
