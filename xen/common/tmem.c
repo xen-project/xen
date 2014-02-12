@@ -654,15 +654,14 @@ static void pgp_free_data(struct tmem_page_descriptor *pgp, struct tmem_pool *po
     pgp->size = -1;
 }
 
-static void pgp_free(struct tmem_page_descriptor *pgp, int from_delete)
+static void pgp_free(struct tmem_page_descriptor *pgp)
 {
     struct tmem_pool *pool = NULL;
 
     ASSERT(pgp->us.obj != NULL);
-    ASSERT(pgp->us.obj->pool->client != NULL);
-    if ( from_delete )
-        ASSERT(pgp_lookup_in_obj(pgp->us.obj,pgp->index) == NULL);
     ASSERT(pgp->us.obj->pool != NULL);
+    ASSERT(pgp->us.obj->pool->client != NULL);
+
     pool = pgp->us.obj->pool;
     if ( !is_persistent(pool) )
     {
@@ -743,7 +742,8 @@ static void pgp_delete(struct tmem_page_descriptor *pgp)
     life = get_cycles() - pgp->timestamp;
     pgp->us.obj->pool->sum_life_cycles += life;
     pgp_delist(pgp);
-    pgp_free(pgp,1);
+    ASSERT(pgp_lookup_in_obj(pgp->us.obj,pgp->index) == NULL);
+    pgp_free(pgp);
 }
 
 /* called only indirectly by radix_tree_destroy */
@@ -756,7 +756,7 @@ static void pgp_destroy(void *v)
     ASSERT(pgp->us.obj != NULL);
     pgp->us.obj->pgp_count--;
     ASSERT(pgp->us.obj->pgp_count >= 0);
-    pgp_free(pgp,0);
+    pgp_free(pgp);
 }
 
 static int pgp_add_to_obj(struct tmem_object_root *obj, uint32_t index, struct tmem_page_descriptor *pgp)
@@ -1354,7 +1354,7 @@ found:
     }
 
     /* pgp already delist, so call pgp_free directly */
-    pgp_free(pgp, 1);
+    pgp_free(pgp);
     if ( obj->pgp_count == 0 )
     {
         ASSERT_WRITELOCK(&pool->pool_rwlock);
