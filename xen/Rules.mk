@@ -44,10 +44,7 @@ ALL_OBJS-$(x86)          += $(BASEDIR)/crypto/built_in.o
 CFLAGS += -fno-builtin -fno-common
 CFLAGS += -Werror -Wredundant-decls -Wno-pointer-arith
 CFLAGS += -pipe -g -D__XEN__ -include $(BASEDIR)/include/xen/config.h
-# Solaris puts stdarg.h &c in the system include directory.
-ifneq ($(XEN_OS),SunOS)
-CFLAGS += -nostdinc -iwithprefix include
-endif
+CFLAGS += -nostdinc
 
 CFLAGS-$(XSM_ENABLE)    += -DXSM_ENABLE
 CFLAGS-$(FLASK_ENABLE)  += -DFLASK_ENABLE -DXSM_MAGIC=0xf97cff8c
