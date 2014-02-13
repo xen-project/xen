@@ -326,11 +326,11 @@ static int flask_security_set_bool(struct xen_flask_boolean *arg)
 {
     int rv;
 
-    rv = flask_security_resolve_bool(arg);
+    rv = domain_has_security(current->domain, SECURITY__SETBOOL);
     if ( rv )
         return rv;
 
-    rv = domain_has_security(current->domain, SECURITY__SETBOOL);
+    rv = flask_security_resolve_bool(arg);
     if ( rv )
         return rv;
 
