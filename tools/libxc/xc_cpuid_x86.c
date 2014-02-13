@@ -197,6 +197,7 @@ static void intel_xc_cpuid_policy(
 
         /* Only a few features are advertised in Intel's 0x80000001. */
         regs[2] &= (is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0) |
+                               bitmaskof(X86_FEATURE_3DNOWPREFETCH) |
                                bitmaskof(X86_FEATURE_ABM);
         regs[3] &= ((is_pae ? bitmaskof(X86_FEATURE_NX) : 0) |
                     (is_64bit ? bitmaskof(X86_FEATURE_LM) : 0) |
@@ -371,6 +372,8 @@ static void xc_cpuid_hvm_policy(
                         bitmaskof(X86_FEATURE_ERMS) |
                         bitmaskof(X86_FEATURE_INVPCID) |
                         bitmaskof(X86_FEATURE_RTM)  |
+                        bitmaskof(X86_FEATURE_RDSEED)  |
+                        bitmaskof(X86_FEATURE_ADX)  |
                         bitmaskof(X86_FEATURE_FSGSBASE));
         } else
             regs[1] = 0;
@@ -502,6 +505,8 @@ static void xc_cpuid_pv_policy(
                         bitmaskof(X86_FEATURE_BMI2) |
                         bitmaskof(X86_FEATURE_ERMS) |
                         bitmaskof(X86_FEATURE_RTM)  |
+                        bitmaskof(X86_FEATURE_RDSEED)  |
+                        bitmaskof(X86_FEATURE_ADX)  |
                         bitmaskof(X86_FEATURE_FSGSBASE));
         else
             regs[1] = 0;
