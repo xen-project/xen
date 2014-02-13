@@ -1101,6 +1101,8 @@ long arch_do_domctl(
                 evc->syscall32_disables_events = 0;
             }
             evc->mcg_cap = v->arch.mcg_cap;
+
+            ret = copy_to_guest(u_domctl, domctl, 1) ? -EFAULT : 0;
         }
         else
         {
@@ -1140,15 +1142,11 @@ long arch_do_domctl(
             if ( evc->size >= offsetof(typeof(*evc), mcg_cap) +
                               sizeof(evc->mcg_cap) )
                 ret = vmce_restore_vcpu(v, evc->mcg_cap);
+            else if ( evc->size <= offsetof(typeof(*evc), mcg_cap) )
+                ret = 0;
         }
-
-        ret = 0;
-
     ext_vcpucontext_out:
         rcu_unlock_domain(d);
-        if ( (domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext) &&
-             copy_to_guest(u_domctl, domctl, 1) )
-            ret = -EFAULT;
     }
     break;
 
