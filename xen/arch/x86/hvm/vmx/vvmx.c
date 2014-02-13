@@ -1394,13 +1394,17 @@ void nvmx_switch_guest(void)
     struct vcpu *v = current;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct cpu_user_regs *regs = guest_cpu_user_regs();
+    const ioreq_t *ioreq = get_ioreq(v);
 
     /*
-     * a pending IO emualtion may still no finished. In this case,
-     * no virtual vmswith is allowed. Or else, the following IO
-     * emulation will handled in a wrong VCPU context.
+     * A pending IO emulation may still be not finished. In this case, no
+     * virtual vmswitch is allowed. Or else, the following IO emulation will
+     * be handled in a wrong VCPU context. If there are no IO backends - PVH
+     * guest by itself or a PVH guest with an HVM guest running inside - we
+     * don't want to continue as this setup is not implemented nor supported
+     * as of right now.
      */
-    if ( get_ioreq(v)->state != STATE_IOREQ_NONE )
+    if ( !ioreq || ioreq->state != STATE_IOREQ_NONE )
         return;
     /*
      * a softirq may interrupt us between a virtual vmentry is
