@@ -169,7 +169,7 @@ struct log_dirty_domain {
     unsigned int   dirty_count;
 
     /* functions which are paging mode specific */
-    int            (*enable_log_dirty   )(struct domain *d);
+    int            (*enable_log_dirty   )(struct domain *d, bool_t log_global);
     int            (*disable_log_dirty  )(struct domain *d);
     void           (*clean_dirty_bitmap )(struct domain *d);
 };

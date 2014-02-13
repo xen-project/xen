@@ -3418,7 +3418,7 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn,
 /* Shadow specific code which is called in paging_log_dirty_enable().
  * Return 0 if no problem found.
  */
-int shadow_enable_log_dirty(struct domain *d)
+int shadow_enable_log_dirty(struct domain *d, bool_t log_global)
 {
     int ret;
 

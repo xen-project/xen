@@ -82,7 +82,7 @@ void shadow_teardown(struct domain *d);
 void shadow_final_teardown(struct domain *d);
 
 /* shadow code to call when log dirty is enabled */
-int shadow_enable_log_dirty(struct domain *d);
+int shadow_enable_log_dirty(struct domain *d, bool_t log_global);
 
 /* shadow code to call when log dirty is disabled */
 int shadow_disable_log_dirty(struct domain *d);

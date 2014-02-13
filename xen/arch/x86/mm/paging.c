@@ -164,7 +164,7 @@ void paging_free_log_dirty_bitmap(struct domain *d)
     paging_unlock(d);
 }
 
-int paging_log_dirty_enable(struct domain *d)
+int paging_log_dirty_enable(struct domain *d, bool_t log_global)
 {
     int ret;
 
@@ -172,7 +172,7 @@ int paging_log_dirty_enable(struct domain *d)
         return -EINVAL;
 
     domain_pause(d);
-    ret = d->arch.paging.log_dirty.enable_log_dirty(d);
+    ret = d->arch.paging.log_dirty.enable_log_dirty(d, log_global);
     domain_unpause(d);
 
     return ret;
@@ -489,7 +489,8 @@ void paging_log_dirty_range(struct domain *d,
  * These function pointers must not be followed with the log-dirty lock held.
  */
 void paging_log_dirty_init(struct domain *d,
-                           int    (*enable_log_dirty)(struct domain *d),
+                           int    (*enable_log_dirty)(struct domain *d,
+                                                      bool_t log_global),
                            int    (*disable_log_dirty)(struct domain *d),
                            void   (*clean_dirty_bitmap)(struct domain *d))
 {
@@ -590,7 +591,7 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
     case XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY:
         if ( hap_enabled(d) )
             hap_logdirty_init(d);
-        return paging_log_dirty_enable(d);
+        return paging_log_dirty_enable(d, 1);
 
     case XEN_DOMCTL_SHADOW_OP_OFF:
         if ( paging_mode_log_dirty(d) )
