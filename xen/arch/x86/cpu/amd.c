@@ -477,6 +477,25 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		       " all your (PV) guest kernels. ***\n");
 
 	if (c->x86 == 0x16 && c->x86_model <= 0xf) {
+		if (c == &boot_cpu_data) {
+			l = pci_conf_read32(0, 0, 0x18, 0x3, 0x58);
+			h = pci_conf_read32(0, 0, 0x18, 0x3, 0x5c);
+			if ((l & 0x1f) | (h & 0x1))
+				printk(KERN_WARNING
+				       "Applying workaround for erratum 792: %s%s%s\n",
+				       (l & 0x1f) ? "clearing D18F3x58[4:0]" : "",
+				       ((l & 0x1f) && (h & 0x1)) ? " and " : "",
+				       (h & 0x1) ? "clearing D18F3x5C[0]" : "");
+
+			if (l & 0x1f)
+				pci_conf_write32(0, 0, 0x18, 0x3, 0x58,
+						 l & ~0x1f);
+
+			if (h & 0x1)
+				pci_conf_write32(0, 0, 0x18, 0x3, 0x5c,
+						 h & ~0x1);
+		}
+
 		rdmsrl(MSR_AMD64_LS_CFG, value);
 		if (!(value & (1 << 15))) {
 			static bool_t warned;
