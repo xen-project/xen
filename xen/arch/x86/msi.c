@@ -610,7 +610,8 @@ static int msi_capability_init(struct pci_dev *dev,
 static u64 read_pci_mem_bar(u16 seg, u8 bus, u8 slot, u8 func, u8 bir, int vf)
 {
     u8 limit;
-    u32 addr, base = PCI_BASE_ADDRESS_0, disp = 0;
+    u32 addr, base = PCI_BASE_ADDRESS_0;
+    u64 disp = 0;
 
     if ( vf >= 0 )
     {
