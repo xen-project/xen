@@ -58,7 +58,7 @@ AX_ARG_DEFAULT_ENABLE([rombios], [Disable ROM BIOS])
 AX_ARG_DEFAULT_ENABLE([seabios], [Disable SeaBIOS])
 AX_ARG_DEFAULT_ENABLE([debug], [Disable debug build of tools])
 AX_ARG_DEFAULT_DISABLE([xend], [Enable xend toolstack])
-AX_ARG_DEFAULT_DISABLE([blktap1], [Disable blktap1 tools])
+AX_ARG_DEFAULT_DISABLE([blktap1], [Enable blktap1 tools])
 
 AC_ARG_ENABLE([qemu-traditional],
     AS_HELP_STRING([--enable-qemu-traditional],

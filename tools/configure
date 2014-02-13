@@ -1427,7 +1427,7 @@ Optional Features:
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
   --disable-debug         Disable debug build of tools (default is ENABLED)
   --enable-xend           Enable xend toolstack (default is DISABLED)
-  --enable-blktap1        Disable blktap1 tools (default is DISABLED)
+  --enable-blktap1        Enable blktap1 tools (default is DISABLED)
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is on
                           for x86, otherwise off)
