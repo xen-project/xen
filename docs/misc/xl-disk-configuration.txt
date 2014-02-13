@@ -70,11 +70,11 @@ Special syntax:
 
    When this parameter is specified by name, ie with the "target="
    syntax in the configuration file, it consumes the whole rest of the
-   <diskspec>.  Therefore in that case it must come last.  This is
-   permissible even if an empty value for the target was already
-   specified as a positional parameter.  This is the only way to
-   specify a target string containing metacharacters such as commas
-   and (in some cases) colons, which would otherwise be
+   <diskspec> including trailing whitespaces.  Therefore in that case
+   it must come last.  This is permissible even if an empty value for
+   the target was already specified as a positional parameter.  This
+   is the only way to specify a target string containing metacharacters
+   such as commas and (in some cases) colons, which would otherwise be
    misinterpreted.
 
    Future parameter and flag names will start with an ascii letter and
