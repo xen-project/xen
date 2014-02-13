@@ -347,6 +347,7 @@ static int flask_security_set_bool(struct xen_flask_boolean *arg)
 
         if ( arg->bool_id >= num )
         {
+            xfree(values);
             rv = -ENOENT;
             goto out;
         }
