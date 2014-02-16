@@ -291,14 +291,14 @@ cpu_init_done:
         ldr   r4, =boot_second
         add   r4, r4, r10            /* r1 := paddr (boot_second) */
 
-        lsr   r2, r9, #20            /* Base address for 2MB mapping */
-        lsl   r2, r2, #20
+        lsr   r2, r9, #SECOND_SHIFT  /* Base address for 2MB mapping */
+        lsl   r2, r2, #SECOND_SHIFT
         orr   r2, r2, #PT_UPPER(MEM) /* r2:r3 := section map */
         orr   r2, r2, #PT_LOWER(MEM)
 
         /* ... map of vaddr(start) in boot_second */
         ldr   r1, =start
-        lsr   r1, #18                /* Slot for vaddr(start) */
+        lsr   r1, #(SECOND_SHIFT - 3)   /* Slot for vaddr(start) */
         strd  r2, r3, [r4, r1]       /* Map vaddr(start) */
 
         /* ... map of paddr(start) in boot_second */
@@ -307,7 +307,7 @@ cpu_init_done:
                                       * then the mapping was done in
                                       * boot_pgtable above */
 
-        mov   r1, r9, lsr #18        /* Slot for paddr(start) */
+        mov   r1, r9, lsr #(SECOND_SHIFT - 3)   /* Slot for paddr(start) */
         strd  r2, r3, [r4, r1]       /* Map Xen there */
 1:
 
@@ -339,8 +339,8 @@ paging:
         /* Add UART to the fixmap table */
         ldr   r1, =xen_fixmap        /* r1 := vaddr (xen_fixmap) */
         mov   r3, #0
-        lsr   r2, r11, #12
-        lsl   r2, r2, #12            /* 4K aligned paddr of UART */
+        lsr   r2, r11, #THIRD_SHIFT
+        lsl   r2, r2, #THIRD_SHIFT   /* 4K aligned paddr of UART */
         orr   r2, r2, #PT_UPPER(DEV_L3)
         orr   r2, r2, #PT_LOWER(DEV_L3) /* r2:r3 := 4K dev map including UART */
         strd  r2, r3, [r1, #(FIXMAP_CONSOLE*8)] /* Map it in the first fixmap's slot */
@@ -353,7 +353,7 @@ paging:
         orr   r2, r2, #PT_UPPER(PT)
         orr   r2, r2, #PT_LOWER(PT)  /* r2:r3 := table map of xen_fixmap */
         ldr   r4, =FIXMAP_ADDR(0)
-        mov   r4, r4, lsr #18        /* r4 := Slot for FIXMAP(0) */
+        mov   r4, r4, lsr #(SECOND_SHIFT - 3)   /* r4 := Slot for FIXMAP(0) */
         strd  r2, r3, [r1, r4]       /* Map it in the fixmap's slot */
 
         /* Use a virtual address to access the UART. */
@@ -365,12 +365,12 @@ paging:
 
         ldr   r1, =boot_second
         mov   r3, #0x0
-        lsr   r2, r8, #21
-        lsl   r2, r2, #21            /* r2: 2MB-aligned paddr of DTB */
+        lsr   r2, r8, #SECOND_SHIFT
+        lsl   r2, r2, #SECOND_SHIFT  /* r2: 2MB-aligned paddr of DTB */
         orr   r2, r2, #PT_UPPER(MEM)
         orr   r2, r2, #PT_LOWER(MEM) /* r2:r3 := 2MB RAM incl. DTB */
         ldr   r4, =BOOT_FDT_VIRT_START
-        mov   r4, r4, lsr #18        /* Slot for BOOT_FDT_VIRT_START */
+        mov   r4, r4, lsr #(SECOND_SHIFT - 3)   /* Slot for BOOT_FDT_VIRT_START */
         strd  r2, r3, [r1, r4]       /* Map it in the early fdt slot */
         dsb
 1:

@@ -289,11 +289,11 @@ skip_bss:
         str   x2, [x4, #0]           /* Map it in slot 0 */
 
         /* ... map of paddr(start) in boot_first */
-        lsr   x2, x19, #30           /* x2 := Offset of base paddr in boot_first */
+        lsr   x2, x19, #FIRST_SHIFT  /* x2 := Offset of base paddr in boot_first */
         and   x1, x2, 0x1ff          /* x1 := Slot to use */
         cbz   x1, 1f                 /* It's in slot 0, map in boot_second */
 
-        lsl   x2, x2, #30            /* Base address for 1GB mapping */
+        lsl   x2, x2, #FIRST_SHIFT   /* Base address for 1GB mapping */
         mov   x3, #PT_MEM            /* x2 := Section map */
         orr   x2, x2, x3
         lsl   x1, x1, #3             /* x1 := Slot offset */
@@ -303,23 +303,23 @@ skip_bss:
         ldr   x4, =boot_second
         add   x4, x4, x20            /* x4 := paddr (boot_second) */
 
-        lsr   x2, x19, #20           /* Base address for 2MB mapping */
-        lsl   x2, x2, #20
+        lsr   x2, x19, #SECOND_SHIFT /* Base address for 2MB mapping */
+        lsl   x2, x2, #SECOND_SHIFT
         mov   x3, #PT_MEM            /* x2 := Section map */
         orr   x2, x2, x3
 
         /* ... map of vaddr(start) in boot_second */
         ldr   x1, =start
-        lsr   x1, x1, #18            /* Slot for vaddr(start) */
+        lsr   x1, x1, #(SECOND_SHIFT - 3)   /* Slot for vaddr(start) */
         str   x2, [x4, x1]           /* Map vaddr(start) */
 
         /* ... map of paddr(start) in boot_second */
-        lsr   x1, x19, #30           /* Base paddr */
+        lsr   x1, x19, #FIRST_SHIFT  /* Base paddr */
         cbnz  x1, 1f                 /* If paddr(start) is not in slot 0
                                       * then the mapping was done in
                                       * boot_pgtable or boot_first above */
 
-        lsr   x1, x19, #18           /* Slot for paddr(start) */
+        lsr   x1, x19, #(SECOND_SHIFT - 3)  /* Slot for paddr(start) */
         str   x2, [x4, x1]           /* Map Xen there */
 1:
 
@@ -351,8 +351,8 @@ paging:
         /* Add UART to the fixmap table */
         ldr   x1, =xen_fixmap
         add   x1, x1, x20            /* x1 := paddr (xen_fixmap) */
-        lsr   x2, x23, #12
-        lsl   x2, x2, #12            /* 4K aligned paddr of UART */
+        lsr   x2, x23, #THIRD_SHIFT
+        lsl   x2, x2, #THIRD_SHIFT   /* 4K aligned paddr of UART */
         mov   x3, #PT_DEV_L3
         orr   x2, x2, x3             /* x2 := 4K dev map including UART */
         str   x2, [x1, #(FIXMAP_CONSOLE*8)] /* Map it in the first fixmap's slot */
@@ -365,7 +365,7 @@ paging:
         mov   x3, #PT_PT
         orr   x2, x2, x3             /* x2 := table map of xen_fixmap */
         ldr   x1, =FIXMAP_ADDR(0)
-        lsr   x1, x1, #18            /* x1 := Slot for FIXMAP(0) */
+        lsr   x1, x1, #(SECOND_SHIFT - 3)   /* x1 := Slot for FIXMAP(0) */
         str   x2, [x4, x1]           /* Map it in the fixmap's slot */
 
         /* Use a virtual address to access the UART. */
@@ -375,12 +375,12 @@ paging:
         /* Map the DTB in the boot misc slot */
         cbnz  x22, 1f                /* Only on boot CPU */
 
-        lsr   x2, x21, #21
-        lsl   x2, x2, #21            /* x2 := 2MB-aligned paddr of DTB */
+        lsr   x2, x21, #SECOND_SHIFT
+        lsl   x2, x2, #SECOND_SHIFT  /* x2 := 2MB-aligned paddr of DTB */
         mov   x3, #PT_MEM            /* x2 := 2MB RAM incl. DTB */
         orr   x2, x2, x3
         ldr   x1, =BOOT_FDT_VIRT_START
-        lsr   x1, x1, #18            /* x4 := Slot for BOOT_FDT_VIRT_START */
+        lsr   x1, x1, #(SECOND_SHIFT - 3)   /* x4 := Slot for BOOT_FDT_VIRT_START */
         str   x2, [x4, x1]           /* Map it in the early fdt slot */
         dsb   sy
 1:
