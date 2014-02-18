@@ -51,7 +51,7 @@
  * In the event that a change is required which cannot be made
  * backwards compatible in this manner a #define of the form
  * LIBXL_HAVE_<interface> will always be added in order to make it
- * possible to write applciations which build against any version of
+ * possible to write applications which build against any version of
  * libxl. Such changes are expected to be exceptional and used as a
  * last resort. The barrier for backporting such a change to a stable
  * branch will be very high.
