@@ -98,7 +98,7 @@ TEST_PROGS += $(foreach t, $(LIBXL_TESTS),test_$t)
 $(LIBXL_OBJS) $(LIBXL_TEST_OBJS): CFLAGS += $(CFLAGS_LIBXL) -include $(XEN_ROOT)/tools/config.h
 
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h _paths.h \
-	_libxl_save_msgs_callout.h _libxl_save_msgs_helper.h
+	libxlu_disk_l.h _libxl_save_msgs_callout.h _libxl_save_msgs_helper.h
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
 AUTOSRCS += _libxl_save_msgs_callout.c _libxl_save_msgs_helper.c
 LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o \
