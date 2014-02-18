@@ -762,8 +762,11 @@ int libxl_cpumap_to_nodemap(libxl_ctx *ctx,
     }
 
     libxl_bitmap_set_none(nodemap);
-    libxl_for_each_set_bit(i, *cpumap)
+    libxl_for_each_set_bit(i, *cpumap) {
+        if (i >= nr_cpus)
+            break;
         libxl_bitmap_set(nodemap, tinfo[i].node);
+    }
  out:
     libxl_cputopology_list_free(tinfo, nr_cpus);
     return rc;
