@@ -30,6 +30,10 @@ static unsigned long raw_copy_to_guest_helper(void *to, const void *from,
         len -= size;
         from += size;
         to += size;
+        /*
+         * After the first iteration, guest virtual address is correctly
+         * aligned to PAGE_SIZE.
+         */
         offset = 0;
     }
 
@@ -68,6 +72,10 @@ unsigned long raw_clear_guest(void *to, unsigned len)
         unmap_domain_page(p - offset);
         len -= size;
         to += size;
+        /*
+         * After the first iteration, guest virtual address is correctly
+         * aligned to PAGE_SIZE.
+         */
         offset = 0;
     }
 
@@ -96,6 +104,11 @@ unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned le
         len -= size;
         from += size;
         to += size;
+        /*
+         * After the first iteration, guest virtual address is correctly
+         * aligned to PAGE_SIZE.
+         */
+        offset = 0;
     }
     return 0;
 }
