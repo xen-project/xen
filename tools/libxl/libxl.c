@@ -3881,7 +3881,8 @@ int libxl_device_events_handler(libxl_ctx *ctx,
 
 out:
     GC_FREE;
-    return rc ? : AO_INPROGRESS;
+    if (rc) return AO_ABORT(rc);
+    return AO_INPROGRESS;
 }
 
 /******************************************************************************/
