@@ -352,6 +352,8 @@ static void dolog(const char *file, int line, const char *func, char *fmt, ...)
     rc = vasprintf(&s, fmt, ap);
     va_end(ap);
     if (rc >= 0)
+        /* we ignore write errors since we have no way to report them;
+         * the alternative would be to abort the whole program */
         libxl_write_exactly(NULL, logfile, s, rc, NULL, NULL);
     free(s);
 }
