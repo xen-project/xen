@@ -419,6 +419,9 @@ struct pv_vcpu
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
     spinlock_t shadow_ldt_lock;
+
+    /* Deferred VA-based update state. */
+    bool_t need_update_runstate_area;
 };
 
 struct arch_vcpu
@@ -513,6 +516,8 @@ struct arch_vcpu
 /* Shorthands to improve code legibility. */
 #define hvm_vmx         hvm_vcpu.u.vmx
 #define hvm_svm         hvm_vcpu.u.svm
+
+bool_t update_runstate_area(const struct vcpu *);
 
 void vcpu_show_execution_state(struct vcpu *);
 void vcpu_show_registers(const struct vcpu *);
