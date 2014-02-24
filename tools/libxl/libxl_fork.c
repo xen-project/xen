@@ -184,9 +184,9 @@ void libxl_postfork_child_noexec(libxl_ctx *ctx)
 int libxl__carefd_close(libxl__carefd *cf)
 {
     if (!cf) return 0;
+    atfork_lock();
     int r = cf->fd < 0 ? 0 : close(cf->fd);
     int esave = errno;
-    atfork_lock();
     LIBXL_LIST_REMOVE(cf, entry);
     atfork_unlock();
     free(cf);
