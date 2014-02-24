@@ -60,6 +60,9 @@ static void sigchld_removehandler_core(void); /* idempotent */
 static void sigchld_user_remove(libxl_ctx *ctx); /* idempotent */
 static void sigchld_sethandler_raw(void (*handler)(int), struct sigaction *old);
 
+static void defer_sigchld(void);
+static void release_sigchld(void);
+
 static void atfork_lock(void)
 {
     int r = pthread_mutex_lock(&no_forking);
@@ -117,6 +120,19 @@ libxl__carefd *libxl__carefd_opened(libxl_ctx *ctx, int fd)
 
 void libxl_postfork_child_noexec(libxl_ctx *ctx)
 {
+    /*
+     * Anything running without the no_forking lock (atfork_lock)
+     * might be interrupted by fork.  But libxl functions other than
+     * this one are then forbidden to the child.
+     *
+     * Conversely, this function might interrupt any other libxl
+     * operation (even though that other operation has the libxl ctx
+     * lock).  We don't take the lock ourselves, since we are running
+     * in the child and if the lock is held the thread that took it no
+     * longer exists.  To prevent us being interrupted by another call
+     * to ourselves (whether in another thread or by virtue of another
+     * fork) we take the atfork lock ourselves.
+     */
     libxl__carefd *cf, *cf_tmp;
     int r;
 
@@ -134,7 +150,33 @@ void libxl_postfork_child_noexec(libxl_ctx *ctx)
     }
     LIBXL_LIST_INIT(&carefds);
 
-    sigchld_user_remove(ctx);
+    if (sigchld_installed) {
+        /* We are in theory not at risk of concurrent execution of the
+         * SIGCHLD handler, because the application should call
+         * libxl_postfork_child_noexec before the child forks again.
+         * (If the SIGCHLD was in flight in the parent at the time of
+         * the fork, the thread it was delivered on exists only in the
+         * parent so is not our concern.)
+         *
+         * But in case the application violated this rule (and did so
+         * while multithreaded in the child), we use our deferral
+         * machinery.  The result is that the SIGCHLD may then be lost
+         * (i.e. signaled to the now-defunct libxl ctx(s)).  But at
+         * least we won't execute undefined behaviour (by examining
+         * the list in the signal handler concurrently with clearing
+         * it here), and since we won't actually reap the new children
+         * things will in fact go OK if the application doesn't try to
+         * use SIGCHLD, but instead just waits for the child(ren). */
+        defer_sigchld();
+
+        LIBXL_LIST_INIT(&sigchld_users);
+        /* After this the ->sigchld_user_registered entries in the
+         * now-obsolete contexts may be lies.  But that's OK because
+         * no-one will look at them. */
+
+        release_sigchld();
+        sigchld_removehandler_core();
+    }
 
     atfork_unlock();
 }

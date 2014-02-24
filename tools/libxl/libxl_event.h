@@ -601,6 +601,22 @@ void libxl_childproc_sigchld_occurred(libxl_ctx *ctx)
  * this all previously existing libxl_ctx's are invalidated and
  * must not be used - or even freed.  It is harmless to call this
  * postfork function and then exec anyway.
+ *
+ * Until libxl_postfork_child_noexec has returned:
+ *  - No other libxl calls may be made.
+ *  - If any libxl ctx was configured handle the process's SIGCHLD,
+ *    the child may not create further (grand)child processes, nor
+ *    manipulate SIGCHLD.
+ *
+ * libxl_postfork_child_noexec may not reclaim all the resources
+ * associated with the libxl ctx.  This includes but is not limited
+ * to: ordinary memory; files on disk and in /var/run; file
+ * descriptors; memory mapped into the process from domains being
+ * managed (grant maps); Xen event channels.  Use of libxl in
+ * processes which fork long-lived children is not recommended for
+ * this reason.  libxl_postfork_child_noexec is provided so that
+ * an application can make further libxl calls in a child which
+ * is going to exec or exit soon.
  */
 void libxl_postfork_child_noexec(libxl_ctx *ctx);
 
