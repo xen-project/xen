@@ -257,6 +257,13 @@ typedef enum {
        CONSOLE_SERIAL,
 } console_type;
 
+static struct termios stdin_old_attr;
+
+static void restore_term_stdin(void)
+{
+	restore_term(STDIN_FILENO, &stdin_old_attr);
+}
+
 int main(int argc, char **argv)
 {
 	struct termios attr;
@@ -383,9 +390,9 @@ int main(int argc, char **argv)
 	}
 
 	init_term(spty, &attr);
-	init_term(STDIN_FILENO, &attr);
+	init_term(STDIN_FILENO, &stdin_old_attr);
+	atexit(restore_term_stdin); /* if this fails, oh dear */
 	console_loop(spty, xs, path);
-	restore_term(STDIN_FILENO, &attr);
 
 	free(path);
 	free(dom_path);
