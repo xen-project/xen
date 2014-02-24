@@ -412,7 +412,6 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     /*
      * Remove default devices created by qemu. Qemu will create only devices
      * defined by xen, since the devices not defined by xen are not usable.
-     * Remove deleting of empty floppy no more needed with nodefault.
      */
     flexarray_append(dm_args, "-nodefaults");
 
@@ -469,10 +468,6 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_append(dm_args, "-sdl");
         /* XXX sdl->{display,xauthority} into $DISPLAY/$XAUTHORITY */
     }
-
-    /*if (info->type == LIBXL_DOMAIN_TYPE_PV && !b_info->nographic) {
-        flexarray_vappend(dm_args, "-vga", "xenfb", NULL);
-      } never was possible?*/
 
     if (keymap) {
         flexarray_vappend(dm_args, "-k", keymap, NULL);
