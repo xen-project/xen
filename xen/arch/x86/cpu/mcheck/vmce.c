@@ -107,7 +107,7 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 
     *val = 0;
 
-    switch ( msr & (MSR_IA32_MC0_CTL | 3) )
+    switch ( msr & (-MSR_IA32_MC0_CTL | 3) )
     {
     case MSR_IA32_MC0_CTL:
         /* stick all 1's to MCi_CTL */
@@ -210,7 +210,7 @@ static int bank_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     int ret = 1;
     unsigned int bank = (msr - MSR_IA32_MC0_CTL) / 4;
 
-    switch ( msr & (MSR_IA32_MC0_CTL | 3) )
+    switch ( msr & (-MSR_IA32_MC0_CTL | 3) )
     {
     case MSR_IA32_MC0_CTL:
         /*
