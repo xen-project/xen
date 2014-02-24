@@ -68,7 +68,6 @@ int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
                    unsigned int flags);
 int iommu_unmap_page(struct domain *d, unsigned long gfn);
 void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte, int order, int present);
-void iommu_set_pgd(struct domain *d);
 
 void pt_pci_init(void);
 

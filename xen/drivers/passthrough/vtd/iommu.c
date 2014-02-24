@@ -1826,7 +1826,7 @@ static int vtd_ept_page_compatible(struct iommu *iommu)
 /*
  * set VT-d page table directory to EPT table if allowed
  */
-void iommu_set_pgd(struct domain *d)
+static void iommu_set_pgd(struct domain *d)
 {
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
     mfn_t pgd_mfn;
