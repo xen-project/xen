@@ -1701,7 +1701,7 @@ static int reassign_device_ownership(
     return ret;
 }
 
-void iommu_domain_teardown(struct domain *d)
+static void iommu_domain_teardown(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
