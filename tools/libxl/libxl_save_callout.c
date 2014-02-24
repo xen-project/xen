@@ -185,7 +185,11 @@ static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
     for (childfd=0; childfd<2; childfd++) {
         /* Setting up the pipe for the child's fd childfd */
         int fds[2];
-        if (libxl_pipe(CTX,fds)) { rc = ERROR_FAIL; goto out; }
+        if (libxl_pipe(CTX,fds)) {
+            rc = ERROR_FAIL;
+            libxl__carefd_unlock();
+            goto out;
+        }
         int childs_end = childfd==0 ? 0 /*read*/  : 1 /*write*/;
         int our_end    = childfd==0 ? 1 /*write*/ : 0 /*read*/;
         childs_pipes[childfd] = libxl__carefd_record(CTX, fds[childs_end]);
