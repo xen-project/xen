@@ -153,7 +153,7 @@ void __init iommu_dom0_init(struct domain *d)
 
     register_keyhandler('o', &iommu_p2m_table);
     d->need_iommu = !!iommu_dom0_strict;
-    if ( need_iommu(d) )
+    if ( need_iommu(d) && !iommu_use_hap_pt(d) )
     {
         struct page_info *page;
         unsigned int i = 0;
