@@ -829,6 +829,8 @@ void pv_cpuid(struct cpu_user_regs *regs)
                   cpufeat_mask(X86_FEATURE_BMI2) |
                   cpufeat_mask(X86_FEATURE_ERMS) |
                   cpufeat_mask(X86_FEATURE_RTM)  |
+                  cpufeat_mask(X86_FEATURE_RDSEED)  |
+                  cpufeat_mask(X86_FEATURE_ADX)  |
                   cpufeat_mask(X86_FEATURE_FSGSBASE));
         else
             b = 0;
