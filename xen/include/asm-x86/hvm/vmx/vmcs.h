@@ -367,6 +367,8 @@ enum vmcs_field {
     GUEST_PDPTR2_HIGH               = 0x0000280f,
     GUEST_PDPTR3                    = 0x00002810,
     GUEST_PDPTR3_HIGH               = 0x00002811,
+    GUEST_BNDCFGS                   = 0x00002812,
+    GUEST_BNDCFGS_HIGH              = 0x00002813,
     HOST_PAT                        = 0x00002c00,
     HOST_PAT_HIGH                   = 0x00002c01,
     HOST_EFER                       = 0x00002c02,
