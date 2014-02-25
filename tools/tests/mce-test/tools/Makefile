@@ -10,7 +10,7 @@ CFLAGS += $(CFLAGS_xeninclude)
 .PHONY: all
 all: xen-mceinj
 
-install: 
+install: xen-mceinj
 	$(INSTALL_PROG) xen-mceinj $(DESTDIR)$(SBINDIR)
 
 .PHONY: clean
