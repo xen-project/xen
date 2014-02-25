@@ -20,18 +20,23 @@
 #define XCR_XFEATURE_ENABLED_MASK 0x00000000  /* index of XCR0 */
 
 #define XSTATE_YMM_SIZE           256
-#define XSTATE_YMM_OFFSET         XSAVE_AREA_MIN_SIZE
 #define XSTATE_AREA_MIN_SIZE      (512 + 64)  /* FP/SSE + XSAVE.HEADER */
 
 #define XSTATE_FP      (1ULL << 0)
 #define XSTATE_SSE     (1ULL << 1)
 #define XSTATE_YMM     (1ULL << 2)
+#define XSTATE_BNDREGS (1ULL << 3)
+#define XSTATE_BNDCSR  (1ULL << 4)
+#define XSTATE_OPMASK  (1ULL << 5)
+#define XSTATE_ZMM     (1ULL << 6)
+#define XSTATE_HI_ZMM  (1ULL << 7)
 #define XSTATE_LWP     (1ULL << 62) /* AMD lightweight profiling */
 #define XSTATE_FP_SSE  (XSTATE_FP | XSTATE_SSE)
-#define XCNTXT_MASK    (XSTATE_FP | XSTATE_SSE | XSTATE_YMM | XSTATE_LWP)
+#define XCNTXT_MASK    (XSTATE_FP | XSTATE_SSE | XSTATE_YMM | XSTATE_OPMASK | \
+                        XSTATE_ZMM | XSTATE_HI_ZMM | XSTATE_NONLAZY)
 
-#define XSTATE_ALL     (~0)
-#define XSTATE_NONLAZY (XSTATE_LWP)
+#define XSTATE_ALL     (~(1ULL << 63))
+#define XSTATE_NONLAZY (XSTATE_LWP | XSTATE_BNDREGS | XSTATE_BNDCSR)
 #define XSTATE_LAZY    (XSTATE_ALL & ~XSTATE_NONLAZY)
 
 extern u64 xfeature_mask;
