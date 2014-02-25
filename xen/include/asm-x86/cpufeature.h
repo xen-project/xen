@@ -148,6 +148,7 @@
 #define X86_FEATURE_INVPCID	(7*32+10) /* Invalidate Process Context ID */
 #define X86_FEATURE_RTM 	(7*32+11) /* Restricted Transactional Memory */
 #define X86_FEATURE_NO_FPU_SEL 	(7*32+13) /* FPU CS/DS stored as zero */
+#define X86_FEATURE_MPX		(7*32+14) /* Memory Protection Extensions */
 #define X86_FEATURE_RDSEED	(7*32+18) /* RDSEED instruction */
 #define X86_FEATURE_ADX		(7*32+19) /* ADCX, ADOX instructions */
 #define X86_FEATURE_SMAP	(7*32+20) /* Supervisor Mode Access Prevention */
@@ -199,6 +200,7 @@
 #define cpu_has_xsave           boot_cpu_has(X86_FEATURE_XSAVE)
 #define cpu_has_avx             boot_cpu_has(X86_FEATURE_AVX)
 #define cpu_has_lwp             boot_cpu_has(X86_FEATURE_LWP)
+#define cpu_has_mpx             boot_cpu_has(X86_FEATURE_MPX)
 
 #define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
 

@@ -186,6 +186,7 @@ extern u32 vmx_pin_based_exec_control;
 #define VM_EXIT_SAVE_GUEST_EFER         0x00100000
 #define VM_EXIT_LOAD_HOST_EFER          0x00200000
 #define VM_EXIT_SAVE_PREEMPT_TIMER      0x00400000
+#define VM_EXIT_CLEAR_BNDCFGS           0x00800000
 extern u32 vmx_vmexit_control;
 
 #define VM_ENTRY_IA32E_MODE             0x00000200
@@ -194,6 +195,7 @@ extern u32 vmx_vmexit_control;
 #define VM_ENTRY_LOAD_PERF_GLOBAL_CTRL  0x00002000
 #define VM_ENTRY_LOAD_GUEST_PAT         0x00004000
 #define VM_ENTRY_LOAD_GUEST_EFER        0x00008000
+#define VM_ENTRY_LOAD_BNDCFGS           0x00010000
 extern u32 vmx_vmentry_control;
 
 #define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES 0x00000001

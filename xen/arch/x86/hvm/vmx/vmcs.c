@@ -269,7 +269,8 @@ static int vmx_init_vmcs_config(void)
     }
 
     min = VM_EXIT_ACK_INTR_ON_EXIT;
-    opt = VM_EXIT_SAVE_GUEST_PAT | VM_EXIT_LOAD_HOST_PAT;
+    opt = VM_EXIT_SAVE_GUEST_PAT | VM_EXIT_LOAD_HOST_PAT |
+          VM_EXIT_CLEAR_BNDCFGS;
     min |= VM_EXIT_IA32E_MODE;
     _vmx_vmexit_control = adjust_vmx_controls(
         "VMExit Control", min, opt, MSR_IA32_VMX_EXIT_CTLS, &mismatch);
@@ -283,7 +284,7 @@ static int vmx_init_vmcs_config(void)
         _vmx_pin_based_exec_control  &= ~ PIN_BASED_POSTED_INTERRUPT;
 
     min = 0;
-    opt = VM_ENTRY_LOAD_GUEST_PAT;
+    opt = VM_ENTRY_LOAD_GUEST_PAT | VM_ENTRY_LOAD_BNDCFGS;
     _vmx_vmentry_control = adjust_vmx_controls(
         "VMEntry Control", min, opt, MSR_IA32_VMX_ENTRY_CTLS, &mismatch);
 
@@ -955,6 +956,9 @@ static int construct_vmcs(struct vcpu *v)
         vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_EIP, MSR_TYPE_R | MSR_TYPE_W);
         if ( paging_mode_hap(d) && (!iommu_enabled || iommu_snoop) )
             vmx_disable_intercept_for_msr(v, MSR_IA32_CR_PAT, MSR_TYPE_R | MSR_TYPE_W);
+        if ( (vmexit_ctl & VM_EXIT_CLEAR_BNDCFGS) &&
+             (vmentry_ctl & VM_ENTRY_LOAD_BNDCFGS) )
+            vmx_disable_intercept_for_msr(v, MSR_IA32_BNDCFGS, MSR_TYPE_R | MSR_TYPE_W);
     }
 
     /* I/O access bitmap. */
