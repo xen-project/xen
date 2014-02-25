@@ -78,29 +78,26 @@ static void rtc_update_irq(RTCState *s)
     hvm_isa_irq_assert(vrtc_domain(s), RTC_IRQ);
 }
 
-bool_t rtc_periodic_interrupt(void *opaque)
+/* Called by the VPT code after it's injected a PF interrupt for us.
+ * Fix up the register state to reflect what happened. */
+static void rtc_pf_callback(struct vcpu *v, void *opaque)
 {
     RTCState *s = opaque;
-    bool_t ret;
 
     spin_lock(&s->lock);
-    ret = rtc_mode_is(s, no_ack) || !(s->hw.cmos_data[RTC_REG_C] & RTC_IRQF);
-    if ( rtc_mode_is(s, no_ack) || !(s->hw.cmos_data[RTC_REG_C] & RTC_PF) )
-    {
-        s->hw.cmos_data[RTC_REG_C] |= RTC_PF;
-        rtc_update_irq(s);
-    }
-    else if ( ++(s->pt_dead_ticks) >= 10 )
+
+    if ( !rtc_mode_is(s, no_ack)
+         && (s->hw.cmos_data[RTC_REG_C] & RTC_IRQF)
+         && ++(s->pt_dead_ticks) >= 10 )
     {
         /* VM is ignoring its RTC; no point in running the timer */
         destroy_periodic_time(&s->pt);
         s->period = 0;
     }
-    if ( !(s->hw.cmos_data[RTC_REG_C] & RTC_IRQF) )
-        ret = 0;
-    spin_unlock(&s->lock);
 
-    return ret;
+    s->hw.cmos_data[RTC_REG_C] |= RTC_PF|RTC_IRQF;
+
+    spin_unlock(&s->lock);
 }
 
 /* Check whether the REG_C.PF bit should have been set by a tick since
@@ -156,7 +153,7 @@ static void rtc_timer_update(RTCState *s)
                     delta = period - ((now - s->start_time) % period);
                 if ( s->hw.cmos_data[RTC_REG_B] & RTC_PIE )
                     create_periodic_time(v, &s->pt, delta, period,
-                                         RTC_IRQ, NULL, s);
+                                         RTC_IRQ, rtc_pf_callback, s);
                 else
                     s->check_ticks_since = now;
             }
