@@ -621,7 +621,7 @@ static inline int xsm_ioport_mapping (xsm_default_t def, struct domain *d, uint3
 #endif /* CONFIG_X86 */
 
 #ifdef CONFIG_ARM
-static inline int xsm_map_gmfn_foreign (struct domain *d, struct domain *t)
+static inline int xsm_map_gmfn_foreign (xsm_default_t def, struct domain *d, struct domain *t)
 {
     return xsm_ops->map_gmfn_foreign(d, t);
 }
