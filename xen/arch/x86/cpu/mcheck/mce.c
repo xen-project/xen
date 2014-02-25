@@ -729,8 +729,10 @@ void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
 {
     enum mcheck_type inited = mcheck_none;
 
-    if (mce_disabled == 1) {
-        dprintk(XENLOG_INFO, "MCE support disabled by bootparam\n");
+    if ( mce_disabled )
+    {
+        if ( bsp )
+            printk(XENLOG_INFO "MCE support disabled by bootparam\n");
         return;
     }
 
