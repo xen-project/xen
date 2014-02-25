@@ -390,6 +390,8 @@ tools/ocaml/xenstored/oxenstored
 tools/ocaml/test/xtl
 tools/ocaml/test/send_debug_keys
 tools/ocaml/test/list_domains
+tools/ocaml/test/dmesg
+tools/ocaml/test/raise_exception
 tools/debugger/kdd/kdd
 tools/firmware/etherboot/ipxe.tar.gz
 tools/firmware/etherboot/ipxe/
