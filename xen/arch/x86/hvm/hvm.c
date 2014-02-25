@@ -1127,10 +1127,117 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-/* We need variable length data chunk for xsave area, hence customized
- * declaration other than HVM_REGISTER_SAVE_RESTORE.
+#define HVM_CPU_MSR_SIZE(cnt) offsetof(struct hvm_msr, msr[cnt])
+static unsigned int __read_mostly msr_count_max;
+
+static int hvm_save_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vcpu *v;
+
+    for_each_vcpu ( d, v )
+    {
+        struct hvm_msr *ctxt;
+        unsigned int i;
+
+        if ( _hvm_init_entry(h, CPU_MSR_CODE, v->vcpu_id,
+                             HVM_CPU_MSR_SIZE(msr_count_max)) )
+            return 1;
+        ctxt = (struct hvm_msr *)&h->data[h->cur];
+        ctxt->count = 0;
+
+        if ( hvm_funcs.save_msr )
+            hvm_funcs.save_msr(v, ctxt);
+
+        for ( i = 0; i < ctxt->count; ++i )
+            ctxt->msr[i]._rsvd = 0;
+
+        if ( ctxt->count )
+            h->cur += HVM_CPU_MSR_SIZE(ctxt->count);
+        else
+            h->cur -= sizeof(struct hvm_save_descriptor);
+    }
+
+    return 0;
+}
+
+static int hvm_load_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
+{
+    unsigned int i, vcpuid = hvm_load_instance(h);
+    struct vcpu *v;
+    const struct hvm_save_descriptor *desc;
+    struct hvm_msr *ctxt;
+    int err = 0;
+
+    if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
+    {
+        dprintk(XENLOG_G_ERR, "HVM restore: dom%d has no vcpu%u\n",
+                d->domain_id, vcpuid);
+        return -EINVAL;
+    }
+
+    /* Customized checking for entry since our entry is of variable length */
+    desc = (struct hvm_save_descriptor *)&h->data[h->cur];
+    if ( sizeof (*desc) > h->size - h->cur)
+    {
+        printk(XENLOG_G_WARNING
+               "HVM%d.%d restore: not enough data left to read MSR descriptor\n",
+               d->domain_id, vcpuid);
+        return -ENODATA;
+    }
+    if ( desc->length + sizeof (*desc) > h->size - h->cur)
+    {
+        printk(XENLOG_G_WARNING
+               "HVM%d.%d restore: not enough data left to read %u MSR bytes\n",
+               d->domain_id, vcpuid, desc->length);
+        return -ENODATA;
+    }
+    if ( desc->length < HVM_CPU_MSR_SIZE(1) )
+    {
+        printk(XENLOG_G_WARNING
+               "HVM%d.%d restore mismatch: MSR length %u < %zu\n",
+               d->domain_id, vcpuid, desc->length, HVM_CPU_MSR_SIZE(1));
+        return -EINVAL;
+    }
+
+    h->cur += sizeof(*desc);
+    ctxt = (struct hvm_msr *)&h->data[h->cur];
+    h->cur += desc->length;
+
+    if ( desc->length != HVM_CPU_MSR_SIZE(ctxt->count) )
+    {
+        printk(XENLOG_G_WARNING
+               "HVM%d.%d restore mismatch: MSR length %u != %zu\n",
+               d->domain_id, vcpuid, desc->length,
+               HVM_CPU_MSR_SIZE(ctxt->count));
+        return -EOPNOTSUPP;
+    }
+
+    for ( i = 0; i < ctxt->count; ++i )
+        if ( ctxt->msr[i]._rsvd )
+            return -EOPNOTSUPP;
+    /* Checking finished */
+
+    if ( hvm_funcs.load_msr )
+        err = hvm_funcs.load_msr(v, ctxt);
+
+    for ( i = 0; !err && i < ctxt->count; ++i )
+    {
+        switch ( ctxt->msr[i].index )
+        {
+        default:
+            if ( !ctxt->msr[i]._rsvd )
+                err = -ENXIO;
+            break;
+        }
+    }
+
+    return err;
+}
+
+/* We need variable length data chunks for XSAVE area and MSRs, hence
+ * a custom declaration rather than HVM_REGISTER_SAVE_RESTORE.
  */
-static int __init __hvm_register_CPU_XSAVE_save_and_restore(void)
+static int __init hvm_register_CPU_save_and_restore(void)
 {
     hvm_register_savevm(CPU_XSAVE_CODE,
                         "CPU_XSAVE",
@@ -1139,9 +1246,22 @@ static int __init __hvm_register_CPU_XSAVE_save_and_restore(void)
                         HVM_CPU_XSAVE_SIZE(xfeature_mask) +
                             sizeof(struct hvm_save_descriptor),
                         HVMSR_PER_VCPU);
+
+    if ( hvm_funcs.init_msr )
+        msr_count_max += hvm_funcs.init_msr();
+
+    if ( msr_count_max )
+        hvm_register_savevm(CPU_MSR_CODE,
+                            "CPU_MSR",
+                            hvm_save_cpu_msrs,
+                            hvm_load_cpu_msrs,
+                            HVM_CPU_MSR_SIZE(msr_count_max) +
+                                sizeof(struct hvm_save_descriptor),
+                            HVMSR_PER_VCPU);
+
     return 0;
 }
-__initcall(__hvm_register_CPU_XSAVE_save_and_restore);
+__initcall(hvm_register_CPU_save_and_restore);
 
 int hvm_vcpu_initialise(struct vcpu *v)
 {
