@@ -113,7 +113,8 @@ typedef struct RTCState {
     /* periodic timer */
     struct periodic_time pt;
     s_time_t start_time;
-    int pt_code;
+    s_time_t check_ticks_since;
+    int period;
     uint8_t pt_dead_ticks;
     uint32_t use_timer;
     spinlock_t lock;
