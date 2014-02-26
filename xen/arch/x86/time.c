@@ -661,7 +661,7 @@ static unsigned long __get_cmos_time(void)
     mon  = CMOS_READ(RTC_MONTH);
     year = CMOS_READ(RTC_YEAR);
     
-    if ( !(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) || RTC_ALWAYS_BCD )
+    if ( RTC_ALWAYS_BCD || !(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) )
     {
         BCD_TO_BIN(sec);
         BCD_TO_BIN(min);
