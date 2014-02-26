@@ -21,7 +21,8 @@
 static unsigned int probe_intel_cpuid_faulting(void)
 {
 	uint64_t x;
-	return !rdmsr_safe(MSR_INTEL_PLATFORM_INFO, x) && (x & (1u<<31));
+	return !rdmsr_safe(MSR_INTEL_PLATFORM_INFO, x) &&
+		(x & MSR_PLATFORM_INFO_CPUID_FAULTING);
 }
 
 static DEFINE_PER_CPU(bool_t, cpuid_faulting_enabled);
@@ -34,9 +35,9 @@ void set_cpuid_faulting(bool_t enable)
 		return;
 
 	rdmsr(MSR_INTEL_MISC_FEATURES_ENABLES, lo, hi);
-	lo &= ~1;
+	lo &= ~MSR_MISC_FEATURES_CPUID_FAULTING;
 	if (enable)
-		lo |= 1;
+		lo |= MSR_MISC_FEATURES_CPUID_FAULTING;
 	wrmsr(MSR_INTEL_MISC_FEATURES_ENABLES, lo, hi);
 
 	this_cpu(cpuid_faulting_enabled) = enable;
