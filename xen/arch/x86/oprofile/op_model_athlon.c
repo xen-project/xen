@@ -497,14 +497,11 @@ static int __init init_ibs_nmi(void)
 
 static void __init get_ibs_caps(void)
 {
-	unsigned int max_level;
-
 	if (!boot_cpu_has(X86_FEATURE_IBS))
 		return;
 
     /* check IBS cpuid feature flags */
-	max_level = cpuid_eax(0x80000000);
-	if (max_level >= IBS_CPUID_FEATURES)
+	if (current_cpu_data.extended_cpuid_level >= IBS_CPUID_FEATURES)
 		ibs_caps = cpuid_eax(IBS_CPUID_FEATURES);
 	if (!(ibs_caps & IBS_CAPS_AVAIL))
 		/* cpuid flags not valid */

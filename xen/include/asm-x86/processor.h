@@ -162,6 +162,7 @@ struct cpuinfo_x86 {
     __u8 x86_model;
     __u8 x86_mask;
     int  cpuid_level;    /* Maximum supported CPUID level, -1=no CPUID */
+    __u32 extended_cpuid_level; /* Maximum supported CPUID extended level */
     unsigned int x86_capability[NCAPINTS];
     char x86_vendor_id[16];
     char x86_model_id[64];

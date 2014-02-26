@@ -74,7 +74,7 @@ int __cpuinit get_model_name(struct cpuinfo_x86 *c)
 	unsigned int *v;
 	char *p, *q;
 
-	if (cpuid_eax(0x80000000) < 0x80000004)
+	if (c->extended_cpuid_level < 0x80000004)
 		return 0;
 
 	v = (unsigned int *) c->x86_model_id;
@@ -101,11 +101,9 @@ int __cpuinit get_model_name(struct cpuinfo_x86 *c)
 
 void __cpuinit display_cacheinfo(struct cpuinfo_x86 *c)
 {
-	unsigned int n, dummy, ecx, edx, l2size;
+	unsigned int dummy, ecx, edx, l2size;
 
-	n = cpuid_eax(0x80000000);
-
-	if (n >= 0x80000005) {
+	if (c->extended_cpuid_level >= 0x80000005) {
 		cpuid(0x80000005, &dummy, &dummy, &ecx, &edx);
 		if (opt_cpu_info)
 			printk("CPU: L1 I cache %dK (%d bytes/line),"
@@ -114,7 +112,7 @@ void __cpuinit display_cacheinfo(struct cpuinfo_x86 *c)
 		c->x86_cache_size=(ecx>>24)+(edx>>24);	
 	}
 
-	if (n < 0x80000006)	/* Some chips just has a large L1. */
+	if (c->extended_cpuid_level < 0x80000006)	/* Some chips just has a large L1. */
 		return;
 
 	ecx = cpuid_ecx(0x80000006);
@@ -195,7 +193,7 @@ static void __init early_cpu_detect(void)
 
 static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 {
-	u32 tfms, xlvl, capability, excap, ebx;
+	u32 tfms, capability, excap, ebx;
 
 	/* Get vendor name */
 	cpuid(0x00000000, &c->cpuid_level,
@@ -222,15 +220,15 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 		c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
 
 	/* AMD-defined flags: level 0x80000001 */
-	xlvl = cpuid_eax(0x80000000);
-	if ( (xlvl & 0xffff0000) == 0x80000000 ) {
-		if ( xlvl >= 0x80000001 ) {
+	c->extended_cpuid_level = cpuid_eax(0x80000000);
+	if ( (c->extended_cpuid_level & 0xffff0000) == 0x80000000 ) {
+		if ( c->extended_cpuid_level >= 0x80000001 ) {
 			c->x86_capability[1] = cpuid_edx(0x80000001);
 			c->x86_capability[6] = cpuid_ecx(0x80000001);
 		}
-		if ( xlvl >= 0x80000004 )
+		if ( c->extended_cpuid_level >= 0x80000004 )
 			get_model_name(c); /* Default name */
-		if ( xlvl >= 0x80000008 )
+		if ( c->extended_cpuid_level >= 0x80000008 )
 			paddr_bits = cpuid_eax(0x80000008) & 0xff;
 	}
 

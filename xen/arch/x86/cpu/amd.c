@@ -419,11 +419,11 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 
 	display_cacheinfo(c);
 
-	if (cpuid_eax(0x80000000) >= 0x80000008) {
+	if (c->extended_cpuid_level >= 0x80000008) {
 		c->x86_max_cores = (cpuid_ecx(0x80000008) & 0xff) + 1;
 	}
 
-	if (cpuid_eax(0x80000000) >= 0x80000007) {
+	if (c->extended_cpuid_level >= 0x80000007) {
 		c->x86_power = cpuid_edx(0x80000007);
 		if (c->x86_power & (1<<8)) {
 			set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
