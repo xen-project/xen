@@ -115,15 +115,15 @@ static int get_pty_fd(struct xs_handle *xs, char *path, int seconds)
 			/* We only watch for one thing, so no need to 
 			 * disambiguate: just read the pty path */
 			pty_path = xs_read(xs, XBT_NULL, path, &len);
-			if (pty_path != NULL) {
+			if (pty_path != NULL && pty_path[0] != '\0') {
 				if (access(pty_path, R_OK|W_OK) != 0)
 					continue;
 				pty_fd = open(pty_path, O_RDWR | O_NOCTTY);
 				if (pty_fd == -1) 
-					err(errno, "Could not open tty `%s'", 
+					warn(errno, "Could not open tty `%s'", 
 					    pty_path);
-				free(pty_path);
 			}
+			free(pty_path);
 		}
 	} while (pty_fd == -1 && (now = time(NULL)) < start + seconds);
 
