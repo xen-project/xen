@@ -1148,6 +1148,8 @@ static int hvm_save_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
         if ( hvm_funcs.save_msr )
             hvm_funcs.save_msr(v, ctxt);
 
+        ASSERT(ctxt->count <= msr_count_max);
+
         for ( i = 0; i < ctxt->count; ++i )
             ctxt->msr[i]._rsvd = 0;
 
