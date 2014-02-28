@@ -1716,8 +1716,8 @@ int policydb_read(struct policydb *p, void *fp)
 
     if ( le32_to_cpu(buf[0]) != POLICYDB_MAGIC )
     {
-        printk(KERN_ERR "Flask:  policydb magic number 0x%x does "
-               "not match expected magic number 0x%x\n",
+        printk(KERN_ERR "Flask:  policydb magic number %#x does "
+               "not match expected magic number %#x\n",
                le32_to_cpu(buf[0]), POLICYDB_MAGIC);
         goto bad;
     }

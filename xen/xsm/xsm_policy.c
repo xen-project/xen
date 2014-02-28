@@ -52,7 +52,7 @@ int __init xsm_policy_init(unsigned long *module_map,
             policy_buffer = (char *)_policy_start;
             policy_size = _policy_len;
 
-            printk("Policy len  0x%lx, start at %p.\n",
+            printk("Policy len %#lx, start at %p.\n",
                    _policy_len,_policy_start);
 
             __clear_bit(i, module_map);

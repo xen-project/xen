@@ -2111,7 +2111,7 @@ int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
                 c->u.ioport.high_ioport == high && c->sid[0] == sid)
                 break;
 
-            printk("%s: IO Port overlap with entry 0x%x - 0x%x\n",
+            printk("%s: IO Port overlap with entry %#x - %#x\n",
                    __FUNCTION__, c->u.ioport.low_ioport,
                    c->u.ioport.high_ioport);
             ret = -EEXIST;
@@ -2145,7 +2145,7 @@ int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
                 c->u.iomem.high_iomem == high && c->sid[0] == sid)
                 break;
 
-            printk("%s: IO Memory overlap with entry 0x%x - 0x%x\n",
+            printk("%s: IO Memory overlap with entry %#x - %#x\n",
                    __FUNCTION__, c->u.iomem.low_iomem,
                    c->u.iomem.high_iomem);
             ret = -EEXIST;
@@ -2177,7 +2177,7 @@ int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
                 if ( c->sid[0] == sid )
                     break;
 
-                printk("%s: Duplicate PCI Device 0x%x\n", __FUNCTION__,
+                printk("%s: Duplicate PCI Device %#x\n", __FUNCTION__,
                         add->u.device);
                 ret = -EEXIST;
                 break;
@@ -2257,7 +2257,7 @@ int security_ocontext_del( u32 ocon, unsigned int low, unsigned int high )
             }
         }
 
-        printk("%s: ocontext not found: ioport 0x%x - 0x%x\n", __FUNCTION__,
+        printk("%s: ocontext not found: ioport %#x - %#x\n", __FUNCTION__,
                 low, high);
         ret = -ENOENT;
         break;
@@ -2284,7 +2284,7 @@ int security_ocontext_del( u32 ocon, unsigned int low, unsigned int high )
             }
         }
 
-        printk("%s: ocontext not found: iomem 0x%x - 0x%x\n", __FUNCTION__,
+        printk("%s: ocontext not found: iomem %#x - %#x\n", __FUNCTION__,
                 low, high);
         ret = -ENOENT;
         break;
@@ -2310,7 +2310,7 @@ int security_ocontext_del( u32 ocon, unsigned int low, unsigned int high )
             }
         }
 
-        printk("%s: ocontext not found: pcidevice 0x%x\n", __FUNCTION__, low);
+        printk("%s: ocontext not found: pcidevice %#x\n", __FUNCTION__, low);
         ret = -ENOENT;
         break;
 
