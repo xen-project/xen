@@ -412,6 +412,13 @@ static XSM_INLINE long xsm_do_xsm_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
     return -ENOSYS;
 }
 
+#ifdef CONFIG_COMPAT
+static XSM_INLINE int xsm_do_compat_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
+{
+    return -ENOSYS;
+}
+#endif
+
 static XSM_INLINE char *xsm_show_irq_sid(int irq)
 {
     return NULL;

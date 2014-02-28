@@ -105,6 +105,9 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, hvm_param_nested);
 
     set_to_dummy_if_null(ops, do_xsm_op);
+#ifdef CONFIG_COMPAT
+    set_to_dummy_if_null(ops, do_compat_op);
+#endif
 
     set_to_dummy_if_null(ops, add_to_physmap);
     set_to_dummy_if_null(ops, remove_from_physmap);

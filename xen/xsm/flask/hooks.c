@@ -1464,6 +1464,7 @@ static int flask_map_gmfn_foreign(struct domain *d, struct domain *t)
 #endif
 
 long do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
+int compat_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
 
 static struct xsm_operations flask_ops = {
     .security_domaininfo = flask_security_domaininfo,
@@ -1538,6 +1539,9 @@ static struct xsm_operations flask_ops = {
     .hvm_param_nested = flask_hvm_param_nested,
 
     .do_xsm_op = do_flask_op,
+#ifdef CONFIG_COMPAT
+    .do_compat_op = compat_flask_op,
+#endif
 
     .add_to_physmap = flask_add_to_physmap,
     .remove_from_physmap = flask_remove_from_physmap,

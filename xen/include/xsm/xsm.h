@@ -129,6 +129,9 @@ struct xsm_operations {
     int (*tmem_control)(void);
 
     long (*do_xsm_op) (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op);
+#ifdef CONFIG_COMPAT
+    int (*do_compat_op) (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op);
+#endif
 
     int (*hvm_param) (struct domain *d, unsigned long op);
     int (*hvm_param_nested) (struct domain *d);
@@ -498,6 +501,13 @@ static inline long xsm_do_xsm_op (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
 {
     return xsm_ops->do_xsm_op(op);
 }
+
+#ifdef CONFIG_COMPAT
+static inline int xsm_do_compat_op (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
+{
+    return xsm_ops->do_compat_op(op);
+}
+#endif
 
 static inline int xsm_hvm_param (xsm_default_t def, struct domain *d, unsigned long op)
 {

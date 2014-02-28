@@ -27,6 +27,7 @@ headers-$(CONFIG_X86)     += compat/arch-x86/xen-mca.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen-$(compat-arch-y).h
 headers-y                 += compat/arch-$(compat-arch-y).h compat/xlat.h
+headers-$(FLASK_ENABLE)   += compat/xsm/flask_op.h
 
 cppflags-y                := -include public/xen-compat.h
 cppflags-$(CONFIG_X86)    += -m32
@@ -69,7 +70,9 @@ compat/xlat.h: xlat.lst $(filter-out compat/xlat.h,$(headers-y)) $(BASEDIR)/tool
 	export PYTHON=$(PYTHON); \
 	grep -v '^[	 ]*#' xlat.lst | \
 	while read what name hdr; do \
-		$(SHELL) $(BASEDIR)/tools/get-fields.sh "$$what" compat_$$name $$(echo compat/$$hdr | sed 's,@arch@,$(compat-arch-y),g') || exit $$?; \
+		hdr="compat/$$(echo $$hdr | sed 's,@arch@,$(compat-arch-y),g')"; \
+		echo '$(headers-y)' | grep -q "$$hdr" || continue; \
+		$(SHELL) $(BASEDIR)/tools/get-fields.sh "$$what" compat_$$name $$hdr || exit $$?; \
 	done >$@.new
 	mv -f $@.new $@
 
