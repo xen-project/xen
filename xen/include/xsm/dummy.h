@@ -59,20 +59,14 @@ static always_inline int xsm_default_action(
     switch ( action ) {
     case XSM_HOOK:
         return 0;
-    case XSM_DM_PRIV:
-        if ( src->is_privileged )
-            return 0;
-        if ( target && src->target == target )
-            return 0;
-        return -EPERM;
     case XSM_TARGET:
         if ( src == target )
             return 0;
-        if ( src->is_privileged )
-            return 0;
+        /* fall through */
+    case XSM_DM_PRIV:
         if ( target && src->target == target )
             return 0;
-        return -EPERM;
+        /* fall through */
     case XSM_PRIV:
         if ( src->is_privileged )
             return 0;
