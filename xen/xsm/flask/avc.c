@@ -360,11 +360,10 @@ static struct avc_node *avc_alloc_node(void)
 {
     struct avc_node *node;
 
-    node = xmalloc(struct avc_node);
+    node = xzalloc(struct avc_node);
     if (!node)
         goto out;
 
-    memset(node, 0, sizeof(*node));
     INIT_RCU_HEAD(&node->rhead);
     INIT_HLIST_NODE(&node->list);
     avc_cache_stats_incr(allocations);

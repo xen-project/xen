@@ -132,12 +132,9 @@ static int flask_domain_alloc_security(struct domain *d)
 {
     struct domain_security_struct *dsec;
 
-    dsec = xmalloc(struct domain_security_struct);
-
+    dsec = xzalloc(struct domain_security_struct);
     if ( !dsec )
         return -ENOMEM;
-
-    memset(dsec, 0, sizeof(struct domain_security_struct));
 
     switch ( d->domain_id )
     {
@@ -294,12 +291,9 @@ static int flask_alloc_security_evtchn(struct evtchn *chn)
 {
     struct evtchn_security_struct *esec;
 
-    esec = xmalloc(struct evtchn_security_struct);
-
+    esec = xzalloc(struct evtchn_security_struct);
     if ( !esec )
         return -ENOMEM;
-
-    memset(esec, 0, sizeof(struct evtchn_security_struct));
 
     esec->sid = SECINITSID_UNLABELED;
 

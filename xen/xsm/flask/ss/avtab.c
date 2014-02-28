@@ -38,11 +38,10 @@ static struct avtab_node* avtab_insert_node(struct avtab *h, int hvalue,
     struct avtab_node * prev, struct avtab_node * cur, struct avtab_key *key, 
                                                     struct avtab_datum *datum)
 {
-    struct avtab_node * newnode;
-    newnode = xmalloc(struct avtab_node);
+    struct avtab_node *newnode = xzalloc(struct avtab_node);
+
     if ( newnode == NULL )
         return NULL;
-    memset(newnode, 0, sizeof(struct avtab_node));
     newnode->key = *key;
     newnode->datum = *datum;
     if ( prev )

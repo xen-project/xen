@@ -166,13 +166,12 @@ static int roles_init(struct policydb *p)
     int rc;
     struct role_datum *role;
 
-    role = xmalloc(struct role_datum);
+    role = xzalloc(struct role_datum);
     if ( !role )
     {
         rc = -ENOMEM;
         goto out;
     }
-    memset(role, 0, sizeof(*role));
     role->value = ++p->p_roles.nprim;
     if ( role->value != OBJECT_R_VAL )
     {
@@ -950,13 +949,12 @@ static int perm_read(struct policydb *p, struct hashtab *h, void *fp)
     __le32 buf[2];
     u32 len;
 
-    perdatum = xmalloc(struct perm_datum);
+    perdatum = xzalloc(struct perm_datum);
     if ( !perdatum )
     {
         rc = -ENOMEM;
         goto out;
     }
-    memset(perdatum, 0, sizeof(*perdatum));
 
     rc = next_entry(buf, fp, sizeof buf);
     if ( rc < 0 )
@@ -994,13 +992,12 @@ static int common_read(struct policydb *p, struct hashtab *h, void *fp)
     u32 len, nel;
     int i, rc;
 
-    comdatum = xmalloc(struct common_datum);
+    comdatum = xzalloc(struct common_datum);
     if ( !comdatum )
     {
         rc = -ENOMEM;
         goto out;
     }
-    memset(comdatum, 0, sizeof(*comdatum));
 
     rc = next_entry(buf, fp, sizeof buf);
     if ( rc < 0 )
@@ -1055,10 +1052,9 @@ static int read_cons_helper(struct constraint_node **nodep, int ncons,
     lc = NULL;
     for ( i = 0; i < ncons; i++ )
     {
-        c = xmalloc(struct constraint_node);
+        c = xzalloc(struct constraint_node);
         if ( !c )
             return -ENOMEM;
-        memset(c, 0, sizeof(*c));
 
         if ( lc )
         {
@@ -1078,10 +1074,9 @@ static int read_cons_helper(struct constraint_node **nodep, int ncons,
         depth = -1;
         for ( j = 0; j < nexpr; j++ )
         {
-            e = xmalloc(struct constraint_expr);
+            e = xzalloc(struct constraint_expr);
             if ( !e )
                 return -ENOMEM;
-            memset(e, 0, sizeof(*e));
 
             if ( le )
                 le->next = e;
@@ -1142,13 +1137,12 @@ static int class_read(struct policydb *p, struct hashtab *h, void *fp)
     u32 len, len2, ncons, nel;
     int i, rc;
 
-    cladatum = xmalloc(struct class_datum);
+    cladatum = xzalloc(struct class_datum);
     if ( !cladatum )
     {
         rc = -ENOMEM;
         goto out;
     }
-    memset(cladatum, 0, sizeof(*cladatum));
 
     rc = next_entry(buf, fp, sizeof(u32)*6);
     if ( rc < 0 )
@@ -1226,13 +1220,12 @@ static int role_read(struct policydb *p, struct hashtab *h, void *fp)
     __le32 buf[3];
     u32 len;
 
-    role = xmalloc(struct role_datum);
+    role = xzalloc(struct role_datum);
     if ( !role )
     {
         rc = -ENOMEM;
         goto out;
     }
-    memset(role, 0, sizeof(*role));
 
     if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
         rc = next_entry(buf, fp, sizeof(buf[0]) * 3);
@@ -1297,13 +1290,12 @@ static int type_read(struct policydb *p, struct hashtab *h, void *fp)
     __le32 buf[4];
     u32 len;
 
-    typdatum = xmalloc(struct type_datum);
+    typdatum = xzalloc(struct type_datum);
     if ( !typdatum )
     {
         rc = -ENOMEM;
         return rc;
     }
-    memset(typdatum, 0, sizeof(*typdatum));
 
     if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
         rc = next_entry(buf, fp, sizeof(buf[0]) * 4);
@@ -1391,13 +1383,12 @@ static int user_read(struct policydb *p, struct hashtab *h, void *fp)
     __le32 buf[3];
     u32 len;
 
-    usrdatum = xmalloc(struct user_datum);
+    usrdatum = xzalloc(struct user_datum);
     if ( !usrdatum )
     {
         rc = -ENOMEM;
         goto out;
     }
-    memset(usrdatum, 0, sizeof(*usrdatum));
 
     if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
         rc = next_entry(buf, fp, sizeof(buf[0]) * 3);
@@ -1455,13 +1446,12 @@ static int sens_read(struct policydb *p, struct hashtab *h, void *fp)
     __le32 buf[2];
     u32 len;
 
-    levdatum = xmalloc(struct level_datum);
+    levdatum = xzalloc(struct level_datum);
     if ( !levdatum )
     {
         rc = -ENOMEM;
         goto out;
     }
-    memset(levdatum, 0, sizeof(*levdatum));
 
     rc = next_entry(buf, fp, sizeof buf);
     if ( rc < 0 )
@@ -1511,13 +1501,12 @@ static int cat_read(struct policydb *p, struct hashtab *h, void *fp)
     __le32 buf[3];
     u32 len;
 
-    catdatum = xmalloc(struct cat_datum);
+    catdatum = xzalloc(struct cat_datum);
     if ( !catdatum )
     {
         rc = -ENOMEM;
         goto out;
     }
-    memset(catdatum, 0, sizeof(*catdatum));
 
     rc = next_entry(buf, fp, sizeof buf);
     if ( rc < 0 )
@@ -1875,13 +1864,12 @@ int policydb_read(struct policydb *p, void *fp)
     ltr = NULL;
     for ( i = 0; i < nel; i++ )
     {
-        tr = xmalloc(struct role_trans);
+        tr = xzalloc(struct role_trans);
         if ( !tr )
         {
             rc = -ENOMEM;
             goto bad;
         }
-        memset(tr, 0, sizeof(*tr));
         if ( ltr )
             ltr->next = tr;
         else
@@ -1909,13 +1897,12 @@ int policydb_read(struct policydb *p, void *fp)
     lra = NULL;
     for ( i = 0; i < nel; i++ )
     {
-        ra = xmalloc(struct role_allow);
+        ra = xzalloc(struct role_allow);
         if ( !ra )
         {
             rc = -ENOMEM;
             goto bad;
         }
-        memset(ra, 0, sizeof(*ra));
         if ( lra )
             lra->next = ra;
         else
@@ -1951,13 +1938,12 @@ int policydb_read(struct policydb *p, void *fp)
         l = NULL;
         for ( j = 0; j < nel; j++ )
         {
-            c = xmalloc(struct ocontext);
+            c = xzalloc(struct ocontext);
             if ( !c )
             {
                 rc = -ENOMEM;
                 goto bad;
             }
-            memset(c, 0, sizeof(*c));
             if ( l )
                 l->next = c;
             else
@@ -2067,13 +2053,12 @@ int policydb_read(struct policydb *p, void *fp)
         lrt = NULL;
         for ( i = 0; i < nel; i++ )
         {
-            rt = xmalloc(struct range_trans);
+            rt = xzalloc(struct range_trans);
             if ( !rt )
             {
                 rc = -ENOMEM;
                 goto bad;
             }
-            memset(rt, 0, sizeof(*rt));
             if ( lrt )
                 lrt->next = rt;
             else

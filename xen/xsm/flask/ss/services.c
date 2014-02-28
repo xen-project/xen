@@ -1771,13 +1771,12 @@ int security_get_user_sids(u32 fromsid, char *username, u32 **sids, u32 *nel)
     }
     usercon.user = user->value;
 
-    mysids = xmalloc_array(u32, maxnel);
+    mysids = xzalloc_array(u32, maxnel);
     if ( !mysids )
     {
         rc = -ENOMEM;
         goto out_unlock;
     }
-    memset(mysids, 0, maxnel*sizeof(*mysids));
 
     ebitmap_for_each_positive_bit(&user->roles, rnode, i)
     {
@@ -1808,14 +1807,13 @@ int security_get_user_sids(u32 fromsid, char *username, u32 **sids, u32 *nel)
             else
             {
                 maxnel += SIDS_NEL;
-                mysids2 = xmalloc_array(u32, maxnel);
+                mysids2 = xzalloc_array(u32, maxnel);
                 if ( !mysids2 )
                 {
                     rc = -ENOMEM;
                     xfree(mysids);
                     goto out_unlock;
                 }
-                memset(mysids2, 0, maxnel*sizeof(*mysids2));
                 memcpy(mysids2, mysids, mynel * sizeof(*mysids2));
                 xfree(mysids);
                 mysids = mysids2;
@@ -1868,14 +1866,14 @@ int security_get_bools(int *len, char ***names, int **values, size_t *maxstr)
         goto out;
     }
 
-    if ( names ) {
-        *names = (char**)xmalloc_array(char*, *len);
+    if ( names )
+    {
+        *names = xzalloc_array(char *, *len);
         if ( !*names )
             goto err;
-        memset(*names, 0, sizeof(char*) * *len);
     }
 
-    *values = (int*)xmalloc_array(int, *len);
+    *values = xmalloc_array(int, *len);
     if ( !*values )
         goto err;
 
@@ -2059,9 +2057,8 @@ int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
     struct ocontext *prev;
     struct ocontext *add;
 
-    if ( (add = xmalloc(struct ocontext)) == NULL )
+    if ( (add = xzalloc(struct ocontext)) == NULL )
         return -ENOMEM;
-    memset(add, 0, sizeof(struct ocontext));
     add->sid[0] = sid;
 
     POLICY_WRLOCK;
