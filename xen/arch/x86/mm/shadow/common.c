@@ -786,8 +786,7 @@ static void oos_hash_remove(struct vcpu *v, mfn_t gmfn)
     mfn_t *oos;
     struct domain *d = v->domain;
 
-    SHADOW_PRINTK("D%dV%d gmfn %lx\n",
-                  v->domain->domain_id, v->vcpu_id, mfn_x(gmfn)); 
+    SHADOW_PRINTK("%pv gmfn %lx\n", v, mfn_x(gmfn));
 
     for_each_vcpu(d, v) 
     {

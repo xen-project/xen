@@ -559,8 +559,7 @@ void restore_vcpu_affinity(struct domain *d)
 
         if ( v->affinity_broken )
         {
-            printk(XENLOG_DEBUG "Restoring affinity for d%dv%d\n",
-                   d->domain_id, v->vcpu_id);
+            printk(XENLOG_DEBUG "Restoring affinity for %pv\n", v);
             cpumask_copy(v->cpu_affinity, v->cpu_affinity_saved);
             v->affinity_broken = 0;
         }
@@ -608,8 +607,7 @@ int cpu_disable_scheduler(unsigned int cpu)
             if ( cpumask_empty(&online_affinity) &&
                  cpumask_test_cpu(cpu, v->cpu_affinity) )
             {
-                printk(XENLOG_DEBUG "Breaking affinity for d%dv%d\n",
-                        d->domain_id, v->vcpu_id);
+                printk(XENLOG_DEBUG "Breaking affinity for %pv\n", v);
 
                 if (system_state == SYS_STATE_suspend)
                 {

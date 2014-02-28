@@ -74,12 +74,11 @@
 
 #ifndef __ASSEMBLY__
 
-int current_domain_id(void);
 #define dprintk(_l, _f, _a...)                              \
     printk(_l "%s:%d: " _f, __FILE__ , __LINE__ , ## _a )
 #define gdprintk(_l, _f, _a...)                             \
-    printk(XENLOG_GUEST _l "%s:%d:d%d " _f, __FILE__,       \
-           __LINE__, current_domain_id() , ## _a )
+    printk(XENLOG_GUEST _l "%s:%d:%pv " _f, __FILE__,       \
+           __LINE__, current, ## _a )
 
 #endif /* !__ASSEMBLY__ */
 

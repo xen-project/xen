@@ -413,9 +413,7 @@ __runq_insert(struct list_head *runq, struct csched_vcpu *svc)
     struct list_head *iter;
     int pos = 0;
 
-    d2printk("rqi d%dv%d\n",
-           svc->vcpu->domain->domain_id,
-           svc->vcpu->vcpu_id);
+    d2printk("rqi %pv\n", svc->vcpu);
 
     BUG_ON(&svc->rqd->runq != runq);
     /* Idle vcpus not allowed on the runqueue anymore */
@@ -429,10 +427,7 @@ __runq_insert(struct list_head *runq, struct csched_vcpu *svc)
 
         if ( svc->credit > iter_svc->credit )
         {
-            d2printk(" p%d d%dv%d\n",
-                   pos,
-                   iter_svc->vcpu->domain->domain_id,
-                   iter_svc->vcpu->vcpu_id);
+            d2printk(" p%d %pv\n", pos, iter_svc->vcpu);
             break;
         }
         pos++;
@@ -492,11 +487,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
     cpumask_t mask;
     struct csched_vcpu * cur;
 
-    d2printk("rqt d%dv%d cd%dv%d\n",
-             new->vcpu->domain->domain_id,
-             new->vcpu->vcpu_id,
-             current->domain->domain_id,
-             current->vcpu_id);
+    d2printk("rqt %pv curr %pv\n", new->vcpu, current);
 
     BUG_ON(new->vcpu->processor != cpu);
     BUG_ON(new->rqd != rqd);
@@ -681,10 +672,7 @@ void burn_credits(struct csched_runqueue_data *rqd, struct csched_vcpu *svc, s_t
         t2c_update(rqd, delta, svc);
         svc->start_time = now;
 
-        d2printk("b d%dv%d c%d\n",
-                 svc->vcpu->domain->domain_id,
-                 svc->vcpu->vcpu_id,
-                 svc->credit);
+        d2printk("b %pv c%d\n", svc->vcpu, svc->credit);
     } else {
         d2printk("%s: Time went backwards? now %"PRI_stime" start %"PRI_stime"\n",
                __func__, now, svc->start_time);
@@ -871,11 +859,9 @@ static void
 csched_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu *svc = vc->sched_priv;
-    struct domain * const dom = vc->domain;
     struct csched_dom * const sdom = svc->sdom;
 
-    printk("%s: Inserting d%dv%d\n",
-           __func__, dom->domain_id, vc->vcpu_id);
+    printk("%s: Inserting %pv\n", __func__, vc);
 
     /* NB: On boot, idle vcpus are inserted before alloc_pdata() has
      * been called for that cpu.
@@ -965,7 +951,7 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 
     /* Schedule lock should be held at this point. */
 
-    d2printk("w d%dv%d\n", vc->domain->domain_id, vc->vcpu_id);
+    d2printk("w %pv\n", vc);
 
     BUG_ON( is_idle_vcpu(vc) );
 
@@ -1074,7 +1060,7 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
     {
         if ( test_and_clear_bit(__CSFLAG_runq_migrate_request, &svc->flags) )
         {
-            d2printk("d%dv%d -\n", svc->vcpu->domain->domain_id, svc->vcpu->vcpu_id);
+            d2printk("%pv -\n", svc->vcpu);
             clear_bit(__CSFLAG_runq_migrate_request, &svc->flags);
         }
         /* Leave it where it is for now.  When we actually pay attention
@@ -1094,7 +1080,7 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
         }
         else
         {
-            d2printk("d%dv%d +\n", svc->vcpu->domain->domain_id, svc->vcpu->vcpu_id);
+            d2printk("%pv +\n", svc->vcpu);
             new_cpu = cpumask_cycle(vc->processor, &svc->migrate_rqd->active);
             goto out_up;
         }
@@ -1203,8 +1189,7 @@ void migrate(const struct scheduler *ops,
 {
     if ( test_bit(__CSFLAG_scheduled, &svc->flags) )
     {
-        d2printk("d%dv%d %d-%d a\n", svc->vcpu->domain->domain_id, svc->vcpu->vcpu_id,
-                 svc->rqd->id, trqd->id);
+        d2printk("%pv %d-%d a\n", svc->vcpu, svc->rqd->id, trqd->id);
         /* It's running; mark it to migrate. */
         svc->migrate_rqd = trqd;
         set_bit(_VPF_migrating, &svc->vcpu->pause_flags);
@@ -1214,8 +1199,7 @@ void migrate(const struct scheduler *ops,
     {
         int on_runq=0;
         /* It's not running; just move it */
-        d2printk("d%dv%d %d-%d i\n", svc->vcpu->domain->domain_id, svc->vcpu->vcpu_id,
-                 svc->rqd->id, trqd->id);
+        d2printk("%pv %d-%d i\n", svc->vcpu, svc->rqd->id, trqd->id);
         if ( __vcpu_on_runq(svc) )
         {
             __runq_remove(svc);
@@ -1662,11 +1646,7 @@ csched_schedule(
     SCHED_STAT_CRANK(schedule);
     CSCHED_VCPU_CHECK(current);
 
-    d2printk("sc p%d c d%dv%d now %"PRI_stime"\n",
-             cpu,
-             scurr->vcpu->domain->domain_id,
-             scurr->vcpu->vcpu_id,
-             now);
+    d2printk("sc p%d c %pv now %"PRI_stime"\n", cpu, scurr->vcpu, now);
 
     BUG_ON(!cpumask_test_cpu(cpu, &CSCHED_PRIV(ops)->initialized));
 
@@ -1693,12 +1673,11 @@ csched_schedule(
                 }
             }
         }
-        printk("%s: pcpu %d rq %d, but scurr d%dv%d assigned to "
+        printk("%s: pcpu %d rq %d, but scurr %pv assigned to "
                "pcpu %d rq %d!\n",
                __func__,
                cpu, this_rqi,
-               scurr->vcpu->domain->domain_id, scurr->vcpu->vcpu_id,
-               scurr->vcpu->processor, other_rqi);
+               scurr->vcpu, scurr->vcpu->processor, other_rqi);
     }
     BUG_ON(!is_idle_vcpu(scurr->vcpu) && scurr->rqd != rqd);
 
@@ -1755,12 +1734,8 @@ csched_schedule(
             __runq_remove(snext);
             if ( snext->vcpu->is_running )
             {
-                printk("p%d: snext d%dv%d running on p%d! scurr d%dv%d\n",
-                       cpu,
-                       snext->vcpu->domain->domain_id, snext->vcpu->vcpu_id,
-                       snext->vcpu->processor,
-                       scurr->vcpu->domain->domain_id,
-                       scurr->vcpu->vcpu_id);
+                printk("p%d: snext %pv running on p%d! scurr %pv\n",
+                       cpu, snext->vcpu, snext->vcpu->processor, scurr->vcpu);
                 BUG();
             }
             set_bit(__CSFLAG_scheduled, &snext->flags);

@@ -15,3 +15,6 @@ Symbol/Function pointers:
 
        In the case that an appropriate symbol name can't be found, %p[sS] will
        fall back to '%p' and print the address in hex.
+
+       %pv     Domain and vCPU ID from a 'struct vcpu *' (printed as
+               "d<domid>v<vcpuid>")

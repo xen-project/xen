@@ -769,8 +769,8 @@ static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
         if ( !cpu_has(c, X86_FEATURE_DTES64) )
         {
             printk(XENLOG_G_WARNING "CPU doesn't support 64-bit DS Area"
-                   " - Debug Store disabled for d%d:v%d\n",
-                   v->domain->domain_id, v->vcpu_id);
+                   " - Debug Store disabled for %pv\n",
+                   v);
             goto func_out;
         }
         vpmu_set(vpmu, VPMU_CPU_HAS_DS);
@@ -780,8 +780,8 @@ static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
             /* If BTS_UNAVAIL is set reset the DS feature. */
             vpmu_reset(vpmu, VPMU_CPU_HAS_DS);
             printk(XENLOG_G_WARNING "CPU has set BTS_UNAVAIL"
-                   " - Debug Store disabled for d%d:v%d\n",
-                   v->domain->domain_id, v->vcpu_id);
+                   " - Debug Store disabled for %pv\n",
+                   v);
         }
         else
         {

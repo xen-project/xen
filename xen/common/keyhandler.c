@@ -89,9 +89,8 @@ void dump_execstate(struct cpu_user_regs *regs)
 
     if ( !is_idle_vcpu(current) )
     {
-        printk("*** Dumping CPU%u guest state (d%d:v%d): ***\n",
-               smp_processor_id(), current->domain->domain_id,
-               current->vcpu_id);
+        printk("*** Dumping CPU%u guest state (%pv): ***\n",
+               smp_processor_id(), current);
         show_execution_state(guest_cpu_user_regs());
         printk("\n");
     }

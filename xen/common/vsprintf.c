@@ -19,6 +19,7 @@
 #include <xen/ctype.h>
 #include <xen/symbols.h>
 #include <xen/lib.h>
+#include <xen/sched.h>
 #include <asm/div64.h>
 #include <asm/page.h>
 
@@ -300,6 +301,19 @@ static char *pointer(char *str, char *end, const char **fmt_ptr,
         }
 
         return str;
+    }
+
+    case 'v': /* d<domain-id>v<vcpu-id> from a struct vcpu */
+    {
+        const struct vcpu *v = arg;
+
+        ++*fmt_ptr;
+        if ( str <= end )
+            *str = 'd';
+        str = number(str + 1, end, v->domain->domain_id, 10, -1, -1, 0);
+        if ( str <= end )
+            *str = 'v';
+        return number(str + 1, end, v->vcpu_id, 10, -1, -1, 0);
     }
     }
 

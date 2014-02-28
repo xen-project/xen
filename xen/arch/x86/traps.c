@@ -1070,8 +1070,8 @@ void do_machine_check(struct cpu_user_regs *regs)
 static void reserved_bit_page_fault(
     unsigned long addr, struct cpu_user_regs *regs)
 {
-    printk("d%d:v%d: reserved bit in page table (ec=%04X)\n",
-           current->domain->domain_id, current->vcpu_id, regs->error_code);
+    printk("%pv: reserved bit in page table (ec=%04X)\n",
+           current, regs->error_code);
     show_page_walk(addr);
     show_execution_state(regs);
 }
@@ -1113,8 +1113,7 @@ struct trap_bounce *propagate_page_fault(unsigned long addr, u16 error_code)
         tb->flags |= TBF_INTERRUPT;
     if ( unlikely(null_trap_bounce(v, tb)) )
     {
-        printk("d%d:v%d: unhandled page fault (ec=%04X)\n",
-               v->domain->domain_id, v->vcpu_id, error_code);
+        printk("%pv: unhandled page fault (ec=%04X)\n", v, error_code);
         show_page_walk(addr);
     }
 

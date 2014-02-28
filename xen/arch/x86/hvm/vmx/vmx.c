@@ -734,10 +734,10 @@ void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
         if ( !warned )
         {
             warned = 1;
-            printk(XENLOG_WARNING "Segment register inaccessible for d%dv%d\n"
+            printk(XENLOG_WARNING "Segment register inaccessible for %pv\n"
                    "(If you see this outside of debugging activity,"
                    " please report to xen-devel@lists.xenproject.org)\n",
-                   v->domain->domain_id, v->vcpu_id);
+                   v);
         }
         memset(reg, 0, sizeof(*reg));
         return;

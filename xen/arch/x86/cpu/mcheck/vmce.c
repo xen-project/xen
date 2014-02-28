@@ -82,10 +82,9 @@ int vmce_restore_vcpu(struct vcpu *v, const struct hvm_vmce_vcpu *ctxt)
     if ( ctxt->caps & ~guest_mcg_cap & ~MCG_CAP_COUNT & ~MCG_CTL_P )
     {
         dprintk(XENLOG_G_ERR, "%s restore: unsupported MCA capabilities"
-                " %#" PRIx64 " for d%d:v%u (supported: %#Lx)\n",
+                " %#" PRIx64 " for %pv (supported: %#Lx)\n",
                 has_hvm_container_vcpu(v) ? "HVM" : "PV", ctxt->caps,
-                v->domain->domain_id, v->vcpu_id,
-                guest_mcg_cap & ~MCG_CAP_COUNT);
+                v, guest_mcg_cap & ~MCG_CAP_COUNT);
         return -EPERM;
     }
 
@@ -361,15 +360,13 @@ int inject_vmce(struct domain *d, int vcpu)
               guest_has_trap_callback(d, v->vcpu_id, TRAP_machine_check)) &&
              !test_and_set_bool(v->mce_pending) )
         {
-            mce_printk(MCE_VERBOSE, "MCE: inject vMCE to d%d:v%d\n",
-                       d->domain_id, v->vcpu_id);
+            mce_printk(MCE_VERBOSE, "MCE: inject vMCE to %pv\n", v);
             vcpu_kick(v);
             ret = 0;
         }
         else
         {
-            mce_printk(MCE_QUIET, "Failed to inject vMCE to d%d:v%d\n",
-                       d->domain_id, v->vcpu_id);
+            mce_printk(MCE_QUIET, "Failed to inject vMCE to %pv\n", v);
             ret = -EBUSY;
             break;
         }
