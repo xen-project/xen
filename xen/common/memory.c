@@ -268,7 +268,7 @@ static void decrease_reservation(struct memop_args *a)
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
     {
-        if ( hypercall_preempt_check() )
+        if ( hypercall_preempt_check() && i != a->nr_done )
         {
             a->preempted = 1;
             goto out;
