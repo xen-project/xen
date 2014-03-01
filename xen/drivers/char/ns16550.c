@@ -89,6 +89,9 @@ struct ns16550_config_mmio {
     unsigned int fifo_size;
     u8 lsr_mask;
     unsigned int max_bars;
+    unsigned int base_baud;
+    unsigned int uart_offset;
+    unsigned int first_offset;
 };
 
 
@@ -111,6 +114,19 @@ static struct ns16550_config_mmio __initdata uart_config[] =
         .lsr_mask = (UART_LSR_THRE | UART_LSR_TEMT),
         .max_bars = 1,
     },
+    /* OXPCIe952 1 Native UART  */
+    {
+        .vendor_id = 0x1415,
+        .dev_id = 0xc138,
+        .base_baud = 4000000,
+        .uart_offset = 0x200,
+        .first_offset = 0x1000,
+        .reg_width = 1,
+        .reg_shift = 0,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .max_bars = 1, /* It can do more, but we would need more custom code.*/
+    }
 };
 #endif
 
@@ -703,6 +719,10 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
                         uart->lsr_mask = uart_config[i].lsr_mask;
                         uart->io_base = ((u64)bar_64 << 32) |
                                         (bar & PCI_BASE_ADDRESS_MEM_MASK);
+                        uart->io_base += uart_config[i].first_offset;
+                        uart->io_base += bar_idx * uart_config[i].uart_offset;
+                        if ( uart_config[i].base_baud )
+                            uart->clock_hz = uart_config[i].base_baud * 16;
                         /* Set device and MMIO region read only to Dom0 */
                         uart->enable_ro = 1;
                         break;
