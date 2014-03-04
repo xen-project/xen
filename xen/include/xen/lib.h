@@ -8,7 +8,7 @@
 #include <xen/string.h>
 #include <asm/bug.h>
 
-void __bug(char *file, int line) __attribute__((noreturn));
+void noreturn __bug(char *file, int line);
 void __warn(char *file, int line);
 
 #define BUG_ON(p)  do { if (unlikely(p)) BUG();  } while (0)

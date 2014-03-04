@@ -183,7 +183,7 @@ static bool_t __init match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2)
            !memcmp(guid1->Data4, guid2->Data4, sizeof(guid1->Data4));
 }
 
-static void __init __attribute__((__noreturn__)) blexit(const CHAR16 *str)
+static void __init noreturn blexit(const CHAR16 *str)
 {
     if ( str )
         PrintStr((CHAR16 *)str);
@@ -762,7 +762,7 @@ static void __init relocate_trampoline(unsigned long phys)
         *(u16 *)(*trampoline_ptr + (long)trampoline_ptr) = phys >> 4;
 }
 
-void EFIAPI __init __attribute__((__noreturn__))
+void EFIAPI __init noreturn
 efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
     static EFI_GUID __initdata loaded_image_guid = LOADED_IMAGE_PROTOCOL;

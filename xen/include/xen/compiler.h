@@ -14,6 +14,8 @@
 #define always_inline __inline__ __attribute__ ((always_inline))
 #define noinline      __attribute__((noinline))
 
+#define noreturn      __attribute__((noreturn))
+
 #if (!defined(__clang__) && (__GNUC__ == 4) && (__GNUC_MINOR__ < 5))
 #define unreachable() do {} while (1)
 #else

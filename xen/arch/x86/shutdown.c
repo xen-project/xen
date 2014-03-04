@@ -85,7 +85,7 @@ static inline void kb_wait(void)
             break;
 }
 
-static void __attribute__((noreturn)) __machine_halt(void *unused)
+static void noreturn __machine_halt(void *unused)
 {
     local_irq_disable();
     for ( ; ; )

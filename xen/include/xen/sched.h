@@ -580,7 +580,7 @@ void __domain_crash(struct domain *d);
  * Mark current domain as crashed and synchronously deschedule from the local
  * processor. This function never returns.
  */
-void __domain_crash_synchronous(void) __attribute__((noreturn));
+void noreturn __domain_crash_synchronous(void);
 #define domain_crash_synchronous() do {                                   \
     printk("domain_crash_sync called from %s:%d\n", __FILE__, __LINE__);  \
     __domain_crash_synchronous();                                         \
@@ -591,7 +591,7 @@ void __domain_crash_synchronous(void) __attribute__((noreturn));
  * the crash occured.  If addr is 0, look up address from last extable
  * redirection.
  */
-void asm_domain_crash_synchronous(unsigned long addr) __attribute__((noreturn));
+void noreturn asm_domain_crash_synchronous(unsigned long addr);
 
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);

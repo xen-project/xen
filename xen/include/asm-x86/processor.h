@@ -550,7 +550,7 @@ DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
 
 void trap_nop(void);
 void enable_nmis(void);
-void __attribute__((noreturn)) do_nmi_crash(struct cpu_user_regs *regs);
+void noreturn do_nmi_crash(struct cpu_user_regs *regs);
 
 void syscall_enter(void);
 void sysenter_entry(void);

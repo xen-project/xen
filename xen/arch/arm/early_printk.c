@@ -52,7 +52,7 @@ void __init early_printk(const char *fmt, ...)
     va_end(args);
 }
 
-void __attribute__((noreturn)) __init
+void __init
 early_panic(const char *fmt, ...)
 {
     va_list args;
