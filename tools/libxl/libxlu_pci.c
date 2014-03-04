@@ -141,6 +141,8 @@ int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str
                     pcidev->power_mgmt = atoi(tok);
                 }else if ( !strcmp(optkey, "permissive") ) {
                     pcidev->permissive = atoi(tok);
+                }else if ( !strcmp(optkey, "seize") ) {
+                    pcidev->seize = atoi(tok);
                 }else{
                     XLU__PCI_ERR(cfg, "Unknown PCI BDF option: %s", optkey);
                 }

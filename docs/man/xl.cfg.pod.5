@@ -509,6 +509,15 @@ the PCI device regardless whether the guest uses INTx or MSI. Some
 device drivers, such as NVIDIA's, detect an inconsistency and do not
 function when this option is enabled. Therefore the default is false (0).
 
+=item B<seize=BOOLEAN>
+
+Tells xl to automatically attempt to re-assign a device to
+pciback if it is not already assigned.
+
+WARNING: If you set this option, xl will gladly re-assign a critical
+system device, such as a network or a disk controller being used by
+dom0 without confirmation.  Please use with care.
+
 =item B<power_mgmt=BOOLEAN>
 
 (HVM only) Specifies that the VM should be able to program the
@@ -529,6 +538,11 @@ above.
 
 Changes the default value of 'msitranslate' for all PCI devices passed
 through to this VM. See L<msitranslate|/"msitranslate_boolean"> above.
+
+=item B<pci_seize=BOOLEAN>
+
+Changes the default value of 'seize' for all PCI devices passed
+through to this VM. See L<seize|/"seize_boolean"> above.
 
 =item B<pci_power_mgmt=BOOLEAN>
 

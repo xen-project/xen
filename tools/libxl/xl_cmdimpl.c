@@ -737,6 +737,7 @@ static void parse_config_data(const char *config_source,
     int pci_power_mgmt = 0;
     int pci_msitranslate = 0;
     int pci_permissive = 0;
+    int pci_seize = 0;
     int i, e;
 
     libxl_domain_create_info *c_info = &d_config->c_info;
@@ -1462,6 +1463,9 @@ skip_vfb:
     if (!xlu_cfg_get_long (config, "pci_permissive", &l, 0))
         pci_permissive = l;
 
+    if (!xlu_cfg_get_long (config, "pci_seize", &l, 0))
+        pci_seize = l;
+
     /* To be reworked (automatically enabled) once the auto ballooning
      * after guest starts is done (with PCI devices passed in). */
     if (c_info->type == LIBXL_DOMAIN_TYPE_PV) {
@@ -1481,6 +1485,7 @@ skip_vfb:
             pcidev->msitranslate = pci_msitranslate;
             pcidev->power_mgmt = pci_power_mgmt;
             pcidev->permissive = pci_permissive;
+            pcidev->seize = pci_seize;
             if (!xlu_pci_parse_bdf(config, pcidev, buf))
                 d_config->num_pcidevs++;
         }

@@ -444,6 +444,7 @@ libxl_device_pci = Struct("device_pci", [
     ("msitranslate", bool),
     ("power_mgmt", bool),
     ("permissive", bool),
+    ("seize", bool),
     ])
 
 libxl_device_vtpm = Struct("device_vtpm", [

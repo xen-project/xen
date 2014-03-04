@@ -1050,6 +1050,12 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcide
     rc = libxl__device_pci_setdefault(gc, pcidev);
     if (rc) goto out;
 
+    if (pcidev->seize && !pciback_dev_is_assigned(gc, pcidev)) {
+        rc = libxl__device_pci_assignable_add(gc, pcidev, 1);
+        if ( rc )
+            goto out;
+    }
+
     if (!libxl_pcidev_assignable(ctx, pcidev)) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "PCI device %x:%x:%x.%x is not assignable",
                    pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
