@@ -399,13 +399,9 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		 * revision D (model = 0x14) and later actually support it.
 		 * (AMD Erratum #110, docId: 25759).
 		 */
-		unsigned int lo, hi;
-
 		clear_bit(X86_FEATURE_LAHF_LM, c->x86_capability);
-		if (!rdmsr_amd_safe(0xc001100d, &lo, &hi)) {
-			hi &= ~1;
-			wrmsr_amd_safe(0xc001100d, lo, hi);
-		}
+		if (!rdmsr_amd_safe(0xc001100d, &l, &h))
+			wrmsr_amd_safe(0xc001100d, l, h & ~1);
 	}
 
 	switch(c->x86)
