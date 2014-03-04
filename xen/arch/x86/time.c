@@ -921,15 +921,15 @@ int cpu_frequency_change(u64 freq)
 void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
 {
     u64 x;
-    u32 y, _wc_sec, _wc_nsec;
+    u32 y;
     struct domain *d;
 
-    x = (secs * 1000000000ULL) + (u64)nsecs - system_time_base;
+    x = SECONDS(secs) + (u64)nsecs - system_time_base;
     y = do_div(x, 1000000000);
 
     spin_lock(&wc_lock);
-    wc_sec  = _wc_sec  = (u32)x;
-    wc_nsec = _wc_nsec = (u32)y;
+    wc_sec  = x;
+    wc_nsec = y;
     spin_unlock(&wc_lock);
 
     rcu_read_lock(&domlist_read_lock);
@@ -1548,8 +1548,8 @@ unsigned long get_localtime(struct domain *d)
 /* Return microsecs after 00:00:00 localtime, 1 January, 1970. */
 uint64_t get_localtime_us(struct domain *d)
 {
-    return ((wc_sec + d->time_offset_seconds) * 1000000000ULL
-        + wc_nsec + NOW()) / 1000UL;
+    return (SECONDS(wc_sec + d->time_offset_seconds) + wc_nsec + NOW())
+           / 1000UL;
 }
 
 unsigned long get_sec(void)
@@ -1651,7 +1651,7 @@ struct tm wallclock_time(void)
     if ( !wc_sec )
         return (struct tm) { 0 };
 
-    seconds = NOW() + (wc_sec * 1000000000ull) + wc_nsec;
+    seconds = NOW() + SECONDS(wc_sec) + wc_nsec;
     do_div(seconds, 1000000000);
     return gmtime(seconds);
 }
