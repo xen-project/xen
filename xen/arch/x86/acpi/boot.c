@@ -56,7 +56,9 @@ bool_t __initdata acpi_ht = 1;	/* enable HT */
 bool_t __initdata acpi_lapic;
 bool_t __initdata acpi_ioapic;
 
-bool_t acpi_skip_timer_override __initdata;
+/* acpi_skip_timer_override: Skip IRQ0 overrides. */
+static bool_t acpi_skip_timer_override __initdata;
+boolean_param("acpi_skip_timer_override", acpi_skip_timer_override);
 
 #ifdef CONFIG_X86_LOCAL_APIC
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;

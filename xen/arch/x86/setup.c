@@ -71,10 +71,6 @@ static void parse_acpi_param(char *s);
 custom_param("acpi", parse_acpi_param);
 
 /* **** Linux config option: propagated to domain0. */
-/* acpi_skip_timer_override: Skip IRQ0 overrides. */
-boolean_param("acpi_skip_timer_override", acpi_skip_timer_override);
-
-/* **** Linux config option: propagated to domain0. */
 /* noapic: Disable IOAPIC setup. */
 boolean_param("noapic", skip_ioapic_setup);
 
@@ -1365,9 +1361,6 @@ void __init __start_xen(unsigned long mbi_p)
         /* Append any extra parameters. */
         if ( skip_ioapic_setup && !strstr(dom0_cmdline, "noapic") )
             safe_strcat(dom0_cmdline, " noapic");
-        if ( acpi_skip_timer_override &&
-             !strstr(dom0_cmdline, "acpi_skip_timer_override") )
-            safe_strcat(dom0_cmdline, " acpi_skip_timer_override");
         if ( (strlen(acpi_param) == 0) && acpi_disabled )
         {
             printk("ACPI is disabled, notifying Domain 0 (acpi=off)\n");
