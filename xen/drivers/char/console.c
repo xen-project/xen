@@ -1089,7 +1089,6 @@ void __bug(char *file, int line)
     printk("Xen BUG at %s:%d\n", file, line);
     dump_execution_state();
     panic("Xen BUG at %s:%d", file, line);
-    for ( ; ; ) ;
 }
 
 void __warn(char *file, int line)

@@ -201,7 +201,7 @@ static void __init noreturn blexit(const CHAR16 *str)
         efi_bs->FreePages(xsm.addr, PFN_UP(xsm.size));
 
     efi_bs->Exit(efi_ih, EFI_SUCCESS, 0, NULL);
-    for( ; ; ); /* not reached */
+    unreachable(); /* not reached */
 }
 
 /* generic routine for printing error messages */

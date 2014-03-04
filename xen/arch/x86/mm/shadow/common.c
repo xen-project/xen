@@ -874,7 +874,6 @@ static int sh_skip_sync(struct vcpu *v, mfn_t gl1mfn)
     SHADOW_ERROR("gmfn %#lx was OOS but not shadowed as an l1.\n",
                  mfn_x(gl1mfn));
     BUG();
-    return 0; /* BUG() is no longer __attribute__((noreturn)). */
 }
 
 
