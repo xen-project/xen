@@ -66,14 +66,24 @@ compat/%.c: public/%.h xlat.lst Makefile $(BASEDIR)/tools/compat-build-source.py
 	$(PYTHON) $(BASEDIR)/tools/compat-build-source.py >$@.new
 	mv -f $@.new $@
 
-compat/xlat.h: xlat.lst $(filter-out compat/xlat.h,$(headers-y)) $(BASEDIR)/tools/get-fields.sh Makefile
+compat/.xlat/%.h: compat/%.h compat/.xlat/%.lst $(BASEDIR)/tools/get-fields.sh Makefile
 	export PYTHON=$(PYTHON); \
-	grep -v '^[	 ]*#' xlat.lst | \
-	while read what name hdr; do \
-		hdr="compat/$$(echo $$hdr | sed 's,@arch@,$(compat-arch-y),g')"; \
-		echo '$(headers-y)' | grep -q "$$hdr" || continue; \
-		$(SHELL) $(BASEDIR)/tools/get-fields.sh "$$what" compat_$$name $$hdr || exit $$?; \
-	done >$@.new
+	while read what name; do \
+		$(SHELL) $(BASEDIR)/tools/get-fields.sh "$$what" compat_$$name $< || exit $$?; \
+	done <$(patsubst compat/%,compat/.xlat/%,$(basename $<)).lst >$@.new
+	mv -f $@.new $@
+
+.PRECIOUS: compat/.xlat/%.lst
+compat/.xlat/%.lst: xlat.lst Makefile
+	mkdir -p $(@D)
+	grep -v '^[ \t]*#' $< | sed -ne 's,@arch@,$(compat-arch-y),g' -e 's,[ \t]\+$*\.h[ \t]*$$,,p' >$@.new
+	$(call move-if-changed,$@.new,$@)
+
+xlat-y := $(shell sed -ne 's,@arch@,$(compat-arch-y),g' -e 's,^[?!][ \t]\+[^ \t]\+[ \t]\+,,p' xlat.lst | uniq)
+xlat-y := $(filter $(patsubst compat/%,%,$(headers-y)),$(xlat-y))
+
+compat/xlat.h: $(addprefix compat/.xlat/,$(xlat-y)) Makefile
+	cat $(filter %.h,$^) >$@.new
 	mv -f $@.new $@
 
 ifeq ($(XEN_TARGET_ARCH),$(XEN_COMPILE_ARCH))
