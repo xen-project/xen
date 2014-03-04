@@ -36,7 +36,7 @@ static unsigned int crashing_cpu;
 static DEFINE_PER_CPU_READ_MOSTLY(bool_t, crash_save_done);
 
 /* This becomes the NMI handler for non-crashing CPUs, when Xen is crashing. */
-void __attribute__((noreturn)) do_nmi_crash(struct cpu_user_regs *regs)
+void do_nmi_crash(struct cpu_user_regs *regs)
 {
     int cpu = smp_processor_id();
 
@@ -113,6 +113,7 @@ void __attribute__((noreturn)) do_nmi_crash(struct cpu_user_regs *regs)
         halt();
 }
 
+void nmi_crash(void);
 static void nmi_shootdown_cpus(void)
 {
     unsigned long msecs;
