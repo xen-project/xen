@@ -59,10 +59,13 @@ static inline struct cpu_info *get_cpu_info(void)
     ((sp & (~(STACK_SIZE-1))) +                 \
      (STACK_SIZE - sizeof(struct cpu_info) - sizeof(unsigned long)))
 
-#define reset_stack_and_jump(__fn)              \
-    __asm__ __volatile__ (                      \
-        "mov %0,%%"__OP"sp; jmp %c1"            \
-        : : "r" (guest_cpu_user_regs()), "i" (__fn) : "memory" )
+#define reset_stack_and_jump(__fn)                                      \
+    ({                                                                  \
+        __asm__ __volatile__ (                                          \
+            "mov %0,%%"__OP"sp; jmp %c1"                                \
+            : : "r" (guest_cpu_user_regs()), "i" (__fn) : "memory" );   \
+        unreachable();                                                  \
+    })
 
 #define schedule_tail(vcpu) (((vcpu)->arch.schedule_tail)(vcpu))
 

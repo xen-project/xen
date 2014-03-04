@@ -537,7 +537,7 @@ static char * __init cmdline_cook(char *p, char *loader_name)
     return p;
 }
 
-void __init __start_xen(unsigned long mbi_p)
+void __init noreturn __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
     char *cmdline, *kextra, *loader;

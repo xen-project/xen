@@ -133,12 +133,12 @@ void startup_cpu_idle_loop(void)
     reset_stack_and_jump(idle_loop);
 }
 
-static void continue_idle_domain(struct vcpu *v)
+static void noreturn continue_idle_domain(struct vcpu *v)
 {
     reset_stack_and_jump(idle_loop);
 }
 
-static void continue_nonidle_domain(struct vcpu *v)
+static void noreturn continue_nonidle_domain(struct vcpu *v)
 {
     check_wakeup_from_wait();
     mark_regs_dirty(guest_cpu_user_regs());
@@ -1521,13 +1521,11 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     update_vcpu_system_time(next);
 
     schedule_tail(next);
-    BUG();
 }
 
 void continue_running(struct vcpu *same)
 {
     schedule_tail(same);
-    BUG();
 }
 
 int __sync_local_execstate(void)

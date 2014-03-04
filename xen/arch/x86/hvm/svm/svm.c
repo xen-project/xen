@@ -911,7 +911,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
         wrmsrl(MSR_TSC_AUX, hvm_msr_tsc_aux(v));
 }
 
-static void svm_do_resume(struct vcpu *v) 
+static void noreturn svm_do_resume(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     bool_t debug_state = v->domain->debugger_attached;
