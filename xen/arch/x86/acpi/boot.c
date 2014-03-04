@@ -404,11 +404,15 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 	acpi_fadt_copy_address(pm1b_evt, pm1b_event, pm1_event);
 
 	printk(KERN_INFO PREFIX
-	       "SLEEP INFO: pm1x_cnt[%"PRIx64",%"PRIx64"], "
-	       "pm1x_evt[%"PRIx64",%"PRIx64"]\n",
+	       "SLEEP INFO: pm1x_cnt[%d:%"PRIx64",%d:%"PRIx64"], "
+	       "pm1x_evt[%d:%"PRIx64",%d:%"PRIx64"]\n",
+	       acpi_sinfo.pm1a_cnt_blk.space_id,
 	       acpi_sinfo.pm1a_cnt_blk.address,
+	       acpi_sinfo.pm1b_cnt_blk.space_id,
 	       acpi_sinfo.pm1b_cnt_blk.address,
+	       acpi_sinfo.pm1a_evt_blk.space_id,
 	       acpi_sinfo.pm1a_evt_blk.address,
+	       acpi_sinfo.pm1b_evt_blk.space_id,
 	       acpi_sinfo.pm1b_evt_blk.address);
 
 	/* Now FACS... */
