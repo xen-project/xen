@@ -1323,7 +1323,7 @@ void init_percpu_time(void)
     s_time_t now;
 
     /* Initial estimate for TSC rate. */
-    this_cpu(cpu_time).tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
+    t->tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
 
     local_irq_save(flags);
     rdtscll(t->local_tsc_stamp);
