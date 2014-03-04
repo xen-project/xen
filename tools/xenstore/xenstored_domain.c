@@ -606,7 +606,7 @@ static int dom0_init(void)
 	if (port == -1)
 		return -1;
 
-	dom0 = new_domain(NULL, 0, port); 
+	dom0 = new_domain(NULL, xenbus_master_domid(), port);
 	if (dom0 == NULL)
 		return -1;
 

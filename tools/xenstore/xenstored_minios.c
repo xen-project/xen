@@ -51,7 +51,7 @@ evtchn_port_t xenbus_evtchn(void)
 
 void *xenbus_map(void)
 {
-	return xc_gnttab_map_grant_ref(*xcg_handle, 0,
+	return xc_gnttab_map_grant_ref(*xcg_handle, xenbus_master_domid(),
 			GNTTAB_RESERVED_XENSTORE, PROT_READ|PROT_WRITE);
 }
 

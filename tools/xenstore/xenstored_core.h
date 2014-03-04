@@ -170,12 +170,15 @@ void trace(const char *fmt, ...);
 void dtrace_io(const struct connection *conn, const struct buffered_data *data, int out);
 
 extern int event_fd;
+extern int dom0_domid;
 extern int dom0_event;
 extern int priv_domid;
 
 /* Map the kernel's xenstore page. */
 void *xenbus_map(void);
 void unmap_xenbus(void *interface);
+
+static inline int xenbus_master_domid(void) { return dom0_domid; }
 
 /* Return the event channel used by xenbus. */
 evtchn_port_t xenbus_evtchn(void);
