@@ -1262,8 +1262,14 @@ static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *multidev,
         goto error_out;
     }
 
-    for (i = 0; i < d_config->num_pcidevs; i++)
-        libxl__device_pci_add(gc, domid, &d_config->pcidevs[i], 1);
+    for (i = 0; i < d_config->num_pcidevs; i++) {
+        ret = libxl__device_pci_add(gc, domid, &d_config->pcidevs[i], 1);
+        if (ret < 0) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "libxl_device_pci_add failed: %d", ret);
+            goto error_out;
+        }
+    }
 
     if (d_config->num_pcidevs > 0) {
         ret = libxl__create_pci_backend(gc, domid, d_config->pcidevs,
