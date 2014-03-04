@@ -11,7 +11,7 @@ static void raw_machine_reset(void)
     platform_reset();
 }
 
-static void halt_this_cpu(void *arg)
+static void noreturn halt_this_cpu(void *arg)
 {
     stop_cpu();
 }

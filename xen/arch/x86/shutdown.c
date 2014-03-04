@@ -452,7 +452,7 @@ static int __init reboot_init(void)
 }
 __initcall(reboot_init);
 
-static void __machine_restart(void *pdelay)
+static void noreturn __machine_restart(void *pdelay)
 {
     machine_restart(*(unsigned int *)pdelay);
 }

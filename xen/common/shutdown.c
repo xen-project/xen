@@ -17,7 +17,7 @@
 bool_t __read_mostly opt_noreboot;
 boolean_param("noreboot", opt_noreboot);
 
-static void maybe_reboot(void)
+static void noreturn maybe_reboot(void)
 {
     if ( opt_noreboot )
     {

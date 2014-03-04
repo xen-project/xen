@@ -15,7 +15,7 @@ DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
 
 #define raw_smp_processor_id() (get_processor_id())
 
-extern void stop_cpu(void);
+extern void noreturn stop_cpu(void);
 
 extern int arch_smp_init(void);
 extern int arch_cpu_init(int cpu, struct dt_device_node *dn);

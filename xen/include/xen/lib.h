@@ -87,7 +87,7 @@ extern void printk(const char *format, ...)
     __attribute__ ((format (printf, 1, 2)));
 extern void guest_printk(const struct domain *d, const char *format, ...)
     __attribute__ ((format (printf, 2, 3)));
-extern void panic(const char *format, ...)
+extern void noreturn panic(const char *format, ...)
     __attribute__ ((format (printf, 1, 2)));
 extern long vm_assist(struct domain *, unsigned int, unsigned int);
 extern int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst);
