@@ -99,4 +99,12 @@ CFLAGS-$(EARLY_PRINTK) += -DEARLY_PRINTK_INC=\"debug-$(EARLY_PRINTK_INC).inc\"
 CFLAGS-$(EARLY_PRINTK) += -DEARLY_PRINTK_BAUD=$(EARLY_PRINTK_BAUD)
 CFLAGS-$(EARLY_PRINTK) += -DEARLY_UART_BASE_ADDRESS=$(EARLY_UART_BASE_ADDRESS)
 CFLAGS-$(EARLY_PRINTK) += -DEARLY_UART_REG_SHIFT=$(EARLY_UART_REG_SHIFT)
+
+else # !debug
+
+ifneq ($(CONFIG_EARLY_PRINTK),)
+# Early printk is dependant on a debug build.
+$(error CONFIG_EARLY_PRINTK enabled for non-debug build)
+endif
+
 endif
