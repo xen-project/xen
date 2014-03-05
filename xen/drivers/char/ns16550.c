@@ -616,6 +616,7 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
     unsigned int b, d, f, nextf, i;
     u16 vendor, device;
 
+    uart->io_base = 0;
     /* NB. Start at bus 1 to avoid AMT: a plug-in card cannot be on bus 0. */
     for ( b = skip_amt ? 1 : 0; b < 0x100; b++ )
     {
