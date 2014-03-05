@@ -19,8 +19,6 @@
 
 #include <asm/config.h>
 #include <asm/page.h>
-#include <asm/processor-ca15.h>
-#include <asm/processor-ca7.h>
 #include <asm/asm_defns.h>
 #include <asm/early_printk.h>
 
