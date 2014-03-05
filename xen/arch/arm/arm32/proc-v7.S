@@ -35,6 +35,7 @@ __v7_ca15mp_proc_info:
         .long 0x410FC0F0             /* Cortex-A15 */
         .long 0xFF0FFFF0             /* Mask */
         .long ca15mp_init
+        .long caxx_processor
         .size __v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
 
         .section ".init.proc.info", #alloc, #execinstr
@@ -43,6 +44,7 @@ __v7_ca7mp_proc_info:
         .long 0x410FC070             /* Cortex-A7 */
         .long 0xFF0FFFF0             /* Mask */
         .long ca7mp_init
+        .long caxx_processor
         .size __v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
 
         .section ".init.proc.info", #alloc, #execinstr
@@ -51,6 +53,7 @@ __v7_brahma15mp_proc_info:
         .long 0x420F00F2             /* Broadcom Brahma-B15 */
         .long 0xFF0FFFFF             /* Mask */
         .long brahma15mp_init
+        .long caxx_processor
         .size __v7_brahma15mp_proc_info, . - __v7_brahma15mp_proc_info
 
 /*

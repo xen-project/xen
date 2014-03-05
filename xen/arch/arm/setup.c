@@ -43,6 +43,7 @@
 #include <asm/gic.h>
 #include <asm/cpufeature.h>
 #include <asm/platform.h>
+#include <asm/procinfo.h>
 
 struct cpuinfo_arm __read_mostly boot_cpu_data;
 
@@ -149,6 +150,8 @@ static void __init processor_id(void)
     {
         printk("32-bit Execution: Unsupported\n");
     }
+
+    processor_setup();
 }
 
 static void dt_unreserved_regions(paddr_t s, paddr_t e,

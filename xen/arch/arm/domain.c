@@ -28,7 +28,7 @@
 #include <asm/irq.h>
 #include <asm/cpufeature.h>
 #include <asm/vfp.h>
-#include <asm/processor-ca15.h>
+#include <asm/procinfo.h>
 
 #include <asm/gic.h>
 #include <asm/platform.h>
@@ -480,11 +480,7 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.actlr = READ_SYSREG32(ACTLR_EL1);
 
-    /* XXX: Handle other than CA15 cpus */
-    if ( v->domain->max_vcpus > 1 )
-        v->arch.actlr |= ACTLR_CA15_SMP;
-    else
-        v->arch.actlr &= ~ACTLR_CA15_SMP;
+    processor_vcpu_initialise(v);
 
     if ( (rc = vcpu_vgic_init(v)) != 0 )
         return rc;

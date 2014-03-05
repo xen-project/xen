@@ -21,10 +21,23 @@
 #ifndef __ASM_ARM_PROCINFO_H
 #define __ASM_ARM_PROCINFO_H
 
-struct proc_info_list {
-	unsigned int		cpu_val;
-	unsigned int		cpu_mask;
-    void                (*cpu_init)(void);
+#include <xen/sched.h>
+
+struct processor {
+    /* Initialize specific processor register for the new VPCU*/
+    void (*vcpu_initialise)(struct vcpu *v);
 };
+
+struct proc_info_list {
+    unsigned int        cpu_val;
+    unsigned int        cpu_mask;
+    void                (*cpu_init)(void);
+    struct processor    *processor;
+};
+
+const __init struct proc_info_list *lookup_processor_type(void);
+
+void __init processor_setup(void);
+void processor_vcpu_initialise(struct vcpu *v);
 
 #endif
