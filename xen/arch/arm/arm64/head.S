@@ -546,6 +546,13 @@ putn:   ret
 
 #endif /* EARLY_PRINTK */
 
+/* This provides a C-API version of __lookup_processor_type
+ * TODO: For now, the implementation return NULL every time
+ */
+GLOBAL(lookup_processor_type)
+        mov  x0, #0
+        ret
+
 /*
  * Local variables:
  * mode: ASM
