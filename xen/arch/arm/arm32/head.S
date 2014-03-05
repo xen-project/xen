@@ -198,26 +198,16 @@ skip_bss:
         PRINT("- Setting up control registers -\r\n")
 
         /* Get processor specific proc info into r1 */
-        mrc   CP32(r0, MIDR)                /* r0 := our cpu id */
-        ldr   r1, = __proc_info_start
-        add   r1, r1, r10                   /* r1 := paddr of table (start) */
-        ldr   r2, = __proc_info_end
-        add   r2, r2, r10                   /* r2 := paddr of table (end) */
-1:      ldr   r3, [r1, #PROCINFO_cpu_mask]
-        and   r4, r0, r3                    /* r4 := our cpu id with mask */
-        ldr   r3, [r1, #PROCINFO_cpu_val]   /* r3 := cpu val in current proc info */
-        teq   r4, r3
-        beq   2f                            /* Match => exit, or try next proc info */
-        add   r1, r1, #PROCINFO_sizeof
-        cmp   r1, r2
-        blo   1b
+        bl    __lookup_processor_type
+        teq   r1, #0
+        bne   1f
         mov   r4, r0
         PRINT("- Missing processor info: ")
         mov   r0, r4
         bl    putn
         PRINT(" -\r\n")
         b     fail
-2:
+1:
 
         /* Jump to cpu_init */
         ldr   r1, [r1, #PROCINFO_cpu_init]  /* r1 := vaddr(init func) */
@@ -544,6 +534,45 @@ puts:
 putn:   mov   pc, lr
 
 #endif /* !EARLY_PRINTK */
+
+/* This provides a C-API version of __lookup_processor_type */
+GLOBAL(lookup_processor_type)
+        stmfd sp!, {r4, r10, lr}
+        mov   r10, #0                   /* r10 := offset between virt&phys */
+        bl    __lookup_processor_type
+        mov r0, r1
+        ldmfd sp!, {r4, r10, pc}
+
+/* Read processor ID register (CP#15, CR0), and Look up in the linker-built
+ * supported processor list. Note that we can't use the absolute addresses for
+ * the __proc_info lists since we aren't running with the MMU on (and therefore,
+ * we are not in correct address space). We have to calculate the offset.
+ *
+ * r10: offset between virt&phys
+ *
+ * Returns:
+ * r0: CPUID
+ * r1: proc_info pointer
+ * Clobbers r2-r4
+ */
+__lookup_processor_type:
+        mrc   CP32(r0, MIDR)                /* r0 := our cpu id */
+        ldr   r1, = __proc_info_start
+        add   r1, r1, r10                   /* r1 := paddr of table (start) */
+        ldr   r2, = __proc_info_end
+        add   r2, r2, r10                   /* r2 := paddr of table (end) */
+1:      ldr   r3, [r1, #PROCINFO_cpu_mask]
+        and   r4, r0, r3                    /* r4 := our cpu id with mask */
+        ldr   r3, [r1, #PROCINFO_cpu_val]   /* r3 := cpu val in current proc info */
+        teq   r4, r3
+        beq   2f                            /* Match => exit, or try next proc info */
+        add   r1, r1, #PROCINFO_sizeof
+        cmp   r1, r2
+        blo   1b
+        /* We failed to find the proc_info, return NULL */
+        mov   r1, #0
+2:
+        mov   pc, lr
 
 /*
  * Local variables:
