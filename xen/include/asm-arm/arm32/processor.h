@@ -1,7 +1,7 @@
 #ifndef __ASM_ARM_ARM32_PROCESSOR_H
 #define __ASM_ARM_ARM32_PROCESSOR_H
 
-#define ACTLR_V7_SMP    (1<<6)
+#define ACTLR_CAXX_SMP      (1<<6)
 
 #ifndef __ASSEMBLY__
 /* On stack VCPU state */
