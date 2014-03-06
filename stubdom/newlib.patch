@@ -81,28 +81,6 @@ diff -u -p -r1.10 stdint.h
 
 Define the basic ia64 jump buffer
 
-Index: newlib/libc/include/machine/setjmp.h
-===================================================================
-RCS file: /cvs/src/src/newlib/libc/include/machine/setjmp.h,v
-retrieving revision 1.34
-diff -u -p -r1.34 setjmp.h
---- newlib/libc/include/machine/setjmp.h	7 Nov 2007 21:42:24 -0000	1.34
-+++ newlib/libc/include/machine/setjmp.h	11 Jan 2008 18:10:43 -0000
-@@ -72,6 +72,11 @@ _BEGIN_STD_C
- #define _JBLEN  8
- #endif
- 
-+#ifdef __ia64__
-+#define _JBTYPE long
-+#define _JBLEN 70
-+#endif
-+
- #ifdef __i960__
- #define _JBLEN 35
- #endif
-
-In mini-os we use a dynamic reentrency buffer.
-
 Index: newlib/libc/include/sys/config.h
 ===================================================================
 RCS file: /cvs/src/src/newlib/libc/include/sys/config.h,v
