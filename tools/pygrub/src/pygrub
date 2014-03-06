@@ -360,11 +360,7 @@ class Grub:
                 curline = len(img.lines) - 1
 
         if self.isdone:
-           # Fix to allow pygrub command-line editing in Lilo bootloader (used by IA64)
-           if platform.machine() == 'ia64':
-              origimg.reset(img.lines, img.path)
-           else:
-              origimg.reset(img.lines)
+           origimg.reset(img.lines)
 
     def edit_line(self, line):
         self.screen.erase()
@@ -416,25 +412,16 @@ class Grub:
         if not os.access(fn, os.R_OK):
             raise RuntimeError, "Unable to access %s" %(fn,)
 
-        if platform.machine() == 'ia64':
-            cfg_list = map(lambda x: (x,grub.LiloConf.LiloConfigFile), 
-                           # common distributions
-                           ["/efi/debian/elilo.conf", "/efi/gentoo/elilo.conf", 
-                            "/efi/redflag/elilo.conf", "/efi/redhat/elilo.conf", 
-                            "/efi/SuSE/elilo.conf",] + 
-                           # fallbacks
-                           ["/efi/boot/elilo.conf", "/elilo.conf",])
-        else:
-            cfg_list = map(lambda x: (x,grub.GrubConf.Grub2ConfigFile),
-                           ["/boot/grub/grub.cfg", "/grub/grub.cfg",
-                            "/boot/grub2/grub.cfg", "/grub2/grub.cfg"]) + \
-                       map(lambda x: (x,grub.ExtLinuxConf.ExtLinuxConfigFile),
-                           ["/boot/isolinux/isolinux.cfg",
-                            "/boot/extlinux/extlinux.conf",
-                            "/boot/extlinux.conf"]) + \
-                       map(lambda x: (x,grub.GrubConf.GrubConfigFile),
-                           ["/boot/grub/menu.lst", "/boot/grub/grub.conf",
-                            "/grub/menu.lst", "/grub/grub.conf"])
+        cfg_list = map(lambda x: (x,grub.GrubConf.Grub2ConfigFile),
+                       ["/boot/grub/grub.cfg", "/grub/grub.cfg",
+                        "/boot/grub2/grub.cfg", "/grub2/grub.cfg"]) + \
+                   map(lambda x: (x,grub.ExtLinuxConf.ExtLinuxConfigFile),
+                       ["/boot/isolinux/isolinux.cfg",
+                        "/boot/extlinux/extlinux.conf",
+                        "/boot/extlinux.conf"]) + \
+                   map(lambda x: (x,grub.GrubConf.GrubConfigFile),
+                       ["/boot/grub/menu.lst", "/boot/grub/grub.conf",
+                        "/grub/menu.lst", "/grub/grub.conf"])
 
         if not fs:
             # set the config file and parse it
