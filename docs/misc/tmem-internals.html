@@ -728,13 +728,6 @@ However, the Xen heap is limited in size on
 32-bit Xen so tmem did not work very well.
 There are still 32-bit ifdefs in some places in the code, but things may
 have bit-rotted so using tmem on a 32-bit Xen is not recommended.
-<P>
-<b><i>IA-64 implementation. </i></b>
-The vast majority of the tmem
-implementation is architecture-independent.
-For tmem to run on Xen/ia64, it is believed that only one or two
-routines needs to be written.(See the
-#ifdef __ia64__ at <i>cli_mfn_to_va()</i>.)
 
 <h2>Known Issues</h2>
 
