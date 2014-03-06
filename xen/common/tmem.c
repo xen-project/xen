@@ -2614,17 +2614,15 @@ long do_tmem_op(tmem_cli_op_t uops)
 
     if ( client != NULL && client->domain->is_dying )
     {
-        rc = -ENODEV;
- simple_error:
         errored_tmem_ops++;
-        return rc;
+        return -ENODEV;
     }
 
     if ( unlikely(tmem_get_tmemop_from_client(&op, uops) != 0) )
     {
         tmem_client_err("tmem: can't get tmem struct from %s\n", tmem_client_str);
-        rc = -EFAULT;
-        goto simple_error;
+        errored_tmem_ops++;
+        return -EFAULT;
     }
 
     if ( op.cmd == TMEM_CONTROL )
