@@ -137,10 +137,9 @@ command line parameter to the Xen hypervisor. It has two forms:
       e.g. crashkernel=128M@256M
 
    Regardless of which of the two forms of the crashkernel command line you
-   use, the crash kernel region should appear in /proc/iomem on x86 or
-   /proc/iomem_machine on ia64. If it doesn't then either the crashkernel
-   parameter is missing, or for some reason the region couldn't be placed -
-   for instance because it is too large.
+   use, the crash kernel region should appear in /proc/iomem on x86. If it
+   doesn't then either the crashkernel parameter is missing, or for some
+   reason the region couldn't be placed - for instance because it is too large.
 
    # cat /proc/iomem
    ...
@@ -179,8 +178,6 @@ On x86 systems the crash kernel may be either
 - Relocatability is controlled by the CONFIG_RELOCATABLE kernel
   compile configuration parameter. This option may not be available
   depending on the kernel version
-On ia64
-  Either a vmlinuz or vmlinux.gz image may be used
 
 
 2. Execute
