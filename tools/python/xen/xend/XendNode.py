@@ -132,16 +132,6 @@ class XendNode:
                       'stepping' : cpuinfo[number]['stepping'],
                       'flags'    : cpuinfo[number]['flags'],
                     })
-            elif arch.type == "ia64":
-                self.cpus[u].update(
-                    { 'host'     : self.uuid,
-                      'features' : cpu_features,
-                      'speed'    : int(float(cpuinfo[number]['cpu MHz'])),
-                      'vendor'   : cpuinfo[number]['vendor'],
-                      'modelname': cpuinfo[number]['family'],
-                      'stepping' : cpuinfo[number]['model'],
-                      'flags'    : cpuinfo[number]['features'],
-                    })
             else:
                 self.cpus[u].update(
                     { 'host'     : self.uuid,

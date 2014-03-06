@@ -39,15 +39,12 @@ def getRdPath():
 
     return rdpath
 
-# Begin: Intel ia32 and ia64 as well as AMD 32-bit and 64-bit processors
+# Begin: Intel as well as AMD 32-bit and 64-bit processors
 def ia_checkBuffer(buffer):
     return
 
 def ia_minSafeMem():
     return 32
-
-def ia64_minSafeMem():
-    return 128
 
 def ia_getDeviceModel():
     """Get the path to the device model based on
@@ -85,7 +82,7 @@ ia_HVMDefaults =      {"memory"       : 64,
                        "serial"       : "pty",
                        "device_model" : ia_getDeviceModel(),
 }
-# End  : Intel ia32 and ia64 as well as AMD 32-bit and 64-bit processors
+# End  : Intel as well as AMD 32-bit and 64-bit processors
 
 """Convert from uname specification to a more general platform."""
 _uname_to_arch_map = {
@@ -94,12 +91,11 @@ _uname_to_arch_map = {
     "i586"  : "x86",
     "i686"  : "x86",
     "x86_64": "x86_64",
-    "ia64"  : "ia64",
 }
 
 # Lookup current platform.
 _arch = _uname_to_arch_map.get(os.uname()[4], "Unknown")
-if _arch == "x86" or _arch == "x86_64" or _arch == "ia64":
+if _arch == "x86" or _arch == "x86_64":
     minSafeMem = ia_minSafeMem
     getDefaultKernel = ia_getDefaultKernel
     checkBuffer = ia_checkBuffer
@@ -117,10 +113,6 @@ if _arch == "x86" or _arch == "x86_64" or _arch == "ia64":
             configDefaults['extra'] = configDefaults['extra'] + " " + clause
         else:
             configDefaults['extra'] = clause
-
-    if _arch == "ia64":
-        minSafeMem = ia64_minSafeMem
-        configDefaults['memory'] = ia64_minSafeMem()
 
 else:
     raise ValueError, "Unknown architecture!"

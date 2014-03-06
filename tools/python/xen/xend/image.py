@@ -729,8 +729,6 @@ class LinuxImageHandler(ImageHandler):
         log.debug("features       = %s", self.vm.getFeatures())
         log.debug("flags          = %d", self.flags)
         log.debug("superpages     = %d", self.superpages)
-        if arch.type == "ia64":
-            log.debug("vhpt          = %d", self.vhpt)
 
         return xc.linux_build(domid          = self.vm.getDomid(),
                               memsize        = mem_mb,
@@ -982,56 +980,6 @@ class HVMImageHandler(ImageHandler):
         return rc
 
 
-class IA64_HVM_ImageHandler(HVMImageHandler):
-
-    def configure(self, vmConfig):
-        HVMImageHandler.configure(self, vmConfig)
-        self.vhpt = int(vmConfig['platform'].get('vhpt',  0))
-        self.vramsize = int(vmConfig['platform'].get('videoram',4)) * 1024
-
-    def buildDomain(self):
-        xc.nvram_init(self.vm.getName(), self.vm.getDomid())
-        xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_VHPT_SIZE, self.vhpt)
-        if self.guest_os_type is not None:
-            xc.set_os_type(self.guest_os_type.lower(), self.vm.getDomid())
-        return HVMImageHandler.buildDomain(self)
-
-    def getRequiredAvailableMemory(self, mem_kb):
-        page_kb = 16
-        # ROM size for guest firmware, io page, xenstore page
-        # buffer io page, buffer pio page and memmap info page
-        extra_pages = 1024 + 5
-        mem_kb += extra_pages * page_kb
-        mem_kb += self.vramsize
-        return mem_kb
-
-    def getRequiredInitialReservation(self):
-        return self.vm.getMemoryTarget()
-
-    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
-        # Explicit shadow memory is not a concept 
-        return 0
-
-    def getDeviceModelArgs(self, restore = False):
-        args = HVMImageHandler.getDeviceModelArgs(self, restore)
-        args = args + ([ "-m", "%s" %
-                         (self.getRequiredInitialReservation() / 1024) ])
-        return args
-
-    def setCpuid(self):
-        # Guest CPUID configuration is not implemented yet.
-        return
-
-class IA64_Linux_ImageHandler(LinuxImageHandler):
-
-    def configure(self, vmConfig):
-        LinuxImageHandler.configure(self, vmConfig)
-        self.vhpt = int(vmConfig['platform'].get('vhpt',  0))
-
-    def setCpuid(self):
-        # Guest CPUID configuration is not implemented yet.
-        return
-
 class X86_HVM_ImageHandler(HVMImageHandler):
 
     def configure(self, vmConfig):
@@ -1079,10 +1027,6 @@ class X86_Linux_ImageHandler(LinuxImageHandler):
         return rc
 
 _handlers = {
-    "ia64": {
-        "linux": IA64_Linux_ImageHandler,
-        "hvm": IA64_HVM_ImageHandler,
-    },
     "x86": {
         "linux": X86_Linux_ImageHandler,
         "hvm": X86_HVM_ImageHandler,

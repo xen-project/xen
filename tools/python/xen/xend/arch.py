@@ -27,6 +27,5 @@ _types = {
     "x86_64": "x86",
     "amd64": "x86",
     "i86pc": "x86",
-    "ia64": "ia64",
 }
 type = _types.get(os.uname()[4], "unknown")

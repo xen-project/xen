@@ -412,7 +412,7 @@ class PciController(DevController):
                                     ' the same guest with %s'
                                 raise VmError(err_msg % (f, dev.name))
             elif dev.dev_type == DEV_TYPE_PCI:
-                if dev.bus == 0 or arch.type == "ia64":
+                if dev.bus == 0:
                     if not dev.pci_af_flr:
                         # We cope with this case by using the Dstate transition
                         # method or some vendor specific methods for now.
