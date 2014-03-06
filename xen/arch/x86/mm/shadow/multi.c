@@ -592,6 +592,8 @@ _sh_propagate(struct vcpu *v,
     {
         unsigned int type;
 
+        ASSERT(!(sflags & (_PAGE_PAT | _PAGE_PCD | _PAGE_PWT)));
+
         /* compute the PAT index for shadow page entry when VT-d is enabled
          * and device assigned. 
          * 1) direct MMIO: compute the PAT index with gMTRR=UC and gPAT.
