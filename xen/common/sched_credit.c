@@ -29,9 +29,9 @@
  * Basic constants
  */
 #define CSCHED_DEFAULT_WEIGHT       256
-#define CSCHED_TICKS_PER_TSLICE     1
-/* Default timeslice: 5ms */
-#define CSCHED_DEFAULT_TSLICE_MS    5
+#define CSCHED_TICKS_PER_TSLICE     3
+/* Default timeslice: 30ms */
+#define CSCHED_DEFAULT_TSLICE_MS    30
 #define CSCHED_CREDITS_PER_MSEC     10
 
 
