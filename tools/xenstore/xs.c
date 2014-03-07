@@ -724,7 +724,10 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 	struct iovec iov[2];
 
 #ifdef USE_PTHREAD
-#define READ_THREAD_STACKSIZE PTHREAD_STACK_MIN
+#define DEFAULT_THREAD_STACKSIZE (16 * 1024)
+#define READ_THREAD_STACKSIZE 					\
+	((DEFAULT_THREAD_STACKSIZE < PTHREAD_STACK_MIN) ? 	\
+	PTHREAD_STACK_MIN : DEFAULT_THREAD_STACKSIZE)
 
 	/* We dynamically create a reader thread on demand. */
 	mutex_lock(&h->request_mutex);
