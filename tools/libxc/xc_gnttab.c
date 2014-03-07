@@ -18,7 +18,6 @@
  */
 
 #include "xc_private.h"
-#include <errno.h>
 
 int xc_gnttab_op(xc_interface *xch, int cmd, void * op, int op_size, int count)
 {

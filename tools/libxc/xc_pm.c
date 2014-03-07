@@ -19,7 +19,6 @@
  *
  */
 
-#include <errno.h>
 #include <stdbool.h>
 #include "xc_private.h"
 

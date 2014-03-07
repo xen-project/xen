@@ -29,7 +29,6 @@
 #include <mini-os/events.h>
 #include <mini-os/wait.h>
 #include <sys/mman.h>
-#include <errno.h>
 
 #include <xen/memory.h>
 #include <unistd.h>

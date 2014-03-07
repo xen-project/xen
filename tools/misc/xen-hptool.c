@@ -1,7 +1,6 @@
 #include <xenctrl.h>
 #include <xc_private.h>
 #include <xc_core.h>
-#include <errno.h>
 #include <unistd.h>
 
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))

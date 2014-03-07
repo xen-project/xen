@@ -32,7 +32,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <inttypes.h>
-#include <errno.h>
 #include "xc_private.h"
 #include "xenctrl.h"
 #include "xg_save_restore.h"
