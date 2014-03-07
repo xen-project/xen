@@ -80,10 +80,14 @@ static struct ns16550 {
 #endif
 } ns16550_com[2] = { { 0 } };
 
-/* Defining uart config options for MMIO devices */
 struct ns16550_config_mmio {
     u16 vendor_id;
     u16 dev_id;
+    unsigned int param;
+};
+
+/* Defining uart config options for MMIO devices */
+struct ns16550_config_param {
     unsigned int reg_shift;
     unsigned int reg_width;
     unsigned int fifo_size;
@@ -96,28 +100,27 @@ struct ns16550_config_mmio {
 
 
 #ifdef HAS_PCI
+enum {
+    param_default = 0,
+    param_trumanage,
+    param_oxford,
+};
 /*
  * Create lookup tables for specific MMIO devices..
  * It is assumed that if the device found is MMIO,
  * then you have indexed it here. Else, the driver
  * does nothing.
  */
-static struct ns16550_config_mmio __initdata uart_config[] =
-{
-    /* Broadcom TruManage device */
-    {
-        .vendor_id = 0x14e4,
-        .dev_id = 0x160a,
+static const struct ns16550_config_param __initconst uart_param[] = {
+    [param_default] = { }, /* Ignored. */
+    [param_trumanage] = {
         .reg_shift = 2,
         .reg_width = 1,
         .fifo_size = 16,
         .lsr_mask = (UART_LSR_THRE | UART_LSR_TEMT),
         .max_bars = 1,
     },
-    /* OXPCIe952 1 Native UART  */
-    {
-        .vendor_id = 0x1415,
-        .dev_id = 0xc138,
+    [param_oxford] = {
         .base_baud = 4000000,
         .uart_offset = 0x200,
         .first_offset = 0x1000,
@@ -126,6 +129,21 @@ static struct ns16550_config_mmio __initdata uart_config[] =
         .fifo_size = 16,
         .lsr_mask = UART_LSR_THRE,
         .max_bars = 1, /* It can do more, but we would need more custom code.*/
+    }
+};
+static const struct ns16550_config_mmio __initconst uart_config[] =
+{
+    /* Broadcom TruManage device */
+    {
+        .vendor_id = 0x14e4,
+        .dev_id = 0x160a,
+        .param = param_trumanage,
+    },
+    /* OXPCIe952 1 Native UART  */
+    {
+        .vendor_id = 0x1415,
+        .dev_id = 0xc138,
+        .param = param_oxford,
     }
 };
 #endif
@@ -692,37 +710,40 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
 
                     size &= -size;
 
-                    /* Check for quirks in uart_config lookup table */
+                    /* Check for params in uart_config lookup table */
                     for ( i = 0; i < ARRAY_SIZE(uart_config); i++)
                     {
+                        unsigned int p;
+
                         if ( uart_config[i].vendor_id != vendor )
                             continue;
 
                         if ( uart_config[i].dev_id != device )
                             continue;
 
+                        p = uart_config[i].param;
                         /*
                          * Force length of mmio region to be at least
                          * 8 bytes times (1 << reg_shift)
                          */
-                        if ( size < (0x8 * (1 << uart_config[i].reg_shift)) )
+                        if ( size < (0x8 * (1 << uart_param[p].reg_shift)) )
                             continue;
 
-                        if ( bar_idx >= uart_config[i].max_bars )
+                        if ( bar_idx >= uart_param[p].max_bars )
                             continue;
 
-                        if ( uart_config[i].fifo_size )
-                            uart->fifo_size = uart_config[i].fifo_size;
+                        if ( uart_param[p].fifo_size )
+                            uart->fifo_size = uart_param[p].fifo_size;
 
-                        uart->reg_shift = uart_config[i].reg_shift;
-                        uart->reg_width = uart_config[i].reg_width;
-                        uart->lsr_mask = uart_config[i].lsr_mask;
+                        uart->reg_shift = uart_param[p].reg_shift;
+                        uart->reg_width = uart_param[p].reg_width;
+                        uart->lsr_mask = uart_param[p].lsr_mask;
                         uart->io_base = ((u64)bar_64 << 32) |
                                         (bar & PCI_BASE_ADDRESS_MEM_MASK);
-                        uart->io_base += uart_config[i].first_offset;
-                        uart->io_base += bar_idx * uart_config[i].uart_offset;
-                        if ( uart_config[i].base_baud )
-                            uart->clock_hz = uart_config[i].base_baud * 16;
+                        uart->io_base += uart_param[p].first_offset;
+                        uart->io_base += bar_idx * uart_param[p].uart_offset;
+                        if ( uart_param[p].base_baud )
+                            uart->clock_hz = uart_param[p].base_baud * 16;
                         /* Set device and MMIO region read only to Dom0 */
                         uart->enable_ro = 1;
                         break;
