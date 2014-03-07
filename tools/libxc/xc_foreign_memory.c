@@ -27,7 +27,7 @@ void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
     int i, *err;
 
     if (num < 0) {
-        errno = -EINVAL;
+        errno = EINVAL;
         return NULL;
     }
 

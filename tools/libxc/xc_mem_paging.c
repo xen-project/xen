@@ -76,7 +76,7 @@ int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
 {
     int rc, old_errno;
 
-    errno = -EINVAL;
+    errno = EINVAL;
 
     if ( !buffer )
         return -1;

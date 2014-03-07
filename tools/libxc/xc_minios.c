@@ -349,7 +349,7 @@ static int minios_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t
         }
     }
     printf("Warning: couldn't find port %"PRId32" for xc handle %x\n", port, fd);
-    errno = -EINVAL;
+    errno = EINVAL;
     return -1;
 }
 
