@@ -143,7 +143,181 @@ static const struct ns16550_config_mmio __initconst uart_config[] =
     /* OXPCIe952 1 Native UART  */
     {
         .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc11b,
+        .param = param_oxford,
+    },
+    /* OXPCIe952 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc11f,
+        .param = param_oxford,
+    },
+    /* OXPCIe952 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
         .dev_id = 0xc138,
+        .param = param_oxford,
+    },
+    /* OXPCIe952 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc13d,
+        .param = param_oxford,
+    },
+    /* OXPCIe952 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc40b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc40f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc41b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc41f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc42b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc42f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc43b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc43f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc44b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc44f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc45b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc45f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc46b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc46f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc47b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc47f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc48b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc48f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc49b,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc49f,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4ab,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4af,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4bb,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4bf,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4cb,
+        .param = param_oxford,
+    },
+    /* OXPCIe200 1 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc4cf,
         .param = param_oxford,
     }
 };
