@@ -612,10 +612,11 @@ static int __init
 pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
 {
     uint32_t bar, bar_64 = 0, len, len_64;
-    u64 size, mask;
+    u64 size, mask, orig_base;
     unsigned int b, d, f, nextf, i;
     u16 vendor, device;
 
+    orig_base = uart->io_base;
     uart->io_base = 0;
     /* NB. Start at bus 1 to avoid AMT: a plug-in card cannot be on bus 0. */
     for ( b = skip_amt ? 1 : 0; b < 0x100; b++ )
@@ -747,9 +748,8 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
     if ( !skip_amt )
         return -1;
 
-    uart->io_base = 0x3f8;
-    uart->irq = 0;
-    uart->clock_hz  = UART_CLOCK_HZ;
+    /* No AMT found, fallback to the defaults. */
+    uart->io_base = orig_base;
 
     return 0;
 }
