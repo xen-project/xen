@@ -70,10 +70,14 @@ static const uint8_t mm_type_tbl[MTRR_NUM_TYPES][PAT_TYPE_NUMS] = {
  * Reverse lookup table, to find a pat type according to MTRR and effective
  * memory type. This table is dynamically generated.
  */
-static uint8_t mtrr_epat_tbl[MTRR_NUM_TYPES][MEMORY_NUM_TYPES];
+static uint8_t __read_mostly mtrr_epat_tbl[MTRR_NUM_TYPES][MEMORY_NUM_TYPES] =
+    { [0 ... MTRR_NUM_TYPES-1] =
+        { [0 ... MEMORY_NUM_TYPES-1] = INVALID_MEM_TYPE }
+    };
 
 /* Lookup table for PAT entry of a given PAT value in host PAT. */
-static uint8_t pat_entry_tbl[PAT_TYPE_NUMS];
+static uint8_t __read_mostly pat_entry_tbl[PAT_TYPE_NUMS] =
+    { [0 ... PAT_TYPE_NUMS-1] = INVALID_MEM_TYPE };
 
 static void get_mtrr_range(uint64_t base_msr, uint64_t mask_msr,
                            uint64_t *base, uint64_t *end)
@@ -149,23 +153,21 @@ bool_t is_var_mtrr_overlapped(struct mtrr_state *m)
 #define MTRRphysBase_MSR(reg) (0x200 + 2 * (reg))
 #define MTRRphysMask_MSR(reg) (0x200 + 2 * (reg) + 1)
 
-static int hvm_mtrr_pat_init(void)
+static int __init hvm_mtrr_pat_init(void)
 {
     unsigned int i, j, phys_addr;
 
-    memset(&mtrr_epat_tbl, INVALID_MEM_TYPE, sizeof(mtrr_epat_tbl));
     for ( i = 0; i < MTRR_NUM_TYPES; i++ )
     {
         for ( j = 0; j < PAT_TYPE_NUMS; j++ )
         {
-            int32_t tmp = mm_type_tbl[i][j];
-            if ( (tmp >= 0) && (tmp < MEMORY_NUM_TYPES) )
+            unsigned int tmp = mm_type_tbl[i][j];
+
+            if ( tmp < MEMORY_NUM_TYPES )
                 mtrr_epat_tbl[i][tmp] = j;
         }
     }
 
-    memset(&pat_entry_tbl, INVALID_MEM_TYPE,
-           PAT_TYPE_NUMS * sizeof(pat_entry_tbl[0]));
     for ( i = 0; i < PAT_TYPE_NUMS; i++ )
     {
         for ( j = 0; j < PAT_TYPE_NUMS; j++ )
@@ -190,16 +192,16 @@ __initcall(hvm_mtrr_pat_init);
 
 uint8_t pat_type_2_pte_flags(uint8_t pat_type)
 {
-    int32_t pat_entry = pat_entry_tbl[pat_type];
+    unsigned int pat_entry = pat_entry_tbl[pat_type];
 
-    /* INVALID_MEM_TYPE, means doesn't find the pat_entry in host pat for
-     * a given pat_type. If host pat covers all the pat types,
-     * it can't happen.
+    /*
+     * INVALID_MEM_TYPE, means doesn't find the pat_entry in host PAT for a
+     * given pat_type. If host PAT covers all the PAT types, it can't happen.
      */
-    if ( likely(pat_entry != INVALID_MEM_TYPE) )
-        return pat_entry_2_pte_flags[pat_entry];
+    if ( unlikely(pat_entry == INVALID_MEM_TYPE) )
+        pat_entry = pat_entry_tbl[PAT_TYPE_UNCACHABLE];
 
-    return pat_entry_2_pte_flags[pat_entry_tbl[PAT_TYPE_UNCACHABLE]];
+    return pat_entry_2_pte_flags[pat_entry];
 }
 
 int hvm_vcpu_cacheattr_init(struct vcpu *v)
