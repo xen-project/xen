@@ -150,7 +150,7 @@ world:
 # to be a full featured policy compliant .deb package.
 .PHONY: debball
 debball: dist
-	fakeroot sh ./tools/misc/mkdeb $(XEN_ROOT) $$($(MAKE) -C xen xenversion | grep -v :)
+	fakeroot sh ./tools/misc/mkdeb $(XEN_ROOT) $$($(MAKE) -C xen xenversion --no-print-directory)
 
 # clean doesn't do a kclean
 .PHONY: clean
