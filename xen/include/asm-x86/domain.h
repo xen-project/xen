@@ -395,7 +395,7 @@ struct arch_vcpu
 
     unsigned long      flags; /* TF_ */
 
-    void noreturn (*schedule_tail) (struct vcpu *);
+    void (*schedule_tail) (struct vcpu *);
 
     void (*ctxt_switch_from) (struct vcpu *);
     void (*ctxt_switch_to) (struct vcpu *);
