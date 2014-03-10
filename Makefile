@@ -152,6 +152,13 @@ world:
 debball: dist
 	fakeroot sh ./tools/misc/mkdeb $(XEN_ROOT) $$($(MAKE) -C xen xenversion --no-print-directory)
 
+# Package a build in an rpmball file, that is inside a .rpm format
+# container to allow for easy and clean removal. This is not intended
+# to be a full featured policy compliant .rpm package.
+.PHONY: rpmball
+rpmball: dist
+	bash ./tools/misc/mkrpm $(XEN_ROOT) $$($(MAKE) -C xen xenversion --no-print-directory)
+
 # clean doesn't do a kclean
 .PHONY: clean
 clean::

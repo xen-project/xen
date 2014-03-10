@@ -1,0 +1,76 @@
+#!/bin/bash
+#
+# mkrpm: package the dist/install output of a Xen build in an .rpm
+#
+# Takes 2 arguments, the path to the dist directory and the version
+
+set -e
+
+if [[ -z "$1" || -z "$2" ]] ; then
+  echo "usage: $0 path-to-XEN_ROOT xen-version"
+  exit 1
+fi
+
+xenroot="$1"
+
+# rpmbuild doesn't like dashes in the version; break it down into
+# version and release.  Default to "0" if there isn't a release.
+v=(${2/-/ })
+version=${v[0]}
+release=${v[1]}
+
+[[ -n "$release" ]] || release="0"
+
+cd $xenroot
+
+# Prepare the directory to package
+cd dist
+rm -rf rpm
+
+# Fill in the rpm boilerplate
+mkdir -p rpm/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+cat >rpm/SPECS/xen.spec <<EOF
+Summary: Xen development build, version $version
+Name: xen
+Version: $version
+Release: $release
+License: GPL
+Group:   System/Hypervisor
+URL: http://xenbits.xenproject.org/xen.git
+
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+%define __spec_install_post /usr/lib/rpm/brp-compress || :
+%define debug_package %{nil}
+
+%description
+This package contains the Xen hypervisor and associated tools, built
+from a source tree.  It is not a fully packaged and supported Xen, just
+the output of a xen "make dist" wrapped in an .rpm to make it easy to
+uninstall.
+
+%build
+
+%install
+rm -rf \$RPM_BUILD_ROOT
+mkdir -p \$RPM_BUILD_ROOT
+cd %{_xenroot}
+dist/install.sh \$RPM_BUILD_ROOT/
+
+cd \$RPM_BUILD_ROOT
+
+%clean
+rm -rf \$RPM_BUILD_ROOT
+
+%files
+%defattr(-,root,root,-)
+/*
+
+%post
+EOF
+
+# Package it up
+rpmbuild --define "_xenroot $xenroot" --define "_topdir $PWD/rpm" -bb rpm/SPECS/xen.spec
+
+# Tidy up after ourselves
+mv rpm/RPMS/*/*.rpm .
+rm -rf rpm
