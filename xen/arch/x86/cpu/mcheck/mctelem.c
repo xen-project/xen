@@ -248,25 +248,14 @@ static void mctelem_processing_release(struct mctelem_ent *tep)
 	}
 }
 
-void mctelem_init(int reqdatasz)
+void __init mctelem_init(unsigned int datasz)
 {
-	static int called = 0;
-	static int datasz = 0, realdatasz = 0;
 	char *datarr;
-	int i;
+	unsigned int i;
 	
-	BUG_ON(MC_URGENT != 0 || MC_NONURGENT != 1 || MC_NCLASSES != 2);
+	BUILD_BUG_ON(MC_URGENT != 0 || MC_NONURGENT != 1 || MC_NCLASSES != 2);
 
-	/* Called from mcheck_init for all processors; initialize for the
-	 * first call only (no race here since the boot cpu completes
-	 * init before others start up). */
-	if (++called == 1) {
-		realdatasz = reqdatasz;
-		datasz = (reqdatasz & ~0xf) + 0x10;	/* 16 byte roundup */
-	} else {
-		BUG_ON(reqdatasz != realdatasz);
-		return;
-	}
+	datasz = (datasz & ~0xf) + 0x10;	/* 16 byte roundup */
 
 	if ((mctctl.mctc_elems = xmalloc_array(struct mctelem_ent,
 	    MC_NENT)) == NULL ||

@@ -59,7 +59,7 @@ typedef enum mctelem_class {
 	MC_NONURGENT
 } mctelem_class_t;
 
-extern void mctelem_init(int);
+extern void mctelem_init(unsigned int);
 extern mctelem_cookie_t mctelem_reserve(mctelem_class_t);
 extern void *mctelem_dataptr(mctelem_cookie_t);
 extern void mctelem_commit(mctelem_cookie_t);

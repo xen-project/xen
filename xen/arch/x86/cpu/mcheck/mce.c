@@ -775,13 +775,15 @@ void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
 
     intpose_init();
 
-    mctelem_init(sizeof(struct mc_info));
+    if ( bsp )
+    {
+        mctelem_init(sizeof(struct mc_info));
+        register_cpu_notifier(&cpu_nfb);
+    }
 
     /* Turn on MCE now */
     set_in_cr4(X86_CR4_MCE);
 
-    if ( bsp )
-        register_cpu_notifier(&cpu_nfb);
     set_poll_bankmask(c);
 
     return;
