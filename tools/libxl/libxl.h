@@ -445,6 +445,16 @@
 #define LIBXL_HAVE_NO_SUSPEND_RESUME 1
 #endif
 
+/*
+ * LIBXL_HAVE_DEVICE_PCI_SEIZE
+ *
+ * If this is defined, then the libxl_device_pci struct will contain
+ * the "seize" boolean field.  If this field is set, libxl_pci_add will
+ * check to see if the device is currently assigned to pciback, and if not,
+ * it will attempt to do so (unbinding the device from the existing driver).
+ */
+#define LIBXL_HAVE_DEVICE_PCI_SEIZE 1
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */
