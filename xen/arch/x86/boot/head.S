@@ -136,6 +136,12 @@ __start:
         /* Check for availability of long mode. */
         bt      $29,%edx
         jnc     bad_cpu
+
+        /* Stash TSC to calculate a good approximation of time-since-boot */
+        rdtsc
+        mov     %eax,sym_phys(boot_tsc_stamp)
+        mov     %edx,sym_phys(boot_tsc_stamp+4)
+
         /* Initialise L2 boot-map page table entries (16MB). */
         mov     $sym_phys(l2_bootmap),%edx
         mov     $PAGE_HYPERVISOR|_PAGE_PSE,%eax

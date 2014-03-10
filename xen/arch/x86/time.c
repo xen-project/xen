@@ -84,6 +84,9 @@ static u16 pit_stamp16;
 static u32 pit_stamp32;
 static bool_t __read_mostly using_pit;
 
+/* Boot timestamp, filled in head.S */
+u64 __initdata boot_tsc_stamp;
+
 /*
  * 32-bit division of integer dividend and integer divisor yielding
  * 32-bit fractional quotient.
@@ -1433,9 +1436,6 @@ int __init init_xen_time(void)
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
 
-    /* System time (get_s_time()) starts ticking from now. */
-    rdtscll(this_cpu(cpu_time).local_tsc_stamp);
-
     /* NB. get_cmos_time() can take over one second to execute. */
     do_settime(get_cmos_time(), 0, NOW());
 
@@ -1453,9 +1453,11 @@ int __init init_xen_time(void)
 /* Early init function. */
 void __init early_time_init(void)
 {
+    struct cpu_time *t = &this_cpu(cpu_time);
     u64 tmp = init_pit_and_calibrate_tsc();
 
-    set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
+    set_time_scale(&t->tsc_scale, tmp);
+    t->local_tsc_stamp = boot_tsc_stamp;
 
     do_div(tmp, 1000);
     cpu_khz = (unsigned long)tmp;
