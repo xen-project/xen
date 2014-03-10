@@ -67,6 +67,7 @@ main(int argc, char **argv)
     }
 
     xc_interface_close(xch);
+    xtl_logger_destroy(l);
 
     return ret;
 }

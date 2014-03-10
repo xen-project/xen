@@ -222,6 +222,7 @@ main(int argc, char **argv)
         xc_evtchn_close(si.xce);
 
     xc_interface_close(si.xch);
+    xtl_logger_destroy(l);
 
     return ret;
 }
