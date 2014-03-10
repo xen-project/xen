@@ -17,7 +17,6 @@
  * Author: Allen Kay <allen.m.kay@intel.com> - adapted from linux
  */
 
-#define PCI_VENDOR_ID_INTEL        0x8086
 #define PCI_DEVICE_ID_INTEL_E7520_MCH    0x3590
 #define PCI_DEVICE_ID_INTEL_82945G_HB    0x2770
 
@@ -29,10 +28,7 @@
 #define PCI_PROBE_MASK        0x000f
 #define PCI_PROBE_NOEARLY    0x0010
 
-#define PCI_VENDOR_ID_AMD             0x1022
 #define PCI_CHECK_ENABLE_AMD_MMCONF     0x20000
-
-#define PCI_VENDOR_ID_NVIDIA       0x10de
 
 extern unsigned int pci_probe;
 

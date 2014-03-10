@@ -20,7 +20,8 @@
 #include <asm/current.h>
 #include <asm/hvm/support.h>
 #include <xen/pci_regs.h>
- 
+#include <xen/pci_ids.h>
+
 #include "op_x86_model.h"
 #include "op_counter.h"
 
@@ -445,7 +446,6 @@ static inline void __init init_ibs_nmi_per_cpu(void *arg)
 	apic_write(reg, APIC_EILVT_MSG_NMI << 8);
 }
 
-#define PCI_VENDOR_ID_AMD               0x1022
 #define PCI_DEVICE_ID_AMD_10H_NB_MISC   0x1203
 #define IBSCTL                          0x1cc
 static int __init init_ibs_nmi(void)

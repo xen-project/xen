@@ -19,6 +19,7 @@
 #ifdef HAS_PCI
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#include <xen/pci_ids.h>
 #endif
 #include <xen/8250-uart.h>
 #include <xen/vmap.h>
@@ -135,13 +136,13 @@ static const struct ns16550_config_mmio __initconst uart_config[] =
 {
     /* Broadcom TruManage device */
     {
-        .vendor_id = 0x14e4,
+        .vendor_id = PCI_VENDOR_ID_BROADCOM,
         .dev_id = 0x160a,
         .param = param_trumanage,
     },
     /* OXPCIe952 1 Native UART  */
     {
-        .vendor_id = 0x1415,
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
         .dev_id = 0xc138,
         .param = param_oxford,
     }

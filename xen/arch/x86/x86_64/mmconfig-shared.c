@@ -19,6 +19,7 @@
 #include <xen/xmalloc.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#include <xen/pci_ids.h>
 #include <asm/e820.h>
 #include <asm/msr.h>
 #include <asm/msr-index.h>
