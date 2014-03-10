@@ -42,22 +42,28 @@ static const uint8_t pat_entry_2_pte_flags[8] = {
 
 /* Effective mm type lookup table, according to MTRR and PAT. */
 static const uint8_t mm_type_tbl[MTRR_NUM_TYPES][PAT_TYPE_NUMS] = {
-/********PAT(UC,WC,RS,RS,WT,WP,WB,UC-)*/
-/* RS means reserved type(2,3), and type is hardcoded here */
- /*MTRR(UC):(UC,WC,RS,RS,UC,UC,UC,UC)*/
-            {0, 1, 2, 2, 0, 0, 0, 0},
- /*MTRR(WC):(UC,WC,RS,RS,UC,UC,WC,WC)*/
-            {0, 1, 2, 2, 0, 0, 1, 1},
- /*MTRR(RS):(RS,RS,RS,RS,RS,RS,RS,RS)*/
-            {2, 2, 2, 2, 2, 2, 2, 2},
- /*MTRR(RS):(RS,RS,RS,RS,RS,RS,RS,RS)*/
-            {2, 2, 2, 2, 2, 2, 2, 2},
- /*MTRR(WT):(UC,WC,RS,RS,WT,WP,WT,UC)*/
-            {0, 1, 2, 2, 4, 5, 4, 0},
- /*MTRR(WP):(UC,WC,RS,RS,WT,WP,WP,WC)*/
-            {0, 1, 2, 2, 4, 5, 5, 1},
- /*MTRR(WB):(UC,WC,RS,RS,WT,WP,WB,UC)*/
-            {0, 1, 2, 2, 4, 5, 6, 0}
+#define RS MEMORY_NUM_TYPES
+#define UC MTRR_TYPE_UNCACHABLE
+#define WB MTRR_TYPE_WRBACK
+#define WC MTRR_TYPE_WRCOMB
+#define WP MTRR_TYPE_WRPROT
+#define WT MTRR_TYPE_WRTHROUGH
+
+/*          PAT(UC, WC, RS, RS, WT, WP, WB, UC-) */
+/* MTRR(UC) */ {UC, WC, RS, RS, UC, UC, UC, UC},
+/* MTRR(WC) */ {UC, WC, RS, RS, UC, UC, WC, WC},
+/* MTRR(RS) */ {RS, RS, RS, RS, RS, RS, RS, RS},
+/* MTRR(RS) */ {RS, RS, RS, RS, RS, RS, RS, RS},
+/* MTRR(WT) */ {UC, WC, RS, RS, WT, WP, WT, UC},
+/* MTRR(WP) */ {UC, WC, RS, RS, WT, WP, WP, WC},
+/* MTRR(WB) */ {UC, WC, RS, RS, WT, WP, WB, UC}
+
+#undef UC
+#undef WC
+#undef WT
+#undef WP
+#undef WB
+#undef RS
 };
 
 /*
@@ -301,11 +307,12 @@ static uint8_t get_mtrr_type(struct mtrr_state *m, paddr_t pa)
         */
        return overlap_mtrr_pos;
 
-   if ( overlap_mtrr & 0x1 )
+   if ( overlap_mtrr & (1 << MTRR_TYPE_UNCACHABLE) )
        /* Two or more match, one is UC. */
        return MTRR_TYPE_UNCACHABLE;
 
-   if ( !(overlap_mtrr & 0xaf) )
+   if ( !(overlap_mtrr &
+          ~((1 << MTRR_TYPE_WRTHROUGH) | (1 << MTRR_TYPE_WRBACK))) )
        /* Two or more match, WT and WB. */
        return MTRR_TYPE_WRTHROUGH;
 
@@ -403,13 +410,26 @@ uint32_t get_pat_flags(struct vcpu *v,
     return pat_type_2_pte_flags(pat_entry_value);
 }
 
+static inline bool_t valid_mtrr_type(uint8_t type)
+{
+    switch ( type )
+    {
+    case MTRR_TYPE_UNCACHABLE:
+    case MTRR_TYPE_WRBACK:
+    case MTRR_TYPE_WRCOMB:
+    case MTRR_TYPE_WRPROT:
+    case MTRR_TYPE_WRTHROUGH:
+        return 1;
+    }
+    return 0;
+}
+
 bool_t mtrr_def_type_msr_set(struct mtrr_state *m, uint64_t msr_content)
 {
     uint8_t def_type = msr_content & 0xff;
     uint8_t enabled = (msr_content >> 10) & 0x3;
 
-    if ( unlikely(!(def_type == 0 || def_type == 1 || def_type == 4 ||
-                    def_type == 5 || def_type == 6)) )
+    if ( unlikely(!valid_mtrr_type(def_type)) )
     {
          HVM_DBG_LOG(DBG_LEVEL_MSR, "invalid MTRR def type:%x\n", def_type);
          return 0;
@@ -436,15 +456,11 @@ bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, uint32_t row,
     if ( fixed_range_base[row] != msr_content )
     {
         uint8_t *range = (uint8_t*)&msr_content;
-        int32_t i, type;
+        unsigned int i;
 
         for ( i = 0; i < 8; i++ )
-        {
-            type = range[i];
-            if ( unlikely(!(type == 0 || type == 1 ||
-                            type == 4 || type == 5 || type == 6)) )
+            if ( unlikely(!valid_mtrr_type(range[i])) )
                 return 0;
-        }
 
         fixed_range_base[row] = msr_content;
     }
@@ -455,7 +471,7 @@ bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, uint32_t row,
 bool_t mtrr_var_range_msr_set(
     struct domain *d, struct mtrr_state *m, uint32_t msr, uint64_t msr_content)
 {
-    uint32_t index, type, phys_addr, eax, ebx, ecx, edx;
+    uint32_t index, phys_addr, eax, ebx, ecx, edx;
     uint64_t msr_mask;
     uint64_t *var_range_base = (uint64_t*)m->var_ranges;
 
@@ -463,9 +479,7 @@ bool_t mtrr_var_range_msr_set(
     if ( var_range_base[index] == msr_content )
         return 1;
 
-    type = (uint8_t)msr_content;
-    if ( unlikely(!(type == 0 || type == 1 ||
-                    type == 4 || type == 5 || type == 6)) )
+    if ( unlikely(!valid_mtrr_type((uint8_t)msr_content)) )
         return 0;
 
     phys_addr = 36;
