@@ -1,9 +1,9 @@
 #################################
-__  __            _  _   _  _    ___  
-\ \/ /___ _ __   | || | | || |  / _ \ 
- \  // _ \ '_ \  | || |_| || |_| | | |
- /  \  __/ | | | |__   _|__   _| |_| |
-/_/\_\___|_| |_|    |_|(_) |_|(_)___/ 
+__  __            _  _   _  _ 
+\ \/ /___ _ __   | || | | || |
+ \  // _ \ '_ \  | || |_| || |_
+ /  \  __/ | | | |__   _|__   _|
+/_/\_\___|_| |_|    |_|(_) |_|
 
 #################################
 
@@ -19,14 +19,16 @@ is freely-distributable Open Source software, released under the GNU
 GPL. Since its initial public release, Xen has grown a large
 development community, spearheaded by xen.org (http://www.xen.org).
 
-The 4.3 release offers a number of improvements, including NUMA
-scheduling affinity, openvswitch integration, and defaulting to
-qemu-xen rather than qemu-traditional for non-stubdom guests.
-(qemu-xen is kept very close to the upstream project.)  We also have a
-number of updates to vTPM, and improvements to XSM and Flask to allow
-greater disaggregation.  Additionally, 4.3 contains a basic version of
-Xen for the new ARM server architecture, both 32- and 64-bit.  And as
-always, there are a number of performance, stability, and security
+The 4.4 release offers a number of improvements, including solid
+support for libvirt running on libxl, a new scalable event channel
+interface, improved flexibility for driver domains, an experimental
+"PVH" virtualization mode, improved kexec support, and improved
+support for SPICE clients.  Additionally, the ARM platform has had a
+number of improvements.  The most important of these is that the
+hypervisor ABIs for both arm32 and arm64 have been declared stable.
+Additionally, many new ARM platforms have been added, and changes have
+been made that will make adding new platforms easier.  And as always,
+there are a number of performance, stability, and security
 improvements under-the hood.
 
 This file contains some quick-start instructions to install Xen on
