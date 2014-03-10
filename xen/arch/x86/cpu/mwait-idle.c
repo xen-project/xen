@@ -1,7 +1,7 @@
 /*
  * mwait_idle.c - native hardware idle loop for modern processors
  *
- * Copyright (c) 2010, Intel Corporation.
+ * Copyright (c) 2013, Intel Corporation.
  * Len Brown <len.brown@intel.com>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -301,6 +301,22 @@ static const struct cpuidle_state atom_cstates[] = {
 	{}
 };
 
+static const struct cpuidle_state avn_cstates[] = {
+	{
+		.name = "C1-AVN",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 2,
+		.target_residency = 2,
+	},
+	{
+		.name = "C6-AVN",
+		.flags = MWAIT2flg(0x51) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 15,
+		.target_residency = 45,
+	},
+	{}
+};
+
 static void mwait_idle(void)
 {
 	unsigned int cpu = smp_processor_id();
@@ -436,6 +452,11 @@ static const struct idle_cpu idle_cpu_hsw = {
 	.disable_promotion_to_c1e = 1,
 };
 
+static const struct idle_cpu idle_cpu_avn = {
+	.state_table = avn_cstates,
+	.disable_promotion_to_c1e = 1,
+};
+
 #define ICPU(model, cpu) { 6, model, &idle_cpu_##cpu }
 
 static struct intel_idle_id {
@@ -459,6 +480,7 @@ static struct intel_idle_id {
 	ICPU(0x3f, hsw),
 	ICPU(0x45, hsw),
 	ICPU(0x46, hsw),
+	ICPU(0x4d, avn),
 	{}
 };
 
