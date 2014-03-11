@@ -155,6 +155,8 @@ char *libxl__strndup(libxl__gc *gc, const char *c, size_t n)
 
     if (!s) libxl__alloc_failed(CTX, __func__, n, 1);
 
+    libxl__ptr_add(gc, s);
+
     return s;
 }
 
