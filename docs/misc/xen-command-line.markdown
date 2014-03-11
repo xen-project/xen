@@ -676,6 +676,13 @@ Specify if the MMConfig space should be enabled.
 
 Force Xen to (not) use PCI-MSI, even if ACPI FADT says otherwise.
 
+### mtrr.show
+> `= <boolean>`
+
+> Default: `false`
+
+Print boot time MTRR state (x86 only).
+
 ### mwait-idle
 > `= <boolean>`
 

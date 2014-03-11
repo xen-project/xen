@@ -84,11 +84,113 @@ void __init get_mtrr_state(void)
 	rdmsrl(MSR_MTRRcap, mtrr_state.mtrr_cap);
 }
 
+static bool_t __initdata mtrr_show;
+boolean_param("mtrr.show", mtrr_show);
+
+static const char *__init mtrr_attrib_to_str(mtrr_type x)
+{
+	static const char __initconst strings[MTRR_NUM_TYPES][16] =
+	{
+		[0 ... MTRR_NUM_TYPES - 1] = "?",
+		[MTRR_TYPE_UNCACHABLE]     = "uncachable",
+		[MTRR_TYPE_WRCOMB]         = "write-combining",
+		[MTRR_TYPE_WRTHROUGH]      = "write-through",
+		[MTRR_TYPE_WRPROT]         = "write-protect",
+		[MTRR_TYPE_WRBACK]         = "write-back",
+	};
+
+	return x < MTRR_NUM_TYPES ? strings[x] : "?";
+}
+
+static unsigned int __initdata last_fixed_start;
+static unsigned int __initdata last_fixed_end;
+static mtrr_type __initdata last_fixed_type;
+
+static void __init print_fixed_last(const char *level)
+{
+	if (!last_fixed_end)
+		return;
+
+	printk("%s  %05x-%05x %s\n", level, last_fixed_start,
+	       last_fixed_end - 1, mtrr_attrib_to_str(last_fixed_type));
+
+	last_fixed_end = 0;
+}
+
+static void __init update_fixed_last(unsigned int base, unsigned int end,
+				     mtrr_type type)
+{
+	last_fixed_start = base;
+	last_fixed_end = end;
+	last_fixed_type = type;
+}
+
+static void __init print_fixed(unsigned int base, unsigned int step,
+			       const mtrr_type *types, const char *level)
+{
+	unsigned i;
+
+	for (i = 0; i < 8; ++i, ++types, base += step) {
+		if (last_fixed_end == 0) {
+			update_fixed_last(base, base + step, *types);
+			continue;
+		}
+		if (last_fixed_end == base && last_fixed_type == *types) {
+			last_fixed_end = base + step;
+			continue;
+		}
+		/* new segments: gap or different type */
+		print_fixed_last(level);
+		update_fixed_last(base, base + step, *types);
+	}
+}
+
+static void __init print_mtrr_state(const char *level)
+{
+	unsigned int i;
+	int width;
+
+	printk("%sMTRR default type: %s\n", level,
+	       mtrr_attrib_to_str(mtrr_state.def_type));
+	if (mtrr_state.have_fixed) {
+		const mtrr_type *fr = mtrr_state.fixed_ranges;
+		const struct fixed_range_block *block = fixed_range_blocks;
+		unsigned int base = 0, step = 0x10000;
+
+		printk("%sMTRR fixed ranges %sabled:\n", level,
+		       mtrr_state.enabled & 1 ? "en" : "dis");
+		for (; block->ranges; ++block, step >>= 2) {
+			for (i = 0; i < block->ranges; ++i, fr += 8) {
+				print_fixed(base, step, fr, level);
+				base += 8 * step;
+			}
+		}
+		print_fixed_last(level);
+	}
+	printk("%sMTRR variable ranges %sabled:\n", level,
+	       mtrr_state.enabled & 2 ? "en" : "dis");
+	width = (paddr_bits - PAGE_SHIFT + 3) / 4;
+
+	for (i = 0; i < num_var_ranges; ++i) {
+		if (mtrr_state.var_ranges[i].mask & MTRR_PHYSMASK_VALID)
+			printk("%s  %u base %0*"PRIx64"000 mask %0*"PRIx64"000 %s\n",
+			       level, i,
+			       width, mtrr_state.var_ranges[i].base >> 12,
+			       width, mtrr_state.var_ranges[i].mask >> 12,
+			       mtrr_attrib_to_str(mtrr_state.var_ranges[i].base &
+			                          MTRR_PHYSBASE_TYPE_MASK));
+		else
+			printk("%s  %u disabled\n", level, i);
+	}
+}
+
 /*  Some BIOS's are fucked and don't set all MTRRs the same!  */
 void __init mtrr_state_warn(void)
 {
 	unsigned long mask = smp_changes_mask;
 
+	if (mtrr_show)
+		print_mtrr_state(mask ? KERN_WARNING : "");
 	if (!mask)
 		return;
 	if (mask & MTRR_CHANGE_MASK_FIXED)
@@ -99,6 +201,8 @@ void __init mtrr_state_warn(void)
 		printk(KERN_WARNING "mtrr: your CPUs had inconsistent MTRRdefType settings\n");
 	printk(KERN_INFO "mtrr: probably your BIOS does not setup all CPUs.\n");
 	printk(KERN_INFO "mtrr: corrected configuration.\n");
+	if (!mtrr_show)
+		print_mtrr_state(KERN_INFO);
 }
 
 /* Doesn't attempt to pass an error out to MTRR users
