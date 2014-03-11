@@ -23,9 +23,9 @@ our @msgs = (
                                                  STRING doing_what),
                                                 'unsigned long', 'done',
                                                 'unsigned long', 'total'] ],
-    [  3, 'scxW',   "suspend", [] ],         
-    [  4, 'scxW',   "postcopy", [] ],        
-    [  5, 'scxA',   "checkpoint", [] ],      
+    [  3, 'scxW',   "suspend", [] ],
+    [  4, 'scxW',   "postcopy", [] ],
+    [  5, 'scxA',   "checkpoint", [] ],
     [  6, 'scxA',   "switch_qemu_logdirty",  [qw(int domid
                                               unsigned enable)] ],
     #                toolstack_save          done entirely `by hand'
@@ -199,7 +199,7 @@ static void BLOCK_put(unsigned char *const buf,
     uint32_t_put(buf, len, size);
     bytes_put(buf, len, bytes, size);
 }
-    
+
 static void STRING_put(unsigned char *const buf,
 		       int *len,
 		       const char *string)
@@ -209,7 +209,7 @@ static void STRING_put(unsigned char *const buf,
     assert(slen < (uint32_t)0x40000000);
     BLOCK_put(buf, len, (const void*)string, slen+1);
 }
-    
+
 END
 
 foreach my $sr (qw(save restore)) {
