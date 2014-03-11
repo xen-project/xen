@@ -480,13 +480,13 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     /* Clear the copy of the boot pagetables. Each secondary CPU
      * rebuilds these itself (see head.S) */
     memset(boot_pgtable, 0x0, PAGE_SIZE);
-    clean_xen_dcache(boot_pgtable);
+    clean_and_invalidate_xen_dcache(boot_pgtable);
 #ifdef CONFIG_ARM_64
     memset(boot_first, 0x0, PAGE_SIZE);
-    clean_xen_dcache(boot_first);
+    clean_and_invalidate_xen_dcache(boot_first);
 #endif
     memset(boot_second, 0x0, PAGE_SIZE);
-    clean_xen_dcache(boot_second);
+    clean_and_invalidate_xen_dcache(boot_second);
 
     /* Break up the Xen mapping into 4k pages and protect them separately. */
     for ( i = 0; i < LPAE_ENTRIES; i++ )
