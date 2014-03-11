@@ -447,9 +447,8 @@ void pit_reset(struct domain *d)
     spin_unlock(&pit->lock);
 }
 
-void pit_init(struct vcpu *v, unsigned long cpu_khz)
+void pit_init(struct domain *d, unsigned long cpu_khz)
 {
-    struct domain *d = v->domain;
     PITState *pit = domain_vpit(d);
 
     spin_lock_init(&pit->lock);
