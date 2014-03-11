@@ -3178,10 +3178,10 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         index = msr - MSR_MTRRfix4K_C0000;
         *msr_content = fixed_range_base[index + 3];
         break;
-    case MSR_IA32_MTRR_PHYSBASE0...MSR_IA32_MTRR_PHYSMASK7:
+    case MSR_IA32_MTRR_PHYSBASE(0)...MSR_IA32_MTRR_PHYSMASK(MTRR_VCNT-1):
         if ( !mtrr )
             goto gp_fault;
-        index = msr - MSR_IA32_MTRR_PHYSBASE0;
+        index = msr - MSR_IA32_MTRR_PHYSBASE(0);
         *msr_content = var_range_base[index];
         break;
 
@@ -3305,7 +3305,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
                                      index, msr_content) )
             goto gp_fault;
         break;
-    case MSR_IA32_MTRR_PHYSBASE0...MSR_IA32_MTRR_PHYSMASK7:
+    case MSR_IA32_MTRR_PHYSBASE(0)...MSR_IA32_MTRR_PHYSMASK(MTRR_VCNT-1):
         if ( !mtrr )
             goto gp_fault;
         if ( !mtrr_var_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,

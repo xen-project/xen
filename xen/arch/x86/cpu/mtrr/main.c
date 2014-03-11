@@ -91,7 +91,7 @@ static void __init set_num_var_ranges(void)
 	unsigned long config = 0;
 
 	if (use_intel()) {
-		rdmsrl(MTRRcap_MSR, config);
+		rdmsrl(MSR_MTRRcap, config);
 	} else if (is_cpu(AMD))
 		config = 2;
 	else if (is_cpu(CYRIX) || is_cpu(CENTAUR))

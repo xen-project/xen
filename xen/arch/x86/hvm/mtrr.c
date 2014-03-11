@@ -88,7 +88,7 @@ static void get_mtrr_range(uint64_t base_msr, uint64_t mask_msr,
     uint32_t base_hi = (uint32_t)(base_msr >> 32);
     uint32_t size;
 
-    if ( (mask_lo & 0x800) == 0 )
+    if ( !(mask_lo & MTRR_PHYSMASK_VALID) )
     {
         /* Invalid (i.e. free) range */
         *base = 0;
@@ -142,16 +142,6 @@ bool_t is_var_mtrr_overlapped(struct mtrr_state *m)
     }
     return 0;
 }
-
-#define MTRR_PHYSMASK_VALID_BIT  11
-#define MTRR_PHYSMASK_SHIFT      12
-
-#define MTRR_PHYSBASE_TYPE_MASK  0xff   /* lowest 8 bits */
-#define MTRR_PHYSBASE_SHIFT      12
-#define MTRR_VCNT                8
-
-#define MTRRphysBase_MSR(reg) (0x200 + 2 * (reg))
-#define MTRRphysMask_MSR(reg) (0x200 + 2 * (reg) + 1)
 
 static int __init hvm_mtrr_pat_init(void)
 {
@@ -280,7 +270,7 @@ static uint8_t get_mtrr_type(struct mtrr_state *m, paddr_t pa)
    {
        phys_base = ((uint64_t*)m->var_ranges)[seg*2];
        phys_mask = ((uint64_t*)m->var_ranges)[seg*2 + 1];
-       if ( phys_mask & (1 << MTRR_PHYSMASK_VALID_BIT) )
+       if ( phys_mask & MTRR_PHYSMASK_VALID )
        {
            if ( ((uint64_t) pa & phys_mask) >> MTRR_PHYSMASK_SHIFT ==
                 (phys_base & phys_mask) >> MTRR_PHYSMASK_SHIFT )
@@ -477,7 +467,7 @@ bool_t mtrr_var_range_msr_set(
     uint64_t msr_mask;
     uint64_t *var_range_base = (uint64_t*)m->var_ranges;
 
-    index = msr - MSR_IA32_MTRR_PHYSBASE0;
+    index = msr - MSR_IA32_MTRR_PHYSBASE(0);
     if ( var_range_base[index] == msr_content )
         return 1;
 
@@ -683,9 +673,11 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
     for ( i = 0; i < MTRR_VCNT; i++ )
     {
         mtrr_var_range_msr_set(d, mtrr_state,
-                MTRRphysBase_MSR(i), hw_mtrr.msr_mtrr_var[i*2]);
+                               MSR_IA32_MTRR_PHYSBASE(i),
+                               hw_mtrr.msr_mtrr_var[i * 2]);
         mtrr_var_range_msr_set(d, mtrr_state,
-                MTRRphysMask_MSR(i), hw_mtrr.msr_mtrr_var[i*2+1]);
+                               MSR_IA32_MTRR_PHYSMASK(i),
+                               hw_mtrr.msr_mtrr_var[i * 2 + 1]);
     }
 
     mtrr_def_type_msr_set(mtrr_state, hw_mtrr.msr_mtrr_def_type);

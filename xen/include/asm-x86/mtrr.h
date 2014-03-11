@@ -33,6 +33,14 @@ enum {
    an 8 bit field: */
 typedef u8 mtrr_type;
 
+#define MTRR_PHYSMASK_VALID_BIT  11
+#define MTRR_PHYSMASK_VALID      (1 << MTRR_PHYSMASK_VALID_BIT)
+#define MTRR_PHYSMASK_SHIFT      12
+#define MTRR_PHYSBASE_TYPE_MASK  0xff
+#define MTRR_PHYSBASE_SHIFT      12
+/* Number of variable range MSR pairs we emulate for HVM guests: */
+#define MTRR_VCNT                8
+
 struct mtrr_var_range {
 	uint64_t base;
 	uint64_t mask;
