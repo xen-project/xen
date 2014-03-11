@@ -127,8 +127,7 @@ static int switch_qemu_logdirty(int domid, unsigned int enable, void *data)
     if (!xs_watch(xs, path, "qemu-logdirty-ret"))
         errx(1, "can't set watch in store (%s)\n", path);
 
-    if (!(cmd_str = strdup( enable == 0 ? "disable" : "enable")))
-        errx(1, "can't get logdirty cmd path in store");
+    cmd_str = enable == 0 ? "disable" : "enable";
 
     /* Tell qemu that we want it to start logging dirty page to Xen */
     strcpy(p, "cmd");
@@ -156,7 +155,6 @@ static int switch_qemu_logdirty(int domid, unsigned int enable, void *data)
         goto read_again;
 
     free(path);
-    free(cmd_str);
     free(ret_str);
 
     return 0;
