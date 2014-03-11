@@ -162,14 +162,12 @@ char *libxl__strndup(libxl__gc *gc, const char *c, size_t n)
 
 char *libxl__dirname(libxl__gc *gc, const char *s)
 {
-    char *c;
-    char *ptr = libxl__strdup(gc, s);
+    char *c = strrchr(s, '/');
 
-    c = strrchr(ptr, '/');
     if (!c)
         return NULL;
-    *c = '\0';
-    return ptr;
+
+    return libxl__strndup(gc, s, c - s);
 }
 
 void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
