@@ -120,10 +120,24 @@ the stubdom tree.
 Compiling the LINUX dom0 kernel:
 --------------------------------
 
-The Linux dom0 kernel should not try accessing the TPM while the vTPM
-Manager domain is accessing it; the simplest way to accomplish this is
-to ensure the kernel is compiled without a driver for the TPM, or avoid
-loading the driver by blacklisting the module.
+Because the TPM manager uses direct access to the physical TPM, it may interfere
+with access to the TPM by dom0.  The simplest solution for this is to prevent
+dom0 from accessing the physical TPM by compiling the kernel without a driver or
+blacklisting the module.  If dom0 needs a TPM but does not need to use it during
+the boot process (i.e. it is not using IMA), a virtual TPM can be attached to
+dom0 after the system is booted.
+
+Because the TPM manager does not yet accept requests for deep quotes, if a quote
+or other request needs to be fulfilled by the physical TPM, dom0 will need to
+access the physical TPM.  In order to prevent interference, the TPM Manager and
+dom0 should use different values for the TPM's locality; since Linux always uses
+locality 0, using locality 2 for the TPM Manager is recommended.  If both Linux
+and the TPM Manager attempt to access the TPM at the same time, the TPM device
+will return a busy status; some applications will consider this a fatal error
+instead of retrying the command at a later time.  If a vTPM gets an error when
+loading its key, it will currently generate a fresh vTPM image (with a new EK,
+SRK, and blank NVRAM).
+
 
 Compiling the LINUX domU kernel:
 --------------------------------
