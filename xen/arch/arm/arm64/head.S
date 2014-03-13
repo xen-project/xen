@@ -30,7 +30,7 @@
 #define PT_DEV    0xe71 /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=100 T=0 P=1 */
 #define PT_DEV_L3 0xe73 /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=100 T=1 P=1 */
 
-#if (defined (EARLY_PRINTK)) && (defined (EARLY_PRINTK_INC))
+#if (defined (CONFIG_EARLY_PRINTK)) && (defined (EARLY_PRINTK_INC))
 #include EARLY_PRINTK_INC
 #endif
 
@@ -71,7 +71,7 @@
 
 /* Macro to print a string to the UART, if there is one.
  * Clobbers x0-x3. */
-#ifdef EARLY_PRINTK
+#ifdef CONFIG_EARLY_PRINTK
 #define PRINT(_s)       \
         adr   x0, 98f ; \
         bl    puts    ; \
@@ -79,9 +79,9 @@
 98:     .asciz _s     ; \
         .align 2      ; \
 99:
-#else /* EARLY_PRINTK */
+#else /* CONFIG_EARLY_PRINTK */
 #define PRINT(s)
-#endif /* !EARLY_PRINTK */
+#endif /* !CONFIG_EARLY_PRINTK */
 
         /*.aarch64*/
 
@@ -174,7 +174,7 @@ common_start:
         b     2b
 1:
 
-#ifdef EARLY_PRINTK
+#ifdef CONFIG_EARLY_PRINTK
         ldr   x23, =EARLY_UART_BASE_ADDRESS /* x23 := UART base address */
         cbnz  x22, 1f
         bl    init_uart                 /* Boot CPU sets up the UART too */
@@ -343,7 +343,7 @@ paging:
         /* Now we can install the fixmap and dtb mappings, since we
          * don't need the 1:1 map any more */
         dsb   sy
-#if defined(EARLY_PRINTK) /* Fixmap is only used by early printk */
+#if defined(CONFIG_EARLY_PRINTK) /* Fixmap is only used by early printk */
         /* Non-boot CPUs don't need to rebuild the fixmap itself, just
 	 * the mapping from boot_second to xen_fixmap */
         cbnz  x22, 1f
@@ -489,7 +489,7 @@ ENTRY(relocate_xen)
 
         ret
 
-#ifdef EARLY_PRINTK
+#ifdef CONFIG_EARLY_PRINTK
 /* Bring up the UART.
  * x23: Early UART base address
  * Clobbers x0-x1 */
@@ -536,7 +536,7 @@ putn:
 hex:    .ascii "0123456789abcdef"
         .align 2
 
-#else  /* EARLY_PRINTK */
+#else  /* CONFIG_EARLY_PRINTK */
 
 init_uart:
 .global early_puts
@@ -544,7 +544,7 @@ early_puts:
 puts:
 putn:   ret
 
-#endif /* EARLY_PRINTK */
+#endif /* !CONFIG_EARLY_PRINTK */
 
 /* This provides a C-API version of __lookup_processor_type
  * TODO: For now, the implementation return NULL every time

@@ -32,7 +32,7 @@
 #define PT_UPPER(x) (PT_##x & 0xf00)
 #define PT_LOWER(x) (PT_##x & 0x0ff)
 
-#if (defined (EARLY_PRINTK)) && (defined (EARLY_PRINTK_INC))
+#if (defined (CONFIG_EARLY_PRINTK)) && (defined (EARLY_PRINTK_INC))
 #include EARLY_PRINTK_INC
 #endif
 
@@ -57,7 +57,7 @@
  */
 /* Macro to print a string to the UART, if there is one.
  * Clobbers r0-r3. */
-#ifdef EARLY_PRINTK
+#ifdef CONFIG_EARLY_PRINTK
 #define PRINT(_s)       \
         adr   r0, 98f ; \
         bl    puts    ; \
@@ -65,9 +65,9 @@
 98:     .asciz _s     ; \
         .align 2      ; \
 99:
-#else /* EARLY_PRINTK */
+#else /* CONFIG_EARLY_PRINTK */
 #define PRINT(s)
-#endif /* !EARLY_PRINTK */
+#endif /* !CONFIG_EARLY_PRINTK */
 
         .arm
 
@@ -147,7 +147,7 @@ common_start:
         b     2b
 1:
 
-#ifdef EARLY_PRINTK
+#ifdef CONFIG_EARLY_PRINTK
         ldr   r11, =EARLY_UART_BASE_ADDRESS  /* r11 := UART base address */
         teq   r12, #0                /* Boot CPU sets up the UART too */
         bleq  init_uart
@@ -318,7 +318,7 @@ paging:
         /* Now we can install the fixmap and dtb mappings, since we
          * don't need the 1:1 map any more */
         dsb
-#if defined(EARLY_PRINTK) /* Fixmap is only used by early printk */
+#if defined(CONFIG_EARLY_PRINTK) /* Fixmap is only used by early printk */
         /* Non-boot CPUs don't need to rebuild the fixmap itself, just
 	 * the mapping from boot_second to xen_fixmap */
         teq   r12, #0
@@ -480,7 +480,7 @@ ENTRY(relocate_xen)
 
         mov pc, lr
 
-#ifdef EARLY_PRINTK
+#ifdef CONFIG_EARLY_PRINTK
 /* Bring up the UART.
  * r11: Early UART base address
  * Clobbers r0-r2 */
@@ -525,7 +525,7 @@ putn:
 hex:    .ascii "0123456789abcdef"
         .align 2
 
-#else  /* EARLY_PRINTK */
+#else  /* CONFIG_EARLY_PRINTK */
 
 init_uart:
 .global early_puts
@@ -533,7 +533,7 @@ early_puts:
 puts:
 putn:   mov   pc, lr
 
-#endif /* !EARLY_PRINTK */
+#endif /* !CONFIG_EARLY_PRINTK */
 
 /* This provides a C-API version of __lookup_processor_type */
 GLOBAL(lookup_processor_type)

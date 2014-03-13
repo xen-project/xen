@@ -12,7 +12,7 @@
 
 #include <xen/config.h>
 
-#ifdef EARLY_PRINTK
+#ifdef CONFIG_EARLY_PRINTK
 
 /* need to add the uart address offset in page to the fixmap address */
 #define EARLY_UART_VIRTUAL_ADDRESS \
@@ -22,7 +22,7 @@
 
 #ifndef __ASSEMBLY__
 
-#ifdef EARLY_PRINTK
+#ifdef CONFIG_EARLY_PRINTK
 
 void early_puts(const char *s);
 void early_printk(const char *fmt, ...)
@@ -42,7 +42,7 @@ static inline void noreturn
 __attribute__((format (printf, 1, 2))) early_panic(const char *fmt, ...)
 {while(1);}
 
-#endif
+#endif /* !CONFIG_EARLY_PRINTK */
 
 #endif	/* __ASSEMBLY__ */
 
