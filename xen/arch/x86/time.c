@@ -1646,15 +1646,19 @@ int dom0_pit_access(struct ioreq *ioreq)
     return 0;
 }
 
-struct tm wallclock_time(void)
+struct tm wallclock_time(uint64_t *ns)
 {
-    uint64_t seconds;
+    uint64_t seconds, nsec;
 
     if ( !wc_sec )
         return (struct tm) { 0 };
 
     seconds = NOW() + SECONDS(wc_sec) + wc_nsec;
-    do_div(seconds, 1000000000);
+    nsec = do_div(seconds, 1000000000);
+
+    if ( ns )
+        *ns = nsec;
+
     return gmtime(seconds);
 }
 

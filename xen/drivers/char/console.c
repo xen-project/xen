@@ -53,6 +53,7 @@ enum con_timestamp_mode
 {
     TSM_NONE,          /* No timestamps */
     TSM_DATE,          /* [YYYY-MM-DD HH:MM:SS] */
+    TSM_DATE_MS,       /* [YYYY-MM-DD HH:MM:SS.mmm] */
     TSM_BOOT           /* [SSSSSS.uuuuuu] */
 };
 
@@ -560,6 +561,8 @@ static void __init parse_console_timestamps(char *s)
     if ( *s == '\0' || /* Compat for old booleanparam() */
          !strcmp(s, "date") )
         opt_con_timestamp_mode = TSM_DATE;
+    else if ( !strcmp(s, "datems") )
+        opt_con_timestamp_mode = TSM_DATE_MS;
     else if ( !strcmp(s, "boot") )
         opt_con_timestamp_mode = TSM_BOOT;
     else if ( !strcmp(s, "none") )
@@ -577,7 +580,8 @@ static void printk_start_of_line(const char *prefix)
     switch ( opt_con_timestamp_mode )
     {
     case TSM_DATE:
-        tm = wallclock_time();
+    case TSM_DATE_MS:
+        tm = wallclock_time(&nsec);
 
         if ( tm.tm_mday == 0 )
             return;
@@ -586,6 +590,11 @@ static void printk_start_of_line(const char *prefix)
             snprintf(tstr, sizeof(tstr), "[%04u-%02u-%02u %02u:%02u:%02u] ",
                      1900 + tm.tm_year, tm.tm_mon + 1, tm.tm_mday,
                      tm.tm_hour, tm.tm_min, tm.tm_sec);
+        else
+            snprintf(tstr, sizeof(tstr),
+                     "[%04u-%02u-%02u %02u:%02u:%02u.%03"PRIu64"] ",
+                     1900 + tm.tm_year, tm.tm_mon + 1, tm.tm_mday,
+                     tm.tm_hour, tm.tm_min, tm.tm_sec, nsec / 1000000);
         break;
 
     case TSM_BOOT:

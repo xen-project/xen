@@ -275,7 +275,7 @@ cleared.  This allows a single port to be shared by two subsystems
 makes sense on its own.
 
 ### console\_timestamps
-> `= none | date | boot`
+> `= none | date | datems | boot`
 
 > Default: `none`
 
@@ -284,6 +284,8 @@ Specify which timestamp format Xen should use for each console line.
 * `none`: No timestamps
 * `date`: Date and time information
     * `[YYYY-MM-DD HH:MM:SS]`
+* `datems`: Date and time, with milliseconds
+    * `[YYYY-MM-DD HH:MM:SS.mmm]`
 * `boot`: Seconds and microseconds since boot
     * `[SSSSSS.uuuuuu]`
 
