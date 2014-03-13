@@ -400,7 +400,7 @@ int main(int argc, char *argv[])
     xch = xc_interface_open(0, 0, 0);
     if ( !xch )
     {
-        ERROR("Failed to open an xc handler");
+        fprintf(stderr, "Failed to open an xc handler");
         return 1;
     }
 
