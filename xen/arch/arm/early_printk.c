@@ -21,7 +21,7 @@ void early_flush(void);
 /* Early printk buffer */
 static char __initdata buf[512];
 
-static void __init early_puts(const char *s)
+void early_puts(const char *s)
 {
     while (*s != '\0') {
         if (*s == '\n')
