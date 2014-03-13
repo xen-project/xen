@@ -52,7 +52,7 @@ do_multicall(
 
     for ( i = 0; !rc && i < nr_calls; i++ )
     {
-        if ( hypercall_preempt_check() )
+        if ( i && hypercall_preempt_check() )
             goto preempted;
 
         if ( unlikely(__copy_from_guest(&mcs->call, call_list, 1)) )
