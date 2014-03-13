@@ -18,29 +18,6 @@
 #define EARLY_UART_VIRTUAL_ADDRESS \
     (FIXMAP_ADDR(FIXMAP_CONSOLE) +(EARLY_UART_BASE_ADDRESS & ~PAGE_MASK))
 
-#endif
-
-#ifndef __ASSEMBLY__
-
-#ifdef CONFIG_EARLY_PRINTK
-
-void early_printk(const char *fmt, ...)
-    __attribute__((format (printf, 1, 2)));
-void noreturn early_panic(const char *fmt, ...)
-    __attribute__((format (printf, 1, 2)));
-
-#else
-
-static inline  __attribute__((format (printf, 1, 2))) void
-early_printk(const char *fmt, ...)
-{}
-
-static inline void noreturn
-__attribute__((format (printf, 1, 2))) early_panic(const char *fmt, ...)
-{while(1);}
-
 #endif /* !CONFIG_EARLY_PRINTK */
-
-#endif	/* __ASSEMBLY__ */
 
 #endif

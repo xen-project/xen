@@ -22,7 +22,6 @@
 #include <xen/serial.h>
 #include <xen/init.h>
 #include <xen/irq.h>
-#include <asm/early_printk.h>
 #include <xen/device_tree.h>
 #include <xen/errno.h>
 #include <asm/device.h>
@@ -107,7 +106,7 @@ static void __init pl011_init_preirq(struct serial_port *port)
         /* Baud rate already set: read it out from the divisor latch. */
         divisor = (pl011_read(uart, IBRD) << 6) | (pl011_read(uart, FBRD));
         if (!divisor)
-            early_panic("pl011: No Baud rate configured\n");
+            panic("pl011: No Baud rate configured\n");
         uart->baud = (uart->clock_hz << 2) / divisor;
     }
     /* This write must follow FBRD and IBRD writes. */
@@ -229,7 +228,7 @@ static int __init pl011_uart_init(struct dt_device_node *dev,
 
     if ( strcmp(config, "") )
     {
-        early_printk("WARNING: UART configuration is not supported\n");
+        printk("WARNING: UART configuration is not supported\n");
     }
 
     uart = &pl011_com;
@@ -243,22 +242,22 @@ static int __init pl011_uart_init(struct dt_device_node *dev,
     res = dt_device_get_address(dev, 0, &addr, &size);
     if ( res )
     {
-        early_printk("pl011: Unable to retrieve the base"
-                     " address of the UART\n");
+        printk("pl011: Unable to retrieve the base"
+               " address of the UART\n");
         return res;
     }
 
     res = dt_device_get_irq(dev, 0, &uart->irq);
     if ( res )
     {
-        early_printk("pl011: Unable to retrieve the IRQ\n");
+        printk("pl011: Unable to retrieve the IRQ\n");
         return res;
     }
 
     uart->regs = ioremap_nocache(addr, size);
     if ( !uart->regs )
     {
-        early_printk("pl011: Unable to map the UART memory\n");
+        printk("pl011: Unable to map the UART memory\n");
         return -ENOMEM;
     }
 

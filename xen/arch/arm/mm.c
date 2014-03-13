@@ -37,7 +37,6 @@
 #include <public/memory.h>
 #include <xen/sched.h>
 #include <xen/vmap.h>
-#include <asm/early_printk.h>
 #include <xsm/xsm.h>
 #include <xen/pfn.h>
 
@@ -651,8 +650,8 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
         xenheap_mfn_start = base_mfn;
 
     if ( base_mfn < xenheap_mfn_start )
-        early_panic("cannot add xenheap mapping at %lx below heap start %lx",
-                    base_mfn, xenheap_mfn_start);
+        panic("cannot add xenheap mapping at %lx below heap start %lx",
+              base_mfn, xenheap_mfn_start);
 
     end_mfn = base_mfn + nr_mfns;
 

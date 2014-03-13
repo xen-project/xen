@@ -23,7 +23,6 @@
 #include <xen/cpumask.h>
 #include <xen/ctype.h>
 #include <xen/lib.h>
-#include <asm/early_printk.h>
 
 struct dt_early_info __initdata early_info;
 const void *device_tree_flattened;
@@ -54,21 +53,10 @@ struct dt_alias_prop {
 
 static LIST_HEAD(aliases_lookup);
 
-/* Some device tree functions may be called both before and after the
-   console is initialized. */
-#define dt_printk(fmt, ...)                         \
-    do                                              \
-    {                                               \
-        if ( system_state == SYS_STATE_early_boot ) \
-            early_printk(fmt, ## __VA_ARGS__);      \
-        else                                        \
-            printk(fmt, ## __VA_ARGS__);            \
-    } while (0)
-
 // #define DEBUG_DT
 
 #ifdef DEBUG_DT
-# define dt_dprintk(fmt, args...) dt_printk(XENLOG_DEBUG fmt, ##args)
+# define dt_dprintk(fmt, args...) printk(XENLOG_DEBUG fmt, ##args)
 static void dt_dump_addr(const char *s, const __be32 *addr, int na)
 {
     dt_dprintk("%s", s);
@@ -215,8 +203,8 @@ static int __init device_tree_for_each_node(const void *fdt,
 
         if ( depth >= DEVICE_TREE_MAX_DEPTH )
         {
-            dt_printk("Warning: device tree node `%s' is nested too deep\n",
-                      name);
+            printk("Warning: device tree node `%s' is nested too deep\n",
+                   name);
             continue;
         }
 
@@ -277,7 +265,7 @@ static int dump_node(const void *fdt, int node, const char *name, int depth,
 
     if ( name[0] == '\0' )
         name = "/";
-    dt_printk("%s%s:\n", prefix, name);
+    printk("%s%s:\n", prefix, name);
 
     for ( prop = fdt_first_property_offset(fdt, node);
           prop >= 0;
@@ -287,7 +275,7 @@ static int dump_node(const void *fdt, int node, const char *name, int depth,
 
         p = fdt_get_property_by_offset(fdt, prop, NULL);
 
-        dt_printk("%s  %s\n", prefix, fdt_string(fdt, fdt32_to_cpu(p->nameoff)));
+        printk("%s  %s\n", prefix, fdt_string(fdt, fdt32_to_cpu(p->nameoff)));
     }
 
     return 0;
@@ -316,15 +304,15 @@ static void __init process_memory_node(const void *fdt, int node,
 
     if ( address_cells < 1 || size_cells < 1 )
     {
-        early_printk("fdt: node `%s': invalid #address-cells or #size-cells",
-                     name);
+        printk("fdt: node `%s': invalid #address-cells or #size-cells",
+               name);
         return;
     }
 
     prop = fdt_get_property(fdt, node, "reg", NULL);
     if ( !prop )
     {
-        early_printk("fdt: node `%s': missing `reg' property\n", name);
+        printk("fdt: node `%s': missing `reg' property\n", name);
         return;
     }
 
@@ -357,16 +345,16 @@ static void __init process_multiboot_node(const void *fdt, int node,
     else if ( fdt_node_check_compatible(fdt, node, "xen,xsm-policy") == 0 )
         nr = MOD_XSM;
     else
-        early_panic("%s not a known xen multiboot type\n", name);
+        panic("%s not a known xen multiboot type\n", name);
 
     mod = &early_info.modules.module[nr];
 
     prop = fdt_get_property(fdt, node, "reg", &len);
     if ( !prop )
-        early_panic("node %s missing `reg' property\n", name);
+        panic("node %s missing `reg' property\n", name);
 
     if ( len < dt_cells_to_size(address_cells + size_cells) )
-        early_panic("fdt: node `%s': `reg` property length is too short\n",
+        panic("fdt: node `%s': `reg` property length is too short\n",
                     name);
 
     cell = (const __be32 *)prop->data;
@@ -377,7 +365,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
     if ( prop )
     {
         if ( len > sizeof(mod->cmdline) )
-            early_panic("module %d command line too long\n", nr);
+            panic("module %d command line too long\n", nr);
 
         safe_strcpy(mod->cmdline, prop->data);
     }
@@ -397,7 +385,7 @@ static void __init process_chosen_node(const void *fdt, int node,
     paddr_t start, end;
     int len;
 
-    dt_printk("Checking for initrd in /chosen\n");
+    printk("Checking for initrd in /chosen\n");
 
     prop = fdt_get_property(fdt, node, "linux,initrd-start", &len);
     if ( !prop )
@@ -405,7 +393,7 @@ static void __init process_chosen_node(const void *fdt, int node,
         return;
     if ( len != sizeof(u32) && len != sizeof(u64) )
     {
-        dt_printk("linux,initrd-start property has invalid length %d\n", len);
+        printk("linux,initrd-start property has invalid length %d\n", len);
         return;
     }
     start = dt_read_number((void *)&prop->data, dt_size_to_cells(len));
@@ -413,24 +401,24 @@ static void __init process_chosen_node(const void *fdt, int node,
     prop = fdt_get_property(fdt, node, "linux,initrd-end", &len);
     if ( !prop )
     {
-        dt_printk("linux,initrd-end not present but -start was\n");
+        printk("linux,initrd-end not present but -start was\n");
         return;
     }
     if ( len != sizeof(u32) && len != sizeof(u64) )
     {
-        dt_printk("linux,initrd-end property has invalid length %d\n", len);
+        printk("linux,initrd-end property has invalid length %d\n", len);
         return;
     }
     end = dt_read_number((void *)&prop->data, dt_size_to_cells(len));
 
     if ( start >= end )
     {
-        dt_printk("linux,initrd limits invalid: %"PRIpaddr" >= %"PRIpaddr"\n",
+        printk("linux,initrd limits invalid: %"PRIpaddr" >= %"PRIpaddr"\n",
                   start, end);
         return;
     }
 
-    dt_printk("Initrd %"PRIpaddr"-%"PRIpaddr"\n", start, end);
+    printk("Initrd %"PRIpaddr"-%"PRIpaddr"\n", start, end);
 
     mod->start = start;
     mod->size = end - start;
@@ -460,12 +448,12 @@ static void __init early_print_info(void)
     int i, nr_rsvd;
 
     for ( i = 0; i < mi->nr_banks; i++ )
-        early_printk("RAM: %"PRIpaddr" - %"PRIpaddr"\n",
+        printk("RAM: %"PRIpaddr" - %"PRIpaddr"\n",
                      mi->bank[i].start,
                      mi->bank[i].start + mi->bank[i].size - 1);
-    early_printk("\n");
+    printk("\n");
     for ( i = 1 ; i < mods->nr_mods + 1; i++ )
-        early_printk("MODULE[%d]: %"PRIpaddr" - %"PRIpaddr" %s\n",
+        printk("MODULE[%d]: %"PRIpaddr" - %"PRIpaddr" %s\n",
                      i,
                      mods->module[i].start,
                      mods->module[i].start + mods->module[i].size,
@@ -478,10 +466,10 @@ static void __init early_print_info(void)
             continue;
         /* fdt_get_mem_rsv returns length */
         e += s;
-        early_printk(" RESVD[%d]: %"PRIpaddr" - %"PRIpaddr"\n",
+        printk(" RESVD[%d]: %"PRIpaddr" - %"PRIpaddr"\n",
                      i, s, e);
     }
-    early_printk("\n");
+    printk("\n");
 }
 
 /**
@@ -497,7 +485,7 @@ size_t __init device_tree_early_init(const void *fdt, paddr_t paddr)
 
     ret = fdt_check_header(fdt);
     if ( ret < 0 )
-        early_panic("No valid device tree\n");
+        panic("No valid device tree\n");
 
     mod = &early_info.modules.module[MOD_FDT];
     mod->start = paddr;
@@ -947,7 +935,7 @@ static int dt_translate_one(const struct dt_device_node *parent,
     ranges = dt_get_property(parent, rprop, &rlen);
     if ( ranges == NULL )
     {
-        dt_printk(XENLOG_ERR "DT: no ranges; cannot translate\n");
+        printk(XENLOG_ERR "DT: no ranges; cannot translate\n");
         return 1;
     }
     if ( rlen == 0 )
@@ -1017,7 +1005,7 @@ static u64 __dt_translate_address(const struct dt_device_node *dev,
     bus->count_cells(dev, &na, &ns);
     if ( !DT_CHECK_COUNTS(na, ns) )
     {
-        dt_printk(XENLOG_ERR "dt_parse: Bad cell count for device %s\n",
+        printk(XENLOG_ERR "dt_parse: Bad cell count for device %s\n",
                   dev->full_name);
         goto bail;
     }
@@ -1046,7 +1034,7 @@ static u64 __dt_translate_address(const struct dt_device_node *dev,
         pbus = dt_match_bus(parent);
         if ( pbus == NULL )
         {
-            dt_printk("DT: %s is not a valid bus\n", parent->full_name);
+            printk("DT: %s is not a valid bus\n", parent->full_name);
             break;
         }
         pbus->count_cells(dev, &pna, &pns);
@@ -1518,7 +1506,7 @@ static unsigned long __init unflatten_dt_node(const void *fdt,
     tag = be32_to_cpup((__be32 *)(*p));
     if ( tag != FDT_BEGIN_NODE )
     {
-        dt_printk(XENLOG_WARNING "Weird tag at start of node: %x\n", tag);
+        printk(XENLOG_WARNING "Weird tag at start of node: %x\n", tag);
         return mem;
     }
     *p += 4;
@@ -1720,7 +1708,7 @@ static unsigned long __init unflatten_dt_node(const void *fdt,
     }
     if ( tag != FDT_END_NODE )
     {
-        dt_printk(XENLOG_WARNING "Weird tag at end of node: %x\n", tag);
+        printk(XENLOG_WARNING "Weird tag at end of node: %x\n", tag);
         return mem;
     }
 
@@ -1769,10 +1757,10 @@ static void __init __unflatten_device_tree(const void *fdt,
     start = ((unsigned long)fdt) + fdt_off_dt_struct(fdt);
     unflatten_dt_node(fdt, mem, &start, NULL, &allnextp, 0);
     if ( be32_to_cpup((__be32 *)start) != FDT_END )
-        dt_printk(XENLOG_WARNING "Weird tag at end of tree: %08x\n",
+        printk(XENLOG_WARNING "Weird tag at end of tree: %08x\n",
                   *((u32 *)start));
     if ( be32_to_cpu(((__be32 *)mem)[size / 4]) != 0xdeadbeef )
-        dt_printk(XENLOG_WARNING "End of tree marker overwritten: %08x\n",
+        printk(XENLOG_WARNING "End of tree marker overwritten: %08x\n",
                   be32_to_cpu(((__be32 *)mem)[size / 4]));
     *allnextp = NULL;
 

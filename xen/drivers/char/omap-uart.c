@@ -15,7 +15,6 @@
 #include <xen/serial.h>
 #include <xen/init.h>
 #include <xen/irq.h>
-#include <asm/early_printk.h>
 #include <xen/device_tree.h>
 #include <asm/device.h>
 #include <xen/errno.h>
@@ -301,14 +300,14 @@ static int __init omap_uart_init(struct dt_device_node *dev,
     u64 addr, size;
 
     if ( strcmp(config, "") )
-        early_printk("WARNING: UART configuration is not supported\n");
+        printk("WARNING: UART configuration is not supported\n");
 
     uart = &omap_com;
 
     res = dt_property_read_u32(dev, "clock-frequency", &clkspec);
     if ( !res )
     {
-        early_printk("omap-uart: Unable to retrieve the clock frequency\n");
+        printk("omap-uart: Unable to retrieve the clock frequency\n");
         return -EINVAL;
     }
 
@@ -321,22 +320,22 @@ static int __init omap_uart_init(struct dt_device_node *dev,
     res = dt_device_get_address(dev, 0, &addr, &size);
     if ( res )
     {
-        early_printk("omap-uart: Unable to retrieve the base"
-                     " address of the UART\n");
+        printk("omap-uart: Unable to retrieve the base"
+               " address of the UART\n");
         return res;
     }
 
     res = dt_device_get_irq(dev, 0, &uart->irq);
     if ( res )
     {
-        early_printk("omap-uart: Unable to retrieve the IRQ\n");
+        printk("omap-uart: Unable to retrieve the IRQ\n");
         return res;
     }
 
     uart->regs = ioremap_nocache(addr, size);
     if ( !uart->regs )
     {
-        early_printk("omap-uart: Unable to map the UART memory\n");
+        printk("omap-uart: Unable to map the UART memory\n");
         return -ENOMEM;
     }
 

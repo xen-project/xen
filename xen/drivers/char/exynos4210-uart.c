@@ -24,7 +24,6 @@
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/mm.h>
-#include <asm/early_printk.h>
 #include <asm/device.h>
 #include <asm/exynos4210-uart.h>
 #include <asm/io.h>
@@ -314,9 +313,7 @@ static int __init exynos4210_uart_init(struct dt_device_node *dev,
     u64 addr, size;
 
     if ( strcmp(config, "") )
-    {
-        early_printk("WARNING: UART configuration is not supported\n");
-    }
+        printk("WARNING: UART configuration is not supported\n");
 
     uart = &exynos4210_com;
 
@@ -329,22 +326,22 @@ static int __init exynos4210_uart_init(struct dt_device_node *dev,
     res = dt_device_get_address(dev, 0, &addr, &size);
     if ( res )
     {
-        early_printk("exynos4210: Unable to retrieve the base"
-                     " address of the UART\n");
+        printk("exynos4210: Unable to retrieve the base"
+               " address of the UART\n");
         return res;
     }
 
     res = dt_device_get_irq(dev, 0, &uart->irq);
     if ( res )
     {
-        early_printk("exynos4210: Unable to retrieve the IRQ\n");
+        printk("exynos4210: Unable to retrieve the IRQ\n");
         return res;
     }
 
     uart->regs = ioremap_nocache(addr, size);
     if ( !uart->regs )
     {
-        early_printk("exynos4210: Unable to map the UART memory\n");
+        printk("exynos4210: Unable to map the UART memory\n");
         return -ENOMEM;
     }
 

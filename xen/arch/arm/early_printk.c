@@ -14,13 +14,9 @@
 #include <xen/stdarg.h>
 #include <xen/string.h>
 #include <xen/early_printk.h>
-#include <asm/early_printk.h>
 
 void early_putch(char c);
 void early_flush(void);
-
-/* Early printk buffer */
-static char __initdata buf[512];
 
 void early_puts(const char *s)
 {
@@ -36,33 +32,4 @@ void early_puts(const char *s)
      * to continue. This will avoid lost characters if Xen abort.
      */
     early_flush();
-}
-
-static void __init early_vprintk(const char *fmt, va_list args)
-{
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    early_puts(buf);
-}
-
-void __init early_printk(const char *fmt, ...)
-{
-    va_list args;
-
-    va_start(args, fmt);
-    early_vprintk(fmt, args);
-    va_end(args);
-}
-
-void __init
-early_panic(const char *fmt, ...)
-{
-    va_list args;
-
-    va_start(args, fmt);
-    early_vprintk(fmt, args);
-    va_end(args);
-
-    early_printk("\n\nEarly Panic: Stopping\n");
-
-    while(1);
 }

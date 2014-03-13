@@ -25,7 +25,6 @@
 #include <xen/libfdt/libfdt.h>
 #include <xen/init.h>
 #include <xen/mm.h>
-#include <asm/early_printk.h>
 #include "font.h"
 #include "lfb.h"
 #include "modelines.h"
@@ -123,21 +122,21 @@ void __init video_init(void)
 
     if ( !dev )
     {
-        early_printk("HDLCD: Cannot find node compatible with \"arm,hdcld\"\n");
+        printk("HDLCD: Cannot find node compatible with \"arm,hdcld\"\n");
         return;
     }
 
     res = dt_device_get_address(dev, 0, &hdlcd_start, &hdlcd_size);
     if ( !res )
     {
-        early_printk("HDLCD: Unable to retrieve MMIO base address\n");
+        printk("HDLCD: Unable to retrieve MMIO base address\n");
         return;
     }
 
     cells = dt_get_property(dev, "framebuffer", &lenp);
     if ( !cells )
     {
-        early_printk("HDLCD: Unable to retrieve framebuffer property\n");
+        printk("HDLCD: Unable to retrieve framebuffer property\n");
         return;
     }
 
@@ -146,13 +145,13 @@ void __init video_init(void)
 
     if ( !hdlcd_start )
     {
-        early_printk(KERN_ERR "HDLCD: address missing from device tree, disabling driver\n");
+        printk(KERN_ERR "HDLCD: address missing from device tree, disabling driver\n");
         return;
     }
 
     if ( !framebuffer_start )
     {
-        early_printk(KERN_ERR "HDLCD: framebuffer address missing from device tree, disabling driver\n");
+        printk(KERN_ERR "HDLCD: framebuffer address missing from device tree, disabling driver\n");
         return;
     }
 
@@ -166,13 +165,13 @@ void __init video_init(void)
     else if ( strlen(mode_string) < strlen("800x600@60") ||
             strlen(mode_string) > sizeof(_mode_string) - 1 )
     {
-        early_printk(KERN_ERR "HDLCD: invalid modeline=%s\n", mode_string);
+        printk(KERN_ERR "HDLCD: invalid modeline=%s\n", mode_string);
         return;
     } else {
         char *s = strchr(mode_string, '-');
         if ( !s )
         {
-            early_printk(KERN_INFO "HDLCD: bpp not found in modeline %s, assume 32 bpp\n",
+            printk(KERN_INFO "HDLCD: bpp not found in modeline %s, assume 32 bpp\n",
                          mode_string);
             get_color_masks("32", &c);
             memcpy(_mode_string, mode_string, strlen(mode_string) + 1);
@@ -180,13 +179,13 @@ void __init video_init(void)
         } else {
             if ( strlen(s) < 6 )
             {
-                early_printk(KERN_ERR "HDLCD: invalid mode %s\n", mode_string);
+                printk(KERN_ERR "HDLCD: invalid mode %s\n", mode_string);
                 return;
             }
             s++;
             if ( get_color_masks(s, &c) < 0 )
             {
-                early_printk(KERN_WARNING "HDLCD: unsupported bpp %s\n", s);
+                printk(KERN_WARNING "HDLCD: unsupported bpp %s\n", s);
                 return;
             }
             bytes_per_pixel = simple_strtoll(s, NULL, 10) / 8;
@@ -205,23 +204,23 @@ void __init video_init(void)
     }
     if ( !videomode )
     {
-        early_printk(KERN_WARNING "HDLCD: unsupported videomode %s\n",
-                     _mode_string);
+        printk(KERN_WARNING "HDLCD: unsupported videomode %s\n",
+               _mode_string);
         return;
     }
 
     if ( framebuffer_size < bytes_per_pixel * videomode->xres * videomode->yres )
     {
-        early_printk(KERN_ERR "HDLCD: the framebuffer is too small, disabling the HDLCD driver\n");
+        printk(KERN_ERR "HDLCD: the framebuffer is too small, disabling the HDLCD driver\n");
         return;
     }
 
-    early_printk(KERN_INFO "Initializing HDLCD driver\n");
+    printk(KERN_INFO "Initializing HDLCD driver\n");
 
     lfb = ioremap_wc(framebuffer_start, framebuffer_size);
     if ( !lfb )
     {
-        early_printk(KERN_ERR "Couldn't map the framebuffer\n");
+        printk(KERN_ERR "Couldn't map the framebuffer\n");
         return;
     }
     memset(lfb, 0x00, bytes_per_pixel * videomode->xres * videomode->yres);

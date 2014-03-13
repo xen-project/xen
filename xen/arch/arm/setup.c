@@ -39,7 +39,6 @@
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/setup.h>
-#include <asm/early_printk.h>
 #include <asm/gic.h>
 #include <asm/cpufeature.h>
 #include <asm/platform.h>
@@ -353,10 +352,10 @@ static paddr_t __init get_xen_paddr(void)
     }
 
     if ( !paddr )
-        early_panic("Not enough memory to relocate Xen");
+        panic("Not enough memory to relocate Xen");
 
-    early_printk("Placing Xen at 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
-                 paddr, paddr + min_size);
+    printk("Placing Xen at 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
+           paddr, paddr + min_size);
 
     early_info.modules.module[MOD_XEN].start = paddr;
     early_info.modules.module[MOD_XEN].size = min_size;
@@ -378,7 +377,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     void *fdt;
 
     if ( !early_info.mem.nr_banks )
-        early_panic("No memory bank");
+        panic("No memory bank");
 
     /*
      * We are going to accumulate two regions here.
@@ -437,8 +436,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     if ( i != early_info.mem.nr_banks )
     {
-        early_printk("WARNING: only using %d out of %d memory banks\n",
-                     i, early_info.mem.nr_banks);
+        printk("WARNING: only using %d out of %d memory banks\n",
+               i, early_info.mem.nr_banks);
         early_info.mem.nr_banks = i;
     }
 
@@ -472,14 +471,13 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     } while ( xenheap_pages > 128<<(20-PAGE_SHIFT) );
 
     if ( ! e )
-        early_panic("Not not enough space for xenheap");
+        panic("Not not enough space for xenheap");
 
     domheap_pages = heap_pages - xenheap_pages;
 
-    early_printk("Xen heap: %"PRIpaddr"-%"PRIpaddr" (%lu pages)\n",
-                 e - (pfn_to_paddr(xenheap_pages)), e,
-                 xenheap_pages);
-    early_printk("Dom heap: %lu pages\n", domheap_pages);
+    printk("Xen heap: %"PRIpaddr"-%"PRIpaddr" (%lu pages)\n",
+            e - (pfn_to_paddr(xenheap_pages)), e, xenheap_pages);
+    printk("Dom heap: %lu pages\n", domheap_pages);
 
     setup_xenheap_mappings((e >> PAGE_SHIFT) - xenheap_pages, xenheap_pages);
 
@@ -613,8 +611,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     if ( bank != early_info.mem.nr_banks )
     {
-        early_printk("WARNING: only using %d out of %d memory banks\n",
-                     bank, early_info.mem.nr_banks);
+        printk("WARNING: only using %d out of %d memory banks\n",
+               bank, early_info.mem.nr_banks);
         early_info.mem.nr_banks = bank;
     }
 
@@ -679,7 +677,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     fdt_size = device_tree_early_init(device_tree_flattened, fdt_paddr);
 
     cmdline = device_tree_bootargs(device_tree_flattened);
-    early_printk("Command line: %s\n", cmdline);
+    printk("Command line: %s\n", cmdline);
     cmdline_parse(cmdline);
 
     setup_pagetables(boot_phys_offset, get_xen_paddr());
