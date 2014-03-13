@@ -12,9 +12,6 @@ static inline cycles_t get_cycles (void)
         return 0;
 }
 
-struct tm;
-struct tm wallclock_time(void);
-
 /* List of timer's IRQ */
 enum timer_ppi
 {

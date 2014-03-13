@@ -48,6 +48,7 @@ struct tm {
     int     tm_isdst;       /* daylight saving time */
 };
 struct tm gmtime(unsigned long t);
+struct tm wallclock_time(void);
 
 #define SYSTEM_TIME_HZ  1000000000ULL
 #define NOW()           ((s_time_t)get_s_time())
