@@ -217,6 +217,9 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             break;
         case LIBXL_VGA_INTERFACE_TYPE_CIRRUS:
             break;
+        case LIBXL_VGA_INTERFACE_TYPE_NONE:
+            flexarray_append_pair(dm_args, "-vga", "none");
+            break;
         }
 
         if (b_info->u.hvm.boot) {
@@ -509,6 +512,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append_pair(dm_args, "-global",
                 GCSPRINTF("vga.vram_size_mb=%d",
                 libxl__sizekb_to_mb(b_info->video_memkb)));
+            break;
+        case LIBXL_VGA_INTERFACE_TYPE_NONE:
             break;
         }
 

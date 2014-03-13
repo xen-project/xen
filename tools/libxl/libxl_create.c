@@ -226,6 +226,10 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         switch (b_info->device_model_version) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
             switch (b_info->u.hvm.vga.kind) {
+            case LIBXL_VGA_INTERFACE_TYPE_NONE:
+                if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
+                    b_info->video_memkb = 0;
+                break;
             case LIBXL_VGA_INTERFACE_TYPE_STD:
                 if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
                     b_info->video_memkb = 8 * 1024;
@@ -246,6 +250,10 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         default:
             switch (b_info->u.hvm.vga.kind) {
+            case LIBXL_VGA_INTERFACE_TYPE_NONE:
+                if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
+                    b_info->video_memkb = 0;
+                break;
             case LIBXL_VGA_INTERFACE_TYPE_STD:
                 if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
                     b_info->video_memkb = 16 * 1024;
