@@ -1836,8 +1836,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         }
         
         /* HVM guests are done now */
-        errno = 0;
-        goto out;
+        goto success;
     }
 
     /* PV guests only from now on */
@@ -2037,6 +2036,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     }
 
     /* Success! */
+ success:
     rc = errno = 0;
     goto out_rc;
 
