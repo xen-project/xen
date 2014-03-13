@@ -29,18 +29,18 @@ static void __init early_puts(const char *s)
         early_putch(*s);
         s++;
     }
-}
-
-static void __init early_vprintk(const char *fmt, va_list args)
-{
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    early_puts(buf);
 
     /*
      * Wait the UART has finished to transfer all characters before
      * to continue. This will avoid lost characters if Xen abort.
      */
     early_flush();
+}
+
+static void __init early_vprintk(const char *fmt, va_list args)
+{
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    early_puts(buf);
 }
 
 void __init early_printk(const char *fmt, ...)
