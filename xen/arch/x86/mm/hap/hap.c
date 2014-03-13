@@ -326,7 +326,7 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
     else
         pages -= d->arch.paging.hap.p2m_pages;
 
-    while ( d->arch.paging.hap.total_pages != pages )
+    for ( ; ; )
     {
         if ( d->arch.paging.hap.total_pages < pages )
         {
@@ -355,6 +355,8 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
             d->arch.paging.hap.total_pages--;
             free_domheap_page(pg);
         }
+        else
+            break;
 
         /* Check to see if we need to yield and try again */
         if ( preempted && hypercall_preempt_check() )

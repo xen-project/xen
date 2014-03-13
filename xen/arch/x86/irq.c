@@ -1068,13 +1068,13 @@ bool_t cpu_has_pending_apic_eoi(void)
 
 static inline void set_pirq_eoi(struct domain *d, unsigned int irq)
 {
-    if ( !is_hvm_domain(d) && d->arch.pv_domain.pirq_eoi_map )
+    if ( is_pv_domain(d) && d->arch.pv_domain.pirq_eoi_map )
         set_bit(irq, d->arch.pv_domain.pirq_eoi_map);
 }
 
 static inline void clear_pirq_eoi(struct domain *d, unsigned int irq)
 {
-    if ( !is_hvm_domain(d) && d->arch.pv_domain.pirq_eoi_map )
+    if ( is_pv_domain(d) && d->arch.pv_domain.pirq_eoi_map )
         clear_bit(irq, d->arch.pv_domain.pirq_eoi_map);
 }
 
