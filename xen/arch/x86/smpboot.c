@@ -347,6 +347,8 @@ void start_secondary(void *unused)
 
     percpu_traps_init();
 
+    init_percpu_time();
+
     cpu_init();
 
     smp_callin();
@@ -380,8 +382,6 @@ void start_secondary(void *unused)
     __setup_vector_irq(cpu);
     cpumask_set_cpu(cpu, &cpu_online_map);
     unlock_vector_lock();
-
-    init_percpu_time();
 
     /* We can take interrupts now: we're officially "up". */
     local_irq_enable();
