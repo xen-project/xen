@@ -13,6 +13,7 @@
 #include <xen/lib.h>
 #include <xen/stdarg.h>
 #include <xen/string.h>
+#include <xen/early_printk.h>
 #include <asm/early_printk.h>
 
 void early_putch(char c);

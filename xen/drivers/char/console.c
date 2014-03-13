@@ -28,6 +28,7 @@
 #include <asm/debugger.h>
 #include <asm/div64.h>
 #include <xen/hypercall.h> /* for do_console_io */
+#include <xen/early_printk.h>
 
 /* console: comma-separated list of console outputs. */
 static char __initdata opt_console[30] = OPT_CONSOLE_STR;
@@ -255,7 +256,7 @@ long read_console_ring(struct xen_sysctl_readconsole *op)
 static char serial_rx_ring[SERIAL_RX_SIZE];
 static unsigned int serial_rx_cons, serial_rx_prod;
 
-static void (*serial_steal_fn)(const char *);
+static void (*serial_steal_fn)(const char *) = early_puts;
 
 int console_steal(int handle, void (*fn)(const char *))
 {
@@ -699,7 +700,10 @@ void __init console_init_preirq(void)
         else if ( !strncmp(p, "none", 4) )
             continue;
         else if ( (sh = serial_parse_handle(p)) >= 0 )
+        {
             sercon_handle = sh;
+            serial_steal_fn = NULL;
+        }
         else
         {
             char *q = strchr(p, ',');
