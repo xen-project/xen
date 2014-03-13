@@ -49,8 +49,17 @@ static bool_t __read_mostly opt_console_to_ring;
 boolean_param("console_to_ring", opt_console_to_ring);
 
 /* console_timestamps: include a timestamp prefix on every Xen console line. */
-static bool_t __read_mostly opt_console_timestamps;
-boolean_param("console_timestamps", opt_console_timestamps);
+enum con_timestamp_mode
+{
+    TSM_NONE,          /* No timestamps */
+    TSM_DATE,          /* [YYYY-MM-DD HH:MM:SS] */
+    TSM_BOOT           /* [SSSSSS.uuuuuu] */
+};
+
+static enum con_timestamp_mode __read_mostly opt_con_timestamp_mode = TSM_NONE;
+
+static void parse_console_timestamps(char *s);
+custom_param("console_timestamps", parse_console_timestamps);
 
 /* conring_size: allows a large console ring than default (16kB). */
 static uint32_t __initdata opt_conring_size;
@@ -546,23 +555,52 @@ static int printk_prefix_check(char *p, char **pp)
             ((loglvl < upper_thresh) && printk_ratelimit()));
 } 
 
+static void __init parse_console_timestamps(char *s)
+{
+    if ( *s == '\0' || /* Compat for old booleanparam() */
+         !strcmp(s, "date") )
+        opt_con_timestamp_mode = TSM_DATE;
+    else if ( !strcmp(s, "boot") )
+        opt_con_timestamp_mode = TSM_BOOT;
+    else if ( !strcmp(s, "none") )
+        opt_con_timestamp_mode = TSM_NONE;
+}
+
 static void printk_start_of_line(const char *prefix)
 {
     struct tm tm;
     char tstr[32];
+    uint64_t sec, nsec;
 
     __putstr(prefix);
 
-    if ( !opt_console_timestamps )
-        return;
+    switch ( opt_con_timestamp_mode )
+    {
+    case TSM_DATE:
+        tm = wallclock_time();
 
-    tm = wallclock_time();
-    if ( tm.tm_mday == 0 )
-        return;
+        if ( tm.tm_mday == 0 )
+            return;
 
-    snprintf(tstr, sizeof(tstr), "[%04u-%02u-%02u %02u:%02u:%02u] ",
-             1900 + tm.tm_year, tm.tm_mon + 1, tm.tm_mday,
-             tm.tm_hour, tm.tm_min, tm.tm_sec);
+        if ( opt_con_timestamp_mode == TSM_DATE )
+            snprintf(tstr, sizeof(tstr), "[%04u-%02u-%02u %02u:%02u:%02u] ",
+                     1900 + tm.tm_year, tm.tm_mon + 1, tm.tm_mday,
+                     tm.tm_hour, tm.tm_min, tm.tm_sec);
+        break;
+
+    case TSM_BOOT:
+        sec = NOW();
+        nsec = do_div(sec, 1000000000);
+
+        snprintf(tstr, sizeof(tstr), "[%5"PRIu64".%06"PRIu64"] ",
+                 sec, nsec / 1000);
+        break;
+
+    case TSM_NONE:
+    default:
+        return;
+    }
+
     __putstr(tstr);
 }
 
