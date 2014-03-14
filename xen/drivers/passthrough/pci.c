@@ -27,6 +27,7 @@
 #include <xen/delay.h>
 #include <xen/keyhandler.h>
 #include <xen/radix-tree.h>
+#include <xen/softirq.h>
 #include <xen/tasklet.h>
 #include <xsm/xsm.h>
 #ifdef CONFIG_X86
@@ -705,6 +706,20 @@ static int __init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
             pdev->domain = ctxt->d;
             list_add(&pdev->domain_list, &ctxt->d->arch.pdev_list);
             ctxt->handler(pdev);
+
+            if ( iommu_verbose )
+            {
+                spin_unlock(&pcidevs_lock);
+                process_pending_softirqs();
+                spin_lock(&pcidevs_lock);
+            }
+        }
+
+        if ( !iommu_verbose )
+        {
+            spin_unlock(&pcidevs_lock);
+            process_pending_softirqs();
+            spin_lock(&pcidevs_lock);
         }
     }
 
