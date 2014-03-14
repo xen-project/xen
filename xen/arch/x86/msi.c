@@ -636,7 +636,7 @@ static u64 read_pci_mem_bar(u16 seg, u8 bus, u8 slot, u8 func, u8 bir, int vf)
             return 0;
         base = pos + PCI_SRIOV_BAR;
         vf -= PCI_BDF(bus, slot, func) + offset;
-        if ( vf < 0 || (vf && vf % stride) )
+        if ( vf < 0 )
             return 0;
         if ( stride )
         {
