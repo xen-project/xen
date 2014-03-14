@@ -698,14 +698,20 @@ uint8_t epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( hvm_get_mem_pinned_cacheattr(d, gfn, &type) )
         return type;
 
-    if ( !iommu_enabled )
+    if ( !iommu_enabled ||
+         (rangeset_is_empty(d->iomem_caps) &&
+          rangeset_is_empty(d->arch.ioport_caps) &&
+          !has_arch_pdevs(d)) )
     {
+        ASSERT(!direct_mmio ||
+               mfn_x(mfn) == d->arch.hvm_domain.vmx.apic_access_mfn);
         *ipat = 1;
         return MTRR_TYPE_WRBACK;
     }
 
     if ( direct_mmio )
-        return MTRR_TYPE_UNCACHABLE;
+        return mfn_x(mfn) != d->arch.hvm_domain.vmx.apic_access_mfn
+               ? MTRR_TYPE_UNCACHABLE : MTRR_TYPE_WRBACK;
 
     if ( iommu_snoop )
     {
