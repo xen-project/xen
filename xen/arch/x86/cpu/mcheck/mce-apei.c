@@ -44,7 +44,6 @@
 	UUID_LE(0xfe08ffbe, 0x95e4, 0x4be7, 0xbc, 0x73, 0x40, 0x96,	\
 		0x04, 0x4a, 0x38, 0xfc)
 
-#pragma pack(1)
 /*
  * CPER specification (in UEFI specification 2.3 appendix N) requires
  * byte-packed.
@@ -53,9 +52,7 @@ struct cper_mce_record {
 	struct cper_record_header hdr;
 	struct cper_section_descriptor sec_hdr;
 	struct mce mce;
-} __packed;
-/* Reset to default packing */
-#pragma pack()
+} __attribute__((packed));
 
 int apei_write_mce(struct mce *m)
 {

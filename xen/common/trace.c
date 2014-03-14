@@ -643,7 +643,7 @@ static inline void insert_lost_records(struct t_buf *buf)
 {
     struct {
         u32 lost_records;
-        u32 did:16, vid:16;
+        u16 did, vid;
         u64 first_tsc;
     } __attribute__((packed)) ed;
 

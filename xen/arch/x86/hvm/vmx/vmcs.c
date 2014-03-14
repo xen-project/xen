@@ -670,11 +670,6 @@ void vmx_vmcs_exit(struct vcpu *v)
     }
 }
 
-struct xgt_desc {
-    unsigned short size;
-    unsigned long address __attribute__((packed));
-};
-
 static void vmx_set_host_env(struct vcpu *v)
 {
     unsigned int cpu = smp_processor_id();
