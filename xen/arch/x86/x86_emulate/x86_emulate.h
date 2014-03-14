@@ -55,7 +55,7 @@ enum x86_segment {
  * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
  * segment descriptor. It happens to match the format of an AMD SVM VMCB.
  */
-typedef union segment_attributes {
+typedef union __packed segment_attributes {
     uint16_t bytes;
     struct
     {
@@ -69,18 +69,18 @@ typedef union segment_attributes {
         uint16_t g:   1;    /* 11; Bit 55 */
         uint16_t pad: 4;
     } fields;
-} __attribute__ ((packed)) segment_attributes_t;
+} segment_attributes_t;
 
 /*
  * Full state of a segment register (visible and hidden portions).
  * Again, this happens to match the format of an AMD SVM VMCB.
  */
-struct segment_register {
+struct __packed segment_register {
     uint16_t   sel;
     segment_attributes_t attr;
     uint32_t   limit;
     uint64_t   base;
-} __attribute__ ((packed));
+};
 
 /*
  * Return codes from state-accessor functions and from x86_emulate().

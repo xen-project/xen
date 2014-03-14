@@ -14,5 +14,7 @@ typedef bool bool_t;
 #define cpu_has_amd_erratum(nr) 0
 #define mark_regs_dirty(r) ((void)(r))
 
+#define __packed __attribute__((packed))
+
 #include "x86_emulate/x86_emulate.h"
 #include "x86_emulate/x86_emulate.c"
