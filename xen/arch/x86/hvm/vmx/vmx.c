@@ -2038,9 +2038,9 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
     if ( apic_va == NULL )
         return -ENOMEM;
     share_xen_page_with_guest(virt_to_page(apic_va), d, XENSHARE_writable);
+    d->arch.hvm_domain.vmx.apic_access_mfn = virt_to_mfn(apic_va);
     set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE),
         _mfn(virt_to_mfn(apic_va)));
-    d->arch.hvm_domain.vmx.apic_access_mfn = virt_to_mfn(apic_va);
 
     return 0;
 }
