@@ -94,7 +94,7 @@
  * bits that's not in use in a given node type can be used as
  * extra software-defined bits. */
 
-typedef struct {
+typedef struct __packed {
     /* These are used in all kinds of entry. */
     unsigned long valid:1;      /* Valid mapping */
     unsigned long table:1;      /* == 1 in 4k map entries too */
@@ -126,11 +126,11 @@ typedef struct {
     unsigned long xnt:1;        /* eXecute-Never */
     unsigned long apt:2;        /* Access Permissions */
     unsigned long nst:1;        /* Not-Secure */
-} __attribute__((__packed__)) lpae_pt_t;
+} lpae_pt_t;
 
 /* The p2m tables have almost the same layout, but some of the permission
  * and cache-control bits are laid out differently (or missing) */
-typedef struct {
+typedef struct __packed {
     /* These are used in all kinds of entry. */
     unsigned long valid:1;      /* Valid mapping */
     unsigned long table:1;      /* == 1 in 4k map entries too */
@@ -156,13 +156,13 @@ typedef struct {
     unsigned long type:4;       /* Ignore by hardware. Used to store p2m types */
 
     unsigned long sbz1:5;
-} __attribute__((__packed__)) lpae_p2m_t;
+} lpae_p2m_t;
 
 /*
  * Walk is the common bits of p2m and pt entries which are needed to
  * simply walk the table (e.g. for debug).
  */
-typedef struct {
+typedef struct __packed {
     /* These are used in all kinds of entry. */
     unsigned long valid:1;      /* Valid mapping */
     unsigned long table:1;      /* == 1 in 4k map entries too */
@@ -173,7 +173,7 @@ typedef struct {
     unsigned long base:28;      /* Base address of block or next table */
 
     unsigned long pad1:24;
-} __attribute__((__packed__)) lpae_walk_t;
+} lpae_walk_t;
 
 typedef union {
     uint64_t bits;
