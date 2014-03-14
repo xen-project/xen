@@ -1130,6 +1130,8 @@ typedef struct libxl__xswait_state libxl__xswait_state;
  *     This HAS been logged.
  *     xswait will not continue (but calling libxl__xswait_stop is OK).
  *
+ * xswait.path may start with with '@', in which case no read is done
+ * and the callback will always get data==0.
  */
 typedef void libxl__xswait_callback(libxl__egc *egc,
       libxl__xswait_state *xswa, int rc, const char *data);

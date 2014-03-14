@@ -69,8 +69,12 @@ void xswait_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *xsw,
     int rc;
     const char *data;
 
-    rc = libxl__xs_read_checked(gc, XBT_NULL, xswa->path, &data);
-    if (rc) { xswait_report_error(egc, xswa, rc); return; }
+    if (xswa->path[0] == '@') {
+        data = 0;
+    } else {
+        rc = libxl__xs_read_checked(gc, XBT_NULL, xswa->path, &data);
+        if (rc) { xswait_report_error(egc, xswa, rc); return; }
+    }
 
     xswa->callback(egc, xswa, 0, data);
 }
