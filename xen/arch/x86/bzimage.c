@@ -146,7 +146,7 @@ static __init int perform_gunzip(char *output, char *image, unsigned long image_
     return rc;
 }
 
-struct setup_header {
+struct __packed setup_header {
         uint8_t         _pad0[0x1f1];           /* skip uninteresting stuff */
         uint8_t         setup_sects;
         uint16_t        root_flags;
@@ -183,7 +183,7 @@ struct setup_header {
         uint64_t        hardware_subarch_data;
         uint32_t        payload_offset;
         uint32_t        payload_length;
-    } __attribute__((packed));
+    };
 
 static __init int bzimage_check(struct setup_header *hdr, unsigned long len)
 {

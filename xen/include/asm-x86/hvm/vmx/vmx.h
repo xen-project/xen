@@ -421,11 +421,11 @@ static inline void __invept(unsigned long type, u64 eptp, u64 gpa)
 
 static inline void __invvpid(unsigned long type, u16 vpid, u64 gva)
 {
-    struct {
+    struct __packed {
         u64 vpid:16;
         u64 rsvd:48;
         u64 gva;
-    } __attribute__ ((packed)) operand = {vpid, 0, gva};
+    }  operand = {vpid, 0, gva};
 
     /* Fix up #UD exceptions which occur when TLBs are flushed before VMXON. */
     asm volatile ( "1: "

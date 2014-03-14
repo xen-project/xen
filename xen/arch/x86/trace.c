@@ -38,12 +38,12 @@ void __trace_pv_trap(int trapnr, unsigned long eip,
 {
     if ( is_pv_32on64_vcpu(current) )
     {
-        struct {
+        struct __packed {
             unsigned eip:32,
                 trapnr:15,
                 use_error_code:1,
                 error_code:16;
-        } __attribute__((packed)) d;
+        } d;
 
         d.eip = eip;
         d.trapnr = trapnr;
@@ -54,12 +54,12 @@ void __trace_pv_trap(int trapnr, unsigned long eip,
     }
     else
     {
-        struct {
+        struct __packed {
             unsigned long eip;
             unsigned trapnr:15,
                 use_error_code:1,
                 error_code:16;
-        } __attribute__((packed)) d;
+        } d;
         unsigned event;
 
         d.eip = eip;
@@ -79,9 +79,9 @@ void __trace_pv_page_fault(unsigned long addr, unsigned error_code)
 
     if ( is_pv_32on64_vcpu(current) )
     {
-        struct {
+        struct __packed {
             u32 eip, addr, error_code;
-        } __attribute__((packed)) d;
+        } d;
 
         d.eip = eip;
         d.addr = addr;
@@ -91,10 +91,10 @@ void __trace_pv_page_fault(unsigned long addr, unsigned error_code)
     }
     else
     {
-        struct {
+        struct __packed {
             unsigned long eip, addr;
             u32 error_code;
-        } __attribute__((packed)) d;
+        } d;
         unsigned event;
 
         d.eip = eip;
@@ -125,18 +125,18 @@ void __trace_trap_two_addr(unsigned event, unsigned long va1,
 {
     if ( is_pv_32on64_vcpu(current) )
     {
-        struct {
+        struct __packed {
             u32 va1, va2;
-        } __attribute__((packed)) d;
+        } d;
         d.va1=va1;
         d.va2=va2;
         __trace_var(event, 1, sizeof(d), &d);
     }
     else
     {
-        struct {
+        struct __packed {
             unsigned long va1, va2;
-        } __attribute__((packed)) d;
+        } d;
         d.va1=va1;
         d.va2=va2;
         event |= TRC_64_FLAG;
@@ -158,10 +158,10 @@ void __trace_ptwr_emulation(unsigned long addr, l1_pgentry_t npte)
 
     if ( is_pv_32on64_vcpu(current) )
     {
-        struct {
+        struct __packed {
             l1_pgentry_t pte;
             u32 addr, eip;
-        } __attribute__((packed)) d;
+        } d;
         d.addr = addr;
         d.eip = eip;
         d.pte = npte;

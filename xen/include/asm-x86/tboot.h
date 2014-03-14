@@ -39,10 +39,6 @@
 
 #include <xen/acpi.h>
 
-#ifndef __packed
-#define __packed   __attribute__ ((packed))
-#endif
-
 typedef struct __packed {
   uint32_t    data1;
   uint16_t    data2;

@@ -48,11 +48,11 @@
  * CPER specification (in UEFI specification 2.3 appendix N) requires
  * byte-packed.
  */
-struct cper_mce_record {
+struct __packed cper_mce_record {
 	struct cper_record_header hdr;
 	struct cper_section_descriptor sec_hdr;
 	struct mce mce;
-} __attribute__((packed));
+};
 
 int apei_write_mce(struct mce *m)
 {

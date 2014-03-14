@@ -2700,13 +2700,13 @@ static inline void trace_shadow_fixup(guest_l1e_t gl1e,
 {
     if ( tb_init_done )
     {
-        struct {
+        struct __packed {
             /* for PAE, guest_l1e may be 64 while guest_va may be 32;
                so put it first for alignment sake. */
             guest_l1e_t gl1e;
             guest_va_t va;
             u32 flags;
-        } __attribute__((packed)) d;
+        } d;
         u32 event;
 
         event = TRC_SHADOW_FIXUP | ((GUEST_PAGING_LEVELS-2)<<8);
@@ -2724,13 +2724,13 @@ static inline void trace_not_shadow_fault(guest_l1e_t gl1e,
 {
     if ( tb_init_done )
     {
-        struct {
+        struct __packed {
             /* for PAE, guest_l1e may be 64 while guest_va may be 32;
                so put it first for alignment sake. */
             guest_l1e_t gl1e;
             guest_va_t va;
             u32 flags;
-        } __attribute__((packed)) d;
+        } d;
         u32 event;
 
         event = TRC_SHADOW_NOT_SHADOW | ((GUEST_PAGING_LEVELS-2)<<8);
@@ -2749,7 +2749,7 @@ static inline void trace_shadow_emulate_other(u32 event,
 {
     if ( tb_init_done )
     {
-        struct {
+        struct __packed {
             /* for PAE, guest_l1e may be 64 while guest_va may be 32;
                so put it first for alignment sake. */
 #if GUEST_PAGING_LEVELS == 2
@@ -2758,7 +2758,7 @@ static inline void trace_shadow_emulate_other(u32 event,
             u64 gfn;
 #endif
             guest_va_t va;
-        } __attribute__((packed)) d;
+        } d;
 
         event |= ((GUEST_PAGING_LEVELS-2)<<8);
 
@@ -2779,13 +2779,13 @@ static inline void trace_shadow_emulate(guest_l1e_t gl1e, unsigned long va)
 {
     if ( tb_init_done )
     {
-        struct {
+        struct __packed {
             /* for PAE, guest_l1e may be 64 while guest_va may be 32;
                so put it first for alignment sake. */
             guest_l1e_t gl1e, write_val;
             guest_va_t va;
             unsigned flags:29, emulation_count:3;
-        } __attribute__((packed)) d;
+        } d;
         u32 event;
 
         event = TRC_SHADOW_EMULATE | ((GUEST_PAGING_LEVELS-2)<<8);

@@ -28,11 +28,11 @@ struct ix87_state {
         uint32_t fdp;
         uint16_t fds, _res6;
     } env;
-    struct ix87_reg {
+    struct __packed ix87_reg {
         uint64_t mantissa;
         uint16_t exponent:15;
         uint16_t sign:1;
-    } __attribute__((__packed__)) r[8];
+    } r[8];
 };
 
 void vcpu_restore_fpu_eager(struct vcpu *v);

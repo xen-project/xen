@@ -10,11 +10,11 @@
 #define E820_NVS          4
 #define E820_UNUSABLE     5
 
-struct e820entry {
+struct __packed e820entry {
     uint64_t addr;
     uint64_t size;
     uint32_t type;
-} __attribute__((packed));
+};
 
 #define E820MAX	128
 

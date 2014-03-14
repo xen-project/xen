@@ -142,7 +142,7 @@
 #define lapic ((volatile struct local_apic *)APIC_BASE)
 
 #ifndef __ASSEMBLY__
-struct local_apic {
+struct __packed local_apic {
 
 /*000*/	struct { u32 __reserved[4]; } __reserved_01;
 
@@ -388,7 +388,7 @@ struct local_apic {
 
 /*3F0*/	struct { u32 __reserved[4]; } __reserved_20;
 
-} __attribute__ ((packed));
+};
 #endif /* !__ASSEMBLY__ */
 
 #undef u32

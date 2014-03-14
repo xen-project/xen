@@ -412,7 +412,7 @@ static always_inline void __mwait(unsigned long eax, unsigned long ecx)
 #define IOBMP_BYTES             8192
 #define IOBMP_INVALID_OFFSET    0x8000
 
-struct tss_struct {
+struct __packed __cacheline_aligned tss_struct {
     unsigned short	back_link,__blh;
     union { u64 rsp0, esp0; };
     union { u64 rsp1, esp1; };
@@ -426,7 +426,7 @@ struct tss_struct {
     u16 bitmap;
     /* Pads the TSS to be cacheline-aligned (total size is 0x80). */
     u8 __cacheline_filler[24];
-} __cacheline_aligned __attribute__((packed));
+};
 
 #define IST_NONE 0UL
 #define IST_DF   1UL

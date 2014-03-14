@@ -309,7 +309,7 @@ enum VMEXIT_EXITCODE
 /* Definition of segment state is borrowed by the generic HVM code. */
 typedef struct segment_register svm_segment_register_t;
 
-typedef union 
+typedef union __packed
 {
     u64 bytes;
     struct 
@@ -321,9 +321,9 @@ typedef union
         u64 v:         1;
         u64 errorcode:32;
     } fields;
-} __attribute__ ((packed)) eventinj_t;
+} eventinj_t;
 
-typedef union 
+typedef union __packed
 {
     u64 bytes;
     struct 
@@ -339,9 +339,9 @@ typedef union
         u64 vector:       8;
         u64 rsvd3:       24;
     } fields;
-} __attribute__ ((packed)) vintr_t;
+} vintr_t;
 
-typedef union
+typedef union __packed
 {
     u64 bytes;
     struct 
@@ -356,18 +356,18 @@ typedef union
         u64 rsv1: 9;
         u64 port: 16;
     } fields;
-} __attribute__ ((packed)) ioio_info_t;
+} ioio_info_t;
 
-typedef union
+typedef union __packed
 {
     u64 bytes;
     struct
     {
         u64 enable:1;
     } fields;
-} __attribute__ ((packed)) lbrctrl_t;
+} lbrctrl_t;
 
-typedef union
+typedef union __packed
 {
     uint32_t bytes;
     struct
@@ -397,12 +397,12 @@ typedef union
         uint32_t lbr: 1;
         uint32_t resv: 21;
     } fields;
-} __attribute__ ((packed)) vmcbcleanbits_t;
+} vmcbcleanbits_t;
 
 #define IOPM_SIZE   (12 * 1024)
 #define MSRPM_SIZE  (8  * 1024)
 
-struct vmcb_struct {
+struct __packed vmcb_struct {
     u32 _cr_intercepts;         /* offset 0x00 - cleanbit 0 */
     u32 _dr_intercepts;         /* offset 0x04 - cleanbit 0 */
     u32 _exception_intercepts;  /* offset 0x08 - cleanbit 0 */
@@ -487,7 +487,7 @@ struct vmcb_struct {
     u64 _lastintfromip;         /* cleanbit 10 */
     u64 _lastinttoip;           /* cleanbit 10 */
     u64 res16[301];
-} __attribute__ ((packed));
+};
 
 struct svm_domain {
 };

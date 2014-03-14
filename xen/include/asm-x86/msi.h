@@ -168,7 +168,7 @@ int msi_free_irq(struct msi_desc *entry);
  * MSI Defined Data Structures
  */
 
-struct msg_data {
+struct __packed msg_data {
 #if defined(__LITTLE_ENDIAN_BITFIELD)
 	__u32	vector		:  8;
 	__u32	delivery_mode	:  3;	/* 000b: FIXED | 001b: lowest prior */
@@ -186,9 +186,9 @@ struct msg_data {
 #else
 #error "Bitfield endianness not defined! Check your byteorder.h"
 #endif
-} __attribute__ ((packed));
+};
 
-struct msg_address {
+struct __packed msg_address {
 	union {
 		struct {
 #if defined(__LITTLE_ENDIAN_BITFIELD)
@@ -212,7 +212,7 @@ struct msg_address {
        		__u32  value;
 	}lo_address;
 	__u32 	hi_address;
-} __attribute__ ((packed));
+};
 
 #define MAX_MSIX_TABLE_ENTRIES  (PCI_MSIX_FLAGS_QSIZE + 1)
 #define MAX_MSIX_TABLE_PAGES    PFN_UP(MAX_MSIX_TABLE_ENTRIES * \

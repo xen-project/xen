@@ -181,10 +181,10 @@ do {                                                     \
         (((u32)(addr) & 0x00FF0000U) >> 16);             \
 } while (0)
 
-struct desc_ptr {
+struct __packed desc_ptr {
 	unsigned short limit;
 	unsigned long base;
-} __attribute__((__packed__)) ;
+};
 
 extern struct desc_struct boot_cpu_gdt_table[];
 DECLARE_PER_CPU(struct desc_struct *, gdt_table);

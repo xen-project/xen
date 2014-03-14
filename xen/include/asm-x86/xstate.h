@@ -42,7 +42,7 @@
 extern u64 xfeature_mask;
 
 /* extended state save area */
-struct xsave_struct
+struct __packed __attribute__((aligned (64))) xsave_struct
 {
     union {                                  /* FPU/MMX, SSE */
         char x[512];
@@ -73,7 +73,7 @@ struct xsave_struct
 
     struct { char x[XSTATE_YMM_SIZE]; } ymm; /* YMM */
     char   data[];                           /* Future new states */
-} __attribute__ ((packed, aligned (64)));
+};
 
 /* extended state operations */
 bool_t __must_check set_xcr0(u64 xfeatures);

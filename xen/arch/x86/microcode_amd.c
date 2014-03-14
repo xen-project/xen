@@ -27,15 +27,15 @@
 #include <asm/microcode.h>
 #include <asm/hvm/svm/svm.h>
 
-struct equiv_cpu_entry {
+struct __packed equiv_cpu_entry {
     uint32_t installed_cpu;
     uint32_t fixed_errata_mask;
     uint32_t fixed_errata_compare;
     uint16_t equiv_cpu;
     uint16_t reserved;
-} __attribute__((packed));
+};
 
-struct microcode_header_amd {
+struct __packed microcode_header_amd {
     uint32_t data_code;
     uint32_t patch_id;
     uint8_t  mc_patch_data_id[2];
@@ -50,7 +50,7 @@ struct microcode_header_amd {
     uint8_t  bios_api_rev;
     uint8_t  reserved1[3];
     uint32_t match_reg[8];
-} __attribute__((packed));
+};
 
 #define UCODE_MAGIC                0x00414d44
 #define UCODE_EQUIV_CPU_TABLE_TYPE 0x00000000
