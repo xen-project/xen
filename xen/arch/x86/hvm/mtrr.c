@@ -719,5 +719,35 @@ uint8_t epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
                   MTRR_TYPE_WRBACK;
 
     hmtrr_mtype = get_mtrr_type(&mtrr_state, (mfn_x(mfn) << PAGE_SHIFT));
-    return ((gmtrr_mtype <= hmtrr_mtype) ? gmtrr_mtype : hmtrr_mtype);
+
+    /* If both types match we're fine. */
+    if ( likely(gmtrr_mtype == hmtrr_mtype) )
+        return hmtrr_mtype;
+
+    /* If either type is UC, we have to go with that one. */
+    if ( gmtrr_mtype == MTRR_TYPE_UNCACHABLE ||
+         hmtrr_mtype == MTRR_TYPE_UNCACHABLE )
+        return MTRR_TYPE_UNCACHABLE;
+
+    /* If either type is WB, we have to go with the other one. */
+    if ( gmtrr_mtype == MTRR_TYPE_WRBACK )
+        return hmtrr_mtype;
+    if ( hmtrr_mtype == MTRR_TYPE_WRBACK )
+        return gmtrr_mtype;
+
+    /*
+     * At this point we have disagreeing WC, WT, or WP types. The only
+     * combination that can be cleanly resolved is WT:WP. The ones involving
+     * WC need to be converted to UC, both due to the memory ordering
+     * differences and because WC disallows reads to be cached (WT and WP
+     * permit this), while WT and WP require writes to go straight to memory
+     * (WC can buffer them).
+     */
+    if ( (gmtrr_mtype == MTRR_TYPE_WRTHROUGH &&
+          hmtrr_mtype == MTRR_TYPE_WRPROT) ||
+         (gmtrr_mtype == MTRR_TYPE_WRPROT &&
+          hmtrr_mtype == MTRR_TYPE_WRTHROUGH) )
+        return MTRR_TYPE_WRPROT;
+
+    return MTRR_TYPE_UNCACHABLE;
 }
