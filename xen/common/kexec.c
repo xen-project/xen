@@ -265,6 +265,8 @@ static int noinline one_cpu_only(void)
     }
 
     set_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags);
+    printk("Executing kexec image on cpu%u\n", cpu);
+
     return 0;
 }
 
@@ -339,8 +341,6 @@ void kexec_crash(void)
     pos = (test_bit(KEXEC_FLAG_CRASH_POS, &kexec_flags) != 0);
     if ( !test_bit(KEXEC_IMAGE_CRASH_BASE + pos, &kexec_flags) )
         return;
-
-    printk("Executing crash image\n");
 
     kexecing = TRUE;
 
