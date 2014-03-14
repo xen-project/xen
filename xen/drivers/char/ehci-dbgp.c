@@ -251,25 +251,25 @@ struct ehci_dbg_port {
  * For most devices, interfaces don't coordinate with each other, so
  * such requests may be made at any time.
  */
-struct usb_ctrlrequest {
+struct __packed usb_ctrlrequest {
     u8 bRequestType;
     u8 bRequest;
     __le16 wValue;
     __le16 wIndex;
     __le16 wLength;
-} __attribute__ ((packed));
+};
 
 /* USB_DT_DEBUG: for special highspeed devices, replacing serial console */
 
 #define USB_DT_DEBUG    0x0a
 
-struct usb_debug_descriptor {
+struct __packed usb_debug_descriptor {
     u8 bLength;
     u8 bDescriptorType;
     /* bulk endpoints with 8 byte maxpacket */
     u8 bDebugInEndpoint;
     u8 bDebugOutEndpoint;
-} __attribute__((packed));
+};
 
 #define USB_DEBUG_DEVNUM 127
 

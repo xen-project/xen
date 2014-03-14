@@ -14,7 +14,7 @@
 #define __DEFINE_COMPAT_HANDLE(name, type) \
     typedef struct { \
         compat_ptr_t c; \
-        type *_[0] __attribute__((__packed__)); \
+        type *_[0] __packed; \
     } __compat_handle_ ## name
 
 #define DEFINE_COMPAT_HANDLE(name) \

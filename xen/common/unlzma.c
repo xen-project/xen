@@ -214,11 +214,11 @@ rc_bit_tree_decode(struct rc *rc, uint16_t *p, int num_levels, int *symbol)
  */
 
 
-struct lzma_header {
+struct __packed lzma_header {
 	uint8_t pos;
 	uint32_t dict_size;
 	uint64_t dst_size;
-} __attribute__ ((packed)) ;
+};
 
 
 #define LZMA_BASE_SIZE 1846

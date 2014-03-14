@@ -16,6 +16,8 @@
 
 #define noreturn      __attribute__((noreturn))
 
+#define __packed      __attribute__((packed))
+
 #if (!defined(__clang__) && (__GNUC__ == 4) && (__GNUC_MINOR__ < 5))
 #define unreachable() do {} while (1)
 #else
