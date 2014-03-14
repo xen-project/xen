@@ -527,11 +527,10 @@ static void xmalloc_pool_put(void *p)
 
 static void *xmalloc_whole_pages(unsigned long size, unsigned long align)
 {
-    unsigned int i, order = get_order_from_bytes(size);
+    unsigned int i, order;
     void *res, *p;
 
-    if ( align > size )
-        get_order_from_bytes(align);
+    order = get_order_from_bytes(max(align, size));
 
     res = alloc_xenheap_pages(order, 0);
     if ( res == NULL )
