@@ -31,7 +31,6 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
-#include <xen/softirq.h>
 #include <asm/msi.h>
 #include <asm/irq.h>
 #include <asm/hvm/vmx/vmx.h>
@@ -1493,9 +1492,6 @@ static int domain_context_mapping(
         ret = -EINVAL;
         break;
     }
-
-    if ( iommu_verbose )
-        process_pending_softirqs();
 
     return ret;
 }

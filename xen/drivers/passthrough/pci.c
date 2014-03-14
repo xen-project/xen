@@ -27,6 +27,7 @@
 #include <xen/delay.h>
 #include <xen/keyhandler.h>
 #include <xen/radix-tree.h>
+#include <xen/softirq.h>
 #include <xen/tasklet.h>
 #include <xsm/xsm.h>
 #include <asm/msi.h>
@@ -922,6 +923,20 @@ static int __init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
                 printk(XENLOG_WARNING "Dom%d owning %04x:%02x:%02x.%u?\n",
                        pdev->domain->domain_id, pseg->nr, bus,
                        PCI_SLOT(devfn), PCI_FUNC(devfn));
+
+            if ( iommu_verbose )
+            {
+                spin_unlock(&pcidevs_lock);
+                process_pending_softirqs();
+                spin_lock(&pcidevs_lock);
+            }
+        }
+
+        if ( !iommu_verbose )
+        {
+            spin_unlock(&pcidevs_lock);
+            process_pending_softirqs();
+            spin_lock(&pcidevs_lock);
         }
     }
 
