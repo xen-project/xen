@@ -2541,6 +2541,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     vcpu_nestedhvm(v).nv_vmswitch_in_progress = 0;
     if ( nestedhvm_vcpu_in_guestmode(v) )
     {
+        paging_update_nestedmode(v);
         if ( nvmx_n2_vmexit_handler(regs, exit_reason) )
             goto out;
     }
