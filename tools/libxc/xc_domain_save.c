@@ -894,6 +894,12 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     int completed = 0;
 
+    if ( getenv("XG_MIGRATION_V2") )
+    {
+        return xc_domain_save2(xch, io_fd, dom, max_iters,
+                               max_factor, flags, callbacks, hvm);
+    }
+
     DPRINTF("%s: starting save of domid %u", __func__, dom);
 
     if ( hvm && !callbacks->switch_qemu_logdirty )

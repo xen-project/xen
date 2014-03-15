@@ -1502,6 +1502,14 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     struct restore_ctx *ctx = &_ctx;
     struct domain_info_context *dinfo = &ctx->dinfo;
 
+    if ( getenv("XG_MIGRATION_V2") )
+    {
+        return xc_domain_restore2(
+            xch, io_fd, dom, store_evtchn, store_mfn,
+            store_domid, console_evtchn, console_mfn, console_domid,
+            hvm,  pae,  superpages, checkpointed_stream, callbacks);
+    }
+
     DPRINTF("%s: starting restore of new domid %u", __func__, dom);
 
     pagebuf_init(&pagebuf);
