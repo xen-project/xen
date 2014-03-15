@@ -3,6 +3,14 @@
 
 #include "xg_private.h"
 
+#include "xc_sr_stream_format.h"
+
+/* String representation of Domain Header types. */
+const char *dhdr_type_to_str(uint32_t type);
+
+/* String representation of Record types. */
+const char *rec_type_to_str(uint32_t type);
+
 #endif
 /*
  * Local variables:
