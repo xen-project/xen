@@ -491,7 +491,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     /* Copy the DTB. */
     fdt = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
-    copy_from_paddr(fdt, dtb_paddr, dtb_size, BUFFERABLE);
+    copy_from_paddr(fdt, dtb_paddr, dtb_size);
     device_tree_flattened = fdt;
 
     /* Add non-xenheap memory */
@@ -628,7 +628,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     /* Copy the DTB. */
     fdt = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
-    copy_from_paddr(fdt, dtb_paddr, dtb_size, BUFFERABLE);
+    copy_from_paddr(fdt, dtb_paddr, dtb_size);
     device_tree_flattened = fdt;
 
     setup_frametable_mappings(ram_start, ram_end);

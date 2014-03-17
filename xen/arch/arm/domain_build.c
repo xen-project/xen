@@ -976,7 +976,7 @@ static void initrd_load(struct kernel_info *kinfo)
 
         dst = map_domain_page(ma>>PAGE_SHIFT);
 
-        copy_from_paddr(dst + s, paddr + offs, l, BUFFERABLE);
+        copy_from_paddr(dst + s, paddr + offs, l);
 
         unmap_domain_page(dst);
         offs += l;

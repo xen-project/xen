@@ -40,7 +40,7 @@ struct minimal_dtb_header {
  * @paddr: source physical address
  * @len: length to copy
  */
-void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len, int attrindx)
+void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
 {
     void *src = (void *)FIXMAP_ADDR(FIXMAP_MISC);
 
@@ -52,7 +52,7 @@ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len, int attrindx)
         s = paddr & (PAGE_SIZE-1);
         l = min(PAGE_SIZE - s, len);
 
-        set_fixmap(FIXMAP_MISC, p, attrindx);
+        set_fixmap(FIXMAP_MISC, p, BUFFERABLE);
         memcpy(dst, src + s, l);
         clean_xen_dcache_va_range(dst, l);
 
@@ -145,7 +145,7 @@ static void kernel_zimage_load(struct kernel_info *info)
 
         dst = map_domain_page(ma>>PAGE_SHIFT);
 
-        copy_from_paddr(dst + s, paddr + offs, l, BUFFERABLE);
+        copy_from_paddr(dst + s, paddr + offs, l);
 
         unmap_domain_page(dst);
         offs += l;
@@ -178,7 +178,7 @@ static int kernel_try_zimage64_prepare(struct kernel_info *info,
     if ( size < sizeof(zimage) )
         return -EINVAL;
 
-    copy_from_paddr(&zimage, addr, sizeof(zimage), DEV_SHARED);
+    copy_from_paddr(&zimage, addr, sizeof(zimage));
 
     if ( zimage.magic0 != ZIMAGE64_MAGIC_V0 &&
          zimage.magic1 != ZIMAGE64_MAGIC_V1 )
@@ -223,7 +223,7 @@ static int kernel_try_zimage32_prepare(struct kernel_info *info,
     if ( size < ZIMAGE32_HEADER_LEN )
         return -EINVAL;
 
-    copy_from_paddr(zimage, addr, sizeof(zimage), DEV_SHARED);
+    copy_from_paddr(zimage, addr, sizeof(zimage));
 
     if (zimage[ZIMAGE32_MAGIC_OFFSET/4] != ZIMAGE32_MAGIC)
         return -EINVAL;
@@ -239,8 +239,7 @@ static int kernel_try_zimage32_prepare(struct kernel_info *info,
      */
     if ( addr + end - start + sizeof(dtb_hdr) <= size )
     {
-        copy_from_paddr(&dtb_hdr, addr + end - start,
-                        sizeof(dtb_hdr), DEV_SHARED);
+        copy_from_paddr(&dtb_hdr, addr + end - start, sizeof(dtb_hdr));
         if (be32_to_cpu(dtb_hdr.magic) == DTB_MAGIC) {
             end += be32_to_cpu(dtb_hdr.total_size);
 
@@ -311,7 +310,7 @@ static int kernel_try_elf_prepare(struct kernel_info *info,
     if ( info->kernel_img == NULL )
         panic("Cannot allocate temporary buffer for kernel");
 
-    copy_from_paddr(info->kernel_img, addr, size, BUFFERABLE);
+    copy_from_paddr(info->kernel_img, addr, size);
 
     if ( (rc = elf_init(&info->elf.elf, info->kernel_img, size )) != 0 )
         goto err;
