@@ -19,7 +19,9 @@
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/xenoprof.h>
+#ifdef HAS_PCI
 #include <asm/msi.h>
+#endif
 #include <public/xen.h>
 #include <public/physdev.h>
 #include <public/platform.h>
@@ -100,7 +102,6 @@ static int domain_has_xen(struct domain *d, u32 perms)
 
 static int get_irq_sid(int irq, u32 *sid, struct avc_audit_data *ad)
 {
-    struct irq_desc *desc = irq_to_desc(irq);
     if ( irq >= nr_irqs || irq < 0 )
         return -EINVAL;
     if ( irq < nr_static_irqs ) {
@@ -110,15 +111,21 @@ static int get_irq_sid(int irq, u32 *sid, struct avc_audit_data *ad)
         }
         return security_irq_sid(irq, sid);
     }
-    if ( desc->msi_desc && desc->msi_desc->dev ) {
-        struct pci_dev *dev = desc->msi_desc->dev;
-        u32 sbdf = (dev->seg << 16) | (dev->bus << 8) | dev->devfn;
-        if (ad) {
-            AVC_AUDIT_DATA_INIT(ad, DEV);
-            ad->device = sbdf;
+#ifdef HAS_PCI
+    {
+        struct irq_desc *desc = irq_to_desc(irq);
+        if ( desc->msi_desc && desc->msi_desc->dev ) {
+            struct pci_dev *dev = desc->msi_desc->dev;
+            u32 sbdf = (dev->seg << 16) | (dev->bus << 8) | dev->devfn;
+            if (ad) {
+                AVC_AUDIT_DATA_INIT(ad, DEV);
+                ad->device = sbdf;
+            }
+            return security_device_sid(sbdf, sid);
         }
-        return security_device_sid(sbdf, sid);
     }
+#endif
+
     if (ad) {
         AVC_AUDIT_DATA_INIT(ad, IRQ);
         ad->irq = irq;
@@ -825,21 +832,34 @@ static int flask_map_domain_pirq (struct domain *d)
     return current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
 }
 
+static int flask_map_domain_msi (struct domain *d, int irq, void *data,
+                                 u32 *sid, struct avc_audit_data *ad)
+{
+#ifdef HAS_PCI
+    struct msi_info *msi = data;
+
+    u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
+    AVC_AUDIT_DATA_INIT(ad, DEV);
+    ad->device = machine_bdf;
+
+    return security_device_sid(machine_bdf, sid);
+#else
+    return -EINVAL;
+#endif
+}
+
 static int flask_map_domain_irq (struct domain *d, int irq, void *data)
 {
     u32 sid, dsid;
     int rc = -EPERM;
-    struct msi_info *msi = data;
     struct avc_audit_data ad;
 
-    if ( irq >= nr_static_irqs && msi ) {
-        u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
-        AVC_AUDIT_DATA_INIT(&ad, DEV);
-        ad.device = machine_bdf;
-        rc = security_device_sid(machine_bdf, &sid);
+    if ( irq >= nr_static_irqs && data ) {
+        rc = flask_map_domain_msi(d, irq, data, &sid, &ad);
     } else {
         rc = get_irq_sid(irq, &sid, &ad);
     }
+
     if ( rc )
         return rc;
 
@@ -858,18 +878,30 @@ static int flask_unmap_domain_pirq (struct domain *d)
     return current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
 }
 
+static int flask_unmap_domain_msi (struct domain *d, int irq, void *data,
+                                   u32 *sid, struct avc_audit_data *ad)
+{
+#ifdef HAS_PCI
+    struct msi_info *msi = data;
+    u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
+
+    AVC_AUDIT_DATA_INIT(ad, DEV);
+    ad->device = machine_bdf;
+
+    return security_device_sid(machine_bdf, sid);
+#else
+    return -EINVAL;
+#endif
+}
+
 static int flask_unmap_domain_irq (struct domain *d, int irq, void *data)
 {
     u32 sid;
     int rc = -EPERM;
-    struct msi_info *msi = data;
     struct avc_audit_data ad;
 
-    if ( irq >= nr_static_irqs && msi ) {
-        u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
-        AVC_AUDIT_DATA_INIT(&ad, DEV);
-        ad.device = machine_bdf;
-        rc = security_device_sid(machine_bdf, &sid);
+    if ( irq >= nr_static_irqs && data ) {
+        rc = flask_unmap_domain_msi(d, irq, data, &sid, &ad);
     } else {
         rc = get_irq_sid(irq, &sid, &ad);
     }
