@@ -963,7 +963,7 @@ void share_xen_page_with_guest(struct page_info *page,
     page->u.inuse.type_info |= PGT_validated | 1;
 
     page_set_owner(page, d);
-    wmb(); /* install valid domain ptr before updating refcnt. */
+    smp_wmb(); /* install valid domain ptr before updating refcnt. */
     ASSERT((page->count_info & ~PGC_xen_heap) == 0);
 
     /* Only add to the allocation list if the domain isn't dying. */

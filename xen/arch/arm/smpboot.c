@@ -298,12 +298,12 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
 
     /* Run local notifiers */
     notify_cpu_starting(cpuid);
-    wmb();
+    smp_wmb();
 
     /* Now report this CPU is up */
     smp_up_cpu = MPIDR_INVALID;
     cpumask_set_cpu(cpuid, &cpu_online_map);
-    wmb();
+    smp_wmb();
 
     local_irq_enable();
     local_abort_enable();
@@ -330,7 +330,7 @@ void __cpu_disable(void)
 
     if ( cpu_disable_scheduler(cpu) )
         BUG();
-    mb();
+    smp_mb();
 
     /* Return to caller; eventually the IPI mechanism will unwind and the 
      * scheduler will drop to the idle loop, which will call stop_cpu(). */
@@ -411,10 +411,10 @@ void __cpu_die(unsigned int cpu)
         process_pending_softirqs();
         if ( (++i % 10) == 0 )
             printk(KERN_ERR "CPU %u still not dead...\n", cpu);
-        mb();
+        smp_mb();
     }
     cpu_is_dead = 0;
-    mb();
+    smp_mb();
 }
 
 /*
