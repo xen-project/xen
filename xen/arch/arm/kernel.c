@@ -16,10 +16,6 @@
 
 #include "kernel.h"
 
-/* Store kernel in first 8M of flash */
-#define KERNEL_FLASH_ADDRESS 0x00000000UL
-#define KERNEL_FLASH_SIZE    0x00800000UL
-
 #define ZIMAGE32_MAGIC_OFFSET 0x24
 #define ZIMAGE32_START_OFFSET 0x28
 #define ZIMAGE32_END_OFFSET   0x2c
@@ -124,7 +120,6 @@ static void kernel_zimage_load(struct kernel_info *info)
 {
     paddr_t load_addr = info->zimage.load_addr;
     paddr_t paddr = info->zimage.kernel_addr;
-    paddr_t attr = info->load_attr;
     paddr_t len = info->zimage.len;
     unsigned long offs;
 
@@ -150,7 +145,7 @@ static void kernel_zimage_load(struct kernel_info *info)
 
         dst = map_domain_page(ma>>PAGE_SHIFT);
 
-        copy_from_paddr(dst + s, paddr + offs, l, attr);
+        copy_from_paddr(dst + s, paddr + offs, l, BUFFERABLE);
 
         unmap_domain_page(dst);
         offs += l;
@@ -316,7 +311,7 @@ static int kernel_try_elf_prepare(struct kernel_info *info,
     if ( info->kernel_img == NULL )
         panic("Cannot allocate temporary buffer for kernel");
 
-    copy_from_paddr(info->kernel_img, addr, size, info->load_attr);
+    copy_from_paddr(info->kernel_img, addr, size, BUFFERABLE);
 
     if ( (rc = elf_init(&info->elf.elf, info->kernel_img, size )) != 0 )
         goto err;
@@ -367,20 +362,16 @@ int kernel_prepare(struct kernel_info *info)
 
     paddr_t start, size;
 
-    if ( early_info.modules.nr_mods < MOD_KERNEL )
+    start = early_info.modules.module[MOD_KERNEL].start;
+    size = early_info.modules.module[MOD_KERNEL].size;
+
+    if ( !size )
     {
-        printk("No boot modules found, trying flash\n");
-        start = KERNEL_FLASH_ADDRESS;
-        size = KERNEL_FLASH_SIZE;
-        info->load_attr = DEV_SHARED;
+        printk(XENLOG_ERR "Missing kernel boot module?\n");
+        return -ENOENT;
     }
-    else
-    {
-        printk("Loading kernel from boot module %d\n", MOD_KERNEL);
-        start = early_info.modules.module[MOD_KERNEL].start;
-        size = early_info.modules.module[MOD_KERNEL].size;
-        info->load_attr = BUFFERABLE;
-    }
+
+    printk("Loading kernel from boot module %d\n", MOD_KERNEL);
 
 #ifdef CONFIG_ARM_64
     rc = kernel_try_zimage64_prepare(info, start, size);

@@ -40,7 +40,6 @@ struct kernel_info {
     };
 
     void (*load)(struct kernel_info *info);
-    int load_attr;
 };
 
 int kernel_prepare(struct kernel_info *info);
