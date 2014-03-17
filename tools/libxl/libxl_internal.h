@@ -626,6 +626,26 @@ int libxl__xs_rm_checked(libxl__gc *gc, xs_transaction_t t, const char *path);
  *        // other cleanups
  *        return rc;
  *    }
+ *
+ * Formally the states of *t are:
+ *
+ *  name     value of *t  description
+ *   Idle         0         no transaction exists
+ *   Ready        non-0     ready for work, nothing done yet
+ *   Busy         non-0     writes have been made but we are not finished
+ *   Uncommitted  non-0     writes have been made and should be committed
+ *
+ * libxl__xs_transaction_start:  Idle -> Ready (on error: Idle)
+ *
+ * The transaction goes from Ready to Busy, and from Busy to
+ * Uncommitted, by the use of xenstore read and write operations
+ * (libxl__xs_..., xs_...) made by libxl__xs_transaction's caller.
+ *
+ * libxl__xs_transaction_commit:  Ready/Uncommitted -> Idle
+ *     on success (returns 0): xenstore has been updated
+ *     on error (<0) or conflict (+1): updates discarded
+ *
+ * libxl__xs_transaction_abort:  Any -> Idle  (any updates discarded)
  */
 int libxl__xs_transaction_start(libxl__gc *gc, xs_transaction_t *t);
 int libxl__xs_transaction_commit(libxl__gc *gc, xs_transaction_t *t);
