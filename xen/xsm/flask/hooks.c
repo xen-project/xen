@@ -798,11 +798,6 @@ static int flask_readconsole(uint32_t clear)
     return domain_has_xen(current->domain, perms);
 }
 
-static int flask_do_mca(void)
-{
-    return domain_has_xen(current->domain, XEN__MCA_OP);
-}
-
 static inline u32 resource_to_perm(uint8_t access)
 {
     if ( access )
@@ -1169,6 +1164,11 @@ static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)
 #endif /* HAS_PASSTHROUGH && HAS_PCI */
 
 #ifdef CONFIG_X86
+static int flask_do_mca(void)
+{
+    return domain_has_xen(current->domain, XEN__MCA_OP);
+}
+
 static int flask_shadow_control(struct domain *d, uint32_t op)
 {
     u32 perm;
@@ -1472,7 +1472,6 @@ static struct xsm_operations flask_ops = {
     .domctl = flask_domctl,
     .sysctl = flask_sysctl,
     .readconsole = flask_readconsole,
-    .do_mca = flask_do_mca,
 
     .evtchn_unbound = flask_evtchn_unbound,
     .evtchn_interdomain = flask_evtchn_interdomain,
@@ -1551,6 +1550,7 @@ static struct xsm_operations flask_ops = {
 #endif
 
 #ifdef CONFIG_X86
+    .do_mca = flask_do_mca,
     .shadow_control = flask_shadow_control,
     .hvm_set_pci_intx_level = flask_hvm_set_pci_intx_level,
     .hvm_set_isa_irq_level = flask_hvm_set_isa_irq_level,

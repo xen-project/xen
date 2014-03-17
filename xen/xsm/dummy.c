@@ -38,7 +38,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, domctl);
     set_to_dummy_if_null(ops, sysctl);
     set_to_dummy_if_null(ops, readconsole);
-    set_to_dummy_if_null(ops, do_mca);
 
     set_to_dummy_if_null(ops, evtchn_unbound);
     set_to_dummy_if_null(ops, evtchn_interdomain);
@@ -115,6 +114,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, remove_from_physmap);
 
 #ifdef CONFIG_X86
+    set_to_dummy_if_null(ops, do_mca);
     set_to_dummy_if_null(ops, shadow_control);
     set_to_dummy_if_null(ops, hvm_set_pci_intx_level);
     set_to_dummy_if_null(ops, hvm_set_isa_irq_level);

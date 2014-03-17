@@ -61,7 +61,6 @@ struct xsm_operations {
     int (*domctl) (struct domain *d, int cmd);
     int (*sysctl) (int cmd);
     int (*readconsole) (uint32_t clear);
-    int (*do_mca) (void);
 
     int (*evtchn_unbound) (struct domain *d, struct evtchn *chn, domid_t id2);
     int (*evtchn_interdomain) (struct domain *d1, struct evtchn *chn1,
@@ -139,6 +138,7 @@ struct xsm_operations {
     int (*hvm_param_nested) (struct domain *d);
 
 #ifdef CONFIG_X86
+    int (*do_mca) (void);
     int (*shadow_control) (struct domain *d, uint32_t op);
     int (*hvm_set_pci_intx_level) (struct domain *d);
     int (*hvm_set_isa_irq_level) (struct domain *d);
@@ -221,11 +221,6 @@ static inline int xsm_sysctl (xsm_default_t def, int cmd)
 static inline int xsm_readconsole (xsm_default_t def, uint32_t clear)
 {
     return xsm_ops->readconsole(clear);
-}
-
-static inline int xsm_do_mca(xsm_default_t def)
-{
-    return xsm_ops->do_mca();
 }
 
 static inline int xsm_evtchn_unbound (xsm_default_t def, struct domain *d1, struct evtchn *chn,
@@ -524,6 +519,11 @@ static inline int xsm_hvm_param_nested (xsm_default_t def, struct domain *d)
 }
 
 #ifdef CONFIG_X86
+static inline int xsm_do_mca(xsm_default_t def)
+{
+    return xsm_ops->do_mca();
+}
+
 static inline int xsm_shadow_control (xsm_default_t def, struct domain *d, uint32_t op)
 {
     return xsm_ops->shadow_control(d, op);

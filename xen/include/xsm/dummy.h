@@ -140,12 +140,6 @@ static XSM_INLINE int xsm_readconsole(XSM_DEFAULT_ARG uint32_t clear)
     return xsm_default_action(action, current->domain, NULL);
 }
 
-static XSM_INLINE int xsm_do_mca(XSM_DEFAULT_VOID)
-{
-    XSM_ASSERT_ACTION(XSM_PRIV);
-    return xsm_default_action(action, current->domain, NULL);
-}
-
 static XSM_INLINE int xsm_alloc_security_domain(struct domain *d)
 {
     return 0;
@@ -496,6 +490,12 @@ static XSM_INLINE int xsm_hvm_param_nested(XSM_DEFAULT_ARG struct domain *d)
 }
 
 #ifdef CONFIG_X86
+static XSM_INLINE int xsm_do_mca(XSM_DEFAULT_VOID)
+{
+    XSM_ASSERT_ACTION(XSM_PRIV);
+    return xsm_default_action(action, current->domain, NULL);
+}
+
 static XSM_INLINE int xsm_shadow_control(XSM_DEFAULT_ARG struct domain *d, uint32_t op)
 {
     XSM_ASSERT_ACTION(XSM_HOOK);
