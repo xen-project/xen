@@ -17,12 +17,21 @@
 #define dmb(scope)      asm volatile("dmb " #scope : : : "memory")
 
 #define mb()            dsb(sy)
-#define rmb()           dsb(sy)
-#define wmb()           dsb(sy)
+#ifdef CONFIG_ARM_64
+#define rmb()           dsb(ld)
+#else
+#define rmb()           dsb(sy) /* 32-bit has no ld variant. */
+#endif
+#define wmb()           dsb(st)
 
 #define smp_mb()        dmb(ish)
-#define smp_rmb()       dmb(ish)
-#define smp_wmb()       dmb(ish)
+#ifdef CONFIG_ARM_64
+#define smp_rmb()       dmb(ishld)
+#else
+#define smp_rmb()       dmb(ish) /* 32-bit has no ishld variant. */
+#endif
+
+#define smp_wmb()       dmb(ishst)
 
 #define xchg(ptr,x) \
         ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
