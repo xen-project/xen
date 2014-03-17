@@ -341,7 +341,7 @@ void stop_cpu(void)
     local_irq_disable();
     cpu_is_dead = 1;
     /* Make sure the write happens before we sleep forever */
-    dsb();
+    dsb(sy);
     isb();
     while ( 1 )
         wfi();

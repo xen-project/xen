@@ -13,16 +13,16 @@
 #define wfi()           asm volatile("wfi" : : : "memory")
 
 #define isb()           asm volatile("isb" : : : "memory")
-#define dsb()           asm volatile("dsb sy" : : : "memory")
-#define dmb()           asm volatile("dmb sy" : : : "memory")
+#define dsb(scope)      asm volatile("dsb " #scope : : : "memory")
+#define dmb(scope)      asm volatile("dmb " #scope : : : "memory")
 
-#define mb()            dsb()
-#define rmb()           dsb()
-#define wmb()           dsb()
+#define mb()            dsb(sy)
+#define rmb()           dsb(sy)
+#define wmb()           dsb(sy)
 
-#define smp_mb()        dmb()
-#define smp_rmb()       dmb()
-#define smp_wmb()       dmb()
+#define smp_mb()        dmb(sy)
+#define smp_rmb()       dmb(sy)
+#define smp_wmb()       dmb(sy)
 
 #define xchg(ptr,x) \
         ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))

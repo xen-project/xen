@@ -47,7 +47,7 @@ void idle_loop(void)
         local_irq_disable();
         if ( cpu_is_haltable(smp_processor_id()) )
         {
-            dsb();
+            dsb(sy);
             wfi();
         }
         local_irq_enable();

@@ -139,7 +139,7 @@ static void gic_irq_enable(struct irq_desc *desc)
     spin_lock_irqsave(&desc->lock, flags);
     spin_lock(&gic.lock);
     desc->status &= ~IRQ_DISABLED;
-    dsb();
+    dsb(sy);
     /* Enable routing */
     GICD[GICD_ISENABLER + irq / 32] = (1u << (irq % 32));
     spin_unlock(&gic.lock);
@@ -486,7 +486,7 @@ void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi)
     cpumask_and(&online_mask, cpumask, &cpu_online_map);
     mask = gic_cpu_mask(&online_mask);
 
-    dsb();
+    dsb(sy);
 
     GICD[GICD_SGIR] = GICD_SGI_TARGET_LIST
         | (mask<<GICD_SGI_TARGET_SHIFT)
@@ -503,7 +503,7 @@ void send_SGI_self(enum gic_sgi sgi)
 {
     ASSERT(sgi < 16); /* There are only 16 SGIs */
 
-    dsb();
+    dsb(sy);
 
     GICD[GICD_SGIR] = GICD_SGI_TARGET_SELF
         | sgi;
@@ -513,7 +513,7 @@ void send_SGI_allbutself(enum gic_sgi sgi)
 {
    ASSERT(sgi < 16); /* There are only 16 SGIs */
 
-   dsb();
+   dsb(sy);
 
    GICD[GICD_SGIR] = GICD_SGI_TARGET_OTHERS
        | sgi;
@@ -599,7 +599,7 @@ static int __setup_irq(struct irq_desc *desc, unsigned int irq,
         return -EBUSY;
 
     desc->action  = new;
-    dsb();
+    dsb(sy);
 
     return 0;
 }

@@ -260,7 +260,7 @@ void udelay(unsigned long usecs)
     s_time_t deadline = get_s_time() + 1000 * (s_time_t) usecs;
     while ( get_s_time() - deadline < 0 )
         ;
-    dsb();
+    dsb(sy);
     isb();
 }
 

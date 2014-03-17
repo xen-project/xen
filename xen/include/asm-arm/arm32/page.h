@@ -67,13 +67,13 @@ static inline void flush_xen_data_tlb(void)
 static inline void flush_xen_data_tlb_range_va(unsigned long va, unsigned long size)
 {
     unsigned long end = va + size;
-    dsb(); /* Ensure preceding are visible */
+    dsb(sy); /* Ensure preceding are visible */
     while ( va < end ) {
         asm volatile(STORE_CP32(0, TLBIMVAH)
                      : : "r" (va) : "memory");
         va += PAGE_SIZE;
     }
-    dsb(); /* Ensure completion of the TLB flush */
+    dsb(sy); /* Ensure completion of the TLB flush */
     isb();
 }
 

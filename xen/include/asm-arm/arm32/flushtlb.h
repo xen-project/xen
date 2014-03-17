@@ -4,44 +4,44 @@
 /* Flush local TLBs, current VMID only */
 static inline void flush_tlb_local(void)
 {
-    dsb();
+    dsb(sy);
 
     WRITE_CP32((uint32_t) 0, TLBIALL);
 
-    dsb();
+    dsb(sy);
     isb();
 }
 
 /* Flush inner shareable TLBs, current VMID only */
 static inline void flush_tlb(void)
 {
-    dsb();
+    dsb(sy);
 
     WRITE_CP32((uint32_t) 0, TLBIALLIS);
 
-    dsb();
+    dsb(sy);
     isb();
 }
 
 /* Flush local TLBs, all VMIDs, non-hypervisor mode */
 static inline void flush_tlb_all_local(void)
 {
-    dsb();
+    dsb(sy);
 
     WRITE_CP32((uint32_t) 0, TLBIALLNSNH);
 
-    dsb();
+    dsb(sy);
     isb();
 }
 
 /* Flush innershareable TLBs, all VMIDs, non-hypervisor mode */
 static inline void flush_tlb_all(void)
 {
-    dsb();
+    dsb(sy);
 
     WRITE_CP32((uint32_t) 0, TLBIALLNSNHIS);
 
-    dsb();
+    dsb(sy);
     isb();
 }
 

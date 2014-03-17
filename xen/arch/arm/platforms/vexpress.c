@@ -48,7 +48,7 @@ static inline int vexpress_ctrl_start(uint32_t *syscfg, int write,
     /* wait for complete flag to be set */
     do {
         stat = syscfg[V2M_SYS_CFGSTAT/4];
-        dsb();
+        dsb(sy);
     } while ( !(stat & V2M_SYS_CFG_COMPLETE) );
 
     /* check error status and return error flag if set */
@@ -113,10 +113,10 @@ static void vexpress_reset(void)
 
     /* switch to slow mode */
     writel(0x3, sp810);
-    dsb(); isb();
+    dsb(sy); isb();
     /* writing any value to SCSYSSTAT reg will reset the system */
     writel(0x1, sp810 + 4);
-    dsb(); isb();
+    dsb(sy); isb();
 
     iounmap(sp810);
 }

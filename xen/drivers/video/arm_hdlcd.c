@@ -78,7 +78,7 @@ void (*video_puts)(const char *) = vga_noop_puts;
 
 static void hdlcd_flush(void)
 {
-    dsb();
+    dsb(sy);
 }
 
 static int __init get_color_masks(const char* bpp, struct color_masks **masks)

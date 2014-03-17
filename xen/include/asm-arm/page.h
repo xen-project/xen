@@ -263,20 +263,20 @@ extern size_t cacheline_bytes;
 static inline void clean_xen_dcache_va_range(void *p, unsigned long size)
 {
     void *end;
-    dsb();           /* So the CPU issues all writes to the range */
+    dsb(sy);           /* So the CPU issues all writes to the range */
     for ( end = p + size; p < end; p += cacheline_bytes )
         asm volatile (__clean_xen_dcache_one(0) : : "r" (p));
-    dsb();           /* So we know the flushes happen before continuing */
+    dsb(sy);           /* So we know the flushes happen before continuing */
 }
 
 static inline void clean_and_invalidate_xen_dcache_va_range
     (void *p, unsigned long size)
 {
     void *end;
-    dsb();           /* So the CPU issues all writes to the range */
+    dsb(sy);         /* So the CPU issues all writes to the range */
     for ( end = p + size; p < end; p += cacheline_bytes )
         asm volatile (__clean_and_invalidate_xen_dcache_one(0) : : "r" (p));
-    dsb();           /* So we know the flushes happen before continuing */
+    dsb(sy);         /* So we know the flushes happen before continuing */
 }
 
 /* Macros for flushing a single small item.  The predicate is always
