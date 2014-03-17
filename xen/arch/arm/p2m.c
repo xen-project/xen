@@ -145,10 +145,10 @@ static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
                                p2m_type_t t)
 {
     paddr_t pa = ((paddr_t) mfn) << PAGE_SHIFT;
-    /* xn and write bit will be defined in the switch */
+    /* sh, xn and write bit will be defined in the following switches
+     * based on mattr and t. */
     lpae_t e = (lpae_t) {
         .p2m.af = 1,
-        .p2m.sh = LPAE_SH_OUTER,
         .p2m.read = 1,
         .p2m.mattr = mattr,
         .p2m.table = 1,
@@ -157,6 +157,20 @@ static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
     };
 
     BUILD_BUG_ON(p2m_max_real_type > (1 << 4));
+
+    switch (mattr)
+    {
+    case MATTR_MEM:
+        e.p2m.sh = LPAE_SH_INNER;
+        break;
+
+    case MATTR_DEV:
+        e.p2m.sh = LPAE_SH_OUTER;
+        break;
+    default:
+        BUG();
+        break;
+    }
 
     switch (t)
     {

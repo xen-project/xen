@@ -24,8 +24,8 @@
 
 #define ZIMAGE_MAGIC_NUMBER 0x016f2818
 
-#define PT_PT     0xe7f /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=111 T=1 P=1 */
-#define PT_MEM    0xe7d /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=111 T=0 P=1 */
+#define PT_PT     0xf7f /* nG=1 AF=1 SH=11 AP=01 NS=1 ATTR=111 T=1 P=1 */
+#define PT_MEM    0xf7d /* nG=1 AF=1 SH=11 AP=01 NS=1 ATTR=111 T=0 P=1 */
 #define PT_DEV    0xe71 /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=100 T=0 P=1 */
 #define PT_DEV_L3 0xe73 /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=100 T=1 P=1 */
 
@@ -224,10 +224,10 @@ cpu_init_done:
         mcr   CP32(r1, HMAIR1)
 
         /* Set up the HTCR:
-         * PT walks use Outer-Shareable accesses,
+         * PT walks use Inner-Shareable accesses,
          * PT walks are write-back, write-allocate in both cache levels,
          * Full 32-bit address space goes through this table. */
-        ldr   r0, =0x80002500
+        ldr   r0, =0x80003500
         mcr   CP32(r0, HTCR)
 
         /* Set up the HSCTLR:
