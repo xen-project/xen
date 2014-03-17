@@ -322,7 +322,8 @@ static void __init gic_dist_init(void)
 
     /* Default priority for global interrupts */
     for ( i = 32; i < gic.lines; i += 4 )
-        GICD[GICD_IPRIORITYR + i / 4] = 0xa0a0a0a0;
+        GICD[GICD_IPRIORITYR + i / 4] =
+            GIC_PRI_IRQ<<24 | GIC_PRI_IRQ<<16 | GIC_PRI_IRQ<<8 | GIC_PRI_IRQ;
 
     /* Disable all global interrupts */
     for ( i = 32; i < gic.lines; i += 32 )
@@ -343,9 +344,14 @@ static void __cpuinit gic_cpu_init(void)
      * be set up here with the other per-cpu state. */
     GICD[GICD_ICENABLER] = 0xffff0000; /* Disable all PPI */
     GICD[GICD_ISENABLER] = 0x0000ffff; /* Enable all SGI */
-    /* Set PPI and SGI priorities */
-    for (i = 0; i < 32; i += 4)
-        GICD[GICD_IPRIORITYR + i / 4] = 0xa0a0a0a0;
+    /* Set SGI priorities */
+    for (i = 0; i < 16; i += 4)
+        GICD[GICD_IPRIORITYR + i / 4] =
+            GIC_PRI_IPI<<24 | GIC_PRI_IPI<<16 | GIC_PRI_IPI<<8 | GIC_PRI_IPI;
+    /* Set PPI priorities */
+    for (i = 16; i < 32; i += 4)
+        GICD[GICD_IPRIORITYR + i / 4] =
+            GIC_PRI_IRQ<<24 | GIC_PRI_IRQ<<16 | GIC_PRI_IRQ<<8 | GIC_PRI_IRQ;
 
     /* Local settings: interface controller */
     GICC[GICC_PMR] = 0xff;                /* Don't mask by priority */
@@ -541,7 +547,8 @@ void gic_disable_cpu(void)
 void gic_route_ppis(void)
 {
     /* GIC maintenance */
-    gic_route_dt_irq(&gic.maintenance, cpumask_of(smp_processor_id()), 0xa0);
+    gic_route_dt_irq(&gic.maintenance, cpumask_of(smp_processor_id()),
+                     GIC_PRI_IRQ);
     /* Route timer interrupt */
     route_timer_interrupt();
 }
@@ -556,7 +563,8 @@ void gic_route_spis(void)
         if ( (irq = serial_dt_irq(seridx)) == NULL )
             continue;
 
-        gic_route_dt_irq(irq, cpumask_of(smp_processor_id()), 0xa0);
+        gic_route_dt_irq(irq, cpumask_of(smp_processor_id()),
+                         GIC_PRI_IRQ);
     }
 }
 
@@ -779,7 +787,7 @@ int gic_route_irq_to_guest(struct domain *d, const struct dt_irq *irq,
     level = dt_irq_is_level_triggered(irq);
 
     gic_set_irq_properties(irq->irq, level, cpumask_of(smp_processor_id()),
-                           0xa0);
+                           GIC_PRI_IRQ);
 
     retval = __setup_irq(desc, irq->irq, action);
     if (retval) {
