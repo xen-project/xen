@@ -76,7 +76,7 @@ static int domain_has_security(struct domain *d, u32 perms)
                         perms, NULL);
 }
 
-static int flask_copyin_string(XEN_GUEST_HANDLE_PARAM(char) u_buf, char **buf,
+static int flask_copyin_string(XEN_GUEST_HANDLE(char) u_buf, char **buf,
                                size_t size, size_t max_size)
 {
     char *tmp;
