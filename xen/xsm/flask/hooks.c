@@ -9,6 +9,7 @@
  */
 
 #include <xen/init.h>
+#include <xen/irq.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/paging.h>
