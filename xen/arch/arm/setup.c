@@ -284,6 +284,9 @@ static paddr_t __init next_module(paddr_t s, paddr_t *end)
         paddr_t mod_s = mi->module[i].start;
         paddr_t mod_e = mod_s + mi->module[i].size;
 
+        if ( !mi->module[i].size )
+            continue;
+
         if ( mod_s < s )
             continue;
         if ( mod_s > lowest )
