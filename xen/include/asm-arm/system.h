@@ -18,11 +18,11 @@
 
 #define mb()            dsb()
 #define rmb()           dsb()
-#define wmb()           mb()
+#define wmb()           dsb()
 
-#define smp_mb()        mb()
-#define smp_rmb()       rmb()
-#define smp_wmb()       wmb()
+#define smp_mb()        dmb()
+#define smp_rmb()       dmb()
+#define smp_wmb()       dmb()
 
 #define xchg(ptr,x) \
         ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
