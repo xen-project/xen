@@ -55,7 +55,11 @@ typedef u64 register_t;
 #define PRIregister "lx"
 #endif
 
+#if defined(__SIZE_TYPE__)
+typedef __SIZE_TYPE__ size_t;
+#else
 typedef unsigned long size_t;
+#endif
 
 typedef char bool_t;
 #define test_and_set_bool(b)   xchg(&(b), 1)
