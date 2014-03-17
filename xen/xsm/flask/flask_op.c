@@ -785,7 +785,7 @@ ret_t do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op)
     return rv;
 }
 
-#ifndef COMPAT
+#if defined(CONFIG_COMPAT) && !defined(COMPAT)
 #undef _copy_to_guest
 #define _copy_to_guest copy_to_compat
 #undef _copy_from_guest
