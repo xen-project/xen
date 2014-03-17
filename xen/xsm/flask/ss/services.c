@@ -1958,7 +1958,7 @@ out:
     return rc;
 }
 
-int security_get_bool_value(unsigned int bool)
+int security_get_bool_value(unsigned int b)
 {
     int rc = 0;
     unsigned int len;
@@ -1966,19 +1966,19 @@ int security_get_bool_value(unsigned int bool)
     POLICY_RDLOCK;
 
     len = policydb.p_bools.nprim;
-    if ( bool >= len )
+    if ( b >= len )
     {
         rc = -ENOENT;
         goto out;
     }
 
-    rc = policydb.bool_val_to_struct[bool]->state;
+    rc = policydb.bool_val_to_struct[b]->state;
 out:
     POLICY_RDUNLOCK;
     return rc;
 }
 
-char *security_get_bool_name(unsigned int bool)
+char *security_get_bool_name(unsigned int b)
 {
     unsigned int len;
     char *rv = NULL;
@@ -1986,16 +1986,16 @@ char *security_get_bool_name(unsigned int bool)
     POLICY_RDLOCK;
 
     len = policydb.p_bools.nprim;
-    if ( bool >= len )
+    if ( b >= len )
     {
         goto out;
     }
 
-    len = strlen(policydb.p_bool_val_to_name[bool]) + 1;
+    len = strlen(policydb.p_bool_val_to_name[b]) + 1;
     rv = xmalloc_array(char, len);
     if ( !rv )
         goto out;
-    memcpy(rv, policydb.p_bool_val_to_name[bool], len);
+    memcpy(rv, policydb.p_bool_val_to_name[b], len);
 out:
     POLICY_RDUNLOCK;
     return rv;

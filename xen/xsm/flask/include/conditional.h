@@ -21,7 +21,7 @@ int security_set_bools(int len, int *values);
 
 int security_find_bool(const char *name);
 
-char *security_get_bool_name(unsigned int bool);
-int security_get_bool_value(unsigned int bool);
+char *security_get_bool_name(unsigned int b);
+int security_get_bool_value(unsigned int b);
 
 #endif
