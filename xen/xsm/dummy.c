@@ -85,10 +85,12 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, iomem_mapping);
     set_to_dummy_if_null(ops, pci_config_permission);
 
+#if defined(HAS_PASSTHROUGH) && defined(HAS_PCI)
     set_to_dummy_if_null(ops, get_device_group);
     set_to_dummy_if_null(ops, test_assign_device);
     set_to_dummy_if_null(ops, assign_device);
     set_to_dummy_if_null(ops, deassign_device);
+#endif
 
     set_to_dummy_if_null(ops, resource_plug_core);
     set_to_dummy_if_null(ops, resource_unplug_core);

@@ -317,6 +317,7 @@ static XSM_INLINE int xsm_set_pod_target(XSM_DEFAULT_ARG struct domain *d)
     return xsm_default_action(action, current->domain, d);
 }
 
+#if defined(HAS_PASSTHROUGH) && defined(HAS_PCI)
 static XSM_INLINE int xsm_get_device_group(XSM_DEFAULT_ARG uint32_t machine_bdf)
 {
     XSM_ASSERT_ACTION(XSM_HOOK);
@@ -340,6 +341,8 @@ static XSM_INLINE int xsm_deassign_device(XSM_DEFAULT_ARG struct domain *d, uint
     XSM_ASSERT_ACTION(XSM_HOOK);
     return xsm_default_action(action, current->domain, d);
 }
+
+#endif /* HAS_PASSTHROUGH && HAS_PCI */
 
 static XSM_INLINE int xsm_resource_plug_core(XSM_DEFAULT_VOID)
 {

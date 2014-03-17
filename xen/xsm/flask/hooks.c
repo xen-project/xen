@@ -1102,6 +1102,72 @@ static int flask_hvm_param_nested(struct domain *d)
     return current_has_perm(d, SECCLASS_HVM, HVM__NESTED);
 }
 
+#if defined(HAS_PASSTHROUGH) && defined(HAS_PCI)
+static int flask_get_device_group(uint32_t machine_bdf)
+{
+    u32 rsid;
+    int rc = -EPERM;
+
+    rc = security_device_sid(machine_bdf, &rsid);
+    if ( rc )
+        return rc;
+
+    return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__STAT_DEVICE, NULL);
+}
+
+static int flask_test_assign_device(uint32_t machine_bdf)
+{
+    u32 rsid;
+    int rc = -EPERM;
+
+    rc = security_device_sid(machine_bdf, &rsid);
+    if ( rc )
+        return rc;
+
+    return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__STAT_DEVICE, NULL);
+}
+
+static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
+{
+    u32 dsid, rsid;
+    int rc = -EPERM;
+    struct avc_audit_data ad;
+
+    rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
+    if ( rc )
+        return rc;
+
+    rc = security_device_sid(machine_bdf, &rsid);
+    if ( rc )
+        return rc;
+
+    AVC_AUDIT_DATA_INIT(&ad, DEV);
+    ad.device = (unsigned long) machine_bdf;
+    rc = avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__ADD_DEVICE, &ad);
+    if ( rc )
+        return rc;
+
+    dsid = domain_sid(d);
+    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
+}
+
+static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)
+{
+    u32 rsid;
+    int rc = -EPERM;
+
+    rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
+    if ( rc )
+        return rc;
+
+    rc = security_device_sid(machine_bdf, &rsid);
+    if ( rc )
+        return rc;
+
+    return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__REMOVE_DEVICE, NULL);
+}
+#endif /* HAS_PASSTHROUGH && HAS_PCI */
+
 #ifdef CONFIG_X86
 static int flask_shadow_control(struct domain *d, uint32_t op)
 {
@@ -1355,70 +1421,6 @@ static int flask_priv_mapping(struct domain *d, struct domain *t)
     return domain_has_perm(d, t, SECCLASS_MMU, MMU__TARGET_HACK);
 }
 
-static int flask_get_device_group(uint32_t machine_bdf)
-{
-    u32 rsid;
-    int rc = -EPERM;
-
-    rc = security_device_sid(machine_bdf, &rsid);
-    if ( rc )
-        return rc;
-
-    return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__STAT_DEVICE, NULL);
-}
-
-static int flask_test_assign_device(uint32_t machine_bdf)
-{
-    u32 rsid;
-    int rc = -EPERM;
-
-    rc = security_device_sid(machine_bdf, &rsid);
-    if ( rc )
-        return rc;
-
-    return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__STAT_DEVICE, NULL);
-}
-
-static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
-{
-    u32 dsid, rsid;
-    int rc = -EPERM;
-    struct avc_audit_data ad;
-
-    rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
-    if ( rc )
-        return rc;
-
-    rc = security_device_sid(machine_bdf, &rsid);
-    if ( rc )
-        return rc;
-
-    AVC_AUDIT_DATA_INIT(&ad, DEV);
-    ad.device = (unsigned long) machine_bdf;
-    rc = avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__ADD_DEVICE, &ad);
-    if ( rc )
-        return rc;
-
-    dsid = domain_sid(d);
-    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
-}
-
-static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)
-{
-    u32 rsid;
-    int rc = -EPERM;
-
-    rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
-    if ( rc )
-        return rc;
-
-    rc = security_device_sid(machine_bdf, &rsid);
-    if ( rc )
-        return rc;
-
-    return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__REMOVE_DEVICE, NULL);
-}
-
 static int flask_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *bind)
 {
     u32 dsid, rsid;
@@ -1540,6 +1542,14 @@ static struct xsm_operations flask_ops = {
     .add_to_physmap = flask_add_to_physmap,
     .remove_from_physmap = flask_remove_from_physmap,
 
+
+#if defined(HAS_PASSTHROUGH) && defined(HAS_PCI)
+    .get_device_group = flask_get_device_group,
+    .test_assign_device = flask_test_assign_device,
+    .assign_device = flask_assign_device,
+    .deassign_device = flask_deassign_device,
+#endif
+
 #ifdef CONFIG_X86
     .shadow_control = flask_shadow_control,
     .hvm_set_pci_intx_level = flask_hvm_set_pci_intx_level,
@@ -1557,15 +1567,12 @@ static struct xsm_operations flask_ops = {
     .mmuext_op = flask_mmuext_op,
     .update_va_mapping = flask_update_va_mapping,
     .priv_mapping = flask_priv_mapping,
-    .get_device_group = flask_get_device_group,
-    .test_assign_device = flask_test_assign_device,
-    .assign_device = flask_assign_device,
-    .deassign_device = flask_deassign_device,
     .bind_pt_irq = flask_bind_pt_irq,
     .unbind_pt_irq = flask_unbind_pt_irq,
     .ioport_permission = flask_ioport_permission,
     .ioport_mapping = flask_ioport_mapping,
 #endif
+
 #ifdef CONFIG_ARM
     .map_gmfn_foreign = flask_map_gmfn_foreign,
 #endif
