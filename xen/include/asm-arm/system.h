@@ -20,9 +20,9 @@
 #define rmb()           dsb(sy)
 #define wmb()           dsb(sy)
 
-#define smp_mb()        dmb(sy)
-#define smp_rmb()       dmb(sy)
-#define smp_wmb()       dmb(sy)
+#define smp_mb()        dmb(ish)
+#define smp_rmb()       dmb(ish)
+#define smp_wmb()       dmb(ish)
 
 #define xchg(ptr,x) \
         ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
