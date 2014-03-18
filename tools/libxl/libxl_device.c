@@ -1031,7 +1031,7 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
 
     if (!pid) {
         /* child */
-        libxl__exec(gc, -1, -1, -1, args[0], args, env);
+        libxl__exec(gc, -1, 2, -1, args[0], args, env);
         /* notreached */
         abort();
     }
