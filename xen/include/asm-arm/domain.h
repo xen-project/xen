@@ -76,14 +76,14 @@ struct hvm_domain
 
 #ifdef CONFIG_ARM_64
 enum domain_type {
-    DOMAIN_PV32,
-    DOMAIN_PV64,
+    DOMAIN_32BIT,
+    DOMAIN_64BIT,
 };
-#define is_pv32_domain(d) ((d)->arch.type == DOMAIN_PV32)
-#define is_pv64_domain(d) ((d)->arch.type == DOMAIN_PV64)
+#define is_32bit_domain(d) ((d)->arch.type == DOMAIN_32BIT)
+#define is_64bit_domain(d) ((d)->arch.type == DOMAIN_64BIT)
 #else
-#define is_pv32_domain(d) (1)
-#define is_pv64_domain(d) (0)
+#define is_32bit_domain(d) (1)
+#define is_64bit_domain(d) (0)
 #endif
 
 extern int dom0_11_mapping;

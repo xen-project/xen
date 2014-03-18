@@ -209,7 +209,7 @@ static int kernel_try_zimage64_prepare(struct kernel_info *info,
     info->entry = info->zimage.load_addr;
     info->load = kernel_zimage_load;
 
-    info->type = DOMAIN_PV64;
+    info->type = DOMAIN_64BIT;
 
     return 0;
 }
@@ -281,7 +281,7 @@ static int kernel_try_zimage32_prepare(struct kernel_info *info,
     info->load = kernel_zimage_load;
 
 #ifdef CONFIG_ARM_64
-    info->type = DOMAIN_PV32;
+    info->type = DOMAIN_32BIT;
 #endif
 
     return 0;
@@ -329,9 +329,9 @@ static int kernel_try_elf_prepare(struct kernel_info *info,
 
 #ifdef CONFIG_ARM_64
     if ( elf_32bit(&info->elf.elf) )
-        info->type = DOMAIN_PV32;
+        info->type = DOMAIN_32BIT;
     else if ( elf_64bit(&info->elf.elf) )
-        info->type = DOMAIN_PV64;
+        info->type = DOMAIN_64BIT;
     else
     {
         printk("Unknown ELF class\n");

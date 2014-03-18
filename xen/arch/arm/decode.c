@@ -151,7 +151,7 @@ bad_thumb:
 
 int decode_instruction(const struct cpu_user_regs *regs, struct hsr_dabt *dabt)
 {
-    if ( is_pv32_domain(current->domain) && regs->cpsr & PSR_THUMB )
+    if ( is_32bit_domain(current->domain) && regs->cpsr & PSR_THUMB )
         return decode_thumb(regs->pc, dabt);
 
     /* TODO: Handle ARM instruction */

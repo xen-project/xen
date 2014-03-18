@@ -33,7 +33,7 @@ int do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
         return PSCI_EINVAL;
 
     /* THUMB set is not allowed with 64-bit domain */
-    if ( is_pv64_domain(d) && is_thumb )
+    if ( is_64bit_domain(d) && is_thumb )
         return PSCI_EINVAL;
 
     if ( (ctxt = alloc_vcpu_guest_context()) == NULL )
@@ -47,7 +47,7 @@ int do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
     ctxt->ttbr0 = 0;
     ctxt->ttbr1 = 0;
     ctxt->ttbcr = 0; /* Defined Reset Value */
-    if ( is_pv32_domain(d) )
+    if ( is_32bit_domain(d) )
         ctxt->user_regs.cpsr = PSR_GUEST32_INIT;
 #ifdef CONFIG_ARM_64
     else

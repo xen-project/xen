@@ -74,7 +74,7 @@ static void ctxt_switch_from(struct vcpu *p)
     /* Arch timer */
     virt_timer_save(p);
 
-    if ( is_pv32_domain(p->domain) && cpu_has_thumbee )
+    if ( is_32bit_domain(p->domain) && cpu_has_thumbee )
     {
         p->arch.teecr = READ_SYSREG32(TEECR32_EL1);
         p->arch.teehbr = READ_SYSREG32(TEEHBR32_EL1);
@@ -92,7 +92,7 @@ static void ctxt_switch_from(struct vcpu *p)
     p->arch.ttbcr = READ_SYSREG(TCR_EL1);
     p->arch.ttbr0 = READ_SYSREG64(TTBR0_EL1);
     p->arch.ttbr1 = READ_SYSREG64(TTBR1_EL1);
-    if ( is_pv32_domain(p->domain) )
+    if ( is_32bit_domain(p->domain) )
         p->arch.dacr = READ_SYSREG(DACR32_EL2);
     p->arch.par = READ_SYSREG64(PAR_EL1);
 #if defined(CONFIG_ARM_32)
@@ -115,7 +115,7 @@ static void ctxt_switch_from(struct vcpu *p)
     p->arch.esr = READ_SYSREG64(ESR_EL1);
 #endif
 
-    if ( is_pv32_domain(p->domain) )
+    if ( is_32bit_domain(p->domain) )
         p->arch.ifsr  = READ_SYSREG(IFSR32_EL2);
     p->arch.afsr0 = READ_SYSREG(AFSR0_EL1);
     p->arch.afsr1 = READ_SYSREG(AFSR1_EL1);
@@ -164,7 +164,7 @@ static void ctxt_switch_to(struct vcpu *n)
     WRITE_SYSREG64(n->arch.esr, ESR_EL1);
 #endif
 
-    if ( is_pv32_domain(n->domain) )
+    if ( is_32bit_domain(n->domain) )
         WRITE_SYSREG(n->arch.ifsr, IFSR32_EL2);
     WRITE_SYSREG(n->arch.afsr0, AFSR0_EL1);
     WRITE_SYSREG(n->arch.afsr1, AFSR1_EL1);
@@ -174,7 +174,7 @@ static void ctxt_switch_to(struct vcpu *n)
     WRITE_SYSREG(n->arch.ttbcr, TCR_EL1);
     WRITE_SYSREG64(n->arch.ttbr0, TTBR0_EL1);
     WRITE_SYSREG64(n->arch.ttbr1, TTBR1_EL1);
-    if ( is_pv32_domain(n->domain) )
+    if ( is_32bit_domain(n->domain) )
         WRITE_SYSREG(n->arch.dacr, DACR32_EL2);
     WRITE_SYSREG64(n->arch.par, PAR_EL1);
 #if defined(CONFIG_ARM_32)
@@ -197,7 +197,7 @@ static void ctxt_switch_to(struct vcpu *n)
     WRITE_SYSREG(n->arch.tpidrro_el0, TPIDRRO_EL0);
     WRITE_SYSREG(n->arch.tpidr_el1, TPIDR_EL1);
 
-    if ( is_pv32_domain(n->domain) && cpu_has_thumbee )
+    if ( is_32bit_domain(n->domain) && cpu_has_thumbee )
     {
         WRITE_SYSREG32(n->arch.teecr, TEECR32_EL1);
         WRITE_SYSREG32(n->arch.teehbr, TEEHBR32_EL1);
@@ -214,7 +214,7 @@ static void ctxt_switch_to(struct vcpu *n)
 
     isb();
 
-    if ( is_pv32_domain(n->domain) )
+    if ( is_32bit_domain(n->domain) )
         hcr &= ~HCR_RW;
     else
         hcr |= HCR_RW;
@@ -257,7 +257,7 @@ static void continue_new_vcpu(struct vcpu *prev)
 
     if ( is_idle_vcpu(current) )
         reset_stack_and_jump(idle_loop);
-    else if is_pv32_domain(current->domain)
+    else if is_32bit_domain(current->domain)
         /* check_wakeup_from_wait(); */
         reset_stack_and_jump(return_to_new_vcpu32);
     else
@@ -616,7 +616,7 @@ int arch_set_info_guest(
     struct vcpu_guest_context *ctxt = c.nat;
     struct vcpu_guest_core_regs *regs = &c.nat->user_regs;
 
-    if ( is_pv32_domain(v->domain) )
+    if ( is_32bit_domain(v->domain) )
     {
         if ( !is_guest_pv32_psr(regs->cpsr) )
             return -EINVAL;

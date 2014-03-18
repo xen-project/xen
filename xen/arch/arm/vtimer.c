@@ -266,16 +266,16 @@ int vtimer_emulate(struct cpu_user_regs *regs, union hsr hsr)
 
     switch (hsr.ec) {
     case HSR_EC_CP15_32:
-        if ( !is_pv32_domain(current->domain) )
+        if ( !is_32bit_domain(current->domain) )
             return 0;
         return vtimer_emulate_cp32(regs, hsr);
     case HSR_EC_CP15_64:
-        if ( !is_pv32_domain(current->domain) )
+        if ( !is_32bit_domain(current->domain) )
             return 0;
         return vtimer_emulate_cp64(regs, hsr);
 #ifdef CONFIG_ARM_64
     case HSR_EC_SYSREG:
-        if ( is_pv32_domain(current->domain) )
+        if ( is_32bit_domain(current->domain) )
             return 0;
         return vtimer_emulate_sysreg(regs, hsr);
 #endif

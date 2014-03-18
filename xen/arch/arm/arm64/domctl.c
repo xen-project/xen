@@ -35,9 +35,9 @@ long subarch_do_domctl(struct xen_domctl *domctl, struct domain *d,
         switch ( domctl->u.address_size.size )
         {
         case 32:
-            return switch_mode(d, DOMAIN_PV32);
+            return switch_mode(d, DOMAIN_32BIT);
         case 64:
-            return switch_mode(d, DOMAIN_PV64);
+            return switch_mode(d, DOMAIN_64BIT);
         default:
             return -EINVAL;
         }

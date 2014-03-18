@@ -507,7 +507,7 @@ static int make_cpus_node(const struct domain *d, void *fdt,
                 return res;
         }
 
-        if ( is_pv64_domain(d) )
+        if ( is_64bit_domain(d) )
         {
             res = fdt_property_string(fdt, "enable-method", "psci");
             if ( res )
@@ -1024,7 +1024,7 @@ int construct_dom0(struct domain *d)
     p2m_load_VTTBR(d);
 #ifdef CONFIG_ARM_64
     d->arch.type = kinfo.type;
-    if ( is_pv32_domain(d) )
+    if ( is_32bit_domain(d) )
         WRITE_SYSREG(READ_SYSREG(HCR_EL2) & ~HCR_RW, HCR_EL2);
     else
         WRITE_SYSREG(READ_SYSREG(HCR_EL2) | HCR_RW, HCR_EL2);
@@ -1048,7 +1048,7 @@ int construct_dom0(struct domain *d)
 
     regs->pc = (register_t)kinfo.entry;
 
-    if ( is_pv32_domain(d) )
+    if ( is_32bit_domain(d) )
     {
         regs->cpsr = PSR_GUEST32_INIT;
 

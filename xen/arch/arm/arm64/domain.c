@@ -29,7 +29,7 @@ void vcpu_regs_hyp_to_user(const struct vcpu *vcpu,
 {
 #define C(hyp,user) regs->user = vcpu->arch.cpu_info->guest_cpu_user_regs.hyp
     ALLREGS;
-    if ( is_pv32_domain(vcpu->domain) )
+    if ( is_32bit_domain(vcpu->domain) )
     {
         ALLREGS32;
     }
@@ -45,7 +45,7 @@ void vcpu_regs_user_to_hyp(struct vcpu *vcpu,
 {
 #define C(hyp,user) vcpu->arch.cpu_info->guest_cpu_user_regs.hyp = regs->user
     ALLREGS;
-    if ( is_pv32_domain(vcpu->domain) )
+    if ( is_32bit_domain(vcpu->domain) )
     {
         ALLREGS32;
     }

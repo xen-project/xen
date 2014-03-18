@@ -294,7 +294,7 @@ static void inject_undef32_exception(struct cpu_user_regs *regs)
     /* Saved PC points to the instruction past the faulting instruction. */
     uint32_t return_offset = is_thumb ? 2 : 4;
 
-    BUG_ON( !is_pv32_domain(current->domain) );
+    BUG_ON( !is_32bit_domain(current->domain) );
 
     /* Update processor mode */
     cpsr_switch_mode(regs, PSR_MODE_UND);
@@ -322,7 +322,7 @@ static void inject_abt32_exception(struct cpu_user_regs *regs,
     uint32_t return_offset = is_thumb ? 4 : 0;
     register_t fsr;
 
-    BUG_ON( !is_pv32_domain(current->domain) );
+    BUG_ON( !is_32bit_domain(current->domain) );
 
     cpsr_switch_mode(regs, PSR_MODE_ABT);
 
@@ -392,7 +392,7 @@ static void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len)
         .ec = HSR_EC_UNKNOWN,
     };
 
-    BUG_ON( is_pv32_domain(current->domain) );
+    BUG_ON( is_32bit_domain(current->domain) );
 
     regs->spsr_el1 = regs->cpsr;
     regs->elr_el1 = regs->pc;
@@ -429,7 +429,7 @@ static void inject_abt64_exception(struct cpu_user_regs *regs,
         esr.ec = prefetch
             ? HSR_EC_INSTR_ABORT_CURR_EL : HSR_EC_DATA_ABORT_CURR_EL;
 
-    BUG_ON( is_pv32_domain(current->domain) );
+    BUG_ON( is_32bit_domain(current->domain) );
 
     regs->spsr_el1 = regs->cpsr;
     regs->elr_el1 = regs->pc;
@@ -462,7 +462,7 @@ static void inject_iabt_exception(struct cpu_user_regs *regs,
                                   register_t addr,
                                   int instr_len)
 {
-        if ( is_pv32_domain(current->domain) )
+        if ( is_32bit_domain(current->domain) )
             inject_pabt32_exception(regs, addr);
 #ifdef CONFIG_ARM_64
         else
@@ -474,7 +474,7 @@ static void inject_dabt_exception(struct cpu_user_regs *regs,
                                   register_t addr,
                                   int instr_len)
 {
-        if ( is_pv32_domain(current->domain) )
+        if ( is_32bit_domain(current->domain) )
             inject_dabt32_exception(regs, addr);
 #ifdef CONFIG_ARM_64
         else
@@ -679,10 +679,10 @@ static void _show_registers(struct cpu_user_regs *regs,
 
     if ( guest_mode )
     {
-        if ( is_pv32_domain(v->domain) )
+        if ( is_32bit_domain(v->domain) )
             show_registers_32(regs, ctxt, guest_mode, v);
 #ifdef CONFIG_ARM_64
-        else if ( is_pv64_domain(v->domain) )
+        else if ( is_64bit_domain(v->domain) )
             show_registers_64(regs, ctxt, guest_mode, v);
 #endif
     }
@@ -1230,7 +1230,7 @@ static int check_conditional_instr(struct cpu_user_regs *regs, union hsr hsr)
     {
         unsigned long it;
 
-        BUG_ON( !is_pv32_domain(current->domain) || !(cpsr&PSR_THUMB) );
+        BUG_ON( !is_32bit_domain(current->domain) || !(cpsr&PSR_THUMB) );
 
         it = ( (cpsr >> (10-2)) & 0xfc) | ((cpsr >> 25) & 0x3 );
 
@@ -1255,10 +1255,10 @@ static void advance_pc(struct cpu_user_regs *regs, union hsr hsr)
     unsigned long itbits, cond, cpsr = regs->cpsr;
 
     /* PSR_IT_MASK bits can only be set for 32-bit processors in Thumb mode. */
-    BUG_ON( (!is_pv32_domain(current->domain)||!(cpsr&PSR_THUMB))
+    BUG_ON( (!is_32bit_domain(current->domain)||!(cpsr&PSR_THUMB))
             && (cpsr&PSR_IT_MASK) );
 
-    if ( is_pv32_domain(current->domain) && (cpsr&PSR_IT_MASK) )
+    if ( is_32bit_domain(current->domain) && (cpsr&PSR_IT_MASK) )
     {
         /* The ITSTATE[7:0] block is contained in CPSR[15:10],CPSR[26:25]
          *
@@ -1563,12 +1563,12 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         advance_pc(regs, hsr);
         break;
     case HSR_EC_CP15_32:
-        if ( ! is_pv32_domain(current->domain) )
+        if ( ! is_32bit_domain(current->domain) )
             goto bad_trap;
         do_cp15_32(regs, hsr);
         break;
     case HSR_EC_CP15_64:
-        if ( ! is_pv32_domain(current->domain) )
+        if ( ! is_32bit_domain(current->domain) )
             goto bad_trap;
         do_cp15_64(regs, hsr);
         break;
@@ -1598,7 +1598,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         inject_undef64_exception(regs, hsr.len);
         break;
     case HSR_EC_SYSREG:
-        if ( is_pv32_domain(current->domain) )
+        if ( is_32bit_domain(current->domain) )
             goto bad_trap;
         do_sysreg(regs, hsr);
         break;
