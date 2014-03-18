@@ -1418,6 +1418,11 @@ _hidden int libxl__xenstore_child_wait_deprecated(libxl__gc *gc,
  *
  * The last entry of the array always has to be NULL.
  *
+ * stdinfd, stdoutfd, stderrfd will be dup2'd onto the corresponding
+ * fd in the child, if they are not -1.  The original copy of the
+ * descriptor will be closed in the child (unless it's 0, 1 or 2
+ * ie the source descriptor is itself stdin, stdout or stderr).
+ *
  * Logs errors, never returns.
  */
 _hidden  void libxl__exec(libxl__gc *gc, int stdinfd, int stdoutfd,

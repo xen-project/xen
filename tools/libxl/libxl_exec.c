@@ -77,11 +77,11 @@ void libxl__exec(libxl__gc *gc, int stdinfd, int stdoutfd, int stderrfd,
     if (stderrfd != -1)
         dup2(stderrfd, STDERR_FILENO);
 
-    if (stdinfd != -1)
+    if (stdinfd > 2)
         close(stdinfd);
-    if (stdoutfd != -1 && stdoutfd != stdinfd)
+    if (stdoutfd > 2 && stdoutfd != stdinfd)
         close(stdoutfd);
-    if (stderrfd != -1 && stderrfd != stdinfd && stderrfd != stdoutfd)
+    if (stderrfd > 2 && stderrfd != stdinfd && stderrfd != stdoutfd)
         close(stderrfd);
 
     check_open_fds(arg0);
