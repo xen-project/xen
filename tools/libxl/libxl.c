@@ -566,7 +566,7 @@ libxl_dominfo * libxl_list_domain(libxl_ctx *ctx, int *nb_domain_out)
 
     ret = xc_domain_getinfolist(ctx->xch, 0, 1024, info);
     if (ret<0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "geting domain info list");
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain info list");
         free(ptr);
         return NULL;
     }
