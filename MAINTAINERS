@@ -187,6 +187,7 @@ F:	xen/drivers/passthrough/vtd/
 INTEL(R) VT FOR X86 (VT-X)
 M:	Jun Nakajima <jun.nakajima@intel.com>
 M:	Eddie Dong <eddie.dong@intel.com>
+M:	Kevin Tian <kevin.tian@intel.com>
 S:	Supported
 F:	xen/arch/x86/hvm/vmx/
 F:	xen/arch/x86/mm/hap/p2m-ept.c
