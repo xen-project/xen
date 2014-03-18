@@ -257,7 +257,7 @@ static void continue_new_vcpu(struct vcpu *prev)
 
     if ( is_idle_vcpu(current) )
         reset_stack_and_jump(idle_loop);
-    else if is_32bit_domain(current->domain)
+    else if ( is_32bit_domain(current->domain) )
         /* check_wakeup_from_wait(); */
         reset_stack_and_jump(return_to_new_vcpu32);
     else

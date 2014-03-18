@@ -1563,12 +1563,12 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         advance_pc(regs, hsr);
         break;
     case HSR_EC_CP15_32:
-        if ( ! is_32bit_domain(current->domain) )
+        if ( !is_32bit_domain(current->domain) )
             goto bad_trap;
         do_cp15_32(regs, hsr);
         break;
     case HSR_EC_CP15_64:
-        if ( ! is_32bit_domain(current->domain) )
+        if ( !is_32bit_domain(current->domain) )
             goto bad_trap;
         do_cp15_64(regs, hsr);
         break;
