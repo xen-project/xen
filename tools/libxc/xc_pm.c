@@ -123,45 +123,53 @@ int xc_pm_get_max_cx(xc_interface *xch, int cpuid, int *max_cx)
 int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt)
 {
     DECLARE_SYSCTL;
-    DECLARE_NAMED_HYPERCALL_BOUNCE(triggers, cxpt->triggers, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
-    DECLARE_NAMED_HYPERCALL_BOUNCE(residencies, cxpt->residencies, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
-    int max_cx, ret;
+    DECLARE_NAMED_HYPERCALL_BOUNCE(triggers, cxpt->triggers,
+                                   cxpt->nr * sizeof(*cxpt->triggers),
+                                   XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(residencies, cxpt->residencies,
+                                   cxpt->nr * sizeof(*cxpt->residencies),
+                                   XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(pc, cxpt->pc,
+                                   cxpt->nr_pc * sizeof(*cxpt->pc),
+                                   XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(cc, cxpt->cc,
+                                   cxpt->nr_cc * sizeof(*cxpt->cc),
+                                   XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    int ret = -1;
 
-    if( !cxpt->triggers || !cxpt->residencies )
-        return -EINVAL;
-
-    if ( (ret = xc_pm_get_max_cx(xch, cpuid, &max_cx)) )
-        goto unlock_0;
-
-    HYPERCALL_BOUNCE_SET_SIZE(triggers, max_cx * sizeof(uint64_t));
-    HYPERCALL_BOUNCE_SET_SIZE(residencies, max_cx * sizeof(uint64_t));
-
-    ret = -1;
     if ( xc_hypercall_bounce_pre(xch, triggers) )
         goto unlock_0;
     if ( xc_hypercall_bounce_pre(xch, residencies) )
         goto unlock_1;
+    if ( xc_hypercall_bounce_pre(xch, pc) )
+        goto unlock_2;
+    if ( xc_hypercall_bounce_pre(xch, cc) )
+        goto unlock_3;
 
     sysctl.cmd = XEN_SYSCTL_get_pmstat;
     sysctl.u.get_pmstat.type = PMSTAT_get_cxstat;
     sysctl.u.get_pmstat.cpuid = cpuid;
+    sysctl.u.get_pmstat.u.getcx.nr = cxpt->nr;
+    sysctl.u.get_pmstat.u.getcx.nr_pc = cxpt->nr_pc;
+    sysctl.u.get_pmstat.u.getcx.nr_cc = cxpt->nr_cc;
     set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.triggers, triggers);
     set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.residencies, residencies);
+    set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.pc, pc);
+    set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.cc, cc);
 
     if ( (ret = xc_sysctl(xch, &sysctl)) )
-        goto unlock_2;
+        goto unlock_4;
 
     cxpt->nr = sysctl.u.get_pmstat.u.getcx.nr;
     cxpt->last = sysctl.u.get_pmstat.u.getcx.last;
     cxpt->idle_time = sysctl.u.get_pmstat.u.getcx.idle_time;
-    cxpt->pc2 = sysctl.u.get_pmstat.u.getcx.pc2;
-    cxpt->pc3 = sysctl.u.get_pmstat.u.getcx.pc3;
-    cxpt->pc6 = sysctl.u.get_pmstat.u.getcx.pc6;
-    cxpt->pc7 = sysctl.u.get_pmstat.u.getcx.pc7;
-    cxpt->cc3 = sysctl.u.get_pmstat.u.getcx.cc3;
-    cxpt->cc6 = sysctl.u.get_pmstat.u.getcx.cc6;
-    cxpt->cc7 = sysctl.u.get_pmstat.u.getcx.cc7;
+    cxpt->nr_pc = sysctl.u.get_pmstat.u.getcx.nr_pc;
+    cxpt->nr_cc = sysctl.u.get_pmstat.u.getcx.nr_cc;
 
+unlock_4:
+    xc_hypercall_bounce_post(xch, cc);
+unlock_3:
+    xc_hypercall_bounce_post(xch, pc);
 unlock_2:
     xc_hypercall_bounce_post(xch, residencies);
 unlock_1:

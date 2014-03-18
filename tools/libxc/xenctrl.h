@@ -1935,18 +1935,15 @@ int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt);
 int xc_pm_reset_pxstat(xc_interface *xch, int cpuid);
 
 struct xc_cx_stat {
-    uint32_t nr;    /* entry nr in triggers & residencies, including C0 */
+    uint32_t nr;           /* entry nr in triggers[]/residencies[], incl C0 */
     uint32_t last;         /* last Cx state */
     uint64_t idle_time;    /* idle time from boot */
     uint64_t *triggers;    /* Cx trigger counts */
     uint64_t *residencies; /* Cx residencies */
-    uint64_t pc2;
-    uint64_t pc3;
-    uint64_t pc6;
-    uint64_t pc7;
-    uint64_t cc3;
-    uint64_t cc6;
-    uint64_t cc7;
+    uint32_t nr_pc;        /* entry nr in pc[] */
+    uint32_t nr_cc;        /* entry nr in cc[] */
+    uint64_t *pc;          /* 1-biased indexing (i.e. excl C0) */
+    uint64_t *cc;          /* 1-biased indexing (i.e. excl C0) */
 };
 typedef struct xc_cx_stat xc_cx_stat_t;
 
