@@ -34,9 +34,9 @@
 
 #define SUSPEND_FILE_BUFLEN (sizeof(SUSPEND_LOCK_FILE) + 10)
 
-static void get_suspend_file(char buf[SUSPEND_FILE_BUFLEN], int domid)
+static void get_suspend_file(char buf[], int domid)
 {
-    snprintf(buf, sizeof(buf), SUSPEND_LOCK_FILE, domid);
+    snprintf(buf, SUSPEND_FILE_BUFLEN, SUSPEND_LOCK_FILE, domid);
 }
 
 static int lock_suspend_event(xc_interface *xch, int domid, int *lockfd)
