@@ -956,7 +956,7 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
     char *be_path = libxl__device_backend_path(gc, aodev->dev);
     char **args = NULL, **env = NULL;
     int rc = 0;
-    int hotplug;
+    int hotplug, nullfd = -1;
     pid_t pid;
     uint32_t domid;
 
@@ -1021,6 +1021,13 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
     aodev->what = GCSPRINTF("%s %s", args[0], args[1]);
     LOG(DEBUG, "calling hotplug script: %s %s", args[0], args[1]);
 
+    nullfd = open("/dev/null", O_RDONLY);
+    if (nullfd < 0) {
+        LOG(ERROR, "unable to open /dev/null for hotplug script");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
     /* fork and execute hotplug script */
     pid = libxl__ev_child_fork(gc, &aodev->child, device_hotplug_child_death_cb);
     if (pid == -1) {
@@ -1031,16 +1038,18 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
 
     if (!pid) {
         /* child */
-        libxl__exec(gc, -1, 2, -1, args[0], args, env);
+        libxl__exec(gc, nullfd, 2, -1, args[0], args, env);
         /* notreached */
         abort();
     }
 
+    close(nullfd);
     assert(libxl__ev_child_inuse(&aodev->child));
 
     return;
 
 out:
+    if (nullfd >= 0) close(nullfd);
     aodev->rc = rc;
     device_hotplug_done(egc, aodev);
     return;
