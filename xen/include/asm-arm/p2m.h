@@ -75,6 +75,10 @@ int p2m_alloc_table(struct domain *d);
 /* */
 void p2m_load_VTTBR(struct domain *d);
 
+/* Context switch */
+void p2m_save_state(struct vcpu *p);
+void p2m_restore_state(struct vcpu *n);
+
 /* Look up the MFN corresponding to a domain's PFN. */
 paddr_t p2m_lookup(struct domain *d, paddr_t gpfn, p2m_type_t *t);
 
