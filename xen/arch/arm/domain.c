@@ -59,11 +59,12 @@ void idle_loop(void)
 
 static void ctxt_switch_from(struct vcpu *p)
 {
+    p2m_save_state(p);
+
     /* CP 15 */
     p->arch.csselr = READ_SYSREG(CSSELR_EL1);
 
     /* Control Registers */
-    p->arch.sctlr = READ_SYSREG(SCTLR_EL1);
     p->arch.cpacr = READ_SYSREG(CPACR_EL1);
 
     p->arch.contextidr = READ_SYSREG(CONTEXTIDR_EL1);
@@ -135,14 +136,7 @@ static void ctxt_switch_from(struct vcpu *p)
 
 static void ctxt_switch_to(struct vcpu *n)
 {
-    register_t hcr;
-
-    hcr = READ_SYSREG(HCR_EL2);
-    WRITE_SYSREG(hcr & ~HCR_VM, HCR_EL2);
-    isb();
-
-    p2m_load_VTTBR(n->domain);
-    isb();
+    p2m_restore_state(n);
 
     WRITE_SYSREG32(n->domain->arch.vpidr, VPIDR_EL2);
     WRITE_SYSREG(n->arch.vmpidr, VMPIDR_EL2);
@@ -190,7 +184,6 @@ static void ctxt_switch_to(struct vcpu *n)
     isb();
 
     /* Control Registers */
-    WRITE_SYSREG(n->arch.sctlr, SCTLR_EL1);
     WRITE_SYSREG(n->arch.cpacr, CPACR_EL1);
 
     WRITE_SYSREG(n->arch.contextidr, CONTEXTIDR_EL1);
@@ -213,14 +206,6 @@ static void ctxt_switch_to(struct vcpu *n)
     /* CP 15 */
     WRITE_SYSREG(n->arch.csselr, CSSELR_EL1);
 
-    isb();
-
-    if ( is_pv32_domain(n->domain) )
-        hcr &= ~HCR_RW;
-    else
-        hcr |= HCR_RW;
-
-    WRITE_SYSREG(hcr, HCR_EL2);
     isb();
 
     /* This is could trigger an hardware interrupt from the virtual

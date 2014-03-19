@@ -44,6 +44,31 @@ void p2m_load_VTTBR(struct domain *d)
     isb(); /* Ensure update is visible */
 }
 
+void p2m_save_state(struct vcpu *p)
+{
+    p->arch.sctlr = READ_SYSREG(SCTLR_EL1);
+}
+
+void p2m_restore_state(struct vcpu *n)
+{
+    register_t hcr;
+
+    hcr = READ_SYSREG(HCR_EL2);
+    WRITE_SYSREG(hcr & ~HCR_VM, HCR_EL2);
+    isb();
+
+    p2m_load_VTTBR(n->domain);
+    isb();
+
+    if ( is_pv32_domain(n->domain) )
+        hcr &= ~HCR_RW;
+    else
+        hcr |= HCR_RW;
+
+    WRITE_SYSREG(hcr, HCR_EL2);
+    isb();
+}
+
 static int p2m_first_level_index(paddr_t addr)
 {
     /*
