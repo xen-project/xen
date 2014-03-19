@@ -1997,7 +1997,7 @@ static void autoconnect_console(libxl_ctx *ctx_ignored,
     sleep(1);
     libxl_primary_console_exec(ctx, bldomid);
     /* Do not return. xl continued in child process */
-    fprintf(stderr, "Unable to attach console\n");
+    perror("xl: unable to exec console client");
     _exit(1);
 }
 
