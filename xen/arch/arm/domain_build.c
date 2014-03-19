@@ -1021,14 +1021,7 @@ int construct_dom0(struct domain *d)
         return rc;
 
     /* The following loads use the domain's p2m */
-    p2m_load_VTTBR(d);
-#ifdef CONFIG_ARM_64
-    d->arch.type = kinfo.type;
-    if ( is_32bit_domain(d) )
-        WRITE_SYSREG(READ_SYSREG(HCR_EL2) & ~HCR_RW, HCR_EL2);
-    else
-        WRITE_SYSREG(READ_SYSREG(HCR_EL2) | HCR_RW, HCR_EL2);
-#endif
+    p2m_restore_state(v);
 
     /*
      * kernel_load will determine the placement of the initrd & fdt in
