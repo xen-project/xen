@@ -205,17 +205,26 @@ static uint32_t find_domain(const char *p)
     return domid;
 }
 
+int child_report(xlchildnum child)
+{
+    int status;
+    pid_t got = xl_waitpid(child, &status, 0);
+    if (got < 0) {
+        fprintf(stderr, "xl: warning, failed to waitpid for %s: %s\n",
+                children[child].description, strerror(errno));
+        return ERROR_FAIL;
+    } else if (status) {
+        xl_report_child_exitstatus(XTL_ERROR, child, got, status);
+        return ERROR_FAIL;
+    } else {
+        return 0;
+    }
+}
+
 static void console_child_report(xlchildnum child)
 {
-    if (xl_child_pid(child)) {
-        int status;
-        pid_t got = xl_waitpid(child, &status, 0);
-        if (got < 0)
-            fprintf(stderr, "xl: warning, failed to waitpid for %s: %s\n",
-                    children[child].description, strerror(errno));
-        else if (status)
-            xl_report_child_exitstatus(XTL_ERROR, child, got, status);
-    }
+    if (xl_child_pid(child))
+        child_report(child);
 }
 
 static int vncviewer(uint32_t domid, int autopass)
@@ -431,26 +440,13 @@ out:
 static int do_daemonize(char *name)
 {
     char *fullname;
-    pid_t child1, got_child;
+    pid_t child1;
     int nullfd, ret = 0;
-    int status = 0;
 
-    child1 = xl_fork(child_waitdaemon, "domain monitoring daemon");
+    child1 = xl_fork(child_waitdaemon, "domain monitoring daemonizing child");
     if (child1) {
-        got_child = xl_waitpid(child_waitdaemon, &status, 0);
-        if (got_child != child1) {
-            assert(got_child == -1);
-            LOG("failed to wait for daemonizing child: %s", strerror(errno));
-            ret = ERROR_FAIL;
-            goto out;
-        }
-
-        if (status) {
-            libxl_report_child_exitstatus(ctx, XTL_ERROR,
-                       "daemonizing child", child1, status);
-            ret = ERROR_FAIL;
-            goto out;
-        }
+        ret = child_report(child_waitdaemon);
+        if (ret) goto out;
         ret = 1;
         goto out;
     }

@@ -153,6 +153,10 @@ void xl_report_child_exitstatus(xentoollog_level level,
                                 xlchildnum child, pid_t pid, int status);
     /* like libxl_report_child_exitstatus, but uses children[].description */
 
+int child_report(xlchildnum child);
+    /* waits and expects child to exit status 0.
+     * otherwise, logs and returns ERROR_FAIL */
+
 /* global options */
 extern int autoballoon;
 extern int run_hotplug_scripts;
