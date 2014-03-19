@@ -26,23 +26,24 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <errno.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <string.h>
 #include <time.h>
 #include <signal.h>
 #include <unistd.h>
+#include <sys/mman.h>
 #include <sys/poll.h>
-#include <xc_private.h>
-#include <xg_save_restore.h>
 
+#include <xenctrl.h>
 #include <xen/mem_event.h>
 
-//#if 0
-#undef DPRINTF
 #define DPRINTF(a, b...) fprintf(stderr, a, ## b)
-//#endif
+#define ERROR(a, b...) fprintf(stderr, a "\n", ## b)
+#define PERROR(a, b...) fprintf(stderr, a ": %s\n", ## b, strerror(errno))
 
 /* Spinlock and mem event definitions */
 
@@ -104,17 +105,9 @@ typedef struct mem_event {
     spinlock_t ring_lock;
 } mem_event_t;
 
-typedef struct xc_platform_info {
-    unsigned long max_mfn;
-    unsigned long hvirt_start;
-    unsigned int  pt_levels;
-    unsigned int  guest_width;
-} xc_platform_info_t;
-
 typedef struct xenaccess {
     xc_interface *xc_handle;
 
-    xc_platform_info_t *platform_info;
     xc_domaininfo_t    *domain_info;
 
     mem_event_t mem_event;
@@ -178,7 +171,7 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
 
     /* Tear down domain xenaccess in Xen */
     if ( xenaccess->mem_event.ring_page )
-        munmap(xenaccess->mem_event.ring_page, PAGE_SIZE);
+        munmap(xenaccess->mem_event.ring_page, XC_PAGE_SIZE);
 
     if ( mem_access_enable )
     {
@@ -219,7 +212,6 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
     }
     xenaccess->xc_handle = NULL;
 
-    free(xenaccess->platform_info);
     free(xenaccess->domain_info);
     free(xenaccess);
 
@@ -328,31 +320,12 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     SHARED_RING_INIT((mem_event_sring_t *)xenaccess->mem_event.ring_page);
     BACK_RING_INIT(&xenaccess->mem_event.back_ring,
                    (mem_event_sring_t *)xenaccess->mem_event.ring_page,
-                   PAGE_SIZE);
+                   XC_PAGE_SIZE);
 
     /* Now that the ring is set, remove it from the guest's physmap */
     if ( xc_domain_decrease_reservation_exact(xch, 
                     xenaccess->mem_event.domain_id, 1, 0, &ring_pfn) )
         PERROR("Failed to remove ring from guest physmap");
-
-    /* Get platform info */
-    xenaccess->platform_info = malloc(sizeof(xc_platform_info_t));
-    if ( xenaccess->platform_info == NULL )
-    {
-        ERROR("Error allocating memory for platform info");
-        goto err;
-    }
-
-    rc = get_platform_info(xenaccess->xc_handle, domain_id,
-                           &xenaccess->platform_info->max_mfn,
-                           &xenaccess->platform_info->hvirt_start,
-                           &xenaccess->platform_info->pt_levels,
-                           &xenaccess->platform_info->guest_width);
-    if ( rc != 1 )
-    {
-        ERROR("Error getting platform info");
-        goto err;
-    }
 
     /* Get domaininfo */
     xenaccess->domain_info = malloc(sizeof(xc_domaininfo_t));
