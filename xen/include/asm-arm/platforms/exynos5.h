@@ -1,5 +1,5 @@
 #ifndef __ASM_ARM_PLATFORMS_EXYNOS5_H
-#define __ASM_ASM_PLATFORMS_EXYSNO5_H
+#define __ASM_ARM_PLATFORMS_EXYNOS5_H
 
 #define EXYNOS5_MCT_BASE            0x101c0000
 #define EXYNOS5_MCT_G_TCON          0x240       /* Relative to MCT_BASE */
