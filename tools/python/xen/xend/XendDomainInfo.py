@@ -65,7 +65,7 @@ from xen.xend.XendConstants import *
 from xen.xend.XendAPIConstants import *
 from xen.xend.XendCPUPool import XendCPUPool
 from xen.xend.server.DevConstants import xenbusState
-from xen.xend.server.BlktapController import TapdiskController
+from xen.xend.server.BlktapController import TapdiskController, TapdiskException
 
 from xen.xend.XendVMMetrics import XendVMMetrics
 
@@ -861,7 +861,7 @@ class XendDomainInfo:
                     # blktap1
                     dev_type = self.getBlockDeviceClass(devid)
                 self._waitForDevice(dev_type, devid)
-            except VmError, ex:
+            except (VmError, TapdiskException), ex:
                 del self.info['devices'][dev_uuid]
                 if dev_type == 'pci':
                     for dev in dev_config_dict['devs']:
