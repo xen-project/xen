@@ -108,6 +108,8 @@ static inline uint64_t gva_to_ipa_par(vaddr_t va)
     return par;
 }
 
+#define clear_page(page) memset((void *)(page), 0, PAGE_SIZE)
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __ARM_ARM32_PAGE_H__ */

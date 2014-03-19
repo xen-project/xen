@@ -103,6 +103,8 @@ static inline uint64_t gva_to_ipa_par(vaddr_t va)
     return par;
 }
 
+extern void clear_page(void *to);
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __ARM_ARM64_PAGE_H__ */

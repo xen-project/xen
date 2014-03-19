@@ -420,8 +420,6 @@ static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr)
 #define third_table_offset(va)  TABLE_OFFSET(third_linear_offset(va))
 #define zeroeth_table_offset(va)  TABLE_OFFSET(zeroeth_linear_offset(va))
 
-#define clear_page(page) memset((void *)(page), 0, PAGE_SIZE)
-
 #define PAGE_ALIGN(x) (((x) + PAGE_SIZE - 1) & PAGE_MASK)
 
 #endif /* __ARM_PAGE_H__ */
