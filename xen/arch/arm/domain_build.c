@@ -1021,17 +1021,13 @@ int construct_dom0(struct domain *d)
     if ( rc < 0 )
         return rc;
 
-    /* The following loads use the domain's p2m */
+    /*
+     * The following loads use the domain's p2m and require current to
+     * be a vcpu of the domain, temporarily switch
+     */
     saved_current = current;
-    p2m_load_VTTBR(d);
+    p2m_restore_state(v);
     set_current(v);
-#ifdef CONFIG_ARM_64
-    d->arch.type = kinfo.type;
-    if ( is_pv32_domain(d) )
-        WRITE_SYSREG(READ_SYSREG(HCR_EL2) & ~HCR_RW, HCR_EL2);
-    else
-        WRITE_SYSREG(READ_SYSREG(HCR_EL2) | HCR_RW, HCR_EL2);
-#endif
 
     /*
      * kernel_load will determine the placement of the initrd & fdt in
@@ -1044,7 +1040,7 @@ int construct_dom0(struct domain *d)
 
     /* Now that we are done restore the original p2m and current. */
     set_current(saved_current);
-    p2m_load_VTTBR(current->domain);
+    p2m_restore_state(saved_current);
 
     discard_initial_modules();
 
