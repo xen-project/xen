@@ -35,7 +35,7 @@ void dump_p2m_lookup(struct domain *d, paddr_t addr)
     unmap_domain_page(first);
 }
 
-void p2m_load_VTTBR(struct domain *d)
+static void p2m_load_VTTBR(struct domain *d)
 {
     if ( is_idle_domain(d) )
         return;

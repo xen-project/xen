@@ -72,9 +72,6 @@ int relinquish_p2m_mapping(struct domain *d);
  */
 int p2m_alloc_table(struct domain *d);
 
-/* */
-void p2m_load_VTTBR(struct domain *d);
-
 /* Context switch */
 void p2m_save_state(struct vcpu *p);
 void p2m_restore_state(struct vcpu *n);
