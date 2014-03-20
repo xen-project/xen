@@ -89,8 +89,17 @@ int domain_vgic_init(struct domain *d)
 
     d->arch.vgic.shared_irqs =
         xzalloc_array(struct vgic_irq_rank, DOMAIN_NR_RANKS(d));
+    if ( d->arch.vgic.shared_irqs == NULL )
+        return -ENOMEM;
+
     d->arch.vgic.pending_irqs =
         xzalloc_array(struct pending_irq, d->arch.vgic.nr_lines);
+    if ( d->arch.vgic.pending_irqs == NULL )
+    {
+        xfree(d->arch.vgic.shared_irqs);
+        return -ENOMEM;
+    }
+
     for (i=0; i<d->arch.vgic.nr_lines; i++)
     {
         INIT_LIST_HEAD(&d->arch.vgic.pending_irqs[i].inflight);
