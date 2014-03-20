@@ -509,14 +509,18 @@ moretodo:
         aiocbp = (void*) (uintptr_t) rsp->id;
         status = rsp->status;
 
-        if (status != BLKIF_RSP_OKAY)
-            printk("block error %d for op %d\n", status, rsp->operation);
-
         switch (rsp->operation) {
         case BLKIF_OP_READ:
         case BLKIF_OP_WRITE:
         {
             int j;
+
+            if (status != BLKIF_RSP_OKAY)
+                printk("%s error %d on %s at offset %llu, num bytes %llu\n",
+                        rsp->operation == BLKIF_OP_READ?"read":"write",
+                        status, aiocbp->aio_dev->nodename,
+                        (unsigned long long) aiocbp->aio_offset,
+                        (unsigned long long) aiocbp->aio_nbytes);
 
             for (j = 0; j < aiocbp->n; j++)
                 gnttab_end_access(aiocbp->gref[j]);
@@ -525,11 +529,17 @@ moretodo:
         }
 
         case BLKIF_OP_WRITE_BARRIER:
+            if (status != BLKIF_RSP_OKAY)
+                printk("write barrier error %d\n", status);
+            break;
         case BLKIF_OP_FLUSH_DISKCACHE:
+            if (status != BLKIF_RSP_OKAY)
+                printk("flush error %d\n", status);
             break;
 
         default:
-            printk("unrecognized block operation %d response\n", rsp->operation);
+            printk("unrecognized block operation %d response (status %d)\n", rsp->operation, status);
+            break;
         }
 
         dev->ring.rsp_cons = ++cons;
