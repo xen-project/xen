@@ -151,7 +151,7 @@ AC_PROG_INSTALL
 AC_PATH_PROG([BISON], [bison])
 AC_PATH_PROG([FLEX], [flex])
 AX_PATH_PROG_OR_FAIL([PERL], [perl])
-AS_IF([test "x$xapi" = "xy"], [
+AS_IF([test "x$xenapi" = "xy"], [
     AX_PATH_PROG_OR_FAIL([CURL], [curl-config])
     AX_PATH_PROG_OR_FAIL([XML], [xml2-config])
 ])

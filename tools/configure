@@ -4702,7 +4702,7 @@ if test x"${PERL}" = x"no"
 then
     as_fn_error $? "Unable to find perl, please install perl" "$LINENO" 5
 fi
-if test "x$xapi" = "xy"; then :
+if test "x$xenapi" = "xy"; then :
 
     # Extract the first word of "curl-config", so it can be a program name with args.
 set dummy curl-config; ac_word=$2
