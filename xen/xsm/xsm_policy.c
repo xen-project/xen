@@ -23,6 +23,10 @@
 #include <xen/multiboot.h>
 #endif
 #include <xen/bitops.h>
+#ifdef HAS_DEVICE_TREE
+# include <asm/setup.h>
+# include <xen/device_tree.h>
+#endif
 
 char *__initdata policy_buffer = NULL;
 u32 __initdata policy_size = 0;
@@ -67,5 +71,38 @@ int __init xsm_multiboot_policy_init(unsigned long *module_map,
     }
 
     return rc;
+}
+#endif
+
+#ifdef HAS_DEVICE_TREE
+int __init xsm_dt_policy_init(void)
+{
+    paddr_t paddr = early_info.modules.module[MOD_XSM].start;
+    paddr_t len = early_info.modules.module[MOD_XSM].size;
+    xsm_magic_t magic;
+
+    if ( !len )
+        return 0;
+
+    copy_from_paddr(&magic, paddr, sizeof(magic));
+
+    if ( magic != XSM_MAGIC )
+    {
+        printk(XENLOG_ERR "xsm: Invalid magic for XSM blob got 0x%x "
+               "expected 0x%x\n", magic, XSM_MAGIC);
+        return -EINVAL;
+    }
+
+    printk("xsm: Policy len = 0x%"PRIpaddr" start at 0x%"PRIpaddr"\n",
+           len, paddr);
+
+    policy_buffer = xmalloc_bytes(len);
+    if ( !policy_buffer )
+        return -ENOMEM;
+
+    copy_from_paddr(policy_buffer, paddr, len);
+    policy_size = len;
+
+    return 0;
 }
 #endif

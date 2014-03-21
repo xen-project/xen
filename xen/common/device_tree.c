@@ -354,6 +354,8 @@ static void __init process_multiboot_node(const void *fdt, int node,
         nr = MOD_KERNEL;
     else if ( fdt_node_check_compatible(fdt, node, "xen,linux-initrd") == 0)
         nr = MOD_INITRD;
+    else if ( fdt_node_check_compatible(fdt, node, "xen,xsm-policy") == 0 )
+        nr = MOD_XSM;
     else
         early_panic("%s not a known xen multiboot type\n", name);
 

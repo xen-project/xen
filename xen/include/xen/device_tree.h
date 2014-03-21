@@ -24,7 +24,8 @@
 #define MOD_FDT    1
 #define MOD_KERNEL 2
 #define MOD_INITRD 3
-#define NR_MODULES 4
+#define MOD_XSM    4
+#define NR_MODULES 5
 
 #define MOD_DISCARD_FIRST MOD_FDT
 

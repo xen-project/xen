@@ -652,6 +652,11 @@ extern int xsm_multiboot_policy_init(unsigned long *module_map,
                                      void *(*bootstrap_map)(const module_t *));
 #endif
 
+#ifdef HAS_DEVICE_TREE
+extern int xsm_dt_init(void);
+extern int xsm_dt_policy_init(void);
+#endif
+
 extern int register_xsm(struct xsm_operations *ops);
 extern int unregister_xsm(struct xsm_operations *ops);
 
@@ -666,6 +671,13 @@ extern void xsm_fixup_ops(struct xsm_operations *ops);
 static inline int xsm_multiboot_init (unsigned long *module_map,
                                       const multiboot_info_t *mbi,
                                       void *(*bootstrap_map)(const module_t *))
+{
+    return 0;
+}
+#endif
+
+#ifdef HAS_DEVICE_TREE
+static inline int xsm_dt_init(void)
 {
     return 0;
 }

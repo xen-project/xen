@@ -85,6 +85,32 @@ int __init xsm_multiboot_init(unsigned long *module_map,
 }
 #endif
 
+#ifdef HAS_DEVICE_TREE
+int __init xsm_dt_init(void)
+{
+    int ret = 0;
+
+    printk("XSM Framework v" XSM_FRAMEWORK_VERSION " initialized\n");
+
+    if ( XSM_MAGIC )
+    {
+        ret = xsm_dt_policy_init();
+        if ( ret )
+        {
+            printk("%s: Error initializing policy (rc = %d).\n",
+                   __FUNCTION__, ret);
+            return -EINVAL;
+        }
+    }
+
+    ret = xsm_core_init();
+
+    xfree(policy_buffer);
+
+    return ret;
+}
+#endif
+
 int register_xsm(struct xsm_operations *ops)
 {
     if ( verify(ops) )

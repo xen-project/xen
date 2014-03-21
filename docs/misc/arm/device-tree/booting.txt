@@ -16,6 +16,7 @@ Each node contains the following properties:
 
 	- "linux-zimage" -- the dom0 kernel
 	- "linux-initrd" -- the dom0 ramdisk
+	- "xsm-policy"	 -- XSM policy blob
 
 - reg
 
