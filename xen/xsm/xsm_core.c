@@ -43,6 +43,21 @@ static void __init do_xsm_initcalls(void)
     }
 }
 
+static int __init xsm_core_init(void)
+{
+    if ( verify(&dummy_xsm_ops) )
+    {
+        printk("%s could not verify "
+               "dummy_xsm_ops structure.\n", __FUNCTION__);
+        return -EIO;
+    }
+
+    xsm_ops = &dummy_xsm_ops;
+    do_xsm_initcalls();
+
+    return 0;
+}
+
 #ifdef CONFIG_MULTIBOOT
 int __init xsm_multiboot_init(unsigned long *module_map,
                               const multiboot_info_t *mbi,
@@ -63,16 +78,7 @@ int __init xsm_multiboot_init(unsigned long *module_map,
         }
     }
 
-    if ( verify(&dummy_xsm_ops) )
-    {
-        bootstrap_map(NULL);
-        printk("%s could not verify "
-               "dummy_xsm_ops structure.\n", __FUNCTION__);
-        return -EIO;
-    }
-
-    xsm_ops = &dummy_xsm_ops;
-    do_xsm_initcalls();
+    ret = xsm_core_init();
     bootstrap_map(NULL);
 
     return 0;
