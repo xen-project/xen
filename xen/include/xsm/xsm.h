@@ -643,11 +643,15 @@ static inline int xsm_map_gmfn_foreign (xsm_default_t def, struct domain *d, str
 
 #endif /* XSM_NO_WRAPPERS */
 
-extern int xsm_init(unsigned long *module_map, const multiboot_info_t *mbi,
-                    void *(*bootstrap_map)(const module_t *));
-extern int xsm_policy_init(unsigned long *module_map,
-                           const multiboot_info_t *mbi,
-                           void *(*bootstrap_map)(const module_t *));
+#ifdef CONFIG_MULTIBOOT
+extern int xsm_multiboot_init(unsigned long *module_map,
+                              const multiboot_info_t *mbi,
+                              void *(*bootstrap_map)(const module_t *));
+extern int xsm_multiboot_policy_init(unsigned long *module_map,
+                                     const multiboot_info_t *mbi,
+                                     void *(*bootstrap_map)(const module_t *));
+#endif
+
 extern int register_xsm(struct xsm_operations *ops);
 extern int unregister_xsm(struct xsm_operations *ops);
 
@@ -658,12 +662,15 @@ extern void xsm_fixup_ops(struct xsm_operations *ops);
 
 #include <xsm/dummy.h>
 
-static inline int xsm_init (unsigned long *module_map,
-                            const multiboot_info_t *mbi,
-                            void *(*bootstrap_map)(const module_t *))
+#ifdef CONFIG_MULTIBOOT
+static inline int xsm_multiboot_init (unsigned long *module_map,
+                                      const multiboot_info_t *mbi,
+                                      void *(*bootstrap_map)(const module_t *))
 {
     return 0;
 }
+#endif
+
 #endif /* XSM_ENABLE */
 
 #endif /* __XSM_H */

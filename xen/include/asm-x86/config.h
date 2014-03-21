@@ -52,6 +52,8 @@
 #define CONFIG_KEXEC 1
 #define CONFIG_WATCHDOG 1
 
+#define CONFIG_MULTIBOOT 1
+
 #define HZ 100
 
 #define OPT_CONSOLE_STR "vga"

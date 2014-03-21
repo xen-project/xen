@@ -1251,7 +1251,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     bitmap_fill(module_map, mbi->mods_count);
     __clear_bit(0, module_map); /* Dom0 kernel is always first */
 
-    xsm_init(module_map, mbi, bootstrap_map);
+    xsm_multiboot_init(module_map, mbi, bootstrap_map);
 
     microcode_grab_module(module_map, mbi, bootstrap_map);
 
