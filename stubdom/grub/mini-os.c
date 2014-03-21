@@ -126,6 +126,9 @@ biosdisk (int read, int drive, struct geometry *geometry,
     if (i >= blk_nb)
         return -1;
 
+    if (sector + nsec > geometry->total_sectors)
+      return -1;
+
     aiocb.aio_dev = blk_dev[i];
     aiocb.aio_buf = addr;
     aiocb.aio_nbytes = (size_t)nsec * blk_info[i].sector_size;
