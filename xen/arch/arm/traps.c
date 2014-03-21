@@ -1006,6 +1006,7 @@ static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL(sched_op, 2),
     HYPERCALL(console_io, 3),
     HYPERCALL(xen_version, 2),
+    HYPERCALL(xsm_op, 1),
     HYPERCALL(event_channel_op, 2),
     HYPERCALL(physdev_op, 2),
     HYPERCALL(sysctl, 2),

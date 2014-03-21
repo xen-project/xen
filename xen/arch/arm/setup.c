@@ -44,6 +44,7 @@
 #include <asm/cpufeature.h>
 #include <asm/platform.h>
 #include <asm/procinfo.h>
+#include <xsm/xsm.h>
 
 struct cpuinfo_arm __read_mostly boot_cpu_data;
 
@@ -721,6 +722,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     gic_route_ppis();
     gic_route_spis();
+    xsm_dt_init();
 
     init_maintenance_interrupt();
     init_timer_interrupt();
