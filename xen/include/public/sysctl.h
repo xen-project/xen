@@ -228,8 +228,15 @@ struct pm_cx_stat {
     XEN_GUEST_HANDLE_64(uint64) residencies; /* Cx residencies */
     uint32_t nr_pc;                          /* entry nr in pc[] */
     uint32_t nr_cc;                          /* entry nr in cc[] */
-    XEN_GUEST_HANDLE_64(uint64) pc;          /* 1-biased indexing */
-    XEN_GUEST_HANDLE_64(uint64) cc;          /* 1-biased indexing */
+    /*
+     * These two arrays may (and generally will) have unused slots; slots not
+     * having a corresponding hardware register will not be written by the
+     * hypervisor. It is therefore up to the caller to put a suitable sentinel
+     * into all slots before invoking the function.
+     * Indexing is 1-biased (PC1/CC1 being at index 0).
+     */
+    XEN_GUEST_HANDLE_64(uint64) pc;
+    XEN_GUEST_HANDLE_64(uint64) cc;
 };
 
 struct xen_sysctl_get_pmstat {
