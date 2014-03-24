@@ -98,4 +98,14 @@
 #define __cpuinitdata
 #define __cpuinit
 
+#ifdef FLASK_ENABLE
+#define XSM_MAGIC 0xf97cff8c
+/* Enable permissive mode (xl setenforce or flask_enforcing parameter) */
+#define FLASK_DEVELOP 1
+/* Allow runtime disabling of FLASK via the flask_enable parameter */
+#define FLASK_BOOTPARAM 1
+/* Maintain statistics on the access vector cache */
+#define FLASK_AVC_STATS 1
+#endif
+
 #endif /* __XEN_CONFIG_H__ */
