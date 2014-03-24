@@ -248,7 +248,7 @@ static int uncanonicalize_pagetable(
 static xen_pfn_t *load_p2m_frame_list(
     xc_interface *xch, struct restore_ctx *ctx,
     int io_fd, int *pae_extended_cr3, int *ext_vcpucontext,
-    int *vcpuextstate, uint32_t *vcpuextstate_size)
+    uint32_t *vcpuextstate_size)
 {
     xen_pfn_t *p2m_frame_list;
     vcpu_guest_context_any_t ctxt;
@@ -326,7 +326,6 @@ static xen_pfn_t *load_p2m_frame_list(
             }
             else if ( !strncmp(chunk_sig, "xcnt", 4) )
             {
-                *vcpuextstate = 1;
                 if ( RDEXACT(io_fd, vcpuextstate_size, sizeof(*vcpuextstate_size)) )
                 {
                     PERROR("read extended vcpu state size failed");
@@ -520,7 +519,7 @@ static int buffer_tail_hvm(xc_interface *xch, struct restore_ctx *ctx,
                            struct tailbuf_hvm *buf, int fd,
                            unsigned int max_vcpu_id, uint64_t *vcpumap,
                            int ext_vcpucontext,
-                           int vcpuextstate, uint32_t vcpuextstate_size)
+                           uint32_t vcpuextstate_size)
 {
     uint8_t *tmp;
     unsigned char qemusig[21];
@@ -588,7 +587,6 @@ static int buffer_tail_pv(xc_interface *xch, struct restore_ctx *ctx,
                           struct tailbuf_pv *buf, int fd,
                           unsigned int max_vcpu_id, uint64_t *vcpumap,
                           int ext_vcpucontext,
-                          int vcpuextstate,
                           uint32_t vcpuextstate_size)
 {
     unsigned int i;
@@ -629,9 +627,7 @@ static int buffer_tail_pv(xc_interface *xch, struct restore_ctx *ctx,
                : sizeof(vcpu_guest_context_x86_32_t)) * buf->vcpucount;
     if ( ext_vcpucontext )
         vcpulen += 128 * buf->vcpucount;
-    if ( vcpuextstate ) {
-        vcpulen += vcpuextstate_size * buf->vcpucount;
-    }
+    vcpulen += vcpuextstate_size * buf->vcpucount;
 
     if ( !(buf->vcpubuf) ) {
         if ( !(buf->vcpubuf = malloc(vcpulen)) ) {
@@ -671,16 +667,14 @@ static int buffer_tail_pv(xc_interface *xch, struct restore_ctx *ctx,
 static int buffer_tail(xc_interface *xch, struct restore_ctx *ctx,
                        tailbuf_t *buf, int fd, unsigned int max_vcpu_id,
                        uint64_t *vcpumap, int ext_vcpucontext,
-                       int vcpuextstate, uint32_t vcpuextstate_size)
+                       uint32_t vcpuextstate_size)
 {
     if ( buf->ishvm )
         return buffer_tail_hvm(xch, ctx, &buf->u.hvm, fd, max_vcpu_id, vcpumap,
-                               ext_vcpucontext, vcpuextstate,
-                               vcpuextstate_size);
+                               ext_vcpucontext, vcpuextstate_size);
     else
         return buffer_tail_pv(xch, ctx, &buf->u.pv, fd, max_vcpu_id, vcpumap,
-                              ext_vcpucontext, vcpuextstate,
-                              vcpuextstate_size);
+                              ext_vcpucontext, vcpuextstate_size);
 }
 
 static void tailbuf_free_hvm(struct tailbuf_hvm *buf)
@@ -1421,7 +1415,6 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     DECLARE_DOMCTL;
     xc_dominfo_t info;
     int rc = 1, frc, i, j, n, m, pae_extended_cr3 = 0, ext_vcpucontext = 0;
-    int vcpuextstate = 0;
     uint32_t vcpuextstate_size = 0;
     unsigned long mfn, pfn;
     int nraces = 0;
@@ -1527,7 +1520,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         /* Load the p2m frame list, plus potential extended info chunk */
         p2m_frame_list = load_p2m_frame_list(xch, ctx,
             io_fd, &pae_extended_cr3, &ext_vcpucontext,
-            &vcpuextstate, &vcpuextstate_size);
+            &vcpuextstate_size);
 
         if ( !p2m_frame_list )
             goto out;
@@ -1730,7 +1723,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     if ( !ctx->completed ) {
 
         if ( buffer_tail(xch, ctx, &tailbuf, io_fd, max_vcpu_id, vcpumap,
-                         ext_vcpucontext, vcpuextstate, vcpuextstate_size) < 0 ) {
+                         ext_vcpucontext, vcpuextstate_size) < 0 ) {
             ERROR ("error buffering image tail");
             goto out;
         }
@@ -1783,7 +1776,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     memset(&tmptail, 0, sizeof(tmptail));
     tmptail.ishvm = hvm;
     if ( buffer_tail(xch, ctx, &tmptail, io_fd, max_vcpu_id, vcpumap,
-                     ext_vcpucontext, vcpuextstate, vcpuextstate_size) < 0 ) {
+                     ext_vcpucontext, vcpuextstate_size) < 0 ) {
         ERROR ("error buffering image tail, finishing");
         goto out;
     }
@@ -2147,7 +2140,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         }
 
  vcpu_ext_state_restore:
-        if ( !vcpuextstate )
+        if ( !vcpuextstate_size )
             continue;
 
         memcpy(&domctl.u.vcpuextstate.xfeature_mask, vcpup,
