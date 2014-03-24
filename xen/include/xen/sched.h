@@ -100,8 +100,24 @@ struct evtchn
     u8 pending:1;
     u16 last_vcpu_id;
     u8 last_priority;
+#ifdef XSM_ENABLE
+    union {
+#ifdef XSM_NEED_GENERIC_EVTCHN_SSID
+        /*
+         * If an XSM module needs more space for its event channel context,
+         * this pointer stores the necessary data for the security server.
+         */
+        void *generic;
+#endif
 #ifdef FLASK_ENABLE
-    void *ssid;
+        /*
+         * Inlining the contents of the structure for FLASK avoids unneeded
+         * allocations, and on 64-bit platforms with only FLASK enabled,
+         * reduces the size of struct evtchn.
+         */
+        u32 flask_sid;
+#endif
+    } ssid;
 #endif
 };
 

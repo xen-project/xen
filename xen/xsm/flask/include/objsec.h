@@ -23,10 +23,4 @@ struct domain_security_struct {
     u32 target_sid;        /* SID for device model target domain */
 };
 
-struct evtchn_security_struct {
-    u32 sid;                 /* current SID */
-};
-
-extern unsigned int selinux_checkreqprot;
-
 #endif /* _FLASK_OBJSEC_H_ */

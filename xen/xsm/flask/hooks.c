@@ -55,8 +55,7 @@ static u32 domain_target_sid(struct domain *src, struct domain *dst)
 
 static u32 evtchn_sid(const struct evtchn *chn)
 {
-    struct evtchn_security_struct *esec = chn->ssid;
-    return esec->sid;
+    return chn->ssid.flask_sid;
 }
 
 static int domain_has_perm(struct domain *dom1, struct domain *dom2, 
@@ -182,7 +181,6 @@ static int flask_evtchn_unbound(struct domain *d1, struct evtchn *chn,
     u32 sid1, sid2, newsid;
     int rc;
     struct domain *d2;
-    struct evtchn_security_struct *esec;
 
     d2 = rcu_lock_domain_by_any_id(id2);
     if ( d2 == NULL )
@@ -190,7 +188,6 @@ static int flask_evtchn_unbound(struct domain *d1, struct evtchn *chn,
 
     sid1 = domain_sid(d1);
     sid2 = domain_target_sid(d1, d2);
-    esec = chn->ssid;
 
     rc = security_transition_sid(sid1, sid2, SECCLASS_EVENT, &newsid);
     if ( rc )
@@ -204,7 +201,7 @@ static int flask_evtchn_unbound(struct domain *d1, struct evtchn *chn,
     if ( rc )
         goto out;
 
-    esec->sid = newsid;
+    chn->ssid.flask_sid = newsid;
 
  out:
     rcu_unlock_domain(d2);
@@ -216,7 +213,6 @@ static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1,
 {
     u32 sid1, sid2, newsid, reverse_sid;
     int rc;
-    struct evtchn_security_struct *esec1;
     struct avc_audit_data ad;
     AVC_AUDIT_DATA_INIT(&ad, NONE);
     ad.sdom = d1;
@@ -224,8 +220,6 @@ static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1,
 
     sid1 = domain_sid(d1);
     sid2 = domain_target_sid(d1, d2);
-
-    esec1 = chn1->ssid;
 
     rc = security_transition_sid(sid1, sid2, SECCLASS_EVENT, &newsid);
     if ( rc )
@@ -252,17 +246,14 @@ static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1,
     if ( rc )
         return rc;
 
-    esec1->sid = newsid;
+    chn1->ssid.flask_sid = newsid;
 
     return rc;
 }
 
 static void flask_evtchn_close_post(struct evtchn *chn)
 {
-    struct evtchn_security_struct *esec;
-    esec = chn->ssid;
-
-    esec->sid = SECINITSID_UNLABELED;
+    chn->ssid.flask_sid = SECINITSID_UNLABELED;
 }
 
 static int flask_evtchn_send(struct domain *d, struct evtchn *chn)
@@ -297,33 +288,17 @@ static int flask_evtchn_reset(struct domain *d1, struct domain *d2)
 
 static int flask_alloc_security_evtchn(struct evtchn *chn)
 {
-    struct evtchn_security_struct *esec;
-
-    esec = xzalloc(struct evtchn_security_struct);
-    if ( !esec )
-        return -ENOMEM;
-
-    esec->sid = SECINITSID_UNLABELED;
-
-    chn->ssid = esec;
+    chn->ssid.flask_sid = SECINITSID_UNLABELED;
 
     return 0;    
 }
 
 static void flask_free_security_evtchn(struct evtchn *chn)
 {
-    struct evtchn_security_struct *esec;
-
     if ( !chn )
         return;
 
-    esec = chn->ssid;
-
-    if ( !esec )
-        return;
-
-    chn->ssid = NULL;
-    xfree(esec);
+    chn->ssid.flask_sid = SECINITSID_UNLABELED;
 }
 
 static char *flask_show_security_evtchn(struct domain *d, const struct evtchn *chn)
