@@ -4465,6 +4465,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             goto param_fail5;
             
         rc = p2m_set_mem_access(d, a.first_pfn, a.nr, a.hvmmem_access);
+        if ( rc > 0 )
+        {
+            a.first_pfn += a.nr - rc;
+            a.nr = rc;
+            if ( __copy_to_guest(arg, &a, 1) )
+                rc = -EFAULT;
+            else
+                rc = -EAGAIN;
+        }
 
     param_fail5:
         rcu_unlock_domain(d);
