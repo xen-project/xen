@@ -3755,7 +3755,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
              ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
             goto param_fail5;
             
-        for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
+        for ( pfn = a.first_pfn; a.nr; ++pfn )
         {
             p2m_type_t t;
             mfn_t mfn;
@@ -3768,6 +3768,17 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             p2m_unlock(p2m);
             if ( !success )
                 goto param_fail5;
+
+            /* Check for continuation if it's not the last interation. */
+            if ( --a.nr && hypercall_preempt_check() )
+            {
+                a.first_pfn = pfn + 1;
+                if ( copy_to_guest(arg, &a, 1) )
+                    rc = -EFAULT;
+                else
+                    rc = -EAGAIN;
+                goto param_fail5;
+            }
         }
 
         rc = 0;
