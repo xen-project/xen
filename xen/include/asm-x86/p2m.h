@@ -576,8 +576,8 @@ void p2m_mem_access_resume(struct domain *d);
 
 /* Set access type for a region of pfns.
  * If start_pfn == -1ul, sets the default access type */
-int p2m_set_mem_access(struct domain *d, unsigned long start_pfn, 
-                       uint32_t nr, hvmmem_access_t access);
+long p2m_set_mem_access(struct domain *d, unsigned long start_pfn,
+                        uint32_t nr, hvmmem_access_t access);
 
 /* Get access type for a pfn
  * If pfn == -1ul, gets the default access type */
