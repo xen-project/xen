@@ -1,0 +1,158 @@
+Xen on ARM uses various low level assembly primitives from the Linux
+kernel. This file tracks what files have been imported and when they
+were last updated.
+
+=====================================================================
+arm64:
+=====================================================================
+
+bitops: last sync @ v3.14-rc7 (last commit: 8e86f0b)
+
+linux/arch/arm64/lib/bitops.S           xen/arch/arm/arm64/lib/bitops.S
+linux/arch/arm64/include/asm/bitops.h   xen/include/asm-arm/arm64/bitops.h
+
+---------------------------------------------------------------------
+
+cmpxchg: last sync @ v3.14-rc7 (last commit: 95c4189)
+
+linux/arch/arm64/include/asm/cmpxchg.h  xen/include/asm-arm/arm64/cmpxchg.h
+
+Skipped:
+  60010e5 arm64: cmpxchg: update macros to prevent warnings
+
+---------------------------------------------------------------------
+
+atomics: last sync @ v3.14-rc7 (last commit: 95c4189)
+
+linux/arch/arm64/include/asm/atomic.h   xen/include/asm-arm/arm64/atomic.h
+
+---------------------------------------------------------------------
+
+spinlocks: last sync @ v3.14-rc7 (last commit: 95c4189)
+
+linux/arch/arm64/include/asm/spinlock.h xen/include/asm-arm/arm64/spinlock.h
+
+Skipped:
+  5686b06 arm64: lockref: add support for lockless lockrefs using cmpxchg
+  52ea2a5 arm64: locks: introduce ticket-based spinlock implementation
+
+---------------------------------------------------------------------
+
+mem*: last sync @ v3.14-rc7 (last commit: 4a89922)
+
+linux/arch/arm64/lib/memchr.S             xen/arch/arm/arm64/lib/memchr.S
+linux/arch/arm64/lib/memcpy.S             xen/arch/arm/arm64/lib/memcpy.S
+linux/arch/arm64/lib/memmove.S            xen/arch/arm/arm64/lib/memmove.S
+linux/arch/arm64/lib/memset.S             xen/arch/arm/arm64/lib/memset.S
+
+for i in memchr.S memcpy.S memmove.S memset.S ; do
+    diff -u linux/arch/arm64/lib/$i xen/arch/arm/arm64/lib/$i
+done
+
+---------------------------------------------------------------------
+
+str*: last sync @ v3.14-rc7 (last commit: 2b8cac8)
+
+linux/arch/arm/lib/strchr.S             xen/arch/arm/arm64/lib/strchr.S
+linux/arch/arm/lib/strrchr.S            xen/arch/arm/arm64/lib/strrchr.S
+
+---------------------------------------------------------------------
+
+{clear,copy}_page: last sync @ v3.14-rc7 (last commit: f27bb13)
+
+linux/arch/arm64/lib/clear_page.S       unused in Xen
+linux/arch/arm64/lib/copy_page.S        xen/arch/arm/arm64/lib/copy_page.S
+
+=====================================================================
+arm32
+=====================================================================
+
+bitops: last sync @ v3.14-rc7 (last commit: b7ec699)
+
+linux/arch/arm/lib/bitops.h             xen/arch/arm/arm32/lib/bitops.h
+linux/arch/arm/lib/changebit.S          xen/arch/arm/arm32/lib/changebit.S
+linux/arch/arm/lib/clearbit.S           xen/arch/arm/arm32/lib/clearbit.S
+linux/arch/arm/lib/findbit.S            xen/arch/arm/arm32/lib/findbit.S
+linux/arch/arm/lib/setbit.S             xen/arch/arm/arm32/lib/setbit.S
+linux/arch/arm/lib/testchangebit.S      xen/arch/arm/arm32/lib/testchangebit.S
+linux/arch/arm/lib/testclearbit.S       xen/arch/arm/arm32/lib/testclearbit.S
+linux/arch/arm/lib/testsetbit.S         xen/arch/arm/arm32/lib/testsetbit.S
+
+for i in bitops.h changebit.S clearbit.S findbit.S setbit.S testchangebit.S \
+         testclearbit.S testsetbit.S; do
+    diff -u ../linux/arch/arm/lib/$i xen/arch/arm/arm32/lib/$i;
+done
+
+---------------------------------------------------------------------
+
+cmpxchg: last sync @ v3.14-rc7 (last commit: 775ebcc)
+
+linux/arch/arm/include/asm/cmpxchg.h    xen/include/asm-arm/arm32/cmpxchg.h
+
+---------------------------------------------------------------------
+
+atomics: last sync @ v3.14-rc7 (last commit: aed3a4e)
+
+linux/arch/arm/include/asm/atomic.h     xen/include/asm-arm/arm32/atomic.h
+
+---------------------------------------------------------------------
+
+spinlocks: last sync: 15e7e5c1ebf5
+
+linux/arch/arm/include/asm/spinlock.h   xen/include/asm-arm/arm32/spinlock.h
+
+resync to v3.14-rc7:
+
+  7c8746a ARM: 7955/1: spinlock: ensure we have a compiler barrier before sev
+  0cbad9c ARM: 7854/1: lockref: add support for lockless lockrefs using cmpxchg64
+  9bb17be ARM: locks: prefetch the destination word for write prior to strex
+  27a8479 ARM: smp_on_up: move inline asm ALT_SMP patching macro out of spinlock.
+  00efaa0 ARM: 7812/1: rwlocks: retry trylock operation if strex fails on free lo
+  afa31d8 ARM: 7811/1: locks: use early clobber in arch_spin_trylock
+  73a6fdc ARM: spinlock: use inner-shareable dsb variant prior to sev instruction
+
+---------------------------------------------------------------------
+
+mem*: last sync @ v3.14-rc7 (last commit: 418df63a)
+
+linux/arch/arm/lib/copy_template.S      xen/arch/arm/arm32/lib/copy_template.S
+linux/arch/arm/lib/memchr.S             xen/arch/arm/arm32/lib/memchr.S
+linux/arch/arm/lib/memcpy.S             xen/arch/arm/arm32/lib/memcpy.S
+linux/arch/arm/lib/memmove.S            xen/arch/arm/arm32/lib/memmove.S
+linux/arch/arm/lib/memset.S             xen/arch/arm/arm32/lib/memset.S
+linux/arch/arm/lib/memzero.S            xen/arch/arm/arm32/lib/memzero.S
+
+linux/arch/arm/lib/strchr.S             xen/arch/arm/arm32/lib/strchr.S
+linux/arch/arm/lib/strrchr.S            xen/arch/arm/arm32/lib/strrchr.S
+
+for i in copy_template.S memchr.S memcpy.S memmove.S memset.S \
+         memzero.S ; do
+    diff -u linux/arch/arm/lib/$i xen/arch/arm/arm32/lib/$i
+done
+
+---------------------------------------------------------------------
+
+str*: last sync @ v3.13-rc7 (last commit: 93ed397)
+
+linux/arch/arm/lib/strchr.S             xen/arch/arm/arm32/lib/strchr.S
+linux/arch/arm/lib/strrchr.S            xen/arch/arm/arm32/lib/strrchr.S
+
+---------------------------------------------------------------------
+
+{clear,copy}_page: last sync: Never
+
+linux/arch/arm/lib/copy_page.S          unused in Xen
+
+clear_page == memset
+
+---------------------------------------------------------------------
+
+libgcc: last sync @ v3.14-rc7 (last commit: 01885bc)
+
+linux/arch/arm/lib/lib1funcs.S          xen/arch/arm/arm32/lib/lib1funcs.S
+linux/arch/arm/lib/lshrdi3.S            xen/arch/arm/arm32/lib/lshrdi3.S
+linux/arch/arm/lib/div64.S              xen/arch/arm/arm32/lib/div64.S
+
+for i in lib1funcs.S lshrdi3.S div64.S ; do
+    diff -u linux/arch/arm/lib/$i xen/arch/arm/arm32/lib/$i
+done
