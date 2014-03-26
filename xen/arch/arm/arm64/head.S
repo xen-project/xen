@@ -239,9 +239,9 @@ skip_bss:
          * Write-implies-XN disabled (for now),
          * D-cache disabled (for now),
          * I-cache enabled,
-         * Alignment checking enabled,
+         * Alignment checking disabled,
          * MMU translation disabled (for now). */
-        ldr   x0, =(HSCTLR_BASE|SCTLR_A)
+        ldr   x0, =(HSCTLR_BASE)
         msr   SCTLR_EL2, x0
 
         /* Rebuild the boot pagetable's first-level entries. The structure
