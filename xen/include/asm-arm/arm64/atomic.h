@@ -157,7 +157,7 @@ static inline int __atomic_add_unless(atomic_t *v, int a, int u)
  * Local variables:
  * mode: C
  * c-file-style: "BSD"
- * c-basic-offset: 4
- * indent-tabs-mode: nil
+ * c-basic-offset: 8
+ * indent-tabs-mode: t
  * End:
  */
