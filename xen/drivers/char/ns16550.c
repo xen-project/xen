@@ -1129,6 +1129,8 @@ static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
     uart->stop_bits = 1;
     /* Default is no transmit FIFO. */
     uart->fifo_size = 1;
+    /* Default lsr_mask = UART_LSR_THRE */
+    uart->lsr_mask = UART_LSR_THRE;
 
     res = dt_device_get_address(dev, 0, &uart->io_base, &io_size);
     if ( res )
