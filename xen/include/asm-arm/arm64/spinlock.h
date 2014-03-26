@@ -70,7 +70,7 @@ static always_inline int _raw_read_trylock(raw_rwlock_t *rw)
         "1:\n"
         : "=&r" (tmp), "+r" (tmp2), "+Q" (rw->lock)
         :
-        : "cc", "memory");
+        : "memory");
 
     return !tmp2;
 }
@@ -86,7 +86,7 @@ static always_inline int _raw_write_trylock(raw_rwlock_t *rw)
         "1:\n"
         : "=&r" (tmp), "+Q" (rw->lock)
         : "r" (0x80000000)
-        : "cc", "memory");
+        : "memory");
 
     return !tmp;
 }
@@ -102,7 +102,7 @@ static inline void _raw_read_unlock(raw_rwlock_t *rw)
         "       cbnz    %w1, 1b\n"
         : "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
         :
-        : "cc", "memory");
+        : "memory");
 }
 
 static inline void _raw_write_unlock(raw_rwlock_t *rw)
