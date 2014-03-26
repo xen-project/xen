@@ -113,9 +113,29 @@ static always_inline unsigned long __cmpxchg(
     return oldval;
 }
 
-#define cmpxchg(ptr,o,n)                                                \
-    ((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),            \
-                                   (unsigned long)(n),sizeof(*(ptr))))
+static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+					 unsigned long new, int size)
+{
+	unsigned long ret;
+
+	smp_mb();
+	ret = __cmpxchg(ptr, old, new, size);
+	smp_mb();
+
+	return ret;
+}
+
+#define cmpxchg(ptr,o,n)						\
+	((__typeof__(*(ptr)))__cmpxchg_mb((ptr),			\
+					  (unsigned long)(o),		\
+					  (unsigned long)(n),		\
+					  sizeof(*(ptr))))
+
+#define cmpxchg_local(ptr,o,n)						\
+	((__typeof__(*(ptr)))__cmpxchg((ptr),				\
+				       (unsigned long)(o),		\
+				       (unsigned long)(n),		\
+				       sizeof(*(ptr))))
 
 #define local_irq_disable() asm volatile ( "cpsid i @ local_irq_disable\n" : : : "cc" )
 #define local_irq_enable()  asm volatile ( "cpsie i @ local_irq_enable\n" : : : "cc" )
