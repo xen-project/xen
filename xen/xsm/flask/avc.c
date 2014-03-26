@@ -654,11 +654,6 @@ int avc_add_callback(int (*callback)(u32 event, u32 ssid, u32 tsid, u16 tclass,
     return rc;
 }
 
-static inline int avc_sidcmp(u32 x, u32 y)
-{
-    return (x == y || x == SECSID_WILD || y == SECSID_WILD);
-}
-
 /**
  * avc_update_node Update an AVC entry
  * @event : Updating event
