@@ -696,7 +696,8 @@ void burn_credits(struct csched_runqueue_data *rqd, struct csched_vcpu *svc, s_t
 }
 
 /* Find the domain with the highest weight. */
-void update_max_weight(struct csched_runqueue_data *rqd, int new_weight, int old_weight)
+static void update_max_weight(struct csched_runqueue_data *rqd, int new_weight,
+                              int old_weight)
 {
     /* Try to avoid brute-force search:
      * - If new_weight is larger, max_weigth <- new_weight
@@ -1182,10 +1183,10 @@ static void consider(balance_state_t *st,
 }
 
 
-void migrate(const struct scheduler *ops,
-             struct csched_vcpu *svc, 
-             struct csched_runqueue_data *trqd, 
-             s_time_t now)
+static void migrate(const struct scheduler *ops,
+                    struct csched_vcpu *svc, 
+                    struct csched_runqueue_data *trqd, 
+                    s_time_t now)
 {
     if ( test_bit(__CSFLAG_scheduled, &svc->flags) )
     {
