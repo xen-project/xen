@@ -2035,20 +2035,6 @@ out:
     return rc;
 }
 
-int determine_ocontext( char *ocontext )
-{
-    if ( strcmp(ocontext, "pirq") == 0 )
-        return OCON_PIRQ;
-    else if ( strcmp(ocontext, "ioport") == 0 )
-        return OCON_IOPORT;
-    else if ( strcmp(ocontext, "iomem") == 0 )
-        return OCON_IOMEM;
-    else if ( strcmp(ocontext, "pcidevice") == 0 )
-        return OCON_DEVICE;
-    else
-        return -1;
-}
-
 int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
                             ,u32 sid )
 {
