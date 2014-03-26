@@ -14,6 +14,9 @@ extern void *memmove(void *dest, const void *src, size_t n);
 #define __HAVE_ARCH_MEMSET
 extern void * memset(void *, int, __kernel_size_t);
 
+#define __HAVE_ARCH_MEMCHR
+extern void * memchr(const void *, int, __kernel_size_t);
+
 extern void __memzero(void *ptr, __kernel_size_t n);
 
 #define memset(p,v,n)                                                   \
