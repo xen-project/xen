@@ -272,7 +272,7 @@ static int flask_security_sid(struct xen_flask_sid_context *arg)
 
 #ifndef COMPAT
 
-int flask_disable(void)
+static int flask_disable(void)
 {
     static int flask_disabled = 0;
 
