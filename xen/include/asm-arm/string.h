@@ -3,8 +3,6 @@
 
 #include <xen/config.h>
 
-#if defined(CONFIG_ARM_32)
-
 /*
  * We don't do inline string functions, since the
  * optimised inline asm versions are not small.
@@ -28,6 +26,8 @@ extern void * memset(void *, int, __kernel_size_t);
 
 #define __HAVE_ARCH_MEMCHR
 extern void * memchr(const void *, int, __kernel_size_t);
+
+#if defined(CONFIG_ARM_32)
 
 extern void __memzero(void *ptr, __kernel_size_t n);
 
