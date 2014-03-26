@@ -651,9 +651,9 @@ unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)
         hv_cr4_mask &= ~X86_CR4_OSXSAVE;
 
     if ( (guest_cr4 & hv_cr4_mask) != (hv_cr4 & hv_cr4_mask) )
-        gdprintk(XENLOG_WARNING,
-                 "Attempt to change CR4 flags %08lx -> %08lx\n",
-                 hv_cr4, guest_cr4);
+        printk(XENLOG_G_WARNING
+               "d%d attempted to change %pv's CR4 flags %08lx -> %08lx\n",
+               current->domain->domain_id, v, hv_cr4, guest_cr4);
 
     return (hv_cr4 & hv_cr4_mask) | (guest_cr4 & ~hv_cr4_mask);
 }
