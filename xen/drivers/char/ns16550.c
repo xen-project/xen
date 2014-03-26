@@ -1076,27 +1076,9 @@ static void __init ns16550_parse_port_config(
     serial_register_uart(uart - ns16550_com, &ns16550_driver, uart);
 }
 
-void __init ns16550_init(int index, struct ns16550_defaults *defaults)
+static void ns16550_init_common(struct ns16550 *uart)
 {
-    struct ns16550 *uart;
-
-    if ( (index < 0) || (index > 1) )
-        return;
-
-    uart = &ns16550_com[index];
-
-    uart->baud      = (defaults->baud ? :
-                       console_has((index == 0) ? "com1" : "com2")
-                       ? BAUD_AUTO : 0);
     uart->clock_hz  = UART_CLOCK_HZ;
-    uart->data_bits = defaults->data_bits;
-    uart->parity    = parse_parity_char(defaults->parity);
-    uart->stop_bits = defaults->stop_bits;
-    uart->irq       = defaults->irq;
-    uart->io_base   = defaults->io_base;
-    uart->io_size   = 8;
-    uart->reg_width = 1;
-    uart->reg_shift = 0;
 
 #ifdef HAS_PCI
     uart->enable_ro = 0;
@@ -1106,7 +1088,31 @@ void __init ns16550_init(int index, struct ns16550_defaults *defaults)
     uart->fifo_size = 1;
 
     /* Default lsr_mask = UART_LSR_THRE */
-    uart->lsr_mask = UART_LSR_THRE;
+    uart->lsr_mask  = UART_LSR_THRE;
+}
+
+void __init ns16550_init(int index, struct ns16550_defaults *defaults)
+{
+    struct ns16550 *uart;
+
+    if ( (index < 0) || (index > 1) )
+        return;
+
+    uart = &ns16550_com[index];
+
+    ns16550_init_common(uart);
+
+    uart->baud      = (defaults->baud ? :
+                       console_has((index == 0) ? "com1" : "com2")
+                       ? BAUD_AUTO : 0);
+    uart->data_bits = defaults->data_bits;
+    uart->parity    = parse_parity_char(defaults->parity);
+    uart->stop_bits = defaults->stop_bits;
+    uart->irq       = defaults->irq;
+    uart->io_base   = defaults->io_base;
+    uart->io_size   = 8;
+    uart->reg_width = 1;
+    uart->reg_shift = 0;
 
     ns16550_parse_port_config(uart, (index == 0) ? opt_com1 : opt_com2);
 }
@@ -1122,15 +1128,12 @@ static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
 
     uart = &ns16550_com[0];
 
+    ns16550_init_common(uart);
+
     uart->baud      = BAUD_AUTO;
-    uart->clock_hz  = UART_CLOCK_HZ;
     uart->data_bits = 8;
     uart->parity    = UART_PARITY_NONE;
     uart->stop_bits = 1;
-    /* Default is no transmit FIFO. */
-    uart->fifo_size = 1;
-    /* Default lsr_mask = UART_LSR_THRE */
-    uart->lsr_mask = UART_LSR_THRE;
 
     res = dt_device_get_address(dev, 0, &uart->io_base, &io_size);
     if ( res )
