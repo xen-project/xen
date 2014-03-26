@@ -2,6 +2,7 @@
 #define __ARCH_ARM_ATOMIC__
 
 #include <xen/config.h>
+#include <xen/prefetch.h>
 #include <asm/system.h>
 
 #define build_atomic_read(name, size, width, type, reg)\
