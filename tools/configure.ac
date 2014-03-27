@@ -51,7 +51,6 @@ m4_include([../m4/ax_compare_version.m4])
 # Enable/disable options
 AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
 AX_ARG_DEFAULT_ENABLE([monitors], [Disable xenstat and xentop monitoring tools])
-AX_ARG_DEFAULT_DISABLE([xenapi], [Enable Xen API Bindings])
 AX_ARG_DEFAULT_ENABLE([ocamltools], [Disable Ocaml tools])
 AX_ARG_DEFAULT_ENABLE([xsmpolicy], [Disable XSM policy compilation])
 AX_ARG_DEFAULT_DISABLE([ovmf], [Enable OVMF])
@@ -150,10 +149,6 @@ AC_PROG_INSTALL
 AC_PATH_PROG([BISON], [bison])
 AC_PATH_PROG([FLEX], [flex])
 AX_PATH_PROG_OR_FAIL([PERL], [perl])
-AS_IF([test "x$xenapi" = "xy"], [
-    AX_PATH_PROG_OR_FAIL([CURL], [curl-config])
-    AX_PATH_PROG_OR_FAIL([XML], [xml2-config])
-])
 AS_IF([test "x$ocamltools" = "xy"], [
     AC_PROG_OCAML
     AC_PROG_FINDLIB

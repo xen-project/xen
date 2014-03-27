@@ -198,9 +198,6 @@ tools/hotplug/common/hotplugpath.sh
 tools/include/xen/*
 tools/include/xen-foreign/*.(c|h|size)
 tools/include/xen-foreign/checker
-tools/libxen/libxenapi-
-tools/libxen/test/test_bindings
-tools/libxen/test/test_event_handling
 tools/libxl/libxlu_cfg_y.output
 tools/libxl/xl
 tools/libxl/testenum
