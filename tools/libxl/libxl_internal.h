@@ -504,8 +504,8 @@ static inline int libxl__gc_is_real(const libxl__gc *gc)
 _hidden void libxl__ptr_add(libxl__gc *gc_opt, void *ptr /* may be NULL */) NN1;
 /* if this is the outermost libxl callframe then free all pointers in @gc */
 _hidden void libxl__free_all(libxl__gc *gc);
-/* allocate and zero @bytes. (similar to a gc'd malloc(3)+memzero()) */
-_hidden void *libxl__zalloc(libxl__gc *gc_opt, int bytes) NN1;
+/* allocate and zero @size. (similar to a gc'd malloc(3)+memzero()) */
+_hidden void *libxl__zalloc(libxl__gc *gc_opt, size_t size) NN1;
 /* allocate and zero memory for an array of @nmemb members of @size each.
  * (similar to a gc'd calloc(3)). */
 _hidden void *libxl__calloc(libxl__gc *gc_opt, size_t nmemb, size_t size) NN1;
