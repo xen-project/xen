@@ -78,6 +78,15 @@ void libxl__free_all(libxl__gc *gc)
     gc->alloc_maxsize = 0;
 }
 
+void *libxl__malloc(libxl__gc *gc, size_t size)
+{
+    void *ptr = malloc(size);
+    if (!ptr) libxl__alloc_failed(CTX, __func__, size, 1);
+
+    libxl__ptr_add(gc, ptr);
+    return ptr;
+}
+
 void *libxl__zalloc(libxl__gc *gc, size_t size)
 {
     void *ptr = calloc(size, 1);
