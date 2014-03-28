@@ -134,7 +134,7 @@ struct xenpf_efi_runtime_call {
      * where it holds the single returned value.
      */
     uint32_t misc;
-    unsigned long status;
+    xen_ulong_t status;
     union {
 #define XEN_EFI_GET_TIME_SET_CLEARS_NS 0x00000001
         struct {
@@ -168,7 +168,7 @@ struct xenpf_efi_runtime_call {
 #define XEN_EFI_VARIABLE_RUNTIME_ACCESS     0x00000004
         struct {
             XEN_GUEST_HANDLE(void) name;  /* UCS-2/UTF-16 string */
-            unsigned long size;
+            xen_ulong_t size;
             XEN_GUEST_HANDLE(void) data;
             struct xenpf_efi_guid {
                 uint32_t data1;
@@ -179,7 +179,7 @@ struct xenpf_efi_runtime_call {
         } get_variable, set_variable;
 
         struct {
-            unsigned long size;
+            xen_ulong_t size;
             XEN_GUEST_HANDLE(void) name;  /* UCS-2/UTF-16 string */
             struct xenpf_efi_guid vendor_guid;
         } get_next_variable_name;
@@ -194,14 +194,14 @@ struct xenpf_efi_runtime_call {
 
         struct {
             XEN_GUEST_HANDLE(void) capsule_header_array;
-            unsigned long capsule_count;
+            xen_ulong_t capsule_count;
             uint64_t max_capsule_size;
-            unsigned int reset_type;
+            uint32_t reset_type;
         } query_capsule_capabilities;
 
         struct {
             XEN_GUEST_HANDLE(void) capsule_header_array;
-            unsigned long capsule_count;
+            xen_ulong_t capsule_count;
             uint64_t sg_list; /* machine address */
         } update_capsule;
     } u;
