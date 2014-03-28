@@ -730,6 +730,14 @@ static void ept_dump_p2m_table(unsigned char key)
     unsigned long record_counter = 0;
     struct p2m_domain *p2m;
     struct ept_data *ept;
+    static const char memory_types[8][2] = {
+        [0 ... 7] = "?",
+        [MTRR_TYPE_UNCACHABLE]     = "UC",
+        [MTRR_TYPE_WRCOMB]         = "WC",
+        [MTRR_TYPE_WRTHROUGH]      = "WT",
+        [MTRR_TYPE_WRPROT]         = "WP",
+        [MTRR_TYPE_WRBACK]         = "WB",
+    };
 
     for_each_domain(d)
     {
@@ -759,8 +767,15 @@ static void ept_dump_p2m_table(unsigned char key)
                 if ( ept_entry->sa_p2mt == p2m_populate_on_demand )
                     printk("gfn: %13lx order: %2d PoD\n", gfn, order);
                 else
-                    printk("gfn: %13lx order: %2d mfn: %13lx\n",
-                           gfn, order, ept_entry->mfn + 0UL);
+                    printk("gfn: %13lx order: %2d mfn: %13lx %c%c%c %c%c%c\n",
+                           gfn, order, ept_entry->mfn + 0UL,
+                           ept_entry->r ? 'r' : ' ',
+                           ept_entry->w ? 'w' : ' ',
+                           ept_entry->x ? 'x' : ' ',
+                           memory_types[ept_entry->emt][0],
+                           memory_types[ept_entry->emt][1]
+                           ?: ept_entry->emt + '0',
+                           ept_entry->ipat ? '!' : ' ');
 
                 if ( !(record_counter++ % 100) )
                     process_pending_softirqs();
