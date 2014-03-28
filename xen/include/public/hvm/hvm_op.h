@@ -90,10 +90,10 @@ typedef enum {
 struct xen_hvm_track_dirty_vram {
     /* Domain to be tracked. */
     domid_t  domid;
+    /* Number of pages to track. */
+    uint32_t nr;
     /* First pfn to track. */
     uint64_aligned_t first_pfn;
-    /* Number of pages to track. */
-    uint64_aligned_t nr;
     /* OUT variable. */
     /* Dirty bitmap buffer. */
     XEN_GUEST_HANDLE_64(uint8) dirty_bitmap;
@@ -106,10 +106,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_track_dirty_vram_t);
 struct xen_hvm_modified_memory {
     /* Domain to be updated. */
     domid_t  domid;
+    /* Number of pages. */
+    uint32_t nr;
     /* First pfn. */
     uint64_aligned_t first_pfn;
-    /* Number of pages. */
-    uint64_aligned_t nr;
 };
 typedef struct xen_hvm_modified_memory xen_hvm_modified_memory_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_modified_memory_t);
