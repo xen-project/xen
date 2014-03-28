@@ -12,3 +12,6 @@ POD2HTML            := @POD2HTML@
 POD2TEXT            := @POD2TEXT@
 MARKDOWN            := @MARKDOWN@
 PERL                := @PERL@
+
+# Subsets of documentation to build
+CONFIG_XEND         := @xend@

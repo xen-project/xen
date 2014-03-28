@@ -6,20 +6,30 @@ VERSION		:= $(shell $(MAKE) -C $(XEN_ROOT)/xen --no-print-directory xenversion)
 
 DOC_ARCHES      := arm x86_32 x86_64
 
-DOC_MAN5SRC	:= $(wildcard man/*.pod.5)
-DOC_MAN1SRC	:= $(wildcard man/*.pod.1)
-DOC_MAN1	:= $(patsubst man/%.pod.1,man1/%.1,$(DOC_MAN1SRC))
-DOC_MAN5	:= $(patsubst man/%.pod.5,man5/%.5,$(DOC_MAN5SRC))
-DOC_MARKDOWN	:= $(wildcard misc/*.markdown)
-DOC_HTML	:= $(patsubst %.markdown,html/%.html,$(DOC_MARKDOWN)) \
-		   $(patsubst man/%.pod.1,html/man/%.1.html,$(DOC_MAN1SRC)) \
-		   $(patsubst man/%.pod.5,html/man/%.5.html,$(DOC_MAN5SRC)) \
-		   $(patsubst %.txt,html/%.txt,$(wildcard misc/*.txt)) \
-		   $(patsubst %,html/hypercall/%/index.html,$(DOC_ARCHES))
-DOC_TXT         := $(patsubst %.txt,txt/%.txt,$(wildcard misc/*.txt)) \
-		   $(patsubst %.markdown,txt/%.txt,$(DOC_MARKDOWN)) \
-		   $(patsubst man/%.pod.1,txt/man/%.1.txt,$(DOC_MAN1SRC)) \
-		   $(patsubst man/%.pod.5,txt/man/%.5.txt,$(DOC_MAN5SRC))
+# Documentation sources to build
+MAN1SRC-y := $(wildcard man/xl*.pod.1)
+MAN1SRC-y += $(wildcard man/xenstore*.pod.1)
+MAN1SRC-$(CONFIG_XEND) += man/xm.pod.1
+
+MAN5SRC-y := $(wildcard man/xl*.pod.5)
+MAN5SRC-$(CONFIG_XEND) += man/xend-config.sxp.pod.5 man/xmdomain.cfg.pod.5
+
+MARKDOWNSRC-y := $(wildcard misc/*.markdown)
+
+TXTSRC-y := $(wildcard misc/*.txt)
+
+
+DOC_MAN1 := $(patsubst man/%.pod.1,man1/%.1,$(MAN1SRC-y))
+DOC_MAN5 := $(patsubst man/%.pod.5,man5/%.5,$(MAN5SRC-y))
+DOC_HTML := $(patsubst %.markdown,html/%.html,$(MARKDOWNSRC-y)) \
+            $(patsubst man/%.pod.1,html/man/%.1.html,$(MAN1SRC-y)) \
+            $(patsubst man/%.pod.5,html/man/%.5.html,$(MAN5SRC-y)) \
+            $(patsubst %.txt,html/%.txt,$(TXTSRC-y)) \
+            $(patsubst %,html/hypercall/%/index.html,$(DOC_ARCHES))
+DOC_TXT  := $(patsubst %.txt,txt/%.txt,$(TXTSRC-y)) \
+            $(patsubst %.markdown,txt/%.txt,$(MARKDOWNSRC-y)) \
+            $(patsubst man/%.pod.1,txt/man/%.1.txt,$(MAN1SRC-y)) \
+            $(patsubst man/%.pod.5,txt/man/%.5.txt,$(MAN5SRC-y))
 
 .PHONY: all
 all: build

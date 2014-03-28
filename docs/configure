@@ -588,6 +588,7 @@ ac_unique_file="misc/xen-command-line.markdown"
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 PERL
+xend
 MARKDOWN
 POD2TEXT
 POD2HTML
@@ -634,6 +635,7 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
+enable_xend
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1249,6 +1251,13 @@ if test -n "$ac_init_help"; then
    esac
   cat <<\_ACEOF
 
+Optional Features:
+  --disable-option-checking  ignore unrecognized --enable/--with options
+  --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+  --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-xend           Enable xend toolstack documentation (default is
+                          DISABLED)
+
 Some influential environment variables:
   FIG2DEV     Path to fig2dev tool
   POD2MAN     Path to pod2man tool
@@ -1732,6 +1741,12 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 
 
+
+
+
+
+
+
     # Extract the first word of "fig2dev", so it can be a program name with args.
 set dummy fig2dev; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -1979,6 +1994,31 @@ done
 $as_echo "$as_me: WARNING: markdown is not available so some documentation won't be built" >&2;}
 
 fi
+
+
+# Enable/disable options
+
+# Check whether --enable-xend was given.
+if test "${enable_xend+set}" = set; then :
+  enableval=$enable_xend;
+fi
+
+
+if test "x$enable_xend" = "xno"; then :
+
+    ax_cv_xend="n"
+
+elif test "x$enable_xend" = "xyes"; then :
+
+    ax_cv_xend="y"
+
+elif test -z $ax_cv_xend; then :
+
+    ax_cv_xend="n"
+
+fi
+xend=$ax_cv_xend
+
 
 
 
