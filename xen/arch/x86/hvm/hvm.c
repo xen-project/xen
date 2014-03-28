@@ -3294,13 +3294,15 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_MTRRdefType:
         if ( !mtrr )
             goto gp_fault;
-        if ( !mtrr_def_type_msr_set(&v->arch.hvm_vcpu.mtrr, msr_content) )
+        if ( !mtrr_def_type_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
+                                    msr_content) )
            goto gp_fault;
         break;
     case MSR_MTRRfix64K_00000:
         if ( !mtrr )
             goto gp_fault;
-        if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr, 0, msr_content) )
+        if ( !mtrr_fix_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr, 0,
+                                     msr_content) )
             goto gp_fault;
         break;
     case MSR_MTRRfix16K_80000:
@@ -3308,7 +3310,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         if ( !mtrr )
             goto gp_fault;
         index = msr - MSR_MTRRfix16K_80000 + 1;
-        if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr,
+        if ( !mtrr_fix_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
                                      index, msr_content) )
             goto gp_fault;
         break;
@@ -3316,7 +3318,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         if ( !mtrr )
             goto gp_fault;
         index = msr - MSR_MTRRfix4K_C0000 + 3;
-        if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr,
+        if ( !mtrr_fix_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
                                      index, msr_content) )
             goto gp_fault;
         break;

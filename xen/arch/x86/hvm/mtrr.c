@@ -412,7 +412,8 @@ static inline bool_t valid_mtrr_type(uint8_t type)
     return 0;
 }
 
-bool_t mtrr_def_type_msr_set(struct mtrr_state *m, uint64_t msr_content)
+bool_t mtrr_def_type_msr_set(struct domain *d, struct mtrr_state *m,
+                             uint64_t msr_content)
 {
     uint8_t def_type = msr_content & 0xff;
     uint8_t enabled = (msr_content >> 10) & 0x3;
@@ -436,8 +437,8 @@ bool_t mtrr_def_type_msr_set(struct mtrr_state *m, uint64_t msr_content)
     return 1;
 }
 
-bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, uint32_t row,
-                              uint64_t msr_content)
+bool_t mtrr_fix_range_msr_set(struct domain *d, struct mtrr_state *m,
+                              uint32_t row, uint64_t msr_content)
 {
     uint64_t *fixed_range_base = (uint64_t *)m->fixed_ranges;
 
@@ -669,7 +670,7 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
     mtrr_state->mtrr_cap = hw_mtrr.msr_mtrr_cap;
 
     for ( i = 0; i < NUM_FIXED_MSR; i++ )
-        mtrr_fix_range_msr_set(mtrr_state, i, hw_mtrr.msr_mtrr_fixed[i]);
+        mtrr_fix_range_msr_set(d, mtrr_state, i, hw_mtrr.msr_mtrr_fixed[i]);
 
     for ( i = 0; i < MTRR_VCNT; i++ )
     {
@@ -681,7 +682,7 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
                                hw_mtrr.msr_mtrr_var[i * 2 + 1]);
     }
 
-    mtrr_def_type_msr_set(mtrr_state, hw_mtrr.msr_mtrr_def_type);
+    mtrr_def_type_msr_set(d, mtrr_state, hw_mtrr.msr_mtrr_def_type);
 
     return 0;
 }
