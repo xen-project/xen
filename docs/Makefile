@@ -88,15 +88,19 @@ distclean: clean
 	rm -rf $(XEN_ROOT)/config/Docs.mk config.log config.status config.cache \
 		autom4te.cache
 
-.PHONY: install
-install: all
-	rm -rf $(DESTDIR)$(DOCDIR)
-	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
-
+.PHONY: install-man-pages
+install-man-pages: man-pages
 	$(INSTALL_DIR) $(DESTDIR)$(MANDIR)
 	cp -R man1 $(DESTDIR)$(MANDIR)
 	cp -R man5 $(DESTDIR)$(MANDIR)
+
+.PHONY: install-html
+install-html: html txt figs
+	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
 	[ ! -d html ] || cp -R html $(DESTDIR)$(DOCDIR)
+
+.PHONY: install
+install: install-man-pages install-html
 
 html/index.html: $(DOC_HTML) $(CURDIR)/gen-html-index INDEX
 	$(PERL) -w -- $(CURDIR)/gen-html-index -i INDEX html $(DOC_HTML)
