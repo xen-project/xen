@@ -693,8 +693,7 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
     return pt;
 }
 
-/* Modify the p2m type of a range of gfns from ot to nt.
- * Resets the access permissions. */
+/* Modify the p2m type of a range of gfns from ot to nt. */
 void p2m_change_type_range(struct domain *d, 
                            unsigned long start, unsigned long end,
                            p2m_type_t ot, p2m_type_t nt)
@@ -710,11 +709,29 @@ void p2m_change_type_range(struct domain *d,
     p2m_lock(p2m);
     p2m->defer_nested_flush = 1;
 
-    for ( gfn = start; gfn < end; gfn++ )
+    for ( gfn = start; gfn < end; )
     {
-        mfn = p2m->get_entry(p2m, gfn, &pt, &a, 0, NULL);
+        unsigned int order;
+
+        mfn = p2m->get_entry(p2m, gfn, &pt, &a, 0, &order);
+        while ( order > PAGE_ORDER_4K )
+        {
+            if ( pt != ot )
+                break;
+            if ( !(gfn & ((1UL << order) - 1)) &&
+                 end > (gfn | ((1UL << order) - 1)) )
+                break;
+            if ( order == PAGE_ORDER_1G )
+                order = PAGE_ORDER_2M;
+            else
+                order = PAGE_ORDER_4K;
+        }
         if ( pt == ot )
-            set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, nt, p2m->default_access);
+            set_p2m_entry(p2m, gfn, mfn, order, nt, a);
+        gfn += 1UL << order;
+        gfn &= -1UL << order;
+        if ( !gfn )
+            break;
     }
 
     p2m->defer_nested_flush = 0;
