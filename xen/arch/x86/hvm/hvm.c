@@ -4291,7 +4291,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 a.value = d->arch.hvm_domain.params[a.index];
                 break;
             }
-            rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+            rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         }
 
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "%s param %u = %"PRIx64,
@@ -4389,8 +4389,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             goto param_fail3;
 
         rc = -EINVAL;
-        if ( (a.first_pfn > domain_get_maximum_gpfn(d)) ||
-             ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
+        if ( ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
              ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
             goto param_fail3;
 
@@ -4419,7 +4418,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             /* Check for continuation if it's not the last interation */
             if ( a.nr > 0 && hypercall_preempt_check() )
             {
-                if ( copy_to_guest(arg, &a, 1) )
+                if ( __copy_to_guest(arg, &a, 1) )
                     rc = -EFAULT;
                 else
                     rc = -EAGAIN;
@@ -4468,7 +4467,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 a.mem_type =  HVMMEM_ram_rw;
             else
                 a.mem_type =  HVMMEM_mmio_dm;
-            rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+            rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         }
 
     param_fail_getmemtype:
@@ -4504,8 +4503,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             goto param_fail4;
 
         rc = -EINVAL;
-        if ( (a.first_pfn > domain_get_maximum_gpfn(d)) ||
-             ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
+        if ( ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
              ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
             goto param_fail4;
             
@@ -4561,7 +4559,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             /* Check for continuation if it's not the last interation */
             if ( a.nr > 0 && hypercall_preempt_check() )
             {
-                if ( copy_to_guest(arg, &a, 1) )
+                if ( __copy_to_guest(arg, &a, 1) )
                     rc = -EFAULT;
                 else
                     rc = -EAGAIN;
@@ -4598,9 +4596,8 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         rc = -EINVAL;
         if ( (a.first_pfn != ~0ull) &&
-             ((a.first_pfn > domain_get_maximum_gpfn(d)) ||
-             ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
-             ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d))) )
+             (((a.first_pfn + a.nr - 1) < a.first_pfn) ||
+              ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d))) )
             goto param_fail5;
             
         rc = p2m_set_mem_access(d, a.first_pfn, a.nr, a.hvmmem_access);
@@ -4649,7 +4646,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             goto param_fail6;
 
         a.hvmmem_access = access;
-        rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+        rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
 
     param_fail6:
         rcu_unlock_domain(d);
