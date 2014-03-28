@@ -248,19 +248,18 @@ static int __init pl011_uart_init(struct dt_device_node *dev,
         return res;
     }
 
-    uart->regs = ioremap_attr(addr, size, PAGE_HYPERVISOR_NOCACHE);
-    if ( !uart->regs )
-    {
-        early_printk("pl011: Unable to map the UART memory\n");
-
-        return -ENOMEM;
-    }
-
     res = dt_device_get_irq(dev, 0, &uart->irq);
     if ( res )
     {
         early_printk("pl011: Unable to retrieve the IRQ\n");
         return res;
+    }
+
+    uart->regs = ioremap_nocache(addr, size);
+    if ( !uart->regs )
+    {
+        early_printk("pl011: Unable to map the UART memory\n");
+        return -ENOMEM;
     }
 
     uart->vuart.base_addr = addr;

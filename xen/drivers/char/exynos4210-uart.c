@@ -334,17 +334,18 @@ static int __init exynos4210_uart_init(struct dt_device_node *dev,
         return res;
     }
 
-    uart->regs = ioremap_nocache(addr, size);
-    if ( !uart->regs )
-    {
-        early_printk("exynos4210: Unable to map the UART memory\n");
-        return -ENOMEM;
-    }
     res = dt_device_get_irq(dev, 0, &uart->irq);
     if ( res )
     {
         early_printk("exynos4210: Unable to retrieve the IRQ\n");
         return res;
+    }
+
+    uart->regs = ioremap_nocache(addr, size);
+    if ( !uart->regs )
+    {
+        early_printk("exynos4210: Unable to map the UART memory\n");
+        return -ENOMEM;
     }
 
     uart->vuart.base_addr = addr;
