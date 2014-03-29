@@ -333,7 +333,7 @@ struct frame {
 static void minios_transmit (struct nic *nic, const char *d, unsigned int t,
                              unsigned int s, const char *p)
 {
-    struct frame *frame = alloca(sizeof(frame) + s);
+    struct frame *frame = alloca(sizeof(*frame) + s);
 
     memcpy(frame->dest, d, ETH_ALEN);
     memcpy(frame->src, nic->node_addr, ETH_ALEN);
