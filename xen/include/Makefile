@@ -76,10 +76,10 @@ compat/.xlat/%.h: compat/%.h compat/.xlat/%.lst $(BASEDIR)/tools/get-fields.sh M
 .PRECIOUS: compat/.xlat/%.lst
 compat/.xlat/%.lst: xlat.lst Makefile
 	mkdir -p $(@D)
-	grep -v '^[ \t]*#' $< | sed -ne 's,@arch@,$(compat-arch-y),g' -e 's,[ \t]\+$*\.h[ \t]*$$,,p' >$@.new
+	grep -v '^[[:blank:]]*#' $< | sed -ne 's,@arch@,$(compat-arch-y),g' -re 's,[[:blank:]]+$*\.h[[:blank:]]*$$,,p' >$@.new
 	$(call move-if-changed,$@.new,$@)
 
-xlat-y := $(shell sed -ne 's,@arch@,$(compat-arch-y),g' -e 's,^[?!][ \t]\+[^ \t]\+[ \t]\+,,p' xlat.lst | uniq)
+xlat-y := $(shell sed -ne 's,@arch@,$(compat-arch-y),g' -re 's,^[?!][[:blank:]]+[^[:blank:]]+[[:blank:]]+,,p' xlat.lst | uniq)
 xlat-y := $(filter $(patsubst compat/%,%,$(headers-y)),$(xlat-y))
 
 compat/xlat.h: $(addprefix compat/.xlat/,$(xlat-y)) Makefile
