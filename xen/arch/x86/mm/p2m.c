@@ -422,14 +422,13 @@ int p2m_alloc_table(struct p2m_domain *p2m)
         goto error;
     p2m->defer_nested_flush = 0;
 
-    P2M_PRINTK("p2m table initialised (%u pages)\n", page_count);
+    P2M_PRINTK("p2m table initialised for slot zero\n");
     p2m_unlock(p2m);
     return 0;
 
     spin_unlock(&p2m->domain->page_alloc_lock);
  error:
-    P2M_PRINTK("failed to initialize p2m table, gfn=%05lx, mfn=%"
-               PRI_mfn "\n", gfn, mfn_x(mfn));
+    P2M_PRINTK("failed to initialise p2m table for slot zero\n");
     p2m_unlock(p2m);
     return -ENOMEM;
 }
