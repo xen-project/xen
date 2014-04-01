@@ -201,6 +201,32 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
     return rc;
 }
 
+static unsigned long timer_mode(const libxl_domain_build_info *info)
+{
+    const libxl_timer_mode mode = info->u.hvm.timer_mode;
+    assert(mode >= LIBXL_TIMER_MODE_DELAY_FOR_MISSED_TICKS &&
+           mode <= LIBXL_TIMER_MODE_ONE_MISSED_TICK_PENDING);
+    return ((unsigned long)mode);
+}
+
+static void hvm_set_conf_params(xc_interface *handle, uint32_t domid,
+                                libxl_domain_build_info *const info)
+{
+    xc_set_hvm_param(handle, domid, HVM_PARAM_PAE_ENABLED,
+                    libxl_defbool_val(info->u.hvm.pae));
+#if defined(__i386__) || defined(__x86_64__)
+    xc_set_hvm_param(handle, domid, HVM_PARAM_VIRIDIAN,
+                    libxl_defbool_val(info->u.hvm.viridian));
+    xc_set_hvm_param(handle, domid, HVM_PARAM_HPET_ENABLED,
+                    libxl_defbool_val(info->u.hvm.hpet));
+#endif
+    xc_set_hvm_param(handle, domid, HVM_PARAM_TIMER_MODE, timer_mode(info));
+    xc_set_hvm_param(handle, domid, HVM_PARAM_VPT_ALIGN,
+                    libxl_defbool_val(info->u.hvm.vpt_align));
+    xc_set_hvm_param(handle, domid, HVM_PARAM_NESTEDHVM,
+                    libxl_defbool_val(info->u.hvm.nested_hvm));
+}
+
 int libxl__build_pre(libxl__gc *gc, uint32_t domid,
               libxl_domain_config *d_config, libxl__domain_build_state *state)
 {
@@ -254,6 +280,9 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     state->store_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->store_domid);
     state->console_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->console_domid);
     state->vm_generationid_addr = 0;
+
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM)
+        hvm_set_conf_params(ctx->xch, domid, info);
 
     rc = libxl__arch_domain_create(gc, d_config, domid);
 
@@ -449,13 +478,6 @@ out:
     return ret == 0 ? 0 : ERROR_FAIL;
 }
 
-static unsigned long timer_mode(const libxl_domain_build_info *info)
-{
-    const libxl_timer_mode mode = info->u.hvm.timer_mode;
-    assert(mode >= LIBXL_TIMER_MODE_DELAY_FOR_MISSED_TICKS &&
-           mode <= LIBXL_TIMER_MODE_ONE_MISSED_TICK_PENDING);
-    return ((unsigned long)mode);
-}
 static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
                                 libxl_domain_build_info *info,
                                 int store_evtchn, unsigned long *store_mfn,
@@ -484,19 +506,6 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
 
     xc_get_hvm_param(handle, domid, HVM_PARAM_STORE_PFN, store_mfn);
     xc_get_hvm_param(handle, domid, HVM_PARAM_CONSOLE_PFN, console_mfn);
-    xc_set_hvm_param(handle, domid, HVM_PARAM_PAE_ENABLED,
-                     libxl_defbool_val(info->u.hvm.pae));
-#if defined(__i386__) || defined(__x86_64__)
-    xc_set_hvm_param(handle, domid, HVM_PARAM_VIRIDIAN,
-                     libxl_defbool_val(info->u.hvm.viridian));
-    xc_set_hvm_param(handle, domid, HVM_PARAM_HPET_ENABLED,
-                     libxl_defbool_val(info->u.hvm.hpet));
-#endif
-    xc_set_hvm_param(handle, domid, HVM_PARAM_TIMER_MODE, timer_mode(info));
-    xc_set_hvm_param(handle, domid, HVM_PARAM_VPT_ALIGN,
-                     libxl_defbool_val(info->u.hvm.vpt_align));
-    xc_set_hvm_param(handle, domid, HVM_PARAM_NESTEDHVM,
-                     libxl_defbool_val(info->u.hvm.nested_hvm));
     xc_set_hvm_param(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);
     xc_set_hvm_param(handle, domid, HVM_PARAM_CONSOLE_EVTCHN, console_evtchn);
 
