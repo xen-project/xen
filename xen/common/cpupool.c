@@ -307,7 +307,7 @@ out:
  * - last cpu and still active domains in cpupool
  * - cpu just being unplugged
  */
-int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
+static int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
 {
     int work_cpu;
     int ret;
