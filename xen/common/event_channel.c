@@ -59,7 +59,7 @@
  * with a pointer, we stash them dynamically in a small lookup array which
  * can be indexed by a small integer.
  */
-static xen_event_channel_notification_t xen_consumers[8];
+static xen_event_channel_notification_t xen_consumers[NR_XEN_CONSUMERS];
 
 /* Default notification action: wake up from wait_on_xen_event_channel(). */
 static void default_xen_notification_fn(struct vcpu *v, unsigned int port)
