@@ -1350,13 +1350,13 @@ void p2m_mem_access_resume(struct domain *d)
 /* Set access type for a region of pfns.
  * If start_pfn == -1ul, sets the default access type */
 long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
-                        hvmmem_access_t access)
+                        uint32_t start, uint32_t mask, hvmmem_access_t access)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_access_t a, _a;
     p2m_type_t t;
     mfn_t mfn;
-    long rc;
+    long rc = 0;
 
     /* N.B. _not_ static: initializer depends on p2m->default_access */
     p2m_access_t memaccess[] = {
@@ -1385,11 +1385,8 @@ long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
         return 0;
     }
 
-    if ( !nr )
-        return 0;
-
     p2m_lock(p2m);
-    for ( ; ; ++pfn )
+    for ( pfn += start; nr > start; ++pfn )
     {
         mfn = p2m->get_entry(p2m, pfn, &t, &_a, 0, NULL);
         if ( p2m->set_entry(p2m, pfn, mfn, PAGE_ORDER_4K, t, a) == 0 )
@@ -1399,9 +1396,9 @@ long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
         }
 
         /* Check for continuation if it's not the last interation. */
-        if ( !--nr || hypercall_preempt_check() )
+        if ( nr > ++start && !(start & mask) && hypercall_preempt_check() )
         {
-            rc = nr;
+            rc = start;
             break;
         }
     }

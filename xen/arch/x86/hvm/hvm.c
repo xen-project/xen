@@ -4072,13 +4072,16 @@ static int hvm_replace_event_channel(struct vcpu *v, domid_t remote_domid,
     return 0;
 }
 
+#define HVMOP_op_mask 0xff
+
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 {
     struct domain *curr_d = current->domain;
+    unsigned long start_iter = op & ~HVMOP_op_mask;
     long rc = 0;
 
-    switch ( op )
+    switch ( op &= HVMOP_op_mask )
     {
     case HVMOP_set_param:
     case HVMOP_get_param:
@@ -4408,7 +4411,8 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             goto param_fail3;
 
         rc = -EINVAL;
-        if ( ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
+        if ( a.nr < start_iter ||
+             ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
              ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
             goto param_fail3;
 
@@ -4416,9 +4420,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !paging_mode_log_dirty(d) )
             goto param_fail3;
 
-        while ( a.nr > 0 )
+        while ( a.nr > start_iter )
         {
-            unsigned long pfn = a.first_pfn;
+            unsigned long pfn = a.first_pfn + start_iter;
             struct page_info *page;
 
             page = get_page_from_gfn(d, pfn, NULL, P2M_UNSHARE);
@@ -4431,16 +4435,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 put_page(page);
             }
 
-            a.first_pfn++;
-            a.nr--;
-
             /* Check for continuation if it's not the last interation */
-            if ( a.nr > 0 && hypercall_preempt_check() )
+            if ( a.nr > ++start_iter && !(start_iter & HVMOP_op_mask) &&
+                 hypercall_preempt_check() )
             {
-                if ( __copy_to_guest(arg, &a, 1) )
-                    rc = -EFAULT;
-                else
-                    rc = -EAGAIN;
+                rc = -EAGAIN;
                 break;
             }
         }
@@ -4522,16 +4521,17 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             goto param_fail4;
 
         rc = -EINVAL;
-        if ( ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
+        if ( a.nr < start_iter ||
+             ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
              ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
             goto param_fail4;
             
         if ( a.hvmmem_type >= ARRAY_SIZE(memtype) )
             goto param_fail4;
 
-        while ( a.nr )
+        while ( a.nr > start_iter )
         {
-            unsigned long pfn = a.first_pfn;
+            unsigned long pfn = a.first_pfn + start_iter;
             p2m_type_t t;
             p2m_type_t nt;
             mfn_t mfn;
@@ -4572,16 +4572,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             }
             put_gfn(d, pfn);
 
-            a.first_pfn++;
-            a.nr--;
-
             /* Check for continuation if it's not the last interation */
-            if ( a.nr > 0 && hypercall_preempt_check() )
+            if ( a.nr > ++start_iter && !(start_iter & HVMOP_op_mask) &&
+                 hypercall_preempt_check() )
             {
-                if ( __copy_to_guest(arg, &a, 1) )
-                    rc = -EFAULT;
-                else
-                    rc = -EAGAIN;
+                rc = -EAGAIN;
                 goto param_fail4;
             }
         }
@@ -4615,19 +4610,17 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         rc = -EINVAL;
         if ( (a.first_pfn != ~0ull) &&
-             (((a.first_pfn + a.nr - 1) < a.first_pfn) ||
+             (a.nr < start_iter ||
+              ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
               ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d))) )
             goto param_fail5;
             
-        rc = p2m_set_mem_access(d, a.first_pfn, a.nr, a.hvmmem_access);
+        rc = p2m_set_mem_access(d, a.first_pfn, a.nr, start_iter,
+                                HVMOP_op_mask, a.hvmmem_access);
         if ( rc > 0 )
         {
-            a.first_pfn += a.nr - rc;
-            a.nr = rc;
-            if ( __copy_to_guest(arg, &a, 1) )
-                rc = -EFAULT;
-            else
-                rc = -EAGAIN;
+            start_iter = rc;
+            rc = -EAGAIN;
         }
 
     param_fail5:
@@ -4776,8 +4769,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
 
     if ( rc == -EAGAIN )
-        rc = hypercall_create_continuation(
-            __HYPERVISOR_hvm_op, "lh", op, arg);
+    {
+        ASSERT(!(start_iter & HVMOP_op_mask));
+        rc = hypercall_create_continuation(__HYPERVISOR_hvm_op, "lh",
+                                           op | start_iter, arg);
+    }
 
     return rc;
 }
