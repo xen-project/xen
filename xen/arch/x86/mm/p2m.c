@@ -1358,25 +1358,32 @@ long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
     mfn_t mfn;
     long rc = 0;
 
-    /* N.B. _not_ static: initializer depends on p2m->default_access */
-    p2m_access_t memaccess[] = {
-        p2m_access_n,
-        p2m_access_r,
-        p2m_access_w,
-        p2m_access_rw,
-        p2m_access_x,
-        p2m_access_rx,
-        p2m_access_wx,
-        p2m_access_rwx,
-        p2m_access_rx2rw,
-        p2m_access_n2rwx,
-        p2m->default_access,
+    static const p2m_access_t memaccess[] = {
+#define ACCESS(ac) [HVMMEM_access_##ac] = p2m_access_##ac
+        ACCESS(n),
+        ACCESS(r),
+        ACCESS(w),
+        ACCESS(rw),
+        ACCESS(x),
+        ACCESS(rx),
+        ACCESS(wx),
+        ACCESS(rwx),
+        ACCESS(rx2rw),
+        ACCESS(n2rwx),
+#undef ACCESS
     };
 
-    if ( (unsigned) access >= HVMMEM_access_default )
+    switch ( access )
+    {
+    case 0 ... ARRAY_SIZE(memaccess) - 1:
+        a = memaccess[access];
+        break;
+    case HVMMEM_access_default:
+        a = p2m->default_access;
+        break;
+    default:
         return -EINVAL;
-
-    a = memaccess[access];
+    }
 
     /* If request to set default access */
     if ( pfn == ~0ul )
