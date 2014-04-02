@@ -33,9 +33,9 @@
 static DEFINE_SPINLOCK(domctl_lock);
 DEFINE_SPINLOCK(vcpu_alloc_lock);
 
-int bitmap_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_bitmap,
-                            const unsigned long *bitmap,
-                            unsigned int nbits)
+static int bitmap_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_bitmap,
+                                   const unsigned long *bitmap,
+                                   unsigned int nbits)
 {
     unsigned int guest_bytes, copy_bytes, i;
     uint8_t zero = 0;
@@ -63,9 +63,9 @@ int bitmap_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_bitmap,
     return err;
 }
 
-int xenctl_bitmap_to_bitmap(unsigned long *bitmap,
-                            const struct xenctl_bitmap *xenctl_bitmap,
-                            unsigned int nbits)
+static int xenctl_bitmap_to_bitmap(unsigned long *bitmap,
+                                   const struct xenctl_bitmap *xenctl_bitmap,
+                                   unsigned int nbits)
 {
     unsigned int guest_bytes, copy_bytes;
     int err = 0;
@@ -118,15 +118,15 @@ int xenctl_bitmap_to_cpumask(cpumask_var_t *cpumask,
     return err;
 }
 
-int nodemask_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_nodemap,
-                              const nodemask_t *nodemask)
+static int nodemask_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_nodemap,
+                                     const nodemask_t *nodemask)
 {
     return bitmap_to_xenctl_bitmap(xenctl_nodemap, nodes_addr(*nodemask),
                                    MAX_NUMNODES);
 }
 
-int xenctl_bitmap_to_nodemask(nodemask_t *nodemask,
-                              const struct xenctl_bitmap *xenctl_nodemap)
+static int xenctl_bitmap_to_nodemask(nodemask_t *nodemask,
+                                     const struct xenctl_bitmap *xenctl_nodemap)
 {
     return xenctl_bitmap_to_bitmap(nodes_addr(*nodemask), xenctl_nodemap,
                                    MAX_NUMNODES);
