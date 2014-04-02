@@ -20,7 +20,7 @@ CFLAGS := $(filter-out -flto,$(CFLAGS))
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -fpic $< -o $@
-	$(OBJDUMP) -h $@ | sed -n '/[0-9]/{s,00*,0,g;p}' |\
+	$(OBJDUMP) -h $@ | sed -n '/[0-9]/{s,00*,0,g;p;}' |\
 		while read idx name sz rest; do \
 			case "$$name" in \
 			.data|.data.*|.rodata|.rodata.*|.bss|.bss.*) \

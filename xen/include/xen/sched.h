@@ -68,6 +68,9 @@ extern struct domain *dom0;
 #define EVTCHNS_PER_GROUP  (BUCKETS_PER_GROUP * EVTCHNS_PER_BUCKET)
 #define NR_EVTCHN_GROUPS   DIV_ROUND_UP(MAX_NR_EVTCHNS, EVTCHNS_PER_GROUP)
 
+#define XEN_CONSUMER_BITS 3
+#define NR_XEN_CONSUMERS ((1 << XEN_CONSUMER_BITS) - 1)
+
 struct evtchn
 {
 #define ECS_FREE         0 /* Channel is available for use.                  */
@@ -78,7 +81,8 @@ struct evtchn
 #define ECS_VIRQ         5 /* Channel is bound to a virtual IRQ line.        */
 #define ECS_IPI          6 /* Channel is bound to a virtual IPI line.        */
     u8  state;             /* ECS_* */
-    u8  xen_consumer;      /* Consumer in Xen, if any? (0 = send to guest) */
+    u8  xen_consumer:XEN_CONSUMER_BITS; /* Consumer in Xen if nonzero */
+    u8  pending:1;
     u16 notify_vcpu_id;    /* VCPU for local delivery notification */
     u32 port;
     union {
@@ -97,9 +101,8 @@ struct evtchn
         u16 virq;      /* state == ECS_VIRQ */
     } u;
     u8 priority;
-    u8 pending:1;
-    u16 last_vcpu_id;
     u8 last_priority;
+    u16 last_vcpu_id;
 #ifdef XSM_ENABLE
     union {
 #ifdef XSM_NEED_GENERIC_EVTCHN_SSID
