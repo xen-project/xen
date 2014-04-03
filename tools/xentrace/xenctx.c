@@ -39,6 +39,7 @@ static struct xenctx {
     int nr_stack_pages;
     int bytes_per_line;
     int lines;
+    int decode_as_ascii;
     int all_vcpus;
     int self_paused;
     xc_dominfo_t dominfo;
@@ -670,6 +671,7 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
     guest_word_t frame;
     guest_word_t word;
     guest_word_t *p;
+    guest_word_t ascii[MAX_BYTES_PER_LINE/4];
     int i;
 
     if ( width )
@@ -684,6 +686,9 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
         printf("Stack:\n");
         for (i = 1; i < xenctx.lines + 1 && stack < stack_limit; i++)
         {
+            int j = 0;
+            int k;
+
             while ( stack < stack_limit &&
                     stack < stack_pointer(ctx) + i * xenctx.bytes_per_line )
             {
@@ -691,9 +696,35 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
                 if ( !p )
                     return -1;
                 word = read_stack_word(p, width);
+                if ( xenctx.decode_as_ascii )
+                    ascii[j++] = word;
                 printf(" ");
                 print_stack_word(word, width);
                 stack += width;
+            }
+            if ( xenctx.decode_as_ascii )
+            {
+                /*
+                 * Line up ascii output if less than bytes_per_line
+                 * were printed.
+                 */
+                for (k = j; k < xenctx.bytes_per_line / width; k++)
+                    printf(" %*s", width * 2, "");
+                printf("  ");
+                for (k = 0; k < j; k++)
+                {
+                    int l;
+                    unsigned char *bytep = (unsigned char *)&ascii[k];
+
+                    for (l = 0; l < width; l++)
+                    {
+                        if (isprint(*bytep))
+                            printf("%c", *bytep);
+                        else
+                            printf(".");
+                        bytep++;
+                    }
+                }
             }
             printf("\n");
         }
@@ -868,19 +899,22 @@ static void usage(void)
            DEFAULT_LINES);
     printf("                     Can be specified as MAX.  Note: Fewer lines will be output\n");
     printf("                     if stack limit reached.\n");
+    printf("  -D, --decode-as-ascii\n");
+    printf("                     add a decode of Stack dump as ascii.\n");
 }
 
 int main(int argc, char **argv)
 {
     int ch;
     int ret;
-    static const char *sopts = "fs:hak:SCn:b:l:";
+    static const char *sopts = "fs:hak:SCn:b:l:D";
     static const struct option lopts[] = {
         {"stack-trace", 0, NULL, 'S'},
         {"symbol-table", 1, NULL, 's'},
         {"frame-pointers", 0, NULL, 'f'},
         {"kernel-start", 1, NULL, 'k'},
         {"display-stack-pages", 0, NULL, 'n'},
+        {"decode-as-ascii", 0, NULL, 'D'},
         {"bytes-per-line", 1, NULL, 'b'},
         {"lines", 1, NULL, 'l'},
         {"all", 0, NULL, 'a'},
@@ -919,6 +953,9 @@ int main(int argc, char **argv)
                         argv[0], xenctx.nr_stack_pages, optarg);
                 exit(-1);
             }
+            break;
+        case 'D':
+            xenctx.decode_as_ascii = 1;
             break;
         case 'b':
             xenctx.bytes_per_line = strtol(optarg, NULL, 0);
