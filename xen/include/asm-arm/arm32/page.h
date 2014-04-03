@@ -37,15 +37,14 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
  */
 static inline void flush_xen_text_tlb_local(void)
 {
-    register unsigned long r0 asm ("r0");
     asm volatile (
         "isb;"                        /* Ensure synchronization with previous changes to text */
-        STORE_CP32(0, TLBIALLH)       /* Flush hypervisor TLB */
-        STORE_CP32(0, ICIALLU)        /* Flush I-cache */
-        STORE_CP32(0, BPIALL)         /* Flush branch predictor */
+        CMD_CP32(TLBIALLH)            /* Flush hypervisor TLB */
+        CMD_CP32(ICIALLU)             /* Flush I-cache */
+        CMD_CP32(BPIALL)              /* Flush branch predictor */
         "dsb;"                        /* Ensure completion of TLB+BP flush */
         "isb;"
-        : : "r" (r0) /*dummy*/ : "memory");
+        : : : "memory");
 }
 
 /*
@@ -55,12 +54,11 @@ static inline void flush_xen_text_tlb_local(void)
  */
 static inline void flush_xen_data_tlb_local(void)
 {
-    register unsigned long r0 asm ("r0");
     asm volatile("dsb;" /* Ensure preceding are visible */
-                 STORE_CP32(0, TLBIALLH)
+                 CMD_CP32(TLBIALLH)
                  "dsb;" /* Ensure completion of the TLB flush */
                  "isb;"
-                 : : "r" (r0) /* dummy */: "memory");
+                 : : : "memory");
 }
 
 /* Flush TLB of local processor for address va. */

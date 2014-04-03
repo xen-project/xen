@@ -69,6 +69,10 @@ struct cpu_user_regs
 #define LOAD_CP64(r, name...)  "mrrc " __stringify(CP64(%r, %H##r, name)) ";"
 #define STORE_CP64(r, name...) "mcrr " __stringify(CP64(%r, %H##r, name)) ";"
 
+/* Issue a CP operation which takes no argument,
+ * uses r0 as a placeholder register. */
+#define CMD_CP32(name...)      "mcr " __stringify(CP32(r0, name)) ";"
+
 #ifndef __ASSEMBLY__
 
 /* C wrappers */
