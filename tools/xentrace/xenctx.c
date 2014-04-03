@@ -34,6 +34,15 @@
 #define DEFAULT_BYTES_PER_LINE 32
 #define DEFAULT_LINES 5
 
+/* Note: the order of these matter.
+ * NOT_KERNEL_ADDR must be < both KERNEL_DATA_ADDR and KERNEL_TEXT_ADDR.
+ * KERNEL_DATA_ADDR must be < KERNEL_TEXT_ADDR. */
+typedef enum type_of_addr_ {
+    NOT_KERNEL_ADDR,
+    KERNEL_DATA_ADDR,
+    KERNEL_TEXT_ADDR,
+} type_of_addr;
+
 #if defined (__i386__) || defined (__x86_64__)
 typedef unsigned long long guest_word_t;
 #define FMT_32B_WORD "%08llx"
@@ -76,6 +85,7 @@ static struct xenctx {
     int do_memory;
     int do_stack;
 #endif
+    int kernel_start_set;
     int self_paused;
     xc_dominfo_t dominfo;
 } xenctx;
@@ -87,31 +97,52 @@ struct symbol {
 } *symbol_table = NULL;
 
 guest_word_t kernel_stext, kernel_etext, kernel_sinittext, kernel_einittext, kernel_hypercallpage;
+guest_word_t kernel_text;
 
 #if defined (__i386__) || defined (__arm__)
 unsigned long long kernel_start = 0xc0000000;
+unsigned long long kernel_end = 0xffffffffULL;
 #elif defined (__x86_64__)
 unsigned long long kernel_start = 0xffffffff80000000UL;
+unsigned long long kernel_end = 0xffffffffffffffffUL;
 #elif defined (__aarch64__)
 unsigned long long kernel_start = 0xffffff8000000000UL;
+unsigned long long kernel_end = 0xffffffffffffffffULL;
 #endif
 
-static int is_kernel_text(guest_word_t addr)
+static type_of_addr kernel_addr(guest_word_t addr)
 {
-    if (symbol_table == NULL)
-        return (addr > kernel_start);
+    if ( symbol_table == NULL )
+    {
+        if ( addr > kernel_start )
+            return KERNEL_TEXT_ADDR;
+        else
+            return NOT_KERNEL_ADDR;
+    }
 
     if (addr >= kernel_stext &&
         addr <= kernel_etext)
-        return 1;
+        return KERNEL_TEXT_ADDR;
     if ( kernel_hypercallpage &&
          (addr >= kernel_hypercallpage &&
           addr <= kernel_hypercallpage + 4096) )
-        return 1;
+        return KERNEL_TEXT_ADDR;
     if (addr >= kernel_sinittext &&
         addr <= kernel_einittext)
-        return 1;
-    return 0;
+        return KERNEL_TEXT_ADDR;
+    if ( xenctx.kernel_start_set )
+    {
+        if ( addr > kernel_start )
+            return KERNEL_TEXT_ADDR;
+    } else {
+        if ( addr >= kernel_text &&
+             addr <= kernel_end )
+            return KERNEL_DATA_ADDR;
+        if ( addr >= kernel_start &&
+             addr <= kernel_end )
+            return KERNEL_TEXT_ADDR;
+    }
+    return NOT_KERNEL_ADDR;
 }
 
 #if 0
@@ -165,11 +196,11 @@ static struct symbol *lookup_symbol(guest_word_t address)
     return s->next && s->next->address <= address ? s->next : s;
 }
 
-static void print_symbol(guest_word_t addr)
+static void print_symbol(guest_word_t addr, type_of_addr type)
 {
     struct symbol *s;
 
-    if (!is_kernel_text(addr))
+    if ( kernel_addr(addr) < type )
         return;
 
     s = lookup_symbol(addr);
@@ -249,6 +280,10 @@ static void read_symbol_table(const char *symtab)
             kernel_stext = address;
         else if (strcmp(p, "_etext") == 0)
             kernel_etext = address;
+        else if ( strcmp(p, "_text") == 0 )
+            kernel_text = address;
+        else if ( strcmp(p, "_end") == 0 || strcmp(p, "__bss_stop") == 0 )
+            kernel_end = address;
         else if (strcmp(p, "_sinittext") == 0)
             kernel_sinittext = address;
         else if (strcmp(p, "_einittext") == 0)
@@ -320,7 +355,7 @@ static void print_ctx_32(vcpu_guest_context_x86_32_t *ctx)
     struct cpu_user_regs_x86_32 *regs = &ctx->user_regs;
 
     printf("cs:eip: %04x:%08x", regs->cs, regs->eip);
-    print_symbol(regs->eip);
+    print_symbol(regs->eip, KERNEL_TEXT_ADDR);
     print_flags(regs->eflags);
     printf("ss:esp: %04x:%08x\n", regs->ss, regs->esp);
 
@@ -349,7 +384,7 @@ static void print_ctx_32on64(vcpu_guest_context_x86_64_t *ctx)
     struct cpu_user_regs_x86_64 *regs = &ctx->user_regs;
 
     printf("cs:eip: %04x:%08x", regs->cs, (uint32_t)regs->eip);
-    print_symbol((uint32_t)regs->eip);
+    print_symbol((uint32_t)regs->eip, KERNEL_TEXT_ADDR);
     print_flags((uint32_t)regs->eflags);
     printf("ss:esp: %04x:%08x\n", regs->ss, (uint32_t)regs->esp);
 
@@ -378,7 +413,7 @@ static void print_ctx_64(vcpu_guest_context_x86_64_t *ctx)
     struct cpu_user_regs_x86_64 *regs = &ctx->user_regs;
 
     printf("rip: %016"PRIx64, regs->rip);
-    print_symbol(regs->rip);
+    print_symbol(regs->rip, KERNEL_TEXT_ADDR);
     print_flags(regs->rflags);
     printf("rsp: %016"PRIx64"\n", regs->rsp);
 
@@ -476,7 +511,7 @@ static void print_ctx_32(vcpu_guest_context_t *ctx)
     vcpu_guest_core_regs_t *regs = &ctx->user_regs;
 
     printf("PC:       %08"PRIx32, regs->pc32);
-    print_symbol(regs->pc32);
+    print_symbol(regs->pc32, KERNEL_TEXT_ADDR);
     printf("\n");
     printf("CPSR:     %08"PRIx32"\n", regs->cpsr);
     printf("USR:               SP:%08"PRIx32" LR:%08"PRIx32"\n",
@@ -528,7 +563,7 @@ static void print_ctx_64(vcpu_guest_context_t *ctx)
     vcpu_guest_core_regs_t *regs = &ctx->user_regs;
 
     printf("PC:       %016"PRIx64, regs->pc64);
-    print_symbol(regs->pc64);
+    print_symbol(regs->pc64, KERNEL_TEXT_ADDR);
     printf("\n");
 
     printf("LR:       %016"PRIx64"\n", regs->x30);
@@ -817,7 +852,7 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width,
         print_stack_word(instr_pointer(ctx), width);
         printf(">]");
 
-        print_symbol(instr_pointer(ctx));
+        print_symbol(instr_pointer(ctx), KERNEL_TEXT_ADDR);
         printf(" <--\n");
     }
     if (xenctx.frame_ptrs) {
@@ -860,7 +895,7 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width,
                 printf("%c [<", xenctx.stack_trace ? '|' : ' ');
                 print_stack_word(word, width);
                 printf(">]");
-                print_symbol(word);
+                print_symbol(word, KERNEL_TEXT_ADDR);
                 printf("\n");
                 stack += width;
             }
@@ -872,12 +907,13 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width,
             if (!p)
                 return -1;
             word = read_mem_word(ctx, vcpu, stack, width);
-            if (is_kernel_text(word)) {
+            if ( kernel_addr(word) >= KERNEL_TEXT_ADDR )
+            {
                 print_stack_addr(stack, width);
                 printf("  [<");
                 print_stack_word(word, width);
                 printf(">]");
-                print_symbol(word);
+                print_symbol(word, KERNEL_TEXT_ADDR);
                 printf("\n");
             } else if (xenctx.stack_trace) {
                 print_stack_addr(stack, width);
@@ -944,7 +980,7 @@ static void dump_ctx(int vcpu)
 #ifndef NO_TRANSLATION
     if (print_code(&ctx, vcpu))
         return;
-    if (is_kernel_text(instr_pointer(&ctx)))
+    if ( kernel_addr(instr_pointer(&ctx)) >= KERNEL_TEXT_ADDR )
         if ( print_stack(&ctx, vcpu, guest_word_size,
                          stack_pointer(&ctx)) )
             return;
@@ -1108,6 +1144,7 @@ int main(int argc, char **argv)
             break;
         case 'k':
             kernel_start = strtoull(optarg, NULL, 0);
+            xenctx.kernel_start_set = 1;
             break;
 #ifndef NO_TRANSLATION
         case 'm':
