@@ -44,6 +44,8 @@ typedef enum type_of_addr_ {
 } type_of_addr;
 
 #if defined (__i386__) || defined (__x86_64__)
+static const uint64_t cr_reg_mask[5] = { [2] = ~UINT64_C(0) };
+static const uint64_t dr_reg_mask[8] = { [0 ... 3] = ~UINT64_C(0) };
 typedef unsigned long long guest_word_t;
 #define FMT_32B_WORD "%08llx"
 #define FMT_64B_WORD "%016llx"
@@ -336,17 +338,29 @@ static void print_flags(uint64_t flags)
     printf("\n");
 }
 
-static void print_special(void *regs, const char *name, unsigned int mask, int width)
+static void print_special(void *regs, const char *name, unsigned int mask,
+                          const uint64_t reg_is_addr_mask[], int width)
 {
     unsigned int i;
 
     printf("\n");
     for (i = 0; mask; mask >>= 1, ++i)
         if (mask & 1) {
-            if (width == 4)
-                printf("%s%u: %08"PRIx32"\n", name, i, ((uint32_t *) regs)[i]);
+            if ( width == 4 )
+            {
+                printf("%s%u: %08"PRIx32, name, i, ((uint32_t *) regs)[i]);
+                if ( reg_is_addr_mask[i] )
+                    print_symbol(reg_is_addr_mask[i] & ((uint32_t *) regs)[i],
+                                 KERNEL_DATA_ADDR);
+            }
             else
-                printf("%s%u: %08"PRIx64"\n", name, i, ((uint64_t *) regs)[i]);
+            {
+                printf("%s%u: %016"PRIx64, name, i, ((uint64_t *) regs)[i]);
+                if ( reg_is_addr_mask[i] )
+                    print_symbol(reg_is_addr_mask[i] & ((uint64_t *) regs)[i],
+                                 KERNEL_DATA_ADDR);
+            }
+            printf("\n");
         }
 }
 
@@ -374,8 +388,8 @@ static void print_ctx_32(vcpu_guest_context_x86_32_t *ctx)
     printf(" gs:     %04x\n", regs->gs);
 
     if (xenctx.disp_all) {
-        print_special(ctx->ctrlreg, "cr", 0x1d, 4);
-        print_special(ctx->debugreg, "dr", 0xcf, 4);
+        print_special(ctx->ctrlreg, "cr", 0x1d, cr_reg_mask, 4);
+        print_special(ctx->debugreg, "dr", 0xcf, dr_reg_mask, 4);
     }
 }
 
@@ -403,8 +417,8 @@ static void print_ctx_32on64(vcpu_guest_context_x86_64_t *ctx)
     printf(" gs:     %04x\n", regs->gs);
 
     if (xenctx.disp_all) {
-        print_special(ctx->ctrlreg, "cr", 0x1d, 4);
-        print_special(ctx->debugreg, "dr", 0xcf, 4);
+        print_special(ctx->ctrlreg, "cr", 0x1d, cr_reg_mask, 4);
+        print_special(ctx->debugreg, "dr", 0xcf, dr_reg_mask, 4);
     }
 }
 
@@ -442,13 +456,22 @@ static void print_ctx_64(vcpu_guest_context_x86_64_t *ctx)
     printf(" ds: %04x\t", regs->ds);
     printf(" es: %04x\n", regs->es);
 
-    printf(" fs: %04x @ %016"PRIx64"\n", regs->fs, ctx->fs_base);
-    printf(" gs: %04x @ %016"PRIx64"/%016"PRIx64"\n", regs->gs,
+    printf(" fs: %04x @ %016"PRIx64, regs->fs, ctx->fs_base);
+    print_symbol(ctx->fs_base, KERNEL_DATA_ADDR);
+    printf("\n");
+    printf(" gs: %04x @ %016"PRIx64"/%016"PRIx64, regs->gs,
            ctx->gs_base_kernel, ctx->gs_base_user);
+    if ( symbol_table )
+    {
+        print_symbol(ctx->gs_base_kernel, KERNEL_DATA_ADDR);
+        printf("/");
+        print_symbol(ctx->gs_base_user, KERNEL_DATA_ADDR);
+    }
+    printf("\n");
 
     if (xenctx.disp_all) {
-        print_special(ctx->ctrlreg, "cr", 0x1d, 8);
-        print_special(ctx->debugreg, "dr", 0xcf, 8);
+        print_special(ctx->ctrlreg, "cr", 0x1d, cr_reg_mask, 8);
+        print_special(ctx->debugreg, "dr", 0xcf, dr_reg_mask, 8);
     }
 }
 
