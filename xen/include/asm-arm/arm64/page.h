@@ -55,23 +55,10 @@ static inline void flush_xen_data_tlb_local(void)
         : : : "memory");
 }
 
-/*
- * Flush a range of VA's hypervisor mappings from the data TLB of the
- * local processor. This is not sufficient when changing code mappings
- * or for self modifying code.
- */
-static inline void flush_xen_data_tlb_range_va_local(unsigned long va,
-                                                     unsigned long size)
+/* Flush TLB of local processor for address va. */
+static inline void  __flush_xen_data_tlb_one_local(vaddr_t va)
 {
-    unsigned long end = va + size;
-    dsb(sy); /* Ensure preceding are visible */
-    while ( va < end ) {
-        asm volatile("tlbi vae2, %0;"
-                     : : "r" (va>>PAGE_SHIFT) : "memory");
-        va += PAGE_SIZE;
-    }
-    dsb(sy); /* Ensure completion of the TLB flush */
-    isb();
+    asm volatile("tlbi vae2, %0;" : : "r" (va>>PAGE_SHIFT) : "memory");
 }
 
 /* Ask the MMU to translate a VA for us */
