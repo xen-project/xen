@@ -498,7 +498,12 @@ static guest_word_t instr_pointer(vcpu_guest_context_any_t *ctx)
             r += ctx->x32.user_regs.cs << NONPROT_MODE_SEGMENT_SHIFT;
     }
     else
+    {
         r = ctx->x64.user_regs.rip;
+
+        if ( !guest_protected_mode )
+            r += ctx->x64.user_regs.cs << NONPROT_MODE_SEGMENT_SHIFT;
+    }
 
     return r;
 }
@@ -514,7 +519,12 @@ static guest_word_t stack_pointer(vcpu_guest_context_any_t *ctx)
             r += ctx->x32.user_regs.ss << NONPROT_MODE_SEGMENT_SHIFT;
     }
     else
+    {
         r = ctx->x64.user_regs.rsp;
+
+        if ( !guest_protected_mode )
+            r += ctx->x64.user_regs.ss << NONPROT_MODE_SEGMENT_SHIFT;
+    }
 
     return r;
 }
@@ -865,6 +875,9 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width,
             return -1;
     }
 
+    if ( !guest_protected_mode )
+        return 0;
+
     if(xenctx.stack_trace)
         printf("Stack Trace:\n");
     else
@@ -1003,7 +1016,8 @@ static void dump_ctx(int vcpu)
 #ifndef NO_TRANSLATION
     if (print_code(&ctx, vcpu))
         return;
-    if ( kernel_addr(instr_pointer(&ctx)) >= KERNEL_TEXT_ADDR )
+    if ( !guest_protected_mode ||
+         kernel_addr(instr_pointer(&ctx)) >= KERNEL_TEXT_ADDR )
         if ( print_stack(&ctx, vcpu, guest_word_size,
                          stack_pointer(&ctx)) )
             return;
