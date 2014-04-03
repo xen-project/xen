@@ -35,10 +35,13 @@ static struct xenctx {
     int frame_ptrs;
     int stack_trace;
     int disp_all;
+    int nr_stack_pages;
     int all_vcpus;
     int self_paused;
     xc_dominfo_t dominfo;
 } xenctx;
+
+#define DEFAULT_NR_STACK_PAGES 1
 
 #if defined (__i386__) || defined (__x86_64__)
 typedef unsigned long long guest_word_t;
@@ -663,7 +666,8 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
     int i;
 
     stack_limit = ((stack_pointer(ctx) + XC_PAGE_SIZE)
-                   & ~((guest_word_t) XC_PAGE_SIZE - 1));
+                   & ~((guest_word_t) XC_PAGE_SIZE - 1))
+                   + (xenctx.nr_stack_pages - 1) * XC_PAGE_SIZE;
     printf("\n");
     printf("Stack:\n");
     for (i=1; i<5 && stack < stack_limit; i++) {
@@ -834,18 +838,24 @@ static void usage(void)
         kernel_start);
     printf("  -a, --all          display more registers\n");
     printf("  -C, --all-vcpus    print info for all vcpus\n");
+    printf("  -n PAGES, --display-stack-pages=PAGES\n");
+    printf("                     Display N pages from the stack pointer. (default %d)\n",
+           DEFAULT_NR_STACK_PAGES);
+    printf("                     Changes stack limit.  Note: use with caution (easy\n");
+    printf("                     to get garbage).\n");
 }
 
 int main(int argc, char **argv)
 {
     int ch;
     int ret;
-    static const char *sopts = "fs:hak:SC";
+    static const char *sopts = "fs:hak:SCn:";
     static const struct option lopts[] = {
         {"stack-trace", 0, NULL, 'S'},
         {"symbol-table", 1, NULL, 's'},
         {"frame-pointers", 0, NULL, 'f'},
         {"kernel-start", 1, NULL, 'k'},
+        {"display-stack-pages", 0, NULL, 'n'},
         {"all", 0, NULL, 'a'},
         {"all-vcpus", 0, NULL, 'C'},
         {"help", 0, NULL, 'h'},
@@ -854,6 +864,8 @@ int main(int argc, char **argv)
     const char *symbol_table = NULL;
 
     int vcpu = 0;
+
+    xenctx.nr_stack_pages = DEFAULT_NR_STACK_PAGES;
 
     while ((ch = getopt_long(argc, argv, sopts, lopts, NULL)) != -1) {
         switch(ch) {
@@ -868,6 +880,16 @@ int main(int argc, char **argv)
             break;
         case 'a':
             xenctx.disp_all = 1;
+            break;
+        case 'n':
+            xenctx.nr_stack_pages = strtol(optarg, NULL, 0);
+            if ( xenctx.nr_stack_pages < 1)
+            {
+                fprintf(stderr,
+                        "%s: Unsupported value(%d) for --display-stack-pages '%s'. Needs to be >= 1\n",
+                        argv[0], xenctx.nr_stack_pages, optarg);
+                exit(-1);
+            }
             break;
         case 'C':
             xenctx.all_vcpus = 1;
