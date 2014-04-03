@@ -1001,6 +1001,7 @@ int main(int argc, char **argv)
 {
     int ch;
     int ret;
+    const char *prog = argv[0];
     static const char *sopts = "fs:hak:SCn:b:l:Dt"
 #ifndef NO_TRANSLATION
         "m:"
@@ -1053,7 +1054,7 @@ int main(int argc, char **argv)
             {
                 fprintf(stderr,
                         "%s: Unsupported value(%d) for --display-stack-pages '%s'. Needs to be >= 1\n",
-                        argv[0], xenctx.nr_stack_pages, optarg);
+                        prog, xenctx.nr_stack_pages, optarg);
                 exit(-1);
             }
             break;
@@ -1070,7 +1071,7 @@ int main(int argc, char **argv)
             {
                 fprintf(stderr,
                         "%s: Unsupported value for --bytes-per-line '%s'. Needs to be 4 <= %d <= %d\n",
-                        argv[0], optarg, xenctx.bytes_per_line,
+                        prog, optarg, xenctx.bytes_per_line,
                         MAX_BYTES_PER_LINE);
                 exit(-1);
             }
@@ -1085,7 +1086,7 @@ int main(int argc, char **argv)
             {
                 fprintf(stderr,
                         "%s: Unsupported value(%d) for --lines '%s'. Needs to be >= 0, < %d\n",
-                        argv[0], xenctx.lines, optarg, INT_MAX);
+                        prog, xenctx.lines, optarg, INT_MAX);
                 exit(-1);
             }
             break;
@@ -1107,7 +1108,7 @@ int main(int argc, char **argv)
             usage();
             exit(-1);
         case '?':
-            fprintf(stderr, "%s --help for more options\n", argv[0]);
+            fprintf(stderr, "%s --help for more options\n", prog);
             exit(-1);
         }
     }
@@ -1125,8 +1126,17 @@ int main(int argc, char **argv)
             exit(-1);
     }
 
-    if (argc == 2)
+    if ( argc == 2 )
+    {
+        if ( xenctx.all_vcpus )
+        {
+            fprintf(stderr,
+                    "%s: both --all-vcpus and [VCPU] is not supported\n",
+                    prog);
+            exit(-1);
+        }
         vcpu = atoi(argv[1]);
+    }
 
     if (symbol_table)
         read_symbol_table(symbol_table);
