@@ -665,6 +665,12 @@ static int print_code(vcpu_guest_context_any_t *ctx, int vcpu)
     return 0;
 }
 
+static void print_stack_addr(guest_word_t addr, int width)
+{
+    print_stack_word(addr, width);
+    printf(": ");
+}
+
 static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
 {
     guest_word_t stack = stack_pointer(ctx);
@@ -741,7 +747,7 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
         printf("Stack Trace:\n");
     else
         printf("Call Trace:\n");
-    printf("%c [<", xenctx.stack_trace ? '*' : ' ');
+    printf("%*s  %c [<", width*2, "", xenctx.stack_trace ? '*' : ' ');
     print_stack_word(instr_pointer(ctx), width);
     printf(">]");
 
@@ -756,9 +762,10 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
                     p = map_page(ctx, vcpu, stack);
                     if (!p)
                         return -1;
+                    print_stack_addr(stack, width);
                     printf("|   ");
                     print_stack_word(read_stack_word(p, width), width);
-                    printf("   \n");
+                    printf("\n");
                     stack += width;
                 }
             } else {
@@ -770,6 +777,7 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
                 return -1;
             frame = read_stack_word(p, width);
             if (xenctx.stack_trace) {
+                print_stack_addr(stack, width);
                 printf("|-- ");
                 print_stack_word(read_stack_word(p, width), width);
                 printf("\n");
@@ -781,6 +789,7 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
                 if (!p)
                     return -1;
                 word = read_stack_word(p, width);
+                print_stack_addr(stack, width);
                 printf("%c [<", xenctx.stack_trace ? '|' : ' ');
                 print_stack_word(word, width);
                 printf(">]");
@@ -797,12 +806,14 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
                 return -1;
             word = read_stack_word(p, width);
             if (is_kernel_text(word)) {
+                print_stack_addr(stack, width);
                 printf("  [<");
                 print_stack_word(word, width);
                 printf(">]");
                 print_symbol(word);
                 printf("\n");
             } else if (xenctx.stack_trace) {
+                print_stack_addr(stack, width);
                 printf("    ");
                 print_stack_word(word, width);
                 printf("\n");
