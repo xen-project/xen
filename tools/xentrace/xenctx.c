@@ -57,8 +57,8 @@ typedef uint64_t guest_word_t;
 #elif defined(__aarch64__)
 #define NO_TRANSLATION
 typedef uint64_t guest_word_t;
-#define FMT_32B_WORD "%08lx"
-#define FMT_64B_WORD "%016lx"
+#define FMT_32B_WORD "%08llx"
+#define FMT_64B_WORD "%016llx"
 #endif
 
 struct symbol {
