@@ -325,6 +325,25 @@ static inline void flush_xen_data_tlb_range_va_local(unsigned long va,
     isb();
 }
 
+/*
+ * Flush a range of VA's hypervisor mappings from the data TLB of all
+ * processors in the inner-shareable domain. This is not sufficient
+ * when changing code mappings or for self modifying code.
+ */
+static inline void flush_xen_data_tlb_range_va(unsigned long va,
+                                               unsigned long size)
+{
+    unsigned long end = va + size;
+    dsb(sy); /* Ensure preceding are visible */
+    while ( va < end )
+    {
+        __flush_xen_data_tlb_one(va);
+        va += PAGE_SIZE;
+    }
+    dsb(sy); /* Ensure completion of the TLB flush */
+    isb();
+}
+
 /* Flush the dcache for an entire page. */
 void flush_page_to_ram(unsigned long mfn);
 

@@ -215,7 +215,7 @@ void set_fixmap(unsigned map, unsigned long mfn, unsigned attributes)
     pte.pt.table = 1; /* 4k mappings always have this bit set */
     pte.pt.xn = 1;
     write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
-    flush_xen_data_tlb_range_va_local(FIXMAP_ADDR(map), PAGE_SIZE);
+    flush_xen_data_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
 }
 
 /* Remove a mapping from a fixmap entry */
@@ -223,7 +223,7 @@ void clear_fixmap(unsigned map)
 {
     lpae_t pte = {0};
     write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
-    flush_xen_data_tlb_range_va_local(FIXMAP_ADDR(map), PAGE_SIZE);
+    flush_xen_data_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
 }
 
 #ifdef CONFIG_DOMAIN_PAGE
@@ -403,7 +403,7 @@ void __init remove_early_mappings(void)
 {
     lpae_t pte = {0};
     write_pte(xen_second + second_table_offset(BOOT_FDT_VIRT_START), pte);
-    flush_xen_data_tlb_range_va_local(BOOT_FDT_VIRT_START, SECOND_SIZE);
+    flush_xen_data_tlb_range_va(BOOT_FDT_VIRT_START, SECOND_SIZE);
 }
 
 extern void relocate_xen(uint64_t ttbr, void *src, void *dst, size_t len);

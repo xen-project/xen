@@ -61,6 +61,13 @@ static inline void  __flush_xen_data_tlb_one_local(vaddr_t va)
     asm volatile("tlbi vae2, %0;" : : "r" (va>>PAGE_SHIFT) : "memory");
 }
 
+/* Flush TLB of all processors in the inner-shareable domain for
+ * address va. */
+static inline void __flush_xen_data_tlb_one(vaddr_t va)
+{
+    asm volatile("tlbi vae2is, %0;" : : "r" (va>>PAGE_SHIFT) : "memory");
+}
+
 /* Ask the MMU to translate a VA for us */
 static inline uint64_t __va_to_par(vaddr_t va)
 {
