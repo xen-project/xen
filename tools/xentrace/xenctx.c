@@ -85,8 +85,9 @@ static int is_kernel_text(guest_word_t addr)
     if (addr >= kernel_stext &&
         addr <= kernel_etext)
         return 1;
-    if (addr >= kernel_hypercallpage &&
-        addr <= kernel_hypercallpage + 4096)
+    if ( kernel_hypercallpage &&
+         (addr >= kernel_hypercallpage &&
+          addr <= kernel_hypercallpage + 4096) )
         return 1;
     if (addr >= kernel_sinittext &&
         addr <= kernel_einittext)
