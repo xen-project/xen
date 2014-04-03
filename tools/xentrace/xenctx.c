@@ -1019,7 +1019,13 @@ static void dump_all_vcpus(void)
         if ( xc_vcpu_getinfo(xenctx.xc_handle, xenctx.domid, vcpu, &vinfo) )
             continue;
         if ( vinfo.online )
+        {
+            printf("vcpu%d:\n", vcpu);
             dump_ctx(vcpu);
+            printf("\n");
+        }
+        else
+            printf("vcpu%d offline\n\n", vcpu);
     }
 }
 
