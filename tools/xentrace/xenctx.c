@@ -30,22 +30,6 @@
 #include <xen/foreign/x86_64.h>
 #include <xen/hvm/save.h>
 
-static struct xenctx {
-    xc_interface *xc_handle;
-    int domid;
-    int frame_ptrs;
-    int stack_trace;
-    int disp_all;
-    int nr_stack_pages;
-    int bytes_per_line;
-    int lines;
-    int decode_as_ascii;
-    int tag_stack_dump;
-    int all_vcpus;
-    int self_paused;
-    xc_dominfo_t dominfo;
-} xenctx;
-
 #define DEFAULT_NR_STACK_PAGES 1
 #define DEFAULT_BYTES_PER_LINE 32
 #define DEFAULT_LINES 5
@@ -72,6 +56,27 @@ typedef uint64_t guest_word_t;
 #endif
 
 #define MAX_BYTES_PER_LINE 128
+
+static struct xenctx {
+    xc_interface *xc_handle;
+    int domid;
+    int frame_ptrs;
+    int stack_trace;
+    int disp_all;
+    int nr_stack_pages;
+    int bytes_per_line;
+    int lines;
+    int decode_as_ascii;
+    int tag_stack_dump;
+    int tag_call_trace;
+    int all_vcpus;
+#ifndef NO_TRANSLATION
+    guest_word_t mem_addr;
+    int do_memory;
+#endif
+    int self_paused;
+    xc_dominfo_t dominfo;
+} xenctx;
 
 struct symbol {
     guest_word_t address;
@@ -634,12 +639,121 @@ static guest_word_t read_stack_word(guest_word_t *src, int width)
     return word;
 }
 
+static guest_word_t read_mem_word(vcpu_guest_context_any_t *ctx, int vcpu,
+                                  guest_word_t virt, int width)
+{
+    if ( (virt & 7) == 0 )
+    {
+        guest_word_t *p = map_page(ctx, vcpu, virt);
+
+        if ( p )
+            return read_stack_word(p, width);
+        else
+            return -1;
+    }
+    else
+    {
+        guest_word_t word = 0;
+        char *src, *dst;
+        int i;
+
+        /* Little-endian only */
+        dst = (char *)&word;
+        for (i = 0; i < width; i++)
+        {
+            src = map_page(ctx, vcpu, virt + i);
+            if ( src )
+                *dst++ = *src;
+            else
+            {
+                guest_word_t missing = -1LL;
+
+                /* Return all ones for missing memory */
+                memcpy(dst, &missing, width - i);
+                return word;
+            }
+        }
+        return word;
+    }
+}
+
 static void print_stack_word(guest_word_t word, int width)
 {
     if (width == 4)
         printf(FMT_32B_WORD, word);
     else
         printf(FMT_64B_WORD, word);
+}
+
+static int print_lines(vcpu_guest_context_any_t *ctx, int vcpu, int width,
+                       guest_word_t mem_addr, guest_word_t mem_limit)
+{
+    guest_word_t mem_start = mem_addr;
+    guest_word_t word;
+    guest_word_t ascii[MAX_BYTES_PER_LINE/4];
+    int i;
+
+    for (i = 1; i < xenctx.lines + 1 && mem_addr < mem_limit; i++)
+    {
+        int j = 0;
+        int k;
+
+        if ( xenctx.tag_stack_dump )
+        {
+            print_stack_word(mem_addr, width);
+            printf(":");
+        }
+        while ( mem_addr < mem_limit &&
+                mem_addr < mem_start + i * xenctx.bytes_per_line )
+        {
+            void *p = map_page(ctx, vcpu, mem_addr);
+            if ( !p )
+                return -1;
+            word = read_mem_word(ctx, vcpu, mem_addr, width);
+            if ( xenctx.decode_as_ascii )
+                ascii[j++] = word;
+            printf(" ");
+            print_stack_word(word, width);
+            mem_addr += width;
+        }
+        if ( xenctx.decode_as_ascii )
+        {
+            /*
+             * Line up ascii output if less than bytes_per_line
+             * were printed.
+             */
+            for (k = j; k < xenctx.bytes_per_line / width; k++)
+                printf(" %*s", width * 2, "");
+            printf("  ");
+            for (k = 0; k < j; k++)
+            {
+                int l;
+                unsigned char *bytep = (unsigned char *)&ascii[k];
+
+                for (l = 0; l < width; l++)
+                {
+                    if (isprint(*bytep))
+                        printf("%c", *bytep);
+                    else
+                        printf(".");
+                    bytep++;
+                }
+            }
+        }
+        printf("\n");
+    }
+    printf("\n");
+    return 0;
+}
+
+static void print_mem(vcpu_guest_context_any_t *ctx, int vcpu, int width,
+                          guest_word_t mem_addr)
+{
+    printf("Memory (address ");
+    print_stack_word(mem_addr, width);
+    printf("):\n");
+    print_lines(ctx, vcpu, width, mem_addr,
+                mem_addr + xenctx.lines * xenctx.bytes_per_line);
 }
 
 static int print_code(vcpu_guest_context_any_t *ctx, int vcpu)
@@ -678,8 +792,6 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
     guest_word_t frame;
     guest_word_t word;
     guest_word_t *p;
-    guest_word_t ascii[MAX_BYTES_PER_LINE/4];
-    int i;
 
     if ( width )
         xenctx.bytes_per_line =
@@ -691,56 +803,8 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
     if ( xenctx.lines )
     {
         printf("Stack:\n");
-        for (i = 1; i < xenctx.lines + 1 && stack < stack_limit; i++)
-        {
-            int j = 0;
-            int k;
-
-            if ( xenctx.tag_stack_dump )
-            {
-                print_stack_word(stack, width);
-                printf(":");
-            }
-            while ( stack < stack_limit &&
-                    stack < stack_pointer(ctx) + i * xenctx.bytes_per_line )
-            {
-                p = map_page(ctx, vcpu, stack);
-                if ( !p )
-                    return -1;
-                word = read_stack_word(p, width);
-                if ( xenctx.decode_as_ascii )
-                    ascii[j++] = word;
-                printf(" ");
-                print_stack_word(word, width);
-                stack += width;
-            }
-            if ( xenctx.decode_as_ascii )
-            {
-                /*
-                 * Line up ascii output if less than bytes_per_line
-                 * were printed.
-                 */
-                for (k = j; k < xenctx.bytes_per_line / width; k++)
-                    printf(" %*s", width * 2, "");
-                printf("  ");
-                for (k = 0; k < j; k++)
-                {
-                    int l;
-                    unsigned char *bytep = (unsigned char *)&ascii[k];
-
-                    for (l = 0; l < width; l++)
-                    {
-                        if (isprint(*bytep))
-                            printf("%c", *bytep);
-                        else
-                            printf(".");
-                        bytep++;
-                    }
-                }
-            }
-            printf("\n");
-        }
-        printf("\n");
+        if ( print_lines(ctx, vcpu, width, stack, stack_limit) )
+            return -1;
     }
 
     if(xenctx.stack_trace)
@@ -861,6 +925,13 @@ static void dump_ctx(int vcpu)
     }
 #endif
 
+#ifndef NO_TRANSLATION
+    if ( xenctx.do_memory )
+    {
+        print_mem(&ctx, vcpu, guest_word_size, xenctx.mem_addr);
+        return;
+    }
+#endif
     print_ctx(&ctx);
 #ifndef NO_TRANSLATION
     if (print_code(&ctx, vcpu))
@@ -920,13 +991,21 @@ static void usage(void)
     printf("                     add a decode of Stack dump as ascii.\n");
     printf("  -t, --tag-stack-dump\n");
     printf("                     add address on each line of Stack dump.\n");
+#ifndef NO_TRANSLATION
+    printf("  -m maddr, --memory=maddr\n");
+    printf("                     dump memory at maddr.\n");
+#endif
 }
 
 int main(int argc, char **argv)
 {
     int ch;
     int ret;
-    static const char *sopts = "fs:hak:SCn:b:l:Dt";
+    static const char *sopts = "fs:hak:SCn:b:l:Dt"
+#ifndef NO_TRANSLATION
+        "m:"
+#endif
+        ;
     static const struct option lopts[] = {
         {"stack-trace", 0, NULL, 'S'},
         {"symbol-table", 1, NULL, 's'},
@@ -935,6 +1014,9 @@ int main(int argc, char **argv)
         {"display-stack-pages", 0, NULL, 'n'},
         {"decode-as-ascii", 0, NULL, 'D'},
         {"tag-stack-dump", 0, NULL, 't'},
+#ifndef NO_TRANSLATION
+        {"memory", 1, NULL, 'm'},
+#endif
         {"bytes-per-line", 1, NULL, 'b'},
         {"lines", 1, NULL, 'l'},
         {"all", 0, NULL, 'a'},
@@ -945,6 +1027,7 @@ int main(int argc, char **argv)
     const char *symbol_table = NULL;
 
     int vcpu = 0;
+    int do_default = 1;
 
     xenctx.bytes_per_line = DEFAULT_BYTES_PER_LINE;
     xenctx.lines = DEFAULT_LINES;
@@ -1008,10 +1091,18 @@ int main(int argc, char **argv)
             break;
         case 'C':
             xenctx.all_vcpus = 1;
+            do_default = 0;
             break;
         case 'k':
             kernel_start = strtoull(optarg, NULL, 0);
             break;
+#ifndef NO_TRANSLATION
+        case 'm':
+            xenctx.mem_addr = strtoull(optarg, NULL, 0);
+            xenctx.do_memory = 1;
+            do_default = 0;
+            break;
+#endif
         case 'h':
             usage();
             exit(-1);
@@ -1061,9 +1152,18 @@ int main(int argc, char **argv)
         xenctx.self_paused = 1;
     }
 
+#ifndef NO_TRANSLATION
+    if ( xenctx.do_memory )
+    {
+        dump_ctx(vcpu);
+        if (xenctx.all_vcpus)
+            printf("\n");
+    }
+    xenctx.do_memory = 0;
+#endif
     if (xenctx.all_vcpus)
         dump_all_vcpus();
-    else
+    if ( do_default )
         dump_ctx(vcpu);
 
     if (xenctx.self_paused) {
