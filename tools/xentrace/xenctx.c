@@ -420,8 +420,15 @@ static void print_ctx_32on64(vcpu_guest_context_x86_64_t *ctx)
     printf(" gs:     %04x\n", regs->gs);
 
     if (xenctx.disp_all) {
-        print_special(ctx->ctrlreg, "cr", 0x1d, cr_reg_mask, 4);
-        print_special(ctx->debugreg, "dr", 0xcf, dr_reg_mask, 4);
+        uint32_t tmp_regs[8];
+        int i;
+
+        for (i = 0; i < 5; i++)
+            tmp_regs[i] = ctx->ctrlreg[i];
+        print_special(tmp_regs, "cr", 0x1d, cr_reg_mask, 4);
+        for (i = 0; i < 8; i++)
+            tmp_regs[i] = ctx->debugreg[i];
+        print_special(tmp_regs, "dr", 0xcf, dr_reg_mask, 4);
     }
 }
 
