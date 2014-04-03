@@ -618,7 +618,7 @@ static void *map_page(vcpu_guest_context_any_t *ctx, int vcpu, guest_word_t virt
     mapped = xc_map_foreign_range(xenctx.xc_handle, xenctx.domid, XC_PAGE_SIZE, PROT_READ, mfn);
 
     if (mapped == NULL) {
-        fprintf(stderr, "failed to map page.\n");
+        fprintf(stderr, "\nfailed to map page for "FMT_32B_WORD".\n", virt);
         return NULL;
     }
 
