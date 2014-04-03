@@ -171,9 +171,9 @@ static void print_symbol(guest_word_t addr)
         return;
 
     if (addr==s->address)
-        printf("%s ", s->name);
+        printf(" %s", s->name);
     else
-        printf("%s+%#x ", s->name, (unsigned int)(addr - s->address));
+        printf(" %s+%#x", s->name, (unsigned int)(addr - s->address));
 }
 
 static void read_symbol_table(const char *symtab)
@@ -312,7 +312,7 @@ static void print_ctx_32(vcpu_guest_context_x86_32_t *ctx)
 {
     struct cpu_user_regs_x86_32 *regs = &ctx->user_regs;
 
-    printf("cs:eip: %04x:%08x ", regs->cs, regs->eip);
+    printf("cs:eip: %04x:%08x", regs->cs, regs->eip);
     print_symbol(regs->eip);
     print_flags(regs->eflags);
     printf("ss:esp: %04x:%08x\n", regs->ss, regs->esp);
@@ -341,7 +341,7 @@ static void print_ctx_32on64(vcpu_guest_context_x86_64_t *ctx)
 {
     struct cpu_user_regs_x86_64 *regs = &ctx->user_regs;
 
-    printf("cs:eip: %04x:%08x ", regs->cs, (uint32_t)regs->eip);
+    printf("cs:eip: %04x:%08x", regs->cs, (uint32_t)regs->eip);
     print_symbol((uint32_t)regs->eip);
     print_flags((uint32_t)regs->eflags);
     printf("ss:esp: %04x:%08x\n", regs->ss, (uint32_t)regs->esp);
@@ -370,7 +370,7 @@ static void print_ctx_64(vcpu_guest_context_x86_64_t *ctx)
 {
     struct cpu_user_regs_x86_64 *regs = &ctx->user_regs;
 
-    printf("rip: %016"PRIx64" ", regs->rip);
+    printf("rip: %016"PRIx64, regs->rip);
     print_symbol(regs->rip);
     print_flags(regs->rflags);
     printf("rsp: %016"PRIx64"\n", regs->rsp);
@@ -468,7 +468,7 @@ static void print_ctx_32(vcpu_guest_context_t *ctx)
 {
     vcpu_guest_core_regs_t *regs = &ctx->user_regs;
 
-    printf("PC:       %08"PRIx32" ", regs->pc32);
+    printf("PC:       %08"PRIx32, regs->pc32);
     print_symbol(regs->pc32);
     printf("\n");
     printf("CPSR:     %08"PRIx32"\n", regs->cpsr);
@@ -520,7 +520,7 @@ static void print_ctx_64(vcpu_guest_context_t *ctx)
 {
     vcpu_guest_core_regs_t *regs = &ctx->user_regs;
 
-    printf("PC:       %016"PRIx64" ", regs->pc64);
+    printf("PC:       %016"PRIx64, regs->pc64);
     print_symbol(regs->pc64);
     printf("\n");
 
@@ -743,7 +743,7 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
         printf("Call Trace:\n");
     printf("%c [<", xenctx.stack_trace ? '*' : ' ');
     print_stack_word(instr_pointer(ctx), width);
-    printf(">] ");
+    printf(">]");
 
     print_symbol(instr_pointer(ctx));
     printf(" <--\n");
@@ -783,7 +783,7 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
                 word = read_stack_word(p, width);
                 printf("%c [<", xenctx.stack_trace ? '|' : ' ');
                 print_stack_word(word, width);
-                printf(">] ");
+                printf(">]");
                 print_symbol(word);
                 printf("\n");
                 stack += width;
@@ -799,7 +799,7 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
             if (is_kernel_text(word)) {
                 printf("  [<");
                 print_stack_word(word, width);
-                printf(">] ");
+                printf(">]");
                 print_symbol(word);
                 printf("\n");
             } else if (xenctx.stack_trace) {
