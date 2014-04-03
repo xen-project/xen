@@ -40,6 +40,7 @@ static struct xenctx {
     int bytes_per_line;
     int lines;
     int decode_as_ascii;
+    int tag_stack_dump;
     int all_vcpus;
     int self_paused;
     xc_dominfo_t dominfo;
@@ -689,6 +690,11 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
             int j = 0;
             int k;
 
+            if ( xenctx.tag_stack_dump )
+            {
+                print_stack_word(stack, width);
+                printf(":");
+            }
             while ( stack < stack_limit &&
                     stack < stack_pointer(ctx) + i * xenctx.bytes_per_line )
             {
@@ -901,13 +907,15 @@ static void usage(void)
     printf("                     if stack limit reached.\n");
     printf("  -D, --decode-as-ascii\n");
     printf("                     add a decode of Stack dump as ascii.\n");
+    printf("  -t, --tag-stack-dump\n");
+    printf("                     add address on each line of Stack dump.\n");
 }
 
 int main(int argc, char **argv)
 {
     int ch;
     int ret;
-    static const char *sopts = "fs:hak:SCn:b:l:D";
+    static const char *sopts = "fs:hak:SCn:b:l:Dt";
     static const struct option lopts[] = {
         {"stack-trace", 0, NULL, 'S'},
         {"symbol-table", 1, NULL, 's'},
@@ -915,6 +923,7 @@ int main(int argc, char **argv)
         {"kernel-start", 1, NULL, 'k'},
         {"display-stack-pages", 0, NULL, 'n'},
         {"decode-as-ascii", 0, NULL, 'D'},
+        {"tag-stack-dump", 0, NULL, 't'},
         {"bytes-per-line", 1, NULL, 'b'},
         {"lines", 1, NULL, 'l'},
         {"all", 0, NULL, 'a'},
@@ -956,6 +965,9 @@ int main(int argc, char **argv)
             break;
         case 'D':
             xenctx.decode_as_ascii = 1;
+            break;
+        case 't':
+            xenctx.tag_stack_dump = 1;
             break;
         case 'b':
             xenctx.bytes_per_line = strtol(optarg, NULL, 0);
