@@ -72,7 +72,9 @@ static struct xenctx {
     int all_vcpus;
 #ifndef NO_TRANSLATION
     guest_word_t mem_addr;
+    guest_word_t stk_addr;
     int do_memory;
+    int do_stack;
 #endif
     int self_paused;
     xc_dominfo_t dominfo;
@@ -773,9 +775,7 @@ static int print_code(vcpu_guest_context_any_t *ctx, int vcpu)
         else
             printf("%02x ", *c);
     }
-    printf("\n");
-
-    printf("\n");
+    printf("\n\n\n");
     return 0;
 }
 
@@ -785,9 +785,10 @@ static void print_stack_addr(guest_word_t addr, int width)
     printf(": ");
 }
 
-static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
+static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width,
+                       guest_word_t stk_addr_start)
 {
-    guest_word_t stack = stack_pointer(ctx);
+    guest_word_t stack = stk_addr_start;
     guest_word_t stack_limit;
     guest_word_t frame;
     guest_word_t word;
@@ -799,7 +800,6 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
     stack_limit = ((stack_pointer(ctx) + XC_PAGE_SIZE)
                    & ~((guest_word_t) XC_PAGE_SIZE - 1))
                    + (xenctx.nr_stack_pages - 1) * XC_PAGE_SIZE;
-    printf("\n");
     if ( xenctx.lines )
     {
         printf("Stack:\n");
@@ -811,12 +811,15 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
         printf("Stack Trace:\n");
     else
         printf("Call Trace:\n");
-    printf("%*s  %c [<", width*2, "", xenctx.stack_trace ? '*' : ' ');
-    print_stack_word(instr_pointer(ctx), width);
-    printf(">]");
+    if ( !xenctx.do_stack )
+    {
+        printf("%*s  %c [<", width*2, "", xenctx.stack_trace ? '*' : ' ');
+        print_stack_word(instr_pointer(ctx), width);
+        printf(">]");
 
-    print_symbol(instr_pointer(ctx));
-    printf(" <--\n");
+        print_symbol(instr_pointer(ctx));
+        printf(" <--\n");
+    }
     if (xenctx.frame_ptrs) {
         stack = stack_pointer(ctx);
         frame = frame_pointer(ctx);
@@ -863,12 +866,12 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
             }
         }
     } else {
-        stack = stack_pointer(ctx);
+        stack = stk_addr_start;
         while(stack < stack_limit) {
             p = map_page(ctx, vcpu, stack);
             if (!p)
                 return -1;
-            word = read_stack_word(p, width);
+            word = read_mem_word(ctx, vcpu, stack, width);
             if (is_kernel_text(word)) {
                 print_stack_addr(stack, width);
                 printf("  [<");
@@ -931,13 +934,19 @@ static void dump_ctx(int vcpu)
         print_mem(&ctx, vcpu, guest_word_size, xenctx.mem_addr);
         return;
     }
+    if ( xenctx.do_stack )
+    {
+        print_stack(&ctx, vcpu, guest_word_size, xenctx.stk_addr);
+        return;
+    }
 #endif
     print_ctx(&ctx);
 #ifndef NO_TRANSLATION
     if (print_code(&ctx, vcpu))
         return;
     if (is_kernel_text(instr_pointer(&ctx)))
-        if (print_stack(&ctx, vcpu, guest_word_size))
+        if ( print_stack(&ctx, vcpu, guest_word_size,
+                         stack_pointer(&ctx)) )
             return;
 #endif
 }
@@ -994,6 +1003,8 @@ static void usage(void)
 #ifndef NO_TRANSLATION
     printf("  -m maddr, --memory=maddr\n");
     printf("                     dump memory at maddr.\n");
+    printf("  -d daddr, --dump-as-stack=daddr\n");
+    printf("                     dump memory as a stack at daddr.\n");
 #endif
 }
 
@@ -1004,7 +1015,7 @@ int main(int argc, char **argv)
     const char *prog = argv[0];
     static const char *sopts = "fs:hak:SCn:b:l:Dt"
 #ifndef NO_TRANSLATION
-        "m:"
+        "m:d:"
 #endif
         ;
     static const struct option lopts[] = {
@@ -1017,6 +1028,7 @@ int main(int argc, char **argv)
         {"tag-stack-dump", 0, NULL, 't'},
 #ifndef NO_TRANSLATION
         {"memory", 1, NULL, 'm'},
+        {"dump-as-stack", 1, NULL, 'd'},
 #endif
         {"bytes-per-line", 1, NULL, 'b'},
         {"lines", 1, NULL, 'l'},
@@ -1103,6 +1115,11 @@ int main(int argc, char **argv)
             xenctx.do_memory = 1;
             do_default = 0;
             break;
+        case 'd':
+            xenctx.stk_addr = strtoull(optarg, NULL, 0);
+            xenctx.do_stack = 1;
+            do_default = 0;
+            break;
 #endif
         case 'h':
             usage();
@@ -1119,6 +1136,16 @@ int main(int argc, char **argv)
         printf("usage: xenctx [options] <domid> <optional vcpu>\n");
         exit(-1);
     }
+
+#ifndef NO_TRANSLATION
+    if ( xenctx.frame_ptrs && xenctx.do_stack )
+    {
+        fprintf(stderr,
+                "%s: both --frame-pointers and --dump-as-stack is not supported\n",
+                prog);
+        exit(-1);
+    }
+#endif
 
     xenctx.domid = atoi(argv[0]);
     if (xenctx.domid==0) {
@@ -1166,10 +1193,17 @@ int main(int argc, char **argv)
     if ( xenctx.do_memory )
     {
         dump_ctx(vcpu);
-        if (xenctx.all_vcpus)
+        if ( xenctx.do_stack || xenctx.all_vcpus )
             printf("\n");
     }
     xenctx.do_memory = 0;
+    if ( xenctx.do_stack )
+    {
+        dump_ctx(vcpu);
+        if ( xenctx.all_vcpus )
+            printf("\n");
+    }
+    xenctx.do_stack = 0;
 #endif
     if (xenctx.all_vcpus)
         dump_all_vcpus();
