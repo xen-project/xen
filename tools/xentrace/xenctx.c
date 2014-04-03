@@ -823,15 +823,16 @@ static void usage(void)
 
     printf("options:\n");
     printf("  -f, --frame-pointers\n");
-    printf("                    assume the kernel was compiled with\n");
-    printf("                    frame pointers.\n");
+    printf("                     assume the kernel was compiled with\n");
+    printf("                     frame pointers.\n");
     printf("  -s SYMTAB, --symbol-table=SYMTAB\n");
-    printf("                    read symbol table from SYMTAB.\n");
-    printf("  -S --stack-trace  print a complete stack trace.\n");
-    printf("  -k, --kernel-start\n");
-    printf("                    set user/kernel split. (default 0xc0000000)\n");
-    printf("  -a --all          display more registers\n");
-    printf("  -C --all-vcpus    print info for all vcpus\n");
+    printf("                     read symbol table from SYMTAB.\n");
+    printf("  -S, --stack-trace  print a complete stack trace.\n");
+    printf("  -k KADDR, --kernel-start=KADDR\n");
+    printf("                     set user/kernel split. (default 0x"FMT_32B_WORD")\n",
+        kernel_start);
+    printf("  -a, --all          display more registers\n");
+    printf("  -C, --all-vcpus    print info for all vcpus\n");
 }
 
 int main(int argc, char **argv)
