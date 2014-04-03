@@ -47,6 +47,7 @@ typedef enum type_of_addr_ {
 static const uint64_t cr_reg_mask[5] = { [2] = ~UINT64_C(0) };
 static const uint64_t dr_reg_mask[8] = { [0 ... 3] = ~UINT64_C(0) };
 typedef unsigned long long guest_word_t;
+#define FMT_16B_WORD "%04llx"
 #define FMT_32B_WORD "%08llx"
 #define FMT_64B_WORD "%016llx"
 /* Word-length of the guest's own data structures */
@@ -57,11 +58,13 @@ int guest_protected_mode = 1;
 #elif defined(__arm__)
 #define NO_TRANSLATION
 typedef uint64_t guest_word_t;
+#define FMT_16B_WORD "%04llx"
 #define FMT_32B_WORD "%08llx"
 #define FMT_64B_WORD "%016llx"
 #elif defined(__aarch64__)
 #define NO_TRANSLATION
 typedef uint64_t guest_word_t;
+#define FMT_16B_WORD "%04llx"
 #define FMT_32B_WORD "%08llx"
 #define FMT_64B_WORD "%016llx"
 #endif
@@ -479,7 +482,7 @@ static void print_ctx(vcpu_guest_context_any_t *ctx)
 {
     if (ctxt_word_size == 4)
         print_ctx_32(&ctx->x32);
-    else if (guest_word_size == 4)
+    else if (guest_word_size != 8)
         print_ctx_32on64(&ctx->x64);
     else
         print_ctx_64(&ctx->x64);
@@ -749,7 +752,9 @@ static guest_word_t read_mem_word(vcpu_guest_context_any_t *ctx, int vcpu,
 
 static void print_stack_word(guest_word_t word, int width)
 {
-    if (width == 4)
+    if (width == 2)
+        printf(FMT_16B_WORD, word);
+    else if (width == 4)
         printf(FMT_32B_WORD, word);
     else
         printf(FMT_64B_WORD, word);
@@ -984,8 +989,9 @@ static void dump_ctx(int vcpu)
                 perror("xc_domain_hvm_getcontext_partial");
                 return;
             }
-            guest_word_size = (cpuctx.msr_efer & 0x400) ? 8 : 4;
             guest_protected_mode = (cpuctx.cr0 & CR0_PE);
+            guest_word_size = (cpuctx.msr_efer & 0x400) ? 8 :
+                guest_protected_mode ? 4 : 2;
             /* HVM guest context records are always host-sized */
             if (xc_version(xenctx.xc_handle, XENVER_capabilities, &xen_caps) != 0) {
                 perror("xc_version");
