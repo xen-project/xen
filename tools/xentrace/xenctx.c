@@ -23,6 +23,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <getopt.h>
+#include <limits.h>
 
 #include "xenctrl.h"
 #include <xen/foreign/x86_32.h>
@@ -36,12 +37,16 @@ static struct xenctx {
     int stack_trace;
     int disp_all;
     int nr_stack_pages;
+    int bytes_per_line;
+    int lines;
     int all_vcpus;
     int self_paused;
     xc_dominfo_t dominfo;
 } xenctx;
 
 #define DEFAULT_NR_STACK_PAGES 1
+#define DEFAULT_BYTES_PER_LINE 32
+#define DEFAULT_LINES 5
 
 #if defined (__i386__) || defined (__x86_64__)
 typedef unsigned long long guest_word_t;
@@ -63,6 +68,8 @@ typedef uint64_t guest_word_t;
 #define FMT_32B_WORD "%08llx"
 #define FMT_64B_WORD "%016llx"
 #endif
+
+#define MAX_BYTES_PER_LINE 128
 
 struct symbol {
     guest_word_t address;
@@ -665,24 +672,33 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
     guest_word_t *p;
     int i;
 
+    if ( width )
+        xenctx.bytes_per_line =
+            ((xenctx.bytes_per_line + width - 1) / width) * width;
     stack_limit = ((stack_pointer(ctx) + XC_PAGE_SIZE)
                    & ~((guest_word_t) XC_PAGE_SIZE - 1))
                    + (xenctx.nr_stack_pages - 1) * XC_PAGE_SIZE;
     printf("\n");
-    printf("Stack:\n");
-    for (i=1; i<5 && stack < stack_limit; i++) {
-        while(stack < stack_limit && stack < stack_pointer(ctx) + i*32) {
-            p = map_page(ctx, vcpu, stack);
-            if (!p)
-                return -1;
-            word = read_stack_word(p, width);
-            printf(" ");
-            print_stack_word(word, width);
-            stack += width;
+    if ( xenctx.lines )
+    {
+        printf("Stack:\n");
+        for (i = 1; i < xenctx.lines + 1 && stack < stack_limit; i++)
+        {
+            while ( stack < stack_limit &&
+                    stack < stack_pointer(ctx) + i * xenctx.bytes_per_line )
+            {
+                p = map_page(ctx, vcpu, stack);
+                if ( !p )
+                    return -1;
+                word = read_stack_word(p, width);
+                printf(" ");
+                print_stack_word(word, width);
+                stack += width;
+            }
+            printf("\n");
         }
         printf("\n");
     }
-    printf("\n");
 
     if(xenctx.stack_trace)
         printf("Stack Trace:\n");
@@ -843,19 +859,30 @@ static void usage(void)
            DEFAULT_NR_STACK_PAGES);
     printf("                     Changes stack limit.  Note: use with caution (easy\n");
     printf("                     to get garbage).\n");
+    printf("  -b <bytes>, --bytes-per-line <bytes>\n");
+    printf("                     change the number of bytes per line output for Stack.\n");
+    printf("                     (default %d) Note: rounded to native size (4 or 8 bytes).\n",
+           DEFAULT_BYTES_PER_LINE);
+    printf("  -l <lines>, --lines <lines>\n");
+    printf("                     change the number of lines output for Stack. (default %d)\n",
+           DEFAULT_LINES);
+    printf("                     Can be specified as MAX.  Note: Fewer lines will be output\n");
+    printf("                     if stack limit reached.\n");
 }
 
 int main(int argc, char **argv)
 {
     int ch;
     int ret;
-    static const char *sopts = "fs:hak:SCn:";
+    static const char *sopts = "fs:hak:SCn:b:l:";
     static const struct option lopts[] = {
         {"stack-trace", 0, NULL, 'S'},
         {"symbol-table", 1, NULL, 's'},
         {"frame-pointers", 0, NULL, 'f'},
         {"kernel-start", 1, NULL, 'k'},
         {"display-stack-pages", 0, NULL, 'n'},
+        {"bytes-per-line", 1, NULL, 'b'},
+        {"lines", 1, NULL, 'l'},
         {"all", 0, NULL, 'a'},
         {"all-vcpus", 0, NULL, 'C'},
         {"help", 0, NULL, 'h'},
@@ -865,6 +892,8 @@ int main(int argc, char **argv)
 
     int vcpu = 0;
 
+    xenctx.bytes_per_line = DEFAULT_BYTES_PER_LINE;
+    xenctx.lines = DEFAULT_LINES;
     xenctx.nr_stack_pages = DEFAULT_NR_STACK_PAGES;
 
     while ((ch = getopt_long(argc, argv, sopts, lopts, NULL)) != -1) {
@@ -888,6 +917,32 @@ int main(int argc, char **argv)
                 fprintf(stderr,
                         "%s: Unsupported value(%d) for --display-stack-pages '%s'. Needs to be >= 1\n",
                         argv[0], xenctx.nr_stack_pages, optarg);
+                exit(-1);
+            }
+            break;
+        case 'b':
+            xenctx.bytes_per_line = strtol(optarg, NULL, 0);
+            if ( xenctx.bytes_per_line < 4 ||
+                 xenctx.bytes_per_line > MAX_BYTES_PER_LINE )
+            {
+                fprintf(stderr,
+                        "%s: Unsupported value for --bytes-per-line '%s'. Needs to be 4 <= %d <= %d\n",
+                        argv[0], optarg, xenctx.bytes_per_line,
+                        MAX_BYTES_PER_LINE);
+                exit(-1);
+            }
+            break;
+        case 'l':
+            if ( !strcmp(optarg, "all") || !strcmp(optarg, "ALL") ||
+                 !strcmp(optarg, "max") || !strcmp(optarg, "MAX") )
+                xenctx.lines = INT_MAX - 1;
+            else
+                xenctx.lines = strtol(optarg, NULL, 0);
+            if ( xenctx.lines < 0 || xenctx.lines == INT_MAX)
+            {
+                fprintf(stderr,
+                        "%s: Unsupported value(%d) for --lines '%s'. Needs to be >= 0, < %d\n",
+                        argv[0], xenctx.lines, optarg, INT_MAX);
                 exit(-1);
             }
             break;
