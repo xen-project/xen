@@ -27,13 +27,15 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
 #define __clean_and_invalidate_xen_dcache_one(R) STORE_CP32(R, DCCIMVAC)
 
 /*
- * Flush all hypervisor mappings from the TLB and branch predictor.
+ * Flush all hypervisor mappings from the TLB and branch predictor of
+ * the local processor.
+ *
  * This is needed after changing Xen code mappings.
  *
  * The caller needs to issue the necessary DSB and D-cache flushes
  * before calling flush_xen_text_tlb.
  */
-static inline void flush_xen_text_tlb(void)
+static inline void flush_xen_text_tlb_local(void)
 {
     register unsigned long r0 asm ("r0");
     asm volatile (
@@ -47,10 +49,11 @@ static inline void flush_xen_text_tlb(void)
 }
 
 /*
- * Flush all hypervisor mappings from the data TLB. This is not
- * sufficient when changing code mappings or for self modifying code.
+ * Flush all hypervisor mappings from the data TLB of the local
+ * processor. This is not sufficient when changing code mappings or
+ * for self modifying code.
  */
-static inline void flush_xen_data_tlb(void)
+static inline void flush_xen_data_tlb_local(void)
 {
     register unsigned long r0 asm ("r0");
     asm volatile("dsb;" /* Ensure preceding are visible */
@@ -61,10 +64,12 @@ static inline void flush_xen_data_tlb(void)
 }
 
 /*
- * Flush a range of VA's hypervisor mappings from the data TLB. This is not
- * sufficient when changing code mappings or for self modifying code.
+ * Flush a range of VA's hypervisor mappings from the data TLB of the
+ * local processor. This is not sufficient when changing code mappings
+ * or for self modifying code.
  */
-static inline void flush_xen_data_tlb_range_va(unsigned long va, unsigned long size)
+static inline void flush_xen_data_tlb_range_va_local(unsigned long va,
+                                                     unsigned long size)
 {
     unsigned long end = va + size;
     dsb(sy); /* Ensure preceding are visible */

@@ -215,7 +215,7 @@ void set_fixmap(unsigned map, unsigned long mfn, unsigned attributes)
     pte.pt.table = 1; /* 4k mappings always have this bit set */
     pte.pt.xn = 1;
     write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
-    flush_xen_data_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
+    flush_xen_data_tlb_range_va_local(FIXMAP_ADDR(map), PAGE_SIZE);
 }
 
 /* Remove a mapping from a fixmap entry */
@@ -223,7 +223,7 @@ void clear_fixmap(unsigned map)
 {
     lpae_t pte = {0};
     write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
-    flush_xen_data_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
+    flush_xen_data_tlb_range_va_local(FIXMAP_ADDR(map), PAGE_SIZE);
 }
 
 #ifdef CONFIG_DOMAIN_PAGE
@@ -301,7 +301,7 @@ void *map_domain_page(unsigned long mfn)
      * We may not have flushed this specific subpage at map time,
      * since we only flush the 4k page not the superpage
      */
-    flush_xen_data_tlb_range_va(va, PAGE_SIZE);
+    flush_xen_data_tlb_range_va_local(va, PAGE_SIZE);
 
     return (void *)va;
 }
@@ -403,7 +403,7 @@ void __init remove_early_mappings(void)
 {
     lpae_t pte = {0};
     write_pte(xen_second + second_table_offset(BOOT_FDT_VIRT_START), pte);
-    flush_xen_data_tlb_range_va(BOOT_FDT_VIRT_START, SECOND_SIZE);
+    flush_xen_data_tlb_range_va_local(BOOT_FDT_VIRT_START, SECOND_SIZE);
 }
 
 extern void relocate_xen(uint64_t ttbr, void *src, void *dst, size_t len);
@@ -421,7 +421,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     dest_va = BOOT_RELOC_VIRT_START;
     pte = mfn_to_xen_entry(xen_paddr >> PAGE_SHIFT, WRITEALLOC);
     write_pte(xen_second + second_table_offset(dest_va), pte);
-    flush_xen_data_tlb_range_va(dest_va, SECOND_SIZE);
+    flush_xen_data_tlb_range_va_local(dest_va, SECOND_SIZE);
 
     /* Calculate virt-to-phys offset for the new location */
     phys_offset = xen_paddr - (unsigned long) _start;
@@ -473,7 +473,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     dest_va = BOOT_RELOC_VIRT_START;
     pte = mfn_to_xen_entry(xen_paddr >> PAGE_SHIFT, WRITEALLOC);
     write_pte(boot_second + second_table_offset(dest_va), pte);
-    flush_xen_data_tlb_range_va(dest_va, SECOND_SIZE);
+    flush_xen_data_tlb_range_va_local(dest_va, SECOND_SIZE);
 #ifdef CONFIG_ARM_64
     ttbr = (uintptr_t) xen_pgtable + phys_offset;
 #else
@@ -521,7 +521,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     /* From now on, no mapping may be both writable and executable. */
     WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
     /* Flush everything after setting WXN bit. */
-    flush_xen_text_tlb();
+    flush_xen_text_tlb_local();
 
 #ifdef CONFIG_ARM_32
     per_cpu(xen_pgtable, 0) = cpu0_pgtable;
@@ -594,7 +594,7 @@ void __cpuinit mmu_init_secondary_cpu(void)
 {
     /* From now on, no mapping may be both writable and executable. */
     WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
-    flush_xen_text_tlb();
+    flush_xen_text_tlb_local();
 }
 
 /* Create Xen's mappings of memory.
@@ -622,7 +622,7 @@ static void __init create_32mb_mappings(lpae_t *second,
         write_pte(p + i, pte);
         pte.pt.base += 1 << LPAE_SHIFT;
     }
-    flush_xen_data_tlb();
+    flush_xen_data_tlb_local();
 }
 
 #ifdef CONFIG_ARM_32
@@ -701,7 +701,7 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
         vaddr += FIRST_SIZE;
     }
 
-    flush_xen_data_tlb();
+    flush_xen_data_tlb_local();
 }
 #endif
 
@@ -845,7 +845,7 @@ static int create_xen_entries(enum xenmap_operation op,
                 BUG();
         }
     }
-    flush_xen_data_tlb_range_va(virt, PAGE_SIZE * nr_mfns);
+    flush_xen_data_tlb_range_va_local(virt, PAGE_SIZE * nr_mfns);
 
     rc = 0;
 
@@ -908,7 +908,7 @@ static void set_pte_flags_on_range(const char *p, unsigned long l, enum mg mg)
         }
         write_pte(xen_xenmap + i, pte);
     }
-    flush_xen_text_tlb();
+    flush_xen_text_tlb_local();
 }
 
 /* Release all __init and __initdata ranges to be reused */
