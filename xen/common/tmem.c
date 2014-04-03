@@ -1263,7 +1263,8 @@ static bool_t tmem_try_to_evict_pgp(struct tmem_page_descriptor *pgp, bool_t *ho
             return 1;
         }
 pcd_unlock:
-        write_unlock(&pcd_tree_rwlocks[firstbyte]);
+        if ( tmem_dedup_enabled() )
+            write_unlock(&pcd_tree_rwlocks[firstbyte]);
 obj_unlock:
         spin_unlock(&obj->obj_spinlock);
     }
