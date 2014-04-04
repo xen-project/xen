@@ -1845,8 +1845,6 @@ static int do_tmem_destroy_pool(uint32_t pool_id)
     struct client *client = current->domain->tmem_client;
     struct tmem_pool *pool;
 
-    if ( client->pools == NULL )
-        return 0;
     if ( pool_id >= MAX_POOLS_PER_DOMAIN )
         return 0;
     if ( (pool = client->pools[pool_id]) == NULL )
