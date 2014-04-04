@@ -18,14 +18,16 @@ struct kernel_info {
     paddr_t unassigned_mem; /* RAM not (yet) assigned to a bank */
     struct dt_mem_info mem;
 
-    paddr_t dtb_paddr;
+    /* kernel entry point */
     paddr_t entry;
 
+    /* boot blob load addresses */
+    paddr_t dtb_paddr;
     paddr_t initrd_paddr;
 
-    void *kernel_img;
-    unsigned kernel_order;
-
+    /* loader to use for this kernel */
+    void (*load)(struct kernel_info *info);
+    /* loader specific state */
     union {
         struct {
             paddr_t kernel_addr;
@@ -36,10 +38,10 @@ struct kernel_info {
         struct {
             struct elf_binary elf;
             struct elf_dom_parms parms;
+            unsigned kernel_order;
+            void *kernel_img;
         } elf;
     };
-
-    void (*load)(struct kernel_info *info);
 };
 
 int kernel_prepare(struct kernel_info *info);

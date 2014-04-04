@@ -297,7 +297,7 @@ static void kernel_elf_load(struct kernel_info *info)
     elf_load_binary(&info->elf.elf);
 
     printk("Free temporary kernel buffer\n");
-    free_xenheap_pages(info->kernel_img, info->kernel_order);
+    free_xenheap_pages(info->elf.kernel_img, info->elf.kernel_order);
 }
 
 static int kernel_try_elf_prepare(struct kernel_info *info,
@@ -307,14 +307,14 @@ static int kernel_try_elf_prepare(struct kernel_info *info,
 
     memset(&info->elf.elf, 0, sizeof(info->elf.elf));
 
-    info->kernel_order = get_order_from_bytes(size);
-    info->kernel_img = alloc_xenheap_pages(info->kernel_order, 0);
-    if ( info->kernel_img == NULL )
+    info->elf.kernel_order = get_order_from_bytes(size);
+    info->elf.kernel_img = alloc_xenheap_pages(info->elf.kernel_order, 0);
+    if ( info->elf.kernel_img == NULL )
         panic("Cannot allocate temporary buffer for kernel");
 
-    copy_from_paddr(info->kernel_img, addr, size);
+    copy_from_paddr(info->elf.kernel_img, addr, size);
 
-    if ( (rc = elf_init(&info->elf.elf, info->kernel_img, size )) != 0 )
+    if ( (rc = elf_init(&info->elf.elf, info->elf.kernel_img, size )) != 0 )
         goto err;
 #ifdef VERBOSE
     elf_set_verbose(&info->elf.elf);
@@ -353,7 +353,7 @@ err:
         printk("Xen: ELF kernel broken: %s\n",
                elf_check_broken(&info->elf.elf));
 
-    free_xenheap_pages(info->kernel_img, info->kernel_order);
+    free_xenheap_pages(info->elf.kernel_img, info->elf.kernel_order);
     return rc;
 }
 
