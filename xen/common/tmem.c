@@ -1646,8 +1646,11 @@ copy_uncompressed:
 
     if ( tmem_dedup_enabled() && !is_persistent(pool) )
     {
-        if ( pcd_associate(pgp,NULL,0) == -ENOMEM )
+        if ( pcd_associate(pgp, NULL, 0) == -ENOMEM )
+        {
+            ret = -ENOMEM;
             goto del_pgp_from_obj;
+        }
     }
 
 insert_page:
