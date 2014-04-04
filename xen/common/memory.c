@@ -63,7 +63,7 @@ static void increase_reservation(struct memop_args *a)
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
     {
-        if ( hypercall_preempt_check() )
+        if ( i != a->nr_done && hypercall_preempt_check() )
         {
             a->preempted = 1;
             goto out;
@@ -109,7 +109,7 @@ static void populate_physmap(struct memop_args *a)
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
     {
-        if ( hypercall_preempt_check() )
+        if ( i != a->nr_done && hypercall_preempt_check() )
         {
             a->preempted = 1;
             goto out;
@@ -268,7 +268,7 @@ static void decrease_reservation(struct memop_args *a)
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
     {
-        if ( hypercall_preempt_check() )
+        if ( i != a->nr_done && hypercall_preempt_check() )
         {
             a->preempted = 1;
             goto out;
@@ -398,7 +398,8 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
           i < (exch.in.nr_extents >> in_chunk_order);
           i++ )
     {
-        if ( hypercall_preempt_check() )
+        if ( i != (exch.nr_exchanged >> in_chunk_order) &&
+             hypercall_preempt_check() )
         {
             exch.nr_exchanged = i << in_chunk_order;
             rcu_unlock_domain(d);

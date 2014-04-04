@@ -375,12 +375,12 @@ static DECLARE_SOFTIRQ_TASKLET(notify_dom0_con_ring_tasklet,
 static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
 {
     char kbuf[128];
-    int kcount;
+    int kcount = 0;
     struct domain *cd = current->domain;
 
     while ( count > 0 )
     {
-        if ( hypercall_preempt_check() )
+        if ( kcount && hypercall_preempt_check() )
             return hypercall_create_continuation(
                 __HYPERVISOR_console_io, "iih",
                 CONSOLEIO_write, count, buffer);
