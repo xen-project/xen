@@ -118,12 +118,46 @@ static void place_modules(struct kernel_info *info,
     info->initrd_paddr = info->dtb_paddr + dtb_len;
 }
 
+static paddr_t kernel_zimage_place(struct kernel_info *info)
+{
+    paddr_t load_addr;
+
+#ifdef CONFIG_ARM_64
+    if ( info->type == DOMAIN_64BIT )
+        return info->mem.bank[0].start + info->zimage.text_offset;
+#endif
+
+    /*
+     * If start is zero, the zImage is position independent, in this
+     * case Documentation/arm/Booting recommends loading below 128MiB
+     * and above 32MiB. Load it as high as possible within these
+     * constraints, while also avoiding the DTB.
+     */
+    if ( info->zimage.start == 0 )
+    {
+        paddr_t load_end;
+
+        load_end = info->mem.bank[0].start + info->mem.bank[0].size;
+        load_end = MIN(info->mem.bank[0].start + MB(128), load_end);
+
+        load_addr = load_end - info->zimage.len;
+        /* Align to 2MB */
+        load_addr &= ~((2 << 20) - 1);
+    }
+    else
+        load_addr = info->zimage.start;
+
+    return load_addr;
+}
+
 static void kernel_zimage_load(struct kernel_info *info)
 {
-    paddr_t load_addr = info->zimage.load_addr;
+    paddr_t load_addr = kernel_zimage_place(info);
     paddr_t paddr = info->zimage.kernel_addr;
     paddr_t len = info->zimage.len;
     unsigned long offs;
+
+    info->entry = load_addr;
 
     place_modules(info, load_addr, load_addr + len);
 
@@ -156,10 +190,10 @@ static void kernel_zimage_load(struct kernel_info *info)
 
 #ifdef CONFIG_ARM_64
 /*
- * Check if the image is a 64-bit zImage and setup kernel_info
+ * Check if the image is a 64-bit Image.
  */
-static int kernel_try_zimage64_prepare(struct kernel_info *info,
-                                     paddr_t addr, paddr_t size)
+static int kernel_zimage64_probe(struct kernel_info *info,
+                                 paddr_t addr, paddr_t size)
 {
     /* linux/Documentation/arm64/booting.txt */
     struct {
@@ -198,12 +232,9 @@ static int kernel_try_zimage64_prepare(struct kernel_info *info,
         return -EINVAL;
 
     info->zimage.kernel_addr = addr;
-
-    info->zimage.load_addr = info->mem.bank[0].start
-        + zimage.text_offset;
     info->zimage.len = end - start;
+    info->zimage.text_offset = zimage.text_offset;
 
-    info->entry = info->zimage.load_addr;
     info->load = kernel_zimage_load;
 
     info->type = DOMAIN_64BIT;
@@ -215,8 +246,8 @@ static int kernel_try_zimage64_prepare(struct kernel_info *info,
 /*
  * Check if the image is a 32-bit zImage and setup kernel_info
  */
-static int kernel_try_zimage32_prepare(struct kernel_info *info,
-                                     paddr_t addr, paddr_t size)
+static int kernel_zimage32_probe(struct kernel_info *info,
+                                 paddr_t addr, paddr_t size)
 {
     uint32_t zimage[ZIMAGE32_HEADER_LEN/4];
     uint32_t start, end;
@@ -252,28 +283,9 @@ static int kernel_try_zimage32_prepare(struct kernel_info *info,
 
     info->zimage.kernel_addr = addr;
 
-    /*
-     * If start is zero, the zImage is position independent, in this
-     * case Documentation/arm/Booting recommends loading below 128MiB
-     * and above 32MiB. Load it as high as possible within these
-     * constraints, while also avoiding the DTB.
-     */
-    if (start == 0)
-    {
-        paddr_t load_end;
-
-        load_end = info->mem.bank[0].start + info->mem.bank[0].size;
-        load_end = MIN(info->mem.bank[0].start + MB(128), load_end);
-
-        info->zimage.load_addr = load_end - end;
-        /* Align to 2MB */
-        info->zimage.load_addr &= ~((2 << 20) - 1);
-    }
-    else
-        info->zimage.load_addr = start;
+    info->zimage.start = start;
     info->zimage.len = end - start;
 
-    info->entry = info->zimage.load_addr;
     info->load = kernel_zimage_load;
 
 #ifdef CONFIG_ARM_64
@@ -285,6 +297,12 @@ static int kernel_try_zimage32_prepare(struct kernel_info *info,
 
 static void kernel_elf_load(struct kernel_info *info)
 {
+    /*
+     * TODO: can the ELF header be used to find the physical address
+     * to load the image to?  Instead of assuming virt == phys.
+     */
+    info->entry = info->elf.parms.virt_entry;
+
     place_modules(info,
                   info->elf.parms.virt_kstart,
                   info->elf.parms.virt_kend);
@@ -300,8 +318,8 @@ static void kernel_elf_load(struct kernel_info *info)
     free_xenheap_pages(info->elf.kernel_img, info->elf.kernel_order);
 }
 
-static int kernel_try_elf_prepare(struct kernel_info *info,
-                                  paddr_t addr, paddr_t size)
+static int kernel_elf_probe(struct kernel_info *info,
+                            paddr_t addr, paddr_t size)
 {
     int rc;
 
@@ -336,11 +354,6 @@ static int kernel_try_elf_prepare(struct kernel_info *info,
     }
 #endif
 
-    /*
-     * TODO: can the ELF header be used to find the physical address
-     * to load the image to?  Instead of assuming virt == phys.
-     */
-    info->entry = info->elf.parms.virt_entry;
     info->load = kernel_elf_load;
 
     if ( elf_check_broken(&info->elf.elf) )
@@ -357,7 +370,7 @@ err:
     return rc;
 }
 
-int kernel_prepare(struct kernel_info *info)
+int kernel_probe(struct kernel_info *info)
 {
     int rc;
 
@@ -375,12 +388,12 @@ int kernel_prepare(struct kernel_info *info)
     printk("Loading kernel from boot module %d\n", MOD_KERNEL);
 
 #ifdef CONFIG_ARM_64
-    rc = kernel_try_zimage64_prepare(info, start, size);
+    rc = kernel_zimage64_probe(info, start, size);
     if (rc < 0)
 #endif
-        rc = kernel_try_zimage32_prepare(info, start, size);
+        rc = kernel_zimage32_probe(info, start, size);
     if (rc < 0)
-        rc = kernel_try_elf_prepare(info, start, size);
+        rc = kernel_elf_probe(info, start, size);
 
     return rc;
 }

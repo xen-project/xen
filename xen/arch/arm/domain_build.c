@@ -1002,15 +1002,15 @@ int construct_dom0(struct domain *d)
 
     kinfo.unassigned_mem = dom0_mem;
 
-    allocate_memory(d, &kinfo);
-
-    rc = kernel_prepare(&kinfo);
+    rc = kernel_probe(&kinfo);
     if ( rc < 0 )
         return rc;
 
 #ifdef CONFIG_ARM_64
     d->arch.type = kinfo.type;
 #endif
+
+    allocate_memory(d, &kinfo);
 
     rc = prepare_dtb(d, &kinfo);
     if ( rc < 0 )
@@ -1024,8 +1024,8 @@ int construct_dom0(struct domain *d)
     p2m_restore_state(v);
 
     /*
-     * kernel_load will determine the placement of the initrd & fdt in
-     * RAM, so call it first.
+     * kernel_load will determine the placement of the kernel as well
+     * as the initrd & fdt in RAM, so call it first.
      */
     kernel_load(&kinfo);
     /* initrd_load will fix up the fdt, so call it before dtb_load */
