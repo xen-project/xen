@@ -643,7 +643,6 @@ void hvm_domain_relinquish_resources(struct domain *d)
     rtc_deinit(d);
     if ( d->vcpu != NULL && d->vcpu[0] != NULL )
     {
-        pit_deinit(d);
         pmtimer_deinit(d);
         hpet_deinit(d);
     }
@@ -1217,7 +1216,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( v->vcpu_id == 0 )
     {
         /* NB. All these really belong in hvm_domain_initialise(). */
-        pit_init(v, cpu_khz);
         pmtimer_init(v);
         hpet_init(v);
  

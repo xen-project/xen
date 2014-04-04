@@ -175,7 +175,7 @@ void destroy_periodic_time(struct periodic_time *pt);
 int pv_pit_handler(int port, int data, int write);
 void pit_reset(struct domain *d);
 
-void pit_init(struct vcpu *v, unsigned long cpu_khz);
+void pit_init(struct domain *d, unsigned long cpu_khz);
 void pit_stop_channel0_irq(PITState * pit);
 void pit_deinit(struct domain *d);
 void rtc_init(struct domain *d);

@@ -422,10 +422,6 @@ int vcpu_initialise(struct vcpu *v)
 
         /* PV guests by default have a 100Hz ticker. */
         v->periodic_period = MILLISECS(10);
-
-        /* PV guests get an emulated PIT too for video BIOSes to use. */
-        if ( v->vcpu_id == 0 )
-            pit_init(v, cpu_khz);
     }
 
     v->arch.schedule_tail = continue_nonidle_domain;
@@ -578,6 +574,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     /* initialize default tsc behavior in case tools don't */
     tsc_set_info(d, TSC_MODE_DEFAULT, 0UL, 0, 0);
     spin_lock_init(&d->arch.vtsc_lock);
+
+    /* PV/PVH guests get an emulated PIT too for video BIOSes to use. */
+    pit_init(d, cpu_khz);
 
     return 0;
 
@@ -1979,6 +1978,8 @@ int domain_relinquish_resources(struct domain *d)
     default:
         BUG();
     }
+
+    pit_deinit(d);
 
     if ( has_hvm_container_domain(d) )
         hvm_domain_relinquish_resources(d);
