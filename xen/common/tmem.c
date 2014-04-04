@@ -829,7 +829,7 @@ static void rtn_free(struct radix_tree_node *rtn, void *arg)
 
 /************ POOL OBJECT COLLECTION MANIPULATION ROUTINES *******************/
 
-int oid_compare(struct oid *left, struct oid *right)
+static int oid_compare(struct oid *left, struct oid *right)
 {
     if ( left->oid[2] == right->oid[2] )
     {
@@ -853,12 +853,12 @@ int oid_compare(struct oid *left, struct oid *right)
         return 1;
 }
 
-void oid_set_invalid(struct oid *oidp)
+static void oid_set_invalid(struct oid *oidp)
 {
     oidp->oid[0] = oidp->oid[1] = oidp->oid[2] = -1UL;
 }
 
-unsigned oid_hash(struct oid *oidp)
+static unsigned oid_hash(struct oid *oidp)
 {
     return (tmem_hash(oidp->oid[0] ^ oidp->oid[1] ^ oidp->oid[2],
                      BITS_PER_LONG) & OBJ_HASH_BUCKETS_MASK);
