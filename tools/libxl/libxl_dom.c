@@ -407,8 +407,8 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
         LOGE(ERROR, "xc_dom_parse_image failed");
         goto out;
     }
-    if ( (ret = libxl__arch_domain_configure(gc, info, dom)) != 0 ) {
-        LOGE(ERROR, "libxl__arch_domain_configure failed");
+    if ( (ret = libxl__arch_domain_init_hw_description(gc, info, dom)) != 0 ) {
+        LOGE(ERROR, "libxl__arch_domain_init_hw_description failed");
         goto out;
     }
     if ( (ret = xc_dom_mem_init(dom, info->target_memkb / 1024)) != 0 ) {
@@ -417,6 +417,10 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
     }
     if ( (ret = xc_dom_boot_mem_init(dom)) != 0 ) {
         LOGE(ERROR, "xc_dom_boot_mem_init failed");
+        goto out;
+    }
+    if ( (ret = libxl__arch_domain_finalise_hw_description(gc, info, dom)) != 0 ) {
+        LOGE(ERROR, "libxl__arch_domain_finalise_hw_description failed");
         goto out;
     }
     if ( (ret = xc_dom_build_image(dom)) != 0 ) {

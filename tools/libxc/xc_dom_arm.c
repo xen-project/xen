@@ -249,6 +249,18 @@ int arch_setup_meminit(struct xc_dom_image *dom)
 {
     int rc;
     xen_pfn_t pfn, allocsz, i;
+    uint64_t modbase;
+
+    /* Convenient */
+    const uint64_t rambase = dom->rambase_pfn << XC_PAGE_SHIFT;
+    const uint64_t ramend = rambase + ( dom->total_pages << XC_PAGE_SHIFT );
+    const uint64_t kernend = ROUNDUP(dom->kernel_seg.vend, 21/*2MB*/);
+    const uint64_t dtb_size = dom->devicetree_blob ?
+        ROUNDUP(dom->devicetree_size, XC_PAGE_SHIFT) : 0;
+    const uint64_t ramdisk_size = dom->ramdisk_blob ?
+        ROUNDUP(dom->ramdisk_size, XC_PAGE_SHIFT) : 0;
+    const uint64_t modsize = dtb_size + ramdisk_size;
+    const uint64_t ram128mb = rambase + (128<<20);
 
     rc = set_mode(dom->xch, dom->guest_domid, dom->guest_type);
     if ( rc )
@@ -278,23 +290,49 @@ int arch_setup_meminit(struct xc_dom_image *dom)
             0, 0, &dom->p2m_host[i]);
     }
 
-    if ( dom->devicetree_blob )
+
+    /*
+     * Place boot modules at 128MB into RAM if there is enough RAM and
+     * the kernel does not overlap. Otherwise place them immediately
+     * after the kernel. If there is no space after the kernel then
+     * there is insufficient RAM and we fail.
+     */
+    if ( ramend >= ram128mb + modsize && kernend < ram128mb )
+        modbase = ram128mb;
+    else if ( ramend >= kernend + modsize )
+        modbase = kernend;
+    else
+        return -1;
+
+    DOMPRINTF("%s: placing boot modules at 0x%" PRIx64, __FUNCTION__, modbase);
+
+    /*
+     * Must map DTB *after* initrd, to satisfy order of calls to
+     * xc_dom_alloc_segment in xc_dom_build_image, which must map
+     * things at monotonolically increasing addresses.
+     */
+    if ( ramdisk_size )
     {
-        const uint64_t rambase = dom->rambase_pfn << XC_PAGE_SHIFT;
-        const uint64_t ramend = rambase + ( dom->total_pages << XC_PAGE_SHIFT );
-        const uint64_t dtbsize = ROUNDUP(dom->devicetree_size, XC_PAGE_SHIFT);
+        dom->ramdisk_seg.vstart = modbase;
+        dom->ramdisk_seg.vend = modbase + ramdisk_size;
 
-        /* Place at 128MB if there is sufficient RAM */
-        if ( ramend >= rambase + 128*1024*1024 + dtbsize )
-            dom->devicetree_seg.vstart = rambase + 128*1024*1024;
-        else /* otherwise at top of RAM */
-            dom->devicetree_seg.vstart = ramend - dtbsize;
+        DOMPRINTF("%s: ramdisk: 0x%" PRIx64 " -> 0x%" PRIx64 "",
+                  __FUNCTION__,
+                  dom->ramdisk_seg.vstart, dom->ramdisk_seg.vend);
 
-        dom->devicetree_seg.vend =
-            dom->devicetree_seg.vstart + dom->devicetree_size;
+        modbase += ramdisk_size;
+    }
+
+    if ( dtb_size )
+    {
+        dom->devicetree_seg.vstart = modbase;
+        dom->devicetree_seg.vend = modbase + dtb_size;
+
         DOMPRINTF("%s: devicetree: 0x%" PRIx64 " -> 0x%" PRIx64 "",
                   __FUNCTION__,
                   dom->devicetree_seg.vstart, dom->devicetree_seg.vend);
+
+        modbase += dtb_size;
     }
 
     return 0;
