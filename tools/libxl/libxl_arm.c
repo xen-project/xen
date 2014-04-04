@@ -2,6 +2,7 @@
 #include "libxl_arch.h"
 
 #include <xc_dom.h>
+#include <stdbool.h>
 #include <libfdt.h>
 #include <assert.h>
 
@@ -30,6 +31,9 @@ typedef be32 gic_interrupt[3];
 
 #define ROOT_ADDRESS_CELLS 2
 #define ROOT_SIZE_CELLS 2
+
+#define PROP_INITRD_START "linux,initrd-start"
+#define PROP_INITRD_END "linux,initrd-end"
 
 static void set_cell(be32 **cellp, int size, uint64_t val)
 {
@@ -155,7 +159,7 @@ static int make_root_properties(libxl__gc *gc,
     return 0;
 }
 
-static int make_chosen_node(libxl__gc *gc, void *fdt,
+static int make_chosen_node(libxl__gc *gc, void *fdt, bool ramdisk,
                             const libxl_domain_build_info *info)
 {
     int res;
@@ -166,6 +170,15 @@ static int make_chosen_node(libxl__gc *gc, void *fdt,
 
     if (info->u.pv.cmdline) {
         res = fdt_property_string(fdt, "bootargs", info->u.pv.cmdline);
+        if (res) return res;
+    }
+
+    if (ramdisk) {
+        uint64_t dummy = 0;
+        LOG(DEBUG, "/chosen adding placeholder linux,initrd properties");
+        res = fdt_property(fdt, PROP_INITRD_START, &dummy, sizeof(dummy));
+        if (res) return res;
+        res = fdt_property(fdt, PROP_INITRD_END, &dummy, sizeof(dummy));
         if (res) return res;
     }
 
@@ -412,9 +425,9 @@ out:
 
 #define FDT_MAX_SIZE (1<<20)
 
-int libxl__arch_domain_configure(libxl__gc *gc,
-                                 libxl_domain_build_info *info,
-                                 struct xc_dom_image *dom)
+int libxl__arch_domain_init_hw_description(libxl__gc *gc,
+                                           libxl_domain_build_info *info,
+                                           struct xc_dom_image *dom)
 {
     void *fdt = NULL;
     int rc, res;
@@ -475,7 +488,7 @@ next_resize:
         FDT( fdt_begin_node(fdt, "") );
 
         FDT( make_root_properties(gc, vers, fdt) );
-        FDT( make_chosen_node(gc, fdt, info) );
+        FDT( make_chosen_node(gc, fdt, !!dom->ramdisk_blob, info) );
         FDT( make_cpus_node(gc, fdt, info->max_vcpus, ainfo) );
         FDT( make_psci_node(gc, fdt) );
 
@@ -505,10 +518,49 @@ next_resize:
         goto out;
     }
 
-    debug_dump_fdt(gc, fdt);
-
     rc = 0;
 
 out:
     return rc;
+}
+
+int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
+                                               libxl_domain_build_info *info,
+                                               struct xc_dom_image *dom)
+{
+    void *fdt = dom->devicetree_blob;
+
+    const struct xc_dom_seg *ramdisk = dom->ramdisk_blob ?
+        &dom->ramdisk_seg : NULL;
+
+    if (ramdisk) {
+        int chosen, res;
+        uint64_t val;
+
+        /* Neither the fdt_path_offset() nor either of the
+         * fdt_setprop_inplace() calls can fail. If they do then
+         * make_chosen_node() (see above) has got something very
+         * wrong.
+         */
+        chosen = fdt_path_offset(fdt, "/chosen");
+        assert(chosen > 0);
+
+        LOG(DEBUG, "/chosen updating initrd properties to cover "
+            "%"PRIx64"-%"PRIx64,
+            ramdisk->vstart, ramdisk->vend);
+
+        val = cpu_to_fdt64(ramdisk->vstart);
+        res = fdt_setprop_inplace(fdt, chosen, PROP_INITRD_START,
+                                  &val, sizeof(val));
+        assert(!res);
+
+        val = cpu_to_fdt64(ramdisk->vend);
+        res = fdt_setprop_inplace(fdt, chosen,PROP_INITRD_END,
+                                  &val, sizeof(val));
+        assert(!res);
+    }
+
+    debug_dump_fdt(gc, fdt);
+
+    return 0;
 }
