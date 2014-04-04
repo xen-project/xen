@@ -182,6 +182,7 @@ static int do_kimage_alloc(struct kexec_image **rimage, paddr_t entry,
         goto out;
 
     /* Add an empty indirection page. */
+    result = -ENOMEM;
     image->entry_page = kimage_alloc_control_page(image, 0);
     if ( !image->entry_page )
         goto out;
