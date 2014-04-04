@@ -329,13 +329,6 @@ int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
 
     for ( ; ; )
     {
-        if ( hypercall_preempt_check() )
-        {
-            rc = hypercall_create_continuation(
-                __HYPERVISOR_set_trap_table, "h", traps);
-            break;
-        }
-
         if ( copy_from_guest(&cur, traps, 1) )
         {
             rc = -EFAULT;
@@ -353,6 +346,13 @@ int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
             init_int80_direct_trap(current);
 
         guest_handle_add_offset(traps, 1);
+
+        if ( hypercall_preempt_check() )
+        {
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_set_trap_table, "h", traps);
+            break;
+        }
     }
 
     return rc;

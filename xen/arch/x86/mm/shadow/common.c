@@ -1674,7 +1674,7 @@ static unsigned int sh_set_allocation(struct domain *d,
     SHADOW_PRINTK("current %i target %i\n", 
                    d->arch.paging.shadow.total_pages, pages);
 
-    while ( d->arch.paging.shadow.total_pages != pages ) 
+    for ( ; ; )
     {
         if ( d->arch.paging.shadow.total_pages < pages ) 
         {
@@ -1709,6 +1709,8 @@ static unsigned int sh_set_allocation(struct domain *d,
             d->arch.paging.shadow.total_pages--;
             free_domheap_page(sp);
         }
+        else
+            break;
 
         /* Check to see if we need to yield and try again */
         if ( preempted && hypercall_preempt_check() )

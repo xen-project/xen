@@ -3595,13 +3595,6 @@ long do_set_trap_table(XEN_GUEST_HANDLE_PARAM(const_trap_info_t) traps)
 
     for ( ; ; )
     {
-        if ( hypercall_preempt_check() )
-        {
-            rc = hypercall_create_continuation(
-                __HYPERVISOR_set_trap_table, "h", traps);
-            break;
-        }
-
         if ( copy_from_guest(&cur, traps, 1) )
         {
             rc = -EFAULT;
@@ -3622,6 +3615,13 @@ long do_set_trap_table(XEN_GUEST_HANDLE_PARAM(const_trap_info_t) traps)
             init_int80_direct_trap(curr);
 
         guest_handle_add_offset(traps, 1);
+
+        if ( hypercall_preempt_check() )
+        {
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_set_trap_table, "h", traps);
+            break;
+        }
     }
 
     return rc;
