@@ -580,6 +580,16 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
     if ( (ret = acpi_dmar_check_length(header, sizeof(*rmrr))) != 0 )
         return ret;
 
+    list_for_each_entry(rmrru, &acpi_rmrr_units, list)
+       if ( base_addr <= rmrru->end_address && rmrru->base_address <= end_addr )
+       {
+           printk(XENLOG_ERR VTDPREFIX
+                  "Overlapping RMRRs [%"PRIx64",%"PRIx64"] and [%"PRIx64",%"PRIx64"]\n",
+                  rmrru->base_address, rmrru->end_address,
+                  base_addr, end_addr);
+           return -EEXIST;
+       }
+
     /* This check is here simply to detect when RMRR values are
      * not properly represented in the system memory map and
      * inform the user
