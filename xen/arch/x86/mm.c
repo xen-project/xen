@@ -2934,7 +2934,7 @@ long do_mmuext_op(
 
     for ( i = 0; i < count; i++ )
     {
-        if ( curr->arch.old_guest_table || hypercall_preempt_check() )
+        if ( curr->arch.old_guest_table || (i && hypercall_preempt_check()) )
         {
             rc = -EAGAIN;
             break;
@@ -3481,7 +3481,7 @@ long do_mmu_update(
 
     for ( i = 0; i < count; i++ )
     {
-        if ( curr->arch.old_guest_table || hypercall_preempt_check() )
+        if ( curr->arch.old_guest_table || (i && hypercall_preempt_check()) )
         {
             rc = -EAGAIN;
             break;

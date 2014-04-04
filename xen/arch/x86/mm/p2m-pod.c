@@ -242,7 +242,8 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
 
         p2m_pod_cache_add(p2m, page, order);
 
-        if ( hypercall_preempt_check() && preemptible )
+        if ( preemptible && pod_target != p2m->pod.count &&
+             hypercall_preempt_check() )
         {
             ret = -EAGAIN;
             goto out;
@@ -286,7 +287,8 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
 
             put_page(page+i);
 
-            if ( hypercall_preempt_check() && preemptible )
+            if ( preemptible && pod_target != p2m->pod.count &&
+                 hypercall_preempt_check() )
             {
                 ret = -EAGAIN;
                 goto out;
