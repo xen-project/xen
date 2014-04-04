@@ -147,6 +147,9 @@ void __devinit early_intel_workaround(struct cpuinfo_x86 *c)
 /*
  * P4 Xeon errata 037 workaround.
  * Hardware prefetcher may cause stale data to be loaded into the cache.
+ *
+ * Xeon 7400 erratum AAI65 (and further newer Xeons)
+ * MONITOR/MWAIT may have excessive false wakeups
  */
 static void __devinit Intel_errata_workarounds(struct cpuinfo_x86 *c)
 {
@@ -161,6 +164,10 @@ static void __devinit Intel_errata_workarounds(struct cpuinfo_x86 *c)
 			wrmsr (MSR_IA32_MISC_ENABLE, lo, hi);
 		}
 	}
+
+	if (c->x86 == 6 && cpu_has_clflush &&
+	    (c->x86_model == 29 || c->x86_model == 46 || c->x86_model == 47))
+		set_bit(X86_FEATURE_CLFLUSH_MONITOR, c->x86_capability);
 }
 
 
