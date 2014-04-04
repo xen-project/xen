@@ -69,19 +69,15 @@ static void allocate_memory_11(struct domain *d, struct kernel_info *kinfo)
 {
     paddr_t start;
     paddr_t size;
-    struct page_info *pg = NULL;
+    struct page_info *pg;
     unsigned int order = get_order_from_bytes(dom0_mem);
     int res;
     paddr_t spfn;
-    unsigned int bits;
 
-    for ( bits = PAGE_SHIFT + 1; bits < PADDR_BITS; bits++ )
-    {
-        pg = alloc_domheap_pages(d, order, MEMF_bits(bits));
-        if ( pg != NULL )
-            break;
-    }
-
+    if ( is_32bit_domain(d) )
+        pg = alloc_domheap_pages(d, order, MEMF_bits(32));
+    else
+        pg = alloc_domheap_pages(d, order, 0);
     if ( !pg )
         panic("Failed to allocate contiguous memory for dom0");
 
