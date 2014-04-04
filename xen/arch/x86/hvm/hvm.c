@@ -3292,6 +3292,12 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case PHYSDEVOP_irq_status_query:
     case PHYSDEVOP_get_free_pirq:
         return do_physdev_op(cmd, arg);
+
+    /* pvh fixme: coming soon */
+    case PHYSDEVOP_pirq_eoi_gmfn_v1:
+    case PHYSDEVOP_pirq_eoi_gmfn_v2:
+        return -ENOSYS;
+
     }
 }
 
