@@ -23,7 +23,6 @@ case "$host_cpu" in
 esac
 
 AX_SUBSYSTEM_DEFAULT_ENABLE([xen])
-AX_SUBSYSTEM_DEFAULT_ENABLE([kernels])
 AX_SUBSYSTEM_DEFAULT_ENABLE([tools])
 AX_SUBSYSTEM_CONDITIONAL([stubdom], $arch_enable_stubdom)
 AX_SUBSYSTEM_DEFAULT_ENABLE([docs])

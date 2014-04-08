@@ -1,2 +1,0 @@
-LINUX_VER ?= 2.6-tip
-include buildconfigs/mk.linux-2.6

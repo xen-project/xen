@@ -592,7 +592,6 @@ SUBSYSTEMS
 docs
 stubdom
 tools
-kernels
 xen
 subdirs
 host_os
@@ -645,7 +644,6 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 enable_xen
-enable_kernels
 enable_tools
 enable_stubdom
 enable_docs
@@ -654,7 +652,6 @@ enable_docs
 host_alias
 target_alias'
 ac_subdirs_all='xen
-kernels
 tools
 stubdom
 docs'
@@ -1271,7 +1268,6 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-xen           Disable build and install of xen
-  --disable-kernels       Disable build and install of kernels
   --disable-tools         Disable build and install of tools
   --enable-stubdom        Enable build and install of stubdom
   --disable-docs          Disable build and install of docs
@@ -1883,52 +1879,6 @@ if test -e "xen/configure"; then :
 
 if test "x$xen" = "xy" || test "x$xen" = "x" ; then
     subdirs="$subdirs xen"
-
-fi
-
-fi
-
-
-
-
-# Check whether --enable-kernels was given.
-if test "${enable_kernels+set}" = set; then :
-  enableval=$enable_kernels;
-
-if test "x$enableval" = "xyes"; then :
-
-
-kernels=y
-SUBSYSTEMS="$SUBSYSTEMS kernels"
-
-
-else
-
-if test "x$enableval" = "xno"; then :
-
-
-kernels=n
-
-
-fi
-
-fi
-
-
-else
-
-
-kernels=y
-SUBSYSTEMS="$SUBSYSTEMS kernels"
-
-
-fi
-
-
-if test -e "kernels/configure"; then :
-
-if test "x$kernels" = "xy" || test "x$kernels" = "x" ; then
-    subdirs="$subdirs kernels"
 
 fi
 

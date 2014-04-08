@@ -1,2 +1,0 @@
-LINUX_VER ?= 2.6-mm
-include buildconfigs/mk.linux-2.6

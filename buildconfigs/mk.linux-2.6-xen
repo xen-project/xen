@@ -1,6 +1,0 @@
-EXTRAVERSION ?= -xen
-LINUX_VER    ?= 2.6.18
-
-XEN_LINUX_SOURCE ?= hg-clone
-
-include buildconfigs/mk.linux-2.6-common

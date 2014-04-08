@@ -1,2 +1,0 @@
-EXTRAVERSION = -xen0
-include buildconfigs/mk.linux-2.6-xen
