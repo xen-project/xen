@@ -688,14 +688,12 @@ seabios_path
 qemu_xen
 qemu_traditional
 blktap1
-xend
 debug
 seabios
 rombios
 ovmf
 xsmpolicy
 ocamltools
-xenapi
 monitors
 githttp
 FILE_OFFSET_BITS
@@ -758,14 +756,12 @@ enable_option_checking
 enable_largefile
 enable_githttp
 enable_monitors
-enable_xenapi
 enable_ocamltools
 enable_xsmpolicy
 enable_ovmf
 enable_rombios
 enable_seabios
 enable_debug
-enable_xend
 enable_blktap1
 enable_qemu_traditional
 with_system_qemu
@@ -1420,14 +1416,12 @@ Optional Features:
                           DISABLED)
   --disable-monitors      Disable xenstat and xentop monitoring tools (default
                           is ENABLED)
-  --enable-xenapi         Enable Xen API Bindings (default is DISABLED)
   --disable-ocamltools    Disable Ocaml tools (default is ENABLED)
   --disable-xsmpolicy     Disable XSM policy compilation (default is ENABLED)
   --enable-ovmf           Enable OVMF (default is DISABLED)
   --disable-rombios       Disable ROM BIOS (default is ENABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
   --disable-debug         Disable debug build of tools (default is ENABLED)
-  --enable-xend           Enable xend toolstack (default is DISABLED)
   --enable-blktap1        Enable blktap1 tools (default is DISABLED)
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is on
@@ -3586,29 +3580,6 @@ monitors=$ax_cv_monitors
 
 
 
-# Check whether --enable-xenapi was given.
-if test "${enable_xenapi+set}" = set; then :
-  enableval=$enable_xenapi;
-fi
-
-
-if test "x$enable_xenapi" = "xno"; then :
-
-    ax_cv_xenapi="n"
-
-elif test "x$enable_xenapi" = "xyes"; then :
-
-    ax_cv_xenapi="y"
-
-elif test -z $ax_cv_xenapi; then :
-
-    ax_cv_xenapi="n"
-
-fi
-xenapi=$ax_cv_xenapi
-
-
-
 # Check whether --enable-ocamltools was given.
 if test "${enable_ocamltools+set}" = set; then :
   enableval=$enable_ocamltools;
@@ -3744,29 +3715,6 @@ elif test -z $ax_cv_debug; then :
 
 fi
 debug=$ax_cv_debug
-
-
-
-# Check whether --enable-xend was given.
-if test "${enable_xend+set}" = set; then :
-  enableval=$enable_xend;
-fi
-
-
-if test "x$enable_xend" = "xno"; then :
-
-    ax_cv_xend="n"
-
-elif test "x$enable_xend" = "xyes"; then :
-
-    ax_cv_xend="y"
-
-elif test -z $ax_cv_xend; then :
-
-    ax_cv_xend="n"
-
-fi
-xend=$ax_cv_xend
 
 
 
@@ -4701,100 +4649,6 @@ fi
 if test x"${PERL}" = x"no"
 then
     as_fn_error $? "Unable to find perl, please install perl" "$LINENO" 5
-fi
-if test "x$xenapi" = "xy"; then :
-
-    # Extract the first word of "curl-config", so it can be a program name with args.
-set dummy curl-config; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_CURL+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $CURL in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_CURL="$CURL" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_path_CURL="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_CURL" && ac_cv_path_CURL="no"
-  ;;
-esac
-fi
-CURL=$ac_cv_path_CURL
-if test -n "$CURL"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $CURL" >&5
-$as_echo "$CURL" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-if test x"${CURL}" = x"no"
-then
-    as_fn_error $? "Unable to find curl-config, please install curl-config" "$LINENO" 5
-fi
-    # Extract the first word of "xml2-config", so it can be a program name with args.
-set dummy xml2-config; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_XML+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $XML in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_XML="$XML" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_path_XML="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_XML" && ac_cv_path_XML="no"
-  ;;
-esac
-fi
-XML=$ac_cv_path_XML
-if test -n "$XML"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $XML" >&5
-$as_echo "$XML" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-if test x"${XML}" = x"no"
-then
-    as_fn_error $? "Unable to find xml2-config, please install xml2-config" "$LINENO" 5
-fi
-
 fi
 for ac_prog in gawk mawk nawk awk
 do
@@ -9480,25 +9334,3 @@ $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
 
-if test "x$xend" = "xy" ; then :
-
-    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: You have enabled the xend toolstack.
-
-xend is deprecated and scheduled for removal. Please migrate to another
-toolstack ASAP.
-
-See http://wiki.xen.org/wiki/Choice_of_Toolstacks for information on
-other alternatives, including xl which is designed to be a drop in
-replacement for xm (http://wiki.xen.org/wiki/XL).
-" >&5
-$as_echo "$as_me: WARNING: You have enabled the xend toolstack.
-
-xend is deprecated and scheduled for removal. Please migrate to another
-toolstack ASAP.
-
-See http://wiki.xen.org/wiki/Choice_of_Toolstacks for information on
-other alternatives, including xl which is designed to be a drop in
-replacement for xm (http://wiki.xen.org/wiki/XL).
-" >&2;}
-
-fi

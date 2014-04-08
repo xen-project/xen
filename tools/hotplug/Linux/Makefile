@@ -2,7 +2,6 @@ XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 # Init scripts.
-XEND_INITD = init.d/xend
 XENDOMAINS_INITD = init.d/xendomains
 XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 
@@ -30,7 +29,6 @@ XEN_SCRIPT_DATA += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
 XEN_SCRIPT_DATA += block-common.sh
 
 UDEV_RULES_DIR = $(CONFIG_DIR)/udev
-UDEV_RULES-$(CONFIG_XEND) = xend.rules
 UDEV_RULES = xen-backend.rules $(UDEV_RULES-y)
 
 .PHONY: all
@@ -47,9 +45,6 @@ install: all install-initd install-scripts install-udev
 install-initd:
 	[ -d $(DESTDIR)$(INITD_DIR) ] || $(INSTALL_DIR) $(DESTDIR)$(INITD_DIR)
 	[ -d $(DESTDIR)$(SYSCONFIG_DIR) ] || $(INSTALL_DIR) $(DESTDIR)$(SYSCONFIG_DIR)
-ifeq ($(CONFIG_XEND),y)
-	$(INSTALL_PROG) $(XEND_INITD) $(DESTDIR)$(INITD_DIR)
-endif
 	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)$(INITD_DIR)
 	$(INSTALL_DATA) $(XENDOMAINS_SYSCONFIG) $(DESTDIR)$(SYSCONFIG_DIR)/xendomains
 	$(INSTALL_PROG) $(XENCOMMONS_INITD) $(DESTDIR)$(INITD_DIR)

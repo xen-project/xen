@@ -23,7 +23,6 @@ SUBDIRS-$(CONFIG_Linux) += blktap2
 SUBDIRS-$(CONFIG_NetBSD) += blktap2
 SUBDIRS-$(CONFIG_NetBSD) += xenbackendd
 SUBDIRS-y += libfsimage
-SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 SUBDIRS-$(CONFIG_Linux) += libvchan
 
 # do not recurse in to a dir we are about to delete

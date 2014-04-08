@@ -51,14 +51,12 @@ m4_include([../m4/ax_compare_version.m4])
 # Enable/disable options
 AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
 AX_ARG_DEFAULT_ENABLE([monitors], [Disable xenstat and xentop monitoring tools])
-AX_ARG_DEFAULT_DISABLE([xenapi], [Enable Xen API Bindings])
 AX_ARG_DEFAULT_ENABLE([ocamltools], [Disable Ocaml tools])
 AX_ARG_DEFAULT_ENABLE([xsmpolicy], [Disable XSM policy compilation])
 AX_ARG_DEFAULT_DISABLE([ovmf], [Enable OVMF])
 AX_ARG_DEFAULT_ENABLE([rombios], [Disable ROM BIOS])
 AX_ARG_DEFAULT_ENABLE([seabios], [Disable SeaBIOS])
 AX_ARG_DEFAULT_ENABLE([debug], [Disable debug build of tools])
-AX_ARG_DEFAULT_DISABLE([xend], [Enable xend toolstack])
 AX_ARG_DEFAULT_DISABLE([blktap1], [Enable blktap1 tools])
 
 AC_ARG_ENABLE([qemu-traditional],
@@ -151,10 +149,6 @@ AC_PROG_INSTALL
 AC_PATH_PROG([BISON], [bison])
 AC_PATH_PROG([FLEX], [flex])
 AX_PATH_PROG_OR_FAIL([PERL], [perl])
-AS_IF([test "x$xenapi" = "xy"], [
-    AX_PATH_PROG_OR_FAIL([CURL], [curl-config])
-    AX_PATH_PROG_OR_FAIL([XML], [xml2-config])
-])
 AS_IF([test "x$ocamltools" = "xy"], [
     AC_PROG_OCAML
     AC_PROG_FINDLIB
@@ -245,15 +239,3 @@ AC_CHECK_HEADERS([yajl/yajl_version.h sys/eventfd.h])
 
 AC_OUTPUT()
 
-AS_IF([test "x$xend" = "xy" ], [
-    AC_MSG_WARN(
-[You have enabled the xend toolstack.
-
-xend is deprecated and scheduled for removal. Please migrate to another
-toolstack ASAP.
-
-See http://wiki.xen.org/wiki/Choice_of_Toolstacks for information on
-other alternatives, including xl which is designed to be a drop in
-replacement for xm (http://wiki.xen.org/wiki/XL).
-])
-])

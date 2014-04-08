@@ -5,18 +5,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 XEN_READMES = README
 XEN_READMES += README.incompatibilities
 
-XEN_CONFIGS-$(CONFIG_XEND) += xend-config.sxp
-XEN_CONFIGS-$(CONFIG_XEND) += xm-config.xml
-XEN_CONFIGS-$(CONFIG_XEND) += xmexample1
-XEN_CONFIGS-$(CONFIG_XEND) += xmexample2
-XEN_CONFIGS-$(CONFIG_XEND) += xmexample3
-XEN_CONFIGS-$(CONFIG_XEND) += xmexample.hvm
-XEN_CONFIGS-$(CONFIG_XEND) += xmexample.hvm-stubdom
-XEN_CONFIGS-$(CONFIG_XEND) += xmexample.pv-grub
-XEN_CONFIGS-$(CONFIG_XEND) += xmexample.nbd
-XEN_CONFIGS-$(CONFIG_XEND) += xend-pci-quirks.sxp
-XEN_CONFIGS-$(CONFIG_XEND) += xend-pci-permissive.sxp
-
 XEN_CONFIGS += xlexample.hvm
 XEN_CONFIGS += xlexample.pvlinux
 XEN_CONFIGS += xl.conf
