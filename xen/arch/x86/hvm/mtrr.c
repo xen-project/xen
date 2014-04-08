@@ -145,7 +145,7 @@ bool_t is_var_mtrr_overlapped(struct mtrr_state *m)
 
 static int hvm_mtrr_pat_init(void)
 {
-    unsigned int i, j;
+    unsigned int i, j, phys_addr;
 
     memset(&mtrr_epat_tbl, INVALID_MEM_TYPE, sizeof(mtrr_epat_tbl));
     for ( i = 0; i < MTRR_NUM_TYPES; i++ )
@@ -172,7 +172,11 @@ static int hvm_mtrr_pat_init(void)
         }
     }
 
-    size_or_mask = ~((1 << (paddr_bits - PAGE_SHIFT)) - 1);
+    phys_addr = 36;
+    if ( cpuid_eax(0x80000000) >= 0x80000008 )
+        phys_addr = (uint8_t)cpuid_eax(0x80000008);
+
+    size_or_mask = ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
 
     return 0;
 }
@@ -464,21 +468,16 @@ bool_t mtrr_var_range_msr_set(
                     type == 4 || type == 5 || type == 6)) )
         return 0;
 
-    if ( d == current->domain )
+    phys_addr = 36;
+    domain_cpuid(d, 0x80000000, 0, &eax, &ebx, &ecx, &edx);
+    if ( eax >= 0x80000008 )
     {
-        phys_addr = 36;
-        hvm_cpuid(0x80000000, &eax, &ebx, &ecx, &edx);
-        if ( eax >= 0x80000008 )
-        {
-            hvm_cpuid(0x80000008, &eax, &ebx, &ecx, &edx);
-            phys_addr = (uint8_t)eax;
-        }
+        domain_cpuid(d, 0x80000008, 0, &eax, &ebx, &ecx, &edx);
+        phys_addr = (uint8_t)eax;
     }
-    else
-        phys_addr = paddr_bits;
     msr_mask = ~((((uint64_t)1) << phys_addr) - 1);
     msr_mask |= (index & 1) ? 0x7ffUL : 0xf00UL;
-    if ( unlikely(msr_content & msr_mask) )
+    if ( unlikely(msr_content && (msr_content & msr_mask)) )
     {
         HVM_DBG_LOG(DBG_LEVEL_MSR, "invalid msr content:%"PRIx64"\n",
                     msr_content);
