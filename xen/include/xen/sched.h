@@ -487,7 +487,7 @@ static always_inline int get_domain(struct domain *d)
         old = seen;
         if ( unlikely(_atomic_read(old) & DOMAIN_DESTROYED) )
             return 0;
-        _atomic_set(new, _atomic_read(old) + 1);
+        _atomic_set(&new, _atomic_read(old) + 1);
         seen = atomic_compareandswap(old, new, &d->refcnt);
     }
     while ( unlikely(_atomic_read(seen) != _atomic_read(old)) );

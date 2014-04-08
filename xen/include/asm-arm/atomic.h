@@ -84,11 +84,25 @@ typedef struct { int counter; } atomic_t;
  * strex/ldrex monitor on some implementations. The reason we can use it for
  * atomic_set() is the clrex or dummy strex done on every exception return.
  */
-#define _atomic_read(v) ((v).counter)
-#define atomic_read(v)  (*(volatile int *)&(v)->counter)
+static inline int atomic_read(atomic_t *v)
+{
+    return *(volatile int *)&v->counter;
+}
 
-#define _atomic_set(v,i) (((v).counter) = (i))
-#define atomic_set(v,i) (((v)->counter) = (i))
+static inline int _atomic_read(atomic_t v)
+{
+    return v.counter;
+}
+
+static inline void atomic_set(atomic_t *v, int i)
+{
+    v->counter = i;
+}
+
+static inline void _atomic_set(atomic_t *v, int i)
+{
+    v->counter = i;
+}
 
 #if defined(CONFIG_ARM_32)
 # include <asm/arm32/atomic.h>

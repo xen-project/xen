@@ -66,21 +66,50 @@ typedef struct { int counter; } atomic_t;
 /**
  * atomic_read - read atomic variable
  * @v: pointer of type atomic_t
- * 
+ *
  * Atomically reads the value of @v.
  */
-#define _atomic_read(v)  ((v).counter)
-#define atomic_read(v)   read_atomic(&((v)->counter))
+static inline int atomic_read(atomic_t *v)
+{
+    return read_atomic(&v->counter);
+}
+
+/**
+ * _atomic_read - read atomic variable non-atomically
+ * @v atomic_t
+ *
+ * Non-atomically reads the value of @v
+ */
+static inline int _atomic_read(atomic_t v)
+{
+    return v.counter;
+}
+
 
 /**
  * atomic_set - set atomic variable
  * @v: pointer of type atomic_t
  * @i: required value
- * 
+ *
  * Atomically sets the value of @v to @i.
- */ 
-#define _atomic_set(v,i) (((v).counter) = (i))
-#define atomic_set(v,i)  write_atomic(&((v)->counter), (i))
+ */
+static inline void atomic_set(atomic_t *v, int i)
+{
+    write_atomic(&v->counter, i);
+}
+
+/**
+ * _atomic_set - set atomic variable non-atomically
+ * @v: pointer of type atomic_t
+ * @i: required value
+ *
+ * Non-atomically sets the value of @v to @i.
+ */
+static inline void _atomic_set(atomic_t *v, int i)
+{
+    v->counter = i;
+}
+
 
 /**
  * atomic_add - add integer to atomic variable
