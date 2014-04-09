@@ -65,25 +65,25 @@ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
 }
 
 static void place_modules(struct kernel_info *info,
-                         paddr_t kernel_start,
-                         paddr_t kernel_end)
+                          paddr_t kernbase, paddr_t kernend)
 {
     /* Align DTB and initrd size to 2Mb. Linux only requires 4 byte alignment */
     const paddr_t initrd_len =
         ROUNDUP(early_info.modules.module[MOD_INITRD].size, MB(2));
     const paddr_t dtb_len = ROUNDUP(fdt_totalsize(info->fdt), MB(2));
-    const paddr_t total = initrd_len + dtb_len;
+    const paddr_t modsize = initrd_len + dtb_len;
 
     /* Convenient */
-    const paddr_t mem_start = info->mem.bank[0].start;
-    const paddr_t mem_size = info->mem.bank[0].size;
-    const paddr_t mem_end = mem_start + mem_size;
-    const paddr_t kernel_size = kernel_end - kernel_start;
+    const paddr_t rambase = info->mem.bank[0].start;
+    const paddr_t ramsize = info->mem.bank[0].size;
+    const paddr_t ramend = rambase + ramsize;
+    const paddr_t kernsize = kernend - kernbase;
+    const paddr_t ram128mb = rambase + MB(128);
 
-    paddr_t addr;
+    paddr_t modbase;
 
-    if ( total + kernel_size > mem_size )
-        panic("Not enough memory in the first bank for the dtb+initrd");
+    if ( modsize + kernsize > ramsize )
+        panic("Not enough memory in the first bank for the kernel+dtb+initrd");
 
     /*
      * DTB must be loaded such that it does not conflict with the
@@ -100,19 +100,19 @@ static void place_modules(struct kernel_info *info,
      * just after the kernel, if there is room, otherwise just before.
      */
 
-    if ( kernel_end < MIN(mem_start + MB(128), mem_end - total) )
-        addr = MIN(mem_start + MB(128), mem_end - total);
-    else if ( mem_end - ROUNDUP(kernel_end, MB(2)) >= total )
-        addr = ROUNDUP(kernel_end, MB(2));
-    else if ( kernel_start - mem_start >= total )
-        addr = kernel_start - total;
+    if ( kernend < MIN(ram128mb, ramend - modsize) )
+        modbase = MIN(ram128mb, ramend - modsize);
+    else if ( ramend - ROUNDUP(kernend, MB(2)) >= modsize )
+        modbase = ROUNDUP(kernend, MB(2));
+    else if ( kernbase - rambase >= modsize )
+        modbase = kernbase - modsize;
     else
     {
         panic("Unable to find suitable location for dtb+initrd");
         return;
     }
 
-    info->dtb_paddr = addr;
+    info->dtb_paddr = modbase;
     info->initrd_paddr = info->dtb_paddr + dtb_len;
 }
 
