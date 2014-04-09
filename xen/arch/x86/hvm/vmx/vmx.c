@@ -1033,6 +1033,7 @@ static void vmx_handle_cd(struct vcpu *v, unsigned long value)
 
             vmx_get_guest_pat(v, pat);
             vmx_set_guest_pat(v, uc_pat);
+            vmx_enable_intercept_for_msr(v, MSR_IA32_CR_PAT);
 
             wbinvd();               /* flush possibly polluted cache */
             hvm_asid_flush_vcpu(v); /* invalidate memory type cached in TLB */
@@ -1042,6 +1043,8 @@ static void vmx_handle_cd(struct vcpu *v, unsigned long value)
         {
             v->arch.hvm_vcpu.cache_mode = NORMAL_CACHE_MODE;
             vmx_set_guest_pat(v, *pat);
+            if ( !iommu_enabled || iommu_snoop )
+                vmx_disable_intercept_for_msr(v, MSR_IA32_CR_PAT);
             hvm_asid_flush_vcpu(v); /* no need to flush cache */
         }
     }

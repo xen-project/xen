@@ -682,6 +682,32 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr)
     }
 }
 
+void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr)
+{
+    unsigned long *msr_bitmap = v->arch.hvm_vmx.msr_bitmap;
+
+    /* VMX MSR bitmap supported? */
+    if ( msr_bitmap == NULL )
+        return;
+
+    /*
+     * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals
+     * have the write-low and read-high bitmap offsets the wrong way round.
+     * We can control MSRs 0x00000000-0x00001fff and 0xc0000000-0xc0001fff.
+     */
+    if ( msr <= 0x1fff )
+    {
+        set_bit(msr, msr_bitmap + 0x000/BYTES_PER_LONG); /* read-low */
+        set_bit(msr, msr_bitmap + 0x800/BYTES_PER_LONG); /* write-low */
+    }
+    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+    {
+        msr &= 0x1fff;
+        set_bit(msr, msr_bitmap + 0x400/BYTES_PER_LONG); /* read-high */
+        set_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
+    }
+}
+
 /*
  * Switch VMCS between layer 1 & 2 guest
  */
