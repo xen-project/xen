@@ -711,8 +711,12 @@ uint8_t epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
     }
 
     if ( direct_mmio )
-        return mfn_x(mfn) != d->arch.hvm_domain.vmx.apic_access_mfn
-               ? MTRR_TYPE_UNCACHABLE : MTRR_TYPE_WRBACK;
+    {
+        if ( mfn_x(mfn) != d->arch.hvm_domain.vmx.apic_access_mfn )
+            return MTRR_TYPE_UNCACHABLE;
+        *ipat = 1;
+        return MTRR_TYPE_WRBACK;
+    }
 
     if ( iommu_snoop )
     {
