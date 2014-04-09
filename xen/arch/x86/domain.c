@@ -181,6 +181,30 @@ void dump_pageframe_info(struct domain *d)
     spin_unlock(&d->page_alloc_lock);
 }
 
+/*
+ * The hole may be at or above the 44-bit boundary, so we need to determine
+ * the total bit count until reaching 32 significant (not squashed out) bits
+ * in PFN representations.
+ * Note that the way "bits" gets initialized/updated/bounds-checked guarantees
+ * that the function will never return zero, and hence will never be called
+ * more than once (which is important due to it being deliberately placed in
+ * .init.text).
+ */
+static unsigned int __init noinline _domain_struct_bits(void)
+{
+    unsigned int bits = 32 + PAGE_SHIFT;
+#ifdef __x86_64__
+    unsigned int sig = hweight32(~pfn_hole_mask);
+    unsigned int mask = pfn_hole_mask >> 32;
+
+    for ( ; bits < BITS_PER_LONG && sig < 32; ++bits, mask >>= 1 )
+        if ( !(mask & 1) )
+            ++sig;
+#endif
+
+    return bits;
+}
+
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
@@ -188,11 +212,11 @@ struct domain *alloc_domain_struct(void)
      * We pack the PDX of the domain structure into a 32-bit field within
      * the page_info structure. Hence the MEMF_bits() restriction.
      */
-    unsigned int bits = 32 + PAGE_SHIFT;
+    static unsigned int __read_mostly bits;
 
-#ifdef __x86_64__
-    bits += pfn_pdx_hole_shift;
-#endif
+    if ( unlikely(!bits) )
+         bits = _domain_struct_bits();
+
     BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);
     d = alloc_xenheap_pages(0, MEMF_bits(bits));
     if ( d != NULL )
