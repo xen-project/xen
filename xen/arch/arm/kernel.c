@@ -77,7 +77,7 @@ static void place_modules(struct kernel_info *info,
     const paddr_t rambase = info->mem.bank[0].start;
     const paddr_t ramsize = info->mem.bank[0].size;
     const paddr_t ramend = rambase + ramsize;
-    const paddr_t kernsize = kernend - kernbase;
+    const paddr_t kernsize = ROUNDUP(kernend, MB(2)) - kernbase;
     const paddr_t ram128mb = rambase + MB(128);
 
     paddr_t modbase;
@@ -95,16 +95,18 @@ static void place_modules(struct kernel_info *info,
      * If the bootloader provides an initrd, it will be loaded just
      * after the DTB.
      *
-     * We try to place dtb+initrd at 128MB, (or, if we have less RAM,
-     * as high as possible). If there is no space then fallback to
-     * just after the kernel, if there is room, otherwise just before.
+     * We try to place dtb+initrd at 128MB or if we have less RAM
+     * as high as possible. If there is no space then fallback to
+     * just before the kernel.
+     *
+     * If changing this then consider
+     * tools/libxc/xc_dom_arm.c:arch_setup_meminit as well.
      */
-
-    if ( kernend < MIN(ram128mb, ramend - modsize) )
-        modbase = MIN(ram128mb, ramend - modsize);
-    else if ( ramend - ROUNDUP(kernend, MB(2)) >= modsize )
-        modbase = ROUNDUP(kernend, MB(2));
-    else if ( kernbase - rambase >= modsize )
+    if ( ramend >= ram128mb + modsize && kernend < ram128mb )
+        modbase = ram128mb;
+    else if ( ramend - modsize > ROUNDUP(kernend, MB(2)) )
+        modbase = ramend - modsize;
+    else if ( kernbase - rambase > modsize )
         modbase = kernbase - modsize;
     else
     {
