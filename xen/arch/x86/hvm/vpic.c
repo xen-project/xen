@@ -30,6 +30,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <xen/trace.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
@@ -99,6 +100,8 @@ static void vpic_update_int_output(struct hvm_hw_vpic *vpic)
     ASSERT(vpic_is_locked(vpic));
 
     irq = vpic_get_highest_priority_irq(vpic);
+    TRACE_3D(TRC_HVM_EMUL_PIC_INT_OUTPUT, vpic->int_output, vpic->is_master,
+             irq);
     if ( vpic->int_output == (irq >= 0) )
         return;
 
@@ -112,7 +115,10 @@ static void vpic_update_int_output(struct hvm_hw_vpic *vpic)
             /* Master INT line is connected in Virtual Wire Mode. */
             struct vcpu *v = vpic_domain(vpic)->arch.hvm_domain.i8259_target;
             if ( v != NULL )
+            {
+                TRACE_1D(TRC_HVM_EMUL_PIC_KICK, irq);
                 vcpu_kick(v);
+            }
         }
         else
         {
@@ -135,6 +141,7 @@ static void __vpic_intack(struct hvm_hw_vpic *vpic, int irq)
 
     ASSERT(vpic_is_locked(vpic));
 
+    TRACE_2D(TRC_HVM_EMUL_PIC_INTACK, vpic->is_master, irq);
     /* Edge-triggered: clear the IRR (forget the edge). */
     if ( !(vpic->elcr & mask) )
         vpic->irr &= ~mask;
@@ -434,6 +441,7 @@ void vpic_irq_positive_edge(struct domain *d, int irq)
     ASSERT(irq <= 15);
     ASSERT(vpic_is_locked(vpic));
 
+    TRACE_1D(TRC_HVM_EMUL_PIC_POSEDGE, irq);
     if ( irq == 2 )
         return;
 
@@ -450,6 +458,7 @@ void vpic_irq_negative_edge(struct domain *d, int irq)
     ASSERT(irq <= 15);
     ASSERT(vpic_is_locked(vpic));
 
+    TRACE_1D(TRC_HVM_EMUL_PIC_NEGEDGE, irq);
     if ( irq == 2 )
         return;
 
@@ -463,6 +472,8 @@ int vpic_ack_pending_irq(struct vcpu *v)
     int irq, vector;
     struct hvm_hw_vpic *vpic = &v->domain->arch.hvm_domain.vpic[0];
 
+    TRACE_2D(TRC_HVM_EMUL_PIC_PEND_IRQ_CALL, vlapic_accept_pic_intr(v),
+             vpic->int_output);
     if ( !vlapic_accept_pic_intr(v) || !vpic->int_output )
         return -1;
 

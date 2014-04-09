@@ -31,6 +31,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <xen/trace.h>
 #include <asm/time.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
@@ -159,6 +160,7 @@ static int pit_get_gate(PITState *pit, int channel)
 static void pit_time_fired(struct vcpu *v, void *priv)
 {
     uint64_t *count_load_time = priv;
+    TRACE_0D(TRC_HVM_EMUL_PIT_TIMER_CB);
     *count_load_time = get_guest_time(v);
 }
 
@@ -188,16 +190,19 @@ static void pit_load_count(PITState *pit, int channel, int val)
     case 2:
     case 3:
         /* Periodic timer. */
+        TRACE_2D(TRC_HVM_EMUL_PIT_START_TIMER, period, period);
         create_periodic_time(v, &pit->pt0, period, period, 0, pit_time_fired, 
                              &pit->count_load_time[channel]);
         break;
     case 1:
     case 4:
         /* One-shot timer. */
+        TRACE_2D(TRC_HVM_EMUL_PIT_START_TIMER, period, 0);
         create_periodic_time(v, &pit->pt0, period, 0, 0, pit_time_fired,
                              &pit->count_load_time[channel]);
         break;
     default:
+        TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
         destroy_periodic_time(&pit->pt0);
         break;
     }
@@ -377,6 +382,7 @@ static uint32_t pit_ioport_read(struct PITState *pit, uint32_t addr)
 
 void pit_stop_channel0_irq(PITState *pit)
 {
+    TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
     spin_lock(&pit->lock);
     destroy_periodic_time(&pit->pt0);
     spin_unlock(&pit->lock);
@@ -431,6 +437,7 @@ void pit_reset(struct domain *d)
     struct hvm_hw_pit_channel *s;
     int i;
 
+    TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
     destroy_periodic_time(&pit->pt0);
     pit->pt0.source = PTSRC_isa;
 
@@ -465,6 +472,8 @@ void pit_init(struct domain *d, unsigned long cpu_khz)
 void pit_deinit(struct domain *d)
 {
     PITState *pit = domain_vpit(d);
+
+    TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
     destroy_periodic_time(&pit->pt0);
 }
 

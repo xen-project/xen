@@ -27,6 +27,7 @@
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
 #include <asm/current.h>
+#include <xen/trace.h>
 
 #define USEC_PER_SEC    1000000UL
 #define NS_PER_USEC     1000UL
@@ -91,6 +92,7 @@ static void rtc_pf_callback(struct vcpu *v, void *opaque)
          && ++(s->pt_dead_ticks) >= 10 )
     {
         /* VM is ignoring its RTC; no point in running the timer */
+        TRACE_0D(TRC_HVM_EMUL_RTC_STOP_TIMER);
         destroy_periodic_time(&s->pt);
         s->period = 0;
     }
@@ -152,8 +154,11 @@ static void rtc_timer_update(RTCState *s)
                 else
                     delta = period - ((now - s->start_time) % period);
                 if ( s->hw.cmos_data[RTC_REG_B] & RTC_PIE )
+                {
+                    TRACE_2D(TRC_HVM_EMUL_RTC_START_TIMER, delta, period);
                     create_periodic_time(v, &s->pt, delta, period,
                                          RTC_IRQ, rtc_pf_callback, s);
+                }
                 else
                     s->check_ticks_since = now;
             }
@@ -161,6 +166,7 @@ static void rtc_timer_update(RTCState *s)
         }
         /* fall through */
     default:
+        TRACE_0D(TRC_HVM_EMUL_RTC_STOP_TIMER);
         destroy_periodic_time(&s->pt);
         s->period = 0;
         break;
@@ -513,6 +519,7 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
         rtc_update_irq(s);
         if ( (data ^ orig) & RTC_PIE )
         {
+            TRACE_0D(TRC_HVM_EMUL_RTC_STOP_TIMER);
             destroy_periodic_time(&s->pt);
             s->period = 0;
             rtc_timer_update(s);
@@ -772,6 +779,7 @@ void rtc_reset(struct domain *d)
 {
     RTCState *s = domain_vrtc(d);
 
+    TRACE_0D(TRC_HVM_EMUL_RTC_STOP_TIMER);
     destroy_periodic_time(&s->pt);
     s->period = 0;
     s->pt.source = PTSRC_isa;
@@ -813,6 +821,7 @@ void rtc_deinit(struct domain *d)
 
     spin_barrier(&s->lock);
 
+    TRACE_0D(TRC_HVM_EMUL_RTC_STOP_TIMER);
     destroy_periodic_time(&s->pt);
     kill_timer(&s->update_timer);
     kill_timer(&s->update_timer2);

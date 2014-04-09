@@ -20,10 +20,12 @@
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
+#include <asm/hvm/trace.h>
 #include <asm/current.h>
 #include <asm/hpet.h>
 #include <xen/sched.h>
 #include <xen/event.h>
+#include <xen/trace.h>
 
 #define domain_vhpet(x) (&(x)->arch.hvm_domain.pl_time.vhpet)
 #define vcpu_vhpet(x)   (domain_vhpet((x)->domain))
@@ -191,6 +193,7 @@ static void hpet_stop_timer(HPETState *h, unsigned int tn)
 {
     ASSERT(tn < HPET_TIMER_NUM);
     ASSERT(spin_is_locked(&h->lock));
+    TRACE_1D(TRC_HVM_EMUL_HPET_STOP_TIMER, tn);
     destroy_periodic_time(&h->pt[tn]);
     /* read the comparator to get it updated so a read while stopped will
      * return the expected value. */
@@ -255,6 +258,10 @@ static void hpet_set_timer(HPETState *h, unsigned int tn)
      * being enabled (now).
      */
     oneshot = !timer_is_periodic(h, tn);
+    TRACE_2_LONG_4D(TRC_HVM_EMUL_HPET_START_TIMER, tn, irq,
+                    TRC_PAR_LONG(hpet_tick_to_ns(h, diff)),
+                    TRC_PAR_LONG(oneshot ? 0LL :
+                                 hpet_tick_to_ns(h, h->hpet.period[tn])));
     create_periodic_time(vhpet_vcpu(h), &h->pt[tn],
                          hpet_tick_to_ns(h, diff),
                          oneshot ? 0 : hpet_tick_to_ns(h, h->hpet.period[tn]),

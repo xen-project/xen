@@ -58,6 +58,13 @@
 
 #define TRC_PAR_LONG(par) ((par)&0xFFFFFFFF),((par)>>32)
 
+#define TRACE_2_LONG_2D(_e, d1, d2, ...) \
+    TRACE_4D(_e, d1, d2)
+#define TRACE_2_LONG_3D(_e, d1, d2, d3, ...) \
+    TRACE_5D(_e, d1, d2, d3)
+#define TRACE_2_LONG_4D(_e, d1, d2, d3, d4, ...) \
+    TRACE_6D(_e, d1, d2, d3, d4)
+
 #define HVMTRACE_ND(evt, modifier, cycles, count, d1, d2, d3, d4, d5, d6) \
     do {                                                                  \
         if ( unlikely(tb_init_done) && DO_TRC_HVM_ ## evt )               \
