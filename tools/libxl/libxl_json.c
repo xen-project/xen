@@ -285,7 +285,6 @@ void libxl__json_object_free(libxl__gc *gc, libxl__json_object *obj)
     }
     case JSON_ARRAY: {
         libxl__json_object *node = NULL;
-        break;
 
         for (idx = 0; idx < obj->u.array->count; idx++) {
             if (flexarray_get(obj->u.array, idx, (void**)&node) != 0)
