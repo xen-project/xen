@@ -18,9 +18,6 @@ external-device-migrate - called by xend for migrating external devices
 locking.sh          - locking functions to prevent concurrent access to
                       critical sections inside script files
 logging.sh          - logging function to log output using syslog
-network-bridge      - xen network start/stop script when using bridging
-network-nat         - xen network start/stop script when using NAT
-network-route       - xen network start/stop script when using routing
 vif-bridge          - virtual network start/stop script in bridged mode
 vif-common.sh       - sourced by vif-bridge 
 vif-nat             - xen virtual network start/stop script in NAT mode 
@@ -31,7 +28,7 @@ xen-backend.rules   - hotplug script rules
 xend-config.sxp     - default xend configuration file
 xen-hotplug-common.sh - sourced by vif-common.sh
 xen-network-common.sh - sourced by vif-common.sh
-xen-script-common.sh  - sourced by network-bridge, xen-hotplug-common.sh
+xen-script-common.sh  - sourced by xen-hotplug-common.sh
 xmexample1          - example configuration script for 'xm create'
 xmexample2          - a more complex configuration script for 'xm create'
 xmexample3          - an advanced configuration script for 'xm create' 

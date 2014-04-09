@@ -9,9 +9,9 @@ XENCOMMONS_INITD = init.d/xencommons
 XENCOMMONS_SYSCONFIG = init.d/sysconfig.xencommons
 
 # Xen script dir and scripts to go there.
-XEN_SCRIPTS = network-bridge vif-bridge
-XEN_SCRIPTS += network-route vif-route
-XEN_SCRIPTS += network-nat vif-nat
+XEN_SCRIPTS = vif-bridge
+XEN_SCRIPTS += vif-route
+XEN_SCRIPTS += vif-nat
 XEN_SCRIPTS += vif-openvswitch
 XEN_SCRIPTS += vif2
 XEN_SCRIPTS += vif-setup
