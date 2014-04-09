@@ -276,6 +276,9 @@ static void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
     unsigned int cpu = smp_processor_id();
     s_time_t expires = per_cpu(timer_deadline, cpu);
 
+    if ( boot_cpu_has(X86_FEATURE_CLFLUSH_MONITOR) )
+        clflush((void *)&mwait_wakeup(cpu));
+
     __monitor((void *)&mwait_wakeup(cpu), 0, 0);
     smp_mb();
 
