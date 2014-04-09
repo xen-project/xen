@@ -253,14 +253,24 @@ int arch_setup_meminit(struct xc_dom_image *dom)
 
     /* Convenient */
     const uint64_t rambase = dom->rambase_pfn << XC_PAGE_SHIFT;
-    const uint64_t ramend = rambase + ( dom->total_pages << XC_PAGE_SHIFT );
+    const uint64_t ramsize = dom->total_pages << XC_PAGE_SHIFT;
+    const uint64_t ramend = rambase + ramsize;
+    const uint64_t kernbase = dom->kernel_seg.vstart;
     const uint64_t kernend = ROUNDUP(dom->kernel_seg.vend, 21/*2MB*/);
+    const uint64_t kernsize = kernend - kernbase;
     const uint64_t dtb_size = dom->devicetree_blob ?
         ROUNDUP(dom->devicetree_size, XC_PAGE_SHIFT) : 0;
     const uint64_t ramdisk_size = dom->ramdisk_blob ?
         ROUNDUP(dom->ramdisk_size, XC_PAGE_SHIFT) : 0;
     const uint64_t modsize = dtb_size + ramdisk_size;
     const uint64_t ram128mb = rambase + (128<<20);
+
+    if ( modsize + kernsize > ramsize )
+    {
+        DOMPRINTF("%s: Not enough memory for the kernel+dtb+initrd",
+                  __FUNCTION__);
+        return -1;
+    }
 
     rc = set_mode(dom->xch, dom->guest_domid, dom->guest_type);
     if ( rc )
@@ -290,17 +300,20 @@ int arch_setup_meminit(struct xc_dom_image *dom)
             0, 0, &dom->p2m_host[i]);
     }
 
-
     /*
-     * Place boot modules at 128MB into RAM if there is enough RAM and
-     * the kernel does not overlap. Otherwise place them immediately
-     * after the kernel. If there is no space after the kernel then
-     * there is insufficient RAM and we fail.
+     * We try to place dtb+initrd at 128MB or if we have less RAM
+     * as high as possible. If there is no space then fallback to
+     * just before the kernel.
+     *
+     * If changing this then consider
+     * xen/arch/arm/kernel.c:place_modules as well.
      */
     if ( ramend >= ram128mb + modsize && kernend < ram128mb )
         modbase = ram128mb;
-    else if ( ramend >= kernend + modsize )
-        modbase = kernend;
+    else if ( ramend - modsize > kernend )
+        modbase = ramend - modsize;
+    else if (kernbase - rambase > modsize )
+        modbase = kernbase - modsize;
     else
         return -1;
 
