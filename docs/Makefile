@@ -9,10 +9,8 @@ DOC_ARCHES      := arm x86_32 x86_64
 # Documentation sources to build
 MAN1SRC-y := $(wildcard man/xl*.pod.1)
 MAN1SRC-y += $(wildcard man/xenstore*.pod.1)
-MAN1SRC-$(CONFIG_XEND) += man/xm.pod.1
 
 MAN5SRC-y := $(wildcard man/xl*.pod.5)
-MAN5SRC-$(CONFIG_XEND) += man/xend-config.sxp.pod.5 man/xmdomain.cfg.pod.5
 
 MARKDOWNSRC-y := $(wildcard misc/*.markdown)
 

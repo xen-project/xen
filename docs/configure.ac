@@ -19,9 +19,6 @@ AX_DOCS_TOOL_PROG([POD2HTML], [pod2html])
 AX_DOCS_TOOL_PROG([POD2TEXT], [pod2text])
 AX_DOCS_TOOL_PROGS([MARKDOWN], [markdown], [markdown markdown_py])
 
-# Enable/disable options
-AX_ARG_DEFAULT_DISABLE([xend], [Enable xend toolstack documentation])
-
 AC_ARG_VAR([PERL], [Path to Perl parser])
 AX_PATH_PROG_OR_FAIL([PERL], [perl])
 
