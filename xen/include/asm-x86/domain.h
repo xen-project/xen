@@ -225,13 +225,6 @@ struct pv_domain
 {
     l1_pgentry_t **gdt_ldt_l1tab;
 
-    /* Shared page for notifying that explicit PIRQ EOI is required. */
-    unsigned long *pirq_eoi_map;
-    unsigned long pirq_eoi_map_mfn;
-    /* set auto_unmask to 1 if you want PHYSDEVOP_eoi to automatically
-     * unmask the event channel */
-    bool_t auto_unmask;
-
     /* map_domain_page() mapping cache. */
     struct mapcache_domain mapcache;
 };
@@ -313,6 +306,13 @@ struct arch_domain
     spinlock_t e820_lock;
     struct e820entry *e820;
     unsigned int nr_e820;
+
+    /* set auto_unmask to 1 if you want PHYSDEVOP_eoi to automatically
+     * unmask the event channel */
+    bool_t auto_unmask;
+    /* Shared page for notifying that explicit PIRQ EOI is required. */
+    unsigned long *pirq_eoi_map;
+    unsigned long pirq_eoi_map_mfn;
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
