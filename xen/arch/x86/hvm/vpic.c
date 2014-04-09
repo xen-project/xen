@@ -473,3 +473,12 @@ int vpic_ack_pending_irq(struct vcpu *v)
     vector = vpic[irq >> 3].irq_base + (irq & 7);
     return vector;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

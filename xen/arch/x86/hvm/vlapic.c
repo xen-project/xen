@@ -1279,3 +1279,12 @@ void vlapic_destroy(struct vcpu *v)
     unmap_domain_page_global(vlapic->regs);
     free_domheap_page(vlapic->regs_page);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

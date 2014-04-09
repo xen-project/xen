@@ -827,3 +827,12 @@ void rtc_update_clock(struct domain *d)
     s->current_tm = gmtime(get_localtime(d));
     spin_unlock(&s->lock);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

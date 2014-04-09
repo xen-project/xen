@@ -556,3 +556,12 @@ int pv_pit_handler(int port, int data, int write)
 
     return !write ? ioreq.data : 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
