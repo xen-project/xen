@@ -107,6 +107,10 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 	ASSERT((status == not_parsed) && (smp_processor_id() == 0));
 	status = no_mask;
 
+	/* Fam11 doesn't support masking at all. */
+	if (c->x86 == 0x11)
+		return;
+
 	if (~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
 	      opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx)) {
 		feat_ecx = opt_cpuid_mask_ecx;
@@ -176,7 +180,6 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 	       extfeat_ecx, extfeat_edx);
 
  setmask:
-	/* FIXME check if processor supports CPUID masking */
 	/* AMD processors prior to family 10h required a 32-bit password */
 	if (c->x86 >= 0x10) {
 		wrmsr(MSR_K8_FEATURE_MASK, feat_edx, feat_ecx);
