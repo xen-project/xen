@@ -233,7 +233,7 @@ F:	tools/ocaml/
 
 POWER MANAGEMENT
 M:	Jan Beulich <jbeulich@suse.com>
-M:	Liu Jinsong <jinsong.liu@intel.com>
+M:	Liu Jinsong <jinsong.liu@alibaba-inc.com>
 S:	Supported
 F:	xen/arch/x86/acpi/
 X:	xen/arch/x86/acpi/boot.c
