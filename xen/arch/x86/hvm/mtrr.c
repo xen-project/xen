@@ -222,30 +222,40 @@ void hvm_vcpu_cacheattr_destroy(struct vcpu *v)
 
 /*
  * Get MTRR memory type for physical address pa.
+ *
+ * May return a negative value when order > 0, indicating to the caller
+ * that the respective mapping needs splitting.
  */
-static uint8_t get_mtrr_type(struct mtrr_state *m, paddr_t pa)
+static int get_mtrr_type(const struct mtrr_state *m,
+                         paddr_t pa, unsigned int order)
 {
-   int32_t     addr, seg, index;
    uint8_t     overlap_mtrr = 0;
    uint8_t     overlap_mtrr_pos = 0;
-   uint64_t    phys_base;
-   uint64_t    phys_mask;
-   uint8_t     num_var_ranges = m->mtrr_cap & 0xff;
+   uint64_t    mask = -(uint64_t)PAGE_SIZE << order;
+   unsigned int seg, num_var_ranges = m->mtrr_cap & 0xff;
 
    if ( unlikely(!(m->enabled & 0x2)) )
        return MTRR_TYPE_UNCACHABLE;
 
+   pa &= mask;
    if ( (pa < 0x100000) && (m->enabled & 1) )
    {
-       /* Fixed range MTRR takes effective */
-       addr = (uint32_t) pa;
+       /* Fixed range MTRR takes effect. */
+       uint32_t addr = (uint32_t)pa, index;
+
        if ( addr < 0x80000 )
        {
+           /* 0x00000 ... 0x7FFFF in 64k steps */
+           if ( order > 4 )
+               return -1;
            seg = (addr >> 16);
            return m->fixed_ranges[seg];
        }
        else if ( addr < 0xc0000 )
        {
+           /* 0x80000 ... 0xBFFFF in 16k steps */
+           if ( order > 2 )
+               return -1;
            seg = (addr - 0x80000) >> 14;
            index = (seg >> 3) + 1;
            seg &= 7;            /* select 0-7 segments */
@@ -253,7 +263,9 @@ static uint8_t get_mtrr_type(struct mtrr_state *m, paddr_t pa)
        }
        else
        {
-           /* 0xC0000 --- 0x100000 */
+           /* 0xC0000 ... 0xFFFFF in 4k steps */
+           if ( order )
+               return -1;
            seg = (addr - 0xc0000) >> 12;
            index = (seg >> 3) + 3;
            seg &= 7;            /* select 0-7 segments */
@@ -264,14 +276,15 @@ static uint8_t get_mtrr_type(struct mtrr_state *m, paddr_t pa)
    /* Match with variable MTRRs. */
    for ( seg = 0; seg < num_var_ranges; seg++ )
    {
-       phys_base = ((uint64_t*)m->var_ranges)[seg*2];
-       phys_mask = ((uint64_t*)m->var_ranges)[seg*2 + 1];
+       uint64_t phys_base = m->var_ranges[seg].base;
+       uint64_t phys_mask = m->var_ranges[seg].mask;
+
        if ( phys_mask & MTRR_PHYSMASK_VALID )
        {
-           if ( ((uint64_t) pa & phys_mask) >> MTRR_PHYSMASK_SHIFT ==
-                (phys_base & phys_mask) >> MTRR_PHYSMASK_SHIFT )
+           phys_mask &= mask;
+           if ( (pa & phys_mask) == (phys_base & phys_mask) )
            {
-               if ( unlikely(m->overlapped) )
+               if ( unlikely(m->overlapped) || order )
                {
                     overlap_mtrr |= 1 << (phys_base & MTRR_PHYSBASE_TYPE_MASK);
                     overlap_mtrr_pos = phys_base & MTRR_PHYSBASE_TYPE_MASK;
@@ -285,23 +298,24 @@ static uint8_t get_mtrr_type(struct mtrr_state *m, paddr_t pa)
        }
    }
 
-   /* Overlapped or not found. */
+   /* Not found? */
    if ( unlikely(overlap_mtrr == 0) )
        return m->def_type;
 
-   if ( likely(!(overlap_mtrr & ~( ((uint8_t)1) << overlap_mtrr_pos ))) )
-       /* Covers both one variable memory range matches and
-        * two or more identical match.
-        */
+   /* One match, or multiple identical ones? */
+   if ( likely(overlap_mtrr == (1 << overlap_mtrr_pos)) )
        return overlap_mtrr_pos;
 
+   if ( order )
+       return -1;
+
+   /* Two or more matches, one being UC? */
    if ( overlap_mtrr & (1 << MTRR_TYPE_UNCACHABLE) )
-       /* Two or more match, one is UC. */
        return MTRR_TYPE_UNCACHABLE;
 
-   if ( !(overlap_mtrr &
-          ~((1 << MTRR_TYPE_WRTHROUGH) | (1 << MTRR_TYPE_WRBACK))) )
-       /* Two or more match, WT and WB. */
+   /* Two or more matches, all of them WT and WB? */
+   if ( overlap_mtrr ==
+        ((1 << MTRR_TYPE_WRTHROUGH) | (1 << MTRR_TYPE_WRBACK)) )
        return MTRR_TYPE_WRTHROUGH;
 
    /* Behaviour is undefined, but return the last overlapped type. */
@@ -341,7 +355,7 @@ static uint8_t effective_mm_type(struct mtrr_state *m,
      * just use it
      */ 
     if ( gmtrr_mtype == NO_HARDCODE_MEM_TYPE )
-        mtrr_mtype = get_mtrr_type(m, gpa);
+        mtrr_mtype = get_mtrr_type(m, gpa, 0);
     else
         mtrr_mtype = gmtrr_mtype;
 
@@ -370,7 +384,7 @@ uint32_t get_pat_flags(struct vcpu *v,
     guest_eff_mm_type = effective_mm_type(g, pat, gpaddr, 
                                           gl1e_flags, gmtrr_mtype);
     /* 2. Get the memory type of host physical address, with MTRR */
-    shadow_mtrr_type = get_mtrr_type(&mtrr_state, spaddr);
+    shadow_mtrr_type = get_mtrr_type(&mtrr_state, spaddr, 0);
 
     /* 3. Find the memory type in PAT, with host MTRR memory type
      * and guest effective memory type.
@@ -703,10 +717,10 @@ void memory_type_changed(struct domain *d)
         p2m_memory_type_changed(d);
 }
 
-uint8_t epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
-                           uint8_t *ipat, bool_t direct_mmio)
+int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
+                       unsigned int order, uint8_t *ipat, bool_t direct_mmio)
 {
-    uint8_t gmtrr_mtype, hmtrr_mtype;
+    int gmtrr_mtype, hmtrr_mtype;
     uint32_t type;
     struct vcpu *v = current;
 
@@ -747,10 +761,12 @@ uint8_t epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
     }
 
     gmtrr_mtype = is_hvm_domain(d) && v ?
-                  get_mtrr_type(&v->arch.hvm_vcpu.mtrr, (gfn << PAGE_SHIFT)) :
+                  get_mtrr_type(&v->arch.hvm_vcpu.mtrr,
+                                gfn << PAGE_SHIFT, order) :
                   MTRR_TYPE_WRBACK;
-
-    hmtrr_mtype = get_mtrr_type(&mtrr_state, (mfn_x(mfn) << PAGE_SHIFT));
+    hmtrr_mtype = get_mtrr_type(&mtrr_state, mfn_x(mfn) << PAGE_SHIFT, order);
+    if ( gmtrr_mtype < 0 || hmtrr_mtype < 0 )
+        return -1;
 
     /* If both types match we're fine. */
     if ( likely(gmtrr_mtype == hmtrr_mtype) )
