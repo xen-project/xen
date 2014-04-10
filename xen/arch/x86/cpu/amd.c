@@ -91,6 +91,51 @@ static inline int wrmsr_amd_safe(unsigned int msr, unsigned int lo,
 	return err;
 }
 
+static const struct cpuidmask {
+	uint16_t fam;
+	char rev[2];
+	unsigned int ecx, edx, ext_ecx, ext_edx;
+} pre_canned[] __initconst = {
+#define CAN(fam, id, rev) { \
+		fam, #rev, \
+		AMD_FEATURES_##id##_REV_##rev##_ECX, \
+		AMD_FEATURES_##id##_REV_##rev##_EDX, \
+		AMD_EXTFEATURES_##id##_REV_##rev##_ECX, \
+		AMD_EXTFEATURES_##id##_REV_##rev##_EDX \
+	}
+#define CAN_FAM(fam, rev) CAN(0x##fam, FAM##fam##h, rev)
+#define CAN_K8(rev)       CAN(0x0f,    K8,          rev)
+	CAN_FAM(11, B),
+	CAN_FAM(10, C),
+	CAN_FAM(10, B),
+	CAN_K8(G),
+	CAN_K8(F),
+	CAN_K8(E),
+	CAN_K8(D),
+	CAN_K8(C)
+#undef CAN
+};
+
+static const struct cpuidmask *__init noinline get_cpuidmask(const char *opt)
+{
+	unsigned long fam;
+	char rev;
+	unsigned int i;
+
+	if (strncmp(opt, "fam_", 4))
+		return NULL;
+	fam = simple_strtoul(opt + 4, &opt, 16);
+	if (strncmp(opt, "_rev_", 5) || !opt[5] || opt[6])
+		return NULL;
+	rev = toupper(opt[5]);
+
+	for (i = 0; i < ARRAY_SIZE(pre_canned); ++i)
+		if (fam == pre_canned[i].fam && rev == *pre_canned[i].rev)
+			return &pre_canned[i];
+
+	return NULL;
+}
+
 /*
  * Mask the features and extended features returned by CPUID.  Parameters are
  * set from the boot line via two methods:
@@ -136,50 +181,18 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 		thermal_ecx = opt_cpuid_mask_thermal_ecx;
 	} else if (*opt_famrev == '\0') {
 		return;
-	} else if (!strcmp(opt_famrev, "fam_0f_rev_c")) {
-		feat_ecx = AMD_FEATURES_K8_REV_C_ECX;
-		feat_edx = AMD_FEATURES_K8_REV_C_EDX;
-		extfeat_ecx = AMD_EXTFEATURES_K8_REV_C_ECX;
-		extfeat_edx = AMD_EXTFEATURES_K8_REV_C_EDX;
-	} else if (!strcmp(opt_famrev, "fam_0f_rev_d")) {
-		feat_ecx = AMD_FEATURES_K8_REV_D_ECX;
-		feat_edx = AMD_FEATURES_K8_REV_D_EDX;
-		extfeat_ecx = AMD_EXTFEATURES_K8_REV_D_ECX;
-		extfeat_edx = AMD_EXTFEATURES_K8_REV_D_EDX;
-	} else if (!strcmp(opt_famrev, "fam_0f_rev_e")) {
-		feat_ecx = AMD_FEATURES_K8_REV_E_ECX;
-		feat_edx = AMD_FEATURES_K8_REV_E_EDX;
-		extfeat_ecx = AMD_EXTFEATURES_K8_REV_E_ECX;
-		extfeat_edx = AMD_EXTFEATURES_K8_REV_E_EDX;
-	} else if (!strcmp(opt_famrev, "fam_0f_rev_f")) {
-		feat_ecx = AMD_FEATURES_K8_REV_F_ECX;
-		feat_edx = AMD_FEATURES_K8_REV_F_EDX;
-		extfeat_ecx = AMD_EXTFEATURES_K8_REV_F_ECX;
-		extfeat_edx = AMD_EXTFEATURES_K8_REV_F_EDX;
-	} else if (!strcmp(opt_famrev, "fam_0f_rev_g")) {
-		feat_ecx = AMD_FEATURES_K8_REV_G_ECX;
-		feat_edx = AMD_FEATURES_K8_REV_G_EDX;
-		extfeat_ecx = AMD_EXTFEATURES_K8_REV_G_ECX;
-		extfeat_edx = AMD_EXTFEATURES_K8_REV_G_EDX;
-	} else if (!strcmp(opt_famrev, "fam_10_rev_b")) {
-		feat_ecx = AMD_FEATURES_FAM10h_REV_B_ECX;
-		feat_edx = AMD_FEATURES_FAM10h_REV_B_EDX;
-		extfeat_ecx = AMD_EXTFEATURES_FAM10h_REV_B_ECX;
-		extfeat_edx = AMD_EXTFEATURES_FAM10h_REV_B_EDX;
-	} else if (!strcmp(opt_famrev, "fam_10_rev_c")) {
-		feat_ecx = AMD_FEATURES_FAM10h_REV_C_ECX;
-		feat_edx = AMD_FEATURES_FAM10h_REV_C_EDX;
-		extfeat_ecx = AMD_EXTFEATURES_FAM10h_REV_C_ECX;
-		extfeat_edx = AMD_EXTFEATURES_FAM10h_REV_C_EDX;
-	} else if (!strcmp(opt_famrev, "fam_11_rev_b")) {
-		feat_ecx = AMD_FEATURES_FAM11h_REV_B_ECX;
-		feat_edx = AMD_FEATURES_FAM11h_REV_B_EDX;
-		extfeat_ecx = AMD_EXTFEATURES_FAM11h_REV_B_ECX;
-		extfeat_edx = AMD_EXTFEATURES_FAM11h_REV_B_EDX;
 	} else {
-		printk("Invalid processor string: %s\n", opt_famrev);
-		printk("CPUID will not be masked\n");
-		return;
+		const struct cpuidmask *m = get_cpuidmask(opt_famrev);
+
+		if (!m) {
+			printk("Invalid processor string: %s\n", opt_famrev);
+			printk("CPUID will not be masked\n");
+			return;
+		}
+		feat_ecx = m->ecx;
+		feat_edx = m->edx;
+		extfeat_ecx = m->ext_ecx;
+		extfeat_edx = m->ext_edx;
 	}
 
         /* Setting bits in the CPUID mask MSR that are not set in the
