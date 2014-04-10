@@ -1950,6 +1950,7 @@ static void hvm_update_cr(struct vcpu *v, unsigned int cr, unsigned long value)
 int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
+    struct domain *d = v->domain;
     unsigned long gfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
     struct page_info *page;
 
@@ -1973,8 +1974,8 @@ int hvm_set_cr0(unsigned long value)
         goto gpf;
 
     /* A pvh is not expected to change to real mode. */
-    if ( is_pvh_vcpu(v)
-         && (value & (X86_CR0_PE | X86_CR0_PG)) != (X86_CR0_PG | X86_CR0_PE) )
+    if ( is_pvh_domain(d) &&
+         (value & (X86_CR0_PE | X86_CR0_PG)) != (X86_CR0_PG | X86_CR0_PE) )
     {
         printk(XENLOG_G_WARNING
                "PVH attempting to turn off PE/PG. CR0:%lx\n", value);
@@ -1996,16 +1997,16 @@ int hvm_set_cr0(unsigned long value)
             hvm_update_guest_efer(v);
         }
 
-        if ( !paging_mode_hap(v->domain) )
+        if ( !paging_mode_hap(d) )
         {
             /* The guest CR3 must be pointing to the guest physical. */
             gfn = v->arch.hvm_vcpu.guest_cr[3]>>PAGE_SHIFT;
-            page = get_page_from_gfn(v->domain, gfn, NULL, P2M_ALLOC);
+            page = get_page_from_gfn(d, gfn, NULL, P2M_ALLOC);
             if ( !page )
             {
                 gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx\n",
                          v->arch.hvm_vcpu.guest_cr[3]);
-                domain_crash(v->domain);
+                domain_crash(d);
                 return X86EMUL_UNHANDLEABLE;
             }
 
@@ -2032,24 +2033,18 @@ int hvm_set_cr0(unsigned long value)
             hvm_update_guest_efer(v);
         }
 
-        if ( !paging_mode_hap(v->domain) )
+        if ( !paging_mode_hap(d) )
         {
             put_page(pagetable_get_page(v->arch.guest_table));
             v->arch.guest_table = pagetable_null();
         }
     }
 
-    /*
-     * When cr0.cd setting
-     * 1. For guest w/o VT-d, and for guest with VT-d but snooped, Xen need not
-     * do anything, since hardware snoop mechanism has ensured cache coherency;
-     * 2. For guest with VT-d but non-snooped, cache coherency cannot be
-     * guaranteed by h/w so need emulate UC memory type to guest.
-     */
     if ( ((value ^ old_value) & X86_CR0_CD) &&
-           has_arch_pdevs(v->domain) &&
-           iommu_enabled && !iommu_snoop &&
-           hvm_funcs.handle_cd )
+         iommu_enabled && hvm_funcs.handle_cd &&
+         (!rangeset_is_empty(d->iomem_caps) ||
+          !rangeset_is_empty(d->arch.ioport_caps) ||
+          has_arch_pdevs(d)) )
         hvm_funcs.handle_cd(v, value);
 
     hvm_update_cr(v, 0, value);

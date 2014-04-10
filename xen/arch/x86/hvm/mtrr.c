@@ -713,7 +713,7 @@ HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, hvm_load_mtrr_msr,
 
 void memory_type_changed(struct domain *d)
 {
-    if ( iommu_enabled && !iommu_snoop && d->vcpu && d->vcpu[0] )
+    if ( iommu_enabled && d->vcpu && d->vcpu[0] )
         p2m_memory_type_changed(d);
 }
 
@@ -750,12 +750,6 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
     {
         if ( mfn_x(mfn) != d->arch.hvm_domain.vmx.apic_access_mfn )
             return MTRR_TYPE_UNCACHABLE;
-        *ipat = 1;
-        return MTRR_TYPE_WRBACK;
-    }
-
-    if ( iommu_snoop )
-    {
         *ipat = 1;
         return MTRR_TYPE_WRBACK;
     }
