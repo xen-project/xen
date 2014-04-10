@@ -331,23 +331,41 @@ Indicate where the responsibility for driving power states lies.
 ### cpuid\_mask\_cpu (AMD only)
 > `= fam_0f_rev_c | fam_0f_rev_d | fam_0f_rev_e | fam_0f_rev_f | fam_0f_rev_g | fam_10_rev_b | fam_10_rev_c | fam_11_rev_b`
 
-If the other **cpuid\_mask\_{,ext\_}e{c,d}x** options are fully set
-(unspecified on the command line), specify a pre-canned cpuid mask to
-mask the current processor down to appear as the specified processor.
-It is important to ensure that all hosts in a pool appear the same to
-guests to allow successful live migration.
+If the other **cpuid\_mask\_{,ext\_,thermal\_,l7s0\_}e{a,b,c,d}x**
+options are fully set (unspecified on the command line), specify a
+pre-canned cpuid mask to mask the current processor down to appear as
+the specified processor. It is important to ensure that all hosts in a
+pool appear the same to guests to allow successful live migration.
 
-### cpuid\_mask\_ ecx,edx,ext\_ecx,ext\_edx,xsave_eax
+### cpuid\_mask\_{{,ext\_}ecx,edx}
 > `= <integer>`
 
 > Default: `~0` (all bits set)
 
-These five command line parameters are used to specify cpuid masks to
+These four command line parameters are used to specify cpuid masks to
 help with cpuid levelling across a pool of hosts.  Setting a bit in
 the mask indicates that the feature should be enabled, while clearing
 a bit in the mask indicates that the feature should be disabled.  It
 is important to ensure that all hosts in a pool appear the same to
 guests to allow successful live migration.
+
+### cpuid\_mask\_xsave\_eax (Intel only)
+> `= <integer>`
+
+> Default: `~0` (all bits set)
+
+This command line parameter is also used to specify a cpuid mask to
+help with cpuid levelling across a pool of hosts.  See the description
+of the other respective options above.
+
+### cpuid\_mask\_{l7s0\_{eax,ebx},thermal\_ecx} (AMD only)
+> `= <integer>`
+
+> Default: `~0` (all bits set)
+
+These three command line parameters are also used to specify cpuid
+masks to help with cpuid levelling across a pool of hosts.  See the
+description of the other respective options above.
 
 ### cpuidle
 > `= <boolean>`

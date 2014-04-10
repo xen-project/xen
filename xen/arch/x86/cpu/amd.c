@@ -30,8 +30,16 @@
  * "fam_10_rev_c"
  * "fam_11_rev_b"
  */
-static char opt_famrev[14];
+static char __initdata opt_famrev[14];
 string_param("cpuid_mask_cpu", opt_famrev);
+
+static unsigned int __initdata opt_cpuid_mask_l7s0_eax = ~0u;
+integer_param("cpuid_mask_l7s0_eax", opt_cpuid_mask_l7s0_eax);
+static unsigned int __initdata opt_cpuid_mask_l7s0_ebx = ~0u;
+integer_param("cpuid_mask_l7s0_ebx", opt_cpuid_mask_l7s0_ebx);
+
+static unsigned int __initdata opt_cpuid_mask_thermal_ecx = ~0u;
+integer_param("cpuid_mask_thermal_ecx", opt_cpuid_mask_thermal_ecx);
 
 /* 1 = allow, 0 = don't allow guest creation, -1 = don't allow boot */
 s8 __read_mostly opt_allow_unsafe;
@@ -96,7 +104,11 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 {
 	static unsigned int feat_ecx, feat_edx;
 	static unsigned int extfeat_ecx, extfeat_edx;
+	static unsigned int l7s0_eax, l7s0_ebx;
+	static unsigned int thermal_ecx;
+	static bool_t skip_l7s0_eax_ebx, skip_thermal_ecx;
 	static enum { not_parsed, no_mask, set_mask } status;
+	unsigned int eax, ebx, ecx, edx;
 
 	if (status == no_mask)
 		return;
@@ -104,7 +116,7 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 	if (status == set_mask)
 		goto setmask;
 
-	ASSERT((status == not_parsed) && (smp_processor_id() == 0));
+	ASSERT((status == not_parsed) && (c == &boot_cpu_data));
 	status = no_mask;
 
 	/* Fam11 doesn't support masking at all. */
@@ -112,11 +124,16 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 		return;
 
 	if (~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
-	      opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx)) {
+	      opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx &
+	      opt_cpuid_mask_l7s0_eax & opt_cpuid_mask_l7s0_ebx &
+	      opt_cpuid_mask_thermal_ecx)) {
 		feat_ecx = opt_cpuid_mask_ecx;
 		feat_edx = opt_cpuid_mask_edx;
 		extfeat_ecx = opt_cpuid_mask_ext_ecx;
 		extfeat_edx = opt_cpuid_mask_ext_edx;
+		l7s0_eax = opt_cpuid_mask_l7s0_eax;
+		l7s0_ebx = opt_cpuid_mask_l7s0_ebx;
+		thermal_ecx = opt_cpuid_mask_thermal_ecx;
 	} else if (*opt_famrev == '\0') {
 		return;
 	} else if (!strcmp(opt_famrev, "fam_0f_rev_c")) {
@@ -179,11 +196,39 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 	printk("Writing CPUID extended feature mask ECX:EDX -> %08Xh:%08Xh\n", 
 	       extfeat_ecx, extfeat_edx);
 
+	if (c->cpuid_level >= 7)
+		cpuid_count(7, 0, &eax, &ebx, &ecx, &edx);
+	else
+		ebx = eax = 0;
+	if ((eax | ebx) && ~(l7s0_eax & l7s0_ebx)) {
+		if (l7s0_eax > eax)
+			l7s0_eax = eax;
+		l7s0_ebx &= ebx;
+		printk("Writing CPUID leaf 7 subleaf 0 feature mask EAX:EBX -> %08Xh:%08Xh\n",
+		       l7s0_eax, l7s0_ebx);
+	} else
+		skip_l7s0_eax_ebx = 1;
+
+	/* Only Fam15 has the respective MSR. */
+	ecx = c->x86 == 0x15 && c->cpuid_level >= 6 ? cpuid_ecx(6) : 0;
+	if (ecx && ~thermal_ecx) {
+		thermal_ecx &= ecx;
+		printk("Writing CPUID thermal/power feature mask ECX -> %08Xh\n",
+		       thermal_ecx);
+	} else
+		skip_thermal_ecx = 1;
+
  setmask:
 	/* AMD processors prior to family 10h required a 32-bit password */
 	if (c->x86 >= 0x10) {
 		wrmsr(MSR_K8_FEATURE_MASK, feat_edx, feat_ecx);
 		wrmsr(MSR_K8_EXT_FEATURE_MASK, extfeat_edx, extfeat_ecx);
+		if (!skip_l7s0_eax_ebx)
+			wrmsr(MSR_AMD_L7S0_FEATURE_MASK, l7s0_ebx, l7s0_eax);
+		if (!skip_thermal_ecx) {
+			rdmsr(MSR_AMD_THRM_FEATURE_MASK, eax, edx);
+			wrmsr(MSR_AMD_THRM_FEATURE_MASK, thermal_ecx, edx);
+		}
 	} else {
 		wrmsr_amd(MSR_K8_FEATURE_MASK, feat_edx, feat_ecx);
 		wrmsr_amd(MSR_K8_EXT_FEATURE_MASK, extfeat_edx, extfeat_ecx);
