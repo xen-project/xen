@@ -551,6 +551,15 @@ bool_t mtrr_pat_not_equal(struct vcpu *vd, struct vcpu *vs)
     return 0;
 }
 
+struct hvm_mem_pinned_cacheattr_range {
+    struct list_head list;
+    uint64_t start, end;
+    uint32_t type;
+    struct rcu_head rcu;
+};
+
+static DEFINE_RCU_READ_LOCK(pinned_cacheattr_rcu_lock);
+
 void hvm_init_cacheattr_region_list(
     struct domain *d)
 {
@@ -573,30 +582,47 @@ void hvm_destroy_cacheattr_region_list(
     }
 }
 
-int32_t hvm_get_mem_pinned_cacheattr(
+int hvm_get_mem_pinned_cacheattr(
     struct domain *d,
     uint64_t guest_fn,
+    unsigned int order,
     uint32_t *type)
 {
     struct hvm_mem_pinned_cacheattr_range *range;
+    int rc = 0;
 
-    *type = 0;
+    *type = ~0;
 
     if ( !is_hvm_domain(d) )
         return 0;
 
+    rcu_read_lock(&pinned_cacheattr_rcu_lock);
     list_for_each_entry_rcu ( range,
                               &d->arch.hvm_domain.pinned_cacheattr_ranges,
                               list )
     {
-        if ( (guest_fn >= range->start) && (guest_fn <= range->end) )
+        if ( (guest_fn >= range->start) &&
+             (guest_fn + (1UL << order) - 1 <= range->end) )
         {
             *type = range->type;
-            return 1;
+            rc = 1;
+            break;
+        }
+        if ( (guest_fn <= range->end) &&
+             (range->start <= guest_fn + (1UL << order) - 1) )
+        {
+            rc = -1;
+            break;
         }
     }
+    rcu_read_unlock(&pinned_cacheattr_rcu_lock);
 
-    return 0;
+    return rc;
+}
+
+static void free_pinned_cacheattr_entry(struct rcu_head *rcu)
+{
+    xfree(container_of(rcu, struct hvm_mem_pinned_cacheattr_range, rcu));
 }
 
 int32_t hvm_set_mem_pinned_cacheattr(
@@ -606,6 +632,28 @@ int32_t hvm_set_mem_pinned_cacheattr(
     uint32_t  type)
 {
     struct hvm_mem_pinned_cacheattr_range *range;
+    int rc = 1;
+
+    if ( !is_hvm_domain(d) || gfn_end < gfn_start )
+        return 0;
+
+    if ( type == XEN_DOMCTL_DELETE_MEM_CACHEATTR )
+    {
+        /* Remove the requested range. */
+        rcu_read_lock(&pinned_cacheattr_rcu_lock);
+        list_for_each_entry_rcu ( range,
+                                  &d->arch.hvm_domain.pinned_cacheattr_ranges,
+                                  list )
+            if ( range->start == gfn_start && range->end == gfn_end )
+            {
+                rcu_read_unlock(&pinned_cacheattr_rcu_lock);
+                list_del_rcu(&range->list);
+                call_rcu(&range->rcu, free_pinned_cacheattr_entry);
+                return 0;
+            }
+        rcu_read_unlock(&pinned_cacheattr_rcu_lock);
+        return -ENOENT;
+    }
 
     if ( !((type == PAT_TYPE_UNCACHABLE) ||
            (type == PAT_TYPE_WRCOMB) ||
@@ -615,6 +663,27 @@ int32_t hvm_set_mem_pinned_cacheattr(
            (type == PAT_TYPE_UC_MINUS)) ||
          !is_hvm_domain(d) )
         return -EINVAL;
+
+    rcu_read_lock(&pinned_cacheattr_rcu_lock);
+    list_for_each_entry_rcu ( range,
+                              &d->arch.hvm_domain.pinned_cacheattr_ranges,
+                              list )
+    {
+        if ( range->start == gfn_start && range->end == gfn_end )
+        {
+            range->type = type;
+            rc = 0;
+            break;
+        }
+        if ( range->start <= gfn_end && gfn_start <= range->end )
+        {
+            rc = -EBUSY;
+            break;
+        }
+    }
+    rcu_read_unlock(&pinned_cacheattr_rcu_lock);
+    if ( rc <= 0 )
+        return rc;
 
     range = xzalloc(struct hvm_mem_pinned_cacheattr_range);
     if ( range == NULL )
@@ -732,8 +801,14 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( !mfn_valid(mfn_x(mfn)) )
         return MTRR_TYPE_UNCACHABLE;
 
-    if ( hvm_get_mem_pinned_cacheattr(d, gfn, &type) )
-        return type;
+    switch ( hvm_get_mem_pinned_cacheattr(d, gfn, order, &type) )
+    {
+    case 1:
+        *ipat = 1;
+        return type != PAT_TYPE_UC_MINUS ? type : PAT_TYPE_UNCACHABLE;
+    case -1:
+        return -1;
+    }
 
     if ( !iommu_enabled ||
          (rangeset_is_empty(d->iomem_caps) &&

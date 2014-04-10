@@ -555,6 +555,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_ioport_mapping_t);
 #define XEN_DOMCTL_MEM_CACHEATTR_WP  5
 #define XEN_DOMCTL_MEM_CACHEATTR_WB  6
 #define XEN_DOMCTL_MEM_CACHEATTR_UCM 7
+#define XEN_DOMCTL_DELETE_MEM_CACHEATTR (~(uint32_t)0)
 struct xen_domctl_pin_mem_cacheattr {
     uint64_aligned_t start, end;
     uint32_t type; /* XEN_DOMCTL_MEM_CACHEATTR_* */
