@@ -34,11 +34,20 @@ struct libxl__yajl_ctx {
 };
 
 #ifdef DEBUG_ANSWER
-#  define DEBUG_GEN_ALLOC(ctx) \
-    if ((ctx)->g == NULL) { \
-        yajl_gen_config conf = { 1, "  " }; \
+#if YAJL_VERSION < 20000
+#  define DEBUG_GEN_ALLOC(ctx)                  \
+    if ((ctx)->g == NULL) {                     \
+        yajl_gen_config conf = { 1, "  " };     \
         (ctx)->g = yajl_gen_alloc(&conf, NULL); \
     }
+#else  /* YAJL2 */
+#  define DEBUG_GEN_ALLOC(ctx)                                    \
+    if ((ctx)->g == NULL) {                                       \
+        (ctx)->g = yajl_gen_alloc(NULL);                          \
+        yajl_gen_config((ctx)->g, yajl_gen_beautify, 1);          \
+        yajl_gen_config((ctx)->g, yajl_gen_indent_string, "  ");  \
+    }
+#endif
 #  define DEBUG_GEN_FREE(ctx) \
     if ((ctx)->g) yajl_gen_free((ctx)->g)
 #  define DEBUG_GEN(ctx, type)              yajl_gen_##type(ctx->g)
@@ -48,7 +57,7 @@ struct libxl__yajl_ctx {
 #  define DEBUG_GEN_REPORT(yajl_ctx) \
     do { \
         const unsigned char *buf = NULL; \
-        unsigned int len = 0; \
+        size_t len = 0; \
         yajl_gen_get_buf((yajl_ctx)->g, &buf, &len); \
         LIBXL__LOG(libxl__gc_owner((yajl_ctx)->gc), \
                    LIBXL__LOG_DEBUG, "response:\n%s", buf); \
