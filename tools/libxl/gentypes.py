@@ -226,7 +226,7 @@ def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
         s += "s = yajl_gen_map_open(hand);\n"
         s += "if (s != yajl_gen_status_ok)\n"
         s += "    goto out;\n"
-        for f in [f for f in ty.fields if not f.const]:
+        for f in [f for f in ty.fields if not f.const and not f.type.private]:
             (nparent,fexpr) = ty.member(v, f, parent is None)
             s += "s = yajl_gen_string(hand, (const unsigned char *)\"%s\", sizeof(\"%s\")-1);\n" % (f.name, f.name)
             s += "if (s != yajl_gen_status_ok)\n"
