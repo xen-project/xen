@@ -3016,6 +3016,16 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
 
+    case EXIT_REASON_EPT_MISCONFIG:
+    {
+        paddr_t gpa;
+
+        __vmread(GUEST_PHYSICAL_ADDRESS, &gpa);
+        if ( !ept_handle_misconfig(gpa) )
+            goto exit_and_crash;
+        break;
+    }
+
     case EXIT_REASON_MONITOR_TRAP_FLAG:
         v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
         vmx_update_cpu_exec_control(v);

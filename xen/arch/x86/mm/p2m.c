@@ -200,6 +200,18 @@ void p2m_change_entry_type_global(struct domain *d,
     p2m_unlock(p2m);
 }
 
+void p2m_memory_type_changed(struct domain *d)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    if ( p2m->memory_type_changed )
+    {
+        p2m_lock(p2m);
+        p2m->memory_type_changed(p2m);
+        p2m_unlock(p2m);
+    }
+}
+
 mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
                     p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
                     unsigned int *page_order, bool_t locked)

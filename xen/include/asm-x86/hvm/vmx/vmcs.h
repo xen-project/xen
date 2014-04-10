@@ -124,6 +124,9 @@ struct arch_vmx_struct {
 
     unsigned long        host_cr0;
 
+    /* Do we need to tolerate a spurious EPT_MISCONFIG VM exit? */
+    bool_t               ept_spurious_misconfig;
+
     /* Is the guest in real mode? */
     uint8_t              vmx_realmode;
     /* Are we emulating rather than VMENTERing? */

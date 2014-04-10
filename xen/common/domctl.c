@@ -815,6 +815,10 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
         else
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
+#ifdef CONFIG_X86
+        if ( !ret )
+            memory_type_changed(d);
+#endif
     }
     break;
 

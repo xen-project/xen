@@ -83,6 +83,8 @@ long arch_do_domctl(
             ret = ioports_permit_access(d, fp, fp + np - 1);
         else
             ret = ioports_deny_access(d, fp, fp + np - 1);
+        if ( !ret )
+            memory_type_changed(d);
     }
     break;
 
@@ -706,6 +708,8 @@ long arch_do_domctl(
                        ret, add ? "removing" : "denying", d->domain_id,
                        mfn, mfn + nr_mfns - 1);
         }
+        /* Do this unconditionally to cover errors on above failure paths. */
+        memory_type_changed(d);
     }
     break;
 
@@ -792,6 +796,8 @@ long arch_do_domctl(
                        "ioport_map: error %ld denying dom%d access to [%x,%x]\n",
                        ret, d->domain_id, fmp, fmp + np - 1);
         }
+        if ( !ret )
+            memory_type_changed(d);
     }
     break;
 

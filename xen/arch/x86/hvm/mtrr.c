@@ -431,8 +431,12 @@ bool_t mtrr_def_type_msr_set(struct domain *d, struct mtrr_state *m,
          return 0;
     }
 
-    m->enabled = enabled;
-    m->def_type = def_type;
+    if ( m->enabled != enabled || m->def_type != def_type )
+    {
+        m->enabled = enabled;
+        m->def_type = def_type;
+        memory_type_changed(d);
+    }
 
     return 1;
 }
@@ -452,6 +456,7 @@ bool_t mtrr_fix_range_msr_set(struct domain *d, struct mtrr_state *m,
                 return 0;
 
         fixed_range_base[row] = msr_content;
+        memory_type_changed(d);
     }
 
     return 1;
@@ -495,6 +500,8 @@ bool_t mtrr_var_range_msr_set(
     var_range_base[index] = msr_content;
 
     m->overlapped = is_var_mtrr_overlapped(m);
+
+    memory_type_changed(d);
 
     return 1;
 }
@@ -690,6 +697,12 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
 HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, hvm_load_mtrr_msr,
                           1, HVMSR_PER_VCPU);
 
+void memory_type_changed(struct domain *d)
+{
+    if ( iommu_enabled && !iommu_snoop && d->vcpu && d->vcpu[0] )
+        p2m_memory_type_changed(d);
+}
+
 uint8_t epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
                            uint8_t *ipat, bool_t direct_mmio)
 {
@@ -733,8 +746,7 @@ uint8_t epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
         return MTRR_TYPE_WRBACK;
     }
 
-    gmtrr_mtype = is_hvm_domain(d) && v &&
-                  d->arch.hvm_domain.params[HVM_PARAM_IDENT_PT] ?
+    gmtrr_mtype = is_hvm_domain(d) && v ?
                   get_mtrr_type(&v->arch.hvm_vcpu.mtrr, (gfn << PAGE_SHIFT)) :
                   MTRR_TYPE_WRBACK;
 

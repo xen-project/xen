@@ -252,6 +252,9 @@ int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat)
 
     if ( !hvm_funcs.set_guest_pat(v, guest_pat) )
         v->arch.hvm_vcpu.pat_cr = guest_pat;
+
+    memory_type_changed(v->domain);
+
     return 1;
 }
 

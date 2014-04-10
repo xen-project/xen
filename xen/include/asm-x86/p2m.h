@@ -233,6 +233,7 @@ struct p2m_domain {
     void               (*change_entry_type_global)(struct p2m_domain *p2m,
                                                    p2m_type_t ot,
                                                    p2m_type_t nt);
+    void               (*memory_type_changed)(struct p2m_domain *p2m);
     
     void               (*write_p2m_entry)(struct p2m_domain *p2m,
                                           unsigned long gfn, l1_pgentry_t *p,
@@ -505,6 +506,9 @@ void p2m_change_type_range(struct domain *d,
 /* Compare-exchange the type of a single p2m entry */
 p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
                            p2m_type_t ot, p2m_type_t nt);
+
+/* Report a change affecting memory types. */
+void p2m_memory_type_changed(struct domain *d);
 
 /* Set mmio addresses in the p2m table (for pass-through) */
 int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
