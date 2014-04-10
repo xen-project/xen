@@ -216,7 +216,7 @@ F:      xen/arch/x86/x86_64/kexec_reloc.S
 
 MACHINE CHECK (MCA) & RAS
 M:	Christoph Egger <chegger@amazon.de>
-M:	Liu Jinsong <jinsong.liu@intel.com>
+M:	Liu Jinsong <jinsong.liu@alibaba-inc.com>
 S:	Supported
 F:	xen/arch/x86/cpu/mcheck/
 
