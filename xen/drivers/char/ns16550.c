@@ -105,6 +105,7 @@ enum {
     param_default = 0,
     param_trumanage,
     param_oxford,
+    param_oxford_2port,
 };
 /*
  * Create lookup tables for specific MMIO devices..
@@ -130,6 +131,16 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .fifo_size = 16,
         .lsr_mask = UART_LSR_THRE,
         .max_bars = 1, /* It can do more, but we would need more custom code.*/
+    },
+    [param_oxford_2port] = {
+        .base_baud = 4000000,
+        .uart_offset = 0x200,
+        .first_offset = 0x1000,
+        .reg_width = 1,
+        .reg_shift = 0,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .max_bars = 2,
     }
 };
 static const struct ns16550_config_mmio __initconst uart_config[] =
@@ -158,11 +169,23 @@ static const struct ns16550_config_mmio __initconst uart_config[] =
         .dev_id = 0xc138,
         .param = param_oxford,
     },
+    /* OXPCIe952 2 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc158,
+        .param = param_oxford_2port,
+    },
     /* OXPCIe952 1 Native UART  */
     {
         .vendor_id = PCI_VENDOR_ID_OXSEMI,
         .dev_id = 0xc13d,
         .param = param_oxford,
+    },
+    /* OXPCIe952 2 Native UART  */
+    {
+        .vendor_id = PCI_VENDOR_ID_OXSEMI,
+        .dev_id = 0xc15d,
+        .param = param_oxford_2port,
     },
     /* OXPCIe952 1 Native UART  */
     {
