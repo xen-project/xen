@@ -1742,7 +1742,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         break;
     default:
  bad_trap:
-        printk("Hypervisor Trap. HSR=0x%x EC=0x%x IL=%x Syndrome=%"PRIx32"\n",
+        printk("Hypervisor Trap. HSR=0x%x EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
                hsr.bits, hsr.ec, hsr.len, hsr.iss);
         do_unexpected_trap("Hypervisor", regs);
     }
