@@ -275,12 +275,12 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
         goto out;
 
     lchn->u.interdomain.remote_dom  = rd;
-    lchn->u.interdomain.remote_port = (u16)rport;
+    lchn->u.interdomain.remote_port = rport;
     lchn->state                     = ECS_INTERDOMAIN;
     evtchn_port_init(ld, lchn);
     
     rchn->u.interdomain.remote_dom  = ld;
-    rchn->u.interdomain.remote_port = (u16)lport;
+    rchn->u.interdomain.remote_port = lport;
     rchn->state                     = ECS_INTERDOMAIN;
 
     /*
