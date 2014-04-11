@@ -1242,7 +1242,7 @@ static int intel_iommu_domain_init(struct domain *d)
     return 0;
 }
 
-static void __init intel_iommu_dom0_init(struct domain *d)
+static void __hwdom_init intel_iommu_dom0_init(struct domain *d)
 {
     struct acpi_drhd_unit *drhd;
 
@@ -1992,7 +1992,7 @@ static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     return domain_context_unmap(pdev->domain, devfn, pdev);
 }
 
-static int __init setup_dom0_device(u8 devfn, struct pci_dev *pdev)
+static int __hwdom_init setup_dom0_device(u8 devfn, struct pci_dev *pdev)
 {
     int err;
 
@@ -2140,7 +2140,7 @@ static int init_vtd_hw(void)
     return 0;
 }
 
-static void __init setup_dom0_rmrr(struct domain *d)
+static void __hwdom_init setup_dom0_rmrr(struct domain *d)
 {
     struct acpi_rmrr_unit *rmrr;
     u16 bdf;

@@ -1438,7 +1438,7 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
     }
 }
 
-int __init xen_in_range(unsigned long mfn)
+int __hwdom_init xen_in_range(unsigned long mfn)
 {
     paddr_t start, end;
     int i;
@@ -1446,7 +1446,7 @@ int __init xen_in_range(unsigned long mfn)
     enum { region_s3, region_text, region_bss, nr_regions };
     static struct {
         paddr_t s, e;
-    } xen_regions[nr_regions] __initdata;
+    } xen_regions[nr_regions] __hwdom_initdata;
 
     /* initialize first time */
     if ( !xen_regions[0].s )

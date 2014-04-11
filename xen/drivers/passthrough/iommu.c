@@ -45,7 +45,7 @@ custom_param("iommu", parse_iommu_param);
 bool_t __initdata iommu_enable = 1;
 bool_t __read_mostly iommu_enabled;
 bool_t __read_mostly force_iommu;
-bool_t __initdata iommu_dom0_strict;
+bool_t __hwdom_initdata iommu_dom0_strict;
 bool_t __read_mostly iommu_verbose;
 bool_t __read_mostly iommu_workaround_bios_bug;
 bool_t __read_mostly iommu_passthrough;
@@ -130,7 +130,7 @@ int iommu_domain_init(struct domain *d)
     return hd->platform_ops->init(d);
 }
 
-static __init void check_dom0_pvh_reqs(struct domain *d)
+static void __hwdom_init check_dom0_pvh_reqs(struct domain *d)
 {
     if ( !iommu_enabled )
         panic("Presently, iommu must be enabled for pvh dom0\n");
@@ -141,7 +141,7 @@ static __init void check_dom0_pvh_reqs(struct domain *d)
     iommu_dom0_strict = 1;
 }
 
-void __init iommu_dom0_init(struct domain *d)
+void __hwdom_init iommu_dom0_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 

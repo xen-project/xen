@@ -893,7 +893,7 @@ static void setup_one_dom0_device(const struct setup_dom0 *ctxt,
               PCI_SLOT(devfn) == PCI_SLOT(pdev->devfn) );
 }
 
-static int __init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
+static int __hwdom_init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
 {
     struct setup_dom0 *ctxt = arg;
     int bus, devfn;
@@ -943,7 +943,7 @@ static int __init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
     return 0;
 }
 
-void __init setup_dom0_pci_devices(
+void __hwdom_init setup_dom0_pci_devices(
     struct domain *d, int (*handler)(u8 devfn, struct pci_dev *))
 {
     struct setup_dom0 ctxt = { .d = d, .handler = handler };

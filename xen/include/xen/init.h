@@ -129,4 +129,12 @@ extern struct kernel_param __setup_start, __setup_end;
 #define __devexitdata __exitdata
 #endif
 
+#ifdef CONFIG_LATE_HWDOM
+#define __hwdom_init
+#define __hwdom_initdata  __read_mostly
+#else
+#define __hwdom_init      __init
+#define __hwdom_initdata  __initdata
+#endif
+
 #endif /* _LINUX_INIT_H */

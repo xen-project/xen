@@ -169,7 +169,8 @@ static void amd_iommu_setup_domain_device(
     }
 }
 
-static int __init amd_iommu_setup_dom0_device(u8 devfn, struct pci_dev *pdev)
+static int __hwdom_init amd_iommu_setup_dom0_device(
+    u8 devfn, struct pci_dev *pdev)
 {
     int bdf = PCI_BDF2(pdev->bus, pdev->devfn);
     struct amd_iommu *iommu = find_iommu_for_device(pdev->seg, bdf);
@@ -280,7 +281,7 @@ static int amd_iommu_domain_init(struct domain *d)
     return 0;
 }
 
-static void __init amd_iommu_dom0_init(struct domain *d)
+static void __hwdom_init amd_iommu_dom0_init(struct domain *d)
 {
     unsigned long i; 
 
