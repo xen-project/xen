@@ -42,7 +42,6 @@
 #endif
 
 #ifndef ARCH_HAS_SPINLOCK_PREFETCH
-#define ARCH_HAS_SPINLOCK_PREFETCH
 #define spin_lock_prefetch(x) prefetchw(x)
 #endif
 

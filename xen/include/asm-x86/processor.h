@@ -481,34 +481,6 @@ static always_inline void rep_nop(void)
 
 #define cpu_relax() rep_nop()
 
-/* Prefetch instructions for Pentium III and AMD Athlon */
-#ifdef 	CONFIG_MPENTIUMIII
-
-#define ARCH_HAS_PREFETCH
-extern always_inline void prefetch(const void *x)
-{
-    asm volatile ( "prefetchnta (%0)" : : "r"(x) );
-}
-
-#elif CONFIG_X86_USE_3DNOW
-
-#define ARCH_HAS_PREFETCH
-#define ARCH_HAS_PREFETCHW
-#define ARCH_HAS_SPINLOCK_PREFETCH
-
-extern always_inline void prefetch(const void *x)
-{
-    asm volatile ( "prefetch (%0)" : : "r"(x) );
-}
-
-extern always_inline void prefetchw(const void *x)
-{
-    asm volatile ( "prefetchw (%0)" : : "r"(x) );
-}
-#define spin_lock_prefetch(x)	prefetchw(x)
-
-#endif
-
 void show_stack(struct cpu_user_regs *regs);
 void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs);
 void show_registers(struct cpu_user_regs *regs);
