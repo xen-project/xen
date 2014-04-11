@@ -1839,7 +1839,7 @@ void tsc_set_info(struct domain *d,
                   uint32_t tsc_mode, uint64_t elapsed_nsec,
                   uint32_t gtsc_khz, uint32_t incarnation)
 {
-    if ( is_idle_domain(d) || (d->domain_id == 0) )
+    if ( is_idle_domain(d) || is_hardware_domain(d) )
     {
         d->arch.vtsc = 0;
         return;
@@ -1943,7 +1943,7 @@ static void dump_softtsc(unsigned char key)
                "warp=%lu (count=%lu)\n", tsc_max_warp, tsc_check_count);
     for_each_domain ( d )
     {
-        if ( d->domain_id == 0 && d->arch.tsc_mode == TSC_MODE_DEFAULT )
+        if ( is_hardware_domain(d) && d->arch.tsc_mode == TSC_MODE_DEFAULT )
             continue;
         printk("dom%u%s: mode=%d",d->domain_id,
                 is_hvm_domain(d) ? "(hvm)" : "", d->arch.tsc_mode);

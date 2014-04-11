@@ -54,10 +54,11 @@ int vcpu_domain_init(struct domain *d)
 int vcpu_vtimer_init(struct vcpu *v)
 {
     struct vtimer *t = &v->arch.phys_timer;
-    bool_t d0 = (v->domain == dom0);
+    bool_t d0 = is_hardware_domain(v->domain);
 
     /*
-     * Domain 0 uses the hardware interrupts, guests get the virtual platform.
+     * Hardware domain uses the hardware interrupts, guests get the virtual
+     * platform.
      */
 
     init_timer(&t->timer, phys_timer_expired, t, v->processor);

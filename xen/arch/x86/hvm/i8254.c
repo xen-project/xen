@@ -549,7 +549,7 @@ int pv_pit_handler(int port, int data, int write)
         .data = data
     };
 
-    if ( (current->domain->domain_id == 0) && dom0_pit_access(&ioreq) )
+    if ( is_hardware_domain(current->domain) && dom0_pit_access(&ioreq) )
     {
         /* nothing to do */;
     }

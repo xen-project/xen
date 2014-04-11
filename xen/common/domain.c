@@ -237,7 +237,7 @@ struct domain *domain_create(
     else if ( domcr_flags & DOMCRF_pvh )
         d->guest_type = guest_type_pvh;
 
-    if ( domid == 0 )
+    if ( is_hardware_domain(d) )
     {
         d->is_pinned = opt_dom0_vcpus_pin;
         d->disable_migrate = 1;
@@ -262,7 +262,7 @@ struct domain *domain_create(
         d->is_paused_by_controller = 1;
         atomic_inc(&d->pause_count);
 
-        if ( domid )
+        if ( !is_hardware_domain(d) )
             d->nr_pirqs = nr_static_irqs + extra_domU_irqs;
         else
             d->nr_pirqs = nr_static_irqs + extra_dom0_irqs;
@@ -594,7 +594,7 @@ void domain_shutdown(struct domain *d, u8 reason)
         d->shutdown_code = reason;
     reason = d->shutdown_code;
 
-    if ( d->domain_id == 0 )
+    if ( is_hardware_domain(d) )
         dom0_shutdown(reason);
 
     if ( d->is_shutting_down )

@@ -4787,7 +4787,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
             .max_mfn = MACH2PHYS_NR_ENTRIES - 1
         };
 
-        if ( !mem_hotplug && current->domain == dom0 )
+        if ( !mem_hotplug && is_hardware_domain(current->domain) )
             mapping.max_mfn = max_page - 1;
         if ( copy_to_guest(arg, &mapping, 1) )
             return -EFAULT;

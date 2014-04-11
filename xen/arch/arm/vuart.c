@@ -46,7 +46,7 @@
 
 int domain_vuart_init(struct domain *d)
 {
-    ASSERT( !d->domain_id );
+    ASSERT( is_hardware_domain(d) );
 
     d->arch.vuart.info = serial_vuart_info(SERHND_DTUART);
     if ( !d->arch.vuart.info )

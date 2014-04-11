@@ -1529,7 +1529,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         }
 
         set_cpuid_faulting(is_pv_vcpu(next) &&
-                           (next->domain->domain_id != 0));
+                           !is_control_domain(next->domain) &&
+                           !is_hardware_domain(next->domain));
     }
 
     if (is_hvm_vcpu(next) && (prev != next) )

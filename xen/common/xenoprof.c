@@ -601,9 +601,15 @@ static int xenoprof_op_init(XEN_GUEST_HANDLE_PARAM(void) arg)
                                    xenoprof_init.cpu_type)) )
         return ret;
 
+    /* Only the hardware domain may become the primary profiler here because
+     * there is currently no cleanup of xenoprof_primary_profiler or associated
+     * profiling state when the primary profiling domain is shut down or
+     * crashes.  Once a better cleanup method is present, it will be possible to
+     * allow another domain to be the primary profiler.
+     */
     xenoprof_init.is_primary = 
         ((xenoprof_primary_profiler == d) ||
-         ((xenoprof_primary_profiler == NULL) && (d->domain_id == 0)));
+         ((xenoprof_primary_profiler == NULL) && is_hardware_domain(d)));
     if ( xenoprof_init.is_primary )
         xenoprof_primary_profiler = current->domain;
 

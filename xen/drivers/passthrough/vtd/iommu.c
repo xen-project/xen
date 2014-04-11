@@ -1327,7 +1327,7 @@ int domain_context_mapping_one(
         return res;
     }
 
-    if ( iommu_passthrough && (domain->domain_id == 0) )
+    if ( iommu_passthrough && is_hardware_domain(domain) )
     {
         context_set_translation_type(*context, CONTEXT_TT_PASS_THRU);
         agaw = level_to_agaw(iommu->nr_pt_levels);
@@ -1723,7 +1723,7 @@ static int intel_iommu_map_page(
         return 0;
 
     /* do nothing if dom0 and iommu supports pass thru */
-    if ( iommu_passthrough && (d->domain_id == 0) )
+    if ( iommu_passthrough && is_hardware_domain(d) )
         return 0;
 
     spin_lock(&hd->mapping_lock);
@@ -1767,7 +1767,7 @@ static int intel_iommu_map_page(
 static int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
     /* Do nothing if dom0 and iommu supports pass thru. */
-    if ( iommu_passthrough && (d->domain_id == 0) )
+    if ( iommu_passthrough && is_hardware_domain(d) )
         return 0;
 
     dma_pte_clear_one(d, (paddr_t)gfn << PAGE_SHIFT_4K);
@@ -1950,8 +1950,9 @@ static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
             continue;
 
         /*
-         * If the device belongs to dom0, and it has RMRR, don't remove
-         * it from dom0, because BIOS may use RMRR at booting time.
+         * If the device belongs to the hardware domain, and it has RMRR, don't
+         * remove it from the hardware domain, because BIOS may use RMRR at
+         * booting time.
          */
         if ( is_hardware_domain(pdev->domain) )
             return 0;

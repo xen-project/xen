@@ -82,7 +82,7 @@ int domain_vgic_init(struct domain *d)
     /* Currently nr_lines in vgic and gic doesn't have the same meanings
      * Here nr_lines = number of SPIs
      */
-    if ( d->domain_id == 0 )
+    if ( is_hardware_domain(d) )
         d->arch.vgic.nr_lines = gic_number_lines() - 32;
     else
         d->arch.vgic.nr_lines = 0; /* We don't need SPIs for the guest */

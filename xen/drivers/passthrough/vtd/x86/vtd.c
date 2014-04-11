@@ -111,7 +111,7 @@ void __init iommu_set_dom0_mapping(struct domain *d)
 {
     unsigned long i, j, tmp, top;
 
-    BUG_ON(d->domain_id != 0);
+    BUG_ON(!is_hardware_domain(d));
 
     top = max(max_pdx, pfn_to_pdx(0xffffffffUL >> PAGE_SHIFT) + 1);
 

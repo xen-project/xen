@@ -732,18 +732,19 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
 void pv_cpuid(struct cpu_user_regs *regs)
 {
     uint32_t a, b, c, d;
+    struct vcpu *curr = current;
 
     a = regs->eax;
     b = regs->ebx;
     c = regs->ecx;
     d = regs->edx;
 
-    if ( current->domain->domain_id != 0 )
+    if ( !is_control_domain(curr->domain) && !is_hardware_domain(curr->domain) )
     {
         unsigned int cpuid_leaf = a, sub_leaf = c;
 
         if ( !cpuid_hypervisor_leaves(a, c, &a, &b, &c, &d) )
-            domain_cpuid(current->domain, a, c, &a, &b, &c, &d);
+            domain_cpuid(curr->domain, a, c, &a, &b, &c, &d);
 
         switch ( cpuid_leaf )
         {
@@ -751,15 +752,15 @@ void pv_cpuid(struct cpu_user_regs *regs)
         {
             unsigned int _eax, _ebx, _ecx, _edx;
             /* EBX value of main leaf 0 depends on enabled xsave features */
-            if ( sub_leaf == 0 && current->arch.xcr0 )
+            if ( sub_leaf == 0 && curr->arch.xcr0 )
             {
                 /* reset EBX to default value first */
                 b = XSTATE_AREA_MIN_SIZE;
                 for ( sub_leaf = 2; sub_leaf < 63; sub_leaf++ )
                 {
-                    if ( !(current->arch.xcr0 & (1ULL << sub_leaf)) )
+                    if ( !(curr->arch.xcr0 & (1ULL << sub_leaf)) )
                         continue;
-                    domain_cpuid(current->domain, cpuid_leaf, sub_leaf,
+                    domain_cpuid(curr->domain, cpuid_leaf, sub_leaf,
                                  &_eax, &_ebx, &_ecx, &_edx);
                     if ( (_eax + _ebx) > b )
                         b = _eax + _ebx;
@@ -796,7 +797,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_DS, &d);
         __clear_bit(X86_FEATURE_ACC, &d);
         __clear_bit(X86_FEATURE_PBE, &d);
-        if ( is_pvh_vcpu(current) )
+        if ( is_pvh_vcpu(curr) )
             __clear_bit(X86_FEATURE_MTRR, &d);
 
         __clear_bit(X86_FEATURE_DTES64 % 32, &c);
@@ -805,7 +806,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_VMXE % 32, &c);
         __clear_bit(X86_FEATURE_SMXE % 32, &c);
         __clear_bit(X86_FEATURE_TM2 % 32, &c);
-        if ( is_pv_32bit_vcpu(current) )
+        if ( is_pv_32bit_vcpu(curr) )
             __clear_bit(X86_FEATURE_CX16 % 32, &c);
         __clear_bit(X86_FEATURE_XTPR % 32, &c);
         __clear_bit(X86_FEATURE_PDCM % 32, &c);
@@ -844,12 +845,12 @@ void pv_cpuid(struct cpu_user_regs *regs)
 
     case 0x80000001:
         /* Modify Feature Information. */
-        if ( is_pv_32bit_vcpu(current) )
+        if ( is_pv_32bit_vcpu(curr) )
         {
             __clear_bit(X86_FEATURE_LM % 32, &d);
             __clear_bit(X86_FEATURE_LAHF_LM % 32, &c);
         }
-        if ( is_pv_32on64_vcpu(current) &&
+        if ( is_pv_32on64_vcpu(curr) &&
              boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
             __clear_bit(X86_FEATURE_SYSCALL % 32, &d);
         __clear_bit(X86_FEATURE_PAGE1GB % 32, &d);
@@ -1860,7 +1861,7 @@ static inline uint64_t guest_misc_enable(uint64_t val)
 static int is_cpufreq_controller(struct domain *d)
 {
     return ((cpufreq_controller == FREQCTL_dom0_kernel) &&
-            (d->domain_id == 0));
+            is_hardware_domain(d));
 }
 
 #include "x86_64/mmconfig.h"

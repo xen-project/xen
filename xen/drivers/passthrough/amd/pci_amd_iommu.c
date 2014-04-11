@@ -122,7 +122,7 @@ static void amd_iommu_setup_domain_device(
 
     BUG_ON( !hd->root_table || !hd->paging_mode || !iommu->dev_table.buffer );
 
-    if ( iommu_passthrough && (domain->domain_id == 0) )
+    if ( iommu_passthrough && is_hardware_domain(domain) )
         valid = 0;
 
     if ( ats_enabled )

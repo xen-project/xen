@@ -430,7 +430,7 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
     int rc;
 
     /* Always trust dom0's MCE handler will prevent future access */
-    if ( d == dom0 )
+    if ( is_hardware_domain(d) )
         return 0;
 
     if (!mfn_valid(mfn_x(mfn)))

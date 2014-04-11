@@ -525,10 +525,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     /*
      * Virtual UART is only used by linux early printk and decompress code.
-     * Only use it for dom0 because the linux kernel may not support
-     * multi-platform.
+     * Only use it for the hardware domain because the linux kernel may not
+     * support multi-platform.
      */
-    if ( (d->domain_id == 0) && (rc = domain_vuart_init(d)) )
+    if ( is_hardware_domain(d) && (rc = domain_vuart_init(d)) )
         goto fail;
 
     return 0;
