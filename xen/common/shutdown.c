@@ -32,7 +32,7 @@ static void noreturn maybe_reboot(void)
     }
 }
 
-void dom0_shutdown(u8 reason)
+void hwdom_shutdown(u8 reason)
 {
     switch ( reason )
     {

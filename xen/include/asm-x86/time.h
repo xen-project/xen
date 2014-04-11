@@ -44,7 +44,7 @@ int time_resume(void);
 void init_percpu_time(void);
 
 struct ioreq;
-int dom0_pit_access(struct ioreq *ioreq);
+int hwdom_pit_access(struct ioreq *ioreq);
 
 int cpu_frequency_change(u64 freq);
 

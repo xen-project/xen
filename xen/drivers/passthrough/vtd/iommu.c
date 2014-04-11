@@ -55,8 +55,8 @@ int nr_iommus;
 
 static struct tasklet vtd_fault_tasklet;
 
-static int setup_dom0_device(u8 devfn, struct pci_dev *);
-static void setup_dom0_rmrr(struct domain *d);
+static int setup_hwdom_device(u8 devfn, struct pci_dev *);
+static void setup_hwdom_rmrr(struct domain *d);
 
 static int domain_iommu_domid(struct domain *d,
                               struct iommu *iommu)
@@ -1242,18 +1242,18 @@ static int intel_iommu_domain_init(struct domain *d)
     return 0;
 }
 
-static void __hwdom_init intel_iommu_dom0_init(struct domain *d)
+static void __hwdom_init intel_iommu_hwdom_init(struct domain *d)
 {
     struct acpi_drhd_unit *drhd;
 
     if ( !iommu_passthrough && !need_iommu(d) )
     {
         /* Set up 1:1 page table for dom0 */
-        iommu_set_dom0_mapping(d);
+        iommu_set_hwdom_mapping(d);
     }
 
-    setup_dom0_pci_devices(d, setup_dom0_device);
-    setup_dom0_rmrr(d);
+    setup_hwdom_pci_devices(d, setup_hwdom_device);
+    setup_hwdom_rmrr(d);
 
     iommu_flush_all();
 
@@ -1992,7 +1992,7 @@ static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     return domain_context_unmap(pdev->domain, devfn, pdev);
 }
 
-static int __hwdom_init setup_dom0_device(u8 devfn, struct pci_dev *pdev)
+static int __hwdom_init setup_hwdom_device(u8 devfn, struct pci_dev *pdev)
 {
     int err;
 
@@ -2140,7 +2140,7 @@ static int init_vtd_hw(void)
     return 0;
 }
 
-static void __hwdom_init setup_dom0_rmrr(struct domain *d)
+static void __hwdom_init setup_hwdom_rmrr(struct domain *d)
 {
     struct acpi_rmrr_unit *rmrr;
     u16 bdf;
@@ -2464,7 +2464,7 @@ static void vtd_dump_p2m_table(struct domain *d)
 
 const struct iommu_ops intel_iommu_ops = {
     .init = intel_iommu_domain_init,
-    .dom0_init = intel_iommu_dom0_init,
+    .hwdom_init = intel_iommu_hwdom_init,
     .add_device = intel_iommu_add_device,
     .enable_device = intel_iommu_enable_device,
     .remove_device = intel_iommu_remove_device,

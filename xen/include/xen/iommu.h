@@ -55,7 +55,7 @@ int iommu_add_device(struct pci_dev *pdev);
 int iommu_enable_device(struct pci_dev *pdev);
 int iommu_remove_device(struct pci_dev *pdev);
 int iommu_domain_init(struct domain *d);
-void iommu_dom0_init(struct domain *d);
+void iommu_hwdom_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
 int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn);
 
@@ -90,7 +90,7 @@ struct page_info;
 
 struct iommu_ops {
     int (*init)(struct domain *d);
-    void (*dom0_init)(struct domain *d);
+    void (*hwdom_init)(struct domain *d);
     int (*add_device)(u8 devfn, struct pci_dev *);
     int (*enable_device)(struct pci_dev *pdev);
     int (*remove_device)(u8 devfn, struct pci_dev *);
@@ -127,7 +127,7 @@ void iommu_suspend(void);
 void iommu_resume(void);
 void iommu_crash_shutdown(void);
 
-void iommu_set_dom0_mapping(struct domain *d);
+void iommu_set_hwdom_mapping(struct domain *d);
 void iommu_share_p2m_table(struct domain *d);
 
 int iommu_do_domctl(struct xen_domctl *, struct domain *d,

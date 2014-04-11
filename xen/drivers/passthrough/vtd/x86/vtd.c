@@ -107,7 +107,7 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
     spin_unlock(&d->event_lock);
 }
 
-void __hwdom_init iommu_set_dom0_mapping(struct domain *d)
+void __hwdom_init iommu_set_hwdom_mapping(struct domain *d)
 {
     unsigned long i, j, tmp, top;
 

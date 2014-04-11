@@ -595,7 +595,7 @@ void domain_shutdown(struct domain *d, u8 reason)
     reason = d->shutdown_code;
 
     if ( is_hardware_domain(d) )
-        dom0_shutdown(reason);
+        hwdom_shutdown(reason);
 
     if ( d->is_shutting_down )
     {

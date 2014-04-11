@@ -148,9 +148,9 @@ static struct keyhandler dump_registers_keyhandler = {
     .desc = "dump registers"
 };
 
-static DECLARE_TASKLET(dump_dom0_tasklet, NULL, 0);
+static DECLARE_TASKLET(dump_hwdom_tasklet, NULL, 0);
 
-static void dump_dom0_action(unsigned long arg)
+static void dump_hwdom_action(unsigned long arg)
 {
     struct vcpu *v = (void *)arg;
 
@@ -161,14 +161,14 @@ static void dump_dom0_action(unsigned long arg)
             break;
         if ( softirq_pending(smp_processor_id()) )
         {
-            dump_dom0_tasklet.data = (unsigned long)v;
-            tasklet_schedule_on_cpu(&dump_dom0_tasklet, v->processor);
+            dump_hwdom_tasklet.data = (unsigned long)v;
+            tasklet_schedule_on_cpu(&dump_hwdom_tasklet, v->processor);
             break;
         }
     }
 }
 
-static void dump_dom0_registers(unsigned char key)
+static void dump_hwdom_registers(unsigned char key)
 {
     struct vcpu *v;
 
@@ -181,19 +181,19 @@ static void dump_dom0_registers(unsigned char key)
     {
         if ( alt_key_handling && softirq_pending(smp_processor_id()) )
         {
-            tasklet_kill(&dump_dom0_tasklet);
-            tasklet_init(&dump_dom0_tasklet, dump_dom0_action,
+            tasklet_kill(&dump_hwdom_tasklet);
+            tasklet_init(&dump_hwdom_tasklet, dump_hwdom_action,
                          (unsigned long)v);
-            tasklet_schedule_on_cpu(&dump_dom0_tasklet, v->processor);
+            tasklet_schedule_on_cpu(&dump_hwdom_tasklet, v->processor);
             return;
         }
         vcpu_show_execution_state(v);
     }
 }
 
-static struct keyhandler dump_dom0_registers_keyhandler = {
+static struct keyhandler dump_hwdom_registers_keyhandler = {
     .diagnostic = 1,
-    .u.fn = dump_dom0_registers,
+    .u.fn = dump_hwdom_registers,
     .desc = "dump Dom0 registers"
 };
 
@@ -543,7 +543,7 @@ void __init initialize_keytable(void)
     register_keyhandler('r', &dump_runq_keyhandler);
     register_keyhandler('R', &reboot_machine_keyhandler);
     register_keyhandler('t', &read_clocks_keyhandler);
-    register_keyhandler('0', &dump_dom0_registers_keyhandler);
+    register_keyhandler('0', &dump_hwdom_registers_keyhandler);
     register_keyhandler('%', &do_debug_key_keyhandler);
     register_keyhandler('*', &run_all_keyhandlers_keyhandler);
 

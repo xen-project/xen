@@ -867,12 +867,12 @@ int __init scan_pci_devices(void)
     return ret;
 }
 
-struct setup_dom0 {
+struct setup_hwdom {
     struct domain *d;
     int (*handler)(u8 devfn, struct pci_dev *);
 };
 
-static void setup_one_dom0_device(const struct setup_dom0 *ctxt,
+static void setup_one_hwdom_device(const struct setup_hwdom *ctxt,
                                   struct pci_dev *pdev)
 {
     u8 devfn = pdev->devfn;
@@ -893,9 +893,9 @@ static void setup_one_dom0_device(const struct setup_dom0 *ctxt,
               PCI_SLOT(devfn) == PCI_SLOT(pdev->devfn) );
 }
 
-static int __hwdom_init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
+static int __hwdom_init _setup_hwdom_pci_devices(struct pci_seg *pseg, void *arg)
 {
-    struct setup_dom0 *ctxt = arg;
+    struct setup_hwdom *ctxt = arg;
     int bus, devfn;
 
     for ( bus = 0; bus < 256; bus++ )
@@ -911,12 +911,12 @@ static int __hwdom_init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
             {
                 pdev->domain = ctxt->d;
                 list_add(&pdev->domain_list, &ctxt->d->arch.pdev_list);
-                setup_one_dom0_device(ctxt, pdev);
+                setup_one_hwdom_device(ctxt, pdev);
             }
             else if ( pdev->domain == dom_xen )
             {
                 pdev->domain = ctxt->d;
-                setup_one_dom0_device(ctxt, pdev);
+                setup_one_hwdom_device(ctxt, pdev);
                 pdev->domain = dom_xen;
             }
             else if ( pdev->domain != ctxt->d )
@@ -943,13 +943,13 @@ static int __hwdom_init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
     return 0;
 }
 
-void __hwdom_init setup_dom0_pci_devices(
+void __hwdom_init setup_hwdom_pci_devices(
     struct domain *d, int (*handler)(u8 devfn, struct pci_dev *))
 {
-    struct setup_dom0 ctxt = { .d = d, .handler = handler };
+    struct setup_hwdom ctxt = { .d = d, .handler = handler };
 
     spin_lock(&pcidevs_lock);
-    pci_segments_iterate(_setup_dom0_pci_devices, &ctxt);
+    pci_segments_iterate(_setup_hwdom_pci_devices, &ctxt);
     spin_unlock(&pcidevs_lock);
 }
 

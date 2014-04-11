@@ -169,7 +169,7 @@ static void amd_iommu_setup_domain_device(
     }
 }
 
-static int __hwdom_init amd_iommu_setup_dom0_device(
+static int __hwdom_init amd_iommu_setup_hwdom_device(
     u8 devfn, struct pci_dev *pdev)
 {
     int bdf = PCI_BDF2(pdev->bus, pdev->devfn);
@@ -281,7 +281,7 @@ static int amd_iommu_domain_init(struct domain *d)
     return 0;
 }
 
-static void __hwdom_init amd_iommu_dom0_init(struct domain *d)
+static void __hwdom_init amd_iommu_hwdom_init(struct domain *d)
 {
     unsigned long i; 
 
@@ -305,7 +305,7 @@ static void __hwdom_init amd_iommu_dom0_init(struct domain *d)
         }
     }
 
-    setup_dom0_pci_devices(d, amd_iommu_setup_dom0_device);
+    setup_hwdom_pci_devices(d, amd_iommu_setup_hwdom_device);
 }
 
 void amd_iommu_disable_domain_device(struct domain *domain,
@@ -603,7 +603,7 @@ static void amd_dump_p2m_table(struct domain *d)
 
 const struct iommu_ops amd_iommu_ops = {
     .init = amd_iommu_domain_init,
-    .dom0_init = amd_iommu_dom0_init,
+    .hwdom_init = amd_iommu_hwdom_init,
     .add_device = amd_iommu_add_device,
     .remove_device = amd_iommu_remove_device,
     .assign_device  = amd_iommu_assign_device,

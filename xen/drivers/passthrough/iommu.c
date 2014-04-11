@@ -130,7 +130,7 @@ int iommu_domain_init(struct domain *d)
     return hd->platform_ops->init(d);
 }
 
-static void __hwdom_init check_dom0_pvh_reqs(struct domain *d)
+static void __hwdom_init check_hwdom_pvh_reqs(struct domain *d)
 {
     if ( !iommu_enabled )
         panic("Presently, iommu must be enabled for pvh dom0\n");
@@ -141,12 +141,12 @@ static void __hwdom_init check_dom0_pvh_reqs(struct domain *d)
     iommu_dom0_strict = 1;
 }
 
-void __hwdom_init iommu_dom0_init(struct domain *d)
+void __hwdom_init iommu_hwdom_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
     if ( is_pvh_domain(d) )
-        check_dom0_pvh_reqs(d);
+        check_hwdom_pvh_reqs(d);
 
     if ( !iommu_enabled )
         return;
@@ -173,7 +173,7 @@ void __hwdom_init iommu_dom0_init(struct domain *d)
         }
     }
 
-    return hd->platform_ops->dom0_init(d);
+    return hd->platform_ops->hwdom_init(d);
 }
 
 int iommu_add_device(struct pci_dev *pdev)

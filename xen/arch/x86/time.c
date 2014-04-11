@@ -1602,7 +1602,7 @@ int time_resume(void)
     return 0;
 }
 
-int dom0_pit_access(struct ioreq *ioreq)
+int hwdom_pit_access(struct ioreq *ioreq)
 {
     /* Is Xen using Channel 2? Then disallow direct dom0 access. */
     if ( using_pit )

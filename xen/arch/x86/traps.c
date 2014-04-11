@@ -3150,7 +3150,7 @@ void async_exception_cleanup(struct vcpu *curr)
     curr->async_exception_mask = curr->async_exception_state(trap).old_mask;
 }
 
-static void nmi_dom0_report(unsigned int reason_idx)
+static void nmi_hwdom_report(unsigned int reason_idx)
 {
     struct domain *d = hardware_domain;
 
@@ -3169,7 +3169,7 @@ static void pci_serr_error(struct cpu_user_regs *regs)
     switch ( opt_nmi[0] )
     {
     case 'd': /* 'dom0' */
-        nmi_dom0_report(_XEN_NMIREASON_pci_serr);
+        nmi_hwdom_report(_XEN_NMIREASON_pci_serr);
     case 'i': /* 'ignore' */
         /* Would like to print a diagnostic here but can't call printk()
            from NMI context -- raise a softirq instead. */
@@ -3187,7 +3187,7 @@ static void io_check_error(struct cpu_user_regs *regs)
     switch ( opt_nmi[0] )
     {
     case 'd': /* 'dom0' */
-        nmi_dom0_report(_XEN_NMIREASON_io_error);
+        nmi_hwdom_report(_XEN_NMIREASON_io_error);
     case 'i': /* 'ignore' */
         break;
     default:  /* 'fatal' */
@@ -3206,7 +3206,7 @@ static void unknown_nmi_error(struct cpu_user_regs *regs, unsigned char reason)
     switch ( opt_nmi[0] )
     {
     case 'd': /* 'dom0' */
-        nmi_dom0_report(_XEN_NMIREASON_unknown);
+        nmi_hwdom_report(_XEN_NMIREASON_unknown);
     case 'i': /* 'ignore' */
         break;
     default:  /* 'fatal' */

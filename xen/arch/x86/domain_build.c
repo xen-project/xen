@@ -1150,7 +1150,7 @@ int __init construct_dom0(
         printk(" Xen warning: dom0 kernel broken ELF: %s\n",
                elf_check_broken(&elf));
 
-    iommu_dom0_init(hardware_domain);
+    iommu_hwdom_init(hardware_domain);
     return 0;
 
 out:
