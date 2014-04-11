@@ -663,6 +663,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     size_t fdt_size;
     int cpus, i;
     const char *cmdline;
+    struct domain *dom0;
 
     setup_cache();
 
@@ -760,8 +761,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     do_initcalls();
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0, 0, 0);
-    if ( IS_ERR(dom0) || (alloc_dom0_vcpu0() == NULL) )
+    hardware_domain = dom0 = domain_create(0, 0, 0);
+    if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
             panic("Error creating domain 0");
 
     dom0->is_privileged = 1;

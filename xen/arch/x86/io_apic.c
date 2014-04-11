@@ -2363,7 +2363,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
      * that dom0 pirq == irq.
      */
     pirq = (irq >= 256) ? irq : rte.vector;
-    if ( (pirq < 0) || (pirq >= dom0->nr_pirqs) )
+    if ( (pirq < 0) || (pirq >= hardware_domain->nr_pirqs) )
         return -EINVAL;
     
     if ( desc->action )
@@ -2399,10 +2399,10 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 
         printk(XENLOG_INFO "allocated vector %02x for irq %d\n", ret, irq);
     }
-    spin_lock(&dom0->event_lock);
-    ret = map_domain_pirq(dom0, pirq, irq,
+    spin_lock(&hardware_domain->event_lock);
+    ret = map_domain_pirq(hardware_domain, pirq, irq,
             MAP_PIRQ_TYPE_GSI, NULL);
-    spin_unlock(&dom0->event_lock);
+    spin_unlock(&hardware_domain->event_lock);
     if ( ret < 0 )
         return ret;
 

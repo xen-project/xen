@@ -3152,7 +3152,7 @@ void async_exception_cleanup(struct vcpu *curr)
 
 static void nmi_dom0_report(unsigned int reason_idx)
 {
-    struct domain *d = dom0;
+    struct domain *d = hardware_domain;
 
     if ( (d == NULL) || (d->vcpu == NULL) || (d->vcpu[0] == NULL) )
         return;

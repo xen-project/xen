@@ -1447,15 +1447,15 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     if ( ret )
         goto destroy_m2p;
 
-    if ( !need_iommu(dom0) )
+    if ( !need_iommu(hardware_domain) )
     {
         for ( i = spfn; i < epfn; i++ )
-            if ( iommu_map_page(dom0, i, i, IOMMUF_readable|IOMMUF_writable) )
+            if ( iommu_map_page(hardware_domain, i, i, IOMMUF_readable|IOMMUF_writable) )
                 break;
         if ( i != epfn )
         {
             while (i-- > old_max)
-                iommu_unmap_page(dom0, i);
+                iommu_unmap_page(hardware_domain, i);
             goto destroy_m2p;
         }
     }

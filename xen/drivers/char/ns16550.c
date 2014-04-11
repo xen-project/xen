@@ -726,10 +726,12 @@ static void __init ns16550_endboot(struct serial_port *port)
 {
 #ifdef HAS_IOPORTS
     struct ns16550 *uart = port->uart;
+    int rv;
 
     if ( uart->remapped_io_base )
         return;
-    if ( ioports_deny_access(dom0, uart->io_base, uart->io_base + 7) != 0 )
+    rv = ioports_deny_access(hardware_domain, uart->io_base, uart->io_base + 7);
+    if ( rv != 0 )
         BUG();
 #endif
 }

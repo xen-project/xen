@@ -547,6 +547,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
     int i, j, e820_warn = 0, bytes = 0;
     bool_t acpi_boot_table_init_done = 0;
+    struct domain *dom0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
         .parity    = 'n',
@@ -1338,8 +1339,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         panic("Could not protect TXT memory regions");
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0, DOMCRF_s3_integrity, 0);
-    if ( IS_ERR(dom0) || (alloc_dom0_vcpu0() == NULL) )
+    hardware_domain = dom0 = domain_create(0, DOMCRF_s3_integrity, 0);
+    if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
         panic("Error creating domain 0");
 
     dom0->is_privileged = 1;

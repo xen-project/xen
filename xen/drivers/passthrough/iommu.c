@@ -265,7 +265,7 @@ static void iommu_teardown(struct domain *d)
 }
 
 /*
- * If the device isn't owned by dom0, it means it already
+ * If the device isn't owned by the hardware domain, it means it already
  * has been assigned to other domain, or it doesn't exist.
  */
 static int device_assigned(u16 seg, u8 bus, u8 devfn)
@@ -273,7 +273,7 @@ static int device_assigned(u16 seg, u8 bus, u8 devfn)
     struct pci_dev *pdev;
 
     spin_lock(&pcidevs_lock);
-    pdev = pci_get_pdev_by_domain(dom0, seg, bus, devfn);
+    pdev = pci_get_pdev_by_domain(hardware_domain, seg, bus, devfn);
     spin_unlock(&pcidevs_lock);
 
     return pdev ? 0 : -EBUSY;
@@ -312,7 +312,7 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
         d->need_iommu = 1;
     }
 
-    pdev = pci_get_pdev_by_domain(dom0, seg, bus, devfn);
+    pdev = pci_get_pdev_by_domain(hardware_domain, seg, bus, devfn);
     if ( !pdev )
     {
         rc = pci_get_pdev(seg, bus, devfn) ? -EBUSY : -ENODEV;
@@ -507,7 +507,7 @@ int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
         devfn += pdev->phantom_stride;
         if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
             break;
-        ret = hd->platform_ops->reassign_device(d, dom0, devfn, pdev);
+        ret = hd->platform_ops->reassign_device(d, hardware_domain, devfn, pdev);
         if ( !ret )
             continue;
 
@@ -517,7 +517,7 @@ int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
     }
 
     devfn = pdev->devfn;
-    ret = hd->platform_ops->reassign_device(d, dom0, devfn, pdev);
+    ret = hd->platform_ops->reassign_device(d, hardware_domain, devfn, pdev);
     if ( ret )
     {
         dprintk(XENLOG_G_ERR,

@@ -569,7 +569,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
     ret = 0;
     if ( !pdev->domain )
     {
-        pdev->domain = dom0;
+        pdev->domain = hardware_domain;
         ret = iommu_add_device(pdev);
         if ( ret )
         {
@@ -577,7 +577,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
             goto out;
         }
 
-        list_add(&pdev->domain_list, &dom0->arch.pdev_list);
+        list_add(&pdev->domain_list, &hardware_domain->arch.pdev_list);
     }
     else
         iommu_enable_device(pdev);

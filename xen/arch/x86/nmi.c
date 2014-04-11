@@ -519,7 +519,7 @@ static void do_nmi_stats(unsigned char key)
     for_each_online_cpu ( i )
         printk("%3d\t%3d\n", i, nmi_count(i));
 
-    if ( ((d = dom0) == NULL) || (d->vcpu == NULL) ||
+    if ( ((d = hardware_domain) == NULL) || (d->vcpu == NULL) ||
          ((v = d->vcpu[0]) == NULL) )
         return;
 

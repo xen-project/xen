@@ -5222,7 +5222,7 @@ void *alloc_xen_pagetable(void)
     {
         void *ptr = alloc_xenheap_page();
 
-        BUG_ON(!dom0 && !ptr);
+        BUG_ON(!hardware_domain && !ptr);
         return ptr;
     }
 

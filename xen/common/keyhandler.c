@@ -172,12 +172,12 @@ static void dump_dom0_registers(unsigned char key)
 {
     struct vcpu *v;
 
-    if ( dom0 == NULL )
+    if ( hardware_domain == NULL )
         return;
 
     printk("'%c' pressed -> dumping Dom0's registers\n", key);
 
-    for_each_vcpu ( dom0, v )
+    for_each_vcpu ( hardware_domain, v )
     {
         if ( alt_key_handling && softirq_pending(smp_processor_id()) )
         {

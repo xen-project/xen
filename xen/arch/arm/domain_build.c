@@ -50,7 +50,7 @@ custom_param("dom0_mem", parse_dom0_mem);
  */
 #define DOM0_FDT_EXTRA_SIZE (128 + sizeof(struct fdt_reserve_entry))
 
-struct vcpu *__init alloc_dom0_vcpu0(void)
+struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 {
     if ( opt_dom0_max_vcpus == 0 )
         opt_dom0_max_vcpus = num_online_cpus();

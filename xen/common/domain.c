@@ -59,7 +59,7 @@ DEFINE_RCU_READ_LOCK(domlist_read_lock);
 static struct domain *domain_hash[DOMAIN_HASH_SIZE];
 struct domain *domain_list;
 
-struct domain *dom0;
+struct domain *hardware_domain __read_mostly;
 
 struct vcpu *idle_vcpu[NR_CPUS] __read_mostly;
 

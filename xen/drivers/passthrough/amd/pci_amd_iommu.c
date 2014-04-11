@@ -403,7 +403,7 @@ static int amd_iommu_assign_device(struct domain *d, u8 devfn,
             ivrs_mappings[req_id].read_permission);
     }
 
-    return reassign_device(dom0, d, devfn, pdev);
+    return reassign_device(hardware_domain, d, devfn, pdev);
 }
 
 static void deallocate_next_page_table(struct page_info *pg, int level)

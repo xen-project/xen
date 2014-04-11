@@ -185,9 +185,9 @@ int create_irq(int node)
         desc->arch.used = IRQ_UNUSED;
         irq = ret;
     }
-    else if ( dom0 )
+    else if ( hardware_domain )
     {
-        ret = irq_permit_access(dom0, irq);
+        ret = irq_permit_access(hardware_domain, irq);
         if ( ret )
             printk(XENLOG_G_ERR
                    "Could not grant Dom0 access to IRQ%d (error %d)\n",
@@ -205,9 +205,9 @@ void destroy_irq(unsigned int irq)
 
     BUG_ON(!MSI_IRQ(irq));
 
-    if ( dom0 )
+    if ( hardware_domain )
     {
-        int err = irq_deny_access(dom0, irq);
+        int err = irq_deny_access(hardware_domain, irq);
 
         if ( err )
             printk(XENLOG_G_ERR

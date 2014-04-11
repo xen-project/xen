@@ -43,8 +43,8 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
 
 #define SCHED_STAT_CRANK(_X)                (perfc_incr(_X))
 
-/* A global pointer to the initial domain (DOM0). */
-extern struct domain *dom0;
+/* A global pointer to the hardware domain (usually DOM0). */
+extern struct domain *hardware_domain;
 
 #ifndef CONFIG_COMPAT
 #define BITS_PER_EVTCHN_WORD(d) BITS_PER_XEN_ULONG

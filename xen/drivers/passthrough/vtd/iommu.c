@@ -1667,7 +1667,7 @@ static int reassign_device_ownership(
      * can attempt to send arbitrary LAPIC/MSI messages. We are unprotected
      * by the root complex unless interrupt remapping is enabled.
      */
-    if ( (target != dom0) && !iommu_intremap )
+    if ( (target != hardware_domain) && !iommu_intremap )
         untrusted_msi = 1;
 
     ret = domain_context_unmap(source, devfn, pdev);
@@ -2270,7 +2270,7 @@ static int intel_iommu_assign_device(
     if ( list_empty(&acpi_drhd_units) )
         return -ENODEV;
 
-    ret = reassign_device_ownership(dom0, d, devfn, pdev);
+    ret = reassign_device_ownership(hardware_domain, d, devfn, pdev);
     if ( ret )
         goto done;
 
