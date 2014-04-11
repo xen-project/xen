@@ -33,7 +33,7 @@ fi
 # Fill in the debian boilerplate
 mkdir -p deb/DEBIAN
 cat >deb/DEBIAN/control <<EOF
-Package: xen-upstream-$version
+Package: xen-upstream
 Source: xen-upstream
 Version: $version
 Architecture: $arch
@@ -41,12 +41,15 @@ Maintainer: Unmaintained snapshot
 Section: admin
 Priority: optional
 Installed-Size: $(du -ks deb | cut -f1)
-Description: Xen hypervisor and tools, version $version
- This package contains the Xen hypervisor and associated tools, built
- from a source tree.  It is not a fully packaged and supported Xen, just
- the output of a xen "make dist" wrapped in a .deb to make it easy to
- uninstall.
+Description: Xen upstream testing build snapshot
+ Warning: This is a custom testing build of Xen; it is not an
+ officially supported Debian package. Please not distribute.
+ It is just the output of a xen "make dist" wrapped in a .deb
+ to make it easy to update and uninstall.
 EOF
+# Find all /etc files and add them to conffiles
+find deb/etc -type f -printf /etc/%P\\n >deb/DEBIAN/conffiles
+
 
 # Package it up
 chown -R root:root deb
