@@ -436,7 +436,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             for ( dom = rover + 1; dom != rover; dom++ )
             {
                 if ( dom == DOMID_FIRST_RESERVED )
-                    dom = 0;
+                    dom = 1;
                 if ( is_free_domid(dom) )
                     break;
             }
