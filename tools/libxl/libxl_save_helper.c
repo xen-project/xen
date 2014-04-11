@@ -47,6 +47,35 @@
 #include "xenguest.h"
 #include "_libxl_save_msgs_helper.h"
 
+/*----- logger -----*/
+
+static void tellparent_vmessage(xentoollog_logger *logger_in,
+                                xentoollog_level level,
+                                int errnoval,
+                                const char *context,
+                                const char *format,
+                                va_list al)
+{
+    char *formatted;
+    int r = vasprintf(&formatted, format, al);
+    if (r < 0) { perror("memory allocation failed during logging"); exit(-1); }
+    helper_stub_log(level, errnoval, context, formatted, 0);
+    free(formatted);
+}
+
+static void tellparent_progress(struct xentoollog_logger *logger_in,
+                                const char *context,
+                                const char *doing_what, int percent,
+                                unsigned long done, unsigned long total)
+{
+    helper_stub_progress(context, doing_what, done, total, 0);
+}
+
+static void tellparent_destroy(struct xentoollog_logger *logger_in)
+{
+    abort();
+}
+
 /*----- globals -----*/
 
 static const char *program = "libxl-save-helper";
@@ -86,38 +115,9 @@ static void *xmalloc(size_t sz)
     return r;
 }
 
-/*----- logger -----*/
-
 typedef struct {
     xentoollog_logger vtable;
 } xentoollog_logger_tellparent;
-
-static void tellparent_vmessage(xentoollog_logger *logger_in,
-                                xentoollog_level level,
-                                int errnoval,
-                                const char *context,
-                                const char *format,
-                                va_list al)
-{
-    char *formatted;
-    int r = vasprintf(&formatted, format, al);
-    if (r < 0) { perror("memory allocation failed during logging"); exit(-1); }
-    helper_stub_log(level, errnoval, context, formatted, 0);
-    free(formatted);
-}
-
-static void tellparent_progress(struct xentoollog_logger *logger_in,
-                                const char *context,
-                                const char *doing_what, int percent,
-                                unsigned long done, unsigned long total)
-{
-    helper_stub_progress(context, doing_what, done, total, 0);
-}
-
-static void tellparent_destroy(struct xentoollog_logger *logger_in)
-{
-    abort();
-}
 
 static xentoollog_logger_tellparent *createlogger_tellparent(void)
 {
