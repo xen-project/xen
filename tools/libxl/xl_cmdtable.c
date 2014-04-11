@@ -56,7 +56,10 @@ struct cmd_spec cmd_table[] = {
     { "destroy",
       &main_destroy, 0, 1,
       "Terminate a domain immediately",
-      "<Domain>",
+      "[options] <Domain>\n",
+      "-f                      Permit destroying domain 0, which will only succeed\n"
+      "                        when run from disaggregated toolstack domain with a\n"
+      "                        hardware domain distinct from domain 0."
     },
     { "shutdown",
       &main_shutdown, 0, 1,

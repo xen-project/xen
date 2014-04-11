@@ -3053,12 +3053,14 @@ static void unpause_domain(uint32_t domid)
     libxl_domain_unpause(ctx, domid);
 }
 
-static void destroy_domain(uint32_t domid)
+static void destroy_domain(uint32_t domid, int force)
 {
     int rc;
 
-    if (domid == 0) {
-        fprintf(stderr, "Cannot destroy privileged domain 0.\n\n");
+    if (domid == 0 && !force) {
+        fprintf(stderr, "Not destroying domain 0; use -f to force.\n"
+                        "This can only be done when using a disaggregated "
+                        "hardware domain and toolstack.\n\n");
         exit(-1);
     }
     rc = libxl_domain_destroy(ctx, domid, 0);
@@ -4157,12 +4159,15 @@ int main_unpause(int argc, char **argv)
 int main_destroy(int argc, char **argv)
 {
     int opt;
+    int force = 0;
 
-    SWITCH_FOREACH_OPT(opt, "", NULL, "destroy", 1) {
-        /* No options */
+    SWITCH_FOREACH_OPT(opt, "f", NULL, "destroy", 1) {
+    case 'f':
+        force = 1;
+        break;
     }
 
-    destroy_domain(find_domain(argv[optind]));
+    destroy_domain(find_domain(argv[optind]), force);
     return 0;
 }
 

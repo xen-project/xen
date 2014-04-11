@@ -217,12 +217,24 @@ Connect to console number I<NUM>. Console numbers start from 0.
 
 =back
 
-=item B<destroy> I<domain-id>
+=item B<destroy> [I<OPTIONS>] I<domain-id>
 
 Immediately terminate the domain I<domain-id>.  This doesn't give the
 domain OS any chance to react, and is the equivalent of ripping the
 power cord out on a physical machine.  In most cases you will want to
 use the B<shutdown> command instead.
+
+B<OPTIONS>
+
+=over 4
+
+=item I<-f>
+
+Allow domain 0 to be destroyed.  Because domain cannot destroy itself, this is
+only possible when using a disaggregated toolstack, and is most useful when
+using a hardware domain separated from domain 0.
+
+=back
 
 =item B<domid> I<domain-name>
 
