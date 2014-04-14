@@ -618,6 +618,8 @@ static int make_timer_node(const struct domain *d, void *fdt,
     int res;
     const struct dt_irq *irq;
     gic_interrupt_t intrs[3];
+    u32 clock_frequency;
+    bool_t clock_valid;
 
     DPRINT("Create timer node\n");
 
@@ -658,6 +660,15 @@ static int make_timer_node(const struct domain *d, void *fdt,
     res = fdt_property_interrupts(fdt, intrs, 3);
     if ( res )
         return res;
+
+    clock_valid = dt_property_read_u32(dev, "clock-frequency",
+                                       &clock_frequency);
+    if ( clock_valid )
+    {
+        res = fdt_property_cell(fdt, "clock-frequency", clock_frequency);
+        if ( res )
+            return res;
+    }
 
     res = fdt_end_node(fdt);
 
