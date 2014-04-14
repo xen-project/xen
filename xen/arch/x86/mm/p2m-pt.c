@@ -277,8 +277,8 @@ p2m_next_level(struct p2m_domain *p2m, mfn_t *table_mfn, void **table,
 
 // Returns 0 on error (out of memory)
 static int
-p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn, 
-              unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
+p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
+                 unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
 {
     // XXX -- this might be able to be faster iff current->domain == d
     mfn_t table_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m));
@@ -461,9 +461,9 @@ out:
 }
 
 static mfn_t
-p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn, 
-               p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
-               unsigned int *page_order)
+p2m_pt_get_entry(struct p2m_domain *p2m, unsigned long gfn,
+                 p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
+                 unsigned int *page_order)
 {
     mfn_t mfn;
     paddr_t addr = ((paddr_t)gfn) << PAGE_SHIFT;
@@ -604,8 +604,8 @@ pod_retry_l1:
 /* Walk the whole p2m table, changing any entries of the old type
  * to the new type.  This is used in hardware-assisted paging to 
  * quickly enable or diable log-dirty tracking */
-static void p2m_change_type_global(struct p2m_domain *p2m,
-                                   p2m_type_t ot, p2m_type_t nt)
+static void p2m_pt_change_entry_type_global(struct p2m_domain *p2m,
+                                            p2m_type_t ot, p2m_type_t nt)
 {
     unsigned long mfn, gfn, flags;
     l1_pgentry_t l1e_content;
@@ -870,9 +870,9 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
 /* Set up the p2m function pointers for pagetable format */
 void p2m_pt_init(struct p2m_domain *p2m)
 {
-    p2m->set_entry = p2m_set_entry;
-    p2m->get_entry = p2m_gfn_to_mfn;
-    p2m->change_entry_type_global = p2m_change_type_global;
+    p2m->set_entry = p2m_pt_set_entry;
+    p2m->get_entry = p2m_pt_get_entry;
+    p2m->change_entry_type_global = p2m_pt_change_entry_type_global;
     p2m->write_p2m_entry = paging_write_p2m_entry;
 #if P2M_AUDIT
     p2m->audit_p2m = p2m_pt_audit_p2m;
