@@ -115,6 +115,7 @@
 #define NSACR           p15,0,c1,c1,2   /* Non-Secure Access Control Register */
 #define HSCTLR          p15,4,c1,c0,0   /* Hyp. System Control Register */
 #define HCR             p15,4,c1,c1,0   /* Hyp. Configuration Register */
+#define HCPTR           p15,4,c1,c1,2   /* Hyp. Coprocessor Trap Register */
 
 /* CP15 CR2: Translation Table Base and Control Registers */
 #define TTBCR           p15,0,c2,c0,2   /* Translatation Table Base Control Register */
@@ -260,6 +261,7 @@
 #define CNTV_CVAL_EL0           CNTV_CVAL
 #define CONTEXTIDR_EL1          CONTEXTIDR
 #define CPACR_EL1               CPACR
+#define CPTR_EL2                HCPTR
 #define CSSELR_EL1              CSSELR
 #define DACR32_EL2              DACR
 #define ESR_EL1                 DFSR
