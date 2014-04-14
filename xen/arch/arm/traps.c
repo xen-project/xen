@@ -82,7 +82,7 @@ void __cpuinit init_traps(void)
 
     /* Setup hypervisor traps */
     WRITE_SYSREG(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM|HCR_TWI|HCR_TSC|
-                 HCR_TAC|HCR_SWIO, HCR_EL2);
+                 HCR_TAC|HCR_SWIO|HCR_TIDCP, HCR_EL2);
     isb();
 }
 
