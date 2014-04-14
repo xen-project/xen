@@ -124,7 +124,7 @@ nestedhap_fix_p2m(struct vcpu *v, struct p2m_domain *p2m,
         gfn = (L2_gpa >> PAGE_SHIFT) & mask;
         mfn = _mfn((L0_gpa >> PAGE_SHIFT) & mask);
 
-        rv = set_p2m_entry(p2m, gfn, mfn, page_order, p2mt, p2ma);
+        rv = p2m_set_entry(p2m, gfn, mfn, page_order, p2mt, p2ma);
     }
 
     p2m_unlock(p2m);
