@@ -347,7 +347,11 @@ F:  xen/xsm/
 F:  docs/misc/xsm-flask.txt
 
 THE REST
+M:	Ian Campbell <ian.campbell@citrix.com>
+M:	Ian Jackson <ian.jackson@eu.citrix.com>
+M:	Jan Beulich <jbeulich@suse.com>
 M:	Keir Fraser <keir@xen.org>
+M:	Tim Deegan <tim@xen.org>
 L:	xen-devel@lists.xen.org
 S:	Supported
 F:	*
