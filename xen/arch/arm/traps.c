@@ -1350,10 +1350,16 @@ static void do_cp15_32(struct cpu_user_regs *regs,
            *r = v->arch.actlr;
         break;
     default:
-        printk("%s p15, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
-               cp32.read ? "mrc" : "mcr",
-               cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
-        panic("unhandled 32-bit CP15 access %#x", hsr.bits & HSR_CP32_REGS_MASK);
+#ifndef NDEBUG
+        gdprintk(XENLOG_ERR,
+                 "%s p15, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
+                 cp32.read ? "mrc" : "mcr",
+                 cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
+        gdprintk(XENLOG_ERR, "unhandled 32-bit CP15 access %#x",
+                 hsr.bits & HSR_CP32_REGS_MASK);
+#endif
+        inject_undef32_exception(regs);
+        return;
     }
     advance_pc(regs, hsr);
 }
@@ -1361,8 +1367,6 @@ static void do_cp15_32(struct cpu_user_regs *regs,
 static void do_cp15_64(struct cpu_user_regs *regs,
                        union hsr hsr)
 {
-    struct hsr_cp64 cp64 = hsr.cp64;
-
     if ( !check_conditional_instr(regs, hsr) )
     {
         advance_pc(regs, hsr);
@@ -1380,10 +1384,20 @@ static void do_cp15_64(struct cpu_user_regs *regs,
         }
         break;
     default:
-        printk("%s p15, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
-               cp64.read ? "mrrc" : "mcrr",
-               cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
-        panic("unhandled 64-bit CP15 access %#x", hsr.bits & HSR_CP64_REGS_MASK);
+        {
+#ifndef NDEBUG
+            struct hsr_cp64 cp64 = hsr.cp64;
+
+            gdprintk(XENLOG_ERR,
+                     "%s p15, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
+                     cp64.read ? "mrrc" : "mcrr",
+                     cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
+            gdprintk(XENLOG_ERR, "unhandled 64-bit CP15 access %#x",
+                     hsr.bits & HSR_CP64_REGS_MASK);
+#endif
+            inject_undef32_exception(regs);
+            return;
+        }
     }
     advance_pc(regs, hsr);
 }
@@ -1392,7 +1406,6 @@ static void do_cp15_64(struct cpu_user_regs *regs,
 static void do_sysreg(struct cpu_user_regs *regs,
                       union hsr hsr)
 {
-    struct hsr_sysreg sysreg = hsr.sysreg;
 
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {
@@ -1406,15 +1419,23 @@ static void do_sysreg(struct cpu_user_regs *regs,
         }
         break;
     default:
-        printk("%s %d, %d, c%d, c%d, %d %s x%d @ 0x%"PRIregister"\n",
-               sysreg.read ? "mrs" : "msr",
-               sysreg.op0, sysreg.op1,
-               sysreg.crn, sysreg.crm,
-               sysreg.op2,
-               sysreg.read ? "=>" : "<=",
-               sysreg.reg, regs->pc);
-        panic("unhandled 64-bit sysreg access %#x",
-              hsr.bits & HSR_SYSREG_REGS_MASK);
+        {
+            struct hsr_sysreg sysreg = hsr.sysreg;
+#ifndef NDEBUG
+
+            gdprintk(XENLOG_ERR,
+                     "%s %d, %d, c%d, c%d, %d %s x%d @ 0x%"PRIregister"\n",
+                     sysreg.read ? "mrs" : "msr",
+                     sysreg.op0, sysreg.op1,
+                     sysreg.crn, sysreg.crm,
+                     sysreg.op2,
+                     sysreg.read ? "=>" : "<=",
+                     sysreg.reg, regs->pc);
+            gdprintk(XENLOG_ERR, "unhandled 64-bit sysreg access %#x",
+                     hsr.bits & HSR_SYSREG_REGS_MASK);
+#endif
+            inject_undef64_exception(regs, sysreg.len);
+        }
     }
 
     regs->pc += 4;
