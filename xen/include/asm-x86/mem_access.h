@@ -1,5 +1,5 @@
 /******************************************************************************
- * include/asm-x86/mem_paging.h
+ * include/asm-x86/mem_access.h
  *
  * Memory access support.
  *
@@ -20,10 +20,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifndef _XEN_ASM_MEM_ACCESS_H
+#define _XEN_ASM_MEM_ACCESS_H
 
 int mem_access_memop(struct domain *d, xen_mem_event_op_t *meo);
 int mem_access_send_req(struct domain *d, mem_event_request_t *req);
 
+#endif /* _XEN_ASM_MEM_ACCESS_H */
 
 /*
  * Local variables:
