@@ -74,6 +74,12 @@ void __cpuinit init_traps(void)
     /* Setup Hyp vector base */
     WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
 
+    /* Trap all coprocessor registers (0-13) except cp10 and cp11 for VFP
+     * /!\ All processors except cp10 and cp11 cannot be used in Xen
+     */
+    WRITE_SYSREG((HCPTR_CP_MASK & ~(HCPTR_CP(10) | HCPTR_CP(11))) | HCPTR_TTA,
+                 CPTR_EL2);
+
     /* Setup hypervisor traps */
     WRITE_SYSREG(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM|HCR_TWI|HCR_TSC|
                  HCR_TAC, HCR_EL2);
@@ -1402,6 +1408,17 @@ static void do_cp15_64(struct cpu_user_regs *regs,
     advance_pc(regs, hsr);
 }
 
+static void do_cp(struct cpu_user_regs *regs, union hsr hsr)
+{
+    if ( !check_conditional_instr(regs, hsr) )
+    {
+        advance_pc(regs, hsr);
+        return;
+    }
+
+    inject_undef32_exception(regs);
+}
+
 #ifdef CONFIG_ARM_64
 static void do_sysreg(struct cpu_user_regs *regs,
                       union hsr hsr)
@@ -1592,6 +1609,11 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         if ( ! is_pv32_domain(current->domain) )
             goto bad_trap;
         do_cp15_64(regs, hsr);
+        break;
+    case HSR_EC_CP:
+        if ( !is_pv32_domain(current->domain) )
+            goto bad_trap;
+        do_cp(regs, hsr);
         break;
     case HSR_EC_SMC32:
         inject_undef32_exception(regs);
