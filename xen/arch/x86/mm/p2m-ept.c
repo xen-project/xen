@@ -405,6 +405,8 @@ bool_t ept_handle_misconfig(uint64_t gpa)
 /*
  * ept_set_entry() computes 'need_modify_vtd_table' for itself,
  * by observing whether any gfn->mfn translations are modified.
+ *
+ * Returns: 0 for success, -errno for failure
  */
 static int
 ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn, 
@@ -413,7 +415,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     ept_entry_t *table, *ept_entry = NULL;
     unsigned long gfn_remainder = gfn;
     int i, target = order / EPT_TABLE_ORDER;
-    int rv = 0;
+    int rc = 0;
     int ret = 0;
     bool_t direct_mmio = (p2mt == p2m_mmio_direct);
     uint8_t ipat = 0;
@@ -435,7 +437,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     if ( ((gfn | mfn_x(mfn)) & ((1UL << order) - 1)) ||
          ((u64)gfn >> ((ept_get_wl(ept) + 1) * EPT_TABLE_ORDER)) ||
          (order % EPT_TABLE_ORDER) )
-        return 0;
+        return -EINVAL;
 
     ASSERT((target == 2 && hvm_hap_has_1gb()) ||
            (target == 1 && hvm_hap_has_2mb()) ||
@@ -447,7 +449,10 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     {
         ret = ept_next_level(p2m, 0, &table, &gfn_remainder, i);
         if ( !ret )
+        {
+            rc = -ENOENT;
             goto out;
+        }
         else if ( ret != GUEST_TABLE_NORMAL_PAGE )
             break;
     }
@@ -494,6 +499,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         if ( !ept_split_super_page(p2m, &split_ept_entry, i, target) )
         {
             ept_free_entry(p2m, &split_ept_entry, i);
+            rc = -ENOMEM;
             goto out;
         }
 
@@ -545,9 +551,6 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
          (gfn + (1UL << order) - 1 > p2m->max_mapped_pfn) )
         p2m->max_mapped_pfn = gfn + (1UL << order) - 1;
 
-    /* Success */
-    rv = 1;
-
 out:
     unmap_domain_page(table);
 
@@ -555,7 +558,7 @@ out:
         ept_sync_domain(p2m);
 
     /* For non-nested p2m, may need to change VT-d page table.*/
-    if ( rv && !p2m_is_nestedp2m(p2m) && need_iommu(d) &&
+    if ( rc == 0 && !p2m_is_nestedp2m(p2m) && need_iommu(d) &&
          need_modify_vtd_table )
     {
         if ( iommu_hap_pt_share )
@@ -579,7 +582,7 @@ out:
     if ( is_epte_present(&old_entry) )
         ept_free_entry(p2m, &old_entry, target);
 
-    return rv;
+    return rc;
 }
 
 /* Read ept p2m entries */

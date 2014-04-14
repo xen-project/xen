@@ -673,13 +673,12 @@ long arch_do_domctl(
             if ( !ret && paging_mode_translate(d) )
             {
                 for ( i = 0; !ret && i < nr_mfns; i++ )
-                    if ( !set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i)) )
-                        ret = -EIO;
+                    ret = set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i));
                 if ( ret )
                 {
                     printk(XENLOG_G_WARNING
-                           "memory_map:fail: dom%d gfn=%lx mfn=%lx\n",
-                           d->domain_id, gfn + i, mfn + i);
+                           "memory_map:fail: dom%d gfn=%lx mfn=%lx ret:%ld\n",
+                           d->domain_id, gfn + i, mfn + i, ret);
                     while ( i-- )
                         clear_mmio_p2m_entry(d, gfn + i);
                     if ( iomem_deny_access(d, mfn, mfn + nr_mfns - 1) &&
@@ -692,20 +691,26 @@ long arch_do_domctl(
         }
         else
         {
+            int tmp_rc = 0;
+
             printk(XENLOG_G_INFO
                    "memory_map:remove: dom%d gfn=%lx mfn=%lx nr=%lx\n",
                    d->domain_id, gfn, mfn, nr_mfns);
 
             if ( paging_mode_translate(d) )
                 for ( i = 0; i < nr_mfns; i++ )
-                    add |= !clear_mmio_p2m_entry(d, gfn + i);
+                {
+                    ret = clear_mmio_p2m_entry(d, gfn + i);
+                    if ( ret )
+                        tmp_rc = ret;
+                }
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
-            if ( !ret && add )
-                ret = -EIO;
+            if ( !ret )
+                ret = tmp_rc;
             if ( ret && is_hardware_domain(current->domain) )
                 printk(XENLOG_ERR
                        "memory_map: error %ld %s dom%d access to [%lx,%lx]\n",
-                       ret, add ? "removing" : "denying", d->domain_id,
+                       ret, tmp_rc ? "removing" : "denying", d->domain_id,
                        mfn, mfn + nr_mfns - 1);
         }
         /* Do this unconditionally to cover errors on above failure paths. */

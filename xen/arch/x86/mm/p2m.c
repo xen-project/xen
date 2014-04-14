@@ -320,14 +320,14 @@ struct page_info *get_page_from_gfn_p2m(
     return page;
 }
 
-
+/* Returns: 0 for success, -errno for failure */
 int p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
                   unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
 {
     struct domain *d = p2m->domain;
     unsigned long todo = 1ul << page_order;
     unsigned int order;
-    int rc = 1;
+    int set_rc, rc = 0;
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
 
@@ -341,8 +341,10 @@ int p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         else
             order = 0;
 
-        if ( !p2m->set_entry(p2m, gfn, mfn, order, p2mt, p2ma) )
-            rc = 0;
+        set_rc = p2m->set_entry(p2m, gfn, mfn, order, p2mt, p2ma);
+        if ( set_rc )
+            rc = set_rc;
+
         gfn += 1ul << order;
         if ( mfn_x(mfn) != INVALID_MFN )
             mfn = _mfn(mfn_x(mfn) + (1ul << order));
@@ -382,17 +384,19 @@ void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg)
     return;
 }
 
-// Allocate a new p2m table for a domain.
-//
-// The structure of the p2m table is that of a pagetable for xen (i.e. it is
-// controlled by CONFIG_PAGING_LEVELS).
-//
-// Returns 0 for success or -errno.
-//
+/*
+ * Allocate a new p2m table for a domain.
+ *
+ * The structure of the p2m table is that of a pagetable for xen (i.e. it is
+ * controlled by CONFIG_PAGING_LEVELS).
+ *
+ * Returns 0 for success, -errno for failure.
+ */
 int p2m_alloc_table(struct p2m_domain *p2m)
 {
     struct page_info *p2m_top;
     struct domain *d = p2m->domain;
+    int rc = 0;
 
     p2m_lock(p2m);
 
@@ -429,8 +433,9 @@ int p2m_alloc_table(struct p2m_domain *p2m)
 
     /* Initialise physmap tables for slot zero. Other code assumes this. */
     p2m->defer_nested_flush = 1;
-    if ( !p2m_set_entry(p2m, 0, _mfn(INVALID_MFN), PAGE_ORDER_4K,
-                        p2m_invalid, p2m->default_access) )
+    rc = p2m_set_entry(p2m, 0, _mfn(INVALID_MFN), PAGE_ORDER_4K,
+                       p2m_invalid, p2m->default_access);
+    if ( rc )
         goto error;
     p2m->defer_nested_flush = 0;
 
@@ -440,9 +445,9 @@ int p2m_alloc_table(struct p2m_domain *p2m)
 
     spin_unlock(&p2m->domain->page_alloc_lock);
  error:
-    P2M_PRINTK("failed to initialise p2m table for slot zero\n");
+    P2M_PRINTK("failed to initialise p2m table for slot zero. rc:%d\n", rc);
     p2m_unlock(p2m);
-    return -ENOMEM;
+    return rc;
 }
 
 void p2m_teardown(struct p2m_domain *p2m)
@@ -648,12 +653,11 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     /* Now, actually do the two-way mapping */
     if ( mfn_valid(_mfn(mfn)) ) 
     {
-        if ( !p2m_set_entry(p2m, gfn, _mfn(mfn), page_order, t,
-                            p2m->default_access) )
-        {
-            rc = -EINVAL;
+        rc = p2m_set_entry(p2m, gfn, _mfn(mfn), page_order, t,
+                           p2m->default_access);
+        if ( rc )
             goto out; /* Failed to update p2m, bail without updating m2p. */
-        }
+
         if ( !p2m_is_grant(t) )
         {
             for ( i = 0; i < (1UL << page_order); i++ )
@@ -664,10 +668,9 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     {
         gdprintk(XENLOG_WARNING, "Adding bad mfn to p2m map (%#lx -> %#lx)\n",
                  gfn, mfn);
-        if ( !p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), page_order,
-                            p2m_invalid, p2m->default_access) )
-            rc = -EINVAL;
-        else
+        rc = p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), page_order,
+                           p2m_invalid, p2m->default_access);
+        if ( rc == 0 )
         {
             pod_lock(p2m);
             p2m->pod.entry_count -= pod_count;
@@ -754,9 +757,8 @@ void p2m_change_type_range(struct domain *d,
 }
 
 
-
-int
-set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+/* Returns: 0 for success, -errno for failure */
+int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 {
     int rc = 0;
     p2m_access_t a;
@@ -765,7 +767,7 @@ set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     if ( !paging_mode_translate(d) )
-        return 0;
+        return -EIO;
 
     gfn_lock(p2m, gfn, 0);
     omfn = p2m->get_entry(p2m, gfn, &ot, &a, 0, NULL);
@@ -773,7 +775,7 @@ set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     {
         p2m_unlock(p2m);
         domain_crash(d);
-        return 0;
+        return -ENOENT;
     }
     else if ( p2m_is_ram(ot) )
     {
@@ -785,24 +787,24 @@ set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     rc = p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_mmio_direct,
                        p2m->default_access);
     gfn_unlock(p2m, gfn, 0);
-    if ( 0 == rc )
+    if ( rc )
         gdprintk(XENLOG_ERR,
-            "set_mmio_p2m_entry: p2m_set_entry failed! mfn=%08lx\n",
-            mfn_x(get_gfn_query_unlocked(p2m->domain, gfn, &ot)));
+                 "p2m_set_entry failed! mfn=%08lx rc:%d\n",
+                 mfn_x(get_gfn_query_unlocked(p2m->domain, gfn, &ot)), rc);
     return rc;
 }
 
-int
-clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
+/* Returns: 0 for success, -errno for failure */
+int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
 {
-    int rc = 0;
+    int rc = -EINVAL;
     mfn_t mfn;
     p2m_access_t a;
     p2m_type_t t;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     if ( !paging_mode_translate(d) )
-        return 0;
+        return -EIO;
 
     gfn_lock(p2m, gfn, 0);
     mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL);
@@ -811,20 +813,20 @@ clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
     if ( (INVALID_MFN == mfn_x(mfn)) || (t != p2m_mmio_direct) )
     {
         gdprintk(XENLOG_ERR,
-            "clear_mmio_p2m_entry: gfn_to_mfn failed! gfn=%08lx\n", gfn);
+                 "gfn_to_mfn failed! gfn=%08lx type:%d\n", gfn, t);
         goto out;
     }
     rc = p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), PAGE_ORDER_4K, p2m_invalid,
                        p2m->default_access);
 
-out:
+ out:
     gfn_unlock(p2m, gfn, 0);
 
     return rc;
 }
 
-int
-set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+/* Returns: 0 for success, -errno for failure */
+int set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc = 0;
@@ -834,7 +836,7 @@ set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     unsigned long pg_type;
 
     if ( !paging_mode_translate(p2m->domain) )
-        return 0;
+        return -EIO;
 
     gfn_lock(p2m, gfn, 0);
     omfn = p2m->get_entry(p2m, gfn, &ot, &a, 0, NULL);
@@ -853,10 +855,10 @@ set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     rc = p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_shared,
                        p2m->default_access);
     gfn_unlock(p2m, gfn, 0);
-    if ( 0 == rc )
+    if ( rc )
         gdprintk(XENLOG_ERR,
-            "set_shared_p2m_entry: p2m_set_entry failed! mfn=%08lx\n",
-            mfn_x(get_gfn_query_unlocked(p2m->domain, gfn, &ot)));
+                 "p2m_set_entry failed! mfn=%08lx rc:%d\n",
+                 mfn_x(get_gfn_query_unlocked(p2m->domain, gfn, &ot)), rc);
     return rc;
 }
 
@@ -1275,7 +1277,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla,
     if ( access_w && p2ma == p2m_access_rx2rw ) 
     {
         rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rw);
-        ASSERT(rc);
+        ASSERT(rc == 0);
         gfn_unlock(p2m, gfn, 0);
         return 1;
     }
@@ -1284,7 +1286,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla,
         ASSERT(access_w || access_r || access_x);
         rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K,
                             p2mt, p2m_access_rwx);
-        ASSERT(rc);
+        ASSERT(rc == 0);
     }
     gfn_unlock(p2m, gfn, 0);
 
@@ -1311,7 +1313,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla,
                  * gfn locked and just did a successful get_entry(). */
                 rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K,
                                     p2mt, p2m_access_rwx);
-                ASSERT(rc);
+                ASSERT(rc == 0);
             }
             gfn_unlock(p2m, gfn, 0);
             return 1;
@@ -1413,13 +1415,11 @@ long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
     for ( pfn += start; nr > start; ++pfn )
     {
         mfn = p2m->get_entry(p2m, pfn, &t, &_a, 0, NULL);
-        if ( p2m->set_entry(p2m, pfn, mfn, PAGE_ORDER_4K, t, a) == 0 )
-        {
-            rc = -ENOMEM;
+        rc = p2m->set_entry(p2m, pfn, mfn, PAGE_ORDER_4K, t, a);
+        if ( rc )
             break;
-        }
 
-        /* Check for continuation if it's not the last interation. */
+        /* Check for continuation if it's not the last iteration. */
         if ( nr > ++start && !(start & mask) && hypercall_preempt_check() )
         {
             rc = start;

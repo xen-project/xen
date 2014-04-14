@@ -1150,10 +1150,9 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     }
 
     /* Now, actually do the two-way mapping */
-    if ( !p2m_set_entry(p2m, gfn, _mfn(0), order,
-                        p2m_populate_on_demand, p2m->default_access) )
-        rc = -EINVAL;
-    else
+    rc = p2m_set_entry(p2m, gfn, _mfn(0), order, p2m_populate_on_demand,
+                       p2m->default_access);
+    if ( rc == 0 )
     {
         pod_lock(p2m);
         p2m->pod.entry_count += 1 << order;

@@ -1021,7 +1021,7 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
         put_page_and_type(cpage);
         d = get_domain_by_id(gfn->domain);
         BUG_ON(!d);
-        BUG_ON(set_shared_p2m_entry(d, gfn->gfn, smfn) == 0);
+        BUG_ON(set_shared_p2m_entry(d, gfn->gfn, smfn));
         put_domain(d);
     }
     ASSERT(list_empty(&cpage->sharing->gfns));
@@ -1095,13 +1095,11 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
     ret = p2m_set_entry(p2m, cgfn, smfn, PAGE_ORDER_4K, p2m_ram_shared, a);
 
     /* Tempted to turn this into an assert */
-    if ( !ret )
+    if ( ret )
     {
-        ret = -ENOENT;
         mem_sharing_gfn_destroy(spage, cd, gfn_info);
         put_page_and_type(spage);
     } else {
-        ret = 0;
         /* There is a chance we're plugging a hole where a paged out page was */
         if ( p2m_is_paging(cmfn_type) && (cmfn_type != p2m_ram_paging_out) )
         {
@@ -1232,7 +1230,7 @@ int __mem_sharing_unshare_page(struct domain *d,
     unmap_domain_page(s);
     unmap_domain_page(t);
 
-    BUG_ON(set_shared_p2m_entry(d, gfn, page_to_mfn(page)) == 0);
+    BUG_ON(set_shared_p2m_entry(d, gfn, page_to_mfn(page)));
     mem_sharing_gfn_destroy(old_page, d, gfn_info);
     mem_sharing_page_unlock(old_page);
     put_page_and_type(old_page);
@@ -1288,7 +1286,7 @@ int relinquish_shared_pages(struct domain *d)
              * we hold the p2m lock. */
             set_rc = p2m->set_entry(p2m, gfn, _mfn(0), PAGE_ORDER_4K,
                                     p2m_invalid, p2m_access_rwx);
-            ASSERT(set_rc != 0);
+            ASSERT(set_rc == 0);
             count += 0x10;
         }
         else
