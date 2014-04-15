@@ -115,6 +115,7 @@
 #define NSACR           p15,0,c1,c1,2   /* Non-Secure Access Control Register */
 #define HSCTLR          p15,4,c1,c0,0   /* Hyp. System Control Register */
 #define HCR             p15,4,c1,c1,0   /* Hyp. Configuration Register */
+#define HDCR            p15,4,c1,c1,1   /* Hyp. Debug Configuration Register */
 #define HCPTR           p15,4,c1,c1,2   /* Hyp. Coprocessor Trap Register */
 #define HSTR            p15,4,c1,c1,3   /* Hyp. System Trap Register */
 
@@ -287,6 +288,7 @@
 #define ID_PFR0_EL1             ID_PFR0
 #define ID_PFR1_EL1             ID_PFR1
 #define IFSR32_EL2              IFSR
+#define MDCR_EL2                HDCR
 #define MIDR_EL1                MIDR
 #define MPIDR_EL1               MPIDR
 #define PAR_EL1                 PAR

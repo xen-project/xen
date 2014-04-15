@@ -40,6 +40,31 @@
     ((__HSR_SYSREG_##crm) << HSR_SYSREG_CRM_SHIFT) | \
     ((__HSR_SYSREG_##op2) << HSR_SYSREG_OP2_SHIFT)
 
+#define HSR_SYSREG_MDSCR_EL1      HSR_SYSREG(2,0,c0,c2,2)
+#define HSR_SYSREG_OSLAR_EL1      HSR_SYSREG(2,0,c1,c0,4)
+
+#define HSR_SYSREG_DBGBVRn_EL1(n) HSR_SYSREG(2,0,c0,c##n,4)
+#define HSR_SYSREG_DBGBCRn_EL1(n) HSR_SYSREG(2,0,c0,c##n,5)
+#define HSR_SYSREG_DBGWVRn_EL1(n) HSR_SYSREG(2,0,c0,c##n,6)
+#define HSR_SYSREG_DBGWCRn_EL1(n) HSR_SYSREG(2,0,c0,c##n,7)
+
+#define HSR_SYSREG_DBG_CASES(REG) case HSR_SYSREG_##REG##n_EL1(0):  \
+                                  case HSR_SYSREG_##REG##n_EL1(1):  \
+                                  case HSR_SYSREG_##REG##n_EL1(2):  \
+                                  case HSR_SYSREG_##REG##n_EL1(3):  \
+                                  case HSR_SYSREG_##REG##n_EL1(4):  \
+                                  case HSR_SYSREG_##REG##n_EL1(5):  \
+                                  case HSR_SYSREG_##REG##n_EL1(6):  \
+                                  case HSR_SYSREG_##REG##n_EL1(7):  \
+                                  case HSR_SYSREG_##REG##n_EL1(8):  \
+                                  case HSR_SYSREG_##REG##n_EL1(9):  \
+                                  case HSR_SYSREG_##REG##n_EL1(10): \
+                                  case HSR_SYSREG_##REG##n_EL1(11): \
+                                  case HSR_SYSREG_##REG##n_EL1(12): \
+                                  case HSR_SYSREG_##REG##n_EL1(13): \
+                                  case HSR_SYSREG_##REG##n_EL1(14): \
+                                  case HSR_SYSREG_##REG##n_EL1(15)
+
 #define HSR_SYSREG_SCTLR_EL1      HSR_SYSREG(3,0,c1, c0,0)
 #define HSR_SYSREG_TTBR0_EL1      HSR_SYSREG(3,0,c2, c0,0)
 #define HSR_SYSREG_TTBR1_EL1      HSR_SYSREG(3,0,c2, c0,1)
@@ -48,9 +73,27 @@
 #define HSR_SYSREG_AFSR1_EL1      HSR_SYSREG(3,0,c5, c1,1)
 #define HSR_SYSREG_ESR_EL1        HSR_SYSREG(3,0,c5, c2,0)
 #define HSR_SYSREG_FAR_EL1        HSR_SYSREG(3,0,c6, c0,0)
+#define HSR_SYSREG_PMINTENSET_EL1 HSR_SYSREG(3,0,c9,c14,1)
+#define HSR_SYSREG_PMINTENCLR_EL1 HSR_SYSREG(3,0,c9,c14,2)
 #define HSR_SYSREG_MAIR_EL1       HSR_SYSREG(3,0,c10,c2,0)
 #define HSR_SYSREG_AMAIR_EL1      HSR_SYSREG(3,0,c10,c3,0)
 #define HSR_SYSREG_CONTEXTIDR_EL1 HSR_SYSREG(3,0,c13,c0,1)
+
+#define HSR_SYSREG_PMCR_EL0       HSR_SYSREG(3,3,c9,c12,0)
+#define HSR_SYSREG_PMCNTENSET_EL0 HSR_SYSREG(3,3,c9,c12,1)
+#define HSR_SYSREG_PMCNTENCLR_EL0 HSR_SYSREG(3,3,c9,c12,2)
+#define HSR_SYSREG_PMOVSCLR_EL0   HSR_SYSREG(3,3,c9,c12,3)
+#define HSR_SYSREG_PMSWINC_EL0    HSR_SYSREG(3,3,c9,c12,4)
+#define HSR_SYSREG_PMSELR_EL0     HSR_SYSREG(3,3,c9,c12,5)
+#define HSR_SYSREG_PMCEID0_EL0    HSR_SYSREG(3,3,c9,c12,6)
+#define HSR_SYSREG_PMCEID1_EL0    HSR_SYSREG(3,3,c9,c12,7)
+
+#define HSR_SYSREG_PMCCNTR_EL0    HSR_SYSREG(3,3,c9,c13,0)
+#define HSR_SYSREG_PMXEVTYPER_EL0 HSR_SYSREG(3,3,c9,c13,1)
+#define HSR_SYSREG_PMXEVCNTR_EL0  HSR_SYSREG(3,3,c9,c13,2)
+
+#define HSR_SYSREG_PMUSERENR_EL0  HSR_SYSREG(3,3,c9,c14,0)
+#define HSR_SYSREG_PMOVSSET_EL0   HSR_SYSREG(3,3,c9,c14,3)
 
 #define HSR_SYSREG_CNTPCT_EL0     HSR_SYSREG(3,3,c14,c0,0)
 #define HSR_SYSREG_CNTP_CTL_EL0   HSR_SYSREG(3,3,c14,c2,1)
