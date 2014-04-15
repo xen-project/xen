@@ -74,6 +74,10 @@ void __cpuinit init_traps(void)
     /* Setup Hyp vector base */
     WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
 
+    /* Trap Debug and Performance Monitor accesses */
+    WRITE_SYSREG(HDCR_TDRA|HDCR_TDOSA|HDCR_TDA|HDCR_TPM|HDCR_TPMCR,
+                 MDCR_EL2);
+
     /* Trap CP15 c15 used for implementation defined registers */
     WRITE_SYSREG(HSTR_T(15), HSTR_EL2);
 
@@ -1411,6 +1415,17 @@ static void do_cp15_64(struct cpu_user_regs *regs,
     advance_pc(regs, hsr);
 }
 
+static void do_cp14(struct cpu_user_regs *regs, union hsr hsr)
+{
+    if ( !check_conditional_instr(regs, hsr) )
+    {
+        advance_pc(regs, hsr);
+        return;
+    }
+
+    inject_undef32_exception(regs);
+}
+
 static void do_cp(struct cpu_user_regs *regs, union hsr hsr)
 {
     if ( !check_conditional_instr(regs, hsr) )
@@ -1426,9 +1441,46 @@ static void do_cp(struct cpu_user_regs *regs, union hsr hsr)
 static void do_sysreg(struct cpu_user_regs *regs,
                       union hsr hsr)
 {
+    register_t *x = select_user_reg(regs, hsr.sysreg.reg);
 
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {
+    /* RAZ/WI registers: */
+    /*  - Debug */
+    case HSR_SYSREG_MDSCR_EL1:
+    /*  - Perf monitors */
+    case HSR_SYSREG_PMINTENSET_EL1:
+    case HSR_SYSREG_PMINTENCLR_EL1:
+    case HSR_SYSREG_PMCR_EL0:
+    case HSR_SYSREG_PMCNTENSET_EL0:
+    case HSR_SYSREG_PMCNTENCLR_EL0:
+    case HSR_SYSREG_PMOVSCLR_EL0:
+    case HSR_SYSREG_PMSWINC_EL0:
+    case HSR_SYSREG_PMSELR_EL0:
+    case HSR_SYSREG_PMCEID0_EL0:
+    case HSR_SYSREG_PMCEID1_EL0:
+    case HSR_SYSREG_PMCCNTR_EL0:
+    case HSR_SYSREG_PMXEVTYPER_EL0:
+    case HSR_SYSREG_PMXEVCNTR_EL0:
+    case HSR_SYSREG_PMUSERENR_EL0:
+    case HSR_SYSREG_PMOVSSET_EL0:
+    /* - Breakpoints */
+    HSR_SYSREG_DBG_CASES(DBGBVR):
+    HSR_SYSREG_DBG_CASES(DBGBCR):
+    /* -  Watchpoints */
+    HSR_SYSREG_DBG_CASES(DBGWVR):
+    HSR_SYSREG_DBG_CASES(DBGWCR):
+        if ( hsr.sysreg.read )
+            *x = 0;
+        /* else: write ignored */
+        break;
+
+    /* Write only, Write ignore registers: */
+    case HSR_SYSREG_OSLAR_EL1:
+        if ( hsr.sysreg.read )
+            goto bad_sysreg;
+        /* else: write ignored */
+        break;
     case HSR_SYSREG_CNTP_CTL_EL0:
     case HSR_SYSREG_CNTP_TVAL_EL0:
         if ( !vtimer_emulate(regs, hsr) )
@@ -1439,6 +1491,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
         }
         break;
     default:
+ bad_sysreg:
         {
             struct hsr_sysreg sysreg = hsr.sysreg;
 #ifndef NDEBUG
@@ -1612,6 +1665,12 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         if ( ! is_pv32_domain(current->domain) )
             goto bad_trap;
         do_cp15_64(regs, hsr);
+        break;
+    case HSR_EC_CP14_32:
+    case HSR_EC_CP14_DBG:
+        if ( !is_pv32_domain(current->domain) )
+            goto bad_trap;
+        do_cp14(regs, hsr);
         break;
     case HSR_EC_CP:
         if ( !is_pv32_domain(current->domain) )
