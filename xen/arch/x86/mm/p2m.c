@@ -435,18 +435,12 @@ int p2m_alloc_table(struct p2m_domain *p2m)
     p2m->defer_nested_flush = 1;
     rc = p2m_set_entry(p2m, 0, _mfn(INVALID_MFN), PAGE_ORDER_4K,
                        p2m_invalid, p2m->default_access);
-    if ( rc )
-        goto error;
     p2m->defer_nested_flush = 0;
-
-    P2M_PRINTK("p2m table initialised for slot zero\n");
     p2m_unlock(p2m);
-    return 0;
-
-    spin_unlock(&p2m->domain->page_alloc_lock);
- error:
-    P2M_PRINTK("failed to initialise p2m table for slot zero. rc:%d\n", rc);
-    p2m_unlock(p2m);
+    if ( !rc )
+        P2M_PRINTK("p2m table initialised for slot zero\n");
+    else
+        P2M_PRINTK("failed to initialise p2m table for slot zero (%d)\n", rc);
     return rc;
 }
 
