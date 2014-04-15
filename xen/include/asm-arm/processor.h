@@ -89,6 +89,9 @@
 #define HCPTR_CP(x)     ((_AC(1,U)<<(x)))       /* Trap Coprocessor x */
 #define HCPTR_CP_MASK   ((_AC(1,U)<<14)-1)
 
+/* HSTR Hyp. System Trap Register */
+#define HSTR_T(x)       ((_AC(1,U)<<(x)))       /* Trap Cp15 c<x> */
+
 #define HSR_EC_UNKNOWN              0x00
 #define HSR_EC_WFI_WFE              0x01
 #define HSR_EC_CP15_32              0x03

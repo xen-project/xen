@@ -116,6 +116,7 @@
 #define HSCTLR          p15,4,c1,c0,0   /* Hyp. System Control Register */
 #define HCR             p15,4,c1,c1,0   /* Hyp. Configuration Register */
 #define HCPTR           p15,4,c1,c1,2   /* Hyp. Coprocessor Trap Register */
+#define HSTR            p15,4,c1,c1,3   /* Hyp. System Trap Register */
 
 /* CP15 CR2: Translation Table Base and Control Registers */
 #define TTBCR           p15,0,c2,c0,2   /* Translatation Table Base Control Register */
@@ -270,6 +271,7 @@
 #define FAR_EL2                 HIFAR
 #define HCR_EL2                 HCR
 #define HPFAR_EL2               HPFAR
+#define HSTR_EL2                HSTR
 #define ID_AFR0_EL1             ID_AFR0
 #define ID_DFR0_EL1             ID_DFR0
 #define ID_ISAR0_EL1            ID_ISAR0
