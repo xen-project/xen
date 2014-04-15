@@ -95,10 +95,6 @@ CFLAGS-$(CONFIG_Linux) += -D_GNU_SOURCE
 
 CFLAGS	+= $(PTHREAD_CFLAGS)
 
-# Define this to make it possible to run valgrind on code linked with these
-# libraries.
-#CFLAGS   += -DVALGRIND -O0 -ggdb3
-
 CTRL_LIB_OBJS := $(patsubst %.c,%.o,$(CTRL_SRCS-y))
 CTRL_PIC_OBJS := $(patsubst %.c,%.opic,$(CTRL_SRCS-y))
 

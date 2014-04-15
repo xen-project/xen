@@ -588,10 +588,6 @@ int xc_get_pfn_list(xc_interface *xch,
     DECLARE_HYPERCALL_BOUNCE(pfn_buf, max_pfns * sizeof(*pfn_buf), XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     int ret;
 
-#ifdef VALGRIND
-    memset(pfn_buf, 0, max_pfns * sizeof(*pfn_buf));
-#endif
-
     if ( xc_hypercall_bounce_pre(xch, pfn_buf) )
     {
         PERROR("xc_get_pfn_list: pfn_buf bounce failed");
@@ -706,11 +702,6 @@ int xc_version(xc_interface *xch, int cmd, void *arg)
         PERROR("Could not bounce buffer for version hypercall");
         return -ENOMEM;
     }
-
-#ifdef VALGRIND
-    if (sz != 0)
-        memset(hypercall_bounce_get(bounce), 0, sz);
-#endif
 
     rc = do_xen_version(xch, cmd, HYPERCALL_BUFFER(arg));
 
