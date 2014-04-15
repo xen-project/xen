@@ -74,6 +74,9 @@ void __cpuinit init_traps(void)
     /* Setup Hyp vector base */
     WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
 
+    /* Trap CP15 c15 used for implementation defined registers */
+    WRITE_SYSREG(HSTR_T(15), HSTR_EL2);
+
     /* Trap all coprocessor registers (0-13) except cp10 and cp11 for VFP
      * /!\ All processors except cp10 and cp11 cannot be used in Xen
      */
