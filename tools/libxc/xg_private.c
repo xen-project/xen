@@ -21,7 +21,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <zlib.h>
-#include <malloc.h>
 
 #include "xg_private.h"
 
