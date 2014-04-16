@@ -36,7 +36,7 @@ ifeq ($(CONFIG_ROMBIOS),y)
 	false ; \
 	fi
 endif
-	$(MAKE) PYTHON=$(PYTHON) subdirs-$@
+	$(MAKE) CC=$(CC) PYTHON=$(PYTHON) subdirs-$@
 
 
 .PHONY: install
