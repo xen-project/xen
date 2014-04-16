@@ -104,6 +104,7 @@
 #include <xen/xmalloc.h>
 #include <xen/efi.h>
 #include <xen/grant_table.h>
+#include <xen/hypercall.h>
 #include <asm/paging.h>
 #include <asm/shadow.h>
 #include <asm/page.h>
@@ -4631,9 +4632,10 @@ int xenmem_add_to_physmap_one(
     return rc;
 }
 
-long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
+long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int rc;
+    int op = cmd & MEMOP_CMD_MASK;
 
     switch ( op )
     {
@@ -4853,7 +4855,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
 
     default:
-        return subarch_memory_op(op, arg);
+        return subarch_memory_op(cmd, arg);
     }
 
     return 0;

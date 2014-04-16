@@ -1381,7 +1381,7 @@ void p2m_mem_access_resume(struct domain *d)
 /* Set access type for a region of pfns.
  * If start_pfn == -1ul, sets the default access type */
 long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
-                        uint32_t start, uint32_t mask, hvmmem_access_t access)
+                        uint32_t start, uint32_t mask, xenmem_access_t access)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_access_t a, _a;
@@ -1390,7 +1390,7 @@ long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
     long rc = 0;
 
     static const p2m_access_t memaccess[] = {
-#define ACCESS(ac) [HVMMEM_access_##ac] = p2m_access_##ac
+#define ACCESS(ac) [XENMEM_access_##ac] = p2m_access_##ac
         ACCESS(n),
         ACCESS(r),
         ACCESS(w),
@@ -1409,7 +1409,7 @@ long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
     case 0 ... ARRAY_SIZE(memaccess) - 1:
         a = memaccess[access];
         break;
-    case HVMMEM_access_default:
+    case XENMEM_access_default:
         a = p2m->default_access;
         break;
     default:
@@ -1445,23 +1445,26 @@ long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
 /* Get access type for a pfn
  * If pfn == -1ul, gets the default access type */
 int p2m_get_mem_access(struct domain *d, unsigned long pfn, 
-                       hvmmem_access_t *access)
+                       xenmem_access_t *access)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_type_t t;
     p2m_access_t a;
     mfn_t mfn;
 
-    static const hvmmem_access_t memaccess[] = {
-        HVMMEM_access_n,
-        HVMMEM_access_r,
-        HVMMEM_access_w,
-        HVMMEM_access_rw,
-        HVMMEM_access_x,
-        HVMMEM_access_rx,
-        HVMMEM_access_wx,
-        HVMMEM_access_rwx,
-        HVMMEM_access_rx2rw
+    static const xenmem_access_t memaccess[] = {
+#define ACCESS(ac) [XENMEM_access_##ac] = XENMEM_access_##ac
+            ACCESS(n),
+            ACCESS(r),
+            ACCESS(w),
+            ACCESS(rw),
+            ACCESS(x),
+            ACCESS(rx),
+            ACCESS(wx),
+            ACCESS(rwx),
+            ACCESS(rx2rw),
+            ACCESS(n2rwx),
+#undef ACCESS
     };
 
     /* If request to get default access */

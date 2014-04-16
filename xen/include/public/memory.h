@@ -363,9 +363,6 @@ typedef struct xen_pod_target xen_pod_target_t;
 #define XENMEM_paging_op_evict              1
 #define XENMEM_paging_op_prep               2
 
-#define XENMEM_access_op                    21
-#define XENMEM_access_op_resume             0
-
 struct xen_mem_event_op {
     uint8_t     op;         /* XENMEM_*_op_* */
     domid_t     domain;
@@ -378,6 +375,56 @@ struct xen_mem_event_op {
 };
 typedef struct xen_mem_event_op xen_mem_event_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mem_event_op_t);
+
+#define XENMEM_access_op                    21
+#define XENMEM_access_op_resume             0
+#define XENMEM_access_op_set_access         1
+#define XENMEM_access_op_get_access         2
+
+typedef enum {
+    XENMEM_access_n,
+    XENMEM_access_r,
+    XENMEM_access_w,
+    XENMEM_access_rw,
+    XENMEM_access_x,
+    XENMEM_access_rx,
+    XENMEM_access_wx,
+    XENMEM_access_rwx,
+    /*
+     * Page starts off as r-x, but automatically
+     * change to r-w on a write
+     */
+    XENMEM_access_rx2rw,
+    /*
+     * Log access: starts off as n, automatically
+     * goes to rwx, generating an event without
+     * pausing the vcpu
+     */
+    XENMEM_access_n2rwx,
+    /* Take the domain default */
+    XENMEM_access_default
+} xenmem_access_t;
+
+struct xen_mem_access_op {
+    /* XENMEM_access_op_* */
+    uint8_t op;
+    /* xenmem_access_t */
+    uint8_t access;
+    domid_t domid;
+    /*
+     * Number of pages for set op
+     * Ignored on setting default access and other ops
+     */
+    uint32_t nr;
+    /*
+     * First pfn for set op
+     * pfn for get op
+     * ~0ull is used to set and get the default access for pages
+     */
+    uint64_aligned_t pfn;
+};
+typedef struct xen_mem_access_op xen_mem_access_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_mem_access_op_t);
 
 #define XENMEM_sharing_op                   22
 #define XENMEM_sharing_op_nominate_gfn      0

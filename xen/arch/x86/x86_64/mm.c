@@ -25,6 +25,7 @@
 #include <xen/numa.h>
 #include <xen/nodemask.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/asm_defns.h>
 #include <asm/page.h>
@@ -36,6 +37,7 @@
 #include <asm/numa.h>
 #include <asm/mem_event.h>
 #include <asm/mem_sharing.h>
+#include <asm/mem_access.h>
 #include <public/memory.h>
 
 /* Parameters for PFN/MADDR compression. */
@@ -948,7 +950,7 @@ void __init subarch_init_memory(void)
     }
 }
 
-long subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
+long subarch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct xen_machphys_mfn_list xmml;
     l3_pgentry_t l3e;
@@ -957,6 +959,7 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
     xen_pfn_t mfn, last_mfn;
     unsigned int i;
     long rc = 0;
+    int op = cmd & MEMOP_CMD_MASK;
 
     switch ( op )
     {
@@ -1007,7 +1010,6 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         return mem_sharing_get_nr_shared_mfns();
 
     case XENMEM_paging_op:
-    case XENMEM_access_op:
     {
         xen_mem_event_op_t meo;
         if ( copy_from_guest(&meo, arg, 1) )
@@ -1017,6 +1019,11 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -EFAULT;
         break;
     }
+
+    case XENMEM_access_op:
+        rc = mem_access_memop(cmd, guest_handle_cast(arg, xen_mem_access_op_t));
+        break;
+
     case XENMEM_sharing_op:
     {
         xen_mem_sharing_op_t mso;

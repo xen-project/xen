@@ -13,6 +13,8 @@ CHECK_TYPE(domid);
 #undef compat_domid_t
 #undef xen_domid_t
 
+CHECK_mem_access_op;
+
 int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 {
     int split, op = cmd & MEMOP_CMD_MASK;

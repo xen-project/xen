@@ -4636,7 +4636,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
         struct xen_hvm_get_mem_access a;
         struct domain *d;
-        hvmmem_access_t access;
+        xenmem_access_t access;
 
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;

@@ -964,7 +964,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
 
     default:
-        rc = arch_memory_op(op, arg);
+        rc = arch_memory_op(cmd, arg);
         break;
     }
 

@@ -4,6 +4,7 @@
 #include <compat/xen.h>
 #include <asm/mem_event.h>
 #include <asm/mem_sharing.h>
+#include <asm/mem_access.h>
 
 int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries)
 {
@@ -44,7 +45,7 @@ int compat_update_descriptor(u32 pa_lo, u32 pa_hi, u32 desc_lo, u32 desc_hi)
                                 desc_lo | ((u64)desc_hi << 32));
 }
 
-int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
+int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct compat_machphys_mfn_list xmml;
     l2_pgentry_t l2e;
@@ -52,6 +53,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
     compat_pfn_t mfn;
     unsigned int i;
     int rc = 0;
+    int op = cmd & MEMOP_CMD_MASK;
 
     switch ( op )
     {
@@ -68,7 +70,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         XLAT_foreign_memory_map(nat, &cmp);
 #undef XLAT_memory_map_HNDL_buffer
 
-        rc = arch_memory_op(op, guest_handle_from_ptr(nat, void));
+        rc = arch_memory_op(cmd, guest_handle_from_ptr(nat, void));
 
         break;
     }
@@ -87,7 +89,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         XLAT_memory_map(nat, &cmp);
 #undef XLAT_memory_map_HNDL_buffer
 
-        rc = arch_memory_op(op, guest_handle_from_ptr(nat, void));
+        rc = arch_memory_op(cmd, guest_handle_from_ptr(nat, void));
         if ( rc < 0 )
             break;
 
@@ -111,7 +113,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         XLAT_pod_target(nat, &cmp);
 
-        rc = arch_memory_op(op, guest_handle_from_ptr(nat, void));
+        rc = arch_memory_op(cmd, guest_handle_from_ptr(nat, void));
         if ( rc < 0 )
             break;
 
@@ -185,7 +187,6 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         return mem_sharing_get_nr_shared_mfns();
 
     case XENMEM_paging_op:
-    case XENMEM_access_op:
     {
         xen_mem_event_op_t meo;
         if ( copy_from_guest(&meo, arg, 1) )
@@ -195,6 +196,11 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -EFAULT;
         break;
     }
+
+    case XENMEM_access_op:
+        rc = mem_access_memop(cmd, guest_handle_cast(arg, xen_mem_access_op_t));
+        break;
+
     case XENMEM_sharing_op:
     {
         xen_mem_sharing_op_t mso;

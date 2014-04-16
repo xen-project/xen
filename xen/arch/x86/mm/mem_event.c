@@ -458,9 +458,6 @@ int do_mem_event_op(int op, uint32_t domain, void *arg)
         case XENMEM_paging_op:
             ret = mem_paging_memop(d, (xen_mem_event_op_t *) arg);
             break;
-        case XENMEM_access_op:
-            ret = mem_access_memop(d, (xen_mem_event_op_t *) arg);
-            break;
         case XENMEM_sharing_op:
             ret = mem_sharing_memop(d, (xen_mem_sharing_op_t *) arg);
             break;
