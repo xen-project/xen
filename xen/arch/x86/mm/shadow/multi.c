@@ -804,7 +804,6 @@ shadow_write_entries(void *d, void *s, int entries, mfn_t mfn)
     {
         perfc_incr(shadow_linear_map_failed);
         map = sh_map_domain_page(mfn);
-        ASSERT(map != NULL);
         dst = map + ((unsigned long)dst & (PAGE_SIZE - 1));
     }
 
@@ -1424,8 +1423,7 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
     unsigned int slots;
 
     sl4e = sh_map_domain_page(sl4mfn);
-    ASSERT(sl4e != NULL);
-    ASSERT(sizeof (l4_pgentry_t) == sizeof (shadow_l4e_t));
+    BUILD_BUG_ON(sizeof (l4_pgentry_t) != sizeof (shadow_l4e_t));
     
     /* Copy the common Xen mappings from the idle domain */
     slots = (shadow_mode_external(d)
@@ -1478,8 +1476,7 @@ static void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
         return;
 
     sl2e = sh_map_domain_page(sl2hmfn);
-    ASSERT(sl2e != NULL);
-    ASSERT(sizeof (l2_pgentry_t) == sizeof (shadow_l2e_t));
+    BUILD_BUG_ON(sizeof (l2_pgentry_t) != sizeof (shadow_l2e_t));
 
     /* Copy the common Xen mappings from the idle domain */
     memcpy(
