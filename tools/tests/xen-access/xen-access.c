@@ -410,8 +410,7 @@ static int xenaccess_resume_page(xenaccess_t *paging, mem_event_response_t *rsp)
         goto out;
 
     /* Tell Xen page is ready */
-    ret = xc_mem_access_resume(paging->xc_handle, paging->mem_event.domain_id,
-                               rsp->gfn);
+    ret = xc_mem_access_resume(paging->xc_handle, paging->mem_event.domain_id);
     ret = xc_evtchn_notify(paging->mem_event.xce_handle,
                            paging->mem_event.port);
 
@@ -440,8 +439,8 @@ int main(int argc, char *argv[])
     int rc = -1;
     int rc1;
     xc_interface *xch;
-    hvmmem_access_t default_access = HVMMEM_access_rwx;
-    hvmmem_access_t after_first_access = HVMMEM_access_rwx;
+    xenmem_access_t default_access = XENMEM_access_rwx;
+    xenmem_access_t after_first_access = XENMEM_access_rwx;
     int required = 0;
     int int3 = 0;
     int shutting_down = 0;
@@ -475,13 +474,13 @@ int main(int argc, char *argv[])
 
     if ( !strcmp(argv[0], "write") )
     {
-        default_access = HVMMEM_access_rx;
-        after_first_access = HVMMEM_access_rwx;
+        default_access = XENMEM_access_rx;
+        after_first_access = XENMEM_access_rwx;
     }
     else if ( !strcmp(argv[0], "exec") )
     {
-        default_access = HVMMEM_access_rw;
-        after_first_access = HVMMEM_access_rwx;
+        default_access = XENMEM_access_rw;
+        after_first_access = XENMEM_access_rwx;
     }
     else if ( !strcmp(argv[0], "int3") )
     {
@@ -520,15 +519,15 @@ int main(int argc, char *argv[])
     }
 
     /* Set the default access type and convert all pages to it */
-    rc = xc_hvm_set_mem_access(xch, domain_id, default_access, ~0ull, 0);
+    rc = xc_set_mem_access(xch, domain_id, default_access, ~0ull, 0);
     if ( rc < 0 )
     {
         ERROR("Error %d setting default mem access type\n", rc);
         goto exit;
     }
 
-    rc = xc_hvm_set_mem_access(xch, domain_id, default_access, 0,
-                               xenaccess->domain_info->max_pages);
+    rc = xc_set_mem_access(xch, domain_id, default_access, 0,
+                           xenaccess->domain_info->max_pages);
     if ( rc < 0 )
     {
         ERROR("Error %d setting all memory to access type %d\n", rc,
@@ -554,8 +553,9 @@ int main(int argc, char *argv[])
             DPRINTF("xenaccess shutting down on signal %d\n", interrupted);
 
             /* Unregister for every event */
-            rc = xc_hvm_set_mem_access(xch, domain_id, HVMMEM_access_rwx, ~0ull, 0);
-            rc = xc_hvm_set_mem_access(xch, domain_id, HVMMEM_access_rwx, 0, xenaccess->domain_info->max_pages);
+            rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, ~0ull, 0);
+            rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, 0,
+                                   xenaccess->domain_info->max_pages);
             rc = xc_set_hvm_param(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_disabled);
 
             shutting_down = 1;
@@ -575,7 +575,7 @@ int main(int argc, char *argv[])
 
         while ( RING_HAS_UNCONSUMED_REQUESTS(&xenaccess->mem_event.back_ring) )
         {
-            hvmmem_access_t access;
+            xenmem_access_t access;
 
             rc = get_request(&xenaccess->mem_event, &req);
             if ( rc != 0 )
@@ -591,7 +591,7 @@ int main(int argc, char *argv[])
 
             switch (req.reason) {
             case MEM_EVENT_REASON_VIOLATION:
-                rc = xc_hvm_get_mem_access(xch, domain_id, req.gfn, &access);
+                rc = xc_get_mem_access(xch, domain_id, req.gfn, &access);
                 if (rc < 0)
                 {
                     ERROR("Error %d getting mem_access event\n", rc);
@@ -611,8 +611,8 @@ int main(int argc, char *argv[])
 
                 if ( default_access != after_first_access )
                 {
-                    rc = xc_hvm_set_mem_access(xch, domain_id,
-                                               after_first_access, req.gfn, 1);
+                    rc = xc_set_mem_access(xch, domain_id, after_first_access,
+                                           req.gfn, 1);
                     if (rc < 0)
                     {
                         ERROR("Error %d setting gfn to access_type %d\n", rc,
