@@ -26,12 +26,14 @@
 #if defined(__NetBSD__)
 #define SYSFS_PCI_DEV          "/sys/bus/pci/devices"
 #define SYSFS_PCIBACK_DRIVER   "/kern/xen/pci"
+#define NETBACK_NIC_NAME       "xvif%ui%d"
 #include <util.h>
 #elif defined(__OpenBSD__)
 #include <util.h>
 #elif defined(__linux__)
 #define SYSFS_PCI_DEV          "/sys/bus/pci/devices"
 #define SYSFS_PCIBACK_DRIVER   "/sys/bus/pci/drivers/pciback"
+#define NETBACK_NIC_NAME       "vif%u.%d"
 #include <pty.h>
 #elif defined(__sun__)
 #include <stropts.h>

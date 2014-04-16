@@ -3171,9 +3171,9 @@ const char *libxl__device_nic_devname(libxl__gc *gc,
 {
     switch (type) {
     case LIBXL_NIC_TYPE_VIF:
-        return GCSPRINTF("vif%u.%d", domid, devid);
+        return GCSPRINTF(NETBACK_NIC_NAME, domid, devid);
     case LIBXL_NIC_TYPE_VIF_IOEMU:
-        return GCSPRINTF("vif%u.%d" TAP_DEVICE_SUFFIX, domid, devid);
+        return GCSPRINTF(NETBACK_NIC_NAME TAP_DEVICE_SUFFIX, domid, devid);
     default:
         abort();
     }
