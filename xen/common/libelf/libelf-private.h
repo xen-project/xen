@@ -61,6 +61,11 @@
 #define bswap_16(x) swap16(x)
 #define bswap_32(x) swap32(x)
 #define bswap_64(x) swap64(x)
+#elif defined(__FreeBSD__)
+#include <sys/endian.h>
+#define bswap_16(x) bswap16(x)
+#define bswap_32(x) bswap32(x)
+#define bswap_64(x) bswap64(x)
 #elif defined(__linux__) || defined(__Linux__) || defined(__MINIOS__)
 #include <byteswap.h>
 #else
