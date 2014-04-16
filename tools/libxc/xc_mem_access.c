@@ -22,7 +22,7 @@
  */
 
 #include "xc_private.h"
-
+#include <xen/memory.h>
 
 int xc_mem_access_enable(xc_interface *xch, domid_t domain_id,
                          uint32_t *port)
@@ -47,12 +47,54 @@ int xc_mem_access_disable(xc_interface *xch, domid_t domain_id)
                                 NULL);
 }
 
-int xc_mem_access_resume(xc_interface *xch, domid_t domain_id, unsigned long gfn)
+int xc_mem_access_resume(xc_interface *xch, domid_t domain_id)
 {
-    return xc_mem_event_memop(xch, domain_id,
-                                XENMEM_access_op_resume,
-                                XENMEM_access_op,
-                                gfn, NULL);
+    xen_mem_access_op_t mao =
+    {
+        .op    = XENMEM_access_op_resume,
+        .domid = domain_id
+    };
+
+    return do_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
+}
+
+int xc_set_mem_access(xc_interface *xch,
+                      domid_t domain_id,
+                      xenmem_access_t access,
+                      uint64_t first_pfn,
+                      uint32_t nr)
+{
+    xen_mem_access_op_t mao =
+    {
+        .op     = XENMEM_access_op_set_access,
+        .domid  = domain_id,
+        .access = access,
+        .pfn    = first_pfn,
+        .nr     = nr
+    };
+
+    return do_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
+}
+
+int xc_get_mem_access(xc_interface *xch,
+                      domid_t domain_id,
+                      uint64_t pfn,
+                      xenmem_access_t *access)
+{
+    int rc;
+    xen_mem_access_op_t mao =
+    {
+        .op    = XENMEM_access_op_get_access,
+        .domid = domain_id,
+        .pfn   = pfn
+    };
+
+    rc = do_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
+
+    if ( rc == 0 )
+        *access = mao.access;
+
+    return rc;
 }
 
 /*

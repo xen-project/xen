@@ -2059,8 +2059,22 @@ int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
  */
 int xc_mem_access_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
 int xc_mem_access_disable(xc_interface *xch, domid_t domain_id);
-int xc_mem_access_resume(xc_interface *xch, domid_t domain_id,
-                         unsigned long gfn);
+int xc_mem_access_resume(xc_interface *xch, domid_t domain_id);
+
+/*
+ * Set a range of memory to a specific access.
+ * Allowed types are XENMEM_access_default, XENMEM_access_n, any combination of
+ * XENMEM_access_ + (rwx), and XENMEM_access_rx2rw
+ */
+int xc_set_mem_access(xc_interface *xch, domid_t domain_id,
+                      xenmem_access_t access, uint64_t first_pfn,
+                      uint32_t nr);
+
+/*
+ * Gets the mem access for the given page (returned in access on success)
+ */
+int xc_get_mem_access(xc_interface *xch, domid_t domain_id,
+                      uint64_t pfn, xenmem_access_t *access);
 
 /***
  * Memory sharing operations.
