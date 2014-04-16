@@ -180,7 +180,7 @@ _domctl_hcall(uint32_t cmd,            /* which domctl hypercall */
     hypercall.op = __HYPERVISOR_domctl;
     hypercall.arg[0] = (unsigned long)&domctl;
 
-    rc = ioctl(_dom0_fd, IOCTL_PRIVCMD_HYPERCALL, (ulong)&hypercall);
+    rc = ioctl(_dom0_fd, IOCTL_PRIVCMD_HYPERCALL, &hypercall);
     if (domctlarg && sz)
         munlock(domctlarg, sz);
     return rc;
@@ -220,7 +220,7 @@ _check_hyp(int guest_bitness)
     hypercall.arg[0] = (unsigned long)XENVER_capabilities;
     hypercall.arg[1] = (unsigned long)&xen_caps;
 
-    rc = ioctl(_dom0_fd, IOCTL_PRIVCMD_HYPERCALL, (ulong)&hypercall);
+    rc = ioctl(_dom0_fd, IOCTL_PRIVCMD_HYPERCALL, &hypercall);
     munlock(&xen_caps, sizeof(xen_caps));
     XGTRC("XENCAPS:%s\n", xen_caps);
 
