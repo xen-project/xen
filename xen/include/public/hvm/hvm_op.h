@@ -162,49 +162,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_xentrace_t);
 /* Following tools-only interfaces may change in future. */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
+/* Deprecated by XENMEM_access_op_set_access */
 #define HVMOP_set_mem_access        12
-typedef enum {
-    HVMMEM_access_n,
-    HVMMEM_access_r,
-    HVMMEM_access_w,
-    HVMMEM_access_rw,
-    HVMMEM_access_x,
-    HVMMEM_access_rx,
-    HVMMEM_access_wx,
-    HVMMEM_access_rwx,
-    HVMMEM_access_rx2rw,       /* Page starts off as r-x, but automatically
-                                * change to r-w on a write */
-    HVMMEM_access_n2rwx,       /* Log access: starts off as n, automatically 
-                                * goes to rwx, generating an event without
-                                * pausing the vcpu */
-    HVMMEM_access_default      /* Take the domain default */
-} hvmmem_access_t;
-/* Notify that a region of memory is to have specific access types */
-struct xen_hvm_set_mem_access {
-    /* Domain to be updated. */
-    domid_t domid;
-    /* Memory type */
-    uint16_t hvmmem_access; /* hvm_access_t */
-    /* Number of pages, ignored on setting default access */
-    uint32_t nr;
-    /* First pfn, or ~0ull to set the default access for new pages */
-    uint64_aligned_t first_pfn;
-};
-typedef struct xen_hvm_set_mem_access xen_hvm_set_mem_access_t;
-DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_mem_access_t);
 
+/* Deprecated by XENMEM_access_op_get_access */
 #define HVMOP_get_mem_access        13
-/* Get the specific access type for that region of memory */
-struct xen_hvm_get_mem_access {
-    /* Domain to be queried. */
-    domid_t domid;
-    /* Memory type: OUT */
-    uint16_t hvmmem_access; /* hvm_access_t */
-    /* pfn, or ~0ull for default access for new pages.  IN */
-    uint64_aligned_t pfn;
-};
-typedef struct xen_hvm_get_mem_access xen_hvm_get_mem_access_t;
-DEFINE_XEN_GUEST_HANDLE(xen_hvm_get_mem_access_t);
 
 #define HVMOP_inject_trap            14
 /* Inject a trap into a VCPU, which will get taken up on the next
