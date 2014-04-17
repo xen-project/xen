@@ -6,11 +6,11 @@ include $(XEN_ROOT)/tools/Rules.mk
 all: build
 .PHONY: build
 build:
-	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py build
+	CC="$(CC)" CFLAGS="$(CFLAGS) $(APPEND_LDFLAGS)" $(PYTHON) setup.py build
 
 .PHONY: install
 install: all
-	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py install \
+	CC="$(CC)" CFLAGS="$(CFLAGS) $(APPEND_LDFLAGS)" $(PYTHON) setup.py install \
 		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" \
 		--install-scripts=$(PRIVATE_BINDIR) --force
 	set -e; if [ $(BINDIR) != $(PRIVATE_BINDIR) -a \
