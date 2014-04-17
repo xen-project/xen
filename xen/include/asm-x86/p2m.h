@@ -70,6 +70,7 @@ typedef enum {
     p2m_ram_paging_in = 11,       /* Memory that is being paged in */
     p2m_ram_shared = 12,          /* Shared or sharable memory */
     p2m_ram_broken = 13,          /* Broken page, access cause domain crash */
+    p2m_map_foreign  = 14,        /* ram pages from foreign domain */
 } p2m_type_t;
 
 /*
@@ -180,6 +181,7 @@ typedef unsigned int p2m_query_t;
 #define p2m_is_sharable(_t) (p2m_to_mask(_t) & P2M_SHARABLE_TYPES)
 #define p2m_is_shared(_t)   (p2m_to_mask(_t) & P2M_SHARED_TYPES)
 #define p2m_is_broken(_t)   (p2m_to_mask(_t) & P2M_BROKEN_TYPES)
+#define p2m_is_foreign(_t)  (p2m_to_mask(_t) & p2m_to_mask(p2m_map_foreign))
 
 /* Per-p2m-table state */
 struct p2m_domain {

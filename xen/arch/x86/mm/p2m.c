@@ -508,7 +508,7 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
         for ( i = 0; i < (1UL << page_order); i++ )
         {
             mfn_return = p2m->get_entry(p2m, gfn + i, &t, &a, 0, NULL);
-            if ( !p2m_is_grant(t) && !p2m_is_shared(t) )
+            if ( !p2m_is_grant(t) && !p2m_is_shared(t) && !p2m_is_foreign(t) )
                 set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
             ASSERT( !p2m_is_valid(t) || mfn + i == mfn_x(mfn_return) );
         }
@@ -756,9 +756,9 @@ void p2m_change_type_range(struct domain *d,
     p2m_unlock(p2m);
 }
 
-
 /* Returns: 0 for success, -errno for failure */
-int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+static int set_typed_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
+                               p2m_type_t gfn_p2mt)
 {
     int rc = 0;
     p2m_access_t a;
@@ -783,8 +783,8 @@ int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
         set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
     }
 
-    P2M_DEBUG("set mmio %lx %lx\n", gfn, mfn_x(mfn));
-    rc = p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_mmio_direct,
+    P2M_DEBUG("set %d %lx %lx\n", gfn_p2mt, gfn, mfn_x(mfn));
+    rc = p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, gfn_p2mt,
                        p2m->default_access);
     gfn_unlock(p2m, gfn, 0);
     if ( rc )
@@ -792,6 +792,18 @@ int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
                  "p2m_set_entry failed! mfn=%08lx rc:%d\n",
                  mfn_x(get_gfn_query_unlocked(p2m->domain, gfn, &ot)), rc);
     return rc;
+}
+
+/* Set foreign mfn in the given guest's p2m table. */
+static int __attribute__((unused))
+set_foreign_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+{
+    return set_typed_p2m_entry(d, gfn, mfn, p2m_map_foreign);
+}
+
+int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+{
+    return set_typed_p2m_entry(d, gfn, mfn, p2m_mmio_direct);
 }
 
 /* Returns: 0 for success, -errno for failure */

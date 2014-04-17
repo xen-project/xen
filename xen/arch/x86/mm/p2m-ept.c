@@ -75,6 +75,7 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type, p2m_acces
             entry->w = 0;
             break;
         case p2m_grant_map_rw:
+        case p2m_map_foreign:
             entry->r = entry->w = 1;
             entry->x = 0;
             break;
