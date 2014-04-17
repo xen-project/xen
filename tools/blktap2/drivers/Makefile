@@ -79,25 +79,25 @@ all: $(IBIN) lock-util qcow-util
 
 
 tapdisk2: $(TAP-OBJS-y) $(BLK-OBJS-y) $(MISC-OBJS-y) tapdisk2.o
-	$(CC) -o $@ $^ $(LDFLAGS) -lrt -lz $(VHDLIBS) $(AIOLIBS) $(MEMSHRLIBS) -lm 
+	$(CC) -o $@ $^ $(LDFLAGS) -lrt -lz $(VHDLIBS) $(AIOLIBS) $(MEMSHRLIBS) -lm  $(APPEND_LDFLAGS)
 
 tapdisk-client: tapdisk-client.o
-	$(CC) -o $@ $^ $(LDFLAGS) -lrt
+	$(CC) -o $@ $^ $(LDFLAGS) -lrt $(APPEND_LDFLAGS)
 
 tapdisk-stream tapdisk-diff: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
-	$(CC) -o $@ $^ $(LDFLAGS) -lrt -lz $(VHDLIBS) $(AIOLIBS) $(MEMSHRLIBS) -lm
+	$(CC) -o $@ $^ $(LDFLAGS) -lrt -lz $(VHDLIBS) $(AIOLIBS) $(MEMSHRLIBS) -lm $(APPEND_LDFLAGS)
 
 td-util: td.o tapdisk-utils.o tapdisk-log.o $(PORTABLE-OBJS-y)
-	$(CC) -o $@ $^ $(LDFLAGS) $(VHDLIBS)
+	$(CC) -o $@ $^ $(LDFLAGS) $(VHDLIBS) $(APPEND_LDFLAGS)
 
 lock-util: lock.c
-	$(CC) $(CFLAGS) -DUTIL -o lock-util lock.c $(LDFLAGS)
+	$(CC) $(CFLAGS) -DUTIL -o lock-util lock.c $(LDFLAGS) $(APPEND_LDFLAGS)
 
 .PHONY: qcow-util
 qcow-util: img2qcow qcow2raw qcow-create
 
 img2qcow qcow2raw qcow-create: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
-	$(CC) -o $@ $^ $(LDFLAGS) -lrt -lz $(VHDLIBS) $(AIOLIBS) $(MEMSHRLIBS) -lm
+	$(CC) -o $@ $^ $(LDFLAGS) -lrt -lz $(VHDLIBS) $(AIOLIBS) $(MEMSHRLIBS) -lm $(APPEND_LDFLAGS)
 
 install: all
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST_DIR)
