@@ -1339,7 +1339,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         panic("Could not protect TXT memory regions");
 
     /* Create initial domain 0. */
-    hardware_domain = dom0 = domain_create(0, DOMCRF_s3_integrity, 0);
+    dom0 = domain_create(0, DOMCRF_s3_integrity, 0);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
         panic("Error creating domain 0");
 

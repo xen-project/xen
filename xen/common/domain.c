@@ -237,10 +237,11 @@ struct domain *domain_create(
     else if ( domcr_flags & DOMCRF_pvh )
         d->guest_type = guest_type_pvh;
 
-    if ( is_hardware_domain(d) )
+    if ( domid == 0 )
     {
         d->is_pinned = opt_dom0_vcpus_pin;
         d->disable_migrate = 1;
+        hardware_domain = d;
     }
 
     rangeset_domain_initialise(d);
@@ -319,6 +320,8 @@ struct domain *domain_create(
 
  fail:
     d->is_dying = DOMDYING_dead;
+    if ( hardware_domain == d )
+        hardware_domain = NULL;
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
     xfree(d->mem_event);
     xfree(d->pbuf);
