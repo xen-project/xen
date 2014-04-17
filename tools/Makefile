@@ -63,7 +63,6 @@ install: subdirs-install
 	$(INSTALL_DIR) $(DESTDIR)/var/xen/dump
 	$(INSTALL_DIR) $(DESTDIR)/var/log/xen
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xen
-	$(INSTALL_DIR) $(DESTDIR)/var/lock/subsys
 
 .PHONY: uninstall
 uninstall: D=$(DESTDIR)
