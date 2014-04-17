@@ -817,7 +817,7 @@ unlock:
 }
 
 void __trace_hypercall(uint32_t event, unsigned long op,
-                       const unsigned long *args)
+                       const xen_ulong_t *args)
 {
     struct {
         uint32_t op;

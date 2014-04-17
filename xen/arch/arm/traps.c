@@ -17,6 +17,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/stdbool.h>
 #include <xen/init.h>
 #include <xen/string.h>
 #include <xen/version.h>
@@ -1024,6 +1025,7 @@ static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL(sysctl, 2),
     HYPERCALL(hvm_op, 2),
     HYPERCALL(grant_table_op, 3),
+    HYPERCALL(multicall, 2),
     HYPERCALL_ARM(vcpu_op, 3),
 };
 
@@ -1171,6 +1173,24 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
 #endif
 }
 
+static bool_t check_multicall_32bit_clean(struct multicall_entry *multi)
+{
+    int i;
+
+    for ( i = 0; i < arm_hypercall_table[multi->op].nr_args; i++ )
+    {
+        if ( unlikely(multi->args[i] & 0xffffffff00000000ULL) )
+        {
+            printk("%pv: multicall argument %d is not 32-bit clean %"PRIx64"\n",
+                   current, i, multi->args[i]);
+            domain_crash(current->domain);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void do_multicall_call(struct multicall_entry *multi)
 {
     arm_hypercall_fn_t call = NULL;
@@ -1188,9 +1208,13 @@ void do_multicall_call(struct multicall_entry *multi)
         return;
     }
 
+    if ( is_pv32_domain(current->domain) &&
+         !check_multicall_32bit_clean(multi) )
+        return;
+
     multi->result = call(multi->args[0], multi->args[1],
-                        multi->args[2], multi->args[3],
-                        multi->args[4]);
+                         multi->args[2], multi->args[3],
+                         multi->args[4]);
 }
 
 /*

@@ -35,10 +35,10 @@ static void trace_multicall_call(multicall_entry_t *call)
 
 ret_t
 do_multicall(
-    XEN_GUEST_HANDLE_PARAM(multicall_entry_t) call_list, unsigned int nr_calls)
+    XEN_GUEST_HANDLE_PARAM(multicall_entry_t) call_list, uint32_t nr_calls)
 {
     struct mc_state *mcs = &current->mc_state;
-    unsigned int     i;
+    uint32_t         i;
     int              rc = 0;
 
     if ( unlikely(__test_and_set_bit(_MCSF_in_multicall, &mcs->flags)) )
