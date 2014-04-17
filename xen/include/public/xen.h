@@ -541,13 +541,15 @@ DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 /*
  * ` enum neg_errnoval
  * ` HYPERVISOR_multicall(multicall_entry_t call_list[],
- * `                      unsigned int nr_calls);
+ * `                      uint32_t nr_calls);
  *
- * NB. The fields are natural register size for this architecture.
+ * NB. The fields are logically the natural register size for this
+ * architecture. In cases where xen_ulong_t is larger than this then
+ * any unused bits in the upper portion must be zero.
  */
 struct multicall_entry {
-    unsigned long op, result;
-    unsigned long args[6];
+    xen_ulong_t op, result;
+    xen_ulong_t args[6];
 };
 typedef struct multicall_entry multicall_entry_t;
 DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
