@@ -10,7 +10,7 @@ OBJS    := $(CFILES:.c=.o)
 all: kdd
 
 kdd: $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(APPEND_LDFLAGS)
 
 .PHONY: clean
 clean:
