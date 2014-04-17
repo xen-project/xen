@@ -24,6 +24,7 @@ CFLAGS += -DHOST_$(XEN_OS)
 
 # Include configure output (config.h) to headers search path
 CFLAGS += -I$(XEN_ROOT)/tools
+LDFLAGS += $(APPEND_LDFLAGS)
 
 .PHONY: all
 all: xentop
