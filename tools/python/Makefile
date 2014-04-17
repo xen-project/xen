@@ -16,11 +16,11 @@ build: genpath genwrap.py $(XEN_ROOT)/tools/libxl/libxl_types.idl \
 		$(XEN_ROOT)/tools/libxl/libxl_types.idl \
 		xen/lowlevel/xl/_pyxl_types.h \
 		xen/lowlevel/xl/_pyxl_types.c
-	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py build
+	CC="$(CC)" CFLAGS="$(CFLAGS) $(APPEND_LDFLAGS)" $(PYTHON) setup.py build
 
 .PHONY: install
 install:
-	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py install \
+	CC="$(CC)" CFLAGS="$(CFLAGS) $(APPEND_LDFLAGS)" $(PYTHON) setup.py install \
 		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" --force
 
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
