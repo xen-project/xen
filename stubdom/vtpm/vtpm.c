@@ -33,6 +33,7 @@
 #include "vtpm_cmd.h"
 #include "vtpm_pcrs.h"
 #include "vtpmblk.h"
+#include "vtpm_manager.h"
 
 #define TPM_LOG_INFO LOG_INFO
 #define TPM_LOG_ERROR LOG_ERR
@@ -115,6 +116,40 @@ int init_random(void) {
    ctr_drbg_set_prediction_resistance( &ctr_drbg, CTR_DRBG_PR_OFF );
 
    return 0;
+}
+
+int check_passthru(tpmcmd_t* tpmcmd) {
+   TPM_TAG tag;
+   UINT32 len = 10;
+   BYTE* ptr;
+   size_t size;
+
+   if(tpmcmd->req_len < 10) {
+      return false;
+   }
+
+   ptr = tpmcmd->req;
+   tpm_unmarshal_UINT16(&ptr, &len, &tag);
+
+   if (tag == VTPM_TAG_REQ2) {
+      info("VTPM passthru: %d bytes", (int)tpmcmd->req_len);
+      tpmfront_cmd(tpmfront_dev, tpmcmd->req, tpmcmd->req_len, &tpmcmd->resp, &size);
+      tpmcmd->resp_len = size;
+      info("VTPM passthru return: %d bytes", (int)size);
+      return true;
+   }
+
+   if (tag == VTPM_TAG_REQ) {
+      info("VTPM pTPM-cmd: %d bytes", (int)tpmcmd->req_len);
+      ptr = tpmcmd->req;
+      tpm_marshal_UINT16(&ptr, &len, TPM_TAG_RQU_COMMAND);
+      tpmfront_cmd(tpmfront_dev, tpmcmd->req, tpmcmd->req_len, &tpmcmd->resp, &size);
+      tpmcmd->resp_len = size;
+      info("VTPM pTPM-cmd return: %d bytes", (int)size);
+      return true;
+   }
+
+   return false;
 }
 
 int check_ordinal(tpmcmd_t* tpmcmd) {
@@ -209,6 +244,9 @@ static void main_loop(void) {
             error("Invalid locality (%d) for client in tpm_handle_command", tpmcmd->locality);
             create_error_response(tpmcmd, TPM_FAIL);
 	 }
+         /* Check for TPM Manager passthrough command */
+         else if(check_passthru(tpmcmd)) {
+	 }
          /* Check for disabled ordinals */
          else if(!check_ordinal(tpmcmd)) {
             create_error_response(tpmcmd, TPM_BAD_ORDINAL);
@@ -231,7 +269,7 @@ static void main_loop(void) {
    }
 
 abort_postpcrs:
-   info("VTPM Shutting down\n");
+   info("VTPM Shutting down");
 
    tpm_emulator_shutdown();
 }
