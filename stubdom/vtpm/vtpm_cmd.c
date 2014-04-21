@@ -217,6 +217,51 @@ egress:
    return status;
 }
 
+extern struct tpmfront_dev* tpmfront_dev;
+TPM_RESULT VTPM_GetParentQuote(TPM_NONCE *data, TPM_PCR_SELECTION *sel, UINT32 *sigSize, BYTE **sig)
+{
+   TPM_RESULT status = TPM_SUCCESS;
+   uint8_t* bptr, *resp;
+   uint8_t* cmdbuf = NULL;
+   size_t resplen = 0;
+   UINT32 len;
+
+   TPM_TAG tag = VTPM_TAG_REQ;
+   UINT32 size;
+   TPM_COMMAND_CODE ord = VTPM_ORD_GET_QUOTE;
+
+   /*Create the command*/
+   len = size = VTPM_COMMAND_HEADER_SIZE + 25;
+   bptr = cmdbuf = malloc(size);
+   TRYFAILGOTO(pack_header(&bptr, &len, tag, size, ord));
+   TRYFAILGOTO(tpm_marshal_TPM_NONCE(&bptr, &len, data));
+   TRYFAILGOTO(tpm_marshal_TPM_PCR_SELECTION(&bptr, &len, sel));
+
+   /* Send the command to vtpm_manager */
+   info("Requesting Quote from backend");
+   TRYFAILGOTOMSG(tpmfront_cmd(tpmfront_dev, cmdbuf, size, &resp, &resplen), ERR_TPMFRONT);
+
+   /* Unpack response header */
+   bptr = resp;
+   len = resplen;
+   TRYFAILGOTOMSG(unpack_header(&bptr, &len, &tag, &size, &ord), ERR_MALFORMED);
+
+   /* Check return code */
+   CHECKSTATUSGOTO(ord, "VTPM_GetParentQuote()");
+
+   /* Copy out the value */
+   *sigSize = len;
+   *sig = tpm_malloc(*sigSize);
+   TRYFAILGOTOMSG(tpm_unmarshal_BYTE_ARRAY(&bptr, &len, *sig, *sigSize), ERR_MALFORMED);
+
+   goto egress;
+abort_egress:
+   error("VTPM_GetParentQuote failed");
+egress:
+   free(cmdbuf);
+   return status;
+}
+
 TPM_RESULT VTPM_PCRRead(struct tpmfront_dev* tpmfront_dev, UINT32 pcrIndex, BYTE* outDigest)
 {
    TPM_RESULT status = TPM_SUCCESS;
