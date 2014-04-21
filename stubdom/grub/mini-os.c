@@ -735,8 +735,14 @@ void __attribute__ ((noreturn)) grub_reboot (void)
  * for grub's 32bit pointers to work */
 char grub_scratch_mem[SCRATCH_MEMSIZE] __attribute__((aligned(PAGE_SIZE)));
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
+    if (argc > 1 && memcmp(argv[1], "--vtpm-label=", 13) == 0) {
+        vtpm_label = argv[1] + 13;
+        argc--;
+        argv++;
+    }
+
     if (argc > 1) {
         strncpy(config_file, argv[1], sizeof(config_file) - 1);
         config_file[sizeof(config_file) - 1] = 0;

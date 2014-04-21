@@ -68,6 +68,14 @@ struct pcr_extend_cmd {
 	unsigned char hash[20];
 } __attribute__((packed));
 
+struct pcr_extend_rsp {
+	uint16_t tag;
+	uint32_t size;
+	uint32_t status;
+
+	unsigned char hash[20];
+} __attribute__((packed));
+
 /* Not imported from polarssl's header since the prototype unhelpfully defines
  * the input as unsigned char, which causes pointer type mismatches */
 void sha1(const void *input, size_t ilen, unsigned char output[20]);
@@ -135,20 +143,49 @@ int kexec_allocate(struct xc_dom_image *dom, xen_vaddr_t up_to)
     return 0;
 }
 
+/* Filled from mini-os command line or left as NULL */
+char *vtpm_label;
+
 static void tpm_hash2pcr(struct xc_dom_image *dom, char *cmdline)
 {
 	struct tpmfront_dev* tpm = init_tpmfront(NULL);
-	uint8_t *resp;
+	struct pcr_extend_rsp *resp;
 	size_t resplen = 0;
 	struct pcr_extend_cmd cmd;
+	int rv;
 
-	/* If all guests have access to a vTPM, it may be useful to replace this
-	 * with ASSERT(tpm) to prevent configuration errors from allowing a guest
-	 * to boot without a TPM (or with a TPM that has not been sent any
-	 * measurements, which could allow forging the measurements).
+	/*
+	 * If vtpm_label was specified on the command line, require a vTPM to be
+	 * attached and for the domain providing the vTPM to have the given
+	 * label.
 	 */
-	if (!tpm)
+	if (vtpm_label) {
+		char ctx[128];
+		if (!tpm) {
+			printf("No TPM found and vtpm_label specified, aborting!\n");
+			do_exit();
+		}
+		rv = evtchn_get_peercontext(tpm->evtchn, ctx, sizeof(ctx) - 1);
+		if (rv < 0) {
+			printf("Could not verify vtpm_label: %d\n", rv);
+			do_exit();
+		}
+		ctx[127] = 0;
+		rv = strcmp(ctx, vtpm_label);
+		if (rv && vtpm_label[0] == '*') {
+			int match_len = strlen(vtpm_label) - 1;
+			int offset = strlen(ctx) - match_len;
+			if (offset > 0)
+				rv = strcmp(ctx + offset, vtpm_label + 1);
+		}
+
+		if (rv) {
+			printf("Mismatched vtpm_label: '%s' != '%s'\n", ctx, vtpm_label);
+			do_exit();
+		}
+	} else if (!tpm) {
 		return;
+	}
 
 	cmd.tag = bswap_16(TPM_TAG_RQU_COMMAND);
 	cmd.size = bswap_32(sizeof(cmd));
@@ -156,15 +193,18 @@ static void tpm_hash2pcr(struct xc_dom_image *dom, char *cmdline)
 	cmd.pcr = bswap_32(4); // PCR #4 for kernel
 	sha1(dom->kernel_blob, dom->kernel_size, cmd.hash);
 
-	tpmfront_cmd(tpm, (void*)&cmd, sizeof(cmd), &resp, &resplen);
+	rv = tpmfront_cmd(tpm, (void*)&cmd, sizeof(cmd), (void*)&resp, &resplen);
+	ASSERT(rv == 0 && resp->status == 0);
 
 	cmd.pcr = bswap_32(5); // PCR #5 for cmdline
 	sha1(cmdline, strlen(cmdline), cmd.hash);
-	tpmfront_cmd(tpm, (void*)&cmd, sizeof(cmd), &resp, &resplen);
+	rv = tpmfront_cmd(tpm, (void*)&cmd, sizeof(cmd), (void*)&resp, &resplen);
+	ASSERT(rv == 0 && resp->status == 0);
 
 	cmd.pcr = bswap_32(5); // PCR #5 for initrd
 	sha1(dom->ramdisk_blob, dom->ramdisk_size, cmd.hash);
-	tpmfront_cmd(tpm, (void*)&cmd, sizeof(cmd), &resp, &resplen);
+	rv = tpmfront_cmd(tpm, (void*)&cmd, sizeof(cmd), (void*)&resp, &resplen);
+	ASSERT(rv == 0 && resp->status == 0);
 
 	shutdown_tpmfront(tpm);
 }
