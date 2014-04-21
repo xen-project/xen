@@ -57,6 +57,8 @@ struct vtpm_globals {
 
    entropy_context     entropy;
    ctr_drbg_context    ctr_drbg;
+
+   int hw_locality;
 };
 
 struct tpm_opaque {

@@ -69,7 +69,8 @@ const TPM_AUTHDATA WELLKNOWN_AUTH = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0
 
 struct vtpm_globals vtpm_globals = {
    .tpm_fd = -1,
-   .oiap = { .AuthHandle = 0 }
+   .oiap = { .AuthHandle = 0 },
+   .hw_locality = 0
 };
 
 static int tpm_entropy_source(void* dummy, unsigned char* data, size_t len, size_t* olen) {
@@ -436,6 +437,7 @@ TPM_RESULT vtpmmgr_init(int argc, char** argv) {
             }
             vtpm_globals.tpm_fd = tpm_tis_open(tpm);
             tpm_tis_request_locality(tpm, opts.tpmlocality);
+            vtpm_globals.hw_locality = opts.tpmlocality;
          }
          break;
       case TPMDRV_TPMFRONT:
