@@ -326,6 +326,9 @@ tools/qemu-xen-traditional-dir
 tools/firmware/seabios-dir-remote
 tools/firmware/seabios-dir
 
+tools/firmware/ovmf-dir-remote
+tools/firmware/ovmf-dir
+
 tools/firmware/rombios/_rombios_.c
 tools/firmware/rombios/rombios.s
 tools/firmware/rombios/rombios.sym
