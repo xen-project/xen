@@ -386,6 +386,8 @@ static void set_opaque(domid_t domid, unsigned int handle)
 
 	opq = calloc(1, sizeof(*opq));
 	opq->uuid = (uuid_t*)tpmback_get_uuid(domid, handle);
+	opq->domid = domid;
+	opq->handle = handle;
 	tpmback_set_opaque(domid, handle, opq);
 }
 

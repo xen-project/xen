@@ -125,3 +125,17 @@ which requires the presence of a vTPM.  To bind the configuration of the guest
 to the vTPM, the guest may use full-disk encryption which can be unlocked using
 an unseal operation; using the wrong vTPM will then yield a non-functioning
 guest.
+
+In order to use pv-grub to obtain measurements of the guest kernel in PCRs 4 and
+5, it must not be possible to attach to a guest's vTPM without booting a fresh
+guest image.  This requires pairing every vTPM's launch with the launch of a
+guest, as described above, and using the --vtpm-label= argument to pv-grub so
+that it refuses to launch a guest if it could not write to the vTPM.  To permit
+the hardware domain, which cannot use pv-grub, to use a vTPM in this situation,
+multiple vTPM groups must be used in the TPM Manager.  Group 0 would be for the
+hardware domain only, and would only support vTPMs with label
+"system_u:system_r:vtpm_t".  Group 1 would support vTPMs with label
+"*:vm_r:vtpm_t", and would be used for all guest vTPMs.  The EK quote used in
+initial provisioning and any deep quotes produced later would include the label,
+which would allow a verifier to reliably determine if the value of the vTPM's
+PCR 4 contains the hash of the domain's kernel.

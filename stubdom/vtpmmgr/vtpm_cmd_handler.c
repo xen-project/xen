@@ -59,10 +59,40 @@ static void gen_random_uuid(uuid_t uuid)
 	uuid[8] = 0x80 | (uuid[8] & 0x3F);
 }
 
+/*
+ * Instead of using a kernel hash, which requires a trusted domain builder to
+ * report, use the XSM label as a substitute.
+ */
 static TPM_RESULT find_vtpm_khash(int domid, struct tpm_opaque *opq)
 {
-	// TODO getting the build hashes requires a domain builder to report them
-	memset(opq->kern_hash, 0, sizeof(opq->kern_hash));
+	char buf[128];
+	int i, rv;
+	buf[127] = 0;
+	rv = tpmback_get_peercontext(opq->domid, opq->handle, buf, sizeof(buf) - 1);
+	if (rv < 0)
+		return TPM_FAIL;
+
+	sha1((void*)buf, strlen(buf), opq->kern_hash);
+
+	/*
+	 * As a hack to support the use of the XSM user field as an optional
+	 * wildcard, check the hash against the group here. If it fails, replace
+	 * the user field with a "*" and return the hash of that value.
+	 */
+	for(i=0; i < be32_native(opq->group->seal_bits.nr_kerns); i++) {
+		if (!memcmp(opq->group->seal_bits.kernels[i].bits, opq->kern_hash, 20)) {
+			return TPM_SUCCESS;
+		}
+	}
+
+	char* upos = strchr(buf, ':');
+	if (upos == NULL || upos == buf)
+		return TPM_SUCCESS;
+
+	upos--;
+	upos[0] = '*';
+
+	sha1((void*)upos, strlen(upos), opq->kern_hash);
 	return TPM_SUCCESS;
 }
 

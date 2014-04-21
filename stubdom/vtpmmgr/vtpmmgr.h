@@ -65,7 +65,11 @@ struct tpm_opaque {
 	uuid_t *uuid;
 	struct mem_group *group;
 	struct mem_vtpm *vtpm;
-	uint8_t kern_hash[32];
+
+	domid_t domid;
+	unsigned int handle;
+
+	uint8_t kern_hash[20];
 };
 
 // --------------------------- Global Values --------------------------

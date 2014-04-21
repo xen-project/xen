@@ -123,7 +123,9 @@ strengthen this assumption if the creation of vTPM-labeled domains is more
 constrained (for example, only permitted to a domain builder service): the only
 grants mapped by the TPM Manager should belong to vTPM domains, so restricting
 the ability to map other domain's granted pages will prevent other domains from
-directly requesting keys from the TPM Manager.
+directly requesting keys from the TPM Manager.  The TPM Manager uses the hash of
+the XSM label of the attached vTPM as the kernel hash, so vTPMs with distinct
+labels may be further partitioned using vTPM groups.
 
 A domain with direct access to the hardware TPM will be able to decrypt the TPM
 Manager's disk image if the haredware TPM's PCR values are in a permitted
@@ -158,6 +160,6 @@ would look like the following:
 6. Attach the vTPM migration domain's vtpm/1 device to the new vtpmmgr
 7. Migration domain executes vtpmmgr_SaveHashKey on vtpm/1
 
-This requires the migration domain must be added to the list of valid vTPM
-kernel hashes.  Because the TPM Manager currently does not verify vTPM kernel
-hashes, the control domain can initiate this operation at any time.
+This requires the migration domain to be added to the list of valid vTPM kernel
+hashes. In the current version of the vtpmmgr domain, this is the hash of the
+XSM label, not the kernel.
