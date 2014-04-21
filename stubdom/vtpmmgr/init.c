@@ -48,7 +48,7 @@
 
 #include "log.h"
 #include "vtpmmgr.h"
-#include "vtpm_storage.h"
+#include "vtpm_disk.h"
 #include "tpm.h"
 #include "marshal.h"
 
@@ -64,16 +64,11 @@ struct Opts {
 };
 
 // --------------------------- Well Known Auths --------------------------
-const TPM_AUTHDATA WELLKNOWN_SRK_AUTH = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+const TPM_AUTHDATA WELLKNOWN_AUTH = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-const TPM_AUTHDATA WELLKNOWN_OWNER_AUTH = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 struct vtpm_globals vtpm_globals = {
    .tpm_fd = -1,
-   .storage_key = TPM_KEY_INIT,
-   .storage_key_handle = 0,
    .oiap = { .AuthHandle = 0 }
 };
 
@@ -247,42 +242,11 @@ abort_egress:
    return status;
 }
 
-static void init_storage_key(TPM_KEY* key) {
-   key->ver.major = 1;
-   key->ver.minor = 1;
-   key->ver.revMajor = 0;
-   key->ver.revMinor = 0;
-
-   key->keyUsage = TPM_KEY_BIND;
-   key->keyFlags = 0;
-   key->authDataUsage = TPM_AUTH_ALWAYS;
-
-   TPM_KEY_PARMS* p = &key->algorithmParms;
-   p->algorithmID = TPM_ALG_RSA;
-   p->encScheme = TPM_ES_RSAESOAEP_SHA1_MGF1;
-   p->sigScheme = TPM_SS_NONE;
-   p->parmSize = 12;
-
-   TPM_RSA_KEY_PARMS* r = &p->parms.rsa;
-   r->keyLength = RSA_KEY_SIZE;
-   r->numPrimes = 2;
-   r->exponentSize = 0;
-   r->exponent = NULL;
-
-   key->PCRInfoSize = 0;
-   key->encDataSize = 0;
-   key->encData = NULL;
-}
-
-static int parse_auth_string(char* authstr, BYTE* target, const TPM_AUTHDATA wellknown, int allowrandom) {
+static int parse_auth_string(char* authstr, BYTE* target) {
    int rc;
    /* well known owner auth */
    if(!strcmp(authstr, "well-known")) {
-      memcpy(target, wellknown, sizeof(TPM_AUTHDATA));
-   }
-   /* Create a randomly generated owner auth */
-   else if(allowrandom && !strcmp(authstr, "random")) {
-      return 1;
+	   return 0;
    }
    /* owner auth is a raw hash */
    else if(!strncmp(authstr, "hash:", 5)) {
@@ -318,12 +282,12 @@ int parse_cmdline_opts(int argc, char** argv, struct Opts* opts)
    int i;
 
    //Set defaults
-   memcpy(vtpm_globals.owner_auth, WELLKNOWN_OWNER_AUTH, sizeof(TPM_AUTHDATA));
-   memcpy(vtpm_globals.srk_auth, WELLKNOWN_SRK_AUTH, sizeof(TPM_AUTHDATA));
+   memcpy(vtpm_globals.owner_auth, WELLKNOWN_AUTH, sizeof(TPM_AUTHDATA));
+   memcpy(vtpm_globals.srk_auth, WELLKNOWN_AUTH, sizeof(TPM_AUTHDATA));
 
    for(i = 1; i < argc; ++i) {
       if(!strncmp(argv[i], "owner_auth:", 10)) {
-         if((rc = parse_auth_string(argv[i] + 10, vtpm_globals.owner_auth, WELLKNOWN_OWNER_AUTH, 1)) < 0) {
+         if((rc = parse_auth_string(argv[i] + 10, vtpm_globals.owner_auth)) < 0) {
             goto err_invalid;
          }
          if(rc == 1) {
@@ -331,7 +295,7 @@ int parse_cmdline_opts(int argc, char** argv, struct Opts* opts)
          }
       }
       else if(!strncmp(argv[i], "srk_auth:", 8)) {
-         if((rc = parse_auth_string(argv[i] + 8, vtpm_globals.srk_auth, WELLKNOWN_SRK_AUTH, 0)) != 0) {
+         if((rc = parse_auth_string(argv[i] + 8, vtpm_globals.srk_auth)) != 0) {
             goto err_invalid;
          }
       }
@@ -389,8 +353,6 @@ static TPM_RESULT vtpmmgr_create(void) {
    TPMTRYRETURN(try_take_ownership());
 
    // Generate storage key's auth
-   memset(&vtpm_globals.storage_key_usage_auth, 0, sizeof(TPM_AUTHDATA));
-
    TPMTRYRETURN( TPM_OSAP(
             TPM_ET_KEYHANDLE,
             TPM_SRK_KEYHANDLE,
@@ -398,30 +360,11 @@ static TPM_RESULT vtpmmgr_create(void) {
             &sharedsecret,
             &osap) );
 
-   init_storage_key(&vtpm_globals.storage_key);
-
-   //initialize the storage key
-   TPMTRYRETURN( TPM_CreateWrapKey(
-            TPM_SRK_KEYHANDLE,
-            (const TPM_AUTHDATA*)&sharedsecret,
-            (const TPM_AUTHDATA*)&vtpm_globals.storage_key_usage_auth,
-            (const TPM_AUTHDATA*)&vtpm_globals.storage_key_usage_auth,
-            &vtpm_globals.storage_key,
-            &osap) );
-
-   //Load Storage Key
-   TPMTRYRETURN( TPM_LoadKey(
-            TPM_SRK_KEYHANDLE,
-            &vtpm_globals.storage_key,
-            &vtpm_globals.storage_key_handle,
-            (const TPM_AUTHDATA*) &vtpm_globals.srk_auth,
-            &vtpm_globals.oiap));
-
    //Make sure TPM has commited changes
    TPMTRYRETURN( TPM_SaveState() );
 
    //Create new disk image
-   TPMTRYRETURN(vtpm_storage_new_header());
+   TPMTRYRETURN(vtpm_new_disk());
 
    goto egress;
 abort_egress:
@@ -436,10 +379,21 @@ egress:
    return status;
 }
 
-/* Set up the opaque field to contain a pointer to the UUID */
-static void set_opaque_to_uuid(domid_t domid, unsigned int handle)
+static void set_opaque(domid_t domid, unsigned int handle)
 {
-   tpmback_set_opaque(domid, handle, tpmback_get_uuid(domid, handle));
+	struct tpm_opaque* opq;
+
+	opq = calloc(1, sizeof(*opq));
+	opq->uuid = (uuid_t*)tpmback_get_uuid(domid, handle);
+	tpmback_set_opaque(domid, handle, opq);
+}
+
+static void free_opaque(domid_t domid, unsigned int handle)
+{
+	struct tpm_opaque* opq = tpmback_get_opaque(domid, handle);
+	if (opq && opq->vtpm)
+		opq->vtpm->flags &= ~VTPM_FLAG_OPEN;
+	free(opq);
 }
 
 TPM_RESULT vtpmmgr_init(int argc, char** argv) {
@@ -468,7 +422,7 @@ TPM_RESULT vtpmmgr_init(int argc, char** argv) {
    }
 
    //Setup tpmback device
-   init_tpmback(set_opaque_to_uuid, NULL);
+   init_tpmback(set_opaque, free_opaque);
 
    //Setup tpm access
    switch(opts.tpmdriver) {
@@ -521,7 +475,8 @@ TPM_RESULT vtpmmgr_init(int argc, char** argv) {
    TPMTRYRETURN( TPM_OIAP(&vtpm_globals.oiap) );
 
    /* Load the Manager data, if it fails create a new manager */
-   if (vtpm_storage_load_header() != TPM_SUCCESS) {
+   // TODO handle upgrade recovery of auth0
+   if (vtpm_load_disk()) {
       /* If the OIAP session was closed by an error, create a new one */
       if(vtpm_globals.oiap.AuthHandle == 0) {
          TPMTRYRETURN( TPM_OIAP(&vtpm_globals.oiap) );
@@ -539,18 +494,11 @@ egress:
 
 void vtpmmgr_shutdown(void)
 {
-   /* Cleanup resources */
-   free_TPM_KEY(&vtpm_globals.storage_key);
-
    /* Cleanup TPM resources */
-   TPM_EvictKey(vtpm_globals.storage_key_handle);
    TPM_TerminateHandle(vtpm_globals.oiap.AuthHandle);
 
    /* Close tpmback */
    shutdown_tpmback();
-
-   /* Close the storage system and blkfront */
-   vtpm_storage_shutdown();
 
    /* Close tpmfront/tpm_tis */
    close(vtpm_globals.tpm_fd);

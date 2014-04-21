@@ -51,6 +51,9 @@ void tpmrsa_set_pubkey(tpmrsa_context* ctx,
       const unsigned char* exponent,
       int explen);
 
+/* Check an RSA signature */
+TPM_RESULT tpmrsa_sigcheck(tpmrsa_context *ctx, const unsigned char *input, const unsigned char *sha1);
+
 /* Do rsa public crypto */
 TPM_RESULT tpmrsa_pub_encrypt_oaep( tpmrsa_context *ctx,
       int (*f_rng)(void *, unsigned char *, size_t),

@@ -490,6 +490,13 @@ typedef struct TPM_SYMMETRIC_KEY_PARMS {
    BYTE* IV;
 } TPM_SYMMETRIC_KEY_PARMS;
 
+typedef struct TPM_SYMMETRIC_KEY {
+   UINT32 algId;
+   UINT16 encScheme;
+   UINT16 size;
+   BYTE* data;
+} TPM_SYMMETRIC_KEY;
+
 inline void free_TPM_SYMMETRIC_KEY_PARMS(TPM_SYMMETRIC_KEY_PARMS* p) {
    free(p->IV);
    p->IV = NULL;

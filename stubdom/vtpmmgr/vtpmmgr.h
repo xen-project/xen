@@ -50,10 +50,7 @@
 
 struct vtpm_globals {
    int tpm_fd;
-   TPM_KEY             storage_key;
-   TPM_HANDLE          storage_key_handle;       // Key used by persistent store
    TPM_AUTH_SESSION    oiap;                // OIAP session for storageKey
-   TPM_AUTHDATA        storage_key_usage_auth;
 
    TPM_AUTHDATA        owner_auth;
    TPM_AUTHDATA        srk_auth;
@@ -62,13 +59,20 @@ struct vtpm_globals {
    ctr_drbg_context    ctr_drbg;
 };
 
+struct tpm_opaque {
+	uuid_t *uuid;
+	struct mem_group *group;
+	struct mem_vtpm *vtpm;
+	uint8_t kern_hash[32];
+};
+
 // --------------------------- Global Values --------------------------
 extern struct vtpm_globals vtpm_globals;   // Key info and DMI states
 
 TPM_RESULT vtpmmgr_init(int argc, char** argv);
 void vtpmmgr_shutdown(void);
 
-TPM_RESULT vtpmmgr_handle_cmd(const uuid_t uuid, tpmcmd_t* tpmcmd);
+TPM_RESULT vtpmmgr_handle_cmd(struct tpm_opaque *opq, tpmcmd_t* tpmcmd);
 
 inline TPM_RESULT vtpmmgr_rand(unsigned char* bytes, size_t num_bytes) {
    return ctr_drbg_random(&vtpm_globals.ctr_drbg, bytes, num_bytes) == 0 ? 0 : TPM_FAIL;

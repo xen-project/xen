@@ -1,0 +1,127 @@
+Author: Daniel De Graaf <dgdegra@tycho.nsa.gov>
+
+================================================================================
+Overview
+================================================================================
+
+This document describes example platforms which use virtual TPMs to provide
+security properties for guests running on the platforms.  There are several
+tradeoffs between flexibility and trust which must be considered when
+implementing a platform containing vTPMs.
+
+================================================================================
+Example 1: Trusted Domain 0
+================================================================================
+
+This is the simplest example and provides maximal flexibility for testing the
+vTPM Manager and vTPMs.  The vtpmmgr, vtpm, and guest domains are created using
+xl from the command line on domain 0.
+
+Provisioning on domain 0:
+# dd if=/dev/zero of=/images/vtpmmgr-stubdom.img bs=2M count=1
+# dd if=/dev/zero of=/images/vtpm-guest1.img bs=2M count=1
+# dd if=/dev/zero of=/images/vtpm-guest2.img bs=2M count=1
+
+The vtpmmgr configuration file (vtpmmgr.cfg):
+
+name="vtpmmgr"
+kernel="/usr/lib/xen/boot/vtpmmgr-stubdom.gz"
+extra="tpmlocality=2"
+memory=8
+disk=["file:/images/vtpmmgr-stubdom.img,hda,w"]
+iomem=["fed42,1"]
+
+The vtpm configuration files (vtpm-guest1.cfg, vtpm-guest2.cfg):
+
+name="vtpm-guest1"
+kernel="/usr/lib/xen/boot/vtpm-stubdom.gz"
+extra="loglevel=debug"
+memory=8
+disk=["file:/images/vtpm-guest1.img,hda,w"]
+vtpm=["backend=vtpmmgr,uuid=ac0a5b9e-cbe2-4c07-b43b-1d69e46fb839"]
+
+name="vtpm-guest2"
+kernel="/usr/lib/xen/boot/vtpm-stubdom.gz"
+extra="loglevel=debug"
+memory=8
+disk=["file:/images/vtpm-guest2.img,hda,w"]
+vtpm=["backend=vtpmmgr,uuid=6c3ff5f1-8d58-4fed-b00d-a5ea9a817f7f"]
+
+The guest configuration files (guest1.cfg, guest2.cfg):
+
+name="guest1"
+kernel="/usr/lib/xen/boot/pv-grub-x86_64.gz"
+memory=1024
+disk=["file:/images/guest1.img,xvda,w"]
+vif=['mac=00:01:02:03:04:05,bridge=br0']
+vtpm=["backend=vtpm-guest1"]
+
+name="guest2"
+kernel="/usr/lib/xen/boot/pv-grub-x86_64.gz"
+memory=1024
+disk=["file:/images/guest2.img,xvda,w"]
+vif=['mac=00:01:02:03:04:06,bridge=br0']
+vtpm=["backend=vtpm-guest2"]
+
+Starting domains:
+
+# xl create vtpmmgr.cfg
+# xl create vtpm-guest1.cfg
+# xl create guest1.cfg
+
+================================================================================
+Example 2: Domain Builder with Static vTPMs
+================================================================================
+
+This example uses the domain builder to construct a TPM Manager and vTPM which
+do not require trusting the hardware domain with the vTPM's secrets.  However,
+it is not possible to construct additional vTPMs after the system is booted, and
+the guests with access to vTPMs may not be rebooted without rebooting the entire
+platform.
+
+The domain builder (dom0) constructs:
+	dom1 - xenstore    system_u:system_r:xenstore_t
+	dom2 - hardware    system_u:system_r:hwdom_t
+	dom3 - vtpmmgr     system_u:system_r:vtpmmgr_t
+	dom4 - vtpm-hw     system_u:system_r:vtpm_t
+	dom5 - vtpm-g1     guest1_u:vm_r:vtpm_t
+	dom6 - vtpm-g2     guest2_u:vm_r:vtpm_t
+	dom7 - guest1      guest1_u:vm_r:guest_t
+	dom8 - guest2      guest2_u:vm_r:guest_t
+
+It unpauses dom1 and dom2 after setting up Xenstore. The hardware domain is not
+permitted access to IO memory at 0xfed42; this IO memory is accessible to the
+vtpmmgr domain.  The two guest domains may be instantiated using pv-grub or
+using the same kernel as the hardware domain to conserve space in the domain
+builder's initrd.
+
+Once the hardware domain boots, it runs:
+
+# xl block-attach vtpmmgr 'backendtype=phy,backend=hardware,vdev=hda,access=w,target=/dev/lvm/vtpmmgr'
+# xl block-attach vtpm-hw 'backendtype=phy,backend=hardware,vdev=hda,access=w,target=/dev/lvm/vtpm-hw'
+# xl block-attach vtpm-g1 'backendtype=phy,backend=hardware,vdev=hda,access=w,target=/dev/lvm/vtpm-g1'
+# xl block-attach vtpm-g2 'backendtype=phy,backend=hardware,vdev=hda,access=w,target=/dev/lvm/vtpm-g2'
+# xl block-attach guest1 'backendtype=phy,backend=hardware,vdev=xvda,access=w,target=/dev/lvm/guest1'
+# xl block-attach guest2 'backendtype=phy,backend=hardware,vdev=xvda,access=w,target=/dev/lvm/guest2'
+# xl vtpm-attach vtpm-hw uuid=062b6416-ed46-492a-9e65-a2f92dc07f7f backend=vtpmmgr
+# xl vtpm-attach vtpm-g1 uuid=e9aa9d0f-ece5-4b84-b129-93004ba61a5f backend=vtpmmgr
+# xl vtpm-attach vtpm-g2 uuid=3fb2caf0-d305-4516-96c7-420618d98efb backend=vtpmmgr
+# xl vtpm-attach hardware uuid=062b6416-ed46-492a-9e65-a2f92dc07f7f backend=vtpm-hw
+# xl vtpm-attach guest1 uuid=e9aa9d0f-ece5-4b84-b129-93004ba61a5f backend=vtpm-g1
+# xl vtpm-attach guest2 uuid=3fb2caf0-d305-4516-96c7-420618d98efb backend=vtpm-g2
+
+Once these commands are complete, the domains are unpaused and may boot. The XSM
+policy must be configured to not allow any of the domain types named above to be
+created by any domain except the domain builder; guests created by the hardware
+domain or one of the primary guests acting as a control domain must have a
+different type. The type vtpmmgr_t may only map grants from vtpm_t; vtpm_t may
+only map grants from a domain of type guest_t or hwdom_t with the same user
+field.
+
+This example may be extended to allow dynamic creation of domains by using a
+domain builder that accepts build requests.  A single build request would create
+a pair of domains using an unused XSM user field: a vTPM and a pv-grub domain
+which requires the presence of a vTPM.  To bind the configuration of the guest
+to the vTPM, the guest may use full-disk encryption which can be unlocked using
+an unseal operation; using the wrong vTPM will then yield a non-functioning
+guest.

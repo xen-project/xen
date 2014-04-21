@@ -89,6 +89,31 @@ cleanup:
    return TPM_SUCCESS;
 }
 
+static const unsigned char rsa_der_header[] = {
+	0x00, 0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e, 0x03, 0x02, 0x1a, 0x05, 0x00, 0x04, 0x14,
+};
+
+TPM_RESULT tpmrsa_sigcheck(tpmrsa_context *ctx, const unsigned char *input, const unsigned char *sha1)
+{
+	unsigned char *tmp = alloca(ctx->len);
+	TPM_RESULT rv;
+	int i;
+	rv = tpmrsa_public(ctx, input, tmp);
+	if (rv)
+		return rv;
+	if (tmp[0] != 0 || tmp[1] != 1)
+		return TPM_INAPPROPRIATE_SIG;
+	for(i=2; i < 220; i++) {
+		if (tmp[i] != 0xFF)
+			return TPM_INAPPROPRIATE_SIG;
+	}
+	if (memcmp(tmp + 220, rsa_der_header, sizeof(rsa_der_header)))
+		return TPM_INAPPROPRIATE_SIG;
+	if (memcmp(tmp + 236, sha1, 20))
+		return TPM_DECRYPT_ERROR;
+	return TPM_SUCCESS;
+}
+
 static void mgf_mask( unsigned char *dst, int dlen, unsigned char *src, int slen)
 {
    unsigned char mask[HASH_LEN];

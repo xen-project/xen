@@ -80,22 +80,11 @@ TPM_RESULT TPM_FlushSpecific ( TPM_HANDLE  handle,  // in
 
 // TPM Mandatory
 TPM_RESULT TPM_Extend ( TPM_PCRINDEX  pcrNum,  // in
-      TPM_DIGEST   inDigest, // in
+      TPM_DIGEST*  inDigest, // in
       TPM_PCRVALUE*   outDigest // out
       );
 
-TPM_RESULT TPM_PcrRead ( TPM_PCRINDEX  pcrNum,  // in
-      TPM_PCRVALUE*  outDigest // out
-      );
-
-TPM_RESULT TPM_Quote ( TCS_KEY_HANDLE  keyHandle,  // in
-      TPM_NONCE   antiReplay,  // in
-      UINT32*    PcrDataSize, // in, out
-      BYTE**    PcrData,  // in, out
-      TPM_AUTH_SESSION*   privAuth,  // in, out
-      UINT32*    sigSize,  // out
-      BYTE**    sig    // out
-      );
+TPM_RESULT TPM_Reset(TPM_PCR_SELECTION *sel);
 
 TPM_RESULT TPM_Seal(
       TCS_KEY_HANDLE  keyHandle,  // in
@@ -120,41 +109,6 @@ TPM_RESULT TPM_Unseal (
       TPM_AUTH_SESSION*   dataAuth  // in, out
       );
 
-TPM_RESULT TPM_DirWriteAuth ( TPM_DIRINDEX  dirIndex,  // in
-      TPM_DIRVALUE  newContents, // in
-      TPM_AUTH_SESSION*   ownerAuth  // in, out
-      );
-
-TPM_RESULT TPM_DirRead ( TPM_DIRINDEX  dirIndex, // in
-      TPM_DIRVALUE*  dirValue // out
-      );
-
-TPM_RESULT TPM_Bind(
-      const TPM_KEY* key, //in
-      const BYTE* in, //in
-      UINT32 ilen, //in
-      BYTE* out //out, must be at least cipher block size
-      );
-
-TPM_RESULT TPM_UnBind (
-      TCS_KEY_HANDLE  keyHandle,  // in
-      UINT32 ilen, //in
-      const BYTE* in, //
-      UINT32*   outDataSize, // out
-      BYTE*    outData, //out
-      const TPM_AUTHDATA* usage_auth,
-      TPM_AUTH_SESSION* auth //in, out
-      );
-
-TPM_RESULT TPM_CreateWrapKey (
-      TCS_KEY_HANDLE  hWrappingKey,  // in
-      const TPM_AUTHDATA* osapSharedSecret,
-      const TPM_AUTHDATA* dataUsageAuth, //in
-      const TPM_AUTHDATA* dataMigrationAuth, //in
-      TPM_KEY*     key, //in
-      TPM_AUTH_SESSION*   pAuth    // in, out
-      );
-
 TPM_RESULT TPM_LoadKey (
       TPM_KEY_HANDLE  parentHandle, //
       const TPM_KEY* key, //in
@@ -163,33 +117,12 @@ TPM_RESULT TPM_LoadKey (
       TPM_AUTH_SESSION* auth
       );
 
-TPM_RESULT TPM_GetPubKey (  TCS_KEY_HANDLE  hKey,   // in
-      TPM_AUTH_SESSION*   pAuth,   // in, out
-      UINT32*    pcPubKeySize, // out
-      BYTE**    prgbPubKey  // out
-      );
-
-TPM_RESULT TPM_EvictKey ( TCS_KEY_HANDLE  hKey  // in
-      );
-
 TPM_RESULT TPM_FlushSpecific(TPM_HANDLE handle, //in
       TPM_RESOURCE_TYPE rt //in
       );
 
-TPM_RESULT TPM_Sign ( TCS_KEY_HANDLE  keyHandle,  // in
-      UINT32    areaToSignSize, // in
-      BYTE*    areaToSign,  // in
-      TPM_AUTH_SESSION*   privAuth,  // in, out
-      UINT32*    sigSize,  // out
-      BYTE**    sig    // out
-      );
-
 TPM_RESULT TPM_GetRandom (  UINT32*    bytesRequested, // in, out
       BYTE*    randomBytes  // out
-      );
-
-TPM_RESULT TPM_StirRandom (  UINT32    inDataSize, // in
-      BYTE*    inData  // in
       );
 
 TPM_RESULT TPM_ReadPubek (
@@ -203,11 +136,44 @@ TPM_RESULT TPM_GetCapability(
       UINT32* respSize,
       BYTE** resp);
 
+TPM_RESULT TPM_PCR_Read(UINT32 pcr, TPM_DIGEST *value);
 TPM_RESULT TPM_SaveState(void);
 
 TPM_RESULT TPM_CreateEndorsementKeyPair(
       const TPM_KEY_PARMS* keyInfo,
       TPM_PUBKEY* pubEK);
+
+TPM_RESULT TPM_MakeIdentity(
+	const TPM_AUTHDATA* identityAuth, // in
+	const TPM_AUTHDATA* privCADigest, // in
+	const TPM_KEY* kinfo, // in
+	const TPM_AUTHDATA* srk_auth, // in
+	const TPM_AUTHDATA* owner_auth, // in
+	TPM_AUTH_SESSION* srkAuth, // in,out
+	TPM_AUTH_SESSION* ownAuth, // in,out
+	TPM_KEY* key, // out
+	UINT32* identityBindingSize, // out
+	BYTE** identityBinding); // out
+
+TPM_RESULT TPM_ActivateIdentity(
+	TPM_KEY_HANDLE aikHandle, // in
+	BYTE* blob, // in
+	UINT32 blobSize, // in
+	const TPM_AUTHDATA* aik_auth, // in
+	const TPM_AUTHDATA* owner_auth, // in
+	TPM_AUTH_SESSION* aikAuth, // in,out
+	TPM_AUTH_SESSION* ownAuth, // in,out
+	TPM_SYMMETRIC_KEY* symKey); // out
+
+TPM_RESULT TPM_Quote(
+	TPM_KEY_HANDLE keyh, // in
+	const TPM_NONCE* data, // in
+	const TPM_PCR_SELECTION *pcrSelect, // in
+	const TPM_AUTHDATA* auth, // in
+	TPM_AUTH_SESSION* oiap, // in,out
+	TPM_PCR_COMPOSITE *pcrs, // out
+	BYTE** sig, // out
+	UINT32* sigSize); // out
 
 TPM_RESULT TPM_TransmitData(
       BYTE* in,

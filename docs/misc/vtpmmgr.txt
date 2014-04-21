@@ -1,0 +1,163 @@
+Author: Daniel De Graaf <dgdegra@tycho.nsa.gov>
+
+This document describes the operation and command line interface of
+vtpmmgr-stubdom. See docs/misc/vtpm.txt for details on the vTPM subsystem as a
+whole.
+
+================================================================================
+Overview
+================================================================================
+
+The TPM Manager has three primary functions:
+
+1. Securely store the encryption keys for vTPMs
+2. Provide a single controlled path of access to the physical TPM
+3. Provide evidence (via TPM Quotes) of the current configuration
+
+When combined with a platform that provides a trusted method for creating
+domains, the TPM Manager provides assurance that the private keys in a vTPM are
+only available in specific trusted configurations.
+
+The manager accepts commands from the vtpm-stubdom domains via the mini-os TPM
+backend driver. The vTPM manager communicates directly with hardware TPM using
+the mini-os tpm_tis driver.
+
+================================================================================
+Boot Configurations and TPM Groups
+================================================================================
+
+The TPM Manager's data is secured by using the physical TPM's seal operation,
+which allows data to be bound to specific PCRs. These PCRs are populated in the
+physical TPM during the boot process, either by the firmware/BIOS or by a
+dynamic launch environment such as TBOOT. In order to provide assurance of the
+system's security, the PCRs used to seal the TPM manager's data must contain
+measurements for domains used to bootstrap the TPM Manager and vTPMs.
+
+Because these measurements are based on hashes, they will change any time that
+any component of the system is upgraded. Since it is not possible to construct a
+list of all possible future good measurements, the job of approving
+configurations is delegated to a third party, referred to here as the system
+approval agent (SAA). The SAA is identified by its public (RSA) signature key,
+which is used to sign lists of valid configurations. A single TPM manager can
+support multiple SAAs via the use of vTPM groups. Each group is associated with
+a single SAA; this allows the creation of a multi-tenant environment where
+tenants may not all choose to trust the same SAA.
+
+Each vTPM is bound to a vTPM group at the time of its creation. Each vTPM group
+has its own AIK in the physical TPM for quotes of the hardware TPM state; when
+used with a conforming Privacy CA, this allows each group on the system to form
+the basis of a distinct identity.
+
+================================================================================
+Initial Provisioning
+================================================================================
+
+When the TPM Manager first boots up, it will create a stub vTPM group along with
+entries for any vTPMs that communicate with it. This stub group must be
+provisioned with an SAA and a boot configuration in order to survive a reboot.
+
+When a vTPM is connected to the TPM Manager using a UUID that is not recognized,
+a slot will be created in group 0 for it. In the future, this auto-creation may
+be restricted to specific UUIDs (such as the all-zero UUID) to enforce the use
+of the TPM manager as the generator of the UUID. The first vTPM to be connected
+is given administrative privileges for the TPM Manager, and should be attached
+to dom0 or a control domain in order to send provisioning commands.
+
+Provisioning a vTPM group for the system requires the public key of the SAA and
+privacy CA data used to certify the AIK (see the TPM spec for details). Once the
+group is created, a signed list of boot measurements can be installed. The
+initial group controls the ability to boot the system as a whole, and cannot be
+deleted once provisioned.
+
+================================================================================
+Command Line Arguments
+================================================================================
+
+Command line arguments are passed to the domain via the 'extra' parameter in the
+VM config file. Each parameter is separated by white space. For example:
+
+extra="foo=bar baz"
+
+Valid arguments:
+
+owner_auth=<AUTHSPEC>
+srk_auth=<AUTHSPEC>
+	Set the owner and SRK authdata for the TPM. If not specified, the
+	default is 160 zero bits (the well-known auth value). Valid values of
+	<AUTHSPEC> are:
+		well-known   Use the well known auth (default)
+		hash:<HASH>  Use the given 40-character ASCII hex string
+		text:<STR>   Use sha1 hash of <STR>.
+
+tpmdriver=<DRIVER>
+	Choose the driver used for communication with the hardware TPM. Values
+	other than tpm_tis should only be used for testing.
+
+	The possible values of <DRIVER> are:
+		tpm_tis    Direct communication with a hardware TPM 1.2.  The
+                           domain must have access to TPM IO memory. (default)
+		tpmfront   Use the Xen tpmfront interface to talk to another
+                           domain which provides access to the TPM.
+
+The following options only apply to the tpm_tis driver:
+
+tpmiomem=<ADDR>: The base address of the hardware memory pages of the TPM.
+	The default is 0xfed40000, as defined by the TCG's PC Client spec.
+
+tpmirq=<IRQ>: The irq of the hardware TPM if using interrupts. A value of
+	"probe" can be set to probe for the irq. A value of 0 disables
+	interrupts and uses polling (default 0).
+
+tpmlocality=<LOC>: Attempt to use locality <LOC> of the hardware TPM.
+	For full functionality of the TPM Manager, this should be set to "2".
+
+================================================================================
+Platform Security Assumptions
+================================================================================
+
+While the TPM Manager has the ability to check the hash of the vTPM requesting a
+key, there is currently no trusted method to inform the TPM Manager of the hash
+of each new domain.  Because of this, the TPM Manager trusts the UUID key in
+Xenstore to identify a vTPM in a trusted manner.  The XSM policy may be used to
+strengthen this assumption if the creation of vTPM-labeled domains is more
+constrained (for example, only permitted to a domain builder service): the only
+grants mapped by the TPM Manager should belong to vTPM domains, so restricting
+the ability to map other domain's granted pages will prevent other domains from
+directly requesting keys from the TPM Manager.
+
+A domain with direct access to the hardware TPM will be able to decrypt the TPM
+Manager's disk image if the haredware TPM's PCR values are in a permitted
+configuration.  To protect the TPM Manager's data, the list of permitted
+configurations should be chosen to include PCRs that measure the hypervisor,
+domain 0, the TPM Manager, and other critical configuration such as the XSM
+policy.  If the TPM Manager is configured to use locality 2 as recommended, it
+is safe to permit the hardware domain to access locality 0 (the default in
+Linux), although concurrent use of the TPM should be avoided as it can result in
+unexpected busy errors from the TPM driver.  The ability to access locality 2 of
+the TPM should be enforced using IO memory labeling in the XSM policy; the
+physical address 0xFED42xxx is always locality 2 for TPMs using the TIS driver.
+
+================================================================================
+Appendix: unsecured migration process for vtpmmgr domain upgrade
+================================================================================
+
+There is no direct upgrade supported from previous versions of the vtpmmgr
+domain due to changes in the on-disk format and the method used to seal data.
+If a vTPM domain supports migration, this feature should be used to migrate the
+vTPM's data; however, the vTPM packaged with Xen does not yet support migration.
+
+If adding migration support to the vTPM is not desired, a simpler migration
+domain usable only for local migration can be constructed. The migration process
+would look like the following:
+
+1. Start the old vtpmmgr
+2. Start the vTPM migration domain
+3. Attach the vTPM migration domain's vtpm/0 device to the old vtpmmgr
+4. Migration domain executes vtpmmgr_LoadHashKey on vtpm/0
+5. Start the new vtpmmgr, possibly shutting down the old one first
+6. Attach the vTPM migration domain's vtpm/1 device to the new vtpmmgr
+7. Migration domain executes vtpmmgr_SaveHashKey on vtpm/1
+
+This requires the migration domain must be added to the list of valid vTPM
+kernel hashes.  Because the TPM Manager currently does not verify vTPM kernel
+hashes, the control domain can initiate this operation at any time.
