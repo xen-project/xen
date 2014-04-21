@@ -88,11 +88,11 @@ TPM_RESULT TPM_Reset(TPM_PCR_SELECTION *sel);
 
 TPM_RESULT TPM_Seal(
       TCS_KEY_HANDLE  keyHandle,  // in
-      UINT32    pcrInfoSize, // in
-      TPM_PCR_INFO*    pcrInfo,  // in
+      UINT32    pcrInfoLongSize, // in
+      TPM_PCR_INFO_LONG*    pcrInfoLong,  // in
       UINT32    inDataSize,  // in
       const BYTE*    inData,   // in
-      TPM_STORED_DATA* sealedData, //out
+      TPM_STORED_DATA12* sealedData, //out
       const TPM_SECRET* osapSharedSecret, //in
       const TPM_AUTHDATA* sealDataAuth, //in
       TPM_AUTH_SESSION*   pubAuth  // in, out
@@ -100,7 +100,7 @@ TPM_RESULT TPM_Seal(
 
 TPM_RESULT TPM_Unseal (
       TPM_KEY_HANDLE parentHandle, // in
-      const TPM_STORED_DATA* sealedData,
+      const TPM_STORED_DATA12* sealedData,
       UINT32*   outSize,  // out
       BYTE**    out, //out
       const TPM_AUTHDATA* key_usage_auth, //in

@@ -492,11 +492,11 @@ abort_egress:
 
 TPM_RESULT TPM_Seal(
 		TPM_KEY_HANDLE  keyHandle,  // in
-		UINT32	 pcrInfoSize, // in
-		TPM_PCR_INFO*	 pcrInfo,  // in
+		UINT32	 pcrInfoLongSize, // in
+		TPM_PCR_INFO_LONG*	 pcrInfoLong,  // in
 		UINT32	 inDataSize,  // in
 		const BYTE*	 inData,	// in
-		TPM_STORED_DATA* sealedData, //out
+		TPM_STORED_DATA12* sealedData, //out
 		const TPM_SECRET* osapSharedSecret, //in
 		const TPM_AUTHDATA* sealedDataAuth, //in
 		TPM_AUTH_SESSION*	pubAuth  // in, out
@@ -509,28 +509,30 @@ TPM_RESULT TPM_Seal(
 
 	xorEncrypt(osapSharedSecret, &pubAuth->NonceEven, sealedDataAuth, IN_PTR, NULL, NULL);
 	in_pos += sizeof(TPM_ENCAUTH);
-	PACK_IN(UINT32, pcrInfoSize);
-	if (pcrInfoSize)
-		PACK_IN(TPM_PCR_INFO, pcrInfo);
+
+	PACK_IN(UINT32, pcrInfoLongSize);
+	if (pcrInfoLongSize) {
+		PACK_IN(TPM_PCR_INFO_LONG, pcrInfoLong);
+	}
 	PACK_IN(UINT32, inDataSize);
 	PACK_IN(BUFFER, inData, inDataSize);
 
 	TPM_XMIT_AUTH1(osapSharedSecret, pubAuth);
 
-	UNPACK_OUT(TPM_STORED_DATA, sealedData, UNPACK_ALLOC);
+	UNPACK_OUT(TPM_STORED_DATA12, sealedData, UNPACK_ALLOC);
 
 	TPM_END_AUTH1(osapSharedSecret, pubAuth);
 
  abort_egress:
 	if (status)
-		free_TPM_STORED_DATA(sealedData);
+		free_TPM_STORED_DATA12(sealedData);
 	TPM_AUTH_ERR_CHECK(pubAuth);
 	return status;
 }
 
 TPM_RESULT TPM_Unseal(
 		TPM_KEY_HANDLE parentHandle, // in
-		const TPM_STORED_DATA* sealedData,
+		const TPM_STORED_DATA12* sealedData,
 		UINT32*	outSize,  // out
 		BYTE**	 out, //out
 		const TPM_AUTHDATA* key_usage_auth, //in
@@ -544,7 +546,7 @@ TPM_RESULT TPM_Unseal(
 	PACK_IN(TPM_KEY_HANDLE, parentHandle);
 
 	TPM_HASH_IN_BEGIN;
-	PACK_IN(TPM_STORED_DATA, sealedData);
+	PACK_IN(TPM_STORED_DATA12, sealedData);
 
 	TPM_XMIT_AUTH2(key_usage_auth, keyAuth, data_usage_auth, dataAuth);
 

@@ -74,11 +74,14 @@ void TPM_pcr_digest(struct hash160 *buf, le32_t selection)
 int TPM_disk_seal(struct disk_seal_entry *dst, const void* src, size_t size)
 {
 	uint32_t rc;
-	TPM_PCR_INFO info;
-	TPM_STORED_DATA out;
+	uint32_t infoSize;
+	TPM_PCR_INFO_LONG info;
+	TPM_STORED_DATA12 out;
 	TPM_AUTH_SESSION osap = TPM_AUTH_SESSION_INIT;
 	TPM_AUTHDATA sharedsecret;
 	TPM_AUTHDATA auth;
+
+	printk("Calling TPM_disk_seal\n");
 
 	rc = TPM_OSAP(TPM_ET_KEYHANDLE, TPM_SRK_KEYHANDLE, (void*)&vtpm_globals.srk_auth,
 			&sharedsecret, &osap);
@@ -94,18 +97,26 @@ int TPM_disk_seal(struct disk_seal_entry *dst, const void* src, size_t size)
 #endif
 
 	memset(auth, 0, 20);
-	info.pcrSelection.sizeOfSelect = 3;
-	info.pcrSelection.pcrSelect = (void*)&dst->pcr_selection;
+	info.tag = TPM_TAG_PCR_INFO_LONG;
+	info.localityAtCreation = 1 << vtpm_globals.hw_locality;
+	info.localityAtRelease = 1 << vtpm_globals.hw_locality;
+	info.creationPCRSelection.sizeOfSelect = 3;
+	info.creationPCRSelection.pcrSelect = (void*)&dst->pcr_selection;
+	info.releasePCRSelection.sizeOfSelect = 3;
+	info.releasePCRSelection.pcrSelect = (void*)&dst->pcr_selection;
 	memcpy(&info.digestAtCreation, &dst->digest_at_seal, 20);
 	memcpy(&info.digestAtRelease, &dst->digest_release, 20);
 
-	rc = TPM_Seal(TPM_SRK_KEYHANDLE, 45, &info, size, src, &out,
+	infoSize = 2 + 1 + 1 + 2 + 3 + 2 + 3 + 20 + 20;
+	//infoSize = sizeof_TPM_PCR_INFO_LONG(&info);
+
+	rc = TPM_Seal(TPM_SRK_KEYHANDLE, infoSize, &info, size, src, &out,
 			(void*)&sharedsecret, (void*)&auth, &osap);
 
 	TPM_TerminateHandle(osap.AuthHandle);
 
 #ifdef DEBUG_SEAL_OPS
-	printk("TPM_Seal rc=%d encDataSize=%d sealInfoSize=%d\n", rc, out.encDataSize, out.sealInfoSize);
+	printk("TPM_Seal rc=%d encDataSize=%d sealInfoSize=%d\n", rc, out.encDataSize, out.sealInfoLongSize);
 #endif
 	if (!rc)
 		memcpy(dst->sealed_data, out.encData, 256);
@@ -113,7 +124,7 @@ int TPM_disk_seal(struct disk_seal_entry *dst, const void* src, size_t size)
 #ifdef DEBUG_SEAL_OPS
 	uint8_t buf[512];
 	uint8_t *start = buf;
-	uint8_t *end = pack_TPM_STORED_DATA(buf, &out);
+	uint8_t *end = pack_TPM_STORED_DATA12(buf, &out);
 	printk("stored_data:");
 	while (start != end) {
 		printk(" %02x", *start);
@@ -122,37 +133,46 @@ int TPM_disk_seal(struct disk_seal_entry *dst, const void* src, size_t size)
 	printk("\n");
 #endif
 
-	free_TPM_STORED_DATA(&out);
+	free_TPM_STORED_DATA12(&out);
 	return rc;
 }
 
 int TPM_disk_unseal(void *dst, size_t size, const struct disk_seal_entry *src)
 {
 	uint32_t rc;
-	TPM_STORED_DATA in;
+	TPM_STORED_DATA12 in;
 	TPM_AUTH_SESSION oiap = TPM_AUTH_SESSION_INIT;
 	TPM_AUTHDATA auth;
 	uint32_t outSize = 0;
 	uint8_t *out = NULL;
+
+	printk("Calling TPM_disk_unseal\n");
 
 	rc = TPM_OIAP(&oiap);
 	if (rc) abort();
 
 	memset(auth, 0, 20);
 
-	in.ver = TPM_STRUCT_VER_1_1;
-	in.sealInfoSize = 45;
-	in.sealInfo.pcrSelection.sizeOfSelect = 3;
-	in.sealInfo.pcrSelection.pcrSelect = (void*)&src->pcr_selection;
-	memcpy(&in.sealInfo.digestAtCreation, &src->digest_at_seal, 20);
-	memcpy(&in.sealInfo.digestAtRelease, &src->digest_release, 20);
+	in.tag = TPM_TAG_STORED_DATA12;
+	in.et = 0;
+	//in.sealInfoLongSize = sizeof_TPM_PCR_INFO_LONG(&in.sealInfoLong);
+	in.sealInfoLongSize = 2 + 1 + 1 + 2 + 3 + 2 + 3 + 20 + 20;
+	in.sealInfoLong.tag = TPM_TAG_PCR_INFO_LONG;
+	in.sealInfoLong.localityAtCreation = 1 << vtpm_globals.hw_locality;
+	in.sealInfoLong.localityAtRelease = 1 << vtpm_globals.hw_locality;
+	in.sealInfoLong.creationPCRSelection.sizeOfSelect = 3;
+	in.sealInfoLong.creationPCRSelection.pcrSelect = (void*)&src->pcr_selection;
+	in.sealInfoLong.releasePCRSelection.sizeOfSelect = 3;
+	in.sealInfoLong.releasePCRSelection.pcrSelect = (void*)&src->pcr_selection;
+	memcpy(&in.sealInfoLong.digestAtCreation, &src->digest_at_seal, 20);
+	memcpy(&in.sealInfoLong.digestAtRelease, &src->digest_release, 20);
 	in.encDataSize = 256;
 	in.encData = (void*)src->sealed_data;
 
 #ifdef DEBUG_SEAL_OPS
 	uint8_t buf[512];
 	uint8_t *start = buf;
-	uint8_t *end = pack_TPM_STORED_DATA(buf, &in);
+	uint8_t *end = pack_TPM_STORED_DATA12(buf, &in);
 	printk("stored_data:");
 	while (start != end) {
 		printk(" %02x", *start);

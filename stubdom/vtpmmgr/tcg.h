@@ -259,6 +259,8 @@
 #define TPM_ST_DEACTIVATED 0x003
 
 // TPM_TAG values
+#define TPM_TAG_PCR_INFO_LONG 0x0006
+#define TPM_TAG_STORED_DATA12 0x0016
 #define TPM_TAG_RQU_COMMAND 0x00c1
 #define TPM_TAG_RQU_AUTH1_COMMAND 0x00c2
 #define TPM_TAG_RQU_AUTH2_COMMAND 0x00c3
@@ -582,6 +584,26 @@ inline void free_TPM_PCR_SELECTION(TPM_PCR_SELECTION* p) {
    p->pcrSelect = NULL;
 }
 
+#define TPM_LOCALITY_SELECTION BYTE
+
+typedef struct TPM_PCR_INFO_LONG {
+   TPM_STRUCTURE_TAG tag;
+   TPM_LOCALITY_SELECTION localityAtCreation;
+   TPM_LOCALITY_SELECTION localityAtRelease;
+   TPM_PCR_SELECTION creationPCRSelection;
+   TPM_PCR_SELECTION releasePCRSelection;
+   TPM_COMPOSITE_HASH digestAtCreation;
+   TPM_COMPOSITE_HASH digestAtRelease;
+} TPM_PCR_INFO_LONG;
+
+#define TPM_PCR_INFO_LONG_INIT { 0, 0, 0, TPM_PCR_SELECTION_INIT, \
+                                 TPM_PCR_SELECTION_INIT }
+
+inline void free_TPM_PCR_INFO_LONG(TPM_PCR_INFO_LONG* p) {
+   free_TPM_PCR_SELECTION(&p->creationPCRSelection);
+   free_TPM_PCR_SELECTION(&p->releasePCRSelection);
+}
+
 typedef struct TPM_PCR_INFO {
    TPM_PCR_SELECTION pcrSelection;
    TPM_COMPOSITE_HASH digestAtRelease;
@@ -662,6 +684,26 @@ typedef struct TPM_STORED_DATA {
 inline void free_TPM_STORED_DATA(TPM_STORED_DATA* d) {
    if(d->sealInfoSize) {
       free_TPM_PCR_INFO(&d->sealInfo);
+   }
+   free(d->encData);
+   d->encData = NULL;
+}
+
+typedef struct TPM_STORED_DATA12 {
+  TPM_STRUCTURE_TAG tag;
+  TPM_ENTITY_TYPE et;
+  UINT32 sealInfoLongSize;
+  TPM_PCR_INFO_LONG sealInfoLong;
+  UINT32 encDataSize;
+  BYTE* encData;
+} TPM_STORED_DATA12;
+
+#define TPM_STORED_DATA12_INIT { .sealInfoLongSize = 0, \
+   sealInfoLong = TPM_PCR_INFO_INIT, .encDataSize = 0, .encData = NULL }
+
+inline void free_TPM_STORED_DATA12(TPM_STORED_DATA12* d) {
+   if(d->sealInfoLongSize) {
+      free_TPM_PCR_INFO_LONG(&d->sealInfoLong);
    }
    free(d->encData);
    d->encData = NULL;

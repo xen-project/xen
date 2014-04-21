@@ -142,6 +142,7 @@ inline int unpack3_UINT32(BYTE* ptr, UINT32* pos, UINT32 max, UINT32 *t)
 #define pack_TPM_MIGRATE_SCHEME(p, t) pack_UINT16(p, t)
 #define pack_TPM_PHYSICAL_PRESENCE(p, t) pack_UINT16(p, t)
 #define pack_TPM_KEY_FLAGS(p, t) pack_UINT32(p, t)
+#define pack_TPM_LOCALITY_SELECTION(p, t) pack_BYTE(p, t)
 
 #define unpack_TPM_RESULT(p, t) unpack_UINT32(p, t)
 #define unpack_TPM_PCRINDEX(p, t) unpack_UINT32(p, t)
@@ -167,6 +168,7 @@ inline int unpack3_UINT32(BYTE* ptr, UINT32* pos, UINT32 max, UINT32 *t)
 #define unpack_TPM_MIGRATE_SCHEME(p, t) unpack_UINT16(p, t)
 #define unpack_TPM_PHYSICAL_PRESENCE(p, t) unpack_UINT16(p, t)
 #define unpack_TPM_KEY_FLAGS(p, t) unpack_UINT32(p, t)
+#define unpack_TPM_LOCALITY_SELECTION(p, t) unpack_BYTE(p, t)
 
 #define unpack3_TPM_RESULT(p, l, m, t) unpack3_UINT32(p, l, m, t)
 #define unpack3_TPM_PCRINDEX(p, l, m, t) unpack3_UINT32(p, l, m, t)
@@ -192,6 +194,7 @@ inline int unpack3_UINT32(BYTE* ptr, UINT32* pos, UINT32 max, UINT32 *t)
 #define unpack3_TPM_MIGRATE_SCHEME(p, l, m, t) unpack3_UINT16(p, l, m, t)
 #define unpack3_TPM_PHYSICAL_PRESENCE(p, l, m, t) unpack3_UINT16(p, l, m, t)
 #define unpack3_TPM_KEY_FLAGS(p, l, m, t) unpack3_UINT32(p, l, m, t)
+#define unpack3_TPM_LOCALITY_SELECTION(p, l, m, t) unpack3_BYTE(p, l, m, t)
 
 #define sizeof_TPM_RESULT(t) sizeof_UINT32(t)
 #define sizeof_TPM_PCRINDEX(t) sizeof_UINT32(t)
@@ -217,6 +220,7 @@ inline int unpack3_UINT32(BYTE* ptr, UINT32* pos, UINT32 max, UINT32 *t)
 #define sizeof_TPM_MIGRATE_SCHEME(t) sizeof_UINT16(t)
 #define sizeof_TPM_PHYSICAL_PRESENCE(t) sizeof_UINT16(t)
 #define sizeof_TPM_KEY_FLAGS(t) sizeof_UINT32(t)
+#define sizeof_TPM_LOCALITY_SELECTION(t) sizeof_BYTE(t)
 
 #define pack_TPM_AUTH_HANDLE(p, t) pack_UINT32(p, t)
 #define pack_TCS_CONTEXT_HANDLE(p, t) pack_UINT32(p, t)
@@ -312,6 +316,7 @@ inline int unpack3_TPM_AUTHDATA(BYTE* ptr, UINT32* pos, UINT32 len, TPM_AUTHDATA
 #define unpack_TPM_PAYLOAD_TYPE(p, t) unpack_BYTE(p, t)
 #define unpack_TPM_TAG(p, t) unpack_UINT16(p, t)
 #define unpack_TPM_STRUCTURE_TAG(p, t) unpack_UINT16(p, t)
+#define unpack3_TPM_STRUCTURE_TAG(p, l, m, t) unpack3_UINT16(p, l, m, t)
 
 #define sizeof_TPM_SECRET(t) sizeof_TPM_AUTHDATA(t)
 #define sizeof_TPM_ENCAUTH(t) sizeof_TPM_AUTHDATA(t)
@@ -593,6 +598,43 @@ inline int sizeof_TPM_PCR_INFO(const TPM_PCR_INFO* p) {
 	return rc;
 }
 
+inline BYTE* pack_TPM_PCR_INFO_LONG(BYTE* ptr, const TPM_PCR_INFO_LONG* p) {
+	ptr = pack_TPM_STRUCTURE_TAG(ptr, p->tag);
+	ptr = pack_TPM_LOCALITY_SELECTION(ptr, p->localityAtCreation);
+	ptr = pack_TPM_LOCALITY_SELECTION(ptr, p->localityAtRelease);
+	ptr = pack_TPM_PCR_SELECTION(ptr, &p->creationPCRSelection);
+	ptr = pack_TPM_PCR_SELECTION(ptr, &p->releasePCRSelection);
+	ptr = pack_TPM_COMPOSITE_HASH(ptr, &p->digestAtCreation);
+	ptr = pack_TPM_COMPOSITE_HASH(ptr, &p->digestAtRelease);
+	return ptr;
+}
+
+inline int sizeof_TPM_PCR_INFO_LONG(const TPM_PCR_INFO_LONG* p) {
+	int rc = 0;
+	rc += sizeof_TPM_STRUCTURE_TAG(p->tag);
+	rc += sizeof_TPM_LOCALITY_SELECTION(p->localityAtCreation);
+	rc += sizeof_TPM_LOCALITY_SELECTION(p->localityAtRelease);
+	rc += sizeof_TPM_PCR_SELECTION(&p->creationPCRSelection);
+	rc += sizeof_TPM_PCR_SELECTION(&p->releasePCRSelection);
+	rc += sizeof_TPM_COMPOSITE_HASH(&p->digestAtCreation);
+	rc += sizeof_TPM_COMPOSITE_HASH(&p->digestAtRelease);
+	return rc;
+}
+
+inline int unpack3_TPM_PCR_INFO_LONG(BYTE* ptr, UINT32* pos, UINT32 max, TPM_PCR_INFO_LONG* p, UnpackPtr alloc) {
+	return unpack3_TPM_STRUCTURE_TAG(ptr, pos, max, &p->tag) ||
+		unpack3_TPM_LOCALITY_SELECTION(ptr, pos, max,
+					       &p->localityAtCreation) ||
+		unpack3_TPM_LOCALITY_SELECTION(ptr, pos, max,
+					       &p->localityAtRelease) ||
+		unpack3_TPM_PCR_SELECTION(ptr, pos, max,
+					  &p->creationPCRSelection, alloc) ||
+		unpack3_TPM_PCR_SELECTION(ptr, pos, max,
+					  &p->releasePCRSelection, alloc) ||
+		unpack3_TPM_COMPOSITE_HASH(ptr, pos, max,
+					  &p->digestAtCreation) ||
+		unpack3_TPM_COMPOSITE_HASH(ptr, pos, max, &p->digestAtRelease);
+}
 
 inline BYTE* pack_TPM_PCR_COMPOSITE(BYTE* ptr, const TPM_PCR_COMPOSITE* p) {
 	ptr = pack_TPM_PCR_SELECTION(ptr, &p->select);
@@ -696,6 +738,46 @@ inline int unpack3_TPM_STORED_DATA(BYTE* ptr, UINT32* pos, UINT32 len, TPM_STORE
 		return rc;
 	if (d->sealInfoSize)
 		rc = unpack3_TPM_PCR_INFO(ptr, pos, len, &d->sealInfo, alloc);
+	if (rc)
+		return rc;
+	rc = unpack3_UINT32(ptr, pos, len, &d->encDataSize) ||
+		unpack3_PTR(ptr, pos, len, &d->encData, d->encDataSize, alloc);
+	return rc;
+}
+
+inline BYTE* pack_TPM_STORED_DATA12(BYTE* ptr, const TPM_STORED_DATA12* d) {
+	ptr = pack_TPM_STRUCTURE_TAG(ptr, d->tag);
+	ptr = pack_TPM_ENTITY_TYPE(ptr, d->et);
+	ptr = pack_UINT32(ptr, d->sealInfoLongSize);
+	if(d->sealInfoLongSize) {
+		ptr = pack_TPM_PCR_INFO_LONG(ptr, &d->sealInfoLong);
+	}
+	ptr = pack_UINT32(ptr, d->encDataSize);
+	ptr = pack_BUFFER(ptr, d->encData, d->encDataSize);
+	return ptr;
+}
+
+inline int sizeof_TPM_STORED_DATA12(const TPM_STORED_DATA12* d) {
+	int rv = sizeof_TPM_STRUCTURE_TAG(&d->ver) +
+		 sizeof_TPM_ENTITY_TYPE(&d->et) +
+		 sizeof_UINT32(d->sealInfoLongSize);
+	if (d->sealInfoLongSize) {
+		rv += sizeof_TPM_PCR_INFO_LONG(&d->sealInfoLong);
+	}
+	rv += sizeof_UINT32(d->encDataSize);
+	rv += sizeof_BUFFER(d->encData, d->encDataSize);
+	return rv;
+}
+
+inline int unpack3_TPM_STORED_DATA12(BYTE* ptr, UINT32* pos, UINT32 len, TPM_STORED_DATA12* d, UnpackPtr alloc) {
+	int rc = unpack3_TPM_STRUCTURE_TAG(ptr, pos, len, &d->tag) ||
+		unpack3_TPM_ENTITY_TYPE(ptr, pos, len, &d->et) ||
+		unpack3_UINT32(ptr, pos, len, &d->sealInfoLongSize);
+	if (rc)
+		return rc;
+	if (d->sealInfoLongSize)
+		rc = unpack3_TPM_PCR_INFO_LONG(ptr, pos, len, &d->sealInfoLong,
+					       alloc);
 	if (rc)
 		return rc;
 	rc = unpack3_UINT32(ptr, pos, len, &d->encDataSize) ||
