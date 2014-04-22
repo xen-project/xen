@@ -89,10 +89,12 @@ int apei_write_mce(struct mce *m)
 	return erst_write(&rcd.hdr);
 }
 
-size_t apei_read_mce(struct mce *m, u64 *record_id)
+#ifndef NDEBUG /* currently dead code */
+
+ssize_t apei_read_mce(struct mce *m, u64 *record_id)
 {
 	struct cper_mce_record rcd;
-	size_t len;
+	ssize_t len;
 
 	if (!m || !record_id)
 		return -EINVAL;
@@ -115,12 +117,14 @@ size_t apei_read_mce(struct mce *m, u64 *record_id)
 }
 
 /* Check whether there is record in ERST */
-int apei_check_mce(void)
+bool_t apei_check_mce(void)
 {
-	return erst_get_record_count();
+	return erst_get_record_count() > 0;
 }
 
 int apei_clear_mce(u64 record_id)
 {
 	return erst_clear(record_id);
 }
+
+#endif /* currently dead code */

@@ -383,21 +383,24 @@ static int erst_get_erange(struct erst_erange *range)
 	return 0;
 }
 
-static size_t __erst_get_record_count(void)
+static ssize_t __erst_get_record_count(void)
 {
 	struct apei_exec_context ctx;
 	int rc;
+	u64 output;
+	ssize_t count;
 
 	erst_exec_ctx_init(&ctx);
 	rc = apei_exec_run(&ctx, ACPI_ERST_GET_RECORD_COUNT);
 	if (rc)
 		return rc;
-	return apei_exec_ctx_get_output(&ctx);
+	count = output = apei_exec_ctx_get_output(&ctx);
+	return count >= 0 && count == output ? count : -ERANGE;
 }
 
-size_t erst_get_record_count(void)
+ssize_t erst_get_record_count(void)
 {
-	size_t count;
+	ssize_t count;
 	unsigned long flags;
 
 	if (!erst_enabled)
@@ -483,6 +486,8 @@ static int __erst_write_to_storage(u64 offset)
 	return erst_errno(val);
 }
 
+#ifndef NDEBUG /* currently dead code */
+
 static int __erst_read_from_storage(u64 record_id, u64 offset)
 {
 	struct apei_exec_context ctx;
@@ -565,12 +570,16 @@ static int __erst_clear_from_storage(u64 record_id)
 	return erst_errno(val);
 }
 
+#endif /* currently dead code */
+
 /* NVRAM ERST Error Log Address Range is not supported yet */
 static int __erst_write_to_nvram(const struct cper_record_header *record)
 {
 	/* do not print message, because printk is not safe for NMI */
 	return -ENOSYS;
 }
+
+#ifndef NDEBUG /* currently dead code */
 
 static int __erst_read_to_erange_from_nvram(u64 record_id, u64 *offset)
 {
@@ -585,6 +594,8 @@ static int __erst_clear_from_nvram(u64 record_id)
 		"NVRAM ERST Log Address Range is not implemented yet\n");
 	return -ENOSYS;
 }
+
+#endif /* currently dead code */
 
 int erst_write(const struct cper_record_header *record)
 {
@@ -625,6 +636,8 @@ int erst_write(const struct cper_record_header *record)
 	return rc;
 }
 
+#ifndef NDEBUG /* currently dead code */
+
 static int __erst_read_to_erange(u64 record_id, u64 *offset)
 {
 	int rc;
@@ -641,22 +654,24 @@ static int __erst_read_to_erange(u64 record_id, u64 *offset)
 	return 0;
 }
 
-static size_t __erst_read(u64 record_id, struct cper_record_header *record,
+static ssize_t __erst_read(u64 record_id, struct cper_record_header *record,
 			   size_t buflen)
 {
 	int rc;
-	u64 offset, len = 0;
+	u64 offset;
+	ssize_t len;
 	struct cper_record_header *rcd_tmp;
 
 	rc = __erst_read_to_erange(record_id, &offset);
 	if (rc)
 		return rc;
 	rcd_tmp = erst_erange.vaddr + offset;
+	if (rcd_tmp->record_length > buflen)
+		return -ENOBUFS;
 	len = rcd_tmp->record_length;
-	if (len <= buflen)
-		memcpy(record, rcd_tmp, len);
+	memcpy(record, rcd_tmp, len);
 
-	return len;
+	return len >= 0 ? len : -ERANGE;
 }
 
 /*
@@ -664,10 +679,10 @@ static size_t __erst_read(u64 record_id, struct cper_record_header *record,
  * else if return value < 0, something goes wrong,
  * else everything is OK, and return value is record length
  */
-size_t erst_read(u64 record_id, struct cper_record_header *record,
+ssize_t erst_read(u64 record_id, struct cper_record_header *record,
 		  size_t buflen)
 {
-	size_t len;
+	ssize_t len;
 	unsigned long flags;
 
 	if (!erst_enabled)
@@ -685,10 +700,10 @@ size_t erst_read(u64 record_id, struct cper_record_header *record,
  * else if return value < 0, something goes wrong,
  * else everything is OK, and return value is record length
  */
-size_t erst_read_next(struct cper_record_header *record, size_t buflen)
+ssize_t erst_read_next(struct cper_record_header *record, size_t buflen)
 {
 	int rc;
-	size_t len;
+	ssize_t len;
 	unsigned long flags;
 	u64 record_id;
 
@@ -730,6 +745,8 @@ int erst_clear(u64 record_id)
 
 	return rc;
 }
+
+#endif /* currently dead code */
 
 static int __init erst_check_table(struct acpi_table_erst *erst_tab)
 {
