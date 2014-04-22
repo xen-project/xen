@@ -18,38 +18,6 @@
 
 #include <asm/exynos4210-uart.h>
 
-/* Exynos 5 UART initialization
- * rb: register which contains the UART base address
- * rc: scratch register 1
- * rd: scratch register 2 */
-.macro early_uart_init rb rc rd
-        /* init clock */
-        ldr   \rc, =0x10020000
-        /* select MPLL (800MHz) source clock */
-        ldr   \rd, [\rc, #0x250]
-        and   \rd, \rd, #(~(0xf<<8))
-        orr   \rd, \rd, #(0x6<<8)
-        str   \rd, [\rc, #0x250]
-        /* ratio 800/(7+1) */
-        ldr   \rd, [\rc, #0x558]
-        and   \rd, \rd, #(~(0xf<<8))
-        orr   \rd, \rd, #(0x7<<8)
-        str   \rd, [\rc, #0x558]
-
-        mov   \rc, #(100000000 / EARLY_PRINTK_BAUD % 16)
-        str   \rc, [\rb, #UFRACVAL]     /* -> UFRACVAL (Baud divisor fraction) */
-        mov   \rc, #(100000000 / EARLY_PRINTK_BAUD / 16 - 1)
-        str   \rc, [\rb, #UBRDIV]       /* -> UBRDIV (Baud divisor integer) */
-        mov   \rc, #3                   /* 8n1 */
-        str   \rc, [\rb, #ULCON]        /* -> (Line control) */
-        ldr   \rc, =UCON_TX_IRQ         /* TX IRQMODE */
-        str   \rc, [\rb, #UCON]         /* -> (Control Register) */
-        mov   \rc, #0x0
-        str   \rc, [\rb, #UFCON]        /* disable FIFO */
-        mov   \rc, #0x0
-        str   \rc, [\rb, #UMCON]        /* no auto flow control */
-.endm
-
 /* Exynos 5 UART wait UART to be ready to transmit
  * rb: register which contains the UART base address
  * rc: scratch register */
