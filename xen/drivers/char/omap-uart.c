@@ -262,13 +262,6 @@ static int __init omap_uart_irq(struct serial_port *port)
     return ((uart->irq.irq > 0) ? uart->irq.irq : -1);
 }
 
-static const struct dt_irq __init *omap_uart_dt_irq(struct serial_port *port)
-{
-    struct omap_uart *uart = port->uart;
-
-    return &uart->irq;
-}
-
 static const struct vuart_info *omap_vuart_info(struct serial_port *port)
 {
     struct omap_uart *uart = port->uart;
@@ -286,7 +279,6 @@ static struct uart_driver __read_mostly omap_uart_driver = {
     .putc = omap_uart_putc,
     .getc = omap_uart_getc,
     .irq = omap_uart_irq,
-    .dt_irq_get = omap_uart_dt_irq,
     .vuart_info = omap_vuart_info,
 };
 

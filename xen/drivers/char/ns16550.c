@@ -742,14 +742,6 @@ static int __init ns16550_irq(struct serial_port *port)
     return ((uart->irq > 0) ? uart->irq : -1);
 }
 
-#ifdef HAS_DEVICE_TREE
-static const struct dt_irq __init *ns16550_dt_irq(struct serial_port *port)
-{
-    struct ns16550 *uart = port->uart;
-    return &uart->dt_irq;
-}
-#endif
-
 #ifdef CONFIG_ARM
 static const struct vuart_info *ns16550_vuart_info(struct serial_port *port)
 {
@@ -769,9 +761,6 @@ static struct uart_driver __read_mostly ns16550_driver = {
     .putc         = ns16550_putc,
     .getc         = ns16550_getc,
     .irq          = ns16550_irq,
-#ifdef HAS_DEVICE_TREE
-    .dt_irq_get   = ns16550_dt_irq,
-#endif
 #ifdef CONFIG_ARM
     .vuart_info   = ns16550_vuart_info,
 #endif

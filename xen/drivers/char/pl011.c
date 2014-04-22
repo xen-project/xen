@@ -189,13 +189,6 @@ static int __init pl011_irq(struct serial_port *port)
     return ((uart->irq.irq > 0) ? uart->irq.irq : -1);
 }
 
-static const struct dt_irq __init *pl011_dt_irq(struct serial_port *port)
-{
-    struct pl011 *uart = port->uart;
-
-    return &uart->irq;
-}
-
 static const struct vuart_info *pl011_vuart(struct serial_port *port)
 {
     struct pl011 *uart = port->uart;
@@ -213,7 +206,6 @@ static struct uart_driver __read_mostly pl011_driver = {
     .putc         = pl011_putc,
     .getc         = pl011_getc,
     .irq          = pl011_irq,
-    .dt_irq_get   = pl011_dt_irq,
     .vuart_info   = pl011_vuart,
 };
 

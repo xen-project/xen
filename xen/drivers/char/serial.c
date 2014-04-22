@@ -500,15 +500,6 @@ int __init serial_irq(int idx)
     return -1;
 }
 
-const struct dt_irq __init *serial_dt_irq(int idx)
-{
-    if ( (idx >= 0) && (idx < ARRAY_SIZE(com)) &&
-         com[idx].driver && com[idx].driver->dt_irq_get )
-        return com[idx].driver->dt_irq_get(&com[idx]);
-
-    return NULL;
-}
-
 const struct vuart_info *serial_vuart_info(int idx)
 {
     if ( (idx >= 0) && (idx < ARRAY_SIZE(com)) &&

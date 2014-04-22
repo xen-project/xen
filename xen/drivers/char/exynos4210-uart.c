@@ -275,13 +275,6 @@ static int __init exynos4210_uart_irq(struct serial_port *port)
     return uart->irq.irq;
 }
 
-static const struct dt_irq __init *exynos4210_uart_dt_irq(struct serial_port *port)
-{
-    struct exynos4210_uart *uart = port->uart;
-
-    return &uart->irq;
-}
-
 static const struct vuart_info *exynos4210_vuart_info(struct serial_port *port)
 {
     struct exynos4210_uart *uart = port->uart;
@@ -299,7 +292,6 @@ static struct uart_driver __read_mostly exynos4210_uart_driver = {
     .putc         = exynos4210_uart_putc,
     .getc         = exynos4210_uart_getc,
     .irq          = exynos4210_uart_irq,
-    .dt_irq_get   = exynos4210_uart_dt_irq,
     .vuart_info   = exynos4210_vuart_info,
 };
 
