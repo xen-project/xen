@@ -351,9 +351,9 @@ bool_t ept_handle_misconfig(uint64_t gpa)
                                              e.sa_p2mt == p2m_mmio_direct);
                 if ( unlikely(emt < 0) )
                 {
-                    unmap_domain_page(epte);
                     if ( ept_split_super_page(p2m, &e, level, level - 1) )
                     {
+                        unmap_domain_page(epte);
                         mfn = e.mfn;
                         continue;
                     }
