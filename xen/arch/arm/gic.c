@@ -128,14 +128,14 @@ static void gic_irq_enable(struct irq_desc *desc)
     int irq = desc->irq;
     unsigned long flags;
 
-    spin_lock_irqsave(&desc->lock, flags);
-    spin_lock(&gic.lock);
+    ASSERT(spin_is_locked(&desc->lock));
+
+    spin_lock_irqsave(&gic.lock, flags);
     desc->status &= ~IRQ_DISABLED;
     dsb(sy);
     /* Enable routing */
     GICD[GICD_ISENABLER + irq / 32] = (1u << (irq % 32));
-    spin_unlock(&gic.lock);
-    spin_unlock_irqrestore(&desc->lock, flags);
+    spin_unlock_irqrestore(&gic.lock, flags);
 }
 
 static void gic_irq_disable(struct irq_desc *desc)
@@ -143,18 +143,19 @@ static void gic_irq_disable(struct irq_desc *desc)
     int irq = desc->irq;
     unsigned long flags;
 
-    spin_lock_irqsave(&desc->lock, flags);
-    spin_lock(&gic.lock);
+    ASSERT(spin_is_locked(&desc->lock));
+
+    spin_lock_irqsave(&gic.lock, flags);
     /* Disable routing */
     GICD[GICD_ICENABLER + irq / 32] = (1u << (irq % 32));
     desc->status |= IRQ_DISABLED;
-    spin_unlock(&gic.lock);
-    spin_unlock_irqrestore(&desc->lock, flags);
+    spin_unlock_irqrestore(&gic.lock, flags);
 }
 
 static unsigned int gic_irq_startup(struct irq_desc *desc)
 {
     gic_irq_enable(desc);
+
     return 0;
 }
 
@@ -261,10 +262,10 @@ static int gic_route_irq(unsigned int irq, bool_t level,
     if ( desc->action != NULL )
         return -EBUSY;
 
+    spin_lock_irqsave(&desc->lock, flags);
+
     /* Disable interrupt */
     desc->handler->shutdown(desc);
-
-    spin_lock_irqsave(&desc->lock, flags);
 
     desc->handler = &gic_host_irq_type;
 

@@ -217,9 +217,10 @@ void release_irq(unsigned int irq)
 
     desc = irq_to_desc(irq);
 
+    spin_lock_irqsave(&desc->lock,flags);
+
     desc->handler->shutdown(desc);
 
-    spin_lock_irqsave(&desc->lock,flags);
     action = desc->action;
     desc->action  = NULL;
     desc->status &= ~IRQ_GUEST;
@@ -254,10 +255,11 @@ int setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
 
     spin_lock_irqsave(&desc->lock, flags);
     rc = __setup_irq(desc, new);
-    spin_unlock_irqrestore(&desc->lock, flags);
 
     if ( !rc )
         desc->handler->startup(desc);
+
+    spin_unlock_irqrestore(&desc->lock, flags);
 
     return rc;
 }
