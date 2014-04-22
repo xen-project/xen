@@ -98,6 +98,18 @@ void __cpuinit init_secondary_IRQ(void)
     BUG_ON(init_local_irq_data() < 0);
 }
 
+static inline struct domain *irq_get_domain(struct irq_desc *desc)
+{
+    ASSERT(spin_is_locked(&desc->lock));
+
+    if ( !(desc->status & IRQ_GUEST) )
+        return dom_xen;
+
+    ASSERT(desc->action != NULL);
+
+    return desc->action->dev_id;
+}
+
 int request_dt_irq(const struct dt_irq *irq,
                    void (*handler)(int, void *, struct cpu_user_regs *),
                    const char *devname, void *dev_id)
@@ -156,7 +168,7 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
 
     if ( desc->status & IRQ_GUEST )
     {
-        struct domain *d = action->dev_id;
+        struct domain *d = irq_get_domain(desc);
 
         desc->handler->end(desc);
 
