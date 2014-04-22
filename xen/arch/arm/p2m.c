@@ -383,10 +383,10 @@ static int apply_p2m_changes(struct domain *d,
             put_page(mfn_to_page(mfn));
         }
 
-        /* Allocate a new RAM page and attach */
         switch (op) {
             case ALLOCATE:
                 {
+                    /* Allocate a new RAM page and attach */
                     struct page_info *page;
 
                     ASSERT(!pte.p2m.valid);
