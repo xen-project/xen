@@ -299,6 +299,12 @@ static XSM_INLINE char *xsm_show_security_evtchn(struct domain *d, const struct 
     return NULL;
 }
 
+static XSM_INLINE int xsm_init_hardware_domain(XSM_DEFAULT_ARG struct domain *d)
+{
+    XSM_ASSERT_ACTION(XSM_HOOK);
+    return xsm_default_action(action, current->domain, d);
+}
+
 static XSM_INLINE int xsm_get_pod_target(XSM_DEFAULT_ARG struct domain *d)
 {
     XSM_ASSERT_ACTION(XSM_PRIV);

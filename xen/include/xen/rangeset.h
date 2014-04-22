@@ -67,6 +67,9 @@ int __must_check rangeset_remove_singleton(
 int __must_check rangeset_contains_singleton(
     struct rangeset *r, unsigned long s);
 
+/* swap contents */
+void rangeset_swap(struct rangeset *a, struct rangeset *b);
+
 /* Rangeset pretty printing. */
 void rangeset_printk(
     struct rangeset *r);

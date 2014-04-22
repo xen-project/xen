@@ -327,6 +327,11 @@ static char *flask_show_security_evtchn(struct domain *d, const struct evtchn *c
     return ctx;
 }
 
+static int flask_init_hardware_domain(struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__CREATE_HARDWARE_DOMAIN);
+}
+
 static int flask_grant_mapref(struct domain *d1, struct domain *d2, 
                               uint32_t flags)
 {
@@ -1498,6 +1503,7 @@ static struct xsm_operations flask_ops = {
     .alloc_security_evtchn = flask_alloc_security_evtchn,
     .free_security_evtchn = flask_free_security_evtchn,
     .show_security_evtchn = flask_show_security_evtchn,
+    .init_hardware_domain = flask_init_hardware_domain,
 
     .get_pod_target = flask_get_pod_target,
     .set_pod_target = flask_set_pod_target,

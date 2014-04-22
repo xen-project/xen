@@ -380,6 +380,29 @@ void rangeset_domain_destroy(
     }
 }
 
+void rangeset_swap(struct rangeset *a, struct rangeset *b)
+{
+    LIST_HEAD(tmp);
+
+    if ( a < b )
+    {
+        spin_lock(&a->lock);
+        spin_lock(&b->lock);
+    }
+    else
+    {
+        spin_lock(&b->lock);
+        spin_lock(&a->lock);
+    }
+
+    list_splice_init(&a->range_list, &tmp);
+    list_splice_init(&b->range_list, &a->range_list);
+    list_splice(&tmp, &b->range_list);
+
+    spin_unlock(&a->lock);
+    spin_unlock(&b->lock);
+}
+
 /*****************************
  * Pretty-printing functions
  */

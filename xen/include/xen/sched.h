@@ -46,6 +46,12 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
 /* A global pointer to the hardware domain (usually DOM0). */
 extern struct domain *hardware_domain;
 
+#ifdef CONFIG_LATE_HWDOM
+extern domid_t hardware_domid;
+#else
+#define hardware_domid 0
+#endif
+
 #ifndef CONFIG_COMPAT
 #define BITS_PER_EVTCHN_WORD(d) BITS_PER_XEN_ULONG
 #else

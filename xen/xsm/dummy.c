@@ -58,6 +58,8 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, alloc_security_evtchn);
     set_to_dummy_if_null(ops, free_security_evtchn);
     set_to_dummy_if_null(ops, show_security_evtchn);
+    set_to_dummy_if_null(ops, init_hardware_domain);
+
     set_to_dummy_if_null(ops, get_pod_target);
     set_to_dummy_if_null(ops, set_pod_target);
 

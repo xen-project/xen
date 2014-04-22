@@ -61,6 +61,11 @@ struct domain *domain_list;
 
 struct domain *hardware_domain __read_mostly;
 
+#ifdef CONFIG_LATE_HWDOM
+domid_t hardware_domid __read_mostly;
+integer_param("hardware_dom", hardware_domid);
+#endif
+
 struct vcpu *idle_vcpu[NR_CPUS] __read_mostly;
 
 vcpu_info_t dummy_vcpu_info;
@@ -178,6 +183,51 @@ struct vcpu *alloc_vcpu(
     return v;
 }
 
+static int late_hwdom_init(struct domain *d)
+{
+#ifdef CONFIG_LATE_HWDOM
+    struct domain *dom0;
+    int rv;
+
+    if ( d != hardware_domain || d->domain_id == 0 )
+        return 0;
+
+    rv = xsm_init_hardware_domain(XSM_HOOK, d);
+    if ( rv )
+        return rv;
+
+    printk("Initialising hardware domain %d\n", hardware_domid);
+
+    dom0 = rcu_lock_domain_by_id(0);
+    ASSERT(dom0 != NULL);
+    /*
+     * Hardware resource ranges for domain 0 have been set up from
+     * various sources intended to restrict the hardware domain's
+     * access.  Apply these ranges to the actual hardware domain.
+     *
+     * Because the lists are being swapped, a side effect of this
+     * operation is that Domain 0's rangesets are cleared.  Since
+     * domain 0 should not be accessing the hardware when it constructs
+     * a hardware domain, this should not be a problem.  Both lists
+     * may be modified after this hypercall returns if a more complex
+     * device model is desired.
+     */
+    rangeset_swap(d->irq_caps, dom0->irq_caps);
+    rangeset_swap(d->iomem_caps, dom0->iomem_caps);
+#ifdef CONFIG_X86
+    rangeset_swap(d->arch.ioport_caps, dom0->arch.ioport_caps);
+#endif
+
+    rcu_unlock_domain(dom0);
+
+    iommu_hwdom_init(d);
+
+    return rv;
+#else
+    return 0;
+#endif
+}
+
 static unsigned int __read_mostly extra_dom0_irqs = 256;
 static unsigned int __read_mostly extra_domU_irqs = 32;
 static void __init parse_extra_guest_irqs(const char *s)
@@ -192,7 +242,7 @@ custom_param("extra_guest_irqs", parse_extra_guest_irqs);
 struct domain *domain_create(
     domid_t domid, unsigned int domcr_flags, uint32_t ssidref)
 {
-    struct domain *d, **pd;
+    struct domain *d, **pd, *old_hwdom = NULL;
     enum { INIT_xsm = 1u<<0, INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,
            INIT_evtchn = 1u<<3, INIT_gnttab = 1u<<4, INIT_arch = 1u<<5 };
     int err, init_status = 0;
@@ -237,10 +287,13 @@ struct domain *domain_create(
     else if ( domcr_flags & DOMCRF_pvh )
         d->guest_type = guest_type_pvh;
 
-    if ( domid == 0 )
+    if ( domid == 0 || domid == hardware_domid )
     {
+        if ( hardware_domid < 0 || hardware_domid >= DOMID_FIRST_RESERVED )
+            panic("The value of hardware_dom must be a valid domain ID");
         d->is_pinned = opt_dom0_vcpus_pin;
         d->disable_migrate = 1;
+        old_hwdom = hardware_domain;
         hardware_domain = d;
     }
 
@@ -302,6 +355,9 @@ struct domain *domain_create(
     if ( (err = sched_init_domain(d)) != 0 )
         goto fail;
 
+    if ( (err = late_hwdom_init(d)) != 0 )
+        goto fail;
+
     if ( !is_idle_domain(d) )
     {
         spin_lock(&domlist_update_lock);
@@ -321,7 +377,7 @@ struct domain *domain_create(
  fail:
     d->is_dying = DOMDYING_dead;
     if ( hardware_domain == d )
-        hardware_domain = NULL;
+        hardware_domain = old_hwdom;
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
     xfree(d->mem_event);
     xfree(d->pbuf);

@@ -590,6 +590,16 @@ Paging (HAP).
 Flag to enable 2 MB host page table support for Hardware Assisted
 Paging (HAP).
 
+### hardware\_dom
+> `= <domid>`
+
+> Default: `0`
+
+Enable late hardware domain creation using the specified domain ID.  This is
+intended to be used when domain 0 is a stub domain which builds a disaggregated
+system including a hardware domain with the specified domain ID.  This option is
+supported only when compiled with XSM\_ENABLE=y on x86.
+
 ### hpetbroadcast
 > `= <boolean>`
 
