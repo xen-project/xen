@@ -775,7 +775,7 @@ static void ept_change_entry_type_global(struct p2m_domain *p2m,
         return;
 
     BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
-    BUG_ON(ot != nt && (ot == p2m_mmio_direct || nt == p2m_mmio_direct));
+    BUG_ON(p2m_is_mmio(ot) || p2m_is_mmio(nt));
 
     ept_change_entry_type_page(_mfn(ept_get_asr(ept)),
                                ept_get_wl(ept), ot, nt);
