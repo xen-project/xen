@@ -570,7 +570,7 @@ void gic_route_spis(void)
     }
 }
 
-void __init release_irq(unsigned int irq)
+void release_irq(unsigned int irq)
 {
     struct irq_desc *desc;
     unsigned long flags;
@@ -605,7 +605,7 @@ static int __setup_irq(struct irq_desc *desc, struct irqaction *new)
     return 0;
 }
 
-int __init setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
+int setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
 {
     int rc;
     unsigned long flags;

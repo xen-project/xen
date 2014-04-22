@@ -89,9 +89,9 @@ void __cpuinit init_secondary_IRQ(void)
     BUG_ON(init_local_irq_data() < 0);
 }
 
-int __init request_dt_irq(const struct dt_irq *irq,
-        void (*handler)(int, void *, struct cpu_user_regs *),
-        const char *devname, void *dev_id)
+int request_dt_irq(const struct dt_irq *irq,
+                   void (*handler)(int, void *, struct cpu_user_regs *),
+                   const char *devname, void *dev_id)
 {
     struct irqaction *action;
     int retval;
