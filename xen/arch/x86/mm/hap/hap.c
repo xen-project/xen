@@ -233,9 +233,8 @@ static struct page_info *hap_alloc(struct domain *d)
     d->arch.paging.hap.free_pages--;
 
     p = __map_domain_page(pg);
-    ASSERT(p != NULL);
     clear_page(p);
-    hap_unmap_domain_page(p);
+    unmap_domain_page(p);
 
     return pg;
 }
@@ -375,7 +374,6 @@ static void hap_install_xen_entries_in_l4(struct vcpu *v, mfn_t l4mfn)
     l4_pgentry_t *l4e;
 
     l4e = hap_map_domain_page(l4mfn);
-    ASSERT(l4e != NULL);
 
     /* Copy the common Xen mappings from the idle domain */
     memcpy(&l4e[ROOT_PAGETABLE_FIRST_XEN_SLOT],
