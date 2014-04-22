@@ -754,8 +754,9 @@ static int map_device(struct domain *d, const struct dt_device_node *dev)
         if ( res )
         {
             printk(XENLOG_ERR "Unable to map 0x%"PRIx64
-                   " - 0x%"PRIx64" in dom0\n",
-                   addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1);
+                   " - 0x%"PRIx64" in domain %d\n",
+                   addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1,
+                   d->domain_id);
             return res;
         }
     }
