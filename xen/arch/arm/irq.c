@@ -27,23 +27,19 @@
 
 #include <asm/gic.h>
 
-static void enable_none(struct irq_desc *irq) { }
-static unsigned int startup_none(struct irq_desc *irq) { return 0; }
-static void disable_none(struct irq_desc *irq) { }
 static void ack_none(struct irq_desc *irq)
 {
     printk("unexpected IRQ trap at irq %02x\n", irq->irq);
 }
 
-#define shutdown_none   disable_none
-#define end_none        enable_none
+static void end_none(struct irq_desc *irq) { }
 
 hw_irq_controller no_irq_type = {
     .typename = "none",
-    .startup = startup_none,
-    .shutdown = shutdown_none,
-    .enable = enable_none,
-    .disable = disable_none,
+    .startup = irq_startup_none,
+    .shutdown = irq_shutdown_none,
+    .enable = irq_enable_none,
+    .disable = irq_disable_none,
     .ack = ack_none,
     .end = end_none
 };
