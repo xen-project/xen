@@ -90,6 +90,12 @@ struct hvm_domain {
     bool_t                 qemu_mapcache_invalidate;
     bool_t                 is_s3_suspended;
 
+    /*
+     * TSC value that VCPUs use to calculate their tsc_offset value.
+     * Used during initialization and save/restore.
+     */
+    uint64_t sync_tsc;
+
     union {
         struct vmx_domain vmx;
         struct svm_domain svm;

@@ -137,7 +137,7 @@ struct hvm_function_table {
     int  (*get_guest_pat)(struct vcpu *v, u64 *);
     int  (*set_guest_pat)(struct vcpu *v, u64);
 
-    void (*set_tsc_offset)(struct vcpu *v, u64 offset);
+    void (*set_tsc_offset)(struct vcpu *v, u64 offset, u64 at_tsc);
 
     void (*inject_trap)(struct hvm_trap *trap);
 
@@ -233,11 +233,13 @@ void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat);
 int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat);
 
 void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc);
-u64 hvm_get_guest_tsc(struct vcpu *v);
+u64 hvm_get_guest_tsc_fixed(struct vcpu *v, u64 at_tsc);
+#define hvm_get_guest_tsc(v) hvm_get_guest_tsc_fixed(v, 0)
 
 void hvm_init_guest_time(struct domain *d);
 void hvm_set_guest_time(struct vcpu *v, u64 guest_time);
-u64 hvm_get_guest_time(struct vcpu *v);
+u64 hvm_get_guest_time_fixed(struct vcpu *v, u64 at_tsc);
+#define hvm_get_guest_time(v) hvm_get_guest_time_fixed(v, 0)
 
 int vmsi_deliver(
     struct domain *d, int vector,

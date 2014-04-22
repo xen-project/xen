@@ -716,17 +716,25 @@ static unsigned long get_cmos_time(void)
  * System Time
  ***************************************************************************/
 
-s_time_t get_s_time(void)
+s_time_t get_s_time_fixed(u64 at_tsc)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
     u64 tsc, delta;
     s_time_t now;
 
-    rdtscll(tsc);
+    if ( at_tsc )
+        tsc = at_tsc;
+    else
+        rdtscll(tsc);
     delta = tsc - t->local_tsc_stamp;
     now = t->stime_local_stamp + scale_delta(delta, &t->tsc_scale);
 
     return now;
+}
+
+s_time_t get_s_time()
+{
+    return get_s_time_fixed(0);
 }
 
 uint64_t tsc_ticks2ns(uint64_t ticks)
@@ -1924,7 +1932,24 @@ void tsc_set_info(struct domain *d,
     }
     d->arch.incarnation = incarnation + 1;
     if ( is_hvm_domain(d) )
+    {
         hvm_set_rdtsc_exiting(d, d->arch.vtsc);
+        if ( d->vcpu && d->vcpu[0] && incarnation == 0 )
+        {
+            /*
+             * set_tsc_offset() is called from hvm_vcpu_initialise() before
+             * tsc_set_info(). New vtsc mode may require recomputing TSC
+             * offset.
+             * We only need to do this for BSP during initial boot. APs will
+             * call set_tsc_offset() later from hvm_vcpu_reset_state() and they
+             * will sync their TSC to BSP's sync_tsc.
+             */
+            rdtscll(d->arch.hvm_domain.sync_tsc);
+            hvm_funcs.set_tsc_offset(d->vcpu[0],
+                                     d->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset,
+                                     d->arch.hvm_domain.sync_tsc);
+        }
+    }
 }
 
 /* vtsc may incur measurable performance degradation, diagnose with this */

@@ -78,9 +78,9 @@ static inline int wrmsr_safe(unsigned int msr, uint64_t val)
      __asm__ __volatile__("rdtsc" : "=a" (low) : : "edx")
 
 #define rdtscll(val) do { \
-     unsigned int a,d; \
-     asm volatile("rdtsc" : "=a" (a), "=d" (d)); \
-     (val) = ((unsigned long)a) | (((unsigned long)d)<<32); \
+     unsigned int _eax, _edx; \
+     asm volatile("rdtsc" : "=a" (_eax), "=d" (_edx)); \
+     (val) = ((unsigned long)_eax) | (((unsigned long)_edx)<<32); \
 } while(0)
 
 #define __write_tsc(val) wrmsrl(MSR_IA32_TSC, val)

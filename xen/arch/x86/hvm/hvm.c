@@ -278,26 +278,30 @@ void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
                           - v->arch.hvm_vcpu.cache_tsc_offset;
     v->arch.hvm_vcpu.cache_tsc_offset = delta_tsc;
 
-    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
 }
 
 void hvm_set_guest_tsc_adjust(struct vcpu *v, u64 tsc_adjust)
 {
     v->arch.hvm_vcpu.cache_tsc_offset += tsc_adjust
                             - v->arch.hvm_vcpu.msr_tsc_adjust;
-    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
     v->arch.hvm_vcpu.msr_tsc_adjust = tsc_adjust;
 }
 
-u64 hvm_get_guest_tsc(struct vcpu *v)
+u64 hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc)
 {
     uint64_t tsc;
 
     if ( v->domain->arch.vtsc )
     {
-        tsc = hvm_get_guest_time(v);
+        tsc = hvm_get_guest_time_fixed(v, at_tsc);
         tsc = gtime_to_gtsc(v->domain, tsc);
         v->domain->arch.vtsc_kerncount++;
+    }
+    else if ( at_tsc )
+    {
+        tsc = at_tsc;
     }
     else
     {
@@ -3840,7 +3844,8 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     /* Sync AP's TSC with BSP's. */
     v->arch.hvm_vcpu.cache_tsc_offset =
         v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
-    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset,
+                             d->arch.hvm_domain.sync_tsc);
 
     v->arch.hvm_vcpu.msr_tsc_adjust = 0;
 

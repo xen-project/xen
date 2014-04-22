@@ -680,7 +680,7 @@ static uint64_t svm_get_tsc_offset(uint64_t host_tsc, uint64_t guest_tsc,
     return guest_tsc - offset;
 }
 
-static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
+static void svm_set_tsc_offset(struct vcpu *v, u64 offset, u64 at_tsc)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     struct vmcb_struct *n1vmcb, *n2vmcb;
@@ -688,11 +688,15 @@ static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
     struct domain *d = v->domain;
     uint64_t host_tsc, guest_tsc;
 
-    guest_tsc = hvm_get_guest_tsc(v);
+    guest_tsc = hvm_get_guest_tsc_fixed(v, at_tsc);
 
     /* Re-adjust the offset value when TSC_RATIO is available */
-    if ( cpu_has_tsc_ratio && d->arch.vtsc ) {
-        rdtscll(host_tsc);
+    if ( cpu_has_tsc_ratio && !d->arch.vtsc )
+    {
+        if ( at_tsc )
+            host_tsc = at_tsc;
+        else
+            rdtscll(host_tsc);
         offset = svm_get_tsc_offset(host_tsc, guest_tsc, vcpu_tsc_ratio(v));
     }
 
@@ -847,13 +851,13 @@ static int svm_update_lwp_cfg(struct vcpu *v, uint64_t msr_content)
 static inline void svm_tsc_ratio_save(struct vcpu *v)
 {
     /* Other vcpus might not have vtsc enabled. So disable TSC_RATIO here. */
-    if ( cpu_has_tsc_ratio && v->domain->arch.vtsc )
+    if ( cpu_has_tsc_ratio && !v->domain->arch.vtsc )
         wrmsrl(MSR_AMD64_TSC_RATIO, DEFAULT_TSC_RATIO);
 }
 
 static inline void svm_tsc_ratio_load(struct vcpu *v)
 {
-    if ( cpu_has_tsc_ratio && v->domain->arch.vtsc ) 
+    if ( cpu_has_tsc_ratio && !v->domain->arch.vtsc ) 
         wrmsrl(MSR_AMD64_TSC_RATIO, vcpu_tsc_ratio(v));
 }
 

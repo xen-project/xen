@@ -36,7 +36,7 @@ void hvm_init_guest_time(struct domain *d)
     pl->last_guest_time = 0;
 }
 
-u64 hvm_get_guest_time(struct vcpu *v)
+u64 hvm_get_guest_time_fixed(struct vcpu *v, u64 at_tsc)
 {
     struct pl_time *pl = &v->domain->arch.hvm_domain.pl_time;
     u64 now;
@@ -45,11 +45,15 @@ u64 hvm_get_guest_time(struct vcpu *v)
     ASSERT(is_hvm_vcpu(v));
 
     spin_lock(&pl->pl_time_lock);
-    now = get_s_time() + pl->stime_offset;
-    if ( (int64_t)(now - pl->last_guest_time) > 0 )
-        pl->last_guest_time = now;
-    else
-        now = ++pl->last_guest_time;
+    now = get_s_time_fixed(at_tsc) + pl->stime_offset;
+
+    if ( !at_tsc )
+    {
+        if ( (int64_t)(now - pl->last_guest_time) > 0 )
+            pl->last_guest_time = now;
+        else
+            now = ++pl->last_guest_time;
+    }
     spin_unlock(&pl->pl_time_lock);
 
     return now + v->arch.hvm_vcpu.stime_offset;
