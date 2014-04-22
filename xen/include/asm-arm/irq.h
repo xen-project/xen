@@ -14,8 +14,7 @@ struct arch_pirq
 {
 };
 
-struct irq_cfg {
-#define arch_irq_desc irq_cfg
+struct arch_irq_desc {
     int eoi_cpu;
 };
 
