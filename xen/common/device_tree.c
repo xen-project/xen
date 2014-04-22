@@ -512,10 +512,8 @@ static void __init *unflatten_dt_alloc(unsigned long *mem, unsigned long size,
 }
 
 /* Find a property with a given name for a given node and return it. */
-static const struct dt_property *
-dt_find_property(const struct dt_device_node *np,
-                 const char *name,
-                 u32 *lenp)
+const struct dt_property *dt_find_property(const struct dt_device_node *np,
+                                           const char *name, u32 *lenp)
 {
     const struct dt_property *pp;
 

@@ -15,6 +15,7 @@
 #include <xen/init.h>
 #include <xen/string.h>
 #include <xen/types.h>
+#include <xen/stdbool.h>
 
 #define DEVICE_TREE_MAX_DEPTH 16
 
@@ -348,6 +349,10 @@ struct dt_device_node *dt_find_compatible_node(struct dt_device_node *from,
 const void *dt_get_property(const struct dt_device_node *np,
                             const char *name, u32 *lenp);
 
+const struct dt_property *dt_find_property(const struct dt_device_node *np,
+                                           const char *name, u32 *lenp);
+
+
 /**
  * dt_property_read_u32 - Helper to read a u32 property.
  * @np: node to get the value
@@ -368,6 +373,22 @@ bool_t dt_property_read_u32(const struct dt_device_node *np,
  */
 bool_t dt_property_read_u64(const struct dt_device_node *np,
                             const char *name, u64 *out_value);
+
+/**
+ * dt_property_read_bool - Check if a property exists
+ * @np: node to get the value
+ * @name: name of the property
+ *
+ * Search for a property in a device node.
+ * Return true if the property exists false otherwise.
+ */
+static inline bool_t dt_property_read_bool(const struct dt_device_node *np,
+                                           const char *name)
+{
+    const struct dt_property *prop = dt_find_property(np, name, NULL);
+
+    return prop ? true : false;
+}
 
 /**
  * dt_property_read_string - Find and read a string from a property
