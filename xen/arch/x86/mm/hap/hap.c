@@ -269,7 +269,7 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
     else if ( !d->arch.paging.p2m_alloc_failed )
     {
         d->arch.paging.p2m_alloc_failed = 1;
-        dprintk(XENLOG_ERR, "d%i failed to allocate from HAP pool",
+        dprintk(XENLOG_ERR, "d%i failed to allocate from HAP pool\n",
                 d->domain_id);
     }
 
