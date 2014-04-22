@@ -52,8 +52,6 @@ static struct {
     spinlock_t lock;
 } gic;
 
-static irq_desc_t irq_desc[NR_IRQS];
-static DEFINE_PER_CPU(irq_desc_t[NR_LOCAL_IRQS], local_irq_desc);
 static DEFINE_PER_CPU(uint64_t, lr_mask);
 
 static unsigned nr_lrs;
@@ -86,12 +84,6 @@ static unsigned int gic_cpu_mask(const cpumask_t *cpumask)
 unsigned int gic_number_lines(void)
 {
     return gic.lines;
-}
-
-irq_desc_t *__irq_to_desc(int irq)
-{
-    if (irq < NR_LOCAL_IRQS) return &this_cpu(local_irq_desc)[irq];
-    return &irq_desc[irq-NR_LOCAL_IRQS];
 }
 
 void gic_save_state(struct vcpu *v)
@@ -285,9 +277,9 @@ static int gic_route_irq(unsigned int irq, bool_t level,
 /* Program the GIC to route an interrupt to a guest
  *   - desc.lock must be held
  */
-static void gic_route_irq_to_guest(struct domain *d, struct irq_desc *desc,
-                                   bool_t level, const cpumask_t *cpu_mask,
-                                   unsigned int priority)
+void gic_route_irq_to_guest(struct domain *d, struct irq_desc *desc,
+                            bool_t level, const cpumask_t *cpu_mask,
+                            unsigned int priority)
 {
     struct pending_irq *p;
     ASSERT(spin_is_locked(&desc->lock));
@@ -591,59 +583,6 @@ void gic_route_spis(void)
     }
 }
 
-void release_irq(unsigned int irq)
-{
-    struct irq_desc *desc;
-    unsigned long flags;
-   struct irqaction *action;
-
-    desc = irq_to_desc(irq);
-
-    desc->handler->shutdown(desc);
-
-    spin_lock_irqsave(&desc->lock,flags);
-    action = desc->action;
-    desc->action  = NULL;
-    desc->status &= ~IRQ_GUEST;
-
-    spin_unlock_irqrestore(&desc->lock,flags);
-
-    /* Wait to make sure it's not being used on another CPU */
-    do { smp_mb(); } while ( desc->status & IRQ_INPROGRESS );
-
-    if (action && action->free_on_release)
-        xfree(action);
-}
-
-static int __setup_irq(struct irq_desc *desc, struct irqaction *new)
-{
-    if ( desc->action != NULL )
-        return -EBUSY;
-
-    desc->action  = new;
-    dsb(sy);
-
-    return 0;
-}
-
-int setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
-{
-    int rc;
-    unsigned long flags;
-    struct irq_desc *desc;
-
-    desc = irq_to_desc(irq->irq);
-
-    spin_lock_irqsave(&desc->lock, flags);
-    rc = __setup_irq(desc, new);
-    spin_unlock_irqrestore(&desc->lock, flags);
-
-    if ( !rc )
-        desc->handler->startup(desc);
-
-    return rc;
-}
-
 static inline void gic_set_lr(int lr, struct pending_irq *p,
         unsigned int state)
 {
@@ -780,41 +719,6 @@ void gic_inject(void)
         gic_inject_irq_stop();
     else
         gic_inject_irq_start();
-}
-
-int route_dt_irq_to_guest(struct domain *d, const struct dt_irq *irq,
-                          const char * devname)
-{
-    struct irqaction *action;
-    struct irq_desc *desc = irq_to_desc(irq->irq);
-    unsigned long flags;
-    int retval;
-    bool_t level;
-
-    action = xmalloc(struct irqaction);
-    if (!action)
-        return -ENOMEM;
-
-    action->dev_id = d;
-    action->name = devname;
-    action->free_on_release = 1;
-
-    spin_lock_irqsave(&desc->lock, flags);
-
-    retval = __setup_irq(desc, action);
-    if ( retval )
-    {
-        xfree(action);
-        goto out;
-    }
-
-    level = dt_irq_is_level_triggered(irq);
-    gic_route_irq_to_guest(d, desc, level, cpumask_of(smp_processor_id()),
-                           GIC_PRI_IRQ);
-
-out:
-    spin_unlock_irqrestore(&desc->lock, flags);
-    return retval;
 }
 
 static void do_sgi(struct cpu_user_regs *regs, int othercpu, enum gic_sgi sgi)

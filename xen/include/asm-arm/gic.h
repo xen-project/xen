@@ -153,6 +153,7 @@
 
 #ifndef __ASSEMBLY__
 #include <xen/device_tree.h>
+#include <xen/irq.h>
 
 #define DT_MATCH_GIC    DT_MATCH_COMPATIBLE("arm,cortex-a15-gic"), \
                         DT_MATCH_COMPATIBLE("arm,cortex-a7-gic")
@@ -170,6 +171,9 @@ extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 extern void gic_route_dt_irq(const struct dt_irq *irq,
                              const cpumask_t *cpu_mask,
                              unsigned int priority);
+extern void gic_route_irq_to_guest(struct domain *, struct irq_desc *desc,
+                                   bool_t level, const cpumask_t *cpu_mask,
+                                   unsigned int priority);
 extern void gic_route_ppis(void);
 extern void gic_route_spis(void);
 
