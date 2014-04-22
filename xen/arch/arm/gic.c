@@ -594,8 +594,7 @@ void __init release_irq(unsigned int irq)
         xfree(action);
 }
 
-static int __setup_irq(struct irq_desc *desc, unsigned int irq,
-                       struct irqaction *new)
+static int __setup_irq(struct irq_desc *desc, struct irqaction *new)
 {
     if ( desc->action != NULL )
         return -EBUSY;
@@ -615,7 +614,7 @@ int __init setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
     desc = irq_to_desc(irq->irq);
 
     spin_lock_irqsave(&desc->lock, flags);
-    rc = __setup_irq(desc, irq->irq, new);
+    rc = __setup_irq(desc, new);
     spin_unlock_irqrestore(&desc->lock, flags);
 
     if ( !rc )
@@ -790,7 +789,7 @@ int gic_route_irq_to_guest(struct domain *d, const struct dt_irq *irq,
     gic_set_irq_properties(irq->irq, level, cpumask_of(smp_processor_id()),
                            GIC_PRI_IRQ);
 
-    retval = __setup_irq(desc, irq->irq, action);
+    retval = __setup_irq(desc, action);
     if (retval) {
         xfree(action);
         goto out;
