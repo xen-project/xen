@@ -218,17 +218,6 @@ static void vtimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     vgic_vcpu_inject_irq(current, current->arch.virt_timer.irq, 1);
 }
 
-/* Route timer's IRQ on this CPU */
-void __cpuinit route_timer_interrupt(void)
-{
-    gic_route_dt_irq(&timer_irq[TIMER_PHYS_NONSECURE_PPI],
-                     cpumask_of(smp_processor_id()), GIC_PRI_IRQ);
-    gic_route_dt_irq(&timer_irq[TIMER_HYP_PPI],
-                     cpumask_of(smp_processor_id()), GIC_PRI_IRQ);
-    gic_route_dt_irq(&timer_irq[TIMER_VIRT_PPI],
-                     cpumask_of(smp_processor_id()), GIC_PRI_IRQ);
-}
-
 /* Set up the timer interrupt on this CPU */
 void __cpuinit init_timer_interrupt(void)
 {

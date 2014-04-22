@@ -250,15 +250,37 @@ int setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
     int rc;
     unsigned long flags;
     struct irq_desc *desc;
+    bool_t disabled;
 
     desc = irq_to_desc(irq->irq);
 
     spin_lock_irqsave(&desc->lock, flags);
+
+    disabled = (desc->action == NULL);
+
     rc = __setup_irq(desc, new);
+    if ( rc )
+        goto err;
 
-    if ( !rc )
+    /* First time the IRQ is setup */
+    if ( disabled )
+    {
+        bool_t level;
+
+        level = dt_irq_is_level_triggered(irq);
+        /* It's fine to use smp_processor_id() because:
+         * For PPI: irq_desc is banked
+         * For SPI: we don't care for now which CPU will receive the
+         * interrupt
+         * TODO: Handle case where SPI is setup on different CPU than
+         * the targeted CPU and the priority.
+         */
+        gic_route_irq_to_xen(desc, level, cpumask_of(smp_processor_id()),
+                             GIC_PRI_IRQ);
         desc->handler->startup(desc);
+    }
 
+err:
     spin_unlock_irqrestore(&desc->lock, flags);
 
     return rc;

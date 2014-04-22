@@ -287,8 +287,6 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
 
     init_secondary_IRQ();
 
-    gic_route_ppis();
-
     init_maintenance_interrupt();
     init_timer_interrupt();
 

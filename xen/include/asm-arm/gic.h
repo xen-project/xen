@@ -167,15 +167,13 @@ extern void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq,int virtual);
 extern void vgic_clear_pending_irqs(struct vcpu *v);
 extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 
-/* Program the GIC to route an interrupt with a dt_irq */
-extern void gic_route_dt_irq(const struct dt_irq *irq,
-                             const cpumask_t *cpu_mask,
-                             unsigned int priority);
+/* Program the GIC to route an interrupt */
+extern void gic_route_irq_to_xen(struct irq_desc *desc, bool_t level,
+                                 const cpumask_t *cpu_mask,
+                                 unsigned int priority);
 extern void gic_route_irq_to_guest(struct domain *, struct irq_desc *desc,
                                    bool_t level, const cpumask_t *cpu_mask,
                                    unsigned int priority);
-extern void gic_route_ppis(void);
-extern void gic_route_spis(void);
 
 extern void gic_inject(void);
 extern void gic_clear_pending_irqs(struct vcpu *v);

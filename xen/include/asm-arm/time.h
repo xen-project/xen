@@ -25,9 +25,6 @@ enum timer_ppi
 /* Get one of the timer IRQ number */
 unsigned int timer_get_irq(enum timer_ppi ppi);
 
-/* Route timer's IRQ on this CPU */
-extern void __cpuinit route_timer_interrupt(void);
-
 /* Set up the timer interrupt on this CPU */
 extern void __cpuinit init_timer_interrupt(void);
 

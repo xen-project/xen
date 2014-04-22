@@ -249,30 +249,20 @@ static void gic_set_irq_properties(unsigned int irq, bool_t level,
     spin_unlock(&gic.lock);
 }
 
-/* Program the GIC to route an interrupt */
-static int gic_route_irq(unsigned int irq, bool_t level,
-                         const cpumask_t *cpu_mask, unsigned int priority)
+/* Program the GIC to route an interrupt to the host (i.e. Xen)
+ * - needs to be called with desc.lock held
+ */
+void gic_route_irq_to_xen(struct irq_desc *desc, bool_t level,
+                          const cpumask_t *cpu_mask, unsigned int priority)
 {
-    struct irq_desc *desc = irq_to_desc(irq);
-    unsigned long flags;
-
     ASSERT(priority <= 0xff);     /* Only 8 bits of priority */
-    ASSERT(irq < gic.lines);      /* Can't route interrupts that don't exist */
-
-    if ( desc->action != NULL )
-        return -EBUSY;
-
-    spin_lock_irqsave(&desc->lock, flags);
-
-    /* Disable interrupt */
-    desc->handler->shutdown(desc);
+    ASSERT(desc->irq < gic.lines);/* Can't route interrupts that don't exist */
+    ASSERT(desc->status & IRQ_DISABLED);
+    ASSERT(spin_is_locked(&desc->lock));
 
     desc->handler = &gic_host_irq_type;
 
-    gic_set_irq_properties(irq, level, cpu_mask, priority);
-
-    spin_unlock_irqrestore(&desc->lock, flags);
-    return 0;
+    gic_set_irq_properties(desc->irq, level, cpu_mask, priority);
 }
 
 /* Program the GIC to route an interrupt to a guest
@@ -294,17 +284,6 @@ void gic_route_irq_to_guest(struct domain *d, struct irq_desc *desc,
     /* TODO: do not assume delivery to vcpu0 */
     p = irq_to_pending(d->vcpu[0], desc->irq);
     p->desc = desc;
-}
-
-/* Program the GIC to route an interrupt with a dt_irq */
-void gic_route_dt_irq(const struct dt_irq *irq, const cpumask_t *cpu_mask,
-                      unsigned int priority)
-{
-    bool_t level;
-
-    level = dt_irq_is_level_triggered(irq);
-
-    gic_route_irq(irq->irq, level, cpu_mask, priority);
 }
 
 static void __init gic_dist_init(void)
@@ -558,30 +537,6 @@ void gic_disable_cpu(void)
     gic_cpu_disable();
     gic_hyp_disable();
     spin_unlock(&gic.lock);
-}
-
-void gic_route_ppis(void)
-{
-    /* GIC maintenance */
-    gic_route_dt_irq(&gic.maintenance, cpumask_of(smp_processor_id()),
-                     GIC_PRI_IRQ);
-    /* Route timer interrupt */
-    route_timer_interrupt();
-}
-
-void gic_route_spis(void)
-{
-    int seridx;
-    const struct dt_irq *irq;
-
-    for ( seridx = 0; seridx <= SERHND_IDX; seridx++ )
-    {
-        if ( (irq = serial_dt_irq(seridx)) == NULL )
-            continue;
-
-        gic_route_dt_irq(irq, cpumask_of(smp_processor_id()),
-                         GIC_PRI_IRQ);
-    }
 }
 
 static inline void gic_set_lr(int lr, struct pending_irq *p,
