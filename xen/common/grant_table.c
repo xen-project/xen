@@ -721,12 +721,10 @@ __gnttab_map_grant_ref(
 
     double_gt_lock(lgt, rgt);
 
-    if ( is_pv_domain(ld) && need_iommu(ld) )
+    if ( !paging_mode_translate(ld) && need_iommu(ld) )
     {
         unsigned int wrc, rdc;
         int err = 0;
-        /* Shouldn't happen, because you can't use iommu in a HVM domain. */
-        BUG_ON(paging_mode_translate(ld));
         /* We're not translated, so we know that gmfns and mfns are
            the same things, so the IOMMU entry is always 1-to-1. */
         mapcount(lgt, rd, frame, &wrc, &rdc);
@@ -931,11 +929,10 @@ __gnttab_unmap_common(
             act->pin -= GNTPIN_hstw_inc;
     }
 
-    if ( is_pv_domain(ld) && need_iommu(ld) )
+    if ( !paging_mode_translate(ld) && need_iommu(ld) )
     {
         unsigned int wrc, rdc;
         int err = 0;
-        BUG_ON(paging_mode_translate(ld));
         mapcount(lgt, rd, op->frame, &wrc, &rdc);
         if ( (wrc + rdc) == 0 )
             err = iommu_unmap_page(ld, op->frame);
