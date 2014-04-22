@@ -296,9 +296,6 @@ static int apply_p2m_changes(struct domain *d,
 
     spin_lock(&p2m->lock);
 
-    if ( d != current->domain )
-        p2m_load_VTTBR(d);
-
     addr = start_gpaddr;
     while ( addr < end_gpaddr )
     {
@@ -454,12 +451,17 @@ static int apply_p2m_changes(struct domain *d,
 
     if ( flush )
     {
-        /* At the beginning of the function, Xen is updating VTTBR
-         * with the domain where the mappings are created. In this
-         * case it's only necessary to flush TLBs on every CPUs with
-         * the current VMID (our domain).
+        /* Update the VTTBR if necessary with the domain where mappings
+         * are created. In this case it's only necessary to flush TLBs
+         * on every CPUs with the current VMID (our domain).
          */
+        if ( d != current->domain )
+            p2m_load_VTTBR(d);
+
         flush_tlb();
+
+        if ( d != current->domain )
+            p2m_load_VTTBR(current->domain);
     }
 
     if ( op == ALLOCATE || op == INSERT )
@@ -477,9 +479,6 @@ out:
     if (third) unmap_domain_page(third);
     if (second) unmap_domain_page(second);
     if (first) unmap_domain_page(first);
-
-    if ( d != current->domain )
-        p2m_load_VTTBR(current->domain);
 
     spin_unlock(&p2m->lock);
 
