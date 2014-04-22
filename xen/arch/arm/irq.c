@@ -256,6 +256,16 @@ int setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
 
     spin_lock_irqsave(&desc->lock, flags);
 
+    if ( desc->status & IRQ_GUEST )
+    {
+        struct domain *d = irq_get_domain(desc);
+
+        spin_unlock_irqrestore(&desc->lock, flags);
+        printk(XENLOG_ERR "ERROR: IRQ %u is already in use by the domain %u\n",
+               irq->irq, d->domain_id);
+        return -EBUSY;
+    }
+
     disabled = (desc->action == NULL);
 
     rc = __setup_irq(desc, new);
@@ -292,7 +302,7 @@ int route_dt_irq_to_guest(struct domain *d, const struct dt_irq *irq,
     struct irqaction *action;
     struct irq_desc *desc = irq_to_desc(irq->irq);
     unsigned long flags;
-    int retval;
+    int retval = 0;
     bool_t level;
 
     action = xmalloc(struct irqaction);
@@ -305,19 +315,42 @@ int route_dt_irq_to_guest(struct domain *d, const struct dt_irq *irq,
 
     spin_lock_irqsave(&desc->lock, flags);
 
-    retval = __setup_irq(desc, action);
-    if ( retval )
+    /* If the IRQ is already used by someone
+     *  - If it's the same domain -> Xen doesn't need to update the IRQ desc
+     *  - Otherwise -> For now, don't allow the IRQ to be shared between
+     *  Xen and domains.
+     */
+    if ( desc->action != NULL )
     {
-        xfree(action);
+        struct domain *ad = irq_get_domain(desc);
+
+        if ( (desc->status & IRQ_GUEST) && d == ad )
+            goto out;
+
+        if ( desc->status & IRQ_GUEST )
+            printk(XENLOG_ERR "ERROR: IRQ %u is already used by domain %u\n",
+                   irq->irq, ad->domain_id);
+        else
+            printk(XENLOG_ERR "ERROR: IRQ %u is already used by Xen\n",
+                   irq->irq);
+        retval = -EBUSY;
         goto out;
     }
+
+    retval = __setup_irq(desc, action);
+    if ( retval )
+        goto out;
 
     level = dt_irq_is_level_triggered(irq);
     gic_route_irq_to_guest(d, desc, level, cpumask_of(smp_processor_id()),
                            GIC_PRI_IRQ);
+    spin_unlock_irqrestore(&desc->lock, flags);
+    return 0;
 
 out:
     spin_unlock_irqrestore(&desc->lock, flags);
+    xfree(action);
+
     return retval;
 }
 

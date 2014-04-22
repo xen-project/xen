@@ -725,8 +725,13 @@ static int map_device(struct domain *d, const struct dt_device_node *dev)
         }
 
         DPRINT("irq %u = %u type = 0x%x\n", i, irq.irq, irq.type);
-        /* Don't check return because the IRQ can be use by multiple device */
-        route_dt_irq_to_guest(d, &irq, dt_node_name(dev));
+        res = route_dt_irq_to_guest(d, &irq, dt_node_name(dev));
+        if ( res )
+        {
+            printk(XENLOG_ERR "Unable to route IRQ %u to domain %u\n",
+                   irq.irq, d->domain_id);
+            return res;
+        }
     }
 
     /* Map the address ranges */
