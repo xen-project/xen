@@ -282,6 +282,27 @@ static int gic_route_irq(unsigned int irq, bool_t level,
     return 0;
 }
 
+/* Program the GIC to route an interrupt to a guest
+ *   - desc.lock must be held
+ */
+static void gic_route_irq_to_guest(struct domain *d, struct irq_desc *desc,
+                                   bool_t level, const cpumask_t *cpu_mask,
+                                   unsigned int priority)
+{
+    struct pending_irq *p;
+    ASSERT(spin_is_locked(&desc->lock));
+
+    desc->handler = &gic_guest_irq_type;
+    desc->status |= IRQ_GUEST;
+
+    gic_set_irq_properties(desc->irq, level, cpumask_of(smp_processor_id()),
+                           GIC_PRI_IRQ);
+
+    /* TODO: do not assume delivery to vcpu0 */
+    p = irq_to_pending(d->vcpu[0], desc->irq);
+    p->desc = desc;
+}
+
 /* Program the GIC to route an interrupt with a dt_irq */
 void gic_route_dt_irq(const struct dt_irq *irq, const cpumask_t *cpu_mask,
                       unsigned int priority)
@@ -761,15 +782,14 @@ void gic_inject(void)
         gic_inject_irq_start();
 }
 
-int gic_route_irq_to_guest(struct domain *d, const struct dt_irq *irq,
-                           const char * devname)
+int route_dt_irq_to_guest(struct domain *d, const struct dt_irq *irq,
+                          const char * devname)
 {
     struct irqaction *action;
     struct irq_desc *desc = irq_to_desc(irq->irq);
     unsigned long flags;
     int retval;
     bool_t level;
-    struct pending_irq *p;
 
     action = xmalloc(struct irqaction);
     if (!action)
@@ -781,23 +801,16 @@ int gic_route_irq_to_guest(struct domain *d, const struct dt_irq *irq,
 
     spin_lock_irqsave(&desc->lock, flags);
 
-    desc->handler = &gic_guest_irq_type;
-    desc->status |= IRQ_GUEST;
-
-    level = dt_irq_is_level_triggered(irq);
-
-    gic_set_irq_properties(irq->irq, level, cpumask_of(smp_processor_id()),
-                           GIC_PRI_IRQ);
-
     retval = __setup_irq(desc, action);
-    if (retval) {
+    if ( retval )
+    {
         xfree(action);
         goto out;
     }
 
-    /* TODO: do not assume delivery to vcpu0 */
-    p = irq_to_pending(d->vcpu[0], irq->irq);
-    p->desc = desc;
+    level = dt_irq_is_level_triggered(irq);
+    gic_route_irq_to_guest(d, desc, level, cpumask_of(smp_processor_id()),
+                           GIC_PRI_IRQ);
 
 out:
     spin_unlock_irqrestore(&desc->lock, flags);

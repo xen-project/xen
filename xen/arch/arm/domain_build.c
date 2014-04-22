@@ -726,7 +726,7 @@ static int map_device(struct domain *d, const struct dt_device_node *dev)
 
         DPRINT("irq %u = %u type = 0x%x\n", i, irq.irq, irq.type);
         /* Don't check return because the IRQ can be use by multiple device */
-        gic_route_irq_to_guest(d, &irq, dt_node_name(dev));
+        route_dt_irq_to_guest(d, &irq, dt_node_name(dev));
     }
 
     /* Map the address ranges */

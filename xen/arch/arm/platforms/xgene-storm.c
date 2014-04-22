@@ -66,7 +66,7 @@ static int map_one_spi(struct domain *d, const char *what,
 
     printk("Additional IRQ %u (%s)\n", irq.irq, what);
 
-    ret = gic_route_irq_to_guest(d, &irq, what);
+    ret = route_dt_irq_to_guest(d, &irq, what);
     if ( ret )
         printk("Failed to route %s to dom%d\n", what, d->domain_id);
 
