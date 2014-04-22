@@ -728,7 +728,7 @@ static void svm_set_rdtsc_exiting(struct vcpu *v, bool_t enable)
     general1_intercepts &= ~GENERAL1_INTERCEPT_RDTSC;
     general2_intercepts &= ~GENERAL2_INTERCEPT_RDTSCP;
 
-    if ( enable && !cpu_has_tsc_ratio )
+    if ( enable )
     {
         general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
         general2_intercepts |= GENERAL2_INTERCEPT_RDTSCP;
