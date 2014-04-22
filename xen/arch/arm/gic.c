@@ -221,7 +221,6 @@ static hw_irq_controller gic_guest_irq_type = {
 };
 
 /*
- * - needs to be called with gic.lock held
  * - needs to be called with a valid cpu_mask, ie each cpu in the mask has
  * already called gic_cpu_init
  */
@@ -231,7 +230,11 @@ static void gic_set_irq_properties(unsigned int irq, bool_t level,
 {
     volatile unsigned char *bytereg;
     uint32_t cfg, edgebit;
-    unsigned int mask = gic_cpu_mask(cpu_mask);
+    unsigned int mask;
+
+    spin_lock(&gic.lock);
+
+    mask = gic_cpu_mask(cpu_mask);
 
     /* Set edge / level */
     cfg = GICD[GICD_ICFGR + irq / 16];
@@ -250,6 +253,7 @@ static void gic_set_irq_properties(unsigned int irq, bool_t level,
     bytereg = (unsigned char *) (GICD + GICD_IPRIORITYR);
     bytereg[irq] = priority;
 
+    spin_unlock(&gic.lock);
 }
 
 /* Program the GIC to route an interrupt */
@@ -272,9 +276,7 @@ static int gic_route_irq(unsigned int irq, bool_t level,
 
     desc->handler = &gic_host_irq_type;
 
-    spin_lock(&gic.lock);
     gic_set_irq_properties(irq, level, cpu_mask, priority);
-    spin_unlock(&gic.lock);
 
     spin_unlock_irqrestore(&desc->lock, flags);
     return 0;
@@ -779,7 +781,6 @@ int gic_route_irq_to_guest(struct domain *d, const struct dt_irq *irq,
     action->free_on_release = 1;
 
     spin_lock_irqsave(&desc->lock, flags);
-    spin_lock(&gic.lock);
 
     desc->handler = &gic_guest_irq_type;
     desc->status |= IRQ_GUEST;
@@ -800,7 +801,6 @@ int gic_route_irq_to_guest(struct domain *d, const struct dt_irq *irq,
     p->desc = desc;
 
 out:
-    spin_unlock(&gic.lock);
     spin_unlock_irqrestore(&desc->lock, flags);
     return retval;
 }
