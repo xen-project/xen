@@ -258,15 +258,19 @@ int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat)
     return 1;
 }
 
-void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
+void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc)
 {
     uint64_t tsc;
     uint64_t delta_tsc;
 
     if ( v->domain->arch.vtsc )
     {
-        tsc = hvm_get_guest_time(v);
+        tsc = hvm_get_guest_time_fixed(v, at_tsc);
         tsc = gtime_to_gtsc(v->domain, tsc);
+    }
+    else if ( at_tsc )
+    {
+        tsc = at_tsc;
     }
     else
     {
@@ -278,7 +282,7 @@ void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
                           - v->arch.hvm_vcpu.cache_tsc_offset;
     v->arch.hvm_vcpu.cache_tsc_offset = delta_tsc;
 
-    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, at_tsc);
 }
 
 void hvm_set_guest_tsc_adjust(struct vcpu *v, u64 tsc_adjust)

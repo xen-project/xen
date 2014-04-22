@@ -540,7 +540,8 @@ static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_star         = guest_state->msrs[VMX_INDEX_MSR_STAR];
     data->msr_syscall_mask = guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
 
-    data->tsc = hvm_get_guest_tsc(v);
+    data->tsc = hvm_get_guest_tsc_fixed(v,
+                                        v->domain->arch.hvm_domain.sync_tsc);
 }
 
 static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
@@ -556,7 +557,7 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     v->arch.hvm_vmx.cstar     = data->msr_cstar;
     v->arch.hvm_vmx.shadow_gs = data->shadow_gs;
 
-    hvm_set_guest_tsc(v, data->tsc);
+    hvm_set_guest_tsc_fixed(v, data->tsc, v->domain->arch.hvm_domain.sync_tsc);
 }
 
 
