@@ -65,7 +65,7 @@ int vcpu_vtimer_init(struct vcpu *v)
     t->ctl = 0;
     t->cval = NOW();
     t->irq = d0
-        ? timer_dt_irq(TIMER_PHYS_NONSECURE_PPI)->irq
+        ? timer_get_irq(TIMER_PHYS_NONSECURE_PPI)
         : GUEST_TIMER_PHYS_NS_PPI;
     t->v = v;
 
@@ -73,7 +73,7 @@ int vcpu_vtimer_init(struct vcpu *v)
     init_timer(&t->timer, virt_timer_expired, t, v->processor);
     t->ctl = 0;
     t->irq = d0
-        ? timer_dt_irq(TIMER_VIRT_PPI)->irq
+        ? timer_get_irq(TIMER_VIRT_PPI)
         : GUEST_TIMER_VIRT_PPI;
     t->v = v;
 

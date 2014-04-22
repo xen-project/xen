@@ -50,11 +50,11 @@ unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
 
 static struct dt_irq timer_irq[MAX_TIMER_PPI];
 
-const struct dt_irq *timer_dt_irq(enum timer_ppi ppi)
+unsigned int timer_get_irq(enum timer_ppi ppi)
 {
     ASSERT(ppi >= TIMER_PHYS_SECURE_PPI && ppi < MAX_TIMER_PPI);
 
-    return &timer_irq[ppi];
+    return timer_irq[ppi].irq;
 }
 
 /*static inline*/ s_time_t ticks_to_ns(uint64_t ticks)

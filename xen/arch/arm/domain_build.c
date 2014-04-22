@@ -616,7 +616,7 @@ static int make_timer_node(const struct domain *d, void *fdt,
     u32 len;
     const void *compatible;
     int res;
-    const struct dt_irq *irq;
+    unsigned int irq;
     gic_interrupt_t intrs[3];
     u32 clock_frequency;
     bool_t clock_valid;
@@ -645,17 +645,20 @@ static int make_timer_node(const struct domain *d, void *fdt,
     if ( res )
         return res;
 
-    irq = timer_dt_irq(TIMER_PHYS_SECURE_PPI);
-    DPRINT("  Secure interrupt %u\n", irq->irq);
-    set_interrupt_ppi(intrs[0], irq->irq, 0xf, irq->type);
+    /* The timer IRQ is emulated by Xen. It always exposes an active-low
+     * level-sensitive interrupt */
 
-    irq = timer_dt_irq(TIMER_PHYS_NONSECURE_PPI);
-    DPRINT("  Non secure interrupt %u\n", irq->irq);
-    set_interrupt_ppi(intrs[1], irq->irq, 0xf, irq->type);
+    irq = timer_get_irq(TIMER_PHYS_SECURE_PPI);
+    DPRINT("  Secure interrupt %u\n", irq);
+    set_interrupt_ppi(intrs[0], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
-    irq = timer_dt_irq(TIMER_VIRT_PPI);
-    DPRINT("  Virt interrupt %u\n", irq->irq);
-    set_interrupt_ppi(intrs[2], irq->irq, 0xf, irq->type);
+    irq = timer_get_irq(TIMER_PHYS_NONSECURE_PPI);
+    DPRINT("  Non secure interrupt %u\n", irq);
+    set_interrupt_ppi(intrs[1], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+
+    irq = timer_get_irq(TIMER_VIRT_PPI);
+    DPRINT("  Virt interrupt %u\n", irq);
+    set_interrupt_ppi(intrs[2], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property_interrupts(fdt, intrs, 3);
     if ( res )
