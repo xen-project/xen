@@ -845,7 +845,7 @@ static int create_xen_entries(enum xenmap_operation op,
                 BUG();
         }
     }
-    flush_xen_data_tlb_range_va_local(virt, PAGE_SIZE * nr_mfns);
+    flush_xen_data_tlb_range_va(virt, PAGE_SIZE * nr_mfns);
 
     rc = 0;
 
