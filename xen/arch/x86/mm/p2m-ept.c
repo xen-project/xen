@@ -353,6 +353,7 @@ bool_t ept_handle_misconfig(uint64_t gpa)
                 {
                     if ( ept_split_super_page(p2m, &e, level, level - 1) )
                     {
+                        atomic_write_ept_entry(&epte[i], e);
                         unmap_domain_page(epte);
                         mfn = e.mfn;
                         continue;
