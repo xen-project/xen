@@ -144,7 +144,9 @@ void __bitmap_shift_right(unsigned long *dst,
 		lower = src[off + k];
 		if (left && off + k == lim - 1)
 			lower &= mask;
-		dst[k] = upper << (BITS_PER_LONG - rem) | lower >> rem;
+		dst[k] = rem
+		         ? (upper << (BITS_PER_LONG - rem)) | (lower >> rem)
+		         : lower;
 		if (left && k == lim - 1)
 			dst[k] &= mask;
 	}
@@ -185,7 +187,9 @@ void __bitmap_shift_left(unsigned long *dst,
 		upper = src[k];
 		if (left && k == lim - 1)
 			upper &= (1UL << left) - 1;
-		dst[k + off] = lower  >> (BITS_PER_LONG - rem) | upper << rem;
+		dst[k + off] = rem ? (lower >> (BITS_PER_LONG - rem))
+		                      | (upper << rem)
+		                   : upper;
 		if (left && k + off == lim - 1)
 			dst[k + off] &= (1UL << left) - 1;
 	}
