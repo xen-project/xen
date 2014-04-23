@@ -1643,6 +1643,7 @@ int hwdom_pit_access(struct ioreq *ioreq)
             outb(ioreq->data, PIT_MODE);
             return 1;
         }
+        break;
 
     case 0x61:
         if ( ioreq->dir == IOREQ_READ )
