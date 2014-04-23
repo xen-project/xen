@@ -583,8 +583,8 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     case GICD_ICFGR + 2 ... GICD_ICFGRN: /* SPIs */
         if ( dabt.size != 2 ) goto bad_width;
         rank = vgic_irq_rank(v, 2, gicd_reg - GICD_ICFGR);
-        vgic_lock_rank(v, rank);
         if ( rank == NULL) goto write_ignore;
+        vgic_lock_rank(v, rank);
         rank->icfg[REG_RANK_INDEX(2, gicd_reg - GICD_ICFGR)] = *r;
         vgic_unlock_rank(v, rank);
         return 1;
