@@ -152,6 +152,12 @@ It is possible to pass I<key=value> pairs on the command line to provide
 options as if they were written in the configuration file; these override
 whatever is in the I<configfile>.
 
+NB: Many config options require characters such as quotes or brackets
+which are interpreted by the shell (and often discarded) before being
+passed to xl, resulting in xl being unable to parse the value
+correctly.  A simple work-around is to put all extra options within a
+single set of quotes, separated by semicolons.  (See below for an example.)
+
 =back
 
 B<EXAMPLES>
@@ -164,6 +170,13 @@ B<EXAMPLES>
 
 This creates a domain with the file /etc/xen/DebianLenny, and returns as
 soon as it is run.
+
+=item I<with extra parameters>
+
+  xl create hvm.cfg 'cpus="0-3"; pci=["01:05.1","01:05.2"]'
+
+This creates a domain with the file hvm.cfg, but additionally pins it to
+cpus 0-3, and passes through two PCI devices.
 
 =back
 
@@ -186,9 +199,11 @@ Use the given configuration file.
 
 =item B<key=value>
 
-It is possible to pass I<key=value> pairs on the command line to provide
-options as if they were written in the configuration file; these override
-whatever is in the I<configfile>.
+It is possible to pass I<key=value> pairs on the command line to
+provide options as if they were written in the configuration file;
+these override whatever is in the I<configfile>.  Please see the note
+under I<create> on handling special characters when passing
+I<key=value> pairs on the command line.
 
 =back
 
