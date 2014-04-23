@@ -39,6 +39,8 @@ endif
 XEN_CONFIG_DIR = $(CONFIG_DIR)/xen
 XEN_SCRIPT_DIR = $(PRIVATE_PREFIX)/scripts
 
+BOOT_DIR ?= /boot
+
 SunOS_LIBDIR = /usr/sfw/lib
 SunOS_LIBDIR_x86_64 = /usr/sfw/lib/amd64
 

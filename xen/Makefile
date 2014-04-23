@@ -12,7 +12,7 @@ export XEN_DOMAIN	?= $(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) |
 export BASEDIR := $(CURDIR)
 export XEN_ROOT := $(BASEDIR)/..
 
-EFI_MOUNTPOINT ?= /boot/efi
+EFI_MOUNTPOINT ?= $(BOOT_DIR)/efi
 
 .PHONY: default
 default: build
@@ -36,12 +36,12 @@ _install: D=$(DESTDIR)
 _install: T=$(notdir $(TARGET))
 _install: Z=$(CONFIG_XEN_INSTALL_SUFFIX)
 _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
-	[ -d $(D)/boot ] || $(INSTALL_DIR) $(D)/boot
-	$(INSTALL_DATA) $(TARGET)$(Z) $(D)/boot/$(T)-$(XEN_FULLVERSION)$(Z)
-	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)/boot/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)$(Z)
-	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)/boot/$(T)-$(XEN_VERSION)$(Z)
-	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)/boot/$(T)$(Z)
-	$(INSTALL_DATA) $(TARGET)-syms $(D)/boot/$(T)-syms-$(XEN_FULLVERSION)
+	[ -d $(D)$(BOOT_DIR) ] || $(INSTALL_DIR) $(D)$(BOOT_DIR)
+	$(INSTALL_DATA) $(TARGET)$(Z) $(D)$(BOOT_DIR)/$(T)-$(XEN_FULLVERSION)$(Z)
+	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)$(BOOT_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)$(Z)
+	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)$(BOOT_DIR)/$(T)-$(XEN_VERSION)$(Z)
+	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)$(BOOT_DIR)/$(T)$(Z)
+	$(INSTALL_DATA) $(TARGET)-syms $(D)$(BOOT_DIR)/$(T)-syms-$(XEN_FULLVERSION)
 	if [ -r $(TARGET).efi -a -n '$(EFI_DIR)' ]; then \
 		[ -d $(D)$(EFI_DIR) ] || $(INSTALL_DIR) $(D)$(EFI_DIR); \
 		$(INSTALL_DATA) $(TARGET).efi $(D)$(EFI_DIR)/$(T)-$(XEN_FULLVERSION).efi; \
@@ -60,11 +60,11 @@ _uninstall: D=$(DESTDIR)
 _uninstall: T=$(notdir $(TARGET))
 _uninstall: Z=$(CONFIG_XEN_INSTALL_SUFFIX)
 _uninstall:
-	rm -f $(D)/boot/$(T)-$(XEN_FULLVERSION)$(Z)
-	rm -f $(D)/boot/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)$(Z)
-	rm -f $(D)/boot/$(T)-$(XEN_VERSION)$(Z)
-	rm -f $(D)/boot/$(T)$(Z)
-	rm -f $(D)/boot/$(T)-syms-$(XEN_FULLVERSION)
+	rm -f $(D)$(BOOT_DIR)/$(T)-$(XEN_FULLVERSION)$(Z)
+	rm -f $(D)$(BOOT_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)$(Z)
+	rm -f $(D)$(BOOT_DIR)/$(T)-$(XEN_VERSION)$(Z)
+	rm -f $(D)$(BOOT_DIR)/$(T)$(Z)
+	rm -f $(D)$(BOOT_DIR)/$(T)-syms-$(XEN_FULLVERSION)
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_FULLVERSION).efi
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION).efi
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).efi
