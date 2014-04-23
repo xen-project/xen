@@ -1268,8 +1268,8 @@ int relinquish_shared_pages(struct domain *d)
         return 0;
 
     p2m_lock(p2m);
-    for (gfn = p2m->next_shared_gfn_to_relinquish; 
-         gfn < p2m->max_mapped_pfn; gfn++ )
+    for ( gfn = p2m->next_shared_gfn_to_relinquish;
+          gfn <= p2m->max_mapped_pfn; gfn++ )
     {
         p2m_access_t a;
         p2m_type_t t;
