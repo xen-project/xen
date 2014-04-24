@@ -9,6 +9,7 @@
 #include <xen/smp.h>
 #include <asm/processor.h>
 #include <asm/msr.h>
+#include <asm/debugreg.h>
 #include <asm/flushtlb.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>

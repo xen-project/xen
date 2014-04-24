@@ -64,4 +64,16 @@
 #define DR_GLOBAL_EXACT_ENABLE   (0x00000200ul) /* Global exact enable */
 #define DR_GENERAL_DETECT        (0x00002000ul) /* General detect enable */
 
+#define write_debugreg(reg, val) do {                       \
+    unsigned long __val = val;                              \
+    asm volatile ( "mov %0,%%db" #reg : : "r" (__val) );    \
+} while (0)
+#define read_debugreg(reg) ({                               \
+    unsigned long __val;                                    \
+    asm volatile ( "mov %%db" #reg ",%0" : "=r" (__val) );  \
+    __val;                                                  \
+})
+long set_debugreg(struct vcpu *, unsigned int reg, unsigned long value);
+void activate_debugregs(const struct vcpu *);
+
 #endif /* _X86_DEBUGREG_H */

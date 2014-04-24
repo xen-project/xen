@@ -1341,14 +1341,7 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
         write_cr4(cr4);
 
     if ( unlikely(v->arch.debugreg[7] & DR7_ACTIVE_MASK) )
-    {
-        write_debugreg(0, v->arch.debugreg[0]);
-        write_debugreg(1, v->arch.debugreg[1]);
-        write_debugreg(2, v->arch.debugreg[2]);
-        write_debugreg(3, v->arch.debugreg[3]);
-        write_debugreg(6, v->arch.debugreg[6]);
-        write_debugreg(7, v->arch.debugreg[7]);
-    }
+        activate_debugregs(v);
 
     if ( (v->domain->arch.tsc_mode ==  TSC_MODE_PVRDTSCP) &&
          boot_cpu_has(X86_FEATURE_RDTSCP) )

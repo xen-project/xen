@@ -462,17 +462,6 @@ long set_gdt(struct vcpu *d,
              unsigned long *frames, 
              unsigned int entries);
 
-#define write_debugreg(reg, val) do {                       \
-    unsigned long __val = val;                              \
-    asm volatile ( "mov %0,%%db" #reg : : "r" (__val) );    \
-} while (0)
-#define read_debugreg(reg) ({                               \
-    unsigned long __val;                                    \
-    asm volatile ( "mov %%db" #reg ",%0" : "=r" (__val) );  \
-    __val;                                                  \
-})
-long set_debugreg(struct vcpu *p, int reg, unsigned long value);
-
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 static always_inline void rep_nop(void)
 {

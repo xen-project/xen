@@ -374,6 +374,9 @@ struct pv_vcpu
     unsigned long shadow_ldt_mapcnt;
     spinlock_t shadow_ldt_lock;
 
+    /* data breakpoint extension MSRs */
+    uint32_t dr_mask[4];
+
     /* Deferred VA-based update state. */
     bool_t need_update_runstate_area;
     struct vcpu_time_info pending_system_time;
