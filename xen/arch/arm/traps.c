@@ -1392,7 +1392,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
                  "%s p15, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
                  cp32.read ? "mrc" : "mcr",
                  cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
-        gdprintk(XENLOG_ERR, "unhandled 32-bit CP15 access %#x",
+        gdprintk(XENLOG_ERR, "unhandled 32-bit CP15 access %#x\n",
                  hsr.bits & HSR_CP32_REGS_MASK);
 #endif
         inject_undef32_exception(regs);
@@ -1429,7 +1429,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
                      "%s p15, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
                      cp64.read ? "mrrc" : "mcrr",
                      cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
-            gdprintk(XENLOG_ERR, "unhandled 64-bit CP15 access %#x",
+            gdprintk(XENLOG_ERR, "unhandled 64-bit CP15 access %#x\n",
                      hsr.bits & HSR_CP64_REGS_MASK);
 #endif
             inject_undef32_exception(regs);
@@ -1528,7 +1528,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
                      sysreg.op2,
                      sysreg.read ? "=>" : "<=",
                      sysreg.reg, regs->pc);
-            gdprintk(XENLOG_ERR, "unhandled 64-bit sysreg access %#x",
+            gdprintk(XENLOG_ERR, "unhandled 64-bit sysreg access %#x\n",
                      hsr.bits & HSR_SYSREG_REGS_MASK);
 #endif
             inject_undef64_exception(regs, sysreg.len);
