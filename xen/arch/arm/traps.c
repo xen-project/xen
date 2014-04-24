@@ -1393,6 +1393,34 @@ static void do_cp15_32(struct cpu_user_regs *regs,
         if ( cp32.read )
            *r = v->arch.actlr;
         break;
+
+    /* We could trap ID_DFR0 and tell the guest we don't support
+     * performance monitoring, but Linux doesn't check the ID_DFR0.
+     * Therefore it will read PMCR.
+     *
+     * We tell the guest we have 0 counters. Unfortunately we must
+     * always support PMCCNTR (the cyle counter): we just RAZ/WI for all
+     * PM register, which doesn't crash the kernel at least
+     */
+    case HSR_CPREG32(PMCR):
+    case HSR_CPREG32(PMCNTENSET):
+    case HSR_CPREG32(PMCNTENCLR):
+    case HSR_CPREG32(PMOVSR):
+    case HSR_CPREG32(PMSWINC):
+    case HSR_CPREG32(PMSELR):
+    case HSR_CPREG32(PMCEID0):
+    case HSR_CPREG32(PMCEID1):
+    case HSR_CPREG32(PMCCNTR):
+    case HSR_CPREG32(PMXEVCNTR):
+    case HSR_CPREG32(PMXEVCNR):
+    case HSR_CPREG32(PMUSERENR):
+    case HSR_CPREG32(PMINTENSET):
+    case HSR_CPREG32(PMINTENCLR):
+    case HSR_CPREG32(PMOVSSET):
+        if ( cp32.read )
+            *r = 0;
+        break;
+
     default:
 #ifndef NDEBUG
         gdprintk(XENLOG_ERR,
