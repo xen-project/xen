@@ -1,6 +1,7 @@
 #include <xenctrl.h>
 #include <xc_private.h>
 #include <xc_core.h>
+#include <xenstore.h>
 #include <unistd.h>
 
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
@@ -95,8 +96,6 @@ static int hp_mem_query_func(int argc, char *argv[])
 
     return ret;
 }
-
-extern int xs_suspend_evtchn_port(int domid);
 
 static int suspend_guest(xc_interface *xch, xc_evtchn *xce, int domid,
                          int *evtchn, int *lockfd)
