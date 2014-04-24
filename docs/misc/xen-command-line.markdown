@@ -545,6 +545,22 @@ versa.  For example to change dom0 without changing domU, use
 
 Specify the font size when using the VESA console driver.
 
+### force-ept (Intel)
+> `= <boolean>`
+
+> Default: `false`
+
+Allow EPT to be enabled when VMX feature VM\_ENTRY\_LOAD\_GUEST\_PAT is not
+present.
+
+*Warning:*
+Due to CVE-2013-2212, VMX feature VM\_ENTRY\_LOAD\_GUEST\_PAT is by default
+required as a prerequisite for using EPT.  If you are not using PCI Passthrough,
+or trust the guest administrator who would be using passthrough, then the
+requirement can be relaxed.  This option is particularly useful for nested
+virtualization, to allow the L1 hypervisor to use EPT even if the L0 hypervisor
+does not provide VM\_ENTRY\_LOAD\_GUEST\_PAT.
+
 ### gdb
 > `= <baud>[/<clock_hz>][,DPS[,<io-base>[,<irq>[,<port-bdf>[,<bridge-bdf>]]]] | pci | amt ] `
 

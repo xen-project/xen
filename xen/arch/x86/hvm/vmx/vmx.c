@@ -58,6 +58,9 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/event.h>
 
+static bool_t __initdata opt_force_ept;
+boolean_param("force-ept", opt_force_ept);
+
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 
 static void vmx_ctxt_switch_from(struct vcpu *v);
@@ -1725,7 +1728,7 @@ const struct hvm_function_table * __init start_vmx(void)
      * Do not enable EPT when (!cpu_has_vmx_pat), to prevent security hole
      * (refer to http://xenbits.xen.org/xsa/advisory-60.html).
      */
-    if ( cpu_has_vmx_ept && cpu_has_vmx_pat )
+    if ( cpu_has_vmx_ept && (cpu_has_vmx_pat || opt_force_ept) )
     {
         vmx_function_table.hap_supported = 1;
 
