@@ -101,43 +101,47 @@ int dump_p2m_func(int argc, char *argv[])
     {
         unsigned long pagetype = minfo.pfn_type[i] &
                                      XEN_DOMCTL_PFINFO_LTAB_MASK;
+        xen_pfn_t mfn;
 
-        printf("  pfn=0x%lx ==> mfn=0x%lx (type 0x%lx)", i, minfo.p2m_table[i],
-               pagetype >> XEN_DOMCTL_PFINFO_LTAB_SHIFT);
-
-        if ( is_mapped(minfo.p2m_table[i]) )
-            printf(" [mapped]");
-
-        if ( pagetype & XEN_DOMCTL_PFINFO_LPINTAB )
-            printf (" [pinned]");
-
-        if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
-            printf(" [xtab]");
-        if ( pagetype == XEN_DOMCTL_PFINFO_BROKEN )
-            printf(" [broken]");
-        if ( pagetype == XEN_DOMCTL_PFINFO_XALLOC )
-            printf( " [xalloc]");
-
-        switch ( pagetype & XEN_DOMCTL_PFINFO_LTABTYPE_MASK )
+        if ( minfo.guest_width == sizeof(uint64_t) )
+            mfn = ((uint64_t*)minfo.p2m_table)[i];
+        else
         {
-            case XEN_DOMCTL_PFINFO_L1TAB:
-                printf(" L1 table");
-                break;
-
-            case XEN_DOMCTL_PFINFO_L2TAB:
-                printf(" L2 table");
-                break;
-
-            case XEN_DOMCTL_PFINFO_L3TAB:
-                printf(" L3 table");
-                break;
-
-            case XEN_DOMCTL_PFINFO_L4TAB:
-                printf(" L4 table");
-                break;
+            mfn = ((uint32_t*)minfo.p2m_table)[i];
+#ifdef __x86_64__
+            if ( mfn == ~0U ) /* Expand a 32bit guest's idea of INVALID_MFN */
+                mfn = ~0UL;
+#endif
         }
 
-        printf("\n");
+        printf("  pfn=0x%lx ==> mfn=0x%lx (type 0x%lx)", i, mfn,
+               pagetype >> XEN_DOMCTL_PFINFO_LTAB_SHIFT);
+
+        switch ( pagetype >> XEN_DOMCTL_PFINFO_LTAB_SHIFT )
+        {
+        case 0x0: /* NOTAB */
+            printf("\n");
+            break;
+        case 0x1 ... 0x4: /* L1 -> L4 */
+            printf(" L%lu\n", pagetype >> XEN_DOMCTL_PFINFO_LTAB_SHIFT);
+            break;
+        case 0x9 ... 0xc: /* Pinned L1 -> L4 */
+            printf(" pinned L%lu\n",
+                   (pagetype >> XEN_DOMCTL_PFINFO_LTAB_SHIFT) & 7);
+            break;
+        case 0xd: /* BROKEN */
+            printf(" broken\n");
+            break;
+        case 0xe: /* XALLOC */
+            printf(" xalloc\n");
+            break;
+        case 0xf: /* XTAB */
+            printf(" invalid\n");
+            break;
+        default:
+            printf(" <invalid type>\n");
+            break;
+        }
     }
     printf(" --- End of P2M for domain %d ---\n", domid);
 
