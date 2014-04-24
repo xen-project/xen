@@ -3088,6 +3088,9 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         /* Only provide PSE36 when guest runs in 32bit PAE or in long mode */
         if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
             *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
+        /* Hide data breakpoint extensions if the hardware has no support. */
+        if ( !boot_cpu_has(X86_FEATURE_DBEXT) )
+            *ecx &= ~cpufeat_mask(X86_FEATURE_DBEXT);
         break;
 
     case 0x80000008:

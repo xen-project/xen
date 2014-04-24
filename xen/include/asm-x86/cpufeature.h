@@ -134,6 +134,7 @@
 #define X86_FEATURE_NODEID_MSR  (6*32+19) /* NodeId MSR */
 #define X86_FEATURE_TBM         (6*32+21) /* trailing bit manipulations */
 #define X86_FEATURE_TOPOEXT     (6*32+22) /* topology extensions CPUID leafs */
+#define X86_FEATURE_DBEXT       (6*32+26) /* data breakpoint extension */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 7 */
 #define X86_FEATURE_FSGSBASE	(7*32+ 0) /* {RD,WR}{FS,GS}BASE instructions */

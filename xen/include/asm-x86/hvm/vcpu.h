@@ -140,7 +140,7 @@ struct hvm_vcpu {
 
     int                 xen_port;
 
-    bool_t              flag_dr_dirty;
+    u8                  flag_dr_dirty;
     bool_t              debug_state_latch;
     bool_t              single_step;
 

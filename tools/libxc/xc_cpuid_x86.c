@@ -110,9 +110,10 @@ static void amd_xc_cpuid_policy(
                     bitmaskof(X86_FEATURE_3DNOWPREFETCH) |
                     bitmaskof(X86_FEATURE_OSVW) |
                     bitmaskof(X86_FEATURE_XOP) |
+                    bitmaskof(X86_FEATURE_LWP) |
                     bitmaskof(X86_FEATURE_FMA4) |
                     bitmaskof(X86_FEATURE_TBM) |
-                    bitmaskof(X86_FEATURE_LWP));
+                    bitmaskof(X86_FEATURE_DBEXT));
         regs[3] &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
                     (is_pae ? bitmaskof(X86_FEATURE_NX) : 0) |
                     (is_64bit ? bitmaskof(X86_FEATURE_LM) : 0) |

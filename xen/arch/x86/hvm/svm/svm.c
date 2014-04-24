@@ -160,13 +160,27 @@ void svm_intercept_msr(struct vcpu *v, uint32_t msr, int flags)
 static void svm_save_dr(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    unsigned int flag_dr_dirty = v->arch.hvm_vcpu.flag_dr_dirty;
 
-    if ( !v->arch.hvm_vcpu.flag_dr_dirty )
+    if ( !flag_dr_dirty )
         return;
 
     /* Clear the DR dirty flag and re-enable intercepts for DR accesses. */
     v->arch.hvm_vcpu.flag_dr_dirty = 0;
     vmcb_set_dr_intercepts(vmcb, ~0u);
+
+    if ( flag_dr_dirty & 2 )
+    {
+        svm_intercept_msr(v, MSR_AMD64_DR0_ADDRESS_MASK, MSR_INTERCEPT_RW);
+        svm_intercept_msr(v, MSR_AMD64_DR1_ADDRESS_MASK, MSR_INTERCEPT_RW);
+        svm_intercept_msr(v, MSR_AMD64_DR2_ADDRESS_MASK, MSR_INTERCEPT_RW);
+        svm_intercept_msr(v, MSR_AMD64_DR3_ADDRESS_MASK, MSR_INTERCEPT_RW);
+
+        rdmsrl(MSR_AMD64_DR0_ADDRESS_MASK, v->arch.hvm_svm.dr_mask[0]);
+        rdmsrl(MSR_AMD64_DR1_ADDRESS_MASK, v->arch.hvm_svm.dr_mask[1]);
+        rdmsrl(MSR_AMD64_DR2_ADDRESS_MASK, v->arch.hvm_svm.dr_mask[2]);
+        rdmsrl(MSR_AMD64_DR3_ADDRESS_MASK, v->arch.hvm_svm.dr_mask[3]);
+    }
 
     v->arch.debugreg[0] = read_debugreg(0);
     v->arch.debugreg[1] = read_debugreg(1);
@@ -178,11 +192,31 @@ static void svm_save_dr(struct vcpu *v)
 
 static void __restore_debug_registers(struct vmcb_struct *vmcb, struct vcpu *v)
 {
+    unsigned int ecx;
+
     if ( v->arch.hvm_vcpu.flag_dr_dirty )
         return;
 
     v->arch.hvm_vcpu.flag_dr_dirty = 1;
     vmcb_set_dr_intercepts(vmcb, 0);
+
+    ASSERT(v == current);
+    hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
+    if ( test_bit(X86_FEATURE_DBEXT & 31, &ecx) )
+    {
+        svm_intercept_msr(v, MSR_AMD64_DR0_ADDRESS_MASK, MSR_INTERCEPT_NONE);
+        svm_intercept_msr(v, MSR_AMD64_DR1_ADDRESS_MASK, MSR_INTERCEPT_NONE);
+        svm_intercept_msr(v, MSR_AMD64_DR2_ADDRESS_MASK, MSR_INTERCEPT_NONE);
+        svm_intercept_msr(v, MSR_AMD64_DR3_ADDRESS_MASK, MSR_INTERCEPT_NONE);
+
+        wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, v->arch.hvm_svm.dr_mask[0]);
+        wrmsrl(MSR_AMD64_DR1_ADDRESS_MASK, v->arch.hvm_svm.dr_mask[1]);
+        wrmsrl(MSR_AMD64_DR2_ADDRESS_MASK, v->arch.hvm_svm.dr_mask[2]);
+        wrmsrl(MSR_AMD64_DR3_ADDRESS_MASK, v->arch.hvm_svm.dr_mask[3]);
+
+        /* Can't use hvm_cpuid() in svm_save_dr(): v != current. */
+        v->arch.hvm_vcpu.flag_dr_dirty |= 2;
+    }
 
     write_debugreg(0, v->arch.debugreg[0]);
     write_debugreg(1, v->arch.debugreg[1]);
@@ -354,6 +388,72 @@ static int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     }
 
     return 0;
+}
+
+static unsigned int __init svm_init_msr(void)
+{
+    return boot_cpu_has(X86_FEATURE_DBEXT) ? 4 : 0;
+}
+
+static void svm_save_msr(struct vcpu *v, struct hvm_msr *ctxt)
+{
+    if ( boot_cpu_has(X86_FEATURE_DBEXT) )
+    {
+        ctxt->msr[ctxt->count].val = v->arch.hvm_svm.dr_mask[0];
+        if ( ctxt->msr[ctxt->count].val )
+            ctxt->msr[ctxt->count++].index = MSR_AMD64_DR0_ADDRESS_MASK;
+
+        ctxt->msr[ctxt->count].val = v->arch.hvm_svm.dr_mask[1];
+        if ( ctxt->msr[ctxt->count].val )
+            ctxt->msr[ctxt->count++].index = MSR_AMD64_DR1_ADDRESS_MASK;
+
+        ctxt->msr[ctxt->count].val = v->arch.hvm_svm.dr_mask[2];
+        if ( ctxt->msr[ctxt->count].val )
+            ctxt->msr[ctxt->count++].index = MSR_AMD64_DR2_ADDRESS_MASK;
+
+        ctxt->msr[ctxt->count].val = v->arch.hvm_svm.dr_mask[3];
+        if ( ctxt->msr[ctxt->count].val )
+            ctxt->msr[ctxt->count++].index = MSR_AMD64_DR3_ADDRESS_MASK;
+    }
+}
+
+static int svm_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
+{
+    unsigned int i, idx;
+    int err = 0;
+
+    for ( i = 0; i < ctxt->count; ++i )
+    {
+        switch ( idx = ctxt->msr[i].index )
+        {
+        case MSR_AMD64_DR0_ADDRESS_MASK:
+            if ( !boot_cpu_has(X86_FEATURE_DBEXT) )
+                err = -ENXIO;
+            else if ( ctxt->msr[i].val >> 32 )
+                err = -EDOM;
+            else
+                v->arch.hvm_svm.dr_mask[0] = ctxt->msr[i].val;
+            break;
+
+        case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
+            if ( !boot_cpu_has(X86_FEATURE_DBEXT) )
+                err = -ENXIO;
+            else if ( ctxt->msr[i].val >> 32 )
+                err = -EDOM;
+            else
+                v->arch.hvm_svm.dr_mask[idx - MSR_AMD64_DR1_ADDRESS_MASK + 1] =
+                    ctxt->msr[i].val;
+            break;
+
+        default:
+            continue;
+        }
+        if ( err )
+            break;
+        ctxt->msr[i]._rsvd = 1;
+    }
+
+    return err;
 }
 
 static void svm_fpu_enter(struct vcpu *v)
@@ -1456,6 +1556,8 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
     switch ( msr )
     {
+        unsigned int ecx;
+
     case MSR_IA32_SYSENTER_CS:
         *msr_content = v->arch.hvm_svm.guest_sysenter_cs;
         break;
@@ -1531,6 +1633,21 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         vpmu_do_rdmsr(msr, msr_content);
         break;
 
+    case MSR_AMD64_DR0_ADDRESS_MASK:
+        hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
+        if ( !test_bit(X86_FEATURE_DBEXT & 31, &ecx) )
+            goto gpf;
+        *msr_content = v->arch.hvm_svm.dr_mask[0];
+        break;
+
+    case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
+        hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
+        if ( !test_bit(X86_FEATURE_DBEXT & 31, &ecx) )
+            goto gpf;
+        *msr_content =
+            v->arch.hvm_svm.dr_mask[msr - MSR_AMD64_DR1_ADDRESS_MASK + 1];
+        break;
+
     case MSR_AMD_OSVW_ID_LENGTH:
     case MSR_AMD_OSVW_STATUS:
         ret = svm_handle_osvw(v, msr, msr_content, 1);
@@ -1599,6 +1716,8 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
     switch ( msr )
     {
+        unsigned int ecx;
+
     case MSR_IA32_SYSENTER_CS:
         vmcb->sysenter_cs = v->arch.hvm_svm.guest_sysenter_cs = msr_content;
         break;
@@ -1672,6 +1791,21 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
          * all write accesses. This behaviour matches real HW, so guests should
          * have no problem with this.
          */
+        break;
+
+    case MSR_AMD64_DR0_ADDRESS_MASK:
+        hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
+        if ( !test_bit(X86_FEATURE_DBEXT & 31, &ecx) || (msr_content >> 32) )
+            goto gpf;
+        v->arch.hvm_svm.dr_mask[0] = msr_content;
+        break;
+
+    case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
+        hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
+        if ( !test_bit(X86_FEATURE_DBEXT & 31, &ecx) || (msr_content >> 32) )
+            goto gpf;
+        v->arch.hvm_svm.dr_mask[msr - MSR_AMD64_DR1_ADDRESS_MASK + 1] =
+            msr_content;
         break;
 
     case MSR_AMD_OSVW_ID_LENGTH:
@@ -2027,6 +2161,9 @@ static struct hvm_function_table __initdata svm_function_table = {
     .vcpu_destroy         = svm_vcpu_destroy,
     .save_cpu_ctxt        = svm_save_vmcb_ctxt,
     .load_cpu_ctxt        = svm_load_vmcb_ctxt,
+    .init_msr             = svm_init_msr,
+    .save_msr             = svm_save_msr,
+    .load_msr             = svm_load_msr,
     .get_interrupt_shadow = svm_get_interrupt_shadow,
     .set_interrupt_shadow = svm_set_interrupt_shadow,
     .guest_x86_mode       = svm_guest_x86_mode,
