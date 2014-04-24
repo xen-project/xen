@@ -71,6 +71,20 @@
 
 /* Coprocessor 14 */
 
+/* CP14 0: Debug Register interface */
+#define DBGDIDR         p14,0,c0,c0,0   /* Debug ID Register */
+#define DBGDSCRINT      p14,0,c0,c1,0   /* Debug Status and Control Internal */
+#define DBGDSCREXT      p14,0,c0,c2,2   /* Debug Status and Control External */
+#define DBGVCR          p14,0,c0,c7,0   /* Vector Catch */
+#define DBGBVR0         p14,0,c0,c0,4   /* Breakpoint Value 0 */
+#define DBGBCR0         p14,0,c0,c0,5   /* Breakpoint Control 0 */
+#define DBGWVR0         p14,0,c0,c0,6   /* Watchpoint Value 0 */
+#define DBGWCR0         p14,0,c0,c0,7   /* Watchpoint Control 0 */
+#define DBGBVR1         p14,0,c0,c1,4   /* Breakpoint Value 1 */
+#define DBGBCR1         p14,0,c0,c1,5   /* Breakpoint Control 1 */
+#define DBGOSLAR        p14,0,c1,c0,4   /* OS Lock Access */
+#define DBGOSDLR        p14,0,c1,c3,4   /* OS Double Lock */
+
 /* CP14 CR0: */
 #define TEECR           p14,6,c0,c0,0   /* ThumbEE Configuration Register */
 

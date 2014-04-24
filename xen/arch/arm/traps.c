@@ -1474,7 +1474,76 @@ static void do_cp15_64(struct cpu_user_regs *regs,
     advance_pc(regs, hsr);
 }
 
-static void do_cp14(struct cpu_user_regs *regs, union hsr hsr)
+static void do_cp14_32(struct cpu_user_regs *regs, union hsr hsr)
+{
+    struct hsr_cp32 cp32 = hsr.cp32;
+    uint32_t *r = (uint32_t *)select_user_reg(regs, cp32.reg);
+    struct domain *d = current->domain;
+
+    if ( !check_conditional_instr(regs, hsr) )
+    {
+        advance_pc(regs, hsr);
+        return;
+    }
+
+    switch ( hsr.bits & HSR_CP32_REGS_MASK )
+    {
+    case HSR_CPREG32(DBGDIDR):
+
+        /* Read-only register */
+        if ( !cp32.read )
+            goto bad_cp;
+
+        /* Implement the minimum requirements:
+         *  - Number of watchpoints: 1
+         *  - Number of breakpoints: 2
+         *  - Version: ARMv7 v7.1
+         *  - Variant and Revision bits match MDIR
+         */
+        *r = (1 << 24) | (5 << 16);
+        *r |= ((d->arch.vpidr >> 20) & 0xf) | (d->arch.vpidr & 0xf);
+        break;
+
+    case HSR_CPREG32(DBGDSCRINT):
+    case HSR_CPREG32(DBGDSCREXT):
+        /* Implement debug status and control register as RAZ/WI.
+         * The OS won't use Hardware debug if MDBGen not set
+         */
+        if ( cp32.read )
+           *r = 0;
+        break;
+    case HSR_CPREG32(DBGVCR):
+    case HSR_CPREG32(DBGOSLAR):
+    case HSR_CPREG32(DBGBVR0):
+    case HSR_CPREG32(DBGBCR0):
+    case HSR_CPREG32(DBGWVR0):
+    case HSR_CPREG32(DBGWCR0):
+    case HSR_CPREG32(DBGBVR1):
+    case HSR_CPREG32(DBGBCR1):
+    case HSR_CPREG32(DBGOSDLR):
+        /* RAZ/WI */
+        if ( cp32.read )
+            *r = 0;
+        break;
+
+    default:
+bad_cp:
+#ifndef NDEBUG
+        gdprintk(XENLOG_ERR,
+                 "%s p14, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
+                  cp32.read ? "mrc" : "mcr",
+                  cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
+        gdprintk(XENLOG_ERR, "unhandled 32-bit cp14 access %#x\n",
+                 hsr.bits & HSR_CP32_REGS_MASK);
+#endif
+        inject_undef32_exception(regs);
+        return;
+    }
+
+    advance_pc(regs, hsr);
+}
+
+static void do_cp14_dbg(struct cpu_user_regs *regs, union hsr hsr)
 {
     if ( !check_conditional_instr(regs, hsr) )
     {
@@ -1726,10 +1795,14 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         do_cp15_64(regs, hsr);
         break;
     case HSR_EC_CP14_32:
+        if ( !is_pv32_domain(current->domain) )
+            goto bad_trap;
+        do_cp14_32(regs, hsr);
+        break;
     case HSR_EC_CP14_DBG:
         if ( !is_pv32_domain(current->domain) )
             goto bad_trap;
-        do_cp14(regs, hsr);
+        do_cp14_dbg(regs, hsr);
         break;
     case HSR_EC_CP:
         if ( !is_pv32_domain(current->domain) )
