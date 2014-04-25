@@ -816,6 +816,14 @@ Defaults to booting secondary processors.
 
 Default: `on`
 
+### pci
+> `= {no-}serr | {no-}perr`
+
+Disable signaling of SERR (system errors) and/or PERR (parity errors)
+on all PCI devices.
+
+Default: Signaling left as set by firmware.
+
 ### pci-phantom
 > `=[<seg>:]<bus>:<device>,<stride>`
 
