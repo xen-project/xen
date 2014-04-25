@@ -683,10 +683,9 @@ static void hap_update_paging_modes(struct vcpu *v)
 }
 
 static void
-hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
-                    mfn_t table_mfn, l1_pgentry_t new, unsigned int level)
+hap_write_p2m_entry(struct domain *d, unsigned long gfn, l1_pgentry_t *p,
+                    l1_pgentry_t new, unsigned int level)
 {
-    struct domain *d = v->domain;
     uint32_t old_flags;
     bool_t flush_nestedp2m = 0;
 

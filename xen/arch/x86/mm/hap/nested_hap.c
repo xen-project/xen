@@ -79,7 +79,7 @@
 
 void
 nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
-    l1_pgentry_t *p, mfn_t table_mfn, l1_pgentry_t new, unsigned int level)
+    l1_pgentry_t *p, l1_pgentry_t new, unsigned int level)
 {
     struct domain *d = p2m->domain;
     uint32_t old_flags;

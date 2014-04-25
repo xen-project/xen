@@ -3310,11 +3310,14 @@ static int shadow_test_disable(struct domain *d)
  * shadow processing jobs.
  */
 
-static void sh_unshadow_for_p2m_change(struct vcpu *v, unsigned long gfn, 
-                                       l1_pgentry_t *p, mfn_t table_mfn, 
-                                       l1_pgentry_t new, unsigned int level)
+static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
+                                       l1_pgentry_t *p, l1_pgentry_t new,
+                                       unsigned int level)
 {
-    struct domain *d = v->domain;
+    struct vcpu *v = current;
+
+    if ( v->domain != d )
+        v = d->vcpu ? d->vcpu[0] : NULL;
 
     /* The following assertion is to make sure we don't step on 1GB host
      * page support of HVM guest. */
@@ -3379,18 +3382,16 @@ static void sh_unshadow_for_p2m_change(struct vcpu *v, unsigned long gfn,
 }
 
 void
-shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, 
-                       l1_pgentry_t *p, mfn_t table_mfn, 
-                       l1_pgentry_t new, unsigned int level)
+shadow_write_p2m_entry(struct domain *d, unsigned long gfn,
+                       l1_pgentry_t *p, l1_pgentry_t new,
+                       unsigned int level)
 {
-    struct domain *d = v->domain;
-    
     paging_lock(d);
 
     /* If there are any shadows, update them.  But if shadow_teardown()
      * has already been called then it's not safe to try. */ 
     if ( likely(d->arch.paging.shadow.total_pages != 0) )
-         sh_unshadow_for_p2m_change(v, gfn, p, table_mfn, new, level);
+         sh_unshadow_for_p2m_change(d, gfn, p, new, level);
 
     /* Update the entry with new content */
     safe_write_pte(p, new);

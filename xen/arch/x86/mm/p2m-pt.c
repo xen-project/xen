@@ -157,7 +157,7 @@ static void p2m_add_iommu_flags(l1_pgentry_t *p2m_entry,
 
 /* Returns: 0 for success, -errno for failure */
 static int
-p2m_next_level(struct p2m_domain *p2m, mfn_t *table_mfn, void **table,
+p2m_next_level(struct p2m_domain *p2m, void **table,
                unsigned long *gfn_remainder, unsigned long gfn, u32 shift,
                u32 max, unsigned long type)
 {
@@ -186,15 +186,15 @@ p2m_next_level(struct p2m_domain *p2m, mfn_t *table_mfn, void **table,
         switch ( type ) {
         case PGT_l3_page_table:
             p2m_add_iommu_flags(&new_entry, 3, IOMMUF_readable|IOMMUF_writable);
-            p2m->write_p2m_entry(p2m, gfn, p2m_entry, *table_mfn, new_entry, 4);
+            p2m->write_p2m_entry(p2m, gfn, p2m_entry, new_entry, 4);
             break;
         case PGT_l2_page_table:
             p2m_add_iommu_flags(&new_entry, 2, IOMMUF_readable|IOMMUF_writable);
-            p2m->write_p2m_entry(p2m, gfn, p2m_entry, *table_mfn, new_entry, 3);
+            p2m->write_p2m_entry(p2m, gfn, p2m_entry, new_entry, 3);
             break;
         case PGT_l1_page_table:
             p2m_add_iommu_flags(&new_entry, 1, IOMMUF_readable|IOMMUF_writable);
-            p2m->write_p2m_entry(p2m, gfn, p2m_entry, *table_mfn, new_entry, 2);
+            p2m->write_p2m_entry(p2m, gfn, p2m_entry, new_entry, 2);
             break;
         default:
             BUG();
@@ -222,14 +222,13 @@ p2m_next_level(struct p2m_domain *p2m, mfn_t *table_mfn, void **table,
         {
             new_entry = l1e_from_pfn(pfn + (i * L1_PAGETABLE_ENTRIES), flags);
             p2m_add_iommu_flags(&new_entry, 1, IOMMUF_readable|IOMMUF_writable);
-            p2m->write_p2m_entry(p2m, gfn,
-                l1_entry+i, *table_mfn, new_entry, 2);
+            p2m->write_p2m_entry(p2m, gfn, l1_entry + i, new_entry, 2);
         }
         unmap_domain_page(l1_entry);
         new_entry = l1e_from_pfn(mfn_x(page_to_mfn(pg)),
                                  __PAGE_HYPERVISOR|_PAGE_USER); //disable PSE
         p2m_add_iommu_flags(&new_entry, 2, IOMMUF_readable|IOMMUF_writable);
-        p2m->write_p2m_entry(p2m, gfn, p2m_entry, *table_mfn, new_entry, 3);
+        p2m->write_p2m_entry(p2m, gfn, p2m_entry, new_entry, 3);
     }
 
 
@@ -257,20 +256,17 @@ p2m_next_level(struct p2m_domain *p2m, mfn_t *table_mfn, void **table,
         {
             new_entry = l1e_from_pfn(pfn + i, flags);
             p2m_add_iommu_flags(&new_entry, 0, 0);
-            p2m->write_p2m_entry(p2m, gfn,
-                l1_entry+i, *table_mfn, new_entry, 1);
+            p2m->write_p2m_entry(p2m, gfn, l1_entry + i, new_entry, 1);
         }
         unmap_domain_page(l1_entry);
         
         new_entry = l1e_from_pfn(mfn_x(page_to_mfn(pg)),
                                  __PAGE_HYPERVISOR|_PAGE_USER);
         p2m_add_iommu_flags(&new_entry, 1, IOMMUF_readable|IOMMUF_writable);
-        p2m->write_p2m_entry(p2m, gfn,
-            p2m_entry, *table_mfn, new_entry, 2);
+        p2m->write_p2m_entry(p2m, gfn, p2m_entry, new_entry, 2);
     }
 
-    *table_mfn = _mfn(l1e_get_pfn(*p2m_entry));
-    next = map_domain_page(mfn_x(*table_mfn));
+    next = map_domain_page(l1e_get_pfn(*p2m_entry));
     unmap_domain_page(*table);
     *table = next;
 
@@ -283,8 +279,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
                  unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
 {
     /* XXX -- this might be able to be faster iff current->domain == d */
-    mfn_t table_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m));
-    void *table = map_domain_page(mfn_x(table_mfn));
+    void *table;
     unsigned long i, gfn_remainder = gfn;
     l1_pgentry_t *p2m_entry;
     l1_pgentry_t entry_content;
@@ -313,7 +308,8 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         __trace_var(TRC_MEM_SET_P2M_ENTRY, 0, sizeof(t), &t);
     }
 
-    rc = p2m_next_level(p2m, &table_mfn, &table, &gfn_remainder, gfn,
+    table = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
+    rc = p2m_next_level(p2m, &table, &gfn_remainder, gfn,
                         L4_PAGETABLE_SHIFT - PAGE_SHIFT,
                         L4_PAGETABLE_ENTRIES, PGT_l3_page_table);
     if ( rc )
@@ -350,7 +346,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             old_mfn = l1e_get_pfn(*p2m_entry);
         }
 
-        p2m->write_p2m_entry(p2m, gfn, p2m_entry, table_mfn, entry_content, 3);
+        p2m->write_p2m_entry(p2m, gfn, p2m_entry, entry_content, 3);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
 
         /* Free old intermediate tables if necessary */
@@ -359,8 +355,8 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     }
     else 
     {
-        rc = p2m_next_level(p2m, &table_mfn, &table, &gfn_remainder,
-                            gfn, L3_PAGETABLE_SHIFT - PAGE_SHIFT,
+        rc = p2m_next_level(p2m, &table, &gfn_remainder, gfn,
+                            L3_PAGETABLE_SHIFT - PAGE_SHIFT,
                             L3_PAGETABLE_ENTRIES, PGT_l2_page_table);
         if ( rc )
             goto out;
@@ -368,7 +364,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
     if ( page_order == PAGE_ORDER_4K )
     {
-        rc = p2m_next_level(p2m, &table_mfn, &table, &gfn_remainder, gfn,
+        rc = p2m_next_level(p2m, &table, &gfn_remainder, gfn,
                             L2_PAGETABLE_SHIFT - PAGE_SHIFT,
                             L2_PAGETABLE_ENTRIES, PGT_l1_page_table);
         if ( rc )
@@ -391,7 +387,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             old_mfn = l1e_get_pfn(*p2m_entry);
         }
         /* level 1 entry */
-        p2m->write_p2m_entry(p2m, gfn, p2m_entry, table_mfn, entry_content, 1);
+        p2m->write_p2m_entry(p2m, gfn, p2m_entry, entry_content, 1);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
     }
     else if ( page_order == PAGE_ORDER_2M )
@@ -427,7 +423,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             old_mfn = l1e_get_pfn(*p2m_entry);
         }
 
-        p2m->write_p2m_entry(p2m, gfn, p2m_entry, table_mfn, entry_content, 2);
+        p2m->write_p2m_entry(p2m, gfn, p2m_entry, entry_content, 2);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
 
         /* Free old intermediate tables if necessary */
@@ -661,7 +657,7 @@ static void p2m_pt_change_entry_type_global(struct p2m_domain *p2m,
                 l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
                 p2m->write_p2m_entry(p2m, gfn,
                                      (l1_pgentry_t *)&l3e[i3],
-                                     l3mfn, l1e_content, 3);
+                                     l1e_content, 3);
                 continue;
             }
 
@@ -688,7 +684,7 @@ static void p2m_pt_change_entry_type_global(struct p2m_domain *p2m,
                     l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
                     p2m->write_p2m_entry(p2m, gfn,
                                          (l1_pgentry_t *)&l2e[i2],
-                                         l2mfn, l1e_content, 2);
+                                         l1e_content, 2);
                     continue;
                 }
 
@@ -707,7 +703,7 @@ static void p2m_pt_change_entry_type_global(struct p2m_domain *p2m,
                     flags = p2m_type_to_flags(nt, _mfn(mfn));
                     l1e_content = p2m_l1e_from_pfn(mfn, flags);
                     p2m->write_p2m_entry(p2m, gfn, &l1e[i1],
-                                         l1mfn, l1e_content, 1);
+                                         l1e_content, 1);
                 }
                 unmap_domain_page(l1e);
             }

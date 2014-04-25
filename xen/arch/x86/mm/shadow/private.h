@@ -359,9 +359,9 @@ extern int sh_remove_write_access(struct vcpu *v, mfn_t readonly_mfn,
                                   unsigned long fault_addr);
 
 /* Functions that atomically write PT/P2M entries and update state */
-void shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, 
-                            l1_pgentry_t *p, mfn_t table_mfn,
-                            l1_pgentry_t new, unsigned int level);
+void shadow_write_p2m_entry(struct domain *d, unsigned long gfn,
+                            l1_pgentry_t *p, l1_pgentry_t new,
+                            unsigned int level);
 int shadow_write_guest_entry(struct vcpu *v, intpte_t *p,
                              intpte_t new, mfn_t gmfn);
 int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
