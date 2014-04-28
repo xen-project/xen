@@ -166,11 +166,8 @@ wakeup_32:
         .code64
 wakeup_64:
         /* Jump to high mappings and the higher-level wakeup code. */
-        movq    ret_point(%rip), %rbx
+        movabs  $__ret_point, %rbx
         jmp     *%rbx
-
-ret_point:
-        .quad   __ret_point
 
 bogus_saved_magic:
         movw    $0x0e00 + 'S', 0xb8014
