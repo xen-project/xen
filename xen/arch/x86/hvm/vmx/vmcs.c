@@ -1301,11 +1301,6 @@ void vm_resume_fail(void)
     domain_crash_synchronous();
 }
 
-static void wbinvd_ipi(void *info)
-{
-    wbinvd();
-}
-
 void vmx_do_resume(struct vcpu *v)
 {
     bool_t debug_state;
@@ -1332,7 +1327,7 @@ void vmx_do_resume(struct vcpu *v)
         {
             int cpu = v->arch.hvm_vmx.active_cpu;
             if ( cpu != -1 )
-                on_selected_cpus(cpumask_of(cpu), wbinvd_ipi, NULL, 1);
+                flush_mask(cpumask_of(cpu), FLUSH_CACHE);
         }
 
         vmx_clear_vmcs(v);

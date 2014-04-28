@@ -2307,18 +2307,13 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
     do_IRQ(regs);
 }
 
-static void wbinvd_ipi(void *info)
-{
-    wbinvd();
-}
-
 static void vmx_wbinvd_intercept(void)
 {
     if ( !cache_flush_permitted(current->domain) || iommu_snoop )
         return;
 
     if ( cpu_has_wbinvd_exiting )
-        on_each_cpu(wbinvd_ipi, NULL, 1);
+        flush_all(FLUSH_CACHE);
     else
         wbinvd();
 }

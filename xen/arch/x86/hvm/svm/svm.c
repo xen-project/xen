@@ -2106,15 +2106,10 @@ static void svm_vmexit_mce_intercept(
     }
 }
 
-static void wbinvd_ipi(void *info)
-{
-    wbinvd();
-}
-
 static void svm_wbinvd_intercept(void)
 {
     if ( cache_flush_permitted(current->domain) )
-        on_each_cpu(wbinvd_ipi, NULL, 1);
+        flush_all(FLUSH_CACHE);
 }
 
 static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)

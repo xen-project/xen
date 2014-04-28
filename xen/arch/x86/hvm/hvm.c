@@ -1823,11 +1823,6 @@ static bool_t domain_exit_uc_mode(struct vcpu *v)
     return 1;
 }
 
-static void local_flush_cache(void *info)
-{
-    wbinvd();
-}
-
 static void hvm_set_uc_mode(struct vcpu *v, bool_t is_in_uc_mode)
 {
     v->domain->arch.hvm_domain.is_in_uc_mode = is_in_uc_mode;
@@ -1927,7 +1922,7 @@ void hvm_shadow_handle_cd(struct vcpu *v, unsigned long value)
             domain_pause_nosync(v->domain);
 
             /* Flush physical caches. */
-            on_each_cpu(local_flush_cache, NULL, 1);
+            flush_all(FLUSH_CACHE);
             hvm_set_uc_mode(v, 1);
 
             domain_unpause(v->domain);
