@@ -187,6 +187,15 @@ typedef struct xen_machphys_mfn_list xen_machphys_mfn_list_t;
 DEFINE_XEN_GUEST_HANDLE(xen_machphys_mfn_list_t);
 
 /*
+ * For a compat caller, this is identical to XENMEM_machphys_mfn_list.
+ *
+ * For a non compat caller, this functions similarly to
+ * XENMEM_machphys_mfn_list, but returns the mfns making up the compatibility
+ * m2p table.
+ */
+#define XENMEM_machphys_compat_mfn_list     25
+
+/*
  * Returns the location in virtual address space of the machine_to_phys
  * mapping table. Architectures which do not have a m2p table, or which do not
  * map it by default into guest address space, do not implement this command.
@@ -513,6 +522,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
  */
 
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
+
+/* Next available subop number is 26 */
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 

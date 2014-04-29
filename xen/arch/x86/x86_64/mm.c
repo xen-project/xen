@@ -955,7 +955,7 @@ long subarch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     struct xen_machphys_mfn_list xmml;
     l3_pgentry_t l3e;
     l2_pgentry_t l2e;
-    unsigned long v;
+    unsigned long v, limit;
     xen_pfn_t mfn, last_mfn;
     unsigned int i;
     long rc = 0;
@@ -1000,6 +1000,34 @@ long subarch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         xmml.nr_extents = i;
         if ( __copy_to_guest(arg, &xmml, 1) )
             return -EFAULT;
+
+        break;
+
+    case XENMEM_machphys_compat_mfn_list:
+        if ( copy_from_guest(&xmml, arg, 1) )
+            return -EFAULT;
+
+        limit = (unsigned long)(compat_machine_to_phys_mapping + max_page);
+        if ( limit > RDWR_COMPAT_MPT_VIRT_END )
+            limit = RDWR_COMPAT_MPT_VIRT_END;
+        for ( i = 0, v = RDWR_COMPAT_MPT_VIRT_START, last_mfn = 0;
+              (i != xmml.max_extents) && (v < limit);
+              i++, v += 1 << L2_PAGETABLE_SHIFT )
+        {
+            l2e = compat_idle_pg_table_l2[l2_table_offset(v)];
+            if ( l2e_get_flags(l2e) & _PAGE_PRESENT )
+                mfn = l2e_get_pfn(l2e);
+            else
+                mfn = last_mfn;
+            ASSERT(mfn);
+            if ( copy_to_guest_offset(xmml.extent_start, i, &mfn, 1) )
+                return -EFAULT;
+            last_mfn = mfn;
+        }
+
+        xmml.nr_extents = i;
+        if ( __copy_to_guest(arg, &xmml, 1) )
+            rc = -EFAULT;
 
         break;
 

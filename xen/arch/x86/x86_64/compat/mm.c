@@ -148,6 +148,7 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
 
     case XENMEM_machphys_mfn_list:
+    case XENMEM_machphys_compat_mfn_list:
     {
         unsigned long limit;
         compat_pfn_t last_mfn;
