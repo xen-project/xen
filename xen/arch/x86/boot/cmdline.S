@@ -329,6 +329,8 @@ cmdline_parse_early:
         popa
         ret
 
+        .pushsection .init.rodata, "a", @progbits
+
 .Lvga_text_modes: /* rows, mode_number */
         .word   25,VIDEO_80x25
         .word   50,VIDEO_80x50
@@ -361,3 +363,5 @@ cmdline_parse_early:
         .asciz  "no"
 .Ledd_opt:
         .asciz  "edd"
+
+        .popsection

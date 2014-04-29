@@ -32,10 +32,18 @@ ENTRY(start)
         /* Checksum: must be the negated sum of the first two fields. */
         .long   -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
 
-        .section .init.text, "ax"
+        .section .init.rodata, "a", @progbits
+        .align 4
+
+        .word   0
+gdt_boot_descr:
+        .word   6*8-1
+        .long   sym_phys(trampoline_gdt)
 
 .Lbad_cpu_msg: .asciz "ERR: Not a 64-bit CPU!"
 .Lbad_ldr_msg: .asciz "ERR: Not a Multiboot bootloader!"
+
+        .section .init.text, "ax", @progbits
 
 bad_cpu:
         mov     $(sym_phys(.Lbad_cpu_msg)),%esi # Error message
@@ -58,10 +66,6 @@ print_err:
         mov     $7,%al
         stosb                  # Write an attribute to the VGA framebuffer
         jmp     1b
-
-gdt_boot_descr:
-        .word   6*8-1
-        .long   sym_phys(trampoline_gdt)
 
 __start:
         cld
