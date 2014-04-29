@@ -4414,12 +4414,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 rc = -EINVAL;
                 goto param_fail4;
             } 
-            if ( p2m_is_grant(t) )
+            if ( !p2m_is_ram(t) &&
+                 (!p2m_is_hole(t) || a.hvmmem_type != HVMMEM_mmio_dm) )
             {
                 put_gfn(d, pfn);
-                gdprintk(XENLOG_WARNING,
-                         "type for pfn %#lx changed to grant while "
-                         "we were working?\n", pfn);
                 goto param_fail4;
             }
             else
