@@ -3666,13 +3666,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 rc = -EINVAL;
                 goto param_fail4;
             } 
-            if ( p2m_is_grant(t) )
-            {
-                gdprintk(XENLOG_WARNING,
-                         "type for pfn 0x%lx changed to grant while "
-                         "we were working?\n", pfn);
+            if ( !p2m_is_ram(t) &&
+                 (!p2m_is_hole(t) || a.hvmmem_type != HVMMEM_mmio_dm) )
                 goto param_fail4;
-            }
             else
             {
                 nt = p2m_change_type(p2m, pfn, t, memtype[a.hvmmem_type]);

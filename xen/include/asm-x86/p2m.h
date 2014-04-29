@@ -134,6 +134,13 @@ typedef enum {
                        | p2m_to_mask(p2m_ram_paging_in)       \
                        | p2m_to_mask(p2m_ram_shared))
 
+/* Types that represent a physmap hole. */
+#define P2M_HOLE_TYPES (p2m_to_mask(p2m_mmio_dm)               \
+                        | p2m_to_mask(p2m_invalid)             \
+                        | p2m_to_mask(p2m_ram_paging_in_start) \
+                        | p2m_to_mask(p2m_ram_paging_in)       \
+                        | p2m_to_mask(p2m_ram_paged))
+
 /* Grant mapping types, which map to a real machine frame in another
  * VM */
 #define P2M_GRANT_TYPES (p2m_to_mask(p2m_grant_map_rw)  \
@@ -170,6 +177,7 @@ typedef enum {
 
 /* Useful predicates */
 #define p2m_is_ram(_t) (p2m_to_mask(_t) & P2M_RAM_TYPES)
+#define p2m_is_hole(_t) (p2m_to_mask(_t) & P2M_HOLE_TYPES)
 #define p2m_is_mmio(_t) (p2m_to_mask(_t) & P2M_MMIO_TYPES)
 #define p2m_is_readonly(_t) (p2m_to_mask(_t) & P2M_RO_TYPES)
 #define p2m_is_magic(_t) (p2m_to_mask(_t) & P2M_MAGIC_TYPES)
