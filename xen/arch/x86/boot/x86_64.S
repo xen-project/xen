@@ -29,7 +29,11 @@
 
         test    %ebx,%ebx
         jnz     start_secondary
+        jmp     start_bsp
 
+        .section .init.text, "ax", @progbits
+
+start_bsp:
         /* Initialise IDT with simple error defaults. */
         leaq    ignore_int(%rip),%rcx
         movl    %ecx,%eax
@@ -55,10 +59,6 @@
         ud2     /* Force a panic (invalid opcode). */
 
 /* This is the default interrupt handler. */
-int_msg:
-        .asciz "Unknown interrupt (cr2=%016lx)\n"
-hex_msg:
-        .asciz "    %016lx"
 ignore_int:
         SAVE_ALL
         movq    %cr2,%rsi
@@ -75,6 +75,12 @@ ignore_int:
         jnz     0b
 1:      jmp     1b
 
+        .section .init.rodata, "a", @progbits
+
+int_msg:
+        .asciz "Unknown interrupt (cr2=%016lx)\n"
+hex_msg:
+        .asciz "    %016lx"
 
 /*** DESCRIPTOR TABLES ***/
 
