@@ -54,11 +54,11 @@ print_err:
         mov     $0xB8000,%edi  # VGA framebuffer
 1:      mov     (%esi),%bl
         test    %bl,%bl        # Terminate on '\0' sentinel
-2:      je      2b
+        je      .Lhalt
         mov     $0x3f8+5,%dx   # UART Line Status Register
-3:      in      %dx,%al
+2:      in      %dx,%al
         test    $0x20,%al      # Test THR Empty flag
-        je      3b
+        je      2b
         mov     $0x3f8+0,%dx   # UART Transmit Holding Register
         mov     %bl,%al
         out     %al,%dx        # Send a character over the serial line
@@ -66,6 +66,8 @@ print_err:
         mov     $7,%al
         stosb                  # Write an attribute to the VGA framebuffer
         jmp     1b
+.Lhalt: hlt
+        jmp     .Lhalt
 
 __start:
         cld

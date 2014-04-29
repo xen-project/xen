@@ -73,7 +73,8 @@ ignore_int:
         call    printk
         testq   $0xff8,%rbp
         jnz     0b
-1:      jmp     1b
+1:      hlt
+        jmp     1b
 
         .section .init.rodata, "a", @progbits
 
