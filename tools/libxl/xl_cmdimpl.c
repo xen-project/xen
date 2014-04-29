@@ -6560,7 +6560,7 @@ int main_tmem_freeable(int argc, char **argv)
     int opt;
     int mb;
 
-    SWITCH_FOREACH_OPT(opt, "", NULL, "tmem-freeale", 0) {
+    SWITCH_FOREACH_OPT(opt, "", NULL, "tmem-freeable", 0) {
         /* No options */
     }
 
