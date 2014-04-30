@@ -308,6 +308,11 @@ int libxl__get_numa_candidate(libxl__gc *gc,
     if (ninfo == NULL)
         return ERROR_FAIL;
 
+    if (nr_nodes <= 1) {
+        *cndt_found = 0;
+        goto out;
+    }
+
     GCNEW_ARRAY(vcpus_on_node, nr_nodes);
 
     /*
