@@ -95,6 +95,13 @@
 #define LIBXL_HAVE_BUILDINFO_EVENT_CHANNELS 1
 
 /*
+ * LIBXL_HAVE_DEVICE_DISK_DIRECT_IO_SAFE indicates that a
+ * 'direct_io_safe' field (of boolean type) is present in
+ * libxl_device_disk.
+ */
+#define LIBXL_HAVE_DEVICE_DISK_DIRECT_IO_SAFE 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

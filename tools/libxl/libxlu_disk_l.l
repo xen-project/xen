@@ -173,6 +173,7 @@ backendtype=[^,]*,? { STRIP(','); setbackendtype(DPC,FROMEQUALS); }
 
 vdev=[^,]*,?	{ STRIP(','); SAVESTRING("vdev", vdev, FROMEQUALS); }
 script=[^,]*,?	{ STRIP(','); SAVESTRING("script", script, FROMEQUALS); }
+direct-io-safe,? { DPC->disk->direct_io_safe = 1; }
 
  /* the target magic parameter, eats the rest of the string */
 

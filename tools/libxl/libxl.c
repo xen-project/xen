@@ -2205,6 +2205,10 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
         flexarray_append(back, disk->readwrite ? "w" : "r");
         flexarray_append(back, "device-type");
         flexarray_append(back, disk->is_cdrom ? "cdrom" : "disk");
+        if (disk->direct_io_safe) {
+            flexarray_append(back, "direct-io-safe");
+            flexarray_append(back, "1");
+        }
 
         flexarray_append(front, "backend-id");
         flexarray_append(front, libxl__sprintf(gc, "%d", disk->backend_domid));

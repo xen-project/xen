@@ -125,3 +125,9 @@ because they directly map the bottom 8 bits of the xenstore integer
 directly to the Linux guest's device number and throw away the rest;
 they can crash due to minor number clashes.  With these guests, the
 workaround is not to supply problematic combinations of devices.
+
+
+Other frontend and backend options
+----------------------------------
+
+See xen/include/public/io/blkif.h for the full list of options.

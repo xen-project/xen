@@ -178,6 +178,44 @@ information to be interpreted by the executable program <script>,
 These scripts are normally called "block-<script>".
 
 
+direct-io-safe
+--------------
+
+Description:           Disables non-O_DIRECT workaround
+Supported values:      absent, present
+Mandatory:             No
+Default value:         absent (workaround may be enabled)
+
+There is a memory lifetime bug in some driver domain (dom0) kernels
+which can cause crashes when using O_DIRECT.  The bug occurs due to a
+mismatch between the backend-visible lifetime of pages used for the
+Xen PV network protocol and that expected by the backend kernel's
+networking subsystem.  This can cause crashes when using certain
+backends with certain underlying storage.
+
+See:
+ http://lists.xen.org/archives/html/xen-devel/2012-12/msg01154.html
+
+For this reason, (this version of) the Xen libxl toolstack disables
+O_DIRECT when using the qemu-based Xen PV backend ("qdisk").
+
+However, this workaround has performance and scaling implications, and
+it is only necessary if the underlying device is a network filesystem.
+If the underlying device is not, then it is good to disable it; that
+is what this option is for.
+
+This option simply requests that the workaround be disabled.  (However,
+not all backends versions which use the workaround understand this
+option, so this is on a best effort basis.)
+
+It's important to note that if you are storing the VM disk on a
+network filesystem or a network block device (NFS or ISCSI) it might
+not be safe to use this option.  Otherwise specifying it is safe and
+can give better performances.
+
+If in the future the bug is fixed properly this option will then be
+silently ignored.
+
 
 ============================================
 DEPRECATED PARAMETERS, PREFIXES AND SYNTAXES
