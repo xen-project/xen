@@ -470,11 +470,15 @@ int vcpu_initialise(struct vcpu *v)
     processor_vcpu_initialise(v);
 
     if ( (rc = vcpu_vgic_init(v)) != 0 )
-        return rc;
+        goto fail;
 
     if ( (rc = vcpu_vtimer_init(v)) != 0 )
-        return rc;
+        goto fail;
 
+    return rc;
+
+fail:
+    vcpu_destroy(v);
     return rc;
 }
 

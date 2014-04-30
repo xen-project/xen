@@ -77,11 +77,16 @@ int vcpu_vtimer_init(struct vcpu *v)
         : GUEST_TIMER_VIRT_PPI;
     t->v = v;
 
+    v->arch.vtimer_initialized = 1;
+
     return 0;
 }
 
 void vcpu_timer_destroy(struct vcpu *v)
 {
+    if ( !v->arch.vtimer_initialized )
+        return;
+
     kill_timer(&v->arch.virt_timer.timer);
     kill_timer(&v->arch.phys_timer.timer);
 }
