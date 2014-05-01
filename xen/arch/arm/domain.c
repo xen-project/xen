@@ -517,7 +517,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     if ( (rc = domain_vgic_init(d)) != 0 )
         goto fail;
 
-    if ( (rc = vcpu_domain_init(d)) != 0 )
+    if ( (rc = domain_vtimer_init(d)) != 0 )
         goto fail;
 
     if ( d->domain_id )
