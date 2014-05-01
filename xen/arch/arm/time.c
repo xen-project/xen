@@ -234,7 +234,6 @@ void __cpuinit init_timer_interrupt(void)
 {
     /* Sensible defaults */
     WRITE_SYSREG64(0, CNTVOFF_EL2);     /* No VM-specific offset */
-    WRITE_SYSREG32(0, CNTKCTL_EL1);     /* No user-mode access */
 #if USE_HYP_TIMER
     /* Do not let the VMs program the physical timer, only read the physical counter */
     WRITE_SYSREG32(CNTHCTL_PA, CNTHCTL_EL2);
