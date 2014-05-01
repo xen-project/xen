@@ -283,6 +283,9 @@ struct arch_vcpu
         spinlock_t lock;
     } vgic;
 
+    /* Timer registers  */
+    uint32_t cntkctl;
+
     struct vtimer phys_timer;
     struct vtimer virt_timer;
 }  __cacheline_aligned;

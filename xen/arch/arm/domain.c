@@ -72,6 +72,7 @@ static void ctxt_switch_from(struct vcpu *p)
     p->arch.tpidr_el1 = READ_SYSREG(TPIDR_EL1);
 
     /* Arch timer */
+    p->arch.cntkctl = READ_SYSREG32(CNTKCTL_EL1);
     virt_timer_save(p);
 
     if ( is_pv32_domain(p->domain) && cpu_has_thumbee )
@@ -224,6 +225,7 @@ static void ctxt_switch_to(struct vcpu *n)
 
     /* This is could trigger an hardware interrupt from the virtual
      * timer. The interrupt needs to be injected into the guest. */
+    WRITE_SYSREG32(n->arch.cntkctl, CNTKCTL_EL1);
     virt_timer_restore(n);
 }
 
