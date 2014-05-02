@@ -57,6 +57,7 @@
 #include <asm/apic.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/event.h>
+#include <public/arch-x86/cpuid.h>
 
 static bool_t __initdata opt_force_ept;
 boolean_param("force-ept", opt_force_ept);
@@ -1655,6 +1656,24 @@ static void vmx_handle_eoi(u8 vector)
     __vmwrite(GUEST_INTR_STATUS, status);
 }
 
+void vmx_hypervisor_cpuid_leaf(uint32_t sub_idx,
+                               uint32_t *eax, uint32_t *ebx,
+                               uint32_t *ecx, uint32_t *edx)
+{
+    if ( sub_idx != 0 )
+        return;
+    if ( cpu_has_vmx_apic_reg_virt )
+        *eax |= XEN_HVM_CPUID_APIC_ACCESS_VIRT;
+    /*
+     * We want to claim that x2APIC is virtualized if APIC MSR accesses are
+     * not intercepted. When all three of these are true both rdmsr and wrmsr
+     * in the guest will run without VMEXITs (see vmx_vlapic_msr_changed()).
+     */
+    if ( cpu_has_vmx_virtualize_x2apic_mode && cpu_has_vmx_apic_reg_virt &&
+         cpu_has_vmx_virtual_intr_delivery )
+        *eax |= XEN_HVM_CPUID_X2APIC_VIRT;
+}
+
 static struct hvm_function_table __initdata vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -1712,6 +1731,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .sync_pir_to_irr      = vmx_sync_pir_to_irr,
     .handle_eoi           = vmx_handle_eoi,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
+    .hypervisor_cpuid_leaf = vmx_hypervisor_cpuid_leaf,
 };
 
 const struct hvm_function_table * __init start_vmx(void)
