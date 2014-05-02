@@ -499,7 +499,8 @@ static int hpet_save(struct domain *d, hvm_domain_context_t *h)
     spin_lock(&hp->lock);
 
     /* Write the proper value into the main counter */
-    hp->hpet.mc64 = hp->mc_offset + guest_time_hpet(hp);
+    if ( hpet_enabled(hp) )
+        hp->hpet.mc64 = hp->mc_offset + guest_time_hpet(hp);
 
     /* Save the HPET registers */
     rc = _hvm_init_entry(h, HVM_SAVE_CODE(HPET), 0, HVM_SAVE_LENGTH(HPET));
