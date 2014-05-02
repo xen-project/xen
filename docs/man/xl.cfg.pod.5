@@ -881,9 +881,13 @@ Possible values for a single feature bit:
   'k' -> pass through the host bit value
   's' -> as 'k' but preserve across save/restore and migration (not implemented)
 
+Note: when specifying B<cpuid> for hypervisor leaves (0x4000xxxx major group)
+only the lowest 8 bits of leaf's 0x4000xx00 EAX register are processed, the rest
+are ignored (these 8 bits signify maximum number of hypervisor leaves).
+
 List of keys taking a value:
-apicidsize brandid clflush family localapicid maxleaf model nc proccount procpkg
-stepping
+apicidsize brandid clflush family localapicid maxleaf maxhvleaf model nc
+proccount procpkg stepping
 
 List of keys taking a character:
 3dnow 3dnowext 3dnowprefetch abm acpi aes altmovcr8 apic avx clfsh cmov

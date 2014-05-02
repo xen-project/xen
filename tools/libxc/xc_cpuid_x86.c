@@ -561,6 +561,17 @@ static int xc_cpuid_policy(
 {
     xc_dominfo_t        info;
 
+    /*
+     * For hypervisor leaves (0x4000XXXX) only 0x4000xx00.EAX[7:0] bits (max
+     * number of leaves) can be set by user. Hypervisor will enforce this so
+     * all other bits are don't-care and we can set them to zero.
+     */
+    if ( (input[0] & 0xffff0000) == 0x40000000 )
+    {
+        regs[0] = regs[1] = regs[2] = regs[3] = 0;
+        return 0;
+    }
+
     if ( xc_domain_getinfo(xch, domid, 1, &info) == 0 )
         return -EINVAL;
 
