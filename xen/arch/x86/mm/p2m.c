@@ -728,10 +728,7 @@ void p2m_change_type_range(struct domain *d,
                            unsigned long start, unsigned long end,
                            p2m_type_t ot, p2m_type_t nt)
 {
-    p2m_access_t a;
-    p2m_type_t pt;
     unsigned long gfn = start;
-    mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc = 0;
 
@@ -750,47 +747,8 @@ void p2m_change_type_range(struct domain *d,
         }
         end = p2m->max_mapped_pfn + 1;
     }
-
-    if ( gfn < end && p2m->change_entry_type_range )
-    {
+    if ( gfn < end )
         rc = p2m->change_entry_type_range(p2m, ot, nt, gfn, end - 1);
-        gfn = end;
-    }
-    while ( !rc && gfn < end )
-    {
-        unsigned int order;
-
-        mfn = p2m->get_entry(p2m, gfn, &pt, &a, 0, &order);
-        while ( order > PAGE_ORDER_4K )
-        {
-            unsigned long mask = ~0UL << order;
-
-            /*
-             * Log-dirty ranges starting/ending in the middle of a super page
-             * (with a page split still pending) can't have a consistent type
-             * reported for the full range and hence need the split to be
-             * enforced here.
-             */
-            if ( !p2m_is_changeable(pt) ||
-                 p2m_is_logdirty_range(p2m, gfn & mask, gfn | ~mask) >= 0 )
-            {
-                if ( pt != ot )
-                    break;
-                if ( !(gfn & ~mask) && end > (gfn | ~mask) )
-                    break;
-            }
-            if ( order == PAGE_ORDER_1G )
-                order = PAGE_ORDER_2M;
-            else
-                order = PAGE_ORDER_4K;
-        }
-        if ( pt == ot )
-            rc = p2m_set_entry(p2m, gfn, mfn, order, nt, a);
-        gfn += 1UL << order;
-        gfn &= -1UL << order;
-        if ( !gfn )
-            break;
-    }
     if ( rc )
     {
         printk(XENLOG_G_ERR "Error %d changing Dom%d GFNs [%lx,%lx] from %d to %d\n",

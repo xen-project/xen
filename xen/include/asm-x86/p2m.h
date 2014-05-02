@@ -670,6 +670,8 @@ static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
     return (flags >> 12) & 0x7f;
 }
 
+int p2m_pt_handle_deferred_changes(uint64_t gpa);
+
 /*
  * Nested p2m: shadow p2m tables used for nested HVM virtualization 
  */

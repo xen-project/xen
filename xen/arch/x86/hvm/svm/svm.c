@@ -2557,7 +2557,17 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         perfc_incra(svmexits, VMEXIT_NPF_PERFC);
         if ( cpu_has_svm_decode )
             v->arch.hvm_svm.cached_insn_len = vmcb->guest_ins_len & 0xf;
-        svm_do_nested_pgfault(v, regs, vmcb->exitinfo1, vmcb->exitinfo2);
+        rc = vmcb->exitinfo1 & PFEC_page_present
+             ? p2m_pt_handle_deferred_changes(vmcb->exitinfo2) : 0;
+        if ( rc >= 0 )
+            svm_do_nested_pgfault(v, regs, vmcb->exitinfo1, vmcb->exitinfo2);
+        else
+        {
+            printk(XENLOG_G_ERR
+                   "%pv: Error %d handling NPF (gpa=%08lx ec=%04lx)\n",
+                   v, rc, vmcb->exitinfo2, vmcb->exitinfo1);
+            domain_crash(v->domain);
+        }
         v->arch.hvm_svm.cached_insn_len = 0;
         break;
 
