@@ -890,10 +890,8 @@ static void ept_change_entry_type_global(struct p2m_domain *p2m,
 {
     unsigned long mfn = ept_get_asr(&p2m->ept);
 
-    if ( !mfn || ot == nt )
+    if ( !mfn )
         return;
-
-    BUG_ON(!p2m_is_changeable(ot) || !p2m_is_changeable(nt));
 
     if ( ept_invalidate_emt(_mfn(mfn), 1) )
         ept_sync_domain(p2m);

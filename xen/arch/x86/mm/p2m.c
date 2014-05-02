@@ -214,6 +214,10 @@ void p2m_change_entry_type_global(struct domain *d,
                                   p2m_type_t ot, p2m_type_t nt)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    ASSERT(ot != nt);
+    ASSERT(p2m_is_changeable(ot) && p2m_is_changeable(nt));
+
     p2m_lock(p2m);
     p2m->change_entry_type_global(p2m, ot, nt);
     p2m->global_logdirty = (nt == p2m_ram_logdirty);

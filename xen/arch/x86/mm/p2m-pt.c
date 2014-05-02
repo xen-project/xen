@@ -828,118 +828,36 @@ pod_retry_l1:
     return (p2m_is_valid(*t) || p2m_is_grant(*t)) ? mfn : _mfn(INVALID_MFN);
 }
 
-/* Walk the whole p2m table, changing any entries of the old type
- * to the new type.  This is used in hardware-assisted paging to 
- * quickly enable or diable log-dirty tracking */
 static void p2m_pt_change_entry_type_global(struct p2m_domain *p2m,
                                             p2m_type_t ot, p2m_type_t nt)
 {
-    unsigned long mfn, gfn, flags;
-    l1_pgentry_t l1e_content;
-    l1_pgentry_t *l1e;
-    l2_pgentry_t *l2e;
-    mfn_t l1mfn, l2mfn, l3mfn;
-    unsigned long i1, i2, i3;
-    l3_pgentry_t *l3e;
-    l4_pgentry_t *l4e;
-    unsigned long i4;
-
-    BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
-    BUG_ON(ot != nt && (ot == p2m_mmio_direct || nt == p2m_mmio_direct));
-
-    if ( !paging_mode_translate(p2m->domain) )
-        return;
+    l1_pgentry_t *tab;
+    unsigned long gfn = 0;
+    unsigned int i, changed;
 
     if ( pagetable_get_pfn(p2m_get_pagetable(p2m)) == 0 )
         return;
 
-    ASSERT(p2m_locked_by_me(p2m));
+    ASSERT(hap_enabled(p2m->domain));
 
-    l4e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
-
-    for ( i4 = 0; i4 < L4_PAGETABLE_ENTRIES; i4++ )
+    tab = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
+    for ( changed = i = 0; i < (1 << PAGETABLE_ORDER); ++i )
     {
-        if ( !(l4e_get_flags(l4e[i4]) & _PAGE_PRESENT) )
+        l1_pgentry_t e = tab[i];
+
+        if ( (l1e_get_flags(e) & _PAGE_PRESENT) &&
+             !needs_recalc(l1, e) )
         {
-            continue;
+            set_recalc(l1, e);
+            p2m->write_p2m_entry(p2m, gfn, &tab[i], e, 4);
+            ++changed;
         }
-        l3mfn = _mfn(l4e_get_pfn(l4e[i4]));
-        l3e = map_domain_page(l4e_get_pfn(l4e[i4]));
-        for ( i3 = 0;
-              i3 < L3_PAGETABLE_ENTRIES;
-              i3++ )
-        {
-            if ( !(l3e_get_flags(l3e[i3]) & _PAGE_PRESENT) )
-            {
-                continue;
-            }
-            if ( (l3e_get_flags(l3e[i3]) & _PAGE_PSE) )
-            {
-                flags = l3e_get_flags(l3e[i3]);
-                if ( p2m_flags_to_type(flags) != ot )
-                    continue;
-                mfn = l3e_get_pfn(l3e[i3]);
-                gfn = get_gpfn_from_mfn(mfn);
-                flags = p2m_type_to_flags(nt, _mfn(mfn));
-                l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
-                p2m->write_p2m_entry(p2m, gfn,
-                                     (l1_pgentry_t *)&l3e[i3],
-                                     l1e_content, 3);
-                continue;
-            }
-
-            l2mfn = _mfn(l3e_get_pfn(l3e[i3]));
-            l2e = map_domain_page(l3e_get_pfn(l3e[i3]));
-            for ( i2 = 0; i2 < L2_PAGETABLE_ENTRIES; i2++ )
-            {
-                if ( !(l2e_get_flags(l2e[i2]) & _PAGE_PRESENT) )
-                {
-                    continue;
-                }
-
-                if ( (l2e_get_flags(l2e[i2]) & _PAGE_PSE) )
-                {
-                    flags = l2e_get_flags(l2e[i2]);
-                    if ( p2m_flags_to_type(flags) != ot )
-                        continue;
-                    mfn = l2e_get_pfn(l2e[i2]);
-                    /* Do not use get_gpfn_from_mfn because it may return 
-                       SHARED_M2P_ENTRY */
-                    gfn = (i2 + (i3 + (i4 * L3_PAGETABLE_ENTRIES))
-                           * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
-                    flags = p2m_type_to_flags(nt, _mfn(mfn));
-                    l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
-                    p2m->write_p2m_entry(p2m, gfn,
-                                         (l1_pgentry_t *)&l2e[i2],
-                                         l1e_content, 2);
-                    continue;
-                }
-
-                l1mfn = _mfn(l2e_get_pfn(l2e[i2]));
-                l1e = map_domain_page(mfn_x(l1mfn));
-
-                for ( i1 = 0; i1 < L1_PAGETABLE_ENTRIES; i1++ )
-                {
-                    flags = l1e_get_flags(l1e[i1]);
-                    if ( p2m_flags_to_type(flags) != ot )
-                        continue;
-                    mfn = l1e_get_pfn(l1e[i1]);
-                    gfn = i1 + (i2 + (i3 + (i4 * L3_PAGETABLE_ENTRIES))
-                                * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
-                    /* create a new 1le entry with the new type */
-                    flags = p2m_type_to_flags(nt, _mfn(mfn));
-                    l1e_content = p2m_l1e_from_pfn(mfn, flags);
-                    p2m->write_p2m_entry(p2m, gfn, &l1e[i1],
-                                         l1e_content, 1);
-                }
-                unmap_domain_page(l1e);
-            }
-            unmap_domain_page(l2e);
-        }
-        unmap_domain_page(l3e);
+        gfn += 1UL << (L4_PAGETABLE_SHIFT - PAGE_SHIFT);
     }
+    unmap_domain_page(tab);
 
-    unmap_domain_page(l4e);
+    if ( changed )
+         flush_tlb_mask(p2m->domain->domain_dirty_cpumask);
 }
 
 static int p2m_pt_change_entry_type_range(struct p2m_domain *p2m,
