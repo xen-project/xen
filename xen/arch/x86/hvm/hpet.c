@@ -404,6 +404,8 @@ static int hpet_write(
         if ( timer_is_periodic(h, tn) &&
              !(h->hpet.timers[tn].config & HPET_TN_SETVAL) )
         {
+            uint64_t max_period = (timer_is_32bit(h, tn) ? ~0u : ~0ull) >> 1;
+
             /*
              * Clamp period to reasonable min/max values:
              *  - minimum is 100us, same as timers controlled by vpt.c
@@ -411,7 +413,8 @@ static int hpet_write(
              */
             if ( hpet_tick_to_ns(h, new_val) < MICROSECS(100) )
                 new_val = (MICROSECS(100) << 10) / h->hpet_to_ns_scale;
-            new_val &= (timer_is_32bit(h, tn) ? ~0u : ~0ull) >> 1;
+            if ( new_val > max_period )
+                new_val = max_period;
             h->hpet.period[tn] = new_val;
         }
         else
