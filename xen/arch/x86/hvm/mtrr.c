@@ -816,15 +816,18 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
           !has_arch_pdevs(d)) )
     {
         ASSERT(!direct_mmio ||
-               mfn_x(mfn) == d->arch.hvm_domain.vmx.apic_access_mfn);
+               !((mfn_x(mfn) ^ d->arch.hvm_domain.vmx.apic_access_mfn) >>
+                 order));
         *ipat = 1;
         return MTRR_TYPE_WRBACK;
     }
 
     if ( direct_mmio )
     {
-        if ( mfn_x(mfn) != d->arch.hvm_domain.vmx.apic_access_mfn )
+        if ( (mfn_x(mfn) ^ d->arch.hvm_domain.vmx.apic_access_mfn) >> order )
             return MTRR_TYPE_UNCACHABLE;
+        if ( order )
+            return -1;
         *ipat = 1;
         return MTRR_TYPE_WRBACK;
     }
