@@ -75,17 +75,18 @@
     ((timer_config(h, n) & HPET_TN_INT_ROUTE_CAP_MASK) \
         >> HPET_TN_INT_ROUTE_CAP_SHIFT)
 
-static inline uint64_t hpet_read_maincounter(HPETState *h)
+static inline uint64_t hpet_read_maincounter(HPETState *h, uint64_t guest_time)
 {
     ASSERT(spin_is_locked(&h->lock));
 
     if ( hpet_enabled(h) )
-        return guest_time_hpet(h) + h->mc_offset;
+        return guest_time + h->mc_offset;
     else
         return h->hpet.mc64;
 }
 
-static uint64_t hpet_get_comparator(HPETState *h, unsigned int tn)
+static uint64_t hpet_get_comparator(HPETState *h, unsigned int tn,
+                                    uint64_t guest_time)
 {
     uint64_t comparator;
     uint64_t elapsed;
@@ -97,7 +98,8 @@ static uint64_t hpet_get_comparator(HPETState *h, unsigned int tn)
         uint64_t period = h->hpet.period[tn];
         if (period)
         {
-            elapsed = hpet_read_maincounter(h) + period - 1 - comparator;
+            elapsed = hpet_read_maincounter(h, guest_time) +
+                period - 1 - comparator;
             comparator += (elapsed / period) * period;
             h->hpet.comparator64[tn] = comparator;
         }
@@ -109,7 +111,8 @@ static uint64_t hpet_get_comparator(HPETState *h, unsigned int tn)
     h->hpet.timers[tn].cmp = comparator;
     return comparator;
 }
-static inline uint64_t hpet_read64(HPETState *h, unsigned long addr)
+static inline uint64_t hpet_read64(HPETState *h, unsigned long addr,
+                                   uint64_t guest_time)
 {
     addr &= ~7;
 
@@ -122,7 +125,7 @@ static inline uint64_t hpet_read64(HPETState *h, unsigned long addr)
     case HPET_STATUS:
         return h->hpet.isr;
     case HPET_COUNTER:
-        return hpet_read_maincounter(h);
+        return hpet_read_maincounter(h, guest_time);
     case HPET_Tn_CFG(0):
     case HPET_Tn_CFG(1):
     case HPET_Tn_CFG(2):
@@ -130,7 +133,7 @@ static inline uint64_t hpet_read64(HPETState *h, unsigned long addr)
     case HPET_Tn_CMP(0):
     case HPET_Tn_CMP(1):
     case HPET_Tn_CMP(2):
-        return hpet_get_comparator(h, HPET_TN(CMP, addr));
+        return hpet_get_comparator(h, HPET_TN(CMP, addr), guest_time);
     case HPET_Tn_ROUTE(0):
     case HPET_Tn_ROUTE(1):
     case HPET_Tn_ROUTE(2):
@@ -176,7 +179,7 @@ static int hpet_read(
 
     spin_lock(&h->lock);
 
-    val = hpet_read64(h, addr);
+    val = hpet_read64(h, addr, guest_time_hpet(h));
 
     result = val;
     if ( length != 8 )
@@ -189,7 +192,8 @@ static int hpet_read(
     return X86EMUL_OKAY;
 }
 
-static void hpet_stop_timer(HPETState *h, unsigned int tn)
+static void hpet_stop_timer(HPETState *h, unsigned int tn,
+                            uint64_t guest_time)
 {
     ASSERT(tn < HPET_TIMER_NUM);
     ASSERT(spin_is_locked(&h->lock));
@@ -197,14 +201,15 @@ static void hpet_stop_timer(HPETState *h, unsigned int tn)
     destroy_periodic_time(&h->pt[tn]);
     /* read the comparator to get it updated so a read while stopped will
      * return the expected value. */
-    hpet_get_comparator(h, tn);
+    hpet_get_comparator(h, tn, guest_time);
 }
 
 /* the number of HPET tick that stands for
  * 1/(2^10) second, namely, 0.9765625 milliseconds */
 #define  HPET_TINY_TIME_SPAN  ((h->stime_freq >> 10) / STIME_PER_HPET_TICK)
 
-static void hpet_set_timer(HPETState *h, unsigned int tn)
+static void hpet_set_timer(HPETState *h, unsigned int tn,
+                           uint64_t guest_time)
 {
     uint64_t tn_cmp, cur_tick, diff;
     unsigned int irq;
@@ -223,8 +228,8 @@ static void hpet_set_timer(HPETState *h, unsigned int tn)
     if ( !timer_enabled(h, tn) )
         return;
 
-    tn_cmp   = hpet_get_comparator(h, tn);
-    cur_tick = hpet_read_maincounter(h);
+    tn_cmp   = hpet_get_comparator(h, tn, guest_time);
+    cur_tick = hpet_read_maincounter(h, guest_time);
     if ( timer_is_32bit(h, tn) )
     {
         tn_cmp   = (uint32_t)tn_cmp;
@@ -282,6 +287,7 @@ static int hpet_write(
 {
     HPETState *h = vcpu_vhpet(v);
     uint64_t old_val, new_val;
+    uint64_t guest_time;
     int tn, i;
 
     /* Acculumate a bit mask of timers whos state is changed by this write. */
@@ -298,7 +304,8 @@ static int hpet_write(
 
     spin_lock(&h->lock);
 
-    old_val = hpet_read64(h, addr);
+    guest_time = guest_time_hpet(h);
+    old_val = hpet_read64(h, addr, guest_time);
     new_val = val;
     if ( length != 8 )
         new_val = hpet_fixup_reg(
@@ -313,7 +320,7 @@ static int hpet_write(
         if ( !(old_val & HPET_CFG_ENABLE) && (new_val & HPET_CFG_ENABLE) )
         {
             /* Enable main counter and interrupt generation. */
-            h->mc_offset = h->hpet.mc64 - guest_time_hpet(h);
+            h->mc_offset = h->hpet.mc64 - guest_time;
             for ( i = 0; i < HPET_TIMER_NUM; i++ )
             {
                 h->hpet.comparator64[i] =
@@ -327,7 +334,7 @@ static int hpet_write(
         else if ( (old_val & HPET_CFG_ENABLE) && !(new_val & HPET_CFG_ENABLE) )
         {
             /* Halt main counter and disable interrupt generation. */
-            h->hpet.mc64 = h->mc_offset + guest_time_hpet(h);
+            h->hpet.mc64 = h->mc_offset + guest_time;
             for ( i = 0; i < HPET_TIMER_NUM; i++ )
                 if ( timer_enabled(h, i) )
                     set_stop_timer(i);
@@ -441,14 +448,14 @@ static int hpet_write(
     {
         i = find_first_set_bit(stop_timers);
         __clear_bit(i, &stop_timers);
-        hpet_stop_timer(h, i);
+        hpet_stop_timer(h, i, guest_time);
     }
 
     while (start_timers)
     {
         i = find_first_set_bit(start_timers);
         __clear_bit(i, &start_timers);
-        hpet_set_timer(h, i);
+        hpet_set_timer(h, i, guest_time);
     }
 
 #undef set_stop_timer
@@ -524,6 +531,7 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
     HPETState *hp = domain_vhpet(d);
     struct hvm_hw_hpet *rec;
     uint64_t cmp;
+    uint64_t guest_time;
     int i;
 
     spin_lock(&hp->lock);
@@ -562,14 +570,15 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
 #undef C
 
     /* Recalculate the offset between the main counter and guest time */
-    hp->mc_offset = hp->hpet.mc64 - guest_time_hpet(hp);
+    guest_time = guest_time_hpet(hp);
+    hp->mc_offset = hp->hpet.mc64 - guest_time;
 
     /* restart all timers */
 
     if ( hpet_enabled(hp) )
         for ( i = 0; i < HPET_TIMER_NUM; i++ )
             if ( timer_enabled(hp, i) )
-                hpet_set_timer(hp, i);
+                hpet_set_timer(hp, i, guest_time);
 
     spin_unlock(&hp->lock);
 
@@ -617,9 +626,13 @@ void hpet_deinit(struct domain *d)
     spin_lock(&h->lock);
 
     if ( hpet_enabled(h) )
+    {
+        uint64_t guest_time = guest_time_hpet(h);
+
         for ( i = 0; i < HPET_TIMER_NUM; i++ )
             if ( timer_enabled(h, i) )
-                hpet_stop_timer(h, i);
+                hpet_stop_timer(h, i, guest_time);
+    }
 
     spin_unlock(&h->lock);
 }
