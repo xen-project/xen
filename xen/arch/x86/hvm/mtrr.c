@@ -651,6 +651,7 @@ int32_t hvm_set_mem_pinned_cacheattr(
                 rcu_read_unlock(&pinned_cacheattr_rcu_lock);
                 list_del_rcu(&range->list);
                 call_rcu(&range->rcu, free_pinned_cacheattr_entry);
+                p2m_memory_type_changed(d);
                 return 0;
             }
         rcu_read_unlock(&pinned_cacheattr_rcu_lock);
@@ -696,6 +697,7 @@ int32_t hvm_set_mem_pinned_cacheattr(
     range->type = type;
 
     list_add_rcu(&range->list, &d->arch.hvm_domain.pinned_cacheattr_ranges);
+    p2m_memory_type_changed(d);
 
     return 0;
 }
