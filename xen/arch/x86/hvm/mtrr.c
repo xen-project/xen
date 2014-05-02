@@ -20,6 +20,7 @@
 #include <public/hvm/e820.h>
 #include <xen/types.h>
 #include <asm/e820.h>
+#include <asm/iocap.h>
 #include <asm/mm.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
@@ -810,10 +811,7 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
         return -1;
     }
 
-    if ( !iommu_enabled ||
-         (rangeset_is_empty(d->iomem_caps) &&
-          rangeset_is_empty(d->arch.ioport_caps) &&
-          !has_arch_pdevs(d)) )
+    if ( !need_iommu(d) && !cache_flush_permitted(d) )
     {
         ASSERT(!direct_mmio ||
                !((mfn_x(mfn) ^ d->arch.hvm_domain.vmx.apic_access_mfn) >>
