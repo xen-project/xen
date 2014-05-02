@@ -401,19 +401,6 @@ typedef struct xen_domctl_hypercall_init xen_domctl_hypercall_init_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_hypercall_init_t);
 
 
-/* XEN_DOMCTL_arch_setup */
-#define _XEN_DOMAINSETUP_hvm_guest 0
-#define XEN_DOMAINSETUP_hvm_guest  (1UL<<_XEN_DOMAINSETUP_hvm_guest)
-#define _XEN_DOMAINSETUP_query 1 /* Get parameters (for save)  */
-#define XEN_DOMAINSETUP_query  (1UL<<_XEN_DOMAINSETUP_query)
-#define _XEN_DOMAINSETUP_sioemu_guest 2
-#define XEN_DOMAINSETUP_sioemu_guest  (1UL<<_XEN_DOMAINSETUP_sioemu_guest)
-typedef struct xen_domctl_arch_setup {
-    uint64_aligned_t flags;  /* XEN_DOMAINSETUP_* */
-} xen_domctl_arch_setup_t;
-DEFINE_XEN_GUEST_HANDLE(xen_domctl_arch_setup_t);
-
-
 /* XEN_DOMCTL_settimeoffset */
 struct xen_domctl_settimeoffset {
     int32_t  time_offset_seconds; /* applied to domain wallclock time */
@@ -438,14 +425,6 @@ typedef struct xen_domctl_address_size {
     uint32_t size;
 } xen_domctl_address_size_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_address_size_t);
-
-
-/* XEN_DOMCTL_real_mode_area */
-struct xen_domctl_real_mode_area {
-    uint32_t log; /* log2 of Real Mode Area size */
-};
-typedef struct xen_domctl_real_mode_area xen_domctl_real_mode_area_t;
-DEFINE_XEN_GUEST_HANDLE(xen_domctl_real_mode_area_t);
 
 
 /* XEN_DOMCTL_sendtrigger */
@@ -940,10 +919,10 @@ struct xen_domctl {
 #define XEN_DOMCTL_iomem_permission              20
 #define XEN_DOMCTL_ioport_permission             21
 #define XEN_DOMCTL_hypercall_init                22
-#define XEN_DOMCTL_arch_setup                    23
+#define XEN_DOMCTL_arch_setup                    23 /* Obsolete IA64 only */
 #define XEN_DOMCTL_settimeoffset                 24
 #define XEN_DOMCTL_getvcpuaffinity               25
-#define XEN_DOMCTL_real_mode_area                26
+#define XEN_DOMCTL_real_mode_area                26 /* Obsolete PPC only */
 #define XEN_DOMCTL_resumedomain                  27
 #define XEN_DOMCTL_sendtrigger                   28
 #define XEN_DOMCTL_subscribe                     29
@@ -1013,11 +992,9 @@ struct xen_domctl {
         struct xen_domctl_iomem_permission  iomem_permission;
         struct xen_domctl_ioport_permission ioport_permission;
         struct xen_domctl_hypercall_init    hypercall_init;
-        struct xen_domctl_arch_setup        arch_setup;
         struct xen_domctl_settimeoffset     settimeoffset;
         struct xen_domctl_disable_migrate   disable_migrate;
         struct xen_domctl_tsc_info          tsc_info;
-        struct xen_domctl_real_mode_area    real_mode_area;
         struct xen_domctl_hvmcontext        hvmcontext;
         struct xen_domctl_hvmcontext_partial hvmcontext_partial;
         struct xen_domctl_address_size      address_size;
