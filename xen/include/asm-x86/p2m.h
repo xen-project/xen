@@ -140,6 +140,10 @@ typedef unsigned int p2m_query_t;
                       | p2m_to_mask(p2m_grant_map_ro)   \
                       | p2m_to_mask(p2m_ram_shared) )
 
+/* Types that can be subject to bulk transitions. */
+#define P2M_CHANGEABLE_TYPES (p2m_to_mask(p2m_ram_rw) \
+                              | p2m_to_mask(p2m_ram_logdirty) )
+
 #define P2M_POD_TYPES (p2m_to_mask(p2m_populate_on_demand))
 
 /* Pageable types */
@@ -168,6 +172,7 @@ typedef unsigned int p2m_query_t;
 #define p2m_is_hole(_t) (p2m_to_mask(_t) & P2M_HOLE_TYPES)
 #define p2m_is_mmio(_t) (p2m_to_mask(_t) & P2M_MMIO_TYPES)
 #define p2m_is_readonly(_t) (p2m_to_mask(_t) & P2M_RO_TYPES)
+#define p2m_is_changeable(_t) (p2m_to_mask(_t) & P2M_CHANGEABLE_TYPES)
 #define p2m_is_pod(_t) (p2m_to_mask(_t) & P2M_POD_TYPES)
 #define p2m_is_grant(_t) (p2m_to_mask(_t) & P2M_GRANT_TYPES)
 /* Grant types are *not* considered valid, because they can be
@@ -211,6 +216,11 @@ struct p2m_domain {
      * threaded on in LRU order. */
     struct list_head   np2m_list;
 
+    /* Host p2m: Log-dirty ranges registered for the domain. */
+    struct rangeset   *logdirty_ranges;
+
+    /* Host p2m: Global log-dirty mode enabled for the domain. */
+    bool_t             global_logdirty;
 
     /* Host p2m: when this flag is set, don't flush all the nested-p2m 
      * tables on every host-p2m change.  The setter of this flag 
@@ -510,6 +520,9 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
 
 /* Report a change affecting memory types. */
 void p2m_memory_type_changed(struct domain *d);
+
+int p2m_is_logdirty_range(struct p2m_domain *, unsigned long start,
+                          unsigned long end);
 
 /* Set mmio addresses in the p2m table (for pass-through) */
 int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);

@@ -38,7 +38,7 @@ typedef union {
         ipat        :   1,  /* bit 6 - Ignore PAT memory type */
         sp          :   1,  /* bit 7 - Is this a superpage? */
         rsvd1       :   2,  /* bits 9:8 - Reserved for future use */
-        avail1      :   1,  /* bit 10 - Software available 1 */
+        recalc      :   1,  /* bit 10 - Software available 1 */
         snp         :   1,  /* bit 11 - VT-d snoop control in shared
                                EPT/VT-d usage */
         mfn         :   40, /* bits 51:12 - Machine physical frame number */

@@ -116,8 +116,14 @@ static int p2m_init_hostp2m(struct domain *d)
 
     if ( p2m )
     {
-        d->arch.p2m = p2m;
-        return 0;
+        p2m->logdirty_ranges = rangeset_new(d, "log-dirty",
+                                            RANGESETF_prettyprint_hex);
+        if ( p2m->logdirty_ranges )
+        {
+            d->arch.p2m = p2m;
+            return 0;
+        }
+        p2m_free_one(p2m);
     }
     return -ENOMEM;
 }
@@ -129,6 +135,7 @@ static void p2m_teardown_hostp2m(struct domain *d)
 
     if ( p2m )
     {
+        rangeset_destroy(p2m->logdirty_ranges);
         p2m_free_one(p2m);
         d->arch.p2m = NULL;
     }
@@ -191,12 +198,25 @@ int p2m_init(struct domain *d)
     return rc;
 }
 
+int p2m_is_logdirty_range(struct p2m_domain *p2m, unsigned long start,
+                          unsigned long end)
+{
+    ASSERT(!p2m_is_nestedp2m(p2m));
+    if ( p2m->global_logdirty ||
+         rangeset_contains_range(p2m->logdirty_ranges, start, end) )
+        return 1;
+    if ( rangeset_overlaps_range(p2m->logdirty_ranges, start, end) )
+        return -1;
+    return 0;
+}
+
 void p2m_change_entry_type_global(struct domain *d,
                                   p2m_type_t ot, p2m_type_t nt)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_lock(p2m);
     p2m->change_entry_type_global(p2m, ot, nt);
+    p2m->global_logdirty = (nt == p2m_ram_logdirty);
     p2m_unlock(p2m);
 }
 
@@ -713,6 +733,7 @@ void p2m_change_type_range(struct domain *d,
     unsigned long gfn;
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    int rc = 0;
 
     BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
 
@@ -726,11 +747,22 @@ void p2m_change_type_range(struct domain *d,
         mfn = p2m->get_entry(p2m, gfn, &pt, &a, 0, &order);
         while ( order > PAGE_ORDER_4K )
         {
-            if ( pt != ot )
-                break;
-            if ( !(gfn & ((1UL << order) - 1)) &&
-                 end > (gfn | ((1UL << order) - 1)) )
-                break;
+            unsigned long mask = ~0UL << order;
+
+            /*
+             * Log-dirty ranges starting/ending in the middle of a super page
+             * (with a page split still pending) can't have a consistent type
+             * reported for the full range and hence need the split to be
+             * enforced here.
+             */
+            if ( !p2m_is_changeable(pt) ||
+                 p2m_is_logdirty_range(p2m, gfn & mask, gfn | ~mask) >= 0 )
+            {
+                if ( pt != ot )
+                    break;
+                if ( !(gfn & ~mask) && end > (gfn | ~mask) )
+                    break;
+            }
             if ( order == PAGE_ORDER_1G )
                 order = PAGE_ORDER_2M;
             else
@@ -742,6 +774,26 @@ void p2m_change_type_range(struct domain *d,
         gfn &= -1UL << order;
         if ( !gfn )
             break;
+    }
+
+    switch ( nt )
+    {
+    case p2m_ram_rw:
+        if ( ot == p2m_ram_logdirty )
+            rc = rangeset_remove_range(p2m->logdirty_ranges, start, end - 1);
+        break;
+    case p2m_ram_logdirty:
+        if ( ot == p2m_ram_rw )
+            rc = rangeset_add_range(p2m->logdirty_ranges, start, end - 1);
+        break;
+    default:
+        break;
+    }
+    if ( rc )
+    {
+        printk(XENLOG_G_ERR "Error %d manipulating Dom%d's log-dirty ranges\n",
+               rc, d->domain_id);
+        domain_crash(d);
     }
 
     p2m->defer_nested_flush = 0;
