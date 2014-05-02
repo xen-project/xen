@@ -2794,9 +2794,6 @@ void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
         return NULL;
     }
 
-    if ( memflags & MEMF_tmem )
-        read_lock(&tmem_rwlock);
-
     while ( (pfp = tmem_page_list_get()) == NULL )
     {
         if ( (max_evictions-- <= 0) || !tmem_evict())
@@ -2811,9 +2808,6 @@ void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
             scrub_one_page(pfp);
         relinq_pgs++;
     }
-
-    if ( memflags & MEMF_tmem )
-        read_unlock(&tmem_rwlock);
 
     return pfp;
 }
