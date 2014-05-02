@@ -495,12 +495,14 @@ static int hpet_save(struct domain *d, hvm_domain_context_t *h)
 {
     HPETState *hp = domain_vhpet(d);
     int rc;
+    uint64_t guest_time;
 
     spin_lock(&hp->lock);
+    guest_time = guest_time_hpet(hp);
 
     /* Write the proper value into the main counter */
     if ( hpet_enabled(hp) )
-        hp->hpet.mc64 = hp->mc_offset + guest_time_hpet(hp);
+        hp->hpet.mc64 = hp->mc_offset + guest_time;
 
     /* Save the HPET registers */
     rc = _hvm_init_entry(h, HVM_SAVE_CODE(HPET), 0, HVM_SAVE_LENGTH(HPET));
@@ -524,8 +526,18 @@ static int hpet_save(struct domain *d, hvm_domain_context_t *h)
         C(period[1]);
         C(period[2]);
 #undef C
-        /* save the 64 bit comparator in the 64 bit timer[n].cmp field
-         * regardless of whether or not the timer is in 32 bit mode. */
+        /*
+         * read the comparator to get it updated so hpet_save will
+         * return the expected value.
+         */
+        hpet_get_comparator(hp, 0, guest_time);
+        hpet_get_comparator(hp, 1, guest_time);
+        hpet_get_comparator(hp, 2, guest_time);
+        /*
+         * save the 64 bit comparator in the 64 bit timer[n].cmp
+         * field regardless of whether or not the timer is in 32 bit
+         * mode.
+         */
         rec->timers[0].cmp = hp->hpet.comparator64[0];
         rec->timers[1].cmp = hp->hpet.comparator64[1];
         rec->timers[2].cmp = hp->hpet.comparator64[2];
