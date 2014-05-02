@@ -650,8 +650,11 @@ int32_t hvm_set_mem_pinned_cacheattr(
             {
                 rcu_read_unlock(&pinned_cacheattr_rcu_lock);
                 list_del_rcu(&range->list);
+                type = range->type;
                 call_rcu(&range->rcu, free_pinned_cacheattr_entry);
                 p2m_memory_type_changed(d);
+                if ( type != PAT_TYPE_UNCACHABLE )
+                    flush_all(FLUSH_CACHE);
                 return 0;
             }
         rcu_read_unlock(&pinned_cacheattr_rcu_lock);
@@ -698,6 +701,8 @@ int32_t hvm_set_mem_pinned_cacheattr(
 
     list_add_rcu(&range->list, &d->arch.hvm_domain.pinned_cacheattr_ranges);
     p2m_memory_type_changed(d);
+    if ( type != PAT_TYPE_WRBACK )
+        flush_all(FLUSH_CACHE);
 
     return 0;
 }
@@ -787,7 +792,10 @@ HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, hvm_load_mtrr_msr,
 void memory_type_changed(struct domain *d)
 {
     if ( iommu_enabled && d->vcpu && d->vcpu[0] )
+    {
         p2m_memory_type_changed(d);
+        flush_all(FLUSH_CACHE);
+    }
 }
 
 int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
