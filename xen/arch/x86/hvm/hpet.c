@@ -636,6 +636,7 @@ void hpet_init(struct vcpu *v)
         h->hpet.timers[i].config =
             HPET_TN_INT_ROUTE_CAP | HPET_TN_64BIT_CAP | HPET_TN_PERIODIC_CAP;
         h->hpet.timers[i].cmp = ~0ULL;
+        h->hpet.comparator64[i] = ~0ULL;
         h->pt[i].source = PTSRC_isa;
     }
 }
