@@ -590,6 +590,7 @@ int hvm_get_mem_pinned_cacheattr(
     uint32_t *type)
 {
     struct hvm_mem_pinned_cacheattr_range *range;
+    uint64_t mask = ~(uint64_t)0 << order;
     int rc = 0;
 
     *type = ~0;
@@ -602,15 +603,15 @@ int hvm_get_mem_pinned_cacheattr(
                               &d->arch.hvm_domain.pinned_cacheattr_ranges,
                               list )
     {
-        if ( (guest_fn >= range->start) &&
-             (guest_fn + (1UL << order) - 1 <= range->end) )
+        if ( ((guest_fn & mask) >= range->start) &&
+             ((guest_fn | ~mask) <= range->end) )
         {
             *type = range->type;
             rc = 1;
             break;
         }
-        if ( (guest_fn <= range->end) &&
-             (range->start <= guest_fn + (1UL << order) - 1) )
+        if ( ((guest_fn & mask) <= range->end) &&
+             (range->start <= (guest_fn | ~mask)) )
         {
             rc = -1;
             break;
