@@ -549,7 +549,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     if ( !is_idle_domain(d) )
     {
-        d->arch.cpuids = xzalloc_array(cpuid_input_t, MAX_CPUID_INPUT);
+        d->arch.cpuids = xmalloc_array(cpuid_input_t, MAX_CPUID_INPUT);
         rc = -ENOMEM;
         if ( d->arch.cpuids == NULL )
             goto fail;

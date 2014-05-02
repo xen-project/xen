@@ -1006,14 +1006,18 @@ long arch_do_domctl(
     case XEN_DOMCTL_set_cpuid:
     {
         xen_domctl_cpuid_t *ctl = &domctl->u.cpuid;
-        cpuid_input_t *cpuid = NULL; 
+        cpuid_input_t *cpuid, *unused = NULL;
 
         for ( i = 0; i < MAX_CPUID_INPUT; i++ )
         {
             cpuid = &d->arch.cpuids[i];
 
             if ( cpuid->input[0] == XEN_CPUID_INPUT_UNUSED )
-                break;
+            {
+                if ( !unused )
+                    unused = cpuid;
+                continue;
+            }
 
             if ( (cpuid->input[0] == ctl->input[0]) &&
                  ((cpuid->input[1] == XEN_CPUID_INPUT_UNUSED) ||
@@ -1021,15 +1025,12 @@ long arch_do_domctl(
                 break;
         }
         
-        if ( i == MAX_CPUID_INPUT )
-        {
-            ret = -ENOENT;
-        }
+        if ( i < MAX_CPUID_INPUT )
+            *cpuid = *ctl;
+        else if ( unused )
+            *unused = *ctl;
         else
-        {
-            memcpy(cpuid, ctl, sizeof(cpuid_input_t));
-            ret = 0;
-        }
+            ret = -ENOENT;
     }
     break;
 
