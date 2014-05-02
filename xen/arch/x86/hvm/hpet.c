@@ -99,7 +99,7 @@ static uint64_t hpet_get_comparator(HPETState *h, unsigned int tn,
         if (period)
         {
             elapsed = hpet_read_maincounter(h, guest_time) +
-                period - 1 - comparator;
+                period - comparator;
             comparator += (elapsed / period) * period;
             h->hpet.comparator64[tn] = comparator;
         }
