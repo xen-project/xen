@@ -4531,41 +4531,37 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         while ( a.nr > start_iter )
         {
             unsigned long pfn = a.first_pfn + start_iter;
-            p2m_type_t t;
-            p2m_type_t nt;
-            mfn_t mfn;
-            mfn = get_gfn_unshare(d, pfn, &t);
+            p2m_type_t t, nt;
+
+            get_gfn_unshare(d, pfn, &t);
             if ( p2m_is_paging(t) )
             {
                 put_gfn(d, pfn);
                 p2m_mem_paging_populate(d, pfn);
-                rc = -EINVAL;
+                rc = -EINVAL; /* XXX EAGAIN */
                 goto param_fail4;
             }
             if ( p2m_is_shared(t) )
             {
                 put_gfn(d, pfn);
-                rc = -EINVAL;
+                rc = -EINVAL; /* XXX EAGAIN */
                 goto param_fail4;
-            } 
+            }
             if ( !p2m_is_ram(t) &&
                  (!p2m_is_hole(t) || a.hvmmem_type != HVMMEM_mmio_dm) )
             {
                 put_gfn(d, pfn);
                 goto param_fail4;
             }
-            else
+
+            nt = p2m_change_type(d, pfn, t, memtype[a.hvmmem_type]);
+            if ( nt != t )
             {
-                nt = p2m_change_type(d, pfn, t, memtype[a.hvmmem_type]);
-                if ( nt != t )
-                {
-                    put_gfn(d, pfn);
-                    gdprintk(XENLOG_WARNING,
-                             "type of pfn %#lx changed from %d to %d while "
-                             "we were trying to change it to %d\n",
-                             pfn, t, nt, memtype[a.hvmmem_type]);
-                    goto param_fail4;
-                }
+                put_gfn(d, pfn);
+                printk(XENLOG_G_WARNING
+                       "d%d: GFN %#lx type changed from %d to %d while trying to change it to %d\n",
+                       d->domain_id, pfn, t, nt, memtype[a.hvmmem_type]);
+                goto param_fail4;
             }
             put_gfn(d, pfn);
 
