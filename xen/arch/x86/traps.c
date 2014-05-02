@@ -726,6 +726,10 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
         cpuid_time_leaf( sub_idx, eax, ebx, ecx, edx );
         break;
 
+    case 4:
+        hvm_hypervisor_cpuid_leaf(sub_idx, eax, ebx, ecx, edx);
+        break;
+
     default:
         BUG();
     }

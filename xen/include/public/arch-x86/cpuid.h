@@ -65,6 +65,11 @@
 #define _XEN_CPUID_FEAT1_MMU_PT_UPDATE_PRESERVE_AD 0
 #define XEN_CPUID_FEAT1_MMU_PT_UPDATE_PRESERVE_AD  (1u<<0)
 
-#define XEN_CPUID_MAX_NUM_LEAVES 3
+/*
+ * Leaf 5 (0x40000004)
+ * HVM-specific features
+ */
+
+#define XEN_CPUID_MAX_NUM_LEAVES 4
 
 #endif /* __XEN_PUBLIC_ARCH_X86_CPUID_H__ */

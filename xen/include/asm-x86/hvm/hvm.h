@@ -200,6 +200,10 @@ struct hvm_function_table {
                                 paddr_t *L1_gpa, unsigned int *page_order,
                                 uint8_t *p2m_acc, bool_t access_r,
                                 bool_t access_w, bool_t access_x);
+
+    void (*hypervisor_cpuid_leaf)(uint32_t sub_idx,
+                                  uint32_t *eax, uint32_t *ebx,
+                                  uint32_t *ecx, uint32_t *edx);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -339,6 +343,9 @@ static inline unsigned long hvm_get_shadow_gs_base(struct vcpu *v)
 #define is_viridian_domain(_d)                                             \
  (is_hvm_domain(_d) && ((_d)->arch.hvm_domain.params[HVM_PARAM_VIRIDIAN]))
 
+void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
+                               uint32_t *eax, uint32_t *ebx,
+                               uint32_t *ecx, uint32_t *edx);
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
 void hvm_migrate_timers(struct vcpu *v);
