@@ -92,7 +92,7 @@ static uint64_t hpet_get_comparator(HPETState *h, unsigned int tn,
     uint64_t elapsed;
 
     comparator = h->hpet.comparator64[tn];
-    if ( timer_is_periodic(h, tn) )
+    if ( hpet_enabled(h) && timer_is_periodic(h, tn) )
     {
         /* update comparator by number of periods elapsed since last update */
         uint64_t period = h->hpet.period[tn];
