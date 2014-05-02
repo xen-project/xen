@@ -730,17 +730,33 @@ void p2m_change_type_range(struct domain *d,
 {
     p2m_access_t a;
     p2m_type_t pt;
-    unsigned long gfn;
+    unsigned long gfn = start;
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc = 0;
 
-    BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
+    ASSERT(ot != nt);
+    ASSERT(p2m_is_changeable(ot) && p2m_is_changeable(nt));
 
     p2m_lock(p2m);
     p2m->defer_nested_flush = 1;
 
-    for ( gfn = start; gfn < end; )
+    if ( unlikely(end > p2m->max_mapped_pfn) )
+    {
+        if ( !gfn )
+        {
+            p2m->change_entry_type_global(p2m, ot, nt);
+            gfn = end;
+        }
+        end = p2m->max_mapped_pfn + 1;
+    }
+
+    if ( gfn < end && p2m->change_entry_type_range )
+    {
+        rc = p2m->change_entry_type_range(p2m, ot, nt, gfn, end - 1);
+        gfn = end;
+    }
+    while ( !rc && gfn < end )
     {
         unsigned int order;
 
@@ -769,11 +785,17 @@ void p2m_change_type_range(struct domain *d,
                 order = PAGE_ORDER_4K;
         }
         if ( pt == ot )
-            p2m_set_entry(p2m, gfn, mfn, order, nt, a);
+            rc = p2m_set_entry(p2m, gfn, mfn, order, nt, a);
         gfn += 1UL << order;
         gfn &= -1UL << order;
         if ( !gfn )
             break;
+    }
+    if ( rc )
+    {
+        printk(XENLOG_G_ERR "Error %d changing Dom%d GFNs [%lx,%lx] from %d to %d\n",
+               rc, d->domain_id, start, end - 1, ot, nt);
+        domain_crash(d);
     }
 
     switch ( nt )

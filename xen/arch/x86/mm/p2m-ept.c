@@ -302,6 +302,77 @@ static bool_t ept_invalidate_emt(mfn_t mfn, bool_t recalc)
 }
 
 /*
+ * Just like ept_invalidate_emt() except that
+ * - not all entries at the targeted level may need processing,
+ * - the re-calculation flag gets always set.
+ * The passed in range is guaranteed to not cross a page (table)
+ * boundary at the targeted level.
+ */
+static int ept_invalidate_emt_range(struct p2m_domain *p2m,
+                                    unsigned int target,
+                                    unsigned long first_gfn,
+                                    unsigned long last_gfn)
+{
+    ept_entry_t *table;
+    unsigned long gfn_remainder = first_gfn;
+    unsigned int i, index;
+    int rc = 0, ret = GUEST_TABLE_MAP_FAILED;
+
+    table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
+    for ( i = ept_get_wl(&p2m->ept); i > target; --i )
+    {
+        ret = ept_next_level(p2m, 1, &table, &gfn_remainder, i);
+        if ( ret == GUEST_TABLE_MAP_FAILED )
+            goto out;
+        if ( ret != GUEST_TABLE_NORMAL_PAGE )
+            break;
+    }
+
+    if ( i > target )
+    {
+        /* We need to split the original page. */
+        ept_entry_t split_ept_entry;
+
+        index = gfn_remainder >> (i * EPT_TABLE_ORDER);
+        split_ept_entry = atomic_read_ept_entry(&table[index]);
+        ASSERT(is_epte_superpage(&split_ept_entry));
+        if ( !ept_split_super_page(p2m, &split_ept_entry, i, target) )
+        {
+            ept_free_entry(p2m, &split_ept_entry, i);
+            rc = -ENOMEM;
+            goto out;
+        }
+        atomic_write_ept_entry(&table[index], split_ept_entry);
+
+        for ( ; i > target; --i )
+            if ( !ept_next_level(p2m, 1, &table, &gfn_remainder, i) )
+                break;
+        ASSERT(i == target);
+    }
+
+    index = gfn_remainder >> (i * EPT_TABLE_ORDER);
+    i = (last_gfn >> (i * EPT_TABLE_ORDER)) & (EPT_PAGETABLE_ENTRIES - 1);
+    for ( ; index <= i; ++index )
+    {
+        ept_entry_t e = atomic_read_ept_entry(&table[index]);
+
+        if ( is_epte_valid(&e) && is_epte_present(&e) &&
+             (e.emt != MTRR_NUM_TYPES || !e.recalc) )
+        {
+            e.emt = MTRR_NUM_TYPES;
+            e.recalc = 1;
+            atomic_write_ept_entry(&table[index], e);
+            rc = 1;
+        }
+    }
+
+ out:
+    unmap_domain_page(table);
+
+    return rc;
+}
+
+/*
  * Resolve deliberately mis-configured (EMT field set to an invalid value)
  * entries in the page table hierarchy for the given GFN:
  * - calculate the correct value for the EMT field,
@@ -828,6 +899,53 @@ static void ept_change_entry_type_global(struct p2m_domain *p2m,
         ept_sync_domain(p2m);
 }
 
+static int ept_change_entry_type_range(struct p2m_domain *p2m,
+                                       p2m_type_t ot, p2m_type_t nt,
+                                       unsigned long first_gfn,
+                                       unsigned long last_gfn)
+{
+    unsigned int i, wl = ept_get_wl(&p2m->ept);
+    unsigned long mask = (1 << EPT_TABLE_ORDER) - 1;
+    int rc = 0, sync = 0;
+
+    if ( !ept_get_asr(&p2m->ept) )
+        return -EINVAL;
+
+    for ( i = 0; i <= wl; )
+    {
+        if ( first_gfn & mask )
+        {
+            unsigned long end_gfn = min(first_gfn | mask, last_gfn);
+
+            rc = ept_invalidate_emt_range(p2m, i, first_gfn, end_gfn);
+            sync |= rc;
+            if ( rc < 0 || end_gfn >= last_gfn )
+                break;
+            first_gfn = end_gfn + 1;
+        }
+        else if ( (last_gfn & mask) != mask )
+        {
+            unsigned long start_gfn = max(first_gfn, last_gfn & ~mask);
+
+            rc = ept_invalidate_emt_range(p2m, i, start_gfn, last_gfn);
+            sync |= rc;
+            if ( rc < 0 || start_gfn <= first_gfn )
+                break;
+            last_gfn = start_gfn - 1;
+        }
+        else
+        {
+            ++i;
+            mask |= mask << EPT_TABLE_ORDER;
+        }
+    }
+
+    if ( sync )
+        ept_sync_domain(p2m);
+
+    return rc < 0 ? rc : 0;
+}
+
 static void ept_memory_type_changed(struct p2m_domain *p2m)
 {
     unsigned long mfn = ept_get_asr(&p2m->ept);
@@ -876,6 +994,7 @@ int ept_p2m_init(struct p2m_domain *p2m)
     p2m->set_entry = ept_set_entry;
     p2m->get_entry = ept_get_entry;
     p2m->change_entry_type_global = ept_change_entry_type_global;
+    p2m->change_entry_type_range = ept_change_entry_type_range;
     p2m->memory_type_changed = ept_memory_type_changed;
     p2m->audit_p2m = NULL;
 

@@ -245,6 +245,10 @@ struct p2m_domain {
     void               (*change_entry_type_global)(struct p2m_domain *p2m,
                                                    p2m_type_t ot,
                                                    p2m_type_t nt);
+    int                (*change_entry_type_range)(struct p2m_domain *p2m,
+                                                  p2m_type_t ot, p2m_type_t nt,
+                                                  unsigned long first_gfn,
+                                                  unsigned long last_gfn);
     void               (*memory_type_changed)(struct p2m_domain *p2m);
     
     void               (*write_p2m_entry)(struct p2m_domain *p2m,
