@@ -401,20 +401,8 @@ static int hpet_write(
     case HPET_Tn_CMP(1):
     case HPET_Tn_CMP(2):
         tn = HPET_TN(CMP, addr);
-        if ( timer_is_32bit(h, tn) )
-            new_val = (uint32_t)new_val;
-        h->hpet.timers[tn].cmp = new_val;
-        if ( h->hpet.timers[tn].config & HPET_TN_SETVAL )
-            /*
-             * When SETVAL is one, software is able to "directly set a periodic
-             * timer's accumulator."  That is, set the comparator without
-             * adjusting the period.  Much the same as just setting the
-             * comparator on an enabled one-shot timer.
-             *
-             * This configuration bit clears when the comparator is written.
-             */
-            h->hpet.timers[tn].config &= ~HPET_TN_SETVAL;
-        else if ( timer_is_periodic(h, tn) )
+        if ( timer_is_periodic(h, tn) &&
+             !(h->hpet.timers[tn].config & HPET_TN_SETVAL) )
         {
             /*
              * Clamp period to reasonable min/max values:
@@ -426,7 +414,25 @@ static int hpet_write(
             new_val &= (timer_is_32bit(h, tn) ? ~0u : ~0ull) >> 1;
             h->hpet.period[tn] = new_val;
         }
-        h->hpet.comparator64[tn] = new_val;
+        else
+        {
+            /*
+             * When SETVAL is one, software is able to "directly set
+             * a periodic timer's accumulator."  That is, set the
+             * comparator without adjusting the period.  Much the
+             * same as just setting the comparator on an enabled
+             * one-shot timer.
+             *
+             * This configuration bit clears when the comparator is
+             * written.
+             */
+            h->hpet.timers[tn].config &= ~HPET_TN_SETVAL;
+            h->hpet.comparator64[tn] = new_val;
+            /* truncate if timer is in 32 bit mode */
+            if ( timer_is_32bit(h, tn) )
+                new_val = (uint32_t)new_val;
+            h->hpet.timers[tn].cmp = new_val;
+        }
         if ( hpet_enabled(h) && timer_enabled(h, tn) )
             set_restart_timer(tn);
         break;
