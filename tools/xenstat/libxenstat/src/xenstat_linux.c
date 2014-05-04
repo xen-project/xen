@@ -64,14 +64,12 @@ static const char PROCNETDEV_HEADER[] =
 
 /* We need to get the name of the bridge interface for use with bonding interfaces */
 /* Use excludeName parameter to avoid adding bridges we don't care about, eg. virbr0 */
-char *getBridge(char *excludeName)
+void getBridge(char *excludeName, char *result, size_t resultLen)
 {
 	struct dirent *de;
 	DIR *d;
 
-	char tmp[256] = { 0 }, *bridge;
-
-	bridge = (char *)malloc(16 * sizeof(char));
+	char tmp[256] = { 0 };
 
 	d = opendir("/sys/class/net");
 	while ((de = readdir(d)) != NULL) {
@@ -79,14 +77,14 @@ char *getBridge(char *excludeName)
 			&& (strstr(de->d_name, excludeName) == NULL)) {
 				sprintf(tmp, "/sys/class/net/%s/bridge", de->d_name);
 
-				if (access(tmp, F_OK) == 0)
-					bridge = de->d_name;
+				if (access(tmp, F_OK) == 0) {
+					strncpy(result, de->d_name, resultLen - 1);
+					result[resultLen - 1] = 0;
+				}
 		}
 	}
 
 	closedir(d);
-
-	return bridge;
 }
 
 /* parseNetLine provides regular expression based parsing for lines from /proc/net/dev, all the */
@@ -279,7 +277,7 @@ int xenstat_collect_networks(xenstat_node * node)
 	      SEEK_SET);
 
 	/* We get the bridge devices for use with bonding interface to get bonding interface stats */
-	snprintf(devBridge, 16, "%s", getBridge("vir"));
+	getBridge("vir", devBridge, sizeof(devBridge));
 	snprintf(devNoBridge, 16, "p%s", devBridge);
 
 	while (fgets(line, 512, priv->procnetdev)) {
