@@ -164,7 +164,7 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	xenstat_node *node;
 	xc_physinfo_t physinfo = { 0 };
 	xc_domaininfo_t domaininfo[DOMAIN_CHUNK_SIZE];
-	unsigned int new_domains;
+	int new_domains;
 	unsigned int i;
 
 	/* Create the node */
