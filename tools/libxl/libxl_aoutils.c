@@ -451,3 +451,92 @@ int libxl__openptys(libxl__openpty_state *op,
     return rc;
 }
 
+static void async_exec_timeout(libxl__egc *egc,
+                               libxl__ev_time *ev,
+                               const struct timeval *requested_abs)
+{
+    libxl__async_exec_state *aes = CONTAINER_OF(ev, *aes, time);
+    STATE_AO_GC(aes->ao);
+
+    libxl__ev_time_deregister(gc, &aes->time);
+
+    assert(libxl__ev_child_inuse(&aes->child));
+    LOG(ERROR, "killing execution of %s because of timeout", aes->what);
+
+    if (kill(aes->child.pid, SIGKILL)) {
+        LOGEV(ERROR, errno, "unable to kill %s [%ld]",
+              aes->what, (unsigned long)aes->child.pid);
+    }
+
+    return;
+}
+
+static void async_exec_done(libxl__egc *egc,
+                            libxl__ev_child *child,
+                            pid_t pid, int status)
+{
+    libxl__async_exec_state *aes = CONTAINER_OF(child, *aes, child);
+    STATE_AO_GC(aes->ao);
+
+    libxl__ev_time_deregister(gc, &aes->time);
+
+    if (status) {
+        libxl_report_child_exitstatus(CTX, LIBXL__LOG_ERROR,
+                                      aes->what, pid, status);
+    }
+
+    aes->callback(egc, aes, status);
+}
+
+void libxl__async_exec_init(libxl__async_exec_state *aes)
+{
+    libxl__ev_time_init(&aes->time);
+    libxl__ev_child_init(&aes->child);
+}
+
+int libxl__async_exec_start(libxl__gc *gc, libxl__async_exec_state *aes)
+{
+    pid_t pid;
+
+    /* Convenience aliases */
+    libxl__ev_child *const child = &aes->child;
+    char ** const args = aes->args;
+
+    /* Set execution timeout */
+    if (libxl__ev_time_register_rel(gc, &aes->time,
+                                    async_exec_timeout,
+                                    aes->timeout_ms)) {
+        LOG(ERROR, "unable to register timeout for executing: %s", aes->what);
+        goto out;
+    }
+
+    LOG(DEBUG, "forking to execute: %s ", aes->what);
+
+    /* Fork and exec */
+    pid = libxl__ev_child_fork(gc, child, async_exec_done);
+    if (pid == -1) {
+        LOG(ERROR, "unable to fork");
+        goto out;
+    }
+
+    if (!pid) {
+        /* child */
+        libxl__exec(gc, aes->stdfds[0], aes->stdfds[1],
+                    aes->stdfds[2], args[0], args, aes->env);
+        /* notreached */
+        abort();
+    }
+
+    return 0;
+
+out:
+    return ERROR_FAIL;
+}
+
+bool libxl__async_exec_inuse(const libxl__async_exec_state *aes)
+{
+    bool time_inuse = libxl__ev_time_isregistered(&aes->time);
+    bool child_inuse = libxl__ev_child_inuse(&aes->child);
+    assert(time_inuse == child_inuse);
+    return child_inuse;
+}

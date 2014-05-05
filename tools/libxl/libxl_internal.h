@@ -2050,6 +2050,33 @@ _hidden const char *libxl__xen_script_dir_path(void);
 _hidden const char *libxl__lock_dir_path(void);
 _hidden const char *libxl__run_dir_path(void);
 
+/*----- subprocess execution with timeout -----*/
+
+typedef struct libxl__async_exec_state libxl__async_exec_state;
+
+typedef void libxl__async_exec_callback(libxl__egc *egc,
+                        libxl__async_exec_state *aes, int status);
+
+struct libxl__async_exec_state {
+    /* caller must fill these in */
+    libxl__ao *ao;
+    const char *what; /* for error msgs, what we're executing */
+    int timeout_ms;
+    libxl__async_exec_callback *callback;
+    /* caller must fill in; as for libxl__exec */
+    int stdfds[3];
+    char **args; /* execution arguments */
+    char **env; /* execution environment */
+
+    /* private */
+    libxl__ev_time time;
+    libxl__ev_child child;
+};
+
+void libxl__async_exec_init(libxl__async_exec_state *aes);
+int libxl__async_exec_start(libxl__gc *gc, libxl__async_exec_state *aes);
+bool libxl__async_exec_inuse(const libxl__async_exec_state *aes);
+
 /*----- device addition/removal -----*/
 
 typedef struct libxl__ao_device libxl__ao_device;
@@ -2086,14 +2113,13 @@ struct libxl__ao_device {
     libxl__multidev *multidev; /* reference to the containing multidev */
     /* private for add/remove implementation */
     libxl__ev_devstate backend_ds;
-    /* Bodge for Qemu devices, also used for timeout of hotplug execution */
+    /* Bodge for Qemu devices */
     libxl__ev_time timeout;
     /* xenstore watch for backend path of driver domains */
     libxl__ev_xswatch xs_watch;
-    /* device hotplug execution */
-    const char *what;
     int num_exec;
-    libxl__ev_child child;
+    /* for calling hotplug scripts */
+    libxl__async_exec_state aes;
 };
 
 /*
