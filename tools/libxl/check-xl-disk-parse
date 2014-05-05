@@ -61,7 +61,8 @@ disk: {
     "script": null,
     "removable": 0,
     "readwrite": 1,
-    "is_cdrom": 0
+    "is_cdrom": 0,
+    "direct_io_safe": false
 }
 
 END
@@ -82,7 +83,8 @@ disk: {
     "script": null,
     "removable": 1,
     "readwrite": 0,
-    "is_cdrom": 1
+    "is_cdrom": 1,
+    "direct_io_safe": false
 }
 
 END
@@ -104,7 +106,8 @@ disk: {
     "script": null,
     "removable": 0,
     "readwrite": 1,
-    "is_cdrom": 0
+    "is_cdrom": 0,
+    "direct_io_safe": false
 }
 
 EOF
@@ -121,7 +124,8 @@ disk: {
     "script": null,
     "removable": 1,
     "readwrite": 0,
-    "is_cdrom": 1
+    "is_cdrom": 1,
+    "direct_io_safe": false
 }
 
 EOF
@@ -142,7 +146,8 @@ disk: {
     "script": null,
     "removable": 1,
     "readwrite": 0,
-    "is_cdrom": 1
+    "is_cdrom": 1,
+    "direct_io_safe": false
 }
 
 EOF
@@ -160,7 +165,8 @@ disk: {
     "script": "block-iscsi",
     "removable": 0,
     "readwrite": 1,
-    "is_cdrom": 0
+    "is_cdrom": 0,
+    "direct_io_safe": false
 }
 
 EOF
@@ -180,7 +186,8 @@ disk: {
     "script": "block-drbd",
     "removable": 0,
     "readwrite": 1,
-    "is_cdrom": 0
+    "is_cdrom": 0,
+    "direct_io_safe": false
 }
 
 EOF
