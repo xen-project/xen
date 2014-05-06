@@ -465,6 +465,12 @@ ENTRY(dom_crash_sync_extable)
         xorl  %edi,%edi
         jmp   asm_domain_crash_synchronous /* Does not return */
 
+ENTRY(common_interrupt)
+        SAVE_ALL
+        movq %rsp,%rdi
+        callq do_IRQ
+        jmp ret_from_intr
+
 /* No special register assumptions. */
 ENTRY(ret_from_intr)
         GET_CURRENT(%rbx)

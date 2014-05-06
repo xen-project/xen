@@ -51,27 +51,27 @@
         r__->entry_vector |= TRAP_regs_dirty; \
 })
 
-#define SAVE_ALL                                \
-        addq  $-(UREGS_error_code-UREGS_r15), %rsp; \
-        cld;                                    \
-        movq  %rdi,UREGS_rdi(%rsp);             \
-        movq  %rsi,UREGS_rsi(%rsp);             \
-        movq  %rdx,UREGS_rdx(%rsp);             \
-        movq  %rcx,UREGS_rcx(%rsp);             \
-        movq  %rax,UREGS_rax(%rsp);             \
-        movq  %r8,UREGS_r8(%rsp);               \
-        movq  %r9,UREGS_r9(%rsp);               \
-        movq  %r10,UREGS_r10(%rsp);             \
-        movq  %r11,UREGS_r11(%rsp);             \
-        movq  %rbx,UREGS_rbx(%rsp);             \
-        movq  %rbp,UREGS_rbp(%rsp);             \
-        SETUP_EXCEPTION_FRAME_POINTER(UREGS_rbp); \
-        movq  %r12,UREGS_r12(%rsp);             \
-        movq  %r13,UREGS_r13(%rsp);             \
-        movq  %r14,UREGS_r14(%rsp);             \
-        movq  %r15,UREGS_r15(%rsp);             \
-
 #ifdef __ASSEMBLY__
+.macro SAVE_ALL
+        addq  $-(UREGS_error_code-UREGS_r15), %rsp
+        cld
+        movq  %rdi,UREGS_rdi(%rsp)
+        movq  %rsi,UREGS_rsi(%rsp)
+        movq  %rdx,UREGS_rdx(%rsp)
+        movq  %rcx,UREGS_rcx(%rsp)
+        movq  %rax,UREGS_rax(%rsp)
+        movq  %r8,UREGS_r8(%rsp)
+        movq  %r9,UREGS_r9(%rsp)
+        movq  %r10,UREGS_r10(%rsp)
+        movq  %r11,UREGS_r11(%rsp)
+        movq  %rbx,UREGS_rbx(%rsp)
+        movq  %rbp,UREGS_rbp(%rsp)
+        SETUP_EXCEPTION_FRAME_POINTER(UREGS_rbp)
+        movq  %r12,UREGS_r12(%rsp)
+        movq  %r13,UREGS_r13(%rsp)
+        movq  %r14,UREGS_r14(%rsp)
+        movq  %r15,UREGS_r15(%rsp)
+.endm
 
 /*
  * Save all registers not preserved by C code or used in entry/exit code. Mark
@@ -207,15 +207,6 @@
 #else
 #define REX64_PREFIX "rex64/"
 #endif
-
-#define BUILD_COMMON_IRQ()                      \
-__asm__(                                        \
-    "\n" __ALIGN_STR"\n"                        \
-    "common_interrupt:\n\t"                     \
-    STR(SAVE_ALL) "\n\t"                        \
-    "movq %rsp,%rdi\n\t"                        \
-    "callq " STR(do_IRQ) "\n\t"                 \
-    "jmp ret_from_intr\n");
 
 #define BUILD_IRQ(nr)                           \
     "pushq $0\n\t"                              \

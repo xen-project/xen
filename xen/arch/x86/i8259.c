@@ -35,8 +35,6 @@
 
 __asm__(".section .text");
 
-BUILD_COMMON_IRQ()
-
 #define IRQ_NAME(nr) VEC##nr##_interrupt
 
 #define BI(nr)                                           \
