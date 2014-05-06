@@ -71,8 +71,8 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode, uint64_t *elapsed_nsec,
 void force_update_vcpu_system_time(struct vcpu *v);
 
 int host_tsc_is_safe(void);
-void cpuid_time_leaf(uint32_t sub_idx, unsigned int *eax, unsigned int *ebx,
-                      unsigned int *ecx, unsigned int *edx);
+void cpuid_time_leaf(uint32_t sub_idx, uint32_t *eax, uint32_t *ebx,
+                     uint32_t *ecx, uint32_t *edx);
 
 u64 stime2tsc(s_time_t stime);
 

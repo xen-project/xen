@@ -1754,10 +1754,9 @@ void cpuid_time_leaf(uint32_t sub_idx, uint32_t *eax, uint32_t *ebx,
     switch ( sub_idx )
     {
     case 0: /* features */
-        *eax = ( ( (!!d->arch.vtsc) << 0 ) |
-                 ( (!!host_tsc_is_safe()) << 1 ) |
-                 ( (!!boot_cpu_has(X86_FEATURE_RDTSCP)) << 2 ) |
-               0 );
+        *eax = (!!d->arch.vtsc << 0) |
+               (!!host_tsc_is_safe() << 1) |
+               (!!boot_cpu_has(X86_FEATURE_RDTSCP) << 2);
         *ebx = d->arch.tsc_mode;
         *ecx = d->arch.tsc_khz;
         *edx = d->arch.incarnation;
