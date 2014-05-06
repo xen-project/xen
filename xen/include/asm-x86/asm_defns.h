@@ -77,6 +77,9 @@ void ret_from_intr(void);
 #define ASSERT_NOT_IN_ATOMIC
 #endif
 
+#define CPUINFO_FEATURE_OFFSET(feature)           \
+        ((((feature) >> 3) & ~3) + CPUINFO_features)
+
 #else
 
 #ifdef __clang__ /* clang's builtin assember can't do .subsection */

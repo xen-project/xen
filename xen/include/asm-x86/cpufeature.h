@@ -7,7 +7,9 @@
 #ifndef __ASM_I386_CPUFEATURE_H
 #define __ASM_I386_CPUFEATURE_H
 
+#ifndef __ASSEMBLY__
 #include <xen/bitops.h>
+#endif
 
 #define NCAPINTS	8	/* N 32-bit words worth of info */
 
@@ -152,6 +154,7 @@
 #define X86_FEATURE_ADX		(7*32+19) /* ADCX, ADOX instructions */
 #define X86_FEATURE_SMAP	(7*32+20) /* Supervisor Mode Access Prevention */
 
+#ifndef __ASSEMBLY__
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
 #define cpufeat_mask(idx)       (1u << ((idx) & 31))
@@ -210,6 +213,7 @@
 #define cpu_has_vmx		boot_cpu_has(X86_FEATURE_VMXE)
 
 #define cpu_has_cpuid_faulting	boot_cpu_has(X86_FEATURE_CPUID_FAULTING)
+#endif
 
 #endif /* __ASM_I386_CPUFEATURE_H */
 

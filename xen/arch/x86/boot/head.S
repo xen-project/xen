@@ -6,6 +6,7 @@
 #include <asm/fixmap.h>
 #include <asm/page.h>
 #include <asm/msr.h>
+#include <asm/cpufeature.h>
 
         .text
         .code32
@@ -137,10 +138,10 @@ __start:
         mov     $0x80000001,%eax
         cpuid
 1:      mov     %edx,sym_phys(cpuid_ext_features)
-        mov     %edx,sym_phys(boot_cpu_data)+CPUINFO86_ext_features
+        mov     %edx,sym_phys(boot_cpu_data)+CPUINFO_FEATURE_OFFSET(X86_FEATURE_LM)
 
         /* Check for availability of long mode. */
-        bt      $29,%edx
+        bt      $X86_FEATURE_LM & 0x1f,%edx
         jnc     bad_cpu
 
         /* Stash TSC to calculate a good approximation of time-since-boot */

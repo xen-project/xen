@@ -160,7 +160,7 @@ void __dummy__(void)
     OFFSET(IRQSTAT_softirq_pending, irq_cpustat_t, __softirq_pending);
     BLANK();
 
-    OFFSET(CPUINFO86_ext_features, struct cpuinfo_x86, x86_capability[1]);
+    OFFSET(CPUINFO_features, struct cpuinfo_x86, x86_capability);
     BLANK();
 
     OFFSET(MB_flags, multiboot_info_t, flags);
