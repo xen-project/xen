@@ -8,7 +8,7 @@
  *  Tigran Aivazian <tigran@aivazian.fsnet.co.uk>
  *
  *  This driver allows to upgrade microcode on AMD
- *  family 0x10 and 0x11 processors.
+ *  family 0x10 and later.
  *
  *  Licensed unter the terms of the GNU General Public
  *  License version 2. See file COPYING for details.
@@ -26,6 +26,8 @@
 #include <asm/processor.h>
 #include <asm/microcode.h>
 #include <asm/hvm/svm/svm.h>
+
+#define pr_debug(x...) ((void)0)
 
 struct __packed equiv_cpu_entry {
     uint32_t installed_cpu;
@@ -88,10 +90,38 @@ static int collect_cpu_info(int cpu, struct cpu_signature *csig)
 
     rdmsrl(MSR_AMD_PATCHLEVEL, csig->rev);
 
-    printk(KERN_DEBUG "microcode: CPU%d collect_cpu_info: patch_id=%#x\n",
-           cpu, csig->rev);
+    pr_debug("microcode: CPU%d collect_cpu_info: patch_id=%#x\n",
+             cpu, csig->rev);
 
     return 0;
+}
+
+static bool_t verify_patch_size(uint32_t patch_size)
+{
+    uint32_t max_size;
+
+#define F1XH_MPB_MAX_SIZE 2048
+#define F14H_MPB_MAX_SIZE 1824
+#define F15H_MPB_MAX_SIZE 4096
+#define F16H_MPB_MAX_SIZE 3458
+
+    switch (boot_cpu_data.x86)
+    {
+    case 0x14:
+        max_size = F14H_MPB_MAX_SIZE;
+        break;
+    case 0x15:
+        max_size = F15H_MPB_MAX_SIZE;
+        break;
+    case 0x16:
+        max_size = F16H_MPB_MAX_SIZE;
+        break;
+    default:
+        max_size = F1XH_MPB_MAX_SIZE;
+        break;
+    }
+
+    return (patch_size <= max_size);
 }
 
 static bool_t microcode_fits(const struct microcode_amd *mc_amd, int cpu)
@@ -123,12 +153,20 @@ static bool_t microcode_fits(const struct microcode_amd *mc_amd, int cpu)
     if ( (mc_header->processor_rev_id) != equiv_cpu_id )
         return 0;
 
-    if ( mc_header->patch_id <= uci->cpu_sig.rev )
+    if ( !verify_patch_size(mc_amd->mpb_size) )
+    {
+        pr_debug("microcode: patch size mismatch\n");
         return 0;
+    }
 
-    printk(KERN_DEBUG "microcode: CPU%d found a matching microcode "
-           "update with version %#x (current=%#x)\n",
-           cpu, mc_header->patch_id, uci->cpu_sig.rev);
+    if ( mc_header->patch_id <= uci->cpu_sig.rev )
+    {
+        pr_debug("microcode: patch is already at required level or greater.\n");
+        return 0;
+    }
+
+    pr_debug("microcode: CPU%d found a matching microcode update with version %#x (current=%#x)\n",
+             cpu, mc_header->patch_id, uci->cpu_sig.rev);
 
     return 1;
 }
@@ -224,10 +262,10 @@ static int get_ucode_from_buffer_amd(
 
     *offset = off + mpbuf->len + 8;
 
-    printk(KERN_DEBUG "microcode: CPU%d size %zu, block size %u offset %zu equivID %#x rev %#x\n",
-           raw_smp_processor_id(), bufsize, mpbuf->len, off,
-           ((struct microcode_header_amd *)mc_amd->mpb)->processor_rev_id,
-           ((struct microcode_header_amd *)mc_amd->mpb)->patch_id);
+    pr_debug("microcode: CPU%d size %zu, block size %u offset %zu equivID %#x rev %#x\n",
+             raw_smp_processor_id(), bufsize, mpbuf->len, off,
+             ((struct microcode_header_amd *)mc_amd->mpb)->processor_rev_id,
+             ((struct microcode_header_amd *)mc_amd->mpb)->patch_id);
 
     return 0;
 }
