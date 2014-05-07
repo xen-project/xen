@@ -1794,39 +1794,34 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
 
     switch ( *tsc_mode )
     {
+        uint64_t tsc;
+
     case TSC_MODE_NEVER_EMULATE:
-        *elapsed_nsec =  *gtsc_khz = 0;
+        *elapsed_nsec = *gtsc_khz = 0;
         break;
-    case TSC_MODE_ALWAYS_EMULATE:
-        *elapsed_nsec = get_s_time() - d->arch.vtsc_offset;
-        *gtsc_khz =  d->arch.tsc_khz;
-         break;
     case TSC_MODE_DEFAULT:
         if ( d->arch.vtsc )
         {
+    case TSC_MODE_ALWAYS_EMULATE:
             *elapsed_nsec = get_s_time() - d->arch.vtsc_offset;
-            *gtsc_khz =  d->arch.tsc_khz;
+            *gtsc_khz = d->arch.tsc_khz;
+            break;
         }
-        else
-        {
-            uint64_t tsc = 0;
-            rdtscll(tsc);
-            *elapsed_nsec = scale_delta(tsc,&d->arch.vtsc_to_ns);
-            *gtsc_khz =  cpu_khz;
-        }
+        rdtscll(tsc);
+        *elapsed_nsec = scale_delta(tsc, &d->arch.vtsc_to_ns);
+        *gtsc_khz = cpu_khz;
         break;
     case TSC_MODE_PVRDTSCP:
         if ( d->arch.vtsc )
         {
             *elapsed_nsec = get_s_time() - d->arch.vtsc_offset;
-            *gtsc_khz =  cpu_khz;
+            *gtsc_khz = cpu_khz;
         }
         else
         {
-            uint64_t tsc = 0;
             rdtscll(tsc);
-            *elapsed_nsec = (scale_delta(tsc,&d->arch.vtsc_to_ns) -
-                             d->arch.vtsc_offset);
+            *elapsed_nsec = scale_delta(tsc, &d->arch.vtsc_to_ns) -
+                            d->arch.vtsc_offset;
             *gtsc_khz = 0; /* ignored by tsc_set_info */
         }
         break;
@@ -1883,38 +1878,32 @@ void tsc_set_info(struct domain *d,
 
     switch ( d->arch.tsc_mode = tsc_mode )
     {
-    case TSC_MODE_NEVER_EMULATE:
-        d->arch.vtsc = 0;
-        break;
-    case TSC_MODE_ALWAYS_EMULATE:
-        d->arch.vtsc = 1;
-        d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
-        d->arch.tsc_khz = gtsc_khz ? gtsc_khz : cpu_khz;
-        set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
-        d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
-        break;
     case TSC_MODE_DEFAULT:
-        d->arch.vtsc = 1;
+    case TSC_MODE_ALWAYS_EMULATE:
         d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
-        d->arch.tsc_khz = gtsc_khz ? gtsc_khz : cpu_khz;
-        set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
+        d->arch.tsc_khz = gtsc_khz ?: cpu_khz;
+        set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000);
         /*
-         * Use native TSC if the host has safe TSC and:
+         * In default mode use native TSC if the host has safe TSC and:
          *  HVM/PVH: host and guest frequencies are the same (either
          *           "naturally" or via TSC scaling)
          *  PV: guest has not migrated yet (and thus arch.tsc_khz == cpu_khz)
          */
-        if ( host_tsc_is_safe() &&
-             ((has_hvm_container_domain(d) &&
-               (d->arch.tsc_khz == cpu_khz || cpu_has_tsc_ratio)) ||
+        if ( tsc_mode == TSC_MODE_DEFAULT && host_tsc_is_safe() &&
+             (has_hvm_container_domain(d) ?
+              d->arch.tsc_khz == cpu_khz || cpu_has_tsc_ratio :
               incarnation == 0) )
+        {
+    case TSC_MODE_NEVER_EMULATE:
             d->arch.vtsc = 0;
-        else 
-            d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
+            break;
+        }
+        d->arch.vtsc = 1;
+        d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
         break;
     case TSC_MODE_PVRDTSCP:
-        d->arch.vtsc =  boot_cpu_has(X86_FEATURE_RDTSCP) &&
-                        host_tsc_is_safe() ?  0 : 1;
+        d->arch.vtsc = !boot_cpu_has(X86_FEATURE_RDTSCP) ||
+                       !host_tsc_is_safe();
         d->arch.tsc_khz = cpu_khz;
         set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
         d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
