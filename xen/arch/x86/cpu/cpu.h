@@ -6,7 +6,6 @@ struct cpu_dev {
 	char	* c_ident[2];	
 
 	void		(*c_init)(struct cpuinfo_x86 * c);
-	void		(*c_identify)(struct cpuinfo_x86 * c);
 };
 
 extern struct cpu_dev * cpu_devs [X86_VENDOR_NUM];

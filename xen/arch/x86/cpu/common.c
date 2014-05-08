@@ -270,22 +270,11 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	generic_identify(c);
 
 #ifdef NOISY_CAPS
-	printk(KERN_DEBUG "CPU: After generic identify, caps:");
+	printk(KERN_DEBUG "CPU: After vendor identify, caps:");
 	for (i = 0; i < NCAPINTS; i++)
 		printk(" %08x", c->x86_capability[i]);
 	printk("\n");
 #endif
-
-	if (this_cpu->c_identify) {
-		this_cpu->c_identify(c);
-
-#ifdef NOISY_CAPS
-		printk(KERN_DEBUG "CPU: After vendor identify, caps:");
-		for (i = 0; i < NCAPINTS; i++)
-			printk(" %08x", c->x86_capability[i]);
-		printk("\n");
-#endif
-	}
 
 	/*
 	 * Vendor-specific initialization.  In this section we
