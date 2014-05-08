@@ -76,9 +76,10 @@
  * Halt execution of this domain (all VCPUs) and notify the system controller.
  * @arg == pointer to sched_shutdown_t structure.
  *
- * If the sched_shutdown_t reason is SHUTDOWN_suspend then this
- * hypercall takes an additional extra argument which should be the
- * MFN of the guest's start_info_t.
+ * If the sched_shutdown_t reason is SHUTDOWN_suspend then
+ * x86 PV guests must also set RDX (EDX for 32-bit guests) to the MFN
+ * of the guest's start info page.  RDX/EDX is the third hypercall
+ * argument.
  *
  * In addition, which reason is SHUTDOWN_suspend this hypercall
  * returns 1 if suspend was cancelled or the domain was merely
