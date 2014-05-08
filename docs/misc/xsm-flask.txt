@@ -72,9 +72,7 @@ __HYPERVISOR_domctl (xen/include/public/domctl.h)
  * XEN_DOMCTL_getvcpucontext
  * XEN_DOMCTL_max_vcpus
  * XEN_DOMCTL_scheduler_op
- * XEN_DOMCTL_irq_permission
  * XEN_DOMCTL_iomem_permission
- * XEN_DOMCTL_ioport_permission
  * XEN_DOMCTL_gethvmcontext
  * XEN_DOMCTL_sethvmcontext
  * XEN_DOMCTL_set_address_size

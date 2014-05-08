@@ -46,6 +46,8 @@ static int gdbsx_guest_mem_io(
     return (iop->remain ? -EFAULT : 0);
 }
 
+#define MAX_IOPORTS 0x10000
+
 long arch_do_domctl(
     struct xen_domctl *domctl, struct domain *d,
     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
@@ -72,13 +74,11 @@ long arch_do_domctl(
         unsigned int np = domctl->u.ioport_permission.nr_ports;
         int allow = domctl->u.ioport_permission.allow_access;
 
-        ret = -EINVAL;
-        if ( (fp + np) > 65536 )
-            break;
-
-        if ( np == 0 )
-            ret = 0;
-        else if ( xsm_ioport_permission(XSM_HOOK, d, fp, fp + np - 1, allow) )
+        if ( (fp + np) <= fp || (fp + np) > MAX_IOPORTS )
+            ret = -EINVAL;
+        else if ( !ioports_access_permitted(current->domain,
+                                            fp, fp + np - 1) ||
+                  xsm_ioport_permission(XSM_HOOK, d, fp, fp + np - 1, allow) )
             ret = -EPERM;
         else if ( allow )
             ret = ioports_permit_access(d, fp, fp + np - 1);
@@ -719,7 +719,6 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_ioport_mapping:
     {
-#define MAX_IOPORTS    0x10000
         struct hvm_iommu *hd;
         unsigned int fgp = domctl->u.ioport_mapping.first_gport;
         unsigned int fmp = domctl->u.ioport_mapping.first_mport;

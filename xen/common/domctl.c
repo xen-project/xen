@@ -790,7 +790,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         if ( pirq >= d->nr_pirqs )
             ret = -EINVAL;
-        else if ( xsm_irq_permission(XSM_HOOK, d, pirq, allow) )
+        else if ( !pirq_access_permitted(current->domain, pirq) ||
+                  xsm_irq_permission(XSM_HOOK, d, pirq, allow) )
             ret = -EPERM;
         else if ( allow )
             ret = pirq_permit_access(d, pirq);
@@ -809,7 +810,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
             break;
 
-        if ( xsm_iomem_permission(XSM_HOOK, d, mfn, mfn + nr_mfns - 1, allow) )
+        if ( !iomem_access_permitted(current->domain,
+                                     mfn, mfn + nr_mfns - 1) ||
+             xsm_iomem_permission(XSM_HOOK, d, mfn, mfn + nr_mfns - 1, allow) )
             ret = -EPERM;
         else if ( allow )
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
