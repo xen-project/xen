@@ -35,6 +35,7 @@
 #include <asm/setup.h>
 #include <asm/bzimage.h> /* for bzimage_parse */
 #include <asm/io_apic.h>
+#include <asm/hap.h>
 
 #include <public/version.h>
 
@@ -307,6 +308,158 @@ static void __init process_dom0_ioports_disable(void)
     }
 }
 
+static __init void pvh_add_mem_mapping(struct domain *d, unsigned long gfn,
+                                       unsigned long mfn, unsigned long nr_mfns)
+{
+    unsigned long i;
+    int rc;
+
+    for ( i = 0; i < nr_mfns; i++ )
+        if ( (rc = set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i))) )
+            panic("pvh_add_mem_mapping: gfn:%lx mfn:%lx i:%ld rc:%d\n",
+                  gfn, mfn, i, rc);
+}
+
+/*
+ * Set the 1:1 map for all non-RAM regions for dom 0. Thus, dom0 will have
+ * the entire io region mapped in the EPT/NPT.
+ *
+ * pvh fixme: The following doesn't map MMIO ranges when they sit above the
+ *            highest E820 covered address.
+ */
+static __init void pvh_map_all_iomem(struct domain *d)
+{
+    unsigned long start_pfn, end_pfn, end = 0, start = 0;
+    const struct e820entry *entry;
+    unsigned int i, nump;
+
+    for ( i = 0, entry = e820.map; i < e820.nr_map; i++, entry++ )
+    {
+        end = entry->addr + entry->size;
+
+        if ( entry->type == E820_RAM || entry->type == E820_UNUSABLE ||
+             i == e820.nr_map - 1 )
+        {
+            start_pfn = PFN_DOWN(start);
+
+            /* Unused RAM areas are marked UNUSABLE, so skip them too */
+            if ( entry->type == E820_RAM || entry->type == E820_UNUSABLE )
+                end_pfn = PFN_UP(entry->addr);
+            else
+                end_pfn = PFN_UP(end);
+
+            if ( start_pfn < end_pfn )
+            {
+                nump = end_pfn - start_pfn;
+                /* Add pages to the mapping */
+                pvh_add_mem_mapping(d, start_pfn, start_pfn, nump);
+            }
+            start = end;
+        }
+    }
+
+    /*
+     * Some BIOSes may not report io space above ram that is less than 4GB. So
+     * we map any non-ram upto 4GB.
+     */
+    if ( end < GB(4) )
+    {
+        start_pfn = PFN_UP(end);
+        end_pfn = (GB(4)) >> PAGE_SHIFT;
+        nump = end_pfn - start_pfn;
+        pvh_add_mem_mapping(d, start_pfn, start_pfn, nump);
+    }
+}
+
+static __init void dom0_update_physmap(struct domain *d, unsigned long pfn,
+                                   unsigned long mfn, unsigned long vphysmap_s)
+{
+    if ( is_pvh_domain(d) )
+    {
+        int rc = guest_physmap_add_page(d, pfn, mfn, 0);
+        BUG_ON(rc);
+        return;
+    }
+    if ( !is_pv_32on64_domain(d) )
+        ((unsigned long *)vphysmap_s)[pfn] = mfn;
+    else
+        ((unsigned int *)vphysmap_s)[pfn] = mfn;
+
+    set_gpfn_from_mfn(mfn, pfn);
+}
+
+/* Replace mfns with pfns in dom0 page tables */
+static __init void pvh_fixup_page_tables_for_hap(struct vcpu *v,
+                                                 unsigned long v_start,
+                                                 unsigned long v_end)
+{
+    int i, j, k;
+    l4_pgentry_t *pl4e, *l4start;
+    l3_pgentry_t *pl3e;
+    l2_pgentry_t *pl2e;
+    l1_pgentry_t *pl1e;
+    unsigned long cr3_pfn;
+
+    ASSERT(paging_mode_enabled(v->domain));
+
+    l4start = map_domain_page(pagetable_get_pfn(v->arch.guest_table));
+
+    /* Clear entries prior to guest L4 start */
+    pl4e = l4start + l4_table_offset(v_start);
+    memset(l4start, 0, (unsigned long)pl4e - (unsigned long)l4start);
+
+    for ( ; pl4e <= l4start + l4_table_offset(v_end - 1); pl4e++ )
+    {
+        pl3e = map_l3t_from_l4e(*pl4e);
+        for ( i = 0; i < PAGE_SIZE / sizeof(*pl3e); i++, pl3e++ )
+        {
+            if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
+                continue;
+
+            pl2e = map_l2t_from_l3e(*pl3e);
+            for ( j = 0; j < PAGE_SIZE / sizeof(*pl2e); j++, pl2e++ )
+            {
+                if ( !(l2e_get_flags(*pl2e)  & _PAGE_PRESENT) )
+                    continue;
+
+                pl1e = map_l1t_from_l2e(*pl2e);
+                for ( k = 0; k < PAGE_SIZE / sizeof(*pl1e); k++, pl1e++ )
+                {
+                    if ( !(l1e_get_flags(*pl1e) & _PAGE_PRESENT) )
+                        continue;
+
+                    *pl1e = l1e_from_pfn(get_gpfn_from_mfn(l1e_get_pfn(*pl1e)),
+                                         l1e_get_flags(*pl1e));
+                }
+                unmap_domain_page(pl1e);
+                *pl2e = l2e_from_pfn(get_gpfn_from_mfn(l2e_get_pfn(*pl2e)),
+                                     l2e_get_flags(*pl2e));
+            }
+            unmap_domain_page(pl2e);
+            *pl3e = l3e_from_pfn(get_gpfn_from_mfn(l3e_get_pfn(*pl3e)),
+                                 l3e_get_flags(*pl3e));
+        }
+        unmap_domain_page(pl3e);
+        *pl4e = l4e_from_pfn(get_gpfn_from_mfn(l4e_get_pfn(*pl4e)),
+                             l4e_get_flags(*pl4e));
+    }
+
+    /* Clear entries post guest L4. */
+    if ( (unsigned long)pl4e & (PAGE_SIZE - 1) )
+        memset(pl4e, 0, PAGE_SIZE - ((unsigned long)pl4e & (PAGE_SIZE - 1)));
+
+    unmap_domain_page(l4start);
+
+    cr3_pfn = get_gpfn_from_mfn(paddr_to_pfn(v->arch.cr3));
+    v->arch.hvm_vcpu.guest_cr[3] = pfn_to_paddr(cr3_pfn);
+
+    /*
+     * Finally, we update the paging modes (hap_update_paging_modes). This will
+     * create monitor_table for us, update v->arch.cr3, and update vmcs.cr3.
+     */
+    paging_update_paging_modes(v);
+}
+
 static __init void mark_pv_pt_pages_rdonly(struct domain *d,
                                            l4_pgentry_t *l4start,
                                            unsigned long vpt_start,
@@ -516,6 +669,8 @@ int __init construct_dom0(
     l3_pgentry_t *l3tab = NULL, *l3start = NULL;
     l2_pgentry_t *l2tab = NULL, *l2start = NULL;
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
+    paddr_t shared_info_paddr = 0;
+    u32 save_pvh_pg_mode = 0;
 
     /*
      * This fully describes the memory layout of the initial domain. All 
@@ -593,12 +748,21 @@ int __init construct_dom0(
         goto out;
     }
 
-    if ( parms.elf_notes[XEN_ELFNOTE_SUPPORTED_FEATURES].type != XEN_ENT_NONE &&
-         !test_bit(XENFEAT_dom0, parms.f_supported) )
+    if ( parms.elf_notes[XEN_ELFNOTE_SUPPORTED_FEATURES].type != XEN_ENT_NONE )
     {
-        printk("Kernel does not support Dom0 operation\n");
-        rc = -EINVAL;
-        goto out;
+        if ( !test_bit(XENFEAT_dom0, parms.f_supported) )
+        {
+            printk("Kernel does not support Dom0 operation\n");
+            rc = -EINVAL;
+            goto out;
+        }
+        if ( is_pvh_domain(d) &&
+             !test_bit(XENFEAT_hvm_callback_vector, parms.f_supported) )
+        {
+            printk("Kernel does not support PVH mode\n");
+            rc = -EINVAL;
+            goto out;
+        }
     }
 
     if ( compat32 )
@@ -663,6 +827,13 @@ int __init construct_dom0(
     vstartinfo_end   = (vstartinfo_start +
                         sizeof(struct start_info) +
                         sizeof(struct dom0_vga_console_info));
+
+    if ( is_pvh_domain(d) )
+    {
+        shared_info_paddr = round_pgup(vstartinfo_end) - v_start;
+        vstartinfo_end   += PAGE_SIZE;
+    }
+
     vpt_start        = round_pgup(vstartinfo_end);
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
@@ -903,6 +1074,13 @@ int __init construct_dom0(
         (void)alloc_vcpu(d, i, cpu);
     }
 
+    /*
+     * pvh: we temporarily disable d->arch.paging.mode so that we can build cr3
+     * needed to run on dom0's page tables.
+     */
+    save_pvh_pg_mode = d->arch.paging.mode;
+    d->arch.paging.mode = 0;
+
     /* Set up CR3 value for write_ptbase */
     if ( paging_mode_enabled(d) )
         paging_update_paging_modes(v);
@@ -969,6 +1147,22 @@ int __init construct_dom0(
                          nr_pages);
     }
 
+    if ( is_pvh_domain(d) )
+    {
+        unsigned long hap_pages, memkb = nr_pages * (PAGE_SIZE / 1024);
+
+        /* Copied from: libxl_get_required_shadow_memory() */
+        memkb = 4 * (256 * d->max_vcpus + 2 * (memkb / 1024));
+        hap_pages = ( (memkb + 1023) / 1024) << (20 - PAGE_SHIFT);
+        hap_set_alloc_for_pvh_dom0(d, hap_pages);
+    }
+
+    /*
+     * We enable paging mode again so guest_physmap_add_page will do the
+     * right thing for us.
+     */
+    d->arch.paging.mode = save_pvh_pg_mode;
+
     /* Write the phys->machine and machine->phys table entries. */
     for ( pfn = 0; pfn < count; pfn++ )
     {
@@ -985,11 +1179,7 @@ int __init construct_dom0(
         if ( pfn > REVERSE_START && (vinitrd_start || pfn < initrd_pfn) )
             mfn = alloc_epfn - (pfn - REVERSE_START);
 #endif
-        if ( !is_pv_32on64_domain(d) )
-            ((unsigned long *)vphysmap_start)[pfn] = mfn;
-        else
-            ((unsigned int *)vphysmap_start)[pfn] = mfn;
-        set_gpfn_from_mfn(mfn, pfn);
+        dom0_update_physmap(d, pfn, mfn, vphysmap_start);
         if (!(pfn & 0xfffff))
             process_pending_softirqs();
     }
@@ -1005,8 +1195,8 @@ int __init construct_dom0(
             if ( !page->u.inuse.type_info &&
                  !get_page_and_type(page, d, PGT_writable_page) )
                 BUG();
-            ((unsigned long *)vphysmap_start)[pfn] = mfn;
-            set_gpfn_from_mfn(mfn, pfn);
+
+            dom0_update_physmap(d, pfn, mfn, vphysmap_start);
             ++pfn;
             if (!(pfn & 0xfffff))
                 process_pending_softirqs();
@@ -1026,11 +1216,7 @@ int __init construct_dom0(
 #ifndef NDEBUG
 #define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif
-            if ( !is_pv_32on64_domain(d) )
-                ((unsigned long *)vphysmap_start)[pfn] = mfn;
-            else
-                ((unsigned int *)vphysmap_start)[pfn] = mfn;
-            set_gpfn_from_mfn(mfn, pfn);
+            dom0_update_physmap(d, pfn, mfn, vphysmap_start);
 #undef pfn
             page++; pfn++;
             if (!(pfn & 0xfffff))
@@ -1053,6 +1239,15 @@ int __init construct_dom0(
         si->console.dom0.info_off  = sizeof(struct start_info);
         si->console.dom0.info_size = sizeof(struct dom0_vga_console_info);
     }
+
+    /*
+     * PVH: We need to update si->shared_info while we are on dom0 page tables,
+     * but need to defer the p2m update until after we have fixed up the
+     * page tables for PVH so that the m2p for the si pte entry returns
+     * correct pfn.
+     */
+    if ( is_pvh_domain(d) )
+        si->shared_info = shared_info_paddr;
 
     if ( is_pv_32on64_domain(d) )
         xlat_start_info(si, XLAT_start_info_console_dom0);
@@ -1087,8 +1282,15 @@ int __init construct_dom0(
     regs->eflags = X86_EFLAGS_IF;
 
     if ( opt_dom0_shadow )
+    {
+        if ( is_pvh_domain(d) )
+        {
+            printk("Unsupported option dom0_shadow for PVH\n");
+            return -EINVAL;
+        }
         if ( paging_enable(d, PG_SH_enable) == 0 ) 
             paging_update_paging_modes(v);
+    }
 
     if ( supervisor_mode_kernel )
     {
@@ -1178,6 +1380,19 @@ int __init construct_dom0(
     if ( elf_check_broken(&elf) )
         printk(" Xen warning: dom0 kernel broken ELF: %s\n",
                elf_check_broken(&elf));
+
+    if ( is_pvh_domain(d) )
+    {
+        /* finally, fixup the page table, replacing mfns with pfns */
+        pvh_fixup_page_tables_for_hap(v, v_start, v_end);
+
+        /* the pt has correct pfn for si, now update the mfn in the p2m */
+        mfn = virt_to_mfn(d->shared_info);
+        pfn = shared_info_paddr >> PAGE_SHIFT;
+        dom0_update_physmap(d, pfn, mfn, 0);
+
+        pvh_map_all_iomem(d);
+    }
 
     if ( d->domain_id == hardware_domid )
         iommu_hwdom_init(d);

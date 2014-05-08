@@ -63,6 +63,7 @@ int   hap_track_dirty_vram(struct domain *d,
                            XEN_GUEST_HANDLE_64(uint8) dirty_bitmap);
 
 extern const struct paging_mode *hap_paging_get_mode(struct vcpu *);
+void hap_set_alloc_for_pvh_dom0(struct domain *d, unsigned long num_pages);
 
 #endif /* XEN_HAP_H */
 

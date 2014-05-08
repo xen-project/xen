@@ -599,6 +599,18 @@ int hap_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
     }
 }
 
+void __init hap_set_alloc_for_pvh_dom0(struct domain *d,
+                                       unsigned long hap_pages)
+{
+    int rc;
+
+    paging_lock(d);
+    rc = hap_set_allocation(d, hap_pages, NULL);
+    paging_unlock(d);
+
+    BUG_ON(rc);
+}
+
 static const struct paging_mode hap_paging_real_mode;
 static const struct paging_mode hap_paging_protected_mode;
 static const struct paging_mode hap_paging_pae_mode;
