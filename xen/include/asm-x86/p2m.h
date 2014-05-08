@@ -519,8 +519,8 @@ void p2m_change_type_range(struct domain *d,
                            p2m_type_t ot, p2m_type_t nt);
 
 /* Compare-exchange the type of a single p2m entry */
-p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
-                           p2m_type_t ot, p2m_type_t nt);
+int p2m_change_type_one(struct domain *d, unsigned long gfn,
+                        p2m_type_t ot, p2m_type_t nt);
 
 /* Report a change affecting memory types. */
 void p2m_memory_type_changed(struct domain *d);

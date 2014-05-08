@@ -1698,7 +1698,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
         if ( access_w )
         {
             paging_mark_dirty(v->domain, mfn_x(mfn));
-            p2m_change_type(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
+            p2m_change_type_one(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
         }
         rc = 1;
         goto out_put_gfn;
@@ -4540,7 +4540,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         while ( a.nr > start_iter )
         {
             unsigned long pfn = a.first_pfn + start_iter;
-            p2m_type_t t, nt;
+            p2m_type_t t;
 
             get_gfn_unshare(d, pfn, &t);
             if ( p2m_is_paging(t) )
@@ -4563,16 +4563,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 goto param_fail4;
             }
 
-            nt = p2m_change_type(d, pfn, t, memtype[a.hvmmem_type]);
-            if ( nt != t )
-            {
-                put_gfn(d, pfn);
-                printk(XENLOG_G_WARNING
-                       "d%d: GFN %#lx type changed from %d to %d while trying to change it to %d\n",
-                       d->domain_id, pfn, t, nt, memtype[a.hvmmem_type]);
-                goto param_fail4;
-            }
+            rc = p2m_change_type_one(d, pfn, t, memtype[a.hvmmem_type]);
             put_gfn(d, pfn);
+            if ( rc )
+                goto param_fail4;
 
             /* Check for continuation if it's not the last interation */
             if ( a.nr > ++start_iter && !(start_iter & HVMOP_op_mask) &&

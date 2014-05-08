@@ -444,8 +444,7 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
     if ( p2m_to_mask(pt) & P2M_UNMAP_TYPES)
     {
         ASSERT(mfn_x(r_mfn) == mfn_x(mfn));
-        p2m_change_type(d, gfn, pt, p2m_ram_broken);
-        rc = 0;
+        rc = p2m_change_type_one(d, gfn, pt, p2m_ram_broken);
     }
     put_gfn(d, gfn);
 

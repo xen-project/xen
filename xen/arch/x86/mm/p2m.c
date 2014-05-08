@@ -704,27 +704,33 @@ out:
 }
 
 
-/* Modify the p2m type of a single gfn from ot to nt, returning the 
- * entry's previous type.  Resets the access permissions. */
-p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn, 
-                           p2m_type_t ot, p2m_type_t nt)
+/*
+ * Modify the p2m type of a single gfn from ot to nt.
+ * Returns: 0 for success, -errno for failure.
+ * Resets the access permissions.
+ */
+int p2m_change_type_one(struct domain *d, unsigned long gfn,
+                       p2m_type_t ot, p2m_type_t nt)
 {
     p2m_access_t a;
     p2m_type_t pt;
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    int rc;
 
     BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
 
     gfn_lock(p2m, gfn, 0);
 
     mfn = p2m->get_entry(p2m, gfn, &pt, &a, 0, NULL);
-    if ( pt == ot )
-        p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, nt, p2m->default_access);
+    rc = likely(pt == ot)
+         ? p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, nt,
+                         p2m->default_access)
+         : -EBUSY;
 
     gfn_unlock(p2m, gfn, 0);
 
-    return pt;
+    return rc;
 }
 
 /* Modify the p2m type of a range of gfns from ot to nt. */

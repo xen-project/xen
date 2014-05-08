@@ -823,7 +823,7 @@ int guest_iommu_set_base(struct domain *d, uint64_t base)
         unsigned long gfn = base + i;
 
         get_gfn_query(d, gfn, &t);
-        p2m_change_type(d, gfn, t, p2m_mmio_dm);
+        p2m_change_type_one(d, gfn, t, p2m_mmio_dm);
         put_gfn(d, gfn);
     }
 
