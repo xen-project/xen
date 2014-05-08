@@ -501,7 +501,7 @@ void p2m_final_teardown(struct domain *d)
 }
 
 
-static void
+static int
 p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
                 unsigned int page_order)
 {
@@ -515,7 +515,7 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
         if ( need_iommu(p2m->domain) )
             for ( i = 0; i < (1 << page_order); i++ )
                 iommu_unmap_page(p2m->domain, mfn + i);
-        return;
+        return 0;
     }
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
@@ -531,8 +531,8 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
             ASSERT( !p2m_is_valid(t) || mfn + i == mfn_x(mfn_return) );
         }
     }
-    p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), page_order, p2m_invalid,
-                  p2m->default_access);
+    return p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), page_order, p2m_invalid,
+                         p2m->default_access);
 }
 
 void
@@ -957,8 +957,7 @@ int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn)
         goto out;
 
     /* Fix p2m entry */
-    p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_paging_out, a);
-    ret = 0;
+    ret = p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_paging_out, a);
 
  out:
     gfn_unlock(p2m, gfn, 0);
@@ -1022,15 +1021,14 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
         put_page(page);
 
     /* Remove mapping from p2m table */
-    p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), PAGE_ORDER_4K, p2m_ram_paged, a);
+    ret = p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), PAGE_ORDER_4K,
+                        p2m_ram_paged, a);
 
     /* Clear content before returning the page to Xen */
     scrub_one_page(page);
 
     /* Track number of paged gfns */
     atomic_inc(&d->paged_pages);
-
-    ret = 0;
 
  out_put:
     /* Put the page back so it gets freed */
@@ -1231,15 +1229,13 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
     /* Make the page already guest-accessible. If the pager still has a
      * pending resume operation, it will be idempotent p2m entry-wise,
      * but will unpause the vcpu */
-    p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K,
-                  paging_mode_log_dirty(d) ? p2m_ram_logdirty :
-                  p2m_ram_rw, a);
+    ret = p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K,
+                        paging_mode_log_dirty(d) ? p2m_ram_logdirty
+                                                 : p2m_ram_rw, a);
     set_gpfn_from_mfn(mfn_x(mfn), gfn);
 
     if ( !page_extant )
         atomic_dec(&d->paged_pages);
-
-    ret = 0;
 
  out:
     gfn_unlock(p2m, gfn, 0);
