@@ -508,9 +508,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append_pair(dm_args, "-device", "VGA");
             break;
         case LIBXL_VGA_INTERFACE_TYPE_CIRRUS:
-            flexarray_append_pair(dm_args, "-device", "cirrus-vga");
-            flexarray_append_pair(dm_args, "-global",
-                GCSPRINTF("vga.vram_size_mb=%d",
+            flexarray_append_pair(dm_args, "-device",
+                GCSPRINTF("cirrus-vga,vgamem_mb=%d",
                 libxl__sizekb_to_mb(b_info->video_memkb)));
             break;
         case LIBXL_VGA_INTERFACE_TYPE_NONE:
