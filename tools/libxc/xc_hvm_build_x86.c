@@ -283,15 +283,11 @@ static int setup_guest(xc_interface *xch,
         goto error_out;
     }
 
-    DPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
-            "  Loader:        %016"PRIx64"->%016"PRIx64"\n"
-            "  Modules:       %016"PRIx64"->%016"PRIx64"\n"
-            "  TOTAL:         %016"PRIx64"->%016"PRIx64"\n"
-            "  ENTRY ADDRESS: %016"PRIx64"\n",
-            elf.pstart, elf.pend,
-            m_start, m_end,
-            v_start, v_end,
-            elf_uval(&elf, elf.ehdr, e_entry));
+    DPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n");
+    DPRINTF("  Loader:   %016"PRIx64"->%016"PRIx64"\n", elf.pstart, elf.pend);
+    DPRINTF("  Modules:  %016"PRIx64"->%016"PRIx64"\n", m_start, m_end);
+    DPRINTF("  TOTAL:    %016"PRIx64"->%016"PRIx64"\n", v_start, v_end);
+    DPRINTF("  ENTRY:    %016"PRIx64"\n", elf_uval(&elf, elf.ehdr, e_entry));
 
     if ( (page_array = malloc(nr_pages * sizeof(xen_pfn_t))) == NULL )
     {
@@ -453,11 +449,10 @@ static int setup_guest(xc_interface *xch,
         goto error_out;
     }
 
-    DPRINTF("PHYSICAL MEMORY ALLOCATION:\n"
-            "  4KB PAGES: 0x%016lx\n"
-            "  2MB PAGES: 0x%016lx\n"
-            "  1GB PAGES: 0x%016lx\n",
-            stat_normal_pages, stat_2mb_pages, stat_1gb_pages);
+    DPRINTF("PHYSICAL MEMORY ALLOCATION:\n");
+    DPRINTF("  4KB PAGES: 0x%016lx\n", stat_normal_pages);
+    DPRINTF("  2MB PAGES: 0x%016lx\n", stat_2mb_pages);
+    DPRINTF("  1GB PAGES: 0x%016lx\n", stat_1gb_pages);
     
     if ( loadelfimage(xch, &elf, dom, page_array) != 0 )
         goto error_out;
