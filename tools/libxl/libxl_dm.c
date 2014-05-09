@@ -505,7 +505,9 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
 
         switch (b_info->u.hvm.vga.kind) {
         case LIBXL_VGA_INTERFACE_TYPE_STD:
-            flexarray_append_pair(dm_args, "-device", "VGA");
+            flexarray_append_pair(dm_args, "-device",
+                GCSPRINTF("VGA,vgamem_mb=%d",
+                libxl__sizekb_to_mb(b_info->video_memkb)));
             break;
         case LIBXL_VGA_INTERFACE_TYPE_CIRRUS:
             flexarray_append_pair(dm_args, "-device",
