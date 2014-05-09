@@ -118,6 +118,16 @@ AC_ARG_WITH([system-ovmf],
 ],[])
 AC_SUBST(ovmf_path)
 
+AC_ARG_WITH([extra-qemuu-configure-args],
+    AS_HELP_STRING([--with-extra-qemuu-configure-args@<:@="--ARG1 ..."@:>@],
+       [List of additional configure options for upstream qemu]),[
+    case $withval in
+        no) EXTRA_QEMUU_CONFIGURE_ARGS= ;;
+        *)  EXTRA_QEMUU_CONFIGURE_ARGS=$withval ;;
+    esac
+],[])
+AC_SUBST(EXTRA_QEMUU_CONFIGURE_ARGS)
+
 AC_ARG_VAR([PREPEND_INCLUDES],
     [List of include folders to prepend to CFLAGS (without -I)])
 AC_ARG_VAR([PREPEND_LIB],

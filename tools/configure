@@ -683,6 +683,7 @@ APPEND_LIB
 APPEND_INCLUDES
 PREPEND_LIB
 PREPEND_INCLUDES
+EXTRA_QEMUU_CONFIGURE_ARGS
 ovmf_path
 seabios_path
 qemu_xen
@@ -767,6 +768,7 @@ enable_qemu_traditional
 with_system_qemu
 with_system_seabios
 with_system_ovmf
+with_extra_qemuu_configure_args
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1440,6 +1442,9 @@ Optional Packages:
   --with-system-ovmf[=PATH]
                           Use system supplied OVMF PATH instead of building
                           and installing our own version
+  --with-extra-qemuu-configure-args[="--ARG1 ..."]
+                          List of additional configure options for upstream
+                          qemu
 
 Some influential environment variables:
   CC          C compiler command
@@ -3818,6 +3823,19 @@ if test "${with_system_ovmf+set}" = set; then :
     case $withval in
         no) ovmf_path= ;;
         *)  ovmf_path=$withval ;;
+    esac
+
+fi
+
+
+
+
+# Check whether --with-extra-qemuu-configure-args was given.
+if test "${with_extra_qemuu_configure_args+set}" = set; then :
+  withval=$with_extra_qemuu_configure_args;
+    case $withval in
+        no) EXTRA_QEMUU_CONFIGURE_ARGS= ;;
+        *)  EXTRA_QEMUU_CONFIGURE_ARGS=$withval ;;
     esac
 
 fi

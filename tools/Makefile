@@ -203,6 +203,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		--disable-docs \
 		--disable-guest-agent \
 		--python=$(PYTHON) \
+		$(CONFIG_QEMUU_EXTRA_ARGS) \
 		$(IOEMU_CONFIGURE_CROSS); \
 	$(MAKE) all
 
