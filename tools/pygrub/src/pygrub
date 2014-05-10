@@ -760,7 +760,7 @@ if __name__ == "__main__":
         usage()
         sys.exit(1)
     file = args[0]
-        
+    fs = None
     output = None
     entry = None
     interactive = True
@@ -882,7 +882,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # Did looping through partitions find us a kernel?
-    if not fs:
+    if fs is None:
         raise RuntimeError, "Unable to find partition containing kernel"
 
     bootcfg["kernel"] = copy_from_image(fs, chosencfg["kernel"], "kernel",
