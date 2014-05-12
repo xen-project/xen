@@ -887,9 +887,8 @@ hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
     }
 
     safe_write_pte(p, new);
-    if ( (old_flags & _PAGE_PRESENT)
-         && (level == 1 || (level == 2 && (old_flags & _PAGE_PSE))) )
-             flush_tlb_mask(d->domain_dirty_cpumask);
+    if ( old_flags & _PAGE_PRESENT )
+        flush_tlb_mask(d->domain_dirty_cpumask);
 
 #if CONFIG_PAGING_LEVELS == 3
     /* install P2M in monitor table for PAE Xen */
