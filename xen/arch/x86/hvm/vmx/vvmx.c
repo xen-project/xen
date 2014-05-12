@@ -1394,7 +1394,6 @@ void nvmx_switch_guest(void)
     struct vcpu *v = current;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct cpu_user_regs *regs = guest_cpu_user_regs();
-    const ioreq_t *ioreq = get_ioreq(v);
 
     /*
      * A pending IO emulation may still be not finished. In this case, no
@@ -1404,7 +1403,7 @@ void nvmx_switch_guest(void)
      * don't want to continue as this setup is not implemented nor supported
      * as of right now.
      */
-    if ( !ioreq || ioreq->state != STATE_IOREQ_NONE )
+    if ( hvm_io_pending(v) )
         return;
     /*
      * a softirq may interrupt us between a virtual vmentry is
@@ -2522,3 +2521,13 @@ void nvmx_set_cr_read_shadow(struct vcpu *v, unsigned int cr)
     /* nvcpu.guest_cr is what L2 write to cr actually. */
     __vmwrite(read_shadow_field, v->arch.hvm_vcpu.nvcpu.guest_cr[cr]);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

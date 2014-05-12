@@ -363,6 +363,26 @@ void hvm_migrate_pirqs(struct vcpu *v)
     spin_unlock(&d->event_lock);
 }
 
+static ioreq_t *get_ioreq(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    shared_iopage_t *p = d->arch.hvm_domain.ioreq.va;
+
+    ASSERT((v == current) || spin_is_locked(&d->arch.hvm_domain.ioreq.lock));
+
+    return p ? &p->vcpu_ioreq[v->vcpu_id] : NULL;
+}
+
+bool_t hvm_io_pending(struct vcpu *v)
+{
+    ioreq_t *p = get_ioreq(v);
+
+    if ( !p )
+        return 0;
+
+    return p->state != STATE_IOREQ_NONE;
+}
+
 void hvm_do_resume(struct vcpu *v)
 {
     ioreq_t *p = get_ioreq(v);
@@ -380,6 +400,7 @@ void hvm_do_resume(struct vcpu *v)
             switch ( p->state )
             {
             case STATE_IORESP_READY: /* IORESP_READY -> NONE */
+                rmb(); /* see IORESP_READY /then/ read contents of ioreq */
                 hvm_io_assist(p);
                 break;
             case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
@@ -1424,7 +1445,87 @@ void hvm_vcpu_down(struct vcpu *v)
     }
 }
 
-bool_t hvm_send_assist_req(void)
+int hvm_buffered_io_send(ioreq_t *p)
+{
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
+    struct hvm_ioreq_page *iorp = &d->arch.hvm_domain.buf_ioreq;
+    buffered_iopage_t *pg = iorp->va;
+    buf_ioreq_t bp = { .data = p->data,
+                       .addr = p->addr,
+                       .type = p->type,
+                       .dir = p->dir };
+    /* Timeoffset sends 64b data, but no address. Use two consecutive slots. */
+    int qw = 0;
+
+    /* Ensure buffered_iopage fits in a page */
+    BUILD_BUG_ON(sizeof(buffered_iopage_t) > PAGE_SIZE);
+
+    /*
+     * Return 0 for the cases we can't deal with:
+     *  - 'addr' is only a 20-bit field, so we cannot address beyond 1MB
+     *  - we cannot buffer accesses to guest memory buffers, as the guest
+     *    may expect the memory buffer to be synchronously accessed
+     *  - the count field is usually used with data_is_ptr and since we don't
+     *    support data_is_ptr we do not waste space for the count field either
+     */
+    if ( (p->addr > 0xffffful) || p->data_is_ptr || (p->count != 1) )
+        return 0;
+
+    switch ( p->size )
+    {
+    case 1:
+        bp.size = 0;
+        break;
+    case 2:
+        bp.size = 1;
+        break;
+    case 4:
+        bp.size = 2;
+        break;
+    case 8:
+        bp.size = 3;
+        qw = 1;
+        break;
+    default:
+        gdprintk(XENLOG_WARNING, "unexpected ioreq size: %u\n", p->size);
+        return 0;
+    }
+
+    spin_lock(&iorp->lock);
+
+    if ( (pg->write_pointer - pg->read_pointer) >=
+         (IOREQ_BUFFER_SLOT_NUM - qw) )
+    {
+        /* The queue is full: send the iopacket through the normal path. */
+        spin_unlock(&iorp->lock);
+        return 0;
+    }
+
+    pg->buf_ioreq[pg->write_pointer % IOREQ_BUFFER_SLOT_NUM] = bp;
+
+    if ( qw )
+    {
+        bp.data = p->data >> 32;
+        pg->buf_ioreq[(pg->write_pointer+1) % IOREQ_BUFFER_SLOT_NUM] = bp;
+    }
+
+    /* Make the ioreq_t visible /before/ write_pointer. */
+    wmb();
+    pg->write_pointer += qw ? 2 : 1;
+
+    notify_via_xen_event_channel(d, d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN]);
+    spin_unlock(&iorp->lock);
+
+    return 1;
+}
+
+bool_t hvm_has_dm(struct domain *d)
+{
+    return !!d->arch.hvm_domain.ioreq.va;
+}
+
+bool_t hvm_send_assist_req(ioreq_t *proto_p)
 {
     struct vcpu *v = current;
     ioreq_t *p = get_ioreq(v);
@@ -1443,14 +1544,18 @@ bool_t hvm_send_assist_req(void)
         return 0;
     }
 
-    prepare_wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port);
+    proto_p->state = STATE_IOREQ_NONE;
+    proto_p->vp_eport = p->vp_eport;
+    *p = *proto_p;
+
+    prepare_wait_on_xen_event_channel(p->vp_eport);
 
     /*
      * Following happens /after/ blocking and setting up ioreq contents.
      * prepare_wait_on_xen_event_channel() is an implicit barrier.
      */
     p->state = STATE_IOREQ_READY;
-    notify_via_xen_event_channel(v->domain, v->arch.hvm_vcpu.xen_port);
+    notify_via_xen_event_channel(v->domain, p->vp_eport);
 
     return 1;
 }

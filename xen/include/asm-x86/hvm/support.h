@@ -22,20 +22,9 @@
 #define __ASM_X86_HVM_SUPPORT_H__
 
 #include <xen/types.h>
-#include <public/hvm/ioreq.h>
 #include <xen/sched.h>
 #include <xen/hvm/save.h>
 #include <asm/processor.h>
-
-static inline ioreq_t *get_ioreq(struct vcpu *v)
-{
-    struct domain *d = v->domain;
-    shared_iopage_t *p = d->arch.hvm_domain.ioreq.va;
-
-    ASSERT((v == current) || spin_is_locked(&d->arch.hvm_domain.ioreq.lock));
-
-    return p ? &p->vcpu_ioreq[v->vcpu_id] : NULL;
-}
 
 #define HVM_DELIVER_NO_ERROR_CODE  -1
 
@@ -144,3 +133,13 @@ int hvm_mov_to_cr(unsigned int cr, unsigned int gpr);
 int hvm_mov_from_cr(unsigned int cr, unsigned int gpr);
 
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

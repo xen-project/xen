@@ -26,6 +26,7 @@
 #include <asm/hvm/asid.h>
 #include <public/domctl.h>
 #include <public/hvm/save.h>
+#include <public/hvm/ioreq.h>
 #include <asm/mm.h>
 
 /* Interrupt acknowledgement sources. */
@@ -231,7 +232,7 @@ int prepare_ring_for_helper(struct domain *d, unsigned long gmfn,
                             struct page_info **_page, void **_va);
 void destroy_ring_for_helper(void **_va, struct page_info *page);
 
-bool_t hvm_send_assist_req(void);
+bool_t hvm_send_assist_req(ioreq_t *p);
 
 void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat);
 int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat);
@@ -349,6 +350,8 @@ void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
 void hvm_migrate_timers(struct vcpu *v);
+bool_t hvm_has_dm(struct domain *d);
+bool_t hvm_io_pending(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 void hvm_migrate_pirqs(struct vcpu *v);
 
@@ -545,3 +548,13 @@ bool_t nhvm_vmcx_hap_enabled(struct vcpu *v);
 enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v);
 
 #endif /* __ASM_X86_HVM_HVM_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
