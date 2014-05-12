@@ -61,6 +61,10 @@ integer_param("maxcpus", max_cpus);
 static bool_t __initdata disable_smep;
 invbool_param("smep", disable_smep);
 
+/* smap: Enable/disable Supervisor Mode Access Prevention (default on). */
+static bool_t __initdata disable_smap;
+invbool_param("smap", disable_smap);
+
 /* **** Linux config option: propagated to domain0. */
 /* "acpi=off":    Sisables both ACPI table parsing and interpreter. */
 /* "acpi=force":  Override the disable blacklist.                   */
@@ -1280,6 +1284,11 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( cpu_has_smep )
         set_in_cr4(X86_CR4_SMEP);
 
+    if ( disable_smap )
+        setup_clear_cpu_cap(X86_FEATURE_SMAP);
+    if ( cpu_has_smap )
+        set_in_cr4(X86_CR4_SMAP);
+
     if ( cpu_has_fsgsbase )
         set_in_cr4(X86_CR4_FSGSBASE);
 
@@ -1386,6 +1395,14 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                initrdidx);
 
     /*
+     * Temporarily clear SMAP in CR4 to allow user-accesses in construct_dom0().
+     * This saves a large number of corner cases interactions with
+     * copy_from_user().
+     */
+    if ( cpu_has_smap )
+        write_cr4(read_cr4() & ~X86_CR4_SMAP);
+
+    /*
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
@@ -1394,6 +1411,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                         ? mod + initrdidx : NULL,
                         bootstrap_map, cmdline) != 0)
         panic("Could not set up DOM0 guest OS");
+
+    if ( cpu_has_smap )
+        write_cr4(read_cr4() | X86_CR4_SMAP);
 
     /* Scrub RAM that is still free and so may go to an unprivileged domain. */
     scrub_heap_pages();

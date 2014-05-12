@@ -912,6 +912,13 @@ Set the serial transmit buffer size.
 
 Flag to enable Supervisor Mode Execution Protection
 
+### smap
+> `= <boolean>`
+
+> Default: `true`
+
+Flag to enable Supervisor Mode Access Prevention
+
 ### snb\_igd\_quirk
 > `= <boolean>`
 

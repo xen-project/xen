@@ -1194,11 +1194,12 @@ static int handle_gdt_ldt_mapping_fault(
 enum pf_type {
     real_fault,
     smep_fault,
+    smap_fault,
     spurious_fault
 };
 
 static enum pf_type __page_fault_type(
-    unsigned long addr, unsigned int error_code)
+    unsigned long addr, const struct cpu_user_regs *regs)
 {
     unsigned long mfn, cr3 = read_cr3();
     l4_pgentry_t l4e, *l4t;
@@ -1206,6 +1207,7 @@ static enum pf_type __page_fault_type(
     l2_pgentry_t l2e, *l2t;
     l1_pgentry_t l1e, *l1t;
     unsigned int required_flags, disallowed_flags, page_user;
+    unsigned int error_code = regs->error_code;
 
     /*
      * We do not take spurious page faults in IRQ handlers as we do not
@@ -1274,19 +1276,37 @@ static enum pf_type __page_fault_type(
     page_user &= l1e_get_flags(l1e);
 
 leaf:
-    /*
-     * Supervisor Mode Execution Protection (SMEP):
-     * Disallow supervisor execution from user-accessible mappings
-     */
-    if ( (read_cr4() & X86_CR4_SMEP) && page_user &&
-         ((error_code & (PFEC_insn_fetch|PFEC_user_mode)) == PFEC_insn_fetch) )
-        return smep_fault;
+    if ( page_user )
+    {
+        unsigned long cr4 = read_cr4();
+        /*
+         * Supervisor Mode Execution Prevention (SMEP):
+         * Disallow supervisor execution from user-accessible mappings
+         */
+        if ( (cr4 & X86_CR4_SMEP) &&
+             ((error_code & (PFEC_insn_fetch|PFEC_user_mode)) == PFEC_insn_fetch) )
+            return smep_fault;
+
+        /*
+         * Supervisor Mode Access Prevention (SMAP):
+         * Disallow supervisor access user-accessible mappings
+         * A fault is considered as an SMAP violation if the following
+         * conditions are true:
+         *   - X86_CR4_SMAP is set in CR4
+         *   - A user page is being accessed
+         *   - CPL=3 or X86_EFLAGS_AC is clear
+         *   - Page fault in kernel mode
+         */
+        if ( (cr4 & X86_CR4_SMAP) && !(error_code & PFEC_user_mode) &&
+             (((regs->cs & 3) == 3) || !(regs->eflags & X86_EFLAGS_AC)) )
+            return smap_fault;
+    }
 
     return spurious_fault;
 }
 
 static enum pf_type spurious_page_fault(
-    unsigned long addr, unsigned int error_code)
+    unsigned long addr, const struct cpu_user_regs *regs)
 {
     unsigned long flags;
     enum pf_type pf_type;
@@ -1296,7 +1316,7 @@ static enum pf_type spurious_page_fault(
      * page tables from becoming invalid under our feet during the walk.
      */
     local_irq_save(flags);
-    pf_type = __page_fault_type(addr, error_code);
+    pf_type = __page_fault_type(addr, regs);
     local_irq_restore(flags);
 
     return pf_type;
@@ -1391,8 +1411,14 @@ void do_page_fault(struct cpu_user_regs *regs)
 
     if ( unlikely(!guest_mode(regs)) )
     {
-        pf_type = spurious_page_fault(addr, error_code);
-        BUG_ON(pf_type == smep_fault);
+        pf_type = spurious_page_fault(addr, regs);
+        if ( (pf_type == smep_fault) || (pf_type == smap_fault) )
+        {
+            console_start_sync();
+            printk("Xen SM%cP violation\n", (pf_type == smep_fault) ? 'E' : 'A');
+            fatal_trap(TRAP_page_fault, regs);
+        }
+
         if ( pf_type != real_fault )
             return;
 
@@ -1418,10 +1444,12 @@ void do_page_fault(struct cpu_user_regs *regs)
 
     if ( unlikely(current->domain->arch.suppress_spurious_page_faults) )
     {
-        pf_type = spurious_page_fault(addr, error_code);
-        if ( pf_type == smep_fault )
+        pf_type = spurious_page_fault(addr, regs);
+        if ( (pf_type == smep_fault) || (pf_type == smap_fault))
         {
-            gdprintk(XENLOG_ERR, "Fatal SMEP fault\n");
+            printk(XENLOG_G_ERR "%pv fatal SM%cP violation\n",
+                   current, (pf_type == smep_fault) ? 'E' : 'A');
+
             domain_crash(current->domain);
         }
         if ( pf_type != real_fault )

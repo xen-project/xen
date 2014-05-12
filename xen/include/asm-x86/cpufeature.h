@@ -190,6 +190,7 @@
 #define cpu_has_fsgsbase	boot_cpu_has(X86_FEATURE_FSGSBASE)
 
 #define cpu_has_smep            boot_cpu_has(X86_FEATURE_SMEP)
+#define cpu_has_smap            boot_cpu_has(X86_FEATURE_SMAP)
 #define cpu_has_fpu_sel         (!boot_cpu_has(X86_FEATURE_NO_FPU_SEL))
 
 #define cpu_has_ffxsr           ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) \
