@@ -27,6 +27,7 @@
 #include <xen/softirq.h>
 #include <xen/time.h>
 #include <xen/pci.h>
+#include <xen/pci_ids.h>
 #include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
 #include <asm/msi.h>
@@ -390,12 +391,68 @@ void __init pci_vtd_quirk(struct pci_dev *pdev)
     int bus = pdev->bus;
     int dev = PCI_SLOT(pdev->devfn);
     int func = PCI_FUNC(pdev->devfn);
-    int id, val;
+    int pos;
+    u32 val;
 
-    id = pci_conf_read32(seg, bus, dev, func, 0);
-    if ( id == 0x342e8086 || id == 0x3c288086 )
+    if ( pci_conf_read16(seg, bus, dev, func, PCI_VENDOR_ID) !=
+         PCI_VENDOR_ID_INTEL )
+        return;
+
+    switch ( pci_conf_read16(seg, bus, dev, func, PCI_DEVICE_ID) )
     {
+    case 0x342e: /* Tylersburg chipset (Nehalem / Westmere systems) */
+    case 0x3c28: /* Sandybridge */
         val = pci_conf_read32(seg, bus, dev, func, 0x1AC);
         pci_conf_write32(seg, bus, dev, func, 0x1AC, val | (1 << 31));
+        break;
+
+    /* Tylersburg (EP)/Boxboro (MP) chipsets (NHM-EP/EX, WSM-EP/EX) */
+    case 0x3400 ... 0x3407: /* host bridges */
+    case 0x3408 ... 0x3411: case 0x3420 ... 0x3421: /* root ports */
+    /* JasperForest (Intel Xeon Processor C5500/C3500 */
+    case 0x3700 ... 0x370f: /* host bridges */
+    case 0x3720 ... 0x3724: /* root ports */
+    /* Sandybridge-EP (Romley) */
+    case 0x3c00: /* host bridge */
+    case 0x3c01 ... 0x3c0b: /* root ports */
+        pos = pci_find_ext_capability(seg, bus, pdev->devfn,
+                                      PCI_EXT_CAP_ID_ERR);
+        if ( !pos )
+        {
+            pos = pci_find_ext_capability(seg, bus, pdev->devfn,
+                                          PCI_EXT_CAP_ID_VNDR);
+            while ( pos )
+            {
+                val = pci_conf_read32(seg, bus, dev, func, pos + PCI_VNDR_HEADER);
+                if ( PCI_VNDR_HEADER_ID(val) == 4 && PCI_VNDR_HEADER_REV(val) == 1 )
+                {
+                    pos += PCI_VNDR_HEADER;
+                    break;
+                }
+                pos = pci_find_next_ext_capability(seg, bus, pdev->devfn, pos,
+                                                   PCI_EXT_CAP_ID_VNDR);
+            }
+        }
+        if ( !pos )
+        {
+            printk(XENLOG_WARNING "%04x:%02x:%02x.%u without AER capability?\n",
+                   seg, bus, dev, func);
+            break;
+        }
+
+        val = pci_conf_read32(seg, bus, dev, func, pos + PCI_ERR_UNCOR_MASK);
+        pci_conf_write32(seg, bus, dev, func, pos + PCI_ERR_UNCOR_MASK,
+                         val | PCI_ERR_UNC_UNSUP);
+        val = pci_conf_read32(seg, bus, dev, func, pos + PCI_ERR_COR_MASK);
+        pci_conf_write32(seg, bus, dev, func, pos + PCI_ERR_COR_MASK,
+                         val | PCI_ERR_COR_ADV_NFAT);
+
+        /* XPUNCERRMSK Send Completion with Unsupported Request */
+        val = pci_conf_read32(seg, bus, dev, func, 0x20c);
+        pci_conf_write32(seg, bus, dev, func, 0x20c, val | (1 << 4));
+
+        printk(XENLOG_INFO "Masked UR signaling on %04x:%02x:%02x.%u\n",
+               seg, bus, dev, func);
+        break;
     }
 }
