@@ -478,7 +478,7 @@ static int hvm_set_ioreq_page(
 
     if ( (iorp->va != NULL) || d->is_dying )
     {
-        destroy_ring_for_helper(&iorp->va, iorp->page);
+        destroy_ring_for_helper(&va, page);
         spin_unlock(&iorp->lock);
         return -EINVAL;
     }
