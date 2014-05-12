@@ -537,10 +537,10 @@ int set_guest_nmi_trapbounce(void)
     return !null_trap_bounce(v, tb);
 }
 
-static inline void do_trap(
-    int trapnr, struct cpu_user_regs *regs, int use_error_code)
+static void do_trap(struct cpu_user_regs *regs, int use_error_code)
 {
     struct vcpu *curr = current;
+    unsigned int trapnr = regs->entry_vector;
     unsigned long fixup;
 
     DEBUGGER_trap_entry(trapnr, regs);
@@ -576,28 +576,28 @@ static inline void do_trap(
           trapnr, trapstr(trapnr), regs->error_code);
 }
 
-#define DO_ERROR_NOCODE(trapnr, name)                   \
-void do_##name(struct cpu_user_regs *regs)   \
+#define DO_ERROR_NOCODE(name)                           \
+void do_##name(struct cpu_user_regs *regs)              \
 {                                                       \
-    do_trap(trapnr, regs, 0);                           \
+    do_trap(regs, 0);                                   \
 }
 
-#define DO_ERROR(trapnr, name)                          \
-void do_##name(struct cpu_user_regs *regs)   \
+#define DO_ERROR(name)                                  \
+void do_##name(struct cpu_user_regs *regs)              \
 {                                                       \
-    do_trap(trapnr, regs, 1);                           \
+    do_trap(regs, 1);                                   \
 }
 
-DO_ERROR_NOCODE(TRAP_divide_error,    divide_error)
-DO_ERROR_NOCODE(TRAP_overflow,        overflow)
-DO_ERROR_NOCODE(TRAP_bounds,          bounds)
-DO_ERROR_NOCODE(TRAP_copro_seg,       coprocessor_segment_overrun)
-DO_ERROR(       TRAP_invalid_tss,     invalid_TSS)
-DO_ERROR(       TRAP_no_segment,      segment_not_present)
-DO_ERROR(       TRAP_stack_error,     stack_segment)
-DO_ERROR_NOCODE(TRAP_copro_error,     coprocessor_error)
-DO_ERROR(       TRAP_alignment_check, alignment_check)
-DO_ERROR_NOCODE(TRAP_simd_error,      simd_coprocessor_error)
+DO_ERROR_NOCODE(divide_error)
+DO_ERROR_NOCODE(overflow)
+DO_ERROR_NOCODE(bounds)
+DO_ERROR_NOCODE(coprocessor_segment_overrun)
+DO_ERROR(       invalid_TSS)
+DO_ERROR(       segment_not_present)
+DO_ERROR(       stack_segment)
+DO_ERROR_NOCODE(coprocessor_error)
+DO_ERROR(       alignment_check)
+DO_ERROR_NOCODE(simd_coprocessor_error)
 
 /* Returns 0 if not handled, and non-0 for success. */
 int rdmsr_hypervisor_regs(uint32_t idx, uint64_t *val)
