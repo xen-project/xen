@@ -49,9 +49,13 @@
 int hvm_buffered_io_send(ioreq_t *p)
 {
     struct vcpu *v = current;
-    struct hvm_ioreq_page *iorp = &v->domain->arch.hvm_domain.buf_ioreq;
+    struct domain *d = v->domain;
+    struct hvm_ioreq_page *iorp = &d->arch.hvm_domain.buf_ioreq;
     buffered_iopage_t *pg = iorp->va;
-    buf_ioreq_t bp;
+    buf_ioreq_t bp = { .data = p->data,
+                       .addr = p->addr,
+                       .type = p->type,
+                       .dir  = p->dir };
     /* Timeoffset sends 64b data, but no address. Use two consecutive slots. */
     int qw = 0;
 
@@ -69,8 +73,6 @@ int hvm_buffered_io_send(ioreq_t *p)
     if ( (p->addr > 0xffffful) || p->data_is_ptr || (p->count != 1) )
         return 0;
 
-    bp.type = p->type;
-    bp.dir  = p->dir;
     switch ( p->size )
     {
     case 1:
@@ -91,9 +93,6 @@ int hvm_buffered_io_send(ioreq_t *p)
         return 0;
     }
     
-    bp.data = p->data;
-    bp.addr = p->addr;
-    
     spin_lock(&iorp->lock);
 
     if ( (pg->write_pointer - pg->read_pointer) >=
@@ -104,22 +103,20 @@ int hvm_buffered_io_send(ioreq_t *p)
         return 0;
     }
     
-    memcpy(&pg->buf_ioreq[pg->write_pointer % IOREQ_BUFFER_SLOT_NUM],
-           &bp, sizeof(bp));
+    pg->buf_ioreq[pg->write_pointer % IOREQ_BUFFER_SLOT_NUM] = bp;
     
     if ( qw )
     {
         bp.data = p->data >> 32;
-        memcpy(&pg->buf_ioreq[(pg->write_pointer+1) % IOREQ_BUFFER_SLOT_NUM],
-               &bp, sizeof(bp));
+        pg->buf_ioreq[(pg->write_pointer+1) % IOREQ_BUFFER_SLOT_NUM] = bp;
     }
 
     /* Make the ioreq_t visible /before/ write_pointer. */
     wmb();
     pg->write_pointer += qw ? 2 : 1;
 
-    notify_via_xen_event_channel(v->domain,
-            v->domain->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN]);
+    notify_via_xen_event_channel(d,
+            d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN]);
     spin_unlock(&iorp->lock);
     
     return 1;
@@ -127,22 +124,19 @@ int hvm_buffered_io_send(ioreq_t *p)
 
 void send_timeoffset_req(unsigned long timeoff)
 {
-    ioreq_t p[1];
+    ioreq_t p = {
+        .type = IOREQ_TYPE_TIMEOFFSET,
+        .size = 8,
+        .count = 1,
+        .dir = IOREQ_WRITE,
+        .data = timeoff,
+        .state = STATE_IOREQ_READY,
+    };
 
     if ( timeoff == 0 )
         return;
 
-    memset(p, 0, sizeof(*p));
-
-    p->type = IOREQ_TYPE_TIMEOFFSET;
-    p->size = 8;
-    p->count = 1;
-    p->dir = IOREQ_WRITE;
-    p->data = timeoff;
-
-    p->state = STATE_IOREQ_READY;
-
-    if ( !hvm_buffered_io_send(p) )
+    if ( !hvm_buffered_io_send(&p) )
         printk("Unsuccessful timeoffset update\n");
 }
 
@@ -168,7 +162,7 @@ void send_invalidate_req(void)
     p->dir = IOREQ_WRITE;
     p->data = ~0UL; /* flush all */
 
-    (void)hvm_send_assist_req(v);
+    (void)hvm_send_assist_req();
 }
 
 int handle_mmio(void)

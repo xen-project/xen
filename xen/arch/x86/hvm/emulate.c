@@ -241,7 +241,7 @@ static int hvmemul_do_io(
         else
         {
             rc = X86EMUL_RETRY;
-            if ( !hvm_send_assist_req(curr) )
+            if ( !hvm_send_assist_req() )
                 vio->io_state = HVMIO_none;
             else if ( p_data == NULL )
                 rc = X86EMUL_OKAY;

@@ -31,7 +31,9 @@ static inline ioreq_t *get_ioreq(struct vcpu *v)
 {
     struct domain *d = v->domain;
     shared_iopage_t *p = d->arch.hvm_domain.ioreq.va;
+
     ASSERT((v == current) || spin_is_locked(&d->arch.hvm_domain.ioreq.lock));
+
     return p ? &p->vcpu_ioreq[v->vcpu_id] : NULL;
 }
 

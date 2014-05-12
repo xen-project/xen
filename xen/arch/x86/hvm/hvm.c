@@ -365,7 +365,7 @@ void hvm_migrate_pirqs(struct vcpu *v)
 
 void hvm_do_resume(struct vcpu *v)
 {
-    ioreq_t *p;
+    ioreq_t *p = get_ioreq(v);
 
     check_wakeup_from_wait();
 
@@ -373,30 +373,29 @@ void hvm_do_resume(struct vcpu *v)
         pt_restore_timer(v);
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
-    if ( !(p = get_ioreq(v)) )
-        goto check_inject_trap;
-
-    while ( p->state != STATE_IOREQ_NONE )
+    if ( p )
     {
-        switch ( p->state )
+        while ( p->state != STATE_IOREQ_NONE )
         {
-        case STATE_IORESP_READY: /* IORESP_READY -> NONE */
-            hvm_io_assist(p);
-            break;
-        case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
-        case STATE_IOREQ_INPROCESS:
-            wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port,
-                                      (p->state != STATE_IOREQ_READY) &&
-                                      (p->state != STATE_IOREQ_INPROCESS));
-            break;
-        default:
-            gdprintk(XENLOG_ERR, "Weird HVM iorequest state %d.\n", p->state);
-            domain_crash(v->domain);
-            return; /* bail */
+            switch ( p->state )
+            {
+            case STATE_IORESP_READY: /* IORESP_READY -> NONE */
+                hvm_io_assist(p);
+                break;
+            case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
+            case STATE_IOREQ_INPROCESS:
+                wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port,
+                                          (p->state != STATE_IOREQ_READY) &&
+                                          (p->state != STATE_IOREQ_INPROCESS));
+                break;
+            default:
+                gdprintk(XENLOG_ERR, "Weird HVM iorequest state %d.\n", p->state);
+                domain_crash(v->domain);
+                return; /* bail */
+            }
         }
     }
 
- check_inject_trap:
     /* Inject pending hw/sw trap */
     if ( v->arch.hvm_vcpu.inject_trap.vector != -1 ) 
     {
@@ -426,7 +425,7 @@ void destroy_ring_for_helper(
     }
 }
 
-static void hvm_destroy_ioreq_page(
+static void hvm_unmap_ioreq_page(
     struct domain *d, struct hvm_ioreq_page *iorp)
 {
     spin_lock(&iorp->lock);
@@ -482,7 +481,7 @@ int prepare_ring_for_helper(
     return 0;
 }
 
-static int hvm_set_ioreq_page(
+static int hvm_map_ioreq_page(
     struct domain *d, struct hvm_ioreq_page *iorp, unsigned long gmfn)
 {
     struct page_info *page;
@@ -652,8 +651,8 @@ void hvm_domain_relinquish_resources(struct domain *d)
     if ( hvm_funcs.nhvm_domain_relinquish_resources )
         hvm_funcs.nhvm_domain_relinquish_resources(d);
 
-    hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.ioreq);
-    hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
+    hvm_unmap_ioreq_page(d, &d->arch.hvm_domain.ioreq);
+    hvm_unmap_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
     msixtbl_pt_cleanup(d);
 
@@ -1425,14 +1424,15 @@ void hvm_vcpu_down(struct vcpu *v)
     }
 }
 
-bool_t hvm_send_assist_req(struct vcpu *v)
+bool_t hvm_send_assist_req(void)
 {
-    ioreq_t *p;
+    struct vcpu *v = current;
+    ioreq_t *p = get_ioreq(v);
 
     if ( unlikely(!vcpu_start_shutdown_deferral(v)) )
         return 0; /* implicitly bins the i/o operation */
 
-    if ( !(p = get_ioreq(v)) )
+    if ( !p )
         return 0;
 
     if ( unlikely(p->state != STATE_IOREQ_NONE) )
@@ -4129,7 +4129,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             {
             case HVM_PARAM_IOREQ_PFN:
                 iorp = &d->arch.hvm_domain.ioreq;
-                if ( (rc = hvm_set_ioreq_page(d, iorp, a.value)) != 0 )
+                if ( (rc = hvm_map_ioreq_page(d, iorp, a.value)) != 0 )
                     break;
                 spin_lock(&iorp->lock);
                 if ( iorp->va != NULL )
@@ -4138,9 +4138,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                         get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
                 spin_unlock(&iorp->lock);
                 break;
-            case HVM_PARAM_BUFIOREQ_PFN: 
+            case HVM_PARAM_BUFIOREQ_PFN:
                 iorp = &d->arch.hvm_domain.buf_ioreq;
-                rc = hvm_set_ioreq_page(d, iorp, a.value);
+                rc = hvm_map_ioreq_page(d, iorp, a.value);
                 break;
             case HVM_PARAM_CALLBACK_IRQ:
                 hvm_set_callback_via(d, a.value);
