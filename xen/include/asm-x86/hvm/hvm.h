@@ -265,6 +265,8 @@ int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
     (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE))
 #define hvm_smep_enabled(v) \
     (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_SMEP))
+#define hvm_smap_enabled(v) \
+    (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_SMAP))
 #define hvm_nx_enabled(v) \
     (!!((v)->arch.hvm_vcpu.guest_efer & EFER_NX))
 
@@ -366,15 +368,28 @@ static inline int hvm_event_pending(struct vcpu *v)
 
 static inline bool_t hvm_vcpu_has_smep(void)
 {
-    unsigned int eax, ebx;
+    unsigned int eax, ebx, ecx = 0;
 
     hvm_cpuid(0, &eax, NULL, NULL, NULL);
 
-    if (eax < 7)
+    if ( eax < 7 )
         return 0;
 
-    hvm_cpuid(7, NULL, &ebx, NULL, NULL);
+    hvm_cpuid(7, NULL, &ebx, &ecx, NULL);
     return !!(ebx & cpufeat_mask(X86_FEATURE_SMEP));
+}
+
+static inline bool_t hvm_vcpu_has_smap(void)
+{
+    unsigned int eax, ebx, ecx = 0;
+
+    hvm_cpuid(0, &eax, NULL, NULL, NULL);
+
+    if ( eax < 7 )
+        return 0;
+
+    hvm_cpuid(7, NULL, &ebx, &ecx, NULL);
+    return !!(ebx & cpufeat_mask(X86_FEATURE_SMAP));
 }
 
 /* These reserved bits in lower 32 remain 0 after any load of CR0 */
@@ -397,6 +412,7 @@ static inline bool_t hvm_vcpu_has_smep(void)
         X86_CR4_MCE | X86_CR4_PGE | X86_CR4_PCE |       \
         X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT |           \
         (hvm_vcpu_has_smep() ? X86_CR4_SMEP : 0) |      \
+        (hvm_vcpu_has_smap() ? X86_CR4_SMAP : 0) |      \
         (cpu_has_fsgsbase ? X86_CR4_FSGSBASE : 0) |     \
         ((nestedhvm_enabled((_v)->domain) && cpu_has_vmx)\
                       ? X86_CR4_VMXE : 0)  |             \

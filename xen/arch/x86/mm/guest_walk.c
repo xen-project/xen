@@ -144,7 +144,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     guest_l4e_t *l4p;
 #endif
     uint32_t gflags, mflags, iflags, rc = 0;
-    int smep;
+    bool_t smep = 0, smap = 0;
     bool_t pse1G = 0, pse2M = 0;
     p2m_query_t qt = P2M_ALLOC | P2M_UNSHARE;
 
@@ -159,13 +159,33 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     mflags = mandatory_flags(v, pfec);
     iflags = (_PAGE_NX_BIT | _PAGE_INVALID_BITS);
 
-    /* SMEP: kernel-mode instruction fetches from user-mode mappings
-     * should fault.  Unlike NX or invalid bits, we're looking for _all_
-     * entries in the walk to have _PAGE_USER set, so we need to do the
-     * whole walk as if it were a user-mode one and then invert the answer. */
-    smep = (is_hvm_vcpu(v) && hvm_smep_enabled(v) 
-            && (pfec & PFEC_insn_fetch) && !(pfec & PFEC_user_mode) );
-    if ( smep )
+    if ( is_hvm_vcpu(v) && !(pfec & PFEC_user_mode) )
+    {
+        struct segment_register seg;
+        const struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+        hvm_get_segment_register(v, x86_seg_ss, &seg);
+
+        /* SMEP: kernel-mode instruction fetches from user-mode mappings
+         * should fault.  Unlike NX or invalid bits, we're looking for _all_
+         * entries in the walk to have _PAGE_USER set, so we need to do the
+         * whole walk as if it were a user-mode one and then invert the answer. */
+        smep =  hvm_smep_enabled(v) && (pfec & PFEC_insn_fetch);
+
+        /*
+         * SMAP: kernel-mode data accesses from user-mode mappings should fault
+         * A fault is considered as a SMAP violation if the following
+         * conditions come true:
+         *   - X86_CR4_SMAP is set in CR4
+         *   - A user page is accessed
+         *   - CPL = 3 or X86_EFLAGS_AC is clear
+         *   - Page fault in kernel mode
+         */
+        smap = hvm_smap_enabled(v) &&
+               ((seg.attr.fields.dpl == 3) || !(regs->eflags & X86_EFLAGS_AC));
+    }
+
+    if ( smep || smap )
         mflags |= _PAGE_USER;
 
 #if GUEST_PAGING_LEVELS >= 3 /* PAE or 64... */
@@ -338,8 +358,8 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
 set_ad:
 #endif
-    /* Now re-invert the user-mode requirement for SMEP. */
-    if ( smep ) 
+    /* Now re-invert the user-mode requirement for SMEP and SMAP */
+    if ( smep || smap )
         rc ^= _PAGE_USER;
 
     /* Go back and set accessed and dirty bits only if the walk was a
