@@ -60,7 +60,7 @@ start_bsp:
 
 /* This is the default interrupt handler. */
 ignore_int:
-        SAVE_ALL
+        SAVE_ALL CLAC
         movq    %cr2,%rsi
         leaq    int_msg(%rip),%rdi
         xorl    %eax,%eax

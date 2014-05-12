@@ -56,10 +56,7 @@ void restore_rest_processor_state(void)
     wrmsrl(MSR_LSTAR, saved_lstar);
     wrmsrl(MSR_CSTAR, saved_cstar);
     wrmsr(MSR_STAR, 0, (FLAT_RING3_CS32<<16) | __HYPERVISOR_CS);
-    wrmsr(MSR_SYSCALL_MASK,
-          X86_EFLAGS_VM|X86_EFLAGS_RF|X86_EFLAGS_NT|
-          X86_EFLAGS_DF|X86_EFLAGS_IF|X86_EFLAGS_TF,
-          0U);
+    wrmsr(MSR_SYSCALL_MASK, XEN_SYSCALL_MASK, 0U);
 
     wrfsbase(saved_fs_base);
     wrgsbase(saved_gs_base);

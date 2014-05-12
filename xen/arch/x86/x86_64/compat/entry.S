@@ -13,6 +13,7 @@
 #include <irq_vectors.h>
 
 ENTRY(compat_hypercall)
+        ASM_CLAC
         pushq $0
         SAVE_VOLATILE type=TRAP_syscall compat=1
 

@@ -273,6 +273,7 @@ ENTRY(sysenter_entry)
         pushq $0
         pushfq
 GLOBAL(sysenter_eflags_saved)
+        ASM_CLAC
         pushq $3 /* ring 3 null cs */
         pushq $0 /* null rip */
         pushq $0
@@ -309,6 +310,7 @@ UNLIKELY_END(sysenter_gpf)
         jmp   .Lbounce_exception
 
 ENTRY(int80_direct_trap)
+        ASM_CLAC
         pushq $0
         SAVE_VOLATILE 0x80
 
@@ -466,7 +468,7 @@ ENTRY(dom_crash_sync_extable)
         jmp   asm_domain_crash_synchronous /* Does not return */
 
 ENTRY(common_interrupt)
-        SAVE_ALL
+        SAVE_ALL CLAC
         movq %rsp,%rdi
         callq do_IRQ
         jmp ret_from_intr
@@ -485,7 +487,7 @@ ENTRY(page_fault)
         movl  $TRAP_page_fault,4(%rsp)
 /* No special register assumptions. */
 GLOBAL(handle_exception)
-        SAVE_ALL
+        SAVE_ALL CLAC
 handle_exception_saved:
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
@@ -614,7 +616,8 @@ ENTRY(spurious_interrupt_bug)
 
 ENTRY(double_fault)
         movl  $TRAP_double_fault,4(%rsp)
-        SAVE_ALL
+        /* Set AC to reduce chance of further SMAP faults */
+        SAVE_ALL STAC
         movq  %rsp,%rdi
         call  do_double_fault
         ud2
@@ -631,7 +634,7 @@ ENTRY(nmi)
         pushq $0
         movl  $TRAP_nmi,4(%rsp)
 handle_ist_exception:
-        SAVE_ALL
+        SAVE_ALL CLAC
         testb $3,UREGS_cs(%rsp)
         jz    1f
         /* Interrupted guest context. Copy the context to stack bottom. */
@@ -667,7 +670,8 @@ handle_ist_exception:
 ENTRY(nmi_crash)
         pushq $0
         movl $TRAP_nmi,4(%rsp)
-        SAVE_ALL
+        /* Set AC to reduce chance of further SMAP faults */
+        SAVE_ALL STAC
         movq %rsp,%rdi
         callq do_nmi_crash /* Does not return */
         ud2

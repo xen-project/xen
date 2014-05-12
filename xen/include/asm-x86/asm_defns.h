@@ -190,7 +190,18 @@ static inline void stac(void)
 #endif
 
 #ifdef __ASSEMBLY__
-.macro SAVE_ALL
+.macro SAVE_ALL op
+.ifeqs "\op", "CLAC"
+        ASM_CLAC
+.else
+.ifeqs "\op", "STAC"
+        ASM_STAC
+.else
+.ifnb \op
+        .err
+.endif
+.endif
+.endif
         addq  $-(UREGS_error_code-UREGS_r15), %rsp
         cld
         movq  %rdi,UREGS_rdi(%rsp)

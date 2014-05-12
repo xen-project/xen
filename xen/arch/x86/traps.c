@@ -401,6 +401,9 @@ void fatal_trap(int trapnr, struct cpu_user_regs *regs)
 {
     static DEFINE_PER_CPU(char, depth);
 
+    /* Set AC to reduce chance of further SMAP faults */
+    stac();
+
     /*
      * In some cases, we can end up in a vicious cycle of fatal_trap()s
      * within fatal_trap()s. We give the problem a couple of iterations to

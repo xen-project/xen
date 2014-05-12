@@ -141,6 +141,10 @@
 #define PFEC_page_paged     (1U<<5)
 #define PFEC_page_shared    (1U<<6)
 
+#define XEN_SYSCALL_MASK (X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|    \
+                          X86_EFLAGS_NT|X86_EFLAGS_DF|X86_EFLAGS_IF|    \
+                          X86_EFLAGS_TF)
+
 #ifndef __ASSEMBLY__
 
 struct domain;
