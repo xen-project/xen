@@ -140,6 +140,7 @@
 #define X86_FEATURE_RTM         11 /* Restricted Transactional Memory */
 #define X86_FEATURE_RDSEED      18 /* RDSEED instruction */
 #define X86_FEATURE_ADX         19 /* ADCX, ADOX instructions */
+#define X86_FEATURE_SMAP        20 /* Supervisor Mode Access Protection */
 
 
 #endif /* __LIBXC_CPUFEATURE_H */
