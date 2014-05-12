@@ -125,7 +125,7 @@
 #define  PCI_IO_RANGE_TYPE_16	0x00
 #define  PCI_IO_RANGE_TYPE_32	0x01
 #define  PCI_IO_RANGE_MASK	(~0x0fUL)
-#define PCI_SEC_STATUS		0x1e	/* Secondary status register, only bit 14 used */
+#define PCI_SEC_STATUS		0x1e	/* Secondary status register */
 #define PCI_MEMORY_BASE		0x20	/* Memory range behind */
 #define PCI_MEMORY_LIMIT	0x22
 #define  PCI_MEMORY_RANGE_TYPE_MASK 0x0fUL
@@ -152,6 +152,7 @@
 #define  PCI_BRIDGE_CTL_MASTER_ABORT	0x20  /* Report master aborts */
 #define  PCI_BRIDGE_CTL_BUS_RESET	0x40	/* Secondary bus reset */
 #define  PCI_BRIDGE_CTL_FAST_BACK	0x80	/* Fast Back2Back enabled on secondary interface */
+#define  PCI_BRIDGE_CTL_DTMR_SERR	0x800	/* SERR upon discard timer expiry */
 
 /* Header type 2 (CardBus bridges) */
 #define PCI_CB_CAPABILITY_LIST	0x14
