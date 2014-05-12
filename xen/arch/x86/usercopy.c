@@ -14,6 +14,7 @@ unsigned long __copy_to_user_ll(void __user *to, const void *from, unsigned n)
 {
     unsigned long __d0, __d1, __d2, __n = n;
 
+    stac();
     asm volatile (
         "    cmp  $"STR(2*BYTES_PER_LONG-1)",%0\n"
         "    jbe  1f\n"
@@ -42,6 +43,7 @@ unsigned long __copy_to_user_ll(void __user *to, const void *from, unsigned n)
         : "=&c" (__n), "=&D" (__d0), "=&S" (__d1), "=&r" (__d2)
         : "0" (__n), "1" (to), "2" (from), "3" (__n)
         : "memory" );
+    clac();
 
     return __n;
 }
@@ -51,6 +53,7 @@ __copy_from_user_ll(void *to, const void __user *from, unsigned n)
 {
     unsigned long __d0, __d1, __d2, __n = n;
 
+    stac();
     asm volatile (
         "    cmp  $"STR(2*BYTES_PER_LONG-1)",%0\n"
         "    jbe  1f\n"
@@ -85,6 +88,7 @@ __copy_from_user_ll(void *to, const void __user *from, unsigned n)
         : "=&c" (__n), "=&D" (__d0), "=&S" (__d1), "=&r" (__d2)
         : "0" (__n), "1" (to), "2" (from), "3" (__n)
         : "memory" );
+    clac();
 
     return __n;
 }
@@ -113,6 +117,7 @@ copy_to_user(void __user *to, const void *from, unsigned n)
 #define __do_clear_user(addr,size)					\
 do {									\
 	long __d0;							\
+	stac();								\
 	__asm__ __volatile__(						\
 		"0:	rep; stosl\n"					\
 		"	movl %2,%0\n"					\
@@ -126,6 +131,7 @@ do {									\
 		_ASM_EXTABLE(1b,2b)					\
 		: "=&c"(size), "=&D" (__d0)				\
 		: "r"(size & 3), "0"(size / 4), "1"((long)addr), "a"(0));	\
+	clac();								\
 } while (0)
 
 /**

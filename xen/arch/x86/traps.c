@@ -3822,6 +3822,18 @@ unsigned long do_get_debugreg(int reg)
 
 void asm_domain_crash_synchronous(unsigned long addr)
 {
+    /*
+     * We need clear AC bit here because in entry.S AC is set
+     * by ASM_STAC to temporarily allow accesses to user pages
+     * which is prevented by SMAP by default.
+     *
+     * For some code paths, where this function is called, clac()
+     * is not needed, but adding clac() here instead of each place
+     * asm_domain_crash_synchronous() is called can reduce the code
+     * redundancy, and it is harmless as well.
+     */
+    clac();
+
     if ( addr == 0 )
         addr = this_cpu(last_extable_addr);
 

@@ -379,6 +379,7 @@ __UNLIKELY_END(create_bounce_frame_bad_sp)
         movb  TRAPBOUNCE_flags(%rdx),%cl
         subq  $40,%rsi
         movq  UREGS_ss+8(%rsp),%rax
+        ASM_STAC
 .Lft2:  movq  %rax,32(%rsi)             # SS
         movq  UREGS_rsp+8(%rsp),%rax
 .Lft3:  movq  %rax,24(%rsi)             # RSP
@@ -423,6 +424,7 @@ UNLIKELY_END(bounce_failsafe)
 .Lft12: movq  %rax,8(%rsi)              # R11
         movq  UREGS_rcx+8(%rsp),%rax
 .Lft13: movq  %rax,(%rsi)               # RCX
+        ASM_CLAC
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         /* Also clear AC: alignment checks shouldn't trigger in kernel mode. */

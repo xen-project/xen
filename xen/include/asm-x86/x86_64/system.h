@@ -12,6 +12,7 @@
  * is the same as the initial value of _o then _n is written to location _p.
  */
 #define __cmpxchg_user(_p,_o,_n,_isuff,_oppre,_regtype)                 \
+    stac();                                                             \
     asm volatile (                                                      \
         "1: lock; cmpxchg"_isuff" %"_oppre"2,%3\n"                      \
         "2:\n"                                                          \
@@ -22,7 +23,8 @@
         _ASM_EXTABLE(1b, 3b)                                            \
         : "=a" (_o), "=r" (_rc)                                         \
         : _regtype (_n), "m" (*__xg((volatile void *)_p)), "0" (_o), "1" (0) \
-        : "memory");
+        : "memory");                                                    \
+    clac()
 
 #define cmpxchg_user(_p,_o,_n)                                          \
 ({                                                                      \
