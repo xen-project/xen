@@ -64,6 +64,7 @@ struct hvm_ioreq_server {
 };
 
 struct hvm_domain {
+    spinlock_t              ioreq_server_lock;
     struct hvm_ioreq_server *ioreq_server;
 
     struct pl_time         pl_time;
