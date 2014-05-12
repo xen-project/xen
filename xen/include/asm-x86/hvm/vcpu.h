@@ -138,8 +138,6 @@ struct hvm_vcpu {
     spinlock_t          tm_lock;
     struct list_head    tm_list;
 
-    int                 xen_port;
-
     u8                  flag_dr_dirty;
     bool_t              debug_state_latch;
     bool_t              single_step;
@@ -186,3 +184,13 @@ struct hvm_vcpu {
 };
 
 #endif /* __ASM_X86_HVM_VCPU_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
