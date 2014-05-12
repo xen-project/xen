@@ -577,6 +577,10 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         return 0;
     }
 
+    /* foreign pages are added thru p2m_add_foreign */
+    if ( p2m_is_foreign(t) )
+        return -EINVAL;
+
     p2m_lock(p2m);
 
     P2M_DEBUG("adding gfn=%#lx mfn=%#lx\n", gfn, mfn);
@@ -611,9 +615,9 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
             omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, 0, NULL);
             ASSERT(!p2m_is_shared(ot));
         }
-        if ( p2m_is_grant(ot) )
+        if ( p2m_is_grant(ot) || p2m_is_foreign(ot) )
         {
-            /* Really shouldn't be unmapping grant maps this way */
+            /* Really shouldn't be unmapping grant/foreign maps this way */
             domain_crash(d);
             p2m_unlock(p2m);
             
@@ -719,6 +723,7 @@ int p2m_change_type_one(struct domain *d, unsigned long gfn,
     int rc;
 
     BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
+    BUG_ON(p2m_is_foreign(ot) || p2m_is_foreign(nt));
 
     gfn_lock(p2m, gfn, 0);
 
@@ -807,7 +812,7 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     gfn_lock(p2m, gfn, 0);
     omfn = p2m->get_entry(p2m, gfn, &ot, &a, 0, NULL);
-    if ( p2m_is_grant(ot) )
+    if ( p2m_is_grant(ot) || p2m_is_foreign(ot) )
     {
         p2m_unlock(p2m);
         domain_crash(d);
