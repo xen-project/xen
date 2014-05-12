@@ -393,6 +393,8 @@ void __init pci_vtd_quirk(struct pci_dev *pdev)
     int func = PCI_FUNC(pdev->devfn);
     int pos;
     u32 val;
+    u64 bar;
+    paddr_t pa;
 
     if ( pci_conf_read16(seg, bus, dev, func, PCI_VENDOR_ID) !=
          PCI_VENDOR_ID_INTEL )
@@ -453,6 +455,34 @@ void __init pci_vtd_quirk(struct pci_dev *pdev)
 
         printk(XENLOG_INFO "Masked UR signaling on %04x:%02x:%02x.%u\n",
                seg, bus, dev, func);
+        break;
+
+    case 0x100: case 0x104: case 0x108: /* Sandybridge */
+    case 0x150: case 0x154: case 0x158: /* Ivybridge */
+    case 0xa04: /* Haswell ULT */
+    case 0xc00: case 0xc04: case 0xc08: /* Haswell */
+        bar = pci_conf_read32(seg, bus, dev, func, 0x6c);
+        bar = (bar << 32) | pci_conf_read32(seg, bus, dev, func, 0x68);
+        pa = bar & 0x7fffff000; /* bits 12...38 */
+        if ( (bar & 1) && pa &&
+             page_is_ram_type(paddr_to_pfn(pa), RAM_TYPE_RESERVED) )
+        {
+            u32 __iomem *va = ioremap(pa, PAGE_SIZE);
+
+            if ( va )
+            {
+                __set_bit(0x1c8 * 8 + 20, va);
+                iounmap(va);
+                printk(XENLOG_INFO "Masked UR signaling on %04x:%02x:%02x.%u\n",
+                       seg, bus, dev, func);
+            }
+            else
+                printk(XENLOG_ERR "Could not map %"PRIpaddr" for %04x:%02x:%02x.%u\n",
+                       pa, seg, bus, dev, func);
+        }
+        else
+            printk(XENLOG_WARNING "Bogus DMIBAR %#"PRIx64" on %04x:%02x:%02x.%u\n",
+                   bar, seg, bus, dev, func);
         break;
     }
 }
