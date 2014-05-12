@@ -38,6 +38,13 @@ struct rangeset *rangeset_new(
 void rangeset_destroy(
     struct rangeset *r);
 
+/*
+ * Set a limit on the number of ranges that may exist in set @r.
+ * NOTE: This must be called while @r is empty.
+ */
+void rangeset_limit(
+    struct rangeset *r, unsigned int limit);
+
 /* Flags for passing to rangeset_new(). */
  /* Pretty-print range limits in hexadecimal. */
 #define _RANGESETF_prettyprint_hex 0
@@ -77,3 +84,13 @@ void rangeset_domain_printk(
     struct domain *d);
 
 #endif /* __XEN_RANGESET_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
