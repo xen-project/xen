@@ -66,23 +66,33 @@ int pci_find_next_cap(u16 seg, u8 bus, unsigned int devfn, u8 pos, int cap)
 
 /**
  * pci_find_ext_capability - Find an extended capability
- * @dev: PCI device to query
+ * @seg/@bus/@devfn: PCI device to query
  * @cap: capability code
  *
  * Returns the address of the requested extended capability structure
  * within the device's PCI configuration space or 0 if the device does
- * not support it.  Possible values for @cap:
- *
- *  %PCI_EXT_CAP_ID_ERR         Advanced Error Reporting
- *  %PCI_EXT_CAP_ID_VC          Virtual Channel
- *  %PCI_EXT_CAP_ID_DSN         Device Serial Number
- *  %PCI_EXT_CAP_ID_PWR         Power Budgeting
+ * not support it.
  */
 int pci_find_ext_capability(int seg, int bus, int devfn, int cap)
 {
+    return pci_find_next_ext_capability(seg, bus, devfn, 0, cap);
+}
+
+/**
+ * pci_find_next_ext_capability - Find another extended capability
+ * @seg/@bus/@devfn: PCI device to query
+ * @pos: starting position
+ * @cap: capability code
+ *
+ * Returns the address of the requested extended capability structure
+ * within the device's PCI configuration space or 0 if the device does
+ * not support it.
+ */
+int pci_find_next_ext_capability(int seg, int bus, int devfn, int start, int cap)
+{
     u32 header;
     int ttl = 480; /* 3840 bytes, minimum 8 bytes per capability */
-    int pos = 0x100;
+    int pos = max(start, 0x100);
 
     header = pci_conf_read32(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos);
 
@@ -92,9 +102,10 @@ int pci_find_ext_capability(int seg, int bus, int devfn, int cap)
      */
     if ( (header == 0) || (header == -1) )
         return 0;
+    ASSERT(start != pos || PCI_EXT_CAP_ID(header) == cap);
 
     while ( ttl-- > 0 ) {
-        if ( PCI_EXT_CAP_ID(header) == cap )
+        if ( PCI_EXT_CAP_ID(header) == cap && pos != start )
             return pos;
         pos = PCI_EXT_CAP_NEXT(header);
         if ( pos < 0x100 )

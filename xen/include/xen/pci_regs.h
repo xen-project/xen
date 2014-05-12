@@ -431,6 +431,7 @@
 #define PCI_EXT_CAP_ID_VC	2
 #define PCI_EXT_CAP_ID_DSN	3
 #define PCI_EXT_CAP_ID_PWR	4
+#define PCI_EXT_CAP_ID_VNDR	11
 #define PCI_EXT_CAP_ID_ACS	13
 #define PCI_EXT_CAP_ID_ARI	14
 #define PCI_EXT_CAP_ID_ATS	15
@@ -459,6 +460,7 @@
 #define  PCI_ERR_COR_BAD_DLLP	0x00000080	/* Bad DLLP Status */
 #define  PCI_ERR_COR_REP_ROLL	0x00000100	/* REPLAY_NUM Rollover */
 #define  PCI_ERR_COR_REP_TIMER	0x00001000	/* Replay Timer Timeout */
+#define  PCI_ERR_COR_ADV_NFAT	0x00002000	/* Advisory Non-Fatal */
 #define PCI_ERR_COR_MASK	20	/* Correctable Error Mask */
 	/* Same bits as above */
 #define PCI_ERR_CAP		24	/* Advanced Error Capabilities */
@@ -509,6 +511,12 @@
 #define  PCI_PWR_DATA_RAIL(x)	(((x) >> 18) & 7)   /* Power Rail */
 #define PCI_PWR_CAP		12	/* Capability */
 #define  PCI_PWR_CAP_BUDGET(x)	((x) & 1)	/* Included in system budget */
+
+/* Vendor-Specific (VSEC, PCI_EXT_CAP_ID_VNDR) */
+#define PCI_VNDR_HEADER		4	/* Vendor-Specific Header */
+#define  PCI_VNDR_HEADER_ID(x)	((x) & 0xffff)
+#define  PCI_VNDR_HEADER_REV(x)	(((x) >> 16) & 0xf)
+#define  PCI_VNDR_HEADER_LEN(x)	(((x) >> 20) & 0xfff)
 
 /*
  * Hypertransport sub capability types
