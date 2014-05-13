@@ -72,6 +72,21 @@ void p2m_restore_state(struct vcpu *n)
     isb();
 }
 
+void flush_tlb_domain(struct domain *d)
+{
+    /* Update the VTTBR if necessary with the domain d. In this case,
+     * it's only necessary to flush TLBs on every CPUs with the current VMID
+     * (our domain).
+     */
+    if ( d != current->domain )
+        p2m_load_VTTBR(d);
+
+    flush_tlb();
+
+    if ( d != current->domain )
+        p2m_load_VTTBR(current->domain);
+}
+
 static int p2m_first_level_index(paddr_t addr)
 {
     /*
@@ -450,19 +465,7 @@ static int apply_p2m_changes(struct domain *d,
     }
 
     if ( flush )
-    {
-        /* Update the VTTBR if necessary with the domain where mappings
-         * are created. In this case it's only necessary to flush TLBs
-         * on every CPUs with the current VMID (our domain).
-         */
-        if ( d != current->domain )
-            p2m_load_VTTBR(d);
-
-        flush_tlb();
-
-        if ( d != current->domain )
-            p2m_load_VTTBR(current->domain);
-    }
+        flush_tlb_domain(d);
 
     if ( op == ALLOCATE || op == INSERT )
     {
@@ -550,14 +553,10 @@ int p2m_alloc_table(struct domain *d)
     d->arch.vttbr = page_to_maddr(p2m->first_level)
         | ((uint64_t)p2m->vmid&0xff)<<48;
 
-    p2m_load_VTTBR(d);
-
     /* Make sure that all TLBs corresponding to the new VMID are flushed
      * before using it
      */
-    flush_tlb();
-
-    p2m_load_VTTBR(current->domain);
+    flush_tlb_domain(d);
 
     spin_unlock(&p2m->lock);
 
