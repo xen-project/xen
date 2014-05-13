@@ -363,7 +363,7 @@ const libxl__json_object *libxl__json_map_get(const char *key,
                 return NULL;
             if (strcmp(key, node->map_key) == 0) {
                 if (expected_type == JSON_ANY
-                    || (node->obj && node->obj->type == expected_type)) {
+                    || (node->obj && (node->obj->type & expected_type))) {
                     return node->obj;
                 } else {
                     return NULL;

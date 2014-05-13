@@ -1613,16 +1613,16 @@ _hidden yajl_gen_status libxl__yajl_gen_asciiz(yajl_gen hand, const char *str);
 _hidden yajl_gen_status libxl__yajl_gen_enum(yajl_gen hand, const char *str);
 
 typedef enum {
-    JSON_NULL,
-    JSON_BOOL,
-    JSON_INTEGER,
-    JSON_DOUBLE,
+    JSON_NULL    = (1 << 0),
+    JSON_BOOL    = (1 << 1),
+    JSON_INTEGER = (1 << 2),
+    JSON_DOUBLE  = (1 << 3),
     /* number is store in string, it's too big to be a long long or a double */
-    JSON_NUMBER,
-    JSON_STRING,
-    JSON_MAP,
-    JSON_ARRAY,
-    JSON_ANY
+    JSON_NUMBER  = (1 << 4),
+    JSON_STRING  = (1 << 5),
+    JSON_MAP     = (1 << 6),
+    JSON_ARRAY   = (1 << 7),
+    JSON_ANY     = 255 /* this is a mask of all values above, adjust as needed */
 } libxl__json_node_type;
 
 typedef struct libxl__json_object {
