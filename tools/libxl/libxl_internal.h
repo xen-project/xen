@@ -1696,6 +1696,14 @@ const char *libxl__json_object_get_string(const libxl__json_object *o)
         return NULL;
 }
 static inline
+const char *libxl__json_object_get_number(const libxl__json_object *o)
+{
+    if (libxl__json_object_is_number(o))
+        return o->u.string;
+    else
+        return NULL;
+}
+static inline
 flexarray_t *libxl__json_object_get_map(const libxl__json_object *o)
 {
     if (libxl__json_object_is_map(o))
