@@ -245,6 +245,16 @@
  * libxl_types.idl). The library provides a common set of methods for
  * initialising and freeing these types.
  *
+ * IDL-generated libxl types should be used as follows: the user must
+ * always call the "init" function before using a type, even if the
+ * variable is simply being passed by reference as an out parameter
+ * to a libxl function.  The user must always calls "dispose" exactly
+ * once afterwards, to clean up, regardless of whether operations on
+ * this object succeeded or failed.  See the xl code for examples.
+ *
+ * "init" is idempotent.  We intend that "dispose" will become
+ * idempotent, but this is not currently the case.
+ *
  * void libxl_<type>_init(<type> *p):
  *
  *    Initialises the members of "p" to all defaults. These may either
