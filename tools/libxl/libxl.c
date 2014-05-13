@@ -232,10 +232,6 @@ void libxl_key_value_list_dispose(libxl_key_value_list *pkvl)
     free(kvl);
 }
 
-#define LIBXL__DEFBOOL_DEFAULT (0)
-#define LIBXL__DEFBOOL_FALSE (-1)
-#define LIBXL__DEFBOOL_TRUE (1)
-
 void libxl_defbool_set(libxl_defbool *db, bool b)
 {
     db->val = b ? LIBXL__DEFBOOL_TRUE : LIBXL__DEFBOOL_FALSE;
@@ -266,11 +262,11 @@ bool libxl_defbool_val(libxl_defbool db)
 const char *libxl_defbool_to_string(libxl_defbool b)
 {
     if (b.val < 0)
-        return "False";
+        return LIBXL__DEFBOOL_STR_FALSE;
     else if (b.val > 0)
-        return "True";
+        return LIBXL__DEFBOOL_STR_TRUE;
     else
-        return "<default>";
+        return LIBXL__DEFBOOL_STR_DEFAULT;
 }
 
 /******************************************************************************/

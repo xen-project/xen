@@ -3036,6 +3036,14 @@ void libxl__numa_candidate_put_nodemap(libxl__gc *gc,
     libxl_bitmap_copy(CTX, &cndt->nodemap, nodemap);
 }
 
+/* Som handy macros for defbool type. */
+#define LIBXL__DEFBOOL_DEFAULT     (0)
+#define LIBXL__DEFBOOL_FALSE       (-1)
+#define LIBXL__DEFBOOL_TRUE        (1)
+#define LIBXL__DEFBOOL_STR_DEFAULT "<default>"
+#define LIBXL__DEFBOOL_STR_FALSE   "False"
+#define LIBXL__DEFBOOL_STR_TRUE    "True"
+
 /*
  * Inserts "elm_new" into the sorted list "head".
  *
