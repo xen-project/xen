@@ -291,6 +291,11 @@
  *    Frees any dynamically allocated memory used by the members of
  *    "p" but not the storage used by "p" itself (this allows for the
  *    allocation of arrays of types and for the composition of types).
+ *
+ * char *libxl_<type>_to_json(instance *p)
+ *
+ *    Generates a JSON object from "p" in the form of a NULL terminated
+ *    string.
  */
 #ifndef LIBXL_H
 #define LIBXL_H
