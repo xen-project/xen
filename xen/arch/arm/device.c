@@ -67,6 +67,21 @@ int __init device_init(struct dt_device_node *dev, enum device_type type,
     return -EBADF;
 }
 
+enum device_type device_get_type(const struct dt_device_node *dev)
+{
+    const struct device_desc *desc;
+
+    ASSERT(dev != NULL);
+
+    for ( desc = _sdevice; desc != _edevice; desc++ )
+    {
+        if ( device_is_compatible(desc, dev) )
+            return desc->type;
+    }
+
+    return DEVICE_UNKNOWN;
+}
+
 /*
  * Local variables:
  * mode: C

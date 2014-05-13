@@ -11,6 +11,7 @@
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/guest_access.h>
+#include <asm/device.h>
 #include <asm/setup.h>
 #include <asm/platform.h>
 #include <asm/psci.h>
@@ -830,6 +831,15 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     if ( dt_device_used_by(node) == DOMID_XEN )
     {
         DPRINT("  Skip it (used by Xen)\n");
+        return 0;
+    }
+
+    /* Even if the IOMMU device is not used by Xen, it should not be
+     * passthrough to DOM0
+     */
+    if ( device_get_type(node) == DEVICE_IOMMU )
+    {
+        DPRINT(" IOMMU, skip it\n");
         return 0;
     }
 
