@@ -1647,6 +1647,10 @@ typedef struct {
 
 typedef struct libxl__yajl_ctx libxl__yajl_ctx;
 
+static inline bool libxl__json_object_is_null(const libxl__json_object *o)
+{
+    return o != NULL && o->type == JSON_NULL;
+}
 static inline bool libxl__json_object_is_bool(const libxl__json_object *o)
 {
     return o != NULL && o->type == JSON_BOOL;
@@ -1658,6 +1662,14 @@ static inline bool libxl__json_object_is_string(const libxl__json_object *o)
 static inline bool libxl__json_object_is_integer(const libxl__json_object *o)
 {
     return o != NULL && o->type == JSON_INTEGER;
+}
+static inline bool libxl__json_object_is_double(const libxl__json_object *o)
+{
+    return o != NULL && o->type == JSON_DOUBLE;
+}
+static inline bool libxl__json_object_is_number(const libxl__json_object *o)
+{
+    return o != NULL && o->type == JSON_NUMBER;
 }
 static inline bool libxl__json_object_is_map(const libxl__json_object *o)
 {
