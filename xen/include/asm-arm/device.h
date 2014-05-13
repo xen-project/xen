@@ -6,7 +6,8 @@
 
 enum device_type
 {
-    DEVICE_SERIAL
+    DEVICE_SERIAL,
+    DEVICE_IOMMU,
 };
 
 struct device_desc {

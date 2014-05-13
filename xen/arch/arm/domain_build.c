@@ -679,7 +679,7 @@ static int make_timer_node(const struct domain *d, void *fdt,
 }
 
 /* Map the device in the domain */
-static int map_device(struct domain *d, const struct dt_device_node *dev)
+static int map_device(struct domain *d, struct dt_device_node *dev)
 {
     unsigned int nirq;
     unsigned int naddr;
@@ -693,6 +693,18 @@ static int map_device(struct domain *d, const struct dt_device_node *dev)
     naddr = dt_number_of_address(dev);
 
     DPRINT("%s nirq = %d naddr = %u\n", dt_node_full_name(dev), nirq, naddr);
+
+    if ( dt_device_is_protected(dev) )
+    {
+        DPRINT("%s setup iommu\n", dt_node_full_name(dev));
+        res = iommu_assign_dt_device(d, dev);
+        if ( res )
+        {
+            printk(XENLOG_ERR "Failed to setup the IOMMU for %s\n",
+                   dt_node_full_name(dev));
+            return res;
+        }
+    }
 
     /* Map IRQs */
     for ( i = 0; i < nirq; i++ )
@@ -765,7 +777,7 @@ static int map_device(struct domain *d, const struct dt_device_node *dev)
 }
 
 static int handle_node(struct domain *d, struct kernel_info *kinfo,
-                       const struct dt_device_node *node)
+                       struct dt_device_node *node)
 {
     static const struct dt_device_match skip_matches[] __initconst =
     {
@@ -786,7 +798,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         DT_MATCH_TIMER,
         { /* sentinel */ },
     };
-    const struct dt_device_node *child;
+    struct dt_device_node *child;
     int res;
     const char *name;
     const char *path;
@@ -1013,6 +1025,8 @@ int construct_dom0(struct domain *d)
     BUG_ON(v->is_initialised);
 
     printk("*** LOADING DOMAIN 0 ***\n");
+
+    iommu_hwdom_init(d);
 
     d->max_pages = ~0U;
 

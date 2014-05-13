@@ -9,6 +9,7 @@
 #include <asm/vfp.h>
 #include <public/hvm/params.h>
 #include <xen/serial.h>
+#include <xen/hvm/iommu.h>
 
 /* Represents state corresponding to a block of 32 interrupts */
 struct vgic_irq_rank {
@@ -72,6 +73,7 @@ struct pending_irq
 struct hvm_domain
 {
     uint64_t              params[HVM_NR_PARAMS];
+    struct hvm_iommu      iommu;
 }  __cacheline_aligned;
 
 #ifdef CONFIG_ARM_64

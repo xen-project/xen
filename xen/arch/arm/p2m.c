@@ -465,7 +465,13 @@ static int apply_p2m_changes(struct domain *d,
     }
 
     if ( flush )
+    {
+        unsigned long sgfn = paddr_to_pfn(start_gpaddr);
+        unsigned long egfn = paddr_to_pfn(end_gpaddr);
+
         flush_tlb_domain(d);
+        iommu_iotlb_flush(d, sgfn, egfn - sgfn);
+    }
 
     if ( op == ALLOCATE || op == INSERT )
     {
