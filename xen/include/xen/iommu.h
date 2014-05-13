@@ -90,6 +90,16 @@ void iommu_read_msi_from_ire(struct msi_desc *msi_desc, struct msi_msg *msg);
 #define PT_IRQ_TIME_OUT MILLISECS(8)
 #endif /* HAS_PCI */
 
+#ifdef HAS_DEVICE_TREE
+#include <xen/device_tree.h>
+
+int iommu_assign_dt_device(struct domain *d, struct dt_device_node *dev);
+int iommu_deassign_dt_device(struct domain *d, struct dt_device_node *dev);
+int iommu_dt_domain_init(struct domain *d);
+void iommu_dt_domain_destroy(struct domain *d);
+
+#endif /* HAS_DEVICE_TREE */
+
 struct page_info;
 
 struct iommu_ops {
@@ -106,6 +116,12 @@ struct iommu_ops {
     int (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);
     void (*read_msi_from_ire)(struct msi_desc *msi_desc, struct msi_msg *msg);
 #endif /* HAS_PCI */
+#ifdef HAS_DEVICE_TREE
+    int (*assign_dt_device)(struct domain *d, const struct dt_device_node *dev);
+    int (*reassign_dt_device)(struct domain *s, struct domain *t,
+                              const struct dt_device_node *dev);
+#endif
+
     void (*teardown)(struct domain *d);
     int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn,
                     unsigned int flags);

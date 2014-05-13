@@ -16,6 +16,7 @@
 #include <xen/string.h>
 #include <xen/types.h>
 #include <xen/stdbool.h>
+#include <xen/list.h>
 
 #define DEVICE_TREE_MAX_DEPTH 16
 
@@ -111,6 +112,9 @@ struct dt_device_node {
     struct dt_device_node *next; /* TODO: Remove it. Only use to know the last children */
     struct dt_device_node *allnext;
 
+    /* IOMMU specific fields */
+    bool is_protected;
+    struct list_head domain_list;
 };
 
 #define MAX_PHANDLE_ARGS 16
@@ -324,6 +328,16 @@ static inline void dt_device_set_used_by(struct dt_device_node *device,
 static inline domid_t dt_device_used_by(const struct dt_device_node *device)
 {
     return device->used_by;
+}
+
+static inline void dt_device_set_protected(struct dt_device_node *device)
+{
+    device->is_protected = true;
+}
+
+static inline bool dt_device_is_protected(const struct dt_device_node *device)
+{
+    return device->is_protected;
 }
 
 static inline bool_t dt_property_name_is_equal(const struct dt_property *pp,

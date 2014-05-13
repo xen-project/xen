@@ -21,6 +21,7 @@
 #define __XEN_HVM_IOMMU_H__
 
 #include <xen/iommu.h>
+#include <xen/list.h>
 #include <asm/hvm/iommu.h>
 
 struct hvm_iommu {
@@ -28,6 +29,11 @@ struct hvm_iommu {
 
     /* iommu_ops */
     const struct iommu_ops *platform_ops;
+
+#ifdef HAS_DEVICE_TREE
+    /* List of DT devices assigned to this domain */
+    struct list_head dt_devices;
+#endif
 };
 
 #endif /* __XEN_HVM_IOMMU_H__ */
