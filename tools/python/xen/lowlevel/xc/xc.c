@@ -1183,6 +1183,40 @@ static PyObject *pyxc_physinfo(XcObject *self)
                             "virt_caps",        virt_caps);
 }
 
+static PyObject *pyxc_getcpuinfo(XcObject *self, PyObject *args, PyObject *kwds)
+{
+    xc_cpuinfo_t *cpuinfo, *cpuinfo_ptr;
+    PyObject *cpuinfo_list_obj, *cpuinfo_obj;
+    int max_cpus, nr_cpus, ret, i;
+    static char *kwd_list[] = { "max_cpus", NULL };
+    static char kwd_type[] = "i";
+
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, kwd_type, kwd_list, &max_cpus))
+        return NULL;
+
+    cpuinfo = malloc(sizeof(xc_cpuinfo_t) * max_cpus);
+    if (!cpuinfo)
+        return NULL;
+
+    ret = xc_getcpuinfo(self->xc_handle, max_cpus, cpuinfo, &nr_cpus);
+    if (ret != 0) {
+        free(cpuinfo);
+        return pyxc_error_to_exception(self->xc_handle);
+    }
+
+    cpuinfo_list_obj = PyList_New(0);
+    cpuinfo_ptr = cpuinfo;
+    for (i = 0; i < nr_cpus; i++) {
+        cpuinfo_obj = Py_BuildValue("{s:k}", "idletime", cpuinfo_ptr->idletime);
+        PyList_Append(cpuinfo_list_obj, cpuinfo_obj);
+        cpuinfo_ptr++;
+    }
+
+    free(cpuinfo);
+
+    return cpuinfo_list_obj;
+}
+
 static PyObject *pyxc_topologyinfo(XcObject *self)
 {
 #define MAX_CPU_INDEX 255
@@ -2609,6 +2643,13 @@ static PyMethodDef pyxc_methods[] = {
       METH_NOARGS, "\n"
       "Get information about the physical host machine\n"
       "Returns [dict]: information about the hardware"
+      "        [None]: on failure.\n" },
+
+    { "getcpuinfo",
+      (PyCFunction)pyxc_getcpuinfo,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Get information about physical CPUs\n"
+      "Returns [list]: information about physical CPUs"
       "        [None]: on failure.\n" },
 
     { "topologyinfo",
