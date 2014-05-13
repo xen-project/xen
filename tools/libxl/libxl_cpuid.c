@@ -26,6 +26,7 @@ void libxl_cpuid_dispose(libxl_cpuid_policy_list *p_cpuid_list)
             if (cpuid_list[i].policy[j] != NULL)
                 free(cpuid_list[i].policy[j]);
     }
+    free(cpuid_list);
     return;
 }
 
