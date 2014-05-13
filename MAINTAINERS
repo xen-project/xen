@@ -136,6 +136,7 @@ F:	xen/drivers/char/dt-uart.c
 F:	xen/drivers/char/exynos4210-uart.c
 F:	xen/drivers/char/omap-uart.c
 F:	xen/drivers/char/pl011.c
+F:	xen/drivers/passthrough/arm/
 
 CPU POOLS
 M:	Juergen Gross <juergen.gross@ts.fujitsu.com>
@@ -205,6 +206,7 @@ M:	Jan Beulich <jbeulich@suse.com>
 S:	Supported
 F:	xen/drivers/passthrough/
 X:	xen/drivers/passthrough/amd/
+X:	xen/drivers/passthrough/arm/
 X:	xen/drivers/passthrough/vtd/
 F:	xen/include/xen/iommu.h
 
