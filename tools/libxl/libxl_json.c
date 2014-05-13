@@ -234,36 +234,43 @@ libxl__json_object *libxl__json_object_alloc(libxl__gc *gc,
     return obj;
 }
 
-int libxl__json_object_append_to(libxl__gc *gc,
-                                 libxl__json_object *obj,
-                                 libxl__json_object *dst)
+int libxl__json_object_append_to(libxl__gc *gc, libxl__json_object *obj,
+                                 libxl__yajl_ctx *ctx)
 {
-    assert(dst != NULL);
+    libxl__json_object *dst = ctx->current;
 
-    switch (dst->type) {
-    case JSON_MAP: {
-        libxl__json_map_node *last;
+    if (dst) {
+        switch (dst->type) {
+        case JSON_MAP: {
+            libxl__json_map_node *last;
 
-        if (dst->u.map->count == 0) {
-            LIBXL__LOG(libxl__gc_owner(gc), LIBXL__LOG_ERROR,
-                       "Try to add a value to an empty map (with no key)");
-            return -1;
+            if (dst->u.map->count == 0) {
+                LIBXL__LOG(libxl__gc_owner(gc), LIBXL__LOG_ERROR,
+                           "Try to add a value to an empty map (with no key)");
+                return ERROR_FAIL;
+            }
+            flexarray_get(dst->u.map, dst->u.map->count - 1, (void**)&last);
+            last->obj = obj;
+            break;
         }
-        flexarray_get(dst->u.map, dst->u.map->count - 1, (void**)&last);
-        last->obj = obj;
-        break;
-    }
-    case JSON_ARRAY:
-        flexarray_append(dst->u.array, obj);
-        break;
-    default:
-        LIBXL__LOG(libxl__gc_owner(gc), LIBXL__LOG_ERROR,
-                   "Try append an object is not a map/array (%i)\n",
-                   dst->type);
-        return -1;
+        case JSON_ARRAY:
+            flexarray_append(dst->u.array, obj);
+            break;
+        default:
+            LIBXL__LOG(libxl__gc_owner(gc), LIBXL__LOG_ERROR,
+                       "Try append an object is not a map/array (%i)\n",
+                       dst->type);
+            return ERROR_FAIL;
+        }
     }
 
     obj->parent = dst;
+
+    if (libxl__json_object_is_map(obj) || libxl__json_object_is_array(obj))
+        ctx->current = obj;
+    if (ctx->head == NULL)
+        ctx->head = obj;
+
     return 0;
 }
 
@@ -449,9 +456,8 @@ static int json_callback_null(void *opaque)
 
     obj = libxl__json_object_alloc(ctx->gc, JSON_NULL);
 
-    if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
+    if (libxl__json_object_append_to(ctx->gc, obj, ctx))
         return 0;
-    }
 
     return 1;
 }
@@ -466,9 +472,8 @@ static int json_callback_boolean(void *opaque, int boolean)
     obj = libxl__json_object_alloc(ctx->gc, JSON_BOOL);
     obj->u.b = boolean;
 
-    if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
+    if (libxl__json_object_append_to(ctx->gc, obj, ctx))
         return 0;
-    }
 
     return 1;
 }
@@ -523,9 +528,8 @@ error:
     obj->u.string = t;
 
 out:
-    if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
+    if (libxl__json_object_append_to(ctx->gc, obj, ctx))
         return 0;
-    }
 
     return 1;
 }
@@ -547,9 +551,8 @@ static int json_callback_string(void *opaque, const unsigned char *str,
     obj = libxl__json_object_alloc(ctx->gc, JSON_STRING);
     obj->u.string = t;
 
-    if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
+    if (libxl__json_object_append_to(ctx->gc, obj, ctx))
         return 0;
-    }
 
     return 1;
 }
@@ -595,16 +598,8 @@ static int json_callback_start_map(void *opaque)
 
     obj = libxl__json_object_alloc(ctx->gc, JSON_MAP);
 
-    if (ctx->current) {
-        if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
-            return 0;
-        }
-    }
-
-    ctx->current = obj;
-    if (ctx->head == NULL) {
-        ctx->head = obj;
-    }
+    if (libxl__json_object_append_to(ctx->gc, obj, ctx))
+        return 0;
 
     return 1;
 }
@@ -635,16 +630,8 @@ static int json_callback_start_array(void *opaque)
 
     obj = libxl__json_object_alloc(ctx->gc, JSON_ARRAY);
 
-    if (ctx->current) {
-        if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
-            return 0;
-        }
-    }
-
-    ctx->current = obj;
-    if (ctx->head == NULL) {
-        ctx->head = obj;
-    }
+    if (libxl__json_object_append_to(ctx->gc, obj, ctx))
+        return 0;
 
     return 1;
 }
