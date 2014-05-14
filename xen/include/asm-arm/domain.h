@@ -256,7 +256,6 @@ struct arch_vcpu
 
     uint32_t gic_hcr, gic_vmcr, gic_apr;
     uint32_t gic_lr[64];
-    uint64_t event_mask;
     uint64_t lr_mask;
 
     struct {
