@@ -235,9 +235,9 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 447d264115c476142f884af0be287622cd244423
 QEMU_UPSTREAM_REVISION ?= master
-SEABIOS_UPSTREAM_TAG ?= rel-1.7.3.1
-# Fri Aug 2 14:12:09 2013 -0400
-# Fix bug in CBFS file walking with compressed files.
+SEABIOS_UPSTREAM_TAG ?= rel-1.7.4
+# Sun Dec 22 10:42:26 2013 -0500
+# coreboot: Make sure to print the SeaBIOS version in cbmem debug output.
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
