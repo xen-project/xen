@@ -752,7 +752,7 @@ long arch_do_domctl(
                    "ioport_map:add: dom%d gport=%x mport=%x nr=%x\n",
                    d->domain_id, fgp, fmp, np);
 
-            list_for_each_entry(g2m_ioport, &hd->g2m_ioport_list, list)
+            list_for_each_entry(g2m_ioport, &hd->arch.g2m_ioport_list, list)
                 if (g2m_ioport->mport == fmp )
                 {
                     g2m_ioport->gport = fgp;
@@ -771,7 +771,7 @@ long arch_do_domctl(
                 g2m_ioport->gport = fgp;
                 g2m_ioport->mport = fmp;
                 g2m_ioport->np = np;
-                list_add_tail(&g2m_ioport->list, &hd->g2m_ioport_list);
+                list_add_tail(&g2m_ioport->list, &hd->arch.g2m_ioport_list);
             }
             if ( !ret )
                 ret = ioports_permit_access(d, fmp, fmp + np - 1);
@@ -786,7 +786,7 @@ long arch_do_domctl(
             printk(XENLOG_G_INFO
                    "ioport_map:remove: dom%d gport=%x mport=%x nr=%x\n",
                    d->domain_id, fgp, fmp, np);
-            list_for_each_entry(g2m_ioport, &hd->g2m_ioport_list, list)
+            list_for_each_entry(g2m_ioport, &hd->arch.g2m_ioport_list, list)
                 if ( g2m_ioport->mport == fmp )
                 {
                     list_del(&g2m_ioport->list);

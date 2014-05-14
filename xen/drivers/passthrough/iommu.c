@@ -117,10 +117,11 @@ static void __init parse_iommu_param(char *s)
 int iommu_domain_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
+    int ret = 0;
 
-    spin_lock_init(&hd->mapping_lock);
-    INIT_LIST_HEAD(&hd->g2m_ioport_list);
-    INIT_LIST_HEAD(&hd->mapped_rmrrs);
+    ret = arch_iommu_domain_init(d);
+    if ( ret )
+        return ret;
 
     if ( !iommu_enabled )
         return 0;
@@ -188,9 +189,7 @@ void iommu_teardown(struct domain *d)
 
 void iommu_domain_destroy(struct domain *d)
 {
-    struct hvm_iommu *hd  = domain_hvm_iommu(d);
-    struct list_head *ioport_list, *tmp;
-    struct g2m_ioport *ioport;
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
 
     if ( !iommu_enabled || !hd->platform_ops )
         return;
@@ -198,12 +197,7 @@ void iommu_domain_destroy(struct domain *d)
     if ( need_iommu(d) )
         iommu_teardown(d);
 
-    list_for_each_safe ( ioport_list, tmp, &hd->g2m_ioport_list )
-    {
-        ioport = list_entry(ioport_list, struct g2m_ioport, list);
-        list_del(&ioport->list);
-        xfree(ioport);
-    }
+    arch_iommu_domain_destroy(d);
 }
 
 int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,

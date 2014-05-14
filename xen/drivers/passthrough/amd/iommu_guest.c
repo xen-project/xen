@@ -60,12 +60,12 @@ static uint16_t guest_bdf(struct domain *d, uint16_t machine_bdf)
 
 static inline struct guest_iommu *domain_iommu(struct domain *d)
 {
-    return domain_hvm_iommu(d)->g_iommu;
+    return domain_hvm_iommu(d)->arch.g_iommu;
 }
 
 static inline struct guest_iommu *vcpu_iommu(struct vcpu *v)
 {
-    return domain_hvm_iommu(v->domain)->g_iommu;
+    return domain_hvm_iommu(v->domain)->arch.g_iommu;
 }
 
 static void guest_iommu_enable(struct guest_iommu *iommu)
@@ -886,7 +886,7 @@ int guest_iommu_init(struct domain* d)
 
     guest_iommu_reg_init(iommu);
     iommu->domain = d;
-    hd->g_iommu = iommu;
+    hd->arch.g_iommu = iommu;
 
     tasklet_init(&iommu->cmd_buffer_tasklet,
                  guest_iommu_process_command, (unsigned long)d);
@@ -907,7 +907,7 @@ void guest_iommu_destroy(struct domain *d)
     tasklet_kill(&iommu->cmd_buffer_tasklet);
     xfree(iommu);
 
-    domain_hvm_iommu(d)->g_iommu = NULL;
+    domain_hvm_iommu(d)->arch.g_iommu = NULL;
 }
 
 static int guest_iommu_mmio_range(struct vcpu *v, unsigned long addr)

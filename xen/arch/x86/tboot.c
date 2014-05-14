@@ -228,7 +228,8 @@ static void tboot_gen_domain_integrity(const uint8_t key[TB_KEY_SIZE],
         if ( !is_idle_domain(d) )
         {
             struct hvm_iommu *hd = domain_hvm_iommu(d);
-            update_iommu_mac(&ctx, hd->pgd_maddr, agaw_to_level(hd->agaw));
+            update_iommu_mac(&ctx, hd->arch.pgd_maddr,
+                             agaw_to_level(hd->arch.agaw));
         }
     }
 

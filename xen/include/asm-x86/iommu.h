@@ -17,7 +17,9 @@
 
 #define MAX_IOMMUS 32
 
-#include <asm/msi.h>
+/* Does this domain have a P2M table we can use as its IOMMU pagetable? */
+#define iommu_use_hap_pt(d) (hap_enabled(d) && iommu_hap_pt_share)
+#define domain_hvm_iommu(d)     (&d->arch.hvm_domain.hvm_iommu)
 
 void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);
 unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg);

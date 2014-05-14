@@ -23,25 +23,8 @@
 #include <xen/iommu.h>
 #include <asm/hvm/iommu.h>
 
-struct g2m_ioport {
-    struct list_head list;
-    unsigned int gport;
-    unsigned int mport;
-    unsigned int np;
-};
-
 struct hvm_iommu {
-    u64 pgd_maddr;                 /* io page directory machine address */
-    spinlock_t mapping_lock;       /* io page table lock */
-    int agaw;     /* adjusted guest address width, 0 is level 2 30-bit */
-    struct list_head g2m_ioport_list;  /* guest to machine ioport mapping */
-    u64 iommu_bitmap;              /* bitmap of iommu(s) that the domain uses */
-    struct list_head mapped_rmrrs;
-
-    /* amd iommu support */
-    int paging_mode;
-    struct page_info *root_table;
-    struct guest_iommu *g_iommu;
+    struct arch_hvm_iommu arch;
 
     /* iommu_ops */
     const struct iommu_ops *platform_ops;

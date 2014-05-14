@@ -355,7 +355,7 @@ int dpci_ioport_intercept(ioreq_t *p)
     unsigned int s = 0, e = 0;
     int rc;
 
-    list_for_each_entry( g2m_ioport, &hd->g2m_ioport_list, list )
+    list_for_each_entry( g2m_ioport, &hd->arch.g2m_ioport_list, list )
     {
         s = g2m_ioport->gport;
         e = s + g2m_ioport->np;

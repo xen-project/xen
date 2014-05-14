@@ -35,11 +35,6 @@ extern bool_t iommu_hap_pt_share;
 extern bool_t iommu_debug;
 extern bool_t amd_iommu_perdev_intremap;
 
-/* Does this domain have a P2M table we can use as its IOMMU pagetable? */
-#define iommu_use_hap_pt(d) (hap_enabled(d) && iommu_hap_pt_share)
-
-#define domain_hvm_iommu(d)     (&d->arch.hvm_domain.hvm_iommu)
-
 #define PAGE_SHIFT_4K       (12)
 #define PAGE_SIZE_4K        (1UL << PAGE_SHIFT_4K)
 #define PAGE_MASK_4K        (((u64)-1) << PAGE_SHIFT_4K)
@@ -55,6 +50,8 @@ void iommu_hwdom_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
 int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn);
 
+void arch_iommu_domain_destroy(struct domain *d);
+int arch_iommu_domain_init(struct domain *d);
 int arch_iommu_populate_page_table(struct domain *d);
 void arch_iommu_check_autotranslated_hwdom(struct domain *d);
 
