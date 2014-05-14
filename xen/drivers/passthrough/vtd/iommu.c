@@ -1249,7 +1249,7 @@ static void __hwdom_init intel_iommu_hwdom_init(struct domain *d)
     if ( !iommu_passthrough && !need_iommu(d) )
     {
         /* Set up 1:1 page table for dom0 */
-        iommu_set_hwdom_mapping(d);
+        vtd_set_hwdom_mapping(d);
     }
 
     setup_hwdom_pci_devices(d, setup_hwdom_device);

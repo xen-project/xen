@@ -127,7 +127,6 @@ void iommu_suspend(void);
 void iommu_resume(void);
 void iommu_crash_shutdown(void);
 
-void iommu_set_hwdom_mapping(struct domain *d);
 void iommu_share_p2m_table(struct domain *d);
 
 int iommu_do_domctl(struct xen_domctl *, struct domain *d,
