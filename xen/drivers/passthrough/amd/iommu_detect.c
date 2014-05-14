@@ -95,7 +95,7 @@ void __init get_iommu_features(struct amd_iommu *iommu)
 
     while ( feature_str[i] )
     {
-        if ( iommu_has_feature(iommu, i) )
+        if ( amd_iommu_has_feature(iommu, i) )
             printk( " %s\n", feature_str[i]);
         i++;
     }

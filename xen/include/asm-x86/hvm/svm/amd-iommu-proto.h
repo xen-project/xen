@@ -210,7 +210,7 @@ static inline int iommu_has_cap(struct amd_iommu *iommu, uint32_t bit)
     return !!(iommu->cap.header & (1u << bit));
 }
 
-static inline int iommu_has_feature(struct amd_iommu *iommu, uint32_t bit)
+static inline int amd_iommu_has_feature(struct amd_iommu *iommu, uint32_t bit)
 {
     if ( !iommu_has_cap(iommu, PCI_CAP_EFRSUP_SHIFT) )
         return 0;

@@ -884,7 +884,7 @@ static void enable_iommu(struct amd_iommu *iommu)
     register_iommu_event_log_in_mmio_space(iommu);
     register_iommu_exclusion_range(iommu);
 
-    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
+    if ( amd_iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
         register_iommu_ppr_log_in_mmio_space(iommu);
 
     desc = irq_to_desc(iommu->msi.irq);
@@ -898,15 +898,15 @@ static void enable_iommu(struct amd_iommu *iommu)
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_ENABLED);
     set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
 
-    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
+    if ( amd_iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
         set_iommu_ppr_log_control(iommu, IOMMU_CONTROL_ENABLED);
 
-    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_GTSUP_SHIFT) )
+    if ( amd_iommu_has_feature(iommu, IOMMU_EXT_FEATURE_GTSUP_SHIFT) )
         set_iommu_guest_translation_control(iommu, IOMMU_CONTROL_ENABLED);
 
     set_iommu_translation_control(iommu, IOMMU_CONTROL_ENABLED);
 
-    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_IASUP_SHIFT) )
+    if ( amd_iommu_has_feature(iommu, IOMMU_EXT_FEATURE_IASUP_SHIFT) )
         amd_iommu_flush_all_caches(iommu);
 
     iommu->enabled = 1;
@@ -1009,7 +1009,7 @@ static int __init amd_iommu_init_one(struct amd_iommu *iommu)
     if ( allocate_event_log(iommu) == NULL )
         goto error_out;
 
-    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
+    if ( amd_iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
         if ( allocate_ppr_log(iommu) == NULL )
             goto error_out;
 
@@ -1283,10 +1283,10 @@ static void disable_iommu(struct amd_iommu *iommu)
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_DISABLED);
     set_iommu_event_log_control(iommu, IOMMU_CONTROL_DISABLED);
 
-    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
+    if ( amd_iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
         set_iommu_ppr_log_control(iommu, IOMMU_CONTROL_DISABLED);
 
-    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_GTSUP_SHIFT) )
+    if ( amd_iommu_has_feature(iommu, IOMMU_EXT_FEATURE_GTSUP_SHIFT) )
         set_iommu_guest_translation_control(iommu, IOMMU_CONTROL_DISABLED);
 
     set_iommu_translation_control(iommu, IOMMU_CONTROL_DISABLED);
@@ -1356,7 +1356,7 @@ void amd_iommu_resume(void)
     }
 
     /* flush all cache entries after iommu re-enabled */
-    if ( !iommu_has_feature(iommu, IOMMU_EXT_FEATURE_IASUP_SHIFT) )
+    if ( !amd_iommu_has_feature(iommu, IOMMU_EXT_FEATURE_IASUP_SHIFT) )
     {
         invalidate_all_devices();
         invalidate_all_domain_pages();
