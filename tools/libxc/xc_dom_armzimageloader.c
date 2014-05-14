@@ -51,7 +51,6 @@ struct minimal_dtb_header {
 static int xc_dom_probe_zimage32_kernel(struct xc_dom_image *dom)
 {
     uint32_t *zimage;
-    uint32_t end;
 
     if ( dom->kernel_blob == NULL )
     {
@@ -73,22 +72,6 @@ static int xc_dom_probe_zimage32_kernel(struct xc_dom_image *dom)
         return -EINVAL;
     }
 
-    end = zimage[ZIMAGE32_END_OFFSET/4];
-
-    /*
-     * Check for an appended DTB.
-     */
-    if ( end + sizeof(struct minimal_dtb_header) < dom->kernel_size ) {
-        struct minimal_dtb_header *dtb_hdr;
-        dtb_hdr = (struct minimal_dtb_header *)(dom->kernel_blob + end);
-        if (ntohl/*be32_to_cpu*/(dtb_hdr->magic) == DTB_MAGIC) {
-            xc_dom_printf(dom->xch, "%s: found an appended DTB", __FUNCTION__);
-            end += ntohl/*be32_to_cpu*/(dtb_hdr->total_size);
-        }
-    }
-
-    dom->kernel_size = end;
-
     return 0;
 }
 
@@ -105,8 +88,20 @@ static int xc_dom_parse_zimage32_kernel(struct xc_dom_image *dom)
 
     /* Do not load kernel at the very first RAM address */
     v_start = rambase + 0x8000;
+
+    if ( dom->kernel_size > UINT64_MAX - v_start )
+    {
+        DOMPRINTF("%s: kernel is too large\n", __FUNCTION__);
+        return -EINVAL;
+    }
+
     v_end = v_start + dom->kernel_size;
 
+    /*
+     * If start is invalid then the guest will start at some invalid
+     * address and crash, but this happens in guest context so doesn't
+     * concern us here.
+     */
     start = zimage[ZIMAGE32_START_OFFSET/4];
 
     if (start == 0)
@@ -187,7 +182,20 @@ static int xc_dom_parse_zimage64_kernel(struct xc_dom_image *dom)
 
     zimage = dom->kernel_blob;
 
+    if ( zimage->text_offset > UINT64_MAX - rambase )
+    {
+        DOMPRINTF("%s: kernel text offset is too large\n", __FUNCTION__);
+        return -EINVAL;
+    }
+
     v_start = rambase + zimage->text_offset;
+
+    if ( dom->kernel_size > UINT64_MAX - v_start )
+    {
+        DOMPRINTF("%s: kernel is too large\n", __FUNCTION__);
+        return -EINVAL;
+    }
+
     v_end = v_start + dom->kernel_size;
 
     dom->kernel_seg.vstart = v_start;
