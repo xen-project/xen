@@ -23,7 +23,7 @@ ovmf-dir:
 
 seabios-dir:
 	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(SEABIOS_UPSTREAM_URL) $(SEABIOS_UPSTREAM_TAG) seabios-dir
-	cp seabios-config seabios-dir/.config;
+	$(MAKE) -C seabios-dir defconfig
 
 .PHONY: all
 all: $(SUBDIRS-y)
