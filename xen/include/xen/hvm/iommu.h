@@ -21,6 +21,7 @@
 #define __XEN_HVM_IOMMU_H__
 
 #include <xen/iommu.h>
+#include <asm/hvm/iommu.h>
 
 struct g2m_ioport {
     struct list_head list;
