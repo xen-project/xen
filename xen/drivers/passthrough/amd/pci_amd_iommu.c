@@ -138,7 +138,7 @@ static void amd_iommu_setup_domain_device(
     {
         /* bind DTE to domain page-tables */
         amd_iommu_set_root_page_table(
-            (u32 *)dte, page_to_maddr(hd->root_table), hd->domain_id,
+            (u32 *)dte, page_to_maddr(hd->root_table), domain->domain_id,
             hd->paging_mode, valid);
 
         if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
@@ -152,7 +152,7 @@ static void amd_iommu_setup_domain_device(
                         "domain = %d, paging mode = %d\n",
                         req_id, pdev->type,
                         page_to_maddr(hd->root_table),
-                        hd->domain_id, hd->paging_mode);
+                        domain->domain_id, hd->paging_mode);
     }
 
     spin_unlock_irqrestore(&iommu->lock, flags);
@@ -274,8 +274,6 @@ static int amd_iommu_domain_init(struct domain *d)
                       IOMMU_PAGING_MODE_LEVEL_2 :
                       get_paging_mode(max_page);
 
-    hd->domain_id = d->domain_id;
-
     guest_iommu_init(d);
 
     return 0;
@@ -334,7 +332,7 @@ void amd_iommu_disable_domain_device(struct domain *domain,
 
         AMD_IOMMU_DEBUG("Disable: device id = %#x, "
                         "domain = %d, paging mode = %d\n",
-                        req_id,  domain_hvm_iommu(domain)->domain_id,
+                        req_id,  domain->domain_id,
                         domain_hvm_iommu(domain)->paging_mode);
     }
     spin_unlock_irqrestore(&iommu->lock, flags);

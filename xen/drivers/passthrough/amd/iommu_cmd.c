@@ -354,8 +354,7 @@ static void _amd_iommu_flush_pages(struct domain *d,
 {
     unsigned long flags;
     struct amd_iommu *iommu;
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
-    unsigned int dom_id = hd->domain_id;
+    unsigned int dom_id = d->domain_id;
 
     /* send INVALIDATE_IOMMU_PAGES command */
     for_each_amd_iommu ( iommu )

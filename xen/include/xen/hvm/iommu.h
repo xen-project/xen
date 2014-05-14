@@ -38,7 +38,6 @@ struct hvm_iommu {
     struct list_head mapped_rmrrs;
 
     /* amd iommu support */
-    int domain_id;
     int paging_mode;
     struct page_info *root_table;
     struct guest_iommu *g_iommu;

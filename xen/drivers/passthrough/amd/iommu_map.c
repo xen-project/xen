@@ -614,7 +614,7 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
                 /* valid = 0 only works for dom0 passthrough mode */
                 amd_iommu_set_root_page_table((u32 *)device_entry,
                                               page_to_maddr(hd->root_table),
-                                              hd->domain_id,
+                                              d->domain_id,
                                               hd->paging_mode, 1);
 
                 amd_iommu_flush_device(iommu, req_id);
