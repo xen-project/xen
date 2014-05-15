@@ -653,7 +653,7 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
             if ( p2m_is_paging(t) )
             {
                 p2m_mem_paging_populate(d, gmfn);
-                return -EAGAIN;
+                return -ERESTART;
             }
 
             gdprintk(XENLOG_WARNING,
@@ -2385,7 +2385,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             {
             case 0:
                 break;
-            case -EAGAIN: /* retry after preemption */
+            case -ERESTART: /* retry after preemption */
                 goto skip;
             default:      /* not okay */
                 goto fail;

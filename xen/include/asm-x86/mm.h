@@ -125,7 +125,7 @@ struct page_info
          * PGT_partial gets set, and it must be dropped when the flag gets
          * cleared. This is so that a get() leaving a page in partially
          * validated state (where the caller would drop the reference acquired
-         * due to the getting of the type [apparently] failing [-EAGAIN])
+         * due to the getting of the type [apparently] failing [-ERESTART])
          * would not accidentally result in a page left with zero general
          * reference count, but non-zero type reference count (possible when
          * the partial get() is followed immediately by domain destruction).

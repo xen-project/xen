@@ -2289,7 +2289,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
                      !is_last_branch_msr(msr) )
                     switch ( wrmsr_hypervisor_regs(msr, msr_content) )
                     {
-                    case -EAGAIN:
+                    case -ERESTART:
                         return X86EMUL_RETRY;
                     case 0:
                     case 1:

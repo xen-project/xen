@@ -245,7 +245,7 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
         if ( preemptible && pod_target != p2m->pod.count &&
              hypercall_preempt_check() )
         {
-            ret = -EAGAIN;
+            ret = -ERESTART;
             goto out;
         }
     }
@@ -290,7 +290,7 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
             if ( preemptible && pod_target != p2m->pod.count &&
                  hypercall_preempt_check() )
             {
-                ret = -EAGAIN;
+                ret = -ERESTART;
                 goto out;
             }
         }

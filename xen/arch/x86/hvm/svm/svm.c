@@ -1827,7 +1827,7 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
         switch ( wrmsr_hypervisor_regs(msr, msr_content) )
         {
-        case -EAGAIN:
+        case -ERESTART:
             result = X86EMUL_RETRY;
             break;
         case 0:

@@ -342,7 +342,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( guest_handle_is_null(op->u.vcpucontext.ctxt) )
         {
             ret = vcpu_reset(v);
-            if ( ret == -EAGAIN )
+            if ( ret == -ERESTART )
                 ret = hypercall_create_continuation(
                           __HYPERVISOR_domctl, "h", u_domctl);
             break;
@@ -374,7 +374,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = arch_set_info_guest(v, c);
             domain_unpause(d);
 
-            if ( ret == -EAGAIN )
+            if ( ret == -ERESTART )
                 ret = hypercall_create_continuation(
                           __HYPERVISOR_domctl, "h", u_domctl);
         }

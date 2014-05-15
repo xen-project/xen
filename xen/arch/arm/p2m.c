@@ -454,7 +454,7 @@ static int apply_p2m_changes(struct domain *d,
             if ( hypercall_preempt_check() )
             {
                 p2m->lowest_mapped_gfn = addr >> PAGE_SHIFT;
-                rc = -EAGAIN;
+                rc = -ERESTART;
                 goto out;
             }
             count = 0;

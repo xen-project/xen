@@ -929,8 +929,8 @@ int arch_set_info_guest(
         switch ( rc )
         {
         case -EINTR:
-            rc = -EAGAIN;
-        case -EAGAIN:
+            rc = -ERESTART;
+        case -ERESTART:
         case 0:
             break;
         default:
@@ -957,8 +957,8 @@ int arch_set_info_guest(
                 switch ( rc )
                 {
                 case -EINTR:
-                    rc = -EAGAIN;
-                case -EAGAIN:
+                    rc = -ERESTART;
+                case -ERESTART:
                     v->arch.old_guest_table =
                         pagetable_get_page(v->arch.guest_table);
                     v->arch.guest_table = pagetable_null();
@@ -1808,9 +1808,9 @@ static int relinquish_memory(
         {
         case 0:
             break;
-        case -EAGAIN:
+        case -ERESTART:
         case -EINTR:
-            ret = -EAGAIN;
+            ret = -ERESTART;
             page_list_add(page, list);
             set_bit(_PGT_pinned, &page->u.inuse.type_info);
             put_page(page);
@@ -1855,9 +1855,9 @@ static int relinquish_memory(
                     if ( x & PGT_partial )
                         put_page(page);
                     put_page(page);
-                    ret = -EAGAIN;
+                    ret = -ERESTART;
                     goto out;
-                case -EAGAIN:
+                case -ERESTART:
                     page_list_add(page, list);
                     page->u.inuse.type_info |= PGT_partial;
                     if ( x & PGT_partial )
@@ -1881,7 +1881,7 @@ static int relinquish_memory(
 
         if ( hypercall_preempt_check() )
         {
-            ret = -EAGAIN;
+            ret = -ERESTART;
             goto out;
         }
     }

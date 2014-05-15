@@ -1285,7 +1285,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type,
              && hypercall_preempt_check() )
         {
             page->nr_validated_ptes = i;
-            rc = -EAGAIN;
+            rc = -ERESTART;
             break;
         }
 
@@ -1356,7 +1356,7 @@ static int alloc_l3_table(struct page_info *page)
                   (rc = get_page_from_l3e(pl3e[i], pfn, d, partial)) > 0 )
             continue;
 
-        if ( rc == -EAGAIN )
+        if ( rc == -ERESTART )
         {
             page->nr_validated_ptes = i;
             page->partial_pte = partial ?: 1;
@@ -1365,7 +1365,7 @@ static int alloc_l3_table(struct page_info *page)
         {
             page->nr_validated_ptes = i;
             page->partial_pte = 0;
-            rc = -EAGAIN;
+            rc = -ERESTART;
         }
         if ( rc < 0 )
             break;
@@ -1375,7 +1375,7 @@ static int alloc_l3_table(struct page_info *page)
 
     if ( rc >= 0 && !create_pae_xen_mappings(d, pl3e) )
         rc = -EINVAL;
-    if ( rc < 0 && rc != -EAGAIN && rc != -EINTR )
+    if ( rc < 0 && rc != -ERESTART && rc != -EINTR )
     {
         MEM_LOG("Failure in alloc_l3_table: entry %d", i);
         if ( i )
@@ -1428,7 +1428,7 @@ static int alloc_l4_table(struct page_info *page)
              (rc = get_page_from_l4e(pl4e[i], pfn, d, partial)) > 0 )
             continue;
 
-        if ( rc == -EAGAIN )
+        if ( rc == -ERESTART )
         {
             page->nr_validated_ptes = i;
             page->partial_pte = partial ?: 1;
@@ -1442,7 +1442,7 @@ static int alloc_l4_table(struct page_info *page)
                 page->nr_validated_ptes = i;
                 page->partial_pte = 0;
                 if ( rc == -EINTR )
-                    rc = -EAGAIN;
+                    rc = -ERESTART;
                 else
                 {
                     if ( current->arch.old_guest_table )
@@ -1500,7 +1500,7 @@ static int free_l2_table(struct page_info *page, int preemptible)
              preemptible && i && hypercall_preempt_check() )
         {
            page->nr_validated_ptes = i;
-           err = -EAGAIN;
+           err = -ERESTART;
         }
     } while ( !err && i-- );
 
@@ -1537,7 +1537,7 @@ static int free_l3_table(struct page_info *page)
 
     unmap_domain_page(pl3e);
 
-    if ( rc == -EAGAIN )
+    if ( rc == -ERESTART )
     {
         page->nr_validated_ptes = i;
         page->partial_pte = partial ?: -1;
@@ -1546,7 +1546,7 @@ static int free_l3_table(struct page_info *page)
     {
         page->nr_validated_ptes = i + 1;
         page->partial_pte = 0;
-        rc = -EAGAIN;
+        rc = -ERESTART;
     }
     return rc > 0 ? 0 : rc;
 }
@@ -1567,7 +1567,7 @@ static int free_l4_table(struct page_info *page)
         partial = 0;
     } while ( i-- );
 
-    if ( rc == -EAGAIN )
+    if ( rc == -ERESTART )
     {
         page->nr_validated_ptes = i;
         page->partial_pte = partial ?: -1;
@@ -1576,7 +1576,7 @@ static int free_l4_table(struct page_info *page)
     {
         page->nr_validated_ptes = i + 1;
         page->partial_pte = 0;
-        rc = -EAGAIN;
+        rc = -ERESTART;
     }
 
     unmap_domain_page(pl4e);
@@ -2104,7 +2104,7 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
         {
             ASSERT((page->u.inuse.type_info &
                     (PGT_count_mask | PGT_validated)) == 1);
-    case -EAGAIN:
+    case -ERESTART:
             get_page_light(page);
             page->u.inuse.type_info |= PGT_partial;
         }
@@ -2203,7 +2203,7 @@ static int __put_final_page_type(
     }
     else
     {
-        BUG_ON(rc != -EAGAIN);
+        BUG_ON(rc != -ERESTART);
         wmb();
         get_page_light(page);
         page->u.inuse.type_info |= PGT_partial;
@@ -2421,7 +2421,7 @@ int get_page_type(struct page_info *page, unsigned long type)
     int rc = __get_page_type(page, type, 0);
     if ( likely(rc == 0) )
         return 1;
-    ASSERT(rc != -EINTR && rc != -EAGAIN);
+    ASSERT(rc != -EINTR && rc != -ERESTART);
     return 0;
 }
 
@@ -2633,8 +2633,8 @@ int put_old_guest_table(struct vcpu *v)
     switch ( rc = put_page_and_type_preemptible(v->arch.old_guest_table) )
     {
     case -EINTR:
-    case -EAGAIN:
-        return -EAGAIN;
+    case -ERESTART:
+        return -ERESTART;
     }
 
     v->arch.old_guest_table = NULL;
@@ -2722,8 +2722,8 @@ int new_guest_cr3(unsigned long mfn)
         case 0:
             break;
         case -EINTR:
-        case -EAGAIN:
-            return -EAGAIN;
+        case -ERESTART:
+            return -ERESTART;
         default:
             MEM_LOG("Error while installing new compat baseptr %lx", mfn);
             return rc;
@@ -2758,8 +2758,8 @@ int new_guest_cr3(unsigned long mfn)
     case 0:
         break;
     case -EINTR:
-    case -EAGAIN:
-        return -EAGAIN;
+    case -ERESTART:
+        return -ERESTART;
     default:
         MEM_LOG("Error while installing new baseptr %lx", mfn);
         return rc;
@@ -2782,8 +2782,8 @@ int new_guest_cr3(unsigned long mfn)
             switch ( rc = put_page_and_type_preemptible(page) )
             {
             case -EINTR:
-                rc = -EAGAIN;
-            case -EAGAIN:
+                rc = -ERESTART;
+            case -ERESTART:
                 curr->arch.old_guest_table = page;
                 break;
             default:
@@ -2896,7 +2896,7 @@ long do_mmuext_op(
 
     if ( unlikely(rc) )
     {
-        if ( likely(rc == -EAGAIN) )
+        if ( likely(rc == -ERESTART) )
             rc = hypercall_create_continuation(
                      __HYPERVISOR_mmuext_op, "hihi", uops, count, pdone,
                      foreigndom);
@@ -2937,7 +2937,7 @@ long do_mmuext_op(
     {
         if ( curr->arch.old_guest_table || (i && hypercall_preempt_check()) )
         {
-            rc = -EAGAIN;
+            rc = -ERESTART;
             break;
         }
 
@@ -2991,8 +2991,8 @@ long do_mmuext_op(
             if ( unlikely(!okay) )
             {
                 if ( rc == -EINTR )
-                    rc = -EAGAIN;
-                else if ( rc != -EAGAIN )
+                    rc = -ERESTART;
+                else if ( rc != -ERESTART )
                     MEM_LOG("Error while pinning mfn %lx", page_to_mfn(page));
                 if ( page != curr->arch.old_guest_table )
                     put_page(page);
@@ -3061,7 +3061,7 @@ long do_mmuext_op(
             switch ( rc = put_page_and_type_preemptible(page) )
             {
             case -EINTR:
-            case -EAGAIN:
+            case -ERESTART:
                 curr->arch.old_guest_table = page;
                 rc = 0;
                 break;
@@ -3117,8 +3117,8 @@ long do_mmuext_op(
                 if ( unlikely(!okay) )
                 {
                     if ( rc == -EINTR )
-                        rc = -EAGAIN;
-                    else if ( rc != -EAGAIN )
+                        rc = -ERESTART;
+                    else if ( rc != -ERESTART )
                         MEM_LOG("Error while installing new mfn %lx",
                                 op.arg1.mfn);
                     break;
@@ -3137,8 +3137,8 @@ long do_mmuext_op(
                     switch ( rc = put_page_and_type_preemptible(page) )
                     {
                     case -EINTR:
-                        rc = -EAGAIN;
-                    case -EAGAIN:
+                        rc = -ERESTART;
+                    case -ERESTART:
                         curr->arch.old_guest_table = page;
                         okay = 0;
                         break;
@@ -3373,7 +3373,7 @@ long do_mmuext_op(
         guest_handle_add_offset(uops, 1);
     }
 
-    if ( rc == -EAGAIN )
+    if ( rc == -ERESTART )
     {
         ASSERT(i < count);
         rc = hypercall_create_continuation(
@@ -3430,7 +3430,7 @@ long do_mmu_update(
 
     if ( unlikely(rc) )
     {
-        if ( likely(rc == -EAGAIN) )
+        if ( likely(rc == -ERESTART) )
             rc = hypercall_create_continuation(
                      __HYPERVISOR_mmu_update, "hihi", ureqs, count, pdone,
                      foreigndom);
@@ -3484,7 +3484,7 @@ long do_mmu_update(
     {
         if ( curr->arch.old_guest_table || (i && hypercall_preempt_check()) )
         {
-            rc = -EAGAIN;
+            rc = -ERESTART;
             break;
         }
 
@@ -3614,7 +3614,7 @@ long do_mmu_update(
                 }
                 page_unlock(page);
                 if ( rc == -EINTR )
-                    rc = -EAGAIN;
+                    rc = -ERESTART;
             }
             else if ( get_page_type(page, PGT_writable_page) )
             {
@@ -3676,7 +3676,7 @@ long do_mmu_update(
         guest_handle_add_offset(ureqs, 1);
     }
 
-    if ( rc == -EAGAIN )
+    if ( rc == -ERESTART )
     {
         ASSERT(i < count);
         rc = hypercall_create_continuation(
@@ -4830,7 +4830,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             rc = p2m_pod_set_mem_target(d, target.target_pages);
         }
 
-        if ( rc == -EAGAIN )
+        if ( rc == -ERESTART )
         {
             rc = hypercall_create_continuation(
                 __HYPERVISOR_memory_op, "lh", op, arg);

@@ -590,6 +590,8 @@ int domain_kill(struct domain *d)
         rc = domain_relinquish_resources(d);
         if ( rc != 0 )
         {
+            if ( rc == -ERESTART )
+                rc = -EAGAIN;
             BUG_ON(rc != -EAGAIN);
             break;
         }
@@ -1067,7 +1069,7 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         free_vcpu_guest_context(ctxt);
 
-        if ( rc == -EAGAIN )
+        if ( rc == -ERESTART )
             rc = hypercall_create_continuation(__HYPERVISOR_vcpu_op, "iih",
                                                cmd, vcpuid, arg);
 

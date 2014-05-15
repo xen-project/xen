@@ -4449,7 +4449,7 @@ static int hvmop_flush_tlb_all(void)
 
     /* Avoid deadlock if more than one vcpu tries this at the same time. */
     if ( !spin_trylock(&d->hypercall_deadlock_mutex) )
-        return -EAGAIN;
+        return -ERESTART;
 
     /* Pause all other vcpus. */
     for_each_vcpu ( d, v )
@@ -4557,7 +4557,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                  * All foreign updates to guest state must synchronise on
                  * the domctl_lock.
                  */
-                rc = -EAGAIN;
+                rc = -ERESTART;
                 if ( !domctl_lock_acquire() )
                     break;
 
@@ -4819,7 +4819,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             if ( a.nr > ++start_iter && !(start_iter & HVMOP_op_mask) &&
                  hypercall_preempt_check() )
             {
-                rc = -EAGAIN;
+                rc = -ERESTART;
                 break;
             }
         }
@@ -4919,13 +4919,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             {
                 put_gfn(d, pfn);
                 p2m_mem_paging_populate(d, pfn);
-                rc = -EINVAL; /* XXX EAGAIN */
+                rc = -EAGAIN;
                 goto param_fail4;
             }
             if ( p2m_is_shared(t) )
             {
                 put_gfn(d, pfn);
-                rc = -EINVAL; /* XXX EAGAIN */
+                rc = -EAGAIN;
                 goto param_fail4;
             }
             if ( !p2m_is_ram(t) &&
@@ -4944,7 +4944,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             if ( a.nr > ++start_iter && !(start_iter & HVMOP_op_mask) &&
                  hypercall_preempt_check() )
             {
-                rc = -EAGAIN;
+                rc = -ERESTART;
                 goto param_fail4;
             }
         }
@@ -5059,7 +5059,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
     }
 
-    if ( rc == -EAGAIN )
+    if ( rc == -ERESTART )
     {
         ASSERT(!(start_iter & HVMOP_op_mask));
         rc = hypercall_create_continuation(__HYPERVISOR_hvm_op, "lh",

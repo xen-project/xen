@@ -1297,7 +1297,7 @@ int relinquish_shared_pages(struct domain *d)
             if ( hypercall_preempt_check() )
             {
                 p2m->next_shared_gfn_to_relinquish = gfn + 1;
-                rc = -EAGAIN;
+                rc = -ERESTART;
                 break;
             }
             count = 0;

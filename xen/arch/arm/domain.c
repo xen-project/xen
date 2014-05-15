@@ -682,7 +682,7 @@ static int relinquish_memory(struct domain *d, struct page_list_head *list)
 
         if ( hypercall_preempt_check() )
         {
-            ret = -EAGAIN;
+            ret = -ERESTART;
             goto out;
         }
     }
