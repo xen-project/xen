@@ -283,7 +283,8 @@ void hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data)
 
     if ( !vector )
     {
-        int pirq = ((addr >> 32) & 0xffffff00) | ((addr >> 12) & 0xff);
+        int pirq = ((addr >> 32) & 0xffffff00) | dest;
+
         if ( pirq > 0 )
         {
             struct pirq *info = pirq_info(d, pirq);

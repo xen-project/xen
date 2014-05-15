@@ -535,7 +535,7 @@ static int remap_entry_to_msi_msg(
         msg->dest32 = iremap_entry->lo.dst;
     else
         msg->dest32 = (iremap_entry->lo.dst >> 8) & 0xff;
-    msg->address_lo |= (msg->dest32 & 0xff) << MSI_ADDR_DEST_ID_SHIFT;
+    msg->address_lo |= MSI_ADDR_DEST_ID(msg->dest32);
 
     msg->data =
         MSI_DATA_TRIGGER_EDGE |

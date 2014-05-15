@@ -1044,7 +1044,7 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     if (x2apic_enabled)
         msg.address_hi = dest & 0xFFFFFF00;
     msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
-    msg.address_lo |= MSI_ADDR_DEST_ID(dest & 0xff);
+    msg.address_lo |= MSI_ADDR_DEST_ID(dest);
     iommu->msi.msg = msg;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
