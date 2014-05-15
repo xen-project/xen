@@ -906,7 +906,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
             /* Re-sync the stack and then switch to relocated pagetables. */
             asm volatile (
-                "rep movsb        ; " /* re-sync the stack */
+                "rep movsq        ; " /* re-sync the stack */
                 "movq %%cr4,%%rsi ; "
                 "andb $0x7f,%%sil ; "
                 "movq %%rsi,%%cr4 ; " /* CR4.PGE == 0 */
@@ -914,7 +914,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                 "orb $0x80,%%sil  ; "
                 "movq %%rsi,%%cr4   " /* CR4.PGE == 1 */
                 : : "r" (__pa(idle_pg_table)), "S" (cpu0_stack),
-                "D" (__va(__pa(cpu0_stack))), "c" (STACK_SIZE) : "memory" );
+                "D" (__va(__pa(cpu0_stack))), "c" (STACK_SIZE / 8) : "memory" );
 
             bootstrap_map(NULL);
         }
