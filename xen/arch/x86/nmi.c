@@ -118,11 +118,12 @@ int __init check_nmi_watchdog (void)
 {
     static unsigned int __initdata prev_nmi_count[NR_CPUS];
     int cpu;
-    
+    bool_t ok = 1;
+
     if ( !nmi_watchdog )
         return 0;
 
-    printk("Testing NMI watchdog --- ");
+    printk("Testing NMI watchdog on all CPUs:");
 
     for_each_online_cpu ( cpu )
         prev_nmi_count[cpu] = nmi_count(cpu);
@@ -136,12 +137,13 @@ int __init check_nmi_watchdog (void)
     for_each_online_cpu ( cpu )
     {
         if ( nmi_count(cpu) - prev_nmi_count[cpu] <= 5 )
-            printk("CPU#%d stuck. ", cpu);
-        else
-            printk("CPU#%d okay. ", cpu);
+        {
+            printk(" %d", cpu);
+            ok = 0;
+        }
     }
 
-    printk("\n");
+    printk(" %s\n", ok ? "ok" : "stuck");
 
     /*
      * Now that we know it works we can reduce NMI frequency to
