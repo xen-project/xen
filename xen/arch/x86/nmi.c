@@ -126,7 +126,6 @@ int __init check_nmi_watchdog (void)
 
     for_each_online_cpu ( cpu )
         prev_nmi_count[cpu] = nmi_count(cpu);
-    local_irq_enable();
 
     /* Wait for 10 ticks.  Busy-wait on all CPUs: the LAPIC counter that
      * the NMI watchdog uses only runs while the core's not halted */
