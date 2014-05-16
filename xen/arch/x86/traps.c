@@ -3431,8 +3431,8 @@ static void __set_intr_gate(unsigned int n, uint32_t dpl, void *addr)
     /* Keep secondary tables in sync with IRQ updates. */
     for ( i = 1; i < nr_cpu_ids; i++ )
         if ( idt_tables[i] != NULL )
-            _set_gate(&idt_tables[i][n], 14, dpl, addr);
-    _set_gate(&idt_table[n], 14, dpl, addr);
+            _set_gate(&idt_tables[i][n], SYS_DESC_irq_gate, dpl, addr);
+    _set_gate(&idt_table[n], SYS_DESC_irq_gate, dpl, addr);
 }
 
 static void set_swint_gate(unsigned int n, void *addr)
@@ -3457,12 +3457,12 @@ void load_TR(void)
         this_cpu(gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
-        9);
+        SYS_DESC_tss_avail);
     _set_tssldt_desc(
         this_cpu(compat_gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
-        11);
+        SYS_DESC_tss_busy);
 
     /* Switch to non-compat GDT (which has B bit clear) to execute LTR. */
     asm volatile (

@@ -390,14 +390,12 @@ void __devinit subarch_percpu_traps_init(void)
         set_ist(&idt_table[TRAP_nmi],           IST_NMI);
         set_ist(&idt_table[TRAP_machine_check], IST_MCE);
 
-        /*
-         * The 32-on-64 hypercall entry vector is only accessible from ring 1.
-         * Also note that this is a trap gate, not an interrupt gate.
-         */
-        _set_gate(idt_table+HYPERCALL_VECTOR, 15, 1, &compat_hypercall);
+        /* The 32-on-64 hypercall vector is only accessible from ring 1. */
+        _set_gate(idt_table + HYPERCALL_VECTOR,
+                  SYS_DESC_trap_gate, 1, &compat_hypercall);
 
         /* Fast trap for int80 (faster than taking the #GP-fixup path). */
-        _set_gate(idt_table+0x80, 15, 3, &int80_direct_trap);
+        _set_gate(idt_table + 0x80, SYS_DESC_trap_gate, 3, &int80_direct_trap);
     }
 
     stack_bottom = (char *)get_stack_bottom();

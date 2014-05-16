@@ -149,7 +149,8 @@ static void nmi_shootdown_cpus(void)
              * This update is safe from a security point of view, as this pcpu 
              * is never going to try to sysret back to a PV vcpu.
              */
-            _set_gate_lower(&idt_tables[i][TRAP_nmi], 14, 0, &trap_nop);
+            _set_gate_lower(&idt_tables[i][TRAP_nmi],
+                            SYS_DESC_irq_gate, 0, &trap_nop);
             set_ist(&idt_tables[i][TRAP_machine_check], IST_NONE);
         }
         else
