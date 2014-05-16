@@ -30,7 +30,7 @@
 
 static struct exynos4210_uart {
     unsigned int baud, clock_hz, data_bits, parity, stop_bits;
-    struct dt_irq irq;
+    unsigned int irq;
     void *regs;
     struct irqaction irqaction;
     struct vuart_info vuart;
@@ -197,9 +197,9 @@ static void __init exynos4210_uart_init_postirq(struct serial_port *port)
     uart->irqaction.name    = "exynos4210_uart";
     uart->irqaction.dev_id  = port;
 
-    if ( (rc = setup_dt_irq(&uart->irq, &uart->irqaction)) != 0 )
+    if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
         dprintk(XENLOG_ERR, "Failed to allocated exynos4210_uart IRQ %d\n",
-                uart->irq.irq);
+                uart->irq);
 
     /* Unmask interrupts */
     exynos4210_write(uart, UINTM, ~UINTM_ALLI);
@@ -272,7 +272,7 @@ static int __init exynos4210_uart_irq(struct serial_port *port)
 {
     struct exynos4210_uart *uart = port->uart;
 
-    return uart->irq.irq;
+    return uart->irq;
 }
 
 static const struct vuart_info *exynos4210_vuart_info(struct serial_port *port)
@@ -323,12 +323,13 @@ static int __init exynos4210_uart_init(struct dt_device_node *dev,
         return res;
     }
 
-    res = dt_device_get_irq(dev, 0, &uart->irq);
-    if ( res )
+    res = platform_get_irq(dev, 0);
+    if ( res < 0 )
     {
         printk("exynos4210: Unable to retrieve the IRQ\n");
-        return res;
+        return -EINVAL;
     }
+    uart->irq = res;
 
     uart->regs = ioremap_nocache(addr, size);
     if ( !uart->regs )

@@ -47,7 +47,7 @@ static struct {
     paddr_t hbase;       /* Address of virtual interface registers */
     paddr_t vbase;       /* Address of virtual cpu interface registers */
     unsigned int lines;  /* Number of interrupts (SPIs + PPIs + SGIs) */
-    struct dt_irq maintenance; /* IRQ maintenance */
+    unsigned int maintenance_irq; /* IRQ maintenance */
     unsigned int cpus;
     spinlock_t lock;
 } gic;
@@ -433,9 +433,10 @@ void __init gic_init(void)
     if ( res || !gic.vbase || (gic.vbase & ~PAGE_MASK) )
         panic("GIC: Cannot find a valid address for the virtual CPU");
 
-    res = dt_device_get_irq(node, 0, &gic.maintenance);
-    if ( res )
+    res = platform_get_irq(node, 0);
+    if ( res < 0 )
         panic("GIC: Cannot find the maintenance IRQ");
+    gic.maintenance_irq = res;
 
     /* Set the GIC as the primary interrupt controller */
     dt_interrupt_controller = node;
@@ -449,7 +450,7 @@ void __init gic_init(void)
               "        gic_vcpu_addr=%"PRIpaddr"\n"
               "        gic_maintenance_irq=%u\n",
               gic.dbase, gic.cbase, gic.hbase, gic.vbase,
-              gic.maintenance.irq);
+              gic.maintenance_irq);
 
     if ( (gic.dbase & ~PAGE_MASK) || (gic.cbase & ~PAGE_MASK) ||
          (gic.hbase & ~PAGE_MASK) || (gic.vbase & ~PAGE_MASK) )
@@ -886,8 +887,8 @@ void gic_dump_info(struct vcpu *v)
 
 void __cpuinit init_maintenance_interrupt(void)
 {
-    request_dt_irq(&gic.maintenance, maintenance_interrupt,
-                   "irq-maintenance", NULL);
+    request_irq(gic.maintenance_irq, maintenance_interrupt,
+                "irq-maintenance", NULL);
 }
 
 /*

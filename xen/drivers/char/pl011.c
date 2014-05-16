@@ -32,7 +32,7 @@
 
 static struct pl011 {
     unsigned int baud, clock_hz, data_bits, parity, stop_bits;
-    struct dt_irq irq;
+    unsigned int irq;
     void __iomem *regs;
     /* UART with IRQ line: interrupt-driven I/O. */
     struct irqaction irqaction;
@@ -132,13 +132,13 @@ static void __init pl011_init_postirq(struct serial_port *port)
     struct pl011 *uart = port->uart;
     int rc;
 
-    if ( uart->irq.irq > 0 )
+    if ( uart->irq > 0 )
     {
         uart->irqaction.handler = pl011_interrupt;
         uart->irqaction.name    = "pl011";
         uart->irqaction.dev_id  = port;
-        if ( (rc = setup_dt_irq(&uart->irq, &uart->irqaction)) != 0 )
-            printk("ERROR: Failed to allocate pl011 IRQ %d\n", uart->irq.irq);
+        if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
+            printk("ERROR: Failed to allocate pl011 IRQ %d\n", uart->irq);
     }
 
     /* Clear pending error interrupts */
@@ -186,7 +186,8 @@ static int pl011_getc(struct serial_port *port, char *pc)
 static int __init pl011_irq(struct serial_port *port)
 {
     struct pl011 *uart = port->uart;
-    return ((uart->irq.irq > 0) ? uart->irq.irq : -1);
+
+    return ((uart->irq > 0) ? uart->irq : -1);
 }
 
 static const struct vuart_info *pl011_vuart(struct serial_port *port)
@@ -239,12 +240,13 @@ static int __init pl011_uart_init(struct dt_device_node *dev,
         return res;
     }
 
-    res = dt_device_get_irq(dev, 0, &uart->irq);
-    if ( res )
+    res = platform_get_irq(dev, 0);
+    if ( res < 0 )
     {
         printk("pl011: Unable to retrieve the IRQ\n");
-        return res;
+        return -EINVAL;
     }
+    uart->irq = res;
 
     uart->regs = ioremap_nocache(addr, size);
     if ( !uart->regs )

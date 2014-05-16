@@ -76,9 +76,6 @@ static struct ns16550 {
     u8 bar_idx;
     bool_t enable_ro; /* Make MMIO devices read only to Dom0 */
 #endif
-#ifdef HAS_DEVICE_TREE
-    struct dt_irq dt_irq;
-#endif
 } ns16550_com[2] = { { 0 } };
 
 struct ns16550_config_mmio {
@@ -612,13 +609,8 @@ static void __init ns16550_init_postirq(struct serial_port *port)
         uart->irqaction.handler = ns16550_interrupt;
         uart->irqaction.name    = "ns16550";
         uart->irqaction.dev_id  = port;
-#ifdef HAS_DEVICE_TREE
-        if ( (rc = setup_dt_irq(&uart->dt_irq, &uart->irqaction)) != 0 )
-            printk("ERROR: Failed to allocate ns16550 DT IRQ.\n");
-#else
         if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
             printk("ERROR: Failed to allocate ns16550 IRQ %d\n", uart->irq);
-#endif
     }
 
     ns16550_setup_postirq(uart);
@@ -1172,12 +1164,10 @@ static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
     if ( uart->reg_width != 1 && uart->reg_width != 4 )
         return -EINVAL;
 
-    res = dt_device_get_irq(dev, 0, &uart->dt_irq);
-    if ( res )
-        return res;
-
-    /* The common bit of the driver mostly deals with irq not dt_irq. */
-    uart->irq = uart->dt_irq.irq;
+    res = platform_get_irq(dev, 0);
+    if ( ! res )
+        return -EINVAL;
+    uart->irq = res;
 
     uart->dw_usr_bsy = dt_device_is_compatible(dev, "snps,dw-apb-uart");
 

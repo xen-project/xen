@@ -133,9 +133,9 @@ static inline struct domain *irq_get_domain(struct irq_desc *desc)
     return desc->action->dev_id;
 }
 
-int request_dt_irq(const struct dt_irq *irq,
-                   void (*handler)(int, void *, struct cpu_user_regs *),
-                   const char *devname, void *dev_id)
+int request_irq(unsigned int irq,
+                void (*handler)(int, void *, struct cpu_user_regs *),
+                const char *devname, void *dev_id)
 {
     struct irqaction *action;
     int retval;
@@ -146,13 +146,13 @@ int request_dt_irq(const struct dt_irq *irq,
      * which interrupt is which (messes up the interrupt freeing
      * logic etc).
      */
-    if (irq->irq >= nr_irqs)
+    if ( irq >= nr_irqs )
         return -EINVAL;
-    if (!handler)
+    if ( !handler )
         return -EINVAL;
 
     action = xmalloc(struct irqaction);
-    if (!action)
+    if ( !action )
         return -ENOMEM;
 
     action->handler = handler;
@@ -160,8 +160,8 @@ int request_dt_irq(const struct dt_irq *irq,
     action->dev_id = dev_id;
     action->free_on_release = 1;
 
-    retval = setup_dt_irq(irq, action);
-    if (retval)
+    retval = setup_irq(irq, action);
+    if ( retval )
         xfree(action);
 
     return retval;
@@ -268,14 +268,14 @@ static int __setup_irq(struct irq_desc *desc, struct irqaction *new)
     return 0;
 }
 
-int setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
+int setup_irq(unsigned int irq, struct irqaction *new)
 {
     int rc;
     unsigned long flags;
     struct irq_desc *desc;
     bool_t disabled;
 
-    desc = irq_to_desc(irq->irq);
+    desc = irq_to_desc(irq);
 
     spin_lock_irqsave(&desc->lock, flags);
 
@@ -285,7 +285,7 @@ int setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
 
         spin_unlock_irqrestore(&desc->lock, flags);
         printk(XENLOG_ERR "ERROR: IRQ %u is already in use by the domain %u\n",
-               irq->irq, d->domain_id);
+               irq, d->domain_id);
         return -EBUSY;
     }
 
@@ -305,7 +305,6 @@ int setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
          * TODO: Handle case where SPI is setup on different CPU than
          * the targeted CPU and the priority.
          */
-        desc->arch.type = irq->type;
         gic_route_irq_to_xen(desc, cpumask_of(smp_processor_id()),
                              GIC_PRI_IRQ);
         desc->handler->startup(desc);

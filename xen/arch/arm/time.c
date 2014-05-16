@@ -48,13 +48,13 @@ uint64_t __read_mostly boot_count;
  * register-mapped time source in the SoC. */
 unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
 
-static struct dt_irq timer_irq[MAX_TIMER_PPI];
+static unsigned int timer_irq[MAX_TIMER_PPI];
 
 unsigned int timer_get_irq(enum timer_ppi ppi)
 {
     ASSERT(ppi >= TIMER_PHYS_SECURE_PPI && ppi < MAX_TIMER_PPI);
 
-    return timer_irq[ppi].irq;
+    return timer_irq[ppi];
 }
 
 /*static inline*/ s_time_t ticks_to_ns(uint64_t ticks)
@@ -120,15 +120,17 @@ int __init init_xen_time(void)
     /* Retrieve all IRQs for the timer */
     for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
     {
-        res = dt_device_get_irq(dev, i, &timer_irq[i]);
-        if ( res )
+        res = platform_get_irq(dev, i);
+
+        if ( res < 0 )
             panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
+        timer_irq[i] = res;
     }
 
     printk("Generic Timer IRQ: phys=%u hyp=%u virt=%u\n",
-           timer_irq[TIMER_PHYS_NONSECURE_PPI].irq,
-           timer_irq[TIMER_HYP_PPI].irq,
-           timer_irq[TIMER_VIRT_PPI].irq);
+           timer_irq[TIMER_PHYS_NONSECURE_PPI],
+           timer_irq[TIMER_HYP_PPI],
+           timer_irq[TIMER_VIRT_PPI]);
 
     res = platform_init_time();
     if ( res )
@@ -192,7 +194,7 @@ int reprogram_timer(s_time_t timeout)
 /* Handle the firing timer */
 static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
-    if ( irq == (timer_irq[TIMER_HYP_PPI].irq) &&
+    if ( irq == (timer_irq[TIMER_HYP_PPI]) &&
          READ_SYSREG32(CNTHP_CTL_EL2) & CNTx_CTL_PENDING )
     {
         /* Signal the generic timer code to do its work */
@@ -201,7 +203,7 @@ static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
         WRITE_SYSREG32(0, CNTHP_CTL_EL2);
     }
 
-    if ( irq == (timer_irq[TIMER_PHYS_NONSECURE_PPI].irq) &&
+    if ( irq == (timer_irq[TIMER_PHYS_NONSECURE_PPI]) &&
          READ_SYSREG32(CNTP_CTL_EL0) & CNTx_CTL_PENDING )
     {
         /* Signal the generic timer code to do its work */
@@ -234,12 +236,12 @@ void __cpuinit init_timer_interrupt(void)
     WRITE_SYSREG32(0, CNTHP_CTL_EL2);   /* Hypervisor's timer disabled */
     isb();
 
-    request_dt_irq(&timer_irq[TIMER_HYP_PPI], timer_interrupt,
-                   "hyptimer", NULL);
-    request_dt_irq(&timer_irq[TIMER_VIRT_PPI], vtimer_interrupt,
+    request_irq(timer_irq[TIMER_HYP_PPI], timer_interrupt,
+                "hyptimer", NULL);
+    request_irq(timer_irq[TIMER_VIRT_PPI], vtimer_interrupt,
                    "virtimer", NULL);
-    request_dt_irq(&timer_irq[TIMER_PHYS_NONSECURE_PPI], timer_interrupt,
-                   "phytimer", NULL);
+    request_irq(timer_irq[TIMER_PHYS_NONSECURE_PPI], timer_interrupt,
+                "phytimer", NULL);
 }
 
 /* Wait a set number of microseconds */
