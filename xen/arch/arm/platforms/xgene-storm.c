@@ -57,16 +57,21 @@ static int map_one_mmio(struct domain *d, const char *what,
 static int map_one_spi(struct domain *d, const char *what,
                        unsigned int spi, unsigned int type)
 {
-    struct dt_irq irq;
+    unsigned int irq;
     int ret;
 
-    irq.type = type;
+    irq = spi + 32; /* SPIs start at IRQ 32 */
 
-    irq.irq = spi + 32; /* SPIs start at IRQ 32 */
+    ret = irq_set_spi_type(irq, type);
+    if ( ret )
+    {
+        printk("Failed to set the type for IRQ%u\n", irq);
+        return ret;
+    }
 
-    printk("Additional IRQ %u (%s)\n", irq.irq, what);
+    printk("Additional IRQ %u (%s)\n", irq, what);
 
-    ret = route_dt_irq_to_guest(d, &irq, what);
+    ret = route_irq_to_guest(d, irq, what);
     if ( ret )
         printk("Failed to route %s to dom%d\n", what, d->domain_id);
 

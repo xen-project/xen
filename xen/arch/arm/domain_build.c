@@ -686,7 +686,7 @@ static int map_device(struct domain *d, struct dt_device_node *dev)
     unsigned int naddr;
     unsigned int i;
     int res;
-    struct dt_irq irq;
+    unsigned int irq;
     struct dt_raw_irq rirq;
     u64 addr, size;
 
@@ -729,20 +729,22 @@ static int map_device(struct domain *d, struct dt_device_node *dev)
             continue;
         }
 
-        res = dt_irq_translate(&rirq, &irq);
-        if ( res )
+        res = platform_get_irq(dev, i);
+        if ( res < 0 )
         {
-            printk(XENLOG_ERR "Unable to translate irq %u for %s\n",
+            printk(XENLOG_ERR "Unable to get irq %u for %s\n",
                    i, dt_node_full_name(dev));
             return res;
         }
 
-        DPRINT("irq %u = %u type = 0x%x\n", i, irq.irq, irq.type);
-        res = route_dt_irq_to_guest(d, &irq, dt_node_name(dev));
+        irq = res;
+
+        DPRINT("irq %u = %u\n", i, irq);
+        res = route_irq_to_guest(d, irq, dt_node_name(dev));
         if ( res )
         {
             printk(XENLOG_ERR "Unable to route IRQ %u to domain %u\n",
-                   irq.irq, d->domain_id);
+                   irq, d->domain_id);
             return res;
         }
     }

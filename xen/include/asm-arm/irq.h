@@ -40,8 +40,8 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq);
 void init_IRQ(void);
 void init_secondary_IRQ(void);
 
-int route_dt_irq_to_guest(struct domain *d, const struct dt_irq *irq,
-                          const char *devname);
+int route_irq_to_guest(struct domain *d, unsigned int irq,
+                       const char *devname);
 
 /* Set IRQ type for an SPI */
 int irq_set_spi_type(unsigned int spi, unsigned int type);

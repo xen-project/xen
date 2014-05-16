@@ -316,11 +316,11 @@ err:
     return rc;
 }
 
-int route_dt_irq_to_guest(struct domain *d, const struct dt_irq *irq,
-                          const char * devname)
+int route_irq_to_guest(struct domain *d, unsigned int irq,
+                       const char * devname)
 {
     struct irqaction *action;
-    struct irq_desc *desc = irq_to_desc(irq->irq);
+    struct irq_desc *desc = irq_to_desc(irq);
     unsigned long flags;
     int retval = 0;
 
@@ -348,10 +348,9 @@ int route_dt_irq_to_guest(struct domain *d, const struct dt_irq *irq,
 
         if ( desc->status & IRQ_GUEST )
             printk(XENLOG_ERR "ERROR: IRQ %u is already used by domain %u\n",
-                   irq->irq, ad->domain_id);
+                   irq, ad->domain_id);
         else
-            printk(XENLOG_ERR "ERROR: IRQ %u is already used by Xen\n",
-                   irq->irq);
+            printk(XENLOG_ERR "ERROR: IRQ %u is already used by Xen\n", irq);
         retval = -EBUSY;
         goto out;
     }
@@ -360,7 +359,6 @@ int route_dt_irq_to_guest(struct domain *d, const struct dt_irq *irq,
     if ( retval )
         goto out;
 
-    desc->arch.type = irq->type;
     gic_route_irq_to_guest(d, desc, cpumask_of(smp_processor_id()),
                            GIC_PRI_IRQ);
     spin_unlock_irqrestore(&desc->lock, flags);
