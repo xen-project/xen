@@ -318,7 +318,6 @@ void start_secondary(void *unused)
     this_cpu(curr_vcpu) = idle_vcpu[cpu];
     if ( cpu_has_efer )
         rdmsrl(MSR_EFER, this_cpu(efer));
-    asm volatile ( "mov %%cr4,%0" : "=r" (this_cpu(cr4)) );
 
     /*
      * Just as during early bootstrap, it is convenient here to disable
@@ -341,6 +340,9 @@ void start_secondary(void *unused)
     load_system_tables();
 
     /* Full exception support from here on in. */
+
+    /* Safe to enable feature such as CR4.MCE with the IDT set up now. */
+    write_cr4(mmu_cr4_features);
 
     percpu_traps_init();
 

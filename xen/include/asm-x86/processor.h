@@ -141,6 +141,8 @@
 #define PFEC_page_paged     (1U<<5)
 #define PFEC_page_shared    (1U<<6)
 
+#define XEN_MINIMAL_CR4 (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE)
+
 #define XEN_SYSCALL_MASK (X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|    \
                           X86_EFLAGS_NT|X86_EFLAGS_DF|X86_EFLAGS_IF|    \
                           X86_EFLAGS_TF)

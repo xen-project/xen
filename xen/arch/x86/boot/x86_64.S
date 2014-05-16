@@ -9,8 +9,8 @@
         mov     %ecx,%gs
         mov     %ecx,%ss
 
-        /* Enable full CR4 features. */
-        mov     mmu_cr4_features(%rip),%rcx
+        /* Enable minimal CR4 features. */
+        mov     $XEN_MINIMAL_CR4,%rcx
         mov     %rcx,%cr4
 
         mov     stack_start(%rip),%rsp
