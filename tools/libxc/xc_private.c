@@ -201,13 +201,13 @@ static int xc_interface_close_common(xc_interface *xch)
     if (!xch)
 	return 0;
 
+    rc = xch->ops->close(xch, xch->ops_handle);
+    if (rc) PERROR("Could not close hypervisor interface");
+
     xc__hypercall_buffer_cache_release(xch);
 
     xtl_logger_destroy(xch->dombuild_logger_tofree);
     xtl_logger_destroy(xch->error_handler_tofree);
-
-    rc = xch->ops->close(xch, xch->ops_handle);
-    if (rc) PERROR("Could not close hypervisor interface");
 
     free(xch);
     return rc;
