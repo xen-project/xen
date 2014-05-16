@@ -118,7 +118,7 @@ static inline int send_notify(struct libxenvchan *ctrl, uint8_t bit)
 static inline int raw_get_data_ready(struct libxenvchan *ctrl)
 {
 	uint32_t ready = rd_prod(ctrl) - rd_cons(ctrl);
-	if (ready >= rd_ring_size(ctrl))
+	if (ready > rd_ring_size(ctrl))
 		/* We have no way to return errors.  Locking up the ring is
 		 * better than the alternatives. */
 		return 0;
