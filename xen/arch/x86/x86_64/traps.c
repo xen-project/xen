@@ -379,38 +379,12 @@ static int write_stack_trampoline(
 void __devinit subarch_percpu_traps_init(void)
 {
     char *stack_bottom, *stack;
-    int   cpu = smp_processor_id();
-
-    if ( cpu == 0 )
-    {
-        /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
-        set_intr_gate(TRAP_double_fault, &double_fault);
-        set_ist(&idt_table[TRAP_double_fault],  IST_DF);
-        set_ist(&idt_table[TRAP_nmi],           IST_NMI);
-        set_ist(&idt_table[TRAP_machine_check], IST_MCE);
-
-        /* The 32-on-64 hypercall vector is only accessible from ring 1. */
-        _set_gate(idt_table + HYPERCALL_VECTOR,
-                  SYS_DESC_trap_gate, 1, &compat_hypercall);
-
-        /* Fast trap for int80 (faster than taking the #GP-fixup path). */
-        _set_gate(idt_table + 0x80, SYS_DESC_trap_gate, 3, &int80_direct_trap);
-    }
 
     stack_bottom = (char *)get_stack_bottom();
     stack        = (char *)((unsigned long)stack_bottom & ~(STACK_SIZE - 1));
 
     /* IST_MAX IST pages + 1 syscall page + 1 guard page + primary stack. */
     BUILD_BUG_ON((IST_MAX + 2) * PAGE_SIZE + PRIMARY_STACK_SIZE > STACK_SIZE);
-
-    /* Machine Check handler has its own per-CPU 4kB stack. */
-    this_cpu(init_tss).ist[IST_MCE-1] = (unsigned long)&stack[IST_MCE * PAGE_SIZE];
-
-    /* Double-fault handler has its own per-CPU 4kB stack. */
-    this_cpu(init_tss).ist[IST_DF-1] = (unsigned long)&stack[IST_DF * PAGE_SIZE];
-
-    /* NMI handler has its own per-CPU 4kB stack. */
-    this_cpu(init_tss).ist[IST_NMI-1] = (unsigned long)&stack[IST_NMI * PAGE_SIZE];
 
     /* Trampoline for SYSCALL entry from long mode. */
     stack = &stack[IST_MAX * PAGE_SIZE]; /* Skip the IST stacks. */

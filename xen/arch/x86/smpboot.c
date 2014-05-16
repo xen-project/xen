@@ -303,15 +303,6 @@ static void set_cpu_sibling_map(int cpu)
     }
 }
 
-static void construct_percpu_idt(unsigned int cpu)
-{
-    unsigned char idt_load[10];
-
-    *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*sizeof(idt_entry_t))-1;
-    *(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];
-    __asm__ __volatile__ ( "lidt %0" : "=m" (idt_load) );
-}
-
 void start_secondary(void *unused)
 {
     /*
@@ -319,6 +310,8 @@ void start_secondary(void *unused)
      * want to limit the things done here to the most necessary things.
      */
     unsigned int cpu = booting_cpu;
+
+    /* Critical region without IDT or TSS.  Any fault is deadly! */
 
     set_processor_id(cpu);
     set_current(idle_vcpu[cpu]);
@@ -345,6 +338,10 @@ void start_secondary(void *unused)
      */
     spin_debug_disable();
 
+    load_system_tables();
+
+    /* Full exception support from here on in. */
+
     percpu_traps_init();
 
     init_percpu_time();
@@ -352,12 +349,6 @@ void start_secondary(void *unused)
     cpu_init();
 
     smp_callin();
-
-    /*
-     * At this point, boot CPU has fully initialised the IDT. It is
-     * now safe to make ourselves a private copy.
-     */
-    construct_percpu_idt(cpu);
 
     setup_secondary_APIC_clock();
 

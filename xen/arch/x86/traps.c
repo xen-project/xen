@@ -3497,7 +3497,7 @@ void __devinit percpu_traps_init(void)
     ler_enable();
 }
 
-void __init trap_init(void)
+void __init init_idt_traps(void)
 {
     /*
      * Note that interrupt gates are always used, rather than trap gates. We
@@ -3515,23 +3515,42 @@ void __init trap_init(void)
     set_intr_gate(TRAP_bounds,&bounds);
     set_intr_gate(TRAP_invalid_op,&invalid_op);
     set_intr_gate(TRAP_no_device,&device_not_available);
+    set_intr_gate(TRAP_double_fault,&double_fault);
     set_intr_gate(TRAP_copro_seg,&coprocessor_segment_overrun);
     set_intr_gate(TRAP_invalid_tss,&invalid_TSS);
     set_intr_gate(TRAP_no_segment,&segment_not_present);
     set_intr_gate(TRAP_stack_error,&stack_segment);
     set_intr_gate(TRAP_gp_fault,&general_protection);
-    set_intr_gate(TRAP_page_fault,&page_fault);
+    set_intr_gate(TRAP_page_fault,&early_page_fault);
     set_intr_gate(TRAP_spurious_int,&spurious_interrupt_bug);
     set_intr_gate(TRAP_copro_error,&coprocessor_error);
     set_intr_gate(TRAP_alignment_check,&alignment_check);
     set_intr_gate(TRAP_machine_check,&machine_check);
     set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
 
+    /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
+    set_ist(&idt_table[TRAP_double_fault],  IST_DF);
+    set_ist(&idt_table[TRAP_nmi],           IST_NMI);
+    set_ist(&idt_table[TRAP_machine_check], IST_MCE);
+
     /* CPU0 uses the master IDT. */
     idt_tables[0] = idt_table;
 
     this_cpu(gdt_table) = boot_cpu_gdt_table;
     this_cpu(compat_gdt_table) = boot_cpu_compat_gdt_table;
+}
+
+void __init trap_init(void)
+{
+    /* Replace early pagefault with real pagefault handler. */
+    set_intr_gate(TRAP_page_fault, &page_fault);
+
+    /* The 32-on-64 hypercall vector is only accessible from ring 1. */
+    _set_gate(idt_table + HYPERCALL_VECTOR,
+              SYS_DESC_trap_gate, 1, &compat_hypercall);
+
+    /* Fast trap for int80 (faster than taking the #GP-fixup path). */
+    _set_gate(idt_table + 0x80, SYS_DESC_trap_gate, 3, &int80_direct_trap);
 
     percpu_traps_init();
 

@@ -558,16 +558,21 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         .stop_bits = 1
     };
 
+    /* Critical region without IDT or TSS.  Any fault is deadly! */
+
     set_processor_id(0);
     set_current((struct vcpu *)0xfffff000); /* debug sanity. */
     idle_vcpu[0] = current;
 
     percpu_init_areas();
 
+    init_idt_traps();
+    load_system_tables();
+
     smp_prepare_boot_cpu();
     sort_exception_tables();
 
-    set_intr_gate(TRAP_page_fault, &early_page_fault);
+    /* Full exception support from here on in. */
 
     loader = (mbi->flags & MBI_LOADERNAME)
         ? (char *)__va(mbi->boot_loader_name) : "unknown";

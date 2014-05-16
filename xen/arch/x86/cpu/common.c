@@ -515,6 +515,61 @@ void __init early_cpu_init(void)
 	centaur_init_cpu();
 	early_cpu_detect();
 }
+
+/*
+ * Sets up system tables and descriptors.
+ *
+ * - Sets up TSS with stack pointers, including ISTs
+ * - Inserts TSS selector into regular and compat GDTs
+ * - Loads GDT, IDT, TR then null LDT
+ */
+void __cpuinit load_system_tables(void)
+{
+	unsigned int cpu = smp_processor_id();
+	unsigned long stack_bottom = get_stack_bottom(),
+		stack_top = stack_bottom & ~(STACK_SIZE - 1);
+
+	struct tss_struct *tss = &this_cpu(init_tss);
+	struct desc_struct *gdt =
+		this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY;
+	struct desc_struct *compat_gdt =
+		this_cpu(compat_gdt_table) - FIRST_RESERVED_GDT_ENTRY;
+
+	const struct desc_ptr gdtr = {
+		.base = (unsigned long)gdt,
+		.limit = LAST_RESERVED_GDT_BYTE,
+	};
+	const struct desc_ptr idtr = {
+		.base = (unsigned long)idt_tables[cpu],
+		.limit = (IDT_ENTRIES * sizeof(idt_entry_t)) - 1,
+	};
+
+	/* Main stack for interrupts/exceptions. */
+	tss->rsp0 = stack_bottom;
+	tss->bitmap = IOBMP_INVALID_OFFSET;
+
+	/* MCE, NMI and Double Fault handlers get their own stacks. */
+	tss->ist[IST_MCE - 1] = stack_top + IST_MCE * PAGE_SIZE;
+	tss->ist[IST_DF  - 1] = stack_top + IST_DF  * PAGE_SIZE;
+	tss->ist[IST_NMI - 1] = stack_top + IST_NMI * PAGE_SIZE;
+
+	_set_tssldt_desc(
+		gdt + TSS_ENTRY,
+		(unsigned long)tss,
+		offsetof(struct tss_struct, __cacheline_filler) - 1,
+		SYS_DESC_tss_avail);
+	_set_tssldt_desc(
+		compat_gdt + TSS_ENTRY,
+		(unsigned long)tss,
+		offsetof(struct tss_struct, __cacheline_filler) - 1,
+		SYS_DESC_tss_busy);
+
+	asm volatile ("lgdt %0"  : : "m"  (gdtr) );
+	asm volatile ("lidt %0"  : : "m"  (idtr) );
+	asm volatile ("ltr  %w0" : : "rm" (TSS_ENTRY << 3) );
+	asm volatile ("lldt %w0" : : "rm" (0) );
+}
+
 /*
  * cpu_init() initializes state that is per-CPU. Some data is already
  * initialized (naturally) in the bootstrap process, such as the GDT
@@ -524,11 +579,6 @@ void __init early_cpu_init(void)
 void __cpuinit cpu_init(void)
 {
 	int cpu = smp_processor_id();
-	struct tss_struct *t = &this_cpu(init_tss);
-	struct desc_ptr gdt_desc = {
-		.base = (unsigned long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY),
-		.limit = LAST_RESERVED_GDT_BYTE
-	};
 
 	if (cpumask_test_and_set_cpu(cpu, &cpu_initialized)) {
 		printk(KERN_WARNING "CPU#%d already initialized!\n", cpu);
@@ -543,21 +593,11 @@ void __cpuinit cpu_init(void)
 	/* Install correct page table. */
 	write_ptbase(current);
 
-	asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
-
 	/* No nested task. */
 	asm volatile ("pushf ; andw $0xbfff,(%"__OP"sp) ; popf" );
 
 	/* Ensure FPU gets initialised for each domain. */
 	stts();
-
-	/* Set up and load the per-CPU TSS and LDT. */
-	t->bitmap = IOBMP_INVALID_OFFSET;
-	/* Bottom-of-stack must be 16-byte aligned! */
-	BUG_ON((get_stack_bottom() & 15) != 0);
-	t->rsp0 = get_stack_bottom();
-	load_TR();
-	asm volatile ( "lldt %%ax" : : "a" (0) );
 
 	/* Clear all 6 debug registers: */
 #define CD(register) asm volatile ( "mov %0,%%db" #register : : "r"(0UL) );
