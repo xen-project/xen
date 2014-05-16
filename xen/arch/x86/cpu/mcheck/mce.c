@@ -72,8 +72,9 @@ custom_param("mce_verbosity", mce_set_verbosity);
 /* Handle unconfigured int18 (should never happen) */
 static void unexpected_machine_check(struct cpu_user_regs *regs, long error_code)
 {
-    printk(XENLOG_ERR "CPU#%d: Unexpected int18 (Machine Check).\n",
-           smp_processor_id());
+    console_force_unlock();
+    printk("Unexpected Machine Check Exception");
+    fatal_trap(TRAP_machine_check, regs);
 }
 
 

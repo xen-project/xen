@@ -561,7 +561,8 @@ static void do_trap(struct cpu_user_regs *regs, int use_error_code)
     }
 
     if ( ((trapnr == TRAP_copro_error) || (trapnr == TRAP_simd_error)) &&
-         has_hvm_container_vcpu(curr) && curr->arch.hvm_vcpu.fpu_exception_callback )
+         system_state >= SYS_STATE_active && has_hvm_container_vcpu(curr) &&
+         curr->arch.hvm_vcpu.fpu_exception_callback )
     {
         curr->arch.hvm_vcpu.fpu_exception_callback(
             curr->arch.hvm_vcpu.fpu_exception_callback_arg, regs);
