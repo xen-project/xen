@@ -34,7 +34,6 @@ enum reboot_type {
         BOOT_CF9 = 'p',
 };
 
-static long no_idt[2];
 static int reboot_mode;
 
 /*
@@ -466,6 +465,7 @@ void machine_restart(unsigned int delay_millisecs)
 {
     unsigned int i, attempt;
     enum reboot_type orig_reboot_type = reboot_type;
+    const struct desc_ptr no_idt = { 0 };
 
     watchdog_disable();
     console_start_sync();
@@ -532,7 +532,7 @@ void machine_restart(unsigned int delay_millisecs)
                            ? BOOT_ACPI : BOOT_TRIPLE);
             break;
         case BOOT_TRIPLE:
-            asm volatile ( "lidt %0 ; int3" : "=m" (no_idt) );
+            asm volatile ("lidt %0; int3" : : "m" (no_idt));
             reboot_type = BOOT_KBD;
             break;
         case BOOT_ACPI:

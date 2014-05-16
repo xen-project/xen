@@ -375,21 +375,18 @@ void vcpu_show_execution_state(struct vcpu *v)
     vcpu_unpause(v);
 }
 
-static char *trapstr(int trapnr)
+static const char *trapstr(unsigned int trapnr)
 {
-    static char *strings[] = { 
-        "divide error", "debug", "nmi", "bkpt", "overflow", "bounds", 
-        "invalid opcode", "device not available", "double fault", 
-        "coprocessor segment", "invalid tss", "segment not found", 
-        "stack error", "general protection fault", "page fault", 
-        "spurious interrupt", "coprocessor error", "alignment check", 
+    static const char * const strings[] = {
+        "divide error", "debug", "nmi", "bkpt", "overflow", "bounds",
+        "invalid opcode", "device not available", "double fault",
+        "coprocessor segment", "invalid tss", "segment not found",
+        "stack error", "general protection fault", "page fault",
+        "spurious interrupt", "coprocessor error", "alignment check",
         "machine check", "simd error"
     };
 
-    if ( (trapnr < 0) || (trapnr >= ARRAY_SIZE(strings)) )
-        return "???";
-
-    return strings[trapnr];
+    return trapnr < ARRAY_SIZE(strings) ? strings[trapnr] : "???";
 }
 
 /*
@@ -1485,15 +1482,10 @@ void __init do_early_page_fault(struct cpu_user_regs *regs)
 
     if ( stuck++ == 1000 )
     {
-        unsigned long *stk = (unsigned long *)regs;
-        printk("Early fatal page fault at %04x:%p (cr2=%p, ec=%04x)\n", 
+        console_start_sync();
+        printk("Early fatal page fault at %04x:%p (cr2=%p, ec=%04x)\n",
                regs->cs, _p(regs->eip), _p(cr2), regs->error_code);
-        show_page_walk(cr2);
-        printk("Stack dump: ");
-        while ( ((long)stk & ((PAGE_SIZE - 1) & ~(BYTES_PER_LONG - 1))) != 0 )
-            printk("%p ", _p(*stk++));
-        for ( ; ; )
-            halt();
+        fatal_trap(TRAP_page_fault, regs);
     }
 }
 
@@ -3393,7 +3385,7 @@ void do_debug(struct cpu_user_regs *regs)
             }
             if ( !debugger_trap_fatal(TRAP_debug, regs) )
             {
-                WARN_ON(1);
+                WARN();
                 regs->eflags &= ~X86_EFLAGS_TF;
             }
         }
@@ -3508,11 +3500,11 @@ void __devinit percpu_traps_init(void)
 void __init trap_init(void)
 {
     /*
-     * Note that interrupt gates are always used, rather than trap gates. We 
-     * must have interrupts disabled until DS/ES/FS/GS are saved because the 
-     * first activation must have the "bad" value(s) for these registers and 
-     * we may lose them if another activation is installed before they are 
-     * saved. The page-fault handler also needs interrupts disabled until %cr2 
+     * Note that interrupt gates are always used, rather than trap gates. We
+     * must have interrupts disabled until DS/ES/FS/GS are saved because the
+     * first activation must have the "bad" value(s) for these registers and
+     * we may lose them if another activation is installed before they are
+     * saved. The page-fault handler also needs interrupts disabled until %cr2
      * has been read and saved on the stack.
      */
     set_intr_gate(TRAP_divide_error,&divide_error);

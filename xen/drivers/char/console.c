@@ -1124,14 +1124,9 @@ void panic(const char *fmt, ...)
 #endif
 
     if ( opt_noreboot )
-    {
         machine_halt();
-    }
     else
-    {
-        watchdog_disable();
         machine_restart(5000);
-    }
 }
 
 void __bug(char *file, int line)
