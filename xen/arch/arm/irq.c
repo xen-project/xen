@@ -232,7 +232,7 @@ out_no_end:
     irq_exit();
 }
 
-void release_irq(unsigned int irq)
+void release_irq(unsigned int irq, const void *dev_id)
 {
     struct irq_desc *desc;
     unsigned long flags;

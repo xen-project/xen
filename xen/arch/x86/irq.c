@@ -983,7 +983,7 @@ int __init request_irq(unsigned int irq,
     return retval;
 }
 
-void __init release_irq(unsigned int irq)
+void __init release_irq(unsigned int irq, const void *dev_id)
 {
     struct irq_desc *desc;
     unsigned long flags;
