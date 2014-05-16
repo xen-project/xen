@@ -949,7 +949,7 @@ static int __init irq_ratelimit_init(void)
 }
 __initcall(irq_ratelimit_init);
 
-int __init request_irq(unsigned int irq,
+int __init request_irq(unsigned int irq, unsigned int irqflags,
         void (*handler)(int, void *, struct cpu_user_regs *),
         const char * devname, void *dev_id)
 {
@@ -976,7 +976,7 @@ int __init request_irq(unsigned int irq,
     action->dev_id = dev_id;
     action->free_on_release = 1;
 
-    retval = setup_irq(irq, action);
+    retval = setup_irq(irq, irqflags, action);
     if (retval)
         xfree(action);
 
@@ -1005,10 +1005,13 @@ void __init release_irq(unsigned int irq, const void *dev_id)
         xfree(action);
 }
 
-int __init setup_irq(unsigned int irq, struct irqaction *new)
+int __init setup_irq(unsigned int irq, unsigned int irqflags,
+                     struct irqaction *new)
 {
     struct irq_desc *desc;
     unsigned long flags;
+
+    ASSERT(irqflags == 0);
 
     desc = irq_to_desc(irq);
  

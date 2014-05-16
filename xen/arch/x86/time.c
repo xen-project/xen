@@ -1473,7 +1473,7 @@ void __init early_time_init(void)
     printk("Detected %lu.%03lu MHz processor.\n", 
            cpu_khz / 1000, cpu_khz % 1000);
 
-    setup_irq(0, &irq0);
+    setup_irq(0, 0, &irq0);
 }
 
 /* keep pit enabled for pit_broadcast working while cpuidle enabled */

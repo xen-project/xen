@@ -366,6 +366,6 @@ void __init init_IRQ(void)
     outb_p(LATCH & 0xff, PIT_CH0); /* LSB */
     outb(LATCH >> 8, PIT_CH0);     /* MSB */
 
-    setup_irq(2, &cascade);
+    setup_irq(2, 0, &cascade);
 }
 

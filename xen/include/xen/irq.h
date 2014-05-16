@@ -89,9 +89,10 @@ int arch_init_one_irq_desc(struct irq_desc *);
 
 #define irq_desc_initialized(desc) ((desc)->handler != NULL)
 
-extern int setup_irq(unsigned int irq, struct irqaction *);
+extern int setup_irq(unsigned int irq, unsigned int irqflags,
+                     struct irqaction *);
 extern void release_irq(unsigned int irq, const void *dev_id);
-extern int request_irq(unsigned int irq,
+extern int request_irq(unsigned int irq, unsigned int irqflags,
                void (*handler)(int, void *, struct cpu_user_regs *),
                const char * devname, void *dev_id);
 

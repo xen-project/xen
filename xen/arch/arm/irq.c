@@ -133,7 +133,7 @@ static inline struct domain *irq_get_domain(struct irq_desc *desc)
     return desc->action->dev_id;
 }
 
-int request_irq(unsigned int irq,
+int request_irq(unsigned int irq, unsigned int irqflags,
                 void (*handler)(int, void *, struct cpu_user_regs *),
                 const char *devname, void *dev_id)
 {
@@ -160,7 +160,7 @@ int request_irq(unsigned int irq,
     action->dev_id = dev_id;
     action->free_on_release = 1;
 
-    retval = setup_irq(irq, action);
+    retval = setup_irq(irq, irqflags, action);
     if ( retval )
         xfree(action);
 
@@ -268,7 +268,7 @@ static int __setup_irq(struct irq_desc *desc, struct irqaction *new)
     return 0;
 }
 
-int setup_irq(unsigned int irq, struct irqaction *new)
+int setup_irq(unsigned int irq, unsigned int irqflags, struct irqaction *new)
 {
     int rc;
     unsigned long flags;

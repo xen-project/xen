@@ -197,7 +197,7 @@ static void __init exynos4210_uart_init_postirq(struct serial_port *port)
     uart->irqaction.name    = "exynos4210_uart";
     uart->irqaction.dev_id  = port;
 
-    if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
+    if ( (rc = setup_irq(uart->irq, 0, &uart->irqaction)) != 0 )
         dprintk(XENLOG_ERR, "Failed to allocated exynos4210_uart IRQ %d\n",
                 uart->irq);
 

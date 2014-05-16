@@ -137,7 +137,7 @@ static void __init pl011_init_postirq(struct serial_port *port)
         uart->irqaction.handler = pl011_interrupt;
         uart->irqaction.name    = "pl011";
         uart->irqaction.dev_id  = port;
-        if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
+        if ( (rc = setup_irq(uart->irq, 0, &uart->irqaction)) != 0 )
             printk("ERROR: Failed to allocate pl011 IRQ %d\n", uart->irq);
     }
 

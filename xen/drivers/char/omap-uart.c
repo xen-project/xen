@@ -205,7 +205,7 @@ static void __init omap_uart_init_postirq(struct serial_port *port)
     uart->irqaction.name = "omap_uart";
     uart->irqaction.dev_id = port;
 
-    if ( setup_irq(uart->irq, &uart->irqaction) != 0 )
+    if ( setup_irq(uart->irq, 0, &uart->irqaction) != 0 )
     {
         dprintk(XENLOG_ERR, "Failed to allocated omap_uart IRQ %d\n",
                 uart->irq);
