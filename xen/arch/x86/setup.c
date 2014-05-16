@@ -1319,6 +1319,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     console_init_postirq();
 
+    system_state = SYS_STATE_smp_boot;
+
     do_presmp_initcalls();
 
     for_each_present_cpu ( i )

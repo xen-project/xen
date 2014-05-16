@@ -92,6 +92,7 @@ extern char _sinittext[], _einittext[];
 extern enum system_state {
     SYS_STATE_early_boot,
     SYS_STATE_boot,
+    SYS_STATE_smp_boot,
     SYS_STATE_active,
     SYS_STATE_suspend,
     SYS_STATE_resume

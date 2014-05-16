@@ -96,8 +96,13 @@ void machine_halt(void)
 {
     watchdog_disable();
     console_start_sync();
-    local_irq_enable();
-    smp_call_function(__machine_halt, NULL, 0);
+
+    if ( system_state >= SYS_STATE_smp_boot )
+    {
+        local_irq_enable();
+        smp_call_function(__machine_halt, NULL, 0);
+    }
+
     __machine_halt(NULL);
 }
 
@@ -466,18 +471,6 @@ void machine_restart(unsigned int delay_millisecs)
     console_start_sync();
     spin_debug_disable();
 
-    local_irq_enable();
-
-    /* Ensure we are the boot CPU. */
-    if ( get_apic_id() != boot_cpu_physical_apicid )
-    {
-        /* Send IPI to the boot CPU (logical cpu 0). */
-        on_selected_cpus(cpumask_of(0), __machine_restart,
-                         &delay_millisecs, 0);
-        for ( ; ; )
-            halt();
-    }
-
     /*
      * We may be called from an interrupt context, and various functions we
      * may need to call (alloc_domheap_pages, map_domain_page, ...) assert that
@@ -485,7 +478,22 @@ void machine_restart(unsigned int delay_millisecs)
      */
     local_irq_count(0) = 0;
 
-    smp_send_stop();
+    if ( system_state >= SYS_STATE_smp_boot )
+    {
+        local_irq_enable();
+
+        /* Ensure we are the boot CPU. */
+        if ( get_apic_id() != boot_cpu_physical_apicid )
+        {
+            /* Send IPI to the boot CPU (logical cpu 0). */
+            on_selected_cpus(cpumask_of(0), __machine_restart,
+                             &delay_millisecs, 0);
+            for ( ; ; )
+                halt();
+        }
+
+        smp_send_stop();
+    }
 
     mdelay(delay_millisecs);
 

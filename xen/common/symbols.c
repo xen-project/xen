@@ -96,7 +96,7 @@ static unsigned int get_symbol_offset(unsigned long pos)
 bool_t is_active_kernel_text(unsigned long addr)
 {
     return (is_kernel_text(addr) ||
-            (system_state == SYS_STATE_boot && is_kernel_inittext(addr)));
+            (system_state < SYS_STATE_active && is_kernel_inittext(addr)));
 }
 
 const char *symbols_lookup(unsigned long addr,
