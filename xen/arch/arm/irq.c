@@ -171,7 +171,6 @@ int request_irq(unsigned int irq, unsigned int irqflags,
 void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
 {
     struct irq_desc *desc = irq_to_desc(irq);
-    struct irqaction *action = desc->action;
 
     /* TODO: perfc_incr(irqs); */
 
@@ -182,7 +181,7 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
     spin_lock(&desc->lock);
     desc->handler->ack(desc);
 
-    if ( action == NULL )
+    if ( !desc->action )
     {
         printk("Unknown %s %#3.3x\n",
                is_fiq ? "FIQ" : "IRQ", irq);
@@ -214,12 +213,21 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
 
     desc->status |= IRQ_INPROGRESS;
 
-    action = desc->action;
     while ( desc->status & IRQ_PENDING )
     {
+        struct irqaction *action;
+
         desc->status &= ~IRQ_PENDING;
+        action = desc->action;
+
         spin_unlock_irq(&desc->lock);
-        action->handler(irq, action->dev_id, regs);
+
+        do
+        {
+            action->handler(irq, action->dev_id, regs);
+            action = action->next;
+        } while ( action );
+
         spin_lock_irq(&desc->lock);
     }
 
@@ -236,34 +244,71 @@ void release_irq(unsigned int irq, const void *dev_id)
 {
     struct irq_desc *desc;
     unsigned long flags;
-   struct irqaction *action;
+    struct irqaction *action, **action_ptr;
 
     desc = irq_to_desc(irq);
 
     spin_lock_irqsave(&desc->lock,flags);
 
-    desc->handler->shutdown(desc);
+    action_ptr = &desc->action;
+    for ( ;; )
+    {
+        action = *action_ptr;
+        if ( !action )
+        {
+            printk(XENLOG_WARNING "Trying to free already-free IRQ %u\n", irq);
+            spin_unlock_irqrestore(&desc->lock, flags);
+            return;
+        }
 
-    action = desc->action;
-    desc->action  = NULL;
-    desc->status &= ~IRQ_GUEST;
+        if ( action->dev_id == dev_id )
+            break;
+
+        action_ptr = &action->next;
+    }
+
+    /* Found it - remove it from the action list */
+    *action_ptr = action->next;
+
+    /* If this was the last action, shut down the IRQ */
+    if ( !desc->action )
+    {
+        desc->handler->shutdown(desc);
+        desc->status &= ~IRQ_GUEST;
+    }
 
     spin_unlock_irqrestore(&desc->lock,flags);
 
     /* Wait to make sure it's not being used on another CPU */
     do { smp_mb(); } while ( desc->status & IRQ_INPROGRESS );
 
-    if ( action && action->free_on_release )
+    if ( action->free_on_release )
         xfree(action);
 }
 
-static int __setup_irq(struct irq_desc *desc, struct irqaction *new)
+static int __setup_irq(struct irq_desc *desc, unsigned int irqflags,
+                       struct irqaction *new)
 {
-    if ( desc->action != NULL )
-        return -EBUSY;
+    bool_t shared = !!(irqflags & IRQF_SHARED);
 
-    desc->action  = new;
-    dsb(sy);
+    ASSERT(new != NULL);
+
+    /* Sanity checks:
+     *  - if the IRQ is marked as shared
+     *  - dev_id is not NULL when IRQF_SHARED is set
+     */
+    if ( desc->action != NULL && (!(desc->status & IRQF_SHARED) || !shared) )
+        return -EINVAL;
+    if ( shared && new->dev_id == NULL )
+        return -EINVAL;
+
+    if ( shared )
+        desc->status |= IRQF_SHARED;
+
+    new->next = desc->action;
+    dsb(ish);
+    desc->action = new;
+    dsb(ish);
 
     return 0;
 }
@@ -291,7 +336,7 @@ int setup_irq(unsigned int irq, unsigned int irqflags, struct irqaction *new)
 
     disabled = (desc->action == NULL);
 
-    rc = __setup_irq(desc, new);
+    rc = __setup_irq(desc, irqflags, new);
     if ( rc )
         goto err;
 
@@ -355,7 +400,7 @@ int route_irq_to_guest(struct domain *d, unsigned int irq,
         goto out;
     }
 
-    retval = __setup_irq(desc, action);
+    retval = __setup_irq(desc, 0, action);
     if ( retval )
         goto out;
 

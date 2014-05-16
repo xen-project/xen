@@ -37,6 +37,8 @@
 
 #define CONFIG_VIDEO 1
 
+#define CONFIG_IRQ_HAS_MULTIPLE_ACTION 1
+
 #define OPT_CONSOLE_STR "dtuart"
 
 #ifdef MAX_PHYS_CPUS

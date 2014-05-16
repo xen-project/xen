@@ -14,6 +14,9 @@ struct irqaction {
     const char *name;
     void *dev_id;
     bool_t free_on_release;
+#ifdef CONFIG_IRQ_HAS_MULTIPLE_ACTION
+    struct irqaction *next;
+#endif
 };
 
 /*
@@ -27,6 +30,7 @@ struct irqaction {
 #define IRQ_MOVE_PENDING  (1u<<5) /* IRQ is migrating to another CPUs */
 #define IRQ_PER_CPU       (1u<<6) /* IRQ is per CPU */
 #define IRQ_GUEST_EOI_PENDING (1u<<7) /* IRQ was disabled, pending a guest EOI */
+#define IRQF_SHARED       (1<<8)  /* IRQ is shared */
 
 /* Special IRQ numbers. */
 #define AUTO_ASSIGN_IRQ         (-1)
