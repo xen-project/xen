@@ -558,7 +558,14 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         .stop_bits = 1
     };
 
+    set_processor_id(0);
+    set_current((struct vcpu *)0xfffff000); /* debug sanity. */
+    idle_vcpu[0] = current;
+
     percpu_init_areas();
+
+    smp_prepare_boot_cpu();
+    sort_exception_tables();
 
     set_intr_gate(TRAP_page_fault, &early_page_fault);
 
@@ -588,14 +595,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     parse_video_info();
 
-    set_current((struct vcpu *)0xfffff000); /* debug sanity */
-    idle_vcpu[0] = current;
-    set_processor_id(0); /* needed early, for smp_processor_id() */
     if ( cpu_has_efer )
         rdmsrl(MSR_EFER, this_cpu(efer));
     asm volatile ( "mov %%cr4,%0" : "=r" (this_cpu(cr4)) );
-
-    smp_prepare_boot_cpu();
 
     /* We initialise the serial devices very early so we can get debugging. */
     ns16550.io_base = 0x3f8;
@@ -1211,8 +1213,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( opt_watchdog ) 
         nmi_watchdog = NMI_LOCAL_APIC;
-
-    sort_exception_tables();
 
     find_smp_config();
 

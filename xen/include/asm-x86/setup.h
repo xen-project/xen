@@ -7,7 +7,6 @@ extern unsigned long xenheap_initial_phys_start;
 
 void early_cpu_init(void);
 void early_time_init(void);
-void early_page_fault(void);
 
 int intel_cpu_init(void);
 int amd_init_cpu(void);
