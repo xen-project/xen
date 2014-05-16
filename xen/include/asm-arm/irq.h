@@ -16,6 +16,7 @@ struct arch_pirq
 
 struct arch_irq_desc {
     int eoi_cpu;
+    unsigned int type;
 };
 
 #define NR_LOCAL_IRQS	32
@@ -46,6 +47,11 @@ int setup_dt_irq(const struct dt_irq *irq, struct irqaction *new);
 
 int route_dt_irq_to_guest(struct domain *d, const struct dt_irq *irq,
                           const char *devname);
+
+/* Set IRQ type for an SPI */
+int irq_set_spi_type(unsigned int spi, unsigned int type);
+
+int platform_get_irq(const struct dt_device_node *device, int index);
 
 #endif /* _ASM_HW_IRQ_H */
 /*

@@ -168,11 +168,10 @@ extern void vgic_clear_pending_irqs(struct vcpu *v);
 extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 
 /* Program the GIC to route an interrupt */
-extern void gic_route_irq_to_xen(struct irq_desc *desc, bool_t level,
-                                 const cpumask_t *cpu_mask,
+extern void gic_route_irq_to_xen(struct irq_desc *desc, const cpumask_t *cpu_mask,
                                  unsigned int priority);
 extern void gic_route_irq_to_guest(struct domain *, struct irq_desc *desc,
-                                   bool_t level, const cpumask_t *cpu_mask,
+                                   const cpumask_t *cpu_mask,
                                    unsigned int priority);
 
 extern void gic_inject(void);

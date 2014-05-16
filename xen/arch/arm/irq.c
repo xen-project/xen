@@ -27,6 +27,9 @@
 
 #include <asm/gic.h>
 
+static unsigned int local_irqs_type[NR_LOCAL_IRQS];
+static DEFINE_SPINLOCK(local_irqs_type_lock);
+
 static void ack_none(struct irq_desc *irq)
 {
     printk("unexpected IRQ trap at irq %02x\n", irq->irq);
@@ -55,6 +58,7 @@ irq_desc_t *__irq_to_desc(int irq)
 
 int __init arch_init_one_irq_desc(struct irq_desc *desc)
 {
+    desc->arch.type = DT_IRQ_TYPE_INVALID;
     return 0;
 }
 
@@ -77,18 +81,37 @@ static int __cpuinit init_local_irq_data(void)
 {
     int irq;
 
+    spin_lock(&local_irqs_type_lock);
+
     for (irq = 0; irq < NR_LOCAL_IRQS; irq++) {
         struct irq_desc *desc = irq_to_desc(irq);
         init_one_irq_desc(desc);
         desc->irq = irq;
         desc->action  = NULL;
+
+        /* PPIs are included in local_irqs, we copy the IRQ type from
+         * local_irqs_type when bringing up local IRQ for this CPU in
+         * order to pick up any configuration done before this CPU came
+         * up. For interrupts configured after this point this is done in
+         * irq_set_type.
+         */
+        desc->arch.type = local_irqs_type[irq];
     }
+
+    spin_unlock(&local_irqs_type_lock);
 
     return 0;
 }
 
 void __init init_IRQ(void)
 {
+    int irq;
+
+    spin_lock(&local_irqs_type_lock);
+    for ( irq = 0; irq < NR_LOCAL_IRQS; irq++ )
+        local_irqs_type[irq] = DT_IRQ_TYPE_INVALID;
+    spin_unlock(&local_irqs_type_lock);
+
     BUG_ON(init_local_irq_data() < 0);
     BUG_ON(init_irq_data() < 0);
 }
@@ -275,9 +298,6 @@ int setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
     /* First time the IRQ is setup */
     if ( disabled )
     {
-        bool_t level;
-
-        level = dt_irq_is_level_triggered(irq);
         /* It's fine to use smp_processor_id() because:
          * For PPI: irq_desc is banked
          * For SPI: we don't care for now which CPU will receive the
@@ -285,7 +305,8 @@ int setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
          * TODO: Handle case where SPI is setup on different CPU than
          * the targeted CPU and the priority.
          */
-        gic_route_irq_to_xen(desc, level, cpumask_of(smp_processor_id()),
+        desc->arch.type = irq->type;
+        gic_route_irq_to_xen(desc, cpumask_of(smp_processor_id()),
                              GIC_PRI_IRQ);
         desc->handler->startup(desc);
     }
@@ -303,7 +324,6 @@ int route_dt_irq_to_guest(struct domain *d, const struct dt_irq *irq,
     struct irq_desc *desc = irq_to_desc(irq->irq);
     unsigned long flags;
     int retval = 0;
-    bool_t level;
 
     action = xmalloc(struct irqaction);
     if (!action)
@@ -341,8 +361,8 @@ int route_dt_irq_to_guest(struct domain *d, const struct dt_irq *irq,
     if ( retval )
         goto out;
 
-    level = dt_irq_is_level_triggered(irq);
-    gic_route_irq_to_guest(d, desc, level, cpumask_of(smp_processor_id()),
+    desc->arch.type = irq->type;
+    gic_route_irq_to_guest(d, desc, cpumask_of(smp_processor_id()),
                            GIC_PRI_IRQ);
     spin_unlock_irqrestore(&desc->lock, flags);
     return 0;
@@ -381,6 +401,97 @@ void pirq_guest_unbind(struct domain *d, struct pirq *pirq)
 void pirq_set_affinity(struct domain *d, int pirq, const cpumask_t *mask)
 {
     BUG();
+}
+
+static bool_t irq_validate_new_type(unsigned int curr, unsigned new)
+{
+    return (curr == DT_IRQ_TYPE_INVALID || curr == new );
+}
+
+int irq_set_spi_type(unsigned int spi, unsigned int type)
+{
+    unsigned long flags;
+    struct irq_desc *desc = irq_to_desc(spi);
+    int ret = -EBUSY;
+
+    /* This function should not be used for other than SPIs */
+    if ( spi < NR_LOCAL_IRQS )
+        return -EINVAL;
+
+    spin_lock_irqsave(&desc->lock, flags);
+
+    if ( !irq_validate_new_type(desc->arch.type, type) )
+        goto err;
+
+    desc->arch.type = type;
+
+    ret = 0;
+
+err:
+    spin_unlock_irqrestore(&desc->lock, flags);
+    return ret;
+}
+
+static int irq_local_set_type(unsigned int irq, unsigned int type)
+{
+    unsigned int cpu;
+    unsigned int old_type;
+    unsigned long flags;
+    int ret = -EBUSY;
+    struct irq_desc *desc;
+
+    ASSERT(irq < NR_LOCAL_IRQS);
+
+    spin_lock(&local_irqs_type_lock);
+
+    old_type = local_irqs_type[irq];
+
+    if ( !irq_validate_new_type(old_type, type) )
+        goto unlock;
+
+    ret = 0;
+    /* We don't need to reconfigure if the type is correctly set */
+    if ( old_type == type )
+        goto unlock;
+
+    local_irqs_type[irq] = type;
+
+    for_each_cpu( cpu, &cpu_online_map )
+    {
+        desc = &per_cpu(local_irq_desc, cpu)[irq];
+        spin_lock_irqsave(&desc->lock, flags);
+        desc->arch.type = type;
+        spin_unlock_irqrestore(&desc->lock, flags);
+    }
+
+unlock:
+    spin_unlock(&local_irqs_type_lock);
+    return ret;
+}
+
+int platform_get_irq(const struct dt_device_node *device, int index)
+{
+    struct dt_irq dt_irq;
+    unsigned int type, irq;
+    int res;
+
+    res = dt_device_get_irq(device, index, &dt_irq);
+    if ( res )
+        return -1;
+
+    irq = dt_irq.irq;
+    type = dt_irq.type;
+
+    /* Setup the IRQ type */
+    if ( irq < NR_LOCAL_IRQS )
+        res = irq_local_set_type(irq, type);
+    else
+        res = irq_set_spi_type(irq, type);
+
+    if ( res )
+            return -1;
+
+    return irq;
 }
 
 /*

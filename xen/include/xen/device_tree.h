@@ -135,6 +135,7 @@ struct dt_phandle_args {
  * DT_IRQ_TYPE_LEVEL_LOW       - low level triggered
  * DT_IRQ_TYPE_LEVEL_MASK      - Mask to filter out the level bits
  * DT_IRQ_TYPE_SENSE_MASK      - Mask for all the above bits
+ * DT_IRQ_TYPE_INVALID         - Use to initialize the type
  */
 #define DT_IRQ_TYPE_NONE           0x00000000
 #define DT_IRQ_TYPE_EDGE_RISING    0x00000001
@@ -146,6 +147,8 @@ struct dt_phandle_args {
 #define DT_IRQ_TYPE_LEVEL_MASK                          \
     (DT_IRQ_TYPE_LEVEL_LOW | DT_IRQ_TYPE_LEVEL_HIGH)
 #define DT_IRQ_TYPE_SENSE_MASK     0x0000000f
+
+#define DT_IRQ_TYPE_INVALID        0x00000010
 
 /**
  * dt_irq - describe an IRQ in the device tree

@@ -216,14 +216,21 @@ static hw_irq_controller gic_guest_irq_type = {
 /*
  * - needs to be called with a valid cpu_mask, ie each cpu in the mask has
  * already called gic_cpu_init
+ * - desc.lock must be held
+ * - arch.type must be valid (i.e != DT_IRQ_TYPE_INVALID)
  */
-static void gic_set_irq_properties(unsigned int irq, bool_t level,
+static void gic_set_irq_properties(struct irq_desc *desc,
                                    const cpumask_t *cpu_mask,
                                    unsigned int priority)
 {
     volatile unsigned char *bytereg;
     uint32_t cfg, edgebit;
     unsigned int mask;
+    unsigned int irq = desc->irq;
+    unsigned int type = desc->arch.type;
+
+    ASSERT(type != DT_IRQ_TYPE_INVALID);
+    ASSERT(spin_is_locked(&desc->lock));
 
     spin_lock(&gic.lock);
 
@@ -232,9 +239,9 @@ static void gic_set_irq_properties(unsigned int irq, bool_t level,
     /* Set edge / level */
     cfg = GICD[GICD_ICFGR + irq / 16];
     edgebit = 2u << (2 * (irq % 16));
-    if ( level )
+    if ( type & DT_IRQ_TYPE_LEVEL_MASK )
         cfg &= ~edgebit;
-    else
+    else if ( type & DT_IRQ_TYPE_EDGE_BOTH )
         cfg |= edgebit;
     GICD[GICD_ICFGR + irq / 16] = cfg;
 
@@ -252,8 +259,8 @@ static void gic_set_irq_properties(unsigned int irq, bool_t level,
 /* Program the GIC to route an interrupt to the host (i.e. Xen)
  * - needs to be called with desc.lock held
  */
-void gic_route_irq_to_xen(struct irq_desc *desc, bool_t level,
-                          const cpumask_t *cpu_mask, unsigned int priority)
+void gic_route_irq_to_xen(struct irq_desc *desc, const cpumask_t *cpu_mask,
+                          unsigned int priority)
 {
     ASSERT(priority <= 0xff);     /* Only 8 bits of priority */
     ASSERT(desc->irq < gic.lines);/* Can't route interrupts that don't exist */
@@ -262,15 +269,14 @@ void gic_route_irq_to_xen(struct irq_desc *desc, bool_t level,
 
     desc->handler = &gic_host_irq_type;
 
-    gic_set_irq_properties(desc->irq, level, cpu_mask, priority);
+    gic_set_irq_properties(desc, cpu_mask, priority);
 }
 
 /* Program the GIC to route an interrupt to a guest
  *   - desc.lock must be held
  */
 void gic_route_irq_to_guest(struct domain *d, struct irq_desc *desc,
-                            bool_t level, const cpumask_t *cpu_mask,
-                            unsigned int priority)
+                            const cpumask_t *cpu_mask, unsigned int priority)
 {
     struct pending_irq *p;
     ASSERT(spin_is_locked(&desc->lock));
@@ -278,8 +284,7 @@ void gic_route_irq_to_guest(struct domain *d, struct irq_desc *desc,
     desc->handler = &gic_guest_irq_type;
     desc->status |= IRQ_GUEST;
 
-    gic_set_irq_properties(desc->irq, level, cpumask_of(smp_processor_id()),
-                           GIC_PRI_IRQ);
+    gic_set_irq_properties(desc, cpumask_of(smp_processor_id()), GIC_PRI_IRQ);
 
     /* TODO: do not assume delivery to vcpu0 */
     p = irq_to_pending(d->vcpu[0], desc->irq);

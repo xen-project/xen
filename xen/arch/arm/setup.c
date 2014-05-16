@@ -688,6 +688,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     dt_unflatten_host_device_tree();
     dt_irq_xlate = gic_irq_xlate;
 
+    init_IRQ();
+
     dt_uart_init();
     console_init_preirq();
 
@@ -717,7 +719,6 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     tasklet_subsys_init();
 
-    init_IRQ();
 
     xsm_dt_init();
 
