@@ -105,6 +105,10 @@ void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss,
                                 toolstack_data_buf, toolstack_data_len,
                                 "toolstack data tmpfile", 0);
         if (r) { rc = ERROR_FAIL; goto out; }
+
+        /* file position must be reset before passing to libxl-save-helper. */
+        r = lseek(toolstack_data_fd, 0, SEEK_SET);
+        if (r) { rc = ERROR_FAIL; goto out; }
     }
 
     const unsigned long argnums[] = {

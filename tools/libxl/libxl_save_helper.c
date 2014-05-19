@@ -163,10 +163,9 @@ static uint32_t toolstack_save_len;
 static int toolstack_save_cb(uint32_t domid, uint8_t **buf,
                              uint32_t *len, void *data)
 {
-    assert(toolstack_save_fd > 0);
+    int r;
 
-    int r = lseek(toolstack_save_fd, 0, SEEK_SET);
-    if (r) fail(errno,"rewind toolstack data tmpfile");
+    assert(toolstack_save_fd > 0);
 
     *buf = xmalloc(toolstack_save_len);
     r = read_exactly(toolstack_save_fd, *buf, toolstack_save_len);
