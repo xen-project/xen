@@ -383,7 +383,7 @@ static const char *trapstr(unsigned int trapnr)
         "coprocessor segment", "invalid tss", "segment not found",
         "stack error", "general protection fault", "page fault",
         "spurious interrupt", "coprocessor error", "alignment check",
-        "machine check", "simd error"
+        "machine check", "simd error", "virtualisation exception"
     };
 
     return trapnr < ARRAY_SIZE(strings) ? strings[trapnr] : "???";
@@ -534,6 +534,15 @@ int set_guest_nmi_trapbounce(void)
     return !null_trap_bounce(v, tb);
 }
 
+void do_reserved_trap(struct cpu_user_regs *regs)
+{
+    unsigned int trapnr = regs->entry_vector;
+
+    DEBUGGER_trap_fatal(trapnr, regs);
+    show_execution_state(regs);
+    panic("FATAL RESERVED TRAP %#x: %s", trapnr, trapstr(trapnr));
+}
+
 static void do_trap(struct cpu_user_regs *regs, int use_error_code)
 {
     struct vcpu *curr = current;
@@ -589,7 +598,6 @@ void do_##name(struct cpu_user_regs *regs)              \
 DO_ERROR_NOCODE(divide_error)
 DO_ERROR_NOCODE(overflow)
 DO_ERROR_NOCODE(bounds)
-DO_ERROR_NOCODE(coprocessor_segment_overrun)
 DO_ERROR(       invalid_TSS)
 DO_ERROR(       segment_not_present)
 DO_ERROR(       stack_segment)
@@ -3414,10 +3422,6 @@ void do_debug(struct cpu_user_regs *regs)
     return;
 }
 
-void do_spurious_interrupt_bug(struct cpu_user_regs *regs)
-{
-}
-
 static void __set_intr_gate(unsigned int n, uint32_t dpl, void *addr)
 {
     int i;
@@ -3516,13 +3520,11 @@ void __init init_idt_traps(void)
     set_intr_gate(TRAP_invalid_op,&invalid_op);
     set_intr_gate(TRAP_no_device,&device_not_available);
     set_intr_gate(TRAP_double_fault,&double_fault);
-    set_intr_gate(TRAP_copro_seg,&coprocessor_segment_overrun);
     set_intr_gate(TRAP_invalid_tss,&invalid_TSS);
     set_intr_gate(TRAP_no_segment,&segment_not_present);
     set_intr_gate(TRAP_stack_error,&stack_segment);
     set_intr_gate(TRAP_gp_fault,&general_protection);
     set_intr_gate(TRAP_page_fault,&early_page_fault);
-    set_intr_gate(TRAP_spurious_int,&spurious_interrupt_bug);
     set_intr_gate(TRAP_copro_error,&coprocessor_error);
     set_intr_gate(TRAP_alignment_check,&alignment_check);
     set_intr_gate(TRAP_machine_check,&machine_check);
@@ -3540,8 +3542,11 @@ void __init init_idt_traps(void)
     this_cpu(compat_gdt_table) = boot_cpu_compat_gdt_table;
 }
 
+extern void (*__initconst autogen_entrypoints[NR_VECTORS])(void);
 void __init trap_init(void)
 {
+    unsigned int vector;
+
     /* Replace early pagefault with real pagefault handler. */
     set_intr_gate(TRAP_page_fault, &page_fault);
 
@@ -3551,6 +3556,21 @@ void __init trap_init(void)
 
     /* Fast trap for int80 (faster than taking the #GP-fixup path). */
     _set_gate(idt_table + 0x80, SYS_DESC_trap_gate, 3, &int80_direct_trap);
+
+    for ( vector = 0; vector < NR_VECTORS; ++vector )
+    {
+        if ( autogen_entrypoints[vector] )
+        {
+            /* Found autogen entry: check we won't clobber an existing trap. */
+            ASSERT(idt_table[vector].b == 0);
+            set_intr_gate(vector, autogen_entrypoints[vector]);
+        }
+        else
+        {
+            /* No entry point: confirm we have an existing trap in place. */
+            ASSERT(idt_table[vector].b != 0);
+        }
+    }
 
     percpu_traps_init();
 

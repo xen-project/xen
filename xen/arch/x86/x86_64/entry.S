@@ -586,11 +586,6 @@ ENTRY(invalid_op)
         movl  $TRAP_invalid_op,4(%rsp)
         jmp   handle_exception
 
-ENTRY(coprocessor_segment_overrun)
-        pushq $0
-        movl  $TRAP_copro_seg,4(%rsp)
-        jmp   handle_exception
-
 ENTRY(invalid_TSS)
         movl  $TRAP_invalid_tss,4(%rsp)
         jmp   handle_exception
@@ -609,11 +604,6 @@ ENTRY(general_protection)
 
 ENTRY(alignment_check)
         movl  $TRAP_alignment_check,4(%rsp)
-        jmp   handle_exception
-
-ENTRY(spurious_interrupt_bug)
-        pushq $0
-        movl  $TRAP_spurious_int,4(%rsp)
         jmp   handle_exception
 
 ENTRY(double_fault)
@@ -716,18 +706,21 @@ ENTRY(exception_table)
         .quad do_bounds
         .quad do_invalid_op
         .quad do_device_not_available
-        .quad 0 # double_fault
-        .quad do_coprocessor_segment_overrun
+        .quad do_reserved_trap /* double_fault - has its own entry. */
+        .quad do_reserved_trap /* coproc_seg_overrun - Intel 387 only. */
         .quad do_invalid_TSS
         .quad do_segment_not_present
         .quad do_stack_segment
         .quad do_general_protection
         .quad do_page_fault
-        .quad do_spurious_interrupt_bug
+        .quad do_reserved_trap /* Default PIC spurious irq - architecturally reserved. */
         .quad do_coprocessor_error
         .quad do_alignment_check
         .quad do_machine_check
         .quad do_simd_coprocessor_error
+        .rept TRAP_last_reserved + 1 - ((. - exception_table) / 8)
+        .quad do_reserved_trap /* Architecturally reserved exceptions. */
+        .endr
 
 ENTRY(hypercall_table)
         .quad do_set_trap_table     /*  0 */
@@ -824,3 +817,51 @@ ENTRY(hypercall_args_table)
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr
+
+/* Table of automatically generated entry points.  One per vector. */
+        .section .init.rodata, "a", @progbits
+GLOBAL(autogen_entrypoints)
+        /* pop into the .init.rodata section and record an entry point. */
+        .macro entrypoint ent
+        .pushsection .init.rodata
+        .quad \ent
+        .popsection
+        .endm
+
+        .text
+autogen_stubs: /* Automatically generated stubs. */
+
+        vec = 0
+        .rept NR_VECTORS
+        ALIGN
+
+        /* Common interrupts, heading towards do_IRQ(). */
+        .if vec >= FIRST_DYNAMIC_VECTOR && vec != HYPERCALL_VECTOR && vec != LEGACY_SYSCALL_VECTOR
+
+1:      pushq $0
+        movb  $vec,4(%rsp)
+        jmp   common_interrupt
+
+        entrypoint 1b
+
+        /* Reserved exceptions, heading towards do_reserved_trap(). */
+        .elseif vec == TRAP_copro_seg || vec == TRAP_spurious_int || (vec > TRAP_simd_error && vec <= TRAP_last_reserved)
+
+1:      test  $8,%spl        /* 64bit exception frames are 16 byte aligned, but the word */
+        jz    2f             /* size is 8 bytes.  Check whether the processor gave us an */
+        pushq $0             /* error code, and insert an empty one if not.              */
+2:      movb  $vec,4(%rsp)
+        jmp   handle_exception
+
+        entrypoint 1b
+
+        /* Hand crafted entry points above. */
+        .else
+        entrypoint 0
+        .endif
+
+        vec = vec + 1
+        .endr
+
+        .section .init.rodata
+        .size autogen_entrypoints, . - autogen_entrypoints

@@ -357,9 +357,4 @@ static inline void stac(void)
 #define REX64_PREFIX "rex64/"
 #endif
 
-#define BUILD_IRQ(nr)                           \
-    "pushq $0\n\t"                              \
-    "movl $"#nr",4(%rsp)\n\t"                   \
-    "jmp common_interrupt"
-
 #endif /* __X86_ASM_DEFNS_H__ */

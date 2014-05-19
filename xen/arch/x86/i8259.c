@@ -23,65 +23,6 @@
 #include <io_ports.h>
 
 /*
- * Common place to define all x86 IRQ vectors
- *
- * This builds up the IRQ handler stubs using some ugly macros in irq.h
- *
- * These macros create the low-level assembly IRQ routines that save
- * register context and call do_IRQ(). do_IRQ() then does all the
- * operations that are needed to keep the AT (or SMP IOAPIC)
- * interrupt-controller happy.
- */
-
-__asm__(".section .text");
-
-#define IRQ_NAME(nr) VEC##nr##_interrupt
-
-#define BI(nr)                                           \
-void IRQ_NAME(nr)(void);                                 \
-__asm__(                                                 \
-".if " STR(0x##nr) " >= " STR(FIRST_DYNAMIC_VECTOR) "\n" \
-__ALIGN_STR "\n"                                         \
-STR(IRQ_NAME(nr)) ":\n\t"                                \
-BUILD_IRQ(0x##nr) "\n"                                   \
-".else\n"                                                \
-".equ " STR(IRQ_NAME(nr)) ", 0\n"                        \
-".endif\n")
-
-#define BUILD_16_IRQS(x) \
-    BI(x##0); BI(x##1); BI(x##2); BI(x##3); \
-    BI(x##4); BI(x##5); BI(x##6); BI(x##7); \
-    BI(x##8); BI(x##9); BI(x##a); BI(x##b); \
-    BI(x##c); BI(x##d); BI(x##e); BI(x##f)
-
-BUILD_16_IRQS(0); BUILD_16_IRQS(1); BUILD_16_IRQS(2); BUILD_16_IRQS(3);
-BUILD_16_IRQS(4); BUILD_16_IRQS(5); BUILD_16_IRQS(6); BUILD_16_IRQS(7);
-BUILD_16_IRQS(8); BUILD_16_IRQS(9); BUILD_16_IRQS(a); BUILD_16_IRQS(b);
-BUILD_16_IRQS(c); BUILD_16_IRQS(d); BUILD_16_IRQS(e); BUILD_16_IRQS(f);
-
-#undef BUILD_16_IRQS
-#undef BI
-
-
-#define IRQ(x,y) IRQ_NAME(x##y)
-
-#define IRQLIST_16(x) \
-    IRQ(x,0), IRQ(x,1), IRQ(x,2), IRQ(x,3), \
-    IRQ(x,4), IRQ(x,5), IRQ(x,6), IRQ(x,7), \
-    IRQ(x,8), IRQ(x,9), IRQ(x,a), IRQ(x,b), \
-    IRQ(x,c), IRQ(x,d), IRQ(x,e), IRQ(x,f)
-
-static void (*__initdata interrupt[NR_VECTORS])(void) = {
-    IRQLIST_16(0), IRQLIST_16(1), IRQLIST_16(2), IRQLIST_16(3),
-    IRQLIST_16(4), IRQLIST_16(5), IRQLIST_16(6), IRQLIST_16(7),
-    IRQLIST_16(8), IRQLIST_16(9), IRQLIST_16(a), IRQLIST_16(b),
-    IRQLIST_16(c), IRQLIST_16(d), IRQLIST_16(e), IRQLIST_16(f)
-};
-
-#undef IRQ
-#undef IRQLIST_16
-
-/*
  * This is the 'legacy' 8259A Programmable Interrupt Controller,
  * present in the majority of PC/AT boxes.
  * plus some generic x86 specific things if generic specifics makes
@@ -395,21 +336,13 @@ static struct irqaction __read_mostly cascade = { no_action, "cascade", NULL};
 
 void __init init_IRQ(void)
 {
-    int vector, irq, cpu = smp_processor_id();
+    int irq, cpu = smp_processor_id();
 
     init_bsp_APIC();
 
     init_8259A(0);
 
     BUG_ON(init_irq_data() < 0);
-
-    for ( vector = FIRST_DYNAMIC_VECTOR; vector < NR_VECTORS; vector++ )
-    {
-        if (vector == HYPERCALL_VECTOR || vector == LEGACY_SYSCALL_VECTOR)
-            continue;
-        BUG_ON(!interrupt[vector]);
-        set_intr_gate(vector, interrupt[vector]);
-    }
 
     for (irq = 0; platform_legacy_irq(irq); irq++) {
         struct irq_desc *desc = irq_to_desc(irq);

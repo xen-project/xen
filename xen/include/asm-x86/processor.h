@@ -113,6 +113,7 @@
 #define TRAP_alignment_check  17
 #define TRAP_machine_check    18
 #define TRAP_simd_error       19
+#define TRAP_virtualisation   20
 #define TRAP_last_reserved    31
 
 /* Set for entry via SYSCALL. Informs return code to use SYSRETQ not IRETQ. */
@@ -503,7 +504,6 @@ DECLARE_TRAP_HANDLER(bounds);
 DECLARE_TRAP_HANDLER(invalid_op);
 DECLARE_TRAP_HANDLER(device_not_available);
 DECLARE_TRAP_HANDLER(double_fault);
-DECLARE_TRAP_HANDLER(coprocessor_segment_overrun);
 DECLARE_TRAP_HANDLER(invalid_TSS);
 DECLARE_TRAP_HANDLER(segment_not_present);
 DECLARE_TRAP_HANDLER(stack_segment);
@@ -514,12 +514,12 @@ DECLARE_TRAP_HANDLER(coprocessor_error);
 DECLARE_TRAP_HANDLER(simd_coprocessor_error);
 DECLARE_TRAP_HANDLER(machine_check);
 DECLARE_TRAP_HANDLER(alignment_check);
-DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
 #undef DECLARE_TRAP_HANDLER
 
 void trap_nop(void);
 void enable_nmis(void);
 void noreturn do_nmi_crash(struct cpu_user_regs *regs);
+void do_reserved_trap(struct cpu_user_regs *regs);
 
 void syscall_enter(void);
 void sysenter_entry(void);
