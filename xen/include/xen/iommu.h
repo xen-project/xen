@@ -67,6 +67,15 @@ int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
                    unsigned int flags);
 int iommu_unmap_page(struct domain *d, unsigned long gfn);
 
+enum iommu_feature
+{
+    IOMMU_FEAT_COHERENT_WALK,
+    IOMMU_FEAT_count
+};
+
+bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature);
+
+
 #ifdef HAS_PCI
 void pt_pci_init(void);
 

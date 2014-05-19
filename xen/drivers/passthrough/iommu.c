@@ -344,6 +344,16 @@ void iommu_crash_shutdown(void)
     iommu_enabled = iommu_intremap = 0;
 }
 
+bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature)
+{
+    const struct hvm_iommu *hd = domain_hvm_iommu(d);
+
+    if ( !iommu_enabled )
+        return 0;
+
+    return test_bit(feature, hd->features);
+}
+
 static void iommu_dump_p2m_table(unsigned char key)
 {
     struct domain *d;

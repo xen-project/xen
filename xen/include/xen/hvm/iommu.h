@@ -34,6 +34,12 @@ struct hvm_iommu {
     /* List of DT devices assigned to this domain */
     struct list_head dt_devices;
 #endif
+
+    /* Features supported by the IOMMU */
+    DECLARE_BITMAP(features, IOMMU_FEAT_count);
 };
+
+#define iommu_set_feature(d, f)   set_bit((f), domain_hvm_iommu(d)->features)
+#define iommu_clear_feature(d, f) clear_bit((f), domain_hvm_iommu(d)->features)
 
 #endif /* __XEN_HVM_IOMMU_H__ */

@@ -5,6 +5,7 @@
 #include <xen/kernel.h>
 #include <asm/page.h>
 #include <public/xen.h>
+#include <xen/domain_page.h>
 
 /* Align Xen to a 2 MiB boundary. */
 #define XEN_PADDR_ALIGN (1 << 21)
@@ -340,6 +341,8 @@ static inline void put_page_and_type(struct page_info *page)
     put_page_type(page);
     put_page(page);
 }
+
+void clear_and_clean_page(struct page_info *page);
 
 #endif /*  __ARCH_ARM_MM__ */
 /*

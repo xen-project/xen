@@ -253,9 +253,15 @@ static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
     return e;
 }
 
+static inline void p2m_write_pte(lpae_t *p, lpae_t pte, bool_t flush_cache)
+{
+    write_pte(p, pte);
+    if ( flush_cache )
+        clean_xen_dcache(*p);
+}
+
 /* Allocate a new page table page and hook it in via the given entry */
-static int p2m_create_table(struct domain *d,
-                            lpae_t *entry)
+static int p2m_create_table(struct domain *d, lpae_t *entry, bool_t flush_cache)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
     struct page_info *page;
@@ -272,11 +278,13 @@ static int p2m_create_table(struct domain *d,
 
     p = __map_domain_page(page);
     clear_page(p);
+    if ( flush_cache )
+        clean_xen_dcache_va_range(p, PAGE_SIZE);
     unmap_domain_page(p);
 
     pte = mfn_to_p2m_entry(page_to_mfn(page), MATTR_MEM, p2m_invalid);
 
-    write_pte(entry, pte);
+    p2m_write_pte(entry, pte, flush_cache);
 
     return 0;
 }
@@ -308,6 +316,13 @@ static int apply_p2m_changes(struct domain *d,
     unsigned int flush = 0;
     bool_t populate = (op == INSERT || op == ALLOCATE);
     lpae_t pte;
+    bool_t flush_pt;
+
+    /* Some IOMMU don't support coherent PT walk. When the p2m is
+     * shared with the CPU, Xen has to make sure that the PT changes have
+     * reached the memory
+     */
+    flush_pt = iommu_enabled && !iommu_has_feature(d, IOMMU_FEAT_COHERENT_WALK);
 
     spin_lock(&p2m->lock);
 
@@ -334,7 +349,8 @@ static int apply_p2m_changes(struct domain *d,
                 continue;
             }
 
-            rc = p2m_create_table(d, &first[first_table_offset(addr)]);
+            rc = p2m_create_table(d, &first[first_table_offset(addr)],
+                                  flush_pt);
             if ( rc < 0 )
             {
                 printk("p2m_populate_ram: L1 failed\n");
@@ -360,7 +376,8 @@ static int apply_p2m_changes(struct domain *d,
                 continue;
             }
 
-            rc = p2m_create_table(d, &second[second_table_offset(addr)]);
+            rc = p2m_create_table(d, &second[second_table_offset(addr)],
+                                  flush_pt);
             if ( rc < 0 ) {
                 printk("p2m_populate_ram: L2 failed\n");
                 goto out;
@@ -411,13 +428,15 @@ static int apply_p2m_changes(struct domain *d,
 
                     pte = mfn_to_p2m_entry(page_to_mfn(page), mattr, t);
 
-                    write_pte(&third[third_table_offset(addr)], pte);
+                    p2m_write_pte(&third[third_table_offset(addr)],
+                                  pte, flush_pt);
                 }
                 break;
             case INSERT:
                 {
                     pte = mfn_to_p2m_entry(maddr >> PAGE_SHIFT, mattr, t);
-                    write_pte(&third[third_table_offset(addr)], pte);
+                    p2m_write_pte(&third[third_table_offset(addr)],
+                                  pte, flush_pt);
                     maddr += PAGE_SIZE;
                 }
                 break;
@@ -433,7 +452,8 @@ static int apply_p2m_changes(struct domain *d,
                     count += 0x10;
 
                     memset(&pte, 0x00, sizeof(pte));
-                    write_pte(&third[third_table_offset(addr)], pte);
+                    p2m_write_pte(&third[third_table_offset(addr)],
+                                  pte, flush_pt);
                     count++;
                 }
                 break;
@@ -537,7 +557,6 @@ int p2m_alloc_table(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
     struct page_info *page;
-    void *p;
 
     page = alloc_domheap_pages(NULL, P2M_FIRST_ORDER, 0);
     if ( page == NULL )
@@ -546,13 +565,8 @@ int p2m_alloc_table(struct domain *d)
     spin_lock(&p2m->lock);
 
     /* Clear both first level pages */
-    p = __map_domain_page(page);
-    clear_page(p);
-    unmap_domain_page(p);
-
-    p = __map_domain_page(page + 1);
-    clear_page(p);
-    unmap_domain_page(p);
+    clear_and_clean_page(page);
+    clear_and_clean_page(page + 1);
 
     p2m->first_level = page;
 

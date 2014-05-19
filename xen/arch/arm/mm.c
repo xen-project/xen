@@ -1235,6 +1235,16 @@ int is_iomem_page(unsigned long mfn)
         return 1;
     return 0;
 }
+
+void clear_and_clean_page(struct page_info *page)
+{
+    void *p = __map_domain_page(page);
+
+    clear_page(p);
+    clean_xen_dcache_va_range(p, PAGE_SIZE);
+    unmap_domain_page(p);
+}
+
 /*
  * Local variables:
  * mode: C
