@@ -102,6 +102,11 @@
 #define LIBXL_HAVE_DEVICE_DISK_DIRECT_IO_SAFE 1
 
 /*
+ * The libxl_device_disk has the discard_enable field.
+ */
+#define LIBXL_HAVE_LIBXL_DEVICE_DISK_DISCARD_ENABLE 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

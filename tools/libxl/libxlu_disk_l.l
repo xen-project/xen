@@ -174,6 +174,8 @@ backendtype=[^,]*,? { STRIP(','); setbackendtype(DPC,FROMEQUALS); }
 vdev=[^,]*,?	{ STRIP(','); SAVESTRING("vdev", vdev, FROMEQUALS); }
 script=[^,]*,?	{ STRIP(','); SAVESTRING("script", script, FROMEQUALS); }
 direct-io-safe,? { DPC->disk->direct_io_safe = 1; }
+discard,?	{ libxl_defbool_set(&DPC->disk->discard_enable, true); }
+no-discard,?	{ libxl_defbool_set(&DPC->disk->discard_enable, false); }
 
  /* the target magic parameter, eats the rest of the string */
 

@@ -217,6 +217,23 @@ If in the future the bug is fixed properly this option will then be
 silently ignored.
 
 
+discard / no-discard
+---------------
+
+Description:           Request that backend advertise discard support to frontend
+Supported values:      discard
+                       no-discard
+Mandatory:             No
+Default value:         discard
+
+An advisory setting for the backend driver, specifying whether to
+advertise discard support (TRIM, UNMAP) to the frontend.  The real
+benefit of this option is to be able to force it off rather than on.  It
+can be used to disable "hole punching" for file based backends which
+were intentionally created non-sparse to avoid fragmentation of the
+file.
+
+
 ============================================
 DEPRECATED PARAMETERS, PREFIXES AND SYNTAXES
 ============================================

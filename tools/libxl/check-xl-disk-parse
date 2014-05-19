@@ -62,7 +62,8 @@ disk: {
     "removable": 0,
     "readwrite": 1,
     "is_cdrom": 0,
-    "direct_io_safe": false
+    "direct_io_safe": false,
+    "discard_enable": "True"
 }
 
 END
@@ -84,7 +85,8 @@ disk: {
     "removable": 1,
     "readwrite": 0,
     "is_cdrom": 1,
-    "direct_io_safe": false
+    "direct_io_safe": false,
+    "discard_enable": "False"
 }
 
 END
@@ -107,7 +109,8 @@ disk: {
     "removable": 0,
     "readwrite": 1,
     "is_cdrom": 0,
-    "direct_io_safe": false
+    "direct_io_safe": false,
+    "discard_enable": "True"
 }
 
 EOF
@@ -125,7 +128,8 @@ disk: {
     "removable": 1,
     "readwrite": 0,
     "is_cdrom": 1,
-    "direct_io_safe": false
+    "direct_io_safe": false,
+    "discard_enable": "False"
 }
 
 EOF
@@ -147,7 +151,8 @@ disk: {
     "removable": 1,
     "readwrite": 0,
     "is_cdrom": 1,
-    "direct_io_safe": false
+    "direct_io_safe": false,
+    "discard_enable": "False"
 }
 
 EOF
@@ -166,7 +171,8 @@ disk: {
     "removable": 0,
     "readwrite": 1,
     "is_cdrom": 0,
-    "direct_io_safe": false
+    "direct_io_safe": false,
+    "discard_enable": "True"
 }
 
 EOF
@@ -187,7 +193,8 @@ disk: {
     "removable": 0,
     "readwrite": 1,
     "is_cdrom": 0,
-    "direct_io_safe": false
+    "direct_io_safe": false,
+    "discard_enable": "True"
 }
 
 EOF
@@ -195,5 +202,64 @@ EOF
 # http://lists.linbit.com/pipermail/drbd-user/2008-September/010221.html
 # http://www.drbd.org/users-guide-emb/s-xen-configure-domu.html
 one 0 drbd:app01,hda,w
+
+expected <<END
+disk: {
+    "backend_domid": 0,
+    "backend_domname": null,
+    "pdev_path": "/some/disk/image.raw",
+    "vdev": "hda",
+    "backend": "unknown",
+    "format": "raw",
+    "script": null,
+    "removable": 0,
+    "readwrite": 1,
+    "is_cdrom": 0,
+    "direct_io_safe": false,
+    "discard_enable": "True"
+}
+
+END
+one 0  discard=on  vdev=hda target=/some/disk/image.raw
+one 0  discard=1   vdev=hda target=/some/disk/image.raw
+
+expected <<END
+disk: {
+    "backend_domid": 0,
+    "backend_domname": null,
+    "pdev_path": "/some/disk/image.raw",
+    "vdev": "hda",
+    "backend": "unknown",
+    "format": "raw",
+    "script": null,
+    "removable": 0,
+    "readwrite": 1,
+    "is_cdrom": 0,
+    "direct_io_safe": false,
+    "discard_enable": "False"
+}
+
+END
+one 0  discard vdev=hda target=/some/disk/image.raw
+one 0  discard vdev=hda target=/some/disk/image.raw
+
+expected <<END
+disk: {
+    "backend_domid": 0,
+    "backend_domname": null,
+    "pdev_path": "/some/disk/image.iso",
+    "vdev": "hda",
+    "backend": "unknown",
+    "format": "raw",
+    "script": null,
+    "removable": 1,
+    "readwrite": 0,
+    "is_cdrom": 1,
+    "direct_io_safe": false,
+    "discard_enable": "False"
+}
+
+END
+one 0  cdrom no-discard vdev=hda target=/some/disk/image.iso
 
 complete

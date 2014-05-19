@@ -79,6 +79,7 @@ int xlu_disk_parse(XLU_Config *cfg,
         if (!disk->pdev_path || !strcmp(disk->pdev_path, ""))
             disk->format = LIBXL_DISK_FORMAT_EMPTY;
     }
+    libxl_defbool_setdefault(&disk->discard_enable, !!disk->readwrite);
 
     if (!disk->vdev) {
         xlu__disk_err(&dpc,0, "no vdev specified");

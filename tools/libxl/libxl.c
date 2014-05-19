@@ -2209,6 +2209,9 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
             flexarray_append(back, "direct-io-safe");
             flexarray_append(back, "1");
         }
+        flexarray_append_pair(back, "discard-enable",
+                              libxl_defbool_val(disk->discard_enable) ?
+                              "1" : "0");
 
         flexarray_append(front, "backend-id");
         flexarray_append(front, libxl__sprintf(gc, "%d", disk->backend_domid));

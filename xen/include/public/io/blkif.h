@@ -197,6 +197,16 @@
  *
  *------------------------- Backend Device Properties -------------------------
  *
+ * discard-enable
+ *      Values:         0/1 (boolean)
+ *      Default Value:  1
+ *
+ *      This optional property, set by the toolstack, instructs the backend
+ *      to offer discard to the frontend. If the property is missing the
+ *      backend should offer discard if the backing storage actually supports
+ *      it. This optional property, set by the toolstack, requests that the
+ *      backend offer, or not offer, discard to the frontend.
+ *
  * discard-alignment
  *      Values:         <uint32_t>
  *      Default Value:  0
