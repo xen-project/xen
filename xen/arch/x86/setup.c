@@ -133,11 +133,6 @@ static void __init parse_acpi_param(char *s)
     }
 }
 
-#define EARLY_FAIL(f, a...) do {                \
-    printk( f , ## a );                         \
-    for ( ; ; ) halt();                         \
-} while (0)
-
 static const module_t *__initdata initial_images;
 static unsigned int __initdata nr_initial_images;
 
@@ -669,11 +664,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
-        EARLY_FAIL("dom0 kernel not specified. "
-                   "Check bootloader configuration.\n");
+        panic("dom0 kernel not specified. Check bootloader configuration.");
 
     if ( ((unsigned long)cpu0_stack & (STACK_SIZE-1)) != 0 )
-        EARLY_FAIL("Misaligned CPU0 stack.\n");
+        panic("Misaligned CPU0 stack.");
 
     if ( efi_enabled )
     {
@@ -754,9 +748,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         e820_raw_nr = 2;
     }
     else
-    {
-        EARLY_FAIL("Bootloader provided no memory information.\n");
-    }
+        panic("Bootloader provided no memory information.");
 
     /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = raw_max_page = init_e820(memmap_type, e820_raw, &e820_raw_nr);
@@ -791,7 +783,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     for ( i = 0; !efi_enabled && i < mbi->mods_count; i++ )
     {
         if ( mod[i].mod_start & (PAGE_SIZE - 1) )
-            EARLY_FAIL("Bootloader didn't honor module alignment request.\n");
+            panic("Bootloader didn't honor module alignment request.");
         mod[i].mod_end -= mod[i].mod_start;
         mod[i].mod_start >>= PAGE_SHIFT;
         mod[i].reserved = 0;
@@ -964,7 +956,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     }
 
     if ( modules_headroom && !mod->reserved )
-        EARLY_FAIL("Not enough memory to relocate the dom0 kernel image.\n");
+        panic("Not enough memory to relocate the dom0 kernel image.");
     for ( i = 0; i < mbi->mods_count; ++i )
     {
         uint64_t s = (uint64_t)mod[i].mod_start << PAGE_SHIFT;
@@ -973,7 +965,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     }
 
     if ( !xen_phys_start )
-        EARLY_FAIL("Not enough memory to relocate Xen.\n");
+        panic("Not enough memory to relocate Xen.");
     reserve_e820_ram(&boot_e820, efi_enabled ? mbi->mem_upper : __pa(&_start),
                      __pa(&_end));
 

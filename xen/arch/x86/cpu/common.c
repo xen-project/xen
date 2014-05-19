@@ -593,9 +593,6 @@ void __cpuinit cpu_init(void)
 	/* Install correct page table. */
 	write_ptbase(current);
 
-	/* No nested task. */
-	asm volatile ("pushf ; andw $0xbfff,(%"__OP"sp) ; popf" );
-
 	/* Ensure FPU gets initialised for each domain. */
 	stts();
 

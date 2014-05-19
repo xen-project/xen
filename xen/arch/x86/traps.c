@@ -3422,22 +3422,17 @@ void do_debug(struct cpu_user_regs *regs)
     return;
 }
 
-static void __set_intr_gate(unsigned int n, uint32_t dpl, void *addr)
+static void __init noinline __set_intr_gate(unsigned int n, uint32_t dpl, void *addr)
 {
-    int i;
-    /* Keep secondary tables in sync with IRQ updates. */
-    for ( i = 1; i < nr_cpu_ids; i++ )
-        if ( idt_tables[i] != NULL )
-            _set_gate(&idt_tables[i][n], SYS_DESC_irq_gate, dpl, addr);
     _set_gate(&idt_table[n], SYS_DESC_irq_gate, dpl, addr);
 }
 
-static void set_swint_gate(unsigned int n, void *addr)
+static void __init set_swint_gate(unsigned int n, void *addr)
 {
     __set_intr_gate(n, 3, addr);
 }
 
-void set_intr_gate(unsigned int n, void *addr)
+static void __init set_intr_gate(unsigned int n, void *addr)
 {
     __set_intr_gate(n, 0, addr);
 }

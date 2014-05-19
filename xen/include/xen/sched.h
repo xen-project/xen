@@ -770,7 +770,6 @@ void domain_unpause(struct domain *d);
 void domain_pause_by_systemcontroller(struct domain *d);
 void domain_unpause_by_systemcontroller(struct domain *d);
 void cpu_init(void);
-void load_system_tables(void);
 
 struct scheduler;
 

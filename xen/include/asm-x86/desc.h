@@ -199,7 +199,6 @@ DECLARE_PER_CPU(struct desc_struct *, gdt_table);
 extern struct desc_struct boot_cpu_compat_gdt_table[];
 DECLARE_PER_CPU(struct desc_struct *, compat_gdt_table);
 
-extern void set_intr_gate(unsigned int irq, void * addr);
 extern void load_TR(void);
 
 #endif /* !__ASSEMBLY__ */

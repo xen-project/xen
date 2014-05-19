@@ -73,7 +73,7 @@ custom_param("mce_verbosity", mce_set_verbosity);
 static void unexpected_machine_check(struct cpu_user_regs *regs, long error_code)
 {
     console_force_unlock();
-    printk("Unexpected Machine Check Exception");
+    printk("Unexpected Machine Check Exception\n");
     fatal_trap(TRAP_machine_check, regs);
 }
 
