@@ -187,7 +187,8 @@ F:	xen/arch/x86/tboot.c
 F:	xen/include/asm-x86/tboot.h
 
 INTEL(R) VT FOR DIRECTED I/O (VT-D)
-M:	Xiantao Zhang <xiantao.zhang@intel.com>
+M:	Yang Zhang <yang.z.zhang@intel.com>
+M:	Kevin Tian <kevin.tian@intel.com>
 S:	Supported
 F:	xen/drivers/passthrough/vtd/
 
@@ -201,7 +202,6 @@ F:	xen/arch/x86/mm/hap/p2m-ept.c
 F:	xen/include/asm-x86/hvm/vmx/
 
 IOMMU VENDOR INDEPENDENT CODE
-M:	Xiantao Zhang <xiantao.zhang@intel.com>
 M:	Jan Beulich <jbeulich@suse.com>
 S:	Supported
 F:	xen/drivers/passthrough/
