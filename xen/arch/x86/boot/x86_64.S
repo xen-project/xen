@@ -25,63 +25,14 @@
         leaq    1f(%rip),%rax
         pushq   %rax
         lretq
-1:      lidt    idt_descr(%rip)
-
+1:
         test    %ebx,%ebx
         jnz     start_secondary
-        jmp     start_bsp
-
-        .section .init.text, "ax", @progbits
-
-start_bsp:
-        /* Initialise IDT with simple error defaults. */
-        leaq    ignore_int(%rip),%rcx
-        movl    %ecx,%eax
-        andl    $0xFFFF0000,%eax
-        orl     $0x00008E00,%eax
-        shlq    $32,%rax
-        movl    %ecx,%edx
-        andl    $0x0000FFFF,%edx
-        orl     $(__HYPERVISOR_CS64<<16),%edx
-        orq     %rdx,%rax
-        shrq    $32,%rcx
-        movl    %ecx,%edx
-        leaq    idt_table(%rip),%rdi
-        movl    $256,%ecx
-1:      movq    %rax,(%rdi)
-        movq    %rdx,8(%rdi)
-        addq    $16,%rdi
-        loop    1b
 
         /* Pass off the Multiboot info structure to C land. */
         mov     multiboot_ptr(%rip),%edi
         call    __start_xen
         ud2     /* Force a panic (invalid opcode). */
-
-/* This is the default interrupt handler. */
-ignore_int:
-        SAVE_ALL CLAC
-        movq    %cr2,%rsi
-        leaq    int_msg(%rip),%rdi
-        xorl    %eax,%eax
-        call    printk
-        movq    %rsp,%rbp
-0:      movq    (%rbp),%rsi
-        addq    $8,%rbp
-        leaq    hex_msg(%rip),%rdi
-        xorl    %eax,%eax
-        call    printk
-        testq   $0xff8,%rbp
-        jnz     0b
-1:      hlt
-        jmp     1b
-
-        .section .init.rodata, "a", @progbits
-
-int_msg:
-        .asciz "Unknown interrupt (cr2=%016lx)\n"
-hex_msg:
-        .asciz "    %016lx"
 
 /*** DESCRIPTOR TABLES ***/
 
@@ -94,11 +45,6 @@ multiboot_ptr:
 GLOBAL(gdt_descr)
         .word   LAST_RESERVED_GDT_BYTE
         .quad   boot_cpu_gdt_table - FIRST_RESERVED_GDT_BYTE
-
-        .word   0,0,0
-GLOBAL(idt_descr)
-        .word   256*16-1
-        .quad   idt_table
 
 GLOBAL(stack_start)
         .quad   cpu0_stack

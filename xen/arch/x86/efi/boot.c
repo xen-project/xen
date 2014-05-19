@@ -1474,7 +1474,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     asm volatile ( "mov    %[cr4], %%cr4\n\t"
                    "mov    %[cr3], %%cr3\n\t"
                    "movabs $__start_xen, %[rip]\n\t"
-                   "lidt   idt_descr(%%rip)\n\t"
                    "lgdt   gdt_descr(%%rip)\n\t"
                    "mov    stack_start(%%rip), %%rsp\n\t"
                    "mov    %[ds], %%ss\n\t"
