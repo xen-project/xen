@@ -24,19 +24,9 @@
 #include "xc_private.h"
 #include <xen/memory.h>
 
-int xc_mem_access_enable(xc_interface *xch, domid_t domain_id,
-                         uint32_t *port)
+void *xc_mem_access_enable(xc_interface *xch, domid_t domain_id, uint32_t *port)
 {
-    if ( !port )
-    {
-        errno = EINVAL;
-        return -1;
-    }
-
-    return xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE,
-                                XEN_DOMCTL_MEM_EVENT_OP_ACCESS,
-                                port);
+    return xc_mem_event_enable(xch, domain_id, HVM_PARAM_ACCESS_RING_PFN, port);
 }
 
 int xc_mem_access_disable(xc_interface *xch, domid_t domain_id)

@@ -223,7 +223,6 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     xenaccess_t *xenaccess = 0;
     xc_interface *xch;
     int rc;
-    unsigned long ring_pfn, mmap_pfn;
 
     xch = xc_interface_open(NULL, NULL, 0);
     if ( !xch )
@@ -245,40 +244,12 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     /* Initialise lock */
     mem_event_ring_lock_init(&xenaccess->mem_event);
 
-    /* Map the ring page */
-    xc_get_hvm_param(xch, xenaccess->mem_event.domain_id, 
-                        HVM_PARAM_ACCESS_RING_PFN, &ring_pfn);
-    mmap_pfn = ring_pfn;
-    xenaccess->mem_event.ring_page = 
-        xc_map_foreign_batch(xch, xenaccess->mem_event.domain_id, 
-                                PROT_READ | PROT_WRITE, &mmap_pfn, 1);
-    if ( mmap_pfn & XEN_DOMCTL_PFINFO_XTAB )
-    {
-        /* Map failed, populate ring page */
-        rc = xc_domain_populate_physmap_exact(xenaccess->xc_handle, 
-                                              xenaccess->mem_event.domain_id,
-                                              1, 0, 0, &ring_pfn);
-        if ( rc != 0 )
-        {
-            PERROR("Failed to populate ring gfn\n");
-            goto err;
-        }
-
-        mmap_pfn = ring_pfn;
-        xenaccess->mem_event.ring_page = 
-            xc_map_foreign_batch(xch, xenaccess->mem_event.domain_id, 
-                                    PROT_READ | PROT_WRITE, &mmap_pfn, 1);
-        if ( mmap_pfn & XEN_DOMCTL_PFINFO_XTAB )
-        {
-            PERROR("Could not map the ring page\n");
-            goto err;
-        }
-    }
-
-    /* Initialise Xen */
-    rc = xc_mem_access_enable(xenaccess->xc_handle, xenaccess->mem_event.domain_id,
-                             &xenaccess->mem_event.evtchn_port);
-    if ( rc != 0 )
+    /* Enable mem_access */
+    xenaccess->mem_event.ring_page =
+            xc_mem_access_enable(xenaccess->xc_handle,
+                                 xenaccess->mem_event.domain_id,
+                                 &xenaccess->mem_event.evtchn_port);
+    if ( xenaccess->mem_event.ring_page == NULL )
     {
         switch ( errno ) {
             case EBUSY:
@@ -288,7 +259,7 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
                 ERROR("EPT not supported for this guest");
                 break;
             default:
-                perror("Error initialising shared page");
+                perror("Error enabling mem_access");
                 break;
         }
         goto err;
@@ -321,11 +292,6 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     BACK_RING_INIT(&xenaccess->mem_event.back_ring,
                    (mem_event_sring_t *)xenaccess->mem_event.ring_page,
                    XC_PAGE_SIZE);
-
-    /* Now that the ring is set, remove it from the guest's physmap */
-    if ( xc_domain_decrease_reservation_exact(xch, 
-                    xenaccess->mem_event.domain_id, 1, 0, &ring_pfn) )
-        PERROR("Failed to remove ring from guest physmap");
 
     /* Get domaininfo */
     xenaccess->domain_info = malloc(sizeof(xc_domaininfo_t));

@@ -2190,6 +2190,12 @@ int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
 int xc_mem_event_memop(xc_interface *xch, domid_t domain_id, 
                         unsigned int op, unsigned int mode,
                         uint64_t gfn, void *buffer);
+/*
+ * Enables mem_event and returns the mapped ring page indicated by param.
+ * param can be HVM_PARAM_PAGING/ACCESS/SHARING_RING_PFN
+ */
+void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
+                          uint32_t *port);
 
 /** 
  * Mem paging operations.
@@ -2210,7 +2216,13 @@ int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
  * Access tracking operations.
  * Supported only on Intel EPT 64 bit processors.
  */
-int xc_mem_access_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
+
+/*
+ * Enables mem_access and returns the mapped ring page.
+ * Will return NULL on error.
+ * Caller has to unmap this page when done.
+ */
+void *xc_mem_access_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
 int xc_mem_access_disable(xc_interface *xch, domid_t domain_id);
 int xc_mem_access_resume(xc_interface *xch, domid_t domain_id);
 
