@@ -620,7 +620,6 @@ must be given in hexadecimal.
 It is recommended to use this option only for trusted VMs under
 administrator control.
 
-
 =item B<irqs=[ NUMBER, NUMBER, ... ]>
 
 Allow a guest to access specific physical IRQs.
@@ -702,6 +701,7 @@ it is safe to allow this to be enabled but you may wish to disable it
 anyway.
 
 =item B<pvh=BOOLEAN>
+
 Selects whether to run this PV guest in an HVM container. Default is 0.
 
 =back
@@ -944,7 +944,6 @@ preceded by a 32b integer indicating the size of the next structure.
 
 =item B<tsc_mode="MODE">
 
-
 Specifies how the TSC (Time Stamp Counter) should be provided to the
 guest (X86 only). Specifying this option as a number is
 deprecated. Options are:
@@ -989,7 +988,6 @@ i.e. set to UTC.
 =item B<rtc_timeoffset=SECONDS>
 
 Set the real time clock offset in seconds. False (0) by default.
-
 
 =item B<vpt_align=BOOLEAN>
 
