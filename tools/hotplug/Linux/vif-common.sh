@@ -123,7 +123,7 @@ ip=$(xenstore_read_default "$XENBUS_PATH/ip" "$ip")
 
 frob_iptable()
 {
-  if [ "$command" == "online" ]
+  if [ "$command" == "online" -o "$command" == "add" ]
   then
     local c="-I"
   else
@@ -135,7 +135,7 @@ frob_iptable()
   iptables "$c" FORWARD -m physdev --physdev-is-bridged --physdev-out "$dev" \
     -j ACCEPT 2>/dev/null
 
-  if [ "$command" == "online" -a $? -ne 0 ]
+  if [ \( "$command" == "online" -o "$command" == "add" \) -a $? -ne 0 ]
   then
     log err "iptables setup failed. This may affect guest networking."
   fi
