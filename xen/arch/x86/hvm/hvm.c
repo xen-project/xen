@@ -4748,7 +4748,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( a.nr > GB(1) >> PAGE_SHIFT )
             goto param_fail2;
 
-        rc = xsm_hvm_param(XSM_TARGET, d, op);
+        rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
         if ( rc )
             goto param_fail2;
 
@@ -4786,7 +4786,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail3;
 
-        rc = xsm_hvm_param(XSM_TARGET, d, op);
+        rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
         if ( rc )
             goto param_fail3;
 
@@ -4896,7 +4896,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail4;
 
-        rc = xsm_hvm_param(XSM_TARGET, d, op);
+        rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
         if ( rc )
             goto param_fail4;
 
@@ -5026,7 +5026,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail8;
 
-        rc = xsm_hvm_param(XSM_TARGET, d, op);
+        rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
         if ( rc )
             goto param_fail8;
 

@@ -137,6 +137,7 @@ struct xsm_operations {
 #endif
 
     int (*hvm_param) (struct domain *d, unsigned long op);
+    int (*hvm_control) (struct domain *d, unsigned long op);
     int (*hvm_param_nested) (struct domain *d);
 
 #ifdef CONFIG_X86
@@ -520,6 +521,11 @@ static inline int xsm_do_compat_op (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
 static inline int xsm_hvm_param (xsm_default_t def, struct domain *d, unsigned long op)
 {
     return xsm_ops->hvm_param(d, op);
+}
+
+static inline int xsm_hvm_control(xsm_default_t def, struct domain *d, unsigned long op)
+{
+    return xsm_ops->hvm_control(d, op);
 }
 
 static inline int xsm_hvm_param_nested (xsm_default_t def, struct domain *d)

@@ -47,7 +47,7 @@ int mem_access_memop(unsigned long cmd,
     if ( !is_hvm_domain(d) )
         goto out;
 
-    rc = xsm_mem_event_op(XSM_TARGET, d, XENMEM_access_op);
+    rc = xsm_mem_event_op(XSM_DM_PRIV, d, XENMEM_access_op);
     if ( rc )
         goto out;
 

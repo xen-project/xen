@@ -449,7 +449,7 @@ int do_mem_event_op(int op, uint32_t domain, void *arg)
     if ( ret )
         return ret;
 
-    ret = xsm_mem_event_op(XSM_TARGET, d, op);
+    ret = xsm_mem_event_op(XSM_DM_PRIV, d, op);
     if ( ret )
         goto out;
 

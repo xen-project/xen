@@ -1543,6 +1543,7 @@ static struct xsm_operations flask_ops = {
     .tmem_op = flask_tmem_op,
     .tmem_control = flask_tmem_control,
     .hvm_param = flask_hvm_param,
+    .hvm_control = flask_hvm_param,
     .hvm_param_nested = flask_hvm_param_nested,
 
     .do_xsm_op = do_flask_op,
