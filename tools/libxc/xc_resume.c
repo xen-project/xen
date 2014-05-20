@@ -33,9 +33,18 @@ static int modify_returncode(xc_interface *xch, uint32_t domid)
     struct domain_info_context *dinfo = &_dinfo;
     int rc;
 
-    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 )
+    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 ||
+         info.domid != domid )
     {
         PERROR("Could not get domain info");
+        return -1;
+    }
+
+    if ( !info.shutdown || (info.shutdown_reason != SHUTDOWN_suspend) )
+    {
+        ERROR("Dom %d not suspended: (shutdown %d, reason %d)", domid,
+              info.shutdown, info.shutdown_reason);
+        errno = EINVAL;
         return -1;
     }
 
