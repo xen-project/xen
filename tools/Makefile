@@ -187,7 +187,9 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 	cd qemu-xen-dir; \
 	$$source/configure --enable-xen --target-list=i386-softmmu \
 		$(QEMU_XEN_ENABLE_DEBUG) \
-		--prefix=$(PREFIX) \
+		--prefix=$(PREFIX)/lib/xen \
+		--libdir=$(PREFIX)/lib/xen/lib \
+		--includedir=$(PREFIX)/lib/xen/include \
 		--source-path=$$source \
 		--extra-cflags="-I$(XEN_ROOT)/tools/include \
 		-I$(XEN_ROOT)/tools/libxc \
@@ -195,7 +197,8 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		-I$(XEN_ROOT)/tools/xenstore/compat \
 		$(EXTRA_CFLAGS_QEMU_XEN)" \
 		--extra-ldflags="-L$(XEN_ROOT)/tools/libxc \
-		-L$(XEN_ROOT)/tools/xenstore" \
+		-L$(XEN_ROOT)/tools/xenstore \
+		-Wl,-rpath=$(PREFIX)/lib/xen/lib" \
 		--bindir=$(LIBEXEC) \
 		--datadir=$(SHAREDIR)/qemu-xen \
 		--localstatedir=/var \
