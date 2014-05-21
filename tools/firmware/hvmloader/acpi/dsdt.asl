@@ -45,7 +45,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
     Scope (\_SB)
     {
        /* ACPI_INFO_PHYSICAL_ADDRESS == 0xFC000000 */
-       OperationRegion(BIOS, SystemMemory, 0xFC000000, 24)
+       OperationRegion(BIOS, SystemMemory, 0xFC000000, 40)
        Field(BIOS, ByteAcc, NoLock, Preserve) {
            UAR1, 1,
            UAR2, 1,
@@ -56,7 +56,9 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
            PLEN, 32,
            MSUA, 32, /* MADT checksum address */
            MAPA, 32, /* MADT LAPIC0 address */
-           VGIA, 32  /* VM generation id address */
+           VGIA, 32, /* VM generation id address */
+           HMIN, 64,
+           HLEN, 64
        }
 
         /* Fix HCT test for 0x400 pci memory:
@@ -136,7 +138,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                     /* reserve memory for pci devices */
                     DWordMemory(
                         ResourceProducer, PosDecode, MinFixed, MaxFixed,
-                        Cacheable, ReadWrite,
+                        WriteCombining, ReadWrite,
                         0x00000000,
                         0x000A0000,
                         0x000BFFFF,
@@ -145,13 +147,24 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
 
                     DWordMemory(
                         ResourceProducer, PosDecode, MinFixed, MaxFixed,
-                        Cacheable, ReadWrite,
+                        NonCacheable, ReadWrite,
                         0x00000000,
                         0xF0000000,
                         0xF4FFFFFF,
                         0x00000000,
                         0x05000000,
                         ,, _Y01)
+
+                    QWordMemory (
+                        ResourceProducer, PosDecode, MinFixed, MaxFixed,
+                        NonCacheable, ReadWrite,
+                        0x0000000000000000,
+                        0x0000000000000000,
+                        0x0000000000000000,
+                        0x0000000000000000,
+                        0x0000000000000000,
+                        ,, _Y02)
+
                 })
 
                 CreateDWordField(PRT0, \_SB.PCI0._CRS._Y01._MIN, MMIN)
@@ -162,6 +175,17 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                 Store(\_SB.PLEN, MLEN)
                 Add(MMIN, MLEN, MMAX)
                 Subtract(MMAX, One, MMAX)
+
+                CreateQWordField(PRT0, \_SB.PCI0._CRS._Y02._MIN, HMIN)
+                CreateQWordField(PRT0, \_SB.PCI0._CRS._Y02._MAX, HMAX)
+                CreateQWordField(PRT0, \_SB.PCI0._CRS._Y02._LEN, HLEN)
+
+                Store(\_SB.HMIN, HMIN)
+                Store(\_SB.HLEN, HLEN)
+                Add(HMIN, HLEN, HMAX)
+                If(LOr(HMIN, HLEN)) {
+                    Subtract(HMAX, One, HMAX)
+                }
 
                 Return (PRT0)
             }

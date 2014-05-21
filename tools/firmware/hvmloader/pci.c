@@ -32,6 +32,7 @@
 
 unsigned long pci_mem_start = PCI_MEM_START;
 unsigned long pci_mem_end = PCI_MEM_END;
+uint64_t pci_hi_mem_start = 0, pci_hi_mem_end = 0;
 
 enum virtual_vga virtual_vga = VGA_none;
 unsigned long igd_opregion_pgbase = 0;
@@ -345,9 +346,8 @@ void pci_setup(void)
                 if ( high_mem_resource.base & (bar_sz - 1) )
                     high_mem_resource.base = high_mem_resource.base - 
                         (high_mem_resource.base & (bar_sz - 1)) + bar_sz;
-                else
-                    high_mem_resource.base = high_mem_resource.base - 
-                        (high_mem_resource.base & (bar_sz - 1));
+                if ( !pci_hi_mem_start )
+                    pci_hi_mem_start = high_mem_resource.base;
                 resource = &high_mem_resource;
                 bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
             } 
@@ -396,6 +396,16 @@ void pci_setup(void)
         else
             cmd |= PCI_COMMAND_IO;
         pci_writew(devfn, PCI_COMMAND, cmd);
+    }
+
+    if ( pci_hi_mem_start )
+    {
+        /*
+         * Make end address alignment match the start address one's so that
+         * fewer variable range MTRRs are needed to cover the range.
+         */
+        pci_hi_mem_end = ((high_mem_resource.base - 1) |
+                          ((pci_hi_mem_start & -pci_hi_mem_start) - 1)) + 1;
     }
 
     if ( vga_devfn != 256 )

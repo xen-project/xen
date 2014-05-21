@@ -97,8 +97,7 @@ void cacheattr_init(void)
     nr_var_ranges = (uint8_t)mtrr_cap;
     if ( nr_var_ranges != 0 )
     {
-        unsigned long base = pci_mem_start, size;
-        int i;
+        uint64_t base = pci_mem_start, size;
 
         for ( i = 0; (base != pci_mem_end) && (i < nr_var_ranges); i++ )
         {
@@ -109,8 +108,22 @@ void cacheattr_init(void)
                 size >>= 1;
 
             wrmsr(MSR_MTRRphysBase(i), base);
-            wrmsr(MSR_MTRRphysMask(i),
-                  (~(uint64_t)(size-1) & addr_mask) | (1u << 11));
+            wrmsr(MSR_MTRRphysMask(i), (~(size - 1) & addr_mask) | (1u << 11));
+
+            base += size;
+        }
+
+        for ( base = pci_hi_mem_start;
+              (base != pci_hi_mem_end) && (i < nr_var_ranges); i++ )
+        {
+            size = PAGE_SIZE;
+            while ( !(base & size) )
+                size <<= 1;
+            while ( (base + size < base) || (base + size > pci_hi_mem_end) )
+                size >>= 1;
+
+            wrmsr(MSR_MTRRphysBase(i), base);
+            wrmsr(MSR_MTRRphysMask(i), (~(size - 1) & addr_mask) | (1u << 11));
 
             base += size;
         }

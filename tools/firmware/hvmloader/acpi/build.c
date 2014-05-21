@@ -51,6 +51,7 @@ struct acpi_info {
     uint32_t madt_csum_addr;    /* 12   - Address of MADT checksum */
     uint32_t madt_lapic0_addr;  /* 16   - Address of first MADT LAPIC struct */
     uint32_t vm_gid_addr;       /* 20   - Address of VM generation id buffer */
+    uint64_t pci_hi_min, pci_hi_len; /* 24, 32 - PCI I/O hole boundaries */
 };
 
 /* Number of processor objects in the chosen DSDT. */
@@ -525,6 +526,11 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
     acpi_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
     acpi_info->pci_min = pci_mem_start;
     acpi_info->pci_len = pci_mem_end - pci_mem_start;
+    if ( pci_hi_mem_end > pci_hi_mem_start )
+    {
+        acpi_info->pci_hi_min = pci_hi_mem_start;
+        acpi_info->pci_hi_len = pci_hi_mem_end - pci_hi_mem_start;
+    }
 
     return;
 
