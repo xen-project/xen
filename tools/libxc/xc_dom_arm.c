@@ -272,6 +272,15 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         return -1;
     }
 
+    if ( ramsize > GUEST_RAM_SIZE - NR_MAGIC_PAGES*XC_PAGE_SIZE )
+    {
+        DOMPRINTF("%s: ram size is too large for guest address space: "
+                  "%"PRIx64" > %llx",
+                  __FUNCTION__, ramsize,
+                  GUEST_RAM_SIZE - NR_MAGIC_PAGES*XC_PAGE_SIZE);
+        return -1;
+    }
+
     rc = set_mode(dom->xch, dom->guest_domid, dom->guest_type);
     if ( rc )
         return rc;
