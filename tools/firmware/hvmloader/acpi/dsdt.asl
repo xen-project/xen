@@ -159,10 +159,10 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                         ResourceProducer, PosDecode, MinFixed, MaxFixed,
                         NonCacheable, ReadWrite,
                         0x0000000000000000,
+                        0x0000000FFFFFFFF0,
+                        0x0000000FFFFFFFFF,
                         0x0000000000000000,
-                        0x0000000000000000,
-                        0x0000000000000000,
-                        0x0000000000000000,
+                        0x0000000000000010,
                         ,, _Y02)
 
                 })
