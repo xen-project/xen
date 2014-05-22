@@ -256,11 +256,10 @@ static int make_psci_node(libxl__gc *gc, void *fdt)
 }
 
 static int make_memory_node(libxl__gc *gc, void *fdt,
-                            unsigned long long base,
-                            unsigned long long size)
+                            uint64_t base, uint64_t size)
 {
     int res;
-    const char *name = GCSPRINTF("memory@%08llx", base);
+    const char *name = GCSPRINTF("memory@%"PRIx64, base);
 
     res = fdt_begin_node(fdt, name);
     if (res) return res;
@@ -269,7 +268,7 @@ static int make_memory_node(libxl__gc *gc, void *fdt,
     if (res) return res;
 
     res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
-                            1, (uint64_t)base, (uint64_t)size);
+                            1, base, size);
     if (res) return res;
 
     res = fdt_end_node(fdt);
@@ -279,13 +278,11 @@ static int make_memory_node(libxl__gc *gc, void *fdt,
 }
 
 static int make_intc_node(libxl__gc *gc, void *fdt,
-                          unsigned long long gicd_base,
-                          unsigned long long gicd_size,
-                          unsigned long long gicc_base,
-                          unsigned long long gicc_size)
+                          uint64_t gicd_base, uint64_t gicd_size,
+                          uint64_t gicc_base, uint64_t gicc_size)
 {
     int res;
-    const char *name = GCSPRINTF("interrupt-controller@%08llx", gicd_base);
+    const char *name = GCSPRINTF("interrupt-controller@%"PRIx64, gicd_base);
 
     res = fdt_begin_node(fdt, name);
     if (res) return res;
@@ -307,8 +304,8 @@ static int make_intc_node(libxl__gc *gc, void *fdt,
 
     res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
                             2,
-                            (uint64_t)gicd_base, (uint64_t)gicd_size,
-                            (uint64_t)gicc_base, (uint64_t)gicc_size);
+                            gicd_base, gicd_size,
+                            gicc_base, gicc_size);
     if (res) return res;
 
     res = fdt_property_cell(fdt, "linux,phandle", PHANDLE_GIC);
