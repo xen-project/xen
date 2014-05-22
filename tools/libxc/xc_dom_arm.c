@@ -18,6 +18,7 @@
  * Copyright (c) 2011, Citrix Systems
  */
 #include <inttypes.h>
+#include <assert.h>
 
 #include <xen/xen.h>
 #include <xen/io/protocols.h>
@@ -279,17 +280,16 @@ static int populate_guest_memory(struct xc_dom_image *dom,
 
 int arch_setup_meminit(struct xc_dom_image *dom)
 {
-    int rc;
+    int i, rc;
     xen_pfn_t pfn;
     uint64_t modbase;
 
+    uint64_t ramsize = (uint64_t)dom->total_pages << XC_PAGE_SHIFT;
+
+    const uint64_t bankbase[] = GUEST_RAM_BANK_BASES;
+    const uint64_t bankmax[] = GUEST_RAM_BANK_SIZES;
+
     /* Convenient */
-    const uint64_t rambase = dom->rambase_pfn << XC_PAGE_SHIFT;
-    const uint64_t ramsize = dom->total_pages << XC_PAGE_SHIFT;
-    const uint64_t ramend = rambase + ramsize;
-
-    const xen_pfn_t p2m_size = dom->total_pages;
-
     const uint64_t kernbase = dom->kernel_seg.vstart;
     const uint64_t kernend = ROUNDUP(dom->kernel_seg.vend, 21/*2MB*/);
     const uint64_t kernsize = kernend - kernbase;
@@ -298,20 +298,32 @@ int arch_setup_meminit(struct xc_dom_image *dom)
     const uint64_t ramdisk_size = dom->ramdisk_blob ?
         ROUNDUP(dom->ramdisk_size, XC_PAGE_SHIFT) : 0;
     const uint64_t modsize = dtb_size + ramdisk_size;
-    const uint64_t ram128mb = rambase + (128<<20);
+    const uint64_t ram128mb = bankbase[0] + (128<<20);
 
-    if ( modsize + kernsize > ramsize )
+    xen_pfn_t p2m_size;
+    xen_pfn_t rambank_size[GUEST_RAM_BANKS];
+    uint64_t bank0end;
+
+    assert(dom->rambase_pfn << XC_PAGE_SHIFT == bankbase[0]);
+
+    if ( modsize + kernsize > bankmax[0] )
     {
         DOMPRINTF("%s: Not enough memory for the kernel+dtb+initrd",
                   __FUNCTION__);
         return -1;
     }
 
-    if ( ramsize > GUEST_RAM_SIZE )
+    if ( ramsize == 0 )
+    {
+        DOMPRINTF("%s: ram size is 0", __FUNCTION__);
+        return -1;
+    }
+
+    if ( ramsize > GUEST_RAM_MAX )
     {
         DOMPRINTF("%s: ram size is too large for guest address space: "
                   "%"PRIx64" > %llx",
-                  __FUNCTION__, ramsize, GUEST_RAM_SIZE);
+                  __FUNCTION__, ramsize, GUEST_RAM_MAX);
         return -1;
     }
 
@@ -321,6 +333,20 @@ int arch_setup_meminit(struct xc_dom_image *dom)
 
     dom->shadow_enabled = 1;
 
+    for ( i = 0; ramsize && i < GUEST_RAM_BANKS; i++ )
+    {
+        uint64_t banksize = ramsize > bankmax[i] ? bankmax[i] : ramsize;
+
+        ramsize -= banksize;
+
+        p2m_size = ( bankbase[i] + banksize - bankbase[0] ) >> XC_PAGE_SHIFT;
+
+        rambank_size[i] = banksize >> XC_PAGE_SHIFT;
+    }
+
+    assert(rambank_size[0] != 0);
+    assert(ramsize == 0); /* Too much RAM is rejected above */
+
     dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * p2m_size);
     if ( dom->p2m_host == NULL )
         return -EINVAL;
@@ -328,10 +354,13 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         dom->p2m_host[pfn] = INVALID_MFN;
 
     /* setup initial p2m and allocate guest memory */
-    if ((rc = populate_guest_memory(dom,
-                                    GUEST_RAM_BASE >> XC_PAGE_SHIFT,
-                                    ramsize >> XC_PAGE_SHIFT)))
-        return rc;
+    for ( i = 0; rambank_size[i] && i < GUEST_RAM_BANKS; i++ )
+    {
+        if ((rc = populate_guest_memory(dom,
+                                        bankbase[i] >> XC_PAGE_SHIFT,
+                                        rambank_size[i])))
+            return rc;
+    }
 
     /*
      * We try to place dtb+initrd at 128MB or if we have less RAM
@@ -341,11 +370,13 @@ int arch_setup_meminit(struct xc_dom_image *dom)
      * If changing this then consider
      * xen/arch/arm/kernel.c:place_modules as well.
      */
-    if ( ramend >= ram128mb + modsize && kernend < ram128mb )
+    bank0end = bankbase[0] + ((uint64_t)rambank_size[0] << XC_PAGE_SHIFT);
+
+    if ( bank0end >= ram128mb + modsize && kernend < ram128mb )
         modbase = ram128mb;
-    else if ( ramend - modsize > kernend )
-        modbase = ramend - modsize;
-    else if (kernbase - rambase > modsize )
+    else if ( bank0end - modsize > kernend )
+        modbase = bank0end - modsize;
+    else if (kernbase - bankbase[0] > modsize )
         modbase = kernbase - modsize;
     else
         return -1;

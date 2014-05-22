@@ -375,8 +375,17 @@ typedef uint64_t xen_callback_t;
 #define GUEST_MAGIC_BASE  0x39000000ULL
 #define GUEST_MAGIC_SIZE  0x01000000ULL
 
-#define GUEST_RAM_BASE    0x40000000ULL /* 3GB of RAM @ 1GB */
-#define GUEST_RAM_SIZE    0xc0000000ULL
+#define GUEST_RAM_BANKS   1
+
+#define GUEST_RAM0_BASE   0x40000000ULL /* 3GB of RAM @ 1GB */
+#define GUEST_RAM0_SIZE   0xc0000000ULL
+
+#define GUEST_RAM_BASE    GUEST_RAM0_BASE /* Lowest RAM address */
+/* Largest amount of actual RAM, not including holes */
+#define GUEST_RAM_MAX     (GUEST_RAM0_SIZE)
+/* Suitable for e.g. const uint64_t ramfoo[] = GUEST_RAM_BANK_FOOS; */
+#define GUEST_RAM_BANK_BASES   { GUEST_RAM0_BASE }
+#define GUEST_RAM_BANK_SIZES   { GUEST_RAM0_SIZE }
 
 /* Interrupts */
 #define GUEST_TIMER_VIRT_PPI    27
