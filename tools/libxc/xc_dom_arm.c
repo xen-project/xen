@@ -248,16 +248,48 @@ static int set_mode(xc_interface *xch, domid_t domid, char *guest_type)
     return rc;
 }
 
+static int populate_guest_memory(struct xc_dom_image *dom,
+                                 xen_pfn_t base_pfn, xen_pfn_t nr_pfns)
+{
+    int rc;
+    xen_pfn_t allocsz, pfn;
+
+    DOMPRINTF("%s: populating RAM @ %016"PRIx64"-%016"PRIx64" (%"PRId64"MB)",
+              __FUNCTION__,
+              (uint64_t)base_pfn << XC_PAGE_SHIFT,
+              (uint64_t)(base_pfn + nr_pfns) << XC_PAGE_SHIFT,
+              (uint64_t)nr_pfns >> (20-XC_PAGE_SHIFT));
+
+    for ( pfn = 0; pfn < nr_pfns; pfn++ )
+        dom->p2m_host[pfn] = base_pfn + pfn;
+
+    for ( pfn = rc = allocsz = 0; (pfn < nr_pfns) && !rc; pfn += allocsz )
+    {
+        allocsz = nr_pfns - pfn;
+        if ( allocsz > 1024*1024 )
+            allocsz = 1024*1024;
+
+        rc = xc_domain_populate_physmap_exact(
+            dom->xch, dom->guest_domid, allocsz,
+            0, 0, &dom->p2m_host[pfn]);
+    }
+
+    return rc;
+}
+
 int arch_setup_meminit(struct xc_dom_image *dom)
 {
     int rc;
-    xen_pfn_t pfn, allocsz, i;
+    xen_pfn_t pfn;
     uint64_t modbase;
 
     /* Convenient */
     const uint64_t rambase = dom->rambase_pfn << XC_PAGE_SHIFT;
     const uint64_t ramsize = dom->total_pages << XC_PAGE_SHIFT;
     const uint64_t ramend = rambase + ramsize;
+
+    const xen_pfn_t p2m_size = dom->total_pages;
+
     const uint64_t kernbase = dom->kernel_seg.vstart;
     const uint64_t kernend = ROUNDUP(dom->kernel_seg.vend, 21/*2MB*/);
     const uint64_t kernsize = kernend - kernbase;
@@ -289,27 +321,17 @@ int arch_setup_meminit(struct xc_dom_image *dom)
 
     dom->shadow_enabled = 1;
 
-    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
+    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * p2m_size);
     if ( dom->p2m_host == NULL )
         return -EINVAL;
+    for ( pfn = 0; pfn < p2m_size; pfn++ )
+        dom->p2m_host[pfn] = INVALID_MFN;
 
-    /* setup initial p2m */
-    for ( pfn = 0; pfn < dom->total_pages; pfn++ )
-        dom->p2m_host[pfn] = pfn + dom->rambase_pfn;
-
-    /* allocate guest memory */
-    for ( i = rc = allocsz = 0;
-          (i < dom->total_pages) && !rc;
-          i += allocsz )
-    {
-        allocsz = dom->total_pages - i;
-        if ( allocsz > 1024*1024 )
-            allocsz = 1024*1024;
-
-        rc = xc_domain_populate_physmap_exact(
-            dom->xch, dom->guest_domid, allocsz,
-            0, 0, &dom->p2m_host[i]);
-    }
+    /* setup initial p2m and allocate guest memory */
+    if ((rc = populate_guest_memory(dom,
+                                    GUEST_RAM_BASE >> XC_PAGE_SHIFT,
+                                    ramsize >> XC_PAGE_SHIFT)))
+        return rc;
 
     /*
      * We try to place dtb+initrd at 128MB or if we have less RAM
