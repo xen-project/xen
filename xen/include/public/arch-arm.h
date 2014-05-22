@@ -369,8 +369,11 @@ typedef uint64_t xen_callback_t;
 #define GUEST_GICC_BASE   0x03002000ULL
 #define GUEST_GICC_SIZE   0x00000100ULL
 
+/* 16MB == 4096 pages reserved for guest to use as a region to map its
+ * grant table in.
+ */
 #define GUEST_GNTTAB_BASE 0x38000000ULL
-#define GUEST_GNTTAB_SIZE 0x00020000ULL
+#define GUEST_GNTTAB_SIZE 0x01000000ULL
 
 #define GUEST_MAGIC_BASE  0x39000000ULL
 #define GUEST_MAGIC_SIZE  0x01000000ULL
