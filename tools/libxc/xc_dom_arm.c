@@ -58,12 +58,15 @@ static int setup_pgtables_arm(struct xc_dom_image *dom)
 static int alloc_magic_pages(struct xc_dom_image *dom)
 {
     int rc, i;
+    const xen_pfn_t base = GUEST_MAGIC_BASE >> XC_PAGE_SHIFT;
     xen_pfn_t p2m[NR_MAGIC_PAGES];
+
+    XC_BUILD_BUG_ON(NR_MAGIC_PAGES > GUEST_MAGIC_SIZE >> XC_PAGE_SHIFT);
 
     DOMPRINTF_CALLED(dom->xch);
 
     for (i = 0; i < NR_MAGIC_PAGES; i++)
-        p2m[i] = dom->rambase_pfn + dom->total_pages + i;
+        p2m[i] = base + i;
 
     rc = xc_domain_populate_physmap_exact(
             dom->xch, dom->guest_domid, NR_MAGIC_PAGES,
@@ -71,8 +74,8 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
     if ( rc < 0 )
         return rc;
 
-    dom->console_pfn = dom->rambase_pfn + dom->total_pages + CONSOLE_PFN_OFFSET;
-    dom->xenstore_pfn = dom->rambase_pfn + dom->total_pages + XENSTORE_PFN_OFFSET;
+    dom->console_pfn = base + CONSOLE_PFN_OFFSET;
+    dom->xenstore_pfn = base + XENSTORE_PFN_OFFSET;
 
     xc_clear_domain_page(dom->xch, dom->guest_domid, dom->console_pfn);
     xc_clear_domain_page(dom->xch, dom->guest_domid, dom->xenstore_pfn);
@@ -272,12 +275,11 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         return -1;
     }
 
-    if ( ramsize > GUEST_RAM_SIZE - NR_MAGIC_PAGES*XC_PAGE_SIZE )
+    if ( ramsize > GUEST_RAM_SIZE )
     {
         DOMPRINTF("%s: ram size is too large for guest address space: "
                   "%"PRIx64" > %llx",
-                  __FUNCTION__, ramsize,
-                  GUEST_RAM_SIZE - NR_MAGIC_PAGES*XC_PAGE_SIZE);
+                  __FUNCTION__, ramsize, GUEST_RAM_SIZE);
         return -1;
     }
 

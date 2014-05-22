@@ -375,6 +375,9 @@ typedef uint64_t xen_callback_t;
 #define GUEST_GNTTAB_BASE 0xb0000000ULL
 #define GUEST_GNTTAB_SIZE 0x00020000ULL
 
+#define GUEST_MAGIC_BASE  0xc0000000ULL
+#define GUEST_MAGIC_SIZE  0x01000000ULL
+
 /* Interrupts */
 #define GUEST_TIMER_VIRT_PPI    27
 #define GUEST_TIMER_PHYS_S_PPI  29
