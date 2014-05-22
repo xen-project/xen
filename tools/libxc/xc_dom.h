@@ -114,13 +114,21 @@ struct xc_dom_image {
 
     /* physical memory
      *
-     * A PV guest has a single contiguous block of physical RAM,
+     * An x86 PV guest has a single contiguous block of physical RAM,
      * consisting of total_pages starting at rambase_pfn.
+     *
+     * An ARM guest has GUEST_RAM_BANKS regions of RAM, with
+     * rambank_size[i] pages in each. The lowest RAM address
+     * (corresponding to the base of the p2m arrays above) is stored
+     * in rambase_pfn.
      */
     xen_pfn_t rambase_pfn;
     xen_pfn_t total_pages;
     struct xc_dom_phys *phys_pages;
     int realmodearea_log;
+#if defined (__arm__) || defined(__aarch64__)
+    xen_pfn_t rambank_size[GUEST_RAM_BANKS];
+#endif
 
     /* malloc memory pool */
     struct xc_dom_mem *memblocks;

@@ -301,7 +301,6 @@ int arch_setup_meminit(struct xc_dom_image *dom)
     const uint64_t ram128mb = bankbase[0] + (128<<20);
 
     xen_pfn_t p2m_size;
-    xen_pfn_t rambank_size[GUEST_RAM_BANKS];
     uint64_t bank0end;
 
     assert(dom->rambase_pfn << XC_PAGE_SHIFT == bankbase[0]);
@@ -341,10 +340,10 @@ int arch_setup_meminit(struct xc_dom_image *dom)
 
         p2m_size = ( bankbase[i] + banksize - bankbase[0] ) >> XC_PAGE_SHIFT;
 
-        rambank_size[i] = banksize >> XC_PAGE_SHIFT;
+        dom->rambank_size[i] = banksize >> XC_PAGE_SHIFT;
     }
 
-    assert(rambank_size[0] != 0);
+    assert(dom->rambank_size[0] != 0);
     assert(ramsize == 0); /* Too much RAM is rejected above */
 
     dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * p2m_size);
@@ -354,11 +353,11 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         dom->p2m_host[pfn] = INVALID_MFN;
 
     /* setup initial p2m and allocate guest memory */
-    for ( i = 0; rambank_size[i] && i < GUEST_RAM_BANKS; i++ )
+    for ( i = 0; dom->rambank_size[i] && i < GUEST_RAM_BANKS; i++ )
     {
         if ((rc = populate_guest_memory(dom,
                                         bankbase[i] >> XC_PAGE_SHIFT,
-                                        rambank_size[i])))
+                                        dom->rambank_size[i])))
             return rc;
     }
 
@@ -370,7 +369,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
      * If changing this then consider
      * xen/arch/arm/kernel.c:place_modules as well.
      */
-    bank0end = bankbase[0] + ((uint64_t)rambank_size[0] << XC_PAGE_SHIFT);
+    bank0end = bankbase[0] + ((uint64_t)dom->rambank_size[0] << XC_PAGE_SHIFT);
 
     if ( bank0end >= ram128mb + modsize && kernend < ram128mb )
         modbase = ram128mb;
