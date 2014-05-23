@@ -385,7 +385,7 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
  *   - This can cause system failure upon non-fatal VT-d faults
  *   - Potential security issue if malicious guest trigger VT-d faults
  */
-void __init pci_vtd_quirk(struct pci_dev *pdev)
+void pci_vtd_quirk(const struct pci_dev *pdev)
 {
     int seg = pdev->seg;
     int bus = pdev->bus;
