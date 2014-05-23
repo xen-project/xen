@@ -379,12 +379,6 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
     }
 }
 
-/*
- * Mask reporting Intel VT-d faults to IOH core logic:
- *   - Some platform escalates VT-d faults to platform errors 
- *   - This can cause system failure upon non-fatal VT-d faults
- *   - Potential security issue if malicious guest trigger VT-d faults
- */
 void pci_vtd_quirk(const struct pci_dev *pdev)
 {
     int seg = pdev->seg;
@@ -402,10 +396,20 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
 
     switch ( pci_conf_read16(seg, bus, dev, func, PCI_DEVICE_ID) )
     {
+    /*
+     * Mask reporting Intel VT-d faults to IOH core logic:
+     *   - Some platform escalates VT-d faults to platform errors.
+     *   - This can cause system failure upon non-fatal VT-d faults.
+     *   - Potential security issue if malicious guest trigger VT-d faults.
+     */
+    case 0x0e28: /* Xeon-E5v2 (IvyBridge) */
     case 0x342e: /* Tylersburg chipset (Nehalem / Westmere systems) */
+    case 0x3728: /* Xeon C5500/C3500 (JasperForest) */
     case 0x3c28: /* Sandybridge */
         val = pci_conf_read32(seg, bus, dev, func, 0x1AC);
         pci_conf_write32(seg, bus, dev, func, 0x1AC, val | (1 << 31));
+        printk(XENLOG_INFO "Masked VT-d error signaling on %04x:%02x:%02x.%u\n",
+               seg, bus, dev, func);
         break;
 
     /* Tylersburg (EP)/Boxboro (MP) chipsets (NHM-EP/EX, WSM-EP/EX) */
