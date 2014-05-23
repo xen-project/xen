@@ -539,6 +539,8 @@ int domain_kill(struct domain *d)
             BUG_ON(rc != -EAGAIN);
             break;
         }
+        if ( sched_move_domain(d, cpupool0) )
+            return -EAGAIN;
         for_each_vcpu ( d, v )
             unmap_vcpu_info(v);
         d->is_dying = DOMDYING_dead;
@@ -721,8 +723,6 @@ static void complete_domain_destroy(struct rcu_head *head)
 
     sched_destroy_domain(d);
 
-    cpupool_rm_domain(d);
-
     /* Free page used by xen oprofile buffer. */
 #ifdef CONFIG_XENOPROF
     free_xenoprof_pages(d);
@@ -769,6 +769,8 @@ void domain_destroy(struct domain *d)
     old = atomic_compareandswap(old, new, &d->refcnt);
     if ( _atomic_read(old) != 0 )
         return;
+
+    cpupool_rm_domain(d);
 
     /* Delete from task list and task hashtable. */
     TRACE_1D(TRC_SCHED_DOM_REM, d->domain_id);
