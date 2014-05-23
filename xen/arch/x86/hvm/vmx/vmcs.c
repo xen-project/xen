@@ -828,8 +828,12 @@ void virtual_vmcs_enter(void *vvmcs)
 
 void virtual_vmcs_exit(void *vvmcs)
 {
+    struct vmcs_struct *cur = this_cpu(current_vmcs);
+
     __vmpclear(pfn_to_paddr(domain_page_map_to_mfn(vvmcs)));
-    __vmptrld(virt_to_maddr(this_cpu(current_vmcs)));
+    if ( cur )
+        __vmptrld(virt_to_maddr(cur));
+
 }
 
 u64 virtual_vmcs_vmread(void *vvmcs, u32 vmcs_encoding)
