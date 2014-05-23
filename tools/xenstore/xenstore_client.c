@@ -40,6 +40,7 @@ enum mode {
 
 static char *output_buf = NULL;
 static int output_pos = 0;
+static struct expanding_buffer ebuf;
 
 static int output_size = 0;
 
@@ -126,7 +127,6 @@ static int show_whole_path = 0;
 
 static void do_ls(struct xs_handle *h, char *path, int cur_depth, int show_perms)
 {
-    static struct expanding_buffer ebuf;
     char **e;
     char newpath[STRING_MAX], *val;
     int newpath_len;
@@ -308,7 +308,6 @@ perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh
             /* CANNOT BE REACHED */
             errx(1, "invalid mode %d", mode);
         case MODE_read: {
-            static struct expanding_buffer ebuf;
             unsigned len;
             char *val = xs_read(xsh, xth, argv[optind], &len);
             if (val == NULL) {
@@ -323,7 +322,6 @@ perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh
             break;
         }
         case MODE_write: {
-            static struct expanding_buffer ebuf;
             char *val_spec = argv[optind + 1];
             unsigned len;
             expanding_buffer_ensure(&ebuf, strlen(val_spec)+1);
@@ -654,6 +652,12 @@ again:
 
     if (output_pos)
 	printf("%s", output_buf);
+
+    free(output_buf);
+    free(ebuf.buf);
+
+    if (xsh)
+        xs_close(xsh);
 
     return ret;
 }
