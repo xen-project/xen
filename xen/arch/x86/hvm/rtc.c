@@ -94,13 +94,31 @@ bool_t rtc_periodic_interrupt(void *opaque)
     {
         /* VM is ignoring its RTC; no point in running the timer */
         destroy_periodic_time(&s->pt);
-        s->pt_code = 0;
+        s->period = 0;
     }
     if ( !(s->hw.cmos_data[RTC_REG_C] & RTC_IRQF) )
         ret = 0;
     spin_unlock(&s->lock);
 
     return ret;
+}
+
+/* Check whether the REG_C.PF bit should have been set by a tick since
+ * the last time we looked. This is used to track ticks when REG_B.PIE
+ * is clear; when PIE is set, PF ticks are handled by the VPT callbacks.  */
+static void check_for_pf_ticks(RTCState *s)
+{
+    s_time_t now;
+
+    if ( s->period == 0 || (s->hw.cmos_data[RTC_REG_B] & RTC_PIE) )
+        return;
+
+    now = NOW();
+    if ( (now - s->start_time) / s->period
+         != (s->check_ticks_since - s->start_time) / s->period )
+        s->hw.cmos_data[RTC_REG_C] |= RTC_PF;
+
+    s->check_ticks_since = now;
 }
 
 /* Enable/configure/disable the periodic timer based on the RTC_PIE and
@@ -125,24 +143,29 @@ static void rtc_timer_update(RTCState *s)
     case RTC_REF_CLCK_4MHZ:
         if ( period_code != 0 )
         {
-            if ( period_code != s->pt_code )
+            period = 1 << (period_code - 1); /* period in 32 Khz cycles */
+            period = DIV_ROUND(period * 1000000000ULL, 32768); /* in ns */
+            if ( period != s->period )
             {
-                s->pt_code = period_code;
-                period = 1 << (period_code - 1); /* period in 32 Khz cycles */
-                period = DIV_ROUND(period * 1000000000ULL, 32768); /* in ns */
+                s_time_t now = NOW();
+
+                s->period = period;
                 if ( v->domain->arch.hvm_domain.params[HVM_PARAM_VPT_ALIGN] )
                     delta = 0;
                 else
-                    delta = period - ((NOW() - s->start_time) % period);
-                create_periodic_time(v, &s->pt, delta, period,
-                                     RTC_IRQ, NULL, s);
+                    delta = period - ((now - s->start_time) % period);
+                if ( s->hw.cmos_data[RTC_REG_B] & RTC_PIE )
+                    create_periodic_time(v, &s->pt, delta, period,
+                                         RTC_IRQ, NULL, s);
+                else
+                    s->check_ticks_since = now;
             }
             break;
         }
         /* fall through */
     default:
         destroy_periodic_time(&s->pt);
-        s->pt_code = 0;
+        s->period = 0;
         break;
     }
 }
@@ -484,14 +507,19 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
             if ( orig & RTC_SET )
                 rtc_set_time(s);
         }
+        check_for_pf_ticks(s);
         s->hw.cmos_data[RTC_REG_B] = data;
         /*
          * If the interrupt is already set when the interrupt becomes
          * enabled, raise an interrupt immediately.
          */
         rtc_update_irq(s);
-        if ( (data & RTC_PIE) && !(orig & RTC_PIE) )
+        if ( (data ^ orig) & RTC_PIE )
+        {
+            destroy_periodic_time(&s->pt);
+            s->period = 0;
             rtc_timer_update(s);
+        }
         if ( (data ^ orig) & RTC_SET )
             check_update_timer(s);
         if ( (data ^ orig) & (RTC_24H | RTC_DM_BINARY | RTC_SET) )
@@ -645,6 +673,7 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
             ret |= RTC_UIP;
         break;
     case RTC_REG_C:
+        check_for_pf_ticks(s);
         ret = s->hw.cmos_data[s->hw.cmos_index];
         s->hw.cmos_data[RTC_REG_C] = 0x00;
         if ( (ret & RTC_IRQF) && !rtc_mode_is(s, no_ack) )
@@ -652,7 +681,7 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
         rtc_update_irq(s);
         check_update_timer(s);
         alarm_timer_update(s);
-        rtc_timer_update(s);
+        s->pt_dead_ticks = 0;
         break;
     default:
         ret = s->hw.cmos_data[s->hw.cmos_index];
@@ -748,7 +777,7 @@ void rtc_reset(struct domain *d)
     RTCState *s = domain_vrtc(d);
 
     destroy_periodic_time(&s->pt);
-    s->pt_code = 0;
+    s->period = 0;
     s->pt.source = PTSRC_isa;
 }
 
