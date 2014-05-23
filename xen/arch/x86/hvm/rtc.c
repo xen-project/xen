@@ -673,9 +673,8 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
         check_for_pf_ticks(s);
         ret = s->hw.cmos_data[s->hw.cmos_index];
         s->hw.cmos_data[RTC_REG_C] = 0x00;
-        if ( (ret & RTC_IRQF) && !rtc_mode_is(s, no_ack) )
+        if ( ret & RTC_IRQF )
             hvm_isa_irq_deassert(d, RTC_IRQ);
-        rtc_update_irq(s);
         check_update_timer(s);
         alarm_timer_update(s);
         s->pt_dead_ticks = 0;
