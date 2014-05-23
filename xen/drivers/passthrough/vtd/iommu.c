@@ -1513,6 +1513,9 @@ static int domain_context_mapping(
         break;
     }
 
+    if ( !ret && devfn == pdev->devfn )
+        pci_vtd_quirk(pdev);
+
     return ret;
 }
 
@@ -1953,6 +1956,8 @@ static int intel_iommu_enable_device(struct pci_dev *pdev)
     struct acpi_drhd_unit *drhd = acpi_find_matched_drhd_unit(pdev);
     int ret = drhd ? ats_device(pdev, drhd) : -ENODEV;
 
+    pci_vtd_quirk(pdev);
+
     if ( ret <= 0 )
         return ret;
 
@@ -2026,7 +2031,6 @@ static int intel_iommu_remove_device(struct pci_dev *pdev)
 static void __init setup_dom0_device(struct pci_dev *pdev)
 {
     domain_context_mapping(pdev->domain, pdev->seg, pdev->bus, pdev->devfn);
-    pci_vtd_quirk(pdev);
 }
 
 void clear_fault_bits(struct iommu *iommu)
