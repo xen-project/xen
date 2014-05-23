@@ -231,12 +231,9 @@ int pt_update_irq(struct vcpu *v)
     struct periodic_time *pt, *temp, *earliest_pt;
     uint64_t max_lag;
     int irq, is_lapic;
-    void *pt_priv;
 
- rescan:
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
- rescan_locked:
     earliest_pt = NULL;
     max_lag = -1ULL;
     list_for_each_entry_safe ( pt, temp, head, list )
@@ -270,48 +267,11 @@ int pt_update_irq(struct vcpu *v)
     earliest_pt->irq_issued = 1;
     irq = earliest_pt->irq;
     is_lapic = (earliest_pt->source == PTSRC_lapic);
-    pt_priv = earliest_pt->priv;
 
     spin_unlock(&v->arch.hvm_vcpu.tm_lock);
 
     if ( is_lapic )
         vlapic_set_irq(vcpu_vlapic(v), irq, 0);
-    else if ( irq == RTC_IRQ && pt_priv )
-    {
-        if ( !rtc_periodic_interrupt(pt_priv) )
-            irq = -1;
-
-        pt_lock(earliest_pt);
-
-        if ( irq < 0 && earliest_pt->pending_intr_nr )
-        {
-            /*
-             * RTC periodic timer runs without the corresponding interrupt
-             * being enabled - need to mimic enough of pt_intr_post() to keep
-             * things going.
-             */
-            earliest_pt->pending_intr_nr = 0;
-            earliest_pt->irq_issued = 0;
-            set_timer(&earliest_pt->timer, earliest_pt->scheduled);
-        }
-        else if ( irq >= 0 && pt_irq_masked(earliest_pt) )
-        {
-            if ( earliest_pt->on_list )
-            {
-                /* suspend timer emulation */
-                list_del(&earliest_pt->list);
-                earliest_pt->on_list = 0;
-            }
-            irq = -1;
-        }
-
-        /* Avoid dropping the lock if we can. */
-        if ( irq < 0 && v == earliest_pt->vcpu )
-            goto rescan_locked;
-        pt_unlock(earliest_pt);
-        if ( irq < 0 )
-            goto rescan;
-    }
     else
     {
         hvm_isa_irq_deassert(v->domain, irq);
