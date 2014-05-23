@@ -233,6 +233,29 @@ int parseNetDevLine(char *line, char *iface, unsigned long long *rxBytes, unsign
 	return 0;
 }
 
+/* Find out the domid and network number given an interface name.
+ * Return 0 if the iface cannot be recognized as a Xen VIF. */
+static int get_iface_domid_network(const char *iface, unsigned int *domid_p, unsigned int *netid_p)
+{
+	char nodename_path[48];
+	FILE * nodename_file;
+	int ret;
+
+	snprintf(nodename_path, 48, "/sys/class/net/%s/device/nodename", iface);
+	nodename_file = fopen(nodename_path, "r");
+	if (nodename_file != NULL) {
+		ret = fscanf(nodename_file, "backend/vif/%u/%u", domid_p, netid_p);
+		fclose(nodename_file);
+		if (ret == 2)
+			return 1;
+	}
+
+	if (sscanf(iface, "vif%u.%u", domid_p, netid_p) == 2)
+		return 1;
+
+	return 0;
+}
+
 /* Collect information about networks */
 int xenstat_collect_networks(xenstat_node * node)
 {
@@ -309,8 +332,7 @@ int xenstat_collect_networks(xenstat_node * node)
 			}
 		}
 		else /* Otherwise we need to preserve old behaviour */
-		if (strstr(iface, "vif") != NULL) {
-			sscanf(iface, "vif%u.%u", &domid, &net.id);
+		if (get_iface_domid_network(iface, &domid, &net.id)) {
 
 			net.tbytes = txBytes;
 			net.tpackets = txPackets;
