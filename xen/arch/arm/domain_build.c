@@ -11,6 +11,7 @@
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/guest_access.h>
+#include <xen/iocap.h>
 #include <asm/device.h>
 #include <asm/setup.h>
 #include <asm/platform.h>
@@ -763,6 +764,16 @@ static int map_device(struct domain *d, struct dt_device_node *dev)
         DPRINT("addr %u = 0x%"PRIx64" - 0x%"PRIx64"\n",
                i, addr, addr + size - 1);
 
+        res = iomem_permit_access(d, paddr_to_pfn(addr & PAGE_MASK),
+                                  paddr_to_pfn(PAGE_ALIGN(addr + size - 1)));
+        if ( res )
+        {
+            printk(XENLOG_ERR "Unable to permit to dom%d access to"
+                   " 0x%"PRIx64" - 0x%"PRIx64"\n",
+                   d->domain_id,
+                   addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1);
+            return res;
+        }
         res = map_mmio_regions(d, addr & PAGE_MASK,
                                PAGE_ALIGN(addr + size) - 1,
                                addr & PAGE_MASK);
