@@ -383,6 +383,8 @@ static int erst_get_erange(struct erst_erange *range)
 	return 0;
 }
 
+#ifndef NDEBUG /* currently dead code */
+
 static ssize_t __erst_get_record_count(void)
 {
 	struct apei_exec_context ctx;
@@ -446,6 +448,8 @@ int erst_get_next_record_id(u64 *record_id)
 
 	return rc;
 }
+
+#endif /* currently dead code */
 
 static int __erst_write_to_storage(u64 offset)
 {
@@ -777,21 +781,27 @@ int __init erst_init(void)
 {
 	int rc = 0;
 	acpi_status status;
+	acpi_physical_address erst_addr;
+	acpi_native_uint erst_len;
 	struct apei_exec_context ctx;
 
 	if (acpi_disabled)
 		return -ENODEV;
 
-	status = acpi_get_table(ACPI_SIG_ERST, 0,
-				(struct acpi_table_header **)&erst_tab);
+	status = acpi_get_table_phys(ACPI_SIG_ERST, 0, &erst_addr, &erst_len);
 	if (status == AE_NOT_FOUND) {
 		printk(KERN_INFO "ERST table was not found\n");
 		return -ENODEV;
-	} else if (ACPI_FAILURE(status)) {
+	}
+	if (ACPI_FAILURE(status)) {
 		const char *msg = acpi_format_exception(status);
 		printk(KERN_WARNING "Failed to get ERST table: %s\n", msg);
 		return -EINVAL;
 	}
+	map_pages_to_xen((unsigned long)__va(erst_addr), PFN_DOWN(erst_addr),
+			 PFN_UP(erst_addr + erst_len) - PFN_DOWN(erst_addr),
+			 PAGE_HYPERVISOR);
+	erst_tab = __va(erst_addr);
 
 	rc = erst_check_table(erst_tab);
 	if (rc) {
