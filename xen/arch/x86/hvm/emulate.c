@@ -53,11 +53,17 @@ static int hvmemul_do_io(
     int is_mmio, paddr_t addr, unsigned long *reps, int size,
     paddr_t ram_gpa, int dir, int df, void *p_data)
 {
-    paddr_t value = ram_gpa;
-    int value_is_ptr = (p_data == NULL);
     struct vcpu *curr = current;
     struct hvm_vcpu_io *vio;
-    ioreq_t p;
+    ioreq_t p = {
+        .type = is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO,
+        .addr = addr,
+        .size = size,
+        .dir = dir,
+        .df = df,
+        .data = ram_gpa,
+        .data_is_ptr = (p_data == NULL),
+    };
     unsigned long ram_gfn = paddr_to_pfn(ram_gpa);
     p2m_type_t p2mt;
     struct page_info *ram_page;
@@ -94,15 +100,15 @@ static int hvmemul_do_io(
         return X86EMUL_UNHANDLEABLE;
     }
 
-    if ( (p_data != NULL) && (dir == IOREQ_WRITE) )
+    if ( !p.data_is_ptr && (dir == IOREQ_WRITE) )
     {
-        memcpy(&value, p_data, size);
+        memcpy(&p.data, p_data, size);
         p_data = NULL;
     }
 
     vio = &curr->arch.hvm_vcpu.hvm_io;
 
-    if ( is_mmio && !value_is_ptr )
+    if ( is_mmio && !p.data_is_ptr )
     {
         /* Part of a multi-cycle read or write? */
         if ( dir == IOREQ_WRITE )
@@ -146,7 +152,7 @@ static int hvmemul_do_io(
         goto finish_access;
     case HVMIO_dispatched:
         /* May have to wait for previous cycle of a multi-write to complete. */
-        if ( is_mmio && !value_is_ptr && (dir == IOREQ_WRITE) &&
+        if ( is_mmio && !p.data_is_ptr && (dir == IOREQ_WRITE) &&
              (addr == (vio->mmio_large_write_pa +
                        vio->mmio_large_write_bytes)) )
         {
@@ -179,14 +185,7 @@ static int hvmemul_do_io(
     if ( vio->mmio_retrying )
         *reps = 1;
 
-    p.dir = dir;
-    p.data_is_ptr = value_is_ptr;
-    p.type = is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO;
-    p.size = size;
-    p.addr = addr;
     p.count = *reps;
-    p.df = df;
-    p.data = value;
 
     if ( dir == IOREQ_WRITE )
         hvmtrace_io_assist(is_mmio, &p);
@@ -251,7 +250,7 @@ static int hvmemul_do_io(
     if ( p_data != NULL )
         memcpy(p_data, &vio->io_data, size);
 
-    if ( is_mmio && !value_is_ptr )
+    if ( is_mmio && !p.data_is_ptr )
     {
         /* Part of a multi-cycle read or write? */
         if ( dir == IOREQ_WRITE )
