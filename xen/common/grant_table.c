@@ -727,7 +727,7 @@ __gnttab_map_grant_ref(
 
     double_gt_lock(lgt, rgt);
 
-    if ( !paging_mode_translate(ld) && need_iommu(ld) )
+    if ( gnttab_need_iommu_mapping(ld) )
     {
         unsigned int wrc, rdc;
         int err = 0;
@@ -935,7 +935,7 @@ __gnttab_unmap_common(
             act->pin -= GNTPIN_hstw_inc;
     }
 
-    if ( !paging_mode_translate(ld) && need_iommu(ld) )
+    if ( gnttab_need_iommu_mapping(ld) )
     {
         unsigned int wrc, rdc;
         int err = 0;

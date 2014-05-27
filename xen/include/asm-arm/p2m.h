@@ -45,6 +45,9 @@ typedef enum {
     p2m_map_foreign,    /* Ram pages from foreign domain */
     p2m_grant_map_rw,   /* Read/write grant mapping */
     p2m_grant_map_ro,   /* Read-only grant mapping */
+    /* The types below are only used to decide the page attribute in the P2M */
+    p2m_iommu_map_rw,   /* Read/write iommu mapping */
+    p2m_iommu_map_ro,   /* Read-only iommu mapping */
     p2m_max_real_type,  /* Types after this won't be store in the p2m */
 } p2m_type_t;
 

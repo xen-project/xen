@@ -227,6 +227,7 @@ static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
         e.p2m.write = 0;
         break;
 
+    case p2m_iommu_map_rw:
     case p2m_map_foreign:
     case p2m_grant_map_rw:
     case p2m_mmio_direct:
@@ -234,6 +235,7 @@ static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
         e.p2m.write = 1;
         break;
 
+    case p2m_iommu_map_ro:
     case p2m_grant_map_ro:
     case p2m_invalid:
         e.p2m.xn = 1;
