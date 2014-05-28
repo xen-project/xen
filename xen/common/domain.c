@@ -286,6 +286,8 @@ struct domain *domain_create(
         d->guest_type = guest_type_hvm;
     else if ( domcr_flags & DOMCRF_pvh )
         d->guest_type = guest_type_pvh;
+    else
+        d->guest_type = guest_type_pv;
 
     if ( domid == 0 || domid == hardware_domid )
     {
