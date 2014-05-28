@@ -706,6 +706,7 @@ CPPFLAGS
 LDFLAGS
 CFLAGS
 CC
+CONFIG_RUMP
 host_os
 host_vendor
 host_cpu
@@ -2321,6 +2322,12 @@ host_os=$*
 IFS=$ac_save_IFS
 case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
+
+
+case $host_vendor in
+rumpxen) CONFIG_RUMP=y; rump=true ;;
+*)       CONFIG_RUMP=n; rump=false ;;
+esac
 
 
 ac_ext=c
@@ -6704,6 +6711,8 @@ LDLFAGS=$ac_previous_ldflags
 
 fi
 
+if ! $rump; then
+
 # Extract the first word of "xgettext", so it can be a program name with args.
 set dummy xgettext; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -8159,6 +8168,8 @@ fi
 
 done
 
+
+fi # ! $rump
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure

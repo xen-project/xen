@@ -20,6 +20,12 @@ APPEND_INCLUDES and APPEND_LIB instead when possible.])
 
 AC_CANONICAL_HOST
 
+case $host_vendor in
+rumpxen) CONFIG_RUMP=y; rump=true ;;
+*)       CONFIG_RUMP=n; rump=false ;;
+esac
+AC_SUBST(CONFIG_RUMP)
+
 AC_SYS_LARGEFILE
 
 case $ac_cv_sys_file_offset_bits in #(
@@ -34,11 +40,11 @@ AC_SUBST(FILE_OFFSET_BITS)
 m4_include([../m4/savevar.m4])
 m4_include([../m4/features.m4])
 m4_include([../m4/path_or_fail.m4])
+m4_include([../m4/checkpolicy.m4])
+m4_include([../m4/set_cflags_ldflags.m4])
 m4_include([../m4/python_version.m4])
 m4_include([../m4/python_devel.m4])
 m4_include([../m4/ocaml.m4])
-m4_include([../m4/checkpolicy.m4])
-m4_include([../m4/set_cflags_ldflags.m4])
 m4_include([../m4/uuid.m4])
 m4_include([../m4/pkg.m4])
 m4_include([../m4/curses.m4])
@@ -233,6 +239,8 @@ AS_IF([test "$cross_compiling" != yes], [
     AX_CHECK_PYTHON_DEVEL()
 ])
 
+if ! $rump; then
+
 AX_PATH_PROG_OR_FAIL([XGETTEXT], [xgettext])
 dnl as86, ld86, bcc and iasl are only required when the host system is x86*.
 dnl "host" here means the platform on which the hypervisor and tools is
@@ -286,6 +294,8 @@ esac
 
 # Checks for header files.
 AC_CHECK_HEADERS([yajl/yajl_version.h sys/eventfd.h valgrind/memcheck.h utmp.h])
+
+fi # ! $rump
 
 AC_OUTPUT()
 
