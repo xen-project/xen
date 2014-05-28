@@ -315,9 +315,13 @@ static __init void pvh_add_mem_mapping(struct domain *d, unsigned long gfn,
     int rc;
 
     for ( i = 0; i < nr_mfns; i++ )
+    {
         if ( (rc = set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i))) )
             panic("pvh_add_mem_mapping: gfn:%lx mfn:%lx i:%ld rc:%d\n",
                   gfn, mfn, i, rc);
+        if ( !(i & 0xfffff) )
+                process_pending_softirqs();
+    }
 }
 
 /*
@@ -327,11 +331,14 @@ static __init void pvh_add_mem_mapping(struct domain *d, unsigned long gfn,
  * pvh fixme: The following doesn't map MMIO ranges when they sit above the
  *            highest E820 covered address.
  */
-static __init void pvh_map_all_iomem(struct domain *d)
+static __init void pvh_map_all_iomem(struct domain *d, unsigned long nr_pages)
 {
     unsigned long start_pfn, end_pfn, end = 0, start = 0;
     const struct e820entry *entry;
-    unsigned int i, nump;
+    unsigned long nump, nmap, navail, mfn, nr_holes = 0;
+    unsigned int i;
+    struct page_info *page;
+    int rc;
 
     for ( i = 0, entry = e820.map; i < e820.nr_map; i++, entry++ )
     {
@@ -353,6 +360,9 @@ static __init void pvh_map_all_iomem(struct domain *d)
                 nump = end_pfn - start_pfn;
                 /* Add pages to the mapping */
                 pvh_add_mem_mapping(d, start_pfn, start_pfn, nump);
+                if ( start_pfn < nr_pages )
+                    nr_holes += (end_pfn < nr_pages) ?
+                                    nump : (nr_pages - start_pfn);
             }
             start = end;
         }
@@ -369,6 +379,104 @@ static __init void pvh_map_all_iomem(struct domain *d)
         nump = end_pfn - start_pfn;
         pvh_add_mem_mapping(d, start_pfn, start_pfn, nump);
     }
+
+    /*
+     * Add the memory removed by the holes at the end of the
+     * memory map.
+     */
+    page = page_list_first(&d->page_list);
+    for ( i = 0, entry = e820.map; i < e820.nr_map && nr_holes > 0;
+          i++, entry++ )
+    {
+        if ( entry->type != E820_RAM )
+            continue;
+
+        end_pfn = PFN_UP(entry->addr + entry->size);
+        if ( end_pfn <= nr_pages )
+            continue;
+
+        navail = end_pfn - nr_pages;
+        nmap = min(navail, nr_holes);
+        nr_holes -= nmap;
+        start_pfn = max_t(unsigned long, nr_pages, PFN_DOWN(entry->addr));
+        /*
+         * Populate this memory region using the pages
+         * previously removed by the MMIO holes.
+         */
+        do
+        {
+            mfn = page_to_mfn(page);
+            if ( get_gpfn_from_mfn(mfn) != INVALID_M2P_ENTRY )
+                continue;
+
+            rc = guest_physmap_add_page(d, start_pfn, mfn, 0);
+            if ( rc != 0 )
+                panic("Unable to add gpfn %#lx mfn %#lx to Dom0 physmap: %d",
+                      start_pfn, mfn, rc);
+            start_pfn++;
+            nmap--;
+            if ( !(nmap & 0xfffff) )
+                process_pending_softirqs();
+        } while ( ((page = page_list_next(page, &d->page_list)) != NULL)
+                  && nmap );
+        ASSERT(nmap == 0);
+        if ( page == NULL )
+            break;
+    }
+
+    ASSERT(nr_holes == 0);
+}
+
+static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
+{
+    struct e820entry *entry, *entry_guest;
+    unsigned int i;
+    unsigned long pages, cur_pages = 0;
+
+    /*
+     * Craft the e820 memory map for Dom0 based on the hardware e820 map.
+     */
+    d->arch.e820 = xzalloc_array(struct e820entry, e820.nr_map);
+    if ( !d->arch.e820 )
+        panic("Unable to allocate memory for Dom0 e820 map");
+    entry_guest = d->arch.e820;
+
+    /* Clamp e820 memory map to match the memory assigned to Dom0 */
+    for ( i = 0, entry = e820.map; i < e820.nr_map; i++, entry++ )
+    {
+        if ( entry->type != E820_RAM )
+        {
+            *entry_guest = *entry;
+            goto next;
+        }
+
+        if ( nr_pages == cur_pages )
+        {
+            /*
+             * We already have all the assigned memory,
+             * skip this entry
+             */
+            continue;
+        }
+
+        *entry_guest = *entry;
+        pages = PFN_UP(entry_guest->size);
+        if ( (cur_pages + pages) > nr_pages )
+        {
+            /* Truncate region */
+            entry_guest->size = (nr_pages - cur_pages) << PAGE_SHIFT;
+            cur_pages = nr_pages;
+        }
+        else
+        {
+            cur_pages += pages;
+        }
+ next:
+        d->arch.nr_e820++;
+        entry_guest++;
+    }
+    ASSERT(cur_pages == nr_pages);
+    ASSERT(d->arch.nr_e820 <= e820.nr_map);
 }
 
 static __init void dom0_update_physmap(struct domain *d, unsigned long pfn,
@@ -1391,7 +1499,8 @@ int __init construct_dom0(
         pfn = shared_info_paddr >> PAGE_SHIFT;
         dom0_update_physmap(d, pfn, mfn, 0);
 
-        pvh_map_all_iomem(d);
+        pvh_map_all_iomem(d, nr_pages);
+        pvh_setup_e820(d, nr_pages);
     }
 
     if ( d->domain_id == hardware_domid )
