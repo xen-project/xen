@@ -87,7 +87,7 @@ libxenstore.so.$(MAJOR): libxenstore.so.$(MAJOR).$(MINOR)
 xs.opic: CFLAGS += -DUSE_PTHREAD
 
 libxenstore.so.$(MAJOR).$(MINOR): xs.opic xs_lib.opic
-	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenstore.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(SOCKET_LIBS) -lpthread $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) $(PTHREAD_LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenstore.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(SOCKET_LIBS) $(PTHREAD_LIBS) $(APPEND_LDFLAGS)
 
 libxenstore.a: xs.o xs_lib.o
 	$(AR) rcs $@ $^
