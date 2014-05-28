@@ -109,16 +109,16 @@ $(CTRL_LIB_OBJS) $(GUEST_LIB_OBJS) $(OSDEP_LIB_OBJS) \
 $(CTRL_PIC_OBJS) $(GUEST_PIC_OBJS) $(OSDEP_PIC_OBJS) : CFLAGS += -include $(XEN_ROOT)/tools/config.h
 
 LIB := libxenctrl.a
-ifneq ($(stubdom),y)
+ifneq ($(nosharedlibs),y)
 LIB += libxenctrl.so libxenctrl.so.$(MAJOR) libxenctrl.so.$(MAJOR).$(MINOR)
 endif
 
 LIB += libxenguest.a
-ifneq ($(stubdom),y)
+ifneq ($(nosharedlibs),y)
 LIB += libxenguest.so libxenguest.so.$(MAJOR) libxenguest.so.$(MAJOR).$(MINOR)
 endif
 
-ifneq ($(stubdom),y)
+ifneq ($(nosharedlibs),y)
 LIB += xenctrl_osdep_ENOSYS.so
 endif
 

@@ -21,9 +21,18 @@ CFLAGS_xeninclude = -I$(XEN_INCLUDE)
 
 XENSTORE_XENSTORED ?= y
 
+ifneq ($(nosharedlibs),y)
 INSTALL_SHLIB = $(INSTALL_PROG)
 SYMLINK_SHLIB = ln -sf
 libextension = .so
+else
+libextension = .a
+XENSTORE_STATIC_CLIENTS=y
+# If something tries to use these it is a mistake.  Provide references
+# to nonexistent programs to produce a sane error message.
+INSTALL_SHLIB = : install-shlib-unsupported-fail
+SYMLINK_SHLIB = : symlink-shlib-unsupported-fail
+endif
 
 CFLAGS_libxenctrl = -I$(XEN_LIBXC) $(CFLAGS_xeninclude)
 LDLIBS_libxenctrl = $(XEN_LIBXC)/libxenctrl$(libextension)
