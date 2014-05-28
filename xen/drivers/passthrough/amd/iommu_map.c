@@ -691,8 +691,6 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
         if ( !iommu_update_pde_count(d, pt_mfn[merge_level],
                                      gfn, mfn, merge_level) )
             break;
-        /* Deallocate lower level page table */
-        free_amd_iommu_pgtable(mfn_to_page(pt_mfn[merge_level - 1]));
 
         if ( iommu_merge_pages(d, pt_mfn[merge_level], gfn, 
                                flags, merge_level) )
@@ -703,6 +701,9 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
             domain_crash(d);
             return -EFAULT;
         }
+
+        /* Deallocate lower level page table */
+        free_amd_iommu_pgtable(mfn_to_page(pt_mfn[merge_level - 1]));
     }
 
 out:
