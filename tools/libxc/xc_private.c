@@ -33,6 +33,10 @@
 
 #define XENCTRL_OSDEP "XENCTRL_OSDEP"
 
+#if !defined (__MINIOS__) && !defined(__RUMPUSER_XEN__)
+#define DO_DYNAMIC_OSDEP
+#endif
+
 /*
  * Returns a (shallow) copy of the xc_osdep_info_t for the
  * active OS interface.
@@ -50,7 +54,7 @@
 static int xc_osdep_get_info(xc_interface *xch, xc_osdep_info_t *info)
 {
     int rc = -1;
-#ifndef __MINIOS__
+#ifdef DO_DYNAMIC_OSDEP
     const char *lib = getenv(XENCTRL_OSDEP);
     xc_osdep_info_t *pinfo;
     void *dl_handle = NULL;
@@ -86,7 +90,7 @@ static int xc_osdep_get_info(xc_interface *xch, xc_osdep_info_t *info)
         info->dl_handle = dl_handle;
     }
     else
-#endif
+#endif /*DO_DYNAMIC_OSDEP*/
     {
         *info = xc_osdep_info;
         info->dl_handle = NULL;
@@ -94,21 +98,21 @@ static int xc_osdep_get_info(xc_interface *xch, xc_osdep_info_t *info)
 
     rc = 0;
 
-#ifndef __MINIOS__
+#ifdef DO_DYNAMIC_OSDEP
 out:
     if ( dl_handle && rc == -1 )
         dlclose(dl_handle);
-#endif
+#endif /*DO_DYNAMIC_OSDEP*/
 
     return rc;
 }
 
 static void xc_osdep_put(xc_osdep_info_t *info)
 {
-#ifndef __MINIOS__
+#ifdef DO_DYNAMIC_OSDEP
     if ( info->dl_handle )
         dlclose(info->dl_handle);
-#endif
+#endif /*DO_DYNAMIC_OSDEP*/
 }
 
 static const char *xc_osdep_type_name(enum xc_osdep_type type)
