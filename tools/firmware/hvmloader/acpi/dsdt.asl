@@ -57,8 +57,10 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
            MSUA, 32, /* MADT checksum address */
            MAPA, 32, /* MADT LAPIC0 address */
            VGIA, 32, /* VM generation id address */
-           HMIN, 64,
-           HLEN, 64
+           LMIN, 32,
+           HMIN, 32,
+           LLEN, 32,
+           HLEN, 32
        }
 
         /* Fix HCT test for 0x400 pci memory:
@@ -176,15 +178,41 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                 Add(MMIN, MLEN, MMAX)
                 Subtract(MMAX, One, MMAX)
 
-                CreateQWordField(PRT0, \_SB.PCI0._CRS._Y02._MIN, HMIN)
-                CreateQWordField(PRT0, \_SB.PCI0._CRS._Y02._MAX, HMAX)
-                CreateQWordField(PRT0, \_SB.PCI0._CRS._Y02._LEN, HLEN)
+                /*
+                 * WinXP / Win2K3 blue-screen for operations on 64-bit values.
+                 * Therefore we need to split the 64-bit calculations needed
+                 * here, but different iasl versions evaluate name references
+                 * to integers differently:
+                 * Year (approximate)          2006    2008    2012
+                 * \_SB.PCI0._CRS._Y02         zero   valid   valid
+                 * \_SB.PCI0._CRS._Y02._MIN   valid   valid    huge
+                 */
+                If(LEqual(Zero, \_SB.PCI0._CRS._Y02)) {
+                    Subtract(\_SB.PCI0._CRS._Y02._MIN, 14, Local0)
+                } Else {
+                    Store(\_SB.PCI0._CRS._Y02, Local0)
+                }
+                CreateDWordField(PRT0, Add(Local0, 14), MINL)
+                CreateDWordField(PRT0, Add(Local0, 18), MINH)
+                CreateDWordField(PRT0, Add(Local0, 22), MAXL)
+                CreateDWordField(PRT0, Add(Local0, 26), MAXH)
+                CreateDWordField(PRT0, Add(Local0, 38), LENL)
+                CreateDWordField(PRT0, Add(Local0, 42), LENH)
 
-                Store(\_SB.HMIN, HMIN)
-                Store(\_SB.HLEN, HLEN)
-                Add(HMIN, HLEN, HMAX)
-                If(LOr(HMIN, HLEN)) {
-                    Subtract(HMAX, One, HMAX)
+                Store(\_SB.LMIN, MINL)
+                Store(\_SB.HMIN, MINH)
+                Store(\_SB.LLEN, LENL)
+                Store(\_SB.HLEN, LENH)
+                Add(MINL, LENL, MAXL)
+                Add(MINH, LENH, MAXH)
+                If(LLess(MAXL, MINL)) {
+                    Add(MAXH, One, MAXH)
+                }
+                If(LOr(MINH, LENL)) {
+                    If(LEqual(MAXL, 0)) {
+                        Subtract(MAXH, One, MAXH)
+                    }
+                    Subtract(MAXL, One, MAXL)
                 }
 
                 Return (PRT0)
