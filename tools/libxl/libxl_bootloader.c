@@ -15,7 +15,9 @@
 #include "libxl_osdeps.h" /* must come before any other headers */
 
 #include <termios.h>
+#ifdef HAVE_UTMP_H
 #include <utmp.h>
+#endif
 
 #ifdef INCLUDE_LIBUTIL_H
 #include INCLUDE_LIBUTIL_H
