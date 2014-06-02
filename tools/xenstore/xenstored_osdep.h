@@ -14,4 +14,7 @@
 #elif defined(__NetBSD__)
 #define XENSTORED_KVA_DEV  "/dev/xsd_kva"
 #define XENSTORED_PORT_DEV "/kern/xen/xsd_port"
+#elif defined(__FreeBSD__)
+#define XENSTORED_KVA_DEV  "/dev/xen/xenstored"
+#define XENSTORED_PORT_DEV "/dev/xen/xenstored"
 #endif

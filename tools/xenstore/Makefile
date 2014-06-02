@@ -16,6 +16,7 @@ XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored
 XENSTORED_OBJS_$(CONFIG_Linux) = xenstored_posix.o
 XENSTORED_OBJS_$(CONFIG_SunOS) = xenstored_solaris.o xenstored_posix.o xenstored_probes.o
 XENSTORED_OBJS_$(CONFIG_NetBSD) = xenstored_posix.o
+XENSTORED_OBJS_$(CONFIG_FreeBSD) = xenstored_posix.o
 XENSTORED_OBJS_$(CONFIG_MiniOS) = xenstored_minios.o
 
 XENSTORED_OBJS += $(XENSTORED_OBJS_y)
