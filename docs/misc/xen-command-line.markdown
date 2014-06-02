@@ -494,6 +494,13 @@ Practices](http://wiki.xen.org/wiki/Xen_Best_Practices#Xen_dom0_dedicated_memory
 
 Pin dom0 vcpus to their respective pcpus
 
+### dom0pvh
+> `= <boolean>`
+
+> Default: `false`
+
+Flag that makes a 64bit dom0 boot in PVH mode. No 32bit support at present.
+
 ### e820-mtrr-clip
 > `= <boolean>`
 

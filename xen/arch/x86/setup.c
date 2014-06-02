@@ -65,6 +65,10 @@ invbool_param("smep", disable_smep);
 static bool_t __initdata disable_smap;
 invbool_param("smap", disable_smap);
 
+/* Boot dom0 in pvh mode */
+static bool_t __initdata opt_dom0pvh;
+boolean_param("dom0pvh", opt_dom0pvh);
+
 /* **** Linux config option: propagated to domain0. */
 /* "acpi=off":    Sisables both ACPI table parsing and interpreter. */
 /* "acpi=force":  Override the disable blacklist.                   */
@@ -539,7 +543,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
     char *cmdline, *kextra, *loader;
-    unsigned int initrdidx;
+    unsigned int initrdidx, domcr_flags = DOMCRF_s3_integrity;
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
@@ -1345,8 +1349,11 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( !tboot_protect_mem_regions() )
         panic("Could not protect TXT memory regions");
 
+    if ( opt_dom0pvh )
+        domcr_flags |= DOMCRF_pvh | DOMCRF_hap;
+
     /* Create initial domain 0. */
-    dom0 = domain_create(0, DOMCRF_s3_integrity, 0);
+    dom0 = domain_create(0, domcr_flags, 0);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
         panic("Error creating domain 0");
 

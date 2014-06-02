@@ -37,6 +37,8 @@ supported. Phase I patches are broken into three parts:
    - tools changes for creating a PVH guest
    - boot of 64bit dom0 in PVH mode.
 
+To boot 64bit dom0 in PVH mode, add dom0pvh to grub xen command line.
+
 Following fixme's exist in the code:
   - arch/x86/time.c: support more tsc modes.
 
