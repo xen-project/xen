@@ -12,7 +12,6 @@
 #include <asm/byteorder.h>
 #endif
 
-#ifdef __LITTLE_ENDIAN
 static inline u16 INIT get_unaligned_le16(const void *p)
 {
 	return le16_to_cpup(p);
@@ -22,19 +21,6 @@ static inline u32 INIT get_unaligned_le32(const void *p)
 {
 	return le32_to_cpup(p);
 }
-#else
-#include <asm/unaligned.h>
-
-static inline u16 INIT get_unaligned_le16(const void *p)
-{
-	return le16_to_cpu(__get_unaligned(p, 2));
-}
-
-static inline u32 INIT get_unaligned_le32(void *p)
-{
-	return le32_to_cpu(__get_unaligned(p, 4));
-}
-#endif
 
 /*
  * Detects 64 bits mode
