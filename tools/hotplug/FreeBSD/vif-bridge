@@ -1,0 +1,41 @@
+#!/bin/sh -e
+#
+# FreeBSD hotplug script for attaching xnb* interfaces to bridges
+#
+# Parameters:
+#	$1: xenstore backend path of the vif
+#	$2: action, either "add" or "remove"
+#
+# Environment variables:
+#	$iface_dev: name of the backend device (xnb<domid>.<handle>)
+#
+
+DIR=$(dirname "$0")
+. "${DIR}/hotplugpath.sh"
+
+PATH=${BINDIR}:${SBINDIR}:${LIBEXEC}:${PRIVATE_BINDIR}:/bin:/usr/bin:/sbin:/usr/sbin
+export PATH
+
+path=$1
+action=$2
+
+case $action in
+add)
+	bridge=$(xenstore-read "$path/bridge")
+	ifconfig $bridge addm $iface_dev
+	ifconfig $iface_dev up
+	exit 0
+	;;
+remove)
+	if [ "$emulated" -eq 1 ]; then
+		bridge=$(xenstore-read "$path/bridge")
+		ifconfig $iface_dev down
+		ifconfig $bridge deletem $iface_dev
+		ifconfig $iface_dev destroy
+	fi
+	exit 0
+	;;
+*)
+	exit 0
+	;;
+esac
