@@ -61,12 +61,17 @@ AX_ARG_DEFAULT_DISABLE([blktap1], [Enable blktap1 tools])
 
 AC_ARG_ENABLE([qemu-traditional],
     AS_HELP_STRING([--enable-qemu-traditional],
-                   [Enable qemu traditional device model, (DEFAULT is on for x86, otherwise off)]),,[
+                   [Enable qemu traditional device model, (DEFAULT is on for Linux or NetBSD x86, otherwise off)]),,[
     case "$host_cpu" in
         i[[3456]]86|x86_64)
            enable_qemu_traditional="yes";;
         *) enable_qemu_traditional="no";;
     esac
+    case "$host_os" in
+        freebsd*)
+           enable_qemu_traditional="no";;
+    esac
+
 ])
 AS_IF([test "x$enable_qemu_traditional" = "xyes"], [
 AC_DEFINE([HAVE_QEMU_TRADITIONAL], [1], [Qemu traditional enabled])
