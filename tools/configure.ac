@@ -54,7 +54,6 @@ AX_ARG_DEFAULT_ENABLE([monitors], [Disable xenstat and xentop monitoring tools])
 AX_ARG_DEFAULT_ENABLE([ocamltools], [Disable Ocaml tools])
 AX_ARG_DEFAULT_ENABLE([xsmpolicy], [Disable XSM policy compilation])
 AX_ARG_DEFAULT_DISABLE([ovmf], [Enable OVMF])
-AX_ARG_DEFAULT_ENABLE([rombios], [Disable ROM BIOS])
 AX_ARG_DEFAULT_ENABLE([seabios], [Disable SeaBIOS])
 AX_ARG_DEFAULT_ENABLE([debug], [Disable debug build of tools])
 AX_ARG_DEFAULT_DISABLE([blktap1], [Enable blktap1 tools])
@@ -79,6 +78,22 @@ AC_DEFINE([HAVE_QEMU_TRADITIONAL], [1], [Qemu traditional enabled])
     qemu_traditional=n
 ])
 AC_SUBST(qemu_traditional)
+
+AC_ARG_ENABLE([rombios],
+    AS_HELP_STRING([--enable-rombios],
+                   [Enable ROMBIOS, (DEFAULT is on if qemu-traditional is enabled, otherwise off)]),,[
+    AS_IF([test "x$enable_qemu_traditional" = "xyes"], [
+        enable_rombios="yes"
+    ], [
+        enable_rombios="no"
+    ])
+])
+AS_IF([test "x$enable_rombios" = "xyes"], [
+AC_DEFINE([HAVE_ROMBIOS], [1], [ROMBIOS enabled])
+    rombios=y],[
+    rombios=n
+])
+AC_SUBST(rombios)
 
 AC_ARG_WITH([system-qemu],
     AS_HELP_STRING([--with-system-qemu@<:@=PATH@:>@],

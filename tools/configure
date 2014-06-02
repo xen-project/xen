@@ -687,11 +687,11 @@ EXTRA_QEMUU_CONFIGURE_ARGS
 ovmf_path
 seabios_path
 qemu_xen
+rombios
 qemu_traditional
 blktap1
 debug
 seabios
-rombios
 ovmf
 xsmpolicy
 ocamltools
@@ -760,11 +760,11 @@ enable_monitors
 enable_ocamltools
 enable_xsmpolicy
 enable_ovmf
-enable_rombios
 enable_seabios
 enable_debug
 enable_blktap1
 enable_qemu_traditional
+enable_rombios
 with_system_qemu
 with_system_seabios
 with_system_ovmf
@@ -1421,13 +1421,14 @@ Optional Features:
   --disable-ocamltools    Disable Ocaml tools (default is ENABLED)
   --disable-xsmpolicy     Disable XSM policy compilation (default is ENABLED)
   --enable-ovmf           Enable OVMF (default is DISABLED)
-  --disable-rombios       Disable ROM BIOS (default is ENABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
   --disable-debug         Disable debug build of tools (default is ENABLED)
   --enable-blktap1        Enable blktap1 tools (default is DISABLED)
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is on
                           for Linux or NetBSD x86, otherwise off)
+  --enable-rombios        Enable ROMBIOS, (DEFAULT is on if qemu-traditional
+                          is enabled, otherwise off)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -3654,29 +3655,6 @@ ovmf=$ax_cv_ovmf
 
 
 
-# Check whether --enable-rombios was given.
-if test "${enable_rombios+set}" = set; then :
-  enableval=$enable_rombios;
-fi
-
-
-if test "x$enable_rombios" = "xno"; then :
-
-    ax_cv_rombios="n"
-
-elif test "x$enable_rombios" = "xyes"; then :
-
-    ax_cv_rombios="y"
-
-elif test -z $ax_cv_rombios; then :
-
-    ax_cv_rombios="y"
-
-fi
-rombios=$ax_cv_rombios
-
-
-
 # Check whether --enable-seabios was given.
 if test "${enable_seabios+set}" = set; then :
   enableval=$enable_seabios;
@@ -3773,6 +3751,36 @@ $as_echo "#define HAVE_QEMU_TRADITIONAL 1" >>confdefs.h
 else
 
     qemu_traditional=n
+
+fi
+
+
+# Check whether --enable-rombios was given.
+if test "${enable_rombios+set}" = set; then :
+  enableval=$enable_rombios;
+else
+
+    if test "x$enable_qemu_traditional" = "xyes"; then :
+
+        enable_rombios="yes"
+
+else
+
+        enable_rombios="no"
+
+fi
+
+fi
+
+if test "x$enable_rombios" = "xyes"; then :
+
+
+$as_echo "#define HAVE_ROMBIOS 1" >>confdefs.h
+
+    rombios=y
+else
+
+    rombios=n
 
 fi
 
