@@ -3,6 +3,7 @@
 
 #include <stdarg.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <xen/xen.h>
 #include <xen/hvm/hvm_info_table.h>
 
@@ -174,7 +175,6 @@ int printf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 int vprintf(const char *fmt, va_list ap);
 
 /* Buffer output */
-typedef unsigned long size_t;
 int snprintf(char *buf, size_t size, const char *fmt, ...) __attribute__ ((format (printf, 3, 4)));
 
 /* Populate specified memory hole with RAM. */
