@@ -1,6 +1,6 @@
 /*
  * common MCA implementation for AMD CPUs.
- * Copyright (c) 2012 Advanced Micro Devices, Inc.
+ * Copyright (c) 2012-2014 Advanced Micro Devices, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,6 +17,50 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* K8 common MCA documentation published at
+ *
+ * AMD64 Architecture Programmer's Manual Volume 2:
+ * System Programming
+ * Publication # 24593 Revision: 3.24
+ * Issue Date: October 2013
+ *
+ * URL:
+ * http://support.amd.com/TechDocs/24593.pdf 
+ */
+
+/* The related documentation for K8 Revisions A - E is:
+ *
+ * BIOS and Kernel Developer's Guide for
+ * AMD Athlon 64 and AMD Opteron Processors
+ * Publication # 26094 Revision: 3.30
+ * Issue Date: February 2006
+ *
+ * URL:
+ * http://support.amd.com/TechDocs/26094.PDF 
+ */
+
+/* The related documentation for K8 Revisions F - G is:
+ *
+ * BIOS and Kernel Developer's Guide for
+ * AMD NPT Family 0Fh Processors
+ * Publication # 32559 Revision: 3.08
+ * Issue Date: July 2007
+ *
+ * URL:
+ * http://support.amd.com/TechDocs/32559.pdf 
+ */
+
+/* Family10 MCA documentation published at
+ *
+ * BIOS and Kernel Developer's Guide
+ * For AMD Family 10h Processors
+ * Publication # 31116 Revision: 3.62
+ * Isse Date: January 11, 2013
+ *
+ * URL:
+ * http://support.amd.com/TechDocs/31116.pdf 
+ */
+
 #include <xen/init.h>
 #include <xen/types.h>
 
@@ -27,8 +71,8 @@
 #include "x86_mca.h"
 #include "mce_amd.h"
 #include "mcaction.h"
-
 #include "mce_quirks.h"
+#include "vmce.h"
 
 #define ANY -1
 
@@ -98,7 +142,8 @@ mc_amd_addrcheck(uint64_t status, uint64_t misc, int addrtype)
     errorcode = status & (MCi_STATUS_MCA | MCi_STATUS_MSEC);
     ectype = mc_ec2type(errorcode);
 
-    switch (ectype) {
+    switch ( ectype )
+    {
     case MC_EC_BUS_TYPE: /* value in addr MSR is physical */
     case MC_EC_MEM_TYPE: /* value in addr MSR is physical */
         return (addrtype == MC_ADDR_PHYSICAL);
@@ -158,24 +203,114 @@ int mcequirk_amd_apply(enum mcequirk_amd_flags flags)
     return 0;
 }
 
+static struct mcinfo_extended *
+amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
+{
+    struct mcinfo_extended *mc_ext;
+
+    /* Family 0x10 introduced additional MSR that belong to the
+     * northbridge bank (4). */
+    if ( mi == NULL || bank != 4 )
+        return NULL;
+
+    if ( !(status & MCi_STATUS_VAL) )
+        return NULL;
+
+    if ( !(status & MCi_STATUS_MISCV) )
+        return NULL;
+
+    mc_ext = x86_mcinfo_reserve(mi, sizeof(*mc_ext));
+    if ( !mc_ext )
+    {
+        mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
+        return NULL;
+    }
+
+    mc_ext->common.type = MC_TYPE_EXTENDED;
+    mc_ext->common.size = sizeof(*mc_ext);
+    mc_ext->mc_msrs = 3;
+
+    mc_ext->mc_msr[0].reg = MSR_F10_MC4_MISC1;
+    mc_ext->mc_msr[1].reg = MSR_F10_MC4_MISC2;
+    mc_ext->mc_msr[2].reg = MSR_F10_MC4_MISC3;
+
+    mc_ext->mc_msr[0].value = mca_rdmsr(MSR_F10_MC4_MISC1);
+    mc_ext->mc_msr[1].value = mca_rdmsr(MSR_F10_MC4_MISC2);
+    mc_ext->mc_msr[2].value = mca_rdmsr(MSR_F10_MC4_MISC3);
+
+    return mc_ext;
+}
+
+/* Common AMD Machine Check Handler for AMD K8 and higher */
+static void amd_cmn_machine_check(struct cpu_user_regs *regs, long error_code)
+{
+    mcheck_cmn_handler(regs, error_code, mca_allbanks,
+                       __get_cpu_var(mce_clear_banks));
+}
+
+static int amd_need_clearbank_scan(enum mca_source who, uint64_t status)
+{
+    if ( who != MCA_MCE_SCAN )
+        return 1;
+
+    /*
+     * For fatal error, it shouldn't be cleared so that sticky bank
+     * have a chance to be handled after reboot by polling.
+     */
+    if ( (status & MCi_STATUS_UC) && (status & MCi_STATUS_PCC) )
+        return 0;
+
+    return 1;
+}
+
+/* AMD specific MCA MSR */
+int vmce_amd_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
+{
+    /* Do nothing as we don't emulate this MC bank currently */
+    mce_printk(MCE_VERBOSE, "MCE: wr msr %#"PRIx64"\n", val);
+    return 1;
+}
+
+int vmce_amd_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
+{
+    /* Assign '0' as we don't emulate this MC bank currently */
+    *val = 0;
+    return 1;
+}
+
 enum mcheck_type
 amd_mcheck_init(struct cpuinfo_x86 *ci)
 {
-    enum mcheck_type rc = mcheck_none;
+    uint32_t i;
+    enum mcequirk_amd_flags quirkflag = mcequirk_lookup_amd_quirkdata(ci);
 
-    switch ( ci->x86 )
+    /* Assume that machine check support is available.
+     * The minimum provided support is at least the K8. */
+    mce_handler_init();
+    x86_mce_vector_register(amd_cmn_machine_check);
+    mce_need_clearbank_register(amd_need_clearbank_scan);
+
+    for ( i = 0; i < nr_mce_banks; i++ )
     {
-    default:
-        /* Assume that machine check support is available.
-         * The minimum provided support is at least the K8. */
-    case 0xf:
-        rc = amd_k8_mcheck_init(ci);
-        break;
-
-    case 0x10 ... 0x17:
-        rc = amd_f10_mcheck_init(ci);
-        break;
+        if ( quirkflag == MCEQUIRK_K8_GART && i == 4 )
+            mcequirk_amd_apply(quirkflag);
+        else
+        {
+            /* Enable error reporting of all errors */
+            wrmsrl(MSR_IA32_MCx_CTL(i), 0xffffffffffffffffULL);
+            wrmsrl(MSR_IA32_MCx_STATUS(i), 0x0ULL);
+        }
     }
 
-    return rc;
+    if ( ci->x86 == 0xf )
+        return mcheck_amd_k8;
+
+    if ( quirkflag == MCEQUIRK_F10_GART )
+        mcequirk_amd_apply(quirkflag);
+
+    x86_mce_callback_register(amd_f10_handler);
+    mce_recoverable_register(mc_amd_recoverable_scan);
+    mce_register_addrcheck(mc_amd_addrcheck);
+
+    return mcheck_amd_famXX;
 }
