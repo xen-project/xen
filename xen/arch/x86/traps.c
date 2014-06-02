@@ -692,13 +692,19 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
     if ( idx > XEN_CPUID_MAX_NUM_LEAVES )
         return 0; /* Avoid unnecessary pass through domain_cpuid() */
 
-    /* Number of leaves may be user-specified */
     domain_cpuid(d, base, 0, &limit, &dummy, &dummy, &dummy);
-    limit &= 0xff;
-    if ( limit < 2 )
-        limit = 2;
-    else if ( limit > XEN_CPUID_MAX_NUM_LEAVES )
+    if ( limit == 0 )
+        /* Default number of leaves */
         limit = XEN_CPUID_MAX_NUM_LEAVES;
+    else
+    {
+        /* User-specified number of leaves */
+        limit &= 0xff;
+        if ( limit < 2 )
+            limit = 2;
+        else if ( limit > XEN_CPUID_MAX_NUM_LEAVES )
+            limit = XEN_CPUID_MAX_NUM_LEAVES;
+    }
 
     if ( idx > limit ) 
         return 0;
