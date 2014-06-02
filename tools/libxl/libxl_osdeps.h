@@ -37,6 +37,11 @@
 #include <pty.h>
 #elif defined(__sun__)
 #include <stropts.h>
+#elif defined(__FreeBSD__)
+#define SYSFS_PCI_DEV          "/dev/null"
+#define SYSFS_PCIBACK_DRIVER   "/dev/null"
+#define NETBACK_NIC_NAME       "xnb%u.%d"
+#include <libutil.h>
 #endif
 
 #ifndef SYSFS_PCIBACK_DRIVER

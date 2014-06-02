@@ -52,8 +52,12 @@ else
 ifeq ($(CONFIG_Linux),y)
 LIBXL_OBJS-y += libxl_linux.o
 else
+ifeq ($(CONFIG_FreeBSD),y)
+LIBXL_OBJS-y += libxl_freebsd.o
+else
 $(error Your Operating System is not supported by libxenlight, \
 please check libxl_linux.c and libxl_netbsd.c to see how to get it ported)
+endif
 endif
 endif
 
