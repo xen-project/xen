@@ -1286,6 +1286,7 @@ int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long
 
 int xc_hvm_create_ioreq_server(xc_interface *xch,
                                domid_t domid,
+                               int handle_bufioreq,
                                ioservid_t *id)
 {
     DECLARE_HYPERCALL;
@@ -1301,6 +1302,7 @@ int xc_hvm_create_ioreq_server(xc_interface *xch,
     hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
 
     arg->domid = domid;
+    arg->handle_bufioreq = !!handle_bufioreq;
 
     rc = do_xen_hypercall(xch, &hypercall);
 

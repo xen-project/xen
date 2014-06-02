@@ -1802,11 +1802,13 @@ int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long
  *
  * @parm xch a handle to an open hypervisor interface.
  * @parm domid the domain id to be serviced
+ * @parm handle_bufioreq should the IOREQ Server handle buffered requests?
  * @parm id pointer to an ioservid_t to receive the IOREQ Server id.
  * @return 0 on success, -1 on failure.
  */
 int xc_hvm_create_ioreq_server(xc_interface *xch,
                                domid_t domid,
+                               int handle_bufioreq,
                                ioservid_t *id);
 
 /**

@@ -258,12 +258,15 @@ typedef uint16_t ioservid_t;
  * HVMOP_create_ioreq_server: Instantiate a new IOREQ Server for a secondary
  *                            emulator servicing domain <domid>.
  *
- * The <id> handed back is unique for <domid>.
+ * The <id> handed back is unique for <domid>. If <handle_bufioreq> is zero
+ * the buffered ioreq ring will not be allocated and hence all emulation
+ * requestes to this server will be synchronous.
  */
 #define HVMOP_create_ioreq_server 17
 struct xen_hvm_create_ioreq_server {
-    domid_t domid; /* IN - domain to be serviced */
-    ioservid_t id; /* OUT - server id */
+    domid_t domid;           /* IN - domain to be serviced */
+    uint8_t handle_bufioreq; /* IN - should server handle buffered ioreqs */
+    ioservid_t id;           /* OUT - server id */
 };
 typedef struct xen_hvm_create_ioreq_server xen_hvm_create_ioreq_server_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_create_ioreq_server_t);
@@ -273,12 +276,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_create_ioreq_server_t);
  *                              IOREQ Server <id>. 
  *
  * The emulator needs to map the synchronous ioreq structures and buffered
- * ioreq ring that Xen uses to request emulation. These are hosted in domain
- * <domid>'s gmfns <ioreq_pfn> and <bufioreq_pfn> respectively. In addition the
- * emulator needs to bind to event channel <bufioreq_port> to listen for
- * buffered emulation requests. (The event channels used for synchronous
- * emulation requests are specified in the per-CPU ioreq structures in
- * <ioreq_pfn>).
+ * ioreq ring (if it exists) that Xen uses to request emulation. These are
+ * hosted in domain <domid>'s gmfns <ioreq_pfn> and <bufioreq_pfn>
+ * respectively. In addition, if the IOREQ Server is handling buffered
+ * emulation requests, the emulator needs to bind to event channel
+ * <bufioreq_port> to listen for them. (The event channels used for
+ * synchronous emulation requests are specified in the per-CPU ioreq
+ * structures in <ioreq_pfn>).
+ * If the IOREQ Server is not handling buffered emulation requests then the
+ * values handed back in <bufioreq_pfn> and <bufioreq_port> will both be 0.
  */
 #define HVMOP_get_ioreq_server_info 18
 struct xen_hvm_get_ioreq_server_info {
