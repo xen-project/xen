@@ -74,7 +74,7 @@ void send_invalidate_req(void)
         .data = ~0UL, /* flush all */
     };
 
-    (void)hvm_send_assist_req(&p);
+    hvm_broadcast_assist_req(&p);
 }
 
 int handle_mmio(void)

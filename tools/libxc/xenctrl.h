@@ -1393,8 +1393,14 @@ int xc_get_pfn_list(xc_interface *xch, uint32_t domid, uint64_t *pfn_buf,
 int xc_copy_to_domain_page(xc_interface *xch, uint32_t domid,
                            unsigned long dst_pfn, const char *src_page);
 
-int xc_clear_domain_page(xc_interface *xch, uint32_t domid,
-                         unsigned long dst_pfn);
+int xc_clear_domain_pages(xc_interface *xch, uint32_t domid,
+                          unsigned long dst_pfn, int num);
+
+static inline int xc_clear_domain_page(xc_interface *xch, uint32_t domid,
+                                       unsigned long dst_pfn)
+{
+    return xc_clear_domain_pages(xch, domid, dst_pfn, 1);
+}
 
 int xc_mmuext_op(xc_interface *xch, struct mmuext_op *op, unsigned int nr_ops,
                  domid_t dom);
@@ -1786,6 +1792,129 @@ void xc_clear_last_error(xc_interface *xch);
 
 int xc_set_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long value);
 int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long *value);
+
+/*
+ * IOREQ Server API. (See section on IOREQ Servers in public/hvm_op.h).
+ */
+
+/**
+ * This function instantiates an IOREQ Server.
+ *
+ * @parm xch a handle to an open hypervisor interface.
+ * @parm domid the domain id to be serviced
+ * @parm id pointer to an ioservid_t to receive the IOREQ Server id.
+ * @return 0 on success, -1 on failure.
+ */
+int xc_hvm_create_ioreq_server(xc_interface *xch,
+                               domid_t domid,
+                               ioservid_t *id);
+
+/**
+ * This function retrieves the necessary information to allow an
+ * emulator to use an IOREQ Server.
+ *
+ * @parm xch a handle to an open hypervisor interface.
+ * @parm domid the domain id to be serviced
+ * @parm id the IOREQ Server id.
+ * @parm ioreq_pfn pointer to a xen_pfn_t to receive the synchronous ioreq gmfn
+ * @parm bufioreq_pfn pointer to a xen_pfn_t to receive the buffered ioreq gmfn
+ * @parm bufioreq_port pointer to a evtchn_port_t to receive the buffered ioreq event channel
+ * @return 0 on success, -1 on failure.
+ */
+int xc_hvm_get_ioreq_server_info(xc_interface *xch,
+                                 domid_t domid,
+                                 ioservid_t id,
+                                 xen_pfn_t *ioreq_pfn,
+                                 xen_pfn_t *bufioreq_pfn,
+                                 evtchn_port_t *bufioreq_port);
+
+/**
+ * This function registers a range of memory or I/O ports for emulation.
+ *
+ * @parm xch a handle to an open hypervisor interface.
+ * @parm domid the domain id to be serviced
+ * @parm id the IOREQ Server id.
+ * @parm is_mmio is this a range of ports or memory
+ * @parm start start of range
+ * @parm end end of range (inclusive).
+ * @return 0 on success, -1 on failure.
+ */
+int xc_hvm_map_io_range_to_ioreq_server(xc_interface *xch,
+                                        domid_t domid,
+                                        ioservid_t id,
+                                        int is_mmio,
+                                        uint64_t start,
+                                        uint64_t end);
+
+/**
+ * This function deregisters a range of memory or I/O ports for emulation.
+ *
+ * @parm xch a handle to an open hypervisor interface.
+ * @parm domid the domain id to be serviced
+ * @parm id the IOREQ Server id.
+ * @parm is_mmio is this a range of ports or memory
+ * @parm start start of range
+ * @parm end end of range (inclusive).
+ * @return 0 on success, -1 on failure.
+ */
+int xc_hvm_unmap_io_range_from_ioreq_server(xc_interface *xch,
+                                            domid_t domid,
+                                            ioservid_t id,
+                                            int is_mmio,
+                                            uint64_t start,
+                                            uint64_t end);
+
+/**
+ * This function registers a PCI device for config space emulation.
+ *
+ * @parm xch a handle to an open hypervisor interface.
+ * @parm domid the domain id to be serviced
+ * @parm id the IOREQ Server id.
+ * @parm segment the PCI segment of the device
+ * @parm bus the PCI bus of the device
+ * @parm device the 'slot' number of the device
+ * @parm function the function number of the device
+ * @return 0 on success, -1 on failure.
+ */
+int xc_hvm_map_pcidev_to_ioreq_server(xc_interface *xch,
+                                      domid_t domid,
+                                      ioservid_t id,
+                                      uint16_t segment,
+                                      uint8_t bus,
+                                      uint8_t device,
+                                      uint8_t function);
+
+/**
+ * This function deregisters a PCI device for config space emulation.
+ *
+ * @parm xch a handle to an open hypervisor interface.
+ * @parm domid the domain id to be serviced
+ * @parm id the IOREQ Server id.
+ * @parm segment the PCI segment of the device
+ * @parm bus the PCI bus of the device
+ * @parm device the 'slot' number of the device
+ * @parm function the function number of the device
+ * @return 0 on success, -1 on failure.
+ */
+int xc_hvm_unmap_pcidev_from_ioreq_server(xc_interface *xch,
+                                          domid_t domid,
+                                          ioservid_t id,
+                                          uint16_t segment,
+                                          uint8_t bus,
+                                          uint8_t device,
+                                          uint8_t function);
+
+/**
+ * This function destroys an IOREQ Server.
+ *
+ * @parm xch a handle to an open hypervisor interface.
+ * @parm domid the domain id to be serviced
+ * @parm id the IOREQ Server id.
+ * @return 0 on success, -1 on failure.
+ */
+int xc_hvm_destroy_ioreq_server(xc_interface *xch,
+                                domid_t domid,
+                                ioservid_t id);
 
 /* HVM guest pass-through */
 int xc_assign_device(xc_interface *xch,
@@ -2425,3 +2554,13 @@ int xc_kexec_load(xc_interface *xch, uint8_t type, uint16_t arch,
 int xc_kexec_unload(xc_interface *xch, int type);
 
 #endif /* XENCTRL_H */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

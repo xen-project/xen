@@ -259,6 +259,9 @@
 #define XC_SAVE_ID_HVM_ACCESS_RING_PFN  -16
 #define XC_SAVE_ID_HVM_SHARING_RING_PFN -17
 #define XC_SAVE_ID_TOOLSTACK          -18 /* Optional toolstack specific info */
+/* These are a pair; it is an error for one to exist without the other */
+#define XC_SAVE_ID_HVM_IOREQ_SERVER_PFN -19
+#define XC_SAVE_ID_HVM_NR_IOREQ_SERVER_PAGES -20
 
 /*
 ** We process save/restore/migrate in batches of pages; the below

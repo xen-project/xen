@@ -233,6 +233,7 @@ int prepare_ring_for_helper(struct domain *d, unsigned long gmfn,
 void destroy_ring_for_helper(void **_va, struct page_info *page);
 
 bool_t hvm_send_assist_req(ioreq_t *p);
+void hvm_broadcast_assist_req(ioreq_t *p);
 
 void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat);
 int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat);

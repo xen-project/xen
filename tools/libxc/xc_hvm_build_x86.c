@@ -49,6 +49,9 @@
 #define NR_SPECIAL_PAGES     8
 #define special_pfn(x) (0xff000u - NR_SPECIAL_PAGES + (x))
 
+#define NR_IOREQ_SERVER_PAGES 8
+#define ioreq_server_pfn(x) (special_pfn(0) - NR_IOREQ_SERVER_PAGES + (x))
+
 #define VGA_HOLE_SIZE (0x20)
 
 static int modules_init(struct xc_hvm_build_args *args,
@@ -114,7 +117,7 @@ static void build_hvm_info(void *hvm_info_page, uint64_t mem_size,
     /* Memory parameters. */
     hvm_info->low_mem_pgend = lowmem_end >> PAGE_SHIFT;
     hvm_info->high_mem_pgend = highmem_end >> PAGE_SHIFT;
-    hvm_info->reserved_mem_pgstart = special_pfn(0);
+    hvm_info->reserved_mem_pgstart = ioreq_server_pfn(0);
 
     /* Finish with the checksum. */
     for ( i = 0, sum = 0; i < hvm_info->length; i++ )
@@ -257,6 +260,8 @@ static int setup_guest(xc_interface *xch,
         stat_1gb_pages = 0;
     int pod_mode = 0;
     int claim_enabled = args->claim_enabled;
+    xen_pfn_t special_array[NR_SPECIAL_PAGES];
+    xen_pfn_t ioreq_server_array[NR_IOREQ_SERVER_PAGES];
 
     if ( nr_pages > target_pages )
         pod_mode = XENMEMF_populate_on_demand;
@@ -469,17 +474,18 @@ static int setup_guest(xc_interface *xch,
 
     /* Allocate and clear special pages. */
     for ( i = 0; i < NR_SPECIAL_PAGES; i++ )
+        special_array[i] = special_pfn(i);
+
+    rc = xc_domain_populate_physmap_exact(xch, dom, NR_SPECIAL_PAGES, 0, 0,
+                                          special_array);
+    if ( rc != 0 )
     {
-        xen_pfn_t pfn = special_pfn(i);
-        rc = xc_domain_populate_physmap_exact(xch, dom, 1, 0, 0, &pfn);
-        if ( rc != 0 )
-        {
-            PERROR("Could not allocate %d'th special page.", i);
-            goto error_out;
-        }
-        if ( xc_clear_domain_page(xch, dom, special_pfn(i)) )
-            goto error_out;
+        PERROR("Could not allocate special pages.");
+        goto error_out;
     }
+
+    if ( xc_clear_domain_pages(xch, dom, special_pfn(0), NR_SPECIAL_PAGES) )
+            goto error_out;
 
     xc_set_hvm_param(xch, dom, HVM_PARAM_STORE_PFN,
                      special_pfn(SPECIALPAGE_XENSTORE));
@@ -495,6 +501,30 @@ static int setup_guest(xc_interface *xch,
                      special_pfn(SPECIALPAGE_ACCESS));
     xc_set_hvm_param(xch, dom, HVM_PARAM_SHARING_RING_PFN,
                      special_pfn(SPECIALPAGE_SHARING));
+
+    /*
+     * Allocate and clear additional ioreq server pages. The default
+     * server will use the IOREQ and BUFIOREQ special pages above.
+     */
+    for ( i = 0; i < NR_IOREQ_SERVER_PAGES; i++ )
+        ioreq_server_array[i] = ioreq_server_pfn(i);
+
+    rc = xc_domain_populate_physmap_exact(xch, dom, NR_IOREQ_SERVER_PAGES, 0, 0,
+                                          ioreq_server_array);
+    if ( rc != 0 )
+    {
+        PERROR("Could not allocate ioreq server pages.");
+        goto error_out;
+    }
+
+    if ( xc_clear_domain_pages(xch, dom, ioreq_server_pfn(0), NR_IOREQ_SERVER_PAGES) )
+            goto error_out;
+
+    /* Tell the domain where the pages are and how many there are */
+    xc_set_hvm_param(xch, dom, HVM_PARAM_IOREQ_SERVER_PFN,
+                     ioreq_server_pfn(0));
+    xc_set_hvm_param(xch, dom, HVM_PARAM_NR_IOREQ_SERVER_PAGES,
+                     NR_IOREQ_SERVER_PAGES);
 
     /*
      * Identity-map page table is required for running with CR0.PG=0 when

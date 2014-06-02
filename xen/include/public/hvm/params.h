@@ -145,6 +145,9 @@
 /* SHUTDOWN_* action in case of a triple fault */
 #define HVM_PARAM_TRIPLE_FAULT_REASON 31
 
-#define HVM_NR_PARAMS          32
+#define HVM_PARAM_IOREQ_SERVER_PFN 32
+#define HVM_PARAM_NR_IOREQ_SERVER_PAGES 33
+
+#define HVM_NR_PARAMS          34
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

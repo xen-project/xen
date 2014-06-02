@@ -304,6 +304,15 @@ static inline int list_empty(const struct list_head *head)
 }
 
 /**
+ * list_is_singular - tests whether a list has exactly one entry
+ * @head: the list to test.
+ */
+static inline int list_is_singular(const struct list_head *head)
+{
+    return !list_empty(head) && (head->next == head->prev);
+}
+
+/**
  * list_empty_careful - tests whether a list is empty and not being modified
  * @head: the list to test
  *

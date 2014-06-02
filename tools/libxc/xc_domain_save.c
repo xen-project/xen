@@ -1737,6 +1737,30 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             PERROR("Error when writing the viridian flag");
             goto out;
         }
+
+        chunk.id = XC_SAVE_ID_HVM_IOREQ_SERVER_PFN;
+        chunk.data = 0;
+        xc_get_hvm_param(xch, dom, HVM_PARAM_IOREQ_SERVER_PFN,
+                         (unsigned long *)&chunk.data);
+
+        if ( (chunk.data != 0) &&
+             wrexact(io_fd, &chunk, sizeof(chunk)) )
+        {
+            PERROR("Error when writing the ioreq server gmfn base");
+            goto out;
+        }
+
+        chunk.id = XC_SAVE_ID_HVM_NR_IOREQ_SERVER_PAGES;
+        chunk.data = 0;
+        xc_get_hvm_param(xch, dom, HVM_PARAM_NR_IOREQ_SERVER_PAGES,
+                         (unsigned long *)&chunk.data);
+
+        if ( (chunk.data != 0) &&
+             wrexact(io_fd, &chunk, sizeof(chunk)) )
+        {
+            PERROR("Error when writing the ioreq server gmfn count");
+            goto out;
+        }
     }
 
     if ( callbacks != NULL && callbacks->toolstack_save != NULL )

@@ -66,6 +66,7 @@
 #include <asm/mem_event.h>
 #include <asm/mem_access.h>
 #include <public/mem_event.h>
+#include <xen/rangeset.h>
 
 bool_t __read_mostly hvm_enabled;
 
@@ -375,27 +376,35 @@ static ioreq_t *get_ioreq(struct hvm_ioreq_server *s, struct vcpu *v)
 
 bool_t hvm_io_pending(struct vcpu *v)
 {
-    struct hvm_ioreq_server *s = v->domain->arch.hvm_domain.ioreq_server;
-    ioreq_t *p;
+    struct domain *d = v->domain;
+    struct hvm_ioreq_server *s;
 
-    if ( !s )
-        return 0;
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+    {
+        ioreq_t *p = get_ioreq(s, v);
 
-    p = get_ioreq(s, v);
-    return p->state != STATE_IOREQ_NONE;
+        if ( p->state != STATE_IOREQ_NONE )
+            return 1;
+    }
+
+    return 0;
 }
 
 void hvm_do_resume(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    struct hvm_ioreq_server *s = d->arch.hvm_domain.ioreq_server;
+    struct hvm_ioreq_server *s;
 
     check_wakeup_from_wait();
 
     if ( is_hvm_vcpu(v) )
         pt_restore_timer(v);
 
-    if ( s )
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
     {
         ioreq_t *p = get_ioreq(s, v);
 
@@ -428,6 +437,32 @@ void hvm_do_resume(struct vcpu *v)
         hvm_inject_trap(&v->arch.hvm_vcpu.inject_trap);
         v->arch.hvm_vcpu.inject_trap.vector = -1;
     }
+}
+
+static int hvm_alloc_ioreq_gmfn(struct domain *d, unsigned long *gmfn)
+{
+    unsigned int i;
+    int rc;
+
+    rc = -ENOMEM;
+    for ( i = 0; i < sizeof(d->arch.hvm_domain.ioreq_gmfn.mask) * 8; i++ )
+    {
+        if ( test_and_clear_bit(i, &d->arch.hvm_domain.ioreq_gmfn.mask) )
+        {
+            *gmfn = d->arch.hvm_domain.ioreq_gmfn.base + i;
+            rc = 0;
+            break;
+        }
+    }
+
+    return rc;
+}
+
+static void hvm_free_ioreq_gmfn(struct domain *d, unsigned long gmfn)
+{
+    unsigned int i = gmfn - d->arch.hvm_domain.ioreq_gmfn.base;
+
+    clear_bit(i, &d->arch.hvm_domain.ioreq_gmfn.mask);
 }
 
 void destroy_ring_for_helper(
@@ -514,6 +549,7 @@ static int hvm_map_ioreq_page(
 
     iorp->va = va;
     iorp->page = page;
+    iorp->gmfn = gmfn;
 
     return 0;
 }
@@ -544,6 +580,18 @@ static int hvm_print_line(
     return X86EMUL_OKAY;
 }
 
+static int hvm_access_cf8(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+{
+    struct domain *d = current->domain;
+
+    if ( dir == IOREQ_WRITE && bytes == 4 )
+        d->arch.hvm_domain.pci_cf8 = *val;
+
+    /* We always need to fall through to the catch all emulator */
+    return X86EMUL_UNHANDLEABLE;
+}
+
 static int handle_pvh_io(
     int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
@@ -572,7 +620,7 @@ static void hvm_update_ioreq_evtchn(struct hvm_ioreq_server *s,
 }
 
 static int hvm_ioreq_server_add_vcpu(struct hvm_ioreq_server *s,
-                                     struct vcpu *v)
+                                     bool_t is_default, struct vcpu *v)
 {
     struct hvm_ioreq_vcpu *sv;
     int rc;
@@ -600,8 +648,9 @@ static int hvm_ioreq_server_add_vcpu(struct hvm_ioreq_server *s,
             goto fail3;
 
         s->bufioreq_evtchn = rc;
-        d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN] =
-            s->bufioreq_evtchn;
+        if ( is_default )
+            d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN] =
+                s->bufioreq_evtchn;
     }
 
     sv->vcpu = v;
@@ -678,41 +727,132 @@ static void hvm_ioreq_server_remove_all_vcpus(struct hvm_ioreq_server *s)
     spin_unlock(&s->lock);
 }
 
-static int hvm_ioreq_server_map_pages(struct hvm_ioreq_server *s)
+static int hvm_ioreq_server_map_pages(struct hvm_ioreq_server *s,
+                                      bool_t is_default)
 {
     struct domain *d = s->domain;
-    unsigned long pfn;
+    unsigned long ioreq_pfn, bufioreq_pfn;
     int rc;
 
-    pfn = d->arch.hvm_domain.params[HVM_PARAM_IOREQ_PFN];
-    rc = hvm_map_ioreq_page(s, 0, pfn);
-    if ( rc )
-        return rc;
+    if ( is_default )
+    {
+        ioreq_pfn = d->arch.hvm_domain.params[HVM_PARAM_IOREQ_PFN];
+        bufioreq_pfn = d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_PFN];
+    }
+    else
+    {
+        rc = hvm_alloc_ioreq_gmfn(d, &ioreq_pfn);
+        if ( rc )
+            goto fail1;
 
-    pfn = d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_PFN];
-    rc = hvm_map_ioreq_page(s, 1, pfn);
+        rc = hvm_alloc_ioreq_gmfn(d, &bufioreq_pfn);
+        if ( rc )
+            goto fail2;
+    }
+
+    rc = hvm_map_ioreq_page(s, 0, ioreq_pfn);
     if ( rc )
-        goto fail;
+        goto fail3;
+
+    rc = hvm_map_ioreq_page(s, 1, bufioreq_pfn);
+    if ( rc )
+        goto fail4;
 
     return 0;
 
-fail:
+fail4:
     hvm_unmap_ioreq_page(s, 0);
+
+fail3:
+    if ( !is_default )
+        hvm_free_ioreq_gmfn(d, bufioreq_pfn);
+
+fail2:
+    if ( !is_default )
+        hvm_free_ioreq_gmfn(d, ioreq_pfn);
+
+fail1:
     return rc;
 }
 
-static void hvm_ioreq_server_unmap_pages(struct hvm_ioreq_server *s)
+static void hvm_ioreq_server_unmap_pages(struct hvm_ioreq_server *s, 
+                                         bool_t is_default)
 {
+    struct domain *d = s->domain;
+
     hvm_unmap_ioreq_page(s, 1);
     hvm_unmap_ioreq_page(s, 0);
+
+    if ( !is_default )
+    {
+        hvm_free_ioreq_gmfn(d, s->bufioreq.gmfn);
+        hvm_free_ioreq_gmfn(d, s->ioreq.gmfn);
+    }
+}
+
+static int hvm_ioreq_server_alloc_rangesets(struct hvm_ioreq_server *s, 
+                                            bool_t is_default)
+{
+    unsigned int i;
+    int rc;
+
+    if ( is_default )
+        goto done;
+
+    for ( i = 0; i < NR_IO_RANGE_TYPES; i++ )
+    {
+        char *name;
+
+        rc = asprintf(&name, "ioreq_server %d %s", s->id,
+                      (i == HVMOP_IO_RANGE_PORT) ? "port" :
+                      (i == HVMOP_IO_RANGE_MEMORY) ? "memory" :
+                      (i == HVMOP_IO_RANGE_PCI) ? "pci" :
+                      "");
+        if ( rc )
+            goto fail;
+
+        s->range[i] = rangeset_new(s->domain, name,
+                                   RANGESETF_prettyprint_hex);
+
+        xfree(name);
+
+        rc = -ENOMEM;
+        if ( !s->range[i] )
+            goto fail;
+
+        rangeset_limit(s->range[i], MAX_NR_IO_RANGES);
+    }
+
+ done:
+    return 0;
+
+ fail:
+    while ( --i >= 0 )
+        rangeset_destroy(s->range[i]);
+
+    return rc;
+}
+
+static void hvm_ioreq_server_free_rangesets(struct hvm_ioreq_server *s, 
+                                            bool_t is_default)
+{
+    unsigned int i;
+
+    if ( is_default )
+        return;
+
+    for ( i = 0; i < NR_IO_RANGE_TYPES; i++ )
+        rangeset_destroy(s->range[i]);
 }
 
 static int hvm_ioreq_server_init(struct hvm_ioreq_server *s, struct domain *d,
-                                 domid_t domid)
+                                 domid_t domid, bool_t is_default,
+                                 ioservid_t id)
 {
     struct vcpu *v;
     int rc;
 
+    s->id = id;
     s->domain = d;
     s->domid = domid;
 
@@ -720,33 +860,71 @@ static int hvm_ioreq_server_init(struct hvm_ioreq_server *s, struct domain *d,
     INIT_LIST_HEAD(&s->ioreq_vcpu_list);
     spin_lock_init(&s->bufioreq_lock);
 
-    rc = hvm_ioreq_server_map_pages(s);
+    rc = hvm_ioreq_server_alloc_rangesets(s, is_default);
     if ( rc )
-        return rc;
+        goto fail1;
+
+    rc = hvm_ioreq_server_map_pages(s, is_default);
+    if ( rc )
+        goto fail2;
 
     for_each_vcpu ( d, v )
     {
-        rc = hvm_ioreq_server_add_vcpu(s, v);
+        rc = hvm_ioreq_server_add_vcpu(s, is_default, v);
         if ( rc )
-            goto fail;
+            goto fail3;
     }
 
     return 0;
 
- fail:
+ fail3:
     hvm_ioreq_server_remove_all_vcpus(s);
-    hvm_ioreq_server_unmap_pages(s);
+    hvm_ioreq_server_unmap_pages(s, is_default);
 
+ fail2:
+    hvm_ioreq_server_free_rangesets(s, is_default);
+
+ fail1:
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
     return rc;
 }
 
-static void hvm_ioreq_server_deinit(struct hvm_ioreq_server *s)
+static void hvm_ioreq_server_deinit(struct hvm_ioreq_server *s,
+                                    bool_t is_default)
 {
     hvm_ioreq_server_remove_all_vcpus(s);
-    hvm_ioreq_server_unmap_pages(s);
+    hvm_ioreq_server_unmap_pages(s, is_default);
+    hvm_ioreq_server_free_rangesets(s, is_default);
 }
 
-static int hvm_create_ioreq_server(struct domain *d, domid_t domid)
+static ioservid_t next_ioservid(struct domain *d)
+{
+    struct hvm_ioreq_server *s;
+    ioservid_t id;
+    
+    ASSERT(spin_is_locked(&d->arch.hvm_domain.ioreq_server.lock));
+
+    id = d->arch.hvm_domain.ioreq_server.id;
+
+ again:
+    id++;
+
+    /* Check for uniqueness */
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+    {
+        if ( id == s->id )
+            goto again;
+    }
+
+    d->arch.hvm_domain.ioreq_server.id = id;
+
+    return id;
+}
+
+static int hvm_create_ioreq_server(struct domain *d, domid_t domid,
+                                   bool_t is_default, ioservid_t *id)
 {
     struct hvm_ioreq_server *s;
     int rc;
@@ -757,25 +935,34 @@ static int hvm_create_ioreq_server(struct domain *d, domid_t domid)
         goto fail1;
 
     domain_pause(d);
-    spin_lock(&d->arch.hvm_domain.ioreq_server_lock);
+    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
 
     rc = -EEXIST;
-    if ( d->arch.hvm_domain.ioreq_server != NULL )
+    if ( is_default && d->arch.hvm_domain.default_ioreq_server != NULL )
         goto fail2;
 
-    rc = hvm_ioreq_server_init(s, d, domid);
+    rc = hvm_ioreq_server_init(s, d, domid, is_default,
+                               next_ioservid(d));
     if ( rc )
-        goto fail2;
+        goto fail3;
 
-    d->arch.hvm_domain.ioreq_server = s;
+    list_add(&s->list_entry,
+             &d->arch.hvm_domain.ioreq_server.list);
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server_lock);
+    if ( is_default )
+        d->arch.hvm_domain.default_ioreq_server = s;
+
+    if ( id )
+        *id = s->id;
+
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
     domain_unpause(d);
 
     return 0;
 
+ fail3:
  fail2:
-    spin_unlock(&d->arch.hvm_domain.ioreq_server_lock);
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
     domain_unpause(d);
 
     xfree(s);
@@ -783,24 +970,252 @@ static int hvm_create_ioreq_server(struct domain *d, domid_t domid)
     return rc;
 }
 
-static void hvm_destroy_ioreq_server(struct domain *d)
+static int hvm_destroy_ioreq_server(struct domain *d, ioservid_t id)
+{
+    struct hvm_ioreq_server *s;
+    int rc;
+
+    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    rc = -ENOENT;
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+    {
+        if ( s == d->arch.hvm_domain.default_ioreq_server )
+            continue;
+
+        if ( s->id != id )
+            continue;
+
+        domain_pause(d);
+
+        list_del(&s->list_entry);
+        
+        hvm_ioreq_server_deinit(s, 0);
+
+        domain_unpause(d);
+
+        xfree(s);
+
+        rc = 0;
+        break;
+    }
+
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    return rc;
+}
+
+static int hvm_get_ioreq_server_info(struct domain *d, ioservid_t id,
+                                     unsigned long *ioreq_pfn,
+                                     unsigned long *bufioreq_pfn,
+                                     evtchn_port_t *bufioreq_port)
+{
+    struct hvm_ioreq_server *s;
+    int rc;
+
+    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    rc = -ENOENT;
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+    {
+        if ( s == d->arch.hvm_domain.default_ioreq_server )
+            continue;
+
+        if ( s->id != id )
+            continue;
+
+        *ioreq_pfn = s->ioreq.gmfn;
+        *bufioreq_pfn = s->bufioreq.gmfn;
+        *bufioreq_port = s->bufioreq_evtchn;
+
+        rc = 0;
+        break;
+    }
+
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    return rc;
+}
+
+static int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
+                                            uint32_t type, uint64_t start, uint64_t end)
+{
+    struct hvm_ioreq_server *s;
+    int rc;
+
+    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    rc = -ENOENT;
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+    {
+        if ( s == d->arch.hvm_domain.default_ioreq_server )
+            continue;
+
+        if ( s->id == id )
+        {
+            struct rangeset *r;
+
+            switch ( type )
+            {
+            case HVMOP_IO_RANGE_PORT:
+            case HVMOP_IO_RANGE_MEMORY:
+            case HVMOP_IO_RANGE_PCI:
+                r = s->range[type];
+                break;
+
+            default:
+                r = NULL;
+                break;
+            }
+
+            rc = -EINVAL;
+            if ( !r )
+                break;
+
+            rc = -EEXIST;
+            if ( rangeset_overlaps_range(r, start, end) )
+                break;
+
+            rc = rangeset_add_range(r, start, end);
+            break;
+        }
+    }
+
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    return rc;
+}
+
+static int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
+                                                uint32_t type, uint64_t start, uint64_t end)
+{
+    struct hvm_ioreq_server *s;
+    int rc;
+
+    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    rc = -ENOENT;
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+    {
+        if ( s == d->arch.hvm_domain.default_ioreq_server )
+            continue;
+
+        if ( s->id == id )
+        {
+            struct rangeset *r;
+
+            switch ( type )
+            {
+            case HVMOP_IO_RANGE_PORT:
+            case HVMOP_IO_RANGE_MEMORY:
+            case HVMOP_IO_RANGE_PCI:
+                r = s->range[type];
+                break;
+
+            default:
+                r = NULL;
+                break;
+            }
+
+            rc = -EINVAL;
+            if ( !r )
+                break;
+
+            rc = -ENOENT;
+            if ( !rangeset_contains_range(r, start, end) )
+                break;
+
+            rc = rangeset_remove_range(r, start, end);
+            break;
+        }
+    }
+
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    return rc;
+}
+
+static int hvm_all_ioreq_servers_add_vcpu(struct domain *d, struct vcpu *v)
+{
+    struct hvm_ioreq_server *s;
+    int rc;
+
+    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+    {
+        bool_t is_default = (s == d->arch.hvm_domain.default_ioreq_server);
+
+        rc = hvm_ioreq_server_add_vcpu(s, is_default, v);
+        if ( rc )
+            goto fail;
+    }
+
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    return 0;
+
+ fail:
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+        hvm_ioreq_server_remove_vcpu(s, v);
+
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    return rc;
+}
+
+static void hvm_all_ioreq_servers_remove_vcpu(struct domain *d, struct vcpu *v)
 {
     struct hvm_ioreq_server *s;
 
-    domain_pause(d);
-    spin_lock(&d->arch.hvm_domain.ioreq_server_lock);
+    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
 
-    s = d->arch.hvm_domain.ioreq_server;
-    if ( s )
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+        hvm_ioreq_server_remove_vcpu(s, v);
+
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+}
+
+static void hvm_destroy_all_ioreq_servers(struct domain *d)
+{
+    struct hvm_ioreq_server *s, *next;
+
+    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+
+    /* No need to domain_pause() as the domain is being torn down */
+
+    list_for_each_entry_safe ( s,
+                               next,
+                               &d->arch.hvm_domain.ioreq_server.list,
+                               list_entry )
     {
-        d->arch.hvm_domain.ioreq_server = NULL;
-        hvm_ioreq_server_deinit(s);
+        bool_t is_default = (s == d->arch.hvm_domain.default_ioreq_server);
+
+        if ( is_default )
+            d->arch.hvm_domain.default_ioreq_server = NULL;
+
+        list_del(&s->list_entry);
+        
+        hvm_ioreq_server_deinit(s, is_default);
+
+        xfree(s);
     }
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server_lock);
-    domain_unpause(d);
-
-    xfree(s);
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
 }
 
 static int hvm_replace_event_channel(struct vcpu *v, domid_t remote_domid,
@@ -823,21 +1238,22 @@ static int hvm_set_dm_domain(struct domain *d, domid_t domid)
     struct hvm_ioreq_server *s;
     int rc = 0;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server_lock);
+    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
 
     /*
      * Lack of ioreq server is not a failure. HVM_PARAM_DM_DOMAIN will
      * still be set and thus, when the server is created, it will have
      * the correct domid.
      */
-    s = d->arch.hvm_domain.ioreq_server;
+    s = d->arch.hvm_domain.default_ioreq_server;
     if ( !s )
         goto done;
 
     domain_pause(d);
     spin_lock(&s->lock);
 
-    if ( s->domid != domid ) {
+    if ( s->domid != domid ) 
+    {
         struct hvm_ioreq_vcpu *sv;
 
         list_for_each_entry ( sv,
@@ -871,7 +1287,7 @@ static int hvm_set_dm_domain(struct domain *d, domid_t domid)
     domain_unpause(d);
 
  done:
-    spin_unlock(&d->arch.hvm_domain.ioreq_server_lock);
+    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
     return rc;
 }
 
@@ -902,7 +1318,8 @@ int hvm_domain_initialise(struct domain *d)
 
     }
 
-    spin_lock_init(&d->arch.hvm_domain.ioreq_server_lock);
+    spin_lock_init(&d->arch.hvm_domain.ioreq_server.lock);
+    INIT_LIST_HEAD(&d->arch.hvm_domain.ioreq_server.list);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
     spin_lock_init(&d->arch.hvm_domain.uc_lock);
 
@@ -944,6 +1361,7 @@ int hvm_domain_initialise(struct domain *d)
     rtc_init(d);
 
     register_portio_handler(d, 0xe9, 1, hvm_print_line);
+    register_portio_handler(d, 0xcf8, 4, hvm_access_cf8);
 
     rc = hvm_funcs.domain_initialise(d);
     if ( rc != 0 )
@@ -974,7 +1392,7 @@ void hvm_domain_relinquish_resources(struct domain *d)
     if ( hvm_funcs.nhvm_domain_relinquish_resources )
         hvm_funcs.nhvm_domain_relinquish_resources(d);
 
-    hvm_destroy_ioreq_server(d);
+    hvm_destroy_all_ioreq_servers(d);
 
     msixtbl_pt_cleanup(d);
 
@@ -1607,7 +2025,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
     struct domain *d = v->domain;
-    struct hvm_ioreq_server *s;
 
     hvm_asid_flush_vcpu(v);
 
@@ -1650,14 +2067,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
          && (rc = nestedhvm_vcpu_initialise(v)) < 0 ) /* teardown: nestedhvm_vcpu_destroy */
         goto fail5;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server_lock);
-
-    s = d->arch.hvm_domain.ioreq_server;
-    if ( s )
-        rc = hvm_ioreq_server_add_vcpu(s, v);
-
-    spin_unlock(&d->arch.hvm_domain.ioreq_server_lock);
-
+    rc = hvm_all_ioreq_servers_add_vcpu(d, v);
     if ( rc != 0 )
         goto fail6;
 
@@ -1694,15 +2104,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
 void hvm_vcpu_destroy(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    struct hvm_ioreq_server *s;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server_lock);
-
-    s = d->arch.hvm_domain.ioreq_server;
-    if ( s )
-        hvm_ioreq_server_remove_vcpu(s, v);
-
-    spin_unlock(&d->arch.hvm_domain.ioreq_server_lock);
+    hvm_all_ioreq_servers_remove_vcpu(d, v);
 
     nestedhvm_vcpu_destroy(v);
 
@@ -1741,11 +2144,107 @@ void hvm_vcpu_down(struct vcpu *v)
     }
 }
 
+static struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
+                                                        ioreq_t *p)
+{
+#define CF8_BDF(cf8)     (((cf8) & 0x00ffff00) >> 8)
+#define CF8_ADDR_LO(cf8) ((cf8) & 0x000000fc)
+#define CF8_ADDR_HI(cf8) (((cf8) & 0x0f000000) >> 16)
+#define CF8_ENABLED(cf8) (!!((cf8) & 0x80000000))
+
+    struct hvm_ioreq_server *s;
+    uint32_t cf8;
+    uint8_t type;
+    uint64_t addr;
+
+    if ( list_empty(&d->arch.hvm_domain.ioreq_server.list) )
+        return NULL;
+
+    if ( list_is_singular(&d->arch.hvm_domain.ioreq_server.list) ||
+         (p->type != IOREQ_TYPE_COPY && p->type != IOREQ_TYPE_PIO) )
+        return d->arch.hvm_domain.default_ioreq_server;
+
+    cf8 = d->arch.hvm_domain.pci_cf8;
+
+    if ( p->type == IOREQ_TYPE_PIO &&
+         (p->addr & ~3) == 0xcfc &&
+         CF8_ENABLED(cf8) )
+    {
+        uint32_t sbdf;
+
+        /* PCI config data cycle */
+
+        sbdf = HVMOP_PCI_SBDF(0,
+                              PCI_BUS(CF8_BDF(cf8)),
+                              PCI_SLOT(CF8_BDF(cf8)),
+                              PCI_FUNC(CF8_BDF(cf8)));
+
+        type = IOREQ_TYPE_PCI_CONFIG;
+        addr = ((uint64_t)sbdf << 32) |
+               CF8_ADDR_HI(cf8) |
+               CF8_ADDR_LO(cf8) |
+               (p->addr & 3);
+    }
+    else
+    {
+        type = p->type;
+        addr = p->addr;
+    }
+
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+    {
+        struct rangeset *r;
+
+        if ( s == d->arch.hvm_domain.default_ioreq_server )
+            continue;
+
+        BUILD_BUG_ON(IOREQ_TYPE_PIO != HVMOP_IO_RANGE_PORT);
+        BUILD_BUG_ON(IOREQ_TYPE_COPY != HVMOP_IO_RANGE_MEMORY);
+        BUILD_BUG_ON(IOREQ_TYPE_PCI_CONFIG != HVMOP_IO_RANGE_PCI);
+        r = s->range[type];
+
+        switch ( type )
+        {
+            unsigned long end;
+
+        case IOREQ_TYPE_PIO:
+            end = addr + p->size - 1;
+            if ( rangeset_contains_range(r, addr, end) )
+                return s;
+
+            break;
+        case IOREQ_TYPE_COPY:
+            end = addr + (p->size * p->count) - 1;
+            if ( rangeset_contains_range(r, addr, end) )
+                return s;
+
+            break;
+        case IOREQ_TYPE_PCI_CONFIG:
+            if ( rangeset_contains_singleton(r, addr >> 32) )
+            {
+                p->type = type;
+                p->addr = addr;
+                return s;
+            }
+
+            break;
+        }
+    }
+
+    return d->arch.hvm_domain.default_ioreq_server;
+
+#undef CF8_ADDR_ENABLED
+#undef CF8_ADDR_HI
+#undef CF8_ADDR_LO
+#undef CF8_BDF
+}
+
 int hvm_buffered_io_send(ioreq_t *p)
 {
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
-    struct hvm_ioreq_server *s = d->arch.hvm_domain.ioreq_server;
+    struct domain *d = current->domain;
+    struct hvm_ioreq_server *s = hvm_select_ioreq_server(d, p);
     struct hvm_ioreq_page *iorp;
     buffered_iopage_t *pg;
     buf_ioreq_t bp = { .data = p->data,
@@ -1825,23 +2324,20 @@ int hvm_buffered_io_send(ioreq_t *p)
 
 bool_t hvm_has_dm(struct domain *d)
 {
-    return !!d->arch.hvm_domain.ioreq_server;
+    return !list_empty(&d->arch.hvm_domain.ioreq_server.list);
 }
 
-bool_t hvm_send_assist_req(ioreq_t *proto_p)
+bool_t hvm_send_assist_req_to_ioreq_server(struct hvm_ioreq_server *s,
+                                           ioreq_t *proto_p)
 {
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
-    struct hvm_ioreq_server *s = d->arch.hvm_domain.ioreq_server;
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
     ioreq_t *p;
 
-    if ( unlikely(!vcpu_start_shutdown_deferral(v)) )
+    if ( unlikely(!vcpu_start_shutdown_deferral(curr)) )
         return 0; /* implicitly bins the i/o operation */
 
-    if ( !s )
-        return 0;
-
-    p = get_ioreq(s, v);
+    p = get_ioreq(s, curr);
 
     if ( unlikely(p->state != STATE_IOREQ_NONE) )
     {
@@ -1865,6 +2361,29 @@ bool_t hvm_send_assist_req(ioreq_t *proto_p)
     notify_via_xen_event_channel(d, p->vp_eport);
 
     return 1;
+}
+
+bool_t hvm_send_assist_req(ioreq_t *p)
+{
+    struct hvm_ioreq_server *s = hvm_select_ioreq_server(current->domain, p);
+
+    if ( !s )
+        return 0;
+
+    return hvm_send_assist_req_to_ioreq_server(s, p);
+}
+
+void hvm_broadcast_assist_req(ioreq_t *p)
+{
+    struct domain *d = current->domain;
+    struct hvm_ioreq_server *s;
+
+    ASSERT(p->type == IOREQ_TYPE_INVALIDATE);
+
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+        (void) hvm_send_assist_req_to_ioreq_server(s, p);
 }
 
 void hvm_hlt(unsigned long rflags)
@@ -4480,6 +4999,165 @@ static int hvmop_flush_tlb_all(void)
     return 0;
 }
 
+static int hvmop_create_ioreq_server(
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_create_ioreq_server_t) uop)
+{
+    struct domain *curr_d = current->domain;
+    xen_hvm_create_ioreq_server_t op;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
+    if ( rc != 0 )
+        return rc;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = xsm_hvm_ioreq_server(XSM_DM_PRIV, d, HVMOP_create_ioreq_server);
+    if ( rc != 0 )
+        goto out;
+
+    rc = hvm_create_ioreq_server(d, curr_d->domain_id, 0, &op.id);
+    if ( rc != 0 )
+        goto out;
+
+    rc = copy_to_guest(uop, &op, 1) ? -EFAULT : 0;
+    
+ out:
+    rcu_unlock_domain(d);
+    return rc;
+}
+
+static int hvmop_get_ioreq_server_info(
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_get_ioreq_server_info_t) uop)
+{
+    xen_hvm_get_ioreq_server_info_t op;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
+    if ( rc != 0 )
+        return rc;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = xsm_hvm_ioreq_server(XSM_DM_PRIV, d, HVMOP_get_ioreq_server_info);
+    if ( rc != 0 )
+        goto out;
+
+    rc = hvm_get_ioreq_server_info(d, op.id,
+                                   &op.ioreq_pfn,
+                                   &op.bufioreq_pfn, 
+                                   &op.bufioreq_port);
+    if ( rc != 0 )
+        goto out;
+
+    rc = copy_to_guest(uop, &op, 1) ? -EFAULT : 0;
+    
+ out:
+    rcu_unlock_domain(d);
+    return rc;
+}
+
+static int hvmop_map_io_range_to_ioreq_server(
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_io_range_t) uop)
+{
+    xen_hvm_io_range_t op;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
+    if ( rc != 0 )
+        return rc;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = xsm_hvm_ioreq_server(XSM_DM_PRIV, d, HVMOP_map_io_range_to_ioreq_server);
+    if ( rc != 0 )
+        goto out;
+
+    rc = hvm_map_io_range_to_ioreq_server(d, op.id, op.type,
+                                          op.start, op.end);
+
+ out:
+    rcu_unlock_domain(d);
+    return rc;
+}
+
+static int hvmop_unmap_io_range_from_ioreq_server(
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_io_range_t) uop)
+{
+    xen_hvm_io_range_t op;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
+    if ( rc != 0 )
+        return rc;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = xsm_hvm_ioreq_server(XSM_DM_PRIV, d, HVMOP_unmap_io_range_from_ioreq_server);
+    if ( rc != 0 )
+        goto out;
+
+    rc = hvm_unmap_io_range_from_ioreq_server(d, op.id, op.type,
+                                              op.start, op.end);
+    
+ out:
+    rcu_unlock_domain(d);
+    return rc;
+}
+
+static int hvmop_destroy_ioreq_server(
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_destroy_ioreq_server_t) uop)
+{
+    xen_hvm_destroy_ioreq_server_t op;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
+    if ( rc != 0 )
+        return rc;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = xsm_hvm_ioreq_server(XSM_DM_PRIV, d, HVMOP_destroy_ioreq_server);
+    if ( rc != 0 )
+        goto out;
+
+    rc = hvm_destroy_ioreq_server(d, op.id);
+
+ out:
+    rcu_unlock_domain(d);
+    return rc;
+}
+
 #define HVMOP_op_mask 0xff
 
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
@@ -4491,6 +5169,31 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     switch ( op &= HVMOP_op_mask )
     {
+    case HVMOP_create_ioreq_server:
+        rc = hvmop_create_ioreq_server(
+            guest_handle_cast(arg, xen_hvm_create_ioreq_server_t));
+        break;
+    
+    case HVMOP_get_ioreq_server_info:
+        rc = hvmop_get_ioreq_server_info(
+            guest_handle_cast(arg, xen_hvm_get_ioreq_server_info_t));
+        break;
+    
+    case HVMOP_map_io_range_to_ioreq_server:
+        rc = hvmop_map_io_range_to_ioreq_server(
+            guest_handle_cast(arg, xen_hvm_io_range_t));
+        break;
+    
+    case HVMOP_unmap_io_range_from_ioreq_server:
+        rc = hvmop_unmap_io_range_from_ioreq_server(
+            guest_handle_cast(arg, xen_hvm_io_range_t));
+        break;
+    
+    case HVMOP_destroy_ioreq_server:
+        rc = hvmop_destroy_ioreq_server(
+            guest_handle_cast(arg, xen_hvm_destroy_ioreq_server_t));
+        break;
+    
     case HVMOP_set_param:
     case HVMOP_get_param:
     {
@@ -4644,6 +5347,34 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 if ( a.value > SHUTDOWN_MAX )
                     rc = -EINVAL;
                 break;
+            case HVM_PARAM_IOREQ_SERVER_PFN:
+                if ( d == current->domain )
+                {
+                    rc = -EPERM;
+                    break;
+                }
+                d->arch.hvm_domain.ioreq_gmfn.base = a.value;
+                break;
+            case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+            {
+                unsigned int i;
+
+                if ( d == current->domain )
+                {
+                    rc = -EPERM;
+                    break;
+                }
+                if ( a.value == 0 ||
+                     a.value > sizeof(d->arch.hvm_domain.ioreq_gmfn.mask) * 8 )
+                {
+                    rc = -EINVAL;
+                    break;
+                }
+                for ( i = 0; i < a.value; i++ )
+                    set_bit(i, &d->arch.hvm_domain.ioreq_gmfn.mask);
+
+                break;
+            }
             }
 
             if ( rc == 0 ) 
@@ -4677,6 +5408,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             case HVM_PARAM_ACPI_S_STATE:
                 a.value = d->arch.hvm_domain.is_s3_suspended ? 3 : 0;
                 break;
+            case HVM_PARAM_IOREQ_SERVER_PFN:
+            case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+                if ( d == current->domain )
+                {
+                    rc = -EPERM;
+                    break;
+                }
             case HVM_PARAM_IOREQ_PFN:
             case HVM_PARAM_BUFIOREQ_PFN:
             case HVM_PARAM_BUFIOREQ_EVTCHN: {
@@ -4684,7 +5422,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 
                 /* May need to create server */
                 domid = d->arch.hvm_domain.params[HVM_PARAM_DM_DOMAIN];
-                rc = hvm_create_ioreq_server(d, domid);
+                rc = hvm_create_ioreq_server(d, domid, 1, NULL);
                 if ( rc != 0 && rc != -EEXIST )
                     goto param_fail;
                 /*FALLTHRU*/

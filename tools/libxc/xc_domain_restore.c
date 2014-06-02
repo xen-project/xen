@@ -38,6 +38,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include "xg_private.h"
 #include "xg_save_restore.h"
@@ -740,6 +741,8 @@ typedef struct {
     uint64_t acpi_ioport_location;
     uint64_t viridian;
     uint64_t vm_generationid_addr;
+    uint64_t ioreq_server_pfn;
+    uint64_t nr_ioreq_server_pages;
 
     struct toolstack_data_t tdata;
 } pagebuf_t;
@@ -988,6 +991,26 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
             return -1;
         }
         DPRINTF("read generation id buffer address");
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
+    case XC_SAVE_ID_HVM_IOREQ_SERVER_PFN:
+        /* Skip padding 4 bytes then read the ioreq server gmfn base. */
+        if ( RDEXACT(fd, &buf->ioreq_server_pfn, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->ioreq_server_pfn, sizeof(uint64_t)) )
+        {
+            PERROR("error read the ioreq server gmfn base");
+            return -1;
+        }
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
+    case XC_SAVE_ID_HVM_NR_IOREQ_SERVER_PAGES:
+        /* Skip padding 4 bytes then read the ioreq server gmfn count. */
+        if ( RDEXACT(fd, &buf->nr_ioreq_server_pages, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->nr_ioreq_server_pages, sizeof(uint64_t)) )
+        {
+            PERROR("error read the ioreq server gmfn count");
+            return -1;
+        }
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
 
     default:
@@ -1747,6 +1770,31 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     if (pagebuf.viridian != 0)
         xc_set_hvm_param(xch, dom, HVM_PARAM_VIRIDIAN, 1);
+
+    /*
+     * If we are migrating in from a host that does not support
+     * secondary emulators then nr_ioreq_server_pages will be 0, since
+     * there will be no XC_SAVE_ID_HVM_NR_IOREQ_SERVER_PAGES chunk in
+     * the image.
+     * If we are migrating from a host that does support secondary
+     * emulators then the XC_SAVE_ID_HVM_NR_IOREQ_SERVER_PAGES chunk
+     * will exist and is guaranteed to have a non-zero value. The
+     * existence of that chunk also implies the existence of the
+     * XC_SAVE_ID_HVM_IOREQ_SERVER_PFN chunk, which is also guaranteed
+     * to have a non-zero value.
+     */
+    if (!pagebuf.nr_ioreq_server_pages ^ !pagebuf.ioreq_server_pfn) {
+        ERROR("Inconsistent IOREQ Server settings (nr=%"PRIx64", pfn=%"PRIx64")",
+              pagebuf.nr_ioreq_server_pages, pagebuf.ioreq_server_pfn);
+    } else {
+        if (pagebuf.nr_ioreq_server_pages != 0 &&
+            pagebuf.ioreq_server_pfn != 0) {
+            xc_set_hvm_param(xch, dom, HVM_PARAM_NR_IOREQ_SERVER_PAGES, 
+                             pagebuf.nr_ioreq_server_pages);
+            xc_set_hvm_param(xch, dom, HVM_PARAM_IOREQ_SERVER_PFN,
+                             pagebuf.ioreq_server_pfn);
+        }
+    }
 
     if (pagebuf.acpi_ioport_location == 1) {
         DBGPRINTF("Use new firmware ioport from the checkpoint\n");

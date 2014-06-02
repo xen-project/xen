@@ -23,6 +23,7 @@
 
 #include "../xen.h"
 #include "../trace.h"
+#include "../event_channel.h"
 
 /* Get/set subcommands: extra argument == pointer to xen_hvm_param struct. */
 #define HVMOP_set_param           0
@@ -232,6 +233,125 @@ struct xen_hvm_inject_msi {
 typedef struct xen_hvm_inject_msi xen_hvm_inject_msi_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_inject_msi_t);
 
+/*
+ * IOREQ Servers
+ *
+ * The interface between an I/O emulator an Xen is called an IOREQ Server.
+ * A domain supports a single 'legacy' IOREQ Server which is instantiated if
+ * parameter...
+ *
+ * HVM_PARAM_IOREQ_PFN is read (to get the gmfn containing the synchronous
+ * ioreq structures), or...
+ * HVM_PARAM_BUFIOREQ_PFN is read (to get the gmfn containing the buffered
+ * ioreq ring), or...
+ * HVM_PARAM_BUFIOREQ_EVTCHN is read (to get the event channel that Xen uses
+ * to request buffered I/O emulation).
+ * 
+ * The following hypercalls facilitate the creation of IOREQ Servers for
+ * 'secondary' emulators which are invoked to implement port I/O, memory, or
+ * PCI config space ranges which they explicitly register.
+ */
+
+typedef uint16_t ioservid_t;
+
+/*
+ * HVMOP_create_ioreq_server: Instantiate a new IOREQ Server for a secondary
+ *                            emulator servicing domain <domid>.
+ *
+ * The <id> handed back is unique for <domid>.
+ */
+#define HVMOP_create_ioreq_server 17
+struct xen_hvm_create_ioreq_server {
+    domid_t domid; /* IN - domain to be serviced */
+    ioservid_t id; /* OUT - server id */
+};
+typedef struct xen_hvm_create_ioreq_server xen_hvm_create_ioreq_server_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_create_ioreq_server_t);
+
+/*
+ * HVMOP_get_ioreq_server_info: Get all the information necessary to access
+ *                              IOREQ Server <id>. 
+ *
+ * The emulator needs to map the synchronous ioreq structures and buffered
+ * ioreq ring that Xen uses to request emulation. These are hosted in domain
+ * <domid>'s gmfns <ioreq_pfn> and <bufioreq_pfn> respectively. In addition the
+ * emulator needs to bind to event channel <bufioreq_port> to listen for
+ * buffered emulation requests. (The event channels used for synchronous
+ * emulation requests are specified in the per-CPU ioreq structures in
+ * <ioreq_pfn>).
+ */
+#define HVMOP_get_ioreq_server_info 18
+struct xen_hvm_get_ioreq_server_info {
+    domid_t domid;                 /* IN - domain to be serviced */
+    ioservid_t id;                 /* IN - server id */
+    evtchn_port_t bufioreq_port;   /* OUT - buffered ioreq port */
+    uint64_aligned_t ioreq_pfn;    /* OUT - sync ioreq pfn */
+    uint64_aligned_t bufioreq_pfn; /* OUT - buffered ioreq pfn */
+};
+typedef struct xen_hvm_get_ioreq_server_info xen_hvm_get_ioreq_server_info_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_get_ioreq_server_info_t);
+
+/*
+ * HVM_map_io_range_to_ioreq_server: Register an I/O range of domain <domid>
+ *                                   for emulation by the client of IOREQ
+ *                                   Server <id>
+ * HVM_unmap_io_range_from_ioreq_server: Deregister an I/O range of <domid>
+ *                                       for emulation by the client of IOREQ
+ *                                       Server <id>
+ *
+ * There are three types of I/O that can be emulated: port I/O, memory accesses
+ * and PCI config space accesses. The <type> field denotes which type of range
+ * the <start> and <end> (inclusive) fields are specifying.
+ * PCI config space ranges are specified by segment/bus/device/function values
+ * which should be encoded using the HVMOP_PCI_SBDF helper macro below.
+ *
+ * NOTE: unless an emulation request falls entirely within a range mapped
+ * by a secondary emulator, it will not be passed to that emulator.
+ */
+#define HVMOP_map_io_range_to_ioreq_server 19
+#define HVMOP_unmap_io_range_from_ioreq_server 20
+struct xen_hvm_io_range {
+    domid_t domid;               /* IN - domain to be serviced */
+    ioservid_t id;               /* IN - server id */
+    uint32_t type;               /* IN - type of range */
+# define HVMOP_IO_RANGE_PORT   0 /* I/O port range */
+# define HVMOP_IO_RANGE_MEMORY 1 /* MMIO range */
+# define HVMOP_IO_RANGE_PCI    2 /* PCI segment/bus/dev/func range */
+    uint64_aligned_t start, end; /* IN - inclusive start and end of range */
+};
+typedef struct xen_hvm_io_range xen_hvm_io_range_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_io_range_t);
+
+#define HVMOP_PCI_SBDF(s,b,d,f)                 \
+	((((s) & 0xffff) << 16) |                   \
+	 (((b) & 0xff) << 8) |                      \
+	 (((d) & 0x1f) << 3) |                      \
+	 ((f) & 0x07))
+
+/*
+ * HVMOP_destroy_ioreq_server: Destroy the IOREQ Server <id> servicing domain
+ *                             <domid>.
+ *
+ * Any registered I/O ranges will be automatically deregistered.
+ */
+#define HVMOP_destroy_ioreq_server 21
+struct xen_hvm_destroy_ioreq_server {
+    domid_t domid; /* IN - domain to be serviced */
+    ioservid_t id; /* IN - server id */
+};
+typedef struct xen_hvm_destroy_ioreq_server xen_hvm_destroy_ioreq_server_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_destroy_ioreq_server_t);
+
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
