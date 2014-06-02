@@ -1508,6 +1508,33 @@ int xc_hvm_destroy_ioreq_server(xc_interface *xch,
     return rc;
 }
 
+int xc_hvm_set_ioreq_server_state(xc_interface *xch,
+                                  domid_t domid,
+                                  ioservid_t id,
+                                  int enabled)
+{
+    DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_set_ioreq_server_state_t, arg);
+    int rc;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_ioreq_server_state;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
+
+    arg->domid = domid;
+    arg->id = id;
+    arg->enabled = !!enabled;
+
+    rc = do_xen_hypercall(xch, &hypercall);
+
+    xc_hypercall_buffer_free(xch, arg);
+    return rc;
+}
+
 int xc_domain_setdebugging(xc_interface *xch,
                            uint32_t domid,
                            unsigned int enable)

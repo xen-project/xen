@@ -1829,6 +1829,24 @@ int xc_hvm_get_ioreq_server_info(xc_interface *xch,
                                  evtchn_port_t *bufioreq_port);
 
 /**
+ * This function sets IOREQ Server state. An IOREQ Server
+ * will not be passed emulation requests until it is in
+ * the enabled state.
+ * Note that the contents of the ioreq_pfn and bufioreq_pfn are
+ * not meaningful until the IOREQ Server is in the enabled state.
+ *
+ * @parm xch a handle to an open hypervisor interface.
+ * @parm domid the domain id to be serviced
+ * @parm id the IOREQ Server id.
+ * @parm enabled the state.
+ * @return 0 on success, -1 on failure.
+ */
+int xc_hvm_set_ioreq_server_state(xc_interface *xch,
+                                  domid_t domid,
+                                  ioservid_t id,
+                                  int enabled);
+
+/**
  * This function registers a range of memory or I/O ports for emulation.
  *
  * @parm xch a handle to an open hypervisor interface.

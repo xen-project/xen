@@ -69,6 +69,7 @@ struct hvm_ioreq_server {
     spinlock_t             bufioreq_lock;
     evtchn_port_t          bufioreq_evtchn;
     struct rangeset        *range[NR_IO_RANGE_TYPES];
+    bool_t                 enabled;
 };
 
 struct hvm_domain {

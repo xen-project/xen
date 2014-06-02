@@ -342,6 +342,25 @@ struct xen_hvm_destroy_ioreq_server {
 typedef struct xen_hvm_destroy_ioreq_server xen_hvm_destroy_ioreq_server_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_destroy_ioreq_server_t);
 
+/*
+ * HVMOP_set_ioreq_server_state: Enable or disable the IOREQ Server <id> servicing
+ *                               domain <domid>.
+ *
+ * The IOREQ Server will not be passed any emulation requests until it is in the
+ * enabled state.
+ * Note that the contents of the ioreq_pfn and bufioreq_fn (see
+ * HVMOP_get_ioreq_server_info) are not meaningful until the IOREQ Server is in
+ * the enabled state.
+ */
+#define HVMOP_set_ioreq_server_state 22
+struct xen_hvm_set_ioreq_server_state {
+    domid_t domid;   /* IN - domain to be serviced */
+    ioservid_t id;   /* IN - server id */
+    uint8_t enabled; /* IN - enabled? */    
+};
+typedef struct xen_hvm_set_ioreq_server_state xen_hvm_set_ioreq_server_state_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_ioreq_server_state_t);
+
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */
