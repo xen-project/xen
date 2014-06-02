@@ -17,6 +17,8 @@ SUBDIRS-$(CONFIG_ROMBIOS) += vgabios
 SUBDIRS-$(CONFIG_ROMBIOS) += etherboot
 SUBDIRS-y += hvmloader
 
+LD32BIT-$(CONFIG_FreeBSD) := LD32BIT_FLAG=-melf_i386_fbsd
+
 ovmf-dir:
 	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(OVMF_UPSTREAM_URL) $(OVMF_UPSTREAM_REVISION) ovmf-dir
 	cp ovmf-makefile ovmf-dir/Makefile;
@@ -36,7 +38,7 @@ ifeq ($(CONFIG_ROMBIOS),y)
 	false ; \
 	fi
 endif
-	$(MAKE) CC=$(CC) PYTHON=$(PYTHON) subdirs-$@
+	$(MAKE) $(LD32BIT-y) CC=$(CC) PYTHON=$(PYTHON) subdirs-$@
 
 
 .PHONY: install
