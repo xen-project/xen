@@ -37,12 +37,16 @@
 #include <sys/mman.h>
 #include <time.h>
 #include <assert.h>
+#include <sys/types.h>
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <util.h>
 #elif defined(__linux__)
 #include <pty.h>
 #elif defined(__sun__)
 #include <stropts.h>
+#elif defined(__FreeBSD__)
+#include <sys/ioctl.h>
+#include <libutil.h>
 #endif
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
