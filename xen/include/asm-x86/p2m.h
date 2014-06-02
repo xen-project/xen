@@ -188,6 +188,10 @@ typedef unsigned int p2m_query_t;
 #define p2m_is_broken(_t)   (p2m_to_mask(_t) & P2M_BROKEN_TYPES)
 #define p2m_is_foreign(_t)  (p2m_to_mask(_t) & p2m_to_mask(p2m_map_foreign))
 
+#define p2m_is_any_ram(_t)  (p2m_to_mask(_t) &                   \
+                             (P2M_RAM_TYPES | P2M_GRANT_TYPES |  \
+                              p2m_to_mask(p2m_map_foreign)))
+
 /* Per-p2m-table state */
 struct p2m_domain {
     /* Lock that protects updates to the p2m */
@@ -532,6 +536,9 @@ int p2m_is_logdirty_range(struct p2m_domain *, unsigned long start,
 int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn);
 
+/* Add foreign mapping to the guest's p2m table. */
+int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
+                    unsigned long gpfn, domid_t foreign_domid);
 
 /* 
  * Populate-on-demand

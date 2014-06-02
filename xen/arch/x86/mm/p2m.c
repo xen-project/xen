@@ -36,6 +36,7 @@
 #include <xen/event.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
+#include <xsm/xsm.h>
 
 #include "mm-locks.h"
 
@@ -311,14 +312,20 @@ struct page_info *get_page_from_gfn_p2m(
         /* Fast path: look up and get out */
         p2m_read_lock(p2m);
         mfn = __get_gfn_type_access(p2m, gfn, t, a, 0, NULL, 0);
-        if ( (p2m_is_ram(*t) || p2m_is_grant(*t))
-             && mfn_valid(mfn)
+        if ( p2m_is_any_ram(*t) && mfn_valid(mfn)
              && !((q & P2M_UNSHARE) && p2m_is_shared(*t)) )
         {
             page = mfn_to_page(mfn);
-            if ( !get_page(page, d)
-                 /* Page could be shared */
-                 && !get_page(page, dom_cow) )
+            if ( unlikely(p2m_is_foreign(*t)) )
+            {
+                struct domain *fdom = page_get_owner_and_reference(page);
+                ASSERT(fdom != d);
+                if ( fdom == NULL )
+                    page = NULL;
+            }
+            else if ( !get_page(page, d)
+                      /* Page could be shared */
+                      && !get_page(page, dom_cow) )
                 page = NULL;
         }
         p2m_read_unlock(p2m);
@@ -468,6 +475,10 @@ int p2m_alloc_table(struct p2m_domain *p2m)
     return rc;
 }
 
+/*
+ * pvh fixme: when adding support for pvh non-hardware domains, this path must
+ * cleanup any foreign p2m types (release refcnts on them).
+ */
 void p2m_teardown(struct p2m_domain *p2m)
 /* Return all the p2m pages to Xen.
  * We know we don't have any extra mappings to these pages */
@@ -836,8 +847,8 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 }
 
 /* Set foreign mfn in the given guest's p2m table. */
-static int __attribute__((unused))
-set_foreign_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+static int set_foreign_p2m_entry(struct domain *d, unsigned long gfn,
+                                 mfn_t mfn)
 {
     return set_typed_p2m_entry(d, gfn, mfn, p2m_map_foreign);
 }
@@ -1793,6 +1804,107 @@ out_p2m_audit:
 }
 #endif /* P2M_AUDIT */
 
+/*
+ * Add frame from foreign domain to target domain's physmap. Similar to
+ * XENMAPSPACE_gmfn but the frame is foreign being mapped into current,
+ * and is not removed from foreign domain.
+ *
+ * Usage: - libxl on pvh dom0 creating a guest and doing privcmd_ioctl_mmap.
+ *        - xentrace running on dom0 mapping xenheap pages. foreigndom would
+ *          be DOMID_XEN in such a case.
+ *        etc..
+ *
+ * Side Effect: the mfn for fgfn will be refcounted in lower level routines
+ *              so it is not lost while mapped here. The refcnt is released
+ *              via the XENMEM_remove_from_physmap path.
+ *
+ * Returns: 0 ==> success
+ */
+int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
+                    unsigned long gpfn, domid_t foreigndom)
+{
+    p2m_type_t p2mt, p2mt_prev;
+    unsigned long prev_mfn, mfn;
+    struct page_info *page;
+    int rc;
+    struct domain *fdom;
+
+    ASSERT(tdom);
+    if ( foreigndom == DOMID_SELF || !is_pvh_domain(tdom) )
+        return -EINVAL;
+    /*
+     * pvh fixme: until support is added to p2m teardown code to cleanup any
+     * foreign entries, limit this to hardware domain only.
+     */
+    if ( !is_hardware_domain(tdom) )
+        return -EPERM;
+
+    if ( foreigndom == DOMID_XEN )
+        fdom = rcu_lock_domain(dom_xen);
+    else
+        fdom = rcu_lock_domain_by_id(foreigndom);
+    if ( fdom == NULL )
+        return -ESRCH;
+
+    rc = -EINVAL;
+    if ( tdom == fdom )
+        goto out;
+
+    rc = xsm_map_gmfn_foreign(XSM_TARGET, tdom, fdom);
+    if ( rc )
+        goto out;
+
+    /*
+     * Take a refcnt on the mfn. NB: following supported for foreign mapping:
+     *     ram_rw | ram_logdirty | ram_ro | paging_out.
+     */
+    page = get_page_from_gfn(fdom, fgfn, &p2mt, P2M_ALLOC);
+    if ( !page ||
+         !p2m_is_ram(p2mt) || p2m_is_shared(p2mt) || p2m_is_hole(p2mt) )
+    {
+        if ( page )
+            put_page(page);
+        rc = -EINVAL;
+        goto out;
+    }
+    mfn = mfn_x(page_to_mfn(page));
+
+    /* Remove previously mapped page if it is present. */
+    prev_mfn = mfn_x(get_gfn(tdom, gpfn, &p2mt_prev));
+    if ( mfn_valid(_mfn(prev_mfn)) )
+    {
+        if ( is_xen_heap_mfn(prev_mfn) )
+            /* Xen heap frames are simply unhooked from this phys slot */
+            guest_physmap_remove_page(tdom, gpfn, prev_mfn, 0);
+        else
+            /* Normal domain memory is freed, to avoid leaking memory. */
+            guest_remove_page(tdom, gpfn);
+    }
+    /*
+     * Create the new mapping. Can't use guest_physmap_add_page() because it
+     * will update the m2p table which will result in  mfn -> gpfn of dom0
+     * and not fgfn of domU.
+     */
+    rc = set_foreign_p2m_entry(tdom, gpfn, _mfn(mfn));
+    if ( rc )
+        gdprintk(XENLOG_WARNING, "set_foreign_p2m_entry failed. "
+                 "gpfn:%lx mfn:%lx fgfn:%lx td:%d fd:%d\n",
+                 gpfn, mfn, fgfn, tdom->domain_id, fdom->domain_id);
+
+    put_page(page);
+
+    /*
+     * This put_gfn for the above get_gfn for prev_mfn.  We must do this
+     * after set_foreign_p2m_entry so another cpu doesn't populate the gpfn
+     * before us.
+     */
+    put_gfn(tdom, gpfn);
+
+out:
+    if ( fdom )
+        rcu_unlock_domain(fdom);
+    return rc;
+}
 /*
  * Local variables:
  * mode: C

@@ -4584,6 +4584,8 @@ int xenmem_add_to_physmap_one(
             page = mfn_to_page(mfn);
             break;
         }
+        case XENMAPSPACE_gmfn_foreign:
+            return p2m_add_foreign(d, idx, gpfn, foreign_domid);
         default:
             break;
     }
