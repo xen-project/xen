@@ -152,7 +152,8 @@ void flush_area_local(const void *va, unsigned int flags)
         if ( order < (BITS_PER_LONG - PAGE_SHIFT) )
             sz = 1UL << (order + PAGE_SHIFT);
 
-        if ( c->x86_clflush_size && c->x86_cache_size && sz &&
+        if ( !(flags & (FLUSH_TLB|FLUSH_TLB_GLOBAL)) &&
+             c->x86_clflush_size && c->x86_cache_size && sz &&
              ((sz >> 10) < c->x86_cache_size) )
         {
             va = (const void *)((unsigned long)va & ~(sz - 1));
