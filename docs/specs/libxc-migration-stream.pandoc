@@ -1,0 +1,672 @@
+% LibXenCtrl Domain Image Format
+% David Vrabel <<david.vrabel@citrix.com>>
+  Andrew Cooper <<andrew.cooper3@citrix.com>>
+% Draft G
+
+Introduction
+============
+
+Purpose
+-------
+
+The _domain save image_ is the context of a running domain used for
+snapshots of a domain or for transferring domains between hosts during
+migration.
+
+There are a number of problems with the format of the domain save
+image used in Xen 4.4 and earlier (the _legacy format_).
+
+* Dependant on toolstack word size.  A number of fields within the
+  image are native types such as `unsigned long` which have different
+  sizes between 32-bit and 64-bit toolstacks.  This prevents domains
+  from being migrated between hosts running 32-bit and 64-bit
+  toolstacks.
+
+* There is no header identifying the image.
+
+* The image has no version information.
+
+A new format that addresses the above is required.
+
+ARM does not yet have have a domain save image format specified and
+the format described in this specification should be suitable.
+
+Not Yet Included
+----------------
+
+The following features are not yet fully specified and will be
+included in a future draft.
+
+* Remus
+
+* Page data compression.
+
+* ARM
+
+
+Overview
+========
+
+The image format consists of two main sections:
+
+* _Headers_
+* _Records_
+
+Headers
+-------
+
+There are two headers: the _image header_, and the _domain header_.
+The image header describes the format of the image (version etc.).
+The _domain header_ contains general information about the domain
+(architecture, type etc.).
+
+Records
+-------
+
+The main part of the format is a sequence of different _records_.
+Each record type contains information about the domain context.  At a
+minimum there is a END record marking the end of the records section.
+
+
+Fields
+------
+
+All the fields within the headers and records have a fixed width.
+
+Fields are always aligned to their size.
+
+Padding and reserved fields are set to zero on save and must be
+ignored during restore.
+
+Integer (numeric) fields in the image header are always in big-endian
+byte order.
+
+Integer fields in the domain header and in the records are in the
+endianness described in the image header (which will typically be the
+native ordering).
+
+\clearpage
+
+Headers
+=======
+
+Image Header
+------------
+
+The image header identifies an image as a Xen domain save image.  It
+includes the version of this specification that the image complies
+with.
+
+Tools supporting version _V_ of the specification shall always save
+images using version _V_.  Tools shall support restoring from version
+_V_.  If the previous Xen release produced version _V_ - 1 images,
+tools shall supported restoring from these.  Tools may additionally
+support restoring from earlier versions.
+
+The marker field can be used to distinguish between legacy images and
+those corresponding to this specification.  Legacy images will have at
+one or more zero bits within the first 8 octets of the image.
+
+Fields within the image header are always in _big-endian_ byte order,
+regardless of the setting of the endianness bit.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+    | marker                                          |
+    +-----------------------+-------------------------+
+    | id                    | version                 |
+    +-----------+-----------+-------------------------+
+    | options   | (reserved)                          |
+    +-----------+-------------------------------------+
+
+
+--------------------------------------------------------------------
+Field       Description
+----------- --------------------------------------------------------
+marker      0xFFFFFFFFFFFFFFFF.
+
+id          0x58454E46 ("XENF" in ASCII).
+
+version     0x00000002.  The version of this specification.
+
+options     bit 0: Endianness.  0 = little-endian, 1 = big-endian.
+
+            bit 1-15: Reserved.
+--------------------------------------------------------------------
+
+The endianness shall be 0 (little-endian) for images generated on an
+i386, x86_64, or arm host.
+
+\clearpage
+
+Domain Header
+-------------
+
+The domain header includes general properties of the domain.
+
+     0      1     2     3     4     5     6     7 octet
+    +-----------------------+-----------+-------------+
+    | type                  | page_shift| (reserved)  |
+    +-----------------------+-----------+-------------+
+    | xen_major             | xen_minor               |
+    +-----------------------+-------------------------+
+
+--------------------------------------------------------------------
+Field       Description
+----------- --------------------------------------------------------
+type        0x0000: Reserved.
+
+            0x0001: x86 PV.
+
+            0x0002: x86 HVM.
+
+            0x0003: x86 PVH.
+
+            0x0004: ARM.
+
+            0x0005 - 0xFFFFFFFF: Reserved.
+
+page_shift  Size of a guest page as a power of two.
+
+            i.e., page size = 2 ^page_shift^.
+
+xen_major   The Xen major version when this image was saved.
+
+xen_minor   The Xen minor version when this image was saved.
+--------------------------------------------------------------------
+
+The legacy stream conversion tool writes a `xen_major` version of 0, and sets
+`xen_minor` to the version of itself.
+
+\clearpage
+
+Records
+=======
+
+A record has a record header, type specific data and a trailing
+footer.  If `body_length` is not a multiple of 8, the body is padded
+with zeroes to align the end of the record on an 8 octet boundary.
+
+     0     1     2     3     4     5     6     7 octet
+    +-----------------------+-------------------------+
+    | type                  | body_length             |
+    +-----------+-----------+-------------------------+
+    | body...                                         |
+    ...
+    |           | padding (0 to 7 octets)             |
+    +-----------+-------------------------------------+
+
+--------------------------------------------------------------------
+Field        Description
+-----------  -------------------------------------------------------
+type         0x00000000: END
+
+             0x00000001: PAGE_DATA
+
+             0x00000002: X86_PV_INFO
+
+             0x00000003: X86_PV_P2M_FRAMES
+
+             0x00000004: X86_PV_VCPU_BASIC
+
+             0x00000005: X86_PV_VCPU_EXTENDED
+
+             0x00000006: X86_PV_VCPU_XSAVE
+
+             0x00000007: SHARED_INFO
+
+             0x00000008: TSC_INFO
+
+             0x00000009: HVM_CONTEXT
+
+             0x0000000A: HVM_PARAMS
+
+             0x0000000B: TOOLSTACK
+
+             0x0000000C: X86_PV_VCPU_MSRS
+
+             0x0000000D: VERIFY
+
+             0x0000000E - 0x7FFFFFFF: Reserved for future _mandatory_
+             records.
+
+             0x80000000 - 0xFFFFFFFF: Reserved for future _optional_
+             records.
+
+body_length  Length in octets of the record body.
+
+body         Content of the record.
+
+padding      0 to 7 octets of zeros to pad the whole record to a multiple
+             of 8 octets.
+--------------------------------------------------------------------
+
+Records may be _mandatory_ or _optional_.  Optional records have bit
+31 set in their type.  Restoring an image that has unrecognised or
+unsupported mandatory record must fail.  The contents of optional
+records may be ignored during a restore.
+
+The following sub-sections specify the record body format for each of
+the record types.
+
+\clearpage
+
+END
+----
+
+An end record marks the end of the image, and shall be the final record
+in the stream.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+
+The end record contains no fields; its body_length is 0.
+
+\clearpage
+
+PAGE_DATA
+---------
+
+The bulk of an image consists of many PAGE_DATA records containing the
+memory contents.
+
+     0     1     2     3     4     5     6     7 octet
+    +-----------------------+-------------------------+
+    | count (C)             | (reserved)              |
+    +-----------------------+-------------------------+
+    | pfn[0]                                          |
+    +-------------------------------------------------+
+    ...
+    +-------------------------------------------------+
+    | pfn[C-1]                                        |
+    +-------------------------------------------------+
+    | page_data[0]...                                 |
+    ...
+    +-------------------------------------------------+
+    | page_data[N-1]...                               |
+    ...
+    +-------------------------------------------------+
+
+--------------------------------------------------------------------
+Field       Description
+----------- --------------------------------------------------------
+count       Number of pages described in this record.
+
+pfn         An array of count PFNs and their types.
+
+            Bit 63-60: XEN\_DOMCTL\_PFINFO\_* type (from
+            `public/domctl.h` but shifted by 32 bits)
+
+            Bit 59-52: Reserved.
+
+            Bit 51-0: PFN.
+
+page\_data  page\_size octets of uncompressed page contents for each
+            page set as present in the pfn array.
+--------------------------------------------------------------------
+
+Note: Count is strictly > 0.  N is strictly <= C and it is possible for there
+to be no page_data in the record if all pfns are of invalid types.
+
+--------------------------------------------------------------------
+PFINFO type    Value      Description
+-------------  ---------  ------------------------------------------
+NOTAB          0x0        Normal page.
+
+L1TAB          0x1        L1 page table page.
+
+L2TAB          0x2        L2 page table page.
+
+L3TAB          0x3        L3 page table page.
+
+L4TAB          0x4        L4 page table page.
+
+               0x5-0x8    Reserved.
+
+L1TAB_PIN      0x9        L1 page table page (pinned).
+
+L2TAB_PIN      0xA        L2 page table page (pinned).
+
+L3TAB_PIN      0xB        L3 page table page (pinned).
+
+L4TAB_PIN      0xC        L4 page table page (pinned).
+
+BROKEN         0xD        Broken page.
+
+XALLOC         0xE        Allocate only.
+
+XTAB           0xF        Invalid page.
+--------------------------------------------------------------------
+
+Table: XEN\_DOMCTL\_PFINFO\_* Page Types.
+
+PFNs with type `BROKEN`, `XALLOC`, or `XTAB` do not have any
+corresponding `page_data`.
+
+The saver uses the `XTAB` type for PFNs that become invalid in the
+guest's P2M table during a live migration[^2].
+
+Restoring an image with unrecognised page types shall fail.
+
+[^2]: In the legacy format, this is the list of unmapped PFNs in the
+tail.
+
+\clearpage
+
+X86_PV_INFO
+-----------
+
+     0     1     2     3     4     5     6     7 octet
+    +-----+-----+-----------+-------------------------+
+    | w   | ptl | (reserved)                          |
+    +-----+-----+-----------+-------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+-----------      ---------------------------------------------------
+guest_width (w)  Guest width in octets (either 4 or 8).
+
+pt_levels (ptl)  Number of page table levels (either 3 or 4).
+--------------------------------------------------------------------
+
+\clearpage
+
+X86_PV_P2M_FRAMES
+-----------------
+
+     0     1     2     3     4     5     6     7 octet
+    +-----+-----+-----+-----+-------------------------+
+    | p2m_start_pfn (S)     | p2m_end_pfn (E)         |
+    +-----+-----+-----+-----+-------------------------+
+    | p2m_pfn[p2m frame containing pfn S]             |
+    +-------------------------------------------------+
+    ...
+    +-------------------------------------------------+
+    | p2m_pfn[p2m frame containing pfn E]             |
+    +-------------------------------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+-------------    ---------------------------------------------------
+p2m_start_pfn    First pfn index in the p2m_pfn array.
+
+p2m_end_pfn      Last pfn index in the p2m_pfn array.
+
+p2m_pfn          Array of PFNs containing the guest's P2M table, for
+                 the PFN frames containing the PFN range S to E
+                 (inclusive).
+
+--------------------------------------------------------------------
+
+\clearpage
+
+X86_PV_VCPU_BASIC, EXTENDED, XSAVE, MSRS
+----------------------------------------
+
+The format of these records are identical.  They are all binary blobs
+of data which are accessed using specific pairs of domctl hypercalls.
+
+     0     1     2     3     4     5     6     7 octet
+    +-----------------------+-------------------------+
+    | vcpu_id               | (reserved)              |
+    +-----------------------+-------------------------+
+    | context...                                      |
+    ...
+    +-------------------------------------------------+
+
+---------------------------------------------------------------------
+Field            Description
+-----------      ----------------------------------------------------
+vcpu_id          The VCPU ID.
+
+context          Binary data for this VCPU.
+---------------------------------------------------------------------
+
+---------------------------------------------------------------------
+Record type                  Accessor hypercalls
+-----------------------      ----------------------------------------
+X86\_PV\_VCPU\_BASIC         XEN\_DOMCTL\_{get,set}vcpucontext
+
+X86\_PV\_VCPU\_EXTENDED      XEN\_DOMCTL\_{get,set}\_ext\_vcpucontext
+
+X86\_PV\_VCPU\_XSAVE         XEN\_DOMCTL\_{get,set}vcpuextstate
+
+X86\_PV\_VCPU\_MSRS          XEN\_DOMCTL\_{get,set}\_vcpu\_msrs
+---------------------------------------------------------------------
+
+\clearpage
+
+SHARED_INFO
+-----------
+
+The content of the Shared Info page.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+    | shared_info                                     |
+    ...
+    +-------------------------------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+-----------      ---------------------------------------------------
+shared_info      Contents of the shared info page.  This record
+                 should be exactly 1 page long.
+--------------------------------------------------------------------
+
+\clearpage
+
+TSC_INFO
+--------
+
+Domain TSC information, as accessed by the
+XEN\_DOMCTL\_{get,set}tscinfo hypercall sub-ops.
+
+     0     1     2     3     4     5     6     7 octet
+    +------------------------+------------------------+
+    | mode                   | khz                    |
+    +------------------------+------------------------+
+    | nsec                                            |
+    +------------------------+------------------------+
+    | incarnation            | (reserved)             |
+    +------------------------+------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+-----------      ---------------------------------------------------
+mode             TSC mode, TSC\_MODE\_* constant.
+
+khz              TSC frequency, in kHz.
+
+nsec             Elapsed time, in nanoseconds.
+
+incarnation      Incarnation.
+--------------------------------------------------------------------
+
+\clearpage
+
+HVM_CONTEXT
+-----------
+
+HVM Domain context, as accessed by the
+XEN\_DOMCTL\_{get,set}hvmcontext hypercall sub-ops.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+    | hvm_ctx                                         |
+    ...
+    +-------------------------------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+-----------      ---------------------------------------------------
+hvm_ctx          The HVM Context blob from Xen.
+--------------------------------------------------------------------
+
+\clearpage
+
+HVM_PARAMS
+----------
+
+HVM Domain parameters, as accessed by the
+HVMOP\_{get,set}\_param hypercall sub-ops.
+
+     0     1     2     3     4     5     6     7 octet
+    +------------------------+------------------------+
+    | count (C)              | (reserved)             |
+    +------------------------+------------------------+
+    | param[0].index                                  |
+    +-------------------------------------------------+
+    | param[0].value                                  |
+    +-------------------------------------------------+
+    ...
+    +-------------------------------------------------+
+    | param[C-1].index                                |
+    +-------------------------------------------------+
+    | param[C-1].value                                |
+    +-------------------------------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+-----------      ---------------------------------------------------
+count            The number of parameters contained in this record.
+                 Each parameter in the record contains an index and
+                 value.
+
+param index      Parameter index.
+
+param value      Parameter value.
+--------------------------------------------------------------------
+
+\clearpage
+
+TOOLSTACK
+---------
+
+An opaque blob provided by and supplied to the higher layers of the
+toolstack (e.g., libxl) during save and restore.
+
+> This is only temporary -- the intention is the toolstack takes care
+> of this itself.  This record is only present for early development
+> purposes and will be removed before submissions, along with changes
+> to libxl which cause libxl to handle this data itself.
+
+     0     1     2     3     4     5     6     7 octet
+    +------------------------+------------------------+
+    | data                                            |
+    ...
+    +-------------------------------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+-----------      ---------------------------------------------------
+data             Blob of toolstack-specific data.
+--------------------------------------------------------------------
+
+\clearpage
+
+VERIFY
+------
+
+A verify record indicates that, while all memory has now been sent, the sender
+shall send further memory records for debugging purposes.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+
+The verify record contains no fields; its body_length is 0.
+
+\clearpage
+
+Layout
+======
+
+The set of valid records depends on the guest architecture and type.  No
+assumptions should be made about the ordering or interleaving of
+independent records.  Record dependencies are noted below.
+
+x86 PV Guest
+------------
+
+A typical save record for an x86 PV guest image would look like:
+
+1. Image header
+2. Domain header
+3. X86\_PV\_INFO record
+4. X86\_PV\_P2M\_FRAMES record
+5. Many PAGE\_DATA records
+6. TSC\_INFO
+7. SHARED\_INFO record
+8. VCPU context records for each online VCPU
+    a. X86\_PV\_VCPU\_BASIC record
+    b. X86\_PV\_VCPU\_EXTENDED record
+    c. X86\_PV\_VCPU\_XSAVE record
+    d. X86\_PV\_VCPU\_MSRS record
+9. END record
+
+There are some strict ordering requirements.  The following records must
+be present in the following order as each of them depends on information
+present in the preceding ones.
+
+1. X86\_PV\_INFO record
+2. X86\_PV\_P2M\_FRAMES record
+3. PAGE\_DATA records
+4. VCPU records
+
+x86 HVM Guest
+-------------
+
+A typical save record for an x86 HVM guest image would look like:
+
+1. Image header
+2. Domain header
+3. Many PAGE\_DATA records
+4. TSC\_INFO
+5. HVM\_PARAMS
+6. HVM\_CONTEXT
+
+HVM\_PARAMS must precede HVM\_CONTEXT, as certain parameters can affect
+the validity of architectural state in the context.
+
+
+Legacy Images (x86 only)
+========================
+
+Restoring legacy images from older tools shall be handled by
+translating the legacy format image into this new format.
+
+It shall not be possible to save in the legacy format.
+
+There are two different legacy images depending on whether they were
+generated by a 32-bit or a 64-bit toolstack. These shall be
+distinguished by inspecting octets 4-7 in the image.  If these are
+zero then it is a 64-bit image.
+
+Toolstack  Field                            Value
+---------  -----                            -----
+64-bit     Bit 31-63 of the p2m_size field  0 (since p2m_size < 2^32^)
+32-bit     extended-info chunk ID (PV)      0xFFFFFFFF
+32-bit     Chunk type (HVM)                 < 0
+32-bit     Page count (HVM)                 > 0
+
+Table: Possible values for octet 4-7 in legacy images
+
+This assumes the presence of the extended-info chunk which was
+introduced in Xen 3.0.
+
+
+Future Extensions
+=================
+
+All changes to the image or domain headers require the image version
+to be increased.
+
+The format may be extended by adding additional record types.
+
+Extending an existing record type must be done by adding a new record
+type.  This allows old images with the old record to still be
+restored.
+
+The image header may only be extended by _appending_ additional
+fields.  In particular, the `marker`, `id` and `version` fields must
+never change size or location.
