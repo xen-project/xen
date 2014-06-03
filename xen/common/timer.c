@@ -492,8 +492,9 @@ static void timer_softirq_action(void)
         deadline = heap[1]->expires;
     if ( (ts->list != NULL) && (ts->list->expires < deadline) )
         deadline = ts->list->expires;
+    now = NOW();
     this_cpu(timer_deadline) =
-        (deadline == STIME_MAX) ? 0 : deadline + timer_slop;
+        (deadline == STIME_MAX) ? 0 : MAX(deadline, now + timer_slop);
 
     if ( !reprogram_timer(this_cpu(timer_deadline)) )
         raise_softirq(TIMER_SOFTIRQ);
