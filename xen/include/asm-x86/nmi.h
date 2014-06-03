@@ -15,9 +15,9 @@ typedef int (*nmi_callback_t)(struct cpu_user_regs *regs, int cpu);
  * set_nmi_callback
  *
  * Set a handler for an NMI. Only one handler may be
- * set. Return 1 if the NMI was handled.
+ * set. Return the old nmi callback handler.
  */
-void set_nmi_callback(nmi_callback_t callback);
+nmi_callback_t set_nmi_callback(nmi_callback_t callback);
  
 /** 
  * unset_nmi_callback
