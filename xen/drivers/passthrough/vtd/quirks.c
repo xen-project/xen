@@ -482,7 +482,7 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
 
             set_fixmap_nocache(FIX_IOMMU_MMIO_BASE_0, pa);
             __set_bit(0x1c8 * 8 + 20, va);
-            /* __set_fixmap(FIX_IOMMU_MMIO_BASE_0, 0, 0); */
+            __set_fixmap(FIX_IOMMU_MMIO_BASE_0, 0, 0);
             printk(XENLOG_INFO "Masked UR signaling on %04x:%02x:%02x.%u\n",
                    seg, bus, dev, func);
         }
