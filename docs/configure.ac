@@ -17,6 +17,7 @@ AX_DOCS_TOOL_PROG([FIG2DEV], [fig2dev])
 AX_DOCS_TOOL_PROG([POD2MAN], [pod2man])
 AX_DOCS_TOOL_PROG([POD2HTML], [pod2html])
 AX_DOCS_TOOL_PROG([POD2TEXT], [pod2text])
+AX_DOCS_TOOL_PROG([PANDOC], [pandoc])
 AX_DOCS_TOOL_PROGS([MARKDOWN], [markdown], [markdown markdown_py])
 
 AC_ARG_VAR([PERL], [Path to Perl parser])

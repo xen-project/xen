@@ -28,12 +28,13 @@ DOC_TXT  := $(patsubst %.txt,txt/%.txt,$(TXTSRC-y)) \
             $(patsubst %.markdown,txt/%.txt,$(MARKDOWNSRC-y)) \
             $(patsubst man/%.pod.1,txt/man/%.1.txt,$(MAN1SRC-y)) \
             $(patsubst man/%.pod.5,txt/man/%.5.txt,$(MAN5SRC-y))
+DOC_PDF  := $(patsubst %.markdown,pdf/%.pdf,$(MARKDOWNSRC-y))
 
 .PHONY: all
 all: build
 
 .PHONY: build
-build: html txt man-pages figs
+build: html txt pdf man-pages figs
 
 .PHONY: html
 html: $(DOC_HTML) html/index.html
@@ -62,6 +63,14 @@ else
 	@echo "pod2man not installed; skipping man-pages."
 endif
 
+.PHONY: pdf
+pdf:
+ifdef PANDOC
+	$(MAKE) $(DOC_PDF)
+else
+	@echo "pandoc not installed; skipping pdfs."
+endif
+
 man1/%.1: man/%.pod.1 Makefile
 	$(INSTALL_DIR) $(@D)
 	$(POD2MAN) --release=$(VERSION) --name=`echo $@ | sed 's/^man1.//'| \
@@ -77,7 +86,7 @@ clean:
 	$(MAKE) -C figs clean
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
 	rm -rf *.ilg *.log *.ind *.toc *.bak *.tmp core
-	rm -rf html txt
+	rm -rf html txt pdf
 	rm -rf man5
 	rm -rf man1
 
@@ -177,6 +186,10 @@ ifdef POD2TEXT
 else
 	@echo "pod2text not installed; skipping $<."
 endif
+
+pdf/%.pdf: %.markdown
+	$(INSTALL_DIR) $(@D)
+	pandoc -N --toc --standalone $< --output $@
 
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 $(XEN_ROOT)/config/Docs.mk:
