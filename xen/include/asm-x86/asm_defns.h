@@ -10,6 +10,7 @@
 #include <asm/percpu.h>
 #include <xen/stringify.h>
 #include <asm/cpufeature.h>
+#include <asm/alternative.h>
 
 #ifndef __ASSEMBLY__
 void ret_from_intr(void);
@@ -166,26 +167,28 @@ void ret_from_intr(void);
 #define __ASM_STAC      .byte 0x0f,0x01,0xcb
 
 #ifdef __ASSEMBLY__
-#define ASM_AC(op)                                       \
-        btl $X86_FEATURE_SMAP & 31,                      \
-        CPUINFO_FEATURE_OFFSET(X86_FEATURE_SMAP)+boot_cpu_data(%rip); \
-        jnc 881f;                                        \
-        __ASM_##op;                                      \
-881:
+#define ASM_AC(op)                                                     \
+        661: ASM_NOP3;                                                 \
+        .pushsection .altinstr_replacement, "ax";                      \
+        662: __ASM_##op;                                               \
+        .popsection;                                                   \
+        .pushsection .altinstructions, "a";                            \
+        altinstruction_entry 661b, 662b, X86_FEATURE_SMAP, 3, 3;       \
+        .popsection
 
 #define ASM_STAC ASM_AC(STAC)
 #define ASM_CLAC ASM_AC(CLAC)
 #else
 static inline void clac(void)
 {
-    if ( boot_cpu_has(X86_FEATURE_SMAP) )
-        asm volatile (__stringify(__ASM_CLAC) : : : "memory");
+    /* Note: a barrier is implicit in alternative() */
+    alternative(ASM_NOP3, __stringify(__ASM_CLAC), X86_FEATURE_SMAP);
 }
 
 static inline void stac(void)
 {
-    if ( boot_cpu_has(X86_FEATURE_SMAP) )
-        asm volatile (__stringify(__ASM_STAC) : : : "memory");
+    /* Note: a barrier is implicit in alternative() */
+    alternative(ASM_NOP3, __stringify(__ASM_STAC), X86_FEATURE_SMAP);
 }
 #endif
 
