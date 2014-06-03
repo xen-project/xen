@@ -139,7 +139,7 @@ F:	xen/drivers/char/pl011.c
 F:	xen/drivers/passthrough/arm/
 
 CPU POOLS
-M:	Juergen Gross <juergen.gross@ts.fujitsu.com>
+M:	Juergen Gross <jgross@suse.com>
 S:	Supported
 F:	xen/common/cpupool.c
 
