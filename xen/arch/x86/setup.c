@@ -48,6 +48,7 @@
 #include <asm/setup.h>
 #include <xen/cpu.h>
 #include <asm/nmi.h>
+#include <asm/alternative.h>
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static bool_t __initdata opt_nosmp;
@@ -1291,6 +1292,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( cpu_has_fsgsbase )
         set_in_cr4(X86_CR4_FSGSBASE);
+
+    alternative_instructions();
 
     local_irq_enable();
 

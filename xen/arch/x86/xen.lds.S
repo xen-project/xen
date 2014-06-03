@@ -105,6 +105,12 @@ SECTIONS
   .init.text : {
        _sinittext = .;
        *(.init.text)
+       /*
+        * Here are the replacement instructions. The linker sticks them
+        * as binary blobs. The .altinstructions has enough data to get
+        * the address and the length of them to patch the kernel safely.
+        */
+       *(.altinstr_replacement)
        _einittext = .;
   } :text
   .init.data : {
@@ -120,6 +126,15 @@ SECTIONS
        __trampoline_seg_start = .;
        *(.trampoline_seg)
        __trampoline_seg_stop = .;
+       /*
+        * struct alt_inst entries. From the header (alternative.h):
+        * "Alternative instructions for different CPU types or capabilities"
+        * Think locking instructions on spinlocks.
+        */
+       . = ALIGN(8);
+        __alt_instructions = .;
+        *(.altinstructions)
+        __alt_instructions_end = .;
 
        . = ALIGN(8);
        __ctors_start = .;
