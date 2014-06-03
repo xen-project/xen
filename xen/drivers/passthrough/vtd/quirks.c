@@ -467,7 +467,7 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
     case 0xc00: case 0xc04: case 0xc08: /* Haswell */
         bar = pci_conf_read32(seg, bus, dev, func, 0x6c);
         bar = (bar << 32) | pci_conf_read32(seg, bus, dev, func, 0x68);
-        pa = bar & 0x7fffff000; /* bits 12...38 */
+        pa = bar & 0x7ffffff000UL; /* bits 12...38 */
         if ( (bar & 1) && pa &&
              page_is_ram_type(paddr_to_pfn(pa), RAM_TYPE_RESERVED) )
         {
