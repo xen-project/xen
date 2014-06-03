@@ -46,8 +46,9 @@ undefined.
 
 ### Size (`<size>`)
 
-A size parameter may be any integer, with a size suffix
+A size parameter may be any integer, with a single size suffix
 
+* `T` or `t`: TiB (2^40)
 * `G` or `g`: GiB (2^30)
 * `M` or `m`: MiB (2^20)
 * `K` or `k`: KiB (2^10)

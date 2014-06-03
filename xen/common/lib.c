@@ -459,6 +459,8 @@ unsigned long long parse_size_and_unit(const char *s, const char **ps)
 
     switch ( *s1 )
     {
+    case 'T': case 't':
+        ret <<= 10;
     case 'G': case 'g':
         ret <<= 10;
     case 'M': case 'm':
