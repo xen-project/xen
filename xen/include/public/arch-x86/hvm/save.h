@@ -544,7 +544,7 @@ DECLARE_HVM_SAVE_TYPE(MTRR, 14, struct hvm_hw_mtrr);
  */
 
 struct hvm_hw_cpu_xsave {
-    uint64_t xfeature_mask;
+    uint64_t xfeature_mask;        /* Ignored */
     uint64_t xcr0;                 /* Updated by XSETBV */
     uint64_t xcr0_accum;           /* Updated by XSETBV */
     struct {

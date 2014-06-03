@@ -1992,8 +1992,7 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     h->cur += desc->length;
 
     err = validate_xstate(ctxt->xcr0, ctxt->xcr0_accum,
-                          ctxt->save_area.xsave_hdr.xstate_bv,
-                          ctxt->xfeature_mask);
+                          ctxt->save_area.xsave_hdr.xstate_bv);
     if ( err )
     {
         printk(XENLOG_G_WARNING

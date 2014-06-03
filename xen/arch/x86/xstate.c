@@ -346,10 +346,9 @@ static bool_t valid_xcr0(u64 xcr0)
     return !(xcr0 & XSTATE_BNDREGS) == !(xcr0 & XSTATE_BNDCSR);
 }
 
-int validate_xstate(u64 xcr0, u64 xcr0_accum, u64 xstate_bv, u64 xfeat_mask)
+int validate_xstate(u64 xcr0, u64 xcr0_accum, u64 xstate_bv)
 {
-    if ( (xcr0_accum & ~xfeat_mask) ||
-         (xstate_bv & ~xcr0_accum) ||
+    if ( (xstate_bv & ~xcr0_accum) ||
          (xcr0 & ~xcr0_accum) ||
          !valid_xcr0(xcr0) ||
          !valid_xcr0(xcr0_accum) )

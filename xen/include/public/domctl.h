@@ -839,7 +839,7 @@ struct xen_domctl_vcpuextstate {
     /* IN: VCPU that this call applies to. */
     uint32_t         vcpu;
     /*
-     * SET: xfeature support mask of struct (IN)
+     * SET: Ignored.
      * GET: xfeature support mask of struct (IN/OUT)
      * xfeature mask is served as identifications of the saving format
      * so that compatible CPUs can have a check on format to decide
