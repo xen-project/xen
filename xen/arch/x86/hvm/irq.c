@@ -289,20 +289,18 @@ void hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data)
             struct pirq *info = pirq_info(d, pirq);
 
             /* if it is the first time, allocate the pirq */
-            if (info->arch.hvm.emuirq == IRQ_UNBOUND)
+            if ( !info || info->arch.hvm.emuirq == IRQ_UNBOUND )
             {
                 spin_lock(&d->event_lock);
                 map_domain_emuirq_pirq(d, pirq, IRQ_MSI_EMU);
                 spin_unlock(&d->event_lock);
+                info = pirq_info(d, pirq);
+                if ( !info )
+                    return;
             } else if (info->arch.hvm.emuirq != IRQ_MSI_EMU)
-            {
-                printk("%s: pirq %d does not correspond to an emulated MSI\n", __func__, pirq);
                 return;
-            }
             send_guest_pirq(d, info);
             return;
-        } else {
-            printk("%s: error getting pirq from MSI: pirq = %d\n", __func__, pirq);
         }
     }
 
