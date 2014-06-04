@@ -17,7 +17,7 @@ static unsigned long raw_copy_to_guest_helper(void *to, const void *from,
         void *p;
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
 
-        if ( gvirt_to_maddr((vaddr_t) to, &g) )
+        if ( gvirt_to_maddr((vaddr_t) to, &g, GV2M_WRITE) )
             return len;
 
         p = map_domain_page(g>>PAGE_SHIFT);
@@ -62,7 +62,7 @@ unsigned long raw_clear_guest(void *to, unsigned len)
         void *p;
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
 
-        if ( gvirt_to_maddr((vaddr_t) to, &g) )
+        if ( gvirt_to_maddr((vaddr_t) to, &g, GV2M_WRITE) )
             return len;
 
         p = map_domain_page(g>>PAGE_SHIFT);
@@ -92,7 +92,7 @@ unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned le
         void *p;
         unsigned size = min(len, (unsigned)(PAGE_SIZE - offset));
 
-        if ( gvirt_to_maddr((vaddr_t) from & PAGE_MASK, &g) )
+        if ( gvirt_to_maddr((vaddr_t) from & PAGE_MASK, &g, GV2M_READ) )
             return len;
 
         p = map_domain_page(g>>PAGE_SHIFT);

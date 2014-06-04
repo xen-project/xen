@@ -73,6 +73,10 @@
 #define MATTR_DEV     0x1
 #define MATTR_MEM     0xf
 
+/* Flags for gvirt_to_maddr */
+#define GV2M_READ  (0u<<0)
+#define GV2M_WRITE (1u<<0)
+
 #ifndef __ASSEMBLY__
 
 #include <xen/types.h>

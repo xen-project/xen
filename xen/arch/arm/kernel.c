@@ -141,7 +141,7 @@ static void kernel_zimage_load(struct kernel_info *info)
         s = offs & ~PAGE_MASK;
         l = min(PAGE_SIZE - s, len);
 
-        rc = gvirt_to_maddr(load_addr + offs, &ma);
+        rc = gvirt_to_maddr(load_addr + offs, &ma, GV2M_WRITE);
         if ( rc )
         {
             panic("Unable to map translate guest address");

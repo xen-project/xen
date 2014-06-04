@@ -233,9 +233,9 @@ static inline void *maddr_to_virt(paddr_t ma)
 }
 #endif
 
-static inline int gvirt_to_maddr(vaddr_t va, paddr_t *pa)
+static inline int gvirt_to_maddr(vaddr_t va, paddr_t *pa, unsigned int flags)
 {
-    uint64_t par = gva_to_ma_par(va);
+    uint64_t par = gva_to_ma_par(va, flags);
     if ( par & PAR_F )
         return -EFAULT;
     *pa = (par & PADDR_MASK & PAGE_MASK) | ((unsigned long) va & ~PAGE_MASK);
