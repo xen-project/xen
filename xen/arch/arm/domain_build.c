@@ -986,6 +986,7 @@ static void initrd_load(struct kernel_info *kinfo)
 int construct_dom0(struct domain *d)
 {
     struct kernel_info kinfo = {};
+    struct vcpu *saved_current;
     int rc, i, cpu;
 
     struct vcpu *v = d->vcpu[0];
@@ -1021,7 +1022,9 @@ int construct_dom0(struct domain *d)
         return rc;
 
     /* The following loads use the domain's p2m */
+    saved_current = current;
     p2m_load_VTTBR(d);
+    set_current(v);
 #ifdef CONFIG_ARM_64
     d->arch.type = kinfo.type;
     if ( is_pv32_domain(d) )
@@ -1038,6 +1041,10 @@ int construct_dom0(struct domain *d)
     /* initrd_load will fix up the fdt, so call it before dtb_load */
     initrd_load(&kinfo);
     dtb_load(&kinfo);
+
+    /* Now that we are done restore the original p2m and current. */
+    set_current(saved_current);
+    p2m_load_VTTBR(current->domain);
 
     discard_initial_modules();
 

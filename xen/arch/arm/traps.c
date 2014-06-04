@@ -777,7 +777,7 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
 {
     int i;
     vaddr_t sp;
-    paddr_t stack_phys;
+    struct page_info *page;
     void *mapped;
     unsigned long *stack, addr;
 
@@ -837,13 +837,20 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
 
     printk("Guest stack trace from sp=%"PRIvaddr":\n  ", sp);
 
-    if ( gvirt_to_maddr(sp, &stack_phys, GV2M_READ) )
+    if ( sp & ( sizeof(long) - 1 ) )
+    {
+        printk("Stack is misaligned\n");
+        return;
+    }
+
+    page = get_page_from_gva(current->domain, sp, GV2M_READ);
+    if ( page == NULL )
     {
         printk("Failed to convert stack to physical address\n");
         return;
     }
 
-    mapped = map_domain_page(stack_phys >> PAGE_SHIFT);
+    mapped = __map_domain_page(page);
 
     stack = mapped + (sp & ~PAGE_MASK);
 
@@ -861,7 +868,7 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
         printk("Stack empty.");
     printk("\n");
     unmap_domain_page(mapped);
-
+    put_page(page);
 }
 
 #define STACK_BEFORE_EXCEPTION(regs) ((register_t*)(regs)->sp)

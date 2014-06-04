@@ -73,7 +73,7 @@
 #define MATTR_DEV     0x1
 #define MATTR_MEM     0xf
 
-/* Flags for gvirt_to_maddr */
+/* Flags for get_page_from_gva, gvirt_to_maddr etc */
 #define GV2M_READ  (0u<<0)
 #define GV2M_WRITE (1u<<0)
 

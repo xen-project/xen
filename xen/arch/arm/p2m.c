@@ -655,6 +655,34 @@ unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)
     return p >> PAGE_SHIFT;
 }
 
+struct page_info *get_page_from_gva(struct domain *d, vaddr_t va,
+                                    unsigned long flags)
+{
+    struct p2m_domain *p2m = &d->arch.p2m;
+    struct page_info *page = NULL;
+    paddr_t maddr;
+
+    ASSERT(d == current->domain);
+
+    spin_lock(&p2m->lock);
+
+    if ( gvirt_to_maddr(va, &maddr, flags) )
+        goto err;
+
+    if ( !mfn_valid(maddr >> PAGE_SHIFT) )
+        goto err;
+
+    page = mfn_to_page(maddr >> PAGE_SHIFT);
+    ASSERT(page);
+
+    if ( unlikely(!get_page(page, d)) )
+        page = NULL;
+
+err:
+    spin_unlock(&p2m->lock);
+    return page;
+}
+
 /*
  * Local variables:
  * mode: C
