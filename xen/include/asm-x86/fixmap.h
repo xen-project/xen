@@ -62,7 +62,6 @@ enum fixed_addresses {
     FIX_TBOOT_MAP_ADDRESS,
     FIX_APEI_RANGE_BASE,
     FIX_APEI_RANGE_END = FIX_APEI_RANGE_BASE + FIX_APEI_RANGE_MAX -1,
-    FIX_IGD_MMIO,
     FIX_EFI_MPF,
     __end_of_fixed_addresses
 };
