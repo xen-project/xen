@@ -39,6 +39,8 @@ enum fixed_addresses {
 #define FIX_VGC_BEGIN FIX_PAE_HIGHMEM_END
     FIX_DMAR_ZAP_HI,
     FIX_DMAR_ZAP_LO,
+    FIX_ERST_HI,
+    FIX_ERST_LO,
 #else
     FIX_VGC_END,
     FIX_VGC_BEGIN = FIX_VGC_END

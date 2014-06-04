@@ -32,6 +32,7 @@
 #include <xen/string.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
+#include <xen/mm.h>
 #include <xen/cper.h>
 #include <asm/fixmap.h>
 #include <asm/io.h>
@@ -791,20 +792,41 @@ int __init erst_init(void)
 {
 	int rc = 0;
 	acpi_status status;
+	acpi_physical_address erst_addr;
+	acpi_native_uint erst_len;
 	struct apei_exec_context ctx;
 
 	if (acpi_disabled)
 		return -ENODEV;
 
-	status = acpi_get_table(ACPI_SIG_ERST, 0,
-				(struct acpi_table_header **)&erst_tab);
+	status = acpi_get_table_phys(ACPI_SIG_ERST, 0, &erst_addr, &erst_len);
 	if (status == AE_NOT_FOUND) {
 		printk(KERN_INFO "ERST table was not found\n");
 		return -ENODEV;
-	} else if (ACPI_FAILURE(status)) {
+	}
+	if (ACPI_FAILURE(status)) {
 		const char *msg = acpi_format_exception(status);
 		printk(KERN_WARNING "Failed to get ERST table: %s\n", msg);
 		return -EINVAL;
+	}
+#ifdef CONFIG_X86_32
+	if (erst_addr + erst_len > (DIRECTMAP_MBYTES << 20)) {
+		unsigned long offset = erst_addr & (PAGE_SIZE - 1);
+		unsigned long mapped_size = PAGE_SIZE - offset;
+
+		set_fixmap(FIX_ERST_LO, erst_addr);
+		if (mapped_size < erst_len)
+			set_fixmap(FIX_ERST_HI, erst_addr + PAGE_SIZE);
+		erst_tab = (void *)fix_to_virt(FIX_ERST_LO) + offset;
+	} else
+#endif
+	{
+		map_pages_to_xen((unsigned long)__va(erst_addr),
+				 PFN_DOWN(erst_addr),
+				 PFN_UP(erst_addr + erst_len)
+				 - PFN_DOWN(erst_addr),
+				 PAGE_HYPERVISOR);
+		erst_tab = __va(erst_addr);
 	}
 
 	rc = erst_check_table(erst_tab);
