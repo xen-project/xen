@@ -32,7 +32,7 @@ static int tbuf_enable(xc_interface *xch, int enable)
 
     sysctl.cmd = XEN_SYSCTL_tbuf_op;
     sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
-    if (enable)
+    if ( enable )
         sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_enable;
     else
         sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_disable;
@@ -121,7 +121,7 @@ int xc_tbuf_set_cpu_mask(xc_interface *xch, uint32_t mask)
     uint64_t mask64 = mask;
 
     bytemap = xc_hypercall_buffer_alloc(xch, bytemap, sizeof(mask64));
-    if (bytemap == NULL)
+    if ( bytemap == NULL )
     {
         PERROR("Could not allocate memory for xc_tbuf_set_cpu_mask hypercall");
         goto out;
