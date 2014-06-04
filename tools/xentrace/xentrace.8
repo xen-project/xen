@@ -37,10 +37,10 @@ set the time, p, (in milliseconds) to sleep between polling the buffers
 for new data.
 .TP
 .B -c, --cpu-mask=c
-set cpu-mask
+set bitmask of CPUs to trace. It is limited to 32-bits.
 .TP
 .B -e, --evt-mask=e
-set evt-mask
+set event capture mask. If not specified the TRC_ALL will be used.
 .TP
 .B -?, --help
 Give this help list
