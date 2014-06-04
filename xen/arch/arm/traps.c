@@ -837,7 +837,7 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
 
     printk("Guest stack trace from sp=%"PRIvaddr":\n  ", sp);
 
-    if ( gvirt_to_maddr(sp, &stack_phys) )
+    if ( gvirt_to_maddr(sp, &stack_phys, GV2M_READ) )
     {
         printk("Failed to convert stack to physical address\n");
         return;
