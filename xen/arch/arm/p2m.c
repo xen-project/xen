@@ -65,6 +65,9 @@ void p2m_restore_state(struct vcpu *n)
     else
         hcr |= HCR_RW;
 
+    WRITE_SYSREG(n->arch.sctlr, SCTLR_EL1);
+    isb();
+
     WRITE_SYSREG(hcr, HCR_EL2);
     isb();
 }
