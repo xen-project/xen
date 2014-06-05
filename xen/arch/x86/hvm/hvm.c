@@ -5100,7 +5100,7 @@ static int hvmop_inject_msi(
     if ( rc )
         goto out;
 
-    hvm_inject_msi(d, op.addr, op.data);
+    rc = hvm_inject_msi(d, op.addr, op.data);
 
  out:
     rcu_unlock_domain(d);
