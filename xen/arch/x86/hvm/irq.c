@@ -311,9 +311,7 @@ int hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data)
         return -ERANGE;
     }
 
-    vmsi_deliver(d, vector, dest, dest_mode, delivery_mode, trig_mode);
-
-    return 0;
+    return vmsi_deliver(d, vector, dest, dest_mode, delivery_mode, trig_mode);
 }
 
 void hvm_set_callback_via(struct domain *d, uint64_t via)
