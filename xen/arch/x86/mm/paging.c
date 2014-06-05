@@ -168,6 +168,15 @@ int paging_log_dirty_enable(struct domain *d, bool_t log_global)
 {
     int ret;
 
+    if ( need_iommu(d) && log_global )
+    {
+        /*
+         * Refuse to turn on global log-dirty mode
+         * if the domain is using the IOMMU.
+         */
+        return -EINVAL;
+    }
+
     if ( paging_mode_log_dirty(d) )
         return -EINVAL;
 
