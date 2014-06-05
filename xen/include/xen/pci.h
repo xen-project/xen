@@ -144,6 +144,8 @@ int pci_find_next_ext_capability(int seg, int bus, int devfn, int pos, int cap);
 const char *parse_pci(const char *, unsigned int *seg, unsigned int *bus,
                       unsigned int *dev, unsigned int *func);
 
+bool_t pcie_aer_get_firmware_first(const struct pci_dev *);
+
 struct pirq;
 int msixtbl_pt_register(struct domain *, struct pirq *, uint64_t gtable);
 void msixtbl_pt_unregister(struct domain *, struct pirq *);
