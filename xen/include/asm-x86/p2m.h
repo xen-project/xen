@@ -691,6 +691,33 @@ void p2m_flush_nestedp2m(struct domain *d);
 void nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
     l1_pgentry_t *p, l1_pgentry_t new, unsigned int level);
 
+/*
+ * p2m type to IOMMU flags
+ */
+static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt)
+{
+    unsigned int flags;
+
+    switch( p2mt )
+    {
+    case p2m_ram_rw:
+    case p2m_grant_map_rw:
+    case p2m_ram_logdirty:
+    case p2m_map_foreign:
+        flags =  IOMMUF_readable | IOMMUF_writable;
+        break;
+    case p2m_ram_ro:
+    case p2m_grant_map_ro:
+        flags = IOMMUF_readable;
+        break;
+    default:
+        flags = 0;
+        break;
+    }
+
+    return flags;
+}
+
 #endif /* _XEN_P2M_H */
 
 /*

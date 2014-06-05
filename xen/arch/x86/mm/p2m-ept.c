@@ -776,10 +776,11 @@ out:
             iommu_pte_flush(d, gfn, &ept_entry->epte, order, vtd_pte_present);
         else
         {
-            if ( p2mt == p2m_ram_rw )
+            unsigned int flags = p2m_get_iommu_flags(p2mt);
+
+            if ( flags != 0 )
                 for ( i = 0; i < (1 << order); i++ )
-                    iommu_map_page(d, gfn + i, mfn_x(mfn) + i,
-                                   IOMMUF_readable | IOMMUF_writable);
+                    iommu_map_page(d, gfn + i, mfn_x(mfn) + i, flags);
             else
                 for ( i = 0; i < (1 << order); i++ )
                     iommu_unmap_page(d, gfn + i);

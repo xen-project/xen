@@ -491,9 +491,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     l2_pgentry_t l2e_content;
     l3_pgentry_t l3e_content;
     int rc;
-    unsigned int iommu_pte_flags = (p2mt == p2m_ram_rw) ?
-                                   IOMMUF_readable|IOMMUF_writable:
-                                   0; 
+    unsigned int iommu_pte_flags = p2m_get_iommu_flags(p2mt);
     unsigned long old_mfn = 0;
 
     if ( tb_init_done )
@@ -662,10 +660,11 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         }
         else
         {
-            if ( p2mt == p2m_ram_rw )
+            unsigned int flags = p2m_get_iommu_flags(p2mt);
+
+            if ( flags != 0 )
                 for ( i = 0; i < (1UL << page_order); i++ )
-                    iommu_map_page(p2m->domain, gfn+i, mfn_x(mfn)+i,
-                                   IOMMUF_readable|IOMMUF_writable);
+                    iommu_map_page(p2m->domain, gfn+i, mfn_x(mfn)+i, flags);
             else
                 for ( int i = 0; i < (1UL << page_order); i++ )
                     iommu_unmap_page(p2m->domain, gfn+i);
