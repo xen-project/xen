@@ -24,7 +24,7 @@ bool_t __read_mostly cpu_has_xsaveopt;
 static u32 __read_mostly xsave_cntxt_size;
 
 /* A 64-bit bitmask of the XSAVE/XRSTOR features supported by processor. */
-u64 xfeature_mask;
+u64 __read_mostly xfeature_mask;
 
 /* Cached xcr0 for fast read */
 static DEFINE_PER_CPU(uint64_t, xcr0);
@@ -250,6 +250,33 @@ void xstate_free_save_area(struct vcpu *v)
     v->arch.xsave_area = NULL;
 }
 
+static unsigned int _xstate_ctxt_size(u64 xcr0)
+{
+    u64 act_xcr0 = get_xcr0();
+    u32 eax, ebx = 0, ecx, edx;
+    bool_t ok = set_xcr0(xcr0);
+
+    ASSERT(ok);
+    cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
+    ASSERT(ebx <= ecx);
+    ok = set_xcr0(act_xcr0);
+    ASSERT(ok);
+
+    return ebx;
+}
+
+/* Fastpath for common xstate size requests, avoiding reloads of xcr0. */
+unsigned int xstate_ctxt_size(u64 xcr0)
+{
+    if ( xcr0 == xfeature_mask )
+        return xsave_cntxt_size;
+
+    if ( xcr0 == 0 )
+        return 0;
+
+    return _xstate_ctxt_size(xcr0);
+}
+
 /* Collect the information of processor's extended state */
 void xstate_init(bool_t bsp)
 {
@@ -283,14 +310,14 @@ void xstate_init(bool_t bsp)
          * xsave_cntxt_size is the max size required by enabled features.
          * We know FP/SSE and YMM about eax, and nothing about edx at present.
          */
-        xsave_cntxt_size = xstate_ctxt_size(feature_mask);
+        xsave_cntxt_size = _xstate_ctxt_size(feature_mask);
         printk("%s: using cntxt_size: %#x and states: %#"PRIx64"\n",
             __func__, xsave_cntxt_size, xfeature_mask);
     }
     else
     {
         BUG_ON(xfeature_mask != feature_mask);
-        BUG_ON(xsave_cntxt_size != xstate_ctxt_size(feature_mask));
+        BUG_ON(xsave_cntxt_size != _xstate_ctxt_size(feature_mask));
     }
 
     /* Check XSAVEOPT feature. */
@@ -299,26 +326,6 @@ void xstate_init(bool_t bsp)
         cpu_has_xsaveopt = !!(eax & XSTATE_FEATURE_XSAVEOPT);
     else
         BUG_ON(!cpu_has_xsaveopt != !(eax & XSTATE_FEATURE_XSAVEOPT));
-}
-
-unsigned int xstate_ctxt_size(u64 xcr0)
-{
-    u32 ebx = 0;
-
-    if ( xcr0 )
-    {
-        u64 act_xcr0 = get_xcr0();
-        u32 eax, ecx, edx;
-        bool_t ok = set_xcr0(xcr0);
-
-        ASSERT(ok);
-        cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
-        ASSERT(ebx <= ecx);
-        ok = set_xcr0(act_xcr0);
-        ASSERT(ok);
-    }
-
-    return ebx;
 }
 
 static bool_t valid_xcr0(u64 xcr0)
