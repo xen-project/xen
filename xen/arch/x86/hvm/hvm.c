@@ -824,6 +824,18 @@ static void hvm_ioreq_server_unmap_pages(struct hvm_ioreq_server *s,
     }
 }
 
+static void hvm_ioreq_server_free_rangesets(struct hvm_ioreq_server *s,
+                                            bool_t is_default)
+{
+    unsigned int i;
+
+    if ( is_default )
+        return;
+
+    for ( i = 0; i < NR_IO_RANGE_TYPES; i++ )
+        rangeset_destroy(s->range[i]);
+}
+
 static int hvm_ioreq_server_alloc_rangesets(struct hvm_ioreq_server *s, 
                                             bool_t is_default)
 {
@@ -861,22 +873,9 @@ static int hvm_ioreq_server_alloc_rangesets(struct hvm_ioreq_server *s,
     return 0;
 
  fail:
-    while ( --i >= 0 )
-        rangeset_destroy(s->range[i]);
+    hvm_ioreq_server_free_rangesets(s, 0);
 
     return rc;
-}
-
-static void hvm_ioreq_server_free_rangesets(struct hvm_ioreq_server *s, 
-                                            bool_t is_default)
-{
-    unsigned int i;
-
-    if ( is_default )
-        return;
-
-    for ( i = 0; i < NR_IO_RANGE_TYPES; i++ )
-        rangeset_destroy(s->range[i]);
 }
 
 static void hvm_ioreq_server_enable(struct hvm_ioreq_server *s,
