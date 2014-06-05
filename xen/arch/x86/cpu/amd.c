@@ -151,6 +151,7 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 	static unsigned int extfeat_ecx, extfeat_edx;
 	static unsigned int l7s0_eax, l7s0_ebx;
 	static unsigned int thermal_ecx;
+	static bool_t skip_feat, skip_extfeat;
 	static bool_t skip_l7s0_eax_ebx, skip_thermal_ecx;
 	static enum { not_parsed, no_mask, set_mask } status;
 	unsigned int eax, ebx, ecx, edx;
@@ -233,18 +234,29 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 
  setmask:
 	/* AMD processors prior to family 10h required a 32-bit password */
-	if (c->x86 >= 0x10) {
-		wrmsr(MSR_K8_FEATURE_MASK, feat_edx, feat_ecx);
-		wrmsr(MSR_K8_EXT_FEATURE_MASK, extfeat_edx, extfeat_ecx);
-		if (!skip_l7s0_eax_ebx)
-			wrmsr(MSR_AMD_L7S0_FEATURE_MASK, l7s0_ebx, l7s0_eax);
-		if (!skip_thermal_ecx) {
-			rdmsr(MSR_AMD_THRM_FEATURE_MASK, eax, edx);
-			wrmsr(MSR_AMD_THRM_FEATURE_MASK, thermal_ecx, edx);
-		}
-	} else {
-		wrmsr_amd(MSR_K8_FEATURE_MASK, feat_edx, feat_ecx);
-		wrmsr_amd(MSR_K8_EXT_FEATURE_MASK, extfeat_edx, extfeat_ecx);
+	if (!skip_feat &&
+	    wrmsr_amd_safe(MSR_K8_FEATURE_MASK, feat_edx, feat_ecx)) {
+		skip_feat = 1;
+		printk("Failed to set CPUID feature mask\n");
+	}
+
+	if (!skip_extfeat &&
+	    wrmsr_amd_safe(MSR_K8_EXT_FEATURE_MASK, extfeat_edx, extfeat_ecx)) {
+		skip_extfeat = 1;
+		printk("Failed to set CPUID extended feature mask\n");
+	}
+
+	if (!skip_l7s0_eax_ebx &&
+	    wrmsr_amd_safe(MSR_AMD_L7S0_FEATURE_MASK, l7s0_ebx, l7s0_eax)) {
+		skip_l7s0_eax_ebx = 1;
+		printk("Failed to set CPUID leaf 7 subleaf 0 feature mask\n");
+	}
+
+	if (!skip_thermal_ecx &&
+	    (rdmsr_amd_safe(MSR_AMD_THRM_FEATURE_MASK, &eax, &edx) ||
+	     wrmsr_amd_safe(MSR_AMD_THRM_FEATURE_MASK, thermal_ecx, edx))){
+		skip_thermal_ecx = 1;
+		printk("Failed to set CPUID thermal/power feature mask\n");
 	}
 }
 
