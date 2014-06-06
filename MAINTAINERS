@@ -257,6 +257,7 @@ T:	git git://xenbits.xen.org/qemu-upstream-*.git
 
 REMUS
 M:	Shriram Rajagopalan <rshriram@cs.ubc.ca>
+M:	Yang Hongyang <yanghy@cn.fujitsu.com>
 S:	Maintained
 F:	docs/README.remus
 F:	tools/blktap2/drivers/block-remus.c
