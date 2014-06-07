@@ -57,6 +57,7 @@ GUEST_SRCS-y += xc_domain_restore.c xc_domain_save.c
 GUEST_SRCS-y += xc_sr_common.c
 GUEST_SRCS-$(CONFIG_X86) += xc_sr_common_x86.c
 GUEST_SRCS-$(CONFIG_X86) += xc_sr_common_x86_pv.c
+GUEST_SRCS-$(CONFIG_X86) += xc_sr_save_x86_pv.c
 GUEST_SRCS-y += xc_sr_restore.c
 GUEST_SRCS-y += xc_sr_save.c
 GUEST_SRCS-y += xc_offline_page.c xc_compression.c

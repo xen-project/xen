@@ -285,6 +285,7 @@ struct xc_sr_context
     };
 };
 
+extern struct xc_sr_save_ops save_ops_x86_pv;
 
 struct xc_sr_record
 {
