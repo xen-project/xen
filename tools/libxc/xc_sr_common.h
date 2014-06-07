@@ -286,6 +286,7 @@ struct xc_sr_context
 };
 
 extern struct xc_sr_save_ops save_ops_x86_pv;
+extern struct xc_sr_save_ops save_ops_x86_hvm;
 
 extern struct xc_sr_restore_ops restore_ops_x86_pv;
 
