@@ -287,6 +287,8 @@ struct xc_sr_context
 
 extern struct xc_sr_save_ops save_ops_x86_pv;
 
+extern struct xc_sr_restore_ops restore_ops_x86_pv;
+
 struct xc_sr_record
 {
     uint32_t type;
@@ -320,6 +322,14 @@ static inline int write_record(struct xc_sr_context *ctx,
 {
     return write_split_record(ctx, rec, NULL, 0);
 }
+
+/*
+ * This would ideally be private in restore.c, but is needed by
+ * x86_pv_localise_page() if we receive pagetables frames ahead of the
+ * contents of the frames they point at.
+ */
+int populate_pfns(struct xc_sr_context *ctx, unsigned count,
+                  const xen_pfn_t *original_pfns, const uint32_t *types);
 
 #endif
 /*
