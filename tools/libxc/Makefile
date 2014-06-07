@@ -58,6 +58,7 @@ GUEST_SRCS-y += xc_sr_common.c
 GUEST_SRCS-$(CONFIG_X86) += xc_sr_common_x86.c
 GUEST_SRCS-$(CONFIG_X86) += xc_sr_common_x86_pv.c
 GUEST_SRCS-$(CONFIG_X86) += xc_sr_restore_x86_pv.c
+GUEST_SRCS-$(CONFIG_X86) += xc_sr_restore_x86_hvm.c
 GUEST_SRCS-$(CONFIG_X86) += xc_sr_save_x86_pv.c
 GUEST_SRCS-$(CONFIG_X86) += xc_sr_save_x86_hvm.c
 GUEST_SRCS-y += xc_sr_restore.c
