@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include "xc_sr_common.h"
 
 static const char *dhdr_types[] =
@@ -44,6 +46,45 @@ const char *rec_type_to_str(uint32_t type)
     }
 
     return "Reserved";
+}
+
+int write_split_record(struct xc_sr_context *ctx, struct xc_sr_record *rec,
+                       void *buf, size_t sz)
+{
+    static const char zeroes[(1u << REC_ALIGN_ORDER) - 1] = { 0 };
+
+    xc_interface *xch = ctx->xch;
+    typeof(rec->length) combined_length = rec->length + sz;
+    size_t record_length = ROUNDUP(combined_length, REC_ALIGN_ORDER);
+    struct iovec parts[] =
+    {
+        { &rec->type,       sizeof(rec->type) },
+        { &combined_length, sizeof(combined_length) },
+        { rec->data,        rec->length },
+        { buf,              sz },
+        { (void*)zeroes,    record_length - combined_length },
+    };
+
+    if ( record_length > REC_LENGTH_MAX )
+    {
+        ERROR("Record (0x%08x, %s) length %#x exceeds max (%#x)", rec->type,
+              rec_type_to_str(rec->type), rec->length, REC_LENGTH_MAX);
+        return -1;
+    }
+
+    if ( rec->length )
+        assert(rec->data);
+    if ( sz )
+        assert(buf);
+
+    if ( writev_exact(ctx->fd, parts, ARRAY_SIZE(parts)) )
+        goto err;
+
+    return 0;
+
+ err:
+    PERROR("Unable to write record to stream");
+    return -1;
 }
 
 static void __attribute__((unused)) build_assertions(void)

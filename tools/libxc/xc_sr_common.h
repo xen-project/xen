@@ -1,7 +1,12 @@
 #ifndef __COMMON__H
 #define __COMMON__H
 
+#include <stdbool.h>
+
 #include "xg_private.h"
+#include "xg_save_restore.h"
+#include "xc_dom.h"
+#include "xc_bitops.h"
 
 #include "xc_sr_stream_format.h"
 
@@ -10,6 +15,310 @@ const char *dhdr_type_to_str(uint32_t type);
 
 /* String representation of Record types. */
 const char *rec_type_to_str(uint32_t type);
+
+struct xc_sr_context;
+struct xc_sr_record;
+
+/**
+ * Save operations.  To be implemented for each type of guest, for use by the
+ * common save algorithm.
+ *
+ * Every function must be implemented, even if only with a no-op stub.
+ */
+struct xc_sr_save_ops
+{
+    /* Convert a PFN to GFN.  May return ~0UL for an invalid mapping. */
+    xen_pfn_t (*pfn_to_gfn)(const struct xc_sr_context *ctx, xen_pfn_t pfn);
+
+    /**
+     * Optionally transform the contents of a page from being specific to the
+     * sending environment, to being generic for the stream.
+     *
+     * The page of data at the end of 'page' may be a read-only mapping of a
+     * running guest; it must not be modified.  If no transformation is
+     * required, the callee should leave '*pages' untouched.
+     *
+     * If a transformation is required, the callee should allocate themselves
+     * a local page using malloc() and return it via '*page'.
+     *
+     * The caller shall free() '*page' in all cases.  In the case that the
+     * callee encounters an error, it should *NOT* free() the memory it
+     * allocated for '*page'.
+     *
+     * It is valid to fail with EAGAIN if the transformation is not able to be
+     * completed at this point.  The page shall be retried later.
+     *
+     * @returns 0 for success, -1 for failure, with errno appropriately set.
+     */
+    int (*normalise_page)(struct xc_sr_context *ctx, xen_pfn_t type,
+                          void **page);
+
+    /**
+     * Set up local environment to restore a domain.  This is called before
+     * any records are written to the stream.  (Typically querying running
+     * domain state, setting up mappings etc.)
+     */
+    int (*setup)(struct xc_sr_context *ctx);
+
+    /**
+     * Write records which need to be at the start of the stream.  This is
+     * called after the Image and Domain headers are written.  (Any records
+     * which need to be ahead of the memory.)
+     */
+    int (*start_of_stream)(struct xc_sr_context *ctx);
+
+    /**
+     * Write records which need to be at the end of the stream, following the
+     * complete memory contents.  The caller shall handle writing the END
+     * record into the stream.  (Any records which need to be after the memory
+     * is complete.)
+     */
+    int (*end_of_stream)(struct xc_sr_context *ctx);
+
+    /**
+     * Clean up the local environment.  Will be called exactly once, either
+     * after a successful save, or upon encountering an error.
+     */
+    int (*cleanup)(struct xc_sr_context *ctx);
+};
+
+
+/**
+ * Restore operations.  To be implemented for each type of guest, for use by
+ * the common restore algorithm.
+ *
+ * Every function must be implemented, even if only with a no-op stub.
+ */
+struct xc_sr_restore_ops
+{
+    /* Convert a PFN to GFN.  May return ~0UL for an invalid mapping. */
+    xen_pfn_t (*pfn_to_gfn)(const struct xc_sr_context *ctx, xen_pfn_t pfn);
+
+    /* Check to see whether a PFN is valid. */
+    bool (*pfn_is_valid)(const struct xc_sr_context *ctx, xen_pfn_t pfn);
+
+    /* Set the GFN of a PFN. */
+    void (*set_gfn)(struct xc_sr_context *ctx, xen_pfn_t pfn, xen_pfn_t gfn);
+
+    /* Set the type of a PFN. */
+    void (*set_page_type)(struct xc_sr_context *ctx, xen_pfn_t pfn,
+                          xen_pfn_t type);
+
+    /**
+     * Optionally transform the contents of a page from being generic in the
+     * stream, to being specific to the restoring environment.
+     *
+     * 'page' is expected to be modified in-place if a transformation is
+     * required.
+     *
+     * @returns 0 for success, -1 for failure, with errno appropriately set.
+     */
+    int (*localise_page)(struct xc_sr_context *ctx, uint32_t type, void *page);
+
+    /**
+     * Set up local environment to restore a domain.  This is called before
+     * any records are read from the stream.
+     */
+    int (*setup)(struct xc_sr_context *ctx);
+
+    /**
+     * Process an individual record from the stream.  The caller shall take
+     * care of processing common records (e.g. END, PAGE_DATA).
+     *
+     * @return 0 for success, -1 for failure, or the sentinel value
+     * RECORD_NOT_PROCESSED.
+     */
+#define RECORD_NOT_PROCESSED 1
+    int (*process_record)(struct xc_sr_context *ctx, struct xc_sr_record *rec);
+
+    /**
+     * Perform any actions required after the stream has been finished. Called
+     * after the END record has been received.
+     */
+    int (*stream_complete)(struct xc_sr_context *ctx);
+
+    /**
+     * Clean up the local environment.  Will be called exactly once, either
+     * after a successful restore, or upon encountering an error.
+     */
+    int (*cleanup)(struct xc_sr_context *ctx);
+};
+
+/* x86 PV per-vcpu storage structure for blobs heading Xen-wards. */
+struct xc_sr_x86_pv_restore_vcpu
+{
+    void *basic, *extd, *xsave, *msr;
+    size_t basicsz, extdsz, xsavesz, msrsz;
+};
+
+struct xc_sr_context
+{
+    xc_interface *xch;
+    uint32_t domid;
+    int fd;
+
+    xc_dominfo_t dominfo;
+
+    union /* Common save or restore data. */
+    {
+        struct /* Save data. */
+        {
+            struct xc_sr_save_ops ops;
+            struct save_callbacks *callbacks;
+
+            /* Live migrate vs non live suspend. */
+            bool live;
+
+            /* Further debugging information in the stream. */
+            bool debug;
+
+            /* Parameters for tweaking live migration. */
+            unsigned max_iterations;
+            unsigned dirty_threshold;
+
+            unsigned long p2m_size;
+
+            xen_pfn_t *batch_pfns;
+            unsigned nr_batch_pfns;
+            unsigned long *deferred_pages;
+            unsigned long nr_deferred_pages;
+        } save;
+
+        struct /* Restore data. */
+        {
+            struct xc_sr_restore_ops ops;
+            struct restore_callbacks *callbacks;
+
+            /* From Image Header. */
+            uint32_t format_version;
+
+            /* From Domain Header. */
+            uint32_t guest_type;
+            uint32_t guest_page_size;
+
+            /*
+             * Xenstore and Console parameters.
+             * INPUT:  evtchn & domid
+             * OUTPUT: gfn
+             */
+            xen_pfn_t    xenstore_gfn,    console_gfn;
+            unsigned int xenstore_evtchn, console_evtchn;
+            domid_t      xenstore_domid,  console_domid;
+
+            /* Bitmap of currently populated PFNs during restore. */
+            unsigned long *populated_pfns;
+            xen_pfn_t max_populated_pfn;
+
+            /* Sender has invoked verify mode on the stream. */
+            bool verify;
+        } restore;
+    };
+
+    union /* Guest-arch specific data. */
+    {
+        struct /* x86 PV guest. */
+        {
+            /* 4 or 8; 32 or 64 bit domain */
+            unsigned int width;
+            /* 3 or 4 pagetable levels */
+            unsigned int levels;
+
+            /* Maximum Xen frame */
+            xen_pfn_t max_mfn;
+            /* Read-only machine to phys map */
+            xen_pfn_t *m2p;
+            /* first mfn of the compat m2p (Only needed for 32bit PV guests) */
+            xen_pfn_t compat_m2p_mfn0;
+            /* Number of m2p frames mapped */
+            unsigned long nr_m2p_frames;
+
+            /* Maximum guest frame */
+            xen_pfn_t max_pfn;
+
+            /* Number of frames making up the p2m */
+            unsigned int p2m_frames;
+            /* Guest's phys to machine map.  Mapped read-only (save) or
+             * allocated locally (restore).  Uses guest unsigned longs. */
+            void *p2m;
+            /* The guest pfns containing the p2m leaves */
+            xen_pfn_t *p2m_pfns;
+
+            /* Read-only mapping of guests shared info page */
+            shared_info_any_t *shinfo;
+
+            union
+            {
+                struct
+                {
+                    /* State machine for the order of received records. */
+                    bool seen_pv_info;
+
+                    /* Types for each page (bounded by max_pfn). */
+                    uint32_t *pfn_types;
+
+                    /* Vcpu context blobs. */
+                    struct xc_sr_x86_pv_restore_vcpu *vcpus;
+                    unsigned nr_vcpus;
+                } restore;
+            };
+        } x86_pv;
+
+        struct /* x86 HVM guest. */
+        {
+            union
+            {
+                struct
+                {
+                    /* Whether qemu enabled logdirty mode, and we should
+                     * disable on cleanup. */
+                    bool qemu_enabled_logdirty;
+                } save;
+
+                struct
+                {
+                    /* HVM context blob. */
+                    void *context;
+                    size_t contextsz;
+                } restore;
+            };
+        } x86_hvm;
+    };
+};
+
+
+struct xc_sr_record
+{
+    uint32_t type;
+    uint32_t length;
+    void *data;
+};
+
+/*
+ * Writes a split record to the stream, applying correct padding where
+ * appropriate.  It is common when sending records containing blobs from Xen
+ * that the header and blob data are separate.  This function accepts a second
+ * buffer and length, and will merge it with the main record when sending.
+ *
+ * Records with a non-zero length must provide a valid data field; records
+ * with a 0 length shall have their data field ignored.
+ *
+ * Returns 0 on success and non0 on failure.
+ */
+int write_split_record(struct xc_sr_context *ctx, struct xc_sr_record *rec,
+                       void *buf, size_t sz);
+
+/*
+ * Writes a record to the stream, applying correct padding where appropriate.
+ * Records with a non-zero length must provide a valid data field; records
+ * with a 0 length shall have their data field ignored.
+ *
+ * Returns 0 on success and non0 on failure.
+ */
+static inline int write_record(struct xc_sr_context *ctx,
+                               struct xc_sr_record *rec)
+{
+    return write_split_record(ctx, rec, NULL, 0);
+}
 
 #endif
 /*
