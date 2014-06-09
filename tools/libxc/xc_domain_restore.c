@@ -102,7 +102,7 @@ static ssize_t rdexact(xc_interface *xch, struct restore_ctx *ctx,
             errno = 0;
         }
         if ( len <= 0 ) {
-            ERROR("%s failed (read rc: %d, errno: %d)", __func__, len, errno);
+            ERROR("%s failed (read rc: %zd, errno: %d)", __func__, len, errno);
             return -1;
         }
         offset += len;
@@ -443,7 +443,7 @@ static int compat_buffer_qemu(xc_interface *xch, struct restore_ctx *ctx,
     }
 
     if ( memcmp(qbuf, "QEVM", 4) ) {
-        ERROR("Invalid QEMU magic: 0x%08x", *(unsigned long*)qbuf);
+        ERROR("Invalid QEMU magic: 0x%08"PRIx32, *(uint32_t*)qbuf);
         free(qbuf);
         return -1;
     }
@@ -1802,7 +1802,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     } else if (pagebuf.acpi_ioport_location == 0) {
         DBGPRINTF("Use old firmware ioport from the checkpoint\n");
     } else {
-        ERROR("Error, unknow acpi ioport location (%i)", pagebuf.acpi_ioport_location);
+        ERROR("Error, unknow acpi ioport location (%"PRId64")", pagebuf.acpi_ioport_location);
     }
 
     tdatatmp = tdata;

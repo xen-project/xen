@@ -75,7 +75,7 @@ static void *_gnttab_map_table(xc_interface *xch, int domid, int *gnt_num)
 
     if ( rc || (query.status != GNTST_okay) )
     {
-        ERROR("Could not query dom's grant size\n", domid);
+        ERROR("Could not query dom%d's grant size\n", domid);
         return NULL;
     }
 

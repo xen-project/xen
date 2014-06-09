@@ -497,7 +497,7 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
     ctxt = calloc(sizeof(*ctxt), info.max_vcpu_id + 1);
     if ( !ctxt )
     {
-        PERROR("Could not allocate vcpu context array", domid);
+        PERROR("Could not allocate vcpu context array");
         goto out;
     }
 

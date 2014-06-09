@@ -912,7 +912,7 @@ int main(int argc, char *argv[])
 
             if ( req.gfn > paging->max_pages )
             {
-                ERROR("Requested gfn %"PRIx64" higher than max_pages %lx\n", req.gfn, paging->max_pages);
+                ERROR("Requested gfn %"PRIx64" higher than max_pages %x\n", req.gfn, paging->max_pages);
                 goto out;
             }
 

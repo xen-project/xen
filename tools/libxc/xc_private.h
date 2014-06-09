@@ -93,7 +93,8 @@ struct xc_interface_core {
     xc_osdep_handle  ops_handle; /* opaque data for xc_osdep_ops */
 };
 
-void xc_report_error(xc_interface *xch, int code, const char *fmt, ...);
+void xc_report_error(xc_interface *xch, int code, const char *fmt, ...)
+    __attribute__((format(printf,3,4)));
 void xc_reportv(xc_interface *xch, xentoollog_logger *lg, xentoollog_level,
                 int code, const char *fmt, va_list args)
      __attribute__((format(printf,5,0)));
