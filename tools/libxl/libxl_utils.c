@@ -108,6 +108,37 @@ int libxl_domain_qualifier_to_domid(libxl_ctx *ctx, const char *name,
     return rv;
 }
 
+static int qualifier_to_id(const char *p, uint32_t *id_r)
+{
+    int i, alldigit;
+
+    alldigit = 1;
+    for (i = 0; p[i]; i++) {
+        if (!isdigit((uint8_t)p[i])) {
+            alldigit = 0;
+            break;
+        }
+    }
+
+    if (i > 0 && alldigit) {
+        *id_r = strtoul(p, NULL, 10);
+        return 0;
+    } else {
+        /* check here if it's a uuid and do proper conversion */
+    }
+    return 1;
+}
+
+int libxl_cpupool_qualifier_to_cpupoolid(libxl_ctx *ctx, const char *p,
+                                         uint32_t *poolid_r,
+                                         int *was_name_r)
+{
+    int was_name;
+
+    was_name = qualifier_to_id(p, poolid_r);
+    if (was_name_r) *was_name_r = was_name;
+    return was_name ? libxl_name_to_cpupoolid(ctx, p, poolid_r) : 0;
+}
 
 char *libxl_cpupoolid_to_name(libxl_ctx *ctx, uint32_t poolid)
 {

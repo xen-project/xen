@@ -67,6 +67,15 @@
  * the same $(XEN_VERSION) (e.g. throughout a major release).
  */
 
+/* LIBXL_HAVE_CPUPOOL_QUALIFIER_TO_CPUPOOLID
+ *
+ * If this is defined, libxl has a library function called
+ * libxl_cpupool_qualifier_to_cpupoolid, which takes in a CPU pool
+ * qualifier in the form of number or string, then returns the ID of
+ * that CPU pool.
+ */
+#define LIBXL_HAVE_CPUPOOL_QUALIFIER_TO_CPUPOOLID 1
+
 /*
  * LIBXL_HAVE_FIRMWARE_PASSTHROUGH indicates the feature for
  * passing in SMBIOS and ACPI firmware to HVM guests is present

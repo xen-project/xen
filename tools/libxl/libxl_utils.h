@@ -23,6 +23,9 @@ unsigned long libxl_get_required_shadow_memory(unsigned long maxmem_kb, unsigned
 int libxl_name_to_domid(libxl_ctx *ctx, const char *name, uint32_t *domid);
 int libxl_domain_qualifier_to_domid(libxl_ctx *ctx, const char *name, uint32_t *domid);
 char *libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid);
+int libxl_cpupool_qualifier_to_cpupoolid(libxl_ctx *ctx, const char *p,
+                                         uint32_t *poolid_r,
+                                         int *was_name_r);
 int libxl_name_to_cpupoolid(libxl_ctx *ctx, const char *name, uint32_t *poolid);
 char *libxl_cpupoolid_to_name(libxl_ctx *ctx, uint32_t poolid);
 int libxl_cpupoolid_is_valid(libxl_ctx *ctx, uint32_t poolid);

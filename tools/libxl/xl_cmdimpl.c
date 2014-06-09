@@ -158,38 +158,6 @@ struct domain_create {
 };
 
 
-
-static int qualifier_to_id(const char *p, uint32_t *id_r)
-{
-    int i, alldigit;
-
-    alldigit = 1;
-    for (i = 0; p[i]; i++) {
-        if (!isdigit((uint8_t)p[i])) {
-            alldigit = 0;
-            break;
-        }
-    }
-
-    if (i > 0 && alldigit) {
-        *id_r = strtoul(p, NULL, 10);
-        return 0;
-    } else {
-        /* check here if it's a uuid and do proper conversion */
-    }
-    return 1;
-}
-
-static int cpupool_qualifier_to_cpupoolid(const char *p, uint32_t *poolid_r,
-                                     int *was_name_r)
-{
-    int was_name;
-
-    was_name = qualifier_to_id(p, poolid_r);
-    if (was_name_r) *was_name_r = was_name;
-    return was_name ? libxl_name_to_cpupoolid(ctx, p, poolid_r) : 0;
-}
-
 static uint32_t find_domain(const char *p) __attribute__((warn_unused_result));
 static uint32_t find_domain(const char *p)
 {
@@ -817,7 +785,7 @@ static void parse_config_data(const char *config_source,
 
     if (!xlu_cfg_get_string (config, "pool", &buf, 0)) {
         c_info->poolid = -1;
-        cpupool_qualifier_to_cpupoolid(buf, &c_info->poolid, NULL);
+        libxl_cpupool_qualifier_to_cpupoolid(ctx, buf, &c_info->poolid, NULL);
     }
     if (!libxl_cpupoolid_is_valid(ctx, c_info->poolid)) {
         fprintf(stderr, "Illegal pool specified\n");
@@ -5223,7 +5191,7 @@ static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
     int rc = 0;
 
     if (cpupool) {
-        if (cpupool_qualifier_to_cpupoolid(cpupool, &poolid, NULL) ||
+        if (libxl_cpupool_qualifier_to_cpupoolid(ctx, cpupool, &poolid, NULL) ||
             !libxl_cpupoolid_is_valid(ctx, poolid)) {
             fprintf(stderr, "unknown cpupool \'%s\'\n", cpupool);
             return -ERROR_FAIL;
@@ -5343,7 +5311,8 @@ int main_sched_credit(int argc, char **argv)
         uint32_t poolid = 0;
 
         if (cpupool) {
-            if (cpupool_qualifier_to_cpupoolid(cpupool, &poolid, NULL) ||
+            if (libxl_cpupool_qualifier_to_cpupoolid(ctx, cpupool,
+                                                     &poolid, NULL) ||
                 !libxl_cpupoolid_is_valid(ctx, poolid)) {
                 fprintf(stderr, "unknown cpupool \'%s\'\n", cpupool);
                 return -ERROR_FAIL;
@@ -6852,7 +6821,7 @@ int main_cpupooldestroy(int argc, char **argv)
 
     pool = argv[optind];
 
-    if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
+    if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
         fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
         return -ERROR_FAIL;
@@ -6874,7 +6843,7 @@ int main_cpupoolrename(int argc, char **argv)
 
     pool = argv[optind++];
 
-    if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
+    if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
         fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
         return -ERROR_FAIL;
@@ -6912,7 +6881,7 @@ int main_cpupoolcpuadd(int argc, char **argv)
         cpu = atoi(argv[optind]);
     }
 
-    if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
+    if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
         fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
         return -ERROR_FAIL;
@@ -6957,7 +6926,7 @@ int main_cpupoolcpuremove(int argc, char **argv)
         cpu = atoi(argv[optind]);
     }
 
-    if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
+    if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
         fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
         return -ERROR_FAIL;
@@ -7001,7 +6970,7 @@ int main_cpupoolmigrate(int argc, char **argv)
         return -ERROR_FAIL;
     }
 
-    if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
+    if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
         fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
         return -ERROR_FAIL;
