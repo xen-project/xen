@@ -529,6 +529,7 @@ void libxl_bitmap_dispose(libxl_bitmap *map);
 typedef struct libxl__cpuid_policy libxl_cpuid_policy;
 typedef libxl_cpuid_policy * libxl_cpuid_policy_list;
 void libxl_cpuid_dispose(libxl_cpuid_policy_list *cpuid_list);
+int libxl_cpuid_policy_list_length(libxl_cpuid_policy_list *l);
 
 #define LIBXL_PCI_FUNC_ALL (~0U)
 

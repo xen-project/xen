@@ -455,6 +455,19 @@ int libxl_cpuid_policy_list_parse_json(libxl__gc *gc,
     return 0;
 }
 
+int libxl_cpuid_policy_list_length(libxl_cpuid_policy_list *pl)
+{
+    int i = 0;
+    libxl_cpuid_policy_list l = *pl;
+
+    if (l) {
+        while (l[i].input[0] != XEN_CPUID_INPUT_UNUSED)
+            i++;
+    }
+
+    return i;
+}
+
 /*
  * Local variables:
  * mode: C
