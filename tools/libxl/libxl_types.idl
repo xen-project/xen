@@ -7,8 +7,8 @@ namespace("libxl_")
 
 libxl_defbool = Builtin("defbool", passby=PASS_BY_REFERENCE)
 
-libxl_domid = Builtin("domid", json_fn = "yajl_gen_integer", autogenerate_json = False)
-libxl_devid = Builtin("devid", json_fn = "yajl_gen_integer", autogenerate_json = False, signed = True, init_val="-1")
+libxl_domid = Builtin("domid", json_gen_fn = "yajl_gen_integer", autogenerate_json = False)
+libxl_devid = Builtin("devid", json_gen_fn = "yajl_gen_integer", autogenerate_json = False, signed = True, init_val="-1")
 libxl_uuid = Builtin("uuid", passby=PASS_BY_REFERENCE)
 libxl_mac = Builtin("mac", passby=PASS_BY_REFERENCE)
 libxl_bitmap = Builtin("bitmap", dispose_fn="libxl_bitmap_dispose", passby=PASS_BY_REFERENCE)
@@ -22,7 +22,7 @@ libxl_hwcap = Builtin("hwcap", passby=PASS_BY_REFERENCE)
 # Specific integer types
 #
 
-MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT", json_fn = "libxl__uint64_gen_json")
+MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT", json_gen_fn = "libxl__uint64_gen_json")
 
 #
 # Constants / Enumerations

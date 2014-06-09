@@ -229,7 +229,7 @@ def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
                 s += "        goto out;\n"
             s += "    break;\n"
         s += "}\n"
-    elif isinstance(ty, idl.Struct) and (parent is None or ty.json_fn is None):
+    elif isinstance(ty, idl.Struct) and (parent is None or ty.json_gen_fn is None):
         s += "s = yajl_gen_map_open(hand);\n"
         s += "if (s != yajl_gen_status_ok)\n"
         s += "    goto out;\n"
@@ -243,8 +243,8 @@ def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
         s += "if (s != yajl_gen_status_ok)\n"
         s += "    goto out;\n"
     else:
-        if ty.json_fn is not None:
-            s += "s = %s(hand, %s);\n" % (ty.json_fn, ty.pass_arg(v, parent is None))
+        if ty.json_gen_fn is not None:
+            s += "s = %s(hand, %s);\n" % (ty.json_gen_fn, ty.pass_arg(v, parent is None))
             s += "if (s != yajl_gen_status_ok)\n"
             s += "    goto out;\n"
 
@@ -341,7 +341,7 @@ if __name__ == '__main__':
                 f.write("%svoid %s(%s, %s);\n" % (ty.hidden(), ty.init_fn + "_" + ku.keyvar.name,
                                                ty.make_arg("p"),
                                                ku.keyvar.type.make_arg(ku.keyvar.name)))
-        if ty.json_fn is not None:
+        if ty.json_gen_fn is not None:
             f.write("%schar *%s_to_json(libxl_ctx *ctx, %s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p")))
         if isinstance(ty, idl.Enumeration):
             f.write("%sconst char *%s_to_string(%s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p")))
@@ -369,7 +369,7 @@ if __name__ == '__main__':
 
 """ % (header_json_define, header_json_define, " ".join(sys.argv)))
 
-    for ty in [ty for ty in types if ty.json_fn is not None]:
+    for ty in [ty for ty in types if ty.json_gen_fn is not None]:
         f.write("%syajl_gen_status %s_gen_json(yajl_gen hand, %s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
 
     f.write("\n")
@@ -426,7 +426,7 @@ if __name__ == '__main__':
         f.write("}\n")
         f.write("\n")
 
-    for ty in [t for t in types if t.json_fn is not None]:
+    for ty in [t for t in types if t.json_gen_fn is not None]:
         f.write("yajl_gen_status %s_gen_json(yajl_gen hand, %s)\n" % (ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
         f.write("{\n")
         f.write(libxl_C_type_gen_json(ty, "p"))

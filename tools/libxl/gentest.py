@@ -52,7 +52,7 @@ def gen_rand_init(ty, v, indent = "    ", parent = None):
             s += "    break;\n"
         s += "}\n"
     elif isinstance(ty, idl.Struct) \
-     and (parent is None or ty.json_fn is None):
+     and (parent is None or ty.json_gen_fn is None):
         for f in [f for f in ty.fields if not f.const]:
             (nparent,fexpr) = ty.member(v, f, parent is None)
             s += gen_rand_init(f.type, fexpr, "", nparent)
@@ -243,7 +243,7 @@ int main(int argc, char **argv)
     f.write("    printf(\"Testing TYPE_to_json()\\n\");\n")
     f.write("    printf(\"----------------------\\n\");\n")
     f.write("    printf(\"\\n\");\n")
-    for ty in [t for t in types if t.json_fn is not None]:
+    for ty in [t for t in types if t.json_gen_fn is not None]:
         arg = ty.typename + "_val"
         f.write("    %s_rand_init(%s);\n" % (ty.typename, \
             ty.pass_arg(arg, isref=False, passby=idl.PASS_BY_REFERENCE)))

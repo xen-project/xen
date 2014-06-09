@@ -65,9 +65,9 @@ class Type(object):
         self.autogenerate_init_fn = kwargs.setdefault('autogenerate_init_fn', False)
 
         if self.typename is not None and not self.private:
-            self.json_fn = kwargs.setdefault('json_fn', self.typename + "_gen_json")
+            self.json_gen_fn = kwargs.setdefault('json_gen_fn', self.typename + "_gen_json")
         else:
-            self.json_fn = kwargs.setdefault('json_fn', None)
+            self.json_gen_fn = kwargs.setdefault('json_gen_fn', None)
 
         self.autogenerate_json = kwargs.setdefault('autogenerate_json', True)
 
@@ -118,7 +118,7 @@ class Number(Builtin):
         kwargs.setdefault('namespace', None)
         kwargs.setdefault('dispose_fn', None)
         kwargs.setdefault('signed', False)
-        kwargs.setdefault('json_fn', "yajl_gen_integer")
+        kwargs.setdefault('json_gen_fn', "yajl_gen_integer")
         self.signed = kwargs['signed']
         Builtin.__init__(self, ctype, **kwargs)
 
@@ -256,7 +256,7 @@ class KeyedUnion(Aggregate):
 
 void = Builtin("void *", namespace = None)
 bool = Builtin("bool", namespace = None,
-               json_fn = "yajl_gen_bool",
+               json_gen_fn = "yajl_gen_bool",
                autogenerate_json = False)
 
 size_t = Number("size_t", namespace = None)
@@ -266,10 +266,10 @@ integer = Number("int", namespace = None, signed = True)
 uint8 = UInt(8)
 uint16 = UInt(16)
 uint32 = UInt(32)
-uint64 = UInt(64, json_fn = "libxl__uint64_gen_json")
+uint64 = UInt(64, json_gen_fn = "libxl__uint64_gen_json")
 
 string = Builtin("char *", namespace = None, dispose_fn = "free",
-                 json_fn = "libxl__string_gen_json",
+                 json_gen_fn = "libxl__string_gen_json",
                  autogenerate_json = False)
 
 class Array(Type):

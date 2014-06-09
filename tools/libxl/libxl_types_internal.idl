@@ -1,7 +1,7 @@
 namespace("libxl__")
 hidden(True)
 
-libxl_domid = Builtin("domid", namespace="libxl_", json_fn = "yajl_gen_integer")
+libxl_domid = Builtin("domid", namespace="libxl_", json_gen_fn = "yajl_gen_integer")
 
 libxl__qmp_message_type = Enumeration("qmp_message_type", [
     (1, "QMP"),
