@@ -48,7 +48,11 @@
 #define PAGE_MASK               XC_PAGE_MASK
 
 /* Force a compilation error if condition is true */
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+#define XC_BUILD_BUG_ON(p) ({ _Static_assert(!(p), "!(" #p ")"); })
+#else
 #define XC_BUILD_BUG_ON(p) ((void)sizeof(struct { int:-!!(p); }))
+#endif
 
 /*
 ** Define max dirty page cache to permit during save/restore -- need to balance 
