@@ -30,6 +30,8 @@ SECTIONS
   .text : /* XXX should be AT ( XEN_PHYS_START ) */ {
         _stext = .;            /* Text section */
        *(.text)
+       *(.text.cold)
+       *(.text.unlikely)
        *(.fixup)
        *(.gnu.warning)
        _etext = .;             /* End of text section */
