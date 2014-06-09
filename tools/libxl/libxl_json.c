@@ -100,12 +100,57 @@ yajl_gen_status libxl_defbool_gen_json(yajl_gen hand,
     return libxl__yajl_gen_asciiz(hand, libxl_defbool_to_string(*db));
 }
 
+int libxl_defbool_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                             libxl_defbool *p)
+{
+    const char *s;
+
+    if (!libxl__json_object_is_string(o))
+        return ERROR_FAIL;
+
+    s = libxl__json_object_get_string(o);
+
+    if (!strncmp(s, LIBXL__DEFBOOL_STR_DEFAULT,
+                 strlen(LIBXL__DEFBOOL_STR_DEFAULT)))
+        p->val = LIBXL__DEFBOOL_DEFAULT;
+    else if (!strncmp(s, LIBXL__DEFBOOL_STR_TRUE,
+                      strlen(LIBXL__DEFBOOL_STR_TRUE)))
+        p->val = LIBXL__DEFBOOL_TRUE;
+    else if (!strncmp(s, LIBXL__DEFBOOL_STR_FALSE,
+                      strlen(LIBXL__DEFBOOL_STR_FALSE)))
+        p->val = LIBXL__DEFBOOL_FALSE;
+    else
+        return ERROR_FAIL;
+
+    return 0;
+}
+
+int libxl__bool_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                           bool *p)
+{
+    if (!libxl__json_object_is_bool(o))
+        return ERROR_FAIL;
+
+    *p = libxl__json_object_get_bool(o);
+
+    return 0;
+}
+
 yajl_gen_status libxl_uuid_gen_json(yajl_gen hand,
                                     libxl_uuid *uuid)
 {
     char buf[LIBXL_UUID_FMTLEN+1];
     snprintf(buf, sizeof(buf), LIBXL_UUID_FMT, LIBXL_UUID_BYTES((*uuid)));
     return yajl_gen_string(hand, (const unsigned char *)buf, LIBXL_UUID_FMTLEN);
+}
+
+int libxl_uuid_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                          libxl_uuid *p)
+{
+    if (!libxl__json_object_is_string(o))
+        return ERROR_FAIL;
+
+    return libxl_uuid_from_string(p, o->u.string);
 }
 
 yajl_gen_status libxl_bitmap_gen_json(yajl_gen hand,
@@ -126,6 +171,40 @@ yajl_gen_status libxl_bitmap_gen_json(yajl_gen hand,
     s = yajl_gen_array_close(hand);
 out:
     return s;
+}
+
+int libxl_bitmap_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                            libxl_bitmap *p)
+{
+    int i;
+    int size;
+    const libxl__json_object *t;
+    flexarray_t *array;
+
+    if (!libxl__json_object_is_array(o))
+        return ERROR_FAIL;
+
+    array = libxl__json_object_get_array(o);
+    if (!array->count) {
+        libxl_bitmap_init(p);
+        return 0;
+    }
+
+    t = libxl__json_array_get(o, array->count - 1);
+    if (!libxl__json_object_is_integer(t))
+        return ERROR_FAIL;
+    size = libxl__json_object_get_integer(t) + 1;
+
+    libxl_bitmap_alloc(CTX, p, size);
+
+    for (i = 0; (t = libxl__json_array_get(o, i)); i++) {
+        if (!libxl__json_object_is_integer(t))
+            return ERROR_FAIL;
+
+        libxl_bitmap_set(p, libxl__json_object_get_integer(t));
+    }
+
+    return 0;
 }
 
 yajl_gen_status libxl_key_value_list_gen_json(yajl_gen hand,
@@ -155,6 +234,41 @@ out:
     return s;
 }
 
+int libxl_key_value_list_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                                    libxl_key_value_list *p)
+{
+    libxl__json_map_node *node = NULL;
+    flexarray_t *maps = NULL;
+    int i, size;
+    libxl_key_value_list kvl;
+
+    if (!libxl__json_object_is_map(o))
+        return ERROR_FAIL;
+
+    maps = libxl__json_object_get_map(o);
+    size = maps->count * 2;
+    kvl = *p = libxl__calloc(NOGC, size, sizeof(char *));
+
+    for (i = 0; i < maps->count; i++) {
+        int idx = i * 2;
+        if (flexarray_get(maps, i, (void**)&node) != 0)
+            return ERROR_FAIL;
+
+        if (!libxl__json_object_is_string(node->obj) &&
+            !libxl__json_object_is_null(node->obj))
+            return ERROR_FAIL;
+
+        kvl[idx] = libxl__strdup(NOGC, node->map_key);
+        if (libxl__json_object_is_string(node->obj))
+            kvl[idx+1] =
+                libxl__strdup(NOGC, libxl__json_object_get_string(node->obj));
+        else
+            kvl[idx+1] = NULL;
+    }
+
+    return 0;
+}
+
 yajl_gen_status libxl_string_list_gen_json(yajl_gen hand, libxl_string_list *pl)
 {
     libxl_string_list l = *pl;
@@ -176,11 +290,52 @@ out:
     return s;
 }
 
+int libxl_string_list_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                                 libxl_string_list *p)
+{
+    const libxl__json_object *t;
+    libxl_string_list l;
+    flexarray_t *array = NULL;
+    int i, size;
+
+    if (!libxl__json_object_is_array(o))
+        return ERROR_FAIL;
+
+    array = libxl__json_object_get_array(o);
+    size = array->count;
+
+    if (size == 0) {
+        *p = NULL;
+        return 0;
+    }
+
+    /* need one extra slot as sentinel */
+    l = *p = libxl__calloc(NOGC, size + 1, sizeof(char *));
+
+    for (i = 0; (t = libxl__json_array_get(o, i)); i++) {
+        if (!libxl__json_object_is_string(t))
+            return ERROR_FAIL;
+
+        l[i] = libxl__strdup(NOGC, libxl__json_object_get_string(t));
+    }
+
+    return 0;
+}
+
 yajl_gen_status libxl_mac_gen_json(yajl_gen hand, libxl_mac *mac)
 {
     char buf[LIBXL_MAC_FMTLEN+1];
     snprintf(buf, sizeof(buf), LIBXL_MAC_FMT, LIBXL_MAC_BYTES((*mac)));
     return yajl_gen_string(hand, (const unsigned char *)buf, LIBXL_MAC_FMTLEN);
+}
+
+int libxl_mac_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                         libxl_mac *p)
+{
+    if (!libxl__json_object_is_string(o))
+        return ERROR_FAIL;
+
+    return libxl__parse_mac(libxl__json_object_get_string(o), *p);
 }
 
 yajl_gen_status libxl_hwcap_gen_json(yajl_gen hand,
@@ -201,6 +356,27 @@ out:
     return s;
 }
 
+int libxl_hwcap_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                           libxl_hwcap *p)
+{
+    int i;
+
+    if (!libxl__json_object_is_array(o))
+        return ERROR_FAIL;
+
+    for (i = 0; i<4; i++) {
+        const libxl__json_object *t;
+
+        t = libxl__json_array_get(o, i);
+        if (!t || !libxl__json_object_is_integer(t))
+            return ERROR_FAIL;
+
+        (*p)[i] = libxl__json_object_get_integer(t);
+    }
+
+    return 0;
+}
+
 yajl_gen_status libxl__string_gen_json(yajl_gen hand,
                                        const char *p)
 {
@@ -208,6 +384,20 @@ yajl_gen_status libxl__string_gen_json(yajl_gen hand,
         return libxl__yajl_gen_asciiz(hand, p);
     else
         return yajl_gen_null(hand);
+}
+
+int libxl__string_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                             char **p)
+{
+    if (!libxl__json_object_is_string(o) && !libxl__json_object_is_null(o))
+        return ERROR_FAIL;
+
+    if (libxl__json_object_is_null(o))
+        *p = NULL;
+    else
+        *p = libxl__strdup(NOGC, libxl__json_object_get_string(o));
+
+    return 0;
 }
 
 /*
@@ -830,6 +1020,87 @@ int libxl__object_from_json(libxl_ctx *ctx, const char *type,
 out:
     GC_FREE;
     return rc;
+}
+
+int libxl__int_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                          void *p)
+{
+    long long i;
+
+    if (!libxl__json_object_is_integer(o))
+        return ERROR_FAIL;
+
+    i = libxl__json_object_get_integer(o);
+
+    if (i > INT_MAX || i < INT_MIN)
+        return ERROR_FAIL;
+
+    *((int *)p) = i;
+
+    return 0;
+}
+
+/* Macro to generate:
+ *  libxl__uint8_parse_json
+ *  libxl__uint16_parse_json
+ *  libxl__uint32_parse_json
+ */
+#define PARSE_UINT(width)                                               \
+    int libxl__uint ## width ## _parse_json(libxl__gc *gc,              \
+                                            const libxl__json_object *o,\
+                                            void *p)                    \
+    {                                                                   \
+        long long i;                                                    \
+                                                                        \
+        if (!libxl__json_object_is_integer(o))                          \
+            return ERROR_FAIL;                                          \
+                                                                        \
+        i = libxl__json_object_get_integer(o);                          \
+                                                                        \
+        if (i < 0 || i > UINT ## width ## _MAX)                         \
+            return ERROR_FAIL;                                          \
+                                                                        \
+        *((uint ## width ## _t *)p) = i;                                \
+                                                                        \
+        return 0;                                                       \
+    }
+
+PARSE_UINT(8);
+PARSE_UINT(16);
+PARSE_UINT(32);
+
+int libxl__uint64_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                             void *p)
+{
+    if (!libxl__json_object_is_integer(o) &&
+        !libxl__json_object_is_number(o))
+        return ERROR_FAIL;
+
+    if (libxl__json_object_is_integer(o)) {
+        long long i = libxl__json_object_get_integer(o);
+
+        if (i < 0)
+            return ERROR_FAIL;
+
+        *((uint64_t *)p) = i;
+    } else {
+        const char *s;
+        unsigned long long i;
+        int saved_errno = errno;
+
+        s = libxl__json_object_get_number(o);
+
+        errno = 0;
+        i = strtoull(s, NULL, 10);
+
+        if (i == ULLONG_MAX && errno == ERANGE)
+            return ERROR_FAIL;
+
+        errno = saved_errno;
+        *((uint64_t *)p) = i;
+    }
+
+    return 0;
 }
 
 /*

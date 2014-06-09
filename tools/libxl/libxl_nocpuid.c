@@ -44,6 +44,13 @@ yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
     return 0;
 }
 
+int libxl_cpuid_policy_list_parse_json(libxl__gc *gc,
+                                       const libxl__json_object *o,
+                                       libxl_cpuid_policy_list *p)
+{
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C

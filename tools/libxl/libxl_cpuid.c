@@ -338,28 +338,28 @@ void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
                      (const char**)(cpuid[i].policy), cpuid_res);
 }
 
+static const char *input_names[2] = { "leaf", "subleaf" };
+static const char *policy_names[4] = { "eax", "ebx", "ecx", "edx" };
+/*
+ * Aiming for:
+ * [
+ *     { 'leaf':    'val-eax',
+ *       'subleaf': 'val-ecx',
+ *       'eax':     'filter',
+ *       'ebx':     'filter',
+ *       'ecx':     'filter',
+ *       'edx':     'filter' },
+ *     { 'leaf':    'val-eax', ..., 'eax': 'filter', ... },
+ *     ... etc ...
+ * ]
+ */
+
 yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
                                 libxl_cpuid_policy_list *pcpuid)
 {
     libxl_cpuid_policy_list cpuid = *pcpuid;
     yajl_gen_status s;
-    const char *input_names[2] = { "leaf", "subleaf" };
-    const char *policy_names[4] = { "eax", "ebx", "ecx", "edx" };
     int i, j;
-
-    /*
-     * Aiming for:
-     * [
-     *     { 'leaf':    'val-eax',
-     *       'subleaf': 'val-ecx',
-     *       'eax':     'filter',
-     *       'ebx':     'filter',
-     *       'ecx':     'filter',
-     *       'edx':     'filter' },
-     *     { 'leaf':    'val-eax', ..., 'eax': 'filter', ... },
-     *     ... etc ...
-     * ]
-     */
 
     s = yajl_gen_array_open(hand);
     if (s != yajl_gen_status_ok) goto out;
@@ -396,6 +396,63 @@ empty:
     s = yajl_gen_array_close(hand);
 out:
     return s;
+}
+
+int libxl_cpuid_policy_list_parse_json(libxl__gc *gc,
+                                       const libxl__json_object *o,
+                                       libxl_cpuid_policy_list *p)
+{
+    int i, size;
+    libxl_cpuid_policy_list l;
+    flexarray_t *array;
+
+    if (!libxl__json_object_is_array(o))
+        return ERROR_FAIL;
+
+    array = libxl__json_object_get_array(o);
+    if (!array->count)
+        return 0;
+
+    size = array->count;
+    /* need one extra slot as sentinel */
+    l = *p = libxl__calloc(NOGC, size + 1, sizeof(libxl_cpuid_policy));
+
+    l[size].input[0] = XEN_CPUID_INPUT_UNUSED;
+    l[size].input[1] = XEN_CPUID_INPUT_UNUSED;
+
+    for (i = 0; i < size; i++) {
+        const libxl__json_object *t;
+        int j;
+
+        if (flexarray_get(array, i, (void**)&t) != 0)
+            return ERROR_FAIL;
+
+        if (!libxl__json_object_is_map(t))
+            return ERROR_FAIL;
+
+        for (j = 0; j < ARRAY_SIZE(l[0].input); j++) {
+            const libxl__json_object *r;
+
+            r = libxl__json_map_get(input_names[j], t, JSON_INTEGER);
+            if (!r)
+                l[i].input[j] = XEN_CPUID_INPUT_UNUSED;
+            else
+                l[i].input[j] = libxl__json_object_get_integer(r);
+        }
+
+        for (j = 0; j < ARRAY_SIZE(l[0].policy); j++) {
+            const libxl__json_object *r;
+
+            r = libxl__json_map_get(policy_names[j], t, JSON_STRING);
+            if (!r)
+                l[i].policy[j] = NULL;
+            else
+                l[i].policy[j] =
+                    libxl__strdup(NOGC, libxl__json_object_get_string(r));
+        }
+    }
+
+    return 0;
 }
 
 /*
