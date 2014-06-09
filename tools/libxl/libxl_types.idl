@@ -22,7 +22,7 @@ libxl_hwcap = Builtin("hwcap", passby=PASS_BY_REFERENCE)
 # Specific integer types
 #
 
-MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT")
+MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT", json_fn = "libxl__uint64_gen_json")
 
 #
 # Constants / Enumerations
@@ -283,8 +283,6 @@ libxl_domain_create_info = Struct("domain_create_info",[
 libxl_domain_restore_params = Struct("domain_restore_params", [
     ("checkpointed_stream", integer),
     ])
-
-MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT")
 
 libxl_domain_sched_params = Struct("domain_sched_params",[
     ("sched",        libxl_scheduler),

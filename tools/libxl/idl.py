@@ -266,7 +266,7 @@ integer = Number("int", namespace = None, signed = True)
 uint8 = UInt(8)
 uint16 = UInt(16)
 uint32 = UInt(32)
-uint64 = UInt(64)
+uint64 = UInt(64, json_fn = "libxl__uint64_gen_json")
 
 string = Builtin("char *", namespace = None, dispose_fn = "free",
                  json_fn = "libxl__string_gen_json",

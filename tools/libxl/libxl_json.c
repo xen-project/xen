@@ -781,6 +781,27 @@ out:
     return ret;
 }
 
+yajl_gen_status libxl__uint64_gen_json(yajl_gen hand, uint64_t val)
+{
+    char *num;
+    unsigned int len;
+    yajl_gen_status s;
+
+
+    len = asprintf(&num, "%"PRIu64, val);
+    if (len == -1) {
+        s = yajl_gen_in_error_state;
+        goto out;
+    }
+
+    s = yajl_gen_number(hand, num, len);
+
+    free(num);
+
+out:
+    return s;
+}
+
 /*
  * Local variables:
  * mode: C

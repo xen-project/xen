@@ -22,6 +22,7 @@
 #  include <yajl/yajl_version.h>
 #endif
 
+yajl_gen_status libxl__uint64_gen_json(yajl_gen hand, uint64_t val);
 yajl_gen_status libxl_defbool_gen_json(yajl_gen hand, libxl_defbool *p);
 yajl_gen_status libxl_domid_gen_json(yajl_gen hand, libxl_domid *p);
 yajl_gen_status libxl_uuid_gen_json(yajl_gen hand, libxl_uuid *p);
