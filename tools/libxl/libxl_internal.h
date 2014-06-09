@@ -1640,6 +1640,14 @@ typedef struct libxl__json_object {
     struct libxl__json_object *parent;
 } libxl__json_object;
 
+typedef int (*libxl__json_parse_callback)(libxl__gc *gc,
+                                          libxl__json_object *o,
+                                          void *p);
+_hidden int libxl__object_from_json(libxl_ctx *ctx, const char *type,
+                                    libxl__json_parse_callback parse,
+                                    void *p,
+                                    const char *s);
+
 typedef struct {
     char *map_key;
     libxl__json_object *obj;

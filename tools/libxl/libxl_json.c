@@ -802,6 +802,36 @@ out:
     return s;
 }
 
+int libxl__object_from_json(libxl_ctx *ctx, const char *type,
+                            libxl__json_parse_callback parse,
+                            void *p, const char *s)
+{
+    GC_INIT(ctx);
+    libxl__json_object *o;
+    int rc;
+
+    o = libxl__json_parse(gc, s);
+    if (!o) {
+        LOG(ERROR,
+            "unable to generate libxl__json_object from JSON representation of %s.",
+            type);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = parse(gc, o, p);
+    if (rc) {
+        LOG(ERROR, "unable to convert libxl__json_object to %s. (rc=%d)", type, rc);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = 0;
+out:
+    GC_FREE;
+    return rc;
+}
+
 /*
  * Local variables:
  * mode: C
