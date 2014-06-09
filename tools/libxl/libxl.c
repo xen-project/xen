@@ -216,6 +216,19 @@ int libxl_string_list_length(const libxl_string_list *psl)
     return i;
 }
 
+int libxl_key_value_list_length(libxl_key_value_list *pkvl)
+{
+    int i = 0;
+    libxl_key_value_list kvl = *pkvl;
+
+    if (kvl) {
+        while (kvl[2 * i]) /* Only checks keys */
+            i++;
+    }
+
+    return i;
+}
+
 void libxl_key_value_list_dispose(libxl_key_value_list *pkvl)
 {
     int i;

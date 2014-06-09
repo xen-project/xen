@@ -509,6 +509,7 @@ int libxl_string_list_length(const libxl_string_list *sl);
 
 typedef char **libxl_key_value_list;
 void libxl_key_value_list_dispose(libxl_key_value_list *kvl);
+int libxl_key_value_list_length(libxl_key_value_list *kvl);
 
 typedef uint32_t libxl_hwcap[8];
 
