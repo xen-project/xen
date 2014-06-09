@@ -266,6 +266,24 @@ typedef struct xc_hypercall_buffer xc_hypercall_buffer_t;
     }
 
 /*
+ * Like DECLARE_HYPERCALL_BUFFER() but using an already allocated
+ * hypercall buffer, _hbuf.
+ *
+ * Useful when a hypercall buffer is passed to a function and access
+ * via the user pointer is required.
+ *
+ * See DECLARE_HYPERCALL_BUFFER_ARGUMENT() if the user pointer is not
+ * required.
+ */
+#define DECLARE_HYPERCALL_BUFFER_SHADOW(_type, _name, _hbuf)   \
+    _type *_name = _hbuf->hbuf;                                \
+    xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(_name) = { \
+        .hbuf = (void *)-1,                                    \
+        .param_shadow = _hbuf,                                 \
+        HYPERCALL_BUFFER_INIT_NO_BOUNCE                        \
+    }
+
+/*
  * Declare the necessary data structure to allow a hypercall buffer
  * passed as an argument to a function to be used in the normal way.
  */
