@@ -696,9 +696,7 @@ static void parse_top_level_sdl_options(XLU_Config *config,
 static void parse_config_data(const char *config_source,
                               const char *config_data,
                               int config_len,
-                              libxl_domain_config *d_config,
-                              struct domain_create *dom_info)
-
+                              libxl_domain_config *d_config)
 {
     const char *buf;
     long l;
@@ -956,12 +954,9 @@ static void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_long(config, "rtc_timeoffset", &l, 0))
         b_info->rtc_timeoffset = l;
 
-    if (dom_info && !xlu_cfg_get_long(config, "vncviewer", &l, 0)) {
-        /* Command line arguments must take precedence over what's
-         * specified in the configuration file. */
-        if (!dom_info->vnc)
-            dom_info->vnc = l;
-    }
+    if (!xlu_cfg_get_long(config, "vncviewer", &l, 0))
+        fprintf(stderr, "WARNING: ignoring \"vncviewer\" option. "
+                "Use \"-V\" option of \"xl create\" to automatically spawn vncviewer.\n");
 
     xlu_cfg_get_defbool(config, "localtime", &b_info->localtime, 0);
 
@@ -2154,7 +2149,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
     if (!dom_info->quiet)
         printf("Parsing config from %s\n", config_source);
 
-    parse_config_data(config_source, config_data, config_len, &d_config, dom_info);
+    parse_config_data(config_source, config_data, config_len, &d_config);
 
     if (migrate_fd >= 0) {
         if (d_config.c_info.name) {
@@ -2356,7 +2351,7 @@ start:
                 libxl_domain_config_dispose(&d_config);
                 libxl_domain_config_init(&d_config);
                 parse_config_data(config_source, config_data, config_len,
-                                  &d_config, dom_info);
+                                  &d_config);
 
                 /*
                  * XXX FIXME: If this sleep is not there then domain
@@ -3167,7 +3162,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
             continue;
         CHK_SYSCALL(asprintf(&config_source, "<domid %d data>", info[i].domid));
         libxl_domain_config_init(&d_config);
-        parse_config_data(config_source, (char *)data, len, &d_config, NULL);
+        parse_config_data(config_source, (char *)data, len, &d_config);
         if (default_output_format == OUTPUT_FORMAT_JSON)
             s = printf_info_one_json(hand, info[i].domid, &d_config);
         else
@@ -4475,7 +4470,7 @@ int main_config_update(int argc, char **argv)
 
     libxl_domain_config_init(&d_config);
 
-    parse_config_data(filename, config_data, config_len, &d_config, NULL);
+    parse_config_data(filename, config_data, config_len, &d_config);
 
     if (debug || dryrun_only)
         printf_info(default_output_format, -1, &d_config);
