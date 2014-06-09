@@ -186,6 +186,26 @@ def libxl_C_type_member_init(ty, field):
     s += "\n"
     return s
 
+def libxl_C_type_gen_map_key(f, parent, indent = ""):
+    s = ""
+    if isinstance(f.type, idl.KeyedUnion):
+        s += "switch (%s) {\n" % (parent + f.type.keyvar.name)
+        for x in f.type.fields:
+            v = f.type.keyvar.name + "." + x.name
+            s += "case %s:\n" % x.enumname
+            s += "    s = yajl_gen_string(hand, (const unsigned char *)\"%s\", sizeof(\"%s\")-1);\n" % (v, v)
+            s += "    if (s != yajl_gen_status_ok)\n"
+            s += "        goto out;\n"
+            s += "    break;\n"
+        s += "}\n"
+    else:
+        s += "s = yajl_gen_string(hand, (const unsigned char *)\"%s\", sizeof(\"%s\")-1);\n" % (f.name, f.name)
+        s += "if (s != yajl_gen_status_ok)\n"
+        s += "    goto out;\n"
+    if s != "":
+        s = indent + s
+    return s.replace("\n", "\n%s" % indent).rstrip(indent)
+
 def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
     s = ""
     if parent is None:
@@ -235,9 +255,7 @@ def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
         s += "    goto out;\n"
         for f in [f for f in ty.fields if not f.const and not f.type.private]:
             (nparent,fexpr) = ty.member(v, f, parent is None)
-            s += "s = yajl_gen_string(hand, (const unsigned char *)\"%s\", sizeof(\"%s\")-1);\n" % (f.name, f.name)
-            s += "if (s != yajl_gen_status_ok)\n"
-            s += "    goto out;\n"
+            s += libxl_C_type_gen_map_key(f, nparent)
             s += libxl_C_type_gen_json(f.type, fexpr, "", nparent)
         s += "s = yajl_gen_map_close(hand);\n"
         s += "if (s != yajl_gen_status_ok)\n"
