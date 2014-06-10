@@ -297,7 +297,8 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         spin_unlock_irq(lock);
 
         v->sched_priv = vcpu_priv[v->vcpu_id];
-        evtchn_move_pirqs(v);
+        if ( !d->is_dying )
+            evtchn_move_pirqs(v);
 
         new_p = cpumask_cycle(new_p, c->cpu_valid);
 
