@@ -566,6 +566,7 @@ static inline void gic_set_lr(int lr, struct pending_irq *p,
 
     set_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
     clear_bit(GIC_IRQ_GUEST_PENDING, &p->status);
+    p->lr = lr;
 }
 
 static inline void gic_add_to_lr_pending(struct vcpu *v, struct pending_irq *n)
@@ -641,6 +642,7 @@ static void gic_update_one_lr(struct vcpu *v, int i)
         if ( p->desc != NULL )
             p->desc->status &= ~IRQ_INPROGRESS;
         clear_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
+        p->lr = GIC_INVALID_LR;
         if ( test_bit(GIC_IRQ_GUEST_PENDING, &p->status) &&
                 test_bit(GIC_IRQ_GUEST_ENABLED, &p->status))
             gic_set_guest_irq(v, irq, GICH_LR_PENDING, p->priority);
@@ -853,7 +855,7 @@ void gic_dump_info(struct vcpu *v)
 
     list_for_each_entry ( p, &v->arch.vgic.inflight_irqs, inflight )
     {
-        printk("Inflight irq=%d\n", p->irq);
+        printk("Inflight irq=%d lr=%u\n", p->irq, p->lr);
     }
 
     list_for_each_entry( p, &v->arch.vgic.lr_pending, lr_queue )

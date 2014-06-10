@@ -22,7 +22,6 @@ struct vgic_irq_rank {
 
 struct pending_irq
 {
-    int irq;
     /*
      * The following two states track the lifecycle of the guest irq.
      * However because we are not sure and we don't want to track
@@ -61,6 +60,9 @@ struct pending_irq
 #define GIC_IRQ_GUEST_ENABLED  2
     unsigned long status;
     struct irq_desc *desc; /* only set it the irq corresponds to a physical irq */
+    int irq;
+#define GIC_INVALID_LR         ~(uint8_t)0
+    uint8_t lr;
     uint8_t priority;
     /* inflight is used to append instances of pending_irq to
      * vgic.inflight_irqs */
