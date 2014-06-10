@@ -323,11 +323,16 @@ If set, force use of the performance counters for oprofile, rather than detectin
 available support.
 
 ### cpufreq
-> `= dom0-kernel | none | xen`
+> `= dom0-kernel | none | xen[,[powersave|performance|ondemand|userspace][,<maxfreq>][,[<minfreq>][,[verbose]]]]`
 
 > Default: `xen`
 
 Indicate where the responsibility for driving power states lies.
+
+* Default governor policy is ondemand.
+* `<maxfreq>` and `<minfreq>` are integers which represent max and min processor frequencies
+  respectively.
+* `verbose` option can be included as a string or also as `verbose=<integer>`
 
 ### cpuid\_mask\_cpu (AMD only)
 > `= fam_0f_rev_c | fam_0f_rev_d | fam_0f_rev_e | fam_0f_rev_f | fam_0f_rev_g | fam_10_rev_b | fam_10_rev_c | fam_11_rev_b`
