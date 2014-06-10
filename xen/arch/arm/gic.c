@@ -649,22 +649,6 @@ void gic_clear_pending_irqs(struct vcpu *v)
     spin_unlock_irqrestore(&gic.lock, flags);
 }
 
-static void gic_inject_irq_start(void)
-{
-    register_t hcr = READ_SYSREG(HCR_EL2);
-    WRITE_SYSREG(hcr | HCR_VI, HCR_EL2);
-    isb();
-}
-
-static void gic_inject_irq_stop(void)
-{
-    register_t hcr = READ_SYSREG(HCR_EL2);
-    if (hcr & HCR_VI) {
-        WRITE_SYSREG(hcr & ~HCR_VI, HCR_EL2);
-        isb();
-    }
-}
-
 int gic_events_need_delivery(void)
 {
     return (!list_empty(&current->arch.vgic.lr_pending) ||
@@ -677,10 +661,6 @@ void gic_inject(void)
         vgic_vcpu_inject_irq(current, current->domain->arch.evtchn_irq, 1);
 
     gic_restore_pending_irqs(current);
-    if (!gic_events_need_delivery())
-        gic_inject_irq_stop();
-    else
-        gic_inject_irq_start();
 }
 
 static void do_sgi(struct cpu_user_regs *regs, int othercpu, enum gic_sgi sgi)
