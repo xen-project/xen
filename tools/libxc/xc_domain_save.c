@@ -1995,6 +1995,26 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             goto out;
         }
 
+        /* Check there are no PV MSRs in use. */
+        domctl.cmd = XEN_DOMCTL_get_vcpu_msrs;
+        domctl.domain = dom;
+        memset(&domctl.u, 0, sizeof(domctl.u));
+        domctl.u.vcpu_msrs.vcpu = i;
+        domctl.u.vcpu_msrs.msr_count = 0;
+        set_xen_guest_handle_raw(domctl.u.vcpu_msrs.msrs, (void*)1);
+
+        if ( xc_domctl(xch, &domctl) < 0 )
+        {
+            if ( errno == ENOBUFS )
+            {
+                errno = EOPNOTSUPP;
+                PERROR("Unable to migrate PV guest using MSRs (yet)");
+            }
+            else
+                PERROR("Error querying maximum number of MSRs for VCPU%d", i);
+            goto out;
+        }
+
         /* Start to fetch CPU eXtended States */
         /* Get buffer size first */
         domctl.cmd = XEN_DOMCTL_getvcpuextstate;
