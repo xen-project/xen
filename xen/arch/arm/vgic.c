@@ -411,8 +411,13 @@ static void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
              vcpu_info(current, evtchn_upcall_pending) &&
              list_empty(&p->inflight) )
             vgic_vcpu_inject_irq(v, irq);
-        else if ( !list_empty(&p->inflight) && !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
-            gic_raise_guest_irq(v, irq, p->priority);
+        else {
+            unsigned long flags;
+            spin_lock_irqsave(&v->arch.vgic.lock, flags);
+            if ( !list_empty(&p->inflight) && !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
+                gic_raise_guest_irq(v, irq, p->priority);
+            spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+        }
         if ( p->desc != NULL )
         {
             spin_lock_irqsave(&p->desc->lock, flags);

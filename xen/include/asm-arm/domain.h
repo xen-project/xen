@@ -69,7 +69,10 @@ struct pending_irq
      * vgic.inflight_irqs */
     struct list_head inflight;
     /* lr_queue is used to append instances of pending_irq to
-     * gic.lr_pending */
+     * lr_pending. lr_pending is a per vcpu queue, therefore lr_queue
+     * accesses are protected with the vgic lock.
+     * TODO: when implementing irq migration, taking only the current
+     * vgic lock is not going to be enough. */
     struct list_head lr_queue;
 };
 

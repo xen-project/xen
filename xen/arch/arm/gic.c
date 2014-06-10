@@ -113,6 +113,7 @@ void gic_save_state(struct vcpu *v)
 void gic_restore_state(struct vcpu *v)
 {
     int i;
+    ASSERT(!local_irq_is_enabled());
 
     if ( is_idle_vcpu(v) )
         return;
@@ -555,6 +556,7 @@ static inline void gic_set_lr(int lr, struct pending_irq *p,
 {
     uint32_t lr_val;
 
+    ASSERT(!local_irq_is_enabled());
     BUG_ON(lr >= nr_lrs);
     BUG_ON(lr < 0);
     BUG_ON(state & ~(GICH_LR_STATE_MASK<<GICH_LR_STATE_SHIFT));
@@ -575,6 +577,8 @@ static inline void gic_add_to_lr_pending(struct vcpu *v, struct pending_irq *n)
 {
     struct pending_irq *iter;
 
+    ASSERT(spin_is_locked(&v->arch.vgic.lock));
+
     if ( !list_empty(&n->lr_queue) )
         return;
 
@@ -594,15 +598,17 @@ void gic_remove_from_queues(struct vcpu *v, unsigned int virtual_irq)
     struct pending_irq *p = irq_to_pending(v, virtual_irq);
     unsigned long flags;
 
-    spin_lock_irqsave(&gic.lock, flags);
+    spin_lock_irqsave(&v->arch.vgic.lock, flags);
     if ( !list_empty(&p->lr_queue) )
         list_del_init(&p->lr_queue);
-    spin_unlock_irqrestore(&gic.lock, flags);
+    spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
 }
 
 void gic_raise_inflight_irq(struct vcpu *v, unsigned int virtual_irq)
 {
     struct pending_irq *n = irq_to_pending(v, virtual_irq);
+
+    ASSERT(spin_is_locked(&v->arch.vgic.lock));
 
     if ( list_empty(&n->lr_queue) )
     {
@@ -620,9 +626,8 @@ void gic_raise_guest_irq(struct vcpu *v, unsigned int virtual_irq,
         unsigned int priority)
 {
     int i;
-    unsigned long flags;
 
-    spin_lock_irqsave(&gic.lock, flags);
+    ASSERT(spin_is_locked(&v->arch.vgic.lock));
 
     if ( v == current && list_empty(&v->arch.vgic.lr_pending) )
     {
@@ -630,15 +635,11 @@ void gic_raise_guest_irq(struct vcpu *v, unsigned int virtual_irq,
         if (i < nr_lrs) {
             set_bit(i, &this_cpu(lr_mask));
             gic_set_lr(i, irq_to_pending(v, virtual_irq), GICH_LR_PENDING);
-            goto out;
+            return;
         }
     }
 
     gic_add_to_lr_pending(v, irq_to_pending(v, virtual_irq));
-
-out:
-    spin_unlock_irqrestore(&gic.lock, flags);
-    return;
 }
 
 static void gic_update_one_lr(struct vcpu *v, int i)
@@ -648,6 +649,7 @@ static void gic_update_one_lr(struct vcpu *v, int i)
     int irq;
 
     ASSERT(spin_is_locked(&v->arch.vgic.lock));
+    ASSERT(!local_irq_is_enabled());
 
     lr = GICH[GICH_LR + i];
     irq = (lr >> GICH_LR_VIRTUAL_SHIFT) & GICH_LR_VIRTUAL_MASK;
@@ -714,30 +716,28 @@ static void gic_restore_pending_irqs(struct vcpu *v)
     struct pending_irq *p, *t;
     unsigned long flags;
 
+    spin_lock_irqsave(&v->arch.vgic.lock, flags);
     list_for_each_entry_safe ( p, t, &v->arch.vgic.lr_pending, lr_queue )
     {
         i = find_first_zero_bit(&this_cpu(lr_mask), nr_lrs);
         if ( i >= nr_lrs ) return;
 
-        spin_lock_irqsave(&gic.lock, flags);
         gic_set_lr(i, p, GICH_LR_PENDING);
         list_del_init(&p->lr_queue);
         set_bit(i, &this_cpu(lr_mask));
-        spin_unlock_irqrestore(&gic.lock, flags);
     }
-
+    spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
 }
 
 void gic_clear_pending_irqs(struct vcpu *v)
 {
     struct pending_irq *p, *t;
-    unsigned long flags;
 
-    spin_lock_irqsave(&gic.lock, flags);
+    ASSERT(spin_is_locked(&v->arch.vgic.lock));
+
     v->arch.lr_mask = 0;
     list_for_each_entry_safe ( p, t, &v->arch.vgic.lr_pending, lr_queue )
         list_del_init(&p->lr_queue);
-    spin_unlock_irqrestore(&gic.lock, flags);
 }
 
 int gic_events_need_delivery(void)
@@ -748,6 +748,8 @@ int gic_events_need_delivery(void)
 
 void gic_inject(void)
 {
+    ASSERT(!local_irq_is_enabled());
+
     gic_restore_pending_irqs(current);
 
 
