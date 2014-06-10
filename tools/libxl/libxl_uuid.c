@@ -20,7 +20,7 @@
 
 #if defined(__linux__)
 
-int libxl_uuid_is_nil(libxl_uuid *uuid)
+int libxl_uuid_is_nil(const libxl_uuid *uuid)
 {
      return uuid_is_null(uuid->uuid);
 }
@@ -45,9 +45,14 @@ void libxl_uuid_clear(libxl_uuid *uuid)
      uuid_clear(uuid->uuid);
 }
 
-int libxl_uuid_compare(libxl_uuid *uuid1, libxl_uuid *uuid2)
+int libxl_uuid_compare(const libxl_uuid *uuid1, const libxl_uuid *uuid2)
 {
      return uuid_compare(uuid1->uuid, uuid2->uuid);
+}
+
+const uint8_t *libxl_uuid_bytearray_const(const libxl_uuid *uuid)
+{
+    return uuid->uuid;
 }
 
 uint8_t *libxl_uuid_bytearray(libxl_uuid *uuid)
@@ -57,7 +62,7 @@ uint8_t *libxl_uuid_bytearray(libxl_uuid *uuid)
 
 #elif defined(__NetBSD__)
 
-int libxl_uuid_is_nil(libxl_uuid *uuid)
+int libxl_uuid_is_nil(const libxl_uuid *uuid)
 {
     uint32_t status;
     return uuid_is_nil((uuid_t *)uuid->uuid, &status);
@@ -92,9 +97,14 @@ void libxl_uuid_clear(libxl_uuid *uuid)
      memset(uuid->uuid, 0, sizeof(uuid->uuid));
 }
 
-int libxl_uuid_compare(libxl_uuid *uuid1, libxl_uuid *uuid2)
+int libxl_uuid_compare(const libxl_uuid *uuid1, const libxl_uuid *uuid2)
 {
      return memcmp(uuid1->uuid, uuid2->uuid, sizeof(uuid1->uuid));
+}
+
+const uint8_t *libxl_uuid_bytearray_const(const libxl_uuid *uuid)
+{
+    return uuid->uuid;
 }
 
 uint8_t *libxl_uuid_bytearray(libxl_uuid *uuid)

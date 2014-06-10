@@ -53,12 +53,13 @@ typedef struct {
 
 #endif
 
-int libxl_uuid_is_nil(libxl_uuid *uuid);
+int libxl_uuid_is_nil(const libxl_uuid *uuid);
 void libxl_uuid_generate(libxl_uuid *uuid);
 int libxl_uuid_from_string(libxl_uuid *uuid, const char *in);
 void libxl_uuid_copy(libxl_uuid *dst, const libxl_uuid *src);
 void libxl_uuid_clear(libxl_uuid *uuid);
-int libxl_uuid_compare(libxl_uuid *uuid1, libxl_uuid *uuid2);
+int libxl_uuid_compare(const libxl_uuid *uuid1, const libxl_uuid *uuid2);
+const uint8_t *libxl_uuid_bytearray_const(const libxl_uuid *uuid);
 uint8_t *libxl_uuid_bytearray(libxl_uuid *uuid);
 
 #endif /* __LIBXL_UUID_H__ */
