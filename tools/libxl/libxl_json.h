@@ -22,52 +22,17 @@
 #  include <yajl/yajl_version.h>
 #endif
 
-typedef struct libxl__gc libxl__gc;
-typedef struct libxl__json_object libxl__json_object;
-
 yajl_gen_status libxl__uint64_gen_json(yajl_gen hand, uint64_t val);
 yajl_gen_status libxl_defbool_gen_json(yajl_gen hand, libxl_defbool *p);
-int libxl_defbool_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                             libxl_defbool *p);
-int libxl__bool_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                           bool *p);
 yajl_gen_status libxl_uuid_gen_json(yajl_gen hand, libxl_uuid *p);
-int libxl_uuid_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                          libxl_uuid *p);
 yajl_gen_status libxl_mac_gen_json(yajl_gen hand, libxl_mac *p);
-int libxl_mac_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                         libxl_mac *p);
 yajl_gen_status libxl_bitmap_gen_json(yajl_gen hand, libxl_bitmap *p);
-int libxl_bitmap_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                            libxl_bitmap *p);
 yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
                                                  libxl_cpuid_policy_list *p);
-int libxl_cpuid_policy_list_parse_json(libxl__gc *gc,
-                                       const libxl__json_object *o,
-                                       libxl_cpuid_policy_list *p);
 yajl_gen_status libxl_string_list_gen_json(yajl_gen hand, libxl_string_list *p);
-int libxl_string_list_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                                 libxl_string_list *p);
 yajl_gen_status libxl_key_value_list_gen_json(yajl_gen hand,
                                               libxl_key_value_list *p);
-int libxl_key_value_list_parse_json(libxl__gc *gc,
-                                    const libxl__json_object *o,
-                                    libxl_key_value_list *p);
 yajl_gen_status libxl_hwcap_gen_json(yajl_gen hand, libxl_hwcap *p);
-int libxl_hwcap_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                           libxl_hwcap *p);
-int libxl__int_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                          void *p);
-int libxl__uint8_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                            void *p);
-int libxl__uint16_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                             void *p);
-int libxl__uint32_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                             void *p);
-int libxl__uint64_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                             void *p);
-int libxl__string_parse_json(libxl__gc *gc, const libxl__json_object *o,
-                             char **p);
 
 #include <_libxl_types_json.h>
 

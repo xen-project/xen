@@ -3147,6 +3147,38 @@ void libxl__numa_candidate_put_nodemap(libxl__gc *gc,
  */
 #define CTYPE(isfoo,c) (isfoo((unsigned char)(c)))
 
+int libxl_defbool_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                             libxl_defbool *p);
+int libxl__bool_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                           bool *p);
+int libxl_mac_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                         libxl_mac *p);
+int libxl_bitmap_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                            libxl_bitmap *p);
+int libxl_uuid_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                          libxl_uuid *p);
+int libxl_cpuid_policy_list_parse_json(libxl__gc *gc,
+                                       const libxl__json_object *o,
+                                       libxl_cpuid_policy_list *p);
+int libxl_string_list_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                                 libxl_string_list *p);
+int libxl_key_value_list_parse_json(libxl__gc *gc,
+                                    const libxl__json_object *o,
+                                    libxl_key_value_list *p);
+int libxl_hwcap_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                           libxl_hwcap *p);
+int libxl__int_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                          void *p);
+int libxl__uint8_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                            void *p);
+int libxl__uint16_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                             void *p);
+int libxl__uint32_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                             void *p);
+int libxl__uint64_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                             void *p);
+int libxl__string_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                             char **p);
 
 #endif
 
