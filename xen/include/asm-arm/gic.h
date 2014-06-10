@@ -181,6 +181,7 @@ extern int gic_events_need_delivery(void);
 extern void __cpuinit init_maintenance_interrupt(void);
 extern void gic_raise_guest_irq(struct vcpu *v, unsigned int irq,
         unsigned int priority);
+extern void gic_raise_inflight_irq(struct vcpu *v, unsigned int virtual_irq);
 extern void gic_remove_from_queues(struct vcpu *v, unsigned int virtual_irq);
 
 /* Accept an interrupt from the GIC and dispatch its handler */

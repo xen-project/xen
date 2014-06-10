@@ -404,7 +404,14 @@ static void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
         irq = i + (32 * n);
         p = irq_to_pending(v, irq);
         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
-        if ( !list_empty(&p->inflight) && !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
+        /* We need to force the first injection of evtchn_irq because
+         * evtchn_upcall_pending is already set by common code on vcpu
+         * creation. */
+        if ( irq == v->domain->arch.evtchn_irq &&
+             vcpu_info(current, evtchn_upcall_pending) &&
+             list_empty(&p->inflight) )
+            vgic_vcpu_inject_irq(v, irq);
+        else if ( !list_empty(&p->inflight) && !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
             gic_raise_guest_irq(v, irq, p->priority);
         if ( p->desc != NULL )
         {
@@ -717,9 +724,8 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
 
     if ( !list_empty(&n->inflight) )
     {
-        if ( (irq != current->domain->arch.evtchn_irq) ||
-             (!test_bit(GIC_IRQ_GUEST_VISIBLE, &n->status)) )
-            set_bit(GIC_IRQ_GUEST_QUEUED, &n->status);
+        set_bit(GIC_IRQ_GUEST_QUEUED, &n->status);
+        gic_raise_inflight_irq(v, irq);
         goto out;
     }
 

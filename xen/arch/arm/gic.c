@@ -66,6 +66,8 @@ static DEFINE_PER_CPU(u8, gic_cpu_id);
 /* Maximum cpu interface per GIC */
 #define NR_GIC_CPU_IF 8
 
+#undef GIC_DEBUG
+
 static void gic_update_one_lr(struct vcpu *v, int i);
 
 static unsigned int gic_cpu_mask(const cpumask_t *cpumask)
@@ -598,6 +600,22 @@ void gic_remove_from_queues(struct vcpu *v, unsigned int virtual_irq)
     spin_unlock_irqrestore(&gic.lock, flags);
 }
 
+void gic_raise_inflight_irq(struct vcpu *v, unsigned int virtual_irq)
+{
+    struct pending_irq *n = irq_to_pending(v, virtual_irq);
+
+    if ( list_empty(&n->lr_queue) )
+    {
+        if ( v == current )
+            gic_update_one_lr(v, n->lr);
+    }
+#ifdef GIC_DEBUG
+    else
+        gdprintk(XENLOG_DEBUG, "trying to inject irq=%u into d%dv%d, when it is still lr_pending\n",
+                 virtual_irq, v->domain->domain_id, v->vcpu_id);
+#endif
+}
+
 void gic_raise_guest_irq(struct vcpu *v, unsigned int virtual_irq,
         unsigned int priority)
 {
@@ -632,19 +650,36 @@ static void gic_update_one_lr(struct vcpu *v, int i)
     ASSERT(spin_is_locked(&v->arch.vgic.lock));
 
     lr = GICH[GICH_LR + i];
-    if ( !(lr & (GICH_LR_PENDING|GICH_LR_ACTIVE)) )
+    irq = (lr >> GICH_LR_VIRTUAL_SHIFT) & GICH_LR_VIRTUAL_MASK;
+    p = irq_to_pending(v, irq);
+    if ( lr & GICH_LR_ACTIVE )
     {
+        if ( test_bit(GIC_IRQ_GUEST_ENABLED, &p->status) &&
+             test_and_clear_bit(GIC_IRQ_GUEST_QUEUED, &p->status) )
+        {
+            if ( p->desc == NULL )
+                GICH[GICH_LR + i] = lr | GICH_LR_PENDING;
+            else
+                gdprintk(XENLOG_WARNING, "unable to inject hw irq=%d into d%dv%d: already active in LR%d\n",
+                         irq, v->domain->domain_id, v->vcpu_id, i);
+        }
+    } else if ( lr & GICH_LR_PENDING ) {
+        int q __attribute__ ((unused)) = test_and_clear_bit(GIC_IRQ_GUEST_QUEUED, &p->status);
+#ifdef GIC_DEBUG
+        if ( q )
+            gdprintk(XENLOG_DEBUG, "trying to inject irq=%d into d%dv%d, when it is already pending in LR%d\n",
+                    irq, v->domain->domain_id, v->vcpu_id, i);
+#endif
+    } else {
         GICH[GICH_LR + i] = 0;
         clear_bit(i, &this_cpu(lr_mask));
 
-        irq = (lr >> GICH_LR_VIRTUAL_SHIFT) & GICH_LR_VIRTUAL_MASK;
-        p = irq_to_pending(v, irq);
         if ( p->desc != NULL )
             p->desc->status &= ~IRQ_INPROGRESS;
         clear_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
         p->lr = GIC_INVALID_LR;
-        if ( test_bit(GIC_IRQ_GUEST_QUEUED, &p->status) &&
-                test_bit(GIC_IRQ_GUEST_ENABLED, &p->status))
+        if ( test_bit(GIC_IRQ_GUEST_ENABLED, &p->status) &&
+             test_bit(GIC_IRQ_GUEST_QUEUED, &p->status) )
             gic_raise_guest_irq(v, irq, p->priority);
         else
             list_del_init(&p->inflight);
@@ -713,9 +748,6 @@ int gic_events_need_delivery(void)
 
 void gic_inject(void)
 {
-    if ( vcpu_info(current, evtchn_upcall_pending) )
-        vgic_vcpu_inject_irq(current, current->domain->arch.evtchn_irq);
-
     gic_restore_pending_irqs(current);
 
 
