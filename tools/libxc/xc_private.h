@@ -34,6 +34,13 @@
 
 #include <xen/sys/privcmd.h>
 
+#if defined(HAVE_VALGRIND_MEMCHECK_H) && !defined(NDEBUG)
+/* Compile in Valgrind client requests? */
+#include <valgrind/memcheck.h>
+#else
+#define VALGRIND_MAKE_MEM_UNDEFINED(addr, len) /* addr, len */
+#endif
+
 #define DECLARE_HYPERCALL privcmd_hypercall_t hypercall
 #define DECLARE_DOMCTL struct xen_domctl domctl
 #define DECLARE_SYSCTL struct xen_sysctl sysctl

@@ -48,6 +48,9 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
+/* Define to 1 if you have the <valgrind/memcheck.h> header file. */
+#undef HAVE_VALGRIND_MEMCHECK_H
+
 /* Define to 1 if you have the <yajl/yajl_version.h> header file. */
 #undef HAVE_YAJL_YAJL_VERSION_H
 
