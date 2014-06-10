@@ -1762,9 +1762,17 @@ bad_data_abort:
     inject_dabt_exception(regs, info.gva, hsr.len);
 }
 
+static void enter_hypervisor_head(struct cpu_user_regs *regs)
+{
+    if ( guest_mode(regs) )
+        gic_clear_lrs(current);
+}
+
 asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
 {
     union hsr hsr = { .bits = READ_SYSREG32(ESR_EL2) };
+
+    enter_hypervisor_head(regs);
 
     switch (hsr.ec) {
     case HSR_EC_WFI_WFE:
@@ -1858,11 +1866,13 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
 
 asmlinkage void do_trap_irq(struct cpu_user_regs *regs)
 {
+    enter_hypervisor_head(regs);
     gic_interrupt(regs, 0);
 }
 
 asmlinkage void do_trap_fiq(struct cpu_user_regs *regs)
 {
+    enter_hypervisor_head(regs);
     gic_interrupt(regs, 1);
 }
 

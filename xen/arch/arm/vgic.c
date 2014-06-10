@@ -720,8 +720,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
         if ( (irq != current->domain->arch.evtchn_irq) ||
              (!test_bit(GIC_IRQ_GUEST_VISIBLE, &n->status)) )
             set_bit(GIC_IRQ_GUEST_PENDING, &n->status);
-        spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
-        return;
+        goto out;
     }
 
     /* vcpu offline */

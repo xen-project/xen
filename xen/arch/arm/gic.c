@@ -66,6 +66,8 @@ static DEFINE_PER_CPU(u8, gic_cpu_id);
 /* Maximum cpu interface per GIC */
 #define NR_GIC_CPU_IF 8
 
+static void gic_update_one_lr(struct vcpu *v, int i);
+
 static unsigned int gic_cpu_mask(const cpumask_t *cpumask)
 {
     unsigned int cpu;
@@ -549,16 +551,18 @@ void gic_disable_cpu(void)
 static inline void gic_set_lr(int lr, struct pending_irq *p,
         unsigned int state)
 {
-    int maintenance_int = GICH_LR_MAINTENANCE_IRQ;
+    uint32_t lr_val;
 
     BUG_ON(lr >= nr_lrs);
     BUG_ON(lr < 0);
     BUG_ON(state & ~(GICH_LR_STATE_MASK<<GICH_LR_STATE_SHIFT));
 
-    GICH[GICH_LR + lr] = state |
-        maintenance_int |
-        ((p->priority >> 3) << GICH_LR_PRIORITY_SHIFT) |
+    lr_val = state | ((p->priority >> 3) << GICH_LR_PRIORITY_SHIFT) |
         ((p->irq & GICH_LR_VIRTUAL_MASK) << GICH_LR_VIRTUAL_SHIFT);
+    if ( p->desc != NULL )
+        lr_val |= GICH_LR_HW | (p->desc->irq << GICH_LR_PHYSICAL_SHIFT);
+
+    GICH[GICH_LR + lr] = lr_val;
 
     set_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
     clear_bit(GIC_IRQ_GUEST_PENDING, &p->status);
@@ -616,6 +620,55 @@ void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
 out:
     spin_unlock_irqrestore(&gic.lock, flags);
     return;
+}
+
+static void gic_update_one_lr(struct vcpu *v, int i)
+{
+    struct pending_irq *p;
+    uint32_t lr;
+    int irq;
+
+    ASSERT(spin_is_locked(&v->arch.vgic.lock));
+
+    lr = GICH[GICH_LR + i];
+    if ( !(lr & (GICH_LR_PENDING|GICH_LR_ACTIVE)) )
+    {
+        GICH[GICH_LR + i] = 0;
+        clear_bit(i, &this_cpu(lr_mask));
+
+        irq = (lr >> GICH_LR_VIRTUAL_SHIFT) & GICH_LR_VIRTUAL_MASK;
+        p = irq_to_pending(v, irq);
+        if ( p->desc != NULL )
+            p->desc->status &= ~IRQ_INPROGRESS;
+        clear_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
+        if ( test_bit(GIC_IRQ_GUEST_PENDING, &p->status) &&
+                test_bit(GIC_IRQ_GUEST_ENABLED, &p->status))
+            gic_set_guest_irq(v, irq, GICH_LR_PENDING, p->priority);
+        else
+            list_del_init(&p->inflight);
+    }
+}
+
+void gic_clear_lrs(struct vcpu *v)
+{
+    int i = 0;
+    unsigned long flags;
+
+    /* The idle domain has no LRs to be cleared. Since gic_restore_state
+     * doesn't write any LR registers for the idle domain they could be
+     * non-zero. */
+    if ( is_idle_vcpu(v) )
+        return;
+
+    spin_lock_irqsave(&v->arch.vgic.lock, flags);
+
+    while ((i = find_next_bit((const unsigned long *) &this_cpu(lr_mask),
+                              nr_lrs, i)) < nr_lrs ) {
+        gic_update_one_lr(v, i);
+        i++;
+    }
+
+    spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
 }
 
 static void gic_restore_pending_irqs(struct vcpu *v)
@@ -773,77 +826,14 @@ int gicv_setup(struct domain *d)
 
 }
 
-static void gic_irq_eoi(void *info)
-{
-    int virq = (uintptr_t) info;
-    GICC[GICC_DIR] = virq;
-}
-
 static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
-    int i = 0, virq, pirq = -1;
-    uint32_t lr;
-    struct vcpu *v = current;
-    uint64_t eisr = GICH[GICH_EISR0] | (((uint64_t) GICH[GICH_EISR1]) << 32);
-
-    while ((i = find_next_bit((const long unsigned int *) &eisr,
-                              64, i)) < 64) {
-        struct pending_irq *p, *p2;
-        int cpu;
-        bool_t inflight;
-
-        cpu = -1;
-        inflight = 0;
-
-        spin_lock_irq(&gic.lock);
-        lr = GICH[GICH_LR + i];
-        virq = lr & GICH_LR_VIRTUAL_MASK;
-        GICH[GICH_LR + i] = 0;
-        clear_bit(i, &this_cpu(lr_mask));
-
-        p = irq_to_pending(v, virq);
-        if ( p->desc != NULL ) {
-            p->desc->status &= ~IRQ_INPROGRESS;
-            /* Assume only one pcpu needs to EOI the irq */
-            cpu = p->desc->arch.eoi_cpu;
-            pirq = p->desc->irq;
-        }
-        if ( test_bit(GIC_IRQ_GUEST_PENDING, &p->status) &&
-             test_bit(GIC_IRQ_GUEST_ENABLED, &p->status))
-        {
-            inflight = 1;
-            gic_add_to_lr_pending(v, p);
-        }
-
-        clear_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
-
-        if ( !list_empty(&v->arch.vgic.lr_pending) ) {
-            p2 = list_entry(v->arch.vgic.lr_pending.next, typeof(*p2), lr_queue);
-            gic_set_lr(i, p2, GICH_LR_PENDING);
-            list_del_init(&p2->lr_queue);
-            set_bit(i, &this_cpu(lr_mask));
-        }
-        spin_unlock_irq(&gic.lock);
-
-        if ( !inflight )
-        {
-            spin_lock_irq(&v->arch.vgic.lock);
-            list_del_init(&p->inflight);
-            spin_unlock_irq(&v->arch.vgic.lock);
-        }
-
-        if ( p->desc != NULL ) {
-            /* this is not racy because we can't receive another irq of the
-             * same type until we EOI it.  */
-            if ( cpu == smp_processor_id() )
-                gic_irq_eoi((void*)(uintptr_t)pirq);
-            else
-                on_selected_cpus(cpumask_of(cpu),
-                                 gic_irq_eoi, (void*)(uintptr_t)pirq, 0);
-        }
-
-        i++;
-    }
+    /*
+     * This is a dummy interrupt handler.
+     * Receiving the interrupt is going to cause gic_inject to be called
+     * on return to guest that is going to clear the old LRs and inject
+     * new interrupts.
+     */
 }
 
 void gic_dump_info(struct vcpu *v)
