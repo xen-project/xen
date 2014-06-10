@@ -543,16 +543,6 @@ typedef struct xen_domctl_pin_mem_cacheattr xen_domctl_pin_mem_cacheattr_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_pin_mem_cacheattr_t);
 
 
-#if defined(__i386__) || defined(__x86_64__)
-struct xen_domctl_ext_vcpu_msr {
-    uint32_t         index;
-    uint32_t         reserved;
-    uint64_aligned_t value;
-};
-typedef struct xen_domctl_ext_vcpu_msr xen_domctl_ext_vcpu_msr_t;
-DEFINE_XEN_GUEST_HANDLE(xen_domctl_ext_vcpu_msr_t);
-#endif
-
 /* XEN_DOMCTL_set_ext_vcpucontext */
 /* XEN_DOMCTL_get_ext_vcpucontext */
 struct xen_domctl_ext_vcpucontext {
@@ -572,14 +562,6 @@ struct xen_domctl_ext_vcpucontext {
     uint16_t         sysenter_callback_cs;
     uint8_t          syscall32_disables_events;
     uint8_t          sysenter_disables_events;
-    /*
-     * When, for the "get" version, msr_count is too small to cover all MSRs
-     * the hypervisor needs to be saved, the call will return -ENOBUFS and
-     * set msr_count to the required (minimum) value. Furthermore, for both
-     * "get" and "set", that field as well as the msrs one only get looked at
-     * if the size field above covers the structure up to the entire msrs one.
-     */
-    uint16_t         msr_count;
 #if defined(__GNUC__)
     union {
         uint64_aligned_t mcg_cap;
@@ -588,7 +570,6 @@ struct xen_domctl_ext_vcpucontext {
 #else
     struct hvm_vmce_vcpu vmce;
 #endif
-    XEN_GUEST_HANDLE_64(xen_domctl_ext_vcpu_msr_t) msrs;
 #endif
 };
 typedef struct xen_domctl_ext_vcpucontext xen_domctl_ext_vcpucontext_t;
