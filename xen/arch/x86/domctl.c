@@ -1277,8 +1277,6 @@ long arch_do_domctl(
             xfree(receive_buf);
         }
 
-        ret = 0;
-
     vcpuextstate_out:
         if ( domctl->cmd == XEN_DOMCTL_getvcpuextstate )
             copyback = 1;
