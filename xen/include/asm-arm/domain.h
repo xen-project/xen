@@ -28,7 +28,8 @@ struct pending_irq
      * whether an irq added to an LR register is PENDING or ACTIVE, the
      * following states are just an approximation.
      *
-     * GIC_IRQ_GUEST_PENDING: the irq is asserted
+     * GIC_IRQ_GUEST_QUEUED: the irq is asserted and queued for
+     * injection into the guest's LRs.
      *
      * GIC_IRQ_GUEST_VISIBLE: the irq has been added to an LR register,
      * therefore the guest is aware of it. From the guest point of view
@@ -36,16 +37,16 @@ struct pending_irq
      * or active (after acking the irq).
      *
      * In order for the state machine to be fully accurate, for level
-     * interrupts, we should keep the GIC_IRQ_GUEST_PENDING state until
+     * interrupts, we should keep the interrupt's pending state until
      * the guest deactivates the irq. However because we are not sure
-     * when that happens, we simply remove the GIC_IRQ_GUEST_PENDING
-     * state when we add the irq to an LR register. We add it back when
-     * we receive another interrupt notification.
-     * Therefore it is possible to set GIC_IRQ_GUEST_PENDING while the
-     * irq is GIC_IRQ_GUEST_VISIBLE. We could also change the state of
-     * the guest irq in the LR register from active to active and
-     * pending, but for simplicity we simply inject a second irq after
-     * the guest EOIs the first one.
+     * when that happens, we instead track whether there is an interrupt
+     * queued using GIC_IRQ_GUEST_QUEUED. We clear it when we add it to
+     * an LR register. We set it when we receive another interrupt
+     * notification.  Therefore it is possible to set
+     * GIC_IRQ_GUEST_QUEUED while the irq is GIC_IRQ_GUEST_VISIBLE. We
+     * could also change the state of the guest irq in the LR register
+     * from active to active and pending, but for simplicity we simply
+     * inject a second irq after the guest EOIs the first one.
      *
      *
      * An additional state is used to keep track of whether the guest
@@ -55,7 +56,7 @@ struct pending_irq
      * level (GICD_ICENABLER/GICD_ISENABLER).
      *
      */
-#define GIC_IRQ_GUEST_PENDING  0
+#define GIC_IRQ_GUEST_QUEUED   0
 #define GIC_IRQ_GUEST_VISIBLE  1
 #define GIC_IRQ_GUEST_ENABLED  2
     unsigned long status;

@@ -565,7 +565,7 @@ static inline void gic_set_lr(int lr, struct pending_irq *p,
     GICH[GICH_LR + lr] = lr_val;
 
     set_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
-    clear_bit(GIC_IRQ_GUEST_PENDING, &p->status);
+    clear_bit(GIC_IRQ_GUEST_QUEUED, &p->status);
     p->lr = lr;
 }
 
@@ -643,7 +643,7 @@ static void gic_update_one_lr(struct vcpu *v, int i)
             p->desc->status &= ~IRQ_INPROGRESS;
         clear_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
         p->lr = GIC_INVALID_LR;
-        if ( test_bit(GIC_IRQ_GUEST_PENDING, &p->status) &&
+        if ( test_bit(GIC_IRQ_GUEST_QUEUED, &p->status) &&
                 test_bit(GIC_IRQ_GUEST_ENABLED, &p->status))
             gic_raise_guest_irq(v, irq, p->priority);
         else

@@ -719,7 +719,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
     {
         if ( (irq != current->domain->arch.evtchn_irq) ||
              (!test_bit(GIC_IRQ_GUEST_VISIBLE, &n->status)) )
-            set_bit(GIC_IRQ_GUEST_PENDING, &n->status);
+            set_bit(GIC_IRQ_GUEST_QUEUED, &n->status);
         goto out;
     }
 
@@ -733,7 +733,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
     priority = byte_read(rank->ipriority[REG_RANK_INDEX(8, idx)], 0, byte);
 
     n->irq = irq;
-    set_bit(GIC_IRQ_GUEST_PENDING, &n->status);
+    set_bit(GIC_IRQ_GUEST_QUEUED, &n->status);
     n->priority = priority;
 
     /* the irq is enabled */
