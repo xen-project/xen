@@ -344,12 +344,11 @@ static EFI_FILE_HANDLE __init get_parent_handle(EFI_LOADED_IMAGE *loaded_image,
         ret = efi_bs->HandleProtocol(loaded_image->DeviceHandle,
                                      &fs_protocol, (void **)&fio);
         if ( EFI_ERROR(ret) )
-            PrintErrMesg(L"Couldn't obtain the File System Protocol Interface",
-                         ret);
+            blexit(L"Couldn't obtain the File System Protocol Interface");
         ret = fio->OpenVolume(fio, &dir_handle);
     } while ( ret == EFI_MEDIA_CHANGED );
     if ( ret != EFI_SUCCESS )
-        PrintErrMesg(L"OpenVolume failure", ret);
+        blexit(L"OpenVolume failure");
 
 #define buffer ((CHAR16 *)keyhandler_scratch)
 #define BUFFERSIZE sizeof(keyhandler_scratch)
@@ -968,8 +967,8 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     if ( !EFI_ERROR(efi_bs->LocateProtocol(&shim_lock_guid, NULL,
                     (void **)&shim_lock)) &&
-         (status = shim_lock->Verify(kernel.ptr, kernel.size)) != EFI_SUCCESS )
-        PrintErrMesg(L"Dom0 kernel image could not be verified", status);
+         shim_lock->Verify(kernel.ptr, kernel.size) != EFI_SUCCESS )
+        blexit(L"Dom0 kernel image could not be verified.");
 
     name.s = get_value(&cfg, section.s, "ramdisk");
     if ( name.s )
@@ -1382,8 +1381,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     status = efi_bs->GetMemoryMap(&efi_memmap_size, NULL, &map_key,
                                   &efi_mdesc_size, &mdesc_ver);
-    if ( EFI_ERROR(status) )
-        PrintErrMesg(L"Cannot size memory map", status);
     mbi.mem_upper -= efi_memmap_size;
     mbi.mem_upper &= -__alignof__(EFI_MEMORY_DESCRIPTOR);
     if ( mbi.mem_upper < xen_phys_start )
@@ -1392,7 +1389,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     status = efi_bs->GetMemoryMap(&efi_memmap_size, efi_memmap, &map_key,
                                   &efi_mdesc_size, &mdesc_ver);
     if ( EFI_ERROR(status) )
-        PrintErrMesg(L"Cannot obtain memory map", status);
+        blexit(L"Cannot obtain memory map");
 
     /* Populate E820 table and check trampoline area availability. */
     e = e820map - 1;
