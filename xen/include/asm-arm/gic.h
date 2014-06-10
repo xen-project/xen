@@ -149,6 +149,8 @@
 #define GIC_PRI_IRQ        0xa0
 #define GIC_PRI_IPI        0x90 /* IPIs must preempt normal interrupts */
 #define GIC_PRI_HIGHEST    0x80 /* Higher priorities belong to Secure-World */
+#define GIC_PRI_TO_GUEST(pri) (pri >> 3) /* GICH_LR and GICH_VMCR only support
+                                            5 bits for guest irq priority */
 
 
 #ifndef __ASSEMBLY__

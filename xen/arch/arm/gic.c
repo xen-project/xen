@@ -561,7 +561,7 @@ static inline void gic_set_lr(int lr, struct pending_irq *p,
     BUG_ON(lr < 0);
     BUG_ON(state & ~(GICH_LR_STATE_MASK<<GICH_LR_STATE_SHIFT));
 
-    lr_val = state | ((p->priority >> 3) << GICH_LR_PRIORITY_SHIFT) |
+    lr_val = state | (GIC_PRI_TO_GUEST(p->priority) << GICH_LR_PRIORITY_SHIFT) |
         ((p->irq & GICH_LR_VIRTUAL_MASK) << GICH_LR_VIRTUAL_SHIFT);
     if ( p->desc != NULL )
         lr_val |= GICH_LR_HW | (p->desc->irq << GICH_LR_PHYSICAL_SHIFT);
