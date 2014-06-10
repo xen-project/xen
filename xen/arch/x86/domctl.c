@@ -1344,6 +1344,133 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_get_vcpu_msrs:
+    case XEN_DOMCTL_set_vcpu_msrs:
+    {
+        struct xen_domctl_vcpu_msrs *vmsrs = &domctl->u.vcpu_msrs;
+        struct xen_domctl_vcpu_msr msr;
+        struct vcpu *v;
+        uint32_t nr_msrs = 0;
+
+        ret = -ESRCH;
+        if ( (vmsrs->vcpu >= d->max_vcpus) ||
+             ((v = d->vcpu[vmsrs->vcpu]) == NULL) )
+            break;
+
+        ret = -EINVAL;
+        if ( (v == current) || /* no vcpu_pause() */
+             !is_pv_domain(d) )
+            break;
+
+        /* Count maximum number of optional msrs. */
+        if ( boot_cpu_has(X86_FEATURE_DBEXT) )
+            nr_msrs += 4;
+
+        if ( domctl->cmd == XEN_DOMCTL_get_vcpu_msrs )
+        {
+            ret = 0; copyback = 1;
+
+            /* NULL guest handle is a request for max size. */
+            if ( guest_handle_is_null(vmsrs->msrs) )
+                vmsrs->msr_count = nr_msrs;
+            else
+            {
+                i = 0;
+
+                vcpu_pause(v);
+
+                if ( boot_cpu_has(X86_FEATURE_DBEXT) )
+                {
+                    unsigned int j;
+
+                    if ( v->arch.pv_vcpu.dr_mask[0] )
+                    {
+                        if ( i < vmsrs->msr_count && !ret )
+                        {
+                            msr.index = MSR_AMD64_DR0_ADDRESS_MASK;
+                            msr.reserved = 0;
+                            msr.value = v->arch.pv_vcpu.dr_mask[0];
+                            if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
+                                ret = -EFAULT;
+                        }
+                        ++i;
+                    }
+
+                    for ( j = 0; j < 3; ++j )
+                    {
+                        if ( !v->arch.pv_vcpu.dr_mask[1 + j] )
+                            continue;
+                        if ( i < vmsrs->msr_count && !ret )
+                        {
+                            msr.index = MSR_AMD64_DR1_ADDRESS_MASK + j;
+                            msr.reserved = 0;
+                            msr.value = v->arch.pv_vcpu.dr_mask[1 + j];
+                            if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
+                                ret = -EFAULT;
+                        }
+                        ++i;
+                    }
+                }
+
+                vcpu_unpause(v);
+
+                if ( i > vmsrs->msr_count && !ret )
+                    ret = -ENOBUFS;
+                vmsrs->msr_count = i;
+            }
+        }
+        else
+        {
+            ret = -EINVAL;
+            if ( vmsrs->msr_count > nr_msrs )
+                break;
+
+            vcpu_pause(v);
+
+            for ( i = 0; i < vmsrs->msr_count; ++i )
+            {
+                ret = -EFAULT;
+                if ( copy_from_guest_offset(&msr, vmsrs->msrs, i, 1) )
+                    break;
+
+                ret = -EINVAL;
+                if ( msr.reserved )
+                    break;
+
+                switch ( msr.index )
+                {
+                case MSR_AMD64_DR0_ADDRESS_MASK:
+                    if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
+                         (msr.value >> 32) )
+                        break;
+                    v->arch.pv_vcpu.dr_mask[0] = msr.value;
+                    continue;
+
+                case MSR_AMD64_DR1_ADDRESS_MASK ...
+                    MSR_AMD64_DR3_ADDRESS_MASK:
+                    if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
+                         (msr.value >> 32) )
+                        break;
+                    msr.index -= MSR_AMD64_DR1_ADDRESS_MASK - 1;
+                    v->arch.pv_vcpu.dr_mask[msr.index] = msr.value;
+                    continue;
+                }
+                break;
+            }
+
+            vcpu_unpause(v);
+
+            if ( i == vmsrs->msr_count )
+                ret = 0;
+            else
+            {
+                vmsrs->msr_count = i;
+                copyback = 1;
+            }
+        }
+    }
+    break;
+
     default:
         ret = iommu_do_domctl(domctl, d, u_domctl);
         break;
