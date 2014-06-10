@@ -580,7 +580,7 @@ __gnttab_map_grant_ref(
 
     if ( rgt->gt_version == 0 )
         PIN_FAIL(unlock_out, GNTST_general_error,
-                 "remote grant table not yet set up");
+                 "remote grant table not yet set up\n");
 
     /* Bounds check on the grant ref */
     if ( unlikely(op->ref >= nr_grant_entries(rgt)))
