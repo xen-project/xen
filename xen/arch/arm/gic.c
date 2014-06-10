@@ -55,6 +55,7 @@ static struct {
 static DEFINE_PER_CPU(uint64_t, lr_mask);
 
 static unsigned nr_lrs;
+#define lr_all_full() (this_cpu(lr_mask) == ((1 << nr_lrs) - 1))
 
 /* The GIC mapping of CPU interfaces does not necessarily match the
  * logical CPU numbering. Let's use mapping as returned by the GIC
@@ -661,6 +662,13 @@ void gic_inject(void)
         vgic_vcpu_inject_irq(current, current->domain->arch.evtchn_irq);
 
     gic_restore_pending_irqs(current);
+
+
+    if ( !list_empty(&current->arch.vgic.lr_pending) && lr_all_full() )
+        GICH[GICH_HCR] |= GICH_HCR_UIE;
+    else
+        GICH[GICH_HCR] &= ~GICH_HCR_UIE;
+
 }
 
 static void do_sgi(struct cpu_user_regs *regs, int othercpu, enum gic_sgi sgi)
