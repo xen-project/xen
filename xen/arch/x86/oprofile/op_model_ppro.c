@@ -126,7 +126,7 @@ static void ppro_setup_ctrs(struct op_msrs const * const msrs)
 
 static int ppro_check_ctrs(unsigned int const cpu,
                            struct op_msrs const * const msrs,
-                           struct cpu_user_regs * const regs)
+                           struct cpu_user_regs const * const regs)
 {
 	u64 val;
 	int i;

@@ -78,7 +78,7 @@ static const unsigned char * const p6_nops[ASM_NOP_MAX+1] /*__initconst*/ = {
 
 static const unsigned char * const *ideal_nops __initdata = k8_nops;
 
-static int __init mask_nmi_callback(struct cpu_user_regs *regs, int cpu)
+static int __init mask_nmi_callback(const struct cpu_user_regs *regs, int cpu)
 {
     return 1;
 }

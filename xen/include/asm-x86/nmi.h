@@ -9,7 +9,7 @@ struct cpu_user_regs;
 /* Watchdog boolean from the command line */
 extern bool_t opt_watchdog;
  
-typedef int (*nmi_callback_t)(struct cpu_user_regs *regs, int cpu);
+typedef int (*nmi_callback_t)(const struct cpu_user_regs *regs, int cpu);
  
 /** 
  * set_nmi_callback

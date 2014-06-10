@@ -82,7 +82,7 @@ void passive_domain_destroy(struct vcpu *v)
 		model->free_msr(v);
 }
 
-static int nmi_callback(struct cpu_user_regs *regs, int cpu)
+static int nmi_callback(const struct cpu_user_regs *regs, int cpu)
 {
 	int xen_mode, ovf;
 

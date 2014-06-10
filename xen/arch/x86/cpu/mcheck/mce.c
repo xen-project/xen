@@ -70,7 +70,7 @@ static void __init mce_set_verbosity(char *str)
 custom_param("mce_verbosity", mce_set_verbosity);
 
 /* Handle unconfigured int18 (should never happen) */
-static void unexpected_machine_check(struct cpu_user_regs *regs, long error_code)
+static void unexpected_machine_check(const struct cpu_user_regs *regs, long error_code)
 {
     console_force_unlock();
     printk("Unexpected Machine Check Exception\n");
@@ -88,7 +88,7 @@ void x86_mce_vector_register(x86_mce_vector_t hdlr)
 
 /* Call the installed machine check handler for this CPU setup. */
 
-void machine_check_vector(struct cpu_user_regs *regs, long error_code)
+void machine_check_vector(const struct cpu_user_regs *regs, long error_code)
 {
     _machine_check_vector(regs, error_code);
 }
@@ -424,7 +424,7 @@ static void mce_spin_unlock(spinlock_t *lk)
       spin_unlock(lk);
 }
 
-static enum mce_result mce_action(struct cpu_user_regs *regs,
+static enum mce_result mce_action(const struct cpu_user_regs *regs,
     mctelem_cookie_t mctc);
 
 /*
@@ -432,7 +432,7 @@ static enum mce_result mce_action(struct cpu_user_regs *regs,
  * -1: if system can't be recovered
  * 0: Continue to next step
  */
-static int mce_urgent_action(struct cpu_user_regs *regs,
+static int mce_urgent_action(const struct cpu_user_regs *regs,
                               mctelem_cookie_t mctc)
 {
     uint64_t gstatus;
@@ -459,7 +459,7 @@ static int mce_urgent_action(struct cpu_user_regs *regs,
 }
 
 /* Shared #MC handler. */
-void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
+void mcheck_cmn_handler(const struct cpu_user_regs *regs, long error_code,
     struct mca_banks *bankmask, struct mca_banks *clear_bank)
 {
     uint64_t gstatus;
@@ -1570,7 +1570,7 @@ void mc_panic(char *s)
  */
 
 /* Maybe called in MCE context, no lock, no printk */
-static enum mce_result mce_action(struct cpu_user_regs *regs,
+static enum mce_result mce_action(const struct cpu_user_regs *regs,
                       mctelem_cookie_t mctc)
 {
     struct mc_info *local_mi;

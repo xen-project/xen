@@ -33,7 +33,7 @@ struct op_x86_model_spec {
 	void (*setup_ctrs)(struct op_msrs const * const msrs);
 	int (*check_ctrs)(unsigned int const cpu, 
 			  struct op_msrs const * const msrs,
-			  struct cpu_user_regs * const regs);
+			  struct cpu_user_regs const * const regs);
 	void (*start)(struct op_msrs const * const msrs);
 	void (*stop)(struct op_msrs const * const msrs);
 	int (*is_arch_pmu_msr)(u64 msr_index, int *type, int *index);

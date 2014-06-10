@@ -38,7 +38,7 @@ void mce_register_addrcheck(mce_check_addr_t cbfunc)
 void
 mc_memerr_dhandler(struct mca_binfo *binfo,
                    enum mce_result *result,
-                   struct cpu_user_regs *regs)
+                   const struct cpu_user_regs *regs)
 {
     struct mcinfo_bank *bank = binfo->mib;
     struct mcinfo_global *global = binfo->mig;

@@ -237,7 +237,7 @@ static void athlon_setup_ctrs(struct op_msrs const * const msrs)
 }
 
 static inline void
-ibs_log_event(u64 data, struct cpu_user_regs * const regs, int mode)
+ibs_log_event(u64 data, struct cpu_user_regs const * const regs, int mode)
 {
 	struct vcpu *v = current;
 	u32 temp = 0;
@@ -250,7 +250,7 @@ ibs_log_event(u64 data, struct cpu_user_regs * const regs, int mode)
 	
 }
 
-static inline int handle_ibs(int mode, struct cpu_user_regs * const regs)
+static inline int handle_ibs(int mode, struct cpu_user_regs const * const regs)
 {
 	u64 val, ctl;
 	struct vcpu *v = current;
@@ -310,7 +310,7 @@ static inline int handle_ibs(int mode, struct cpu_user_regs * const regs)
 
 static int athlon_check_ctrs(unsigned int const cpu,
 			     struct op_msrs const * const msrs,
-			     struct cpu_user_regs * const regs)
+			     struct cpu_user_regs const * const regs)
 
 {
 	uint64_t msr_content;

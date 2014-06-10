@@ -242,7 +242,7 @@ amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
 }
 
 /* Common AMD Machine Check Handler for AMD K8 and higher */
-static void amd_cmn_machine_check(struct cpu_user_regs *regs, long error_code)
+static void amd_cmn_machine_check(const struct cpu_user_regs *regs, long error_code)
 {
     mcheck_cmn_handler(regs, error_code, mca_allbanks,
                        __get_cpu_var(mce_clear_banks));

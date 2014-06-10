@@ -7,7 +7,7 @@
 void
 mc_memerr_dhandler(struct mca_binfo *binfo,
                    enum mce_result *result,
-                   struct cpu_user_regs *regs);
+                   const struct cpu_user_regs *regs);
 
 #define MC_ADDR_PHYSICAL  0
 #define MC_ADDR_VIRTUAL   1
