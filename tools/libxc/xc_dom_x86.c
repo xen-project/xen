@@ -716,7 +716,7 @@ static int x86_compat(xc_interface *xch, domid_t domid, char *guest_type)
     memset(&domctl, 0, sizeof(domctl));
     domctl.domain = domid;
     domctl.cmd    = XEN_DOMCTL_set_address_size;
-    for ( i = 0; i < sizeof(types)/sizeof(types[0]); i++ )
+    for ( i = 0; i < ARRAY_SIZE(types); i++ )
         if ( !strcmp(types[i].guest, guest_type) )
             domctl.u.address_size.size = types[i].size;
     if ( domctl.u.address_size.size == 0 )
@@ -887,7 +887,7 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
     xen_pfn_t shinfo;
     int i, rc;
 
-    for ( i = 0; i < sizeof(types) / sizeof(types[0]); i++ )
+    for ( i = 0; i < ARRAY_SIZE(types); i++ )
         if ( !strcmp(types[i].guest, dom->guest_type) )
             pgd_type = types[i].pgd_type;
 

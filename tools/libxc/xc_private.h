@@ -54,6 +54,11 @@
 #define XC_BUILD_BUG_ON(p) ((void)sizeof(struct { int:-!!(p); }))
 #endif
 
+#ifndef ARRAY_SIZE /* MiniOS leaks ARRAY_SIZE into our namespace as part of a
+                    * stubdom build.  It shouldn't... */
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+#endif
+
 /*
 ** Define max dirty page cache to permit during save/restore -- need to balance 
 ** keeping cache usage down with CPU impact of invalidating too often.

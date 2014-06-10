@@ -4,6 +4,7 @@
 #include <xenstore.h>
 #include <unistd.h>
 
+#undef ARRAY_SIZE /* We shouldn't be including xc_private.h */
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
 static xc_interface *xch;

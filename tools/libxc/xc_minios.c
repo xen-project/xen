@@ -87,7 +87,7 @@ static int minios_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcm
     int i, ret;
 
     call.op = hypercall->op;
-    for (i = 0; i < sizeof(hypercall->arg) / sizeof(*hypercall->arg); i++)
+    for (i = 0; i < ARRAY_SIZE(hypercall->arg); i++)
 	call.args[i] = hypercall->arg[i];
 
     ret = HYPERVISOR_multicall(&call, 1);
