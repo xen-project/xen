@@ -45,17 +45,6 @@ integer_param("cpuid_mask_thermal_ecx", opt_cpuid_mask_thermal_ecx);
 s8 __read_mostly opt_allow_unsafe;
 boolean_param("allow_unsafe", opt_allow_unsafe);
 
-static inline void wrmsr_amd(unsigned int index, unsigned int lo, 
-		unsigned int hi)
-{
-	asm volatile (
-		"wrmsr"
-		: /* No outputs */
-		: "c" (index), "a" (lo), 
-		"d" (hi), "D" (0x9c5a203a)
-	);
-}
-
 static inline int rdmsr_amd_safe(unsigned int msr, unsigned int *lo,
 				 unsigned int *hi)
 {
