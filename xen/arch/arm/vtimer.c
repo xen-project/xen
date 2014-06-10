@@ -34,14 +34,14 @@ static void phys_timer_expired(void *data)
     struct vtimer *t = data;
     t->ctl |= CNTx_CTL_PENDING;
     if ( !(t->ctl & CNTx_CTL_MASK) )
-        vgic_vcpu_inject_irq(t->v, t->irq, 1);
+        vgic_vcpu_inject_irq(t->v, t->irq);
 }
 
 static void virt_timer_expired(void *data)
 {
     struct vtimer *t = data;
     t->ctl |= CNTx_CTL_MASK;
-    vgic_vcpu_inject_irq(t->v, t->irq, 1);
+    vgic_vcpu_inject_irq(t->v, t->irq);
 }
 
 int domain_vtimer_init(struct domain *d)

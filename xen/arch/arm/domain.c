@@ -780,7 +780,7 @@ void vcpu_mark_events_pending(struct vcpu *v)
     if ( already_pending )
         return;
 
-    vgic_vcpu_inject_irq(v, v->domain->arch.evtchn_irq, 1);
+    vgic_vcpu_inject_irq(v, v->domain->arch.evtchn_irq);
 }
 
 /*

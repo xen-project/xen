@@ -658,7 +658,7 @@ int gic_events_need_delivery(void)
 void gic_inject(void)
 {
     if ( vcpu_info(current, evtchn_upcall_pending) )
-        vgic_vcpu_inject_irq(current, current->domain->arch.evtchn_irq, 1);
+        vgic_vcpu_inject_irq(current, current->domain->arch.evtchn_irq);
 
     gic_restore_pending_irqs(current);
 }

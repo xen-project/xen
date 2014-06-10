@@ -476,7 +476,7 @@ static int vgic_to_sgi(struct vcpu *v, register_t sgir)
                      sgir, vcpu_mask);
             continue;
         }
-        vgic_vcpu_inject_irq(d->vcpu[vcpuid], virtual_irq, 1);
+        vgic_vcpu_inject_irq(d->vcpu[vcpuid], virtual_irq);
     }
     return 1;
 }
@@ -704,7 +704,7 @@ void vgic_clear_pending_irqs(struct vcpu *v)
     spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
 }
 
-void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
+void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
 {
     int idx = irq >> 2, byte = irq & 0x3;
     uint8_t priority;
