@@ -54,7 +54,7 @@ static struct {
 
 static DEFINE_PER_CPU(uint64_t, lr_mask);
 
-static unsigned nr_lrs;
+static uint8_t nr_lrs;
 #define lr_all_full() (this_cpu(lr_mask) == ((1 << nr_lrs) - 1))
 
 /* The GIC mapping of CPU interfaces does not necessarily match the
