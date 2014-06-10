@@ -129,6 +129,9 @@
 #define GICH_LR_CPUID_SHIFT     9
 #define GICH_VTR_NRLRGS         0x3f
 
+#define GICH_VMCR_PRIORITY_MASK   0x1f
+#define GICH_VMCR_PRIORITY_SHIFT  27
+
 /*
  * The minimum GICC_BPR is required to be in the range 0-3. We set
  * GICC_BPR to 0 but we must expect that it might be 3. This means we

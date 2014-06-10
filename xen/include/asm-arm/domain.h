@@ -57,8 +57,9 @@ struct pending_irq
      *
      */
 #define GIC_IRQ_GUEST_QUEUED   0
-#define GIC_IRQ_GUEST_VISIBLE  1
-#define GIC_IRQ_GUEST_ENABLED  2
+#define GIC_IRQ_GUEST_ACTIVE   1
+#define GIC_IRQ_GUEST_VISIBLE  2
+#define GIC_IRQ_GUEST_ENABLED  3
     unsigned long status;
     struct irq_desc *desc; /* only set it the irq corresponds to a physical irq */
     int irq;
