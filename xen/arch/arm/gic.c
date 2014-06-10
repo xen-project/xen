@@ -598,8 +598,8 @@ void gic_remove_from_queues(struct vcpu *v, unsigned int virtual_irq)
     spin_unlock_irqrestore(&gic.lock, flags);
 }
 
-void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
-        unsigned int state, unsigned int priority)
+void gic_raise_guest_irq(struct vcpu *v, unsigned int virtual_irq,
+        unsigned int priority)
 {
     int i;
     unsigned long flags;
@@ -611,7 +611,7 @@ void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
         i = find_first_zero_bit(&this_cpu(lr_mask), nr_lrs);
         if (i < nr_lrs) {
             set_bit(i, &this_cpu(lr_mask));
-            gic_set_lr(i, irq_to_pending(v, virtual_irq), state);
+            gic_set_lr(i, irq_to_pending(v, virtual_irq), GICH_LR_PENDING);
             goto out;
         }
     }
@@ -645,7 +645,7 @@ static void gic_update_one_lr(struct vcpu *v, int i)
         p->lr = GIC_INVALID_LR;
         if ( test_bit(GIC_IRQ_GUEST_PENDING, &p->status) &&
                 test_bit(GIC_IRQ_GUEST_ENABLED, &p->status))
-            gic_set_guest_irq(v, irq, GICH_LR_PENDING, p->priority);
+            gic_raise_guest_irq(v, irq, p->priority);
         else
             list_del_init(&p->inflight);
     }
