@@ -432,7 +432,7 @@ int __init watchdog_setup(void)
     return 0;
 }
 
-void nmi_watchdog_tick(struct cpu_user_regs * regs)
+void nmi_watchdog_tick(const struct cpu_user_regs *regs)
 {
     unsigned int sum = this_cpu(nmi_timer_ticks);
 

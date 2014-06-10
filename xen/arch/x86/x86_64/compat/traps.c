@@ -3,7 +3,7 @@
 #include <compat/callback.h>
 #include <compat/arch-x86_32.h>
 
-void compat_show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs,
+void compat_show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs,
                              int debug_stack_lines)
 {
     unsigned int i, *stack, addr, mask = STACK_SIZE;

@@ -477,27 +477,32 @@ static always_inline void rep_nop(void)
 
 #define cpu_relax() rep_nop()
 
-void show_stack(struct cpu_user_regs *regs);
+void show_stack(const struct cpu_user_regs *regs);
 void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs);
-void show_registers(struct cpu_user_regs *regs);
-void show_execution_state(struct cpu_user_regs *regs);
+void show_registers(const struct cpu_user_regs *regs);
+void show_execution_state(const struct cpu_user_regs *regs);
 #define dump_execution_state() run_in_exception_handler(show_execution_state)
 void show_page_walk(unsigned long addr);
-void noreturn fatal_trap(int trapnr, struct cpu_user_regs *regs);
+void noreturn fatal_trap(int trapnr, const struct cpu_user_regs *regs);
 
-void compat_show_guest_stack(struct vcpu *, struct cpu_user_regs *, int lines);
+void compat_show_guest_stack(struct vcpu *v,
+                             const struct cpu_user_regs *regs, int lines);
 
 extern void mtrr_ap_init(void);
 extern void mtrr_bp_init(void);
 
 void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp);
 
-#define DECLARE_TRAP_HANDLER(_name)                     \
-void _name(void);                            \
-void do_ ## _name(struct cpu_user_regs *regs)
+#define DECLARE_TRAP_HANDLER(_name)                    \
+    void _name(void);                                  \
+    void do_ ## _name(struct cpu_user_regs *regs)
+#define DECLARE_TRAP_HANDLER_CONST(_name)              \
+    void _name(void);                                  \
+    void do_ ## _name(const struct cpu_user_regs *regs)
+
 DECLARE_TRAP_HANDLER(divide_error);
 DECLARE_TRAP_HANDLER(debug);
-DECLARE_TRAP_HANDLER(nmi);
+DECLARE_TRAP_HANDLER_CONST(nmi);
 DECLARE_TRAP_HANDLER(int3);
 DECLARE_TRAP_HANDLER(overflow);
 DECLARE_TRAP_HANDLER(bounds);
@@ -512,8 +517,10 @@ DECLARE_TRAP_HANDLER(page_fault);
 DECLARE_TRAP_HANDLER(early_page_fault);
 DECLARE_TRAP_HANDLER(coprocessor_error);
 DECLARE_TRAP_HANDLER(simd_coprocessor_error);
-DECLARE_TRAP_HANDLER(machine_check);
+DECLARE_TRAP_HANDLER_CONST(machine_check);
 DECLARE_TRAP_HANDLER(alignment_check);
+
+#undef DECLARE_TRAP_HANDLER_CONST
 #undef DECLARE_TRAP_HANDLER
 
 void trap_nop(void);

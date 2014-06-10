@@ -62,12 +62,12 @@ void x86_mc_get_cpu_info(unsigned, uint32_t *, uint16_t *, uint16_t *,
 			 uint32_t *, uint32_t *, uint32_t *, uint32_t *);
 
 /* Register a handler for machine check exceptions. */
-typedef void (*x86_mce_vector_t)(struct cpu_user_regs *, long);
+typedef void (*x86_mce_vector_t)(const struct cpu_user_regs *, long);
 extern void x86_mce_vector_register(x86_mce_vector_t);
 
 /* Common generic MCE handler that implementations may nominate
  * via x86_mce_vector_register. */
-extern void mcheck_cmn_handler(struct cpu_user_regs *, long,
+extern void mcheck_cmn_handler(const struct cpu_user_regs *, long,
     struct mca_banks *, struct mca_banks *);
 
 /* Register a handler for judging whether mce is recoverable. */

@@ -152,7 +152,7 @@ struct mca_error_handler
      */
     int (*owned_error)(uint64_t status);
     void (*recovery_handler)(struct mca_binfo *binfo,
-                    enum mce_result *result, struct cpu_user_regs *regs);
+                    enum mce_result *result, const struct cpu_user_regs *regs);
 };
 
 /* Global variables */

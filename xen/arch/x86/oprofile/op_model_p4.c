@@ -611,7 +611,7 @@ static void p4_setup_ctrs(struct op_msrs const * const msrs)
 
 static int p4_check_ctrs(unsigned int const cpu,
                          struct op_msrs const * const msrs,
-                         struct cpu_user_regs * const regs)
+                         struct cpu_user_regs const * const regs)
 {
 	unsigned long ctr, stag, real;
 	uint64_t msr_content;

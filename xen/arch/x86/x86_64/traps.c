@@ -79,7 +79,7 @@ static void _show_registers(
            regs->gs, regs->ss, regs->cs);
 }
 
-void show_registers(struct cpu_user_regs *regs)
+void show_registers(const struct cpu_user_regs *regs)
 {
     struct cpu_user_regs fault_regs = *regs;
     unsigned long fault_crs[8];

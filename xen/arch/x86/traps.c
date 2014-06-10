@@ -114,7 +114,7 @@ boolean_param("ler", opt_ler);
 #define stack_words_per_line 4
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
 
-static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
+static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
 {
     int i;
     unsigned long *stack, addr;
@@ -290,7 +290,7 @@ static void show_trace(const struct cpu_user_regs *regs)
     printk("\n");
 }
 
-void show_stack(struct cpu_user_regs *regs)
+void show_stack(const struct cpu_user_regs *regs)
 {
     unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), addr;
     int i;
@@ -349,7 +349,7 @@ void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
 #endif
 }
 
-void show_execution_state(struct cpu_user_regs *regs)
+void show_execution_state(const struct cpu_user_regs *regs)
 {
     show_registers(regs);
     show_stack(regs);
@@ -394,7 +394,7 @@ static const char *trapstr(unsigned int trapnr)
  * are disabled). In such situations we can't do much that is safe. We try to
  * print out some tracing and then we just spin.
  */
-void fatal_trap(int trapnr, struct cpu_user_regs *regs)
+void fatal_trap(int trapnr, const struct cpu_user_regs *regs)
 {
     static DEFINE_PER_CPU(char, depth);
 
@@ -1086,7 +1086,7 @@ void do_int3(struct cpu_user_regs *regs)
     do_guest_trap(TRAP_int3, regs, 0);
 }
 
-void do_machine_check(struct cpu_user_regs *regs)
+void do_machine_check(const struct cpu_user_regs *regs)
 {
     machine_check_vector(regs, regs->error_code);
 }
@@ -3240,7 +3240,7 @@ static void nmi_hwdom_report(unsigned int reason_idx)
     send_guest_trap(d, 0, TRAP_nmi);
 }
 
-static void pci_serr_error(struct cpu_user_regs *regs)
+static void pci_serr_error(const struct cpu_user_regs *regs)
 {
     outb((inb(0x61) & 0x0f) | 0x04, 0x61); /* clear-and-disable the PCI SERR error line. */
 
@@ -3260,7 +3260,7 @@ static void pci_serr_error(struct cpu_user_regs *regs)
     }
 }
 
-static void io_check_error(struct cpu_user_regs *regs)
+static void io_check_error(const struct cpu_user_regs *regs)
 {
     switch ( opt_nmi[0] )
     {
@@ -3279,7 +3279,7 @@ static void io_check_error(struct cpu_user_regs *regs)
     outb((inb(0x61) & 0x07) | 0x00, 0x61); /* enable IOCK */
 }
 
-static void unknown_nmi_error(struct cpu_user_regs *regs, unsigned char reason)
+static void unknown_nmi_error(const struct cpu_user_regs *regs, unsigned char reason)
 {
     switch ( opt_nmi[0] )
     {
@@ -3295,14 +3295,14 @@ static void unknown_nmi_error(struct cpu_user_regs *regs, unsigned char reason)
     }
 }
 
-static int dummy_nmi_callback(struct cpu_user_regs *regs, int cpu)
+static int dummy_nmi_callback(const struct cpu_user_regs *regs, int cpu)
 {
     return 0;
 }
  
 static nmi_callback_t nmi_callback = dummy_nmi_callback;
 
-void do_nmi(struct cpu_user_regs *regs)
+void do_nmi(const struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
     unsigned char reason;
