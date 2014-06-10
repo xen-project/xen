@@ -818,7 +818,6 @@ long arch_do_domctl(
     {
         struct xen_domctl_ext_vcpucontext *evc;
         struct vcpu *v;
-        struct xen_domctl_ext_vcpu_msr msr;
 
         evc = &domctl->u.ext_vcpucontext;
 
@@ -864,42 +863,7 @@ long arch_do_domctl(
             evc->vmce.mci_ctl2_bank0 = v->arch.vmce.bank[0].mci_ctl2;
             evc->vmce.mci_ctl2_bank1 = v->arch.vmce.bank[1].mci_ctl2;
 
-            i = ret = 0;
-            if ( boot_cpu_has(X86_FEATURE_DBEXT) )
-            {
-                unsigned int j;
-
-                if ( v->arch.pv_vcpu.dr_mask[0] )
-                {
-                    if ( i < evc->msr_count && !ret )
-                    {
-                        msr.index = MSR_AMD64_DR0_ADDRESS_MASK;
-                        msr.reserved = 0;
-                        msr.value = v->arch.pv_vcpu.dr_mask[0];
-                        if ( copy_to_guest_offset(evc->msrs, i, &msr, 1) )
-                            ret = -EFAULT;
-                    }
-                    ++i;
-                }
-                for ( j = 0; j < 3; ++j )
-                {
-                    if ( !v->arch.pv_vcpu.dr_mask[1 + j] )
-                        continue;
-                    if ( i < evc->msr_count && !ret )
-                    {
-                        msr.index = MSR_AMD64_DR1_ADDRESS_MASK + j;
-                        msr.reserved = 0;
-                        msr.value = v->arch.pv_vcpu.dr_mask[1 + j];
-                        if ( copy_to_guest_offset(evc->msrs, i, &msr, 1) )
-                            ret = -EFAULT;
-                    }
-                    ++i;
-                }
-            }
-            if ( i > evc->msr_count && !ret )
-                ret = -ENOBUFS;
-            evc->msr_count = i;
-
+            ret = 0;
             vcpu_unpause(v);
             copyback = 1;
         }
@@ -954,48 +918,8 @@ long arch_do_domctl(
 
                 ret = vmce_restore_vcpu(v, &vmce);
             }
-            else if ( evc->size > offsetof(typeof(*evc), vmce) )
-                ret = -EINVAL;
             else
                 ret = 0;
-
-            if ( ret || evc->size <= offsetof(typeof(*evc), msrs) )
-                /* nothing */;
-            else if ( evc->size < offsetof(typeof(*evc), msrs) +
-                                  sizeof(evc->msrs) )
-                ret = -EINVAL;
-            else
-            {
-                for ( i = 0; i < evc->msr_count; ++i )
-                {
-                    ret = -EFAULT;
-                    if ( copy_from_guest_offset(&msr, evc->msrs, i, 1) )
-                        break;
-                    ret = -EINVAL;
-                    if ( msr.reserved )
-                        break;
-                    switch ( msr.index )
-                    {
-                    case MSR_AMD64_DR0_ADDRESS_MASK:
-                        if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
-                             (msr.value >> 32) )
-                            break;
-                        v->arch.pv_vcpu.dr_mask[0] = msr.value;
-                        continue;
-                    case MSR_AMD64_DR1_ADDRESS_MASK ...
-                         MSR_AMD64_DR3_ADDRESS_MASK:
-                        if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
-                             (msr.value >> 32) )
-                            break;
-                        msr.index -= MSR_AMD64_DR1_ADDRESS_MASK - 1;
-                        v->arch.pv_vcpu.dr_mask[msr.index] = msr.value;
-                        continue;
-                    }
-                    break;
-                }
-                if ( i == evc->msr_count )
-                    ret = 0;
-            }
 
             domain_unpause(d);
         }
@@ -1341,6 +1265,133 @@ long arch_do_domctl(
             ret = p2m_change_type_one(d, pfn, pt, p2m_ram_broken);
 
         put_gfn(d, pfn);
+    }
+    break;
+
+    case XEN_DOMCTL_get_vcpu_msrs:
+    case XEN_DOMCTL_set_vcpu_msrs:
+    {
+        struct xen_domctl_vcpu_msrs *vmsrs = &domctl->u.vcpu_msrs;
+        struct xen_domctl_vcpu_msr msr;
+        struct vcpu *v;
+        uint32_t nr_msrs = 0;
+
+        ret = -ESRCH;
+        if ( (vmsrs->vcpu >= d->max_vcpus) ||
+             ((v = d->vcpu[vmsrs->vcpu]) == NULL) )
+            break;
+
+        ret = -EINVAL;
+        if ( (v == current) || /* no vcpu_pause() */
+             !is_pv_domain(d) )
+            break;
+
+        /* Count maximum number of optional msrs. */
+        if ( boot_cpu_has(X86_FEATURE_DBEXT) )
+            nr_msrs += 4;
+
+        if ( domctl->cmd == XEN_DOMCTL_get_vcpu_msrs )
+        {
+            ret = 0; copyback = 1;
+
+            /* NULL guest handle is a request for max size. */
+            if ( guest_handle_is_null(vmsrs->msrs) )
+                vmsrs->msr_count = nr_msrs;
+            else
+            {
+                i = 0;
+
+                vcpu_pause(v);
+
+                if ( boot_cpu_has(X86_FEATURE_DBEXT) )
+                {
+                    unsigned int j;
+
+                    if ( v->arch.pv_vcpu.dr_mask[0] )
+                    {
+                        if ( i < vmsrs->msr_count && !ret )
+                        {
+                            msr.index = MSR_AMD64_DR0_ADDRESS_MASK;
+                            msr.reserved = 0;
+                            msr.value = v->arch.pv_vcpu.dr_mask[0];
+                            if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
+                                ret = -EFAULT;
+                        }
+                        ++i;
+                    }
+
+                    for ( j = 0; j < 3; ++j )
+                    {
+                        if ( !v->arch.pv_vcpu.dr_mask[1 + j] )
+                            continue;
+                        if ( i < vmsrs->msr_count && !ret )
+                        {
+                            msr.index = MSR_AMD64_DR1_ADDRESS_MASK + j;
+                            msr.reserved = 0;
+                            msr.value = v->arch.pv_vcpu.dr_mask[1 + j];
+                            if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
+                                ret = -EFAULT;
+                        }
+                        ++i;
+                    }
+                }
+
+                vcpu_unpause(v);
+
+                if ( i > vmsrs->msr_count && !ret )
+                    ret = -ENOBUFS;
+                vmsrs->msr_count = i;
+            }
+        }
+        else
+        {
+            ret = -EINVAL;
+            if ( vmsrs->msr_count > nr_msrs )
+                break;
+
+            vcpu_pause(v);
+
+            for ( i = 0; i < vmsrs->msr_count; ++i )
+            {
+                ret = -EFAULT;
+                if ( copy_from_guest_offset(&msr, vmsrs->msrs, i, 1) )
+                    break;
+
+                ret = -EINVAL;
+                if ( msr.reserved )
+                    break;
+
+                switch ( msr.index )
+                {
+                case MSR_AMD64_DR0_ADDRESS_MASK:
+                    if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
+                         (msr.value >> 32) )
+                        break;
+                    v->arch.pv_vcpu.dr_mask[0] = msr.value;
+                    continue;
+
+                case MSR_AMD64_DR1_ADDRESS_MASK ...
+                    MSR_AMD64_DR3_ADDRESS_MASK:
+                    if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
+                         (msr.value >> 32) )
+                        break;
+                    msr.index -= MSR_AMD64_DR1_ADDRESS_MASK - 1;
+                    v->arch.pv_vcpu.dr_mask[msr.index] = msr.value;
+                    continue;
+                }
+                break;
+            }
+
+            vcpu_unpause(v);
+
+            if ( i == vmsrs->msr_count )
+                ret = 0;
+            else
+            {
+                vmsrs->msr_count = i;
+                copyback = 1;
+            }
+        }
     }
     break;
 

@@ -543,16 +543,6 @@ typedef struct xen_domctl_pin_mem_cacheattr xen_domctl_pin_mem_cacheattr_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_pin_mem_cacheattr_t);
 
 
-#if defined(__i386__) || defined(__x86_64__)
-struct xen_domctl_ext_vcpu_msr {
-    uint32_t         index;
-    uint32_t         reserved;
-    uint64_aligned_t value;
-};
-typedef struct xen_domctl_ext_vcpu_msr xen_domctl_ext_vcpu_msr_t;
-DEFINE_XEN_GUEST_HANDLE(xen_domctl_ext_vcpu_msr_t);
-#endif
-
 /* XEN_DOMCTL_set_ext_vcpucontext */
 /* XEN_DOMCTL_get_ext_vcpucontext */
 struct xen_domctl_ext_vcpucontext {
@@ -572,14 +562,6 @@ struct xen_domctl_ext_vcpucontext {
     uint16_t         sysenter_callback_cs;
     uint8_t          syscall32_disables_events;
     uint8_t          sysenter_disables_events;
-    /*
-     * When, for the "get" version, msr_count is too small to cover all MSRs
-     * the hypervisor needs to be saved, the call will return -ENOBUFS and
-     * set msr_count to the required (minimum) value. Furthermore, for both
-     * "get" and "set", that field as well as the msrs one only get looked at
-     * if the size field above covers the structure up to the entire msrs one.
-     */
-    uint16_t         msr_count;
 #if defined(__GNUC__)
     union {
         uint64_aligned_t mcg_cap;
@@ -588,7 +570,6 @@ struct xen_domctl_ext_vcpucontext {
 #else
     struct hvm_vmce_vcpu vmce;
 #endif
-    XEN_GUEST_HANDLE_64(xen_domctl_ext_vcpu_msr_t) msrs;
 #endif
 };
 typedef struct xen_domctl_ext_vcpucontext xen_domctl_ext_vcpucontext_t;
@@ -895,6 +876,41 @@ struct xen_domctl_cacheflush {
 typedef struct xen_domctl_cacheflush xen_domctl_cacheflush_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_cacheflush_t);
 
+#if defined(__i386__) || defined(__x86_64__)
+struct xen_domctl_vcpu_msr {
+    uint32_t         index;
+    uint32_t         reserved;
+    uint64_aligned_t value;
+};
+typedef struct xen_domctl_vcpu_msr xen_domctl_vcpu_msr_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpu_msr_t);
+
+/*
+ * XEN_DOMCTL_set_vcpu_msrs / XEN_DOMCTL_get_vcpu_msrs.
+ *
+ * Input:
+ * - A NULL 'msrs' guest handle is a request for the maximum 'msr_count'.
+ * - Otherwise, 'msr_count' is the number of entries in 'msrs'.
+ *
+ * Output for get:
+ * - If 'msr_count' is less than the number Xen needs to write, -ENOBUFS shall
+ *   be returned and 'msr_count' updated to reflect the intended number.
+ * - On success, 'msr_count' shall indicate the number of MSRs written, which
+ *   may be less than the maximum if some are not currently used by the vcpu.
+ *
+ * Output for set:
+ * - If Xen encounters an error with a specific MSR, -EINVAL shall be returned
+ *   and 'msr_count' shall be set to the offending index, to aid debugging.
+ */
+struct xen_domctl_vcpu_msrs {
+    uint32_t vcpu;                                   /* IN     */
+    uint32_t msr_count;                              /* IN/OUT */
+    XEN_GUEST_HANDLE_64(xen_domctl_vcpu_msr_t) msrs; /* IN/OUT */
+};
+typedef struct xen_domctl_vcpu_msrs xen_domctl_vcpu_msrs_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpu_msrs_t);
+#endif
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -965,6 +981,8 @@ struct xen_domctl {
 #define XEN_DOMCTL_getnodeaffinity               69
 #define XEN_DOMCTL_set_max_evtchn                70
 #define XEN_DOMCTL_cacheflush                    71
+#define XEN_DOMCTL_get_vcpu_msrs                 72
+#define XEN_DOMCTL_set_vcpu_msrs                 73
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -1014,6 +1032,7 @@ struct xen_domctl {
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_domctl_cpuid             cpuid;
         struct xen_domctl_vcpuextstate      vcpuextstate;
+        struct xen_domctl_vcpu_msrs         vcpu_msrs;
 #endif
         struct xen_domctl_set_access_required access_required;
         struct xen_domctl_audit_p2m         audit_p2m;
