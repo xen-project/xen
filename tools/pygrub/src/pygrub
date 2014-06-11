@@ -418,7 +418,9 @@ class Grub:
                    map(lambda x: (x,grub.ExtLinuxConf.ExtLinuxConfigFile),
                        ["/boot/isolinux/isolinux.cfg",
                         "/boot/extlinux/extlinux.conf",
-                        "/boot/extlinux.conf"]) + \
+                        "/boot/extlinux.conf",
+                        "/extlinux/extlinux.conf",
+                        "/extlinux.conf"]) + \
                    map(lambda x: (x,grub.GrubConf.GrubConfigFile),
                        ["/boot/grub/menu.lst", "/boot/grub/grub.conf",
                         "/grub/menu.lst", "/grub/grub.conf"])
