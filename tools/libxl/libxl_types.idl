@@ -614,6 +614,8 @@ libxl_domain_remus_info = Struct("domain_remus_info",[
     ("allow_unsafe", libxl_defbool),
     ("blackhole",    libxl_defbool),
     ("compression",  libxl_defbool),
+    ("netbuf",       libxl_defbool),
+    ("netbufscript", string),
     ])
 
 libxl_event_type = Enumeration("event_type", [

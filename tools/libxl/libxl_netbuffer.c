@@ -41,6 +41,7 @@ int libxl__netbuffer_enabled(libxl__gc *gc)
 int init_subkind_nic(libxl__remus_devices_state *rds)
 {
     int rc, ret;
+    libxl__domain_suspend_state *dss = CONTAINER_OF(rds, *dss, rds);
 
     STATE_AO_GC(rds->ao);
 
@@ -68,8 +69,12 @@ int init_subkind_nic(libxl__remus_devices_state *rds)
         goto out;
     }
 
-    rds->netbufscript = GCSPRINTF("%s/remus-netbuf-setup",
-                                  libxl__xen_script_dir_path());
+    if (dss->remus->netbufscript) {
+        rds->netbufscript = libxl__strdup(gc, dss->remus->netbufscript);
+    } else {
+        rds->netbufscript = GCSPRINTF("%s/remus-netbuf-setup",
+                                      libxl__xen_script_dir_path());
+    }
 
     rc = 0;
 

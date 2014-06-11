@@ -807,12 +807,16 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
     libxl_defbool_setdefault(&info->allow_unsafe, false);
     libxl_defbool_setdefault(&info->blackhole, false);
     libxl_defbool_setdefault(&info->compression, true);
+    libxl_defbool_setdefault(&info->netbuf, true);
 
     if (!libxl_defbool_val(info->allow_unsafe) &&
-        libxl_defbool_val(info->blackhole)) {
-        LOG(ERROR, "Unsafe mode must be enabled to replicate to /dev/null");
+        (libxl_defbool_val(info->blackhole) ||
+         !libxl_defbool_val(info->netbuf))) {
+        LOG(ERROR, "Unsafe mode must be enabled to replicate to /dev/null and "
+                   "disable network buffering");
         goto out;
     }
+
 
     GCNEW(dss);
     dss->ao = ao;
@@ -830,11 +834,13 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
     /* Convenience aliases */
     libxl__remus_devices_state *const rds = &dss->rds;
 
-    if (!libxl__netbuffer_enabled(gc)) {
-        LOG(ERROR, "Remus: No support for network buffering");
-        goto out;
+    if (libxl_defbool_val(info->netbuf)) {
+        if (!libxl__netbuffer_enabled(gc)) {
+            LOG(ERROR, "Remus: No support for network buffering");
+            goto out;
+        }
+        rds->device_kind_flags |= (1 << LIBXL__DEVICE_KIND_VIF);
     }
-    rds->device_kind_flags |= (1 << LIBXL__DEVICE_KIND_VIF);
     rds->device_kind_flags |= (1 << LIBXL__DEVICE_KIND_VBD);
 
     rds->ao = ao;

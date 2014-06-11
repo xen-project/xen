@@ -501,10 +501,13 @@ struct cmd_spec cmd_table[] = {
       "                        ssh <host> xl migrate-receive -r [-e]\n"
       "-e                      Do not wait in the background (on <host>) for the death\n"
       "                        of the domain.\n"
-      "-F                      Enable unsafe configurations [-b flags]. Use this option\n"
+      "-N <netbufscript>       Use netbufscript to setup network buffering instead of the\n"
+      "                        default script (/etc/xen/scripts/remus-netbuf-setup).\n"
+      "-F                      Enable unsafe configurations [-b|-n flags]. Use this option\n"
       "                        with caution as failover may not work as intended.\n"
       "-b                      Replicate memory checkpoints to /dev/null (blackhole).\n"
-      "                        Works only in unsafe mode."
+      "                        Works only in unsafe mode.\n"
+      "-n                      Disable network output buffering. Works only in unsafe mode."
     },
 #endif
     { "devd",

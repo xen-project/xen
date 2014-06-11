@@ -436,7 +436,7 @@ Enable Remus HA for domain. By default B<xl> relies on ssh as a transport
 mechanism between the two hosts.
 
 N.B: Remus support in xl is still in experimental (proof-of-concept) phase.
-     There is no support for network or disk buffering at the moment.
+     There is no support for disk buffering at the moment.
 
 B<OPTIONS>
 
@@ -460,6 +460,11 @@ If empty, run <host> instead of ssh <host> xl migrate-receive -r [-e].
 On the new host, do not wait in the background (on <host>) for the death
 of the domain. See the corresponding option of the I<create> subcommand.
 
+=item B<-N> I<netbufscript>
+
+Use <netbufscript> to setup network buffering instead of the
+default script (/etc/xen/scripts/remus-netbuf-setup).
+
 =item B<-F>
 
 Run Remus in unsafe mode. Use this option with caution as failover may
@@ -469,6 +474,10 @@ not work as intended.
 
 Replicate memory checkpoints to /dev/null (blackhole).
 Generally useful for debugging. Requires enabling unsafe mode.
+
+=item B<-n>
+
+Disable network output buffering. Requires enabling unsafe mode.
 
 =back
 
