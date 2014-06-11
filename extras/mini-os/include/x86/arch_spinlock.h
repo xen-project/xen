@@ -61,7 +61,7 @@
 
 static inline void _raw_spin_unlock(spinlock_t *lock)
 {
-	char oldval = 1;
+	char oldval = ARCH_SPIN_LOCK_UNLOCKED;
 	__asm__ __volatile__(
 		spin_unlock_string
 	);

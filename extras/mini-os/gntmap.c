@@ -38,6 +38,15 @@
 #include <inttypes.h>
 #include <mini-os/gntmap.h>
 
+//#define GNTMAP_DEBUG
+#ifdef GNTMAP_DEBUG
+#define DEBUG(_f, _a...) \
+    printk("MINI_OS(gntmap.c:%d): %s" _f "\n", __LINE__, __func__, ## _a)
+#else
+#define DEBUG(_f, _a...)    ((void)0)
+#endif
+
+
 #define DEFAULT_MAX_GRANTS 128
 
 struct gntmap_entry {
@@ -61,10 +70,8 @@ gntmap_find_free_entry(struct gntmap *map)
             return &map->entries[i];
     }
 
-#ifdef GNTMAP_DEBUG
-    printk("gntmap_find_free_entry(map=%p): all %d entries full\n",
+    DEBUG("(map=%p): all %d entries full",
            map, map->nentries);
-#endif
     return NULL;
 }
 
@@ -83,9 +90,7 @@ gntmap_find_entry(struct gntmap *map, unsigned long addr)
 int
 gntmap_set_max_grants(struct gntmap *map, int count)
 {
-#ifdef GNTMAP_DEBUG
-    printk("gntmap_set_max_grants(map=%p, count=%d)\n", map, count);
-#endif
+    DEBUG("(map=%p, count=%d)", map, count);
 
     if (map->nentries != 0)
         return -EBUSY;
@@ -157,10 +162,8 @@ gntmap_munmap(struct gntmap *map, unsigned long start_address, int count)
     int i, rc;
     struct gntmap_entry *ent;
 
-#ifdef GNTMAP_DEBUG
-    printk("gntmap_munmap(map=%p, start_address=%lx, count=%d)\n",
+    DEBUG("(map=%p, start_address=%lx, count=%d)",
            map, start_address, count);
-#endif
 
     for (i = 0; i < count; i++) {
         ent = gntmap_find_entry(map, start_address + PAGE_SIZE * i);
@@ -189,14 +192,12 @@ gntmap_map_grant_refs(struct gntmap *map,
     struct gntmap_entry *ent;
     int i;
 
-#ifdef GNTMAP_DEBUG
-    printk("gntmap_map_grant_refs(map=%p, count=%" PRIu32 ", "
+    DEBUG("(map=%p, count=%" PRIu32 ", "
            "domids=%p [%" PRIu32 "...], domids_stride=%d, "
-           "refs=%p [%" PRIu32 "...], writable=%d)\n",
+           "refs=%p [%" PRIu32 "...], writable=%d)",
            map, count,
            domids, domids == NULL ? 0 : domids[0], domids_stride,
            refs, refs == NULL ? 0 : refs[0], writable);
-#endif
 
     (void) gntmap_set_max_grants(map, DEFAULT_MAX_GRANTS);
 
@@ -224,9 +225,7 @@ gntmap_map_grant_refs(struct gntmap *map,
 void
 gntmap_init(struct gntmap *map)
 {
-#ifdef GNTMAP_DEBUG
-    printk("gntmap_init(map=%p)\n", map);
-#endif
+    DEBUG("(map=%p)", map);
     map->nentries = 0;
     map->entries = NULL;
 }
@@ -237,9 +236,7 @@ gntmap_fini(struct gntmap *map)
     struct gntmap_entry *ent;
     int i;
 
-#ifdef GNTMAP_DEBUG
-    printk("gntmap_fini(map=%p)\n", map);
-#endif
+    DEBUG("(map=%p)", map);
 
     for (i = 0; i < map->nentries; i++) {
         ent = &map->entries[i];

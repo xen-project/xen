@@ -276,7 +276,7 @@ static void xenbus_evtchn_handler(evtchn_port_t port, struct pt_regs *regs,
 }
 
 static int nr_live_reqs;
-static spinlock_t req_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(req_lock);
 static DECLARE_WAIT_QUEUE_HEAD(req_wq);
 
 /* Release a xenbus identifier */

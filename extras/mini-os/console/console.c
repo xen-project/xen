@@ -124,7 +124,7 @@ void print(int direct, const char *fmt, va_list args)
     static char   buf[1024];
     
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
- 
+
     if(direct)
     {
         (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(buf), buf);

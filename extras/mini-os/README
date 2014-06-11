@@ -25,8 +25,8 @@ This includes:
 
 - to build it with much better libc support, see the stubdom/ directory
 
-- to start it do the following in domain0 (assuming xend is running)
-  # xm create domain_config
+- to start it do the following in domain0
+  # xl create -c domain_config
 
 This starts the kernel and prints out a bunch of stuff and then once every
 second the system time.

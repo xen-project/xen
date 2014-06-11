@@ -138,7 +138,8 @@ evtchn_port_t bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 	op.virq = virq;
 	op.vcpu = smp_processor_id();
 
-	if ( (rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq, &op)) != 0 )
+	rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq, &op);
+	if (rc != 0)
 	{
 		printk("Failed to bind virtual IRQ %d with rc=%d\n", virq, rc);
 		return -1;

@@ -212,7 +212,7 @@ void block_domain(s_time_t until)
 
 
 /*
- * Just a dummy 
+ * Just a dummy
  */
 static void timer_handler(evtchn_port_t ev, struct pt_regs *regs, void *ign)
 {

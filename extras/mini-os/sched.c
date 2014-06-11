@@ -85,6 +85,7 @@ void schedule(void)
         printk("Must not call schedule() from a callback\n");
         BUG();
     }
+
     if (flags) {
         printk("Must not call schedule() with IRQs disabled\n");
         BUG();
@@ -188,6 +189,8 @@ struct _reent *__getreent(void)
 	}
     }
 #endif
+#else
+#error Not implemented yet
 #endif
     return _reent;
 }
