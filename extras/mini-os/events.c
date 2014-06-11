@@ -167,44 +167,28 @@ evtchn_port_t bind_pirq(uint32_t pirq, int will_share,
 	return op.port;
 }
 
-#if defined(__x86_64__)
-char irqstack[2 * STACK_SIZE];
-
-static struct pda
-{
-    int irqcount;       /* offset 0 (used in x86_64.S) */
-    char *irqstackptr;  /*        8 */
-} cpu0_pda;
-#endif
-
 /*
  * Initially all events are without a handler and disabled
  */
 void init_events(void)
 {
     int i;
-#if defined(__x86_64__)
-    asm volatile("movl %0,%%fs ; movl %0,%%gs" :: "r" (0));
-    wrmsrl(0xc0000101, &cpu0_pda); /* 0xc0000101 is MSR_GS_BASE */
-    cpu0_pda.irqcount = -1;
-    cpu0_pda.irqstackptr = (void*) (((unsigned long)irqstack + 2 * STACK_SIZE)
-                                    & ~(STACK_SIZE - 1));
-#endif
+
     /* initialize event handler */
     for ( i = 0; i < NR_EVS; i++ )
 	{
         ev_actions[i].handler = default_handler;
         mask_evtchn(i);
     }
+
+    arch_init_events();
 }
 
 void fini_events(void)
 {
     /* Dealloc all events */
     unbind_all_ports();
-#if defined(__x86_64__)
-    wrmsrl(0xc0000101, NULL); /* 0xc0000101 is MSR_GS_BASE */
-#endif
+    arch_fini_events();
 }
 
 void default_handler(evtchn_port_t port, struct pt_regs *regs, void *ignore)
