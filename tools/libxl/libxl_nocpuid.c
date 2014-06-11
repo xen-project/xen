@@ -14,6 +14,11 @@
 
 #include "libxl_internal.h"
 
+int libxl__cpuid_policy_is_empty(libxl_cpuid_policy_list *pl)
+{
+    return 1;
+}
+
 void libxl_cpuid_dispose(libxl_cpuid_policy_list *p_cpuid_list)
 {
 }

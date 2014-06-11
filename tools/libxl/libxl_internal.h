@@ -1549,6 +1549,8 @@ struct libxl__xen_console_reader {
 _hidden int libxl__parse_mac(const char *s, libxl_mac mac);
 /* compare mac address @a and @b. 0 if the same, -ve if a<b and +ve if a>b */
 _hidden int libxl__compare_macs(libxl_mac *a, libxl_mac *b);
+/* return true if mac address is all zero (the default value) */
+_hidden int libxl__mac_is_default(libxl_mac *mac);
 /* init a recursive mutex */
 _hidden int libxl__init_recursive_mutex(libxl_ctx *ctx, pthread_mutex_t *lock);
 
@@ -3097,6 +3099,10 @@ _hidden int libxl__ms_vm_genid_set(libxl__gc *gc, uint32_t domid,
 #define LIBXL__DEFBOOL_STR_DEFAULT "<default>"
 #define LIBXL__DEFBOOL_STR_FALSE   "False"
 #define LIBXL__DEFBOOL_STR_TRUE    "True"
+static inline int libxl__defbool_is_default(libxl_defbool *db)
+{
+    return !db->val;
+}
 
 /*
  * Inserts "elm_new" into the sorted list "head".
@@ -3192,6 +3198,24 @@ int libxl__random_bytes(libxl__gc *gc, uint8_t *buf, size_t len);
 #else
 #define BUILD_BUG_ON(p) ((void)sizeof(char[1 - 2 * !!(p)]))
 #endif
+
+/* This always return false, there's no "default value" for hw cap */
+static inline int libxl__hwcap_is_default(libxl_hwcap *hwcap)
+{
+    return 0;
+}
+
+static inline int libxl__string_list_is_empty(libxl_string_list *psl)
+{
+    return !libxl_string_list_length(psl);
+}
+
+static inline int libxl__key_value_list_is_empty(libxl_key_value_list *pkvl)
+{
+    return !libxl_key_value_list_length(pkvl);
+}
+
+int libxl__cpuid_policy_is_empty(libxl_cpuid_policy_list *pl);
 
 #endif
 

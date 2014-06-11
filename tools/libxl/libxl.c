@@ -2860,8 +2860,7 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
         nic->model = strdup("rtl8139");
         if (!nic->model) return ERROR_NOMEM;
     }
-    if (!nic->mac[0] && !nic->mac[1] && !nic->mac[2] &&
-        !nic->mac[3] && !nic->mac[4] && !nic->mac[5]) {
+    if (libxl__mac_is_default(&nic->mac)) {
         const uint8_t *r;
         libxl_uuid uuid;
 
