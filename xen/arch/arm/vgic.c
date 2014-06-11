@@ -73,6 +73,11 @@ static struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n)
         return NULL;
 }
 
+static struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq)
+{
+    return vgic_rank_offset(v, 8, irq >> 2);
+}
+
 int domain_vgic_init(struct domain *d)
 {
     int i;
@@ -720,7 +725,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
 {
     int idx = irq >> 2, byte = irq & 0x3;
     uint8_t priority;
-    struct vgic_irq_rank *rank = vgic_rank_offset(v, 8, idx);
+    struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
     struct pending_irq *iter, *n = irq_to_pending(v, irq);
     unsigned long flags;
     bool_t running;
