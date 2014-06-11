@@ -211,10 +211,9 @@ void vpmu_load(struct vcpu *v)
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_load )
     {
         apic_write_around(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
+        /* Arch code needs to set VPMU_CONTEXT_LOADED */
         vpmu->arch_vpmu_ops->arch_vpmu_load(v);
     }
-
-    vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
 }
 
 void vpmu_initialise(struct vcpu *v)

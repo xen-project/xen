@@ -369,6 +369,8 @@ static void core2_vpmu_load(struct vcpu *v)
     if ( vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
         return;
 
+    vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
+
     __core2_vpmu_load(v);
 }
 

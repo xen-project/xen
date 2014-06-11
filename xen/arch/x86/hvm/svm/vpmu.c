@@ -203,6 +203,8 @@ static void amd_vpmu_load(struct vcpu *v)
         return;
     }
 
+    vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
+
     context_load(v);
 }
 
