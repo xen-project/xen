@@ -3,6 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 # Init scripts.
 XENDOMAINS_INITD = init.d/xendomains
+XENDOMAINS_LIBEXEC = xendomains
 XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 
 XENCOMMONS_INITD = init.d/xencommons
@@ -45,6 +46,8 @@ install: all install-initd install-scripts install-udev
 install-initd:
 	[ -d $(DESTDIR)$(INITD_DIR) ] || $(INSTALL_DIR) $(DESTDIR)$(INITD_DIR)
 	[ -d $(DESTDIR)$(SYSCONFIG_DIR) ] || $(INSTALL_DIR) $(DESTDIR)$(SYSCONFIG_DIR)
+	[ -d $(DESTDIR)$(LIBEXEC) ] || $(INSTALL_DIR) $(DESTDIR)$(LIBEXEC)
+	$(INSTALL_PROG) $(XENDOMAINS_LIBEXEC) $(DESTDIR)$(LIBEXEC)
 	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)$(INITD_DIR)
 	$(INSTALL_DATA) $(XENDOMAINS_SYSCONFIG) $(DESTDIR)$(SYSCONFIG_DIR)/xendomains
 	$(INSTALL_PROG) $(XENCOMMONS_INITD) $(DESTDIR)$(INITD_DIR)

@@ -1,0 +1,584 @@
+#!/bin/bash
+#
+# /etc/init.d/xendomains
+# Start / stop domains automatically when domain 0 boots / shuts down.
+#
+# chkconfig: 345 99 00
+# description: Start / stop Xen domains.
+#
+# This script offers fairly basic functionality.  It should work on Redhat
+# but also on LSB-compliant SuSE releases and on Debian with the LSB package
+# installed.  (LSB is the Linux Standard Base)
+#
+# Based on the example in the "Designing High Quality Integrated Linux
+# Applications HOWTO" by Avi Alkalay
+# <http://www.tldp.org/HOWTO/HighQuality-Apps-HOWTO/>
+#
+### BEGIN INIT INFO
+# Provides:          xendomains
+# Required-Start:    $syslog $remote_fs xenstored xenconsoled
+# Should-Start:      xend
+# Required-Stop:     $syslog $remote_fs xenstored xenconsoled
+# Should-Stop:       xend
+# Default-Start:     2 3 5
+# Default-Stop:      0 1 6
+# Short-Description: Start/stop secondary xen domains
+# Description:       Start / stop domains automatically when domain 0
+#                    boots / shuts down.
+### END INIT INFO
+
+. /etc/xen/scripts/hotplugpath.sh
+
+CMD=${SBINDIR}/xl
+HEADCOMP="Xen saved domain"
+$CMD list &> /dev/null
+if test $? -ne 0
+then
+	exit $?
+fi
+
+$CMD list &> /dev/null
+if test $? -ne 0
+then
+	exit 0;
+fi
+
+# Correct exit code would probably be 5, but it's enough
+# if xend complains if we're not running as privileged domain
+if ! [ -e /proc/xen/privcmd ]; then
+	exit 0
+fi
+
+# See docs/misc/distro_mapping.txt
+if [ -d /var/lock/subsys ]; then
+	LOCKFILE=/var/lock/subsys/xendomains
+else
+	LOCKFILE=/var/lock/xendomains
+fi
+
+if [ -d /etc/sysconfig ]; then
+	XENDOM_CONFIG=/etc/sysconfig/xendomains
+else
+	XENDOM_CONFIG=/etc/default/xendomains
+fi
+
+test -r $XENDOM_CONFIG || { echo "$XENDOM_CONFIG not existing";
+	if [ "$1" = "stop" ]; then exit 0;
+	else exit 6; fi; }
+
+. $XENDOM_CONFIG
+
+# Use the SUSE rc_ init script functions;
+# emulate them on LSB, RH and other systems
+if test -e /etc/rc.status; then
+    # SUSE rc script library
+    . /etc/rc.status
+else
+    _cmd=$1
+    declare -a _SMSG
+    if test "${_cmd}" = "status"; then
+	_SMSG=(running dead dead unused unknown)
+	_RC_UNUSED=3
+    else
+	_SMSG=(done failed failed missed failed skipped unused failed failed)
+	_RC_UNUSED=6
+    fi
+    if test -e /etc/init.d/functions; then
+	# REDHAT
+	. /etc/init.d/functions
+	echo_rc()
+	{
+	    #echo -n "  [${_SMSG[${_RC_RV}]}] "
+	    if test ${_RC_RV} = 0; then
+		success "  [${_SMSG[${_RC_RV}]}] "
+	    else
+		failure "  [${_SMSG[${_RC_RV}]}] "
+	    fi
+	}
+    elif test -e /lib/lsb/init-functions; then
+	# LSB
+	. /lib/lsb/init-functions
+        if alias log_success_msg >/dev/null 2>/dev/null; then
+	  echo_rc()
+	  {
+	       echo "  [${_SMSG[${_RC_RV}]}] "
+	  }
+        else
+	  echo_rc()
+	  {
+	    if test ${_RC_RV} = 0; then
+		log_success_msg "  [${_SMSG[${_RC_RV}]}] "
+	    else
+		log_failure_msg "  [${_SMSG[${_RC_RV}]}] "
+	    fi
+	  }
+        fi
+    else
+	# emulate it
+	echo_rc()
+	{
+	    echo "  [${_SMSG[${_RC_RV}]}] "
+	}
+    fi
+    rc_reset() { _RC_RV=0; }
+    rc_failed()
+    {
+	if test -z "$1"; then
+	    _RC_RV=1;
+	elif test "$1" != "0"; then
+	    _RC_RV=$1;
+	fi
+	return ${_RC_RV}
+    }
+    rc_check()
+    {
+	return rc_failed $?
+    }
+    rc_status()
+    {
+	rc_failed $?
+	if test "$1" = "-r"; then _RC_RV=0; shift; fi
+	if test "$1" = "-s"; then rc_failed 5; echo_rc; rc_failed 3; shift; fi
+	if test "$1" = "-u"; then rc_failed ${_RC_UNUSED}; echo_rc; rc_failed 3; shift; fi
+	if test "$1" = "-v"; then echo_rc; shift; fi
+	if test "$1" = "-r"; then _RC_RV=0; shift; fi
+	return ${_RC_RV}
+    }
+    rc_exit() { exit ${_RC_RV}; }
+    rc_active()
+    {
+	if test -z "$RUNLEVEL"; then read RUNLEVEL REST < <(/sbin/runlevel); fi
+	if test -e /etc/init.d/S[0-9][0-9]${1}; then return 0; fi
+	return 1
+    }
+fi
+
+if ! which usleep >&/dev/null
+then
+  usleep()
+  {
+    if [ -n "$1" ]
+    then
+      sleep $(( $1 / 1000000 ))
+    fi
+  }
+fi
+
+# Reset status of this service
+rc_reset
+
+##
+# Returns 0 (success) if the given parameter names a directory, and that
+# directory is not empty.
+#
+contains_something()
+{
+  if [ -d "$1" ] && [ `/bin/ls $1 | wc -l` -gt 0 ]
+  then
+    return 0
+  else
+    return 1
+  fi
+}
+
+# read name from xen config file
+rdname()
+{
+    NM=$($CMD create --quiet --dryrun --defconfig "$1" |
+         sed -n 's/^.*(name \(.*\))$/\1/p;s/^.*"name": "\(.*\)",$/\1/p')
+}
+
+rdnames()
+{
+    NAMES=
+    if ! contains_something "$XENDOMAINS_AUTO"
+    then
+	return
+    fi
+    for dom in $XENDOMAINS_AUTO/*; do
+	rdname $dom
+	if test -z $NAMES; then
+	    NAMES=$NM;
+	else
+	    NAMES="$NAMES|$NM"
+	fi
+    done
+}
+
+LIST_GREP='(domain\|(domid\|(name\|^    {$\|"name":\|"domid":'
+parseln()
+{
+    if [[ "$1" =~ '(domain' ]] || [[ "$1" = "{" ]]; then
+        name=;id=
+    elif [[ "$1" =~ '(name' ]]; then
+        name=$(echo $1 | sed -e 's/^.*(name \(.*\))$/\1/')
+    elif [[ "$1" =~ '(domid' ]]; then
+        id=$(echo $1 | sed -e 's/^.*(domid \(.*\))$/\1/')
+    elif [[ "$1" =~ '"name":' ]]; then
+        name=$(echo $1 | sed -e 's/^.*"name": "\(.*\)",$/\1/')
+    elif [[ "$1" =~ '"domid":' ]]; then
+        id=$(echo $1 | sed -e 's/^.*"domid": \(.*\),$/\1/')
+    fi
+
+    [ -n "$name" -a -n "$id" ] && return 0 || return 1
+}
+
+is_running()
+{
+    rdname $1
+    RC=1
+    name=;id=
+    while read LN; do
+	parseln "$LN" || continue
+	if test $id = 0; then continue; fi
+	case $name in
+	    ($NM)
+		RC=0
+		;;
+	esac
+    done < <($CMD list -l | grep "$LIST_GREP")
+    return $RC
+}
+
+start()
+{
+    if [ -f $LOCKFILE ]; then
+	echo -e "xendomains already running (lockfile exists)"
+	return;
+    fi
+
+    saved_domains=" "
+    if [ "$XENDOMAINS_RESTORE" = "true" ] &&
+       contains_something "$XENDOMAINS_SAVE"
+    then
+	mkdir -p $(dirname "$LOCKFILE")
+	touch $LOCKFILE
+	echo -n "Restoring Xen domains:"
+	saved_domains=`ls $XENDOMAINS_SAVE`
+        for dom in $XENDOMAINS_SAVE/*; do
+            if [ -f $dom ] ; then
+                HEADER=`head -c 16 $dom | head -n 1 2> /dev/null`
+                if [ "$HEADER" = "$HEADCOMP" ]; then
+                    echo -n " ${dom##*/}"
+                    XMR=`$CMD restore $dom 2>&1 1>/dev/null`
+                    #$CMD restore $dom
+                    if [ $? -ne 0 ]; then
+                        echo -e "\nAn error occurred while restoring domain ${dom##*/}:\n$XMR"
+                        rc_failed $?
+                        echo -e '!'
+                    else
+                        # mv $dom ${dom%/*}/.${dom##*/}
+                        rm $dom
+                    fi
+                fi
+            fi
+        done
+	echo -e
+    fi
+
+    if contains_something "$XENDOMAINS_AUTO"
+    then
+	touch $LOCKFILE
+	echo -n "Starting auto Xen domains:"
+	# We expect config scripts for auto starting domains to be in
+	# XENDOMAINS_AUTO - they could just be symlinks to files elsewhere
+
+	# Create all domains with config files in XENDOMAINS_AUTO.
+	# TODO: We should record which domain name belongs
+	# so we have the option to selectively shut down / migrate later
+	# If a domain statefile from $XENDOMAINS_SAVE matches a domain name
+	# in $XENDOMAINS_AUTO, do not try to start that domain; if it didn't
+	# restore correctly it requires administrative attention.
+	for dom in $XENDOMAINS_AUTO/*; do
+	    echo -n " ${dom##*/}"
+	    shortdom=$(echo $dom | sed -n 's/^.*\/\(.*\)$/\1/p')
+	    echo $saved_domains | grep -w $shortdom > /dev/null
+	    if [ $? -eq 0 ] || is_running $dom; then
+		echo -n "(skip)"
+	    else
+		XMC=`$CMD create --quiet --defconfig $dom`
+		if [ $? -ne 0 ]; then
+		    echo -e "\nAn error occurred while creating domain ${dom##*/}: $XMC\n"
+		    rc_failed $?
+		    echo -e '!'
+		else
+		    usleep $XENDOMAINS_CREATE_USLEEP
+		fi
+	    fi
+	done
+    fi
+}
+
+all_zombies()
+{
+    name=;id=
+    while read LN; do
+	parseln "$LN" || continue
+	if test $id = 0; then continue; fi
+	if test "$state" != "-b---d" -a "$state" != "-----d"; then
+	    return 1;
+	fi
+    done < <($CMD list -l | grep "$LIST_GREP")
+    return 0
+}
+
+# Wait for max $XENDOMAINS_STOP_MAXWAIT for $CMD $1 to finish;
+# if it has not exited by that time kill it, so the init script will
+# succeed within a finite amount of time; if $2 is nonnull, it will
+# kill the command as well as soon as no domain (except for zombies)
+# are left (used for shutdown --all). Third parameter, if any, suppresses
+# output of dots per working state (formatting issues)
+watchdog_xencmd()
+{
+    if test -z "$XENDOMAINS_STOP_MAXWAIT" -o "$XENDOMAINS_STOP_MAXWAIT" = "0"; then
+	exit
+    fi
+
+    usleep 20000
+    for no in `seq 0 $XENDOMAINS_STOP_MAXWAIT`; do
+	# exit if $CMD save/migrate/shutdown is finished
+	PSAX=`ps axlw | grep "$CMD $1" | grep -v grep`
+	if test -z "$PSAX"; then exit; fi
+	if ! test -n "$3"; then echo -n '.'; fi
+	sleep 1
+	# go to kill immediately if there's only zombies left
+	if all_zombies && test -n "$2"; then break; fi
+    done
+    sleep 1
+    read PSF PSUID PSPID PSPPID < <(echo "$PSAX")
+    # kill $CMD $1
+    kill $PSPID >/dev/null 2>&1
+
+    echo -e .
+}
+
+stop()
+{
+    exec 3>&2 2> /dev/null
+
+    # Collect list of domains to shut down
+    if test "$XENDOMAINS_AUTO_ONLY" = "true"; then
+	rdnames
+    fi
+    echo -n "Shutting down Xen domains:"
+    name=;id=
+    while read LN; do
+	parseln "$LN" || continue
+	if test $id = 0; then continue; fi
+	echo -n " $name"
+	if test "$XENDOMAINS_AUTO_ONLY" = "true"; then
+	    eval "
+	    case \"\$name\" in
+		($NAMES)
+		    # nothing
+		    ;;
+		(*)
+		    echo -e '(skip)'
+		    continue
+		    ;;
+	    esac
+	    "
+	fi
+	# XENDOMAINS_SYSRQ chould be something like just "s"
+	# or "s e i u" or even "s e s i u o"
+	# for the latter, you should set XENDOMAINS_USLEEP to 1200000 or so
+	if test -n "$XENDOMAINS_SYSRQ"; then
+	    for sysrq in $XENDOMAINS_SYSRQ; do
+		echo -n "(SR-$sysrq)"
+		XMR=`$CMD sysrq $id $sysrq 2>&1 1>/dev/null`
+		if test $? -ne 0; then
+		    echo -e "\nAn error occurred while doing sysrq on domain:\n$XMR\n"
+		    rc_failed $?
+		    echo -n '!'
+		fi
+		# usleep just ignores empty arg
+		usleep $XENDOMAINS_USLEEP
+	    done
+	fi
+	if test "$state" = "-b---d" -o "$state" = "-----d"; then
+	    echo -n "(zomb)"
+	    continue
+	fi
+	if test -n "$XENDOMAINS_MIGRATE"; then
+	    echo -n "(migr)"
+	    watchdog_xencmd migrate &
+	    WDOG_PID=$!
+	    XMR=`$CMD migrate $id $XENDOMAINS_MIGRATE 2>&1 1>/dev/null`
+	    if test $? -ne 0; then
+		echo -e "\nAn error occurred while migrating domain:\n$XMR\n"
+		rc_failed $?
+		echo -e '!'
+
+		kill $WDOG_PID >/dev/null 2>&1
+	    else
+		kill $WDOG_PID >/dev/null 2>&1
+
+		echo -e .
+		usleep 1000
+		continue
+	    fi
+	fi
+	if test -n "$XENDOMAINS_SAVE"; then
+	    echo -n "(save)"
+	    watchdog_xencmd save &
+	    WDOG_PID=$!
+	    mkdir -p "$XENDOMAINS_SAVE"
+	    XMR=`$CMD save $id $XENDOMAINS_SAVE/$name 2>&1 1>/dev/null`
+	    if test $? -ne 0; then
+		echo -e "\nAn error occurred while saving domain:\n$XMR\n"
+		rc_failed $?
+		echo -e '!'
+		kill $WDOG_PID >/dev/null 2>&1
+	    else
+		kill $WDOG_PID >/dev/null 2>&1
+		echo -e .
+		usleep 1000
+		continue
+	    fi
+	fi
+	if test -n "$XENDOMAINS_SHUTDOWN"; then
+	    # XENDOMAINS_SHUTDOWN should be "--wait"
+	    echo -n "(shut)"
+	    watchdog_xencmd shutdown &
+	    WDOG_PID=$!
+	    XMR=`$CMD shutdown $XENDOMAINS_SHUTDOWN $id 2>&1 1>/dev/null`
+	    if test $? -ne 0; then
+		echo -e "\nAn error occurred while shutting down domain:\n$XMR\n"
+		rc_failed $?
+		echo -e '!'
+	    fi
+	    kill $WDOG_PID >/dev/null 2>&1
+	fi
+    done < <($CMD list -l | grep "$LIST_GREP")
+
+    # NB. this shuts down ALL Xen domains (politely), not just the ones in
+    # AUTODIR/*
+    # This is because it's easier to do ;-) but arguably if this script is run
+    # on system shutdown then it's also the right thing to do.
+    if ! all_zombies && test -n "$XENDOMAINS_SHUTDOWN_ALL"; then
+	# XENDOMAINS_SHUTDOWN_ALL should be "--all --wait"
+	echo -n " SHUTDOWN_ALL "
+	watchdog_xencmd shutdown 1 false &
+	WDOG_PID=$!
+	XMR=`$CMD shutdown $XENDOMAINS_SHUTDOWN_ALL 2>&1 1>/dev/null`
+	if test $? -ne 0; then
+	    echo -e "\nAn error occurred while shutting down all domains: $XMR\n"
+	    rc_failed $?
+	    echo -e '!'
+	fi
+	kill $WDOG_PID >/dev/null 2>&1
+    fi
+
+    # Unconditionally delete lock file
+    rm -f $LOCKFILE
+
+    exec 2>&3
+}
+
+check_domain_up()
+{
+    name=;id=
+    while read LN; do
+	parseln "$LN" || continue
+	if test $id = 0; then continue; fi
+	case $name in
+	    ($1)
+		return 0
+		;;
+	esac
+    done < <($CMD list -l | grep "$LIST_GREP")
+    return 1
+}
+
+check_all_auto_domains_up()
+{
+    if ! contains_something "$XENDOMAINS_AUTO"
+    then
+      return 0
+    fi
+    missing=
+    for nm in $XENDOMAINS_AUTO/*; do
+	rdname $nm
+	found=0
+	if check_domain_up "$NM"; then
+	    echo -n " $name"
+	else
+	    missing="$missing $NM"
+	fi
+    done
+    if test -n "$missing"; then
+	echo -n " MISS AUTO:$missing"
+	return 1
+    fi
+    return 0
+}
+
+check_all_saved_domains_up()
+{
+    if ! contains_something "$XENDOMAINS_SAVE"
+    then
+      return 0
+    fi
+    missing=`/bin/ls $XENDOMAINS_SAVE`
+    echo -n " MISS SAVED: " $missing
+    return 1
+}
+
+# This does NOT necessarily restart all running domains: instead it
+# stops all running domains and then boots all the domains specified in
+# AUTODIR.  If other domains have been started manually then they will
+# not get restarted.
+# Commented out to avoid confusion!
+
+restart()
+{
+    stop
+    start
+}
+
+reload()
+{
+    restart
+}
+
+
+case "$1" in
+    start)
+	start
+	rc_status
+	if test -f $LOCKFILE; then rc_status -v; fi
+	;;
+
+    stop)
+	stop
+	rc_status -v
+	;;
+
+    restart)
+	restart
+	;;
+    reload)
+	reload
+	;;
+
+    status)
+	echo -n "Checking for xendomains:"
+	if test ! -f $LOCKFILE; then
+	    rc_failed 3
+	else
+	    check_all_auto_domains_up
+	    rc_status
+	    check_all_saved_domains_up
+	    rc_status
+	fi
+	rc_status -v
+	;;
+
+    *)
+	echo "Usage: $0 {start|stop|restart|reload|status}"
+	rc_failed 3
+	rc_status -v
+	;;
+esac
+
+rc_exit
