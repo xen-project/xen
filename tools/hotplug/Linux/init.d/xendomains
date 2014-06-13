@@ -23,7 +23,7 @@
 # Default-Start:     2 3 5
 # Default-Stop:      0 1 6
 # Short-Description: Start/stop secondary xen domains
-# Description:       Start / stop domains automatically when domain 0 
+# Description:       Start / stop domains automatically when domain 0
 #                    boots / shuts down.
 ### END INIT INFO
 
@@ -43,7 +43,7 @@ then
 	exit 0;
 fi
 
-# Correct exit code would probably be 5, but it's enough 
+# Correct exit code would probably be 5, but it's enough
 # if xend complains if we're not running as privileged domain
 if ! [ -e /proc/xen/privcmd ]; then
 	exit 0
@@ -73,7 +73,7 @@ test -r $XENDOM_CONFIG || { echo "$XENDOM_CONFIG not existing";
 if test -e /etc/rc.status; then
     # SUSE rc script library
     . /etc/rc.status
-else    
+else
     _cmd=$1
     declare -a _SMSG
     if test "${_cmd}" = "status"; then
@@ -96,7 +96,7 @@ else
 	    fi
 	}
     elif test -e /lib/lsb/init-functions; then
-	# LSB    
+	# LSB
     	. /lib/lsb/init-functions
         if alias log_success_msg >/dev/null 2>/dev/null; then
 	  echo_rc()
@@ -113,7 +113,7 @@ else
 	    fi
 	  }
         fi
-    else    
+    else
 	# emulate it
 	echo_rc()
 	{
@@ -123,17 +123,17 @@ else
     rc_reset() { _RC_RV=0; }
     rc_failed()
     {
-	if test -z "$1"; then 
+	if test -z "$1"; then
 	    _RC_RV=1;
-	elif test "$1" != "0"; then 
-	    _RC_RV=$1; 
-    	fi
+	elif test "$1" != "0"; then
+	    _RC_RV=$1;
+	fi
 	return ${_RC_RV}
     }
     rc_check()
     {
 	return rc_failed $?
-    }	
+    }
     rc_status()
     {
 	rc_failed $?
@@ -145,7 +145,7 @@ else
 	return ${_RC_RV}
     }
     rc_exit() { exit ${_RC_RV}; }
-    rc_active() 
+    rc_active()
     {
 	if test -z "$RUNLEVEL"; then read RUNLEVEL REST < <(/sbin/runlevel); fi
 	if test -e /etc/init.d/S[0-9][0-9]${1}; then return 0; fi
@@ -192,13 +192,13 @@ rdnames()
 {
     NAMES=
     if ! contains_something "$XENDOMAINS_AUTO"
-    then 
+    then
 	return
     fi
     for dom in $XENDOMAINS_AUTO/*; do
 	rdname $dom
-	if test -z $NAMES; then 
-	    NAMES=$NM; 
+	if test -z $NAMES; then
+	    NAMES=$NM;
 	else
 	    NAMES="$NAMES|$NM"
 	fi
@@ -231,7 +231,7 @@ is_running()
     while read LN; do
 	parseln "$LN" || continue
 	if test $id = 0; then continue; fi
-	case $name in 
+	case $name in
 	    ($NM)
 		RC=0
 		;;
@@ -240,11 +240,11 @@ is_running()
     return $RC
 }
 
-start() 
+start()
 {
-    if [ -f $LOCKFILE ]; then 
+    if [ -f $LOCKFILE ]; then
 	echo -e "xendomains already running (lockfile exists)"
-	return; 
+	return;
     fi
 
     saved_domains=" "
@@ -284,10 +284,10 @@ start()
 	# XENDOMAINS_AUTO - they could just be symlinks to files elsewhere
 
 	# Create all domains with config files in XENDOMAINS_AUTO.
-	# TODO: We should record which domain name belongs 
+	# TODO: We should record which domain name belongs
 	# so we have the option to selectively shut down / migrate later
 	# If a domain statefile from $XENDOMAINS_SAVE matches a domain name
-	# in $XENDOMAINS_AUTO, do not try to start that domain; if it didn't 
+	# in $XENDOMAINS_AUTO, do not try to start that domain; if it didn't
 	# restore correctly it requires administrative attention.
 	for dom in $XENDOMAINS_AUTO/*; do
 	    echo -n " ${dom##*/}"
@@ -348,14 +348,14 @@ watchdog_xencmd()
     read PSF PSUID PSPID PSPPID < <(echo "$PSAX")
     # kill $CMD $1
     kill $PSPID >/dev/null 2>&1
-    
+
     echo -e .
 }
 
 stop()
 {
     exec 3>&2 2> /dev/null
-    
+
     # Collect list of domains to shut down
     if test "$XENDOMAINS_AUTO_ONLY" = "true"; then
 	rdnames
@@ -379,7 +379,7 @@ stop()
 	    esac
 	    "
 	fi
-	# XENDOMAINS_SYSRQ chould be something like just "s" 
+	# XENDOMAINS_SYSRQ chould be something like just "s"
 	# or "s e i u" or even "s e s i u o"
 	# for the latter, you should set XENDOMAINS_USLEEP to 1200000 or so
 	if test -n "$XENDOMAINS_SYSRQ"; then
@@ -412,7 +412,7 @@ stop()
 		kill $WDOG_PID >/dev/null 2>&1
 	    else
 		kill $WDOG_PID >/dev/null 2>&1
-		
+
 		echo -e .
 		usleep 1000
 		continue
@@ -471,7 +471,7 @@ stop()
 
     # Unconditionally delete lock file
     rm -f $LOCKFILE
-    
+
     exec 2>&3
 }
 
@@ -481,7 +481,7 @@ check_domain_up()
     while read LN; do
 	parseln "$LN" || continue
 	if test $id = 0; then continue; fi
-	case $name in 
+	case $name in
 	    ($1)
 		return 0
 		;;
@@ -500,9 +500,9 @@ check_all_auto_domains_up()
     for nm in $XENDOMAINS_AUTO/*; do
 	rdname $nm
 	found=0
-	if check_domain_up "$NM"; then 
+	if check_domain_up "$NM"; then
 	    echo -n " $name"
-	else 
+	else
 	    missing="$missing $NM"
 	fi
     done
@@ -515,7 +515,7 @@ check_all_auto_domains_up()
 
 check_all_saved_domains_up()
 {
-    if ! contains_something "$XENDOMAINS_SAVE" 
+    if ! contains_something "$XENDOMAINS_SAVE"
     then
       return 0
     fi
@@ -562,8 +562,8 @@ case "$1" in
 	;;
 
     status)
-	echo -n "Checking for xendomains:" 
-	if test ! -f $LOCKFILE; then 
+	echo -n "Checking for xendomains:"
+	if test ! -f $LOCKFILE; then
 	    rc_failed 3
 	else
 	    check_all_auto_domains_up
