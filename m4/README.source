@@ -1,0 +1,28 @@
+About
+=====
+This documents the upstream sources for the different slew of different
+m4 sources we have picked up or developed.
+
+pkg.m4
+======
+The pkg-config m4 macro library comes from the upstream pkg-config
+git repository [0]. If you update the m4 library update this file
+with provenance and last commit ID information. For documentation
+on how to use this read the pkg-config(1) man page.
+
+Do not modify this file yourself, if you want to evolve it send
+patches upstream and then synch back here.
+
+Tree: git://anongit.freedesktop.org/pkg-config
+
+The last synch was from commit:
+
+commit 4f0084d9d3b8726a797a373c7ec5e406000995d0
+Author: Dan Nicholson <dbn.lists@gmail.com>
+Date:   Mon Feb 3 15:59:18 2014 -0800
+
+    glib: Fix Makefiles to suppress warnings from automake
+
+    With the newly added glib.mk, some of the noinst_* variables need to use
+    += in the evaluation to avoid multiple definition warnings from
+    automake.
