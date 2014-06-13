@@ -29,13 +29,12 @@
 
 . /etc/xen/scripts/hotplugpath.sh
 
-CMD=${SBINDIR}/xm
-HEADCOMP="LinuxGuestRecord"
+CMD=${SBINDIR}/xl
+HEADCOMP="Xen saved domain"
 $CMD list &> /dev/null
 if test $? -ne 0
 then
-	CMD=${SBINDIR}/xl
-	HEADCOMP="Xen saved domain"
+	exit $?
 fi
 
 $CMD list &> /dev/null
