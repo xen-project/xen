@@ -1596,9 +1596,11 @@ static void do_sysreg(struct cpu_user_regs *regs,
     /* - Breakpoints */
     HSR_SYSREG_DBG_CASES(DBGBVR):
     HSR_SYSREG_DBG_CASES(DBGBCR):
-    /* -  Watchpoints */
+    /* - Watchpoints */
     HSR_SYSREG_DBG_CASES(DBGWVR):
     HSR_SYSREG_DBG_CASES(DBGWCR):
+    /* - Double Lock Register */
+    case HSR_SYSREG_OSDLR_EL1:
         if ( hsr.sysreg.read )
             *x = 0;
         /* else: write ignored */
