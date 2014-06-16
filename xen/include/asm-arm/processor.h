@@ -474,10 +474,6 @@ void vcpu_regs_hyp_to_user(const struct vcpu *vcpu,
 void vcpu_regs_user_to_hyp(struct vcpu *vcpu,
                            const struct vcpu_guest_core_regs *regs);
 
-struct cpuinfo_x86 {
-    uint32_t pfr32[2];
-};
-
 #endif /* __ASSEMBLY__ */
 #endif /* __ASM_ARM_PROCESSOR_H */
 /*
