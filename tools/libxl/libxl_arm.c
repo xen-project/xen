@@ -6,6 +6,23 @@
 #include <libfdt.h>
 #include <assert.h>
 
+/**
+ * IRQ line type.
+ * DT_IRQ_TYPE_NONE            - default, unspecified type
+ * DT_IRQ_TYPE_EDGE_RISING     - rising edge triggered
+ * DT_IRQ_TYPE_EDGE_FALLING    - falling edge triggered
+ * DT_IRQ_TYPE_EDGE_BOTH       - rising and falling edge triggered
+ * DT_IRQ_TYPE_LEVEL_HIGH      - high level triggered
+ * DT_IRQ_TYPE_LEVEL_LOW       - low level triggered
+ */
+#define DT_IRQ_TYPE_NONE           0x00000000
+#define DT_IRQ_TYPE_EDGE_RISING    0x00000001
+#define DT_IRQ_TYPE_EDGE_FALLING   0x00000002
+#define DT_IRQ_TYPE_EDGE_BOTH                           \
+    (DT_IRQ_TYPE_EDGE_FALLING | DT_IRQ_TYPE_EDGE_RISING)
+#define DT_IRQ_TYPE_LEVEL_HIGH     0x00000004
+#define DT_IRQ_TYPE_LEVEL_LOW      0x00000008
+
 int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                               uint32_t domid)
 {
@@ -338,9 +355,12 @@ static int make_timer_node(libxl__gc *gc, void *fdt, const struct arch_info *ain
     res = fdt_property_compat(gc, fdt, 1, ainfo->timer_compat);
     if (res) return res;
 
-    set_interrupt_ppi(ints[0], GUEST_TIMER_PHYS_S_PPI, 0xf, 0x8);
-    set_interrupt_ppi(ints[1], GUEST_TIMER_PHYS_NS_PPI, 0xf, 0x8);
-    set_interrupt_ppi(ints[2], GUEST_TIMER_VIRT_PPI, 0xf, 0x8);
+    set_interrupt_ppi(ints[0], GUEST_TIMER_PHYS_S_PPI, 0xf,
+                      DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt_ppi(ints[1], GUEST_TIMER_PHYS_NS_PPI, 0xf,
+                      DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt_ppi(ints[2], GUEST_TIMER_VIRT_PPI, 0xf,
+                      DT_IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property_interrupts(gc, fdt, ints, 3);
     if (res) return res;
@@ -378,7 +398,8 @@ static int make_hypervisor_node(libxl__gc *gc, void *fdt,
      *  - Active-low level-sensitive
      *  - All cpus
      */
-    set_interrupt_ppi(intr, GUEST_EVTCHN_PPI, 0xf, 0x8);
+    set_interrupt_ppi(intr, GUEST_EVTCHN_PPI, 0xf,
+                      DT_IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property_interrupts(gc, fdt, &intr, 1);
     if (res) return res;
