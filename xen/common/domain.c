@@ -409,17 +409,17 @@ struct domain *domain_create(
 
 void domain_update_node_affinity(struct domain *d)
 {
-    cpumask_var_t cpumask;
-    cpumask_var_t online_affinity;
+    cpumask_var_t dom_cpumask, dom_cpumask_soft;
+    cpumask_t *dom_affinity;
     const cpumask_t *online;
     struct vcpu *v;
-    unsigned int node;
+    unsigned int cpu;
 
-    if ( !zalloc_cpumask_var(&cpumask) )
+    if ( !zalloc_cpumask_var(&dom_cpumask) )
         return;
-    if ( !alloc_cpumask_var(&online_affinity) )
+    if ( !zalloc_cpumask_var(&dom_cpumask_soft) )
     {
-        free_cpumask_var(cpumask);
+        free_cpumask_var(dom_cpumask);
         return;
     }
 
@@ -427,31 +427,48 @@ void domain_update_node_affinity(struct domain *d)
 
     spin_lock(&d->node_affinity_lock);
 
-    for_each_vcpu ( d, v )
-    {
-        cpumask_and(online_affinity, v->cpu_hard_affinity, online);
-        cpumask_or(cpumask, cpumask, online_affinity);
-    }
-
     /*
-     * If d->auto_node_affinity is true, the domain's node-affinity mask
-     * (d->node_affinity) is automaically computed from all the domain's
-     * vcpus' vcpu-affinity masks (the union of which we have just built
-     * above in cpumask). OTOH, if d->auto_node_affinity is false, we
-     * must leave the node-affinity of the domain alone.
+     * If d->auto_node_affinity is true, let's compute the domain's
+     * node-affinity and update d->node_affinity accordingly. if false,
+     * just leave d->auto_node_affinity alone.
      */
     if ( d->auto_node_affinity )
     {
+        /*
+         * We want the narrowest possible set of pcpus (to get the narowest
+         * possible set of nodes). What we need is the cpumask of where the
+         * domain can run (the union of the hard affinity of all its vcpus),
+         * and the full mask of where it would prefer to run (the union of
+         * the soft affinity of all its various vcpus). Let's build them.
+         */
+        for_each_vcpu ( d, v )
+        {
+            cpumask_or(dom_cpumask, dom_cpumask, v->cpu_hard_affinity);
+            cpumask_or(dom_cpumask_soft, dom_cpumask_soft,
+                       v->cpu_soft_affinity);
+        }
+        /* Filter out non-online cpus */
+        cpumask_and(dom_cpumask, dom_cpumask, online);
+        ASSERT(!cpumask_empty(dom_cpumask));
+        /* And compute the intersection between hard, online and soft */
+        cpumask_and(dom_cpumask_soft, dom_cpumask_soft, dom_cpumask);
+
+        /*
+         * If not empty, the intersection of hard, soft and online is the
+         * narrowest set we want. If empty, we fall back to hard&online.
+         */
+        dom_affinity = cpumask_empty(dom_cpumask_soft) ?
+                           dom_cpumask : dom_cpumask_soft;
+
         nodes_clear(d->node_affinity);
-        for_each_online_node ( node )
-            if ( cpumask_intersects(&node_to_cpumask(node), cpumask) )
-                node_set(node, d->node_affinity);
+        for_each_cpu ( cpu, dom_affinity )
+            node_set(cpu_to_node(cpu), d->node_affinity);
     }
 
     spin_unlock(&d->node_affinity_lock);
 
-    free_cpumask_var(online_affinity);
-    free_cpumask_var(cpumask);
+    free_cpumask_var(dom_cpumask_soft);
+    free_cpumask_var(dom_cpumask);
 }
 
 

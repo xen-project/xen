@@ -310,7 +310,9 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         SCHED_OP(old_ops, free_vdata, vcpudata);
     }
 
-    domain_update_node_affinity(d);
+    /* Do we have vcpus already? If not, no need to update node-affinity */
+    if ( d->vcpu )
+        domain_update_node_affinity(d);
 
     domain_unpause(d);
 
