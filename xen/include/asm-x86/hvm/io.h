@@ -123,7 +123,7 @@ int handle_pio(uint16_t port, unsigned int size, int dir);
 void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 void hvm_io_assist(ioreq_t *p);
 void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
-                  union vioapic_redir_entry *ent);
+                  const union vioapic_redir_entry *ent);
 void msix_write_completion(struct vcpu *);
 
 struct hvm_hw_stdvga {

@@ -30,10 +30,9 @@
 
 struct dev_intx_gsi_link {
     struct list_head list;
+    uint8_t bus;
     uint8_t device;
     uint8_t intx;
-    uint8_t gsi;
-    uint8_t link;
 };
 
 #define _HVM_IRQ_DPCI_MACH_PCI_SHIFT            0
@@ -69,6 +68,7 @@ struct hvm_gmsi_info {
 
 struct hvm_girq_dpci_mapping {
     struct list_head list;
+    uint8_t bus;
     uint8_t device;
     uint8_t intx;
     uint8_t machine_gsi;

@@ -1702,16 +1702,21 @@ int xc_domain_bind_pt_irq(
     bind->hvm_domid = domid;
     bind->irq_type = irq_type;
     bind->machine_irq = machine_irq;
-    if ( irq_type == PT_IRQ_TYPE_PCI ||
-         irq_type == PT_IRQ_TYPE_MSI_TRANSLATE )
+    switch ( irq_type )
     {
+    case PT_IRQ_TYPE_PCI:
+    case PT_IRQ_TYPE_MSI_TRANSLATE:
         bind->u.pci.bus = bus;
-        bind->u.pci.device = device;    
+        bind->u.pci.device = device;
         bind->u.pci.intx = intx;
-    } 
-    else if ( irq_type == PT_IRQ_TYPE_ISA )
+    case PT_IRQ_TYPE_ISA:
         bind->u.isa.isa_irq = isa_irq;
-    
+        break;
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+
     rc = do_domctl(xch, &domctl);
     return rc;
 }
@@ -1737,11 +1742,22 @@ int xc_domain_unbind_pt_irq(
     bind->hvm_domid = domid;
     bind->irq_type = irq_type;
     bind->machine_irq = machine_irq;
-    bind->u.pci.bus = bus;
-    bind->u.pci.device = device;    
-    bind->u.pci.intx = intx;
-    bind->u.isa.isa_irq = isa_irq;
-    
+    switch ( irq_type )
+    {
+    case PT_IRQ_TYPE_PCI:
+    case PT_IRQ_TYPE_MSI_TRANSLATE:
+        bind->u.pci.bus = bus;
+        bind->u.pci.device = device;
+        bind->u.pci.intx = intx;
+        break;
+    case PT_IRQ_TYPE_ISA:
+        bind->u.isa.isa_irq = isa_irq;
+        break;
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+
     rc = do_domctl(xch, &domctl);
     return rc;
 }
