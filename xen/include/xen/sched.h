@@ -225,6 +225,9 @@ struct vcpu
     /* Used to restore affinity across S3. */
     cpumask_var_t    cpu_hard_affinity_saved;
 
+    /* Bitmask of CPUs on which this VCPU prefers to run. */
+    cpumask_var_t    cpu_soft_affinity;
+
     /* Bitmask of CPUs which are holding onto this VCPU's state. */
     cpumask_var_t    vcpu_dirty_cpumask;
 
@@ -627,7 +630,6 @@ void sched_destroy_domain(struct domain *d);
 int sched_move_domain(struct domain *d, struct cpupool *c);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 long sched_adjust_global(struct xen_sysctl_scheduler_op *);
-void sched_set_node_affinity(struct domain *, nodemask_t *);
 int  sched_id(void);
 void sched_tick_suspend(void);
 void sched_tick_resume(void);

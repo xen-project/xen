@@ -198,6 +198,8 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     else
         cpumask_setall(v->cpu_hard_affinity);
 
+    cpumask_setall(v->cpu_soft_affinity);
+
     /* Initialise the per-vcpu timers. */
     init_timer(&v->periodic_timer, vcpu_periodic_timer_fn,
                v, v->processor);
@@ -286,6 +288,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         migrate_timer(&v->poll_timer, new_p);
 
         cpumask_setall(v->cpu_hard_affinity);
+        cpumask_setall(v->cpu_soft_affinity);
 
         lock = vcpu_schedule_lock_irq(v);
         v->processor = new_p;
@@ -643,11 +646,6 @@ int cpu_disable_scheduler(unsigned int cpu)
     }
 
     return ret;
-}
-
-void sched_set_node_affinity(struct domain *d, nodemask_t *mask)
-{
-    SCHED_OP(DOM2OP(d), set_node_affinity, d, mask);
 }
 
 int vcpu_set_affinity(struct vcpu *v, const cpumask_t *affinity)

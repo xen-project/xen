@@ -128,6 +128,7 @@ struct vcpu *alloc_vcpu(
     if ( !zalloc_cpumask_var(&v->cpu_hard_affinity) ||
          !zalloc_cpumask_var(&v->cpu_hard_affinity_tmp) ||
          !zalloc_cpumask_var(&v->cpu_hard_affinity_saved) ||
+         !zalloc_cpumask_var(&v->cpu_soft_affinity) ||
          !zalloc_cpumask_var(&v->vcpu_dirty_cpumask) )
         goto fail_free;
 
@@ -159,6 +160,7 @@ struct vcpu *alloc_vcpu(
         free_cpumask_var(v->cpu_hard_affinity);
         free_cpumask_var(v->cpu_hard_affinity_tmp);
         free_cpumask_var(v->cpu_hard_affinity_saved);
+        free_cpumask_var(v->cpu_soft_affinity);
         free_cpumask_var(v->vcpu_dirty_cpumask);
         free_vcpu_struct(v);
         return NULL;
@@ -445,8 +447,6 @@ void domain_update_node_affinity(struct domain *d)
             if ( cpumask_intersects(&node_to_cpumask(node), cpumask) )
                 node_set(node, d->node_affinity);
     }
-
-    sched_set_node_affinity(d, &d->node_affinity);
 
     spin_unlock(&d->node_affinity_lock);
 
@@ -795,6 +795,7 @@ static void complete_domain_destroy(struct rcu_head *head)
             free_cpumask_var(v->cpu_hard_affinity);
             free_cpumask_var(v->cpu_hard_affinity_tmp);
             free_cpumask_var(v->cpu_hard_affinity_saved);
+            free_cpumask_var(v->cpu_soft_affinity);
             free_cpumask_var(v->vcpu_dirty_cpumask);
             free_vcpu_struct(v);
         }
