@@ -64,14 +64,20 @@ static void set_cell(be32 **cellp, int size, uint64_t val)
     (*cellp) += cells;
 }
 
-static void set_interrupt_ppi(gic_interrupt interrupt, unsigned int irq,
-                              unsigned int cpumask, unsigned int level)
+static void set_interrupt(gic_interrupt interrupt, unsigned int irq,
+                          unsigned int cpumask, unsigned int level)
 {
     be32 *cells = interrupt;
+    int is_ppi = (irq < 32);
+
+    /* SGIs are not describe in the device tree */
+    assert(irq >= 16);
+
+    irq -= (is_ppi) ? 16: 32; /* PPIs start at 16, SPIs at 32 */
 
     /* See linux Documentation/devictree/bindings/arm/gic.txt */
-    set_cell(&cells, 1, 1); /* is a PPI */
-    set_cell(&cells, 1, irq - 16); /* PPIs start at 16 */
+    set_cell(&cells, 1, is_ppi); /* is a PPI? */
+    set_cell(&cells, 1, irq);
     set_cell(&cells, 1, (cpumask << 8) | level);
 }
 
@@ -355,12 +361,9 @@ static int make_timer_node(libxl__gc *gc, void *fdt, const struct arch_info *ain
     res = fdt_property_compat(gc, fdt, 1, ainfo->timer_compat);
     if (res) return res;
 
-    set_interrupt_ppi(ints[0], GUEST_TIMER_PHYS_S_PPI, 0xf,
-                      DT_IRQ_TYPE_LEVEL_LOW);
-    set_interrupt_ppi(ints[1], GUEST_TIMER_PHYS_NS_PPI, 0xf,
-                      DT_IRQ_TYPE_LEVEL_LOW);
-    set_interrupt_ppi(ints[2], GUEST_TIMER_VIRT_PPI, 0xf,
-                      DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt(ints[0], GUEST_TIMER_PHYS_S_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt(ints[1], GUEST_TIMER_PHYS_NS_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt(ints[2], GUEST_TIMER_VIRT_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property_interrupts(gc, fdt, ints, 3);
     if (res) return res;
@@ -398,8 +401,7 @@ static int make_hypervisor_node(libxl__gc *gc, void *fdt,
      *  - Active-low level-sensitive
      *  - All cpus
      */
-    set_interrupt_ppi(intr, GUEST_EVTCHN_PPI, 0xf,
-                      DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt(intr, GUEST_EVTCHN_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property_interrupts(gc, fdt, &intr, 1);
     if (res) return res;
