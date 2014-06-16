@@ -3183,7 +3183,7 @@ static void nmi_mce_softirq(void)
          * Make sure to wakeup the vcpu on the
          * specified processor.
          */
-        vcpu_set_affinity(st->vcpu, cpumask_of(st->processor));
+        vcpu_set_hard_affinity(st->vcpu, cpumask_of(st->processor));
 
         /* Affinity is restored in the iret hypercall. */
     }
@@ -3212,7 +3212,7 @@ void async_exception_cleanup(struct vcpu *curr)
     if ( !cpumask_empty(curr->cpu_hard_affinity_tmp) &&
          !cpumask_equal(curr->cpu_hard_affinity_tmp, curr->cpu_hard_affinity) )
     {
-        vcpu_set_affinity(curr, curr->cpu_hard_affinity_tmp);
+        vcpu_set_hard_affinity(curr, curr->cpu_hard_affinity_tmp);
         cpumask_clear(curr->cpu_hard_affinity_tmp);
     }
 

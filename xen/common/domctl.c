@@ -287,6 +287,16 @@ void domctl_lock_release(void)
     spin_unlock(&current->domain->hypercall_deadlock_mutex);
 }
 
+static inline
+int vcpuaffinity_params_invalid(const xen_domctl_vcpuaffinity_t *vcpuaff)
+{
+    return vcpuaff->flags == 0 ||
+           ((vcpuaff->flags & XEN_VCPUAFFINITY_HARD) &&
+            guest_handle_is_null(vcpuaff->cpumap_hard.bitmap)) ||
+           ((vcpuaff->flags & XEN_VCPUAFFINITY_SOFT) &&
+            guest_handle_is_null(vcpuaff->cpumap_soft.bitmap));
+}
+
 long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     long ret = 0;
@@ -601,31 +611,108 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_getvcpuaffinity:
     {
         struct vcpu *v;
+        xen_domctl_vcpuaffinity_t *vcpuaff = &op->u.vcpuaffinity;
 
         ret = -EINVAL;
-        if ( op->u.vcpuaffinity.vcpu >= d->max_vcpus )
+        if ( vcpuaff->vcpu >= d->max_vcpus )
             break;
 
         ret = -ESRCH;
-        if ( (v = d->vcpu[op->u.vcpuaffinity.vcpu]) == NULL )
+        if ( (v = d->vcpu[vcpuaff->vcpu]) == NULL )
+            break;
+
+        ret = -EINVAL;
+        if ( vcpuaffinity_params_invalid(vcpuaff) )
             break;
 
         if ( op->cmd == XEN_DOMCTL_setvcpuaffinity )
         {
-            cpumask_var_t new_affinity;
+            cpumask_var_t new_affinity, old_affinity;
+            cpumask_t *online = cpupool_online_cpumask(v->domain->cpupool);;
 
-            ret = xenctl_bitmap_to_cpumask(
-                &new_affinity, &op->u.vcpuaffinity.cpumap);
-            if ( !ret )
+            /*
+             * We want to be able to restore hard affinity if we are trying
+             * setting both and changing soft affinity (which happens later,
+             * when hard affinity has been succesfully chaged already) fails.
+             */
+            if ( !alloc_cpumask_var(&old_affinity) )
             {
-                ret = vcpu_set_affinity(v, new_affinity);
-                free_cpumask_var(new_affinity);
+                ret = -ENOMEM;
+                break;
             }
+            cpumask_copy(old_affinity, v->cpu_hard_affinity);
+
+            if ( !alloc_cpumask_var(&new_affinity) )
+            {
+                free_cpumask_var(old_affinity);
+                ret = -ENOMEM;
+                break;
+            }
+
+            /*
+             * We both set a new affinity and report back to the caller what
+             * the scheduler will be effectively using.
+             */
+            if ( vcpuaff->flags & XEN_VCPUAFFINITY_HARD )
+            {
+                ret = xenctl_bitmap_to_bitmap(cpumask_bits(new_affinity),
+                                              &vcpuaff->cpumap_hard,
+                                              nr_cpu_ids);
+                if ( !ret )
+                    ret = vcpu_set_hard_affinity(v, new_affinity);
+                if ( ret )
+                    goto setvcpuaffinity_out;
+
+                /*
+                 * For hard affinity, what we return is the intersection of
+                 * cpupool's online mask and the new hard affinity.
+                 */
+                cpumask_and(new_affinity, online, v->cpu_hard_affinity);
+                ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_hard,
+                                               new_affinity);
+            }
+            if ( vcpuaff->flags & XEN_VCPUAFFINITY_SOFT )
+            {
+                ret = xenctl_bitmap_to_bitmap(cpumask_bits(new_affinity),
+                                              &vcpuaff->cpumap_soft,
+                                              nr_cpu_ids);
+                if ( !ret)
+                    ret = vcpu_set_soft_affinity(v, new_affinity);
+                if ( ret )
+                {
+                    /*
+                     * Since we're returning error, the caller expects nothing
+                     * happened, so we rollback the changes to hard affinity
+                     * (if any).
+                     */
+                    if ( vcpuaff->flags & XEN_VCPUAFFINITY_HARD )
+                        vcpu_set_hard_affinity(v, old_affinity);
+                    goto setvcpuaffinity_out;
+                }
+
+                /*
+                 * For soft affinity, we return the intersection between the
+                 * new soft affinity, the cpupool's online map and the (new)
+                 * hard affinity.
+                 */
+                cpumask_and(new_affinity, new_affinity, online);
+                cpumask_and(new_affinity, new_affinity, v->cpu_hard_affinity);
+                ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_soft,
+                                               new_affinity);
+            }
+
+ setvcpuaffinity_out:
+            free_cpumask_var(new_affinity);
+            free_cpumask_var(old_affinity);
         }
         else
         {
-            ret = cpumask_to_xenctl_bitmap(
-                &op->u.vcpuaffinity.cpumap, v->cpu_hard_affinity);
+            if ( vcpuaff->flags & XEN_VCPUAFFINITY_HARD )
+                ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_hard,
+                                               v->cpu_hard_affinity);
+            if ( vcpuaff->flags & XEN_VCPUAFFINITY_SOFT )
+                ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_soft,
+                                               v->cpu_soft_affinity);
         }
     }
     break;

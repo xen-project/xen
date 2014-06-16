@@ -650,22 +650,14 @@ int cpu_disable_scheduler(unsigned int cpu)
     return ret;
 }
 
-int vcpu_set_affinity(struct vcpu *v, const cpumask_t *affinity)
+static int vcpu_set_affinity(
+    struct vcpu *v, const cpumask_t *affinity, cpumask_t *which)
 {
-    cpumask_t online_affinity;
-    cpumask_t *online;
     spinlock_t *lock;
-
-    if ( v->domain->is_pinned )
-        return -EINVAL;
-    online = VCPU2ONLINE(v);
-    cpumask_and(&online_affinity, affinity, online);
-    if ( cpumask_empty(&online_affinity) )
-        return -EINVAL;
 
     lock = vcpu_schedule_lock_irq(v);
 
-    cpumask_copy(v->cpu_hard_affinity, affinity);
+    cpumask_copy(which, affinity);
 
     /* Always ask the scheduler to re-evaluate placement
      * when changing the affinity */
@@ -682,6 +674,27 @@ int vcpu_set_affinity(struct vcpu *v, const cpumask_t *affinity)
     }
 
     return 0;
+}
+
+int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity)
+{
+    cpumask_t online_affinity;
+    cpumask_t *online;
+
+    if ( v->domain->is_pinned )
+        return -EINVAL;
+
+    online = VCPU2ONLINE(v);
+    cpumask_and(&online_affinity, affinity, online);
+    if ( cpumask_empty(&online_affinity) )
+        return -EINVAL;
+
+    return vcpu_set_affinity(v, affinity, v->cpu_hard_affinity);
+}
+
+int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity)
+{
+    return vcpu_set_affinity(v, affinity, v->cpu_soft_affinity);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
