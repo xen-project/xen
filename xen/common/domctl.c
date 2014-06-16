@@ -625,7 +625,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         else
         {
             ret = cpumask_to_xenctl_bitmap(
-                &op->u.vcpuaffinity.cpumap, v->cpu_affinity);
+                &op->u.vcpuaffinity.cpumap, v->cpu_hard_affinity);
         }
     }
     break;

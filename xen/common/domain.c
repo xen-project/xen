@@ -125,9 +125,9 @@ struct vcpu *alloc_vcpu(
 
     tasklet_init(&v->continue_hypercall_tasklet, NULL, 0);
 
-    if ( !zalloc_cpumask_var(&v->cpu_affinity) ||
-         !zalloc_cpumask_var(&v->cpu_affinity_tmp) ||
-         !zalloc_cpumask_var(&v->cpu_affinity_saved) ||
+    if ( !zalloc_cpumask_var(&v->cpu_hard_affinity) ||
+         !zalloc_cpumask_var(&v->cpu_hard_affinity_tmp) ||
+         !zalloc_cpumask_var(&v->cpu_hard_affinity_saved) ||
          !zalloc_cpumask_var(&v->vcpu_dirty_cpumask) )
         goto fail_free;
 
@@ -156,9 +156,9 @@ struct vcpu *alloc_vcpu(
  fail_wq:
         destroy_waitqueue_vcpu(v);
  fail_free:
-        free_cpumask_var(v->cpu_affinity);
-        free_cpumask_var(v->cpu_affinity_tmp);
-        free_cpumask_var(v->cpu_affinity_saved);
+        free_cpumask_var(v->cpu_hard_affinity);
+        free_cpumask_var(v->cpu_hard_affinity_tmp);
+        free_cpumask_var(v->cpu_hard_affinity_saved);
         free_cpumask_var(v->vcpu_dirty_cpumask);
         free_vcpu_struct(v);
         return NULL;
@@ -427,7 +427,7 @@ void domain_update_node_affinity(struct domain *d)
 
     for_each_vcpu ( d, v )
     {
-        cpumask_and(online_affinity, v->cpu_affinity, online);
+        cpumask_and(online_affinity, v->cpu_hard_affinity, online);
         cpumask_or(cpumask, cpumask, online_affinity);
     }
 
@@ -792,9 +792,9 @@ static void complete_domain_destroy(struct rcu_head *head)
     for ( i = d->max_vcpus - 1; i >= 0; i-- )
         if ( (v = d->vcpu[i]) != NULL )
         {
-            free_cpumask_var(v->cpu_affinity);
-            free_cpumask_var(v->cpu_affinity_tmp);
-            free_cpumask_var(v->cpu_affinity_saved);
+            free_cpumask_var(v->cpu_hard_affinity);
+            free_cpumask_var(v->cpu_hard_affinity_tmp);
+            free_cpumask_var(v->cpu_hard_affinity_saved);
             free_cpumask_var(v->vcpu_dirty_cpumask);
             free_vcpu_struct(v);
         }
@@ -934,7 +934,7 @@ int vcpu_reset(struct vcpu *v)
     v->async_exception_mask = 0;
     memset(v->async_exception_state, 0, sizeof(v->async_exception_state));
 #endif
-    cpumask_clear(v->cpu_affinity_tmp);
+    cpumask_clear(v->cpu_hard_affinity_tmp);
     clear_bit(_VPF_blocked, &v->pause_flags);
     clear_bit(_VPF_in_reset, &v->pause_flags);
 

@@ -219,11 +219,11 @@ struct vcpu
     spinlock_t       virq_lock;
 
     /* Bitmask of CPUs on which this VCPU may run. */
-    cpumask_var_t    cpu_affinity;
+    cpumask_var_t    cpu_hard_affinity;
     /* Used to change affinity temporarily. */
-    cpumask_var_t    cpu_affinity_tmp;
+    cpumask_var_t    cpu_hard_affinity_tmp;
     /* Used to restore affinity across S3. */
-    cpumask_var_t    cpu_affinity_saved;
+    cpumask_var_t    cpu_hard_affinity_saved;
 
     /* Bitmask of CPUs which are holding onto this VCPU's state. */
     cpumask_var_t    vcpu_dirty_cpumask;
@@ -819,7 +819,7 @@ void watchdog_domain_destroy(struct domain *d);
 #define has_hvm_container_domain(d) ((d)->guest_type != guest_type_pv)
 #define has_hvm_container_vcpu(v)   (has_hvm_container_domain((v)->domain))
 #define is_pinned_vcpu(v) ((v)->domain->is_pinned || \
-                           cpumask_weight((v)->cpu_affinity) == 1)
+                           cpumask_weight((v)->cpu_hard_affinity) == 1)
 #ifdef HAS_PASSTHROUGH
 #define need_iommu(d)    ((d)->need_iommu)
 #else

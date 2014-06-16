@@ -332,13 +332,13 @@ csched_balance_cpumask(const struct vcpu *vc, int step, cpumask_t *mask)
     if ( step == CSCHED_BALANCE_NODE_AFFINITY )
     {
         cpumask_and(mask, CSCHED_DOM(vc->domain)->node_affinity_cpumask,
-                    vc->cpu_affinity);
+                    vc->cpu_hard_affinity);
 
         if ( unlikely(cpumask_empty(mask)) )
-            cpumask_copy(mask, vc->cpu_affinity);
+            cpumask_copy(mask, vc->cpu_hard_affinity);
     }
     else /* step == CSCHED_BALANCE_CPU_AFFINITY */
-        cpumask_copy(mask, vc->cpu_affinity);
+        cpumask_copy(mask, vc->cpu_hard_affinity);
 }
 
 static void burn_credits(struct csched_vcpu *svc, s_time_t now)
@@ -407,7 +407,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
 
             if ( balance_step == CSCHED_BALANCE_NODE_AFFINITY
                  && !__vcpu_has_node_affinity(new->vcpu,
-                                              new->vcpu->cpu_affinity) )
+                                              new->vcpu->cpu_hard_affinity) )
                 continue;
 
             /* Are there idlers suitable for new (for this balance step)? */
@@ -642,7 +642,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
 
     /* Store in cpus the mask of online cpus on which the domain can run */
     online = cpupool_scheduler_cpumask(vc->domain->cpupool);
-    cpumask_and(&cpus, vc->cpu_affinity, online);
+    cpumask_and(&cpus, vc->cpu_hard_affinity, online);
 
     for_each_csched_balance_step( balance_step )
     {
@@ -1498,7 +1498,7 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
              * or counter.
              */
             if ( balance_step == CSCHED_BALANCE_NODE_AFFINITY
-                 && !__vcpu_has_node_affinity(vc, vc->cpu_affinity) )
+                 && !__vcpu_has_node_affinity(vc, vc->cpu_hard_affinity) )
                 continue;
 
             csched_balance_cpumask(vc, balance_step, csched_balance_mask);
