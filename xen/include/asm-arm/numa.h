@@ -12,6 +12,7 @@ static inline __attribute__((pure)) int phys_to_nid(paddr_t addr)
 
 /* XXX: implement NUMA support */
 #define node_spanned_pages(nid) (total_pages)
+#define node_start_pfn(nid) (frametable_base_mfn)
 #define __node_distance(a, b) (20)
 
 #endif /* __ARCH_ARM_NUMA_H */
