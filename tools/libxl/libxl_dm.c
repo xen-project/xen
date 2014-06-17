@@ -910,7 +910,11 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     dm_config->c_info.type = LIBXL_DOMAIN_TYPE_PV;
     dm_config->c_info.name = libxl__stub_dm_name(gc,
                                     libxl__domid_to_name(gc, guest_domid));
+    /* When we are here to launch stubdom, ssidref is a valid value
+     * already, no need to parse it again.
+     */
     dm_config->c_info.ssidref = guest_config->b_info.device_model_ssidref;
+    dm_config->c_info.ssid_label = NULL;
 
     libxl_uuid_generate(&dm_config->c_info.uuid);
 

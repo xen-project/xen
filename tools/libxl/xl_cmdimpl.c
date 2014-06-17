@@ -725,35 +725,17 @@ static void parse_config_data(const char *config_source,
         exit(1);
     }
 
-    if (!xlu_cfg_get_string (config, "init_seclabel", &buf, 0)) {
-        e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
-                                    &c_info->ssidref);
-        if (e) {
-            if (errno == ENOSYS) {
-                fprintf(stderr, "XSM Disabled: init_seclabel not supported\n");
-            } else {
-                fprintf(stderr, "Invalid init_seclabel: %s\n", buf);
-                exit(1);
-            }
-        }
-    }
+    if (!xlu_cfg_get_string (config, "init_seclabel", &buf, 0))
+        xlu_cfg_replace_string(config, "init_seclabel",
+                               &c_info->ssid_label, 0);
 
     if (!xlu_cfg_get_string (config, "seclabel", &buf, 0)) {
-        uint32_t ssidref;
-        e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
-                                    &ssidref);
-        if (e) {
-            if (errno == ENOSYS) {
-                fprintf(stderr, "XSM Disabled: seclabel not supported\n");
-            } else {
-                fprintf(stderr, "Invalid seclabel: %s\n", buf);
-                exit(1);
-            }
-        } else if (c_info->ssidref) {
-            b_info->exec_ssidref = ssidref;
-        } else {
-            c_info->ssidref = ssidref;
-        }
+        if (c_info->ssid_label)
+            xlu_cfg_replace_string(config, "seclabel",
+                                   &b_info->exec_ssid_label, 0);
+        else
+            xlu_cfg_replace_string(config, "seclabel",
+                                   &c_info->ssid_label, 0);
     }
 
     libxl_defbool_set(&c_info->run_hotplug_scripts, run_hotplug_scripts);
@@ -781,14 +763,8 @@ static void parse_config_data(const char *config_source,
 
     xlu_cfg_get_defbool(config, "oos", &c_info->oos, 0);
 
-    if (!xlu_cfg_get_string (config, "pool", &buf, 0)) {
-        c_info->poolid = -1;
-        libxl_cpupool_qualifier_to_cpupoolid(ctx, buf, &c_info->poolid, NULL);
-    }
-    if (!libxl_cpupoolid_is_valid(ctx, c_info->poolid)) {
-        fprintf(stderr, "Illegal pool specified\n");
-        exit(1);
-    }
+    if (!xlu_cfg_get_string (config, "pool", &buf, 0))
+        xlu_cfg_replace_string(config, "pool", &c_info->pool_name, 0);
 
     libxl_domain_build_info_init_type(b_info, c_info->type);
     if (blkdev_start)
@@ -1577,20 +1553,10 @@ skip_vfb:
                          &b_info->device_model_stubdomain, 0);
 
     if (!xlu_cfg_get_string (config, "device_model_stubdomain_seclabel",
-                             &buf, 0)) {
-        e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
-                                    &b_info->device_model_ssidref);
-        if (e) {
-            if (errno == ENOSYS) {
-                fprintf(stderr, "XSM Disabled:"
-                        " device_model_stubdomain_seclabel not supported\n");
-            } else {
-                fprintf(stderr, "Invalid device_model_stubdomain_seclabel:"
-                        " %s\n", buf);
-                exit(1);
-            }
-        }
-    }
+                             &buf, 0))
+        xlu_cfg_replace_string(config, "device_model_stubdomain_seclabel",
+                               &b_info->device_model_ssid_label, 0);
+
 #define parse_extra_args(type)                                            \
     e = xlu_cfg_get_list_as_string_list(config, "device_model_args"#type, \
                                     &b_info->extra##type, 0);            \
@@ -3302,15 +3268,8 @@ static void list_domains(int verbose, int context, int claim, int numa,
         }
         if (claim)
             printf(" %5lu", (unsigned long)info[i].outstanding_memkb / 1024);
-        if (verbose || context) {
-            int rc;
-            size_t size;
-            char *buf = NULL;
-            rc = libxl_flask_sid_to_context(ctx, info[i].ssidref, &buf,
-                                            &size);
-            printf(" %16s", rc < 0 ? "-" : buf);
-            free(buf);
-        }
+        if (verbose || context)
+            printf(" %16s", info[i].ssid_label ? : "-");
         if (numa) {
             libxl_domain_get_nodeaffinity(ctx, info[i].domid, &nodemap);
 
@@ -6775,27 +6734,21 @@ int main_cpupoollist(int argc, char **argv)
 
     for (p = 0; p < n_pools; p++) {
         if (!ret && (!pool || (poolinfo[p].poolid == poolid))) {
-            name = libxl_cpupoolid_to_name(ctx, poolinfo[p].poolid);
-            if (!name) {
-                fprintf(stderr, "error getting cpupool info\n");
-                ret = -ERROR_NOMEM;
-            } else {
-                printf("%-19s", name);
-                free(name);
-                n = 0;
-                libxl_for_each_bit(c, poolinfo[p].cpumap)
-                    if (libxl_bitmap_test(&poolinfo[p].cpumap, c)) {
-                        if (n && opt_cpus) printf(",");
-                        if (opt_cpus) printf("%d", c);
-                        n++;
-                    }
-                if (!opt_cpus) {
-                    printf("%3d %9s       y       %4d", n,
-                           libxl_scheduler_to_string(poolinfo[p].sched),
-                           poolinfo[p].n_dom);
+            name = poolinfo[p].pool_name;
+            printf("%-19s", name);
+            n = 0;
+            libxl_for_each_bit(c, poolinfo[p].cpumap)
+                if (libxl_bitmap_test(&poolinfo[p].cpumap, c)) {
+                    if (n && opt_cpus) printf(",");
+                    if (opt_cpus) printf("%d", c);
+                    n++;
                 }
-                printf("\n");
+            if (!opt_cpus) {
+                printf("%3d %9s       y       %4d", n,
+                       libxl_scheduler_to_string(poolinfo[p].sched),
+                       poolinfo[p].n_dom);
             }
+            printf("\n");
         }
     }
 

@@ -724,6 +724,63 @@ static void initiate_domain_create(libxl__egc *egc,
 
     domid = 0;
 
+    if (d_config->c_info.ssid_label) {
+        char *s = d_config->c_info.ssid_label;
+        ret = libxl_flask_context_to_sid(ctx, s, strlen(s),
+                                         &d_config->c_info.ssidref);
+        if (ret) {
+            if (errno == ENOSYS) {
+                LOG(WARN, "XSM Disabled: init_seclabel not supported");
+                ret = 0;
+            } else {
+                LOG(ERROR, "Invalid init_seclabel: %s", s);
+                goto error_out;
+            }
+        }
+    }
+
+    if (d_config->b_info.exec_ssid_label) {
+        char *s = d_config->b_info.exec_ssid_label;
+        ret = libxl_flask_context_to_sid(ctx, s, strlen(s),
+                                         &d_config->b_info.exec_ssidref);
+        if (ret) {
+            if (errno == ENOSYS) {
+                LOG(WARN, "XSM Disabled: seclabel not supported");
+                ret = 0;
+            } else {
+                LOG(ERROR, "Invalid seclabel: %s", s);
+                goto error_out;
+            }
+        }
+    }
+
+    if (d_config->b_info.device_model_ssid_label) {
+        char *s = d_config->b_info.device_model_ssid_label;
+        ret = libxl_flask_context_to_sid(ctx, s, strlen(s),
+                                         &d_config->b_info.device_model_ssidref);
+        if (ret) {
+            if (errno == ENOSYS) {
+                LOG(WARN,"XSM Disabled: device_model_stubdomain_seclabel not supported");
+                ret = 0;
+            } else {
+                LOG(ERROR, "Invalid device_model_stubdomain_seclabel: %s", s);
+                goto error_out;
+            }
+        }
+    }
+
+    if (d_config->c_info.pool_name) {
+        d_config->c_info.poolid = -1;
+        libxl_cpupool_qualifier_to_cpupoolid(ctx, d_config->c_info.pool_name,
+                                             &d_config->c_info.poolid,
+                                             NULL);
+    }
+    if (!libxl_cpupoolid_is_valid(ctx, d_config->c_info.poolid)) {
+        LOG(ERROR, "Illegal pool specified: %s", d_config->c_info.pool_name);
+        ret = ERROR_INVAL;
+        goto error_out;
+    }
+
     /* If target_memkb is smaller than max_memkb, the subsequent call
      * to libxc when building HVM domain will enable PoD mode.
      */

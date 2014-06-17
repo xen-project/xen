@@ -37,7 +37,6 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
 
     libxl_domain_create_info *c_info = &d_config->c_info;
     libxl_domain_build_info *b_info = &d_config->b_info;
-    char *pool;
 
     printf("(domain\n\t(domid %d)\n", domid);
     printf("\t(create_info)\n");
@@ -55,10 +54,8 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
     } else {
         printf("\t(uuid <unknown>)\n");
     }
-    pool = libxl_cpupoolid_to_name(ctx, c_info->poolid);
-    if (pool)
-        printf("\t(cpupool %s)\n", pool);
-    free(pool);
+    if (c_info->pool_name)
+        printf("\t(cpupool %s)\n", c_info->pool_name);
     if (c_info->xsdata)
         printf("\t(xsdata contains data)\n");
     else

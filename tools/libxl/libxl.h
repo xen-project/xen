@@ -498,6 +498,26 @@
 #define LIBXL_EXTERNAL_CALLERS_ONLY /* disappears for callers outside libxl */
 #endif
 
+/*
+ * LIBXL_HAVE_SSID_LABEL
+ *
+ * If this is defined, then libxl IDL contains string of XSM security
+ * label in all XSM related structures.
+ *
+ * If set this string takes precedence over the numeric field.
+ */
+#define LIBXL_HAVE_SSID_LABEL 1
+
+/*
+ * LIBXL_HAVE_CPUPOOL_NAME
+ *
+ * If this is defined, then libxl IDL contains string of CPU pool
+ * name in all CPU pool related structures.
+ *
+ * If set this string takes precedence over the numeric field.
+ */
+#define LIBXL_HAVE_CPUPOOL_NAME 1
+
 typedef uint8_t libxl_mac[6];
 #define LIBXL_MAC_FMT "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx"
 #define LIBXL_MAC_FMTLEN ((2*6)+5) /* 6 hex bytes plus 5 colons */

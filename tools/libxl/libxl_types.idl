@@ -215,6 +215,7 @@ libxl_dominfo = Struct("dominfo",[
     ("uuid",        libxl_uuid),
     ("domid",       libxl_domid),
     ("ssidref",     uint32),
+    ("ssid_label",  string),
     ("running",     bool),
     ("blocked",     bool),
     ("paused",      bool),
@@ -240,6 +241,7 @@ libxl_dominfo = Struct("dominfo",[
 
 libxl_cpupoolinfo = Struct("cpupoolinfo", [
     ("poolid",      uint32),
+    ("pool_name",   string),
     ("sched",       libxl_scheduler),
     ("n_dom",       uint32),
     ("cpumap",      libxl_bitmap)
@@ -270,11 +272,13 @@ libxl_domain_create_info = Struct("domain_create_info",[
     ("hap",          libxl_defbool),
     ("oos",          libxl_defbool),
     ("ssidref",      uint32),
+    ("ssid_label",   string),
     ("name",         string),
     ("uuid",         libxl_uuid),
     ("xsdata",       libxl_key_value_list),
     ("platformdata", libxl_key_value_list),
     ("poolid",       uint32),
+    ("pool_name",    string),
     ("run_hotplug_scripts",libxl_defbool),
     ("pvh",          libxl_defbool),
     ("driver_domain",libxl_defbool),
@@ -307,6 +311,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("shadow_memkb",    MemKB),
     ("rtc_timeoffset",  uint32),
     ("exec_ssidref",    uint32),
+    ("exec_ssid_label", string),
     ("localtime",       libxl_defbool),
     ("disable_migrate", libxl_defbool),
     ("cpuid",           libxl_cpuid_policy_list),
@@ -317,6 +322,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     # if you set device_model you must set device_model_version too
     ("device_model",     string),
     ("device_model_ssidref", uint32),
+    ("device_model_ssid_label", string),
 
     # extra parameters pass directly to qemu, NULL terminated
     ("extra",            libxl_string_list),

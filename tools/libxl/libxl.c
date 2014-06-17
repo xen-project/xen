@@ -529,12 +529,18 @@ int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
+static void xcinfo2xlinfo(libxl_ctx *ctx,
+                          const xc_domaininfo_t *xcinfo,
                           libxl_dominfo *xlinfo)
 {
+    size_t size;
+
     memcpy(&(xlinfo->uuid), xcinfo->handle, sizeof(xen_domain_handle_t));
     xlinfo->domid = xcinfo->domain;
     xlinfo->ssidref = xcinfo->ssidref;
+    if (libxl_flask_sid_to_context(ctx, xlinfo->ssidref,
+                                   &xlinfo->ssid_label, &size) < 0)
+        xlinfo->ssid_label = NULL;
 
     xlinfo->dying    = !!(xcinfo->flags&XEN_DOMINF_dying);
     xlinfo->shutdown = !!(xcinfo->flags&XEN_DOMINF_shutdown);
@@ -581,7 +587,7 @@ libxl_dominfo * libxl_list_domain(libxl_ctx *ctx, int *nb_domain_out)
     }
 
     for (i = 0; i < ret; i++) {
-        xcinfo2xlinfo(&info[i], &ptr[i]);
+        xcinfo2xlinfo(ctx, &info[i], &ptr[i]);
     }
     *nb_domain_out = ret;
     return ptr;
@@ -600,7 +606,7 @@ int libxl_domain_info(libxl_ctx *ctx, libxl_dominfo *info_r,
     if (ret==0 || xcinfo.domain != domid) return ERROR_INVAL;
 
     if (info_r)
-        xcinfo2xlinfo(&xcinfo, info_r);
+        xcinfo2xlinfo(ctx, &xcinfo, info_r);
     return 0;
 }
 
@@ -628,6 +634,11 @@ static int cpupool_info(libxl__gc *gc,
     }
 
     info->poolid = xcinfo->cpupool_id;
+    info->pool_name = libxl_cpupoolid_to_name(CTX, info->poolid);
+    if (!info->pool_name) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
     info->sched = xcinfo->sched_id;
     info->n_dom = xcinfo->n_dom;
     rc = libxl_cpu_bitmap_alloc(CTX, &info->cpumap, 0);
@@ -4174,10 +4185,13 @@ retry_transaction:
         abort_transaction = 1;
         goto out;
     }
-    xcinfo2xlinfo(&info, &ptr);
+
+    libxl_dominfo_init(&ptr);
+    xcinfo2xlinfo(ctx, &info, &ptr);
     uuid = libxl__uuid2string(gc, ptr.uuid);
     libxl__xs_write(gc, t, libxl__sprintf(gc, "/vm/%s/memory", uuid),
             "%"PRIu32, new_target_memkb / 1024);
+    libxl_dominfo_dispose(&ptr);
 
 out:
     if (!xs_transaction_end(ctx->xsh, t, abort_transaction)
