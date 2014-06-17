@@ -69,11 +69,13 @@ static int _hvm_dpci_isairq_eoi(struct domain *d,
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
     unsigned int isairq = (long)arg;
-    struct dev_intx_gsi_link *digl, *tmp;
+    const struct dev_intx_gsi_link *digl;
 
-    list_for_each_entry_safe ( digl, tmp, &pirq_dpci->digl_list, list )
+    list_for_each_entry ( digl, &pirq_dpci->digl_list, list )
     {
-        if ( hvm_irq->pci_link.route[digl->link] == isairq )
+        unsigned int link = hvm_pci_intx_link(digl->device, digl->intx);
+
+        if ( hvm_irq->pci_link.route[link] == isairq )
         {
             hvm_pci_intx_deassert(d, digl->device, digl->intx);
             if ( --pirq_dpci->pending == 0 )

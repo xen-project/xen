@@ -300,8 +300,33 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_nodeaffinity_t);
 /* XEN_DOMCTL_setvcpuaffinity */
 /* XEN_DOMCTL_getvcpuaffinity */
 struct xen_domctl_vcpuaffinity {
-    uint32_t  vcpu;              /* IN */
-    struct xenctl_bitmap cpumap; /* IN/OUT */
+    /* IN variables. */
+    uint32_t  vcpu;
+ /* Set/get the hard affinity for vcpu */
+#define _XEN_VCPUAFFINITY_HARD  0
+#define XEN_VCPUAFFINITY_HARD   (1U<<_XEN_VCPUAFFINITY_HARD)
+ /* Set/get the soft affinity for vcpu */
+#define _XEN_VCPUAFFINITY_SOFT  1
+#define XEN_VCPUAFFINITY_SOFT   (1U<<_XEN_VCPUAFFINITY_SOFT)
+    uint32_t flags;
+    /*
+     * IN/OUT variables.
+     *
+     * Both are IN/OUT for XEN_DOMCTL_setvcpuaffinity, in which case they
+     * contain effective hard or/and soft affinity. That is, upon successful
+     * return, cpumap_soft, contains the intersection of the soft affinity,
+     * hard affinity and the cpupool's online CPUs for the domain (if
+     * XEN_VCPUAFFINITY_SOFT was set in flags). cpumap_hard contains the
+     * intersection between hard affinity and the cpupool's online CPUs (if
+     * XEN_VCPUAFFINITY_HARD was set in flags).
+     *
+     * Both are OUT-only for XEN_DOMCTL_getvcpuaffinity, in which case they
+     * contain the plain hard and/or soft affinity masks that were set during
+     * previous successful calls to XEN_DOMCTL_setvcpuaffinity (or the
+     * default values), without intersecting or altering them in any way.
+     */
+    struct xenctl_bitmap cpumap_hard;
+    struct xenctl_bitmap cpumap_soft;
 };
 typedef struct xen_domctl_vcpuaffinity xen_domctl_vcpuaffinity_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpuaffinity_t);

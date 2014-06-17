@@ -65,6 +65,13 @@ static bool_t opt_bootscrub __initdata = 1;
 boolean_param("bootscrub", opt_bootscrub);
 
 /*
+ * bootscrub_chunk -> Amount of bytes to scrub lockstep on non-SMT CPUs
+ * on all NUMA nodes.
+ */
+static unsigned long __initdata opt_bootscrub_chunk = MB(128);
+size_param("bootscrub_chunk", opt_bootscrub_chunk);
+
+/*
  * Bit width of the DMA heap -- used to override NUMA-node-first.
  * allocation strategy, which can otherwise exhaust low memory.
  */
@@ -89,6 +96,16 @@ static struct bootmem_region {
     unsigned long s, e; /* MFNs @s through @e-1 inclusive are free */
 } *__initdata bootmem_region_list;
 static unsigned int __initdata nr_bootmem_regions;
+
+struct scrub_region {
+    unsigned long offset;
+    unsigned long start;
+    unsigned long per_cpu_sz;
+    unsigned long rem;
+    cpumask_t cpus;
+};
+static struct scrub_region __initdata region[MAX_NUMNODES];
+static unsigned long __initdata chunk_size;
 
 static void __init boot_bug(int line)
 {
@@ -1256,42 +1273,203 @@ void __init end_boot_allocator(void)
     printk("\n");
 }
 
+static void __init smp_scrub_heap_pages(void *data)
+{
+    unsigned long mfn, start, end;
+    struct page_info *pg;
+    struct scrub_region *r;
+    unsigned int temp_cpu, node, cpu_idx = 0;
+    unsigned int cpu = smp_processor_id();
+
+    if ( data )
+        r = data;
+    else
+    {
+        node = cpu_to_node(cpu);
+        if ( node == NUMA_NO_NODE )
+            return;
+        r = &region[node];
+    }
+
+    /* Determine the current CPU's index into CPU's linked to this node. */
+    for_each_cpu ( temp_cpu, &r->cpus )
+    {
+        if ( cpu == temp_cpu )
+            break;
+        cpu_idx++;
+    }
+
+    /* Calculate the starting mfn for this CPU's memory block. */
+    start = r->start + (r->per_cpu_sz * cpu_idx) + r->offset;
+
+    /* Calculate the end mfn into this CPU's memory block for this iteration. */
+    if ( r->offset + chunk_size >= r->per_cpu_sz )
+    {
+        end = r->start + (r->per_cpu_sz * cpu_idx) + r->per_cpu_sz;
+
+        if ( r->rem && (cpumask_weight(&r->cpus) - 1 == cpu_idx) )
+            end += r->rem;
+    }
+    else
+        end = start + chunk_size;
+
+    for ( mfn = start; mfn < end; mfn++ )
+    {
+        pg = mfn_to_page(mfn);
+
+        /* Check the mfn is valid and page is free. */
+        if ( !mfn_valid(mfn) || !page_state_is(pg, free) )
+            continue;
+
+        scrub_one_page(pg);
+    }
+}
+
+static int __init find_non_smt(unsigned int node, cpumask_t *dest)
+{
+    cpumask_t node_cpus;
+    unsigned int i, cpu;
+
+    cpumask_and(&node_cpus, &node_to_cpumask(node), &cpu_online_map);
+    cpumask_clear(dest);
+    for_each_cpu ( i, &node_cpus )
+    {
+        if ( cpumask_intersects(dest, per_cpu(cpu_sibling_mask, i)) )
+            continue;
+        cpu = cpumask_first(per_cpu(cpu_sibling_mask, i));
+        cpumask_set_cpu(cpu, dest);
+    }
+    return cpumask_weight(dest);
+}
+
 /*
- * Scrub all unallocated pages in all heap zones. This function is more
- * convoluted than appears necessary because we do not want to continuously
- * hold the lock while scrubbing very large memory areas.
+ * Scrub all unallocated pages in all heap zones. This function uses all
+ * online cpu's to scrub the memory in parallel.
  */
 void __init scrub_heap_pages(void)
 {
-    unsigned long mfn;
-    struct page_info *pg;
+    cpumask_t node_cpus, all_worker_cpus;
+    unsigned int i, j;
+    unsigned long offset, max_per_cpu_sz = 0;
+    unsigned long start, end;
+    unsigned long rem = 0;
+    int last_distance, best_node;
+    int cpus;
 
     if ( !opt_bootscrub )
         return;
 
-    printk("Scrubbing Free RAM: ");
+    cpumask_clear(&all_worker_cpus);
+    /* Scrub block size. */
+    chunk_size = opt_bootscrub_chunk >> PAGE_SHIFT;
+    if ( chunk_size == 0 )
+        chunk_size = MB(128) >> PAGE_SHIFT;
 
-    for ( mfn = first_valid_mfn; mfn < max_page; mfn++ )
+    /* Round #0 - figure out amounts and which CPUs to use. */
+    for_each_online_node ( i )
     {
+        if ( !node_spanned_pages(i) )
+            continue;
+        /* Calculate Node memory start and end address. */
+        start = max(node_start_pfn(i), first_valid_mfn);
+        end = min(node_start_pfn(i) + node_spanned_pages(i), max_page);
+        /* Just in case NODE has 1 page and starts below first_valid_mfn. */
+        end = max(end, start);
+        /* CPUs that are online and on this node (if none, that it is OK). */
+        cpus = find_non_smt(i, &node_cpus);
+        cpumask_or(&all_worker_cpus, &all_worker_cpus, &node_cpus);
+        if ( cpus <= 0 )
+        {
+            /* No CPUs on this node. Round #2 will take of it. */
+            rem = 0;
+            region[i].per_cpu_sz = (end - start);
+        }
+        else
+        {
+            rem = (end - start) % cpus;
+            region[i].per_cpu_sz = (end - start) / cpus;
+            if ( region[i].per_cpu_sz > max_per_cpu_sz )
+                max_per_cpu_sz = region[i].per_cpu_sz;
+        }
+        region[i].start = start;
+        region[i].rem = rem;
+        cpumask_copy(&region[i].cpus, &node_cpus);
+    }
+
+    printk("Scrubbing Free RAM on %d nodes using %d CPUs\n", num_online_nodes(),
+           cpumask_weight(&all_worker_cpus));
+
+    /* Round: #1 - do NUMA nodes with CPUs. */
+    for ( offset = 0; offset < max_per_cpu_sz; offset += chunk_size )
+    {
+        for_each_online_node ( i )
+            region[i].offset = offset;
+
         process_pending_softirqs();
 
-        pg = mfn_to_page(mfn);
+        spin_lock(&heap_lock);
+        on_selected_cpus(&all_worker_cpus, smp_scrub_heap_pages, NULL, 1);
+        spin_unlock(&heap_lock);
 
-        /* Quick lock-free check. */
-        if ( !mfn_valid(mfn) || !page_state_is(pg, free) )
+        printk(".");
+    }
+
+    /*
+     * Round #2: NUMA nodes with no CPUs get scrubbed with CPUs on the node
+     * closest to us and with CPUs.
+     */
+    for_each_online_node ( i )
+    {
+        node_cpus = node_to_cpumask(i);
+
+        if ( !cpumask_empty(&node_cpus) )
             continue;
 
-        /* Every 100MB, print a progress dot. */
-        if ( (mfn % ((100*1024*1024)/PAGE_SIZE)) == 0 )
+        last_distance = INT_MAX;
+        best_node = first_node(node_online_map);
+        /* Figure out which NODE CPUs are close. */
+        for_each_online_node ( j )
+        {
+            int distance;
+
+            if ( cpumask_empty(&node_to_cpumask(j)) )
+                continue;
+
+            distance = __node_distance(i, j);
+            if ( distance < last_distance )
+            {
+                last_distance = distance;
+                best_node = j;
+            }
+        }
+        /*
+         * Use CPUs from best node, and if there are no CPUs on the
+         * first node (the default) use the BSP.
+         */
+        cpus = find_non_smt(best_node, &node_cpus);
+        if ( cpus == 0 )
+        {
+            cpumask_set_cpu(smp_processor_id(), &node_cpus);
+            cpus = 1;
+        }
+        /* We already have the node information from round #0. */
+        region[i].rem = region[i].per_cpu_sz % cpus;
+        region[i].per_cpu_sz /= cpus;
+        max_per_cpu_sz = region[i].per_cpu_sz;
+        cpumask_copy(&region[i].cpus, &node_cpus);
+
+        for ( offset = 0; offset < max_per_cpu_sz; offset += chunk_size )
+        {
+            region[i].offset = offset;
+
+            process_pending_softirqs();
+
+            spin_lock(&heap_lock);
+            on_selected_cpus(&node_cpus, smp_scrub_heap_pages, &region[i], 1);
+            spin_unlock(&heap_lock);
+
             printk(".");
-
-        spin_lock(&heap_lock);
-
-        /* Re-check page status with lock held. */
-        if ( page_state_is(pg, free) )
-            scrub_one_page(pg);
-
-        spin_unlock(&heap_lock);
+        }
     }
 
     printk("done.\n");

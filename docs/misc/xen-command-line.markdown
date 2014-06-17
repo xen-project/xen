@@ -198,6 +198,16 @@ Scrub free RAM during boot.  This is a safety feature to prevent
 accidentally leaking sensitive VM data into other VMs if Xen crashes
 and reboots.
 
+### `bootscrub_chunk`
+> `= <size>`
+
+> Default: `128M`
+
+Maximum RAM block size chunks to be scrubbed whilst holding the page heap lock
+and not running softirqs. Reduce this if softirqs are not being run frequently
+enough. Setting this to a high value may cause boot failure, particularly if
+the NMI watchdog is also enabled.
+
 ### cachesize
 > `= <size>`
 

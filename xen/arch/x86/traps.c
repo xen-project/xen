@@ -3173,7 +3173,8 @@ static void nmi_mce_softirq(void)
 
     /* Set the tmp value unconditionally, so that
      * the check in the iret hypercall works. */
-    cpumask_copy(st->vcpu->cpu_affinity_tmp, st->vcpu->cpu_affinity);
+    cpumask_copy(st->vcpu->cpu_hard_affinity_tmp,
+                 st->vcpu->cpu_hard_affinity);
 
     if ((cpu != st->processor)
        || (st->processor != st->vcpu->processor))
@@ -3182,7 +3183,7 @@ static void nmi_mce_softirq(void)
          * Make sure to wakeup the vcpu on the
          * specified processor.
          */
-        vcpu_set_affinity(st->vcpu, cpumask_of(st->processor));
+        vcpu_set_hard_affinity(st->vcpu, cpumask_of(st->processor));
 
         /* Affinity is restored in the iret hypercall. */
     }
@@ -3208,11 +3209,11 @@ void async_exception_cleanup(struct vcpu *curr)
         return;
 
     /* Restore affinity.  */
-    if ( !cpumask_empty(curr->cpu_affinity_tmp) &&
-         !cpumask_equal(curr->cpu_affinity_tmp, curr->cpu_affinity) )
+    if ( !cpumask_empty(curr->cpu_hard_affinity_tmp) &&
+         !cpumask_equal(curr->cpu_hard_affinity_tmp, curr->cpu_hard_affinity) )
     {
-        vcpu_set_affinity(curr, curr->cpu_affinity_tmp);
-        cpumask_clear(curr->cpu_affinity_tmp);
+        vcpu_set_hard_affinity(curr, curr->cpu_hard_affinity_tmp);
+        cpumask_clear(curr->cpu_hard_affinity_tmp);
     }
 
     if ( !(curr->async_exception_mask & (curr->async_exception_mask - 1)) )

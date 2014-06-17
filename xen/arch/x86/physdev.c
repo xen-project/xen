@@ -37,9 +37,8 @@ static int physdev_hvm_map_pirq(
     switch ( type )
     {
     case MAP_PIRQ_TYPE_GSI: {
-        struct hvm_irq_dpci *hvm_irq_dpci;
-        struct hvm_girq_dpci_mapping *girq;
-        uint32_t machine_gsi = 0;
+        const struct hvm_irq_dpci *hvm_irq_dpci;
+        unsigned int machine_gsi = 0;
 
         if ( *index < 0 || *index >= NR_HVM_IRQS )
         {
@@ -52,6 +51,8 @@ static int physdev_hvm_map_pirq(
         hvm_irq_dpci = domain_get_irq_dpci(d);
         if ( hvm_irq_dpci )
         {
+            const struct hvm_girq_dpci_mapping *girq;
+
             BUILD_BUG_ON(ARRAY_SIZE(hvm_irq_dpci->girq) < NR_HVM_IRQS);
             list_for_each_entry ( girq,
                                   &hvm_irq_dpci->girq[*index],

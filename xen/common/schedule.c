@@ -194,9 +194,11 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
      */
     v->processor = processor;
     if ( is_idle_domain(d) || d->is_pinned )
-        cpumask_copy(v->cpu_affinity, cpumask_of(processor));
+        cpumask_copy(v->cpu_hard_affinity, cpumask_of(processor));
     else
-        cpumask_setall(v->cpu_affinity);
+        cpumask_setall(v->cpu_hard_affinity);
+
+    cpumask_setall(v->cpu_soft_affinity);
 
     /* Initialise the per-vcpu timers. */
     init_timer(&v->periodic_timer, vcpu_periodic_timer_fn,
@@ -285,7 +287,8 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         migrate_timer(&v->singleshot_timer, new_p);
         migrate_timer(&v->poll_timer, new_p);
 
-        cpumask_setall(v->cpu_affinity);
+        cpumask_setall(v->cpu_hard_affinity);
+        cpumask_setall(v->cpu_soft_affinity);
 
         lock = vcpu_schedule_lock_irq(v);
         v->processor = new_p;
@@ -307,7 +310,9 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         SCHED_OP(old_ops, free_vdata, vcpudata);
     }
 
-    domain_update_node_affinity(d);
+    /* Do we have vcpus already? If not, no need to update node-affinity */
+    if ( d->vcpu )
+        domain_update_node_affinity(d);
 
     domain_unpause(d);
 
@@ -458,7 +463,7 @@ static void vcpu_migrate(struct vcpu *v)
              */
             if ( pick_called &&
                  (new_lock == per_cpu(schedule_data, new_cpu).schedule_lock) &&
-                 cpumask_test_cpu(new_cpu, v->cpu_affinity) &&
+                 cpumask_test_cpu(new_cpu, v->cpu_hard_affinity) &&
                  cpumask_test_cpu(new_cpu, v->domain->cpupool->cpu_valid) )
                 break;
 
@@ -561,7 +566,7 @@ void restore_vcpu_affinity(struct domain *d)
         if ( v->affinity_broken )
         {
             printk(XENLOG_DEBUG "Restoring affinity for %pv\n", v);
-            cpumask_copy(v->cpu_affinity, v->cpu_affinity_saved);
+            cpumask_copy(v->cpu_hard_affinity, v->cpu_hard_affinity_saved);
             v->affinity_broken = 0;
         }
 
@@ -604,19 +609,20 @@ int cpu_disable_scheduler(unsigned int cpu)
             unsigned long flags;
             spinlock_t *lock = vcpu_schedule_lock_irqsave(v, &flags);
 
-            cpumask_and(&online_affinity, v->cpu_affinity, c->cpu_valid);
+            cpumask_and(&online_affinity, v->cpu_hard_affinity, c->cpu_valid);
             if ( cpumask_empty(&online_affinity) &&
-                 cpumask_test_cpu(cpu, v->cpu_affinity) )
+                 cpumask_test_cpu(cpu, v->cpu_hard_affinity) )
             {
                 printk(XENLOG_DEBUG "Breaking affinity for %pv\n", v);
 
                 if (system_state == SYS_STATE_suspend)
                 {
-                    cpumask_copy(v->cpu_affinity_saved, v->cpu_affinity);
+                    cpumask_copy(v->cpu_hard_affinity_saved,
+                                 v->cpu_hard_affinity);
                     v->affinity_broken = 1;
                 }
 
-                cpumask_setall(v->cpu_affinity);
+                cpumask_setall(v->cpu_hard_affinity);
             }
 
             if ( v->processor == cpu )
@@ -644,27 +650,14 @@ int cpu_disable_scheduler(unsigned int cpu)
     return ret;
 }
 
-void sched_set_node_affinity(struct domain *d, nodemask_t *mask)
+static int vcpu_set_affinity(
+    struct vcpu *v, const cpumask_t *affinity, cpumask_t *which)
 {
-    SCHED_OP(DOM2OP(d), set_node_affinity, d, mask);
-}
-
-int vcpu_set_affinity(struct vcpu *v, const cpumask_t *affinity)
-{
-    cpumask_t online_affinity;
-    cpumask_t *online;
     spinlock_t *lock;
-
-    if ( v->domain->is_pinned )
-        return -EINVAL;
-    online = VCPU2ONLINE(v);
-    cpumask_and(&online_affinity, affinity, online);
-    if ( cpumask_empty(&online_affinity) )
-        return -EINVAL;
 
     lock = vcpu_schedule_lock_irq(v);
 
-    cpumask_copy(v->cpu_affinity, affinity);
+    cpumask_copy(which, affinity);
 
     /* Always ask the scheduler to re-evaluate placement
      * when changing the affinity */
@@ -681,6 +674,27 @@ int vcpu_set_affinity(struct vcpu *v, const cpumask_t *affinity)
     }
 
     return 0;
+}
+
+int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity)
+{
+    cpumask_t online_affinity;
+    cpumask_t *online;
+
+    if ( v->domain->is_pinned )
+        return -EINVAL;
+
+    online = VCPU2ONLINE(v);
+    cpumask_and(&online_affinity, affinity, online);
+    if ( cpumask_empty(&online_affinity) )
+        return -EINVAL;
+
+    return vcpu_set_affinity(v, affinity, v->cpu_hard_affinity);
+}
+
+int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity)
+{
+    return vcpu_set_affinity(v, affinity, v->cpu_soft_affinity);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */

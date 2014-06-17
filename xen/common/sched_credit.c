@@ -112,10 +112,24 @@
 
 
 /*
- * Node Balancing
+ * Hard and soft affinity load balancing.
+ *
+ * Idea is each vcpu has some pcpus that it prefers, some that it does not
+ * prefer but is OK with, and some that it cannot run on at all. The first
+ * set of pcpus are the ones that are both in the soft affinity *and* in the
+ * hard affinity; the second set of pcpus are the ones that are in the hard
+ * affinity but *not* in the soft affinity; the third set of pcpus are the
+ * ones that are not in the hard affinity.
+ *
+ * We implement a two step balancing logic. Basically, every time there is
+ * the need to decide where to run a vcpu, we first check the soft affinity
+ * (well, actually, the && between soft and hard affinity), to see if we can
+ * send it where it prefers to (and can) run on. However, if the first step
+ * does not find any suitable and free pcpu, we fall back checking the hard
+ * affinity.
  */
-#define CSCHED_BALANCE_NODE_AFFINITY    0
-#define CSCHED_BALANCE_CPU_AFFINITY     1
+#define CSCHED_BALANCE_SOFT_AFFINITY    0
+#define CSCHED_BALANCE_HARD_AFFINITY    1
 
 /*
  * Boot parameters
@@ -138,7 +152,7 @@ struct csched_pcpu {
 
 /*
  * Convenience macro for accessing the per-PCPU cpumask we need for
- * implementing the two steps (vcpu and node affinity) balancing logic.
+ * implementing the two steps (soft and hard affinity) balancing logic.
  * It is stored in csched_pcpu so that serialization is not an issue,
  * as there is a csched_pcpu for each PCPU and we always hold the
  * runqueue spin-lock when using this.
@@ -178,9 +192,6 @@ struct csched_dom {
     struct list_head active_vcpu;
     struct list_head active_sdom_elem;
     struct domain *dom;
-    /* cpumask translated from the domain's node-affinity.
-     * Basically, the CPUs we prefer to be scheduled on. */
-    cpumask_var_t node_affinity_cpumask;
     uint16_t active_vcpu_count;
     uint16_t weight;
     uint16_t cap;
@@ -261,59 +272,28 @@ __runq_remove(struct csched_vcpu *svc)
     list_del_init(&svc->runq_elem);
 }
 
-/*
- * Translates node-affinity mask into a cpumask, so that we can use it during
- * actual scheduling. That of course will contain all the cpus from all the
- * set nodes in the original node-affinity mask.
- *
- * Note that any serialization needed to access mask safely is complete
- * responsibility of the caller of this function/hook.
- */
-static void csched_set_node_affinity(
-    const struct scheduler *ops,
-    struct domain *d,
-    nodemask_t *mask)
-{
-    struct csched_dom *sdom;
-    int node;
-
-    /* Skip idle domain since it doesn't even have a node_affinity_cpumask */
-    if ( unlikely(is_idle_domain(d)) )
-        return;
-
-    sdom = CSCHED_DOM(d);
-    cpumask_clear(sdom->node_affinity_cpumask);
-    for_each_node_mask( node, *mask )
-        cpumask_or(sdom->node_affinity_cpumask, sdom->node_affinity_cpumask,
-                   &node_to_cpumask(node));
-}
 
 #define for_each_csched_balance_step(step) \
-    for ( (step) = 0; (step) <= CSCHED_BALANCE_CPU_AFFINITY; (step)++ )
+    for ( (step) = 0; (step) <= CSCHED_BALANCE_HARD_AFFINITY; (step)++ )
 
 
 /*
- * vcpu-affinity balancing is always necessary and must never be skipped.
- * OTOH, if a domain's node-affinity is said to be automatically computed
- * (or if it just spans all the nodes), we can safely avoid dealing with
- * node-affinity entirely.
+ * Hard affinity balancing is always necessary and must never be skipped.
+ * OTOH, if the vcpu's soft affinity is full (it spans all the possible
+ * pcpus) we can safely avoid dealing with it entirely.
  *
- * Node-affinity is also deemed meaningless in case it has empty
- * intersection with mask, to cover the cases where using the node-affinity
+ * A vcpu's soft affinity is also deemed meaningless in case it has empty
+ * intersection with mask, to cover the cases where using the soft affinity
  * mask seems legit, but would instead led to trying to schedule the vcpu
  * on _no_ pcpu! Typical use cases are for mask to be equal to the vcpu's
- * vcpu-affinity, or to the && of vcpu-affinity and the set of online cpus
+ * hard affinity, or to the && of hard affinity and the set of online cpus
  * in the domain's cpupool.
  */
-static inline int __vcpu_has_node_affinity(const struct vcpu *vc,
+static inline int __vcpu_has_soft_affinity(const struct vcpu *vc,
                                            const cpumask_t *mask)
 {
-    const struct domain *d = vc->domain;
-    const struct csched_dom *sdom = CSCHED_DOM(d);
-
-    if ( d->auto_node_affinity
-         || cpumask_full(sdom->node_affinity_cpumask)
-         || !cpumask_intersects(sdom->node_affinity_cpumask, mask) )
+    if ( cpumask_full(vc->cpu_soft_affinity)
+         || !cpumask_intersects(vc->cpu_soft_affinity, mask) )
         return 0;
 
     return 1;
@@ -321,24 +301,23 @@ static inline int __vcpu_has_node_affinity(const struct vcpu *vc,
 
 /*
  * Each csched-balance step uses its own cpumask. This function determines
- * which one (given the step) and copies it in mask. For the node-affinity
- * balancing step, the pcpus that are not part of vc's vcpu-affinity are
+ * which one (given the step) and copies it in mask. For the soft affinity
+ * balancing step, the pcpus that are not part of vc's hard affinity are
  * filtered out from the result, to avoid running a vcpu where it would
  * like, but is not allowed to!
  */
 static void
 csched_balance_cpumask(const struct vcpu *vc, int step, cpumask_t *mask)
 {
-    if ( step == CSCHED_BALANCE_NODE_AFFINITY )
+    if ( step == CSCHED_BALANCE_SOFT_AFFINITY )
     {
-        cpumask_and(mask, CSCHED_DOM(vc->domain)->node_affinity_cpumask,
-                    vc->cpu_affinity);
+        cpumask_and(mask, vc->cpu_soft_affinity, vc->cpu_hard_affinity);
 
         if ( unlikely(cpumask_empty(mask)) )
-            cpumask_copy(mask, vc->cpu_affinity);
+            cpumask_copy(mask, vc->cpu_hard_affinity);
     }
-    else /* step == CSCHED_BALANCE_CPU_AFFINITY */
-        cpumask_copy(mask, vc->cpu_affinity);
+    else /* step == CSCHED_BALANCE_HARD_AFFINITY */
+        cpumask_copy(mask, vc->cpu_hard_affinity);
 }
 
 static void burn_credits(struct csched_vcpu *svc, s_time_t now)
@@ -398,16 +377,16 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
     else if ( !idlers_empty )
     {
         /*
-         * Node and vcpu-affinity balancing loop. For vcpus without
-         * a useful node-affinity, consider vcpu-affinity only.
+         * Soft and hard affinity balancing loop. For vcpus without
+         * a useful soft affinity, consider hard affinity only.
          */
         for_each_csched_balance_step( balance_step )
         {
             int new_idlers_empty;
 
-            if ( balance_step == CSCHED_BALANCE_NODE_AFFINITY
-                 && !__vcpu_has_node_affinity(new->vcpu,
-                                              new->vcpu->cpu_affinity) )
+            if ( balance_step == CSCHED_BALANCE_SOFT_AFFINITY
+                 && !__vcpu_has_soft_affinity(new->vcpu,
+                                              new->vcpu->cpu_hard_affinity) )
                 continue;
 
             /* Are there idlers suitable for new (for this balance step)? */
@@ -418,11 +397,11 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
 
             /*
              * Let's not be too harsh! If there aren't idlers suitable
-             * for new in its node-affinity mask, make sure we check its
-             * vcpu-affinity as well, before taking final decisions.
+             * for new in its soft affinity mask, make sure we check its
+             * hard affinity as well, before taking final decisions.
              */
             if ( new_idlers_empty
-                 && balance_step == CSCHED_BALANCE_NODE_AFFINITY )
+                 && balance_step == CSCHED_BALANCE_SOFT_AFFINITY )
                 continue;
 
             /*
@@ -642,30 +621,30 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
 
     /* Store in cpus the mask of online cpus on which the domain can run */
     online = cpupool_scheduler_cpumask(vc->domain->cpupool);
-    cpumask_and(&cpus, vc->cpu_affinity, online);
+    cpumask_and(&cpus, vc->cpu_hard_affinity, online);
 
     for_each_csched_balance_step( balance_step )
     {
         /*
          * We want to pick up a pcpu among the ones that are online and
          * can accommodate vc, which is basically what we computed above
-         * and stored in cpus. As far as vcpu-affinity is concerned,
+         * and stored in cpus. As far as hard affinity is concerned,
          * there always will be at least one of these pcpus, hence cpus
          * is never empty and the calls to cpumask_cycle() and
          * cpumask_test_cpu() below are ok.
          *
-         * On the other hand, when considering node-affinity too, it
+         * On the other hand, when considering soft affinity too, it
          * is possible for the mask to become empty (for instance, if the
          * domain has been put in a cpupool that does not contain any of the
-         * nodes in its node-affinity), which would result in the ASSERT()-s
+         * pcpus in its soft affinity), which would result in the ASSERT()-s
          * inside cpumask_*() operations triggering (in debug builds).
          *
-         * Therefore, in this case, we filter the node-affinity mask against
-         * cpus and, if the result is empty, we just skip the node-affinity
+         * Therefore, in this case, we filter the soft affinity mask against
+         * cpus and, if the result is empty, we just skip the soft affinity
          * balancing step all together.
          */
-        if ( balance_step == CSCHED_BALANCE_NODE_AFFINITY
-             && !__vcpu_has_node_affinity(vc, &cpus) )
+        if ( balance_step == CSCHED_BALANCE_SOFT_AFFINITY
+             && !__vcpu_has_soft_affinity(vc, &cpus) )
             continue;
 
         /* Pick an online CPU from the proper affinity mask */
@@ -1122,13 +1101,6 @@ csched_alloc_domdata(const struct scheduler *ops, struct domain *dom)
     if ( sdom == NULL )
         return NULL;
 
-    if ( !alloc_cpumask_var(&sdom->node_affinity_cpumask) )
-    {
-        xfree(sdom);
-        return NULL;
-    }
-    cpumask_setall(sdom->node_affinity_cpumask);
-
     /* Initialize credit and weight */
     INIT_LIST_HEAD(&sdom->active_vcpu);
     INIT_LIST_HEAD(&sdom->active_sdom_elem);
@@ -1158,9 +1130,6 @@ csched_dom_init(const struct scheduler *ops, struct domain *dom)
 static void
 csched_free_domdata(const struct scheduler *ops, void *data)
 {
-    struct csched_dom *sdom = data;
-
-    free_cpumask_var(sdom->node_affinity_cpumask);
     xfree(data);
 }
 
@@ -1486,19 +1455,19 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
             BUG_ON( is_idle_vcpu(vc) );
 
             /*
-             * If the vcpu has no useful node-affinity, skip this vcpu.
-             * In fact, what we want is to check if we have any node-affine
-             * work to steal, before starting to look at vcpu-affine work.
+             * If the vcpu has no useful soft affinity, skip this vcpu.
+             * In fact, what we want is to check if we have any "soft-affine
+             * work" to steal, before starting to look at "hard-affine work".
              *
              * Notice that, if not even one vCPU on this runq has a useful
-             * node-affinity, we could have avoid considering this runq for
-             * a node balancing step in the first place. This, for instance,
+             * soft affinity, we could have avoid considering this runq for
+             * a soft balancing step in the first place. This, for instance,
              * can be implemented by taking note of on what runq there are
-             * vCPUs with useful node-affinities in some sort of bitmap
+             * vCPUs with useful soft affinities in some sort of bitmap
              * or counter.
              */
-            if ( balance_step == CSCHED_BALANCE_NODE_AFFINITY
-                 && !__vcpu_has_node_affinity(vc, vc->cpu_affinity) )
+            if ( balance_step == CSCHED_BALANCE_SOFT_AFFINITY
+                 && !__vcpu_has_soft_affinity(vc, vc->cpu_hard_affinity) )
                 continue;
 
             csched_balance_cpumask(vc, balance_step, csched_balance_mask);
@@ -1546,17 +1515,17 @@ csched_load_balance(struct csched_private *prv, int cpu,
         SCHED_STAT_CRANK(load_balance_other);
 
     /*
-     * Let's look around for work to steal, taking both vcpu-affinity
-     * and node-affinity into account. More specifically, we check all
+     * Let's look around for work to steal, taking both hard affinity
+     * and soft affinity into account. More specifically, we check all
      * the non-idle CPUs' runq, looking for:
-     *  1. any node-affine work to steal first,
-     *  2. if not finding anything, any vcpu-affine work to steal.
+     *  1. any "soft-affine work" to steal first,
+     *  2. if not finding anything, any "hard-affine work" to steal.
      */
     for_each_csched_balance_step( bstep )
     {
         /*
          * We peek at the non-idling CPUs in a node-wise fashion. In fact,
-         * it is more likely that we find some node-affine work on our same
+         * it is more likely that we find some affine work on our same
          * node, not to mention that migrating vcpus within the same node
          * could well expected to be cheaper than across-nodes (memory
          * stays local, there might be some node-wide cache[s], etc.).
@@ -1981,8 +1950,6 @@ const struct scheduler sched_credit_def = {
 
     .adjust         = csched_dom_cntl,
     .adjust_global  = csched_sys_cntl,
-
-    .set_node_affinity  = csched_set_node_affinity,
 
     .pick_cpu       = csched_cpu_pick,
     .do_schedule    = csched_schedule,

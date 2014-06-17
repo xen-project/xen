@@ -295,8 +295,10 @@ static void dump_domains(unsigned char key)
                    !vcpu_event_delivery_is_enabled(v));
             cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);
             printk("dirty_cpus=%s ", tmpstr);
-            cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_affinity);
+            cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_hard_affinity);
             printk("cpu_affinity=%s\n", tmpstr);
+            cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_soft_affinity);
+            printk("cpu_soft_affinity=%s\n", tmpstr);
             printk("    pause_count=%d pause_flags=%lx\n",
                    atomic_read(&v->pause_count), v->pause_flags);
             arch_dump_vcpu_info(v);

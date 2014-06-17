@@ -225,13 +225,14 @@ int xc_vcpu_setaffinity(xc_interface *xch,
 
     domctl.cmd = XEN_DOMCTL_setvcpuaffinity;
     domctl.domain = (domid_t)domid;
-    domctl.u.vcpuaffinity.vcpu    = vcpu;
+    domctl.u.vcpuaffinity.vcpu = vcpu;
+    domctl.u.vcpuaffinity.flags = XEN_VCPUAFFINITY_HARD;
 
     memcpy(local, cpumap, cpusize);
 
-    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap_hard.bitmap, local);
 
-    domctl.u.vcpuaffinity.cpumap.nr_bits = cpusize * 8;
+    domctl.u.vcpuaffinity.cpumap_hard.nr_bits = cpusize * 8;
 
     ret = do_domctl(xch, &domctl);
 
@@ -269,9 +270,10 @@ int xc_vcpu_getaffinity(xc_interface *xch,
     domctl.cmd = XEN_DOMCTL_getvcpuaffinity;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu = vcpu;
+    domctl.u.vcpuaffinity.flags = XEN_VCPUAFFINITY_HARD;
 
-    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
-    domctl.u.vcpuaffinity.cpumap.nr_bits = cpusize * 8;
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap_hard.bitmap, local);
+    domctl.u.vcpuaffinity.cpumap_hard.nr_bits = cpusize * 8;
 
     ret = do_domctl(xch, &domctl);
 
@@ -1702,16 +1704,21 @@ int xc_domain_bind_pt_irq(
     bind->hvm_domid = domid;
     bind->irq_type = irq_type;
     bind->machine_irq = machine_irq;
-    if ( irq_type == PT_IRQ_TYPE_PCI ||
-         irq_type == PT_IRQ_TYPE_MSI_TRANSLATE )
+    switch ( irq_type )
     {
+    case PT_IRQ_TYPE_PCI:
+    case PT_IRQ_TYPE_MSI_TRANSLATE:
         bind->u.pci.bus = bus;
-        bind->u.pci.device = device;    
+        bind->u.pci.device = device;
         bind->u.pci.intx = intx;
-    } 
-    else if ( irq_type == PT_IRQ_TYPE_ISA )
+    case PT_IRQ_TYPE_ISA:
         bind->u.isa.isa_irq = isa_irq;
-    
+        break;
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+
     rc = do_domctl(xch, &domctl);
     return rc;
 }
@@ -1737,11 +1744,22 @@ int xc_domain_unbind_pt_irq(
     bind->hvm_domid = domid;
     bind->irq_type = irq_type;
     bind->machine_irq = machine_irq;
-    bind->u.pci.bus = bus;
-    bind->u.pci.device = device;    
-    bind->u.pci.intx = intx;
-    bind->u.isa.isa_irq = isa_irq;
-    
+    switch ( irq_type )
+    {
+    case PT_IRQ_TYPE_PCI:
+    case PT_IRQ_TYPE_MSI_TRANSLATE:
+        bind->u.pci.bus = bus;
+        bind->u.pci.device = device;
+        bind->u.pci.intx = intx;
+        break;
+    case PT_IRQ_TYPE_ISA:
+        bind->u.isa.isa_irq = isa_irq;
+        break;
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+
     rc = do_domctl(xch, &domctl);
     return rc;
 }

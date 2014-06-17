@@ -219,11 +219,14 @@ struct vcpu
     spinlock_t       virq_lock;
 
     /* Bitmask of CPUs on which this VCPU may run. */
-    cpumask_var_t    cpu_affinity;
+    cpumask_var_t    cpu_hard_affinity;
     /* Used to change affinity temporarily. */
-    cpumask_var_t    cpu_affinity_tmp;
+    cpumask_var_t    cpu_hard_affinity_tmp;
     /* Used to restore affinity across S3. */
-    cpumask_var_t    cpu_affinity_saved;
+    cpumask_var_t    cpu_hard_affinity_saved;
+
+    /* Bitmask of CPUs on which this VCPU prefers to run. */
+    cpumask_var_t    cpu_soft_affinity;
 
     /* Bitmask of CPUs which are holding onto this VCPU's state. */
     cpumask_var_t    vcpu_dirty_cpumask;
@@ -627,7 +630,6 @@ void sched_destroy_domain(struct domain *d);
 int sched_move_domain(struct domain *d, struct cpupool *c);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 long sched_adjust_global(struct xen_sysctl_scheduler_op *);
-void sched_set_node_affinity(struct domain *, nodemask_t *);
 int  sched_id(void);
 void sched_tick_suspend(void);
 void sched_tick_resume(void);
@@ -779,7 +781,8 @@ void scheduler_free(struct scheduler *sched);
 int schedule_cpu_switch(unsigned int cpu, struct cpupool *c);
 void vcpu_force_reschedule(struct vcpu *v);
 int cpu_disable_scheduler(unsigned int cpu);
-int vcpu_set_affinity(struct vcpu *v, const cpumask_t *affinity);
+int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity);
+int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity);
 void restore_vcpu_affinity(struct domain *d);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
@@ -819,7 +822,7 @@ void watchdog_domain_destroy(struct domain *d);
 #define has_hvm_container_domain(d) ((d)->guest_type != guest_type_pv)
 #define has_hvm_container_vcpu(v)   (has_hvm_container_domain((v)->domain))
 #define is_pinned_vcpu(v) ((v)->domain->is_pinned || \
-                           cpumask_weight((v)->cpu_affinity) == 1)
+                           cpumask_weight((v)->cpu_hard_affinity) == 1)
 #ifdef HAS_PASSTHROUGH
 #define need_iommu(d)    ((d)->need_iommu)
 #else

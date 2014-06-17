@@ -36,6 +36,7 @@
 #define RESOLUTION 1024
 #define DECAY 4
 #define MAX_INTERESTING 50000
+#define LATENCY_MULTIPLIER 10
 
 /*
  * Concepts and ideas behind the menu governor
@@ -88,6 +89,9 @@
  * the average interrupt interval is, the smaller C state latency should be
  * and thus the less likely a busy CPU will hit such a deep C state.
  *
+ * As an additional rule to reduce the performance impact, menu tries to
+ * limit the exit latency duration to be no more than 10% of the decaying
+ * measured idle time.
  */
 
 struct perf_factor{
@@ -102,6 +106,7 @@ struct menu_device
     int             last_state_idx;
     unsigned int    expected_us;
     u64             predicted_us;
+    u64             latency_factor;
     unsigned int    measured_us;
     unsigned int    exit_us;
     unsigned int    bucket;
@@ -199,6 +204,10 @@ static int menu_select(struct acpi_processor_power *power)
 
     io_interval = avg_intr_interval_us();
 
+    data->latency_factor = DIV_ROUND(
+            data->latency_factor * (DECAY - 1) + data->measured_us,
+            DECAY);
+
     /*
      * if the correction factor is 0 (eg first time init or cpu hotplug
      * etc), we actually want to start out with a unity factor.
@@ -220,6 +229,8 @@ static int menu_select(struct acpi_processor_power *power)
             break;
         if (s->latency * IO_MULTIPLIER > io_interval)
             break;
+        if (s->latency * LATENCY_MULTIPLIER > data->latency_factor)
+            break;
         /* TBD: we need to check the QoS requirment in future */
         data->exit_us = s->latency;
         data->last_state_idx = i;
@@ -231,18 +242,16 @@ static int menu_select(struct acpi_processor_power *power)
 static void menu_reflect(struct acpi_processor_power *power)
 {
     struct menu_device *data = &__get_cpu_var(menu_devices);
-    unsigned int last_idle_us = power->last_residency;
-    unsigned int measured_us;
     u64 new_factor;
 
-    measured_us = last_idle_us;
+    data->measured_us = power->last_residency;
 
     /*
      * We correct for the exit latency; we are assuming here that the
      * exit latency happens after the event that we're interested in.
      */
-    if (measured_us > data->exit_us)
-        measured_us -= data->exit_us;
+    if (data->measured_us > data->exit_us)
+        data->measured_us -= data->exit_us;
 
     /* update our correction ratio */
 
@@ -250,7 +259,7 @@ static void menu_reflect(struct acpi_processor_power *power)
         * (DECAY - 1) / DECAY;
 
     if (data->expected_us > 0 && data->measured_us < MAX_INTERESTING)
-        new_factor += RESOLUTION * measured_us / data->expected_us;
+        new_factor += RESOLUTION * data->measured_us / data->expected_us;
     else
         /*
          * we were idle so long that we count it as a perfect
