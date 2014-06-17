@@ -999,7 +999,7 @@ void do_unexpected_trap(const char *msg, struct cpu_user_regs *regs)
 {
     printk("CPU%d: Unexpected Trap: %s\n", smp_processor_id(), msg);
     show_execution_state(regs);
-    while(1);
+    panic("CPU%d: Unexpected Trap: %s\n", smp_processor_id(), msg);
 }
 
 typedef register_t (*arm_hypercall_fn_t)(
