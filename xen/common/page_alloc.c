@@ -1587,7 +1587,10 @@ void free_xenheap_pages(void *v, unsigned int order)
     pg = virt_to_page(v);
 
     for ( i = 0; i < (1u << order); i++ )
+    {
+        scrub_one_page(&pg[i]);
         pg[i].count_info &= ~PGC_xen_heap;
+    }
 
     free_heap_pages(pg, order);
 }
@@ -1757,6 +1760,8 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
     else
     {
         /* Freeing anonymous domain-heap pages. */
+        for ( i = 0; i < (1 << order); i++ )
+            scrub_one_page(&pg[i]);
         free_heap_pages(pg, order);
         drop_dom_ref = 0;
     }
