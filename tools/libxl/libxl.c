@@ -2025,6 +2025,8 @@ int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk)
 {
     int rc;
 
+    libxl_defbool_setdefault(&disk->discard_enable, !!disk->readwrite);
+
     rc = libxl__resolve_domid(gc, disk->backend_domname, &disk->backend_domid);
     if (rc < 0) return rc;
 
