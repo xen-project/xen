@@ -2019,7 +2019,7 @@ int libxl_devid_to_device_vtpm(libxl_ctx *ctx,
         if(devid == vtpms[i].devid) {
             vtpm->backend_domid = vtpms[i].backend_domid;
             vtpm->devid = vtpms[i].devid;
-            libxl_uuid_copy(&vtpm->uuid, &vtpms[i].uuid);
+            libxl_uuid_copy(ctx, &vtpm->uuid, &vtpms[i].uuid);
             rc = 0;
             break;
         }

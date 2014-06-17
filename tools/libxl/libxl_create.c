@@ -479,7 +479,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
     *domid = -1;
 
     /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
-    libxl_uuid_copy((libxl_uuid *)handle, &info->uuid);
+    libxl_uuid_copy(ctx, (libxl_uuid *)handle, &info->uuid);
 
     ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid);
     if (ret < 0) {

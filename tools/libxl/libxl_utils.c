@@ -536,7 +536,7 @@ int libxl_uuid_to_device_vtpm(libxl_ctx *ctx, uint32_t domid,
         if(!libxl_uuid_compare(uuid, &vtpms[i].uuid)) {
             vtpm->backend_domid = vtpms[i].backend_domid;
             vtpm->devid = vtpms[i].devid;
-            libxl_uuid_copy(&vtpm->uuid, &vtpms[i].uuid);
+            libxl_uuid_copy(ctx, &vtpm->uuid, &vtpms[i].uuid);
             rc = 0;
             break;
         }

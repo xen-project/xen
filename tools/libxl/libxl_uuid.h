@@ -56,7 +56,12 @@ typedef struct {
 int libxl_uuid_is_nil(const libxl_uuid *uuid);
 void libxl_uuid_generate(libxl_uuid *uuid);
 int libxl_uuid_from_string(libxl_uuid *uuid, const char *in);
-void libxl_uuid_copy(libxl_uuid *dst, const libxl_uuid *src);
+void libxl_uuid_copy(libxl_ctx *ctx_opt, libxl_uuid *dst,
+                     const libxl_uuid *src);
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x040500
+void libxl_uuid_copy(dst, src) libxl_uuid_copy(NULL, dst, src)
+#endif
+
 void libxl_uuid_clear(libxl_uuid *uuid);
 int libxl_uuid_compare(const libxl_uuid *uuid1, const libxl_uuid *uuid2);
 const uint8_t *libxl_uuid_bytearray_const(const libxl_uuid *uuid);

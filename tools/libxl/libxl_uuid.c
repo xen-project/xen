@@ -14,8 +14,6 @@
 
 #include "libxl_osdeps.h" /* must come before any other headers */
 
-#include <libxl_uuid.h>
-
 #include "libxl_internal.h"
 
 #if defined(__linux__)
@@ -35,7 +33,8 @@ int libxl_uuid_from_string(libxl_uuid *uuid, const char *in)
      return uuid_parse(in, uuid->uuid);
 }
 
-void libxl_uuid_copy(libxl_uuid *dst, const libxl_uuid *src)
+void libxl_uuid_copy(libxl_ctx *ctx_opt, libxl_uuid *dst,
+                     const libxl_uuid *src)
 {
      uuid_copy(dst->uuid, src->uuid);
 }
@@ -87,7 +86,8 @@ int libxl_uuid_from_string(libxl_uuid *uuid, const char *in)
 }
 #undef LIBXL__UUID_PTRS
 
-void libxl_uuid_copy(libxl_uuid *dst, const libxl_uuid *src)
+void libxl_uuid_copy(libxl_ctx *ctx_opt, libxl_uuid *dst,
+                     const libxl_uuid *src)
 {
      memcpy(dst->uuid, src->uuid, sizeof(dst->uuid));
 }
