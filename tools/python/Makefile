@@ -23,8 +23,6 @@ install:
 	CC="$(CC)" CFLAGS="$(CFLAGS) $(APPEND_LDFLAGS)" $(PYTHON) setup.py install \
 		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" --force
 
-	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
-
 .PHONY: test
 test:
 	export LD_LIBRARY_PATH=$$(readlink -f ../libxc):$$(readlink -f ../xenstore); $(PYTHON) test.py -b -u
