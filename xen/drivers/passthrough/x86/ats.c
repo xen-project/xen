@@ -23,7 +23,7 @@ LIST_HEAD(ats_devices);
 bool_t __read_mostly ats_enabled = 1;
 boolean_param("ats", ats_enabled);
 
-int enable_ats_device(int seg, int bus, int devfn)
+int enable_ats_device(int seg, int bus, int devfn, const void *iommu)
 {
     struct pci_ats_dev *pdev = NULL;
     u32 value;
@@ -66,6 +66,7 @@ int enable_ats_device(int seg, int bus, int devfn)
         pdev->seg = seg;
         pdev->bus = bus;
         pdev->devfn = devfn;
+        pdev->iommu = iommu;
         value = pci_conf_read16(seg, bus, PCI_SLOT(devfn),
                                 PCI_FUNC(devfn), pos + ATS_REG_CAP);
         pdev->ats_queue_depth = value & ATS_QUEUE_DEPTH_MASK ?:
