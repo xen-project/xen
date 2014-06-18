@@ -210,6 +210,15 @@ const char *xenstore_read(const char *path, const char *default_resp);
  */
 int xenstore_write(const char *path, const char *value);
 
+
+/* Get a HVM param.
+ */
+int hvm_param_get(uint32_t index, uint64_t *value);
+
+/* Set a HVM param.
+ */
+int hvm_param_set(uint32_t index, uint64_t value);
+
 /* Setup PCI bus */
 void pci_setup(void);
 

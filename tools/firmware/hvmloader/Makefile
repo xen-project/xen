@@ -31,6 +31,7 @@ CFLAGS += $(CFLAGS_xeninclude)
 OBJS  = hvmloader.o mp_tables.o util.o smbios.o 
 OBJS += smp.o cacheattr.o xenbus.o
 OBJS += e820.o pci.o pir.o ctype.o
+OBJS += hvm_param.o
 ifeq ($(debug),y)
 OBJS += tests.o
 endif

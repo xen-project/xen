@@ -176,14 +176,10 @@ static void cmos_write_memory_size(void)
 static void init_vm86_tss(void)
 {
     void *tss;
-    struct xen_hvm_param p;
 
     tss = mem_alloc(128, 128);
     memset(tss, 0, 128);
-    p.domid = DOMID_SELF;
-    p.index = HVM_PARAM_VM86_TSS;
-    p.value = virt_to_phys(tss);
-    hypercall_hvm_op(HVMOP_set_param, &p);
+    hvm_param_set(HVM_PARAM_VM86_TSS, virt_to_phys(tss));
     printf("vm86 TSS at %08lx\n", virt_to_phys(tss));
 }
 
@@ -314,12 +310,6 @@ int main(void)
 
     if ( acpi_enabled )
     {
-        struct xen_hvm_param p = {
-            .domid = DOMID_SELF,
-            .index = HVM_PARAM_ACPI_IOPORTS_LOCATION,
-            .value = 1,
-        };
-
         if ( bios->acpi_build_tables )
         {
             printf("Loading ACPI ...\n");
@@ -328,7 +318,7 @@ int main(void)
 
         acpi_enable_sci();
 
-        hypercall_hvm_op(HVMOP_set_param, &p);
+        hvm_param_set(HVM_PARAM_ACPI_IOPORTS_LOCATION, 1);
     }
 
     init_vm86_tss();
