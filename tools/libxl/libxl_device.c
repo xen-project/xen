@@ -775,6 +775,8 @@ void libxl__initiate_device_remove(libxl__egc *egc,
     uint32_t my_domid, domid = aodev->dev->domid;
     int rc = 0;
 
+    libxl_dominfo_init(&info);
+
     rc = libxl__get_domid(gc, &my_domid);
     if (rc) {
         LOG(ERROR, "unable to get my domid");
@@ -782,7 +784,6 @@ void libxl__initiate_device_remove(libxl__egc *egc,
     }
 
     if (my_domid == LIBXL_TOOLSTACK_DOMID) {
-        libxl_dominfo_init(&info);
         rc = libxl_domain_info(CTX, &info, domid);
         if (rc) {
             LOG(ERROR, "unable to get info for domain %d", domid);
