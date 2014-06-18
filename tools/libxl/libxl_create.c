@@ -578,12 +578,7 @@ retry_transaction:
                         ARRAY_SIZE(rwperm));
     }
 
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM)
-        libxl__xs_mkdir(gc, t,
-            libxl__sprintf(gc, "%s/hvmloader/generation-id-address", dom_path),
-                        rwperm, ARRAY_SIZE(rwperm));
-
-                    vm_list = libxl_list_vm(ctx, &nb_vm);
+    vm_list = libxl_list_vm(ctx, &nb_vm);
     if (!vm_list) {
         LOG(ERROR, "cannot get number of running guests");
         rc = ERROR_FAIL;
@@ -954,7 +949,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
         goto out;
     }
     libxl__xc_domain_restore(egc, dcs,
-                             hvm, pae, superpages, 1);
+                             hvm, pae, superpages);
     return;
 
  out:
@@ -962,7 +957,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
 }
 
 void libxl__srm_callout_callback_restore_results(unsigned long store_mfn,
-          unsigned long console_mfn, unsigned long genidad, void *user)
+          unsigned long console_mfn, void *user)
 {
     libxl__save_helper_state *shs = user;
     libxl__domain_create_state *dcs = CONTAINER_OF(shs, *dcs, shs);
@@ -971,7 +966,6 @@ void libxl__srm_callout_callback_restore_results(unsigned long store_mfn,
 
     state->store_mfn =            store_mfn;
     state->console_mfn =          console_mfn;
-    state->vm_generationid_addr = genidad;
     shs->need_results =           0;
 }
 

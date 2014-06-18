@@ -802,8 +802,7 @@ static int save_tsc_info(xc_interface *xch, uint32_t dom, int io_fd)
 
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags,
-                   struct save_callbacks* callbacks, int hvm,
-                   unsigned long vm_generationid_addr)
+                   struct save_callbacks* callbacks, int hvm)
 {
     xc_dominfo_t info;
     DECLARE_DOMCTL;
@@ -1634,7 +1633,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         } chunk = { 0, };
 
         chunk.id = XC_SAVE_ID_HVM_GENERATION_ID_ADDR;
-        chunk.data = vm_generationid_addr;
+        xc_hvm_param_get(xch, dom, HVM_PARAM_VM_GENERATION_ID_ADDR, &chunk.data);
 
         if ( (chunk.data != 0) &&
              wrexact(io_fd, &chunk, sizeof(chunk)) )

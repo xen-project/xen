@@ -1431,8 +1431,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       domid_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_mfn, domid_t console_domid,
                       unsigned int hvm, unsigned int pae, int superpages,
-                      int no_incr_generationid, int checkpointed_stream,
-                      unsigned long *vm_generationid_addr,
+                      int checkpointed_stream,
                       struct restore_callbacks *callbacks)
 {
     DECLARE_DOMCTL;
@@ -1657,44 +1656,9 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                 xc_hvm_param_set(xch, dom, HVM_PARAM_VM86_TSS, pagebuf.vm86_tss);
             if ( pagebuf.console_pfn )
                 console_pfn = pagebuf.console_pfn;
-            if ( pagebuf.vm_generationid_addr ) {
-                if ( !no_incr_generationid ) {
-                    unsigned int offset;
-                    unsigned char *buf;
-                    unsigned long long generationid;
-
-                    /*
-                     * Map the VM generation id buffer and inject the new value.
-                     */
-
-                    pfn = pagebuf.vm_generationid_addr >> PAGE_SHIFT;
-                    offset = pagebuf.vm_generationid_addr & (PAGE_SIZE - 1);
-                
-                    if ( (pfn >= dinfo->p2m_size) ||
-                         (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
-                    {
-                        ERROR("generation id buffer frame is bad");
-                        goto out;
-                    }
-
-                    mfn = ctx->p2m[pfn];
-                    buf = xc_map_foreign_range(xch, dom, PAGE_SIZE,
-                                               PROT_READ | PROT_WRITE, mfn);
-                    if ( buf == NULL )
-                    {
-                        ERROR("xc_map_foreign_range for generation id"
-                              " buffer failed");
-                        goto out;
-                    }
-
-                    generationid = *(unsigned long long *)(buf + offset);
-                    *(unsigned long long *)(buf + offset) = generationid + 1;
-
-                    munmap(buf, PAGE_SIZE);
-                }
-
-                *vm_generationid_addr = pagebuf.vm_generationid_addr;
-            }
+            if ( pagebuf.vm_generationid_addr )
+                xc_hvm_param_set(xch, dom, HVM_PARAM_VM_GENERATION_ID_ADDR,
+                                 pagebuf.vm_generationid_addr);
 
             break;  /* our work here is done */
         }

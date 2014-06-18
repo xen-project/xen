@@ -32,8 +32,7 @@ our @msgs = (
     [  7, 'rcxW',   "toolstack_restore",     [qw(uint32_t domid
                                                 BLOCK tsdata)] ],
     [  8, 'r',      "restore_results",       ['unsigned long', 'store_mfn',
-                                              'unsigned long', 'console_mfn',
-                                              'unsigned long', 'genidad'] ],
+                                              'unsigned long', 'console_mfn'] ],
     [  9, 'srW',    "complete",              [qw(int retval
                                                  int errnoval)] ],
 );

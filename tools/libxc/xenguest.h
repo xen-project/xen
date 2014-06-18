@@ -86,8 +86,7 @@ struct save_callbacks {
  */
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
-                   struct save_callbacks* callbacks, int hvm,
-                   unsigned long vm_generationid_addr);
+                   struct save_callbacks* callbacks, int hvm);
 
 
 /* callbacks provided by xc_domain_restore */
@@ -113,9 +112,7 @@ struct restore_callbacks {
  * @parm hvm non-zero if this is a HVM restore
  * @parm pae non-zero if this HVM domain has PAE support enabled
  * @parm superpages non-zero to allocate guest memory with superpages
- * @parm no_incr_generationid non-zero if generation id is NOT to be incremented
  * @parm checkpointed_stream non-zero if the far end of the stream is using checkpointing
- * @parm vm_generationid_addr returned with the address of the generation id buffer
  * @parm callbacks non-NULL to receive a callback to restore toolstack
  *       specific data
  * @return 0 on success, -1 on failure
@@ -125,8 +122,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       domid_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_mfn, domid_t console_domid,
                       unsigned int hvm, unsigned int pae, int superpages,
-                      int no_incr_generationid, int checkpointed_stream,
-                      unsigned long *vm_generationid_addr,
+                      int checkpointed_stream,
                       struct restore_callbacks *callbacks);
 /**
  * xc_domain_restore writes a file to disk that contains the device

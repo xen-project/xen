@@ -217,7 +217,6 @@ int main(int argc, char **argv)
         uint32_t max_factor =      strtoul(NEXTARG,0,10);
         uint32_t flags =           strtoul(NEXTARG,0,10);
         int hvm =                  atoi(NEXTARG);
-        unsigned long genidad =    strtoul(NEXTARG,0,10);
         toolstack_save_fd  =       atoi(NEXTARG);
         toolstack_save_len =       strtoul(NEXTARG,0,10);
         unsigned cbflags =         strtoul(NEXTARG,0,10);
@@ -230,7 +229,7 @@ int main(int argc, char **argv)
 
         startup("save");
         r = xc_domain_save(xch, io_fd, dom, max_iters, max_factor, flags,
-                           &helper_save_callbacks, hvm, genidad);
+                           &helper_save_callbacks, hvm);
         complete(r);
 
     } else if (!strcmp(mode,"--restore-domain")) {
@@ -244,7 +243,6 @@ int main(int argc, char **argv)
         unsigned int hvm =         strtoul(NEXTARG,0,10);
         unsigned int pae =         strtoul(NEXTARG,0,10);
         int superpages =           strtoul(NEXTARG,0,10);
-        int no_incr_genidad =      strtoul(NEXTARG,0,10);
         unsigned cbflags =         strtoul(NEXTARG,0,10);
         int checkpointed =         strtoul(NEXTARG,0,10);
         assert(!*++argv);
@@ -253,15 +251,14 @@ int main(int argc, char **argv)
 
         unsigned long store_mfn = 0;
         unsigned long console_mfn = 0;
-        unsigned long genidad = 0;
 
         startup("restore");
         r = xc_domain_restore(xch, io_fd, dom, store_evtchn, &store_mfn,
                               store_domid, console_evtchn, &console_mfn,
                               console_domid, hvm, pae, superpages,
-                              no_incr_genidad, checkpointed, &genidad,
+                              checkpointed,
                               &helper_restore_callbacks);
-        helper_stub_restore_results(store_mfn,console_mfn,genidad,0);
+        helper_stub_restore_results(store_mfn,console_mfn,0);
         complete(r);
 
     } else {

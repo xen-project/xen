@@ -304,7 +304,6 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
 
     state->store_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->store_domid);
     state->console_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->console_domid);
-    state->vm_generationid_addr = 0;
 
     if (info->type == LIBXL_DOMAIN_TYPE_HVM)
         hvm_set_conf_params(ctx->xch, domid, info);
@@ -322,7 +321,7 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *dom_path, *vm_path;
     xs_transaction_t t;
-    char **ents, **hvm_ents;
+    char **ents;
     int i, rc;
 
     rc = libxl_domain_sched_params_set(CTX, domid, &info->sched_params);
@@ -359,13 +358,6 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
                             ? "online" : "offline";
     }
 
-    hvm_ents = NULL;
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        hvm_ents = libxl__calloc(gc, 3, sizeof(char *));
-        hvm_ents[0] = "hvmloader/generation-id-address";
-        hvm_ents[1] = GCSPRINTF("0x%lx", state->vm_generationid_addr);
-    }
-
     dom_path = libxl__xs_get_dompath(gc, domid);
     if (!dom_path) {
         return ERROR_FAIL;
@@ -376,9 +368,6 @@ retry_transaction:
     t = xs_transaction_start(ctx->xsh);
 
     libxl__xs_writev(gc, t, dom_path, ents);
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM)
-        libxl__xs_writev(gc, t, dom_path, hvm_ents);
-
     libxl__xs_writev(gc, t, dom_path, local_ents);
     libxl__xs_writev(gc, t, vm_path, vms_ents);
 
@@ -1531,7 +1520,6 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
     STATE_AO_GC(dss->ao);
     int port;
     int rc = ERROR_FAIL;
-    unsigned long vm_generationid_addr;
 
     /* Convenience aliases */
     const uint32_t domid = dss->domid;
@@ -1550,19 +1538,10 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
 
     switch (type) {
     case LIBXL_DOMAIN_TYPE_HVM: {
-        char *path;
-        char *addr;
-
-        path = GCSPRINTF("%s/hvmloader/generation-id-address",
-                              libxl__xs_get_dompath(gc, domid));
-        addr = libxl__xs_read(gc, XBT_NULL, path);
-
-        vm_generationid_addr = (addr) ? strtoul(addr, NULL, 0) : 0;
         dss->hvm = 1;
         break;
     }
     case LIBXL_DOMAIN_TYPE_PV:
-        vm_generationid_addr = 0;
         dss->hvm = 0;
         break;
     default:
@@ -1609,7 +1588,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
     callbacks->switch_qemu_logdirty = libxl__domain_suspend_common_switch_qemu_logdirty;
     dss->shs.callbacks.save.toolstack_save = libxl__toolstack_save;
 
-    libxl__xc_domain_save(egc, dss, vm_generationid_addr);
+    libxl__xc_domain_save(egc, dss);
     return;
 
  out:

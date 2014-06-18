@@ -960,8 +960,6 @@ typedef struct {
     uint32_t console_domid;
     unsigned long console_mfn;
 
-    unsigned long vm_generationid_addr;
-
     char *saved_state;
 
     libxl__file_reference pv_kernel;
@@ -2791,8 +2789,7 @@ _hidden void libxl__domain_suspend(libxl__egc *egc,
 
 
 /* calls libxl__xc_domain_suspend_done when done */
-_hidden void libxl__xc_domain_save(libxl__egc*, libxl__domain_suspend_state*,
-                                   unsigned long vm_generationid_addr);
+_hidden void libxl__xc_domain_save(libxl__egc*, libxl__domain_suspend_state*);
 /* If rc==0 then retval is the return value from xc_domain_save
  * and errnoval is the errno value it provided.
  * If rc!=0, retval and errnoval are undefined. */
@@ -2816,8 +2813,7 @@ _hidden int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
 /* calls libxl__xc_domain_restore_done when done */
 _hidden void libxl__xc_domain_restore(libxl__egc *egc,
                                       libxl__domain_create_state *dcs,
-                                      int hvm, int pae, int superpages,
-                                      int no_incr_generationid);
+                                      int hvm, int pae, int superpages);
 /* If rc==0 then retval is the return value from xc_domain_save
  * and errnoval is the errno value it provided.
  * If rc!=0, retval and errnoval are undefined. */
