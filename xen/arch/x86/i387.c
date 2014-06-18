@@ -266,10 +266,10 @@ void vcpu_restore_fpu_lazy(struct vcpu *v)
  * On each context switch, save the necessary FPU info of VCPU being switch 
  * out. It dispatches saving operation based on CPU's capability.
  */
-void vcpu_save_fpu(struct vcpu *v)
+static bool_t _vcpu_save_fpu(struct vcpu *v)
 {
     if ( !v->fpu_dirtied && !v->arch.nonlazy_xstate_used )
-        return;
+        return 0;
 
     ASSERT(!is_idle_vcpu(v));
 
@@ -284,7 +284,20 @@ void vcpu_save_fpu(struct vcpu *v)
         fpu_fsave(v);
 
     v->fpu_dirtied = 0;
+
+    return 1;
+}
+
+void vcpu_save_fpu(struct vcpu *v)
+{
+    _vcpu_save_fpu(v);
     stts();
+}
+
+void save_fpu_enable(void)
+{
+    if ( !_vcpu_save_fpu(current) )
+        clts();
 }
 
 /* Initialize FPU's context save area */
