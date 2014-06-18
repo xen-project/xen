@@ -546,27 +546,27 @@ static PyObject *pyxc_linux_build(XcObject *self,
     return pyxc_error_to_exception(self->xc_handle);
 }
 
-static PyObject *pyxc_get_hvm_param(XcObject *self,
+static PyObject *pyxc_hvm_param_get(XcObject *self,
                                     PyObject *args,
                                     PyObject *kwds)
 {
     uint32_t dom;
     int param;
-    unsigned long value;
+    uint64_t value;
 
     static char *kwd_list[] = { "domid", "param", NULL }; 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list,
                                       &dom, &param) )
         return NULL;
 
-    if ( xc_get_hvm_param(self->xc_handle, dom, param, &value) != 0 )
+    if ( xc_hvm_param_get(self->xc_handle, dom, param, &value) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-    return PyLong_FromUnsignedLong(value);
+    return PyLong_FromUnsignedLongLong(value);
 
 }
 
-static PyObject *pyxc_set_hvm_param(XcObject *self,
+static PyObject *pyxc_hvm_param_set(XcObject *self,
                                     PyObject *args,
                                     PyObject *kwds)
 {
@@ -579,7 +579,7 @@ static PyObject *pyxc_set_hvm_param(XcObject *self,
                                       &dom, &param, &value) )
         return NULL;
 
-    if ( xc_set_hvm_param(self->xc_handle, dom, param, value) != 0 )
+    if ( xc_hvm_param_set(self->xc_handle, dom, param, value) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
@@ -2482,7 +2482,7 @@ static PyMethodDef pyxc_methods[] = {
       "Returns: None on sucess. Raises exception on error.\n" },
 
     { "hvm_get_param", 
-      (PyCFunction)pyxc_get_hvm_param, 
+      (PyCFunction)pyxc_hvm_param_get,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "get a parameter of HVM guest OS.\n"
       " dom     [int]:      Identifier of domain to build into.\n"
@@ -2490,7 +2490,7 @@ static PyMethodDef pyxc_methods[] = {
       "Returns: [long] value of the param.\n" },
 
     { "hvm_set_param", 
-      (PyCFunction)pyxc_set_hvm_param, 
+      (PyCFunction)pyxc_hvm_param_set,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "set a parameter of HVM guest OS.\n"
       " dom     [int]:      Identifier of domain to build into.\n"

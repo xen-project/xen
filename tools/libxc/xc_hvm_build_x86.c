@@ -487,19 +487,19 @@ static int setup_guest(xc_interface *xch,
     if ( xc_clear_domain_pages(xch, dom, special_pfn(0), NR_SPECIAL_PAGES) )
             goto error_out;
 
-    xc_set_hvm_param(xch, dom, HVM_PARAM_STORE_PFN,
+    xc_hvm_param_set(xch, dom, HVM_PARAM_STORE_PFN,
                      special_pfn(SPECIALPAGE_XENSTORE));
-    xc_set_hvm_param(xch, dom, HVM_PARAM_BUFIOREQ_PFN,
+    xc_hvm_param_set(xch, dom, HVM_PARAM_BUFIOREQ_PFN,
                      special_pfn(SPECIALPAGE_BUFIOREQ));
-    xc_set_hvm_param(xch, dom, HVM_PARAM_IOREQ_PFN,
+    xc_hvm_param_set(xch, dom, HVM_PARAM_IOREQ_PFN,
                      special_pfn(SPECIALPAGE_IOREQ));
-    xc_set_hvm_param(xch, dom, HVM_PARAM_CONSOLE_PFN,
+    xc_hvm_param_set(xch, dom, HVM_PARAM_CONSOLE_PFN,
                      special_pfn(SPECIALPAGE_CONSOLE));
-    xc_set_hvm_param(xch, dom, HVM_PARAM_PAGING_RING_PFN,
+    xc_hvm_param_set(xch, dom, HVM_PARAM_PAGING_RING_PFN,
                      special_pfn(SPECIALPAGE_PAGING));
-    xc_set_hvm_param(xch, dom, HVM_PARAM_ACCESS_RING_PFN,
+    xc_hvm_param_set(xch, dom, HVM_PARAM_ACCESS_RING_PFN,
                      special_pfn(SPECIALPAGE_ACCESS));
-    xc_set_hvm_param(xch, dom, HVM_PARAM_SHARING_RING_PFN,
+    xc_hvm_param_set(xch, dom, HVM_PARAM_SHARING_RING_PFN,
                      special_pfn(SPECIALPAGE_SHARING));
 
     /*
@@ -521,9 +521,9 @@ static int setup_guest(xc_interface *xch,
             goto error_out;
 
     /* Tell the domain where the pages are and how many there are */
-    xc_set_hvm_param(xch, dom, HVM_PARAM_IOREQ_SERVER_PFN,
+    xc_hvm_param_set(xch, dom, HVM_PARAM_IOREQ_SERVER_PFN,
                      ioreq_server_pfn(0));
-    xc_set_hvm_param(xch, dom, HVM_PARAM_NR_IOREQ_SERVER_PAGES,
+    xc_hvm_param_set(xch, dom, HVM_PARAM_NR_IOREQ_SERVER_PAGES,
                      NR_IOREQ_SERVER_PAGES);
 
     /*
@@ -538,7 +538,7 @@ static int setup_guest(xc_interface *xch,
         ident_pt[i] = ((i << 22) | _PAGE_PRESENT | _PAGE_RW | _PAGE_USER |
                        _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_PSE);
     munmap(ident_pt, PAGE_SIZE);
-    xc_set_hvm_param(xch, dom, HVM_PARAM_IDENT_PT,
+    xc_hvm_param_set(xch, dom, HVM_PARAM_IDENT_PT,
                      special_pfn(SPECIALPAGE_IDENT_PT) << PAGE_SHIFT);
 
     /* Insert JMP <rel32> instruction at address 0x0 to reach entry point. */

@@ -502,9 +502,9 @@ int main(int argc, char *argv[])
     }
 
     if ( int3 )
-        rc = xc_set_hvm_param(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_sync);
+        rc = xc_hvm_param_set(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_sync);
     else
-        rc = xc_set_hvm_param(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_disabled);
+        rc = xc_hvm_param_set(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_disabled);
     if ( rc < 0 )
     {
         ERROR("Error %d setting int3 mem_event\n", rc);
@@ -522,7 +522,7 @@ int main(int argc, char *argv[])
             rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, ~0ull, 0);
             rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, 0,
                                    xenaccess->domain_info->max_pages);
-            rc = xc_set_hvm_param(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_disabled);
+            rc = xc_hvm_param_set(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_disabled);
 
             shutting_down = 1;
         }

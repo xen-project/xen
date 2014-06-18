@@ -1645,8 +1645,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         chunk.id = XC_SAVE_ID_HVM_IDENT_PT;
         chunk.data = 0;
-        xc_get_hvm_param(xch, dom, HVM_PARAM_IDENT_PT,
-                         (unsigned long *)&chunk.data);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_IDENT_PT, &chunk.data);
 
         if ( (chunk.data != 0) &&
              wrexact(io_fd, &chunk, sizeof(chunk)) )
@@ -1657,8 +1656,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         chunk.id = XC_SAVE_ID_HVM_PAGING_RING_PFN;
         chunk.data = 0;
-        xc_get_hvm_param(xch, dom, HVM_PARAM_PAGING_RING_PFN,
-                         (unsigned long *)&chunk.data);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_PAGING_RING_PFN, &chunk.data);
 
         if ( (chunk.data != 0) &&
              wrexact(io_fd, &chunk, sizeof(chunk)) )
@@ -1669,8 +1667,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         chunk.id = XC_SAVE_ID_HVM_ACCESS_RING_PFN;
         chunk.data = 0;
-        xc_get_hvm_param(xch, dom, HVM_PARAM_ACCESS_RING_PFN,
-                         (unsigned long *)&chunk.data);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_ACCESS_RING_PFN, &chunk.data);
 
         if ( (chunk.data != 0) &&
              wrexact(io_fd, &chunk, sizeof(chunk)) )
@@ -1681,8 +1678,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         chunk.id = XC_SAVE_ID_HVM_SHARING_RING_PFN;
         chunk.data = 0;
-        xc_get_hvm_param(xch, dom, HVM_PARAM_SHARING_RING_PFN,
-                         (unsigned long *)&chunk.data);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_SHARING_RING_PFN, &chunk.data);
 
         if ( (chunk.data != 0) &&
              wrexact(io_fd, &chunk, sizeof(chunk)) )
@@ -1693,8 +1689,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         chunk.id = XC_SAVE_ID_HVM_VM86_TSS;
         chunk.data = 0;
-        xc_get_hvm_param(xch, dom, HVM_PARAM_VM86_TSS,
-                         (unsigned long *)&chunk.data);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_VM86_TSS, &chunk.data);
 
         if ( (chunk.data != 0) &&
              wrexact(io_fd, &chunk, sizeof(chunk)) )
@@ -1705,8 +1700,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         chunk.id = XC_SAVE_ID_HVM_CONSOLE_PFN;
         chunk.data = 0;
-        xc_get_hvm_param(xch, dom, HVM_PARAM_CONSOLE_PFN,
-                         (unsigned long *)&chunk.data);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_CONSOLE_PFN, &chunk.data);
 
         if ( (chunk.data != 0) &&
              wrexact(io_fd, &chunk, sizeof(chunk)) )
@@ -1717,8 +1711,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         chunk.id = XC_SAVE_ID_HVM_ACPI_IOPORTS_LOCATION;
         chunk.data = 0;
-        xc_get_hvm_param(xch, dom, HVM_PARAM_ACPI_IOPORTS_LOCATION,
-                         (unsigned long *)&chunk.data);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_ACPI_IOPORTS_LOCATION, &chunk.data);
 
         if ((chunk.data != 0) && wrexact(io_fd, &chunk, sizeof(chunk)))
         {
@@ -1728,8 +1721,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         chunk.id = XC_SAVE_ID_HVM_VIRIDIAN;
         chunk.data = 0;
-        xc_get_hvm_param(xch, dom, HVM_PARAM_VIRIDIAN,
-                         (unsigned long *)&chunk.data);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_VIRIDIAN, &chunk.data);
 
         if ( (chunk.data != 0) &&
              wrexact(io_fd, &chunk, sizeof(chunk)) )
@@ -1740,8 +1732,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         chunk.id = XC_SAVE_ID_HVM_IOREQ_SERVER_PFN;
         chunk.data = 0;
-        xc_get_hvm_param(xch, dom, HVM_PARAM_IOREQ_SERVER_PFN,
-                         (unsigned long *)&chunk.data);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_IOREQ_SERVER_PFN, &chunk.data);
 
         if ( (chunk.data != 0) &&
              wrexact(io_fd, &chunk, sizeof(chunk)) )
@@ -1752,8 +1743,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         chunk.id = XC_SAVE_ID_HVM_NR_IOREQ_SERVER_PAGES;
         chunk.data = 0;
-        xc_get_hvm_param(xch, dom, HVM_PARAM_NR_IOREQ_SERVER_PAGES,
-                         (unsigned long *)&chunk.data);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_NR_IOREQ_SERVER_PAGES, &chunk.data);
 
         if ( (chunk.data != 0) &&
              wrexact(io_fd, &chunk, sizeof(chunk)) )
@@ -1827,12 +1817,9 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         /* Save magic-page locations. */
         memset(magic_pfns, 0, sizeof(magic_pfns));
-        xc_get_hvm_param(xch, dom, HVM_PARAM_IOREQ_PFN,
-                         (unsigned long *)&magic_pfns[0]);
-        xc_get_hvm_param(xch, dom, HVM_PARAM_BUFIOREQ_PFN,
-                         (unsigned long *)&magic_pfns[1]);
-        xc_get_hvm_param(xch, dom, HVM_PARAM_STORE_PFN,
-                         (unsigned long *)&magic_pfns[2]);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_IOREQ_PFN, &magic_pfns[0]);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_BUFIOREQ_PFN, &magic_pfns[1]);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_STORE_PFN, &magic_pfns[2]);
         if ( wrexact(io_fd, magic_pfns, sizeof(magic_pfns)) )
         {
             PERROR("Error when writing to state file (7)");

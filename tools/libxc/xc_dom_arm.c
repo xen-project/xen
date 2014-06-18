@@ -80,14 +80,14 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
 
     xc_clear_domain_page(dom->xch, dom->guest_domid, dom->console_pfn);
     xc_clear_domain_page(dom->xch, dom->guest_domid, dom->xenstore_pfn);
-    xc_set_hvm_param(dom->xch, dom->guest_domid, HVM_PARAM_CONSOLE_PFN,
+    xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_CONSOLE_PFN,
             dom->console_pfn);
-    xc_set_hvm_param(dom->xch, dom->guest_domid, HVM_PARAM_STORE_PFN,
+    xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_STORE_PFN,
             dom->xenstore_pfn);
     /* allocated by toolstack */
-    xc_set_hvm_param(dom->xch, dom->guest_domid, HVM_PARAM_CONSOLE_EVTCHN,
+    xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_CONSOLE_EVTCHN,
             dom->console_evtchn);
-    xc_set_hvm_param(dom->xch, dom->guest_domid, HVM_PARAM_STORE_EVTCHN,
+    xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_STORE_EVTCHN,
             dom->xenstore_evtchn);
 
     return 0;

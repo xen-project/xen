@@ -1264,7 +1264,7 @@ int xc_domain_send_trigger(xc_interface *xch,
     return do_domctl(xch, &domctl);
 }
 
-int xc_set_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long value)
+int xc_hvm_param_set(xc_interface *handle, domid_t dom, uint32_t param, uint64_t value)
 {
     DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BUFFER(xen_hvm_param_t, arg);
@@ -1285,7 +1285,7 @@ int xc_set_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long
     return rc;
 }
 
-int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long *value)
+int xc_hvm_param_get(xc_interface *handle, domid_t dom, uint32_t param, uint64_t *value)
 {
     DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BUFFER(xen_hvm_param_t, arg);
@@ -1304,6 +1304,23 @@ int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long
     *value = arg->value;
     xc_hypercall_buffer_free(handle, arg);
     return rc;
+}
+
+int xc_set_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long value)
+{
+    return xc_hvm_param_set(handle, dom, param, value);
+}
+
+int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long *value)
+{
+    uint64_t v;
+    int ret;
+
+    ret = xc_hvm_param_get(handle, dom, param, &v);
+    if (ret < 0)
+        return ret;
+    *value = v;
+    return 0;
 }
 
 int xc_hvm_create_ioreq_server(xc_interface *xch,

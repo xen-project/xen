@@ -1646,15 +1646,15 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             }
             /* should this be deferred? does it change? */
             if ( pagebuf.identpt )
-                xc_set_hvm_param(xch, dom, HVM_PARAM_IDENT_PT, pagebuf.identpt);
+                xc_hvm_param_set(xch, dom, HVM_PARAM_IDENT_PT, pagebuf.identpt);
             if ( pagebuf.paging_ring_pfn )
-                xc_set_hvm_param(xch, dom, HVM_PARAM_PAGING_RING_PFN, pagebuf.paging_ring_pfn);
+                xc_hvm_param_set(xch, dom, HVM_PARAM_PAGING_RING_PFN, pagebuf.paging_ring_pfn);
             if ( pagebuf.access_ring_pfn )
-                xc_set_hvm_param(xch, dom, HVM_PARAM_ACCESS_RING_PFN, pagebuf.access_ring_pfn);
+                xc_hvm_param_set(xch, dom, HVM_PARAM_ACCESS_RING_PFN, pagebuf.access_ring_pfn);
             if ( pagebuf.sharing_ring_pfn )
-                xc_set_hvm_param(xch, dom, HVM_PARAM_SHARING_RING_PFN, pagebuf.sharing_ring_pfn);
+                xc_hvm_param_set(xch, dom, HVM_PARAM_SHARING_RING_PFN, pagebuf.sharing_ring_pfn);
             if ( pagebuf.vm86_tss )
-                xc_set_hvm_param(xch, dom, HVM_PARAM_VM86_TSS, pagebuf.vm86_tss);
+                xc_hvm_param_set(xch, dom, HVM_PARAM_VM86_TSS, pagebuf.vm86_tss);
             if ( pagebuf.console_pfn )
                 console_pfn = pagebuf.console_pfn;
             if ( pagebuf.vm_generationid_addr ) {
@@ -1769,7 +1769,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     }
 
     if (pagebuf.viridian != 0)
-        xc_set_hvm_param(xch, dom, HVM_PARAM_VIRIDIAN, 1);
+        xc_hvm_param_set(xch, dom, HVM_PARAM_VIRIDIAN, 1);
 
     /*
      * If we are migrating in from a host that does not support
@@ -1789,16 +1789,16 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     } else {
         if (pagebuf.nr_ioreq_server_pages != 0 &&
             pagebuf.ioreq_server_pfn != 0) {
-            xc_set_hvm_param(xch, dom, HVM_PARAM_NR_IOREQ_SERVER_PAGES, 
+            xc_hvm_param_set(xch, dom, HVM_PARAM_NR_IOREQ_SERVER_PAGES,
                              pagebuf.nr_ioreq_server_pages);
-            xc_set_hvm_param(xch, dom, HVM_PARAM_IOREQ_SERVER_PFN,
+            xc_hvm_param_set(xch, dom, HVM_PARAM_IOREQ_SERVER_PFN,
                              pagebuf.ioreq_server_pfn);
         }
     }
 
     if (pagebuf.acpi_ioport_location == 1) {
         DBGPRINTF("Use new firmware ioport from the checkpoint\n");
-        xc_set_hvm_param(xch, dom, HVM_PARAM_ACPI_IOPORTS_LOCATION, 1);
+        xc_hvm_param_set(xch, dom, HVM_PARAM_ACPI_IOPORTS_LOCATION, 1);
     } else if (pagebuf.acpi_ioport_location == 0) {
         DBGPRINTF("Use old firmware ioport from the checkpoint\n");
     } else {
@@ -2329,15 +2329,15 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         goto out;
     }
 
-    if ( (frc = xc_set_hvm_param(xch, dom,
+    if ( (frc = xc_hvm_param_set(xch, dom,
                                  HVM_PARAM_IOREQ_PFN, tailbuf.u.hvm.magicpfns[0]))
-         || (frc = xc_set_hvm_param(xch, dom,
+         || (frc = xc_hvm_param_set(xch, dom,
                                     HVM_PARAM_BUFIOREQ_PFN, tailbuf.u.hvm.magicpfns[1]))
-         || (frc = xc_set_hvm_param(xch, dom,
+         || (frc = xc_hvm_param_set(xch, dom,
                                     HVM_PARAM_STORE_PFN, tailbuf.u.hvm.magicpfns[2]))
-         || (frc = xc_set_hvm_param(xch, dom,
+         || (frc = xc_hvm_param_set(xch, dom,
                                     HVM_PARAM_PAE_ENABLED, pae))
-         || (frc = xc_set_hvm_param(xch, dom,
+         || (frc = xc_hvm_param_set(xch, dom,
                                     HVM_PARAM_STORE_EVTCHN,
                                     store_evtchn)) )
     {
@@ -2351,7 +2351,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             PERROR("error zeroing console page");
             goto out;
         }
-        if ( (frc = xc_set_hvm_param(xch, dom, 
+        if ( (frc = xc_hvm_param_set(xch, dom,
                                     HVM_PARAM_CONSOLE_PFN, console_pfn)) ) {
             PERROR("error setting HVM param: %i", frc);
             goto out;

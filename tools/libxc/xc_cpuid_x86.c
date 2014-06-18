@@ -276,13 +276,12 @@ static void xc_cpuid_hvm_policy(
 {
     DECLARE_DOMCTL;
     char brand[13];
-    unsigned long nestedhvm;
-    unsigned long pae;
+    uint64_t val;
     int is_pae, is_nestedhvm;
     uint64_t xfeature_mask;
 
-    xc_get_hvm_param(xch, domid, HVM_PARAM_PAE_ENABLED, &pae);
-    is_pae = !!pae;
+    xc_hvm_param_get(xch, domid, HVM_PARAM_PAE_ENABLED, &val);
+    is_pae = !!val;
 
     /* Detecting Xen's atitude towards XSAVE */
     memset(&domctl, 0, sizeof(domctl));
@@ -291,8 +290,8 @@ static void xc_cpuid_hvm_policy(
     do_domctl(xch, &domctl);
     xfeature_mask = domctl.u.vcpuextstate.xfeature_mask;
 
-    xc_get_hvm_param(xch, domid, HVM_PARAM_NESTEDHVM, &nestedhvm);
-    is_nestedhvm = !!nestedhvm;
+    xc_hvm_param_get(xch, domid, HVM_PARAM_NESTEDHVM, &val);
+    is_nestedhvm = !!val;
 
     switch ( input[0] )
     {

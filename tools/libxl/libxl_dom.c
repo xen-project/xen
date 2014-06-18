@@ -212,18 +212,18 @@ static unsigned long timer_mode(const libxl_domain_build_info *info)
 static void hvm_set_conf_params(xc_interface *handle, uint32_t domid,
                                 libxl_domain_build_info *const info)
 {
-    xc_set_hvm_param(handle, domid, HVM_PARAM_PAE_ENABLED,
+    xc_hvm_param_set(handle, domid, HVM_PARAM_PAE_ENABLED,
                     libxl_defbool_val(info->u.hvm.pae));
 #if defined(__i386__) || defined(__x86_64__)
-    xc_set_hvm_param(handle, domid, HVM_PARAM_VIRIDIAN,
+    xc_hvm_param_set(handle, domid, HVM_PARAM_VIRIDIAN,
                     libxl_defbool_val(info->u.hvm.viridian));
-    xc_set_hvm_param(handle, domid, HVM_PARAM_HPET_ENABLED,
+    xc_hvm_param_set(handle, domid, HVM_PARAM_HPET_ENABLED,
                     libxl_defbool_val(info->u.hvm.hpet));
 #endif
-    xc_set_hvm_param(handle, domid, HVM_PARAM_TIMER_MODE, timer_mode(info));
-    xc_set_hvm_param(handle, domid, HVM_PARAM_VPT_ALIGN,
+    xc_hvm_param_set(handle, domid, HVM_PARAM_TIMER_MODE, timer_mode(info));
+    xc_hvm_param_set(handle, domid, HVM_PARAM_VPT_ALIGN,
                     libxl_defbool_val(info->u.hvm.vpt_align));
-    xc_set_hvm_param(handle, domid, HVM_PARAM_NESTEDHVM,
+    xc_hvm_param_set(handle, domid, HVM_PARAM_NESTEDHVM,
                     libxl_defbool_val(info->u.hvm.nested_hvm));
 }
 
@@ -515,6 +515,7 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
 {
     struct hvm_info_table *va_hvm;
     uint8_t *va_map, sum;
+    uint64_t str_mfn, cons_mfn;
     int i;
 
     va_map = xc_map_foreign_range(handle, domid,
@@ -533,10 +534,13 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     va_hvm->checksum -= sum;
     munmap(va_map, XC_PAGE_SIZE);
 
-    xc_get_hvm_param(handle, domid, HVM_PARAM_STORE_PFN, store_mfn);
-    xc_get_hvm_param(handle, domid, HVM_PARAM_CONSOLE_PFN, console_mfn);
-    xc_set_hvm_param(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);
-    xc_set_hvm_param(handle, domid, HVM_PARAM_CONSOLE_EVTCHN, console_evtchn);
+    xc_hvm_param_get(handle, domid, HVM_PARAM_STORE_PFN, &str_mfn);
+    xc_hvm_param_get(handle, domid, HVM_PARAM_CONSOLE_PFN, &cons_mfn);
+    xc_hvm_param_set(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);
+    xc_hvm_param_set(handle, domid, HVM_PARAM_CONSOLE_EVTCHN, console_evtchn);
+
+    *store_mfn = str_mfn;
+    *console_mfn = cons_mfn;
 
     xc_dom_gnttab_hvm_seed(handle, domid, *console_mfn, *store_mfn, console_domid, store_domid);
     return 0;
@@ -1095,15 +1099,15 @@ static void domain_suspend_callback_common(libxl__egc *egc,
                                            libxl__domain_suspend_state *dss)
 {
     STATE_AO_GC(dss->ao);
-    unsigned long hvm_s_state = 0, hvm_pvdrv = 0;
+    uint64_t hvm_s_state = 0, hvm_pvdrv = 0;
     int ret, rc;
 
     /* Convenience aliases */
     const uint32_t domid = dss->domid;
 
     if (dss->hvm) {
-        xc_get_hvm_param(CTX->xch, domid, HVM_PARAM_CALLBACK_IRQ, &hvm_pvdrv);
-        xc_get_hvm_param(CTX->xch, domid, HVM_PARAM_ACPI_S_STATE, &hvm_s_state);
+        xc_hvm_param_get(CTX->xch, domid, HVM_PARAM_CALLBACK_IRQ, &hvm_pvdrv);
+        xc_hvm_param_get(CTX->xch, domid, HVM_PARAM_ACPI_S_STATE, &hvm_s_state);
     }
 
     if ((hvm_s_state == 0) && (dss->guest_evtchn.port >= 0)) {

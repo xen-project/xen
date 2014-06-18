@@ -51,8 +51,8 @@ static int modify_returncode(xc_interface *xch, uint32_t domid)
     if ( info.hvm )
     {
         /* HVM guests without PV drivers have no return code to modify. */
-        unsigned long irq = 0;
-        xc_get_hvm_param(xch, domid, HVM_PARAM_CALLBACK_IRQ, &irq);
+        uint64_t irq = 0;
+        xc_hvm_param_get(xch, domid, HVM_PARAM_CALLBACK_IRQ, &irq);
         if ( !irq )
             return 0;
 
