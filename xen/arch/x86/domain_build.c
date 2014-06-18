@@ -1137,10 +1137,13 @@ int __init construct_dom0(
                                     L1_PROT : COMPAT_L1_PROT));
         l1tab++;
 
-        page = mfn_to_page(mfn);
-        if ( (page->u.inuse.type_info == 0) &&
-             !get_page_and_type(page, d, PGT_writable_page) )
-            BUG();
+        if ( !paging_mode_translate(d) )
+        {
+            page = mfn_to_page(mfn);
+            if ( !page->u.inuse.type_info &&
+                 !get_page_and_type(page, d, PGT_writable_page) )
+                BUG();
+        }
     }
 
     if ( is_pv_32on64_domain(d) )
@@ -1300,7 +1303,7 @@ int __init construct_dom0(
         if ( get_gpfn_from_mfn(mfn) >= count )
         {
             BUG_ON(is_pv_32bit_domain(d));
-            if ( !page->u.inuse.type_info &&
+            if ( !paging_mode_translate(d) && !page->u.inuse.type_info &&
                  !get_page_and_type(page, d, PGT_writable_page) )
                 BUG();
 
