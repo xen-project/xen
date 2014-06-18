@@ -272,8 +272,8 @@ static int change_pte(xc_interface *xch, int domid,
 
     for (i = 0; i < minfo->p2m_size; i++)
     {
-        xen_pfn_t table_mfn = pfn_to_mfn(i, minfo->p2m_table,
-                                         minfo->guest_width);
+        xen_pfn_t table_mfn = xc_pfn_to_mfn(i, minfo->p2m_table,
+                                            minfo->guest_width);
         uint64_t pte, new_pte;
         int j;
 

@@ -1879,8 +1879,8 @@ int xc_map_domain_meminfo(xc_interface *xch, int domid,
         goto failed;
     }
     for ( i = 0; i < minfo->p2m_size; i++ )
-        minfo->pfn_type[i] = pfn_to_mfn(i, minfo->p2m_table,
-                                        minfo->guest_width);
+        minfo->pfn_type[i] = xc_pfn_to_mfn(i, minfo->p2m_table,
+                                           minfo->guest_width);
 
     /* Retrieve PFN types in batches */
     for ( i = 0; i < minfo->p2m_size ; i+=1024 )

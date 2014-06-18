@@ -132,13 +132,19 @@ struct domain_info_context {
     unsigned long p2m_size;
 };
 
-static inline xen_pfn_t pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m, int gwidth)
+static inline xen_pfn_t xc_pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m,
+                                      unsigned gwidth)
 {
-  return ((xen_pfn_t) ((gwidth==8)?
-                       (((uint64_t *)p2m)[(pfn)]):
-                       ((((uint32_t *)p2m)[(pfn)]) == 0xffffffffU ?
-                            (-1UL) :
-                            (((uint32_t *)p2m)[(pfn)]))));
+    if ( gwidth == sizeof(uint64_t) )
+        /* 64 bit guest.  Need to truncate their pfns for 32 bit toolstacks. */
+        return ((uint64_t *)p2m)[pfn];
+    else
+    {
+        /* 32 bit guest.  Need to expand INVALID_MFN for 64 bit toolstacks. */
+        uint32_t mfn = ((uint32_t *)p2m)[pfn];
+
+        return mfn == ~0U ? INVALID_MFN : mfn;
+    }
 }
 
 /* Number of xen_pfn_t in a page */
