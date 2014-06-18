@@ -1086,11 +1086,6 @@ void do_int3(struct cpu_user_regs *regs)
     do_guest_trap(TRAP_int3, regs, 0);
 }
 
-void do_machine_check(const struct cpu_user_regs *regs)
-{
-    machine_check_vector(regs, regs->error_code);
-}
-
 static void reserved_bit_page_fault(
     unsigned long addr, struct cpu_user_regs *regs)
 {

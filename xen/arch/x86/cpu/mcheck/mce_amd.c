@@ -241,13 +241,6 @@ amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
     return mc_ext;
 }
 
-/* Common AMD Machine Check Handler for AMD K8 and higher */
-static void amd_cmn_machine_check(const struct cpu_user_regs *regs, long error_code)
-{
-    mcheck_cmn_handler(regs, error_code, mca_allbanks,
-                       __get_cpu_var(mce_clear_banks));
-}
-
 static int amd_need_clearbank_scan(enum mca_source who, uint64_t status)
 {
     if ( who != MCA_MCE_SCAN )
@@ -287,7 +280,7 @@ amd_mcheck_init(struct cpuinfo_x86 *ci)
     /* Assume that machine check support is available.
      * The minimum provided support is at least the K8. */
     mce_handler_init();
-    x86_mce_vector_register(amd_cmn_machine_check);
+    x86_mce_vector_register(mcheck_cmn_handler);
     mce_need_clearbank_register(amd_need_clearbank_scan);
 
     for ( i = 0; i < nr_mce_banks; i++ )

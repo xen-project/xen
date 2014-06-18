@@ -70,7 +70,7 @@ static void __init mce_set_verbosity(char *str)
 custom_param("mce_verbosity", mce_set_verbosity);
 
 /* Handle unconfigured int18 (should never happen) */
-static void unexpected_machine_check(const struct cpu_user_regs *regs, long error_code)
+static void unexpected_machine_check(const struct cpu_user_regs *regs)
 {
     console_force_unlock();
     printk("Unexpected Machine Check Exception\n");
@@ -88,9 +88,9 @@ void x86_mce_vector_register(x86_mce_vector_t hdlr)
 
 /* Call the installed machine check handler for this CPU setup. */
 
-void machine_check_vector(const struct cpu_user_regs *regs, long error_code)
+void do_machine_check(const struct cpu_user_regs *regs)
 {
-    _machine_check_vector(regs, error_code);
+    _machine_check_vector(regs);
 }
 
 /* Init machine check callback handler
@@ -459,9 +459,10 @@ static int mce_urgent_action(const struct cpu_user_regs *regs,
 }
 
 /* Shared #MC handler. */
-void mcheck_cmn_handler(const struct cpu_user_regs *regs, long error_code,
-    struct mca_banks *bankmask, struct mca_banks *clear_bank)
+void mcheck_cmn_handler(const struct cpu_user_regs *regs)
 {
+    struct mca_banks *bankmask = mca_allbanks;
+    struct mca_banks *clear_bank = __get_cpu_var(mce_clear_banks);
     uint64_t gstatus;
     mctelem_cookie_t mctc = NULL;
     struct mca_summary bs;

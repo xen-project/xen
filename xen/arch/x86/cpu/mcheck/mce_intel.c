@@ -392,12 +392,6 @@ static const struct mca_error_handler intel_mce_uhandlers[] = {
     {intel_default_check, intel_default_mce_uhandler}
 };
 
-static void intel_machine_check(const struct cpu_user_regs * regs, long error_code)
-{
-    mcheck_cmn_handler(regs, error_code, mca_allbanks,
-        __get_cpu_var(mce_clear_banks));
-}
-
 /* According to MCA OS writer guide, CMCI handler need to clear bank when
  * 1) CE (UC = 0)
  * 2) ser_support = 1, Superious error, OVER = 0, EN = 0, [UC = 1]
@@ -780,7 +774,7 @@ static void intel_init_mce(void)
     if (firstbank) /* if cmci enabled, firstbank = 0 */
         wrmsrl(MSR_IA32_MC0_STATUS, 0x0ULL);
 
-    x86_mce_vector_register(intel_machine_check);
+    x86_mce_vector_register(mcheck_cmn_handler);
     mce_recoverable_register(intel_recoverable_scan);
     mce_need_clearbank_register(intel_need_clearbank_scan);
     mce_register_addrcheck(intel_checkaddr);
