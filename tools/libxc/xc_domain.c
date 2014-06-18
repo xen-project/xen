@@ -1711,6 +1711,7 @@ int xc_domain_bind_pt_irq(
         bind->u.pci.bus = bus;
         bind->u.pci.device = device;
         bind->u.pci.intx = intx;
+        break;
     case PT_IRQ_TYPE_ISA:
         bind->u.isa.isa_irq = isa_irq;
         break;
