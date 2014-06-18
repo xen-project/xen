@@ -389,12 +389,12 @@ static void *map_frame_list_list(xc_interface *xch, uint32_t dom,
     int count = 100;
     void *p;
     struct domain_info_context *dinfo = &ctx->dinfo;
-    uint64_t fll = GET_FIELD(shinfo, arch.pfn_to_mfn_frame_list_list);
+    uint64_t fll = GET_FIELD(shinfo, arch.pfn_to_mfn_frame_list_list, dinfo->guest_width);
 
     while ( count-- && (fll == 0) )
     {
         usleep(10000);
-        fll = GET_FIELD(shinfo, arch.pfn_to_mfn_frame_list_list);
+        fll = GET_FIELD(shinfo, arch.pfn_to_mfn_frame_list_list, dinfo->guest_width);
     }
 
     if ( fll == 0 )
@@ -1900,14 +1900,14 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
      * reason==SHUTDOWN_suspend and is therefore found in the edx
      * register.
      */
-    mfn = GET_FIELD(&ctxt, user_regs.edx);
+    mfn = GET_FIELD(&ctxt, user_regs.edx, dinfo->guest_width);
     if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
     {
         errno = ERANGE;
         ERROR("Suspend record is not in range of pseudophys map");
         goto out;
     }
-    SET_FIELD(&ctxt, user_regs.edx, mfn_to_pfn(mfn));
+    SET_FIELD(&ctxt, user_regs.edx, mfn_to_pfn(mfn), dinfo->guest_width);
 
     for ( i = 0; i <= info.max_vcpu_id; i++ )
     {
@@ -1921,28 +1921,30 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         }
 
         /* Canonicalise each GDT frame number. */
-        for ( j = 0; (512*j) < GET_FIELD(&ctxt, gdt_ents); j++ )
+        for ( j = 0; (512*j) < GET_FIELD(&ctxt, gdt_ents, dinfo->guest_width); j++ )
         {
-            mfn = GET_FIELD(&ctxt, gdt_frames[j]);
+            mfn = GET_FIELD(&ctxt, gdt_frames[j], dinfo->guest_width);
             if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
             {
                 errno = ERANGE;
                 ERROR("GDT frame is not in range of pseudophys map");
                 goto out;
             }
-            SET_FIELD(&ctxt, gdt_frames[j], mfn_to_pfn(mfn));
+            SET_FIELD(&ctxt, gdt_frames[j], mfn_to_pfn(mfn), dinfo->guest_width);
         }
 
         /* Canonicalise the page table base pointer. */
-        if ( !MFN_IS_IN_PSEUDOPHYS_MAP(UNFOLD_CR3(
-                                           GET_FIELD(&ctxt, ctrlreg[3]))) )
+        if ( !MFN_IS_IN_PSEUDOPHYS_MAP(
+                 UNFOLD_CR3(GET_FIELD(&ctxt, ctrlreg[3], dinfo->guest_width))) )
         {
             errno = ERANGE;
             ERROR("PT base is not in range of pseudophys map");
             goto out;
         }
         SET_FIELD(&ctxt, ctrlreg[3], 
-            FOLD_CR3(mfn_to_pfn(UNFOLD_CR3(GET_FIELD(&ctxt, ctrlreg[3])))));
+                  FOLD_CR3(mfn_to_pfn(UNFOLD_CR3(
+                                          GET_FIELD(&ctxt, ctrlreg[3], dinfo->guest_width)
+                                          ))), dinfo->guest_width);
 
         /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
         if ( (ctx->pt_levels == 4) && ctxt.x64.ctrlreg[1] )
@@ -2051,7 +2053,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
      */
     memcpy(page, live_shinfo, PAGE_SIZE);
     SET_FIELD(((shared_info_any_t *)page), 
-              arch.pfn_to_mfn_frame_list_list, 0);
+              arch.pfn_to_mfn_frame_list_list, 0, dinfo->guest_width);
     if ( wrexact(io_fd, page, PAGE_SIZE) )
     {
         PERROR("Error when writing to state file (1)");

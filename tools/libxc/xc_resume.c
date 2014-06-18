@@ -74,7 +74,7 @@ static int modify_returncode(xc_interface *xch, uint32_t domid)
     if ( (rc = xc_vcpu_getcontext(xch, domid, 0, &ctxt)) != 0 )
         return rc;
 
-    SET_FIELD(&ctxt, user_regs.eax, 1);
+    SET_FIELD(&ctxt, user_regs.eax, 1, dinfo->guest_width);
 
     if ( (rc = xc_vcpu_setcontext(xch, domid, 0, &ctxt)) != 0 )
         return rc;
@@ -202,7 +202,7 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
         goto out;
     }
 
-    mfn = GET_FIELD(&ctxt, user_regs.edx);
+    mfn = GET_FIELD(&ctxt, user_regs.edx, dinfo->guest_width);
 
     start_info = xc_map_foreign_range(xch, domid, PAGE_SIZE,
                                       PROT_READ | PROT_WRITE, mfn);

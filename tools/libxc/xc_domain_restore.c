@@ -317,7 +317,7 @@ static xen_pfn_t *load_p2m_frame_list(
                 tot_bytes -= chunk_bytes;
                 chunk_bytes = 0;
 
-                if ( GET_FIELD(&ctxt, vm_assist) 
+                if ( GET_FIELD(&ctxt, vm_assist, dinfo->guest_width)
                      & (1UL << VMASST_TYPE_pae_extended_cr3) )
                     *pae_extended_cr3 = 1;
             }
@@ -2018,7 +2018,9 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         DPRINTF("read VCPU %d\n", i);
 
         if ( !new_ctxt_format )
-            SET_FIELD(ctxt, flags, GET_FIELD(ctxt, flags) | VGCF_online);
+            SET_FIELD(ctxt, flags,
+                      GET_FIELD(ctxt, flags, dinfo->guest_width) | VGCF_online,
+                      dinfo->guest_width);
 
         if ( i == 0 )
         {
@@ -2032,7 +2034,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
              * xc_domain_save and therefore the PFN is found in the
              * edx register.
              */
-            pfn = GET_FIELD(ctxt, user_regs.edx);
+            pfn = GET_FIELD(ctxt, user_regs.edx, dinfo->guest_width);
             if ( (pfn >= dinfo->p2m_size) ||
                  (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
             {
@@ -2040,7 +2042,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                 goto out;
             }
             mfn = ctx->p2m[pfn];
-            SET_FIELD(ctxt, user_regs.edx, mfn);
+            SET_FIELD(ctxt, user_regs.edx, mfn, dinfo->guest_width);
             start_info = xc_map_foreign_range(
                 xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
             if ( start_info == NULL )
@@ -2049,39 +2051,39 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                 goto out;
             }
 
-            SET_FIELD(start_info, nr_pages, dinfo->p2m_size);
-            SET_FIELD(start_info, shared_info, shared_info_frame<<PAGE_SHIFT);
-            SET_FIELD(start_info, flags, 0);
-            if ( GET_FIELD(start_info, store_mfn) > dinfo->p2m_size )
+            SET_FIELD(start_info, nr_pages, dinfo->p2m_size, dinfo->guest_width);
+            SET_FIELD(start_info, shared_info, shared_info_frame<<PAGE_SHIFT, dinfo->guest_width);
+            SET_FIELD(start_info, flags, 0, dinfo->guest_width);
+            if ( GET_FIELD(start_info, store_mfn, dinfo->guest_width) > dinfo->p2m_size )
             {
                 ERROR("Suspend record xenstore frame number is bad");
                 munmap(start_info, PAGE_SIZE);
                 goto out;
             }
-            *store_mfn = ctx->p2m[GET_FIELD(start_info, store_mfn)];
-            SET_FIELD(start_info, store_mfn, *store_mfn);
-            SET_FIELD(start_info, store_evtchn, store_evtchn);
-            if ( GET_FIELD(start_info, console.domU.mfn) > dinfo->p2m_size )
+            *store_mfn = ctx->p2m[GET_FIELD(start_info, store_mfn, dinfo->guest_width)];
+            SET_FIELD(start_info, store_mfn, *store_mfn, dinfo->guest_width);
+            SET_FIELD(start_info, store_evtchn, store_evtchn, dinfo->guest_width);
+            if ( GET_FIELD(start_info, console.domU.mfn, dinfo->guest_width) > dinfo->p2m_size )
             {
                 ERROR("Suspend record console frame number is bad");
                 munmap(start_info, PAGE_SIZE);
                 goto out;
             }
-            *console_mfn = ctx->p2m[GET_FIELD(start_info, console.domU.mfn)];
-            SET_FIELD(start_info, console.domU.mfn, *console_mfn);
-            SET_FIELD(start_info, console.domU.evtchn, console_evtchn);
+            *console_mfn = ctx->p2m[GET_FIELD(start_info, console.domU.mfn, dinfo->guest_width)];
+            SET_FIELD(start_info, console.domU.mfn, *console_mfn, dinfo->guest_width);
+            SET_FIELD(start_info, console.domU.evtchn, console_evtchn, dinfo->guest_width);
             munmap(start_info, PAGE_SIZE);
         }
         /* Uncanonicalise each GDT frame number. */
-        if ( GET_FIELD(ctxt, gdt_ents) > 8192 )
+        if ( GET_FIELD(ctxt, gdt_ents, dinfo->guest_width) > 8192 )
         {
             ERROR("GDT entry count out of range");
             goto out;
         }
 
-        for ( j = 0; (512*j) < GET_FIELD(ctxt, gdt_ents); j++ )
+        for ( j = 0; (512*j) < GET_FIELD(ctxt, gdt_ents, dinfo->guest_width); j++ )
         {
-            pfn = GET_FIELD(ctxt, gdt_frames[j]);
+            pfn = GET_FIELD(ctxt, gdt_frames[j], dinfo->guest_width);
             if ( (pfn >= dinfo->p2m_size) ||
                  (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
             {
@@ -2089,10 +2091,10 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       j, (unsigned long)pfn);
                 goto out;
             }
-            SET_FIELD(ctxt, gdt_frames[j], ctx->p2m[pfn]);
+            SET_FIELD(ctxt, gdt_frames[j], ctx->p2m[pfn], dinfo->guest_width);
         }
         /* Uncanonicalise the page table base pointer. */
-        pfn = UNFOLD_CR3(GET_FIELD(ctxt, ctrlreg[3]));
+        pfn = UNFOLD_CR3(GET_FIELD(ctxt, ctrlreg[3], dinfo->guest_width));
 
         if ( pfn >= dinfo->p2m_size )
         {
@@ -2109,7 +2111,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                   (unsigned long)ctx->pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
             goto out;
         }
-        SET_FIELD(ctxt, ctrlreg[3], FOLD_CR3(ctx->p2m[pfn]));
+        SET_FIELD(ctxt, ctrlreg[3], FOLD_CR3(ctx->p2m[pfn]), dinfo->guest_width);
 
         /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
         if ( (ctx->pt_levels == 4) && (ctxt->x64.ctrlreg[1] & 1) )
@@ -2199,16 +2201,16 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     }
 
     /* restore saved vcpu_info and arch specific info */
-    MEMCPY_FIELD(new_shared_info, old_shared_info, vcpu_info);
-    MEMCPY_FIELD(new_shared_info, old_shared_info, arch);
+    MEMCPY_FIELD(new_shared_info, old_shared_info, vcpu_info, dinfo->guest_width);
+    MEMCPY_FIELD(new_shared_info, old_shared_info, arch, dinfo->guest_width);
 
     /* clear any pending events and the selector */
-    MEMSET_ARRAY_FIELD(new_shared_info, evtchn_pending, 0);
+    MEMSET_ARRAY_FIELD(new_shared_info, evtchn_pending, 0, dinfo->guest_width);
     for ( i = 0; i < XEN_LEGACY_MAX_VCPUS; i++ )
-	    SET_FIELD(new_shared_info, vcpu_info[i].evtchn_pending_sel, 0);
+	    SET_FIELD(new_shared_info, vcpu_info[i].evtchn_pending_sel, 0, dinfo->guest_width);
 
     /* mask event channels */
-    MEMSET_ARRAY_FIELD(new_shared_info, evtchn_mask, 0xff);
+    MEMSET_ARRAY_FIELD(new_shared_info, evtchn_mask, 0xff, dinfo->guest_width);
 
     /* leave wallclock time. set by hypervisor */
     munmap(new_shared_info, PAGE_SIZE);
