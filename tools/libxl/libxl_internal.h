@@ -3180,6 +3180,8 @@ int libxl__uint64_parse_json(libxl__gc *gc, const libxl__json_object *o,
 int libxl__string_parse_json(libxl__gc *gc, const libxl__json_object *o,
                              char **p);
 
+int libxl__random_bytes(libxl__gc *gc, uint8_t *buf, size_t len);
+
 #endif
 
 /*

@@ -1014,6 +1014,28 @@ int libxl_domid_valid_guest(uint32_t domid)
 }
 
 /*
+ * Fill @buf with @len random bytes.
+ */
+int libxl__random_bytes(libxl__gc *gc, uint8_t *buf, size_t len)
+{
+    static const char *dev = "/dev/urandom";
+    int fd;
+    int ret;
+
+    fd = open(dev, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+        LOGE(ERROR, "failed to open \"%s\"", dev);
+        return ERROR_FAIL;
+    }
+
+    ret = libxl_read_exactly(CTX, fd, buf, len, dev, NULL);
+
+    close(fd);
+
+    return ret;
+}
+
+/*
  * Local variables:
  * mode: C
  * c-basic-offset: 4
