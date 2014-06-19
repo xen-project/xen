@@ -58,6 +58,24 @@ AX_ARG_DEFAULT_ENABLE([seabios], [Disable SeaBIOS])
 AX_ARG_DEFAULT_ENABLE([debug], [Disable debug build of tools])
 AX_ARG_DEFAULT_DISABLE([blktap1], [Enable blktap1 tools])
 
+dnl Enable blktap2 on Linux only.
+AC_ARG_ENABLE([blktap2],
+    AS_HELP_STRING([--enable-blktap2],
+                   [Enable blktap2, (DEFAULT is on for Linux, otherwise off)]),,[
+    case "$host_os" in
+        linux*)
+           enable_blktap2="yes";;
+        *) enable_blktap2="no";;
+    esac
+])
+AS_IF([test "x$enable_blktap2" = "xyes"], [
+AC_DEFINE([HAVE_BLKTAP2], [1], [Blktap2 enabled])
+    blktap2=y],[
+    blktap2=n
+])
+AC_SUBST(blktap2)
+
+
 AC_ARG_ENABLE([qemu-traditional],
     AS_HELP_STRING([--enable-qemu-traditional],
                    [Enable qemu traditional device model, (DEFAULT is on for Linux or NetBSD x86, otherwise off)]),,[

@@ -689,6 +689,7 @@ seabios_path
 qemu_xen
 rombios
 qemu_traditional
+blktap2
 blktap1
 debug
 seabios
@@ -763,6 +764,7 @@ enable_ovmf
 enable_seabios
 enable_debug
 enable_blktap1
+enable_blktap2
 enable_qemu_traditional
 enable_rombios
 with_system_qemu
@@ -1424,6 +1426,8 @@ Optional Features:
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
   --disable-debug         Disable debug build of tools (default is ENABLED)
   --enable-blktap1        Enable blktap1 tools (default is DISABLED)
+  --enable-blktap2        Enable blktap2, (DEFAULT is on for Linux, otherwise
+                          off)
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is on
                           for Linux or NetBSD x86, otherwise off)
@@ -3721,6 +3725,33 @@ elif test -z $ax_cv_blktap1; then :
 
 fi
 blktap1=$ax_cv_blktap1
+
+
+
+# Check whether --enable-blktap2 was given.
+if test "${enable_blktap2+set}" = set; then :
+  enableval=$enable_blktap2;
+else
+
+    case "$host_os" in
+        linux*)
+           enable_blktap2="yes";;
+        *) enable_blktap2="no";;
+    esac
+
+fi
+
+if test "x$enable_blktap2" = "xyes"; then :
+
+
+$as_echo "#define HAVE_BLKTAP2 1" >>confdefs.h
+
+    blktap2=y
+else
+
+    blktap2=n
+
+fi
 
 
 
