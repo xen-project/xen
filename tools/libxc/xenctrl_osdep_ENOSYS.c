@@ -27,7 +27,11 @@ static int ENOSYS_privcmd_close(xc_interface *xch, xc_osdep_handle h)
 
 static int ENOSYS_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
 {
+#if defined(__FreeBSD__) || defined(__NetBSD__)
+    IPRINTF(xch, "ENOSYS_privcmd %lx: hypercall: %02lu(%#lx,%#lx,%#lx,%#lx,%#lx)\n",
+#else
     IPRINTF(xch, "ENOSYS_privcmd %lx: hypercall: %02lld(%#llx,%#llx,%#llx,%#llx,%#llx)\n",
+#endif
             h, hypercall->op,
             hypercall->arg[0], hypercall->arg[1], hypercall->arg[2],
             hypercall->arg[3], hypercall->arg[4]);
