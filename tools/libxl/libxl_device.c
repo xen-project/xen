@@ -265,12 +265,6 @@ int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
                         disk->vdev, disk->pdev_path);
             return ERROR_INVAL;
         }
-        if (!S_ISBLK(a.stab.st_mode) &
-            !S_ISREG(a.stab.st_mode)) {
-            LOG(ERROR, "Disk vdev=%s phys path is not a block dev or file: %s",
-                       disk->vdev, disk->pdev_path);
-            return ERROR_INVAL;
-        }
     }
 
     if (disk->backend != LIBXL_DISK_BACKEND_UNKNOWN) {
