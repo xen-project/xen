@@ -1546,23 +1546,43 @@ bad_cp:
 
 static void do_cp14_dbg(struct cpu_user_regs *regs, union hsr hsr)
 {
+#ifndef NDEBUG
+    struct hsr_cp64 cp64 = hsr.cp64;
+#endif
+
     if ( !check_conditional_instr(regs, hsr) )
     {
         advance_pc(regs, hsr);
         return;
     }
 
+#ifndef NDEBUG
+    gdprintk(XENLOG_ERR,
+             "%s p14, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
+             cp64.read ? "mrrc" : "mcrr",
+             cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
+    gdprintk(XENLOG_ERR, "unhandled 64-bit CP14 access %#x\n",
+             hsr.bits & HSR_CP64_REGS_MASK);
+#endif
     inject_undef32_exception(regs);
 }
 
 static void do_cp(struct cpu_user_regs *regs, union hsr hsr)
 {
+#ifndef NDEBUG
+    struct hsr_cp cp = hsr.cp;
+#endif
+
     if ( !check_conditional_instr(regs, hsr) )
     {
         advance_pc(regs, hsr);
         return;
     }
 
+#ifndef NDEBUG
+    ASSERT(!cp.tas); /* We don't trap SIMD instruction */
+    gdprintk(XENLOG_ERR, "unhandled CP%d access\n", cp.coproc);
+#endif
     inject_undef32_exception(regs);
 }
 

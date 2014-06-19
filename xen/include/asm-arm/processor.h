@@ -295,6 +295,17 @@ union hsr {
         unsigned long ec:6;     /* Exception Class */
     } cp64; /* HSR_EC_CP15_64, HSR_EC_CP14_64 */
 
+     struct hsr_cp {
+        unsigned long coproc:4; /* Number of coproc accessed */
+        unsigned long sbz0p:1;
+        unsigned long tas:1;    /* Trapped Advanced SIMD */
+        unsigned long res0:14;
+        unsigned long cc:4;     /* Condition Code */
+        unsigned long ccvalid:1;/* CC Valid */
+        unsigned long len:1;    /* Instruction length */
+        unsigned long ec:6;     /* Exception Class */
+    } cp; /* HSR_EC_CP */
+
 #ifdef CONFIG_ARM_64
     struct hsr_sysreg {
         unsigned long read:1;   /* Direction */
