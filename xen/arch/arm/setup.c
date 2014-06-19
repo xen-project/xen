@@ -670,6 +670,12 @@ void __init start_xen(unsigned long boot_phys_offset,
     percpu_init_areas();
     set_processor_id(0); /* needed early, for smp_processor_id() */
 
+    set_current((struct vcpu *)0xfffff000); /* debug sanity */
+    idle_vcpu[0] = current;
+
+    /* Initialize traps early allow us to get backtrace when an error occurred */
+    init_traps();
+
     smp_clear_cpu_maps();
 
     /* This is mapped by head.S */
@@ -705,11 +711,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     init_xen_time();
 
     gic_init();
-
-    set_current((struct vcpu *)0xfffff000); /* debug sanity */
-    idle_vcpu[0] = current;
-
-    init_traps();
 
     setup_virt_paging();
 
