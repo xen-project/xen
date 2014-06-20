@@ -204,6 +204,12 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         p2m_mem_paging_drop_page(d, gmfn, p2mt);
         return 1;
     }
+    if ( p2mt == p2m_mmio_direct )
+    {
+        clear_mmio_p2m_entry(d, gmfn);
+        put_gfn(d, gmfn);
+        return 1;
+    }
 #else
     mfn = gmfn_to_mfn(d, gmfn);
 #endif
