@@ -427,6 +427,7 @@ static uint64_t get_cluster_offset(struct tdqcow_state *s,
 
 		if (posix_memalign((void **)&tmp_ptr, 4096, 4096) != 0) {
 			DPRINTF("ERROR allocating memory for L1 table\n");
+                        return 0;
 		}
 		memcpy(tmp_ptr, l1_ptr, 4096);
 
@@ -600,6 +601,7 @@ found:
 		
 		if (posix_memalign((void **)&tmp_ptr2, 4096, 4096) != 0) {
 			DPRINTF("ERROR allocating memory for L1 table\n");
+                        return 0;
 		}
 		memcpy(tmp_ptr2, l2_ptr, 4096);
 		lseek(s->fd, l2_offset + (l2_sector << 12), SEEK_SET);
