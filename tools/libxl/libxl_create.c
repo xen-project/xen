@@ -187,19 +187,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     } else if (b_info->avail_vcpus.size > HVM_MAX_VCPUS)
         return ERROR_FAIL;
 
-    if (!b_info->cpumap.size) {
-        if (libxl_cpu_bitmap_alloc(CTX, &b_info->cpumap, 0))
-            return ERROR_FAIL;
-        libxl_bitmap_set_any(&b_info->cpumap);
-    }
-
     libxl_defbool_setdefault(&b_info->numa_placement, true);
-
-    if (!b_info->nodemap.size) {
-        if (libxl_node_bitmap_alloc(CTX, &b_info->nodemap, 0))
-            return ERROR_FAIL;
-        libxl_bitmap_set_any(&b_info->nodemap);
-    }
 
     if (b_info->max_memkb == LIBXL_MEMKB_DEFAULT)
         b_info->max_memkb = 32 * 1024;

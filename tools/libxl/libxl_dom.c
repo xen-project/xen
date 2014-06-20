@@ -241,28 +241,39 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     }
 
     /*
-     * Check if the domain has any CPU affinity. If not, try to build
-     * up one. In case numa_place_domain() find at least a suitable
-     * candidate, it will affect info->nodemap accordingly; if it
-     * does not, it just leaves it as it is. This means (unless
-     * some weird error manifests) the subsequent call to
-     * libxl_domain_set_nodeaffinity() will do the actual placement,
-     * whatever that turns out to be.
+     * Check if the domain has any CPU or node affinity already. If not, try
+     * to build up the latter via automatic NUMA placement. In fact, in case
+     * numa_place_domain() manage to find a placement, in info->nodemap is
+     * updated accordingly; if it does not manage, info->nodemap is just left
+     * alone. It is then the the subsequent call to
+     * libxl_domain_set_nodeaffinity() that enacts the actual placement.
      */
     if (libxl_defbool_val(info->numa_placement)) {
-        if (!libxl_bitmap_is_full(&info->cpumap)) {
+        if (info->cpumap.size) {
             LOG(ERROR, "Can run NUMA placement only if no vcpu "
-                       "affinity is specified");
+                       "affinity is specified explicitly");
             return ERROR_INVAL;
         }
+        if (info->nodemap.size) {
+            LOG(ERROR, "Can run NUMA placement only if the domain does not "
+                       "have any NUMA node affinity set already");
+            return ERROR_INVAL;
+        }
+
+        rc = libxl_node_bitmap_alloc(ctx, &info->nodemap, 0);
+        if (rc)
+            return rc;
+        libxl_bitmap_set_any(&info->nodemap);
 
         rc = numa_place_domain(gc, domid, info);
         if (rc)
             return rc;
     }
-    libxl_domain_set_nodeaffinity(ctx, domid, &info->nodemap);
-    libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus,
-                               &info->cpumap, NULL);
+    if (info->nodemap.size)
+        libxl_domain_set_nodeaffinity(ctx, domid, &info->nodemap);
+    if (info->cpumap.size)
+        libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus,
+                                   &info->cpumap, NULL);
 
     if (xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb +
         LIBXL_MAXMEM_CONSTANT) < 0) {
