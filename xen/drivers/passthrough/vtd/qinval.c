@@ -58,7 +58,7 @@ static int qinval_next_index(struct iommu *iommu)
     return tail;
 }
 
-static int qinval_update_qtail(struct iommu *iommu, int index)
+static void qinval_update_qtail(struct iommu *iommu, int index)
 {
     u64 val;
 
@@ -66,7 +66,6 @@ static int qinval_update_qtail(struct iommu *iommu, int index)
     ASSERT( spin_is_locked(&iommu->register_lock) );
     val = (index + 1) % QINVAL_ENTRY_NR;
     dmar_writeq(iommu->reg, DMAR_IQT_REG, (val << QINVAL_INDEX_SHIFT));
-    return 0;
 }
 
 static int gen_cc_inv_dsc(struct iommu *iommu, int index,
@@ -100,17 +99,15 @@ static int gen_cc_inv_dsc(struct iommu *iommu, int index,
 int queue_invalidate_context(struct iommu *iommu,
     u16 did, u16 source_id, u8 function_mask, u8 granu)
 {
-    int ret = -1;
+    int ret;
     unsigned long flags;
     int index = -1;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
-    if ( index == -1 )
-        return -EBUSY;
     ret = gen_cc_inv_dsc(iommu, index, did, source_id,
                          function_mask, granu);
-    ret |= qinval_update_qtail(iommu, index);
+    qinval_update_qtail(iommu, index);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
     return ret;
 }
@@ -150,18 +147,16 @@ static int gen_iotlb_inv_dsc(struct iommu *iommu, int index,
 int queue_invalidate_iotlb(struct iommu *iommu,
     u8 granu, u8 dr, u8 dw, u16 did, u8 am, u8 ih, u64 addr)
 {
-    int ret = -1;
+    int ret;
     unsigned long flags;
     int index = -1;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
 
     index = qinval_next_index(iommu);
-    if ( index == -1 )
-        return -EBUSY;
     ret = gen_iotlb_inv_dsc(iommu, index, granu, dr, dw, did,
                             am, ih, addr);
-    ret |= qinval_update_qtail(iommu, index);
+    qinval_update_qtail(iommu, index);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
     return ret;
 }
@@ -198,16 +193,13 @@ static int queue_invalidate_wait(struct iommu *iommu,
     s_time_t start_time;
     volatile u32 poll_slot = QINVAL_STAT_INIT;
     int index = -1;
-    int ret = -1;
+    int ret;
     unsigned long flags;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
-    if ( index == -1 )
-        return -EBUSY;
-
     ret = gen_wait_dsc(iommu, index, iflag, sw, fn, QINVAL_STAT_DONE, &poll_slot);
-    ret |= qinval_update_qtail(iommu, index);
+    qinval_update_qtail(iommu, index);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 
     /* Now we don't support interrupt method */
@@ -225,19 +217,17 @@ static int queue_invalidate_wait(struct iommu *iommu,
             cpu_relax();
         }
     }
+    else if ( !ret )
+        ret = -EOPNOTSUPP;
     return ret;
 }
 
 static int invalidate_sync(struct iommu *iommu)
 {
-    int ret = -1;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
-    if ( qi_ctrl->qinval_maddr != 0 )
-    {
-        ret = queue_invalidate_wait(iommu, 0, 1, 1);
-        return ret;
-    }
+    if ( qi_ctrl->qinval_maddr )
+        return queue_invalidate_wait(iommu, 0, 1, 1);
     return 0;
 }
 
@@ -274,17 +264,15 @@ static int gen_dev_iotlb_inv_dsc(struct iommu *iommu, int index,
 int qinval_device_iotlb(struct iommu *iommu,
     u32 max_invs_pend, u16 sid, u16 size, u64 addr)
 {
-    int ret = -1;
+    int ret;
     unsigned long flags;
     int index = -1;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
-    if ( index == -1 )
-        return -EBUSY;
     ret = gen_dev_iotlb_inv_dsc(iommu, index, max_invs_pend,
                                 sid, size, addr);
-    ret |= qinval_update_qtail(iommu, index);
+    qinval_update_qtail(iommu, index);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
     return ret;
 }
@@ -324,26 +312,23 @@ int queue_invalidate_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
-    if ( index == -1 )
-        return -EBUSY;
     ret = gen_iec_inv_dsc(iommu, index, granu, im, iidx);
-    ret |= qinval_update_qtail(iommu, index);
+    qinval_update_qtail(iommu, index);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
     return ret;
 }
 
 static int __iommu_flush_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
 {
-    int ret;
-    ret = queue_invalidate_iec(iommu, granu, im, iidx);
-    ret |= invalidate_sync(iommu);
+    int ret = queue_invalidate_iec(iommu, granu, im, iidx);
+    int rc = invalidate_sync(iommu);
 
     /*
      * reading vt-d architecture register will ensure
      * draining happens in implementation independent way.
      */
     (void)dmar_readq(iommu->reg, DMAR_CAP_REG);
-    return ret;
+    return ret ?: rc;
 }
 
 int iommu_flush_iec_global(struct iommu *iommu)
@@ -380,9 +365,13 @@ static int flush_context_qi(
 
     if ( qi_ctrl->qinval_maddr != 0 )
     {
+        int rc;
+
         ret = queue_invalidate_context(iommu, did, sid, fm,
                                        type >> DMA_CCMD_INVL_GRANU_OFFSET);
-        ret |= invalidate_sync(iommu);
+        rc = invalidate_sync(iommu);
+        if ( !ret )
+            ret = rc;
     }
     return ret;
 }
@@ -413,6 +402,8 @@ static int flush_iotlb_qi(
 
     if ( qi_ctrl->qinval_maddr != 0 )
     {
+        int rc;
+
         /* use queued invalidation */
         if (cap_write_drain(iommu->cap))
             dw = 1;
@@ -423,8 +414,10 @@ static int flush_iotlb_qi(
                   (type >> DMA_TLB_FLUSH_GRANU_OFFSET), dr,
                   dw, did, (u8)size_order, 0, addr);
         if ( flush_dev_iotlb )
-            ret |= dev_invalidate_iotlb(iommu, did, addr, size_order, type);
-        ret |= invalidate_sync(iommu);
+            ret = dev_invalidate_iotlb(iommu, did, addr, size_order, type);
+        rc = invalidate_sync(iommu);
+        if ( !ret )
+            ret = rc;
     }
     return ret;
 }
