@@ -88,9 +88,6 @@ xlchild children[child_max];
 static const char *common_domname;
 static int fd_lock = -1;
 
-/* Stash for specific vcpu to pcpu mappping */
-static int *vcpu_to_pcpu;
-
 static const char savefileheader_magic[32]=
     "Xen saved domain, xl format\n \0 \r";
 
@@ -703,7 +700,7 @@ static void parse_config_data(const char *config_source,
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms;
     XLU_ConfigList *ioports, *irqs, *iomem;
-    int num_ioports, num_irqs, num_iomem;
+    int num_ioports, num_irqs, num_iomem, num_cpus;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 0;
     int pci_permissive = 0;
@@ -800,43 +797,32 @@ static void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_long (config, "maxvcpus", &l, 0))
         b_info->max_vcpus = l;
 
-    if (!xlu_cfg_get_list (config, "cpus", &cpus, 0, 1)) {
-        int n_cpus = 0;
+    if (!xlu_cfg_get_list (config, "cpus", &cpus, &num_cpus, 1)) {
+        int j = 0;
 
-        if (libxl_cpu_bitmap_alloc(ctx, &b_info->cpumap, 0)) {
-            fprintf(stderr, "Unable to allocate cpumap\n");
-            exit(1);
-        }
+        /* Silently ignore values corresponding to non existing vcpus */
+        if (num_cpus > b_info->max_vcpus)
+            num_cpus = b_info->max_vcpus;
 
-        /* Prepare the array for single vcpu to pcpu mappings */
-        vcpu_to_pcpu = xmalloc(sizeof(int) * b_info->max_vcpus);
-        memset(vcpu_to_pcpu, -1, sizeof(int) * b_info->max_vcpus);
+        b_info->vcpu_hard_affinity = xmalloc(num_cpus * sizeof(libxl_bitmap));
 
-        /*
-         * Idea here is to let libxl think all the domain's vcpus
-         * have cpu affinity with all the pcpus on the list.
-         * It is then us, here in xl, that matches each single vcpu
-         * to its pcpu (and that's why we need to stash such info in
-         * the vcpu_to_pcpu array now) after the domain has been created.
-         * Doing it like this saves the burden of passing to libxl
-         * some big array hosting the single mappings. Also, using
-         * the cpumap derived from the list ensures memory is being
-         * allocated on the proper nodes anyway.
-         */
-        libxl_bitmap_set_none(&b_info->cpumap);
-        while ((buf = xlu_cfg_get_listitem(cpus, n_cpus)) != NULL) {
+        while ((buf = xlu_cfg_get_listitem(cpus, j)) != NULL && j < num_cpus) {
             i = atoi(buf);
-            if (!libxl_bitmap_cpu_valid(&b_info->cpumap, i)) {
-                fprintf(stderr, "cpu %d illegal\n", i);
+
+            libxl_bitmap_init(&b_info->vcpu_hard_affinity[j]);
+            if (libxl_cpu_bitmap_alloc(ctx,
+                                       &b_info->vcpu_hard_affinity[j], 0)) {
+                fprintf(stderr, "Unable to allocate cpumap for vcpu %d\n", j);
                 exit(1);
             }
-            libxl_bitmap_set(&b_info->cpumap, i);
-            if (n_cpus < b_info->max_vcpus)
-                vcpu_to_pcpu[n_cpus] = i;
-            n_cpus++;
-        }
+            libxl_bitmap_set_none(&b_info->vcpu_hard_affinity[j]);
+            libxl_bitmap_set(&b_info->vcpu_hard_affinity[j], i);
 
-        /* We have a cpumap, disable automatic placement */
+            j++;
+        }
+        b_info->num_vcpu_hard_affinity = num_cpus;
+
+        /* We have a list of cpumaps, disable automatic placement */
         libxl_defbool_set(&b_info->numa_placement, false);
     }
     else if (!xlu_cfg_get_string (config, "cpus", &buf, 0)) {
@@ -2182,33 +2168,6 @@ start:
     }
     if ( ret )
         goto error_out;
-
-    /* If single vcpu to pcpu mapping was requested, honour it */
-    if (vcpu_to_pcpu) {
-        libxl_bitmap vcpu_cpumap;
-
-        ret = libxl_cpu_bitmap_alloc(ctx, &vcpu_cpumap, 0);
-        if (ret)
-            goto error_out;
-        for (i = 0; i < d_config.b_info.max_vcpus; i++) {
-
-            if (vcpu_to_pcpu[i] != -1) {
-                libxl_bitmap_set_none(&vcpu_cpumap);
-                libxl_bitmap_set(&vcpu_cpumap, vcpu_to_pcpu[i]);
-            } else {
-                libxl_bitmap_set_any(&vcpu_cpumap);
-            }
-            if (libxl_set_vcpuaffinity(ctx, domid, i, &vcpu_cpumap, NULL)) {
-                fprintf(stderr, "setting affinity failed on vcpu `%d'.\n", i);
-                libxl_bitmap_dispose(&vcpu_cpumap);
-                free(vcpu_to_pcpu);
-                ret = ERROR_FAIL;
-                goto error_out;
-            }
-        }
-        libxl_bitmap_dispose(&vcpu_cpumap);
-        free(vcpu_to_pcpu); vcpu_to_pcpu = NULL;
-    }
 
     ret = libxl_userdata_store(ctx, domid, "xl",
                                     config_data, config_len);

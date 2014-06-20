@@ -249,7 +249,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
      * libxl_domain_set_nodeaffinity() that enacts the actual placement.
      */
     if (libxl_defbool_val(info->numa_placement)) {
-        if (info->cpumap.size) {
+        if (info->cpumap.size || info->num_vcpu_hard_affinity) {
             LOG(ERROR, "Can run NUMA placement only if no vcpu "
                        "affinity is specified explicitly");
             return ERROR_INVAL;
@@ -271,9 +271,22 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     }
     if (info->nodemap.size)
         libxl_domain_set_nodeaffinity(ctx, domid, &info->nodemap);
-    if (info->cpumap.size)
+    /* As mentioned in libxl.h, vcpu_hard_array takes precedence */
+    if (info->num_vcpu_hard_affinity) {
+        int i;
+
+        for (i = 0; i < info->num_vcpu_hard_affinity; i++) {
+            if (libxl_set_vcpuaffinity(ctx, domid, i,
+                                       &info->vcpu_hard_affinity[i],
+                                       NULL)) {
+                LOG(ERROR, "setting affinity failed on vcpu `%d'", i);
+                return ERROR_FAIL;
+            }
+        }
+    } else if (info->cpumap.size)
         libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus,
                                    &info->cpumap, NULL);
+
 
     if (xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb +
         LIBXL_MAXMEM_CONSTANT) < 0) {

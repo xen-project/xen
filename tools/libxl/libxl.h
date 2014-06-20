@@ -340,6 +340,31 @@ typedef struct libxl__ctx libxl_ctx;
 #endif
 
 /*
+ * LIBXL_HAVE_BUILDINFO_VCPU_AFFINITY_ARRAYS
+ *
+ * If this is defined, then the libxl_domain_build_info structure will
+ * contain two arrays of libxl_bitmap-s, with all the necessary information
+ * to set the hard affinity (vcpu_hard_affinity) and the soft affinity
+ * (vcpu_soft_affinity) of the VCPUs.
+ *
+ * Note that, if the vcpu_hard_affinity array is used, libxl will ignore
+ * the content of the cpumap field of libxl_domain_build_info. That is to
+ * say, if the array is allocated and used by the caller, it is it and
+ * only it that determines the hard affinity of the domain's VCPUs.
+ *
+ * The number of libxl_bitmap-s in the arrays should be equal to the
+ * maximum number of VCPUs of the domain. If there only are N elements in
+ * an array, with N smaller the the maximum number of VCPUs, the hard or
+ * soft affinity (depending on which array we are talking about) will be
+ * set only for the first N VCPUs. The other VCPUs will just have affinity,
+ * both hard and soft, with all the host PCPUs.
+ * Each bitmap should be big enough to accommodate the maximum number of
+ * PCPUs of the host.
+ */
+/* to be uncommented when soft array added */
+/* #define LIBXL_HAVE_BUILDINFO_VCPU_AFFINITY_ARRAYS 1 */
+
+/*
  * LIBXL_HAVE_BUILDINFO_USBDEVICE_LIST
  *
  * If this is defined, then the libxl_domain_build_info structure will
