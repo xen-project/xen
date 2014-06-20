@@ -4606,13 +4606,17 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         libxl_bitmap_init(&ptr->cpumap);
         if (libxl_cpu_bitmap_alloc(ctx, &ptr->cpumap, 0))
             goto err;
+        libxl_bitmap_init(&ptr->cpumap_soft);
+        if (libxl_cpu_bitmap_alloc(ctx, &ptr->cpumap_soft, 0))
+            goto err;
         if (xc_vcpu_getinfo(ctx->xch, domid, *nr_vcpus_out, &vcpuinfo) == -1) {
             LOGE(ERROR, "getting vcpu info");
             goto err;
         }
+
         if (xc_vcpu_getaffinity(ctx->xch, domid, *nr_vcpus_out,
-                                ptr->cpumap.map, NULL,
-                                XEN_VCPUAFFINITY_HARD) == -1) {
+                                ptr->cpumap.map, ptr->cpumap_soft.map,
+                                XEN_VCPUAFFINITY_SOFT|XEN_VCPUAFFINITY_HARD) == -1) {
             LOGE(ERROR, "getting vcpu affinity");
             goto err;
         }
@@ -4628,34 +4632,105 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
 
 err:
     libxl_bitmap_dispose(&ptr->cpumap);
+    libxl_bitmap_dispose(&ptr->cpumap_soft);
     free(ret);
     GC_FREE;
     return NULL;
 }
 
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
-                           libxl_bitmap *cpumap)
+                           const libxl_bitmap *cpumap_hard,
+                           const libxl_bitmap *cpumap_soft)
 {
-    if (xc_vcpu_setaffinity(ctx->xch, domid, vcpuid, cpumap->map, NULL,
-                            XEN_VCPUAFFINITY_HARD)) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "setting vcpu affinity");
-        return ERROR_FAIL;
+    GC_INIT(ctx);
+    libxl_bitmap hard, soft;
+    int rc, flags = 0;
+
+    libxl_bitmap_init(&hard);
+    libxl_bitmap_init(&soft);
+
+    if (!cpumap_hard && !cpumap_soft) {
+        rc = ERROR_INVAL;
+        goto out;
     }
-    return 0;
+
+    /*
+     * Xen wants writable hard and/or soft cpumaps, to put back in them
+     * the effective hard and/or soft affinity that will be used.
+     */
+    if (cpumap_hard) {
+        rc = libxl_cpu_bitmap_alloc(ctx, &hard, 0);
+        if (rc)
+            goto out;
+
+        libxl_bitmap_copy(ctx, &hard, cpumap_hard);
+        flags = XEN_VCPUAFFINITY_HARD;
+    }
+    if (cpumap_soft) {
+        rc = libxl_cpu_bitmap_alloc(ctx, &soft, 0);
+        if (rc)
+            goto out;
+
+        libxl_bitmap_copy(ctx, &soft, cpumap_soft);
+        flags |= XEN_VCPUAFFINITY_SOFT;
+    }
+
+    if (xc_vcpu_setaffinity(ctx->xch, domid, vcpuid,
+                            cpumap_hard ? hard.map : NULL,
+                            cpumap_soft ? soft.map : NULL,
+                            flags)) {
+        LOGE(ERROR, "setting vcpu affinity");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    /*
+     * Let's check the results. Hard affinity will never be empty, but it
+     * is possible that Xen will use something different from what we asked
+     * for various reasons. If that's the case, report it.
+     */
+    if (cpumap_hard &&
+        !libxl_bitmap_equal(cpumap_hard, &hard, 0))
+        LOG(DEBUG, "New hard affinity for vcpu %d has unreachable cpus",
+        vcpuid);
+    /*
+     * Soft affinity can both be different from what asked and empty. Check
+     * for (and report) both.
+     */
+    if (cpumap_soft) {
+        if (!libxl_bitmap_equal(cpumap_soft, &soft, 0))
+            LOG(DEBUG, "New soft affinity for vcpu %d has unreachable cpus",
+                vcpuid);
+        if (libxl_bitmap_is_empty(&soft))
+            LOG(WARN, "all cpus in soft affinity of vcpu %d are unreachable."
+                " Only hard affinity will be considered for scheduling",
+                vcpuid);
+    }
+
+    rc = 0;
+ out:
+    libxl_bitmap_dispose(&hard);
+    libxl_bitmap_dispose(&soft);
+    GC_FREE;
+    return rc;
 }
 
 int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
-                               unsigned int max_vcpus, libxl_bitmap *cpumap)
+                               unsigned int max_vcpus,
+                               const libxl_bitmap *cpumap_hard,
+                               const libxl_bitmap *cpumap_soft)
 {
+    GC_INIT(ctx);
     int i, rc = 0;
 
     for (i = 0; i < max_vcpus; i++) {
-        if (libxl_set_vcpuaffinity(ctx, domid, i, cpumap)) {
-            LIBXL__LOG(ctx, LIBXL__LOG_WARNING,
-                       "failed to set affinity for %d", i);
+        if (libxl_set_vcpuaffinity(ctx, domid, i, cpumap_hard, cpumap_soft)) {
+            LOG(WARN, "failed to set affinity for %d", i);
             rc = ERROR_FAIL;
         }
     }
+
+    GC_FREE;
     return rc;
 }
 

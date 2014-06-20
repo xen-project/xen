@@ -104,6 +104,13 @@
 #define LIBXL_HAVE_BUILDINFO_EVENT_CHANNELS 1
 
 /*
+ * LIBXL_HAVE_VCPUINFO_SOFT_AFFINITY indicates that a 'cpumap_soft'
+ * field (of libxl_bitmap type) is present in libxl_vcpuinfo,
+ * containing the soft affinity of a vcpu.
+ */
+#define LIBXL_HAVE_VCPUINFO_SOFT_AFFINITY 1
+
+/*
  * LIBXL_HAVE_DEVICE_DISK_DIRECT_IO_SAFE indicates that a
  * 'direct_io_safe' field (of boolean type) is present in
  * libxl_device_disk.
@@ -1136,9 +1143,22 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
 
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
-                           libxl_bitmap *cpumap);
+                           const libxl_bitmap *cpumap_hard,
+                           const libxl_bitmap *cpumap_soft);
 int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
-                               unsigned int max_vcpus, libxl_bitmap *cpumap);
+                               unsigned int max_vcpus,
+                               const libxl_bitmap *cpumap_hard,
+                               const libxl_bitmap *cpumap_soft);
+
+#if defined (LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x040500
+
+#define libxl_set_vcpuaffinity(ctx, domid, vcpuid, map) \
+    libxl_set_vcpuaffinity((ctx), (domid), (vcpuid), (map), NULL)
+#define libxl_set_vcpuaffinity_all(ctx, domid, max_vcpus, map) \
+    libxl_set_vcpuaffinity_all((ctx), (domid), (max_vcpus), (map), NULL)
+
+#endif
+
 int libxl_domain_set_nodeaffinity(libxl_ctx *ctx, uint32_t domid,
                                   libxl_bitmap *nodemap);
 int libxl_domain_get_nodeaffinity(libxl_ctx *ctx, uint32_t domid,

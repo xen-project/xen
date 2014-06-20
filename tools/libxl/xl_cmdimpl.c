@@ -2198,7 +2198,7 @@ start:
             } else {
                 libxl_bitmap_set_any(&vcpu_cpumap);
             }
-            if (libxl_set_vcpuaffinity(ctx, domid, i, &vcpu_cpumap)) {
+            if (libxl_set_vcpuaffinity(ctx, domid, i, &vcpu_cpumap, NULL)) {
                 fprintf(stderr, "setting affinity failed on vcpu `%d'.\n", i);
                 libxl_bitmap_dispose(&vcpu_cpumap);
                 free(vcpu_to_pcpu);
@@ -4622,7 +4622,7 @@ static int vcpupin(uint32_t domid, const char *vcpu, char *cpu)
     }
 
     if (vcpuid != -1) {
-        if (libxl_set_vcpuaffinity(ctx, domid, vcpuid, &cpumap) == -1) {
+        if (libxl_set_vcpuaffinity(ctx, domid, vcpuid, &cpumap, NULL)) {
             fprintf(stderr, "Could not set affinity for vcpu `%u'.\n", vcpuid);
             goto out;
         }
@@ -4634,7 +4634,7 @@ static int vcpupin(uint32_t domid, const char *vcpu, char *cpu)
         }
         for (i = 0; i < nb_vcpu; i++) {
             if (libxl_set_vcpuaffinity(ctx, domid, vcpuinfo[i].vcpuid,
-                                       &cpumap) == -1) {
+                                       &cpumap, NULL)) {
                 fprintf(stderr, "libxl_set_vcpuaffinity failed"
                                 " on vcpu `%u'.\n", vcpuinfo[i].vcpuid);
             }

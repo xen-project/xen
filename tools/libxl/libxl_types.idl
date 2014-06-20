@@ -520,7 +520,8 @@ libxl_vcpuinfo = Struct("vcpuinfo", [
     ("blocked", bool),
     ("running", bool),
     ("vcpu_time", uint64), # total vcpu time ran (ns)
-    ("cpumap", libxl_bitmap), # current cpu's affinities
+    ("cpumap", libxl_bitmap), # current hard cpu affinity
+    ("cpumap_soft", libxl_bitmap), # current soft cpu affinity
     ], dir=DIR_OUT)
 
 libxl_physinfo = Struct("physinfo", [

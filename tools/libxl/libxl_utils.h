@@ -101,6 +101,31 @@ static inline int libxl_bitmap_cpu_valid(libxl_bitmap *bitmap, int bit)
 #define libxl_for_each_set_bit(v, m) for (v = 0; v < (m).size * 8; v++) \
                                              if (libxl_bitmap_test(&(m), v))
 
+/*
+ * Compares two bitmaps bit by bit, up to nr_bits or, if nr_bits is 0, up
+ * to the size of the largest bitmap. If sizes does not match, bits past the
+ * of a bitmap are considered as being 0, which matches with the semantic and
+ * implementation of libxl_bitmap_test I think().
+ *
+ * So, basically, [0,1,0] and [0,1] are considered equal, while [0,1,1] and
+ * [0,1] are different.
+ */
+static inline int libxl_bitmap_equal(const libxl_bitmap *ba,
+                                     const libxl_bitmap *bb,
+                                     int nr_bits)
+{
+    int i;
+
+    if (nr_bits == 0)
+        nr_bits = ba->size > bb->size ? ba->size * 8 : bb->size * 8;
+
+    for (i = 0; i < nr_bits; i++) {
+        if (libxl_bitmap_test(ba, i) != libxl_bitmap_test(bb, i))
+            return 0;
+    }
+    return 1;
+}
+
 int libxl_cpu_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *cpumap, int max_cpus);
 int libxl_node_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *nodemap,
                             int max_nodes);
