@@ -159,6 +159,7 @@ int helper_getreply(void *user)
 
 static int toolstack_save_fd;
 static uint32_t toolstack_save_len;
+static struct save_callbacks helper_save_callbacks;
 
 static int toolstack_save_cb(uint32_t domid, uint8_t **buf,
                              uint32_t *len, void *data)
@@ -166,6 +167,12 @@ static int toolstack_save_cb(uint32_t domid, uint8_t **buf,
     int r;
 
     assert(toolstack_save_fd > 0);
+
+    /* This is a hack for remus */
+    if (helper_save_callbacks.checkpoint) {
+        r = lseek(toolstack_save_fd, 0, SEEK_SET);
+        if (r) fail(errno,"rewind toolstack data tmpfile");
+    }
 
     *buf = xmalloc(toolstack_save_len);
     r = read_exactly(toolstack_save_fd, *buf, toolstack_save_len);
@@ -191,7 +198,6 @@ static void complete(int retval) {
     exit(0);
 }
 
-static struct save_callbacks helper_save_callbacks;
 static struct restore_callbacks helper_restore_callbacks;
 
 int main(int argc, char **argv)
