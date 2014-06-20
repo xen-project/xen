@@ -4611,7 +4611,8 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
             goto err;
         }
         if (xc_vcpu_getaffinity(ctx->xch, domid, *nr_vcpus_out,
-                                ptr->cpumap.map) == -1) {
+                                ptr->cpumap.map, NULL,
+                                XEN_VCPUAFFINITY_HARD) == -1) {
             LOGE(ERROR, "getting vcpu affinity");
             goto err;
         }
@@ -4635,7 +4636,8 @@ err:
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
                            libxl_bitmap *cpumap)
 {
-    if (xc_vcpu_setaffinity(ctx->xch, domid, vcpuid, cpumap->map)) {
+    if (xc_vcpu_setaffinity(ctx->xch, domid, vcpuid, cpumap->map, NULL,
+                            XEN_VCPUAFFINITY_HARD)) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "setting vcpu affinity");
         return ERROR_FAIL;
     }

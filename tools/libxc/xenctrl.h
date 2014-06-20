@@ -600,14 +600,65 @@ int xc_domain_node_getaffinity(xc_interface *xch,
                                uint32_t domind,
                                xc_nodemap_t nodemap);
 
+/**
+ * This function specifies the CPU affinity for a vcpu.
+ *
+ * There are two kinds of affinity. Soft affinity is on what CPUs a vcpu
+ * prefers to run. Hard affinity is on what CPUs a vcpu is allowed to run.
+ * If flags contains XEN_VCPUAFFINITY_SOFT, the soft affinity it is set to
+ * what cpumap_soft_inout contains. If flags contains XEN_VCPUAFFINITY_HARD,
+ * the hard affinity is set to what cpumap_hard_inout contains. Both flags
+ * can be set at the same time, in which case both soft and hard affinity are
+ * set to what the respective parameter contains.
+ *
+ * The function also returns the effective hard or/and soft affinity, still
+ * via the cpumap_soft_inout and cpumap_hard_inout parameters. Effective
+ * affinity is, in case of soft affinity, the intersection of soft affinity,
+ * hard affinity and the cpupool's online CPUs for the domain, and is returned
+ * in cpumap_soft_inout, if XEN_VCPUAFFINITY_SOFT is set in flags. In case of
+ * hard affinity, it is the intersection between hard affinity and the
+ * cpupool's online CPUs, and is returned in cpumap_hard_inout, if
+ * XEN_VCPUAFFINITY_HARD is set in flags. If both flags are set, both soft
+ * and hard affinity are returned in the respective parameter.
+ *
+ * We do report it back as effective affinity is what the Xen scheduler will
+ * actually use, and we thus allow checking whether or not that matches with,
+ * or at least is good enough for, the caller's purposes.
+ *
+ * @param xch a handle to an open hypervisor interface.
+ * @param domid the id of the domain to which the vcpu belongs
+ * @param vcpu the vcpu id wihin the domain
+ * @param cpumap_hard_inout specifies(/returns) the (effective) hard affinity
+ * @param cpumap_soft_inout specifies(/returns) the (effective) soft affinity
+ * @param flags what we want to set
+ */
 int xc_vcpu_setaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
-                        xc_cpumap_t cpumap);
+                        xc_cpumap_t cpumap_hard_inout,
+                        xc_cpumap_t cpumap_soft_inout,
+                        uint32_t flags);
+
+/**
+ * This function retrieves hard and soft CPU affinity of a vcpu,
+ * depending on what flags are set.
+ *
+ * Soft affinity is returned in cpumap_soft if XEN_VCPUAFFINITY_SOFT is set.
+ * Hard affinity is returned in cpumap_hard if XEN_VCPUAFFINITY_HARD is set.
+ *
+ * @param xch a handle to an open hypervisor interface.
+ * @param domid the id of the domain to which the vcpu belongs
+ * @param vcpu the vcpu id wihin the domain
+ * @param cpumap_hard is where hard affinity is returned
+ * @param cpumap_soft is where soft affinity is returned
+ * @param flags what we want get
+ */
 int xc_vcpu_getaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
-                        xc_cpumap_t cpumap);
+                        xc_cpumap_t cpumap_hard,
+                        xc_cpumap_t cpumap_soft,
+                        uint32_t flags);
 
 
 /**

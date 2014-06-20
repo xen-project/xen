@@ -256,7 +256,8 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
         }
     }
   
-    if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap) != 0 )
+    if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap,
+                             NULL, XEN_VCPUAFFINITY_HARD) != 0 )
     {
         free(cpumap);
         return pyxc_error_to_exception(self->xc_handle);
@@ -403,7 +404,8 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     if(cpumap == NULL)
         return pyxc_error_to_exception(self->xc_handle);
 
-    rc = xc_vcpu_getaffinity(self->xc_handle, dom, vcpu, cpumap);
+    rc = xc_vcpu_getaffinity(self->xc_handle, dom, vcpu, cpumap,
+                             NULL, XEN_VCPUAFFINITY_HARD);
     if ( rc < 0 )
     {
         free(cpumap);

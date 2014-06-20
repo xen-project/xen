@@ -202,10 +202,15 @@ int xc_domain_node_getaffinity(xc_interface *xch,
 int xc_vcpu_setaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
-                        xc_cpumap_t cpumap)
+                        xc_cpumap_t cpumap_hard_inout,
+                        xc_cpumap_t cpumap_soft_inout,
+                        uint32_t flags)
 {
     DECLARE_DOMCTL;
-    DECLARE_HYPERCALL_BUFFER(uint8_t, local);
+    DECLARE_HYPERCALL_BOUNCE(cpumap_hard_inout, 0,
+                             XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_HYPERCALL_BOUNCE(cpumap_soft_inout, 0,
+                             XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     int ret = -1;
     int cpusize;
 
@@ -213,32 +218,37 @@ int xc_vcpu_setaffinity(xc_interface *xch,
     if (cpusize <= 0)
     {
         PERROR("Could not get number of cpus");
-        goto out;
+        return -1;
     }
 
-    local = xc_hypercall_buffer_alloc(xch, local, cpusize);
-    if ( local == NULL )
+    HYPERCALL_BOUNCE_SET_SIZE(cpumap_hard_inout, cpusize);
+    HYPERCALL_BOUNCE_SET_SIZE(cpumap_soft_inout, cpusize);
+
+    if ( xc_hypercall_bounce_pre(xch, cpumap_hard_inout) ||
+         xc_hypercall_bounce_pre(xch, cpumap_soft_inout) )
     {
-        PERROR("Could not allocate memory for setvcpuaffinity domctl hypercall");
+        PERROR("Could not allocate hcall buffers for DOMCTL_setvcpuaffinity");
         goto out;
     }
 
     domctl.cmd = XEN_DOMCTL_setvcpuaffinity;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu = vcpu;
-    domctl.u.vcpuaffinity.flags = XEN_VCPUAFFINITY_HARD;
+    domctl.u.vcpuaffinity.flags = flags;
 
-    memcpy(local, cpumap, cpusize);
-
-    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap_hard.bitmap, local);
-
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap_hard.bitmap,
+                         cpumap_hard_inout);
     domctl.u.vcpuaffinity.cpumap_hard.nr_bits = cpusize * 8;
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap_soft.bitmap,
+                         cpumap_soft_inout);
+    domctl.u.vcpuaffinity.cpumap_soft.nr_bits = cpusize * 8;
 
     ret = do_domctl(xch, &domctl);
 
-    xc_hypercall_buffer_free(xch, local);
-
  out:
+    xc_hypercall_bounce_post(xch, cpumap_hard_inout);
+    xc_hypercall_bounce_post(xch, cpumap_soft_inout);
+
     return ret;
 }
 
@@ -246,10 +256,13 @@ int xc_vcpu_setaffinity(xc_interface *xch,
 int xc_vcpu_getaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
-                        xc_cpumap_t cpumap)
+                        xc_cpumap_t cpumap_hard,
+                        xc_cpumap_t cpumap_soft,
+                        uint32_t flags)
 {
     DECLARE_DOMCTL;
-    DECLARE_HYPERCALL_BUFFER(uint8_t, local);
+    DECLARE_HYPERCALL_BOUNCE(cpumap_hard, 0, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_HYPERCALL_BOUNCE(cpumap_soft, 0, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     int ret = -1;
     int cpusize;
 
@@ -257,30 +270,37 @@ int xc_vcpu_getaffinity(xc_interface *xch,
     if (cpusize <= 0)
     {
         PERROR("Could not get number of cpus");
-        goto out;
+        return -1;
     }
 
-    local = xc_hypercall_buffer_alloc(xch, local, cpusize);
-    if (local == NULL)
+    HYPERCALL_BOUNCE_SET_SIZE(cpumap_hard, cpusize);
+    HYPERCALL_BOUNCE_SET_SIZE(cpumap_soft, cpusize);
+
+    if ( xc_hypercall_bounce_pre(xch, cpumap_hard) ||
+         xc_hypercall_bounce_pre(xch, cpumap_soft) )
     {
-        PERROR("Could not allocate memory for getvcpuaffinity domctl hypercall");
+        PERROR("Could not allocate hcall buffers for DOMCTL_getvcpuaffinity");
         goto out;
     }
 
     domctl.cmd = XEN_DOMCTL_getvcpuaffinity;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu = vcpu;
-    domctl.u.vcpuaffinity.flags = XEN_VCPUAFFINITY_HARD;
+    domctl.u.vcpuaffinity.flags = flags;
 
-    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap_hard.bitmap, local);
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap_hard.bitmap,
+                         cpumap_hard);
     domctl.u.vcpuaffinity.cpumap_hard.nr_bits = cpusize * 8;
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap_soft.bitmap,
+                         cpumap_soft);
+    domctl.u.vcpuaffinity.cpumap_soft.nr_bits = cpusize * 8;
 
     ret = do_domctl(xch, &domctl);
 
-    memcpy(cpumap, local, cpusize);
+ out:
+    xc_hypercall_bounce_post(xch, cpumap_hard);
+    xc_hypercall_bounce_post(xch, cpumap_soft);
 
-    xc_hypercall_buffer_free(xch, local);
-out:
     return ret;
 }
 
