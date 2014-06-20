@@ -43,7 +43,7 @@ static void print_qi_regs(struct iommu *iommu)
     printk("DMAR_IQT_REG = %"PRIx64"\n", val);
 }
 
-static int qinval_next_index(struct iommu *iommu)
+static unsigned int qinval_next_index(struct iommu *iommu)
 {
     u64 tail;
 
@@ -58,7 +58,7 @@ static int qinval_next_index(struct iommu *iommu)
     return tail;
 }
 
-static void qinval_update_qtail(struct iommu *iommu, int index)
+static void qinval_update_qtail(struct iommu *iommu, unsigned int index)
 {
     u64 val;
 
@@ -68,7 +68,7 @@ static void qinval_update_qtail(struct iommu *iommu, int index)
     dmar_writeq(iommu->reg, DMAR_IQT_REG, (val << QINVAL_INDEX_SHIFT));
 }
 
-static int gen_cc_inv_dsc(struct iommu *iommu, int index,
+static int gen_cc_inv_dsc(struct iommu *iommu, unsigned int index,
     u16 did, u16 source_id, u8 function_mask, u8 granu)
 {
     unsigned long flags;
@@ -101,7 +101,7 @@ int queue_invalidate_context(struct iommu *iommu,
 {
     int ret;
     unsigned long flags;
-    int index = -1;
+    unsigned int index;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
@@ -112,7 +112,7 @@ int queue_invalidate_context(struct iommu *iommu,
     return ret;
 }
 
-static int gen_iotlb_inv_dsc(struct iommu *iommu, int index,
+static int gen_iotlb_inv_dsc(struct iommu *iommu, unsigned int index,
     u8 granu, u8 dr, u8 dw, u16 did, u8 am, u8 ih, u64 addr)
 {
     unsigned long flags;
@@ -149,7 +149,7 @@ int queue_invalidate_iotlb(struct iommu *iommu,
 {
     int ret;
     unsigned long flags;
-    int index = -1;
+    unsigned int index;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
 
@@ -161,7 +161,7 @@ int queue_invalidate_iotlb(struct iommu *iommu,
     return ret;
 }
 
-static int gen_wait_dsc(struct iommu *iommu, int index,
+static int gen_wait_dsc(struct iommu *iommu, unsigned int index,
     u8 iflag, u8 sw, u8 fn, u32 sdata, volatile u32 *saddr)
 {
     unsigned long flags;
@@ -192,7 +192,7 @@ static int queue_invalidate_wait(struct iommu *iommu,
 {
     s_time_t start_time;
     volatile u32 poll_slot = QINVAL_STAT_INIT;
-    int index = -1;
+    unsigned int index;
     int ret;
     unsigned long flags;
 
@@ -231,7 +231,7 @@ static int invalidate_sync(struct iommu *iommu)
     return 0;
 }
 
-static int gen_dev_iotlb_inv_dsc(struct iommu *iommu, int index,
+static int gen_dev_iotlb_inv_dsc(struct iommu *iommu, unsigned int index,
     u32 max_invs_pend, u16 sid, u16 size, u64 addr)
 {
     unsigned long flags;
@@ -266,7 +266,7 @@ int qinval_device_iotlb(struct iommu *iommu,
 {
     int ret;
     unsigned long flags;
-    int index = -1;
+    unsigned int index;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
@@ -277,7 +277,7 @@ int qinval_device_iotlb(struct iommu *iommu,
     return ret;
 }
 
-static int gen_iec_inv_dsc(struct iommu *iommu, int index,
+static int gen_iec_inv_dsc(struct iommu *iommu, unsigned int index,
     u8 granu, u8 im, u16 iidx)
 {
     unsigned long flags;
@@ -308,7 +308,7 @@ int queue_invalidate_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
 {
     int ret;
     unsigned long flags;
-    int index = -1;
+    unsigned int index;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
