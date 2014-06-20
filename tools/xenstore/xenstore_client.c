@@ -128,10 +128,14 @@ static int show_whole_path = 0;
 static void do_ls(struct xs_handle *h, char *path, int cur_depth, int show_perms)
 {
     char **e;
-    char newpath[STRING_MAX], *val;
+    char *newpath, *val;
     int newpath_len;
     int i;
     unsigned int num, len;
+
+    newpath = malloc(STRING_MAX);
+    if (!newpath)
+      err(1, "malloc in do_ls");
 
     e = xs_directory(h, XBT_NULL, path, &num);
     if (e == NULL)
@@ -144,7 +148,7 @@ static void do_ls(struct xs_handle *h, char *path, int cur_depth, int show_perms
         int linewid;
 
         /* Compose fullpath */
-        newpath_len = snprintf(newpath, sizeof(newpath), "%s%s%s", path, 
+        newpath_len = snprintf(newpath, STRING_MAX, "%s%s%s", path,
                 path[strlen(path)-1] == '/' ? "" : "/", 
                 e[i]);
 
@@ -161,7 +165,7 @@ static void do_ls(struct xs_handle *h, char *path, int cur_depth, int show_perms
         }
 
 	/* Fetch value */
-        if ( newpath_len < sizeof(newpath) ) {
+        if ( newpath_len < STRING_MAX ) {
             val = xs_read(h, XBT_NULL, newpath, &len);
         }
         else {
@@ -217,6 +221,7 @@ static void do_ls(struct xs_handle *h, char *path, int cur_depth, int show_perms
         do_ls(h, newpath, cur_depth+1, show_perms); 
     }
     free(e);
+    free(newpath);
 }
 
 static void
