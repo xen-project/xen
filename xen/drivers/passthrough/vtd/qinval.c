@@ -228,7 +228,7 @@ static int queue_invalidate_wait(struct iommu *iommu,
     return ret;
 }
 
-int invalidate_sync(struct iommu *iommu)
+static int invalidate_sync(struct iommu *iommu)
 {
     int ret = -1;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);

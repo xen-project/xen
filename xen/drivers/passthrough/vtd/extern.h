@@ -48,7 +48,6 @@ int queue_invalidate_iotlb(struct iommu *iommu,
     u8 granu, u8 dr, u8 dw, u16 did, u8 am, u8 ih, u64 addr);
 int queue_invalidate_iec(struct iommu *iommu,
     u8 granu, u8 im, u16 iidx);
-int invalidate_sync(struct iommu *iommu);
 int iommu_flush_iec_global(struct iommu *iommu);
 int iommu_flush_iec_index(struct iommu *iommu, u8 im, u16 iidx);
 void clear_fault_bits(struct iommu *iommu);
