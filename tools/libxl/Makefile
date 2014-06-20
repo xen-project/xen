@@ -5,7 +5,7 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-MAJOR = 4.4
+MAJOR = 4.5
 MINOR = 0
 
 XLUMAJOR = 4.3
