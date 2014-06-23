@@ -528,7 +528,6 @@ static struct option opts[] = {
     {"domain", 0, 0, 'd'},
     {"dump", 0, 0, 'D'},
     {"help", 0, 0, 'h'},
-    {"log", 0, 0, 'l'},
     {"page", 0, 0, 'p'},
     {"", 0, 0, '\0'}
 };
@@ -540,11 +539,11 @@ static void help(void)
            "Mandatory arguments to long options are mandatory"
            "for short options too.\n"
            "  -D, --dump           dump addr info without error injection\n"
-           "  -c, --cpu=CPU_ID     target CPU\n"
-           "  -d, --domain=DomID   target domain, the default is Xen itself\n"
+           "  -c, --cpu=CPU        target CPU\n"
+           "  -d, --domain=DOMID   target domain, the default is Xen itself\n"
            "  -h, --help           print this page\n"
-           "  -p, --phyaddr        physical address\n"
-           "  -t, --type=error     error type\n"
+           "  -p, --page=ADDR      physical address to report\n"
+           "  -t, --type=ERROR     error type\n"
            "                        0 : MCE_SRAO_MEM\n"
            "                        1 : MCE_SRAO_LLC\n"
            "                        2 : CMCI_UCNA_LLC\n"
@@ -574,7 +573,7 @@ int main(int argc, char *argv[])
     }
 
     while ( 1 ) {
-        c = getopt_long(argc, argv, "c:Dd:t:hp:r", opts, &opt_index);
+        c = getopt_long(argc, argv, "c:Dd:t:hp:", opts, &opt_index);
         if ( c == -1 )
             break;
         switch ( c ) {
