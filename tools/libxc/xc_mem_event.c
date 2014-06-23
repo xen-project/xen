@@ -60,7 +60,8 @@ void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
                           uint32_t *port)
 {
     void *ring_page = NULL;
-    unsigned long ring_pfn, mmap_pfn;
+    unsigned long pfn;
+    xen_pfn_t ring_pfn, mmap_pfn;
     unsigned int op, mode;
     int rc1, rc2, saved_errno;
 
@@ -79,14 +80,15 @@ void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
     }
 
     /* Get the pfn of the ring page */
-    rc1 = xc_get_hvm_param(xch, domain_id, param, &ring_pfn);
+    rc1 = xc_get_hvm_param(xch, domain_id, param, &pfn);
     if ( rc1 != 0 )
     {
         PERROR("Failed to get pfn of ring page\n");
         goto out;
     }
 
-    mmap_pfn = ring_pfn;
+    ring_pfn = pfn;
+    mmap_pfn = pfn;
     ring_page = xc_map_foreign_batch(xch, domain_id, PROT_READ | PROT_WRITE,
                                      &mmap_pfn, 1);
     if ( mmap_pfn & XEN_DOMCTL_PFINFO_XTAB )
