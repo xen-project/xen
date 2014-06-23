@@ -58,28 +58,43 @@
 #define MSR_IA32_MC0_MISC        0x00000403
 #define MSR_IA32_MC0_CTL2        0x00000280
 
-/* LLC (Last Level Cache) EWB (Explicit Write Back) SRAO MCE */
-#define MCG_STATUS_SRAO_LLC_VAL  0x5
-#define MCE_SRAO_LLC_BANK        0x7
-#define MCi_STATUS_SRAO_LLC_VAL  0xBD2000008000017AUL
-#define MCi_MISC_SRAO_LLC_VAL    0x86UL
+struct mce_info {
+    const char *description;
+    uint8_t mcg_stat;
+    unsigned int bank;
+    uint64_t mci_stat;
+    uint64_t mci_misc;
+    bool cmci;
+};
 
-/* Memory Patrol Scrub SRAO MCE */
-#define MCG_STATUS_SRAO_MEM_VAL  0x5
-#define MCE_SRAO_MEM_BANK        0x8
-#define MCi_STATUS_SRAO_MEM_VAL  0xBD000000004000CFUL
-#define MCi_MISC_SRAO_MEM_VAL    0x86UL
-
-/* LLC EWB UCNA Error */
-#define MCG_STATUS_UCNA_LLC_VAL  0x0
-#define CMCI_UCNA_LLC_BANK       0x9
-#define MCi_STATUS_UCNA_LLC_VAL  0xBC20000080000136UL
-#define MCi_MISC_UCNA_LLC_VAL    0x86UL
-
-/* Error Types */
-#define MCE_SRAO_MEM        0x0
-#define MCE_SRAO_LLC        0x1
-#define CMCI_UCNA_LLC       0x2
+static struct mce_info mce_table[] = {
+    /* LLC (Last Level Cache) EWB (Explicit Write Back) SRAO MCE */
+    {
+        .description = "MCE_SRAO_MEM",
+        .mcg_stat = 0x5,
+        .bank = 7,
+        .mci_stat = 0xBD2000008000017Aull,
+        .mci_misc = 0x86ull,
+    },
+    /* Memory Patrol Scrub SRAO MCE */
+    {
+        .description = "MCE_SRAO_LLC",
+        .mcg_stat = 0x5,
+        .bank = 8,
+        .mci_stat = 0xBD000000004000CFull,
+        .mci_misc = 0x86ull,
+    },
+    /* LLC EWB UCNA Error */
+    {
+        .description = "CMCI_UCNA_LLC",
+        .mcg_stat = 0x0,
+        .bank = 9,
+        .mci_stat = 0xBC20000080000136ull,
+        .mci_misc = 0x86ull,
+        .cmci = true,
+    },
+};
+#define MCE_TABLE_SIZE (sizeof(mce_table)/sizeof(mce_table[0]))
 
 #define LOGFILE stdout
 
@@ -374,25 +389,23 @@ static int inject_mci_addr(xc_interface *xc_handle,
                                     MCi_type_ADDR, bank, val); 
 }
 
-static int inject_llc_srao(xc_interface *xc_handle,
-                             uint32_t cpu_nr,
-                             uint32_t domain,
-                             uint64_t gaddr)
+static int inject(xc_interface *xc_handle, struct mce_info *mce,
+                  uint32_t cpu_nr, uint32_t domain, uint64_t gaddr)
 {
     uint64_t gpfn, mfn, haddr;
     int ret = 0;
 
-    ret = inject_mcg_status(xc_handle, cpu_nr, MCG_STATUS_SRAO_LLC_VAL);
+    ret = inject_mcg_status(xc_handle, cpu_nr, mce->mcg_stat);
     if ( ret )
         err(xc_handle, "Failed to inject MCG_STATUS MSR");
 
     ret = inject_mci_status(xc_handle, cpu_nr,
-                            MCE_SRAO_LLC_BANK, MCi_STATUS_SRAO_LLC_VAL);
+                            mce->bank, mce->mci_stat);
     if ( ret )
         err(xc_handle, "Failed to inject MCi_STATUS MSR");
 
     ret = inject_mci_misc(xc_handle, cpu_nr,
-                          MCE_SRAO_LLC_BANK, MCi_MISC_SRAO_LLC_VAL);
+                          mce->bank, mce->mci_misc);
     if ( ret )
         err(xc_handle, "Failed to inject MCi_MISC MSR");
 
@@ -401,96 +414,17 @@ static int inject_llc_srao(xc_interface *xc_handle,
     if (!mfn_valid(mfn))
         err(xc_handle, "The MFN is not valid");
     haddr = (mfn << PAGE_SHIFT) | (gaddr & (PAGE_SIZE - 1));
-    ret = inject_mci_addr(xc_handle, cpu_nr, MCE_SRAO_LLC_BANK, haddr);
+    ret = inject_mci_addr(xc_handle, cpu_nr, mce->bank, haddr);
     if ( ret )
         err(xc_handle, "Failed to inject MCi_ADDR MSR");
 
     ret = flush_msr_inj(xc_handle);
     if ( ret )
         err(xc_handle, "Failed to inject MSR");
-    ret = inject_mce(xc_handle, cpu_nr);
-    if ( ret )
-        err(xc_handle, "Failed to inject MCE error");
-
-    return 0;
-}
-
-static int inject_mem_srao(xc_interface *xc_handle,
-                             uint32_t cpu_nr,
-                             uint32_t domain,
-                             uint64_t gaddr)
-{
-    uint64_t gpfn, mfn, haddr;
-    int ret = 0;
-
-    ret = inject_mcg_status(xc_handle, cpu_nr, MCG_STATUS_SRAO_MEM_VAL);
-    if ( ret )
-        err(xc_handle, "Failed to inject MCG_STATUS MSR");
-
-    ret = inject_mci_status(xc_handle, cpu_nr,
-                            MCE_SRAO_MEM_BANK, MCi_STATUS_SRAO_MEM_VAL);
-    if ( ret )
-        err(xc_handle, "Failed to inject MCi_STATUS MSR");
-
-    ret = inject_mci_misc(xc_handle, cpu_nr,
-                          MCE_SRAO_MEM_BANK, MCi_MISC_SRAO_MEM_VAL);
-    if ( ret )
-        err(xc_handle, "Failed to inject MCi_MISC MSR");
-
-    gpfn = gaddr >> PAGE_SHIFT;
-    mfn = mca_gpfn_to_mfn(xc_handle, domain, gpfn);
-    if (!mfn_valid(mfn))
-        err(xc_handle, "The MFN is not valid");
-    haddr = (mfn << PAGE_SHIFT) | (gaddr & (PAGE_SIZE - 1));
-    ret = inject_mci_addr(xc_handle, cpu_nr, MCE_SRAO_MEM_BANK, haddr);
-    if ( ret )
-        err(xc_handle, "Failed to inject MCi_ADDR MSR");
-
-    ret = flush_msr_inj(xc_handle);
-    if ( ret )
-        err(xc_handle, "Failed to inject MSR");
-    ret = inject_mce(xc_handle, cpu_nr);
-    if ( ret )
-        err(xc_handle, "Failed to inject MCE error");
-
-    return 0;
-}
-
-static int inject_llc_ucna(xc_interface *xc_handle,
-                             uint32_t cpu_nr,
-                             uint32_t domain,
-                             uint64_t gaddr)
-{
-    uint64_t gpfn, mfn, haddr;
-    int ret = 0;
-
-    ret = inject_mcg_status(xc_handle, cpu_nr, MCG_STATUS_UCNA_LLC_VAL);
-    if ( ret )
-        err(xc_handle, "Failed to inject MCG_STATUS MSR");
-
-    ret = inject_mci_status(xc_handle, cpu_nr,
-                            CMCI_UCNA_LLC_BANK, MCi_STATUS_UCNA_LLC_VAL);
-    if ( ret )
-        err(xc_handle, "Failed to inject MCi_STATUS MSR");
-
-    ret = inject_mci_misc(xc_handle, cpu_nr,
-                          CMCI_UCNA_LLC_BANK, MCi_MISC_UCNA_LLC_VAL);
-    if ( ret )
-        err(xc_handle, "Failed to inject MCi_MISC MSR");
-
-    gpfn = gaddr >> PAGE_SHIFT;
-    mfn = mca_gpfn_to_mfn(xc_handle, domain, gpfn);
-    if (!mfn_valid(mfn))
-        err(xc_handle, "The MFN is not valid");
-    haddr = (mfn << PAGE_SHIFT) | (gaddr & (PAGE_SIZE - 1));
-    ret = inject_mci_addr(xc_handle, cpu_nr, CMCI_UCNA_LLC_BANK, haddr);
-    if ( ret )
-        err(xc_handle, "Failed to inject MCi_ADDR MSR");
-
-    ret = flush_msr_inj(xc_handle);
-    if ( ret )
-        err(xc_handle, "Failed to inject MSR");
-    ret = inject_cmci(xc_handle, cpu_nr);
+    if ( mce->cmci )
+        ret = inject_cmci(xc_handle, cpu_nr);
+    else
+        ret = inject_mce(xc_handle, cpu_nr);
     if ( ret )
         err(xc_handle, "Failed to inject MCE error");
 
@@ -533,6 +467,8 @@ static struct option opts[] = {
 
 static void help(void)
 {
+    unsigned int i;
+
     printf("Usage: xen-mceinj [OPTION]...\n"
            "\n"
            "Mandatory arguments to long options are mandatory"
@@ -542,17 +478,16 @@ static void help(void)
            "  -d, --domain=DOMID   target domain, the default is Xen itself\n"
            "  -h, --help           print this page\n"
            "  -p, --page=ADDR      physical address to report\n"
-           "  -t, --type=ERROR     error type\n"
-           "                        0 : MCE_SRAO_MEM\n"
-           "                        1 : MCE_SRAO_LLC\n"
-           "                        2 : CMCI_UCNA_LLC\n"
-           "\n"
-           );
+           "  -t, --type=ERROR     error type\n");
+
+    for ( i = 0; i < MCE_TABLE_SIZE; i++ )
+        printf("                       %2d : %s\n",
+               i, mce_table[i].description);
 }
 
 int main(int argc, char *argv[])
 {
-    int type = MCE_SRAO_MEM;
+    int type = 0;
     int c, opt_index;
     uint32_t domid;
     xc_interface *xc_handle;
@@ -626,21 +561,12 @@ int main(int argc, char *argv[])
         goto out;
     }
 
-    switch ( type )
-    {
-    case MCE_SRAO_MEM:
-        inject_mem_srao(xc_handle, cpu_nr, domid, gaddr);
-        break;
-    case MCE_SRAO_LLC:
-        inject_llc_srao(xc_handle, cpu_nr, domid, gaddr);
-        break;
-    case CMCI_UCNA_LLC:
-        inject_llc_ucna(xc_handle, cpu_nr, domid, gaddr);
-        break;
-    default:
+    if ( type < 0 || type >= MCE_TABLE_SIZE ) {
         err(xc_handle, "Unsupported error type");
-        break;
+        goto out;
     }
+
+    inject(xc_handle, &mce_table[type], cpu_nr, domid, gaddr);
 
 out:
     xc_interface_close(xc_handle);
