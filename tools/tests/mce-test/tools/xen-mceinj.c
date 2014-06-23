@@ -94,7 +94,7 @@ static void Lprintf(const char *fmt, ...)
     va_start(args, fmt);
     if (vasprintf(&buf, fmt, args) < 0)
         abort();
-    fprintf(LOGFILE, "%s", buf);
+    fprintf(LOGFILE, "%s\n", buf);
     va_end(args);
     free(buf);
 }
@@ -156,7 +156,7 @@ static int inject_cmci(xc_interface *xc_handle, int cpu_nr)
 
     nr_cpus = mca_cpuinfo(xc_handle);
     if (!nr_cpus)
-        err(xc_handle, "Failed to get mca_cpuinfo\n");
+        err(xc_handle, "Failed to get mca_cpuinfo");
 
     mc.cmd = XEN_MC_inject_v2;
     mc.interface_version = XEN_MCA_INTERFACE_VERSION;
@@ -273,32 +273,32 @@ static uint64_t guest_mfn(xc_interface *xc_handle,
     max_gpfn = do_memory_op(xc_handle, XENMEM_maximum_gpfn, &domain, 
                                sizeof(domain)) + 1;
     if ( max_gpfn <= 0 )
-        err(xc_handle, "Failed to get max_gpfn 0x%lx\n", max_gpfn);
+        err(xc_handle, "Failed to get max_gpfn 0x%lx", max_gpfn);
 
-    Lprintf("Maxium gpfn for dom %d is 0x%lx\n", domain, max_gpfn);
+    Lprintf("Maxium gpfn for dom %d is 0x%lx", domain, max_gpfn);
 
     /* Get max mfn */
     if ( !get_platform_info(xc_handle, domain,
                             &max_mfn, &hvirt_start,
                             &pt_levels, &guest_width) )
-        err(xc_handle, "Failed to get platform information\n");
+        err(xc_handle, "Failed to get platform information");
 
     /* Get guest's pfn list */
     pfn_buf = malloc(sizeof(uint64_t) * max_gpfn);
     if ( !pfn_buf )
-        err(xc_handle, "Failed to alloc pfn buf\n");
+        err(xc_handle, "Failed to alloc pfn buf");
     memset(pfn_buf, 0, sizeof(uint64_t) * max_gpfn);
 
     ret = xc_get_pfn_list(xc_handle, domain, pfn_buf, max_gpfn);
     if ( ret < 0 ) {
         free(pfn_buf);
-        err(xc_handle, "Failed to get pfn list %x\n", ret);
+        err(xc_handle, "Failed to get pfn list %x", ret);
     }
 
     /* Now get the m2p table */
     live_m2p = xc_map_m2p(xc_handle, max_mfn, PROT_READ, &m2p_mfn0);
     if ( !live_m2p )
-        err(xc_handle, "Failed to map live M2P table\n");
+        err(xc_handle, "Failed to map live M2P table");
 
     /* match the mapping */
     for ( i = 0; i < max_gpfn; i++ )
@@ -309,7 +309,7 @@ static uint64_t guest_mfn(xc_interface *xc_handle,
         if (mfn_valid(tmp) &&  (mfn_to_pfn(tmp) == gpfn))
         {
             mfn = tmp;
-            Lprintf("We get the mfn 0x%lx for this injection\n", mfn);
+            Lprintf("We get the mfn 0x%lx for this injection", mfn);
             break;
         }
     }
@@ -334,7 +334,7 @@ static uint64_t mca_gpfn_to_mfn(xc_interface *xc_handle,
     max_gpfn = do_memory_op(xc_handle, XENMEM_maximum_gpfn, &domain, 
                                sizeof(domain)) + 1;
     if ( max_gpfn <= 0 )
-        err(xc_handle, "Failed to get max_gpfn 0x%lx\n", max_gpfn);
+        err(xc_handle, "Failed to get max_gpfn 0x%lx", max_gpfn);
     index = gfn % max_gpfn;
 
     return guest_mfn(xc_handle, domain, index);
@@ -385,33 +385,33 @@ static int inject_llc_srao(xc_interface *xc_handle,
 
     ret = inject_mcg_status(xc_handle, cpu_nr, MCG_STATUS_SRAO_LLC_VAL);
     if ( ret )
-        err(xc_handle, "Failed to inject MCG_STATUS MSR\n");
+        err(xc_handle, "Failed to inject MCG_STATUS MSR");
 
     ret = inject_mci_status(xc_handle, cpu_nr,
                             MCE_SRAO_LLC_BANK, MCi_STATUS_SRAO_LLC_VAL);
     if ( ret )
-        err(xc_handle, "Failed to inject MCi_STATUS MSR\n");
+        err(xc_handle, "Failed to inject MCi_STATUS MSR");
 
     ret = inject_mci_misc(xc_handle, cpu_nr,
                           MCE_SRAO_LLC_BANK, MCi_MISC_SRAO_LLC_VAL);
     if ( ret )
-        err(xc_handle, "Failed to inject MCi_MISC MSR\n");
+        err(xc_handle, "Failed to inject MCi_MISC MSR");
 
     gpfn = gaddr >> PAGE_SHIFT;
     mfn = mca_gpfn_to_mfn(xc_handle, domain, gpfn);
     if (!mfn_valid(mfn))
-        err(xc_handle, "The MFN is not valid\n");
+        err(xc_handle, "The MFN is not valid");
     haddr = (mfn << PAGE_SHIFT) | (gaddr & (PAGE_SIZE - 1));
     ret = inject_mci_addr(xc_handle, cpu_nr, MCE_SRAO_LLC_BANK, haddr);
     if ( ret )
-        err(xc_handle, "Failed to inject MCi_ADDR MSR\n");
+        err(xc_handle, "Failed to inject MCi_ADDR MSR");
 
     ret = flush_msr_inj(xc_handle);
     if ( ret )
-        err(xc_handle, "Failed to inject MSR\n");
+        err(xc_handle, "Failed to inject MSR");
     ret = inject_mce(xc_handle, cpu_nr);
     if ( ret )
-        err(xc_handle, "Failed to inject MCE error\n");
+        err(xc_handle, "Failed to inject MCE error");
 
     return 0;
 }
@@ -426,33 +426,33 @@ static int inject_mem_srao(xc_interface *xc_handle,
 
     ret = inject_mcg_status(xc_handle, cpu_nr, MCG_STATUS_SRAO_MEM_VAL);
     if ( ret )
-        err(xc_handle, "Failed to inject MCG_STATUS MSR\n");
+        err(xc_handle, "Failed to inject MCG_STATUS MSR");
 
     ret = inject_mci_status(xc_handle, cpu_nr,
                             MCE_SRAO_MEM_BANK, MCi_STATUS_SRAO_MEM_VAL);
     if ( ret )
-        err(xc_handle, "Failed to inject MCi_STATUS MSR\n");
+        err(xc_handle, "Failed to inject MCi_STATUS MSR");
 
     ret = inject_mci_misc(xc_handle, cpu_nr,
                           MCE_SRAO_MEM_BANK, MCi_MISC_SRAO_MEM_VAL);
     if ( ret )
-        err(xc_handle, "Failed to inject MCi_MISC MSR\n");
+        err(xc_handle, "Failed to inject MCi_MISC MSR");
 
     gpfn = gaddr >> PAGE_SHIFT;
     mfn = mca_gpfn_to_mfn(xc_handle, domain, gpfn);
     if (!mfn_valid(mfn))
-        err(xc_handle, "The MFN is not valid\n");
+        err(xc_handle, "The MFN is not valid");
     haddr = (mfn << PAGE_SHIFT) | (gaddr & (PAGE_SIZE - 1));
     ret = inject_mci_addr(xc_handle, cpu_nr, MCE_SRAO_MEM_BANK, haddr);
     if ( ret )
-        err(xc_handle, "Failed to inject MCi_ADDR MSR\n");
+        err(xc_handle, "Failed to inject MCi_ADDR MSR");
 
     ret = flush_msr_inj(xc_handle);
     if ( ret )
-        err(xc_handle, "Failed to inject MSR\n");
+        err(xc_handle, "Failed to inject MSR");
     ret = inject_mce(xc_handle, cpu_nr);
     if ( ret )
-        err(xc_handle, "Failed to inject MCE error\n");
+        err(xc_handle, "Failed to inject MCE error");
 
     return 0;
 }
@@ -467,33 +467,33 @@ static int inject_llc_ucna(xc_interface *xc_handle,
 
     ret = inject_mcg_status(xc_handle, cpu_nr, MCG_STATUS_UCNA_LLC_VAL);
     if ( ret )
-        err(xc_handle, "Failed to inject MCG_STATUS MSR\n");
+        err(xc_handle, "Failed to inject MCG_STATUS MSR");
 
     ret = inject_mci_status(xc_handle, cpu_nr,
                             CMCI_UCNA_LLC_BANK, MCi_STATUS_UCNA_LLC_VAL);
     if ( ret )
-        err(xc_handle, "Failed to inject MCi_STATUS MSR\n");
+        err(xc_handle, "Failed to inject MCi_STATUS MSR");
 
     ret = inject_mci_misc(xc_handle, cpu_nr,
                           CMCI_UCNA_LLC_BANK, MCi_MISC_UCNA_LLC_VAL);
     if ( ret )
-        err(xc_handle, "Failed to inject MCi_MISC MSR\n");
+        err(xc_handle, "Failed to inject MCi_MISC MSR");
 
     gpfn = gaddr >> PAGE_SHIFT;
     mfn = mca_gpfn_to_mfn(xc_handle, domain, gpfn);
     if (!mfn_valid(mfn))
-        err(xc_handle, "The MFN is not valid\n");
+        err(xc_handle, "The MFN is not valid");
     haddr = (mfn << PAGE_SHIFT) | (gaddr & (PAGE_SIZE - 1));
     ret = inject_mci_addr(xc_handle, cpu_nr, CMCI_UCNA_LLC_BANK, haddr);
     if ( ret )
-        err(xc_handle, "Failed to inject MCi_ADDR MSR\n");
+        err(xc_handle, "Failed to inject MCi_ADDR MSR");
 
     ret = flush_msr_inj(xc_handle);
     if ( ret )
-        err(xc_handle, "Failed to inject MSR\n");
+        err(xc_handle, "Failed to inject MSR");
     ret = inject_cmci(xc_handle, cpu_nr);
     if ( ret )
-        err(xc_handle, "Failed to inject MCE error\n");
+        err(xc_handle, "Failed to inject MCE error");
 
     return 0;
 }
@@ -569,7 +569,7 @@ int main(int argc, char *argv[])
     init_msr_inj();
     xc_handle = xc_interface_open(0, 0, 0);
     if ( !xc_handle ) {
-        Lprintf("Failed to get xc interface\n");
+        Lprintf("Failed to get xc interface");
         exit(EXIT_FAILURE);
     }
 
@@ -584,17 +584,17 @@ int main(int argc, char *argv[])
         case 'c':
             cpu_nr = strtol(optarg, &optarg, 10);
             if ( strlen(optarg) != 0 )
-                err(xc_handle, "Please input a digit parameter for CPU\n");
+                err(xc_handle, "Please input a digit parameter for CPU");
             break;
         case 'd':
             domid = strtol(optarg, &optarg, 10);
             if ( strlen(optarg) != 0 )
-                err(xc_handle, "Please input a digit parameter for domain\n");
+                err(xc_handle, "Please input a digit parameter for domain");
             break;
         case 'p':
             gaddr = strtol(optarg, &optarg, 0);
             if ( strlen(optarg) != 0 )
-                err(xc_handle, "Please input correct page address\n");
+                err(xc_handle, "Please input correct page address");
             break;
         case 't':
             type = strtol(optarg, NULL, 0);
@@ -608,23 +608,22 @@ int main(int argc, char *argv[])
     
     if ( domid != DOMID_XEN ) {
         max_gpa = xs_get_dom_mem(domid);
-        Lprintf("get domain %d max gpa is: 0x%lx \n", domid, max_gpa);
+        Lprintf("get domain %d max gpa is: 0x%lx", domid, max_gpa);
         if ( gaddr >= max_gpa )
-            err(xc_handle, "Fail: gaddr exceeds max_gpa 0x%lx\n", max_gpa);
+            err(xc_handle, "Fail: gaddr exceeds max_gpa 0x%lx", max_gpa);
     }
-    Lprintf("get gaddr of error inject is: 0x%lx \n", gaddr);
+    Lprintf("get gaddr of error inject is: 0x%lx", gaddr);
 
     if ( dump ) {
         gpfn = gaddr >> PAGE_SHIFT;
         mfn = mca_gpfn_to_mfn(xc_handle, domid, gpfn);
         if (!mfn_valid(mfn))
-            err(xc_handle, "The MFN is not valid\n");
+            err(xc_handle, "The MFN is not valid");
         haddr = (mfn << PAGE_SHIFT) | (gaddr & (PAGE_SIZE - 1));
         if ( domid == DOMID_XEN )
-            Lprintf("Xen: mfn=0x%lx, haddr=0x%lx\n", mfn, haddr);
+            Lprintf("Xen: mfn=0x%lx, haddr=0x%lx", mfn, haddr);
         else 
-            Lprintf("Dom%d: gaddr=0x%lx, gpfn=0x%lx,"
-                    "mfn=0x%lx, haddr=0x%lx\n",
+            Lprintf("Dom%d: gaddr=0x%lx, gpfn=0x%lx, mfn=0x%lx, haddr=0x%lx",
                     domid, gaddr, gpfn, mfn, haddr);
         goto out;
     }
@@ -641,7 +640,7 @@ int main(int argc, char *argv[])
         inject_llc_ucna(xc_handle, cpu_nr, domid, gaddr);
         break;
     default:
-        err(xc_handle, "Unsupported error type\n");
+        err(xc_handle, "Unsupported error type");
         break;
     }
 
