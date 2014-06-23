@@ -93,6 +93,22 @@ static struct mce_info mce_table[] = {
         .mci_misc = 0x86ull,
         .cmci = true,
     },
+    /* AMD L1 instruction cache data or tag parity. */
+    {
+        .description = "AMD L1 icache parity",
+        .mcg_stat = 0x5,
+        .bank = 1,
+        .mci_stat = 0x9400000000000151ull,
+        .mci_misc = 0x86ull,
+    },
+    /* LLC (Last Level Cache) EWB (Explicit Write Back) SRAO MCE */
+    {
+        .description = "MCE_SRAO_MEM (Fatal)",
+        .mcg_stat = 0x5,
+        .bank = 7,
+        .mci_stat = 0xBF2000008000017Aull,
+        .mci_misc = 0x86ull,
+    },
 };
 #define MCE_TABLE_SIZE (sizeof(mce_table)/sizeof(mce_table[0]))
 
