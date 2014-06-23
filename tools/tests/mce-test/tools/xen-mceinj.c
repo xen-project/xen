@@ -284,10 +284,9 @@ static uint64_t guest_mfn(xc_interface *xc_handle,
         err(xc_handle, "Failed to get platform information");
 
     /* Get guest's pfn list */
-    pfn_buf = malloc(sizeof(uint64_t) * max_gpfn);
+    pfn_buf = calloc(max_gpfn, sizeof(uint64_t));
     if ( !pfn_buf )
         err(xc_handle, "Failed to alloc pfn buf");
-    memset(pfn_buf, 0, sizeof(uint64_t) * max_gpfn);
 
     ret = xc_get_pfn_list(xc_handle, domain, pfn_buf, max_gpfn);
     if ( ret < 0 ) {
