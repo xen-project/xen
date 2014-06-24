@@ -506,8 +506,8 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         vgic_lock_rank(v, rank);
         tr = rank->ienable;
         rank->ienable |= *r;
-        vgic_unlock_rank(v, rank);
         vgic_enable_irqs(v, (*r) & (~tr), gicd_reg - GICD_ISENABLER);
+        vgic_unlock_rank(v, rank);
         return 1;
 
     case GICD_ICENABLER ... GICD_ICENABLERN:
@@ -517,8 +517,8 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         vgic_lock_rank(v, rank);
         tr = rank->ienable;
         rank->ienable &= ~*r;
-        vgic_unlock_rank(v, rank);
         vgic_disable_irqs(v, (*r) & tr, gicd_reg - GICD_ICENABLER);
+        vgic_unlock_rank(v, rank);
         return 1;
 
     case GICD_ISPENDR ... GICD_ISPENDRN:
