@@ -360,7 +360,7 @@ static void mwait_idle(void)
 		lapic_timer_off();
 
 	before = cpuidle_get_tick();
-	TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, before, exp, pred);
+	TRACE_4D(TRC_PM_IDLE_ENTRY, cx->type, before, exp, pred);
 
 	if (cpu_is_haltable(cpu))
 		mwait_idle_with_hints(eax, MWAIT_ECX_INTERRUPT_BREAK);
@@ -369,7 +369,7 @@ static void mwait_idle(void)
 
 	cstate_restore_tsc();
 	trace_exit_reason(irq_traced);
-	TRACE_6D(TRC_PM_IDLE_EXIT, cx->idx, after,
+	TRACE_6D(TRC_PM_IDLE_EXIT, cx->type, after,
 		irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
 
 	update_idle_stats(power, cx, before, after);
