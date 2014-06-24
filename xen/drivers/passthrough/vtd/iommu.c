@@ -1475,7 +1475,7 @@ static int domain_context_mapping(
                     PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
         if ( !ret && ats_device(pdev, drhd) > 0 )
-            enable_ats_device(seg, bus, devfn);
+            enable_ats_device(seg, bus, devfn, drhd->iommu);
 
         break;
 
@@ -1961,7 +1961,7 @@ static int intel_iommu_enable_device(struct pci_dev *pdev)
     if ( ret <= 0 )
         return ret;
 
-    ret = enable_ats_device(pdev->seg, pdev->bus, pdev->devfn);
+    ret = enable_ats_device(pdev->seg, pdev->bus, pdev->devfn, drhd->iommu);
 
     return ret >= 0 ? 0 : ret;
 }

@@ -137,7 +137,7 @@ static void amd_iommu_setup_domain_device(
     {
         struct pci_dev *pdev;
 
-        enable_ats_device(iommu->seg, bus, devfn);
+        enable_ats_device(iommu->seg, bus, devfn, iommu);
 
         ASSERT(spin_is_locked(&pcidevs_lock));
         pdev = pci_get_pdev(iommu->seg, bus, devfn);

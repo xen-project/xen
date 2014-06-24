@@ -120,6 +120,10 @@ int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
     {
         sid = (pdev->bus << 8) | pdev->devfn;
 
+        /* Only invalidate devices that belong to this IOMMU */
+        if ( pdev->iommu != iommu )
+            continue;
+
         switch ( type ) {
         case DMA_TLB_DSI_FLUSH:
             if ( !device_in_domain(iommu, pdev, did) )
