@@ -386,9 +386,11 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
     int dev = PCI_SLOT(pdev->devfn);
     int func = PCI_FUNC(pdev->devfn);
     int pos;
-    u32 val;
+    bool_t ff;
+    u32 val, val2;
     u64 bar;
     paddr_t pa;
+    const char *action;
 
     if ( pci_conf_read16(seg, bus, dev, func, PCI_VENDOR_ID) !=
          PCI_VENDOR_ID_INTEL )
@@ -438,7 +440,10 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
                 pos = pci_find_next_ext_capability(seg, bus, pdev->devfn, pos,
                                                    PCI_EXT_CAP_ID_VNDR);
             }
+            ff = 0;
         }
+        else
+            ff = pcie_aer_get_firmware_first(pdev);
         if ( !pos )
         {
             printk(XENLOG_WARNING "%04x:%02x:%02x.%u without AER capability?\n",
@@ -447,18 +452,26 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
         }
 
         val = pci_conf_read32(seg, bus, dev, func, pos + PCI_ERR_UNCOR_MASK);
-        pci_conf_write32(seg, bus, dev, func, pos + PCI_ERR_UNCOR_MASK,
-                         val | PCI_ERR_UNC_UNSUP);
-        val = pci_conf_read32(seg, bus, dev, func, pos + PCI_ERR_COR_MASK);
-        pci_conf_write32(seg, bus, dev, func, pos + PCI_ERR_COR_MASK,
-                         val | PCI_ERR_COR_ADV_NFAT);
+        val2 = pci_conf_read32(seg, bus, dev, func, pos + PCI_ERR_COR_MASK);
+        if ( (val & PCI_ERR_UNC_UNSUP) && (val2 & PCI_ERR_COR_ADV_NFAT) )
+            action = "Found masked";
+        else if ( !ff )
+        {
+            pci_conf_write32(seg, bus, dev, func, pos + PCI_ERR_UNCOR_MASK,
+                             val | PCI_ERR_UNC_UNSUP);
+            pci_conf_write32(seg, bus, dev, func, pos + PCI_ERR_COR_MASK,
+                             val2 | PCI_ERR_COR_ADV_NFAT);
+            action = "Masked";
+        }
+        else
+            action = "Must not mask";
 
         /* XPUNCERRMSK Send Completion with Unsupported Request */
         val = pci_conf_read32(seg, bus, dev, func, 0x20c);
         pci_conf_write32(seg, bus, dev, func, 0x20c, val | (1 << 4));
 
-        printk(XENLOG_INFO "Masked UR signaling on %04x:%02x:%02x.%u\n",
-               seg, bus, dev, func);
+        printk(XENLOG_INFO "%s UR signaling on %04x:%02x:%02x.%u\n",
+               action, seg, bus, dev, func);
         break;
 
     case 0x100: case 0x104: case 0x108: /* Sandybridge */

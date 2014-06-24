@@ -748,6 +748,8 @@ int __init acpi_boot_init(void)
 
 	erst_init();
 
+	acpi_hest_init();
+
 	acpi_table_parse(ACPI_SIG_BGRT, acpi_invalidate_bgrt);
 
 	return 0;
