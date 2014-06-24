@@ -373,18 +373,24 @@ static inline bool_t hvm_vcpu_has_smep(void)
     (X86_CR4_VMXE | X86_CR4_PAE | X86_CR4_MCE))
 
 /* These bits in CR4 cannot be set by the guest. */
-#define HVM_CR4_GUEST_RESERVED_BITS(_v)                 \
+#define HVM_CR4_GUEST_RESERVED_BITS(v, restore) ({      \
+    const struct vcpu *_v = (v);                        \
+    bool_t _restore = !!(restore);                      \
+    ASSERT((_restore) || _v == current);                \
     (~((unsigned long)                                  \
        (X86_CR4_VME | X86_CR4_PVI | X86_CR4_TSD |       \
         X86_CR4_DE  | X86_CR4_PSE | X86_CR4_PAE |       \
         X86_CR4_MCE | X86_CR4_PGE | X86_CR4_PCE |       \
         X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT |           \
-        (hvm_vcpu_has_smep() ? X86_CR4_SMEP : 0) |      \
+        (((_restore) ? cpu_has_smep :                   \
+                       hvm_vcpu_has_smep()) ?           \
+         X86_CR4_SMEP : 0) |                            \
         (cpu_has_fsgsbase ? X86_CR4_FSGSBASE : 0) |     \
-        ((nestedhvm_enabled((_v)->domain) && cpu_has_vmx)\
-                      ? X86_CR4_VMXE : 0)  |             \
-        (cpu_has_pcid ? X86_CR4_PCIDE : 0) |             \
-        (cpu_has_xsave ? X86_CR4_OSXSAVE : 0))))
+        ((nestedhvm_enabled(_v->domain) && cpu_has_vmx) \
+                      ? X86_CR4_VMXE : 0)  |            \
+        (cpu_has_pcid ? X86_CR4_PCIDE : 0) |            \
+        (cpu_has_xsave ? X86_CR4_OSXSAVE : 0))));       \
+})
 
 /* These exceptions must always be intercepted. */
 #define HVM_TRAP_MASK ((1U << TRAP_machine_check) | (1U << TRAP_invalid_op))

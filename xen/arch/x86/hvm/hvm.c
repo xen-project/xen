@@ -857,7 +857,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    if ( ctxt.cr4 & HVM_CR4_GUEST_RESERVED_BITS(v) )
+    if ( ctxt.cr4 & HVM_CR4_GUEST_RESERVED_BITS(v, 1) )
     {
         printk(XENLOG_G_ERR "HVM%d restore: bad CR4 %#" PRIx64 "\n",
                d->domain_id, ctxt.cr4);
@@ -1980,7 +1980,7 @@ int hvm_set_cr4(unsigned long value)
     struct vcpu *v = current;
     unsigned long old_cr;
 
-    if ( value & HVM_CR4_GUEST_RESERVED_BITS(v) )
+    if ( value & HVM_CR4_GUEST_RESERVED_BITS(v, 0) )
     {
         HVM_DBG_LOG(DBG_LEVEL_1,
                     "Guest attempts to set reserved bit in CR4: %lx",
