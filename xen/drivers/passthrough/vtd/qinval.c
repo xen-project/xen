@@ -196,7 +196,7 @@ static int queue_invalidate_wait(struct iommu *iommu,
     u8 iflag, u8 sw, u8 fn)
 {
     s_time_t start_time;
-    u32 poll_slot = QINVAL_STAT_INIT;
+    volatile u32 poll_slot = QINVAL_STAT_INIT;
     int index = -1;
     int ret = -1;
     unsigned long flags;
