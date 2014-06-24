@@ -1527,6 +1527,11 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
          (access_w && (p2mt == p2m_ram_ro)) )
     {
         put_gfn(p2m->domain, gfn);
+
+        rc = 0;
+        if ( unlikely(is_pvh_vcpu(v)) )
+            goto out;
+
         if ( !handle_mmio() )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         rc = 1;
