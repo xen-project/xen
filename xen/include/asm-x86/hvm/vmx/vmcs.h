@@ -398,6 +398,8 @@ int vmx_add_guest_msr(u32 msr);
 int vmx_add_host_load_msr(u32 msr);
 void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to);
 
+DECLARE_PER_CPU(bool_t, vmxon);
+
 #endif /* ASM_X86_HVM_VMX_VMCS_H__ */
 
 /*
