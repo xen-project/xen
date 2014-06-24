@@ -48,12 +48,10 @@ restore_all_guest:
         cmpl  $1,%ecx
         ja    .Lforce_iret
 
-        addq  $8,%rsp
-        popq  %rcx                    # RIP
-        popq  %r11                    # CS
-        cmpw  $FLAT_USER_CS32,%r11
-        popq  %r11                    # RFLAGS
-        popq  %rsp                    # RSP
+        cmpw  $FLAT_USER_CS32,16(%rsp)# CS
+        movq  8(%rsp),%rcx            # RIP
+        movq  24(%rsp),%r11           # RFLAGS
+        movq  32(%rsp),%rsp           # RSP
         je    1f
         sysretq
 1:      sysretl
