@@ -617,6 +617,14 @@ static void vmx_fpu_leave(struct vcpu *v)
 
 static void vmx_ctxt_switch_from(struct vcpu *v)
 {
+    /*
+     * Return early if trying to do a context switch without VMX enabled,
+     * this can happen when the hypervisor shuts down with HVM guests
+     * still running.
+     */
+    if ( unlikely(!this_cpu(vmxon)) )
+        return;
+
     vmx_fpu_leave(v);
     vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();

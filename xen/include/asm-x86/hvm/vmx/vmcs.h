@@ -483,6 +483,8 @@ void virtual_vmcs_exit(void *vvmcs);
 u64 virtual_vmcs_vmread(void *vvmcs, u32 vmcs_encoding);
 void virtual_vmcs_vmwrite(void *vvmcs, u32 vmcs_encoding, u64 val);
 
+DECLARE_PER_CPU(bool_t, vmxon);
+
 #endif /* ASM_X86_HVM_VMX_VMCS_H__ */
 
 /*

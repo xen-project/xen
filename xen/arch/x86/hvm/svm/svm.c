@@ -861,6 +861,14 @@ static void svm_ctxt_switch_from(struct vcpu *v)
 {
     int cpu = smp_processor_id();
 
+    /*
+     * Return early if trying to do a context switch without SVM enabled,
+     * this can happen when the hypervisor shuts down with HVM guests
+     * still running.
+     */
+    if ( unlikely((read_efer() & EFER_SVME) == 0) )
+        return;
+
     svm_fpu_leave(v);
 
     svm_save_dr(v);

@@ -74,7 +74,7 @@ u64 vmx_ept_vpid_cap __read_mostly;
 static DEFINE_PER_CPU_READ_MOSTLY(struct vmcs_struct *, vmxon_region);
 static DEFINE_PER_CPU(struct vmcs_struct *, current_vmcs);
 static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
-static DEFINE_PER_CPU(bool_t, vmxon);
+DEFINE_PER_CPU(bool_t, vmxon);
 
 static u32 vmcs_revision_id __read_mostly;
 u64 __read_mostly vmx_basic_msr;
