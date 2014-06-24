@@ -164,7 +164,7 @@ static int apply_microcode(int cpu)
     if ( rev != hdr->patch_id )
     {
         printk(KERN_ERR "microcode: CPU%d update from revision "
-               "%#x to %#x failed\n", cpu, hdr->patch_id, rev);
+               "%#x to %#x failed\n", cpu, rev, hdr->patch_id);
         return -EIO;
     }
 
