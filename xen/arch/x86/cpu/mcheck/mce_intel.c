@@ -49,11 +49,15 @@ static int __read_mostly nr_intel_ext_msrs;
 #define INTEL_SRAR_INSTR_FETCH	0x150
 
 #ifdef CONFIG_X86_MCE_THERMAL
+#define MCE_RING                0x1
+static DEFINE_PER_CPU(int, last_state);
+
 static void intel_thermal_interrupt(struct cpu_user_regs *regs)
 {
     uint64_t msr_content;
     unsigned int cpu = smp_processor_id();
     static DEFINE_PER_CPU(s_time_t, next);
+    int *this_last_state;
 
     ack_APIC_irq();
 
@@ -62,13 +66,17 @@ static void intel_thermal_interrupt(struct cpu_user_regs *regs)
 
     per_cpu(next, cpu) = NOW() + MILLISECS(5000);
     rdmsrl(MSR_IA32_THERM_STATUS, msr_content);
-    if (msr_content & 0x1) {
-        printk(KERN_EMERG "CPU%d: Temperature above threshold\n", cpu);
-        printk(KERN_EMERG "CPU%d: Running in modulated clock mode\n",
-                cpu);
+    this_last_state = &per_cpu(last_state, cpu);
+    if ( *this_last_state == (msr_content & MCE_RING) )
+        return;
+    *this_last_state = msr_content & MCE_RING;
+    if ( msr_content & MCE_RING )
+    {
+        printk(KERN_EMERG "CPU%u: Temperature above threshold\n", cpu);
+        printk(KERN_EMERG "CPU%u: Running in modulated clock mode\n", cpu);
         add_taint(TAINT_MACHINE_CHECK);
     } else {
-        printk(KERN_INFO "CPU%d: Temperature/speed normal\n", cpu);
+        printk(KERN_INFO "CPU%u: Temperature/speed normal\n", cpu);
     }
 }
 
@@ -802,6 +810,7 @@ static int cpu_mcabank_alloc(unsigned int cpu)
 
     per_cpu(no_cmci_banks, cpu) = cmci;
     per_cpu(mce_banks_owned, cpu) = owned;
+    per_cpu(last_state, cpu) = -1;
 
     return 0;
 out:
