@@ -163,7 +163,7 @@ static void amd_iommu_setup_domain_device(
          !pci_ats_enabled(iommu->seg, bus, pdev->devfn) )
     {
         if ( devfn == pdev->devfn )
-            enable_ats_device(iommu->seg, bus, devfn);
+            enable_ats_device(iommu->seg, bus, devfn, iommu);
 
         amd_iommu_flush_iotlb(devfn, pdev, INV_IOMMU_ALL_PAGES_ADDRESS, 0);
     }

@@ -24,6 +24,7 @@ struct pci_ats_dev {
     u8 bus;
     u8 devfn;
     u16 ats_queue_depth;    /* ATS device invalidation queue depth */
+    const void *iommu;      /* No common IOMMU struct so use void pointer */
 };
 
 #define ATS_REG_CAP    4
@@ -34,7 +35,7 @@ struct pci_ats_dev {
 extern struct list_head ats_devices;
 extern bool_t ats_enabled;
 
-int enable_ats_device(int seg, int bus, int devfn);
+int enable_ats_device(int seg, int bus, int devfn, const void *iommu);
 void disable_ats_device(int seg, int bus, int devfn);
 struct pci_ats_dev *get_ats_device(int seg, int bus, int devfn);
 
