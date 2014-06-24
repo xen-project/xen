@@ -12,6 +12,9 @@
 
 #define FIX_APEI_RANGE_MAX 64
 
+typedef int (*apei_hest_func_t)(const struct acpi_hest_header *, void *);
+int apei_hest_parse(apei_hest_func_t, void *);
+
 int erst_write(const struct cper_record_header *record);
 size_t erst_get_record_count(void);
 int erst_get_next_record_id(u64 *record_id);

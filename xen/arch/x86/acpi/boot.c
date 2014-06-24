@@ -846,5 +846,7 @@ int __init acpi_boot_init(void)
 
 	erst_init();
 
+	acpi_hest_init();
+
 	return 0;
 }
