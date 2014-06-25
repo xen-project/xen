@@ -30,7 +30,6 @@ endif
 
 SUBDIRS-y += xenpmd
 SUBDIRS-y += libxl
-SUBDIRS-y += remus
 SUBDIRS-$(CONFIG_X86) += xenpaging
 SUBDIRS-$(CONFIG_X86) += debugger/gdbsx
 SUBDIRS-$(CONFIG_X86) += debugger/kdd
