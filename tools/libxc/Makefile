@@ -136,15 +136,15 @@ libs: $(LIB)
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
-	$(INSTALL_PROG) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_SHLIB) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libxenctrl.a $(DESTDIR)$(LIBDIR)
-	ln -sf libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenctrl.so.$(MAJOR)
-	ln -sf libxenctrl.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenctrl.so
+	$(SYMLINK_SHLIB) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenctrl.so.$(MAJOR)
+	$(SYMLINK_SHLIB) libxenctrl.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenctrl.so
 	$(INSTALL_DATA) xenctrl.h xenctrlosdep.h xentoollog.h $(DESTDIR)$(INCLUDEDIR)
-	$(INSTALL_PROG) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_SHLIB) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libxenguest.a $(DESTDIR)$(LIBDIR)
-	ln -sf libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenguest.so.$(MAJOR)
-	ln -sf libxenguest.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenguest.so
+	$(SYMLINK_SHLIB) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenguest.so.$(MAJOR)
+	$(SYMLINK_SHLIB) libxenguest.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenguest.so
 	$(INSTALL_DATA) xenguest.h $(DESTDIR)$(INCLUDEDIR)
 
 .PHONY: TAGS
@@ -174,9 +174,9 @@ libxenctrl.a: $(CTRL_LIB_OBJS)
 	$(AR) rc $@ $^
 
 libxenctrl.so: libxenctrl.so.$(MAJOR)
-	ln -sf $< $@
+	$(SYMLINK_SHLIB) $< $@
 libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
-	ln -sf $< $@
+	$(SYMLINK_SHLIB) $< $@
 
 libxenctrl.so.$(MAJOR).$(MINOR): $(CTRL_PIC_OBJS)
 	$(CC) $(LDFLAGS) $(PTHREAD_LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(DLOPEN_LIBS) $(PTHREAD_LIBS) $(APPEND_LDFLAGS)
@@ -187,9 +187,9 @@ libxenguest.a: $(GUEST_LIB_OBJS)
 	$(AR) rc $@ $^
 
 libxenguest.so: libxenguest.so.$(MAJOR)
-	ln -sf $< $@
+	$(SYMLINK_SHLIB) $< $@
 libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
-	ln -sf $< $@
+	$(SYMLINK_SHLIB) $< $@
 
 ifeq ($(CONFIG_MiniOS),y)
 zlib-options =
