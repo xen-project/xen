@@ -43,6 +43,10 @@ SUBDIRS-y += pygrub
 SUBDIRS-$(OCAML_TOOLS) += ocaml
 endif
 
+ifeq ($(CONFIG_RUMP),y)
+SUBDIRS-y := include libxc xenstore
+endif
+
 # For the sake of linking, set the sys-root
 ifneq ($(CROSS_COMPILE),)
 CROSS_BIN_PATH ?= /usr/$(CROSS_COMPILE:-=)/bin
