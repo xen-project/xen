@@ -367,66 +367,9 @@ static inline int hvm_event_pending(struct vcpu *v)
     return hvm_funcs.event_pending(v);
 }
 
-static inline bool_t hvm_vcpu_has_smep(void)
-{
-    unsigned int eax, ebx, ecx = 0;
-
-    hvm_cpuid(0, &eax, NULL, NULL, NULL);
-
-    if ( eax < 7 )
-        return 0;
-
-    hvm_cpuid(7, NULL, &ebx, &ecx, NULL);
-    return !!(ebx & cpufeat_mask(X86_FEATURE_SMEP));
-}
-
-static inline bool_t hvm_vcpu_has_smap(void)
-{
-    unsigned int eax, ebx, ecx = 0;
-
-    hvm_cpuid(0, &eax, NULL, NULL, NULL);
-
-    if ( eax < 7 )
-        return 0;
-
-    hvm_cpuid(7, NULL, &ebx, &ecx, NULL);
-    return !!(ebx & cpufeat_mask(X86_FEATURE_SMAP));
-}
-
-/* These reserved bits in lower 32 remain 0 after any load of CR0 */
-#define HVM_CR0_GUEST_RESERVED_BITS             \
-    (~((unsigned long)                          \
-       (X86_CR0_PE | X86_CR0_MP | X86_CR0_EM |  \
-        X86_CR0_TS | X86_CR0_ET | X86_CR0_NE |  \
-        X86_CR0_WP | X86_CR0_AM | X86_CR0_NW |  \
-        X86_CR0_CD | X86_CR0_PG)))
-
 /* These bits in CR4 are owned by the host. */
 #define HVM_CR4_HOST_MASK (mmu_cr4_features & \
     (X86_CR4_VMXE | X86_CR4_PAE | X86_CR4_MCE))
-
-/* These bits in CR4 cannot be set by the guest. */
-#define HVM_CR4_GUEST_RESERVED_BITS(v, restore) ({      \
-    const struct vcpu *_v = (v);                        \
-    bool_t _restore = !!(restore);                      \
-    ASSERT((_restore) || _v == current);                \
-    (~((unsigned long)                                  \
-       (X86_CR4_VME | X86_CR4_PVI | X86_CR4_TSD |       \
-        X86_CR4_DE  | X86_CR4_PSE | X86_CR4_PAE |       \
-        X86_CR4_MCE | X86_CR4_PGE | X86_CR4_PCE |       \
-        X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT |           \
-        (((_restore) ? cpu_has_smep :                   \
-                       hvm_vcpu_has_smep()) ?           \
-         X86_CR4_SMEP : 0) |                            \
-        (((_restore) ? cpu_has_smap :                   \
-                       hvm_vcpu_has_smap()) ?           \
-         X86_CR4_SMAP : 0) |                            \
-        (cpu_has_fsgsbase ? X86_CR4_FSGSBASE : 0) |     \
-        ((nestedhvm_enabled(_v->domain) && cpu_has_vmx) \
-                      ? X86_CR4_VMXE : 0)  |            \
-        (cpu_has_pcid ? X86_CR4_PCIDE : 0) |            \
-        (cpu_has_xsave ? X86_CR4_OSXSAVE : 0))));       \
-})
 
 /* These exceptions must always be intercepted. */
 #define HVM_TRAP_MASK ((1U << TRAP_machine_check) | (1U << TRAP_invalid_op))
