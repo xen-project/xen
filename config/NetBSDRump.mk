@@ -6,3 +6,5 @@ PTHREAD_LIBS =
 XEN_LOCK_DIR = /var/lib
 
 WGET = ftp
+
+XENSTORE_XENSTORED=n

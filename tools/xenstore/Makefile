@@ -28,7 +28,10 @@ LIBXENSTORE := libxenstore.a
 xenstore xenstore-control: CFLAGS += -static
 endif
 
-ALL_TARGETS = libxenstore.so libxenstore.a clients xs_tdb_dump xenstored
+ALL_TARGETS = libxenstore.so libxenstore.a clients
+ifeq ($(XENSTORE_XENSTORED),y)
+ALL_TARGETS += xs_tdb_dump xenstored
+endif
 
 ifeq ($(CONFIG_Linux),y)
 ALL_TARGETS += init-xenstore-domain
@@ -114,8 +117,10 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xenstore-compat
+ifeq ($(XENSTORE_XENSTORED),y)
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xenstored
 	$(INSTALL_PROG) xenstored $(DESTDIR)$(SBINDIR)
+endif
 	$(INSTALL_PROG) xenstore-control $(DESTDIR)$(BINDIR)
 	$(INSTALL_PROG) xenstore $(DESTDIR)$(BINDIR)
 	set -e ; for c in $(CLIENTS) ; do \

@@ -19,6 +19,8 @@ XEN_LIBVCHAN       = $(XEN_ROOT)/tools/libvchan
 
 CFLAGS_xeninclude = -I$(XEN_INCLUDE)
 
+XENSTORE_XENSTORED ?= y
+
 CFLAGS_libxenctrl = -I$(XEN_LIBXC) $(CFLAGS_xeninclude)
 LDLIBS_libxenctrl = $(XEN_LIBXC)/libxenctrl.so
 SHLIB_libxenctrl  = -Wl,-rpath-link=$(XEN_LIBXC)
