@@ -42,12 +42,6 @@ void iommu_flush_cache_page(void *addr, unsigned long npages);
 int iommu_alloc(struct acpi_drhd_unit *drhd);
 void iommu_free(struct acpi_drhd_unit *drhd);
 
-int queue_invalidate_context(struct iommu *iommu,
-    u16 did, u16 source_id, u8 function_mask, u8 granu);
-int queue_invalidate_iotlb(struct iommu *iommu,
-    u8 granu, u8 dr, u8 dw, u16 did, u8 am, u8 ih, u64 addr);
-int queue_invalidate_iec(struct iommu *iommu,
-    u8 granu, u8 im, u16 iidx);
 int iommu_flush_iec_global(struct iommu *iommu);
 int iommu_flush_iec_index(struct iommu *iommu, u8 im, u16 iidx);
 void clear_fault_bits(struct iommu *iommu);
