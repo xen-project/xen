@@ -1724,46 +1724,51 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
         spin_unlock_recursive(&d->page_alloc_lock);
     }
-    else if ( likely(d != NULL) && likely(d != dom_cow) )
+    else
     {
-        /* NB. May recursively lock from relinquish_memory(). */
-        spin_lock_recursive(&d->page_alloc_lock);
+        bool_t scrub;
 
-        for ( i = 0; i < (1 << order); i++ )
+        if ( likely(d) && likely(d != dom_cow) )
         {
-            BUG_ON((pg[i].u.inuse.type_info & PGT_count_mask) != 0);
-            page_list_del2(&pg[i], &d->page_list, &d->arch.relmem_list);
+            /* NB. May recursively lock from relinquish_memory(). */
+            spin_lock_recursive(&d->page_alloc_lock);
+
+            for ( i = 0; i < (1 << order); i++ )
+            {
+                BUG_ON((pg[i].u.inuse.type_info & PGT_count_mask) != 0);
+                page_list_del2(&pg[i], &d->page_list, &d->arch.relmem_list);
+            }
+
+            drop_dom_ref = !domain_adjust_tot_pages(d, -(1 << order));
+
+            spin_unlock_recursive(&d->page_alloc_lock);
+
+            /*
+             * Normally we expect a domain to clear pages before freeing them,
+             * if it cares about the secrecy of their contents. However, after
+             * a domain has died we assume responsibility for erasure.
+             */
+            scrub = !!d->is_dying;
+        }
+        else
+        {
+            /*
+             * All we need to check is that on dom_cow only order-0 chunks
+             * make it here. Due to the if() above, the only two possible
+             * cases right now are d == NULL and d == dom_cow. To protect
+             * against relaxation of that if() condition without updating the
+             * check here, don't check d != dom_cow for now.
+             */
+            ASSERT(!d || !order);
+            drop_dom_ref = 0;
+            scrub = 1;
         }
 
-        drop_dom_ref = !domain_adjust_tot_pages(d, -(1 << order));
-
-        spin_unlock_recursive(&d->page_alloc_lock);
-
-        /*
-         * Normally we expect a domain to clear pages before freeing them, if 
-         * it cares about the secrecy of their contents. However, after a 
-         * domain has died we assume responsibility for erasure.
-         */
-        if ( unlikely(d->is_dying) )
+        if ( unlikely(scrub) )
             for ( i = 0; i < (1 << order); i++ )
                 scrub_one_page(&pg[i]);
 
         free_heap_pages(pg, order);
-    }
-    else if ( unlikely(d == dom_cow) )
-    {
-        ASSERT(order == 0); 
-        scrub_one_page(pg);
-        free_heap_pages(pg, 0);
-        drop_dom_ref = 0;
-    }
-    else
-    {
-        /* Freeing anonymous domain-heap pages. */
-        for ( i = 0; i < (1 << order); i++ )
-            scrub_one_page(&pg[i]);
-        free_heap_pages(pg, order);
-        drop_dom_ref = 0;
     }
 
     if ( drop_dom_ref )
