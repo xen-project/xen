@@ -246,9 +246,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 7f5b3c338e0f8938ba575dec18255dcbee0c2ee2
-# Wed Dec 18 15:25:14 2013 +0000
-# qemu-traditional: Fix build warnings on Wheezy
+QEMU_TAG ?= d0395cc49b2ec6d1723c01f1daf2394b9264ca29
+# Tue Apr 8 16:50:06 2014 +0000
+# qemu-xen-trad: free all the pirqs for msi/msix when driver unloads
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
