@@ -487,8 +487,6 @@ extern struct list_head acpi_ioapic_units;
 
 struct qi_ctrl {
     u64 qinval_maddr;  /* queue invalidation page machine address */
-    int qinval_index;                    /* queue invalidation index */
-    spinlock_t qinval_lock;      /* lock for queue invalidation page */
 };
 
 struct ir_ctrl {

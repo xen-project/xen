@@ -147,7 +147,6 @@ static struct intel_iommu *__init alloc_intel_iommu(void)
     if ( intel == NULL )
         return NULL;
 
-    spin_lock_init(&intel->qi_ctrl.qinval_lock);
     spin_lock_init(&intel->ir_ctrl.iremap_lock);
 
     return intel;
