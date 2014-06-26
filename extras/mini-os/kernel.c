@@ -68,7 +68,9 @@ void setup_xen_features(void)
 /* This should be overridden by the application we are linked against. */
 __attribute__((weak)) void app_shutdown(unsigned reason)
 {
+    struct sched_shutdown sched_shutdown = { .reason = reason };
     printk("Shutdown requested: %d\n", reason);
+    HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
 }
 
 static void shutdown_thread(void *p)
@@ -76,12 +78,14 @@ static void shutdown_thread(void *p)
     const char *path = "control/shutdown";
     const char *token = path;
     xenbus_event_queue events = NULL;
-    char *shutdown, *err;
+    char *shutdown = NULL, *err;
     unsigned int shutdown_reason;
     xenbus_watch_path_token(XBT_NIL, path, token, &events);
-    while ((err = xenbus_read(XBT_NIL, path, &shutdown)) != NULL)
+    while ((err = xenbus_read(XBT_NIL, path, &shutdown)) != NULL || !strcmp(shutdown, ""))
     {
         free(err);
+        free(shutdown);
+        shutdown = NULL;
         xenbus_wait_for_watch(&events);
     }
     err = xenbus_unwatch_path_token(XBT_NIL, path, token);
@@ -106,7 +110,7 @@ static void shutdown_thread(void *p)
 /* This should be overridden by the application we are linked against. */
 __attribute__((weak)) int app_main(start_info_t *si)
 {
-    printk("Dummy main: start_info=%p\n", si);
+    printk("kernel.c: dummy main: start_info=%p\n", si);
     return 0;
 }
 
