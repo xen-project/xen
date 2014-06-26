@@ -23,6 +23,10 @@ void arch_init_events(void)
 #endif
 }
 
+void arch_unbind_ports(void)
+{
+}
+
 void arch_fini_events(void)
 {
 #if defined(__x86_64__)
