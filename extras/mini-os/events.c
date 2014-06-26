@@ -43,7 +43,6 @@ void unbind_all_ports(void)
     int cpu = 0;
     shared_info_t *s = HYPERVISOR_shared_info;
     vcpu_info_t   *vcpu_info = &s->vcpu_info[cpu];
-    int rc;
 
     for ( i = 0; i < NR_EVS; i++ )
     {
@@ -53,14 +52,8 @@ void unbind_all_ports(void)
 
         if ( test_and_clear_bit(i, bound_ports) )
         {
-            struct evtchn_close close;
             printk("port %d still bound!\n", i);
-            mask_evtchn(i);
-            close.port = i;
-            rc = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
-            if ( rc )
-                printk("WARN: close_port %s failed rc=%d. ignored\n", i, rc);
-            clear_evtchn(i);
+	    unbind_evtchn(i);
         }
     }
     vcpu_info->evtchn_upcall_pending = 0;
