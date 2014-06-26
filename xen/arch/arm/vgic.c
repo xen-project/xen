@@ -27,7 +27,7 @@
 
 #include <asm/current.h>
 
-#include "io.h"
+#include <asm/mmio.h>
 #include <asm/gic.h>
 
 #define REG(n) (n/4)

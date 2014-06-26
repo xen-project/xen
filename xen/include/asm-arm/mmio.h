@@ -1,5 +1,5 @@
 /*
- * xen/arch/arm/io.h
+ * xen/include/asm-arm/mmio.h
  *
  * ARM I/O handlers
  *
@@ -16,8 +16,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __ARCH_ARM_IO_H__
-#define __ARCH_ARM_IO_H__
+#ifndef __ASM_ARM_MMIO_H__
+#define __ASM_ARM_MMIO_H__
 
 #include <xen/lib.h>
 #include <asm/processor.h>
@@ -45,7 +45,7 @@ extern const struct mmio_handler vuart_mmio_handler;
 
 extern int handle_mmio(mmio_info_t *info);
 
-#endif
+#endif  /* __ASM_ARM_MMIO_H__ */
 
 /*
  * Local variables:

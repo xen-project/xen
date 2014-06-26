@@ -19,8 +19,7 @@
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <asm/current.h>
-
-#include "io.h"
+#include <asm/mmio.h>
 
 static const struct mmio_handler *const mmio_handlers[] =
 {

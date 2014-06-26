@@ -36,9 +36,9 @@
 #include <asm/regs.h>
 #include <asm/cpregs.h>
 #include <asm/psci.h>
+#include <asm/mmio.h>
 
 #include "decode.h"
-#include "io.h"
 #include "vtimer.h"
 #include <asm/gic.h>
 

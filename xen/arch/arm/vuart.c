@@ -38,9 +38,9 @@
 #include <xen/errno.h>
 #include <xen/ctype.h>
 #include <xen/serial.h>
+#include <asm/mmio.h>
 
 #include "vuart.h"
-#include "io.h"
 
 #define domain_has_vuart(d) ((d)->arch.vuart.info != NULL)
 
