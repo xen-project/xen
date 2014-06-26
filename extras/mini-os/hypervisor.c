@@ -73,18 +73,26 @@ void do_hypervisor_callback(struct pt_regs *regs)
 
 void force_evtchn_callback(void)
 {
+#ifdef XEN_HAVE_PV_UPCALL_MASK
     int save;
+#endif
     vcpu_info_t *vcpu;
     vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];
+#ifdef XEN_HAVE_PV_UPCALL_MASK
     save = vcpu->evtchn_upcall_mask;
+#endif
 
     while (vcpu->evtchn_upcall_pending) {
+#ifdef XEN_HAVE_PV_UPCALL_MASK
         vcpu->evtchn_upcall_mask = 1;
+#endif
         barrier();
         do_hypervisor_callback(NULL);
         barrier();
+#ifdef XEN_HAVE_PV_UPCALL_MASK
         vcpu->evtchn_upcall_mask = save;
         barrier();
+#endif
     };
 }
 
@@ -110,7 +118,9 @@ inline void unmask_evtchn(uint32_t port)
               &vcpu_info->evtchn_pending_sel) )
     {
         vcpu_info->evtchn_upcall_pending = 1;
+#ifdef XEN_HAVE_PV_UPCALL_MASK
         if ( !vcpu_info->evtchn_upcall_mask )
+#endif
             force_evtchn_callback();
     }
 }
