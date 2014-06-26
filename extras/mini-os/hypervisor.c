@@ -64,7 +64,7 @@ void do_hypervisor_callback(struct pt_regs *regs)
             l2 &= ~(1UL << l2i);
 
             port = (l1i * (sizeof(unsigned long) * 8)) + l2i;
-			do_event(port, regs);
+            do_event(port, regs);
         }
     }
 

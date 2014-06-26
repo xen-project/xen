@@ -165,28 +165,28 @@ struct _reent *__getreent(void)
     struct _reent *_reent;
 
     if (!threads_started)
-	_reent = _impure_ptr;
+        _reent = _impure_ptr;
     else if (in_callback)
-	_reent = &callback_reent;
+        _reent = &callback_reent;
     else
-	_reent = &get_current()->reent;
+        _reent = &get_current()->reent;
 
 #ifndef NDEBUG
 #if defined(__x86_64__) || defined(__x86__)
     {
 #ifdef __x86_64__
-	register unsigned long sp asm ("rsp");
+        register unsigned long sp asm ("rsp");
 #else
-	register unsigned long sp asm ("esp");
+        register unsigned long sp asm ("esp");
 #endif
-	if ((sp & (STACK_SIZE-1)) < STACK_SIZE / 16) {
-	    static int overflowing;
-	    if (!overflowing) {
-		overflowing = 1;
-		printk("stack overflow\n");
-		BUG();
-	    }
-	}
+        if ((sp & (STACK_SIZE-1)) < STACK_SIZE / 16) {
+            static int overflowing;
+            if (!overflowing) {
+                overflowing = 1;
+                printk("stack overflow\n");
+                BUG();
+            }
+        }
     }
 #endif
 #else

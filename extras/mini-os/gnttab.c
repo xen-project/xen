@@ -164,7 +164,7 @@ gnttabop_error(int16_t status)
 {
     status = -status;
     if (status < 0 || status >= ARRAY_SIZE(gnttabop_error_msgs))
-	return "bad status";
+        return "bad status";
     else
         return gnttabop_error_msgs[status];
 }
