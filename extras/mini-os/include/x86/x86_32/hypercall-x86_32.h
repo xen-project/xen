@@ -35,6 +35,11 @@
 #include <xen/nmi.h>
 #include <mini-os/mm.h>
 
+typedef struct { unsigned long pte_low, pte_high; } pte_t;
+
+#define __pte(x) ({ unsigned long long _x = (x);        \
+    ((pte_t) {(unsigned long)(_x), (unsigned long)(_x>>32)}); })
+
 #define __STR(x) #x
 #define STR(x) __STR(x)
 
