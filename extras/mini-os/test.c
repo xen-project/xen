@@ -56,8 +56,7 @@ void test_xenbus(void);
 
 static void xenbus_tester(void *p)
 {
-    printk("Xenbus tests disabled, because of a Xend bug.\n");
-    /* test_xenbus(); */
+    test_xenbus();
 }
 #endif
 
