@@ -73,7 +73,7 @@ typedef unsigned long uint64_t;
 #endif
 typedef uint64_t uintmax_t;
 typedef  int64_t intmax_t;
-typedef uint64_t off_t;
+typedef  int64_t off_t;
 #endif
 
 typedef intptr_t            ptrdiff_t;
