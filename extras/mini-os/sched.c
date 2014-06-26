@@ -78,16 +78,16 @@ void schedule(void)
     struct thread *prev, *next, *thread, *tmp;
     unsigned long flags;
 
+    if (irqs_disabled()) {
+        printk("Must not call schedule() with IRQs disabled\n");
+        BUG();
+    }
+
     prev = current;
     local_irq_save(flags); 
 
     if (in_callback) {
         printk("Must not call schedule() from a callback\n");
-        BUG();
-    }
-
-    if (flags) {
-        printk("Must not call schedule() with IRQs disabled\n");
         BUG();
     }
 
