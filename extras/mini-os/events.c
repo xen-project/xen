@@ -109,24 +109,23 @@ evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
 
 void unbind_evtchn(evtchn_port_t port )
 {
-	struct evtchn_close close;
+    struct evtchn_close close;
     int rc;
 
-	if ( ev_actions[port].handler == default_handler )
-		printk("WARN: No handler for port %d when unbinding\n", port);
-	mask_evtchn(port);
-	clear_evtchn(port);
+    if ( ev_actions[port].handler == default_handler )
+        printk("WARN: No handler for port %d when unbinding\n", port);
+    mask_evtchn(port);
+    clear_evtchn(port);
 
-	ev_actions[port].handler = default_handler;
-	wmb();
-	ev_actions[port].data = NULL;
-	clear_bit(port, bound_ports);
+    ev_actions[port].handler = default_handler;
+    wmb();
+    ev_actions[port].data = NULL;
+    clear_bit(port, bound_ports);
 
-	close.port = port;
-	rc = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+    close.port = port;
+    rc = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
     if ( rc )
-        printk("WARN: close_port %s failed rc=%d. ignored\n", port, rc);
-        
+        printk("WARN: close_port %d failed rc=%d. ignored\n", port, rc);
 }
 
 evtchn_port_t bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
