@@ -35,6 +35,9 @@
 /* Number of ranks of interrupt registers for a domain */
 #define DOMAIN_NR_RANKS(d) (((d)->arch.vgic.nr_lines+31)/32)
 
+static int vgic_distr_mmio_read(struct vcpu *v, mmio_info_t *info);
+static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info);
+
 /*
  * Rank containing GICD_<FOO><n> for GICD_<FOO> with
  * <b>-bits-per-interrupt
@@ -78,6 +81,11 @@ static struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq)
     return vgic_rank_offset(v, 8, irq >> 2);
 }
 
+static const struct mmio_handler_ops vgic_distr_mmio_handler = {
+    .read_handler  = vgic_distr_mmio_read,
+    .write_handler = vgic_distr_mmio_write,
+};
+
 int domain_vgic_init(struct domain *d)
 {
     int i;
@@ -112,6 +120,13 @@ int domain_vgic_init(struct domain *d)
     }
     for (i=0; i<DOMAIN_NR_RANKS(d); i++)
         spin_lock_init(&d->arch.vgic.shared_irqs[i].lock);
+
+    /*
+     * We rely on gicv_setup() to initialize dbase(vGIC distributor base)
+     */
+    register_mmio_handler(d, &vgic_distr_mmio_handler,
+                          d->arch.vgic.dbase, PAGE_SIZE);
+
     return 0;
 }
 
@@ -683,19 +698,6 @@ write_ignore:
     if ( dabt.size != 2 ) goto bad_width;
     return 1;
 }
-
-static int vgic_distr_mmio_check(struct vcpu *v, paddr_t addr)
-{
-    struct domain *d = v->domain;
-
-    return (addr >= (d->arch.vgic.dbase)) && (addr < (d->arch.vgic.dbase + PAGE_SIZE));
-}
-
-const struct mmio_handler vgic_distr_mmio_handler = {
-    .check_handler = vgic_distr_mmio_check,
-    .read_handler  = vgic_distr_mmio_read,
-    .write_handler = vgic_distr_mmio_write,
-};
 
 struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq)
 {

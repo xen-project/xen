@@ -512,6 +512,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     share_xen_page_with_guest(
         virt_to_page(d->shared_info), d, XENSHARE_writable);
 
+    if ( (rc = domain_io_init(d)) != 0 )
+        goto fail;
+
     if ( (rc = p2m_alloc_table(d)) != 0 )
         goto fail;
 

@@ -1,5 +1,5 @@
 /*
- * xen/arch/arm/io.h
+ * xen/arch/arm/io.c
  *
  * ARM I/O handlers
  *
@@ -18,29 +18,61 @@
 
 #include <xen/config.h>
 #include <xen/lib.h>
+#include <xen/spinlock.h>
+#include <xen/sched.h>
 #include <asm/current.h>
 #include <asm/mmio.h>
-
-static const struct mmio_handler *const mmio_handlers[] =
-{
-    &vgic_distr_mmio_handler,
-    &vuart_mmio_handler,
-};
-#define MMIO_HANDLER_NR ARRAY_SIZE(mmio_handlers)
 
 int handle_mmio(mmio_info_t *info)
 {
     struct vcpu *v = current;
     int i;
+    const struct mmio_handler *mmio_handler;
+    const struct io_handler *io_handlers = &v->domain->arch.io_handlers;
 
-    for ( i = 0; i < MMIO_HANDLER_NR; i++ )
-        if ( mmio_handlers[i]->check_handler(v, info->gpa) )
+    for ( i = 0; i < io_handlers->num_entries; i++ )
+    {
+        mmio_handler = &io_handlers->mmio_handlers[i];
+
+        if ( (info->gpa >= mmio_handler->addr) &&
+             (info->gpa < (mmio_handler->addr + mmio_handler->size)) )
+        {
             return info->dabt.write ?
-                mmio_handlers[i]->write_handler(v, info) :
-                mmio_handlers[i]->read_handler(v, info);
+                mmio_handler->mmio_handler_ops->write_handler(v, info) :
+                mmio_handler->mmio_handler_ops->read_handler(v, info);
+        }
+    }
 
     return 0;
 }
+
+void register_mmio_handler(struct domain *d,
+                           const struct mmio_handler_ops *handle,
+                           paddr_t addr, paddr_t size)
+{
+    struct io_handler *handler = &d->arch.io_handlers;
+
+    BUG_ON(handler->num_entries >= MAX_IO_HANDLER);
+
+    spin_lock(&handler->lock);
+
+    handler->mmio_handlers[handler->num_entries].mmio_handler_ops = handle;
+    handler->mmio_handlers[handler->num_entries].addr = addr;
+    handler->mmio_handlers[handler->num_entries].size = size;
+    dsb(ish);
+    handler->num_entries++;
+
+    spin_unlock(&handler->lock);
+}
+
+int domain_io_init(struct domain *d)
+{
+   spin_lock_init(&d->arch.io_handlers.lock);
+   d->arch.io_handlers.num_entries = 0;
+
+   return 0;
+}
+
 /*
  * Local variables:
  * mode: C

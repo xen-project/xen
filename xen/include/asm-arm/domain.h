@@ -7,6 +7,7 @@
 #include <asm/page.h>
 #include <asm/p2m.h>
 #include <asm/vfp.h>
+#include <asm/mmio.h>
 #include <public/hvm/params.h>
 #include <xen/serial.h>
 #include <xen/hvm/iommu.h>
@@ -119,6 +120,7 @@ struct arch_domain
     struct hvm_domain hvm_domain;
     xen_pfn_t *grant_table_gpfn;
 
+    struct io_handler io_handlers;
     /* Continuable domain_relinquish_resources(). */
     enum {
         RELMEM_not_started,

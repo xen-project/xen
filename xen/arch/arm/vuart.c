@@ -44,6 +44,14 @@
 
 #define domain_has_vuart(d) ((d)->arch.vuart.info != NULL)
 
+static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info);
+static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info);
+
+static const struct mmio_handler_ops vuart_mmio_handler = {
+    .read_handler  = vuart_mmio_read,
+    .write_handler = vuart_mmio_write,
+};
+
 int domain_vuart_init(struct domain *d)
 {
     ASSERT( is_hardware_domain(d) );
@@ -58,6 +66,10 @@ int domain_vuart_init(struct domain *d)
     d->arch.vuart.buf = xzalloc_array(char, VUART_BUF_SIZE);
     if ( !d->arch.vuart.buf )
         return -ENOMEM;
+
+    register_mmio_handler(d, &vuart_mmio_handler,
+                          d->arch.vuart.info->base_addr,
+                          d->arch.vuart.info->size);
 
     return 0;
 }
@@ -92,14 +104,6 @@ static void vuart_print_char(struct vcpu *v, char c)
     spin_unlock(&uart->lock);
 }
 
-static int vuart_mmio_check(struct vcpu *v, paddr_t addr)
-{
-    const struct vuart_info *info = v->domain->arch.vuart.info;
-
-    return (domain_has_vuart(v->domain) && addr >= info->base_addr &&
-            addr <= (info->base_addr + info->size));
-}
-
 static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info)
 {
     struct domain *d = v->domain;
@@ -132,12 +136,6 @@ static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info)
 
     return 1;
 }
-
-const struct mmio_handler vuart_mmio_handler = {
-    .check_handler = vuart_mmio_check,
-    .read_handler  = vuart_mmio_read,
-    .write_handler = vuart_mmio_write,
-};
 
 /*
  * Local variables:
