@@ -28,6 +28,8 @@
 
 #include <mini-os/os.h>
 #include <mini-os/lib.h> /* for printk, memcpy */
+#include <mini-os/kernel.h>
+#include <xen/xen.h>
 
 /*
  * Shared page for communicating with the hypervisor.
@@ -87,19 +89,44 @@ static inline void sse_init(void) {
 #define sse_init()
 #endif
 
+
+/*
+ * INITIAL C ENTRY POINT.
+ */
 void
 arch_init(start_info_t *si)
 {
-	/*Initialize floating point unit */
-        fpu_init();
+	static char hello[] = "Bootstrapping...\n";
 
-        /* Initialize SSE */
-        sse_init();
+	(void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(hello), hello);
+
+	trap_init();
+
+	/*Initialize floating point unit */
+	fpu_init();
+
+	/* Initialize SSE */
+	sse_init();
 
 	/* Copy the start_info struct to a globally-accessible area. */
 	/* WARN: don't do printk before here, it uses information from
 	   shared_info. Use xprintk instead. */
 	memcpy(&start_info, si, sizeof(*si));
+
+	/* print out some useful information  */
+	printk("Xen Minimal OS!\n");
+	printk("  start_info: %p(VA)\n", si);
+	printk("    nr_pages: 0x%lx\n", si->nr_pages);
+	printk("  shared_inf: 0x%08lx(MA)\n", si->shared_info);
+	printk("     pt_base: %p(VA)\n", (void *)si->pt_base);
+	printk("nr_pt_frames: 0x%lx\n", si->nr_pt_frames);
+	printk("    mfn_list: %p(VA)\n", (void *)si->mfn_list);
+	printk("   mod_start: 0x%lx(VA)\n", si->mod_start);
+	printk("     mod_len: %lu\n", si->mod_len);
+	printk("       flags: 0x%x\n", (unsigned int)si->flags);
+	printk("    cmd_line: %s\n",
+			si->cmd_line ? (const char *)si->cmd_line : "NULL");
+	printk("       stack: %p-%p\n", stack, stack + sizeof(stack));
 
 	/* set up minimal memory infos */
 	phys_to_machine_mapping = (unsigned long *)start_info.mfn_list;
@@ -118,12 +145,15 @@ arch_init(start_info_t *si)
 		(unsigned long)failsafe_callback, 0);
 #endif
 
-
+	start_kernel();
 }
 
 void
 arch_fini(void)
 {
+	/* Reset traps */
+	trap_fini();
+
 #ifdef __i386__
 	HYPERVISOR_set_callbacks(0, 0, 0, 0);
 #else
@@ -132,9 +162,7 @@ arch_fini(void)
 }
 
 void
-arch_print_info(void)
+arch_do_exit(void)
 {
-	printk("  stack:      %p-%p\n", stack, stack + sizeof(stack));
+	stack_walk();
 }
-
-

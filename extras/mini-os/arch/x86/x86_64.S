@@ -21,7 +21,7 @@ _start:
         movq stack_start(%rip),%rsp
         andq $(~(__STACK_SIZE-1)), %rsp
         movq %rsi,%rdi
-        call start_kernel
+        call arch_init
 
 stack_start:
         .quad stack+(2*__STACK_SIZE)

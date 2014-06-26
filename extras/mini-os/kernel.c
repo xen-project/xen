@@ -28,6 +28,7 @@
  */
 
 #include <mini-os/os.h>
+#include <mini-os/kernel.h>
 #include <mini-os/hypervisor.h>
 #include <mini-os/mm.h>
 #include <mini-os/events.h>
@@ -114,40 +115,13 @@ __attribute__((weak)) int app_main(start_info_t *si)
     return 0;
 }
 
-/*
- * INITIAL C ENTRY POINT.
- */
-void start_kernel(start_info_t *si)
+void start_kernel(void)
 {
-    static char hello[] = "Bootstrapping...\n";
-
-    (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(hello), hello);
-
-    arch_init(si);
-
-    trap_init();
-
-    /* print out some useful information  */
-    printk("Xen Minimal OS!\n");
-    printk("  start_info: %p(VA)\n", si);
-    printk("    nr_pages: 0x%lx\n", si->nr_pages);
-    printk("  shared_inf: 0x%08lx(MA)\n", si->shared_info);
-    printk("     pt_base: %p(VA)\n", (void *)si->pt_base); 
-    printk("nr_pt_frames: 0x%lx\n", si->nr_pt_frames);
-    printk("    mfn_list: %p(VA)\n", (void *)si->mfn_list); 
-    printk("   mod_start: 0x%lx(VA)\n", si->mod_start);
-    printk("     mod_len: %lu\n", si->mod_len); 
-    printk("       flags: 0x%x\n", (unsigned int)si->flags);
-    printk("    cmd_line: %s\n",  
-           si->cmd_line ? (const char *)si->cmd_line : "NULL");
-
     /* Set up events. */
     init_events();
-    
+
     /* ENABLE EVENT DELIVERY. This is disabled at start of day. */
     __sti();
-
-    arch_print_info();
 
     setup_xen_features();
 
@@ -201,9 +175,6 @@ void stop_kernel(void)
     /* Reset events. */
     fini_events();
 
-    /* Reset traps */
-    trap_fini();
-
     /* Reset arch details */
     arch_fini();
 }
@@ -218,7 +189,7 @@ void stop_kernel(void)
 void do_exit(void)
 {
     printk("Do_exit called!\n");
-    stack_walk();
+    arch_do_exit();
     for( ;; )
     {
         struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_crash };
