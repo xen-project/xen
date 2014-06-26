@@ -27,6 +27,7 @@ endif
 
 ifeq ($(TARGET_SUBARCH),arm64)
 CFLAGS += -mcpu=generic
+CFLAGS += -mgeneral-regs-only # No fp registers etc
 arm32 := n
 arm64 := y
 endif
