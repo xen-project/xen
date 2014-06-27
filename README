@@ -73,6 +73,10 @@ disabled at compile time:
     * markdown
     * figlet (for generating the traditional Xen start of day banner)
     * systemd daemon development files
+    * Development install of libnl3 (e.g., libnl-3-200,
+      libnl-3-dev, etc).  Required if network buffering is desired
+      when using Remus with libxl.  See tools/remus/README for detailed
+      information.
 
 Second, you need to acquire a suitable kernel for use in domain 0. If
 possible you should use a kernel provided by your OS distributor. If

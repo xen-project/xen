@@ -320,6 +320,22 @@ esac
 # Checks for header files.
 AC_CHECK_HEADERS([yajl/yajl_version.h sys/eventfd.h valgrind/memcheck.h utmp.h])
 
+# Check for libnl3 >=3.2.8. If present enable remus network buffering.
+PKG_CHECK_MODULES(LIBNL3, [libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8],
+    [libnl3_lib="y"], [libnl3_lib="n"])
+
+AS_IF([test "x$libnl3_lib" = "xn" ], [
+    AC_MSG_WARN([Disabling support for Remus network buffering.
+    Please install libnl3 libraries, command line tools and devel
+    headers - version 3.2.8 or higher])
+    AC_SUBST(remus_netbuf, [n])
+    ],[
+    AC_SUBST(remus_netbuf, [y])
+])
+
+AC_SUBST(LIBNL3_LIBS)
+AC_SUBST(LIBNL3_CFLAGS)
+
 fi # ! $rump
 
 AX_AVAILABLE_SYSTEMD()
