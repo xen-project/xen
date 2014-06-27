@@ -33,19 +33,21 @@ typedef struct {
 
 #define LIBXL_UUID_BYTES(arg) LIBXL__UUID_BYTES(((uint8_t *)arg.uuid))
 
-#elif defined(__NetBSD__)
+#elif defined(__FreeBSD__) || defined(__NetBSD__)
 
 #include <uuid.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
 
-#define LIBXL_UUID_BYTES(arg) LIBXL__UUID_BYTES(arg.uuid)
-
-typedef struct {
-    uint8_t uuid[16];
+typedef union {
+    uuid_t uuid;
+    uint8_t uuid_raw[16];
 } libxl_uuid;
+
+#define LIBXL_UUID_BYTES(arg) LIBXL__UUID_BYTES(arg.uuid_raw)
 
 #else
 

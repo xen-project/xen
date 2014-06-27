@@ -3184,6 +3184,15 @@ int libxl__string_parse_json(libxl__gc *gc, const libxl__json_object *o,
 
 int libxl__random_bytes(libxl__gc *gc, uint8_t *buf, size_t len);
 
+/*
+ * Compile time assertion
+ */
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+#define BUILD_BUG_ON(p) ({ _Static_assert(!(p), "!(" #p ")"); })
+#else
+#define BUILD_BUG_ON(p) ((void)sizeof(char[1 - 2 * !!(p)]))
+#endif
+
 #endif
 
 /*
