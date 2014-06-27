@@ -104,6 +104,11 @@
 #define LIBXL_HAVE_BUILDINFO_EVENT_CHANNELS 1
 
 /*
+ * libxl_domain_build_info has the u.hvm.ms_vm_genid field.
+ */
+#define LIBXL_HAVE_BUILDINFO_HVM_MS_VM_GENID 1
+
+/*
  * LIBXL_HAVE_VCPUINFO_SOFT_AFFINITY indicates that a 'cpumap_soft'
  * field (of libxl_bitmap type) is present in libxl_vcpuinfo,
  * containing the soft affinity of a vcpu.
@@ -638,6 +643,11 @@ const char *libxl_defbool_to_string(libxl_defbool b);
 
 #define LIBXL_TIMER_MODE_DEFAULT -1
 #define LIBXL_MEMKB_DEFAULT ~0ULL
+
+#define LIBXL_MS_VM_GENID_LEN 16
+typedef struct {
+    uint8_t bytes[LIBXL_MS_VM_GENID_LEN];
+} libxl_ms_vm_genid;
 
 #include "_libxl_types.h"
 
@@ -1261,6 +1271,9 @@ int libxl_flask_sid_to_context(libxl_ctx *ctx, uint32_t ssidref, char **buf,
 int libxl_flask_getenforce(libxl_ctx *ctx);
 int libxl_flask_setenforce(libxl_ctx *ctx, int mode);
 int libxl_flask_loadpolicy(libxl_ctx *ctx, void *policy, uint32_t size);
+
+int libxl_ms_vm_genid_generate(libxl_ctx *ctx, libxl_ms_vm_genid *id);
+bool libxl_ms_vm_genid_is_zero(const libxl_ms_vm_genid *id);
 
 /* misc */
 

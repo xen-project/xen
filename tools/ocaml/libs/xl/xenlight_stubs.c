@@ -370,6 +370,31 @@ static value Val_hwcap(libxl_hwcap *c_val)
 	CAMLreturn(hwcap);
 }
 
+static value Val_ms_vm_genid (libxl_ms_vm_genid *c_val)
+{
+	CAMLparam0();
+	CAMLlocal1(v);
+	int i;
+
+	v = caml_alloc_tuple(LIBXL_MS_VM_GENID_LEN);
+
+	for(i=0; i<LIBXL_MS_VM_GENID_LEN; i++)
+		Store_field(v, i, Val_int(c_val->bytes[i]));
+
+	CAMLreturn(v);
+}
+
+static int Ms_vm_genid_val(libxl_ms_vm_genid *c_val, value v)
+{
+	CAMLparam1(v);
+	int i;
+
+	for(i=0; i<LIBXL_MS_VM_GENID_LEN; i++)
+		c_val->bytes[i] = Int_val(Field(v, i));
+
+	CAMLreturn(0);
+}
+
 static value Val_string_option(const char *c_val)
 {
 	CAMLparam0();

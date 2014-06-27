@@ -3086,6 +3086,10 @@ void libxl__numa_candidate_put_nodemap(libxl__gc *gc,
     libxl_bitmap_copy(CTX, &cndt->nodemap, nodemap);
 }
 
+_hidden int libxl__ms_vm_genid_set(libxl__gc *gc, uint32_t domid,
+                                   const libxl_ms_vm_genid *id);
+
+
 /* Som handy macros for defbool type. */
 #define LIBXL__DEFBOOL_DEFAULT     (0)
 #define LIBXL__DEFBOOL_FALSE       (-1)
@@ -3163,6 +3167,8 @@ int libxl_key_value_list_parse_json(libxl__gc *gc,
                                     libxl_key_value_list *p);
 int libxl_hwcap_parse_json(libxl__gc *gc, const libxl__json_object *o,
                            libxl_hwcap *p);
+int libxl_ms_vm_genid_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                                 libxl_ms_vm_genid *p);
 int libxl__int_parse_json(libxl__gc *gc, const libxl__json_object *o,
                           void *p);
 int libxl__uint8_parse_json(libxl__gc *gc, const libxl__json_object *o,

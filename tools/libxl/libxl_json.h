@@ -33,6 +33,7 @@ yajl_gen_status libxl_string_list_gen_json(yajl_gen hand, libxl_string_list *p);
 yajl_gen_status libxl_key_value_list_gen_json(yajl_gen hand,
                                               libxl_key_value_list *p);
 yajl_gen_status libxl_hwcap_gen_json(yajl_gen hand, libxl_hwcap *p);
+yajl_gen_status libxl_ms_vm_genid_gen_json(yajl_gen hand, libxl_ms_vm_genid *p);
 
 #include <_libxl_types_json.h>
 

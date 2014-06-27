@@ -377,6 +377,45 @@ int libxl_hwcap_parse_json(libxl__gc *gc, const libxl__json_object *o,
     return 0;
 }
 
+yajl_gen_status libxl_ms_vm_genid_gen_json(yajl_gen hand, libxl_ms_vm_genid *p)
+{
+    yajl_gen_status s;
+    int i;
+
+    s = yajl_gen_array_open(hand);
+    if (s != yajl_gen_status_ok)
+        return s;
+
+    for (i = 0; i < LIBXL_MS_VM_GENID_LEN; i++) {
+        s = yajl_gen_integer(hand, p->bytes[i]);
+        if (s != yajl_gen_status_ok)
+            return s;
+    }
+
+    return yajl_gen_array_close(hand);
+}
+
+int libxl_ms_vm_genid_parse_json(libxl__gc *gc, const libxl__json_object *o,
+                                 libxl_ms_vm_genid *p)
+{
+    unsigned int i;
+
+    if (!libxl__json_object_is_array(o))
+        return ERROR_FAIL;
+
+    for (i = 0; i < LIBXL_MS_VM_GENID_LEN; i++) {
+        const libxl__json_object *t;
+
+        t = libxl__json_array_get(o, i);
+        if (!t || !libxl__json_object_is_integer(t))
+            return ERROR_FAIL;
+
+        p->bytes[i] = libxl__json_object_get_integer(t);
+    }
+
+    return 0;
+}
+
 yajl_gen_status libxl__string_gen_json(yajl_gen hand,
                                        const char *p)
 {

@@ -60,7 +60,7 @@ def gen_rand_init(ty, v, indent = "    ", parent = None):
         s += "%s(%s);\n" % (ty.rand_init,
                             ty.pass_arg(v, isref=parent is None,
                                         passby=idl.PASS_BY_REFERENCE))
-    elif ty.typename in ["libxl_uuid", "libxl_mac", "libxl_hwcap"]:
+    elif ty.typename in ["libxl_uuid", "libxl_mac", "libxl_hwcap", "libxl_ms_vm_genid"]:
         s += "rand_bytes((uint8_t *)%s, sizeof(*%s));\n" % (v,v)
     elif ty.typename in ["libxl_domid", "libxl_devid"] or isinstance(ty, idl.Number):
         s += "%s = rand() %% (sizeof(%s)*8);\n" % \

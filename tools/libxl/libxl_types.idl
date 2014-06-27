@@ -17,6 +17,7 @@ libxl_cpuid_policy_list = Builtin("cpuid_policy_list", dispose_fn="libxl_cpuid_d
 libxl_string_list = Builtin("string_list", dispose_fn="libxl_string_list_dispose", passby=PASS_BY_REFERENCE)
 libxl_key_value_list = Builtin("key_value_list", dispose_fn="libxl_key_value_list_dispose", passby=PASS_BY_REFERENCE)
 libxl_hwcap = Builtin("hwcap", passby=PASS_BY_REFERENCE)
+libxl_ms_vm_genid = Builtin("ms_vm_genid", passby=PASS_BY_REFERENCE)
 
 #
 # Specific integer types
@@ -378,6 +379,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("xen_platform_pci", libxl_defbool),
                                        ("usbdevice_list",   libxl_string_list),
                                        ("vendor_device",    libxl_vendor_device),
+                                       # See libxl_ms_vm_genid_generate()
+                                       ("ms_vm_genid",      libxl_ms_vm_genid),
                                        ])),
                  ("pv", Struct(None, [("kernel", string),
                                       ("slack_memkb", MemKB),

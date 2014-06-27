@@ -18,6 +18,7 @@ builtins = {
     "libxl_string_list":    ("string list",            "libxl_string_list_val(&%(c)s, %(o)s)", "Val_string_list(&%(c)s)"),
     "libxl_mac":            ("int array",              "Mac_val(&%(c)s, %(o)s)",    "Val_mac(&%(c)s)"),
     "libxl_hwcap":          ("int32 array",            None,                                "Val_hwcap(&%(c)s)"),
+    "libxl_ms_vm_genid":    ("int array",              "Ms_vm_genid_val(&%(c)s, %(o)s)",    "Val_ms_vm_genid(&%(c)s)"),
     # The following needs to be sorted out later
     "libxl_cpuid_policy_list": ("unit",                "%(c)s = 0",                         "Val_unit"),
     }

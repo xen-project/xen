@@ -339,6 +339,16 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     if (info->cpuid != NULL)
         libxl_cpuid_set(ctx, domid, info->cpuid);
 
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM
+        && !libxl_ms_vm_genid_is_zero(&info->u.hvm.ms_vm_genid)) {
+        rc = libxl__ms_vm_genid_set(gc, domid,
+                                    &info->u.hvm.ms_vm_genid);
+        if (rc) {
+            LOG(ERROR, "Failed to set VM Generation ID");
+            return rc;
+        }
+    }
+
     ents = libxl__calloc(gc, 12 + (info->max_vcpus * 2) + 2, sizeof(char *));
     ents[0] = "memory/static-max";
     ents[1] = GCSPRINTF("%"PRId64, info->max_memkb);
