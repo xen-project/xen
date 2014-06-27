@@ -231,7 +231,7 @@ class _GrubConfigFile(object):
         if val == "saved":
             self._default = 0
         else:
-            self._default = int(val)
+            self._default = val
 
         if self._default < 0:
             raise ValueError, "default must be positive number"
@@ -431,11 +431,11 @@ class Grub2ConfigFile(_GrubConfigFile):
                 
             if self.commands.has_key(com):
                 if self.commands[com] is not None:
-                    if arg.strip() == "${saved_entry}":
+                    arg_strip = arg.strip()
+                    if arg_strip == "${saved_entry}" or arg_strip == "${next_entry}":
+                        logging.warning("grub2's saved_entry/next_entry not supported")
                         arg = "0"
-                    elif arg.strip() == "${next_entry}":
-                        arg = "0"
-                    setattr(self, self.commands[com], arg.strip())
+                    setattr(self, self.commands[com], arg_strip)
                 else:
                     logging.info("Ignored directive %s" %(com,))
             elif com.startswith('set:'):
