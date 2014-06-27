@@ -166,11 +166,6 @@ use the xenstore-based protocol instead (see ~/control/shutdown,
 below) even if the guest has advertised support for the event channel
 protocol.
 
-#### ~/hvmloader/generation-id-address = ADDRESS [r,HVM,INTERNAL]
-
-The hexadecimal representation of the address of the domain's
-"generation id".
-
 #### ~/hvmloader/allow-memory-relocate = ("1"|"0") [HVM,INTERNAL]
 
 If the default low MMIO hole (below 4GiB) is not big enough for all
@@ -193,9 +188,22 @@ Various platform properties.
 
 #### ~/platform/generation-id = INTEGER ":" INTEGER [HVM,INTERNAL]
 
-Two 64 bit values that represent the Windows Generation ID.
-Is used by the BIOS initializer to get this value.
-If not present or "0:0" (all zeroes) device will not be present to the machine.
+The lower and upper 64-bit words of the 128-bit VM Generation ID.
+
+This key is used by hvmloader to create the ACPI VM Generation ID
+device.  It initialises a 16 octet region of guest memory with this
+value.  The guest physical address of this region is saved in the
+HVM_PARAM_VM_GENERATION_ID_ADDR HVM parameter.
+
+If this key is not present, is empty, or is all-zeros ("0:0") then the
+ACPI device is not created.
+
+When restoring a guest, the toolstack may (in certain circumstances)
+need generate a new random generation ID and write it to guest memory
+at the guest physical address in HVM_PARAM_VM_GENERATION_ID_ADDR.
+
+See Microsoft's "Virtual Machine Generation ID" specification for the
+circumstances where the generation ID needs to be changed.
 
 ### Frontend device paths
 
