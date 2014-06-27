@@ -983,6 +983,21 @@ static void parse_config_data(const char *config_source,
                                &b_info->u.hvm.smbios_firmware, 0);
         xlu_cfg_replace_string(config, "acpi_firmware",
                                &b_info->u.hvm.acpi_firmware, 0);
+
+        if (!xlu_cfg_get_string(config, "ms_vm_genid", &buf, 0)) {
+            if (!strcmp(buf, "generate")) {
+                e = libxl_ms_vm_genid_generate(ctx, &b_info->u.hvm.ms_vm_genid);
+                if (e) {
+                    fprintf(stderr, "ERROR: failed to generate a VM Generation ID\n");
+                    exit(1);
+                }
+            } else if (!strcmp(buf, "none")) {
+                ;
+            } else {
+                    fprintf(stderr, "ERROR: \"ms_vm_genid\" option must be \"generate\" or \"none\"\n");
+                    exit(1);
+            }
+        }
         break;
     case LIBXL_DOMAIN_TYPE_PV:
     {

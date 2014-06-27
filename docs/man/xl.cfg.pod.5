@@ -936,6 +936,35 @@ number of vendor defined SMBIOS structures (type 128 - 255). Since SMBIOS
 structures do not present their overall size, each entry in the file must be
 preceded by a 32b integer indicating the size of the next structure.
 
+=item B<ms_vm_genid="OPTION">
+
+Provide a VM generation ID to the guest.
+
+The VM generation ID as a 128-bit random number that a guest may use
+to determine if the guest has been restored from an earlier snapshot
+or cloned.
+
+This is required for Microsoft Windows Server 2012 (and later) domain
+controllers.
+
+Valid options are:
+
+=over 4
+
+=item B<"generate">
+
+Generate a random VM generation ID every time the domain is created or
+restored.
+
+=item B<"none">
+
+Do not provide a VM generation ID.
+
+=back
+
+See also "Virtual Machine Generation ID" by Microsoft
+(http://www.microsoft.com/en-us/download/details.aspx?id=30707).
+
 =back 
 
 =head3 Guest Virtual Time Controls
