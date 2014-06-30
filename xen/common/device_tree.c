@@ -322,6 +322,8 @@ static void __init process_memory_node(const void *fdt, int node,
     for ( i = 0; i < banks && early_info.mem.nr_banks < NR_MEM_BANKS; i++ )
     {
         device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
+        if ( !size )
+            continue;
         early_info.mem.bank[early_info.mem.nr_banks].start = start;
         early_info.mem.bank[early_info.mem.nr_banks].size = size;
         early_info.mem.nr_banks++;
