@@ -456,7 +456,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
             if (incomplete) {
                 size_t current_pos = s - incomplete;
                 incomplete = libxl__realloc(gc, incomplete,
-                                            incomplete_size + rd);
+                                            incomplete_size + rd + 1);
                 strncat(incomplete + incomplete_size, qmp->buffer, rd);
                 s = incomplete + current_pos;
                 incomplete_size += rd;
