@@ -7,7 +7,7 @@ subdir-y += oprofile
 
 subdir-$(x86_64) += x86_64
 
-obj-y += alternative.o
+obj-bin-y += alternative.init.o
 obj-y += apic.o
 obj-y += bitops.o
 obj-bin-y += bzimage.init.o
