@@ -111,10 +111,10 @@ static void gicv2_save_state(struct vcpu *v)
      * accessed simultaneously by another pCPU.
      */
     for ( i = 0; i < gicv2_info.nr_lrs; i++ )
-        v->arch.gic_lr[i] = readl_relaxed(GICH + GICH_LR + i * 4);
+        v->arch.gic.v2.lr[i] = readl_relaxed(GICH + GICH_LR + i * 4);
 
-    v->arch.gic_apr = readl_relaxed(GICH + GICH_APR);
-    v->arch.gic_vmcr = readl_relaxed(GICH + GICH_VMCR);
+    v->arch.gic.v2.apr = readl_relaxed(GICH + GICH_APR);
+    v->arch.gic.v2.vmcr = readl_relaxed(GICH + GICH_VMCR);
     /* Disable until next VCPU scheduled */
     writel_relaxed(0, GICH + GICH_HCR);
 }
@@ -124,10 +124,10 @@ static void gicv2_restore_state(const struct vcpu *v)
     int i;
 
     for ( i = 0; i < gicv2_info.nr_lrs; i++ )
-        writel_relaxed(v->arch.gic_lr[i], GICH + GICH_LR + i * 4);
+        writel_relaxed(v->arch.gic.v2.lr[i], GICH + GICH_LR + i * 4);
 
-    writel_relaxed(v->arch.gic_apr, GICH + GICH_APR);
-    writel_relaxed(v->arch.gic_vmcr, GICH + GICH_VMCR);
+    writel_relaxed(v->arch.gic.v2.apr, GICH + GICH_APR);
+    writel_relaxed(v->arch.gic.v2.vmcr, GICH + GICH_VMCR);
     writel_relaxed(GICH_HCR_EN, GICH + GICH_HCR);
 }
 
@@ -144,7 +144,7 @@ static void gicv2_dump_state(const struct vcpu *v)
     else
     {
         for ( i = 0; i < gicv2_info.nr_lrs; i++ )
-            printk("   VCPU_LR[%d]=%x\n", i, v->arch.gic_lr[i]);
+            printk("   VCPU_LR[%d]=%x\n", i, v->arch.gic.v2.lr[i]);
     }
 }
 

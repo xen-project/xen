@@ -148,6 +148,24 @@
                         DT_MATCH_COMPATIBLE("arm,cortex-a7-gic")
 
 /*
+ * GICv2 register that needs to be saved/restored
+ * on VCPU context switch
+ */
+struct gic_v2 {
+    uint32_t hcr;
+    uint32_t vmcr;
+    uint32_t apr;
+    uint32_t lr[64];
+};
+
+/*
+ * Union to hold underlying hw version context information
+ */
+union gic_state_data {
+    struct gic_v2 v2;
+};
+
+/*
  * Decode LR register content.
  * The LR register format is different for GIC HW version
  */

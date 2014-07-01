@@ -8,6 +8,7 @@
 #include <asm/p2m.h>
 #include <asm/vfp.h>
 #include <asm/mmio.h>
+#include <asm/gic.h>
 #include <public/hvm/params.h>
 #include <xen/serial.h>
 #include <xen/hvm/iommu.h>
@@ -263,8 +264,8 @@ struct arch_vcpu
     uint32_t csselr;
     register_t vmpidr;
 
-    uint32_t gic_hcr, gic_vmcr, gic_apr;
-    uint32_t gic_lr[64];
+    /* Holds gic context data */
+    union gic_state_data gic;
     uint64_t lr_mask;
 
     struct {
