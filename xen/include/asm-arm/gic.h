@@ -114,24 +114,6 @@
 #define GICH_MISR_VGRP1E  (1 << 6)
 #define GICH_MISR_VGRP1D  (1 << 7)
 
-#define GICH_LR_VIRTUAL_MASK    0x3ff
-#define GICH_LR_VIRTUAL_SHIFT   0
-#define GICH_LR_PHYSICAL_MASK   0x3ff
-#define GICH_LR_PHYSICAL_SHIFT  10
-#define GICH_LR_STATE_MASK      0x3
-#define GICH_LR_STATE_SHIFT     28
-#define GICH_LR_PRIORITY_SHIFT  23
-#define GICH_LR_MAINTENANCE_IRQ (1<<19)
-#define GICH_LR_PENDING         (1<<28)
-#define GICH_LR_ACTIVE          (1<<29)
-#define GICH_LR_GRP1            (1<<30)
-#define GICH_LR_HW              (1<<31)
-#define GICH_LR_CPUID_SHIFT     9
-#define GICH_VTR_NRLRGS         0x3f
-
-#define GICH_VMCR_PRIORITY_MASK   0x1f
-#define GICH_VMCR_PRIORITY_SHIFT  27
-
 /*
  * The minimum GICC_BPR is required to be in the range 0-3. We set
  * GICC_BPR to 0 but we must expect that it might be 3. This means we
@@ -155,6 +137,8 @@
 #define GIC_PRI_TO_GUEST(pri) (pri >> 3) /* GICH_LR and GICH_VMCR only support
                                             5 bits for guest irq priority */
 
+#define GICH_LR_PENDING         1
+#define GICH_LR_ACTIVE          2
 
 #ifndef __ASSEMBLY__
 #include <xen/device_tree.h>
@@ -162,6 +146,28 @@
 
 #define DT_MATCH_GIC    DT_MATCH_COMPATIBLE("arm,cortex-a15-gic"), \
                         DT_MATCH_COMPATIBLE("arm,cortex-a7-gic")
+
+/*
+ * Decode LR register content.
+ * The LR register format is different for GIC HW version
+ */
+struct gic_lr {
+   /* Physical IRQ */
+   uint32_t pirq;
+   /* Virtual IRQ */
+   uint32_t virq;
+   uint8_t priority;
+   uint8_t state;
+   uint8_t hw_status;
+   uint8_t grp;
+};
+
+enum gic_version {
+    GIC_V2,
+};
+
+extern enum gic_version gic_hw_version(void);
+extern void gicv2_init(void);
 
 extern int domain_vgic_init(struct domain *d);
 extern void domain_vgic_free(struct domain *d);
@@ -233,6 +239,71 @@ extern unsigned int gic_number_lines(void);
 int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
                   unsigned int *out_hwirq, unsigned int *out_type);
 void gic_clear_lrs(struct vcpu *v);
+
+struct gic_info {
+    /* GIC version */
+    enum gic_version hw_version;
+    /* Number of GIC lines supported */
+    unsigned int nr_lines;
+    /* Number of LR registers */
+    uint8_t nr_lrs;
+    /* Maintenance irq number */
+    unsigned int maintenance_irq;
+};
+
+struct gic_hw_operations {
+    /* Hold GIC HW information */
+    const struct gic_info *info;
+    /* Save GIC registers */
+    void (*save_state)(struct vcpu *);
+    /* Restore GIC registers */
+    void (*restore_state)(const struct vcpu *);
+    /* Dump GIC LR register information */
+    void (*dump_state)(const struct vcpu *);
+    /* Map MMIO region of GIC */
+    int (*gicv_setup)(struct domain *);
+
+    /* hw_irq_controller to enable/disable/eoi host irq */
+    hw_irq_controller *gic_host_irq_type;
+
+    /* hw_irq_controller to enable/disable/eoi guest irq */
+    hw_irq_controller *gic_guest_irq_type;
+
+    /* End of Interrupt */
+    void (*eoi_irq)(struct irq_desc *irqd);
+    /* Deactivate/reduce priority of irq */
+    void (*deactivate_irq)(struct irq_desc *irqd);
+    /* Read IRQ id and Ack */
+    unsigned int (*read_irq)(void);
+    /* Set IRQ property */
+    void (*set_irq_properties)(struct irq_desc *desc,
+                               const cpumask_t *cpu_mask,
+                               unsigned int priority);
+    /* Send SGI */
+    void (*send_SGI)(enum gic_sgi sgi, enum gic_sgi_mode irqmode,
+                     const cpumask_t *online_mask);
+    /* Disable CPU physical and virtual interfaces */
+    void (*disable_interface)(void);
+    /* Update LR register with state and priority */
+    void (*update_lr)(int lr, const struct pending_irq *pending_irq,
+                      unsigned int state);
+    /* Update HCR status register */
+    void (*update_hcr_status)(uint32_t flag, bool_t set);
+    /* Clear LR register */
+    void (*clear_lr)(int lr);
+    /* Read LR register and populate gic_lr structure */
+    void (*read_lr)(int lr, struct gic_lr *);
+    /* Write LR register from gic_lr structure */
+    void (*write_lr)(int lr, const struct gic_lr *);
+    /* Read VMCR priority */
+    unsigned int (*read_vmcr_priority)(void);
+    /* Read APRn register */
+    unsigned int (*read_apr)(int apr_reg);
+    /* Secondary CPU init */
+    int (*secondary_init)(void);
+};
+
+void register_gic_ops(const struct gic_hw_operations *ops);
 
 #endif /* __ASSEMBLY__ */
 #endif
