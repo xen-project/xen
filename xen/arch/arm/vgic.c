@@ -30,7 +30,7 @@
 #include <asm/mmio.h>
 #include <asm/gic.h>
 
-#define REG(n) (n/4)
+#define REG(n) (n)
 
 /* Number of ranks of interrupt registers for a domain */
 #define DOMAIN_NR_RANKS(d) (((d)->arch.vgic.nr_lines+31)/32)
@@ -58,7 +58,7 @@ static inline int REG_RANK_NR(int b, uint32_t n)
  * Offset of GICD_<FOO><n> with its rank, for GICD_<FOO> with
  * <b>-bits-per-interrupt.
  */
-#define REG_RANK_INDEX(b, n) ((n) & ((b)-1))
+#define REG_RANK_INDEX(b, n) (((n) >> 2) & ((b)-1))
 
 /*
  * Returns rank corresponding to a GICD_<FOO><n> register for
@@ -66,7 +66,7 @@ static inline int REG_RANK_NR(int b, uint32_t n)
  */
 static struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n)
 {
-    int rank = REG_RANK_NR(b, n);
+    int rank = REG_RANK_NR(b, (n >> 2));
 
     if ( rank == 0 )
         return &v->arch.vgic.private_irqs;
@@ -78,7 +78,7 @@ static struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n)
 
 static struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq)
 {
-    return vgic_rank_offset(v, 8, irq >> 2);
+    return vgic_rank_offset(v, 8, irq);
 }
 
 static const struct mmio_handler_ops vgic_distr_mmio_handler = {
@@ -552,7 +552,7 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         tr = rank->ienable;
         rank->ienable |= *r;
         vgic_unlock_rank(v, rank);
-        vgic_enable_irqs(v, (*r) & (~tr), gicd_reg - GICD_ISENABLER);
+        vgic_enable_irqs(v, (*r) & (~tr), (gicd_reg - GICD_ISENABLER) >> 2);
         return 1;
 
     case GICD_ICENABLER ... GICD_ICENABLERN:
@@ -563,7 +563,7 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         tr = rank->ienable;
         rank->ienable &= ~*r;
         vgic_unlock_rank(v, rank);
-        vgic_disable_irqs(v, (*r) & tr, gicd_reg - GICD_ICENABLER);
+        vgic_disable_irqs(v, (*r) & tr, (gicd_reg - GICD_ICENABLER) >> 2);
         return 1;
 
     case GICD_ISPENDR ... GICD_ISPENDRN:
@@ -725,7 +725,6 @@ void vgic_clear_pending_irqs(struct vcpu *v)
 
 void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
 {
-    int idx = irq >> 2, byte = irq & 0x3;
     uint8_t priority;
     struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
     struct pending_irq *iter, *n = irq_to_pending(v, irq);
@@ -748,7 +747,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
         return;
     }
 
-    priority = byte_read(rank->ipriority[REG_RANK_INDEX(8, idx)], 0, byte);
+    priority = byte_read(rank->ipriority[REG_RANK_INDEX(8, irq)], 0, irq & 0x3);
 
     n->irq = irq;
     set_bit(GIC_IRQ_GUEST_QUEUED, &n->status);
