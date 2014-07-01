@@ -42,6 +42,19 @@
 #define VALGRIND_MAKE_MEM_UNDEFINED(addr, len) /* addr, len */
 #endif
 
+#if defined(__MINIOS__)
+/*
+ * MiniOS's libc doesn't know about sys/uio.h or writev().
+ * Declare enough of sys/uio.h to compile.
+ */
+struct iovec {
+    void *iov_base;
+    size_t iov_len;
+};
+#else
+#include <sys/uio.h>
+#endif
+
 #define DECLARE_HYPERCALL privcmd_hypercall_t hypercall
 #define DECLARE_DOMCTL struct xen_domctl domctl
 #define DECLARE_SYSCTL struct xen_sysctl sysctl
@@ -395,6 +408,7 @@ int xc_flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu);
 /* Return 0 on success; -1 on error setting errno. */
 int read_exact(int fd, void *data, size_t size); /* EOF => -1, errno=0 */
 int write_exact(int fd, const void *data, size_t size);
+int writev_exact(int fd, const struct iovec *iov, int iovcnt);
 
 int xc_ffs8(uint8_t x);
 int xc_ffs16(uint16_t x);

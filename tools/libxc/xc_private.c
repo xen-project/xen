@@ -867,6 +867,91 @@ int write_exact(int fd, const void *data, size_t size)
     return 0;
 }
 
+#if defined(__MINIOS__)
+/*
+ * MiniOS's libc doesn't know about writev(). Implement it as multiple write()s.
+ */
+int writev_exact(int fd, const struct iovec *iov, int iovcnt)
+{
+    int rc, i;
+
+    for ( i = 0; i < iovcnt; ++i )
+    {
+        rc = write_exact(fd, iov[i].iov_base, iov[i].iov_len);
+        if ( rc )
+            return rc;
+    }
+
+    return 0;
+}
+#else
+int writev_exact(int fd, const struct iovec *iov, int iovcnt)
+{
+    struct iovec *local_iov = NULL;
+    int rc = 0, iov_idx = 0, saved_errno = 0;
+    ssize_t len;
+
+    while ( iov_idx < iovcnt )
+    {
+        /*
+         * Skip over iov[] entries with 0 length.
+         *
+         * This is needed to cover the case where we took a partial write and
+         * all remaining vectors are of 0 length.  In such a case, the results
+         * from writev() are indistinguishable from EOF.
+         */
+        while ( iov[iov_idx].iov_len == 0 )
+            if ( ++iov_idx == iovcnt )
+                goto out;
+
+        len = writev(fd, &iov[iov_idx], min(iovcnt - iov_idx, IOV_MAX));
+        saved_errno = errno;
+
+        if ( (len == -1) && (errno == EINTR) )
+            continue;
+        if ( len <= 0 )
+        {
+            rc = -1;
+            goto out;
+        }
+
+        /* Check iov[] to see whether we had a partial or complete write. */
+        while ( (len > 0) && (iov_idx < iovcnt) )
+        {
+            if ( len >= iov[iov_idx].iov_len )
+                len -= iov[iov_idx++].iov_len;
+            else
+            {
+                /* Partial write of iov[iov_idx]. Copy iov so we can adjust
+                 * element iov_idx and resubmit the rest. */
+                if ( !local_iov )
+                {
+                    local_iov = malloc(iovcnt * sizeof(*iov));
+                    if ( !local_iov )
+                    {
+                        saved_errno = ENOMEM;
+                        goto out;
+                    }
+
+                    iov = memcpy(local_iov, iov, iovcnt * sizeof(*iov));
+                }
+
+                local_iov[iov_idx].iov_base += len;
+                local_iov[iov_idx].iov_len  -= len;
+                break;
+            }
+        }
+    }
+
+    saved_errno = 0;
+
+ out:
+    free(local_iov);
+    errno = saved_errno;
+    return rc;
+}
+#endif
+
 int xc_ffs8(uint8_t x)
 {
     int i;
