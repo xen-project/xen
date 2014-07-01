@@ -210,6 +210,14 @@ enum gic_sgi {
     GIC_SGI_DUMP_STATE  = 1,
     GIC_SGI_CALL_FUNCTION = 2,
 };
+
+/* SGI irq mode types */
+enum gic_sgi_mode {
+    SGI_TARGET_LIST,
+    SGI_TARGET_OTHERS,
+    SGI_TARGET_SELF,
+};
+
 extern void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi);
 extern void send_SGI_one(unsigned int cpu, enum gic_sgi sgi);
 extern void send_SGI_self(enum gic_sgi sgi);

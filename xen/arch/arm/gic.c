@@ -483,21 +483,37 @@ void __init gic_init(void)
     spin_unlock(&gic.lock);
 }
 
-void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi)
+static void send_SGI(enum gic_sgi sgi, enum gic_sgi_mode irqmode,
+                     const cpumask_t *cpu_mask)
 {
     unsigned int mask = 0;
     cpumask_t online_mask;
 
+    switch ( irqmode )
+    {
+    case SGI_TARGET_OTHERS:
+        GICD[GICD_SGIR] = GICD_SGI_TARGET_OTHERS | sgi;
+        break;
+    case SGI_TARGET_SELF:
+        GICD[GICD_SGIR] = GICD_SGI_TARGET_SELF | sgi;
+        break;
+    case SGI_TARGET_LIST:
+        cpumask_and(&online_mask, cpu_mask, &cpu_online_map);
+        mask = gic_cpu_mask(&online_mask);
+        GICD[GICD_SGIR] = GICD_SGI_TARGET_LIST |
+                          (mask << GICD_SGI_TARGET_SHIFT) | sgi;
+        break;
+    default:
+        BUG();
+    }
+}
+
+void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi)
+{
     ASSERT(sgi < 16); /* There are only 16 SGIs */
 
-    cpumask_and(&online_mask, cpumask, &cpu_online_map);
-    mask = gic_cpu_mask(&online_mask);
-
     dsb(sy);
-
-    GICD[GICD_SGIR] = GICD_SGI_TARGET_LIST
-        | (mask<<GICD_SGI_TARGET_SHIFT)
-        | sgi;
+    send_SGI(sgi, SGI_TARGET_LIST, cpumask);
 }
 
 void send_SGI_one(unsigned int cpu, enum gic_sgi sgi)
@@ -511,9 +527,7 @@ void send_SGI_self(enum gic_sgi sgi)
     ASSERT(sgi < 16); /* There are only 16 SGIs */
 
     dsb(sy);
-
-    GICD[GICD_SGIR] = GICD_SGI_TARGET_SELF
-        | sgi;
+    send_SGI(sgi, SGI_TARGET_SELF, NULL);
 }
 
 void send_SGI_allbutself(enum gic_sgi sgi)
@@ -521,9 +535,7 @@ void send_SGI_allbutself(enum gic_sgi sgi)
    ASSERT(sgi < 16); /* There are only 16 SGIs */
 
    dsb(sy);
-
-   GICD[GICD_SGIR] = GICD_SGI_TARGET_OTHERS
-       | sgi;
+   send_SGI(sgi, SGI_TARGET_OTHERS, NULL);
 }
 
 void smp_send_state_dump(unsigned int cpu)
