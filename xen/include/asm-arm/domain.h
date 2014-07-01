@@ -13,15 +13,6 @@
 #include <xen/serial.h>
 #include <xen/hvm/iommu.h>
 
-/* Represents state corresponding to a block of 32 interrupts */
-struct vgic_irq_rank {
-    spinlock_t lock; /* Covers access to all other members of this struct */
-    uint32_t ienable, iactive, ipend, pendsgi;
-    uint32_t icfg[2];
-    uint32_t ipriority[8];
-    uint32_t itargets[8];
-};
-
 struct pending_irq
 {
     /*
@@ -274,7 +265,7 @@ struct arch_vcpu
          * struct arch_domain.
          */
         struct pending_irq pending_irqs[32];
-        struct vgic_irq_rank private_irqs;
+        struct vgic_irq_rank *private_irqs;
 
         /* This list is ordered by IRQ priority and it is used to keep
          * track of the IRQs that the VGIC injected into the guest.

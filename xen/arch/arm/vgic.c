@@ -29,6 +29,7 @@
 
 #include <asm/mmio.h>
 #include <asm/gic.h>
+#include <asm/vgic.h>
 
 #define REG(n) (n)
 
@@ -69,7 +70,7 @@ static struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n)
     int rank = REG_RANK_NR(b, (n >> 2));
 
     if ( rank == 0 )
-        return &v->arch.vgic.private_irqs;
+        return v->arch.vgic.private_irqs;
     else if ( rank <= DOMAIN_NR_RANKS(v->domain) )
         return &v->domain->arch.vgic.shared_irqs[rank - 1];
     else
@@ -139,9 +140,12 @@ void domain_vgic_free(struct domain *d)
 int vcpu_vgic_init(struct vcpu *v)
 {
     int i;
-    memset(&v->arch.vgic.private_irqs, 0, sizeof(v->arch.vgic.private_irqs));
 
-    spin_lock_init(&v->arch.vgic.private_irqs.lock);
+    v->arch.vgic.private_irqs = xzalloc(struct vgic_irq_rank);
+    if ( v->arch.vgic.private_irqs == NULL )
+      return -ENOMEM;
+
+    spin_lock_init(&v->arch.vgic.private_irqs->lock);
 
     memset(&v->arch.vgic.pending_irqs, 0, sizeof(v->arch.vgic.pending_irqs));
     for (i = 0; i < 32; i++)
@@ -152,7 +156,7 @@ int vcpu_vgic_init(struct vcpu *v)
 
     /* For SGI and PPI the target is always this CPU */
     for ( i = 0 ; i < 8 ; i++ )
-        v->arch.vgic.private_irqs.itargets[i] =
+        v->arch.vgic.private_irqs->itargets[i] =
               (1<<(v->vcpu_id+0))
             | (1<<(v->vcpu_id+8))
             | (1<<(v->vcpu_id+16))
@@ -161,6 +165,12 @@ int vcpu_vgic_init(struct vcpu *v)
     INIT_LIST_HEAD(&v->arch.vgic.lr_pending);
     spin_lock_init(&v->arch.vgic.lock);
 
+    return 0;
+}
+
+int vcpu_vgic_free(struct vcpu *v)
+{
+    xfree(v->arch.vgic.private_irqs);
     return 0;
 }
 
