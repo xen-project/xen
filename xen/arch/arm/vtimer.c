@@ -24,6 +24,7 @@
 #include <asm/irq.h>
 #include <asm/time.h>
 #include <asm/gic.h>
+#include <asm/vgic.h>
 #include <asm/regs.h>
 
 extern s_time_t ticks_to_ns(uint64_t ticks);

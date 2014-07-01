@@ -26,6 +26,7 @@
 #include <xen/sched.h>
 
 #include <asm/gic.h>
+#include <asm/vgic.h>
 
 static unsigned int local_irqs_type[NR_LOCAL_IRQS];
 static DEFINE_SPINLOCK(local_irqs_type_lock);

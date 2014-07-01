@@ -16,6 +16,7 @@
 
 #include <asm/current.h>
 #include <asm/gic.h>
+#include <asm/vgic.h>
 #include <asm/psci.h>
 
 int do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)

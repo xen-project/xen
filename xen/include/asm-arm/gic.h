@@ -188,13 +188,6 @@ enum gic_version {
 };
 
 extern enum gic_version gic_hw_version(void);
-extern int domain_vgic_init(struct domain *d);
-extern void domain_vgic_free(struct domain *d);
-
-extern int vcpu_vgic_init(struct vcpu *v);
-
-extern void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq);
-extern void vgic_clear_pending_irqs(struct vcpu *v);
 extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 
 /* Program the GIC to route an interrupt */

@@ -33,33 +33,8 @@
 
 #define REG(n) (n)
 
-/* Number of ranks of interrupt registers for a domain */
-#define DOMAIN_NR_RANKS(d) (((d)->arch.vgic.nr_lines+31)/32)
-
 static int vgic_distr_mmio_read(struct vcpu *v, mmio_info_t *info);
 static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info);
-
-/*
- * Rank containing GICD_<FOO><n> for GICD_<FOO> with
- * <b>-bits-per-interrupt
- */
-static inline int REG_RANK_NR(int b, uint32_t n)
-{
-    switch ( b )
-    {
-    case 8: return n >> 3;
-    case 4: return n >> 2;
-    case 2: return n >> 1;
-    case 1: return n;
-    default: BUG();
-    }
-}
-
-/*
- * Offset of GICD_<FOO><n> with its rank, for GICD_<FOO> with
- * <b>-bits-per-interrupt.
- */
-#define REG_RANK_INDEX(b, n) (((n) >> 2) & ((b)-1))
 
 /*
  * Returns rank corresponding to a GICD_<FOO><n> register for
@@ -172,34 +147,6 @@ int vcpu_vgic_free(struct vcpu *v)
 {
     xfree(v->arch.vgic.private_irqs);
     return 0;
-}
-
-#define vgic_lock(v)   spin_lock_irq(&(v)->domain->arch.vgic.lock)
-#define vgic_unlock(v) spin_unlock_irq(&(v)->domain->arch.vgic.lock)
-
-#define vgic_lock_rank(v, r) spin_lock(&(r)->lock)
-#define vgic_unlock_rank(v, r) spin_unlock(&(r)->lock)
-
-static uint32_t vgic_byte_read(uint32_t val, int sign, int offset)
-{
-    int byte = offset & 0x3;
-
-    val = val >> (8*byte);
-    if ( sign && (val & 0x80) )
-        val |= 0xffffff00;
-    else
-        val &= 0x000000ff;
-    return val;
-}
-
-static void vgic_byte_write(uint32_t *reg, uint32_t var, int offset)
-{
-    int byte = offset & 0x3;
-
-    var &= (0xff << (8*byte));
-
-    *reg &= ~(0xff << (8*byte));
-    *reg |= var;
 }
 
 static int vgic_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
