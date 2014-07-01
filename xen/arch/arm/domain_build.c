@@ -804,7 +804,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     };
     static const struct dt_device_match gic_matches[] __initconst =
     {
-        DT_MATCH_GIC,
+        DT_MATCH_GIC_V2,
         { /* sentinel */ },
     };
     static const struct dt_device_match timer_matches[] __initconst =

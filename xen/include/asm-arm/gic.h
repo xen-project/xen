@@ -144,8 +144,11 @@
 #include <xen/device_tree.h>
 #include <xen/irq.h>
 
-#define DT_MATCH_GIC    DT_MATCH_COMPATIBLE("arm,cortex-a15-gic"), \
-                        DT_MATCH_COMPATIBLE("arm,cortex-a7-gic")
+#define DT_COMPAT_GIC_CORTEX_A15     "arm,cortex-a15-gic"
+#define DT_COMPAT_GIC_CORTEX_A7      "arm,cortex-a7-gic"
+
+#define DT_MATCH_GIC_V2 DT_MATCH_COMPATIBLE(DT_COMPAT_GIC_CORTEX_A15), \
+                        DT_MATCH_COMPATIBLE(DT_COMPAT_GIC_CORTEX_A7)
 
 /*
  * GICv2 register that needs to be saved/restored
@@ -185,8 +188,6 @@ enum gic_version {
 };
 
 extern enum gic_version gic_hw_version(void);
-extern void gicv2_init(void);
-
 extern int domain_vgic_init(struct domain *d);
 extern void domain_vgic_free(struct domain *d);
 

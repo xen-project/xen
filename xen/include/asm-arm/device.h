@@ -8,6 +8,7 @@ enum device_type
 {
     DEVICE_SERIAL,
     DEVICE_IOMMU,
+    DEVICE_GIC,
     /* Use for error */
     DEVICE_UNKNOWN,
 };

@@ -30,6 +30,7 @@
 #include <asm/p2m.h>
 #include <asm/domain.h>
 #include <asm/platform.h>
+#include <asm/device.h>
 #include <asm/io.h>
 #include <asm/gic.h>
 
@@ -164,7 +165,29 @@ int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
 /* Set up the GIC */
 void __init gic_init(void)
 {
-    gicv2_init();
+    int rc;
+    struct dt_device_node *node;
+    uint8_t num_gics = 0;
+
+    dt_for_each_device_node( dt_host, node )
+    {
+        if ( !dt_get_property(node, "interrupt-controller", NULL) )
+            continue;
+
+        if ( !dt_get_parent(node) )
+            continue;
+
+        rc = device_init(node, DEVICE_GIC, NULL);
+        if ( !rc )
+        {
+            /* NOTE: Only one GIC is supported */
+            num_gics = 1;
+            break;
+        }
+    }
+    if ( !num_gics )
+        panic("Unable to find compatible GIC in the device tree");
+
     /* Clear LR mask for cpu0 */
     clear_cpu_lr_mask();
 }

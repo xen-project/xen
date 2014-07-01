@@ -30,6 +30,7 @@
 #include <asm/p2m.h>
 #include <asm/domain.h>
 #include <asm/platform.h>
+#include <asm/device.h>
 
 #include <asm/io.h>
 #include <asm/gic.h>
@@ -584,19 +585,9 @@ const static struct gic_hw_operations gicv2_ops = {
 };
 
 /* Set up the GIC */
-void __init gicv2_init(void)
+static int __init gicv2_init(struct dt_device_node *node, const void *data)
 {
-    static const struct dt_device_match gic_ids[] __initconst =
-    {
-        DT_MATCH_GIC,
-        { /* sentinel */ },
-    };
-    struct dt_device_node *node;
     int res;
-
-    node = dt_find_interrupt_controller(gic_ids);
-    if ( !node )
-        panic("GICv2: Unable to find compatible GIC in the device tree");
 
     dt_device_set_used_by(node, DOMID_XEN);
 
@@ -667,7 +658,21 @@ void __init gicv2_init(void)
 
     gicv2_info.hw_version = GIC_V2;
     register_gic_ops(&gicv2_ops);
+
+    return 0;
 }
+
+static const char * const gicv2_dt_compat[] __initconst =
+{
+    DT_COMPAT_GIC_CORTEX_A15,
+    DT_COMPAT_GIC_CORTEX_A7,
+    NULL
+};
+
+DT_DEVICE_START(gicv2, "GICv2:", DEVICE_GIC)
+        .compatible = gicv2_dt_compat,
+        .init = gicv2_init,
+DT_DEVICE_END
 
 /*
  * Local variables:
