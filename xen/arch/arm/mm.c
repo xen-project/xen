@@ -994,6 +994,7 @@ int xenmem_add_to_physmap_one(
     unsigned long mfn = 0;
     int rc;
     p2m_type_t t;
+    struct page_info *page = NULL;
 
     switch ( space )
     {
@@ -1041,7 +1042,6 @@ int xenmem_add_to_physmap_one(
     case XENMAPSPACE_gmfn_foreign:
     {
         struct domain *od;
-        struct page_info *page;
         p2m_type_t p2mt;
         od = rcu_lock_domain_by_any_id(foreign_domid);
         if ( od == NULL )
@@ -1090,6 +1090,14 @@ int xenmem_add_to_physmap_one(
 
     /* Map at new location. */
     rc = guest_physmap_add_entry(d, gpfn, mfn, 0, t);
+
+    /* If we fail to add the mapping, we need to drop the reference we
+     * took earlier on foreign pages */
+    if ( rc && space == XENMAPSPACE_gmfn_foreign )
+    {
+        ASSERT(page != NULL);
+        put_page(page);
+    }
 
     return rc;
 }
