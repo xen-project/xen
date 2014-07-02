@@ -261,6 +261,90 @@ static const struct cpuidle_state ivb_cstates[] = {
 	{}
 };
 
+static const struct cpuidle_state ivt_cstates[] = {
+	{
+		.name = "C1-IVT",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 1,
+		.target_residency = 1,
+	},
+	{
+		.name = "C1E-IVT",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 10,
+		.target_residency = 80,
+	},
+	{
+		.name = "C3-IVT",
+		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 59,
+		.target_residency = 156,
+	},
+	{
+		.name = "C6-IVT",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 82,
+		.target_residency = 300,
+	},
+	{}
+};
+
+static const struct cpuidle_state ivt_cstates_4s[] = {
+	{
+		.name = "C1-IVT-4S",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 1,
+		.target_residency = 1,
+	},
+	{
+		.name = "C1E-IVT-4S",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 10,
+		.target_residency = 250,
+	},
+	{
+		.name = "C3-IVT-4S",
+		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 59,
+		.target_residency = 300,
+	},
+	{
+		.name = "C6-IVT-4S",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 84,
+		.target_residency = 400,
+	},
+	{}
+};
+
+static const struct cpuidle_state ivt_cstates_8s[] = {
+	{
+		.name = "C1-IVT-8S",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 1,
+		.target_residency = 1,
+	},
+	{
+		.name = "C1E-IVT-8S",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 10,
+		.target_residency = 500,
+	},
+	{
+		.name = "C3-IVT-8S",
+		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 59,
+		.target_residency = 600,
+	},
+	{
+		.name = "C6-IVT-8S",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 88,
+		.target_residency = 700,
+	},
+	{}
+};
+
 static const struct cpuidle_state hsw_cstates[] = {
 	{
 		.name = "C1-HSW",
@@ -492,6 +576,11 @@ static const struct idle_cpu idle_cpu_ivb = {
 	.disable_promotion_to_c1e = 1,
 };
 
+static const struct idle_cpu idle_cpu_ivt = {
+	.state_table = ivt_cstates,
+	.disable_promotion_to_c1e = 1,
+};
+
 static const struct idle_cpu idle_cpu_hsw = {
 	.state_table = hsw_cstates,
 	.disable_promotion_to_c1e = 1,
@@ -522,7 +611,7 @@ static struct intel_idle_id {
 	ICPU(0x36, atom),
 	ICPU(0x37, byt),
 	ICPU(0x3a, ivb),
-	ICPU(0x3e, ivb),
+	ICPU(0x3e, ivt),
 	ICPU(0x3c, hsw),
 	ICPU(0x3f, hsw),
 	ICPU(0x45, hsw),
@@ -530,6 +619,37 @@ static struct intel_idle_id {
 	ICPU(0x4d, avn),
 	{}
 };
+
+/*
+ * mwait_idle_state_table_update()
+ *
+ * Update the default state_table for this CPU-id
+ *
+ * Currently used to access tuned IVT multi-socket targets
+ * Assumption: num_sockets == (max_package_num + 1)
+ */
+static void __init mwait_idle_state_table_update(void)
+{
+	/* IVT uses a different table for 1-2, 3-4, and > 4 sockets */
+	if (boot_cpu_data.x86_model == 0x3e) { /* IVT */
+		unsigned int cpu, max_apicid = boot_cpu_physical_apicid;
+
+		for_each_present_cpu(cpu)
+			if (max_apicid < x86_cpu_to_apicid[cpu])
+				max_apicid = x86_cpu_to_apicid[cpu];
+		switch (apicid_to_socket(max_apicid)) {
+		case 0: case 1:
+			/* 1 and 2 socket systems use default ivt_cstates */
+			break;
+		case 2: case 3:
+			cpuidle_state_table = ivt_cstates_4s;
+			break;
+		default:
+			cpuidle_state_table = ivt_cstates_8s;
+			break;
+		}
+	}
+}
 
 static int __init mwait_idle_probe(void)
 {
@@ -576,6 +696,9 @@ static int __init mwait_idle_probe(void)
 
 	pr_debug(PREFIX "lapic_timer_reliable_states %#x\n",
 		 lapic_timer_reliable_states);
+
+	mwait_idle_state_table_update();
+
 	return 0;
 }
 

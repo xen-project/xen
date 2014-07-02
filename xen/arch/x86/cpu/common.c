@@ -152,6 +152,11 @@ static void __cpuinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 	this_cpu = &default_cpu;
 }
 
+static inline u32 _phys_pkg_id(u32 cpuid_apic, int index_msb)
+{
+	return cpuid_apic >> index_msb;
+}
+
 /*
  * cpuid returns the value latched in the HW at reset, not the APIC ID
  * register's value.  For any box whose BIOS changes APIC IDs, like
@@ -161,7 +166,7 @@ static void __cpuinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
  */
 static inline u32 phys_pkg_id(u32 cpuid_apic, int index_msb)
 {
-	return hard_smp_processor_id() >> index_msb;
+	return _phys_pkg_id(hard_smp_processor_id(), index_msb);
 }
 
 /* Do minimum CPU detection early.
@@ -470,6 +475,43 @@ void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 	}
 }
 #endif
+
+unsigned int __init apicid_to_socket(unsigned int apicid)
+{
+	unsigned int dummy;
+
+	if (boot_cpu_has(X86_FEATURE_XTOPOLOGY)) {
+		unsigned int eax, ecx, sub_index = 1, core_plus_mask_width;
+
+		cpuid_count(0xb, SMT_LEVEL, &eax, &dummy, &dummy, &dummy);
+		core_plus_mask_width = BITS_SHIFT_NEXT_LEVEL(eax);
+		do {
+			cpuid_count(0xb, sub_index, &eax, &dummy, &ecx,
+			            &dummy);
+
+			if (LEAFB_SUBTYPE(ecx) == CORE_TYPE) {
+				core_plus_mask_width =
+					BITS_SHIFT_NEXT_LEVEL(eax);
+				break;
+			}
+
+			sub_index++;
+		} while (LEAFB_SUBTYPE(ecx) != INVALID_TYPE);
+
+		return _phys_pkg_id(apicid, core_plus_mask_width);
+	}
+
+	if (boot_cpu_has(X86_FEATURE_HT) &&
+	    !boot_cpu_has(X86_FEATURE_CMP_LEGACY)) {
+		unsigned int num_siblings = (cpuid_ebx(1) & 0xff0000) >> 16;
+
+		if (num_siblings)
+			return _phys_pkg_id(apicid,
+			                    get_count_order(num_siblings));
+	}
+
+	return apicid;
+}
 
 void __cpuinit print_cpu_info(unsigned int cpu)
 {

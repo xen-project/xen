@@ -220,6 +220,8 @@ static always_inline void detect_ht(struct cpuinfo_x86 *c) {}
 #define cpu_to_core(_cpu)   (cpu_data[_cpu].cpu_core_id)
 #define cpu_to_socket(_cpu) (cpu_data[_cpu].phys_proc_id)
 
+unsigned int apicid_to_socket(unsigned int);
+
 /*
  * Generic CPUID function
  * clear %ecx since some cpus (Cyrix MII) do not set or clear %ecx
