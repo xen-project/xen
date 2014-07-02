@@ -152,6 +152,17 @@ static void __cpuinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 	this_cpu = &default_cpu;
 }
 
+/*
+ * cpuid returns the value latched in the HW at reset, not the APIC ID
+ * register's value.  For any box whose BIOS changes APIC IDs, like
+ * clustered APIC systems, we must use hard_smp_processor_id.
+ *
+ * See Intel's IA-32 SW Dev's Manual Vol2 under CPUID.
+ */
+static inline u32 phys_pkg_id(u32 cpuid_apic, int index_msb)
+{
+	return hard_smp_processor_id() >> index_msb;
+}
 
 /* Do minimum CPU detection early.
    Fields really needed: vendor, cpuid_level, family, model, mask, cache alignment.
@@ -216,6 +227,7 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 	if (c->x86 >= 0x6)
 		c->x86_model += ((tfms >> 16) & 0xF) << 4;
 	c->x86_mask = tfms & 15;
+	c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
 	if ( cpu_has(c, X86_FEATURE_CLFLSH) )
 		c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
 
@@ -339,17 +351,6 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	}
 }
 
-/* cpuid returns the value latched in the HW at reset, not the APIC ID
- * register's value.  For any box whose BIOS changes APIC IDs, like
- * clustered APIC systems, we must use hard_smp_processor_id.
- *
- * See Intel's IA-32 SW Dev's Manual Vol2 under CPUID.
- */
-static inline u32 phys_pkg_id(u32 cpuid_apic, int index_msb)
-{
-	return hard_smp_processor_id() >> index_msb;
-}
-
 /* leaf 0xb SMT level */
 #define SMT_LEVEL       0
 
@@ -429,14 +430,12 @@ void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 	u32 	eax, ebx, ecx, edx;
 	int 	index_msb, core_bits;
 
-	cpuid(1, &eax, &ebx, &ecx, &edx);
-
-	c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
-
-	if (!cpu_has(c, X86_FEATURE_HT) || cpu_has(c, X86_FEATURE_CMP_LEGACY)
-        || cpu_has(c, X86_FEATURE_XTOPOLOGY))
+	if (!cpu_has(c, X86_FEATURE_HT) ||
+	    cpu_has(c, X86_FEATURE_CMP_LEGACY) ||
+	    cpu_has(c, X86_FEATURE_XTOPOLOGY))
 		return;
 
+	cpuid(1, &eax, &ebx, &ecx, &edx);
 	c->x86_num_siblings = (ebx & 0xff0000) >> 16;
 
 	if (c->x86_num_siblings == 1) {
