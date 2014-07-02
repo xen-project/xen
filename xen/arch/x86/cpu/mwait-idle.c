@@ -187,6 +187,46 @@ static const struct cpuidle_state snb_cstates[] = {
 	{}
 };
 
+static const struct cpuidle_state byt_cstates[] = {
+	{
+		.name = "C1-BYT",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 1,
+		.target_residency = 1,
+	},
+	{
+		.name = "C1E-BYT",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 15,
+		.target_residency = 30,
+	},
+	{
+		.name = "C6N-BYT",
+		.flags = MWAIT2flg(0x58) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 40,
+		.target_residency = 275,
+	},
+	{
+		.name = "C6S-BYT",
+		.flags = MWAIT2flg(0x52) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 140,
+		.target_residency = 560,
+	},
+	{
+		.name = "C7-BYT",
+		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 1200,
+		.target_residency = 1500,
+	},
+	{
+		.name = "C7S-BYT",
+		.flags = MWAIT2flg(0x64) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 10000,
+		.target_residency = 20000,
+	},
+	{}
+};
+
 static const struct cpuidle_state ivb_cstates[] = {
 	{
 		.name = "C1-IVB",
@@ -442,6 +482,11 @@ static const struct idle_cpu idle_cpu_snb = {
 	.disable_promotion_to_c1e = 1,
 };
 
+static const struct idle_cpu idle_cpu_byt = {
+	.state_table = byt_cstates,
+	.disable_promotion_to_c1e = 1,
+};
+
 static const struct idle_cpu idle_cpu_ivb = {
 	.state_table = ivb_cstates,
 	.disable_promotion_to_c1e = 1,
@@ -474,6 +519,7 @@ static struct intel_idle_id {
 	ICPU(0x26, lincroft),
 	ICPU(0x2a, snb),
 	ICPU(0x2d, snb),
+	ICPU(0x37, byt),
 	ICPU(0x3a, ivb),
 	ICPU(0x3e, ivb),
 	ICPU(0x3c, hsw),
