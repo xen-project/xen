@@ -372,12 +372,12 @@ static void gicv2_clear_lr(int lr)
     writel_relaxed(0, GICH + GICH_LR + lr * 4);
 }
 
-static int gicv_v2_init(struct domain *d)
+static int gicv2v_setup(struct domain *d)
 {
     int ret;
 
     /*
-     * Domain 0 gets the hardware address.
+     * The hardware domain gets the hardware address.
      * Guests get the virtual platform layout.
      */
     if ( is_hardware_domain(d) )
@@ -566,7 +566,7 @@ const static struct gic_hw_operations gicv2_ops = {
     .save_state          = gicv2_save_state,
     .restore_state       = gicv2_restore_state,
     .dump_state          = gicv2_dump_state,
-    .gicv_setup          = gicv_v2_init,
+    .gicv_setup          = gicv2v_setup,
     .gic_host_irq_type   = &gicv2_host_irq_type,
     .gic_guest_irq_type  = &gicv2_guest_irq_type,
     .eoi_irq             = gicv2_eoi_irq,
