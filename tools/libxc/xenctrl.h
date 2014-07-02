@@ -119,6 +119,16 @@ typedef struct xc_interface_core xc_interface;
 typedef struct xc_interface_core xc_evtchn;
 typedef struct xc_interface_core xc_gnttab;
 typedef struct xc_interface_core xc_gntshr;
+
+enum xc_error_code {
+  XC_ERROR_NONE = 0,
+  XC_INTERNAL_ERROR = 1,
+  XC_INVALID_KERNEL = 2,
+  XC_INVALID_PARAM = 3,
+  XC_OUT_OF_MEMORY = 4,
+  /* new codes need to be added to xc_error_level_to_desc too */
+};
+
 typedef enum xc_error_code xc_error_code;
 
 
@@ -1816,15 +1826,6 @@ int xc_hvm_inject_trap(
  *  LOGGING AND ERROR REPORTING
  */
 
-
-enum xc_error_code {
-  XC_ERROR_NONE = 0,
-  XC_INTERNAL_ERROR = 1,
-  XC_INVALID_KERNEL = 2,
-  XC_INVALID_PARAM = 3,
-  XC_OUT_OF_MEMORY = 4,
-  /* new codes need to be added to xc_error_level_to_desc too */
-};
 
 #define XC_MAX_ERROR_MSG_LEN 1024
 typedef struct xc_error {
