@@ -352,4 +352,19 @@ int xc_ffs64(uint64_t x);
 #define DOMPRINTF(fmt, args...) xc_dom_printf(dom->xch, fmt, ## args)
 #define DOMPRINTF_CALLED(xch) xc_dom_printf((xch), "%s: called", __FUNCTION__)
 
+/**
+ * mem_event operations. Internal use only.
+ */
+int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
+                         unsigned int mode, uint32_t *port);
+int xc_mem_event_memop(xc_interface *xch, domid_t domain_id,
+                        unsigned int op, unsigned int mode,
+                        uint64_t gfn, void *buffer);
+/*
+ * Enables mem_event and returns the mapped ring page indicated by param.
+ * param can be HVM_PARAM_PAGING/ACCESS/SHARING_RING_PFN
+ */
+void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
+                          uint32_t *port);
+
 #endif /* __XC_PRIVATE_H__ */

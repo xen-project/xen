@@ -2236,21 +2236,6 @@ void xc_tmem_save_done(xc_interface *xch, int dom);
 int xc_tmem_restore(xc_interface *xch, int dom, int fd);
 int xc_tmem_restore_extra(xc_interface *xch, int dom, int fd);
 
-/**
- * mem_event operations. Internal use only.
- */
-int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
-                         unsigned int mode, uint32_t *port);
-int xc_mem_event_memop(xc_interface *xch, domid_t domain_id, 
-                        unsigned int op, unsigned int mode,
-                        uint64_t gfn, void *buffer);
-/*
- * Enables mem_event and returns the mapped ring page indicated by param.
- * param can be HVM_PARAM_PAGING/ACCESS/SHARING_RING_PFN
- */
-void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
-                          uint32_t *port);
-
 /** 
  * Mem paging operations.
  * Paging is supported only on the x86 architecture in 64 bit mode, with
