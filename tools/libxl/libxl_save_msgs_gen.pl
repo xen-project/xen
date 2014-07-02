@@ -24,7 +24,7 @@ our @msgs = (
                                                 'unsigned long', 'done',
                                                 'unsigned long', 'total'] ],
     [  3, 'scxA',   "suspend", [] ],
-    [  4, 'scxW',   "postcopy", [] ],
+    [  4, 'scxA',   "postcopy", [] ],
     [  5, 'scxA',   "checkpoint", [] ],
     [  6, 'scxA',   "switch_qemu_logdirty",  [qw(int domid
                                               unsigned enable)] ],

@@ -1479,18 +1479,22 @@ static void remus_domain_suspend_callback_common_done(libxl__egc *egc,
     libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, ok);
 }
 
-static int libxl__remus_domain_resume_callback(void *data)
+static void libxl__remus_domain_resume_callback(void *data)
 {
+    int ok = 0;
     libxl__save_helper_state *shs = data;
+    libxl__egc *egc = shs->egc;
     libxl__domain_suspend_state *dss = CONTAINER_OF(shs, *dss, shs);
     STATE_AO_GC(dss->ao);
 
     /* Resumes the domain and the device model */
     if (libxl__domain_resume(gc, dss->domid, /* Fast Suspend */1))
-        return 0;
+        goto out;
 
     /* REMUS TODO: Deal with disk. Start a new network output buffer */
-    return 1;
+    ok = 1;
+out:
+    libxl__xc_domain_saverestore_async_callback_done(egc, shs, ok);
 }
 
 /*----- remus asynchronous checkpoint callback -----*/
