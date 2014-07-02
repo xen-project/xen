@@ -233,6 +233,7 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 		c->x86_model += ((tfms >> 16) & 0xF) << 4;
 	c->x86_mask = tfms & 15;
 	c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
+	c->phys_proc_id = c->apicid;
 	if ( cpu_has(c, X86_FEATURE_CLFLSH) )
 		c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
 
@@ -257,10 +258,6 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 	}
 
 	early_intel_workaround(c);
-
-#ifdef CONFIG_X86_HT
-	c->phys_proc_id = (cpuid_ebx(1) >> 24) & 0xff;
-#endif
 }
 
 /*
@@ -429,7 +426,6 @@ void __cpuinit detect_extended_topology(struct cpuinfo_x86 *c)
 	}
 }
 
-#ifdef CONFIG_X86_HT
 void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 {
 	u32 	eax, ebx, ecx, edx;
@@ -474,7 +470,6 @@ void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 			       c->cpu_core_id);
 	}
 }
-#endif
 
 unsigned int __init apicid_to_socket(unsigned int apicid)
 {

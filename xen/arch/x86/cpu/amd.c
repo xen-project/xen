@@ -385,7 +385,6 @@ static void check_syscfg_dram_mod_en(void)
 
 static void __devinit amd_get_topology(struct cpuinfo_x86 *c)
 {
-#ifdef CONFIG_X86_HT
         int cpu;
         unsigned bits;
 
@@ -423,7 +422,6 @@ static void __devinit amd_get_topology(struct cpuinfo_x86 *c)
                                                          "Core",
                        cpu_has(c, X86_FEATURE_TOPOEXT) ? c->compute_unit_id :
                                                          c->cpu_core_id);
-#endif
 }
 
 static void __devinit init_amd(struct cpuinfo_x86 *c)

@@ -211,11 +211,7 @@ extern void dodgy_tsc(void);
 
 extern void detect_extended_topology(struct cpuinfo_x86 *c);
 
-#ifdef CONFIG_X86_HT
 extern void detect_ht(struct cpuinfo_x86 *c);
-#else
-static always_inline void detect_ht(struct cpuinfo_x86 *c) {}
-#endif
 
 #define cpu_to_core(_cpu)   (cpu_data[_cpu].cpu_core_id)
 #define cpu_to_socket(_cpu) (cpu_data[_cpu].phys_proc_id)
