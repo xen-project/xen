@@ -555,23 +555,22 @@ static int mwait_idle_cpu_init(struct notifier_block *nfb,
 	dev->count = 1;
 
 	for (cstate = 0; cpuidle_state_table[cstate].target_residency; ++cstate) {
-		unsigned int num_substates, hint, state, substate;
+		unsigned int num_substates, hint, state;
 		struct acpi_processor_cx *cx;
 
 		hint = flg2MWAIT(cpuidle_state_table[cstate].flags);
 		state = MWAIT_HINT2CSTATE(hint) + 1;
-		substate = MWAIT_HINT2SUBSTATE(hint);
 
 		if (state > max_cstate) {
 			printk(PREFIX "max C-state %u reached\n", max_cstate);
 			break;
 		}
 
-		/* Does the state exist in CPUID.MWAIT? */
+		/* Number of sub-states for this state in CPUID.MWAIT. */
 		num_substates = (mwait_substates >> (state * 4))
 		                & MWAIT_SUBSTATE_MASK;
-		/* if sub-state in table is not enumerated by CPUID */
-		if (substate >= num_substates)
+		/* If NO sub-states for this state in CPUID, skip it. */
+		if (num_substates == 0)
 			continue;
 
 		if (dev->count >= ACPI_PROCESSOR_MAX_POWER) {
