@@ -60,7 +60,7 @@ void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
                           uint32_t *port)
 {
     void *ring_page = NULL;
-    unsigned long pfn;
+    uint64_t pfn;
     xen_pfn_t ring_pfn, mmap_pfn;
     unsigned int op, mode;
     int rc1, rc2, saved_errno;
@@ -80,7 +80,7 @@ void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
     }
 
     /* Get the pfn of the ring page */
-    rc1 = xc_get_hvm_param(xch, domain_id, param, &pfn);
+    rc1 = xc_hvm_param_get(xch, domain_id, param, &pfn);
     if ( rc1 != 0 )
     {
         PERROR("Failed to get pfn of ring page\n");
