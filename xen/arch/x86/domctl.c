@@ -1027,7 +1027,7 @@ long arch_do_domctl(
         struct vcpu *v;
 
         ret = -EBUSY;
-        if ( !d->is_paused_by_controller )
+        if ( d->controller_pause_count > 0 )
             break;
         ret = -EINVAL;
         if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= MAX_VIRT_CPUS ||
@@ -1043,7 +1043,7 @@ long arch_do_domctl(
         struct vcpu *v;
 
         ret = -EBUSY;
-        if ( !d->is_paused_by_controller )
+        if ( d->controller_pause_count > 0 )
             break;
         ret = -EINVAL;
         if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= MAX_VIRT_CPUS ||
@@ -1061,7 +1061,7 @@ long arch_do_domctl(
         struct vcpu *v;
 
         domctl->u.gdbsx_domstatus.vcpu_id = -1;
-        domctl->u.gdbsx_domstatus.paused = d->is_paused_by_controller;
+        domctl->u.gdbsx_domstatus.paused = d->controller_pause_count > 0;
         if ( domctl->u.gdbsx_domstatus.paused )
         {
             for_each_vcpu ( d, v )
