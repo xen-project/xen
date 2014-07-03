@@ -16,7 +16,38 @@
  * GNU General Public License for more details.
  */
 
+#include <xen/mm.h>
+#include <xen/vmap.h>
 #include <asm/platform.h>
+#include <asm/io.h>
+
+/* Watchdog constants: */
+#define SUNXI_WDT_BASE            0x01c20c90
+#define SUNXI_WDT_MODE            0x04
+#define SUNXI_WDT_MODEADDR        (SUNXI_WDT_BASE + SUNXI_WDT_MODE)
+#define SUNXI_WDT_MODE_EN         (1 << 0)
+#define SUNXI_WDT_MODE_RST_EN     (1 << 1)
+
+
+static void sunxi_reset(void)
+{
+    void __iomem *wdt;
+
+    wdt = ioremap_nocache(SUNXI_WDT_MODEADDR & PAGE_MASK, PAGE_SIZE);
+    if ( !wdt )
+    {
+        dprintk(XENLOG_ERR, "Unable to map watchdog register!\n");
+        return;
+    }
+
+    /* Enable watchdog to trigger a reset after 500 ms: */
+    writel(SUNXI_WDT_MODE_EN | SUNXI_WDT_MODE_RST_EN,
+      wdt + (SUNXI_WDT_MODEADDR & ~PAGE_MASK));
+    iounmap(wdt);
+
+    for (;;)
+        wfi();
+}
 
 static const char * const sunxi_dt_compat[] __initconst =
 {
@@ -37,6 +68,7 @@ static const struct dt_device_match sunxi_blacklist_dev[] __initconst =
 PLATFORM_START(sunxi, "Allwinner A20")
     .compatible = sunxi_dt_compat,
     .blacklist_dev = sunxi_blacklist_dev,
+    .reset = sunxi_reset,
 
     .dom0_gnttab_start = 0x01d00000,
     .dom0_gnttab_size = 0x20000,
