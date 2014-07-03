@@ -65,11 +65,13 @@ struct dt_device_match {
     const char *path;
     const char *type;
     const char *compatible;
+    const bool_t not_available;
 };
 
 #define DT_MATCH_PATH(p)                { .path = p }
 #define DT_MATCH_TYPE(typ)              { .type = typ }
 #define DT_MATCH_COMPATIBLE(compat)     { .compatible = compat }
+#define DT_MATCH_NOT_AVAILABLE()        { .not_available = 1 }
 
 typedef u32 dt_phandle;
 

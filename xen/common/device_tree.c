@@ -680,7 +680,8 @@ bool_t dt_match_node(const struct dt_device_match *matches,
     if ( !matches )
         return 0;
 
-    while ( matches->path || matches->type || matches->compatible )
+    while ( matches->path || matches->type ||
+            matches->compatible || matches->not_available )
     {
         bool_t match = 1;
 
@@ -692,6 +693,9 @@ bool_t dt_match_node(const struct dt_device_match *matches,
 
         if ( matches->compatible )
             match &= dt_device_is_compatible(node, matches->compatible);
+
+        if ( matches->not_available )
+            match &= !dt_device_is_available(node);
 
         if ( match )
             return match;
