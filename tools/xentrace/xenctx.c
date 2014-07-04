@@ -91,7 +91,6 @@ static struct xenctx {
     int do_stack;
 #endif
     int kernel_start_set;
-    int self_paused;
     xc_dominfo_t dominfo;
 } xenctx;
 
@@ -1273,13 +1272,10 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-    if (!xenctx.dominfo.paused) {
-        ret = xc_domain_pause(xenctx.xc_handle, xenctx.domid);
-        if (ret < 0) {
-            perror("xc_domain_pause");
-            exit(-1);
-        }
-        xenctx.self_paused = 1;
+    ret = xc_domain_pause(xenctx.xc_handle, xenctx.domid);
+    if (ret < 0) {
+        perror("xc_domain_pause");
+        exit(-1);
     }
 
 #ifndef NO_TRANSLATION
@@ -1303,12 +1299,10 @@ int main(int argc, char **argv)
     if ( do_default )
         dump_ctx(vcpu);
 
-    if (xenctx.self_paused) {
-        ret = xc_domain_unpause(xenctx.xc_handle, xenctx.domid);
-        if (ret < 0) {
-            perror("xc_domain_unpause");
-            exit(-1);
-        }
+    ret = xc_domain_unpause(xenctx.xc_handle, xenctx.domid);
+    if (ret < 0) {
+        perror("xc_domain_unpause");
+        exit(-1);
     }
 
     ret = xc_interface_close(xenctx.xc_handle);
