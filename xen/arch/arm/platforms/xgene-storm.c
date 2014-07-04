@@ -37,7 +37,7 @@ static bool reset_vals_valid = false;
 
 static uint32_t xgene_storm_quirks(void)
 {
-    return PLATFORM_QUIRK_GIC_64K_STRIDE;
+    return PLATFORM_QUIRK_GIC_64K_STRIDE|PLATFORM_QUIRK_GUEST_PIRQ_NEED_EOI;
 }
 
 static int map_one_mmio(struct domain *d, const char *what,

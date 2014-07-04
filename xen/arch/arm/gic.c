@@ -366,7 +366,11 @@ static void gic_update_one_lr(struct vcpu *v, int i)
         clear_bit(i, &this_cpu(lr_mask));
 
         if ( p->desc != NULL )
+        {
             p->desc->status &= ~IRQ_INPROGRESS;
+            if ( platform_has_quirk(PLATFORM_QUIRK_GUEST_PIRQ_NEED_EOI) )
+                gic_hw_ops->deactivate_irq(p->desc);
+        }
         clear_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
         clear_bit(GIC_IRQ_GUEST_ACTIVE, &p->status);
         p->lr = GIC_INVALID_LR;
