@@ -345,6 +345,13 @@ Load the specified file as the kernel image.
 
 Load the specified file as the ramdisk.
 
+=item B<cmdline="STRING">
+
+Append B<cmdline="STRING"> to the kernel command line. (Note: it is
+guest specific what meaning this has). It can replace B<root="STRING">
+plus B<extra="STRING"> and is preferred. When B<cmdline="STRING"> is set,
+B<root="STRING"> and B<extra="STRING"> will be ignored.
+
 =item B<root="STRING">
 
 Append B<root="STRING"> to the kernel command line (Note: it is guest

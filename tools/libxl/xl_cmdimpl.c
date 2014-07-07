@@ -694,19 +694,27 @@ static void parse_top_level_sdl_options(XLU_Config *config,
 static char *parse_cmdline(XLU_Config *config)
 {
     char *cmdline = NULL;
-    const char *root = NULL, *extra = "";
+    const char *root = NULL, *extra = NULL, *buf = NULL;
 
+    xlu_cfg_get_string (config, "cmdline", &buf, 0);
     xlu_cfg_get_string (config, "root", &root, 0);
     xlu_cfg_get_string (config, "extra", &extra, 0);
 
-    if (root) {
-        if (asprintf(&cmdline, "root=%s %s", root, extra) == -1)
-            cmdline = NULL;
+    if (buf) {
+        cmdline = strdup(buf);
+        if (root || extra)
+            fprintf(stderr, "Warning: ignoring root= and extra= "
+                    "in favour of cmdline=\n");
     } else {
-        cmdline = strdup(extra);
+        if (root) {
+            if (asprintf(&cmdline, "root=%s %s", root, extra) == -1)
+                cmdline = NULL;
+        } else if (extra) {
+            cmdline = strdup(extra);
+        }
     }
 
-    if ((root || extra) && !cmdline) {
+    if ((buf || root || extra) && !cmdline) {
         fprintf(stderr, "Failed to allocate memory for cmdline\n");
         exit(1);
     }
