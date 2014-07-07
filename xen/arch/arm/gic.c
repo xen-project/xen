@@ -69,6 +69,7 @@ unsigned int gic_number_lines(void)
 void gic_save_state(struct vcpu *v)
 {
     ASSERT(!local_irq_is_enabled());
+    ASSERT(!is_idle_vcpu(v));
 
     /* No need for spinlocks here because interrupts are disabled around
      * this call and it only accesses struct vcpu fields that cannot be
@@ -82,9 +83,7 @@ void gic_save_state(struct vcpu *v)
 void gic_restore_state(struct vcpu *v)
 {
     ASSERT(!local_irq_is_enabled());
-
-    if ( is_idle_vcpu(v) )
-        return;
+    ASSERT(!is_idle_vcpu(v));
 
     this_cpu(lr_mask) = v->arch.lr_mask;
     gic_hw_ops->restore_state(v);

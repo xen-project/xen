@@ -60,6 +60,12 @@ void idle_loop(void)
 
 static void ctxt_switch_from(struct vcpu *p)
 {
+    /* When the idle VCPU is running, Xen will always stay in hypervisor
+     * mode. Therefore we don't need to save the context of an idle VCPU.
+     */
+    if ( is_idle_vcpu(p) )
+        goto end_context;
+
     p2m_save_state(p);
 
     /* CP 15 */
@@ -132,11 +138,19 @@ static void ctxt_switch_from(struct vcpu *p)
     gic_save_state(p);
 
     isb();
+
+end_context:
     context_saved(p);
 }
 
 static void ctxt_switch_to(struct vcpu *n)
 {
+    /* When the idle VCPU is running, Xen will always stay in hypervisor
+     * mode. Therefore we don't need to restore the context of an idle VCPU.
+     */
+    if ( is_idle_vcpu(n) )
+        return;
+
     p2m_restore_state(n);
 
     WRITE_SYSREG32(n->domain->arch.vpidr, VPIDR_EL2);

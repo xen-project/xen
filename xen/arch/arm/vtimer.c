@@ -94,8 +94,7 @@ void vcpu_timer_destroy(struct vcpu *v)
 
 int virt_timer_save(struct vcpu *v)
 {
-    if ( is_idle_domain(v->domain) )
-        return 0;
+    ASSERT(!is_idle_vcpu(v));
 
     v->arch.virt_timer.ctl = READ_SYSREG32(CNTV_CTL_EL0);
     WRITE_SYSREG32(v->arch.virt_timer.ctl & ~CNTx_CTL_ENABLE, CNTV_CTL_EL0);
@@ -111,8 +110,7 @@ int virt_timer_save(struct vcpu *v)
 
 int virt_timer_restore(struct vcpu *v)
 {
-    if ( is_idle_domain(v->domain) )
-        return 0;
+    ASSERT(!is_idle_vcpu(v));
 
     stop_timer(&v->arch.virt_timer.timer);
     migrate_timer(&v->arch.virt_timer.timer, v->processor);
