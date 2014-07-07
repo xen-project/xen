@@ -326,6 +326,37 @@ Action to take if the domain crashes.  Default is C<destroy>.
 
 =back
 
+=head3 Direct Kernel Boot
+
+Direct kernel boot allows booting directly from a kernel and initrd
+stored in the host physical machine OS, allowing command line arguments
+to be passed directly. PV guest direct kernel boot is supported. HVM
+guest direct kernel boot is supported with limitation (it's supported
+when using qemu-xen and default BIOS 'seabios'; not supported in case of
+stubdom-dm and old rombios.)
+
+=over 4
+
+=item B<kernel="PATHNAME">
+
+Load the specified file as the kernel image.
+
+=item B<ramdisk="PATHNAME">
+
+Load the specified file as the ramdisk.
+
+=item B<root="STRING">
+
+Append B<root="STRING"> to the kernel command line (Note: it is guest
+specific what meaning this has).
+
+=item B<extra="STRING">
+
+Append B<STRING> to the kernel command line. (Note: it is guest
+specific what meaning this has).
+
+=back
+
 =head3 Other Options
 
 =over 4
@@ -668,36 +699,18 @@ The following options apply only to Paravirtual guests.
 
 =over 4
 
-=item B<kernel="PATHNAME">
-
-Load the specified file as the kernel image.  Either B<kernel> or
-B<bootloader> must be specified for PV guests.
-
-=item B<ramdisk="PATHNAME">
-
-Load the specified file as the ramdisk.
-
 =item B<bootloader="PROGRAM">
 
 Run C<PROGRAM> to find the kernel image and ramdisk to use.  Normally
 C<PROGRAM> would be C<pygrub>, which is an emulation of
-grub/grub2/syslinux.
+grub/grub2/syslinux. Either B<kernel> or B<bootloader> must be specified
+for PV guests.
 
 =item B<bootloader_args=[ "ARG", "ARG", ...]>
 
 Append B<ARG>s to the arguments to the B<bootloader>
 program. Alternatively if the argument is a simple string then it will
 be split into words at whitespace (this second option is deprecated).
-
-=item B<root="STRING">
-
-Append B<root="STRING"> to the kernel command line (Note: it is guest
-specific what meaning this has).
-
-=item B<extra="STRING">
-
-Append B<STRING> to the kernel command line. Note: it is guest
-specific what meaning this has).
 
 =item B<e820_host=BOOLEAN>
 

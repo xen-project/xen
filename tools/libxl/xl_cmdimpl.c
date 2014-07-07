@@ -691,6 +691,29 @@ static void parse_top_level_sdl_options(XLU_Config *config,
     xlu_cfg_replace_string (config, "xauthority", &sdl->xauthority, 0);
 }
 
+static char *parse_cmdline(XLU_Config *config)
+{
+    char *cmdline = NULL;
+    const char *root = NULL, *extra = "";
+
+    xlu_cfg_get_string (config, "root", &root, 0);
+    xlu_cfg_get_string (config, "extra", &extra, 0);
+
+    if (root) {
+        if (asprintf(&cmdline, "root=%s %s", root, extra) == -1)
+            cmdline = NULL;
+    } else {
+        cmdline = strdup(extra);
+    }
+
+    if ((root || extra) && !cmdline) {
+        fprintf(stderr, "Failed to allocate memory for cmdline\n");
+        exit(1);
+    }
+
+    return cmdline;
+}
+
 static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
                                 XLU_ConfigList *cpus, const char *buf,
                                 int num_cpus, bool is_hard)
@@ -970,13 +993,21 @@ static void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_long(config, "max_event_channels", &l, 0))
         b_info->event_channels = l;
 
+    xlu_cfg_replace_string (config, "kernel", &b_info->kernel, 0);
+    xlu_cfg_replace_string (config, "ramdisk", &b_info->ramdisk, 0);
+    b_info->cmdline = parse_cmdline(config);
+
     xlu_cfg_get_defbool(config, "driver_domain", &c_info->driver_domain, 0);
 
     switch(b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        if (!xlu_cfg_get_string (config, "kernel", &buf, 0))
-            fprintf(stderr, "WARNING: ignoring \"kernel\" directive for HVM guest. "
-                    "Use \"firmware_override\" instead if you really want a non-default firmware\n");
+        if (!strcmp(libxl_basename(b_info->kernel), "hvmloader")) {
+            fprintf(stderr, "WARNING: you seem to be using \"kernel\" "
+                    "directive to override HVM guest firmware. Ignore "
+                    "that. Use \"firmware_override\" instead if you "
+                    "really want a non-default firmware\n");
+            b_info->kernel = NULL;
+        }
 
         xlu_cfg_replace_string (config, "firmware_override",
                                 &b_info->u.hvm.firmware, 0);
@@ -1043,26 +1074,6 @@ static void parse_config_data(const char *config_source,
         break;
     case LIBXL_DOMAIN_TYPE_PV:
     {
-        char *cmdline = NULL;
-        const char *root = NULL, *extra = "";
-
-        xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel, 0);
-
-        xlu_cfg_get_string (config, "root", &root, 0);
-        xlu_cfg_get_string (config, "extra", &extra, 0);
-
-        if (root) {
-            if (asprintf(&cmdline, "root=%s %s", root, extra) == -1)
-                cmdline = NULL;
-        } else {
-            cmdline = strdup(extra);
-        }
-
-        if ((root || extra) && !cmdline) {
-            fprintf(stderr, "Failed to allocate memory for cmdline\n");
-            exit(1);
-        }
-
         xlu_cfg_replace_string (config, "bootloader", &b_info->u.pv.bootloader, 0);
         switch (xlu_cfg_get_list_as_string_list(config, "bootloader_args",
                                       &b_info->u.pv.bootloader_args, 1))
@@ -1085,13 +1096,11 @@ static void parse_config_data(const char *config_source,
             exit(-ERROR_FAIL);
         }
 
-        if (!b_info->u.pv.bootloader && !b_info->u.pv.kernel) {
+        if (!b_info->u.pv.bootloader && !b_info->kernel) {
             fprintf(stderr, "Neither kernel nor bootloader specified\n");
             exit(1);
         }
 
-        b_info->u.pv.cmdline = cmdline;
-        xlu_cfg_replace_string (config, "ramdisk", &b_info->u.pv.ramdisk, 0);
         break;
     }
     default:

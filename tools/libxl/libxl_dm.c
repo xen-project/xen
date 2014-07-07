@@ -196,6 +196,12 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         int nr_set_cpus = 0;
         char *s;
 
+        if (b_info->kernel) {
+            LOG(ERROR, "HVM direct kernel boot is not supported by "
+                "qemu-xen-traditional");
+            return NULL;
+        }
+
         if (b_info->u.hvm.serial || b_info->u.hvm.serial_list) {
             if ( b_info->u.hvm.serial && b_info->u.hvm.serial_list )
             {

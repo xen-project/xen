@@ -543,6 +543,21 @@ typedef struct libxl__ctx libxl_ctx;
  */
 #define LIBXL_HAVE_DEVICE_PCI_SEIZE 1
 
+/*
+ * LIBXL_HAVE_BUILDINFO_KERNEL
+ *
+ * If this is defined, then the libxl_domain_build_info structure will
+ * contain 'kernel', 'ramdisk', 'cmdline' fields. 'kernel' is a string
+ * to indicate kernel image location, 'ramdisk' is a string to indicate
+ * ramdisk location, 'cmdline' is a string to indicate the paramters which
+ * would be appended to kernel image.
+ *
+ * Both PV guest and HVM guest can use these fields for direct kernel boot.
+ * But for compatibility reason, u.pv.kernel, u.pv.ramdisk and u.pv.cmdline
+ * still exist.
+ */
+#define LIBXL_HAVE_BUILDINFO_KERNEL 1
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */
