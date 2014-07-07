@@ -13,7 +13,7 @@
 
 static uint32_t domid = -1;
 
-static int build(xc_interface *xch, char** argv)
+static int build(xc_interface *xch, int argc, char** argv)
 {
 	char cmdline[512];
 	uint32_t ssid;
@@ -44,6 +44,12 @@ static int build(xc_interface *xch, char** argv)
 	dom = xc_dom_allocate(xch, cmdline, NULL);
 	rv = xc_dom_kernel_file(dom, argv[1]);
 	if (rv) goto err;
+
+	if (argc > 4) {
+		rv = xc_dom_ramdisk_file(dom, argv[4]);
+		if (rv) goto err;
+	}
+
 	rv = xc_dom_boot_xen_init(dom, xch, domid);
 	if (rv) goto err;
 	rv = xc_dom_parse_image(dom);
@@ -81,15 +87,15 @@ int main(int argc, char** argv)
 	char buf[16];
 	int rv, fd;
 
-	if (argc != 4) {
-		printf("Use: %s <xenstore-kernel> <memory_mb> <flask-label>\n", argv[0]);
+	if (argc < 4 || argc > 5) {
+		printf("Use: %s <xenstore-kernel> <memory_mb> <flask-label> [<ramdisk-file>]\n", argv[0]);
 		return 2;
 	}
 
 	xch = xc_interface_open(NULL, NULL, 0);
 	if (!xch) return 1;
 
-	rv = build(xch, argv);
+	rv = build(xch, argc, argv);
 
 	xc_interface_close(xch);
 
