@@ -965,7 +965,7 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
     char *reset;
     int fd, rc;
 
-    reset = libxl__sprintf(gc, "%s/pciback/do_flr", SYSFS_PCI_DEV);
+    reset = libxl__sprintf(gc, "%s/do_flr", SYSFS_PCIBACK_DRIVER);
     fd = open(reset, O_WRONLY);
     if (fd >= 0) {
         char *buf = libxl__sprintf(gc, PCI_BDF, domain, bus, dev, func);
