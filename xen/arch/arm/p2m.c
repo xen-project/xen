@@ -14,6 +14,24 @@
 #define P2M_FIRST_ORDER 1
 #define P2M_FIRST_ENTRIES (LPAE_ENTRIES<<P2M_FIRST_ORDER)
 
+static bool_t p2m_valid(lpae_t pte)
+{
+    return pte.p2m.valid;
+}
+/* These two can only be used on L0..L2 ptes because L3 mappings set
+ * the table bit and therefore these would return the opposite to what
+ * you would expect. */
+static bool_t p2m_table(lpae_t pte)
+{
+    return p2m_valid(pte) && pte.p2m.table;
+}
+#if 0
+static bool_t p2m_mapping(lpae_t pte)
+{
+    return p2m_valid(pte) && !pte.p2m.table;
+}
+#endif
+
 void dump_p2m_lookup(struct domain *d, paddr_t addr)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
@@ -139,13 +157,13 @@ paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
 
     mask = FIRST_MASK;
     pte = first[first_table_offset(paddr)];
-    if ( !pte.p2m.valid || !pte.p2m.table )
+    if ( !p2m_table(pte) )
         goto done;
 
     mask = SECOND_MASK;
     second = map_domain_page(pte.p2m.base);
     pte = second[second_table_offset(paddr)];
-    if ( !pte.p2m.valid || !pte.p2m.table )
+    if ( !p2m_table(pte) )
         goto done;
 
     mask = THIRD_MASK;
@@ -156,11 +174,11 @@ paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
     pte = third[third_table_offset(paddr)];
 
     /* This bit must be one in the level 3 entry */
-    if ( !pte.p2m.table )
+    if ( !p2m_table(pte) )
         pte.bits = 0;
 
 done:
-    if ( pte.p2m.valid )
+    if ( p2m_valid(pte) )
     {
         ASSERT(pte.p2m.type != p2m_invalid);
         maddr = (pte.bits & PADDR_MASK & mask) | (paddr & ~mask);
@@ -367,7 +385,7 @@ static int apply_p2m_changes(struct domain *d,
             cur_first_page = p2m_first_level_index(addr);
         }
 
-        if ( !first[first_table_offset(addr)].p2m.valid )
+        if ( !p2m_valid(first[first_table_offset(addr)]) )
         {
             if ( !populate )
             {
@@ -384,7 +402,7 @@ static int apply_p2m_changes(struct domain *d,
             }
         }
 
-        BUG_ON(!first[first_table_offset(addr)].p2m.valid);
+        BUG_ON(!p2m_valid(first[first_table_offset(addr)]));
 
         if ( cur_first_offset != first_table_offset(addr) )
         {
@@ -394,7 +412,7 @@ static int apply_p2m_changes(struct domain *d,
         }
         /* else: second already valid */
 
-        if ( !second[second_table_offset(addr)].p2m.valid )
+        if ( !p2m_valid(second[second_table_offset(addr)]) )
         {
             if ( !populate )
             {
