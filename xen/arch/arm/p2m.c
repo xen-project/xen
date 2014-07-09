@@ -123,6 +123,7 @@ paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
     struct p2m_domain *p2m = &d->arch.p2m;
     lpae_t pte, *first = NULL, *second = NULL, *third = NULL;
     paddr_t maddr = INVALID_PADDR;
+    paddr_t mask;
     p2m_type_t _t;
 
     /* Allow t to be NULL */
@@ -136,14 +137,20 @@ paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
     if ( !first )
         goto err;
 
+    mask = FIRST_MASK;
     pte = first[first_table_offset(paddr)];
     if ( !pte.p2m.valid || !pte.p2m.table )
         goto done;
 
+    mask = SECOND_MASK;
     second = map_domain_page(pte.p2m.base);
     pte = second[second_table_offset(paddr)];
     if ( !pte.p2m.valid || !pte.p2m.table )
         goto done;
+
+    mask = THIRD_MASK;
+
+    BUILD_BUG_ON(THIRD_MASK != PAGE_MASK);
 
     third = map_domain_page(pte.p2m.base);
     pte = third[third_table_offset(paddr)];
@@ -156,7 +163,7 @@ done:
     if ( pte.p2m.valid )
     {
         ASSERT(pte.p2m.type != p2m_invalid);
-        maddr = (pte.bits & PADDR_MASK & PAGE_MASK) | (paddr & ~PAGE_MASK);
+        maddr = (pte.bits & PADDR_MASK & mask) | (paddr & ~mask);
         *t = pte.p2m.type;
     }
 
