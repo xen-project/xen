@@ -76,6 +76,8 @@ struct arch_domain
     } virt_timer_base;
 
     struct {
+        /* GIC HW version specific vGIC driver handler */
+        const struct vgic_ops *handler;
         /*
          * Covers access to other members of this struct _except_ for
          * shared_irqs where each member contains its own locking.

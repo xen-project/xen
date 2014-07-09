@@ -86,6 +86,13 @@ struct vgic_irq_rank {
     uint32_t itargets[8];
 };
 
+struct vgic_ops {
+    /* Initialize vGIC */
+    int (*vcpu_init)(struct vcpu *v);
+    /* Domain specific initialization of vGIC */
+    int (*domain_init)(struct domain *d);
+};
+
 /* Number of ranks of interrupt registers for a domain */
 #define DOMAIN_NR_RANKS(d) (((d)->arch.vgic.nr_lines+31)/32)
 
@@ -133,6 +140,8 @@ static inline void vgic_byte_write(uint32_t *reg, uint32_t var, int offset)
     *reg |= var;
 }
 
+enum gic_sgi_mode;
+
 /*
  * Offset of GICD_<FOO><n> with its rank, for GICD_<FOO> size <s> with
  * <b>-bits-per-interrupt.
@@ -145,8 +154,16 @@ extern int vcpu_vgic_init(struct vcpu *v);
 extern void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq);
 extern void vgic_clear_pending_irqs(struct vcpu *v);
 extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
+extern struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n, int s);
+extern void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n);
+extern void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n);
+extern void register_vgic_ops(struct domain *d, const struct vgic_ops *ops);
+int vgic_v2_init(struct domain *d);
 
 extern int vcpu_vgic_free(struct vcpu *v);
+extern int vgic_to_sgi(struct vcpu *v, register_t sgir,
+                       enum gic_sgi_mode irqmode, int virq,
+                       unsigned long vcpu_mask);
 #endif /* __ASM_ARM_VGIC_H__ */
 
 /*
