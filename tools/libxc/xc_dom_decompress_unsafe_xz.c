@@ -40,11 +40,6 @@ static inline u32 le32_to_cpup(const u32 *p)
         (void) (&_x == &_y);            \
         _x < _y ? _x : _y; })
 
-#define min_t(type,x,y) \
-        ({ type __x = (x); type __y = (y); __x < __y ? __x: __y; })
-#define max_t(type,x,y) \
-        ({ type __x = (x); type __y = (y); __x > __y ? __x: __y; })
-
 #define __force
 #define always_inline
 
