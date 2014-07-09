@@ -251,6 +251,14 @@ extern struct cpuinfo_arm cpu_data[];
 extern u32 __cpu_logical_map[];
 #define cpu_logical_map(cpu) __cpu_logical_map[cpu]
 
+/* HSR data abort size definition */
+enum dabt_size {
+    DABT_BYTE        = 0,
+    DABT_HALF_WORD   = 1,
+    DABT_WORD        = 2,
+    DABT_DOUBLE_WORD = 3,
+};
+
 union hsr {
     uint32_t bits;
     struct {

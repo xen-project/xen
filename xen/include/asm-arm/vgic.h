@@ -134,10 +134,10 @@ static inline void vgic_byte_write(uint32_t *reg, uint32_t var, int offset)
 }
 
 /*
- * Offset of GICD_<FOO><n> with its rank, for GICD_<FOO> with
+ * Offset of GICD_<FOO><n> with its rank, for GICD_<FOO> size <s> with
  * <b>-bits-per-interrupt.
  */
-#define REG_RANK_INDEX(b, n) (((n) >> 2) & ((b)-1))
+#define REG_RANK_INDEX(b, n, s) ((((n) >> s) & ((b)-1)) % 32)
 
 extern int domain_vgic_init(struct domain *d);
 extern void domain_vgic_free(struct domain *d);
