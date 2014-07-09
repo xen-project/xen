@@ -3198,6 +3198,8 @@ int libxl__random_bytes(libxl__gc *gc, uint8_t *buf, size_t len);
 #else
 #define BUILD_BUG_ON(p) ((void)sizeof(char[1 - 2 * !!(p)]))
 #endif
+#include "_libxl_types_private.h"
+#include "_libxl_types_internal_private.h"
 
 /* This always return false, there's no "default value" for hw cap */
 static inline int libxl__hwcap_is_default(libxl_hwcap *hwcap)

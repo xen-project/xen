@@ -312,6 +312,116 @@ def libxl_C_type_to_json(ty, v, indent = "    "):
         s = indent + s
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
+def libxl_C_type_parse_json(ty, w, v, indent = "    ", parent = None, discriminator = None):
+    s = ""
+    if parent is None:
+        s += "int rc = 0;\n"
+        s += "const libxl__json_object *x = o;\n"
+
+    if isinstance(ty, idl.Array):
+        if parent is None:
+            raise Exception("Array type must have a parent")
+        if discriminator is not None:
+            raise Exception("Only KeyedUnion can have discriminator")
+        lenvar = parent + ty.lenvar.name
+        s += "{\n"
+        s += "    libxl__json_object *t;\n"
+        s += "    int i;\n"
+        s += "    if (!libxl__json_object_is_array(x)) {\n"
+        s += "        rc = -1;\n"
+        s += "        goto out;\n"
+        s += "    }\n"
+        s += "    %s = x->u.array->count;\n" % lenvar
+        s += "    %s = libxl__calloc(NOGC, %s, sizeof(*%s));\n" % (v, lenvar, v)
+        s += "    if (!%s && %s != 0) {\n" % (v, lenvar)
+        s += "        rc = -1;\n"
+        s += "        goto out;\n"
+        s += "    }\n"
+        s += "    for (i=0; (t=libxl__json_array_get(x,i)); i++) {\n"
+        s += libxl_C_type_parse_json(ty.elem_type, "t", v+"[i]",
+                                     indent + "    ", parent)
+        s += "    }\n"
+        s += "    if (i != %s) {\n" % lenvar
+        s += "        rc = -1;\n"
+        s += "        goto out;\n"
+        s += "    }\n"
+        s += "}\n"
+    elif isinstance(ty, idl.Enumeration):
+        if discriminator is not None:
+            raise Exception("Only KeyedUnion can have discriminator")
+        s += "{\n"
+        s += "    const char *enum_str;\n"
+        s += "    if (!libxl__json_object_is_string(x)) {\n"
+        s += "        rc = -1;\n"
+        s += "        goto out;\n"
+        s += "    }\n"
+        s += "    enum_str = libxl__json_object_get_string(x);\n"
+        s += "    rc = %s_from_string(enum_str, %s);\n" % (ty.typename, ty.pass_arg(v, parent is None, idl.PASS_BY_REFERENCE))
+        s += "    if (rc)\n"
+        s += "        goto out;\n"
+        s += "}\n"
+    elif isinstance(ty, idl.KeyedUnion):
+        if parent is None:
+            raise Exception("KeyedUnion type must have a parent")
+        if discriminator is None:
+            raise Excpetion("KeyedUnion type must have a discriminator")
+        for f in ty.fields:
+            if f.enumname != discriminator:
+                continue
+            (nparent,fexpr) = ty.member(v, f, parent is None)
+            if f.type is not None:
+                s += libxl_C_type_parse_json(f.type, w, fexpr, indent + "    ", nparent)
+    elif isinstance(ty, idl.Struct) and (parent is None or ty.json_parse_fn is None):
+        if discriminator is not None:
+            raise Exception("Only KeyedUnion can have discriminator")
+        for f in [f for f in ty.fields if not f.const and not f.type.private]:
+            saved_var_name = "saved_%s" % f.name
+            s += "{\n"
+            s += "    const libxl__json_object *%s = NULL;\n" % saved_var_name
+            s += "    %s = x;\n" % saved_var_name
+            if isinstance(f.type, idl.KeyedUnion):
+                for x in f.type.fields:
+                    s += "    x = libxl__json_map_get(\"%s\", %s, JSON_MAP);\n" % \
+                         (f.type.keyvar.name + "." + x.name, w)
+                    s += "    if (x) {\n"
+                    (nparent, fexpr) = ty.member(v, f.type.keyvar, parent is None)
+                    s += "        %s_init_type(%s, %s);\n" % (ty.typename, v, x.enumname)
+                    (nparent,fexpr) = ty.member(v, f, parent is None)
+                    s += libxl_C_type_parse_json(f.type, "x", fexpr, "  ", nparent, x.enumname)
+                    s += "    }\n"
+            else:
+                s += "    x = libxl__json_map_get(\"%s\", %s, %s);\n" % (f.name, w, f.type.json_parse_type)
+                s += "    if (x) {\n"
+                (nparent,fexpr) = ty.member(v, f, parent is None)
+                s += libxl_C_type_parse_json(f.type, "x", fexpr, "        ", nparent)
+                s += "    }\n"
+            s += "    x = %s;\n" % saved_var_name
+            s += "}\n"
+    else:
+        if discriminator is not None:
+            raise Exception("Only KeyedUnion can have discriminator")
+        if ty.json_parse_fn is not None:
+            s += "rc = %s(gc, %s, &%s);\n" % (ty.json_parse_fn, w, v)
+            s += "if (rc)\n"
+            s += "    goto out;\n"
+
+    if parent is None:
+        s += "out:\n"
+        s += "return rc;\n"
+
+    if s != "":
+        s = indent +s
+    return s.replace("\n", "\n%s" % indent).rstrip(indent)
+
+def libxl_C_type_from_json(ty, v, w, indent = "    "):
+    s = ""
+    parse = "(libxl__json_parse_callback)&%s_parse_json" % (ty.namespace + "_" + ty.rawname)
+    s += "return libxl__object_from_json(ctx, \"%s\", %s, %s, %s);\n" % (ty.typename, parse, v, w)
+
+    if s != "":
+        s = indent + s
+    return s.replace("\n", "\n%s" % indent).rstrip(indent)
+
 def libxl_C_enum_to_string(ty, e, indent = "    "):
     s = ""
     s += "switch(%s) {\n" % e
@@ -350,11 +460,11 @@ def libxl_C_enum_from_string(ty, str, e, indent = "    "):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 5:
-        print >>sys.stderr, "Usage: gentypes.py <idl> <header> <header-json> <implementation>"
+    if len(sys.argv) != 6:
+        print >>sys.stderr, "Usage: gentypes.py <idl> <header> <header-private> <header-json> <implementation>"
         sys.exit(1)
 
-    (_, idlname, header, header_json, impl) = sys.argv
+    (_, idlname, header, header_private, header_json, impl) = sys.argv
 
     (builtins,types) = idl.parse(idlname)
 
@@ -390,6 +500,8 @@ if __name__ == '__main__':
                                                ku.keyvar.type.make_arg(ku.keyvar.name)))
         if ty.json_gen_fn is not None:
             f.write("%schar *%s_to_json(libxl_ctx *ctx, %s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p")))
+        if ty.json_parse_fn is not None:
+            f.write("%sint %s_from_json(libxl_ctx *ctx, %s, const char *s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
         if isinstance(ty, idl.Enumeration):
             f.write("%sconst char *%s_to_string(%s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p")))
             f.write("%sint %s_from_string(const char *s, %s);\n" % (ty.hidden(), ty.typename, ty.make_arg("e", passby=idl.PASS_BY_REFERENCE)))
@@ -418,6 +530,32 @@ if __name__ == '__main__':
 
     for ty in [ty for ty in types if ty.json_gen_fn is not None]:
         f.write("%syajl_gen_status %s_gen_json(yajl_gen hand, %s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
+
+    f.write("\n")
+    f.write("""#endif /* %s */\n""" % header_json_define)
+    f.close()
+
+    print "outputting libxl type internal definitions to %s" % header_private
+
+    f = open(header_private, "w")
+
+    header_private_define = header_private.upper().replace('.','_')
+    f.write("""#ifndef %s
+#define %s
+
+/*
+ * DO NOT EDIT.
+ *
+ * This file is autogenerated by
+ * "%s"
+ */
+
+""" % (header_private_define, header_private_define, " ".join(sys.argv)))
+
+    for ty in [ty for ty in types if ty.json_parse_fn is not None]:
+        f.write("%sint %s_parse_json(libxl__gc *gc, const libxl__json_object *o, %s);\n" % \
+                (ty.hidden(), ty.namespace + "_" + ty.rawname,
+                 ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
 
     f.write("\n")
     f.write("""#endif /* %s */\n""" % header_json_define)
@@ -483,6 +621,22 @@ if __name__ == '__main__':
         f.write("char *%s_to_json(libxl_ctx *ctx, %s)\n" % (ty.typename, ty.make_arg("p")))
         f.write("{\n")
         f.write(libxl_C_type_to_json(ty, "p"))
+        f.write("}\n")
+        f.write("\n")
+
+    for ty in [t for t in types if t.json_parse_fn is not None]:
+        f.write("int %s_parse_json(libxl__gc *gc, const libxl__json_object *%s, %s)\n" % \
+                (ty.namespace + "_" + ty.rawname,"o",ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
+        f.write("{\n")
+        f.write(libxl_C_type_parse_json(ty, "o", "p"))
+        f.write("}\n")
+        f.write("\n")
+
+        f.write("int %s_from_json(libxl_ctx *ctx, %s, const char *s)\n" % (ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
+        f.write("{\n")
+        if not isinstance(ty, idl.Enumeration):
+            f.write("    %s_init(p);\n" % ty.typename)
+        f.write(libxl_C_type_from_json(ty, "p", "s"))
         f.write("}\n")
         f.write("\n")
 

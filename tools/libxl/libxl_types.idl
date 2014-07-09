@@ -5,22 +5,25 @@
 
 namespace("libxl_")
 
-libxl_defbool = Builtin("defbool", passby=PASS_BY_REFERENCE, check_default_fn="libxl__defbool_is_default")
+libxl_defbool = Builtin("defbool", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE,
+                        check_default_fn="libxl__defbool_is_default")
 
-libxl_domid = Builtin("domid", json_gen_fn = "yajl_gen_integer", autogenerate_json = False)
-libxl_devid = Builtin("devid", json_gen_fn = "yajl_gen_integer", autogenerate_json = False, signed = True, init_val="-1")
-libxl_uuid = Builtin("uuid", passby=PASS_BY_REFERENCE, check_default_fn="libxl_uuid_is_nil")
-libxl_mac = Builtin("mac", passby=PASS_BY_REFERENCE, check_default_fn="libxl__mac_is_default")
-libxl_bitmap = Builtin("bitmap", dispose_fn="libxl_bitmap_dispose", passby=PASS_BY_REFERENCE,
+libxl_domid = Builtin("domid", json_gen_fn = "yajl_gen_integer", json_parse_fn = "libxl__uint32_parse_json",
+                      json_parse_type = "JSON_INTEGER", autogenerate_json = False)
+libxl_devid = Builtin("devid", json_gen_fn = "yajl_gen_integer", json_parse_fn = "libxl__int_parse_json",
+                      json_parse_type = "JSON_INTEGER", autogenerate_json = False, signed = True, init_val="-1")
+libxl_uuid = Builtin("uuid", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE, check_default_fn="libxl_uuid_is_nil")
+libxl_mac = Builtin("mac", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE, check_default_fn="libxl__mac_is_default")
+libxl_bitmap = Builtin("bitmap", json_parse_type="JSON_ARRAY", dispose_fn="libxl_bitmap_dispose", passby=PASS_BY_REFERENCE,
                        check_default_fn="libxl_bitmap_is_empty")
 libxl_cpuid_policy_list = Builtin("cpuid_policy_list", dispose_fn="libxl_cpuid_dispose", passby=PASS_BY_REFERENCE,
-                                  check_default_fn="libxl__cpuid_policy_is_empty")
+                                  json_parse_type="JSON_ARRAY", check_default_fn="libxl__cpuid_policy_is_empty")
 
 libxl_string_list = Builtin("string_list", dispose_fn="libxl_string_list_dispose", passby=PASS_BY_REFERENCE,
-                            check_default_fn="libxl__string_list_is_empty")
+                            json_parse_type="JSON_ARRAY", check_default_fn="libxl__string_list_is_empty")
 libxl_key_value_list = Builtin("key_value_list", dispose_fn="libxl_key_value_list_dispose", passby=PASS_BY_REFERENCE,
-                               check_default_fn="libxl__key_value_list_is_empty")
-libxl_hwcap = Builtin("hwcap", passby=PASS_BY_REFERENCE,
+                               json_parse_type="JSON_MAP", check_default_fn="libxl__key_value_list_is_empty")
+libxl_hwcap = Builtin("hwcap", passby=PASS_BY_REFERENCE, json_parse_type="JSON_ARRAY",
                       check_default_fn="libxl__hwcap_is_default")
 libxl_ms_vm_genid = Builtin("ms_vm_genid", passby=PASS_BY_REFERENCE, check_default_fn="libxl_ms_vm_genid_is_zero")
 
@@ -591,7 +594,7 @@ libxl_event_type = Enumeration("event_type", [
 
 libxl_ev_user = UInt(64)
 
-libxl_ev_link = Builtin("ev_link", passby=PASS_BY_REFERENCE, private=True)
+libxl_ev_link = Builtin("ev_link", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE, private=True)
 
 libxl_event = Struct("event",[
     ("link",     libxl_ev_link),

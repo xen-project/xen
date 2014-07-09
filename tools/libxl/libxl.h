@@ -317,6 +317,20 @@
  *
  *    Generates a JSON object from "p" in the form of a NULL terminated
  *    string.
+ *
+ * <type *> libxl_<type>_from_json(const char *json)
+ * int      libxl_<type>_from_json(const char *json)
+ *
+ *    Parses "json" and returns:
+ *
+ *    an int value, if <type> is enumeration type. The value is the enum value
+ *    representing the respective string in "json".
+ *
+ *    an instance of <type>, if <type> is aggregate type. The returned
+ *    instance has its fields filled in by the parser according to "json".
+ *
+ *    If the parsing fails, caller cannot rely on the value / instance
+ *    returned.
  */
 #ifndef LIBXL_H
 #define LIBXL_H

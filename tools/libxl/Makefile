@@ -176,7 +176,7 @@ _libxl_save_msgs_helper.h _libxl_save_msgs_callout.h: \
 
 libxl.h: _libxl_types.h
 libxl_json.h: _libxl_types_json.h
-libxl_internal.h: _libxl_types_internal.h _paths.h
+libxl_internal.h: _libxl_types_internal.h _libxl_types_private.h _libxl_types_internal_private.h _paths.h
 libxl_internal_json.h: _libxl_types_internal_json.h
 xl.h: _paths.h
 
@@ -184,9 +184,11 @@ $(LIBXL_OBJS) $(LIBXL_TEST_OBJS) $(LIBXLU_OBJS) \
 	$(XL_OBJS) $(TEST_PROG_OBJS) $(SAVE_HELPER_OBJS): libxl.h
 $(LIBXL_OBJS) $(LIBXL_TEST_OBJS): libxl_internal.h
 
-_libxl_type%.h _libxl_type%_json.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
-	$(PYTHON) gentypes.py libxl_type$*.idl __libxl_type$*.h __libxl_type$*_json.h __libxl_type$*.c
+_libxl_type%.h _libxl_type%_json.h _libxl_type%_private.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
+	$(PYTHON) gentypes.py libxl_type$*.idl __libxl_type$*.h __libxl_type$*_private.h \
+		__libxl_type$*_json.h  __libxl_type$*.c
 	$(call move-if-changed,__libxl_type$*.h,_libxl_type$*.h)
+	$(call move-if-changed,__libxl_type$*_private.h,_libxl_type$*_private.h)
 	$(call move-if-changed,__libxl_type$*_json.h,_libxl_type$*_json.h)
 	$(call move-if-changed,__libxl_type$*.c,_libxl_type$*.c)
 
