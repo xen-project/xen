@@ -20,6 +20,63 @@
 
 #include <xen/bitops.h>
 
+struct pending_irq
+{
+    /*
+     * The following two states track the lifecycle of the guest irq.
+     * However because we are not sure and we don't want to track
+     * whether an irq added to an LR register is PENDING or ACTIVE, the
+     * following states are just an approximation.
+     *
+     * GIC_IRQ_GUEST_QUEUED: the irq is asserted and queued for
+     * injection into the guest's LRs.
+     *
+     * GIC_IRQ_GUEST_VISIBLE: the irq has been added to an LR register,
+     * therefore the guest is aware of it. From the guest point of view
+     * the irq can be pending (if the guest has not acked the irq yet)
+     * or active (after acking the irq).
+     *
+     * In order for the state machine to be fully accurate, for level
+     * interrupts, we should keep the interrupt's pending state until
+     * the guest deactivates the irq. However because we are not sure
+     * when that happens, we instead track whether there is an interrupt
+     * queued using GIC_IRQ_GUEST_QUEUED. We clear it when we add it to
+     * an LR register. We set it when we receive another interrupt
+     * notification.  Therefore it is possible to set
+     * GIC_IRQ_GUEST_QUEUED while the irq is GIC_IRQ_GUEST_VISIBLE. We
+     * could also change the state of the guest irq in the LR register
+     * from active to active and pending, but for simplicity we simply
+     * inject a second irq after the guest EOIs the first one.
+     *
+     *
+     * An additional state is used to keep track of whether the guest
+     * irq is enabled at the vgicd level:
+     *
+     * GIC_IRQ_GUEST_ENABLED: the guest IRQ is enabled at the VGICD
+     * level (GICD_ICENABLER/GICD_ISENABLER).
+     *
+     */
+#define GIC_IRQ_GUEST_QUEUED   0
+#define GIC_IRQ_GUEST_ACTIVE   1
+#define GIC_IRQ_GUEST_VISIBLE  2
+#define GIC_IRQ_GUEST_ENABLED  3
+    unsigned long status;
+    struct irq_desc *desc; /* only set it the irq corresponds to a physical irq */
+    int irq;
+#define GIC_INVALID_LR         ~(uint8_t)0
+    uint8_t lr;
+    uint8_t priority;
+    /* inflight is used to append instances of pending_irq to
+     * vgic.inflight_irqs */
+    struct list_head inflight;
+    /* lr_queue is used to append instances of pending_irq to
+     * lr_pending. lr_pending is a per vcpu queue, therefore lr_queue
+     * accesses are protected with the vgic lock.
+     * TODO: when implementing irq migration, taking only the current
+     * vgic lock is not going to be enough. */
+    struct list_head lr_queue;
+};
+
 /* Represents state corresponding to a block of 32 interrupts */
 struct vgic_irq_rank {
     spinlock_t lock; /* Covers access to all other members of this struct */
@@ -87,6 +144,7 @@ extern void domain_vgic_free(struct domain *d);
 extern int vcpu_vgic_init(struct vcpu *v);
 extern void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq);
 extern void vgic_clear_pending_irqs(struct vcpu *v);
+extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 
 extern int vcpu_vgic_free(struct vcpu *v);
 #endif /* __ASM_ARM_VGIC_H__ */

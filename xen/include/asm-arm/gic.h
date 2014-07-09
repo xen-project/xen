@@ -143,6 +143,7 @@
 #ifndef __ASSEMBLY__
 #include <xen/device_tree.h>
 #include <xen/irq.h>
+#include <asm-arm/vgic.h>
 
 #define DT_COMPAT_GIC_CORTEX_A15     "arm,cortex-a15-gic"
 #define DT_COMPAT_GIC_CORTEX_A7      "arm,cortex-a7-gic"
@@ -188,7 +189,6 @@ enum gic_version {
 };
 
 extern enum gic_version gic_hw_version(void);
-extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 
 /* Program the GIC to route an interrupt */
 extern void gic_route_irq_to_xen(struct irq_desc *desc, const cpumask_t *cpu_mask,
