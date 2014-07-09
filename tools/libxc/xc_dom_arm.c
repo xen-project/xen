@@ -30,6 +30,13 @@
 #define CONSOLE_PFN_OFFSET 0
 #define XENSTORE_PFN_OFFSET 1
 
+#define LPAE_SHIFT 9
+
+#define PFN_4K_SHIFT  (0)
+#define PFN_2M_SHIFT  (PFN_4K_SHIFT+LPAE_SHIFT)
+#define PFN_1G_SHIFT  (PFN_2M_SHIFT+LPAE_SHIFT)
+#define PFN_512G_SHIFT (PFN_1G_SHIFT+LPAE_SHIFT)
+
 /* get guest IO ABI protocol */
 const char *xc_domain_get_native_protocol(xc_interface *xch,
                                           uint32_t domid)
@@ -249,11 +256,72 @@ static int set_mode(xc_interface *xch, domid_t domid, char *guest_type)
     return rc;
 }
 
+/*  >0: success, *nr_pfns set to number actually populated
+ *   0: didn't try with this pfn shift (e.g. misaligned base etc)
+ *  <0: ERROR
+ */
+static int populate_one_size(struct xc_dom_image *dom, int pfn_shift,
+                             xen_pfn_t base_pfn, xen_pfn_t *nr_pfns,
+                             xen_pfn_t *extents)
+{
+    /* The mask for this level */
+    const uint64_t mask = ((uint64_t)1<<(pfn_shift))-1;
+    /* The shift, mask and next boundary for the level above this one */
+    const int next_shift = pfn_shift + LPAE_SHIFT;
+    const uint64_t next_mask = ((uint64_t)1<<next_shift)-1;
+    const xen_pfn_t next_boundary
+        = (base_pfn + ((uint64_t)1<<next_shift)) & ~next_mask;
+
+    int nr, i, count;
+    xen_pfn_t end_pfn = base_pfn + *nr_pfns;
+
+    /* No level zero super pages with current hardware */
+    if ( pfn_shift == PFN_512G_SHIFT )
+        return 0;
+
+    /* base is misaligned for this level */
+    if ( mask & base_pfn )
+        return 0;
+
+    /*
+     * If base is not aligned at the next level up then try and make
+     * it so for next time around.
+     */
+    if ( (base_pfn & next_mask) && end_pfn > next_boundary )
+        end_pfn = next_boundary;
+
+    count = ( end_pfn - base_pfn ) >> pfn_shift;
+
+    /* Nothing to allocate */
+    if ( !count )
+        return 0;
+
+    for ( i = 0 ; i < count ; i ++ )
+        extents[i] = base_pfn + (i<<pfn_shift);
+
+    nr = xc_domain_populate_physmap(dom->xch, dom->guest_domid, count,
+                                    pfn_shift, 0, extents);
+    if ( nr <= 0 ) return nr;
+    DOMPRINTF("%s: populated %#x/%#x entries with shift %d",
+              __FUNCTION__, nr, count, pfn_shift);
+
+    *nr_pfns = nr << pfn_shift;
+
+    return 1;
+}
+
 static int populate_guest_memory(struct xc_dom_image *dom,
                                  xen_pfn_t base_pfn, xen_pfn_t nr_pfns)
 {
-    int rc;
-    xen_pfn_t allocsz, pfn;
+    int rc = 0;
+    xen_pfn_t allocsz, pfn, *extents;
+
+    extents = calloc(1024*1024,sizeof(xen_pfn_t));
+    if ( extents == NULL )
+    {
+        DOMPRINTF("%s: Unable to allocate extent array", __FUNCTION__);
+        return -1;
+    }
 
     DOMPRINTF("%s: populating RAM @ %016"PRIx64"-%016"PRIx64" (%"PRId64"MB)",
               __FUNCTION__,
@@ -261,21 +329,56 @@ static int populate_guest_memory(struct xc_dom_image *dom,
               (uint64_t)(base_pfn + nr_pfns) << XC_PAGE_SHIFT,
               (uint64_t)nr_pfns >> (20-XC_PAGE_SHIFT));
 
+    for ( pfn = 0; pfn < nr_pfns; pfn += allocsz )
+    {
+        allocsz = min_t(int, 1024*1024, nr_pfns - pfn);
+#if 0 /* Enable this to exercise/debug the code which tries to realign
+       * to a superpage boundary, by misaligning at the start. */
+        if ( pfn == 0 )
+        {
+            allocsz = 1;
+            rc = populate_one_size(dom, PFN_4K_SHIFT,
+                                   base_pfn + pfn, &allocsz, extents);
+            if (rc < 0) break;
+            if (rc > 0) continue;
+            /* Failed to allocate a single page? */
+            break;
+        }
+#endif
+
+        rc = populate_one_size(dom, PFN_512G_SHIFT,
+                               base_pfn + pfn, &allocsz, extents);
+        if ( rc < 0 ) break;
+        if ( rc > 0 ) continue;
+
+        rc = populate_one_size(dom, PFN_1G_SHIFT,
+                               base_pfn + pfn, &allocsz, extents);
+        if ( rc < 0 ) break;
+        if ( rc > 0 ) continue;
+
+        rc = populate_one_size(dom, PFN_2M_SHIFT,
+                               base_pfn + pfn, &allocsz, extents);
+        if ( rc < 0 ) break;
+        if ( rc > 0 ) continue;
+
+        rc = populate_one_size(dom, PFN_4K_SHIFT,
+                               base_pfn + pfn, &allocsz, extents);
+        if ( rc < 0 ) break;
+        if ( rc == 0 )
+        {
+            DOMPRINTF("%s: Not enough RAM", __FUNCTION__);
+            errno = ENOMEM;
+            rc = -1;
+            goto out;
+        }
+    }
+
     for ( pfn = 0; pfn < nr_pfns; pfn++ )
         dom->p2m_host[pfn] = base_pfn + pfn;
 
-    for ( pfn = rc = allocsz = 0; (pfn < nr_pfns) && !rc; pfn += allocsz )
-    {
-        allocsz = nr_pfns - pfn;
-        if ( allocsz > 1024*1024 )
-            allocsz = 1024*1024;
-
-        rc = xc_domain_populate_physmap_exact(
-            dom->xch, dom->guest_domid, allocsz,
-            0, 0, &dom->p2m_host[pfn]);
-    }
-
-    return rc;
+out:
+    free(extents);
+    return rc < 0 ? rc : 0;
 }
 
 int arch_setup_meminit(struct xc_dom_image *dom)
