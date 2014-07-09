@@ -747,12 +747,6 @@ int domain_relinquish_resources(struct domain *d)
 
 void arch_dump_domain_info(struct domain *d)
 {
-    struct vcpu *v;
-
-    for_each_vcpu ( d, v )
-    {
-        gic_dump_info(v);
-    }
 }
 
 
@@ -775,6 +769,7 @@ long arch_do_vcpu_op(int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 void arch_dump_vcpu_info(struct vcpu *v)
 {
+    gic_dump_info(v);
 }
 
 void vcpu_mark_events_pending(struct vcpu *v)
