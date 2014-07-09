@@ -45,6 +45,13 @@ custom_param("dom0_mem", parse_dom0_mem);
 # define DPRINT(fmt, args...) do {} while ( 0 )
 #endif
 
+//#define DEBUG_11_ALLOCATION
+#ifdef DEBUG_11_ALLOCATION
+# define D11PRINT(fmt, args...) printk(XENLOG_DEBUG fmt, ##args)
+#else
+# define D11PRINT(fmt, args...) do {} while ( 0 )
+#endif
+
 /*
  * Amount of extra space required to dom0's device tree.  No new nodes
  * are added (yet) but one terminating reserve map entry (16 bytes) is
@@ -67,39 +74,276 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
     return alloc_vcpu(dom0, 0, 0);
 }
 
-static void allocate_memory_11(struct domain *d, struct kernel_info *kinfo)
+static unsigned int get_11_allocation_size(paddr_t size)
 {
-    paddr_t start;
-    paddr_t size;
-    struct page_info *pg;
-    unsigned int order = get_order_from_bytes(dom0_mem);
-    int res;
-    paddr_t spfn;
+    /*
+     * get_order_from_bytes returns the order greater than or equal to
+     * the given size, but we need less than or equal. Adding one to
+     * the size pushes an evenly aligned size into the next order, so
+     * we can then unconditionally subtract 1 from the order which is
+     * returned.
+     */
+    return get_order_from_bytes(size + 1) - 1;
+}
 
-    if ( is_32bit_domain(d) )
-        pg = alloc_domheap_pages(d, order, MEMF_bits(32));
-    else
-        pg = alloc_domheap_pages(d, order, 0);
-    if ( !pg )
-        panic("Failed to allocate contiguous memory for dom0");
+/*
+ * Insert the given pages into a memory bank, banks are ordered by address.
+ *
+ * Returns false if the memory would be below bank 0 or we have run
+ * out of banks. In this case it will free the pages.
+ */
+static bool_t insert_11_bank(struct domain *d,
+                             struct kernel_info *kinfo,
+                             struct page_info *pg,
+                             unsigned int order)
+{
+    int res, i;
+    paddr_t spfn;
+    paddr_t start, size;
 
     spfn = page_to_mfn(pg);
     start = pfn_to_paddr(spfn);
     size = pfn_to_paddr((1 << order));
 
-    // 1:1 mapping
-    printk("Populate P2M %#"PRIx64"->%#"PRIx64" (1:1 mapping for dom0)\n",
-           start, start + size);
+    D11PRINT("Allocated %#"PRIpaddr"-%#"PRIpaddr" (%ldMB/%ldMB, order %d)\n",
+             start, start + size,
+             1UL << (order+PAGE_SHIFT-20),
+             /* Don't want format this as PRIpaddr (16 digit hex) */
+             (unsigned long)(kinfo->unassigned_mem >> 20),
+             order);
+
+    if ( kinfo->mem.nr_banks > 0 &&
+         size < MB(128) &&
+         start + size < kinfo->mem.bank[0].start )
+    {
+        D11PRINT("Allocation below bank 0 is too small, not using\n");
+        goto fail;
+    }
+
     res = guest_physmap_add_page(d, spfn, spfn, order);
-
     if ( res )
-        panic("Unable to add pages in DOM0: %d", res);
-
-    kinfo->mem.bank[0].start = start;
-    kinfo->mem.bank[0].size = size;
-    kinfo->mem.nr_banks = 1;
+        panic("Failed map pages to DOM0: %d", res);
 
     kinfo->unassigned_mem -= size;
+
+    if ( kinfo->mem.nr_banks == 0 )
+    {
+        kinfo->mem.bank[0].start = start;
+        kinfo->mem.bank[0].size = size;
+        kinfo->mem.nr_banks = 1;
+        return true;
+    }
+
+    for( i = 0; i < kinfo->mem.nr_banks; i++ )
+    {
+        struct membank *bank = &kinfo->mem.bank[i];
+
+        /* If possible merge new memory into the start of the bank */
+        if ( bank->start == start+size )
+        {
+            bank->start = start;
+            bank->size += size;
+            return true;
+        }
+
+        /* If possible merge new memory onto the end of the bank */
+        if ( start == bank->start + bank->size )
+        {
+            bank->size += size;
+            return true;
+        }
+
+        /*
+         * Otherwise if it is below this bank insert new memory in a
+         * new bank before this one. If there was a lower bank we
+         * could have inserted the memory into/before we would already
+         * have done so, so this must be the right place.
+         */
+        if ( start + size < bank->start && kinfo->mem.nr_banks < NR_MEM_BANKS )
+        {
+            memmove(bank + 1, bank, sizeof(*bank)*(kinfo->mem.nr_banks - i));
+            kinfo->mem.nr_banks++;
+            bank->start = start;
+            bank->size = size;
+            return true;
+        }
+    }
+
+    if ( i == kinfo->mem.nr_banks && kinfo->mem.nr_banks < NR_MEM_BANKS )
+    {
+        struct membank *bank = &kinfo->mem.bank[kinfo->mem.nr_banks];
+
+        bank->start = start;
+        bank->size = size;
+        kinfo->mem.nr_banks++;
+        return true;
+    }
+
+    /* If we get here then there are no more banks to fill. */
+
+fail:
+    free_domheap_pages(pg, order);
+    return false;
+}
+
+/*
+ * This is all pretty horrible.
+ *
+ * Requirements:
+ *
+ * 1. The dom0 kernel should be loaded within the first 128MB of RAM. This
+ *    is necessary at least for Linux zImage kernels, which are all we
+ *    support today.
+ * 2. We want to put the dom0 kernel, ramdisk and DTB in the same
+ *    bank. Partly this is just easier for us to deal with, but also
+ *    the ramdisk and DTB must be placed within a certain proximity of
+ *    the kernel within RAM.
+ * 3. For 32-bit dom0 we want to place as much of the RAM as we
+ *    reasonably can below 4GB, so that it can be used by non-LPAE
+ *    enabled kernels.
+ * 4. For 32-bit dom0 the kernel must be located below 4GB.
+ * 5. We want to have a few largers banks rather than many smaller ones.
+ *
+ * For the first two requirements we need to make sure that the lowest
+ * bank is sufficiently large.
+ *
+ * For convenience we also sort the banks by physical address.
+ *
+ * The memory allocator does not really give us the flexibility to
+ * meet these requirements directly. So instead of proceed as follows:
+ *
+ * We first allocate the largest allocation we can as low as we
+ * can. This then becomes the first bank. This bank must be at least
+ * 128MB (or dom0_mem if that is smaller).
+ *
+ * Then we start allocating more memory, trying to allocate the
+ * largest possible size and trying smaller sizes until we
+ * successfully allocate something.
+ *
+ * We then try and insert this memory in to the list of banks. If it
+ * can be merged into an existing bank then this is trivial.
+ *
+ * If the new memory is before the first bank (and cannot be merged into it)
+ * and is at least 128M then we allow it, otherwise we give up. Since the
+ * allocator prefers to allocate high addresses first and the first bank has
+ * already been allocated to be as low as possible this likely means we
+ * wouldn't have been able to allocate much more memory anyway.
+ *
+ * Otherwise we insert a new bank. If we've reached MAX_NR_BANKS then
+ * we give up.
+ *
+ * For 32-bit domain we require that the initial allocation for the
+ * first bank is under 4G. Then for the subsequent allocations we
+ * initially allocate memory only from below 4GB. Once that runs out
+ * (as described above) we allow higher allocations and continue until
+ * that runs out (or we have allocated sufficient dom0 memory).
+ */
+static void allocate_memory_11(struct domain *d, struct kernel_info *kinfo)
+{
+    const unsigned int min_low_order =
+        get_order_from_bytes(min_t(paddr_t, dom0_mem, MB(128)));
+    const unsigned int min_order = get_order_from_bytes(MB(4));
+    struct page_info *pg;
+    unsigned int order = get_11_allocation_size(kinfo->unassigned_mem);
+    int i;
+
+    bool_t lowmem = is_32bit_domain(d);
+    unsigned int bits;
+
+    printk("Allocating 1:1 mappings totalling %ldMB for dom0:\n",
+           /* Don't want format this as PRIpaddr (16 digit hex) */
+           (unsigned long)(kinfo->unassigned_mem >> 20));
+
+    kinfo->mem.nr_banks = 0;
+
+    /*
+     * First try and allocate the largest thing we can as low as
+     * possible to be bank 0.
+     */
+    while ( order >= min_low_order )
+    {
+        for ( bits = order ; bits <= (lowmem ? 32 : PADDR_BITS); bits++ )
+        {
+            pg = alloc_domheap_pages(d, order, MEMF_bits(bits));
+            if ( pg != NULL )
+                goto got_bank0;
+        }
+        order--;
+    }
+
+    panic("Unable to allocate first memory bank");
+
+ got_bank0:
+
+    if ( !insert_11_bank(d, kinfo, pg, order) )
+        BUG(); /* Cannot fail for first bank */
+
+    /* Now allocate more memory and fill in additional banks */
+
+    order = get_11_allocation_size(kinfo->unassigned_mem);
+    while ( kinfo->unassigned_mem && kinfo->mem.nr_banks < NR_MEM_BANKS )
+    {
+        pg = alloc_domheap_pages(d, order, lowmem ? MEMF_bits(32) : 0);
+        if ( !pg )
+        {
+            order --;
+
+            if ( lowmem && order < min_low_order)
+            {
+                D11PRINT("Failed at min_low_order, allow high allocations\n");
+                order = get_11_allocation_size(kinfo->unassigned_mem);
+                lowmem = false;
+                continue;
+            }
+            if ( order >= min_order )
+                continue;
+
+            /* No more we can do */
+            break;
+        }
+
+        if ( !insert_11_bank(d, kinfo, pg, order) )
+        {
+            if ( kinfo->mem.nr_banks == NR_MEM_BANKS )
+                /* Nothing more we can do. */
+                break;
+
+            if ( lowmem )
+            {
+                D11PRINT("Allocation below bank 0, allow high allocations\n");
+                order = get_11_allocation_size(kinfo->unassigned_mem);
+                lowmem = false;
+                continue;
+            }
+            else
+            {
+                D11PRINT("Allocation below bank 0\n");
+                break;
+            }
+        }
+
+        /*
+         * Success, next time around try again to get the largest order
+         * allocation possible.
+         */
+        order = get_11_allocation_size(kinfo->unassigned_mem);
+    }
+
+    if ( kinfo->unassigned_mem )
+        printk("WARNING: Failed to allocate requested dom0 memory."
+               /* Don't want format this as PRIpaddr (16 digit hex) */
+               " %ldMB unallocated\n",
+               (unsigned long)kinfo->unassigned_mem >> 20);
+
+    for( i = 0; i < kinfo->mem.nr_banks; i++ )
+    {
+        printk("BANK[%d] %#"PRIpaddr"-%#"PRIpaddr" (%ldMB)\n",
+               i,
+               kinfo->mem.bank[i].start,
+               kinfo->mem.bank[i].start + kinfo->mem.bank[i].size,
+               /* Don't want format this as PRIpaddr (16 digit hex) */
+               (unsigned long)(kinfo->mem.bank[i].size >> 20));
+    }
 }
 
 static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
