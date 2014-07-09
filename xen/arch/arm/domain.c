@@ -761,6 +761,7 @@ int domain_relinquish_resources(struct domain *d)
 
 void arch_dump_domain_info(struct domain *d)
 {
+    p2m_dump_info(d);
 }
 
 

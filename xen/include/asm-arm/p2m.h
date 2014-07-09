@@ -29,6 +29,15 @@ struct p2m_domain {
      * resume the search. Apart from during teardown this can only
      * decrease. */
     unsigned long lowest_mapped_gfn;
+
+    /* Gather some statistics for information purposes only */
+    struct {
+        /* Number of mappings at each p2m tree level */
+        unsigned long mappings[4];
+        /* Number of times we have shattered a mapping
+         * at each p2m tree level. */
+        unsigned long shattered[4];
+    } stats;
 };
 
 /* List of possible type for each page in the p2m entry.
@@ -78,6 +87,9 @@ int p2m_alloc_table(struct domain *d);
 /* Context switch */
 void p2m_save_state(struct vcpu *p);
 void p2m_restore_state(struct vcpu *n);
+
+/* Print debugging/statistial info about a domain's p2m */
+void p2m_dump_info(struct domain *d);
 
 /* Look up the MFN corresponding to a domain's PFN. */
 paddr_t p2m_lookup(struct domain *d, paddr_t gpfn, p2m_type_t *t);
