@@ -405,22 +405,6 @@ static void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
     }
 }
 
-static inline int is_vcpu_running(struct domain *d, int vcpuid)
-{
-    struct vcpu *v;
-
-    if ( vcpuid >= d->max_vcpus )
-        return 0;
-
-    v = d->vcpu[vcpuid];
-    if ( v == NULL )
-        return 0;
-    if (test_bit(_VPF_down, &v->pause_flags) )
-        return 0;
-
-    return 1;
-}
-
 static int vgic_to_sgi(struct vcpu *v, register_t sgir)
 {
     struct domain *d = v->domain;
@@ -444,7 +428,8 @@ static int vgic_to_sgi(struct vcpu *v, register_t sgir)
         case GICD_SGI_TARGET_OTHERS:
             for ( i = 0; i < d->max_vcpus; i++ )
             {
-                if ( i != current->vcpu_id && is_vcpu_running(d, i) )
+                if ( i != current->vcpu_id && d->vcpu[i] != NULL &&
+                     is_vcpu_online(d->vcpu[i]) )
                     set_bit(i, &vcpu_mask);
             }
             break;
@@ -459,7 +444,7 @@ static int vgic_to_sgi(struct vcpu *v, register_t sgir)
 
     for_each_set_bit( vcpuid, &vcpu_mask, d->max_vcpus )
     {
-        if ( !is_vcpu_running(d, vcpuid) )
+        if ( d->vcpu[vcpuid] != NULL && !is_vcpu_online(d->vcpu[vcpuid]) )
         {
             gdprintk(XENLOG_WARNING, "vGICD: GICD_SGIR write r=%"PRIregister" vcpu_mask=%lx, wrong CPUTargetList\n",
                      sgir, vcpu_mask);
