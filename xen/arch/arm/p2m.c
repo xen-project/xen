@@ -299,6 +299,23 @@ enum p2m_operation {
     CACHEFLUSH,
 };
 
+static void p2m_put_page(const lpae_t pte)
+{
+    /* TODO: Handle other p2m types
+     *
+     * It's safe to do the put_page here because page_alloc will
+     * flush the TLBs if the page is reallocated before the end of
+     * this loop.
+     */
+    if ( p2m_is_foreign(pte.p2m.type) )
+    {
+        unsigned long mfn = pte.p2m.base;
+
+        ASSERT(mfn_valid(mfn));
+        put_page(mfn_to_page(mfn));
+    }
+}
+
 static int apply_p2m_changes(struct domain *d,
                      enum p2m_operation op,
                      paddr_t start_gpaddr,
@@ -400,20 +417,6 @@ static int apply_p2m_changes(struct domain *d,
 
         flush |= pte.p2m.valid;
 
-        /* TODO: Handle other p2m type
-         *
-         * It's safe to do the put_page here because page_alloc will
-         * flush the TLBs if the page is reallocated before the end of
-         * this loop.
-         */
-        if ( pte.p2m.valid && p2m_is_foreign(pte.p2m.type) )
-        {
-            unsigned long mfn = pte.p2m.base;
-
-            ASSERT(mfn_valid(mfn));
-            put_page(mfn_to_page(mfn));
-        }
-
         switch (op) {
             case ALLOCATE:
                 {
@@ -436,6 +439,8 @@ static int apply_p2m_changes(struct domain *d,
                 break;
             case INSERT:
                 {
+                    if ( pte.p2m.valid )
+                        p2m_put_page(pte);
                     pte = mfn_to_p2m_entry(maddr >> PAGE_SHIFT, mattr, t);
                     p2m_write_pte(&third[third_table_offset(addr)],
                                   pte, flush_pt);
@@ -450,6 +455,8 @@ static int apply_p2m_changes(struct domain *d,
                         count++;
                         break;
                     }
+
+                    p2m_put_page(pte);
 
                     count += 0x10;
 
