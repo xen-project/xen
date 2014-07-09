@@ -3,7 +3,7 @@ hidden(True)
 
 libxl_domid = Builtin("domid", namespace="libxl_", json_gen_fn = "yajl_gen_integer",
 		      json_parse_fn = "libxl__uint32_parse_json", json_parse_type = "JSON_INTEGER",
-		      autogenerate_json = False)
+		      autogenerate_json = False, copy_fn = None)
 
 libxl__qmp_message_type = Enumeration("qmp_message_type", [
     (1, "QMP"),

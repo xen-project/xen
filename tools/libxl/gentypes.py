@@ -100,6 +100,61 @@ def libxl_C_type_dispose(ty, v, indent = "    ", parent = None):
         s = indent + s
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
+def libxl_C_type_copy(ty, v, w, indent = "    ", vparent = None, wparent = None):
+    s = ""
+
+    if vparent is None:
+        s += "GC_INIT(ctx);\n";
+
+    if isinstance(ty, idl.KeyedUnion):
+        if vparent is None or wparent is None:
+            raise Exception("KeyedUnion type must have a parent")
+        s += "%s = %s;\n" % ((vparent + ty.keyvar.name), (wparent + ty.keyvar.name))
+        s += "switch (%s) {\n" % (wparent + ty.keyvar.name)
+        for f in ty.fields:
+            (vnparent,vfexpr) = ty.member(v, f, vparent is None)
+            (wnparent,wfexpr) = ty.member(w, f, wparent is None)
+            s += "case %s:\n" % f.enumname
+            if f.type is not None:
+                s += libxl_C_type_copy(f.type, vfexpr, wfexpr, indent + "    ",
+                                       vnparent, wnparent)
+            s += "    break;\n"
+        s += "}\n"
+    elif isinstance(ty, idl.Array):
+        if vparent is None or wparent is None:
+            raise Exception("Array type must have a parent")
+        s += "%s = libxl__calloc(NOGC, %s, sizeof(*%s));\n" % (ty.pass_arg(v, vparent is None),
+                                                               (wparent + ty.lenvar.name),
+                                                               ty.pass_arg(w, wparent is None))
+        s += "%s = %s;\n" % ((vparent + ty.lenvar.name), (wparent + ty.lenvar.name))
+        s += "{\n"
+        s += "    int i;\n"
+        s += "    for (i=0; i<%s; i++)\n" % (wparent + ty.lenvar.name)
+        s += libxl_C_type_copy(ty.elem_type, v+"[i]", w+"[i]",
+                               indent + "        ", vparent, wparent)
+        s += "}\n"
+    elif isinstance(ty, idl.Struct) and ((vparent is None and wparent is None) or ty.copy_fn is None):
+        for f in [f for f in ty.fields if not f.const and not f.type.private]:
+            (vnparent,vfexpr) = ty.member(v, f, vparent is None)
+            (wnparent,wfexpr) = ty.member(w, f, wparent is None)
+            s += libxl_C_type_copy(f.type, vfexpr, wfexpr, "", vnparent, wnparent)
+    else:
+        if ty.copy_fn is not None:
+            s += "%s(ctx, %s, %s);\n" % (ty.copy_fn,
+                                         ty.pass_arg(v, vparent is None, passby=idl.PASS_BY_REFERENCE),
+                                         ty.pass_arg(w, wparent is None, passby=idl.PASS_BY_REFERENCE))
+
+        else:
+            s += "%s = %s;\n" % (ty.pass_arg(v, vparent is None, passby=idl.PASS_BY_VALUE),
+                                 ty.pass_arg(w, wparent is None, passby=idl.PASS_BY_VALUE))
+
+    if vparent is None:
+        s += "GC_FREE;\n"
+
+    if s != "":
+        s = indent + s
+    return s.replace("\n", "\n%s" % indent).rstrip(indent)
+
 def libxl_init_members(ty, nesting = 0):
     """Returns a list of members of ty which require a separate init"""
 
@@ -489,6 +544,9 @@ if __name__ == '__main__':
         f.write(libxl_C_type_define(ty) + ";\n")
         if ty.dispose_fn is not None:
             f.write("%svoid %s(%s);\n" % (ty.hidden(), ty.dispose_fn, ty.make_arg("p")))
+        if ty.copy_fn is not None:
+            f.write("%svoid %s(libxl_ctx *ctx, %s, %s);\n" % (ty.hidden(), ty.copy_fn,
+                                              ty.make_arg("dst"), ty.make_arg("src")))
         if ty.init_fn is not None:
             f.write("%svoid %s(%s);\n" % (ty.hidden(), ty.init_fn, ty.make_arg("p")))
             for field in libxl_init_members(ty):
@@ -588,6 +646,15 @@ if __name__ == '__main__':
         f.write("{\n")
         f.write(libxl_C_type_dispose(ty, "p"))
         f.write("    memset(p, LIBXL_DTOR_POISON, sizeof(*p));\n")
+        f.write("}\n")
+        f.write("\n")
+
+    for ty in [t for t in types if t.copy_fn and t.autogenerate_copy_fn]:
+        f.write("void %s(libxl_ctx *ctx, %s, %s)\n" % (ty.copy_fn,
+                                       ty.make_arg("dst", passby=idl.PASS_BY_REFERENCE),
+                                       ty.make_arg("src", passby=idl.PASS_BY_REFERENCE)))
+        f.write("{\n")
+        f.write(libxl_C_type_copy(ty, "dst", "src"))
         f.write("}\n")
         f.write("\n")
         

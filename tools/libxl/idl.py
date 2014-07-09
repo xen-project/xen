@@ -60,6 +60,13 @@ class Type(object):
 
         self.autogenerate_dispose_fn = kwargs.setdefault('autogenerate_dispose_fn', True)
 
+        if self.typename is not None:
+            self.copy_fn = kwargs.setdefault('copy_fn', self.typename + "_copy")
+        else:
+            self.copy_fn = kwargs.setdefault('copy_fn', None)
+
+        self.autogenerate_copy_fn = kwargs.setdefault('autogenerate_copy_fn', True)
+
         self.init_fn = kwargs.setdefault('init_fn', None)
         self.init_val = kwargs.setdefault('init_val', None)
         self.autogenerate_init_fn = kwargs.setdefault('autogenerate_init_fn', False)
@@ -128,6 +135,7 @@ class Number(Builtin):
     def __init__(self, ctype, **kwargs):
         kwargs.setdefault('namespace', None)
         kwargs.setdefault('dispose_fn', None)
+        kwargs.setdefault('copy_fn', None)
         kwargs.setdefault('signed', False)
         kwargs.setdefault('json_gen_fn', "yajl_gen_integer")
         kwargs.setdefault('json_parse_type', "JSON_INTEGER")
@@ -141,6 +149,7 @@ class UInt(Number):
         kwargs.setdefault('namespace', None)
         kwargs.setdefault('dispose_fn', None)
         kwargs.setdefault('json_parse_fn', "libxl__uint%d_parse_json" % w)
+        kwargs.setdefault('copy_fn', None)
         Number.__init__(self, "uint%d_t" % w, **kwargs)
 
         self.width = w
@@ -157,6 +166,7 @@ class EnumerationValue(object):
 class Enumeration(Type):
     def __init__(self, typename, values, **kwargs):
         kwargs.setdefault('dispose_fn', None)
+        kwargs.setdefault('copy_fn', None)
         kwargs.setdefault('json_parse_type', "JSON_STRING")
         Type.__init__(self, typename, **kwargs)
 
@@ -273,6 +283,7 @@ class KeyedUnion(Aggregate):
 
 void = Builtin("void *", namespace = None)
 bool = Builtin("bool", namespace = None,
+               copy_fn=None,
                json_gen_fn = "yajl_gen_bool",
                json_parse_type = "JSON_BOOL",
                json_parse_fn = "libxl__bool_parse_json",
@@ -287,7 +298,7 @@ uint16 = UInt(16)
 uint32 = UInt(32)
 uint64 = UInt(64, json_gen_fn = "libxl__uint64_gen_json")
 
-string = Builtin("char *", namespace = None, dispose_fn = "free",
+string = Builtin("char *", namespace = None, copy_fn = "libxl_string_copy", dispose_fn = "free",
                  json_gen_fn = "libxl__string_gen_json",
                  json_parse_type = "JSON_STRING | JSON_NULL",
                  json_parse_fn = "libxl__string_parse_json",
