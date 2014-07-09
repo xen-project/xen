@@ -5,19 +5,24 @@
 
 namespace("libxl_")
 
-libxl_defbool = Builtin("defbool", passby=PASS_BY_REFERENCE)
+libxl_defbool = Builtin("defbool", passby=PASS_BY_REFERENCE, check_default_fn="libxl__defbool_is_default")
 
 libxl_domid = Builtin("domid", json_gen_fn = "yajl_gen_integer", autogenerate_json = False)
 libxl_devid = Builtin("devid", json_gen_fn = "yajl_gen_integer", autogenerate_json = False, signed = True, init_val="-1")
-libxl_uuid = Builtin("uuid", passby=PASS_BY_REFERENCE)
-libxl_mac = Builtin("mac", passby=PASS_BY_REFERENCE)
-libxl_bitmap = Builtin("bitmap", dispose_fn="libxl_bitmap_dispose", passby=PASS_BY_REFERENCE)
-libxl_cpuid_policy_list = Builtin("cpuid_policy_list", dispose_fn="libxl_cpuid_dispose", passby=PASS_BY_REFERENCE)
+libxl_uuid = Builtin("uuid", passby=PASS_BY_REFERENCE, check_default_fn="libxl_uuid_is_nil")
+libxl_mac = Builtin("mac", passby=PASS_BY_REFERENCE, check_default_fn="libxl__mac_is_default")
+libxl_bitmap = Builtin("bitmap", dispose_fn="libxl_bitmap_dispose", passby=PASS_BY_REFERENCE,
+                       check_default_fn="libxl_bitmap_is_empty")
+libxl_cpuid_policy_list = Builtin("cpuid_policy_list", dispose_fn="libxl_cpuid_dispose", passby=PASS_BY_REFERENCE,
+                                  check_default_fn="libxl__cpuid_policy_is_empty")
 
-libxl_string_list = Builtin("string_list", dispose_fn="libxl_string_list_dispose", passby=PASS_BY_REFERENCE)
-libxl_key_value_list = Builtin("key_value_list", dispose_fn="libxl_key_value_list_dispose", passby=PASS_BY_REFERENCE)
-libxl_hwcap = Builtin("hwcap", passby=PASS_BY_REFERENCE)
-libxl_ms_vm_genid = Builtin("ms_vm_genid", passby=PASS_BY_REFERENCE)
+libxl_string_list = Builtin("string_list", dispose_fn="libxl_string_list_dispose", passby=PASS_BY_REFERENCE,
+                            check_default_fn="libxl__string_list_is_empty")
+libxl_key_value_list = Builtin("key_value_list", dispose_fn="libxl_key_value_list_dispose", passby=PASS_BY_REFERENCE,
+                               check_default_fn="libxl__key_value_list_is_empty")
+libxl_hwcap = Builtin("hwcap", passby=PASS_BY_REFERENCE,
+                      check_default_fn="libxl__hwcap_is_default")
+libxl_ms_vm_genid = Builtin("ms_vm_genid", passby=PASS_BY_REFERENCE, check_default_fn="libxl_ms_vm_genid_is_zero")
 
 #
 # Specific integer types
@@ -50,7 +55,7 @@ libxl_domain_type = Enumeration("domain_type", [
     (-1, "INVALID"),
     (1, "HVM"),
     (2, "PV"),
-    ], init_val = -1)
+    ], init_val = "LIBXL_DOMAIN_TYPE_INVALID")
 
 libxl_device_model_version = Enumeration("device_model_version", [
     (0, "UNKNOWN"),
@@ -96,7 +101,7 @@ libxl_action_on_shutdown = Enumeration("action_on_shutdown", [
 
     (5, "COREDUMP_DESTROY"),
     (6, "COREDUMP_RESTART"),
-    ], init_val = 1)
+    ], init_val = "LIBXL_ACTION_ON_SHUTDOWN_DESTROY")
 
 libxl_trigger = Enumeration("trigger", [
     (0, "UNKNOWN"),
@@ -155,7 +160,7 @@ libxl_vga_interface_type = Enumeration("vga_interface_type", [
     (1, "CIRRUS"),
     (2, "STD"),
     (3, "NONE"),
-    ], init_val = 1)
+    ], init_val = "LIBXL_VGA_INTERFACE_TYPE_CIRRUS")
 
 libxl_vendor_device = Enumeration("vendor_device", [
     (0, "NONE"),

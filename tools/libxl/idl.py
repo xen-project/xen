@@ -64,6 +64,8 @@ class Type(object):
         self.init_val = kwargs.setdefault('init_val', None)
         self.autogenerate_init_fn = kwargs.setdefault('autogenerate_init_fn', False)
 
+        self.check_default_fn = kwargs.setdefault('check_default_fn', None)
+
         if self.typename is not None and not self.private:
             self.json_gen_fn = kwargs.setdefault('json_gen_fn', self.typename + "_gen_json")
         else:

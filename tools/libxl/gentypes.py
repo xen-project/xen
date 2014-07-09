@@ -206,6 +206,29 @@ def libxl_C_type_gen_map_key(f, parent, indent = ""):
         s = indent + s
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
+def get_init_val(f):
+    if f.init_val is not None:
+        return f.init_val
+    elif f.type.init_val is not None:
+        return f.type.init_val
+    return None
+
+def get_default_expr(f, nparent, fexpr):
+    if isinstance(f.type, idl.Aggregate):
+        return "1 /* always generate JSON output for aggregate type */"
+
+    if isinstance(f.type, idl.Array):
+        return "%s && %s" % (fexpr, nparent + f.type.lenvar.name)
+
+    init_val = get_init_val(f)
+    if init_val is not None:
+        return "%s != %s" % (fexpr, init_val)
+
+    if f.type.check_default_fn:
+        return "!%s(&%s)" % (f.type.check_default_fn, fexpr)
+
+    return "%s" % fexpr
+
 def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
     s = ""
     if parent is None:
@@ -255,8 +278,14 @@ def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
         s += "    goto out;\n"
         for f in [f for f in ty.fields if not f.const and not f.type.private]:
             (nparent,fexpr) = ty.member(v, f, parent is None)
-            s += libxl_C_type_gen_map_key(f, nparent)
-            s += libxl_C_type_gen_json(f.type, fexpr, "", nparent)
+            default_expr = get_default_expr(f, nparent, fexpr)
+            s += "if (%s) {\n" % default_expr
+
+            s += libxl_C_type_gen_map_key(f, nparent, "    ")
+            s += libxl_C_type_gen_json(f.type, fexpr, "    ", nparent)
+
+            s += "}\n"
+
         s += "s = yajl_gen_map_close(hand);\n"
         s += "if (s != yajl_gen_status_ok)\n"
         s += "    goto out;\n"
