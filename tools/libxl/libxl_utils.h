@@ -76,6 +76,8 @@ int libxl_devid_to_device_vtpm(libxl_ctx *ctx, uint32_t domid,
 int libxl_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *bitmap, int n_bits);
     /* Allocated bimap is from malloc, libxl_bitmap_dispose() to be
      * called by the application when done. */
+void libxl_bitmap_copy_alloc(libxl_ctx *ctx, libxl_bitmap *dptr,
+                             const libxl_bitmap *sptr);
 void libxl_bitmap_copy(libxl_ctx *ctx, libxl_bitmap *dptr,
                        const libxl_bitmap *sptr);
 int libxl_bitmap_is_full(const libxl_bitmap *bitmap);
@@ -145,6 +147,8 @@ int libxl_cpumap_to_nodemap(libxl_ctx *ctx,
  static inline uint32_t libxl__sizekb_to_mb(uint32_t s) {
     return (s + 1023) / 1024;
 }
+
+void libxl_string_copy(libxl_ctx *ctx, char **dst, char **src);
 
 #endif
 

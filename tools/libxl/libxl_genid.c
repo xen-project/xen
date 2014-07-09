@@ -51,6 +51,12 @@ bool libxl_ms_vm_genid_is_zero(const libxl_ms_vm_genid *id)
     return memcmp(id->bytes, zero.bytes, LIBXL_MS_VM_GENID_LEN) == 0;
 }
 
+void libxl_ms_vm_genid_copy(libxl_ctx *ctx, libxl_ms_vm_genid *dst,
+                            libxl_ms_vm_genid *src)
+{
+    memcpy(dst, src, LIBXL_MS_VM_GENID_LEN);
+}
+
 int libxl__ms_vm_genid_set(libxl__gc *gc, uint32_t domid,
                            const libxl_ms_vm_genid *id)
 {

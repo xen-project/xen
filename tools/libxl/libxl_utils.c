@@ -614,6 +614,19 @@ void libxl_bitmap_copy(libxl_ctx *ctx, libxl_bitmap *dptr,
     memcpy(dptr->map, sptr->map, sz * sizeof(*dptr->map));
 }
 
+void libxl_bitmap_copy_alloc(libxl_ctx *ctx,
+                             libxl_bitmap *dptr,
+                             const libxl_bitmap *sptr)
+{
+    GC_INIT(ctx);
+
+    dptr->map = libxl__calloc(NOGC, sptr->size, sizeof(*sptr->map));
+    dptr->size = sptr->size;
+    memcpy(dptr->map, sptr->map, sptr->size * sizeof(*sptr->map));
+
+    GC_FREE;
+}
+
 int libxl_bitmap_is_full(const libxl_bitmap *bitmap)
 {
     int i;
@@ -1011,6 +1024,18 @@ int libxl_domid_valid_guest(uint32_t domid)
     /* returns 1 if the value _could_ be a valid guest domid, 0 otherwise
      * does not check whether the domain actually exists */
     return domid > 0 && domid < DOMID_FIRST_RESERVED;
+}
+
+void libxl_string_copy(libxl_ctx *ctx, char **dst, char **src)
+{
+    GC_INIT(ctx);
+
+    if (*src)
+        *dst = libxl__strdup(NOGC, *src);
+    else
+        *dst = NULL;
+
+    GC_FREE;
 }
 
 /*

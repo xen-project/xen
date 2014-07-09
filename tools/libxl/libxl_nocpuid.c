@@ -56,6 +56,12 @@ int libxl__cpuid_policy_list_parse_json(libxl__gc *gc,
     return 0;
 }
 
+void libxl_cpuid_policy_list_copy(libxl_ctx *ctx,
+                                  libxl_cpuid_policy_list *dst,
+                                  libxl_cpuid_policy_list *src)
+{
+}
+
 /*
  * Local variables:
  * mode: C

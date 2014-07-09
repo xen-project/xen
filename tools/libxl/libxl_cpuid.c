@@ -473,6 +473,39 @@ int libxl_cpuid_policy_list_length(libxl_cpuid_policy_list *pl)
     return i;
 }
 
+void libxl_cpuid_policy_list_copy(libxl_ctx *ctx,
+                                  libxl_cpuid_policy_list *dst,
+                                  libxl_cpuid_policy_list *src)
+{
+    GC_INIT(ctx);
+    int i, j, len;
+
+    if (*src == NULL) {
+        *dst = NULL;
+        goto out;
+    }
+
+    len = libxl_cpuid_policy_list_length(src);
+    /* one extra slot for sentinel */
+    *dst = libxl__calloc(NOGC, len + 1, sizeof(libxl_cpuid_policy));
+    (*dst)[len].input[0] = XEN_CPUID_INPUT_UNUSED;
+    (*dst)[len].input[1] = XEN_CPUID_INPUT_UNUSED;
+
+    for (i = 0; i < len; i++) {
+        for (j = 0; j < 2; j++)
+            (*dst)[i].input[j] = (*src)[i].input[j];
+        for (j = 0; j < 4; j++)
+            if ((*src)[i].policy[j])
+                (*dst)[i].policy[j] =
+                    libxl__strdup(NOGC, (*src)[i].policy[j]);
+            else
+                (*dst)[i].policy[j] = NULL;
+    }
+
+out:
+    GC_FREE;
+}
+
 /*
  * Local variables:
  * mode: C

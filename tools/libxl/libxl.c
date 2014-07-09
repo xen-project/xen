@@ -205,6 +205,29 @@ void libxl_string_list_dispose(libxl_string_list *psl)
     free(sl);
 }
 
+void libxl_string_list_copy(libxl_ctx *ctx,
+                            libxl_string_list *dst,
+                            libxl_string_list *src)
+{
+    GC_INIT(ctx);
+    int i, len;
+
+    if (!*src) {
+        *dst = NULL;
+        goto out;
+    }
+
+    len = libxl_string_list_length(src);
+    /* one extra slot for sentinel */
+    *dst = libxl__calloc(NOGC, len + 1, sizeof(char *));
+
+    for (i = 0; i < len; i++)
+        (*dst)[i] = libxl__strdup(NOGC, (*src)[i]);
+
+out:
+    GC_FREE;
+}
+
 int libxl_string_list_length(const libxl_string_list *psl)
 {
     int i = 0;
@@ -243,6 +266,34 @@ void libxl_key_value_list_dispose(libxl_key_value_list *pkvl)
             free(kvl[i + 1]);
     }
     free(kvl);
+}
+
+void libxl_key_value_list_copy(libxl_ctx *ctx,
+                               libxl_key_value_list *dst,
+                               libxl_key_value_list *src)
+{
+    GC_INIT(ctx);
+    int i, len;
+
+    if (*src == NULL) {
+        *dst = NULL;
+        goto out;
+    }
+
+    len = libxl_key_value_list_length(src);
+    /* one extra slot for sentinel */
+    *dst = libxl__calloc(NOGC, len * 2 + 1, sizeof(char *));
+
+    for (i = 0; i < len * 2; i += 2) {
+        (*dst)[i] = libxl__strdup(NOGC, (*src)[i]);
+        if ((*src)[i+1])
+            (*dst)[i+1] = libxl__strdup(NOGC, (*src)[i+1]);
+        else
+            (*dst)[i+1] = NULL;
+    }
+
+out:
+    GC_FREE;
 }
 
 void libxl_defbool_set(libxl_defbool *db, bool b)
@@ -5769,6 +5820,22 @@ int libxl_fd_set_cloexec(libxl_ctx *ctx, int fd, int cloexec)
 int libxl_fd_set_nonblock(libxl_ctx *ctx, int fd, int nonblock)
   { return fd_set_flags(ctx,fd, F_GETFL,F_SETFL,"FL", O_NONBLOCK, nonblock); }
 
+
+void libxl_hwcap_copy(libxl_ctx *ctx,libxl_hwcap *dst, libxl_hwcap *src)
+{
+    int i;
+
+    for (i = 0; i < 8; i++)
+        (*dst)[i] = (*src)[i];
+}
+
+void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src)
+{
+    int i;
+
+    for (i = 0; i < 6; i++)
+        (*dst)[i] = (*src)[i];
+}
 /*
  * Local variables:
  * mode: C
