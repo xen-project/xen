@@ -65,7 +65,7 @@ static struct {
     paddr_t dbase;            /* Address of distributor registers */
     void __iomem * map_dbase; /* IO mapped Address of distributor registers */
     paddr_t cbase;            /* Address of CPU interface registers */
-    void __iomem * map_cbase; /* IO mapped Address of CPU interface registers */
+    void __iomem * map_cbase[2]; /* IO mapped Address of CPU interface registers */
     paddr_t hbase;            /* Address of virtual interface registers */
     void __iomem * map_hbase; /* IO Address of virtual interface registers */
     paddr_t vbase;            /* Address of virtual cpu interface registers */
@@ -100,12 +100,16 @@ static inline uint32_t readl_gicd(unsigned int offset)
 
 static inline void writel_gicc(uint32_t val, unsigned int offset)
 {
-    writel_relaxed(val, gicv2.map_cbase + offset);
+    unsigned int page = offset >> PAGE_SHIFT;
+    offset &= ~PAGE_MASK;
+    writel_relaxed(val, gicv2.map_cbase[page] + offset);
 }
 
 static inline uint32_t readl_gicc(unsigned int offset)
 {
-    return readl_relaxed(gicv2.map_cbase + offset);
+    unsigned int page = offset >> PAGE_SHIFT;
+    offset &= ~PAGE_MASK;
+    return readl_relaxed(gicv2.map_cbase[page] + offset);
 }
 
 static inline void writel_gich(uint32_t val, unsigned int offset)
@@ -665,12 +669,15 @@ static int __init gicv2_init(struct dt_device_node *node, const void *data)
     if ( !gicv2.map_dbase )
         panic("GICv2: Failed to ioremap for GIC distributor\n");
 
-    if ( platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
-        gicv2.map_cbase = ioremap_nocache(gicv2.cbase, PAGE_SIZE * 0x10);
-    else
-        gicv2.map_cbase = ioremap_nocache(gicv2.cbase, PAGE_SIZE * 2);
+    gicv2.map_cbase[0] = ioremap_nocache(gicv2.cbase, PAGE_SIZE);
 
-    if ( !gicv2.map_cbase )
+    if ( platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
+        gicv2.map_cbase[1] = ioremap_nocache(gicv2.cbase + PAGE_SIZE * 0x10,
+                                           PAGE_SIZE);
+    else
+        gicv2.map_cbase[1] = ioremap_nocache(gicv2.cbase + PAGE_SIZE, PAGE_SIZE);
+
+    if ( !gicv2.map_cbase[0] || !gicv2.map_cbase[1] )
         panic("GICv2: Failed to ioremap for GIC CPU interface\n");
 
     gicv2.map_hbase = ioremap_nocache(gicv2.hbase, PAGE_SIZE);
