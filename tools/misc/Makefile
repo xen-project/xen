@@ -6,6 +6,8 @@ CFLAGS += -Werror
 CFLAGS += $(CFLAGS_libxenctrl)
 CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(CFLAGS_libxenstore)
+# xen-hptool.c and xen-mfndump.c incorrectly use libxc internals
+CFLAGS += -I$(XEN_ROOT)/tools/libxc
 
 HDRS     = $(wildcard *.h)
 

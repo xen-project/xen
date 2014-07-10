@@ -192,9 +192,9 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		--includedir=$(PREFIX)/lib/xen/include \
 		--source-path=$$source \
 		--extra-cflags="-I$(XEN_ROOT)/tools/include \
-		-I$(XEN_ROOT)/tools/libxc \
-		-I$(XEN_ROOT)/tools/xenstore \
-		-I$(XEN_ROOT)/tools/xenstore/compat \
+		-I$(XEN_ROOT)/tools/libxc/include \
+		-I$(XEN_ROOT)/tools/xenstore/include \
+		-I$(XEN_ROOT)/tools/xenstore/compat/include \
 		$(EXTRA_CFLAGS_QEMU_XEN)" \
 		--extra-ldflags="-L$(XEN_ROOT)/tools/libxc \
 		-L$(XEN_ROOT)/tools/xenstore \

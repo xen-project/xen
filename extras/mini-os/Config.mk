@@ -46,7 +46,7 @@ DEF_CPPFLAGS += -D__MINIOS__
 ifeq ($(libc),y)
 DEF_CPPFLAGS += -DHAVE_LIBC
 DEF_CPPFLAGS += -isystem $(MINI-OS_ROOT)/include/posix
-DEF_CPPFLAGS += -isystem $(XEN_ROOT)/tools/xenstore
+DEF_CPPFLAGS += -isystem $(XEN_ROOT)/tools/xenstore/include
 endif
 
 ifneq ($(LWIPDIR),)

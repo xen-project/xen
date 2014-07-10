@@ -16,6 +16,8 @@ CFLAGS    += -I$(BLKTAP_ROOT)/include -I$(BLKTAP_ROOT)/drivers
 CFLAGS    += $(CFLAGS_libxenctrl)
 CFLAGS    += -D_GNU_SOURCE
 CFLAGS    += -DUSE_NFS_LOCKS
+# drivers/block-log.c incorrectly uses libxc internals
+CFLAGS    += -I$(XEN_ROOT)/tools/libxc
 
 ifeq ($(CONFIG_X86_64),y)
 CFLAGS            += -fPIC

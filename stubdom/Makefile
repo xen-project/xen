@@ -307,12 +307,14 @@ mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET)
 	mkdir -p libxc-$(XEN_TARGET_ARCH)
 	[ -h libxc-$(XEN_TARGET_ARCH)/Makefile ] || ( cd libxc-$(XEN_TARGET_ARCH) && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/*.h . && \
+	  ln -sf $(XEN_ROOT)/tools/libxc/include/*.h . && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/*.c . && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/Makefile . )
 	mkdir -p xenstore
 	[ -h xenstore/Makefile ] || ( cd xenstore && \
 	  ln -sf $(XEN_ROOT)/tools/xenstore/*.c . && \
 	  ln -sf $(XEN_ROOT)/tools/xenstore/*.h . && \
+	  ln -sf $(XEN_ROOT)/tools/xenstore/include/*.h . && \
 	  ln -sf $(XEN_ROOT)/tools/xenstore/Makefile . )
 	$(MAKE) DESTDIR= -C $(MINI_OS) links
 	touch mk-headers-$(XEN_TARGET_ARCH)

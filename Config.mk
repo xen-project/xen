@@ -266,9 +266,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= d0395cc49b2ec6d1723c01f1daf2394b9264ca29
-# Tue Apr 8 16:50:06 2014 +0000
-# qemu-xen-trad: free all the pirqs for msi/msix when driver unloads
+QEMU_TRADITIONAL_REVISION ?= 58fac0693d8ad591add917e939011fe069720b0c
+# Fri Aug 1 16:32:18 2014 +0100
+# qemu-xen-trad: -I tools/libxc/include and tools/xenstore/include
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.

@@ -89,7 +89,7 @@ OSDEP_SRCS-y                 += xenctrl_osdep_ENOSYS.c
 -include $(XEN_TARGET_ARCH)/Makefile
 
 CFLAGS   += -Werror -Wmissing-prototypes
-CFLAGS   += -I. $(CFLAGS_xeninclude)
+CFLAGS   += -I. -I./include $(CFLAGS_xeninclude)
 
 # Needed for posix_fadvise64() in xc_linux.c
 CFLAGS-$(CONFIG_Linux) += -D_GNU_SOURCE
@@ -148,12 +148,12 @@ install: build
 	$(INSTALL_DATA) libxenctrl.a $(DESTDIR)$(LIBDIR)
 	$(SYMLINK_SHLIB) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenctrl.so.$(MAJOR)
 	$(SYMLINK_SHLIB) libxenctrl.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenctrl.so
-	$(INSTALL_DATA) xenctrl.h xenctrlosdep.h xentoollog.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) include/xenctrl.h include/xenctrlosdep.h include/xentoollog.h $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_SHLIB) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libxenguest.a $(DESTDIR)$(LIBDIR)
 	$(SYMLINK_SHLIB) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenguest.so.$(MAJOR)
 	$(SYMLINK_SHLIB) libxenguest.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenguest.so
-	$(INSTALL_DATA) xenguest.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) include/xenguest.h $(DESTDIR)$(INCLUDEDIR)
 
 .PHONY: TAGS
 TAGS:

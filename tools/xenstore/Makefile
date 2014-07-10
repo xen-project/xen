@@ -7,6 +7,7 @@ MINOR = 3
 CFLAGS += -Werror
 CFLAGS += -I.
 CFLAGS += -I$(XEN_ROOT)/tools/
+CFLAGS += -I./include
 CFLAGS += $(CFLAGS_libxenctrl)
 
 CFLAGS-$(CONFIG_SYSTEMD)  += $(SYSTEMD_CFLAGS)
@@ -141,10 +142,10 @@ endif
 	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenstore.so.$(MAJOR)
 	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenstore.so
 	$(INSTALL_DATA) libxenstore.a $(DESTDIR)$(LIBDIR)
-	$(INSTALL_DATA) xenstore.h $(DESTDIR)$(INCLUDEDIR)
-	$(INSTALL_DATA) xenstore_lib.h $(DESTDIR)$(INCLUDEDIR)
-	$(INSTALL_DATA) compat/xs.h $(DESTDIR)$(INCLUDEDIR)/xenstore-compat/xs.h
-	$(INSTALL_DATA) compat/xs_lib.h $(DESTDIR)$(INCLUDEDIR)/xenstore-compat/xs_lib.h
+	$(INSTALL_DATA) include/xenstore.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) include/xenstore_lib.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) include/compat/xs.h $(DESTDIR)$(INCLUDEDIR)/xenstore-compat/xs.h
+	$(INSTALL_DATA) include/compat/xs_lib.h $(DESTDIR)$(INCLUDEDIR)/xenstore-compat/xs_lib.h
 	ln -sf xenstore-compat/xs.h  $(DESTDIR)$(INCLUDEDIR)/xs.h
 	ln -sf xenstore-compat/xs_lib.h $(DESTDIR)$(INCLUDEDIR)/xs_lib.h
 
