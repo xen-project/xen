@@ -579,8 +579,6 @@ typedef struct libxl__ctx libxl_ctx;
  */
 #define LIBXL_HAVE_CPUPOOL_NAME 1
 
-typedef struct libxl__ctx libxl_ctx;
-
 typedef uint8_t libxl_mac[6];
 #define LIBXL_MAC_FMT "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx"
 #define LIBXL_MAC_FMTLEN ((2*6)+5) /* 6 hex bytes plus 5 colons */
