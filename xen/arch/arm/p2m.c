@@ -604,8 +604,33 @@ static int apply_one_level(struct domain *d,
             return P2M_ONE_PROGRESS_NOP;
         }
 
-        if ( level < 3 && p2m_table(orig_pte) )
-            return P2M_ONE_DESCEND;
+        if ( level < 3 )
+        {
+            if ( p2m_table(orig_pte) )
+                return P2M_ONE_DESCEND;
+
+            if ( op == REMOVE &&
+                 !is_mapping_aligned(*addr, end_gpaddr,
+                                     0, /* maddr doesn't matter for remove */
+                                     level_size) )
+            {
+                /*
+                 * Removing a mapping from the middle of a superpage. Shatter
+                 * and descend.
+                 */
+                *flush = true;
+                rc = p2m_create_table(d, entry,
+                                      level_shift - PAGE_SHIFT, flush_cache);
+                if ( rc < 0 )
+                    return rc;
+
+                p2m->stats.shattered[level]++;
+                p2m->stats.mappings[level]--;
+                p2m->stats.mappings[level+1] += LPAE_ENTRIES;
+
+                return P2M_ONE_DESCEND;
+            }
+        }
 
         *flush = true;
 
