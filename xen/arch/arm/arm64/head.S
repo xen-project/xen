@@ -382,8 +382,19 @@ paging:
         ldr   x1, =BOOT_FDT_VIRT_START
         lsr   x1, x1, #18            /* x4 := Slot for BOOT_FDT_VIRT_START */
         str   x2, [x4, x1]           /* Map it in the early fdt slot */
-        dsb   sy
 1:
+
+        /*
+         * Flush the TLB in case the 1:1 mapping happens to clash with
+         * the virtual addresses used by the fixmap or DTB.
+         */
+        dsb   sy                     /* Ensure any page table updates made above
+                                      * have occurred. */
+
+        isb
+        tlbi  alle2
+        dsb   sy                     /* Ensure completion of TLB flush */
+        isb
 
         PRINT("- Ready -\r\n")
 

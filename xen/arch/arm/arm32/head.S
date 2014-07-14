@@ -372,8 +372,19 @@ paging:
         ldr   r4, =BOOT_FDT_VIRT_START
         mov   r4, r4, lsr #18        /* Slot for BOOT_FDT_VIRT_START */
         strd  r2, r3, [r1, r4]       /* Map it in the early fdt slot */
-        dsb
 1:
+
+        /*
+         * Flush the TLB in case the 1:1 mapping happens to clash with
+         * the virtual addresses used by the fixmap or DTB.
+         */
+        dsb                          /* Ensure any page table updates made above
+                                      * have occurred. */
+
+        isb
+        mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLB */
+        dsb                          /* Ensure completion of TLB flush */
+        isb
 
         PRINT("- Ready -\r\n")
 
