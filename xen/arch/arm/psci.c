@@ -54,7 +54,8 @@ static uint32_t psci_cpu_on_nr;
 
 int call_psci_cpu_on(int cpu)
 {
-    return __invoke_psci_fn_smc(psci_cpu_on_nr, cpu, __pa(init_secondary), 0);
+    return __invoke_psci_fn_smc(psci_cpu_on_nr,
+                                cpu_logical_map(cpu), __pa(init_secondary), 0);
 }
 
 int __init psci_init(void)
@@ -96,3 +97,12 @@ int __init psci_init(void)
 
     return 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
