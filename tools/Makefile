@@ -134,7 +134,7 @@ qemu-xen-dir-find:
 	fi
 
 .PHONY: qemu-xen-traditional-dir-force-update
-qemu-xen-traditional-dir-force-update:
+qemu-xen-traditional-dir-force-update: qemu-xen-traditional-dir-find
 	set -ex; \
 	if [ "$(QEMU_TRADITIONAL_REVISION)" ]; then \
 		cd qemu-xen-traditional-dir-remote; \
@@ -164,7 +164,7 @@ subdir-clean-qemu-xen-traditional-dir:
 	fi
 
 .PHONY: qemu-xen-dir-force-update
-qemu-xen-dir-force-update:
+qemu-xen-dir-force-update: qemu-xen-dir-find
 	set -ex; \
 	if [ "$(QEMU_UPSTREAM_REVISION)" ]; then \
 		cd qemu-xen-dir-remote; \

@@ -62,7 +62,7 @@ subdir-distclean-seabios-dir: .phony
 	rm -rf seabios-dir seabios-dir-remote
 
 .PHONY: ovmf-dir-force-update
-ovmf-dir-force-update:
+ovmf-dir-force-update: ovmf-dir
 	set -ex; \
 	if [ "$(OVMF_UPSTREAM_REVISION)" ]; then \
 		cd ovmf-dir-remote; \
@@ -76,7 +76,7 @@ subdir-clean-ovmf:
 	fi
 
 .PHONY: seabios-dir-force-update
-seabios-dir-force-update:
+seabios-dir-force-update: seabios-dir
 	set -ex; \
 	if [ "$(SEABIOS_UPSTREAM_REVISION)" ]; then \
 		cd seabios-dir-remote; \
