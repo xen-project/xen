@@ -24,7 +24,7 @@ ovmf-dir:
 	cp ovmf-makefile ovmf-dir/Makefile;
 
 seabios-dir:
-	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(SEABIOS_UPSTREAM_URL) $(SEABIOS_UPSTREAM_TAG) seabios-dir
+	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(SEABIOS_UPSTREAM_URL) $(SEABIOS_UPSTREAM_REVISION) seabios-dir
 	$(MAKE) -C seabios-dir defconfig
 
 .PHONY: all
@@ -78,10 +78,10 @@ subdir-clean-ovmf:
 .PHONY: seabios-dir-force-update
 seabios-dir-force-update:
 	set -ex; \
-	if [ "$(SEABIOS_UPSTREAM_TAG)" ]; then \
+	if [ "$(SEABIOS_UPSTREAM_REVISION)" ]; then \
 		cd seabios-dir-remote; \
 		$(GIT) fetch origin; \
-		$(GIT) reset --hard $(SEABIOS_UPSTREAM_TAG); \
+		$(GIT) reset --hard $(SEABIOS_UPSTREAM_REVISION); \
 	fi
 
 subdir-clean-seabios-dir:

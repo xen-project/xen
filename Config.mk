@@ -218,48 +218,59 @@ XEN_EXTFILES_URL ?= http://xenbits.xen.org/xen-extfiles
 # the internet.  The original download URL is preserved as a comment
 # near the place in the Xen Makefiles where the file is used.
 
-ifeq ($(GIT_HTTP),y)
-QEMU_REMOTE ?= http://xenbits.xen.org/git-http/qemu-xen-unstable.git
-else
-QEMU_REMOTE ?= git://xenbits.xen.org/qemu-xen-unstable.git
-endif
-
 # Where to look for inlined subtrees (for example, from a tarball)
 QEMU_UPSTREAM_INTREE ?= $(XEN_ROOT)/tools/qemu-xen
 QEMU_TRADITIONAL_INTREE ?= $(XEN_ROOT)/tools/qemu-xen-traditional
 
 
-# Specify which qemu-dm to use. This may be `ioemu' to use the old
-# Mercurial in-tree version, or a local directory, or a git URL.
-# CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
-CONFIG_QEMU ?= $(or $(wildcard $(QEMU_TRADITIONAL_INTREE)),\
-                    $(QEMU_REMOTE))
-
-ifneq (,$(wildcard $(QEMU_UPSTREAM_INTREE)))
-QEMU_UPSTREAM_URL ?= $(QEMU_UPSTREAM_INTREE)
+# Handle legacy options
+ifneq (,$(SEABIOS_UPSTREAM_TAG))
+SEABIOS_UPSTREAM_REVISION ?= $(SEABIOS_UPSTREAM_TAG)
+endif
+ifneq (,$(QEMU_REMOTE))
+QEMU_TRADITIONAL_URL ?= $(QEMU_REMOTE)
+endif
+ifneq (,$(CONFIG_QEMU))
+QEMU_TRADITIONAL_LOC ?= $(CONFIG_QEMU)
+endif
+ifneq (,$(QEMU_TAG))
+QEMU_TRADITIONAL_REVISION ?= $(QEMU_TAG)
 endif
 
 ifeq ($(GIT_HTTP),y)
 OVMF_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/ovmf.git
 QEMU_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/qemu-upstream-unstable.git
+QEMU_TRADITIONAL_URL ?= http://xenbits.xen.org/git-http/qemu-xen-unstable.git
 SEABIOS_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/seabios.git
 else
 OVMF_UPSTREAM_URL ?= git://xenbits.xen.org/ovmf.git
 QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-unstable.git
+QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-unstable.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 447d264115c476142f884af0be287622cd244423
 QEMU_UPSTREAM_REVISION ?= master
-SEABIOS_UPSTREAM_TAG ?= rel-1.7.5
+SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 # Thu May 22 16:59:16 2014 -0400
 # python3 fixes for vgabios and csm builds.
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TAG ?= d0395cc49b2ec6d1723c01f1daf2394b9264ca29
+QEMU_TRADITIONAL_REVISION ?= d0395cc49b2ec6d1723c01f1daf2394b9264ca29
 # Tue Apr 8 16:50:06 2014 +0000
 # qemu-xen-trad: free all the pirqs for msi/msix when driver unloads
+
+# Specify which qemu-dm to use. This may be `ioemu' to use the old
+# Mercurial in-tree version, or a local directory, or a git URL.
+# QEMU_UPSTREAM_LOC ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
+
+# Defaults for subtree locations
+QEMU_TRADITIONAL_LOC ?= $(or $(wildcard $(QEMU_TRADITIONAL_INTREE)),\
+                        $(QEMU_TRADITIONAL_URL))
+
+QEMU_UPSTREAM_LOC ?= $(or $(wildcard $(QEMU_UPSTREAM_INTREE)),\
+                        $(QEMU_UPSTREAM_URL))
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.

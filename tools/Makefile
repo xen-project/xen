@@ -111,35 +111,35 @@ IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
 			 --interp-prefix=$(CROSS_SYS_ROOT)
 endif
 
-QEMU_ROOT := $(shell if [ -d "$(CONFIG_QEMU)" ]; then echo "$(CONFIG_QEMU)"; else echo .; fi)
+QEMU_ROOT := $(shell if [ -d "$(QEMU_TRADITIONAL_LOC)" ]; then echo "$(QEMU_TRADITIONAL_LOC)"; else echo .; fi)
 ifneq ($(QEMU_ROOT),.)
 export QEMU_ROOT
 endif
 
 qemu-xen-traditional-dir-find:
 	set -ex; \
-	if test -d $(CONFIG_QEMU); then \
+	if test -d $(QEMU_TRADITIONAL_LOC); then \
 		mkdir -p qemu-xen-traditional-dir; \
 	else \
 		export GIT=$(GIT); \
-		$(XEN_ROOT)/scripts/git-checkout.sh $(CONFIG_QEMU) $(QEMU_TAG) qemu-xen-traditional-dir; \
+		$(XEN_ROOT)/scripts/git-checkout.sh $(QEMU_TRADITIONAL_LOC) $(QEMU_TRADITIONAL_REVISION) qemu-xen-traditional-dir; \
 	fi
 
 qemu-xen-dir-find:
-	if test -d $(QEMU_UPSTREAM_URL) ; then \
+	if test -d $(QEMU_UPSTREAM_LOC) ; then \
 		mkdir -p qemu-xen-dir; \
 	else \
 		export GIT=$(GIT); \
-		$(XEN_ROOT)/scripts/git-checkout.sh $(QEMU_UPSTREAM_URL) $(QEMU_UPSTREAM_REVISION) qemu-xen-dir ; \
+		$(XEN_ROOT)/scripts/git-checkout.sh $(QEMU_UPSTREAM_LOC) $(QEMU_UPSTREAM_REVISION) qemu-xen-dir ; \
 	fi
 
 .PHONY: qemu-xen-traditional-dir-force-update
 qemu-xen-traditional-dir-force-update:
 	set -ex; \
-	if [ "$(QEMU_TAG)" ]; then \
+	if [ "$(QEMU_TRADITIONAL_REVISION)" ]; then \
 		cd qemu-xen-traditional-dir-remote; \
 		$(GIT) fetch origin; \
-		$(GIT) reset --hard $(QEMU_TAG); \
+		$(GIT) reset --hard $(QEMU_TRADITIONAL_REVISION); \
 	fi
 
 subdir-all-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
@@ -179,8 +179,8 @@ QEMU_XEN_ENABLE_DEBUG :=
 endif
 
 subdir-all-qemu-xen-dir: qemu-xen-dir-find
-	if test -d $(QEMU_UPSTREAM_URL) ; then \
-		source=$(QEMU_UPSTREAM_URL); \
+	if test -d $(QEMU_UPSTREAM_LOC) ; then \
+		source=$(QEMU_UPSTREAM_LOC); \
 	else \
 		source=.; \
 	fi; \
