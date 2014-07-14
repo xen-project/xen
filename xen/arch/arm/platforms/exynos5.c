@@ -54,13 +54,11 @@ static int exynos5_init_time(void)
 static int exynos5_specific_mapping(struct domain *d)
 {
     /* Map the chip ID */
-    map_mmio_regions(d, paddr_to_pfn(EXYNOS5_PA_CHIPID),
-                     paddr_to_pfn_aligned(EXYNOS5_PA_CHIPID + PAGE_SIZE),
+    map_mmio_regions(d, paddr_to_pfn(EXYNOS5_PA_CHIPID), 1,
                      paddr_to_pfn(EXYNOS5_PA_CHIPID));
 
     /* Map the PWM region */
-    map_mmio_regions(d, paddr_to_pfn(EXYNOS5_PA_TIMER),
-                     paddr_to_pfn_aligned(EXYNOS5_PA_TIMER + (PAGE_SIZE * 2)),
+    map_mmio_regions(d, paddr_to_pfn(EXYNOS5_PA_TIMER), 2,
                      paddr_to_pfn(EXYNOS5_PA_TIMER));
 
     return 0;

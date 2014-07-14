@@ -41,15 +41,13 @@ static uint32_t xgene_storm_quirks(void)
 }
 
 static int map_one_mmio(struct domain *d, const char *what,
-                         paddr_t start, paddr_t end)
+                         unsigned long start, unsigned long end)
 {
     int ret;
 
     printk("Additional MMIO %"PRIpaddr"-%"PRIpaddr" (%s)\n",
            start, end, what);
-    ret = map_mmio_regions(d, paddr_to_pfn(start),
-                           paddr_to_pfn_aligned(end),
-                           paddr_to_pfn(start));
+    ret = map_mmio_regions(d, start, end - start + 1, start);
     if ( ret )
         printk("Failed to map %s @ %"PRIpaddr" to dom%d\n",
                what, start, d->domain_id);
@@ -91,18 +89,22 @@ static int xgene_storm_specific_mapping(struct domain *d)
     int ret;
 
     /* Map the PCIe bus resources */
-    ret = map_one_mmio(d, "PCI MEM REGION", 0xe000000000UL, 0xe010000000UL);
+    ret = map_one_mmio(d, "PCI MEM REGION", paddr_to_pfn(0xe000000000UL),
+                                            paddr_to_pfn(0xe010000000UL));
     if ( ret )
         goto err;
 
-    ret = map_one_mmio(d, "PCI IO REGION", 0xe080000000UL, 0xe080010000UL);
+    ret = map_one_mmio(d, "PCI IO REGION", paddr_to_pfn(0xe080000000UL),
+                                           paddr_to_pfn(0xe080010000UL));
     if ( ret )
         goto err;
 
-    ret = map_one_mmio(d, "PCI CFG REGION", 0xe0d0000000UL, 0xe0d0200000UL);
+    ret = map_one_mmio(d, "PCI CFG REGION", paddr_to_pfn(0xe0d0000000UL),
+                                            paddr_to_pfn(0xe0d0200000UL));
     if ( ret )
         goto err;
-    ret = map_one_mmio(d, "PCI MSI REGION", 0xe010000000UL, 0xe010800000UL);
+    ret = map_one_mmio(d, "PCI MSI REGION", paddr_to_pfn(0xe010000000UL),
+                                            paddr_to_pfn(0xe010800000UL));
     if ( ret )
         goto err;
 

@@ -1020,7 +1020,7 @@ static int map_device(struct domain *d, struct dt_device_node *dev)
         }
         res = map_mmio_regions(d,
                                paddr_to_pfn(addr & PAGE_MASK),
-                               paddr_to_pfn_aligned(addr + size),
+                               DIV_ROUND_UP(size, PAGE_SIZE),
                                paddr_to_pfn(addr & PAGE_MASK));
         if ( res )
         {

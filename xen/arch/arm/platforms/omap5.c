@@ -102,23 +102,19 @@ static int omap5_init_time(void)
 static int omap5_specific_mapping(struct domain *d)
 {
     /* Map the PRM module */
-    map_mmio_regions(d, paddr_to_pfn(OMAP5_PRM_BASE),
-                     paddr_to_pfn_aligned(OMAP5_PRM_BASE + (PAGE_SIZE * 2)),
+    map_mmio_regions(d, paddr_to_pfn(OMAP5_PRM_BASE), 2,
                      paddr_to_pfn(OMAP5_PRM_BASE));
 
     /* Map the PRM_MPU */
-    map_mmio_regions(d, paddr_to_pfn(OMAP5_PRCM_MPU_BASE),
-                     paddr_to_pfn_aligned(OMAP5_PRCM_MPU_BASE + PAGE_SIZE),
+    map_mmio_regions(d, paddr_to_pfn(OMAP5_PRCM_MPU_BASE), 1,
                      paddr_to_pfn(OMAP5_PRCM_MPU_BASE));
 
     /* Map the Wakeup Gen */
-    map_mmio_regions(d, paddr_to_pfn(OMAP5_WKUPGEN_BASE),
-                     paddr_to_pfn_aligned(OMAP5_WKUPGEN_BASE + PAGE_SIZE),
+    map_mmio_regions(d, paddr_to_pfn(OMAP5_WKUPGEN_BASE), 1,
                      paddr_to_pfn(OMAP5_WKUPGEN_BASE));
 
     /* Map the on-chip SRAM */
-    map_mmio_regions(d, paddr_to_pfn(OMAP5_SRAM_PA),
-                     paddr_to_pfn_aligned(OMAP5_SRAM_PA + (PAGE_SIZE * 32)),
+    map_mmio_regions(d, paddr_to_pfn(OMAP5_SRAM_PA), 32,
                      paddr_to_pfn(OMAP5_SRAM_PA));
 
     return 0;

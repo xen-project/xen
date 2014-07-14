@@ -440,22 +440,17 @@ static int gicv2v_setup(struct domain *d)
      * The second page is always mapped at +4K irrespective of the
      * GIC_64K_STRIDE quirk. The DTB passed to the guest reflects this.
      */
-    ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase),
-                           paddr_to_pfn_aligned(d->arch.vgic.cbase + PAGE_SIZE),
-                           paddr_to_pfn(gicv2.vbase));
+    ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase), 1,
+                            paddr_to_pfn(gicv2.vbase));
     if ( ret )
         return ret;
 
     if ( !platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
         ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase + PAGE_SIZE),
-                               paddr_to_pfn_aligned(d->arch.vgic.cbase +
-                                                    (2 * PAGE_SIZE)),
-                               paddr_to_pfn(gicv2.vbase + PAGE_SIZE));
+                               2, paddr_to_pfn(gicv2.vbase + PAGE_SIZE));
     else
         ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase + PAGE_SIZE),
-                               paddr_to_pfn_aligned(d->arch.vgic.cbase +
-			                            (2 * PAGE_SIZE)),
-                               paddr_to_pfn(gicv2.vbase + 16*PAGE_SIZE));
+                               2, paddr_to_pfn(gicv2.vbase + 16*PAGE_SIZE));
 
     return ret;
 }
