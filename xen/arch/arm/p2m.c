@@ -501,7 +501,6 @@ static int apply_one_level(struct domain *d,
                 p2m->stats.mappings[level]++;
 
                 *addr += level_size;
-                *maddr += level_size;
 
                 return P2M_ONE_PROGRESS;
             }
