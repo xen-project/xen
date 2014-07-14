@@ -210,6 +210,8 @@ static inline void __iomem *ioremap_wc(paddr_t start, size_t len)
 #define paddr_to_pfn(pa)  ((unsigned long)((pa) >> PAGE_SHIFT))
 #define paddr_to_pdx(pa)    pfn_to_pdx(paddr_to_pfn(pa))
 
+/* Page-align address and convert to frame number format */
+#define paddr_to_pfn_aligned(paddr)    paddr_to_pfn(PAGE_ALIGN(paddr))
 
 static inline paddr_t __virt_to_maddr(vaddr_t va)
 {

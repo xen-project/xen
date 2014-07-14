@@ -1018,9 +1018,10 @@ static int map_device(struct domain *d, struct dt_device_node *dev)
                    addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1);
             return res;
         }
-        res = map_mmio_regions(d, addr & PAGE_MASK,
-                               PAGE_ALIGN(addr + size) - 1,
-                               addr & PAGE_MASK);
+        res = map_mmio_regions(d,
+                               paddr_to_pfn(addr & PAGE_MASK),
+                               paddr_to_pfn_aligned(addr + size),
+                               paddr_to_pfn(addr & PAGE_MASK));
         if ( res )
         {
             printk(XENLOG_ERR "Unable to map 0x%"PRIx64

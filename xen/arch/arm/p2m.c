@@ -813,12 +813,15 @@ int p2m_populate_ram(struct domain *d,
 }
 
 int map_mmio_regions(struct domain *d,
-                     paddr_t start_gaddr,
-                     paddr_t end_gaddr,
-                     paddr_t maddr)
+                     unsigned long start_gfn,
+                     unsigned long end_gfn,
+                     unsigned long mfn)
 {
-    return apply_p2m_changes(d, INSERT, start_gaddr, end_gaddr,
-                             maddr, MATTR_DEV, p2m_mmio_direct);
+    return apply_p2m_changes(d, INSERT,
+                             pfn_to_paddr(start_gfn),
+                             pfn_to_paddr(end_gfn),
+                             pfn_to_paddr(mfn),
+                             MATTR_DEV, p2m_mmio_direct);
 }
 
 int guest_physmap_add_entry(struct domain *d,
