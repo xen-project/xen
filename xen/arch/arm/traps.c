@@ -1804,15 +1804,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
             return;
         }
         /* at the moment we only trap WFI */
-        vcpu_block();
-        /* The ARM spec declares that even if local irqs are masked in
-         * the CPSR register, an irq should wake up a cpu from WFI anyway.
-         * For this reason we need to check for irqs that need delivery,
-         * ignoring the CPSR register, *after* calling SCHEDOP_block to
-         * avoid races with vgic_vcpu_inject_irq.
-         */
-        if ( local_events_need_delivery_nomask() )
-            vcpu_unblock(current);
+        vcpu_block_unless_event_pending(current);
         advance_pc(regs, hsr);
         break;
     case HSR_EC_CP15_32:

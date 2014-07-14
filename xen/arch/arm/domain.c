@@ -798,6 +798,19 @@ void vcpu_mark_events_pending(struct vcpu *v)
     vgic_vcpu_inject_irq(v, v->domain->arch.evtchn_irq);
 }
 
+/* The ARM spec declares that even if local irqs are masked in
+ * the CPSR register, an irq should wake up a cpu from WFI anyway.
+ * For this reason we need to check for irqs that need delivery,
+ * ignoring the CPSR register, *after* calling SCHEDOP_block to
+ * avoid races with vgic_vcpu_inject_irq.
+ */
+void vcpu_block_unless_event_pending(struct vcpu *v)
+{
+    vcpu_block();
+    if ( local_events_need_delivery_nomask() )
+        vcpu_unblock(current);
+}
+
 /*
  * Local variables:
  * mode: C
