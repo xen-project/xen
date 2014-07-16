@@ -24,10 +24,6 @@
 
 #define GET_FIELD(_p, _f) ((dinfo->guest_width==8) ? ((_p)->x64._f) : ((_p)->x32._f))
 
-#ifndef MAX
-#define MAX(_a, _b) ((_a) >= (_b) ? (_a) : (_b))
-#endif
-
 int
 xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
                               unsigned long pfn)

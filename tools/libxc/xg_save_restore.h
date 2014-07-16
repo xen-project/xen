@@ -392,10 +392,3 @@ static inline int get_platform_info(xc_interface *xch, uint32_t dom,
     else                                                           \
         memset(&(_p)->x32._f[0], (_v), sizeof((_p)->x32._f));      \
 } while (0)
-
-#ifndef MAX
-#define MAX(_a, _b) ((_a) >= (_b) ? (_a) : (_b))
-#endif
-#ifndef MIN
-#define MIN(_a, _b) ((_a) <= (_b) ? (_a) : (_b))
-#endif

@@ -159,7 +159,7 @@ static inline xen_pfn_t xc_pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m,
 /* Size in bytes of the pfn_to_mfn_frame_list     */
 #define P2M_GUEST_FL_SIZE ((P2M_FL_ENTRIES) * (dinfo->guest_width))
 #define P2M_TOOLS_FL_SIZE ((P2M_FL_ENTRIES) *                           \
-                           MAX((sizeof (xen_pfn_t)), dinfo->guest_width))
+                           max_t(size_t, sizeof(xen_pfn_t), dinfo->guest_width))
 
 /* Masks for PTE<->PFN conversions */
 #define MADDR_BITS_X86  ((dinfo->guest_width == 8) ? 52 : 44)

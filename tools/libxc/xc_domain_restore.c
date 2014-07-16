@@ -339,7 +339,7 @@ static xen_pfn_t *load_p2m_frame_list(
             /* Any remaining bytes of this chunk: read and discard. */
             while ( chunk_bytes )
             {
-                unsigned long sz = MIN(chunk_bytes, sizeof(xen_pfn_t));
+                unsigned long sz = min_t(unsigned long, chunk_bytes, sizeof(xen_pfn_t));
                 if ( RDEXACT(io_fd, &p2m_fl_zero, sz) )
                 {
                     PERROR("read-and-discard extended-info chunk bytes failed");
