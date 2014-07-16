@@ -121,7 +121,7 @@ void start_kernel(void)
     init_events();
 
     /* ENABLE EVENT DELIVERY. This is disabled at start of day. */
-    __sti();
+    local_irq_enable();
 
     setup_xen_features();
 
