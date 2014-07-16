@@ -7497,7 +7497,7 @@ int main_remus(int argc, char **argv)
     r_info.interval = 200;
     libxl_defbool_setdefault(&r_info.blackhole, false);
 
-    SWITCH_FOREACH_OPT(opt, "Fbuni:s:N:e", NULL, "remus", 2) {
+    SWITCH_FOREACH_OPT(opt, "Fbundi:s:N:e", NULL, "remus", 2) {
     case 'i':
         r_info.interval = atoi(optarg);
         break;
@@ -7515,6 +7515,9 @@ int main_remus(int argc, char **argv)
         break;
     case 'N':
         r_info.netbufscript = optarg;
+        break;
+    case 'd':
+        libxl_defbool_set(&r_info.diskbuf, false);
         break;
     case 's':
         ssh_command = optarg;

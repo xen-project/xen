@@ -436,7 +436,7 @@ Enable Remus HA for domain. By default B<xl> relies on ssh as a transport
 mechanism between the two hosts.
 
 N.B: Remus support in xl is still in experimental (proof-of-concept) phase.
-     There is no support for disk buffering at the moment.
+     Disk replication support is limited to DRBD disks.
 
 B<OPTIONS>
 
@@ -478,6 +478,10 @@ Generally useful for debugging. Requires enabling unsafe mode.
 =item B<-n>
 
 Disable network output buffering. Requires enabling unsafe mode.
+
+=item B<-d>
+
+Disable disk replication. Requires enabling unsafe mode.
 
 =back
 

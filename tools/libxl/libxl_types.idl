@@ -616,6 +616,7 @@ libxl_domain_remus_info = Struct("domain_remus_info",[
     ("compression",  libxl_defbool),
     ("netbuf",       libxl_defbool),
     ("netbufscript", string),
+    ("diskbuf",      libxl_defbool),
     ])
 
 libxl_event_type = Enumeration("event_type", [
