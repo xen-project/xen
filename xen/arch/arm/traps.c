@@ -90,7 +90,7 @@ void __cpuinit init_traps(void)
 
     /* Setup hypervisor traps */
     WRITE_SYSREG(HCR_PTW|HCR_BSU_INNER|HCR_AMO|HCR_IMO|HCR_FMO|HCR_VM|
-                 HCR_TWI|HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP, HCR_EL2);
+                 HCR_TWE|HCR_TWI|HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP, HCR_EL2);
     isb();
 }
 
@@ -1803,8 +1803,13 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
             advance_pc(regs, hsr);
             return;
         }
-        /* at the moment we only trap WFI */
-        vcpu_block_unless_event_pending(current);
+        if ( hsr.wfi_wfe.ti ) {
+            /* Yield the VCPU for WFE */
+            vcpu_force_reschedule(current);
+        } else {
+            /* Block the VCPU for WFI */
+            vcpu_block_unless_event_pending(current);
+        }
         advance_pc(regs, hsr);
         break;
     case HSR_EC_CP15_32:

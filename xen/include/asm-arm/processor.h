@@ -276,6 +276,15 @@ union hsr {
         unsigned long ec:6;    /* Exception Class */
     } cond;
 
+    struct hsr_wfi_wfe {
+        unsigned long ti:1;    /* Trapped instruction */
+        unsigned long sbzp:19;
+        unsigned long cc:4;    /* Condition Code */
+        unsigned long ccvalid:1;/* CC Valid */
+        unsigned long len:1;   /* Instruction length */
+        unsigned long ec:6;    /* Exception Class */
+    } wfi_wfe;
+
     /* reg, reg0, reg1 are 4 bits on AArch32, the fifth bit is sbzp. */
     struct hsr_cp32 {
         unsigned long read:1;  /* Direction */
