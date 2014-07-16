@@ -107,6 +107,9 @@ struct thread* arch_create_thread(char *name, void (*function)(void *),
     thread->sp = (unsigned long)thread->stack + STACK_SIZE;
     /* Save pointer to the thread on the stack, used by current macro */
     *((unsigned long *)thread->stack) = (unsigned long)thread;
+
+    /* Must ensure that (%rsp + 8) is 16-byte aligned at the start of thread_starter. */
+    thread->sp -= sizeof(unsigned long);
     
     stack_push(thread, (unsigned long) function);
     stack_push(thread, (unsigned long) data);
