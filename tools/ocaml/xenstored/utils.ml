@@ -78,6 +78,7 @@ let create_regular_unix_socket name =
         Unixext.mkdir_rec (Filename.dirname name) 0o700;
         let sockaddr = Unix.ADDR_UNIX(name) in
         let sock = Unix.socket Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+        Unix.set_close_on_exec sock;
         Unix.bind sock sockaddr;
         Unix.listen sock 1;
         sock
