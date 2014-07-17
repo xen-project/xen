@@ -73,14 +73,20 @@ let trim_path path =
 let join_by_null ls = String.concat "\000" ls
 
 (* unix utils *)
+let create_regular_unix_socket name =
+        Unixext.unlink_safe name;
+        Unixext.mkdir_rec (Filename.dirname name) 0o700;
+        let sockaddr = Unix.ADDR_UNIX(name) in
+        let sock = Unix.socket Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+        Unix.bind sock sockaddr;
+        Unix.listen sock 1;
+        sock
+
 let create_unix_socket name =
-	Unixext.unlink_safe name;
-	Unixext.mkdir_rec (Filename.dirname name) 0o700;
-	let sockaddr = Unix.ADDR_UNIX(name) in
-	let sock = Unix.socket Unix.PF_UNIX Unix.SOCK_STREAM 0 in
-	Unix.bind sock sockaddr;
-	Unix.listen sock 1;
-	sock
+        if Systemd.sd_booted() then
+                Systemd.sd_listen_fds name
+        else
+                create_regular_unix_socket name
 
 let read_file_single_integer filename =
 	let fd = Unix.openfile filename [ Unix.O_RDONLY ] 0o640 in

@@ -15,6 +15,11 @@ syslog_OBJS = syslog
 syslog_C_OBJS = syslog_stubs
 OCAML_LIBRARY = syslog
 
+LIBS += systemd.cma systemd.cmxa
+systemd_OBJS = systemd
+systemd_C_OBJS = systemd_stubs
+OCAML_LIBRARY += systemd
+
 OBJS = define \
 	stdext \
 	trie \
@@ -36,11 +41,12 @@ OBJS = define \
 	process \
 	xenstored
 
-INTF = symbol.cmi trie.cmi syslog.cmi
+INTF = symbol.cmi trie.cmi syslog.cmi systemd.cmi
 
 XENSTOREDLIBS = \
 	unix.cmxa \
 	-ccopt -L -ccopt . syslog.cmxa \
+	-ccopt -L -ccopt . systemd.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/mmap $(OCAML_TOPLEVEL)/libs/mmap/xenmmap.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/eventchn $(OCAML_TOPLEVEL)/libs/eventchn/xeneventchn.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xc $(OCAML_TOPLEVEL)/libs/xc/xenctrl.cmxa \

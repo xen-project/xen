@@ -383,6 +383,8 @@ let _ =
 	while not !quit
 	do
 		try
+                        if Systemd.sd_booted() then
+                                Systemd.sd_notify_ready ();
 			main_loop ()
 		with exc ->
 			error "caught exception %s" (Printexc.to_string exc);
