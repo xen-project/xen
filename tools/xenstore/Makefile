@@ -6,6 +6,7 @@ MINOR = 3
 
 CFLAGS += -Werror
 CFLAGS += -I.
+CFLAGS += -I$(XEN_ROOT)/tools/
 CFLAGS += $(CFLAGS_libxenctrl)
 
 CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm xenstore-chmod

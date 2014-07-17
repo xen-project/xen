@@ -2,6 +2,8 @@ XEN_ROOT = $(CURDIR)/../../..
 OCAML_TOPLEVEL = $(CURDIR)/..
 include $(OCAML_TOPLEVEL)/common.make
 
+CFLAGS += -I$(XEN_ROOT)/tools/
+
 OCAMLINCLUDE += \
 	-I $(OCAML_TOPLEVEL)/libs/xb \
 	-I $(OCAML_TOPLEVEL)/libs/mmap \
