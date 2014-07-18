@@ -1719,8 +1719,12 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
     vnc_port = libxl__xs_read(gc, XBT_NULL,
                             libxl__sprintf(gc,
                             "/local/domain/%d/console/vnc-port", domid));
-    if ( vnc_port )
-        port = atoi(vnc_port) - 5900;
+    if (!vnc_port) {
+        LOG(ERROR, "Cannot get vnc-port of domain %d", domid);
+        goto x_fail;
+    }
+
+    port = atoi(vnc_port) - 5900;
 
     vnc_listen = libxl__xs_read(gc, XBT_NULL,
                                 libxl__sprintf(gc,
