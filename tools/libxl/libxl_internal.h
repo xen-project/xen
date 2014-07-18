@@ -2665,6 +2665,9 @@ struct libxl__remus_device_instance_ops {
     void (*teardown)(libxl__egc *egc, libxl__remus_device *dev);
 };
 
+int init_subkind_nic(libxl__remus_devices_state *rds);
+void cleanup_subkind_nic(libxl__remus_devices_state *rds);
+
 typedef void libxl__remus_callback(libxl__egc *,
                                    libxl__remus_devices_state *, int rc);
 
@@ -2699,6 +2702,13 @@ struct libxl__remus_devices_state {
     int num_disks;
 
     libxl__multidev multidev;
+
+    /*----- private for concrete (device-specific) layer only -----*/
+
+    /* private for nic device subkind ops */
+    char *netbufscript;
+    struct nl_sock *nlsock;
+    struct nl_cache *qdisc_cache;
 };
 
 /*

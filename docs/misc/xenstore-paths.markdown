@@ -393,6 +393,10 @@ The guest's virtual time offset from UTC in seconds.
 
 The device model version for a domain.
 
+#### /libxl/$DOMID/remus/netbuf/$DEVID/ifb = STRING [n,INTERNAL]
+
+ifb device used by Remus to buffer network output from the associated vif.
+
 [BLKIF]: http://xenbits.xen.org/docs/unstable/hypercall/include,public,io,blkif.h.html
 [FBIF]: http://xenbits.xen.org/docs/unstable/hypercall/include,public,io,fbif.h.html
 [HVMPARAMS]: http://xenbits.xen.org/docs/unstable/hypercall/include,public,hvm,params.h.html

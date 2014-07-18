@@ -819,6 +819,13 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
 
     /* Convenience aliases */
     libxl__remus_devices_state *const rds = &dss->rds;
+
+    if (!libxl__netbuffer_enabled(gc)) {
+        LOG(ERROR, "Remus: No support for network buffering");
+        goto out;
+    }
+    rds->device_kind_flags |= (1 << LIBXL__DEVICE_KIND_VIF);
+
     rds->ao = ao;
     rds->domid = domid;
     rds->callback = libxl__remus_setup_done;

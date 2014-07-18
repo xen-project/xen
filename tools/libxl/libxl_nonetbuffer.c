@@ -22,6 +22,29 @@ int libxl__netbuffer_enabled(libxl__gc *gc)
     return 0;
 }
 
+int init_subkind_nic(libxl__remus_devices_state *rds)
+{
+    return 0;
+}
+
+void cleanup_subkind_nic(libxl__remus_devices_state *rds)
+{
+    return;
+}
+
+static void nic_setup(libxl__egc *egc, libxl__remus_device *dev)
+{
+    STATE_AO_GC(dev->rds->ao);
+
+    dev->aodev.rc = ERROR_FAIL;
+    dev->aodev.callback(egc, &dev->aodev);
+}
+
+const libxl__remus_device_instance_ops remus_device_nic = {
+    .kind = LIBXL__DEVICE_KIND_VIF,
+    .setup = nic_setup,
+};
+
 /*
  * Local variables:
  * mode: C
