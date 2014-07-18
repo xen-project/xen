@@ -8,6 +8,7 @@
 
 #include <xen/libelf.h>
 #include <xen/device_tree.h>
+#include <asm/setup.h>
 
 struct kernel_info {
 #ifdef CONFIG_ARM_64
@@ -16,7 +17,7 @@ struct kernel_info {
 
     void *fdt; /* flat device tree */
     paddr_t unassigned_mem; /* RAM not (yet) assigned to a bank */
-    struct dt_mem_info mem;
+    struct meminfo mem;
 
     /* kernel entry point */
     paddr_t entry;

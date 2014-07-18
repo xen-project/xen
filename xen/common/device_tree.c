@@ -23,8 +23,8 @@
 #include <xen/cpumask.h>
 #include <xen/ctype.h>
 #include <xen/lib.h>
+#include <asm/setup.h>
 
-struct dt_early_info __initdata early_info;
 const void *device_tree_flattened;
 dt_irq_xlate_func dt_irq_xlate;
 /* Host device tree */
@@ -238,10 +238,10 @@ const char *device_tree_bootargs(const void *fdt)
     prop = fdt_get_property(fdt, node, "xen,xen-bootargs", NULL);
     if ( prop == NULL )
     {
-        struct dt_mb_module *dom0_mod = NULL;
+        struct bootmodule *dom0_mod = NULL;
 
-        if ( early_info.modules.nr_mods >= MOD_KERNEL )
-            dom0_mod = &early_info.modules.module[MOD_KERNEL];
+        if ( bootinfo.modules.nr_mods >= MOD_KERNEL )
+            dom0_mod = &bootinfo.modules.module[MOD_KERNEL];
 
         if (fdt_get_property(fdt, node, "xen,dom0-bootargs", NULL) ||
             ( dom0_mod && dom0_mod->cmdline[0] ) )
@@ -319,14 +319,14 @@ static void __init process_memory_node(const void *fdt, int node,
     cell = (const __be32 *)prop->data;
     banks = fdt32_to_cpu(prop->len) / (reg_cells * sizeof (u32));
 
-    for ( i = 0; i < banks && early_info.mem.nr_banks < NR_MEM_BANKS; i++ )
+    for ( i = 0; i < banks && bootinfo.mem.nr_banks < NR_MEM_BANKS; i++ )
     {
         device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
         if ( !size )
             continue;
-        early_info.mem.bank[early_info.mem.nr_banks].start = start;
-        early_info.mem.bank[early_info.mem.nr_banks].size = size;
-        early_info.mem.nr_banks++;
+        bootinfo.mem.bank[bootinfo.mem.nr_banks].start = start;
+        bootinfo.mem.bank[bootinfo.mem.nr_banks].size = size;
+        bootinfo.mem.nr_banks++;
     }
 }
 
@@ -337,7 +337,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
     const struct fdt_property *prop;
     const __be32 *cell;
     int nr;
-    struct dt_mb_module *mod;
+    struct bootmodule *mod;
     int len;
 
     if ( fdt_node_check_compatible(fdt, node, "xen,linux-zimage") == 0 ||
@@ -351,7 +351,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
     else
         panic("%s not a known xen multiboot type\n", name);
 
-    mod = &early_info.modules.module[nr];
+    mod = &bootinfo.modules.module[nr];
 
     prop = fdt_get_property(fdt, node, "reg", &len);
     if ( !prop )
@@ -376,8 +376,8 @@ static void __init process_multiboot_node(const void *fdt, int node,
     else
         mod->cmdline[0] = 0;
 
-    if ( nr > early_info.modules.nr_mods )
-        early_info.modules.nr_mods = nr;
+    if ( nr > bootinfo.modules.nr_mods )
+        bootinfo.modules.nr_mods = nr;
 }
 
 static void __init process_chosen_node(const void *fdt, int node,
@@ -385,7 +385,7 @@ static void __init process_chosen_node(const void *fdt, int node,
                                        u32 address_cells, u32 size_cells)
 {
     const struct fdt_property *prop;
-    struct dt_mb_module *mod = &early_info.modules.module[MOD_INITRD];
+    struct bootmodule *mod = &bootinfo.modules.module[MOD_INITRD];
     paddr_t start, end;
     int len;
 
@@ -427,7 +427,7 @@ static void __init process_chosen_node(const void *fdt, int node,
     mod->start = start;
     mod->size = end - start;
 
-    early_info.modules.nr_mods = max(MOD_INITRD, early_info.modules.nr_mods);
+    bootinfo.modules.nr_mods = max(MOD_INITRD, bootinfo.modules.nr_mods);
 }
 
 static int __init early_scan_node(const void *fdt,
@@ -448,8 +448,8 @@ static int __init early_scan_node(const void *fdt,
 
 static void __init early_print_info(void)
 {
-    struct dt_mem_info *mi = &early_info.mem;
-    struct dt_module_info *mods = &early_info.modules;
+    struct meminfo *mi = &bootinfo.mem;
+    struct bootmodules *mods = &bootinfo.modules;
     int i, nr_rsvd;
 
     for ( i = 0; i < mi->nr_banks; i++ )
@@ -485,18 +485,18 @@ static void __init early_print_info(void)
  */
 size_t __init device_tree_early_init(const void *fdt, paddr_t paddr)
 {
-    struct dt_mb_module *mod;
+    struct bootmodule *mod;
     int ret;
 
     ret = fdt_check_header(fdt);
     if ( ret < 0 )
         panic("No valid device tree\n");
 
-    mod = &early_info.modules.module[MOD_FDT];
+    mod = &bootinfo.modules.module[MOD_FDT];
     mod->start = paddr;
     mod->size = fdt_totalsize(fdt);
 
-    early_info.modules.nr_mods = max(MOD_FDT, early_info.modules.nr_mods);
+    bootinfo.modules.nr_mods = max(MOD_FDT, bootinfo.modules.nr_mods);
 
     device_tree_for_each_node((void *)fdt, early_scan_node, NULL);
     early_print_info();

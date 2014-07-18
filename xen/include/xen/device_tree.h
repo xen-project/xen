@@ -20,44 +20,6 @@
 
 #define DEVICE_TREE_MAX_DEPTH 16
 
-#define NR_MEM_BANKS 8
-
-#define MOD_XEN    0
-#define MOD_FDT    1
-#define MOD_KERNEL 2
-#define MOD_INITRD 3
-#define MOD_XSM    4
-#define NR_MODULES 5
-
-#define MOD_DISCARD_FIRST MOD_FDT
-
-struct membank {
-    paddr_t start;
-    paddr_t size;
-};
-
-struct dt_mem_info {
-    int nr_banks;
-    struct membank bank[NR_MEM_BANKS];
-};
-
-struct dt_mb_module {
-    paddr_t start;
-    paddr_t size;
-    char cmdline[1024];
-};
-
-struct dt_module_info {
-    int nr_mods;
-    /* Module 0 is Xen itself, followed by the provided modules-proper */
-    struct dt_mb_module module[NR_MODULES];
-};
-
-struct dt_early_info {
-    struct dt_mem_info mem;
-    struct dt_module_info modules;
-};
-
 /*
  * Struct used for matching a device
  */
@@ -195,7 +157,6 @@ typedef int (*device_tree_node_func)(const void *fdt,
                                      u32 address_cells, u32 size_cells,
                                      void *data);
 
-extern struct dt_early_info early_info;
 extern const void *device_tree_flattened;
 
 size_t __init device_tree_early_init(const void *fdt, paddr_t paddr);

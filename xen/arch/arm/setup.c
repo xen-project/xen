@@ -43,7 +43,10 @@
 #include <asm/cpufeature.h>
 #include <asm/platform.h>
 #include <asm/procinfo.h>
+#include <asm/setup.h>
 #include <xsm/xsm.h>
+
+struct bootinfo __initdata bootinfo;
 
 struct cpuinfo_arm __read_mostly boot_cpu_data;
 
@@ -182,7 +185,7 @@ static void dt_unreserved_regions(paddr_t s, paddr_t e,
 
 void __init discard_initial_modules(void)
 {
-    struct dt_module_info *mi = &early_info.modules;
+    struct bootmodules *mi = &bootinfo.modules;
     int i;
 
     for ( i = MOD_DISCARD_FIRST; i <= mi->nr_mods; i++ )
@@ -210,7 +213,7 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
                                        uint32_t size, paddr_t align,
                                        int first_mod)
 {
-    const struct dt_module_info *mi = &early_info.modules;
+    const struct bootmodules *mi = &bootinfo.modules;
     int i;
     int nr_rsvd;
 
@@ -275,7 +278,7 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
  */
 static paddr_t __init next_module(paddr_t s, paddr_t *end)
 {
-    struct dt_module_info *mi = &early_info.modules;
+    struct bootmodules *mi = &bootinfo.modules;
     paddr_t lowest = ~(paddr_t)0;
     int i;
 
@@ -308,7 +311,7 @@ static paddr_t __init next_module(paddr_t s, paddr_t *end)
  */
 static paddr_t __init get_xen_paddr(void)
 {
-    struct dt_mem_info *mi = &early_info.mem;
+    struct meminfo *mi = &bootinfo.mem;
     paddr_t min_size;
     paddr_t paddr = 0, last_end;
     int i;
@@ -357,8 +360,8 @@ static paddr_t __init get_xen_paddr(void)
     printk("Placing Xen at 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            paddr, paddr + min_size);
 
-    early_info.modules.module[MOD_XEN].start = paddr;
-    early_info.modules.module[MOD_XEN].size = min_size;
+    bootinfo.modules.module[MOD_XEN].start = paddr;
+    bootinfo.modules.module[MOD_XEN].size = min_size;
 
     return paddr;
 }
@@ -376,7 +379,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     int i;
     void *fdt;
 
-    if ( !early_info.mem.nr_banks )
+    if ( !bootinfo.mem.nr_banks )
         panic("No memory bank");
 
     /*
@@ -393,15 +396,15 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
      * We also track the number of actual RAM pages (i.e. not counting
      * the holes).
      */
-    ram_size  = early_info.mem.bank[0].size;
+    ram_size  = bootinfo.mem.bank[0].size;
 
-    contig_start = ram_start = early_info.mem.bank[0].start;
+    contig_start = ram_start = bootinfo.mem.bank[0].start;
     contig_end   = ram_end = ram_start + ram_size;
 
-    for ( i = 1; i < early_info.mem.nr_banks; i++ )
+    for ( i = 1; i < bootinfo.mem.nr_banks; i++ )
     {
-        paddr_t bank_start = early_info.mem.bank[i].start;
-        paddr_t bank_size = early_info.mem.bank[i].size;
+        paddr_t bank_start = bootinfo.mem.bank[i].start;
+        paddr_t bank_size = bootinfo.mem.bank[i].size;
         paddr_t bank_end = bank_start + bank_size;
 
         paddr_t new_ram_size = ram_size + bank_size;
@@ -434,11 +437,11 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
         ram_end = new_ram_end;
     }
 
-    if ( i != early_info.mem.nr_banks )
+    if ( i != bootinfo.mem.nr_banks )
     {
         printk("WARNING: only using %d out of %d memory banks\n",
-               i, early_info.mem.nr_banks);
-        early_info.mem.nr_banks = i;
+               i, bootinfo.mem.nr_banks);
+        bootinfo.mem.nr_banks = i;
     }
 
     total_pages = ram_pages = ram_size >> PAGE_SHIFT;
@@ -497,10 +500,10 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     device_tree_flattened = fdt;
 
     /* Add non-xenheap memory */
-    for ( i = 0; i < early_info.mem.nr_banks; i++ )
+    for ( i = 0; i < bootinfo.mem.nr_banks; i++ )
     {
-        paddr_t bank_start = early_info.mem.bank[i].start;
-        paddr_t bank_end = bank_start + early_info.mem.bank[i].size;
+        paddr_t bank_start = bootinfo.mem.bank[i].start;
+        paddr_t bank_end = bank_start + bootinfo.mem.bank[i].size;
 
         s = bank_start;
         while ( s < bank_end )
@@ -557,10 +560,10 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     void *fdt;
 
     total_pages = 0;
-    for ( bank = 0 ; bank < early_info.mem.nr_banks; bank++ )
+    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
     {
-        paddr_t bank_start = early_info.mem.bank[bank].start;
-        paddr_t bank_size = early_info.mem.bank[bank].size;
+        paddr_t bank_start = bootinfo.mem.bank[bank].start;
+        paddr_t bank_size = bootinfo.mem.bank[bank].size;
         paddr_t bank_end = bank_start + bank_size;
         paddr_t s, e;
 
@@ -609,11 +612,11 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
         }
     }
 
-    if ( bank != early_info.mem.nr_banks )
+    if ( bank != bootinfo.mem.nr_banks )
     {
         printk("WARNING: only using %d out of %d memory banks\n",
-               bank, early_info.mem.nr_banks);
-        early_info.mem.nr_banks = bank;
+               bank, bootinfo.mem.nr_banks);
+        bootinfo.mem.nr_banks = bank;
     }
 
     total_pages += ram_size >> PAGE_SHIFT;

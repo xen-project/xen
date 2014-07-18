@@ -69,7 +69,7 @@ static void place_modules(struct kernel_info *info,
 {
     /* Align DTB and initrd size to 2Mb. Linux only requires 4 byte alignment */
     const paddr_t initrd_len =
-        ROUNDUP(early_info.modules.module[MOD_INITRD].size, MB(2));
+        ROUNDUP(bootinfo.modules.module[MOD_INITRD].size, MB(2));
     const paddr_t dtb_len = ROUNDUP(fdt_totalsize(info->fdt), MB(2));
     const paddr_t modsize = initrd_len + dtb_len;
 
@@ -376,8 +376,8 @@ int kernel_probe(struct kernel_info *info)
 
     paddr_t start, size;
 
-    start = early_info.modules.module[MOD_KERNEL].start;
-    size = early_info.modules.module[MOD_KERNEL].size;
+    start = bootinfo.modules.module[MOD_KERNEL].start;
+    size = bootinfo.modules.module[MOD_KERNEL].size;
 
     if ( !size )
     {

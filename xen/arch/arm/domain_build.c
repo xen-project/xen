@@ -16,6 +16,7 @@
 #include <asm/setup.h>
 #include <asm/platform.h>
 #include <asm/psci.h>
+#include <asm/setup.h>
 
 #include <asm/gic.h>
 #include <xen/irq.h>
@@ -404,9 +405,9 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
     int res = 0;
     int had_dom0_bootargs = 0;
 
-    if ( early_info.modules.nr_mods >= MOD_KERNEL &&
-         early_info.modules.module[MOD_KERNEL].cmdline[0] )
-        bootargs = &early_info.modules.module[MOD_KERNEL].cmdline[0];
+    if ( bootinfo.modules.nr_mods >= MOD_KERNEL &&
+         bootinfo.modules.module[MOD_KERNEL].cmdline[0] )
+        bootargs = &bootinfo.modules.module[MOD_KERNEL].cmdline[0];
 
     dt_for_each_property_node (node, prop)
     {
@@ -465,7 +466,7 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
          * If the bootloader provides an initrd, we must create a placeholder
          * for the initrd properties. The values will be replaced later.
          */
-        if ( early_info.modules.module[MOD_INITRD].size )
+        if ( bootinfo.modules.module[MOD_INITRD].size )
         {
             u64 a = 0;
             res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
@@ -1221,8 +1222,8 @@ static void dtb_load(struct kernel_info *kinfo)
 static void initrd_load(struct kernel_info *kinfo)
 {
     paddr_t load_addr = kinfo->initrd_paddr;
-    paddr_t paddr = early_info.modules.module[MOD_INITRD].start;
-    paddr_t len = early_info.modules.module[MOD_INITRD].size;
+    paddr_t paddr = bootinfo.modules.module[MOD_INITRD].start;
+    paddr_t len = bootinfo.modules.module[MOD_INITRD].size;
     unsigned long offs;
     int node;
     int res;
