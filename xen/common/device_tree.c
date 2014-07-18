@@ -340,9 +340,11 @@ static void __init process_multiboot_node(const void *fdt, int node,
     struct dt_mb_module *mod;
     int len;
 
-    if ( fdt_node_check_compatible(fdt, node, "xen,linux-zimage") == 0 )
+    if ( fdt_node_check_compatible(fdt, node, "xen,linux-zimage") == 0 ||
+         fdt_node_check_compatible(fdt, node, "multiboot,kernel") == 0 )
         nr = MOD_KERNEL;
-    else if ( fdt_node_check_compatible(fdt, node, "xen,linux-initrd") == 0)
+    else if ( fdt_node_check_compatible(fdt, node, "xen,linux-initrd") == 0 ||
+              fdt_node_check_compatible(fdt, node, "multiboot,ramdisk") == 0 )
         nr = MOD_INITRD;
     else if ( fdt_node_check_compatible(fdt, node, "xen,xsm-policy") == 0 )
         nr = MOD_XSM;
@@ -435,7 +437,8 @@ static int __init early_scan_node(const void *fdt,
 {
     if ( device_tree_node_matches(fdt, node, "memory") )
         process_memory_node(fdt, node, name, address_cells, size_cells);
-    else if ( device_tree_node_compatible(fdt, node, "xen,multiboot-module" ) )
+    else if ( device_tree_node_compatible(fdt, node, "xen,multiboot-module" ) ||
+              device_tree_node_compatible(fdt, node, "multiboot,module" ))
         process_multiboot_node(fdt, node, name, address_cells, size_cells);
     else if ( depth == 1 && device_tree_node_matches(fdt, node, "chosen") )
         process_chosen_node(fdt, node, name, address_cells, size_cells);
