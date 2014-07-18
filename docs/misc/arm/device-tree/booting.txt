@@ -8,15 +8,31 @@ Each node contains the following properties:
 
 - compatible
 
-	Must be:
+	Must always include at least the generic compatiblity string:
 
-		"xen,<type>", "xen,multiboot-module"
+		"multiboot,module"
 
-	where <type> must be one of:
+	Optionally a more specific compatible string may be used in
+	addition to the above. One of:
 
-	- "linux-zimage" -- the dom0 kernel
-	- "linux-initrd" -- the dom0 ramdisk
-	- "xsm-policy"	 -- XSM policy blob
+	- "multiboot,kernel"	-- the dom0 kernel
+	- "multiboot,ramdisk"	-- the dom0 ramdisk
+	- "xen,xsm-policy"	-- XSM policy blob
+
+	It is normally recommended to include a more specific
+	compatible string (if one applies) in addition to the generic
+	string (which must always be present).
+
+        Xen 4.4 supported a different set of legacy compatible strings
+	which remain supported such that systems supporting both 4.4
+	and later can use a single DTB.
+
+	- "xen,multiboot-module" equivalent to "multiboot,module"
+	- "xen,linux-zimage"     equivalent to "multiboot,kernel"
+	- "xen,linux-initrd"     equivalent to "multiboot,ramdisk"
+
+	For compatibility with Xen 4.4 the more specific "xen,linux-*"
+	names are non-optional and must be included.
 
 - reg
 
@@ -29,6 +45,32 @@ Each node contains the following properties:
 	priority of this field vs. other mechanisms of specifying the
 	bootargs for the kernel.
 
+Examples
+========
+
+A boot module of unspecified type:
+
+	module@0xc0000000 {
+		compatible = "multiboot,module";
+		reg = <0xc0000000 0x1234>;
+		bootargs = "...";
+	};
+
+A boot module containing a ramdisk:
+
+	module@0xd0000000 {
+		compatible = "multiboot,ramdisk", "multiboot,module";
+		reg = <0xd0000000 0x5678>;
+	};
+
+The previous examples are compatible with Xen 4.5+ only.
+
+To be compatible with Xen 4.4 as well use the legacy names:
+
+	module@0xd0000000 {
+		compatible = "xen,linux-initrd", "xen,multiboot-module";
+		reg = <0xd0000000 0x5678>;
+	};
 
 Command lines
 =============
