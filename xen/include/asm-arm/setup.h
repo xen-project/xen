@@ -54,6 +54,7 @@ int construct_dom0(struct domain *d);
 void discard_initial_modules(void);
 
 size_t __init boot_fdt_info(const void *fdt, paddr_t paddr);
+const char __init *boot_fdt_cmdline(const void *fdt);
 
 #endif
 /*

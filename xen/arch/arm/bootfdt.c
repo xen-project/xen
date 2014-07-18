@@ -335,6 +335,33 @@ size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
     return fdt_totalsize(fdt);
 }
 
+const char *boot_fdt_cmdline(const void *fdt)
+{
+    int node;
+    const struct fdt_property *prop;
+
+    node = fdt_path_offset(fdt, "/chosen");
+    if ( node < 0 )
+        return NULL;
+
+    prop = fdt_get_property(fdt, node, "xen,xen-bootargs", NULL);
+    if ( prop == NULL )
+    {
+        struct bootmodule *dom0_mod = NULL;
+
+        if ( bootinfo.modules.nr_mods >= MOD_KERNEL )
+            dom0_mod = &bootinfo.modules.module[MOD_KERNEL];
+
+        if (fdt_get_property(fdt, node, "xen,dom0-bootargs", NULL) ||
+            ( dom0_mod && dom0_mod->cmdline[0] ) )
+            prop = fdt_get_property(fdt, node, "bootargs", NULL);
+    }
+    if ( prop == NULL )
+        return NULL;
+
+    return prop->data;
+}
+
 /*
  * Local variables:
  * mode: C

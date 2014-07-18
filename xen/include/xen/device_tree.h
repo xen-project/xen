@@ -159,8 +159,6 @@ typedef int (*device_tree_node_func)(const void *fdt,
 
 extern const void *device_tree_flattened;
 
-const char __init *device_tree_bootargs(const void *fdt);
-
 /**
  * dt_unflatten_host_device_tree - Unflatten the host device tree
  *

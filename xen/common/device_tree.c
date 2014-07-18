@@ -115,37 +115,6 @@ void dt_set_range(__be32 **cellp, const struct dt_device_node *np,
     dt_set_cell(cellp, dt_n_size_cells(np), size);
 }
 
-/**
- * device_tree_bootargs - return the bootargs (the Xen command line)
- * @fdt flat device tree.
- */
-const char *device_tree_bootargs(const void *fdt)
-{
-    int node;
-    const struct fdt_property *prop;
-
-    node = fdt_path_offset(fdt, "/chosen");
-    if ( node < 0 )
-        return NULL;
-
-    prop = fdt_get_property(fdt, node, "xen,xen-bootargs", NULL);
-    if ( prop == NULL )
-    {
-        struct bootmodule *dom0_mod = NULL;
-
-        if ( bootinfo.modules.nr_mods >= MOD_KERNEL )
-            dom0_mod = &bootinfo.modules.module[MOD_KERNEL];
-
-        if (fdt_get_property(fdt, node, "xen,dom0-bootargs", NULL) ||
-            ( dom0_mod && dom0_mod->cmdline[0] ) )
-            prop = fdt_get_property(fdt, node, "bootargs", NULL);
-    }
-    if ( prop == NULL )
-        return NULL;
-
-    return prop->data;
-}
-
 static void __init *unflatten_dt_alloc(unsigned long *mem, unsigned long size,
                                        unsigned long align)
 {
