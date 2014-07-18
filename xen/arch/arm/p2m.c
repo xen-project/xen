@@ -816,8 +816,8 @@ static int apply_p2m_changes(struct domain *d,
         unsigned long sgfn = paddr_to_pfn(start_gpaddr);
         unsigned long egfn = paddr_to_pfn(end_gpaddr);
 
-        p2m->max_mapped_gfn = MAX(p2m->max_mapped_gfn, egfn);
-        p2m->lowest_mapped_gfn = MIN(p2m->lowest_mapped_gfn, sgfn);
+        p2m->max_mapped_gfn = max(p2m->max_mapped_gfn, egfn);
+        p2m->lowest_mapped_gfn = min(p2m->lowest_mapped_gfn, sgfn);
     }
 
     rc = 0;

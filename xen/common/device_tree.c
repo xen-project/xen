@@ -427,7 +427,7 @@ static void __init process_chosen_node(const void *fdt, int node,
     mod->start = start;
     mod->size = end - start;
 
-    early_info.modules.nr_mods = MAX(MOD_INITRD, early_info.modules.nr_mods);
+    early_info.modules.nr_mods = max(MOD_INITRD, early_info.modules.nr_mods);
 }
 
 static int __init early_scan_node(const void *fdt,
