@@ -25,8 +25,9 @@ Each node contains the following properties:
 
 - bootargs (optional)
 
-	Command line associated with this module. This is deprecated and should
-	be replaced by the bootargs variations described below.
+	Command line associated with this module. See below for the
+	priority of this field vs. other mechanisms of specifying the
+	bootargs for the kernel.
 
 
 Command lines
