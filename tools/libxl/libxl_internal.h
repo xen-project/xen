@@ -2150,6 +2150,8 @@ struct libxl__ao_device {
     libxl__async_exec_state aes;
     /* If we need to update JSON config */
     bool update_json;
+    /* for asynchronous execution of synchronous-only syscalls etc. */
+    libxl__ev_child child;
 };
 
 /*
