@@ -8,3 +8,13 @@ Using Remus with libxl on Xen 4.5 and higher:
  or higher along with the development headers and command line utilities.
  If your distro does not have the appropriate libnl3 version, you can find
  the latest source tarball of libnl3 at http://www.carisma.slowglass.com/~tgr/libnl/
+
+Disk replication:
+ VMs protected by Remus need to use DRBD based disk backends. Specifically, you
+ need a compile and install a custom version of DRBD, that is available publicly
+ at https://github.com/rshriram/remus-drbd
+ This code is based on DRBD 8.3.11 and uses a new replication protocol (named
+ protocol D) for asynchronous disk checkpoint replication. A protected VM's DRBD
+ disks on the primary and backup hosts need to be configured to use protocol D
+ as the replication protocol. An example resource configuration file can be found
+ in the aforementioned github repository.

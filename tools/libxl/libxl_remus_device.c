@@ -18,8 +18,10 @@
 #include "libxl_internal.h"
 
 extern const libxl__remus_device_instance_ops remus_device_nic;
+extern const libxl__remus_device_instance_ops remus_device_drbd_disk;
 static const libxl__remus_device_instance_ops *remus_ops[] = {
     &remus_device_nic,
+    &remus_device_drbd_disk,
     NULL,
 };
 
@@ -36,6 +38,9 @@ static int init_device_subkind(libxl__remus_devices_state *rds)
         if (rc) goto out;
     }
 
+    rc = init_subkind_drbd_disk(rds);
+    if (rc) goto out;
+
     rc = 0;
 out:
     return rc;
@@ -48,6 +53,8 @@ static void cleanup_device_subkind(libxl__remus_devices_state *rds)
 
     if (libxl__netbuffer_enabled(gc))
         cleanup_subkind_nic(rds);
+
+    cleanup_subkind_drbd_disk(rds);
 }
 
 /*----- setup() and teardown() -----*/

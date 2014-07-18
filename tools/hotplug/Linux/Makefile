@@ -24,6 +24,7 @@ XEN_SCRIPTS += xen-hotplug-cleanup
 XEN_SCRIPTS += external-device-migrate
 XEN_SCRIPTS += vscsi
 XEN_SCRIPTS += block-iscsi
+XEN_SCRIPTS += block-drbd-probe
 XEN_SCRIPTS += $(XEN_SCRIPTS-y)
 
 SUBDIRS-$(CONFIG_SYSTEMD) += systemd

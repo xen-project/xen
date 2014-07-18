@@ -56,7 +56,7 @@ else
 LIBXL_OBJS-y += libxl_nonetbuffer.o
 endif
 
-LIBXL_OBJS-y += libxl_remus_device.o
+LIBXL_OBJS-y += libxl_remus_device.o libxl_remus_disk_drbd.o
 
 LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o libxl_x86.o
 LIBXL_OBJS-$(CONFIG_ARM) += libxl_nocpuid.o libxl_arm.o

@@ -825,6 +825,7 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
         goto out;
     }
     rds->device_kind_flags |= (1 << LIBXL__DEVICE_KIND_VIF);
+    rds->device_kind_flags |= (1 << LIBXL__DEVICE_KIND_VBD);
 
     rds->ao = ao;
     rds->domid = domid;
