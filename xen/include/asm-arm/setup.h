@@ -64,6 +64,7 @@ struct bootmodule *add_boot_module(bootmodule_kind kind,
                                    paddr_t start, paddr_t size,
                                    const char *cmdline);
 struct bootmodule *boot_module_find_by_kind(bootmodule_kind kind);
+const char * __init boot_module_kind_as_string(bootmodule_kind kind);
 
 #endif
 /*

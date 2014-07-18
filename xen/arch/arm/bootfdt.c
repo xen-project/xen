@@ -165,6 +165,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
                                           const char *name,
                                           u32 address_cells, u32 size_cells)
 {
+    static int kind_guess = 0;
     const struct fdt_property *prop;
     const __be32 *cell;
     bootmodule_kind kind;
@@ -181,7 +182,18 @@ static void __init process_multiboot_node(const void *fdt, int node,
     else if ( fdt_node_check_compatible(fdt, node, "xen,xsm-policy") == 0 )
         kind = BOOTMOD_XSM;
     else
-        panic("%s not a known xen multiboot type\n", name);
+        kind = BOOTMOD_UNKNOWN;
+
+    /* Guess that first two unknown are kernel and ramdisk respectively. */
+    if ( kind == BOOTMOD_UNKNOWN )
+    {
+        switch ( kind_guess++ )
+        {
+        case 0: kind = BOOTMOD_KERNEL; break;
+        case 1: kind = BOOTMOD_RAMDISK; break;
+        default: break;
+        }
+    }
 
     prop = fdt_get_property(fdt, node, "reg", &len);
     if ( !prop )
@@ -281,10 +293,11 @@ static void __init early_print_info(void)
                      mi->bank[i].start + mi->bank[i].size - 1);
     printk("\n");
     for ( i = 0 ; i < mods->nr_mods; i++ )
-        printk("MODULE[%d]: %"PRIpaddr" - %"PRIpaddr" %s\n",
+        printk("MODULE[%d]: %"PRIpaddr" - %"PRIpaddr" %-12s %s\n",
                      i,
                      mods->module[i].start,
                      mods->module[i].start + mods->module[i].size,
+                     boot_module_kind_as_string(mods->module[i].kind),
                      mods->module[i].cmdline);
     nr_rsvd = fdt_num_mem_rsv(device_tree_flattened);
     for ( i = 0; i < nr_rsvd; i++ )

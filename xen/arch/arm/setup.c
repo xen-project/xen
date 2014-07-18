@@ -223,6 +223,20 @@ struct bootmodule * __init boot_module_find_by_kind(bootmodule_kind kind)
     return NULL;
 }
 
+const char * __init boot_module_kind_as_string(bootmodule_kind kind)
+{
+    switch ( kind )
+    {
+    case BOOTMOD_XEN:     return "Xen";
+    case BOOTMOD_FDT:     return "Device Tree";
+    case BOOTMOD_KERNEL:  return "Kernel";
+    case BOOTMOD_RAMDISK: return "Ramdisk";
+    case BOOTMOD_XSM:     return "XSM";
+    case BOOTMOD_UNKNOWN: return "Unknown";
+    default: BUG();
+    }
+}
+
 void __init discard_initial_modules(void)
 {
     struct bootmodules *mi = &bootinfo.modules;
