@@ -684,7 +684,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     /* This is mapped by head.S */
     device_tree_flattened = (void *)BOOT_FDT_VIRT_START
         + (fdt_paddr & ((1 << SECOND_SHIFT) - 1));
-    fdt_size = device_tree_early_init(device_tree_flattened, fdt_paddr);
+    fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
 
     cmdline = device_tree_bootargs(device_tree_flattened);
     printk("Command line: %s\n", cmdline);

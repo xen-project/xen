@@ -159,10 +159,7 @@ typedef int (*device_tree_node_func)(const void *fdt,
 
 extern const void *device_tree_flattened;
 
-size_t __init device_tree_early_init(const void *fdt, paddr_t paddr);
-
 const char __init *device_tree_bootargs(const void *fdt);
-void __init device_tree_dump(const void *fdt);
 
 /**
  * dt_unflatten_host_device_tree - Unflatten the host device tree
