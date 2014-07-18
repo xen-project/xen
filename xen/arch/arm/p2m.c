@@ -743,6 +743,8 @@ static int apply_p2m_changes(struct domain *d,
                 goto out;
             }
             cur_first_page = p2m_first_level_index(addr);
+            /* Any mapping further down is now invalid */
+            cur_first_offset = cur_second_offset = ~0;
         }
 
         /* We only use a 3 level p2m at the moment, so no level 0,
@@ -765,6 +767,8 @@ static int apply_p2m_changes(struct domain *d,
             if (second) unmap_domain_page(second);
             second = map_domain_page(first[first_table_offset(addr)].p2m.base);
             cur_first_offset = first_table_offset(addr);
+            /* Any mapping further down is now invalid */
+            cur_second_offset = ~0;
         }
         /* else: second already valid */
 
