@@ -61,6 +61,8 @@ libxl_error = Enumeration("error", [
     (-15, "LOCK_FAIL"),
     (-16, "JSON_CONFIG_EMPTY"),
     (-17, "DEVICE_EXISTS"),
+    (-18, "REMUS_DEVOPS_DOES_NOT_MATCH"),
+    (-19, "REMUS_DEVICE_NOT_SUPPORTED"),
     ], value_namespace = "")
 
 libxl_domain_type = Enumeration("domain_type", [

@@ -782,6 +782,10 @@ out:
     return ptr;
 }
 
+static void libxl__remus_setup_done(libxl__egc *egc,
+                                    libxl__remus_devices_state *rds, int rc);
+static void libxl__remus_setup_failed(libxl__egc *egc,
+                                      libxl__remus_devices_state *rds, int rc);
 static void remus_failover_cb(libxl__egc *egc,
                               libxl__domain_suspend_state *dss, int rc);
 
@@ -813,14 +817,48 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
 
     assert(info);
 
-    /* TBD: Remus setup - i.e. attach qdisc, enable disk buffering, etc */
+    /* Convenience aliases */
+    libxl__remus_devices_state *const rds = &dss->rds;
+    rds->ao = ao;
+    rds->domid = domid;
+    rds->callback = libxl__remus_setup_done;
 
     /* Point of no return */
-    libxl__domain_suspend(egc, dss);
+    libxl__remus_devices_setup(egc, rds);
     return AO_INPROGRESS;
 
  out:
     return AO_ABORT(rc);
+}
+
+static void libxl__remus_setup_done(libxl__egc *egc,
+                                    libxl__remus_devices_state *rds, int rc)
+{
+    libxl__domain_suspend_state *dss = CONTAINER_OF(rds, *dss, rds);
+    STATE_AO_GC(dss->ao);
+
+    if (!rc) {
+        libxl__domain_suspend(egc, dss);
+        return;
+    }
+
+    LOG(ERROR, "Remus: failed to setup device for guest with domid %u, rc %d",
+        dss->domid, rc);
+    rds->callback = libxl__remus_setup_failed;
+    libxl__remus_devices_teardown(egc, rds);
+}
+
+static void libxl__remus_setup_failed(libxl__egc *egc,
+                                      libxl__remus_devices_state *rds, int rc)
+{
+    libxl__domain_suspend_state *dss = CONTAINER_OF(rds, *dss, rds);
+    STATE_AO_GC(dss->ao);
+
+    if (rc)
+        LOG(ERROR, "Remus: failed to teardown device after setup failed"
+            " for guest with domid %u, rc %d", dss->domid, rc);
+
+    dss->callback(egc, dss, rc);
 }
 
 static void remus_failover_cb(libxl__egc *egc,
@@ -831,10 +869,6 @@ static void remus_failover_cb(libxl__egc *egc,
      * With Remus, if we reach this point, it means either
      * backup died or some network error occurred preventing us
      * from sending checkpoints.
-     */
-
-    /* TBD: Remus cleanup - i.e. detach qdisc, release other
-     * resources.
      */
     libxl__ao_complete(egc, ao, rc);
 }
