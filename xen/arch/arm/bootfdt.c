@@ -167,22 +167,21 @@ static void __init process_multiboot_node(const void *fdt, int node,
 {
     const struct fdt_property *prop;
     const __be32 *cell;
-    int nr;
-    struct bootmodule *mod;
+    bootmodule_kind kind;
+    paddr_t start, size;
+    const char *cmdline;
     int len;
 
     if ( fdt_node_check_compatible(fdt, node, "xen,linux-zimage") == 0 ||
          fdt_node_check_compatible(fdt, node, "multiboot,kernel") == 0 )
-        nr = MOD_KERNEL;
+        kind = BOOTMOD_KERNEL;
     else if ( fdt_node_check_compatible(fdt, node, "xen,linux-initrd") == 0 ||
               fdt_node_check_compatible(fdt, node, "multiboot,ramdisk") == 0 )
-        nr = MOD_INITRD;
+        kind = BOOTMOD_RAMDISK;
     else if ( fdt_node_check_compatible(fdt, node, "xen,xsm-policy") == 0 )
-        nr = MOD_XSM;
+        kind = BOOTMOD_XSM;
     else
         panic("%s not a known xen multiboot type\n", name);
-
-    mod = &bootinfo.modules.module[nr];
 
     prop = fdt_get_property(fdt, node, "reg", &len);
     if ( !prop )
@@ -193,22 +192,19 @@ static void __init process_multiboot_node(const void *fdt, int node,
                     name);
 
     cell = (const __be32 *)prop->data;
-    device_tree_get_reg(&cell, address_cells, size_cells,
-                        &mod->start, &mod->size);
+    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
 
     prop = fdt_get_property(fdt, node, "bootargs", &len);
     if ( prop )
     {
-        if ( len > sizeof(mod->cmdline) )
-            panic("module %d command line too long\n", nr);
-
-        safe_strcpy(mod->cmdline, prop->data);
+        if ( len > BOOTMOD_MAX_CMDLINE )
+            panic("module %s command line too long\n", name);
+        cmdline = prop->data;
     }
     else
-        mod->cmdline[0] = 0;
+        cmdline = NULL;
 
-    if ( nr > bootinfo.modules.nr_mods )
-        bootinfo.modules.nr_mods = nr;
+    add_boot_module(kind, start, size, cmdline);
 }
 
 static void __init process_chosen_node(const void *fdt, int node,
@@ -216,7 +212,6 @@ static void __init process_chosen_node(const void *fdt, int node,
                                        u32 address_cells, u32 size_cells)
 {
     const struct fdt_property *prop;
-    struct bootmodule *mod = &bootinfo.modules.module[MOD_INITRD];
     paddr_t start, end;
     int len;
 
@@ -255,10 +250,7 @@ static void __init process_chosen_node(const void *fdt, int node,
 
     printk("Initrd %"PRIpaddr"-%"PRIpaddr"\n", start, end);
 
-    mod->start = start;
-    mod->size = end - start;
-
-    bootinfo.modules.nr_mods = max(MOD_INITRD, bootinfo.modules.nr_mods);
+    add_boot_module(BOOTMOD_RAMDISK, start, end-start, NULL);
 }
 
 static int __init early_scan_node(const void *fdt,
@@ -288,7 +280,7 @@ static void __init early_print_info(void)
                      mi->bank[i].start,
                      mi->bank[i].start + mi->bank[i].size - 1);
     printk("\n");
-    for ( i = 1 ; i < mods->nr_mods + 1; i++ )
+    for ( i = 0 ; i < mods->nr_mods; i++ )
         printk("MODULE[%d]: %"PRIpaddr" - %"PRIpaddr" %s\n",
                      i,
                      mods->module[i].start,
@@ -316,18 +308,13 @@ static void __init early_print_info(void)
  */
 size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
 {
-    struct bootmodule *mod;
     int ret;
 
     ret = fdt_check_header(fdt);
     if ( ret < 0 )
         panic("No valid device tree\n");
 
-    mod = &bootinfo.modules.module[MOD_FDT];
-    mod->start = paddr;
-    mod->size = fdt_totalsize(fdt);
-
-    bootinfo.modules.nr_mods = max(MOD_FDT, bootinfo.modules.nr_mods);
+    add_boot_module(BOOTMOD_FDT, paddr, fdt_totalsize(fdt), NULL);
 
     device_tree_for_each_node((void *)fdt, early_scan_node, NULL);
     early_print_info();
@@ -347,10 +334,8 @@ const char *boot_fdt_cmdline(const void *fdt)
     prop = fdt_get_property(fdt, node, "xen,xen-bootargs", NULL);
     if ( prop == NULL )
     {
-        struct bootmodule *dom0_mod = NULL;
-
-        if ( bootinfo.modules.nr_mods >= MOD_KERNEL )
-            dom0_mod = &bootinfo.modules.module[MOD_KERNEL];
+        struct bootmodule *dom0_mod =
+            boot_module_find_by_kind(BOOTMOD_KERNEL);
 
         if (fdt_get_property(fdt, node, "xen,dom0-bootargs", NULL) ||
             ( dom0_mod && dom0_mod->cmdline[0] ) )

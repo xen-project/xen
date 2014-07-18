@@ -5,14 +5,17 @@
 
 #define NR_MEM_BANKS 8
 
-#define MOD_XEN    0
-#define MOD_FDT    1
-#define MOD_KERNEL 2
-#define MOD_INITRD 3
-#define MOD_XSM    4
-#define NR_MODULES 5
+#define MAX_MODULES 5 /* Current maximum useful modules */
 
-#define MOD_DISCARD_FIRST MOD_FDT
+typedef enum {
+    BOOTMOD_XEN,
+    BOOTMOD_FDT,
+    BOOTMOD_KERNEL,
+    BOOTMOD_RAMDISK,
+    BOOTMOD_XSM,
+    BOOTMOD_UNKNOWN
+}  bootmodule_kind;
+
 
 struct membank {
     paddr_t start;
@@ -24,16 +27,17 @@ struct meminfo {
     struct membank bank[NR_MEM_BANKS];
 };
 
+#define BOOTMOD_MAX_CMDLINE 1024
 struct bootmodule {
+    bootmodule_kind kind;
     paddr_t start;
     paddr_t size;
-    char cmdline[1024];
+    char cmdline[BOOTMOD_MAX_CMDLINE];
 };
 
 struct bootmodules {
     int nr_mods;
-    /* Module 0 is Xen itself, followed by the provided modules-proper */
-    struct bootmodule module[NR_MODULES];
+    struct bootmodule module[MAX_MODULES];
 };
 
 struct bootinfo {
@@ -55,6 +59,11 @@ void discard_initial_modules(void);
 
 size_t __init boot_fdt_info(const void *fdt, paddr_t paddr);
 const char __init *boot_fdt_cmdline(const void *fdt);
+
+struct bootmodule *add_boot_module(bootmodule_kind kind,
+                                   paddr_t start, paddr_t size,
+                                   const char *cmdline);
+struct bootmodule *boot_module_find_by_kind(bootmodule_kind kind);
 
 #endif
 /*

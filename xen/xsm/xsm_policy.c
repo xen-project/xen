@@ -77,12 +77,15 @@ int __init xsm_multiboot_policy_init(unsigned long *module_map,
 #ifdef HAS_DEVICE_TREE
 int __init xsm_dt_policy_init(void)
 {
-    paddr_t paddr = early_info.modules.module[MOD_XSM].start;
-    paddr_t len = early_info.modules.module[MOD_XSM].size;
+    struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_XSM);
+    paddr_t paddr, len;
     xsm_magic_t magic;
 
-    if ( !len )
+    if ( !mod || !mod->size )
         return 0;
+
+    paddr = mod->start;
+    len = mod->size;
 
     copy_from_paddr(&magic, paddr, sizeof(magic));
 
@@ -106,3 +109,13 @@ int __init xsm_dt_policy_init(void)
     return 0;
 }
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

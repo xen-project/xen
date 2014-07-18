@@ -68,8 +68,8 @@ static void place_modules(struct kernel_info *info,
                           paddr_t kernbase, paddr_t kernend)
 {
     /* Align DTB and initrd size to 2Mb. Linux only requires 4 byte alignment */
-    const paddr_t initrd_len =
-        ROUNDUP(bootinfo.modules.module[MOD_INITRD].size, MB(2));
+    const struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_RAMDISK);
+    const paddr_t initrd_len = ROUNDUP(mod ? mod->size : 0, MB(2));
     const paddr_t dtb_len = ROUNDUP(fdt_totalsize(info->fdt), MB(2));
     const paddr_t modsize = initrd_len + dtb_len;
 
@@ -372,20 +372,21 @@ err:
 
 int kernel_probe(struct kernel_info *info)
 {
+    struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_KERNEL);
     int rc;
 
     paddr_t start, size;
 
-    start = bootinfo.modules.module[MOD_KERNEL].start;
-    size = bootinfo.modules.module[MOD_KERNEL].size;
-
-    if ( !size )
+    if ( !mod || !mod->size )
     {
         printk(XENLOG_ERR "Missing kernel boot module?\n");
         return -ENOENT;
     }
 
-    printk("Loading kernel from boot module %d\n", MOD_KERNEL);
+    start = mod->start;
+    size = mod->size;
+
+    printk("Loading kernel from boot module @ %"PRIpaddr"\n", start);
 
 #ifdef CONFIG_ARM_64
     rc = kernel_zimage64_probe(info, start, size);

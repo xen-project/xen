@@ -183,17 +183,58 @@ static void dt_unreserved_regions(paddr_t s, paddr_t e,
     cb(s, e);
 }
 
+struct bootmodule *add_boot_module(bootmodule_kind kind,
+                                   paddr_t start, paddr_t size,
+                                   const char *cmdline)
+{
+    struct bootmodules *mods = &bootinfo.modules;
+    struct bootmodule *mod;
+
+    if ( mods->nr_mods == MAX_MODULES )
+    {
+        printk("Ignoring %s boot module at %"PRIpaddr"-%"PRIpaddr" (too many)\n",
+               boot_module_kind_as_string(kind), start, start + size);
+        return NULL;
+    }
+
+    mod = &mods->module[mods->nr_mods++];
+    mod->kind = kind;
+    mod->start = start;
+    mod->size = size;
+    if ( cmdline )
+        safe_strcpy(mod->cmdline, cmdline);
+    else
+        mod->cmdline[0] = 0;
+
+    return mod;
+}
+
+struct bootmodule * __init boot_module_find_by_kind(bootmodule_kind kind)
+{
+    struct bootmodules *mods = &bootinfo.modules;
+    struct bootmodule *mod;
+    int i;
+    for (i = 0 ; i < mods->nr_mods ; i++ )
+    {
+        mod = &mods->module[i];
+        if ( mod->kind == kind )
+            return mod;
+    }
+    return NULL;
+}
+
 void __init discard_initial_modules(void)
 {
     struct bootmodules *mi = &bootinfo.modules;
     int i;
 
-    for ( i = MOD_DISCARD_FIRST; i <= mi->nr_mods; i++ )
+    for ( i = 0; i <= mi->nr_mods; i++ )
     {
         paddr_t s = mi->module[i].start;
         paddr_t e = s + PAGE_ALIGN(mi->module[i].size);
 
-        dt_unreserved_regions(s, e, init_domheap_pages, 0);
+        if ( mi->module[i].kind != BOOTMOD_XEN )
+            dt_unreserved_regions(s, e, init_domheap_pages, 0);
     }
 
     mi->nr_mods = 0;
@@ -335,7 +376,7 @@ static paddr_t __init get_xen_paddr(void)
         if ( bank->size >= min_size )
         {
             e = consider_modules(bank->start, bank->start + bank->size,
-                                 min_size, XEN_PADDR_ALIGN, 1);
+                                 min_size, XEN_PADDR_ALIGN, 0);
             if ( !e )
                 continue;
 
@@ -359,9 +400,6 @@ static paddr_t __init get_xen_paddr(void)
 
     printk("Placing Xen at 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            paddr, paddr + min_size);
-
-    bootinfo.modules.module[MOD_XEN].start = paddr;
-    bootinfo.modules.module[MOD_XEN].size = min_size;
 
     return paddr;
 }
@@ -665,7 +703,9 @@ void __init start_xen(unsigned long boot_phys_offset,
 {
     size_t fdt_size;
     int cpus, i;
+    paddr_t xen_paddr;
     const char *cmdline;
+    struct bootmodule *xen_bootmodule;
     struct domain *dom0;
 
     setup_cache();
@@ -690,7 +730,21 @@ void __init start_xen(unsigned long boot_phys_offset,
     printk("Command line: %s\n", cmdline);
     cmdline_parse(cmdline);
 
-    setup_pagetables(boot_phys_offset, get_xen_paddr());
+    /* Register Xen's load address as a boot module. */
+    xen_bootmodule = add_boot_module(BOOTMOD_XEN,
+                             (paddr_t)(uintptr_t)(_start + boot_phys_offset),
+                             (paddr_t)(uintptr_t)(_end - _start + 1), NULL);
+    BUG_ON(!xen_bootmodule);
+
+    xen_paddr = get_xen_paddr();
+    setup_pagetables(boot_phys_offset, xen_paddr);
+
+    /* Update Xen's address now that we have relocated. */
+    printk("Update BOOTMOD_XEN from %"PRIpaddr"-%"PRIpaddr" => %"PRIpaddr"-%"PRIpaddr"\n",
+           xen_bootmodule->start, xen_bootmodule->start + xen_bootmodule->size,
+           xen_paddr, xen_paddr + xen_bootmodule->size);
+    xen_bootmodule->start = xen_paddr;
+
     setup_mm(fdt_paddr, fdt_size);
 
     vm_init();

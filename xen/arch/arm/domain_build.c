@@ -405,9 +405,10 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
     int res = 0;
     int had_dom0_bootargs = 0;
 
-    if ( bootinfo.modules.nr_mods >= MOD_KERNEL &&
-         bootinfo.modules.module[MOD_KERNEL].cmdline[0] )
-        bootargs = &bootinfo.modules.module[MOD_KERNEL].cmdline[0];
+    struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_KERNEL);
+
+    if ( mod && mod->cmdline[0] )
+        bootargs = &mod->cmdline[0];
 
     dt_for_each_property_node (node, prop)
     {
@@ -454,6 +455,8 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
 
     if ( dt_node_path_is_equal(node, "/chosen") )
     {
+        struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_RAMDISK);
+
         if ( bootargs )
         {
             res = fdt_property(kinfo->fdt, "bootargs", bootargs,
@@ -466,7 +469,7 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
          * If the bootloader provides an initrd, we must create a placeholder
          * for the initrd properties. The values will be replaced later.
          */
-        if ( bootinfo.modules.module[MOD_INITRD].size )
+        if ( mod && mod->size )
         {
             u64 a = 0;
             res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
@@ -1221,17 +1224,20 @@ static void dtb_load(struct kernel_info *kinfo)
 
 static void initrd_load(struct kernel_info *kinfo)
 {
+    struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_RAMDISK);
     paddr_t load_addr = kinfo->initrd_paddr;
-    paddr_t paddr = bootinfo.modules.module[MOD_INITRD].start;
-    paddr_t len = bootinfo.modules.module[MOD_INITRD].size;
+    paddr_t paddr, len;
     unsigned long offs;
     int node;
     int res;
     __be32 val[2];
     __be32 *cellp;
 
-    if ( !len )
+    if ( !mod || !mod->size )
         return;
+
+    paddr = mod->start;
+    len = mod->size;
 
     printk("Loading dom0 initrd from %"PRIpaddr" to 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            paddr, load_addr, load_addr + len);
