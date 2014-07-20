@@ -332,6 +332,7 @@ error_post_irq:
  * returns 0 on success and non-zero on error */
 int tpmif_change_state(tpmif_t* tpmif, enum xenbus_state state)
 {
+   int tempst;
    char path[512];
    char *value;
    char *err;
@@ -347,11 +348,12 @@ int tpmif_change_state(tpmif_t* tpmif, enum xenbus_state state)
       free(err);
       return -1;
    }
-   if(sscanf(value, "%d", &readst) != 1) {
+   if(sscanf(value, "%d", &tempst) != 1) {
       TPMBACK_ERR("Non integer value (%s) in %s ??\n", value, path);
       free(value);
       return -1;
    }
+   readst = (enum xenbus_state) tempst;
    free(value);
 
    /* It's possible that the backend state got updated by hotplug or something else behind our back */
