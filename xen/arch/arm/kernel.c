@@ -116,6 +116,7 @@ static void place_modules(struct kernel_info *info,
 
     info->dtb_paddr = modbase;
     info->initrd_paddr = info->dtb_paddr + dtb_len;
+    info->initrd_bootmodule = mod;
 }
 
 static paddr_t kernel_zimage_place(struct kernel_info *info)
@@ -383,6 +384,7 @@ int kernel_probe(struct kernel_info *info)
         return -ENOENT;
     }
 
+    info->kernel_bootmodule = mod;
     start = mod->start;
     size = mod->size;
 

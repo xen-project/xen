@@ -405,7 +405,7 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
     int res = 0;
     int had_dom0_bootargs = 0;
 
-    struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_KERNEL);
+    const struct bootmodule *mod = kinfo->kernel_bootmodule;
 
     if ( mod && mod->cmdline[0] )
         bootargs = &mod->cmdline[0];
@@ -455,7 +455,7 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
 
     if ( dt_node_path_is_equal(node, "/chosen") )
     {
-        struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_RAMDISK);
+        const struct bootmodule *mod = kinfo->initrd_bootmodule;
 
         if ( bootargs )
         {
@@ -1224,7 +1224,7 @@ static void dtb_load(struct kernel_info *kinfo)
 
 static void initrd_load(struct kernel_info *kinfo)
 {
-    struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_RAMDISK);
+    const struct bootmodule *mod = kinfo->initrd_bootmodule;
     paddr_t load_addr = kinfo->initrd_paddr;
     paddr_t paddr, len;
     unsigned long offs;
