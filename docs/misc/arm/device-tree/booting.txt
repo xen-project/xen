@@ -23,7 +23,13 @@ Each node contains the following properties:
 	compatible string (if one applies) in addition to the generic
 	string (which must always be present).
 
-        Xen 4.4 supported a different set of legacy compatible strings
+	Xen will assume that the first module which lacks a more
+	specific compatible string is a "multiboot,kernel" and that
+	the second such is a "multiboot,ramdisk". Any subsequent
+	modules which lack a specific compatiblity string will not
+	receive any special treatment.
+
+	Xen 4.4 supported a different set of legacy compatible strings
 	which remain supported such that systems supporting both 4.4
 	and later can use a single DTB.
 
