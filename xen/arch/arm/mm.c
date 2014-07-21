@@ -68,6 +68,7 @@ struct domain *dom_xen, *dom_io, *dom_cow;
 lpae_t boot_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 #ifdef CONFIG_ARM_64
 lpae_t boot_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+lpae_t boot_first_id[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 #endif
 lpae_t boot_second[LPAE_ENTRIES]  __attribute__((__aligned__(4096)));
 lpae_t boot_third[LPAE_ENTRIES]  __attribute__((__aligned__(4096)));
@@ -491,6 +492,8 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 #ifdef CONFIG_ARM_64
     memset(boot_first, 0x0, PAGE_SIZE);
     clean_and_invalidate_xen_dcache(boot_first);
+    memset(boot_first_id, 0x0, PAGE_SIZE);
+    clean_and_invalidate_xen_dcache(boot_first_id);
 #endif
     memset(boot_second, 0x0, PAGE_SIZE);
     clean_and_invalidate_xen_dcache(boot_second);

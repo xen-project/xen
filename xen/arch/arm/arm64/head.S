@@ -267,13 +267,28 @@ skip_bss:
         orr   x2, x1, x3             /*       + rights for linear PT */
         str   x2, [x4, #0]           /* Map it in slot 0 */
 
-        /* ... map of paddr(start) in boot_pgtable */
+        /* ... map of paddr(start) in boot_pgtable+boot_first_id */
         lsr   x1, x19, #ZEROETH_SHIFT/* Offset of base paddr in boot_pgtable */
         cbz   x1, 1f                 /* It's in slot 0, map in boot_first
                                       * or boot_second later on */
 
-        lsl   x2, x1, #ZEROETH_SHIFT /* Base address for 512GB mapping */
-        mov   x3, #PT_MEM            /* x2 := Section mapping */
+        /* Level zero does not support superpage mappings, so we have
+         * to use an extra first level page in which we create a 1GB mapping.
+         */
+        ldr   x2, =boot_first_id
+        add   x2, x2, x20            /* x2 := paddr (boot_first_id) */
+
+        mov   x3, #PT_PT             /* x2 := table map of boot_first_id */
+        orr   x2, x2, x3             /*       + rights for linear PT */
+        lsl   x1, x1, #3             /* x1 := Slot offset */
+        str   x2, [x4, x1]
+
+        ldr   x4, =boot_first_id     /* Next level into boot_first_id */
+        add   x4, x4, x20            /* x4 := paddr(boot_first_id) */
+
+        lsr   x1, x19, #FIRST_SHIFT  /* x1 := Offset of base paddr in boot_first_id */
+        lsl   x2, x1, #FIRST_SHIFT   /* x2 := Base address for 1GB mapping */
+        mov   x3, #PT_MEM            /* x2 := Section map */
         orr   x2, x2, x3
         and   x1, x1, #LPAE_ENTRY_MASK /* x1 := Slot offset */
         lsl   x1, x1, #3
