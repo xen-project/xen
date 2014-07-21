@@ -47,8 +47,9 @@ struct domain *dom_xen, *dom_io, *dom_cow;
  * to the CPUs own pagetables.
  *
  * These pagetables have a very simple structure. They include:
- *  - a 2MB mapping of xen at XEN_VIRT_START, boot_first and
- *    boot_second are used to populate the trie down to that mapping.
+ *  - 2MB worth of 4K mappings of xen at XEN_VIRT_START, boot_first and
+ *    boot_second are used to populate the tables down to boot_third
+ *    which contains the actual mapping.
  *  - a 1:1 mapping of xen at its current physical address. This uses a
  *    section mapping at whichever of boot_{pgtable,first,second}
  *    covers that physical address.
@@ -69,6 +70,7 @@ lpae_t boot_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 lpae_t boot_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 #endif
 lpae_t boot_second[LPAE_ENTRIES]  __attribute__((__aligned__(4096)));
+lpae_t boot_third[LPAE_ENTRIES]  __attribute__((__aligned__(4096)));
 
 /* Main runtime page tables */
 
@@ -492,6 +494,8 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 #endif
     memset(boot_second, 0x0, PAGE_SIZE);
     clean_and_invalidate_xen_dcache(boot_second);
+    memset(boot_third, 0x0, PAGE_SIZE);
+    clean_and_invalidate_xen_dcache(boot_third);
 
     /* Break up the Xen mapping into 4k pages and protect them separately. */
     for ( i = 0; i < LPAE_ENTRIES; i++ )

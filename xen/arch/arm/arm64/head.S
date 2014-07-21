@@ -27,6 +27,7 @@
 
 #define PT_PT     0xf7f /* nG=1 AF=1 SH=11 AP=01 NS=1 ATTR=111 T=1 P=1 */
 #define PT_MEM    0xf7d /* nG=1 AF=1 SH=11 AP=01 NS=1 ATTR=111 T=0 P=1 */
+#define PT_MEM_L3 0xf7f /* nG=1 AF=1 SH=11 AP=01 NS=1 ATTR=111 T=1 P=1 */
 #define PT_DEV    0xe71 /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=100 T=0 P=1 */
 #define PT_DEV_L3 0xe73 /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=100 T=1 P=1 */
 
@@ -95,7 +96,7 @@
          *
          * This must be the very first address in the loaded image.
          * It should be linked at XEN_VIRT_START, and loaded at any
-         * 2MB-aligned address.  All of text+data+bss must fit in 2MB,
+         * 4K-aligned address.  All of text+data+bss must fit in 2MB,
          * or the initial pagetable code below will need adjustment.
          */
 
@@ -274,8 +275,9 @@ skip_bss:
         lsl   x2, x1, #ZEROETH_SHIFT /* Base address for 512GB mapping */
         mov   x3, #PT_MEM            /* x2 := Section mapping */
         orr   x2, x2, x3
-        lsl   x1, x1, #3             /* x1 := Slot offset */
-        str   x2, [x4, x1]           /* Mapping of paddr(start)*/
+        and   x1, x1, #LPAE_ENTRY_MASK /* x1 := Slot offset */
+        lsl   x1, x1, #3
+        str   x2, [x4, x1]           /* Mapping of paddr(start) */
 
 1:      /* Setup boot_first: */
         ldr   x4, =boot_first        /* Next level into boot_first */
@@ -290,7 +292,7 @@ skip_bss:
 
         /* ... map of paddr(start) in boot_first */
         lsr   x2, x19, #FIRST_SHIFT  /* x2 := Offset of base paddr in boot_first */
-        and   x1, x2, 0x1ff          /* x1 := Slot to use */
+        and   x1, x2, #LPAE_ENTRY_MASK /* x1 := Slot to use */
         cbz   x1, 1f                 /* It's in slot 0, map in boot_second */
 
         lsl   x2, x2, #FIRST_SHIFT   /* Base address for 1GB mapping */
@@ -303,31 +305,55 @@ skip_bss:
         ldr   x4, =boot_second       /* Next level into boot_second */
         add   x4, x4, x20            /* x4 := paddr(boot_second) */
 
-        lsr   x2, x19, #SECOND_SHIFT /* Base address for 2MB mapping */
-        lsl   x2, x2, #SECOND_SHIFT
-        mov   x3, #PT_MEM            /* x2 := Section map */
-        orr   x2, x2, x3
-
-        /* ... map of vaddr(start) in boot_second */
-        ldr   x1, =start
-        lsr   x1, x1, #(SECOND_SHIFT - 3)   /* Slot for vaddr(start) */
-        str   x2, [x4, x1]           /* Map vaddr(start) */
+        /* ... map boot_third in boot_second[1] */
+        ldr   x1, =boot_third
+        add   x1, x1, x20            /* x1 := paddr(boot_third) */
+        mov   x3, #PT_PT             /* x2 := table map of boot_third */
+        orr   x2, x1, x3             /*       + rights for linear PT */
+        str   x2, [x4, #8]           /* Map it in slot 1 */
 
         /* ... map of paddr(start) in boot_second */
-        lsr   x1, x19, #FIRST_SHIFT  /* Base paddr */
-        cbnz  x1, 1f                 /* If paddr(start) is not in slot 0
-                                      * then the mapping was done in
-                                      * boot_pgtable or boot_first above */
+        lsr   x2, x19, #SECOND_SHIFT /* x2 := Offset of base paddr in boot_second */
+        and   x1, x2, #LPAE_ENTRY_MASK /* x1 := Slot to use */
+        cmp   x1, #1
+        b.eq  virtphys_clash         /* It's in slot 1, which we cannot handle */
 
-        lsr   x1, x19, #(SECOND_SHIFT - 3)  /* Slot for paddr(start) */
-        str   x2, [x4, x1]           /* Map Xen there */
-1:
+        lsl   x2, x2, #SECOND_SHIFT  /* Base address for 2MB mapping */
+        mov   x3, #PT_MEM            /* x2 := Section map */
+        orr   x2, x2, x3
+        lsl   x1, x1, #3             /* x1 := Slot offset */
+        str   x2, [x4, x1]           /* Create mapping of paddr(start)*/
+
+1:      /* Setup boot_third: */
+        ldr   x4, =boot_third
+        add   x4, x4, x20            /* x4 := paddr (boot_third) */
+
+        lsr   x2, x19, #THIRD_SHIFT  /* Base address for 4K mapping */
+        lsl   x2, x2, #THIRD_SHIFT
+        mov   x3, #PT_MEM_L3         /* x2 := Section map */
+        orr   x2, x2, x3
+
+        /* ... map of vaddr(start) in boot_third */
+        mov   x1, xzr
+1:      str   x2, [x4, x1]           /* Map vaddr(start) */
+        add   x2, x2, #PAGE_SIZE     /* Next page */
+        add   x1, x1, #8             /* Next slot */
+        cmp   x1, #(LPAE_ENTRIES<<3) /* 512 entries per page */
+        b.lt  1b
 
         /* Defer fixmap and dtb mapping until after paging enabled, to
          * avoid them clashing with the 1:1 mapping. */
 
         /* boot pagetable setup complete */
 
+        b     1f
+
+virtphys_clash:
+        /* Identity map clashes with boot_third, which we cannot handle yet */
+        PRINT("- Unable to build boot page tables - virt and phys addresses clash. -\r\n")
+        b     fail
+
+1:
         PRINT("- Turning on paging -\r\n")
 
         ldr   x1, =paging            /* Explicit vaddr, not RIP-relative */

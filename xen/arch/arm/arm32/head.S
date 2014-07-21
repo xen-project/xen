@@ -26,6 +26,7 @@
 
 #define PT_PT     0xf7f /* nG=1 AF=1 SH=11 AP=01 NS=1 ATTR=111 T=1 P=1 */
 #define PT_MEM    0xf7d /* nG=1 AF=1 SH=11 AP=01 NS=1 ATTR=111 T=0 P=1 */
+#define PT_MEM_L3 0xf7f /* nG=1 AF=1 SH=11 AP=01 NS=1 ATTR=111 T=1 P=1 */
 #define PT_DEV    0xe71 /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=100 T=0 P=1 */
 #define PT_DEV_L3 0xe73 /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=100 T=1 P=1 */
 
@@ -73,7 +74,7 @@
 
         /* This must be the very first address in the loaded image.
          * It should be linked at XEN_VIRT_START, and loaded at any
-         * 2MB-aligned address.  All of text+data+bss must fit in 2MB,
+         * 4K-aligned address.  All of text+data+bss must fit in 2MB,
          * or the initial pagetable code below will need adjustment. */
         .global start
 start:
@@ -258,11 +259,11 @@ cpu_init_done:
         /* Setup boot_pgtable: */
         ldr   r1, =boot_second
         add   r1, r1, r10            /* r1 := paddr (boot_second) */
-        mov   r3, #0x0
 
         /* ... map boot_second in boot_pgtable[0] */
         orr   r2, r1, #PT_UPPER(PT)  /* r2:r3 := table map of boot_second */
         orr   r2, r2, #PT_LOWER(PT)  /* (+ rights for linear PT) */
+        mov   r3, #0x0
         strd  r2, r3, [r4, #0]       /* Map it in slot 0 */
 
         /* ... map of paddr(start) in boot_pgtable */
@@ -279,31 +280,60 @@ cpu_init_done:
         ldr   r4, =boot_second
         add   r4, r4, r10            /* r4 := paddr (boot_second) */
 
-        lsr   r2, r9, #SECOND_SHIFT  /* Base address for 2MB mapping */
-        lsl   r2, r2, #SECOND_SHIFT
-        orr   r2, r2, #PT_UPPER(MEM) /* r2:r3 := section map */
-        orr   r2, r2, #PT_LOWER(MEM)
+        ldr   r1, =boot_third
+        add   r1, r1, r10            /* r1 := paddr (boot_third) */
 
-        /* ... map of vaddr(start) in boot_second */
-        ldr   r1, =start
-        lsr   r1, #(SECOND_SHIFT - 3)   /* Slot for vaddr(start) */
-        strd  r2, r3, [r4, r1]       /* Map vaddr(start) */
+        /* ... map boot_third in boot_second[1] */
+        orr   r2, r1, #PT_UPPER(PT)  /* r2:r3 := table map of boot_third */
+        orr   r2, r2, #PT_LOWER(PT)  /* (+ rights for linear PT) */
+        mov   r3, #0x0
+        strd  r2, r3, [r4, #8]       /* Map it in slot 1 */
 
         /* ... map of paddr(start) in boot_second */
-        lsrs  r1, r9, #30            /* Base paddr */
-        bne   1f                     /* If paddr(start) is not in slot 0
-                                      * then the mapping was done in
-                                      * boot_pgtable above */
+        lsr   r2, r9, #SECOND_SHIFT  /* Offset of base paddr in boot_second */
+        ldr   r3, =LPAE_ENTRY_MASK
+        and   r1, r2, r3
+        cmp   r1, #1
+        beq   virtphys_clash         /* It's in slot 1, which we cannot handle */
 
-        mov   r1, r9, lsr #(SECOND_SHIFT - 3)   /* Slot for paddr(start) */
-        strd  r2, r3, [r4, r1]       /* Map Xen there */
-1:
+        lsl   r2, r2, #SECOND_SHIFT  /* Base address for 2MB mapping */
+        orr   r2, r2, #PT_UPPER(MEM) /* r2:r3 := section map */
+        orr   r2, r2, #PT_LOWER(MEM)
+        mov   r3, #0x0
+        lsl   r1, r1, #3             /* r1 := Slot offset */
+        strd  r2, r3, [r4, r1]       /* Mapping of paddr(start) */
+
+        /* Setup boot_third: */
+1:      ldr   r4, =boot_third
+        add   r4, r4, r10            /* r4 := paddr (boot_third) */
+
+        lsr   r2, r9, #THIRD_SHIFT  /* Base address for 4K mapping */
+        lsl   r2, r2, #THIRD_SHIFT
+        orr   r2, r2, #PT_UPPER(MEM_L3) /* r2:r3 := map */
+        orr   r2, r2, #PT_LOWER(MEM_L3)
+        mov   r3, #0x0
+
+        /* ... map of vaddr(start) in boot_third */
+        mov   r1, #0
+1:      strd  r2, r3, [r4, r1]       /* Map vaddr(start) */
+        add   r2, r2, #PAGE_SIZE     /* Next page */
+        add   r1, r1, #8             /* Next slot */
+        cmp   r1, #(LPAE_ENTRIES<<3) /* 512*8-byte entries per page */
+        blo   1b
 
         /* Defer fixmap and dtb mapping until after paging enabled, to
          * avoid them clashing with the 1:1 mapping. */
 
         /* boot pagetable setup complete */
 
+        b     1f
+
+virtphys_clash:
+        /* Identity map clashes with boot_third, which we cannot handle yet */
+        PRINT("- Unable to build boot page tables - virt and phys addresses clash. -\r\n")
+        b     fail
+
+1:
         PRINT("- Turning on paging -\r\n")
 
         ldr   r1, =paging            /* Explicit vaddr, not RIP-relative */

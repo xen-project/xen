@@ -396,7 +396,7 @@ static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr)
  */
 
 #define LPAE_SHIFT      9
-#define LPAE_ENTRIES    (1u << LPAE_SHIFT)
+#define LPAE_ENTRIES    (_AC(1,U) << LPAE_SHIFT)
 #define LPAE_ENTRY_MASK (LPAE_ENTRIES - 1)
 
 #define THIRD_SHIFT    (PAGE_SHIFT)
