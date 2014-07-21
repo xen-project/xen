@@ -100,8 +100,7 @@
          * or the initial pagetable code below will need adjustment.
          */
 
-        .global start
-start:
+GLOBAL(start)
         /*
          * DO NOT MODIFY. Image header expected by Linux boot-loaders.
          */
@@ -604,9 +603,8 @@ hex:    .ascii "0123456789abcdef"
 
 #else  /* CONFIG_EARLY_PRINTK */
 
+ENTRY(early_puts)
 init_uart:
-.global early_puts
-early_puts:
 puts:
 putn:   ret
 
@@ -615,7 +613,7 @@ putn:   ret
 /* This provides a C-API version of __lookup_processor_type
  * TODO: For now, the implementation return NULL every time
  */
-GLOBAL(lookup_processor_type)
+ENTRY(lookup_processor_type)
         mov  x0, #0
         ret
 

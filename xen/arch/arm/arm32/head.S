@@ -76,8 +76,7 @@
          * It should be linked at XEN_VIRT_START, and loaded at any
          * 4K-aligned address.  All of text+data+bss must fit in 2MB,
          * or the initial pagetable code below will need adjustment. */
-        .global start
-start:
+GLOBAL(start)
         /* zImage magic header, see:
          * http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html#d0e309
          */
@@ -583,16 +582,15 @@ hex:    .ascii "0123456789abcdef"
 
 #else  /* CONFIG_EARLY_PRINTK */
 
+ENTRY(early_puts)
 init_uart:
-.global early_puts
-early_puts:
 puts:
 putn:   mov   pc, lr
 
 #endif /* !CONFIG_EARLY_PRINTK */
 
 /* This provides a C-API version of __lookup_processor_type */
-GLOBAL(lookup_processor_type)
+ENTRY(lookup_processor_type)
         stmfd sp!, {r4, r10, lr}
         mov   r10, #0                   /* r10 := offset between virt&phys */
         bl    __lookup_processor_type
