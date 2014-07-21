@@ -266,10 +266,10 @@ cpu_init_done:
         strd  r2, r3, [r4, #0]       /* Map it in slot 0 */
 
         /* ... map of paddr(start) in boot_pgtable */
-        lsrs  r1, r9, #30            /* Offset of base paddr in boot_pgtable */
+        lsrs  r1, r9, #FIRST_SHIFT   /* Offset of base paddr in boot_pgtable */
         beq   1f                     /* If it is in slot 0 then map in boot_second
                                       * later on */
-        lsl   r2, r1, #30            /* Base address for 1GB mapping */
+        lsl   r2, r1, #FIRST_SHIFT   /* Base address for 1GB mapping */
         orr   r2, r2, #PT_UPPER(MEM) /* r2:r3 := section map */
         orr   r2, r2, #PT_LOWER(MEM)
         lsl   r1, r1, #3             /* r1 := Slot offset */
@@ -277,7 +277,7 @@ cpu_init_done:
 
 1:      /* Setup boot_second: */
         ldr   r4, =boot_second
-        add   r4, r4, r10            /* r1 := paddr (boot_second) */
+        add   r4, r4, r10            /* r4 := paddr (boot_second) */
 
         lsr   r2, r9, #SECOND_SHIFT  /* Base address for 2MB mapping */
         lsl   r2, r2, #SECOND_SHIFT
@@ -320,7 +320,7 @@ paging:
         dsb
 #if defined(CONFIG_EARLY_PRINTK) /* Fixmap is only used by early printk */
         /* Non-boot CPUs don't need to rebuild the fixmap itself, just
-	 * the mapping from boot_second to xen_fixmap */
+         * the mapping from boot_second to xen_fixmap */
         teq   r12, #0
         bne   1f
 
@@ -408,8 +408,7 @@ launch:
         beq   start_xen              /* and disappear into the land of C */
         b     start_secondary        /* (to the appropriate entry point) */
 
-/* Fail-stop
- * r0: string explaining why */
+/* Fail-stop */
 fail:   PRINT("- Boot failed -\r\n")
 1:      wfe
         b     1b

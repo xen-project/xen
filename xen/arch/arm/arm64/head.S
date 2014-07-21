@@ -267,11 +267,11 @@ skip_bss:
         str   x2, [x4, #0]           /* Map it in slot 0 */
 
         /* ... map of paddr(start) in boot_pgtable */
-        lsr   x1, x19, #39           /* Offset of base paddr in boot_pgtable */
+        lsr   x1, x19, #ZEROETH_SHIFT/* Offset of base paddr in boot_pgtable */
         cbz   x1, 1f                 /* It's in slot 0, map in boot_first
                                       * or boot_second later on */
 
-        lsl   x2, x1, #39            /* Base address for 512GB mapping */
+        lsl   x2, x1, #ZEROETH_SHIFT /* Base address for 512GB mapping */
         mov   x3, #PT_MEM            /* x2 := Section mapping */
         orr   x2, x2, x3
         lsl   x1, x1, #3             /* x1 := Slot offset */
@@ -284,7 +284,7 @@ skip_bss:
         /* ... map boot_second in boot_first[0] */
         ldr   x1, =boot_second
         add   x1, x1, x20            /* x1 := paddr(boot_second) */
-        mov   x3, #PT_PT             /* x2 := table map of boot_first */
+        mov   x3, #PT_PT             /* x2 := table map of boot_second */
         orr   x2, x1, x3             /*       + rights for linear PT */
         str   x2, [x4, #0]           /* Map it in slot 0 */
 
@@ -300,8 +300,8 @@ skip_bss:
         str   x2, [x4, x1]           /* Create mapping of paddr(start)*/
 
 1:      /* Setup boot_second: */
-        ldr   x4, =boot_second
-        add   x4, x4, x20            /* x4 := paddr (boot_second) */
+        ldr   x4, =boot_second       /* Next level into boot_second */
+        add   x4, x4, x20            /* x4 := paddr(boot_second) */
 
         lsr   x2, x19, #SECOND_SHIFT /* Base address for 2MB mapping */
         lsl   x2, x2, #SECOND_SHIFT
@@ -345,7 +345,7 @@ paging:
         dsb   sy
 #if defined(CONFIG_EARLY_PRINTK) /* Fixmap is only used by early printk */
         /* Non-boot CPUs don't need to rebuild the fixmap itself, just
-	 * the mapping from boot_second to xen_fixmap */
+         * the mapping from boot_second to xen_fixmap */
         cbnz  x22, 1f
 
         /* Add UART to the fixmap table */
@@ -428,8 +428,7 @@ launch:
         cbz   x22, start_xen         /* and disappear into the land of C */
         b     start_secondary        /* (to the appropriate entry point) */
 
-/* Fail-stop
- * r0: string explaining why */
+/* Fail-stop */
 fail:   PRINT("- Boot failed -\r\n")
 1:      wfe
         b     1b
