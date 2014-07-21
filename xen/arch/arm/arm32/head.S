@@ -457,6 +457,8 @@ fail:   PRINT("- Boot failed -\r\n")
 1:      wfe
         b     1b
 
+GLOBAL(_end_boot)
+
 /* Copy Xen to new location and switch TTBR
  * r1:r0       ttbr
  * r2          source address
