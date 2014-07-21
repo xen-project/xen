@@ -45,7 +45,7 @@
  *   r3  -
  *   r4  -
  *   r5  -
- *   r6  -
+ *   r6  - identity map in place
  *   r7  - CPUID
  *   r8  - DTB address (boot CPU only)
  *   r9  - paddr(start)
@@ -250,6 +250,14 @@ cpu_init_done:
          * mapping. So each CPU must rebuild the page tables here with
          * the 1:1 in place. */
 
+        /* If Xen is loaded at exactly XEN_VIRT_START then we don't
+         * need an additional 1:1 mapping, the virtual mapping will
+         * suffice.
+         */
+        cmp   r9, #XEN_VIRT_START
+        moveq r6, #1                 /* r6 := identity map now in place */
+        movne r6, #0                 /* r6 := identity map not yet in place */
+
         /* Write Xen's PT's paddr into the HTTBR */
         ldr   r4, =boot_pgtable
         add   r4, r4, r10            /* r4 := paddr (boot_pagetable) */
@@ -275,6 +283,7 @@ cpu_init_done:
         orr   r2, r2, #PT_LOWER(MEM)
         lsl   r1, r1, #3             /* r1 := Slot offset */
         strd  r2, r3, [r4, r1]       /* Mapping of paddr(start) */
+        mov   r6, #1                 /* r6 := identity map now in place */
 
 1:      /* Setup boot_second: */
         ldr   r4, =boot_second
@@ -290,6 +299,8 @@ cpu_init_done:
         strd  r2, r3, [r4, #8]       /* Map it in slot 1 */
 
         /* ... map of paddr(start) in boot_second */
+        cmp   r6, #1                 /* r6 is set if already created */
+        beq   1f
         lsr   r2, r9, #SECOND_SHIFT  /* Offset of base paddr in boot_second */
         ldr   r3, =LPAE_ENTRY_MASK
         and   r1, r2, r3
@@ -302,6 +313,7 @@ cpu_init_done:
         mov   r3, #0x0
         lsl   r1, r1, #3             /* r1 := Slot offset */
         strd  r2, r3, [r4, r1]       /* Mapping of paddr(start) */
+        mov   r6, #1                 /* r6 := identity map now in place */
 
         /* Setup boot_third: */
 1:      ldr   r4, =boot_third
@@ -326,8 +338,10 @@ cpu_init_done:
 
         /* boot pagetable setup complete */
 
-        b     1f
-
+        cmp   r6, #1                /* Did we manage to create an identity mapping ? */
+        beq   1f
+        PRINT("Unable to build boot page tables - Failed to identity map Xen.\r\n")
+        b     fail
 virtphys_clash:
         /* Identity map clashes with boot_third, which we cannot handle yet */
         PRINT("- Unable to build boot page tables - virt and phys addresses clash. -\r\n")

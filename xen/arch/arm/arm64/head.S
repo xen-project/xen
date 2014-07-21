@@ -62,7 +62,7 @@
  *  x22 - is_secondary_cpu
  *  x23 - UART address
  *  x24 - cpuid
- *  x25 -
+ *  x25 - identity map in place
  *  x26 -
  *  x27 -
  *  x28 -
@@ -253,6 +253,13 @@ skip_bss:
          * mapping. So each CPU must rebuild the page tables here with
          * the 1:1 in place. */
 
+        /* If Xen is loaded at exactly XEN_VIRT_START then we don't
+         * need an additional 1:1 mapping, the virtual mapping will
+         * suffice.
+         */
+        cmp   x19, #XEN_VIRT_START
+        cset  x25, eq                /* x25 := identity map in place, or not */
+
         /* Write Xen's PT's paddr into TTBR0_EL2 */
         ldr   x4, =boot_pgtable
         add   x4, x4, x20            /* x4 := paddr (boot_pagetable) */
@@ -293,6 +300,7 @@ skip_bss:
         and   x1, x1, #LPAE_ENTRY_MASK /* x1 := Slot offset */
         lsl   x1, x1, #3
         str   x2, [x4, x1]           /* Mapping of paddr(start) */
+        mov   x25, #1                /* x25 := identity map now in place */
 
 1:      /* Setup boot_first: */
         ldr   x4, =boot_first        /* Next level into boot_first */
@@ -306,6 +314,7 @@ skip_bss:
         str   x2, [x4, #0]           /* Map it in slot 0 */
 
         /* ... map of paddr(start) in boot_first */
+        cbnz  x25, 1f                /* x25 is set if already created */
         lsr   x2, x19, #FIRST_SHIFT  /* x2 := Offset of base paddr in boot_first */
         and   x1, x2, #LPAE_ENTRY_MASK /* x1 := Slot to use */
         cbz   x1, 1f                 /* It's in slot 0, map in boot_second */
@@ -315,6 +324,7 @@ skip_bss:
         orr   x2, x2, x3
         lsl   x1, x1, #3             /* x1 := Slot offset */
         str   x2, [x4, x1]           /* Create mapping of paddr(start)*/
+        mov   x25, #1                /* x25 := identity map now in place */
 
 1:      /* Setup boot_second: */
         ldr   x4, =boot_second       /* Next level into boot_second */
@@ -328,6 +338,7 @@ skip_bss:
         str   x2, [x4, #8]           /* Map it in slot 1 */
 
         /* ... map of paddr(start) in boot_second */
+        cbnz  x25, 1f                /* x25 is set if already created */
         lsr   x2, x19, #SECOND_SHIFT /* x2 := Offset of base paddr in boot_second */
         and   x1, x2, #LPAE_ENTRY_MASK /* x1 := Slot to use */
         cmp   x1, #1
@@ -338,6 +349,7 @@ skip_bss:
         orr   x2, x2, x3
         lsl   x1, x1, #3             /* x1 := Slot offset */
         str   x2, [x4, x1]           /* Create mapping of paddr(start)*/
+        mov   x25, #1                /* x25 := identity map now in place */
 
 1:      /* Setup boot_third: */
         ldr   x4, =boot_third
@@ -361,8 +373,9 @@ skip_bss:
 
         /* boot pagetable setup complete */
 
-        b     1f
-
+        cbnz  x25, 1f                /* Did we manage to create an identity mapping ? */
+        PRINT("Unable to build boot page tables - Failed to identity map Xen.\r\n")
+        b     fail
 virtphys_clash:
         /* Identity map clashes with boot_third, which we cannot handle yet */
         PRINT("- Unable to build boot page tables - virt and phys addresses clash. -\r\n")
