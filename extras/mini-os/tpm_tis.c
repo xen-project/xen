@@ -611,7 +611,7 @@ s_time_t tpm_calc_ordinal_duration(struct tpm_chip *chip,
 
 
 static int locality_enabled(struct tpm_chip* tpm, int l) {
-   return tpm->enabled_localities & (1 << l);
+   return l >= 0 && tpm->enabled_localities & (1 << l);
 }
 
 static int check_locality(struct tpm_chip* tpm, int l) {
