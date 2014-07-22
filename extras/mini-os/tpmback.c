@@ -140,12 +140,12 @@ int globalinit = 0;
  * Duplicates are not allowed
  * **********************************/
 
-inline void tpmif_req_ready(tpmif_t* tpmif) {
+static void tpmif_req_ready(tpmif_t* tpmif) {
    tpmif->flags |= TPMIF_REQ_READY;
    gtpmdev.flags |= TPMIF_REQ_READY;
 }
 
-inline void tpmdev_check_req(void) {
+static void tpmdev_check_req(void) {
    int i;
    int flags;
    local_irq_save(flags);
@@ -160,7 +160,7 @@ inline void tpmdev_check_req(void) {
    local_irq_restore(flags);
 }
 
-inline void tpmif_req_finished(tpmif_t* tpmif) {
+static void tpmif_req_finished(tpmif_t* tpmif) {
    tpmif->flags &= ~TPMIF_REQ_READY;
    tpmdev_check_req();
 }
@@ -382,7 +382,7 @@ int tpmif_change_state(tpmif_t* tpmif, enum xenbus_state state)
 /**********************************
  * TPMIF CREATION AND DELETION
  * *******************************/
-inline tpmif_t* __init_tpmif(domid_t domid, unsigned int handle)
+static tpmif_t* __init_tpmif(domid_t domid, unsigned int handle)
 {
    tpmif_t* tpmif;
    tpmif = malloc(sizeof(*tpmif));
