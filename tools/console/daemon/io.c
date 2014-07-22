@@ -276,8 +276,8 @@ static int create_hv_log(void)
 		dolog(LOG_ERR, "Failed to open log %s: %d (%s)",
 		      logfile, errno, strerror(errno));
 	if (fd != -1 && log_time_hv) {
-		if (write_with_timestamp(fd, "Logfile Opened",
-					 strlen("Logfile Opened"),
+		if (write_with_timestamp(fd, "Logfile Opened\n",
+					 strlen("Logfile Opened\n"),
 					 &log_time_hv_needts) < 0) {
 			dolog(LOG_ERR, "Failed to log opening timestamp "
 				       "in %s: %d (%s)", logfile, errno,
@@ -322,8 +322,8 @@ static int create_domain_log(struct domain *dom)
 		dolog(LOG_ERR, "Failed to open log %s: %d (%s)",
 		      logfile, errno, strerror(errno));
 	if (fd != -1 && log_time_guest) {
-		if (write_with_timestamp(fd, "Logfile Opened",
-					 strlen("Logfile Opened"),
+		if (write_with_timestamp(fd, "Logfile Opened\n",
+					 strlen("Logfile Opened\n"),
 					 &log_time_guest_needts) < 0) {
 			dolog(LOG_ERR, "Failed to log opening timestamp "
 				       "in %s: %d (%s)", logfile, errno,
