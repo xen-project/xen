@@ -909,17 +909,24 @@ static void handle_xs(void)
 
 static void handle_hv_logs(xc_evtchn *xce_handle)
 {
-	char buffer[1024*16];
+	static char buffer[1024*16];
 	char *bufptr = buffer;
-	unsigned int size = sizeof(buffer);
+	unsigned int size;
 	static uint32_t index = 0;
 	evtchn_port_or_error_t port;
 
 	if ((port = xc_evtchn_pending(xce_handle)) == -1)
 		return;
 
-	if (xc_readconsolering(xc, bufptr, &size, 0, 1, &index) == 0 && size > 0) {
+	do
+	{
 		int logret;
+
+		size = sizeof(buffer);
+		if (xc_readconsolering(xc, bufptr, &size, 0, 1, &index) != 0 ||
+		    size == 0)
+			break;
+
 		if (log_time_hv)
 			logret = write_with_timestamp(log_hv_fd, buffer, size,
 						      &log_time_hv_needts);
@@ -929,7 +936,7 @@ static void handle_hv_logs(xc_evtchn *xce_handle)
 		if (logret < 0)
 			dolog(LOG_ERR, "Failed to write hypervisor log: "
 				       "%d (%s)", errno, strerror(errno));
-	}
+	} while (size == sizeof(buffer));
 
 	(void)xc_evtchn_unmask(xce_handle, port);
 }
