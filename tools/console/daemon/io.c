@@ -907,15 +907,15 @@ static void handle_xs(void)
 	free(vec);
 }
 
-static void handle_hv_logs(xc_evtchn *xce_handle)
+static void handle_hv_logs(xc_evtchn *xce_handle, bool force)
 {
 	static char buffer[1024*16];
 	char *bufptr = buffer;
 	unsigned int size;
 	static uint32_t index = 0;
-	evtchn_port_or_error_t port;
+	evtchn_port_or_error_t port = -1;
 
-	if ((port = xc_evtchn_pending(xce_handle)) == -1)
+	if (!force && ((port = xc_evtchn_pending(xce_handle)) == -1))
 		return;
 
 	do
@@ -938,7 +938,8 @@ static void handle_hv_logs(xc_evtchn *xce_handle)
 				       "%d (%s)", errno, strerror(errno));
 	} while (size == sizeof(buffer));
 
-	(void)xc_evtchn_unmask(xce_handle, port);
+	if (port != -1)
+		(void)xc_evtchn_unmask(xce_handle, port);
 }
 
 static void handle_log_reload(void)
@@ -1024,6 +1025,8 @@ void handle_io(void)
 			      "%d (%s)", errno, strerror(errno));
 			goto out;
 		}
+		/* Log the boot dmesg even if VIRQ_CON_RING isn't pending. */
+		handle_hv_logs(xce_handle, true);
 	}
 
 	xcg_handle = xc_gnttab_open(NULL, 0);
@@ -1134,7 +1137,7 @@ void handle_io(void)
 				      errno, strerror(errno));
 				break;
 			} else if (fds[xce_pollfd_idx].revents & POLLIN)
-				handle_hv_logs(xce_handle);
+				handle_hv_logs(xce_handle, false);
 
 			xce_pollfd_idx = -1;
 		}
