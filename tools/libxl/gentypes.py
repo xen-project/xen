@@ -440,7 +440,7 @@ def libxl_C_type_parse_json(ty, w, v, indent = "    ", parent = None, discrimina
                          (f.type.keyvar.name + "." + x.name, w)
                     s += "    if (x) {\n"
                     (nparent, fexpr) = ty.member(v, f.type.keyvar, parent is None)
-                    s += "        %s_init_type(%s, %s);\n" % (ty.typename, v, x.enumname)
+                    s += "        %s_init_%s(%s, %s);\n" % (ty.typename, f.type.keyvar.name, v, x.enumname)
                     (nparent,fexpr) = ty.member(v, f, parent is None)
                     s += libxl_C_type_parse_json(f.type, "x", fexpr, "  ", nparent, x.enumname)
                     s += "    }\n"
