@@ -21,6 +21,7 @@
  */
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include "xc_private.h"
 #include "xc_cpufeature.h"
 #include <xen/hvm/params.h>
@@ -437,7 +438,7 @@ static void xc_cpuid_hvm_policy(
 
 static void xc_cpuid_pv_policy(
     xc_interface *xch, domid_t domid,
-    const unsigned int *input, unsigned int *regs)
+    const unsigned int *input, unsigned int *regs, bool pvh)
 {
     DECLARE_DOMCTL;
     unsigned int guest_width;
@@ -460,8 +461,10 @@ static void xc_cpuid_pv_policy(
     if ( (input[0] & 0x7fffffff) == 0x00000001 )
     {
         clear_bit(X86_FEATURE_VME, regs[3]);
-        clear_bit(X86_FEATURE_PSE, regs[3]);
-        clear_bit(X86_FEATURE_PGE, regs[3]);
+        if ( !pvh ) {
+            clear_bit(X86_FEATURE_PSE, regs[3]);
+            clear_bit(X86_FEATURE_PGE, regs[3]);
+        }
         clear_bit(X86_FEATURE_MCE, regs[3]);
         clear_bit(X86_FEATURE_MCA, regs[3]);
         clear_bit(X86_FEATURE_MTRR, regs[3]);
@@ -530,7 +533,8 @@ static void xc_cpuid_pv_policy(
         {
             set_bit(X86_FEATURE_SYSCALL, regs[3]);
         }
-        clear_bit(X86_FEATURE_PAGE1GB, regs[3]);
+        if ( !pvh )
+            clear_bit(X86_FEATURE_PAGE1GB, regs[3]);
         clear_bit(X86_FEATURE_RDTSCP, regs[3]);
 
         clear_bit(X86_FEATURE_SVM, regs[2]);
@@ -578,7 +582,7 @@ static int xc_cpuid_policy(
     if ( info.hvm )
         xc_cpuid_hvm_policy(xch, domid, input, regs);
     else
-        xc_cpuid_pv_policy(xch, domid, input, regs);
+        xc_cpuid_pv_policy(xch, domid, input, regs, info.pvh);
 
     return 0;
 }
