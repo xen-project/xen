@@ -3100,6 +3100,8 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         rc = libxl_userdata_retrieve(ctx, info[i].domid, "xl", &data, &len);
         if (rc)
             continue;
+        if (len == 0)
+            continue;
         CHK_SYSCALL(asprintf(&config_source, "<domid %d data>", info[i].domid));
         libxl_domain_config_init(&d_config);
         parse_config_data(config_source, (char *)data, len, &d_config);
