@@ -471,12 +471,24 @@ static void cpupool_cpu_add(unsigned int cpu)
  */
 static int cpupool_cpu_remove(unsigned int cpu)
 {
-    int ret = 0;
+    int ret = -EBUSY;
+    struct cpupool **c;
 
     spin_lock(&cpupool_lock);
-    if ( !cpumask_test_cpu(cpu, cpupool0->cpu_valid))
-        ret = -EBUSY;
+    if ( cpumask_test_cpu(cpu, cpupool0->cpu_valid) )
+        ret = 0;
     else
+    {
+        for_each_cpupool(c)
+        {
+            if ( cpumask_test_cpu(cpu, (*c)->cpu_suspended ) )
+            {
+                ret = 0;
+                break;
+            }
+        }
+    }
+    if ( !ret )
         cpumask_set_cpu(cpu, &cpupool_locked_cpus);
     spin_unlock(&cpupool_lock);
 
