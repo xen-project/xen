@@ -266,12 +266,8 @@ void toggle_guest_mode(struct vcpu *v)
     v->arch.flags ^= TF_kernel_mode;
     asm volatile ( "swapgs" );
     update_cr3(v);
-#ifdef USER_MAPPINGS_ARE_GLOBAL
     /* Don't flush user global mappings from the TLB. Don't tick TLB clock. */
     asm volatile ( "mov %0, %%cr3" : : "r" (v->arch.cr3) : "memory" );
-#else
-    write_ptbase(v);
-#endif
 
     if ( !(v->arch.flags & TF_kernel_mode) )
         return;

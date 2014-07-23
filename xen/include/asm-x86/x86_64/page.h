@@ -161,20 +161,15 @@ typedef l4_pgentry_t root_pgentry_t;
 /* Bit 22 of a 24-bit flag mask. This corresponds to bit 62 of a pte.*/
 #define _PAGE_GNTTAB (1U<<22)
 
-#define PAGE_HYPERVISOR         (__PAGE_HYPERVISOR         | _PAGE_GLOBAL)
-#define PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR_NOCACHE | _PAGE_GLOBAL)
-
-#define USER_MAPPINGS_ARE_GLOBAL
-#ifdef USER_MAPPINGS_ARE_GLOBAL
 /*
  * Bit 12 of a 24-bit flag mask. This corresponds to bit 52 of a pte.
  * This is needed to distinguish between user and kernel PTEs since _PAGE_USER
  * is asserted for both.
  */
 #define _PAGE_GUEST_KERNEL (1U<<12)
-#else
-#define _PAGE_GUEST_KERNEL 0
-#endif
+
+#define PAGE_HYPERVISOR         (__PAGE_HYPERVISOR         | _PAGE_GLOBAL)
+#define PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR_NOCACHE | _PAGE_GLOBAL)
 
 #endif /* __X86_64_PAGE_H__ */
 

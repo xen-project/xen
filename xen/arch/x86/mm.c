@@ -162,7 +162,8 @@ boolean_param("allowsuperpage", opt_allow_superpage);
 static void put_superpage(unsigned long mfn);
 
 static uint32_t base_disallow_mask;
-#define L1_DISALLOW_MASK (base_disallow_mask | _PAGE_GNTTAB)
+/* Global bit is allowed to be set on L1 PTEs. Intended for user mappings. */
+#define L1_DISALLOW_MASK ((base_disallow_mask | _PAGE_GNTTAB) & ~_PAGE_GLOBAL)
 #define L2_DISALLOW_MASK (base_disallow_mask & ~_PAGE_PSE)
 
 #define l3_disallow_mask(d) (!is_pv_32on64_domain(d) ?  \
@@ -170,12 +171,6 @@ static uint32_t base_disallow_mask;
                              0xFFFFF198U)
 
 #define L4_DISALLOW_MASK (base_disallow_mask)
-
-#ifdef USER_MAPPINGS_ARE_GLOBAL
-/* Global bit is allowed to be set on L1 PTEs. Intended for user mappings. */
-#undef L1_DISALLOW_MASK
-#define L1_DISALLOW_MASK ((base_disallow_mask | _PAGE_GNTTAB) & ~_PAGE_GLOBAL)
-#endif
 
 #define l1_disallow_mask(d)                                     \
     ((d != dom_io) &&                                           \
@@ -994,7 +989,6 @@ get_page_from_l4e(
     return rc;
 }
 
-#ifdef USER_MAPPINGS_ARE_GLOBAL
 #define adjust_guest_l1e(pl1e, d)                                            \
     do {                                                                     \
         if ( likely(l1e_get_flags((pl1e)) & _PAGE_PRESENT) &&                \
@@ -1011,14 +1005,6 @@ get_page_from_l4e(
                 l1e_add_flags((pl1e), (_PAGE_GLOBAL|_PAGE_USER));            \
         }                                                                    \
     } while ( 0 )
-#else
-#define adjust_guest_l1e(pl1e, d)                               \
-    do {                                                        \
-        if ( likely(l1e_get_flags((pl1e)) & _PAGE_PRESENT) &&   \
-             likely(!is_pv_32on64_domain(d)) )                  \
-            l1e_add_flags((pl1e), _PAGE_USER);                  \
-    } while ( 0 )
-#endif
 
 #define adjust_guest_l2e(pl2e, d)                               \
     do {                                                        \
