@@ -795,7 +795,7 @@ static long do_poll(struct sched_poll *sched_poll)
 }
 
 /* Voluntarily yield the processor for this allocation. */
-static long do_yield(void)
+long vcpu_yield(void)
 {
     struct vcpu * v=current;
     spinlock_t *lock = vcpu_schedule_lock_irq(v);
@@ -888,7 +888,7 @@ long do_sched_op_compat(int cmd, unsigned long arg)
     {
     case SCHEDOP_yield:
     {
-        ret = do_yield();
+        ret = vcpu_yield();
         break;
     }
 
@@ -925,7 +925,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
     case SCHEDOP_yield:
     {
-        ret = do_yield();
+        ret = vcpu_yield();
         break;
     }
 
