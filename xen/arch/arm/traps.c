@@ -1805,7 +1805,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         }
         if ( hsr.wfi_wfe.ti ) {
             /* Yield the VCPU for WFE */
-            vcpu_force_reschedule(current);
+            vcpu_yield();
         } else {
             /* Block the VCPU for WFI */
             vcpu_block_unless_event_pending(current);
