@@ -1738,7 +1738,7 @@ static unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v,
     unsigned int leaf1_ecx = 0, leaf1_edx = 0;
     unsigned int leaf7_0_ebx = 0, leaf7_0_ecx = 0;
 
-    if ( likely(!restore) )
+    if ( !restore && !is_hardware_domain(v->domain) )
     {
         unsigned int level;
 
