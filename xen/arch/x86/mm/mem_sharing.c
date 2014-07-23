@@ -568,7 +568,7 @@ int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
     if ( v->domain == d )
     {
         req.flags = MEM_EVENT_FLAG_VCPU_PAUSED;
-        vcpu_pause_nosync(v);
+        mem_event_vcpu_pause(v);
     }
 
     req.p2mt = p2m_ram_shared;
@@ -609,7 +609,7 @@ int mem_sharing_sharing_resume(struct domain *d)
 
         /* Unpause domain/vcpu */
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
-            vcpu_unpause(v);
+            mem_event_vcpu_unpause(v);
     }
 
     return 0;

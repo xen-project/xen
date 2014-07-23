@@ -66,6 +66,9 @@ int do_mem_event_op(int op, uint32_t domain, void *arg);
 int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                      XEN_GUEST_HANDLE_PARAM(void) u_domctl);
 
+void mem_event_vcpu_pause(struct vcpu *v);
+void mem_event_vcpu_unpause(struct vcpu *v);
+
 #endif /* __MEM_EVENT_H__ */
 
 
