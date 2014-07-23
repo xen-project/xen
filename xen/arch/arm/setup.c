@@ -247,8 +247,13 @@ void __init discard_initial_modules(void)
         paddr_t s = mi->module[i].start;
         paddr_t e = s + PAGE_ALIGN(mi->module[i].size);
 
-        if ( mi->module[i].kind != BOOTMOD_XEN )
-            dt_unreserved_regions(s, e, init_domheap_pages, 0);
+        if ( mi->module[i].kind == BOOTMOD_XEN )
+            continue;
+
+        if ( !mfn_valid(paddr_to_pfn(s)) || !mfn_valid(paddr_to_pfn(e)))
+            continue;
+
+        dt_unreserved_regions(s, e, init_domheap_pages, 0);
     }
 
     mi->nr_mods = 0;
