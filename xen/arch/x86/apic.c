@@ -314,7 +314,7 @@ void disable_local_APIC(void)
                ~(MSR_IA32_APICBASE_ENABLE|MSR_IA32_APICBASE_EXTD));
     }
 
-    if ( kexecing )
+    if ( kexecing && (current_local_apic_mode() != apic_boot_mode) )
     {
         uint64_t msr_content;
         rdmsrl(MSR_IA32_APICBASE, msr_content);
@@ -330,7 +330,9 @@ void disable_local_APIC(void)
             wrmsrl(MSR_IA32_APICBASE, msr_content);
             break;
         case APIC_MODE_X2APIC:
-            msr_content |= (MSR_IA32_APICBASE_ENABLE|MSR_IA32_APICBASE_EXTD);
+            msr_content |= MSR_IA32_APICBASE_ENABLE;
+            wrmsrl(MSR_IA32_APICBASE, msr_content);
+            msr_content |= MSR_IA32_APICBASE_EXTD;
             wrmsrl(MSR_IA32_APICBASE, msr_content);
             break;
         default:
