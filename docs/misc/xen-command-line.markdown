@@ -659,8 +659,100 @@ debug hypervisor only).
 
 ### ioapic\_ack
 ### iommu
-### iommu\_inclusive\_mapping
+> `= List of [ <boolean> | force | required | intremap | qinval | snoop | sharept | dom0-passthrough | dom0-strict | amd-iommu-perdev-intremap | workaround_bios_bug | verbose | debug ]`
+
+> Sub-options:
+
+> `<boolean>`
+
+> Default: `on`
+
+>> Control the use of IOMMU(s) in the system.
+
+> All other sub-options are of boolean kind and can be prefixed with `no-` to
+> effect the inverse meaning.
+
+> `force` or `required`
+
+> Default: `false`
+
+>> Don't continue booting unless IOMMU support is found and can be initialized
+>> successfully.
+
+> `intremap`
+
+> Default: `true`
+
+>> Control the use of interrupt remapping (DMA remapping will always be enabled
+>> if IOMMU functionality is enabled).
+
+> `qinval` (VT-d)
+
+> Default: `true`
+
+>> Control the use of Queued Invalidation.
+
+> `snoop` (Intel)
+
+> Default: `true`
+
+>> Control the use of Snoop Control.
+
+> `sharept`
+
+> Default: `true`
+
+>> Control whether CPU and IOMMU page tables should be shared.
+
+> `dom0-passthrough`
+
+> Default: `false`
+
+>> Control whether to disable DMA remapping for Dom0.
+
+> `dom0-strict`
+
+> Default: `false`
+
+>> Control whether to set up DMA remapping only for the memory Dom0 actually
+>> got assigned. Implies `no-dom0-passthrough`.
+
+> `amd-iommu-perdev-intremap`
+
+> Default: `true`
+
+>> Control whether to set up interrupt remapping data structures per device
+>> rather that once for the entire system. Turning this off is making PCI
+>> device pass-through insecure and hence unsupported.
+
+> `workaround_bios_bug` (VT-d)
+
+> Default: `false`
+
+>> Causes DRHD entries without any PCI discoverable devices under them to be
+>> ignored (normally IOMMU setup fails if any of the devices listed by a DRHD
+>> entry aren't PCI discoverable).
+
+> `verbose`
+
+> Default: `false`
+
+>> Increase IOMMU code's verbosity.
+
+> `debug`
+
+> Default: `false`
+
+>> Enable IOMMU debugging code (implies `verbose`).
+
+### iommu\_inclusive\_mapping (VT-d)
 > `= <boolean>`
+
+> Default: `false`
+
+Use this to work around firmware issues providing correct RMRR entries. Rather
+than only mapping RAM pages for IOMMU accesses for Dom0, with this option all
+pages not marked as unusable in the E820 table will get a mapping established.
 
 ### irq\_ratelimit
 > `= <integer>`
