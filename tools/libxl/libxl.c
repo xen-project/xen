@@ -804,8 +804,15 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
         goto out;
     }
 
+    libxl_defbool_setdefault(&info->allow_unsafe, false);
     libxl_defbool_setdefault(&info->blackhole, false);
     libxl_defbool_setdefault(&info->compression, true);
+
+    if (!libxl_defbool_val(info->allow_unsafe) &&
+        libxl_defbool_val(info->blackhole)) {
+        LOG(ERROR, "Unsafe mode must be enabled to replicate to /dev/null");
+        goto out;
+    }
 
     GCNEW(dss);
     dss->ao = ao;

@@ -611,6 +611,7 @@ libxl_sched_credit_params = Struct("sched_credit_params", [
 
 libxl_domain_remus_info = Struct("domain_remus_info",[
     ("interval",     integer),
+    ("allow_unsafe", libxl_defbool),
     ("blackhole",    libxl_defbool),
     ("compression",  libxl_defbool),
     ])

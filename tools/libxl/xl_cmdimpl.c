@@ -7497,9 +7497,12 @@ int main_remus(int argc, char **argv)
     r_info.interval = 200;
     libxl_defbool_setdefault(&r_info.blackhole, false);
 
-    SWITCH_FOREACH_OPT(opt, "bui:s:e", NULL, "remus", 2) {
+    SWITCH_FOREACH_OPT(opt, "Fbui:s:e", NULL, "remus", 2) {
     case 'i':
         r_info.interval = atoi(optarg);
+        break;
+    case 'F':
+        libxl_defbool_set(&r_info.allow_unsafe, true);
         break;
     case 'b':
         libxl_defbool_set(&r_info.blackhole, true);
