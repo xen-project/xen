@@ -388,18 +388,26 @@ void xc_osdep_log(xc_interface *xch, xentoollog_level level, int code, const cha
     va_end(args);
 }
 
-void xc_report_progress_start(xc_interface *xch, const char *doing,
-                              unsigned long total) {
+const char *xc_set_progress_prefix(xc_interface *xch, const char *doing)
+{
+    const char *old = xch->currently_progress_reporting;
+
     xch->currently_progress_reporting = doing;
-    xtl_progress(xch->error_handler, "xc", xch->currently_progress_reporting,
-                 0, total);
+    return old;
+}
+
+void xc_report_progress_single(xc_interface *xch, const char *doing)
+{
+    assert(doing);
+    xtl_progress(xch->error_handler, "xc", doing, 0, 0);
 }
 
 void xc_report_progress_step(xc_interface *xch,
-                             unsigned long done, unsigned long total) {
+                             unsigned long done, unsigned long total)
+{
     assert(xch->currently_progress_reporting);
-    xtl_progress(xch->error_handler, "xc", xch->currently_progress_reporting,
-                 done, total);
+    xtl_progress(xch->error_handler, "xc",
+                 xch->currently_progress_reporting, done, total);
 }
 
 int xc_get_pfn_type_batch(xc_interface *xch, uint32_t dom,

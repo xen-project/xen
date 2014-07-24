@@ -1131,7 +1131,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                  "Saving memory: iter %d (last sent %u skipped %u)",
                  iter, sent_this_iter, skip_this_iter);
 
-        xc_report_progress_start(xch, reportbuf, dinfo->p2m_size);
+        xc_set_progress_prefix(xch, reportbuf);
+        xc_report_progress_step(xch, 0, dinfo->p2m_size);
 
         iter++;
         sent_this_iter = 0;

@@ -133,8 +133,8 @@ void xc_report(xc_interface *xch, xentoollog_logger *lg, xentoollog_level,
                int code, const char *fmt, ...)
      __attribute__((format(printf,5,6)));
 
-void xc_report_progress_start(xc_interface *xch, const char *doing,
-                              unsigned long total);
+const char *xc_set_progress_prefix(xc_interface *xch, const char *doing);
+void xc_report_progress_single(xc_interface *xch, const char *doing);
 void xc_report_progress_step(xc_interface *xch,
                              unsigned long done, unsigned long total);
 

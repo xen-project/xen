@@ -1622,7 +1622,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         goto out;
     }
 
-    xc_report_progress_start(xch, "Reloading memory pages", dinfo->p2m_size);
+    xc_set_progress_prefix(xch, "Reloading memory pages");
+    xc_report_progress_step(xch, 0, dinfo->p2m_size);
 
     /*
      * Now simply read each saved frame into its new machine frame.

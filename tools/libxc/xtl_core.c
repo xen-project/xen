@@ -66,13 +66,14 @@ void xtl_log(struct xentoollog_logger *logger,
 void xtl_progress(struct xentoollog_logger *logger,
                   const char *context, const char *doing_what,
                   unsigned long done, unsigned long total) {
-    int percent;
+    int percent = 0;
 
     if (!logger->progress) return;
 
-    percent = (total < LONG_MAX/100)
-        ? (done * 100) / total
-        : done / ((total + 99) / 100);
+    if ( total )
+        percent = (total < LONG_MAX/100)
+            ? (done * 100) / total
+            : done / ((total + 99) / 100);
 
     logger->progress(logger, context, doing_what, percent, done, total);
 }
