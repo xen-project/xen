@@ -1815,6 +1815,7 @@ void __init scheduler_init(void)
 
     idle_domain = domain_create(DOMID_IDLE, NULL, false);
     BUG_ON(IS_ERR(idle_domain));
+    BUG_ON(nr_cpu_ids > ARRAY_SIZE(idle_vcpu));
     idle_domain->vcpu = idle_vcpu;
     idle_domain->max_vcpus = nr_cpu_ids;
     if ( vcpu_create(idle_domain, 0, 0) == NULL )

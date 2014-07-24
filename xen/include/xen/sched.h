@@ -15,6 +15,7 @@
 #include <xen/nodemask.h>
 #include <xen/radix-tree.h>
 #include <xen/multicall.h>
+#include <xen/nospec.h>
 #include <xen/tasklet.h>
 #include <xen/mm.h>
 #include <xen/smp.h>
@@ -835,6 +836,31 @@ static inline int domain_pause_by_systemcontroller_nosync(struct domain *d)
 /* domain_pause() but safe against trying to pause current. */
 void domain_pause_except_self(struct domain *d);
 void domain_unpause_except_self(struct domain *d);
+
+/*
+ * For each allocated vcpu, d->vcpu[X]->vcpu_id == X
+ *
+ * During construction, all vcpus in d->vcpu[] are allocated sequentially, and
+ * in ascending order.  Therefore, if d->vcpu[N] exists (e.g. derived from
+ * current), all vcpus with an id less than N also exist.
+ *
+ * SMP considerations: The idle domain is constructed before APs are started.
+ * All other domains have d->vcpu[] allocated and d->max_vcpus set before the
+ * domain is made visible in the domlist, which is serialised on the global
+ * domlist_update_lock.
+ *
+ * Therefore, all observations of d->max_vcpus vs d->vcpu[] will be consistent
+ * despite the lack of smp_* barriers, either by being on the same CPU as the
+ * one which issued the writes, or because of barrier properties of the domain
+ * having been inserted into the domlist.
+ */
+static inline struct vcpu *domain_vcpu(const struct domain *d,
+                                       unsigned int vcpu_id)
+{
+    unsigned int idx = array_index_nospec(vcpu_id, d->max_vcpus);
+
+    return vcpu_id >= d->max_vcpus ? NULL : d->vcpu[idx];
+}
 
 void cpu_init(void);
 
