@@ -49,10 +49,18 @@ done
 
 ---------------------------------------------------------------------
 
-str*: last sync @ v3.16-rc6 (last commit: 2b8cac814cd5)
+str*: last sync @ v3.16-rc6 (last commit: 0a42cb0a6fa6)
 
 linux/arch/arm64/lib/strchr.S           xen/arch/arm/arm64/lib/strchr.S
+linux/arch/arm64/lib/strcmp.S           xen/arch/arm/arm64/lib/strcmp.S
+linux/arch/arm64/lib/strlen.S           xen/arch/arm/arm64/lib/strlen.S
+linux/arch/arm64/lib/strncmp.S          xen/arch/arm/arm64/lib/strncmp.S
+linux/arch/arm64/lib/strnlen.S          xen/arch/arm/arm64/lib/strnlen.S
 linux/arch/arm64/lib/strrchr.S          xen/arch/arm/arm64/lib/strrchr.S
+
+for i in strchr.S strcmp.S strlen.S strncmp.S strnlen.S strrchr.S ; do
+    diff -u linux/arch/arm64/lib/$i xen/arch/arm/arm64/lib/$i
+done
 
 ---------------------------------------------------------------------
 
