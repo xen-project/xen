@@ -1030,11 +1030,10 @@ long arch_do_domctl(
         if ( !d->controller_pause_count )
             break;
         ret = -EINVAL;
-        if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= MAX_VIRT_CPUS ||
+        if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= d->max_vcpus ||
              (v = d->vcpu[domctl->u.gdbsx_pauseunp_vcpu.vcpu]) == NULL )
             break;
-        vcpu_pause(v);
-        ret = 0;
+        ret = vcpu_pause_by_systemcontroller(v);
     }
     break;
 
@@ -1046,13 +1045,14 @@ long arch_do_domctl(
         if ( !d->controller_pause_count )
             break;
         ret = -EINVAL;
-        if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= MAX_VIRT_CPUS ||
+        if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= d->max_vcpus ||
              (v = d->vcpu[domctl->u.gdbsx_pauseunp_vcpu.vcpu]) == NULL )
             break;
-        if ( !atomic_read(&v->pause_count) )
-            printk("WARN: Unpausing vcpu:%d which is not paused\n", v->vcpu_id);
-        vcpu_unpause(v);
-        ret = 0;
+        ret = vcpu_unpause_by_systemcontroller(v);
+        if ( ret == -EINVAL )
+            printk(XENLOG_G_WARNING
+                   "WARN: d%d attempting to unpause %pv which is not paused\n",
+                   current->domain->domain_id, v);
     }
     break;
 

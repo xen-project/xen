@@ -96,9 +96,6 @@ __HYPERVISOR_domctl (xen/include/public/domctl.h)
  * XEN_DOMCTL_set_broken_page_p2m
  * XEN_DOMCTL_setnodeaffinity
  * XEN_DOMCTL_gdbsx_guestmemio
- * XEN_DOMCTL_gdbsx_pausevcpu
- * XEN_DOMCTL_gdbsx_unpausevcpu
- * XEN_DOMCTL_gdbsx_domstatus
 
 __HYPERVISOR_sysctl (xen/include/public/sysctl.h)
 
