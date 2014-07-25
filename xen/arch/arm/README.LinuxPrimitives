@@ -65,7 +65,7 @@ linux/arch/arm64/lib/copy_page.S        unused in Xen
 arm32
 =====================================================================
 
-bitops: last sync @ v3.14-rc7 (last commit: b7ec699)
+bitops: last sync @ v3.16-rc6 (last commit: c32ffce0f66e)
 
 linux/arch/arm/lib/bitops.h             xen/arch/arm/arm32/lib/bitops.h
 linux/arch/arm/lib/changebit.S          xen/arch/arm/arm32/lib/changebit.S
@@ -83,13 +83,13 @@ done
 
 ---------------------------------------------------------------------
 
-cmpxchg: last sync @ v3.14-rc7 (last commit: 775ebcc)
+cmpxchg: last sync @ v3.16-rc6 (last commit: c32ffce0f66e)
 
 linux/arch/arm/include/asm/cmpxchg.h    xen/include/asm-arm/arm32/cmpxchg.h
 
 ---------------------------------------------------------------------
 
-atomics: last sync @ v3.14-rc7 (last commit: aed3a4e)
+atomics: last sync @ v3.16-rc6 (last commit: 030d0178bdbd)
 
 linux/arch/arm/include/asm/atomic.h     xen/include/asm-arm/arm32/atomic.h
 
@@ -98,6 +98,8 @@ linux/arch/arm/include/asm/atomic.h     xen/include/asm-arm/arm32/atomic.h
 spinlocks: last sync: 15e7e5c1ebf5
 
 linux/arch/arm/include/asm/spinlock.h   xen/include/asm-arm/arm32/spinlock.h
+
+*** Linux has switched to ticket locks but we still use bitlocks.
 
 resync to v3.14-rc7:
 
@@ -111,7 +113,7 @@ resync to v3.14-rc7:
 
 ---------------------------------------------------------------------
 
-mem*: last sync @ v3.14-rc7 (last commit: 418df63a)
+mem*: last sync @ v3.16-rc6 (last commit: d98b90ea22b0)
 
 linux/arch/arm/lib/copy_template.S      xen/arch/arm/arm32/lib/copy_template.S
 linux/arch/arm/lib/memchr.S             xen/arch/arm/arm32/lib/memchr.S
@@ -120,9 +122,6 @@ linux/arch/arm/lib/memmove.S            xen/arch/arm/arm32/lib/memmove.S
 linux/arch/arm/lib/memset.S             xen/arch/arm/arm32/lib/memset.S
 linux/arch/arm/lib/memzero.S            xen/arch/arm/arm32/lib/memzero.S
 
-linux/arch/arm/lib/strchr.S             xen/arch/arm/arm32/lib/strchr.S
-linux/arch/arm/lib/strrchr.S            xen/arch/arm/arm32/lib/strrchr.S
-
 for i in copy_template.S memchr.S memcpy.S memmove.S memset.S \
          memzero.S ; do
     diff -u linux/arch/arm/lib/$i xen/arch/arm/arm32/lib/$i
@@ -130,7 +129,7 @@ done
 
 ---------------------------------------------------------------------
 
-str*: last sync @ v3.13-rc7 (last commit: 93ed397)
+str*: last sync @ v3.16-rc6 (last commit: d98b90ea22b0)
 
 linux/arch/arm/lib/strchr.S             xen/arch/arm/arm32/lib/strchr.S
 linux/arch/arm/lib/strrchr.S            xen/arch/arm/arm32/lib/strrchr.S
@@ -145,7 +144,7 @@ clear_page == memset
 
 ---------------------------------------------------------------------
 
-libgcc: last sync @ v3.14-rc7 (last commit: 01885bc)
+libgcc: last sync @ v3.16-rc6 (last commit: 01885bc)
 
 linux/arch/arm/lib/lib1funcs.S          xen/arch/arm/arm32/lib/lib1funcs.S
 linux/arch/arm/lib/lshrdi3.S            xen/arch/arm/arm32/lib/lshrdi3.S

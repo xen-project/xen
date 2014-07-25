@@ -1,6 +1,8 @@
 #ifndef __ASM_ARM32_CMPXCHG_H
 #define __ASM_ARM32_CMPXCHG_H
 
+#include <xen/prefetch.h>
+
 extern void __bad_xchg(volatile void *, int);
 
 static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
@@ -9,6 +11,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
 	unsigned int tmp;
 
 	smp_mb();
+	prefetchw((const void *)ptr);
 
 	switch (size) {
 	case 1:
@@ -55,6 +58,8 @@ static always_inline unsigned long __cmpxchg(
     volatile void *ptr, unsigned long old, unsigned long new, int size)
 {
 	unsigned long oldval, res;
+
+	prefetchw((const void *)ptr);
 
 	switch (size) {
 	case 1:
