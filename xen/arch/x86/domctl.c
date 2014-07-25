@@ -1027,7 +1027,7 @@ long arch_do_domctl(
         struct vcpu *v;
 
         ret = -EBUSY;
-        if ( d->controller_pause_count > 0 )
+        if ( !d->controller_pause_count )
             break;
         ret = -EINVAL;
         if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= MAX_VIRT_CPUS ||
@@ -1043,7 +1043,7 @@ long arch_do_domctl(
         struct vcpu *v;
 
         ret = -EBUSY;
-        if ( d->controller_pause_count > 0 )
+        if ( !d->controller_pause_count )
             break;
         ret = -EINVAL;
         if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= MAX_VIRT_CPUS ||
