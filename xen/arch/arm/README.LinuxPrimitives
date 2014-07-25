@@ -6,29 +6,26 @@ were last updated.
 arm64:
 =====================================================================
 
-bitops: last sync @ v3.14-rc7 (last commit: 8e86f0b)
+bitops: last sync @ v3.16-rc6 (last commit: 8715466b6027)
 
 linux/arch/arm64/lib/bitops.S           xen/arch/arm/arm64/lib/bitops.S
 linux/arch/arm64/include/asm/bitops.h   xen/include/asm-arm/arm64/bitops.h
 
 ---------------------------------------------------------------------
 
-cmpxchg: last sync @ v3.14-rc7 (last commit: 95c4189)
+cmpxchg: last sync @ v3.16-rc6 (last commit: e1dfda9ced9b)
 
 linux/arch/arm64/include/asm/cmpxchg.h  xen/include/asm-arm/arm64/cmpxchg.h
 
-Skipped:
-  60010e5 arm64: cmpxchg: update macros to prevent warnings
-
 ---------------------------------------------------------------------
 
-atomics: last sync @ v3.14-rc7 (last commit: 95c4189)
+atomics: last sync @ v3.16-rc6 (last commit: 8715466b6027)
 
 linux/arch/arm64/include/asm/atomic.h   xen/include/asm-arm/arm64/atomic.h
 
 ---------------------------------------------------------------------
 
-spinlocks: last sync @ v3.14-rc7 (last commit: 95c4189)
+spinlocks: last sync @ v3.16-rc6 (last commit: 95c4189689f9)
 
 linux/arch/arm64/include/asm/spinlock.h xen/include/asm-arm/arm64/spinlock.h
 
@@ -38,30 +35,31 @@ Skipped:
 
 ---------------------------------------------------------------------
 
-mem*: last sync @ v3.14-rc7 (last commit: 4a89922)
+mem*: last sync @ v3.16-rc6 (last commit: d875c9b37240)
 
-linux/arch/arm64/lib/memchr.S             xen/arch/arm/arm64/lib/memchr.S
-linux/arch/arm64/lib/memcpy.S             xen/arch/arm/arm64/lib/memcpy.S
-linux/arch/arm64/lib/memmove.S            xen/arch/arm/arm64/lib/memmove.S
-linux/arch/arm64/lib/memset.S             xen/arch/arm/arm64/lib/memset.S
+linux/arch/arm64/lib/memchr.S           xen/arch/arm/arm64/lib/memchr.S
+linux/arch/arm64/lib/memcmp.S           xen/arch/arm/arm64/lib/memcmp.S
+linux/arch/arm64/lib/memcpy.S           xen/arch/arm/arm64/lib/memcpy.S
+linux/arch/arm64/lib/memmove.S          xen/arch/arm/arm64/lib/memmove.S
+linux/arch/arm64/lib/memset.S           xen/arch/arm/arm64/lib/memset.S
 
-for i in memchr.S memcpy.S memmove.S memset.S ; do
+for i in memchr.S memcmp.S memcpy.S memmove.S memset.S ; do
     diff -u linux/arch/arm64/lib/$i xen/arch/arm/arm64/lib/$i
 done
 
 ---------------------------------------------------------------------
 
-str*: last sync @ v3.14-rc7 (last commit: 2b8cac8)
+str*: last sync @ v3.16-rc6 (last commit: 2b8cac814cd5)
 
-linux/arch/arm/lib/strchr.S             xen/arch/arm/arm64/lib/strchr.S
-linux/arch/arm/lib/strrchr.S            xen/arch/arm/arm64/lib/strrchr.S
+linux/arch/arm64/lib/strchr.S           xen/arch/arm/arm64/lib/strchr.S
+linux/arch/arm64/lib/strrchr.S          xen/arch/arm/arm64/lib/strrchr.S
 
 ---------------------------------------------------------------------
 
-{clear,copy}_page: last sync @ v3.14-rc7 (last commit: f27bb13)
+{clear,copy}_page: last sync @ v3.16-rc6 (last commit: f27bb139c387)
 
-linux/arch/arm64/lib/clear_page.S       unused in Xen
-linux/arch/arm64/lib/copy_page.S        xen/arch/arm/arm64/lib/copy_page.S
+linux/arch/arm64/lib/clear_page.S       xen/arch/arm/arm64/lib/clear_page.S
+linux/arch/arm64/lib/copy_page.S        unused in Xen
 
 =====================================================================
 arm32

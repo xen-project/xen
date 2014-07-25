@@ -17,6 +17,11 @@ extern char * strchr(const char * s, int c);
 #define __HAVE_ARCH_MEMCPY
 extern void * memcpy(void *, const void *, __kernel_size_t);
 
+#if defined(CONFIG_ARM_64)
+#define __HAVE_ARCH_MEMCMP
+extern int memcmp(const void *, const void *, __kernel_size_t);
+#endif
+
 /* Some versions of gcc don't have this builtin. It's non-critical anyway. */
 #define __HAVE_ARCH_MEMMOVE
 extern void *memmove(void *dest, const void *src, size_t n);

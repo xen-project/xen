@@ -33,9 +33,6 @@
 
 #define smp_wmb()       dmb(ishst)
 
-#define xchg(ptr,x) \
-        ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
-
 /*
  * This is used to ensure the compiler did actually allocate the register we
  * asked it for some inline assembly sequences.  Apparently we can't trust

@@ -18,6 +18,7 @@
  */
 
 #include <xen/config.h>
+#include "assembler.h"
 
 /*
  * Find a character in an area of memory.

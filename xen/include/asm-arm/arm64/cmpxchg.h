@@ -54,7 +54,12 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
 }
 
 #define xchg(ptr,x) \
-	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
+({ \
+	__typeof__(*(ptr)) __ret; \
+	__ret = (__typeof__(*(ptr))) \
+		__xchg((unsigned long)(x), (ptr), sizeof(*(ptr))); \
+	__ret; \
+})
 
 extern void __bad_cmpxchg(volatile void *ptr, int size);
 
@@ -144,17 +149,23 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
 	return ret;
 }
 
-#define cmpxchg(ptr,o,n)						\
-	((__typeof__(*(ptr)))__cmpxchg_mb((ptr),			\
-					  (unsigned long)(o),		\
-					  (unsigned long)(n),		\
-					  sizeof(*(ptr))))
+#define cmpxchg(ptr, o, n) \
+({ \
+	__typeof__(*(ptr)) __ret; \
+	__ret = (__typeof__(*(ptr))) \
+		__cmpxchg_mb((ptr), (unsigned long)(o), (unsigned long)(n), \
+			     sizeof(*(ptr))); \
+	__ret; \
+})
 
-#define cmpxchg_local(ptr,o,n)						\
-	((__typeof__(*(ptr)))__cmpxchg((ptr),				\
-				       (unsigned long)(o),		\
-				       (unsigned long)(n),		\
-				       sizeof(*(ptr))))
+#define cmpxchg_local(ptr, o, n) \
+({ \
+	__typeof__(*(ptr)) __ret; \
+	__ret = (__typeof__(*(ptr))) \
+		__cmpxchg((ptr), (unsigned long)(o), \
+			  (unsigned long)(n), sizeof(*(ptr))); \
+	__ret; \
+})
 
 #endif
 /*
