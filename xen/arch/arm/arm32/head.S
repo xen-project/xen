@@ -378,7 +378,7 @@ paging:
 1:
 
         /* Map fixmap into boot_second */
-        ldr   r1, =boot_second       /* r1 := vaddr (xen_fixmap) */
+        ldr   r1, =boot_second       /* r1 := vaddr (boot_second) */
         ldr   r2, =xen_fixmap
         add   r2, r2, r10            /* r2 := paddr (xen_fixmap) */
         orr   r2, r2, #PT_UPPER(PT)
