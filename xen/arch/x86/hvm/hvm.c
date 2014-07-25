@@ -392,6 +392,33 @@ bool_t hvm_io_pending(struct vcpu *v)
     return 0;
 }
 
+static bool_t hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
+{
+    /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
+    while ( p->state != STATE_IOREQ_NONE )
+    {
+        switch ( p->state )
+        {
+        case STATE_IORESP_READY: /* IORESP_READY -> NONE */
+            rmb(); /* see IORESP_READY /then/ read contents of ioreq */
+            hvm_io_assist(p);
+            break;
+        case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
+        case STATE_IOREQ_INPROCESS:
+            wait_on_xen_event_channel(sv->ioreq_evtchn,
+                                      (p->state != STATE_IOREQ_READY) &&
+                                      (p->state != STATE_IOREQ_INPROCESS));
+            break;
+        default:
+            gdprintk(XENLOG_ERR, "Weird HVM iorequest state %d.\n", p->state);
+            domain_crash(sv->vcpu->domain);
+            return 0; /* bail */
+        }
+    }
+
+    return 1;
+}
+
 void hvm_do_resume(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -406,27 +433,18 @@ void hvm_do_resume(struct vcpu *v)
                           &d->arch.hvm_domain.ioreq_server.list,
                           list_entry )
     {
-        ioreq_t *p = get_ioreq(s, v);
+        struct hvm_ioreq_vcpu *sv;
 
-        /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
-        while ( p->state != STATE_IOREQ_NONE )
+        list_for_each_entry ( sv,
+                              &s->ioreq_vcpu_list,
+                              list_entry )
         {
-            switch ( p->state )
+            if ( sv->vcpu == v )
             {
-            case STATE_IORESP_READY: /* IORESP_READY -> NONE */
-                rmb(); /* see IORESP_READY /then/ read contents of ioreq */
-                hvm_io_assist(p);
+                if ( !hvm_wait_for_io(sv, get_ioreq(s, v)) )
+                    return;
+
                 break;
-            case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
-            case STATE_IOREQ_INPROCESS:
-                wait_on_xen_event_channel(p->vp_eport,
-                                          (p->state != STATE_IOREQ_READY) &&
-                                          (p->state != STATE_IOREQ_INPROCESS));
-                break;
-            default:
-                gdprintk(XENLOG_ERR, "Weird HVM iorequest state %d.\n", p->state);
-                domain_crash(d);
-                return; /* bail */
             }
         }
     }
@@ -2545,35 +2563,58 @@ bool_t hvm_send_assist_req_to_ioreq_server(struct hvm_ioreq_server *s,
 {
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
-    ioreq_t *p;
+    struct hvm_ioreq_vcpu *sv;
 
     if ( unlikely(!vcpu_start_shutdown_deferral(curr)) )
         return 0; /* implicitly bins the i/o operation */
 
-    p = get_ioreq(s, curr);
-
-    if ( unlikely(p->state != STATE_IOREQ_NONE) )
+    list_for_each_entry ( sv,
+                          &s->ioreq_vcpu_list,
+                          list_entry )
     {
-        /* This indicates a bug in the device model. Crash the domain. */
-        gdprintk(XENLOG_ERR, "Device model set bad IO state %d.\n", p->state);
-        domain_crash(d);
-        return 0;
+        if ( sv->vcpu == curr )
+        {
+            evtchn_port_t port = sv->ioreq_evtchn;
+            ioreq_t *p = get_ioreq(s, curr);
+
+            if ( unlikely(p->state != STATE_IOREQ_NONE) )
+            {
+                gdprintk(XENLOG_ERR,
+                         "Device model set bad IO state %d.\n",
+                         p->state);
+                goto crash;
+            }
+
+            if ( unlikely(p->vp_eport != port) )
+            {
+                gdprintk(XENLOG_ERR,
+                         "Device model set bad event channel %d.\n",
+                         p->vp_eport);
+                goto crash;
+            }
+
+            proto_p->state = STATE_IOREQ_NONE;
+            proto_p->vp_eport = port;
+            *p = *proto_p;
+
+            prepare_wait_on_xen_event_channel(port);
+
+            /*
+             * Following happens /after/ blocking and setting up ioreq
+             * contents. prepare_wait_on_xen_event_channel() is an implicit
+             * barrier.
+             */
+            p->state = STATE_IOREQ_READY;
+            notify_via_xen_event_channel(d, port);
+            break;
+        }
     }
 
-    proto_p->state = STATE_IOREQ_NONE;
-    proto_p->vp_eport = p->vp_eport;
-    *p = *proto_p;
-
-    prepare_wait_on_xen_event_channel(p->vp_eport);
-
-    /*
-     * Following happens /after/ blocking and setting up ioreq contents.
-     * prepare_wait_on_xen_event_channel() is an implicit barrier.
-     */
-    p->state = STATE_IOREQ_READY;
-    notify_via_xen_event_channel(d, p->vp_eport);
-
     return 1;
+
+ crash:
+    domain_crash(d);
+    return 0;
 }
 
 bool_t hvm_send_assist_req(ioreq_t *p)
