@@ -216,6 +216,8 @@ struct vcpu
 
     /* VCPU paused for mem_event replies. */
     atomic_t         mem_event_pause_count;
+    /* VCPU paused by system controller. */
+    int              controller_pause_count;
 
     /* IRQ-safe virq_lock protects against delivering VIRQ to stale evtchn. */
     evtchn_port_t    virq_to_evtchn[NR_VIRQS];
@@ -768,9 +770,12 @@ void vcpu_block(void);
 void vcpu_unblock(struct vcpu *v);
 void vcpu_pause(struct vcpu *v);
 void vcpu_pause_nosync(struct vcpu *v);
+void vcpu_unpause(struct vcpu *v);
+int vcpu_pause_by_systemcontroller(struct vcpu *v);
+int vcpu_unpause_by_systemcontroller(struct vcpu *v);
+
 void domain_pause(struct domain *d);
 void domain_pause_nosync(struct domain *d);
-void vcpu_unpause(struct vcpu *v);
 void domain_unpause(struct domain *d);
 int domain_unpause_by_systemcontroller(struct domain *d);
 int __domain_pause_by_systemcontroller(struct domain *d,

@@ -878,6 +878,46 @@ void vcpu_unpause(struct vcpu *v)
         vcpu_wake(v);
 }
 
+int vcpu_pause_by_systemcontroller(struct vcpu *v)
+{
+    int old, new, prev = v->controller_pause_count;
+
+    do
+    {
+        old = prev;
+        new = old + 1;
+
+        if ( new > 255 )
+            return -EUSERS;
+
+        prev = cmpxchg(&v->controller_pause_count, old, new);
+    } while ( prev != old );
+
+    vcpu_pause(v);
+
+    return 0;
+}
+
+int vcpu_unpause_by_systemcontroller(struct vcpu *v)
+{
+    int old, new, prev = v->controller_pause_count;
+
+    do
+    {
+        old = prev;
+        new = old - 1;
+
+        if ( new < 0 )
+            return -EINVAL;
+
+        prev = cmpxchg(&v->controller_pause_count, old, new);
+    } while ( prev != old );
+
+    vcpu_unpause(v);
+
+    return 0;
+}
+
 void domain_pause(struct domain *d)
 {
     struct vcpu *v;
