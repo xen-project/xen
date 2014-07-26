@@ -72,7 +72,7 @@ CAMLprim value ocaml_sd_listen_fds(value connect_to)
 			   strerror(errno),
 			   errno);
 		caml_failwith("ocaml_sd_listen_fds() failed to get any sockets");
-	} else if (n > 2) {
+	} else if (n != 2) {
 		fprintf(stderr, SD_ERR "Expected 2 fds but given %d\n", n);
 		sd_notifyf(0, "STATUS=Mismatch on number (2): %s\n"
 			   "ERRNO=%d",
