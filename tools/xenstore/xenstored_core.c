@@ -1770,7 +1770,7 @@ static void xen_claim_active_sockets(int **psock, int **pro_sock)
 			   strerror(errno),
 			   errno);
 		barf_perror("sd_listen_fds() failed\n");
-	} else if (n > 2) {
+	} else if (n != 2) {
 		fprintf(stderr, SD_ERR "Expected 2 fds but given %d\n", n);
 		sd_notifyf(0, "STATUS=Mismatch on number (2): %s\n"
 			   "ERRNO=%d",
