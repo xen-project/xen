@@ -37,6 +37,7 @@ config.log
 config.status
 config.cache
 config/Toplevel.mk
+config/Paths.mk
 
 build-*
 dist/*

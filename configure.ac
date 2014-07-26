@@ -5,12 +5,18 @@ AC_PREREQ([2.67])
 AC_INIT([Xen Hypervisor], m4_esyscmd([./version.sh ./xen/Makefile]),
     [xen-devel@lists.xen.org], [xen], [http://www.xen.org/])
 AC_CONFIG_SRCDIR([./xen/common/kernel.c])
-AC_CONFIG_FILES([./config/Toplevel.mk])
+AC_CONFIG_FILES([
+	config/Toplevel.mk
+	config/Paths.mk
+])
 
 AC_CANONICAL_HOST
 
 m4_include([m4/features.m4])
 m4_include([m4/subsystem.m4])
+m4_include([m4/paths.m4])
+
+AX_XEN_EXPAND_CONFIG()
 
 dnl mini-os is only ported to certain platforms
 case "$host_cpu" in

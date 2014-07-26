@@ -594,6 +594,23 @@ stubdom
 tools
 xen
 subdirs
+XEN_PAGING_DIR
+XEN_LOCK_DIR
+XEN_SCRIPT_DIR
+XEN_CONFIG_DIR
+CONFIG_DIR
+XENFIRMWAREDIR
+PRIVATE_BINDIR
+PKG_XEN_PREFIX
+PRIVATE_PREFIX
+SHAREDIR
+XEN_LIB_STORED
+XEN_LOG_DIR
+XEN_RUN_DIR
+LIBDIR
+LIBEXEC
+SBINDIR
+BINDIR
 host_os
 host_vendor
 host_cpu
@@ -1702,7 +1719,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-ac_config_files="$ac_config_files ./config/Toplevel.mk"
+ac_config_files="$ac_config_files config/Toplevel.mk config/Paths.mk"
 
 
 ac_aux_dir=
@@ -1826,6 +1843,67 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 
+
+
+
+
+
+
+test "x$prefix" = "xNONE" && prefix=$ac_default_prefix
+test "x$exec_prefix" = "xNONE" && exec_prefix=$ac_default_prefix
+
+BINDIR=$prefix/bin
+
+
+SBINDIR=$prefix/sbin
+
+
+LIBEXEC=$prefix/lib/xen/bin
+
+
+LIBDIR=`eval echo $libdir`
+
+
+XEN_RUN_DIR=/var/run/xen
+
+
+XEN_LOG_DIR=/var/log/xen
+
+
+XEN_LIB_STORED=/var/lib/xenstored
+
+
+SHAREDIR=$prefix/share
+
+
+PRIVATE_PREFIX=$LIBDIR/xen
+
+
+PKG_XEN_PREFIX=$LIBDIR/xen
+
+
+PRIVATE_BINDIR=$PRIVATE_PREFIX/bin
+
+
+XENFIRMWAREDIR=$prefix/lib/xen/boot
+
+
+CONFIG_DIR=/etc
+
+
+XEN_CONFIG_DIR=$CONFIG_DIR/xen
+
+
+XEN_SCRIPT_DIR=$XEN_CONFIG_DIR/scripts
+
+
+XEN_LOCK_DIR=/var/lock
+
+
+XEN_RUN_DIR=/var/run/xen
+
+
+XEN_PAGING_DIR=/var/lib/xen/xenpaging
 
 
 
@@ -2749,7 +2827,8 @@ cat >>$CONFIG_STATUS <<\_ACEOF || ac_write_fail=1
 for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
-    "./config/Toplevel.mk") CONFIG_FILES="$CONFIG_FILES ./config/Toplevel.mk" ;;
+    "config/Toplevel.mk") CONFIG_FILES="$CONFIG_FILES config/Toplevel.mk" ;;
+    "config/Paths.mk") CONFIG_FILES="$CONFIG_FILES config/Paths.mk" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
