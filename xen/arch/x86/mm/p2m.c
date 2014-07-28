@@ -1228,8 +1228,17 @@ void p2m_mem_paging_resume(struct domain *d)
     /* Pull all responses off the ring */
     while( mem_event_get_response(d, &d->mem_event->paging, &rsp) )
     {
+        struct vcpu *v;
+
         if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
             continue;
+
+        /* Validate the vcpu_id in the response. */
+        if ( (rsp.vcpu_id >= d->max_vcpus) || !d->vcpu[rsp.vcpu_id] )
+            continue;
+
+        v = d->vcpu[rsp.vcpu_id];
+
         /* Fix p2m entry if the page was not dropped */
         if ( !(rsp.flags & MEM_EVENT_FLAG_DROP_PAGE) )
         {
@@ -1248,7 +1257,7 @@ void p2m_mem_paging_resume(struct domain *d)
         }
         /* Unpause domain */
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
-            vcpu_unpause(d->vcpu[rsp.vcpu_id]);
+            vcpu_unpause(v);
     }
 }
 
@@ -1356,11 +1365,20 @@ void p2m_mem_access_resume(struct domain *d)
     /* Pull all responses off the ring */
     while( mem_event_get_response(d, &d->mem_event->access, &rsp) )
     {
+        struct vcpu *v;
+
         if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
             continue;
+
+        /* Validate the vcpu_id in the response. */
+        if ( (rsp.vcpu_id >= d->max_vcpus) || !d->vcpu[rsp.vcpu_id] )
+            continue;
+
+        v = d->vcpu[rsp.vcpu_id];
+
         /* Unpause domain */
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
-            vcpu_unpause(d->vcpu[rsp.vcpu_id]);
+            vcpu_unpause(v);
     }
 }
 
