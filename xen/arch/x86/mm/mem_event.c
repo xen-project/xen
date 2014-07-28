@@ -655,6 +655,38 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
     return rc;
 }
 
+void mem_event_vcpu_pause(struct vcpu *v)
+{
+    ASSERT(v == current);
+
+    atomic_inc(&v->mem_event_pause_count);
+    vcpu_pause_nosync(v);
+}
+
+void mem_event_vcpu_unpause(struct vcpu *v)
+{
+    int old, new, prev = v->mem_event_pause_count.counter;
+
+    /* All unpause requests as a result of toolstack responses.  Prevent
+     * underflow of the vcpu pause count. */
+    do
+    {
+        old = prev;
+        new = old - 1;
+
+        if ( new < 0 )
+        {
+            printk(XENLOG_G_WARNING
+                   "d%d:v%d mem_event: Too many unpause attempts\n",
+                   v->domain->domain_id, v->vcpu_id);
+            return;
+        }
+
+        prev = cmpxchg(&v->mem_event_pause_count.counter, old, new);
+    } while ( prev != old );
+
+    vcpu_unpause(v);
+}
 
 /*
  * Local variables:
