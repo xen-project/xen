@@ -86,13 +86,13 @@ struct evtchn
             domid_t remote_domid;
         } unbound;     /* state == ECS_UNBOUND */
         struct {
-            u16            remote_port;
+            evtchn_port_t  remote_port;
             struct domain *remote_dom;
         } interdomain; /* state == ECS_INTERDOMAIN */
         struct {
-            u16            irq;
-            u16            next_port;
-            u16            prev_port;
+            u32            irq;
+            evtchn_port_t  next_port;
+            evtchn_port_t  prev_port;
         } pirq;        /* state == ECS_PIRQ */
         u16 virq;      /* state == ECS_VIRQ */
     } u;
@@ -190,7 +190,7 @@ struct vcpu
     atomic_t         pause_count;
 
     /* IRQ-safe virq_lock protects against delivering VIRQ to stale evtchn. */
-    u16              virq_to_evtchn[NR_VIRQS];
+    evtchn_port_t    virq_to_evtchn[NR_VIRQS];
     spinlock_t       virq_lock;
 
     /* Bitmask of CPUs on which this VCPU may run. */
