@@ -75,7 +75,8 @@ int parse_bool(const char *s);
 /*#define DEBUG_TRACE_DUMP*/
 #ifdef DEBUG_TRACE_DUMP
 extern void debugtrace_dump(void);
-extern void debugtrace_printk(const char *fmt, ...);
+extern void debugtrace_printk(const char *fmt, ...)
+    __attribute__ ((format (printf, 1, 2)));
 #else
 #define debugtrace_dump()          ((void)0)
 #define debugtrace_printk(_f, ...) ((void)0)

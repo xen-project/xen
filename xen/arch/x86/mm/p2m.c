@@ -1807,7 +1807,7 @@ void audit_p2m(struct domain *d,
  
     P2M_PRINTK("p2m audit complete\n");
     if ( orphans_count | mpbad | pmbad )
-        P2M_PRINTK("p2m audit found %lu orphans\n", orphans);
+        P2M_PRINTK("p2m audit found %lu orphans\n", orphans_count);
     if ( mpbad | pmbad )
     {
         P2M_PRINTK("p2m audit found %lu odd p2m, %lu bad m2p entries\n",
