@@ -61,7 +61,7 @@ int main (int argCnt, const char *args[])
 
 #ifdef USE_MMAP
     polMem = mmap(NULL, info.st_size, PROT_READ, MAP_SHARED, polFd, 0);
-    if ( !polMem )
+    if ( polMem == MAP_FAILED )
     {
         fprintf(stderr, "Error occurred mapping policy file in memory: %s\n",
                 strerror(errno));
