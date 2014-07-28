@@ -1306,7 +1306,7 @@ long arch_do_domctl(
             break;
 
         ret = -EBUSY;
-        if ( !d->is_paused_by_controller )
+        if ( !d->controller_pause_count )
         {
             rcu_unlock_domain(d);
             break;
@@ -1334,7 +1334,7 @@ long arch_do_domctl(
             break;
 
         ret = -EBUSY;
-        if ( !d->is_paused_by_controller )
+        if ( !d->controller_pause_count )
         {
             rcu_unlock_domain(d);
             break;
@@ -1364,7 +1364,7 @@ long arch_do_domctl(
             break;
 
         domctl->u.gdbsx_domstatus.vcpu_id = -1;
-        domctl->u.gdbsx_domstatus.paused = d->is_paused_by_controller;
+        domctl->u.gdbsx_domstatus.paused = d->controller_pause_count > 0;
         if ( domctl->u.gdbsx_domstatus.paused )
         {
             for_each_vcpu ( d, v )
