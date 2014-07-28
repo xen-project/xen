@@ -674,7 +674,7 @@ static void alloc_qos_data(int ncpu)
         new_qos = (_new_qos_data *) mmap(0, sizeof(_new_qos_data), PROT_READ|PROT_WRITE, 
                                          MAP_SHARED, qos_fd, off);
         off += i;
-        if (new_qos == NULL) {
+        if (new_qos == MAP_FAILED) {
             PERROR("mmap");
             exit(3);
         }
