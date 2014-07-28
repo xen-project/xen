@@ -2300,7 +2300,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
     {
         /* NB. All these really belong in hvm_domain_initialise(). */
         pmtimer_init(v);
-        hpet_init(v);
+        hpet_init(d);
  
         /* Init guest TSC to start from zero. */
         hvm_set_guest_tsc(v, 0);

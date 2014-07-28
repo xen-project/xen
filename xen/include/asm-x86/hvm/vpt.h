@@ -190,7 +190,7 @@ void pmtimer_deinit(struct domain *d);
 void pmtimer_reset(struct domain *d);
 int pmtimer_change_ioport(struct domain *d, unsigned int version);
 
-void hpet_init(struct vcpu *v);
+void hpet_init(struct domain *d);
 void hpet_deinit(struct domain *d);
 void hpet_reset(struct domain *d);
 

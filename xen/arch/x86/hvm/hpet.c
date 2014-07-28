@@ -611,9 +611,9 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
 
 HVM_REGISTER_SAVE_RESTORE(HPET, hpet_save, hpet_load, 1, HVMSR_PER_DOM);
 
-void hpet_init(struct vcpu *v)
+void hpet_init(struct domain *d)
 {
-    HPETState *h = vcpu_vhpet(v);
+    HPETState *h = domain_vhpet(d);
     int i;
 
     memset(h, 0, sizeof(HPETState));
@@ -665,7 +665,7 @@ void hpet_deinit(struct domain *d)
 void hpet_reset(struct domain *d)
 {
     hpet_deinit(d);
-    hpet_init(d->vcpu[0]);
+    hpet_init(d);
 }
 
 /*
