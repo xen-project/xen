@@ -246,7 +246,7 @@ int libxl__file_reference_map(libxl__file_reference *f)
 
     ret = -1;
     data = mmap(NULL, st_buf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (data == NULL)
+    if (data == MAP_FAILED)
         goto out;
 
     f->mapped = 1;
