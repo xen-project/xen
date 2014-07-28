@@ -4704,7 +4704,7 @@ static int hvm_memory_event_traps(long p, uint32_t reason,
     if ( (p & HVMPME_MODE_MASK) == HVMPME_mode_sync ) 
     {
         req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;    
-        vcpu_pause_nosync(v);   
+        mem_event_vcpu_pause(v);
     }
 
     req.gfn = value;

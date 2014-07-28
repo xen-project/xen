@@ -1094,7 +1094,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     /* Pause domain if request came from guest and gfn has paging type */
     if ( p2m_is_paging(p2mt) && v->domain == d )
     {
-        vcpu_pause_nosync(v);
+        mem_event_vcpu_pause(v);
         req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
     }
     /* No need to inform pager if the gfn is not in the page-out path */
@@ -1257,7 +1257,7 @@ void p2m_mem_paging_resume(struct domain *d)
         }
         /* Unpause domain */
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
-            vcpu_unpause(v);
+            mem_event_vcpu_unpause(v);
     }
 }
 
@@ -1352,7 +1352,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla,
 
     /* Pause the current VCPU */
     if ( p2ma != p2m_access_n2rwx )
-        vcpu_pause_nosync(v);
+        mem_event_vcpu_pause(v);
 
     /* VCPU may be paused, return whether we promoted automatically */
     return (p2ma == p2m_access_n2rwx);
@@ -1378,7 +1378,7 @@ void p2m_mem_access_resume(struct domain *d)
 
         /* Unpause domain */
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
-            vcpu_unpause(v);
+            mem_event_vcpu_unpause(v);
     }
 }
 

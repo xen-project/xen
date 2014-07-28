@@ -189,6 +189,9 @@ struct vcpu
     unsigned long    pause_flags;
     atomic_t         pause_count;
 
+    /* VCPU paused for mem_event replies. */
+    atomic_t         mem_event_pause_count;
+
     /* IRQ-safe virq_lock protects against delivering VIRQ to stale evtchn. */
     evtchn_port_t    virq_to_evtchn[NR_VIRQS];
     spinlock_t       virq_lock;
