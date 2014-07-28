@@ -264,7 +264,7 @@ struct domain *domain_create(
         if ( (err = xsm_domain_create(XSM_HOOK, d, ssidref)) != 0 )
             goto fail;
 
-        d->is_paused_by_controller = 1;
+        d->controller_pause_count = 1;
         atomic_inc(&d->pause_count);
 
         if ( domid )
@@ -680,18 +680,13 @@ void vcpu_end_shutdown_deferral(struct vcpu *v)
 #ifdef HAS_GDBSX
 void domain_pause_for_debugger(void)
 {
-    struct domain *d = current->domain;
-    struct vcpu *v;
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
 
-    atomic_inc(&d->pause_count);
-    if ( test_and_set_bool(d->is_paused_by_controller) )
-        domain_unpause(d); /* race-free atomic_dec(&d->pause_count) */
-
-    for_each_vcpu ( d, v )
-        vcpu_sleep_nosync(v);
+    domain_pause_by_systemcontroller_nosync(d);
 
     /* if gdbsx active, we just need to pause the domain */
-    if (current->arch.gdbsx_vcpu_event == 0)
+    if ( curr->arch.gdbsx_vcpu_event == 0 )
         send_global_virq(VIRQ_DEBUGGER);
 }
 #endif
@@ -839,17 +834,49 @@ void domain_unpause(struct domain *d)
             vcpu_wake(v);
 }
 
-void domain_pause_by_systemcontroller(struct domain *d)
+int __domain_pause_by_systemcontroller(struct domain *d,
+                                       void (*pause_fn)(struct domain *d))
 {
-    domain_pause(d);
-    if ( test_and_set_bool(d->is_paused_by_controller) )
-        domain_unpause(d);
+    int old, new, prev = d->controller_pause_count;
+
+    do
+    {
+        old = prev;
+        new = old + 1;
+
+        /*
+         * Limit the toolstack pause count to an arbitrary 255 to prevent the
+         * toolstack overflowing d->pause_count with many repeated hypercalls.
+         */
+        if ( new > 255 )
+            return -EUSERS;
+
+        prev = cmpxchg(&d->controller_pause_count, old, new);
+    } while ( prev != old );
+
+    pause_fn(d);
+
+    return 0;
 }
 
-void domain_unpause_by_systemcontroller(struct domain *d)
+int domain_unpause_by_systemcontroller(struct domain *d)
 {
-    if ( test_and_clear_bool(d->is_paused_by_controller) )
-        domain_unpause(d);
+    int old, new, prev = d->controller_pause_count;
+
+    do
+    {
+        old = prev;
+        new = old - 1;
+
+        if ( new < 0 )
+            return -EINVAL;
+
+        prev = cmpxchg(&d->controller_pause_count, old, new);
+    } while ( prev != old );
+
+    domain_unpause(d);
+
+    return 0;
 }
 
 int vcpu_reset(struct vcpu *v)

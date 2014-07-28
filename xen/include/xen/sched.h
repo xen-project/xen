@@ -338,7 +338,7 @@ struct domain
     /* Is this guest dying (i.e., a zombie)? */
     enum { DOMDYING_alive, DOMDYING_dying, DOMDYING_dead } is_dying;
     /* Domain is paused by controller software? */
-    bool_t           is_paused_by_controller;
+    int              controller_pause_count;
     /* Domain's VCPUs are pinned 1:1 to physical CPUs? */
     bool_t           is_pinned;
 
@@ -742,8 +742,17 @@ void domain_pause(struct domain *d);
 void domain_pause_nosync(struct domain *d);
 void vcpu_unpause(struct vcpu *v);
 void domain_unpause(struct domain *d);
-void domain_pause_by_systemcontroller(struct domain *d);
-void domain_unpause_by_systemcontroller(struct domain *d);
+int domain_unpause_by_systemcontroller(struct domain *d);
+int __domain_pause_by_systemcontroller(struct domain *d,
+                                       void (*pause_fn)(struct domain *d));
+static inline int domain_pause_by_systemcontroller(struct domain *d)
+{
+    return __domain_pause_by_systemcontroller(d, domain_pause);
+}
+static inline int domain_pause_by_systemcontroller_nosync(struct domain *d)
+{
+    return __domain_pause_by_systemcontroller(d, domain_pause_nosync);
+}
 void cpu_init(void);
 
 struct scheduler;

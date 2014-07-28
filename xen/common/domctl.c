@@ -181,7 +181,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     info->flags = (info->nr_online_vcpus ? flags : 0) |
         ((d->is_dying == DOMDYING_dead) ? XEN_DOMINF_dying    : 0) |
         (d->is_shut_down                ? XEN_DOMINF_shutdown : 0) |
-        (d->is_paused_by_controller     ? XEN_DOMINF_paused   : 0) |
+        (d->controller_pause_count > 0  ? XEN_DOMINF_paused   : 0) |
         (d->debugger_attached           ? XEN_DOMINF_debugged : 0) |
         d->shutdown_code << XEN_DOMINF_shutdownshift;
 
@@ -384,22 +384,14 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     break;
 
     case XEN_DOMCTL_pausedomain:
-    {
         ret = -EINVAL;
         if ( d != current->domain )
-        {
-            domain_pause_by_systemcontroller(d);
-            ret = 0;
-        }
-    }
-    break;
+            ret = domain_pause_by_systemcontroller(d);
+        break;
 
     case XEN_DOMCTL_unpausedomain:
-    {
-        domain_unpause_by_systemcontroller(d);
-        ret = 0;
-    }
-    break;
+        ret = domain_unpause_by_systemcontroller(d);
+        break;
 
     case XEN_DOMCTL_resumedomain:
     {
