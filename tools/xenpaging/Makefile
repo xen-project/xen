@@ -13,7 +13,6 @@ SRCS     += pagein.c
 
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
-CFLAGS   += -g
 
 OBJS     = $(SRCS:.c=.o)
 IBINS    = xenpaging

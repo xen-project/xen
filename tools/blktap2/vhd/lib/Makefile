@@ -17,7 +17,6 @@ CFLAGS          += -Wno-unused
 CFLAGS          += -I../../include
 CFLAGS          += -D_GNU_SOURCE
 CFLAGS          += -fPIC
-CFLAGS          += -g
 
 ifeq ($(CONFIG_Linux),y)
 LIBS            := -luuid
