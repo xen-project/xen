@@ -35,8 +35,6 @@ OBJECTS-$(CONFIG_NetBSD) += src/xenstat_netbsd.o
 OBJECTS-$(CONFIG_FreeBSD) += src/xenstat_freebsd.o
 SONAME_FLAGS=-Wl,$(SONAME_LDFLAG) -Wl,libxenstat.so.$(MAJOR)
 
-WARN_FLAGS=-Wall -Werror
-
 CFLAGS+=-fPIC
 CFLAGS+=-Isrc $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore) $(CFLAGS_xeninclude)
 

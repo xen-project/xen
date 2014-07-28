@@ -18,7 +18,7 @@ ifneq ($(XENSTAT_XENTOP),y)
 all install xentop:
 else
 
-CFLAGS += -DGCC_PRINTF -Wall -Werror $(CFLAGS_libxenstat)
+CFLAGS += -DGCC_PRINTF -Werror $(CFLAGS_libxenstat)
 LDLIBS += $(LDLIBS_libxenstat) $(CURSES_LIBS) $(SOCKET_LIBS)
 CFLAGS += -DHOST_$(XEN_OS)
 
