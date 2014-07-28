@@ -1788,6 +1788,7 @@ int hvm_set_cr0(unsigned long value)
 
     v->arch.hvm_vcpu.guest_cr[0] = value;
     hvm_update_guest_cr(v, 0);
+    hvm_memory_event_cr0(value, old_value);
 
     if ( (value ^ old_value) & X86_CR0_PG ) {
         if ( !nestedhvm_vmswitch_in_progress(v) && nestedhvm_vcpu_in_guestmode(v) )
