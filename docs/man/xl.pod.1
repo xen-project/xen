@@ -651,16 +651,32 @@ after B<vcpu-set>, go to B<SEE ALSO> section for information.
 Lists VCPU information for a specific domain.  If no domain is
 specified, VCPU information for all domains will be provided.
 
-=item B<vcpu-pin> I<domain-id> I<vcpu> I<cpus>
+=item B<vcpu-pin> I<domain-id> I<vcpu> I<cpus hard> I<cpus soft>
 
-Pins the VCPU to only run on the specific CPUs.  The keyword
-B<all> can be used to apply the I<cpus> list to all VCPUs in the
-domain.
+Set hard and soft affinity for a I<vcpu> of <domain-id>. Normally VCPUs
+can float between available CPUs whenever Xen deems a different run state
+is appropriate.
 
-Normally VCPUs can float between available CPUs whenever Xen deems a
-different run state is appropriate.  Pinning can be used to restrict
-this, by ensuring certain VCPUs can only run on certain physical
-CPUs.
+Hard affinity can be used to restrict this, by ensuring certain VCPUs
+can only run on certain physical CPUs. Soft affinity specifies a I<preferred>
+set of CPUs. Soft affinity needs special support in the scheduler, which is
+only provided in credit1.
+
+The keyword B<all> can be used to apply the hard and soft affinity masks to
+all the VCPUs in the domain. The symbol '-' can be used to leave either
+hard or soft affinity alone.
+
+For example:
+
+ xl vcpu-pin 0 3 - 6-9
+
+will set soft affinity for vCPU 3 of domain 0 to pCPUs 6,7,8 and 9,
+leaving its hard affinity untouched. On the othe hand:
+
+ xl vcpu-pin 0 3 3,4 6-9
+
+will set both hard and soft affinity, the former to pCPUs 3 and 4, the
+latter to pCPUs 6,7,8, and 9.
 
 =item B<vm-list>
 

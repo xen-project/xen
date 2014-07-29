@@ -653,17 +653,18 @@ static int update_cpumap_range(const char *str, libxl_bitmap *cpumap)
  * single cpus or as eintire NUMA nodes) and turns it into the
  * corresponding libxl_bitmap (in cpumap).
  */
-static int vcpupin_parse(char *cpu, libxl_bitmap *cpumap)
+static int vcpupin_parse(const char *cpu, libxl_bitmap *cpumap)
 {
-    char *ptr, *saveptr = NULL;
+    char *ptr, *saveptr = NULL, *buf = strdup(cpu);
     int rc = 0;
 
-    for (ptr = strtok_r(cpu, ",", &saveptr); ptr;
+    for (ptr = strtok_r(buf, ",", &saveptr); ptr;
          ptr = strtok_r(NULL, ",", &saveptr)) {
         rc = update_cpumap_range(ptr, cpumap);
         if (rc)
             break;
     }
+    free(buf);
 
     return rc;
 }
@@ -826,17 +827,14 @@ static void parse_config_data(const char *config_source,
         libxl_defbool_set(&b_info->numa_placement, false);
     }
     else if (!xlu_cfg_get_string (config, "cpus", &buf, 0)) {
-        char *buf2 = strdup(buf);
-
         if (libxl_cpu_bitmap_alloc(ctx, &b_info->cpumap, 0)) {
             fprintf(stderr, "Unable to allocate cpumap\n");
             exit(1);
         }
 
         libxl_bitmap_set_none(&b_info->cpumap);
-        if (vcpupin_parse(buf2, &b_info->cpumap))
+        if (vcpupin_parse(buf, &b_info->cpumap))
             exit(1);
-        free(buf2);
 
         libxl_defbool_set(&b_info->numa_placement, false);
     }
@@ -4482,8 +4480,10 @@ static void print_vcpuinfo(uint32_t tdomid,
     }
     /*      TIM */
     printf("%9.1f  ", ((float)vcpuinfo->vcpu_time / 1e9));
-    /* CPU AFFINITY */
+    /* CPU HARD AND SOFT AFFINITY */
     print_bitmap(vcpuinfo->cpumap.map, nr_cpus, stdout);
+    printf(" / ");
+    print_bitmap(vcpuinfo->cpumap_soft.map, nr_cpus, stdout);
     printf("\n");
 }
 
@@ -4518,7 +4518,8 @@ static void vcpulist(int argc, char **argv)
     }
 
     printf("%-32s %5s %5s %5s %5s %9s %s\n",
-           "Name", "ID", "VCPU", "CPU", "State", "Time(s)", "CPU Affinity");
+           "Name", "ID", "VCPU", "CPU", "State", "Time(s)",
+           "Affinity (Hard / Soft)");
     if (!argc) {
         if (!(dominfo = libxl_list_domain(ctx, &nb_domain))) {
             fprintf(stderr, "libxl_list_domain failed.\n");
@@ -4551,17 +4552,29 @@ int main_vcpulist(int argc, char **argv)
     return 0;
 }
 
-static int vcpupin(uint32_t domid, const char *vcpu, char *cpu)
+int main_vcpupin(int argc, char **argv)
 {
     libxl_vcpuinfo *vcpuinfo;
-    libxl_bitmap cpumap;
-
-    uint32_t vcpuid;
+    libxl_bitmap cpumap_hard, cpumap_soft;;
+    libxl_bitmap *soft = &cpumap_soft, *hard = &cpumap_hard;
+    uint32_t vcpuid, domid;
+    const char *vcpu, *hard_str, *soft_str;
     char *endptr;
-    int i, nb_cpu, nb_vcpu, rc = -1;
+    int opt, nb_cpu, nb_vcpu, rc = -1;
 
-    libxl_bitmap_init(&cpumap);
+    libxl_bitmap_init(&cpumap_hard);
+    libxl_bitmap_init(&cpumap_soft);
 
+    SWITCH_FOREACH_OPT(opt, "", NULL, "vcpu-pin", 3) {
+        /* No options */
+    }
+
+    domid = find_domain(argv[optind]);
+    vcpu = argv[optind+1];
+    hard_str = argv[optind+2];
+    soft_str = (argc > optind+3) ? argv[optind+3] : NULL;
+
+    /* Figure out with which vCPU we are dealing with */
     vcpuid = strtoul(vcpu, &endptr, 10);
     if (vcpu == endptr) {
         if (strcmp(vcpu, "all")) {
@@ -4571,10 +4584,35 @@ static int vcpupin(uint32_t domid, const char *vcpu, char *cpu)
         vcpuid = -1;
     }
 
-    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0))
+    if (libxl_cpu_bitmap_alloc(ctx, &cpumap_hard, 0) ||
+        libxl_cpu_bitmap_alloc(ctx, &cpumap_soft, 0))
         goto out;
 
-    if (vcpupin_parse(cpu, &cpumap))
+    /*
+     * Syntax is: xl vcpu-pin <domid> <vcpu> <hard> <soft>
+     * We want to handle all the following cases ('-' means
+     * "leave it alone"):
+     *  xl vcpu-pin 0 3 3,4
+     *  xl vcpu-pin 0 3 3,4 -
+     *  xl vcpu-pin 0 3 - 6-9
+     *  xl vcpu-pin 0 3 3,4 6-9
+     */
+
+    /*
+     * Hard affinity is always present. However, if it's "-", all we need
+     * is passing a NULL pointer to the libxl_set_vcpuaffinity() call below.
+     */
+    if (!strcmp(hard_str, "-"))
+        hard = NULL;
+    else if (vcpupin_parse(hard_str, hard))
+        goto out;
+    /*
+     * Soft affinity is handled similarly. Only difference: we also want
+     * to pass NULL to libxl_set_vcpuaffinity() if it is not specified.
+     */
+    if (argc <= optind+3 || !strcmp(soft_str, "-"))
+        soft = NULL;
+    else if (vcpupin_parse(soft_str, soft))
         goto out;
 
     if (dryrun_only) {
@@ -4585,7 +4623,14 @@ static int vcpupin(uint32_t domid, const char *vcpu, char *cpu)
         }
 
         fprintf(stdout, "cpumap: ");
-        print_bitmap(cpumap.map, nb_cpu, stdout);
+        if (hard)
+            print_bitmap(hard->map, nb_cpu, stdout);
+        else
+            fprintf(stdout, "-");
+        if (soft) {
+            fprintf(stdout, " ");
+            print_bitmap(soft->map, nb_cpu, stdout);
+        }
         fprintf(stdout, "\n");
 
         if (ferror(stdout) || fflush(stdout)) {
@@ -4598,41 +4643,27 @@ static int vcpupin(uint32_t domid, const char *vcpu, char *cpu)
     }
 
     if (vcpuid != -1) {
-        if (libxl_set_vcpuaffinity(ctx, domid, vcpuid, &cpumap, NULL)) {
-            fprintf(stderr, "Could not set affinity for vcpu `%u'.\n", vcpuid);
+        if (libxl_set_vcpuaffinity(ctx, domid, vcpuid, hard, soft)) {
+            fprintf(stderr, "Could not set affinity for vcpu `%u'.\n",
+                    vcpuid);
             goto out;
         }
     }
     else {
-        if (!(vcpuinfo = libxl_list_vcpu(ctx, domid, &nb_vcpu, &i))) {
+        if (!(vcpuinfo = libxl_list_vcpu(ctx, domid, &nb_vcpu, &nb_cpu))) {
             fprintf(stderr, "libxl_list_vcpu failed.\n");
             goto out;
         }
-        for (i = 0; i < nb_vcpu; i++) {
-            if (libxl_set_vcpuaffinity(ctx, domid, vcpuinfo[i].vcpuid,
-                                       &cpumap, NULL)) {
-                fprintf(stderr, "libxl_set_vcpuaffinity failed"
-                                " on vcpu `%u'.\n", vcpuinfo[i].vcpuid);
-            }
-        }
+        if (libxl_set_vcpuaffinity_all(ctx, domid, nb_vcpu, hard, soft))
+            fprintf(stderr, "Could not set affinity.\n");
         libxl_vcpuinfo_list_free(vcpuinfo, nb_vcpu);
     }
 
     rc = 0;
  out:
-    libxl_bitmap_dispose(&cpumap);
+    libxl_bitmap_dispose(&cpumap_soft);
+    libxl_bitmap_dispose(&cpumap_hard);
     return rc;
-}
-
-int main_vcpupin(int argc, char **argv)
-{
-    int opt;
-
-    SWITCH_FOREACH_OPT(opt, "", NULL, "vcpu-pin", 3) {
-        /* No options */
-    }
-
-    return vcpupin(find_domain(argv[optind]), argv[optind+1] , argv[optind+2]);
 }
 
 static void vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
