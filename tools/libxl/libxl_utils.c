@@ -1047,9 +1047,14 @@ int libxl__random_bytes(libxl__gc *gc, uint8_t *buf, size_t len)
     int fd;
     int ret;
 
-    fd = open(dev, O_RDONLY | O_CLOEXEC);
+    fd = open(dev, O_RDONLY);
     if (fd < 0) {
         LOGE(ERROR, "failed to open \"%s\"", dev);
+        return ERROR_FAIL;
+    }
+    ret = libxl_fd_set_cloexec(CTX, fd, 1);
+    if (ret) {
+        close(fd);
         return ERROR_FAIL;
     }
 

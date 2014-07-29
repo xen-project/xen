@@ -977,7 +977,7 @@ void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char **vments = NULL, **localents = NULL;
     struct timeval start_time;
-    int i, esave, flags;
+    int i, esave;
 
     /* convenience aliases */
     const uint32_t domid = dcs->guest_domid;
@@ -1045,17 +1045,7 @@ out:
     }
 
     esave = errno;
-
-    flags = fcntl(fd, F_GETFL);
-    if (flags == -1) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unable to get flags on restore fd");
-    } else {
-        flags &= ~O_NONBLOCK;
-        if (fcntl(fd, F_SETFL, flags) == -1)
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unable to put restore fd"
-                         " back to blocking mode");
-    }
-
+    libxl_fd_set_nonblock(ctx, fd, 0);
     errno = esave;
     domcreate_rebuild_done(egc, dcs, ret);
 }
