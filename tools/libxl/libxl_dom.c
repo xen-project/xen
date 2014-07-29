@@ -272,21 +272,36 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     if (info->nodemap.size)
         libxl_domain_set_nodeaffinity(ctx, domid, &info->nodemap);
     /* As mentioned in libxl.h, vcpu_hard_array takes precedence */
-    if (info->num_vcpu_hard_affinity) {
-        int i;
+    if (info->num_vcpu_hard_affinity || info->num_vcpu_soft_affinity) {
+        libxl_bitmap *hard_affinity, *soft_affinity;
+        int i, n_vcpus;
 
-        for (i = 0; i < info->num_vcpu_hard_affinity; i++) {
+        n_vcpus = info->num_vcpu_hard_affinity > info->num_vcpu_soft_affinity ?
+            info->num_vcpu_hard_affinity : info->num_vcpu_soft_affinity;
+
+        for (i = 0; i < n_vcpus; i++) {
+            /*
+             * Prepare hard and soft affinity pointers in a way that allows
+             * us to issue only one call to libxl_set_vcpuaffinity(), setting,
+             * for each vcpu, both hard and soft affinity "atomically".
+             */
+            hard_affinity = NULL;
+            if (info->num_vcpu_hard_affinity &&
+                i < info->num_vcpu_hard_affinity)
+                hard_affinity = &info->vcpu_hard_affinity[i];
+
+            soft_affinity = NULL;
+            if (info->num_vcpu_soft_affinity &&
+                i < info->num_vcpu_soft_affinity)
+                soft_affinity = &info->vcpu_soft_affinity[i];
+
             if (libxl_set_vcpuaffinity(ctx, domid, i,
-                                       &info->vcpu_hard_affinity[i],
-                                       NULL)) {
+                                       hard_affinity, soft_affinity)) {
                 LOG(ERROR, "setting affinity failed on vcpu `%d'", i);
                 return ERROR_FAIL;
             }
         }
-    } else if (info->cpumap.size)
-        libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus,
-                                   &info->cpumap, NULL);
-
+    }
 
     if (xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb +
         LIBXL_MAXMEM_CONSTANT) < 0) {

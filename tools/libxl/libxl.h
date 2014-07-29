@@ -380,8 +380,7 @@ typedef struct libxl__ctx libxl_ctx;
  * Each bitmap should be big enough to accommodate the maximum number of
  * PCPUs of the host.
  */
-/* to be uncommented when soft array added */
-/* #define LIBXL_HAVE_BUILDINFO_VCPU_AFFINITY_ARRAYS 1 */
+#define LIBXL_HAVE_BUILDINFO_VCPU_AFFINITY_ARRAYS 1
 
 /*
  * LIBXL_HAVE_BUILDINFO_USBDEVICE_LIST

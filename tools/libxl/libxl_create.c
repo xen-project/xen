@@ -187,6 +187,21 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     } else if (b_info->avail_vcpus.size > HVM_MAX_VCPUS)
         return ERROR_FAIL;
 
+    /* In libxl internals, we want to deal with vcpu_hard_affinity only! */
+    if (b_info->cpumap.size && !b_info->num_vcpu_hard_affinity) {
+        int i;
+
+        b_info->vcpu_hard_affinity = libxl__calloc(gc, b_info->max_vcpus,
+                                                   sizeof(libxl_bitmap));
+        for (i = 0; i < b_info->max_vcpus; i++) {
+            if (libxl_cpu_bitmap_alloc(CTX, &b_info->vcpu_hard_affinity[i], 0))
+                return ERROR_FAIL;
+            libxl_bitmap_copy(CTX, &b_info->vcpu_hard_affinity[i],
+                              &b_info->cpumap);
+        }
+        b_info->num_vcpu_hard_affinity = b_info->max_vcpus;
+    }
+
     libxl_defbool_setdefault(&b_info->numa_placement, true);
 
     if (b_info->max_memkb == LIBXL_MEMKB_DEFAULT)

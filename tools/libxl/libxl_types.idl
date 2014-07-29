@@ -319,6 +319,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("cpumap",          libxl_bitmap),
     ("nodemap",         libxl_bitmap),
     ("vcpu_hard_affinity", Array(libxl_bitmap, "num_vcpu_hard_affinity")),
+    ("vcpu_soft_affinity", Array(libxl_bitmap, "num_vcpu_soft_affinity")),
     ("numa_placement",  libxl_defbool),
     ("tsc_mode",        libxl_tsc_mode),
     ("max_memkb",       MemKB),
