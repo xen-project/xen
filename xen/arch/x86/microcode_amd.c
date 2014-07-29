@@ -235,27 +235,22 @@ static int get_ucode_from_buffer_amd(
     size_t bufsize,
     size_t *offset)
 {
-    const uint8_t *bufp = buf;
-    size_t off;
-    const struct mpbhdr *mpbuf;
-
-    off = *offset;
+    const struct mpbhdr *mpbuf = buf + *offset;
 
     /* No more data */
-    if ( off >= bufsize )
+    if ( *offset >= bufsize )
     {
         printk(KERN_ERR "microcode: Microcode buffer overrun\n");
         return -EINVAL;
     }
 
-    mpbuf = (const struct mpbhdr *)&bufp[off];
     if ( mpbuf->type != UCODE_UCODE_TYPE )
     {
         printk(KERN_ERR "microcode: Wrong microcode payload type field\n");
         return -EINVAL;
     }
 
-    if ( (off + mpbuf->len) > bufsize )
+    if ( (*offset + mpbuf->len) > bufsize )
     {
         printk(KERN_ERR "microcode: Bad data in microcode data file\n");
         return -EINVAL;
@@ -275,12 +270,12 @@ static int get_ucode_from_buffer_amd(
     }
     memcpy(mc_amd->mpb, mpbuf->data, mpbuf->len);
 
-    *offset = off + mpbuf->len + SECTION_HDR_SIZE;
-
     pr_debug("microcode: CPU%d size %zu, block size %u offset %zu equivID %#x rev %#x\n",
-             raw_smp_processor_id(), bufsize, mpbuf->len, off,
+             raw_smp_processor_id(), bufsize, mpbuf->len, *offset,
              ((struct microcode_header_amd *)mc_amd->mpb)->processor_rev_id,
              ((struct microcode_header_amd *)mc_amd->mpb)->patch_id);
+
+    *offset += mpbuf->len + SECTION_HDR_SIZE;
 
     return 0;
 }
