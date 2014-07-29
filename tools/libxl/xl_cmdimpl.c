@@ -691,6 +691,72 @@ static void parse_top_level_sdl_options(XLU_Config *config,
     xlu_cfg_replace_string (config, "xauthority", &sdl->xauthority, 0);
 }
 
+static void parse_vcpu_affinity(XLU_Config *config,
+                                libxl_domain_build_info *b_info)
+{
+    XLU_ConfigList *cpus;
+    const char *buf;
+    int num_cpus;
+
+    if (!xlu_cfg_get_list (config, "cpus", &cpus, &num_cpus, 1)) {
+        int j = 0;
+
+        /* Silently ignore values corresponding to non existing vcpus */
+        if (num_cpus > b_info->max_vcpus)
+            num_cpus = b_info->max_vcpus;
+
+        b_info->vcpu_hard_affinity = xmalloc(num_cpus * sizeof(libxl_bitmap));
+
+        while ((buf = xlu_cfg_get_listitem(cpus, j)) != NULL && j < num_cpus) {
+            libxl_bitmap_init(&b_info->vcpu_hard_affinity[j]);
+            if (libxl_cpu_bitmap_alloc(ctx,
+                                       &b_info->vcpu_hard_affinity[j], 0)) {
+                fprintf(stderr, "Unable to allocate cpumap for vcpu %d\n", j);
+                exit(1);
+            }
+
+            if (vcpupin_parse(buf, &b_info->vcpu_hard_affinity[j]))
+                exit(1);
+
+            j++;
+        }
+        b_info->num_vcpu_hard_affinity = num_cpus;
+
+        /* We have a list of cpumaps, disable automatic placement */
+        libxl_defbool_set(&b_info->numa_placement, false);
+    }
+    else if (!xlu_cfg_get_string (config, "cpus", &buf, 0)) {
+        int i;
+
+        b_info->vcpu_hard_affinity =
+            xmalloc(b_info->max_vcpus * sizeof(libxl_bitmap));
+
+        libxl_bitmap_init(&b_info->vcpu_hard_affinity[0]);
+        if (libxl_cpu_bitmap_alloc(ctx,
+                                   &b_info->vcpu_hard_affinity[0], 0)) {
+            fprintf(stderr, "Unable to allocate cpumap for vcpu 0\n");
+            exit(1);
+        }
+
+        if (vcpupin_parse(buf, &b_info->vcpu_hard_affinity[0]))
+            exit(1);
+
+        for (i = 1; i < b_info->max_vcpus; i++) {
+            libxl_bitmap_init(&b_info->vcpu_hard_affinity[i]);
+            if (libxl_cpu_bitmap_alloc(ctx,
+                                       &b_info->vcpu_hard_affinity[i], 0)) {
+                fprintf(stderr, "Unable to allocate cpumap for vcpu %d\n", i);
+                exit(1);
+            }
+            libxl_bitmap_copy(ctx, &b_info->vcpu_hard_affinity[i],
+                              &b_info->vcpu_hard_affinity[0]);
+        }
+        b_info->num_vcpu_hard_affinity = b_info->max_vcpus;
+
+        libxl_defbool_set(&b_info->numa_placement, false);
+    }
+}
+
 static void parse_config_data(const char *config_source,
                               const char *config_data,
                               int config_len,
@@ -699,9 +765,9 @@ static void parse_config_data(const char *config_source,
     const char *buf;
     long l;
     XLU_Config *config;
-    XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms;
+    XLU_ConfigList *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms;
     XLU_ConfigList *ioports, *irqs, *iomem;
-    int num_ioports, num_irqs, num_iomem, num_cpus;
+    int num_ioports, num_irqs, num_iomem;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 0;
     int pci_permissive = 0;
@@ -798,61 +864,8 @@ static void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_long (config, "maxvcpus", &l, 0))
         b_info->max_vcpus = l;
 
-    if (!xlu_cfg_get_list (config, "cpus", &cpus, &num_cpus, 1)) {
-        int j = 0;
-
-        /* Silently ignore values corresponding to non existing vcpus */
-        if (num_cpus > b_info->max_vcpus)
-            num_cpus = b_info->max_vcpus;
-
-        b_info->vcpu_hard_affinity = xmalloc(num_cpus * sizeof(libxl_bitmap));
-
-        while ((buf = xlu_cfg_get_listitem(cpus, j)) != NULL && j < num_cpus) {
-            libxl_bitmap_init(&b_info->vcpu_hard_affinity[j]);
-            if (libxl_cpu_bitmap_alloc(ctx,
-                                       &b_info->vcpu_hard_affinity[j], 0)) {
-                fprintf(stderr, "Unable to allocate cpumap for vcpu %d\n", j);
-                exit(1);
-            }
-
-            if (vcpupin_parse(buf, &b_info->vcpu_hard_affinity[j]))
-                exit(1);
-
-            j++;
-        }
-        b_info->num_vcpu_hard_affinity = num_cpus;
-
-        /* We have a list of cpumaps, disable automatic placement */
-        libxl_defbool_set(&b_info->numa_placement, false);
-    }
-    else if (!xlu_cfg_get_string (config, "cpus", &buf, 0)) {
-        b_info->vcpu_hard_affinity =
-            xmalloc(b_info->max_vcpus * sizeof(libxl_bitmap));
-
-        libxl_bitmap_init(&b_info->vcpu_hard_affinity[0]);
-        if (libxl_cpu_bitmap_alloc(ctx,
-                                   &b_info->vcpu_hard_affinity[0], 0)) {
-            fprintf(stderr, "Unable to allocate cpumap for vcpu 0\n");
-            exit(1);
-        }
-
-        if (vcpupin_parse(buf, &b_info->vcpu_hard_affinity[0]))
-            exit(1);
-
-        for (i = 1; i < b_info->max_vcpus; i++) {
-            libxl_bitmap_init(&b_info->vcpu_hard_affinity[i]);
-            if (libxl_cpu_bitmap_alloc(ctx,
-                                       &b_info->vcpu_hard_affinity[i], 0)) {
-                fprintf(stderr, "Unable to allocate cpumap for vcpu %d\n", i);
-                exit(1);
-            }
-            libxl_bitmap_copy(ctx, &b_info->vcpu_hard_affinity[i],
-                              &b_info->vcpu_hard_affinity[0]);
-        }
-        b_info->num_vcpu_hard_affinity = b_info->max_vcpus;
-
-        libxl_defbool_set(&b_info->numa_placement, false);
-    }
+    /* Figure out VCPU hard-affinity ("cpus" config option) */
+    parse_vcpu_affinity(config, b_info);
 
     if (!xlu_cfg_get_long (config, "memory", &l, 0)) {
         b_info->max_memkb = l * 1024;
