@@ -143,11 +143,15 @@ Combining this with "all" is also possible, meaning "all,^nodes:1"
 results in all the vcpus of the guest running on all the cpus on the
 host, except for the cpus belonging to the host NUMA node 1.
 
-=item ["2", "3"] (or [2, 3])
+=item ["2", "3-8,^5"]
 
-To ask for specific vcpu mapping. That means (in this example), vcpu #0
-of the guest will run on cpu #2 of the host and vcpu #1 of the guest will
-run on cpu #3 of the host.
+To ask for specific vcpu mapping. That means (in this example), vcpu 0
+of the guest will run on cpu 2 of the host and vcpu 1 of the guest will
+run on cpus 3,4,6,7,8 of the host.
+
+More complex notation can be also used, exactly as described above. So
+"all,^5-8", or just "all", or "node:0,node:2,^9-11,18-20" are all legal,
+for each element of the list.
 
 =back
 

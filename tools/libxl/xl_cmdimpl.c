@@ -808,16 +808,15 @@ static void parse_config_data(const char *config_source,
         b_info->vcpu_hard_affinity = xmalloc(num_cpus * sizeof(libxl_bitmap));
 
         while ((buf = xlu_cfg_get_listitem(cpus, j)) != NULL && j < num_cpus) {
-            i = atoi(buf);
-
             libxl_bitmap_init(&b_info->vcpu_hard_affinity[j]);
             if (libxl_cpu_bitmap_alloc(ctx,
                                        &b_info->vcpu_hard_affinity[j], 0)) {
                 fprintf(stderr, "Unable to allocate cpumap for vcpu %d\n", j);
                 exit(1);
             }
-            libxl_bitmap_set_none(&b_info->vcpu_hard_affinity[j]);
-            libxl_bitmap_set(&b_info->vcpu_hard_affinity[j], i);
+
+            if (vcpupin_parse(buf, &b_info->vcpu_hard_affinity[j]))
+                exit(1);
 
             j++;
         }
@@ -827,14 +826,30 @@ static void parse_config_data(const char *config_source,
         libxl_defbool_set(&b_info->numa_placement, false);
     }
     else if (!xlu_cfg_get_string (config, "cpus", &buf, 0)) {
-        if (libxl_cpu_bitmap_alloc(ctx, &b_info->cpumap, 0)) {
-            fprintf(stderr, "Unable to allocate cpumap\n");
+        b_info->vcpu_hard_affinity =
+            xmalloc(b_info->max_vcpus * sizeof(libxl_bitmap));
+
+        libxl_bitmap_init(&b_info->vcpu_hard_affinity[0]);
+        if (libxl_cpu_bitmap_alloc(ctx,
+                                   &b_info->vcpu_hard_affinity[0], 0)) {
+            fprintf(stderr, "Unable to allocate cpumap for vcpu 0\n");
             exit(1);
         }
 
-        libxl_bitmap_set_none(&b_info->cpumap);
-        if (vcpupin_parse(buf, &b_info->cpumap))
+        if (vcpupin_parse(buf, &b_info->vcpu_hard_affinity[0]))
             exit(1);
+
+        for (i = 1; i < b_info->max_vcpus; i++) {
+            libxl_bitmap_init(&b_info->vcpu_hard_affinity[i]);
+            if (libxl_cpu_bitmap_alloc(ctx,
+                                       &b_info->vcpu_hard_affinity[i], 0)) {
+                fprintf(stderr, "Unable to allocate cpumap for vcpu %d\n", i);
+                exit(1);
+            }
+            libxl_bitmap_copy(ctx, &b_info->vcpu_hard_affinity[i],
+                              &b_info->vcpu_hard_affinity[0]);
+        }
+        b_info->num_vcpu_hard_affinity = b_info->max_vcpus;
 
         libxl_defbool_set(&b_info->numa_placement, false);
     }
