@@ -162,16 +162,6 @@ here, and the soft affinity mask, provided via B<cpus\_soft=> (if any),
 is utilized to compute the domain node-affinity, for driving memory
 allocations.
 
-If we are on a NUMA machine (i.e., if the host has more than one NUMA
-node) and this option is not specified, libxl automatically tries to
-place the guest on the least possible number of nodes. That, however,
-will not affect vcpu pinning, so the guest will still be able to run on
-all the cpus. A heuristic approach is used for choosing the best node (or
-set of nodes), with the goals of maximizing performance for the guest
-and, at the same time, achieving efficient utilization of host cpus
-and memory. See F<docs/misc/xl-numa-placement.markdown> for more
-details.
-
 =item B<cpus_soft="CPU-LIST">
 
 Exactly as B<cpus=>, but specifies soft affinity, rather than pinning
@@ -185,6 +175,17 @@ any preference regarding on what cpu to run. If this option is specified,
 the intersection of the soft affinity mask, provided here, and the vcpu
 pinning, provided via B<cpus=> (if any), is utilized to compute the
 domain node-affinity, for driving memory allocations.
+
+If this option is not specified (and B<cpus=> is not specified either),
+libxl automatically tries to place the guest on the least possible
+number of nodes. A heuristic approach is used for choosing the best
+node (or set of nodes), with the goal of maximizing performance for
+the guest and, at the same time, achieving efficient utilization of
+host cpus and memory. In that case, the soft affinity of all the vcpus
+of the domain will be set to the pcpus belonging to the NUMA nodes
+chosen during placement.
+
+For more details, see F<docs/misc/xl-numa-placement.markdown>.
 
 =back
 

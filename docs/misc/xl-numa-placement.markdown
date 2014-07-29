@@ -126,10 +126,20 @@ or Xen won't be able to guarantee the locality for their memory accesses.
 That, of course, also mean the vCPUs of the domain will only be able to
 execute on those same pCPUs.
 
+It is is also possible to have a "cpus\_soft=" option in the xl config file,
+to specify the soft affinity for all the vCPUs of the domain. This affects
+the NUMA placement in the following way:
+
+ * if only "cpus\_soft=" is present, the VM's node-affinity will be equal
+   to the nodes to which the pCPUs in the soft affinity mask belong;
+ * if both "cpus\_soft=" and "cpus=" are present, the VM's node-affinity
+   will be equal to the nodes to which the pCPUs present both in hard and
+   soft affinity belong.
+
 ### Placing the guest automatically ###
 
-If no "cpus=" option is specified in the config file, libxl tries
-to figure out on its own on which node(s) the domain could fit best.
+If neither "cpus=" nor "cpus\_soft=" are present in the config file, libxl
+tries to figure out on its own on which node(s) the domain could fit best.
 If it finds one (some), the domain's node affinity get set to there,
 and both memory allocations and NUMA aware scheduling (for the credit
 scheduler and starting from Xen 4.3) will comply with it. Starting from
