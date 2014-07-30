@@ -1884,7 +1884,7 @@ void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
     flexarray_t *front;
     flexarray_t *back;
     libxl__device *device;
-    unsigned int rc;
+    int rc;
 
     rc = libxl__device_vtpm_setdefault(gc, vtpm);
     if (rc) goto out;
@@ -2989,7 +2989,7 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     flexarray_t *front;
     flexarray_t *back;
     libxl__device *device;
-    unsigned int rc;
+    int rc;
 
     rc = libxl__device_nic_setdefault(gc, nic, domid);
     if (rc) goto out;
