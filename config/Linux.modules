@@ -1,0 +1,20 @@
+# The file supports a simple language, comments are ignored, and if you there
+# are module replacements this can be listed by using a pipe to show preference
+# for the first module, followed by the older module.
+
+xen-evtchn
+xen-gntdev
+xen-gntalloc
+xen-blkback
+xen-netback
+xen-pciback
+evtchn
+gntdev
+netbk
+blkbk
+xen-scsibk
+usbbk
+pciback
+xen-acpi-processor
+# Prefer to load blktap2 if found, otherwise load blktap
+blktap2|blktap

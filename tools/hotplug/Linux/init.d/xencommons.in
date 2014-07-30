@@ -57,21 +57,7 @@ do_start () {
         local time=0
 	local timeout=30
 
-	modprobe xen-evtchn 2>/dev/null
-	modprobe xen-gntdev 2>/dev/null
-	modprobe xen-gntalloc 2>/dev/null
-	modprobe xen-blkback 2>/dev/null
-	modprobe xen-netback 2>/dev/null
-	modprobe xen-pciback 2>/dev/null
-	modprobe evtchn 2>/dev/null
-	modprobe gntdev 2>/dev/null
-	modprobe netbk 2>/dev/null
-	modprobe blkbk 2>/dev/null
-	modprobe xen-scsibk 2>/dev/null
-	modprobe usbbk 2>/dev/null
-	modprobe pciback 2>/dev/null
-	modprobe xen-acpi-processor 2>/dev/null
-	modprobe blktap2 2>/dev/null || modprobe blktap 2>/dev/null
+	@LOAD_MODULES@
 	mkdir -p /var/run/xen
 
 	if ! `${BINDIR}/xenstore-read -s / >/dev/null 2>&1`
