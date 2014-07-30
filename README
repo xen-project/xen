@@ -129,6 +129,38 @@ performed with root privileges.]
    versions of those scripts, so that you can copy the dist directory
    to another machine and install from that distribution.
 
+xenstore: xenstored and oxenstored
+====================================
+
+Xen uses a configuration database called xenstore [0] to maintain configuration
+and status information shared between domains. A daemon is implemented as part
+of xenstore to act as an interface for access to the database for dom0 and
+guests. Two xenstored daemons are supported, one written in C which we refer
+to as the xenstored (sometimes referred to as cxenstored), and another written
+in Ocaml called oxenstored. Details for xenstore and the different
+implementations can be found on the wiki's xenstore reference guide [1] and
+the xenstored [2] page. You can choose which xenstore you want to enable as
+default on a system through configure:
+
+	./configure --with-xenstored=xenstored
+	./configure --with-xenstored=oxenstored
+
+By default oxenstored will be used if the ocaml development tools are found.
+If you enable oxenstored the xenstored will still be built and installed,
+the xenstored used can be changed through the configuration file:
+
+/etc/sysconfig/xencommons
+or
+/etc/default/xencommons
+
+You can change the preferred xenstored you want to use in the configuration
+but since we cannot stop the daemon a reboot will be required to make the
+change take effect.
+
+[0] http://wiki.xen.org/wiki/XenStore
+[1] http://wiki.xen.org/wiki/XenStoreReference
+[2] http://wiki.xen.org/wiki/Xenstored
+
 Python Runtime Libraries
 ========================
 

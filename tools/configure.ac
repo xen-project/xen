@@ -5,7 +5,11 @@ AC_PREREQ([2.67])
 AC_INIT([Xen Hypervisor Tools], m4_esyscmd([../version.sh ../xen/Makefile]),
     [xen-devel@lists.xen.org], [xen], [http://www.xen.org/])
 AC_CONFIG_SRCDIR([libxl/libxl.c])
-AC_CONFIG_FILES([../config/Tools.mk])
+AC_CONFIG_FILES([
+../config/Tools.mk
+hotplug/Linux/init.d/xencommons.in
+hotplug/Linux/init.d/sysconfig.xencommons
+])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([../])
 
@@ -53,6 +57,10 @@ m4_include([../m4/ptyfuncs.m4])
 m4_include([../m4/extfs.m4])
 m4_include([../m4/fetcher.m4])
 m4_include([../m4/ax_compare_version.m4])
+m4_include([../m4/paths.m4])
+m4_include([../m4/xenstored.m4])
+
+AX_XEN_EXPAND_CONFIG()
 
 # Enable/disable options
 AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
@@ -203,9 +211,14 @@ AC_PROG_INSTALL
 AC_PATH_PROG([BISON], [bison])
 AC_PATH_PROG([FLEX], [flex])
 AX_PATH_PROG_OR_FAIL([PERL], [perl])
+
+AC_PROG_OCAML
+AC_PROG_FINDLIB
+
+AX_XENSTORE_OPTIONS
+AX_XENSTORE_SET
+
 AS_IF([test "x$ocamltools" = "xy"], [
-    AC_PROG_OCAML
-    AC_PROG_FINDLIB
     AS_IF([test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"], [
         AS_IF([test "x$enable_ocamltools" = "xyes"], [
             AC_MSG_ERROR([Ocaml tools enabled, but unable to find Ocaml])])

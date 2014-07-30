@@ -18,6 +18,8 @@
 # Description:       Starts and stops the daemons neeeded for xl/xend
 ### END INIT INFO
 
+XENSTORED=@XENSTORED@
+
 . /etc/xen/scripts/hotplugpath.sh
 
 if [ -d /etc/sysconfig ]; then
@@ -69,12 +71,6 @@ do_start () {
 		if [ -n "$XENSTORED" ] ; then
 		    echo -n Starting $XENSTORED...
 		    $XENSTORED --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
-		elif [ -x ${SBINDIR}/oxenstored ] ; then
-		    echo -n Starting oxenstored...
-		    ${SBINDIR}/oxenstored --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
-		elif [ -x ${SBINDIR}/xenstored ] ; then
-		    echo -n Starting C xenstored...
-		    ${SBINDIR}/xenstored --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
 		else
 		    echo "No xenstored found"
 		    exit 1

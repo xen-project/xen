@@ -649,6 +649,7 @@ pyconfig
 PYTHONPATH
 CHECKPOLICY
 AWK
+XENSTORED
 OCAMLFIND
 OCAMLBUILD
 OCAMLDOC
@@ -698,6 +699,23 @@ xsmpolicy
 ocamltools
 monitors
 githttp
+XEN_PAGING_DIR
+XEN_LOCK_DIR
+XEN_SCRIPT_DIR
+XEN_CONFIG_DIR
+CONFIG_DIR
+XENFIRMWAREDIR
+PRIVATE_BINDIR
+PKG_XEN_PREFIX
+PRIVATE_PREFIX
+SHAREDIR
+XEN_LIB_STORED
+XEN_LOG_DIR
+XEN_RUN_DIR
+LIBDIR
+LIBEXEC
+SBINDIR
+BINDIR
 FILE_OFFSET_BITS
 OBJEXT
 EXEEXT
@@ -772,6 +790,7 @@ with_system_qemu
 with_system_seabios
 with_system_ovmf
 with_extra_qemuu_configure_args
+with_xenstored
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1451,6 +1470,17 @@ Optional Packages:
   --with-extra-qemuu-configure-args[="--ARG1 ..."]
                           List of additional configure options for upstream
                           qemu
+  --with-xenstored[=oxenstored|xenstored]
+                          This lets you choose which xenstore daemon you want,
+                          you have two options: the original xenstored written
+                          in C (xenstored) or the newer and robust one written
+                          in Ocaml (oxenstored). The oxenstored daemon is the
+                          default but will but can only be used if you have
+                          ocaml library / build dependencies solved, if you
+                          have not specified a preference and do not have
+                          ocaml dependencies resolved we'll enable the C
+                          xenstored for you. If you ask for oxenstored we'll
+                          complain until you resolve those dependencies
 
 Some influential environment variables:
   CC          C compiler command
@@ -2205,7 +2235,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-ac_config_files="$ac_config_files ../config/Tools.mk"
+ac_config_files="$ac_config_files ../config/Tools.mk hotplug/Linux/init.d/xencommons.in hotplug/Linux/init.d/sysconfig.xencommons"
 
 ac_config_headers="$ac_config_headers config.h"
 
@@ -3587,6 +3617,75 @@ esac
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+test "x$prefix" = "xNONE" && prefix=$ac_default_prefix
+test "x$exec_prefix" = "xNONE" && exec_prefix=$ac_default_prefix
+
+BINDIR=$prefix/bin
+
+
+SBINDIR=$prefix/sbin
+
+
+LIBEXEC=$prefix/lib/xen/bin
+
+
+LIBDIR=`eval echo $libdir`
+
+
+XEN_RUN_DIR=/var/run/xen
+
+
+XEN_LOG_DIR=/var/log/xen
+
+
+XEN_LIB_STORED=/var/lib/xenstored
+
+
+SHAREDIR=$prefix/share
+
+
+PRIVATE_PREFIX=$LIBDIR/xen
+
+
+PKG_XEN_PREFIX=$LIBDIR/xen
+
+
+PRIVATE_BINDIR=$PRIVATE_PREFIX/bin
+
+
+XENFIRMWAREDIR=$prefix/lib/xen/boot
+
+
+CONFIG_DIR=/etc
+
+
+XEN_CONFIG_DIR=$CONFIG_DIR/xen
+
+
+XEN_SCRIPT_DIR=$XEN_CONFIG_DIR/scripts
+
+
+XEN_LOCK_DIR=/var/lock
+
+
+XEN_RUN_DIR=/var/run/xen
+
+
+XEN_PAGING_DIR=/var/lib/xen/xenpaging
+
+
+
 # Enable/disable options
 
 # Check whether --enable-githttp was given.
@@ -4757,51 +4856,8 @@ if test x"${PERL}" = x"no"
 then
     as_fn_error $? "Unable to find perl, please install perl" "$LINENO" 5
 fi
-for ac_prog in gawk mawk nawk awk
-do
-  # Extract the first word of "$ac_prog", so it can be a program name with args.
-set dummy $ac_prog; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_prog_AWK+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$AWK"; then
-  ac_cv_prog_AWK="$AWK" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_prog_AWK="$ac_prog"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
 
-fi
-fi
-AWK=$ac_cv_prog_AWK
-if test -n "$AWK"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $AWK" >&5
-$as_echo "$AWK" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-  test -n "$AWK" && break
-done
-
-if test "x$ocamltools" = "xy"; then :
-
-      # checking for ocamlc
+  # checking for ocamlc
   if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}ocamlc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ocamlc; ac_word=$2
@@ -5894,6 +5950,112 @@ else
 fi
 
 
+
+
+
+if test "x$XENSTORE" = "x"; then :
+
+
+# Check whether --with-xenstored was given.
+if test "${with_xenstored+set}" = set; then :
+  withval=$with_xenstored;
+		if test "x$withval" = "xxenstored"; then :
+
+			xenstore=$withval
+			xenstored=$SBINDIR/xenstored
+
+fi
+		if test "x$withval" = "xoxenstored"; then :
+
+			xenstore=$withval
+			xenstored=$SBINDIR/oxenstored
+
+	if test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"; then :
+
+		as_fn_error $? "Missing ocaml dependencies for oxenstored, try installing ocaml ocaml-compiler-libs ocaml-runtime ocaml-findlib" "$LINENO" 5
+
+fi
+
+
+fi
+		if test "x$withval" != "xoxenstored" && test "x$withval" != "xxenstored"; then :
+
+			as_fn_error $? "Unsupported xenstored specified, supported types: oxenstored xenstored" "$LINENO" 5
+
+fi
+
+else
+
+
+	xenstore="oxenstored"
+	xenstored=$SBINDIR/oxenstored
+	if test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"; then :
+
+		xenstore="xenstored"
+		xenstored=$SBINDIR/xenstored
+
+fi
+
+
+fi
+
+
+fi
+
+
+	XENSTORE=$xenstore
+
+	if test "x$XENSTORED" = "x"; then :
+
+		XENSTORED=$xenstored
+
+fi
+
+
+
+for ac_prog in gawk mawk nawk awk
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_AWK+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$AWK"; then
+  ac_cv_prog_AWK="$AWK" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_AWK="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+AWK=$ac_cv_prog_AWK
+if test -n "$AWK"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $AWK" >&5
+$as_echo "$AWK" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$AWK" && break
+done
+
+if test "x$ocamltools" = "xy"; then :
 
     if test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"; then :
 
@@ -8864,6 +9026,8 @@ for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
     "../config/Tools.mk") CONFIG_FILES="$CONFIG_FILES ../config/Tools.mk" ;;
+    "hotplug/Linux/init.d/xencommons.in") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/xencommons.in" ;;
+    "hotplug/Linux/init.d/sysconfig.xencommons") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/sysconfig.xencommons" ;;
     "config.h") CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;

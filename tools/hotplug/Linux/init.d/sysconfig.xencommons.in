@@ -8,8 +8,17 @@
 ## Type: string
 ## Default: xenstored
 #
-# Select xenstored implementation
-#XENSTORED=[oxenstored|xenstored]
+# Select xenstore implementation, this can be either
+# of these below. If using systemd it's preferred that you
+# just edit the xenstored.service unit file and change
+# the XENSTORED variable there.
+#
+# This can be either of:
+#  * @SBINDIR@/oxenstored
+#  * @SBINDIR@/xenstored
+#
+# Changing this requires a reboot to take effect.
+#XENSTORED=@XENSTORED@
 
 ## Type: string
 ## Default: Not defined, tracing off
