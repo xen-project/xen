@@ -216,8 +216,12 @@ uninstall:
 	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xen-backend.rules
 	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xend.rules
 	rm -f  $(D)$(SYSCONFIG_DIR)/xendomains
+	rm -f  $(D)$(SBINDIR)/xendomains
 	rm -f  $(D)$(SYSCONFIG_DIR)/xencommons
-	rm -rf $(D)/var/run/xen* $(D)/var/lib/xen*
+	rm -f  $(D)$(XEN_SYSTEMD_DIR)/*.service
+	rm -f  $(D)$(XEN_SYSTEMD_DIR)/*.mount
+	rm -f  $(D)$(XEN_SYSTEMD_MODULES_LOAD)/*.conf
+	rm -rf $(D)$(XEN_RUN_DIR)* $(D)/var/lib/xen*
 	make -C tools uninstall
 	rm -rf $(D)/boot/tboot*
 

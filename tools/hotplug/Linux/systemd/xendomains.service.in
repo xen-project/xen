@@ -1,0 +1,16 @@
+[Unit]
+Description=Xendomains - start and stop guests on boot and shutdown
+Requires=xenstored.socket
+After=xenstored.service xenconsoled.service
+ConditionVirtualization=xen
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
+ExecStart=-@LIBEXEC@/xendomains start
+ExecStop=@LIBEXEC@/xendomains stop
+ExecReload=@LIBEXEC@/xendomains restart
+
+[Install]
+WantedBy=multi-user.target

@@ -25,6 +25,8 @@ XEN_SCRIPTS += vscsi
 XEN_SCRIPTS += block-iscsi
 XEN_SCRIPTS += $(XEN_SCRIPTS-y)
 
+SUBDIRS-$(CONFIG_SYSTEMD) += systemd
+
 XEN_SCRIPT_DATA = xen-script-common.sh locking.sh logging.sh
 XEN_SCRIPT_DATA += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
 XEN_SCRIPT_DATA += block-common.sh
@@ -33,7 +35,7 @@ UDEV_RULES_DIR = $(CONFIG_DIR)/udev
 UDEV_RULES = xen-backend.rules $(UDEV_RULES-y)
 
 .PHONY: all
-all: $(XENCOMMONS_INITD)
+all: $(XENCOMMONS_INITD) subdirs-all
 
 $(XENCOMMONS_INITD): $(XEN_ROOT)/config/$(XEN_OS).modules $(XENCOMMONS_INITD).in
 	$(XEN_ROOT)/tools/hotplug/Linux/update-modules.sh \
@@ -45,7 +47,7 @@ $(XENCOMMONS_INITD): $(XEN_ROOT)/config/$(XEN_OS).modules $(XENCOMMONS_INITD).in
 build: all
 
 .PHONY: install
-install: all install-initd install-scripts install-udev
+install: all install-initd install-scripts install-udev subdirs-install
 
 # See docs/misc/distro_mapping.txt for INITD_DIR location
 .PHONY: install-initd
@@ -83,4 +85,4 @@ install-udev:
 	done
 
 .PHONY: clean
-clean:
+clean: subdirs-clean

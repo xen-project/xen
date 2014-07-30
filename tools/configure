@@ -624,6 +624,11 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+SYSTEMD_LIBS
+SYSTEMD_CFLAGS
+SYSTEMD_MODULES_LOAD
+SYSTEMD_DIR
+systemd
 libiconv
 PTYFUNCS_LIBS
 PTHREAD_LIBS
@@ -791,6 +796,8 @@ with_system_seabios
 with_system_ovmf
 with_extra_qemuu_configure_args
 with_xenstored
+enable_systemd
+with_systemd
 '
       ac_precious_vars='build_alias
 host_alias
@@ -821,7 +828,9 @@ PKG_CONFIG
 PKG_CONFIG_PATH
 PKG_CONFIG_LIBDIR
 glib_CFLAGS
-glib_LIBS'
+glib_LIBS
+SYSTEMD_CFLAGS
+SYSTEMD_LIBS'
 
 
 # Initialize some variables set by options.
@@ -1453,6 +1462,7 @@ Optional Features:
                           for Linux or NetBSD x86, otherwise off)
   --enable-rombios        Enable ROMBIOS, (DEFAULT is on if qemu-traditional
                           is enabled, otherwise off)
+  --enable-systemd        Enable systemd support (default is DISABLED)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -1481,6 +1491,8 @@ Optional Packages:
                           ocaml dependencies resolved we'll enable the C
                           xenstored for you. If you ask for oxenstored we'll
                           complain until you resolve those dependencies
+  --with-systemd          set directory for systemd service files
+  --with-systemd-modules-load          set directory for systemd modules load files
 
 Some influential environment variables:
   CC          C compiler command
@@ -1516,6 +1528,10 @@ Some influential environment variables:
               path overriding pkg-config's built-in search path
   glib_CFLAGS C compiler flags for glib, overriding pkg-config
   glib_LIBS   linker flags for glib, overriding pkg-config
+  SYSTEMD_CFLAGS
+              C compiler flags for SYSTEMD, overriding pkg-config
+  SYSTEMD_LIBS
+              linker flags for SYSTEMD, overriding pkg-config
 
 Use these variables to override the choices made by `configure' or to help
 it to find libraries and programs with nonstandard names/locations.
@@ -2235,7 +2251,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-ac_config_files="$ac_config_files ../config/Tools.mk hotplug/Linux/init.d/xencommons.in hotplug/Linux/init.d/sysconfig.xencommons"
+ac_config_files="$ac_config_files ../config/Tools.mk hotplug/Linux/init.d/xencommons.in hotplug/Linux/init.d/sysconfig.xencommons hotplug/Linux/systemd/proc-xen.mount hotplug/Linux/systemd/var-lib-xenstored.mount hotplug/Linux/systemd/xenstored.socket hotplug/Linux/systemd/xenstored_ro.socket hotplug/Linux/systemd/xenstored.service hotplug/Linux/systemd/xenconsoled.service hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service hotplug/Linux/systemd/xendomains.service hotplug/Linux/systemd/xen-watchdog.service"
 
 ac_config_headers="$ac_config_headers config.h"
 
@@ -3614,6 +3630,42 @@ esac
 #   warranty.
 
 #serial 11
+
+
+
+
+
+
+
+
+
+
+
+
+# systemd.m4 - Macros to check for and enable systemd          -*- Autoconf -*-
+#
+# Copyright (C) 2014 Luis R. Rodriguez <mcgrof@suse.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+
+
+
+
+
 
 
 
@@ -8333,6 +8385,293 @@ done
 
 fi # ! $rump
 
+
+
+
+# Check whether --enable-systemd was given.
+if test "${enable_systemd+set}" = set; then :
+  enableval=$enable_systemd;
+fi
+
+
+if test "x$enable_systemd" = "xno"; then :
+
+    ax_cv_systemd="n"
+
+elif test "x$enable_systemd" = "xyes"; then :
+
+    ax_cv_systemd="y"
+
+elif test -z $ax_cv_systemd; then :
+
+    ax_cv_systemd="n"
+
+fi
+systemd=$ax_cv_systemd
+
+
+
+
+# Check whether --with-systemd was given.
+if test "${with_systemd+set}" = set; then :
+  withval=$with_systemd; SYSTEMD_DIR="$withval"
+else
+  SYSTEMD_DIR=""
+fi
+
+
+
+
+# Check whether --with-systemd was given.
+if test "${with_systemd+set}" = set; then :
+  withval=$with_systemd; SYSTEMD_MODULES_LOAD="$withval"
+else
+  SYSTEMD_MODULES_LOAD=""
+fi
+
+
+
+
+
+	ac_fn_c_check_header_mongrel "$LINENO" "systemd/sd-daemon.h" "ac_cv_header_systemd_sd_daemon_h" "$ac_includes_default"
+if test "x$ac_cv_header_systemd_sd_daemon_h" = xyes; then :
+
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for sd_listen_fds in -lsystemd-daemon" >&5
+$as_echo_n "checking for sd_listen_fds in -lsystemd-daemon... " >&6; }
+if ${ac_cv_lib_systemd_daemon_sd_listen_fds+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsystemd-daemon  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char sd_listen_fds ();
+int
+main ()
+{
+return sd_listen_fds ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_systemd_daemon_sd_listen_fds=yes
+else
+  ac_cv_lib_systemd_daemon_sd_listen_fds=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_systemd_daemon_sd_listen_fds" >&5
+$as_echo "$ac_cv_lib_systemd_daemon_sd_listen_fds" >&6; }
+if test "x$ac_cv_lib_systemd_daemon_sd_listen_fds" = xyes; then :
+  systemd="y"
+fi
+
+
+fi
+
+
+
+
+		if test "x$enable_systemd" != "xno"; then :
+
+	     if test "x$systemd" = "xy" ; then :
+
+
+$as_echo "#define HAVE_SYSTEMD 1" >>confdefs.h
+
+			systemd=y
+
+	ac_fn_c_check_header_mongrel "$LINENO" "systemd/sd-daemon.h" "ac_cv_header_systemd_sd_daemon_h" "$ac_includes_default"
+if test "x$ac_cv_header_systemd_sd_daemon_h" = xyes; then :
+
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for sd_listen_fds in -lsystemd-daemon" >&5
+$as_echo_n "checking for sd_listen_fds in -lsystemd-daemon... " >&6; }
+if ${ac_cv_lib_systemd_daemon_sd_listen_fds+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsystemd-daemon  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char sd_listen_fds ();
+int
+main ()
+{
+return sd_listen_fds ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_systemd_daemon_sd_listen_fds=yes
+else
+  ac_cv_lib_systemd_daemon_sd_listen_fds=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_systemd_daemon_sd_listen_fds" >&5
+$as_echo "$ac_cv_lib_systemd_daemon_sd_listen_fds" >&6; }
+if test "x$ac_cv_lib_systemd_daemon_sd_listen_fds" = xyes; then :
+  libsystemddaemon="y"
+fi
+
+
+fi
+
+
+	if test "x$libsystemddaemon" = x; then :
+
+	    as_fn_error $? "Unable to find a suitable libsystemd-daemon library" "$LINENO" 5
+
+fi
+
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for SYSTEMD" >&5
+$as_echo_n "checking for SYSTEMD... " >&6; }
+
+if test -n "$SYSTEMD_CFLAGS"; then
+    pkg_cv_SYSTEMD_CFLAGS="$SYSTEMD_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libsystemd-daemon\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libsystemd-daemon") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_SYSTEMD_CFLAGS=`$PKG_CONFIG --cflags "libsystemd-daemon" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$SYSTEMD_LIBS"; then
+    pkg_cv_SYSTEMD_LIBS="$SYSTEMD_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libsystemd-daemon\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libsystemd-daemon") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_SYSTEMD_LIBS=`$PKG_CONFIG --libs "libsystemd-daemon" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        SYSTEMD_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libsystemd-daemon" 2>&1`
+        else
+	        SYSTEMD_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libsystemd-daemon" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$SYSTEMD_PKG_ERRORS" >&5
+
+	as_fn_error $? "Package requirements (libsystemd-daemon) were not met:
+
+$SYSTEMD_PKG_ERRORS
+
+Consider adjusting the PKG_CONFIG_PATH environment variable if you
+installed software in a non-standard prefix.
+
+Alternatively, you may set the environment variables SYSTEMD_CFLAGS
+and SYSTEMD_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details." "$LINENO" 5
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	{ { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
+is in your PATH or set the PKG_CONFIG environment variable to the full
+path to pkg-config.
+
+Alternatively, you may set the environment variables SYSTEMD_CFLAGS
+and SYSTEMD_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details.
+
+To get pkg-config, see <http://pkg-config.freedesktop.org/>.
+See \`config.log' for more details" "$LINENO" 5; }
+else
+	SYSTEMD_CFLAGS=$pkg_cv_SYSTEMD_CFLAGS
+	SYSTEMD_LIBS=$pkg_cv_SYSTEMD_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+fi
+
+
+
+	if test "x$SYSTEMD_DIR" = x; then :
+
+	    	    	    	    	    	    	    	    	    	    	    	    	    SYSTEMD_DIR="\$(prefix)/lib/systemd/system/"
+
+fi
+
+	if test "x$SYSTEMD_DIR" = x; then :
+
+	    as_fn_error $? "SYSTEMD_DIR is unset" "$LINENO" 5
+
+fi
+
+		if test "x$SYSTEMD_MODULES_LOAD" = x; then :
+
+	    SYSTEMD_MODULES_LOAD="\$(prefix)/lib/modules-load.d/"
+
+fi
+
+	if test "x$SYSTEMD_MODULES_LOAD" = x; then :
+
+	    as_fn_error $? "SYSTEMD_MODULES_LOAD is unset" "$LINENO" 5
+
+fi
+
+
+else
+  systemd=n
+fi
+
+else
+  systemd=n
+fi
+
+
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -9028,6 +9367,15 @@ do
     "../config/Tools.mk") CONFIG_FILES="$CONFIG_FILES ../config/Tools.mk" ;;
     "hotplug/Linux/init.d/xencommons.in") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/xencommons.in" ;;
     "hotplug/Linux/init.d/sysconfig.xencommons") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/sysconfig.xencommons" ;;
+    "hotplug/Linux/systemd/proc-xen.mount") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/proc-xen.mount" ;;
+    "hotplug/Linux/systemd/var-lib-xenstored.mount") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/var-lib-xenstored.mount" ;;
+    "hotplug/Linux/systemd/xenstored.socket") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xenstored.socket" ;;
+    "hotplug/Linux/systemd/xenstored_ro.socket") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xenstored_ro.socket" ;;
+    "hotplug/Linux/systemd/xenstored.service") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xenstored.service" ;;
+    "hotplug/Linux/systemd/xenconsoled.service") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xenconsoled.service" ;;
+    "hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service" ;;
+    "hotplug/Linux/systemd/xendomains.service") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xendomains.service" ;;
+    "hotplug/Linux/systemd/xen-watchdog.service") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xen-watchdog.service" ;;
     "config.h") CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;

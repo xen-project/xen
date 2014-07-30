@@ -1,0 +1,13 @@
+[Unit]
+Description=mount xenstore file system
+ConditionVirtualization=xen
+RefuseManualStop=true
+
+[Mount]
+Environment=XENSTORED_MOUNT_CTX=none
+EnvironmentFile=-/etc/sysconfig/xenstored
+EnvironmentFile=-/etc/default/xenstored
+What=xenstore
+Where=@XEN_LIB_STORED@
+Type=tmpfs
+Options=mode=755,context="$XENSTORED_MOUNT_CTX"

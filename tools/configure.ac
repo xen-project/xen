@@ -9,6 +9,15 @@ AC_CONFIG_FILES([
 ../config/Tools.mk
 hotplug/Linux/init.d/xencommons.in
 hotplug/Linux/init.d/sysconfig.xencommons
+hotplug/Linux/systemd/proc-xen.mount
+hotplug/Linux/systemd/var-lib-xenstored.mount
+hotplug/Linux/systemd/xenstored.socket
+hotplug/Linux/systemd/xenstored_ro.socket
+hotplug/Linux/systemd/xenstored.service
+hotplug/Linux/systemd/xenconsoled.service
+hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service
+hotplug/Linux/systemd/xendomains.service
+hotplug/Linux/systemd/xen-watchdog.service
 ])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([../])
@@ -59,6 +68,7 @@ m4_include([../m4/fetcher.m4])
 m4_include([../m4/ax_compare_version.m4])
 m4_include([../m4/paths.m4])
 m4_include([../m4/xenstored.m4])
+m4_include([../m4/systemd.m4])
 
 AX_XEN_EXPAND_CONFIG()
 
@@ -310,5 +320,6 @@ AC_CHECK_HEADERS([yajl/yajl_version.h sys/eventfd.h valgrind/memcheck.h utmp.h])
 
 fi # ! $rump
 
+AX_AVAILABLE_SYSTEMD()
 AC_OUTPUT()
 

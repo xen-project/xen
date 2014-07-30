@@ -1,0 +1,11 @@
+[Unit]
+Description=xenstore ro socket
+ConditionVirtualization=xen
+
+[Socket]
+ListenStream=/var/run/xenstored/socket_ro
+SocketMode=0660
+Service=xenstored.service
+
+[Install]
+WantedBy=sockets.target

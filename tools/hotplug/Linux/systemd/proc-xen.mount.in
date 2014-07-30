@@ -1,0 +1,9 @@
+[Unit]
+Description=Mount /proc/xen files
+ConditionVirtualization=xen
+RefuseManualStop=true
+
+[Mount]
+What=xenfs
+Where=/proc/xen
+Type=xenfs

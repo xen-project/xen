@@ -1,0 +1,22 @@
+[Unit]
+Description=qemu for xen dom0 disk backend
+Requires=proc-xen.mount var-lib-xenstored.mount xenstored.socket
+After=xenstored.service xenconsoled.service
+Before=xendomains.service libvirtd.service libvirt-guests.service
+RefuseManualStop=true
+ConditionVirtualization=xen
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/xenstored
+EnvironmentFile=-/etc/sysconfig/xenstored
+PIDFile=@XEN_RUN_DIR@/qemu-dom0.pid
+ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
+ExecStartPre=/bin/mkdir -p /var/run/xen
+ExecStart=@LIBEXEC@/qemu-system-i386 -xen-domid 0 \
+	-xen-attach -name dom0 -nographic -M xenpv -daemonize \
+	-monitor /dev/null -serial /dev/null -parallel /dev/null \
+	-pidfile @XEN_RUN_DIR@/qemu-dom0.pid
+
+[Install]
+WantedBy=multi-user.target

@@ -72,6 +72,7 @@ disabled at compile time:
     * cmake (if building vtpm stub domains)
     * markdown
     * figlet (for generating the traditional Xen start of day banner)
+    * systemd daemon development files
 
 Second, you need to acquire a suitable kernel for use in domain 0. If
 possible you should use a kernel provided by your OS distributor. If
@@ -160,6 +161,21 @@ change take effect.
 [0] http://wiki.xen.org/wiki/XenStore
 [1] http://wiki.xen.org/wiki/XenStoreReference
 [2] http://wiki.xen.org/wiki/Xenstored
+
+Systemd support
+===============
+
+If you have systemd development packages installed you can build binaries
+with systemd support. Systemd support is enabled by default if you have
+systemd development libraries present. If you want to force enable systemd to
+ensure you build binaries with systemd support you can use the --enable-systemd
+flag. Likewise if you want to force disable systemd you can use:
+
+	./configure --disable-systemd
+
+For more details refer to the xen xenstored systemd wiki page [3].
+
+[3] http://wiki.xen.org/wiki/Xenstored#xenstored_systemd_support
 
 Python Runtime Libraries
 ========================

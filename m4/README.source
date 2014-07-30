@@ -26,3 +26,11 @@ Date:   Mon Feb 3 15:59:18 2014 -0800
     With the newly added glib.mk, some of the noinst_* variables need to use
     += in the evaluation to avoid multiple definition warnings from
     automake.
+
+systemd.m4
+==========
+
+systemd.m4 was contributed to by Luis R. Rodriguez <mcgrof@do-not-panic.com>,
+its current home project can be found at:
+
+https://github.com/mcgrof/funk-systemd

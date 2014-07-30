@@ -353,3 +353,8 @@ tools/xenstore/xenstore-watch
 docs/txt/misc/*.txt
 docs/txt/man/*.txt
 docs/figs/*.png
+
+tools/hotplug/Linux/systemd/*.conf
+tools/hotplug/Linux/systemd/*.mount
+tools/hotplug/Linux/systemd/*.socket
+tools/hotplug/Linux/systemd/*.service

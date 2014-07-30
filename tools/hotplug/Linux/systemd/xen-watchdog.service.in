@@ -1,0 +1,13 @@
+[Unit]
+Description=Xen-watchdog - run xen watchdog daemon
+Requires=proc-xen.mount
+After=proc-xen.mount xendomains.service
+ConditionVirtualization=xen
+
+[Service]
+Type=forking
+ExecStart=@SBINDIR@/xenwatchdogd 30 15
+KillSignal=USR1
+
+[Install]
+WantedBy=multi-user.target

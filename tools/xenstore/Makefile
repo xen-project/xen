@@ -9,6 +9,12 @@ CFLAGS += -I.
 CFLAGS += -I$(XEN_ROOT)/tools/
 CFLAGS += $(CFLAGS_libxenctrl)
 
+CFLAGS-$(CONFIG_SYSTEMD)  += $(SYSTEMD_CFLAGS)
+LDFLAGS-$(CONFIG_SYSTEMD) += $(SYSTEMD_LIBS)
+
+CFLAGS  += $(CFLAGS-y)
+LDFLAGS += $(LDFLAGS-y)
+
 CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm xenstore-chmod
 CLIENTS += xenstore-write xenstore-ls xenstore-watch
 

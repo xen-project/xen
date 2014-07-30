@@ -1,0 +1,27 @@
+[Unit]
+Description=The Xen xenstore
+Requires=xenstored_ro.socket xenstored.socket proc-xen.mount var-lib-xenstored.mount
+After=proc-xen.mount var-lib-xenstored.mount
+Before=libvirtd.service libvirt-guests.service
+RefuseManualStop=true
+ConditionVirtualization=xen
+
+[Service]
+Type=notify
+Environment=XENSTORED_ARGS=
+Environment=XENSTORED_ROOTDIR=@XEN_LIB_STORED@
+Environment=XENSTORED=@XENSTORED@
+EnvironmentFile=-/etc/default/xencommons
+EnvironmentFile=-/etc/sysconfig/xencommons
+ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
+ExecStartPre=-/bin/rm -f @XEN_LIB_STORED@/tdb*
+ExecStartPre=/bin/mkdir -p @XEN_RUN_DIR@
+ExecStart=/bin/sh -c "exec $XENSTORED --no-fork $XENSTORED_ARGS"
+ExecStartPost=-@BINDIR@/xenstore-write "/local/domain/0/name" "Domain-0"
+ExecStartPost=-@BINDIR@/xenstore-write "/local/domain/0/domid" 0
+
+[Install]
+WantedBy=multi-user.target
+Also=xenstored_ro.socket xenstored.socket
+Also=proc-xen.mount
+Also=var-lib-xenstored.mount
