@@ -468,7 +468,7 @@ smap_check_policy_t smap_policy_change(struct vcpu *v,
 #define hvm_svm         hvm_vcpu.u.svm
 
 bool_t update_runstate_area(struct vcpu *);
-bool_t update_secondary_system_time(const struct vcpu *,
+bool_t update_secondary_system_time(struct vcpu *,
                                     struct vcpu_time_info *);
 
 void vcpu_show_execution_state(struct vcpu *);

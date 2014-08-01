@@ -859,17 +859,23 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
         v->arch.pv_vcpu.pending_system_time = _u;
 }
 
-bool_t update_secondary_system_time(const struct vcpu *v,
+bool_t update_secondary_system_time(struct vcpu *v,
                                     struct vcpu_time_info *u)
 {
     XEN_GUEST_HANDLE(vcpu_time_info_t) user_u = v->arch.time_info_guest;
+    smap_check_policy_t saved_policy;
 
     if ( guest_handle_is_null(user_u) )
         return 1;
 
+    saved_policy = smap_policy_change(v, SMAP_CHECK_ENABLED);
+
     /* 1. Update userspace version. */
     if ( __copy_field_to_guest(user_u, u, version) == sizeof(u->version) )
+    {
+        smap_policy_change(v, saved_policy);
         return 0;
+    }
     wmb();
     /* 2. Update all other userspace fields. */
     __copy_to_guest(user_u, u, 1);
@@ -877,6 +883,8 @@ bool_t update_secondary_system_time(const struct vcpu *v,
     /* 3. Update userspace version. */
     u->version = version_update_end(u->version);
     __copy_field_to_guest(user_u, u, version);
+
+    smap_policy_change(v, saved_policy);
 
     return 1;
 }
