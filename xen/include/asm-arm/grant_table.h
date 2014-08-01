@@ -33,8 +33,7 @@ static inline int replace_grant_supported(void)
     ( ((i >= nr_grant_frames(d->grant_table)) &&                         \
      (i < max_nr_grant_frames)) ? 0 : (d->arch.grant_table_gpfn[i]))
 
-#define gnttab_need_iommu_mapping(d)                    \
-    (is_domain_direct_mapped(d) && need_iommu(d))
+#define gnttab_need_iommu_mapping(d)           (is_domain_direct_mapped(d))
 
 #endif /* __ASM_GRANT_TABLE_H__ */
 /*

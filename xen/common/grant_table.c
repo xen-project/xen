@@ -738,13 +738,23 @@ __gnttab_map_grant_ref(
              !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
         {
             if ( wrc == 0 )
-                err = iommu_map_page(ld, frame, frame,
-                                     IOMMUF_readable|IOMMUF_writable);
+            {
+                if ( is_domain_direct_mapped(ld) )
+                    err = arch_grant_map_page_identity(ld, frame, 1);
+                else
+                    err = iommu_map_page(ld, frame, frame,
+                            IOMMUF_readable|IOMMUF_writable);
+            }
         }
         else if ( act_pin && !old_pin )
         {
             if ( (wrc + rdc) == 0 )
-                err = iommu_map_page(ld, frame, frame, IOMMUF_readable);
+            {
+                if ( is_domain_direct_mapped(ld) )
+                    err = arch_grant_map_page_identity(ld, frame, 0);
+                else
+                    err = iommu_map_page(ld, frame, frame, IOMMUF_readable);
+            }
         }
         if ( err )
         {
@@ -941,9 +951,19 @@ __gnttab_unmap_common(
         int err = 0;
         mapcount(lgt, rd, op->frame, &wrc, &rdc);
         if ( (wrc + rdc) == 0 )
-            err = iommu_unmap_page(ld, op->frame);
+        {
+            if ( is_domain_direct_mapped(ld) )
+                err = arch_grant_unmap_page_identity(ld, op->frame);
+            else
+                err = iommu_unmap_page(ld, op->frame);
+        }
         else if ( wrc == 0 )
-            err = iommu_map_page(ld, op->frame, op->frame, IOMMUF_readable);
+        {
+            if ( is_domain_direct_mapped(ld) )
+                err = arch_grant_map_page_identity(ld, op->frame, 0);
+            else
+                err = iommu_map_page(ld, op->frame, op->frame, IOMMUF_readable);
+        }
         if ( err )
         {
             rc = GNTST_general_error;

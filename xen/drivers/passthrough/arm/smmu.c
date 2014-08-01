@@ -1536,37 +1536,6 @@ static void arm_smmu_iommu_domain_teardown(struct domain *d)
     xfree(smmu_domain);
 }
 
-static int arm_smmu_map_page(struct domain *d, unsigned long gfn,
-                             unsigned long mfn, unsigned int flags)
-{
-    /* Grant mappings can be used for DMA requests. The dev_bus_addr returned by
-     * the hypercall is the MFN (not the IPA). For device protected by
-     * an IOMMU, Xen needs to add a 1:1 mapping in the domain p2m to
-     * allow DMA request to work.
-     * This is only valid when the domain is directed mapped. Hence this
-     * function should only be used by gnttab code with gfn == mfn.
-     */
-    BUG_ON(!is_domain_direct_mapped(d));
-    BUG_ON(mfn != gfn);
-
-    /* We only support readable and writable flags */
-    if ( !(flags & (IOMMUF_readable | IOMMUF_writable)) )
-        return -EINVAL;
-
-    return arch_grant_map_page_identity(d, mfn, flags & IOMMUF_writable);
-}
-
-static int arm_smmu_unmap_page(struct domain *d, unsigned long gfn)
-{
-    /* This function should only be used by gnttab code when the domain
-     * is direct mapped
-     */
-    if ( !is_domain_direct_mapped(d) )
-        return -EINVAL;
-
-    return arch_grant_unmap_page_identity(d, gfn);
-}
-
 static const struct iommu_ops arm_smmu_iommu_ops = {
     .init = arm_smmu_iommu_domain_init,
     .hwdom_init = arm_smmu_iommu_hwdom_init,
@@ -1575,8 +1544,6 @@ static const struct iommu_ops arm_smmu_iommu_ops = {
     .iotlb_flush_all = arm_smmu_iotlb_flush_all,
     .assign_dt_device = arm_smmu_attach_dev,
     .reassign_dt_device = arm_smmu_reassign_dt_dev,
-    .map_page = arm_smmu_map_page,
-    .unmap_page = arm_smmu_unmap_page,
 };
 
 static int __init smmu_init(struct dt_device_node *dev,
