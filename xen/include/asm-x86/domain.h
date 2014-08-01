@@ -19,6 +19,7 @@
 #define is_hvm_pv_evtchn_domain(d) (has_hvm_container_domain(d) && \
         d->arch.hvm_domain.irq.callback_via_type == HVMIRQ_callback_vector)
 #define is_hvm_pv_evtchn_vcpu(v) (is_hvm_pv_evtchn_domain(v->domain))
+#define is_domain_direct_mapped(d) ((void)(d), 0)
 
 #define VCPU_TRAP_NMI          1
 #define VCPU_TRAP_MCE          2

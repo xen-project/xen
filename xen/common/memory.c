@@ -29,10 +29,6 @@
 #include <xsm/xsm.h>
 #include <xen/trace.h>
 
-#ifndef is_domain_direct_mapped
-# define is_domain_direct_mapped(d) ((void)(d), 0)
-#endif
-
 struct memop_args {
     /* INPUT */
     struct domain *domain;     /* Domain to be affected. */
