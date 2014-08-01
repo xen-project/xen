@@ -150,6 +150,8 @@ AC_ARG_WITH([system-qemu],
     case "$host_cpu" in
         i[[3456]]86|x86_64)
            qemu_xen=y;;
+        arm*|aarch64)
+           qemu_xen=y;;
         *) qemu_xen=n;;
     esac
 ])
