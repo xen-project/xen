@@ -654,37 +654,40 @@ mktime (unsigned int year, unsigned int mon,
         )*60 + sec; /* finally seconds */
 }
 
-static unsigned long __get_cmos_time(void)
-{
+struct rtc_time {
     unsigned int year, mon, day, hour, min, sec;
+};
 
-    sec  = CMOS_READ(RTC_SECONDS);
-    min  = CMOS_READ(RTC_MINUTES);
-    hour = CMOS_READ(RTC_HOURS);
-    day  = CMOS_READ(RTC_DAY_OF_MONTH);
-    mon  = CMOS_READ(RTC_MONTH);
-    year = CMOS_READ(RTC_YEAR);
+static void __get_cmos_time(struct rtc_time *rtc)
+{
+    rtc->sec  = CMOS_READ(RTC_SECONDS);
+    rtc->min  = CMOS_READ(RTC_MINUTES);
+    rtc->hour = CMOS_READ(RTC_HOURS);
+    rtc->day  = CMOS_READ(RTC_DAY_OF_MONTH);
+    rtc->mon  = CMOS_READ(RTC_MONTH);
+    rtc->year = CMOS_READ(RTC_YEAR);
     
     if ( RTC_ALWAYS_BCD || !(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) )
     {
-        BCD_TO_BIN(sec);
-        BCD_TO_BIN(min);
-        BCD_TO_BIN(hour);
-        BCD_TO_BIN(day);
-        BCD_TO_BIN(mon);
-        BCD_TO_BIN(year);
+        BCD_TO_BIN(rtc->sec);
+        BCD_TO_BIN(rtc->min);
+        BCD_TO_BIN(rtc->hour);
+        BCD_TO_BIN(rtc->day);
+        BCD_TO_BIN(rtc->mon);
+        BCD_TO_BIN(rtc->year);
     }
 
-    if ( (year += 1900) < 1970 )
-        year += 100;
-
-    return mktime(year, mon, day, hour, min, sec);
+    if ( (rtc->year += 1900) < 1970 )
+        rtc->year += 100;
 }
 
 static unsigned long get_cmos_time(void)
 {
     unsigned long res, flags;
-    int i;
+    struct rtc_time rtc;
+    unsigned int seconds = 60;
+    static bool_t __read_mostly cmos_rtc_probe;
+    boolean_param("cmos-rtc-probe", cmos_rtc_probe);
 
     if ( efi_enabled )
     {
@@ -693,23 +696,58 @@ static unsigned long get_cmos_time(void)
             return res;
     }
 
-    if ( unlikely(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC) )
-        panic("System without CMOS RTC must be booted from EFI");
+    if ( likely(!(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC)) )
+        cmos_rtc_probe = 0;
+    else if ( system_state < SYS_STATE_smp_boot && !cmos_rtc_probe )
+        panic("System with no CMOS RTC advertised must be booted from EFI"
+              " (or with command line option \"cmos-rtc-probe\")");
 
-    spin_lock_irqsave(&rtc_lock, flags);
+    for ( ; ; )
+    {
+        s_time_t start, t1, t2;
 
-    /* read RTC exactly on falling edge of update flag */
-    for ( i = 0 ; i < 1000000 ; i++ ) /* may take up to 1 second... */
-        if ( (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) )
+        spin_lock_irqsave(&rtc_lock, flags);
+
+        /* read RTC exactly on falling edge of update flag */
+        start = NOW();
+        do { /* may take up to 1 second... */
+            t1 = NOW() - start;
+        } while ( !(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) &&
+                  t1 <= SECONDS(1) );
+
+        start = NOW();
+        do { /* must try at least 2.228 ms */
+            t2 = NOW() - start;
+        } while ( (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) &&
+                  t2 < MILLISECS(3) );
+
+        __get_cmos_time(&rtc);
+
+        spin_unlock_irqrestore(&rtc_lock, flags);
+
+        if ( likely(!cmos_rtc_probe) ||
+             t1 > SECONDS(1) || t2 >= MILLISECS(3) ||
+             rtc.sec >= 60 || rtc.min >= 60 || rtc.hour >= 24 ||
+             !rtc.day || rtc.day > 31 ||
+             !rtc.mon || rtc.mon > 12 )
             break;
-    for ( i = 0 ; i < 1000000 ; i++ ) /* must try at least 2.228 ms */
-        if ( !(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) )
+
+        if ( seconds < 60 )
+        {
+            if ( rtc.sec != seconds )
+                cmos_rtc_probe = 0;
             break;
+        }
 
-    res = __get_cmos_time();
+        process_pending_softirqs();
 
-    spin_unlock_irqrestore(&rtc_lock, flags);
-    return res;
+        seconds = rtc.sec;
+    }
+
+    if ( unlikely(cmos_rtc_probe) )
+        panic("No CMOS RTC found - system must be booted from EFI");
+
+    return mktime(rtc.year, rtc.mon, rtc.day, rtc.hour, rtc.min, rtc.sec);
 }
 
 /***************************************************************************

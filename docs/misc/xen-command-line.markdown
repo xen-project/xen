@@ -218,6 +218,14 @@ If set, override Xen's calculation of the level 2 cache line size.
 
 If set, override Xen's default choice for the platform timer.
 
+### cmos-rtc-probe
+> `= <boolean>`
+
+> Default: `false`
+
+Flag to indicate whether to probe for a CMOS Real Time Clock irrespective of
+ACPI indicating none to be there.
+
 ### com1,com2
 > `= <baud>[/<clock_hz>][,[DPS][,[<io-base>|pci|amt][,[<irq>][,[<port-bdf>][,[<bridge-bdf>]]]]]]`
 
