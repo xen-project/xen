@@ -379,9 +379,13 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
     while ( offset < bufsize )
     {
         error = install_equiv_cpu_table(mc_amd, buf, &offset);
+        if ( error )
+        {
+            printk(KERN_ERR "microcode: installing equivalent cpu table failed\n");
+            break;
+        }
 
-        if ( !error &&
-             find_equiv_cpu_id(mc_amd->equiv_cpu_table, current_cpu_id,
+        if ( find_equiv_cpu_id(mc_amd->equiv_cpu_table, current_cpu_id,
                                &equiv_cpu_id) )
                 break;
 
@@ -393,7 +397,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
         {
             printk(KERN_ERR "microcode: Microcode buffer overrun\n");
             error = -EINVAL;
-            goto out;
+            break;
         }
 
         error = container_fast_forward(buf, bufsize - offset, &offset);
@@ -402,15 +406,13 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
             printk(KERN_ERR "microcode: CPU%d incorrect or corrupt container file\n"
                    "microcode: Failed to update patch level. "
                    "Current lvl:%#x\n", cpu, uci->cpu_sig.rev);
-            goto out;
+            break;
         }
     }
 
     if ( error )
     {
         xfree(mc_amd);
-        printk(KERN_ERR "microcode: installing equivalent cpu table failed\n");
-        error = -EINVAL;
         goto out;
     }
 
