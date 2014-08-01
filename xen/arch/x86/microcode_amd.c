@@ -193,6 +193,7 @@ static int apply_microcode(int cpu)
     uint32_t rev;
     struct microcode_amd *mc_amd = uci->mc.mc_amd;
     struct microcode_header_amd *hdr;
+    int hw_err;
 
     /* We should bind the task to the CPU */
     BUG_ON(raw_smp_processor_id() != cpu);
@@ -206,7 +207,7 @@ static int apply_microcode(int cpu)
 
     spin_lock_irqsave(&microcode_update_lock, flags);
 
-    wrmsrl(MSR_AMD_PATCHLOADER, (unsigned long)hdr);
+    hw_err = wrmsr_safe(MSR_AMD_PATCHLOADER, (unsigned long)hdr);
 
     /* get patch id after patching */
     rdmsrl(MSR_AMD_PATCHLEVEL, rev);
@@ -214,7 +215,7 @@ static int apply_microcode(int cpu)
     spin_unlock_irqrestore(&microcode_update_lock, flags);
 
     /* check current patch id and patch's id for match */
-    if ( rev != hdr->patch_id )
+    if ( hw_err || (rev != hdr->patch_id) )
     {
         printk(KERN_ERR "microcode: CPU%d update from revision "
                "%#x to %#x failed\n", cpu, rev, hdr->patch_id);
