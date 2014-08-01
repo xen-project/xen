@@ -180,6 +180,14 @@ void dump_pageframe_info(struct domain *d)
     spin_unlock(&d->page_alloc_lock);
 }
 
+smap_check_policy_t smap_policy_change(struct vcpu *v,
+    smap_check_policy_t new_policy)
+{
+    smap_check_policy_t old_policy = v->arch.smap_check_policy;
+    v->arch.smap_check_policy = new_policy;
+    return old_policy;
+}
+
 /*
  * The hole may be at or above the 44-bit boundary, so we need to determine
  * the total bit count until reaching 32 significant (not squashed out) bits
@@ -1349,10 +1357,15 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
 }
 
 /* Update per-VCPU guest runstate shared memory area (if registered). */
-bool_t update_runstate_area(const struct vcpu *v)
+bool_t update_runstate_area(struct vcpu *v)
 {
+    bool_t rc;
+    smap_check_policy_t smap_policy;
+
     if ( guest_handle_is_null(runstate_guest(v)) )
         return 1;
+
+    smap_policy = smap_policy_change(v, SMAP_CHECK_ENABLED);
 
     if ( has_32bit_shinfo(v->domain) )
     {
@@ -1360,11 +1373,15 @@ bool_t update_runstate_area(const struct vcpu *v)
 
         XLAT_vcpu_runstate_info(&info, &v->runstate);
         __copy_to_guest(v->runstate_guest.compat, &info, 1);
-        return 1;
+        rc = 1;
     }
+    else
+        rc = __copy_to_guest(runstate_guest(v), &v->runstate, 1) !=
+             sizeof(v->runstate);
 
-    return __copy_to_guest(runstate_guest(v), &v->runstate, 1) !=
-           sizeof(v->runstate);
+    smap_policy_change(v, smap_policy);
+
+    return rc;
 }
 
 static void _update_runstate_area(struct vcpu *v)
