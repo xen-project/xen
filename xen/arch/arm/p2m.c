@@ -927,6 +927,32 @@ void guest_physmap_remove_page(struct domain *d,
                       pfn_to_paddr(mfn), MATTR_MEM, p2m_invalid);
 }
 
+int arch_grant_map_page_identity(struct domain *d, unsigned long frame,
+                                 bool_t writeable)
+{
+    p2m_type_t t;
+
+    ASSERT(is_domain_direct_mapped(d));
+
+    /* This is not an IOMMU mapping but it is not a regular RAM p2m type
+     * either. We are using IOMMU p2m types here to prevent the pages
+     * from being used as grants. */
+    if ( writeable )
+        t = p2m_iommu_map_rw;
+    else
+        t = p2m_iommu_map_ro;
+
+    return guest_physmap_add_entry(d, frame, frame, 0, t);
+}
+
+int arch_grant_unmap_page_identity(struct domain *d, unsigned long frame)
+{
+    ASSERT(is_domain_direct_mapped(d));
+
+    guest_physmap_remove_page(d, frame, frame, 0);
+    return 0;
+}
+
 int p2m_alloc_table(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;

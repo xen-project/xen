@@ -719,6 +719,10 @@ static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt)
     return flags;
 }
 
+extern int arch_grant_map_page_identity(struct domain *d, unsigned long frame,
+                                 bool_t writeable);
+extern int arch_grant_unmap_page_identity(struct domain *d, unsigned long frame);
+
 #endif /* _XEN_P2M_H */
 
 /*

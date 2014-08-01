@@ -194,6 +194,10 @@ static inline int get_page_and_type(struct page_info *page,
     return rc;
 }
 
+int arch_grant_map_page_identity(struct domain *d, unsigned long frame,
+                                 bool_t writeable);
+int arch_grant_unmap_page_identity(struct domain *d, unsigned long frame);
+
 #endif /* _XEN_P2M_H */
 
 /*
