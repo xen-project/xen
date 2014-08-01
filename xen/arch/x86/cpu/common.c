@@ -443,13 +443,6 @@ void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 	if (c->x86_num_siblings == 1) {
 		printk(KERN_INFO  "CPU: Hyper-Threading is disabled\n");
 	} else if (c->x86_num_siblings > 1 ) {
-
-		if (c->x86_num_siblings > nr_cpu_ids) {
-			printk(KERN_WARNING "CPU: Unsupported number of the siblings %d", c->x86_num_siblings);
-			c->x86_num_siblings = 1;
-			return;
-		}
-
 		index_msb = get_count_order(c->x86_num_siblings);
 		c->phys_proc_id = phys_pkg_id((ebx >> 24) & 0xFF, index_msb);
 
