@@ -230,8 +230,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             || b_info->u.hvm.usbdevice_list) {
             if ( b_info->u.hvm.usbdevice && b_info->u.hvm.usbdevice_list )
             {
-                LOG(ERROR, "%s: Both usbdevice and usbdevice_list set",
-                    __func__);
+                LOG(ERROR, "Both usbdevice and usbdevice_list set");
                 return NULL;
             }
             flexarray_append(dm_args, "-usb");
@@ -527,8 +526,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             || b_info->u.hvm.usbdevice_list) {
             if ( b_info->u.hvm.usbdevice && b_info->u.hvm.usbdevice_list )
             {
-                LOG(ERROR, "%s: Both usbdevice and usbdevice_list set",
-                    __func__);
+                LOG(ERROR, "Both usbdevice and usbdevice_list set");
                 return NULL;
             }
             flexarray_append(dm_args, "-usb");
@@ -565,8 +563,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                     "-device", "nec-usb-xhci,id=usb", NULL);
                 break;
             default:
-                LOG(ERROR, "%s: usbversion parameter is invalid, "
-                    "must be between 1 and 3", __func__);
+                LOG(ERROR, "usbversion parameter is invalid, "
+                    "must be between 1 and 3");
                 return NULL;
             }
             if (b_info->u.hvm.spice.usbredirection >= 0 &&
@@ -577,8 +575,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                         libxl__sprintf(gc, "usb-redir,chardev=usbrc%d,"
                         "id=usbrc%d", i, i), NULL);
             } else {
-                LOG(ERROR, "%s: usbredirection parameter is invalid, "
-                    "it must be between 1 and 4", __func__);
+                LOG(ERROR, "usbredirection parameter is invalid, "
+                    "it must be between 1 and 4");
                 return NULL;
             }
         }
