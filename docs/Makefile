@@ -124,7 +124,7 @@ endif
 
 html/%.txt: %.txt
 	$(INSTALL_DIR) $(@D)
-	cp $< $@
+	$(INSTALL_DATA) $< $@
 
 html/man/%.1.html: man/%.pod.1 Makefile
 	$(INSTALL_DIR) $(@D)
