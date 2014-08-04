@@ -1,5 +1,5 @@
 # Prefix and install folder
-include $(XEN_ROOT)/config/Paths.mk
+-include $(XEN_ROOT)/config/Paths.mk
 prefix              := @prefix@
 PREFIX              := $(prefix)
 exec_prefix         := @exec_prefix@

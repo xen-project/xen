@@ -5,7 +5,7 @@ all:
 
 -include $(XEN_ROOT)/config/Tools.mk
 include $(XEN_ROOT)/Config.mk
-include $(XEN_ROOT)/config/Paths.mk
+-include $(XEN_ROOT)/config/Paths.mk
 
 export _INSTALL := $(INSTALL)
 INSTALL = $(XEN_ROOT)/tools/cross-install
