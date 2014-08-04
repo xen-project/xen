@@ -12,6 +12,7 @@ space   := $(empty) $(empty)
 
 # fallback for older make
 realpath = $(wildcard $(foreach file,$(1),$(shell cd -P $(dir $(file)) && echo "$$PWD/$(notdir $(file))")))
+or       = $(if $(strip $(1)),$(1),$(if $(strip $(2)),$(2),$(if $(strip $(3)),$(3),$(if $(strip $(4)),$(4)))))
 
 -include $(XEN_ROOT)/.config
 
@@ -266,11 +267,11 @@ QEMU_TRADITIONAL_REVISION ?= d0395cc49b2ec6d1723c01f1daf2394b9264ca29
 # QEMU_UPSTREAM_LOC ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 
 # Defaults for subtree locations
-QEMU_TRADITIONAL_LOC ?= $(or $(wildcard $(QEMU_TRADITIONAL_INTREE)),\
-                        $(QEMU_TRADITIONAL_URL))
+QEMU_TRADITIONAL_LOC ?= $(call or,$(wildcard $(QEMU_TRADITIONAL_INTREE)),\
+                                  $(QEMU_TRADITIONAL_URL))
 
-QEMU_UPSTREAM_LOC ?= $(or $(wildcard $(QEMU_UPSTREAM_INTREE)),\
-                        $(QEMU_UPSTREAM_URL))
+QEMU_UPSTREAM_LOC ?= $(call or,$(wildcard $(QEMU_UPSTREAM_INTREE)),\
+                               $(QEMU_UPSTREAM_URL))
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
