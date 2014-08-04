@@ -135,6 +135,13 @@ void __init cmdline_parse(const char *cmdline)
                     parse_size_and_unit(optval, NULL));
                 break;
             case OPT_CUSTOM:
+                if ( !bool_assert )
+                {
+                    if ( *optval )
+                        break;
+                    safe_strcpy(opt, "no");
+                    optval = opt;
+                }
                 ((void (*)(const char *))param->var)(optval);
                 break;
             default:
