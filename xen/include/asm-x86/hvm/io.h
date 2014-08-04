@@ -91,6 +91,7 @@ static inline int hvm_buffered_io_intercept(ioreq_t *p)
     return hvm_io_intercept(p, HVM_BUFFERED_IO);
 }
 
+bool_t hvm_mmio_internal(paddr_t gpa);
 int hvm_mmio_intercept(ioreq_t *p);
 int hvm_buffered_io_send(ioreq_t *p);
 

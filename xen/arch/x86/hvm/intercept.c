@@ -163,6 +163,18 @@ static int hvm_mmio_access(struct vcpu *v,
     return rc;
 }
 
+bool_t hvm_mmio_internal(paddr_t gpa)
+{
+    struct vcpu *curr = current;
+    unsigned int i;
+
+    for ( i = 0; i < HVM_MMIO_HANDLER_NR; ++i )
+        if ( hvm_mmio_handlers[i]->check_handler(curr, gpa) )
+            return 1;
+
+    return 0;
+}
+
 int hvm_mmio_intercept(ioreq_t *p)
 {
     struct vcpu *v = current;

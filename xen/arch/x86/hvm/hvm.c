@@ -2779,11 +2779,14 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
         }
     }
 
-    /* For the benefit of 32-bit WinXP (& older Windows) on AMD CPUs,
-     * a fast path for LAPIC accesses, skipping the p2m lookup. */
+    /*
+     * No need to do the P2M lookup for internally handled MMIO, benefiting
+     * - 32-bit WinXP (& older Windows) on AMD CPUs for LAPIC accesses,
+     * - newer Windows (like Server 2012) for HPET accesses.
+     */
     if ( !nestedhvm_vcpu_in_guestmode(v)
          && is_hvm_vcpu(v)
-         && gfn == PFN_DOWN(vlapic_base_address(vcpu_vlapic(v))) )
+         && hvm_mmio_internal(gpa) )
     {
         if ( !handle_mmio() )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
@@ -3892,7 +3895,9 @@ static enum hvm_copy_result __hvm_copy(
 
     while ( todo > 0 )
     {
-        count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
+        paddr_t gpa = addr & ~PAGE_MASK;
+
+        count = min_t(int, PAGE_SIZE - gpa, todo);
 
         if ( flags & HVMCOPY_virt )
         {
@@ -3907,16 +3912,22 @@ static enum hvm_copy_result __hvm_copy(
                     hvm_inject_page_fault(pfec, addr);
                 return HVMCOPY_bad_gva_to_gfn;
             }
+            gpa |= (paddr_t)gfn << PAGE_SHIFT;
         }
         else
         {
             gfn = addr >> PAGE_SHIFT;
+            gpa = addr;
         }
 
-        /* For the benefit of 32-bit WinXP (& older Windows) on AMD CPUs,
-         * a fast path for LAPIC accesses, skipping the p2m lookup. */
+        /*
+         * No need to do the P2M lookup for internally handled MMIO, benefiting
+         * - 32-bit WinXP (& older Windows) on AMD CPUs for LAPIC accesses,
+         * - newer Windows (like Server 2012) for HPET accesses.
+         */
         if ( !nestedhvm_vcpu_in_guestmode(curr)
-             && gfn == PFN_DOWN(vlapic_base_address(vcpu_vlapic(curr))) )
+             && is_hvm_vcpu(curr)
+             && hvm_mmio_internal(gpa) )
             return HVMCOPY_bad_gfn_to_mfn;
 
         page = get_page_from_gfn(curr->domain, gfn, &p2mt, P2M_UNSHARE);
