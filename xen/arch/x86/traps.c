@@ -803,12 +803,16 @@ void pv_cpuid(struct cpu_user_regs *regs)
     if ( (regs->eax & 0x7fffffff) == 0x00000001 )
     {
         /* Modify Feature Information. */
-        __clear_bit(X86_FEATURE_VME, &d);
         if ( !cpu_has_apic )
             __clear_bit(X86_FEATURE_APIC, &d);
-        __clear_bit(X86_FEATURE_PSE, &d);
-        __clear_bit(X86_FEATURE_PGE, &d);
-        __clear_bit(X86_FEATURE_PSE36, &d);
+
+        if ( !is_pvh_vcpu(curr) )
+        {
+            __clear_bit(X86_FEATURE_PSE, &d);
+            __clear_bit(X86_FEATURE_PGE, &d);
+            __clear_bit(X86_FEATURE_PSE36, &d);
+            __clear_bit(X86_FEATURE_VME, &d);
+        }
     }
 
     switch ( (uint32_t)regs->eax )
