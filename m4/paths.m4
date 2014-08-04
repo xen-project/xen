@@ -1,7 +1,7 @@
 AC_DEFUN([AX_XEN_EXPAND_CONFIG], [
 dnl expand these early so we can use this for substitutions
 test "x$prefix" = "xNONE" && prefix=$ac_default_prefix
-test "x$exec_prefix" = "xNONE" && exec_prefix=$ac_default_prefix
+test "x$exec_prefix" = "xNONE" && exec_prefix=${prefix}
 
 BINDIR=$prefix/bin
 AC_SUBST(BINDIR)
