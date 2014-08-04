@@ -559,6 +559,15 @@ static int printk_prefix_check(char *p, char **pp)
 
 static void __init parse_console_timestamps(char *s)
 {
+    switch ( parse_bool(s) )
+    {
+    case 0:
+        opt_con_timestamp_mode = TSM_NONE;
+        return;
+    case 1:
+        opt_con_timestamp_mode = TSM_DATE;
+        return;
+    }
     if ( *s == '\0' || /* Compat for old booleanparam() */
          !strcmp(s, "date") )
         opt_con_timestamp_mode = TSM_DATE;
