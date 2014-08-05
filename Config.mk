@@ -224,7 +224,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 8a7abb1694f22cb18616ee7a7a544b026c914bf9
+QEMU_TAG ?= xen-4.3.3-rc2
 # Tue Apr 8 16:50:06 2014 +0000
 # qemu-xen-trad: free all the pirqs for msi/msix when driver unloads
 
