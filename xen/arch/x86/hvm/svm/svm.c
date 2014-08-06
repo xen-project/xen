@@ -1692,7 +1692,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         goto gpf;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, msr_value=%"PRIx64,
+    HVM_DBG_LOG(DBG_LEVEL_MSR, "returns: ecx=%x, msr_value=%"PRIx64,
                 msr, *msr_content);
     return X86EMUL_OKAY;
 

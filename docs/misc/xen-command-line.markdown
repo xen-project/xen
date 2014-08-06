@@ -661,8 +661,32 @@ supported only when compiled with XSM\_ENABLE=y on x86.
 ### hvm\_debug
 > `= <integer>`
 
+The specified value is a bit mask with the individual bits having the
+following meaning:
+
+Bit  0 - debug level 0 (unused at present)
+Bit  1 - debug level 1 (Control Register logging)
+Bit  2 - debug level 2 (VMX logging of MSR restores when context switching)
+Bit  3 - debug level 3 (unused at present)
+Bit  4 - I/O operation logging
+Bit  5 - vMMU logging
+Bit  6 - vLAPIC general logging
+Bit  7 - vLAPIC timer logging
+Bit  8 - vLAPIC interrupt logging
+Bit  9 - vIOAPIC logging
+Bit 10 - hypercall logging
+Bit 11 - MSR operation logging
+
+Recognized in debug builds of the hypervisor only.
+
 ### hvm\_port80
 > `= <boolean>`
+
+> Default: `true`
+
+Specify whether guests are to be given access to physical port 80
+(often used for debugging purposes), to override the DMI based
+detection of systems known to misbehave upon accesses to that port.
 
 ### highmem-start
 > `= <size>`

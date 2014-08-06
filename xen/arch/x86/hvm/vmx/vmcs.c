@@ -721,7 +721,7 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
             clear_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
     }
     else
-        HVM_DBG_LOG(DBG_LEVEL_0,
+        HVM_DBG_LOG(DBG_LEVEL_MSR,
                    "msr %x is out of the control range"
                    "0x00000000-0x00001fff and 0xc0000000-0xc0001fff"
                    "RDMSR or WRMSR will cause a VM exit", msr); 
@@ -757,7 +757,7 @@ void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
             set_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
     }
     else
-        HVM_DBG_LOG(DBG_LEVEL_0,
+        HVM_DBG_LOG(DBG_LEVEL_MSR,
                    "msr %x is out of the control range"
                    "0x00000000-0x00001fff and 0xc0000000-0xc0001fff"
                    "RDMSR or WRMSR will cause a VM exit", msr); 

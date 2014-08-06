@@ -199,7 +199,7 @@ long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
         return HNDL_unhandled;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_0, "msr %#x content %#"PRIx64, msr, *msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_MSR, "msr %#x content %#"PRIx64, msr, *msr_content);
 
     return HNDL_done;
 }
@@ -211,7 +211,7 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
     struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
 
-    HVM_DBG_LOG(DBG_LEVEL_0, "msr %#x content %#"PRIx64, msr, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_MSR, "msr %#x content %#"PRIx64, msr, msr_content);
 
     switch ( msr )
     {
@@ -254,7 +254,7 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
     return HNDL_done;
 
  uncanonical_address:
-    HVM_DBG_LOG(DBG_LEVEL_0, "Not cano address of msr write %x", msr);
+    HVM_DBG_LOG(DBG_LEVEL_MSR, "Not cano address of msr write %x", msr);
     hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return HNDL_exception_raised;
 }
@@ -2046,7 +2046,7 @@ static int is_last_branch_msr(u32 ecx)
 
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%#x", msr);
+    HVM_DBG_LOG(DBG_LEVEL_MSR, "ecx=%#x", msr);
 
     switch ( msr )
     {
@@ -2111,7 +2111,7 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     }
 
 done:
-    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%#x, msr_value=%#"PRIx64,
+    HVM_DBG_LOG(DBG_LEVEL_MSR, "returns: ecx=%#x, msr_value=%#"PRIx64,
                 msr, *msr_content);
     return X86EMUL_OKAY;
 
@@ -2229,7 +2229,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%#x, msr_value=%#"PRIx64, msr, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_MSR, "ecx=%#x, msr_value=%#"PRIx64, msr, msr_content);
 
     switch ( msr )
     {

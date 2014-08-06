@@ -70,8 +70,10 @@
 
 bool_t __read_mostly hvm_enabled;
 
+#ifdef DBG_LEVEL_0
 unsigned int opt_hvm_debug_level __read_mostly;
 integer_param("hvm_debug", opt_hvm_debug_level);
+#endif
 
 struct hvm_function_table hvm_funcs __read_mostly;
 
