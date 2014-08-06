@@ -674,6 +674,10 @@ debug hypervisor only).
 > `= <integer>`
 
 ### ioapic\_ack
+> `= old | new`
+
+> Default: `new` unless directed-EOI is supported
+
 ### iommu
 > `= List of [ <boolean> | force | required | intremap | qinval | snoop | sharept | dom0-passthrough | dom0-strict | amd-iommu-perdev-intremap | workaround_bios_bug | verbose | debug ]`
 
@@ -789,10 +793,10 @@ Force the use of `[<seg>:]<bus>:<device>.<func>` as device ID of IO-APIC
 ACPI table.
 
 ### lapic
+> `= <boolean>`
 
 Force the use of use of the local APIC on a uniprocessor system, even
-if left disabled by the BIOS.  This option will accept any value at
-all.
+if left disabled by the BIOS.
 
 ### lapic\_timer\_c2\_ok
 > `= <boolean>`
@@ -827,6 +831,9 @@ with **crashinfo_maxaddr**.
 
 ### max\_gsi\_irqs
 > `= <integer>`
+
+Specifies the number of interrupts to be use for pin (IO-APIC or legacy PIC)
+based interrupts. Any higher IRQs will be available for use via PCI MSI.
 
 ### maxcpus
 > `= <integer>`
@@ -912,7 +919,7 @@ IRQ routing issues.
 > Default: `false`
 
 Ignore the local APIC on a uniprocessor system, even if enabled by the
-BIOS.  This option will accept value.
+BIOS.
 
 ### no-real-mode (x86)
 > `= <boolean>`

@@ -815,12 +815,7 @@ static void __init lapic_disable(char *str)
     setup_clear_cpu_cap(X86_FEATURE_APIC);
 }
 custom_param("nolapic", lapic_disable);
-
-static void __init lapic_enable(char *str)
-{
-    enable_local_apic = 1;
-}
-custom_param("lapic", lapic_enable);
+boolean_param("lapic", enable_local_apic);
 
 static void __init apic_set_verbosity(char *str)
 {
