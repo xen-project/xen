@@ -111,19 +111,27 @@ Specify which ACPI MADT table to parse for APIC information, if more
 than one is present.
 
 ### acpi\_pstate\_strict
-> `= <integer>`
+> `= <boolean>`
+
+> Default: `false`
+
+Enforce checking that P-state transitions by the ACPI cpufreq driver
+actually result in the nominated frequency to be established. A warning
+message will be logged if that isn't the case.
 
 ### acpi\_skip\_timer\_override
 > `= <boolean>`
 
 Instruct Xen to ignore timer-interrupt override.
 
-Because responsibility for ACPI processing is shared between Xen and
-the domain 0 kernel this option is automatically propagated to the
-domain 0 command line
-
 ### acpi\_sleep
 > `= s3_bios | s3_mode`
+
+`s3_bios` instructs Xen to invoke video BIOS initialization during S3
+resume.
+
+`s3_mode` instructs Xen to set up the boot time (option `vga=`) video
+mode during S3 resume.
 
 ### allowsuperpage
 > `= <boolean>`
@@ -964,7 +972,7 @@ This option can be specified more than once (up to 8 times at present).
 > `= <integer>`
 
 ### reboot
-> `= t[riple] | k[bd] | n[o] [, [w]arm | [c]old]`
+> `= t[riple] | k[bd] | a[cpi] | p[ci] | n[o] [, [w]arm | [c]old]`
 
 Default: `0`
 
@@ -974,11 +982,15 @@ Specify the host reboot method.
 
 `cold` instructs Xen to set the cold reboot flag.
 
+`no` instructs Xen to not automatically reboot after panics or crashes.
+
 `triple` instructs Xen to reboot the host by causing a triple fault.
 
 `kbd` instructs Xen to reboot the host via the keyboard controller.
 
 `acpi` instructs Xen to reboot the host using RESET_REG in the ACPI FADT.
+
+`pci` instructs Xen to reboot the host using PCI reset register (port CF9).
 
 ### sched
 > `= credit | credit2 | sedf | arinc653`

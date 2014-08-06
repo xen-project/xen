@@ -37,9 +37,10 @@ enum reboot_type {
 static int reboot_mode;
 
 /*
- * reboot=b[ios] | t[riple] | k[bd] | n[o] [, [w]arm | [c]old]
+ * reboot=t[riple] | k[bd] | a[cpi] | p[ci] | n[o] [, [w]arm | [c]old]
  * warm   Don't set the cold reboot flag
  * cold   Set the cold reboot flag
+ * no     Suppress automatic reboot after panics or crashes
  * triple Force a triple fault (init)
  * kbd    Use the keyboard controller. cold reset (default)
  * acpi   Use the RESET_REG in the FADT

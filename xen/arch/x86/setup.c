@@ -73,7 +73,6 @@ boolean_param("dom0pvh", opt_dom0pvh);
 /* **** Linux config option: propagated to domain0. */
 /* "acpi=off":    Sisables both ACPI table parsing and interpreter. */
 /* "acpi=force":  Override the disable blacklist.                   */
-/* "acpi=strict": Disables out-of-spec workarounds.                 */
 /* "acpi=ht":     Limit ACPI just to boot-time to enable HT.        */
 /* "acpi=noirq":  Disables ACPI interrupt routing.                  */
 static void parse_acpi_param(char *s);

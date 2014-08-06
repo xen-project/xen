@@ -57,8 +57,8 @@ struct acpi_cpufreq_data *cpufreq_drv_data[NR_CPUS];
 
 static struct cpufreq_driver acpi_cpufreq_driver;
 
-static unsigned int __read_mostly acpi_pstate_strict;
-integer_param("acpi_pstate_strict", acpi_pstate_strict);
+static bool_t __read_mostly acpi_pstate_strict;
+boolean_param("acpi_pstate_strict", acpi_pstate_strict);
 
 static int check_est_cpu(unsigned int cpuid)
 {
