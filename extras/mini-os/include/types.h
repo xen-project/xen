@@ -27,7 +27,7 @@ typedef unsigned char       u_char;
 typedef unsigned int        u_int;
 typedef unsigned long       u_long;
 #endif
-#ifdef __i386__
+#if defined(__i386__) || defined(__arm__)
 typedef long long           quad_t;
 typedef unsigned long long  u_quad_t;
 #elif defined(__x86_64__)
@@ -39,10 +39,10 @@ typedef unsigned long       u_quad_t;
 #include <limits.h>
 #include <stdint.h>
 #else
-#ifdef __i386__
+#if defined(__i386__) || defined(__arm__)
 typedef unsigned int        uintptr_t;
 typedef int                 intptr_t;
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) || defined(__aarch64__)
 typedef unsigned long       uintptr_t;
 typedef long                intptr_t;
 #endif /* __i386__ || __x86_64__ */
@@ -52,10 +52,10 @@ typedef unsigned short uint16_t;
 typedef   signed short int16_t;
 typedef unsigned int uint32_t;
 typedef   signed int int32_t;
-#ifdef __i386__
+#if defined(__i386__) || defined(__arm__)
 typedef   signed long long int64_t;
 typedef unsigned long long uint64_t;
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) || defined(__aarch64__)
 typedef   signed long int64_t;
 typedef unsigned long uint64_t;
 #endif

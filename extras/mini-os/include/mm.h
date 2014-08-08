@@ -29,6 +29,8 @@
 #include <xen/arch-x86_32.h>
 #elif defined(__x86_64__)
 #include <xen/arch-x86_64.h>
+#elif defined(__arm__) || defined(__aarch64__)
+#include <xen/arch-arm.h>
 #else
 #error "Unsupported architecture"
 #endif
