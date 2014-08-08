@@ -204,8 +204,30 @@ irq_handler:
 IRQ_handler:
 	.long	0x0
 
+
+.globl __arch_switch_threads
+@ => r0 = &prev->sp
+@    r1 = &next->sp
+@ <= returns to next thread's saved return address
+__arch_switch_threads:
+	push	{r4-r11}	@ Store callee-saved registers to old thread's stack
+	stmia	r0, {sp, lr}	@ Store current sp and ip to prev's struct thread
+
+	ldmia	r1, {sp, lr}	@ Load new sp, ip from next's struct thread
+	pop	{r4-r11}	@ Load callee-saved registers from new thread's stack
+
+	bx	lr
+
 @ This is called if you try to divide by zero. For now, we make a supervisor call,
 @ which will make us halt.
 .globl raise
 raise:
 	svc	0
+
+.globl arm_start_thread
+arm_start_thread:
+	pop	{r0, r1}
+	@ r0 = user data
+	@ r1 -> thread's main function
+	ldr	lr, =exit_thread
+	bx	r1
