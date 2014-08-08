@@ -119,37 +119,37 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
 
 static void dump_guest_os_id(const struct domain *d)
 {
-    gdprintk(XENLOG_INFO, "GUEST_OS_ID:\n");
-    gdprintk(XENLOG_INFO, "\tvendor: %x\n",
-            d->arch.hvm_domain.viridian.guest_os_id.fields.vendor);
-    gdprintk(XENLOG_INFO, "\tos: %x\n",
-            d->arch.hvm_domain.viridian.guest_os_id.fields.os);
-    gdprintk(XENLOG_INFO, "\tmajor: %x\n",
-            d->arch.hvm_domain.viridian.guest_os_id.fields.major);
-    gdprintk(XENLOG_INFO, "\tminor: %x\n",
-            d->arch.hvm_domain.viridian.guest_os_id.fields.minor);
-    gdprintk(XENLOG_INFO, "\tsp: %x\n",
-            d->arch.hvm_domain.viridian.guest_os_id.fields.service_pack);
-    gdprintk(XENLOG_INFO, "\tbuild: %x\n",
-            d->arch.hvm_domain.viridian.guest_os_id.fields.build_number);
+    const union viridian_guest_os_id *goi;
+
+    goi = &d->arch.hvm_domain.viridian.guest_os_id;
+
+    printk(XENLOG_G_INFO
+           "d%d: VIRIDIAN GUEST_OS_ID: vendor: %x os: %x major: %x minor: %x sp: %x build: %x\n",
+           d->domain_id,
+           goi->fields.vendor, goi->fields.os,
+           goi->fields.major, goi->fields.minor,
+           goi->fields.service_pack, goi->fields.build_number);
 }
 
 static void dump_hypercall(const struct domain *d)
 {
-    gdprintk(XENLOG_INFO, "HYPERCALL:\n");
-    gdprintk(XENLOG_INFO, "\tenabled: %x\n",
-            d->arch.hvm_domain.viridian.hypercall_gpa.fields.enabled);
-    gdprintk(XENLOG_INFO, "\tpfn: %lx\n",
-            (unsigned long)d->arch.hvm_domain.viridian.hypercall_gpa.fields.pfn);
+    const union viridian_hypercall_gpa *hg;
+
+    hg = &d->arch.hvm_domain.viridian.hypercall_gpa;
+
+    printk(XENLOG_G_INFO "d%d: VIRIDIAN HYPERCALL: enabled: %x pfn: %lx\n",
+           d->domain_id,
+           hg->fields.enabled, (unsigned long)hg->fields.pfn);
 }
 
 static void dump_apic_assist(const struct vcpu *v)
 {
-    gdprintk(XENLOG_INFO, "APIC_ASSIST[%d]:\n", v->vcpu_id);
-    gdprintk(XENLOG_INFO, "\tenabled: %x\n",
-            v->arch.hvm_vcpu.viridian.apic_assist.fields.enabled);
-    gdprintk(XENLOG_INFO, "\tpfn: %lx\n",
-            (unsigned long)v->arch.hvm_vcpu.viridian.apic_assist.fields.pfn);
+    const union viridian_apic_assist *aa;
+
+    aa = &v->arch.hvm_vcpu.viridian.apic_assist;
+
+    printk(XENLOG_G_INFO "%pv: VIRIDIAN APIC_ASSIST: enabled: %x pfn: %lx\n",
+           v, aa->fields.enabled, (unsigned long)aa->fields.pfn);
 }
 
 static void enable_hypercall_page(struct domain *d)
