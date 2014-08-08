@@ -295,31 +295,30 @@ int pt_irq_destroy_bind(
     struct hvm_irq_dpci *hvm_irq_dpci;
     struct hvm_pirq_dpci *pirq_dpci;
     unsigned int machine_gsi = pt_irq_bind->machine_irq;
-    unsigned int bus = pt_irq_bind->u.pci.bus;
-    unsigned int device = pt_irq_bind->u.pci.device;
-    unsigned int intx = pt_irq_bind->u.pci.intx;
-    unsigned int guest_gsi = hvm_pci_intx_gsi(device, intx);
-    unsigned int link = hvm_pci_intx_link(device, intx);
-    struct dev_intx_gsi_link *digl, *tmp;
-    struct hvm_girq_dpci_mapping *girq;
     struct pirq *pirq;
+    const char *what = NULL;
 
     switch ( pt_irq_bind->irq_type )
     {
     case PT_IRQ_TYPE_PCI:
     case PT_IRQ_TYPE_MSI_TRANSLATE:
+        if ( iommu_verbose )
+        {
+            unsigned int device = pt_irq_bind->u.pci.device;
+            unsigned int intx = pt_irq_bind->u.pci.intx;
+
+            dprintk(XENLOG_G_INFO,
+                    "d%d: unbind: m_gsi=%u g_gsi=%u dev=%02x:%02x.%u intx=%u\n",
+                    d->domain_id, machine_gsi, hvm_pci_intx_gsi(device, intx),
+                    pt_irq_bind->u.pci.bus,
+                    PCI_SLOT(device), PCI_FUNC(device), intx);
+        }
         break;
     case PT_IRQ_TYPE_MSI:
-        return 0;
+        break;
     default:
         return -EOPNOTSUPP;
     }
-
-    if ( iommu_verbose )
-        dprintk(XENLOG_G_INFO,
-                "d%d: unbind: m_gsi=%u g_gsi=%u dev=%02x:%02x.%u intx=%u\n",
-                d->domain_id, machine_gsi, guest_gsi, bus,
-                PCI_SLOT(device), PCI_FUNC(device), intx);
 
     spin_lock(&d->event_lock);
 
@@ -331,63 +330,83 @@ int pt_irq_destroy_bind(
         return -EINVAL;
     }
 
-    list_for_each_entry ( girq, &hvm_irq_dpci->girq[guest_gsi], list )
-    {
-        if ( girq->bus         == bus &&
-             girq->device      == device &&
-             girq->intx        == intx &&
-             girq->machine_gsi == machine_gsi )
-        {
-            list_del(&girq->list);
-            xfree(girq);
-            girq = NULL;
-            break;
-        }
-    }
-
-    if ( girq )
-    {
-        spin_unlock(&d->event_lock);
-        return -EINVAL;
-    }
-
-    hvm_irq_dpci->link_cnt[link]--;
-
     pirq = pirq_info(d, machine_gsi);
     pirq_dpci = pirq_dpci(pirq);
 
-    /* clear the mirq info */
-    if ( pirq_dpci && (pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) )
+    if ( pt_irq_bind->irq_type != PT_IRQ_TYPE_MSI )
     {
-        list_for_each_entry_safe ( digl, tmp, &pirq_dpci->digl_list, list )
+        unsigned int bus = pt_irq_bind->u.pci.bus;
+        unsigned int device = pt_irq_bind->u.pci.device;
+        unsigned int intx = pt_irq_bind->u.pci.intx;
+        unsigned int guest_gsi = hvm_pci_intx_gsi(device, intx);
+        unsigned int link = hvm_pci_intx_link(device, intx);
+        struct hvm_girq_dpci_mapping *girq;
+        struct dev_intx_gsi_link *digl, *tmp;
+
+        list_for_each_entry ( girq, &hvm_irq_dpci->girq[guest_gsi], list )
         {
-            if ( digl->bus    == bus &&
-                 digl->device == device &&
-                 digl->intx   == intx )
+            if ( girq->bus         == bus &&
+                 girq->device      == device &&
+                 girq->intx        == intx &&
+                 girq->machine_gsi == machine_gsi )
             {
-                list_del(&digl->list);
-                xfree(digl);
+                list_del(&girq->list);
+                xfree(girq);
+                girq = NULL;
+                break;
             }
         }
 
-        if ( list_empty(&pirq_dpci->digl_list) )
+        if ( girq )
         {
-            pirq_guest_unbind(d, pirq);
-            msixtbl_pt_unregister(d, pirq);
-            if ( pt_irq_need_timer(pirq_dpci->flags) )
-                kill_timer(&pirq_dpci->timer);
-            pirq_dpci->dom   = NULL;
-            pirq_dpci->flags = 0;
-            pirq_cleanup_check(pirq, d);
+            spin_unlock(&d->event_lock);
+            return -EINVAL;
         }
+
+        hvm_irq_dpci->link_cnt[link]--;
+
+        /* clear the mirq info */
+        if ( pirq_dpci && (pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) )
+        {
+            list_for_each_entry_safe ( digl, tmp, &pirq_dpci->digl_list, list )
+            {
+                if ( digl->bus    == bus &&
+                     digl->device == device &&
+                     digl->intx   == intx )
+                {
+                    list_del(&digl->list);
+                    xfree(digl);
+                }
+            }
+            what = list_empty(&pirq_dpci->digl_list) ? "final" : "partial";
+        }
+        else
+            what = "bogus";
     }
+
+    if ( pirq_dpci && (pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) &&
+         list_empty(&pirq_dpci->digl_list) )
+    {
+        pirq_guest_unbind(d, pirq);
+        msixtbl_pt_unregister(d, pirq);
+        if ( pt_irq_need_timer(pirq_dpci->flags) )
+            kill_timer(&pirq_dpci->timer);
+        pirq_dpci->dom   = NULL;
+        pirq_dpci->flags = 0;
+        pirq_cleanup_check(pirq, d);
+    }
+
     spin_unlock(&d->event_lock);
 
-    if ( iommu_verbose )
+    if ( what && iommu_verbose )
+    {
+        unsigned int device = pt_irq_bind->u.pci.device;
+
         dprintk(XENLOG_G_INFO,
-                "d%d unmap: m_irq=%u dev=%02x:%02x.%u intx=%u\n",
-                d->domain_id, machine_gsi, bus,
-                PCI_SLOT(device), PCI_FUNC(device), intx);
+                "d%d %s unmap: m_irq=%u dev=%02x:%02x.%u intx=%u\n",
+                d->domain_id, what, machine_gsi, pt_irq_bind->u.pci.bus,
+                PCI_SLOT(device), PCI_FUNC(device), pt_irq_bind->u.pci.intx);
+    }
 
     return 0;
 }
