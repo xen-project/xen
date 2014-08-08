@@ -15,6 +15,7 @@
 #include <mini-os/types.h>
 #include <mini-os/hypervisor.h>
 #include <mini-os/kernel.h>
+#include <xen/xsm/flask_op.h>
 
 #define USED    __attribute__ ((used))
 
@@ -558,6 +559,12 @@ static __inline__ int synch_var_test_bit(int nr, volatile void * addr)
  synch_const_test_bit((nr),(addr)) : \
  synch_var_test_bit((nr),(addr)))
 
+static inline int
+HYPERVISOR_xsm_op(
+        struct xen_flask_op *op)
+{
+    return _hypercall1(int, xsm_op, op);
+}
 
 #undef ADDR
 
