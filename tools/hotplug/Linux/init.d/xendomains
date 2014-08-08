@@ -20,7 +20,7 @@
 # Short-Description: Wrapper to start/stop secondary xen domains
 # Description:       Wrapper for starting / stopping domains automatically
 #                    when domain 0 boots / shuts down on systems using init.
-#                    The $SBINDIR/xendomains helper is shared between init and
+#                    The $LIBEXEC/xendomains helper is shared between init and
 #                    systemd systems.
 ### END INIT INFO
 
@@ -28,19 +28,19 @@
 
 case "$1" in
     start)
-	$SBINDIR/xendomains start
+	$LIBEXEC/xendomains start
 	;;
     stop)
-	$SBINDIR/xendomains stop
+	$LIBEXEC/xendomains stop
 	;;
     restart)
-	$SBINDIR/xendomains restart
+	$LIBEXEC/xendomains restart
 	;;
     reload)
-	$SBINDIR/xendomains reload
+	$LIBEXEC/xendomains reload
 	;;
     status)
-	$SBINDIR/xendomains status
+	$LIBEXEC/xendomains status
 	;;
     *)
 	echo "Usage: $0 {start|stop|restart|reload|status}"
