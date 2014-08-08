@@ -60,6 +60,19 @@ static void xenbus_tester(void *p)
 }
 #endif
 
+#ifndef HAVE_LIBC
+/* Should be random enough for our uses */
+int rand(void)
+{
+    static unsigned int previous;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    previous += tv.tv_sec + tv.tv_usec;
+    previous *= RAND_MIX;
+    return previous;
+}
+#endif
+
 static void periodic_thread(void *p)
 {
     struct timeval tv;

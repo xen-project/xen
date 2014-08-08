@@ -424,16 +424,3 @@ __moddi3(quad_t a, quad_t b)
 	(void)__qdivrem(ua, ub, &ur);
 	return (neg ? -ur : ur);
 }
-
-#ifndef HAVE_LIBC
-/* Should be random enough for our uses */
-int rand(void)
-{
-    static unsigned int previous;
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    previous += tv.tv_sec + tv.tv_usec;
-    previous *= RAND_MIX;
-    return previous;
-}
-#endif
