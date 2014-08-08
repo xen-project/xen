@@ -26,6 +26,7 @@
 #include <mini-os/events.h>
 #include <mini-os/wait.h>
 #include <mini-os/xmalloc.h>
+#include <mini-os/lib.h>
 #include <errno.h>
 #include <stdbool.h>
 

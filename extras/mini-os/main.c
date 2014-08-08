@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <xenbus.h>
 #include <events.h>
+#include <mini-os/lib.h>
 
 extern int main(int argc, char *argv[], char *envp[]);
 extern void __libc_init_array(void);

@@ -38,6 +38,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <mini-os/console.h>
+#include <mini-os/lib.h>
 #include <polarssl/sha1.h>
 #include <polarssl/sha2.h>
 

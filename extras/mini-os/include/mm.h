@@ -32,8 +32,7 @@
 #else
 #error "Unsupported architecture"
 #endif
-
-#include <mini-os/lib.h>
+#include <xen/xen.h>
 
 #include <mini-os/arch_limits.h>
 #include <mini-os/arch_mm.h>

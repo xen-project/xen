@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <mini-os/byteorder.h>
+#include <mini-os/lib.h>
 #include <polarssl/aes.h>
 #include <polarssl/sha1.h>
 
