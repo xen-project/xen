@@ -19,7 +19,7 @@ struct __packed e820entry {
 #define E820MAX	128
 
 struct e820map {
-    int nr_map;
+    unsigned int nr_map;
     struct e820entry map[E820MAX];
 };
 
