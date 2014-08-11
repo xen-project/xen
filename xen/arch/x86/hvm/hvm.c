@@ -6074,7 +6074,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 paging_mark_dirty(d, page_to_mfn(page));
                 /* These are most probably not page tables any more */
                 /* don't take a long time and don't die either */
-                sh_remove_shadows(d->vcpu[0], _mfn(page_to_mfn(page)), 1, 0);
+                sh_remove_shadows(d, _mfn(page_to_mfn(page)), 1, 0);
                 put_page(page);
             }
 

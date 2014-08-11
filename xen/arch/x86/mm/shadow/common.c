@@ -687,7 +687,7 @@ static int oos_remove_write_access(struct vcpu *v, mfn_t gmfn,
          * the page.  If that doesn't work either, the guest is granting
          * his pagetables and must be killed after all.
          * This will flush the tlb, so we can return with no worries. */
-        sh_remove_shadows(v, gmfn, 0 /* Be thorough */, 1 /* Must succeed */);
+        sh_remove_shadows(d, gmfn, 0 /* Be thorough */, 1 /* Must succeed */);
         return 1;
     }
 
@@ -1130,7 +1130,7 @@ sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
          * Since the validate call above will have made a "safe" (i.e. zero)
          * shadow entry, we can let the domain live even if we can't fully
          * unshadow the page. */
-        sh_remove_shadows(v, gmfn, 0, 0);
+        sh_remove_shadows(d, gmfn, 0, 0);
     }
 }
 
@@ -2570,7 +2570,7 @@ static int sh_remove_shadow_via_pointer(struct domain *d, mfn_t smfn)
     return rc;
 }
 
-void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
+void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
 /* Remove the shadows of this guest page.
  * If fast != 0, just try the quick heuristic, which will remove
  * at most one reference to each shadow of the page.  Otherwise, walk
@@ -2579,7 +2579,6 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
  * (all != 0 implies fast == 0)
  */
 {
-    struct domain *d = v->domain;
     struct page_info *pg = mfn_to_page(gmfn);
     mfn_t smfn;
     unsigned char t;
@@ -2633,8 +2632,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
      * can be called via put_page_type when we clear a shadow l1e).*/
     paging_lock_recursive(d);
 
-    SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx\n",
-                   d->domain_id, v->vcpu_id, mfn_x(gmfn));
+    SHADOW_PRINTK("d=%d: gmfn=%lx\n", d->domain_id, mfn_x(gmfn));
 
     /* Bail out now if the page is not shadowed */
     if ( (pg->count_info & PGC_page_table) == 0 )
@@ -2703,11 +2701,11 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
 }
 
 static void
-sh_remove_all_shadows_and_parents(struct vcpu *v, mfn_t gmfn)
+sh_remove_all_shadows_and_parents(struct domain *d, mfn_t gmfn)
 /* Even harsher: this is a HVM page that we thing is no longer a pagetable.
  * Unshadow it, and recursively unshadow pages that reference it. */
 {
-    sh_remove_shadows(v, gmfn, 0, 1);
+    sh_remove_shadows(d, gmfn, 0, 1);
     /* XXX TODO:
      * Rework this hashtable walker to return a linked-list of all
      * the shadows it modified, then do breadth-first recursion
@@ -3384,7 +3382,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
         p2m_type_t p2mt = p2m_flags_to_type(l1e_get_flags(*p));
         if ( (p2m_is_valid(p2mt) || p2m_is_grant(p2mt)) && mfn_valid(mfn) )
         {
-            sh_remove_all_shadows_and_parents(v, mfn);
+            sh_remove_all_shadows_and_parents(d, mfn);
             if ( sh_remove_all_mappings(v, mfn) )
                 flush_tlb_mask(d->domain_dirty_cpumask);
         }
@@ -3419,7 +3417,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
                      || l1e_get_pfn(npte[i]) != mfn_x(omfn) )
                 {
                     /* This GFN->MFN mapping has gone away */
-                    sh_remove_all_shadows_and_parents(v, omfn);
+                    sh_remove_all_shadows_and_parents(d, omfn);
                     if ( sh_remove_all_mappings(v, omfn) )
                         cpumask_or(&flushmask, &flushmask,
                                    d->domain_dirty_cpumask);

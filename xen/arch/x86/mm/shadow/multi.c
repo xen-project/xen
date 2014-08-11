@@ -2564,7 +2564,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
                & (SHF_L2_32|SHF_L2_PAE|SHF_L2H_PAE|SHF_L4_64))) )
     {
         perfc_incr(shadow_early_unshadow);
-        sh_remove_shadows(v, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
+        sh_remove_shadows(d, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
         TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EARLY_UNSHADOW);
     }
     v->arch.paging.shadow.last_emulated_mfn_for_unshadow = mfn_x(gmfn);
@@ -3251,7 +3251,7 @@ static int sh_page_fault(struct vcpu *v,
         SHADOW_PRINTK("user-mode fault to PT, unshadowing mfn %#lx\n",
                       mfn_x(gmfn));
         perfc_incr(shadow_fault_emulate_failed);
-        sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
+        sh_remove_shadows(d, gmfn, 0 /* thorough */, 1 /* must succeed */);
         trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_USER,
                                       va, gfn);
         goto done;
@@ -3293,7 +3293,7 @@ static int sh_page_fault(struct vcpu *v,
         }
 
         if ( !used )
-            sh_remove_shadows(v, gmfn, 1 /* fast */, 0 /* can fail */);
+            sh_remove_shadows(d, gmfn, 1 /* fast */, 0 /* can fail */);
     }
 
     /*
@@ -3331,7 +3331,7 @@ static int sh_page_fault(struct vcpu *v,
             gdprintk(XENLOG_DEBUG, "write to pagetable during event "
                      "injection: cr2=%#lx, mfn=%#lx\n",
                      va, mfn_x(gmfn));
-            sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
+            sh_remove_shadows(d, gmfn, 0 /* thorough */, 1 /* must succeed */);
             trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_EVTINJ,
                                        va, gfn);
             return EXCRET_fault_fixed;
@@ -3365,7 +3365,7 @@ static int sh_page_fault(struct vcpu *v,
         /* If this is actually a page table, then we have a bug, and need
          * to support more operations in the emulator.  More likely,
          * though, this is a hint that this page should not be shadowed. */
-        shadow_remove_all_shadows(v, gmfn);
+        shadow_remove_all_shadows(d, gmfn);
 
         trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_UNHANDLED,
                                    va, gfn);
@@ -4626,6 +4626,7 @@ static void *emulate_map_dest(struct vcpu *v,
                               u32 bytes,
                               struct sh_emulate_ctxt *sh_ctxt)
 {
+    struct domain *d = v->domain;
     void *map = NULL;
 
     sh_ctxt->mfn1 = emulate_gva_to_mfn(v, vaddr, sh_ctxt);
@@ -4647,7 +4648,7 @@ static void *emulate_map_dest(struct vcpu *v,
 
     /* Unaligned writes mean probably this isn't a pagetable */
     if ( vaddr & (bytes - 1) )
-        sh_remove_shadows(v, sh_ctxt->mfn1, 0, 0 /* Slow, can fail */ );
+        sh_remove_shadows(d, sh_ctxt->mfn1, 0, 0 /* Slow, can fail */ );
 
     if ( likely(((vaddr + bytes - 1) & PAGE_MASK) == (vaddr & PAGE_MASK)) )
     {
@@ -4674,7 +4675,7 @@ static void *emulate_map_dest(struct vcpu *v,
                     MAPPING_SILENT_FAIL : MAPPING_UNHANDLEABLE);
 
         /* Cross-page writes mean probably not a pagetable */
-        sh_remove_shadows(v, sh_ctxt->mfn2, 0, 0 /* Slow, can fail */ );
+        sh_remove_shadows(d, sh_ctxt->mfn2, 0, 0 /* Slow, can fail */ );
 
         mfns[0] = mfn_x(sh_ctxt->mfn1);
         mfns[1] = mfn_x(sh_ctxt->mfn2);

@@ -2118,7 +2118,7 @@ int free_page_type(struct page_info *page, unsigned long type,
         ASSERT(VALID_M2P(gmfn));
         /* Page sharing not supported for shadowed domains */
         if(!SHARED_M2P(gmfn))
-            shadow_remove_all_shadows(owner->vcpu[0], _mfn(gmfn));
+            shadow_remove_all_shadows(owner, _mfn(gmfn));
     }
 
     if ( !(type & PGT_partial) )
@@ -2283,7 +2283,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
                  && (page->count_info & PGC_page_table)
                  && !((page->shadow_flags & (1u<<29))
                       && type == PGT_writable_page) )
-               shadow_remove_all_shadows(d->vcpu[0], _mfn(page_to_mfn(page)));
+               shadow_remove_all_shadows(d, _mfn(page_to_mfn(page)));
 
             ASSERT(!(x & PGT_pae_xen_l2));
             if ( (x & PGT_type_mask) != type )
