@@ -2436,13 +2436,12 @@ int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
 /* Remove all mappings of a guest frame from the shadow tables.
  * Returns non-zero if we need to flush TLBs. */
 
-static int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
+static int sh_remove_all_mappings(struct domain *d, mfn_t gmfn)
 {
-    struct domain *d = v->domain;
     struct page_info *page = mfn_to_page(gmfn);
 
     /* Dispatch table for getting per-type functions */
-    static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
+    static const hash_domain_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2), /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2), /* fl1_32  */
@@ -2484,7 +2483,7 @@ static int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
 
     /* Brute-force search of all the shadows, by walking the hash */
     perfc_incr(shadow_mappings_bf);
-    hash_vcpu_foreach(v, callback_mask, callbacks, gmfn);
+    hash_domain_foreach(d, callback_mask, callbacks, gmfn);
 
     /* If that didn't catch the mapping, something is very wrong */
     if ( !sh_check_page_has_no_refs(page) )
@@ -3383,7 +3382,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
         if ( (p2m_is_valid(p2mt) || p2m_is_grant(p2mt)) && mfn_valid(mfn) )
         {
             sh_remove_all_shadows_and_parents(d, mfn);
-            if ( sh_remove_all_mappings(v, mfn) )
+            if ( sh_remove_all_mappings(d, mfn) )
                 flush_tlb_mask(d->domain_dirty_cpumask);
         }
     }
@@ -3418,7 +3417,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
                 {
                     /* This GFN->MFN mapping has gone away */
                     sh_remove_all_shadows_and_parents(d, omfn);
-                    if ( sh_remove_all_mappings(v, omfn) )
+                    if ( sh_remove_all_mappings(d, omfn) )
                         cpumask_or(&flushmask, &flushmask,
                                    d->domain_dirty_cpumask);
                 }
@@ -3634,7 +3633,7 @@ int shadow_track_dirty_vram(struct domain *d,
                         dirty = 1;
                         /* TODO: Heuristics for finding the single mapping of
                          * this gmfn */
-                        flush_tlb |= sh_remove_all_mappings(d->vcpu[0], mfn);
+                        flush_tlb |= sh_remove_all_mappings(d, mfn);
                     }
                     else
                     {

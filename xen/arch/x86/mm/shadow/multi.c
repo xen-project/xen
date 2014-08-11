@@ -4315,10 +4315,9 @@ int sh_rm_write_access_from_l1(struct domain *d, mfn_t sl1mfn,
 }
 
 
-int sh_rm_mappings_from_l1(struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn)
+int sh_rm_mappings_from_l1(struct domain *d, mfn_t sl1mfn, mfn_t target_mfn)
 /* Excises all mappings to guest frame from this shadow l1 table */
 {
-    struct domain *d = v->domain;
     shadow_l1e_t *sl1e;
     int done = 0;
     int flags;

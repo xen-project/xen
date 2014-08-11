@@ -65,7 +65,7 @@ SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, GUEST_LEVELS)
     (struct domain *d, mfn_t sl1mfn, mfn_t readonly_mfn);
 extern int
 SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn);
+    (struct domain *d, mfn_t sl1mfn, mfn_t target_mfn);
 
 extern void
 SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, GUEST_LEVELS)
