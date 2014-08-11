@@ -73,6 +73,8 @@
 /* EAX Features */
 #define XEN_HVM_CPUID_APIC_ACCESS_VIRT (1u << 0) /* Virtualized APIC registers */
 #define XEN_HVM_CPUID_X2APIC_VIRT      (1u << 1) /* Virtualized x2APIC accesses */
+/* Memory mapped from other domains has valid IOMMU entries */
+#define XEN_HVM_CPUID_IOMMU_MAPPINGS   (1u << 2)
 
 #define XEN_CPUID_MAX_NUM_LEAVES 4
 

@@ -67,6 +67,7 @@
 #include <asm/mem_access.h>
 #include <public/mem_event.h>
 #include <xen/rangeset.h>
+#include <public/arch-x86/cpuid.h>
 
 bool_t __read_mostly hvm_enabled;
 
@@ -4197,6 +4198,15 @@ void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
     *eax = *ebx = *ecx = *edx = 0;
     if ( hvm_funcs.hypervisor_cpuid_leaf )
         hvm_funcs.hypervisor_cpuid_leaf(sub_idx, eax, ebx, ecx, edx);
+
+    if ( sub_idx == 0 )
+    {
+        /*
+         * Indicate that memory mapped from other domains (either grants or
+         * foreign pages) has valid IOMMU entries.
+         */
+        *eax |= XEN_HVM_CPUID_IOMMU_MAPPINGS;
+    }
 }
 
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
