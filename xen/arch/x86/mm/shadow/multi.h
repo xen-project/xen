@@ -69,7 +69,7 @@ SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, GUEST_LEVELS)
 
 extern void
 SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, GUEST_LEVELS)
-    (struct vcpu *v, void *ep, mfn_t smfn);
+    (struct domain *d, void *ep, mfn_t smfn);
 
 extern int
 SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, GUEST_LEVELS)

@@ -4347,11 +4347,9 @@ int sh_rm_mappings_from_l1(struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn)
 /**************************************************************************/
 /* Functions to excise all pointers to shadows from higher-level shadows. */
 
-void sh_clear_shadow_entry(struct vcpu *v, void *ep, mfn_t smfn)
+void sh_clear_shadow_entry(struct domain *d, void *ep, mfn_t smfn)
 /* Blank out a single shadow entry */
 {
-    struct domain *d = v->domain;
-
     switch ( mfn_to_page(smfn)->u.sh.type )
     {
     case SH_type_l1_shadow:

@@ -2466,11 +2466,10 @@ static int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
 /**************************************************************************/
 /* Remove all shadows of a guest frame from the shadow tables */
 
-static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
+static int sh_remove_shadow_via_pointer(struct domain *d, mfn_t smfn)
 /* Follow this shadow's up-pointer, if it has one, and remove the reference
  * found there.  Returns 1 if that was the only reference to this shadow */
 {
-    struct domain *d = v->domain;
     struct page_info *sp = mfn_to_page(smfn);
     mfn_t pmfn;
     void *vaddr;
@@ -2496,19 +2495,19 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
     {
     case SH_type_l1_32_shadow:
     case SH_type_l2_32_shadow:
-        SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, 2)(v, vaddr, pmfn);
+        SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, 2)(d, vaddr, pmfn);
         break;
     case SH_type_l1_pae_shadow:
     case SH_type_l2_pae_shadow:
     case SH_type_l2h_pae_shadow:
-        SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, 3)(v, vaddr, pmfn);
+        SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, 3)(d, vaddr, pmfn);
         break;
     case SH_type_l1_64_shadow:
     case SH_type_l2_64_shadow:
     case SH_type_l2h_64_shadow:
     case SH_type_l3_64_shadow:
     case SH_type_l4_64_shadow:
-        SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, 4)(v, vaddr, pmfn);
+        SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, 4)(d, vaddr, pmfn);
         break;
     default: BUG(); /* Some wierd unknown shadow type */
     }
@@ -2618,7 +2617,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     if ( sh_type_is_pinnable(d, t) )                                    \
         sh_unpin(d, smfn);                                              \
     else if ( sh_type_has_up_pointer(d, t) )                            \
-        sh_remove_shadow_via_pointer(v, smfn);                          \
+        sh_remove_shadow_via_pointer(d, smfn);                          \
     if( !fast                                                           \
         && (pg->count_info & PGC_page_table)                            \
         && (pg->shadow_flags & (1 << t)) )                              \
