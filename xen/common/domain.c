@@ -415,6 +415,10 @@ void domain_update_node_affinity(struct domain *d)
     struct vcpu *v;
     unsigned int cpu;
 
+    /* Do we have vcpus already? If not, no need to update node-affinity. */
+    if ( !d->vcpu || !d->vcpu[0] )
+        return;
+
     if ( !zalloc_cpumask_var(&dom_cpumask) )
         return;
     if ( !zalloc_cpumask_var(&dom_cpumask_soft) )
