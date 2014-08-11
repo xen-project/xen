@@ -1305,7 +1305,7 @@ static void _shadow_prealloc(
 
         /* Unpin this top-level shadow */
         trace_shadow_prealloc_unpin(d, smfn);
-        sh_unpin(v, smfn);
+        sh_unpin(d, smfn);
 
         /* See if that freed up enough space */
         if ( d->arch.paging.shadow.free_pages >= pages ) return;
@@ -1370,7 +1370,7 @@ static void shadow_blow_tables(struct domain *d)
     foreach_pinned_shadow(d, sp, t)
     {
         smfn = page_to_mfn(sp);
-        sh_unpin(v, smfn);
+        sh_unpin(d, smfn);
     }
 
     /* Second pass: unhook entries of in-use shadows */
@@ -2616,7 +2616,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
         break;                                                          \
     }                                                                   \
     if ( sh_type_is_pinnable(d, t) )                                    \
-        sh_unpin(v, smfn);                                              \
+        sh_unpin(d, smfn);                                              \
     else if ( sh_type_has_up_pointer(d, t) )                            \
         sh_remove_shadow_via_pointer(v, smfn);                          \
     if( !fast                                                           \

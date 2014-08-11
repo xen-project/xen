@@ -538,9 +538,8 @@ void sh_destroy_shadow(struct domain *d, mfn_t smfn);
  * and the physical address of the shadow entry that holds the ref (or zero
  * if the ref is held by something else).
  * Returns 0 for failure, 1 for success. */
-static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
+static inline int sh_get_ref(struct domain *d, mfn_t smfn, paddr_t entry_pa)
 {
-    struct domain *d = v->domain;
     u32 x, nx;
     struct page_info *sp = mfn_to_page(smfn);
 
@@ -645,9 +644,8 @@ prev_pinned_shadow(const struct page_info *page,
 /* Pin a shadow page: take an extra refcount, set the pin bit,
  * and put the shadow at the head of the list of pinned shadows.
  * Returns 0 for failure, 1 for success. */
-static inline int sh_pin(struct vcpu *v, mfn_t smfn)
+static inline int sh_pin(struct domain *d, mfn_t smfn)
 {
-    struct domain *d = v->domain;
     struct page_info *sp[4];
     struct page_list_head *pin_list;
     unsigned int i, pages;
@@ -681,7 +679,7 @@ static inline int sh_pin(struct vcpu *v, mfn_t smfn)
     else
     {
         /* Not pinned: pin it! */
-        if ( !sh_get_ref(v, smfn, 0) )
+        if ( !sh_get_ref(d, smfn, 0) )
             return 0;
         sp[0]->u.sh.pinned = 1;
     }
@@ -695,9 +693,8 @@ static inline int sh_pin(struct vcpu *v, mfn_t smfn)
 
 /* Unpin a shadow page: unset the pin bit, take the shadow off the list
  * of pinned shadows, and release the extra ref. */
-static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
+static inline void sh_unpin(struct domain *d, mfn_t smfn)
 {
-    struct domain *d = v->domain;
     struct page_list_head tmp_list, *pin_list;
     struct page_info *sp, *next;
     unsigned int i, head_type;
