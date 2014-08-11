@@ -4373,10 +4373,9 @@ void sh_clear_shadow_entry(struct domain *d, void *ep, mfn_t smfn)
     }
 }
 
-int sh_remove_l1_shadow(struct vcpu *v, mfn_t sl2mfn, mfn_t sl1mfn)
+int sh_remove_l1_shadow(struct domain *d, mfn_t sl2mfn, mfn_t sl1mfn)
 /* Remove all mappings of this l1 shadow from this l2 shadow */
 {
-    struct domain *d = v->domain;
     shadow_l2e_t *sl2e;
     int done = 0;
     int flags;
@@ -4397,10 +4396,9 @@ int sh_remove_l1_shadow(struct vcpu *v, mfn_t sl2mfn, mfn_t sl1mfn)
 }
 
 #if GUEST_PAGING_LEVELS >= 4
-int sh_remove_l2_shadow(struct vcpu *v, mfn_t sl3mfn, mfn_t sl2mfn)
+int sh_remove_l2_shadow(struct domain *d, mfn_t sl3mfn, mfn_t sl2mfn)
 /* Remove all mappings of this l2 shadow from this l3 shadow */
 {
-    struct domain *d = v->domain;
     shadow_l3e_t *sl3e;
     int done = 0;
     int flags;
@@ -4420,10 +4418,9 @@ int sh_remove_l2_shadow(struct vcpu *v, mfn_t sl3mfn, mfn_t sl2mfn)
     return done;
 }
 
-int sh_remove_l3_shadow(struct vcpu *v, mfn_t sl4mfn, mfn_t sl3mfn)
+int sh_remove_l3_shadow(struct domain *d, mfn_t sl4mfn, mfn_t sl3mfn)
 /* Remove all mappings of this l3 shadow from this l4 shadow */
 {
-    struct domain *d = v->domain;
     shadow_l4e_t *sl4e;
     int done = 0;
     int flags;

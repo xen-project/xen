@@ -1998,6 +1998,7 @@ void shadow_hash_delete(struct domain *d, unsigned long n, unsigned int t,
 }
 
 typedef int (*hash_vcpu_callback_t)(struct vcpu *v, mfn_t smfn, mfn_t other_mfn);
+typedef int (*hash_domain_callback_t)(struct domain *d, mfn_t smfn, mfn_t other_mfn);
 
 static void hash_vcpu_foreach(struct vcpu *v, unsigned int callback_mask,
                               const hash_vcpu_callback_t callbacks[],
@@ -2037,6 +2038,53 @@ static void hash_vcpu_foreach(struct vcpu *v, unsigned int callback_mask,
                 ASSERT(x->u.sh.type <= 15);
                 ASSERT(callbacks[x->u.sh.type] != NULL);
                 done = callbacks[x->u.sh.type](v, page_to_mfn(x),
+                                               callback_mfn);
+                if ( done ) break;
+            }
+        }
+        if ( done ) break;
+    }
+    d->arch.paging.shadow.hash_walking = 0;
+}
+
+static void hash_domain_foreach(struct domain *d,
+                                unsigned int callback_mask,
+                                const hash_domain_callback_t callbacks[],
+                                mfn_t callback_mfn)
+/* Walk the hash table looking at the types of the entries and
+ * calling the appropriate callback function for each entry.
+ * The mask determines which shadow types we call back for, and the array
+ * of callbacks tells us which function to call.
+ * Any callback may return non-zero to let us skip the rest of the scan.
+ *
+ * WARNING: Callbacks MUST NOT add or remove hash entries unless they
+ * then return non-zero to terminate the scan. */
+{
+    int i, done = 0;
+    struct page_info *x;
+
+    ASSERT(paging_locked_by_me(d));
+
+    /* Can be called via p2m code &c after shadow teardown. */
+    if ( unlikely(!d->arch.paging.shadow.hash_table) )
+        return;
+
+    /* Say we're here, to stop hash-lookups reordering the chains */
+    ASSERT(d->arch.paging.shadow.hash_walking == 0);
+    d->arch.paging.shadow.hash_walking = 1;
+
+    for ( i = 0; i < SHADOW_HASH_BUCKETS; i++ )
+    {
+        /* WARNING: This is not safe against changes to the hash table.
+         * The callback *must* return non-zero if it has inserted or
+         * deleted anything from the hash (lookups are OK, though). */
+        for ( x = d->arch.paging.shadow.hash_table[i]; x; x = next_shadow(x) )
+        {
+            if ( callback_mask & (1 << x->u.sh.type) )
+            {
+                ASSERT(x->u.sh.type <= 15);
+                ASSERT(callbacks[x->u.sh.type] != NULL);
+                done = callbacks[x->u.sh.type](d, page_to_mfn(x),
                                                callback_mfn);
                 if ( done ) break;
             }
@@ -2537,7 +2585,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
 
     /* Dispatch table for getting per-type functions: each level must
      * be called with the function to remove a lower-level shadow. */
-    static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
+    static const hash_domain_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         NULL, /* l1_32   */
         NULL, /* fl1_32  */
@@ -2621,7 +2669,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     if( !fast                                                           \
         && (pg->count_info & PGC_page_table)                            \
         && (pg->shadow_flags & (1 << t)) )                              \
-        hash_vcpu_foreach(v, masks[t], callbacks, smfn);                \
+        hash_domain_foreach(d, masks[t], callbacks, smfn);              \
 } while (0)
 
     DO_UNSHADOW(SH_type_l2_32_shadow);

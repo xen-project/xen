@@ -73,13 +73,13 @@ SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, GUEST_LEVELS)
 
 extern int
 SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl2mfn, mfn_t sl1mfn);
+    (struct domain *d, mfn_t sl2mfn, mfn_t sl1mfn);
 extern int
 SHADOW_INTERNAL_NAME(sh_remove_l2_shadow, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl3mfn, mfn_t sl2mfn);
+    (struct domain *d, mfn_t sl3mfn, mfn_t sl2mfn);
 extern int
 SHADOW_INTERNAL_NAME(sh_remove_l3_shadow, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl4mfn, mfn_t sl3mfn);
+    (struct domain *d, mfn_t sl4mfn, mfn_t sl3mfn);
 
 #if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES
 int
