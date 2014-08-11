@@ -81,7 +81,6 @@ int hap_track_dirty_vram(struct domain *d,
 
         if ( !paging_mode_log_dirty(d) )
         {
-            hap_logdirty_init(d);
             rc = paging_log_dirty_enable(d, 0);
             if ( rc )
                 goto out;
@@ -217,15 +216,6 @@ static void hap_clean_dirty_bitmap(struct domain *d)
     /* set l1e entries of P2M table to be read-only. */
     p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
     flush_tlb_mask(d->domain_dirty_cpumask);
-}
-
-void hap_logdirty_init(struct domain *d)
-{
-
-    /* Reinitialize logdirty mechanism */
-    paging_log_dirty_init(d, hap_enable_log_dirty,
-                          hap_disable_log_dirty,
-                          hap_clean_dirty_bitmap);
 }
 
 /************************************************/
@@ -438,6 +428,11 @@ static void hap_destroy_monitor_table(struct vcpu* v, mfn_t mmfn)
 void hap_domain_init(struct domain *d)
 {
     INIT_PAGE_LIST_HEAD(&d->arch.paging.hap.freelist);
+
+    /* Use HAP logdirty mechanism. */
+    paging_log_dirty_init(d, hap_enable_log_dirty,
+                          hap_disable_log_dirty,
+                          hap_clean_dirty_bitmap);
 }
 
 /* return 0 for success, -errno for failure */
