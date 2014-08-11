@@ -1360,7 +1360,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
                     break;
                 /* fall through */
             default:
-                PrintErr(L"Current graphics mode is unsupported!");
+                PrintErr(L"Current graphics mode is unsupported!\r\n");
                 status = EFI_UNSUPPORTED;
                 break;
             }
