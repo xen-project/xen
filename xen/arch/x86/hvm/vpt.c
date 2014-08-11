@@ -512,10 +512,10 @@ void pt_adjust_global_vcpu_target(struct vcpu *v)
     pt_adjust_vcpu(&pl_time->vrtc.pt, v);
     spin_unlock(&pl_time->vrtc.lock);
 
-    spin_lock(&pl_time->vhpet.lock);
+    write_lock(&pl_time->vhpet.lock);
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
         pt_adjust_vcpu(&pl_time->vhpet.pt[i], v);
-    spin_unlock(&pl_time->vhpet.lock);
+    write_unlock(&pl_time->vhpet.lock);
 }
 
 

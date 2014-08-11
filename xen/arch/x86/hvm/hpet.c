@@ -77,7 +77,7 @@
 
 static inline uint64_t hpet_read_maincounter(HPETState *h, uint64_t guest_time)
 {
-    ASSERT(spin_is_locked(&h->lock));
+    ASSERT(rw_is_locked(&h->lock));
 
     if ( hpet_enabled(h) )
         return guest_time + h->mc_offset;
@@ -90,6 +90,8 @@ static uint64_t hpet_get_comparator(HPETState *h, unsigned int tn,
 {
     uint64_t comparator;
     uint64_t elapsed;
+
+    ASSERT(rw_is_write_locked(&h->lock));
 
     comparator = h->hpet.comparator64[tn];
     if ( hpet_enabled(h) && timer_is_periodic(h, tn) )
@@ -179,15 +181,23 @@ static int hpet_read(
         goto out;
     }
 
-    spin_lock(&h->lock);
+    result = addr < HPET_Tn_CMP(0) ||
+             ((addr - HPET_Tn_CMP(0)) % (HPET_Tn_CMP(1) - HPET_Tn_CMP(0))) > 7;
+    if ( result )
+        read_lock(&h->lock);
+    else
+        write_lock(&h->lock);
 
     val = hpet_read64(h, addr, guest_time_hpet(h));
+
+    if ( result )
+        read_unlock(&h->lock);
+    else
+        write_unlock(&h->lock);
 
     result = val;
     if ( length != 8 )
         result = (val >> ((addr & 7) * 8)) & ((1ULL << (length * 8)) - 1);
-
-    spin_unlock(&h->lock);
 
  out:
     *pval = result;
@@ -198,7 +208,7 @@ static void hpet_stop_timer(HPETState *h, unsigned int tn,
                             uint64_t guest_time)
 {
     ASSERT(tn < HPET_TIMER_NUM);
-    ASSERT(spin_is_locked(&h->lock));
+    ASSERT(rw_is_write_locked(&h->lock));
     TRACE_1D(TRC_HVM_EMUL_HPET_STOP_TIMER, tn);
     destroy_periodic_time(&h->pt[tn]);
     /* read the comparator to get it updated so a read while stopped will
@@ -218,7 +228,7 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
     unsigned int oneshot;
 
     ASSERT(tn < HPET_TIMER_NUM);
-    ASSERT(spin_is_locked(&h->lock));
+    ASSERT(rw_is_write_locked(&h->lock));
 
     if ( (tn == 0) && (h->hpet.config & HPET_CFG_LEGACY) )
     {
@@ -304,7 +314,7 @@ static int hpet_write(
     if ( hpet_check_access_length(addr, length) != 0 )
         goto out;
 
-    spin_lock(&h->lock);
+    write_lock(&h->lock);
 
     guest_time = guest_time_hpet(h);
     old_val = hpet_read64(h, addr, guest_time);
@@ -473,7 +483,7 @@ static int hpet_write(
 #undef set_start_timer
 #undef set_restart_timer
 
-    spin_unlock(&h->lock);
+    write_unlock(&h->lock);
 
  out:
     return X86EMUL_OKAY;
@@ -499,7 +509,7 @@ static int hpet_save(struct domain *d, hvm_domain_context_t *h)
     int rc;
     uint64_t guest_time;
 
-    spin_lock(&hp->lock);
+    write_lock(&hp->lock);
     guest_time = guest_time_hpet(hp);
 
     /* Write the proper value into the main counter */
@@ -545,7 +555,7 @@ static int hpet_save(struct domain *d, hvm_domain_context_t *h)
         rec->timers[2].cmp = hp->hpet.comparator64[2];
     }
 
-    spin_unlock(&hp->lock);
+    write_unlock(&hp->lock);
 
     return rc;
 }
@@ -558,12 +568,12 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
     uint64_t guest_time;
     int i;
 
-    spin_lock(&hp->lock);
+    write_lock(&hp->lock);
 
     /* Reload the HPET registers */
     if ( _hvm_check_entry(h, HVM_SAVE_CODE(HPET), HVM_SAVE_LENGTH(HPET), 1) )
     {
-        spin_unlock(&hp->lock);
+        write_unlock(&hp->lock);
         return -EINVAL;
     }
 
@@ -604,7 +614,7 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
             if ( timer_enabled(hp, i) )
                 hpet_set_timer(hp, i, guest_time);
 
-    spin_unlock(&hp->lock);
+    write_unlock(&hp->lock);
 
     return 0;
 }
@@ -618,7 +628,7 @@ void hpet_init(struct domain *d)
 
     memset(h, 0, sizeof(HPETState));
 
-    spin_lock_init(&h->lock);
+    rwlock_init(&h->lock);
 
     h->stime_freq = S_TO_NS;
 
@@ -648,7 +658,7 @@ void hpet_deinit(struct domain *d)
     int i;
     HPETState *h = domain_vhpet(d);
 
-    spin_lock(&h->lock);
+    write_lock(&h->lock);
 
     if ( hpet_enabled(h) )
     {
@@ -659,7 +669,7 @@ void hpet_deinit(struct domain *d)
                 hpet_stop_timer(h, i, guest_time);
     }
 
-    spin_unlock(&h->lock);
+    write_unlock(&h->lock);
 }
 
 void hpet_reset(struct domain *d)
