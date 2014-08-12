@@ -286,7 +286,7 @@ static void cpsr_switch_mode(struct cpu_user_regs *regs, int mode)
         regs->cpsr |= PSR_BIG_ENDIAN;
 }
 
-static vaddr_t exception_handler(vaddr_t offset)
+static vaddr_t exception_handler32(vaddr_t offset)
 {
     uint32_t sctlr = READ_SYSREG32(SCTLR_EL1);
 
@@ -318,7 +318,7 @@ static void inject_undef32_exception(struct cpu_user_regs *regs)
     regs->lr_und = regs->pc32 + return_offset;
 
     /* Branch to exception vector */
-    regs->pc32 = exception_handler(VECTOR32_UND);
+    regs->pc32 = exception_handler32(VECTOR32_UND);
 }
 
 /* Injects an Abort exception into the current vcpu, PC is the exact
@@ -344,7 +344,7 @@ static void inject_abt32_exception(struct cpu_user_regs *regs,
     regs->spsr_abt = spsr;
     regs->lr_abt = regs->pc32 + return_offset;
 
-    regs->pc32 = exception_handler(prefetch ? VECTOR32_PABT : VECTOR32_DABT);
+    regs->pc32 = exception_handler32(prefetch ? VECTOR32_PABT : VECTOR32_DABT);
 
     /* Inject a debug fault, best we can do right now */
     if ( READ_SYSREG(TCR_EL1) & TTBCR_EAE )
@@ -397,9 +397,28 @@ static void inject_pabt32_exception(struct cpu_user_regs *regs,
 }
 
 #ifdef CONFIG_ARM_64
+/*
+ * Take care to call this while regs contains the original faulting
+ * state and not the (partially constructed) exception state.
+ */
+static vaddr_t exception_handler64(struct cpu_user_regs *regs, vaddr_t offset)
+{
+    vaddr_t base = READ_SYSREG(VBAR_EL1);
+
+    if ( usr_mode(regs) )
+        base += VECTOR64_LOWER32_BASE;
+    else if ( psr_mode(regs->cpsr,PSR_MODE_EL0t) )
+        base += VECTOR64_LOWER64_BASE;
+    else /* Otherwise must be from kernel mode */
+        base += VECTOR64_CURRENT_SPx_BASE;
+
+    return base + offset;
+}
+
 /* Inject an undefined exception into a 64 bit guest */
 static void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len)
 {
+    vaddr_t handler;
     union hsr esr = {
         .iss = 0,
         .len = instr_len,
@@ -408,12 +427,14 @@ static void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len)
 
     BUG_ON( is_pv32_domain(current->domain) );
 
+    handler = exception_handler64(regs, VECTOR64_SYNC_OFFSET);
+
     regs->spsr_el1 = regs->cpsr;
     regs->elr_el1 = regs->pc;
 
     regs->cpsr = PSR_MODE_EL1h | PSR_ABT_MASK | PSR_FIQ_MASK | \
         PSR_IRQ_MASK | PSR_DBG_MASK;
-    regs->pc = READ_SYSREG(VBAR_EL1) + VECTOR64_CURRENT_SPx_SYNC;
+    regs->pc = handler;
 
     WRITE_SYSREG32(esr.bits, ESR_EL1);
 }
@@ -424,6 +445,7 @@ static void inject_abt64_exception(struct cpu_user_regs *regs,
                                    register_t addr,
                                    int instr_len)
 {
+    vaddr_t handler;
     union hsr esr = {
         .iss = 0,
         .len = instr_len,
@@ -445,12 +467,14 @@ static void inject_abt64_exception(struct cpu_user_regs *regs,
 
     BUG_ON( is_pv32_domain(current->domain) );
 
+    handler = exception_handler64(regs, VECTOR64_SYNC_OFFSET);
+
     regs->spsr_el1 = regs->cpsr;
     regs->elr_el1 = regs->pc;
 
     regs->cpsr = PSR_MODE_EL1h | PSR_ABT_MASK | PSR_FIQ_MASK | \
         PSR_IRQ_MASK | PSR_DBG_MASK;
-    regs->pc = READ_SYSREG(VBAR_EL1) + VECTOR64_CURRENT_SPx_SYNC;
+    regs->pc = handler;
 
     WRITE_SYSREG(addr, FAR_EL1);
     WRITE_SYSREG32(esr.bits, ESR_EL1);
@@ -471,6 +495,17 @@ static void inject_iabt64_exception(struct cpu_user_regs *regs,
 }
 
 #endif
+
+static void inject_undef_exception(struct cpu_user_regs *regs,
+                                   int instr_len)
+{
+        if ( is_pv32_domain(current->domain) )
+            inject_undef32_exception(regs);
+#ifdef CONFIG_ARM_64
+        else
+            inject_undef64_exception(regs, instr_len);
+#endif
+}
 
 static void inject_iabt_exception(struct cpu_user_regs *regs,
                                   register_t addr,
@@ -1440,7 +1475,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
         gdprintk(XENLOG_ERR, "unhandled 32-bit CP15 access %#x\n",
                  hsr.bits & HSR_CP32_REGS_MASK);
 #endif
-        inject_undef32_exception(regs);
+        inject_undef_exception(regs, hsr.len);
         return;
     }
     advance_pc(regs, hsr);
@@ -1477,7 +1512,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
             gdprintk(XENLOG_ERR, "unhandled 64-bit CP15 access %#x\n",
                      hsr.bits & HSR_CP64_REGS_MASK);
 #endif
-            inject_undef32_exception(regs);
+            inject_undef_exception(regs, hsr.len);
             return;
         }
     }
@@ -1546,7 +1581,7 @@ bad_cp:
         gdprintk(XENLOG_ERR, "unhandled 32-bit cp14 access %#x\n",
                  hsr.bits & HSR_CP32_REGS_MASK);
 #endif
-        inject_undef32_exception(regs);
+        inject_undef_exception(regs, hsr.len);
         return;
     }
 
@@ -1561,7 +1596,7 @@ static void do_cp14_dbg(struct cpu_user_regs *regs, union hsr hsr)
         return;
     }
 
-    inject_undef32_exception(regs);
+    inject_undef_exception(regs, hsr.len);
 }
 
 static void do_cp(struct cpu_user_regs *regs, union hsr hsr)
@@ -1572,7 +1607,7 @@ static void do_cp(struct cpu_user_regs *regs, union hsr hsr)
         return;
     }
 
-    inject_undef32_exception(regs);
+    inject_undef_exception(regs, hsr.len);
 }
 
 #ifdef CONFIG_ARM_64
@@ -1647,7 +1682,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
             gdprintk(XENLOG_ERR, "unhandled 64-bit sysreg access %#x\n",
                      hsr.bits & HSR_SYSREG_REGS_MASK);
 #endif
-            inject_undef64_exception(regs, sysreg.len);
+            inject_undef_exception(regs, sysreg.len);
         }
     }
 
