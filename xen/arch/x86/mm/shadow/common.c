@@ -3706,8 +3706,7 @@ int shadow_domctl(struct domain *d,
         paging_unlock(d);
         if ( preempted )
             /* Not finished.  Set up to re-run the call. */
-            rc = hypercall_create_continuation(
-                __HYPERVISOR_domctl, "h", u_domctl);
+            rc = -EAGAIN;
         else 
             /* Finished.  Return the new allocation */
             sc->mb = shadow_get_allocation(d);

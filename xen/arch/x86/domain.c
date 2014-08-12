@@ -1915,7 +1915,9 @@ int domain_relinquish_resources(struct domain *d)
         pci_release_devices(d);
 
         /* Tear down paging-assistance stuff. */
-        paging_teardown(d);
+        ret = paging_teardown(d);
+        if ( ret )
+            return ret;
 
         /* Drop the in-use references to page-table bases. */
         for_each_vcpu ( d, v )
