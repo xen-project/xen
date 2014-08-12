@@ -1683,6 +1683,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
                      hsr.bits & HSR_SYSREG_REGS_MASK);
 #endif
             inject_undef_exception(regs, sysreg.len);
+            return;
         }
     }
 
