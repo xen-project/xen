@@ -1812,6 +1812,17 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
 {
     union hsr hsr = { .bits = READ_SYSREG32(ESR_EL2) };
 
+    /*
+     * We currently do not handle 32-bit userspace on 64-bit kernels
+     * correctly (See XSA-102). Until that is resolved we treat any
+     * trap from 32-bit userspace on 64-bit kernel as undefined.
+     */
+    if ( is_pv64_domain(current->domain) && psr_mode_is_32bit(regs->cpsr) )
+    {
+        inject_undef_exception(regs, hsr.len);
+        return;
+    }
+
     switch (hsr.ec) {
     case HSR_EC_WFI_WFE:
         if ( !check_conditional_instr(regs, hsr) )
