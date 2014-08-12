@@ -234,14 +234,15 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 			paddr_bits = cpuid_eax(0x80000008) & 0xff;
 	}
 
+	/* Might lift BIOS max_leaf=3 limit. */
+	early_intel_workaround(c);
+
 	/* Intel-defined flags: level 0x00000007 */
 	if ( c->cpuid_level >= 0x00000007 ) {
 		u32 dummy;
 		cpuid_count(0x00000007, 0, &dummy, &ebx, &dummy, &dummy);
 		c->x86_capability[X86_FEATURE_FSGSBASE / 32] = ebx;
 	}
-
-	early_intel_workaround(c);
 
 #ifdef CONFIG_X86_HT
 	c->phys_proc_id = (cpuid_ebx(1) >> 24) & 0xff;
