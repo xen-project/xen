@@ -697,7 +697,17 @@ static void _show_registers(struct cpu_user_regs *regs,
             show_registers_32(regs, ctxt, guest_mode, v);
 #ifdef CONFIG_ARM_64
         else if ( is_pv64_domain(v->domain) )
-            show_registers_64(regs, ctxt, guest_mode, v);
+        {
+            if ( psr_mode_is_32bit(regs->cpsr) )
+            {
+                BUG_ON(!usr_mode(regs));
+                show_registers_32(regs, ctxt, guest_mode, v);
+            }
+            else
+            {
+                show_registers_64(regs, ctxt, guest_mode, v);
+            }
+        }
 #endif
     }
     else
