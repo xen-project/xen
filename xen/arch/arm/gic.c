@@ -137,7 +137,8 @@ void gic_route_irq_to_guest(struct domain *d, struct irq_desc *desc,
 
     gic_set_irq_properties(desc, cpumask_of(smp_processor_id()), GIC_PRI_IRQ);
 
-    /* TODO: do not assume delivery to vcpu0 */
+    /* Use vcpu0 to retrieve the pending_irq struct. Given that we only
+     * route SPIs to guests, it doesn't make any difference. */
     p = irq_to_pending(d->vcpu[0], desc->irq);
     p->desc = desc;
 }

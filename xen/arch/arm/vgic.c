@@ -401,6 +401,17 @@ out:
         smp_send_event_check_mask(cpumask_of(v->processor));
 }
 
+void vgic_vcpu_inject_spi(struct domain *d, unsigned int irq)
+{
+    struct vcpu *v;
+
+    /* the IRQ needs to be an SPI */
+    ASSERT(irq >= 32 && irq <= gic_number_lines());
+
+    v = vgic_get_target_vcpu(d->vcpu[0], irq);
+    vgic_vcpu_inject_irq(v, irq);
+}
+
 /*
  * Local variables:
  * mode: C
