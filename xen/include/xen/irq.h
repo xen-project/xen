@@ -76,6 +76,11 @@ struct msi_desc;
  * This is the "IRQ descriptor", which contains various information
  * about the irq, including what kind of hardware handling it has,
  * whether it is disabled etc etc.
+ *
+ * Note: on ARMv8 we can use normal bit manipulation functions to access
+ * the status field because struct irq_desc contains pointers, therefore
+ * the alignment of the struct is at least 8 bytes and status is the
+ * first field.
  */
 typedef struct irq_desc {
     unsigned int status;        /* IRQ status */

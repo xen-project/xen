@@ -516,7 +516,7 @@ static void gicv2_irq_enable(struct irq_desc *desc)
     ASSERT(spin_is_locked(&desc->lock));
 
     spin_lock_irqsave(&gicv2.lock, flags);
-    desc->status &= ~IRQ_DISABLED;
+    clear_bit(_IRQ_DISABLED, &desc->status);
     dsb(sy);
     /* Enable routing */
     writel_gicd((1u << (irq % 32)), GICD_ISENABLER + (irq / 32) * 4);
@@ -533,7 +533,7 @@ static void gicv2_irq_disable(struct irq_desc *desc)
     spin_lock_irqsave(&gicv2.lock, flags);
     /* Disable routing */
     writel_gicd(1u << (irq % 32), GICD_ICENABLER + (irq / 32) * 4);
-    desc->status |= IRQ_DISABLED;
+    set_bit(_IRQ_DISABLED, &desc->status);
     spin_unlock_irqrestore(&gicv2.lock, flags);
 }
 

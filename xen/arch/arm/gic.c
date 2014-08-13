@@ -115,7 +115,7 @@ void gic_route_irq_to_xen(struct irq_desc *desc, const cpumask_t *cpu_mask,
 {
     ASSERT(priority <= 0xff);     /* Only 8 bits of priority */
     ASSERT(desc->irq < gic_number_lines());/* Can't route interrupts that don't exist */
-    ASSERT(desc->status & IRQ_DISABLED);
+    ASSERT(test_bit(_IRQ_DISABLED, &desc->status));
     ASSERT(spin_is_locked(&desc->lock));
 
     desc->handler = gic_hw_ops->gic_host_irq_type;
@@ -133,7 +133,7 @@ void gic_route_irq_to_guest(struct domain *d, struct irq_desc *desc,
     ASSERT(spin_is_locked(&desc->lock));
 
     desc->handler = gic_hw_ops->gic_guest_irq_type;
-    desc->status |= IRQ_GUEST;
+    set_bit(_IRQ_GUEST, &desc->status);
 
     gic_set_irq_properties(desc, cpumask_of(smp_processor_id()), GIC_PRI_IRQ);
 
@@ -369,7 +369,7 @@ static void gic_update_one_lr(struct vcpu *v, int i)
 
         if ( p->desc != NULL )
         {
-            p->desc->status &= ~IRQ_INPROGRESS;
+            clear_bit(_IRQ_INPROGRESS, &p->desc->status);
             if ( platform_has_quirk(PLATFORM_QUIRK_GUEST_PIRQ_NEED_EOI) )
                 gic_hw_ops->deactivate_irq(p->desc);
         }
