@@ -569,9 +569,20 @@ static void gicv2_guest_irq_end(struct irq_desc *desc)
     /* Deactivation happens in maintenance interrupt / via GICV */
 }
 
-static void gicv2_irq_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
+static void gicv2_irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_mask)
 {
-    BUG();
+    unsigned int mask;
+
+    ASSERT(!cpumask_empty(cpu_mask));
+
+    spin_lock(&gicv2.lock);
+
+    mask = gicv2_cpu_mask(cpu_mask);
+
+    /* Set target CPU mask (RAZ/WI on uniprocessor) */
+    writeb_gicd(mask, GICD_ITARGETSR + desc->irq);
+
+    spin_unlock(&gicv2.lock);
 }
 
 /* XXX different for level vs edge */

@@ -182,6 +182,7 @@ void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
 
     if ( list_empty(&p->inflight) )
     {
+        irq_set_affinity(p->desc, cpumask_of(new->processor));
         spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
         return;
     }
@@ -191,6 +192,7 @@ void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
         clear_bit(GIC_IRQ_GUEST_QUEUED, &p->status);
         list_del_init(&p->lr_queue);
         list_del_init(&p->inflight);
+        irq_set_affinity(p->desc, cpumask_of(new->processor));
         spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
         vgic_vcpu_inject_irq(new, irq);
         return;
@@ -201,6 +203,24 @@ void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
         set_bit(GIC_IRQ_GUEST_MIGRATING, &p->status);
 
     spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
+}
+
+void arch_move_irqs(struct vcpu *v)
+{
+    const cpumask_t *cpu_mask = cpumask_of(v->processor);
+    struct domain *d = v->domain;
+    struct pending_irq *p;
+    struct vcpu *v_target;
+    int i;
+
+    for ( i = 32; i < (d->arch.vgic.nr_lines + 32); i++ )
+    {
+        v_target = vgic_get_target_vcpu(v, i);
+        p = irq_to_pending(v_target, i);
+
+        if ( v_target == v && !test_bit(GIC_IRQ_GUEST_MIGRATING, &p->status) )
+            irq_set_affinity(p->desc, cpu_mask);
+    }
 }
 
 void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
@@ -260,6 +280,7 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
         }
         if ( p->desc != NULL )
         {
+            irq_set_affinity(p->desc, cpumask_of(v_target->processor));
             spin_lock_irqsave(&p->desc->lock, flags);
             p->desc->handler->enable(p->desc);
             spin_unlock_irqrestore(&p->desc->lock, flags);

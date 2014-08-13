@@ -197,4 +197,6 @@ void cleanup_domain_irq_mapping(struct domain *);
 
 bool_t cpu_has_pending_apic_eoi(void);
 
+static inline void arch_move_irqs(struct vcpu *v) { }
+
 #endif /* _ASM_HW_IRQ_H */

@@ -134,6 +134,12 @@ static inline struct domain *irq_get_domain(struct irq_desc *desc)
     return desc->action->dev_id;
 }
 
+void irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_mask)
+{
+    if ( desc != NULL )
+        desc->handler->set_affinity(desc, cpu_mask);
+}
+
 int request_irq(unsigned int irq, unsigned int irqflags,
                 void (*handler)(int, void *, struct cpu_user_regs *),
                 const char *devname, void *dev_id)
