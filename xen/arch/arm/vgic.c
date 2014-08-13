@@ -264,20 +264,10 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
         v_target = d->arch.vgic.handler->get_target_vcpu(v, irq);
         p = irq_to_pending(v_target, irq);
         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
-        /* We need to force the first injection of evtchn_irq because
-         * evtchn_upcall_pending is already set by common code on vcpu
-         * creation. */
-        if ( irq == v_target->domain->arch.evtchn_irq &&
-             vcpu_info(current, evtchn_upcall_pending) &&
-             list_empty(&p->inflight) )
-            vgic_vcpu_inject_irq(v_target, irq);
-        else {
-            unsigned long flags;
-            spin_lock_irqsave(&v_target->arch.vgic.lock, flags);
-            if ( !list_empty(&p->inflight) && !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
-                gic_raise_guest_irq(v_target, irq, p->priority);
-            spin_unlock_irqrestore(&v_target->arch.vgic.lock, flags);
-        }
+        spin_lock_irqsave(&v_target->arch.vgic.lock, flags);
+        if ( !list_empty(&p->inflight) && !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
+            gic_raise_guest_irq(v_target, irq, p->priority);
+        spin_unlock_irqrestore(&v_target->arch.vgic.lock, flags);
         if ( p->desc != NULL )
         {
             irq_set_affinity(p->desc, cpumask_of(v_target->processor));
@@ -431,6 +421,11 @@ void vgic_vcpu_inject_spi(struct domain *d, unsigned int irq)
 
     v = vgic_get_target_vcpu(d->vcpu[0], irq);
     vgic_vcpu_inject_irq(v, irq);
+}
+
+void arch_evtchn_inject(struct vcpu *v)
+{
+    vgic_vcpu_inject_irq(v, v->domain->arch.evtchn_irq);
 }
 
 /*

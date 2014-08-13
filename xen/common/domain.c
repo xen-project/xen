@@ -1102,6 +1102,7 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
     vcpu_info(v, evtchn_upcall_pending) = 1;
     for ( i = 0; i < BITS_PER_EVTCHN_WORD(d); i++ )
         set_bit(i, &vcpu_info(v, evtchn_pending_sel));
+    arch_evtchn_inject(v);
 
     return 0;
 }
