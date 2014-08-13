@@ -196,8 +196,25 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         int nr_set_cpus = 0;
         char *s;
 
-        if (b_info->u.hvm.serial) {
-            flexarray_vappend(dm_args, "-serial", b_info->u.hvm.serial, NULL);
+        if (b_info->u.hvm.serial || b_info->u.hvm.serial_list) {
+            if ( b_info->u.hvm.serial && b_info->u.hvm.serial_list )
+            {
+                LOG(ERROR, "Both serial and serial_list set");
+                return NULL;
+            }
+            if (b_info->u.hvm.serial) {
+                flexarray_vappend(dm_args,
+                                  "-serial", b_info->u.hvm.serial, NULL);
+            } else if (b_info->u.hvm.serial_list) {
+                char **p;
+                for (p = b_info->u.hvm.serial_list;
+                     *p;
+                     p++) {
+                    flexarray_vappend(dm_args,
+                                      "-serial",
+                                      *p, NULL);
+                }
+            }
         }
 
         if (libxl_defbool_val(b_info->u.hvm.nographic) && (!sdl && !vnc)) {
@@ -478,8 +495,25 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_nics = 0;
 
-        if (b_info->u.hvm.serial) {
-            flexarray_vappend(dm_args, "-serial", b_info->u.hvm.serial, NULL);
+        if (b_info->u.hvm.serial || b_info->u.hvm.serial_list) {
+            if ( b_info->u.hvm.serial && b_info->u.hvm.serial_list )
+            {
+                LOG(ERROR, "Both serial and serial_list set");
+                return NULL;
+            }
+            if (b_info->u.hvm.serial) {
+                flexarray_vappend(dm_args,
+                                  "-serial", b_info->u.hvm.serial, NULL);
+            } else if (b_info->u.hvm.serial_list) {
+                char **p;
+                for (p = b_info->u.hvm.serial_list;
+                     *p;
+                     p++) {
+                    flexarray_vappend(dm_args,
+                                      "-serial",
+                                      *p, NULL);
+                }
+            }
         }
 
         if (libxl_defbool_val(b_info->u.hvm.nographic) && (!sdl && !vnc)) {

@@ -578,6 +578,22 @@ typedef struct libxl__ctx libxl_ctx;
  */
 #define LIBXL_HAVE_CPUPOOL_NAME 1
 
+/*
+ * LIBXL_HAVE_BUILDINFO_SERIAL_LIST
+ *
+ * If this is defined, then the libxl_domain_build_info structure will
+ * contain hvm.serial_list, a libxl_string_list type that contains
+ * a list of serial ports to specify on the qemu command-line.
+ *
+ * If it is set, callers may use either hvm.serial or
+ * hvm.serial_list, but not both; if both are set, libxl will
+ * throw an error.
+ *
+ * If this is not defined, callers can only use hvm.serial.  Note
+ * that this means only one serial port can be added at domain build time.
+ */
+#define LIBXL_HAVE_BUILDINFO_SERIAL_LIST 1
+
 typedef uint8_t libxl_mac[6];
 #define LIBXL_MAC_FMT "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx"
 #define LIBXL_MAC_FMTLEN ((2*6)+5) /* 6 hex bytes plus 5 colons */
