@@ -321,13 +321,6 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
 
-    if ( !list_empty(&n->inflight) )
-    {
-        set_bit(GIC_IRQ_GUEST_QUEUED, &n->status);
-        gic_raise_inflight_irq(v, irq);
-        goto out;
-    }
-
     /* vcpu offline */
     if ( test_bit(_VPF_down, &v->pause_flags) )
     {
@@ -335,10 +328,17 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
         return;
     }
 
+    set_bit(GIC_IRQ_GUEST_QUEUED, &n->status);
+
+    if ( !list_empty(&n->inflight) )
+    {
+        gic_raise_inflight_irq(v, irq);
+        goto out;
+    }
+
     priority = vgic_byte_read(rank->ipriority[REG_RANK_INDEX(8, irq, DABT_WORD)], 0, irq & 0x3);
 
     n->irq = irq;
-    set_bit(GIC_IRQ_GUEST_QUEUED, &n->status);
     n->priority = priority;
 
     /* the irq is enabled */
