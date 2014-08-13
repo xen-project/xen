@@ -320,6 +320,7 @@ int xc_lockprof_query_number(xc_interface *xch,
     DECLARE_SYSCTL;
 
     sysctl.cmd = XEN_SYSCTL_lockprof_op;
+    sysctl.u.lockprof_op.max_elem = 0;
     sysctl.u.lockprof_op.cmd = XEN_SYSCTL_LOCKPROF_query;
     set_xen_guest_handle(sysctl.u.lockprof_op.data, HYPERCALL_BUFFER_NULL);
 
