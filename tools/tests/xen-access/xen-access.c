@@ -566,13 +566,16 @@ int main(int argc, char *argv[])
                 }
 
                 printf("PAGE ACCESS: %c%c%c for GFN %"PRIx64" (offset %06"
-                       PRIx64") gla %016"PRIx64" (vcpu %d)\n",
+                       PRIx64") gla %016"PRIx64" (valid: %c; fault in gpt: %c; fault with gla: %c) (vcpu %u)\n",
                        req.access_r ? 'r' : '-',
                        req.access_w ? 'w' : '-',
                        req.access_x ? 'x' : '-',
                        req.gfn,
                        req.offset,
                        req.gla,
+                       req.gla_valid ? 'y' : 'n',
+                       req.fault_in_gpt ? 'y' : 'n',
+                       req.fault_with_gla ? 'y': 'n',
                        req.vcpu_id);
 
                 if ( default_access != after_first_access )
