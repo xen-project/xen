@@ -39,6 +39,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
     register_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
+    unsigned long flags;
 
     switch ( gicd_reg )
     {
@@ -77,54 +78,54 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ISENABLER, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         *r = rank->ienable;
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ICENABLER ... GICD_ICENABLERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ICENABLER, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         *r = rank->ienable;
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ISPENDR ... GICD_ISPENDRN:
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ISPENDR, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         *r = vgic_byte_read(rank->ipend, dabt.sign, gicd_reg);
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ICPENDR ... GICD_ICPENDRN:
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ICPENDR, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         *r = vgic_byte_read(rank->ipend, dabt.sign, gicd_reg);
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ISACTIVER ... GICD_ISACTIVERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ISACTIVER, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         *r = rank->iactive;
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ICACTIVER ... GICD_ICACTIVERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ICACTIVER, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         *r = rank->iactive;
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ITARGETSR ... GICD_ITARGETSRN:
@@ -132,12 +133,12 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         rank = vgic_rank_offset(v, 8, gicd_reg - GICD_ITARGETSR, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
 
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         *r = rank->itargets[REG_RANK_INDEX(8, gicd_reg - GICD_ITARGETSR,
                                            DABT_WORD)];
         if ( dabt.size == DABT_BYTE )
             *r = vgic_byte_read(*r, dabt.sign, gicd_reg);
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_IPRIORITYR ... GICD_IPRIORITYRN:
@@ -145,21 +146,21 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         rank = vgic_rank_offset(v, 8, gicd_reg - GICD_IPRIORITYR, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
 
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         *r = rank->ipriority[REG_RANK_INDEX(8, gicd_reg - GICD_IPRIORITYR,
                                             DABT_WORD)];
         if ( dabt.size == DABT_BYTE )
             *r = vgic_byte_read(*r, dabt.sign, gicd_reg);
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ICFGR ... GICD_ICFGRN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 2, gicd_reg - GICD_ICFGR, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         *r = rank->icfg[REG_RANK_INDEX(2, gicd_reg - GICD_ICFGR, DABT_WORD)];
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_NSACR ... GICD_NSACRN:
@@ -176,18 +177,18 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_CPENDSGIR, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         *r = vgic_byte_read(rank->pendsgi, dabt.sign, gicd_reg);
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_SPENDSGIR ... GICD_SPENDSGIRN:
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_SPENDSGIR, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         *r = vgic_byte_read(rank->pendsgi, dabt.sign, gicd_reg);
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     /* Implementation defined -- read as zero */
@@ -269,6 +270,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     struct vgic_irq_rank *rank;
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
     uint32_t tr;
+    unsigned long flags;
 
     switch ( gicd_reg )
     {
@@ -295,7 +297,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ISENABLER, DABT_WORD);
         if ( rank == NULL) goto write_ignore;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
         rank->ienable |= *r;
         /* The virtual irq is derived from register offset.
@@ -303,14 +305,14 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
          * to get Virtual irq number */
         vgic_enable_irqs(v, (*r) & (~tr),
                          (gicd_reg - GICD_ISENABLER) >> DABT_WORD);
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ICENABLER ... GICD_ICENABLERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ICENABLER, DABT_WORD);
         if ( rank == NULL) goto write_ignore;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
         rank->ienable &= ~*r;
         /* The virtual irq is derived from register offset.
@@ -318,7 +320,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
          * to get  Virtual irq number */
         vgic_disable_irqs(v, (*r) & tr,
                          (gicd_reg - GICD_ICENABLER) >> DABT_WORD);
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ISPENDR ... GICD_ISPENDRN:
@@ -337,18 +339,18 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ISACTIVER, DABT_WORD);
         if ( rank == NULL) goto write_ignore;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         rank->iactive &= ~*r;
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ICACTIVER ... GICD_ICACTIVERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ICACTIVER, DABT_WORD);
         if ( rank == NULL) goto write_ignore;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         rank->iactive &= ~*r;
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ITARGETSR ... GICD_ITARGETSR + 7:
@@ -379,7 +381,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
             !((target & 0xff) && (target & (0xff << 8)) &&
              (target & (0xff << 16)) && (target & (0xff << 24))))
             goto write_ignore;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         i = 0;
         while ( (i = find_next_bit(&target, 32, i)) < 32 )
         {
@@ -407,7 +409,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         else
             vgic_byte_write(&rank->itargets[REG_RANK_INDEX(8,
                        gicd_reg - GICD_ITARGETSR, DABT_WORD)], target, gicd_reg);
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
     }
 
@@ -415,14 +417,14 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 8, gicd_reg - GICD_IPRIORITYR, DABT_WORD);
         if ( rank == NULL) goto write_ignore;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         if ( dabt.size == DABT_WORD )
             rank->ipriority[REG_RANK_INDEX(8, gicd_reg - GICD_IPRIORITYR,
                                            DABT_WORD)] = *r;
         else
             vgic_byte_write(&rank->ipriority[REG_RANK_INDEX(8,
                         gicd_reg - GICD_IPRIORITYR, DABT_WORD)], *r, gicd_reg);
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_ICFGR: /* SGIs */
@@ -434,9 +436,9 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 2, gicd_reg - GICD_ICFGR, DABT_WORD);
         if ( rank == NULL) goto write_ignore;
-        vgic_lock_rank(v, rank);
+        vgic_lock_rank(v, rank, flags);
         rank->icfg[REG_RANK_INDEX(2, gicd_reg - GICD_ICFGR, DABT_WORD)] = *r;
-        vgic_unlock_rank(v, rank);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
 
     case GICD_NSACR ... GICD_NSACRN:

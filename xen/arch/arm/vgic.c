@@ -158,10 +158,11 @@ struct vcpu *vgic_get_target_vcpu(struct vcpu *v, unsigned int irq)
     struct domain *d = v->domain;
     struct vcpu *v_target;
     struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
+    unsigned long flags;
 
-    vgic_lock_rank(v, rank);
+    vgic_lock_rank(v, rank, flags);
     v_target = d->arch.vgic.handler->get_target_vcpu(v, irq);
-    vgic_unlock_rank(v, rank);
+    vgic_unlock_rank(v, rank, flags);
     return v_target;
 }
 
@@ -368,6 +369,10 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
     unsigned long flags;
     bool_t running;
 
+    vgic_lock_rank(v, rank, flags);
+    priority = vgic_byte_read(rank->ipriority[REG_RANK_INDEX(8, irq, DABT_WORD)], 0, irq & 0x3);
+    vgic_unlock_rank(v, rank, flags);
+
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
 
     /* vcpu offline */
@@ -384,8 +389,6 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
         gic_raise_inflight_irq(v, irq);
         goto out;
     }
-
-    priority = vgic_byte_read(rank->ipriority[REG_RANK_INDEX(8, irq, DABT_WORD)], 0, irq & 0x3);
 
     n->irq = irq;
     n->priority = priority;

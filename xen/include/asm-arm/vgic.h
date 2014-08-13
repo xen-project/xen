@@ -107,8 +107,8 @@ struct vgic_ops {
 #define vgic_lock(v)   spin_lock_irq(&(v)->domain->arch.vgic.lock)
 #define vgic_unlock(v) spin_unlock_irq(&(v)->domain->arch.vgic.lock)
 
-#define vgic_lock_rank(v, r) spin_lock(&(r)->lock)
-#define vgic_unlock_rank(v, r) spin_unlock(&(r)->lock)
+#define vgic_lock_rank(v, r, flags)   spin_lock_irqsave(&(r)->lock, flags)
+#define vgic_unlock_rank(v, r, flags) spin_unlock_irqrestore(&(r)->lock, flags)
 
 /*
  * Rank containing GICD_<FOO><n> for GICD_<FOO> with
