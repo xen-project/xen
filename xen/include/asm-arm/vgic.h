@@ -91,6 +91,9 @@ struct vgic_ops {
     int (*vcpu_init)(struct vcpu *v);
     /* Domain specific initialization of vGIC */
     int (*domain_init)(struct domain *d);
+    /* Get the target vcpu for a given virq. The rank lock is already taken
+     * when calling this. */
+    struct vcpu *(*get_target_vcpu)(struct vcpu *v, unsigned int irq);
 };
 
 /* Number of ranks of interrupt registers for a domain */
@@ -151,10 +154,12 @@ enum gic_sgi_mode;
 extern int domain_vgic_init(struct domain *d);
 extern void domain_vgic_free(struct domain *d);
 extern int vcpu_vgic_init(struct vcpu *v);
+extern struct vcpu *vgic_get_target_vcpu(struct vcpu *v, unsigned int irq);
 extern void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq);
 extern void vgic_clear_pending_irqs(struct vcpu *v);
 extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 extern struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n, int s);
+extern struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq);
 extern void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n);
 extern void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n);
 extern void register_vgic_ops(struct domain *d, const struct vgic_ops *ops);

@@ -298,12 +298,12 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         vgic_lock_rank(v, rank);
         tr = rank->ienable;
         rank->ienable |= *r;
-        vgic_unlock_rank(v, rank);
         /* The virtual irq is derived from register offset.
          * The register difference is word difference. So divide by 2(DABT_WORD)
          * to get Virtual irq number */
         vgic_enable_irqs(v, (*r) & (~tr),
                          (gicd_reg - GICD_ISENABLER) >> DABT_WORD);
+        vgic_unlock_rank(v, rank);
         return 1;
 
     case GICD_ICENABLER ... GICD_ICENABLERN:
@@ -313,12 +313,12 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         vgic_lock_rank(v, rank);
         tr = rank->ienable;
         rank->ienable &= ~*r;
-        vgic_unlock_rank(v, rank);
         /* The virtual irq is derived from register offset.
          * The register difference is word difference. So divide by 2(DABT_WORD)
          * to get  Virtual irq number */
         vgic_disable_irqs(v, (*r) & tr,
                          (gicd_reg - GICD_ICENABLER) >> DABT_WORD);
+        vgic_unlock_rank(v, rank);
         return 1;
 
     case GICD_ISPENDR ... GICD_ISPENDRN:
@@ -359,13 +359,29 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 8, gicd_reg - GICD_ITARGETSR, DABT_WORD);
         if ( rank == NULL) goto write_ignore;
+        /* 8-bit vcpu mask for this domain */
+        BUG_ON(v->domain->max_vcpus > 8);
+        tr = (1 << v->domain->max_vcpus) - 1;
+        if ( dabt.size == 2 )
+            tr = tr | (tr << 8) | (tr << 16) | (tr << 24);
+        else
+            tr = (tr << (8 * (gicd_reg & 0x3)));
+        tr &= *r;
+        /* ignore zero writes */
+        if ( !tr )
+            goto write_ignore;
+        /* For word reads ignore writes where any single byte is zero */
+        if ( dabt.size == 2 &&
+            !((tr & 0xff) && (tr & (0xff << 8)) &&
+             (tr & (0xff << 16)) && (tr & (0xff << 24))))
+            goto write_ignore;
         vgic_lock_rank(v, rank);
         if ( dabt.size == DABT_WORD )
             rank->itargets[REG_RANK_INDEX(8, gicd_reg - GICD_ITARGETSR,
-                                          DABT_WORD)] = *r;
+                                          DABT_WORD)] = tr;
         else
             vgic_byte_write(&rank->itargets[REG_RANK_INDEX(8,
-                       gicd_reg - GICD_ITARGETSR, DABT_WORD)], *r, gicd_reg);
+                       gicd_reg - GICD_ITARGETSR, DABT_WORD)], tr, gicd_reg);
         vgic_unlock_rank(v, rank);
         return 1;
 
@@ -460,6 +476,23 @@ static const struct mmio_handler_ops vgic_v2_distr_mmio_handler = {
     .write_handler = vgic_v2_distr_mmio_write,
 };
 
+static struct vcpu *vgic_v2_get_target_vcpu(struct vcpu *v, unsigned int irq)
+{
+    unsigned long target;
+    struct vcpu *v_target;
+    struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
+    ASSERT(spin_is_locked(&rank->lock));
+
+    target = vgic_byte_read(rank->itargets[(irq%32)/4], 0, irq % 4);
+    /* 1-N SPI should be delivered as pending to all the vcpus in the
+     * mask, but here we just return the first vcpu for simplicity and
+     * because it would be too slow to do otherwise. */
+    target = find_first_bit(&target, 8);
+    ASSERT(target >= 0 && target < v->domain->max_vcpus);
+    v_target = v->domain->vcpu[target];
+    return v_target;
+}
+
 static int vgic_v2_vcpu_init(struct vcpu *v)
 {
     int i;
@@ -487,6 +520,7 @@ static int vgic_v2_domain_init(struct domain *d)
 static const struct vgic_ops vgic_v2_ops = {
     .vcpu_init   = vgic_v2_vcpu_init,
     .domain_init = vgic_v2_domain_init,
+    .get_target_vcpu = vgic_v2_get_target_vcpu,
 };
 
 int vgic_v2_init(struct domain *d)

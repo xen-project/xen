@@ -48,7 +48,7 @@ struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n,
         return NULL;
 }
 
-static struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq)
+struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq)
 {
     return vgic_rank_offset(v, 8, irq, DABT_WORD);
 }
@@ -96,7 +96,13 @@ int domain_vgic_init(struct domain *d)
         INIT_LIST_HEAD(&d->arch.vgic.pending_irqs[i].lr_queue);
     }
     for (i=0; i<DOMAIN_NR_RANKS(d); i++)
+    {
         spin_lock_init(&d->arch.vgic.shared_irqs[i].lock);
+        /* By default deliver to CPU0 */
+        memset(d->arch.vgic.shared_irqs[i].itargets,
+               0x1,
+               sizeof(d->arch.vgic.shared_irqs[i].itargets));
+    }
 
     d->arch.vgic.handler->domain_init(d);
 
@@ -146,19 +152,35 @@ int vcpu_vgic_free(struct vcpu *v)
     return 0;
 }
 
+/* takes the rank lock */
+struct vcpu *vgic_get_target_vcpu(struct vcpu *v, unsigned int irq)
+{
+    struct domain *d = v->domain;
+    struct vcpu *v_target;
+    struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
+
+    vgic_lock_rank(v, rank);
+    v_target = d->arch.vgic.handler->get_target_vcpu(v, irq);
+    vgic_unlock_rank(v, rank);
+    return v_target;
+}
+
 void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
 {
+    struct domain *d = v->domain;
     const unsigned long mask = r;
     struct pending_irq *p;
     unsigned int irq;
     unsigned long flags;
     int i = 0;
+    struct vcpu *v_target;
 
     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
-        p = irq_to_pending(v, irq);
+        v_target = d->arch.vgic.handler->get_target_vcpu(v, irq);
+        p = irq_to_pending(v_target, irq);
         clear_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
-        gic_remove_from_queues(v, irq);
+        gic_remove_from_queues(v_target, irq);
         if ( p->desc != NULL )
         {
             spin_lock_irqsave(&p->desc->lock, flags);
@@ -171,29 +193,32 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
 
 void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
 {
+    struct domain *d = v->domain;
     const unsigned long mask = r;
     struct pending_irq *p;
     unsigned int irq;
     unsigned long flags;
     int i = 0;
+    struct vcpu *v_target;
 
     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
-        p = irq_to_pending(v, irq);
+        v_target = d->arch.vgic.handler->get_target_vcpu(v, irq);
+        p = irq_to_pending(v_target, irq);
         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
         /* We need to force the first injection of evtchn_irq because
          * evtchn_upcall_pending is already set by common code on vcpu
          * creation. */
-        if ( irq == v->domain->arch.evtchn_irq &&
+        if ( irq == v_target->domain->arch.evtchn_irq &&
              vcpu_info(current, evtchn_upcall_pending) &&
              list_empty(&p->inflight) )
-            vgic_vcpu_inject_irq(v, irq);
+            vgic_vcpu_inject_irq(v_target, irq);
         else {
             unsigned long flags;
-            spin_lock_irqsave(&v->arch.vgic.lock, flags);
+            spin_lock_irqsave(&v_target->arch.vgic.lock, flags);
             if ( !list_empty(&p->inflight) && !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
-                gic_raise_guest_irq(v, irq, p->priority);
-            spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+                gic_raise_guest_irq(v_target, irq, p->priority);
+            spin_unlock_irqrestore(&v_target->arch.vgic.lock, flags);
         }
         if ( p->desc != NULL )
         {
