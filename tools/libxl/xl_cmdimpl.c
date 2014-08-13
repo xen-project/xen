@@ -1683,9 +1683,26 @@ skip_vfb:
         if (!xlu_cfg_get_long (config, "spiceusbredirection", &l, 0))
             b_info->u.hvm.spice.usbredirection = l;
         xlu_cfg_get_defbool(config, "nographic", &b_info->u.hvm.nographic, 0);
-        xlu_cfg_get_defbool(config, "gfx_passthru", 
+        xlu_cfg_get_defbool(config, "gfx_passthru",
                             &b_info->u.hvm.gfx_passthru, 0);
-        xlu_cfg_replace_string (config, "serial", &b_info->u.hvm.serial, 0);
+        switch (xlu_cfg_get_list_as_string_list(config, "serial",
+                                                &b_info->u.hvm.serial_list,
+                                                1))
+        {
+
+        case 0: break; /* Success */
+        case ESRCH: break; /* Option not present */
+        case EINVAL:
+            /* If it's not a valid list, try reading it as an atom,
+             * falling through to an error if it fails */
+            if (!xlu_cfg_replace_string(config, "serial",
+                                        &b_info->u.hvm.serial, 0))
+                break;
+            /* FALLTHRU */
+        default:
+            fprintf(stderr,"xl: Unable to parse serial.\n");
+            exit(-ERROR_FAIL);
+        }
         xlu_cfg_replace_string (config, "boot", &b_info->u.hvm.boot, 0);
         xlu_cfg_get_defbool(config, "usb", &b_info->u.hvm.usb, 0);
         if (!xlu_cfg_get_long (config, "usbversion", &l, 0))

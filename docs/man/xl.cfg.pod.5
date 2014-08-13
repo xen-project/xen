@@ -1281,12 +1281,14 @@ an usb2 controller. The default is disabled (0).
 
 =over 4
 
-=item B<serial=DEVICE>
+=item B<serial=[ "DEVICE", "DEVICE", ...]>
 
-Redirect the virtual serial port to B<DEVICE>. Please see the
+Redirect virtual serial ports to B<DEVICE>s. Please see the
 B<-serial> option in the L<qemu(1)> manpage for details of the valid
 B<DEVICE> options. Default is B<vc> when in graphical mode and
 B<stdio> if B<nographics=1> is used.
+
+The form serial=DEVICE is also accepted for backwards compatibilty.
 
 =item B<soundhw=DEVICE>
 
