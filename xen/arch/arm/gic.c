@@ -33,6 +33,7 @@
 #include <asm/device.h>
 #include <asm/io.h>
 #include <asm/gic.h>
+#include <asm/vgic.h>
 
 static void gic_restore_pending_irqs(struct vcpu *v);
 
@@ -375,10 +376,13 @@ static void gic_update_one_lr(struct vcpu *v, int i)
         clear_bit(GIC_IRQ_GUEST_ACTIVE, &p->status);
         p->lr = GIC_INVALID_LR;
         if ( test_bit(GIC_IRQ_GUEST_ENABLED, &p->status) &&
-             test_bit(GIC_IRQ_GUEST_QUEUED, &p->status) )
+             test_bit(GIC_IRQ_GUEST_QUEUED, &p->status) &&
+             !test_bit(GIC_IRQ_GUEST_MIGRATING, &p->status) )
             gic_raise_guest_irq(v, irq, p->priority);
-        else
+        else {
             list_del_init(&p->inflight);
+            clear_bit(GIC_IRQ_GUEST_MIGRATING, &p->status);
+        }
     }
 }
 

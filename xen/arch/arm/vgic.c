@@ -165,6 +165,44 @@ struct vcpu *vgic_get_target_vcpu(struct vcpu *v, unsigned int irq)
     return v_target;
 }
 
+void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
+{
+    unsigned long flags;
+    struct pending_irq *p = irq_to_pending(old, irq);
+
+    /* nothing to do for virtual interrupts */
+    if ( p->desc == NULL )
+        return;
+
+    /* migration already in progress, no need to do anything */
+    if ( test_bit(GIC_IRQ_GUEST_MIGRATING, &p->status) )
+        return;
+
+    spin_lock_irqsave(&old->arch.vgic.lock, flags);
+
+    if ( list_empty(&p->inflight) )
+    {
+        spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
+        return;
+    }
+    /* If the IRQ is still lr_pending, re-inject it to the new vcpu */
+    if ( !list_empty(&p->lr_queue) )
+    {
+        clear_bit(GIC_IRQ_GUEST_QUEUED, &p->status);
+        list_del_init(&p->lr_queue);
+        list_del_init(&p->inflight);
+        spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
+        vgic_vcpu_inject_irq(new, irq);
+        return;
+    }
+    /* if the IRQ is in a GICH_LR register, set GIC_IRQ_GUEST_MIGRATING
+     * and wait for the EOI */
+    if ( !list_empty(&p->inflight) )
+        set_bit(GIC_IRQ_GUEST_MIGRATING, &p->status);
+
+    spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
+}
+
 void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
 {
     struct domain *d = v->domain;

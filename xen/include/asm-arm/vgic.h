@@ -55,11 +55,16 @@ struct pending_irq
      * GIC_IRQ_GUEST_ENABLED: the guest IRQ is enabled at the VGICD
      * level (GICD_ICENABLER/GICD_ISENABLER).
      *
+     * GIC_IRQ_GUEST_MIGRATING: the irq is being migrated to a different
+     * vcpu while it is still inflight and on an GICH_LR register on the
+     * old vcpu.
+     *
      */
 #define GIC_IRQ_GUEST_QUEUED   0
 #define GIC_IRQ_GUEST_ACTIVE   1
 #define GIC_IRQ_GUEST_VISIBLE  2
 #define GIC_IRQ_GUEST_ENABLED  3
+#define GIC_IRQ_GUEST_MIGRATING   4
     unsigned long status;
     struct irq_desc *desc; /* only set it the irq corresponds to a physical irq */
     int irq;
@@ -169,6 +174,7 @@ extern int vcpu_vgic_free(struct vcpu *v);
 extern int vgic_to_sgi(struct vcpu *v, register_t sgir,
                        enum gic_sgi_mode irqmode, int virq,
                        unsigned long vcpu_mask);
+extern void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq);
 #endif /* __ASM_ARM_VGIC_H__ */
 
 /*

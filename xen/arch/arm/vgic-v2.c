@@ -356,34 +356,60 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         goto write_ignore;
 
     case GICD_ITARGETSR + 8 ... GICD_ITARGETSRN:
+    {
+        /* unsigned long needed for find_next_bit */
+        unsigned long target;
+        int i;
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 8, gicd_reg - GICD_ITARGETSR, DABT_WORD);
         if ( rank == NULL) goto write_ignore;
         /* 8-bit vcpu mask for this domain */
         BUG_ON(v->domain->max_vcpus > 8);
-        tr = (1 << v->domain->max_vcpus) - 1;
+        target = (1 << v->domain->max_vcpus) - 1;
         if ( dabt.size == 2 )
-            tr = tr | (tr << 8) | (tr << 16) | (tr << 24);
+            target = target | (target << 8) | (target << 16) | (target << 24);
         else
-            tr = (tr << (8 * (gicd_reg & 0x3)));
-        tr &= *r;
+            target = (target << (8 * (gicd_reg & 0x3)));
+        target &= *r;
         /* ignore zero writes */
-        if ( !tr )
+        if ( !target )
             goto write_ignore;
         /* For word reads ignore writes where any single byte is zero */
         if ( dabt.size == 2 &&
-            !((tr & 0xff) && (tr & (0xff << 8)) &&
-             (tr & (0xff << 16)) && (tr & (0xff << 24))))
+            !((target & 0xff) && (target & (0xff << 8)) &&
+             (target & (0xff << 16)) && (target & (0xff << 24))))
             goto write_ignore;
         vgic_lock_rank(v, rank);
+        i = 0;
+        while ( (i = find_next_bit(&target, 32, i)) < 32 )
+        {
+            unsigned int irq, new_target, old_target;
+            unsigned long old_target_mask;
+            struct vcpu *v_target, *v_old;
+
+            new_target = i % 8;
+            old_target_mask = vgic_byte_read(rank->itargets[REG_RANK_INDEX(8,
+                                             gicd_reg - GICD_ITARGETSR, DABT_WORD)], 0, i/8);
+            old_target = find_first_bit(&old_target_mask, 8);
+
+            if ( new_target != old_target )
+            {
+                irq = gicd_reg - GICD_ITARGETSR + (i / 8);
+                v_target = v->domain->vcpu[new_target];
+                v_old = v->domain->vcpu[old_target];
+                vgic_migrate_irq(v_old, v_target, irq);
+            }
+            i += 8 - new_target;
+        }
         if ( dabt.size == DABT_WORD )
             rank->itargets[REG_RANK_INDEX(8, gicd_reg - GICD_ITARGETSR,
-                                          DABT_WORD)] = tr;
+                                          DABT_WORD)] = target;
         else
             vgic_byte_write(&rank->itargets[REG_RANK_INDEX(8,
-                       gicd_reg - GICD_ITARGETSR, DABT_WORD)], tr, gicd_reg);
+                       gicd_reg - GICD_ITARGETSR, DABT_WORD)], target, gicd_reg);
         vgic_unlock_rank(v, rank);
         return 1;
+    }
 
     case GICD_IPRIORITYR ... GICD_IPRIORITYRN:
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
