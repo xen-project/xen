@@ -226,6 +226,12 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     return 0;
 }
 
+static void sched_move_irqs(struct vcpu *v)
+{
+    arch_move_irqs(v);
+    evtchn_move_pirqs(v);
+}
+
 int sched_move_domain(struct domain *d, struct cpupool *c)
 {
     struct vcpu *v;
@@ -301,7 +307,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
         v->sched_priv = vcpu_priv[v->vcpu_id];
         if ( !d->is_dying )
-            evtchn_move_pirqs(v);
+            sched_move_irqs(v);
 
         new_p = cpumask_cycle(new_p, c->cpu_valid);
 
@@ -526,7 +532,7 @@ static void vcpu_migrate(struct vcpu *v)
     spin_unlock_irqrestore(old_lock, flags);
 
     if ( old_cpu != new_cpu )
-        evtchn_move_pirqs(v);
+        sched_move_irqs(v);
 
     /* Wake on new CPU. */
     vcpu_wake(v);
@@ -1249,7 +1255,7 @@ static void schedule(void)
     stop_timer(&prev->periodic_timer);
 
     if ( next_slice.migrated )
-        evtchn_move_pirqs(next);
+        sched_move_irqs(next);
 
     vcpu_periodic_timer_work(next);
 
