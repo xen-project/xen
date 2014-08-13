@@ -22,15 +22,24 @@ struct irqaction {
 /*
  * IRQ line status.
  */
-#define IRQ_INPROGRESS    (1u<<0) /* IRQ handler active - do not enter! */
-#define IRQ_DISABLED      (1u<<1) /* IRQ disabled - do not enter! */
-#define IRQ_PENDING       (1u<<2) /* IRQ pending - replay on enable */
-#define IRQ_REPLAY        (1u<<3) /* IRQ has been replayed but not acked yet */
-#define IRQ_GUEST         (1u<<4) /* IRQ is handled by guest OS(es) */
-#define IRQ_MOVE_PENDING  (1u<<5) /* IRQ is migrating to another CPUs */
-#define IRQ_PER_CPU       (1u<<6) /* IRQ is per CPU */
-#define IRQ_GUEST_EOI_PENDING (1u<<7) /* IRQ was disabled, pending a guest EOI */
-#define IRQF_SHARED       (1<<8)  /* IRQ is shared */
+#define _IRQ_INPROGRESS         0 /* IRQ handler active - do not enter! */
+#define _IRQ_DISABLED           1 /* IRQ disabled - do not enter! */
+#define _IRQ_PENDING            2 /* IRQ pending - replay on enable */
+#define _IRQ_REPLAY             3 /* IRQ has been replayed but not acked yet */
+#define _IRQ_GUEST              4 /* IRQ is handled by guest OS(es) */
+#define _IRQ_MOVE_PENDING       5 /* IRQ is migrating to another CPUs */
+#define _IRQ_PER_CPU            6 /* IRQ is per CPU */
+#define _IRQ_GUEST_EOI_PENDING  7 /* IRQ was disabled, pending a guest EOI */
+#define _IRQF_SHARED            8 /* IRQ is shared */
+#define IRQ_INPROGRESS          (1u<<_IRQ_INPROGRESS)
+#define IRQ_DISABLED            (1u<<_IRQ_DISABLED)
+#define IRQ_PENDING             (1u<<_IRQ_PENDING)
+#define IRQ_REPLAY              (1u<<_IRQ_REPLAY)
+#define IRQ_GUEST               (1u<<_IRQ_GUEST)
+#define IRQ_MOVE_PENDING        (1u<<_IRQ_MOVE_PENDING)
+#define IRQ_PER_CPU             (1u<<_IRQ_PER_CPU)
+#define IRQ_GUEST_EOI_PENDING   (1u<<_IRQ_GUEST_EOI_PENDING)
+#define IRQF_SHARED             (1u<<_IRQF_SHARED)
 
 /* Special IRQ numbers. */
 #define AUTO_ASSIGN_IRQ         (-1)
