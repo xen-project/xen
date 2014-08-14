@@ -28,6 +28,13 @@ case "$host_cpu" in
         ;;
 esac
 
+dnl Stubdomains need some work in order to compile on FreeBSD
+case "$host_os" in
+    freebsd*)
+        arch_enable_stubdom=n
+        ;;
+esac
+
 AX_SUBSYSTEM_DEFAULT_ENABLE([xen])
 AX_SUBSYSTEM_DEFAULT_ENABLE([tools])
 AX_SUBSYSTEM_CONDITIONAL([stubdom], $arch_enable_stubdom)

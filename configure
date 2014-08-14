@@ -1916,6 +1916,12 @@ case "$host_cpu" in
         ;;
 esac
 
+case "$host_os" in
+    freebsd*)
+        arch_enable_stubdom=n
+        ;;
+esac
+
 
 
 
