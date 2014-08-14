@@ -260,7 +260,7 @@ static int make_psci_node(libxl__gc *gc, void *fdt)
     res = fdt_begin_node(fdt, "psci");
     if (res) return res;
 
-    res = fdt_property_compat(gc, fdt, 1, "arm,psci");
+    res = fdt_property_compat(gc, fdt, 2, "arm,psci-0.2","arm,psci");
     if (res) return res;
 
     res = fdt_property_string(fdt, "method", "hvc");

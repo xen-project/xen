@@ -1082,24 +1082,6 @@ static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL_ARM(vcpu_op, 3),
 };
 
-typedef int (*arm_psci_fn_t)(uint32_t, register_t);
-
-typedef struct {
-    arm_psci_fn_t fn;
-    int nr_args;
-} arm_psci_t;
-
-#define PSCI(_name, _nr_args)                                  \
-    [ PSCI_ ## _name ] =  {                                    \
-        .fn = (arm_psci_fn_t) &do_psci_ ## _name,              \
-        .nr_args = _nr_args,                                   \
-    }
-
-static arm_psci_t arm_psci_table[] = {
-    PSCI(cpu_off, 1),
-    PSCI(cpu_on, 2),
-};
-
 #ifndef NDEBUG
 static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 {
@@ -1132,33 +1114,108 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 #endif
 
 #ifdef CONFIG_ARM_64
-#define PSCI_OP_REG(r) (r)->x0
-#define PSCI_RESULT_REG(r) (r)->x0
-#define PSCI_ARGS(r) (r)->x1, (r)->x2
+#define PSCI_RESULT_REG(reg) (reg)->x0
+#define PSCI_ARG(reg,n) (reg)->x##n
+#define PSCI_ARG32(reg,n) (uint32_t)( (reg)->x##n & 0x00000000FFFFFFFF )
 #else
-#define PSCI_OP_REG(r) (r)->r0
-#define PSCI_RESULT_REG(r) (r)->r0
-#define PSCI_ARGS(r) (r)->r1, (r)->r2
+#define PSCI_RESULT_REG(reg) (reg)->r0
+#define PSCI_ARG(reg,n) (reg)->r##n
+#define PSCI_ARG32(reg,n) PSCI_ARG(reg,n)
 #endif
+
+/* helper function for checking arm mode 32/64 bit */
+static inline int psci_mode_check(struct domain *d, register_t fid)
+{
+        return !( is_64bit_domain(d)^( (fid & PSCI_0_2_64BIT) >> 30 ) );
+}
 
 static void do_trap_psci(struct cpu_user_regs *regs)
 {
-    arm_psci_fn_t psci_call = NULL;
+    register_t fid = PSCI_ARG(regs,0);
 
-    if ( PSCI_OP_REG(regs) >= ARRAY_SIZE(arm_psci_table) )
+    /* preloading in case psci_mode_check fails */
+    PSCI_RESULT_REG(regs) = PSCI_INVALID_PARAMETERS;
+    switch( fid )
     {
+    case PSCI_cpu_off:
+        {
+            uint32_t pstate = PSCI_ARG32(regs,1);
+            PSCI_RESULT_REG(regs) = do_psci_cpu_off(pstate);
+        }
+        break;
+    case PSCI_cpu_on:
+        {
+            uint32_t vcpuid = PSCI_ARG32(regs,1);
+            register_t epoint = PSCI_ARG(regs,2);
+            PSCI_RESULT_REG(regs) = do_psci_cpu_on(vcpuid, epoint);
+        }
+        break;
+    case PSCI_0_2_FN_PSCI_VERSION:
+        PSCI_RESULT_REG(regs) = do_psci_0_2_version();
+        break;
+    case PSCI_0_2_FN_CPU_OFF:
+        PSCI_RESULT_REG(regs) = do_psci_0_2_cpu_off();
+        break;
+    case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+        PSCI_RESULT_REG(regs) = do_psci_0_2_migrate_info_type();
+        break;
+    case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+    case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+        if ( psci_mode_check(current->domain, fid) )
+            PSCI_RESULT_REG(regs) = do_psci_0_2_migrate_info_up_cpu();
+        break;
+    case PSCI_0_2_FN_SYSTEM_OFF:
+        do_psci_0_2_system_off();
+        PSCI_RESULT_REG(regs) = PSCI_INTERNAL_FAILURE;
+        break;
+    case PSCI_0_2_FN_SYSTEM_RESET:
+        do_psci_0_2_system_reset();
+        PSCI_RESULT_REG(regs) = PSCI_INTERNAL_FAILURE;
+        break;
+    case PSCI_0_2_FN_CPU_ON:
+    case PSCI_0_2_FN64_CPU_ON:
+        if ( psci_mode_check(current->domain, fid) )
+        {
+            register_t vcpuid = PSCI_ARG(regs,1);
+            register_t epoint = PSCI_ARG(regs,2);
+            register_t cid = PSCI_ARG(regs,3);
+            PSCI_RESULT_REG(regs) =
+                do_psci_0_2_cpu_on(vcpuid, epoint, cid);
+        }
+        break;
+    case PSCI_0_2_FN_CPU_SUSPEND:
+    case PSCI_0_2_FN64_CPU_SUSPEND:
+        if ( psci_mode_check(current->domain, fid) )
+        {
+            uint32_t pstate = PSCI_ARG32(regs,1);
+            register_t epoint = PSCI_ARG(regs,2);
+            register_t cid = PSCI_ARG(regs,3);
+            PSCI_RESULT_REG(regs) =
+                do_psci_0_2_cpu_suspend(pstate, epoint, cid);
+        }
+        break;
+    case PSCI_0_2_FN_AFFINITY_INFO:
+    case PSCI_0_2_FN64_AFFINITY_INFO:
+        if ( psci_mode_check(current->domain, fid) )
+        {
+            register_t taff = PSCI_ARG(regs,1);
+            uint32_t laff = PSCI_ARG32(regs,2);
+            PSCI_RESULT_REG(regs) =
+                do_psci_0_2_affinity_info(taff, laff);
+        }
+        break;
+    case PSCI_0_2_FN_MIGRATE:
+    case PSCI_0_2_FN64_MIGRATE:
+        if ( psci_mode_check(current->domain, fid) )
+        {
+            uint32_t tcpu = PSCI_ARG32(regs,1);
+            PSCI_RESULT_REG(regs) = do_psci_0_2_migrate(tcpu);
+        }
+        break;
+    default:
         domain_crash_synchronous();
         return;
     }
-
-    psci_call = arm_psci_table[PSCI_OP_REG(regs)].fn;
-    if ( psci_call == NULL )
-    {
-        domain_crash_synchronous();
-        return;
-    }
-
-    PSCI_RESULT_REG(regs) = psci_call(PSCI_ARGS(regs));
 }
 
 #ifdef CONFIG_ARM_64

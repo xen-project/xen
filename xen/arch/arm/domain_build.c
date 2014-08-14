@@ -637,6 +637,9 @@ static int make_hypervisor_node(struct domain *d,
 static int make_psci_node(void *fdt, const struct dt_device_node *parent)
 {
     int res;
+    const char compat[] =
+        "arm,psci-0.2""\0"
+        "arm,psci";
 
     DPRINT("Create PSCI node\n");
 
@@ -645,7 +648,7 @@ static int make_psci_node(void *fdt, const struct dt_device_node *parent)
     if ( res )
         return res;
 
-    res = fdt_property_string(fdt, "compatible", "arm,psci");
+    res = fdt_property(fdt, "compatible", compat, sizeof(compat));
     if ( res )
         return res;
 
