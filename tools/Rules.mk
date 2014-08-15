@@ -55,11 +55,7 @@ CFLAGS_libxenvchan = -I$(XEN_LIBVCHAN)
 LDLIBS_libxenvchan = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) -L$(XEN_LIBVCHAN) -lxenvchan
 SHLIB_libxenvchan  = -Wl,-rpath-link=$(XEN_LIBVCHAN)
 
-ifeq ($(CONFIG_Linux),y)
-LIBXL_BLKTAP ?= y
-else
-LIBXL_BLKTAP ?= n
-endif
+LIBXL_BLKTAP ?= $(CONFIG_BLKTAP2)
 
 ifeq ($(LIBXL_BLKTAP),y)
 CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_xeninclude)
