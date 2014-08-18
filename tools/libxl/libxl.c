@@ -71,6 +71,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     ctx->childproc_user = 0;
         
     ctx->sigchld_selfpipe[0] = -1;
+    ctx->sigchld_selfpipe[1] = -1;
     libxl__ev_fd_init(&ctx->sigchld_selfpipe_efd);
 
     /* The mutex is special because we can't idempotently destroy it */
