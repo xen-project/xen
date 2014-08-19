@@ -615,6 +615,7 @@ int domain_kill(struct domain *d)
         {
             if ( rc == -ERESTART )
                 rc = -EAGAIN;
+            BUG_ON(rc != -EAGAIN);
             break;
         }
         if ( sched_move_domain(d, cpupool0) )
