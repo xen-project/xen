@@ -61,9 +61,6 @@ long arch_do_domctl(
         ret = paging_domctl(d,
                             &domctl->u.shadow_op,
                             guest_handle_cast(u_domctl, void));
-        if ( ret == -EAGAIN )
-            return hypercall_create_continuation(__HYPERVISOR_domctl,
-                                                 "h", u_domctl);
         copyback = 1;
     }
     break;
