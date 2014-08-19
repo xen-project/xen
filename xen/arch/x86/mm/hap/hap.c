@@ -572,7 +572,8 @@ int hap_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
         paging_unlock(d);
         if ( preempted )
             /* Not finished.  Set up to re-run the call. */
-            rc = -EAGAIN;
+            rc = hypercall_create_continuation(__HYPERVISOR_domctl, "h",
+                                               u_domctl);
         else
             /* Finished.  Return the new allocation */
             sc->mb = hap_get_allocation(d);
