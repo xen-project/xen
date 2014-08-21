@@ -62,7 +62,7 @@ SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, GUEST_LEVELS)
 
 extern int
 SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl1mfn, mfn_t readonly_mfn);
+    (struct domain *d, mfn_t sl1mfn, mfn_t readonly_mfn);
 extern int
 SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn);
@@ -127,5 +127,5 @@ SHADOW_INTERNAL_NAME(sh_safe_not_to_sync, GUEST_LEVELS)
 
 extern int
 SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p, GUEST_LEVELS)
-     (struct vcpu *v, mfn_t gmfn, mfn_t smfn, unsigned long off);
+     (struct domain *d, mfn_t gmfn, mfn_t smfn, unsigned long off);
 #endif

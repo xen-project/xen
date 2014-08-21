@@ -4177,10 +4177,9 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 /* Functions to revoke guest rights */
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC
-int sh_rm_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
+int sh_rm_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
                                  mfn_t smfn, unsigned long off)
 {
-    struct domain *d = v->domain;
     struct vcpu *curr = current;
     int r;
     shadow_l1e_t *sl1p, sl1e;
@@ -4280,11 +4279,10 @@ static int sh_guess_wrmap(struct vcpu *v, unsigned long vaddr, mfn_t gmfn)
 }
 #endif
 
-int sh_rm_write_access_from_l1(struct vcpu *v, mfn_t sl1mfn,
+int sh_rm_write_access_from_l1(struct domain *d, mfn_t sl1mfn,
                                mfn_t readonly_mfn)
 /* Excises all writeable mappings to readonly_mfn from this l1 shadow table */
 {
-    struct domain *d = v->domain;
     shadow_l1e_t *sl1e;
     int done = 0;
     int flags;

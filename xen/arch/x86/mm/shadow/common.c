@@ -587,12 +587,13 @@ static inline void _sh_resync_l1(struct vcpu *v, mfn_t gmfn, mfn_t snpmfn)
 static inline int oos_fixup_flush_gmfn(struct vcpu *v, mfn_t gmfn,
                                        struct oos_fixup *fixup)
 {
+    struct domain *d = v->domain;
     int i;
     for ( i = 0; i < SHADOW_OOS_FIXUPS; i++ )
     {
         if ( mfn_x(fixup->smfn[i]) != INVALID_MFN )
         {
-            sh_remove_write_access_from_sl1p(v, gmfn,
+            sh_remove_write_access_from_sl1p(d, gmfn,
                                              fixup->smfn[i],
                                              fixup->off[i]);
             fixup->smfn[i] = _mfn(INVALID_MFN);
@@ -638,7 +639,7 @@ void oos_fixup_add(struct domain *d, mfn_t gmfn,
                 TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_OOS_FIXUP_EVICT);
 
                 /* Reuse this slot and remove current writable mapping. */
-                sh_remove_write_access_from_sl1p(v, gmfn,
+                sh_remove_write_access_from_sl1p(d, gmfn,
                                                  oos_fixup[idx].smfn[next],
                                                  oos_fixup[idx].off[next]);
                 perfc_incr(shadow_oos_fixup_evict);
@@ -2184,7 +2185,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
                            unsigned long fault_addr)
 {
     /* Dispatch table for getting per-type functions */
-    static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
+    static const hash_domain_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2), /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2), /* fl1_32  */
@@ -2367,7 +2368,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
         int shtype = mfn_to_page(last_smfn)->u.sh.type;
 
         if ( callbacks[shtype] )
-            callbacks[shtype](curr, last_smfn, gmfn);
+            callbacks[shtype](d, last_smfn, gmfn);
 
         if ( (pg->u.inuse.type_info & PGT_count_mask) != old_count )
             perfc_incr(shadow_writeable_h_5);
@@ -2384,7 +2385,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
         perfc_incr(shadow_writeable_bf_1);
     else
         perfc_incr(shadow_writeable_bf);
-    hash_vcpu_foreach(v, callback_mask, callbacks, gmfn);
+    hash_domain_foreach(d, callback_mask, callbacks, gmfn);
 
     /* If that didn't catch the mapping, then there's some non-pagetable
      * mapping -- ioreq page, grant mapping, &c. */
@@ -2404,7 +2405,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
 }
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
-int sh_remove_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
+int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
                                      mfn_t smfn, unsigned long off)
 {
     struct page_info *sp = mfn_to_page(smfn);
@@ -2416,16 +2417,16 @@ int sh_remove_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
          || sp->u.sh.type == SH_type_fl1_32_shadow )
     {
         return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p,2)
-            (v, gmfn, smfn, off);
+            (d, gmfn, smfn, off);
     }
     else if ( sp->u.sh.type == SH_type_l1_pae_shadow
               || sp->u.sh.type == SH_type_fl1_pae_shadow )
         return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p,3)
-            (v, gmfn, smfn, off);
+            (d, gmfn, smfn, off);
     else if ( sp->u.sh.type == SH_type_l1_64_shadow
               || sp->u.sh.type == SH_type_fl1_64_shadow )
         return SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p,4)
-            (v, gmfn, smfn, off);
+            (d, gmfn, smfn, off);
 
     return 0;
 }

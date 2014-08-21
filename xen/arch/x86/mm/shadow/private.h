@@ -405,7 +405,7 @@ void sh_resync(struct domain *d, mfn_t gmfn);
 
 void oos_fixup_add(struct domain *d, mfn_t gmfn, mfn_t smfn, unsigned long off);
 
-int sh_remove_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
+int sh_remove_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
                                      mfn_t smfn, unsigned long offset);
 
 /* Pull all out-of-sync shadows back into sync.  If skip != 0, we try
