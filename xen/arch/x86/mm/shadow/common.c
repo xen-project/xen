@@ -990,9 +990,8 @@ int sh_unsync(struct vcpu *v, mfn_t gmfn)
  * involves making sure there are no writable mappings available to the guest
  * for this page.
  */
-void shadow_promote(struct vcpu *v, mfn_t gmfn, unsigned int type)
+void shadow_promote(struct domain *d, mfn_t gmfn, unsigned int type)
 {
-    struct domain *d = v->domain;
     struct page_info *page = mfn_to_page(gmfn);
 
     ASSERT(mfn_valid(gmfn));
@@ -1017,9 +1016,8 @@ void shadow_promote(struct vcpu *v, mfn_t gmfn, unsigned int type)
     TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_PROMOTE);
 }
 
-void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
+void shadow_demote(struct domain *d, mfn_t gmfn, u32 type)
 {
-    struct domain *d = v->domain;
     struct page_info *page = mfn_to_page(gmfn);
 
     ASSERT(test_bit(_PGC_page_table, &page->count_info));

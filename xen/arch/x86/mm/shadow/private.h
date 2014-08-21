@@ -350,8 +350,8 @@ void  shadow_hash_delete(struct domain *d,
                          unsigned long n, unsigned int t, mfn_t smfn);
 
 /* shadow promotion */
-void shadow_promote(struct vcpu *v, mfn_t gmfn, u32 type);
-void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type);
+void shadow_promote(struct domain *d, mfn_t gmfn, u32 type);
+void shadow_demote(struct domain *d, mfn_t gmfn, u32 type);
 
 /* Shadow page allocation functions */
 void  shadow_prealloc(struct domain *d, u32 shadow_type, unsigned int count);

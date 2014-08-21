@@ -1563,7 +1563,7 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
         }
     }
 
-    shadow_promote(v, gmfn, shadow_type);
+    shadow_promote(d, gmfn, shadow_type);
     set_shadow_status(d, gmfn, shadow_type, smfn);
 
     return smfn;
@@ -1898,7 +1898,7 @@ void sh_destroy_l4_shadow(struct vcpu *v, mfn_t smfn)
     /* Record that the guest page isn't shadowed any more (in this type) */
     gmfn = backpointer(sp);
     delete_shadow_status(d, gmfn, t, smfn);
-    shadow_demote(v, gmfn, t);
+    shadow_demote(d, gmfn, t);
     /* Decrement refcounts of all the old entries */
     sl4mfn = smfn;
     SHADOW_FOREACH_L4E(sl4mfn, sl4e, 0, 0, d, {
@@ -1930,7 +1930,7 @@ void sh_destroy_l3_shadow(struct vcpu *v, mfn_t smfn)
     /* Record that the guest page isn't shadowed any more (in this type) */
     gmfn = backpointer(sp);
     delete_shadow_status(d, gmfn, t, smfn);
-    shadow_demote(v, gmfn, t);
+    shadow_demote(d, gmfn, t);
 
     /* Decrement refcounts of all the old entries */
     sl3mfn = smfn;
@@ -1968,7 +1968,7 @@ void sh_destroy_l2_shadow(struct vcpu *v, mfn_t smfn)
     /* Record that the guest page isn't shadowed any more (in this type) */
     gmfn = backpointer(sp);
     delete_shadow_status(d, gmfn, t, smfn);
-    shadow_demote(v, gmfn, t);
+    shadow_demote(d, gmfn, t);
 
     /* Decrement refcounts of all the old entries */
     sl2mfn = smfn;
@@ -2005,7 +2005,7 @@ void sh_destroy_l1_shadow(struct vcpu *v, mfn_t smfn)
     {
         mfn_t gmfn = backpointer(sp);
         delete_shadow_status(d, gmfn, t, smfn);
-        shadow_demote(v, gmfn, t);
+        shadow_demote(d, gmfn, t);
     }
 
     if ( shadow_mode_refcounts(d) )
