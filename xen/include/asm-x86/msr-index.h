@@ -79,6 +79,7 @@
 #define IA32_DEBUGCTLMSR_BTINT		(1<<8) /* Branch Trace Interrupt */
 #define IA32_DEBUGCTLMSR_BTS_OFF_OS	(1<<9)  /* BTS off if CPL 0 */
 #define IA32_DEBUGCTLMSR_BTS_OFF_USR	(1<<10) /* BTS off if CPL > 0 */
+#define IA32_DEBUGCTLMSR_RTM		(1<<15) /* RTM debugging enable */
 
 #define MSR_IA32_LASTBRANCHFROMIP	0x000001db
 #define MSR_IA32_LASTBRANCHTOIP		0x000001dc

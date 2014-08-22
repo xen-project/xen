@@ -20,6 +20,7 @@
 #define DR_TRAP3        (0x8)           /* db3 */
 #define DR_STEP         (0x4000)        /* single-step */
 #define DR_SWITCH       (0x8000)        /* task switch */
+#define DR_NOT_RTM      (0x10000)       /* clear: #BP inside RTM region */
 
 /* Now define a bunch of things for manipulating the control register.
    The top two bytes of the control register consist of 4 fields of 4
@@ -62,6 +63,7 @@
 #define DR_CONTROL_RESERVED_ONE  (0x00000400ul) /* Reserved, read as one */
 #define DR_LOCAL_EXACT_ENABLE    (0x00000100ul) /* Local exact enable */
 #define DR_GLOBAL_EXACT_ENABLE   (0x00000200ul) /* Global exact enable */
+#define DR_RTM_ENABLE            (0x00000800ul) /* RTM debugging enable */
 #define DR_GENERAL_DETECT        (0x00002000ul) /* General detect enable */
 
 #define write_debugreg(reg, val) do {                       \

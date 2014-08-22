@@ -2246,6 +2246,8 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         int i, rc = 0;
         uint64_t supported = IA32_DEBUGCTLMSR_LBR | IA32_DEBUGCTLMSR_BTF;
 
+        if ( boot_cpu_has(X86_FEATURE_RTM) )
+            supported |= IA32_DEBUGCTLMSR_RTM;
         if ( msr_content & ~supported )
         {
             /* Perhaps some other bits are supported in vpmu. */
