@@ -764,19 +764,19 @@ static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     u64 msr_content;
-    struct cpuinfo_x86 *c = &current_cpu_data;
+    static bool_t ds_warned;
 
     if ( !(vpmu_flags & VPMU_BOOT_BTS) )
         goto func_out;
     /* Check the 'Debug Store' feature in the CPUID.EAX[1]:EDX[21] */
-    if ( cpu_has(c, X86_FEATURE_DS) )
+    while ( boot_cpu_has(X86_FEATURE_DS) )
     {
-        if ( !cpu_has(c, X86_FEATURE_DTES64) )
+        if ( !boot_cpu_has(X86_FEATURE_DTES64) )
         {
-            printk(XENLOG_G_WARNING "CPU doesn't support 64-bit DS Area"
-                   " - Debug Store disabled for %pv\n",
-                   v);
-            goto func_out;
+            if ( !ds_warned )
+                printk(XENLOG_G_WARNING "CPU doesn't support 64-bit DS Area"
+                       " - Debug Store disabled for guests\n");
+            break;
         }
         vpmu_set(vpmu, VPMU_CPU_HAS_DS);
         rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
@@ -784,14 +784,16 @@ static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
         {
             /* If BTS_UNAVAIL is set reset the DS feature. */
             vpmu_reset(vpmu, VPMU_CPU_HAS_DS);
-            printk(XENLOG_G_WARNING "CPU has set BTS_UNAVAIL"
-                   " - Debug Store disabled for %pv\n",
-                   v);
+            if ( !ds_warned )
+                printk(XENLOG_G_WARNING "CPU has set BTS_UNAVAIL"
+                       " - Debug Store disabled for guests\n");
+            break;
         }
-        else
+
+        vpmu_set(vpmu, VPMU_CPU_HAS_BTS);
+        if ( !ds_warned )
         {
-            vpmu_set(vpmu, VPMU_CPU_HAS_BTS);
-            if ( !cpu_has(c, X86_FEATURE_DSCPL) )
+            if ( !boot_cpu_has(X86_FEATURE_DSCPL) )
                 printk(XENLOG_G_INFO
                        "vpmu: CPU doesn't support CPL-Qualified BTS\n");
             printk("******************************************************\n");
@@ -803,8 +805,10 @@ static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
             printk("** It is NOT recommended for production use!        **\n");
             printk("******************************************************\n");
         }
+        break;
     }
-func_out:
+    ds_warned = 1;
+ func_out:
     check_pmc_quirk();
     return 0;
 }
