@@ -278,10 +278,13 @@ static void context_update(unsigned int msr, u64 msr_content)
     }
 }
 
-static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
+static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
+                             uint64_t supported)
 {
     struct vcpu *v = current;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
+
+    ASSERT(!supported);
 
     /* For all counters, enable guest only mode for HVM guest */
     if ( (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) &&

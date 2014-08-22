@@ -1789,7 +1789,7 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_AMD_FAM15H_EVNTSEL3:
     case MSR_AMD_FAM15H_EVNTSEL4:
     case MSR_AMD_FAM15H_EVNTSEL5:
-        vpmu_do_wrmsr(msr, msr_content);
+        vpmu_do_wrmsr(msr, msr_content, 0);
         break;
 
     case MSR_IA32_MCx_MISC(4): /* Threshold register */

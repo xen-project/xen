@@ -2249,7 +2249,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         if ( msr_content & ~supported )
         {
             /* Perhaps some other bits are supported in vpmu. */
-            if ( !vpmu_do_wrmsr(msr, msr_content) )
+            if ( !vpmu_do_wrmsr(msr, msr_content, supported) )
                 break;
         }
         if ( msr_content & IA32_DEBUGCTLMSR_LBR )
@@ -2278,7 +2278,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
             goto gp_fault;
         break;
     default:
-        if ( vpmu_do_wrmsr(msr, msr_content) )
+        if ( vpmu_do_wrmsr(msr, msr_content, 0) )
             return X86EMUL_OKAY;
         if ( passive_domain_do_wrmsr(msr, msr_content) )
             return X86EMUL_OKAY;

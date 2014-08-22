@@ -64,12 +64,12 @@ static void __init parse_vpmu_param(char *s)
     }
 }
 
-int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
+int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content, uint64_t supported)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_wrmsr )
-        return vpmu->arch_vpmu_ops->do_wrmsr(msr, msr_content);
+        return vpmu->arch_vpmu_ops->do_wrmsr(msr, msr_content, supported);
     return 0;
 }
 

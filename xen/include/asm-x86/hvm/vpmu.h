@@ -45,7 +45,8 @@
 
 /* Arch specific operations shared by all vpmus */
 struct arch_vpmu_ops {
-    int (*do_wrmsr)(unsigned int msr, uint64_t msr_content);
+    int (*do_wrmsr)(unsigned int msr, uint64_t msr_content,
+                    uint64_t supported);
     int (*do_rdmsr)(unsigned int msr, uint64_t *msr_content);
     int (*do_interrupt)(struct cpu_user_regs *regs);
     void (*do_cpuid)(unsigned int input,
@@ -86,7 +87,7 @@ struct vpmu_struct {
 #define vpmu_is_set(_vpmu, _x) ((_vpmu)->flags & (_x))
 #define vpmu_clear(_vpmu)      ((_vpmu)->flags = 0)
 
-int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content);
+int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content, uint64_t supported);
 int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content);
 int vpmu_do_interrupt(struct cpu_user_regs *regs);
 void vpmu_do_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,

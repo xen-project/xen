@@ -454,7 +454,8 @@ static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
     return 1;
 }
 
-static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
+static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
+                               uint64_t supported)
 {
     u64 global_ctrl, non_global_ctrl;
     char pmu_enable = 0;
@@ -469,23 +470,25 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
         /* Special handling for BTS */
         if ( msr == MSR_IA32_DEBUGCTLMSR )
         {
-            uint64_t supported = IA32_DEBUGCTLMSR_TR | IA32_DEBUGCTLMSR_BTS |
-                                 IA32_DEBUGCTLMSR_BTINT;
+            supported |= IA32_DEBUGCTLMSR_TR | IA32_DEBUGCTLMSR_BTS |
+                         IA32_DEBUGCTLMSR_BTINT;
 
             if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
                 supported |= IA32_DEBUGCTLMSR_BTS_OFF_OS |
                              IA32_DEBUGCTLMSR_BTS_OFF_USR;
-            if ( msr_content & supported )
-            {
-                if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
-                    return 1;
-                gdprintk(XENLOG_WARNING, "Debug Store is not supported on this cpu\n");
-                hvm_inject_hw_exception(TRAP_gp_fault, 0);
-                return 0;
-            }
+            if ( !(msr_content & ~supported) &&
+                 vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
+                return 1;
+            if ( (msr_content & supported) &&
+                 !vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
+                printk(XENLOG_G_WARNING
+                       "%pv: Debug Store unsupported on this CPU\n",
+                       current);
         }
         return 0;
     }
+
+    ASSERT(!supported);
 
     core2_vpmu_cxt = vpmu->context;
     switch ( msr )
