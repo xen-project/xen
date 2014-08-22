@@ -179,13 +179,13 @@ void ret_from_intr(void);
 #define ASM_STAC ASM_AC(STAC)
 #define ASM_CLAC ASM_AC(CLAC)
 #else
-static inline void clac(void)
+static always_inline void clac(void)
 {
     /* Note: a barrier is implicit in alternative() */
     alternative(ASM_NOP3, __stringify(__ASM_CLAC), X86_FEATURE_SMAP);
 }
 
-static inline void stac(void)
+static always_inline void stac(void)
 {
     /* Note: a barrier is implicit in alternative() */
     alternative(ASM_NOP3, __stringify(__ASM_STAC), X86_FEATURE_SMAP);
