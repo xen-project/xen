@@ -1,0 +1,205 @@
+% LibXenLight Domain Image Format
+% Andrew Cooper <<andrew.cooper3@citrix.com>>
+% Draft B
+
+Introduction
+============
+
+For the purposes of this document, `xl` is used as a representation of any
+implementer of the `libxl` API.  `xl` should be considered completely
+interchangeable with alternates, such as `libvirt` or `xenopsd-xl`.
+
+Purpose
+-------
+
+The _domain image format_ is the context of a running domain used for
+snapshots of a domain or for transferring domains between hosts during
+migration.
+
+There are a number of problems with the domain image format used in Xen 4.5
+and earlier (the _legacy format_)
+
+* There is no `libxl` context information.  `xl` is required to send certain
+  pieces of `libxl` context itself.
+
+* The contents of the stream is passed directly through `libxl` to `libxc`.
+  The legacy `libxc` format contained some information which belonged at the
+  `libxl` level, resulting in awkward layer violation to return the
+  information back to `libxl`.
+
+* The legacy `libxc` format was inextensible, causing inextensibility in the
+  legacy `libxl` handling.
+
+This design addresses the above points, allowing for a completely
+self-contained, extensible stream with each layer responsible for its own
+appropriate information.
+
+
+Not Yet Included
+----------------
+
+The following features are not yet fully specified and will be
+included in a future draft.
+
+* Remus
+
+* ARM
+
+
+Overview
+========
+
+The image format consists of a _Header_, followed by 1 or more _Records_.
+Each record consists of a type and length field, followed by any type-specific
+data.
+
+\clearpage
+
+Header
+======
+
+The header identifies the stream as a `libxl` stream, including the version of
+this specification that it complies with.
+
+All fields in this header shall be in _big-endian_ byte order, regardless of
+the setting of the endianness bit.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+    | ident                                           |
+    +-----------------------+-------------------------+
+    | version               | options                 |
+    +-----------------------+-------------------------+
+
+--------------------------------------------------------------------
+Field       Description
+----------- --------------------------------------------------------
+ident       0x4c6962786c466d74 ("LibxlFmt" in ASCII).
+
+version     0x00000002.  The version of this specification.
+
+options     bit 0: Endianness.    0 = little-endian, 1 = big-endian.
+
+            bit 1: Legacy Format. If set, this stream was created by
+                                  the legacy conversion tool.
+
+            bits 2-31: Reserved.
+--------------------------------------------------------------------
+
+The endianness shall be 0 (little-endian) for images generated on an
+i386, x86_64, or arm host.
+
+\clearpage
+
+
+Records
+=======
+
+A record has a record header, type specific data and a trailing footer.  If
+`length` is not a multiple of 8, the body is padded with zeroes to align the
+end of the record on an 8 octet boundary.
+
+     0     1     2     3     4     5     6     7 octet
+    +-----------------------+-------------------------+
+    | type                  | body_length             |
+    +-----------+-----------+-------------------------+
+    | body...                                         |
+    ...
+    |           | padding (0 to 7 octets)             |
+    +-----------+-------------------------------------+
+
+--------------------------------------------------------------------
+Field        Description
+-----------  -------------------------------------------------------
+type         0x00000000: END
+
+             0x00000001: LIBXC_CONTEXT
+
+             0x00000002: XENSTORE_DATA
+
+             0x00000003: EMULATOR_CONTEXT
+
+             0x00000004 - 0x7FFFFFFF: Reserved for future _mandatory_
+             records.
+
+             0x80000000 - 0xFFFFFFFF: Reserved for future _optional_
+             records.
+
+body_length  Length in octets of the record body.
+
+body         Content of the record.
+
+padding      0 to 7 octets of zeros to pad the whole record to a multiple
+             of 8 octets.
+--------------------------------------------------------------------
+
+\clearpage
+
+END
+----
+
+A end record marks the end of the image, and shall be the final record
+in the stream.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+
+The end record contains no fields; its body_length is 0.
+
+LIBXC\_CONTEXT
+--------------
+
+A libxc context record is a marker, indicating that the stream should be
+handed to `xc_domain_restore()`.  `libxc` shall be responsible for reading its
+own image format from the stream.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+
+The libxc context record contains no fields; its body_length is 0[^1].
+
+
+[^1]: The sending side cannot calculate ahead of time how much data `libxc`
+might write into the stream, especially for live migration where the quantity
+of data is partially proportional to the elapsed time.
+
+XENSTORE\_DATA
+-------------
+
+A record containing xenstore key/value pairs of data.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+    | xenstore key/value pairs                        |
+    ...
+    +-------------------------------------------------+
+
+EMULATOR\_CONTEXT
+----------------
+
+A context blob for a specific emulator associated with the domain.
+
+     0     1     2     3     4     5     6     7 octet
+    +------------------------+------------------------+
+    | emulator_id            | index                  |
+    +------------------------+------------------------+
+    | emulator_ctx                                    |
+    ...
+    +-------------------------------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+------------     ---------------------------------------------------
+emulator_id      0x00000000: Unknown (In the case of a legacy stream)
+
+                 0x00000001: Qemu Traditional
+
+                 0x00000002: Qemu Upstream
+
+                 0x00000003 - 0xFFFFFFFF: Reserved for future emulators.
+
+index            Index of this emulator for the domain, if multiple
+                 emulators are in use.
+
+emulator_ctx     Emulator context blob.
+--------------------------------------------------------------------
