@@ -19,6 +19,7 @@
 #include <xen/iommu.h>
 #include <xen/symbols.h>
 #include <xen/trace.h>
+#include <xen/softirq.h>
 #include <xsm/xsm.h>
 #include <asm/msi.h>
 #include <asm/current.h>
@@ -2234,6 +2235,8 @@ static void dump_irqs(unsigned char key)
 
     for ( irq = 0; irq < nr_irqs; irq++ )
     {
+        if ( !(irq & 0x1f) )
+            process_pending_softirqs();
 
         desc = irq_to_desc(irq);
 
@@ -2287,6 +2290,7 @@ static void dump_irqs(unsigned char key)
         xfree(ssid);
     }
 
+    process_pending_softirqs();
     printk("Direct vector information:\n");
     for ( i = FIRST_DYNAMIC_VECTOR; i < NR_VECTORS; ++i )
         if ( direct_apic_vector[i] )
