@@ -51,68 +51,109 @@ void set_cpuid_faulting(bool_t enable)
  */
 static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 {
-	u32 eax, edx;
-	const char *extra = "";
+	static unsigned int msr_basic, msr_ext, msr_xsave;
+	static enum { not_parsed, no_mask, set_mask } status;
+	u64 msr_val;
+
+	if (status == no_mask)
+		return;
+
+	if (status == set_mask)
+		goto setmask;
+
+	ASSERT((status == not_parsed) && (c == &boot_cpu_data));
+	status = no_mask;
 
 	if (!~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
 	       opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx &
-               opt_cpuid_mask_xsave_eax))
+	       opt_cpuid_mask_xsave_eax))
 		return;
 
-	/* Only family 6 supports this feature  */
-	switch ((c->x86 == 6) * c->x86_model) {
-	case 0x17:
-		if ((c->x86_mask & 0x0f) < 4)
-			break;
-		/* fall through */
-	case 0x1d:
-		wrmsr(MSR_INTEL_CPUID_FEATURE_MASK,
-		      opt_cpuid_mask_ecx,
-		      opt_cpuid_mask_edx);
-		if (~(opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx))
-			extra = "extended ";
-		else if (~opt_cpuid_mask_xsave_eax)
-			extra = "xsave ";
-		else
-			return;
-		break;
-/* 
- * CPU supports this feature if the processor signature meets the following:
- * (CPUID.(EAX=01h):EAX) > 000106A2h, or
- * (CPUID.(EAX=01h):EAX) == 000106Exh, 0002065xh, 000206Cxh, 000206Exh, or 000206Fxh
- *
- */
-	case 0x1a:
-		if ((c->x86_mask & 0x0f) <= 2)
-			break;
-		/* fall through */
-	case 0x1e: case 0x1f:
-	case 0x25: case 0x2c: case 0x2e: case 0x2f:
-		wrmsr(MSR_INTEL_CPUID1_FEATURE_MASK,
-		      opt_cpuid_mask_ecx,
-		      opt_cpuid_mask_edx);
-		wrmsr(MSR_INTEL_CPUID80000001_FEATURE_MASK,
-		      opt_cpuid_mask_ext_ecx,
-		      opt_cpuid_mask_ext_edx);
-		if (!~opt_cpuid_mask_xsave_eax)
-			return;
-		extra = "xsave ";
-		break;
-	case 0x2a: case 0x2d:
-		wrmsr(MSR_INTEL_CPUID1_FEATURE_MASK_V2,
-		      opt_cpuid_mask_ecx,
-		      opt_cpuid_mask_edx);
-		rdmsr(MSR_INTEL_CPUIDD_01_FEATURE_MASK, eax, edx);
-		wrmsr(MSR_INTEL_CPUIDD_01_FEATURE_MASK,
-		      opt_cpuid_mask_xsave_eax, edx);
-		wrmsr(MSR_INTEL_CPUID80000001_FEATURE_MASK_V2,
-		      opt_cpuid_mask_ext_ecx,
-		      opt_cpuid_mask_ext_edx);
+	/* Only family 6 supports this feature. */
+	if (c->x86 != 6) {
+		printk("No CPUID feature masking support available\n");
 		return;
 	}
 
-	printk(XENLOG_ERR "Cannot set CPU %sfeature mask on CPU#%d\n",
-	       extra, smp_processor_id());
+	switch (c->x86_model) {
+	case 0x17: /* Yorkfield, Wolfdale, Penryn, Harpertown(DP) */
+	case 0x1d: /* Dunnington(MP) */
+		msr_basic = MSR_INTEL_MASK_V1_CPUID1;
+		break;
+
+	case 0x1a: /* Bloomfield, Nehalem-EP(Gainestown) */
+	case 0x1e: /* Clarksfield, Lynnfield, Jasper Forest */
+	case 0x1f: /* Something Nehalem-based - perhaps Auburndale/Havendale? */
+	case 0x25: /* Arrandale, Clarksdale */
+	case 0x2c: /* Gulftown, Westmere-EP */
+	case 0x2e: /* Nehalem-EX(Beckton) */
+	case 0x2f: /* Westmere-EX */
+		msr_basic = MSR_INTEL_MASK_V2_CPUID1;
+		msr_ext   = MSR_INTEL_MASK_V2_CPUID80000001;
+		break;
+
+	case 0x2a: /* SandyBridge */
+	case 0x2d: /* SandyBridge-E, SandyBridge-EN, SandyBridge-EP */
+		msr_basic = MSR_INTEL_MASK_V3_CPUID1;
+		msr_ext   = MSR_INTEL_MASK_V3_CPUID80000001;
+		msr_xsave = MSR_INTEL_MASK_V3_CPUIDD_01;
+		break;
+	}
+
+	status = set_mask;
+
+	if (~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx)) {
+		if (msr_basic)
+			printk("Writing CPUID feature mask ecx:edx -> %08x:%08x\n",
+			       opt_cpuid_mask_ecx, opt_cpuid_mask_edx);
+		else
+			printk("No CPUID feature mask available\n");
+	}
+	else
+		msr_basic = 0;
+
+	if (~(opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx)) {
+		if (msr_ext)
+			printk("Writing CPUID extended feature mask ecx:edx -> %08x:%08x\n",
+			       opt_cpuid_mask_ext_ecx, opt_cpuid_mask_ext_edx);
+		else
+			printk("No CPUID extended feature mask available\n");
+	}
+	else
+		msr_ext = 0;
+
+	if (~opt_cpuid_mask_xsave_eax) {
+		if (msr_xsave)
+			printk("Writing CPUID xsave feature mask eax -> %08x\n",
+			       opt_cpuid_mask_xsave_eax);
+		else
+			printk("No CPUID xsave feature mask available\n");
+	}
+	else
+		msr_xsave = 0;
+
+ setmask:
+	if (msr_basic &&
+	    wrmsr_safe(msr_basic,
+		       ((u64)opt_cpuid_mask_edx << 32) | opt_cpuid_mask_ecx)){
+		msr_basic = 0;
+		printk("Failed to set CPUID feature mask\n");
+	}
+
+	if (msr_ext &&
+	    wrmsr_safe(msr_ext,
+		       ((u64)opt_cpuid_mask_ext_edx << 32) | opt_cpuid_mask_ext_ecx)){
+		msr_ext = 0;
+		printk("Failed to set CPUID extended feature mask\n");
+	}
+
+	if (msr_xsave &&
+	    (rdmsr_safe(msr_xsave, msr_val) ||
+	     wrmsr_safe(msr_xsave,
+			(msr_val & (~0ULL << 32)) | opt_cpuid_mask_xsave_eax))){
+		msr_xsave = 0;
+		printk("Failed to set CPUID xsave feature mask\n");
+	}
 }
 
 void __devinit early_intel_workaround(struct cpuinfo_x86 *c)
@@ -222,6 +263,11 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 
 	if (!cpu_has_cpuid_faulting)
 		set_cpuidmask(c);
+	else if ((c == &boot_cpu_data) &&
+		 (~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
+		    opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx &
+		    opt_cpuid_mask_xsave_eax)))
+		printk("No CPUID feature masking support available\n");
 
 	/* Work around errata */
 	Intel_errata_workarounds(c);
