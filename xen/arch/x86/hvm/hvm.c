@@ -2281,7 +2281,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
     {
         v->arch.hvm_vcpu.hcall_64bit = 1;    /* PVH 32bitfixme. */
         /* This is for hvm_long_mode_enabled(v). */
-        v->arch.hvm_vcpu.guest_efer = EFER_SCE | EFER_LMA | EFER_LME;
+        v->arch.hvm_vcpu.guest_efer = EFER_LMA | EFER_LME;
         return 0;
     }
 
