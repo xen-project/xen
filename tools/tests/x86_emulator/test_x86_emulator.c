@@ -597,23 +597,32 @@ int main(int argc, char **argv)
     printf("skipped\n");
 #endif
 
+#define decl_insn(which) extern const unsigned char which[], which##_len[]
+#define put_insn(which, insn) ".pushsection .test, \"ax\", @progbits\n" \
+                              #which ": " insn "\n"                     \
+                              ".equ " #which "_len, .-" #which "\n"     \
+                              ".popsection"
+#define set_insn(which) (regs.eip = (unsigned long)memcpy(instr, which, \
+                                             (unsigned long)which##_len))
+#define check_eip(which) (regs.eip == (unsigned long)instr + \
+                                      (unsigned long)which##_len)
+
     printf("%-40s", "Testing movq %mm3,(%ecx)...");
     if ( stack_exec && cpu_has_mmx )
     {
-        extern const unsigned char movq_to_mem[];
+        decl_insn(movq_to_mem);
 
         asm volatile ( "pcmpeqb %%mm3, %%mm3\n"
-                       ".pushsection .test, \"a\", @progbits\n"
-                       "movq_to_mem: movq %%mm3, (%0)\n"
-                       ".popsection" :: "c" (NULL) );
+                       put_insn(movq_to_mem, "movq %%mm3, (%0)")
+                       :: "c" (NULL) );
 
-        memcpy(instr, movq_to_mem, 15);
+        set_insn(movq_to_mem);
         memset(res, 0x33, 64);
         memset(res + 8, 0xff, 8);
-        regs.eip    = (unsigned long)&instr[0];
         regs.ecx    = (unsigned long)res;
         rc = x86_emulate(&ctxt, &emulops);
-        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 8, 32) )
+        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 8, 32) ||
+             !check_eip(movq_to_mem) )
             goto fail;
         printf("okay\n");
     }
@@ -623,19 +632,17 @@ int main(int argc, char **argv)
     printf("%-40s", "Testing movq (%edx),%mm5...");
     if ( stack_exec && cpu_has_mmx )
     {
-        extern const unsigned char movq_from_mem[];
+        decl_insn(movq_from_mem);
 
         asm volatile ( "pcmpgtb %%mm5, %%mm5\n"
-                       ".pushsection .test, \"a\", @progbits\n"
-                       "movq_from_mem: movq (%0), %%mm5\n"
-                       ".popsection" :: "d" (NULL) );
+                       put_insn(movq_from_mem, "movq (%0), %%mm5")
+                       :: "d" (NULL) );
 
-        memcpy(instr, movq_from_mem, 15);
-        regs.eip    = (unsigned long)&instr[0];
+        set_insn(movq_from_mem);
         regs.ecx    = 0;
         regs.edx    = (unsigned long)res;
         rc = x86_emulate(&ctxt, &emulops);
-        if ( rc != X86EMUL_OKAY )
+        if ( rc != X86EMUL_OKAY || !check_eip(movq_from_mem) )
             goto fail;
         asm ( "pcmpeqb %%mm3, %%mm3\n\t"
               "pcmpeqb %%mm5, %%mm3\n\t"
@@ -650,20 +657,19 @@ int main(int argc, char **argv)
     printf("%-40s", "Testing movdqu %xmm2,(%ecx)...");
     if ( stack_exec && cpu_has_sse2 )
     {
-        extern const unsigned char movdqu_to_mem[];
+        decl_insn(movdqu_to_mem);
 
         asm volatile ( "pcmpeqb %%xmm2, %%xmm2\n"
-                       ".pushsection .test, \"a\", @progbits\n"
-                       "movdqu_to_mem: movdqu %%xmm2, (%0)\n"
-                       ".popsection" :: "c" (NULL) );
+                       put_insn(movdqu_to_mem, "movdqu %%xmm2, (%0)")
+                       :: "c" (NULL) );
 
-        memcpy(instr, movdqu_to_mem, 15);
+        set_insn(movdqu_to_mem);
         memset(res, 0x55, 64);
         memset(res + 8, 0xff, 16);
-        regs.eip    = (unsigned long)&instr[0];
         regs.ecx    = (unsigned long)res;
         rc = x86_emulate(&ctxt, &emulops);
-        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 8, 32) )
+        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 8, 32) ||
+             !check_eip(movdqu_to_mem) )
             goto fail;
         printf("okay\n");
     }
@@ -673,19 +679,17 @@ int main(int argc, char **argv)
     printf("%-40s", "Testing movdqu (%edx),%xmm4...");
     if ( stack_exec && cpu_has_sse2 )
     {
-        extern const unsigned char movdqu_from_mem[];
+        decl_insn(movdqu_from_mem);
 
         asm volatile ( "pcmpgtb %%xmm4, %%xmm4\n"
-                       ".pushsection .test, \"a\", @progbits\n"
-                       "movdqu_from_mem: movdqu (%0), %%xmm4\n"
-                       ".popsection" :: "d" (NULL) );
+                       put_insn(movdqu_from_mem, "movdqu (%0), %%xmm4")
+                       :: "d" (NULL) );
 
-        memcpy(instr, movdqu_from_mem, 15);
-        regs.eip    = (unsigned long)&instr[0];
+        set_insn(movdqu_from_mem);
         regs.ecx    = 0;
         regs.edx    = (unsigned long)res;
         rc = x86_emulate(&ctxt, &emulops);
-        if ( rc != X86EMUL_OKAY )
+        if ( rc != X86EMUL_OKAY || !check_eip(movdqu_from_mem) )
             goto fail;
         asm ( "pcmpeqb %%xmm2, %%xmm2\n\t"
               "pcmpeqb %%xmm4, %%xmm2\n\t"
@@ -700,21 +704,20 @@ int main(int argc, char **argv)
     printf("%-40s", "Testing vmovdqu %ymm2,(%ecx)...");
     if ( stack_exec && cpu_has_avx )
     {
-        extern const unsigned char vmovdqu_to_mem[];
+        decl_insn(vmovdqu_to_mem);
 
         asm volatile ( "vpcmpeqb %%xmm2, %%xmm2, %%xmm2\n"
-                       ".pushsection .test, \"a\", @progbits\n"
-                       "vmovdqu_to_mem: vmovdqu %%ymm2, (%0)\n"
-                       ".popsection" :: "c" (NULL) );
+                       put_insn(vmovdqu_to_mem, "vmovdqu %%ymm2, (%0)")
+                       :: "c" (NULL) );
 
-        memcpy(instr, vmovdqu_to_mem, 15);
+        set_insn(vmovdqu_to_mem);
         memset(res, 0x55, 128);
         memset(res + 16, 0xff, 16);
         memset(res + 20, 0x00, 16);
-        regs.eip    = (unsigned long)&instr[0];
         regs.ecx    = (unsigned long)res;
         rc = x86_emulate(&ctxt, &emulops);
-        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 16, 64) )
+        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 16, 64) ||
+             !check_eip(vmovdqu_to_mem) )
             goto fail;
         printf("okay\n");
     }
@@ -724,7 +727,7 @@ int main(int argc, char **argv)
     printf("%-40s", "Testing vmovdqu (%edx),%ymm4...");
     if ( stack_exec && cpu_has_avx )
     {
-        extern const unsigned char vmovdqu_from_mem[];
+        decl_insn(vmovdqu_from_mem);
 
 #if 0 /* Don't use AVX2 instructions for now */
         asm volatile ( "vpcmpgtb %%ymm4, %%ymm4, %%ymm4\n"
@@ -732,17 +735,15 @@ int main(int argc, char **argv)
         asm volatile ( "vpcmpgtb %%xmm4, %%xmm4, %%xmm4\n\t"
                        "vinsertf128 $1, %%xmm4, %%ymm4, %%ymm4\n"
 #endif
-                       ".pushsection .test, \"a\", @progbits\n"
-                       "vmovdqu_from_mem: vmovdqu (%0), %%ymm4\n"
-                       ".popsection" :: "d" (NULL) );
+                       put_insn(vmovdqu_from_mem, "vmovdqu (%0), %%ymm4")
+                       :: "d" (NULL) );
 
-        memcpy(instr, vmovdqu_from_mem, 15);
+        set_insn(vmovdqu_from_mem);
         memset(res + 4, 0xff, 16);
-        regs.eip    = (unsigned long)&instr[0];
         regs.ecx    = 0;
         regs.edx    = (unsigned long)res;
         rc = x86_emulate(&ctxt, &emulops);
-        if ( rc != X86EMUL_OKAY )
+        if ( rc != X86EMUL_OKAY || !check_eip(vmovdqu_from_mem) )
             goto fail;
 #if 0 /* Don't use AVX2 instructions for now */
         asm ( "vpcmpeqb %%ymm2, %%ymm2, %%ymm2\n\t"
@@ -769,20 +770,19 @@ int main(int argc, char **argv)
     memset(res + 10, 0x66, 8);
     if ( stack_exec && cpu_has_sse2 )
     {
-        extern const unsigned char movsd_to_mem[];
+        decl_insn(movsd_to_mem);
 
         asm volatile ( "movlpd %0, %%xmm5\n\t"
                        "movhpd %0, %%xmm5\n"
-                       ".pushsection .test, \"a\", @progbits\n"
-                       "movsd_to_mem: movsd %%xmm5, (%1)\n"
-                       ".popsection" :: "m" (res[10]), "c" (NULL) );
+                       put_insn(movsd_to_mem, "movsd %%xmm5, (%1)")
+                       :: "m" (res[10]), "c" (NULL) );
 
-        memcpy(instr, movsd_to_mem, 15);
-        regs.eip    = (unsigned long)&instr[0];
+        set_insn(movsd_to_mem);
         regs.ecx    = (unsigned long)(res + 2);
         regs.edx    = 0;
         rc = x86_emulate(&ctxt, &emulops);
-        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 8, 32) )
+        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 8, 32) ||
+             !check_eip(movsd_to_mem) )
             goto fail;
         printf("okay\n");
     }
@@ -795,19 +795,17 @@ int main(int argc, char **argv)
     printf("%-40s", "Testing movaps (%edx),%xmm7...");
     if ( stack_exec && cpu_has_sse )
     {
-        extern const unsigned char movaps_from_mem[];
+        decl_insn(movaps_from_mem);
 
         asm volatile ( "xorps %%xmm7, %%xmm7\n"
-                       ".pushsection .test, \"a\", @progbits\n"
-                       "movaps_from_mem: movaps (%0), %%xmm7\n"
-                       ".popsection" :: "d" (NULL) );
+                       put_insn(movaps_from_mem, "movaps (%0), %%xmm7")
+                       :: "d" (NULL) );
 
-        memcpy(instr, movaps_from_mem, 15);
-        regs.eip    = (unsigned long)&instr[0];
+        set_insn(movaps_from_mem);
         regs.ecx    = 0;
         regs.edx    = (unsigned long)res;
         rc = x86_emulate(&ctxt, &emulops);
-        if ( rc != X86EMUL_OKAY )
+        if ( rc != X86EMUL_OKAY || !check_eip(movaps_from_mem) )
             goto fail;
         asm ( "cmpeqps %1, %%xmm7\n\t"
               "movmskps %%xmm7, %0" : "=r" (rc) : "m" (res[8]) );
@@ -823,19 +821,18 @@ int main(int argc, char **argv)
     memset(res + 10, 0x77, 8);
     if ( stack_exec && cpu_has_avx )
     {
-        extern const unsigned char vmovsd_to_mem[];
+        decl_insn(vmovsd_to_mem);
 
         asm volatile ( "vbroadcastsd %0, %%ymm5\n"
-                       ".pushsection .test, \"a\", @progbits\n"
-                       "vmovsd_to_mem: vmovsd %%xmm5, (%1)\n"
-                       ".popsection" :: "m" (res[10]), "c" (NULL) );
+                       put_insn(vmovsd_to_mem, "vmovsd %%xmm5, (%1)")
+                       :: "m" (res[10]), "c" (NULL) );
 
-        memcpy(instr, vmovsd_to_mem, 15);
-        regs.eip    = (unsigned long)&instr[0];
+        set_insn(vmovsd_to_mem);
         regs.ecx    = (unsigned long)(res + 2);
         regs.edx    = 0;
         rc = x86_emulate(&ctxt, &emulops);
-        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 8, 32) )
+        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 8, 32) ||
+             !check_eip(vmovsd_to_mem) )
             goto fail;
         printf("okay\n");
     }
@@ -848,19 +845,17 @@ int main(int argc, char **argv)
     printf("%-40s", "Testing vmovaps (%edx),%ymm7...");
     if ( stack_exec && cpu_has_avx )
     {
-        extern const unsigned char vmovaps_from_mem[];
+        decl_insn(vmovaps_from_mem);
 
         asm volatile ( "vxorps %%ymm7, %%ymm7, %%ymm7\n"
-                       ".pushsection .test, \"a\", @progbits\n"
-                       "vmovaps_from_mem: vmovaps (%0), %%ymm7\n"
-                       ".popsection" :: "d" (NULL) );
+                       put_insn(vmovaps_from_mem, "vmovaps (%0), %%ymm7")
+                       :: "d" (NULL) );
 
-        memcpy(instr, vmovaps_from_mem, 15);
-        regs.eip    = (unsigned long)&instr[0];
+        set_insn(vmovaps_from_mem);
         regs.ecx    = 0;
         regs.edx    = (unsigned long)res;
         rc = x86_emulate(&ctxt, &emulops);
-        if ( rc != X86EMUL_OKAY )
+        if ( rc != X86EMUL_OKAY || !check_eip(vmovaps_from_mem) )
             goto fail;
         asm ( "vcmpeqps %1, %%ymm7, %%ymm0\n\t"
               "vmovmskps %%ymm0, %0" : "=r" (rc) : "m" (res[8]) );
@@ -870,6 +865,11 @@ int main(int argc, char **argv)
     }
     else
         printf("skipped\n");
+
+#undef decl_insn
+#undef put_insn
+#undef set_insn
+#undef check_eip
 
     for ( j = 1; j <= 2; j++ )
     {
