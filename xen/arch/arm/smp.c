@@ -19,7 +19,18 @@ void smp_send_event_check_mask(const cpumask_t *mask)
 
 void smp_send_call_function_mask(const cpumask_t *mask)
 {
-    send_SGI_mask(mask, GIC_SGI_CALL_FUNCTION);
+    cpumask_t target_mask;
+
+    cpumask_andnot(&target_mask, mask, cpumask_of(smp_processor_id()));
+
+    send_SGI_mask(&target_mask, GIC_SGI_CALL_FUNCTION);
+
+    if ( cpumask_test_cpu(smp_processor_id(), mask) )
+    {
+        local_irq_disable();
+        smp_call_function_interrupt();
+        local_irq_enable();
+    }
 }
 
 /*
