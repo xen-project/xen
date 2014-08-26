@@ -1092,7 +1092,7 @@ static inline void UNEXPECTED_IO_APIC(void)
 {
 }
 
-static void /*__init*/ __print_IO_APIC(void)
+static void /*__init*/ __print_IO_APIC(bool_t boot)
 {
     int apic, i;
     union IO_APIC_reg_00 reg_00;
@@ -1113,7 +1113,8 @@ static void /*__init*/ __print_IO_APIC(void)
     printk(KERN_INFO "testing the IO APIC.......................\n");
 
     for (apic = 0; apic < nr_ioapics; apic++) {
-        process_pending_softirqs();
+        if ( !boot )
+            process_pending_softirqs();
 
         if (!nr_ioapic_entries[apic])
             continue;
@@ -1219,7 +1220,7 @@ static void /*__init*/ __print_IO_APIC(void)
     for (i = 0; i < nr_irqs_gsi; i++) {
         struct irq_pin_list *entry = irq_2_pin + i;
 
-        if ( !(i & 0x1f) )
+        if ( !boot && !(i & 0x1f) )
             process_pending_softirqs();
 
         if (entry->pin < 0)
@@ -1242,12 +1243,12 @@ static void /*__init*/ __print_IO_APIC(void)
 static void __init print_IO_APIC(void)
 {
     if (apic_verbosity != APIC_QUIET)
-        __print_IO_APIC();
+        __print_IO_APIC(1);
 }
 
 static void _print_IO_APIC_keyhandler(unsigned char key)
 {
-    __print_IO_APIC();
+    __print_IO_APIC(0);
 }
 static struct keyhandler print_IO_APIC_keyhandler = {
     .diagnostic = 1,
