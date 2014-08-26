@@ -434,7 +434,8 @@ static void vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
     c->error_code = 0;
     __vmread(VM_ENTRY_INTR_INFO, &ev);
     if ( (ev & INTR_INFO_VALID_MASK) &&
-         hvm_event_needs_reinjection((ev >> 8) & 7, ev & 0xff) )
+         hvm_event_needs_reinjection(MASK_EXTR(ev, INTR_INFO_INTR_TYPE_MASK),
+                                     ev & INTR_INFO_VECTOR_MASK) )
     {
         c->pending_event = ev;
         __vmread(VM_ENTRY_EXCEPTION_ERROR_CODE, &ev);
@@ -2511,7 +2512,9 @@ static void vmx_idtv_reinject(unsigned long idtv_info)
     /* Event delivery caused this intercept? Queue for redelivery. */
     if ( unlikely(idtv_info & INTR_INFO_VALID_MASK) )
     {
-        if ( hvm_event_needs_reinjection((idtv_info>>8)&7, idtv_info&0xff) )
+        if ( hvm_event_needs_reinjection(MASK_EXTR(idtv_info,
+                                                   INTR_INFO_INTR_TYPE_MASK),
+                                         idtv_info & INTR_INFO_VECTOR_MASK) )
         {
             /* See SDM 3B 25.7.1.1 and .2 for info about masking resvd bits. */
             __vmwrite(VM_ENTRY_INTR_INFO,
