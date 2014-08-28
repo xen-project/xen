@@ -16,6 +16,9 @@
 
 #include "kernel.h"
 
+#define UIMAGE_MAGIC          0x27051956
+#define UIMAGE_NMLEN          32
+
 #define ZIMAGE32_MAGIC_OFFSET 0x24
 #define ZIMAGE32_START_OFFSET 0x28
 #define ZIMAGE32_END_OFFSET   0x2c
@@ -186,6 +189,72 @@ static void kernel_zimage_load(struct kernel_info *info)
         unmap_domain_page(dst);
         offs += l;
     }
+}
+
+/*
+ * Uimage CPU Architecture Codes
+ */
+#define IH_ARCH_ARM             2       /* ARM          */
+#define IH_ARCH_ARM64           22      /* ARM64        */
+
+/*
+ * Check if the image is a uImage and setup kernel_info
+ */
+static int kernel_uimage_probe(struct kernel_info *info,
+                                 paddr_t addr, paddr_t size)
+{
+    struct {
+        __be32 magic;   /* Image Header Magic Number */
+        __be32 hcrc;    /* Image Header CRC Checksum */
+        __be32 time;    /* Image Creation Timestamp  */
+        __be32 size;    /* Image Data Size           */
+        __be32 load;    /* Data Load Address         */
+        __be32 ep;      /* Entry Point Address       */
+        __be32 dcrc;    /* Image Data CRC Checksum   */
+        uint8_t os;     /* Operating System          */
+        uint8_t arch;   /* CPU architecture          */
+        uint8_t type;   /* Image Type                */
+        uint8_t comp;   /* Compression Type          */
+        uint8_t name[UIMAGE_NMLEN]; /* Image Name  */
+    } uimage;
+
+    uint32_t len;
+
+    if ( size < sizeof(uimage) )
+        return -EINVAL;
+
+    copy_from_paddr(&uimage, addr, sizeof(uimage));
+
+    if ( be32_to_cpu(uimage.magic) != UIMAGE_MAGIC )
+        return -EINVAL;
+
+    len = be32_to_cpu(uimage.size);
+
+    if ( len > size - sizeof(uimage) )
+        return -EINVAL;
+
+    info->zimage.kernel_addr = addr + sizeof(uimage);
+    info->zimage.len = len;
+
+    info->entry = info->zimage.start;
+    info->load = kernel_zimage_load;
+
+#ifdef CONFIG_ARM_64
+    switch ( uimage.arch )
+    {
+    case IH_ARCH_ARM:
+        info->type = DOMAIN_32BIT;
+        break;
+    case IH_ARCH_ARM64:
+        info->type = DOMAIN_64BIT;
+        break;
+    default:
+        printk(XENLOG_ERR "Unsupported uImage arch type %d\n", uimage.arch);
+        return -EINVAL;
+    }
+#endif
+
+    return 0;
 }
 
 #ifdef CONFIG_ARM_64
@@ -398,6 +467,8 @@ int kernel_probe(struct kernel_info *info)
     rc = kernel_zimage64_probe(info, start, size);
     if (rc < 0)
 #endif
+        rc = kernel_uimage_probe(info, start, size);
+    if (rc < 0)
         rc = kernel_zimage32_probe(info, start, size);
     if (rc < 0)
         rc = kernel_elf_probe(info, start, size);
