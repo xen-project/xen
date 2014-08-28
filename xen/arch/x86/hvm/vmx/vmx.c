@@ -2352,8 +2352,21 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
     p2m_type_t p2mt;
     int ret;
     struct domain *d = current->domain;
+
+    /*
+     * We treat all write violations also as read violations.
+     * The reason why this is required is the following warning:
+     * "An EPT violation that occurs during as a result of execution of a
+     * read-modify-write operation sets bit 1 (data write). Whether it also
+     * sets bit 0 (data read) is implementation-specific and, for a given
+     * implementation, may differ for different kinds of read-modify-write
+     * operations."
+     * - Intel(R) 64 and IA-32 Architectures Software Developer's Manual
+     *   Volume 3C: System Programming Guide, Part 3
+     */
     struct npfec npfec = {
-        .read_access = !!(qualification & EPT_READ_VIOLATION),
+        .read_access = !!(qualification & EPT_READ_VIOLATION) ||
+                       !!(qualification & EPT_WRITE_VIOLATION),
         .write_access = !!(qualification & EPT_WRITE_VIOLATION),
         .insn_fetch = !!(qualification & EPT_EXEC_VIOLATION)
     };

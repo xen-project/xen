@@ -1403,8 +1403,13 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     p2m_access_t p2ma;
     struct p2m_domain *p2m = NULL;
 
+    /*
+     * Since HW doesn't explicitly provide a read access bit and we need to
+     * somehow describe read-modify-write instructions we will conservatively
+     * set read_access for all memory accesses that are not instruction fetches.
+     */
     struct npfec npfec = {
-        .read_access = 1, /* All NPFs count as reads */
+        .read_access = !(pfec & PFEC_insn_fetch),
         .write_access = !!(pfec & PFEC_write_access),
         .insn_fetch = !!(pfec & PFEC_insn_fetch)
     };
