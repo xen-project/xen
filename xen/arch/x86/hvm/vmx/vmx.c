@@ -2391,6 +2391,10 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
     {
         __vmread(GUEST_LINEAR_ADDRESS, &gla);
         npfec.gla_valid = 1;
+        if( qualification & EPT_GLA_FAULT )
+            npfec.kind = npfec_kind_with_gla;
+        else
+            npfec.kind = npfec_kind_in_gpt;
     }
     else
         gla = ~0ull;

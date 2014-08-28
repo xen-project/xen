@@ -1394,7 +1394,7 @@ const struct hvm_function_table * __init start_svm(void)
 }
 
 static void svm_do_nested_pgfault(struct vcpu *v,
-    struct cpu_user_regs *regs, uint32_t pfec, paddr_t gpa)
+    struct cpu_user_regs *regs, uint64_t pfec, paddr_t gpa)
 {
     int ret;
     unsigned long gfn = gpa >> PAGE_SHIFT;
@@ -1413,6 +1413,12 @@ static void svm_do_nested_pgfault(struct vcpu *v,
         .write_access = !!(pfec & PFEC_write_access),
         .insn_fetch = !!(pfec & PFEC_insn_fetch)
     };
+
+    /* These bits are mutually exclusive */
+    if ( pfec & NPT_PFEC_with_gla )
+        npfec.kind = npfec_kind_with_gla;
+    else if ( pfec & NPT_PFEC_in_gpt )
+        npfec.kind = npfec_kind_in_gpt;
 
     ret = hvm_hap_nested_page_fault(gpa, ~0ul, npfec);
 

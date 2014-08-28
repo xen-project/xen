@@ -105,4 +105,10 @@ extern u32 svm_feature_flags;
 extern void svm_host_osvw_reset(void);
 extern void svm_host_osvw_init(void);
 
+/* EXITINFO1 fields on NPT faults */
+#define _NPT_PFEC_with_gla     32
+#define NPT_PFEC_with_gla      (1UL<<_NPT_PFEC_with_gla)
+#define _NPT_PFEC_in_gpt       33
+#define NPT_PFEC_in_gpt        (1UL<<_NPT_PFEC_in_gpt)
+
 #endif /* __ASM_X86_HVM_SVM_H__ */

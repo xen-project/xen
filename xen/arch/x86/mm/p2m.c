@@ -1405,10 +1405,13 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
         req->offset = gpa & ((1 << PAGE_SHIFT) - 1);
         req->gla_valid = npfec.gla_valid;
         req->gla = gla;
+        if ( npfec.kind == npfec_kind_with_gla )
+            req->fault_with_gla = 1;
+        else if ( npfec.kind == npfec_kind_in_gpt )
+            req->fault_in_gpt = 1;
         req->access_r = npfec.read_access;
         req->access_w = npfec.write_access;
         req->access_x = npfec.insn_fetch;
-    
         req->vcpu_id = v->vcpu_id;
     }
 

@@ -62,7 +62,9 @@ typedef struct mem_event_st {
     uint16_t access_w:1;
     uint16_t access_x:1;
     uint16_t gla_valid:1;
-    uint16_t available:12;
+    uint16_t fault_with_gla:1;
+    uint16_t fault_in_gpt:1;
+    uint16_t available:10;
 
     uint16_t reason;
 } mem_event_request_t, mem_event_response_t;

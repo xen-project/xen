@@ -552,6 +552,16 @@ void audit_domains(void);
 #endif
 
 /*
+ * Extra fault info types which are used to further describe
+ * the source of an access violation.
+ */
+typedef enum {
+    npfec_kind_unknown, /* must be first */
+    npfec_kind_in_gpt,  /* violation in guest page table */
+    npfec_kind_with_gla /* violation with guest linear address */
+} npfec_kind_t;
+
+/*
  * Nested page fault exception codes.
  */
 struct npfec {
@@ -559,6 +569,7 @@ struct npfec {
     unsigned int write_access:1;
     unsigned int insn_fetch:1;
     unsigned int gla_valid:1;
+    unsigned int kind:2;  /* npfec_kind_t */
 };
 
 int new_guest_cr3(unsigned long pfn);
