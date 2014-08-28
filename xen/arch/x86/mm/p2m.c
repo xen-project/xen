@@ -1323,9 +1323,9 @@ void p2m_mem_paging_resume(struct domain *d)
     }
 }
 
-bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla, 
-                          bool_t access_r, bool_t access_w, bool_t access_x,
-                          mem_event_request_t **req_ptr)
+bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
+                            struct npfec npfec,
+                            mem_event_request_t **req_ptr)
 {
     struct vcpu *v = current;
     unsigned long gfn = gpa >> PAGE_SHIFT;
@@ -1343,7 +1343,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla,
     gfn_lock(p2m, gfn, 0);
     mfn = p2m->get_entry(p2m, gfn, &p2mt, &p2ma, 0, NULL);
 
-    if ( access_w && p2ma == p2m_access_rx2rw ) 
+    if ( npfec.write_access && p2ma == p2m_access_rx2rw ) 
     {
         rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rw);
         ASSERT(rc == 0);
@@ -1352,7 +1352,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla,
     }
     else if ( p2ma == p2m_access_n2rwx )
     {
-        ASSERT(access_w || access_r || access_x);
+        ASSERT(npfec.write_access || npfec.read_access || npfec.insn_fetch);
         rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K,
                             p2mt, p2m_access_rwx);
         ASSERT(rc == 0);
@@ -1403,11 +1403,11 @@ bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla,
         /* Send request to mem event */
         req->gfn = gfn;
         req->offset = gpa & ((1 << PAGE_SHIFT) - 1);
-        req->gla_valid = gla_valid;
+        req->gla_valid = npfec.gla_valid;
         req->gla = gla;
-        req->access_r = access_r;
-        req->access_w = access_w;
-        req->access_x = access_x;
+        req->access_r = npfec.read_access;
+        req->access_w = npfec.write_access;
+        req->access_x = npfec.insn_fetch;
     
         req->vcpu_id = v->vcpu_id;
     }

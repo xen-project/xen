@@ -597,9 +597,9 @@ void p2m_mem_paging_resume(struct domain *d);
  * been promoted with no underlying vcpu pause. If the req_ptr has been populated, 
  * then the caller must put the event in the ring (once having released get_gfn*
  * locks -- caller must also xfree the request. */
-bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla, 
-                          bool_t access_r, bool_t access_w, bool_t access_x,
-                          mem_event_request_t **req_ptr);
+bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
+                            struct npfec npfec,
+                            mem_event_request_t **req_ptr);
 /* Resumes the running of the VCPU, restarting the last instruction */
 void p2m_mem_access_resume(struct domain *d);
 

@@ -551,6 +551,16 @@ void audit_domains(void);
 
 #endif
 
+/*
+ * Nested page fault exception codes.
+ */
+struct npfec {
+    unsigned int read_access:1;
+    unsigned int write_access:1;
+    unsigned int insn_fetch:1;
+    unsigned int gla_valid:1;
+};
+
 int new_guest_cr3(unsigned long pfn);
 void make_cr3(struct vcpu *v, unsigned long mfn);
 void update_cr3(struct vcpu *v);

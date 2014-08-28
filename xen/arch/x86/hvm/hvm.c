@@ -2723,12 +2723,8 @@ void hvm_inject_page_fault(int errcode, unsigned long cr2)
     hvm_inject_trap(&trap);
 }
 
-int hvm_hap_nested_page_fault(paddr_t gpa,
-                              bool_t gla_valid,
-                              unsigned long gla,
-                              bool_t access_r,
-                              bool_t access_w,
-                              bool_t access_x)
+int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
+                              struct npfec npfec)
 {
     unsigned long gfn = gpa >> PAGE_SHIFT;
     p2m_type_t p2mt;
@@ -2757,8 +2753,11 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
          * into l1 guest if not fixable. The algorithm is
          * the same as for shadow paging.
          */
-        rv = nestedhvm_hap_nested_page_fault(v, &gpa,
-                                             access_r, access_w, access_x);
+
+         rv = nestedhvm_hap_nested_page_fault(v, &gpa,
+                                              npfec.read_access,
+                                              npfec.write_access,
+                                              npfec.insn_fetch);
         switch (rv) {
         case NESTEDHVM_PAGEFAULT_DONE:
         case NESTEDHVM_PAGEFAULT_RETRY:
@@ -2797,47 +2796,49 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
 
     p2m = p2m_get_hostp2m(v->domain);
     mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 
-                              P2M_ALLOC | (access_w ? P2M_UNSHARE : 0), NULL);
+                              P2M_ALLOC | npfec.write_access ? P2M_UNSHARE : 0,
+                              NULL);
 
     /* Check access permissions first, then handle faults */
     if ( mfn_x(mfn) != INVALID_MFN )
     {
-        int violation = 0;
+        bool_t violation;
+
         /* If the access is against the permissions, then send to mem_event */
-        switch (p2ma) 
+        switch (p2ma)
         {
         case p2m_access_n:
         case p2m_access_n2rwx:
         default:
-            violation = access_r || access_w || access_x;
+            violation = npfec.read_access || npfec.write_access || npfec.insn_fetch;
             break;
         case p2m_access_r:
-            violation = access_w || access_x;
+            violation = npfec.write_access || npfec.insn_fetch;
             break;
         case p2m_access_w:
-            violation = access_r || access_x;
+            violation = npfec.read_access || npfec.insn_fetch;
             break;
         case p2m_access_x:
-            violation = access_r || access_w;
+            violation = npfec.read_access || npfec.write_access;
             break;
         case p2m_access_rx:
         case p2m_access_rx2rw:
-            violation = access_w;
+            violation = npfec.write_access;
             break;
         case p2m_access_wx:
-            violation = access_r;
+            violation = npfec.read_access;
             break;
         case p2m_access_rw:
-            violation = access_x;
+            violation = npfec.insn_fetch;
             break;
         case p2m_access_rwx:
+            violation = 0;
             break;
         }
 
         if ( violation )
         {
-            if ( p2m_mem_access_check(gpa, gla_valid, gla, access_r, 
-                                        access_w, access_x, &req_ptr) )
+            if ( p2m_mem_access_check(gpa, gla, npfec, &req_ptr) )
             {
                 fall_through = 1;
             } else {
@@ -2853,7 +2854,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
      * to the mmio handler.
      */
     if ( (p2mt == p2m_mmio_dm) || 
-         (access_w && (p2mt == p2m_ram_ro)) )
+         (npfec.write_access && (p2mt == p2m_ram_ro)) )
     {
         put_gfn(p2m->domain, gfn);
 
@@ -2872,7 +2873,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
         paged = 1;
 
     /* Mem sharing: unshare the page and try again */
-    if ( access_w && (p2mt == p2m_ram_shared) )
+    if ( npfec.write_access && (p2mt == p2m_ram_shared) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
         sharing_enomem = 
@@ -2889,7 +2890,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
          * a large page, we do not change other pages type within that large
          * page.
          */
-        if ( access_w )
+        if ( npfec.write_access )
         {
             paging_mark_dirty(v->domain, mfn_x(mfn));
             p2m_change_type_one(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
@@ -2899,7 +2900,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
     }
 
     /* Shouldn't happen: Maybe the guest was writing to a r/o grant mapping? */
-    if ( access_w && (p2mt == p2m_grant_map_ro) )
+    if ( npfec.write_access && (p2mt == p2m_grant_map_ro) )
     {
         gdprintk(XENLOG_WARNING,
                  "trying to write to read-only grant mapping\n");

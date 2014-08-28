@@ -2352,6 +2352,11 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
     p2m_type_t p2mt;
     int ret;
     struct domain *d = current->domain;
+    struct npfec npfec = {
+        .read_access = !!(qualification & EPT_READ_VIOLATION),
+        .write_access = !!(qualification & EPT_WRITE_VIOLATION),
+        .insn_fetch = !!(qualification & EPT_EXEC_VIOLATION)
+    };
 
     if ( tb_init_done )
     {
@@ -2370,14 +2375,14 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
     }
 
     if ( qualification & EPT_GLA_VALID )
+    {
         __vmread(GUEST_LINEAR_ADDRESS, &gla);
+        npfec.gla_valid = 1;
+    }
     else
         gla = ~0ull;
-    ret = hvm_hap_nested_page_fault(gpa,
-                                    !!(qualification & EPT_GLA_VALID), gla,
-                                    !!(qualification & EPT_READ_VIOLATION),
-                                    !!(qualification & EPT_WRITE_VIOLATION),
-                                    !!(qualification & EPT_EXEC_VIOLATION));
+
+    ret = hvm_hap_nested_page_fault(gpa, gla, npfec);
     switch ( ret )
     {
     case 0:         // Unhandled L1 EPT violation

@@ -455,11 +455,8 @@ static inline void hvm_invalidate_regs_fields(struct cpu_user_regs *regs)
 #endif
 }
 
-int hvm_hap_nested_page_fault(paddr_t gpa,
-                              bool_t gla_valid, unsigned long gla,
-                              bool_t access_r,
-                              bool_t access_w,
-                              bool_t access_x);
+int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
+                              struct npfec npfec);
 
 #define hvm_msr_tsc_aux(v) ({                                               \
     struct domain *__d = (v)->domain;                                       \
