@@ -191,8 +191,8 @@ static int make_chosen_node(libxl__gc *gc, void *fdt, bool ramdisk,
     res = fdt_begin_node(fdt, "chosen");
     if (res) return res;
 
-    if (info->u.pv.cmdline) {
-        res = fdt_property_string(fdt, "bootargs", info->u.pv.cmdline);
+    if (info->cmdline) {
+        res = fdt_property_string(fdt, "bootargs", info->cmdline);
         if (res) return res;
     }
 
