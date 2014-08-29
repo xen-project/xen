@@ -7495,18 +7495,17 @@ int main_remus(int argc, char **argv)
     memset(&r_info, 0, sizeof(libxl_domain_remus_info));
     /* Defaults */
     r_info.interval = 200;
-    r_info.blackhole = 0;
-    r_info.compression = 1;
+    libxl_defbool_setdefault(&r_info.blackhole, false);
 
     SWITCH_FOREACH_OPT(opt, "bui:s:e", NULL, "remus", 2) {
     case 'i':
         r_info.interval = atoi(optarg);
         break;
     case 'b':
-        r_info.blackhole = 1;
+        libxl_defbool_set(&r_info.blackhole, true);
         break;
     case 'u':
-        r_info.compression = 0;
+        libxl_defbool_set(&r_info.compression, false);
         break;
     case 's':
         ssh_command = optarg;
@@ -7519,7 +7518,7 @@ int main_remus(int argc, char **argv)
     domid = find_domain(argv[optind]);
     host = argv[optind + 1];
 
-    if (r_info.blackhole) {
+    if (libxl_defbool_val(r_info.blackhole)) {
         send_fd = open("/dev/null", O_RDWR, 0644);
         if (send_fd < 0) {
             perror("failed to open /dev/null");

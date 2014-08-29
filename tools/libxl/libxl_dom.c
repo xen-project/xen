@@ -1809,7 +1809,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
 
     if (r_info != NULL) {
         dss->interval = r_info->interval;
-        if (r_info->compression)
+        if (libxl_defbool_val(r_info->compression))
             dss->xcflags |= XCFLAGS_CHECKPOINT_COMPRESS;
     }
 

@@ -804,6 +804,9 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
         goto out;
     }
 
+    libxl_defbool_setdefault(&info->blackhole, false);
+    libxl_defbool_setdefault(&info->compression, true);
+
     GCNEW(dss);
     dss->ao = ao;
     dss->callback = remus_failover_cb;
