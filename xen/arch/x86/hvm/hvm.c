@@ -2788,7 +2788,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          && is_hvm_vcpu(v)
          && hvm_mmio_internal(gpa) )
     {
-        if ( !handle_mmio() )
+        if ( !handle_mmio_with_translation(gla, gpa >> PAGE_SHIFT, npfec) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         rc = 1;
         goto out;
@@ -2862,7 +2862,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         if ( unlikely(is_pvh_vcpu(v)) )
             goto out;
 
-        if ( !handle_mmio() )
+        if ( !handle_mmio_with_translation(gla, gpa >> PAGE_SHIFT, npfec) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         rc = 1;
         goto out;

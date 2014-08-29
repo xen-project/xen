@@ -2824,6 +2824,11 @@ static int sh_page_fault(struct vcpu *v,
     p2m_type_t p2mt;
     uint32_t rc;
     int version;
+    struct npfec access = {
+         .read_access = 1,
+         .gla_valid = 1,
+         .kind = npfec_kind_with_gla
+    };
 #if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
     int fast_emul = 0;
 #endif
@@ -2833,6 +2838,9 @@ static int sh_page_fault(struct vcpu *v,
                   regs->eip);
 
     perfc_incr(shadow_fault);
+
+    if ( regs->error_code & PFEC_write_access )
+        access.write_access = 1;
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
     /* If faulting frame is successfully emulated in last shadow fault
@@ -2935,7 +2943,7 @@ static int sh_page_fault(struct vcpu *v,
             SHADOW_PRINTK("fast path mmio %#"PRIpaddr"\n", gpa);
             reset_early_unshadow(v);
             trace_shadow_gen(TRC_SHADOW_FAST_MMIO, va);
-            return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT)
+            return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT, access)
                     ? EXCRET_fault_fixed : 0);
         }
         else
@@ -3424,7 +3432,7 @@ static int sh_page_fault(struct vcpu *v,
     paging_unlock(d);
     put_gfn(d, gfn_x(gfn));
     trace_shadow_gen(TRC_SHADOW_MMIO, va);
-    return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT)
+    return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT, access)
             ? EXCRET_fault_fixed : 0);
 
  not_a_shadow_fault:

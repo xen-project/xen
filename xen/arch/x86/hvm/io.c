@@ -95,7 +95,7 @@ int handle_mmio(void)
     if ( vio->io_state == HVMIO_awaiting_completion )
         vio->io_state = HVMIO_handle_mmio_awaiting_completion;
     else
-        vio->mmio_gva = 0;
+        vio->mmio_access = (struct npfec){};
 
     switch ( rc )
     {
@@ -124,9 +124,14 @@ int handle_mmio(void)
     return 1;
 }
 
-int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn)
+int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn,
+                                 struct npfec access)
 {
     struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
+
+    vio->mmio_access = access.gla_valid &&
+                       access.kind == npfec_kind_with_gla
+                       ? access : (struct npfec){};
     vio->mmio_gva = gva & PAGE_MASK;
     vio->mmio_gpfn = gpfn;
     return handle_mmio();

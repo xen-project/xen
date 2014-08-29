@@ -481,10 +481,11 @@ static int __hvmemul_read(
         while ( off & (chunk - 1) )
             chunk >>= 1;
 
-    if ( unlikely(vio->mmio_gva == (addr & PAGE_MASK)) && vio->mmio_gva )
+    if ( ((access_type != hvm_access_insn_fetch
+           ? vio->mmio_access.read_access
+           : vio->mmio_access.insn_fetch)) &&
+         (vio->mmio_gva == (addr & PAGE_MASK)) )
     {
-        if ( access_type == hvm_access_insn_fetch )
-            return X86EMUL_UNHANDLEABLE;
         gpa = (((paddr_t)vio->mmio_gpfn << PAGE_SHIFT) | off);
         while ( (off + chunk) <= PAGE_SIZE )
         {
@@ -624,7 +625,8 @@ static int hvmemul_write(
         while ( off & (chunk - 1) )
             chunk >>= 1;
 
-    if ( unlikely(vio->mmio_gva == (addr & PAGE_MASK)) && vio->mmio_gva )
+    if ( vio->mmio_access.write_access &&
+         (vio->mmio_gva == (addr & PAGE_MASK)) )
     {
         gpa = (((paddr_t)vio->mmio_gpfn << PAGE_SHIFT) | off);
         while ( (off + chunk) <= PAGE_SIZE )
