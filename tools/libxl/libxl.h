@@ -128,6 +128,16 @@
 #define LIBXL_HAVE_LIBXL_DEVICE_DISK_DISCARD_ENABLE 1
 
 /*
+ * LIBXL_HAVE_BUILDINFO_IOMEM_START_GFN indicates that it is possible
+ * to specify the start guest frame number used to map a range of I/O
+ * memory machine frame numbers via the 'gfn' field (of type uint64)
+ * of the 'iomem' structure. An array of iomem structures is embedded
+ * in libxl_domain_build_info and used to map the indicated memory
+ * ranges during domain build.
+ */
+#define LIBXL_HAVE_BUILDINFO_IOMEM_START_GFN 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

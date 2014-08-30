@@ -1199,6 +1199,7 @@ static void parse_config_data(const char *config_source,
     }
 
     if (!xlu_cfg_get_list(config, "iomem", &iomem, &num_iomem, 0)) {
+        int ret;
         b_info->num_iomem = num_iomem;
         b_info->iomem = calloc(num_iomem, sizeof(*b_info->iomem));
         if (b_info->iomem == NULL) {
@@ -1212,13 +1213,15 @@ static void parse_config_data(const char *config_source,
                         "xl: Unable to get element %d in iomem list\n", i);
                 exit(1);
             }
-            if(sscanf(buf, "%" SCNx64",%" SCNx64,
-                     &b_info->iomem[i].start,
-                     &b_info->iomem[i].number)
-                  != 2) {
-               fprintf(stderr,
-                       "xl: Invalid argument parsing iomem: %s\n", buf);
-               exit(1);
+            libxl_iomem_range_init(&b_info->iomem[i]);
+            ret = sscanf(buf, "%" SCNx64",%" SCNx64"@%" SCNx64,
+                         &b_info->iomem[i].start,
+                         &b_info->iomem[i].number,
+                         &b_info->iomem[i].gfn);
+            if (ret < 2) {
+                fprintf(stderr,
+                        "xl: Invalid argument parsing iomem: %s\n", buf);
+                exit(1);
             }
         }
     }

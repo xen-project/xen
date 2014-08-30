@@ -185,8 +185,12 @@ libxl_ioport_range = Struct("ioport_range", [
     ])
 
 libxl_iomem_range = Struct("iomem_range", [
+    # start host frame number to be mapped to the guest
     ("start", uint64),
+    # number of frames to be mapped
     ("number", uint64),
+    # guest frame number used as a start for the mapping
+    ("gfn", uint64, {'init_val': "LIBXL_INVALID_GFN"}),
     ])
 
 libxl_vga_interface_info = Struct("vga_interface_info", [

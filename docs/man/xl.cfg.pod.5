@@ -670,12 +670,20 @@ is given in hexadecimal and may either a span e.g. C<2f8-2ff>
 It is recommended to use this option only for trusted VMs under
 administrator control.
 
-=item B<iomem=[ "IOMEM_START,NUM_PAGES", "IOMEM_START,NUM_PAGES", ... ]>
+=item B<iomem=[ "IOMEM_START,NUM_PAGES[@GFN]", "IOMEM_START,NUM_PAGES[@GFN]", ... ]>
 
-Allow guest to access specific hardware I/O memory pages. B<IOMEM_START>
-is a physical page number. B<NUM_PAGES> is the number
-of pages beginning with B<START_PAGE> to allow access. Both values
-must be given in hexadecimal.
+Allow auto-translated domains to access specific hardware I/O memory pages.
+
+B<IOMEM_START> is a physical page number. B<NUM_PAGES> is the number of pages
+beginning with B<START_PAGE> to allow access. B<GFN> specifies the guest frame
+number where the mapping will start in the domU's address space. If B<GFN> is
+not given, the mapping will be performed using B<IOMEM_START> as a start in the
+domU's address space, therefore performing an 1:1 mapping as default.
+All of these values must be given in hexadecimal.
+
+Note that the IOMMU won't be updated with the mappings specified with this
+option. This option therefore should not be used to passthrough any
+IOMMU-protected device.
 
 It is recommended to use this option only for trusted VMs under
 administrator control.

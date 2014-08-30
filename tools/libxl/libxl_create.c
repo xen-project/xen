@@ -102,6 +102,8 @@ static int sched_params_valid(libxl__gc *gc,
 int libxl__domain_build_info_setdefault(libxl__gc *gc,
                                         libxl_domain_build_info *b_info)
 {
+    int i;
+
     if (b_info->type != LIBXL_DOMAIN_TYPE_HVM &&
         b_info->type != LIBXL_DOMAIN_TYPE_PV)
         return ERROR_INVAL;
@@ -189,8 +191,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
 
     /* In libxl internals, we want to deal with vcpu_hard_affinity only! */
     if (b_info->cpumap.size && !b_info->num_vcpu_hard_affinity) {
-        int i;
-
         b_info->vcpu_hard_affinity = libxl__calloc(gc, b_info->max_vcpus,
                                                    sizeof(libxl_bitmap));
         for (i = 0; i < b_info->max_vcpus; i++) {
@@ -214,6 +214,10 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     libxl_defbool_setdefault(&b_info->localtime, false);
 
     libxl_defbool_setdefault(&b_info->disable_migrate, false);
+
+    for (i = 0 ; i < b_info->num_iomem; i++)
+        if (b_info->iomem[i].gfn == LIBXL_INVALID_GFN)
+            b_info->iomem[i].gfn = b_info->iomem[i].start;
 
     if (!b_info->event_channels)
         b_info->event_channels = 1023;
