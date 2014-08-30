@@ -1725,6 +1725,51 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
     return hostmode->gva_to_gfn(v, hostp2m, va, pfec);
 }
 
+int map_mmio_regions(struct domain *d,
+                     unsigned long start_gfn,
+                     unsigned long nr,
+                     unsigned long mfn)
+{
+    int ret = 0;
+    unsigned long i;
+
+    if ( !paging_mode_translate(d) )
+        return 0;
+
+    for ( i = 0; !ret && i < nr; i++ )
+    {
+        ret = set_mmio_p2m_entry(d, start_gfn + i, _mfn(mfn + i));
+        if ( ret )
+        {
+            unmap_mmio_regions(d, start_gfn, i, mfn);
+            break;
+        }
+    }
+
+    return ret;
+}
+
+int unmap_mmio_regions(struct domain *d,
+                       unsigned long start_gfn,
+                       unsigned long nr,
+                       unsigned long mfn)
+{
+    int err = 0;
+    unsigned long i;
+
+    if ( !paging_mode_translate(d) )
+        return 0;
+
+    for ( i = 0; i < nr; i++ )
+    {
+        int ret = clear_mmio_p2m_entry(d, start_gfn + i, _mfn(mfn + i));
+        if ( ret )
+            err = ret;
+    }
+
+    return err;
+}
+
 /*** Audit ***/
 
 #if P2M_AUDIT

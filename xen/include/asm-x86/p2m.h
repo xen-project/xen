@@ -32,6 +32,18 @@
 #include <asm/mem_sharing.h>
 #include <asm/page.h>    /* for pagetable_t */
 
+/* Map MMIO regions in the p2m: start_gfn and nr describe the range in
+ * the guest physical address space to map, starting from the machine
+ * frame number mfn. */
+int map_mmio_regions(struct domain *d,
+                     unsigned long start_gfn,
+                     unsigned long nr,
+                     unsigned long mfn);
+int unmap_mmio_regions(struct domain *d,
+                       unsigned long start_gfn,
+                       unsigned long nr,
+                       unsigned long mfn);
+
 extern bool_t opt_hap_1gb, opt_hap_2mb;
 
 /*

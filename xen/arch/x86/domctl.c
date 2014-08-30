@@ -670,17 +670,14 @@ long arch_do_domctl(
                    d->domain_id, gfn, mfn, nr_mfns);
 
             ret = iomem_permit_access(d, mfn, mfn_end);
-            if ( !ret && paging_mode_translate(d) )
+            if ( !ret )
             {
-                for ( i = 0; !ret && i < nr_mfns; i++ )
-                    ret = set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i));
+                ret = map_mmio_regions(d, gfn, nr_mfns, mfn);
                 if ( ret )
                 {
                     printk(XENLOG_G_WARNING
-                           "memory_map:fail: dom%d gfn=%lx mfn=%lx ret:%ld\n",
-                           d->domain_id, gfn + i, mfn + i, ret);
-                    while ( i-- )
-                        clear_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i));
+                           "memory_map:fail: dom%d gfn=%lx mfn=%lx nr=%lx ret:%ld\n",
+                           d->domain_id, gfn, mfn, nr_mfns, ret);
                     if ( iomem_deny_access(d, mfn, mfn_end) &&
                          is_hardware_domain(current->domain) )
                         printk(XENLOG_ERR
@@ -697,13 +694,7 @@ long arch_do_domctl(
                    "memory_map:remove: dom%d gfn=%lx mfn=%lx nr=%lx\n",
                    d->domain_id, gfn, mfn, nr_mfns);
 
-            if ( paging_mode_translate(d) )
-                for ( i = 0; i < nr_mfns; i++ )
-                {
-                    ret = clear_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i));
-                    if ( ret )
-                        rc = ret;
-                }
+            rc = unmap_mmio_regions(d, gfn, nr_mfns, mfn);
             ret = iomem_deny_access(d, mfn, mfn_end);
             if ( !ret )
                 ret = rc;

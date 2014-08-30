@@ -108,6 +108,10 @@ int map_mmio_regions(struct domain *d,
                      unsigned long start_gfn,
                      unsigned long nr_mfns,
                      unsigned long mfn);
+int unmap_mmio_regions(struct domain *d,
+                       unsigned long start_gfn,
+                       unsigned long nr_mfns,
+                       unsigned long mfn);
 
 int guest_physmap_add_entry(struct domain *d,
                             unsigned long gfn,

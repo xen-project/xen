@@ -893,6 +893,18 @@ int map_mmio_regions(struct domain *d,
                              MATTR_DEV, p2m_mmio_direct);
 }
 
+int unmap_mmio_regions(struct domain *d,
+                       unsigned long start_gfn,
+                       unsigned long nr_mfns,
+                       unsigned long mfn)
+{
+    return apply_p2m_changes(d, REMOVE,
+                             pfn_to_paddr(start_gfn),
+                             pfn_to_paddr(start_gfn + nr_mfns),
+                             pfn_to_paddr(mfn),
+                             MATTR_DEV, p2m_invalid);
+}
+
 int guest_physmap_add_entry(struct domain *d,
                             unsigned long gpfn,
                             unsigned long mfn,
