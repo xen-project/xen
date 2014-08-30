@@ -5,6 +5,8 @@
 
 struct domain;
 
+extern void memory_type_changed(struct domain *);
+
 /* Per-p2m-table state */
 struct p2m_domain {
     /* Lock that protects updates to the p2m */

@@ -47,6 +47,10 @@ void p2m_dump_info(struct domain *d)
     spin_unlock(&p2m->lock);
 }
 
+void memory_type_changed(struct domain *d)
+{
+}
+
 void dump_p2m_lookup(struct domain *d, paddr_t addr)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
