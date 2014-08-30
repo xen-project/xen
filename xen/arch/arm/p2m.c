@@ -601,6 +601,7 @@ static int apply_one_level(struct domain *d,
         {
             /* Progress up to next boundary */
             *addr = (*addr + level_size) & level_mask;
+            *maddr = (*maddr + level_size) & level_mask;
             return P2M_ONE_PROGRESS_NOP;
         }
 
@@ -632,12 +633,29 @@ static int apply_one_level(struct domain *d,
             }
         }
 
+        /*
+         * Ensure that the guest address addr currently being
+         * handled (that is in the range given as argument to
+         * this function) is actually mapped to the corresponding
+         * machine address in the specified range. maddr here is
+         * the machine address given to the function, while
+         * orig_pte.p2m.base is the machine frame number actually
+         * mapped to the guest address: check if the two correspond.
+         */
+         if ( op == REMOVE &&
+              pfn_to_paddr(orig_pte.p2m.base) != *maddr )
+             printk(XENLOG_G_WARNING
+                    "p2m_remove dom%d: mapping at %"PRIpaddr" is of maddr %"PRIpaddr" not %"PRIpaddr" as expected\n",
+                    d->domain_id, *addr, pfn_to_paddr(orig_pte.p2m.base),
+                    *maddr);
+
         *flush = true;
 
         memset(&pte, 0x00, sizeof(pte));
         p2m_write_pte(entry, pte, flush_cache);
 
         *addr += level_size;
+        *maddr += level_size;
 
         p2m->stats.mappings[level]--;
 
