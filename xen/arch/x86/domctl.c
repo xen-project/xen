@@ -679,7 +679,7 @@ long arch_do_domctl(
                            "memory_map:fail: dom%d gfn=%lx mfn=%lx ret:%ld\n",
                            d->domain_id, gfn + i, mfn + i, ret);
                     while ( i-- )
-                        clear_mmio_p2m_entry(d, gfn + i);
+                        clear_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i));
                     if ( iomem_deny_access(d, mfn, mfn + nr_mfns - 1) &&
                          is_hardware_domain(current->domain) )
                         printk(XENLOG_ERR
@@ -699,7 +699,7 @@ long arch_do_domctl(
             if ( paging_mode_translate(d) )
                 for ( i = 0; i < nr_mfns; i++ )
                 {
-                    ret = clear_mmio_p2m_entry(d, gfn + i);
+                    ret = clear_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i));
                     if ( ret )
                         tmp_rc = ret;
                 }

@@ -206,7 +206,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     }
     if ( p2mt == p2m_mmio_direct )
     {
-        clear_mmio_p2m_entry(d, gmfn);
+        clear_mmio_p2m_entry(d, gmfn, _mfn(mfn));
         put_gfn(d, gmfn);
         return 1;
     }

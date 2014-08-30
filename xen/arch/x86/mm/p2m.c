@@ -859,10 +859,10 @@ int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 }
 
 /* Returns: 0 for success, -errno for failure */
-int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
+int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 {
     int rc = -EINVAL;
-    mfn_t mfn;
+    mfn_t actual_mfn;
     p2m_access_t a;
     p2m_type_t t;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
@@ -871,15 +871,19 @@ int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
         return -EIO;
 
     gfn_lock(p2m, gfn, 0);
-    mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL);
+    actual_mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL);
 
     /* Do not use mfn_valid() here as it will usually fail for MMIO pages. */
-    if ( (INVALID_MFN == mfn_x(mfn)) || (t != p2m_mmio_direct) )
+    if ( (INVALID_MFN == mfn_x(actual_mfn)) || (t != p2m_mmio_direct) )
     {
         gdprintk(XENLOG_ERR,
                  "gfn_to_mfn failed! gfn=%08lx type:%d\n", gfn, t);
         goto out;
     }
+    if ( mfn_x(mfn) != mfn_x(actual_mfn) )
+        gdprintk(XENLOG_WARNING,
+                 "no mapping between mfn %08lx and gfn %08lx\n",
+                 mfn_x(mfn), gfn);
     rc = p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), PAGE_ORDER_4K, p2m_invalid,
                        p2m->default_access);
 
