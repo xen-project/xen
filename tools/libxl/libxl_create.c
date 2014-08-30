@@ -1180,6 +1180,17 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
                  "failed give dom%d access to iomem range %"PRIx64"-%"PRIx64,
                  domid, io->start, io->start + io->number - 1);
             ret = ERROR_FAIL;
+            continue;
+        }
+        ret = xc_domain_memory_mapping(CTX->xch, domid,
+                                       io->gfn, io->start,
+                                       io->number, 1);
+        if (ret < 0) {
+            LOGE(ERROR,
+                 "failed to map to dom%d iomem range %"PRIx64"-%"PRIx64
+                 " to guest address %"PRIx64,
+                 domid, io->start, io->start + io->number - 1, io->gfn);
+            ret = ERROR_FAIL;
         }
     }
 

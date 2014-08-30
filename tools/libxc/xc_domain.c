@@ -1960,6 +1960,16 @@ int xc_domain_memory_mapping(
     uint32_t add_mapping)
 {
     DECLARE_DOMCTL;
+    xc_dominfo_t info;
+
+    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 ||
+         info.domid != domid )
+    {
+        PERROR("Could not get info for domain");
+        return -EINVAL;
+    }
+    if ( !xc_core_arch_auto_translated_physmap(&info) )
+        return 0;
 
     domctl.cmd = XEN_DOMCTL_memory_mapping;
     domctl.domain = domid;
