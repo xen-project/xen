@@ -3,6 +3,10 @@
 
 #include <xen/mm.h>
 
+#include <xen/p2m-common.h>
+
+#define paddr_bits PADDR_BITS
+
 struct domain;
 
 extern void memory_type_changed(struct domain *);
@@ -101,17 +105,6 @@ int p2m_cache_flush(struct domain *d, xen_pfn_t start_mfn, xen_pfn_t end_mfn);
 
 /* Setup p2m RAM mapping for domain d from start-end. */
 int p2m_populate_ram(struct domain *d, paddr_t start, paddr_t end);
-/* Map MMIO regions in the p2m: start_gfn and nr_mfns describe the range
- * in the guest physical address space to map, starting from the machine
- * frame number mfn. */
-int map_mmio_regions(struct domain *d,
-                     unsigned long start_gfn,
-                     unsigned long nr_mfns,
-                     unsigned long mfn);
-int unmap_mmio_regions(struct domain *d,
-                       unsigned long start_gfn,
-                       unsigned long nr_mfns,
-                       unsigned long mfn);
 
 int guest_physmap_add_entry(struct domain *d,
                             unsigned long gfn,
