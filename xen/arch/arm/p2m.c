@@ -440,6 +440,14 @@ static bool_t is_mapping_aligned(const paddr_t start_gpaddr,
 #define P2M_ONE_PROGRESS_NOP   0x1
 #define P2M_ONE_PROGRESS       0x10
 
+/* Helpers to lookup the properties of each level */
+static const paddr_t level_sizes[] =
+    { ZEROETH_SIZE, FIRST_SIZE, SECOND_SIZE, THIRD_SIZE };
+static const paddr_t level_masks[] =
+    { ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK };
+static const paddr_t level_shifts[] =
+    { ZEROETH_SHIFT, FIRST_SHIFT, SECOND_SHIFT, THIRD_SHIFT };
+
 /*
  * 0   == (P2M_ONE_DESCEND) continue to descend the tree
  * +ve == (P2M_ONE_PROGRESS_*) handled at this level, continue, flush,
@@ -460,13 +468,6 @@ static int apply_one_level(struct domain *d,
                            int mattr,
                            p2m_type_t t)
 {
-    /* Helpers to lookup the properties of each level */
-    const paddr_t level_sizes[] =
-        { ZEROETH_SIZE, FIRST_SIZE, SECOND_SIZE, THIRD_SIZE };
-    const paddr_t level_masks[] =
-        { ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK };
-    const paddr_t level_shifts[] =
-        { ZEROETH_SHIFT, FIRST_SHIFT, SECOND_SHIFT, THIRD_SHIFT };
     const paddr_t level_size = level_sizes[level];
     const paddr_t level_mask = level_masks[level];
     const paddr_t level_shift = level_shifts[level];
@@ -713,7 +714,8 @@ static int apply_p2m_changes(struct domain *d,
     int rc, ret;
     struct p2m_domain *p2m = &d->arch.p2m;
     lpae_t *first = NULL, *second = NULL, *third = NULL;
-    paddr_t addr;
+    paddr_t addr, orig_maddr = maddr;
+    unsigned int level = 0;
     unsigned long cur_first_page = ~0,
                   cur_first_offset = ~0,
                   cur_second_offset = ~0;
@@ -769,8 +771,9 @@ static int apply_p2m_changes(struct domain *d,
          * current hardware doesn't support super page mappings at
          * level 0 anyway */
 
+        level = 1;
         ret = apply_one_level(d, &first[first_table_offset(addr)],
-                              1, flush_pt, op,
+                              level, flush_pt, op,
                               start_gpaddr, end_gpaddr,
                               &addr, &maddr, &flush,
                               mattr, t);
@@ -790,8 +793,9 @@ static int apply_p2m_changes(struct domain *d,
         }
         /* else: second already valid */
 
+        level = 2;
         ret = apply_one_level(d,&second[second_table_offset(addr)],
-                              2, flush_pt, op,
+                              level, flush_pt, op,
                               start_gpaddr, end_gpaddr,
                               &addr, &maddr, &flush,
                               mattr, t);
@@ -809,8 +813,9 @@ static int apply_p2m_changes(struct domain *d,
             cur_second_offset = second_table_offset(addr);
         }
 
+        level = 3;
         ret = apply_one_level(d, &third[third_table_offset(addr)],
-                              3, flush_pt, op,
+                              level, flush_pt, op,
                               start_gpaddr, end_gpaddr,
                               &addr, &maddr, &flush,
                               mattr, t);
@@ -844,6 +849,20 @@ out:
     if (third) unmap_domain_page(third);
     if (second) unmap_domain_page(second);
     if (first) unmap_domain_page(first);
+    if ( rc < 0 && ( op == INSERT || op == ALLOCATE ) &&
+         addr != start_gpaddr )
+    {
+        BUG_ON(addr == end_gpaddr);
+        /*
+         * addr keeps the address of the last successfully-inserted mapping,
+         * while apply_p2m_changes() considers an address range which is
+         * exclusive of end_gpaddr: add level_size to addr to obtain the
+         * right end of the range
+         */
+        apply_p2m_changes(d, REMOVE,
+                          start_gpaddr, addr + level_sizes[level], orig_maddr,
+                          mattr, p2m_invalid);
+    }
 
     spin_unlock(&p2m->lock);
 
