@@ -2796,7 +2796,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
 
     p2m = p2m_get_hostp2m(v->domain);
     mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 
-                              P2M_ALLOC | npfec.write_access ? P2M_UNSHARE : 0,
+                              P2M_ALLOC | (npfec.write_access ? P2M_UNSHARE : 0),
                               NULL);
 
     /* Check access permissions first, then handle faults */
