@@ -25,9 +25,9 @@ struct cpu_info {
 
 static inline struct cpu_info *get_cpu_info(void)
 {
-    unsigned long tos;
-    __asm__ ( "and %%rsp,%0" : "=r" (tos) : "0" (~(STACK_SIZE-1)) );
-    return (struct cpu_info *)(tos + STACK_SIZE) - 1;
+    register unsigned long sp asm("rsp");
+
+    return (struct cpu_info *)((sp & ~(STACK_SIZE-1)) + STACK_SIZE) - 1;
 }
 
 #define get_current()         (get_cpu_info()->current_vcpu)
