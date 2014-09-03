@@ -481,7 +481,7 @@ void show_registers(const struct cpu_user_regs *regs);
 void show_execution_state(const struct cpu_user_regs *regs);
 #define dump_execution_state() run_in_exception_handler(show_execution_state)
 void show_page_walk(unsigned long addr);
-void noreturn fatal_trap(int trapnr, const struct cpu_user_regs *regs);
+void noreturn fatal_trap(const struct cpu_user_regs *regs);
 
 void compat_show_guest_stack(struct vcpu *v,
                              const struct cpu_user_regs *regs, int lines);

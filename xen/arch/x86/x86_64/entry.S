@@ -536,8 +536,7 @@ exception_with_ints_disabled:
 
 /* No special register assumptions. */
 FATAL_exception_with_ints_disabled:
-        movzbl UREGS_entry_vector(%rsp),%edi
-        movq  %rsp,%rsi
+        movq  %rsp,%rdi
         call  fatal_trap
         ud2
 

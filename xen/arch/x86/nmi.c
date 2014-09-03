@@ -49,6 +49,12 @@ bool_t watchdog_force = 0;
 
 static void __init parse_watchdog(char *s)
 {
+    if ( !*s )
+    {
+        opt_watchdog = 1;
+        return;
+    }
+
     switch ( parse_bool(s) )
     {
     case 0:
@@ -472,7 +478,7 @@ bool_t nmi_watchdog_tick(const struct cpu_user_regs *regs)
             console_force_unlock();
             printk("Watchdog timer detects that CPU%d is stuck!\n",
                    smp_processor_id());
-            fatal_trap(TRAP_nmi, regs);
+            fatal_trap(regs);
         }
     } 
     else 
