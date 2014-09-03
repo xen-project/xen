@@ -472,7 +472,7 @@ bool_t nmi_watchdog_tick(const struct cpu_user_regs *regs)
             console_force_unlock();
             printk("Watchdog timer detects that CPU%d is stuck!\n",
                    smp_processor_id());
-            fatal_trap(TRAP_nmi, regs);
+            fatal_trap(regs);
         }
     } 
     else 

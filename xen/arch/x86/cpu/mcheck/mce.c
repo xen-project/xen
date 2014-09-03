@@ -74,7 +74,7 @@ static void unexpected_machine_check(const struct cpu_user_regs *regs)
 {
     console_force_unlock();
     printk("Unexpected Machine Check Exception\n");
-    fatal_trap(TRAP_machine_check, regs);
+    fatal_trap(regs);
 }
 
 

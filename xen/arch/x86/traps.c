@@ -394,9 +394,10 @@ static const char *trapstr(unsigned int trapnr)
  * are disabled). In such situations we can't do much that is safe. We try to
  * print out some tracing and then we just spin.
  */
-void fatal_trap(int trapnr, const struct cpu_user_regs *regs)
+void fatal_trap(const struct cpu_user_regs *regs)
 {
     static DEFINE_PER_CPU(char, depth);
+    unsigned int trapnr = regs->entry_vector;
 
     /* Set AC to reduce chance of further SMAP faults */
     stac();
@@ -1427,7 +1428,7 @@ void do_page_fault(struct cpu_user_regs *regs)
         {
             console_start_sync();
             printk("Xen SM%cP violation\n", (pf_type == smep_fault) ? 'E' : 'A');
-            fatal_trap(TRAP_page_fault, regs);
+            fatal_trap(regs);
         }
 
         if ( pf_type != real_fault )
@@ -1498,7 +1499,7 @@ void __init do_early_page_fault(struct cpu_user_regs *regs)
         console_start_sync();
         printk("Early fatal page fault at %04x:%p (cr2=%p, ec=%04x)\n",
                regs->cs, _p(regs->eip), _p(cr2), regs->error_code);
-        fatal_trap(TRAP_page_fault, regs);
+        fatal_trap(regs);
     }
 }
 
@@ -3256,7 +3257,7 @@ static void pci_serr_error(const struct cpu_user_regs *regs)
     default:  /* 'fatal' */
         console_force_unlock();
         printk("\n\nNMI - PCI system error (SERR)\n");
-        fatal_trap(TRAP_nmi, regs);
+        fatal_trap(regs);
     }
 }
 
@@ -3271,7 +3272,7 @@ static void io_check_error(const struct cpu_user_regs *regs)
     default:  /* 'fatal' */
         console_force_unlock();
         printk("\n\nNMI - I/O ERROR\n");
-        fatal_trap(TRAP_nmi, regs);
+        fatal_trap(regs);
     }
 
     outb((inb(0x61) & 0x0f) | 0x08, 0x61); /* clear-and-disable IOCK */
@@ -3291,7 +3292,7 @@ static void unknown_nmi_error(const struct cpu_user_regs *regs, unsigned char re
         console_force_unlock();
         printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
         printk("Do you have a strange power saving mode enabled?\n");
-        fatal_trap(TRAP_nmi, regs);
+        fatal_trap(regs);
     }
 }
 
