@@ -49,6 +49,12 @@ bool_t watchdog_force = 0;
 
 static void __init parse_watchdog(char *s)
 {
+    if ( !*s )
+    {
+        opt_watchdog = 1;
+        return;
+    }
+
     switch ( parse_bool(s) )
     {
     case 0:
