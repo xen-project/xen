@@ -847,7 +847,7 @@ static void *linux_gntshr_share_pages(xc_gntshr *xch, xc_osdep_handle h,
 static int linux_gntshr_munmap(xc_gntshr *xcg, xc_osdep_handle h,
                                void *start_address, uint32_t count)
 {
-    return munmap(start_address, count);
+    return munmap(start_address, count * XC_PAGE_SIZE);
 }
 
 static struct xc_osdep_ops linux_gntshr_ops = {

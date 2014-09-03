@@ -365,10 +365,10 @@ void libxenvchan_close(struct libxenvchan *ctrl)
 	if (ctrl->ring) {
 		if (ctrl->is_server) {
 			ctrl->ring->srv_live = 0;
-			xc_gntshr_munmap(ctrl->gntshr, ctrl->ring, PAGE_SIZE);
+			xc_gntshr_munmap(ctrl->gntshr, ctrl->ring, 1);
 		} else {
 			ctrl->ring->cli_live = 0;
-			xc_gnttab_munmap(ctrl->gnttab, ctrl->ring, PAGE_SIZE);
+			xc_gnttab_munmap(ctrl->gnttab, ctrl->ring, 1);
 		}
 	}
 	if (ctrl->event) {
