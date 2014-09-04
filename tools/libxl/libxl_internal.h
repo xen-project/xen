@@ -43,6 +43,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
+#include <sys/file.h>
 
 #include <xenstore.h>
 #include <xenctrl.h>
@@ -3222,6 +3223,10 @@ static inline int libxl__key_value_list_is_empty(libxl_key_value_list *pkvl)
 }
 
 int libxl__cpuid_policy_is_empty(libxl_cpuid_policy_list *pl);
+
+/* Portability note: a proper flock(2) implementation is required */
+libxl__carefd *libxl__lock_domain_userdata(libxl__gc *gc, uint32_t domid);
+void libxl__unlock_domain_userdata(libxl__carefd *lock_carefd);
 
 #endif
 

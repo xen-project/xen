@@ -381,6 +381,75 @@ out:
     return rc;
 }
 
+/* Portability note: this lock utilises flock(2) so a proper implementation of
+ * flock(2) is required.
+ */
+libxl__carefd *libxl__lock_domain_userdata(libxl__gc *gc, uint32_t domid)
+{
+    libxl__carefd *carefd = NULL;
+    const char *lockfile;
+    int fd;
+    struct stat stab, fstab;
+
+    lockfile = libxl__userdata_path(gc, domid, "domain-userdata-lock", "l");
+    if (!lockfile) goto out;
+
+    while (true) {
+        libxl__carefd_begin();
+        fd = open(lockfile, O_RDWR|O_CREAT, 0666);
+        if (fd < 0)
+            LOGE(ERROR, "cannot open lockfile %s, errno=%d", lockfile, errno);
+        carefd = libxl__carefd_opened(CTX, fd);
+        if (fd < 0) goto out;
+
+        /* Lock the file in exclusive mode, wait indefinitely to
+         * acquire the lock
+         */
+        while (flock(fd, LOCK_EX)) {
+            switch (errno) {
+            case EINTR:
+                /* Signal received, retry */
+                continue;
+            default:
+                /* All other errno: EBADF, EINVAL, ENOLCK, EWOULDBLOCK */
+                LOGE(ERROR,
+                     "unexpected error while trying to lock %s, fd=%d, errno=%d",
+                     lockfile, fd, errno);
+                goto out;
+            }
+        }
+
+        if (fstat(fd, &fstab)) {
+            LOGE(ERROR, "cannot fstat %s, fd=%d, errno=%d",
+                 lockfile, fd, errno);
+            goto out;
+        }
+        if (stat(lockfile, &stab)) {
+            if (errno != ENOENT) {
+                LOGE(ERROR, "cannot stat %s, errno=%d", lockfile, errno);
+                goto out;
+            }
+        } else {
+            if (stab.st_dev == fstab.st_dev && stab.st_ino == fstab.st_ino)
+                break;
+        }
+
+        libxl__carefd_close(carefd);
+    }
+
+    return carefd;
+
+out:
+    if (carefd) libxl__carefd_close(carefd);
+    return NULL;
+}
+
+void libxl__unlock_domain_userdata(libxl__carefd *lock_carefd)
+{
+    /* Simply closing the file descriptor releases the lock */
+    libxl__carefd_close(lock_carefd);
+}
+
 /*
  * Local variables:
  * mode: C

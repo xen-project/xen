@@ -1220,6 +1220,9 @@ void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
  *  "xl"          domain config file in xl format, Unix line endings
  *  "libvirt-xml" domain config file in libvirt XML format.  See
  *                http://libvirt.org/formatdomain.html
+ *  "domain-userdata-lock"  lock file to protect domain userdata in libxl.
+ *                          It's a per-domain lock. Applications should
+ *                          not touch this file.
  *
  * libxl does not enforce the registration of userdata userids or the
  * semantics of the data.  For specifications of the data formats
