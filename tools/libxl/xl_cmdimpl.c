@@ -4638,7 +4638,12 @@ int main_vcpupin(int argc, char **argv)
     libxl_vcpuinfo *vcpuinfo;
     libxl_bitmap cpumap_hard, cpumap_soft;;
     libxl_bitmap *soft = &cpumap_soft, *hard = &cpumap_hard;
-    uint32_t vcpuid, domid;
+    uint32_t domid;
+    /*
+     * int would be enough for vcpuid, but we don't want to
+     * mess aroung range checking the return value of strtol().
+     */
+    long vcpuid;
     const char *vcpu, *hard_str, *soft_str;
     char *endptr;
     int opt, nb_cpu, nb_vcpu, rc = -1;
@@ -4656,10 +4661,10 @@ int main_vcpupin(int argc, char **argv)
     soft_str = (argc > optind+3) ? argv[optind+3] : NULL;
 
     /* Figure out with which vCPU we are dealing with */
-    vcpuid = strtoul(vcpu, &endptr, 10);
-    if (vcpu == endptr) {
+    vcpuid = strtol(vcpu, &endptr, 10);
+    if (vcpu == endptr || vcpuid < 0) {
         if (strcmp(vcpu, "all")) {
-            fprintf(stderr, "Error: Invalid argument.\n");
+            fprintf(stderr, "Error: Invalid argument %s as VCPU.\n", vcpu);
             goto out;
         }
         vcpuid = -1;
@@ -4725,12 +4730,11 @@ int main_vcpupin(int argc, char **argv)
 
     if (vcpuid != -1) {
         if (libxl_set_vcpuaffinity(ctx, domid, vcpuid, hard, soft)) {
-            fprintf(stderr, "Could not set affinity for vcpu `%u'.\n",
+            fprintf(stderr, "Could not set affinity for vcpu `%ld'.\n",
                     vcpuid);
             goto out;
         }
-    }
-    else {
+    } else {
         if (!(vcpuinfo = libxl_list_vcpu(ctx, domid, &nb_vcpu, &nb_cpu))) {
             fprintf(stderr, "libxl_list_vcpu failed.\n");
             goto out;
