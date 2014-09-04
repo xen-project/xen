@@ -1223,6 +1223,11 @@ void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
  *  "domain-userdata-lock"  lock file to protect domain userdata in libxl.
  *                          It's a per-domain lock. Applications should
  *                          not touch this file.
+ *  "libxl-json"  libxl_domain_config object in JSON format, generated
+ *                by libxl. Applications should not access this file
+ *                directly. This file is protected by domain-userdata-lock
+ *                for against Read-Modify-Write operation and domain
+ *                destruction.
  *
  * libxl does not enforce the registration of userdata userids or the
  * semantics of the data.  For specifications of the data formats

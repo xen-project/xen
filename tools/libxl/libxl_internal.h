@@ -3238,6 +3238,17 @@ int libxl__cpuid_policy_is_empty(libxl_cpuid_policy_list *pl);
 libxl__carefd *libxl__lock_domain_userdata(libxl__gc *gc, uint32_t domid);
 void libxl__unlock_domain_userdata(libxl__carefd *lock_carefd);
 
+/*
+ * Retrieve / store domain configuration from / to libxl private
+ * data store. The registry entry in libxl private data store
+ * is "libxl-json".
+ * Caller must hold user data lock.
+ */
+int libxl__get_domain_configuration(libxl__gc *gc, uint32_t domid,
+                                    libxl_domain_config *d_config);
+int libxl__set_domain_configuration(libxl__gc *gc, uint32_t domid,
+                                    libxl_domain_config *d_config);
+
 #endif
 
 /*
