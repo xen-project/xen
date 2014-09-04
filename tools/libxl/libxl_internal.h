@@ -2781,6 +2781,7 @@ struct libxl__domain_create_state {
     /* filled in by user */
     libxl__ao *ao;
     libxl_domain_config *guest_config;
+    libxl_domain_config guest_config_saved; /* vanilla config */
     int restore_fd;
     libxl__domain_create_cb *callback;
     libxl_asyncprogress_how aop_console_how;
@@ -3248,6 +3249,26 @@ int libxl__get_domain_configuration(libxl__gc *gc, uint32_t domid,
                                     libxl_domain_config *d_config);
 int libxl__set_domain_configuration(libxl__gc *gc, uint32_t domid,
                                     libxl_domain_config *d_config);
+
+/* ------ Things related to updating domain configurations ----- */
+void libxl__update_domain_configuration(libxl__gc *gc,
+                                        libxl_domain_config *dst,
+                                        const libxl_domain_config *src);
+static inline void libxl__update_config_nic(libxl__gc *gc,
+                                            libxl_device_nic *dst,
+                                            libxl_device_nic *src)
+{
+    dst->devid = src->devid;
+    libxl_mac_copy(CTX, &dst->mac, &src->mac);
+}
+
+static inline void libxl__update_config_vtpm(libxl__gc *gc,
+                                             libxl_device_vtpm *dst,
+                                             libxl_device_vtpm *src)
+{
+    dst->devid = src->devid;
+    libxl_uuid_copy(CTX, &dst->uuid, &src->uuid);
+}
 
 #endif
 

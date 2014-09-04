@@ -1389,9 +1389,29 @@ static void domcreate_complete(libxl__egc *egc,
 {
     STATE_AO_GC(dcs->ao);
     libxl_domain_config *const d_config = dcs->guest_config;
+    libxl_domain_config *d_config_saved = &dcs->guest_config_saved;
 
     if (!rc && d_config->b_info.exec_ssidref)
         rc = xc_flask_relabel_domain(CTX->xch, dcs->guest_domid, d_config->b_info.exec_ssidref);
+
+    if (!rc) {
+        libxl__carefd *lock;
+
+        /* Note that we hold CTX lock at this point so only need to
+         * take data store lock
+         */
+        lock = libxl__lock_domain_userdata(gc, dcs->guest_domid);
+        if (!lock) {
+            rc = ERROR_LOCK_FAIL;
+        } else {
+            libxl__update_domain_configuration(gc, d_config_saved, d_config);
+            rc = libxl__set_domain_configuration(gc, dcs->guest_domid,
+                                                 d_config_saved);
+            libxl__unlock_domain_userdata(lock);
+        }
+    }
+
+    libxl_domain_config_dispose(d_config_saved);
 
     if (rc) {
         if (dcs->guest_domid) {
@@ -1443,6 +1463,8 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     GCNEW(cdcs);
     cdcs->dcs.ao = ao;
     cdcs->dcs.guest_config = d_config;
+    libxl_domain_config_init(&cdcs->dcs.guest_config_saved);
+    libxl_domain_config_copy(ctx, &cdcs->dcs.guest_config_saved, d_config);
     cdcs->dcs.restore_fd = restore_fd;
     cdcs->dcs.callback = domain_create_cb;
     cdcs->dcs.checkpointed_stream = checkpointed_stream;

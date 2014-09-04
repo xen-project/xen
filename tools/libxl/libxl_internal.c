@@ -506,6 +506,27 @@ out:
     return rc;
 }
 
+void libxl__update_domain_configuration(libxl__gc *gc,
+                                        libxl_domain_config *dst,
+                                        const libxl_domain_config *src)
+{
+    int i;
+
+    /* update network interface information */
+    for (i = 0; i < src->num_nics; i++)
+        libxl__update_config_nic(gc, &dst->nics[i], &src->nics[i]);
+
+    /* update vtpm information */
+    for (i = 0; i < src->num_vtpms; i++)
+        libxl__update_config_vtpm(gc, &dst->vtpms[i], &src->vtpms[i]);
+
+    /* update guest UUID */
+    libxl_uuid_copy(CTX, &dst->c_info.uuid, &src->c_info.uuid);
+
+    /* video ram */
+    dst->b_info.video_memkb = src->b_info.video_memkb;
+}
+
 /*
  * Local variables:
  * mode: C
