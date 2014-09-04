@@ -124,6 +124,8 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
     char *num_devs, *be_path;
     int num = 0;
     xs_transaction_t t;
+    libxl__device *device;
+    int rc;
 
     be_path = libxl__sprintf(gc, "%s/backend/pci/%d/0", libxl__xs_get_dompath(gc, 0), domid);
     num_devs = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/num_devs", be_path));
@@ -148,15 +150,32 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
     if (!starting)
         flexarray_append_pair(back, "state", libxl__sprintf(gc, "%d", 7));
 
-retry_transaction:
-    t = xs_transaction_start(ctx->xsh);
-    libxl__xs_writev(gc, t, be_path,
-                    libxl__xs_kvs_of_flexarray(gc, back, back->count));
-    if (!xs_transaction_end(ctx->xsh, t, 0))
-        if (errno == EAGAIN)
-            goto retry_transaction;
+    GCNEW(device);
+    libxl__device_from_pcidev(gc, domid, pcidev, device);
 
-    return 0;
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+
+        rc = libxl__device_exists(gc, t, device);
+        if (rc < 0) goto out;
+        if (rc == 1) {
+            LOG(ERROR, "device already exists in xenstore");
+            rc = ERROR_DEVICE_EXISTS;
+            goto out;
+        }
+
+        libxl__xs_writev(gc, t, be_path,
+                         libxl__xs_kvs_of_flexarray(gc, back, back->count));
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc < 0) goto out;
+    }
+
+out:
+    libxl__xs_transaction_abort(gc, &t);
+    return rc;
 }
 
 static int libxl__device_pci_remove_xenstore(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev)

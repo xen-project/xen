@@ -1893,6 +1893,7 @@ void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
     flexarray_t *back;
     libxl__device *device;
     int rc;
+    xs_transaction_t t = XBT_NULL;
 
     rc = libxl__device_vtpm_setdefault(gc, vtpm);
     if (rc) goto out;
@@ -1932,10 +1933,30 @@ void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
     flexarray_append(front, "handle");
     flexarray_append(front, GCSPRINTF("%d", vtpm->devid));
 
-    libxl__device_generic_add(gc, XBT_NULL, device,
-                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                              libxl__xs_kvs_of_flexarray(gc, front, front->count),
-                              NULL);
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+
+        rc = libxl__device_exists(gc, t, device);
+        if (rc < 0) goto out;
+        if (rc == 1) {              /* already exists in xenstore */
+            LOG(ERROR, "device already exists in xenstore");
+            aodev->action = LIBXL__DEVICE_ACTION_ADD; /* for error message */
+            rc = ERROR_DEVICE_EXISTS;
+            goto out;
+        }
+
+        libxl__device_generic_add(gc, t, device,
+                                  libxl__xs_kvs_of_flexarray(gc, back,
+                                                             back->count),
+                                  libxl__xs_kvs_of_flexarray(gc, front,
+                                                             front->count),
+                                  NULL);
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc < 0) goto out;
+    }
 
     aodev->dev = device;
     aodev->action = LIBXL__DEVICE_ACTION_ADD;
@@ -1943,6 +1964,7 @@ void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
 
     rc = 0;
 out:
+    libxl__xs_transaction_abort(gc, &t);
     aodev->rc = rc;
     if(rc) aodev->callback(egc, aodev);
     return;
@@ -2206,6 +2228,15 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
         if (rc != 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Invalid or unsupported"
                    " virtual disk identifier %s", disk->vdev);
+            goto out;
+        }
+
+        rc = libxl__device_exists(gc, t, device);
+        if (rc < 0) goto out;
+        if (rc == 1) {              /* already exists in xenstore */
+            LOG(ERROR, "device already exists in xenstore");
+            aodev->action = LIBXL__DEVICE_ACTION_ADD; /* for error message */
+            rc = ERROR_DEVICE_EXISTS;
             goto out;
         }
 
@@ -2998,6 +3029,7 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     flexarray_t *back;
     libxl__device *device;
     int rc;
+    xs_transaction_t t = XBT_NULL;
 
     rc = libxl__device_nic_setdefault(gc, nic, domid);
     if (rc) goto out;
@@ -3068,10 +3100,31 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     flexarray_append(front, "mac");
     flexarray_append(front, libxl__sprintf(gc,
                                     LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nic->mac)));
-    libxl__device_generic_add(gc, XBT_NULL, device,
-                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                              libxl__xs_kvs_of_flexarray(gc, front, front->count),
-                              NULL);
+
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+
+        rc = libxl__device_exists(gc, t, device);
+        if (rc < 0) goto out;
+        if (rc == 1) {              /* already exists in xenstore */
+            LOG(ERROR, "device already exists in xenstore");
+            aodev->action = LIBXL__DEVICE_ACTION_ADD; /* for error message */
+            rc = ERROR_DEVICE_EXISTS;
+            goto out;
+        }
+
+        libxl__device_generic_add(gc, t, device,
+                                  libxl__xs_kvs_of_flexarray(gc, back,
+                                                             back->count),
+                                  libxl__xs_kvs_of_flexarray(gc, front,
+                                                             front->count),
+                                  NULL);
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc < 0) goto out;
+    }
 
     aodev->dev = device;
     aodev->action = LIBXL__DEVICE_ACTION_ADD;
@@ -3079,6 +3132,7 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
 
     rc = 0;
 out:
+    libxl__xs_transaction_abort(gc, &t);
     aodev->rc = rc;
     if (rc) aodev->callback(egc, aodev);
     return;

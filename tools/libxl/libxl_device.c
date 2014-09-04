@@ -40,6 +40,25 @@ char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
                      device->domid, device->devid);
 }
 
+/* Returns 1 if device exists, 0 if not, ERROR_* (<0) on error. */
+int libxl__device_exists(libxl__gc *gc, xs_transaction_t t,
+                         libxl__device *device)
+{
+    int rc;
+    char *be_path = libxl__device_backend_path(gc, device);
+    const char *dir;
+
+    be_path = libxl__device_backend_path(gc, device);
+    rc = libxl__xs_read_checked(gc, t, be_path, &dir);
+
+    if (rc)
+        return rc;
+
+    if (dir)
+        return 1;
+    return 0;
+}
+
 int libxl__parse_backend_path(libxl__gc *gc,
                               const char *path,
                               libxl__device *dev)

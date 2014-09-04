@@ -60,6 +60,7 @@ libxl_error = Enumeration("error", [
     (-14, "UNKNOWN_CHILD"),
     (-15, "LOCK_FAIL"),
     (-16, "JSON_CONFIG_EMPTY"),
+    (-17, "DEVICE_EXISTS"),
     ], value_namespace = "")
 
 libxl_domain_type = Enumeration("domain_type", [
