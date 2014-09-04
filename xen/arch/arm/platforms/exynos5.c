@@ -23,18 +23,45 @@
 #include <xen/domain_page.h>
 #include <xen/mm.h>
 #include <xen/vmap.h>
+#include <xen/delay.h>
 #include <asm/platforms/exynos5.h>
 #include <asm/platform.h>
 #include <asm/io.h>
+
+#define EXYNOS_ARM_CORE0_CONFIG     0x2000
+#define EXYNOS_ARM_CORE_CONFIG(_nr) (0x80 * (_nr))
+#define EXYNOS_ARM_CORE_STATUS(_nr) (EXYNOS_ARM_CORE_CONFIG(_nr) + 0x4)
+#define S5P_CORE_LOCAL_PWR_EN       0x3
 
 static int exynos5_init_time(void)
 {
     uint32_t reg;
     void __iomem *mct;
+    int rc;
+    struct dt_device_node *node;
+    u64 mct_base_addr;
+    u64 size;
 
     BUILD_BUG_ON(EXYNOS5_MCT_G_TCON >= PAGE_SIZE);
 
-    mct = ioremap_attr(EXYNOS5_MCT_BASE, PAGE_SIZE, PAGE_HYPERVISOR_NOCACHE);
+    node = dt_find_compatible_node(NULL, NULL, "samsung,exynos4210-mct");
+    if ( !node )
+    {
+        dprintk(XENLOG_ERR, "samsung,exynos4210-mct missing in DT\n");
+        return -ENXIO;
+    }
+
+    rc = dt_device_get_address(node, 0, &mct_base_addr, &size);
+    if ( rc )
+    {
+        dprintk(XENLOG_ERR, "Error in \"samsung,exynos4210-mct\"\n");
+        return -ENXIO;
+    }
+
+    dprintk(XENLOG_INFO, "mct_base_addr: %016llx size: %016llx\n",
+            mct_base_addr, size);
+
+    mct = ioremap_attr(mct_base_addr, PAGE_SIZE, PAGE_HYPERVISOR_NOCACHE);
     if ( !mct )
     {
         dprintk(XENLOG_ERR, "Unable to map MCT\n");
@@ -51,7 +78,7 @@ static int exynos5_init_time(void)
 }
 
 /* Additional mappings for dom0 (Not in the DTS) */
-static int exynos5_specific_mapping(struct domain *d)
+static int exynos5250_specific_mapping(struct domain *d)
 {
     /* Map the chip ID */
     map_mmio_regions(d, paddr_to_pfn(EXYNOS5_PA_CHIPID), 1,
@@ -67,8 +94,29 @@ static int exynos5_specific_mapping(struct domain *d)
 static int __init exynos5_smp_init(void)
 {
     void __iomem *sysram;
+    struct dt_device_node *node;
+    u64 sysram_ns_base_addr;
+    u64 size;
+    int rc;
 
-    sysram = ioremap_nocache(S5P_PA_SYSRAM, PAGE_SIZE);
+    node = dt_find_compatible_node(NULL, NULL, "samsung,exynos4210-sysram-ns");
+    if ( !node )
+    {
+        dprintk(XENLOG_ERR, "samsung,exynos4210-sysram-ns missing in DT\n");
+        return -ENXIO;
+    }
+
+    rc = dt_device_get_address(node, 0, &sysram_ns_base_addr, &size);
+    if ( rc )
+    {
+        dprintk(XENLOG_ERR, "Error in \"samsung,exynos4210-sysram-ns\"\n");
+        return -ENXIO;
+    }
+
+    dprintk(XENLOG_INFO, "sysram_ns_base_addr: %016llx size: %016llx\n",
+            sysram_ns_base_addr, size);
+
+    sysram = ioremap_nocache(sysram_ns_base_addr, PAGE_SIZE);
     if ( !sysram )
     {
         dprintk(XENLOG_ERR, "Unable to map exynos5 MMIO\n");
@@ -77,20 +125,127 @@ static int __init exynos5_smp_init(void)
 
     printk("Set SYSRAM to %"PRIpaddr" (%p)\n",
            __pa(init_secondary), init_secondary);
-    writel(__pa(init_secondary), sysram);
+    writel(__pa(init_secondary), sysram + 0x1c);
 
     iounmap(sysram);
 
     return 0;
 }
 
+static int exynos_cpu_power_state(void __iomem *power, int cpu)
+{
+    return __raw_readl(power + EXYNOS_ARM_CORE_STATUS(cpu)) &
+                       S5P_CORE_LOCAL_PWR_EN;
+}
+
+static void exynos_cpu_power_up(void __iomem *power, int cpu)
+{
+    __raw_writel(S5P_CORE_LOCAL_PWR_EN,
+                 power + EXYNOS_ARM_CORE_CONFIG(cpu));
+}
+
+static int exynos5_cpu_power_up(void __iomem *power, int cpu)
+{
+    unsigned int timeout;
+
+    if ( !exynos_cpu_power_state(power, cpu) )
+    {
+        exynos_cpu_power_up(power, cpu);
+        timeout = 10;
+
+        /* wait max 10 ms until cpu is on */
+        while ( exynos_cpu_power_state(power, cpu) != S5P_CORE_LOCAL_PWR_EN )
+        {
+            if ( timeout-- == 0 )
+                break;
+
+            mdelay(1);
+        }
+
+        if ( timeout == 0 )
+        {
+            dprintk(XENLOG_ERR, "CPU%d power enable failed", cpu);
+            return -ETIMEDOUT;
+        }
+    }
+    return 0;
+}
+
+static int exynos5_get_pmu_base_addr(u64 *power_base_addr) {
+    u64 size;
+    struct dt_device_node *node;
+    int rc;
+    static const struct dt_device_match exynos_dt_pmu_matches[] __initconst =
+    {
+        DT_MATCH_COMPATIBLE("samsung,exynos5250-pmu"),
+        DT_MATCH_COMPATIBLE("samsung,exynos5410-pmu"),
+        DT_MATCH_COMPATIBLE("samsung,exynos5420-pmu"),
+        { /*sentinel*/ },
+    };
+
+    node = dt_find_matching_node(NULL, exynos_dt_pmu_matches);
+    if ( !node )
+    {
+        dprintk(XENLOG_ERR, "samsung,exynos5XXX-pmu missing in DT\n");
+        return -ENXIO;
+    }
+
+    rc = dt_device_get_address(node, 0, power_base_addr, &size);
+    if ( rc )
+    {
+        dprintk(XENLOG_ERR, "Error in \"samsung,exynos5XXX-pmu\"\n");
+        return -ENXIO;
+    }
+
+    dprintk(XENLOG_DEBUG, "power_base_addr: %016llx size: %016llx\n",
+            *power_base_addr, size);
+
+    return 0;
+}
+
+static int exynos5_cpu_up(int cpu)
+{
+    u64 power_base_addr;
+    void __iomem *power;
+    int rc;
+
+    rc = exynos5_get_pmu_base_addr(&power_base_addr);
+    if ( rc )
+        return rc;
+
+    power = ioremap_nocache(power_base_addr +
+                            EXYNOS_ARM_CORE0_CONFIG, PAGE_SIZE);
+    if ( !power )
+    {
+        dprintk(XENLOG_ERR, "Unable to map power MMIO\n");
+        return -EFAULT;
+    }
+
+    rc = exynos5_cpu_power_up(power, cpu);
+    if ( rc )
+    {
+        iounmap(power);
+        return -ETIMEDOUT;
+    }
+
+    iounmap(power);
+
+    return cpu_up_send_sgi(cpu);
+}
+
 static void exynos5_reset(void)
 {
+    u64 power_base_addr;
     void __iomem *pmu;
+    int rc;
 
     BUILD_BUG_ON(EXYNOS5_SWRESET >= PAGE_SIZE);
 
-    pmu = ioremap_nocache(EXYNOS5_PA_PMU, PAGE_SIZE);
+    rc = exynos5_get_pmu_base_addr(&power_base_addr);
+    if ( rc )
+        return;
+
+    pmu = ioremap_nocache(power_base_addr, PAGE_SIZE);
     if ( !pmu )
     {
         dprintk(XENLOG_ERR, "Unable to map PMU\n");
@@ -98,14 +253,9 @@ static void exynos5_reset(void)
     }
 
     writel(1, pmu + EXYNOS5_SWRESET);
+
     iounmap(pmu);
 }
-
-static const char * const exynos5_dt_compat[] __initconst =
-{
-    "samsung,exynos5250",
-    NULL
-};
 
 static const struct dt_device_match exynos5_blacklist_dev[] __initconst =
 {
@@ -117,12 +267,33 @@ static const struct dt_device_match exynos5_blacklist_dev[] __initconst =
     { /* sentinel */ },
 };
 
+static const char * const exynos5250_dt_compat[] __initconst =
+{
+    "samsung,exynos5250",
+    NULL
+};
+
+static const char * const exynos5_dt_compat[] __initconst =
+{
+    "samsung,exynos5410",
+    NULL
+};
+
+PLATFORM_START(exynos5250, "SAMSUNG EXYNOS5250")
+    .compatible = exynos5250_dt_compat,
+    .init_time = exynos5_init_time,
+    .specific_mapping = exynos5250_specific_mapping,
+    .smp_init = exynos5_smp_init,
+    .cpu_up = cpu_up_send_sgi,
+    .reset = exynos5_reset,
+    .blacklist_dev = exynos5_blacklist_dev,
+PLATFORM_END
+
 PLATFORM_START(exynos5, "SAMSUNG EXYNOS5")
     .compatible = exynos5_dt_compat,
     .init_time = exynos5_init_time,
-    .specific_mapping = exynos5_specific_mapping,
     .smp_init = exynos5_smp_init,
-    .cpu_up = cpu_up_send_sgi,
+    .cpu_up = exynos5_cpu_up,
     .reset = exynos5_reset,
     .blacklist_dev = exynos5_blacklist_dev,
 PLATFORM_END
