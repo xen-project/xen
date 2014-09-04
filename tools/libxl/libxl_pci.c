@@ -64,6 +64,20 @@ static void libxl_create_pci_backend_device(libxl__gc *gc, flexarray_t *back, in
     flexarray_append_pair(back, libxl__sprintf(gc, "state-%d", num), libxl__sprintf(gc, "%d", 1));
 }
 
+static int libxl__device_from_pcidev(libxl__gc *gc, uint32_t domid,
+                                     libxl_device_pci *pcidev,
+                                     libxl__device *device)
+{
+    device->backend_devid = 0;
+    device->backend_domid = 0;
+    device->backend_kind = LIBXL__DEVICE_KIND_PCI;
+    device->devid = 0;
+    device->domid = domid;
+    device->kind = LIBXL__DEVICE_KIND_PCI;
+
+    return 0;
+}
+
 int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
                               libxl_device_pci *pcidev, int num)
 {
@@ -81,12 +95,7 @@ int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
     LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Creating pci backend");
 
     /* add pci device */
-    device.backend_devid = 0;
-    device.backend_domid = 0;
-    device.backend_kind = LIBXL__DEVICE_KIND_PCI;
-    device.devid = 0;
-    device.domid = domid;
-    device.kind = LIBXL__DEVICE_KIND_PCI;
+    libxl__device_from_pcidev(gc, domid, pcidev, &device);
 
     flexarray_append_pair(back, "frontend-id", libxl__sprintf(gc, "%d", domid));
     flexarray_append_pair(back, "online", "1");
