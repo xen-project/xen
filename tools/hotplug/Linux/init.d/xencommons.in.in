@@ -90,9 +90,8 @@ do_start () {
 		    exit 1
 		fi
 
-		echo Setting domain 0 name and domid...
-		${BINDIR}/xenstore-write "/local/domain/0/name" "Domain-0"
-		${BINDIR}/xenstore-write "/local/domain/0/domid" 0
+		echo Setting domain 0 name, domid and JSON config...
+		${PRIVATE_BINDIR}/xen-init-dom0
 	fi
 
 	echo Starting xenconsoled...
