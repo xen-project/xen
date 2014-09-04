@@ -538,6 +538,13 @@ static int vgic_v2_vcpu_init(struct vcpu *v)
 
 static int vgic_v2_domain_init(struct domain *d)
 {
+    int i;
+
+    /* By default deliver to CPU0 */
+    for ( i = 0; i < DOMAIN_NR_RANKS(d); i++ )
+        memset(d->arch.vgic.shared_irqs[i].itargets, 0x1,
+               sizeof(d->arch.vgic.shared_irqs[i].itargets));
+
     /* We rely on gicv_setup() to initialize dbase(vGIC distributor base) */
     register_mmio_handler(d, &vgic_v2_distr_mmio_handler, d->arch.vgic.dbase,
                           PAGE_SIZE);

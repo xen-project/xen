@@ -96,13 +96,7 @@ int domain_vgic_init(struct domain *d)
         INIT_LIST_HEAD(&d->arch.vgic.pending_irqs[i].lr_queue);
     }
     for (i=0; i<DOMAIN_NR_RANKS(d); i++)
-    {
         spin_lock_init(&d->arch.vgic.shared_irqs[i].lock);
-        /* By default deliver to CPU0 */
-        memset(d->arch.vgic.shared_irqs[i].itargets,
-               0x1,
-               sizeof(d->arch.vgic.shared_irqs[i].itargets));
-    }
 
     d->arch.vgic.handler->domain_init(d);
 
