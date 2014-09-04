@@ -575,6 +575,7 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_scheduler_op:
     case XEN_DOMCTL_irq_permission:
     case XEN_DOMCTL_iomem_permission:
+    case XEN_DOMCTL_memory_mapping:
     case XEN_DOMCTL_set_target:
 #ifdef CONFIG_X86
     /* These have individual XSM hooks (arch/x86/domctl.c) */
@@ -582,7 +583,6 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_ioport_permission:
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_unbind_pt_irq:
-    case XEN_DOMCTL_memory_mapping:
     case XEN_DOMCTL_ioport_mapping:
     case XEN_DOMCTL_mem_event_op:
     /* These have individual XSM hooks (drivers/passthrough/iommu.c) */
