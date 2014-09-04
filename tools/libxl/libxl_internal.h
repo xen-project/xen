@@ -997,6 +997,16 @@ _hidden const char *libxl__userdata_path(libxl__gc *gc, uint32_t domid,
                                          const char *userdata_userid,
                                          const char *wh);
 _hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
+/* Caller must hold userdata store lock before calling
+ * libxl__userdata_{retrieve,store}
+ * See libxl__{un,}lock_domain_userdata.
+ */
+_hidden int libxl__userdata_retrieve(libxl__gc *gc, uint32_t domid,
+                                     const char *userdata_userid,
+                                     uint8_t **data_r, int *datalen_r);
+_hidden int libxl__userdata_store(libxl__gc *gc, uint32_t domid,
+                                  const char *userdata_userid,
+                                  const uint8_t *data, int datalen);
 
 _hidden int libxl__domain_resume(libxl__gc *gc, uint32_t domid,
                                  int suspend_cancel);

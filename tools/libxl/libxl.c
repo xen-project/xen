@@ -1530,6 +1530,7 @@ static void devices_destroy_cb(libxl__egc *egc,
     uint32_t domid = dis->domid;
     char *dom_path;
     char *vm_path;
+    libxl__carefd *lock = NULL;
 
     dom_path = libxl__xs_get_dompath(gc, domid);
     if (!dom_path) {
@@ -1555,6 +1556,12 @@ static void devices_destroy_cb(libxl__egc *egc,
     xs_rm(ctx->xsh, XBT_NULL, libxl__sprintf(gc,
                                 "/local/domain/%d/hvmloader", domid));
 
+    /* This is async operation, we already hold CTX lock */
+    lock = libxl__lock_domain_userdata(gc, domid);
+    if (!lock) {
+        rc = ERROR_LOCK_FAIL;
+        goto out;
+    }
     libxl__userdata_destroyall(gc, domid);
 
     rc = xc_domain_destroy(ctx->xch, domid);
@@ -1566,6 +1573,7 @@ static void devices_destroy_cb(libxl__egc *egc,
     rc = 0;
 
 out:
+    if (lock) libxl__unlock_domain_userdata(lock);
     dis->callback(egc, dis, rc);
     return;
 }

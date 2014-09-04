@@ -1865,11 +1865,10 @@ out:
     return;
 }
 
-int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
-                              const char *userdata_userid,
-                              const uint8_t *data, int datalen)
+int libxl__userdata_store(libxl__gc *gc, uint32_t domid,
+                          const char *userdata_userid,
+                          const uint8_t *data, int datalen)
 {
-    GC_INIT(ctx);
     const char *filename;
     const char *newfilename;
     int e, rc;
@@ -1898,7 +1897,7 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
     if (fd < 0)
         goto err;
 
-    if (libxl_write_exactly(ctx, fd, data, datalen, "userdata", newfilename))
+    if (libxl_write_exactly(CTX, fd, data, datalen, "userdata", newfilename))
         goto err;
 
     if (close(fd) < 0) {
@@ -1920,18 +1919,42 @@ err:
     }
 
     if (rc)
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "cannot write/rename %s for %s",
+        LIBXL__LOG_ERRNO(CTX, LIBXL__LOG_ERROR, "cannot write/rename %s for %s",
                  newfilename, filename);
 out:
+    return rc;
+}
+
+int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
+                              const char *userdata_userid,
+                              const uint8_t *data, int datalen)
+{
+    GC_INIT(ctx);
+    int rc;
+    libxl__carefd *lock;
+
+    CTX_LOCK;
+    lock = libxl__lock_domain_userdata(gc, domid);
+    if (!lock) {
+        rc = ERROR_LOCK_FAIL;
+        goto out;
+    }
+
+    rc = libxl__userdata_store(gc, domid, userdata_userid,
+                               data, datalen);
+
+    libxl__unlock_domain_userdata(lock);
+
+out:
+    CTX_UNLOCK;
     GC_FREE;
     return rc;
 }
 
-int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
-                                 const char *userdata_userid,
-                                 uint8_t **data_r, int *datalen_r)
+int libxl__userdata_retrieve(libxl__gc *gc, uint32_t domid,
+                             const char *userdata_userid,
+                             uint8_t **data_r, int *datalen_r)
 {
-    GC_INIT(ctx);
     const char *filename;
     int e, rc;
     int datalen = 0;
@@ -1943,13 +1966,13 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
         goto out;
     }
 
-    e = libxl_read_file_contents(ctx, filename, data_r ? &data : 0, &datalen);
+    e = libxl_read_file_contents(CTX, filename, data_r ? &data : 0, &datalen);
     if (e && errno != ENOENT) {
         rc = ERROR_FAIL;
         goto out;
     }
     if (!e && !datalen) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "userdata file %s is empty", filename);
+        LIBXL__LOG(CTX, LIBXL__LOG_ERROR, "userdata file %s is empty", filename);
         if (data_r) assert(!*data_r);
         rc = ERROR_FAIL;
         goto out;
@@ -1958,7 +1981,33 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
     if (data_r) *data_r = data;
     if (datalen_r) *datalen_r = datalen;
     rc = 0;
+
 out:
+    return rc;
+}
+
+int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
+                                 const char *userdata_userid,
+                                 uint8_t **data_r, int *datalen_r)
+{
+    GC_INIT(ctx);
+    int rc;
+    libxl__carefd *lock;
+
+    CTX_LOCK;
+    lock = libxl__lock_domain_userdata(gc, domid);
+    if (!lock) {
+        rc = ERROR_LOCK_FAIL;
+        goto out;
+    }
+
+    rc = libxl__userdata_retrieve(gc, domid, userdata_userid,
+                                  data_r, datalen_r);
+
+
+    libxl__unlock_domain_userdata(lock);
+out:
+    CTX_UNLOCK;
     GC_FREE;
     return rc;
 }
