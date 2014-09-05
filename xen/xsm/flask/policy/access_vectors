@@ -200,6 +200,10 @@ class domain2
     cacheflush
 # Creation of the hardware domain when it is not dom0
     create_hardware_domain
+# XEN_DOMCTL_setvnumainfo
+    set_vnumainfo
+# XENMEM_getvnumainfo
+    get_vnumainfo
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains

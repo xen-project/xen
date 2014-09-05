@@ -49,7 +49,7 @@ define(`create_domain_common', `
 			getdomaininfo hypercall setvcpucontext setextvcpucontext
 			getscheduler getvcpuinfo getvcpuextstate getaddrsize
 			getaffinity setaffinity };
-	allow $1 $2:domain2 { set_cpuid settsc setscheduler setclaim  set_max_evtchn };
+	allow $1 $2:domain2 { set_cpuid settsc setscheduler setclaim set_max_evtchn set_vnumainfo get_vnumainfo };
 	allow $1 $2:security check_context;
 	allow $1 $2:shadow enable;
 	allow $1 $2:mmu { map_read map_write adjust memorymap physmap pinpage mmuext_op };
@@ -81,6 +81,7 @@ define(`manage_domain', `
 	allow $1 $2:domain { getdomaininfo getvcpuinfo getaffinity
 			getaddrsize pause unpause trigger shutdown destroy
 			setaffinity setdomainmaxmem getscheduler };
+    allow $1 $2:domain2 set_vnumainfo;
 ')
 
 # migrate_domain_out(priv, target)

@@ -139,6 +139,7 @@ struct xsm_operations {
     int (*hvm_param) (struct domain *d, unsigned long op);
     int (*hvm_control) (struct domain *d, unsigned long op);
     int (*hvm_param_nested) (struct domain *d);
+    int (*get_vnumainfo) (struct domain *d);
 
 #ifdef CONFIG_X86
     int (*do_mca) (void);
@@ -534,6 +535,11 @@ static inline int xsm_hvm_param_nested (xsm_default_t def, struct domain *d)
     return xsm_ops->hvm_param_nested(d);
 }
 
+static inline int xsm_get_vnumainfo (xsm_default_t def, struct domain *d)
+{
+    return xsm_ops->get_vnumainfo(d);
+}
+
 #ifdef CONFIG_X86
 static inline int xsm_do_mca(xsm_default_t def)
 {
@@ -653,6 +659,7 @@ static inline int xsm_ioport_mapping (xsm_default_t def, struct domain *d, uint3
 {
     return xsm_ops->ioport_mapping(d, s, e, allow);
 }
+
 #endif /* CONFIG_X86 */
 
 #endif /* XSM_NO_WRAPPERS */

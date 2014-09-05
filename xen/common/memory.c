@@ -989,6 +989,13 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( (d = rcu_lock_domain_by_any_id(topology.domid)) == NULL )
             return -ESRCH;
 
+        rc = xsm_get_vnumainfo(XSM_TARGET, d);
+        if ( rc )
+        {
+            rcu_unlock_domain(d);
+            return rc;
+        }
+
         read_lock(&d->vnuma_rwlock);
 
         if ( d->vnuma == NULL )

@@ -404,6 +404,11 @@ static int flask_claim_pages(struct domain *d)
     return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__SETCLAIM);
 }
 
+static int flask_get_vnumainfo(struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__GET_VNUMAINFO);
+}
+
 static int flask_console_io(struct domain *d, int cmd)
 {
     u32 perm;
@@ -714,6 +719,9 @@ static int flask_domctl(struct domain *d, int cmd)
 
     case XEN_DOMCTL_cacheflush:
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__CACHEFLUSH);
+
+    case XEN_DOMCTL_setvnumainfo:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN2__SET_VNUMAINFO);
 
     default:
         printk("flask_domctl: Unknown op %d\n", cmd);
@@ -1552,6 +1560,8 @@ static struct xsm_operations flask_ops = {
     .hvm_param_nested = flask_hvm_param_nested,
 
     .do_xsm_op = do_flask_op,
+    .get_vnumainfo = flask_get_vnumainfo,
+
 #ifdef CONFIG_COMPAT
     .do_compat_op = compat_flask_op,
 #endif
