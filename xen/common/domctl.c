@@ -297,6 +297,120 @@ int vcpuaffinity_params_invalid(const xen_domctl_vcpuaffinity_t *vcpuaff)
             guest_handle_is_null(vcpuaff->cpumap_soft.bitmap));
 }
 
+void vnuma_destroy(struct vnuma_info *vnuma)
+{
+    if ( vnuma )
+    {
+        xfree(vnuma->vmemrange);
+        xfree(vnuma->vcpu_to_vnode);
+        xfree(vnuma->vdistance);
+        xfree(vnuma->vnode_to_pnode);
+        xfree(vnuma);
+    }
+}
+
+/*
+ * Allocates memory for vNUMA, **vnuma should be NULL.
+ * Caller has to make sure that domain has max_pages
+ * and number of vcpus set for domain.
+ * Verifies that single allocation does not exceed
+ * PAGE_SIZE.
+ */
+static struct vnuma_info *vnuma_alloc(unsigned int nr_vnodes,
+                                      unsigned int nr_ranges,
+                                      unsigned int nr_vcpus)
+{
+
+    struct vnuma_info *vnuma;
+
+    /*
+     * Check if any of the allocations are bigger than PAGE_SIZE.
+     * See XSA-77.
+     */
+    if ( nr_vnodes * nr_vnodes > (PAGE_SIZE / sizeof(*vnuma->vdistance)) ||
+         nr_ranges > (PAGE_SIZE / sizeof(*vnuma->vmemrange)) )
+        return ERR_PTR(-EINVAL);
+
+    /*
+     * If allocations become larger then PAGE_SIZE, these allocations
+     * should be split into PAGE_SIZE allocations due to XSA-77.
+     */
+    vnuma = xmalloc(struct vnuma_info);
+    if ( !vnuma )
+        return ERR_PTR(-ENOMEM);
+
+    vnuma->vdistance = xmalloc_array(unsigned int, nr_vnodes * nr_vnodes);
+    vnuma->vcpu_to_vnode = xmalloc_array(unsigned int, nr_vcpus);
+    vnuma->vnode_to_pnode = xmalloc_array(unsigned int, nr_vnodes);
+    vnuma->vmemrange = xmalloc_array(vmemrange_t, nr_ranges);
+
+    if ( vnuma->vdistance == NULL || vnuma->vmemrange == NULL ||
+         vnuma->vcpu_to_vnode == NULL || vnuma->vnode_to_pnode == NULL )
+    {
+        vnuma_destroy(vnuma);
+        return ERR_PTR(-ENOMEM);
+    }
+
+    return vnuma;
+}
+
+/*
+ * Construct vNUMA topology form uinfo.
+ */
+static struct vnuma_info *vnuma_init(const struct xen_domctl_vnuma *uinfo,
+                                     const struct domain *d)
+{
+    unsigned int i, nr_vnodes;
+    int ret = -EINVAL;
+    struct vnuma_info *info;
+
+    nr_vnodes = uinfo->nr_vnodes;
+
+    if ( nr_vnodes == 0 || uinfo->nr_vcpus != d->max_vcpus || uinfo->pad != 0 )
+        return ERR_PTR(ret);
+
+    info = vnuma_alloc(nr_vnodes, uinfo->nr_vmemranges, d->max_vcpus);
+    if ( IS_ERR(info) )
+        return info;
+
+    ret = -EFAULT;
+
+    if ( copy_from_guest(info->vdistance, uinfo->vdistance,
+                         nr_vnodes * nr_vnodes) )
+        goto vnuma_fail;
+
+    if ( copy_from_guest(info->vcpu_to_vnode, uinfo->vcpu_to_vnode,
+                         d->max_vcpus) )
+        goto vnuma_fail;
+
+    if ( copy_from_guest(info->vnode_to_pnode, uinfo->vnode_to_pnode,
+                         nr_vnodes) )
+        goto vnuma_fail;
+
+    if (copy_from_guest(info->vmemrange, uinfo->vmemrange,
+                        uinfo->nr_vmemranges))
+        goto vnuma_fail;
+
+    info->nr_vnodes = nr_vnodes;
+    info->nr_vmemranges = uinfo->nr_vmemranges;
+
+    /* Check that vmemranges flags are zero. */
+    for ( i = 0; i < info->nr_vmemranges; i++ )
+    {
+        if ( info->vmemrange[i].flags != 0 )
+        {
+            ret = -EINVAL;
+            goto vnuma_fail;
+        }
+    }
+
+    return info;
+
+ vnuma_fail:
+    vnuma_destroy(info);
+    return ERR_PTR(ret);
+}
+
 long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     long ret = 0;
@@ -1030,6 +1144,27 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         d->max_evtchn_port = min_t(unsigned int,
                                    op->u.set_max_evtchn.max_port,
                                    INT_MAX);
+    }
+    break;
+
+    case XEN_DOMCTL_setvnumainfo:
+    {
+        struct vnuma_info *vnuma;
+
+        vnuma = vnuma_init(&op->u.vnuma, d);
+        if ( IS_ERR(vnuma) )
+        {
+            ret = PTR_ERR(vnuma);
+            break;
+        }
+
+        /* overwrite vnuma topology for domain. */
+        write_lock(&d->vnuma_rwlock);
+        vnuma_destroy(d->vnuma);
+        d->vnuma = vnuma;
+        write_unlock(&d->vnuma_rwlock);
+
+        ret = 0;
     }
     break;
 

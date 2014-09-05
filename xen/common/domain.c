@@ -280,6 +280,8 @@ struct domain *domain_create(
 
     spin_lock_init(&d->pbuf_lock);
 
+    rwlock_init(&d->vnuma_rwlock);
+
     err = -ENOMEM;
     if ( !zalloc_cpumask_var(&d->domain_dirty_cpumask) )
         goto fail;
@@ -606,6 +608,7 @@ int domain_kill(struct domain *d)
         evtchn_destroy(d);
         gnttab_release_mappings(d);
         tmem_destroy(d->tmem_client);
+        vnuma_destroy(d->vnuma);
         domain_set_outstanding_pages(d, 0);
         d->tmem_client = NULL;
         /* fallthrough */

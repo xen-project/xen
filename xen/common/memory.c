@@ -969,6 +969,130 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         break;
 
+    case XENMEM_get_vnumainfo:
+    {
+        struct vnuma_topology_info topology;
+        struct domain *d;
+        unsigned int dom_vnodes, dom_vranges, dom_vcpus;
+        struct vnuma_info tmp;
+
+        /*
+         * Guest passes nr_vnodes, number of regions and nr_vcpus thus
+         * we know how much memory guest has allocated.
+         */
+        if ( copy_from_guest(&topology, arg, 1 ))
+            return -EFAULT;
+
+        if ( topology.pad != 0 )
+            return -EINVAL;
+
+        if ( (d = rcu_lock_domain_by_any_id(topology.domid)) == NULL )
+            return -ESRCH;
+
+        read_lock(&d->vnuma_rwlock);
+
+        if ( d->vnuma == NULL )
+        {
+            read_unlock(&d->vnuma_rwlock);
+            rcu_unlock_domain(d);
+            return -EOPNOTSUPP;
+        }
+
+        dom_vnodes = d->vnuma->nr_vnodes;
+        dom_vranges = d->vnuma->nr_vmemranges;
+        dom_vcpus = d->max_vcpus;
+
+        /*
+         * Copied from guest values may differ from domain vnuma config.
+         * Check here guest parameters make sure we dont overflow.
+         * Additionaly check padding.
+         */
+        if ( topology.nr_vnodes < dom_vnodes      ||
+             topology.nr_vcpus < dom_vcpus        ||
+             topology.nr_vmemranges < dom_vranges )
+        {
+            read_unlock(&d->vnuma_rwlock);
+            rcu_unlock_domain(d);
+
+            topology.nr_vnodes = dom_vnodes;
+            topology.nr_vcpus = dom_vcpus;
+            topology.nr_vmemranges = dom_vranges;
+
+            /* Copy back needed values. */
+            return __copy_to_guest(arg, &topology, 1) ? -EFAULT : -ENOBUFS;
+        }
+
+        read_unlock(&d->vnuma_rwlock);
+
+        tmp.vdistance = xmalloc_array(unsigned int, dom_vnodes * dom_vnodes);
+        tmp.vmemrange = xmalloc_array(vmemrange_t, dom_vranges);
+        tmp.vcpu_to_vnode = xmalloc_array(unsigned int, dom_vcpus);
+
+        if ( tmp.vdistance == NULL ||
+             tmp.vmemrange == NULL ||
+             tmp.vcpu_to_vnode == NULL )
+        {
+            rc = -ENOMEM;
+            goto vnumainfo_out;
+        }
+
+        /*
+         * Check if vnuma info has changed and if the allocated arrays
+         * are not big enough.
+         */
+        read_lock(&d->vnuma_rwlock);
+
+        if ( dom_vnodes < d->vnuma->nr_vnodes ||
+             dom_vranges < d->vnuma->nr_vmemranges ||
+             dom_vcpus < d->max_vcpus )
+        {
+            read_unlock(&d->vnuma_rwlock);
+            rc = -EAGAIN;
+            goto vnumainfo_out;
+        }
+
+        dom_vnodes = d->vnuma->nr_vnodes;
+        dom_vranges = d->vnuma->nr_vmemranges;
+        dom_vcpus = d->max_vcpus;
+
+        memcpy(tmp.vmemrange, d->vnuma->vmemrange,
+               sizeof(*d->vnuma->vmemrange) * dom_vranges);
+        memcpy(tmp.vdistance, d->vnuma->vdistance,
+               sizeof(*d->vnuma->vdistance) * dom_vnodes * dom_vnodes);
+        memcpy(tmp.vcpu_to_vnode, d->vnuma->vcpu_to_vnode,
+               sizeof(*d->vnuma->vcpu_to_vnode) * dom_vcpus);
+
+        read_unlock(&d->vnuma_rwlock);
+
+        rc = -EFAULT;
+
+        if ( copy_to_guest(topology.vmemrange.h, tmp.vmemrange,
+                           dom_vranges) != 0 )
+            goto vnumainfo_out;
+
+        if ( copy_to_guest(topology.vdistance.h, tmp.vdistance,
+                           dom_vnodes * dom_vnodes) != 0 )
+            goto vnumainfo_out;
+
+        if ( copy_to_guest(topology.vcpu_to_vnode.h, tmp.vcpu_to_vnode,
+                           dom_vcpus) != 0 )
+            goto vnumainfo_out;
+
+        topology.nr_vnodes = dom_vnodes;
+        topology.nr_vcpus = dom_vcpus;
+        topology.nr_vmemranges = dom_vranges;
+
+        rc = __copy_to_guest(arg, &topology, 1) ? -EFAULT : 0;
+
+ vnumainfo_out:
+        rcu_unlock_domain(d);
+
+        xfree(tmp.vdistance);
+        xfree(tmp.vmemrange);
+        xfree(tmp.vcpu_to_vnode);
+        break;
+    }
+
     default:
         rc = arch_memory_op(cmd, arg);
         break;

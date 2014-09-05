@@ -521,9 +521,59 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
  * The zero value is appropiate.
  */
 
+/* vNUMA node memory ranges */
+struct vmemrange {
+    uint64_t start, end;
+    unsigned int flags;
+    unsigned int nid;
+};
+
+typedef struct vmemrange vmemrange_t;
+DEFINE_XEN_GUEST_HANDLE(vmemrange_t);
+
+/*
+ * vNUMA topology specifies vNUMA node number, distance table,
+ * memory ranges and vcpu mapping provided for guests.
+ * XENMEM_get_vnumainfo hypercall expects to see from guest
+ * nr_vnodes, nr_vmemranges and nr_vcpus to indicate available memory.
+ * After filling guests structures, nr_vnodes, nr_vmemranges and nr_vcpus
+ * copied back to guest. Domain returns expected values of nr_vnodes,
+ * nr_vmemranges and nr_vcpus to guest if the values where incorrect.
+ */
+struct vnuma_topology_info {
+    /* IN */
+    domid_t domid;
+    uint16_t pad;
+    /* IN/OUT */
+    unsigned int nr_vnodes;
+    unsigned int nr_vcpus;
+    unsigned int nr_vmemranges;
+    /* OUT */
+    union {
+        XEN_GUEST_HANDLE(uint) h;
+        uint64_t pad;
+    } vdistance;
+    union {
+        XEN_GUEST_HANDLE(uint) h;
+        uint64_t pad;
+    } vcpu_to_vnode;
+    union {
+        XEN_GUEST_HANDLE(vmemrange_t) h;
+        uint64_t pad;
+    } vmemrange;
+};
+typedef struct vnuma_topology_info vnuma_topology_info_t;
+DEFINE_XEN_GUEST_HANDLE(vnuma_topology_info_t);
+
+/*
+ * XENMEM_get_vnumainfo used by guest to get
+ * vNUMA topology from hypervisor.
+ */
+#define XENMEM_get_vnumainfo               26
+
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
-/* Next available subop number is 26 */
+/* Next available subop number is 27 */
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 

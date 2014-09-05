@@ -452,6 +452,10 @@ struct domain
     nodemask_t node_affinity;
     unsigned int last_alloc_node;
     spinlock_t node_affinity_lock;
+
+    /* vNUMA topology accesses are protected by rwlock. */
+    rwlock_t vnuma_rwlock;
+    struct vnuma_info *vnuma;
 };
 
 struct domain_setup_info

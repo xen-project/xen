@@ -35,6 +35,7 @@
 #include "xen.h"
 #include "grant_table.h"
 #include "hvm/save.h"
+#include "memory.h"
 
 #define XEN_DOMCTL_INTERFACE_VERSION 0x0000000a
 
@@ -934,6 +935,34 @@ struct xen_domctl_vcpu_msrs {
 };
 typedef struct xen_domctl_vcpu_msrs xen_domctl_vcpu_msrs_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpu_msrs_t);
+
+/*
+ * Use in XEN_DOMCTL_setvnumainfo to set
+ * vNUMA domain topology.
+ */
+struct xen_domctl_vnuma {
+    uint32_t nr_vnodes;
+    uint32_t nr_vmemranges;
+    uint32_t nr_vcpus;
+    uint32_t pad;
+    XEN_GUEST_HANDLE_64(uint) vdistance;
+    XEN_GUEST_HANDLE_64(uint) vcpu_to_vnode;
+
+    /*
+     * vnodes to physical NUMA nodes mask.
+     * This kept on per-domain basis for
+     * interested consumers, such as numa aware ballooning.
+     */
+    XEN_GUEST_HANDLE_64(uint) vnode_to_pnode;
+
+    /*
+     * memory rages for each vNUMA node
+     */
+    XEN_GUEST_HANDLE_64(vmemrange_t) vmemrange;
+};
+typedef struct xen_domctl_vnuma xen_domctl_vnuma_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_vnuma_t);
+
 #endif
 
 struct xen_domctl {
@@ -1008,6 +1037,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_cacheflush                    71
 #define XEN_DOMCTL_get_vcpu_msrs                 72
 #define XEN_DOMCTL_set_vcpu_msrs                 73
+#define XEN_DOMCTL_setvnumainfo                  74
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -1068,6 +1098,7 @@ struct xen_domctl {
         struct xen_domctl_cacheflush        cacheflush;
         struct xen_domctl_gdbsx_pauseunp_vcpu gdbsx_pauseunp_vcpu;
         struct xen_domctl_gdbsx_domstatus   gdbsx_domstatus;
+        struct xen_domctl_vnuma             vnuma;
         uint8_t                             pad[128];
     } u;
 };
