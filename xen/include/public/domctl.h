@@ -935,6 +935,7 @@ struct xen_domctl_vcpu_msrs {
 };
 typedef struct xen_domctl_vcpu_msrs xen_domctl_vcpu_msrs_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpu_msrs_t);
+#endif
 
 /*
  * Use in XEN_DOMCTL_setvnumainfo to set
@@ -962,8 +963,6 @@ struct xen_domctl_vnuma {
 };
 typedef struct xen_domctl_vnuma xen_domctl_vnuma_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vnuma_t);
-
-#endif
 
 struct xen_domctl {
     uint32_t cmd;
