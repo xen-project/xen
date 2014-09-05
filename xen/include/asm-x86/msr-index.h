@@ -112,11 +112,6 @@
 
 #define MSR_AMD64_MCx_MASK(x)		(MSR_AMD64_MC0_MASK + (x))
 
-#define MSR_P6_PERFCTR0			0x000000c1
-#define MSR_P6_PERFCTR1			0x000000c2
-#define MSR_P6_EVNTSEL0			0x00000186
-#define MSR_P6_EVNTSEL1			0x00000187
-
 /* MSRs & bits used for VMX enabling */
 #define MSR_IA32_VMX_BASIC                      0x480
 #define MSR_IA32_VMX_PINBASED_CTLS              0x481
@@ -329,8 +324,8 @@
 #define MSR_IA32_ENERGY_PERF_BIAS	0x000001b0
 
 /* Intel Model 6 */
-#define MSR_P6_EVNTSEL0			0x00000186
-#define MSR_P6_EVNTSEL1			0x00000187
+#define MSR_P6_PERFCTR(n)		(0x000000c1 + (n))
+#define MSR_P6_EVNTSEL(n)		(0x00000186 + (n))
 
 /* P4/Xeon+ specific */
 #define MSR_IA32_MCG_EAX		0x00000180
@@ -487,8 +482,5 @@
 #define MSR_INTEL_MISC_FEATURES_ENABLES	0x00000140
 #define _MSR_MISC_FEATURES_CPUID_FAULTING	0
 #define MSR_MISC_FEATURES_CPUID_FAULTING	(1ULL << _MSR_MISC_FEATURES_CPUID_FAULTING)
-
-/* Geode defined MSRs */
-#define MSR_GEODE_BUSCONT_CONF0		0x00001900
 
 #endif /* __ASM_MSR_INDEX_H */

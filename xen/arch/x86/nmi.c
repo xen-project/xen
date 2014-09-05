@@ -205,7 +205,7 @@ void disable_lapic_nmi_watchdog(void)
     case X86_VENDOR_INTEL:
         switch (boot_cpu_data.x86) {
         case 6:
-            wrmsr(MSR_P6_EVNTSEL0, 0, 0);
+            wrmsr(MSR_P6_EVNTSEL(0), 0, 0);
             break;
         case 15:
             wrmsr(MSR_P4_IQ_CCCR0, 0, 0);
@@ -304,21 +304,21 @@ static void __pminit setup_p6_watchdog(unsigned counter)
 {
     unsigned int evntsel;
 
-    nmi_perfctr_msr = MSR_P6_PERFCTR0;
+    nmi_perfctr_msr = MSR_P6_PERFCTR(0);
 
-    clear_msr_range(MSR_P6_EVNTSEL0, 2);
-    clear_msr_range(MSR_P6_PERFCTR0, 2);
+    clear_msr_range(MSR_P6_EVNTSEL(0), 2);
+    clear_msr_range(MSR_P6_PERFCTR(0), 2);
 
     evntsel = P6_EVNTSEL_INT
         | P6_EVNTSEL_OS
         | P6_EVNTSEL_USR
         | counter;
 
-    wrmsr(MSR_P6_EVNTSEL0, evntsel, 0);
+    wrmsr(MSR_P6_EVNTSEL(0), evntsel, 0);
     write_watchdog_counter("P6_PERFCTR0");
     apic_write(APIC_LVTPC, APIC_DM_NMI);
     evntsel |= P6_EVNTSEL0_ENABLE;
-    wrmsr(MSR_P6_EVNTSEL0, evntsel, 0);
+    wrmsr(MSR_P6_EVNTSEL(0), evntsel, 0);
 }
 
 static int __pminit setup_p4_watchdog(void)
@@ -508,9 +508,9 @@ bool_t nmi_watchdog_tick(const struct cpu_user_regs *regs)
             wrmsrl(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val);
             apic_write(APIC_LVTPC, APIC_DM_NMI);
         }
-        else if ( nmi_perfctr_msr == MSR_P6_PERFCTR0 )
+        else if ( nmi_perfctr_msr == MSR_P6_PERFCTR(0) )
         {
-            rdmsrl(MSR_P6_PERFCTR0, msr_content);
+            rdmsrl(MSR_P6_PERFCTR(0), msr_content);
             if ( msr_content & (1ULL << P6_EVENT_WIDTH) )
                 watchdog_tick = 0;
 

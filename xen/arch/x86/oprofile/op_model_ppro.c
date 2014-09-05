@@ -64,9 +64,9 @@ static void ppro_fill_in_addresses(struct op_msrs * const msrs)
 	int i;
 
 	for (i = 0; i < num_counters; i++)
-		msrs->counters[i].addr = MSR_P6_PERFCTR0 + i;
+		msrs->counters[i].addr = MSR_P6_PERFCTR(i);
 	for (i = 0; i < num_counters; i++)
-		msrs->controls[i].addr = MSR_P6_EVNTSEL0 + i;
+		msrs->controls[i].addr = MSR_P6_EVNTSEL(i);
 }
 
 
@@ -211,11 +211,11 @@ static int ppro_is_arch_pmu_msr(u64 msr_index, int *type, int *index)
 		*index = msr_index - MSR_IA32_PERFCTR0;
 		return 1;
         }
-        if ( (msr_index >= MSR_P6_EVNTSEL0) &&
-            (msr_index < (MSR_P6_EVNTSEL0 + num_counters)) )
+        if ( (msr_index >= MSR_P6_EVNTSEL(0)) &&
+            (msr_index < (MSR_P6_EVNTSEL(num_counters))) )
         {
 		*type = MSR_TYPE_ARCH_CTRL;
-		*index = msr_index - MSR_P6_EVNTSEL0;
+		*index = msr_index - MSR_P6_EVNTSEL(0);
 		return 1;
         }
 
