@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <xenctrl.h>
 #include <xen/io/xs_wire.h>
@@ -42,8 +43,8 @@ static int xs_ring_read(struct mmap_interface *interface,
 	XENSTORE_RING_IDX cons, prod; /* offsets only */
 	int to_read;
 
-	cons = *(volatile uint32*)&intf->req_cons;
-	prod = *(volatile uint32*)&intf->req_prod;
+	cons = *(volatile uint32_t*)&intf->req_cons;
+	prod = *(volatile uint32_t*)&intf->req_prod;
 	xen_mb();
 
 	if ((prod - cons) > XENSTORE_RING_SIZE)
@@ -72,8 +73,8 @@ static int xs_ring_write(struct mmap_interface *interface,
 	XENSTORE_RING_IDX cons, prod;
 	int can_write;
 
-	cons = *(volatile uint32*)&intf->rsp_cons;
-	prod = *(volatile uint32*)&intf->rsp_prod;
+	cons = *(volatile uint32_t*)&intf->rsp_cons;
+	prod = *(volatile uint32_t*)&intf->rsp_prod;
 	xen_mb();
 	if ( (prod - cons) >= XENSTORE_RING_SIZE )
 		return 0;
