@@ -2917,6 +2917,36 @@ _hidden void libxl__remus_devices_commit(libxl__egc *egc,
                                          libxl__remus_devices_state *rds);
 _hidden int libxl__netbuffer_enabled(libxl__gc *gc);
 
+/*----- Legacy conversion helper -----*/
+typedef struct libxl__conversion_helper_state libxl__conversion_helper_state;
+
+struct libxl__conversion_helper_state {
+    /* public */
+    libxl__ao *ao;
+    int legacy_fd;
+    bool hvm;                  /* pv or hvm domain? */
+    libxl__carefd *v2_carefd;  /* Filled by successful call to
+                                * libxl__convert_legacy_stream().  Caller
+                                * assumes ownership of the fd. */
+    void (*completion_callback)(
+        libxl__egc *egc, libxl__conversion_helper_state *chs, int rc);
+    /* private */
+    int rc;
+    libxl__ao_abortable abrt;
+    libxl__ev_child child;
+};
+
+_hidden void libxl__conversion_helper_init
+                    (libxl__conversion_helper_state *chs);
+_hidden int libxl__convert_legacy_stream(libxl__egc *egc,
+                    libxl__conversion_helper_state *chs);
+_hidden void libxl__conversion_helper_abort(libxl__egc *egc,
+                    libxl__conversion_helper_state *chs, int rc);
+static inline bool libxl__conversion_helper_inuse
+                    (const libxl__conversion_helper_state *chs)
+{ return libxl__ev_child_inuse(&chs->child); }
+
+
 /*----- Domain suspend (save) state structure -----*/
 
 typedef struct libxl__domain_suspend_state libxl__domain_suspend_state;

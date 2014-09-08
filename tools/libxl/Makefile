@@ -56,6 +56,12 @@ else
 LIBXL_OBJS-y += libxl_nonetbuffer.o
 endif
 
+ifeq ($(CONFIG_X86),y)
+LIBXL_OBJS-y += libxl_convert_callout.o
+else
+LIBXL_OBJS-y += libxl_no_convert_callout.o
+endif
+
 LIBXL_OBJS-y += libxl_remus_device.o libxl_remus_disk_drbd.o
 
 LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o libxl_x86.o libxl_psr.o
