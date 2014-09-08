@@ -1031,7 +1031,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
 
         ret = -EPERM;
-        if ( !iomem_access_permitted(current->domain, mfn, mfn_end) )
+        if ( !iomem_access_permitted(current->domain, mfn, mfn_end) ||
+             !iomem_access_permitted(d, mfn, mfn_end) )
             break;
 
         ret = xsm_iomem_mapping(XSM_HOOK, d, mfn, mfn_end, add);
@@ -1044,40 +1045,23 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                    "memory_map:add: dom%d gfn=%lx mfn=%lx nr=%lx\n",
                    d->domain_id, gfn, mfn, nr_mfns);
 
-            ret = iomem_permit_access(d, mfn, mfn_end);
-            if ( !ret )
-            {
-                ret = map_mmio_regions(d, gfn, nr_mfns, mfn);
-                if ( ret )
-                {
-                    printk(XENLOG_G_WARNING
-                           "memory_map:fail: dom%d gfn=%lx mfn=%lx nr=%lx ret:%ld\n",
-                           d->domain_id, gfn, mfn, nr_mfns, ret);
-                    if ( iomem_deny_access(d, mfn, mfn_end) &&
-                         is_hardware_domain(current->domain) )
-                        printk(XENLOG_ERR
-                               "memory_map: failed to deny dom%d access to [%lx,%lx]\n",
-                               d->domain_id, mfn, mfn_end);
-                }
-            }
+            ret = map_mmio_regions(d, gfn, nr_mfns, mfn);
+            if ( ret )
+                printk(XENLOG_G_WARNING
+                       "memory_map:fail: dom%d gfn=%lx mfn=%lx nr=%lx ret:%ld\n",
+                       d->domain_id, gfn, mfn, nr_mfns, ret);
         }
         else
         {
-            int rc = 0;
-
             printk(XENLOG_G_INFO
                    "memory_map:remove: dom%d gfn=%lx mfn=%lx nr=%lx\n",
                    d->domain_id, gfn, mfn, nr_mfns);
 
-            rc = unmap_mmio_regions(d, gfn, nr_mfns, mfn);
-            ret = iomem_deny_access(d, mfn, mfn_end);
-            if ( !ret )
-                ret = rc;
+            ret = unmap_mmio_regions(d, gfn, nr_mfns, mfn);
             if ( ret && is_hardware_domain(current->domain) )
                 printk(XENLOG_ERR
-                       "memory_map: error %ld %s dom%d access to [%lx,%lx]\n",
-                       ret, rc ? "removing" : "denying", d->domain_id,
-                       mfn, mfn_end);
+                       "memory_map: error %ld removing dom%d access to [%lx,%lx]\n",
+                       ret, d->domain_id, mfn, mfn_end);
         }
         /* Do this unconditionally to cover errors on above failure paths. */
         memory_type_changed(d);
