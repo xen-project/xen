@@ -1216,6 +1216,15 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
             libxl__spawn_stub_dm(egc, &dcs->dmss);
         else
             libxl__spawn_local_dm(egc, &dcs->dmss.dm);
+
+        /*
+         * Handle the domain's (and the related stubdomain's) access to
+         * the VGA framebuffer.
+         */
+        ret = libxl__grant_vga_iomem_permission(gc, domid, d_config);
+        if ( ret )
+            goto error_out;
+
         return;
     }
     case LIBXL_DOMAIN_TYPE_PV:

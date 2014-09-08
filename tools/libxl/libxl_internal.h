@@ -952,6 +952,8 @@ _hidden int libxl__domain_cpupool(libxl__gc *gc, uint32_t domid);
 _hidden libxl_scheduler libxl__domain_scheduler(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__sched_set_params(libxl__gc *gc, uint32_t domid,
                                     libxl_domain_sched_params *scparams);
+_hidden int libxl__grant_vga_iomem_permission(libxl__gc *gc, const uint32_t domid,
+                                              libxl_domain_config *const d_config);
 
 typedef struct {
     uint32_t store_port;

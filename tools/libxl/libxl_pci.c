@@ -874,10 +874,13 @@ static int qemu_pci_add_xenstore(libxl__gc *gc, uint32_t domid,
 static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
+    libxl_domain_type type = libxl__domain_type(gc, domid);
     int rc, hvm = 0;
 
-    switch (libxl__domain_type(gc, domid)) {
-    case LIBXL_DOMAIN_TYPE_HVM:
+    if (type == LIBXL_DOMAIN_TYPE_INVALID)
+        return ERROR_FAIL;
+
+    if (type == LIBXL_DOMAIN_TYPE_HVM) {
         hvm = 1;
         if (libxl__wait_for_device_model_deprecated(gc, domid, "running",
                                          NULL, NULL, NULL) < 0) {
@@ -895,8 +898,8 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
         }
         if ( rc )
             return ERROR_FAIL;
-        break;
-    case LIBXL_DOMAIN_TYPE_PV:
+    }
+
     {
         char *sysfs_path = libxl__sprintf(gc, SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
                                          pcidev->bus, pcidev->dev, pcidev->func);
@@ -965,11 +968,8 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
                 return ERROR_FAIL;
             }
         }
-        break;
     }
-    case LIBXL_DOMAIN_TYPE_INVALID:
-        return ERROR_FAIL;
-    }
+
 out:
     if (!libxl_is_stubdom(ctx, domid, NULL)) {
         rc = xc_assign_device(ctx->xch, domid, pcidev_encode_bdf(pcidev));
@@ -1194,6 +1194,7 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl_device_pci *assigned;
+    libxl_domain_type type = libxl__domain_type(gc, domid);
     int hvm = 0, rc, num;
     int stubdomid = 0;
 
@@ -1209,8 +1210,7 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
     }
 
     rc = ERROR_FAIL;
-    switch (libxl__domain_type(gc, domid)) {
-    case LIBXL_DOMAIN_TYPE_HVM:
+    if (type == LIBXL_DOMAIN_TYPE_HVM) {
         hvm = 1;
         if (libxl__wait_for_device_model_deprecated(gc, domid, "running",
                                          NULL, NULL, NULL) < 0)
@@ -1231,8 +1231,8 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
             rc = ERROR_FAIL;
             goto out_fail;
         }
-        break;
-    case LIBXL_DOMAIN_TYPE_PV:
+    } else if (type != LIBXL_DOMAIN_TYPE_PV)
+        abort();
     {
         char *sysfs_path = libxl__sprintf(gc, SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
                                          pcidev->bus, pcidev->dev, pcidev->func);
@@ -1282,10 +1282,6 @@ skip1:
             }
         }
         fclose(f);
-        break;
-    }
-    default:
-        abort();
     }
 out:
     /* don't do multiple resets while some functions are still passed through */
@@ -1460,6 +1456,69 @@ int libxl__device_pci_destroy_all(libxl__gc *gc, uint32_t domid)
     }
 
     free(pcidevs);
+    return 0;
+}
+
+int libxl__grant_vga_iomem_permission(libxl__gc *gc, const uint32_t domid,
+                                      libxl_domain_config *const d_config)
+{
+    int i, ret;
+
+    if (!libxl_defbool_val(d_config->b_info.u.hvm.gfx_passthru))
+        return 0;
+
+    for (i = 0 ; i < d_config->num_pcidevs ; i++) {
+        uint64_t vga_iomem_start = 0xa0000 >> XC_PAGE_SHIFT;
+        uint32_t stubdom_domid;
+        libxl_device_pci *pcidev = &d_config->pcidevs[i];
+        char *pci_device_class_path =
+            libxl__sprintf(gc, SYSFS_PCI_DEV"/"PCI_BDF"/class",
+                           pcidev->domain, pcidev->bus, pcidev->dev,
+                           pcidev->func);
+        int read_items;
+        unsigned long pci_device_class;
+
+        FILE *f = fopen(pci_device_class_path, "r");
+        if (!f) {
+            LOGE(ERROR,
+                 "pci device "PCI_BDF" does not have class attribute",
+                 pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+            continue;
+        }
+        read_items = fscanf(f, "0x%lx\n", &pci_device_class);
+        fclose(f);
+        if (read_items != 1) {
+            LOGE(ERROR,
+                 "cannot read class of pci device "PCI_BDF,
+                 pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+            continue;
+        }
+        if (pci_device_class != 0x030000) /* VGA class */
+            continue;
+
+        stubdom_domid = libxl_get_stubdom_id(CTX, domid);
+        ret = xc_domain_iomem_permission(CTX->xch, stubdom_domid,
+                                         vga_iomem_start, 0x20, 1);
+        if (ret < 0) {
+            LOGE(ERROR,
+                 "failed to give stubdom%d access to iomem range "
+                 "%"PRIx64"-%"PRIx64" for VGA passthru",
+                 stubdom_domid,
+                 vga_iomem_start, (vga_iomem_start + 0x20 - 1));
+            return ret;
+        }
+        ret = xc_domain_iomem_permission(CTX->xch, domid,
+                                         vga_iomem_start, 0x20, 1);
+        if (ret < 0) {
+            LOGE(ERROR,
+                 "failed to give dom%d access to iomem range "
+                 "%"PRIx64"-%"PRIx64" for VGA passthru",
+                 domid, vga_iomem_start, (vga_iomem_start + 0x20 - 1));
+            return ret;
+        }
+        break;
+    }
+
     return 0;
 }
 
