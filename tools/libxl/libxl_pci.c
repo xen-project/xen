@@ -875,7 +875,10 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl_domain_type type = libxl__domain_type(gc, domid);
-    int rc, hvm = 0;
+    char *sysfs_path;
+    FILE *f;
+    unsigned long long start, end, flags, size;
+    int irq, i, rc, hvm = 0;
 
     if (type == LIBXL_DOMAIN_TYPE_INVALID)
         return ERROR_FAIL;
@@ -900,73 +903,70 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
             return ERROR_FAIL;
     }
 
-    {
-        char *sysfs_path = libxl__sprintf(gc, SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
-                                         pcidev->bus, pcidev->dev, pcidev->func);
-        FILE *f = fopen(sysfs_path, "r");
-        unsigned long long start = 0, end = 0, flags = 0, size = 0;
-        int irq = 0;
-        int i;
+    sysfs_path = libxl__sprintf(gc, SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
+                                pcidev->bus, pcidev->dev, pcidev->func);
+    f = fopen(sysfs_path, "r");
+    start = end = flags = size = 0;
+    irq = 0;
 
-        if (f == NULL) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't open %s", sysfs_path);
-            return ERROR_FAIL;
-        }
-        for (i = 0; i < PROC_PCI_NUM_RESOURCES; i++) {
-            if (fscanf(f, "0x%llx 0x%llx 0x%llx\n", &start, &end, &flags) != 3)
-                continue;
-            size = end - start + 1;
-            if (start) {
-                if (flags & PCI_BAR_IO) {
-                    rc = xc_domain_ioport_permission(ctx->xch, domid, start, size, 1);
-                    if (rc < 0) {
-                        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Error: xc_domain_ioport_permission error 0x%llx/0x%llx", start, size);
-                        fclose(f);
-                        return ERROR_FAIL;
-                    }
-                } else {
-                    rc = xc_domain_iomem_permission(ctx->xch, domid, start>>XC_PAGE_SHIFT,
-                                                    (size+(XC_PAGE_SIZE-1))>>XC_PAGE_SHIFT, 1);
-                    if (rc < 0) {
-                        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Error: xc_domain_iomem_permission error 0x%llx/0x%llx", start, size);
-                        fclose(f);
-                        return ERROR_FAIL;
-                    }
+    if (f == NULL) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't open %s", sysfs_path);
+        return ERROR_FAIL;
+    }
+    for (i = 0; i < PROC_PCI_NUM_RESOURCES; i++) {
+        if (fscanf(f, "0x%llx 0x%llx 0x%llx\n", &start, &end, &flags) != 3)
+            continue;
+        size = end - start + 1;
+        if (start) {
+            if (flags & PCI_BAR_IO) {
+                rc = xc_domain_ioport_permission(ctx->xch, domid, start, size, 1);
+                if (rc < 0) {
+                    LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Error: xc_domain_ioport_permission error 0x%llx/0x%llx", start, size);
+                    fclose(f);
+                    return ERROR_FAIL;
+                }
+            } else {
+                rc = xc_domain_iomem_permission(ctx->xch, domid, start>>XC_PAGE_SHIFT,
+                                                (size+(XC_PAGE_SIZE-1))>>XC_PAGE_SHIFT, 1);
+                if (rc < 0) {
+                    LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Error: xc_domain_iomem_permission error 0x%llx/0x%llx", start, size);
+                    fclose(f);
+                    return ERROR_FAIL;
                 }
             }
         }
-        fclose(f);
-        sysfs_path = libxl__sprintf(gc, SYSFS_PCI_DEV"/"PCI_BDF"/irq", pcidev->domain,
-                                   pcidev->bus, pcidev->dev, pcidev->func);
-        f = fopen(sysfs_path, "r");
-        if (f == NULL) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't open %s", sysfs_path);
-            goto out;
+    }
+    fclose(f);
+    sysfs_path = libxl__sprintf(gc, SYSFS_PCI_DEV"/"PCI_BDF"/irq", pcidev->domain,
+                                pcidev->bus, pcidev->dev, pcidev->func);
+    f = fopen(sysfs_path, "r");
+    if (f == NULL) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't open %s", sysfs_path);
+        goto out;
+    }
+    if ((fscanf(f, "%u", &irq) == 1) && irq) {
+        rc = xc_physdev_map_pirq(ctx->xch, domid, irq, &irq);
+        if (rc < 0) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Error: xc_physdev_map_pirq irq=%d", irq);
+            fclose(f);
+            return ERROR_FAIL;
         }
-        if ((fscanf(f, "%u", &irq) == 1) && irq) {
-            rc = xc_physdev_map_pirq(ctx->xch, domid, irq, &irq);
-            if (rc < 0) {
-                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Error: xc_physdev_map_pirq irq=%d", irq);
-                fclose(f);
-                return ERROR_FAIL;
-            }
-            rc = xc_domain_irq_permission(ctx->xch, domid, irq, 1);
-            if (rc < 0) {
-                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Error: xc_domain_irq_permission irq=%d", irq);
-                fclose(f);
-                return ERROR_FAIL;
-            }
+        rc = xc_domain_irq_permission(ctx->xch, domid, irq, 1);
+        if (rc < 0) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Error: xc_domain_irq_permission irq=%d", irq);
+            fclose(f);
+            return ERROR_FAIL;
         }
-        fclose(f);
+    }
+    fclose(f);
 
-        /* Don't restrict writes to the PCI config space from this VM */
-        if (pcidev->permissive) {
-            if ( sysfs_write_bdf(gc, SYSFS_PCIBACK_DRIVER"/permissive",
-                                 pcidev) < 0 ) {
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                           "Setting permissive for device");
-                return ERROR_FAIL;
-            }
+    /* Don't restrict writes to the PCI config space from this VM */
+    if (pcidev->permissive) {
+        if ( sysfs_write_bdf(gc, SYSFS_PCIBACK_DRIVER"/permissive",
+                             pcidev) < 0 ) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "Setting permissive for device");
+            return ERROR_FAIL;
         }
     }
 
