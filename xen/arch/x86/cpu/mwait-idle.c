@@ -88,6 +88,7 @@ struct idle_cpu {
 	 * Indicate which enable bits to clear here.
 	 */
 	unsigned long auto_demotion_disable_flags;
+	bool_t byt_auto_demotion_disable_flag;
 	bool_t disable_promotion_to_c1e;
 };
 
@@ -537,6 +538,12 @@ static void auto_demotion_disable(void *dummy)
 	wrmsrl(MSR_NHM_SNB_PKG_CST_CFG_CTL, msr_bits);
 }
 
+static void byt_auto_demotion_disable(void *dummy)
+{
+	wrmsrl(MSR_CC6_DEMOTION_POLICY_CONFIG, 0);
+	wrmsrl(MSR_MC6_DEMOTION_POLICY_CONFIG, 0);
+}
+
 static void c1e_promotion_disable(void *dummy)
 {
 	u64 msr_bits;
@@ -569,6 +576,7 @@ static const struct idle_cpu idle_cpu_snb = {
 static const struct idle_cpu idle_cpu_byt = {
 	.state_table = byt_cstates,
 	.disable_promotion_to_c1e = 1,
+	.byt_auto_demotion_disable_flag = 1,
 };
 
 static const struct idle_cpu idle_cpu_ivb = {
@@ -766,6 +774,9 @@ static int mwait_idle_cpu_init(struct notifier_block *nfb,
 
 	if (icpu->auto_demotion_disable_flags)
 		on_selected_cpus(cpumask_of(cpu), auto_demotion_disable, NULL, 1);
+
+	if (icpu->byt_auto_demotion_disable_flag)
+		on_selected_cpus(cpumask_of(cpu), byt_auto_demotion_disable, NULL, 1);
 
 	if (icpu->disable_promotion_to_c1e)
 		on_selected_cpus(cpumask_of(cpu), c1e_promotion_disable, NULL, 1);
