@@ -178,6 +178,19 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
         bool_t linked = 0;
 
         /*
+         * Control block not mapped.  The guest must not unmask an
+         * event until the control block is initialized, so we can
+         * just drop the event.
+         */
+        if ( unlikely(!v->evtchn_fifo->control_block) )
+        {
+            printk(XENLOG_G_WARNING
+                   "d%dv%d has no FIFO event channel control block\n",
+                   d->domain_id, v->vcpu_id);
+            goto done;
+        }
+
+        /*
          * No locking around getting the queue. This may race with
          * changing the priority but we are allowed to signal the
          * event once on the old priority.
@@ -385,36 +398,42 @@ static void init_queue(struct vcpu *v, struct evtchn_fifo_queue *q,
 {
     spin_lock_init(&q->lock);
     q->priority = i;
-    q->head = &v->evtchn_fifo->control_block->head[i];
 }
 
-static int setup_control_block(struct vcpu *v, uint64_t gfn, uint32_t offset)
+static int setup_control_block(struct vcpu *v)
 {
-    struct domain *d = v->domain;
     struct evtchn_fifo_vcpu *efv;
-    void *virt;
     unsigned int i;
-    int rc;
-
-    if ( v->evtchn_fifo )
-        return -EINVAL;
 
     efv = xzalloc(struct evtchn_fifo_vcpu);
     if ( !efv )
         return -ENOMEM;
 
-    rc = map_guest_page(d, gfn, &virt);
-    if ( rc < 0 )
-    {
-        xfree(efv);
-        return rc;
-    }
+    for ( i = 0; i <= EVTCHN_FIFO_PRIORITY_MIN; i++ )
+        init_queue(v, &efv->queue[i], i);
 
     v->evtchn_fifo = efv;
+
+    return 0;
+}
+
+static int map_control_block(struct vcpu *v, uint64_t gfn, uint32_t offset)
+{
+    void *virt;
+    unsigned int i;
+    int rc;
+
+    if ( v->evtchn_fifo->control_block )
+        return -EINVAL;
+
+    rc = map_guest_page(v->domain, gfn, &virt);
+    if ( rc < 0 )
+        return rc;
+
     v->evtchn_fifo->control_block = virt + offset;
 
     for ( i = 0; i <= EVTCHN_FIFO_PRIORITY_MIN; i++ )
-        init_queue(v, &v->evtchn_fifo->queue[i], i);
+        v->evtchn_fifo->queue[i].head = &v->evtchn_fifo->control_block->head[i];
 
     return 0;
 }
@@ -508,27 +527,42 @@ int evtchn_fifo_init_control(struct evtchn_init_control *init_control)
 
     spin_lock(&d->event_lock);
 
-    rc = setup_control_block(v, gfn, offset);
-
     /*
      * If this is the first control block, setup an empty event array
      * and switch to the fifo port ops.
      */
-    if ( rc == 0 && !d->evtchn_fifo )
+    if ( !d->evtchn_fifo )
     {
+        struct vcpu *vcb;
+
+        for_each_vcpu ( d, vcb ) {
+            rc = setup_control_block(vcb);
+            if ( rc < 0 )
+                goto error;
+        }
+
         rc = setup_event_array(d);
         if ( rc < 0 )
-            cleanup_control_block(v);
-        else
-        {
-            d->evtchn_port_ops = &evtchn_port_ops_fifo;
-            d->max_evtchns = EVTCHN_FIFO_NR_CHANNELS;
-            setup_ports(d);
-        }
+            goto error;
+
+        rc = map_control_block(v, gfn, offset);
+        if ( rc < 0 )
+            goto error;
+
+        d->evtchn_port_ops = &evtchn_port_ops_fifo;
+        d->max_evtchns = EVTCHN_FIFO_NR_CHANNELS;
+        setup_ports(d);
     }
+    else
+        rc = map_control_block(v, gfn, offset);
 
     spin_unlock(&d->event_lock);
 
+    return rc;
+
+ error:
+    evtchn_fifo_destroy(d);
+    spin_unlock(&d->event_lock);
     return rc;
 }
 
