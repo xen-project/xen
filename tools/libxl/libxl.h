@@ -847,10 +847,15 @@ int static inline libxl_domain_create_restore_0x040200(
     LIBXL_EXTERNAL_CALLERS_ONLY
 {
     libxl_domain_restore_params params;
-    params.checkpointed_stream = 0;
+    int ret;
 
-    return libxl_domain_create_restore(
+    libxl_domain_restore_params_init(&params);
+
+    ret = libxl_domain_create_restore(
         ctx, d_config, domid, restore_fd, &params, ao_how, aop_console_how);
+
+    libxl_domain_restore_params_dispose(&params);
+    return ret;
 }
 
 #define libxl_domain_create_restore libxl_domain_create_restore_0x040200

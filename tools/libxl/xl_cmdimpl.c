@@ -2246,11 +2246,17 @@ start:
 
     if ( restoring ) {
         libxl_domain_restore_params params;
+
+        libxl_domain_restore_params_init(&params);
+
         params.checkpointed_stream = dom_info->checkpointed_stream;
         ret = libxl_domain_create_restore(ctx, &d_config,
                                           &domid, restore_fd,
                                           &params,
                                           0, autoconnect_console_how);
+
+        libxl_domain_restore_params_dispose(&params);
+
         /*
          * On subsequent reboot etc we should create the domain, not
          * restore/migrate-receive it again.
