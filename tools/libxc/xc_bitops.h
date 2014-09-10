@@ -60,4 +60,12 @@ static inline int test_and_set_bit(int nr, unsigned long *addr)
     return oldbit;
 }
 
+static inline void bitmap_or(unsigned long *dst, const unsigned long *other,
+                             int nr_bits)
+{
+    int i, nr_longs = (bitmap_size(nr_bits) / sizeof(unsigned long));
+    for ( i = 0; i < nr_longs; ++i )
+        dst[i] |= other[i];
+}
+
 #endif  /* XC_BITOPS_H */
