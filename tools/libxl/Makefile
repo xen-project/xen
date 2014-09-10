@@ -185,7 +185,7 @@ libxl_internal_json.h: _libxl_types_internal_json.h
 xl.h: _paths.h
 
 $(LIBXL_OBJS) $(LIBXL_TEST_OBJS) $(LIBXLU_OBJS) \
-	$(XL_OBJS) $(TEST_PROG_OBJS) $(SAVE_HELPER_OBJS): libxl.h
+	$(XL_OBJS) $(TEST_PROG_OBJS) $(SAVE_HELPER_OBJS) $(XEN_INIT_DOM0_OBJS): libxl.h
 $(LIBXL_OBJS) $(LIBXL_TEST_OBJS): libxl_internal.h
 
 _libxl_type%.h _libxl_type%_json.h _libxl_type%_private.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
