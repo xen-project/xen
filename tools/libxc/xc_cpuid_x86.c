@@ -34,13 +34,6 @@
 #define DEF_MAX_INTELEXT  0x80000008u
 #define DEF_MAX_AMDEXT    0x8000001cu
 
-static int hypervisor_is_64bit(xc_interface *xch)
-{
-    xen_capabilities_info_t xen_caps = "";
-    return ((xc_version(xch, XENVER_capabilities, &xen_caps) == 0) &&
-            (strstr(xen_caps, "x86_64") != NULL));
-}
-
 static void cpuid(const unsigned int *input, unsigned int *regs)
 {
     unsigned int count = (input[1] == XEN_CPUID_INPUT_UNUSED) ? 0 : input[1];
@@ -95,13 +88,11 @@ static void amd_xc_cpuid_policy(
         break;
 
     case 0x80000001: {
-        int is_64bit = hypervisor_is_64bit(xch) && is_pae;
-
         if ( !is_pae )
             clear_bit(X86_FEATURE_PAE, regs[3]);
 
         /* Filter all other features according to a whitelist. */
-        regs[2] &= ((is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0) |
+        regs[2] &= (bitmaskof(X86_FEATURE_LAHF_LM) |
                     bitmaskof(X86_FEATURE_CMP_LEGACY) |
                     (is_nestedhvm ? bitmaskof(X86_FEATURE_SVM) : 0) |
                     bitmaskof(X86_FEATURE_CR8_LEGACY) |
@@ -116,8 +107,8 @@ static void amd_xc_cpuid_policy(
                     bitmaskof(X86_FEATURE_TBM) |
                     bitmaskof(X86_FEATURE_DBEXT));
         regs[3] &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
-                    (is_pae ? bitmaskof(X86_FEATURE_NX) : 0) |
-                    (is_64bit ? bitmaskof(X86_FEATURE_LM) : 0) |
+                    bitmaskof(X86_FEATURE_NX) |
+                    bitmaskof(X86_FEATURE_LM) |
                     bitmaskof(X86_FEATURE_SYSCALL) |
                     bitmaskof(X86_FEATURE_MP) |
                     bitmaskof(X86_FEATURE_MMXEXT) |
@@ -195,16 +186,14 @@ static void intel_xc_cpuid_policy(
         break;
 
     case 0x80000001: {
-        int is_64bit = hypervisor_is_64bit(xch) && is_pae;
-
         /* Only a few features are advertised in Intel's 0x80000001. */
-        regs[2] &= (is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0) |
-                               bitmaskof(X86_FEATURE_3DNOWPREFETCH) |
-                               bitmaskof(X86_FEATURE_ABM);
-        regs[3] &= ((is_pae ? bitmaskof(X86_FEATURE_NX) : 0) |
-                    (is_64bit ? bitmaskof(X86_FEATURE_LM) : 0) |
-                    (is_64bit ? bitmaskof(X86_FEATURE_SYSCALL) : 0) |
-                    (is_64bit ? bitmaskof(X86_FEATURE_RDTSCP) : 0));
+        regs[2] &= (bitmaskof(X86_FEATURE_LAHF_LM) |
+                    bitmaskof(X86_FEATURE_3DNOWPREFETCH) |
+                    bitmaskof(X86_FEATURE_ABM));
+        regs[3] &= (bitmaskof(X86_FEATURE_NX) |
+                    bitmaskof(X86_FEATURE_LM) |
+                    bitmaskof(X86_FEATURE_SYSCALL) |
+                    bitmaskof(X86_FEATURE_RDTSCP));
         break;
     }
 
@@ -391,7 +380,10 @@ static void xc_cpuid_hvm_policy(
         break;
 
     case 0x80000001:
-        if ( !is_pae ) {
+        if ( !is_pae )
+        {
+            clear_bit(X86_FEATURE_LAHF_LM, regs[2]);
+            clear_bit(X86_FEATURE_LM, regs[3]);
             clear_bit(X86_FEATURE_NX, regs[3]);
             clear_bit(X86_FEATURE_PSE36, regs[3]);
         }
@@ -442,7 +434,7 @@ static void xc_cpuid_pv_policy(
 {
     DECLARE_DOMCTL;
     unsigned int guest_width;
-    int guest_64bit, xen_64bit = hypervisor_is_64bit(xch);
+    int guest_64bit;
     char brand[13];
     uint64_t xfeature_mask;
 
@@ -474,7 +466,7 @@ static void xc_cpuid_pv_policy(
     switch ( input[0] )
     {
     case 0x00000001:
-        if ( !xen_64bit || strstr(brand, "AMD") )
+        if ( strstr(brand, "AMD") )
             clear_bit(X86_FEATURE_SEP, regs[3]);
         clear_bit(X86_FEATURE_DS, regs[3]);
         clear_bit(X86_FEATURE_ACC, regs[3]);
