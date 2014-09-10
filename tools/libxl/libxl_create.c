@@ -883,7 +883,7 @@ static void initiate_domain_create(libxl__egc *egc,
     }
 
     if (restore_fd >= 0) {
-        LOG(DEBUG, "restoring, not running bootloader\n");
+        LOG(DEBUG, "restoring, not running bootloader");
         domcreate_bootloader_done(egc, &dcs->bl, 0);
     } else  {
         LOG(DEBUG, "running bootloader");
