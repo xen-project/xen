@@ -99,7 +99,7 @@ static int __init exynos5_smp_init(void)
     u64 size;
     int rc;
 
-    node = dt_find_compatible_node(NULL, NULL, "samsung,exynos4210-sysram-ns");
+    node = dt_find_compatible_node(NULL, NULL, "samsung,exynos4210-sysram");
     if ( !node )
     {
         dprintk(XENLOG_ERR, "samsung,exynos4210-sysram-ns missing in DT\n");
@@ -125,7 +125,7 @@ static int __init exynos5_smp_init(void)
 
     printk("Set SYSRAM to %"PRIpaddr" (%p)\n",
            __pa(init_secondary), init_secondary);
-    writel(__pa(init_secondary), sysram + 0x1c);
+    writel(__pa(init_secondary), sysram);
 
     iounmap(sysram);
 
