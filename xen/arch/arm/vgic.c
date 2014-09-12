@@ -31,6 +31,16 @@
 #include <asm/gic.h>
 #include <asm/vgic.h>
 
+static inline struct vgic_irq_rank *vgic_get_rank(struct vcpu *v, int rank)
+{
+    if ( rank == 0 )
+        return v->arch.vgic.private_irqs;
+    else if ( rank <= DOMAIN_NR_RANKS(v->domain) )
+        return &v->domain->arch.vgic.shared_irqs[rank - 1];
+    else
+        return NULL;
+}
+
 /*
  * Returns rank corresponding to a GICD_<FOO><n> register for
  * GICD_<FOO> with <b>-bits-per-interrupt.
@@ -40,17 +50,14 @@ struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n,
 {
     int rank = REG_RANK_NR(b, (n >> s));
 
-    if ( rank == 0 )
-        return v->arch.vgic.private_irqs;
-    else if ( rank <= DOMAIN_NR_RANKS(v->domain) )
-        return &v->domain->arch.vgic.shared_irqs[rank - 1];
-    else
-        return NULL;
+    return vgic_get_rank(v, rank);
 }
 
 struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq)
 {
-    return vgic_rank_offset(v, 8, irq, DABT_WORD);
+    int rank = irq/32;
+
+    return vgic_get_rank(v, rank);
 }
 
 int domain_vgic_init(struct domain *d)
