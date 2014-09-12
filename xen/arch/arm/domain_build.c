@@ -777,9 +777,6 @@ static int make_gic_node(const struct domain *d, void *fdt,
                          const struct dt_device_node *node)
 {
     const struct dt_device_node *gic = dt_interrupt_controller;
-    const void *compatible = NULL;
-    u32 len;
-    __be32 *new_cells, *tmp;
     int res = 0;
 
     /*
@@ -794,48 +791,7 @@ static int make_gic_node(const struct domain *d, void *fdt,
 
     DPRINT("Create gic node\n");
 
-    compatible = dt_get_property(gic, "compatible", &len);
-    if ( !compatible )
-    {
-        dprintk(XENLOG_ERR, "Can't find compatible property for the gic node\n");
-        return -FDT_ERR_XEN(ENOENT);
-    }
-
-    res = fdt_begin_node(fdt, "interrupt-controller");
-    if ( res )
-        return res;
-
-    res = fdt_property(fdt, "compatible", compatible, len);
-    if ( res )
-        return res;
-
-    res = fdt_property_cell(fdt, "#interrupt-cells", 3);
-    if ( res )
-        return res;
-
-    res = fdt_property(fdt, "interrupt-controller", NULL, 0);
-
-    if ( res )
-        return res;
-
-    len = dt_cells_to_size(dt_n_addr_cells(node) + dt_n_size_cells(node));
-    len *= 2; /* GIC has two memory regions: Distributor + CPU interface */
-    new_cells = xzalloc_bytes(len);
-    if ( new_cells == NULL )
-        return -FDT_ERR_XEN(ENOMEM);
-
-    tmp = new_cells;
-    DPRINT("  Set Distributor Base 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
-           d->arch.vgic.dbase, d->arch.vgic.dbase + PAGE_SIZE - 1);
-    dt_set_range(&tmp, node, d->arch.vgic.dbase, PAGE_SIZE);
-
-    DPRINT("  Set Cpu Base 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
-           d->arch.vgic.cbase, d->arch.vgic.cbase + (PAGE_SIZE * 2) - 1);
-    dt_set_range(&tmp, node, d->arch.vgic.cbase, PAGE_SIZE * 2);
-
-    res = fdt_property(fdt, "reg", new_cells, len);
-    xfree(new_cells);
-
+    res = gic_make_node(d, node, fdt);
     if ( res )
         return res;
 
@@ -1058,6 +1014,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     static const struct dt_device_match gic_matches[] __initconst =
     {
         DT_MATCH_GIC_V2,
+        DT_MATCH_GIC_V3,
         { /* sentinel */ },
     };
     static const struct dt_device_match timer_matches[] __initconst =

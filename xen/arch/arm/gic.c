@@ -625,6 +625,12 @@ void __cpuinit init_maintenance_interrupt(void)
                 "irq-maintenance", NULL);
 }
 
+int gic_make_node(const struct domain *d,const struct dt_device_node *node,
+                   void *fdt)
+{
+    return gic_hw_ops->make_dt_node(d, node, fdt);
+}
+
 /*
  * Local variables:
  * mode: C

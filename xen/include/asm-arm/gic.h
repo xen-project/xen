@@ -336,9 +336,13 @@ struct gic_hw_operations {
     unsigned int (*read_apr)(int apr_reg);
     /* Secondary CPU init */
     int (*secondary_init)(void);
+    int (*make_dt_node)(const struct domain *d,
+                        const struct dt_device_node *node, void *fdt);
 };
 
 void register_gic_ops(const struct gic_hw_operations *ops);
+int gic_make_node(const struct domain *d,const struct dt_device_node *node,
+                  void *fdt);
 
 #endif /* __ASSEMBLY__ */
 #endif

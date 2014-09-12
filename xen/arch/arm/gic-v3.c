@@ -32,6 +32,7 @@
 #include <xen/delay.h>
 #include <xen/device_tree.h>
 #include <xen/sizes.h>
+#include <xen/libfdt/libfdt.h>
 #include <asm/p2m.h>
 #include <asm/domain.h>
 #include <asm/io.h>
@@ -1027,6 +1028,82 @@ static void gicv3_irq_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     spin_unlock(&gicv3.lock);
 }
 
+static int gicv3_make_dt_node(const struct domain *d,
+                              const struct dt_device_node *node, void *fdt)
+{
+    const struct dt_device_node *gic = dt_interrupt_controller;
+    const void *compatible = NULL;
+    uint32_t len;
+    __be32 *new_cells, *tmp;
+    uint32_t rd_stride = 0;
+    uint32_t rd_count = 0;
+
+    int i, res = 0;
+
+    compatible = dt_get_property(gic, "compatible", &len);
+    if ( !compatible )
+    {
+        dprintk(XENLOG_ERR, "Can't find compatible property for the gic node\n");
+        return -FDT_ERR_XEN(ENOENT);
+    }
+
+    res = fdt_begin_node(fdt, "interrupt-controller");
+    if ( res )
+        return res;
+
+    res = fdt_property(fdt, "compatible", compatible, len);
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "#interrupt-cells", 3);
+    if ( res )
+        return res;
+
+    res = fdt_property(fdt, "interrupt-controller", NULL, 0);
+    if ( res )
+        return res;
+
+    res = dt_property_read_u32(gic, "redistributor-stride", &rd_stride);
+    if ( !res )
+        rd_stride = 0;
+
+    res = dt_property_read_u32(gic, "#redistributor-regions", &rd_count);
+    if ( !res )
+        rd_count = 1;
+
+    res = fdt_property_cell(fdt, "redistributor-stride", rd_stride);
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "#redistributor-regions", rd_count);
+    if ( res )
+        return res;
+
+    len = dt_cells_to_size(dt_n_addr_cells(node) + dt_n_size_cells(node));
+    /*
+     * GIC has two memory regions: Distributor + rdist regions
+     * CPU interface and virtual cpu interfaces accessesed as System registers
+     * So cells are created only for Distributor and rdist regions
+     */
+    len = len * (d->arch.vgic.rdist_count + 1);
+    new_cells = xzalloc_bytes(len);
+    if ( new_cells == NULL )
+        return -FDT_ERR_XEN(ENOMEM);
+
+    tmp = new_cells;
+
+    dt_set_range(&tmp, node, d->arch.vgic.dbase, d->arch.vgic.dbase_size);
+
+    for ( i = 0; i < d->arch.vgic.rdist_count; i++ )
+        dt_set_range(&tmp, node, d->arch.vgic.rbase[i],
+                     d->arch.vgic.rbase_size[i]);
+
+    res = fdt_property(fdt, "reg", new_cells, len);
+    xfree(new_cells);
+
+    return res;
+}
+
 static const hw_irq_controller gicv3_host_irq_type = {
     .typename     = "gic-v3",
     .startup      = gicv3_irq_startup,
@@ -1071,6 +1148,7 @@ static const struct gic_hw_operations gicv3_ops = {
     .read_vmcr_priority  = gicv3_read_vmcr_priority,
     .read_apr            = gicv3_read_apr,
     .secondary_init      = gicv3_secondary_cpu_init,
+    .make_dt_node        = gicv3_make_dt_node,
 };
 
 /* Set up the GIC */
