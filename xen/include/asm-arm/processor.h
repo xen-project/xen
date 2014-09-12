@@ -20,6 +20,19 @@
 #define AFFINITY_MASK(level)    ~((_AC(0x1,U) << ((level) * MPIDR_LEVEL_BITS)) - 1)
 
 
+/*
+ * Macros to extract affinity level. picked from kernel
+ */
+
+#define MPIDR_LEVEL_BITS_SHIFT  3
+#define MPIDR_LEVEL_MASK        ((1 << MPIDR_LEVEL_BITS) - 1)
+
+#define MPIDR_LEVEL_SHIFT(level) \
+         (((1 << level) >> 1) << MPIDR_LEVEL_BITS_SHIFT)
+
+#define MPIDR_AFFINITY_LEVEL(mpidr, level) \
+         ((mpidr >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK)
+
 /* TTBCR Translation Table Base Control Register */
 #define TTBCR_EAE    _AC(0x80000000,U)
 #define TTBCR_N_MASK _AC(0x07,U)

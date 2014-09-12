@@ -11,6 +11,7 @@ obj-y += domctl.o
 obj-y += sysctl.o
 obj-y += domain_build.o
 obj-y += gic.o gic-v2.o
+obj-$(CONFIG_ARM_64) += gic-v3.o
 obj-y += io.o
 obj-y += irq.o
 obj-y += kernel.o

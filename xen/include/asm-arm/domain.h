@@ -99,6 +99,14 @@ struct arch_domain
         /* Base address for guest GIC */
         paddr_t dbase; /* Distributor base address */
         paddr_t cbase; /* CPU base address */
+#ifdef CONFIG_ARM_64
+        /* GIC V3 addressing */
+        paddr_t dbase_size; /* Distributor base size */
+        paddr_t rbase[MAX_RDIST_COUNT];      /* Re-Distributor base address */
+        paddr_t rbase_size[MAX_RDIST_COUNT]; /* Re-Distributor size */
+        uint32_t rdist_stride;               /* Re-Distributor stride */
+        int rdist_count;                     /* No. of Re-Distributors */
+#endif
     } vgic;
 
     struct vuart {

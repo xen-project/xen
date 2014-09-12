@@ -18,6 +18,10 @@
 #ifndef __ASM_ARM_GIC_H__
 #define __ASM_ARM_GIC_H__
 
+#define NR_GIC_LOCAL_IRQS  NR_LOCAL_IRQS
+#define NR_GIC_SGI         16
+#define MAX_RDIST_COUNT    4
+
 #define GICD_CTLR       (0x000)
 #define GICD_TYPER      (0x004)
 #define GICD_IIDR       (0x008)
@@ -154,6 +158,20 @@
 #define DT_MATCH_GIC_V2 DT_MATCH_COMPATIBLE(DT_COMPAT_GIC_CORTEX_A15), \
                         DT_MATCH_COMPATIBLE(DT_COMPAT_GIC_CORTEX_A7)
 
+#define DT_COMPAT_GIC_V3             "arm,gic-v3"
+
+#define DT_MATCH_GIC_V3 DT_MATCH_COMPATIBLE(DT_COMPAT_GIC_V3)
+
+/*
+ * GICv3 registers that needs to be saved/restored
+ */
+struct gic_v3 {
+    uint32_t hcr, vmcr, sre_el1;
+    uint32_t apr0[4];
+    uint32_t apr1[4];
+    uint64_t lr[16];
+};
+
 /*
  * GICv2 register that needs to be saved/restored
  * on VCPU context switch
@@ -170,6 +188,7 @@ struct gic_v2 {
  */
 union gic_state_data {
     struct gic_v2 v2;
+    struct gic_v3 v3;
 };
 
 /*
@@ -189,6 +208,7 @@ struct gic_lr {
 
 enum gic_version {
     GIC_V2,
+    GIC_V3,
 };
 
 extern enum gic_version gic_hw_version(void);
