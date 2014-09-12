@@ -39,6 +39,7 @@
 #include <asm/device.h>
 #include <asm/gic.h>
 #include <asm/gic_v3_defs.h>
+#include <asm/cpufeature.h>
 
 struct rdist_region {
     paddr_t base;
@@ -1157,6 +1158,12 @@ static int __init gicv3_init(struct dt_device_node *node, const void *data)
     struct rdist_region *rdist_regs;
     int res, i;
     uint32_t reg;
+
+    if ( !cpu_has_gicv3 )
+    {
+        dprintk(XENLOG_ERR, "GICv3: driver requires system register support\n");
+        return -ENODEV;
+    }
 
     dt_device_set_used_by(node, DOMID_XEN);
 

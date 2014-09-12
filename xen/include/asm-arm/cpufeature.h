@@ -15,6 +15,7 @@
 #define cpu_has_el3_64    (boot_cpu_feature64(el3) >= 1)
 #define cpu_has_fp        (boot_cpu_feature64(fp) == 0)
 #define cpu_has_simd      (boot_cpu_feature64(simd) == 0)
+#define cpu_has_gicv3     (boot_cpu_feature64(gic) == 1)
 #endif
 
 #define cpu_feature32(c, feat)         ((c)->pfr32.feat)

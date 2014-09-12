@@ -103,9 +103,10 @@ static void __init processor_id(void)
            cpu_has_el2_32 ? "64+32" : cpu_has_el2_64 ? "64" : "No",
            cpu_has_el1_32 ? "64+32" : cpu_has_el1_64 ? "64" : "No",
            cpu_has_el0_32 ? "64+32" : cpu_has_el0_64 ? "64" : "No");
-    printk("    Extensions:%s%s\n",
+    printk("    Extensions:%s%s%s\n",
            cpu_has_fp ? " FloatingPoint" : "",
-           cpu_has_simd ? " AdvancedSIMD" : "");
+           cpu_has_simd ? " AdvancedSIMD" : "",
+           cpu_has_gicv3 ? " GICv3-SysReg" : "");
 
     printk("  Debug Features: %016"PRIx64" %016"PRIx64"\n",
            boot_cpu_data.dbg64.bits[0], boot_cpu_data.dbg64.bits[1]);
