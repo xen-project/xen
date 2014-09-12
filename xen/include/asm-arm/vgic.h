@@ -108,6 +108,8 @@ struct vgic_ops {
     /* Get the target vcpu for a given virq. The rank lock is already taken
      * when calling this. */
     struct vcpu *(*get_target_vcpu)(struct vcpu *v, unsigned int irq);
+    /* vGIC sysreg emulation */
+    int (*emulate_sysreg)(struct cpu_user_regs *regs, union hsr hsr);
 };
 
 /* Number of ranks of interrupt registers for a domain */
@@ -183,6 +185,7 @@ extern void vgic_clear_pending_irqs(struct vcpu *v);
 extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 extern struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n, int s);
 extern struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq);
+extern int vgic_emulate(struct cpu_user_regs *regs, union hsr hsr);
 extern void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n);
 extern void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n);
 extern void register_vgic_ops(struct domain *d, const struct vgic_ops *ops);

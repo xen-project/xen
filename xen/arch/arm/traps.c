@@ -41,6 +41,7 @@
 #include "decode.h"
 #include "vtimer.h"
 #include <asm/gic.h>
+#include <asm/vgic.h>
 
 /* The base of the stack must always be double-word aligned, which means
  * that both the kernel half of struct cpu_user_regs (which is pushed in
@@ -1743,6 +1744,20 @@ static void do_sysreg(struct cpu_user_regs *regs,
             domain_crash_synchronous();
         }
         break;
+    case HSR_SYSREG_ICC_SGI1R_EL1:
+        if ( !vgic_emulate(regs, hsr) )
+        {
+            dprintk(XENLOG_WARNING,
+                    "failed emulation of sysreg ICC_SGI1R_EL1 access\n");
+            inject_undef64_exception(regs, hsr.len);
+        }
+        break;
+    case HSR_SYSREG_ICC_SGI0R_EL1:
+    case HSR_SYSREG_ICC_ASGI1R_EL1:
+        /* TBD: Implement to support secure grp0/1 SGI forwarding */
+        dprintk(XENLOG_WARNING,
+                "Emulation of sysreg ICC_SGI0R_EL1/ASGI1R_EL1 not supported\n");
+        inject_undef64_exception(regs, hsr.len);
     default:
  bad_sysreg:
         {

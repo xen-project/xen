@@ -871,6 +871,59 @@ write_ignore_64:
     return 1;
 }
 
+static int vgic_v3_to_sgi(struct vcpu *v, register_t sgir)
+{
+    int virq;
+    int irqmode;
+    enum gic_sgi_mode sgi_mode;
+    unsigned long vcpu_mask = 0;
+
+    irqmode = (sgir >> ICH_SGI_IRQMODE_SHIFT) & ICH_SGI_IRQMODE_MASK;
+    virq = (sgir >> ICH_SGI_IRQ_SHIFT ) & ICH_SGI_IRQ_MASK;
+    /* SGI's are injected at Rdist level 0. ignoring affinity 1, 2, 3 */
+    vcpu_mask = sgir & ICH_SGI_TARGETLIST_MASK;
+
+    /* Map GIC sgi value to enum value */
+    switch ( irqmode )
+    {
+    case ICH_SGI_TARGET_LIST:
+        sgi_mode = SGI_TARGET_LIST;
+        break;
+    case ICH_SGI_TARGET_OTHERS:
+        sgi_mode = SGI_TARGET_OTHERS;
+        break;
+    default:
+        gdprintk(XENLOG_WARNING, "Wrong irq mode in SGI1R_EL1 register\n");
+        return 0;
+    }
+
+    return vgic_to_sgi(v, sgir, sgi_mode, virq, vcpu_mask);
+}
+
+static int vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
+{
+    struct vcpu *v = current;
+    struct hsr_sysreg sysreg = hsr.sysreg;
+    register_t *r = select_user_reg(regs, sysreg.reg);
+
+    ASSERT (hsr.ec == HSR_EC_SYSREG);
+
+    switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
+    {
+    case HSR_SYSREG_ICC_SGI1R_EL1:
+        /* WO */
+        if ( !sysreg.read )
+            return vgic_v3_to_sgi(v, *r);
+        else
+        {
+            gdprintk(XENLOG_WARNING, "Reading SGI1R_EL1 - WO register\n");
+            return 0;
+        }
+    default:
+        return 0;
+    }
+}
+
 static const struct mmio_handler_ops vgic_rdistr_mmio_handler = {
     .read_handler  = vgic_v3_rdistr_mmio_read,
     .write_handler = vgic_v3_rdistr_mmio_write,
@@ -934,6 +987,7 @@ static const struct vgic_ops v3_ops = {
     .domain_init = vgic_v3_domain_init,
     .get_irq_priority = vgic_v3_get_irq_priority,
     .get_target_vcpu  = vgic_v3_get_target_vcpu,
+    .emulate_sysreg  = vgic_v3_emulate_sysreg,
 };
 
 int vgic_v3_init(struct domain *d)
