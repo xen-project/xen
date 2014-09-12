@@ -521,6 +521,17 @@ static struct vcpu *vgic_v2_get_target_vcpu(struct vcpu *v, unsigned int irq)
     return v_target;
 }
 
+static int vgic_v2_get_irq_priority(struct vcpu *v, unsigned int irq)
+{
+    int priority;
+    struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
+
+    ASSERT(spin_is_locked(&rank->lock));
+    priority = vgic_byte_read(rank->ipriority[(irq%32)/4], 0, irq % 4);
+
+    return priority;
+}
+
 static int vgic_v2_vcpu_init(struct vcpu *v)
 {
     int i;
@@ -555,6 +566,7 @@ static int vgic_v2_domain_init(struct domain *d)
 static const struct vgic_ops vgic_v2_ops = {
     .vcpu_init   = vgic_v2_vcpu_init,
     .domain_init = vgic_v2_domain_init,
+    .get_irq_priority = vgic_v2_get_irq_priority,
     .get_target_vcpu = vgic_v2_get_target_vcpu,
 };
 

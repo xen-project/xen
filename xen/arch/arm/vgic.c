@@ -368,7 +368,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
     bool_t running;
 
     vgic_lock_rank(v, rank, flags);
-    priority = vgic_byte_read(rank->ipriority[REG_RANK_INDEX(8, irq, DABT_WORD)], 0, irq & 0x3);
+    priority = v->domain->arch.vgic.handler->get_irq_priority(v, irq);
     vgic_unlock_rank(v, rank, flags);
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
