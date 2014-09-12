@@ -124,19 +124,9 @@ static void __default_send_IPI_shortcut(unsigned int shortcut, int vector,
     apic_write_around(APIC_ICR, cfg);
 }
 
-void send_IPI_self_flat(int vector)
+void send_IPI_self_legacy(uint8_t vector)
 {
     __default_send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
-}
-
-void send_IPI_self_phys(int vector)
-{
-    __default_send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
-}
-
-void send_IPI_self_x2apic(int vector)
-{
-    apic_write(APIC_SELF_IPI, vector);    
 }
 
 void send_IPI_mask_flat(const cpumask_t *cpumask, int vector)

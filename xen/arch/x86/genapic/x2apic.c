@@ -92,6 +92,11 @@ static unsigned int cpu_mask_to_apicid_x2apic_cluster(const cpumask_t *cpumask)
     return dest;
 }
 
+static void send_IPI_self_x2apic(uint8_t vector)
+{
+    apic_wrmsr(APIC_SELF_IPI, vector);
+}
+
 static void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
 {
     unsigned int cpu;

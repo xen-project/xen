@@ -37,7 +37,7 @@ struct genapic {
 	const cpumask_t *(*vector_allocation_cpumask)(int cpu);
 	unsigned int (*cpu_mask_to_apicid)(const cpumask_t *cpumask);
 	void (*send_IPI_mask)(const cpumask_t *mask, int vector);
-    void (*send_IPI_self)(int vector);
+    void (*send_IPI_self)(uint8_t vector);
 };
 
 #define APICFUNC(x) .x = x
@@ -52,12 +52,12 @@ extern const struct genapic *genapic;
 extern const struct genapic apic_default;
 
 const cpumask_t *target_cpus_all(void);
+void send_IPI_self_legacy(uint8_t vector);
 
 void init_apic_ldr_flat(void);
 void clustered_apic_check_flat(void);
 unsigned int cpu_mask_to_apicid_flat(const cpumask_t *cpumask);
 void send_IPI_mask_flat(const cpumask_t *mask, int vector);
-void send_IPI_self_flat(int vector);
 const cpumask_t *vector_allocation_cpumask_flat(int cpu);
 #define GENAPIC_FLAT \
 	.int_delivery_mode = dest_LowestPrio, \
@@ -68,13 +68,12 @@ const cpumask_t *vector_allocation_cpumask_flat(int cpu);
 	.vector_allocation_cpumask = vector_allocation_cpumask_flat, \
 	.cpu_mask_to_apicid = cpu_mask_to_apicid_flat, \
 	.send_IPI_mask = send_IPI_mask_flat, \
-	.send_IPI_self = send_IPI_self_flat
+	.send_IPI_self = send_IPI_self_legacy
 
 void init_apic_ldr_phys(void);
 void clustered_apic_check_phys(void);
 unsigned int cpu_mask_to_apicid_phys(const cpumask_t *cpumask);
 void send_IPI_mask_phys(const cpumask_t *mask, int vector);
-void send_IPI_self_phys(int vector);
 const cpumask_t *vector_allocation_cpumask_phys(int cpu);
 #define GENAPIC_PHYS \
 	.int_delivery_mode = dest_Fixed, \
@@ -85,8 +84,6 @@ const cpumask_t *vector_allocation_cpumask_phys(int cpu);
 	.vector_allocation_cpumask = vector_allocation_cpumask_phys, \
 	.cpu_mask_to_apicid = cpu_mask_to_apicid_phys, \
 	.send_IPI_mask = send_IPI_mask_phys, \
-	.send_IPI_self = send_IPI_self_phys
-
-void send_IPI_self_x2apic(int vector);
+	.send_IPI_self = send_IPI_self_legacy
 
 #endif
