@@ -88,7 +88,14 @@ struct vgic_irq_rank {
     uint32_t ienable, iactive, ipend, pendsgi;
     uint32_t icfg[2];
     uint32_t ipriority[8];
-    uint32_t itargets[8];
+    union {
+        struct {
+            uint32_t itargets[8];
+        }v2;
+        struct {
+            uint64_t irouter[32];
+        }v3;
+    };
 };
 
 struct vgic_ops {
@@ -120,6 +127,14 @@ static inline int REG_RANK_NR(int b, uint32_t n)
 {
     switch ( b )
     {
+    /*
+     * IRQ ranks are of size 32. So n cannot be shifted beyond 5 for 32
+     * and above. For 64-bit n is already shifted DBAT_DOUBLE_WORD
+     * by the caller
+     */
+    case 64:
+    case 32: return n >> 5;
+    case 16: return n >> 4;
     case 8: return n >> 3;
     case 4: return n >> 2;
     case 2: return n >> 1;
@@ -172,6 +187,7 @@ extern void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n);
 extern void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n);
 extern void register_vgic_ops(struct domain *d, const struct vgic_ops *ops);
 int vgic_v2_init(struct domain *d);
+int vgic_v3_init(struct domain *d);
 
 extern int vcpu_vgic_free(struct vcpu *v);
 extern int vgic_to_sgi(struct vcpu *v, register_t sgir,

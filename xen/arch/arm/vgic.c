@@ -76,6 +76,12 @@ int domain_vgic_init(struct domain *d)
 
     switch ( gic_hw_version() )
     {
+#ifdef CONFIG_ARM_64
+    case GIC_V3:
+        if ( vgic_v3_init(d) )
+           return -ENODEV;
+        break;
+#endif
     case GIC_V2:
         if ( vgic_v2_init(d) )
             return -ENODEV;
