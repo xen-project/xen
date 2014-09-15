@@ -88,3 +88,15 @@ subdir-clean-seabios-dir:
 	set -e; if test -d seabios-dir/.; then \
 		$(MAKE) -C seabios-dir clean; \
 	fi
+
+subtree-force-update:
+ifeq ($(CONFIG_SEABIOS),y)
+	$(MAKE) seabios-dir-force-update
+endif
+ifeq ($(CONFIG_OVMF),y)
+	$(MAKE) ovmf-dir-force-update
+endif
+
+subtree-force-update-all:
+	$(MAKE) seabios-dir-force-update
+	$(MAKE) ovmf-dir-force-update

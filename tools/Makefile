@@ -240,3 +240,17 @@ subdir-all-debugger/kdd: .phony
 
 subdir-distclean-firmware: .phony
 	$(MAKE) -C firmware distclean
+
+subtree-force-update:
+ifeq ($(CONFIG_QEMU_XEN),y)
+	$(MAKE) qemu-xen-dir-force-update
+endif
+ifeq ($(CONFIG_QEMU_TRAD),y)
+	$(MAKE) qemu-xen-traditional-dir-force-update
+endif
+	$(MAKE) -C firmware subtree-force-update
+
+subtree-force-update-all:
+	$(MAKE) qemu-xen-dir-force-update
+	$(MAKE) qemu-xen-traditional-dir-force-update
+	$(MAKE) -C firmware subtree-force-update-all

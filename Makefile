@@ -135,6 +135,14 @@ debball: dist
 rpmball: dist
 	bash ./tools/misc/mkrpm $(XEN_ROOT) $$($(MAKE) -C xen xenversion --no-print-directory)
 
+.PHONY: subtree-force-update
+subtree-force-update:
+	$(MAKE) -C tools subtree-force-update
+
+.PHONY: subtree-force-update-all
+subtree-force-update-all:
+	$(MAKE) -C tools subtree-force-update-all
+
 .PHONY: clean
 clean::
 	$(MAKE) -C xen clean
@@ -173,34 +181,35 @@ src-tarball: distclean
 .PHONY: help
 help:
 	@echo 'Installation targets:'
-	@echo '  install          - build and install everything'
-	@echo '  install-xen      - build and install the Xen hypervisor'
-	@echo '  install-tools    - build and install the control tools'
-	@echo '  install-stubdom  - build and install the stubdomain images'
-	@echo '  install-docs     - build and install user documentation'
+	@echo '  install               - build and install everything'
+	@echo '  install-xen           - build and install the Xen hypervisor'
+	@echo '  install-tools         - build and install the control tools'
+	@echo '  install-stubdom       - build and install the stubdomain images'
+	@echo '  install-docs          - build and install user documentation'
 	@echo ''
 	@echo 'Building targets:'
-	@echo '  dist             - build and install everything into local dist directory'
-	@echo '  world            - clean everything then make dist'
-	@echo '  xen              - build and install Xen hypervisor'
-	@echo '  tools            - build and install tools'
-	@echo '  stubdom          - build and install the stubdomain images'
-	@echo '  docs             - build and install user documentation'
-	@echo '  dev-docs         - build developer-only documentation'
+	@echo '  dist                  - build and install everything into local dist directory'
+	@echo '  world                 - clean everything then make dist'
+	@echo '  xen                   - build and install Xen hypervisor'
+	@echo '  tools                 - build and install tools'
+	@echo '  stubdom               - build and install the stubdomain images'
+	@echo '  docs                  - build and install user documentation'
+	@echo '  dev-docs              - build developer-only documentation'
 	@echo ''
 	@echo 'Cleaning targets:'
-	@echo '  clean            - clean the Xen, tools and docs (but not guest kernel trees)'
-	@echo '  distclean        - clean plus delete kernel build trees and'
-	@echo '                     local downloaded files'
+	@echo '  clean                 - clean the Xen, tools and docs (but not guest kernel trees)'
+	@echo '  distclean             - clean plus delete kernel build trees and'
+	@echo '                          local downloaded files'
+	@echo '  subtree-force-update  - Call *-force-update on all git subtrees (qemu, seabios, ovmf)'
 	@echo ''
 	@echo 'Miscellaneous targets:'
-	@echo '  uninstall        - attempt to remove installed Xen tools'
-	@echo '                     (use with extreme care!)'
+	@echo '  uninstall             - attempt to remove installed Xen tools'
+	@echo '                          (use with extreme care!)'
 	@echo
 	@echo 'Trusted Boot (tboot) targets:'
-	@echo '  build-tboot      - download and build the tboot module'
-	@echo '  install-tboot    - download, build, and install the tboot module'
-	@echo '  clean-tboot      - clean the tboot module if it exists'
+	@echo '  build-tboot           - download and build the tboot module'
+	@echo '  install-tboot         - download, build, and install the tboot module'
+	@echo '  clean-tboot           - clean the tboot module if it exists'
 	@echo
 	@echo 'Environment:'
 	@echo '  [ this documentation is sadly not complete ]'
