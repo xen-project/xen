@@ -271,7 +271,7 @@ xen/xsm/flask/include/class_to_string.h
 xen/xsm/flask/include/flask.h
 xen/xsm/flask/include/initial_sid_to_string.h
 tools/flask/policy/policy.conf
-tools/flask/policy/xenpolicy.24
+tools/flask/policy/xenpolicy-*
 xen/xen
 xen/xen-syms
 xen/xen.*

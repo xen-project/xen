@@ -32,7 +32,7 @@ M4 ?= m4
 # include the Xen policy type (needed for static device policy).
 OUTPUT_POLICY = 24
 
-POLICY_FILENAME = xenpolicy.$(OUTPUT_POLICY)
+POLICY_FILENAME = xenpolicy-$(shell $(MAKE) -C $(XEN_ROOT)/xen xenversion --no-print-directory)
 POLICY_LOADPATH = /boot
 
 # policy source layout
