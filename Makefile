@@ -143,6 +143,23 @@ subtree-force-update:
 subtree-force-update-all:
 	$(MAKE) -C tools subtree-force-update-all
 
+# Make a source tarball, including qemu sub-trees.
+#
+# src-tarball will use "git describe" for the version number.  This
+# will have the most recent tag, number of commits since that tag, and
+# git commit id of the head.  This is suitable for a "snapshot"
+# tarball of an unreleased tree.
+#
+# src-tarball-release will use "make xenversion" as the version
+# number.  This is suitable for release tarballs.
+.PHONY: src-tarball-release
+src-tarball-release: subtree-force-update-all
+	bash ./tools/misc/mktarball $(XEN_ROOT) $$($(MAKE) -C xen xenversion --no-print-directory)
+
+.PHONY: src-tarball
+src-tarball: subtree-force-update-all
+	bash ./tools/misc/mktarball $(XEN_ROOT) $$(git describe)
+
 .PHONY: clean
 clean::
 	$(MAKE) -C xen clean
@@ -170,13 +187,6 @@ endif
 # Linux name for GNU distclean
 .PHONY: mrproper
 mrproper: distclean
-
-# Prepare for source tarball
-.PHONY: src-tarball
-src-tarball: distclean
-	$(MAKE) -C xen .banner
-	rm -rf xen/tools/figlet .[a-z]*
-	$(MAKE) -C xen distclean
 
 .PHONY: help
 help:
@@ -210,6 +220,10 @@ help:
 	@echo '  build-tboot           - download and build the tboot module'
 	@echo '  install-tboot         - download, build, and install the tboot module'
 	@echo '  clean-tboot           - clean the tboot module if it exists'
+	@echo
+	@echo 'Package targets:'
+	@echo '  src-tarball-release   - make a source tarball with xen and qemu tagged with a release'
+	@echo '  src-tarball           - make a source tarball with xen and qemu tagged with git describe'
 	@echo
 	@echo 'Environment:'
 	@echo '  [ this documentation is sadly not complete ]'

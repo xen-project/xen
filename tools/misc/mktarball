@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# mktarball: Make a release tarball (including xen, qemu, and qemu-traditional)
+#
+# Takes 2 arguments, the path to the dist directory and the version
+set -ex
+
+function git_archive_into {
+    mkdir "$2"
+
+    git --git-dir="$1"/.git \
+	archive --format=tar HEAD | \
+	tar Cxf "$2" -
+}
+
+if [[ -z "$1" || -z "$2" ]] ; then
+  echo "usage: $0 path-to-XEN_ROOT xen-version"
+  exit 1
+fi
+
+xen_root="$1"
+desc="$2"
+
+tdir="$xen_root/dist/tmp.src-tarball"
+
+rm -rf $tdir
+
+mkdir -p $tdir
+
+git_archive_into $xen_root $tdir/xen-$desc
+
+git_archive_into $xen_root/tools/qemu-xen-dir-remote $tdir/xen-$desc/tools/qemu-xen
+
+git_archive_into $xen_root/tools/qemu-xen-traditional-dir-remote $tdir/xen-$desc/tools/qemu-xen-traditional
+
+GZIP=-9v tar cz -f $xen_root/dist/xen-$desc.tar.gz -C $tdir xen-$desc
+
+echo "Source tarball in $xen_root/dist/xen-$desc.tar.gz"
