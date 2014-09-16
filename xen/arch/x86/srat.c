@@ -339,13 +339,6 @@ void __init acpi_numa_arch_fixup(void) {}
 
 static u64 __initdata srat_region_mask;
 
-static u64 __init fill_mask(u64 mask)
-{
-	while (mask & (mask + 1))
-		mask |= mask + 1;
-	return mask;
-}
-
 static int __init srat_parse_region(struct acpi_subtable_header *header,
 				    const unsigned long end)
 {
@@ -366,8 +359,7 @@ static int __init srat_parse_region(struct acpi_subtable_header *header,
 		       ma->base_address, ma->base_address + ma->length - 1);
 
 	srat_region_mask |= ma->base_address |
-			    fill_mask(ma->base_address ^
-				      (ma->base_address + ma->length - 1));
+			    pdx_region_mask(ma->base_address, ma->length);
 
 	return 0;
 }
@@ -381,7 +373,7 @@ void __init srat_parse_regions(u64 addr)
 	    acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat))
 		return;
 
-	srat_region_mask = fill_mask(addr - 1);
+	srat_region_mask = pdx_init_mask(addr);
 	acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
 			      srat_parse_region, 0);
 
@@ -389,9 +381,7 @@ void __init srat_parse_regions(u64 addr)
 		if (e820.map[i].type != E820_RAM)
 			continue;
 
-		if (~mask &
-		    fill_mask(e820.map[i].addr ^
-			      (e820.map[i].addr + e820.map[i].size - 1)))
+		if (~mask & pdx_region_mask(e820.map[i].addr, e820.map[i].size))
 			mask = 0;
 	}
 
