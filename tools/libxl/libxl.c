@@ -1894,6 +1894,13 @@ void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
     libxl__device *device;
     int rc;
     xs_transaction_t t = XBT_NULL;
+    libxl_domain_config d_config;
+    libxl_device_vtpm vtpm_saved;
+    libxl__domain_userdata_lock *lock = NULL;
+
+    libxl_domain_config_init(&d_config);
+    libxl_device_vtpm_init(&vtpm_saved);
+    libxl_device_vtpm_copy(CTX, &vtpm_saved, vtpm);
 
     rc = libxl__device_vtpm_setdefault(gc, vtpm);
     if (rc) goto out;
@@ -1907,6 +1914,8 @@ void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
             goto out;
         }
     }
+
+    libxl__update_config_vtpm(gc, &vtpm_saved, vtpm);
 
     GCNEW(device);
     rc = libxl__device_from_vtpm(gc, domid, vtpm, device);
@@ -1933,6 +1942,19 @@ void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
     flexarray_append(front, "handle");
     flexarray_append(front, GCSPRINTF("%d", vtpm->devid));
 
+    if (aodev->update_json) {
+        lock = libxl__lock_domain_userdata(gc, domid);
+        if (!lock) {
+            rc = ERROR_LOCK_FAIL;
+            goto out;
+        }
+
+        rc = libxl__get_domain_configuration(gc, domid, &d_config);
+        if (rc) goto out;
+
+        DEVICE_ADD(vtpm, vtpms, domid, &vtpm_saved, COMPARE_DEVID, &d_config);
+    }
+
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
         if (rc) goto out;
@@ -1944,6 +1966,11 @@ void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
             aodev->action = LIBXL__DEVICE_ACTION_ADD; /* for error message */
             rc = ERROR_DEVICE_EXISTS;
             goto out;
+        }
+
+        if (aodev->update_json) {
+            rc = libxl__set_domain_configuration(gc, domid, &d_config);
+            if (rc) goto out;
         }
 
         libxl__device_generic_add(gc, t, device,
@@ -1965,6 +1992,9 @@ void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
     rc = 0;
 out:
     libxl__xs_transaction_abort(gc, &t);
+    if (lock) libxl__unlock_domain_userdata(lock);
+    libxl_device_vtpm_dispose(&vtpm_saved);
+    libxl_domain_config_dispose(&d_config);
     aodev->rc = rc;
     if(rc) aodev->callback(egc, aodev);
     return;
@@ -2197,11 +2227,38 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
     int rc;
     libxl_ctx *ctx = gc->owner;
     xs_transaction_t t = XBT_NULL;
+    libxl_domain_config d_config;
+    libxl_device_disk disk_saved;
+    libxl__domain_userdata_lock *lock = NULL;
+
+    libxl_domain_config_init(&d_config);
+    libxl_device_disk_init(&disk_saved);
+    libxl_device_disk_copy(ctx, &disk_saved, disk);
 
     libxl_domain_type type = libxl__domain_type(gc, domid);
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
         rc = ERROR_FAIL;
         goto out;
+    }
+
+    /*
+     * get_vdev != NULL -> local attach
+     * get_vdev == NULL -> block attach
+     *
+     * We don't care about local attach state because it's only
+     * intermediate state.
+     */
+    if (!get_vdev && aodev->update_json) {
+        lock = libxl__lock_domain_userdata(gc, domid);
+        if (!lock) {
+            rc = ERROR_LOCK_FAIL;
+            goto out;
+        }
+
+        rc = libxl__get_domain_configuration(gc, domid, &d_config);
+        if (rc) goto out;
+
+        DEVICE_ADD(disk, disks, domid, &disk_saved, COMPARE_DISK, &d_config);
     }
 
     for (;;) {
@@ -2356,6 +2413,11 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
             }
         }
 
+        if (!get_vdev && aodev->update_json) {
+            rc = libxl__set_domain_configuration(gc, domid, &d_config);
+            if (rc) goto out;
+        }
+
         libxl__device_generic_add(gc, t, device,
                                   libxl__xs_kvs_of_flexarray(gc, back, back->count),
                                   libxl__xs_kvs_of_flexarray(gc, front, front->count),
@@ -2374,6 +2436,9 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
 
 out:
     libxl__xs_transaction_abort(gc, &t);
+    if (lock) libxl__unlock_domain_userdata(lock);
+    libxl_device_disk_dispose(&disk_saved);
+    libxl_domain_config_dispose(&d_config);
     aodev->rc = rc;
     if (rc) aodev->callback(egc, aodev);
     return;
@@ -3030,6 +3095,13 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     libxl__device *device;
     int rc;
     xs_transaction_t t = XBT_NULL;
+    libxl_domain_config d_config;
+    libxl_device_nic nic_saved;
+    libxl__domain_userdata_lock *lock = NULL;
+
+    libxl_domain_config_init(&d_config);
+    libxl_device_nic_init(&nic_saved);
+    libxl_device_nic_copy(CTX, &nic_saved, nic);
 
     rc = libxl__device_nic_setdefault(gc, nic, domid);
     if (rc) goto out;
@@ -3043,6 +3115,8 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
             goto out;
         }
     }
+
+    libxl__update_config_nic(gc, &nic_saved, nic);
 
     GCNEW(device);
     rc = libxl__device_from_nic(gc, domid, nic, device);
@@ -3101,6 +3175,19 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     flexarray_append(front, libxl__sprintf(gc,
                                     LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nic->mac)));
 
+    if (aodev->update_json) {
+        lock = libxl__lock_domain_userdata(gc, domid);
+        if (!lock) {
+            rc = ERROR_LOCK_FAIL;
+            goto out;
+        }
+
+        rc = libxl__get_domain_configuration(gc, domid, &d_config);
+        if (rc) goto out;
+
+        DEVICE_ADD(nic, nics, domid, &nic_saved, COMPARE_DEVID, &d_config);
+    }
+
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
         if (rc) goto out;
@@ -3112,6 +3199,11 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
             aodev->action = LIBXL__DEVICE_ACTION_ADD; /* for error message */
             rc = ERROR_DEVICE_EXISTS;
             goto out;
+        }
+
+        if (aodev->update_json) {
+            rc = libxl__set_domain_configuration(gc, domid, &d_config);
+            if (rc) goto out;
         }
 
         libxl__device_generic_add(gc, t, device,
@@ -3133,6 +3225,9 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     rc = 0;
 out:
     libxl__xs_transaction_abort(gc, &t);
+    if (lock) libxl__unlock_domain_userdata(lock);
+    libxl_device_nic_dispose(&nic_saved);
+    libxl_domain_config_dispose(&d_config);
     aodev->rc = rc;
     if (rc) aodev->callback(egc, aodev);
     return;
@@ -3686,6 +3781,7 @@ DEFINE_DEVICE_REMOVE(vtpm, destroy, 1)
         GCNEW(aodev);                                                   \
         libxl__prepare_ao_device(ao, aodev);                            \
         aodev->callback = device_addrm_aocomplete;                      \
+        aodev->update_json = true;                                      \
         libxl__device_##type##_add(egc, domid, type, aodev);            \
                                                                         \
         return AO_INPROGRESS;                                           \

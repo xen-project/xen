@@ -2148,6 +2148,8 @@ struct libxl__ao_device {
     int num_exec;
     /* for calling hotplug scripts */
     libxl__async_exec_state aes;
+    /* If we need to update JSON config */
+    bool update_json;
 };
 
 /*
@@ -2272,6 +2274,77 @@ struct libxl__multidev {
  * finish the connection (might involve executing hotplug scripts).
  *
  * Once finished, aodev->callback will be executed.
+ */
+/*
+ * As of Xen 4.5 we maintain various infomation, including hotplug
+ * device information, in JSON files, so that we can use this JSON
+ * file as a template to reconstruct domain configuration.
+ *
+ * In essense there are now two views of device state, one is xenstore,
+ * the other is JSON file. We use xenstore as primary reference.
+ *
+ * Here we maintain one invariant: every device in xenstore must have
+ * an entry in JSON file.
+ *
+ * All device hotplug routines should comply to following pattern:
+ *   lock json config (json_lock)
+ *       read json config
+ *       update in-memory json config with new entry, replacing
+ *          any stale entry
+ *       for loop -- xs transaction
+ *           open xs transaction
+ *           check device existence, abort if it exists
+ *           write in-memory json config to disk
+ *           commit xs transaction
+ *       end for loop
+ *   unlock json config
+ *
+ * Device removal routines are not touched.
+ *
+ * Here is the proof that we always maintain that invariant and we
+ * don't leak files during interaction of hotplug thread and other
+ * threads / processes.
+ *
+ * # Safe against parallel add
+ *
+ * When another thread / process tries to add same device, it's
+ * blocked by json_lock. The loser of two threads will bail at
+ * existence check, so that we don't overwrite anything.
+ *
+ * # Safe against domain destruction
+ *
+ * If the thread / process trying to destroy domain loses the race, it's
+ * blocked by json_lock. If the hotplug thread is loser, it bails at
+ * acquiring lock because lock acquisition function checks existence of
+ * the domain.
+ *
+ * # Safe against parallel removal
+ *
+ * When another thread / process tries to remove a device, it's _NOT_
+ * blocked by json_lock, but xenstore transaction can help maintain
+ * invariant. The removal threads either a) sees that device in
+ * xenstore, b) doesn't see that device in xenstore.
+ *
+ * In a), it sees that device in xenstore. At that point hotplug is
+ * already finished (both JSON and xenstore changes committed). So that
+ * device can be safely removed. JSON entry is left untouched and
+ * becomes stale, but this is a valid state -- next time when a
+ * device with same identifier gets added, the stale entry gets
+ * overwritten.
+ *
+ * In b), it doesn't see that device in xenstore, but it will commence
+ * anyway. Eventually a forcibly removal is initiated, which will forcely
+ * remove xenstore entry.
+ *
+ * If hotplug threads creates xenstore entry (therefore JSON entry as
+ * well) before force removal, that xenstore entry is removed. We're
+ * left with JSON stale entry but not xenstore entry, which is a valid
+ * state.
+ *
+ * If hotplug thread has not created xenstore entry when the removal
+ * is committed, we're obviously safe. Hotplug thread will add in
+ * xenstore entry afterwards. We have both JSON and xenstore entry,
+ * it's a valid state.
  */
 _hidden void libxl__device_disk_add(libxl__egc *egc, uint32_t domid,
                                     libxl_device_disk *disk,
@@ -3279,6 +3352,63 @@ static inline void libxl__update_config_vtpm(libxl__gc *gc,
     dst->devid = src->devid;
     libxl_uuid_copy(CTX, &dst->uuid, &src->uuid);
 }
+
+/* Macros used to compare device identifier. Returns true if the two
+ * devices have same identifier. */
+#define COMPARE_DEVID(a, b) ((a)->devid == (b)->devid)
+#define COMPARE_DISK(a, b) (!strcmp((a)->vdev, (b)->vdev))
+#define COMPARE_PCI(a, b) ((a)->func == (b)->func &&    \
+                           (a)->bus == (b)->bus &&      \
+                           (a)->dev == (b)->dev)
+
+/* DEVICE_ADD
+ *
+ * Add a device in libxl_domain_config structure
+ *
+ * It takes 6 parameters:
+ *  type:     the type of the device, say nic, vtpm, disk, pci etc
+ *  ptr:      pointer to the start of the array, the array must be
+ *            of type libxl_device_#type
+ *  domid:    domain id of target domain
+ *  dev:      the device that is to be added / removed / updated
+ *  compare:  the COMPARE_* macro used to compare @dev's identifier to
+ *            those in the array pointed to by @ptr
+ *  d_config: pointer to template domain config
+ *
+ * For most device types (nic, vtpm), the array pointer @ptr can be
+ * derived from @type, pci device being the exception, hence we need
+ * to have @ptr.
+ *
+ * If there is already a device with the same identifier in d_config,
+ * that entry is updated.
+ */
+#define DEVICE_ADD(type, ptr, domid, dev, compare, d_config)    \
+    ({                                                          \
+        int DA_x;                                               \
+        libxl_device_##type *DA_p = NULL;                       \
+                                                                \
+        /* Check for existing device */                         \
+        for (DA_x = 0; DA_x < (d_config)->num_##ptr; DA_x++) {  \
+            if (compare(&(d_config)->ptr[DA_x], (dev))) {       \
+                DA_p = &(d_config)->ptr[DA_x];                  \
+                break;                                          \
+            }                                                   \
+        }                                                       \
+                                                                \
+        if (!DA_p) {                                            \
+            (d_config)->ptr =                                   \
+                libxl__realloc(NOGC, (d_config)->ptr,           \
+                               ((d_config)->num_##ptr + 1) *    \
+                               sizeof(libxl_device_##type));    \
+            DA_p = &(d_config)->ptr[(d_config)->num_##ptr];     \
+            (d_config)->num_##ptr++;                            \
+        } else {                                                \
+            libxl_device_##type##_dispose(DA_p);                \
+        }                                                       \
+                                                                \
+        libxl_device_##type##_init(DA_p);                       \
+        libxl_device_##type##_copy(CTX, DA_p, (dev));           \
+    })
 
 #endif
 
