@@ -2664,14 +2664,26 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
 {
     AO_CREATE(ctx, domid, ao_how);
     int num = 0, i;
-    libxl_device_disk *disks = NULL;
+    libxl_device_disk *disks = NULL, disk_saved, disk_empty;
+    libxl_domain_config d_config;
     int rc, dm_ver;
-
     libxl__device device;
     const char * path;
     char * tmp;
+    libxl__domain_userdata_lock *lock = NULL;
+    xs_transaction_t t = XBT_NULL;
+    flexarray_t *insert = NULL, *empty = NULL;
 
-    flexarray_t *insert = NULL;
+    libxl_domain_config_init(&d_config);
+    libxl_device_disk_init(&disk_empty);
+    libxl_device_disk_init(&disk_saved);
+    libxl_device_disk_copy(ctx, &disk_saved, disk);
+
+    disk_empty.format = LIBXL_DISK_FORMAT_EMPTY;
+    disk_empty.vdev = libxl__strdup(NOGC, disk->vdev);
+    disk_empty.pdev_path = libxl__strdup(NOGC, "");
+    disk_empty.is_cdrom = 1;
+    libxl__device_disk_setdefault(gc, &disk_empty);
 
     libxl_domain_type type = libxl__domain_type(gc, domid);
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
@@ -2723,23 +2735,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     rc = libxl__device_from_disk(gc, domid, disk, &device);
     if (rc) goto out;
 
-    if (dm_ver == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
-        rc = libxl__qmp_insert_cdrom(gc, domid, disk);
-        if (rc) goto out;
-    }
-
     path = libxl__device_backend_path(gc, &device);
-
-    /* Sanity check: make sure the backend exists before writing here */
-    tmp = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/frontend", path));
-    if (!tmp)
-    {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Internal error: %s does not exist",
-            libxl__sprintf(gc, "%s/frontend", path));
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
 
     insert = flexarray_make(gc, 4, 1);
 
@@ -2753,9 +2749,84 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     else
         flexarray_append_pair(insert, "params", "");
 
-    rc = libxl__xs_writev_atonce(gc, path,
-                        libxl__xs_kvs_of_flexarray(gc, insert, insert->count));
+    empty = flexarray_make(gc, 4, 1);
+    flexarray_append_pair(empty, "type",
+                          libxl__device_disk_string_of_backend(disk->backend));
+    flexarray_append_pair(empty, "params", "");
+
+    /* Note: CTX lock is already held at this point so lock hierarchy
+     * is maintained.
+     */
+    lock = libxl__lock_domain_userdata(gc, domid);
+    if (!lock) {
+        rc = ERROR_LOCK_FAIL;
+        goto out;
+    }
+
+    /* We need to eject the original image first. This is implemented
+     * by inserting empty media. JSON is not updated.
+     */
+    if (dm_ver == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
+        rc = libxl__qmp_insert_cdrom(gc, domid, &disk_empty);
+        if (rc) goto out;
+    }
+
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+        /* Sanity check: make sure the backend exists before writing here */
+        tmp = libxl__xs_read(gc, t, libxl__sprintf(gc, "%s/frontend", path));
+        if (!tmp)
+        {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Internal error: %s does not exist",
+                       libxl__sprintf(gc, "%s/frontend", path));
+            rc = ERROR_FAIL;
+            goto out;
+        }
+
+        rc = libxl__xs_writev(gc, t, path,
+                              libxl__xs_kvs_of_flexarray(gc, empty, empty->count));
+        if (rc) goto out;
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc < 0) goto out;
+    }
+
+    rc = libxl__get_domain_configuration(gc, domid, &d_config);
     if (rc) goto out;
+
+    DEVICE_ADD(disk, disks, domid, &disk_saved, COMPARE_DISK, &d_config);
+
+    if (dm_ver == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
+        rc = libxl__qmp_insert_cdrom(gc, domid, disk);
+        if (rc) goto out;
+    }
+
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+        /* Sanity check: make sure the backend exists before writing here */
+        tmp = libxl__xs_read(gc, t, libxl__sprintf(gc, "%s/frontend", path));
+        if (!tmp)
+        {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Internal error: %s does not exist",
+                       libxl__sprintf(gc, "%s/frontend", path));
+            rc = ERROR_FAIL;
+            goto out;
+        }
+
+        rc = libxl__set_domain_configuration(gc, domid, &d_config);
+        if (rc) goto out;
+
+        rc = libxl__xs_writev(gc, t, path,
+                              libxl__xs_kvs_of_flexarray(gc, insert, insert->count));
+        if (rc) goto out;
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc < 0) goto out;
+    }
 
     /* success, no actual async */
     libxl__ao_complete(egc, ao, 0);
@@ -2763,9 +2834,15 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     rc = 0;
 
 out:
+    libxl__xs_transaction_abort(gc, &t);
     for (i = 0; i < num; i++)
         libxl_device_disk_dispose(&disks[i]);
     free(disks);
+    libxl_device_disk_dispose(&disk_empty);
+    libxl_device_disk_dispose(&disk_saved);
+    libxl_domain_config_dispose(&d_config);
+
+    if (lock) libxl__unlock_domain_userdata(lock);
 
     if (rc) return AO_ABORT(rc);
     return AO_INPROGRESS;
