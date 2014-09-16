@@ -442,19 +442,30 @@ UNLIKELY_START(z, create_bounce_frame_bad_bounce_ip)
 __UNLIKELY_END(create_bounce_frame_bad_bounce_ip)
         movq  %rax,UREGS_rip+8(%rsp)
         ret
-        _ASM_EXTABLE(.Lft2,  dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft3,  dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft4,  dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft5,  dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft6,  dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft7,  dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft8,  dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft9,  dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft10, dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft11, dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft12, dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft13, dom_crash_sync_extable)
+        _ASM_EXTABLE(.Lft2,  domain_crash_page_fault_32)
+        _ASM_EXTABLE(.Lft3,  domain_crash_page_fault_24)
+        _ASM_EXTABLE(.Lft4,  domain_crash_page_fault_8)
+        _ASM_EXTABLE(.Lft5,  domain_crash_page_fault_16)
+        _ASM_EXTABLE(.Lft6,  domain_crash_page_fault)
+        _ASM_EXTABLE(.Lft7,  domain_crash_page_fault)
+        _ASM_EXTABLE(.Lft8,  domain_crash_page_fault_24)
+        _ASM_EXTABLE(.Lft9,  domain_crash_page_fault_16)
+        _ASM_EXTABLE(.Lft10, domain_crash_page_fault_8)
+        _ASM_EXTABLE(.Lft11, domain_crash_page_fault)
+        _ASM_EXTABLE(.Lft12, domain_crash_page_fault_8)
+        _ASM_EXTABLE(.Lft13, domain_crash_page_fault)
 
+domain_crash_page_fault_32:
+        addq  $8,%rsi
+domain_crash_page_fault_24:
+        addq  $8,%rsi
+domain_crash_page_fault_16:
+        addq  $8,%rsi
+domain_crash_page_fault_8:
+        addq  $8,%rsi
+domain_crash_page_fault:
+        movq  %rsi,%rdi
+        call  show_page_walk
 ENTRY(dom_crash_sync_extable)
         # Get out of the guest-save area of the stack.
         GET_STACK_BASE(%rax)
