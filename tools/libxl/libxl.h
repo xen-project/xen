@@ -368,6 +368,14 @@ typedef struct libxl__ctx libxl_ctx;
 #endif
 #endif
 
+/* LIBXL_HAVE_RETRIEVE_DOMAIN_CONFIGURATION
+ *
+ * If this is defined we have libxl_retrieve_domain_configuration which
+ * returns the current configuration of a domain, which can be used to
+ * rebuild a domain.
+ */
+#define LIBXL_HAVE_RETRIEVE_DOMAIN_CONFIGURATION 1
+
 /*
  * LIBXL_HAVE_BUILDINFO_VCPU_AFFINITY_ARRAYS
  *
@@ -869,6 +877,14 @@ int static inline libxl_domain_create_restore_0x040200(
 
 void libxl_domain_config_init(libxl_domain_config *d_config);
 void libxl_domain_config_dispose(libxl_domain_config *d_config);
+
+/*
+ * Retrieve domain configuration and filled it in d_config. The
+ * returned configuration can be used to rebuild a domain. It only
+ * works with DomU.
+ */
+int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
+                                        libxl_domain_config *d_config);
 
 int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd,
                          int flags, /* LIBXL_SUSPEND_* */
