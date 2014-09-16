@@ -1530,7 +1530,7 @@ static void devices_destroy_cb(libxl__egc *egc,
     uint32_t domid = dis->domid;
     char *dom_path;
     char *vm_path;
-    libxl__carefd *lock = NULL;
+    libxl__domain_userdata_lock *lock = NULL;
 
     dom_path = libxl__xs_get_dompath(gc, domid);
     if (!dom_path) {

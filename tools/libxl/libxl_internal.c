@@ -384,9 +384,10 @@ out:
 /* Portability note: this lock utilises flock(2) so a proper implementation of
  * flock(2) is required.
  */
-libxl__carefd *libxl__lock_domain_userdata(libxl__gc *gc, uint32_t domid)
+libxl__domain_userdata_lock *libxl__lock_domain_userdata(libxl__gc *gc,
+                                                         uint32_t domid)
 {
-    libxl__carefd *carefd = NULL;
+    libxl__domain_userdata_lock *lock = NULL;
     const char *lockfile;
     int fd;
     struct stat stab, fstab;
@@ -394,12 +395,15 @@ libxl__carefd *libxl__lock_domain_userdata(libxl__gc *gc, uint32_t domid)
     lockfile = libxl__userdata_path(gc, domid, "domain-userdata-lock", "l");
     if (!lockfile) goto out;
 
+    lock = libxl__zalloc(NOGC, sizeof(libxl__domain_userdata_lock));
+    lock->path = libxl__strdup(NOGC, lockfile);
+
     while (true) {
         libxl__carefd_begin();
         fd = open(lockfile, O_RDWR|O_CREAT, 0666);
         if (fd < 0)
             LOGE(ERROR, "cannot open lockfile %s, errno=%d", lockfile, errno);
-        carefd = libxl__carefd_opened(CTX, fd);
+        lock->lock_carefd = libxl__carefd_opened(CTX, fd);
         if (fd < 0) goto out;
 
         /* Lock the file in exclusive mode, wait indefinitely to
@@ -434,20 +438,28 @@ libxl__carefd *libxl__lock_domain_userdata(libxl__gc *gc, uint32_t domid)
                 break;
         }
 
-        libxl__carefd_close(carefd);
+        libxl__carefd_close(lock->lock_carefd);
     }
 
-    return carefd;
+    /* Check the domain is still there, if not we should release the
+     * lock and clean up.
+     */
+    if (libxl_domain_info(CTX, NULL, domid))
+        goto out;
+
+    return lock;
 
 out:
-    if (carefd) libxl__carefd_close(carefd);
+    if (lock) libxl__unlock_domain_userdata(lock);
     return NULL;
 }
 
-void libxl__unlock_domain_userdata(libxl__carefd *lock_carefd)
+void libxl__unlock_domain_userdata(libxl__domain_userdata_lock *lock)
 {
-    /* Simply closing the file descriptor releases the lock */
-    libxl__carefd_close(lock_carefd);
+    if (lock->path) unlink(lock->path);
+    if (lock->lock_carefd) libxl__carefd_close(lock->lock_carefd);
+    free(lock->path);
+    free(lock);
 }
 
 int libxl__get_domain_configuration(libxl__gc *gc, uint32_t domid,

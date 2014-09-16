@@ -1404,7 +1404,7 @@ static void domcreate_complete(libxl__egc *egc,
         rc = xc_flask_relabel_domain(CTX->xch, dcs->guest_domid, d_config->b_info.exec_ssidref);
 
     if (!rc) {
-        libxl__carefd *lock;
+        libxl__domain_userdata_lock *lock;
 
         /* Note that we hold CTX lock at this point so only need to
          * take data store lock

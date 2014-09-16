@@ -1857,8 +1857,12 @@ void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid)
     if (r)
         LOGE(ERROR, "glob failed for %s", pattern);
 
+    /* Note: don't delete domain-userdata-lock, it will be handled by
+     * unlock function.
+     */
     for (i=0; i<gl.gl_pathc; i++) {
-        userdata_delete(gc, gl.gl_pathv[i]);
+        if (!strstr(gl.gl_pathv[i], "domain-userdata-lock"))
+            userdata_delete(gc, gl.gl_pathv[i]);
     }
     globfree(&gl);
 out:
@@ -1931,7 +1935,7 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
 {
     GC_INIT(ctx);
     int rc;
-    libxl__carefd *lock;
+    libxl__domain_userdata_lock *lock;
 
     CTX_LOCK;
     lock = libxl__lock_domain_userdata(gc, domid);
@@ -1992,7 +1996,7 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
 {
     GC_INIT(ctx);
     int rc;
-    libxl__carefd *lock;
+    libxl__domain_userdata_lock *lock;
 
     CTX_LOCK;
     lock = libxl__lock_domain_userdata(gc, domid);
