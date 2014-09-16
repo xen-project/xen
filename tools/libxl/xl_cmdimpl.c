@@ -107,6 +107,8 @@ static const char migrate_report[]=
    *            from target to source
    */
 
+#define XL_MANDATORY_FLAG_JSON (1U << 0) /* config data is in JSON format */
+#define XL_MANDATORY_FLAG_ALL  (XL_MANDATORY_FLAG_JSON)
 struct save_file_header {
     char magic[32]; /* savefileheader_magic */
     /* All uint32_ts are in domain's byte order. */
@@ -1778,21 +1780,41 @@ skip_vfb:
 }
 
 static void reload_domain_config(uint32_t domid,
-                                 uint8_t **config_data, int *config_len)
+                                 libxl_domain_config *d_config)
 {
+    int rc;
     uint8_t *t_data;
     int ret, t_len;
+    libxl_domain_config d_config_new;
 
+    /* In case user has used "config-update" to store a new config
+     * file.
+     */
     ret = libxl_userdata_retrieve(ctx, domid, "xl", &t_data, &t_len);
-    if (ret) {
-        LOG("failed to retrieve guest configuration (rc=%d). "
-            "reusing old configuration", ret);
+    if (ret && errno != ENOENT) {
+        LOG("\"xl\" configuration found but failed to load\n");
+    }
+    if (t_len > 0) {
+        LOG("\"xl\" configuration found, using it\n");
+        libxl_domain_config_dispose(d_config);
+        parse_config_data("<updated>", (const char *)t_data,
+                          t_len, d_config);
+        free(t_data);
+        libxl_userdata_unlink(ctx, domid, "xl");
         return;
     }
 
-    free(*config_data);
-    *config_data = t_data;
-    *config_len = t_len;
+    libxl_domain_config_init(&d_config_new);
+    rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config_new);
+    if (rc) {
+        LOG("failed to retrieve guest configuration (rc=%d). "
+            "reusing old configuration", rc);
+        libxl_domain_config_dispose(&d_config_new);
+    } else {
+        libxl_domain_config_dispose(d_config);
+        /* Steal allocations */
+        memcpy(d_config, &d_config_new, sizeof(libxl_domain_config));
+    }
 }
 
 /* Returns 1 if domain should be restarted,
@@ -1800,7 +1822,6 @@ static void reload_domain_config(uint32_t domid,
  * Can update r_domid if domain is destroyed etc */
 static int handle_domain_death(uint32_t *r_domid,
                                libxl_event *event,
-                               uint8_t **config_data, int *config_len,
                                libxl_domain_config *d_config)
 
 {
@@ -1858,13 +1879,12 @@ static int handle_domain_death(uint32_t *r_domid,
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_RESTART_RENAME:
-        reload_domain_config(*r_domid, config_data, config_len);
+        reload_domain_config(*r_domid, d_config);
         restart = 2;
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_RESTART:
-        reload_domain_config(*r_domid, config_data, config_len);
-
+        reload_domain_config(*r_domid, d_config);
         restart = 1;
         /* fall-through */
     case LIBXL_ACTION_ON_SHUTDOWN_DESTROY:
@@ -2061,6 +2081,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
     const char *config_source = NULL;
     const char *restore_source = NULL;
     int migrate_fd = dom_info->migrate_fd;
+    bool config_in_json;
 
     int i;
     int need_daemon = daemonize;
@@ -2115,7 +2136,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
                 restore_source, hdr.mandatory_flags, hdr.optional_flags,
                 hdr.optional_data_len);
 
-        badflags = hdr.mandatory_flags & ~( 0 /* none understood yet */ );
+        badflags = hdr.mandatory_flags & ~XL_MANDATORY_FLAG_ALL;
         if (badflags) {
             fprintf(stderr, "Savefile has mandatory flag(s) 0x%"PRIx32" "
                     "which are not supported; need newer xl\n",
@@ -2143,7 +2164,9 @@ static uint32_t create_domain(struct domain_create *dom_info)
         optdata_here = optdata_begin;
 
         if (OPTDATA_LEFT) {
-            fprintf(stderr, " Savefile contains xl domain config\n");
+            fprintf(stderr, " Savefile contains xl domain config%s\n",
+                    !!(hdr.mandatory_flags & XL_MANDATORY_FLAG_JSON)
+                    ? " in JSON format" : "");
             WITH_OPTDATA(4, {
                 memcpy(u32buf.b, optdata_here, 4);
                 config_len = u32buf.u32;
@@ -2183,6 +2206,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
                 extra_config);
         }
         config_source=config_file;
+        config_in_json = false;
     } else {
         if (!config_data) {
             fprintf(stderr, "Config file not specified and"
@@ -2190,12 +2214,18 @@ static uint32_t create_domain(struct domain_create *dom_info)
             return ERROR_INVAL;
         }
         config_source = "<saved>";
+        config_in_json = !!(hdr.mandatory_flags & XL_MANDATORY_FLAG_JSON);
     }
 
     if (!dom_info->quiet)
         printf("Parsing config from %s\n", config_source);
 
-    parse_config_data(config_source, config_data, config_len, &d_config);
+    if (config_in_json) {
+        libxl_domain_config_from_json(ctx, &d_config,
+                                      (const char *)config_data);
+    } else {
+        parse_config_data(config_source, config_data, config_len, &d_config);
+    }
 
     if (migrate_fd >= 0) {
         if (d_config.c_info.name) {
@@ -2269,14 +2299,6 @@ start:
     if ( ret )
         goto error_out;
 
-    ret = libxl_userdata_store(ctx, domid, "xl",
-                                    config_data, config_len);
-    if (ret) {
-        perror("cannot save config file");
-        ret = ERROR_FAIL;
-        goto error_out;
-    }
-
     release_lock();
 
     if (!paused)
@@ -2333,9 +2355,7 @@ start:
             LOG("Domain %d has shut down, reason code %d 0x%x", domid,
                 event->u.domain_shutdown.shutdown_reason,
                 event->u.domain_shutdown.shutdown_reason);
-            switch (handle_domain_death(&domid, event,
-                                        (uint8_t **)&config_data, &config_len,
-                                        &d_config)) {
+            switch (handle_domain_death(&domid, event, &d_config)) {
             case 2:
                 if (!preserve_domain(&domid, event, &d_config)) {
                     /* If we fail then exit leaving the old domain in place. */
@@ -2371,12 +2391,6 @@ start:
                     && strcmp(d_config.c_info.name, common_domname)) {
                     d_config.c_info.name = strdup(common_domname);
                 }
-
-                /* Reparse the configuration in case it has changed */
-                libxl_domain_config_dispose(&d_config);
-                libxl_domain_config_init(&d_config);
-                parse_config_data(config_source, config_data, config_len,
-                                  &d_config);
 
                 /*
                  * XXX FIXME: If this sleep is not there then domain
@@ -3156,9 +3170,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
 {
     libxl_domain_config d_config;
 
-    char *config_source;
-    uint8_t *data;
-    int i, len, rc;
+    int i, rc;
 
     yajl_gen hand = NULL;
     yajl_gen_status s;
@@ -3179,24 +3191,18 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         s = yajl_gen_status_ok;
 
     for (i = 0; i < nb_domain; i++) {
+        libxl_domain_config_init(&d_config);
         /* no detailed info available on dom0 */
         if (info[i].domid == 0)
             continue;
-        rc = libxl_userdata_retrieve(ctx, info[i].domid, "xl", &data, &len);
+        rc = libxl_retrieve_domain_configuration(ctx, info[i].domid, &d_config);
         if (rc)
             continue;
-        if (len == 0)
-            continue;
-        CHK_SYSCALL(asprintf(&config_source, "<domid %d data>", info[i].domid));
-        libxl_domain_config_init(&d_config);
-        parse_config_data(config_source, (char *)data, len, &d_config);
         if (default_output_format == OUTPUT_FORMAT_JSON)
             s = printf_info_one_json(hand, info[i].domid, &d_config);
         else
             printf_info_sexp(info[i].domid, &d_config);
         libxl_domain_config_dispose(&d_config);
-        free(data);
-        free(config_source);
         if (s != yajl_gen_status_ok)
             goto out;
     }
@@ -3381,22 +3387,41 @@ static void save_domain_core_begin(uint32_t domid,
                                    int *config_len_r)
 {
     int rc;
+    libxl_domain_config d_config;
+    char *config_c = 0;
 
     /* configuration file in optional data: */
+
+    libxl_domain_config_init(&d_config);
 
     if (override_config_file) {
         void *config_v = 0;
         rc = libxl_read_file_contents(ctx, override_config_file,
                                       &config_v, config_len_r);
-        *config_data_r = config_v;
+        if (rc) {
+            fprintf(stderr, "unable to read overridden config file\n");
+            exit(2);
+        }
+        parse_config_data(override_config_file, config_v, *config_len_r,
+                          &d_config);
+        free(config_v);
     } else {
-        rc = libxl_userdata_retrieve(ctx, domid, "xl",
-                                     config_data_r, config_len_r);
+        rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config);
+        if (rc) {
+            fprintf(stderr, "unable to retrieve domain configuration\n");
+            exit(2);
+        }
     }
-    if (rc) {
-        fputs("Unable to get config file\n",stderr);
+
+    config_c = libxl_domain_config_to_json(ctx, &d_config);
+    if (!config_c) {
+        fprintf(stderr, "unable to convert config file to JSON\n");
         exit(2);
     }
+    *config_data_r = (uint8_t *)config_c;
+    *config_len_r = strlen(config_c) + 1; /* including trailing '\0' */
+
+    libxl_domain_config_dispose(&d_config);
 }
 
 static void save_domain_core_writeconfig(int fd, const char *source,
@@ -3424,6 +3449,8 @@ static void save_domain_core_writeconfig(int fd, const char *source,
     u32buf.u32 = config_len;
     ADD_OPTDATA(u32buf.b,    4);
     ADD_OPTDATA(config_data, config_len);
+    if (config_len)
+        hdr.mandatory_flags |= XL_MANDATORY_FLAG_JSON;
 
     /* that's the optional data */
 
@@ -4432,6 +4459,9 @@ int main_config_update(int argc, char **argv)
         help("config-update");
         exit(1);
     }
+
+    fprintf(stderr, "WARNING: xl now has better capability to manage domain configuration, "
+            "avoid using this command when possible\n");
 
     domid = find_domain(argv[1]);
     argc--; argv++;

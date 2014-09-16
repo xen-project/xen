@@ -38,7 +38,9 @@ struct cmd_spec cmd_table[] = {
     { "config-update",
       &main_config_update, 1, 1,
       "Update a running domain's saved configuration, used when rebuilding "
-      "the domain after reboot",
+      "the domain after reboot.\n"
+      "WARNING: xl now has better capability to manage domain configuration, "
+      "avoid using this command when possible",
       "<Domain> <ConfigFile> [options] [vars]",
       "-h                      Print this help.\n"
       "-f FILE, --defconfig=FILE\n                     Use the given configuration file.\n"

@@ -187,6 +187,11 @@ immediate effect but will be applied when the guest is next
 restarted. This command is useful to ensure that runtime modifications
 made to the guest will be preserved when the guest is restarted.
 
+Since Xen 4.5 xl has improved capabilities to handle dynamic domain
+configuration changes and will preserve any changes made a runtime
+when necessary. Therefore it should not normally be necessary to use
+this command any more.
+
 I<configfile> has to be an absolute path to a file.
 
 B<OPTIONS>
