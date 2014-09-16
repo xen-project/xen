@@ -2016,6 +2016,32 @@ out:
     return rc;
 }
 
+int libxl_userdata_unlink(libxl_ctx *ctx, uint32_t domid,
+                          const char *userdata_userid)
+{
+    GC_INIT(ctx);
+    int rc;
+
+    libxl__domain_userdata_lock *lock;
+    const char *filename;
+
+    CTX_LOCK;
+    lock = libxl__lock_domain_userdata(gc, domid);
+    if (!lock) {
+        rc = ERROR_LOCK_FAIL;
+        goto out;
+    }
+
+    filename = libxl__userdata_path(gc, domid, userdata_userid, "d");
+    if (unlink(filename)) rc = ERROR_FAIL;
+
+    libxl__unlock_domain_userdata(lock);
+out:
+    CTX_UNLOCK;
+    GC_FREE;
+    return rc;
+}
+
 /*
  * Local variables:
  * mode: C

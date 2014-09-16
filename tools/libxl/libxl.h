@@ -67,6 +67,13 @@
  * the same $(XEN_VERSION) (e.g. throughout a major release).
  */
 
+/* LIBXL_HAVE_USERDATA_UNLINK
+ *
+ * If it is defined, libxl has a library function called
+ * libxl_userdata_unlink.
+ */
+#define LIBXL_HAVE_USERDATA_UNLINK 1
+
 /* LIBXL_HAVE_CPUPOOL_QUALIFIER_TO_CPUPOOLID
  *
  * If this is defined, libxl has a library function called
@@ -1268,6 +1275,9 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
    * data_r and datalen_r may be 0.
    * On error return, *data_r and *datalen_r are undefined.
    */
+int libxl_userdata_unlink(libxl_ctx *ctx, uint32_t domid,
+                          const char *userdata_userid);
+
 
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
