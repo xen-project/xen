@@ -140,7 +140,7 @@ unsigned long xenheap_mfn_start __read_mostly = ~0UL;
 unsigned long xenheap_mfn_end __read_mostly;
 unsigned long xenheap_virt_end __read_mostly;
 
-unsigned long frametable_base_mfn __read_mostly;
+unsigned long frametable_base_pdx __read_mostly;
 unsigned long frametable_virt_end __read_mostly;
 
 unsigned long max_page;
@@ -681,7 +681,7 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
     /* Align to previous 1GB boundary */
     base_mfn &= ~((FIRST_SIZE>>PAGE_SHIFT)-1);
 
-    offset = base_mfn - xenheap_mfn_start;
+    offset = pfn_to_pdx(base_mfn - xenheap_mfn_start);
     vaddr = DIRECTMAP_VIRT_START + offset*PAGE_SIZE;
 
     while ( base_mfn < end_mfn )
@@ -732,7 +732,8 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
 void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
 {
     unsigned long nr_pages = (pe - ps) >> PAGE_SHIFT;
-    unsigned long frametable_size = nr_pages * sizeof(struct page_info);
+    unsigned long nr_pdxs = pfn_to_pdx(nr_pages);
+    unsigned long frametable_size = nr_pdxs * sizeof(struct page_info);
     unsigned long base_mfn;
 #ifdef CONFIG_ARM_64
     lpae_t *second, pte;
@@ -740,7 +741,7 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     int i;
 #endif
 
-    frametable_base_mfn = ps >> PAGE_SHIFT;
+    frametable_base_pdx = pfn_to_pdx(ps >> PAGE_SHIFT);
 
     /* Round up to 32M boundary */
     frametable_size = (frametable_size + 0x1ffffff) & ~0x1ffffff;
@@ -761,11 +762,11 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     create_32mb_mappings(xen_second, FRAMETABLE_VIRT_START, base_mfn, frametable_size >> PAGE_SHIFT);
 #endif
 
-    memset(&frame_table[0], 0, nr_pages * sizeof(struct page_info));
-    memset(&frame_table[nr_pages], -1,
-           frametable_size - (nr_pages * sizeof(struct page_info)));
+    memset(&frame_table[0], 0, nr_pdxs * sizeof(struct page_info));
+    memset(&frame_table[nr_pdxs], -1,
+           frametable_size - (nr_pdxs * sizeof(struct page_info)));
 
-    frametable_virt_end = FRAMETABLE_VIRT_START + (nr_pages * sizeof(struct page_info));
+    frametable_virt_end = FRAMETABLE_VIRT_START + (nr_pdxs * sizeof(struct page_info));
 }
 
 void *__init arch_vmap_virt_end(void)

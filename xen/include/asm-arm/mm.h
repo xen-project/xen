@@ -6,6 +6,7 @@
 #include <asm/page.h>
 #include <public/xen.h>
 #include <xen/domain_page.h>
+#include <xen/pdx.h>
 
 /* Align Xen to a 2 MiB boundary. */
 #define XEN_PADDR_ALIGN (1 << 21)
@@ -140,11 +141,13 @@ extern void share_xen_page_with_privileged_guests(
     struct page_info *page, int readonly);
 
 #define frame_table ((struct page_info *)FRAMETABLE_VIRT_START)
-/* MFN of the first page in the frame table. */
-extern unsigned long frametable_base_mfn;
+/* PDX of the first page in the frame table. */
+extern unsigned long frametable_base_pdx;
 
 extern unsigned long max_page;
 extern unsigned long total_pages;
+
+#define PDX_GROUP_SHIFT SECOND_SHIFT
 
 /* Boot-time pagetable setup */
 extern void setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr);
@@ -182,20 +185,15 @@ static inline void __iomem *ioremap_wc(paddr_t start, size_t len)
     return ioremap_attr(start, len, PAGE_HYPERVISOR_WC);
 }
 
+/* XXX -- account for base */
 #define mfn_valid(mfn)        ({                                              \
     unsigned long __m_f_n = (mfn);                                            \
-    likely(__m_f_n >= frametable_base_mfn && __m_f_n < max_page);             \
+    likely(pfn_to_pdx(__m_f_n) >= frametable_base_pdx && __mfn_valid(__m_f_n)); \
 })
 
-#define max_pdx                 max_page
-#define pfn_to_pdx(pfn)         (pfn)
-#define pdx_to_pfn(pdx)         (pdx)
-#define virt_to_pdx(va)         virt_to_mfn(va)
-#define pdx_to_virt(pdx)        mfn_to_virt(pdx)
-
 /* Convert between machine frame numbers and page-info structures. */
-#define mfn_to_page(mfn)  (frame_table + (pfn_to_pdx(mfn) - frametable_base_mfn))
-#define page_to_mfn(pg)   pdx_to_pfn((unsigned long)((pg) - frame_table) + frametable_base_mfn)
+#define mfn_to_page(mfn)  (frame_table + (pfn_to_pdx(mfn) - frametable_base_pdx))
+#define page_to_mfn(pg)   pdx_to_pfn((unsigned long)((pg) - frame_table) + frametable_base_pdx)
 #define __page_to_mfn(pg)  page_to_mfn(pg)
 #define __mfn_to_page(mfn) mfn_to_page(mfn)
 
@@ -228,9 +226,11 @@ static inline void *maddr_to_virt(paddr_t ma)
 #else
 static inline void *maddr_to_virt(paddr_t ma)
 {
-    ASSERT((ma >> PAGE_SHIFT) < (DIRECTMAP_SIZE >> PAGE_SHIFT));
-    ma -= pfn_to_paddr(xenheap_mfn_start);
-    return (void *)(unsigned long) ma + DIRECTMAP_VIRT_START;
+    ASSERT(pfn_to_pdx(ma >> PAGE_SHIFT) < (DIRECTMAP_SIZE >> PAGE_SHIFT));
+    return (void *)(DIRECTMAP_VIRT_START -
+                    pfn_to_paddr(xenheap_mfn_start) +
+                    ((ma & ma_va_bottom_mask) |
+                     ((ma & ma_top_mask) >> pfn_pdx_hole_shift)));
 }
 #endif
 
@@ -256,13 +256,14 @@ static inline int gvirt_to_maddr(vaddr_t va, paddr_t *pa, unsigned int flags)
 static inline struct page_info *virt_to_page(const void *v)
 {
     unsigned long va = (unsigned long)v;
+    unsigned long pdx;
+
     ASSERT(va >= XENHEAP_VIRT_START);
     ASSERT(va < xenheap_virt_end);
 
-    return frame_table
-        + ((va - XENHEAP_VIRT_START) >> PAGE_SHIFT)
-        + xenheap_mfn_start
-        - frametable_base_mfn;
+    pdx = (va - XENHEAP_VIRT_START) >> PAGE_SHIFT;
+    pdx += pfn_to_pdx(xenheap_mfn_start);
+    return frame_table + pdx - frametable_base_pdx;
 }
 
 static inline void *page_to_virt(const struct page_info *pg)

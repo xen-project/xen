@@ -424,11 +424,47 @@ static paddr_t __init get_xen_paddr(void)
     return paddr;
 }
 
+static void init_pdx(void)
+{
+    paddr_t bank_start, bank_size, bank_end;
+
+    u64 mask = pdx_init_mask(bootinfo.mem.bank[0].start);
+    int bank;
+
+    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
+    {
+        bank_start = bootinfo.mem.bank[bank].start;
+        bank_size = bootinfo.mem.bank[bank].size;
+
+        mask |= bank_start | pdx_region_mask(bank_start, bank_size);
+    }
+
+    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
+    {
+        bank_start = bootinfo.mem.bank[bank].start;
+        bank_size = bootinfo.mem.bank[bank].size;
+
+        if (~mask & pdx_region_mask(bank_start, bank_size))
+            mask = 0;
+    }
+
+    pfn_pdx_hole_setup(mask >> PAGE_SHIFT);
+
+    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
+    {
+        bank_start = bootinfo.mem.bank[bank].start;
+        bank_size = bootinfo.mem.bank[bank].size;
+        bank_end = bank_start + bank_size;
+
+        set_pdx_range(paddr_to_pfn(bank_start),
+                      paddr_to_pfn(bank_end));
+    }
+}
+
 #ifdef CONFIG_ARM_32
 static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 {
     paddr_t ram_start, ram_end, ram_size;
-    paddr_t contig_start, contig_end;
     paddr_t s, e;
     unsigned long ram_pages;
     unsigned long heap_pages, xenheap_pages, domheap_pages;
@@ -440,24 +476,11 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     if ( !bootinfo.mem.nr_banks )
         panic("No memory bank");
 
-    /*
-     * We are going to accumulate two regions here.
-     *
-     * The first is the bounds of the initial memory region which is
-     * contiguous with the first bank. For simplicity the xenheap is
-     * always allocated from this region.
-     *
-     * The second is the complete bounds of the regions containing RAM
-     * (ie. from the lowest RAM address to the highest), which
-     * includes any holes.
-     *
-     * We also track the number of actual RAM pages (i.e. not counting
-     * the holes).
-     */
-    ram_size  = bootinfo.mem.bank[0].size;
+    init_pdx();
 
-    contig_start = ram_start = bootinfo.mem.bank[0].start;
-    contig_end   = ram_end = ram_start + ram_size;
+    ram_start = bootinfo.mem.bank[0].start;
+    ram_size  = bootinfo.mem.bank[0].size;
+    ram_end   = ram_start + ram_size;
 
     for ( i = 1; i < bootinfo.mem.nr_banks; i++ )
     {
@@ -465,41 +488,9 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
         paddr_t bank_size = bootinfo.mem.bank[i].size;
         paddr_t bank_end = bank_start + bank_size;
 
-        paddr_t new_ram_size = ram_size + bank_size;
-        paddr_t new_ram_start = min(ram_start,bank_start);
-        paddr_t new_ram_end = max(ram_end,bank_end);
-
-        /*
-         * If the new bank is contiguous with the initial contiguous
-         * region then incorporate it into the contiguous region.
-         *
-         * Otherwise we allow non-contigious regions so long as at
-         * least half of the total RAM region actually contains
-         * RAM. We actually fudge this slightly and require that
-         * adding the current bank does not cause us to violate this
-         * restriction.
-         *
-         * This restriction ensures that the frametable (which is not
-         * currently sparse) does not consume all available RAM.
-         */
-        if ( bank_start == contig_end )
-            contig_end = bank_end;
-        else if ( bank_end == contig_start )
-            contig_start = bank_start;
-        else if ( 2 * new_ram_size < new_ram_end - new_ram_start )
-            /* Would create memory map which is too sparse, so stop here. */
-            break;
-
-        ram_size = new_ram_size;
-        ram_start = new_ram_start;
-        ram_end = new_ram_end;
-    }
-
-    if ( i != bootinfo.mem.nr_banks )
-    {
-        printk("WARNING: only using %d out of %d memory banks\n",
-               i, bootinfo.mem.nr_banks);
-        bootinfo.mem.nr_banks = i;
+        ram_size  = ram_size + bank_size;
+        ram_start = min(ram_start,bank_start);
+        ram_end   = max(ram_end,bank_end);
     }
 
     total_pages = ram_pages = ram_size >> PAGE_SHIFT;
@@ -521,8 +512,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     do
     {
-        /* xenheap is always in the initial contiguous region */
-        e = consider_modules(contig_start, contig_end,
+        e = consider_modules(ram_start, ram_end,
                              pfn_to_paddr(xenheap_pages),
                              32<<20, 0);
         if ( e )
@@ -617,6 +607,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     unsigned long dtb_pages;
     void *fdt;
 
+    init_pdx();
+
     total_pages = 0;
     for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
     {
@@ -625,26 +617,9 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
         paddr_t bank_end = bank_start + bank_size;
         paddr_t s, e;
 
-        paddr_t new_ram_size = ram_size + bank_size;
-        paddr_t new_ram_start = min(ram_start,bank_start);
-        paddr_t new_ram_end = max(ram_end,bank_end);
-
-        /*
-         * We allow non-contigious regions so long as at least half of
-         * the total RAM region actually contains RAM. We actually
-         * fudge this slightly and require that adding the current
-         * bank does not cause us to violate this restriction.
-         *
-         * This restriction ensures that the frametable (which is not
-         * currently sparse) does not consume all available RAM.
-         */
-        if ( bank > 0 && 2 * new_ram_size < new_ram_end - new_ram_start )
-            /* Would create memory map which is too sparse, so stop here. */
-            break;
-
-        ram_start = new_ram_start;
-        ram_end = new_ram_end;
-        ram_size = new_ram_size;
+        ram_size = ram_size + bank_size;
+        ram_start = min(ram_start,bank_start);
+        ram_end = max(ram_end,bank_end);
 
         setup_xenheap_mappings(bank_start>>PAGE_SHIFT, bank_size>>PAGE_SHIFT);
 
@@ -668,13 +643,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
             dt_unreserved_regions(s, e, init_boot_pages, 0);
             s = n;
         }
-    }
-
-    if ( bank != bootinfo.mem.nr_banks )
-    {
-        printk("WARNING: only using %d out of %d memory banks\n",
-               bank, bootinfo.mem.nr_banks);
-        bootinfo.mem.nr_banks = bank;
     }
 
     total_pages += ram_size >> PAGE_SHIFT;
