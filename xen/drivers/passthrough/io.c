@@ -513,45 +513,39 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
     spin_unlock(&d->event_lock);
 }
 
-static void hvm_pci_msi_assert(
-    struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
-{
-    struct pirq *pirq = dpci_pirq(pirq_dpci);
-
-    if ( hvm_domain_use_pirq(d, pirq) )
-        send_guest_pirq(d, pirq);
-    else
-        vmsi_deliver_pirq(d, pirq_dpci);
-}
-
 static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
                             void *arg)
 {
     if ( test_and_clear_bool(pirq_dpci->masked) )
     {
+        struct pirq *pirq = dpci_pirq(pirq_dpci);
         const struct dev_intx_gsi_link *digl;
+
+        if ( hvm_domain_use_pirq(d, pirq) )
+        {
+            send_guest_pirq(d, pirq);
+
+            if ( pirq_dpci->flags & HVM_IRQ_DPCI_GUEST_MSI )
+                return 0;
+        }
 
         if ( pirq_dpci->flags & HVM_IRQ_DPCI_GUEST_MSI )
         {
-            hvm_pci_msi_assert(d, pirq_dpci);
+            vmsi_deliver_pirq(d, pirq_dpci);
             return 0;
         }
 
         list_for_each_entry ( digl, &pirq_dpci->digl_list, list )
         {
-            struct pirq *info = dpci_pirq(pirq_dpci);
-
-            if ( hvm_domain_use_pirq(d, info) )
-                send_guest_pirq(d, info);
-            else
-                hvm_pci_intx_assert(d, digl->device, digl->intx);
+            hvm_pci_intx_assert(d, digl->device, digl->intx);
             pirq_dpci->pending++;
+        }
 
-            if ( pirq_dpci->flags & HVM_IRQ_DPCI_TRANSLATE )
-            {
-                /* for translated MSI to INTx interrupt, eoi as early as possible */
-                __msi_pirq_eoi(pirq_dpci);
-            }
+        if ( pirq_dpci->flags & HVM_IRQ_DPCI_TRANSLATE )
+        {
+            /* for translated MSI to INTx interrupt, eoi as early as possible */
+            __msi_pirq_eoi(pirq_dpci);
+            return 0;
         }
 
         /*
@@ -561,8 +555,8 @@ static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
          * guest will never deal with the irq, then the physical interrupt line
          * will never be deasserted.
          */
-        if ( pt_irq_need_timer(pirq_dpci->flags) )
-            set_timer(&pirq_dpci->timer, NOW() + PT_IRQ_TIME_OUT);
+        ASSERT(pt_irq_need_timer(pirq_dpci->flags));
+        set_timer(&pirq_dpci->timer, NOW() + PT_IRQ_TIME_OUT);
     }
 
     return 0;
@@ -583,12 +577,12 @@ static void __hvm_dpci_eoi(struct domain *d,
                            const struct hvm_girq_dpci_mapping *girq,
                            const union vioapic_redir_entry *ent)
 {
-    struct pirq *pirq;
+    struct pirq *pirq = pirq_info(d, girq->machine_gsi);
     struct hvm_pirq_dpci *pirq_dpci;
 
-    hvm_pci_intx_deassert(d, girq->device, girq->intx);
+    if ( !hvm_domain_use_pirq(d, pirq) )
+        hvm_pci_intx_deassert(d, girq->device, girq->intx);
 
-    pirq = pirq_info(d, girq->machine_gsi);
     pirq_dpci = pirq_dpci(pirq);
 
     /*

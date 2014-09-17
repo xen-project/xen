@@ -2167,6 +2167,7 @@ void vmx_vlapic_msr_changed(struct vcpu *v)
 {
     int virtualize_x2apic_mode;
     struct vlapic *vlapic = vcpu_vlapic(v);
+    unsigned int msr;
 
     virtualize_x2apic_mode = ( (cpu_has_vmx_apic_reg_virt ||
                                 cpu_has_vmx_virtual_intr_delivery) &&
@@ -2183,8 +2184,6 @@ void vmx_vlapic_msr_changed(struct vcpu *v)
     if ( !vlapic_hw_disabled(vlapic) &&
          (vlapic_base_address(vlapic) == APIC_DEFAULT_PHYS_BASE) )
     {
-        unsigned int msr;
-
         if ( virtualize_x2apic_mode && vlapic_x2apic_mode(vlapic) )
         {
             v->arch.hvm_vmx.secondary_exec_control |=
@@ -2213,15 +2212,15 @@ void vmx_vlapic_msr_changed(struct vcpu *v)
             }
         }
         else
-        {
             v->arch.hvm_vmx.secondary_exec_control |=
                 SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
-            for ( msr = MSR_IA32_APICBASE_MSR;
-                  msr <= MSR_IA32_APICBASE_MSR + 0xff; msr++ )
-                vmx_enable_intercept_for_msr(v, msr,
-                                             MSR_TYPE_R | MSR_TYPE_W);
-        }
     }
+    if ( !(v->arch.hvm_vmx.secondary_exec_control &
+           SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE) )
+        for ( msr = MSR_IA32_APICBASE_MSR;
+              msr <= MSR_IA32_APICBASE_MSR + 0xff; msr++ )
+            vmx_enable_intercept_for_msr(v, msr, MSR_TYPE_R | MSR_TYPE_W);
+
     vmx_update_secondary_exec_control(v);
     vmx_vmcs_exit(v);
 }
