@@ -147,9 +147,6 @@ struct domain *dom_xen, *dom_io, *dom_cow;
 unsigned long max_page;
 unsigned long total_pages;
 
-unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
-    (FRAMETABLE_NR + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT)] = { [0] = 1 };
-
 bool_t __read_mostly machine_to_phys_mapping_valid = 0;
 
 struct rangeset *__read_mostly mmio_ro_ranges;

@@ -334,8 +334,6 @@ void *alloc_xen_pagetable(void);
 void free_xen_pagetable(void *v);
 l1_pgentry_t *virt_to_xen_l1e(unsigned long v);
 
-extern void set_pdx_range(unsigned long smfn, unsigned long emfn);
-
 /* Convert between PAT/PCD/PWT embedded in PTE flags and 3-bit cacheattr. */
 static inline uint32_t pte_flags_to_cacheattr(uint32_t flags)
 {

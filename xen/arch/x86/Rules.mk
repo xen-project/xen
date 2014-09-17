@@ -12,6 +12,7 @@ HAS_NS16550 := y
 HAS_EHCI := y
 HAS_KEXEC := y
 HAS_GDBSX := y
+HAS_PDX := y
 xenoprof := y
 
 #

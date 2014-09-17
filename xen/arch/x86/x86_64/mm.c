@@ -40,15 +40,6 @@
 #include <asm/mem_access.h>
 #include <public/memory.h>
 
-/* Parameters for PFN/MADDR compression. */
-unsigned long __read_mostly max_pdx;
-unsigned long __read_mostly pfn_pdx_bottom_mask = ~0UL;
-unsigned long __read_mostly ma_va_bottom_mask = ~0UL;
-unsigned long __read_mostly pfn_top_mask = 0;
-unsigned long __read_mostly ma_top_mask = 0;
-unsigned long __read_mostly pfn_hole_mask = 0;
-unsigned int __read_mostly pfn_pdx_hole_shift = 0;
-
 unsigned int __read_mostly m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 
 /* Enough page directories to map into the bottom 1GB. */
@@ -58,14 +49,6 @@ l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     l2_bootmap[L2_PAGETABLE_ENTRIES];
 
 l2_pgentry_t *compat_idle_pg_table_l2;
-
-int __mfn_valid(unsigned long mfn)
-{
-    return likely(mfn < max_page) &&
-           likely(!(mfn & pfn_hole_mask)) &&
-           likely(test_bit(pfn_to_pdx(mfn) / PDX_GROUP_COUNT,
-                           pdx_group_valid));
-}
 
 void *do_page_walk(struct vcpu *v, unsigned long addr)
 {
@@ -117,42 +100,6 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
 
  ret:
     return map_domain_page(mfn) + (addr & ~PAGE_MASK);
-}
-
-void __init pfn_pdx_hole_setup(unsigned long mask)
-{
-    unsigned int i, j, bottom_shift = 0, hole_shift = 0;
-
-    /*
-     * We skip the first MAX_ORDER bits, as we never want to compress them.
-     * This guarantees that page-pointer arithmetic remains valid within
-     * contiguous aligned ranges of 2^MAX_ORDER pages. Among others, our
-     * buddy allocator relies on this assumption.
-     */
-    for ( j = MAX_ORDER-1; ; )
-    {
-        i = find_next_zero_bit(&mask, BITS_PER_LONG, j);
-        j = find_next_bit(&mask, BITS_PER_LONG, i);
-        if ( j >= BITS_PER_LONG )
-            break;
-        if ( j - i > hole_shift )
-        {
-            hole_shift = j - i;
-            bottom_shift = i;
-        }
-    }
-    if ( !hole_shift )
-        return;
-
-    printk(KERN_INFO "PFN compression on bits %u...%u\n",
-           bottom_shift, bottom_shift + hole_shift - 1);
-
-    pfn_pdx_hole_shift  = hole_shift;
-    pfn_pdx_bottom_mask = (1UL << bottom_shift) - 1;
-    ma_va_bottom_mask   = (PAGE_SIZE << bottom_shift) - 1;
-    pfn_hole_mask       = ((1UL << hole_shift) - 1) << bottom_shift;
-    pfn_top_mask        = ~(pfn_pdx_bottom_mask | pfn_hole_mask);
-    ma_top_mask         = pfn_top_mask << PAGE_SHIFT;
 }
 
 /*

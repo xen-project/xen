@@ -59,6 +59,7 @@ CFLAGS-$(HAS_PASSTHROUGH) += -DHAS_PASSTHROUGH
 CFLAGS-$(HAS_DEVICE_TREE) += -DHAS_DEVICE_TREE
 CFLAGS-$(HAS_PCI)       += -DHAS_PCI
 CFLAGS-$(HAS_IOPORTS)   += -DHAS_IOPORTS
+CFLAGS-$(HAS_PDX)       += -DHAS_PDX
 CFLAGS-$(frame_pointer) += -fno-omit-frame-pointer -DCONFIG_FRAME_POINTER
 
 ifneq ($(max_phys_cpus),)

@@ -392,16 +392,6 @@ static void __init setup_max_pdx(unsigned long top_page)
     max_page = pdx_to_pfn(max_pdx - 1) + 1;
 }
 
-void set_pdx_range(unsigned long smfn, unsigned long emfn)
-{
-    unsigned long idx, eidx;
-
-    idx = pfn_to_pdx(smfn) / PDX_GROUP_COUNT;
-    eidx = (pfn_to_pdx(emfn - 1) + PDX_GROUP_COUNT) / PDX_GROUP_COUNT;
-    for ( ; idx < eidx; ++idx )
-        __set_bit(idx, pdx_group_valid);
-}
-
 /* A temporary copy of the e820 map that we can mess with during bootstrap. */
 static struct e820map __initdata boot_e820;
 

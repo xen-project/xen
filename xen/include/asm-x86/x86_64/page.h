@@ -35,17 +35,10 @@
 #include <xen/config.h>
 #include <asm/types.h>
 
+#include <xen/pdx.h>
+
 extern unsigned long xen_virt_end;
 
-extern unsigned long max_pdx;
-extern unsigned long pfn_pdx_bottom_mask, ma_va_bottom_mask;
-extern unsigned int pfn_pdx_hole_shift;
-extern unsigned long pfn_hole_mask;
-extern unsigned long pfn_top_mask, ma_top_mask;
-extern void pfn_pdx_hole_setup(unsigned long);
-
-#define page_to_pdx(pg)  ((pg) - frame_table)
-#define pdx_to_page(pdx) (frame_table + (pdx))
 #define spage_to_pdx(spg) (((spg) - spage_table)<<(SUPERPAGE_SHIFT-PAGE_SHIFT))
 #define pdx_to_spage(pdx) (spage_table + ((pdx)>>(SUPERPAGE_SHIFT-PAGE_SHIFT)))
 /*
@@ -56,20 +49,6 @@ extern void pfn_pdx_hole_setup(unsigned long);
                           PAGE_SHIFT)
 #define pdx_to_virt(pdx) ((void *)(DIRECTMAP_VIRT_START + \
                                    ((unsigned long)(pdx) << PAGE_SHIFT)))
-
-extern int __mfn_valid(unsigned long mfn);
-
-static inline unsigned long pfn_to_pdx(unsigned long pfn)
-{
-    return (pfn & pfn_pdx_bottom_mask) |
-           ((pfn & pfn_top_mask) >> pfn_pdx_hole_shift);
-}
-
-static inline unsigned long pdx_to_pfn(unsigned long pdx)
-{
-    return (pdx & pfn_pdx_bottom_mask) |
-           ((pdx << pfn_pdx_hole_shift) & pfn_top_mask);
-}
 
 static inline unsigned long pfn_to_sdx(unsigned long pfn)
 {
