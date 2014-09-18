@@ -20,7 +20,7 @@ struct p2m_domain {
     struct page_list_head pages;
 
     /* Root of p2m page tables, 2 contiguous pages */
-    struct page_info *first_level;
+    struct page_info *root;
 
     /* Current VMID in use */
     uint8_t vmid;

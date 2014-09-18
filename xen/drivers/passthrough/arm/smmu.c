@@ -937,7 +937,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain_cfg *cfg)
     paddr_t p2maddr;
 
     ASSERT(cfg->domain != NULL);
-    p2maddr = page_to_maddr(cfg->domain->arch.p2m.first_level);
+    p2maddr = page_to_maddr(cfg->domain->arch.p2m.root);
 
     gr1_base = SMMU_GR1(smmu);
     cb_base = SMMU_CB_BASE(smmu) + SMMU_CB(smmu, cfg->cbndx);

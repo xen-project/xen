@@ -12,8 +12,8 @@
 #include <asm/page.h>
 
 /* First level P2M is 2 consecutive pages */
-#define P2M_FIRST_ORDER 1
-#define P2M_FIRST_ENTRIES (LPAE_ENTRIES<<P2M_FIRST_ORDER)
+#define P2M_ROOT_ORDER 1
+#define P2M_ROOT_ENTRIES (LPAE_ENTRIES<<P2M_ROOT_ORDER)
 
 static bool_t p2m_valid(lpae_t pte)
 {
@@ -65,9 +65,9 @@ void dump_p2m_lookup(struct domain *d, paddr_t addr)
     }
 
     printk("P2M @ %p mfn:0x%lx\n",
-           p2m->first_level, page_to_mfn(p2m->first_level));
+           p2m->root, page_to_mfn(p2m->root));
 
-    first = __map_domain_page(p2m->first_level);
+    first = __map_domain_page(p2m->root);
     dump_pt_walk(first, addr);
     unmap_domain_page(first);
 }
@@ -141,10 +141,10 @@ static lpae_t *p2m_map_first(struct p2m_domain *p2m, paddr_t addr)
 {
     struct page_info *page;
 
-    if ( first_linear_offset(addr) >= P2M_FIRST_ENTRIES )
+    if ( first_linear_offset(addr) >= P2M_ROOT_ENTRIES )
         return NULL;
 
-    page = p2m->first_level + p2m_first_level_index(addr);
+    page = p2m->root + p2m_first_level_index(addr);
 
     return __map_domain_page(page);
 }
@@ -958,7 +958,7 @@ int p2m_alloc_table(struct domain *d)
     struct p2m_domain *p2m = &d->arch.p2m;
     struct page_info *page;
 
-    page = alloc_domheap_pages(NULL, P2M_FIRST_ORDER, 0);
+    page = alloc_domheap_pages(NULL, P2M_ROOT_ORDER, 0);
     if ( page == NULL )
         return -ENOMEM;
 
@@ -968,9 +968,9 @@ int p2m_alloc_table(struct domain *d)
     clear_and_clean_page(page);
     clear_and_clean_page(page + 1);
 
-    p2m->first_level = page;
+    p2m->root = page;
 
-    d->arch.vttbr = page_to_maddr(p2m->first_level)
+    d->arch.vttbr = page_to_maddr(p2m->root)
         | ((uint64_t)p2m->vmid&0xff)<<48;
 
     /* Make sure that all TLBs corresponding to the new VMID are flushed
@@ -1047,9 +1047,9 @@ void p2m_teardown(struct domain *d)
     while ( (pg = page_list_remove_head(&p2m->pages)) )
         free_domheap_page(pg);
 
-    free_domheap_pages(p2m->first_level, P2M_FIRST_ORDER);
+    free_domheap_pages(p2m->root, P2M_ROOT_ORDER);
 
-    p2m->first_level = NULL;
+    p2m->root = NULL;
 
     p2m_free_vmid(d);
 
@@ -1073,7 +1073,7 @@ int p2m_init(struct domain *d)
 
     d->arch.vttbr = 0;
 
-    p2m->first_level = NULL;
+    p2m->root = NULL;
 
     p2m->max_mapped_gfn = 0;
     p2m->lowest_mapped_gfn = ULONG_MAX;
