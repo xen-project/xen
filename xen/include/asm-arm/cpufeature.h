@@ -27,7 +27,11 @@
 #define cpu_has_jazelle   (boot_cpu_feature32(jazelle) >= 0)
 #define cpu_has_thumbee   (boot_cpu_feature32(thumbee) == 1)
 
+#ifdef CONFIG_ARM_32
 #define cpu_has_gentimer  (boot_cpu_feature32(gentimer) == 1)
+#else
+#define cpu_has_gentimer  (1)
+#endif
 #define cpu_has_security  (boot_cpu_feature32(security) > 0)
 
 #endif
