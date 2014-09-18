@@ -321,17 +321,16 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         vmcb_set_h_cr3(vmcb, pagetable_get_paddr(p2m_get_pagetable(p2m)));
     }
 
-    if ( c->pending_valid ) 
+    if ( c->pending_valid &&
+         hvm_event_needs_reinjection(c->pending_type, c->pending_vector) )
     {
         gdprintk(XENLOG_INFO, "Re-injecting %#"PRIx32", %#"PRIx32"\n",
                  c->pending_event, c->error_code);
-
-        if ( hvm_event_needs_reinjection(c->pending_type, c->pending_vector) )
-        {
-            vmcb->eventinj.bytes = c->pending_event;
-            vmcb->eventinj.fields.errorcode = c->error_code;
-        }
+        vmcb->eventinj.bytes = c->pending_event;
+        vmcb->eventinj.fields.errorcode = c->error_code;
     }
+    else
+        vmcb->eventinj.bytes = 0;
 
     vmcb->cleanbits.bytes = 0;
     paging_update_paging_modes(v);

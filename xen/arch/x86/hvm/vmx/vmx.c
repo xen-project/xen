@@ -510,23 +510,22 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     __vmwrite(GUEST_DR7, c->dr7);
 
-    vmx_vmcs_exit(v);
-
-    paging_update_paging_modes(v);
-
-    if ( c->pending_valid )
+    if ( c->pending_valid &&
+         hvm_event_needs_reinjection(c->pending_type, c->pending_vector) )
     {
         gdprintk(XENLOG_INFO, "Re-injecting %#"PRIx32", %#"PRIx32"\n",
                  c->pending_event, c->error_code);
-
-        if ( hvm_event_needs_reinjection(c->pending_type, c->pending_vector) )
-        {
-            vmx_vmcs_enter(v);
-            __vmwrite(VM_ENTRY_INTR_INFO, c->pending_event);
-            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, c->error_code);
-            vmx_vmcs_exit(v);
-        }
+        __vmwrite(VM_ENTRY_INTR_INFO, c->pending_event);
+        __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, c->error_code);
     }
+    else
+    {
+        __vmwrite(VM_ENTRY_INTR_INFO, 0);
+        __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, 0);
+    }
+    vmx_vmcs_exit(v);
+
+    paging_update_paging_modes(v);
 
     return 0;
 }
