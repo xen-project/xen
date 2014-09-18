@@ -1327,6 +1327,61 @@ void p2m_mem_paging_resume(struct domain *d)
     }
 }
 
+static void p2m_mem_event_fill_regs(mem_event_request_t *req)
+{
+    const struct cpu_user_regs *regs = guest_cpu_user_regs();
+    struct segment_register seg;
+    struct hvm_hw_cpu ctxt;
+    struct vcpu *curr = current;
+
+    /* Architecture-specific vmcs/vmcb bits */
+    hvm_funcs.save_cpu_ctxt(curr, &ctxt);
+
+    req->x86_regs.rax = regs->eax;
+    req->x86_regs.rcx = regs->ecx;
+    req->x86_regs.rdx = regs->edx;
+    req->x86_regs.rbx = regs->ebx;
+    req->x86_regs.rsp = regs->esp;
+    req->x86_regs.rbp = regs->ebp;
+    req->x86_regs.rsi = regs->esi;
+    req->x86_regs.rdi = regs->edi;
+
+    req->x86_regs.r8  = regs->r8;
+    req->x86_regs.r9  = regs->r9;
+    req->x86_regs.r10 = regs->r10;
+    req->x86_regs.r11 = regs->r11;
+    req->x86_regs.r12 = regs->r12;
+    req->x86_regs.r13 = regs->r13;
+    req->x86_regs.r14 = regs->r14;
+    req->x86_regs.r15 = regs->r15;
+
+    req->x86_regs.rflags = regs->eflags;
+    req->x86_regs.rip    = regs->eip;
+
+    req->x86_regs.dr7 = curr->arch.debugreg[7];
+    req->x86_regs.cr0 = ctxt.cr0;
+    req->x86_regs.cr2 = ctxt.cr2;
+    req->x86_regs.cr3 = ctxt.cr3;
+    req->x86_regs.cr4 = ctxt.cr4;
+
+    req->x86_regs.sysenter_cs = ctxt.sysenter_cs;
+    req->x86_regs.sysenter_esp = ctxt.sysenter_esp;
+    req->x86_regs.sysenter_eip = ctxt.sysenter_eip;
+
+    req->x86_regs.msr_efer = ctxt.msr_efer;
+    req->x86_regs.msr_star = ctxt.msr_star;
+    req->x86_regs.msr_lstar = ctxt.msr_lstar;
+
+    hvm_get_segment_register(curr, x86_seg_fs, &seg);
+    req->x86_regs.fs_base = seg.base;
+
+    hvm_get_segment_register(curr, x86_seg_gs, &seg);
+    req->x86_regs.gs_base = seg.base;
+
+    hvm_get_segment_register(curr, x86_seg_cs, &seg);
+    req->x86_regs.cs_arbytes = seg.attr.bytes;
+}
+
 bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                             struct npfec npfec,
                             mem_event_request_t **req_ptr)
@@ -1417,6 +1472,8 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
         req->access_w = npfec.write_access;
         req->access_x = npfec.insn_fetch;
         req->vcpu_id = v->vcpu_id;
+
+        p2m_mem_event_fill_regs(req);
     }
 
     /* Pause the current VCPU */

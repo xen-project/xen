@@ -6149,6 +6149,38 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
     return rc;
 }
 
+static void hvm_mem_event_fill_regs(mem_event_request_t *req)
+{
+    const struct cpu_user_regs *regs = guest_cpu_user_regs();
+    const struct vcpu *curr = current;
+
+    req->x86_regs.rax = regs->eax;
+    req->x86_regs.rcx = regs->ecx;
+    req->x86_regs.rdx = regs->edx;
+    req->x86_regs.rbx = regs->ebx;
+    req->x86_regs.rsp = regs->esp;
+    req->x86_regs.rbp = regs->ebp;
+    req->x86_regs.rsi = regs->esi;
+    req->x86_regs.rdi = regs->edi;
+
+    req->x86_regs.r8  = regs->r8;
+    req->x86_regs.r9  = regs->r9;
+    req->x86_regs.r10 = regs->r10;
+    req->x86_regs.r11 = regs->r11;
+    req->x86_regs.r12 = regs->r12;
+    req->x86_regs.r13 = regs->r13;
+    req->x86_regs.r14 = regs->r14;
+    req->x86_regs.r15 = regs->r15;
+
+    req->x86_regs.rflags = regs->eflags;
+    req->x86_regs.rip    = regs->eip;
+
+    req->x86_regs.msr_efer = curr->arch.hvm_vcpu.guest_efer;
+    req->x86_regs.cr0 = curr->arch.hvm_vcpu.guest_cr[0];
+    req->x86_regs.cr3 = curr->arch.hvm_vcpu.guest_cr[3];
+    req->x86_regs.cr4 = curr->arch.hvm_vcpu.guest_cr[4];
+}
+
 static int hvm_memory_event_traps(long p, uint32_t reason,
                                   unsigned long value, unsigned long old, 
                                   bool_t gla_valid, unsigned long gla) 
@@ -6193,6 +6225,7 @@ static int hvm_memory_event_traps(long p, uint32_t reason,
         req.gla = old;
     }
     
+    hvm_mem_event_fill_regs(&req);
     mem_event_put_request(d, &d->mem_event->access, &req);
     
     return 1;

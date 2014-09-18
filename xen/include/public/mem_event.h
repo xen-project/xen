@@ -48,6 +48,44 @@
 #define MEM_EVENT_REASON_MSR         7    /* MSR was hit: gfn is MSR value, gla is MSR address;
                                              does NOT honour HVMPME_onchangeonly */
 
+/* Using a custom struct (not hvm_hw_cpu) so as to not fill
+ * the mem_event ring buffer too quickly. */
+struct mem_event_regs_x86 {
+    uint64_t rax;
+    uint64_t rcx;
+    uint64_t rdx;
+    uint64_t rbx;
+    uint64_t rsp;
+    uint64_t rbp;
+    uint64_t rsi;
+    uint64_t rdi;
+    uint64_t r8;
+    uint64_t r9;
+    uint64_t r10;
+    uint64_t r11;
+    uint64_t r12;
+    uint64_t r13;
+    uint64_t r14;
+    uint64_t r15;
+    uint64_t rflags;
+    uint64_t dr7;
+    uint64_t rip;
+    uint64_t cr0;
+    uint64_t cr2;
+    uint64_t cr3;
+    uint64_t cr4;
+    uint64_t sysenter_cs;
+    uint64_t sysenter_esp;
+    uint64_t sysenter_eip;
+    uint64_t msr_efer;
+    uint64_t msr_star;
+    uint64_t msr_lstar;
+    uint64_t fs_base;
+    uint64_t gs_base;
+    uint32_t cs_arbytes;
+    uint32_t _pad;
+};
+
 typedef struct mem_event_st {
     uint32_t flags;
     uint32_t vcpu_id;
@@ -67,6 +105,7 @@ typedef struct mem_event_st {
     uint16_t available:10;
 
     uint16_t reason;
+    struct mem_event_regs_x86 x86_regs;
 } mem_event_request_t, mem_event_response_t;
 
 DEFINE_RING_TYPES(mem_event, mem_event_request_t, mem_event_response_t);
