@@ -1138,8 +1138,17 @@ err:
     return page;
 }
 
-void __cpuinit setup_virt_paging(void)
+static void __init setup_virt_paging_one(void *data)
 {
+    unsigned long val = (unsigned long)data;
+    WRITE_SYSREG32(val, VTCR_EL2);
+    isb();
+}
+
+void __init setup_virt_paging(void)
+{
+    unsigned long val;
+
     /* Setup Stage 2 address translation */
     /* SH0=11 (Inner-shareable)
      * ORGN0=IRGN0=01 (Normal memory, Write-Back Write-Allocate Cacheable)
@@ -1149,11 +1158,12 @@ void __cpuinit setup_virt_paging(void)
      *        PS=010 == 40 bits
      */
 #ifdef CONFIG_ARM_32
-    WRITE_SYSREG32(0x80003558, VTCR_EL2);
+    val = 0x80003558;
 #else
-    WRITE_SYSREG32(0x80023558, VTCR_EL2);
+    val = 0x80023558;
 #endif
-    isb();
+    setup_virt_paging_one((void *)val);
+    smp_call_function(setup_virt_paging_one, (void *)val, 1);
 }
 
 /*

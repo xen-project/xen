@@ -789,8 +789,6 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     gic_init();
 
-    setup_virt_paging();
-
     p2m_vmid_allocator_init();
 
     softirq_init();
@@ -836,6 +834,8 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     /* TODO: smp_cpus_done(); */
+
+    setup_virt_paging();
 
     do_initcalls();
 
