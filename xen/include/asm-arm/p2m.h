@@ -19,7 +19,7 @@ struct p2m_domain {
     /* Pages used to construct the p2m */
     struct page_list_head pages;
 
-    /* Root of p2m page tables, 2 contiguous pages */
+    /* The root of the p2m tree. May be concatenated */
     struct page_info *root;
 
     /* Current VMID in use */

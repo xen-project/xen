@@ -11,10 +11,17 @@
 #include <asm/hardirq.h>
 #include <asm/page.h>
 
-#define P2M_ROOT_LEVEL       1
+#ifdef CONFIG_ARM_64
+static unsigned int __read_mostly p2m_root_order;
+static unsigned int __read_mostly p2m_root_level;
+#define P2M_ROOT_ORDER    p2m_root_order
+#define P2M_ROOT_LEVEL p2m_root_level
+#else
+/* First level P2M is alway 2 consecutive pages */
+#define P2M_ROOT_LEVEL 1
+#define P2M_ROOT_ORDER    1
+#endif
 
-/* First level P2M is 2 consecutive pages */
-#define P2M_ROOT_ORDER 1
 #define P2M_ROOT_PAGES    (1<<P2M_ROOT_ORDER)
 
 static bool_t p2m_valid(lpae_t pte)
@@ -167,6 +174,8 @@ paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
     spin_lock(&p2m->lock);
 
     map = __map_domain_page(p2m->root + root_table);
+
+    ASSERT(P2M_ROOT_LEVEL < 4);
 
     for ( level = P2M_ROOT_LEVEL ; level < 4 ; level++ )
     {
@@ -952,6 +961,7 @@ int p2m_alloc_table(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
     struct page_info *page;
+    unsigned int i;
 
     page = alloc_domheap_pages(NULL, P2M_ROOT_ORDER, 0);
     if ( page == NULL )
@@ -960,8 +970,8 @@ int p2m_alloc_table(struct domain *d)
     spin_lock(&p2m->lock);
 
     /* Clear both first level pages */
-    clear_and_clean_page(page);
-    clear_and_clean_page(page + 1);
+    for ( i = 0; i < P2M_ROOT_PAGES; i++ )
+        clear_and_clean_page(page + i);
 
     p2m->root = page;
 
@@ -1147,21 +1157,61 @@ static void __init setup_virt_paging_one(void *data)
 
 void __init setup_virt_paging(void)
 {
-    unsigned long val;
-
     /* Setup Stage 2 address translation */
-    /* SH0=11 (Inner-shareable)
-     * ORGN0=IRGN0=01 (Normal memory, Write-Back Write-Allocate Cacheable)
-     * SL0=01 (Level-1)
-     * ARVv7: T0SZ=(1)1000 = -8 (32-(-8) = 40 bit physical addresses)
-     * ARMv8: T0SZ=01 1000 = 24 (64-24   = 40 bit physical addresses)
-     *        PS=010 == 40 bits
-     */
+    unsigned long val = VTCR_RES1|VTCR_SH0_IS|VTCR_ORGN0_WBWA|VTCR_IRGN0_WBWA;
+
 #ifdef CONFIG_ARM_32
-    val = 0x80003558;
-#else
-    val = 0x80023558;
+    printk("P2M: 40-bit IPA\n");
+    val |= VTCR_T0SZ(0x18); /* 40 bit IPA */
+#else /* CONFIG_ARM_64 */
+    const struct {
+        unsigned int pabits; /* Physical Address Size */
+        unsigned int t0sz;   /* Desired T0SZ, minimum in comment */
+        unsigned int root_order; /* Page order of the root of the p2m */
+        unsigned int sl0;    /* Desired SL0, maximum in comment */
+    } pa_range_info[] = {
+        /* T0SZ minimum and SL0 maximum from ARM DDI 0487A.b Table D4-5 */
+        /*      PA size, t0sz(min), root-order, sl0(max) */
+        [0] = { 32,      32/*32*/,  0,          1 },
+        [1] = { 36,      28/*28*/,  0,          1 },
+        [2] = { 40,      24/*24*/,  1,          1 },
+        [3] = { 42,      24/*22*/,  1,          1 },
+        [4] = { 44,      20/*20*/,  0,          2 },
+        [5] = { 48,      16/*16*/,  0,          2 },
+        [6] = { 0 }, /* Invalid */
+        [7] = { 0 }  /* Invalid */
+    };
+
+    unsigned int cpu;
+    unsigned int pa_range = 0x10; /* Larger than any possible value */
+
+    for_each_online_cpu ( cpu )
+    {
+        const struct cpuinfo_arm *info = &cpu_data[cpu];
+        if ( info->mm64.pa_range < pa_range )
+            pa_range = info->mm64.pa_range;
+    }
+
+    /* pa_range is 4 bits, but the defined encodings are only 3 bits */
+    if ( pa_range&0x8 || !pa_range_info[pa_range].pabits )
+        panic("Unknown encoding of ID_AA64MMFR0_EL1.PARange %x\n", pa_range);
+
+    val |= VTCR_PS(pa_range);
+    val |= VTCR_TG0_4K;
+    val |= VTCR_SL0(pa_range_info[pa_range].sl0);
+    val |= VTCR_T0SZ(pa_range_info[pa_range].t0sz);
+
+    p2m_root_order = pa_range_info[pa_range].root_order;
+    p2m_root_level = 2 - pa_range_info[pa_range].sl0;
+
+    printk("P2M: %d-bit IPA with %d-bit PA\n",
+           64 - pa_range_info[pa_range].t0sz,
+           pa_range_info[pa_range].pabits);
 #endif
+    printk("P2M: %d levels with order-%d root, VTCR 0x%lx\n",
+           4 - P2M_ROOT_LEVEL, P2M_ROOT_ORDER, val);
+    /* It is not allowed to concatenate a level zero root */
+    BUG_ON( P2M_ROOT_LEVEL == 0 && P2M_ROOT_ORDER > 0 );
     setup_virt_paging_one((void *)val);
     smp_call_function(setup_virt_paging_one, (void *)val, 1);
 }
