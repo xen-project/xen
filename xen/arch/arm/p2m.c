@@ -153,55 +153,76 @@ static lpae_t *p2m_map_first(struct p2m_domain *p2m, paddr_t addr)
 paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
-    lpae_t pte, *first = NULL, *second = NULL, *third = NULL;
+    const unsigned int offsets[4] = {
+        zeroeth_table_offset(paddr),
+        first_table_offset(paddr),
+        second_table_offset(paddr),
+        third_table_offset(paddr)
+    };
+    const paddr_t masks[4] = {
+        ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK
+    };
+    lpae_t pte, *map;
     paddr_t maddr = INVALID_PADDR;
-    paddr_t mask;
+    paddr_t mask = 0;
     p2m_type_t _t;
+    unsigned int level, root_table;
+
+    BUILD_BUG_ON(THIRD_MASK != PAGE_MASK);
 
     /* Allow t to be NULL */
     t = t ?: &_t;
 
     *t = p2m_invalid;
 
+    if ( P2M_ROOT_PAGES > 1 )
+    {
+        /*
+         * Concatenated root-level tables. The table number will be
+         * the offset at the previous level. It is not possible to
+         * concatenate a level-0 root.
+         */
+        ASSERT(P2M_ROOT_LEVEL > 0);
+        root_table = offsets[P2M_ROOT_LEVEL - 1];
+        if ( root_table >= P2M_ROOT_PAGES )
+            goto err;
+    }
+    else
+        root_table = 0;
+
     spin_lock(&p2m->lock);
 
-    first = p2m_map_first(p2m, paddr);
-    if ( !first )
-        goto err;
+    map = __map_domain_page(p2m->root + root_table);
 
-    mask = FIRST_MASK;
-    pte = first[first_table_offset(paddr)];
-    if ( !p2m_table(pte) )
-        goto done;
+    for ( level = P2M_ROOT_LEVEL ; level < 4 ; level++ )
+    {
+        mask = masks[level];
 
-    mask = SECOND_MASK;
-    second = map_domain_page(pte.p2m.base);
-    pte = second[second_table_offset(paddr)];
-    if ( !p2m_table(pte) )
-        goto done;
+        pte = map[offsets[level]];
 
-    mask = THIRD_MASK;
+        if ( level == 3 && !p2m_table(pte) )
+            /* Invalid, clobber the pte */
+            pte.bits = 0;
+        if ( level == 3 || !p2m_table(pte) )
+            /* Done */
+            break;
 
-    BUILD_BUG_ON(THIRD_MASK != PAGE_MASK);
+        ASSERT(level < 3);
 
-    third = map_domain_page(pte.p2m.base);
-    pte = third[third_table_offset(paddr)];
+        /* Map for next level */
+        unmap_domain_page(map);
+        map = map_domain_page(pte.p2m.base);
+    }
 
-    /* This bit must be one in the level 3 entry */
-    if ( !p2m_table(pte) )
-        pte.bits = 0;
+    unmap_domain_page(map);
 
-done:
     if ( p2m_valid(pte) )
     {
+        ASSERT(mask);
         ASSERT(pte.p2m.type != p2m_invalid);
         maddr = (pte.bits & PADDR_MASK & mask) | (paddr & ~mask);
         *t = pte.p2m.type;
     }
-
-    if (third) unmap_domain_page(third);
-    if (second) unmap_domain_page(second);
-    if (first) unmap_domain_page(first);
 
 err:
     spin_unlock(&p2m->lock);
