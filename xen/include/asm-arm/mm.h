@@ -155,8 +155,6 @@ extern void remove_early_mappings(void);
 extern int __cpuinit init_secondary_pagetables(int cpu);
 /* Switch secondary CPUS to its own pagetables and finalise MMU setup */
 extern void __cpuinit mmu_init_secondary_cpu(void);
-/* Second stage paging setup, to be called on all CPUs */
-extern void __cpuinit setup_virt_paging(void);
 /* Set up the xenheap: up to 1GB of contiguous, always-mapped memory.
  * Base must be 32MB aligned and size a multiple of 32MB. */
 extern void setup_xenheap_mappings(unsigned long base_mfn, unsigned long nr_mfns);

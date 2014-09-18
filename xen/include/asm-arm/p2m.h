@@ -72,6 +72,9 @@ typedef enum {
 /* Initialise vmid allocator */
 void p2m_vmid_allocator_init(void);
 
+/* Second stage paging setup, to be called on all CPUs */
+void __cpuinit setup_virt_paging(void);
+
 /* Init the datastructures for later use by the p2m code */
 int p2m_init(struct domain *d);
 

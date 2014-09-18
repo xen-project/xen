@@ -411,24 +411,6 @@ void __init arch_init_memory(void)
     BUG_ON(IS_ERR(dom_cow));
 }
 
-void __cpuinit setup_virt_paging(void)
-{
-    /* Setup Stage 2 address translation */
-    /* SH0=11 (Inner-shareable)
-     * ORGN0=IRGN0=01 (Normal memory, Write-Back Write-Allocate Cacheable)
-     * SL0=01 (Level-1)
-     * ARVv7: T0SZ=(1)1000 = -8 (32-(-8) = 40 bit physical addresses)
-     * ARMv8: T0SZ=01 1000 = 24 (64-24   = 40 bit physical addresses)
-     *        PS=010 == 40 bits
-     */
-#ifdef CONFIG_ARM_32
-    WRITE_SYSREG32(0x80003558, VTCR_EL2);
-#else
-    WRITE_SYSREG32(0x80023558, VTCR_EL2);
-#endif
-    isb();
-}
-
 static inline lpae_t pte_of_xenaddr(vaddr_t va)
 {
     paddr_t ma = va + phys_offset;
