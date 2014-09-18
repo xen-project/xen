@@ -459,6 +459,17 @@ struct arch_vcpu
 
     /* A secondary copy of the vcpu time info. */
     XEN_GUEST_HANDLE(vcpu_time_info_t) time_info_guest;
+
+    /*
+     * Should we emulate the next matching instruction on VCPU resume
+     * after a mem_event?
+     */
+    struct {
+        uint32_t emulate_flags;
+        unsigned long gpa;
+        unsigned long eip;
+    } mem_event;
+
 } __cacheline_aligned;
 
 smap_check_policy_t smap_policy_change(struct vcpu *v,

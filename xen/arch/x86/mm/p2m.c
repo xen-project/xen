@@ -1395,6 +1395,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     p2m_access_t p2ma;
     mem_event_request_t *req;
     int rc;
+    unsigned long eip = guest_cpu_user_regs()->eip;
 
     /* First, handle rx2rw conversion automatically.
      * These calls to p2m->set_entry() must succeed: we have the gfn
@@ -1446,6 +1447,30 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
             gfn_unlock(p2m, gfn, 0);
             return 1;
         }
+    }
+
+    /* The previous mem_event reply does not match the current state. */
+    if ( v->arch.mem_event.gpa != gpa || v->arch.mem_event.eip != eip )
+    {
+        /* Don't emulate the current instruction, send a new mem_event. */
+        v->arch.mem_event.emulate_flags = 0;
+
+        /*
+         * Make sure to mark the current state to match it again against
+         * the new mem_event about to be sent.
+         */
+        v->arch.mem_event.gpa = gpa;
+        v->arch.mem_event.eip = eip;
+    }
+
+    if ( v->arch.mem_event.emulate_flags )
+    {
+        hvm_mem_event_emulate_one((v->arch.mem_event.emulate_flags &
+                                   MEM_EVENT_FLAG_EMULATE_NOWRITE) != 0,
+                                  TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+
+        v->arch.mem_event.emulate_flags = 0;
+        return 1;
     }
 
     *req_ptr = NULL;
@@ -1501,6 +1526,56 @@ void p2m_mem_access_resume(struct domain *d)
             continue;
 
         v = d->vcpu[rsp.vcpu_id];
+
+        /* Mark vcpu for skipping one instruction upon rescheduling. */
+        if ( rsp.flags & MEM_EVENT_FLAG_EMULATE )
+        {
+            xenmem_access_t access;
+            bool_t violation = 1;
+
+            if ( p2m_get_mem_access(d, rsp.gfn, &access) == 0 )
+            {
+                switch ( access )
+                {
+                case XENMEM_access_n:
+                case XENMEM_access_n2rwx:
+                default:
+                    violation = rsp.access_r || rsp.access_w || rsp.access_x;
+                    break;
+
+                case XENMEM_access_r:
+                    violation = rsp.access_w || rsp.access_x;
+                    break;
+
+                case XENMEM_access_w:
+                    violation = rsp.access_r || rsp.access_x;
+                    break;
+
+                case XENMEM_access_x:
+                    violation = rsp.access_r || rsp.access_w;
+                    break;
+
+                case XENMEM_access_rx:
+                case XENMEM_access_rx2rw:
+                    violation = rsp.access_w;
+                    break;
+
+                case XENMEM_access_wx:
+                    violation = rsp.access_r;
+                    break;
+
+                case XENMEM_access_rw:
+                    violation = rsp.access_x;
+                    break;
+
+                case XENMEM_access_rwx:
+                    violation = 0;
+                    break;
+                }
+            }
+
+            v->arch.mem_event.emulate_flags = violation ? rsp.flags : 0;
+        }
 
         /* Unpause domain */
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )

@@ -415,6 +415,9 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.flags = TF_kernel_mode;
 
+    /* By default, do not emulate */
+    v->arch.mem_event.emulate_flags = 0;
+
     rc = mapcache_vcpu_init(v);
     if ( rc )
         return rc;

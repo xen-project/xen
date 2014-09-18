@@ -31,11 +31,22 @@
 #include "io/ring.h"
 
 /* Memory event flags */
-#define MEM_EVENT_FLAG_VCPU_PAUSED  (1 << 0)
-#define MEM_EVENT_FLAG_DROP_PAGE    (1 << 1)
-#define MEM_EVENT_FLAG_EVICT_FAIL   (1 << 2)
-#define MEM_EVENT_FLAG_FOREIGN      (1 << 3)
-#define MEM_EVENT_FLAG_DUMMY        (1 << 4)
+#define MEM_EVENT_FLAG_VCPU_PAUSED     (1 << 0)
+#define MEM_EVENT_FLAG_DROP_PAGE       (1 << 1)
+#define MEM_EVENT_FLAG_EVICT_FAIL      (1 << 2)
+#define MEM_EVENT_FLAG_FOREIGN         (1 << 3)
+#define MEM_EVENT_FLAG_DUMMY           (1 << 4)
+/*
+ * Emulate the fault-causing instruction (if set in the event response flags).
+ * This will allow the guest to continue execution without lifting the page
+ * access restrictions.
+ */
+#define MEM_EVENT_FLAG_EMULATE         (1 << 5)
+/*
+ * Same as MEM_EVENT_FLAG_EMULATE, but with write operations or operations
+ * potentially having side effects (like memory mapped or port I/O) disabled.
+ */
+#define MEM_EVENT_FLAG_EMULATE_NOWRITE (1 << 6)
 
 /* Reasons for the memory event request */
 #define MEM_EVENT_REASON_UNKNOWN     0    /* typical reason */
