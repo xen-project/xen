@@ -352,7 +352,7 @@ static inline void flush_xen_data_tlb_range_va(unsigned long va,
 void flush_page_to_ram(unsigned long mfn);
 
 /* Print a walk of an arbitrary page table */
-void dump_pt_walk(lpae_t *table, paddr_t addr);
+void dump_pt_walk(lpae_t *table, paddr_t addr, unsigned int root_level);
 
 /* Print a walk of the hypervisor's page tables for a virtual addr. */
 extern void dump_hyp_walk(vaddr_t addr);

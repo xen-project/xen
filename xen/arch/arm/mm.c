@@ -84,10 +84,12 @@ lpae_t boot_third[LPAE_ENTRIES]  __attribute__((__aligned__(4096)));
  */
 
 #ifdef CONFIG_ARM_64
+#define HYP_PT_ROOT_LEVEL 0
 lpae_t xen_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 lpae_t xen_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 #define THIS_CPU_PGTABLE xen_pgtable
 #else
+#define HYP_PT_ROOT_LEVEL 1
 /* Per-CPU pagetable pages */
 /* xen_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
 static DEFINE_PER_CPU(lpae_t *, xen_pgtable);
@@ -165,34 +167,49 @@ static inline void check_memory_layout_alignment_constraints(void) {
 #endif
 }
 
-void dump_pt_walk(lpae_t *first, paddr_t addr)
+void dump_pt_walk(lpae_t *root, paddr_t addr,
+                  unsigned int root_level)
 {
-    lpae_t *second = NULL, *third = NULL;
+    static const char *level_strs[4] = { "0TH", "1ST", "2ND", "3RD" };
+    const unsigned int offsets[4] = {
+        zeroeth_table_offset(addr),
+        first_table_offset(addr),
+        second_table_offset(addr),
+        third_table_offset(addr)
+    };
+    lpae_t pte, *mappings[4] = { 0, };
+    unsigned int level;
 
-    if ( first_table_offset(addr) >= LPAE_ENTRIES )
-        return;
+    BUG_ON(!root);
+#ifdef CONFIG_ARM_32
+    BUG_ON(root_level < 1);
+#endif
+    BUG_ON(root_level > 3);
 
-    printk("1ST[0x%x] = 0x%"PRIpaddr"\n", first_table_offset(addr),
-           first[first_table_offset(addr)].bits);
-    if ( !first[first_table_offset(addr)].walk.valid ||
-         !first[first_table_offset(addr)].walk.table )
-        goto done;
+    mappings[root_level] = root;
 
-    second = map_domain_page(first[first_table_offset(addr)].walk.base);
-    printk("2ND[0x%x] = 0x%"PRIpaddr"\n", second_table_offset(addr),
-           second[second_table_offset(addr)].bits);
-    if ( !second[second_table_offset(addr)].walk.valid ||
-         !second[second_table_offset(addr)].walk.table )
-        goto done;
+    for ( level = root_level; ; level++ )
+    {
+        if ( offsets[level] > LPAE_ENTRIES )
+            break;
 
-    third = map_domain_page(second[second_table_offset(addr)].walk.base);
-    printk("3RD[0x%x] = 0x%"PRIpaddr"\n", third_table_offset(addr),
-           third[third_table_offset(addr)].bits);
+        pte = mappings[level][offsets[level]];
 
-done:
-    if (third) unmap_domain_page(third);
-    if (second) unmap_domain_page(second);
+        printk("%s[0x%x] = 0x%"PRIpaddr"\n",
+               level_strs[level], offsets[level], pte.bits);
 
+        if ( level == 3 || !pte.walk.valid || !pte.walk.table )
+            break;
+
+        mappings[level+1] = map_domain_page(pte.walk.base);
+    }
+
+    /* mappings[root_level] is provided by the caller so don't unmap that */
+    do
+    {
+        unmap_domain_page(mappings[level]);
+    }
+    while ( level-- > root_level );
 }
 
 void dump_hyp_walk(vaddr_t addr)
@@ -208,7 +225,7 @@ void dump_hyp_walk(vaddr_t addr)
         BUG_ON( (lpae_t *)(unsigned long)(ttbr - phys_offset) != pgtable );
     else
         BUG_ON( virt_to_maddr(pgtable) != ttbr );
-    dump_pt_walk(pgtable, addr);
+    dump_pt_walk(pgtable, addr, HYP_PT_ROOT_LEVEL);
 }
 
 /* Map a 4k page in a fixmap entry */

@@ -11,6 +11,8 @@
 #include <asm/hardirq.h>
 #include <asm/page.h>
 
+#define P2M_ROOT_LEVEL       1
+
 /* First level P2M is 2 consecutive pages */
 #define P2M_ROOT_ORDER 1
 #define P2M_ROOT_ENTRIES (LPAE_ENTRIES<<P2M_ROOT_ORDER)
@@ -68,7 +70,7 @@ void dump_p2m_lookup(struct domain *d, paddr_t addr)
            p2m->root, page_to_mfn(p2m->root));
 
     first = __map_domain_page(p2m->root);
-    dump_pt_walk(first, addr);
+    dump_pt_walk(first, addr, P2M_ROOT_LEVEL);
     unmap_domain_page(first);
 }
 
