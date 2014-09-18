@@ -9,4 +9,6 @@
 #define PCI_SERR_SOFTIRQ       (NR_COMMON_SOFTIRQS + 4)
 #define NR_ARCH_SOFTIRQS       5
 
+bool_t arch_skip_send_event_check(unsigned int cpu);
+
 #endif /* __ASM_SOFTIRQ_H__ */

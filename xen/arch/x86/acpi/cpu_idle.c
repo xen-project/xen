@@ -330,6 +330,16 @@ void cpuidle_wakeup_mwait(cpumask_t *mask)
     cpumask_andnot(mask, mask, &target);
 }
 
+bool_t arch_skip_send_event_check(unsigned int cpu)
+{
+    /*
+     * This relies on softirq_pending() and mwait_wakeup() to access data
+     * on the same cache line.
+     */
+    smp_mb();
+    return !!cpumask_test_cpu(cpu, &cpuidle_mwait_flags);
+}
+
 void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
 {
     unsigned int cpu = smp_processor_id();
@@ -349,7 +359,7 @@ void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
      * Timer deadline passing is the event on which we will be woken via
      * cpuidle_mwait_wakeup. So check it now that the location is armed.
      */
-    if ( expires > NOW() || expires == 0 )
+    if ( (expires > NOW() || expires == 0) && !softirq_pending(cpu) )
     {
         cpumask_set_cpu(cpu, &cpuidle_mwait_flags);
         __mwait(eax, ecx);
