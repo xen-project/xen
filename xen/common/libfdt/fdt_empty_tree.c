@@ -1,9 +1,6 @@
-#ifndef _FDT_H
-#define _FDT_H
 /*
  * libfdt - Flat Device Tree manipulation
- * Copyright (C) 2006 David Gibson, IBM Corporation.
- * Copyright 2012 Kim Phillips, Freescale Semiconductor.
+ * Copyright (C) 2012 David Gibson, IBM Corporation.
  *
  * libfdt is dual licensed: you can use it either under the terms of
  * the GPL, or the BSD license, at your option.
@@ -51,61 +48,37 @@
  *     OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "libfdt_env.h"
 
-#ifndef __ASSEMBLY__
+#include <fdt.h>
+#include <libfdt.h>
 
-struct fdt_header {
-	fdt32_t magic;			 /* magic word FDT_MAGIC */
-	fdt32_t totalsize;		 /* total size of DT block */
-	fdt32_t off_dt_struct;		 /* offset to structure */
-	fdt32_t off_dt_strings;		 /* offset to strings */
-	fdt32_t off_mem_rsvmap;		 /* offset to memory reserve map */
-	fdt32_t version;		 /* format version */
-	fdt32_t last_comp_version;	 /* last compatible version */
+#include "libfdt_internal.h"
 
-	/* version 2 fields below */
-	fdt32_t boot_cpuid_phys;	 /* Which physical CPU id we're
-					    booting on */
-	/* version 3 fields below */
-	fdt32_t size_dt_strings;	 /* size of the strings block */
+int fdt_create_empty_tree(void *buf, int bufsize)
+{
+	int err;
 
-	/* version 17 fields below */
-	fdt32_t size_dt_struct;		 /* size of the structure block */
-};
+	err = fdt_create(buf, bufsize);
+	if (err)
+		return err;
 
-struct fdt_reserve_entry {
-	fdt64_t address;
-	fdt64_t size;
-};
+	err = fdt_finish_reservemap(buf);
+	if (err)
+		return err;
 
-struct fdt_node_header {
-	fdt32_t tag;
-	char name[0];
-};
+	err = fdt_begin_node(buf, "");
+	if (err)
+		return err;
 
-struct fdt_property {
-	fdt32_t tag;
-	fdt32_t len;
-	fdt32_t nameoff;
-	char data[0];
-};
+	err =  fdt_end_node(buf);
+	if (err)
+		return err;
 
-#endif /* !__ASSEMBLY */
+	err = fdt_finish(buf);
+	if (err)
+		return err;
 
-#define FDT_MAGIC	0xd00dfeed	/* 4: version, 4: total size */
-#define FDT_TAGSIZE	sizeof(fdt32_t)
+	return fdt_open_into(buf, buf, bufsize);
+}
 
-#define FDT_BEGIN_NODE	0x1		/* Start node: full name */
-#define FDT_END_NODE	0x2		/* End node */
-#define FDT_PROP	0x3		/* Property: name off,
-					   size, content */
-#define FDT_NOP		0x4		/* nop */
-#define FDT_END		0x9
-
-#define FDT_V1_SIZE	(7*sizeof(fdt32_t))
-#define FDT_V2_SIZE	(FDT_V1_SIZE + sizeof(fdt32_t))
-#define FDT_V3_SIZE	(FDT_V2_SIZE + sizeof(fdt32_t))
-#define FDT_V16_SIZE	FDT_V3_SIZE
-#define FDT_V17_SIZE	(FDT_V16_SIZE + sizeof(fdt32_t))
-
-#endif /* _FDT_H */
