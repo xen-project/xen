@@ -100,6 +100,41 @@
 #define HCR_SWIO        (_AC(1,UL)<<1) /* Set/Way Invalidation Override */
 #define HCR_VM          (_AC(1,UL)<<0) /* Virtual MMU Enable */
 
+/* TCR: Stage 1 Translation Control */
+
+#define TCR_T0SZ(x)     ((x)<<0)
+
+#define TCR_IRGN0_NC    (_AC(0x0,UL)<<8)
+#define TCR_IRGN0_WBWA  (_AC(0x1,UL)<<8)
+#define TCR_IRGN0_WT    (_AC(0x2,UL)<<8)
+#define TCR_IRGN0_WB    (_AC(0x3,UL)<<8)
+
+#define TCR_ORGN0_NC    (_AC(0x0,UL)<<10)
+#define TCR_ORGN0_WBWA  (_AC(0x1,UL)<<10)
+#define TCR_ORGN0_WT    (_AC(0x2,UL)<<10)
+#define TCR_ORGN0_WB    (_AC(0x3,UL)<<10)
+
+#define TCR_SH0_NS      (_AC(0x0,UL)<<12)
+#define TCR_SH0_OS      (_AC(0x2,UL)<<12)
+#define TCR_SH0_IS      (_AC(0x3,UL)<<12)
+
+#define TCR_TG0_4K      (_AC(0x0,UL)<<14)
+#define TCR_TG0_64K     (_AC(0x1,UL)<<14)
+#define TCR_TG0_16K     (_AC(0x2,UL)<<14)
+
+#ifdef CONFIG_ARM_64
+
+#define TCR_PS(x)       ((x)<<16)
+#define TCR_TBI         (_AC(0x1,UL)<<20)
+
+#define TCR_RES1        (_AC(1,UL)<<31|_AC(1,UL)<<23)
+
+#else
+
+#define TCR_RES1        (_AC(1,UL)<<31)
+
+#endif
+
 /* HCPTR Hyp. Coprocessor Trap Register */
 #define HCPTR_TTA       ((_AC(1,U)<<20))        /* Trap trace registers */
 #define HCPTR_CP(x)     ((_AC(1,U)<<(x)))       /* Trap Coprocessor x */
@@ -204,8 +239,19 @@ struct cpuinfo_arm {
         uint64_t bits[2];
     } aux64;
 
-    struct {
+    union {
         uint64_t bits[2];
+        struct {
+            unsigned long pa_range:4;
+            unsigned long asid_bits:4;
+            unsigned long bigend:4;
+            unsigned long secure_ns:4;
+            unsigned long bigend_el0:4;
+            unsigned long tgranule_16K:4;
+            unsigned long tgranule_64K:4;
+            unsigned long tgranule_4K:4;
+            unsigned long __res0:32;
+       };
     } mm64;
 
     struct {

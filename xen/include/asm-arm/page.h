@@ -6,7 +6,11 @@
 #include <public/xen.h>
 #include <asm/processor.h>
 
+#ifdef CONFIG_ARM_64
+#define PADDR_BITS              48
+#else
 #define PADDR_BITS              40
+#endif
 #define PADDR_MASK              ((1ULL << PADDR_BITS)-1)
 
 #define VADDR_BITS              32
@@ -114,8 +118,8 @@ typedef struct __packed {
     unsigned long ng:1;         /* Not-Global */
 
     /* The base address must be appropriately aligned for Block entries */
-    unsigned long base:28;      /* Base address of block or next table */
-    unsigned long sbz:12;       /* Must be zero */
+    unsigned long long base:36; /* Base address of block or next table */
+    unsigned long sbz:4;        /* Must be zero */
 
     /* These seven bits are only used in Block entries and are ignored
      * in Table entries. */
@@ -149,8 +153,8 @@ typedef struct __packed {
     unsigned long sbz4:1;
 
     /* The base address must be appropriately aligned for Block entries */
-    unsigned long base:28;      /* Base address of block or next table */
-    unsigned long sbz3:12;
+    unsigned long long base:36; /* Base address of block or next table */
+    unsigned long sbz3:4;
 
     /* These seven bits are only used in Block entries and are ignored
      * in Table entries. */
@@ -174,9 +178,9 @@ typedef struct __packed {
     unsigned long pad2:10;
 
     /* The base address must be appropriately aligned for Block entries */
-    unsigned long base:28;      /* Base address of block or next table */
+    unsigned long long base:36; /* Base address of block or next table */
 
-    unsigned long pad1:24;
+    unsigned long pad1:16;
 } lpae_walk_t;
 
 typedef union {

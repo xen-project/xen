@@ -227,7 +227,7 @@ cpu_init_done:
          * PT walks use Inner-Shareable accesses,
          * PT walks are write-back, write-allocate in both cache levels,
          * Full 32-bit address space goes through this table. */
-        ldr   r0, =0x80003500
+        ldr   r0, =(TCR_RES1|TCR_SH0_IS|TCR_ORGN0_WBWA|TCR_IRGN0_WBWA|TCR_T0SZ(0))
         mcr   CP32(r0, HTCR)
 
         /* Set up the HSCTLR:
