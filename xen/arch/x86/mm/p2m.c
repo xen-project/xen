@@ -1526,7 +1526,7 @@ int p2m_get_mem_access(struct domain *d, unsigned long pfn,
     mfn_t mfn;
 
     static const xenmem_access_t memaccess[] = {
-#define ACCESS(ac) [XENMEM_access_##ac] = XENMEM_access_##ac
+#define ACCESS(ac) [p2m_access_##ac] = XENMEM_access_##ac
             ACCESS(n),
             ACCESS(r),
             ACCESS(w),
