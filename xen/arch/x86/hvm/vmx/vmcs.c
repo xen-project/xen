@@ -39,6 +39,7 @@
 #include <xen/keyhandler.h>
 #include <asm/shadow.h>
 #include <asm/tboot.h>
+#include <asm/mem_event.h>
 
 static bool_t __read_mostly opt_vpid_enabled = 1;
 boolean_param("vpid", opt_vpid_enabled);
@@ -70,6 +71,18 @@ u32 vmx_secondary_exec_control __read_mostly;
 u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 u64 vmx_ept_vpid_cap __read_mostly;
+
+const u32 vmx_introspection_force_enabled_msrs[] = {
+    MSR_IA32_SYSENTER_EIP,
+    MSR_IA32_SYSENTER_ESP,
+    MSR_IA32_SYSENTER_CS,
+    MSR_IA32_MC0_CTL,
+    MSR_STAR,
+    MSR_LSTAR
+};
+
+const unsigned int vmx_introspection_force_enabled_msrs_size =
+    ARRAY_SIZE(vmx_introspection_force_enabled_msrs);
 
 static DEFINE_PER_CPU_READ_MOSTLY(struct vmcs_struct *, vmxon_region);
 static DEFINE_PER_CPU(struct vmcs_struct *, current_vmcs);
@@ -695,10 +708,22 @@ static void vmx_set_host_env(struct vcpu *v)
 void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
 {
     unsigned long *msr_bitmap = v->arch.hvm_vmx.msr_bitmap;
+    struct domain *d = v->domain;
 
     /* VMX MSR bitmap supported? */
     if ( msr_bitmap == NULL )
         return;
+
+    if ( unlikely(d->arch.hvm_domain.introspection_enabled) &&
+         mem_event_check_ring(&d->mem_event->access) )
+    {
+        unsigned int i;
+
+        /* Filter out MSR-s needed for memory introspection */
+        for ( i = 0; i < vmx_introspection_force_enabled_msrs_size; i++ )
+            if ( msr == vmx_introspection_force_enabled_msrs[i] )
+                return;
+    }
 
     /*
      * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals

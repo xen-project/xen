@@ -26,7 +26,15 @@
 
 void *xc_mem_access_enable(xc_interface *xch, domid_t domain_id, uint32_t *port)
 {
-    return xc_mem_event_enable(xch, domain_id, HVM_PARAM_ACCESS_RING_PFN, port);
+    return xc_mem_event_enable(xch, domain_id, HVM_PARAM_ACCESS_RING_PFN,
+                               port, 0);
+}
+
+void *xc_mem_access_enable_introspection(xc_interface *xch, domid_t domain_id,
+                                         uint32_t *port)
+{
+    return xc_mem_event_enable(xch, domain_id, HVM_PARAM_ACCESS_RING_PFN,
+                               port, 1);
 }
 
 int xc_mem_access_disable(xc_interface *xch, domid_t domain_id)

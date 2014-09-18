@@ -57,7 +57,7 @@ int xc_mem_event_memop(xc_interface *xch, domid_t domain_id,
 }
 
 void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
-                          uint32_t *port)
+                          uint32_t *port, int enable_introspection)
 {
     void *ring_page = NULL;
     uint64_t pfn;
@@ -120,7 +120,10 @@ void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
         break;
 
     case HVM_PARAM_ACCESS_RING_PFN:
-        op = XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE;
+        if ( enable_introspection )
+            op = XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE_INTROSPECTION;
+        else
+            op = XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE;
         mode = XEN_DOMCTL_MEM_EVENT_OP_ACCESS;
         break;
 

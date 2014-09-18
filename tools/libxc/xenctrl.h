@@ -2273,6 +2273,8 @@ int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
  * Caller has to unmap this page when done.
  */
 void *xc_mem_access_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
+void *xc_mem_access_enable_introspection(xc_interface *xch, domid_t domain_id,
+                                         uint32_t *port);
 int xc_mem_access_disable(xc_interface *xch, domid_t domain_id);
 int xc_mem_access_resume(xc_interface *xch, domid_t domain_id);
 

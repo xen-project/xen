@@ -381,6 +381,6 @@ int xc_mem_event_memop(xc_interface *xch, domid_t domain_id,
  * param can be HVM_PARAM_PAGING/ACCESS/SHARING_RING_PFN
  */
 void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
-                          uint32_t *port);
+                          uint32_t *port, int enable_introspection);
 
 #endif /* __XC_PRIVATE_H__ */

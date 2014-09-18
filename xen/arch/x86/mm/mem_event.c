@@ -587,6 +587,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         switch( mec->op )
         {
         case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE:
+        case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE_INTROSPECTION:
         {
             rc = -ENODEV;
             /* Only HAP is supported */
@@ -600,13 +601,23 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             rc = mem_event_enable(d, mec, med, _VPF_mem_access, 
                                     HVM_PARAM_ACCESS_RING_PFN,
                                     mem_access_notification);
+
+            if ( mec->op != XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE &&
+                 rc == 0 && hvm_funcs.enable_msr_exit_interception )
+            {
+                d->arch.hvm_domain.introspection_enabled = 1;
+                hvm_funcs.enable_msr_exit_interception(d);
+            }
         }
         break;
 
         case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE:
         {
             if ( med->ring_page )
+            {
                 rc = mem_event_disable(d, med);
+                d->arch.hvm_domain.introspection_enabled = 0;
+            }
         }
         break;
 

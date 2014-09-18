@@ -1682,6 +1682,18 @@ void vmx_hypervisor_cpuid_leaf(uint32_t sub_idx,
         *eax |= XEN_HVM_CPUID_X2APIC_VIRT;
 }
 
+static void vmx_enable_msr_exit_interception(struct domain *d)
+{
+    struct vcpu *v;
+    unsigned int i;
+
+    /* Enable interception for MSRs needed for memory introspection. */
+    for_each_vcpu ( d, v )
+        for ( i = 0; i < vmx_introspection_force_enabled_msrs_size; i++ )
+            vmx_enable_intercept_for_msr(v, vmx_introspection_force_enabled_msrs[i],
+                                         MSR_TYPE_W);
+}
+
 static struct hvm_function_table __initdata vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -1740,6 +1752,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .handle_eoi           = vmx_handle_eoi,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
     .hypervisor_cpuid_leaf = vmx_hypervisor_cpuid_leaf,
+    .enable_msr_exit_interception = vmx_enable_msr_exit_interception,
 };
 
 const struct hvm_function_table * __init start_vmx(void)

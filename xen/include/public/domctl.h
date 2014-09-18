@@ -773,10 +773,11 @@ struct xen_domctl_gdbsx_domstatus {
  * ENODEV - host lacks HAP support (EPT/NPT) or HAP is disabled in guest
  * EBUSY  - guest has or had access enabled, ring buffer still active
  */
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS            2
+#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS                        2
 
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE     0
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE    1
+#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE                 0
+#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE                1
+#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE_INTROSPECTION   2
 
 /*
  * Sharing ENOMEM helper.

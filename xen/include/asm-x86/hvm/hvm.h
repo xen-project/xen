@@ -205,6 +205,8 @@ struct hvm_function_table {
     void (*hypervisor_cpuid_leaf)(uint32_t sub_idx,
                                   uint32_t *eax, uint32_t *ebx,
                                   uint32_t *ecx, uint32_t *edx);
+
+    void (*enable_msr_exit_interception)(struct domain *d);
 };
 
 extern struct hvm_function_table hvm_funcs;
