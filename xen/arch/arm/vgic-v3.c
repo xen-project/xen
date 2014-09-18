@@ -940,7 +940,8 @@ static int vgic_v3_get_irq_priority(struct vcpu *v, unsigned int irq)
     struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
 
     ASSERT(spin_is_locked(&rank->lock));
-    priority = vgic_byte_read(rank->ipriority[(irq%32)/4], 0, irq % 4);
+    priority = vgic_byte_read(rank->ipriority[REG_RANK_INDEX(8,
+                                              irq, DABT_WORD)], 0, irq & 0x3);
 
     return priority;
 }

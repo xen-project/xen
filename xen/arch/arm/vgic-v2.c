@@ -510,7 +510,9 @@ static struct vcpu *vgic_v2_get_target_vcpu(struct vcpu *v, unsigned int irq)
     struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
     ASSERT(spin_is_locked(&rank->lock));
 
-    target = vgic_byte_read(rank->v2.itargets[(irq%32)/4], 0, irq % 4);
+    target = vgic_byte_read(rank->v2.itargets[REG_RANK_INDEX(8,
+                                              irq, DABT_WORD)], 0, irq & 0x3);
+
     /* 1-N SPI should be delivered as pending to all the vcpus in the
      * mask, but here we just return the first vcpu for simplicity and
      * because it would be too slow to do otherwise. */
@@ -526,7 +528,8 @@ static int vgic_v2_get_irq_priority(struct vcpu *v, unsigned int irq)
     struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
 
     ASSERT(spin_is_locked(&rank->lock));
-    priority = vgic_byte_read(rank->ipriority[(irq%32)/4], 0, irq % 4);
+    priority = vgic_byte_read(rank->ipriority[REG_RANK_INDEX(8,
+                                              irq, DABT_WORD)], 0, irq & 0x3);
 
     return priority;
 }
