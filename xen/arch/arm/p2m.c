@@ -15,7 +15,6 @@
 
 /* First level P2M is 2 consecutive pages */
 #define P2M_ROOT_ORDER 1
-#define P2M_ROOT_ENTRIES (LPAE_ENTRIES<<P2M_ROOT_ORDER)
 #define P2M_ROOT_PAGES    (1<<P2M_ROOT_ORDER)
 
 static bool_t p2m_valid(lpae_t pte)
@@ -117,31 +116,6 @@ void flush_tlb_domain(struct domain *d)
 
     if ( d != current->domain )
         p2m_load_VTTBR(current->domain);
-}
-
-static int p2m_first_level_index(paddr_t addr)
-{
-    /*
-     * 1st pages are concatenated so zeroeth offset gives us the
-     * index of the 1st page
-     */
-    return zeroeth_table_offset(addr);
-}
-
-/*
- * Map whichever of the first pages contain addr. The caller should
- * then use first_table_offset as an index.
- */
-static lpae_t *p2m_map_first(struct p2m_domain *p2m, paddr_t addr)
-{
-    struct page_info *page;
-
-    if ( first_linear_offset(addr) >= P2M_ROOT_ENTRIES )
-        return NULL;
-
-    page = p2m->root + p2m_first_level_index(addr);
-
-    return __map_domain_page(page);
 }
 
 /*
@@ -733,13 +707,12 @@ static int apply_p2m_changes(struct domain *d,
 {
     int rc, ret;
     struct p2m_domain *p2m = &d->arch.p2m;
-    lpae_t *first = NULL, *second = NULL, *third = NULL;
+    lpae_t *mappings[4] = { NULL, };
     paddr_t addr, orig_maddr = maddr;
     unsigned int level = 0;
-    unsigned long cur_first_page = ~0,
-                  cur_first_offset = ~0,
-                  cur_second_offset = ~0;
-    unsigned long count = 0;
+    unsigned int cur_root_table = ~0;
+    unsigned int cur_offset[4] = { ~0, };
+    unsigned int count = 0;
     bool_t flush = false;
     bool_t flush_pt;
 
@@ -751,9 +724,21 @@ static int apply_p2m_changes(struct domain *d,
 
     spin_lock(&p2m->lock);
 
+    /* Static mapping. P2M_ROOT_PAGES > 1 are handled below */
+    if ( P2M_ROOT_PAGES == 1 )
+        mappings[P2M_ROOT_LEVEL] = __map_domain_page(p2m->root);
+
     addr = start_gpaddr;
     while ( addr < end_gpaddr )
     {
+        int root_table;
+        const unsigned int offsets[4] = {
+            zeroeth_table_offset(addr),
+            first_table_offset(addr),
+            second_table_offset(addr),
+            third_table_offset(addr)
+        };
+
         /*
          * Arbitrarily, preempt every 512 operations or 8192 nops.
          * 512*P2M_ONE_PROGRESS == 8192*P2M_ONE_PROGRESS_NOP == 0x2000
@@ -773,76 +758,67 @@ static int apply_p2m_changes(struct domain *d,
             count = 0;
         }
 
-        if ( cur_first_page != p2m_first_level_index(addr) )
+        if ( P2M_ROOT_PAGES > 1 )
         {
-            if ( first ) unmap_domain_page(first);
-            first = p2m_map_first(p2m, addr);
-            if ( !first )
+            int i;
+            /*
+             * Concatenated root-level tables. The table number will be the
+             * offset at the previous level. It is not possible to concatenate
+             * a level-0 root.
+             */
+            ASSERT(P2M_ROOT_LEVEL > 0);
+            root_table = offsets[P2M_ROOT_LEVEL - 1];
+            if ( root_table >= P2M_ROOT_PAGES )
             {
                 rc = -EINVAL;
                 goto out;
             }
-            cur_first_page = p2m_first_level_index(addr);
-            /* Any mapping further down is now invalid */
-            cur_first_offset = cur_second_offset = ~0;
+
+            if ( cur_root_table != root_table )
+            {
+                if ( mappings[P2M_ROOT_LEVEL] )
+                    unmap_domain_page(mappings[P2M_ROOT_LEVEL]);
+                mappings[P2M_ROOT_LEVEL] =
+                    __map_domain_page(p2m->root + root_table);
+                cur_root_table = root_table;
+                /* Any mapping further down is now invalid */
+                for ( i = P2M_ROOT_LEVEL; i < 4; i++ )
+                    cur_offset[i] = ~0;
+            }
         }
 
-        /* We only use a 3 level p2m at the moment, so no level 0,
-         * current hardware doesn't support super page mappings at
-         * level 0 anyway */
-
-        level = 1;
-        ret = apply_one_level(d, &first[first_table_offset(addr)],
-                              level, flush_pt, op,
-                              start_gpaddr, end_gpaddr,
-                              &addr, &maddr, &flush,
-                              mattr, t);
-        if ( ret < 0 ) { rc = ret ; goto out; }
-        count += ret;
-        if ( ret != P2M_ONE_DESCEND ) continue;
-
-        BUG_ON(!p2m_valid(first[first_table_offset(addr)]));
-
-        if ( cur_first_offset != first_table_offset(addr) )
+        for ( level = P2M_ROOT_LEVEL; level < 4; level++ )
         {
-            if (second) unmap_domain_page(second);
-            second = map_domain_page(first[first_table_offset(addr)].p2m.base);
-            cur_first_offset = first_table_offset(addr);
-            /* Any mapping further down is now invalid */
-            cur_second_offset = ~0;
+            unsigned offset = offsets[level];
+            lpae_t *entry = &mappings[level][offset];
+
+            ret = apply_one_level(d, entry,
+                                  level, flush_pt, op,
+                                  start_gpaddr, end_gpaddr,
+                                  &addr, &maddr, &flush,
+                                  mattr, t);
+            if ( ret < 0 ) { rc = ret ; goto out; }
+            count += ret;
+            /* L3 had better have done something! We cannot descend any further */
+            BUG_ON(level == 3 && ret == P2M_ONE_DESCEND);
+            if ( ret != P2M_ONE_DESCEND ) break;
+
+            BUG_ON(!p2m_valid(*entry));
+
+            if ( cur_offset[level] != offset )
+            {
+                /* Update mapping for next level */
+                int i;
+                if ( mappings[level+1] )
+                    unmap_domain_page(mappings[level+1]);
+                mappings[level+1] = map_domain_page(entry->p2m.base);
+                cur_offset[level] = offset;
+                /* Any mapping further down is now invalid */
+                for ( i = level+1; i < 4; i++ )
+                    cur_offset[i] = ~0;
+            }
+            /* else: next level already valid */
         }
-        /* else: second already valid */
-
-        level = 2;
-        ret = apply_one_level(d,&second[second_table_offset(addr)],
-                              level, flush_pt, op,
-                              start_gpaddr, end_gpaddr,
-                              &addr, &maddr, &flush,
-                              mattr, t);
-        if ( ret < 0 ) { rc = ret ; goto out; }
-        count += ret;
-        if ( ret != P2M_ONE_DESCEND ) continue;
-
-        BUG_ON(!p2m_valid(second[second_table_offset(addr)]));
-
-        if ( cur_second_offset != second_table_offset(addr) )
-        {
-            /* map third level */
-            if (third) unmap_domain_page(third);
-            third = map_domain_page(second[second_table_offset(addr)].p2m.base);
-            cur_second_offset = second_table_offset(addr);
-        }
-
-        level = 3;
-        ret = apply_one_level(d, &third[third_table_offset(addr)],
-                              level, flush_pt, op,
-                              start_gpaddr, end_gpaddr,
-                              &addr, &maddr, &flush,
-                              mattr, t);
-        if ( ret < 0 ) { rc = ret ; goto out; }
-        /* L3 had better have done something! We cannot descend any further */
-        BUG_ON(ret == P2M_ONE_DESCEND);
-        count += ret;
     }
 
     if ( flush )
@@ -866,9 +842,6 @@ static int apply_p2m_changes(struct domain *d,
     rc = 0;
 
 out:
-    if (third) unmap_domain_page(third);
-    if (second) unmap_domain_page(second);
-    if (first) unmap_domain_page(first);
     if ( rc < 0 && ( op == INSERT || op == ALLOCATE ) &&
          addr != start_gpaddr )
     {
@@ -882,6 +855,12 @@ out:
         apply_p2m_changes(d, REMOVE,
                           start_gpaddr, addr + level_sizes[level], orig_maddr,
                           mattr, p2m_invalid);
+    }
+
+    for ( level = P2M_ROOT_LEVEL; level < 4; level ++ )
+    {
+        if ( mappings[level] )
+            unmap_domain_page(mappings[level]);
     }
 
     spin_unlock(&p2m->lock);
