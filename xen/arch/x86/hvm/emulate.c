@@ -690,6 +690,94 @@ static int hvmemul_write(
     return X86EMUL_OKAY;
 }
 
+static int hvmemul_write_discard(
+    enum x86_segment seg,
+    unsigned long offset,
+    void *p_data,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
+{
+    /* Discarding the write. */
+    return X86EMUL_OKAY;
+}
+
+static int hvmemul_rep_ins_discard(
+    uint16_t src_port,
+    enum x86_segment dst_seg,
+    unsigned long dst_offset,
+    unsigned int bytes_per_rep,
+    unsigned long *reps,
+    struct x86_emulate_ctxt *ctxt)
+{
+    return X86EMUL_OKAY;
+}
+
+static int hvmemul_rep_movs_discard(
+   enum x86_segment src_seg,
+   unsigned long src_offset,
+   enum x86_segment dst_seg,
+   unsigned long dst_offset,
+   unsigned int bytes_per_rep,
+   unsigned long *reps,
+   struct x86_emulate_ctxt *ctxt)
+{
+    return X86EMUL_OKAY;
+}
+
+static int hvmemul_rep_outs_discard(
+    enum x86_segment src_seg,
+    unsigned long src_offset,
+    uint16_t dst_port,
+    unsigned int bytes_per_rep,
+    unsigned long *reps,
+    struct x86_emulate_ctxt *ctxt)
+{
+    return X86EMUL_OKAY;
+}
+
+static int hvmemul_cmpxchg_discard(
+    enum x86_segment seg,
+    unsigned long offset,
+    void *p_old,
+    void *p_new,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
+{
+    return X86EMUL_OKAY;
+}
+
+static int hvmemul_read_io_discard(
+    unsigned int port,
+    unsigned int bytes,
+    unsigned long *val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    return X86EMUL_OKAY;
+}
+
+static int hvmemul_write_io_discard(
+    unsigned int port,
+    unsigned int bytes,
+    unsigned long val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    return X86EMUL_OKAY;
+}
+
+static int hvmemul_write_msr_discard(
+    unsigned long reg,
+    uint64_t val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    return X86EMUL_OKAY;
+}
+
+static int hvmemul_wbinvd_discard(
+    struct x86_emulate_ctxt *ctxt)
+{
+    return X86EMUL_OKAY;
+}
+
 static int hvmemul_cmpxchg(
     enum x86_segment seg,
     unsigned long offset,
@@ -1140,8 +1228,33 @@ static const struct x86_emulate_ops hvm_emulate_ops = {
     .invlpg        = hvmemul_invlpg
 };
 
-int hvm_emulate_one(
-    struct hvm_emulate_ctxt *hvmemul_ctxt)
+static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
+    .read          = hvmemul_read,
+    .insn_fetch    = hvmemul_insn_fetch,
+    .write         = hvmemul_write_discard,
+    .cmpxchg       = hvmemul_cmpxchg_discard,
+    .rep_ins       = hvmemul_rep_ins_discard,
+    .rep_outs      = hvmemul_rep_outs_discard,
+    .rep_movs      = hvmemul_rep_movs_discard,
+    .read_segment  = hvmemul_read_segment,
+    .write_segment = hvmemul_write_segment,
+    .read_io       = hvmemul_read_io_discard,
+    .write_io      = hvmemul_write_io_discard,
+    .read_cr       = hvmemul_read_cr,
+    .write_cr      = hvmemul_write_cr,
+    .read_msr      = hvmemul_read_msr,
+    .write_msr     = hvmemul_write_msr_discard,
+    .wbinvd        = hvmemul_wbinvd_discard,
+    .cpuid         = hvmemul_cpuid,
+    .inject_hw_exception = hvmemul_inject_hw_exception,
+    .inject_sw_interrupt = hvmemul_inject_sw_interrupt,
+    .get_fpu       = hvmemul_get_fpu,
+    .put_fpu       = hvmemul_put_fpu,
+    .invlpg        = hvmemul_invlpg
+};
+
+static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
+    const struct x86_emulate_ops *ops)
 {
     struct cpu_user_regs *regs = hvmemul_ctxt->ctxt.regs;
     struct vcpu *curr = current;
@@ -1193,7 +1306,7 @@ int hvm_emulate_one(
     vio->mmio_retrying = vio->mmio_retry;
     vio->mmio_retry = 0;
 
-    rc = x86_emulate(&hvmemul_ctxt->ctxt, &hvm_emulate_ops);
+    rc = x86_emulate(&hvmemul_ctxt->ctxt, ops);
 
     if ( rc == X86EMUL_OKAY && vio->mmio_retry )
         rc = X86EMUL_RETRY;
@@ -1239,6 +1352,62 @@ int hvm_emulate_one(
     }
 
     return X86EMUL_OKAY;
+}
+
+int hvm_emulate_one(
+    struct hvm_emulate_ctxt *hvmemul_ctxt)
+{
+    return _hvm_emulate_one(hvmemul_ctxt, &hvm_emulate_ops);
+}
+
+int hvm_emulate_one_no_write(
+    struct hvm_emulate_ctxt *hvmemul_ctxt)
+{
+    return _hvm_emulate_one(hvmemul_ctxt, &hvm_emulate_ops_no_write);
+}
+
+void hvm_mem_event_emulate_one(bool_t nowrite, unsigned int trapnr,
+    unsigned int errcode)
+{
+    struct hvm_emulate_ctxt ctx = {{ 0 }};
+    int rc;
+
+    hvm_emulate_prepare(&ctx, guest_cpu_user_regs());
+
+    if ( nowrite )
+        rc = hvm_emulate_one_no_write(&ctx);
+    else
+        rc = hvm_emulate_one(&ctx);
+
+    switch ( rc )
+    {
+    case X86EMUL_RETRY:
+        /*
+         * This function is called when handling an EPT-related mem_event
+         * reply. As such, nothing else needs to be done here, since simply
+         * returning makes the current instruction cause a page fault again,
+         * consistent with X86EMUL_RETRY.
+         */
+        return;
+    case X86EMUL_UNHANDLEABLE:
+        gdprintk(XENLOG_DEBUG, "Emulation failed @ %04x:%lx: "
+               "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+               hvmemul_get_seg_reg(x86_seg_cs, &ctx)->sel,
+               ctx.insn_buf_eip,
+               ctx.insn_buf[0], ctx.insn_buf[1],
+               ctx.insn_buf[2], ctx.insn_buf[3],
+               ctx.insn_buf[4], ctx.insn_buf[5],
+               ctx.insn_buf[6], ctx.insn_buf[7],
+               ctx.insn_buf[8], ctx.insn_buf[9]);
+        hvm_inject_hw_exception(trapnr, errcode);
+        break;
+    case X86EMUL_EXCEPTION:
+        if ( ctx.exn_pending )
+            hvm_inject_hw_exception(ctx.exn_vector, ctx.exn_error_code);
+        break;
+    }
+
+    hvm_emulate_writeback(&ctx);
 }
 
 void hvm_emulate_prepare(
