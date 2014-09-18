@@ -16,6 +16,7 @@
 /* First level P2M is 2 consecutive pages */
 #define P2M_ROOT_ORDER 1
 #define P2M_ROOT_ENTRIES (LPAE_ENTRIES<<P2M_ROOT_ORDER)
+#define P2M_ROOT_PAGES    (1<<P2M_ROOT_ORDER)
 
 static bool_t p2m_valid(lpae_t pte)
 {
@@ -56,22 +57,14 @@ void memory_type_changed(struct domain *d)
 void dump_p2m_lookup(struct domain *d, paddr_t addr)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
-    lpae_t *first;
 
     printk("dom%d IPA 0x%"PRIpaddr"\n", d->domain_id, addr);
-
-    if ( first_linear_offset(addr) > LPAE_ENTRIES )
-    {
-        printk("Cannot dump addresses in second of first level pages...\n");
-        return;
-    }
 
     printk("P2M @ %p mfn:0x%lx\n",
            p2m->root, page_to_mfn(p2m->root));
 
-    first = __map_domain_page(p2m->root);
-    dump_pt_walk(first, addr, P2M_ROOT_LEVEL);
-    unmap_domain_page(first);
+    dump_pt_walk(page_to_maddr(p2m->root), addr,
+                 P2M_ROOT_LEVEL, P2M_ROOT_PAGES);
 }
 
 static void p2m_load_VTTBR(struct domain *d)

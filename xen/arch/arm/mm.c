@@ -167,33 +167,53 @@ static inline void check_memory_layout_alignment_constraints(void) {
 #endif
 }
 
-void dump_pt_walk(lpae_t *root, paddr_t addr,
-                  unsigned int root_level)
+void dump_pt_walk(paddr_t ttbr, paddr_t addr,
+                  unsigned int root_level,
+                  unsigned int nr_root_tables)
 {
     static const char *level_strs[4] = { "0TH", "1ST", "2ND", "3RD" };
+    const unsigned long root_pfn = paddr_to_pfn(ttbr);
     const unsigned int offsets[4] = {
         zeroeth_table_offset(addr),
         first_table_offset(addr),
         second_table_offset(addr),
         third_table_offset(addr)
     };
-    lpae_t pte, *mappings[4] = { 0, };
-    unsigned int level;
+    lpae_t pte, *mapping;
+    unsigned int level, root_table;
 
-    BUG_ON(!root);
 #ifdef CONFIG_ARM_32
     BUG_ON(root_level < 1);
 #endif
     BUG_ON(root_level > 3);
 
-    mappings[root_level] = root;
+    if ( nr_root_tables > 1 )
+    {
+        /*
+         * Concatenated root-level tables. The table number will be
+         * the offset at the previous level. It is not possible to
+         * concatenate a level-0 root.
+         */
+        BUG_ON(root_level == 0);
+        root_table = offsets[root_level - 1];
+        printk("Using concatenated root table %u\n", root_table);
+        if ( root_table >= nr_root_tables )
+        {
+            printk("Invalid root table offset\n");
+            return;
+        }
+    }
+    else
+        root_table = 0;
+
+    mapping = map_domain_page(root_pfn + root_table);
 
     for ( level = root_level; ; level++ )
     {
         if ( offsets[level] > LPAE_ENTRIES )
             break;
 
-        pte = mappings[level][offsets[level]];
+        pte = mapping[offsets[level]];
 
         printk("%s[0x%x] = 0x%"PRIpaddr"\n",
                level_strs[level], offsets[level], pte.bits);
@@ -201,15 +221,12 @@ void dump_pt_walk(lpae_t *root, paddr_t addr,
         if ( level == 3 || !pte.walk.valid || !pte.walk.table )
             break;
 
-        mappings[level+1] = map_domain_page(pte.walk.base);
+        /* For next iteration */
+        unmap_domain_page(mapping);
+        mapping = map_domain_page(pte.walk.base);
     }
 
-    /* mappings[root_level] is provided by the caller so don't unmap that */
-    do
-    {
-        unmap_domain_page(mappings[level]);
-    }
-    while ( level-- > root_level );
+    unmap_domain_page(mapping);
 }
 
 void dump_hyp_walk(vaddr_t addr)
@@ -225,7 +242,7 @@ void dump_hyp_walk(vaddr_t addr)
         BUG_ON( (lpae_t *)(unsigned long)(ttbr - phys_offset) != pgtable );
     else
         BUG_ON( virt_to_maddr(pgtable) != ttbr );
-    dump_pt_walk(pgtable, addr, HYP_PT_ROOT_LEVEL);
+    dump_pt_walk(ttbr, addr, HYP_PT_ROOT_LEVEL, 1);
 }
 
 /* Map a 4k page in a fixmap entry */
