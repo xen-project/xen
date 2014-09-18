@@ -409,6 +409,26 @@ void vlapic_handle_EOI_induced_exit(struct vlapic *vlapic, int vector)
     hvm_dpci_msi_eoi(current->domain, vector);
 }
 
+static bool_t is_multicast_dest(struct vlapic *vlapic, unsigned int short_hand,
+                                uint32_t dest, bool_t dest_mode)
+{
+    if ( vlapic_domain(vlapic)->max_vcpus <= 2 )
+        return 0;
+
+    if ( short_hand )
+        return short_hand != APIC_DEST_SELF;
+
+    if ( vlapic_x2apic_mode(vlapic) )
+        return dest_mode ? hweight16(dest) > 1 : dest == 0xffffffff;
+
+    if ( dest_mode )
+        return hweight8(dest &
+                        GET_xAPIC_DEST_FIELD(vlapic_get_reg(vlapic,
+                                                            APIC_DFR))) > 1;
+
+    return dest == 0xff;
+}
+
 void vlapic_ipi(
     struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high)
 {
@@ -447,12 +467,18 @@ void vlapic_ipi(
 
     default: {
         struct vcpu *v;
+        bool_t batch = is_multicast_dest(vlapic, short_hand, dest, dest_mode);
+
+        if ( batch )
+            cpu_raise_softirq_batch_begin();
         for_each_vcpu ( vlapic_domain(vlapic), v )
         {
             if ( vlapic_match_dest(vcpu_vlapic(v), vlapic,
                                    short_hand, dest, dest_mode) )
                 vlapic_accept_irq(v, icr_low);
         }
+        if ( batch )
+            cpu_raise_softirq_batch_finish();
         break;
     }
     }
