@@ -5249,6 +5249,47 @@ static int sched_sedf_domain_output(
     return 0;
 }
 
+static int sched_rtds_domain_output(
+    int domid)
+{
+    char *domname;
+    libxl_domain_sched_params scinfo;
+    int rc = 0;
+
+    if (domid < 0) {
+        printf("%-33s %4s %9s %9s\n", "Name", "ID", "Period", "Budget");
+        return 0;
+    }
+
+    libxl_domain_sched_params_init(&scinfo);
+    rc = sched_domain_get(LIBXL_SCHEDULER_RTDS, domid, &scinfo);
+    if (rc)
+        goto out;
+
+    domname = libxl_domid_to_name(ctx, domid);
+    printf("%-33s %4d %9d %9d\n",
+        domname,
+        domid,
+        scinfo.period,
+        scinfo.budget);
+    free(domname);
+
+out:
+    libxl_domain_sched_params_dispose(&scinfo);
+    return rc;
+}
+
+static int sched_rtds_pool_output(uint32_t poolid)
+{
+    char *poolname;
+
+    poolname = libxl_cpupoolid_to_name(ctx, poolid);
+    printf("Cpupool %s: sched=RTDS\n", poolname);
+
+    free(poolname);
+    return 0;
+}
+
 static int sched_default_pool_output(uint32_t poolid)
 {
     char *poolname;
@@ -5606,6 +5647,87 @@ int main_sched_sedf(int argc, char **argv)
                 scinfo.period = 0;
                 scinfo.slice = 0;
             }
+            rc = sched_domain_set(domid, &scinfo);
+            libxl_domain_sched_params_dispose(&scinfo);
+            if (rc)
+                return -rc;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * <nothing>            : List all domain paramters and sched params
+ * -d [domid]           : List domain params for domain
+ * -d [domid] [params]  : Set domain params for domain
+ */
+int main_sched_rtds(int argc, char **argv)
+{
+    const char *dom = NULL;
+    const char *cpupool = NULL;
+    int period = 0; /* period is in microsecond */
+    int budget = 0; /* budget is in microsecond */
+    bool opt_p = false;
+    bool opt_b = false;
+    int opt, rc;
+    static struct option opts[] = {
+        {"domain", 1, 0, 'd'},
+        {"period", 1, 0, 'p'},
+        {"budget", 1, 0, 'b'},
+        {"cpupool", 1, 0, 'c'},
+        COMMON_LONG_OPTS,
+        {0, 0, 0, 0}
+    };
+
+    SWITCH_FOREACH_OPT(opt, "d:p:b:c:h", opts, "sched-rtds", 0) {
+    case 'd':
+        dom = optarg;
+        break;
+    case 'p':
+        period = strtol(optarg, NULL, 10);
+        opt_p = 1;
+        break;
+    case 'b':
+        budget = strtol(optarg, NULL, 10);
+        opt_b = 1;
+        break;
+    case 'c':
+        cpupool = optarg;
+        break;
+    }
+
+    if (cpupool && (dom || opt_p || opt_b)) {
+        fprintf(stderr, "Specifying a cpupool is not allowed with "
+                "other options.\n");
+        return 1;
+    }
+    if (!dom && (opt_p || opt_b)) {
+        fprintf(stderr, "Must specify a domain.\n");
+        return 1;
+    }
+    if (opt_p != opt_b) {
+        fprintf(stderr, "Must specify period and budget\n");
+        return 1;
+    }
+
+    if (!dom) { /* list all domain's rt scheduler info */
+        return -sched_domain_output(LIBXL_SCHEDULER_RTDS,
+                                    sched_rtds_domain_output,
+                                    sched_rtds_pool_output,
+                                    cpupool);
+    } else {
+        uint32_t domid = find_domain(dom);
+        if (!opt_p && !opt_b) { /* output rt scheduler info */
+            sched_rtds_domain_output(-1);
+            return -sched_rtds_domain_output(domid);
+        } else { /* set rt scheduler paramaters */
+            libxl_domain_sched_params scinfo;
+            libxl_domain_sched_params_init(&scinfo);
+            scinfo.sched = LIBXL_SCHEDULER_RTDS;
+            scinfo.period = period;
+            scinfo.budget = budget;
+
             rc = sched_domain_set(domid, &scinfo);
             libxl_domain_sched_params_dispose(&scinfo);
             if (rc)

@@ -1040,6 +1040,41 @@ Restrict output to domains in the specified cpupool.
 
 =back
 
+=item B<sched-rtds> [I<OPTIONS>]
+
+Set or get rtds (Real Time Deferrable Server) scheduler parameters.
+This rt scheduler applies Preemptive Global Earliest Deadline First
+real-time scheduling algorithm to schedule VCPUs in the system.
+Each VCPU has a dedicated period and budget.
+VCPUs in the same domain have the same period and budget.
+While scheduled, a VCPU burns its budget.
+A VCPU has its budget replenished at the beginning of each period;
+Unused budget is discarded at the end of each period.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-d DOMAIN>, B<--domain=DOMAIN>
+
+Specify domain for which scheduler parameters are to be modified or retrieved.
+Mandatory for modifying scheduler parameters.
+
+=item B<-p PERIOD>, B<--period=PERIOD>
+
+Period of time, in microseconds, over which to replenish the budget.
+
+=item B<-b BUDGET>, B<--budget=BUDGET>
+
+Amount of time, in microseconds, that the VCPU will be allowed
+to run every period.
+
+=item B<-c CPUPOOL>, B<--cpupool=CPUPOOL>
+
+Restrict output to domains in the specified cpupool.
+
+=back
+
 =back
 
 =head1 CPUPOOLS COMMANDS
