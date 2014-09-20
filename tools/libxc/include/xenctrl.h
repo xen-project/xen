@@ -875,6 +875,13 @@ int xc_sched_credit2_domain_get(xc_interface *xch,
                                uint32_t domid,
                                struct xen_domctl_sched_credit2 *sdom);
 
+int xc_sched_rtds_domain_set(xc_interface *xch,
+                            uint32_t domid,
+                            struct xen_domctl_sched_rtds *sdom);
+int xc_sched_rtds_domain_get(xc_interface *xch,
+                            uint32_t domid,
+                            struct xen_domctl_sched_rtds *sdom);
+
 int
 xc_sched_arinc653_schedule_set(
     xc_interface *xch,
