@@ -77,6 +77,7 @@
 #define TRC_SCHED_CSCHED2  1
 #define TRC_SCHED_SEDF     2
 #define TRC_SCHED_ARINC653 3
+#define TRC_SCHED_RTDS     4
 
 /* Per-scheduler tracing */
 #define TRC_SCHED_CLASS_EVT(_c, _e) \

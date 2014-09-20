@@ -26,6 +26,7 @@ obj-y += sched_credit.o
 obj-y += sched_credit2.o
 obj-y += sched_sedf.o
 obj-y += sched_arinc653.o
+obj-y += sched_rt.o
 obj-y += schedule.o
 obj-y += shutdown.o
 obj-y += softirq.o

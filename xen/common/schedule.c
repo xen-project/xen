@@ -69,6 +69,7 @@ static const struct scheduler *schedulers[] = {
     &sched_credit_def,
     &sched_credit2_def,
     &sched_arinc653_def,
+    &sched_rtds_def,
 };
 
 static struct scheduler __read_mostly ops;
