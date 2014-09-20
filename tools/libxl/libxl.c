@@ -5449,6 +5449,72 @@ static int sched_sedf_domain_set(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
+static int sched_rtds_domain_get(libxl__gc *gc, uint32_t domid,
+                               libxl_domain_sched_params *scinfo)
+{
+    struct xen_domctl_sched_rtds sdom;
+    int rc;
+
+    rc = xc_sched_rtds_domain_get(CTX->xch, domid, &sdom);
+    if (rc != 0) {
+        LOGE(ERROR, "getting domain sched rtds");
+        return ERROR_FAIL;
+    }
+
+    libxl_domain_sched_params_init(scinfo);
+
+    scinfo->sched = LIBXL_SCHEDULER_RTDS;
+    scinfo->period = sdom.period;
+    scinfo->budget = sdom.budget;
+
+    return 0;
+}
+
+static int sched_rtds_domain_set(libxl__gc *gc, uint32_t domid,
+                               const libxl_domain_sched_params *scinfo)
+{
+    struct xen_domctl_sched_rtds sdom;
+    int rc;
+
+    rc = xc_sched_rtds_domain_get(CTX->xch, domid, &sdom);
+    if (rc != 0) {
+        LOGE(ERROR, "getting domain sched rtds");
+        return ERROR_FAIL;
+    }
+
+    if (scinfo->period != LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT) {
+        if (scinfo->period < 1) {
+            LOG(ERROR, "VCPU period is not set or out of range, "
+                       "valid values are larger than 1");
+            return ERROR_INVAL;
+        }
+        sdom.period = scinfo->period;
+    }
+
+    if (scinfo->budget != LIBXL_DOMAIN_SCHED_PARAM_BUDGET_DEFAULT) {
+        if (scinfo->budget < 1) {
+            LOG(ERROR, "VCPU budget is not set or out of range, "
+                       "valid values are larger than 1");
+            return ERROR_INVAL;
+        }
+        sdom.budget = scinfo->budget;
+    }
+
+    if (sdom.budget > sdom.period) {
+        LOG(ERROR, "VCPU budget is larger than VCPU period, "
+                   "VCPU budget should be no larger than VCPU period");
+        return ERROR_INVAL;
+    }
+
+    rc = xc_sched_rtds_domain_set(CTX->xch, domid, &sdom);
+    if (rc < 0) {
+        LOGE(ERROR, "setting domain sched rtds");
+        return ERROR_FAIL;
+    }
+
+    return 0;
+}
+
 int libxl_domain_sched_params_set(libxl_ctx *ctx, uint32_t domid,
                                   const libxl_domain_sched_params *scinfo)
 {
@@ -5471,6 +5537,9 @@ int libxl_domain_sched_params_set(libxl_ctx *ctx, uint32_t domid,
         break;
     case LIBXL_SCHEDULER_ARINC653:
         ret=sched_arinc653_domain_set(gc, domid, scinfo);
+        break;
+    case LIBXL_SCHEDULER_RTDS:
+        ret=sched_rtds_domain_set(gc, domid, scinfo);
         break;
     default:
         LOG(ERROR, "Unknown scheduler");
@@ -5501,6 +5570,9 @@ int libxl_domain_sched_params_get(libxl_ctx *ctx, uint32_t domid,
         break;
     case LIBXL_SCHEDULER_CREDIT2:
         ret=sched_credit2_domain_get(gc, domid, scinfo);
+        break;
+    case LIBXL_SCHEDULER_RTDS:
+        ret=sched_rtds_domain_get(gc, domid, scinfo);
         break;
     default:
         LOG(ERROR, "Unknown scheduler");
