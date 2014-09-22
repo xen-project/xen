@@ -5,7 +5,6 @@ other distros one needs to set the variables for the elements below
                  | Red Hat          |  Debian       |  Suse          |
 -----------------+------------------+---------------+----------------+
 CONFIG_LEAF_DIR  | sysconfig        | default       | sysconfig      |
-SUBSYS_DIR       | /var/run/subsys  | /var/run      | /var/run       |
 INITD_DIR        | /etc/rc.d/init.d | /etc/init.d   | /etc/init.d    |
 -----------------+------------------+---------------+----------------+
 
