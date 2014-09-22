@@ -31,7 +31,7 @@ rm -rf rpm
 mkdir -p rpm/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 cat >rpm/SPECS/xen.spec <<EOF
 Summary: Xen development build, version $version
-Name: xen
+Name: xen$PKG_SUFFIX
 Version: $version
 Release: $release
 License: GPL
