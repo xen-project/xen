@@ -145,6 +145,7 @@ lwip-$(XEN_TARGET_ARCH): lwip-$(LWIP_VERSION).tar.gz
 	tar xzf $<
 	mv lwip $@
 	patch -d $@ -p0 < lwip.patch-cvs
+	patch -d $@ -p0 < lwip.dhcp_create_request-hwaddr_len.patch
 	touch $@
 
 #############
