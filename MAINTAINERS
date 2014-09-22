@@ -283,6 +283,7 @@ TOOLSTACK
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 M:	Ian Campbell <ian.campbell@citrix.com>
+M:	Wei Liu <wei.liu2@citrix.com>
 S:	Supported
 F:	tools/
 
