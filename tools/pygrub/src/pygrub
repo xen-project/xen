@@ -778,7 +778,7 @@ if __name__ == "__main__":
     debug = False
     not_really = False
     output_format = "sxp"
-    output_directory = "/var/run/xend/boot"
+    output_directory = "/var/run/xen/pygrub"
 
     # what was passed in
     incfg = { "kernel": None, "ramdisk": None, "args": "" }
@@ -829,10 +829,16 @@ if __name__ == "__main__":
                 sys.exit(1)
             output_format = a
         elif o in ("--output-directory",):
+            if not os.path.isdir(a):
+                print "%s is not an existing directory" % a
+                sys.exit(1)
             output_directory = a
 
     if debug:
 	logging.basicConfig(level=logging.DEBUG)
+
+    if not os.path.isdir(output_directory):
+        os.mkdir(output_directory, 0700)
 
     if output is None or output == "-":
         fd = sys.stdout.fileno()
