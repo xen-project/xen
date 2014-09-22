@@ -6,8 +6,6 @@
 
 #define EXYNOS5_PA_CHIPID           0x10000000
 #define EXYNOS5_PA_TIMER            0x12dd0000
-/* Base address of system controller */
-#define EXYNOS5_PA_PMU              0x10040000
 
 #define EXYNOS5_SWRESET             0x0400      /* Relative to PA_PMU */
 
