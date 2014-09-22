@@ -3348,7 +3348,13 @@ static int libxl__device_nic_from_xs_be(libxl__gc *gc,
     nic->script = READ_BACKEND(NOGC, "script");
 
     /* vif_ioemu nics use the same xenstore entries as vif interfaces */
-    nic->nictype = LIBXL_NIC_TYPE_VIF;
+    tmp = READ_BACKEND(gc, "type");
+    if (tmp) {
+        rc = libxl_nic_type_from_string(tmp, &nic->nictype);
+        if (rc) goto out;
+    } else {
+        nic->nictype = LIBXL_NIC_TYPE_VIF;
+    }
     nic->model = NULL; /* XXX Only for TYPE_IOEMU */
     nic->ifname = NULL; /* XXX Only for TYPE_IOEMU */
 
