@@ -172,8 +172,7 @@ BUILD_MAKE_VARS := SBINDIR BINDIR LIBEXEC LIBDIR SHAREDIR PRIVATE_BINDIR \
 
 buildmakevars2file = $(eval $(call buildmakevars2file-closure,$(1)))
 define buildmakevars2file-closure
-    .PHONY: genpath
-    genpath:
+    $(1): .phony
 	rm -f $(1).tmp; \
 	$(foreach var, $(BUILD_MAKE_VARS), \
 	          echo "$(var)=\"$($(var))\"" >>$(1).tmp;) \

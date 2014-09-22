@@ -48,17 +48,17 @@ TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
 
 TARGETS=$(STUBDOM_TARGETS)
 
-.PHONY: all
-all: build
-ifeq ($(STUBDOM_SUPPORTED),1)
-build: genpath $(STUBDOM_BUILD)
-else
-build: genpath
-endif
-
 STUBDOMPATH="stubdompath.sh"
 genpath-target = $(call buildmakevars2file,$(STUBDOMPATH))
 $(eval $(genpath-target))
+
+.PHONY: all
+all: build
+ifeq ($(STUBDOM_SUPPORTED),1)
+build: $(STUBDOMPATH) $(STUBDOM_BUILD)
+else
+build: $(STUBDOMPATH)
+endif
 
 ##############
 # Cross-newlib
@@ -450,9 +450,9 @@ xenstore-stubdom: mini-os-$(XEN_TARGET_ARCH)-xenstore libxc xenstore
 #########
 
 ifeq ($(STUBDOM_SUPPORTED),1)
-install: genpath install-readme $(STUBDOM_INSTALL)
+install: $(STUBDOMPATH) install-readme $(STUBDOM_INSTALL)
 else
-install: genpath
+install: $(STUBDOMPATH)
 endif
 
 install-readme:

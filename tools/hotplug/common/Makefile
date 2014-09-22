@@ -16,7 +16,7 @@ $(eval $(genpath-target))
 all: build
 
 .PHONY: build
-build: genpath
+build: $(HOTPLUGPATH)
 
 .PHONY: install
 install: all install-scripts

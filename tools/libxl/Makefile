@@ -163,7 +163,7 @@ _%.api-for-check: %.h $(AUTOINCS)
 		>$@.new
 	mv -f $@.new $@
 
-_paths.h: genpath
+_paths.h: _paths.h.tmp
 	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@.tmp >$@.2.tmp
 	rm -f $@.tmp
 	$(call move-if-changed,$@.2.tmp,$@)
