@@ -19,7 +19,7 @@ all:
 build:
 
 .PHONY: install
-install: all install-readmes install-configs $(HOTPLUGS)
+install: all install-readmes install-configs
 
 .PHONY: install-readmes
 install-readmes:
@@ -39,25 +39,6 @@ install-configs: $(XEN_CONFIGS)
 	set -e; for i in $(XEN_CONFIGS); \
 	    do [ -e $(DESTDIR)$(XEN_CONFIG_DIR)/$$i ] || \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_CONFIG_DIR); \
-	done
-
-.PHONY: install-hotplug
-install-hotplug:
-	[ -d $(DESTDIR)$(XEN_HOTPLUG_DIR) ] || \
-		$(INSTALL_DIR) $(DESTDIR)$(XEN_HOTPLUG_DIR)
-	set -e; for i in $(XEN_HOTPLUG_SCRIPTS); \
-	    do \
-	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_HOTPLUG_DIR); \
-	done
-
-.PHONY: install-udev
-install-udev:
-	[ -d $(DESTDIR)$(UDEV_RULES_DIR) ] || \
-		$(INSTALL_DIR) $(DESTDIR)$(UDEV_RULES_DIR)/rules.d
-	set -e; for i in $(UDEV_RULES); \
-	    do \
-	    $(INSTALL_DATA) $$i $(DESTDIR)$(UDEV_RULES_DIR); \
-	    ln -sf ../$$i $(DESTDIR)$(UDEV_RULES_DIR)/rules.d; \
 	done
 
 .PHONY: clean
