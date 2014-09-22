@@ -60,7 +60,7 @@ do_start () {
 	local timeout=30
 
 	@LOAD_MODULES@
-	mkdir -p /var/run/xen
+	mkdir -p ${XEN_RUN_DIR}
 
 	if ! `${BINDIR}/xenstore-read -s / >/dev/null 2>&1`
 	then
