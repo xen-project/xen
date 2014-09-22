@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 
+#include "_paths.h"
 #include "xenctrl.h"
 #include "xenctrlosdep.h"
 

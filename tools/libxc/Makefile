@@ -122,6 +122,14 @@ ifneq ($(nosharedlibs),y)
 LIB += xenctrl_osdep_ENOSYS.so
 endif
 
+genpath-target = $(call buildmakevars2header,_paths.h)
+$(eval $(genpath-target))
+
+xc_private.h: _paths.h
+
+$(CTRL_LIB_OBJS) $(GUEST_LIB_OBJS) $(OSDEP_LIB_OBJS) \
+$(CTRL_PIC_OBJS) $(GUEST_PIC_OBJS) $(OSDEP_PIC_OBJS): xc_private.h
+
 .PHONY: all
 all: build
 
@@ -154,6 +162,7 @@ TAGS:
 .PHONY: clean
 clean:
 	rm -rf *.rpm $(LIB) *~ $(DEPS) \
+            _paths.h \
             $(CTRL_LIB_OBJS) $(CTRL_PIC_OBJS) \
             $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS) \
             $(OSDEP_LIB_OBJS) $(OSDEP_PIC_OBJS)
