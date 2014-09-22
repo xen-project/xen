@@ -3,6 +3,25 @@ dnl expand these early so we can use this for substitutions
 test "x$prefix" = "xNONE" && prefix=$ac_default_prefix
 test "x$exec_prefix" = "xNONE" && exec_prefix=${prefix}
 
+dnl
+if test "x$sysconfdir" = 'x${prefix}/etc' ; then
+    case "$host_os" in
+         *freebsd*)
+         sysconfdir=$prefix/etc
+         ;;
+         *solaris*)
+         if test "$prefix" = "/usr" ; then
+             sysconfdir=/etc
+         else
+             sysconfdir=$prefix/etc
+         fi
+         ;;
+         *)
+         sysconfdir=/etc
+         ;;
+    esac
+fi
+
 BINDIR=$prefix/bin
 AC_SUBST(BINDIR)
 
@@ -41,7 +60,7 @@ AC_SUBST(PRIVATE_BINDIR)
 XENFIRMWAREDIR=$prefix/lib/xen/boot
 AC_SUBST(XENFIRMWAREDIR)
 
-CONFIG_DIR=/etc
+CONFIG_DIR=$sysconfdir
 AC_SUBST(CONFIG_DIR)
 
 XEN_CONFIG_DIR=$CONFIG_DIR/xen

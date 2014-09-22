@@ -41,7 +41,6 @@ XENFIRMWAREDIR = $(PREFIX)/lib/xen/boot
 PRIVATE_PREFIX = $(LIBDIR)/xen
 PRIVATE_BINDIR = $(PRIVATE_PREFIX)/bin
 
-CONFIG_DIR = /etc
 XEN_LOCK_DIR = /var/lock
 XEN_RUN_DIR = /var/run/xen
 XEN_PAGING_DIR = /var/lib/xen/xenpaging
