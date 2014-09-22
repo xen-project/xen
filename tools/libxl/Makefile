@@ -150,7 +150,7 @@ $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS) \
 	@rm -f $*.[ch]
 	$(FLEX) --header-file=$*.h --outfile=$*.c $<
 
-genpath-target = $(call buildmakevars2file,_paths.h.tmp)
+genpath-target = $(call buildmakevars2header,_paths.h)
 $(eval $(genpath-target))
 
 libxl.api-ok: check-libxl-api-rules _libxl.api-for-check
@@ -162,11 +162,6 @@ _%.api-for-check: %.h $(AUTOINCS)
 		-DLIBXL_EXTERNAL_CALLERS_ONLY=LIBXL_EXTERNAL_CALLERS_ONLY \
 		>$@.new
 	mv -f $@.new $@
-
-_paths.h: _paths.h.tmp
-	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@.tmp >$@.2.tmp
-	rm -f $@.tmp
-	$(call move-if-changed,$@.2.tmp,$@)
 
 _libxl_list.h: $(XEN_INCLUDE)/xen-external/bsd-sys-queue-h-seddery $(XEN_INCLUDE)/xen-external/bsd-sys-queue.h
 	$(PERL) $^ --prefix=libxl >$@.new
