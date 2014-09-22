@@ -20,7 +20,7 @@
 #include "xc_private.h"
 #include "xenguest.h"
 
-#define SUSPEND_LOCK_FILE "/var/run/xen/suspend-evtchn-%d.lock"
+#define SUSPEND_LOCK_FILE    XEN_RUN_DIR "/suspend-evtchn-%d.lock"
 
 /*
  * locking
