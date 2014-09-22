@@ -718,6 +718,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                 libxl__device_disk_dev_number(disks[i].vdev, &disk, &part);
             const char *format = qemu_disk_format_string(disks[i].format);
             char *drive;
+            const char *pdev_path;
 
             if (dev_number == -1) {
                 LIBXL__LOG(ctx, LIBXL__LOG_WARNING, "unable to determine"
@@ -747,6 +748,12 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                     continue;
                 }
 
+                if (disks[i].backend == LIBXL_DISK_BACKEND_TAP)
+                    pdev_path = libxl__blktap_devpath(gc, disks[i].pdev_path,
+                                                      disks[i].format);
+                else
+                    pdev_path = disks[i].pdev_path;
+
                 /*
                  * Explicit sd disks are passed through as is.
                  *
@@ -756,11 +763,11 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                 if (strncmp(disks[i].vdev, "sd", 2) == 0)
                     drive = libxl__sprintf
                         (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s,cache=writeback",
-                         disks[i].pdev_path, disk, format);
+                         pdev_path, disk, format);
                 else if (disk < 4)
                     drive = libxl__sprintf
                         (gc, "file=%s,if=ide,index=%d,media=disk,format=%s,cache=writeback",
-                         disks[i].pdev_path, disk, format);
+                         pdev_path, disk, format);
                 else
                     continue; /* Do not emulate this disk */
             }
