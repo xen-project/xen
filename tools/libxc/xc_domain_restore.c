@@ -1405,7 +1405,7 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
 
                 DPRINTF("************** pfn=%lx type=%lx gotcs=%08lx "
                         "actualcs=%08lx\n", pfn, pagebuf->pfn_types[pfn],
-                        csum_page(region_base + (i + curbatch)*PAGE_SIZE),
+                        csum_page(region_base + i * PAGE_SIZE),
                         csum_page(buf));
 
                 for ( v = 0; v < 4; v++ )
