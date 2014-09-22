@@ -1106,7 +1106,7 @@ static int pagebuf_get(xc_interface *xch, struct restore_ctx *ctx,
 static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
                        xen_pfn_t* region_mfn, unsigned long* pfn_type, int pae_extended_cr3,
                        struct xc_mmu* mmu,
-                       pagebuf_t* pagebuf, int curbatch)
+                       pagebuf_t* pagebuf, int curbatch, int *invalid_pages)
 {
     int i, j, curpage, nr_mfns;
     int k, scount;
@@ -1121,6 +1121,12 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
     struct domain_info_context *dinfo = &ctx->dinfo;
     int* pfn_err = NULL;
     int rc = -1;
+    int local_invalid_pages = 0;
+    /* We have handled curbatch pages before this batch, and there are
+     * *invalid_pages pages that are not in pagebuf->pages. So the first
+     * page for this page is (curbatch - *invalid_pages) page.
+     */
+    int first_page = curbatch - *invalid_pages;
 
     unsigned long mfn, pfn, pagetype;
 
@@ -1293,10 +1299,13 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
         pfn      = pagebuf->pfn_types[i + curbatch] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
         pagetype = pagebuf->pfn_types[i + curbatch] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
-        if ( pagetype == XEN_DOMCTL_PFINFO_XTAB 
+        if ( pagetype == XEN_DOMCTL_PFINFO_XTAB
              || pagetype == XEN_DOMCTL_PFINFO_XALLOC)
+        {
+            local_invalid_pages++;
             /* a bogus/unmapped/allocate-only page: skip it */
             continue;
+        }
 
         if ( pagetype == XEN_DOMCTL_PFINFO_BROKEN )
         {
@@ -1306,6 +1315,8 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
                       "dom=%d, pfn=%lx\n", dom, pfn);
                 goto err_mapped;
             }
+
+            local_invalid_pages++;
             continue;
         }
 
@@ -1344,7 +1355,7 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
             }
         }
         else
-            memcpy(page, pagebuf->pages + (curpage + curbatch) * PAGE_SIZE,
+            memcpy(page, pagebuf->pages + (first_page + curpage) * PAGE_SIZE,
                    PAGE_SIZE);
 
         pagetype &= XEN_DOMCTL_PFINFO_LTABTYPE_MASK;
@@ -1418,6 +1429,7 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
     } /* end of 'batch' for loop */
 
     rc = nraces;
+    *invalid_pages += local_invalid_pages;
 
   err_mapped:
     munmap(region_base, j*PAGE_SIZE);
@@ -1621,7 +1633,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
  loadpages:
     for ( ; ; )
     {
-        int j, curbatch;
+        int j, curbatch, invalid_pages;
 
         xc_report_progress_step(xch, n, dinfo->p2m_size);
 
@@ -1665,11 +1677,13 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
         /* break pagebuf into batches */
         curbatch = 0;
+        invalid_pages = 0;
         while ( curbatch < j ) {
             int brc;
 
             brc = apply_batch(xch, dom, ctx, region_mfn, pfn_type,
-                              pae_extended_cr3, mmu, &pagebuf, curbatch);
+                              pae_extended_cr3, mmu, &pagebuf, curbatch,
+                              &invalid_pages);
             if ( brc < 0 )
                 goto out;
 
