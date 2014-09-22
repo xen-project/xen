@@ -49,12 +49,7 @@ if ! [ -e /proc/xen/privcmd ]; then
 	exit 0
 fi
 
-# See docs/misc/distro_mapping.txt
-if [ -d /var/lock/subsys ]; then
-	LOCKFILE=/var/lock/subsys/xendomains
-else
-	LOCKFILE=/var/lock/xendomains
-fi
+LOCKFILE=${XEN_LOCK_DIR}/xendomains
 
 if [ -d /etc/sysconfig ]; then
 	XENDOM_CONFIG=/etc/sysconfig/xendomains
