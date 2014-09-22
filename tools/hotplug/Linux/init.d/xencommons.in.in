@@ -61,6 +61,7 @@ do_start () {
 
 	@LOAD_MODULES@
 	mkdir -p ${XEN_RUN_DIR}
+	mkdir -p ${XEN_LOCK_DIR}
 
 	if ! `${BINDIR}/xenstore-read -s / >/dev/null 2>&1`
 	then
