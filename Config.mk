@@ -166,16 +166,17 @@ define move-if-changed
 	if ! cmp -s $(1) $(2); then mv -f $(1) $(2); else rm -f $(1); fi
 endef
 
+BUILD_MAKE_VARS := SBINDIR BINDIR LIBEXEC LIBDIR SHAREDIR PRIVATE_BINDIR \
+                   XENFIRMWAREDIR XEN_CONFIG_DIR XEN_SCRIPT_DIR XEN_LOCK_DIR \
+                   XEN_RUN_DIR XEN_PAGING_DIR
+
 buildmakevars2file = $(eval $(call buildmakevars2file-closure,$(1)))
 define buildmakevars2file-closure
     .PHONY: genpath
     genpath:
-	rm -f $(1).tmp;                                                     \
-	$(foreach var,                                                      \
-	          SBINDIR BINDIR LIBEXEC LIBDIR SHAREDIR PRIVATE_BINDIR     \
-	          XENFIRMWAREDIR XEN_CONFIG_DIR XEN_SCRIPT_DIR XEN_LOCK_DIR \
-	          XEN_RUN_DIR XEN_PAGING_DIR,                               \
-	          echo "$(var)=\"$($(var))\"" >>$(1).tmp;)        \
+	rm -f $(1).tmp; \
+	$(foreach var, $(BUILD_MAKE_VARS), \
+	          echo "$(var)=\"$($(var))\"" >>$(1).tmp;) \
 	$(call move-if-changed,$(1).tmp,$(1))
 endef
 
