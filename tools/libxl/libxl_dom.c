@@ -209,14 +209,81 @@ static unsigned long timer_mode(const libxl_domain_build_info *info)
     return ((unsigned long)mode);
 }
 
+#if defined(__i386__) || defined(__x86_64__)
+static int hvm_set_viridian_features(libxl__gc *gc, uint32_t domid,
+                                     libxl_domain_build_info *const info)
+{
+    libxl_bitmap enlightenments;
+    libxl_viridian_enlightenment v;
+    uint64_t mask = 0;
+
+    libxl_bitmap_init(&enlightenments);
+    libxl_bitmap_alloc(CTX, &enlightenments,
+                       LIBXL_BUILDINFO_HVM_VIRIDIAN_ENABLE_DISABLE_WIDTH);
+
+    if (libxl_defbool_val(info->u.hvm.viridian)) {
+        /* Enable defaults */
+        libxl_bitmap_set(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_BASE);
+        libxl_bitmap_set(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_FREQ);
+    }
+
+    libxl_for_each_set_bit(v, info->u.hvm.viridian_enable) {
+        if (libxl_bitmap_test(&info->u.hvm.viridian_disable, v)) {
+            LIBXL__LOG(CTX, LIBXL__LOG_ERROR, "%s group both enabled and disabled",
+                       libxl_viridian_enlightenment_to_string(v));
+            goto err;
+        }
+        if (libxl_viridian_enlightenment_to_string(v)) /* check validity */
+            libxl_bitmap_set(&enlightenments, v);
+    }
+
+    libxl_for_each_set_bit(v, info->u.hvm.viridian_disable)
+        if (libxl_viridian_enlightenment_to_string(v)) /* check validity */
+            libxl_bitmap_reset(&enlightenments, v);
+
+    /* The base set is a pre-requisite for all others */
+    if (!libxl_bitmap_is_empty(&enlightenments) &&
+        !libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_BASE)) {
+        LIBXL__LOG(CTX, LIBXL__LOG_ERROR, "base group not enabled");
+        goto err;
+    }
+
+    libxl_for_each_set_bit(v, enlightenments)
+        LOG(DETAIL, "%s group enabled", libxl_viridian_enlightenment_to_string(v));
+
+    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_BASE)) {
+        mask |= HVMPV_base_freq;
+
+        if (!libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_FREQ))
+            mask |= HVMPV_no_freq;
+    }
+
+    if (mask != 0 &&
+        xc_hvm_param_set(CTX->xch,
+                         domid,
+                         HVM_PARAM_VIRIDIAN,
+                         mask) != 0) {
+        LIBXL__LOG_ERRNO(CTX, LIBXL__LOG_ERROR,
+                         "Couldn't set viridian feature mask (0x%"PRIx64")",
+                         mask);
+        goto err;
+    }
+
+    libxl_bitmap_dispose(&enlightenments);
+    return 0;
+
+err:
+    libxl_bitmap_dispose(&enlightenments);
+    return ERROR_FAIL;
+}
+#endif
+
 static void hvm_set_conf_params(xc_interface *handle, uint32_t domid,
                                 libxl_domain_build_info *const info)
 {
     xc_hvm_param_set(handle, domid, HVM_PARAM_PAE_ENABLED,
                     libxl_defbool_val(info->u.hvm.pae));
 #if defined(__i386__) || defined(__x86_64__)
-    xc_hvm_param_set(handle, domid, HVM_PARAM_VIRIDIAN,
-                    libxl_defbool_val(info->u.hvm.viridian));
     xc_hvm_param_set(handle, domid, HVM_PARAM_HPET_ENABLED,
                     libxl_defbool_val(info->u.hvm.hpet));
 #endif
@@ -350,8 +417,14 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     state->store_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->store_domid);
     state->console_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->console_domid);
 
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM)
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         hvm_set_conf_params(ctx->xch, domid, info);
+#if defined(__i386__) || defined(__x86_64__)
+        rc = hvm_set_viridian_features(gc, domid, info);
+        if (rc)
+            return rc;
+#endif
+    }
 
     rc = libxl__arch_domain_create(gc, d_config, domid);
 

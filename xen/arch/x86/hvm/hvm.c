@@ -5555,8 +5555,24 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                     rc = -EINVAL;
                 break;
             case HVM_PARAM_VIRIDIAN:
-                if ( a.value > 1 )
+                /* This should only ever be set once by the tools and read by the guest. */
+                rc = -EPERM;
+                if ( curr_d == d )
+                    break;
+
+                if ( a.value != d->arch.hvm_domain.params[a.index] )
+                {
+                    rc = -EEXIST;
+                    if ( d->arch.hvm_domain.params[a.index] != 0 )
+                        break;
+
                     rc = -EINVAL;
+                    if ( (a.value & ~HVMPV_feature_mask) ||
+                         !(a.value & HVMPV_base_freq) )
+                        break;
+                }
+
+                rc = 0;
                 break;
             case HVM_PARAM_IDENT_PT:
                 /* Not reflexive, as we must domain_pause(). */

@@ -1134,18 +1134,62 @@ Windows L<http://wiki.xen.org/wiki/XenWindowsGplPv>.
 Setting B<xen_platform_pci=0> with the default device_model "qemu-xen"
 requires at least QEMU 1.6.
 
-=item B<viridian=BOOLEAN>
+=item B<viridian=[ "GROUP", "GROUP", ...]>
 
-Turns on or off the exposure of MicroSoft Hyper-V (AKA viridian)
-compatible enlightenments to the guest.  These can improve performance
-of Microsoft Windows guests from Windows Vista and Windows 2008
-onwards and setting this option for such guests is strongly
-recommended. This option should be harmless for other versions of
-Windows (although it will not give any benefit) and the majority of
-other non-Windows OSes. However it is known to be incompatible with
-some other Operating Systems and in some circumstance can prevent
-Xen's own paravirtualisation interfaces for HVM guests from being
-used.
+The groups of Microsoft Hyper-V (AKA viridian) compatible enlightenments
+exposed to the guest. The following groups of enlightenments may be
+specified:
+
+=over 4
+
+=item B<base>
+
+This group incorporates the Hypercall MSRs, Virtual processor index MSR,
+and APIC access MSRs. These enlightenments can improve performance of
+Windows Vista and Windows Server 2008 onwards and setting this option
+for such guests is strongly recommended.
+This group is also a pre-requisite for all others. If it is disabled
+then it is an error to attempt to enable any other group.
+
+=item B<freq>
+
+This group incorporates the TSC and APIC frequency MSRs. These
+enlightenments can improve performance of Windows 7 and Windows
+Server 2008 R2 onwards.
+
+=item B<defaults>
+
+This is a special value that enables the default set of groups, which
+is currently the B<base> and B<freq> groups.
+
+=item B<all>
+
+This is a special value that enables all available groups.
+
+=back
+
+Groups can be disabled by prefixing the name with '!'. So, for example,
+to enable all groups except B<freq>, specify:
+
+=over 4
+
+B<viridian=[ "all", "!freq" ]>
+
+=back
+
+For details of the enlightenments see the latest version of Microsoft's
+Hypervisor Top-Level Functional Specification.
+
+The enlightenments should be harmless for other versions of Windows
+(although they will not give any benefit) and the majority of other
+non-Windows OSes.
+However it is known that they are incompatible with some other Operating
+Systems and in some circumstance can prevent Xen's own paravirtualisation
+interfaces for HVM guests from being used.
+
+The viridian option can be specified as a boolean. A value of true (1)
+is equivalent to the list [ "defaults" ], and a value of false (0) is
+equivalent to an empty list.
 
 =back
 

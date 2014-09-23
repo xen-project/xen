@@ -808,8 +808,8 @@ static void parse_config_data(const char *config_source,
     long l;
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms;
-    XLU_ConfigList *ioports, *irqs, *iomem;
-    int num_ioports, num_irqs, num_iomem, num_cpus;
+    XLU_ConfigList *ioports, *irqs, *iomem, *viridian;
+    int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 0;
     int pci_permissive = 0;
@@ -1034,9 +1034,58 @@ static void parse_config_data(const char *config_source,
         xlu_cfg_get_defbool(config, "acpi_s3", &b_info->u.hvm.acpi_s3, 0);
         xlu_cfg_get_defbool(config, "acpi_s4", &b_info->u.hvm.acpi_s4, 0);
         xlu_cfg_get_defbool(config, "nx", &b_info->u.hvm.nx, 0);
-        xlu_cfg_get_defbool(config, "viridian", &b_info->u.hvm.viridian, 0);
         xlu_cfg_get_defbool(config, "hpet", &b_info->u.hvm.hpet, 0);
         xlu_cfg_get_defbool(config, "vpt_align", &b_info->u.hvm.vpt_align, 0);
+
+        switch (xlu_cfg_get_list(config, "viridian",
+                                 &viridian, &num_viridian, 1))
+        {
+        case 0: /* Success */
+            if (num_viridian) {
+                libxl_bitmap_alloc(ctx, &b_info->u.hvm.viridian_enable,
+                                   LIBXL_BUILDINFO_HVM_VIRIDIAN_ENABLE_DISABLE_WIDTH);
+                libxl_bitmap_alloc(ctx, &b_info->u.hvm.viridian_disable,
+                                   LIBXL_BUILDINFO_HVM_VIRIDIAN_ENABLE_DISABLE_WIDTH);
+            }
+            for (i = 0; i < num_viridian; i++) {
+                libxl_viridian_enlightenment v;
+
+                buf = xlu_cfg_get_listitem(viridian, i);
+                if (strcmp(buf, "all") == 0)
+                    libxl_bitmap_set_any(&b_info->u.hvm.viridian_enable);
+                else if (strcmp(buf, "defaults") == 0)
+                    libxl_defbool_set(&b_info->u.hvm.viridian, true);
+                else {
+                    libxl_bitmap *s = &b_info->u.hvm.viridian_enable;
+                    libxl_bitmap *r = &b_info->u.hvm.viridian_disable;
+
+                    if (*buf == '!') {
+                        s = &b_info->u.hvm.viridian_disable;
+                        r = &b_info->u.hvm.viridian_enable;
+                        buf++;
+                    }
+
+                    e = libxl_viridian_enlightenment_from_string(buf, &v);
+                    if (e) {
+                        fprintf(stderr,
+                                "xl: unknown viridian enlightenment '%s'\n",
+                                buf);
+                        exit(-ERROR_FAIL);
+                    }
+
+                    libxl_bitmap_set(s, v);
+                    libxl_bitmap_reset(r, v);
+                }
+            }
+            break;
+        case ESRCH: break; /* Option not present */
+        case EINVAL:
+            xlu_cfg_get_defbool(config, "viridian", &b_info->u.hvm.viridian, 1);
+            break;
+        default:
+            fprintf(stderr,"xl: Unable to parse viridian enlightenments.\n");
+            exit(-ERROR_FAIL);
+        }
 
         if (!xlu_cfg_get_long(config, "timer_mode", &l, 1)) {
             const char *s = libxl_timer_mode_to_string(l);

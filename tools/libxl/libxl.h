@@ -151,6 +151,13 @@
 #define LIBXL_HAVE_SCHED_RTDS 1
 
 /*
+ * libxl_domain_build_info has u.hvm.viridian_enable and _disable bitmaps
+ * of the specified width.
+ */
+#define LIBXL_HAVE_BUILDINFO_HVM_VIRIDIAN_ENABLE_DISABLE 1
+#define LIBXL_BUILDINFO_HVM_VIRIDIAN_ENABLE_DISABLE_WIDTH 64
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

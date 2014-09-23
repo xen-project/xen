@@ -90,8 +90,9 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
         /* Which hypervisor MSRs are available to the guest */
         *eax = (CPUID3A_MSR_APIC_ACCESS |
                 CPUID3A_MSR_HYPERCALL   |
-                CPUID3A_MSR_VP_INDEX    |
-                CPUID3A_MSR_FREQ);
+                CPUID3A_MSR_VP_INDEX);
+        if ( !(viridian_feature_mask(d) & HVMPV_no_freq) )
+            *eax |= CPUID3A_MSR_FREQ;
         break;
     case 4:
         /* Recommended hypercall usage. */
@@ -312,11 +313,17 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
         break;
 
     case VIRIDIAN_MSR_TSC_FREQUENCY:
+        if ( viridian_feature_mask(d) & HVMPV_no_freq )
+            return 0;
+
         perfc_incr(mshv_rdmsr_tsc_frequency);
         *val = (uint64_t)d->arch.tsc_khz * 1000ull;
         break;
 
     case VIRIDIAN_MSR_APIC_FREQUENCY:
+        if ( viridian_feature_mask(d) & HVMPV_no_freq )
+            return 0;
+
         perfc_incr(mshv_rdmsr_apic_frequency);
         *val = 1000000000ull / APIC_BUS_CYCLE_NS;
         break;
@@ -489,3 +496,13 @@ static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
 HVM_REGISTER_SAVE_RESTORE(VIRIDIAN_VCPU, viridian_save_vcpu_ctxt,
                           viridian_load_vcpu_ctxt, 1, HVMSR_PER_VCPU);
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

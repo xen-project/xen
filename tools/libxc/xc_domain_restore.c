@@ -922,7 +922,7 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         if ( RDEXACT(fd, &buf->viridian, sizeof(uint32_t)) ||
              RDEXACT(fd, &buf->viridian, sizeof(uint64_t)) )
         {
-            PERROR("error read the viridian flag");
+            PERROR("error reading the viridian enlightenments");
             return -1;
         }
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
@@ -1747,7 +1747,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     }
 
     if (pagebuf.viridian != 0)
-        xc_hvm_param_set(xch, dom, HVM_PARAM_VIRIDIAN, 1);
+        xc_hvm_param_set(xch, dom, HVM_PARAM_VIRIDIAN, pagebuf.viridian);
 
     /*
      * If we are migrating in from a host that does not support

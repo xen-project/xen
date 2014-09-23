@@ -179,6 +179,12 @@ libxl_vendor_device = Enumeration("vendor_device", [
     (0, "NONE"),
     (1, "XENSERVER"),
     ])
+
+libxl_viridian_enlightenment = Enumeration("viridian_enlightenment", [
+    (0, "base"),
+    (1, "freq"),
+    ])
+
 #
 # Complex libxl types
 #
@@ -377,6 +383,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("acpi_s4",          libxl_defbool),
                                        ("nx",               libxl_defbool),
                                        ("viridian",         libxl_defbool),
+                                       ("viridian_enable",  libxl_bitmap),
+                                       ("viridian_disable", libxl_bitmap),
                                        ("timeoffset",       string),
                                        ("hpet",             libxl_defbool),
                                        ("vpt_align",        libxl_defbool),
