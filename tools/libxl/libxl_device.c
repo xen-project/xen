@@ -48,7 +48,6 @@ int libxl__device_exists(libxl__gc *gc, xs_transaction_t t,
     char *be_path = libxl__device_backend_path(gc, device);
     const char *dir;
 
-    be_path = libxl__device_backend_path(gc, device);
     rc = libxl__xs_read_checked(gc, t, be_path, &dir);
 
     if (rc)
