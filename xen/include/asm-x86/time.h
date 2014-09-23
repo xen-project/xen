@@ -76,4 +76,8 @@ void cpuid_time_leaf(uint32_t sub_idx, uint32_t *eax, uint32_t *ebx,
 
 u64 stime2tsc(s_time_t stime);
 
+struct time_scale;
+void set_time_scale(struct time_scale *ts, u64 ticks_per_sec);
+u64 scale_delta(u64 delta, struct time_scale *scale);
+
 #endif /* __X86_TIME_H__ */

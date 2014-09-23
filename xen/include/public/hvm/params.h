@@ -88,7 +88,14 @@
 #define _HVMPV_no_freq 1
 #define HVMPV_no_freq  (1 << _HVMPV_no_freq)
 
-#define HVMPV_feature_mask (HVMPV_base_freq|HVMPV_no_freq)
+/* Enable Partition Time Reference Counter (HV_X64_MSR_TIME_REF_COUNT) */
+#define _HVMPV_time_ref_count 2
+#define HVMPV_time_ref_count  (1 << _HVMPV_time_ref_count)
+
+#define HVMPV_feature_mask \
+	(HVMPV_base_freq | \
+	 HVMPV_no_freq | \
+	 HVMPV_time_ref_count)
 
 #endif
 

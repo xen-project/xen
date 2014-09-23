@@ -121,7 +121,7 @@ static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
  * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
  * yielding a 64-bit result.
  */
-static inline u64 scale_delta(u64 delta, struct time_scale *scale)
+u64 scale_delta(u64 delta, struct time_scale *scale)
 {
     u64 product;
 
@@ -272,7 +272,7 @@ static u64 init_pit_and_calibrate_tsc(void)
     return ((end - start) * (u64)CALIBRATE_FRAC);
 }
 
-static void set_time_scale(struct time_scale *ts, u64 ticks_per_sec)
+void set_time_scale(struct time_scale *ts, u64 ticks_per_sec)
 {
     u64 tps64 = ticks_per_sec;
     u32 tps32;

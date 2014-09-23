@@ -36,11 +36,11 @@
 #define HvNotifyLongSpinWait    8
 
 /* Viridian CPUID 4000003, Viridian MSR availability. */
-#define CPUID3A_MSR_REF_COUNT   (1 << 1)
-#define CPUID3A_MSR_APIC_ACCESS (1 << 4)
-#define CPUID3A_MSR_HYPERCALL   (1 << 5)
-#define CPUID3A_MSR_VP_INDEX    (1 << 6)
-#define CPUID3A_MSR_FREQ        (1 << 11)
+#define CPUID3A_MSR_TIME_REF_COUNT (1 << 1)
+#define CPUID3A_MSR_APIC_ACCESS    (1 << 4)
+#define CPUID3A_MSR_HYPERCALL      (1 << 5)
+#define CPUID3A_MSR_VP_INDEX       (1 << 6)
+#define CPUID3A_MSR_FREQ           (1 << 11)
 
 /* Viridian CPUID 4000004, Implementation Recommendations. */
 #define CPUID4A_MSR_BASED_APIC  (1 << 3)
@@ -93,6 +93,8 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
                 CPUID3A_MSR_VP_INDEX);
         if ( !(viridian_feature_mask(d) & HVMPV_no_freq) )
             *eax |= CPUID3A_MSR_FREQ;
+        if ( viridian_feature_mask(d) & HVMPV_time_ref_count )
+            *eax |= CPUID3A_MSR_TIME_REF_COUNT;
         break;
     case 4:
         /* Recommended hypercall usage. */
@@ -343,6 +345,23 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
         perfc_incr(mshv_rdmsr_apic_msr);
         *val = v->arch.hvm_vcpu.viridian.apic_assist.raw;
         break;
+
+    case VIRIDIAN_MSR_TIME_REF_COUNT:
+    {
+        uint64_t tsc;
+        struct time_scale tsc_to_ns;
+
+        if ( !(viridian_feature_mask(d) & HVMPV_time_ref_count) )
+            return 0;
+
+        perfc_incr(mshv_rdmsr_time_ref_count);
+        tsc = hvm_get_guest_tsc(pt_global_vcpu_target(d));
+
+        /* convert tsc to count of 100ns periods */
+        set_time_scale(&tsc_to_ns, d->arch.tsc_khz * 1000ul);
+        *val = scale_delta(tsc, &tsc_to_ns) / 100ul;
+        break;
+    }
 
     default:
         return 0;

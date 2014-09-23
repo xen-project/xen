@@ -1157,10 +1157,16 @@ This group incorporates the TSC and APIC frequency MSRs. These
 enlightenments can improve performance of Windows 7 and Windows
 Server 2008 R2 onwards.
 
+=item B<time_ref_count>
+
+This group incorporates Partition Time Reference Counter MSR. This
+enlightenment can improve performance of Windows 8 and Windows
+Server 2012 onwards.
+
 =item B<defaults>
 
 This is a special value that enables the default set of groups, which
-is currently the B<base> and B<freq> groups.
+is currently the B<base>, B<freq> and B<time_ref_count> groups.
 
 =item B<all>
 
