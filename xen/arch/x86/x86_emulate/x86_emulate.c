@@ -2634,6 +2634,7 @@ x86_emulate(
     case 0xcd: /* int imm8 */
         src.val = insn_fetch_type(uint8_t);
     swint:
+        fail_if(!in_realmode(ctxt, ops)); /* XSA-106 */
         fail_if(ops->inject_sw_interrupt == NULL);
         rc = ops->inject_sw_interrupt(src.val, _regs.eip - ctxt->regs->eip,
                                       ctxt) ? : X86EMUL_EXCEPTION;
