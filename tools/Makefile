@@ -106,8 +106,7 @@ distclean: subdirs-distclean
 		config.cache autom4te.cache
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
-IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
-			 --cross-prefix=$(CROSS_COMPILE) \
+IOEMU_CONFIGURE_CROSS ?= --cross-prefix=$(CROSS_COMPILE) \
 			 --interp-prefix=$(CROSS_SYS_ROOT)
 endif
 
@@ -146,7 +145,7 @@ subdir-all-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
 	set -e; \
 		$(buildmakevars2shellvars); \
 		cd qemu-xen-traditional-dir; \
-		$(QEMU_ROOT)/xen-setup $(IOEMU_CONFIGURE_CROSS); \
+		$(QEMU_ROOT)/xen-setup --cpu=$(IOEMU_CPU_ARCH) $(IOEMU_CONFIGURE_CROSS); \
 		$(MAKE) all
 
 subdir-install-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
@@ -155,6 +154,7 @@ subdir-install-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
 		cd qemu-xen-traditional-dir; \
 		$(QEMU_ROOT)/xen-setup \
 		--extra-cflags="$(EXTRA_CFLAGS_QEMU_TRADITIONAL)" \
+		--cpu=$(IOEMU_CPU_ARCH) \
 		$(IOEMU_CONFIGURE_CROSS); \
 		$(MAKE) install
 
@@ -207,6 +207,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		--disable-guest-agent \
 		--python=$(PYTHON) \
 		$(CONFIG_QEMUU_EXTRA_ARGS) \
+		--cpu=$(IOEMU_CPU_ARCH) \
 		$(IOEMU_CONFIGURE_CROSS); \
 	$(MAKE) all
 

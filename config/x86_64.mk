@@ -25,3 +25,5 @@ else
 LDFLAGS_DIRECT += -melf_x86_64
 endif
 endif
+
+IOEMU_CPU_ARCH ?= x86_64
