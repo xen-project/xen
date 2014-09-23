@@ -3486,7 +3486,7 @@ int shadow_track_dirty_vram(struct domain *d,
     int flush_tlb = 0;
     unsigned long i;
     p2m_type_t t;
-    struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
+    struct sh_dirty_vram *dirty_vram;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     if ( end_pfn < begin_pfn || end_pfn > p2m->max_mapped_pfn + 1 )
@@ -3495,6 +3495,8 @@ int shadow_track_dirty_vram(struct domain *d,
     /* We perform p2m lookups, so lock the p2m upfront to avoid deadlock */
     p2m_lock(p2m_get_hostp2m(d));
     paging_lock(d);
+
+    dirty_vram = d->arch.hvm_domain.dirty_vram;
 
     if ( dirty_vram && (!nr ||
              ( begin_pfn != dirty_vram->begin_pfn
