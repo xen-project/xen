@@ -3314,6 +3314,7 @@ x86_emulate(
         goto swint;
 
     case 0xf4: /* hlt */
+        generate_exception_if(!mode_ring0(), EXC_GP, 0);
         ctxt->retire.flags.hlt = 1;
         break;
 
@@ -3710,6 +3711,7 @@ x86_emulate(
             break;
         case 2: /* lgdt */
         case 3: /* lidt */
+            generate_exception_if(!mode_ring0(), EXC_GP, 0);
             generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
             fail_if(ops->write_segment == NULL);
             memset(&reg, 0, sizeof(reg));
@@ -3738,6 +3740,7 @@ x86_emulate(
         case 6: /* lmsw */
             fail_if(ops->read_cr == NULL);
             fail_if(ops->write_cr == NULL);
+            generate_exception_if(!mode_ring0(), EXC_GP, 0);
             if ( (rc = ops->read_cr(0, &cr0, ctxt)) )
                 goto done;
             if ( ea.type == OP_REG )
