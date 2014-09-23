@@ -67,7 +67,7 @@ struct hvm_domain {
     /* Memory ranges with pinned cache attributes. */
     struct list_head       pinned_cacheattr_ranges;
 
-    /* VRAM dirty support. */
+    /* VRAM dirty support.  Protect with the domain paging lock. */
     struct sh_dirty_vram *dirty_vram;
 
     /* If one of vcpus of this domain is in no_fill_mode or
