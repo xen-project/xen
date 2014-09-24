@@ -595,11 +595,12 @@ static void __init setup_efi_pci(void)
     struct efi_pci_rom *last = NULL;
 
     status = efi_bs->LocateHandle(ByProtocol, &pci_guid, NULL, &size, NULL);
-    if ( status == EFI_BUFFER_TOO_SMALL )
-        status = efi_bs->AllocatePool(EfiLoaderData, size, (void **)&handles);
-    if ( !EFI_ERROR(status) )
-        status = efi_bs->LocateHandle(ByProtocol, &pci_guid, NULL, &size,
-                                      handles);
+    if ( status != EFI_BUFFER_TOO_SMALL )
+        return;
+    status = efi_bs->AllocatePool(EfiLoaderData, size, (void **)&handles);
+    if ( EFI_ERROR(status) )
+        return;
+    status = efi_bs->LocateHandle(ByProtocol, &pci_guid, NULL, &size, handles);
     if ( EFI_ERROR(status) )
         size = 0;
 
