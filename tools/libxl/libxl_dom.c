@@ -2243,12 +2243,12 @@ int libxl_userdata_unlink(libxl_ctx *ctx, uint32_t domid,
                           const char *userdata_userid)
 {
     GC_INIT(ctx);
-    int rc;
+    CTX_LOCK;
 
-    libxl__domain_userdata_lock *lock;
+    int rc;
+    libxl__domain_userdata_lock *lock = NULL;
     const char *filename;
 
-    CTX_LOCK;
     lock = libxl__lock_domain_userdata(gc, domid);
     if (!lock) {
         rc = ERROR_LOCK_FAIL;
@@ -2256,10 +2256,20 @@ int libxl_userdata_unlink(libxl_ctx *ctx, uint32_t domid,
     }
 
     filename = libxl__userdata_path(gc, domid, userdata_userid, "d");
-    if (unlink(filename)) rc = ERROR_FAIL;
+    if (!filename) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    if (unlink(filename)) {
+        LOGE(ERROR, "error deleting userdata file: %s", filename);
+        rc = ERROR_FAIL;
+        goto out;
+    }
 
-    libxl__unlock_domain_userdata(lock);
+    rc = 0;
 out:
+    if (lock)
+        libxl__unlock_domain_userdata(lock);
     CTX_UNLOCK;
     GC_FREE;
     return rc;
