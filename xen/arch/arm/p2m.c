@@ -1163,6 +1163,7 @@ void __init setup_virt_paging(void)
 #ifdef CONFIG_ARM_32
     printk("P2M: 40-bit IPA\n");
     val |= VTCR_T0SZ(0x18); /* 40 bit IPA */
+    val |= VTCR_SL0(0x1); /* P2M starts at first level */
 #else /* CONFIG_ARM_64 */
     const struct {
         unsigned int pabits; /* Physical Address Size */
