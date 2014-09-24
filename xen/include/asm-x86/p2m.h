@@ -262,7 +262,7 @@ struct p2m_domain {
     long               (*audit_p2m)(struct p2m_domain *p2m);
 
     /* Default P2M access type for each page in the the domain: new pages,
-     * swapped in pages, cleared pages, and pages that are ambiquously
+     * swapped in pages, cleared pages, and pages that are ambiguously
      * retyped get this access type.  See definition of p2m_access_t. */
     p2m_access_t default_access;
 
