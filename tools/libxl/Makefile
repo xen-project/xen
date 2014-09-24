@@ -173,7 +173,7 @@ _libxl_save_msgs_helper.h _libxl_save_msgs_callout.h: \
 	$(PERL) -w $< $@ >$@.new
 	$(call move-if-changed,$@.new,$@)
 
-libxl.h: _libxl_types.h
+libxl.h: _libxl_types.h _libxl_list.h
 libxl_json.h: _libxl_types_json.h
 libxl_internal.h: _libxl_types_internal.h _libxl_types_private.h _libxl_types_internal_private.h _paths.h
 libxl_internal_json.h: _libxl_types_internal_json.h
