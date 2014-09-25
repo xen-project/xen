@@ -64,6 +64,7 @@ static CHAR16 *s2w(union string *str);
 static char *w2s(const union string *str);
 static bool_t  read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
                                struct file *file);
+static int set_color(u32 mask, int bpp, u8 *pos, u8 *sz);
 
 static EFI_BOOT_SERVICES *__initdata efi_bs;
 static EFI_HANDLE __initdata efi_ih;
@@ -771,12 +772,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     if ( StdOut->QueryMode(StdOut, StdOut->Mode->Mode,
                            &cols, &rows) == EFI_SUCCESS )
-    {
-        vga_console_info.video_type = XEN_VGATYPE_TEXT_MODE_3;
-        vga_console_info.u.text_mode_3.columns = cols;
-        vga_console_info.u.text_mode_3.rows = rows;
-        vga_console_info.u.text_mode_3.font_height = 16;
-    }
+        efi_arch_console_init(cols, rows);
 
     size = 0;
     status = efi_bs->LocateHandle(ByProtocol, &gop_guid, NULL, &size, NULL);
@@ -1030,7 +1026,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     if ( gop )
     {
-        int bpp = 0;
 
         /* Set graphics mode. */
         if ( gop_mode < gop->Mode->MaxMode && gop_mode != gop->Mode->Mode )
@@ -1039,65 +1034,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         /* Get graphics and frame buffer info. */
         status = gop->QueryMode(gop, gop->Mode->Mode, &info_size, &mode_info);
         if ( !EFI_ERROR(status) )
-            switch ( mode_info->PixelFormat )
-            {
-            case PixelRedGreenBlueReserved8BitPerColor:
-                vga_console_info.u.vesa_lfb.red_pos = 0;
-                vga_console_info.u.vesa_lfb.red_size = 8;
-                vga_console_info.u.vesa_lfb.green_pos = 8;
-                vga_console_info.u.vesa_lfb.green_size = 8;
-                vga_console_info.u.vesa_lfb.blue_pos = 16;
-                vga_console_info.u.vesa_lfb.blue_size = 8;
-                vga_console_info.u.vesa_lfb.rsvd_pos = 24;
-                vga_console_info.u.vesa_lfb.rsvd_size = 8;
-                bpp = 32;
-                break;
-            case PixelBlueGreenRedReserved8BitPerColor:
-                vga_console_info.u.vesa_lfb.red_pos = 16;
-                vga_console_info.u.vesa_lfb.red_size = 8;
-                vga_console_info.u.vesa_lfb.green_pos = 8;
-                vga_console_info.u.vesa_lfb.green_size = 8;
-                vga_console_info.u.vesa_lfb.blue_pos = 0;
-                vga_console_info.u.vesa_lfb.blue_size = 8;
-                vga_console_info.u.vesa_lfb.rsvd_pos = 24;
-                vga_console_info.u.vesa_lfb.rsvd_size = 8;
-                bpp = 32;
-                break;
-            case PixelBitMask:
-                bpp = set_color(mode_info->PixelInformation.RedMask, bpp,
-                                &vga_console_info.u.vesa_lfb.red_pos,
-                                &vga_console_info.u.vesa_lfb.red_size);
-                bpp = set_color(mode_info->PixelInformation.GreenMask, bpp,
-                                &vga_console_info.u.vesa_lfb.green_pos,
-                                &vga_console_info.u.vesa_lfb.green_size);
-                bpp = set_color(mode_info->PixelInformation.BlueMask, bpp,
-                                &vga_console_info.u.vesa_lfb.blue_pos,
-                                &vga_console_info.u.vesa_lfb.blue_size);
-                bpp = set_color(mode_info->PixelInformation.ReservedMask, bpp,
-                                &vga_console_info.u.vesa_lfb.rsvd_pos,
-                                &vga_console_info.u.vesa_lfb.rsvd_size);
-                if ( bpp > 0 )
-                    break;
-                /* fall through */
-            default:
-                PrintErr(L"Current graphics mode is unsupported!\r\n");
-                status = EFI_UNSUPPORTED;
-                break;
-            }
-        if ( !EFI_ERROR(status) )
-        {
-            vga_console_info.video_type = XEN_VGATYPE_EFI_LFB;
-            vga_console_info.u.vesa_lfb.gbl_caps = 2; /* possibly non-VGA */
-            vga_console_info.u.vesa_lfb.width =
-                mode_info->HorizontalResolution;
-            vga_console_info.u.vesa_lfb.height = mode_info->VerticalResolution;
-            vga_console_info.u.vesa_lfb.bits_per_pixel = bpp;
-            vga_console_info.u.vesa_lfb.bytes_per_line =
-                (mode_info->PixelsPerScanLine * bpp + 7) >> 3;
-            vga_console_info.u.vesa_lfb.lfb_base = gop->Mode->FrameBufferBase;
-            vga_console_info.u.vesa_lfb.lfb_size =
-                (gop->Mode->FrameBufferSize + 0xffff) >> 16;
-        }
+            efi_arch_video_init(gop, info_size, mode_info);
     }
 
     efi_bs->GetMemoryMap(&efi_memmap_size, NULL, &map_key,
