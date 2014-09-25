@@ -173,18 +173,17 @@ uint32_t vlapic_set_ppr(struct vlapic *vlapic)
    return ppr;
 }
 
-static int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda)
+static int vlapic_match_logical_addr(struct vlapic *vlapic, uint32_t mda)
 {
     int result = 0;
-    uint32_t logical_id;
+    uint32_t logical_id = vlapic_get_reg(vlapic, APIC_LDR);
 
     if ( vlapic_x2apic_mode(vlapic) )
-    {
-        logical_id = vlapic_get_reg(vlapic, APIC_LDR);
-        return !!(logical_id & mda);
-    }
+        return ((logical_id >> 16) == (mda >> 16)) &&
+               (uint16_t)(logical_id & mda);
 
-    logical_id = GET_xAPIC_LOGICAL_ID(vlapic_get_reg(vlapic, APIC_LDR));
+    logical_id = GET_xAPIC_LOGICAL_ID(logical_id);
+    mda = (uint8_t)mda;
 
     switch ( vlapic_get_reg(vlapic, APIC_DFR) )
     {
@@ -208,7 +207,7 @@ static int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda)
 
 bool_t vlapic_match_dest(
     struct vlapic *target, struct vlapic *source,
-    int short_hand, uint8_t dest, uint8_t dest_mode)
+    int short_hand, uint32_t dest, uint8_t dest_mode)
 {
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "target %p, source %p, dest %#x, "
                 "dest_mode %#x, short_hand %#x",
@@ -219,7 +218,8 @@ bool_t vlapic_match_dest(
     case APIC_DEST_NOSHORT:
         if ( dest_mode )
             return vlapic_match_logical_addr(target, dest);
-        return ((dest == 0xFF) || (dest == VLAPIC_ID(target)));
+        return (dest == _VLAPIC_ID(target, 0xffffffff)) ||
+               (dest == VLAPIC_ID(target));
 
     case APIC_DEST_SELF:
         return (target == source);
@@ -353,7 +353,7 @@ static void vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
 
 struct vlapic *vlapic_lowest_prio(
     struct domain *d, struct vlapic *source,
-    int short_hand, uint8_t dest, uint8_t dest_mode)
+    int short_hand, uint32_t dest, uint8_t dest_mode)
 {
     int old = d->arch.hvm_domain.irq.round_robin_prev_vcpu;
     uint32_t ppr, target_ppr = UINT_MAX;
@@ -438,9 +438,7 @@ void vlapic_ipi(
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "icr = 0x%08x:%08x", icr_high, icr_low);
 
-    dest = (vlapic_x2apic_mode(vlapic)
-            ? icr_high
-            : GET_xAPIC_DEST_FIELD(icr_high));
+    dest = _VLAPIC_ID(vlapic, icr_high);
 
     switch ( icr_low & APIC_MODE_MASK )
     {
@@ -619,10 +617,6 @@ int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
     vlapic_read_aligned(vlapic, offset, &low);
     switch ( offset )
     {
-    case APIC_ID:
-        low = GET_xAPIC_ID(low);
-        break;
-
     case APIC_ICR:
         vlapic_read_aligned(vlapic, APIC_ICR2, &high);
         break;
@@ -655,6 +649,8 @@ static int vlapic_reg_write(struct vcpu *v,
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     int rc = X86EMUL_OKAY;
+
+    memset(&vlapic->loaded, 0, sizeof(vlapic->loaded));
 
     switch ( offset )
     {
@@ -961,6 +957,15 @@ const struct hvm_mmio_handler vlapic_mmio_handler = {
     .write_handler = vlapic_write
 };
 
+static void set_x2apic_id(struct vlapic *vlapic)
+{
+    u32 id = vlapic_vcpu(vlapic)->vcpu_id;
+    u32 ldr = ((id & ~0xf) << 12) | (1 << (id & 0xf));
+
+    vlapic_set_reg(vlapic, APIC_ID, id * 2);
+    vlapic_set_reg(vlapic, APIC_LDR, ldr);
+}
+
 bool_t vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
 {
     if ( (vlapic->hw.apic_base_msr ^ value) & MSR_IA32_APICBASE_ENABLE )
@@ -986,13 +991,10 @@ bool_t vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
         return 0;
 
     vlapic->hw.apic_base_msr = value;
+    memset(&vlapic->loaded, 0, sizeof(vlapic->loaded));
 
     if ( vlapic_x2apic_mode(vlapic) )
-    {
-        u32 id = vlapic_get_reg(vlapic, APIC_ID);
-        u32 ldr = ((id & ~0xf) << 16) | (1 << (id & 0xf));
-        vlapic_set_reg(vlapic, APIC_LDR, ldr);
-    }
+        set_x2apic_id(vlapic);
 
     vmx_vlapic_msr_changed(vlapic_vcpu(vlapic));
 
@@ -1264,6 +1266,35 @@ static int lapic_save_regs(struct domain *d, hvm_domain_context_t *h)
     return rc;
 }
 
+/*
+ * Following lapic_load_hidden()/lapic_load_regs() we may need to
+ * correct ID and LDR when they come from an old, broken hypervisor.
+ */
+static void lapic_load_fixup(struct vlapic *vlapic)
+{
+    uint32_t id = vlapic->loaded.id;
+
+    if ( vlapic_x2apic_mode(vlapic) && id && vlapic->loaded.ldr == 1 )
+    {
+        /*
+         * This is optional: ID != 0 contradicts LDR == 1. It's being added
+         * to aid in eventual debugging of issues arising from the fixup done
+         * here, but can be dropped as soon as it is found to conflict with
+         * other (future) changes.
+         */
+        if ( GET_xAPIC_ID(id) != vlapic_vcpu(vlapic)->vcpu_id * 2 ||
+             id != SET_xAPIC_ID(GET_xAPIC_ID(id)) )
+            printk(XENLOG_G_WARNING "%pv: bogus APIC ID %#x loaded\n",
+                   vlapic_vcpu(vlapic), id);
+        set_x2apic_id(vlapic);
+    }
+    else /* Undo an eventual earlier fixup. */
+    {
+        vlapic_set_reg(vlapic, APIC_ID, id);
+        vlapic_set_reg(vlapic, APIC_LDR, vlapic->loaded.ldr);
+    }
+}
+
 static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
 {
     uint16_t vcpuid;
@@ -1282,6 +1313,10 @@ static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
     
     if ( hvm_load_entry_zeroextend(LAPIC, h, &s->hw) != 0 ) 
         return -EINVAL;
+
+    s->loaded.hw = 1;
+    if ( s->loaded.regs )
+        lapic_load_fixup(s);
 
     if ( !(s->hw.apic_base_msr & MSR_IA32_APICBASE_ENABLE) &&
          unlikely(vlapic_x2apic_mode(s)) )
@@ -1310,6 +1345,12 @@ static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
     
     if ( hvm_load_entry(LAPIC_REGS, h, s->regs) != 0 ) 
         return -EINVAL;
+
+    s->loaded.id = vlapic_get_reg(s, APIC_ID);
+    s->loaded.ldr = vlapic_get_reg(s, APIC_LDR);
+    s->loaded.regs = 1;
+    if ( s->loaded.hw )
+        lapic_load_fixup(s);
 
     if ( hvm_funcs.process_isr )
         hvm_funcs.process_isr(vlapic_find_highest_isr(s), v);

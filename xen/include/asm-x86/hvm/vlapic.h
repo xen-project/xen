@@ -30,8 +30,9 @@
 #define vlapic_vcpu(x)   (container_of((x), struct vcpu, arch.hvm_vcpu.vlapic))
 #define vlapic_domain(x) (vlapic_vcpu(x)->domain)
 
-#define VLAPIC_ID(vlapic)   \
-    (GET_xAPIC_ID(vlapic_get_reg((vlapic), APIC_ID)))
+#define _VLAPIC_ID(vlapic, id) (vlapic_x2apic_mode(vlapic) \
+                                ? (id) : GET_xAPIC_ID(id))
+#define VLAPIC_ID(vlapic) _VLAPIC_ID(vlapic, vlapic_get_reg(vlapic, APIC_ID))
 
 /*
  * APIC can be disabled in two ways:
@@ -70,6 +71,10 @@
 struct vlapic {
     struct hvm_hw_lapic      hw;
     struct hvm_hw_lapic_regs *regs;
+    struct {
+        bool_t               hw, regs;
+        uint32_t             id, ldr;
+    }                        loaded;
     struct periodic_time     pt;
     s_time_t                 timer_last_update;
     struct page_info         *regs_page;
@@ -124,10 +129,10 @@ int vlapic_apicv_write(struct vcpu *v, unsigned int offset);
 
 struct vlapic *vlapic_lowest_prio(
     struct domain *d, struct vlapic *source,
-    int short_hand, uint8_t dest, uint8_t dest_mode);
+    int short_hand, uint32_t dest, uint8_t dest_mode);
 
 bool_t vlapic_match_dest(
     struct vlapic *target, struct vlapic *source,
-    int short_hand, uint8_t dest, uint8_t dest_mode);
+    int short_hand, uint32_t dest, uint8_t dest_mode);
 
 #endif /* __ASM_X86_HVM_VLAPIC_H__ */
