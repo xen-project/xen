@@ -54,13 +54,14 @@ let process_connection_fds store cons domains rset wset =
 let process_domains store cons domains =
 	let do_io_domain domain =
 		if not (Domain.is_bad_domain domain) then
-			let con = Connections.find_domain cons (Domain.get_id domain) in
+			let io_credit = Domain.get_io_credit domain in
+			if io_credit > 0 then (
+				let con = Connections.find_domain cons (Domain.get_id domain) in
 				Process.do_input store cons domains con;
-				Process.do_output store cons domains con in
-	List.iter
-		(fun c ->
-		 match Connection.get_domain c with
-		 | Some d -> do_io_domain d | _ -> ())
+				Process.do_output store cons domains con;
+				Domain.decr_io_credit domain;
+			) in
+	Domains.iter domains do_io_domain
 
 let sigusr1_handler store =
 	try
@@ -81,6 +82,8 @@ let config_filename cf =
 	| None      -> Define.default_config_dir ^ "/oxenstored.conf"
 
 let default_pidfile = "/var/run/xenstored.pid"
+
+let ring_scan_interval = ref 20
 
 let parse_config filename =
 	let pidfile = ref default_pidfile in
@@ -108,6 +111,7 @@ let parse_config filename =
 		("access-log-transactions-ops", Config.Set_bool Logging.access_log_transaction_ops);
 		("access-log-special-ops", Config.Set_bool Logging.access_log_special_ops);
 		("allow-debug", Config.Set_bool Process.allow_debug);
+		("ring-scan-interval", Config.Set_int ring_scan_interval);
 		("pid-file", Config.Set_string pidfile); ] in
 	begin try Config.read filename options (fun _ _ -> raise Not_found)
 	with
@@ -318,7 +322,8 @@ let _ =
 				)
 				else
 					let c = Connections.find_domain_by_port cons port in
-					process_domains store cons domains [c]
+					match Connection.get_domain c with
+					| Some dom -> Domain.incr_io_credit dom | None -> ()
 				) (fun () -> Event.unmask eventchn port)
 		and do_if_set fd set fct =
 			if List.mem fd set then
@@ -327,11 +332,30 @@ let _ =
 		maybe (fun fd -> do_if_set fd rset (accept_connection true)) rw_sock;
 		maybe (fun fd -> do_if_set fd rset (accept_connection false)) ro_sock;
 		do_if_set (Event.fd eventchn) rset (handle_eventchn)
-		in
+	in
+
+	let ring_scan_checker dom =
+		(* no need to scan domains already marked as for processing *)
+		if not (Domain.get_io_credit dom > 0) then
+			let con = Connections.find_domain cons (Domain.get_id dom) in
+			if not (Connection.has_more_work con) then (
+				Process.do_output store cons domains con;
+				Process.do_input store cons domains con;
+				if Connection.has_more_work con then
+					(* Previously thought as no work, but detect some after scan (as
+					   processing a new message involves multiple steps.) It's very
+					   likely to be a "lazy" client, bump its credit. It could be false
+					   positive though (due to time window), but it's no harm to give a
+					   domain extra credit. *)
+					let n = 32 + 2 * (Domains.number domains) in
+					info "found lazy domain %d, credit %d" (Domain.get_id dom) n;
+					Domain.set_io_credit ~n dom
+			) in
 
 	let last_stat_time = ref 0. in
-	let periodic_ops_counter = ref 0 in
-	let periodic_ops () =
+	let last_scan_time = ref 0. in
+
+	let periodic_ops now =
 		(* we garbage collect the string->int dictionary after a sizeable amount of operations,
 		 * there's no need to be really fast even if we got loose
 		 * objects since names are often reuse.
@@ -344,10 +368,13 @@ let _ =
 			Symbol.garbage ()
 		end;
 
+		(* scan all the xs rings as a safenet for ill-behaved clients *)
+		if !ring_scan_interval >= 0 && now > (!last_scan_time +. float !ring_scan_interval) then
+			(last_scan_time := now; Domains.iter domains ring_scan_checker);
+
 		(* make sure we don't print general stats faster than 2 min *)
-		let ntime = Unix.gettimeofday () in
-		if ntime > (!last_stat_time +. 120.) then (
-			last_stat_time := ntime;
+		if now > (!last_stat_time +. 120.) then (
+			last_stat_time := now;
 
 			let gc = Gc.stat () in
 			let (lanon, lanon_ops, lanon_watchs,
@@ -368,16 +395,20 @@ let _ =
 		)
 		in
 
+		let period_ops_interval = 15. in
+		let period_start = ref 0. in
+
 	let main_loop () =
-		incr periodic_ops_counter;
-		if !periodic_ops_counter > 20 then (
-			periodic_ops_counter := 0;
-			periodic_ops ();
-		);
 
 		let mw = Connections.has_more_work cons in
+		List.iter
+			(fun c ->
+			 match Connection.get_domain c with
+			 | None -> () | Some d -> Domain.incr_io_credit d)
+			mw;
+		let timeout =
+			if List.length mw > 0 then 0. else period_ops_interval in
 		let inset, outset = Connections.select cons in
-		let timeout = if List.length mw > 0 then 0. else -1. in
 		let rset, wset, _ =
 		try
 			Select.select (spec_fds @ inset) outset [] timeout
@@ -389,7 +420,12 @@ let _ =
 			process_special_fds sfds;
 		if List.length cfds > 0 || List.length wset > 0 then
 			process_connection_fds store cons domains cfds wset;
-		process_domains store cons domains mw
+		if timeout <> 0. then (
+			let now = Unix.gettimeofday () in
+			if now > !period_start +. period_ops_interval then
+				(period_start := now; periodic_ops now)
+		);
+		process_domains store cons domains
 		in
 
 	while not !quit

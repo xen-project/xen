@@ -28,6 +28,9 @@ type t =
 	eventchn: Event.t;
 	mutable port: Xeneventchn.t option;
 	mutable bad_client: bool;
+	mutable io_credit: int; (* the rounds of ring process left to do, default is 0,
+	                           usually set to 1 when there is work detected, could
+	                           also set to n to give "lazy" clients extra credit *)
 }
 
 let get_path dom = "/local/domain/" ^ (sprintf "%u" dom.id)
@@ -39,6 +42,11 @@ let get_port d = d.port
 
 let is_bad_domain domain = domain.bad_client
 let mark_as_bad domain = domain.bad_client <- true
+
+let get_io_credit domain = domain.io_credit
+let set_io_credit ?(n=1) domain = domain.io_credit <- max 0 n
+let incr_io_credit domain = domain.io_credit <- domain.io_credit + 1
+let decr_io_credit domain = domain.io_credit <- max 0 (domain.io_credit - 1)
 
 let string_of_port = function
 | None -> "None"
@@ -74,7 +82,8 @@ let make id mfn remote_port interface eventchn = {
 	interface = interface;
 	eventchn = eventchn;
 	port = None;
-	bad_client = false
+	bad_client = false;
+	io_credit = 0;
 }
 
 let is_dom0 d = d.id = 0
