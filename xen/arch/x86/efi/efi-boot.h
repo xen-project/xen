@@ -127,3 +127,74 @@ static void __init place_string(u32 *addr, const char *s)
     }
     *addr = (long)alloc;
 }
+
+static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
+                                               void *map,
+                                               UINTN map_size,
+                                               UINTN desc_size,
+                                               UINT32 desc_ver)
+{
+    struct e820entry *e;
+    unsigned int i;
+
+    /* Populate E820 table and check trampoline area availability. */
+    e = e820map - 1;
+    for ( i = 0; i < map_size; i += desc_size )
+    {
+        EFI_MEMORY_DESCRIPTOR *desc = map + i;
+        u64 len = desc->NumberOfPages << EFI_PAGE_SHIFT;
+        u32 type;
+
+        switch ( desc->Type )
+        {
+        default:
+            type = E820_RESERVED;
+            break;
+        case EfiConventionalMemory:
+        case EfiBootServicesCode:
+        case EfiBootServicesData:
+            if ( !trampoline_phys && desc->PhysicalStart + len <= 0x100000 &&
+                 len >= cfg.size && desc->PhysicalStart + len > cfg.addr )
+                cfg.addr = (desc->PhysicalStart + len - cfg.size) & PAGE_MASK;
+            /* fall through */
+        case EfiLoaderCode:
+        case EfiLoaderData:
+            if ( desc->Attribute & EFI_MEMORY_WB )
+                type = E820_RAM;
+            else
+        case EfiUnusableMemory:
+                type = E820_UNUSABLE;
+            break;
+        case EfiACPIReclaimMemory:
+            type = E820_ACPI;
+            break;
+        case EfiACPIMemoryNVS:
+            type = E820_NVS;
+            break;
+        }
+        if ( e820nr && type == e->type &&
+             desc->PhysicalStart == e->addr + e->size )
+            e->size += len;
+        else if ( !len || e820nr >= E820MAX )
+            continue;
+        else
+        {
+            ++e;
+            e->addr = desc->PhysicalStart;
+            e->size = len;
+            e->type = type;
+            ++e820nr;
+        }
+    }
+
+}
+
+static void *__init efi_arch_allocate_mmap_buffer(UINTN map_size)
+{
+    place_string(&mbi.mem_upper, NULL);
+    mbi.mem_upper -= map_size;
+    mbi.mem_upper &= -__alignof__(EFI_MEMORY_DESCRIPTOR);
+    if ( mbi.mem_upper < xen_phys_start )
+        return NULL;
+    return (void *)(long)mbi.mem_upper;
+}
