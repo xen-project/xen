@@ -151,15 +151,29 @@ void dump_pageframe_info(struct domain *d)
 
     printk("Memory pages belonging to domain %u:\n", d->domain_id);
 
-    if ( d->tot_pages >= 10 )
+    if ( d->tot_pages >= 10 && d->is_dying < DOMDYING_dead )
     {
         printk("    DomPage list too long to display\n");
     }
     else
     {
+        unsigned long total[MASK_EXTR(PGT_type_mask, PGT_type_mask) + 1] = {};
+
         spin_lock(&d->page_alloc_lock);
         page_list_for_each ( page, &d->page_list )
         {
+            unsigned int index = MASK_EXTR(page->u.inuse.type_info,
+                                           PGT_type_mask);
+
+            if ( ++total[index] > 16 )
+            {
+                switch ( page->u.inuse.type_info & PGT_type_mask )
+                {
+                case PGT_none:
+                case PGT_writable_page:
+                    continue;
+                }
+            }
             printk("    DomPage %p: caf=%08lx, taf=%" PRtype_info "\n",
                    _p(page_to_mfn(page)),
                    page->count_info, page->u.inuse.type_info);
