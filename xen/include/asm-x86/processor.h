@@ -199,6 +199,7 @@ extern void set_cpuid_faulting(bool_t enable);
 
 extern u64 host_pat;
 extern bool_t opt_cpu_info;
+extern u32 cpuid_ext_features;
 
 /* Maximum width of physical addresses supported by the hardware */
 extern unsigned int paddr_bits;

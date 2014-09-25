@@ -18,13 +18,9 @@
 #include <xen/string.h>
 #include <xen/stringify.h>
 #include <xen/vga.h>
-#include <asm/e820.h>
-#include <asm/edd.h>
 #define __ASSEMBLY__ /* avoid pulling in ACPI stuff (conflicts with EFI) */
 #include <asm/fixmap.h>
 #undef __ASSEMBLY__
-#include <asm/msr.h>
-#include <asm/processor.h>
 
 /* Using SetVirtualAddressMap() is incompatible with kexec: */
 #undef USE_SET_VIRTUAL_ADDRESS_MAP
@@ -41,9 +37,6 @@ typedef struct {
     EFI_SHIM_LOCK_VERIFY Verify;
 } EFI_SHIM_LOCK_PROTOCOL;
 
-extern char start[];
-extern u32 cpuid_ext_features;
-
 union string {
     CHAR16 *w;
     char *s;
@@ -58,6 +51,13 @@ struct file {
     };
 };
 
+static CHAR16 *FormatDec(UINT64 Val, CHAR16 *Buffer);
+static CHAR16 *FormatHex(UINT64 Val, UINTN Width, CHAR16 *Buffer);
+static void  DisplayUint(UINT64 Val, INTN Width);
+static CHAR16 *wstrcpy(CHAR16 *d, const CHAR16 *s);
+static void noreturn blexit(const CHAR16 *str);
+static void PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode);
+
 static EFI_BOOT_SERVICES *__initdata efi_bs;
 static EFI_HANDLE __initdata efi_ih;
 
@@ -69,18 +69,17 @@ static UINT32 __initdata mdesc_ver;
 static struct file __initdata cfg;
 static struct file __initdata kernel;
 static struct file __initdata ramdisk;
-static struct file __initdata ucode;
 static struct file __initdata xsm;
-
-static multiboot_info_t __initdata mbi = {
-    .flags = MBI_MODULES | MBI_LOADERNAME
-};
-static module_t __initdata mb_modules[3];
-
 static CHAR16 __initdata newline[] = L"\r\n";
 
 #define PrintStr(s) StdOut->OutputString(StdOut, s)
 #define PrintErr(s) StdErr->OutputString(StdErr, s)
+
+/*
+ * Include architecture specific implementation here, which references the
+ * static globals defined above.
+ */
+#include "efi-boot.h"
 
 static CHAR16 *__init FormatDec(UINT64 Val, CHAR16 *Buffer)
 {
@@ -253,32 +252,6 @@ static void __init PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode)
         break;
     }
     blexit(mesg);
-}
-
-static void __init place_string(u32 *addr, const char *s)
-{
-    static char *__initdata alloc = start;
-
-    if ( s && *s )
-    {
-        size_t len1 = strlen(s) + 1;
-        const char *old = (char *)(long)*addr;
-        size_t len2 = *addr ? strlen(old) + 1 : 0;
-
-        alloc -= len1 + len2;
-        /*
-         * Insert new string before already existing one. This is needed
-         * for options passed on the command line to override options from
-         * the configuration file.
-         */
-        memcpy(alloc, s, len1);
-        if ( *addr )
-        {
-            alloc[len1 - 1] = ' ';
-            memcpy(alloc + len1, old, len2);
-        }
-    }
-    *addr = (long)alloc;
 }
 
 static unsigned int __init get_argv(unsigned int argc, CHAR16 **argv,
@@ -574,18 +547,6 @@ static void __init split_value(char *s)
     *s = 0;
 }
 
-static void __init edd_put_string(u8 *dst, size_t n, const char *src)
-{
-    while ( n-- && *src )
-       *dst++ = *src++;
-    if ( *src )
-       PrintErrMesg(L"Internal error populating EDD info",
-                    EFI_BUFFER_TOO_SMALL);
-    while ( n-- )
-       *dst++ = ' ';
-}
-#define edd_put_string(d, s) edd_put_string(d, ARRAY_SIZE(d), s)
-
 static void __init setup_efi_pci(void)
 {
     EFI_STATUS status;
@@ -686,82 +647,6 @@ static int __init set_color(u32 mask, int bpp, u8 *pos, u8 *sz)
    if ( mask )
        return -EINVAL;
    return max(*pos + *sz, bpp);
-}
-
-extern const intpte_t __page_tables_start[], __page_tables_end[];
-#define in_page_tables(v) ((intpte_t *)(v) >= __page_tables_start && \
-                           (intpte_t *)(v) < __page_tables_end)
-
-#define PE_BASE_RELOC_ABS      0
-#define PE_BASE_RELOC_HIGHLOW  3
-#define PE_BASE_RELOC_DIR64   10
-
-extern const struct pe_base_relocs {
-    u32 rva;
-    u32 size;
-    u16 entries[];
-} __base_relocs_start[], __base_relocs_end[];
-
-static void __init relocate_image(unsigned long delta)
-{
-    const struct pe_base_relocs *base_relocs;
-
-    for ( base_relocs = __base_relocs_start; base_relocs < __base_relocs_end; )
-    {
-        unsigned int i, n;
-
-        n = (base_relocs->size - sizeof(*base_relocs)) /
-            sizeof(*base_relocs->entries);
-        for ( i = 0; i < n; ++i )
-        {
-            unsigned long addr = xen_phys_start + base_relocs->rva +
-                                 (base_relocs->entries[i] & 0xfff);
-
-            switch ( base_relocs->entries[i] >> 12 )
-            {
-            case PE_BASE_RELOC_ABS:
-                break;
-            case PE_BASE_RELOC_HIGHLOW:
-                if ( delta )
-                {
-                    *(u32 *)addr += delta;
-                    if ( in_page_tables(addr) )
-                        *(u32 *)addr += xen_phys_start;
-                }
-                break;
-            case PE_BASE_RELOC_DIR64:
-                if ( delta )
-                {
-                    *(u64 *)addr += delta;
-                    if ( in_page_tables(addr) )
-                        *(intpte_t *)addr += xen_phys_start;
-                }
-                break;
-            default:
-                blexit(L"Unsupported relocation type");
-            }
-        }
-        base_relocs = (const void *)(base_relocs->entries + i + (i & 1));
-    }
-}
-
-extern const s32 __trampoline_rel_start[], __trampoline_rel_stop[];
-extern const s32 __trampoline_seg_start[], __trampoline_seg_stop[];
-
-static void __init relocate_trampoline(unsigned long phys)
-{
-    const s32 *trampoline_ptr;
-
-    trampoline_phys = phys;
-    /* Apply relocations to trampoline. */
-    for ( trampoline_ptr = __trampoline_rel_start;
-          trampoline_ptr < __trampoline_rel_stop;
-          ++trampoline_ptr )
-        *(u32 *)(*trampoline_ptr + (long)trampoline_ptr) += phys;
-    for ( trampoline_ptr = __trampoline_seg_start;
-          trampoline_ptr < __trampoline_seg_stop;
-          ++trampoline_ptr )
-        *(u16 *)(*trampoline_ptr + (long)trampoline_ptr) = phys >> 4;
 }
 
 void EFIAPI __init noreturn
@@ -880,7 +765,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     PrintStr(L"Xen " __stringify(XEN_VERSION) "." __stringify(XEN_SUBVERSION)
              XEN_EXTRAVERSION " (c/s " XEN_CHANGESET ") EFI loader\r\n");
 
-    relocate_image(0);
+    efi_arch_relocate_image(0);
 
     if ( StdOut->QueryMode(StdOut, StdOut->Mode->Mode,
                            &cols, &rows) == EFI_SUCCESS )
@@ -1461,7 +1346,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     efi_memmap = (void *)efi_memmap + DIRECTMAP_VIRT_START;
     efi_fw_vendor = (void *)efi_fw_vendor + DIRECTMAP_VIRT_START;
 
-    relocate_image(__XEN_VIRT_START - xen_phys_start);
+    efi_arch_relocate_image(__XEN_VIRT_START - xen_phys_start);
     memcpy((void *)trampoline_phys, trampoline_start, cfg.size);
 
     /* Set system registers and transfer control. */
