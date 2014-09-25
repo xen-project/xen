@@ -529,3 +529,38 @@ static void __init efi_arch_video_init(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
             (gop->Mode->FrameBufferSize + 0xffff) >> 16;
     }
 }
+
+static void __init efi_arch_memory_setup(void)
+{
+    unsigned int i;
+    EFI_STATUS status;
+
+    /* Allocate space for trampoline (in first Mb). */
+    cfg.addr = 0x100000;
+    cfg.size = trampoline_end - trampoline_start;
+    status = efi_bs->AllocatePages(AllocateMaxAddress, EfiLoaderData,
+                                   PFN_UP(cfg.size), &cfg.addr);
+    if ( status == EFI_SUCCESS )
+        relocate_trampoline(cfg.addr);
+    else
+    {
+        cfg.addr = 0;
+        PrintStr(L"Trampoline space cannot be allocated; will try fallback.\r\n");
+    }
+
+    /* Initialise L2 identity-map and boot-map page table entries (16MB). */
+    for ( i = 0; i < 8; ++i )
+    {
+        unsigned int slot = (xen_phys_start >> L2_PAGETABLE_SHIFT) + i;
+        paddr_t addr = slot << L2_PAGETABLE_SHIFT;
+
+        l2_identmap[slot] = l2e_from_paddr(addr, PAGE_HYPERVISOR|_PAGE_PSE);
+        slot &= L2_PAGETABLE_ENTRIES - 1;
+        l2_bootmap[slot] = l2e_from_paddr(addr, __PAGE_HYPERVISOR|_PAGE_PSE);
+    }
+    /* Initialise L3 boot-map page directory entries. */
+    l3_bootmap[l3_table_offset(xen_phys_start)] =
+        l3e_from_paddr((UINTN)l2_bootmap, __PAGE_HYPERVISOR);
+    l3_bootmap[l3_table_offset(xen_phys_start + (8 << L2_PAGETABLE_SHIFT) - 1)] =
+        l3e_from_paddr((UINTN)l2_bootmap, __PAGE_HYPERVISOR);
+}
