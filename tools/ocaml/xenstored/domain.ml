@@ -35,6 +35,7 @@ let get_id domain = domain.id
 let get_interface d = d.interface
 let get_mfn d = d.mfn
 let get_remote_port d = d.remote_port
+let get_port d = d.port
 
 let is_bad_domain domain = domain.bad_client
 let mark_as_bad domain = domain.bad_client <- true

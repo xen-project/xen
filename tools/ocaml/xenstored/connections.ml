@@ -20,10 +20,16 @@ let debug fmt = Logging.debug "connections" fmt
 type t = {
 	anonymous: (Unix.file_descr, Connection.t) Hashtbl.t;
 	domains: (int, Connection.t) Hashtbl.t;
+	ports: (Xeneventchn.t, Connection.t) Hashtbl.t;
 	mutable watches: (string, Connection.watch list) Trie.t;
 }
 
-let create () = { anonymous = Hashtbl.create 37; domains = Hashtbl.create 37; watches = Trie.create () }
+let create () = {
+	anonymous = Hashtbl.create 37;
+	domains = Hashtbl.create 37;
+	ports = Hashtbl.create 37;
+	watches = Trie.create ()
+}
 
 let add_anonymous cons fd can_write =
 	let xbcon = Xenbus.Xb.open_fd fd in
@@ -33,7 +39,10 @@ let add_anonymous cons fd can_write =
 let add_domain cons dom =
 	let xbcon = Xenbus.Xb.open_mmap (Domain.get_interface dom) (fun () -> Domain.notify dom) in
 	let con = Connection.create xbcon (Some dom) in
-	Hashtbl.add cons.domains (Domain.get_id dom) con
+	Hashtbl.add cons.domains (Domain.get_id dom) con;
+	match Domain.get_port dom with
+	| Some p -> Hashtbl.add cons.ports p con;
+	| None -> ()
 
 let select cons =
 	Hashtbl.fold
@@ -45,8 +54,11 @@ let select cons =
 let find cons =
 	Hashtbl.find cons.anonymous
 
-let find_domain cons id =
-	Hashtbl.find cons.domains id
+let find_domain cons =
+	Hashtbl.find cons.domains
+
+let find_domain_by_port cons port =
+	Hashtbl.find cons.ports port
 
 let del_watches_of_con con watches =
 	match List.filter (fun w -> Connection.get_con w != con) watches with
@@ -65,6 +77,12 @@ let del_domain cons id =
 	try
 		let con = find_domain cons id in
 		Hashtbl.remove cons.domains id;
+		(match Connection.get_domain con with
+		 | Some d ->
+		   (match Domain.get_port d with
+		    | Some p -> Hashtbl.remove cons.ports p
+		    | None -> ())
+		 | None -> ());
 		cons.watches <- Trie.map (del_watches_of_con con) cons.watches;
 		Connection.close con
 	with exn ->
