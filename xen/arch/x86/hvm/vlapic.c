@@ -173,9 +173,10 @@ uint32_t vlapic_set_ppr(struct vlapic *vlapic)
    return ppr;
 }
 
-static int vlapic_match_logical_addr(struct vlapic *vlapic, uint32_t mda)
+static bool_t vlapic_match_logical_addr(const struct vlapic *vlapic,
+                                        uint32_t mda)
 {
-    int result = 0;
+    bool_t result = 0;
     uint32_t logical_id = vlapic_get_reg(vlapic, APIC_LDR);
 
     if ( vlapic_x2apic_mode(vlapic) )
@@ -196,9 +197,9 @@ static int vlapic_match_logical_addr(struct vlapic *vlapic, uint32_t mda)
             result = 1;
         break;
     default:
-        gdprintk(XENLOG_WARNING, "Bad DFR value for lapic of vcpu %d: %08x\n",
-                 vlapic_vcpu(vlapic)->vcpu_id,
-                 vlapic_get_reg(vlapic, APIC_DFR));
+        printk(XENLOG_G_WARNING "%pv: bad LAPIC DFR value %08x\n",
+               const_vlapic_vcpu(vlapic),
+               vlapic_get_reg(vlapic, APIC_DFR));
         break;
     }
 
@@ -206,8 +207,8 @@ static int vlapic_match_logical_addr(struct vlapic *vlapic, uint32_t mda)
 }
 
 bool_t vlapic_match_dest(
-    struct vlapic *target, struct vlapic *source,
-    int short_hand, uint32_t dest, uint8_t dest_mode)
+    const struct vlapic *target, const struct vlapic *source,
+    int short_hand, uint32_t dest, bool_t dest_mode)
 {
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "target %p, source %p, dest %#x, "
                 "dest_mode %#x, short_hand %#x",
@@ -286,7 +287,7 @@ static void vlapic_init_sipi_action(unsigned long _vcpu)
     uint32_t icr = vcpu_vlapic(origin)->init_sipi.icr;
     uint32_t dest = vcpu_vlapic(origin)->init_sipi.dest;
     uint32_t short_hand = icr & APIC_SHORT_MASK;
-    uint32_t dest_mode  = !!(icr & APIC_DEST_MASK);
+    bool_t dest_mode = !!(icr & APIC_DEST_MASK);
     struct vcpu *v;
 
     if ( icr == 0 )
@@ -352,8 +353,8 @@ static void vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
 }
 
 struct vlapic *vlapic_lowest_prio(
-    struct domain *d, struct vlapic *source,
-    int short_hand, uint32_t dest, uint8_t dest_mode)
+    struct domain *d, const struct vlapic *source,
+    int short_hand, uint32_t dest, bool_t dest_mode)
 {
     int old = d->arch.hvm_domain.irq.round_robin_prev_vcpu;
     uint32_t ppr, target_ppr = UINT_MAX;
@@ -434,7 +435,7 @@ void vlapic_ipi(
 {
     unsigned int dest;
     unsigned int short_hand = icr_low & APIC_SHORT_MASK;
-    unsigned int dest_mode  = !!(icr_low & APIC_DEST_MASK);
+    bool_t dest_mode = !!(icr_low & APIC_DEST_MASK);
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "icr = 0x%08x:%08x", icr_high, icr_low);
 

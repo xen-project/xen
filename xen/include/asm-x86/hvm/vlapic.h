@@ -28,6 +28,8 @@
 
 #define vcpu_vlapic(x)   (&(x)->arch.hvm_vcpu.vlapic)
 #define vlapic_vcpu(x)   (container_of((x), struct vcpu, arch.hvm_vcpu.vlapic))
+#define const_vlapic_vcpu(x) (container_of((x), const struct vcpu, \
+                              arch.hvm_vcpu.vlapic))
 #define vlapic_domain(x) (vlapic_vcpu(x)->domain)
 
 #define _VLAPIC_ID(vlapic, id) (vlapic_x2apic_mode(vlapic) \
@@ -88,7 +90,8 @@ struct vlapic {
 /* vlapic's frequence is 100 MHz */
 #define APIC_BUS_CYCLE_NS               10
 
-static inline uint32_t vlapic_get_reg(struct vlapic *vlapic, uint32_t reg)
+static inline uint32_t vlapic_get_reg(const struct vlapic *vlapic,
+                                      uint32_t reg)
 {
     return *((uint32_t *)(&vlapic->regs->data[reg]));
 }
@@ -128,11 +131,11 @@ void vlapic_ipi(struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high);
 int vlapic_apicv_write(struct vcpu *v, unsigned int offset);
 
 struct vlapic *vlapic_lowest_prio(
-    struct domain *d, struct vlapic *source,
-    int short_hand, uint32_t dest, uint8_t dest_mode);
+    struct domain *d, const struct vlapic *source,
+    int short_hand, uint32_t dest, bool_t dest_mode);
 
 bool_t vlapic_match_dest(
-    struct vlapic *target, struct vlapic *source,
-    int short_hand, uint32_t dest, uint8_t dest_mode);
+    const struct vlapic *target, const struct vlapic *source,
+    int short_hand, uint32_t dest, bool_t dest_mode);
 
 #endif /* __ASM_X86_HVM_VLAPIC_H__ */
