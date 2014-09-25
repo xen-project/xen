@@ -64,7 +64,7 @@ distinction for a 64bit PVH is that it is launched at privilege level 0 as
 opposed to a 64bit PV guest which is launched at privilege level 3.
 
 Also, the `rsi` (`esi` on 32bits) register is going to contain the virtual
-memory address were Xen has placed the `start_info` structure. The `rsp` (`esp`
+memory address where Xen has placed the `start_info` structure. The `rsp` (`esp`
 on 32bits) will point to the top of an initial single page stack, that can be
 used by the guest kernel. The `start_info` structure contains all the info the
 guest needs in order to initialize. More information about the contents can be
