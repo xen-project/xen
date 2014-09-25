@@ -130,8 +130,17 @@ let string_of_date () =
 		tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec
 		(int_of_float (1000.0 *. msec))
 
+(* We can defer to syslog for log management *)
 let make_syslog_logger facility =
-	(* We defer to syslog for log management *)
+	(* When TZ is unset in the environment, each syslog call will stat the
+	   /etc/localtime file at least three times during the process. We'd like to
+	   avoid this cost given that we are not a mobile environment and we log
+	   almost every xenstore entry update/watch. *)
+	let () =
+		let tz_is_set =
+			try String.length (Unix.getenv "TZ") > 0
+			with Not_found -> false in
+		if not tz_is_set then Unix.putenv "TZ" "/etc/localtime" in
 	let nothing () = () in
 	let write ?level s =
 		let level = match level with
