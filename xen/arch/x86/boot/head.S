@@ -82,7 +82,7 @@ __start:
         mov     %ecx,%ss
 
         /* Check for Multiboot bootloader */
-        cmp     $0x2BADB002,%eax
+        cmp     $MULTIBOOT_BOOTLOADER_MAGIC,%eax
         jne     not_multiboot
 
         /* Set up trampoline segment 64k below EBDA */
