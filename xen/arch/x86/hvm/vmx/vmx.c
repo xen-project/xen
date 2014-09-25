@@ -2499,6 +2499,19 @@ static void vmx_vmexit_ud_intercept(struct cpu_user_regs *regs)
     struct hvm_emulate_ctxt ctxt;
     int rc;
 
+    if ( opt_hvm_fep )
+    {
+        char sig[5]; /* ud2; .ascii "xen" */
+
+        if ( (hvm_fetch_from_guest_virt_nofault(
+                  sig, regs->eip, sizeof(sig), 0) == HVMCOPY_okay) &&
+             (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
+        {
+            regs->eip += sizeof(sig);
+            regs->eflags &= ~X86_EFLAGS_RF;
+        }
+    }
+
     hvm_emulate_prepare(&ctxt, regs);
 
     rc = hvm_emulate_one(&ctxt);

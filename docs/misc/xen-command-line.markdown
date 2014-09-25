@@ -682,6 +682,17 @@ Bit 11 - MSR operation logging
 
 Recognized in debug builds of the hypervisor only.
 
+### hvm\_fep
+> `= <boolean>`
+
+> Default: `false`
+
+Allow use of the Forced Emulation Prefix in HVM guests, to allow emulation of
+arbitrary instructions.
+
+This option is intended for development purposes, and is only available in
+debug builds of the hypervisor.
+
 ### hvm\_port80
 > `= <boolean>`
 

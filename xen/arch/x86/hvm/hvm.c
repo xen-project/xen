@@ -86,6 +86,11 @@ unsigned long __attribute__ ((__section__ (".bss.page_aligned")))
 static bool_t __initdata opt_hap_enabled = 1;
 boolean_param("hap", opt_hap_enabled);
 
+#ifndef opt_hvm_fep
+bool_t opt_hvm_fep;
+boolean_param("hvm_fep", opt_hvm_fep);
+#endif
+
 static int cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {

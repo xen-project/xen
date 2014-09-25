@@ -517,6 +517,13 @@ bool_t nhvm_vmcx_hap_enabled(struct vcpu *v);
 /* interrupt */
 enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v);
 
+#ifndef NDEBUG
+/* Permit use of the Forced Emulation Prefix in HVM guests */
+extern bool_t opt_hvm_fep;
+#else
+#define opt_hvm_fep 0
+#endif
+
 #endif /* __ASM_X86_HVM_HVM_H__ */
 
 /*
