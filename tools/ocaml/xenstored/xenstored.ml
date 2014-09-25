@@ -43,8 +43,11 @@ let process_connection_fds store cons domains rset wset =
 			debug "closing socket connection"
 		in
 	let process_fdset_with fds fct =
-		List.iter (fun fd -> try_fct fct (Connections.find cons fd)) fds
-	in
+		List.iter
+			(fun fd ->
+			 try try_fct fct (Connections.find cons fd)
+			 with Not_found -> ()
+			) fds in
 	process_fdset_with rset Process.do_input;
 	process_fdset_with wset Process.do_output
 
