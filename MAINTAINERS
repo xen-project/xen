@@ -228,6 +228,7 @@ MINI-OS
 M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 S:	Supported
+F:	config/MiniOS.mk
 F:	extras/mini-os/
 
 OCAML TOOLS
@@ -284,6 +285,8 @@ STUB DOMAINS
 M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 S:	Supported
+F:	config/Stubdom.mk.in
+F:	m4/stubdom.m4
 F:	stubdom/
 
 TOOLSTACK
@@ -292,6 +295,16 @@ M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 M:	Ian Campbell <ian.campbell@citrix.com>
 M:	Wei Liu <wei.liu2@citrix.com>
 S:	Supported
+F:	autogen.sh
+F:	config/*.in
+F:	install.sh
+F:	m4/
+F:	configure
+F:	docs/Makefile
+F:	stubdom/Makefile
+F:	*.ac
+F:	*/configure
+F:	*/*.ac
 F:	tools/
 
 TRANSCENDENT MEMORY (TMEM)
