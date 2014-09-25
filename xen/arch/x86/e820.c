@@ -89,9 +89,9 @@ static void __init add_memory_region(unsigned long long start,
     }
 } /* add_memory_region */
 
-static void __init print_e820_memory_map(struct e820entry *map, int entries)
+static void __init print_e820_memory_map(struct e820entry *map, unsigned int entries)
 {
-    int i;
+    unsigned int i;
 
     for (i = 0; i < entries; i++) {
         printk(" %016Lx - %016Lx ",
@@ -512,7 +512,7 @@ static void __init reserve_dmi_region(void)
 }
 
 static void __init machine_specific_memory_setup(
-    struct e820entry *raw, int *raw_nr)
+    struct e820entry *raw, unsigned int *raw_nr)
 {
     unsigned long mpt_limit, ro_mpt_limit;
     uint64_t top_of_ram, size;
@@ -695,7 +695,7 @@ int __init reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e)
 }
 
 unsigned long __init init_e820(
-    const char *str, struct e820entry *raw, int *raw_nr)
+    const char *str, struct e820entry *raw, unsigned int *raw_nr)
 {
     if ( e820_verbose )
     {
