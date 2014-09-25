@@ -198,3 +198,53 @@ static void *__init efi_arch_allocate_mmap_buffer(UINTN map_size)
         return NULL;
     return (void *)(long)mbi.mem_upper;
 }
+
+static void __init efi_arch_pre_exit_boot(void)
+{
+    if ( !trampoline_phys )
+    {
+        if ( !cfg.addr )
+            blexit(L"No memory for trampoline");
+        relocate_trampoline(cfg.addr);
+    }
+}
+
+static void __init noreturn efi_arch_post_exit_boot(void)
+{
+    u64 efer;
+
+    efi_arch_relocate_image(__XEN_VIRT_START - xen_phys_start);
+    memcpy((void *)trampoline_phys, trampoline_start, cfg.size);
+
+    /* Set system registers and transfer control. */
+    asm volatile("pushq $0\n\tpopfq");
+    rdmsrl(MSR_EFER, efer);
+    efer |= EFER_SCE;
+    if ( cpuid_ext_features & (1 << (X86_FEATURE_NX & 0x1f)) )
+        efer |= EFER_NX;
+    wrmsrl(MSR_EFER, efer);
+    write_cr0(X86_CR0_PE | X86_CR0_MP | X86_CR0_ET | X86_CR0_NE | X86_CR0_WP |
+              X86_CR0_AM | X86_CR0_PG);
+    asm volatile ( "mov    %[cr4], %%cr4\n\t"
+                   "mov    %[cr3], %%cr3\n\t"
+                   "movabs $__start_xen, %[rip]\n\t"
+                   "lgdt   gdt_descr(%%rip)\n\t"
+                   "mov    stack_start(%%rip), %%rsp\n\t"
+                   "mov    %[ds], %%ss\n\t"
+                   "mov    %[ds], %%ds\n\t"
+                   "mov    %[ds], %%es\n\t"
+                   "mov    %[ds], %%fs\n\t"
+                   "mov    %[ds], %%gs\n\t"
+                   "movl   %[cs], 8(%%rsp)\n\t"
+                   "mov    %[rip], (%%rsp)\n\t"
+                   "lretq  %[stkoff]-16"
+                   : [rip] "=&r" (efer/* any dead 64-bit variable */)
+                   : [cr3] "r" (idle_pg_table),
+                     [cr4] "r" (mmu_cr4_features),
+                     [cs] "ir" (__HYPERVISOR_CS),
+                     [ds] "r" (__HYPERVISOR_DS),
+                     [stkoff] "i" (STACK_SIZE - sizeof(struct cpu_info)),
+                     "D" (&mbi)
+                   : "memory" );
+    for( ; ; ); /* not reached */
+}
