@@ -23,6 +23,16 @@ type event = {
 }
 
 external select_on_poll: (Unix.file_descr * event) array -> int -> int = "stub_select_on_poll"
+external set_fd_limit: int -> unit = "stub_set_fd_limit"
+
+(* The rlim_max given to setrlimit must not go above the system level nr_open,
+   which we can read from /proc/sys. *)
+let get_sys_fs_nr_open () =
+	try
+		let ch = open_in "/proc/sys/fs/nr_open" in
+		let v = int_of_string (input_line ch) in
+		close_in_noerr ch; v
+	with _ -> 1024 * 1024
 
 let init_event () = {read = false; write = false; except = false}
 

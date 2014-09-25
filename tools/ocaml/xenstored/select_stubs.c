@@ -66,3 +66,15 @@ CAMLprim value stub_select_on_poll(value fd_events, value timeo) {
 
 	CAMLreturn(Val_int(rc));
 }
+
+
+CAMLprim value stub_set_fd_limit(value limit) {
+
+	CAMLparam1(limit);
+	struct rlimit rl;
+
+	rl.rlim_cur = rl.rlim_max = Int_val(limit);
+	if (setrlimit(RLIMIT_NOFILE, &rl) != 0) uerror("setrlimit", Nothing);
+	CAMLreturn(Val_unit);
+
+}
