@@ -57,7 +57,10 @@ let process_domains store cons domains =
 			let con = Connections.find_domain cons (Domain.get_id domain) in
 				Process.do_input store cons domains con;
 				Process.do_output store cons domains con in
-	Domains.iter domains do_io_domain
+	List.iter
+		(fun c ->
+		 match Connection.get_domain c with
+		 | Some d -> do_io_domain d | _ -> ())
 
 let sigusr1_handler store =
 	try
@@ -305,6 +308,7 @@ let _ =
 			Connections.add_anonymous cons cfd can_write
 		and handle_eventchn fd =
 			let port = Event.pending eventchn in
+			debug "pending port %d" (Xeneventchn.to_int port);
 			finally (fun () ->
 				if Some port = eventchn.Event.virq_port then (
 					let (notify, deaddom) = Domains.cleanup xc domains in
@@ -312,7 +316,10 @@ let _ =
 					if deaddom <> [] || notify then
 						Connections.fire_spec_watches cons "@releaseDomain"
 				)
-			) (fun () -> Event.unmask eventchn port);
+				else
+					let c = Connections.find_domain_by_port cons port in
+					process_domains store cons domains [c]
+				) (fun () -> Event.unmask eventchn port)
 		and do_if_set fd set fct =
 			if List.mem fd set then
 				fct fd in
@@ -382,7 +389,7 @@ let _ =
 			process_special_fds sfds;
 		if List.length cfds > 0 || List.length wset > 0 then
 			process_connection_fds store cons domains cfds wset;
-		process_domains store cons domains
+		process_domains store cons domains mw
 		in
 
 	while not !quit

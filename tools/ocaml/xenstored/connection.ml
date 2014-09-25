@@ -223,9 +223,13 @@ let pop_in con = Xenbus.Xb.get_in_packet con.xb
 let has_more_input con = Xenbus.Xb.has_more_input con.xb
 
 let has_output con = Xenbus.Xb.has_output con.xb
+let has_old_output con = Xenbus.Xb.has_old_output con.xb
 let has_new_output con = Xenbus.Xb.has_new_output con.xb
 let peek_output con = Xenbus.Xb.peek_output con.xb
 let do_output con = Xenbus.Xb.output con.xb
+
+let has_more_work con =
+	has_more_input con || not (has_old_output con) && has_new_output con
 
 let incr_ops con = con.stat_nb_ops <- con.stat_nb_ops + 1
 
