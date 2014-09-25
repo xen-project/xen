@@ -248,3 +248,23 @@ static void __init noreturn efi_arch_post_exit_boot(void)
                    : "memory" );
     for( ; ; ); /* not reached */
 }
+
+static void __init efi_arch_cfg_file_early(EFI_FILE_HANDLE dir_handle, char *section)
+{
+}
+
+static void __init efi_arch_cfg_file_late(EFI_FILE_HANDLE dir_handle, char *section)
+{
+    union string name;
+
+    name.s = get_value(&cfg, section, "ucode");
+    if ( !name.s )
+        name.s = get_value(&cfg, "global", "ucode");
+    if ( name.s )
+    {
+        microcode_set_module(mbi.mods_count);
+        split_value(name.s);
+        read_file(dir_handle, s2w(&name), &ucode);
+        efi_bs->FreePool(name.w);
+    }
+}

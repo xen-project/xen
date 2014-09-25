@@ -57,6 +57,12 @@ static void  DisplayUint(UINT64 Val, INTN Width);
 static CHAR16 *wstrcpy(CHAR16 *d, const CHAR16 *s);
 static void noreturn blexit(const CHAR16 *str);
 static void PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode);
+static char *get_value(const struct file *cfg, const char *section,
+                              const char *item);
+static void  split_value(char *s);
+static CHAR16 *s2w(union string *str);
+static bool_t  read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
+                               struct file *file);
 
 static EFI_BOOT_SERVICES *__initdata efi_bs;
 static EFI_HANDLE __initdata efi_ih;
@@ -846,6 +852,9 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     }
     if ( !name.s )
         blexit(L"No Dom0 kernel image specified.");
+
+    efi_arch_cfg_file_early(dir_handle, section.s);
+
     split_value(name.s);
     read_file(dir_handle, s2w(&name), &kernel);
     efi_bs->FreePool(name.w);
@@ -860,17 +869,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     {
         split_value(name.s);
         read_file(dir_handle, s2w(&name), &ramdisk);
-        efi_bs->FreePool(name.w);
-    }
-
-    name.s = get_value(&cfg, section.s, "ucode");
-    if ( !name.s )
-        name.s = get_value(&cfg, "global", "ucode");
-    if ( name.s )
-    {
-        microcode_set_module(mbi.mods_count);
-        split_value(name.s);
-        read_file(dir_handle, s2w(&name), &ucode);
         efi_bs->FreePool(name.w);
     }
 
@@ -912,6 +910,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
                 cols = rows = depth = 0;
         }
     }
+    efi_arch_cfg_file_late(dir_handle, section.s);
 
     efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
     cfg.addr = 0;
