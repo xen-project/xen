@@ -61,6 +61,7 @@ static char *get_value(const struct file *cfg, const char *section,
                               const char *item);
 static void  split_value(char *s);
 static CHAR16 *s2w(union string *str);
+static char *w2s(const union string *str);
 static bool_t  read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
                                struct file *file);
 
@@ -261,7 +262,8 @@ static void __init PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode)
 }
 
 static unsigned int __init get_argv(unsigned int argc, CHAR16 **argv,
-                                    CHAR16 *cmdline, UINTN cmdsize)
+                                    CHAR16 *cmdline, UINTN cmdsize,
+                                    CHAR16 **options)
 {
     CHAR16 *ptr = (CHAR16 *)(argv + argc + 1), *prev = NULL;
     bool_t prev_sep = TRUE;
@@ -287,10 +289,8 @@ static unsigned int __init get_argv(unsigned int argc, CHAR16 **argv,
                 ++argc;
             else if ( prev && wstrcmp(prev, L"--") == 0 )
             {
-                union string rest = { .w = cmdline };
-
-                --argv;
-                place_string(&mbi.cmdline, w2s(&rest));
+                if ( options )
+                    *options = cmdline;
                 break;
             }
             else
@@ -666,7 +666,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_LOADED_IMAGE *loaded_image;
     EFI_STATUS status;
     unsigned int i, argc;
-    CHAR16 **argv, *file_name, *cfg_file_name = NULL;
+    CHAR16 **argv, *file_name, *cfg_file_name = NULL, *options = NULL;
     UINTN cols, rows, depth, size, map_key, info_size, gop_mode = ~0;
     EFI_HANDLE *handles = NULL;
     EFI_SHIM_LOCK_PROTOCOL *shim_lock;
@@ -704,14 +704,14 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     dir_handle = get_parent_handle(loaded_image, &file_name);
 
     argc = get_argv(0, NULL, loaded_image->LoadOptions,
-                    loaded_image->LoadOptionsSize);
+                    loaded_image->LoadOptionsSize, NULL);
     if ( argc > 0 &&
          efi_bs->AllocatePool(EfiLoaderData,
                               (argc + 1) * sizeof(*argv) +
                                   loaded_image->LoadOptionsSize,
                               (void **)&argv) == EFI_SUCCESS )
         get_argv(argc, argv, loaded_image->LoadOptions,
-                 loaded_image->LoadOptionsSize);
+                 loaded_image->LoadOptionsSize, &options);
     else
         argc = 0;
     for ( i = 1; i < argc; ++i )
@@ -881,17 +881,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     }
 
     name.s = get_value(&cfg, section.s, "options");
-    if ( name.s )
-        place_string(&mbi.cmdline, name.s);
-    /* Insert image name last, as it gets prefixed to the other options. */
-    if ( argc )
-    {
-        name.w = *argv;
-        w2s(&name);
-    }
-    else
-        name.s = "xen";
-    place_string(&mbi.cmdline, name.s);
+    efi_arch_handle_cmdline(argc ? *argv : NULL, options, name.s);
 
     cols = rows = depth = 0;
     if ( !base_video )
@@ -957,15 +947,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             }
         }
     }
-
-    if ( mbi.cmdline )
-        mbi.flags |= MBI_CMDLINE;
-    /*
-     * These must not be initialized statically, since the value must
-     * not get relocated when processing base relocations below.
-     */
-    mbi.boot_loader_name = (long)"EFI";
-    mbi.mods_addr = (long)mb_modules;
 
     /* Collect EDD info. */
     BUILD_BUG_ON(offsetof(struct edd_info, edd_device_params) != EDDEXTSIZE);

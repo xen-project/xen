@@ -268,3 +268,37 @@ static void __init efi_arch_cfg_file_late(EFI_FILE_HANDLE dir_handle, char *sect
         efi_bs->FreePool(name.w);
     }
 }
+
+static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
+                                           CHAR16 *cmdline_options,
+                                           char *cfgfile_options)
+{
+    union string name;
+
+    if ( cmdline_options )
+    {
+        name.w = cmdline_options;
+        w2s(&name);
+        place_string(&mbi.cmdline, name.s);
+    }
+    if ( cfgfile_options )
+        place_string(&mbi.cmdline, cfgfile_options);
+    /* Insert image name last, as it gets prefixed to the other options. */
+    if ( image_name )
+    {
+        name.w = image_name;
+        w2s(&name);
+    }
+    else
+        name.s = "xen";
+    place_string(&mbi.cmdline, name.s);
+
+    if ( mbi.cmdline )
+        mbi.flags |= MBI_CMDLINE;
+    /*
+     * These must not be initialized statically, since the value must
+     * not get relocated when processing base relocations later.
+     */
+    mbi.boot_loader_name = (long)"EFI";
+    mbi.mods_addr = (long)mb_modules;
+}
