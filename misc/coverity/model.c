@@ -121,6 +121,16 @@ void libxl__ctx_unlock(libxl_ctx *ctx)
 }
 
 /*
+ * Coverity doesn't understand __builtin_unreachable(), which causes it to
+ * incorrectly find issues based on continuing execution along the false
+ * branch of an ASSERT().
+ */
+void __builtin_unreachable(void)
+{
+    __coverity_panic__();
+}
+
+/*
  * Local variables:
  * mode: C
  * c-file-style: "BSD"
