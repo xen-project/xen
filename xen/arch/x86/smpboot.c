@@ -391,17 +391,17 @@ extern void *stack_start;
 static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
     unsigned long send_status = 0, accept_status = 0;
-    int maxlvt, timeout, num_starts, i;
+    int maxlvt, timeout, i;
 
     /*
      * Be paranoid about clearing APIC errors.
      */
-    if ( APIC_INTEGRATED(apic_version[phys_apicid]) )
-    {
-        apic_read_around(APIC_SPIV);
-        apic_write(APIC_ESR, 0);
-        apic_read(APIC_ESR);
-    }
+    if ( !APIC_INTEGRATED(apic_version[phys_apicid]) )
+        return -ENODEV;
+
+    apic_read_around(APIC_SPIV);
+    apic_write(APIC_ESR, 0);
+    apic_read(APIC_ESR);
 
     Dprintk("Asserting INIT.\n");
 
@@ -448,20 +448,9 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
         udelay(10);
     }
 
-    /*
-     * Should we send STARTUP IPIs ?
-     *
-     * Determine this based on the APIC version.
-     * If we don't have an integrated APIC, don't send the STARTUP IPIs.
-     */
-    num_starts = APIC_INTEGRATED(apic_version[phys_apicid]) ? 2 : 0;
-
-    /* Run STARTUP IPI loop. */
-    Dprintk("#startup loops: %d.\n", num_starts);
-
     maxlvt = get_maxlvt();
 
-    for ( i = 0; i < num_starts; i++ )
+    for ( i = 0; i < 2; i++ )
     {
         Dprintk("Sending STARTUP #%d.\n", i+1);
         apic_read_around(APIC_SPIV);
@@ -761,8 +750,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
     }
 
     /* If we couldn't find a local APIC, then get out of here now! */
-    if ( APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])
-         && !cpu_has_apic )
+    if ( !APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])
+         || !cpu_has_apic )
     {
         printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
                boot_cpu_physical_apicid);
