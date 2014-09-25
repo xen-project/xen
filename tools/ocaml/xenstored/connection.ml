@@ -45,6 +45,20 @@ let mark_as_bad con =
 	|None -> ()
 	| Some domain -> Domain.mark_as_bad domain
 
+let initial_next_tid = 1
+
+let reconnect con =
+	Xenbus.Xb.reconnect con.xb;
+	(* dom is the same *)
+	Hashtbl.clear con.transactions;
+	con.next_tid <- initial_next_tid;
+	Hashtbl.clear con.watches;
+	(* anonid is the same *)
+	con.nb_watches <- 0;
+	con.stat_nb_ops <- 0;
+	(* perm is the same *)
+	()
+
 let get_path con =
 Printf.sprintf "/local/domain/%i/" (match con.dom with None -> 0 | Some d -> Domain.get_id d)
 
@@ -89,7 +103,7 @@ let create xbcon dom =
 	xb = xbcon;
 	dom = dom;
 	transactions = Hashtbl.create 5;
-	next_tid = 1;
+	next_tid = initial_next_tid;
 	watches = Hashtbl.create 8;
 	nb_watches = 0;
 	anonid = id;

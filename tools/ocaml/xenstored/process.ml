@@ -377,7 +377,12 @@ let do_input store cons doms con =
 	let newpacket =
 		try
 			Connection.do_input con
-		with Failure exp ->
+		with Xenbus.Xb.Reconnect ->
+			info "%s requests a reconnect" (Connection.get_domstr con);
+			Connection.reconnect con;
+			info "%s reconnection complete" (Connection.get_domstr con);
+			false
+		| Failure exp ->
 			error "caught exception %s" exp;
 			error "got a bad client %s" (sprintf "%-8s" (Connection.get_domstr con));
 			Connection.mark_as_bad con;
@@ -407,6 +412,11 @@ let do_output store cons doms con =
 			         (Xenbus.Xb.Op.to_string ty) (sanitize_data data);*)
 			write_answer_log ~ty ~tid ~con ~data;
 		);
-		ignore (Connection.do_output con)
+		try
+			ignore (Connection.do_output con)
+		with Xenbus.Xb.Reconnect ->
+			info "%s requests a reconnect" (Connection.get_domstr con);
+			Connection.reconnect con;
+			info "%s reconnection complete" (Connection.get_domstr con)
 	)
 

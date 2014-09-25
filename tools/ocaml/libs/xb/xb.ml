@@ -21,6 +21,10 @@ exception End_of_file
 exception Eagain
 exception Noent
 exception Invalid
+exception Reconnect
+
+let _ =
+  Callback.register_exception "Xb.Reconnect" Reconnect
 
 type backend_mmap =
 {
@@ -49,6 +53,19 @@ type t =
 
 let init_partial_in () = NoHdr
 	(Partial.header_size (), String.make (Partial.header_size()) '\000')
+
+let reconnect t = match t.backend with
+	| Fd _ ->
+		(* should never happen, so close the connection *)
+		raise End_of_file
+	| Xenmmap backend ->
+		Xs_ring.close backend.mmap;
+		backend.eventchn_notify ();
+		(* Clear our old connection state *)
+		Queue.clear t.pkt_in;
+		Queue.clear t.pkt_out;
+		t.partial_in <- init_partial_in ();
+		t.partial_out <- ""
 
 let queue con pkt = Queue.push pkt con.pkt_out
 
@@ -84,6 +101,7 @@ let write con s len =
 	| Fd backfd     -> write_fd backfd con s len
 	| Xenmmap backmmap -> write_mmap backmmap con s len
 
+(* NB: can throw Reconnect *)
 let output con =
 	(* get the output string from a string_of(packet) or partial_out *)
 	let s = if String.length con.partial_out > 0 then
@@ -102,6 +120,7 @@ let output con =
 	(* after sending one packet, partial is empty *)
 	con.partial_out = ""
 
+(* NB: can throw Reconnect *)
 let input con =
 	let newpacket = ref false in
 	let to_read =
@@ -145,6 +164,8 @@ let newcon backend = {
 let open_fd fd = newcon (Fd { fd = fd; })
 
 let open_mmap mmap notifyfct =
+	(* Advertise XENSTORE_SERVER_FEATURE_RECONNECTION *)
+	Xs_ring.set_server_features mmap (Xs_ring.Server_features.singleton Xs_ring.Server_feature.Reconnection);
 	newcon (Xenmmap {
 		mmap = mmap;
 		eventchn_notify = notifyfct;

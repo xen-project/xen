@@ -1,0 +1,116 @@
+The xenstore ring is a datastructure stored within a single 4KiB page
+shared between the xenstore server and the guest. The ring contains
+two queues of bytes -- one in each direction -- and some signalling
+information. The [xenstore protocol](xenstore.txt) is layered on top of
+the byte streams.
+
+The xenstore ring datastructure
+===============================
+
+The following table describes the ring structure where
+  - offsets and lengths are in bytes;
+  - "Input" is used to describe the data sent to the server; and
+  - "Output" is used to describe the data sent to the domain.
+
+Offset  Length  Description
+-----------------------------------------------------------------
+0       1024    Input data
+1024    1024    Output data
+2048    4       Input consumer offset
+2052    4       Input producer offset
+2056    4       Output consumer offset
+2060    4       Output producer offset
+2064    4       Server feature bitmap
+2068    4       Connection state
+
+The Input data and Output data are circular buffers. Each buffer is
+associated with a pair of free-running offsets labelled "consumer" and
+"producer".
+
+A "producer" offset is the offset in the byte stream of the next byte
+to be written modulo 2^32. A "consumer" offset is the offset in the byte
+stream of the next byte to be read modulo 2^32. Implementations must
+take care to handle wraparound properly when performing arithmetic with
+these values.
+
+The byte at offset 'x' in the byte stream will be stored at offset
+'x modulo 1024' in the circular buffer.
+
+Implementations may only overwrite previously-written data if it has
+been marked as 'consumed' by the relevant consumer pointer.
+
+When the guest domain is created, there is no outstanding Input or Output
+data. However
+
+  - guests must not assume that producer or consumer pointers start
+    at zero; and
+  - guests must not assume that unused bytes in either the Input or
+    Output data buffers has any particular value.
+
+A xenstore ring is always associated with an event channel. Whenever the
+ring structure is updated the event channel must be signalled. The
+guest and server are free to inspect the contents of the ring at any
+time, not only in response to an event channel event. This implies that
+updates must be ordered carefully to ensure consistency.
+
+The xenstore server may decide to advertise some features via the
+"Server feature bitmap". The server can start advertising features
+at any time by setting bits but it will never stop advertising features
+i.e. bits will never be cleared. The guest is not permitted to write to
+the server feature bitmap. The server features are offered to the guest;
+it is up to the guest whether to use them or not. The guest should ignore
+any unknown feature bits.
+
+The following features are defined:
+
+Mask    Description
+-----------------------------------------------------------------
+1       Ring reconnection (see the ring reconnection feature below)
+
+The "Connection state" field is used to request a ring close and reconnect.
+The "Connection state" field only contains valid data if the server has
+advertised the ring reconnection feature. If the feature has been advertised
+then the "Connection state" may take the following values:
+
+Value   Description
+-----------------------------------------------------------------
+0       Ring is connected
+1       Ring close and reconnect is in progress (see the "ring
+        reconnection feature" described below)
+
+The ring reconnection feature
+=============================
+
+The ring reconnection feature allows the guest to ask the server to
+reset the ring to a valid initial state i.e. one in which the Input
+and Output queues contain no data and there are no outstanding requests,
+watches or transactions.
+
+The ring reconnection feature is only available if the 'Ring reconnection'
+feature bit has been set by the server in the "Server feature bitmap".
+If a server supports ring reconnection, it will guarantee to advertise
+the feature before producing or consuming any data from the Input or Output
+queues.
+
+Assuming the server has advertised the feature, the guest can initiate
+a reconnection by setting the the Connection state to 1 ("Ring close
+and reconnect is in progress") and signalling the event channel.
+The guest must now ignore all fields except the Connection state and
+wait for it to be set to 0 ("Ring is connected")
+
+The server will guarantee to
+
+  - drop any partially read or written higher-level
+    [xenstore protocol](xenstore.txt) packets it may have;
+  - empty the Input and Output queues in the xenstore ring;
+  - discard any in-flight requests
+  - discard any watches associated with the connection
+  - discard any transactions associated with the connection
+  - set the Connection state to 0 ("Ring is connected"); and
+  - signal the event channel.
+
+From the point of view of the guest, the connection has been reset on a
+packet boundary.
+
+Note that only the guest may set the Connection state to 1 and only the
+server may set it back to 0.

@@ -23,7 +23,7 @@ module Op :
       | Resume
       | Set_target
       | Restrict
-      | Invalid (* Not a valid wire operation *)
+      | Invalid
     val operation_c_mapping : operation array
     val size : int
     val array_search : 'a -> 'a array -> int
@@ -57,6 +57,7 @@ exception End_of_file
 exception Eagain
 exception Noent
 exception Invalid
+exception Reconnect
 type backend_mmap = {
   mmap : Xenmmap.mmap_interface;
   eventchn_notify : unit -> unit;
@@ -73,6 +74,7 @@ type t = {
   mutable partial_out : string;
 }
 val init_partial_in : unit -> partial_buf
+val reconnect : t -> unit
 val queue : t -> Packet.t -> unit
 val read_fd : backend_fd -> 'a -> string -> int -> int
 val read_mmap : backend_mmap -> 'a -> string -> int -> int
