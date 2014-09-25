@@ -18,17 +18,17 @@
 let debug fmt = Logging.debug "connections" fmt
 
 type t = {
-	mutable anonymous: Connection.t list;
+	anonymous: (Unix.file_descr, Connection.t) Hashtbl.t;
 	domains: (int, Connection.t) Hashtbl.t;
 	mutable watches: (string, Connection.watch list) Trie.t;
 }
 
-let create () = { anonymous = []; domains = Hashtbl.create 8; watches = Trie.create () }
+let create () = { anonymous = Hashtbl.create 37; domains = Hashtbl.create 37; watches = Trie.create () }
 
 let add_anonymous cons fd can_write =
 	let xbcon = Xenbus.Xb.open_fd fd in
 	let con = Connection.create xbcon None in
-	cons.anonymous <- con :: cons.anonymous
+	Hashtbl.add cons.anonymous (Xenbus.Xb.get_fd xbcon) con
 
 let add_domain cons dom =
 	let xbcon = Xenbus.Xb.open_mmap (Domain.get_interface dom) (fun () -> Domain.notify dom) in
@@ -36,14 +36,14 @@ let add_domain cons dom =
 	Hashtbl.add cons.domains (Domain.get_id dom) con
 
 let select cons =
-	let inset = List.map (fun c -> Connection.get_fd c) cons.anonymous
-	and outset = List.fold_left (fun l c -> if Connection.has_output c
-						then Connection.get_fd c :: l
-						else l) [] cons.anonymous in
-	inset, outset
+	Hashtbl.fold
+		(fun _ con (ins, outs) ->
+		 let fd = Connection.get_fd con in
+		 (fd :: ins,  if Connection.has_output con then fd :: outs else outs))
+		cons.anonymous ([], [])
 
-let find cons fd =
-	List.find (fun c -> Connection.get_fd c = fd) cons.anonymous
+let find cons =
+	Hashtbl.find cons.anonymous
 
 let find_domain cons id =
 	Hashtbl.find cons.domains id
@@ -55,7 +55,7 @@ let del_watches_of_con con watches =
 
 let del_anonymous cons con =
 	try
-		cons.anonymous <- Utils.list_remove con cons.anonymous;
+		Hashtbl.remove cons.anonymous (Connection.get_fd con);
 		cons.watches <- Trie.map (del_watches_of_con con) cons.watches;
 		Connection.close con
 	with exn ->
@@ -74,7 +74,7 @@ let iter_domains cons fct =
 	Hashtbl.iter (fun k c -> fct c) cons.domains
 
 let iter_anonymous cons fct =
-	List.iter (fun c -> fct c) (List.rev cons.anonymous)
+	Hashtbl.iter (fun _ c -> fct c) cons.anonymous
 
 let iter cons fct =
 	iter_domains cons fct; iter_anonymous cons fct
@@ -163,10 +163,10 @@ let stats cons =
 		nb_ops_dom := !nb_ops_dom + con_ops;
 		nb_watchs_dom := !nb_watchs_dom + con_watchs;
 	);
-	(List.length cons.anonymous, !nb_ops_anon, !nb_watchs_anon,
+	(Hashtbl.length cons.anonymous, !nb_ops_anon, !nb_watchs_anon,
 	 Hashtbl.length cons.domains, !nb_ops_dom, !nb_watchs_dom)
 
 let debug cons =
-	let anonymous = List.map Connection.debug cons.anonymous in
+	let anonymous = Hashtbl.fold (fun _ con accu -> Connection.debug con :: accu) cons.anonymous [] in
 	let domains = Hashtbl.fold (fun _ con accu -> Connection.debug con :: accu) cons.domains [] in
 	String.concat "" (domains @ anonymous)
