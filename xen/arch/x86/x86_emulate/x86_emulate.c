@@ -3769,8 +3769,7 @@ x86_emulate(
 
     case 0x05: /* syscall */ {
         uint64_t msr_content;
-        struct segment_register cs = { 0 }, ss = { 0 };
-        int rc;
+        struct segment_register cs, ss;
 
         generate_exception_if(in_realmode(ctxt, ops), EXC_UD, -1);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
@@ -3784,13 +3783,11 @@ x86_emulate(
         if ( (rc = ops->read_msr(MSR_STAR, &msr_content, ctxt)) != 0 )
             goto done;
 
-        msr_content >>= 32;
-        cs.sel = (uint16_t)(msr_content & 0xfffc);
-        ss.sel = (uint16_t)(msr_content + 8);
+        cs.sel = (msr_content >> 32) & ~3; /* SELECTOR_RPL_MASK */
+        ss.sel = cs.sel + 8;
 
         cs.base = ss.base = 0; /* flat segment */
         cs.limit = ss.limit = ~0u;  /* 4GB limit */
-        cs.attr.bytes = 0xc9b; /* G+DB+P+S+Code */
         ss.attr.bytes = 0xc93; /* G+DB+P+S+Data */
 
 #ifdef __x86_64__
@@ -3799,8 +3796,7 @@ x86_emulate(
             goto cannot_emulate;
         if ( rc )
         {
-            cs.attr.fields.db = 0;
-            cs.attr.fields.l = 1;
+            cs.attr.bytes = 0xa9b; /* L+DB+P+S+Code */
 
             _regs.rcx = _regs.rip;
             _regs.r11 = _regs.eflags & ~EFLG_RF;
@@ -3817,10 +3813,9 @@ x86_emulate(
         else
 #endif
         {
-            if ( (rc = ops->read_msr(MSR_STAR, &msr_content, ctxt)) != 0 )
-                goto done;
+            cs.attr.bytes = 0xc9b; /* G+DB+P+S+Code */
 
-            _regs.ecx = _regs.eip;
+            _regs.ecx = (uint32_t)_regs.eip;
             _regs.eip = (uint32_t)msr_content;
             _regs.eflags &= ~(EFLG_VM | EFLG_IF | EFLG_RF);
         }
@@ -4012,7 +4007,7 @@ x86_emulate(
     case 0x34: /* sysenter */ {
         uint64_t msr_content;
         struct segment_register cs, ss;
-        int rc;
+        int lm;
 
         generate_exception_if(mode_ring0(), EXC_GP, 0);
         generate_exception_if(in_realmode(ctxt, ops), EXC_GP, 0);
@@ -4022,33 +4017,25 @@ x86_emulate(
         if ( (rc = ops->read_msr(MSR_SYSENTER_CS, &msr_content, ctxt)) != 0 )
             goto done;
 
-        if ( mode_64bit() )
-            generate_exception_if(msr_content == 0, EXC_GP, 0);
-        else
-            generate_exception_if((msr_content & 0xfffc) == 0, EXC_GP, 0);
+        generate_exception_if(!(msr_content & 0xfffc), EXC_GP, 0);
+        lm = in_longmode(ctxt, ops);
+        if ( lm < 0 )
+            goto cannot_emulate;
 
         _regs.eflags &= ~(EFLG_VM | EFLG_IF | EFLG_RF);
 
         fail_if(ops->read_segment == NULL);
         ops->read_segment(x86_seg_cs, &cs, ctxt);
-        cs.sel = (uint16_t)msr_content & ~3; /* SELECTOR_RPL_MASK */
+        cs.sel = msr_content & ~3; /* SELECTOR_RPL_MASK */
         cs.base = 0;   /* flat segment */
         cs.limit = ~0u;  /* 4GB limit */
-        cs.attr.bytes = 0xc9b; /* G+DB+P+S+Code */
+        cs.attr.bytes = lm ? 0xa9b  /* L+DB+P+S+Code */
+                           : 0xc9b; /* G+DB+P+S+Code */
 
         ss.sel = cs.sel + 8;
         ss.base = 0;   /* flat segment */
         ss.limit = ~0u;  /* 4GB limit */
         ss.attr.bytes = 0xc93; /* G+DB+P+S+Data */
-
-        rc = in_longmode(ctxt, ops);
-        if ( rc < 0 )
-            goto cannot_emulate;
-        if ( rc )
-        {
-            cs.attr.fields.db = 0;
-            cs.attr.fields.l = 1;
-        }
 
         fail_if(ops->write_segment == NULL);
         if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) != 0 ||
@@ -4057,11 +4044,11 @@ x86_emulate(
 
         if ( (rc = ops->read_msr(MSR_SYSENTER_EIP, &msr_content, ctxt)) != 0 )
             goto done;
-        _regs.eip = msr_content;
+        _regs.eip = lm ? msr_content : (uint32_t)msr_content;
 
         if ( (rc = ops->read_msr(MSR_SYSENTER_ESP, &msr_content, ctxt)) != 0 )
             goto done;
-        _regs.esp = msr_content;
+        _regs.esp = lm ? msr_content : (uint32_t)msr_content;
 
         break;
     }
@@ -4070,7 +4057,6 @@ x86_emulate(
         uint64_t msr_content;
         struct segment_register cs, ss;
         bool_t user64 = !!(rex_prefix & REX_W);
-        int rc;
 
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         generate_exception_if(in_realmode(ctxt, ops), EXC_GP, 0);
@@ -4080,42 +4066,27 @@ x86_emulate(
         if ( (rc = ops->read_msr(MSR_SYSENTER_CS, &msr_content, ctxt)) != 0 )
             goto done;
 
-        if ( user64 )
-        {
-            cs.sel = (uint16_t)(msr_content + 32);
-            ss.sel = (cs.sel + 8);
-            generate_exception_if(msr_content == 0, EXC_GP, 0);
-        }
-        else
-        {
-            cs.sel = (uint16_t)(msr_content + 16);
-            ss.sel = (uint16_t)(msr_content + 24);
-            generate_exception_if((msr_content & 0xfffc) == 0, EXC_GP, 0);
-        }
+        generate_exception_if(!(msr_content & 0xfffc), EXC_GP, 0);
 
-        cs.sel |= 0x3;   /* SELECTOR_RPL_MASK */
+        cs.sel = (msr_content | 3) + /* SELECTOR_RPL_MASK */
+                 (user64 ? 32 : 16);
         cs.base = 0;   /* flat segment */
         cs.limit = ~0u;  /* 4GB limit */
-        cs.attr.bytes = 0xcfb; /* G+DB+P+DPL3+S+Code */
+        cs.attr.bytes = user64 ? 0xafb  /* L+DB+P+DPL3+S+Code */
+                               : 0xcfb; /* G+DB+P+DPL3+S+Code */
 
-        ss.sel |= 0x3;   /* SELECTOR_RPL_MASK */
+        ss.sel = cs.sel + 8;
         ss.base = 0;   /* flat segment */
         ss.limit = ~0u;  /* 4GB limit */
         ss.attr.bytes = 0xcf3; /* G+DB+P+DPL3+S+Data */
-
-        if ( user64 )
-        {
-            cs.attr.fields.db = 0;
-            cs.attr.fields.l = 1;
-        }
 
         fail_if(ops->write_segment == NULL);
         if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) != 0 ||
              (rc = ops->write_segment(x86_seg_ss, &ss, ctxt)) != 0 )
             goto done;
 
-        _regs.eip = _regs.edx;
-        _regs.esp = _regs.ecx;
+        _regs.eip = user64 ? _regs.edx : (uint32_t)_regs.edx;
+        _regs.esp = user64 ? _regs.ecx : (uint32_t)_regs.ecx;
         break;
     }
 
