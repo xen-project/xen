@@ -65,7 +65,7 @@
 	1;                                      \
 })
 
-extern char _start[], _end[];
+extern char _start[], _end[], start[];
 #define is_kernel(p) ({                         \
     char *__p = (char *)(unsigned long)(p);     \
     (__p >= _start) && (__p < _end);            \
