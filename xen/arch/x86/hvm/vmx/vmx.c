@@ -3123,8 +3123,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_APIC_WRITE:
-        if ( vmx_handle_apic_write() )
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        vmx_handle_apic_write();
         break;
 
     case EXIT_REASON_ACCESS_GDTR_OR_IDTR:

@@ -4504,7 +4504,8 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
 
     case MSR_IA32_APICBASE:
-        vlapic_msr_set(vcpu_vlapic(v), msr_content);
+        if ( !vlapic_msr_set(vcpu_vlapic(v), msr_content) )
+            goto gp_fault;
         break;
 
     case MSR_IA32_TSC_DEADLINE:
