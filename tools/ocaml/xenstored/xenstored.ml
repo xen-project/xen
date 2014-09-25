@@ -368,7 +368,7 @@ let _ =
 		let timeout = if List.length mw > 0 then 0. else -1. in
 		let rset, wset, _ =
 		try
-			Unix.select (spec_fds @ inset) outset [] timeout
+			Select.select (spec_fds @ inset) outset [] timeout
 		with Unix.Unix_error(Unix.EINTR, _, _) ->
 			[], [], [] in
 		let sfds, cfds =
