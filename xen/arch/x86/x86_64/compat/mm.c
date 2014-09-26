@@ -198,10 +198,6 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     }
 
-    case XENMEM_access_op:
-        rc = mem_access_memop(cmd, guest_handle_cast(arg, xen_mem_access_op_t));
-        break;
-
     case XENMEM_sharing_op:
     {
         xen_mem_sharing_op_t mso;

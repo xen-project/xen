@@ -21,13 +21,14 @@
 #include <xen/errno.h>
 #include <xen/tmem.h>
 #include <xen/tmem_xen.h>
+#include <xen/numa.h>
+#include <xen/mem_access.h>
+#include <xen/trace.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <asm/p2m.h>
-#include <xen/numa.h>
 #include <public/memory.h>
 #include <xsm/xsm.h>
-#include <xen/trace.h>
 
 struct memop_args {
     /* INPUT */
@@ -938,6 +939,10 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         break;
     }
+
+    case XENMEM_access_op:
+        rc = mem_access_memop(cmd, guest_handle_cast(arg, xen_mem_access_op_t));
+        break;
 
     case XENMEM_claim_pages:
         if ( copy_from_guest(&reservation, arg, 1) )

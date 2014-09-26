@@ -589,6 +589,9 @@ int p2m_get_mem_access(struct domain *d, unsigned long pfn,
 void p2m_mem_event_emulate_check(struct vcpu *v,
                                  const mem_event_response_t *rsp);
 
+/* Enable arch specific introspection options (such as MSR interception). */
+void p2m_setup_introspection(struct domain *d);
+
 /* 
  * Internal functions, only called by other p2m code
  */

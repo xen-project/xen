@@ -1131,14 +1131,6 @@ long arch_do_domctl(
     }
     break;
 
-    case XEN_DOMCTL_mem_event_op:
-    {
-        ret = mem_event_domctl(d, &domctl->u.mem_event_op,
-                              guest_handle_cast(u_domctl, void));
-        copyback = 1;
-    }
-    break;
-
     case XEN_DOMCTL_mem_sharing_op:
     {
         ret = mem_sharing_domctl(d, &domctl->u.mem_sharing_op);
