@@ -22,7 +22,7 @@
 
 
 #include <asm/p2m.h>
-#include <asm/mem_event.h>
+#include <xen/mem_event.h>
 
 
 int mem_paging_memop(struct domain *d, xen_mem_event_op_t *mec)

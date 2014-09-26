@@ -20,16 +20,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <xen/iommu.h>
+#include <xen/mem_event.h>
+#include <xen/event.h>
+#include <public/mem_event.h>
 #include <asm/domain.h>
 #include <asm/page.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
 #include <asm/hvm/vmx/vmx.h> /* ept_p2m_init() */
-#include <xen/iommu.h>
-#include <asm/mem_event.h>
-#include <public/mem_event.h>
 #include <asm/mem_sharing.h>
-#include <xen/event.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 

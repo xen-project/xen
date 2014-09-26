@@ -371,4 +371,10 @@ int guest_remove_page(struct domain *d, unsigned long gmfn);
 /* TRUE if the whole page at @mfn is of the requested RAM type(s) above. */
 int page_is_ram_type(unsigned long mfn, unsigned long mem_type);
 
+/* Prepare/destroy a ring for a dom0 helper. Helper with talk
+ * with Xen on behalf of this domain. */
+int prepare_ring_for_helper(struct domain *d, unsigned long gmfn,
+                            struct page_info **_page, void **_va);
+void destroy_ring_for_helper(void **_va, struct page_info *page);
+
 #endif /* __XEN_MM_H__ */

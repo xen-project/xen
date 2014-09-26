@@ -27,12 +27,12 @@
 #include <xen/mm.h>
 #include <xen/grant_table.h>
 #include <xen/sched.h>
+#include <xen/rcupdate.h>
+#include <xen/mem_event.h>
 #include <asm/page.h>
 #include <asm/string.h>
 #include <asm/p2m.h>
-#include <asm/mem_event.h>
 #include <asm/atomic.h>
-#include <xen/rcupdate.h>
 #include <asm/event.h>
 #include <xsm/xsm.h>
 

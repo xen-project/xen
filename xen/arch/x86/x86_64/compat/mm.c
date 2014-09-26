@@ -1,10 +1,10 @@
 #include <xen/event.h>
+#include <xen/mem_event.h>
+#include <xen/mem_access.h>
 #include <xen/multicall.h>
 #include <compat/memory.h>
 #include <compat/xen.h>
-#include <asm/mem_event.h>
 #include <asm/mem_sharing.h>
-#include <asm/mem_access.h>
 
 int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries)
 {

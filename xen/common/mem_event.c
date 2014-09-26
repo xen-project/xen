@@ -1,5 +1,5 @@
 /******************************************************************************
- * arch/x86/mm/mem_event.c
+ * mem_event.c
  *
  * Memory event support.
  *
@@ -21,14 +21,21 @@
  */
 
 
-#include <asm/domain.h>
+#include <xen/sched.h>
 #include <xen/event.h>
 #include <xen/wait.h>
+#include <xen/mem_event.h>
+#include <xen/mem_access.h>
 #include <asm/p2m.h>
-#include <asm/mem_event.h>
+
+#ifdef HAS_MEM_PAGING
 #include <asm/mem_paging.h>
-#include <asm/mem_access.h>
+#endif
+
+#ifdef HAS_MEM_SHARING
 #include <asm/mem_sharing.h>
+#endif
+
 #include <xsm/xsm.h>
 
 /* for public/io/ring.h macros */
@@ -419,26 +426,32 @@ int __mem_event_claim_slot(struct domain *d, struct mem_event_domain *med,
         return mem_event_grab_slot(med, (current->domain != d));
 }
 
+#ifdef HAS_MEM_PAGING
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void mem_paging_notification(struct vcpu *v, unsigned int port)
 {
     if ( likely(v->domain->mem_event->paging.ring_page != NULL) )
         p2m_mem_paging_resume(v->domain);
 }
+#endif
 
+#ifdef HAS_MEM_ACCESS
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void mem_access_notification(struct vcpu *v, unsigned int port)
 {
     if ( likely(v->domain->mem_event->access.ring_page != NULL) )
         p2m_mem_access_resume(v->domain);
 }
+#endif
 
+#ifdef HAS_MEM_SHARING
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void mem_sharing_notification(struct vcpu *v, unsigned int port)
 {
     if ( likely(v->domain->mem_event->share.ring_page != NULL) )
         mem_sharing_sharing_resume(v->domain);
 }
+#endif
 
 int do_mem_event_op(int op, uint32_t domain, void *arg)
 {
@@ -455,12 +468,16 @@ int do_mem_event_op(int op, uint32_t domain, void *arg)
 
     switch (op)
     {
+#ifdef HAS_MEM_PAGING
         case XENMEM_paging_op:
             ret = mem_paging_memop(d, (xen_mem_event_op_t *) arg);
             break;
+#endif
+#ifdef HAS_MEM_SHARING
         case XENMEM_sharing_op:
             ret = mem_sharing_memop(d, (xen_mem_sharing_op_t *) arg);
             break;
+#endif
         default:
             ret = -ENOSYS;
     }
@@ -473,6 +490,7 @@ int do_mem_event_op(int op, uint32_t domain, void *arg)
 /* Clean up on domain destruction */
 void mem_event_cleanup(struct domain *d)
 {
+#ifdef HAS_MEM_PAGING
     if ( d->mem_event->paging.ring_page ) {
         /* Destroying the wait queue head means waking up all
          * queued vcpus. This will drain the list, allowing
@@ -484,14 +502,19 @@ void mem_event_cleanup(struct domain *d)
         destroy_waitqueue_head(&d->mem_event->paging.wq);
         (void)mem_event_disable(d, &d->mem_event->paging);
     }
+#endif
+#ifdef HAS_MEM_ACCESS
     if ( d->mem_event->access.ring_page ) {
         destroy_waitqueue_head(&d->mem_event->access.wq);
         (void)mem_event_disable(d, &d->mem_event->access);
     }
+#endif
+#ifdef HAS_MEM_SHARING
     if ( d->mem_event->share.ring_page ) {
         destroy_waitqueue_head(&d->mem_event->share.wq);
         (void)mem_event_disable(d, &d->mem_event->share);
     }
+#endif
 }
 
 int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
@@ -528,6 +551,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 
     switch ( mec->mode )
     {
+#ifdef HAS_MEM_PAGING
     case XEN_DOMCTL_MEM_EVENT_OP_PAGING:
     {
         struct mem_event_domain *med = &d->mem_event->paging;
@@ -578,7 +602,9 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         }
     }
     break;
+#endif
 
+#ifdef HAS_MEM_ACCESS
     case XEN_DOMCTL_MEM_EVENT_OP_ACCESS: 
     {
         struct mem_event_domain *med = &d->mem_event->access;
@@ -627,7 +653,9 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         }
     }
     break;
+#endif
 
+#ifdef HAS_MEM_SHARING
     case XEN_DOMCTL_MEM_EVENT_OP_SHARING: 
     {
         struct mem_event_domain *med = &d->mem_event->share;
@@ -666,6 +694,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         }
     }
     break;
+#endif
 
     default:
         rc = -ENOSYS;

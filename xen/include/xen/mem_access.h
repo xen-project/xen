@@ -1,5 +1,5 @@
 /******************************************************************************
- * include/asm-x86/mem_access.h
+ * mem_access.h
  *
  * Memory access support.
  *
@@ -23,9 +23,30 @@
 #ifndef _XEN_ASM_MEM_ACCESS_H
 #define _XEN_ASM_MEM_ACCESS_H
 
+#include <public/memory.h>
+
+#ifdef HAS_MEM_ACCESS
+
 int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg);
 int mem_access_send_req(struct domain *d, mem_event_request_t *req);
+
+#else
+
+static inline
+int mem_access_memop(unsigned long cmd,
+                     XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg)
+{
+    return -ENOSYS;
+}
+
+static inline
+int mem_access_send_req(struct domain *d, mem_event_request_t *req)
+{
+    return -ENOSYS;
+}
+
+#endif /* HAS_MEM_ACCESS */
 
 #endif /* _XEN_ASM_MEM_ACCESS_H */
 

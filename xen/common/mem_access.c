@@ -1,5 +1,5 @@
 /******************************************************************************
- * arch/x86/mm/mem_access.c
+ * mem_access.c
  *
  * Memory access support.
  *
@@ -24,10 +24,10 @@
 #include <xen/sched.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
+#include <xen/mem_event.h>
+#include <public/memory.h>
 #include <asm/p2m.h>
-#include <asm/mem_event.h>
 #include <xsm/xsm.h>
-
 
 int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg)
@@ -121,7 +121,7 @@ int mem_access_send_req(struct domain *d, mem_event_request_t *req)
     mem_event_put_request(d, &d->mem_event->access, req);
 
     return 0;
-} 
+}
 
 /*
  * Local variables:

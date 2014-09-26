@@ -35,6 +35,9 @@
 #include <xen/paging.h>
 #include <xen/cpu.h>
 #include <xen/wait.h>
+#include <xen/mem_event.h>
+#include <xen/mem_access.h>
+#include <xen/rangeset.h>
 #include <asm/shadow.h>
 #include <asm/hap.h>
 #include <asm/current.h>
@@ -63,10 +66,7 @@
 #include <public/hvm/ioreq.h>
 #include <public/version.h>
 #include <public/memory.h>
-#include <asm/mem_event.h>
-#include <asm/mem_access.h>
 #include <public/mem_event.h>
-#include <xen/rangeset.h>
 #include <public/arch-x86/cpuid.h>
 
 bool_t __read_mostly hvm_enabled;
@@ -489,68 +489,11 @@ static void hvm_free_ioreq_gmfn(struct domain *d, unsigned long gmfn)
     clear_bit(i, &d->arch.hvm_domain.ioreq_gmfn.mask);
 }
 
-void destroy_ring_for_helper(
-    void **_va, struct page_info *page)
-{
-    void *va = *_va;
-
-    if ( va != NULL )
-    {
-        unmap_domain_page_global(va);
-        put_page_and_type(page);
-        *_va = NULL;
-    }
-}
-
 static void hvm_unmap_ioreq_page(struct hvm_ioreq_server *s, bool_t buf)
 {
     struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
 
     destroy_ring_for_helper(&iorp->va, iorp->page);
-}
-
-int prepare_ring_for_helper(
-    struct domain *d, unsigned long gmfn, struct page_info **_page,
-    void **_va)
-{
-    struct page_info *page;
-    p2m_type_t p2mt;
-    void *va;
-
-    page = get_page_from_gfn(d, gmfn, &p2mt, P2M_UNSHARE);
-    if ( p2m_is_paging(p2mt) )
-    {
-        if ( page )
-            put_page(page);
-        p2m_mem_paging_populate(d, gmfn);
-        return -ENOENT;
-    }
-    if ( p2m_is_shared(p2mt) )
-    {
-        if ( page )
-            put_page(page);
-        return -ENOENT;
-    }
-    if ( !page )
-        return -EINVAL;
-
-    if ( !get_page_type(page, PGT_writable_page) )
-    {
-        put_page(page);
-        return -EINVAL;
-    }
-
-    va = __map_domain_page_global(page);
-    if ( va == NULL )
-    {
-        put_page_and_type(page);
-        return -ENOMEM;
-    }
-
-    *_va = va;
-    *_page = page;
-
-    return 0;
 }
 
 static int hvm_map_ioreq_page(

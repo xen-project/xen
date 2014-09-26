@@ -300,7 +300,6 @@ struct page_info *get_page_from_gva(struct domain *d, vaddr_t va,
     })
 
 static inline void put_gfn(struct domain *d, unsigned long gfn) {}
-static inline void mem_event_cleanup(struct domain *d) {}
 static inline int relinquish_shared_pages(struct domain *d)
 {
     return 0;

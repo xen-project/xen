@@ -228,12 +228,6 @@ int hvm_vcpu_cacheattr_init(struct vcpu *v);
 void hvm_vcpu_cacheattr_destroy(struct vcpu *v);
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip);
 
-/* Prepare/destroy a ring for a dom0 helper. Helper with talk
- * with Xen on behalf of this hvm domain. */
-int prepare_ring_for_helper(struct domain *d, unsigned long gmfn, 
-                            struct page_info **_page, void **_va);
-void destroy_ring_for_helper(void **_va, struct page_info *page);
-
 bool_t hvm_send_assist_req(ioreq_t *p);
 void hvm_broadcast_assist_req(ioreq_t *p);
 

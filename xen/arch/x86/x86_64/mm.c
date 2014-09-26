@@ -26,6 +26,8 @@
 #include <xen/nodemask.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
+#include <xen/mem_event.h>
+#include <xen/mem_access.h>
 #include <asm/current.h>
 #include <asm/asm_defns.h>
 #include <asm/page.h>
@@ -35,9 +37,7 @@
 #include <asm/msr.h>
 #include <asm/setup.h>
 #include <asm/numa.h>
-#include <asm/mem_event.h>
 #include <asm/mem_sharing.h>
-#include <asm/mem_access.h>
 #include <public/memory.h>
 
 unsigned int __read_mostly m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;

@@ -609,8 +609,6 @@ unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);
 
 unsigned long domain_get_maximum_gpfn(struct domain *d);
 
-void mem_event_cleanup(struct domain *d);
-
 extern struct domain *dom_xen, *dom_io, *dom_cow;	/* for vmcoreinfo */
 
 /* Definition of an mm lock: spinlock with extra fields for debugging */

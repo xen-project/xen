@@ -15,6 +15,7 @@
 #include <xen/domain.h>
 #include <xen/mm.h>
 #include <xen/event.h>
+#include <xen/mem_event.h>
 #include <xen/time.h>
 #include <xen/console.h>
 #include <xen/softirq.h>

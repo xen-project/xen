@@ -17,14 +17,14 @@
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
+#include <xen/mem_event.h>
+#include <xen/event.h>
+#include <public/mem_event.h>
 #include <asm/domain.h>
 #include <asm/page.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
-#include <asm/mem_event.h>
-#include <public/mem_event.h>
 #include <asm/mem_sharing.h>
-#include <xen/event.h>
 #include <asm/hap.h>
 #include <asm/hvm/support.h>
 

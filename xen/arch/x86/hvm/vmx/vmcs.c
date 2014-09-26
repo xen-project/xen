@@ -22,6 +22,10 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/domain_page.h>
+#include <xen/event.h>
+#include <xen/kernel.h>
+#include <xen/keyhandler.h>
+#include <xen/mem_event.h>
 #include <asm/current.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -34,12 +38,8 @@
 #include <asm/hvm/vmx/vvmx.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/flushtlb.h>
-#include <xen/event.h>
-#include <xen/kernel.h>
-#include <xen/keyhandler.h>
 #include <asm/shadow.h>
 #include <asm/tboot.h>
-#include <asm/mem_event.h>
 
 static bool_t __read_mostly opt_vpid_enabled = 1;
 boolean_param("vpid", opt_vpid_enabled);

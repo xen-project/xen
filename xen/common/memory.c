@@ -1104,6 +1104,69 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
+void destroy_ring_for_helper(
+    void **_va, struct page_info *page)
+{
+    void *va = *_va;
+
+    if ( va != NULL )
+    {
+        unmap_domain_page_global(va);
+        put_page_and_type(page);
+        *_va = NULL;
+    }
+}
+
+int prepare_ring_for_helper(
+    struct domain *d, unsigned long gmfn, struct page_info **_page,
+    void **_va)
+{
+    struct page_info *page;
+    p2m_type_t p2mt;
+    void *va;
+
+    page = get_page_from_gfn(d, gmfn, &p2mt, P2M_UNSHARE);
+
+#ifdef HAS_MEM_PAGING
+    if ( p2m_is_paging(p2mt) )
+    {
+        if ( page )
+            put_page(page);
+        p2m_mem_paging_populate(d, gmfn);
+        return -ENOENT;
+    }
+#endif
+#ifdef HAS_MEM_SHARING
+    if ( p2m_is_shared(p2mt) )
+    {
+        if ( page )
+            put_page(page);
+        return -ENOENT;
+    }
+#endif
+
+    if ( !page )
+        return -EINVAL;
+
+    if ( !get_page_type(page, PGT_writable_page) )
+    {
+        put_page(page);
+        return -EINVAL;
+    }
+
+    va = __map_domain_page_global(page);
+    if ( va == NULL )
+    {
+        put_page_and_type(page);
+        return -ENOMEM;
+    }
+
+    *_va = va;
+    *_page = page;
+
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C

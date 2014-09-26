@@ -1,5 +1,5 @@
 /******************************************************************************
- * include/asm-x86/mem_event.h
+ * mem_event.h
  *
  * Common interface for memory event support.
  *
@@ -23,6 +23,13 @@
 
 #ifndef __MEM_EVENT_H__
 #define __MEM_EVENT_H__
+
+#include <xen/sched.h>
+
+#ifdef HAS_MEM_ACCESS
+
+/* Clean up on domain destruction */
+void mem_event_cleanup(struct domain *d);
 
 /* Returns whether a ring has been set up */
 bool_t mem_event_check_ring(struct mem_event_domain *med);
@@ -68,6 +75,60 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 
 void mem_event_vcpu_pause(struct vcpu *v);
 void mem_event_vcpu_unpause(struct vcpu *v);
+
+#else
+
+static inline void mem_event_cleanup(struct domain *d) {}
+
+static inline bool_t mem_event_check_ring(struct mem_event_domain *med)
+{
+    return 0;
+}
+
+static inline int mem_event_claim_slot(struct domain *d,
+                                        struct mem_event_domain *med)
+{
+    return -ENOSYS;
+}
+
+static inline int mem_event_claim_slot_nosleep(struct domain *d,
+                                        struct mem_event_domain *med)
+{
+    return -ENOSYS;
+}
+
+static inline
+void mem_event_cancel_slot(struct domain *d, struct mem_event_domain *med)
+{}
+
+static inline
+void mem_event_put_request(struct domain *d, struct mem_event_domain *med,
+                            mem_event_request_t *req)
+{}
+
+static inline
+int mem_event_get_response(struct domain *d, struct mem_event_domain *med,
+                           mem_event_response_t *rsp)
+{
+    return -ENOSYS;
+}
+
+static inline int do_mem_event_op(int op, uint32_t domain, void *arg)
+{
+    return -ENOSYS;
+}
+
+static inline
+int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
+                     XEN_GUEST_HANDLE_PARAM(void) u_domctl)
+{
+    return -ENOSYS;
+}
+
+static inline void mem_event_vcpu_pause(struct vcpu *v) {}
+static inline void mem_event_vcpu_unpause(struct vcpu *v) {}
+
+#endif /* HAS_MEM_ACCESS */
 
 #endif /* __MEM_EVENT_H__ */
 

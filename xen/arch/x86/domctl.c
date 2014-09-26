@@ -30,7 +30,7 @@
 #include <xen/hypercall.h> /* for arch_do_domctl */
 #include <xsm/xsm.h>
 #include <xen/iommu.h>
-#include <asm/mem_event.h>
+#include <xen/mem_event.h>
 #include <public/mem_event.h>
 #include <asm/mem_sharing.h>
 #include <asm/xstate.h>
