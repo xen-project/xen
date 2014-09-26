@@ -2,6 +2,7 @@
 #include <efi/efiprot.h>
 #include <efi/efipciio.h>
 #include <public/xen.h>
+#include <xen/bitops.h>
 #include <xen/compile.h>
 #include <xen/ctype.h>
 #include <xen/dmi.h>
@@ -17,10 +18,16 @@
 #endif
 #include <xen/string.h>
 #include <xen/stringify.h>
-#include <xen/vga.h>
+#ifdef CONFIG_X86
+/*
+ * Keep this arch-specific modified include in the common file, as moving
+ * it to the arch specific include file would obscure that special care is
+ * taken to include it with __ASSEMBLY__ defined.
+ */
 #define __ASSEMBLY__ /* avoid pulling in ACPI stuff (conflicts with EFI) */
 #include <asm/fixmap.h>
 #undef __ASSEMBLY__
+#endif
 
 /* Using SetVirtualAddressMap() is incompatible with kexec: */
 #undef USE_SET_VIRTUAL_ADDRESS_MAP
@@ -66,6 +73,7 @@ static bool_t read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
                         struct file *file, char *options);
 static size_t wstrlen(const CHAR16 * s);
 static int set_color(u32 mask, int bpp, u8 *pos, u8 *sz);
+static bool_t match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2);
 
 static EFI_BOOT_SERVICES *__initdata efi_bs;
 static EFI_HANDLE __initdata efi_ih;
@@ -121,7 +129,7 @@ static void __init DisplayUint(UINT64 Val, INTN Width)
     PrintStr(PrintString);
 }
 
-static size_t __init wstrlen(const CHAR16 *s)
+static size_t __init __maybe_unused wstrlen(const CHAR16 *s)
 {
     const CHAR16 *sc;
 
@@ -661,7 +669,7 @@ static void __init setup_efi_pci(void)
     efi_bs->FreePool(handles);
 }
 
-static int __init set_color(u32 mask, int bpp, u8 *pos, u8 *sz)
+static int __init __maybe_unused set_color(u32 mask, int bpp, u8 *pos, u8 *sz)
 {
    if ( bpp < 0 )
        return bpp;
@@ -986,8 +994,10 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 	       efi.smbios = (long)efi_ct[i].VendorTable;
     }
 
+#ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
     if (efi.smbios != EFI_INVALID_TABLE_ADDR)
         dmi_efi_get_table((void *)(long)efi.smbios);
+#endif
 
     /* Collect PCI ROM contents. */
     setup_efi_pci();
@@ -1058,6 +1068,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     for( ; ; ); /* not reached */
 }
 
+#ifndef CONFIG_ARM /* TODO - runtime service support */
 #ifndef USE_SET_VIRTUAL_ADDRESS_MAP
 static __init void copy_mapping(unsigned long mfn, unsigned long end,
                                 bool_t (*is_valid)(unsigned long smfn,
@@ -1283,3 +1294,4 @@ void __init efi_init_memory(void)
         efi_l4_pgtable[i] = idle_pg_table[i];
 #endif
 }
+#endif

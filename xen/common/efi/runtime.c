@@ -1,20 +1,24 @@
 #include "efi.h"
+#include "runtime.h"
 #include <xen/cache.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/irq.h>
 #include <xen/time.h>
-#include <asm/mc146818rtc.h>
 
 DEFINE_XEN_GUEST_HANDLE(CHAR16);
 
 #ifndef COMPAT
 
+#ifdef CONFIG_ARM  /* Disabled until runtime services implemented */
+const bool_t efi_enabled = 0;
+#else
 # include <asm/i387.h>
 # include <asm/xstate.h>
 # include <public/platform.h>
 
 const bool_t efi_enabled = 1;
+#endif
 
 unsigned int __read_mostly efi_num_ct;
 EFI_CONFIGURATION_TABLE *__read_mostly efi_ct;
@@ -24,7 +28,9 @@ unsigned int __read_mostly efi_fw_revision;
 const CHAR16 *__read_mostly efi_fw_vendor;
 
 EFI_RUNTIME_SERVICES *__read_mostly efi_rs;
+#ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
 static DEFINE_SPINLOCK(efi_rs_lock);
+#endif
 
 UINTN __read_mostly efi_memmap_size;
 UINTN __read_mostly efi_mdesc_size;
@@ -41,10 +47,9 @@ struct efi __read_mostly efi = {
 	.smbios = EFI_INVALID_TABLE_ADDR,
 };
 
-l4_pgentry_t *__read_mostly efi_l4_pgtable;
-
 const struct efi_pci_rom *__read_mostly efi_pci_roms;
 
+#ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
 unsigned long efi_rs_enter(void)
 {
     static const u16 fcw = FCW_DEFAULT;
@@ -134,8 +139,10 @@ void efi_reset_system(bool_t warm)
     printk(XENLOG_WARNING "EFI: could not reset system (%#lx)\n", status);
 }
 
+#endif /* CONFIG_ARM */
 #endif
 
+#ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
 int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
 {
     unsigned int i, n;
@@ -545,3 +552,4 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
 
     return rc;
 }
+#endif

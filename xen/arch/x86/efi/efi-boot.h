@@ -3,6 +3,7 @@
  * is intended to be included by common/efi/boot.c _only_, and
  * therefore can define arch specific global variables.
  */
+#include <xen/vga.h>
 #include <asm/e820.h>
 #include <asm/edd.h>
 #include <asm/msr.h>

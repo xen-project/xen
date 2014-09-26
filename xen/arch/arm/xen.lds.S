@@ -135,6 +135,7 @@ SECTIONS
        *(.xsm_initcall.init)
        __xsm_initcall_end = .;
   } :text
+  __init_end_efi = .;
   . = ALIGN(STACK_SIZE);
   __init_end = .;
 

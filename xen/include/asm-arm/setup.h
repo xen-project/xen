@@ -3,7 +3,7 @@
 
 #include <public/version.h>
 
-#define NR_MEM_BANKS 8
+#define NR_MEM_BANKS 64
 
 #define MAX_MODULES 5 /* Current maximum useful modules */
 

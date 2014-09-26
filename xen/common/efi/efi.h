@@ -28,7 +28,9 @@ extern EFI_RUNTIME_SERVICES *efi_rs;
 extern UINTN efi_memmap_size, efi_mdesc_size;
 extern void *efi_memmap;
 
+#ifdef CONFIG_X86
 extern l4_pgentry_t *efi_l4_pgtable;
+#endif
 
 extern const struct efi_pci_rom *efi_pci_roms;
 
