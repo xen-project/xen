@@ -622,3 +622,17 @@ static void __init efi_arch_load_addr_check(EFI_LOADED_IMAGE *loaded_image)
         blexit(L"Xen must be loaded at a 2Mb boundary.");
     trampoline_xen_phys_start = xen_phys_start;
 }
+
+static bool_t __init efi_arch_use_config_file(EFI_SYSTEM_TABLE *SystemTable)
+{
+    return 1; /* x86 always uses a config file */
+}
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

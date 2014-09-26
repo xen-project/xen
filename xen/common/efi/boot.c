@@ -691,7 +691,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
-    EFI_FILE_HANDLE dir_handle;
     union string section = { NULL }, name;
     bool_t base_video = 0;
     char *option_str;
@@ -714,9 +713,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         PrintErrMesg(L"No Loaded Image Protocol", status);
 
     efi_arch_load_addr_check(loaded_image);
-
-    /* Get the file system interface. */
-    dir_handle = get_parent_handle(loaded_image, &file_name);
 
     argc = get_argv(0, NULL, loaded_image->LoadOptions,
                     loaded_image->LoadOptionsSize, NULL);
@@ -813,107 +809,118 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     if ( EFI_ERROR(status) )
         gop = NULL;
 
-    /* Read and parse the config file. */
-    if ( !cfg_file_name )
+    cols = rows = depth = 0;
+    if ( efi_arch_use_config_file(SystemTable) )
     {
-        CHAR16 *tail;
+        EFI_FILE_HANDLE dir_handle;
 
-        while ( (tail = point_tail(file_name)) != NULL )
+        /* Get the file system interface. */
+        dir_handle = get_parent_handle(loaded_image, &file_name);
+
+        /* Read and parse the config file. */
+        if ( !cfg_file_name )
         {
-            wstrcpy(tail, L".cfg");
-            if ( read_file(dir_handle, file_name, &cfg, NULL) )
-                break;
-            *tail = 0;
+            CHAR16 *tail;
+
+            while ( (tail = point_tail(file_name)) != NULL )
+            {
+                wstrcpy(tail, L".cfg");
+                if ( read_file(dir_handle, file_name, &cfg, NULL) )
+                    break;
+                *tail = 0;
+            }
+            if ( !tail )
+                blexit(L"No configuration file found.");
+            PrintStr(L"Using configuration file '");
+            PrintStr(file_name);
+            PrintStr(L"'\r\n");
         }
-        if ( !tail )
-            blexit(L"No configuration file found.");
-        PrintStr(L"Using configuration file '");
-        PrintStr(file_name);
-        PrintStr(L"'\r\n");
-    }
-    else if ( !read_file(dir_handle, cfg_file_name, &cfg, NULL) )
-        blexit(L"Configuration file not found.");
-    pre_parse(&cfg);
+        else if ( !read_file(dir_handle, cfg_file_name, &cfg, NULL) )
+            blexit(L"Configuration file not found.");
+        pre_parse(&cfg);
 
-    if ( section.w )
-        w2s(&section);
-    else
-        section.s = get_value(&cfg, "global", "default");
+        if ( section.w )
+            w2s(&section);
+        else
+            section.s = get_value(&cfg, "global", "default");
 
-    for ( ; ; )
-    {
-        name.s = get_value(&cfg, section.s, "kernel");
-        if ( name.s )
-            break;
-        name.s = get_value(&cfg, "global", "chain");
+        for ( ; ; )
+        {
+            name.s = get_value(&cfg, section.s, "kernel");
+            if ( name.s )
+                break;
+            name.s = get_value(&cfg, "global", "chain");
+            if ( !name.s )
+                break;
+            efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
+            cfg.addr = 0;
+            if ( !read_file(dir_handle, s2w(&name), &cfg, NULL) )
+            {
+                PrintStr(L"Chained configuration file '");
+                PrintStr(name.w);
+                efi_bs->FreePool(name.w);
+                blexit(L"'not found.");
+            }
+            pre_parse(&cfg);
+            efi_bs->FreePool(name.w);
+        }
+
         if ( !name.s )
-            break;
+            blexit(L"No Dom0 kernel image specified.");
+
+        efi_arch_cfg_file_early(dir_handle, section.s);
+
+        option_str = split_string(name.s);
+        read_file(dir_handle, s2w(&name), &kernel, option_str);
+        efi_bs->FreePool(name.w);
+
+        if ( !EFI_ERROR(efi_bs->LocateProtocol(&shim_lock_guid, NULL,
+                        (void **)&shim_lock)) &&
+             (status = shim_lock->Verify(kernel.ptr, kernel.size)) != EFI_SUCCESS )
+            PrintErrMesg(L"Dom0 kernel image could not be verified", status);
+
+        name.s = get_value(&cfg, section.s, "ramdisk");
+        if ( name.s )
+        {
+            read_file(dir_handle, s2w(&name), &ramdisk, NULL);
+            efi_bs->FreePool(name.w);
+        }
+
+        name.s = get_value(&cfg, section.s, "xsm");
+        if ( name.s )
+        {
+            read_file(dir_handle, s2w(&name), &xsm, NULL);
+            efi_bs->FreePool(name.w);
+        }
+
+        name.s = get_value(&cfg, section.s, "options");
+        efi_arch_handle_cmdline(argc ? *argv : NULL, options, name.s);
+
+        if ( !base_video )
+        {
+            name.cs = get_value(&cfg, section.s, "video");
+            if ( !name.cs )
+                name.cs = get_value(&cfg, "global", "video");
+            if ( name.cs && !strncmp(name.cs, "gfx-", 4) )
+            {
+                cols = simple_strtoul(name.cs + 4, &name.cs, 10);
+                if ( *name.cs == 'x' )
+                    rows = simple_strtoul(name.cs + 1, &name.cs, 10);
+                if ( *name.cs == 'x' )
+                    depth = simple_strtoul(name.cs + 1, &name.cs, 10);
+                if ( *name.cs )
+                    cols = rows = depth = 0;
+            }
+        }
+
+        efi_arch_cfg_file_late(dir_handle, section.s);
+
         efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
         cfg.addr = 0;
-        if ( !read_file(dir_handle, s2w(&name), &cfg, NULL) )
-        {
-            PrintStr(L"Chained configuration file '");
-            PrintStr(name.w);
-            efi_bs->FreePool(name.w);
-            blexit(L"'not found.");
-        }
-        pre_parse(&cfg);
-        efi_bs->FreePool(name.w);
+
+        dir_handle->Close(dir_handle);
+
     }
-    if ( !name.s )
-        blexit(L"No Dom0 kernel image specified.");
-
-    efi_arch_cfg_file_early(dir_handle, section.s);
-
-    option_str = split_string(name.s);
-    read_file(dir_handle, s2w(&name), &kernel, option_str);
-    efi_bs->FreePool(name.w);
-
-    if ( !EFI_ERROR(efi_bs->LocateProtocol(&shim_lock_guid, NULL,
-                    (void **)&shim_lock)) &&
-         (status = shim_lock->Verify(kernel.ptr, kernel.size)) != EFI_SUCCESS )
-        PrintErrMesg(L"Dom0 kernel image could not be verified", status);
-
-    name.s = get_value(&cfg, section.s, "ramdisk");
-    if ( name.s )
-    {
-        read_file(dir_handle, s2w(&name), &ramdisk, NULL);
-        efi_bs->FreePool(name.w);
-    }
-
-    name.s = get_value(&cfg, section.s, "xsm");
-    if ( name.s )
-    {
-        read_file(dir_handle, s2w(&name), &xsm, NULL);
-        efi_bs->FreePool(name.w);
-    }
-
-    name.s = get_value(&cfg, section.s, "options");
-    efi_arch_handle_cmdline(argc ? *argv : NULL, options, name.s);
-
-    cols = rows = depth = 0;
-    if ( !base_video )
-    {
-        name.cs = get_value(&cfg, section.s, "video");
-        if ( !name.cs )
-            name.cs = get_value(&cfg, "global", "video");
-        if ( name.cs && !strncmp(name.cs, "gfx-", 4) )
-        {
-            cols = simple_strtoul(name.cs + 4, &name.cs, 10);
-            if ( *name.cs == 'x' )
-                rows = simple_strtoul(name.cs + 1, &name.cs, 10);
-            if ( *name.cs == 'x' )
-                depth = simple_strtoul(name.cs + 1, &name.cs, 10);
-            if ( *name.cs )
-                cols = rows = depth = 0;
-        }
-    }
-    efi_arch_cfg_file_late(dir_handle, section.s);
-
-    efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
-    cfg.addr = 0;
-
-    dir_handle->Close(dir_handle);
 
     if ( gop && !base_video )
     {
