@@ -918,30 +918,28 @@ static int hvm_ioreq_server_init(struct hvm_ioreq_server *s, struct domain *d,
 
     rc = hvm_ioreq_server_alloc_rangesets(s, is_default);
     if ( rc )
-        goto fail1;
+        return rc;
 
     rc = hvm_ioreq_server_map_pages(s, is_default, handle_bufioreq);
     if ( rc )
-        goto fail2;
+        goto fail_map;
 
     for_each_vcpu ( d, v )
     {
         rc = hvm_ioreq_server_add_vcpu(s, is_default, v);
         if ( rc )
-            goto fail3;
+            goto fail_add;
     }
 
     return 0;
 
- fail3:
+ fail_add:
     hvm_ioreq_server_remove_all_vcpus(s);
     hvm_ioreq_server_unmap_pages(s, is_default);
 
- fail2:
+ fail_map:
     hvm_ioreq_server_free_rangesets(s, is_default);
 
- fail1:
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
     return rc;
 }
 
