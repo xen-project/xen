@@ -285,7 +285,11 @@ void mem_event_put_request(struct domain *d,
     if ( current->domain != d )
     {
         req->flags |= MEM_EVENT_FLAG_FOREIGN;
-        ASSERT( !(req->flags & MEM_EVENT_FLAG_VCPU_PAUSED) );
+#ifndef NDEBUG
+        if ( !(req->flags & MEM_EVENT_FLAG_VCPU_PAUSED) )
+            gdprintk(XENLOG_G_WARNING, "d%dv%d was not paused.\n",
+                     d->domain_id, req->vcpu_id);
+#endif
     }
 
     mem_event_ring_lock(med);
