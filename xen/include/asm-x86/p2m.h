@@ -598,6 +598,12 @@ static inline bool_t p2m_mem_event_sanity_check(struct domain *d)
     return hap_enabled(d) && cpu_has_vmx;
 }
 
+/* Sanity check for mem_access hardware support */
+static inline bool_t p2m_mem_access_sanity_check(struct domain *d)
+{
+    return is_hvm_domain(d);
+}
+
 /* 
  * Internal functions, only called by other p2m code
  */
