@@ -21,7 +21,7 @@
 
 static const char *libxl_tapif_script(libxl__gc *gc)
 {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
     return libxl__strdup(gc, "no");
 #else
     return libxl__sprintf(gc, "%s/qemu-ifup", libxl__xen_script_dir_path());
