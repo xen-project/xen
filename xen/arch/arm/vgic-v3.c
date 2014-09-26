@@ -45,10 +45,42 @@
 #define GICV3_GICR_PIDR2  GICV3_GICD_PIDR2
 #define GICV3_GICR_PIDR4  GICV3_GICD_PIDR4
 
+static struct vcpu *vgic_v3_irouter_to_vcpu(struct vcpu *v, uint64_t irouter)
+{
+    irouter &= ~(GICD_IROUTER_SPI_MODE_ANY);
+    irouter = irouter & MPIDR_AFF0_MASK;
+
+    return v->domain->vcpu[irouter];
+}
+
+static uint64_t vgic_v3_vcpu_to_irouter(struct vcpu *v,
+                                        unsigned int vcpu_id)
+{
+    uint64_t irq_affinity;
+    struct vcpu *v_target;
+
+    v_target = v->domain->vcpu[vcpu_id];
+    irq_affinity = (MPIDR_AFFINITY_LEVEL(v_target->arch.vmpidr, 3) << 32 |
+                    MPIDR_AFFINITY_LEVEL(v_target->arch.vmpidr, 2) << 16 |
+                    MPIDR_AFFINITY_LEVEL(v_target->arch.vmpidr, 1) << 8  |
+                    MPIDR_AFFINITY_LEVEL(v_target->arch.vmpidr, 0));
+
+    return irq_affinity;
+}
+
 static struct vcpu *vgic_v3_get_target_vcpu(struct vcpu *v, unsigned int irq)
 {
-    /* TODO: Return vcpu0 always */
-    return v->domain->vcpu[0];
+    uint64_t target;
+    struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
+
+    ASSERT(spin_is_locked(&rank->lock));
+
+    target = rank->v3.irouter[irq % 32];
+    target &= ~(GICD_IROUTER_SPI_MODE_ANY);
+    target &= MPIDR_AFF0_MASK;
+    ASSERT(target >= 0 && target < v->domain->max_vcpus);
+
+    return v->domain->vcpu[target];
 }
 
 static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
@@ -353,9 +385,9 @@ static int __vgic_v3_distr_common_mmio_write(struct vcpu *v, mmio_info_t *info,
         vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
         rank->ienable |= *r;
-        vgic_unlock_rank(v, rank, flags);
         /* The irq number is extracted from offset. so shift by register size */
         vgic_enable_irqs(v, (*r) & (~tr), (reg - GICD_ISENABLER) >> DABT_WORD);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_ICENABLER ... GICD_ICENABLERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -364,9 +396,9 @@ static int __vgic_v3_distr_common_mmio_write(struct vcpu *v, mmio_info_t *info,
         vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
         rank->ienable &= ~*r;
-        vgic_unlock_rank(v, rank, flags);
         /* The irq number is extracted from offset. so shift by register size */
         vgic_disable_irqs(v, (*r) & tr, (reg - GICD_ICENABLER) >> DABT_WORD);
+        vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_ISPENDR ... GICD_ISPENDRN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -620,6 +652,8 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
     register_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
     unsigned long flags;
+    uint64_t irouter;
+    unsigned int vcpu_id;
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
 
     switch ( gicd_reg )
@@ -672,8 +706,17 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
                                 DABT_DOUBLE_WORD);
         if ( rank == NULL ) goto read_as_zero;
         vgic_lock_rank(v, rank, flags);
-        *r = rank->v3.irouter[REG_RANK_INDEX(64,
-                              (gicd_reg - GICD_IROUTER), DABT_DOUBLE_WORD)];
+        irouter = rank->v3.irouter[REG_RANK_INDEX(64,
+                                  (gicd_reg - GICD_IROUTER), DABT_DOUBLE_WORD)];
+        /* XXX: bit[31] stores IRQ mode. Just return */
+        if ( irouter & GICD_IROUTER_SPI_MODE_ANY )
+        {
+            *r = GICD_IROUTER_SPI_MODE_ANY;
+            vgic_unlock_rank(v, rank, flags);
+            return 1;
+        }
+        vcpu_id = irouter;
+        *r = vgic_v3_vcpu_to_irouter(v, vcpu_id);
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_NSACR ... GICD_NSACRN:
@@ -754,6 +797,8 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     register_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
     unsigned long flags;
+    uint64_t new_irouter, new_target, old_target;
+    struct vcpu *old_vcpu, *new_vcpu;
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
 
     switch ( gicd_reg )
@@ -810,16 +855,43 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         rank = vgic_rank_offset(v, 64, gicd_reg - GICD_IROUTER,
                                 DABT_DOUBLE_WORD);
         if ( rank == NULL ) goto write_ignore_64;
-        if ( *r )
-        {
-            /* TODO: Ignored. We don't support irq delivery for vcpu != 0 */
-            gdprintk(XENLOG_DEBUG,
-                     "SPI delivery to secondary cpus not supported\n");
-            goto write_ignore_64;
-        }
+        BUG_ON(v->domain->max_vcpus > 8);
+        new_irouter = *r;
         vgic_lock_rank(v, rank, flags);
-        rank->v3.irouter[REG_RANK_INDEX(64,
-                      (gicd_reg - GICD_IROUTER), DABT_DOUBLE_WORD)] = *r;
+
+        old_target = rank->v3.irouter[REG_RANK_INDEX(64,
+                              (gicd_reg - GICD_IROUTER), DABT_DOUBLE_WORD)];
+        old_target &= ~(GICD_IROUTER_SPI_MODE_ANY);
+        if ( new_irouter & GICD_IROUTER_SPI_MODE_ANY )
+        {
+            /*
+             * IRQ routing mode set. Route any one processor in the entire
+             * system. We chose vcpu 0 and set IRQ mode bit[31] in irouter.
+             */
+            new_target = 0;
+            new_vcpu = v->domain->vcpu[0];
+            new_irouter = GICD_IROUTER_SPI_MODE_ANY;
+        }
+        else
+        {
+            new_target = new_irouter & MPIDR_AFF0_MASK;
+            if ( new_target >= v->domain->max_vcpus )
+            {
+                printk("vGICv3: vGICD: wrong irouter at offset %#08x\n val 0x%lx vcpu %x",
+                       gicd_reg, new_target, v->domain->max_vcpus);
+                vgic_unlock_rank(v, rank, flags);
+                return 0;
+            }
+            new_vcpu = vgic_v3_irouter_to_vcpu(v, new_irouter);
+        }
+
+        rank->v3.irouter[REG_RANK_INDEX(64, (gicd_reg - GICD_IROUTER),
+                         DABT_DOUBLE_WORD)] = new_irouter;
+        if ( old_target != new_target )
+        {
+            old_vcpu = v->domain->vcpu[old_target];
+            vgic_migrate_irq(old_vcpu, new_vcpu, (gicd_reg - GICD_IROUTER)/8);
+        }
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_NSACR ... GICD_NSACRN:
@@ -965,8 +1037,14 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
 
 static int vgic_v3_domain_init(struct domain *d)
 {
-    int i;
+    int i, idx;
 
+    /* By default deliver to CPU0 */
+    for ( i = 0; i < DOMAIN_NR_RANKS(d); i++ )
+    {
+        for ( idx = 0; idx < 32; idx++ )
+            d->arch.vgic.shared_irqs[i].v3.irouter[idx] = 0;
+    }
     /* We rely on gicv init to get dbase and size */
     register_mmio_handler(d, &vgic_distr_mmio_handler, d->arch.vgic.dbase,
                           d->arch.vgic.dbase_size);
