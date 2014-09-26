@@ -27,7 +27,7 @@
 #include <public/domctl.h>
 #include <public/hvm/save.h>
 #include <public/hvm/ioreq.h>
-#include <asm/mm.h>
+#include <xen/mm.h>
 
 /* Interrupt acknowledgement sources. */
 enum hvm_intsrc {

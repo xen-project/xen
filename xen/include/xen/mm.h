@@ -88,6 +88,27 @@ int assign_pages(
 /* Dump info to serial console */
 void arch_dump_shared_mem_info(void);
 
+/*
+ * Extra fault info types which are used to further describe
+ * the source of an access violation.
+ */
+typedef enum {
+    npfec_kind_unknown, /* must be first */
+    npfec_kind_in_gpt,  /* violation in guest page table */
+    npfec_kind_with_gla /* violation with guest linear address */
+} npfec_kind_t;
+
+/*
+ * Nested page fault exception codes.
+ */
+struct npfec {
+    unsigned int read_access:1;
+    unsigned int write_access:1;
+    unsigned int insn_fetch:1;
+    unsigned int gla_valid:1;
+    unsigned int kind:2;  /* npfec_kind_t */
+};
+
 /* memflags: */
 #define _MEMF_no_refcount 0
 #define  MEMF_no_refcount (1U<<_MEMF_no_refcount)
