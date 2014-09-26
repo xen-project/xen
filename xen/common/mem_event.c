@@ -620,12 +620,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE_INTROSPECTION:
         {
             rc = -ENODEV;
-            /* Only HAP is supported */
-            if ( !hap_enabled(d) )
-                break;
-
-            /* Currently only EPT is supported */
-            if ( !cpu_has_vmx )
+            if ( !p2m_mem_event_sanity_check(d) )
                 break;
 
             rc = mem_event_enable(d, mec, med, _VPF_mem_access,

@@ -592,6 +592,12 @@ void p2m_mem_event_emulate_check(struct vcpu *v,
 /* Enable arch specific introspection options (such as MSR interception). */
 void p2m_setup_introspection(struct domain *d);
 
+/* Sanity check for mem_event hardware support */
+static inline bool_t p2m_mem_event_sanity_check(struct domain *d)
+{
+    return hap_enabled(d) && cpu_has_vmx;
+}
+
 /* 
  * Internal functions, only called by other p2m code
  */
