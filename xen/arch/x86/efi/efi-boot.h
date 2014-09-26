@@ -597,3 +597,28 @@ static void __init efi_arch_handle_module(struct file *file, const CHAR16 *name,
     ++mbi.mods_count;
     efi_bs->FreePool(ptr);
 }
+
+static void __init efi_arch_cpu(void)
+{
+    if ( cpuid_eax(0x80000000) > 0x80000000 )
+    {
+        cpuid_ext_features = cpuid_edx(0x80000001);
+        boot_cpu_data.x86_capability[1] = cpuid_ext_features;
+    }
+}
+
+static void __init efi_arch_blexit(void)
+{
+    if ( ucode.addr )
+        efi_bs->FreePages(ucode.addr, PFN_UP(ucode.size));
+}
+
+static void __init efi_arch_load_addr_check(EFI_LOADED_IMAGE *loaded_image)
+{
+    xen_phys_start = (UINTN)loaded_image->ImageBase;
+    if ( (xen_phys_start + loaded_image->ImageSize - 1) >> 32 )
+        blexit(L"Xen must be loaded below 4Gb.");
+    if ( xen_phys_start & ((1 << L2_PAGETABLE_SHIFT) - 1) )
+        blexit(L"Xen must be loaded at a 2Mb boundary.");
+    trampoline_xen_phys_start = xen_phys_start;
+}

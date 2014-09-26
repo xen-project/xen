@@ -212,10 +212,10 @@ static void __init noreturn blexit(const CHAR16 *str)
         efi_bs->FreePages(kernel.addr, PFN_UP(kernel.size));
     if ( ramdisk.addr )
         efi_bs->FreePages(ramdisk.addr, PFN_UP(ramdisk.size));
-    if ( ucode.addr )
-        efi_bs->FreePages(ucode.addr, PFN_UP(ucode.size));
     if ( xsm.addr )
         efi_bs->FreePages(xsm.addr, PFN_UP(xsm.size));
+
+    efi_arch_blexit();
 
     efi_bs->Exit(efi_ih, EFI_SUCCESS, 0, NULL);
     unreachable(); /* not reached */
@@ -713,12 +713,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     if ( status != EFI_SUCCESS )
         PrintErrMesg(L"No Loaded Image Protocol", status);
 
-    xen_phys_start = (UINTN)loaded_image->ImageBase;
-    if ( (xen_phys_start + loaded_image->ImageSize - 1) >> 32 )
-        blexit(L"Xen must be loaded below 4Gb.");
-    if ( xen_phys_start & ((1 << L2_PAGETABLE_SHIFT) - 1) )
-        blexit(L"Xen must be loaded at a 2Mb boundary.");
-    trampoline_xen_phys_start = xen_phys_start;
+    efi_arch_load_addr_check(loaded_image);
 
     /* Get the file system interface. */
     dir_handle = get_parent_handle(loaded_image, &file_name);
@@ -964,12 +959,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     efi_arch_edd();
 
     /* XXX Collect EDID info. */
-
-    if ( cpuid_eax(0x80000000) > 0x80000000 )
-    {
-        cpuid_ext_features = cpuid_edx(0x80000001);
-        boot_cpu_data.x86_capability[1] = cpuid_ext_features;
-    }
+    efi_arch_cpu();
 
     /* Obtain basic table pointers. */
     for ( i = 0; i < efi_num_ct; ++i )
