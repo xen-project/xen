@@ -43,6 +43,9 @@ PTHREAD_LIBS        := @PTHREAD_LIBS@
 
 PTYFUNCS_LIBS       := @PTYFUNCS_LIBS@
 
+LIBNL3_LIBS         := @LIBNL3_LIBS@
+LIBNL3_CFLAGS       := @LIBNL3_CFLAGS@
+
 # Download GIT repositories via HTTP or GIT's own protocol?
 # GIT's protocol is faster and more robust, when it works at all (firewalls
 # may block it). We make it the default, but if your GIT repository downloads
@@ -62,6 +65,7 @@ CONFIG_BLKTAP1      := @blktap1@
 CONFIG_BLKTAP2      := @blktap2@
 CONFIG_VTPM         := @vtpm@
 CONFIG_QEMUU_EXTRA_ARGS:= @EXTRA_QEMUU_CONFIGURE_ARGS@
+CONFIG_REMUS_NETBUF := @remus_netbuf@
 
 CONFIG_SYSTEMD      := @systemd@
 SYSTEMD_CFLAGS      := @SYSTEMD_CFLAGS@

@@ -260,8 +260,15 @@ M:	Shriram Rajagopalan <rshriram@cs.ubc.ca>
 M:	Yang Hongyang <yanghy@cn.fujitsu.com>
 S:	Maintained
 F:	docs/README.remus
+F:	tools/libxc/xc_domain_save.c
+F:	tools/libxc/xc_domain_restore.c
 F:	tools/blktap2/drivers/block-remus.c
 F:	tools/blktap2/drivers/hashtable*
+F:	tools/libxl/libxl_remus_*
+F:	tools/libxl/libxl_netbuffer.c
+F:	tools/libxl/libxl_nonetbuffer.c
+F:	tools/hotplug/Linux/remus-netbuf-setup
+F:	tools/hotplug/Linux/block-drbd-probe
 
 SCHEDULING
 M:	George Dunlap <george.dunlap@eu.citrix.com>

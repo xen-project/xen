@@ -7495,18 +7495,29 @@ int main_remus(int argc, char **argv)
     memset(&r_info, 0, sizeof(libxl_domain_remus_info));
     /* Defaults */
     r_info.interval = 200;
-    r_info.blackhole = 0;
-    r_info.compression = 1;
+    libxl_defbool_setdefault(&r_info.blackhole, false);
 
-    SWITCH_FOREACH_OPT(opt, "bui:s:e", NULL, "remus", 2) {
+    SWITCH_FOREACH_OPT(opt, "Fbundi:s:N:e", NULL, "remus", 2) {
     case 'i':
         r_info.interval = atoi(optarg);
         break;
+    case 'F':
+        libxl_defbool_set(&r_info.allow_unsafe, true);
+        break;
     case 'b':
-        r_info.blackhole = 1;
+        libxl_defbool_set(&r_info.blackhole, true);
         break;
     case 'u':
-        r_info.compression = 0;
+        libxl_defbool_set(&r_info.compression, false);
+        break;
+    case 'n':
+        libxl_defbool_set(&r_info.netbuf, false);
+        break;
+    case 'N':
+        r_info.netbufscript = optarg;
+        break;
+    case 'd':
+        libxl_defbool_set(&r_info.diskbuf, false);
         break;
     case 's':
         ssh_command = optarg;
@@ -7519,7 +7530,10 @@ int main_remus(int argc, char **argv)
     domid = find_domain(argv[optind]);
     host = argv[optind + 1];
 
-    if (r_info.blackhole) {
+    if (!r_info.netbufscript)
+        r_info.netbufscript = default_remus_netbufscript;
+
+    if (libxl_defbool_val(r_info.blackhole)) {
         send_fd = open("/dev/null", O_RDWR, 0644);
         if (send_fd < 0) {
             perror("failed to open /dev/null");
@@ -7556,13 +7570,19 @@ int main_remus(int argc, char **argv)
     /* Point of no return */
     rc = libxl_domain_remus_start(ctx, &r_info, domid, send_fd, recv_fd, 0);
 
-    /* If we are here, it means backup has failed/domain suspend failed.
-     * Try to resume the domain and exit gracefully.
+    /* check if the domain exists. User may have xl destroyed the
+     * domain to force failover
+     */
+    if (libxl_domain_info(ctx, 0, domid)) {
+        fprintf(stderr, "Remus: Primary domain has been destroyed.\n");
+        close(send_fd);
+        return 0;
+    }
+
+    /* If we are here, it means remus setup/domain suspend/backup has
+     * failed. Try to resume the domain and exit gracefully.
      * TODO: Split-Brain check.
      */
-    fprintf(stderr, "remus sender: libxl_domain_suspend failed"
-            " (rc=%d)\n", rc);
-
     if (rc == ERROR_GUEST_TIMEDOUT)
         fprintf(stderr, "Failed to suspend domain at primary.\n");
     else {

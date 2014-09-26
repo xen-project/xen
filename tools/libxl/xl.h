@@ -171,6 +171,7 @@ extern char *default_vifscript;
 extern char *default_bridge;
 extern char *default_gatewaydev;
 extern char *default_vifbackend;
+extern char *default_remus_netbufscript;
 extern char *blkdev_start;
 
 enum output_format {

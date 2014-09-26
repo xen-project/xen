@@ -1,0 +1,230 @@
+#!/bin/bash
+#============================================================================
+# ${XEN_SCRIPT_DIR}/remus-netbuf-setup
+#
+# Script for attaching a network buffer to the specified vif (in any mode).
+# The hotplugging system will call this script when starting remus via libxl
+# API, libxl_domain_remus_start.
+#
+# Usage:
+# remus-netbuf-setup (setup|teardown)
+#
+# Environment vars:
+# vifname     vif interface name (required).
+# XENBUS_PATH path in Xenstore, where the REMUS_IFB device details will be
+#             stored or read from (required).
+#             (libxl passes /libxl/<domid>/remus/netbuf/<devid>)
+# REMUS_IFB   ifb interface to be cleaned up (required). [for teardown op only]
+
+# Written to the store: (setup operation)
+# XENBUS_PATH/ifb=<ifbdevName> the REMUS_IFB device serving
+#  as the intermediate buffer through which the interface's network output
+#  can be controlled.
+#
+
+# Remus network buffering requirements:
+
+# We need to buffer (queue) egress traffic from every vif attached to
+# the guest and release the buffers when the checkpoint associated
+# with them has been committed at the backup host. We achieve this
+# with the help of the plug queuing discipline (sch_plug module).
+# Simply put, Remus' network buffering imposes traffic
+# shaping on the guest's vif(s).
+
+# Limitations and Workarounds:
+
+# Egress traffic from a vif appears as ingress traffic to dom0. Linux
+# supports policing (dropping packets) but not traffic shaping
+# (queuing packets) on ingress traffic. The standard workaround to
+# this limitation is to attach an ingress qdisc to the guest vif,
+# redirect all egress traffic from the guest to an intermediate
+# queuing interface, and apply egress rules to it. The IFB
+# (Intermediate Functional Block) device serves the purpose of an
+# intermediate queuing interface.
+#
+
+# The following commands install a network buffer on a
+# guest's vif (vif1.0) using an IFB device (ifb0):
+#
+#  ip link set dev ifb0 up
+#  tc qdisc add dev vif1.0 ingress
+#  tc filter add dev vif1.0 parent ffff: proto ip \
+#    prio 10 u32 match u32 0 0 action mirred egress redirect dev ifb0
+#  nl-qdisc-add --dev=ifb0 --parent root plug
+#  nl-qdisc-add --dev=ifb0 --parent root --update plug --limit=10000000
+#                                                (10MB limit on buffer)
+#
+# So order of operations when installing a network buffer on vif1.0
+# 1. find a free ifb and bring up the device
+# 2. redirect traffic from vif1.0 to ifb:
+#   2.1 add ingress qdisc to vif1.0 (to capture outgoing packets from guest)
+#   2.2 use tc filter command with actions mirred egress + redirect
+# 3. install plug_qdisc on ifb device, with which we can buffer/release
+#    guest's network output from vif1.0
+#
+# Note:
+# 1. If the setup process fails, the script's cleanup is limited to removing the
+#    ingress qdisc on the guest vif, so that its traffic can flow normally.
+#    The chosen ifb device is not torn down. Libxl has to execute the
+#    teardown op to remove other qdiscs and subsequently free the IFB device.
+#
+# 2. The teardown op may be invoked multiple times by libxl.
+
+#============================================================================
+
+# Unlike other vif scripts, vif-common is not needed here as it executes vif
+#specific setup code such as renaming.
+dir=$(dirname "$0")
+. "$dir/xen-hotplug-common.sh"
+
+findCommand "$@"
+
+if [ "$command" != "setup" -a  "$command" != "teardown" ]
+then
+  echo "Invalid command: $command"
+  log err "Invalid command: $command"
+  exit 1
+fi
+
+evalVariables "$@"
+
+: ${vifname:?}
+: ${XENBUS_PATH:?}
+
+check_libnl_tools() {
+    if ! command -v nl-qdisc-list > /dev/null 2>&1; then
+        fatal "Unable to find nl-qdisc-list tool"
+    fi
+    if ! command -v nl-qdisc-add > /dev/null 2>&1; then
+        fatal "Unable to find nl-qdisc-add tool"
+    fi
+    if ! command -v nl-qdisc-delete > /dev/null 2>&1; then
+        fatal "Unable to find nl-qdisc-delete tool"
+    fi
+}
+
+# We only check for modules. We don't load them.
+# User/Admin is supposed to load ifb during boot time,
+# ensuring that there are enough free ifbs in the system.
+# Other modules will be loaded automatically by tc commands.
+check_modules() {
+    for m in ifb sch_plug sch_ingress act_mirred cls_u32
+    do
+        if ! modinfo $m > /dev/null 2>&1; then
+            fatal "Unable to find $m kernel module"
+        fi
+    done
+}
+
+#return 0 if the ifb is free
+check_ifb() {
+    local installed=`nl-qdisc-list -d $1`
+    [ -n "$installed" ] && return 1
+
+    for domid in `xenstore-list "/local/domain" 2>/dev/null || true`
+    do
+        [ $domid -eq 0 ] && continue
+        xenstore-exists "/libxl/$domid/remus/netbuf" || continue
+        for devid in `xenstore-list "/libxl/$domid/remus/netbuf" 2>/dev/null || true`
+        do
+            local path="/libxl/$domid/remus/netbuf/$devid/ifb"
+            xenstore-exists $path || continue
+            local ifb=`xenstore-read "$path" 2>/dev/null || true`
+            [ "$ifb" = "$1" ] && return 1
+        done
+    done
+
+    return 0
+}
+
+setup_ifb() {
+
+    for ifb in `ifconfig -a -s|egrep ^ifb|cut -d ' ' -f1`
+    do
+        check_ifb "$ifb" || continue
+        REMUS_IFB="$ifb"
+        break
+    done
+
+    if [ -z "$REMUS_IFB" ]
+    then
+        fatal "Unable to find a free ifb device for $vifname"
+    fi
+
+    #not using xenstore_write that automatically exits on error
+    #because we need to cleanup
+    xenstore_write "$XENBUS_PATH/ifb" "$REMUS_IFB"
+    do_or_die ip link set dev "$REMUS_IFB" up
+}
+
+redirect_vif_traffic() {
+    local vif=$1
+    local ifb=$2
+
+    do_or_die tc qdisc add dev "$vif" ingress
+
+    tc filter add dev "$vif" parent ffff: proto ip prio 10 \
+        u32 match u32 0 0 action mirred egress redirect dev "$ifb" >/dev/null 2>&1
+
+    if [ $? -ne 0 ]
+    then
+        do_without_error tc qdisc del dev "$vif" ingress
+        fatal "Failed to redirect traffic from $vif to $ifb"
+    fi
+}
+
+add_plug_qdisc() {
+    local vif=$1
+    local ifb=$2
+
+    nl-qdisc-add --dev="$ifb" --parent root plug >/dev/null 2>&1
+    if [ $? -ne 0 ]
+    then
+        do_without_error tc qdisc del dev "$vif" ingress
+        fatal "Failed to add plug qdisc to $ifb"
+    fi
+
+    #set ifb buffering limit in bytes. Its okay if this command fails
+    nl-qdisc-add --dev="$ifb" --parent root \
+        --update plug --limit=10000000 >/dev/null 2>&1 || true
+}
+
+teardown_netbuf() {
+    local vif=$1
+    local ifb=$2
+
+    #Check if the XENBUS_PATH/ifb exists and has IFB name same as REMUS_IFB.
+    #Otherwise, if the teardown op is called multiple times, then we may end
+    #up freeing another domain's allocated IFB inside the if loop.
+    xenstore-exists "$XENBUS_PATH/ifb" && \
+        local ifb2=`xenstore-read "$XENBUS_PATH/ifb" 2>/dev/null || true`
+
+    if [[ "$ifb2" && "$ifb2" == "$ifb" ]]; then
+        do_without_error ip link set dev "$ifb" down
+        do_without_error nl-qdisc-delete --dev="$ifb" --parent root plug >/dev/null 2>&1
+        xenstore-rm -t "$XENBUS_PATH/ifb" 2>/dev/null || true
+    fi
+    do_without_error tc qdisc del dev "$vif" ingress
+    xenstore-rm -t "$XENBUS_PATH/hotplug-status" 2>/dev/null || true
+    xenstore-rm -t "$XENBUS_PATH/hotplug-error" 2>/dev/null || true
+}
+
+case "$command" in
+    setup)
+        check_libnl_tools
+        check_modules
+
+        claim_lock "pickifb"
+        setup_ifb
+        redirect_vif_traffic "$vifname" "$REMUS_IFB"
+        add_plug_qdisc "$vifname" "$REMUS_IFB"
+        release_lock "pickifb"
+
+        success
+        ;;
+    teardown)
+        teardown_netbuf "$vifname" "$REMUS_IFB"
+        ;;
+esac
+
+log debug "Successful remus-netbuf-setup $command for $vifname, ifb $REMUS_IFB."

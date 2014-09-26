@@ -1,0 +1,87 @@
+#! /bin/bash
+#
+# Copyright (C) 2014 FUJITSU LIMITED
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# Usage:
+#     block-drbd-probe devicename
+#
+# Return value:
+#     0: the device is drbd device
+#     1: the device is not drbd device
+#     2: unkown error
+#     3: the drbd device does not use protocol D
+#     4: the drbd device is not ready
+
+set -e
+
+drbd_res=
+
+function get_res_name()
+{
+    local drbd_dev=$1
+    local drbd_dev_list=($(drbdadm sh-dev all))
+    local drbd_res_list=($(drbdadm sh-resource all))
+    local temp_drbd_dev temp_drbd_res
+    local found=0
+
+    for temp_drbd_dev in ${drbd_dev_list[@]}; do
+        if [[ "$temp_drbd_dev" == "$drbd_dev" ]]; then
+            found=1
+            break
+        fi
+    done
+
+    if [[ $found -eq 0 ]]; then
+        return 1
+    fi
+
+    for temp_drbd_res in ${drbd_res_list[@]}; do
+        temp_drbd_dev=$(drbdadm sh-dev $temp_drbd_res)
+        if [[ "$temp_drbd_dev" == "$drbd_dev" ]]; then
+            drbd_res="$temp_drbd_res"
+            return 0
+        fi
+    done
+
+    # OOPS
+    return 2
+}
+
+get_res_name $1
+rc=$?
+if [[ $rc -ne 0 ]]; then
+    exit $rc
+fi
+
+# check protocol
+drbdsetup $1 show | grep -q "protocol D;"
+if [[ $? -ne 0 ]]; then
+    exit 3
+fi
+
+# check connect status
+state=$(drbdadm cstate "$drbd_res")
+if [[ "$state" != "Connected" ]]; then
+    exit 4
+fi
+
+# check role
+role=$(drbdadm role "$drbd_res")
+if [[ "$role" != "Primary/Secondary" ]]; then
+    exit 4
+fi
+
+exit 0

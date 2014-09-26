@@ -44,6 +44,7 @@ char *default_vifscript = NULL;
 char *default_bridge = NULL;
 char *default_gatewaydev = NULL;
 char *default_vifbackend = NULL;
+char *default_remus_netbufscript = NULL;
 enum output_format default_output_format = OUTPUT_FORMAT_JSON;
 int claim_mode = 1;
 bool progress_use_cr = 0;
@@ -175,6 +176,9 @@ static void parse_global_config(const char *configfile,
 
     if (!xlu_cfg_get_long (config, "claim_mode", &l, 0))
         claim_mode = l;
+
+    xlu_cfg_replace_string (config, "remus.default.netbufscript",
+        &default_remus_netbufscript, 0);
 
     xlu_cfg_destroy(config);
 }
