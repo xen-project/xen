@@ -59,11 +59,12 @@ static void noreturn blexit(const CHAR16 *str);
 static void PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode);
 static char *get_value(const struct file *cfg, const char *section,
                               const char *item);
-static void  split_value(char *s);
+static char *split_string(char *s);
 static CHAR16 *s2w(union string *str);
 static char *w2s(const union string *str);
-static bool_t  read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
-                               struct file *file);
+static bool_t read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
+                        struct file *file, char *options);
+static size_t wstrlen(const CHAR16 * s);
 static int set_color(u32 mask, int bpp, u8 *pos, u8 *sz);
 
 static EFI_BOOT_SERVICES *__initdata efi_bs;
@@ -118,6 +119,15 @@ static void __init DisplayUint(UINT64 Val, INTN Width)
     }
     *end = 0;
     PrintStr(PrintString);
+}
+
+static size_t __init wstrlen(const CHAR16 *s)
+{
+    const CHAR16 *sc;
+
+    for ( sc = s; *sc != L'\0'; ++sc )
+        /* nothing */;
+    return sc - s;
 }
 
 static CHAR16 *__init wstrcpy(CHAR16 *d, const CHAR16 *s)
@@ -409,9 +419,25 @@ static CHAR16 *__init point_tail(CHAR16 *fn)
             break;
         }
 }
+/*
+ * Truncate string at first space, and return pointer
+ * to remainder of string, if any/ NULL returned if
+ * no remainder after space.
+ */
+static char * __init split_string(char *s)
+{
+    while ( *s && !isspace(*s) )
+        ++s;
+    if ( *s )
+    {
+        *s = 0;
+        return s + 1;
+    }
+    return NULL;
+}
 
 static bool_t __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
-                               struct file *file)
+                               struct file *file, char *options)
 {
     EFI_FILE_HANDLE FileHandle = NULL;
     UINT64 size;
@@ -452,6 +478,7 @@ static bool_t __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
     }
     else
     {
+        file->size = size;
         if ( file != &cfg )
         {
             PrintStr(name);
@@ -460,12 +487,9 @@ static bool_t __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
             PrintStr(L"-");
             DisplayUint(file->addr + size, 2 * sizeof(file->addr));
             PrintStr(newline);
-            mb_modules[mbi.mods_count].mod_start = file->addr >> PAGE_SHIFT;
-            mb_modules[mbi.mods_count].mod_end = size;
-            ++mbi.mods_count;
+            efi_arch_handle_module(file, name, options);
         }
 
-        file->size = size;
         ret = FileHandle->Read(FileHandle, &file->size, file->ptr);
         if ( !EFI_ERROR(ret) && file->size != size )
             ret = EFI_ABORTED;
@@ -536,22 +560,18 @@ static char *__init get_value(const struct file *cfg, const char *section,
             break;
         default:
             if ( match && strncmp(ptr, item, ilen) == 0 && ptr[ilen] == '=' )
-                return ptr + ilen + 1;
+            {
+                ptr += ilen + 1;
+                /* strip off any leading spaces */
+                while ( *ptr && isspace(*ptr) )
+                    ptr++;
+                return ptr;
+            }
             break;
         }
         ptr += strlen(ptr);
     }
     return NULL;
-}
-
-static void __init split_value(char *s)
-{
-    while ( *s && isspace(*s) )
-        ++s;
-    place_string(&mb_modules[mbi.mods_count].string, s);
-    while ( *s && !isspace(*s) )
-        ++s;
-    *s = 0;
 }
 
 static void __init setup_efi_pci(void)
@@ -674,6 +694,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_FILE_HANDLE dir_handle;
     union string section = { NULL }, name;
     bool_t base_video = 0;
+    char *option_str;
 
     efi_ih = ImageHandle;
     efi_bs = SystemTable->BootServices;
@@ -805,7 +826,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         while ( (tail = point_tail(file_name)) != NULL )
         {
             wstrcpy(tail, L".cfg");
-            if ( read_file(dir_handle, file_name, &cfg) )
+            if ( read_file(dir_handle, file_name, &cfg, NULL) )
                 break;
             *tail = 0;
         }
@@ -815,7 +836,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         PrintStr(file_name);
         PrintStr(L"'\r\n");
     }
-    else if ( !read_file(dir_handle, cfg_file_name, &cfg) )
+    else if ( !read_file(dir_handle, cfg_file_name, &cfg, NULL) )
         blexit(L"Configuration file not found.");
     pre_parse(&cfg);
 
@@ -834,7 +855,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             break;
         efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
         cfg.addr = 0;
-        if ( !read_file(dir_handle, s2w(&name), &cfg) )
+        if ( !read_file(dir_handle, s2w(&name), &cfg, NULL) )
         {
             PrintStr(L"Chained configuration file '");
             PrintStr(name.w);
@@ -849,8 +870,8 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     efi_arch_cfg_file_early(dir_handle, section.s);
 
-    split_value(name.s);
-    read_file(dir_handle, s2w(&name), &kernel);
+    option_str = split_string(name.s);
+    read_file(dir_handle, s2w(&name), &kernel, option_str);
     efi_bs->FreePool(name.w);
 
     if ( !EFI_ERROR(efi_bs->LocateProtocol(&shim_lock_guid, NULL,
@@ -861,16 +882,14 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     name.s = get_value(&cfg, section.s, "ramdisk");
     if ( name.s )
     {
-        split_value(name.s);
-        read_file(dir_handle, s2w(&name), &ramdisk);
+        read_file(dir_handle, s2w(&name), &ramdisk, NULL);
         efi_bs->FreePool(name.w);
     }
 
     name.s = get_value(&cfg, section.s, "xsm");
     if ( name.s )
     {
-        split_value(name.s);
-        read_file(dir_handle, s2w(&name), &xsm);
+        read_file(dir_handle, s2w(&name), &xsm, NULL);
         efi_bs->FreePool(name.w);
     }
 

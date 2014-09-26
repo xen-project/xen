@@ -263,8 +263,8 @@ static void __init efi_arch_cfg_file_late(EFI_FILE_HANDLE dir_handle, char *sect
     if ( name.s )
     {
         microcode_set_module(mbi.mods_count);
-        split_value(name.s);
-        read_file(dir_handle, s2w(&name), &ucode);
+        split_string(name.s);
+        read_file(dir_handle, s2w(&name), &ucode, NULL);
         efi_bs->FreePool(name.w);
     }
 }
@@ -563,4 +563,37 @@ static void __init efi_arch_memory_setup(void)
         l3e_from_paddr((UINTN)l2_bootmap, __PAGE_HYPERVISOR);
     l3_bootmap[l3_table_offset(xen_phys_start + (8 << L2_PAGETABLE_SHIFT) - 1)] =
         l3e_from_paddr((UINTN)l2_bootmap, __PAGE_HYPERVISOR);
+}
+
+static void __init efi_arch_handle_module(struct file *file, const CHAR16 *name,
+                                          char *options)
+{
+    union string local_name;
+    void *ptr;
+
+    /*
+     * Make a copy, as conversion is destructive, and caller still wants
+     * wide string available after this call returns.
+     */
+    if ( efi_bs->AllocatePool(EfiLoaderData, (wstrlen(name) + 1) * sizeof(*name),
+                              &ptr) != EFI_SUCCESS )
+        blexit(L"Unable to allocate string buffer");
+
+    local_name.w = ptr;
+    wstrcpy(local_name.w, name);
+    w2s(&local_name);
+
+    /*
+     * If options are provided, put them in
+     * mb_modules[mbi.mods_count].string after the filename, with a space
+     * separating them.  place_string() prepends strings and adds separating
+     * spaces, so the call order is reversed.
+     */
+    if ( options )
+        place_string(&mb_modules[mbi.mods_count].string, options);
+    place_string(&mb_modules[mbi.mods_count].string, local_name.s);
+    mb_modules[mbi.mods_count].mod_start = file->addr >> PAGE_SHIFT;
+    mb_modules[mbi.mods_count].mod_end = file->size;
+    ++mbi.mods_count;
+    efi_bs->FreePool(ptr);
 }
