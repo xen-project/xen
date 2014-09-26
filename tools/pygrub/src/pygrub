@@ -13,7 +13,7 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-import os, sys, string, struct, tempfile, re, traceback
+import os, sys, string, struct, tempfile, re, traceback, stat
 import copy
 import logging
 import platform
@@ -29,6 +29,16 @@ import grub.ExtLinuxConf
 
 PYGRUB_VER = 0.6
 FS_READ_MAX = 1024 * 1024
+SECTOR_SIZE = 512
+
+def read_size_roundup(fd, size):
+    if platform.system() != 'FreeBSD':
+        return size
+    st = os.fstat(fd)
+    if (not stat.S_ISCHR(st.st_mode)):
+        return size
+    # Round up to sector size if it's a raw character device
+    return (((size)+((SECTOR_SIZE)-1))&(~((SECTOR_SIZE)-1)))
 
 def enable_cursor(ison):
     if ison:
@@ -45,7 +55,7 @@ DISK_TYPE_RAW, DISK_TYPE_HYBRIDISO, DISK_TYPE_DOS = range(3)
 def identify_disk_image(file):
     """Detect DOS partition table or HybridISO format."""
     fd = os.open(file, os.O_RDONLY)
-    buf = os.read(fd, 0x8006)
+    buf = os.read(fd, read_size_roundup(fd, 0x8006))
     os.close(fd)
 
     if len(buf) >= 512 and \
@@ -56,7 +66,6 @@ def identify_disk_image(file):
         return DISK_TYPE_DOS
     return DISK_TYPE_RAW
 
-SECTOR_SIZE=512
 DK_LABEL_LOC=1
 DKL_MAGIC=0xdabe
 V_ROOT=0x2
@@ -91,7 +100,7 @@ def get_fs_offset_gpt(file):
     i = partcount
     offsets = []
     while i>0:
-        buf = os.read(fd, partsize)
+        buf = os.read(fd, read_size_roundup(fd, partsize))
         offsets.append(struct.unpack("<Q", buf[32:40])[0] * SECTOR_SIZE)
         i -= 1
     os.close(fd)
