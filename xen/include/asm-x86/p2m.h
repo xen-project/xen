@@ -74,34 +74,6 @@ typedef enum {
     p2m_map_foreign  = 14,        /* ram pages from foreign domain */
 } p2m_type_t;
 
-/*
- * Additional access types, which are used to further restrict
- * the permissions given my the p2m_type_t memory type.  Violations
- * caused by p2m_access_t restrictions are sent to the mem_event
- * interface.
- *
- * The access permissions are soft state: when any ambigious change of page
- * type or use occurs, or when pages are flushed, swapped, or at any other
- * convenient type, the access permissions can get reset to the p2m_domain
- * default.
- */
-typedef enum {
-    p2m_access_n     = 0, /* No access permissions allowed */
-    p2m_access_r     = 1,
-    p2m_access_w     = 2, 
-    p2m_access_rw    = 3,
-    p2m_access_x     = 4, 
-    p2m_access_rx    = 5,
-    p2m_access_wx    = 6, 
-    p2m_access_rwx   = 7,
-    p2m_access_rx2rw = 8, /* Special: page goes from RX to RW on write */
-    p2m_access_n2rwx = 9, /* Special: page goes from N to RWX on access, *
-                           * generates an event but does not pause the
-                           * vcpu */
-
-    /* NOTE: Assumed to be only 4 bits right now */
-} p2m_access_t;
-
 /* Modifiers to the query */
 typedef unsigned int p2m_query_t;
 #define P2M_ALLOC    (1u<<0)   /* Populate PoD and paged-out entries */
