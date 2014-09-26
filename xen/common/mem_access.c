@@ -29,6 +29,32 @@
 #include <asm/p2m.h>
 #include <xsm/xsm.h>
 
+void mem_access_resume(struct domain *d)
+{
+    mem_event_response_t rsp;
+
+    /* Pull all responses off the ring. */
+    while ( mem_event_get_response(d, &d->mem_event->access, &rsp) )
+    {
+        struct vcpu *v;
+
+        if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
+            continue;
+
+        /* Validate the vcpu_id in the response. */
+        if ( (rsp.vcpu_id >= d->max_vcpus) || !d->vcpu[rsp.vcpu_id] )
+            continue;
+
+        v = d->vcpu[rsp.vcpu_id];
+
+        p2m_mem_event_emulate_check(v, &rsp);
+
+        /* Unpause domain. */
+        if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
+            mem_event_vcpu_unpause(v);
+    }
+}
+
 int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg)
 {
@@ -58,7 +84,7 @@ int mem_access_memop(unsigned long cmd,
     switch ( mao.op )
     {
     case XENMEM_access_op_resume:
-        p2m_mem_access_resume(d);
+        mem_access_resume(d);
         rc = 0;
         break;
 

@@ -1382,6 +1382,59 @@ static void p2m_mem_event_fill_regs(mem_event_request_t *req)
     req->x86_regs.cs_arbytes = seg.attr.bytes;
 }
 
+void p2m_mem_event_emulate_check(struct vcpu *v, const mem_event_response_t *rsp)
+{
+    /* Mark vcpu for skipping one instruction upon rescheduling. */
+    if ( rsp->flags & MEM_EVENT_FLAG_EMULATE )
+    {
+        xenmem_access_t access;
+        bool_t violation = 1;
+
+        if ( p2m_get_mem_access(v->domain, rsp->gfn, &access) == 0 )
+        {
+            switch ( access )
+            {
+            case XENMEM_access_n:
+            case XENMEM_access_n2rwx:
+            default:
+                violation = rsp->access_r || rsp->access_w || rsp->access_x;
+                break;
+
+            case XENMEM_access_r:
+                violation = rsp->access_w || rsp->access_x;
+                break;
+
+            case XENMEM_access_w:
+                violation = rsp->access_r || rsp->access_x;
+                break;
+
+            case XENMEM_access_x:
+                violation = rsp->access_r || rsp->access_w;
+                break;
+
+            case XENMEM_access_rx:
+            case XENMEM_access_rx2rw:
+                violation = rsp->access_w;
+                break;
+
+            case XENMEM_access_wx:
+                violation = rsp->access_r;
+                break;
+
+            case XENMEM_access_rw:
+                violation = rsp->access_x;
+                break;
+
+            case XENMEM_access_rwx:
+                violation = 0;
+                break;
+            }
+        }
+
+        v->arch.mem_event.emulate_flags = violation ? rsp->flags : 0;
+    }
+}
+
 bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                             struct npfec npfec,
                             mem_event_request_t **req_ptr)
@@ -1507,80 +1560,6 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
 
     /* VCPU may be paused, return whether we promoted automatically */
     return (p2ma == p2m_access_n2rwx);
-}
-
-void p2m_mem_access_resume(struct domain *d)
-{
-    mem_event_response_t rsp;
-
-    /* Pull all responses off the ring */
-    while( mem_event_get_response(d, &d->mem_event->access, &rsp) )
-    {
-        struct vcpu *v;
-
-        if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
-            continue;
-
-        /* Validate the vcpu_id in the response. */
-        if ( (rsp.vcpu_id >= d->max_vcpus) || !d->vcpu[rsp.vcpu_id] )
-            continue;
-
-        v = d->vcpu[rsp.vcpu_id];
-
-        /* Mark vcpu for skipping one instruction upon rescheduling. */
-        if ( rsp.flags & MEM_EVENT_FLAG_EMULATE )
-        {
-            xenmem_access_t access;
-            bool_t violation = 1;
-
-            if ( p2m_get_mem_access(d, rsp.gfn, &access) == 0 )
-            {
-                switch ( access )
-                {
-                case XENMEM_access_n:
-                case XENMEM_access_n2rwx:
-                default:
-                    violation = rsp.access_r || rsp.access_w || rsp.access_x;
-                    break;
-
-                case XENMEM_access_r:
-                    violation = rsp.access_w || rsp.access_x;
-                    break;
-
-                case XENMEM_access_w:
-                    violation = rsp.access_r || rsp.access_x;
-                    break;
-
-                case XENMEM_access_x:
-                    violation = rsp.access_r || rsp.access_w;
-                    break;
-
-                case XENMEM_access_rx:
-                case XENMEM_access_rx2rw:
-                    violation = rsp.access_w;
-                    break;
-
-                case XENMEM_access_wx:
-                    violation = rsp.access_r;
-                    break;
-
-                case XENMEM_access_rw:
-                    violation = rsp.access_x;
-                    break;
-
-                case XENMEM_access_rwx:
-                    violation = 0;
-                    break;
-                }
-            }
-
-            v->arch.mem_event.emulate_flags = violation ? rsp.flags : 0;
-        }
-
-        /* Unpause domain */
-        if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
-            mem_event_vcpu_unpause(v);
-    }
 }
 
 /* Set access type for a region of pfns.

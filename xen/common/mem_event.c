@@ -440,7 +440,7 @@ static void mem_paging_notification(struct vcpu *v, unsigned int port)
 static void mem_access_notification(struct vcpu *v, unsigned int port)
 {
     if ( likely(v->domain->mem_event->access.ring_page != NULL) )
-        p2m_mem_access_resume(v->domain);
+        mem_access_resume(v->domain);
 }
 #endif
 

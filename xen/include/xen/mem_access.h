@@ -31,6 +31,9 @@ int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg);
 int mem_access_send_req(struct domain *d, mem_event_request_t *req);
 
+/* Resumes the running of the VCPU, restarting the last instruction */
+void mem_access_resume(struct domain *d);
+
 #else
 
 static inline
@@ -45,6 +48,8 @@ int mem_access_send_req(struct domain *d, mem_event_request_t *req)
 {
     return -ENOSYS;
 }
+
+static inline void mem_access_resume(struct domain *d) {}
 
 #endif /* HAS_MEM_ACCESS */
 

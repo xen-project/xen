@@ -66,6 +66,13 @@ typedef enum {
     p2m_max_real_type,  /* Types after this won't be store in the p2m */
 } p2m_type_t;
 
+static inline
+void p2m_mem_event_emulate_check(struct vcpu *v,
+                                 const mem_event_response_t *rsp)
+{
+    /* Not supported on ARM. */
+};
+
 #define p2m_is_foreign(_t)  ((_t) == p2m_map_foreign)
 #define p2m_is_ram(_t)      ((_t) == p2m_ram_rw || (_t) == p2m_ram_ro)
 

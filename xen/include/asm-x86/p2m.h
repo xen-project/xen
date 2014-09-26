@@ -573,8 +573,6 @@ void p2m_mem_paging_resume(struct domain *d);
 bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                             struct npfec npfec,
                             mem_event_request_t **req_ptr);
-/* Resumes the running of the VCPU, restarting the last instruction */
-void p2m_mem_access_resume(struct domain *d);
 
 /* Set access type for a region of pfns.
  * If start_pfn == -1ul, sets the default access type */
@@ -585,6 +583,11 @@ long p2m_set_mem_access(struct domain *d, unsigned long start_pfn, uint32_t nr,
  * If pfn == -1ul, gets the default access type */
 int p2m_get_mem_access(struct domain *d, unsigned long pfn,
                        xenmem_access_t *access);
+
+/* Check for emulation and mark vcpu for skipping one instruction
+ * upon rescheduling if required. */
+void p2m_mem_event_emulate_check(struct vcpu *v,
+                                 const mem_event_response_t *rsp);
 
 /* 
  * Internal functions, only called by other p2m code
