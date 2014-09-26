@@ -27,6 +27,7 @@
 #include <asm/current.h>
 #include <asm/irq.h>
 #include <asm/page.h>
+#include <asm/p2m.h>
 #include <public/domctl.h>
 #include <xsm/xsm.h>
 
@@ -1115,6 +1116,22 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         d->disable_migrate = op->u.disable_migrate.disable;
     }
     break;
+
+#ifdef HAS_MEM_ACCESS
+    case XEN_DOMCTL_set_access_required:
+    {
+        struct p2m_domain* p2m;
+
+        ret = -EPERM;
+        if ( current->domain == d )
+            break;
+
+        ret = 0;
+        p2m = p2m_get_hostp2m(d);
+        p2m->access_required = op->u.access_required.access_required;
+    }
+    break;
+#endif
 
     case XEN_DOMCTL_set_virq_handler:
     {

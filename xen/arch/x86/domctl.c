@@ -1163,20 +1163,6 @@ long arch_do_domctl(
     break;
 #endif /* P2M_AUDIT */
 
-    case XEN_DOMCTL_set_access_required:
-    {
-        struct p2m_domain* p2m;
-        
-        ret = -EPERM;
-        if ( current->domain == d )
-            break;
-
-        ret = 0;
-        p2m = p2m_get_hostp2m(d);
-        p2m->access_required = domctl->u.access_required.access_required;
-    }
-    break;
-
     case XEN_DOMCTL_set_broken_page_p2m:
     {
         p2m_type_t pt;
