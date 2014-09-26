@@ -64,7 +64,7 @@ static int mem_event_enable(
     if ( med->ring_page )
         return -EBUSY;
 
-    /* The parameter defaults to zero, and it should be 
+    /* The parameter defaults to zero, and it should be
      * set to something */
     if ( ring_gfn == 0 )
         return -ENOSYS;
@@ -72,7 +72,7 @@ static int mem_event_enable(
     mem_event_ring_lock_init(med);
     mem_event_ring_lock(med);
 
-    rc = prepare_ring_for_helper(d, ring_gfn, &med->ring_pg_struct, 
+    rc = prepare_ring_for_helper(d, ring_gfn, &med->ring_pg_struct,
                                     &med->ring_page);
     if ( rc < 0 )
         goto err;
@@ -104,7 +104,7 @@ static int mem_event_enable(
     return 0;
 
  err:
-    destroy_ring_for_helper(&med->ring_page, 
+    destroy_ring_for_helper(&med->ring_page,
                             med->ring_pg_struct);
     mem_event_ring_unlock(med);
 
@@ -233,7 +233,7 @@ static int mem_event_disable(struct domain *d, struct mem_event_domain *med)
             }
         }
 
-        destroy_ring_for_helper(&med->ring_page, 
+        destroy_ring_for_helper(&med->ring_page,
                                 med->ring_pg_struct);
         mem_event_ring_unlock(med);
     }
@@ -497,7 +497,7 @@ void mem_event_cleanup(struct domain *d)
          * the disable routine to complete. It will also drop
          * all domain refs the wait-queued vcpus are holding.
          * Finally, because this code path involves previously
-         * pausing the domain (domain_kill), unpausing the 
+         * pausing the domain (domain_kill), unpausing the
          * vcpus causes no harm. */
         destroy_waitqueue_head(&d->mem_event->paging.wq);
         (void)mem_event_disable(d, &d->mem_event->paging);
@@ -583,7 +583,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             if ( p2m->pod.entry_count )
                 break;
 
-            rc = mem_event_enable(d, mec, med, _VPF_mem_paging, 
+            rc = mem_event_enable(d, mec, med, _VPF_mem_paging,
                                     HVM_PARAM_PAGING_RING_PFN,
                                     mem_paging_notification);
         }
@@ -605,7 +605,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 #endif
 
 #ifdef HAS_MEM_ACCESS
-    case XEN_DOMCTL_MEM_EVENT_OP_ACCESS: 
+    case XEN_DOMCTL_MEM_EVENT_OP_ACCESS:
     {
         struct mem_event_domain *med = &d->mem_event->access;
         rc = -EINVAL;
@@ -624,7 +624,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             if ( !cpu_has_vmx )
                 break;
 
-            rc = mem_event_enable(d, mec, med, _VPF_mem_access, 
+            rc = mem_event_enable(d, mec, med, _VPF_mem_access,
                                     HVM_PARAM_ACCESS_RING_PFN,
                                     mem_access_notification);
 
@@ -654,7 +654,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 #endif
 
 #ifdef HAS_MEM_SHARING
-    case XEN_DOMCTL_MEM_EVENT_OP_SHARING: 
+    case XEN_DOMCTL_MEM_EVENT_OP_SHARING:
     {
         struct mem_event_domain *med = &d->mem_event->share;
         rc = -EINVAL;
@@ -673,7 +673,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             if ( !hap_enabled(d) )
                 break;
 
-            rc = mem_event_enable(d, mec, med, _VPF_mem_sharing, 
+            rc = mem_event_enable(d, mec, med, _VPF_mem_sharing,
                                     HVM_PARAM_SHARING_RING_PFN,
                                     mem_sharing_notification);
         }
