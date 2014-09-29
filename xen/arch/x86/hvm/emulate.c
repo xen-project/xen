@@ -1119,6 +1119,7 @@ static int hvmemul_inject_hw_exception(
 }
 
 static int hvmemul_inject_sw_interrupt(
+    enum x86_swint_type type,
     uint8_t vector,
     uint8_t insn_len,
     struct x86_emulate_ctxt *ctxt)

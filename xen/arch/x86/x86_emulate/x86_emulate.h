@@ -51,6 +51,14 @@ enum x86_segment {
 
 #define is_x86_user_segment(seg) ((unsigned)(seg) <= x86_seg_gs)
 
+/* Classification of the types of software generated interrupts/exceptions. */
+enum x86_swint_type {
+    x86_swint_icebp, /* 0xf1 */
+    x86_swint_int3,  /* 0xcc */
+    x86_swint_into,  /* 0xce */
+    x86_swint_int,   /* 0xcd $n */
+};
+
 /* 
  * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
  * segment descriptor. It happens to match the format of an AMD SVM VMCB.
@@ -337,6 +345,7 @@ struct x86_emulate_ops
 
     /* inject_sw_interrupt */
     int (*inject_sw_interrupt)(
+        enum x86_swint_type type,
         uint8_t vector,
         uint8_t insn_len,
         struct x86_emulate_ctxt *ctxt);

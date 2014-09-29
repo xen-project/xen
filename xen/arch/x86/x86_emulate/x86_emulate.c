@@ -1333,6 +1333,7 @@ x86_emulate(
     bool_t lock_prefix = 0;
     int override_seg = -1, rc = X86EMUL_OKAY;
     struct operand src, dst;
+    enum x86_swint_type swint_type;
     DECLARE_ALIGNED(mmval_t, mmval);
     /*
      * Data operand effective address (usually computed from ModRM).
@@ -2629,14 +2630,17 @@ x86_emulate(
 
     case 0xcc: /* int3 */
         src.val = EXC_BP;
+        swint_type = x86_swint_int3;
         goto swint;
 
     case 0xcd: /* int imm8 */
         src.val = insn_fetch_type(uint8_t);
+        swint_type = x86_swint_int;
     swint:
         fail_if(!in_realmode(ctxt, ops)); /* XSA-106 */
         fail_if(ops->inject_sw_interrupt == NULL);
-        rc = ops->inject_sw_interrupt(src.val, _regs.eip - ctxt->regs->eip,
+        rc = ops->inject_sw_interrupt(swint_type, src.val,
+                                      _regs.eip - ctxt->regs->eip,
                                       ctxt) ? : X86EMUL_EXCEPTION;
         goto done;
 
@@ -2645,6 +2649,7 @@ x86_emulate(
         if ( !(_regs.eflags & EFLG_OF) )
             break;
         src.val = EXC_OF;
+        swint_type = x86_swint_into;
         goto swint;
 
     case 0xcf: /* iret */ {
@@ -3312,6 +3317,7 @@ x86_emulate(
 
     case 0xf1: /* int1 (icebp) */
         src.val = EXC_DB;
+        swint_type = x86_swint_icebp;
         goto swint;
 
     case 0xf4: /* hlt */
