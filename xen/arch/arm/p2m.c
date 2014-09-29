@@ -227,6 +227,76 @@ int p2m_pod_decrease_reservation(struct domain *d,
     return -ENOSYS;
 }
 
+static void p2m_set_permission(lpae_t *e, p2m_type_t t, p2m_access_t a)
+{
+    /* First apply type permissions */
+    switch ( t )
+    {
+    case p2m_ram_rw:
+        e->p2m.xn = 0;
+        e->p2m.write = 1;
+        break;
+
+    case p2m_ram_ro:
+        e->p2m.xn = 0;
+        e->p2m.write = 0;
+        break;
+
+    case p2m_iommu_map_rw:
+    case p2m_map_foreign:
+    case p2m_grant_map_rw:
+    case p2m_mmio_direct:
+        e->p2m.xn = 1;
+        e->p2m.write = 1;
+        break;
+
+    case p2m_iommu_map_ro:
+    case p2m_grant_map_ro:
+    case p2m_invalid:
+        e->p2m.xn = 1;
+        e->p2m.write = 0;
+        break;
+
+    case p2m_max_real_type:
+        BUG();
+        break;
+    }
+
+    /* Then restrict with access permissions */
+    switch ( a )
+    {
+    case p2m_access_rwx:
+        break;
+    case p2m_access_wx:
+        e->p2m.read = 0;
+        break;
+    case p2m_access_rw:
+        e->p2m.xn = 1;
+        break;
+    case p2m_access_w:
+        e->p2m.read = 0;
+        e->p2m.xn = 1;
+        break;
+    case p2m_access_rx:
+    case p2m_access_rx2rw:
+        e->p2m.write = 0;
+        break;
+    case p2m_access_x:
+        e->p2m.write = 0;
+        e->p2m.read = 0;
+        break;
+    case p2m_access_r:
+        e->p2m.write = 0;
+        e->p2m.xn = 1;
+        break;
+    case p2m_access_n:
+    case p2m_access_n2rwx:
+        e->p2m.read = e->p2m.write = 0;
+        e->p2m.xn = 1;
+        break;
+    }
+}
+
 static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
                                p2m_type_t t)
 {
@@ -258,37 +328,8 @@ static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
         break;
     }
 
-    switch (t)
-    {
-    case p2m_ram_rw:
-        e.p2m.xn = 0;
-        e.p2m.write = 1;
-        break;
-
-    case p2m_ram_ro:
-        e.p2m.xn = 0;
-        e.p2m.write = 0;
-        break;
-
-    case p2m_iommu_map_rw:
-    case p2m_map_foreign:
-    case p2m_grant_map_rw:
-    case p2m_mmio_direct:
-        e.p2m.xn = 1;
-        e.p2m.write = 1;
-        break;
-
-    case p2m_iommu_map_ro:
-    case p2m_grant_map_ro:
-    case p2m_invalid:
-        e.p2m.xn = 1;
-        e.p2m.write = 0;
-        break;
-
-    case p2m_max_real_type:
-        BUG();
-        break;
-    }
+    /* We pass p2m_access_rwx as a placeholder for now. */
+    p2m_set_permission(&e, t, p2m_access_rwx);
 
     ASSERT(!(pa & ~PAGE_MASK));
     ASSERT(!(pa & ~PADDR_MASK));
@@ -451,6 +492,26 @@ static const paddr_t level_masks[] =
 static const paddr_t level_shifts[] =
     { ZEROETH_SHIFT, FIRST_SHIFT, SECOND_SHIFT, THIRD_SHIFT };
 
+static int p2m_shatter_page(struct domain *d,
+                            lpae_t *entry,
+                            unsigned int level,
+                            bool_t flush_cache)
+{
+    const paddr_t level_shift = level_shifts[level];
+    int rc = p2m_create_table(d, entry,
+                              level_shift - PAGE_SHIFT, flush_cache);
+
+    if ( !rc )
+    {
+        struct p2m_domain *p2m = &d->arch.p2m;
+        p2m->stats.shattered[level]++;
+        p2m->stats.mappings[level]--;
+        p2m->stats.mappings[level+1] += LPAE_ENTRIES;
+    }
+
+    return rc;
+}
+
 /*
  * 0   == (P2M_ONE_DESCEND) continue to descend the tree
  * +ve == (P2M_ONE_PROGRESS_*) handled at this level, continue, flush,
@@ -582,14 +643,9 @@ static int apply_one_level(struct domain *d,
             if ( p2m_mapping(orig_pte) )
             {
                 *flush = true;
-                rc = p2m_create_table(d, entry,
-                                      level_shift - PAGE_SHIFT, flush_cache);
+                rc = p2m_shatter_page(d, entry, level, flush_cache);
                 if ( rc < 0 )
                     return rc;
-
-                p2m->stats.shattered[level]++;
-                p2m->stats.mappings[level]--;
-                p2m->stats.mappings[level+1] += LPAE_ENTRIES;
             } /* else: an existing table mapping -> descend */
 
             BUG_ON(!p2m_table(*entry));
@@ -624,14 +680,9 @@ static int apply_one_level(struct domain *d,
                  * and descend.
                  */
                 *flush = true;
-                rc = p2m_create_table(d, entry,
-                                      level_shift - PAGE_SHIFT, flush_cache);
+                rc = p2m_shatter_page(d, entry, level, flush_cache);
                 if ( rc < 0 )
                     return rc;
-
-                p2m->stats.shattered[level]++;
-                p2m->stats.mappings[level]--;
-                p2m->stats.mappings[level+1] += LPAE_ENTRIES;
 
                 return P2M_ONE_DESCEND;
             }
