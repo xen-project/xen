@@ -1187,8 +1187,6 @@ static void svm_inject_trap(struct hvm_trap *trap)
             __restore_debug_registers(vmcb, curr);
             vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | 0x4000);
         }
-        if ( cpu_has_monitor_trap_flag )
-            break;
         /* fall through */
     case TRAP_int3:
         if ( curr->domain->debugger_attached )
