@@ -2523,7 +2523,7 @@ static void vmx_vmexit_ud_intercept(struct cpu_user_regs *regs)
         break;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )
-            hvm_inject_hw_exception(ctxt.exn_vector, ctxt.exn_error_code);
+            hvm_inject_trap(&ctxt.trap);
         /* fall through */
     default:
         hvm_emulate_writeback(&ctxt);

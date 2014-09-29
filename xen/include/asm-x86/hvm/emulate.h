@@ -13,6 +13,7 @@
 #define __ASM_X86_HVM_EMULATE_H__
 
 #include <xen/config.h>
+#include <asm/hvm/hvm.h>
 #include <asm/x86_emulate.h>
 
 struct hvm_emulate_ctxt {
@@ -28,9 +29,7 @@ struct hvm_emulate_ctxt {
     unsigned long seg_reg_dirty;
 
     bool_t exn_pending;
-    uint8_t exn_vector;
-    uint8_t exn_insn_len;
-    int32_t exn_error_code;
+    struct hvm_trap trap;
 
     uint32_t intr_shadow;
 };

@@ -441,9 +441,10 @@ static int hvmemul_virtual_to_linear(
 
     /* This is a singleton operation: fail it with an exception. */
     hvmemul_ctxt->exn_pending = 1;
-    hvmemul_ctxt->exn_vector = TRAP_gp_fault;
-    hvmemul_ctxt->exn_error_code = 0;
-    hvmemul_ctxt->exn_insn_len = 0;
+    hvmemul_ctxt->trap.vector = TRAP_gp_fault;
+    hvmemul_ctxt->trap.type = X86_EVENTTYPE_HW_EXCEPTION;
+    hvmemul_ctxt->trap.error_code = 0;
+    hvmemul_ctxt->trap.insn_len = 0;
     return X86EMUL_EXCEPTION;
 }
 
@@ -1111,9 +1112,10 @@ static int hvmemul_inject_hw_exception(
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
 
     hvmemul_ctxt->exn_pending = 1;
-    hvmemul_ctxt->exn_vector = vector;
-    hvmemul_ctxt->exn_error_code = error_code;
-    hvmemul_ctxt->exn_insn_len = 0;
+    hvmemul_ctxt->trap.vector = vector;
+    hvmemul_ctxt->trap.type = X86_EVENTTYPE_HW_EXCEPTION;
+    hvmemul_ctxt->trap.error_code = error_code;
+    hvmemul_ctxt->trap.insn_len = 0;
 
     return X86EMUL_OKAY;
 }
@@ -1127,10 +1129,29 @@ static int hvmemul_inject_sw_interrupt(
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
 
+    switch ( type )
+    {
+    case x86_swint_icebp:
+        hvmemul_ctxt->trap.type = X86_EVENTTYPE_PRI_SW_EXCEPTION;
+        break;
+
+    case x86_swint_int3:
+    case x86_swint_into:
+        hvmemul_ctxt->trap.type = X86_EVENTTYPE_SW_EXCEPTION;
+        break;
+
+    case x86_swint_int:
+        hvmemul_ctxt->trap.type = X86_EVENTTYPE_SW_INTERRUPT;
+        break;
+
+    default:
+        return X86EMUL_UNHANDLEABLE;
+    }
+
     hvmemul_ctxt->exn_pending = 1;
-    hvmemul_ctxt->exn_vector = vector;
-    hvmemul_ctxt->exn_error_code = -1;
-    hvmemul_ctxt->exn_insn_len = insn_len;
+    hvmemul_ctxt->trap.vector = vector;
+    hvmemul_ctxt->trap.error_code = HVM_DELIVER_NO_ERROR_CODE;
+    hvmemul_ctxt->trap.insn_len = insn_len;
 
     return X86EMUL_OKAY;
 }
@@ -1404,7 +1425,7 @@ void hvm_mem_event_emulate_one(bool_t nowrite, unsigned int trapnr,
         break;
     case X86EMUL_EXCEPTION:
         if ( ctx.exn_pending )
-            hvm_inject_hw_exception(ctx.exn_vector, ctx.exn_error_code);
+            hvm_inject_trap(&ctx.trap);
         break;
     }
 

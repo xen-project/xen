@@ -113,7 +113,7 @@ int handle_mmio(void)
         return 0;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )
-            hvm_inject_hw_exception(ctxt.exn_vector, ctxt.exn_error_code);
+            hvm_inject_trap(&ctxt.trap);
         break;
     default:
         break;
