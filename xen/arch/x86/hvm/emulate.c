@@ -21,6 +21,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/trace.h>
 #include <asm/hvm/support.h>
+#include <asm/hvm/svm/svm.h>
 
 static void hvmtrace_io_assist(int is_mmio, ioreq_t *p)
 {
@@ -1327,6 +1328,13 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     hvmemul_ctxt->exn_pending = 0;
     vio->mmio_retrying = vio->mmio_retry;
     vio->mmio_retry = 0;
+
+    if ( cpu_has_vmx )
+        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_none;
+    else if ( cpu_has_svm_nrips )
+        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_icebp;
+    else
+        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_all;
 
     rc = x86_emulate(&hvmemul_ctxt->ctxt, ops);
 

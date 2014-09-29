@@ -59,6 +59,13 @@ enum x86_swint_type {
     x86_swint_int,   /* 0xcd $n */
 };
 
+/* How much help is required with software event injection? */
+enum x86_swint_emulation {
+    x86_swint_emulate_none, /* Hardware supports all software injection properly */
+    x86_swint_emulate_icebp,/* Help needed with `icebp` (0xf1) */
+    x86_swint_emulate_all,  /* Help needed with all software events */
+};
+
 /* 
  * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
  * segment descriptor. It happens to match the format of an AMD SVM VMCB.
@@ -387,6 +394,9 @@ struct x86_emulate_ctxt
 
     /* Set this if writes may have side effects. */
     uint8_t force_writeback;
+
+    /* Software event injection support. */
+    enum x86_swint_emulation swint_emulate;
 
     /* Retirement state, set by the emulator (valid only on X86EMUL_OKAY). */
     union {

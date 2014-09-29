@@ -5096,6 +5096,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     ptwr_ctxt.ctxt.force_writeback = 0;
     ptwr_ctxt.ctxt.addr_size = ptwr_ctxt.ctxt.sp_size =
         is_pv_32on64_domain(d) ? 32 : BITS_PER_LONG;
+    ptwr_ctxt.ctxt.swint_emulate = x86_swint_emulate_none;
     ptwr_ctxt.cr2 = addr;
     ptwr_ctxt.pte = pte;
 
@@ -5172,6 +5173,7 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
         .ctxt.regs = regs,
         .ctxt.addr_size = addr_size,
         .ctxt.sp_size = addr_size,
+        .ctxt.swint_emulate = x86_swint_emulate_none,
         .cr2 = addr
     };
     int rc;

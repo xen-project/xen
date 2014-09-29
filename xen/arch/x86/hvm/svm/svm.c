@@ -1177,11 +1177,12 @@ static void svm_inject_trap(struct hvm_trap *trap)
     struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
     eventinj_t event = vmcb->eventinj;
     struct hvm_trap _trap = *trap;
+    const struct cpu_user_regs *regs = guest_cpu_user_regs();
 
     switch ( _trap.vector )
     {
     case TRAP_debug:
-        if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
+        if ( regs->eflags & X86_EFLAGS_TF )
         {
             __restore_debug_registers(vmcb, curr);
             vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | 0x4000);
@@ -1209,10 +1210,58 @@ static void svm_inject_trap(struct hvm_trap *trap)
 
     event.bytes = 0;
     event.fields.v = 1;
-    event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
     event.fields.vector = _trap.vector;
-    event.fields.ev = (_trap.error_code != HVM_DELIVER_NO_ERROR_CODE);
-    event.fields.errorcode = _trap.error_code;
+
+    /* Refer to AMD Vol 2: System Programming, 15.20 Event Injection. */
+    switch ( _trap.type )
+    {
+    case X86_EVENTTYPE_SW_INTERRUPT: /* int $n */
+        /*
+         * Injection type 4 (software interrupt) is only supported with
+         * NextRIP support.  Without NextRIP, the emulator will have performed
+         * DPL and presence checks for us.
+         */
+        if ( cpu_has_svm_nrips )
+        {
+            vmcb->nextrip = regs->eip + _trap.insn_len;
+            event.fields.type = X86_EVENTTYPE_SW_INTERRUPT;
+        }
+        else
+            event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
+        break;
+
+    case X86_EVENTTYPE_PRI_SW_EXCEPTION: /* icebp */
+        /*
+         * icebp's injection must always be emulated.  Software injection help
+         * in x86_emulate has moved eip forward, but NextRIP (if used) still
+         * needs setting or execution will resume from 0.
+         */
+        if ( cpu_has_svm_nrips )
+            vmcb->nextrip = regs->eip;
+        event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
+        break;
+
+    case X86_EVENTTYPE_SW_EXCEPTION: /* int3, into */
+        /*
+         * The AMD manual states that .type=3 (HW exception), .vector=3 or 4,
+         * will perform DPL checks.  Experimentally, DPL and presence checks
+         * are indeed performed, even without NextRIP support.
+         *
+         * However without NextRIP support, the event injection still needs
+         * fully emulating to get the correct eip in the trap frame, yet get
+         * the correct faulting eip should a fault occur.
+         */
+        if ( cpu_has_svm_nrips )
+            vmcb->nextrip = regs->eip + _trap.insn_len;
+        event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
+        break;
+
+    default:
+        event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
+        event.fields.ev = (_trap.error_code != HVM_DELIVER_NO_ERROR_CODE);
+        event.fields.errorcode = _trap.error_code;
+        break;
+    }
 
     vmcb->eventinj = event;
 

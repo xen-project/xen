@@ -366,6 +366,7 @@ const struct x86_emulate_ops *shadow_init_emulation(
 
     sh_ctxt->ctxt.regs = regs;
     sh_ctxt->ctxt.force_writeback = 0;
+    sh_ctxt->ctxt.swint_emulate = x86_swint_emulate_none;
 
     if ( is_pv_vcpu(v) )
     {

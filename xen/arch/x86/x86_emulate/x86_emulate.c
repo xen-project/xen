@@ -403,6 +403,11 @@ typedef union {
 #define EXC_PF 14
 #define EXC_MF 16
 
+/* Segment selector error code bits. */
+#define ECODE_EXT (1 << 0)
+#define ECODE_IDT (1 << 1)
+#define ECODE_TI  (1 << 2)
+
 /*
  * Instruction emulation:
  * Most instructions are emulated directly via a fragment of inline assembly
@@ -1316,6 +1321,115 @@ decode_segment(uint8_t modrm_reg)
     default: break;
     }
     return decode_segment_failed;
+}
+
+/* Inject a software interrupt/exception, emulating if needed. */
+static int inject_swint(enum x86_swint_type type,
+                        uint8_t vector, uint8_t insn_len,
+                        struct x86_emulate_ctxt *ctxt,
+                        const struct x86_emulate_ops *ops)
+{
+    int rc, error_code, fault_type = EXC_GP;
+
+    fail_if(ops->inject_sw_interrupt == NULL);
+    fail_if(ops->inject_hw_exception == NULL);
+
+    /*
+     * Without hardware support, injecting software interrupts/exceptions is
+     * problematic.
+     *
+     * All software methods of generating exceptions (other than BOUND) yield
+     * traps, so eip in the exception frame needs to point after the
+     * instruction, not at it.
+     *
+     * However, if injecting it as a hardware exception causes a fault during
+     * delivery, our adjustment of eip will cause the fault to be reported
+     * after the faulting instruction, not pointing to it.
+     *
+     * Therefore, eip can only safely be wound forwards if we are certain that
+     * injecting an equivalent hardware exception won't fault, which means
+     * emulating everything the processor would do on a control transfer.
+     *
+     * However, emulation of complete control transfers is very complicated.
+     * All we care about is that guest userspace cannot avoid the descriptor
+     * DPL check by using the Xen emulator, and successfully invoke DPL=0
+     * descriptors.
+     *
+     * Any OS which would further fault during injection is going to receive a
+     * double fault anyway, and won't be in a position to care that the
+     * faulting eip is incorrect.
+     */
+
+    if ( (ctxt->swint_emulate == x86_swint_emulate_all) ||
+         ((ctxt->swint_emulate == x86_swint_emulate_icebp) &&
+          (type == x86_swint_icebp)) )
+    {
+        if ( !in_realmode(ctxt, ops) )
+        {
+            unsigned int idte_size = (ctxt->addr_size == 64) ? 16 : 8;
+            unsigned int idte_offset = vector * idte_size;
+            struct segment_register idtr;
+            uint32_t idte_ctl;
+
+            /* icebp sets the External Event bit despite being an instruction. */
+            error_code = (vector << 3) | ECODE_IDT |
+                (type == x86_swint_icebp ? ECODE_EXT : 0);
+
+            /*
+             * TODO - this does not cover the v8086 mode with CR4.VME case
+             * correctly, but falls on the safe side from the point of view of
+             * a 32bit OS.  Someone with many TUITs can see about reading the
+             * TSS Software Interrupt Redirection bitmap.
+             */
+            if ( (ctxt->regs->eflags & EFLG_VM) &&
+                 ((ctxt->regs->eflags & EFLG_IOPL) != EFLG_IOPL) )
+                goto raise_exn;
+
+            fail_if(ops->read_segment == NULL);
+            fail_if(ops->read == NULL);
+            if ( (rc = ops->read_segment(x86_seg_idtr, &idtr, ctxt)) )
+                goto done;
+
+            if ( (idte_offset + idte_size - 1) > idtr.limit )
+                goto raise_exn;
+
+            /*
+             * Should strictly speaking read all 8/16 bytes of an entry,
+             * but we currently only care about the dpl and present bits.
+             */
+            ops->read(x86_seg_none, idtr.base + idte_offset + 4,
+                      &idte_ctl, sizeof(idte_ctl), ctxt);
+
+            /* Is this entry present? */
+            if ( !(idte_ctl & (1u << 15)) )
+            {
+                fault_type = EXC_NP;
+                goto raise_exn;
+            }
+
+            /* icebp counts as a hardware event, and bypasses the dpl check. */
+            if ( type != x86_swint_icebp )
+            {
+                struct segment_register ss;
+
+                if ( (rc = ops->read_segment(x86_seg_ss, &ss, ctxt)) )
+                    goto done;
+
+                if ( ss.attr.fields.dpl > ((idte_ctl >> 13) & 3) )
+                    goto raise_exn;
+            }
+        }
+
+        ctxt->regs->eip += insn_len;
+    }
+
+    rc = ops->inject_sw_interrupt(type, vector, insn_len, ctxt);
+
+ done:
+    return rc;
+
+ raise_exn:
+    return ops->inject_hw_exception(fault_type, error_code, ctxt);
 }
 
 int
@@ -2637,11 +2751,9 @@ x86_emulate(
         src.val = insn_fetch_type(uint8_t);
         swint_type = x86_swint_int;
     swint:
-        fail_if(!in_realmode(ctxt, ops)); /* XSA-106 */
-        fail_if(ops->inject_sw_interrupt == NULL);
-        rc = ops->inject_sw_interrupt(swint_type, src.val,
-                                      _regs.eip - ctxt->regs->eip,
-                                      ctxt) ? : X86EMUL_EXCEPTION;
+        rc = inject_swint(swint_type, src.val,
+                          _regs.eip - ctxt->regs->eip,
+                          ctxt, ops) ? : X86EMUL_EXCEPTION;
         goto done;
 
     case 0xce: /* into */
