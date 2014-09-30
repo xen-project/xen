@@ -3,6 +3,7 @@
 
 #include <asm/cpregs.h>
 #include <asm/sysregs.h>
+#include <public/arch-arm.h>
 
 /* MIDR Main ID Register */
 #define MIDR_MASK    0xff0ffff0
@@ -179,6 +180,7 @@
 #define HDCR_TDRA       (_AC(1,U)<<11)          /* Trap Debug ROM access */
 #define HDCR_TDOSA      (_AC(1,U)<<10)          /* Trap Debug-OS-related register access */
 #define HDCR_TDA        (_AC(1,U)<<9)           /* Trap Debug Access */
+#define HDCR_TDE        (_AC(1,U)<<8)           /* Route Soft Debug exceptions from EL1/EL1 to EL2 */
 #define HDCR_TPM        (_AC(1,U)<<6)           /* Trap Performance Monitors accesses */
 #define HDCR_TPMCR      (_AC(1,U)<<5)           /* Trap PMCR accesses */
 
@@ -205,6 +207,9 @@
 #define HSR_EC_INSTR_ABORT_CURR_EL  0x21
 #define HSR_EC_DATA_ABORT_LOWER_EL  0x24
 #define HSR_EC_DATA_ABORT_CURR_EL   0x25
+#ifdef CONFIG_ARM_64
+#define HSR_EC_BRK                  0x3c
+#endif
 
 /* FSR format, common */
 #define FSR_LPAE                (_AC(1,UL)<<9)
@@ -452,6 +457,17 @@ union hsr {
         unsigned long len:1;   /* Instruction length */
         unsigned long ec:6;    /* Exception Class */
     } dabt; /* HSR_EC_DATA_ABORT_* */
+
+#ifdef CONFIG_ARM_64
+    struct hsr_brk {
+        unsigned long comment:16;   /* Comment */
+        unsigned long res0:9;
+        unsigned long len:1;        /* Instruction length */
+        unsigned long ec:6;         /* Exception Class */
+    } brk;
+#endif
+
+
 };
 #endif
 
@@ -583,7 +599,7 @@ void panic_PAR(uint64_t par);
 void show_execution_state(struct cpu_user_regs *regs);
 void show_registers(struct cpu_user_regs *regs);
 //#define dump_execution_state() run_in_exception_handler(show_execution_state)
-#define dump_execution_state() asm volatile (".word 0xe7f000f0\n"); /* XXX */
+#define dump_execution_state() WARN()
 
 #define cpu_relax() barrier() /* Could yield? */
 

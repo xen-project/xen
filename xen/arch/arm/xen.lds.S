@@ -40,6 +40,14 @@ SECTIONS
   . = ALIGN(PAGE_SIZE);
   .rodata : {
         _srodata = .;          /* Read-only data */
+        /* Bug frames table */
+       __start_bug_frames = .;
+       *(.bug_frames.0)
+       __stop_bug_frames_0 = .;
+       *(.bug_frames.1)
+       __stop_bug_frames_1 = .;
+       *(.bug_frames.2)
+       __stop_bug_frames_2 = .;
        *(.rodata)
        *(.rodata.*)
         _erodata = .;          /* End of read-only data */

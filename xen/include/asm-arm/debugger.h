@@ -1,7 +1,7 @@
 #ifndef __ARM_DEBUGGER_H__
 #define __ARM_DEBUGGER_H__
 
-#define debugger_trap_fatal(v, r) ((void) 0)
+#define debugger_trap_fatal(v, r) (0)
 #define debugger_trap_immediate() ((void) 0)
 
 #endif /* __ARM_DEBUGGER_H__ */

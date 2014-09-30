@@ -18,6 +18,7 @@
 
 #include <xen/config.h>
 #include <xen/lib.h>
+#include <xen/kernel.h>
 
 #include <public/xen.h>
 
@@ -25,6 +26,28 @@
 
 asmlinkage void do_trap_undefined_instruction(struct cpu_user_regs *regs)
 {
+    uint32_t pc = regs->pc;
+    uint32_t instr;
+
+    if ( !is_kernel_text(pc) &&
+         (system_state >= SYS_STATE_active || !is_kernel_inittext(pc)) )
+        goto die;
+
+    /* PC should be always a multiple of 4, as Xen is using ARM instruction set */
+    if ( regs->pc & 0x3 )
+        goto die;
+
+    instr = *((uint32_t *)pc);
+    if ( instr != BUG_OPCODE )
+        goto die;
+
+    if ( do_bug_frame(regs, pc) )
+        goto die;
+
+    regs->pc += 4;
+    return;
+
+die:
     do_unexpected_trap("Undefined Instruction", regs);
 }
 

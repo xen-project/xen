@@ -32,6 +32,7 @@
 #include <xen/domain_page.h>
 #include <public/sched.h>
 #include <public/xen.h>
+#include <asm/debugger.h>
 #include <asm/event.h>
 #include <asm/regs.h>
 #include <asm/cpregs.h>
@@ -1050,6 +1051,102 @@ void do_unexpected_trap(const char *msg, struct cpu_user_regs *regs)
     panic("CPU%d: Unexpected Trap: %s\n", smp_processor_id(), msg);
 }
 
+int do_bug_frame(struct cpu_user_regs *regs, vaddr_t pc)
+{
+    const struct bug_frame *bug;
+    const char *prefix = "", *filename, *predicate;
+    unsigned long fixup;
+    int id, lineno;
+    static const struct bug_frame *const stop_frames[] = {
+        __stop_bug_frames_0,
+        __stop_bug_frames_1,
+        __stop_bug_frames_2,
+        NULL
+    };
+
+    for ( bug = __start_bug_frames, id = 0; stop_frames[id]; ++bug )
+    {
+        while ( unlikely(bug == stop_frames[id]) )
+            ++id;
+
+        if ( ((vaddr_t)bug_loc(bug)) == pc )
+            break;
+    }
+
+    if ( !stop_frames[id] )
+        return -ENOENT;
+
+    /* WARN, BUG or ASSERT: decode the filename pointer and line number. */
+    filename = bug_file(bug);
+    if ( !is_kernel(filename) )
+        return -EINVAL;
+    fixup = strlen(filename);
+    if ( fixup > 50 )
+    {
+        filename += fixup - 47;
+        prefix = "...";
+    }
+    lineno = bug_line(bug);
+
+    switch ( id )
+    {
+    case BUGFRAME_warn:
+        printk("Xen WARN at %s%s:%d\n", prefix, filename, lineno);
+        show_execution_state(regs);
+        return 0;
+
+    case BUGFRAME_bug:
+        printk("Xen BUG at %s%s:%d\n", prefix, filename, lineno);
+
+        if ( debugger_trap_fatal(TRAP_invalid_op, regs) )
+            return 0;
+
+        show_execution_state(regs);
+        panic("Xen BUG at %s%s:%d", prefix, filename, lineno);
+
+    case BUGFRAME_assert:
+        /* ASSERT: decode the predicate string pointer. */
+        predicate = bug_msg(bug);
+        if ( !is_kernel(predicate) )
+            predicate = "<unknown>";
+
+        printk("Assertion '%s' failed at %s%s:%d\n",
+               predicate, prefix, filename, lineno);
+        if ( debugger_trap_fatal(TRAP_invalid_op, regs) )
+            return 0;
+        show_execution_state(regs);
+        panic("Assertion '%s' failed at %s%s:%d",
+              predicate, prefix, filename, lineno);
+    }
+
+    return -EINVAL;
+}
+
+#ifdef CONFIG_ARM_64
+static void do_trap_brk(struct cpu_user_regs *regs, union hsr hsr)
+{
+    /* HCR_EL2.TGE and MDCR_EL2.TDE are not set so we never receive
+     * software breakpoint exception for EL1 and EL0 here.
+     */
+    BUG_ON(!hyp_mode(regs));
+
+    switch (hsr.brk.comment)
+    {
+    case BRK_BUG_FRAME:
+        if ( do_bug_frame(regs, regs->pc) )
+            goto die;
+
+        regs->pc += 4;
+
+        break;
+
+    default:
+die:
+        do_unexpected_trap("Undefined Breakpoint Value", regs);
+    }
+}
+#endif
+
 typedef register_t (*arm_hypercall_fn_t)(
     register_t, register_t, register_t, register_t, register_t);
 
@@ -1921,7 +2018,8 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
      * correctly (See XSA-102). Until that is resolved we treat any
      * trap from 32-bit userspace on 64-bit kernel as undefined.
      */
-    if ( is_64bit_domain(current->domain) && psr_mode_is_32bit(regs->cpsr) )
+    if ( !hyp_mode(regs) && is_64bit_domain(current->domain) &&
+         psr_mode_is_32bit(regs->cpsr) )
     {
         inject_undef_exception(regs, hsr.len);
         return;
@@ -2006,6 +2104,13 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
     case HSR_EC_DATA_ABORT_LOWER_EL:
         do_trap_data_abort_guest(regs, hsr);
         break;
+
+#ifdef CONFIG_ARM_64
+    case HSR_EC_BRK:
+        do_trap_brk(regs, hsr);
+        break;
+#endif
+
     default:
  bad_trap:
         printk("Hypervisor Trap. HSR=0x%x EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
