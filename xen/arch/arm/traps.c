@@ -791,7 +791,7 @@ void show_registers(struct cpu_user_regs *regs)
 #else
     ctxt.far = READ_SYSREG(FAR_EL1);
     ctxt.esr_el1 = READ_SYSREG(ESR_EL1);
-    if ( is_32bit_domain(current->domain) )
+    if ( guest_mode(regs) && is_32bit_domain(current->domain) )
         ctxt.ifsr32_el2 = READ_SYSREG(IFSR32_EL2);
 #endif
     ctxt.vttbr_el2 = READ_SYSREG64(VTTBR_EL2);
