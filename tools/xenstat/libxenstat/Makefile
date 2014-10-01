@@ -15,10 +15,6 @@
 XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-prefix=$(PREFIX)
-includedir=$(prefix)/include
-libdir=$(prefix)/lib
-
 LDCONFIG=ldconfig
 MAKE_LINK=ln -sf
 
