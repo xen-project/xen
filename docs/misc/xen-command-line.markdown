@@ -167,10 +167,13 @@ developers wishing Xen to fall back to older timing methods on newer hardware.
 ### ats
 > `= <boolean>`
 
-> Default: `true`
+> Default: `false`
 
-Permits Xen to set up and use PCI Address Translation Services, which
-is required for PCI Passthrough.
+Permits Xen to set up and use PCI Address Translation Services.  This is a
+performance optimisation for PCI Passthrough.
+
+**WARNING: Xen cannot currently safely use ATS because of its synchronous wait
+loops for Queued Invalidation completions.**
 
 ### availmem
 > `= <size>`
