@@ -2332,8 +2332,7 @@ static struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
     if ( list_empty(&d->arch.hvm_domain.ioreq_server.list) )
         return NULL;
 
-    if ( list_is_singular(&d->arch.hvm_domain.ioreq_server.list) ||
-         (p->type != IOREQ_TYPE_COPY && p->type != IOREQ_TYPE_PIO) )
+    if ( p->type != IOREQ_TYPE_COPY && p->type != IOREQ_TYPE_PIO )
         return d->arch.hvm_domain.default_ioreq_server;
 
     cf8 = d->arch.hvm_domain.pci_cf8;
@@ -2564,12 +2563,42 @@ bool_t hvm_send_assist_req_to_ioreq_server(struct hvm_ioreq_server *s,
     return 0;
 }
 
+static bool_t hvm_complete_assist_req(ioreq_t *p)
+{
+    switch ( p->type )
+    {
+    case IOREQ_TYPE_COPY:
+    case IOREQ_TYPE_PIO:
+        if ( p->dir == IOREQ_READ )
+        {
+            if ( !p->data_is_ptr )
+                p->data = ~0ul;
+            else
+            {
+                int i, step = p->df ? -p->size : p->size;
+                uint32_t data = ~0;
+
+                for ( i = 0; i < p->count; i++ )
+                    hvm_copy_to_guest_phys(p->data + step * i, &data,
+                                           p->size);
+            }
+        }
+        /* FALLTHRU */
+    default:
+        p->state = STATE_IORESP_READY;
+        hvm_io_assist(p);
+        break;
+    }
+
+    return 1;
+}
+
 bool_t hvm_send_assist_req(ioreq_t *p)
 {
     struct hvm_ioreq_server *s = hvm_select_ioreq_server(current->domain, p);
 
     if ( !s )
-        return 0;
+        return hvm_complete_assist_req(p);
 
     return hvm_send_assist_req_to_ioreq_server(s, p);
 }
