@@ -577,6 +577,9 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_iomem_permission:
     case XEN_DOMCTL_memory_mapping:
     case XEN_DOMCTL_set_target:
+#ifdef HAS_MEM_ACCESS
+    case XEN_DOMCTL_mem_event_op:
+#endif
 #ifdef CONFIG_X86
     /* These have individual XSM hooks (arch/x86/domctl.c) */
     case XEN_DOMCTL_shadow_op:
@@ -584,7 +587,6 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_unbind_pt_irq:
     case XEN_DOMCTL_ioport_mapping:
-    case XEN_DOMCTL_mem_event_op:
     /* These have individual XSM hooks (drivers/passthrough/iommu.c) */
     case XEN_DOMCTL_get_device_group:
     case XEN_DOMCTL_test_assign_device:
@@ -1189,6 +1191,18 @@ static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)
 }
 #endif /* HAS_PASSTHROUGH && HAS_PCI */
 
+#ifdef HAS_MEM_ACCESS
+static int flask_mem_event_control(struct domain *d, int mode, int op)
+{
+    return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
+}
+
+static int flask_mem_event_op(struct domain *d, int op)
+{
+    return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
+}
+#endif /* HAS_MEM_ACCESS */
+
 #ifdef CONFIG_X86
 static int flask_do_mca(void)
 {
@@ -1297,16 +1311,6 @@ static int flask_hvm_inject_msi(struct domain *d)
 static int flask_hvm_ioreq_server(struct domain *d, int op)
 {
     return current_has_perm(d, SECCLASS_HVM, HVM__HVMCTL);
-}
-
-static int flask_mem_event_control(struct domain *d, int mode, int op)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
-}
-
-static int flask_mem_event_op(struct domain *d, int op)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
 }
 
 static int flask_mem_sharing_op(struct domain *d, struct domain *cd, int op)
@@ -1577,6 +1581,11 @@ static struct xsm_operations flask_ops = {
     .deassign_device = flask_deassign_device,
 #endif
 
+#ifdef HAS_MEM_ACCESS
+    .mem_event_control = flask_mem_event_control,
+    .mem_event_op = flask_mem_event_op,
+#endif
+
 #ifdef CONFIG_X86
     .do_mca = flask_do_mca,
     .shadow_control = flask_shadow_control,
@@ -1585,8 +1594,6 @@ static struct xsm_operations flask_ops = {
     .hvm_set_pci_link_route = flask_hvm_set_pci_link_route,
     .hvm_inject_msi = flask_hvm_inject_msi,
     .hvm_ioreq_server = flask_hvm_ioreq_server,
-    .mem_event_control = flask_mem_event_control,
-    .mem_event_op = flask_mem_event_op,
     .mem_sharing_op = flask_mem_sharing_op,
     .apic = flask_apic,
     .platform_op = flask_platform_op,

@@ -141,6 +141,11 @@ struct xsm_operations {
     int (*hvm_param_nested) (struct domain *d);
     int (*get_vnumainfo) (struct domain *d);
 
+#ifdef HAS_MEM_ACCESS
+    int (*mem_event_control) (struct domain *d, int mode, int op);
+    int (*mem_event_op) (struct domain *d, int op);
+#endif
+
 #ifdef CONFIG_X86
     int (*do_mca) (void);
     int (*shadow_control) (struct domain *d, uint32_t op);
@@ -149,8 +154,6 @@ struct xsm_operations {
     int (*hvm_set_pci_link_route) (struct domain *d);
     int (*hvm_inject_msi) (struct domain *d);
     int (*hvm_ioreq_server) (struct domain *d, int op);
-    int (*mem_event_control) (struct domain *d, int mode, int op);
-    int (*mem_event_op) (struct domain *d, int op);
     int (*mem_sharing_op) (struct domain *d, struct domain *cd, int op);
     int (*apic) (struct domain *d, int cmd);
     int (*memtype) (uint32_t access);
@@ -540,6 +543,18 @@ static inline int xsm_get_vnumainfo (xsm_default_t def, struct domain *d)
     return xsm_ops->get_vnumainfo(d);
 }
 
+#ifdef HAS_MEM_ACCESS
+static inline int xsm_mem_event_control (xsm_default_t def, struct domain *d, int mode, int op)
+{
+    return xsm_ops->mem_event_control(d, mode, op);
+}
+
+static inline int xsm_mem_event_op (xsm_default_t def, struct domain *d, int op)
+{
+    return xsm_ops->mem_event_op(d, op);
+}
+#endif
+
 #ifdef CONFIG_X86
 static inline int xsm_do_mca(xsm_default_t def)
 {
@@ -574,16 +589,6 @@ static inline int xsm_hvm_inject_msi (xsm_default_t def, struct domain *d)
 static inline int xsm_hvm_ioreq_server (xsm_default_t def, struct domain *d, int op)
 {
     return xsm_ops->hvm_ioreq_server(d, op);
-}
-
-static inline int xsm_mem_event_control (xsm_default_t def, struct domain *d, int mode, int op)
-{
-    return xsm_ops->mem_event_control(d, mode, op);
-}
-
-static inline int xsm_mem_event_op (xsm_default_t def, struct domain *d, int op)
-{
-    return xsm_ops->mem_event_op(d, op);
 }
 
 static inline int xsm_mem_sharing_op (xsm_default_t def, struct domain *d, struct domain *cd, int op)

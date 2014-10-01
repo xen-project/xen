@@ -118,6 +118,11 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, remove_from_physmap);
     set_to_dummy_if_null(ops, map_gmfn_foreign);
 
+#ifdef HAS_MEM_ACCESS
+    set_to_dummy_if_null(ops, mem_event_control);
+    set_to_dummy_if_null(ops, mem_event_op);
+#endif
+
 #ifdef CONFIG_X86
     set_to_dummy_if_null(ops, do_mca);
     set_to_dummy_if_null(ops, shadow_control);
@@ -126,8 +131,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, hvm_set_pci_link_route);
     set_to_dummy_if_null(ops, hvm_inject_msi);
     set_to_dummy_if_null(ops, hvm_ioreq_server);
-    set_to_dummy_if_null(ops, mem_event_control);
-    set_to_dummy_if_null(ops, mem_event_op);
     set_to_dummy_if_null(ops, mem_sharing_op);
     set_to_dummy_if_null(ops, apic);
     set_to_dummy_if_null(ops, platform_op);
