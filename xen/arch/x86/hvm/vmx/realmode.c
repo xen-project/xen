@@ -157,14 +157,7 @@ static void realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
     return;
 
  fail:
-    gdprintk(XENLOG_ERR,
-             "Real-mode emulation failed @ %04x:%08lx: "
-             "%02x %02x %02x %02x %02x %02x\n",
-             hvmemul_get_seg_reg(x86_seg_cs, hvmemul_ctxt)->sel,
-             hvmemul_ctxt->insn_buf_eip,
-             hvmemul_ctxt->insn_buf[0], hvmemul_ctxt->insn_buf[1],
-             hvmemul_ctxt->insn_buf[2], hvmemul_ctxt->insn_buf[3],
-             hvmemul_ctxt->insn_buf[4], hvmemul_ctxt->insn_buf[5]);
+    hvm_dump_emulation_state(XENLOG_G_ERR "Real-mode", hvmemul_ctxt);
     domain_crash(curr->domain);
 }
 

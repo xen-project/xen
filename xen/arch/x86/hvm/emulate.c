@@ -1420,15 +1420,7 @@ void hvm_mem_event_emulate_one(bool_t nowrite, unsigned int trapnr,
          */
         return;
     case X86EMUL_UNHANDLEABLE:
-        gdprintk(XENLOG_DEBUG, "Emulation failed @ %04x:%lx: "
-               "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-               hvmemul_get_seg_reg(x86_seg_cs, &ctx)->sel,
-               ctx.insn_buf_eip,
-               ctx.insn_buf[0], ctx.insn_buf[1],
-               ctx.insn_buf[2], ctx.insn_buf[3],
-               ctx.insn_buf[4], ctx.insn_buf[5],
-               ctx.insn_buf[6], ctx.insn_buf[7],
-               ctx.insn_buf[8], ctx.insn_buf[9]);
+        hvm_dump_emulation_state(XENLOG_G_DEBUG "Mem event", &ctx);
         hvm_inject_hw_exception(trapnr, errcode);
         break;
     case X86EMUL_EXCEPTION:
@@ -1477,6 +1469,32 @@ struct segment_register *hvmemul_get_seg_reg(
     if ( !__test_and_set_bit(seg, &hvmemul_ctxt->seg_reg_accessed) )
         hvm_get_segment_register(current, seg, &hvmemul_ctxt->seg_reg[seg]);
     return &hvmemul_ctxt->seg_reg[seg];
+}
+
+static const char *guest_x86_mode_to_str(int mode)
+{
+    switch ( mode )
+    {
+    case 0:  return "Real";
+    case 1:  return "v86";
+    case 2:  return "16bit";
+    case 4:  return "32bit";
+    case 8:  return "64bit";
+    default: return "Unknown";
+    }
+}
+
+void hvm_dump_emulation_state(const char *prefix,
+                              struct hvm_emulate_ctxt *hvmemul_ctxt)
+{
+    struct vcpu *curr = current;
+    const char *mode_str = guest_x86_mode_to_str(hvm_guest_x86_mode(curr));
+    const struct segment_register *cs =
+        hvmemul_get_seg_reg(x86_seg_cs, hvmemul_ctxt);
+
+    printk("%s emulation failed: %pv %s @ %04x:%08lx -> %*ph\n",
+           prefix, curr, mode_str, cs->sel, hvmemul_ctxt->insn_buf_eip,
+           hvmemul_ctxt->insn_buf_bytes, hvmemul_ctxt->insn_buf);
 }
 
 /*

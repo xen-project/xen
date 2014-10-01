@@ -54,4 +54,7 @@ int hvmemul_do_pio(
     unsigned long port, unsigned long *reps, int size,
     paddr_t ram_gpa, int dir, int df, void *p_data);
 
+void hvm_dump_emulation_state(const char *prefix,
+                              struct hvm_emulate_ctxt *hvmemul_ctxt);
+
 #endif /* __ASM_X86_HVM_EMULATE_H__ */

@@ -100,16 +100,7 @@ int handle_mmio(void)
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
-        gdprintk(XENLOG_WARNING,
-                 "MMIO emulation failed @ %04x:%lx: "
-                 "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-                 hvmemul_get_seg_reg(x86_seg_cs, &ctxt)->sel,
-                 ctxt.insn_buf_eip,
-                 ctxt.insn_buf[0], ctxt.insn_buf[1],
-                 ctxt.insn_buf[2], ctxt.insn_buf[3],
-                 ctxt.insn_buf[4], ctxt.insn_buf[5],
-                 ctxt.insn_buf[6], ctxt.insn_buf[7],
-                 ctxt.insn_buf[8], ctxt.insn_buf[9]);
+        hvm_dump_emulation_state(XENLOG_G_WARNING "MMIO", &ctxt);
         return 0;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )
