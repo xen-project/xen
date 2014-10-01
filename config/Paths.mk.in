@@ -24,6 +24,7 @@ XEN_LOG_DIR              := @XEN_LOG_DIR@
 XEN_LIB_STORED           := @XEN_LIB_STORED@
 
 CONFIG_DIR               := @CONFIG_DIR@
+INITD_DIR                := @INITD_DIR@
 XEN_LOCK_DIR             := @XEN_LOCK_DIR@
 XEN_PAGING_DIR           := @XEN_PAGING_DIR@
 

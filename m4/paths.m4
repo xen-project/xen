@@ -22,6 +22,23 @@ if test "x$sysconfdir" = 'x${prefix}/etc' ; then
     esac
 fi
 
+AC_ARG_WITH([initddir],
+    AS_HELP_STRING([--with-initddir=DIR],
+    [Path to directory with sysv runlevel scripts. [SYSCONFDIR/init.d]]),
+    [initddir_path=$withval],
+    [case "$host_os" in
+         *linux*)
+         if test -d $sysconfdir/rc.d/init.d ; then
+             initddir_path=$sysconfdir/rc.d/init.d
+         else
+             initddir_path=$sysconfdir/init.d
+         fi
+         ;;
+         *)
+         initddir_path=$sysconfdir/rc.d
+         ;;
+     esac])
+
 BINDIR=$prefix/bin
 AC_SUBST(BINDIR)
 
@@ -62,6 +79,9 @@ AC_SUBST(XENFIRMWAREDIR)
 
 CONFIG_DIR=$sysconfdir
 AC_SUBST(CONFIG_DIR)
+
+INITD_DIR=$initddir_path
+AC_SUBST(INITD_DIR)
 
 XEN_CONFIG_DIR=$CONFIG_DIR/xen
 AC_SUBST(XEN_CONFIG_DIR)

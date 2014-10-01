@@ -76,7 +76,6 @@ endef
 
 # See distro_mapping.txt for other options
 $(eval $(call setvar_dir,CONFIG_LEAF_DIR,,/etc/sysconfig,sysconfig,default))
-$(eval $(call setvar_dir,INITD_DIR,/etc,/rc.d/init.d,/rc.d/init.d,/init.d))
 
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include

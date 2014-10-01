@@ -13,8 +13,9 @@ build host, via the "setvar_dir" macro in Config.mk) and for some
 scripts at run-time.  If the Red Hat directory exists, it is used;
 otherwise the Debian one is used.
 
-You can override this by setting the variables in the environment or
-your ".config" (which is included by .config).
+The INITD_DIR path can be changed with configure --with-initddir=DIR.
+The CONFIG_LEAF_DIR path can be changed by setting the variables in
+the environment or your ".config" (which is included by Config.mk).
 
 To add support for new distributions that don't use the above locations,
 one must grep for the above elements and add appropriate checks.
