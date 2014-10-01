@@ -24,7 +24,7 @@
 #                    systemd systems.
 ### END INIT INFO
 
-. /etc/xen/scripts/hotplugpath.sh
+. @XEN_SCRIPT_DIR@/hotplugpath.sh
 
 case "$1" in
     start)

@@ -20,7 +20,7 @@
 
 XENSTORED=@XENSTORED@
 
-. /etc/xen/scripts/hotplugpath.sh
+. @XEN_SCRIPT_DIR@/hotplugpath.sh
 
 if [ -d /etc/sysconfig ]; then
 	xencommons_config=/etc/sysconfig

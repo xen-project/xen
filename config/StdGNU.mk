@@ -48,7 +48,6 @@ XEN_PAGING_DIR = /var/lib/xen/xenpaging
 SYSCONFIG_DIR = $(CONFIG_DIR)/$(CONFIG_LEAF_DIR)
 
 XEN_CONFIG_DIR = $(CONFIG_DIR)/xen
-XEN_SCRIPT_DIR = $(XEN_CONFIG_DIR)/scripts
 
 BOOT_DIR ?= /boot
 

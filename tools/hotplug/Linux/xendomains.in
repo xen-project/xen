@@ -27,7 +27,7 @@
 #                    boots / shuts down.
 ### END INIT INFO
 
-. /etc/xen/scripts/hotplugpath.sh
+. @XEN_SCRIPT_DIR@/hotplugpath.sh
 
 CMD=${SBINDIR}/xl
 HEADCOMP="Xen saved domain"

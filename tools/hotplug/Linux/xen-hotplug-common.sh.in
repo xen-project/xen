@@ -112,7 +112,7 @@ xenstore_write() {
 # Execute each hook in the <hook> directory.
 #
 call_hooks() {
-  for f in /etc/xen/scripts/${1}-${2}.d/*.hook; do
+  for f in @XEN_SCRIPT_DIR@/${1}-${2}.d/*.hook; do
     if [ -x "$f" ]; then . "$f"; fi
   done
 }

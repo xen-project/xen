@@ -9,6 +9,8 @@ AC_CONFIG_FILES([
 ../config/Tools.mk
 hotplug/Linux/init.d/xencommons.in
 hotplug/Linux/init.d/sysconfig.xencommons
+hotplug/Linux/init.d/xen-watchdog
+hotplug/Linux/init.d/xendomains
 hotplug/Linux/systemd/proc-xen.mount
 hotplug/Linux/systemd/var-lib-xenstored.mount
 hotplug/Linux/systemd/xenstored.socket
@@ -18,6 +20,10 @@ hotplug/Linux/systemd/xenconsoled.service
 hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service
 hotplug/Linux/systemd/xendomains.service
 hotplug/Linux/systemd/xen-watchdog.service
+hotplug/Linux/vif-setup
+hotplug/Linux/xen-backend.rules
+hotplug/Linux/xen-hotplug-common.sh
+hotplug/Linux/xendomains
 ])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([../])

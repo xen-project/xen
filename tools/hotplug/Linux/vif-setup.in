@@ -4,6 +4,6 @@ if test "$script"
 then
     exec $script $*
 else
-    exec /etc/xen/scripts/vif-bridge $*
+    exec @XEN_SCRIPT_DIR@/vif-bridge $*
 fi
 
