@@ -716,11 +716,11 @@ static int apply_p2m_changes(struct domain *d,
 {
     int rc, ret;
     struct p2m_domain *p2m = &d->arch.p2m;
-    lpae_t *mappings[4] = { NULL, };
+    lpae_t *mappings[4] = { NULL, NULL, NULL, NULL };
     paddr_t addr, orig_maddr = maddr;
     unsigned int level = 0;
     unsigned int cur_root_table = ~0;
-    unsigned int cur_offset[4] = { ~0, };
+    unsigned int cur_offset[4] = { ~0, ~0, ~0, ~0 };
     unsigned int count = 0;
     bool_t flush = false;
     bool_t flush_pt;
