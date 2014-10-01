@@ -816,6 +816,7 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
          !libxl_defbool_val(info->diskbuf))) {
         LOG(ERROR, "Unsafe mode must be enabled to replicate to /dev/null,"
                    "disable network buffering and disk replication");
+        rc = ERROR_FAIL;
         goto out;
     }
 
@@ -839,6 +840,7 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
     if (libxl_defbool_val(info->netbuf)) {
         if (!libxl__netbuffer_enabled(gc)) {
             LOG(ERROR, "Remus: No support for network buffering");
+            rc = ERROR_FAIL;
             goto out;
         }
         rds->device_kind_flags |= (1 << LIBXL__DEVICE_KIND_VIF);
