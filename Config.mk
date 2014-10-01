@@ -58,7 +58,6 @@ endif
 include $(XEN_ROOT)/config/$(XEN_OS).mk
 include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
 
-SHAREDIR    ?= $(PREFIX)/share
 DOCDIR      ?= $(SHAREDIR)/doc/xen
 MANDIR      ?= $(SHAREDIR)/man
 BASH_COMPLETION_DIR ?= $(CONFIG_DIR)/bash_completion.d

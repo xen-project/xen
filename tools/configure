@@ -715,7 +715,6 @@ INITD_DIR
 CONFIG_DIR
 XENFIRMWAREDIR
 PRIVATE_BINDIR
-PKG_XEN_PREFIX
 PRIVATE_PREFIX
 SHAREDIR
 XEN_LIB_STORED
@@ -3739,7 +3738,10 @@ BINDIR=$prefix/bin
 SBINDIR=$prefix/sbin
 
 
-LIBEXEC=$prefix/lib/xen/bin
+case "$host_os" in
+*netbsd*)  LIBEXEC=$prefix/libexec ;;
+*) LIBEXEC=$prefix/lib/xen/bin ;;
+esac
 
 
 LIBDIR=`eval echo $libdir`
@@ -3760,10 +3762,11 @@ SHAREDIR=$prefix/share
 PRIVATE_PREFIX=$LIBDIR/xen
 
 
-PKG_XEN_PREFIX=$LIBDIR/xen
-
-
-PRIVATE_BINDIR=$PRIVATE_PREFIX/bin
+case "$host_os" in
+*freebsd*) PRIVATE_BINDIR=$PRIVATE_PREFIX/bin ;;
+*netbsd*) PRIVATE_BINDIR=$BINDIR ;;
+*) PRIVATE_BINDIR=$PRIVATE_PREFIX/bin ;;
+esac
 
 
 XENFIRMWAREDIR=$prefix/lib/xen/boot
@@ -3781,7 +3784,11 @@ XEN_CONFIG_DIR=$CONFIG_DIR/xen
 XEN_SCRIPT_DIR=$XEN_CONFIG_DIR/scripts
 
 
-XEN_LOCK_DIR=/var/lock
+case "$host_os" in
+*freebsd*) XEN_LOCK_DIR=/var/lib ;;
+*netbsd*) XEN_LOCK_DIR=/var/lib ;;
+*) XEN_LOCK_DIR=/var/lock ;;
+esac
 
 
 XEN_RUN_DIR=/var/run/xen

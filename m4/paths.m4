@@ -47,7 +47,10 @@ AC_SUBST(SBINDIR)
 
 dnl XXX: this should be changed to use the passed $libexec
 dnl but can be done as a second step
-LIBEXEC=$prefix/lib/xen/bin
+case "$host_os" in
+*netbsd*)  LIBEXEC=$prefix/libexec ;;
+*) LIBEXEC=$prefix/lib/xen/bin ;;
+esac
 AC_SUBST(LIBEXEC)
 
 LIBDIR=`eval echo $libdir`
@@ -68,10 +71,11 @@ AC_SUBST(SHAREDIR)
 PRIVATE_PREFIX=$LIBDIR/xen
 AC_SUBST(PRIVATE_PREFIX)
 
-PKG_XEN_PREFIX=$LIBDIR/xen
-AC_SUBST(PKG_XEN_PREFIX)
-
-PRIVATE_BINDIR=$PRIVATE_PREFIX/bin
+case "$host_os" in
+*freebsd*) PRIVATE_BINDIR=$PRIVATE_PREFIX/bin ;;
+*netbsd*) PRIVATE_BINDIR=$BINDIR ;;
+*) PRIVATE_BINDIR=$PRIVATE_PREFIX/bin ;;
+esac
 AC_SUBST(PRIVATE_BINDIR)
 
 XENFIRMWAREDIR=$prefix/lib/xen/boot
@@ -89,7 +93,11 @@ AC_SUBST(XEN_CONFIG_DIR)
 XEN_SCRIPT_DIR=$XEN_CONFIG_DIR/scripts
 AC_SUBST(XEN_SCRIPT_DIR)
 
-XEN_LOCK_DIR=/var/lock
+case "$host_os" in
+*freebsd*) XEN_LOCK_DIR=/var/lib ;;
+*netbsd*) XEN_LOCK_DIR=/var/lib ;;
+*) XEN_LOCK_DIR=/var/lock ;;
+esac
 AC_SUBST(XEN_LOCK_DIR)
 
 XEN_RUN_DIR=/var/run/xen
