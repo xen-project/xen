@@ -12,6 +12,23 @@
 #
 # http://wiki.xen.org/wiki/Category:Host_Configuration#System_wide_xen_configuration
 
+PACKAGE_TARNAME          := @PACKAGE_TARNAME@
+prefix                   := @prefix@
+bindir                   := @bindir@
+sbindir                  := @sbindir@
+libdir                   := @libdir@
+libexecdir               := @libexecdir@
+datarootdir              := @datarootdir@
+mandir                   := @mandir@
+docdir                   := @docdir@
+dvidir                   := @dvidir@
+htmldir                  := @htmldir@
+pdfdir                   := @pdfdir@
+psdir                    := @psdir@
+includedir               := @includedir@
+localstatedir            := @localstatedir@
+sysconfdir               := @sysconfdir@
+
 SBINDIR                  := @SBINDIR@
 BINDIR                   := @BINDIR@
 LIBEXEC                  := @LIBEXEC@
