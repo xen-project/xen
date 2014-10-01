@@ -30,7 +30,7 @@
 const char *xs_daemon_rootdir(void)
 {
 	char *s = getenv("XENSTORED_ROOTDIR");
-	return (s ? s : "/var/lib/xenstored");
+	return (s ? s : XEN_LIB_STORED);
 }
 
 const char *xs_daemon_rundir(void)

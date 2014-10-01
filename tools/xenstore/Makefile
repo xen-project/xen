@@ -9,6 +9,7 @@ CFLAGS += -I.
 CFLAGS += -I$(XEN_ROOT)/tools/
 CFLAGS += -I./include
 CFLAGS += $(CFLAGS_libxenctrl)
+CFLAGS += -DXEN_LIB_STORED="\"$(XEN_LIB_STORED)\""
 
 CFLAGS-$(CONFIG_SYSTEMD)  += $(SYSTEMD_CFLAGS)
 LDFLAGS-$(CONFIG_SYSTEMD) += $(SYSTEMD_LIBS)
@@ -129,7 +130,7 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xenstore-compat
 ifeq ($(XENSTORE_XENSTORED),y)
-	$(INSTALL_DIR) $(DESTDIR)/var/lib/xenstored
+	$(INSTALL_DIR) $(DESTDIR)$(XEN_LIB_STORED)
 	$(INSTALL_PROG) xenstored $(DESTDIR)$(SBINDIR)
 endif
 	$(INSTALL_PROG) xenstore-control $(DESTDIR)$(BINDIR)

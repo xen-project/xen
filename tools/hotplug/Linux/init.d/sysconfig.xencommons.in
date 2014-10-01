@@ -27,10 +27,10 @@
 #XENSTORED_TRACE=[yes|on|1]
 
 ## Type: string
-## Default: "/var/lib/xenstored"
+## Default: "@XEN_LIB_STORED@"
 #
 # Running xenstored on XENSTORED_ROOTDIR
-#XENSTORED_ROOTDIR=/var/lib/xenstored
+#XENSTORED_ROOTDIR=@XEN_LIB_STORED@
 
 ## Type: string
 ## Default: Not defined, xenbackendd debug mode off
