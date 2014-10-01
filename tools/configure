@@ -3805,9 +3805,6 @@ case "$host_os" in
 esac
 
 
-XEN_RUN_DIR=$localstatedir/run/xen
-
-
 XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
 
 

@@ -108,9 +108,6 @@ case "$host_os" in
 esac
 AC_SUBST(XEN_LOCK_DIR)
 
-XEN_RUN_DIR=$localstatedir/run/xen
-AC_SUBST(XEN_RUN_DIR)
-
 XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
 AC_SUBST(XEN_PAGING_DIR)
 ])
