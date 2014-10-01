@@ -20,7 +20,7 @@
 
 LIST_HEAD(ats_devices);
 
-bool_t __read_mostly ats_enabled = 1;
+bool_t __read_mostly ats_enabled = 0;
 boolean_param("ats", ats_enabled);
 
 int enable_ats_device(int seg, int bus, int devfn, const void *iommu)
