@@ -474,10 +474,12 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
                action, seg, bus, dev, func);
         break;
 
-    case 0x100: case 0x104: case 0x108: /* Sandybridge */
-    case 0x150: case 0x154: case 0x158: /* Ivybridge */
-    case 0xa04: /* Haswell ULT */
-    case 0xc00: case 0xc04: case 0xc08: /* Haswell */
+    case 0x0040: case 0x0044: case 0x0048: /* Nehalem/Westmere */
+    case 0x0100: case 0x0104: case 0x0108: /* Sandybridge */
+    case 0x0150: case 0x0154: case 0x0158: /* Ivybridge */
+    case 0x0a04: /* Haswell ULT */
+    case 0x0c00: case 0x0c04: case 0x0c08: /* Haswell */
+    case 0x1600: case 0x1604: case 0x1608: /* Broadwell */
         bar = pci_conf_read32(seg, bus, dev, func, 0x6c);
         bar = (bar << 32) | pci_conf_read32(seg, bus, dev, func, 0x68);
         pa = bar & 0x7ffffff000UL; /* bits 12...38 */
