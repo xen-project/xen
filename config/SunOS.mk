@@ -19,8 +19,6 @@ INSTALL_DIR  = $(INSTALL) -d -m0755 -p
 INSTALL_DATA = $(INSTALL) -m0644 -p
 INSTALL_PROG = $(INSTALL) -m0755 -p
 
-PREFIX ?= /usr
-
 BOOT_DIR ?= /boot
 
 SunOS_LIBDIR = /usr/sfw/lib
