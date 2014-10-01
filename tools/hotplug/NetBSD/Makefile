@@ -33,12 +33,12 @@ install-scripts:
 
 .PHONY: install-rcd
 install-rcd:
-	$(INSTALL_DIR) $(DESTDIR)$(CONFIG_DIR)/rc.d
+	$(INSTALL_DIR) $(DESTDIR)$(INITD_DIR)
 	set -e; for i in $(XEN_RCD_PROG); \
 	   do \
-	   $(INSTALL_PROG) $$i $(DESTDIR)$(CONFIG_DIR)/rc.d; \
+	   $(INSTALL_PROG) $$i $(DESTDIR)$(INITD_DIR); \
 	done
-	$(INSTALL_DATA) ../common/hotplugpath.sh $(DESTDIR)$(CONFIG_DIR)/rc.d/xen-hotplugpath.sh
+	$(INSTALL_DATA) ../common/hotplugpath.sh $(DESTDIR)$(INITD_DIR)/xen-hotplugpath.sh
 
 .PHONY: clean
 clean:
