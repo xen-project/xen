@@ -506,6 +506,30 @@ static void parse_vif_rate(XLU_Config **config, const char *rate,
     }
 }
 
+static void set_default_nic_values(libxl_device_nic *nic)
+{
+
+    if (default_vifscript) {
+        free(nic->script);
+        nic->script = strdup(default_vifscript);
+    }
+
+    if (default_bridge) {
+        free(nic->bridge);
+        nic->bridge = strdup(default_bridge);
+    }
+
+    if (default_gatewaydev) {
+        free(nic->gatewaydev);
+        nic->gatewaydev = strdup(default_gatewaydev);
+    }
+
+    if (default_vifbackend) {
+        free(nic->backend_domname);
+        nic->backend_domname = strdup(default_vifbackend);
+    }
+}
+
 static void split_string_into_string_list(const char *str,
                                           const char *delim,
                                           libxl_string_list *psl)
@@ -1354,26 +1378,7 @@ static void parse_config_data(const char *config_source,
             nic = d_config->nics + d_config->num_nics;
             libxl_device_nic_init(nic);
             nic->devid = d_config->num_nics;
-
-            if (default_vifscript) {
-                free(nic->script);
-                nic->script = strdup(default_vifscript);
-            }
-
-            if (default_bridge) {
-                free(nic->bridge);
-                nic->bridge = strdup(default_bridge);
-            }
-
-            if (default_gatewaydev) {
-                free(nic->gatewaydev);
-                nic->gatewaydev = strdup(default_gatewaydev);
-            }
-
-            if (default_vifbackend) {
-                free(nic->backend_domname);
-                nic->backend_domname = strdup(default_vifbackend);
-            }
+            set_default_nic_values(nic);
 
             p = strtok(buf2, ",");
             if (!p)
@@ -6005,6 +6010,8 @@ int main_networkattach(int argc, char **argv)
     }
 
     libxl_device_nic_init(&nic);
+    set_default_nic_values(&nic);
+
     for (argv += optind+1, argc -= optind+1; argc > 0; ++argv, --argc) {
         if (MATCH_OPTION("type", *argv, oparg)) {
             if (!strcmp("vif", oparg)) {
