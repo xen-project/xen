@@ -707,6 +707,7 @@ xsmpolicy
 ocamltools
 monitors
 githttp
+rpath
 XEN_PAGING_DIR
 XEN_LOCK_DIR
 XEN_SCRIPT_DIR
@@ -779,6 +780,7 @@ ac_user_opts='
 enable_option_checking
 enable_largefile
 with_initddir
+enable_rpath
 enable_githttp
 enable_monitors
 enable_ocamltools
@@ -1446,6 +1448,8 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-largefile     omit support for large files
+  --enable-rpath          Build tools with -Wl,-rpath,LIBDIR (default is
+                          DISABLED)
   --enable-githttp        Download GIT repositories via HTTP (default is
                           DISABLED)
   --disable-monitors      Disable xenstat and xentop monitoring tools (default
@@ -3789,6 +3793,29 @@ XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
 
 
 # Enable/disable options
+
+# Check whether --enable-rpath was given.
+if test "${enable_rpath+set}" = set; then :
+  enableval=$enable_rpath;
+fi
+
+
+if test "x$enable_rpath" = "xno"; then :
+
+    ax_cv_rpath="n"
+
+elif test "x$enable_rpath" = "xyes"; then :
+
+    ax_cv_rpath="y"
+
+elif test -z $ax_cv_rpath; then :
+
+    ax_cv_rpath="n"
+
+fi
+rpath=$ax_cv_rpath
+
+
 
 # Check whether --enable-githttp was given.
 if test "${enable_githttp+set}" = set; then :

@@ -118,6 +118,14 @@ IOEMU_CONFIGURE_CROSS ?= --cross-prefix=$(CROSS_COMPILE) \
 			 --interp-prefix=$(CROSS_SYS_ROOT)
 endif
 
+ifeq ($(XEN_TOOLS_RPATH),y)
+QEMU_UPSTREAM_RPATH := -Wl,-rpath,$(LIBEXEC_LIB):$(LIBDIR)
+IOEMU_EXTRA_LDFLAGS := --extra-ldflags="-Wl,-rpath,$(LIBDIR)"
+else
+QEMU_UPSTREAM_RPATH := -Wl,-rpath,$(LIBEXEC_LIB)
+IOEMU_EXTRA_LDFLAGS :=
+endif
+
 QEMU_ROOT := $(shell if [ -d "$(QEMU_TRADITIONAL_LOC)" ]; then echo "$(QEMU_TRADITIONAL_LOC)"; else echo .; fi)
 ifneq ($(QEMU_ROOT),.)
 export QEMU_ROOT
@@ -153,7 +161,10 @@ subdir-all-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
 	set -e; \
 		$(buildmakevars2shellvars); \
 		cd qemu-xen-traditional-dir; \
-		$(QEMU_ROOT)/xen-setup --cpu=$(IOEMU_CPU_ARCH) $(IOEMU_CONFIGURE_CROSS); \
+		$(QEMU_ROOT)/xen-setup \
+		$(IOEMU_EXTRA_LDFLAGS) \
+		--cpu=$(IOEMU_CPU_ARCH) \
+		$(IOEMU_CONFIGURE_CROSS); \
 		$(MAKE) all
 
 subdir-install-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
@@ -162,6 +173,7 @@ subdir-install-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
 		cd qemu-xen-traditional-dir; \
 		$(QEMU_ROOT)/xen-setup \
 		--extra-cflags="$(EXTRA_CFLAGS_QEMU_TRADITIONAL)" \
+		$(IOEMU_EXTRA_LDFLAGS) \
 		--cpu=$(IOEMU_CPU_ARCH) \
 		$(IOEMU_CONFIGURE_CROSS); \
 		$(MAKE) install
@@ -206,7 +218,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		$(EXTRA_CFLAGS_QEMU_XEN)" \
 		--extra-ldflags="-L$(XEN_ROOT)/tools/libxc \
 		-L$(XEN_ROOT)/tools/xenstore \
-		-Wl,-rpath=$(PREFIX)/lib/xen/lib" \
+		$(QEMU_UPSTREAM_RPATH)" \
 		--bindir=$(LIBEXEC_BIN) \
 		--datadir=$(SHAREDIR)/qemu-xen \
 		--localstatedir=$(localstatedir) \

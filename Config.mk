@@ -208,6 +208,9 @@ LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i))
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
 LDFLAGS += $(foreach i, $(PREPEND_LIB), -L$(i))
 CFLAGS += $(foreach i, $(PREPEND_INCLUDES), -I$(i))
+ifeq ($(XEN_TOOLS_RPATH),y)
+LDFLAGS += -Wl,-rpath,$(LIBDIR)
+endif
 APPEND_LDFLAGS += $(foreach i, $(APPEND_LIB), -L$(i))
 APPEND_CFLAGS += $(foreach i, $(APPEND_INCLUDES), -I$(i))
 
