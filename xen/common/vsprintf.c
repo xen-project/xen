@@ -272,6 +272,34 @@ static char *pointer(char *str, char *end, const char **fmt_ptr,
     /* Custom %p suffixes. See XEN_ROOT/docs/misc/printk-formats.txt */
     switch ( fmt[1] )
     {
+    case 'h': /* Raw buffer as hex string. */
+    {
+        const uint8_t *hex_buffer = arg;
+        unsigned int i;
+
+        /* Consumed 'h' from the format string. */
+        ++*fmt_ptr;
+
+        /* Bound user count from %* to between 0 and 64 bytes. */
+        if ( field_width <= 0 )
+            return str;
+        if ( field_width > 64 )
+            field_width = 64;
+
+        for ( i = 0; ; )
+        {
+            /* Each byte: 2 chars, 0-padded, base 16, no hex prefix. */
+            str = number(str, end, hex_buffer[i], 16, 2, -1, ZEROPAD);
+
+            if ( ++i == field_width )
+                return str;
+
+            if ( str < end )
+                *str = ' ';
+            ++str;
+        }
+    }
+
     case 's': /* Symbol name with offset and size (iff offset != 0) */
     case 'S': /* Symbol name unconditionally with offset and size */
     {
