@@ -1013,12 +1013,14 @@ As the BTS virtualisation is not 100% safe and because of the nehalem quirk
 don't use the vpmu flag on production systems with Intel cpus!
 
 ### watchdog
-> `= <boolean>`
+> `= force | <boolean>`
 
 > Default: `false`
 
 Run an NMI watchdog on each processor.  If a processor is stuck for
-longer than the **watchdog\_timeout**, a panic occurs.
+longer than the **watchdog\_timeout**, a panic occurs.  When `force` is
+specified, in addition to running an NMI watchdog on each processor,
+unknown NMIs will still be processed.
 
 ### watchdog\_timeout
 > `= <integer>`

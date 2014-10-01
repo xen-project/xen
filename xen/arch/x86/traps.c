@@ -3226,14 +3226,15 @@ void do_nmi(struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
     unsigned char reason;
+    bool_t handle_unknown = 0;
 
     ++nmi_count(cpu);
 
     if ( nmi_callback(regs, cpu) )
         return;
 
-    if ( nmi_watchdog )
-        nmi_watchdog_tick(regs);
+    if ( !nmi_watchdog || (!nmi_watchdog_tick(regs) && watchdog_force) )
+        handle_unknown = 1;
 
     /* Only the BSP gets external NMIs from the system. */
     if ( cpu == 0 )
@@ -3243,7 +3244,7 @@ void do_nmi(struct cpu_user_regs *regs)
             pci_serr_error(regs);
         if ( reason & 0x40 )
             io_check_error(regs);
-        if ( !(reason & 0xc0) && !nmi_watchdog )
+        if ( !(reason & 0xc0) && handle_unknown )
             unknown_nmi_error(regs, reason);
     }
 }

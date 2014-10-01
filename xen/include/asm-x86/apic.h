@@ -206,7 +206,7 @@ extern void release_lapic_nmi(void);
 extern void self_nmi(void);
 extern void disable_timer_nmi_watchdog(void);
 extern void enable_timer_nmi_watchdog(void);
-extern void nmi_watchdog_tick (struct cpu_user_regs *regs);
+extern bool_t nmi_watchdog_tick (struct cpu_user_regs *regs);
 extern int APIC_init_uniprocessor (void);
 extern void disable_APIC_timer(void);
 extern void enable_APIC_timer(void);

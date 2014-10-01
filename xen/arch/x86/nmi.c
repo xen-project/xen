@@ -43,7 +43,32 @@ static DEFINE_PER_CPU(unsigned int, nmi_timer_ticks);
 
 /* opt_watchdog: If true, run a watchdog NMI on each processor. */
 bool_t __initdata opt_watchdog = 0;
-boolean_param("watchdog", opt_watchdog);
+
+/* watchdog_force: If true, process unknown NMIs when running the watchdog. */
+bool_t watchdog_force = 0;
+
+static void __init parse_watchdog(char *s)
+{
+    if ( !*s )
+    {
+        opt_watchdog = 1;
+        return;
+    }
+
+    switch ( parse_bool(s) )
+    {
+    case 0:
+        opt_watchdog = 0;
+        return;
+    case 1:
+        opt_watchdog = 1;
+        return;
+    }
+
+    if ( !strcmp(s, "force") )
+        watchdog_force = opt_watchdog = 1;
+}
+custom_param("watchdog", parse_watchdog);
 
 /* opt_watchdog_timeout: Number of seconds to wait before panic. */
 static unsigned int opt_watchdog_timeout = 5;
@@ -82,6 +107,7 @@ int nmi_active;
 #define K7_EVNTSEL_USR		(1 << 16)
 #define K7_EVENT_CYCLES_PROCESSOR_IS_RUNNING	0x76
 #define K7_NMI_EVENT		K7_EVENT_CYCLES_PROCESSOR_IS_RUNNING
+#define K7_EVENT_WIDTH          32
 
 #define P6_EVNTSEL0_ENABLE	(1 << 22)
 #define P6_EVNTSEL_INT		(1 << 20)
@@ -89,10 +115,12 @@ int nmi_active;
 #define P6_EVNTSEL_USR		(1 << 16)
 #define P6_EVENT_CPU_CLOCKS_NOT_HALTED	 0x79
 #define CORE_EVENT_CPU_CLOCKS_NOT_HALTED 0x3c
+#define P6_EVENT_WIDTH          32
 
 #define P4_ESCR_EVENT_SELECT(N)	((N)<<25)
 #define P4_CCCR_OVF_PMI0	(1<<26)
 #define P4_CCCR_OVF_PMI1	(1<<27)
+#define P4_CCCR_OVF		(1<<31)
 #define P4_CCCR_THRESHOLD(N)	((N)<<20)
 #define P4_CCCR_COMPLEMENT	(1<<19)
 #define P4_CCCR_COMPARE		(1<<18)
@@ -433,8 +461,10 @@ int __init watchdog_setup(void)
     return 0;
 }
 
-void nmi_watchdog_tick(struct cpu_user_regs * regs)
+/* Returns false if this was not a watchdog NMI, true otherwise */
+bool_t nmi_watchdog_tick(struct cpu_user_regs *regs)
 {
+    bool_t watchdog_tick = 1;
     unsigned int sum = this_cpu(nmi_timer_ticks);
 
     if ( (this_cpu(last_irq_sums) == sum) && watchdog_enabled() )
@@ -460,8 +490,15 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
 
     if ( nmi_perfctr_msr )
     {
+        uint64_t msr_content;
+
+        /* Work out if this is a watchdog tick by checking for overflow. */
         if ( nmi_perfctr_msr == MSR_P4_IQ_PERFCTR0 )
         {
+            rdmsrl(MSR_P4_IQ_CCCR0, msr_content);
+            if ( !(msr_content & P4_CCCR_OVF) )
+                watchdog_tick = 0;
+
             /*
              * P4 quirks:
              * - An overflown perfctr will assert its interrupt
@@ -474,14 +511,26 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
         }
         else if ( nmi_perfctr_msr == MSR_P6_PERFCTR0 )
         {
+            rdmsrl(MSR_P6_PERFCTR0, msr_content);
+            if ( msr_content & (1ULL << P6_EVENT_WIDTH) )
+                watchdog_tick = 0;
+
             /*
              * Only P6 based Pentium M need to re-unmask the apic vector but
              * it doesn't hurt other P6 variants.
              */
             apic_write(APIC_LVTPC, APIC_DM_NMI);
         }
+        else if ( nmi_perfctr_msr == MSR_K7_PERFCTR0 )
+        {
+            rdmsrl(MSR_K7_PERFCTR0, msr_content);
+            if ( msr_content & (1ULL << K7_EVENT_WIDTH) )
+                watchdog_tick = 0;
+        }
         write_watchdog_counter(NULL);
     }
+
+    return watchdog_tick;
 }
 
 /*
