@@ -209,7 +209,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		-Wl,-rpath=$(PREFIX)/lib/xen/lib" \
 		--bindir=$(LIBEXEC_BIN) \
 		--datadir=$(SHAREDIR)/qemu-xen \
-		--localstatedir=/var \
+		--localstatedir=$(localstatedir) \
 		--disable-kvm \
 		--disable-docs \
 		--disable-guest-agent \

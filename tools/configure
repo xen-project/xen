@@ -3688,6 +3688,11 @@ esac
 
 test "x$prefix" = "xNONE" && prefix=$ac_default_prefix
 test "x$exec_prefix" = "xNONE" && exec_prefix=${prefix}
+
+if test "$localstatedir" = '${prefix}/var' ; then
+    localstatedir=/var
+fi
+
 bindir=`eval echo $bindir`
 sbindir=`eval echo $sbindir`
 libdir=`eval echo $libdir`
@@ -3742,13 +3747,13 @@ libexecdir=`eval echo $libexecdir`
 LIBEXEC_BIN=`eval echo $libexecdir/$PACKAGE_TARNAME/bin`
 
 
-XEN_RUN_DIR=/var/run/xen
+XEN_RUN_DIR=$localstatedir/run/xen
 
 
-XEN_LOG_DIR=/var/log/xen
+XEN_LOG_DIR=$localstatedir/log/xen
 
 
-XEN_LIB_STORED=/var/lib/xenstored
+XEN_LIB_STORED=$localstatedir/lib/xenstored
 
 
 SHAREDIR=$prefix/share
@@ -3770,16 +3775,16 @@ XEN_SCRIPT_DIR=$XEN_CONFIG_DIR/scripts
 
 
 case "$host_os" in
-*freebsd*) XEN_LOCK_DIR=/var/lib ;;
-*netbsd*) XEN_LOCK_DIR=/var/lib ;;
-*) XEN_LOCK_DIR=/var/lock ;;
+*freebsd*) XEN_LOCK_DIR=$localstatedir/lib ;;
+*netbsd*) XEN_LOCK_DIR=$localstatedir/lib ;;
+*) XEN_LOCK_DIR=$localstatedir/lock ;;
 esac
 
 
-XEN_RUN_DIR=/var/run/xen
+XEN_RUN_DIR=$localstatedir/run/xen
 
 
-XEN_PAGING_DIR=/var/lib/xen/xenpaging
+XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
 
 
 

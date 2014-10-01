@@ -2,6 +2,14 @@ AC_DEFUN([AX_XEN_EXPAND_CONFIG], [
 dnl expand these early so we can use this for substitutions
 test "x$prefix" = "xNONE" && prefix=$ac_default_prefix
 test "x$exec_prefix" = "xNONE" && exec_prefix=${prefix}
+
+dnl Use /var instead of /usr/local/var because there can be only one
+dnl xenstored active at a time. All tools have to share this dir, even
+dnl if they come from a different --prefix=.
+if test "$localstatedir" = '${prefix}/var' ; then
+    localstatedir=/var
+fi
+
 dnl expand exec_prefix or it will endup in substituted variables
 bindir=`eval echo $bindir`
 sbindir=`eval echo $sbindir`
@@ -58,13 +66,13 @@ dnl This variable will be substituted in various .in files
 LIBEXEC_BIN=`eval echo $libexecdir/$PACKAGE_TARNAME/bin`
 AC_SUBST(LIBEXEC_BIN)
 
-XEN_RUN_DIR=/var/run/xen
+XEN_RUN_DIR=$localstatedir/run/xen
 AC_SUBST(XEN_RUN_DIR)
 
-XEN_LOG_DIR=/var/log/xen
+XEN_LOG_DIR=$localstatedir/log/xen
 AC_SUBST(XEN_LOG_DIR)
 
-XEN_LIB_STORED=/var/lib/xenstored
+XEN_LIB_STORED=$localstatedir/lib/xenstored
 AC_SUBST(XEN_LIB_STORED)
 
 SHAREDIR=$prefix/share
@@ -86,15 +94,15 @@ XEN_SCRIPT_DIR=$XEN_CONFIG_DIR/scripts
 AC_SUBST(XEN_SCRIPT_DIR)
 
 case "$host_os" in
-*freebsd*) XEN_LOCK_DIR=/var/lib ;;
-*netbsd*) XEN_LOCK_DIR=/var/lib ;;
-*) XEN_LOCK_DIR=/var/lock ;;
+*freebsd*) XEN_LOCK_DIR=$localstatedir/lib ;;
+*netbsd*) XEN_LOCK_DIR=$localstatedir/lib ;;
+*) XEN_LOCK_DIR=$localstatedir/lock ;;
 esac
 AC_SUBST(XEN_LOCK_DIR)
 
-XEN_RUN_DIR=/var/run/xen
+XEN_RUN_DIR=$localstatedir/run/xen
 AC_SUBST(XEN_RUN_DIR)
 
-XEN_PAGING_DIR=/var/lib/xen/xenpaging
+XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
 AC_SUBST(XEN_PAGING_DIR)
 ])
