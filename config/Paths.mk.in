@@ -33,6 +33,7 @@ SBINDIR                  := $(sbindir)
 BINDIR                   := $(bindir)
 LIBEXEC                  := @LIBEXEC@
 
+INCLUDEDIR               := $(includedir)
 SHAREDIR                 := @SHAREDIR@
 MANDIR                   := $(mandir)
 MAN1DIR                  := $(MANDIR)/man1

@@ -20,7 +20,6 @@ INSTALL_DATA = $(INSTALL) -m0644 -p
 INSTALL_PROG = $(INSTALL) -m0755 -p
 
 PREFIX ?= /usr
-INCLUDEDIR = $(PREFIX)/include
 
 BOOT_DIR ?= /boot
 
