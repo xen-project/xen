@@ -21,9 +21,6 @@ INSTALL_PROG = $(INSTALL) -m0755 -p
 
 PREFIX ?= /usr
 INCLUDEDIR = $(PREFIX)/include
-MANDIR = $(PREFIX)/share/man
-MAN1DIR = $(MANDIR)/man1
-MAN8DIR = $(MANDIR)/man8
 
 BOOT_DIR ?= /boot
 

@@ -34,6 +34,9 @@ BINDIR                   := $(bindir)
 LIBEXEC                  := @LIBEXEC@
 
 SHAREDIR                 := @SHAREDIR@
+MANDIR                   := $(mandir)
+MAN1DIR                  := $(MANDIR)/man1
+MAN8DIR                  := $(MANDIR)/man8
 LIBDIR                   := $(libdir)
 
 XEN_RUN_DIR              := @XEN_RUN_DIR@
