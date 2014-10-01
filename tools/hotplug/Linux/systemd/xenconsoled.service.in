@@ -14,7 +14,7 @@ EnvironmentFile=-/etc/sysconfig/xenconsoled
 PIDFile=@XEN_RUN_DIR@/xenconsoled.pid
 ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
 ExecStartPre=/bin/mkdir -p ${XENCONSOLED_LOG_DIR}
-ExecStart=@SBINDIR@/xenconsoled --pid-file @XEN_RUN_DIR@/xenconsoled.pid --log=${XENCONSOLED_LOG} --log-dir=${XENCONSOLED_LOG_DIR} $XENCONSOLED_ARGS
+ExecStart=@sbindir@/xenconsoled --pid-file @XEN_RUN_DIR@/xenconsoled.pid --log=${XENCONSOLED_LOG} --log-dir=${XENCONSOLED_LOG_DIR} $XENCONSOLED_ARGS
 
 [Install]
 WantedBy=multi-user.target

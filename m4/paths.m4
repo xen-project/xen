@@ -2,6 +2,10 @@ AC_DEFUN([AX_XEN_EXPAND_CONFIG], [
 dnl expand these early so we can use this for substitutions
 test "x$prefix" = "xNONE" && prefix=$ac_default_prefix
 test "x$exec_prefix" = "xNONE" && exec_prefix=${prefix}
+dnl expand exec_prefix or it will endup in substituted variables
+bindir=`eval echo $bindir`
+sbindir=`eval echo $sbindir`
+libdir=`eval echo $libdir`
 
 dnl
 if test "x$sysconfdir" = 'x${prefix}/etc' ; then
@@ -39,12 +43,6 @@ AC_ARG_WITH([initddir],
          ;;
      esac])
 
-BINDIR=$prefix/bin
-AC_SUBST(BINDIR)
-
-SBINDIR=$prefix/sbin
-AC_SUBST(SBINDIR)
-
 dnl XXX: this should be changed to use the passed $libexec
 dnl but can be done as a second step
 case "$host_os" in
@@ -52,9 +50,6 @@ case "$host_os" in
 *) LIBEXEC=$prefix/lib/xen/bin ;;
 esac
 AC_SUBST(LIBEXEC)
-
-LIBDIR=`eval echo $libdir`
-AC_SUBST(LIBDIR)
 
 XEN_RUN_DIR=/var/run/xen
 AC_SUBST(XEN_RUN_DIR)
@@ -68,7 +63,7 @@ AC_SUBST(XEN_LIB_STORED)
 SHAREDIR=$prefix/share
 AC_SUBST(SHAREDIR)
 
-PRIVATE_PREFIX=$LIBDIR/xen
+PRIVATE_PREFIX=`eval echo $libdir`
 AC_SUBST(PRIVATE_PREFIX)
 
 case "$host_os" in

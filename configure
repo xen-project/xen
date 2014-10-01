@@ -607,10 +607,7 @@ SHAREDIR
 XEN_LIB_STORED
 XEN_LOG_DIR
 XEN_RUN_DIR
-LIBDIR
 LIBEXEC
-SBINDIR
-BINDIR
 host_os
 host_vendor
 host_cpu
@@ -1858,6 +1855,9 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 test "x$prefix" = "xNONE" && prefix=$ac_default_prefix
 test "x$exec_prefix" = "xNONE" && exec_prefix=${prefix}
+bindir=`eval echo $bindir`
+sbindir=`eval echo $sbindir`
+libdir=`eval echo $libdir`
 
 if test "x$sysconfdir" = 'x${prefix}/etc' ; then
     case "$host_os" in
@@ -1897,19 +1897,10 @@ else
 fi
 
 
-BINDIR=$prefix/bin
-
-
-SBINDIR=$prefix/sbin
-
-
 case "$host_os" in
 *netbsd*)  LIBEXEC=$prefix/libexec ;;
 *) LIBEXEC=$prefix/lib/xen/bin ;;
 esac
-
-
-LIBDIR=`eval echo $libdir`
 
 
 XEN_RUN_DIR=/var/run/xen
@@ -1924,7 +1915,7 @@ XEN_LIB_STORED=/var/lib/xenstored
 SHAREDIR=$prefix/share
 
 
-PRIVATE_PREFIX=$LIBDIR/xen
+PRIVATE_PREFIX=`eval echo $libdir`
 
 
 case "$host_os" in

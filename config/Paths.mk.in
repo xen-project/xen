@@ -29,12 +29,12 @@ includedir               := @includedir@
 localstatedir            := @localstatedir@
 sysconfdir               := @sysconfdir@
 
-SBINDIR                  := @SBINDIR@
-BINDIR                   := @BINDIR@
+SBINDIR                  := $(sbindir)
+BINDIR                   := $(bindir)
 LIBEXEC                  := @LIBEXEC@
 
 SHAREDIR                 := @SHAREDIR@
-LIBDIR                   := @LIBDIR@
+LIBDIR                   := $(libdir)
 
 XEN_RUN_DIR              := @XEN_RUN_DIR@
 XEN_LOG_DIR              := @XEN_LOG_DIR@

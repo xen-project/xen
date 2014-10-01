@@ -720,10 +720,7 @@ SHAREDIR
 XEN_LIB_STORED
 XEN_LOG_DIR
 XEN_RUN_DIR
-LIBDIR
 LIBEXEC
-SBINDIR
-BINDIR
 FILE_OFFSET_BITS
 OBJEXT
 EXEEXT
@@ -3693,6 +3690,9 @@ esac
 
 test "x$prefix" = "xNONE" && prefix=$ac_default_prefix
 test "x$exec_prefix" = "xNONE" && exec_prefix=${prefix}
+bindir=`eval echo $bindir`
+sbindir=`eval echo $sbindir`
+libdir=`eval echo $libdir`
 
 if test "x$sysconfdir" = 'x${prefix}/etc' ; then
     case "$host_os" in
@@ -3732,19 +3732,10 @@ else
 fi
 
 
-BINDIR=$prefix/bin
-
-
-SBINDIR=$prefix/sbin
-
-
 case "$host_os" in
 *netbsd*)  LIBEXEC=$prefix/libexec ;;
 *) LIBEXEC=$prefix/lib/xen/bin ;;
 esac
-
-
-LIBDIR=`eval echo $libdir`
 
 
 XEN_RUN_DIR=/var/run/xen
@@ -3759,7 +3750,7 @@ XEN_LIB_STORED=/var/lib/xenstored
 SHAREDIR=$prefix/share
 
 
-PRIVATE_PREFIX=$LIBDIR/xen
+PRIVATE_PREFIX=`eval echo $libdir`
 
 
 case "$host_os" in
@@ -6076,13 +6067,13 @@ if test "${with_xenstored+set}" = set; then :
 		if test "x$withval" = "xxenstored"; then :
 
 			xenstore=$withval
-			xenstored=$SBINDIR/xenstored
+			xenstored=$sbindir/xenstored
 
 fi
 		if test "x$withval" = "xoxenstored"; then :
 
 			xenstore=$withval
-			xenstored=$SBINDIR/oxenstored
+			xenstored=$sbindir/oxenstored
 
 	if test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"; then :
 
@@ -6102,11 +6093,11 @@ else
 
 
 	xenstore="oxenstored"
-	xenstored=$SBINDIR/oxenstored
+	xenstored=$sbindir/oxenstored
 	if test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"; then :
 
 		xenstore="xenstored"
-		xenstored=$SBINDIR/xenstored
+		xenstored=$sbindir/xenstored
 
 fi
 

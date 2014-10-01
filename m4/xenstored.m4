@@ -6,10 +6,10 @@ AC_DEFUN([AX_XEN_OCAML_XENSTORE_CHECK], [
 
 AC_DEFUN([AX_XEN_OCAML_XENSTORE_DEFAULTS], [
 	xenstore="oxenstored"
-	xenstored=$SBINDIR/oxenstored
+	xenstored=$sbindir/oxenstored
 	AS_IF([test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"], [
 		xenstore="xenstored"
-		xenstored=$SBINDIR/xenstored
+		xenstored=$sbindir/xenstored
 	])
 ])
 
@@ -29,11 +29,11 @@ AC_ARG_WITH([xenstored],
 	[
 		AS_IF([test "x$withval" = "xxenstored"], [
 			xenstore=$withval
-			xenstored=$SBINDIR/xenstored
+			xenstored=$sbindir/xenstored
 		])
 		AS_IF([test "x$withval" = "xoxenstored"], [
 			xenstore=$withval
-			xenstored=$SBINDIR/oxenstored
+			xenstored=$sbindir/oxenstored
 			AX_XEN_OCAML_XENSTORE_CHECK()
 		])
 		AS_IF([test "x$withval" != "xoxenstored" && test "x$withval" != "xxenstored"], [

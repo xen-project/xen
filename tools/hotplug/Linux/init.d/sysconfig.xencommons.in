@@ -14,8 +14,8 @@
 # the XENSTORED variable there.
 #
 # This can be either of:
-#  * @SBINDIR@/oxenstored
-#  * @SBINDIR@/xenstored
+#  * @sbindir@/oxenstored
+#  * @sbindir@/xenstored
 #
 # Changing this requires a reboot to take effect.
 #XENSTORED=@XENSTORED@
