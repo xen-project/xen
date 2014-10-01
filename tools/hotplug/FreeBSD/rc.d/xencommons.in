@@ -5,7 +5,7 @@
 
 . /etc/rc.subr
 
-. @xen_script_dir@/hotplugpath.sh
+. @XEN_SCRIPT_DIR@/hotplugpath.sh
 
 LD_LIBRARY_PATH="${LIBDIR}"
 export LD_LIBRARY_PATH

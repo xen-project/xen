@@ -35,7 +35,6 @@ install-rcd:
 	set -e; for i in $(XEN_RCD_PROG); \
 	   do \
 	   $(INSTALL_PROG) $$i $(DESTDIR)$(INITD_DIR); \
-	   sed -i '' 's,@xen_script_dir@,$(DESTDIR)$(XEN_SCRIPT_DIR),g' $(DESTDIR)$(CONFIG_DIR)/$$i; \
 	done
 	$(INSTALL_DATA) ../common/hotplugpath.sh $(DESTDIR)$(XEN_SCRIPT_DIR)
 

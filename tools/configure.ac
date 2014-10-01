@@ -7,6 +7,7 @@ AC_INIT([Xen Hypervisor Tools], m4_esyscmd([../version.sh ../xen/Makefile]),
 AC_CONFIG_SRCDIR([libxl/libxl.c])
 AC_CONFIG_FILES([
 ../config/Tools.mk
+hotplug/FreeBSD/rc.d/xencommons
 hotplug/Linux/init.d/sysconfig.xencommons
 hotplug/Linux/init.d/xen-watchdog
 hotplug/Linux/init.d/xencommons.in

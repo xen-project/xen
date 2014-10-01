@@ -160,6 +160,7 @@ tools/flask/utils/flask-set-bool
 tools/flask/utils/flask-label-pci
 tools/fs-back/fs-backend
 tools/hotplug/common/hotplugpath.sh
+tools/hotplug/FreeBSD/rc.d/xencommons
 tools/hotplug/Linux/init.d/xen-watchdog
 tools/hotplug/Linux/init.d/xendomains
 tools/hotplug/Linux/vif-setup
