@@ -23,6 +23,11 @@ build: $(TARGET)
 $(TARGET): $(OBJS)
 	ar -rcs $@ $^
 
+install:
+	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC_BIN)"
+	$(INSTALL_PROG) calc.pl "$(DESTDIR)$(LIBEXEC_BIN)"
+	$(INSTALL_PROG) manage-vtpmmgr.pl "$(DESTDIR)$(LIBEXEC_BIN)"
+
 clean:
 	rm -f $(TARGET) $(OBJS)
 

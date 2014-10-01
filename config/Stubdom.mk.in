@@ -6,7 +6,6 @@ FETCHER             := @FETCHER@
 
 # A debug build of stubdom? //FIXME: Someone make this do something
 debug               := @debug@
-vtpm = @vtpm@
 
 STUBDOM_TARGETS     := @STUBDOM_TARGETS@
 STUBDOM_BUILD       := @STUBDOM_BUILD@

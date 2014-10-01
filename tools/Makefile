@@ -34,7 +34,6 @@ SUBDIRS-$(CONFIG_X86) += xenpaging
 SUBDIRS-$(CONFIG_X86) += debugger/gdbsx
 SUBDIRS-$(CONFIG_X86) += debugger/kdd
 SUBDIRS-$(CONFIG_TESTS) += tests
-SUBDIRS-$(CONFIG_VTPM) += vtpmmgr
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))

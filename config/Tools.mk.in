@@ -59,7 +59,6 @@ CONFIG_QEMU_TRAD    := @qemu_traditional@
 CONFIG_QEMU_XEN     := @qemu_xen@
 CONFIG_BLKTAP1      := @blktap1@
 CONFIG_BLKTAP2      := @blktap2@
-CONFIG_VTPM         := @vtpm@
 CONFIG_QEMUU_EXTRA_ARGS:= @EXTRA_QEMUU_CONFIGURE_ARGS@
 CONFIG_REMUS_NETBUF := @remus_netbuf@
 
