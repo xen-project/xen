@@ -1838,12 +1838,13 @@ int xc_domain_bind_pt_isa_irq(
 
 int xc_unmap_domain_meminfo(xc_interface *xch, struct xc_domain_meminfo *minfo)
 {
-    struct domain_info_context _di = { .guest_width = minfo->guest_width };
+    struct domain_info_context _di = { .guest_width = minfo->guest_width,
+                                       .p2m_size = minfo->p2m_size};
     struct domain_info_context *dinfo = &_di;
 
     free(minfo->pfn_type);
     if ( minfo->p2m_table )
-        munmap(minfo->p2m_table, P2M_FLL_ENTRIES * PAGE_SIZE);
+        munmap(minfo->p2m_table, P2M_FL_ENTRIES * PAGE_SIZE);
     minfo->p2m_table = NULL;
 
     return 0;
@@ -1954,7 +1955,7 @@ failed:
     }
     if ( minfo->p2m_table )
     {
-        munmap(minfo->p2m_table, P2M_FLL_ENTRIES * PAGE_SIZE);
+        munmap(minfo->p2m_table, P2M_FL_ENTRIES * PAGE_SIZE);
         minfo->p2m_table = NULL;
     }
 
