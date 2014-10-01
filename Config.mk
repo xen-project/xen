@@ -58,8 +58,6 @@ endif
 include $(XEN_ROOT)/config/$(XEN_OS).mk
 include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
 
-BASH_COMPLETION_DIR ?= $(CONFIG_DIR)/bash_completion.d
-
 # arguments: variable, common path part, path to test, if yes, if no
 define setvar_dir
   ifndef $(1)
