@@ -37,23 +37,17 @@ UDEV_RULES_DIR = $(CONFIG_DIR)/udev
 UDEV_RULES = xen-backend.rules $(UDEV_RULES-y)
 
 .PHONY: all
-all: $(XENCOMMONS_INITD) subdirs-all
-
-$(XENCOMMONS_INITD): $(XEN_ROOT)/config/$(XEN_OS).modules $(XENCOMMONS_INITD).in
-	$(XEN_ROOT)/tools/hotplug/Linux/update-modules.sh \
-		$(XEN_ROOT) \
-		$(XEN_OS) \
-		$(XENCOMMONS_INITD) > $@
+all: subdirs-all
 
 .PHONY: build
-build: all
+build:
 
 .PHONY: install
 install: all install-initd install-scripts install-udev subdirs-install
 
 # See docs/misc/distro_mapping.txt for INITD_DIR location
 .PHONY: install-initd
-install-initd: all
+install-initd:
 	[ -d $(DESTDIR)$(INITD_DIR) ] || $(INSTALL_DIR) $(DESTDIR)$(INITD_DIR)
 	[ -d $(DESTDIR)$(SYSCONFIG_DIR) ] || $(INSTALL_DIR) $(DESTDIR)$(SYSCONFIG_DIR)
 	[ -d $(DESTDIR)$(LIBEXEC_BIN) ] || $(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
@@ -65,7 +59,7 @@ install-initd: all
 	$(INSTALL_PROG) init.d/xen-watchdog $(DESTDIR)$(INITD_DIR)
 
 .PHONY: install-scripts
-install-scripts: all
+install-scripts:
 	[ -d $(DESTDIR)$(XEN_SCRIPT_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
 	set -e; for i in $(XEN_SCRIPTS); \

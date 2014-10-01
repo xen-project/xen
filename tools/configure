@@ -699,6 +699,7 @@ qemu_xen
 rombios
 qemu_traditional
 blktap2
+LINUX_BACKEND_MODULES
 blktap1
 debug
 seabios
@@ -789,6 +790,7 @@ enable_ovmf
 enable_seabios
 enable_debug
 enable_blktap1
+with_linux_backend_modules
 enable_blktap2
 enable_qemu_traditional
 enable_rombios
@@ -1474,6 +1476,9 @@ Optional Packages:
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-initddir=DIR     Path to directory with sysv runlevel scripts.
                           [SYSCONFDIR/init.d]
+  --with-linux-backend-modules="mod1 mod2"
+                          List of Linux backend module or modalias names to be
+                          autoloaded on startup.
   --with-system-qemu[=PATH]
                           Use system supplied qemu PATH or qemu (taken from
                           $PATH) as qemu-xen device model instead of building
@@ -2261,7 +2266,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-ac_config_files="$ac_config_files ../config/Tools.mk hotplug/FreeBSD/rc.d/xencommons hotplug/Linux/init.d/sysconfig.xencommons hotplug/Linux/init.d/xen-watchdog hotplug/Linux/init.d/xencommons.in hotplug/Linux/init.d/xendomains hotplug/Linux/systemd/proc-xen.mount hotplug/Linux/systemd/var-lib-xenstored.mount hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service hotplug/Linux/systemd/xen-watchdog.service hotplug/Linux/systemd/xenconsoled.service hotplug/Linux/systemd/xendomains.service hotplug/Linux/systemd/xenstored.service hotplug/Linux/systemd/xenstored.socket hotplug/Linux/systemd/xenstored_ro.socket hotplug/Linux/vif-setup hotplug/Linux/xen-backend.rules hotplug/Linux/xen-hotplug-common.sh hotplug/Linux/xendomains"
+ac_config_files="$ac_config_files ../config/Tools.mk hotplug/FreeBSD/rc.d/xencommons hotplug/Linux/init.d/sysconfig.xencommons hotplug/Linux/init.d/xen-watchdog hotplug/Linux/init.d/xencommons hotplug/Linux/init.d/xendomains hotplug/Linux/systemd/proc-xen.mount hotplug/Linux/systemd/var-lib-xenstored.mount hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service hotplug/Linux/systemd/xen-watchdog.service hotplug/Linux/systemd/xenconsoled.service hotplug/Linux/systemd/xendomains.service hotplug/Linux/systemd/xenstored.service hotplug/Linux/systemd/xenstored.socket hotplug/Linux/systemd/xenstored_ro.socket hotplug/Linux/vif-setup hotplug/Linux/xen-backend.rules hotplug/Linux/xen-hotplug-common.sh hotplug/Linux/xendomains"
 
 ac_config_headers="$ac_config_headers config.h"
 
@@ -3999,6 +4004,41 @@ elif test -z $ax_cv_blktap1; then :
 fi
 blktap1=$ax_cv_blktap1
 
+
+
+
+# Check whether --with-linux-backend-modules was given.
+if test "${with_linux_backend_modules+set}" = set; then :
+  withval=$with_linux_backend_modules; LINUX_BACKEND_MODULES="$withval"
+else
+  case "$host_os" in
+*linux*)
+LINUX_BACKEND_MODULES="
+xen-evtchn
+xen-gntdev
+xen-gntalloc
+xen-blkback
+xen-netback
+xen-pciback
+evtchn
+gntdev
+netbk
+blkbk
+xen-scsibk
+usbbk
+pciback
+xen-acpi-processor
+blktap2
+blktap
+"
+;;
+*)
+LINUX_BACKEND_MODULES=
+;;
+esac
+fi
+
+LINUX_BACKEND_MODULES="`eval echo $LINUX_BACKEND_MODULES`"
 
 
 # Check whether --enable-blktap2 was given.
@@ -9541,7 +9581,7 @@ do
     "hotplug/FreeBSD/rc.d/xencommons") CONFIG_FILES="$CONFIG_FILES hotplug/FreeBSD/rc.d/xencommons" ;;
     "hotplug/Linux/init.d/sysconfig.xencommons") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/sysconfig.xencommons" ;;
     "hotplug/Linux/init.d/xen-watchdog") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/xen-watchdog" ;;
-    "hotplug/Linux/init.d/xencommons.in") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/xencommons.in" ;;
+    "hotplug/Linux/init.d/xencommons") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/xencommons" ;;
     "hotplug/Linux/init.d/xendomains") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/xendomains" ;;
     "hotplug/Linux/systemd/proc-xen.mount") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/proc-xen.mount" ;;
     "hotplug/Linux/systemd/var-lib-xenstored.mount") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/var-lib-xenstored.mount" ;;

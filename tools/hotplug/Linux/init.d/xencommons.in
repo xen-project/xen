@@ -19,6 +19,7 @@
 ### END INIT INFO
 
 XENSTORED=@XENSTORED@
+BACKEND_MODULES="@LINUX_BACKEND_MODULES@"
 
 . @XEN_SCRIPT_DIR@/hotplugpath.sh
 
@@ -58,8 +59,10 @@ fi
 do_start () {
         local time=0
 	local timeout=30
+	local mod
 
-	@LOAD_MODULES@
+	for mod in $BACKEND_MODULES ; do modprobe "$mod" &>/dev/null ; done
+
 	mkdir -p ${XEN_RUN_DIR}
 	mkdir -p ${XEN_LOCK_DIR}
 

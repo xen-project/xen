@@ -10,7 +10,7 @@ AC_CONFIG_FILES([
 hotplug/FreeBSD/rc.d/xencommons
 hotplug/Linux/init.d/sysconfig.xencommons
 hotplug/Linux/init.d/xen-watchdog
-hotplug/Linux/init.d/xencommons.in
+hotplug/Linux/init.d/xencommons
 hotplug/Linux/init.d/xendomains
 hotplug/Linux/systemd/proc-xen.mount
 hotplug/Linux/systemd/var-lib-xenstored.mount
@@ -89,6 +89,38 @@ AX_ARG_DEFAULT_DISABLE([ovmf], [Enable OVMF])
 AX_ARG_DEFAULT_ENABLE([seabios], [Disable SeaBIOS])
 AX_ARG_DEFAULT_ENABLE([debug], [Disable debug build of tools])
 AX_ARG_DEFAULT_DISABLE([blktap1], [Enable blktap1 tools])
+
+AC_ARG_WITH([linux-backend-modules],
+    AS_HELP_STRING([--with-linux-backend-modules="mod1 mod2"],
+    [List of Linux backend module or modalias names to be autoloaded on startup.]),
+    [LINUX_BACKEND_MODULES="$withval"],
+    [case "$host_os" in
+*linux*)
+LINUX_BACKEND_MODULES="
+xen-evtchn
+xen-gntdev
+xen-gntalloc
+xen-blkback
+xen-netback
+xen-pciback
+evtchn
+gntdev
+netbk
+blkbk
+xen-scsibk
+usbbk
+pciback
+xen-acpi-processor
+blktap2
+blktap
+"
+;;
+*)
+LINUX_BACKEND_MODULES=
+;;
+esac])
+LINUX_BACKEND_MODULES="`eval echo $LINUX_BACKEND_MODULES`"
+AC_SUBST(LINUX_BACKEND_MODULES)
 
 dnl Enable blktap2 on Linux only.
 AC_ARG_ENABLE([blktap2],
