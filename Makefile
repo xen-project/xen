@@ -232,19 +232,7 @@ help:
 .PHONY: uninstall
 uninstall: D=$(DESTDIR)
 uninstall:
-	[ -d $(D)$(XEN_CONFIG_DIR) ] && mv -f $(D)$(XEN_CONFIG_DIR) $(D)$(XEN_CONFIG_DIR).old-`date +%s` || true
 	$(MAKE) -C xen uninstall
-	rm -rf $(D)$(CONFIG_DIR)/init.d/xendomains $(D)$(CONFIG_DIR)/init.d/xend
-	rm -rf $(D)$(CONFIG_DIR)/init.d/xencommons $(D)$(CONFIG_DIR)/init.d/xen-watchdog
-	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xen-backend.rules
-	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xend.rules
-	rm -f  $(D)$(SYSCONFIG_DIR)/xendomains
-	rm -f  $(D)$(SBINDIR)/xendomains
-	rm -f  $(D)$(SYSCONFIG_DIR)/xencommons
-	rm -f  $(D)$(XEN_SYSTEMD_DIR)/*.service
-	rm -f  $(D)$(XEN_SYSTEMD_DIR)/*.mount
-	rm -f  $(D)$(XEN_SYSTEMD_MODULES_LOAD)/*.conf
-	rm -rf $(D)$(XEN_RUN_DIR)* $(D)/var/lib/xen*
 	make -C tools uninstall
 	rm -rf $(D)/boot/tboot*
 
