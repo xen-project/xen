@@ -8,9 +8,9 @@ ConditionVirtualization=xen
 Type=oneshot
 RemainAfterExit=true
 ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
-ExecStart=-@LIBEXEC@/xendomains start
-ExecStop=@LIBEXEC@/xendomains stop
-ExecReload=@LIBEXEC@/xendomains restart
+ExecStart=-@LIBEXEC_BIN@/xendomains start
+ExecStop=@LIBEXEC_BIN@/xendomains stop
+ExecReload=@LIBEXEC_BIN@/xendomains restart
 
 [Install]
 WantedBy=multi-user.target

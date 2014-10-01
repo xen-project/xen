@@ -2070,7 +2070,6 @@ _hidden int libxl__carefd_close(libxl__carefd*);
 _hidden int libxl__carefd_fd(const libxl__carefd*);
 
 /* common paths */
-_hidden const char *libxl__libexec_path(void);
 _hidden const char *libxl__private_bindir_path(void);
 _hidden const char *libxl__xenfirmwaredir_path(void);
 _hidden const char *libxl__xen_config_dir_path(void);

@@ -65,7 +65,7 @@ xen_startcmd()
 	printf "\n"
 
 	printf "Setting domain 0 name, domid and JSON config...\n"
-	${PRIVATE_BINDIR}/xen-init-dom0
+	${LIBEXEC_BIN}/xen-init-dom0
 }
 
 xen_stop()

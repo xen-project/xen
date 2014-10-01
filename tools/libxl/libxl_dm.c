@@ -38,7 +38,7 @@ static const char *qemu_xen_path(libxl__gc *gc)
 #ifdef QEMU_XEN_PATH
     return QEMU_XEN_PATH;
 #else
-    return libxl__abs_path(gc, "qemu-system-i386", libxl__libexec_path());
+    return libxl__abs_path(gc, "qemu-system-i386", libxl__private_bindir_path());
 #endif
 }
 
@@ -73,7 +73,7 @@ const char *libxl__domain_device_model(libxl__gc *gc,
     } else {
         switch (info->device_model_version) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-            dm = libxl__abs_path(gc, "qemu-dm", libxl__libexec_path());
+            dm = libxl__abs_path(gc, "qemu-dm", libxl__private_bindir_path());
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
             dm = qemu_xen_path(gc);

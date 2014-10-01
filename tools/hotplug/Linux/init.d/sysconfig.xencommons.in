@@ -39,4 +39,4 @@
 #XENBACKENDD_DEBUG=[yes|on|1]
 
 # qemu path
-#QEMU_XEN=/usr/lib/xen/bin/qemu-system-i386
+#QEMU_XEN=@LIBEXEC_BIN@/qemu-system-i386

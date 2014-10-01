@@ -92,14 +92,14 @@ do_start () {
 		fi
 
 		echo Setting domain 0 name, domid and JSON config...
-		${PRIVATE_BINDIR}/xen-init-dom0
+		${LIBEXEC_BIN}/xen-init-dom0
 	fi
 
 	echo Starting xenconsoled...
 	test -z "$XENCONSOLED_TRACE" || XENCONSOLED_ARGS=" --log=$XENCONSOLED_TRACE"
 	${SBINDIR}/xenconsoled --pid-file=$XENCONSOLED_PIDFILE $XENCONSOLED_ARGS
 	echo Starting QEMU as disk backend for dom0
-	test -z "$QEMU_XEN" && QEMU_XEN="${LIBEXEC}/qemu-system-i386"
+	test -z "$QEMU_XEN" && QEMU_XEN="${LIBEXEC_BIN}/qemu-system-i386"
 	$QEMU_XEN -xen-domid 0 -xen-attach -name dom0 -nographic -M xenpv -daemonize \
 		-monitor /dev/null -serial /dev/null -parallel /dev/null \
 		-pidfile $QEMU_PIDFILE

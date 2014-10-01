@@ -15,14 +15,9 @@
 #include "libxl_osdeps.h" /* must come before any other headers */
 #include "libxl_internal.h"
 
-const char *libxl__libexec_path(void)
-{
-    return LIBEXEC;
-}
-
 const char *libxl__private_bindir_path(void)
 {
-    return PRIVATE_BINDIR;
+    return LIBEXEC_BIN;
 }
 
 const char *libxl__xenfirmwaredir_path(void)

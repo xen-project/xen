@@ -43,13 +43,20 @@ AC_ARG_WITH([initddir],
          ;;
      esac])
 
-dnl XXX: this should be changed to use the passed $libexec
-dnl but can be done as a second step
-case "$host_os" in
-*netbsd*)  LIBEXEC=$prefix/libexec ;;
-*) LIBEXEC=$prefix/lib/xen/bin ;;
-esac
-AC_SUBST(LIBEXEC)
+if test "$libexecdir" = '${exec_prefix}/libexec' ; then
+    case "$host_os" in
+         *netbsd*) ;;
+         *)
+         libexecdir='${exec_prefix}/lib'
+         ;;
+    esac
+fi
+dnl expand exec_prefix or it will endup in substituted variables
+libexecdir=`eval echo $libexecdir`
+dnl autoconf doc suggest to use a "package name" subdir
+dnl This variable will be substituted in various .in files
+LIBEXEC_BIN=`eval echo $libexecdir/$PACKAGE_TARNAME/bin`
+AC_SUBST(LIBEXEC_BIN)
 
 XEN_RUN_DIR=/var/run/xen
 AC_SUBST(XEN_RUN_DIR)
@@ -62,16 +69,6 @@ AC_SUBST(XEN_LIB_STORED)
 
 SHAREDIR=$prefix/share
 AC_SUBST(SHAREDIR)
-
-PRIVATE_PREFIX=`eval echo $libdir`
-AC_SUBST(PRIVATE_PREFIX)
-
-case "$host_os" in
-*freebsd*) PRIVATE_BINDIR=$PRIVATE_PREFIX/bin ;;
-*netbsd*) PRIVATE_BINDIR=$BINDIR ;;
-*) PRIVATE_BINDIR=$PRIVATE_PREFIX/bin ;;
-esac
-AC_SUBST(PRIVATE_BINDIR)
 
 XENFIRMWAREDIR=$prefix/lib/xen/boot
 AC_SUBST(XENFIRMWAREDIR)

@@ -462,9 +462,9 @@ install-readme:
 	$(INSTALL_DATA) README $(DESTDIR)$(DOCDIR)/README.stubdom
 
 install-ioemu: ioemu-stubdom
-	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC)"
-	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)$(LIBEXEC)"
-	$(INSTALL_DATA) stubdompath.sh "$(DESTDIR)$(LIBEXEC)"
+	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC_BIN)"
+	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)$(LIBEXEC_BIN)"
+	$(INSTALL_DATA) stubdompath.sh "$(DESTDIR)$(LIBEXEC_BIN)"
 	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
 	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-ioemu/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/ioemu-stubdom.gz"
 

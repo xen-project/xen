@@ -94,8 +94,7 @@ uninstall:
 	rm -rf $(D)$(LIBDIR)/libxenctrl* $(D)$(LIBDIR)/libxenguest*
 	rm -rf $(D)$(LIBDIR)/libxenstore* $(D)$(LIBDIR)/libxlutil*
 	rm -rf $(D)$(LIBDIR)/python/xen $(D)$(LIBDIR)/python/grub
-	rm -rf $(D)$(LIBDIR)/xen/
-	rm -rf $(D)$(LIBEXEC)/xen*
+	rm -rf $(D)$(LIBEXEC)
 	rm -rf $(D)$(SBINDIR)/setmask
 	rm -rf $(D)$(SBINDIR)/xen* $(D)$(SBINDIR)/netfix $(D)$(SBINDIR)/xm
 	rm -rf $(D)$(SHAREDIR)/doc/xen
@@ -196,9 +195,9 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 	cd qemu-xen-dir; \
 	$$source/configure --enable-xen --target-list=i386-softmmu \
 		$(QEMU_XEN_ENABLE_DEBUG) \
-		--prefix=$(PREFIX)/lib/xen \
-		--libdir=$(PREFIX)/lib/xen/lib \
-		--includedir=$(PREFIX)/lib/xen/include \
+		--prefix=$(LIBEXEC) \
+		--libdir=$(LIBEXEC_LIB) \
+		--includedir=$(LIBEXEC_INC) \
 		--source-path=$$source \
 		--extra-cflags="-I$(XEN_ROOT)/tools/include \
 		-I$(XEN_ROOT)/tools/libxc/include \
@@ -208,7 +207,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		--extra-ldflags="-L$(XEN_ROOT)/tools/libxc \
 		-L$(XEN_ROOT)/tools/xenstore \
 		-Wl,-rpath=$(PREFIX)/lib/xen/lib" \
-		--bindir=$(LIBEXEC) \
+		--bindir=$(LIBEXEC_BIN) \
 		--datadir=$(SHAREDIR)/qemu-xen \
 		--localstatedir=/var \
 		--disable-kvm \

@@ -162,7 +162,7 @@ define move-if-changed
 	if ! cmp -s $(1) $(2); then mv -f $(1) $(2); else rm -f $(1); fi
 endef
 
-BUILD_MAKE_VARS := SBINDIR BINDIR LIBEXEC LIBDIR SHAREDIR PRIVATE_BINDIR \
+BUILD_MAKE_VARS := SBINDIR BINDIR LIBEXEC LIBEXEC_BIN LIBDIR SHAREDIR \
                    XENFIRMWAREDIR XEN_CONFIG_DIR XEN_SCRIPT_DIR XEN_LOCK_DIR \
                    XEN_RUN_DIR XEN_PAGING_DIR
 
@@ -262,9 +262,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 58fac0693d8ad591add917e939011fe069720b0c
-# Fri Aug 1 16:32:18 2014 +0100
-# qemu-xen-trad: -I tools/libxc/include and tools/xenstore/include
+QEMU_TRADITIONAL_REVISION ?= b0d42741f8e9a00854c3b3faca1da84bfc69bf22
+# Mon Oct 6 16:24:46 2014 +0100
+# qemu-xen-trad: Switch to $(LIBEXEC_BIN) from $(LIBEXEC)
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.

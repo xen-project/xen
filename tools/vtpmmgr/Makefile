@@ -5,9 +5,9 @@ all:
 	@true
 
 install:
-	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC)"
-	$(INSTALL_DATA) calc.pl "$(DESTDIR)$(LIBEXEC)"
-	$(INSTALL_DATA) manage-vtpmmgr.pl "$(DESTDIR)$(LIBEXEC)"
+	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC_BIN)"
+	$(INSTALL_DATA) calc.pl "$(DESTDIR)$(LIBEXEC_BIN)"
+	$(INSTALL_DATA) manage-vtpmmgr.pl "$(DESTDIR)$(LIBEXEC_BIN)"
 
 clean:
 	@true

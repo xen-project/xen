@@ -12,11 +12,11 @@ build:
 install: all
 	CC="$(CC)" CFLAGS="$(CFLAGS) $(APPEND_LDFLAGS)" $(PYTHON) setup.py install \
 		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" \
-		--install-scripts=$(PRIVATE_BINDIR) --force
-	set -e; if [ $(BINDIR) != $(PRIVATE_BINDIR) -a \
+		--install-scripts=$(LIBEXEC_BIN) --force
+	set -e; if [ $(BINDIR) != $(LIBEXEC_BIN) -a \
 	             "`readlink -f $(DESTDIR)/$(BINDIR)`" != \
-	             "`readlink -f $(PRIVATE_BINDIR)`" ]; then \
-	    ln -sf $(PRIVATE_BINDIR)/pygrub $(DESTDIR)/$(BINDIR); \
+	             "`readlink -f $(LIBEXEC_BIN)`" ]; then \
+	    ln -sf $(LIBEXEC_BIN)/pygrub $(DESTDIR)/$(BINDIR); \
 	fi
 
 .PHONY: clean

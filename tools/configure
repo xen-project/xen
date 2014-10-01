@@ -714,13 +714,11 @@ XEN_CONFIG_DIR
 INITD_DIR
 CONFIG_DIR
 XENFIRMWAREDIR
-PRIVATE_BINDIR
-PRIVATE_PREFIX
 SHAREDIR
 XEN_LIB_STORED
 XEN_LOG_DIR
 XEN_RUN_DIR
-LIBEXEC
+LIBEXEC_BIN
 FILE_OFFSET_BITS
 OBJEXT
 EXEEXT
@@ -3732,10 +3730,16 @@ else
 fi
 
 
-case "$host_os" in
-*netbsd*)  LIBEXEC=$prefix/libexec ;;
-*) LIBEXEC=$prefix/lib/xen/bin ;;
-esac
+if test "$libexecdir" = '${exec_prefix}/libexec' ; then
+    case "$host_os" in
+         *netbsd*) ;;
+         *)
+         libexecdir='${exec_prefix}/lib'
+         ;;
+    esac
+fi
+libexecdir=`eval echo $libexecdir`
+LIBEXEC_BIN=`eval echo $libexecdir/$PACKAGE_TARNAME/bin`
 
 
 XEN_RUN_DIR=/var/run/xen
@@ -3748,16 +3752,6 @@ XEN_LIB_STORED=/var/lib/xenstored
 
 
 SHAREDIR=$prefix/share
-
-
-PRIVATE_PREFIX=`eval echo $libdir`
-
-
-case "$host_os" in
-*freebsd*) PRIVATE_BINDIR=$PRIVATE_PREFIX/bin ;;
-*netbsd*) PRIVATE_BINDIR=$BINDIR ;;
-*) PRIVATE_BINDIR=$PRIVATE_PREFIX/bin ;;
-esac
 
 
 XENFIRMWAREDIR=$prefix/lib/xen/boot
