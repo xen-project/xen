@@ -3022,7 +3022,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         *msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
         break;
 
-    case MSR_IA32_APICBASE_MSR ... MSR_IA32_APICBASE_MSR + 0x3ff:
+    case MSR_IA32_APICBASE_MSR ... MSR_IA32_APICBASE_MSR + 0xff:
         if ( hvm_x2apic_msr_read(v, msr, msr_content) )
             goto gp_fault;
         break;
@@ -3148,7 +3148,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         vlapic_tdt_msr_set(vcpu_vlapic(v), msr_content);
         break;
 
-    case MSR_IA32_APICBASE_MSR ... MSR_IA32_APICBASE_MSR + 0x3ff:
+    case MSR_IA32_APICBASE_MSR ... MSR_IA32_APICBASE_MSR + 0xff:
         if ( hvm_x2apic_msr_write(v, msr, msr_content) )
             goto gp_fault;
         break;
