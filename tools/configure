@@ -715,7 +715,6 @@ XEN_SCRIPT_DIR
 XEN_CONFIG_DIR
 INITD_DIR
 CONFIG_DIR
-XENFIRMWAREDIR
 SHAREDIR
 XEN_LIB_STORED
 XEN_LOG_DIR
@@ -3785,9 +3784,6 @@ XEN_LIB_STORED=$localstatedir/lib/xenstored
 
 
 SHAREDIR=$prefix/share
-
-
-XENFIRMWAREDIR=$prefix/lib/xen/boot
 
 
 CONFIG_DIR=$sysconfdir
