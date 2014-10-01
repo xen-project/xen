@@ -14,8 +14,8 @@ scripts at run-time.  If the Red Hat directory exists, it is used;
 otherwise the Debian one is used.
 
 The INITD_DIR path can be changed with configure --with-initddir=DIR.
-The CONFIG_LEAF_DIR path can be changed by setting the variables in
-the environment or your ".config" (which is included by Config.mk).
+The CONFIG_LEAF_DIR name can be changed with configure
+--with-sysconfig-leaf-dir=SUBDIR.
 
 To add support for new distributions that don't use the above locations,
 one must grep for the above elements and add appropriate checks.

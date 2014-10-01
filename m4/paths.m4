@@ -51,6 +51,17 @@ AC_ARG_WITH([initddir],
          ;;
      esac])
 
+AC_ARG_WITH([sysconfig-leaf-dir],
+    AS_HELP_STRING([--with-sysconfig-leaf-dir=SUBDIR],
+    [Name of subdirectory in /etc to store runtime options for runlevel
+    scripts and daemons such as xenstoerd.
+    This should be either "sysconfig" or "default". [sysconfig]]),
+    [config_leaf_dir=$withval],
+    [config_leaf_dir=sysconfig
+    if test ! -d /etc/sysconfig ; then config_leaf_dir=default ; fi])
+CONFIG_LEAF_DIR=$config_leaf_dir
+AC_SUBST(CONFIG_LEAF_DIR)
+
 if test "$libexecdir" = '${exec_prefix}/libexec' ; then
     case "$host_os" in
          *netbsd*) ;;

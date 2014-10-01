@@ -721,6 +721,7 @@ XEN_LIB_STORED
 XEN_LOG_DIR
 XEN_RUN_DIR
 LIBEXEC_BIN
+CONFIG_LEAF_DIR
 FILE_OFFSET_BITS
 OBJEXT
 EXEEXT
@@ -781,6 +782,7 @@ ac_user_opts='
 enable_option_checking
 enable_largefile
 with_initddir
+with_sysconfig_leaf_dir
 enable_rpath
 enable_githttp
 enable_monitors
@@ -1476,6 +1478,11 @@ Optional Packages:
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-initddir=DIR     Path to directory with sysv runlevel scripts.
                           [SYSCONFDIR/init.d]
+  --with-sysconfig-leaf-dir=SUBDIR
+                          Name of subdirectory in /etc to store runtime
+                          options for runlevel scripts and daemons such as
+                          xenstoerd. This should be either "sysconfig" or
+                          "default". [sysconfig]
   --with-linux-backend-modules="mod1 mod2"
                           List of Linux backend module or modalias names to be
                           autoloaded on startup.
@@ -3742,6 +3749,18 @@ else
          ;;
      esac
 fi
+
+
+
+# Check whether --with-sysconfig-leaf-dir was given.
+if test "${with_sysconfig_leaf_dir+set}" = set; then :
+  withval=$with_sysconfig_leaf_dir; config_leaf_dir=$withval
+else
+  config_leaf_dir=sysconfig
+    if test ! -d /etc/sysconfig ; then config_leaf_dir=default ; fi
+fi
+
+CONFIG_LEAF_DIR=$config_leaf_dir
 
 
 if test "$libexecdir" = '${exec_prefix}/libexec' ; then

@@ -606,6 +606,7 @@ XEN_LIB_STORED
 XEN_LOG_DIR
 XEN_RUN_DIR
 LIBEXEC_BIN
+CONFIG_LEAF_DIR
 host_os
 host_vendor
 host_cpu
@@ -656,6 +657,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 with_initddir
+with_sysconfig_leaf_dir
 enable_xen
 enable_tools
 enable_stubdom
@@ -1290,6 +1292,11 @@ Optional Packages:
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-initddir=DIR     Path to directory with sysv runlevel scripts.
                           [SYSCONFDIR/init.d]
+  --with-sysconfig-leaf-dir=SUBDIR
+                          Name of subdirectory in /etc to store runtime
+                          options for runlevel scripts and daemons such as
+                          xenstoerd. This should be either "sysconfig" or
+                          "default". [sysconfig]
 
 Report bugs to <xen-devel@lists.xen.org>.
 Xen Hypervisor home page: <http://www.xen.org/>.
@@ -1898,6 +1905,18 @@ else
          ;;
      esac
 fi
+
+
+
+# Check whether --with-sysconfig-leaf-dir was given.
+if test "${with_sysconfig_leaf_dir+set}" = set; then :
+  withval=$with_sysconfig_leaf_dir; config_leaf_dir=$withval
+else
+  config_leaf_dir=sysconfig
+    if test ! -d /etc/sysconfig ; then config_leaf_dir=default ; fi
+fi
+
+CONFIG_LEAF_DIR=$config_leaf_dir
 
 
 if test "$libexecdir" = '${exec_prefix}/libexec' ; then

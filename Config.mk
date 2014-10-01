@@ -69,9 +69,6 @@ define setvar_dir
   endif
 endef
 
-# See distro_mapping.txt for other options
-$(eval $(call setvar_dir,CONFIG_LEAF_DIR,,/etc/sysconfig,sysconfig,default))
-
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/lib
