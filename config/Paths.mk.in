@@ -29,6 +29,8 @@ includedir               := @includedir@
 localstatedir            := @localstatedir@
 sysconfdir               := @sysconfdir@
 
+PREFIX                   := $(prefix)
+
 SBINDIR                  := $(sbindir)
 BINDIR                   := $(bindir)
 LIBEXEC                  := $(libexecdir)/$(PACKAGE_TARNAME)
