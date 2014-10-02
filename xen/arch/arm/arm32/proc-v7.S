@@ -50,8 +50,8 @@ __v7_ca7mp_proc_info:
         .section ".init.proc.info", #alloc, #execinstr
         .type __v7_brahma15mp_proc_info, #object
 __v7_brahma15mp_proc_info:
-        .long 0x420F00F2             /* Broadcom Brahma-B15 */
-        .long 0xFF0FFFFF             /* Mask */
+        .long 0x420F00F0             /* Broadcom Brahma-B15 */
+        .long 0xFF0FFFF0             /* Mask */
         .long brahma15mp_init
         .long caxx_processor
         .size __v7_brahma15mp_proc_info, . - __v7_brahma15mp_proc_info
