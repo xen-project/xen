@@ -274,7 +274,7 @@ static void nmi_cpu_stop(void * dummy)
 	 * power on apic lvt contain a zero vector nr which are legal only for
 	 * NMI delivery mode. So inhibit apic err before restoring lvtpc
 	 */
-	if ( !(apic_read(APIC_LVTPC) & APIC_DM_NMI)
+	if ( (apic_read(APIC_LVTPC) & APIC_MODE_MASK) != APIC_DM_NMI
 	     || (apic_read(APIC_LVTPC) & APIC_LVT_MASKED) )
 	{
 		printk("nmi_stop: APIC not good %ul\n", apic_read(APIC_LVTPC));

@@ -82,7 +82,7 @@ int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
     return 0;
 }
 
-int vpmu_do_interrupt(struct cpu_user_regs *regs)
+void vpmu_do_interrupt(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
@@ -91,25 +91,23 @@ int vpmu_do_interrupt(struct cpu_user_regs *regs)
     {
         struct vlapic *vlapic = vcpu_vlapic(v);
         u32 vlapic_lvtpc;
-        unsigned char int_vec;
 
-        if ( !vpmu->arch_vpmu_ops->do_interrupt(regs) )
-            return 0;
-
-        if ( !is_vlapic_lvtpc_enabled(vlapic) )
-            return 1;
+        if ( !vpmu->arch_vpmu_ops->do_interrupt(regs) ||
+             !is_vlapic_lvtpc_enabled(vlapic) )
+            return;
 
         vlapic_lvtpc = vlapic_get_reg(vlapic, APIC_LVTPC);
-        int_vec = vlapic_lvtpc & APIC_VECTOR_MASK;
 
-        if ( GET_APIC_DELIVERY_MODE(vlapic_lvtpc) == APIC_MODE_FIXED )
-            vlapic_set_irq(vcpu_vlapic(v), int_vec, 0);
-        else
+        switch ( GET_APIC_DELIVERY_MODE(vlapic_lvtpc) )
+        {
+        case APIC_MODE_FIXED:
+            vlapic_set_irq(vlapic, vlapic_lvtpc & APIC_VECTOR_MASK, 0);
+            break;
+        case APIC_MODE_NMI:
             v->nmi_pending = 1;
-        return 1;
+            break;
+        }
     }
-
-    return 0;
 }
 
 void vpmu_do_cpuid(unsigned int input,

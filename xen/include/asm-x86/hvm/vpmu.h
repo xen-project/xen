@@ -89,7 +89,7 @@ struct vpmu_struct {
 
 int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content, uint64_t supported);
 int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content);
-int vpmu_do_interrupt(struct cpu_user_regs *regs);
+void vpmu_do_interrupt(struct cpu_user_regs *regs);
 void vpmu_do_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                        unsigned int *ecx, unsigned int *edx);
 void vpmu_initialise(struct vcpu *v);
