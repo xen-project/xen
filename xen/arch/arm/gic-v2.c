@@ -768,6 +768,7 @@ static const char * const gicv2_dt_compat[] __initconst =
 {
     DT_COMPAT_GIC_CORTEX_A15,
     DT_COMPAT_GIC_CORTEX_A7,
+    DT_COMPAT_GIC_400,
     NULL
 };
 
