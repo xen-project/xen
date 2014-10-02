@@ -16,6 +16,7 @@ where mach is the name of the machine:
   - omap5432: printk with UART3 on TI OMAP5432 processors
   - sun6i: printk with 8250 on Allwinner A31 processors
   - sun7i: printk with 8250 on Allwinner A20 processors
+  - brcm: printk with 8250 on Broadcom 7445D0 boards with A15 processors.
 
 The base address and baud rate is hardcoded in xen/arch/arm/Rules.mk,
 see there when adding support for new machines.
