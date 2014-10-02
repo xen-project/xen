@@ -18,6 +18,7 @@ where mach is the name of the machine:
   - sun7i: printk with 8250 on Allwinner A20 processors
   - brcm: printk with 8250 on Broadcom 7445D0 boards with A15 processors.
   - hip04-d01: printk with 8250 on HiSilicon Hip-04 D01
+  - seattle: printk with pl011 for AMD Seattle processor
 
 The base address and baud rate is hardcoded in xen/arch/arm/Rules.mk,
 see there when adding support for new machines.
