@@ -49,6 +49,9 @@ ALL_OBJS := $(TARGET_SUBARCH)/head.o $(ALL_OBJS)
 
 $(TARGET): $(TARGET)-syms $(TARGET).axf
 	$(OBJCOPY) -O binary -S $< $@
+ifeq (arm64,$(XEN_TARGET_ARCH))
+	ln -sf $(notdir $@)  ../../$(notdir $@).efi
+endif
 
 $(TARGET).axf: $(TARGET)-syms
 	# XXX: VE model loads by VMA so instead of
@@ -100,3 +103,4 @@ clean::
 	rm -f asm-offsets.s xen.lds
 	rm -f $(BASEDIR)/.xen-syms.[0-9]*
 	rm -f $(TARGET).axf
+	rm -f $(TARGET).efi
