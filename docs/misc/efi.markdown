@@ -1,8 +1,19 @@
-Building xen.efi requires gcc 4.5.x or above (4.6.x or newer recommended, as
-4.5.x was probably never really tested for this purpose) and binutils 2.22 or
-newer. Additionally, the binutils build must be configured to include support
-for the x86_64-pep emulation (i.e. `--enable-targets=x86_64-pep` or an option
-of equivalent effect should be passed to the configure script).
+For x86, building xen.efi requires gcc 4.5.x or above (4.6.x or newer
+recommended, as 4.5.x was probably never really tested for this purpose) and
+binutils 2.22 or newer.  Additionally, the binutils build must be configured to
+include support for the x86_64-pep emulation (i.e.
+`--enable-targets=x86_64-pep` or an option of equivalent effect should be
+passed to the configure script).
+
+For arm64, the PE/COFF header is open-coded in assembly, so no toolchain
+support for PE/COFF is required.  Also, the PE/COFF header co-exists with the
+normal Image format, so a single binary may be booted as an Image file or as an
+EFI application.  When booted as an EFI application, Xen requires a
+configuration file as described below unless a bootloader, such as GRUB, has
+loaded the modules and describes them in the device tree provided to Xen.  If a
+bootloader provides a device tree containing modules then any configuration
+files are ignored, and the bootloader is responsible for populating all
+relevant device tree nodes.
 
 Once built, `make install-xen` will place the resulting binary directly into
 the EFI boot partition, provided `EFI_VENDOR` is set in the environment (and
@@ -73,7 +84,14 @@ Specifies an XSM module to load.
 
 ###`ucode=<filename>`
 
-Specifies a CPU microcode blob to load.
+Specifies a CPU microcode blob to load. (x86 only)
+
+###`dtb=<filename>`
+
+Specifies a device tree file to load.  The platform firmware may provide a
+DTB in an EFI configuration table, so this field is optional in that
+case. A dtb specified in the configuration file will override a device tree
+provided in the EFI configuration table. (ARM only)
 
 ###`chain=<filename>`
 
