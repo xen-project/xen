@@ -162,7 +162,68 @@ irqstack:
 	.fill (1024), 4, 0x0
 irqstack_end:
 
+fault_dump:
+	.fill 18, 4, 0x0		@ On fault, we save the registers + CPSR + handler address
+
 .popsection
+
+fault:
+	cpsid	aif			@ Disable interrupts
+
+	ldr	r13, =fault_dump
+	stmia	r13, {r0-r12}		@ Dump the non-banked registers directly (well, unless from FIQ mode)
+	str	r14, [r13, #15 << 2]	@ Our r14 is the faulting r15
+	mov	r0, r13
+
+	@ Save the caller's CPSR (our SPSR) too.
+	mrs	r1, SPSR
+	str	r1, [r13, #16 << 2]
+
+	@ Switch to the mode we came from to get r13 and r14.
+	@ If coming from user mode, use System mode instead so we're still
+	@ privileged.
+	and	r1, r1, #0x1f		@ r1 = SPSR mode
+	cmp	r1, #0x10		@ If from User mode
+	moveq	r1, #0x1f		@ Then use System mode instead
+
+	mrs	r3, CPSR		@ r3 = our CPSR
+	bic	r2, r3, #0x1f
+	orr	r2, r2, r1
+	msr	CPSR, r2		@ Change to mode r1
+
+	@ Save old mode's r13, r14
+	str	r13, [r0, #13 << 2]
+	str	r14, [r0, #14 << 2]
+
+	msr	CPSR, r3		@ Back to fault mode
+
+	ldr	r1, [r0, #17 << 2]
+	sub	r1, r1, #12		@ Fix to point at start of handler
+	str	r1, [r0, #17 << 2]
+
+	@ Call C code to format the register dump.
+	@ Clobbers the stack, but we're not going to return anyway.
+	ldr	sp, =_boot_stack_end
+	bl	dump_registers
+	b	do_exit
+
+@ We want to store a unique value to identify this handler, without corrupting
+@ any of the registers. So, we store r15 (which will point just after the branch).
+@ Later, we subtract 12 so the user gets pointed at the start of the exception
+@ handler.
+#define FAULT(name)			\
+.globl fault_##name;			\
+fault_##name:				\
+	ldr	r13, =fault_dump;	\
+	str	r15, [r13, #17 << 2];	\
+	b	fault
+
+FAULT(reset)
+FAULT(undefined_instruction)
+FAULT(svc)
+FAULT(prefetch_call)
+FAULT(prefetch_abort)
+FAULT(data_abort)
 
 @ exception base address
 .align 5
@@ -173,13 +234,13 @@ irqstack_end:
 @  instruction to clear an existing tag is required on context switches."
 @ -- ARM Cortex-A Series Programmer’s Guide (Version: 4.0)
 exception_vector_table:
-	b	. @ reset
-	b	. @ undefined instruction
-	b	. @ supervisor call
-	b	. @ prefetch call
-	b	. @ prefetch abort
-	b	. @ data abort
-	b	irq_handler @ irq
+	b	fault_reset
+	b	fault_undefined_instruction
+	b	fault_svc
+	b	fault_prefetch_call
+	b	fault_prefetch_abort
+	b	fault_data_abort
+	b	irq_handler @ IRQ
 	.word 0xe7f000f0    @ abort on FIQ
 
 @ Call fault_undefined_instruction in "Undefined mode"
