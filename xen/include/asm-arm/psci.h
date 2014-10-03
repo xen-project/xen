@@ -13,10 +13,12 @@
 #define PSCI_DISABLED               -8
 
 /* availability of PSCI on the host for SMP bringup */
-extern bool_t psci_available;
+extern uint32_t psci_ver;
 
 int psci_init(void);
 int call_psci_cpu_on(int cpu);
+void call_psci_system_off(void);
+void call_psci_system_reset(void);
 
 /* functions to handle guest PSCI requests */
 int32_t do_psci_cpu_on(uint32_t vcpuid, register_t entry_point);

@@ -54,7 +54,7 @@ static void __init smp_spin_table_init(int cpu, struct dt_device_node *dn)
 
 static int __init smp_psci_init(int cpu)
 {
-    if ( !psci_available )
+    if ( !psci_ver )
     {
         printk("CPU%d asks for PSCI, but DTB has no PSCI node\n", cpu);
         return -ENODEV;
