@@ -4764,7 +4764,7 @@ int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs)
         rc = ERROR_FAIL;
 
 out:
-    return 0;
+    return rc;
 }
 
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
