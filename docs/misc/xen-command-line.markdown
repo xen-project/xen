@@ -1016,6 +1016,27 @@ This option can be specified more than once (up to 8 times at present).
 ### ple\_window
 > `= <integer>`
 
+### psr (Intel)
+> `= List of ( cmt:<boolean> | rmid_max:<integer> )`
+
+> Default: `psr=cmt:0,rmid_max:255`
+
+Platform Shared Resource(PSR) Services.  Intel Haswell and later server
+platforms offer information about the sharing of resources.
+
+To use the PSR monitoring service for a certain domain, a Resource
+Monitoring ID(RMID) is used to bind the domain to corresponding shared
+resource.  RMID is a hardware-provided layer of abstraction between software
+and logical processors.
+
+The following resources are available:
+* Cache Monitoring Technology (Haswell and later).  Information
+regarding the L3 cache occupancy.
+
+`cmt` instructs Xen to enable/disable Cache Monitoring Technology.
+
+`rmid_max` indicates the max value for rmid.
+
 ### reboot
 > `= t[riple] | k[bd] | a[cpi] | p[ci] | n[o] [, [w]arm | [c]old]`
 

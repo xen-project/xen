@@ -42,6 +42,7 @@ obj-y += numa.o
 obj-y += pci.o
 obj-y += percpu.o
 obj-y += physdev.o
+obj-y += psr.o
 obj-y += setup.o
 obj-y += shutdown.o
 obj-y += smp.o

@@ -148,6 +148,7 @@
 #define X86_FEATURE_ERMS	(7*32+ 9) /* Enhanced REP MOVSB/STOSB */
 #define X86_FEATURE_INVPCID	(7*32+10) /* Invalidate Process Context ID */
 #define X86_FEATURE_RTM 	(7*32+11) /* Restricted Transactional Memory */
+#define X86_FEATURE_CMT 	(7*32+12) /* Cache Monitoring Technology */
 #define X86_FEATURE_NO_FPU_SEL 	(7*32+13) /* FPU CS/DS stored as zero */
 #define X86_FEATURE_MPX		(7*32+14) /* Memory Protection Extensions */
 #define X86_FEATURE_RDSEED	(7*32+18) /* RDSEED instruction */
