@@ -46,6 +46,7 @@ static inline bool_t psr_cmt_enabled(void)
 
 int psr_alloc_rmid(struct domain *d);
 void psr_free_rmid(struct domain *d);
+void psr_assoc_rmid(unsigned int rmid);
 
 #endif /* __ASM_PSR_H__ */
 

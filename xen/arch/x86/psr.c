@@ -20,10 +20,16 @@
 
 #define PSR_CMT        (1<<0)
 
+struct psr_assoc {
+    uint64_t val;
+    bool_t initialized;
+};
+
 struct psr_cmt *__read_mostly psr_cmt;
 static bool_t __initdata opt_psr;
 static unsigned int __initdata opt_rmid_max = 255;
 static uint64_t rmid_mask;
+static DEFINE_PER_CPU(struct psr_assoc, psr_assoc);
 
 static void __init parse_psr_param(char *s)
 {
@@ -160,6 +166,27 @@ void psr_free_rmid(struct domain *d)
 
     psr_cmt->rmid_to_dom[rmid] = DOMID_INVALID;
     d->arch.psr_rmid = 0;
+}
+
+void psr_assoc_rmid(unsigned int rmid)
+{
+    uint64_t val;
+    uint64_t new_val;
+    struct psr_assoc *psra = &this_cpu(psr_assoc);
+
+    if ( !psra->initialized )
+    {
+        rdmsrl(MSR_IA32_PSR_ASSOC, psra->val);
+        psra->initialized = 1;
+    }
+    val = psra->val;
+
+    new_val = (val & ~rmid_mask) | (rmid & rmid_mask);
+    if ( val != new_val )
+    {
+        wrmsrl(MSR_IA32_PSR_ASSOC, new_val);
+        psra->val = new_val;
+    }
 }
 
 /*
