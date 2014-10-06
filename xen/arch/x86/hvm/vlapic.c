@@ -123,33 +123,9 @@ static int vlapic_find_highest_irr(struct vlapic *vlapic)
     return vlapic_find_highest_vector(&vlapic->regs->data[APIC_IRR]);
 }
 
-static void vlapic_error(struct vlapic *vlapic, unsigned int errmask)
-{
-    unsigned long flags;
-    uint32_t esr;
-
-    spin_lock_irqsave(&vlapic->esr_lock, flags);
-    esr = vlapic_get_reg(vlapic, APIC_ESR);
-    if ( (esr & errmask) != errmask )
-    {
-        uint32_t lvterr = vlapic_get_reg(vlapic, APIC_LVTERR);
-
-        vlapic_set_reg(vlapic, APIC_ESR, esr | errmask);
-        if ( !(lvterr & APIC_LVT_MASKED) )
-            vlapic_set_irq(vlapic, lvterr & APIC_VECTOR_MASK, 0);
-    }
-    spin_unlock_irqrestore(&vlapic->esr_lock, flags);
-}
-
 void vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
 {
     struct vcpu *target = vlapic_vcpu(vlapic);
-
-    if ( unlikely(vec < 16) )
-    {
-        vlapic_error(vlapic, APIC_ESR_RECVILL);
-        return;
-    }
 
     if ( trig )
         vlapic_set_vector(vec, &vlapic->regs->data[APIC_TMR]);
@@ -484,12 +460,7 @@ void vlapic_ipi(
         struct vlapic *target = vlapic_lowest_prio(
             vlapic_domain(vlapic), vlapic, short_hand, dest, dest_mode);
         if ( target != NULL )
-        {
-            if ( likely((icr_low & APIC_VECTOR_MASK) >= 16) )
-                vlapic_accept_irq(vlapic_vcpu(target), icr_low);
-            else
-                vlapic_error(vlapic, APIC_ESR_SENDILL);
-        }
+            vlapic_accept_irq(vlapic_vcpu(target), icr_low);
         break;
     }
 
@@ -497,11 +468,6 @@ void vlapic_ipi(
         struct vcpu *v;
         bool_t batch = is_multicast_dest(vlapic, short_hand, dest, dest_mode);
 
-        if ( unlikely((icr_low & APIC_VECTOR_MASK) < 16) )
-        {
-            vlapic_error(vlapic, APIC_ESR_SENDILL);
-            break;
-        }
         if ( batch )
             cpu_raise_softirq_batch_begin();
         for_each_vcpu ( vlapic_domain(vlapic), v )
@@ -1437,8 +1403,6 @@ int vlapic_init(struct vcpu *v)
                                 APIC_DEFAULT_PHYS_BASE);
     if ( v->vcpu_id == 0 )
         vlapic->hw.apic_base_msr |= MSR_IA32_APICBASE_BSP;
-
-    spin_lock_init(&vlapic->esr_lock);
 
     tasklet_init(&vlapic->init_sipi.tasklet,
                  vlapic_init_sipi_action,

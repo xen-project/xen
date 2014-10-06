@@ -77,7 +77,6 @@ struct vlapic {
         bool_t               hw, regs;
         uint32_t             id, ldr;
     }                        loaded;
-    spinlock_t               esr_lock;
     struct periodic_time     pt;
     s_time_t                 timer_last_update;
     struct page_info         *regs_page;
