@@ -885,6 +885,7 @@ int guest_iommu_init(struct domain* d)
     }
 
     guest_iommu_reg_init(iommu);
+    iommu->mmio_base = ~0ULL;
     iommu->domain = d;
     hd->arch.g_iommu = iommu;
 
