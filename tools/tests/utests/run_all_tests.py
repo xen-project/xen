@@ -17,15 +17,7 @@
 
 import unittest
 
-import utests.ut_util.ut_fileuri
-import utests.ut_xend.ut_XendConfig
-import utests.ut_xend.ut_image
-
-suite = unittest.TestSuite(
-    [utests.ut_util.ut_fileuri.suite(),
-     utests.ut_xend.ut_XendConfig.suite(),
-     utests.ut_xend.ut_image.suite(),
-     ])
+suite = unittest.TestSuite([])
 
 if __name__ == "__main__":
     testresult = unittest.TextTestRunner(verbosity=3).run(suite)
