@@ -47,6 +47,7 @@
 #include <xen/xsm/flask_op.h>
 #include <xen/tmem.h>
 #include <xen/kexec.h>
+#include <xen/platform.h>
 
 #include "xentoollog.h"
 
@@ -2661,6 +2662,22 @@ int xc_kexec_load(xc_interface *xch, uint8_t type, uint16_t arch,
  * region.
  */
 int xc_kexec_unload(xc_interface *xch, int type);
+
+typedef xenpf_resource_entry_t xc_resource_entry_t;
+
+/*
+ * Generic resource operation which contains multiple non-preemptible
+ * resource access entries that passed to xc_resource_op().
+ */
+struct xc_resource_op {
+    uint64_t result;        /* on return, check this field first */
+    uint32_t cpu;           /* which cpu to run */
+    uint32_t nr_entries;    /* number of resource entries */
+    xc_resource_entry_t *entries;
+};
+
+typedef struct xc_resource_op xc_resource_op_t;
+int xc_resource_op(xc_interface *xch, uint32_t nr_ops, xc_resource_op_t *ops);
 
 #endif /* XENCTRL_H */
 

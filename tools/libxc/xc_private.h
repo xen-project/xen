@@ -47,6 +47,7 @@
 #define DECLARE_SYSCTL struct xen_sysctl sysctl
 #define DECLARE_PHYSDEV_OP struct physdev_op physdev_op
 #define DECLARE_FLASK_OP struct xen_flask_op op
+#define DECLARE_PLATFORM_OP struct xen_platform_op platform_op
 
 #undef PAGE_SHIFT
 #undef PAGE_SIZE
@@ -308,6 +309,56 @@ static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
 
     xc_hypercall_bounce_post(xch, sysctl);
  out1:
+    return ret;
+}
+
+static inline int do_platform_op(xc_interface *xch,
+                                 struct xen_platform_op *platform_op)
+{
+    int ret = -1;
+    DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BOUNCE(platform_op, sizeof(*platform_op),
+                             XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+
+    platform_op->interface_version = XENPF_INTERFACE_VERSION;
+
+    if ( xc_hypercall_bounce_pre(xch, platform_op) )
+    {
+        PERROR("Could not bounce buffer for platform_op hypercall");
+        return -1;
+    }
+
+    hypercall.op     = __HYPERVISOR_platform_op;
+    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(platform_op);
+    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
+    {
+        if ( errno == EACCES )
+            DPRINTF("platform operation failed -- need to"
+                    " rebuild the user-space tool set?\n");
+    }
+
+    xc_hypercall_bounce_post(xch, platform_op);
+    return ret;
+}
+
+static inline int do_multicall_op(xc_interface *xch,
+                                  xc_hypercall_buffer_t *call_list,
+                                  uint32_t nr_calls)
+{
+    int ret = -1;
+    DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BUFFER_ARGUMENT(call_list);
+
+    hypercall.op     = __HYPERVISOR_multicall;
+    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(call_list);
+    hypercall.arg[1] = nr_calls;
+    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
+    {
+        if ( errno == EACCES )
+            DPRINTF("multicall operation failed -- need to"
+                    " rebuild the user-space tool set?\n");
+    }
+
     return ret;
 }
 
