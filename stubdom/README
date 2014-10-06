@@ -22,15 +22,6 @@ See xl.cfg(5) for more details of the xl domain configuration syntax
 and http://wiki.xen.org/wiki/Device_Model_Stub_Domains for more
 information on device model stub domains
 
-Using with XM/xend
-------------------
-
-There is a sample configuration set in xmexample.hvm-stubdom
-
-In your HVM config "hvmconfig" use stubdom-dm as dm script:
-
-device_model = 'stubdom-dm'
-
 
                                    PV-GRUB
                                    =======
