@@ -66,6 +66,7 @@ allow dom0_t xen_t:xen {
 };
 allow dom0_t xen_t:xen2 {
     resource_op
+    psr_cmt_op
 };
 allow dom0_t xen_t:mmu memorymap;
 
@@ -79,7 +80,7 @@ allow dom0_t dom0_t:domain {
 	getpodtarget setpodtarget set_misc_info set_virq_handler
 };
 allow dom0_t dom0_t:domain2 {
-	set_cpuid gettsc settsc setscheduler set_max_evtchn set_vnumainfo get_vnumainfo
+	set_cpuid gettsc settsc setscheduler set_max_evtchn set_vnumainfo get_vnumainfo psr_cmt_op
 };
 allow dom0_t dom0_t:resource { add remove };
 

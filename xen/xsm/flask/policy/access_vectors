@@ -81,6 +81,8 @@ class xen2
 {
 # XENPF_resource_op
     resource_op
+# XEN_SYSCTL_psr_cmt_op
+    psr_cmt_op
 }
 
 # Classes domain and domain2 consist of operations that a domain performs on
@@ -212,6 +214,8 @@ class domain2
     set_vnumainfo
 # XENMEM_getvnumainfo
     get_vnumainfo
+# XEN_DOMCTL_psr_cmt_op
+    psr_cmt_op
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains
