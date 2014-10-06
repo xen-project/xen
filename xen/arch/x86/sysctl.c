@@ -28,8 +28,24 @@
 #include <xen/nodemask.h>
 #include <xen/cpu.h>
 #include <xsm/xsm.h>
+#include <asm/psr.h>
 
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
+
+struct l3_cache_info {
+    int ret;
+    unsigned long size;
+};
+
+static void l3_cache_get(void *arg)
+{
+    struct cpuid4_info info;
+    struct l3_cache_info *l3_info = arg;
+
+    l3_info->ret = cpuid4_cache_lookup(3, &info);
+    if ( !l3_info->ret )
+        l3_info->size = info.size / 1024; /* in KB unit */
+}
 
 long cpu_up_helper(void *data)
 {
@@ -100,6 +116,57 @@ long arch_do_sysctl(
         }
     }
     break;
+
+    case XEN_SYSCTL_psr_cmt_op:
+        if ( !psr_cmt_enabled() )
+            return -ENODEV;
+
+        if ( sysctl->u.psr_cmt_op.flags != 0 )
+            return -EINVAL;
+
+        switch ( sysctl->u.psr_cmt_op.cmd )
+        {
+        case XEN_SYSCTL_PSR_CMT_enabled:
+            sysctl->u.psr_cmt_op.u.data =
+                (psr_cmt->features & PSR_RESOURCE_TYPE_L3) &&
+                (psr_cmt->l3.features & PSR_CMT_L3_OCCUPANCY);
+            break;
+        case XEN_SYSCTL_PSR_CMT_get_total_rmid:
+            sysctl->u.psr_cmt_op.u.data = psr_cmt->rmid_max;
+            break;
+        case XEN_SYSCTL_PSR_CMT_get_l3_upscaling_factor:
+            sysctl->u.psr_cmt_op.u.data = psr_cmt->l3.upscaling_factor;
+            break;
+        case XEN_SYSCTL_PSR_CMT_get_l3_cache_size:
+        {
+            struct l3_cache_info info;
+            unsigned int cpu = sysctl->u.psr_cmt_op.u.l3_cache.cpu;
+
+            if ( (cpu >= nr_cpu_ids) || !cpu_online(cpu) )
+            {
+                ret = -ENODEV;
+                sysctl->u.psr_cmt_op.u.data = 0;
+                break;
+            }
+            if ( cpu == smp_processor_id() )
+                l3_cache_get(&info);
+            else
+                on_selected_cpus(cpumask_of(cpu), l3_cache_get, &info, 1);
+
+            ret = info.ret;
+            sysctl->u.psr_cmt_op.u.data = (ret ? 0 : info.size);
+            break;
+        }
+        default:
+            sysctl->u.psr_cmt_op.u.data = 0;
+            ret = -ENOSYS;
+            break;
+        }
+
+        if ( __copy_to_guest(u_sysctl, sysctl, 1) )
+            ret = -EFAULT;
+
+        break;
 
     default:
         ret = -ENOSYS;

@@ -636,6 +636,24 @@ struct xen_sysctl_coverage_op {
 typedef struct xen_sysctl_coverage_op xen_sysctl_coverage_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_coverage_op_t);
 
+#define XEN_SYSCTL_PSR_CMT_get_total_rmid            0
+#define XEN_SYSCTL_PSR_CMT_get_l3_upscaling_factor   1
+/* The L3 cache size is returned in KB unit */
+#define XEN_SYSCTL_PSR_CMT_get_l3_cache_size         2
+#define XEN_SYSCTL_PSR_CMT_enabled                   3
+struct xen_sysctl_psr_cmt_op {
+    uint32_t cmd;       /* IN: XEN_SYSCTL_PSR_CMT_* */
+    uint32_t flags;     /* padding variable, may be extended for future use */
+    union {
+        uint64_t data;  /* OUT */
+        struct {
+            uint32_t cpu;   /* IN */
+            uint32_t rsvd;
+        } l3_cache;
+    } u;
+};
+typedef struct xen_sysctl_psr_cmt_op xen_sysctl_psr_cmt_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_psr_cmt_op_t);
 
 struct xen_sysctl {
     uint32_t cmd;
@@ -658,6 +676,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_cpupool_op                    18
 #define XEN_SYSCTL_scheduler_op                  19
 #define XEN_SYSCTL_coverage_op                   20
+#define XEN_SYSCTL_psr_cmt_op                    21
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
@@ -679,6 +698,7 @@ struct xen_sysctl {
         struct xen_sysctl_cpupool_op        cpupool_op;
         struct xen_sysctl_scheduler_op      scheduler_op;
         struct xen_sysctl_coverage_op       coverage_op;
+        struct xen_sysctl_psr_cmt_op        psr_cmt_op;
         uint8_t                             pad[128];
     } u;
 };

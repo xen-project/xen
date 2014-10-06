@@ -81,54 +81,9 @@ static struct _cache_table cache_table[] __cpuinitdata =
 	{ 0x00, 0, 0}
 };
 
-
-enum _cache_type
-{
-	CACHE_TYPE_NULL	= 0,
-	CACHE_TYPE_DATA = 1,
-	CACHE_TYPE_INST = 2,
-	CACHE_TYPE_UNIFIED = 3
-};
-
-union _cpuid4_leaf_eax {
-	struct {
-		enum _cache_type	type:5;
-		unsigned int		level:3;
-		unsigned int		is_self_initializing:1;
-		unsigned int		is_fully_associative:1;
-		unsigned int		reserved:4;
-		unsigned int		num_threads_sharing:12;
-		unsigned int		num_cores_on_die:6;
-	} split;
-	u32 full;
-};
-
-union _cpuid4_leaf_ebx {
-	struct {
-		unsigned int		coherency_line_size:12;
-		unsigned int		physical_line_partition:10;
-		unsigned int		ways_of_associativity:10;
-	} split;
-	u32 full;
-};
-
-union _cpuid4_leaf_ecx {
-	struct {
-		unsigned int		number_of_sets:32;
-	} split;
-	u32 full;
-};
-
-struct _cpuid4_info {
-	union _cpuid4_leaf_eax eax;
-	union _cpuid4_leaf_ebx ebx;
-	union _cpuid4_leaf_ecx ecx;
-	unsigned long size;
-};
-
 unsigned short			num_cache_leaves;
 
-static int __cpuinit cpuid4_cache_lookup(int index, struct _cpuid4_info *this_leaf)
+int cpuid4_cache_lookup(int index, struct cpuid4_info *this_leaf)
 {
 	union _cpuid4_leaf_eax 	eax;
 	union _cpuid4_leaf_ebx 	ebx;
@@ -185,7 +140,7 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 		 * parameters cpuid leaf to find the cache details
 		 */
 		for (i = 0; i < num_cache_leaves; i++) {
-			struct _cpuid4_info this_leaf;
+			struct cpuid4_info this_leaf;
 
 			int retval;
 
