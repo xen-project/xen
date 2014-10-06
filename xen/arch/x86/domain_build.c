@@ -270,7 +270,7 @@ static unsigned long __init compute_dom0_nr_pages(
     return nr_pages;
 }
 
-static void __init process_dom0_ioports_disable(void)
+static void __init process_dom0_ioports_disable(struct domain *dom0)
 {
     unsigned long io_from, io_to;
     char *t, *s = opt_dom0_ioports_disable;
@@ -303,7 +303,7 @@ static void __init process_dom0_ioports_disable(void)
         printk("Disabling dom0 access to ioport range %04lx-%04lx\n",
             io_from, io_to);
 
-        if ( ioports_deny_access(hardware_domain, io_from, io_to) != 0 )
+        if ( ioports_deny_access(dom0, io_from, io_to) != 0 )
             BUG();
     }
 }
@@ -1425,29 +1425,28 @@ int __init construct_dom0(
     rc = 0;
 
     /* The hardware domain is initially permitted full I/O capabilities. */
-    rc |= ioports_permit_access(hardware_domain, 0, 0xFFFF);
-    rc |= iomem_permit_access(hardware_domain, 0UL, ~0UL);
-    rc |= irqs_permit_access(hardware_domain, 1, nr_irqs_gsi - 1);
+    rc |= ioports_permit_access(d, 0, 0xFFFF);
+    rc |= iomem_permit_access(d, 0UL, ~0UL);
+    rc |= irqs_permit_access(d, 1, nr_irqs_gsi - 1);
 
     /*
      * Modify I/O port access permissions.
      */
     /* Master Interrupt Controller (PIC). */
-    rc |= ioports_deny_access(hardware_domain, 0x20, 0x21);
+    rc |= ioports_deny_access(d, 0x20, 0x21);
     /* Slave Interrupt Controller (PIC). */
-    rc |= ioports_deny_access(hardware_domain, 0xA0, 0xA1);
+    rc |= ioports_deny_access(d, 0xA0, 0xA1);
     /* Interval Timer (PIT). */
-    rc |= ioports_deny_access(hardware_domain, 0x40, 0x43);
+    rc |= ioports_deny_access(d, 0x40, 0x43);
     /* PIT Channel 2 / PC Speaker Control. */
-    rc |= ioports_deny_access(hardware_domain, 0x61, 0x61);
+    rc |= ioports_deny_access(d, 0x61, 0x61);
     /* ACPI PM Timer. */
     if ( pmtmr_ioport )
-        rc |= ioports_deny_access(hardware_domain, pmtmr_ioport,
-		                          pmtmr_ioport + 3);
+        rc |= ioports_deny_access(d, pmtmr_ioport, pmtmr_ioport + 3);
     /* PCI configuration space (NB. 0xcf8 has special treatment). */
-    rc |= ioports_deny_access(hardware_domain, 0xcfc, 0xcff);
+    rc |= ioports_deny_access(d, 0xcfc, 0xcff);
     /* Command-line I/O ranges. */
-    process_dom0_ioports_disable();
+    process_dom0_ioports_disable(d);
 
     /*
      * Modify I/O memory access permissions.
@@ -1456,22 +1455,22 @@ int __init construct_dom0(
     if ( mp_lapic_addr != 0 )
     {
         mfn = paddr_to_pfn(mp_lapic_addr);
-        rc |= iomem_deny_access(hardware_domain, mfn, mfn);
+        rc |= iomem_deny_access(d, mfn, mfn);
     }
     /* I/O APICs. */
     for ( i = 0; i < nr_ioapics; i++ )
     {
         mfn = paddr_to_pfn(mp_ioapics[i].mpc_apicaddr);
         if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
-            rc |= iomem_deny_access(hardware_domain, mfn, mfn);
+            rc |= iomem_deny_access(d, mfn, mfn);
     }
     /* MSI range. */
-    rc |= iomem_deny_access(hardware_domain, paddr_to_pfn(MSI_ADDR_BASE_LO),
+    rc |= iomem_deny_access(d, paddr_to_pfn(MSI_ADDR_BASE_LO),
                             paddr_to_pfn(MSI_ADDR_BASE_LO +
                                          MSI_ADDR_DEST_ID_MASK));
     /* HyperTransport range. */
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
-        rc |= iomem_deny_access(hardware_domain, paddr_to_pfn(0xfdULL << 32),
+        rc |= iomem_deny_access(d, paddr_to_pfn(0xfdULL << 32),
                                 paddr_to_pfn((1ULL << 40) - 1));
 
     /* Remove access to E820_UNUSABLE I/O regions above 1MB. */
@@ -1483,7 +1482,7 @@ int __init construct_dom0(
         if ( (e820.map[i].type == E820_UNUSABLE) &&
              (e820.map[i].size != 0) &&
              (sfn <= efn) )
-            rc |= iomem_deny_access(hardware_domain, sfn, efn);
+            rc |= iomem_deny_access(d, sfn, efn);
     }
 
     BUG_ON(rc != 0);
