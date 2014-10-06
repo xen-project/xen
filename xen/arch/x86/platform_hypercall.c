@@ -61,6 +61,90 @@ long cpu_down_helper(void *data);
 long core_parking_helper(void *data);
 uint32_t get_cur_idle_nums(void);
 
+#define RESOURCE_ACCESS_MAX_ENTRIES 2
+struct xen_resource_access {
+    unsigned int nr_done;
+    unsigned int nr_entries;
+    xenpf_resource_entry_t *entries;
+};
+
+static bool_t allow_access_msr(unsigned int msr)
+{
+    return 0;
+}
+
+static void check_resource_access(struct xen_resource_access *ra)
+{
+    unsigned int i;
+
+    for ( i = 0; i < ra->nr_entries; i++ )
+    {
+        int ret = 0;
+        xenpf_resource_entry_t *entry = ra->entries + i;
+
+        if ( entry->rsvd )
+        {
+            entry->u.ret = -EINVAL;
+            break;
+        }
+
+        switch ( entry->u.cmd )
+        {
+        case XEN_RESOURCE_OP_MSR_READ:
+        case XEN_RESOURCE_OP_MSR_WRITE:
+            if ( entry->idx >> 32 )
+                ret = -EINVAL;
+            else if ( !allow_access_msr(entry->idx) )
+                ret = -EACCES;
+            break;
+        default:
+            ret = -EOPNOTSUPP;
+            break;
+        }
+
+        if ( ret )
+        {
+           entry->u.ret = ret;
+           break;
+        }
+    }
+
+    ra->nr_done = i;
+}
+
+static void resource_access(void *info)
+{
+    struct xen_resource_access *ra = info;
+    unsigned int i;
+
+    for ( i = 0; i < ra->nr_done; i++ )
+    {
+        int ret;
+        xenpf_resource_entry_t *entry = ra->entries + i;
+
+        switch ( entry->u.cmd )
+        {
+        case XEN_RESOURCE_OP_MSR_READ:
+            ret = rdmsr_safe(entry->idx, entry->val);
+            break;
+        case XEN_RESOURCE_OP_MSR_WRITE:
+            ret = wrmsr_safe(entry->idx, entry->val);
+            break;
+        default:
+            BUG();
+            break;
+        }
+
+        if ( ret )
+        {
+            entry->u.ret = ret;
+            break;
+        }
+    }
+
+    ra->nr_done = i;
+}
+
 ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 {
     ret_t ret = 0;
@@ -598,6 +682,73 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
             ret = -EINVAL;
             break;
         }
+    }
+    break;
+
+    case XENPF_resource_op:
+    {
+        struct xen_resource_access ra;
+        unsigned int cpu;
+        XEN_GUEST_HANDLE(xenpf_resource_entry_t) guest_entries;
+
+        ra.nr_entries = op->u.resource_op.nr_entries;
+        if ( ra.nr_entries == 0 )
+            break;
+        if ( ra.nr_entries > RESOURCE_ACCESS_MAX_ENTRIES )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        ra.entries = xmalloc_array(xenpf_resource_entry_t, ra.nr_entries);
+        if ( !ra.entries )
+        {
+            ret = -ENOMEM;
+            break;
+        }
+
+        guest_from_compat_handle(guest_entries, op->u.resource_op.entries);
+
+        if ( copy_from_guest(ra.entries, guest_entries, ra.nr_entries) )
+        {
+            xfree(ra.entries);
+            ret = -EFAULT;
+            break;
+        }
+
+        /* Do sanity check earlier to omit the potential IPI overhead. */
+        check_resource_access(&ra);
+        if ( ra.nr_done == 0 )
+        {
+            /* Copy the return value for entry 0 if it failed. */
+            if ( __copy_to_guest(guest_entries, ra.entries, 1) )
+                ret = -EFAULT;
+
+            xfree(ra.entries);
+            break;
+        }
+
+        cpu = op->u.resource_op.cpu;
+        if ( (cpu >= nr_cpu_ids) || !cpu_online(cpu) )
+        {
+            xfree(ra.entries);
+            ret = -ENODEV;
+            break;
+        }
+        if ( cpu == smp_processor_id() )
+            resource_access(&ra);
+        else
+            on_selected_cpus(cpumask_of(cpu), resource_access, &ra, 1);
+
+        /* Copy all if succeeded or up to the failed entry. */
+        if ( __copy_to_guest(guest_entries, ra.entries,
+                             ra.nr_done < ra.nr_entries ? ra.nr_done + 1
+                                                        : ra.nr_entries) )
+            ret = -EFAULT;
+        else
+            ret = ra.nr_done;
+
+        xfree(ra.entries);
     }
     break;
 

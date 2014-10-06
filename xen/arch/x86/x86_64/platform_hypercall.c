@@ -32,6 +32,10 @@ CHECK_pf_pcpu_version;
 CHECK_pf_enter_acpi_sleep;
 #undef xen_pf_enter_acpi_sleep
 
+#define xen_pf_resource_entry xenpf_resource_entry
+CHECK_pf_resource_entry;
+#undef xen_pf_resource_entry
+
 #define COMPAT
 #define _XEN_GUEST_HANDLE(t) XEN_GUEST_HANDLE(t)
 #define _XEN_GUEST_HANDLE_PARAM(t) XEN_GUEST_HANDLE_PARAM(t)

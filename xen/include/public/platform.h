@@ -528,6 +528,39 @@ typedef struct xenpf_core_parking xenpf_core_parking_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_core_parking_t);
 
 /*
+ * Access generic platform resources(e.g., accessing MSR, port I/O, etc)
+ * in unified way. Batch resource operations in one call are supported and
+ * they are always non-preemptible and executed in their original order.
+ * The batch itself returns a negative integer for general errors, or a
+ * non-negative integer for the number of successful operations. For the latter
+ * case, the @ret in the failed entry (if any) indicates the exact error.
+ */
+#define XENPF_resource_op   61
+
+#define XEN_RESOURCE_OP_MSR_READ  0
+#define XEN_RESOURCE_OP_MSR_WRITE 1
+
+struct xenpf_resource_entry {
+    union {
+        uint32_t cmd;   /* IN: XEN_RESOURCE_OP_* */
+        int32_t  ret;   /* OUT: return value for failed entry */
+    } u;
+    uint32_t rsvd;      /* IN: padding and must be zero */
+    uint64_t idx;       /* IN: resource address to access */
+    uint64_t val;       /* IN/OUT: resource value to set/get */
+};
+typedef struct xenpf_resource_entry xenpf_resource_entry_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_resource_entry_t);
+
+struct xenpf_resource_op {
+    uint32_t nr_entries;    /* number of resource entry */
+    uint32_t cpu;           /* which cpu to run */
+    XEN_GUEST_HANDLE(xenpf_resource_entry_t) entries;
+};
+typedef struct xenpf_resource_op xenpf_resource_op_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_resource_op_t);
+
+/*
  * ` enum neg_errnoval
  * ` HYPERVISOR_platform_op(const struct xen_platform_op*);
  */
@@ -553,6 +586,7 @@ struct xen_platform_op {
         struct xenpf_cpu_hotadd        cpu_add;
         struct xenpf_mem_hotadd        mem_add;
         struct xenpf_core_parking      core_parking;
+        struct xenpf_resource_op       resource_op;
         uint8_t                        pad[128];
     } u;
 };
