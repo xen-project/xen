@@ -629,6 +629,9 @@ SYSTEMD_CFLAGS
 SYSTEMD_MODULES_LOAD
 SYSTEMD_DIR
 systemd
+remus_netbuf
+LIBNL3_LIBS
+LIBNL3_CFLAGS
 libiconv
 PTYFUNCS_LIBS
 PTHREAD_LIBS
@@ -829,6 +832,8 @@ PKG_CONFIG_PATH
 PKG_CONFIG_LIBDIR
 glib_CFLAGS
 glib_LIBS
+LIBNL3_CFLAGS
+LIBNL3_LIBS
 SYSTEMD_CFLAGS
 SYSTEMD_LIBS'
 
@@ -1528,6 +1533,9 @@ Some influential environment variables:
               path overriding pkg-config's built-in search path
   glib_CFLAGS C compiler flags for glib, overriding pkg-config
   glib_LIBS   linker flags for glib, overriding pkg-config
+  LIBNL3_CFLAGS
+              C compiler flags for LIBNL3, overriding pkg-config
+  LIBNL3_LIBS linker flags for LIBNL3, overriding pkg-config
   SYSTEMD_CFLAGS
               C compiler flags for SYSTEMD, overriding pkg-config
   SYSTEMD_LIBS
@@ -8401,6 +8409,100 @@ _ACEOF
 fi
 
 done
+
+
+# Check for libnl3 >=3.2.8. If present enable remus network buffering.
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for LIBNL3" >&5
+$as_echo_n "checking for LIBNL3... " >&6; }
+
+if test -n "$LIBNL3_CFLAGS"; then
+    pkg_cv_LIBNL3_CFLAGS="$LIBNL3_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_LIBNL3_CFLAGS=`$PKG_CONFIG --cflags "libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$LIBNL3_LIBS"; then
+    pkg_cv_LIBNL3_LIBS="$LIBNL3_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_LIBNL3_LIBS=`$PKG_CONFIG --libs "libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        LIBNL3_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8" 2>&1`
+        else
+	        LIBNL3_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$LIBNL3_PKG_ERRORS" >&5
+
+	libnl3_lib="n"
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	libnl3_lib="n"
+else
+	LIBNL3_CFLAGS=$pkg_cv_LIBNL3_CFLAGS
+	LIBNL3_LIBS=$pkg_cv_LIBNL3_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	libnl3_lib="y"
+fi
+
+if test "x$libnl3_lib" = "xn" ; then :
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Disabling support for Remus network buffering.
+    Please install libnl3 libraries, command line tools and devel
+    headers - version 3.2.8 or higher" >&5
+$as_echo "$as_me: WARNING: Disabling support for Remus network buffering.
+    Please install libnl3 libraries, command line tools and devel
+    headers - version 3.2.8 or higher" >&2;}
+    remus_netbuf=n
+
+
+else
+
+    remus_netbuf=y
+
+
+fi
+
+
 
 
 fi # ! $rump
