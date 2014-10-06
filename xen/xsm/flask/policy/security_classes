@@ -8,6 +8,7 @@
 # for userspace object managers
 
 class xen
+class xen2
 class domain
 class domain2
 class hvm

@@ -3,9 +3,9 @@
 #
 # class class_name { permission_name ... }
 
-# Class xen consists of dom0-only operations dealing with the hypervisor itself.
-# Unless otherwise specified, the source is the domain executing the hypercall,
-# and the target is the xen initial sid (type xen_t).
+# Class xen and xen2 consists of dom0-only operations dealing with the
+# hypervisor itself. Unless otherwise specified, the source is the domain
+# executing the hypercall, and the target is the xen initial sid (type xen_t).
 class xen
 {
 # XENPF_settime
@@ -73,6 +73,14 @@ class xen
     getscheduler
 # XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_putinfo
     setscheduler
+}
+
+# This is a continuation of class xen, since only 32 permissions can be
+# defined per class
+class xen2
+{
+# XENPF_resource_op
+    resource_op
 }
 
 # Classes domain and domain2 consist of operations that a domain performs on
