@@ -496,15 +496,8 @@ int __setup_msi_irq(struct irq_desc *desc, struct msi_desc *msidesc,
 
 int msi_free_irq(struct msi_desc *entry)
 {
-    unsigned int nr = entry->msi.nvec;
-
-    if ( entry->msi_attrib.type == PCI_CAP_ID_MSIX )
-    {
-        unsigned long start;
-        start = (unsigned long)entry->mask_base & ~(PAGE_SIZE - 1);
-        msix_put_fixmap(entry->dev->msix, virt_to_fix(start));
-        nr = 1;
-    }
+    unsigned int nr = entry->msi_attrib.type != PCI_CAP_ID_MSIX
+                      ? entry->msi.nvec : 1;
 
     while ( nr-- )
     {
@@ -514,6 +507,10 @@ int msi_free_irq(struct msi_desc *entry)
         if ( iommu_intremap )
             iommu_update_ire_from_msi(entry + nr, NULL);
     }
+
+    if ( entry->msi_attrib.type == PCI_CAP_ID_MSIX )
+        msix_put_fixmap(entry->dev->msix,
+                        virt_to_fix((unsigned long)entry->mask_base));
 
     list_del(&entry->list);
     xfree(entry);
