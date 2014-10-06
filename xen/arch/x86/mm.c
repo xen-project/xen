@@ -122,6 +122,7 @@
 #include <xen/trace.h>
 #include <asm/setup.h>
 #include <asm/fixmap.h>
+#include <asm/io_apic.h>
 #include <asm/pci.h>
 
 /* Mapping of the fixmap space needed early. */
@@ -4478,10 +4479,9 @@ struct memory_map_context
     struct xen_memory_map map;
 };
 
-static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
+static int _handle_iomem_range(unsigned long s, unsigned long e,
+                               struct memory_map_context *ctxt)
 {
-    struct memory_map_context *ctxt = p;
-
     if ( s > ctxt->s )
     {
         e820entry_t ent;
@@ -4502,6 +4502,31 @@ static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
     ctxt->s = e + 1;
 
     return 0;
+}
+
+static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
+{
+    int err = 0;
+
+    do {
+        unsigned long low = -1UL;
+        unsigned int i;
+
+        for ( i = 0; i < nr_ioapics; ++i )
+        {
+            unsigned long mfn = paddr_to_pfn(mp_ioapics[i].mpc_apicaddr);
+
+            if ( mfn >= s && mfn <= e && mfn < low )
+                low = mfn;
+        }
+        if ( !(low + 1) )
+            break;
+        if ( s < low )
+            err = _handle_iomem_range(s, low - 1, p);
+        s = low + 1;
+    } while ( !err );
+
+    return err || s > e ? err : _handle_iomem_range(s, e, p);
 }
 
 int xenmem_add_to_physmap_one(
@@ -4731,7 +4756,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         {
             unsigned long s = PFN_DOWN(e820.map[i].addr);
 
-            if ( s )
+            if ( s > ctxt.s )
             {
                 rc = rangeset_report_ranges(current->domain->iomem_caps,
                                             ctxt.s, s - 1,
