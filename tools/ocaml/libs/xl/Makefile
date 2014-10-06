@@ -7,6 +7,7 @@ CFLAGS += -Wno-unused -Wno-declaration-after-statement
 
 CFLAGS += $(CFLAGS_libxenlight)
 CFLAGS += -I ../xentoollog
+CFLAGS += $(APPEND_CFLAGS)
 
 OBJS = xenlight
 INTF = xenlight.cmi

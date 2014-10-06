@@ -6,6 +6,7 @@ include $(TOPLEVEL)/common.make
 CFLAGS += -Wno-declaration-after-statement
 
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
+CFLAGS += $(APPEND_CFLAGS)
 OCAMLINCLUDE +=
 
 OBJS = xentoollog

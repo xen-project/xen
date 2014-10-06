@@ -3,6 +3,7 @@ OCAML_TOPLEVEL = $(CURDIR)/..
 include $(OCAML_TOPLEVEL)/common.make
 
 CFLAGS += $(CFLAGS_libxenlight)
+CFLAGS += $(APPEND_CFLAGS)
 LIBS_xenlight = $(LDLIBS_libxenlight)
 
 OCAMLINCLUDE += \
