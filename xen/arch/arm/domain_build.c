@@ -17,6 +17,7 @@
 #include <asm/platform.h>
 #include <asm/psci.h>
 #include <asm/setup.h>
+#include <asm/cpufeature.h>
 
 #include <asm/gic.h>
 #include <xen/irq.h>
@@ -1274,6 +1275,12 @@ int construct_dom0(struct domain *d)
         return rc;
 
 #ifdef CONFIG_ARM_64
+    /* if aarch32 mode is not supported at EL1 do not allow 32-bit domain */
+    if ( !(cpu_has_el1_32) && kinfo.type == DOMAIN_32BIT )
+    {
+        printk("Platform does not support 32-bit domain\n");
+        return -EINVAL;
+    }
     d->arch.type = kinfo.type;
 #endif
 

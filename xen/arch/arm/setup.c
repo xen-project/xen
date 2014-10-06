@@ -127,8 +127,9 @@ static void __init processor_id(void)
         printk("32-bit Execution:\n");
         printk("  Processor Features: %08"PRIx32":%08"PRIx32"\n",
                boot_cpu_data.pfr32.bits[0], boot_cpu_data.pfr32.bits[1]);
-        printk("    Instruction Sets:%s%s%s%s%s\n",
+        printk("    Instruction Sets:%s%s%s%s%s%s\n",
                cpu_has_aarch32 ? " AArch32" : "",
+               cpu_has_arm ? " A32" : "",
                cpu_has_thumb ? " Thumb" : "",
                cpu_has_thumb2 ? " Thumb-2" : "",
                cpu_has_thumbee ? " ThumbEE" : "",
@@ -852,8 +853,11 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
     snprintf(s, sizeof(s), "xen-%d.%d-aarch64 ", major, minor);
     safe_strcat(*info, s);
 #endif
-    snprintf(s, sizeof(s), "xen-%d.%d-armv7l ", major, minor);
-    safe_strcat(*info, s);
+    if ( cpu_has_aarch32 )
+    {
+        snprintf(s, sizeof(s), "xen-%d.%d-armv7l ", major, minor);
+        safe_strcat(*info, s);
+    }
 }
 
 /*
