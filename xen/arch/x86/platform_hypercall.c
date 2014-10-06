@@ -70,6 +70,14 @@ struct xen_resource_access {
 
 static bool_t allow_access_msr(unsigned int msr)
 {
+    switch ( msr )
+    {
+    /* MSR for CMT, refer to chapter 17.14 of Intel SDM. */
+    case MSR_IA32_CMT_EVTSEL:
+    case MSR_IA32_CMT_CTR:
+        return 1;
+    }
+
     return 0;
 }
 

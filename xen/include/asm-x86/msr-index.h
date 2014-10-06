@@ -324,6 +324,8 @@
 #define MSR_IA32_ENERGY_PERF_BIAS	0x000001b0
 
 /* Platform Shared Resource MSRs */
+#define MSR_IA32_CMT_EVTSEL		0x00000c8d
+#define MSR_IA32_CMT_CTR		0x00000c8e
 #define MSR_IA32_PSR_ASSOC		0x00000c8f
 
 /* Intel Model 6 */
