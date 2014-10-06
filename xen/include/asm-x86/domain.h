@@ -328,6 +328,8 @@ struct arch_domain
     /* Shared page for notifying that explicit PIRQ EOI is required. */
     unsigned long *pirq_eoi_map;
     unsigned long pirq_eoi_map_mfn;
+
+    unsigned int psr_rmid; /* RMID assigned to the domain for CMT */
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))

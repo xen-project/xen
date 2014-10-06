@@ -60,6 +60,7 @@
 #include <xen/numa.h>
 #include <xen/iommu.h>
 #include <compat/vcpu.h>
+#include <asm/psr.h>
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 DEFINE_PER_CPU(unsigned long, cr4);
@@ -661,6 +662,8 @@ void arch_domain_destroy(struct domain *d)
 
     free_xenheap_page(d->shared_info);
     cleanup_domain_irq_mapping(d);
+
+    psr_free_rmid(d);
 }
 
 unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)

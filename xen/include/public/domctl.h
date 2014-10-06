@@ -971,6 +971,16 @@ struct xen_domctl_vnuma {
 typedef struct xen_domctl_vnuma xen_domctl_vnuma_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vnuma_t);
 
+struct xen_domctl_psr_cmt_op {
+#define XEN_DOMCTL_PSR_CMT_OP_DETACH         0
+#define XEN_DOMCTL_PSR_CMT_OP_ATTACH         1
+#define XEN_DOMCTL_PSR_CMT_OP_QUERY_RMID     2
+    uint32_t cmd;
+    uint32_t data;
+};
+typedef struct xen_domctl_psr_cmt_op xen_domctl_psr_cmt_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_psr_cmt_op_t);
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -1044,6 +1054,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_get_vcpu_msrs                 72
 #define XEN_DOMCTL_set_vcpu_msrs                 73
 #define XEN_DOMCTL_setvnumainfo                  74
+#define XEN_DOMCTL_psr_cmt_op                    75
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -1105,6 +1116,7 @@ struct xen_domctl {
         struct xen_domctl_gdbsx_pauseunp_vcpu gdbsx_pauseunp_vcpu;
         struct xen_domctl_gdbsx_domstatus   gdbsx_domstatus;
         struct xen_domctl_vnuma             vnuma;
+        struct xen_domctl_psr_cmt_op        psr_cmt_op;
         uint8_t                             pad[128];
     } u;
 };

@@ -15,6 +15,7 @@
  */
 #include <xen/init.h>
 #include <xen/cpu.h>
+#include <xen/sched.h>
 #include <asm/psr.h>
 
 #define PSR_CMT        (1<<0)
@@ -115,6 +116,51 @@ static int __init init_psr(void)
     return 0;
 }
 __initcall(init_psr);
+
+/* Called with domain lock held, no psr specific lock needed */
+int psr_alloc_rmid(struct domain *d)
+{
+    unsigned int rmid;
+
+    ASSERT(psr_cmt_enabled());
+
+    if ( d->arch.psr_rmid > 0 )
+        return -EEXIST;
+
+    for ( rmid = 1; rmid <= psr_cmt->rmid_max; rmid++ )
+    {
+        if ( psr_cmt->rmid_to_dom[rmid] != DOMID_INVALID )
+            continue;
+
+        psr_cmt->rmid_to_dom[rmid] = d->domain_id;
+        break;
+    }
+
+    /* No RMID available, assign RMID=0 by default. */
+    if ( rmid > psr_cmt->rmid_max )
+    {
+        d->arch.psr_rmid = 0;
+        return -EUSERS;
+    }
+
+    d->arch.psr_rmid = rmid;
+
+    return 0;
+}
+
+/* Called with domain lock held, no psr specific lock needed */
+void psr_free_rmid(struct domain *d)
+{
+    unsigned int rmid;
+
+    rmid = d->arch.psr_rmid;
+    /* We do not free system reserved "RMID=0". */
+    if ( rmid == 0 )
+        return;
+
+    psr_cmt->rmid_to_dom[rmid] = DOMID_INVALID;
+    d->arch.psr_rmid = 0;
+}
 
 /*
  * Local variables:

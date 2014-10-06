@@ -35,6 +35,7 @@
 #include <asm/mem_sharing.h>
 #include <asm/xstate.h>
 #include <asm/debugger.h>
+#include <asm/psr.h>
 
 static int gdbsx_guest_mem_io(
     domid_t domid, struct xen_domctl_gdbsx_memio *iop)
@@ -1298,6 +1299,34 @@ long arch_do_domctl(
         }
     }
     break;
+
+    case XEN_DOMCTL_psr_cmt_op:
+        if ( !psr_cmt_enabled() )
+        {
+            ret = -ENODEV;
+            break;
+        }
+
+        switch ( domctl->u.psr_cmt_op.cmd )
+        {
+        case XEN_DOMCTL_PSR_CMT_OP_ATTACH:
+            ret = psr_alloc_rmid(d);
+            break;
+        case XEN_DOMCTL_PSR_CMT_OP_DETACH:
+            if ( d->arch.psr_rmid > 0 )
+                psr_free_rmid(d);
+            else
+                ret = -ENOENT;
+            break;
+        case XEN_DOMCTL_PSR_CMT_OP_QUERY_RMID:
+            domctl->u.psr_cmt_op.data = d->arch.psr_rmid;
+            copyback = 1;
+            break;
+        default:
+            ret = -ENOSYS;
+            break;
+        }
+        break;
 
     default:
         ret = iommu_do_domctl(domctl, d, u_domctl);

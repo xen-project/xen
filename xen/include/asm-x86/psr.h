@@ -16,6 +16,8 @@
 #ifndef __ASM_PSR_H__
 #define __ASM_PSR_H__
 
+#include <xen/types.h>
+
 /* Resource Type Enumeration */
 #define PSR_RESOURCE_TYPE_L3            0x2
 
@@ -36,6 +38,14 @@ struct psr_cmt {
 };
 
 extern struct psr_cmt *psr_cmt;
+
+static inline bool_t psr_cmt_enabled(void)
+{
+    return !!psr_cmt;
+}
+
+int psr_alloc_rmid(struct domain *d);
+void psr_free_rmid(struct domain *d);
 
 #endif /* __ASM_PSR_H__ */
 
