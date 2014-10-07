@@ -150,6 +150,14 @@ endif
 	ln -sf xenstore-compat/xs.h  $(DESTDIR)$(INCLUDEDIR)/xs.h
 	ln -sf xenstore-compat/xs_lib.h $(DESTDIR)$(INCLUDEDIR)/xs_lib.h
 
+.PHONY: clients-install
+clients-install: clients
+	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
+	$(INSTALL_PROG) xenstore $(DESTDIR)$(BINDIR)
+	set -e ; for c in $(CLIENTS) ; do \
+		ln -f $(DESTDIR)$(BINDIR)/xenstore $(DESTDIR)$(BINDIR)/$${c} ; \
+	done
+
 -include $(DEPS)
 
 # never delete any intermediate files.
