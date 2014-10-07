@@ -10,8 +10,6 @@ OBJCOPY    = $(CROSS_COMPILE)gobjcopy
 OBJDUMP    = $(CROSS_COMPILE)gobjdump
 SIZEUTIL   = $(CROSS_COMPILE)gsize
 
-MSGFMT     = gmsgfmt
-
 SHELL      = bash
 
 INSTALL      = ginstall
