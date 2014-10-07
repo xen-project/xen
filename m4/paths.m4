@@ -54,7 +54,7 @@ AC_ARG_WITH([initddir],
 AC_ARG_WITH([sysconfig-leaf-dir],
     AS_HELP_STRING([--with-sysconfig-leaf-dir=SUBDIR],
     [Name of subdirectory in /etc to store runtime options for runlevel
-    scripts and daemons such as xenstoerd.
+    scripts and daemons such as xenstored.
     This should be either "sysconfig" or "default". [sysconfig]]),
     [config_leaf_dir=$withval],
     [config_leaf_dir=sysconfig

@@ -1480,7 +1480,7 @@ Optional Packages:
   --with-sysconfig-leaf-dir=SUBDIR
                           Name of subdirectory in /etc to store runtime
                           options for runlevel scripts and daemons such as
-                          xenstoerd. This should be either "sysconfig" or
+                          xenstored. This should be either "sysconfig" or
                           "default". [sysconfig]
   --with-linux-backend-modules="mod1 mod2"
                           List of Linux backend module or modalias names to be
