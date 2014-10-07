@@ -1,9 +1,12 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-SUBDIRS_PROGRAMS = xenstored test
+SUBDIRS := libs
+SUBDIRS += xenstored
 
-SUBDIRS = libs $(SUBDIRS_PROGRAMS)
+ifeq ($(CONFIG_TESTS),y)
+SUBDIRS += test
+endif
 
 .NOTPARALLEL:
 # targets here must be run in order, otherwise we can try
