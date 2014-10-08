@@ -64,28 +64,6 @@ docs: dist-docs
 install-xen:
 	$(MAKE) -C xen install
 
-ifeq ($(CONFIG_QEMU_TRAD),y)
-QEMU_TRAD_DIR_TGT := tools/qemu-xen-traditional-dir
-
-tools/qemu-xen-traditional-dir:
-	$(MAKE) -C tools qemu-xen-traditional-dir-find
-
-.PHONY: tools/qemu-xen-traditional-dir-force-update
-tools/qemu-xen-traditional-dir-force-update:
-	$(MAKE) -C tools qemu-xen-traditional-dir-force-update
-endif
-
-ifeq ($(CONFIG_QEMU_XEN),y)
-QEMU_XEN_DIR_TGT := tools/qemu-xen-dir
-
-tools/qemu-xen-dir:
-	$(MAKE) -C tools qemu-xen-dir-find
-
-.PHONY: tools/qemu-xen-dir-force-update
-tools/qemu-xen-dir-force-update:
-	$(MAKE) -C tools qemu-xen-dir-force-update
-endif
-
 .PHONY: install-tools
 install-tools: $(QEMU_TRAD_DIR_TARGET) $(QEMU_XEN_DIR_TARGET)
 	$(MAKE) -C tools install
