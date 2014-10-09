@@ -836,6 +836,12 @@ static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
     }
 }
 
+static void replace_string(char **str, const char *val)
+{
+    free(*str);
+    *str = strdup(val);
+}
+
 static void parse_config_data(const char *config_source,
                               const char *config_data,
                               int config_len,
@@ -1980,13 +1986,6 @@ static int match_option_size(const char *prefix, size_t len,
 }
 #define MATCH_OPTION(prefix, arg, oparg) \
     match_option_size((prefix "="), sizeof((prefix)), (arg), &(oparg))
-
-static void replace_string(char **str, const char *val)
-{
-    free(*str);
-    *str = strdup(val);
-}
-
 
 /* Preserve a copy of a domain under a new name. Updates *r_domid */
 static int preserve_domain(uint32_t *r_domid, libxl_event *event,
