@@ -554,7 +554,7 @@ static void split_string_into_string_list(const char *str,
 
     s = strdup(str);
     if (s == NULL) {
-        fprintf(stderr, "unable to allocate memory to parse bootloader args\n");
+        fprintf(stderr, "unable to allocate memory to split string\n");
         exit(-1);
     }
 
@@ -570,7 +570,7 @@ static void split_string_into_string_list(const char *str,
 
     sl = malloc((nr+1) * sizeof (char *));
     if (sl == NULL) {
-        fprintf(stderr, "unable to allocate memory for bootloader args\n");
+        fprintf(stderr, "unable to allocate memory to split string\n");
         exit(-1);
     }
 
@@ -591,7 +591,6 @@ static void split_string_into_string_list(const char *str,
    and look for CTYPE in libxl_internal.h */
 typedef int (*char_predicate_t)(const int c);
 
-static void trim(char_predicate_t predicate, const char *input, char **output) __attribute__ ((unused));
 static void trim(char_predicate_t predicate, const char *input, char **output)
 {
     char *p, *q, *tmp;
@@ -616,10 +615,6 @@ static void trim(char_predicate_t predicate, const char *input, char **output)
     free(tmp);
 }
 
-static int split_string_into_pair(const char *str,
-                                  const char *delim,
-                                  char **a,
-                                  char **b) __attribute__ ((unused));
 static int split_string_into_pair(const char *str,
                                   const char *delim,
                                   char **a,
@@ -917,7 +912,7 @@ static void parse_config_data(const char *config_source,
     long l;
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms;
-    XLU_ConfigList *ioports, *irqs, *iomem, *viridian;
+    XLU_ConfigList *channels, *ioports, *irqs, *iomem, *viridian;
     int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 0;
@@ -1448,6 +1443,84 @@ static void parse_config_data(const char *config_source,
             }
             free(buf2);
             d_config->num_vtpms++;
+        }
+    }
+
+    if (!xlu_cfg_get_list (config, "channel", &channels, 0, 0)) {
+        d_config->num_channels = 0;
+        d_config->channels = NULL;
+        while ((buf = xlu_cfg_get_listitem (channels,
+                d_config->num_channels)) != NULL) {
+            libxl_device_channel *chn;
+            libxl_string_list pairs;
+            char *path = NULL;
+            int len;
+
+            chn = ARRAY_EXTEND_INIT(d_config->channels, d_config->num_channels,
+                                   libxl_device_channel_init);
+
+            split_string_into_string_list(buf, ",", &pairs);
+            len = libxl_string_list_length(&pairs);
+            for (i = 0; i < len; i++) {
+                char *key, *key_untrimmed, *value, *value_untrimmed;
+                int rc;
+                rc = split_string_into_pair(pairs[i], "=",
+                                            &key_untrimmed,
+                                            &value_untrimmed);
+                if (rc != 0) {
+                    fprintf(stderr, "failed to parse channel configuration: %s",
+                            pairs[i]);
+                    exit(1);
+                }
+                trim(isspace, key_untrimmed, &key);
+                trim(isspace, value_untrimmed, &value);
+
+                if (!strcmp(key, "backend")) {
+                    replace_string(&chn->backend_domname, value);
+                } else if (!strcmp(key, "name")) {
+                    replace_string(&chn->name, value);
+                } else if (!strcmp(key, "path")) {
+                    replace_string(&path, value);
+                } else if (!strcmp(key, "connection")) {
+                    if (!strcmp(value, "pty")) {
+                        chn->connection = LIBXL_CHANNEL_CONNECTION_PTY;
+                    } else if (!strcmp(value, "socket")) {
+                        chn->connection = LIBXL_CHANNEL_CONNECTION_SOCKET;
+                    } else {
+                        fprintf(stderr, "unknown channel connection '%s'\n",
+                                value);
+                        exit(1);
+                    }
+                } else {
+                    fprintf(stderr, "unknown channel parameter '%s',"
+                                  " ignoring\n", key);
+                }
+                free(key);
+                free(key_untrimmed);
+                free(value);
+                free(value_untrimmed);
+            }
+            switch (chn->connection) {
+            case LIBXL_CHANNEL_CONNECTION_UNKNOWN:
+                fprintf(stderr, "channel has unknown 'connection'\n");
+                exit(1);
+            case LIBXL_CHANNEL_CONNECTION_SOCKET:
+                if (!path) {
+                    fprintf(stderr, "channel connection 'socket' requires path=..\n");
+                    exit(1);
+                }
+                chn->u.socket.path = xstrdup(path);
+                break;
+            case LIBXL_CHANNEL_CONNECTION_PTY:
+                /* Nothing to do since PTY has no arguments */
+                break;
+            default:
+                fprintf(stderr, "unknown channel connection: %d",
+                        chn->connection);
+                exit(1);
+            }
+            libxl_string_list_dispose(&pairs);
+            free(path);
         }
     }
 
@@ -6222,6 +6295,50 @@ int main_networkdetach(int argc, char **argv)
         return 1;
     }
     libxl_device_nic_dispose(&nic);
+    return 0;
+}
+
+int main_channellist(int argc, char **argv)
+{
+    int opt;
+    libxl_device_channel *channels;
+    libxl_channelinfo channelinfo;
+    int nb, i;
+
+    SWITCH_FOREACH_OPT(opt, "", NULL, "channel-list", 1) {
+        /* No options */
+    }
+
+    /*      Idx BE state evt-ch ring-ref connection params*/
+    printf("%-3s %-2s %-5s %-6s %8s %-10s %-30s\n",
+           "Idx", "BE", "state", "evt-ch", "ring-ref", "connection", "");
+    for (argv += optind, argc -= optind; argc > 0; --argc, ++argv) {
+        uint32_t domid = find_domain(*argv);
+        channels = libxl_device_channel_list(ctx, domid, &nb);
+        if (!channels)
+            continue;
+        for (i = 0; i < nb; ++i) {
+            if (!libxl_device_channel_getinfo(ctx, domid, &channels[i],
+                &channelinfo)) {
+                printf("%-3d %-2d ", channels[i].devid, channelinfo.backend_id);
+                printf("%-5d ", channelinfo.state);
+                printf("%-6d %-8d ", channelinfo.evtch, channelinfo.rref);
+                printf("%-10s ", libxl_channel_connection_to_string(
+                       channels[i].connection));
+                switch (channels[i].connection) {
+                    case LIBXL_CHANNEL_CONNECTION_PTY:
+                        printf("%-30s ", channelinfo.u.pty.path);
+                        break;
+                    default:
+                        break;
+                }
+                printf("\n");
+                libxl_channelinfo_dispose(&channelinfo);
+            }
+            libxl_device_channel_dispose(&channels[i]);
+        }
+        free(channels);
+    }
     return 0;
 }
 

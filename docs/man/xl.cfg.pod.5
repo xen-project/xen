@@ -530,6 +530,59 @@ L<qemu(1)> manpage. The default is B<en-us>.
 
 =back
 
+=item B<channel=[ "CHANNEL_SPEC_STRING", "CHANNEL_SPEC_STRING", ...]>
+
+Specifies the virtual channels to be provided to the guest. A
+channel is a low-bandwidth, bidirectional byte stream, which resembles
+a serial link. Typical uses for channels include transmitting VM
+configuration after boot and signalling to in-guest agents. Please see
+F<docs/misc/channels.txt> for more details.
+
+Each B<CHANNEL_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
+seettings. Leading and trailing whitespace is ignored in both KEY and
+VALUE. Neither KEY nor VALUE may contain ',', '=' or '"'. Defined values
+are:
+
+=over 4
+
+=item C<backend=DOMAIN>
+
+Specify the backend domain name or id. This parameter is optional. If
+this parameter is omitted then the toolstack domain will be assumed.
+
+=item C<name=NAME>
+
+Specify the string name for this device. This parameter is mandatory.
+This should be a well-known name for the specific application (e.g.
+guest agent) and should be used by the frontend to connect the
+application to the right channel device. There is no formal registry
+of channel names, so application authors are encouraged to make their
+names unique by including domain name and version number in the string
+(e.g. org.mydomain.guestagent.1).
+
+=item C<connection=CONNECTION>
+
+Specify how the backend will be implemented. This following options are
+available:
+
+=over 4
+
+=item B<connection=SOCKET>
+
+The backend will bind a Unix domain socket (at the path given by
+B<path=PATH>), call listen and accept connections. The backend will proxy
+data between the channel and the connected socket.
+
+=item B<connection=PTY>
+
+The backend will create a pty and proxy data between the channel and the
+master device. The command B<xl channel-list> can be used to discover the
+assigned slave device.
+
+=back
+
+=back
+
 =item B<pci=[ "PCI_SPEC_STRING", "PCI_SPEC_STRING", ... ]>
 
 Specifies the host PCI devices to passthrough to this guest. Each B<PCI_SPEC_STRING>
