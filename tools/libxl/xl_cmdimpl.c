@@ -300,7 +300,6 @@ static void *xrealloc(void *ptr, size_t sz) {
     return r;
 }
 
-static char *xstrdup(const char *x) __attribute__ ((unused));
 static char *xstrdup(const char *x)
 {
     char *r;
@@ -586,6 +585,73 @@ static void split_string_into_string_list(const char *str,
     *psl = sl;
 
     free(s);
+}
+
+/* NB: this follows the interface used by <ctype.h>. See 'man 3 ctype'
+   and look for CTYPE in libxl_internal.h */
+typedef int (*char_predicate_t)(const int c);
+
+static void trim(char_predicate_t predicate, const char *input, char **output) __attribute__ ((unused));
+static void trim(char_predicate_t predicate, const char *input, char **output)
+{
+    char *p, *q, *tmp;
+
+    *output = NULL;
+    if (*input == '\000')
+        return;
+    /* Input has length >= 1 */
+
+    p = tmp = xstrdup(input);
+    /* Skip past the characters for which predicate is true */
+    while ((*p != '\000') && (predicate((unsigned char)*p)))
+        p ++;
+    q = p + strlen(p) - 1;
+    /* q points to the last non-NULL character */
+    while ((q > p) && (predicate((unsigned char)*q)))
+        q --;
+    /* q points to the last character we want */
+    q ++;
+    *q = '\000';
+    *output = xstrdup(p);
+    free(tmp);
+}
+
+static int split_string_into_pair(const char *str,
+                                  const char *delim,
+                                  char **a,
+                                  char **b) __attribute__ ((unused));
+static int split_string_into_pair(const char *str,
+                                  const char *delim,
+                                  char **a,
+                                  char **b)
+{
+    char *s, *p, *saveptr, *aa = NULL, *bb = NULL;
+    int rc = 0;
+
+    s = xstrdup(str);
+
+    p = strtok_r(s, delim, &saveptr);
+    if (p == NULL) {
+        rc = ERROR_INVAL;
+        goto out;
+    }
+    aa = xstrdup(p);
+    p = strtok_r(NULL, delim, &saveptr);
+    if (p == NULL) {
+        rc = ERROR_INVAL;
+        goto out;
+    }
+    bb = xstrdup(p);
+
+    *a = aa;
+    aa = NULL;
+    *b = bb;
+    bb = NULL;
+out:
+    free(s);
+    free(aa);
+    free(bb);
+    return rc;
 }
 
 static int parse_range(const char *str, unsigned long *a, unsigned long *b)
