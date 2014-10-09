@@ -389,7 +389,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
 
 static int init_console_info(libxl__device_console *console, int dev_num)
 {
-    memset(console, 0x00, sizeof(libxl__device_console));
+    libxl__device_console_init(console);
     console->devid = dev_num;
     console->consback = LIBXL__CONSOLE_BACKEND_XENCONSOLED;
     console->output = strdup("pty");
