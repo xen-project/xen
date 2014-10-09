@@ -20,7 +20,7 @@ AC_ARG_WITH([xenstored],
 		[This lets you choose which xenstore daemon you want, you have
 		two options: the original xenstored written in C (xenstored)
 		or the newer and robust one written in Ocaml (oxenstored).
-		The oxenstored daemon is the default but will but can only
+		The oxenstored daemon is the default but can only
 		be used if you have ocaml library / build dependencies solved,
 		if you have not specified a preference and do not have ocaml
 		dependencies resolved we'll enable the C xenstored for you. If
