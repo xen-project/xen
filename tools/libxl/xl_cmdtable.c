@@ -517,6 +517,25 @@ struct cmd_spec cmd_table[] = {
       "[options]",
       "-F                      Run in the foreground",
     },
+#ifdef LIBXL_HAVE_PSR_CMT
+    { "psr-cmt-attach",
+      &main_psr_cmt_attach, 0, 1,
+      "Attach Cache Monitoring Technology service to a domain",
+      "<Domain>",
+    },
+    { "psr-cmt-detach",
+      &main_psr_cmt_detach, 0, 1,
+      "Detach Cache Monitoring Technology service from a domain",
+      "<Domain>",
+    },
+    { "psr-cmt-show",
+      &main_psr_cmt_show, 0, 1,
+      "Show Cache Monitoring Technology information",
+      "<PSR-CMT-Type> <Domain>",
+      "Available monitor types:\n"
+      "\"cache_occupancy\":         Show L3 cache occupancy\n",
+    },
+#endif
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

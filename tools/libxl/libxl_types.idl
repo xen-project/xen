@@ -652,3 +652,7 @@ libxl_event = Struct("event",[
                                  ])),
            ("domain_create_console_available", None),
            ]))])
+
+libxl_psr_cmt_type = Enumeration("psr_cmt_type", [
+    (1, "CACHE_OCCUPANCY"),
+    ])

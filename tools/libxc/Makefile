@@ -36,6 +36,7 @@ CTRL_SRCS-y       += xc_kexec.c
 CTRL_SRCS-y       += xtl_core.c
 CTRL_SRCS-y       += xtl_logger_stdio.c
 CTRL_SRCS-y       += xc_resource.c
+CTRL_SRCS-$(CONFIG_X86) += xc_psr.c
 CTRL_SRCS-$(CONFIG_X86) += xc_pagetab.c
 CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c xc_linux_osdep.c
 CTRL_SRCS-$(CONFIG_FreeBSD) += xc_freebsd.c xc_freebsd_osdep.c

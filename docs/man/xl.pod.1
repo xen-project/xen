@@ -1440,6 +1440,31 @@ Load FLASK policy from the given policy file. The initial policy is provided to
 the hypervisor as a multiboot module; this command allows runtime updates to the
 policy. Loading new security policy will reset runtime changes to device labels.
 
+=head1 Cache Monitoring Technology
+
+Intel Haswell and later server platforms offer monitoring capability in each
+logical processor to measure specific platform shared resource metric, for
+example, L3 cache occupancy. In Xen implementation, the monitoring granularity
+is domain level. To monitor a specific domain, just attach the domain id with
+the monitoring service. When the domain doesn't need to be monitored any more,
+detach the domain id from the monitoring service.
+
+=over 4
+
+=item B<psr-cmt-attach> [I<domain-id>]
+
+attach: Attach the platform shared resource monitoring service to a domain.
+
+=item B<psr-cmt-detach> [I<domain-id>]
+
+detach: Detach the platform shared resource monitoring service from a domain.
+
+=item B<psr-cmt-show> [I<psr-monitor-type>] [I<domain-id>]
+
+Show monitoring data for a certain domain or all domains. Current supported
+monitor types are:
+ - "cache-occupancy": showing the L3 cache occupancy.
+
 =back
 
 =head1 TO BE DOCUMENTED

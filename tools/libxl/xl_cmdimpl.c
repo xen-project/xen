@@ -7626,6 +7626,166 @@ out:
     return ret;
 }
 
+#ifdef LIBXL_HAVE_PSR_CMT
+static void psr_cmt_print_domain_cache_occupancy(libxl_dominfo *dominfo,
+                                                    uint32_t nr_sockets)
+{
+    char *domain_name;
+    uint32_t socketid;
+    uint32_t l3_cache_occupancy;
+
+    if (!libxl_psr_cmt_domain_attached(ctx, dominfo->domid))
+        return;
+
+    domain_name = libxl_domid_to_name(ctx, dominfo->domid);
+    printf("%-40s %5d", domain_name, dominfo->domid);
+    free(domain_name);
+
+    for (socketid = 0; socketid < nr_sockets; socketid++) {
+        if ( !libxl_psr_cmt_get_cache_occupancy(ctx, dominfo->domid,
+                 socketid, &l3_cache_occupancy) )
+            printf("%13u KB", l3_cache_occupancy);
+    }
+
+    printf("\n");
+}
+
+static int psr_cmt_show_cache_occupancy(uint32_t domid)
+{
+    uint32_t i, socketid, nr_sockets, total_rmid;
+    uint32_t l3_cache_size;
+    libxl_physinfo info;
+    int rc, nr_domains;
+
+    if (!libxl_psr_cmt_enabled(ctx)) {
+        fprintf(stderr, "CMT is disabled in the system\n");
+        return -1;
+    }
+
+    libxl_physinfo_init(&info);
+    rc = libxl_get_physinfo(ctx, &info);
+    if (rc < 0) {
+        fprintf(stderr, "Failed getting physinfo, rc: %d\n", rc);
+        libxl_physinfo_dispose(&info);
+        return -1;
+    }
+    nr_sockets = info.nr_cpus / info.threads_per_core / info.cores_per_socket;
+    libxl_physinfo_dispose(&info);
+
+    rc = libxl_psr_cmt_get_total_rmid(ctx, &total_rmid);
+    if (rc < 0) {
+        fprintf(stderr, "Failed to get max RMID value\n");
+        return -1;
+    }
+
+    printf("Total RMID: %d\n", total_rmid);
+
+    /* Header */
+    printf("%-40s %5s", "Name", "ID");
+    for (socketid = 0; socketid < nr_sockets; socketid++)
+        printf("%14s %d", "Socket", socketid);
+    printf("\n");
+
+    /* Total L3 cache size */
+    printf("%-46s", "Total L3 Cache Size");
+    for (socketid = 0; socketid < nr_sockets; socketid++) {
+        rc = libxl_psr_cmt_get_l3_cache_size(ctx, socketid, &l3_cache_size);
+        if (rc < 0) {
+            fprintf(stderr, "Failed to get system l3 cache size for socket:%d\n",
+                            socketid);
+            return -1;
+        }
+        printf("%13u KB", l3_cache_size);
+    }
+    printf("\n");
+
+    /* Each domain */
+    if (domid != INVALID_DOMID) {
+        libxl_dominfo dominfo;
+        if (!libxl_domain_info(ctx, &dominfo, domid)) {
+            fprintf(stderr, "Failed to get domain info for %d\n", domid);
+            return -1;
+        }
+        psr_cmt_print_domain_cache_occupancy(&dominfo, nr_sockets);
+    }
+    else
+    {
+        libxl_dominfo *list;
+        if (!(list = libxl_list_domain(ctx, &nr_domains))) {
+            fprintf(stderr, "Failed to get domain info for domain list.\n");
+            return -1;
+        }
+        for (i = 0; i < nr_domains; i++)
+            psr_cmt_print_domain_cache_occupancy(list + i, nr_sockets);
+        libxl_dominfo_list_free(list, nr_domains);
+    }
+    return 0;
+}
+
+int main_psr_cmt_attach(int argc, char **argv)
+{
+    uint32_t domid;
+    int opt, ret = 0;
+
+    SWITCH_FOREACH_OPT(opt, "", NULL, "psr-cmt-attach", 1) {
+        /* No options */
+    }
+
+    domid = find_domain(argv[optind]);
+    ret = libxl_psr_cmt_attach(ctx, domid);
+
+    return ret;
+}
+
+int main_psr_cmt_detach(int argc, char **argv)
+{
+    uint32_t domid;
+    int opt, ret = 0;
+
+    SWITCH_FOREACH_OPT(opt, "", NULL, "psr-cmt-detach", 1) {
+        /* No options */
+    }
+
+    domid = find_domain(argv[optind]);
+    ret = libxl_psr_cmt_detach(ctx, domid);
+
+    return ret;
+}
+
+int main_psr_cmt_show(int argc, char **argv)
+{
+    int opt, ret = 0;
+    uint32_t domid;
+    libxl_psr_cmt_type type;
+
+    SWITCH_FOREACH_OPT(opt, "", NULL, "psr-cmt-show", 1) {
+        /* No options */
+    }
+
+    libxl_psr_cmt_type_from_string(argv[optind], &type);
+
+    if (optind + 1 >= argc)
+        domid = INVALID_DOMID;
+    else if (optind + 1 == argc - 1)
+        domid = find_domain(argv[optind + 1]);
+    else {
+        help("psr-cmt-show");
+        return 2;
+    }
+
+    switch (type) {
+    case LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY:
+        ret = psr_cmt_show_cache_occupancy(domid);
+        break;
+    default:
+        help("psr-cmt-show");
+        return 2;
+    }
+
+    return ret;
+}
+#endif
+
 /*
  * Local variables:
  * mode: C

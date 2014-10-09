@@ -659,6 +659,15 @@ typedef uint8_t libxl_mac[6];
 #define LIBXL_MAC_BYTES(mac) mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
 void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
 
+#if defined(__i386__) || defined(__x86_64__)
+/*
+ * LIBXL_HAVE_PSR_CMT
+ *
+ * If this is defined, the Cache Monitoring Technology feature is supported.
+ */
+#define LIBXL_HAVE_PSR_CMT 1
+#endif
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
@@ -1399,6 +1408,18 @@ int libxl_ms_vm_genid_generate(libxl_ctx *ctx, libxl_ms_vm_genid *id);
 bool libxl_ms_vm_genid_is_zero(const libxl_ms_vm_genid *id);
 void libxl_ms_vm_genid_copy(libxl_ctx *ctx, libxl_ms_vm_genid *dst,
                             libxl_ms_vm_genid *src);
+
+#ifdef LIBXL_HAVE_PSR_CMT
+int libxl_psr_cmt_attach(libxl_ctx *ctx, uint32_t domid);
+int libxl_psr_cmt_detach(libxl_ctx *ctx, uint32_t domid);
+int libxl_psr_cmt_domain_attached(libxl_ctx *ctx, uint32_t domid);
+int libxl_psr_cmt_enabled(libxl_ctx *ctx);
+int libxl_psr_cmt_get_total_rmid(libxl_ctx *ctx, uint32_t *total_rmid);
+int libxl_psr_cmt_get_l3_cache_size(libxl_ctx *ctx, uint32_t socketid,
+    uint32_t *l3_cache_size);
+int libxl_psr_cmt_get_cache_occupancy(libxl_ctx *ctx, uint32_t domid,
+    uint32_t socketid, uint32_t *l3_cache_occupancy);
+#endif
 
 /* misc */
 
