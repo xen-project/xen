@@ -300,6 +300,19 @@ static void *xrealloc(void *ptr, size_t sz) {
     return r;
 }
 
+static char *xstrdup(const char *x) __attribute__ ((unused));
+static char *xstrdup(const char *x)
+{
+    char *r;
+    r = strdup(x);
+    if (!r) {
+        fprintf(stderr, "xl: Unable to strdup a string of length %zu.\n",
+                strlen(x));
+        exit(-ERROR_FAIL);
+    }
+    return r;
+}
+
 #define ARRAY_EXTEND_INIT(array,count,initfn)                           \
     ({                                                                  \
         typeof((count)) array_extend_old_count = (count);               \
