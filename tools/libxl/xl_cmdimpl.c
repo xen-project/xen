@@ -839,7 +839,7 @@ static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
 static void replace_string(char **str, const char *val)
 {
     free(*str);
-    *str = strdup(val);
+    *str = xstrdup(val);
 }
 
 static void parse_config_data(const char *config_source,
