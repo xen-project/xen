@@ -387,15 +387,16 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     return 0;
 }
 
-static int init_console_info(libxl__device_console *console, int dev_num)
+static void init_console_info(libxl__gc *gc,
+                             libxl__device_console *console,
+                             int dev_num)
 {
     libxl__device_console_init(console);
     console->devid = dev_num;
     console->consback = LIBXL__CONSOLE_BACKEND_XENCONSOLED;
-    console->output = strdup("pty");
-    if (!console->output)
-        return ERROR_NOMEM;
-    return 0;
+    console->output = libxl__strdup(NOGC, "pty");
+    /* console->{name,connection,path} are NULL on normal consoles.
+       Only 'channels' when mapped to consoles have a string name. */
 }
 
 int libxl__domain_build(libxl__gc *gc,
@@ -1194,17 +1195,31 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         }
     }
 
+    /* For both HVM and PV the 0th console is a regular console. We
+       map channels to IOEMU consoles starting at 1 */
+    for (i = 0; i < d_config->num_channels; i++) {
+        libxl__device_console console;
+        libxl__device device;
+        ret = libxl__init_console_from_channel(gc, &console, i + 1,
+                                               &d_config->channels[i]);
+        if ( ret ) {
+            libxl__device_console_dispose(&console);
+            goto error_out;
+        }
+        libxl__device_console_add(gc, domid, &console, NULL, &device);
+        libxl__device_console_dispose(&console);
+    }
+
     switch (d_config->c_info.type) {
     case LIBXL_DOMAIN_TYPE_HVM:
     {
         libxl__device_console console;
+        libxl__device device;
         libxl_device_vkb vkb;
 
-        ret = init_console_info(&console, 0);
-        if ( ret )
-            goto error_out;
+        init_console_info(gc, &console, 0);
         console.backend_domid = state->console_domid;
-        libxl__device_console_add(gc, domid, &console, state);
+        libxl__device_console_add(gc, domid, &console, state, &device);
         libxl__device_console_dispose(&console);
 
         libxl_device_vkb_init(&vkb);
@@ -1231,22 +1246,22 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
     {
         int need_qemu = 0;
         libxl__device_console console;
+        libxl__device device;
 
         for (i = 0; i < d_config->num_vfbs; i++) {
             libxl__device_vfb_add(gc, domid, &d_config->vfbs[i]);
             libxl__device_vkb_add(gc, domid, &d_config->vkbs[i]);
         }
 
-        ret = init_console_info(&console, 0);
-        if ( ret )
-            goto error_out;
+        init_console_info(gc, &console, 0);
 
         need_qemu = libxl__need_xenpv_qemu(gc, 1, &console,
                 d_config->num_vfbs, d_config->vfbs,
-                d_config->num_disks, &d_config->disks[0]);
+                d_config->num_disks, &d_config->disks[0],
+                d_config->num_channels, &d_config->channels[0]);
 
         console.backend_domid = state->console_domid;
-        libxl__device_console_add(gc, domid, &console, state);
+        libxl__device_console_add(gc, domid, &console, state, &device);
         libxl__device_console_dispose(&console);
 
         if (need_qemu) {

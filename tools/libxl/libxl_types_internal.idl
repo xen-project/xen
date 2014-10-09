@@ -34,6 +34,11 @@ libxl__device_console = Struct("device_console", [
     ("devid", integer),
     ("consback", libxl__console_backend),
     ("output", string),
+    # A regular console has no name.
+    # A console with a name is called a 'channel', see docs/misc/channels.txt
+    ("name", string),
+    ("connection", string),
+    ("path", string),
     ])
 
 libxl__device_action = Enumeration("device_action", [

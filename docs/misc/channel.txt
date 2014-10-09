@@ -1,0 +1,106 @@
+Xen PV Channels
+===============
+
+A channel is a low-bandwidth private byte stream similar to a serial
+link. Typical uses of channels are
+
+  1. to provide initial configuration information to a VM on boot
+     (example use: CloudStack's cloud-early-config service)
+  2. to signal/query an in-guest agent
+     (example use: oVirt's guest agent)
+
+Channels are similar to virtio-serial devices and emulated serial links.
+Channels are intended to be used in the implementation of libvirt <channel>s
+when running on Xen.
+
+Note: if an application requires a high-bandwidth link then it should use
+vchan instead.
+
+How to use channels: an example
+-------------------------------
+
+Consider a cloud deployment where VMs are cloned from pre-made templates,
+and customised on first boot by an in-guest agent which sets the IP address,
+hostname, ssh keys etc. To install the system the cloud administrator would
+first:
+
+  1. Install a guest as normal (no channel configuration necessary)
+  2. Install the in-guest agent specific to the cloud software. This will
+     prepare the guest to communicate over the channel, and also prepare
+     the guest to be cloned safely (sometimes known as "sysprepping")
+  3. Shutdown the guest
+  4. Register the guest as a template with the cloud orchestration software
+  5. Install the cloud orchestration agent in dom0
+
+At runtime, when a cloud tenant requests that a VM is created from the template,
+the sequence of events would be: (assuming a Linux domU)
+
+  1. A VM is "cloned" from the template
+  2. A unique Unix domain socket path in dom0 is allocated
+     (e.g. /my/cloud/software/talk/to/domain/<vm uuid>)
+  3. Domain configuration is created for the VM, listing the channel
+     name expected by the in-guest agent. In xl syntax this would be:
+
+     channel = [ "connection=socket, name=org.my.cloud.software.agent.version1,
+                  path = /my/cloud/software/talk/to/domain/<vm uuid>" ]
+
+  4. The VM is started
+  5. In dom0 the cloud orchestration agent connects to the Unix domain
+     socket, writes a handshake message and waits for a reply
+  6. Assuming the guest kernel has CONFIG_HVC_XEN_FRONTEND set then the console
+     driver will generate a hotplug event
+  7. A udev rule is activated by the hotplug event.
+
+     The udev rule would look something like:
+
+     SUBSYSTEM=="xen", DEVPATH=="/devices/console-[0-9]", RUN+="xen-console-setup"
+
+     where the "xen-console-setup" script would read the channel name and
+     make a symlink in /dev/xen-channel/org.my.cloud.software.agent.version1
+
+  8. The in-guest agent uses inotify to see the creation of the /dev/xen-channel
+     symlink and opens the device.
+  9. The in-guest agent completes the handshake with the dom0 agent
+ 10. The dom0 agent transmits the unique VM configuration: hostname, IP
+     address, ssh keys etc etc
+ 11. The in-guest agent receives the configuration and applies it.
+
+Using channels avoids having to use a temporary disk device or network
+connection.
+
+Design recommendations and pitfalls
+-----------------------------------
+
+It's necessary to install channel-specific software (an "agent") into the guest
+before you can use a channel. By default a channel will appear as a device
+which could be mistaken for a serial port or regular console. It is known
+that some software will proactively seek out serial ports and issue AT commands
+at them; make sure such software is disabled!
+
+Since channels are identified by names, application authors must ensure their
+channel names are unique to avoid clashes. We recommend that channel names
+include parts unique to the application such as a domain names. To assist
+prevent clashes we recommend authors add their names to our global channel
+registry at the end of this document.
+
+Limitations
+-----------
+
+Hotplug and unplug of channels is not currently implemented.
+
+Channel name registry
+---------------------
+
+It is important that channel names are globally unique. To help ensure
+that no-one's name clashes with yours, please add yours to this list.
+
+Key:
+N: Name
+C: Contact
+D: Short description of use, possibly including a URL to your software
+   or API
+
+N: org.xenproject.guest.clipboard.0.1
+C: David Scott <dave.scott@citrix.com>
+D: Share clipboard data via an in-guest agent. See:
+   http://wiki.xenproject.org/wiki/Clipboard_sharing_protocol

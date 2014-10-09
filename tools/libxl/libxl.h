@@ -596,6 +596,15 @@ typedef struct libxl__ctx libxl_ctx;
  */
 #define LIBXL_HAVE_BUILDINFO_KERNEL 1
 
+/*
+ * LIBXL_HAVE_DEVICE_CHANNEL
+ *
+ * If this is defined, then the libxl_device_channel struct exists
+ * and channels can be attached to a domain. Channels manifest as consoles
+ * with names, see docs/misc/console.txt.
+ */
+#define LIBXL_HAVE_DEVICE_CHANNEL 1
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */
@@ -1156,6 +1165,17 @@ int libxl_device_nic_destroy(libxl_ctx *ctx, uint32_t domid,
 libxl_device_nic *libxl_device_nic_list(libxl_ctx *ctx, uint32_t domid, int *num);
 int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_nic *nic, libxl_nicinfo *nicinfo);
+
+/*
+ * Virtual Channels
+ * Channels manifest as consoles with names, see docs/misc/channels.txt
+ */
+libxl_device_channel *libxl_device_channel_list(libxl_ctx *ctx,
+                                                uint32_t domid,
+                                                int *num);
+int libxl_device_channel_getinfo(libxl_ctx *ctx, uint32_t domid,
+                                 libxl_device_channel *channel,
+                                 libxl_channelinfo *channelinfo);
 
 /* Virtual TPMs */
 int libxl_device_vtpm_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vtpm *vtpm,

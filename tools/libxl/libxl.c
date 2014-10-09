@@ -21,6 +21,15 @@
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 #define BACKEND_STRING_SIZE 5
 
+/* Utility to read backend xenstore keys */
+#define READ_BACKEND(tgc, subpath) ({                                   \
+        rc = libxl__xs_read_checked(tgc, XBT_NULL,                      \
+                                    GCSPRINTF("%s/" subpath, be_path),  \
+                                    &tmp);                              \
+        if (rc) goto out;                                               \
+        (char*)tmp;                                                     \
+    });
+
 int libxl_ctx_alloc(libxl_ctx **pctx, int version,
                     unsigned flags, xentoollog_logger * lg)
 {
@@ -3383,14 +3392,6 @@ static int libxl__device_nic_from_xs_be(libxl__gc *gc,
 
     libxl_device_nic_init(nic);
 
-#define READ_BACKEND(tgc, subpath) ({                                   \
-        rc = libxl__xs_read_checked(tgc, XBT_NULL,                      \
-                                    GCSPRINTF("%s/" subpath, be_path),  \
-                                    &tmp);                              \
-        if (rc) goto out;                                               \
-        (char*)tmp;                                                     \
-    });
-
     tmp = READ_BACKEND(gc, "handle");
     if (tmp)
         nic->devid = atoi(tmp);
@@ -3570,14 +3571,19 @@ const char *libxl__device_nic_devname(libxl__gc *gc,
 /******************************************************************************/
 int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
                               libxl__device_console *console,
-                              libxl__domain_build_state *state)
+                              libxl__domain_build_state *state,
+                              libxl__device *device)
 {
     flexarray_t *front, *ro_front;
     flexarray_t *back;
-    libxl__device device;
     int rc;
 
     if (console->devid && state) {
+        rc = ERROR_INVAL;
+        goto out;
+    }
+    if (!console->devid && (console->name || console->path)) {
+        LOG(ERROR, "Primary console has invalid configuration");
         rc = ERROR_INVAL;
         goto out;
     }
@@ -3586,12 +3592,12 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
     ro_front = flexarray_make(gc, 16, 1);
     back = flexarray_make(gc, 16, 1);
 
-    device.backend_devid = console->devid;
-    device.backend_domid = console->backend_domid;
-    device.backend_kind = LIBXL__DEVICE_KIND_CONSOLE;
-    device.devid = console->devid;
-    device.domid = domid;
-    device.kind = LIBXL__DEVICE_KIND_CONSOLE;
+    device->backend_devid = console->devid;
+    device->backend_domid = console->backend_domid;
+    device->backend_kind = LIBXL__DEVICE_KIND_CONSOLE;
+    device->devid = console->devid;
+    device->domid = domid;
+    device->kind = LIBXL__DEVICE_KIND_CONSOLE;
 
     flexarray_append(back, "frontend-id");
     flexarray_append(back, libxl__sprintf(gc, "%d", domid));
@@ -3603,6 +3609,19 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
     flexarray_append(back, libxl__domid_to_name(gc, domid));
     flexarray_append(back, "protocol");
     flexarray_append(back, LIBXL_XENCONSOLE_PROTOCOL);
+
+    if (console->name) {
+        flexarray_append(ro_front, "name");
+        flexarray_append(ro_front, console->name);
+    }
+    if (console->connection) {
+        flexarray_append(back, "connection");
+        flexarray_append(back, console->connection);
+    }
+    if (console->path) {
+        flexarray_append(back, "path");
+        flexarray_append(back, console->path);
+    }
 
     flexarray_append(front, "backend-id");
     flexarray_append(front, libxl__sprintf(gc, "%d", console->backend_domid));
@@ -3630,14 +3649,228 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
         flexarray_append(front, "protocol");
         flexarray_append(front, LIBXL_XENCONSOLE_PROTOCOL);
     }
-
-    libxl__device_generic_add(gc, XBT_NULL, &device,
+    libxl__device_generic_add(gc, XBT_NULL, device,
                               libxl__xs_kvs_of_flexarray(gc, back, back->count),
                               libxl__xs_kvs_of_flexarray(gc, front, front->count),
                               libxl__xs_kvs_of_flexarray(gc, ro_front, ro_front->count));
     rc = 0;
 out:
     return rc;
+}
+
+/******************************************************************************/
+
+int libxl__init_console_from_channel(libxl__gc *gc,
+                                     libxl__device_console *console,
+                                     int dev_num,
+                                     libxl_device_channel *channel)
+{
+    int rc;
+
+    libxl__device_console_init(console);
+
+    /* Perform validation first, allocate second. */
+
+    if (!channel->name) {
+        LOG(ERROR, "channel %d has no name", channel->devid);
+        return ERROR_INVAL;
+    }
+
+    if (channel->backend_domname) {
+        rc = libxl_domain_qualifier_to_domid(CTX, channel->backend_domname,
+                                             &channel->backend_domid);
+        if (rc < 0) return rc;
+    }
+
+    /* The xenstore 'output' node tells the backend what to connect the console
+       to. If the channel has "connection = pty" then the "output" node will be
+       set to "pty". If the channel has "connection = socket" then the "output"
+       node will be set to "chardev:libxl-channel%d". This tells the qemu
+       backend to proxy data between the console ring and the character device
+       with id "libxl-channel%d". These character devices are currently defined
+       on the qemu command-line via "-chardev" options in libxl_dm.c */
+
+    switch (channel->connection) {
+        case LIBXL_CHANNEL_CONNECTION_UNKNOWN:
+            LOG(ERROR, "channel %d has no defined connection; "
+                "to where should it be connected?", channel->devid);
+            return ERROR_INVAL;
+        case LIBXL_CHANNEL_CONNECTION_PTY:
+            console->connection = libxl__strdup(NOGC, "pty");
+            console->output = libxl__sprintf(NOGC, "pty");
+            break;
+        case LIBXL_CHANNEL_CONNECTION_SOCKET:
+            if (!channel->u.socket.path) {
+                LOG(ERROR, "channel %d has no path", channel->devid);
+                return ERROR_INVAL;
+            }
+            console->connection = libxl__strdup(NOGC, "socket");
+            console->path = libxl__strdup(NOGC, channel->u.socket.path);
+            console->output = libxl__sprintf(NOGC, "chardev:libxl-channel%d",
+                                             channel->devid);
+            break;
+        default:
+            /* We've forgotten to add the clause */
+            LOG(ERROR, "%s: missing implementation for channel connection %d",
+                __func__, channel->connection);
+            abort();
+    }
+
+    console->devid = dev_num;
+    console->consback = LIBXL__CONSOLE_BACKEND_IOEMU;
+    console->backend_domid = channel->backend_domid;
+    console->name = libxl__strdup(NOGC, channel->name);
+
+    return 0;
+}
+
+static int libxl__device_channel_from_xs_be(libxl__gc *gc,
+                                            const char *be_path,
+                                            libxl_device_channel *channel)
+{
+    const char *tmp;
+    int rc;
+
+    libxl_device_channel_init(channel);
+
+    /* READ_BACKEND is from libxl__device_nic_from_xs_be above */
+    channel->name = READ_BACKEND(NOGC, "name");
+    tmp = READ_BACKEND(gc, "connection");
+    if (!strcmp(tmp, "pty")) {
+        channel->connection = LIBXL_CHANNEL_CONNECTION_PTY;
+    } else if (!strcmp(tmp, "socket")) {
+        channel->connection = LIBXL_CHANNEL_CONNECTION_SOCKET;
+        channel->u.socket.path = READ_BACKEND(NOGC, "path");
+    } else {
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
+    rc = 0;
+ out:
+    return rc;
+}
+
+static int libxl__append_channel_list_of_type(libxl__gc *gc,
+                                              uint32_t domid,
+                                              const char *type,
+                                              libxl_device_channel **channels,
+                                              int *nchannels)
+{
+    char *fe_path = NULL, *be_path = NULL;
+    char **dir = NULL;
+    unsigned int n = 0, devid = 0;
+    libxl_device_channel *next = NULL;
+    int rc = 0, i;
+
+    fe_path = GCSPRINTF("%s/device/%s",
+                        libxl__xs_get_dompath(gc, domid), type);
+    dir = libxl__xs_directory(gc, XBT_NULL, fe_path, &n);
+    if (!dir || !n)
+      goto out;
+
+    for (i = 0; i < n; i++) {
+        const char *p, *name;
+        libxl_device_channel *tmp;
+
+        p = libxl__sprintf(gc, "%s/%s", fe_path, dir[i]);
+        name = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/name", p));
+        /* 'channels' are consoles with names, so ignore all consoles
+           without names */
+        if (!name) continue;
+        be_path = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/backend", p));
+        tmp = realloc(*channels,
+                      sizeof(libxl_device_channel) * (*nchannels + devid + 1));
+        if (!tmp) {
+          rc = ERROR_NOMEM;
+          goto out;
+        }
+        *channels = tmp;
+        next = *channels + *nchannels + devid;
+        rc = libxl__device_channel_from_xs_be(gc, be_path, next);
+        if (rc) goto out;
+        next->devid = devid;
+        devid++;
+    }
+    *nchannels += devid;
+    return 0;
+
+ out:
+    return rc;
+}
+
+libxl_device_channel *libxl_device_channel_list(libxl_ctx *ctx,
+                                                uint32_t domid,
+                                                int *num)
+{
+    GC_INIT(ctx);
+    libxl_device_channel *channels = NULL;
+    int rc;
+
+    *num = 0;
+
+    rc = libxl__append_channel_list_of_type(gc, domid, "console", &channels, num);
+    if (rc) goto out_err;
+
+    GC_FREE;
+    return channels;
+
+out_err:
+    LOG(ERROR, "Unable to list channels");
+    while (*num) {
+        (*num)--;
+        libxl_device_channel_dispose(&channels[*num]);
+    }
+    free(channels);
+    return NULL;
+}
+
+int libxl_device_channel_getinfo(libxl_ctx *ctx, uint32_t domid,
+                                 libxl_device_channel *channel,
+                                 libxl_channelinfo *channelinfo)
+{
+    GC_INIT(ctx);
+    char *dompath, *fe_path;
+    char *val;
+
+    dompath = libxl__xs_get_dompath(gc, domid);
+    channelinfo->devid = channel->devid;
+
+    fe_path = libxl__sprintf(gc, "%s/device/console/%d", dompath,
+                             channelinfo->devid + 1);
+    channelinfo->backend = xs_read(ctx->xsh, XBT_NULL,
+                                   libxl__sprintf(gc, "%s/backend",
+                                   fe_path), NULL);
+    if (!channelinfo->backend) {
+        GC_FREE;
+        return ERROR_FAIL;
+    }
+    val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/backend-id", fe_path));
+    channelinfo->backend_id = val ? strtoul(val, NULL, 10) : -1;
+    val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/state", fe_path));
+    channelinfo->state = val ? strtoul(val, NULL, 10) : -1;
+    channelinfo->frontend = xs_read(ctx->xsh, XBT_NULL,
+                                    GCSPRINTF("%s/frontend",
+                                    channelinfo->backend), NULL);
+    val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/frontend-id",
+                         channelinfo->backend));
+    channelinfo->frontend_id = val ? strtoul(val, NULL, 10) : -1;
+    val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/ring-ref", fe_path));
+    channelinfo->rref = val ? strtoul(val, NULL, 10) : -1;
+    val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/port", fe_path));
+    channelinfo->evtch = val ? strtoul(val, NULL, 10) : -1;
+
+    channelinfo->connection = channel->connection;
+    switch (channel->connection) {
+         case LIBXL_CHANNEL_CONNECTION_PTY:
+             val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/tty", fe_path));
+             channelinfo->u.pty.path = strdup(val);
+             break;
+         default:
+             break;
+    }
+    GC_FREE;
+    return 0;
 }
 
 /******************************************************************************/
@@ -3905,6 +4138,10 @@ DEFINE_DEVICE_REMOVE(vfb, destroy, 1)
 /* vtpm */
 DEFINE_DEVICE_REMOVE(vtpm, remove, 0)
 DEFINE_DEVICE_REMOVE(vtpm, destroy, 1)
+
+/* channel/console hotunplug is not implemented. There are 2 possibilities:
+ * 1. add support for secondary consoles to xenconsoled
+ * 2. dynamically add/remove qemu chardevs via qmp messages. */
 
 #undef DEFINE_DEVICE_REMOVE
 

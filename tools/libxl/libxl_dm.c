@@ -417,8 +417,9 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     const libxl_sdl_info *sdl = dm_sdl(guest_config);
     const char *keymap = dm_keymap(guest_config);
     flexarray_t *dm_args;
-    int i;
+    int i, connection, devid;
     uint64_t ram_size;
+    const char *path, *chardev;
 
     dm_args = flexarray_make(gc, 16, 1);
 
@@ -434,6 +435,28 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
 
     flexarray_append(dm_args, "-mon");
     flexarray_append(dm_args, "chardev=libxl-cmd,mode=control");
+
+    for (i = 0; i < guest_config->num_channels; i++) {
+        connection = guest_config->channels[i].connection;
+        devid = guest_config->channels[i].devid;
+        switch (connection) {
+            case LIBXL_CHANNEL_CONNECTION_PTY:
+                chardev = GCSPRINTF("pty,id=libxl-channel%d", devid);
+                break;
+            case LIBXL_CHANNEL_CONNECTION_SOCKET:
+                path = guest_config->channels[i].u.socket.path;
+                chardev = GCSPRINTF("socket,id=libxl-channel%d,path=%s,"
+                                    "server,nowait", devid, path);
+                break;
+            default:
+                /* We've forgotten to add the clause */
+                LOG(ERROR, "%s: unknown channel connection %d",
+                    __func__, connection);
+                return NULL;
+        }
+        flexarray_append(dm_args, "-chardev");
+        flexarray_append(dm_args, (void*)chardev);
+    }
 
     /*
      * Remove default devices created by qemu. Qemu will create only devices
@@ -1122,6 +1145,7 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
     }
 
     for (i = 0; i < num_console; i++) {
+        libxl__device device;
         console[i].devid = i;
         console[i].consback = LIBXL__CONSOLE_BACKEND_IOEMU;
         /* STUBDOM_CONSOLE_LOGGING (console 0) is for minios logging
@@ -1152,7 +1176,8 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
                 break;
         }
         ret = libxl__device_console_add(gc, dm_domid, &console[i],
-                        i == STUBDOM_CONSOLE_LOGGING ? stubdom_state : NULL);
+                        i == STUBDOM_CONSOLE_LOGGING ? stubdom_state : NULL,
+                        &device);
         if (ret)
             goto out;
     }
@@ -1575,7 +1600,8 @@ int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
 int libxl__need_xenpv_qemu(libxl__gc *gc,
         int nr_consoles, libxl__device_console *consoles,
         int nr_vfbs, libxl_device_vfb *vfbs,
-        int nr_disks, libxl_device_disk *disks)
+        int nr_disks, libxl_device_disk *disks,
+        int nr_channels, libxl_device_channel *channels)
 {
     int i, ret = 0;
     uint32_t domid;
@@ -1609,6 +1635,20 @@ int libxl__need_xenpv_qemu(libxl__gc *gc,
         for (i = 0; i < nr_disks; i++) {
             if (disks[i].backend == LIBXL_DISK_BACKEND_QDISK &&
                 disks[i].backend_domid == domid) {
+                ret = 1;
+                goto out;
+            }
+        }
+    }
+
+    if (nr_channels > 0) {
+        ret = libxl__get_domid(gc, &domid);
+        if (ret) goto out;
+        for (i = 0; i < nr_channels; i++) {
+            if (channels[i].backend_domid == domid) {
+                /* xenconsoled is limited to the first console only.
+                   Until this restriction is removed we must use qemu for
+                   secondary consoles which includes all channels. */
                 ret = 1;
                 goto out;
             }

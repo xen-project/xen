@@ -1034,7 +1034,8 @@ _hidden int libxl__device_disk_dev_number(const char *virtpath,
 
 _hidden int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
                                       libxl__device_console *console,
-                                      libxl__domain_build_state *state);
+                                      libxl__domain_build_state *state,
+                                      libxl__device *device);
 
 /* Returns 1 if device exists, 0 if not, ERROR_* (<0) on error. */
 _hidden int libxl__device_exists(libxl__gc *gc, xs_transaction_t t,
@@ -1050,6 +1051,10 @@ _hidden int libxl__wait_for_backend(libxl__gc *gc, const char *be_path,
                                     const char *state);
 _hidden int libxl__nic_type(libxl__gc *gc, libxl__device *dev,
                             libxl_nic_type *nictype);
+_hidden int libxl__init_console_from_channel(libxl__gc *gc,
+                                             libxl__device_console *console,
+                                             int dev_num,
+                                             libxl_device_channel *channel);
 
 /*
  * For each aggregate type which can be used as an input we provide:
@@ -1469,7 +1474,8 @@ _hidden const char *libxl__domain_device_model(libxl__gc *gc,
 _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
         int nr_consoles, libxl__device_console *consoles,
         int nr_vfbs, libxl_device_vfb *vfbs,
-        int nr_disks, libxl_device_disk *disks);
+        int nr_disks, libxl_device_disk *disks,
+        int nr_channels, libxl_device_channel *channels);
 
 /*
  * This function will cause the whole libxl process to hang
