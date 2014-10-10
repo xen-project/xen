@@ -110,7 +110,10 @@ struct page_info
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
 
 extern unsigned long xenheap_mfn_start, xenheap_mfn_end;
-extern unsigned long xenheap_virt_end;
+extern vaddr_t xenheap_virt_end;
+#ifdef CONFIG_ARM_64
+extern vaddr_t xenheap_virt_start;
+#endif
 
 #ifdef CONFIG_ARM_32
 #define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
@@ -227,7 +230,7 @@ static inline void *maddr_to_virt(paddr_t ma)
 static inline void *maddr_to_virt(paddr_t ma)
 {
     ASSERT(pfn_to_pdx(ma >> PAGE_SHIFT) < (DIRECTMAP_SIZE >> PAGE_SHIFT));
-    return (void *)(DIRECTMAP_VIRT_START -
+    return (void *)(XENHEAP_VIRT_START -
                     pfn_to_paddr(xenheap_mfn_start) +
                     ((ma & ma_va_bottom_mask) |
                      ((ma & ma_top_mask) >> pfn_pdx_hole_shift)));

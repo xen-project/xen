@@ -138,7 +138,10 @@ static paddr_t phys_offset;
 /* Limits of the Xen heap */
 unsigned long xenheap_mfn_start __read_mostly = ~0UL;
 unsigned long xenheap_mfn_end __read_mostly;
-unsigned long xenheap_virt_end __read_mostly;
+vaddr_t xenheap_virt_end __read_mostly;
+#ifdef CONFIG_ARM_64
+vaddr_t xenheap_virt_start __read_mostly;
+#endif
 
 unsigned long frametable_base_pdx __read_mostly;
 unsigned long frametable_virt_end __read_mostly;
@@ -155,7 +158,11 @@ static inline void check_memory_layout_alignment_constraints(void) {
     BUILD_BUG_ON(FIXMAP_ADDR(0) & ~SECOND_MASK);
     BUILD_BUG_ON(BOOT_RELOC_VIRT_START & ~SECOND_MASK);
     /* 1GB aligned regions */
+#ifdef CONFIG_ARM_32
     BUILD_BUG_ON(XENHEAP_VIRT_START & ~FIRST_MASK);
+#else
+    BUILD_BUG_ON(DIRECTMAP_VIRT_START & ~FIRST_MASK);
+#endif
     /* Page table structure constraints */
 #ifdef CONFIG_ARM_64
     BUILD_BUG_ON(zeroeth_table_offset(XEN_VIRT_START));
@@ -665,12 +672,19 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
                                    unsigned long nr_mfns)
 {
     lpae_t *first, pte;
-    unsigned long offset, end_mfn;
+    unsigned long mfn, end_mfn;
     vaddr_t vaddr;
 
-    /* First call sets the xenheap physical offset. */
+    /* Align to previous 1GB boundary */
+    mfn = base_mfn & ~((FIRST_SIZE>>PAGE_SHIFT)-1);
+
+    /* First call sets the xenheap physical and virtual offset. */
     if ( xenheap_mfn_start == ~0UL )
+    {
         xenheap_mfn_start = base_mfn;
+        xenheap_virt_start = DIRECTMAP_VIRT_START +
+            (base_mfn - mfn) * PAGE_SIZE;
+    }
 
     if ( base_mfn < xenheap_mfn_start )
         panic("cannot add xenheap mapping at %lx below heap start %lx",
@@ -678,13 +692,13 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
 
     end_mfn = base_mfn + nr_mfns;
 
-    /* Align to previous 1GB boundary */
-    base_mfn &= ~((FIRST_SIZE>>PAGE_SHIFT)-1);
+    /*
+     * Virtual address aligned to previous 1GB to match physical
+     * address alignment done above.
+     */
+    vaddr = (vaddr_t)mfn_to_virt(base_mfn) & FIRST_MASK;
 
-    offset = pfn_to_pdx(base_mfn - xenheap_mfn_start);
-    vaddr = DIRECTMAP_VIRT_START + offset*PAGE_SIZE;
-
-    while ( base_mfn < end_mfn )
+    while ( mfn < end_mfn )
     {
         int slot = zeroeth_table_offset(vaddr);
         lpae_t *p = &xen_pgtable[slot];
@@ -716,11 +730,11 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
             first = mfn_to_virt(first_mfn);
         }
 
-        pte = mfn_to_xen_entry(base_mfn, WRITEALLOC);
+        pte = mfn_to_xen_entry(mfn, WRITEALLOC);
         /* TODO: Set pte.pt.contig when appropriate. */
         write_pte(&first[first_table_offset(vaddr)], pte);
 
-        base_mfn += FIRST_SIZE>>PAGE_SHIFT;
+        mfn += FIRST_SIZE>>PAGE_SHIFT;
         vaddr += FIRST_SIZE;
     }
 
