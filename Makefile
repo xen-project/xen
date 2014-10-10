@@ -87,10 +87,6 @@ tools/firmware/ovmf-dir-force-update:
 install-docs:
 	$(MAKE) -C docs install
 
-.PHONY: dev-docs
-dev-docs:
-	$(MAKE) -C docs dev-docs
-
 # build xen and the tools and place them in the install
 # directory. 'make install' should then copy them to the normal system
 # directories
@@ -182,7 +178,6 @@ help:
 	@echo '  tools                 - build and install tools'
 	@echo '  stubdom               - build and install the stubdomain images'
 	@echo '  docs                  - build and install user documentation'
-	@echo '  dev-docs              - build developer-only documentation'
 	@echo ''
 	@echo 'Cleaning targets:'
 	@echo '  clean                 - clean the Xen, tools and docs (but not guest kernel trees)'
