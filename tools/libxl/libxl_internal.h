@@ -44,6 +44,7 @@
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/file.h>
+#include <sys/ioctl.h>
 
 #include <xenstore.h>
 #include <xenctrl.h>
