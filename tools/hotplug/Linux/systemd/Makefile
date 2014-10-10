@@ -21,11 +21,10 @@ ALL_XEN_SYSTEMD =	$(XEN_SYSTEMD_MODULES)  \
 			$(XEN_SYSTEMD_SERVICE)
 
 .PHONY: all
-all:	install
+all:	$(ALL_XEN_SYSTEMD)
 
 .PHONY: clean
 clean:
-	rm -f $(ALL_XEN_SYSTEMD)
 
 .PHONY: install
 install: $(ALL_XEN_SYSTEMD)
