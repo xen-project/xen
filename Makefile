@@ -65,11 +65,11 @@ install-xen:
 	$(MAKE) -C xen install
 
 .PHONY: install-tools
-install-tools: $(QEMU_TRAD_DIR_TARGET) $(QEMU_XEN_DIR_TARGET)
+install-tools:
 	$(MAKE) -C tools install
 
 .PHONY: install-stubdom
-install-stubdom: $(QEMU_TRAD_DIR_TARGET) install-tools
+install-stubdom: install-tools
 	$(MAKE) -C stubdom install
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom install-grub
