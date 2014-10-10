@@ -1509,8 +1509,11 @@ Optional Packages:
                           dependencies resolved we'll enable the C xenstored
                           for you. If you ask for oxenstored we'll complain
                           until you resolve those dependencies
-  --with-systemd          set directory for systemd service files
-  --with-systemd-modules-load          set directory for systemd modules load files
+  --with-systemd=DIR      set directory for systemd service files
+                          [PREFIX/lib/systemd/system]
+  --with-systemd-modules-load=DIR
+                          set directory for systemd modules load files
+                          [PREFIX/lib/modules-load.d/]
 
 Some influential environment variables:
   CC          C compiler command

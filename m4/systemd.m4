@@ -18,12 +18,16 @@
 
 dnl Some optional path options
 AC_DEFUN([AX_SYSTEMD_OPTIONS], [
-	AC_ARG_WITH(systemd, [  --with-systemd          set directory for systemd service files],
-		SYSTEMD_DIR="$withval", SYSTEMD_DIR="")
+	AC_ARG_WITH(systemd,
+		AS_HELP_STRING([--with-systemd=DIR],
+		[set directory for systemd service files [PREFIX/lib/systemd/system]]),
+		[SYSTEMD_DIR="$withval"],[SYSTEMD_DIR=""])
 	AC_SUBST(SYSTEMD_DIR)
 
-	AC_ARG_WITH(systemd, [  --with-systemd-modules-load          set directory for systemd modules load files],
-		SYSTEMD_MODULES_LOAD="$withval", SYSTEMD_MODULES_LOAD="")
+	AC_ARG_WITH(systemd,
+		AS_HELP_STRING([--with-systemd-modules-load=DIR],
+		[set directory for systemd modules load files [PREFIX/lib/modules-load.d/]]),
+		[SYSTEMD_MODULES_LOAD="$withval"], [SYSTEMD_MODULES_LOAD=""])
 	AC_SUBST(SYSTEMD_MODULES_LOAD)
 ])
 
