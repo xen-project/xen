@@ -75,7 +75,6 @@ m4_include([../m4/extfs.m4])
 m4_include([../m4/fetcher.m4])
 m4_include([../m4/ax_compare_version.m4])
 m4_include([../m4/paths.m4])
-m4_include([../m4/xenstored.m4])
 m4_include([../m4/systemd.m4])
 
 AX_XEN_EXPAND_CONFIG()
@@ -268,9 +267,6 @@ AX_PATH_PROG_OR_FAIL([PERL], [perl])
 AC_PROG_OCAML
 AC_PROG_FINDLIB
 
-AX_XENSTORE_OPTIONS
-AX_XENSTORE_SET
-
 AS_IF([test "x$ocamltools" = "xy"], [
     AS_IF([test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"], [
         AS_IF([test "x$enable_ocamltools" = "xyes"], [
@@ -284,6 +280,11 @@ AS_IF([test "x$ocamltools" = "xy"], [
         ])
     ])
 ])
+
+m4_include([../m4/xenstored.m4])
+AX_XENSTORE_OPTIONS
+AX_XENSTORE_SET
+
 AS_IF([test "x$xsmpolicy" = "xy"], [
     AC_PROG_CHECKPOLICY
     AS_IF([test "x$CHECKPOLICY" = "xno"], [

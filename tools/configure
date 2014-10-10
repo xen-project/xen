@@ -656,8 +656,8 @@ CPP
 pyconfig
 PYTHONPATH
 CHECKPOLICY
-AWK
 XENSTORED
+AWK
 OCAMLFIND
 OCAMLBUILD
 OCAMLDOC
@@ -3658,14 +3658,6 @@ esac
 
 
 
-
-
-
-
-
-
-
-
 # systemd.m4 - Macros to check for and enable systemd          -*- Autoconf -*-
 #
 # Copyright (C) 2014 Luis R. Rodriguez <mcgrof@suse.com>
@@ -6138,67 +6130,6 @@ fi
 
 
 
-
-if test "x$XENSTORE" = "x"; then :
-
-
-# Check whether --with-xenstored was given.
-if test "${with_xenstored+set}" = set; then :
-  withval=$with_xenstored;
-		if test "x$withval" = "xxenstored"; then :
-
-			xenstore=$withval
-			xenstored=$sbindir/xenstored
-
-fi
-		if test "x$withval" = "xoxenstored"; then :
-
-			xenstore=$withval
-			xenstored=$sbindir/oxenstored
-
-	if test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"; then :
-
-		as_fn_error $? "Missing ocaml dependencies for oxenstored, try installing ocaml ocaml-compiler-libs ocaml-runtime ocaml-findlib" "$LINENO" 5
-
-fi
-
-
-fi
-		if test "x$withval" != "xoxenstored" && test "x$withval" != "xxenstored"; then :
-
-			as_fn_error $? "Unsupported xenstored specified, supported types: oxenstored xenstored" "$LINENO" 5
-
-fi
-
-else
-
-
-	xenstore="oxenstored"
-	xenstored=$sbindir/oxenstored
-	if test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"; then :
-
-		xenstore="xenstored"
-		xenstored=$sbindir/xenstored
-
-fi
-
-
-fi
-
-
-fi
-
-
-	XENSTORE=$xenstore
-
-	if test "x$XENSTORED" = "x"; then :
-
-		XENSTORED=$xenstored
-
-fi
-
-
-
 for ac_prog in gawk mawk nawk awk
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
@@ -6298,6 +6229,76 @@ fi
 fi
 
 fi
+
+
+
+
+
+
+
+
+
+
+if test "x$XENSTORE" = "x"; then :
+
+
+# Check whether --with-xenstored was given.
+if test "${with_xenstored+set}" = set; then :
+  withval=$with_xenstored;
+		if test "x$withval" = "xxenstored"; then :
+
+			xenstore=$withval
+			xenstored=$sbindir/xenstored
+
+fi
+		if test "x$withval" = "xoxenstored"; then :
+
+			xenstore=$withval
+			xenstored=$sbindir/oxenstored
+
+	if test "$ocamltools" = "n"; then :
+
+		as_fn_error $? "Missing ocaml dependencies for oxenstored, try installing ocaml ocaml-compiler-libs ocaml-runtime ocaml-findlib" "$LINENO" 5
+
+fi
+
+
+fi
+		if test "x$withval" != "xoxenstored" && test "x$withval" != "xxenstored"; then :
+
+			as_fn_error $? "Unsupported xenstored specified, supported types: oxenstored xenstored" "$LINENO" 5
+
+fi
+
+else
+
+
+	xenstore="oxenstored"
+	xenstored=$sbindir/oxenstored
+	if test "$ocamltools" = "n"; then :
+
+		xenstore="xenstored"
+		xenstored=$sbindir/xenstored
+
+fi
+
+
+fi
+
+
+fi
+
+
+	XENSTORE=$xenstore
+
+	if test "x$XENSTORED" = "x"; then :
+
+		XENSTORED=$xenstored
+
+fi
+
+
+
 if test "x$xsmpolicy" = "xy"; then :
 
       # check for a checkpolicy binary with support for -t xen

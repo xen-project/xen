@@ -1,5 +1,5 @@
 AC_DEFUN([AX_XEN_OCAML_XENSTORE_CHECK], [
-	AS_IF([test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"], [
+	AS_IF([test "$ocamltools" = "n"], [
 		AC_MSG_ERROR([Missing ocaml dependencies for oxenstored, try installing ocaml ocaml-compiler-libs ocaml-runtime ocaml-findlib])
 	])
 ])
@@ -7,7 +7,7 @@ AC_DEFUN([AX_XEN_OCAML_XENSTORE_CHECK], [
 AC_DEFUN([AX_XEN_OCAML_XENSTORE_DEFAULTS], [
 	xenstore="oxenstored"
 	xenstored=$sbindir/oxenstored
-	AS_IF([test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"], [
+	AS_IF([test "$ocamltools" = "n"], [
 		xenstore="xenstored"
 		xenstored=$sbindir/xenstored
 	])
