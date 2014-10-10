@@ -24,7 +24,7 @@ AC_DEFUN([AX_SYSTEMD_OPTIONS], [
 		[SYSTEMD_DIR="$withval"],[SYSTEMD_DIR=""])
 	AC_SUBST(SYSTEMD_DIR)
 
-	AC_ARG_WITH(systemd,
+	AC_ARG_WITH(systemd-modules-load,
 		AS_HELP_STRING([--with-systemd-modules-load=DIR],
 		[set directory for systemd modules load files [PREFIX/lib/modules-load.d/]]),
 		[SYSTEMD_MODULES_LOAD="$withval"], [SYSTEMD_MODULES_LOAD=""])
