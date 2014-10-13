@@ -359,7 +359,6 @@ static void __init efi_arch_cfg_file_early(EFI_FILE_HANDLE dir_handle, char *sec
     {
         split_string(name.s);
         read_file(dir_handle, s2w(&name), &dtbfile, NULL);
-            blexit(NULL);
         efi_bs->FreePool(name.w);
     }
     fdt = fdt_increase_size(&dtbfile, cfg.size + EFI_PAGE_SIZE);
