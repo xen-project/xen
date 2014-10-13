@@ -43,7 +43,7 @@ all: subdirs-all
 build:
 
 .PHONY: install
-install: all install-initd install-scripts install-udev subdirs-install
+install: install-initd install-scripts install-udev subdirs-install
 
 # See docs/misc/distro_mapping.txt for INITD_DIR location
 .PHONY: install-initd

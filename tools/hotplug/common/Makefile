@@ -19,7 +19,7 @@ all: build
 build: $(HOTPLUGPATH)
 
 .PHONY: install
-install: all install-scripts
+install: install-scripts
 
 .PHONY: install-scripts
 install-scripts: build

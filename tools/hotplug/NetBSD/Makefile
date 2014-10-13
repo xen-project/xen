@@ -17,7 +17,7 @@ all:
 build:
 
 .PHONY: install
-install: all install-scripts install-rcd
+install: install-scripts install-rcd
 
 .PHONY: install-scripts
 install-scripts:
