@@ -1661,38 +1661,6 @@ out:
     return ret;
 }
 
-static int reassign_device_ownership(
-    struct domain *source,
-    struct domain *target,
-    u8 devfn, struct pci_dev *pdev)
-{
-    int ret;
-
-    /*
-     * Devices assigned to untrusted domains (here assumed to be any domU)
-     * can attempt to send arbitrary LAPIC/MSI messages. We are unprotected
-     * by the root complex unless interrupt remapping is enabled.
-     */
-    if ( (target != hardware_domain) && !iommu_intremap )
-        untrusted_msi = 1;
-
-    ret = domain_context_unmap(source, devfn, pdev);
-    if ( ret )
-        return ret;
-
-    ret = domain_context_mapping(target, devfn, pdev);
-    if ( ret )
-        return ret;
-
-    if ( devfn == pdev->devfn )
-    {
-        list_move(&pdev->domain_list, &target->arch.pdev_list);
-        pdev->domain = target;
-    }
-
-    return ret;
-}
-
 static void iommu_domain_teardown(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
@@ -1839,11 +1807,11 @@ static void iommu_set_pgd(struct domain *d)
     hd->arch.pgd_maddr = pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
 }
 
-static int rmrr_identity_mapping(struct domain *d,
-                                 struct acpi_rmrr_unit *rmrr)
+static int rmrr_identity_mapping(struct domain *d, bool_t map,
+                                 const struct acpi_rmrr_unit *rmrr)
 {
-    u64 base, end;
-    unsigned long base_pfn, end_pfn;
+    unsigned long base_pfn = rmrr->base_address >> PAGE_SHIFT_4K;
+    unsigned long end_pfn = PAGE_ALIGN_4K(rmrr->end_address) >> PAGE_SHIFT_4K;
     struct mapped_rmrr *mrmrr;
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
@@ -1859,21 +1827,40 @@ static int rmrr_identity_mapping(struct domain *d,
         if ( mrmrr->base == rmrr->base_address &&
              mrmrr->end == rmrr->end_address )
         {
-            ++mrmrr->count;
-            return 0;
+            int ret = 0;
+
+            if ( map )
+            {
+                ++mrmrr->count;
+                return 0;
+            }
+
+            if ( --mrmrr->count )
+                return 0;
+
+            while ( base_pfn < end_pfn )
+            {
+                if ( intel_iommu_unmap_page(d, base_pfn) )
+                    ret = -ENXIO;
+                base_pfn++;
+            }
+
+            list_del(&mrmrr->list);
+            xfree(mrmrr);
+            return ret;
         }
     }
 
-    base = rmrr->base_address & PAGE_MASK_4K;
-    base_pfn = base >> PAGE_SHIFT_4K;
-    end = PAGE_ALIGN_4K(rmrr->end_address);
-    end_pfn = end >> PAGE_SHIFT_4K;
+    if ( !map )
+        return -ENOENT;
 
     while ( base_pfn < end_pfn )
     {
-        if ( intel_iommu_map_page(d, base_pfn, base_pfn,
-                                  IOMMUF_readable|IOMMUF_writable) )
-            return -1;
+        int err = intel_iommu_map_page(d, base_pfn, base_pfn,
+                                       IOMMUF_readable|IOMMUF_writable);
+
+        if ( err )
+            return err;
         base_pfn++;
     }
 
@@ -1913,14 +1900,14 @@ static int intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
              PCI_BUS(bdf) == pdev->bus &&
              PCI_DEVFN2(bdf) == devfn )
         {
-            ret = rmrr_identity_mapping(pdev->domain, rmrr);
+            ret = rmrr_identity_mapping(pdev->domain, 1, rmrr);
             if ( ret )
                 dprintk(XENLOG_ERR VTDPREFIX, "d%d: RMRR mapping failed\n",
                         pdev->domain->domain_id);
         }
     }
 
-    return ret;
+    return 0;
 }
 
 static int intel_iommu_enable_device(struct pci_dev *pdev)
@@ -1949,52 +1936,12 @@ static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
 
     for_each_rmrr_device ( rmrr, bdf, i )
     {
-        struct hvm_iommu *hd;
-        struct mapped_rmrr *mrmrr, *tmp;
-
         if ( rmrr->segment != pdev->seg ||
              PCI_BUS(bdf) != pdev->bus ||
              PCI_DEVFN2(bdf) != devfn )
             continue;
 
-        /*
-         * If the device belongs to the hardware domain, and it has RMRR, don't
-         * remove it from the hardware domain, because BIOS may use RMRR at
-         * booting time.
-         */
-        if ( is_hardware_domain(pdev->domain) )
-            return 0;
-
-        hd = domain_hvm_iommu(pdev->domain);
-
-        /*
-         * No need to acquire hd->mapping_lock: Both insertion and removal
-         * get done while holding pcidevs_lock.
-         */
-        ASSERT(spin_is_locked(&pcidevs_lock));
-        list_for_each_entry_safe ( mrmrr, tmp, &hd->arch.mapped_rmrrs, list )
-        {
-            unsigned long base_pfn, end_pfn;
-
-            if ( rmrr->base_address != mrmrr->base ||
-                 rmrr->end_address != mrmrr->end )
-                continue;
-
-            if ( --mrmrr->count )
-                break;
-
-            base_pfn = (mrmrr->base & PAGE_MASK_4K) >> PAGE_SHIFT_4K;
-            end_pfn = PAGE_ALIGN_4K(mrmrr->end) >> PAGE_SHIFT_4K;
-            while ( base_pfn < end_pfn )
-            {
-                if ( intel_iommu_unmap_page(pdev->domain, base_pfn) )
-                    return -ENXIO;
-                base_pfn++;
-            }
-
-            list_del(&mrmrr->list);
-            xfree(mrmrr);
-        }
+        rmrr_identity_mapping(pdev->domain, 0, rmrr);
     }
 
     return domain_context_unmap(pdev->domain, devfn, pdev);
@@ -2152,7 +2099,7 @@ static void __hwdom_init setup_hwdom_rmrr(struct domain *d)
     spin_lock(&pcidevs_lock);
     for_each_rmrr_device ( rmrr, bdf, i )
     {
-        ret = rmrr_identity_mapping(d, rmrr);
+        ret = rmrr_identity_mapping(d, 1, rmrr);
         if ( ret )
             dprintk(XENLOG_ERR VTDPREFIX,
                      "IOMMU: mapping reserved region failed\n");
@@ -2262,6 +2209,62 @@ int __init intel_vtd_setup(void)
     return ret;
 }
 
+static int reassign_device_ownership(
+    struct domain *source,
+    struct domain *target,
+    u8 devfn, struct pci_dev *pdev)
+{
+    int ret;
+
+    /*
+     * Devices assigned to untrusted domains (here assumed to be any domU)
+     * can attempt to send arbitrary LAPIC/MSI messages. We are unprotected
+     * by the root complex unless interrupt remapping is enabled.
+     */
+    if ( (target != hardware_domain) && !iommu_intremap )
+        untrusted_msi = 1;
+
+    /*
+     * If the device belongs to the hardware domain, and it has RMRR, don't
+     * remove it from the hardware domain, because BIOS may use RMRR at
+     * booting time. Also account for the special casing of USB below (in
+     * intel_iommu_assign_device()).
+     */
+    if ( !is_hardware_domain(source) &&
+         !is_usb_device(pdev->seg, pdev->bus, pdev->devfn) )
+    {
+        const struct acpi_rmrr_unit *rmrr;
+        u16 bdf;
+        unsigned int i;
+
+        for_each_rmrr_device( rmrr, bdf, i )
+            if ( rmrr->segment == pdev->seg &&
+                 PCI_BUS(bdf) == pdev->bus &&
+                 PCI_DEVFN2(bdf) == devfn )
+            {
+                ret = rmrr_identity_mapping(source, 0, rmrr);
+                if ( ret != -ENOENT )
+                    return ret;
+            }
+    }
+
+    ret = domain_context_unmap(source, devfn, pdev);
+    if ( ret )
+        return ret;
+
+    ret = domain_context_mapping(target, devfn, pdev);
+    if ( ret )
+        return ret;
+
+    if ( devfn == pdev->devfn )
+    {
+        list_move(&pdev->domain_list, &target->arch.pdev_list);
+        pdev->domain = target;
+    }
+
+    return ret;
+}
+
 static int intel_iommu_assign_device(
     struct domain *d, u8 devfn, struct pci_dev *pdev)
 {
@@ -2275,7 +2278,7 @@ static int intel_iommu_assign_device(
 
     ret = reassign_device_ownership(hardware_domain, d, devfn, pdev);
     if ( ret )
-        goto done;
+        return ret;
 
     /* FIXME: Because USB RMRR conflicts with guest bios region,
      * ignore USB RMRR temporarily.
@@ -2283,10 +2286,7 @@ static int intel_iommu_assign_device(
     seg = pdev->seg;
     bus = pdev->bus;
     if ( is_usb_device(seg, bus, pdev->devfn) )
-    {
-        ret = 0;
-        goto done;
-    }
+        return 0;
 
     /* Setup rmrr identity mapping */
     for_each_rmrr_device( rmrr, bdf, i )
@@ -2295,17 +2295,19 @@ static int intel_iommu_assign_device(
              PCI_BUS(bdf) == bus &&
              PCI_DEVFN2(bdf) == devfn )
         {
-            ret = rmrr_identity_mapping(d, rmrr);
+            ret = rmrr_identity_mapping(d, 1, rmrr);
             if ( ret )
             {
-                dprintk(XENLOG_ERR VTDPREFIX,
-                        "IOMMU: mapping reserved region failed\n");
-                goto done;
+                reassign_device_ownership(d, hardware_domain, devfn, pdev);
+                printk(XENLOG_G_ERR VTDPREFIX
+                       " cannot map reserved region (%"PRIx64",%"PRIx64"] for Dom%d (%d)\n",
+                       rmrr->base_address, rmrr->end_address,
+                       d->domain_id, ret);
+                break;
             }
         }
     }
 
-done:
     return ret;
 }
 
