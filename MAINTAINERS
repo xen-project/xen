@@ -157,6 +157,7 @@ EFI
 M:     Jan Beulich <jbeulich@suse.com>
 S:     Supported
 F:     xen/arch/x86/efi/
+F:     xen/common/efi/
 F:     xen/include/efi/
 F:     xen/include/asm-x86/efi*.h
 F:     xen/include/asm-x86/x86_*/efi*.h
