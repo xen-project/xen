@@ -8,8 +8,7 @@ ConditionPathExists=/proc/xen/capabilities
 
 [Service]
 Type=simple
-EnvironmentFile=-/etc/default/xenstored
-EnvironmentFile=-/etc/sysconfig/xenstored
+EnvironmentFile=-@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xenstored
 PIDFile=@XEN_RUN_DIR@/qemu-dom0.pid
 ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
 ExecStartPre=/bin/mkdir -p @XEN_RUN_DIR@

@@ -7,8 +7,7 @@ RefuseManualStop=true
 
 [Mount]
 Environment=XENSTORED_MOUNT_CTX=none
-EnvironmentFile=-/etc/sysconfig/xenstored
-EnvironmentFile=-/etc/default/xenstored
+EnvironmentFile=-@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xenstored
 What=xenstore
 Where=@XEN_LIB_STORED@
 Type=tmpfs

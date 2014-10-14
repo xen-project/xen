@@ -51,11 +51,7 @@ fi
 
 LOCKFILE=${XEN_LOCK_DIR}/xendomains
 
-if [ -d /etc/sysconfig ]; then
-	XENDOM_CONFIG=/etc/sysconfig/xendomains
-else
-	XENDOM_CONFIG=/etc/default/xendomains
-fi
+XENDOM_CONFIG=@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xendomains
 
 test -r $XENDOM_CONFIG || { echo "$XENDOM_CONFIG not existing";
 	if [ "$1" = "stop" ]; then exit 0;

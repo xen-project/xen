@@ -11,8 +11,7 @@ Type=notify
 Environment=XENSTORED_ARGS=
 Environment=XENSTORED_ROOTDIR=@XEN_LIB_STORED@
 Environment=XENSTORED=@XENSTORED@
-EnvironmentFile=-/etc/default/xencommons
-EnvironmentFile=-/etc/sysconfig/xencommons
+EnvironmentFile=-@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons
 ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
 ExecStartPre=-/bin/rm -f @XEN_LIB_STORED@/tdb*
 ExecStartPre=/bin/mkdir -p @XEN_RUN_DIR@

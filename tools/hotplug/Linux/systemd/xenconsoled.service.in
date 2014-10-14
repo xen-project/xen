@@ -9,8 +9,7 @@ Type=simple
 Environment=XENCONSOLED_ARGS=
 Environment=XENCONSOLED_LOG=none
 Environment=XENCONSOLED_LOG_DIR=@XEN_LOG_DIR@/console
-EnvironmentFile=-/etc/default/xenconsoled
-EnvironmentFile=-/etc/sysconfig/xenconsoled
+EnvironmentFile=-@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xenconsoled
 PIDFile=@XEN_RUN_DIR@/xenconsoled.pid
 ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
 ExecStartPre=/bin/mkdir -p ${XENCONSOLED_LOG_DIR}
