@@ -16,13 +16,11 @@ TARGETS-$(CONFIG_X86) += xen-detect xen-hvmctx xen-hvmcrash xen-lowmemd xen-mfnd
 TARGETS-$(CONFIG_MIGRATE) += xen-hptool
 TARGETS := $(TARGETS-y)
 
-SUBDIRS := $(SUBDIRS-y)
-
 INSTALL_BIN-y := xencons xencov_split
 INSTALL_BIN-$(CONFIG_X86) += xen-detect
 INSTALL_BIN := $(INSTALL_BIN-y)
 
-INSTALL_SBIN-y := xen-bugtool xen-python-path xenperf xenpm xen-tmem-list-parse gtraceview \
+INSTALL_SBIN-y := xen-bugtool xenperf xenpm xen-tmem-list-parse gtraceview \
 	gtracestat xenlockprof xenwatchdogd xen-ringwatch xencov
 INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx xen-hvmcrash xen-lowmemd xen-mfndump
 INSTALL_SBIN-$(CONFIG_MIGRATE) += xen-hptool
@@ -39,7 +37,6 @@ all: build
 
 .PHONY: build
 build: $(TARGETS)
-	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d; done
 
 .PHONY: install
 install: build
@@ -49,12 +46,10 @@ install: build
 	$(INSTALL_PYTHON_PROG) $(INSTALL_BIN) $(DESTDIR)$(BINDIR)
 	$(INSTALL_PYTHON_PROG) $(INSTALL_SBIN) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PYTHON_PROG) $(INSTALL_PRIVBIN) $(DESTDIR)$(LIBEXEC_BIN)
-	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d install-recurse; done
 
 .PHONY: clean
 clean:
 	$(RM) *.o $(TARGETS) *~ $(DEPS)
-	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
 
 xen-hvmctx: xen-hvmctx.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
