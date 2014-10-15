@@ -54,8 +54,8 @@ export CROSS_SYS_ROOT # exported for check/funcs.sh
 export CROSS_BIN_PATH # exported for cross-install.sh
 endif
 
-.PHONY: all
-all: subdirs-all
+.PHONY: build all
+build all: subdirs-all
 
 .PHONY: install
 install: subdirs-install
