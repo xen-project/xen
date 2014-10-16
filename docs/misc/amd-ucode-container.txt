@@ -16,7 +16,8 @@ Intro to AMD Container Files:
   processor families 10h, 11h, 12h, 14h, and 15h.
 * There is one single file (container file) containing all microcode patches
   for AMD families 10h - 14h processors. [microcode_amd.bin]
-* For AMD family 15h processors there is a separate container file. [microcode_amd_fam15h.bin]
+* For AMD processor families 15h and later, there is a separate container file
+  for each family. (e.g. microcode_amd_fam15h.bin)
 * Microcode patches are not incremental, therefore you only need to make
   sure you have the latest container file for your AMD processor family.
 * One can find the latest AMD microcode containers from [1], [2]
@@ -24,7 +25,8 @@ Intro to AMD Container Files:
 Mutual Exclusivity Rule of AMD containers:
 * The patches for families 10h - 14h are guaranteed to be only on
   microcode_amd.bin
-* Similarly, patches for family 15h will only be on microcode_amd_fam15h.bin
+* Similarly, patches for family 15h and later will only be on their respective
+  family specific container file. (e.g. microcode_amd_fam15h.bin)
 * This is because, the processes and scripts used to create container files
   ensure that there is no mix-up
 
@@ -60,35 +62,22 @@ Example System base: Ubuntu 13.04 with 3.8.0-30-generic kernel
 1.  mkdir initrd-for-xen-with_append
 2.  cd initrd-for-xen-with_append
 3.  mkdir -p kernel/x86/microcode
-4.  cp /lib/firmware/amd-ucode/microcode_amd.bin .
-5.  cp /lib/firmware/amd-ucode/microcode_amd_fam15h.bin .
-6.  cat microcode_amd.bin microcode_amd_fam15h.bin > microcode_concatenated.bin
-7.  mv microcode_concatenated.bin kernel/x86/microcode/AuthenticAMD.bin
-8.  rm microcode_amd.bin microcode_amd_fam15h.bin
-9.  find . | cpio -o -H newc > ucode.cpio
-10.  cp /boot/initrd.img-3.8.0-30-generic .
-11. cat ucode.cpio initrd.img-3.8.0-30-generic > initrd_for_xen_with_ucode
-12. cp initrd_for_xen_with_ucode /boot/
-13. On grub.cfg, provide the above initrd name as module.
-14. Use 'ucode=scan' option as Xen boot parameter.
+4.  cat /lib/firmware/amd-ucode/microcode_amd.bin \
+        /lib/firmware/amd-ucode/microcode_amd_fam15h.bin > \
+	kernel/x86/microcode/AuthenticAMD.bin 
+5.  find . | cpio -o -H newc > ucode.cpio
+6.  cat ucode.cpio /boot/initrd.img-3.8.0-30-generic > /boot/initrd_for_xen_with_ucode
+7. On grub.cfg, provide the above initrd name as module.
+8. Use 'ucode=scan' option as Xen boot parameter.
 
 Misc Notes:
 -----------
 It is not recommended to concatenate two(or more) container files of
-the same kind. (two microcode_amd_fam15h.bin for example)
-This is because:
-There is no check in Xen currently to verify this.
-Now, given a situation where
-1. An earlier container has a patch that 'fits' the processor you are
-   currently on,
-2. There is a subsequent container that *also* has a patch that 'fits',
-3. The second patch happens to be an update over the patch found on the
-   first container file.
-
-In such a case, only the patch from the first container is applied.
-This is because Xen assumes that the the containers (if concatenated
-together) are different kinds AND the 'Mutual Exclusivity' rule is
-always true.
+the same kind. (e.g. two microcode_amd_fam15h.bin) since the hypervisor
+will apply a patch as and when it determines that it is a 'good fit'.
+Once the patch is applied, further parsing of the file is skipped.
+Therefore, if a subsequent container file has a newer/updated patch, that 
+patch will be ignored.
 
 In cases where users are not sure about provenance of containers 
 they should obtain a "good" set  by downloading them from source links
