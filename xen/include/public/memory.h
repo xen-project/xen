@@ -521,6 +521,14 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
  * The zero value is appropiate.
  */
 
+#endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
+
+/*
+ * XENMEM_get_vnumainfo used by guest to get
+ * vNUMA topology from hypervisor.
+ */
+#define XENMEM_get_vnumainfo                26
+
 /* vNUMA node memory ranges */
 struct vmemrange {
     uint64_t start, end;
@@ -564,14 +572,6 @@ struct vnuma_topology_info {
 };
 typedef struct vnuma_topology_info vnuma_topology_info_t;
 DEFINE_XEN_GUEST_HANDLE(vnuma_topology_info_t);
-
-/*
- * XENMEM_get_vnumainfo used by guest to get
- * vNUMA topology from hypervisor.
- */
-#define XENMEM_get_vnumainfo               26
-
-#endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 /* Next available subop number is 27 */
 
