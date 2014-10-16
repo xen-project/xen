@@ -515,14 +515,14 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
 
     ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid);
     if (ret < 0) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "domain creation fail");
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "domain creation fail");
         rc = ERROR_FAIL;
         goto out;
     }
 
     ret = xc_cpupool_movedomain(ctx->xch, info->poolid, *domid);
     if (ret < 0) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "domain move fail");
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "domain move fail");
         rc = ERROR_FAIL;
         goto out;
     }
