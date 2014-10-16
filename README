@@ -184,32 +184,11 @@ For more details refer to the xen xenstored systemd wiki page [3].
 Python Runtime Libraries
 ========================
 
-Xend (the Xen daemon) has the following runtime dependencies:
+Various tools, such as pygrub, have the following runtime dependencies:
 
     * Python 2.3 or later.
-      In some distros, the XML-aspects to the standard library
-      (xml.dom.minidom etc) are broken out into a separate python-xml package.
-      This is also required.
-      In more recent versions of Debian and Ubuntu the XML-aspects are included
-      in the base python package however (python-xml has been removed
-      from Debian in squeeze and from Ubuntu in intrepid).
-
           URL:    http://www.python.org/
           Debian: python
-
-    * For optional SSL support, pyOpenSSL:
-          URL:    http://pyopenssl.sourceforge.net/
-          Debian: python-pyopenssl
-
-    * For optional PAM support, PyPAM:
-          URL:    http://www.pangalactic.org/PyPAM/
-          Debian: python-pam
-
-    * For optional XenAPI support in XM, lxml:
-          URL:    http://lxml.de/
-          Debian: python-lxml
-          YUM:    python-lxml
-
 
 Intel(R) Trusted Execution Technology Support
 =============================================
