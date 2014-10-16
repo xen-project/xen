@@ -37,6 +37,7 @@ obj-y += hvm.o
 obj-y += device.o
 obj-y += decode.o
 obj-y += processor.o
+obj-y += smc.o
 
 #obj-bin-y += ....o
 

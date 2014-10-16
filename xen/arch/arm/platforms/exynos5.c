@@ -37,19 +37,6 @@ static bool_t secure_firmware;
 
 #define SMC_CMD_CPU1BOOT            (-4)
 
-static noinline void exynos_smc(register_t function_id, register_t arg0,
-                                register_t arg1, register_t arg2)
-{
-    asm volatile(
-        __asmeq("%0", "r0")
-        __asmeq("%1", "r1")
-        __asmeq("%2", "r2")
-        __asmeq("%3", "r3")
-        "smc #0"
-        :
-        : "r" (function_id), "r" (arg0), "r" (arg1), "r" (arg2));
-}
-
 static int exynos5_init_time(void)
 {
     uint32_t reg;
@@ -263,7 +250,7 @@ static int exynos5_cpu_up(int cpu)
     iounmap(power);
 
     if ( secure_firmware )
-        exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+        call_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
 
     return cpu_up_send_sgi(cpu);
 }

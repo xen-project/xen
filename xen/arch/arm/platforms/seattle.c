@@ -31,22 +31,14 @@ static const char * const seattle_dt_compat[] __initconst =
  * This is temporary until full PSCI-0.2 is supported.
  * Then, these function will be removed.
  */
-static noinline void seattle_smc_psci(register_t func_id)
-{
-    asm volatile(
-        "smc #0"
-        : "+r" (func_id)
-        :);
-}
-
 static void seattle_system_reset(void)
 {
-    seattle_smc_psci(PSCI_0_2_FN_SYSTEM_RESET);
+    call_smc(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
 }
 
 static void seattle_system_off(void)
 {
-    seattle_smc_psci(PSCI_0_2_FN_SYSTEM_OFF);
+    call_smc(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
 }
 
 PLATFORM_START(seattle, "SEATTLE")
