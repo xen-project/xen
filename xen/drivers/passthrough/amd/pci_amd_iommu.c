@@ -19,6 +19,7 @@
  */
 
 #include <xen/sched.h>
+#include <xen/iocap.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/paging.h>
@@ -317,6 +318,7 @@ static int amd_iommu_domain_init(struct domain *d)
 static void __init amd_iommu_dom0_init(struct domain *d)
 {
     unsigned long i; 
+    const struct amd_iommu *iommu;
 
     if ( !iommu_passthrough && !need_iommu(d) )
     {
@@ -337,6 +339,12 @@ static void __init amd_iommu_dom0_init(struct domain *d)
                 process_pending_softirqs();
         }
     }
+
+    for_each_amd_iommu ( iommu )
+        if ( iomem_deny_access(d, PFN_DOWN(iommu->mmio_base_phys),
+                               PFN_DOWN(iommu->mmio_base_phys +
+                                        IOMMU_MMIO_REGION_LENGTH - 1)) )
+            BUG();
 
     setup_dom0_pci_devices(d, amd_iommu_setup_dom0_device);
 }
