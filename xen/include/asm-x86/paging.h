@@ -133,9 +133,6 @@ struct paging_mode {
 /*****************************************************************************
  * Log dirty code */
 
-/* free log dirty bitmap resource */
-void paging_free_log_dirty_bitmap(struct domain *d);
-
 /* get the dirty bitmap for a specific range of pfns */
 void paging_log_dirty_range(struct domain *d,
                             unsigned long begin_pfn,
@@ -144,9 +141,6 @@ void paging_log_dirty_range(struct domain *d,
 
 /* enable log dirty */
 int paging_log_dirty_enable(struct domain *d, bool_t log_global);
-
-/* disable log dirty */
-int paging_log_dirty_disable(struct domain *d);
 
 /* log dirty initialization */
 void paging_log_dirty_init(struct domain *d,
@@ -204,10 +198,13 @@ int paging_domain_init(struct domain *d, unsigned int domcr_flags);
  * and disable ephemeral shadow modes (test mode and log-dirty mode) and
  * manipulate the log-dirty bitmap. */
 int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
-                  XEN_GUEST_HANDLE_PARAM(void) u_domctl);
+                  XEN_GUEST_HANDLE_PARAM(void) u_domctl, bool_t resuming);
+
+/* Helper hypercall for dealing with continuations. */
+long paging_domctl_continuation(XEN_GUEST_HANDLE_PARAM(xen_domctl_t));
 
 /* Call when destroying a domain */
-void paging_teardown(struct domain *d);
+int paging_teardown(struct domain *d);
 
 /* Call once all of the references to the domain have gone away */
 void paging_final_teardown(struct domain *d);
