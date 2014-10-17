@@ -186,6 +186,20 @@ struct paging_domain {
     struct hap_domain       hap;
     /* log dirty support */
     struct log_dirty_domain log_dirty;
+
+    /* preemption handling */
+    struct {
+        const struct domain *dom;
+        unsigned int op;
+        union {
+            struct {
+                unsigned long done:PADDR_BITS - PAGE_SHIFT;
+                unsigned long i4:PAGETABLE_ORDER;
+                unsigned long i3:PAGETABLE_ORDER;
+            } log_dirty;
+        };
+    } preempt;
+
     /* alloc/free pages from the pool for paging-assistance structures
      * (used by p2m and log-dirty code for their tries) */
     struct page_info * (*alloc_page)(struct domain *d);

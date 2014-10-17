@@ -417,6 +417,7 @@ ENTRY(compat_hypercall_table)
         .quad compat_ni_hypercall
         .endr
         .quad do_mca                    /* 48 */
+        .quad paging_domctl_continuation
         .rept NR_hypercalls-((.-compat_hypercall_table)/8)
         .quad compat_ni_hypercall
         .endr
@@ -465,6 +466,7 @@ ENTRY(compat_hypercall_args_table)
         .byte 0 /* compat_ni_hypercall      */
         .endr
         .byte 1 /* do_mca                   */
+        .byte 1 /* paging_domctl_continuation      */
         .rept NR_hypercalls-(.-compat_hypercall_args_table)
         .byte 0 /* compat_ni_hypercall      */
         .endr
