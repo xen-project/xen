@@ -112,17 +112,25 @@ void p2m_restore_state(struct vcpu *n)
 
 void flush_tlb_domain(struct domain *d)
 {
+    unsigned long flags = 0;
+
     /* Update the VTTBR if necessary with the domain d. In this case,
      * it's only necessary to flush TLBs on every CPUs with the current VMID
      * (our domain).
      */
     if ( d != current->domain )
+    {
+        local_irq_save(flags);
         p2m_load_VTTBR(d);
+    }
 
     flush_tlb();
 
     if ( d != current->domain )
+    {
         p2m_load_VTTBR(current->domain);
+        local_irq_restore(flags);
+    }
 }
 
 /*
