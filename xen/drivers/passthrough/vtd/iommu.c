@@ -23,6 +23,7 @@
 #include <xen/sched.h>
 #include <xen/xmalloc.h>
 #include <xen/domain_page.h>
+#include <xen/iocap.h>
 #include <xen/iommu.h>
 #include <asm/hvm/iommu.h>
 #include <xen/numa.h>
@@ -1259,6 +1260,9 @@ static void __init intel_iommu_dom0_init(struct domain *d)
 
     for_each_drhd_unit ( drhd )
     {
+        if ( iomem_deny_access(d, PFN_DOWN(drhd->address),
+                               PFN_DOWN(drhd->address)) )
+            BUG();
         iommu_enable_translation(drhd);
     }
 }
