@@ -207,9 +207,8 @@ paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
         *t = pte.p2m.type;
     }
 
-err:
     spin_unlock(&p2m->lock);
-
+err:
     return maddr;
 }
 
