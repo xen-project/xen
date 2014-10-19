@@ -75,7 +75,7 @@ disabled at compile time:
     * systemd daemon development files
     * Development install of libnl3 (e.g., libnl-3-200,
       libnl-3-dev, etc).  Required if network buffering is desired
-      when using Remus with libxl.  See tools/remus/README for detailed
+      when using Remus with libxl.  See docs/README.remus for detailed
       information.
 
 Second, you need to acquire a suitable kernel for use in domain 0. If
