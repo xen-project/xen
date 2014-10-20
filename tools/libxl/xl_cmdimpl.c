@@ -5016,6 +5016,7 @@ static void vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
     unsigned int max_vcpus, i;
     libxl_bitmap cpumap;
 
+    libxl_bitmap_init(&cpumap);
     max_vcpus = strtoul(nr_vcpus, &endptr, 10);
     if (nr_vcpus == endptr) {
         fprintf(stderr, "Error: Invalid argument.\n");
@@ -7480,6 +7481,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
 
     ret = 0;
 
+    libxl_bitmap_init(&cpumap);
     poolinfo = libxl_list_cpupool(ctx, &n_pools);
     if (!poolinfo) {
         fprintf(stderr, "error getting cpupool info\n");
