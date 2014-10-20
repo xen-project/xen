@@ -5387,6 +5387,8 @@ static int sched_credit_domain_output(int domid)
         printf("%-33s %4s %6s %4s\n", "Name", "ID", "Weight", "Cap");
         return 0;
     }
+
+    libxl_domain_sched_params_init(&scinfo);
     rc = sched_domain_get(LIBXL_SCHEDULER_CREDIT, domid, &scinfo);
     if (rc)
         return rc;
@@ -5433,6 +5435,8 @@ static int sched_credit2_domain_output(
         printf("%-33s %4s %6s\n", "Name", "ID", "Weight");
         return 0;
     }
+
+    libxl_domain_sched_params_init(&scinfo);
     rc = sched_domain_get(LIBXL_SCHEDULER_CREDIT2, domid, &scinfo);
     if (rc)
         return rc;
@@ -5458,6 +5462,8 @@ static int sched_sedf_domain_output(
                "Slice", "Latency", "Extra", "Weight");
         return 0;
     }
+
+    libxl_domain_sched_params_init(&scinfo);
     rc = sched_domain_get(LIBXL_SCHEDULER_SEDF, domid, &scinfo);
     if (rc)
         return rc;
