@@ -57,7 +57,6 @@ provided by your OS distributor:
     * pkg-config
     * bridge-utils package (/sbin/brctl)
     * iproute package (/sbin/ip)
-    * udev
     * GNU bison and GNU flex
     * GNU gettext
     * 16-bit x86 assembler, loader and compiler (dev86 rpm or bin86 & bcc debs)
