@@ -910,6 +910,73 @@ static void replace_string(char **str, const char *val)
     *str = xstrdup(val);
 }
 
+static int match_option_size(const char *prefix, size_t len,
+        char *arg, char **argopt)
+{
+    int rc = strncmp(prefix, arg, len);
+    if (!rc) *argopt = arg+len;
+    return !rc;
+}
+#define MATCH_OPTION(prefix, arg, oparg) \
+    match_option_size((prefix "="), sizeof((prefix)), (arg), &(oparg))
+
+/* Parses network data and adds info into nic
+ * Returns 1 if the input token does not match one of the keys
+ * or parsed values are not correct. Successful parse returns 0 */
+static int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token)
+{
+    char *endptr, *oparg;
+    int i;
+    unsigned int val;
+
+    if (MATCH_OPTION("type", token, oparg)) {
+        if (!strcmp("vif", oparg)) {
+            nic->nictype = LIBXL_NIC_TYPE_VIF;
+        } else if (!strcmp("ioemu", oparg)) {
+            nic->nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
+        } else {
+            fprintf(stderr, "Invalid parameter `type'.\n");
+            return 1;
+        }
+    } else if (MATCH_OPTION("mac", token, oparg)) {
+        for (i = 0; i < 6; i++) {
+            val = strtoul(oparg, &endptr, 16);
+            if ((oparg == endptr) || (val > 255)) {
+                fprintf(stderr, "Invalid parameter `mac'.\n");
+                return 1;
+            }
+            nic->mac[i] = val;
+            oparg = endptr + 1;
+        }
+    } else if (MATCH_OPTION("bridge", token, oparg)) {
+        replace_string(&nic->bridge, oparg);
+    } else if (MATCH_OPTION("netdev", token, oparg)) {
+        fprintf(stderr, "the netdev parameter is deprecated, "
+                        "please use gatewaydev instead\n");
+        replace_string(&nic->gatewaydev, oparg);
+    } else if (MATCH_OPTION("gatewaydev", token, oparg)) {
+        replace_string(&nic->gatewaydev, oparg);
+    } else if (MATCH_OPTION("ip", token, oparg)) {
+        replace_string(&nic->ip, oparg);
+    } else if (MATCH_OPTION("script", token, oparg)) {
+        replace_string(&nic->script, oparg);
+    } else if (MATCH_OPTION("backend", token, oparg)) {
+        replace_string(&nic->backend_domname, oparg);
+    } else if (MATCH_OPTION("vifname", token, oparg)) {
+        replace_string(&nic->ifname, oparg);
+    } else if (MATCH_OPTION("model", token, oparg)) {
+        replace_string(&nic->model, oparg);
+    } else if (MATCH_OPTION("rate", token, oparg)) {
+        parse_vif_rate(config, oparg, nic);
+    } else if (MATCH_OPTION("accel", token, oparg)) {
+        fprintf(stderr, "the accel parameter for vifs is currently not supported\n");
+    } else {
+        fprintf(stderr, "unrecognized argument `%s'\n", token);
+        return 1;
+    }
+    return 0;
+}
+
 static void parse_config_data(const char *config_source,
                               const char *config_data,
                               int config_len,
@@ -1552,7 +1619,7 @@ static void parse_config_data(const char *config_source,
         while ((buf = xlu_cfg_get_listitem (nics, d_config->num_nics)) != NULL) {
             libxl_device_nic *nic;
             char *buf2 = strdup(buf);
-            char *p, *p2;
+            char *p;
 
             d_config->nics = (libxl_device_nic *) realloc(d_config->nics, sizeof (libxl_device_nic) * (d_config->num_nics+1));
             nic = d_config->nics + d_config->num_nics;
@@ -1566,64 +1633,7 @@ static void parse_config_data(const char *config_source,
             do {
                 while (*p == ' ')
                     p++;
-                if ((p2 = strchr(p, '=')) == NULL)
-                    break;
-                *p2 = '\0';
-                if (!strcmp(p, "model")) {
-                    free(nic->model);
-                    nic->model = strdup(p2 + 1);
-                } else if (!strcmp(p, "mac")) {
-                    char *p3 = p2 + 1;
-                    *(p3 + 2) = '\0';
-                    nic->mac[0] = strtol(p3, NULL, 16);
-                    p3 = p3 + 3;
-                    *(p3 + 2) = '\0';
-                    nic->mac[1] = strtol(p3, NULL, 16);
-                    p3 = p3 + 3;
-                    *(p3 + 2) = '\0';
-                    nic->mac[2] = strtol(p3, NULL, 16);
-                    p3 = p3 + 3;
-                    *(p3 + 2) = '\0';
-                    nic->mac[3] = strtol(p3, NULL, 16);
-                    p3 = p3 + 3;
-                    *(p3 + 2) = '\0';
-                    nic->mac[4] = strtol(p3, NULL, 16);
-                    p3 = p3 + 3;
-                    *(p3 + 2) = '\0';
-                    nic->mac[5] = strtol(p3, NULL, 16);
-                } else if (!strcmp(p, "bridge")) {
-                    free(nic->bridge);
-                    nic->bridge = strdup(p2 + 1);
-                } else if (!strcmp(p, "type")) {
-                    if (!strcmp(p2 + 1, "ioemu"))
-                        nic->nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
-                    else
-                        nic->nictype = LIBXL_NIC_TYPE_VIF;
-                } else if (!strcmp(p, "ip")) {
-                    free(nic->ip);
-                    nic->ip = strdup(p2 + 1);
-                } else if (!strcmp(p, "script")) {
-                    free(nic->script);
-                    nic->script = strdup(p2 + 1);
-                } else if (!strcmp(p, "vifname")) {
-                    free(nic->ifname);
-                    nic->ifname = strdup(p2 + 1);
-                } else if (!strcmp(p, "backend")) {
-                    free(nic->backend_domname);
-                    nic->backend_domname = strdup(p2 + 1);
-                } else if (!strcmp(p, "rate")) {
-                    parse_vif_rate(&config, (p2 + 1), nic);
-                } else if (!strcmp(p, "accel")) {
-                    fprintf(stderr, "the accel parameter for vifs is currently not supported\n");
-                } else if (!strcmp(p, "netdev")) {
-                    fprintf(stderr, "the netdev parameter is deprecated, "
-                                    "please use gatewaydev instead\n");
-                    free(nic->gatewaydev);
-                    nic->gatewaydev = strdup(p2 + 1);
-                } else if (!strcmp(p, "gatewaydev")) {
-                    free(nic->gatewaydev);
-                    nic->gatewaydev = strdup(p2 + 1);
-                }
+                parse_nic_config(nic, &config, p);
             } while ((p = strtok(NULL, ",")) != NULL);
 skip_nic:
             free(buf2);
@@ -2136,17 +2146,6 @@ static int handle_domain_death(uint32_t *r_domid,
 
     return restart;
 }
-
-/* for now used only by main_networkattach, but can be reused elsewhere */
-static int match_option_size(const char *prefix, size_t len,
-        char *arg, char **argopt)
-{
-    int rc = strncmp(prefix, arg, len);
-    if (!rc) *argopt = arg+len;
-    return !rc;
-}
-#define MATCH_OPTION(prefix, arg, oparg) \
-    match_option_size((prefix "="), sizeof((prefix)), (arg), &(oparg))
 
 /* Preserve a copy of a domain under a new name. Updates *r_domid */
 static int preserve_domain(uint32_t *r_domid, libxl_event *event,
@@ -6166,10 +6165,6 @@ int main_networkattach(int argc, char **argv)
     int opt;
     libxl_device_nic nic;
     XLU_Config *config = 0;
-    char *endptr, *oparg;
-    const char *tok;
-    int i;
-    unsigned int val;
 
     SWITCH_FOREACH_OPT(opt, "", NULL, "network-attach", 1) {
         /* No options */
@@ -6192,50 +6187,8 @@ int main_networkattach(int argc, char **argv)
     set_default_nic_values(&nic);
 
     for (argv += optind+1, argc -= optind+1; argc > 0; ++argv, --argc) {
-        if (MATCH_OPTION("type", *argv, oparg)) {
-            if (!strcmp("vif", oparg)) {
-                nic.nictype = LIBXL_NIC_TYPE_VIF;
-            } else if (!strcmp("ioemu", oparg)) {
-                nic.nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
-            } else {
-                fprintf(stderr, "Invalid parameter `type'.\n");
-                return 1;
-            }
-        } else if (MATCH_OPTION("mac", *argv, oparg)) {
-            tok = strtok(oparg, ":");
-            for (i = 0; tok && i < 6; tok = strtok(NULL, ":"), ++i) {
-                val = strtoul(tok, &endptr, 16);
-                if ((tok == endptr) || (val > 255)) {
-                    fprintf(stderr, "Invalid parameter `mac'.\n");
-                    return 1;
-                }
-                nic.mac[i] = val;
-            }
-        } else if (MATCH_OPTION("bridge", *argv, oparg)) {
-            replace_string(&nic.bridge, oparg);
-        } else if (MATCH_OPTION("netdev", *argv, oparg)) {
-            fprintf(stderr, "the netdev parameter is deprecated, "
-                            "please use gatewaydev instead\n");
-            replace_string(&nic.gatewaydev, oparg);
-        } else if (MATCH_OPTION("gatewaydev", *argv, oparg)) {
-            replace_string(&nic.gatewaydev, oparg);
-        } else if (MATCH_OPTION("ip", *argv, oparg)) {
-            replace_string(&nic.ip, oparg);
-        } else if (MATCH_OPTION("script", *argv, oparg)) {
-            replace_string(&nic.script, oparg);
-        } else if (MATCH_OPTION("backend", *argv, oparg)) {
-            replace_string(&nic.backend_domname, oparg);
-        } else if (MATCH_OPTION("vifname", *argv, oparg)) {
-            replace_string(&nic.ifname, oparg);
-        } else if (MATCH_OPTION("model", *argv, oparg)) {
-            replace_string(&nic.model, oparg);
-        } else if (MATCH_OPTION("rate", *argv, oparg)) {
-            parse_vif_rate(&config, oparg, &nic);
-        } else if (MATCH_OPTION("accel", *argv, oparg)) {
-        } else {
-            fprintf(stderr, "unrecognized argument `%s'\n", *argv);
+        if (parse_nic_config(&nic, &config, *argv))
             return 1;
-        }
     }
 
     if (dryrun_only) {
