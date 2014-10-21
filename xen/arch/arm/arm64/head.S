@@ -736,20 +736,39 @@ ENTRY(lookup_processor_type)
         ret
 /*
  *  Function to transition from EFI loader in C, to Xen entry point.
- *  void noreturn efi_xen_start(void *fdt_ptr);
+ *  void noreturn efi_xen_start(void *fdt_ptr, uint32_t fdt_size);
  */
 ENTRY(efi_xen_start)
+        /*
+         * Preserve x0 (fdt pointer) across call to __flush_dcache_area,
+         * restore for entry into Xen.
+         */
+        mov   x20, x0
+
+        /* flush dcache covering the FDT updated by EFI boot code */
+        bl    __flush_dcache_area
+
+        /*
+         * Flush dcache covering current runtime addresses
+         * of xen text/data. Then flush all of icache.
+         */
+        adrp  x1, _start
+        add   x1, x1, #:lo12:_start
+        mov   x0, x1
+        adrp  x2, _end
+        add   x2, x2, #:lo12:_end
+        sub   x1, x2, x1
+
+        bl    __flush_dcache_area
+        ic    ialluis
+        tlbi  alle2
+
         /*
          * Turn off cache and MMU as Xen expects. EFI enables them, but also
          * mandates a 1:1 (unity) VA->PA mapping, so we can turn off the
          * MMU while executing EFI code before entering Xen.
          * The EFI loader calls this to start Xen.
-         * Preserve x0 (fdf pointer) across call to __flush_dcache_all,
-         * restore for entry into Xen.
          */
-        mov   x20, x0
-        bl    __flush_dcache_all
-        ic    ialluis
 
         /* Turn off Dcache and MMU */
         mrs   x0, sctlr_el2

@@ -7,7 +7,7 @@
 #include <xen/libfdt/libfdt.h>
 #include <asm/setup.h>
 
-void noreturn efi_xen_start(void *fdt_ptr);
+void noreturn efi_xen_start(void *fdt_ptr, uint32_t fdt_size);
 
 #define DEVICE_TREE_GUID \
 {0xb1b621d5, 0xf19c, 0x41a5, {0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0}}
@@ -343,7 +343,7 @@ static void __init efi_arch_pre_exit_boot(void)
 
 static void __init efi_arch_post_exit_boot(void)
 {
-    efi_xen_start(fdt);
+    efi_xen_start(fdt, fdt_totalsize(fdt));
 }
 
 static void __init efi_arch_cfg_file_early(EFI_FILE_HANDLE dir_handle, char *section)
