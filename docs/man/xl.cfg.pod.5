@@ -1164,6 +1164,21 @@ wallclock (i.e., real) time.
 
 =back
 
+=head3 Memory layout
+
+=over 4
+
+=item B<mmio_hole=MBYTES>
+
+Specifies the size the MMIO hole below 4GiB will be.  Only valid for
+device_model_version = "qemu-xen".
+
+Cannot be smaller than 256. Cannot be larger than 3840.
+
+Known good large value is 3072.
+
+=back
+
 =head3 Support for Paravirtualisation of HVM Guests
 
 The following options allow Paravirtualised features (such as devices)

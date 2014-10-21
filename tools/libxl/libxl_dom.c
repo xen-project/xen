@@ -23,6 +23,7 @@
 #include <xc_dom.h>
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/hvm_xs_strings.h>
+#include <xen/hvm/e820.h>
 
 libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
 {
@@ -800,6 +801,13 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     args.mem_size = (uint64_t)(info->max_memkb - info->video_memkb) << 10;
     args.mem_target = (uint64_t)(info->target_memkb - info->video_memkb) << 10;
     args.claim_enabled = libxl_defbool_val(info->claim_mode);
+    if (info->u.hvm.mmio_hole_memkb) {
+        uint64_t max_ram_below_4g = (1ULL << 32) -
+            (info->u.hvm.mmio_hole_memkb << 10);
+
+        if (max_ram_below_4g < HVM_BELOW_4G_MMIO_START)
+            args.mmio_size = info->u.hvm.mmio_hole_memkb << 10;
+    }
     if (libxl__domain_firmware(gc, info, &args)) {
         LOG(ERROR, "initializing domain firmware failed");
         goto out;

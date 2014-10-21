@@ -413,6 +413,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("timeoffset",       string),
                                        ("hpet",             libxl_defbool),
                                        ("vpt_align",        libxl_defbool),
+                                       ("mmio_hole_memkb",  MemKB),
                                        ("timer_mode",       libxl_timer_mode),
                                        ("nested_hvm",       libxl_defbool),
                                        ("smbios_firmware",  string),

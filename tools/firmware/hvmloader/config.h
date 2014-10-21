@@ -53,7 +53,6 @@ extern struct bios_config ovmf_config;
 #define PCI_ISA_IRQ_MASK    0x0c20U /* ISA IRQs 5,10,11 are PCI connected */
 
 /* MMIO hole: Hardcoded defaults, which can be dynamically expanded. */
-#define PCI_MEM_START       0xf0000000
 #define PCI_MEM_END         0xfc000000
 
 extern unsigned long pci_mem_start, pci_mem_end;

@@ -158,6 +158,11 @@
 #define LIBXL_BUILDINFO_HVM_VIRIDIAN_ENABLE_DISABLE_WIDTH 64
 
 /*
+ * libxl_domain_build_info has the u.hvm.mmio_hole_memkb field.
+ */
+#define LIBXL_HAVE_BUILDINFO_HVM_MMIO_HOLE_MEMKB 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

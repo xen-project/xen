@@ -34,6 +34,7 @@
 #include <ctype.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <xen/hvm/e820.h>
 
 #include "libxl.h"
 #include "libxl_utils.h"
@@ -1191,6 +1192,18 @@ static void parse_config_data(const char *config_source,
             exit(-ERROR_FAIL);
         }
 
+        if (!xlu_cfg_get_long(config, "mmio_hole", &l, 0)) {
+            uint64_t mmio_hole_size;
+
+            b_info->u.hvm.mmio_hole_memkb = l * 1024;
+            mmio_hole_size = b_info->u.hvm.mmio_hole_memkb * 1024;
+            if (mmio_hole_size < HVM_BELOW_4G_MMIO_LENGTH ||
+                mmio_hole_size > HVM_BELOW_4G_MMIO_START) {
+                fprintf(stderr,
+                        "ERROR: invalid value %ld for \"mmio_hole\"\n", l);
+                exit (1);
+            }
+        }
         if (!xlu_cfg_get_long(config, "timer_mode", &l, 1)) {
             const char *s = libxl_timer_mode_to_string(l);
             fprintf(stderr, "WARNING: specifying \"timer_mode\" as an integer is deprecated. "

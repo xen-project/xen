@@ -18,6 +18,7 @@
 #include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
+#include <xen/hvm/e820.h>
 
 static const char *libxl_tapif_script(libxl__gc *gc)
 {
@@ -416,6 +417,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     const libxl_vnc_info *vnc = libxl__dm_vnc(guest_config);
     const libxl_sdl_info *sdl = dm_sdl(guest_config);
     const char *keymap = dm_keymap(guest_config);
+    char *machinearg;
     flexarray_t *dm_args;
     int i, connection, devid;
     uint64_t ram_size;
@@ -720,10 +722,24 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             /* Switching here to the machine "pc" which does not add
              * the xen-platform device instead of the default "xenfv" machine.
              */
-            flexarray_append(dm_args, "pc,accel=xen");
+            machinearg = libxl__sprintf(gc, "pc,accel=xen");
         } else {
-            flexarray_append(dm_args, "xenfv");
+            machinearg = libxl__sprintf(gc, "xenfv");
         }
+        if (b_info->u.hvm.mmio_hole_memkb) {
+            uint64_t max_ram_below_4g = (1ULL << 32) -
+                (b_info->u.hvm.mmio_hole_memkb << 10);
+
+            if (max_ram_below_4g > HVM_BELOW_4G_MMIO_START) {
+                LOG(WARN, "mmio_hole_memkb=%"PRIu64
+                    " invalid ignored.\n",
+                    b_info->u.hvm.mmio_hole_memkb);
+            } else {
+                machinearg = libxl__sprintf(gc, "%s,max-ram-below-4g=%"PRIu64,
+                                            machinearg, max_ram_below_4g);
+            }
+        }
+        flexarray_append(dm_args, machinearg);
         for (i = 0; b_info->extra_hvm && b_info->extra_hvm[i] != NULL; i++)
             flexarray_append(dm_args, b_info->extra_hvm[i]);
         break;

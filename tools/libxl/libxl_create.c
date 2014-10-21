@@ -23,6 +23,7 @@
 #include <xc_dom.h>
 #include <xenguest.h>
 #include <xen/hvm/hvm_info_table.h>
+#include <xen/hvm/e820.h>
 
 int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                          libxl_domain_create_info *c_info)
@@ -226,6 +227,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     case LIBXL_DOMAIN_TYPE_HVM:
         if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
             b_info->shadow_memkb = 0;
+        if (b_info->u.hvm.mmio_hole_memkb == LIBXL_MEMKB_DEFAULT)
+            b_info->u.hvm.mmio_hole_memkb = 0;
 
         if (!b_info->u.hvm.vga.kind)
             b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
@@ -429,13 +432,25 @@ int libxl__domain_build(libxl__gc *gc,
         vments[4] = "start_time";
         vments[5] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
 
-        localents = libxl__calloc(gc, 7, sizeof(char *));
-        localents[0] = "platform/acpi";
-        localents[1] = libxl_defbool_val(info->u.hvm.acpi) ? "1" : "0";
-        localents[2] = "platform/acpi_s3";
-        localents[3] = libxl_defbool_val(info->u.hvm.acpi_s3) ? "1" : "0";
-        localents[4] = "platform/acpi_s4";
-        localents[5] = libxl_defbool_val(info->u.hvm.acpi_s4) ? "1" : "0";
+        localents = libxl__calloc(gc, 9, sizeof(char *));
+        i = 0;
+        localents[i++] = "platform/acpi";
+        localents[i++] = libxl_defbool_val(info->u.hvm.acpi) ? "1" : "0";
+        localents[i++] = "platform/acpi_s3";
+        localents[i++] = libxl_defbool_val(info->u.hvm.acpi_s3) ? "1" : "0";
+        localents[i++] = "platform/acpi_s4";
+        localents[i++] = libxl_defbool_val(info->u.hvm.acpi_s4) ? "1" : "0";
+        if (info->u.hvm.mmio_hole_memkb) {
+            uint64_t max_ram_below_4g =
+                (1ULL << 32) - (info->u.hvm.mmio_hole_memkb << 10);
+
+            if (max_ram_below_4g <= HVM_BELOW_4G_MMIO_START) {
+                localents[i++] = "platform/mmio_hole_size";
+                localents[i++] =
+                    libxl__sprintf(gc, "%"PRIu64,
+                                   info->u.hvm.mmio_hole_memkb << 10);
+            }
+        }
 
         break;
     case LIBXL_DOMAIN_TYPE_PV:

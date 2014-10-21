@@ -28,9 +28,10 @@
 #include <xen/memory.h>
 #include <xen/hvm/ioreq.h>
 #include <xen/hvm/hvm_xs_strings.h>
+#include <xen/hvm/e820.h>
 #include <stdbool.h>
 
-unsigned long pci_mem_start = PCI_MEM_START;
+unsigned long pci_mem_start = HVM_BELOW_4G_MMIO_START;
 unsigned long pci_mem_end = PCI_MEM_END;
 uint64_t pci_hi_mem_start = 0, pci_hi_mem_end = 0;
 
@@ -59,6 +60,7 @@ void pci_setup(void)
         uint64_t bar_sz;
     } *bars = (struct bars *)scratch_start;
     unsigned int i, nr_bars = 0;
+    uint64_t mmio_hole_size = 0;
 
     const char *s;
     /*
@@ -85,6 +87,10 @@ void pci_setup(void)
         allow_memory_relocate = strtoll(s, NULL, 0);
     printf("Relocating guest memory for lowmem MMIO space %s\n",
            allow_memory_relocate?"enabled":"disabled");
+
+    s = xenstore_read("platform/mmio_hole_size", NULL);
+    if ( s )
+        mmio_hole_size = strtoll(s, NULL, 0);
 
     /* Program PCI-ISA bridge with appropriate link routes. */
     isa_irq = 0;
@@ -237,26 +243,49 @@ void pci_setup(void)
         pci_writew(devfn, PCI_COMMAND, cmd);
     }
 
-    /*
-     * At the moment qemu-xen can't deal with relocated memory regions.
-     * It's too close to the release to make a proper fix; for now,
-     * only allow the MMIO hole to grow large enough to move guest memory
-     * if we're running qemu-traditional.  Items that don't fit will be
-     * relocated into the 64-bit address space.
-     *
-     * This loop now does the following:
-     * - If allow_memory_relocate, increase the MMIO hole until it's
-     *   big enough, or until it's 2GiB
-     * - If !allow_memory_relocate, increase the MMIO hole until it's
-     *   big enough, or until it's 2GiB, or until it overlaps guest
-     *   memory
-     */
-    while ( (mmio_total > (pci_mem_end - pci_mem_start)) 
-            && ((pci_mem_start << 1) != 0)
-            && (allow_memory_relocate
-                || (((pci_mem_start << 1) >> PAGE_SHIFT)
-                    >= hvm_info->low_mem_pgend)) )
-        pci_mem_start <<= 1;
+    if ( mmio_hole_size )
+    {
+        uint64_t max_ram_below_4g = (1ULL << 32) - mmio_hole_size;
+
+        if ( max_ram_below_4g > HVM_BELOW_4G_MMIO_START )
+        {
+            printf("max_ram_below_4g=0x"PRIllx
+                   " too big for mmio_hole_size=0x"PRIllx
+                   " has been ignored.\n",
+                   PRIllx_arg(max_ram_below_4g),
+                   PRIllx_arg(mmio_hole_size));
+        }
+        else
+        {
+            pci_mem_start = max_ram_below_4g;
+            printf("pci_mem_start=0x%lx (was 0x%x) for mmio_hole_size=%lu\n",
+                   pci_mem_start, HVM_BELOW_4G_MMIO_START,
+                   (long)mmio_hole_size);
+        }
+    }
+    else
+    {
+        /*
+         * At the moment qemu-xen can't deal with relocated memory regions.
+         * It's too close to the release to make a proper fix; for now,
+         * only allow the MMIO hole to grow large enough to move guest memory
+         * if we're running qemu-traditional.  Items that don't fit will be
+         * relocated into the 64-bit address space.
+         *
+         * This loop now does the following:
+         * - If allow_memory_relocate, increase the MMIO hole until it's
+         *   big enough, or until it's 2GiB
+         * - If !allow_memory_relocate, increase the MMIO hole until it's
+         *   big enough, or until it's 2GiB, or until it overlaps guest
+         *   memory
+         */
+        while ( (mmio_total > (pci_mem_end - pci_mem_start))
+                && ((pci_mem_start << 1) != 0)
+                && (allow_memory_relocate
+                    || (((pci_mem_start << 1) >> PAGE_SHIFT)
+                        >= hvm_info->low_mem_pgend)) )
+            pci_mem_start <<= 1;
+    }
 
     if ( mmio_total > (pci_mem_end - pci_mem_start) )
     {
