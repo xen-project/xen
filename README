@@ -90,8 +90,8 @@ performed with root privileges.]
 
 1. Download and untar the source tarball file. This will be a
    file named xen-unstable-src.tgz, or xen-$version-src.tgz.
-   You can also pull the current version from the mercurial
-   repository at http://xenbits.xen.org/
+   You can also pull the current version from the git or mercurial
+   repositories at http://xenbits.xen.org/
 
     # tar xzf xen-unstable-src.tgz
 
