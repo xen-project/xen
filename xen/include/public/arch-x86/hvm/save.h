@@ -568,6 +568,7 @@ struct hvm_hw_cpu_xsave {
 struct hvm_viridian_domain_context {
     uint64_t hypercall_gpa;
     uint64_t guest_os_id;
+    uint64_t time_ref_count;
 };
 
 DECLARE_HVM_SAVE_TYPE(VIRIDIAN_DOMAIN, 15, struct hvm_viridian_domain_context);

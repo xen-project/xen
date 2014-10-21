@@ -289,6 +289,39 @@ int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
     return 1;
 }
 
+static int64_t raw_trc_val(struct domain *d)
+{
+    uint64_t tsc;
+    struct time_scale tsc_to_ns;
+
+    tsc = hvm_get_guest_tsc(pt_global_vcpu_target(d));
+
+    /* convert tsc to count of 100ns periods */
+    set_time_scale(&tsc_to_ns, d->arch.tsc_khz * 1000ul);
+    return scale_delta(tsc, &tsc_to_ns) / 100ul;
+}
+
+void viridian_time_ref_count_freeze(struct domain *d)
+{
+    struct viridian_time_ref_count *trc;
+
+    trc = &d->arch.hvm_domain.viridian.time_ref_count;
+
+    if ( test_and_clear_bit(_TRC_running, &trc->flags) )
+        trc->val = raw_trc_val(d) + trc->off;
+}
+
+void viridian_time_ref_count_thaw(struct domain *d)
+{
+    struct viridian_time_ref_count *trc;
+
+    trc = &d->arch.hvm_domain.viridian.time_ref_count;
+
+    if ( !d->is_shutting_down &&
+         !test_and_set_bit(_TRC_running, &trc->flags) )
+        trc->off = (int64_t)trc->val - raw_trc_val(d);
+}
+
 int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
 {
     struct vcpu *v = current;
@@ -348,18 +381,19 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
 
     case VIRIDIAN_MSR_TIME_REF_COUNT:
     {
-        uint64_t tsc;
-        struct time_scale tsc_to_ns;
+        struct viridian_time_ref_count *trc;
+
+        trc = &d->arch.hvm_domain.viridian.time_ref_count;
 
         if ( !(viridian_feature_mask(d) & HVMPV_time_ref_count) )
             return 0;
 
-        perfc_incr(mshv_rdmsr_time_ref_count);
-        tsc = hvm_get_guest_tsc(pt_global_vcpu_target(d));
+        if ( !test_and_set_bit(_TRC_accessed, &trc->flags) )
+            printk(XENLOG_G_INFO "d%d: VIRIDIAN MSR_TIME_REF_COUNT: accessed\n",
+                   d->domain_id);
 
-        /* convert tsc to count of 100ns periods */
-        set_time_scale(&tsc_to_ns, d->arch.tsc_khz * 1000ul);
-        *val = scale_delta(tsc, &tsc_to_ns) / 100ul;
+        perfc_incr(mshv_rdmsr_time_ref_count);
+        *val = raw_trc_val(d) + trc->off;
         break;
     }
 
@@ -450,8 +484,9 @@ static int viridian_save_domain_ctxt(struct domain *d, hvm_domain_context_t *h)
     if ( !is_viridian_domain(d) )
         return 0;
 
-    ctxt.hypercall_gpa = d->arch.hvm_domain.viridian.hypercall_gpa.raw;
-    ctxt.guest_os_id   = d->arch.hvm_domain.viridian.guest_os_id.raw;
+    ctxt.time_ref_count = d->arch.hvm_domain.viridian.time_ref_count.val;
+    ctxt.hypercall_gpa  = d->arch.hvm_domain.viridian.hypercall_gpa.raw;
+    ctxt.guest_os_id    = d->arch.hvm_domain.viridian.guest_os_id.raw;
 
     return (hvm_save_entry(VIRIDIAN_DOMAIN, 0, h, &ctxt) != 0);
 }
@@ -460,11 +495,12 @@ static int viridian_load_domain_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_viridian_domain_context ctxt;
 
-    if ( hvm_load_entry(VIRIDIAN_DOMAIN, h, &ctxt) != 0 )
+    if ( hvm_load_entry_zeroextend(VIRIDIAN_DOMAIN, h, &ctxt) != 0 )
         return -EINVAL;
 
-    d->arch.hvm_domain.viridian.hypercall_gpa.raw = ctxt.hypercall_gpa;
-    d->arch.hvm_domain.viridian.guest_os_id.raw   = ctxt.guest_os_id;
+    d->arch.hvm_domain.viridian.time_ref_count.val = ctxt.time_ref_count;
+    d->arch.hvm_domain.viridian.hypercall_gpa.raw  = ctxt.hypercall_gpa;
+    d->arch.hvm_domain.viridian.guest_os_id.raw    = ctxt.guest_os_id;
 
     return 0;
 }

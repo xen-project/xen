@@ -706,6 +706,8 @@ void domain_shutdown(struct domain *d, u8 reason)
         v->paused_for_shutdown = 1;
     }
 
+    arch_domain_shutdown(d);
+
     __domain_finalise_shutdown(d);
 
     spin_unlock(&d->shutdown_lock);
@@ -925,31 +927,35 @@ int vcpu_unpause_by_systemcontroller(struct vcpu *v)
     return 0;
 }
 
-void domain_pause(struct domain *d)
+static void do_domain_pause(struct domain *d,
+                            void (*sleep_fn)(struct vcpu *v))
 {
     struct vcpu *v;
-
-    ASSERT(d != current->domain);
 
     atomic_inc(&d->pause_count);
 
     for_each_vcpu( d, v )
-        vcpu_sleep_sync(v);
+        sleep_fn(v);
+
+    arch_domain_pause(d);
+}
+
+void domain_pause(struct domain *d)
+{
+    ASSERT(d != current->domain);
+    do_domain_pause(d, vcpu_sleep_sync);
 }
 
 void domain_pause_nosync(struct domain *d)
 {
-    struct vcpu *v;
-
-    atomic_inc(&d->pause_count);
-
-    for_each_vcpu( d, v )
-        vcpu_sleep_nosync(v);
+    do_domain_pause(d, vcpu_sleep_nosync);
 }
 
 void domain_unpause(struct domain *d)
 {
     struct vcpu *v;
+
+    arch_domain_unpause(d);
 
     if ( atomic_dec_and_test(&d->pause_count) )
         for_each_vcpu( d, v )

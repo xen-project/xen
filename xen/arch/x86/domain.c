@@ -51,6 +51,7 @@
 #include <asm/fixmap.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
+#include <asm/hvm/viridian.h>
 #include <asm/debugreg.h>
 #include <asm/msr.h>
 #include <asm/traps.h>
@@ -664,6 +665,24 @@ void arch_domain_destroy(struct domain *d)
     cleanup_domain_irq_mapping(d);
 
     psr_free_rmid(d);
+}
+
+void arch_domain_shutdown(struct domain *d)
+{
+    if ( has_viridian_time_ref_count(d) )
+        viridian_time_ref_count_freeze(d);
+}
+
+void arch_domain_pause(struct domain *d)
+{
+    if ( has_viridian_time_ref_count(d) )
+        viridian_time_ref_count_freeze(d);
+}
+
+void arch_domain_unpause(struct domain *d)
+{
+    if ( has_viridian_time_ref_count(d) )
+        viridian_time_ref_count_thaw(d);
 }
 
 unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)

@@ -580,6 +580,18 @@ void arch_domain_destroy(struct domain *d)
     free_xenheap_page(d->shared_info);
 }
 
+void arch_domain_shutdown(struct domain *d)
+{
+}
+
+void arch_domain_pause(struct domain *d)
+{
+}
+
+void arch_domain_unpause(struct domain *d)
+{
+}
+
 static int is_guest_pv32_psr(uint32_t psr)
 {
     switch (psr & PSR_MODE_MASK)

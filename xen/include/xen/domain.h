@@ -59,6 +59,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags);
 
 void arch_domain_destroy(struct domain *d);
 
+void arch_domain_shutdown(struct domain *d);
+void arch_domain_pause(struct domain *d);
+void arch_domain_unpause(struct domain *d);
+
 int arch_set_info_guest(struct vcpu *, vcpu_guest_context_u);
 void arch_get_info_guest(struct vcpu *, vcpu_guest_context_u);
 

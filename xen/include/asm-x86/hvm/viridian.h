@@ -48,10 +48,24 @@ union viridian_hypercall_gpa
     } fields;
 };
 
+struct viridian_time_ref_count
+{
+    unsigned long flags;
+
+#define _TRC_accessed 0
+#define TRC_accessed (1 << _TRC_accessed)
+#define _TRC_running 1
+#define TRC_running (1 << _TRC_running)
+
+    uint64_t val;
+    int64_t off;
+};
+
 struct viridian_domain
 {
     union viridian_guest_os_id guest_os_id;
     union viridian_hypercall_gpa hypercall_gpa;
+    struct viridian_time_ref_count time_ref_count;
 };
 
 int
@@ -75,4 +89,17 @@ rdmsr_viridian_regs(
 int
 viridian_hypercall(struct cpu_user_regs *regs);
 
+void viridian_time_ref_count_freeze(struct domain *d);
+void viridian_time_ref_count_thaw(struct domain *d);
+
 #endif /* __ASM_X86_HVM_VIRIDIAN_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

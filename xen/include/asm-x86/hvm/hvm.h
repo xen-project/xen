@@ -340,11 +340,18 @@ static inline unsigned long hvm_get_shadow_gs_base(struct vcpu *v)
     return hvm_funcs.get_shadow_gs_base(v);
 }
 
+
+#define has_hvm_params(d) \
+    ((d)->arch.hvm_domain.params != NULL)
+
 #define viridian_feature_mask(d) \
-    ((d)->arch.hvm_domain.params[HVM_PARAM_VIRIDIAN])
+    (has_hvm_params(d) ? (d)->arch.hvm_domain.params[HVM_PARAM_VIRIDIAN] : 0)
 
 #define is_viridian_domain(d) \
     (is_hvm_domain(d) && (viridian_feature_mask(d) & HVMPV_base_freq))
+
+#define has_viridian_time_ref_count(d) \
+    (is_viridian_domain(d) && (viridian_feature_mask(d) & HVMPV_time_ref_count))
 
 void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
                                uint32_t *eax, uint32_t *ebx,
