@@ -649,16 +649,35 @@ int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
     if ( !vlapic_x2apic_mode(vlapic) )
         return X86EMUL_UNHANDLEABLE;
 
-    vlapic_read_aligned(vlapic, offset, &low);
     switch ( offset )
     {
     case APIC_ICR:
         vlapic_read_aligned(vlapic, APIC_ICR2, &high);
+        /* Fallthrough. */
+    case APIC_ID:
+    case APIC_LVR:
+    case APIC_TASKPRI:
+    case APIC_PROCPRI:
+    case APIC_LDR:
+    case APIC_SPIV:
+    case APIC_ISR ... APIC_ISR + 0x70:
+    case APIC_TMR ... APIC_TMR + 0x70:
+    case APIC_IRR ... APIC_IRR + 0x70:
+    case APIC_ESR:
+    case APIC_CMCI:
+    case APIC_LVTT:
+    case APIC_LVTTHMR:
+    case APIC_LVTPC:
+    case APIC_LVT0:
+    case APIC_LVT1:
+    case APIC_LVTERR:
+    case APIC_TMICT:
+    case APIC_TMCCT:
+    case APIC_TDCR:
+        vlapic_read_aligned(vlapic, offset, &low);
         break;
 
-    case APIC_EOI:
-    case APIC_ICR2:
-    case APIC_SELF_IPI:
+    default:
         return X86EMUL_UNHANDLEABLE;
     }
 
