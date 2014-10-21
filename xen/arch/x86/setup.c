@@ -508,7 +508,7 @@ static bool_t __init loader_is_grub2(const char *loader_name)
     return (p != NULL) && (p[5] != '0');
 }
 
-static char * __init cmdline_cook(char *p, char *loader_name)
+static char * __init cmdline_cook(char *p, const char *loader_name)
 {
     p = p ? : "";
 
