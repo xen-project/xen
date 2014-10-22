@@ -609,7 +609,7 @@ static void xcinfo2xlinfo(libxl_ctx *ctx,
     xlinfo->blocked  = !!(xcinfo->flags&XEN_DOMINF_blocked);
     xlinfo->running  = !!(xcinfo->flags&XEN_DOMINF_running);
 
-    if (xlinfo->shutdown || xlinfo->dying)
+    if (xlinfo->shutdown)
         xlinfo->shutdown_reason = (xcinfo->flags>>XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask;
     else
         xlinfo->shutdown_reason = LIBXL_SHUTDOWN_REASON_UNKNOWN;
