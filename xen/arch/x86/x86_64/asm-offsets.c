@@ -165,4 +165,5 @@ void __dummy__(void)
 
     OFFSET(MB_flags, multiboot_info_t, flags);
     OFFSET(MB_cmdline, multiboot_info_t, cmdline);
+    OFFSET(MB_mem_lower, multiboot_info_t, mem_lower);
 }

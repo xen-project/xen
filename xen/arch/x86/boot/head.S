@@ -101,7 +101,7 @@ __start:
          */
         testb   $MBI_MEMLIMITS,(%ebx)
         jz      2f                  /* not available? BDA value will be fine */
-        mov     4(%ebx),%edx
+        mov     MB_mem_lower(%ebx),%edx
         cmp     $0x100,%edx         /* is the multiboot value too small? */
         jb      2f                  /* if so, do not use it */
         shl     $10-4,%edx
