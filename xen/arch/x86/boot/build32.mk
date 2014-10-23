@@ -30,5 +30,6 @@ CFLAGS := $(filter-out -flto,$(CFLAGS))
 			esac; \
 		done
 
-reloc.o: $(BASEDIR)/include/asm-x86/config.h
+reloc.o: reloc.c $(RELOC_DEPS)
+
 .PRECIOUS: %.bin %.lnk
