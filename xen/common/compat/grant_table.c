@@ -146,11 +146,11 @@ int compat_grant_table_op(unsigned int cmd,
                 unsigned int max_frame_list_size_in_page =
                     (COMPAT_ARG_XLAT_SIZE - sizeof(*nat.setup)) /
                     sizeof(*nat.setup->frame_list.p);
-                if ( max_frame_list_size_in_page < max_nr_grant_frames )
+                if ( max_frame_list_size_in_page < max_grant_frames )
                 {
                     gdprintk(XENLOG_WARNING,
-                             "max_nr_grant_frames is too large (%u,%u)\n",
-                             max_nr_grant_frames, max_frame_list_size_in_page);
+                             "max_grant_frames is too large (%u,%u)\n",
+                             max_grant_frames, max_frame_list_size_in_page);
                     rc = -EINVAL;
                 }
                 else
@@ -284,11 +284,11 @@ int compat_grant_table_op(unsigned int cmd,
                 break;
             }
             if ( max_frame_list_size_in_pages <
-                 grant_to_status_frames(max_nr_grant_frames) )
+                 grant_to_status_frames(max_grant_frames) )
             {
                 gdprintk(XENLOG_WARNING,
-                         "grant_to_status_frames(max_nr_grant_frames) is too large (%u,%u)\n",
-                         grant_to_status_frames(max_nr_grant_frames),
+                         "grant_to_status_frames(max_grant_frames) is too large (%u,%u)\n",
+                         grant_to_status_frames(max_grant_frames),
                          max_frame_list_size_in_pages);
                 rc = -EINVAL;
                 break;

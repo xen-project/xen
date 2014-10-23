@@ -1054,7 +1054,7 @@ int xenmem_add_to_physmap_one(
         else
         {
             if ( (idx >= nr_grant_frames(d->grant_table)) &&
-                    (idx < max_nr_grant_frames) )
+                 (idx < max_grant_frames) )
                 gnttab_grow_table(d, idx + 1);
 
             if ( idx < nr_grant_frames(d->grant_table) )

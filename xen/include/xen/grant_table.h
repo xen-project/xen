@@ -49,10 +49,8 @@
 /* Default maximum size of a grant table. [POLICY] */
 #define DEFAULT_MAX_NR_GRANT_FRAMES   32
 #endif
-#ifndef max_nr_grant_frames /* to allow arch to override */
 /* The maximum size of a grant table. */
-extern unsigned int max_nr_grant_frames;
-#endif
+extern unsigned int max_grant_frames;
 
 /*
  * Tracks a mapping of another domain's grant reference. Each domain has a

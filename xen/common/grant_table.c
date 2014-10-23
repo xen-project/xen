@@ -40,16 +40,27 @@
 #include <xsm/xsm.h>
 #include <asm/flushtlb.h>
 
-#ifndef max_nr_grant_frames
-unsigned int max_nr_grant_frames = DEFAULT_MAX_NR_GRANT_FRAMES;
+/* 
+ * This option is deprecated, use gnttab_max_frames and
+ * gnttab_max_maptrack_frames instead.
+ */
+static unsigned int __initdata max_nr_grant_frames;
 integer_param("gnttab_max_nr_frames", max_nr_grant_frames);
-#endif
+
+unsigned int __read_mostly max_grant_frames;
+integer_param("gnttab_max_frames", max_grant_frames);
 
 /* The maximum number of grant mappings is defined as a multiplier of the
  * maximum number of grant table entries. This defines the multiplier used.
  * Pretty arbitrary. [POLICY]
+ * As gnttab_max_nr_frames has been deprecated, this multiplier is deprecated too.
+ * New options allow to set max_maptrack_frames and
+ * map_grant_table_frames independently.
  */
-#define MAX_MAPTRACK_TO_GRANTS_RATIO 8
+#define DEFAULT_MAX_MAPTRACK_FRAMES 256
+
+static unsigned int __read_mostly max_maptrack_frames;
+integer_param("gnttab_max_maptrack_frames", max_maptrack_frames);
 
 /*
  * The first two members of a grant entry are updated as a combined pair.
@@ -100,11 +111,6 @@ static inline unsigned int
 nr_maptrack_frames(struct grant_table *t)
 {
     return t->maptrack_limit / MAPTRACK_PER_PAGE;
-}
-
-static unsigned inline int max_nr_maptrack_frames(void)
-{
-    return (max_nr_grant_frames * MAX_MAPTRACK_TO_GRANTS_RATIO);
 }
 
 #define MAPTRACK_TAIL (~0u)
@@ -164,7 +170,7 @@ num_act_frames_from_sha_frames(const unsigned int num)
 }
 
 #define max_nr_active_grant_frames \
-    num_act_frames_from_sha_frames(max_nr_grant_frames)
+    num_act_frames_from_sha_frames(max_grant_frames)
 
 static inline unsigned int
 nr_active_grant_frames(struct grant_table *gt)
@@ -271,7 +277,7 @@ get_maptrack_handle(
     while ( unlikely((handle = __get_maptrack_handle(lgt)) == -1) )
     {
         nr_frames = nr_maptrack_frames(lgt);
-        if ( nr_frames >= max_nr_maptrack_frames() )
+        if ( nr_frames >= max_maptrack_frames )
             break;
 
         new_mt = alloc_xenheap_page();
@@ -1265,7 +1271,7 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
     struct grant_table *gt = d->grant_table;
     unsigned int i;
 
-    ASSERT(req_nr_frames <= max_nr_grant_frames);
+    ASSERT(req_nr_frames <= max_grant_frames);
 
     gdprintk(XENLOG_INFO,
             "Expanding dom (%d) grant table from (%d) to (%d) frames.\n",
@@ -1338,11 +1344,11 @@ gnttab_setup_table(
         return -EFAULT;
     }
 
-    if ( unlikely(op.nr_frames > max_nr_grant_frames) )
+    if ( unlikely(op.nr_frames > max_grant_frames) )
     {
         gdprintk(XENLOG_INFO, "Xen only supports up to %d grant-table frames"
                 " per domain.\n",
-                max_nr_grant_frames);
+                max_grant_frames);
         op.status = GNTST_general_error;
         goto out1;
     }
@@ -1377,7 +1383,7 @@ gnttab_setup_table(
     {
         gdprintk(XENLOG_INFO,
                  "Expand grant table to %u failed. Current: %u Max: %u\n",
-                 op.nr_frames, nr_grant_frames(gt), max_nr_grant_frames);
+                 op.nr_frames, nr_grant_frames(gt), max_grant_frames);
         op.status = GNTST_general_error;
         goto out3;
     }
@@ -1438,7 +1444,7 @@ gnttab_query_size(
     spin_lock(&d->grant_table->lock);
 
     op.nr_frames     = nr_grant_frames(d->grant_table);
-    op.max_nr_frames = max_nr_grant_frames;
+    op.max_nr_frames = max_grant_frames;
     op.status        = GNTST_okay;
 
     spin_unlock(&d->grant_table->lock);
@@ -2659,7 +2665,7 @@ grant_table_create(
 
     /* Tracking of mapped foreign frames table */
     if ( (t->maptrack = xzalloc_array(struct grant_mapping *,
-                                      max_nr_maptrack_frames())) == NULL )
+                                      max_maptrack_frames)) == NULL )
         goto no_mem_2;
     if ( (t->maptrack[0] = alloc_xenheap_page()) == NULL )
         goto no_mem_3;
@@ -2670,7 +2676,7 @@ grant_table_create(
     t->maptrack[0][i - 1].ref = MAPTRACK_TAIL;
 
     /* Shared grant table. */
-    if ( (t->shared_raw = xzalloc_array(void *, max_nr_grant_frames)) == NULL )
+    if ( (t->shared_raw = xzalloc_array(void *, max_grant_frames)) == NULL )
         goto no_mem_3;
     for ( i = 0; i < INITIAL_NR_GRANT_FRAMES; i++ )
     {
@@ -2681,7 +2687,7 @@ grant_table_create(
     
     /* Status pages for grant table - for version 2 */
     t->status = xzalloc_array(grant_status_t *,
-                              grant_to_status_frames(max_nr_grant_frames));
+                              grant_to_status_frames(max_grant_frames));
     if ( t->status == NULL )
         goto no_mem_4;
 
@@ -2930,6 +2936,24 @@ static struct keyhandler gnttab_usage_print_all_keyhandler = {
 
 static int __init gnttab_usage_init(void)
 {
+    if ( max_nr_grant_frames )
+    {
+        printk(XENLOG_WARNING
+               "gnttab_max_nr_frames is deprecated, use gnttab_max_frames instead\n");
+        if ( !max_grant_frames )
+            max_grant_frames = max_nr_grant_frames;
+        BUILD_BUG_ON(DEFAULT_MAX_MAPTRACK_FRAMES < DEFAULT_MAX_NR_GRANT_FRAMES);
+        if ( !max_maptrack_frames )
+            max_maptrack_frames = max_nr_grant_frames *
+                (DEFAULT_MAX_MAPTRACK_FRAMES / DEFAULT_MAX_NR_GRANT_FRAMES);
+    }
+
+    if ( !max_grant_frames )
+        max_grant_frames = DEFAULT_MAX_NR_GRANT_FRAMES;
+
+    if ( !max_maptrack_frames )
+        max_maptrack_frames = DEFAULT_MAX_MAPTRACK_FRAMES;
+
     register_keyhandler('g', &gnttab_usage_print_all_keyhandler);
     return 0;
 }

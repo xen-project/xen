@@ -608,10 +608,25 @@ does not provide VM\_ENTRY\_LOAD\_GUEST\_PAT.
 
 Specify the serial parameters for the GDB stub.
 
-### gnttab\_max\_nr\_frames
+### gnttab\_max\_frames
 > `= <integer>`
 
 Specify the maximum number of frames per grant table operation.
+
+### gnttab\_max\_maptrack\_frames
+> `= <integer>`
+
+Specify the maximum number of maptrack frames domain.
+The default value is 8 times gnttab_max_frames.
+
+### gnttab\_max\_nr\_frames
+> `= <integer>`
+
+*Deprecated*
+Use gnttab\_max\_frames and gnttab\_max\_maptrack\_frames instead.
+
+Specify the maximum number of frames per grant table operation and the
+maximum number of maptrack frames domain.
 
 ### guest\_loglvl
 > `= <level>[/<rate-limited level>]` where level is `none | error | warning | info | debug | all`
