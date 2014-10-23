@@ -271,6 +271,9 @@ static void __init PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode)
     case EFI_COMPROMISED_DATA:
         mesg = L"Compromised data";
         break;
+    case EFI_BUFFER_TOO_SMALL:
+        mesg = L"Buffer too small";
+        break;
     default:
         PrintErr(L"ErrCode: ");
         DisplayUint(ErrCode, 0);
@@ -1038,7 +1041,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     efi_bs->GetMemoryMap(&efi_memmap_size, NULL, &map_key,
                          &efi_mdesc_size, &mdesc_ver);
-    efi_memmap = efi_arch_allocate_mmap_buffer(efi_memmap_size);
+    efi_memmap = efi_arch_allocate_mmap_buffer(&efi_memmap_size);
     if ( !efi_memmap )
         blexit(L"Unable to allocate memory for EFI memory map");
 
