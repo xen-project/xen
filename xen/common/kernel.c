@@ -332,8 +332,6 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
                 break;
             }
 #endif
-            if ( is_domain_direct_mapped(d) )
-                fi.submap |= 1U << XENFEAT_grant_map_identity;
             break;
         default:
             return -EINVAL;
