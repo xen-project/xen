@@ -5252,6 +5252,7 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         return NULL;
     }
 
+    *nr_cpus_out = libxl_get_max_cpus(ctx);
     ret = ptr = libxl__calloc(NOGC, domaininfo.max_vcpu_id + 1,
                               sizeof(libxl_vcpuinfo));
 
