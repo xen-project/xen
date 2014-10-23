@@ -1,0 +1,341 @@
+
+Compiling Xen from source
+
+* Overview
+* Options recognized by configure
+* Variables recognized by make
+* Systemd support
+* History of options
+* Examples
+
+Overview
+========
+
+The xen source contains four subsystems: xen, tools, stubdom and docs.
+All but xen have to be prepared for build with a configure script in the
+toplevel directory. configure recognizes certain arguments and
+environment variables which are used to adjust various aspects of the
+following compile process. Once configure is done, make(1) has to be
+called. Also make(1) recognizes certain arguments. The following sections
+will give an overview.
+
+Options recognized by configure
+===============================
+
+The configure script in the toplevel directory will recognize these
+options. It will pass them to the configure scripts in the tools,
+stubdom, and docs directory.
+
+Individual subsystems can be selected by one of the following options.
+Please note that stubdom requires tools.
+  --disable-xen
+  --disable-tools
+  --enable-stubdom
+  --disable-docs
+
+The well known GNU configure options to specify the target directories.
+Some components of these paths will be compiled into the binaries.
+Note: prefix defaults to /usr/local, sysconfdir defaults to /etc,
+localstatedir defaults to /var.
+  --prefix=DIR
+  --libdir=DIR
+  --libexecdir=BASEDIR
+  --bindir=DIR
+  --sbindir=DIR
+  --sysconfdir=DIR
+  --sharedstatedir=DIR
+  --localstatedir=DIR
+  --includedir=DIR
+  --datarootdir=DIR
+  --datadir=DIR
+  --mandir=DIR
+  --docdir=DIR
+
+To automatically run the toolstack in dom0 during system startup some
+sysv runlevel scripts are installed. This option allows to set the path
+for a given system. Possible values are /etc/init.d, /etc/rc.d/init.d or
+/etc/rc.d. If not specified configure tries to guess the path.
+  --with-initddir=DIR
+
+The runlevel scripts load certain configuration files. They are
+typically located in a subdirectory of /etc. Possible values are this
+subdirectory are "sysconfig" or "default". If not specified configure
+tries to guess the subdir.
+  --with-sysconfig-leaf-dir=SUBDIR
+
+If the tools are configured with a non-standard --prefix the runtime
+linker will either not find the required libraries or it will load them
+from a wrong location. Compiling the tools with rpath will force the
+linker to look in the correct location.
+  --enable-rpath
+
+During build in a git checkout the buildsystem needs to download
+additional tools such as qemu. This is done with either the native git
+protocol, or via http if this option is enabled.
+  --enable-githttp
+
+Disable xenstat and xentop monitoring tools.
+  --disable-monitors
+
+Disable build of certain ocaml libraries and tools. To actually build
+them ocaml development packages must be installed. If they are missing
+configure will automatically disable this option.
+  --disable-ocamltools
+
+Disable XSM policy compilation.
+  --disable-xsmpolicy
+
+Attempt to build of an OVMF firmware binary. This requires special
+versions of development tools. Use at your own risk.
+  --enable-ovmf
+
+Use the given OVMF binary instead of compiling a private copy.
+  --with-system-ovmf=PATH
+
+Build a private copy of SeaBIOS.
+  --disable-seabios
+
+Use the given SeaBIOS binary instead of compiling a private copy.
+  --with-system-seabios=PATH
+
+Build the old qemu used by xm/xend. This is required if existing domUs
+should be migrated to this host, or if existing domU snapshots should be
+started with this version of the tools. Only if all domUs used the new
+upstream qemu during initial start it is safe to disable this option.
+The old qemu requires rombios, which can be disable along with
+qemu-traditional.
+  --enable-qemu-traditional
+  --enable-rombios
+
+The libxl toolstack uses the upstream qemu per default. A private copy
+will be built. If desired this private copy can be configured with
+additional options passed to its configure script.
+  --with-extra-qemuu-configure-args="arg1 arg2"
+
+Use the given qemu binary instead of compiling a private copy.
+  --with-system-qemu=PATH
+
+A dom0 requires a set of backend drivers. The configure script already
+supplies a list of known drivers which are automatically loaded in dom0.
+This internal list can be changed with this option.
+  --with-linux-backend-modules="kmod1 kmod2"
+
+Two variants of a xenstored exist: the original xenstored written in C
+(xenstored) or the newer and robust one written in Ocaml (oxenstored).
+The oxenstored daemon is the default but can only be used if the
+required ocaml packages are installed. In case they are missing the
+original xenstored will be used. Valid names are xenstored and
+oxenstored.
+  --with-xenstored=name
+
+Using additional CFLAGS to build tools running in dom0 is required when
+building distro packages. This is the option to pass things like
+RPM_OPT_FLAGS.
+  --with-extra-cflags-tools=EXTRA_CFLAGS
+  --with-extra-cflags-qemu-traditional=EXTRA_CFLAGS
+  --with-extra-cflags-qemu-upstream=EXTRA_CFLAGS
+
+Instead of starting the tools in dom0 with sysv runlevel scripts they
+can also be started by systemd. If this option is enabled xenstored will
+receive the communication socked directly from systemd. So starting it
+manually will not work anymore. The paths to systemd internals can also
+be changed in case the default paths do not fit anymore.
+NOTE: if systemd development packages are installed the systemd support
+will be the enabled per default. Using --disable-systemd will override
+this detection and the sysv runlevel scripts have to be used.
+  --enable-systemd
+  --with-systemd=DIR
+  --with-systemd-modules-load=DIR
+
+The old backend drivers are disabled because qdisk is now the default.
+This option can be used to build them anyway.
+  --enable-blktap1
+  --enable-blktap2
+
+Build various stubom components, some are only example code. Its usually
+enough to specify just --enable-stubdom and leave these options alone.
+  --enable-ioemu-stubdom
+  --enable-c-stubdom
+  --enable-caml-stubdom
+  --disable-pv-grub
+  --disable-xenstore-stubdom
+  --enable-vtpm-stubdom
+  --enable-vtpmmgr-stubdom
+  --disable-extfiles
+
+Per default some parts of the tools code will print additional runtime
+debug. This option can be used to disable such code paths.
+  --disable-debug
+
+The configure script recognizes also many environment variables. Calling
+the individual configure scripts in the subdirectories with the "--help"
+option will list these environment variables.
+
+Variables recognized by make
+==========================
+
+The following variables are recognized by the build system. They have to
+be passed as make options, like 'make variable=value'. Having these
+variables in the environment, like 'env variable=value make', will not
+work for most of them.
+
+In addition to pass variables as make options it is also supported to
+create a ".config" file in the toplevel directory. The file will be
+sourced by make(1).
+
+The well known variable to specify an offset during make install,
+useful for packaging.
+DESTDIR=
+
+Per default some parts of the tools code will print additional runtime
+debug. This option can be used to disable such code paths.
+debug=y
+debug_symbols=y
+
+If --prefix= was used during configure the and ocaml was enabled the
+resulting libraries will not be installed in the specified path. Instead
+the path provided by ocamlfind(1) will be used. This variable can be
+used to override this path. Using the environment variable
+OCAMLFIND_DESTDIR= and OCAMLFIND_METADIR= will have the same effect.
+OCAMLDESTDIR=
+
+The xen subsystem will install the hypervisor into fixed locations.
+BOOT_DIR defaults to /boot, EFI_DIR to /usr/lib64/efi.
+BOOT_DIR=
+EFI_DIR=
+
+The make target 'rpmball' will build a xen.rpm. This variable can be
+used to append a custom string to the name.
+PKG_SUFFIX=
+
+The hypervisor will report a certain version string. This variable can
+be used to append a custom string to the version.
+XEN_VENDORVERSION=
+
+During boot xen will report a certain user@host string, which can be
+changed with these variables.
+XEN_WHOAMI=
+XEN_DOMAIN=
+
+The following variables can be used to tweak some aspects of the
+hypervisor build.
+verbose=y
+perfc=y
+perfc_arrays=y
+lock_profile=y
+crash_debug=y
+frame_pointer=y
+lto=y
+
+During tools build external repos will be cloned into the source tree.
+This variable can be used to point to a different git binary to be used.
+GIT=
+
+During tools build external repos will be cloned into the source tree.
+During stubdom build external packages will be downloaded into the
+source tree. These variables can be used to point to a different
+locations.
+XEN_EXTFILES_URL=
+OVMF_UPSTREAM_URL=
+QEMU_UPSTREAM_URL=
+QEMU_TRADITIONAL_URL=
+SEABIOS_UPSTREAM_URL=
+
+This variable can be used to use DIR/include and DIR/lib during build.
+This is the same as PREPEND_LIB and PREPEND_INCLUDES. APPEND_LIB and
+APPEND_INCLUDES= will be appended to the CFLAGS/LDFLAGS variable.
+EXTRA_PREFIX=DIR
+PREPEND_LIB=DIR
+PREPEND_INCLUDES=DIR
+APPEND_LIB=DIR
+APPEND_INCLUDES=DIR
+
+While the tools build will set the path to the python binary with the
+configure script, the hypervisor build has to use this variable to use a
+different python binary.
+PYTHON=
+
+Building the python tools may fail unless certain options are passed to
+setup.py. Config.mk contains additional info how to use this variable.
+PYTHON_PREFIX_ARG=
+
+The hypervisor may be build with XSM support, which can be changed with
+the following variables.
+XSM_ENABLE=y
+FLASK_ENABLE=y
+
+Do a build for coverage.
+coverage=y
+
+Use clang instead of GCC.
+clang=y
+
+
+Systemd support
+===============
+
+If the systemd development packages are available then the support for
+systemd will be enabled per default. It is required to manually enable
+the installed systemd service files. Systemd has dependency tracking,
+which means all dependencies will be started automatically:
+
+systemctl enable xen-qemu-dom0-disk-backend.service
+systemctl enable xen-init-dom0.service
+systemctl enable xenconsoled.service
+
+Other optional services are:
+systemctl enable xen-domains.service
+systemctl enable xen-watchdog.service
+
+
+History of options
+==================
+
+Prior to xen-4.5 configure recognized essentially only the --prefix= and
+--libdir= option to specify target directories. Starting with xen-4.5
+all paths can be adjusted once with configure.
+
+
+Examples
+========
+
+* To build a private copy of tools and xen:
+configure --prefix=/odd/path --sysconfdir=/odd/path/etc --enable-rpath
+make
+sudo make install BOOT_DIR=/ood/path/boot EFI_DIR=/odd/path/efi
+
+
+* Use configure and make to build a distro rpm package (it is required
+  to unset variables set by the rpm configure macro):
+%build
+export WGET=$(type -P false)
+export GIT=$(type -P false)
+%configure \
+        --with-extra-cflags-tools="$RPM_OPT_FLAGS" \
+        --with-extra-cflags-qemu-traditional="$RPM_OPT_FLAGS" \
+        --with-extra-cflags-qemu-upstream="$RPM_OPT_FLAGS" \
+        --with-initddir=%{_initddir}
+unset CFLAGS CXXFLAGS FFLAGS LDFLAGS
+make
+%install
+make install \
+        SYSCONFIG_DIR=/var/adm/fillup-templates \
+        DESTDIR=$RPM_BUILD_ROOT
+
+
+* To build xen and tools using a cross compiler:
+./configure --build=x86_64-unknown-linux-gnu --host=aarch64-linux-gnu
+make XEN_TARGET_ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
+make XEN_TARGET_ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+        DESTDIR=/some/path install
+
+
+TODO
+====
+
+ - DESTDIR should be empty, not "/"
+ - add make uninstall targets
+ - replace private path variables as needed (SBINDIR/sbindir)
+ - ...
+
+# vim: tw=72 et
