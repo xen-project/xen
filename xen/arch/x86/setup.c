@@ -902,11 +902,13 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                 "movq %%cr4,%%rsi ; "
                 "andb $0x7f,%%sil ; "
                 "movq %%rsi,%%cr4 ; " /* CR4.PGE == 0 */
-                "movq %0,%%cr3    ; " /* CR3 == new pagetables */
+                "movq %[pg],%%cr3 ; " /* CR3 == new pagetables */
                 "orb $0x80,%%sil  ; "
                 "movq %%rsi,%%cr4   " /* CR4.PGE == 1 */
-                : : "r" (__pa(idle_pg_table)), "S" (cpu0_stack),
-                "D" (__va(__pa(cpu0_stack))), "c" (STACK_SIZE / 8) : "memory" );
+                : "=&S" (i), "=&D" (i), "=&c" (i) /* All outputs discarded. */
+                :  [pg] "r" (__pa(idle_pg_table)), "0" (cpu0_stack),
+                   "1" (__va(__pa(cpu0_stack))), "2" (STACK_SIZE / 8)
+                : "memory" );
 
             bootstrap_map(NULL);
         }
