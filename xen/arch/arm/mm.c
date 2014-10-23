@@ -388,7 +388,7 @@ void flush_page_to_ram(unsigned long mfn)
 {
     void *v = map_domain_page(mfn);
 
-    clean_and_invalidate_xen_dcache_va_range(v, PAGE_SIZE);
+    clean_and_invalidate_dcache_va_range(v, PAGE_SIZE);
     unmap_domain_page(v);
 }
 
@@ -511,17 +511,17 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     /* Clear the copy of the boot pagetables. Each secondary CPU
      * rebuilds these itself (see head.S) */
     memset(boot_pgtable, 0x0, PAGE_SIZE);
-    clean_and_invalidate_xen_dcache(boot_pgtable);
+    clean_and_invalidate_dcache(boot_pgtable);
 #ifdef CONFIG_ARM_64
     memset(boot_first, 0x0, PAGE_SIZE);
-    clean_and_invalidate_xen_dcache(boot_first);
+    clean_and_invalidate_dcache(boot_first);
     memset(boot_first_id, 0x0, PAGE_SIZE);
-    clean_and_invalidate_xen_dcache(boot_first_id);
+    clean_and_invalidate_dcache(boot_first_id);
 #endif
     memset(boot_second, 0x0, PAGE_SIZE);
-    clean_and_invalidate_xen_dcache(boot_second);
+    clean_and_invalidate_dcache(boot_second);
     memset(boot_third, 0x0, PAGE_SIZE);
-    clean_and_invalidate_xen_dcache(boot_third);
+    clean_and_invalidate_dcache(boot_third);
 
     /* Break up the Xen mapping into 4k pages and protect them separately. */
     for ( i = 0; i < LPAE_ENTRIES; i++ )
@@ -559,7 +559,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 
     /* Make sure it is clear */
     memset(this_cpu(xen_dommap), 0, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
-    clean_xen_dcache_va_range(this_cpu(xen_dommap),
+    clean_dcache_va_range(this_cpu(xen_dommap),
                               DOMHEAP_SECOND_PAGES*PAGE_SIZE);
 #endif
 }
@@ -570,7 +570,7 @@ int init_secondary_pagetables(int cpu)
     /* Set init_ttbr for this CPU coming up. All CPus share a single setof
      * pagetables, but rewrite it each time for consistency with 32 bit. */
     init_ttbr = (uintptr_t) xen_pgtable + phys_offset;
-    clean_xen_dcache(init_ttbr);
+    clean_dcache(init_ttbr);
     return 0;
 }
 #else
@@ -605,15 +605,15 @@ int init_secondary_pagetables(int cpu)
         write_pte(&first[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)], pte);
     }
 
-    clean_xen_dcache_va_range(first, PAGE_SIZE);
-    clean_xen_dcache_va_range(domheap, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
+    clean_dcache_va_range(first, PAGE_SIZE);
+    clean_dcache_va_range(domheap, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
 
     per_cpu(xen_pgtable, cpu) = first;
     per_cpu(xen_dommap, cpu) = domheap;
 
     /* Set init_ttbr for this CPU coming up */
     init_ttbr = __pa(first);
-    clean_xen_dcache(init_ttbr);
+    clean_dcache(init_ttbr);
 
     return 0;
 }
@@ -1287,7 +1287,7 @@ void clear_and_clean_page(struct page_info *page)
     void *p = __map_domain_page(page);
 
     clear_page(p);
-    clean_xen_dcache_va_range(p, PAGE_SIZE);
+    clean_dcache_va_range(p, PAGE_SIZE);
     unmap_domain_page(p);
 }
 

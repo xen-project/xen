@@ -374,7 +374,7 @@ int __cpu_up(unsigned int cpu)
 
     /* Open the gate for this CPU */
     smp_up_cpu = cpu_logical_map(cpu);
-    clean_xen_dcache(smp_up_cpu);
+    clean_dcache(smp_up_cpu);
 
     rc = arch_cpu_up(cpu);
 

@@ -268,48 +268,48 @@ extern size_t cacheline_bytes;
 /* Functions for flushing medium-sized areas.
  * if 'range' is large enough we might want to use model-specific
  * full-cache flushes. */
-static inline void clean_xen_dcache_va_range(const void *p, unsigned long size)
+static inline void clean_dcache_va_range(const void *p, unsigned long size)
 {
     const void *end;
     dsb(sy);           /* So the CPU issues all writes to the range */
     for ( end = p + size; p < end; p += cacheline_bytes )
-        asm volatile (__clean_xen_dcache_one(0) : : "r" (p));
+        asm volatile (__clean_dcache_one(0) : : "r" (p));
     dsb(sy);           /* So we know the flushes happen before continuing */
 }
 
-static inline void clean_and_invalidate_xen_dcache_va_range
+static inline void clean_and_invalidate_dcache_va_range
     (const void *p, unsigned long size)
 {
     const void *end;
     dsb(sy);         /* So the CPU issues all writes to the range */
     for ( end = p + size; p < end; p += cacheline_bytes )
-        asm volatile (__clean_and_invalidate_xen_dcache_one(0) : : "r" (p));
+        asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p));
     dsb(sy);         /* So we know the flushes happen before continuing */
 }
 
 /* Macros for flushing a single small item.  The predicate is always
  * compile-time constant so this will compile down to 3 instructions in
  * the common case. */
-#define clean_xen_dcache(x) do {                                        \
+#define clean_dcache(x) do {                                            \
     typeof(x) *_p = &(x);                                               \
     if ( sizeof(x) > MIN_CACHELINE_BYTES || sizeof(x) > alignof(x) )    \
-        clean_xen_dcache_va_range(_p, sizeof(x));                       \
+        clean_dcache_va_range(_p, sizeof(x));                           \
     else                                                                \
         asm volatile (                                                  \
             "dsb sy;"   /* Finish all earlier writes */                 \
-            __clean_xen_dcache_one(0)                                   \
+            __clean_dcache_one(0)                                       \
             "dsb sy;"   /* Finish flush before continuing */            \
             : : "r" (_p), "m" (*_p));                                   \
 } while (0)
 
-#define clean_and_invalidate_xen_dcache(x) do {                         \
+#define clean_and_invalidate_dcache(x) do {                             \
     typeof(x) *_p = &(x);                                               \
     if ( sizeof(x) > MIN_CACHELINE_BYTES || sizeof(x) > alignof(x) )    \
-        clean_and_invalidate_xen_dcache_va_range(_p, sizeof(x));        \
+        clean_and_invalidate_dcache_va_range(_p, sizeof(x));            \
     else                                                                \
         asm volatile (                                                  \
             "dsb sy;"   /* Finish all earlier writes */                 \
-            __clean_and_invalidate_xen_dcache_one(0)                    \
+            __clean_and_invalidate_dcache_one(0)                        \
             "dsb sy;"   /* Finish flush before continuing */            \
             : : "r" (_p), "m" (*_p));                                   \
 } while (0)

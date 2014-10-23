@@ -350,7 +350,7 @@ static inline void p2m_write_pte(lpae_t *p, lpae_t pte, bool_t flush_cache)
 {
     write_pte(p, pte);
     if ( flush_cache )
-        clean_xen_dcache(*p);
+        clean_dcache(*p);
 }
 
 /*
@@ -410,7 +410,7 @@ static int p2m_create_table(struct domain *d, lpae_t *entry,
         clear_page(p);
 
     if ( flush_cache )
-        clean_xen_dcache_va_range(p, PAGE_SIZE);
+        clean_dcache_va_range(p, PAGE_SIZE);
 
     unmap_domain_page(p);
 

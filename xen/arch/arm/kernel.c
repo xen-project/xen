@@ -57,7 +57,7 @@ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
 
         set_fixmap(FIXMAP_MISC, p, BUFFERABLE);
         memcpy(dst, src + s, l);
-        clean_xen_dcache_va_range(dst, l);
+        clean_dcache_va_range(dst, l);
 
         paddr += l;
         dst += l;
