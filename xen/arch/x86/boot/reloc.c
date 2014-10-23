@@ -46,7 +46,7 @@ static void *reloc_mbi_struct(void *old, unsigned int bytes)
     "    mov  %0,%%edi                \n"
     "    rep  movsb                   \n"
        : "=&r" (new), "+c" (bytes), "+S" (old)
-	: : "edx", "edi");
+	: : "edx", "edi", "memory");
     return new;
 }
 
