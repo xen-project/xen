@@ -1157,13 +1157,29 @@ struct page_info *get_page_from_gva(struct domain *d, vaddr_t va,
 {
     struct p2m_domain *p2m = &d->arch.p2m;
     struct page_info *page = NULL;
-    paddr_t maddr;
-
-    ASSERT(d == current->domain);
+    paddr_t maddr = 0;
+    int rc;
 
     spin_lock(&p2m->lock);
 
-    if ( gvirt_to_maddr(va, &maddr, flags) )
+    if ( unlikely(d != current->domain) )
+    {
+        unsigned long irq_flags;
+
+        local_irq_save(irq_flags);
+        p2m_load_VTTBR(d);
+
+        rc = gvirt_to_maddr(va, &maddr, flags);
+
+        p2m_load_VTTBR(current->domain);
+        local_irq_restore(irq_flags);
+    }
+    else
+    {
+        rc = gvirt_to_maddr(va, &maddr, flags);
+    }
+
+    if ( rc )
         goto err;
 
     if ( !mfn_valid(maddr >> PAGE_SHIFT) )
