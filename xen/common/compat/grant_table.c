@@ -51,16 +51,21 @@ CHECK_gnttab_get_version;
 CHECK_gnttab_swap_grant_ref;
 #undef xen_gnttab_swap_grant_ref
 
+#define xen_gnttab_cache_flush gnttab_cache_flush
+CHECK_gnttab_cache_flush;
+#undef xen_gnttab_cache_flush
+
 int compat_grant_table_op(unsigned int cmd,
                           XEN_GUEST_HANDLE_PARAM(void) cmp_uop,
                           unsigned int count)
 {
     int rc = 0;
-    unsigned int i;
+    unsigned int i, cmd_op;
     XEN_GUEST_HANDLE_PARAM(void) cnt_uop;
 
     set_xen_guest_handle(cnt_uop, NULL);
-    switch ( cmd )
+    cmd_op = cmd & GNTTABOP_CMD_MASK;
+    switch ( cmd_op )
     {
 #define CASE(name) \
     case GNTTABOP_##name: \
@@ -106,6 +111,10 @@ int compat_grant_table_op(unsigned int cmd,
     CASE(swap_grant_ref);
 #endif
 
+#ifndef CHECK_gnttab_cache_flush
+    CASE(cache_flush);
+#endif
+
 #undef CASE
     default:
         return do_grant_table_op(cmd, cmp_uop, count);
@@ -132,7 +141,7 @@ int compat_grant_table_op(unsigned int cmd,
         } cmp;
 
         set_xen_guest_handle(nat.uop, COMPAT_ARG_XLAT_VIRT_BASE);
-        switch ( cmd )
+        switch ( cmd_op )
         {
         case GNTTABOP_setup_table:
             if ( unlikely(count > 1) )

@@ -62,6 +62,10 @@ integer_param("gnttab_max_frames", max_grant_frames);
 static unsigned int __read_mostly max_maptrack_frames;
 integer_param("gnttab_max_maptrack_frames", max_maptrack_frames);
 
+#define GNTTABOP_CONTINUATION_ARG_SHIFT 12
+#define GNTTABOP_CMD_MASK               ((1<<GNTTABOP_CONTINUATION_ARG_SHIFT)-1)
+#define GNTTABOP_ARG_MASK               (~GNTTABOP_CMD_MASK)
+
 /*
  * The first two members of a grant entry are updated as a combined pair.
  * The following union allows that to happen in an endian-neutral fashion.
@@ -488,6 +492,43 @@ static int _set_status(unsigned gt_version,
         return _set_status_v1(domid, readonly, mapflag, shah, act);
     else
         return _set_status_v2(domid, readonly, mapflag, shah, act, status);
+}
+
+static int grant_map_exists(const struct domain *ld,
+                            struct grant_table *rgt,
+                            unsigned long mfn,
+                            unsigned int *ref_count)
+{
+    const struct active_grant_entry *act;
+    unsigned int ref, max_iter;
+    
+    ASSERT(spin_is_locked(&rgt->lock));
+
+    max_iter = min(*ref_count + (1 << GNTTABOP_CONTINUATION_ARG_SHIFT),
+                   nr_grant_entries(rgt));
+    for ( ref = *ref_count; ref < max_iter; ref++ )
+    {
+        act = &active_entry(rgt, ref);
+
+        if ( !act->pin )
+            continue;
+
+        if ( act->domid != ld->domain_id )
+            continue;
+
+        if ( act->frame != mfn )
+            continue;
+
+        return 0;
+    }
+
+    if ( ref < nr_grant_entries(rgt) )
+    {
+        *ref_count = ref;
+        return 1;
+    }
+
+    return -EINVAL;
 }
 
 static void mapcount(
@@ -2488,17 +2529,124 @@ gnttab_swap_grant_ref(XEN_GUEST_HANDLE_PARAM(gnttab_swap_grant_ref_t) uop,
     return 0;
 }
 
+static int __gnttab_cache_flush(gnttab_cache_flush_t *cflush,
+                                unsigned int *ref_count)
+{
+    struct domain *d, *owner;
+    struct page_info *page;
+    unsigned long mfn;
+    void *v;
+    int ret;
+
+    if ( (cflush->offset >= PAGE_SIZE) ||
+         (cflush->length > PAGE_SIZE) ||
+         (cflush->offset + cflush->length > PAGE_SIZE) )
+        return -EINVAL;
+
+    if ( cflush->length == 0 || cflush->op == 0 )
+        return 0;
+
+    /* currently unimplemented */
+    if ( cflush->op & GNTTAB_CACHE_SOURCE_GREF )
+        return -EOPNOTSUPP;
+
+    if ( cflush->op & ~(GNTTAB_CACHE_INVAL|GNTTAB_CACHE_CLEAN) )
+        return -EINVAL;
+
+    d = rcu_lock_current_domain();
+    mfn = cflush->a.dev_bus_addr >> PAGE_SHIFT;
+
+    if ( !mfn_valid(mfn) )
+    {
+        rcu_unlock_domain(d);
+        return -EINVAL;
+    }
+
+    page = mfn_to_page(mfn);
+    owner = page_get_owner_and_reference(page);
+    if ( !owner )
+    {
+        rcu_unlock_domain(d);
+        return -EPERM;
+    }
+
+    if ( d != owner )
+    {
+        spin_lock(&owner->grant_table->lock);
+
+        ret = grant_map_exists(d, owner->grant_table, mfn, ref_count);
+        if ( ret != 0 )
+        {
+            spin_unlock(&owner->grant_table->lock);
+            rcu_unlock_domain(d);
+            put_page(page);
+            return ret;
+        }
+    }
+
+    v = map_domain_page(mfn);
+    v += cflush->offset;
+
+    if ( (cflush->op & GNTTAB_CACHE_INVAL) && (cflush->op & GNTTAB_CACHE_CLEAN) )
+        ret = clean_and_invalidate_dcache_va_range(v, cflush->length);
+    else if ( cflush->op & GNTTAB_CACHE_INVAL )
+        ret = invalidate_dcache_va_range(v, cflush->length);
+    else if ( cflush->op & GNTTAB_CACHE_CLEAN )
+        ret = clean_dcache_va_range(v, cflush->length);
+    else
+        ret = 0;
+
+    if ( d != owner )
+        spin_unlock(&owner->grant_table->lock);
+    unmap_domain_page(v);
+    put_page(page);
+
+    return ret;
+}
+
+static long
+gnttab_cache_flush(XEN_GUEST_HANDLE_PARAM(gnttab_cache_flush_t) uop,
+                      unsigned int *ref_count,
+                      unsigned int count)
+{
+    unsigned int i;
+    gnttab_cache_flush_t op;
+
+    for ( i = 0; i < count; i++ )
+    {
+        if ( i && hypercall_preempt_check() )
+            return i;
+        if ( unlikely(__copy_from_guest(&op, uop, 1)) )
+            return -EFAULT;
+        for ( ; ; )
+        {
+            int ret = __gnttab_cache_flush(&op, ref_count);
+
+            if ( ret < 0 )
+                return ret;
+            if ( ret == 0 )
+                break;
+            if ( hypercall_preempt_check() )
+                return i;
+        }
+        *ref_count = 0;
+        guest_handle_add_offset(uop, 1);
+    }
+    return 0;
+}
+
 long
 do_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) uop, unsigned int count)
 {
     long rc;
+    unsigned int opaque_in = cmd & GNTTABOP_ARG_MASK, opaque_out = 0;
     
     if ( (int)count < 0 )
         return -EINVAL;
     
     rc = -EFAULT;
-    switch ( cmd )
+    switch ( cmd &= GNTTABOP_CMD_MASK )
     {
     case GNTTABOP_map_grant_ref:
     {
@@ -2617,17 +2765,34 @@ do_grant_table_op(
         }
         break;
     }
+    case GNTTABOP_cache_flush:
+    {
+        XEN_GUEST_HANDLE_PARAM(gnttab_cache_flush_t) cflush =
+            guest_handle_cast(uop, gnttab_cache_flush_t);
+
+        if ( unlikely(!guest_handle_okay(cflush, count)) )
+            goto out;
+        rc = gnttab_cache_flush(cflush, &opaque_in, count);
+        if ( rc > 0 )
+        {
+            guest_handle_add_offset(cflush, rc);
+            uop = guest_handle_cast(cflush, void);
+        }
+        opaque_out = opaque_in;
+        break;
+    }
     default:
         rc = -ENOSYS;
         break;
     }
     
   out:
-    if ( rc > 0 )
+    if ( rc > 0 || opaque_out != 0 )
     {
         ASSERT(rc < count);
-        rc = hypercall_create_continuation(__HYPERVISOR_grant_table_op,
-                                           "ihi", cmd, uop, count - rc);
+        ASSERT((opaque_out & GNTTABOP_CMD_MASK) == 0);
+        rc = hypercall_create_continuation(__HYPERVISOR_grant_table_op, "ihi",
+                                           opaque_out | cmd, uop, count - rc);
     }
     
     return rc;
