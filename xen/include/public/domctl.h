@@ -108,6 +108,7 @@ struct xen_domctl_getdomaininfo {
     uint64_aligned_t shared_info_frame; /* GMFN of shared_info struct */
     uint64_aligned_t cpu_time;
     uint32_t nr_online_vcpus;    /* Number of VCPUs currently online. */
+#define XEN_INVALID_MAX_VCPU_ID (~0U) /* Domain has no vcpus? */
     uint32_t max_vcpu_id;        /* Maximum VCPUID in use by this domain. */
     uint32_t ssidref;
     xen_domain_handle_t handle;

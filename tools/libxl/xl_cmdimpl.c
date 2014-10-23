@@ -4813,10 +4813,8 @@ static void print_domain_vcpuinfo(uint32_t domid, uint32_t nr_cpus)
 
     vcpuinfo = libxl_list_vcpu(ctx, domid, &nb_vcpu, &nrcpus);
 
-    if (!vcpuinfo) {
-        fprintf(stderr, "libxl_list_vcpu failed.\n");
+    if (!vcpuinfo)
         return;
-    }
 
     for (i = 0; i < nb_vcpu; i++) {
         print_vcpuinfo(domid, &vcpuinfo[i], nr_cpus);

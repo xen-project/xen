@@ -156,6 +156,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     struct vcpu_runstate_info runstate;
     
     info->domain = d->domain_id;
+    info->max_vcpu_id = XEN_INVALID_MAX_VCPU_ID;
     info->nr_online_vcpus = 0;
     info->ssidref = 0;
     
