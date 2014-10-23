@@ -214,10 +214,6 @@ static inline int get_page_and_type(struct page_info *page,
     return rc;
 }
 
-int arch_grant_map_page_identity(struct domain *d, unsigned long frame,
-                                 bool_t writeable);
-int arch_grant_unmap_page_identity(struct domain *d, unsigned long frame);
-
 /* get host p2m table */
 #define p2m_get_hostp2m(d) (&(d)->arch.p2m)
 
