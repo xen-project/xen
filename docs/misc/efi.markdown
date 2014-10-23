@@ -34,7 +34,8 @@ The configuration file consists of one or more sections headed by a section
 name enclosed in square brackets, with individual values specified in each
 section. A section named `[global]` is treated specially to allow certain
 settings to apply to all other sections (or to provide defaults for certain
-settings in case individual sections don't specify them). A typical file would
+settings in case individual sections don't specify them). This file (for now)
+needs to be of ASCII type and not e.g. UTF-8 or UTF-16. A typical file would
 thus look like this (`#` serving as comment character):
 
     **************************example begin******************************
