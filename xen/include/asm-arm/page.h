@@ -268,16 +268,18 @@ extern size_t cacheline_bytes;
 /* Functions for flushing medium-sized areas.
  * if 'range' is large enough we might want to use model-specific
  * full-cache flushes. */
-static inline void clean_dcache_va_range(const void *p, unsigned long size)
+static inline int clean_dcache_va_range(const void *p, unsigned long size)
 {
     const void *end;
     dsb(sy);           /* So the CPU issues all writes to the range */
     for ( end = p + size; p < end; p += cacheline_bytes )
         asm volatile (__clean_dcache_one(0) : : "r" (p));
     dsb(sy);           /* So we know the flushes happen before continuing */
+    /* ARM callers assume that dcache_* functions cannot fail. */
+    return 0;
 }
 
-static inline void clean_and_invalidate_dcache_va_range
+static inline int clean_and_invalidate_dcache_va_range
     (const void *p, unsigned long size)
 {
     const void *end;
@@ -285,6 +287,8 @@ static inline void clean_and_invalidate_dcache_va_range
     for ( end = p + size; p < end; p += cacheline_bytes )
         asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p));
     dsb(sy);         /* So we know the flushes happen before continuing */
+    /* ARM callers assume that dcache_* functions cannot fail. */
+    return 0;
 }
 
 /* Macros for flushing a single small item.  The predicate is always
