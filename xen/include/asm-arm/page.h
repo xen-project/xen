@@ -268,6 +268,38 @@ extern size_t cacheline_bytes;
 /* Functions for flushing medium-sized areas.
  * if 'range' is large enough we might want to use model-specific
  * full-cache flushes. */
+
+static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
+{
+    size_t off;
+    const void *end = p + size;
+
+    dsb(sy);           /* So the CPU issues all writes to the range */
+
+    off = (unsigned long)p % cacheline_bytes;
+    if ( off )
+    {
+        p -= off;
+        asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p));
+        p += cacheline_bytes;
+        size -= cacheline_bytes - off;
+    }
+    off = (unsigned long)end % cacheline_bytes;
+    if ( off )
+    {
+        end -= off;
+        size -= off;
+        asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (end));
+    }
+
+    for ( ; p < end; p += cacheline_bytes )
+        asm volatile (__invalidate_dcache_one(0) : : "r" (p));
+
+    dsb(sy);           /* So we know the flushes happen before continuing */
+
+    return 0;
+}
+
 static inline int clean_dcache_va_range(const void *p, unsigned long size)
 {
     const void *end;

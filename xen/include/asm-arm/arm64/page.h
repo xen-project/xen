@@ -14,6 +14,9 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
         : : "r" (pte.bits), "r" (p) : "memory");
 }
 
+/* Inline ASM to invalidate dcache on register R (may be an inline asm operand) */
+#define __invalidate_dcache_one(R) "dc ivac, %" #R ";"
+
 /* Inline ASM to flush dcache on register R (may be an inline asm operand) */
 #define __clean_dcache_one(R) "dc cvac, %" #R ";"
 
