@@ -1,7 +1,7 @@
 [Unit]
 Description=qemu for xen dom0 disk backend
 Requires=proc-xen.mount var-lib-xenstored.mount xenstored.socket
-After=xenstored.service xenconsoled.service
+After=xenstored.socket xenconsoled.service
 Before=xendomains.service libvirtd.service libvirt-guests.service
 RefuseManualStop=true
 ConditionPathExists=/proc/xen/capabilities
