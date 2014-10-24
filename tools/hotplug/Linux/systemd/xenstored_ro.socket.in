@@ -1,5 +1,7 @@
 [Unit]
 Description=xenstore ro socket
+Requires=proc-xen.mount var-lib-xenstored.mount
+After=proc-xen.mount var-lib-xenstored.mount
 ConditionPathExists=/proc/xen/capabilities
 
 [Socket]

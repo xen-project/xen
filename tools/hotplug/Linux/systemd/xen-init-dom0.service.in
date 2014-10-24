@@ -1,7 +1,7 @@
 [Unit]
 Description=xen-init-dom0, initialise Dom0 configuration (xenstore nodes, JSON configuration stub)
-Requires=xenstored.socket
-After=xenstored.socket
+Requires=xenstored.socket proc-xen.mount
+After=xenstored.socket proc-xen.mount
 ConditionPathExists=/proc/xen/capabilities
 
 [Service]
