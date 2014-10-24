@@ -1,7 +1,7 @@
 [Unit]
 Description=Xendomains - start and stop guests on boot and shutdown
 Requires=xenstored.socket
-After=xenstored.service xenconsoled.service
+After=xenstored.service xenconsoled.service xen-init-dom0.service
 ConditionPathExists=/proc/xen/capabilities
 
 [Service]
