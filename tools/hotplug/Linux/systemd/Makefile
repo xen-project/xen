@@ -25,6 +25,7 @@ all:	$(ALL_XEN_SYSTEMD)
 
 .PHONY: clean
 clean:
+	rm -f $(XEN_SYSTEMD_MODULES)
 
 .PHONY: install
 install: $(ALL_XEN_SYSTEMD)
