@@ -2,7 +2,7 @@
 Description=Xendomains - start and stop guests on boot and shutdown
 Requires=xenstored.socket
 After=xenstored.service xenconsoled.service
-ConditionVirtualization=xen
+ConditionPathExists=/proc/xen/capabilities
 
 [Service]
 Type=oneshot

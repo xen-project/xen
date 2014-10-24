@@ -2,7 +2,7 @@
 Description=Xen-watchdog - run xen watchdog daemon
 Requires=proc-xen.mount
 After=proc-xen.mount xendomains.service
-ConditionVirtualization=xen
+ConditionPathExists=/proc/xen/capabilities
 
 [Service]
 Type=forking

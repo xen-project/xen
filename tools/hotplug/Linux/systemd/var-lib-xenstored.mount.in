@@ -1,6 +1,8 @@
 [Unit]
 Description=mount xenstore file system
-ConditionVirtualization=xen
+Requires=proc-xen.mount
+After=proc-xen.mount
+ConditionPathExists=/proc/xen/capabilities
 RefuseManualStop=true
 
 [Mount]

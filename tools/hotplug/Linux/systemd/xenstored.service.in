@@ -4,7 +4,7 @@ Requires=xenstored_ro.socket xenstored.socket proc-xen.mount var-lib-xenstored.m
 After=proc-xen.mount var-lib-xenstored.mount
 Before=libvirtd.service libvirt-guests.service
 RefuseManualStop=true
-ConditionVirtualization=xen
+ConditionPathExists=/proc/xen/capabilities
 
 [Service]
 Type=notify

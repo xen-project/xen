@@ -1,6 +1,7 @@
 [Unit]
 Description=Mount /proc/xen files
-ConditionVirtualization=xen
+ConditionPathExists=/proc/xen
+ConditionPathExists=!/proc/xen/capabilities
 RefuseManualStop=true
 
 [Mount]

@@ -1,6 +1,6 @@
 [Unit]
 Description=xenstore socket
-ConditionVirtualization=xen
+ConditionPathExists=/proc/xen/capabilities
 
 [Socket]
 ListenStream=/var/run/xenstored/socket
