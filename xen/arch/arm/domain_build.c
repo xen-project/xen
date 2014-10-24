@@ -788,6 +788,8 @@ static int make_gic_node(const struct domain *d, void *fdt,
 {
     const struct dt_device_node *gic = dt_interrupt_controller;
     int res = 0;
+    const void *addrcells;
+    u32 addrcells_len;
 
     /*
      * Xen currently supports only a single GIC. Discard any secondary
@@ -813,6 +815,14 @@ static int make_gic_node(const struct domain *d, void *fdt,
     {
         DPRINT("  Set phandle = 0x%x\n", gic->phandle);
         res = fdt_property_cell(fdt, "phandle", gic->phandle);
+        if ( res )
+            return res;
+    }
+
+    addrcells = dt_get_property(gic, "#address-cells", &addrcells_len);
+    if ( addrcells )
+    {
+        res = fdt_property(fdt, "#address-cells", addrcells, addrcells_len);
         if ( res )
             return res;
     }
