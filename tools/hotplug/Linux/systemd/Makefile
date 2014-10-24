@@ -14,6 +14,7 @@ XEN_SYSTEMD_SERVICE += xenconsoled.service
 XEN_SYSTEMD_SERVICE += xen-qemu-dom0-disk-backend.service
 XEN_SYSTEMD_SERVICE += xendomains.service
 XEN_SYSTEMD_SERVICE += xen-watchdog.service
+XEN_SYSTEMD_SERVICE += xen-init-dom0.service
 
 ALL_XEN_SYSTEMD =	$(XEN_SYSTEMD_MODULES)  \
 			$(XEN_SYSTEMD_MOUNT)	\

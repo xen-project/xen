@@ -1,0 +1,14 @@
+[Unit]
+Description=xen-init-dom0, initialise Dom0 configuration (xenstore nodes, JSON configuration stub)
+Requires=xenstored.socket
+After=xenstored.service
+ConditionPathExists=/proc/xen/capabilities
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
+ExecStart=@LIBEXEC_BIN@/xen-init-dom0
+
+[Install]
+WantedBy=multi-user.target

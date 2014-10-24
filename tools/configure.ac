@@ -14,6 +14,7 @@ hotplug/Linux/init.d/xencommons
 hotplug/Linux/init.d/xendomains
 hotplug/Linux/systemd/proc-xen.mount
 hotplug/Linux/systemd/var-lib-xenstored.mount
+hotplug/Linux/systemd/xen-init-dom0.service
 hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service
 hotplug/Linux/systemd/xen-watchdog.service
 hotplug/Linux/systemd/xenconsoled.service
