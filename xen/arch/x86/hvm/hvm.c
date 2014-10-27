@@ -1971,6 +1971,7 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     struct vcpu *v;
     struct hvm_hw_cpu_xsave *ctxt;
     struct hvm_save_descriptor *desc;
+    unsigned int i, desc_start;
 
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
@@ -2011,15 +2012,8 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
                         save_area) + XSTATE_AREA_MIN_SIZE);
         return -EINVAL;
     }
-    size = HVM_CPU_XSAVE_SIZE(xfeature_mask);
-    if ( desc->length > size )
-    {
-        printk(XENLOG_G_WARNING
-               "HVM%d.%d restore mismatch: xsave length %u > %u\n",
-               d->domain_id, vcpuid, desc->length, size);
-        return -EOPNOTSUPP;
-    }
     h->cur += sizeof (*desc);
+    desc_start = h->cur;
 
     ctxt = (struct hvm_hw_cpu_xsave *)&h->data[h->cur];
     h->cur += desc->length;
@@ -2038,10 +2032,24 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     size = HVM_CPU_XSAVE_SIZE(ctxt->xcr0_accum);
     if ( desc->length > size )
     {
+        /*
+         * Xen 4.3.0, 4.2.3 and older used to send longer-than-needed
+         * xsave regions.  Permit loading the record if the extra data
+         * is all zero.
+         */
+        for ( i = size; i < desc->length; i++ )
+        {
+            if ( h->data[desc_start + i] )
+            {
+                printk(XENLOG_G_WARNING
+                       "HVM%d.%u restore mismatch: xsave length %#x > %#x (non-zero data at %#x)\n",
+                       d->domain_id, vcpuid, desc->length, size, i);
+                return -EOPNOTSUPP;
+            }
+        }
         printk(XENLOG_G_WARNING
-               "HVM%d.%d restore mismatch: xsave length %u > %u\n",
+               "HVM%d.%u restore mismatch: xsave length %#x > %#x\n",
                d->domain_id, vcpuid, desc->length, size);
-        return -EOPNOTSUPP;
     }
     /* Checking finished */
 
@@ -2050,7 +2058,8 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     if ( ctxt->xcr0_accum & XSTATE_NONLAZY )
         v->arch.nonlazy_xstate_used = 1;
     memcpy(v->arch.xsave_area, &ctxt->save_area,
-           desc->length - offsetof(struct hvm_hw_cpu_xsave, save_area));
+           min(desc->length, size) - offsetof(struct hvm_hw_cpu_xsave,
+           save_area));
 
     return 0;
 }
