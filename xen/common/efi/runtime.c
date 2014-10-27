@@ -56,6 +56,9 @@ unsigned long efi_rs_enter(void)
     static const u32 mxcsr = MXCSR_DEFAULT;
     unsigned long cr3 = read_cr3();
 
+    if ( !efi_l4_pgtable )
+        return 0;
+
     save_fpu_enable();
     asm volatile ( "fldcw %0" :: "m" (fcw) );
     asm volatile ( "ldmxcsr %0" :: "m" (mxcsr) );
@@ -83,6 +86,8 @@ unsigned long efi_rs_enter(void)
 
 void efi_rs_leave(unsigned long cr3)
 {
+    if ( !cr3 )
+        return;
     write_cr3(cr3);
     if ( is_pv_vcpu(current) && !is_idle_vcpu(current) )
     {
@@ -100,7 +105,7 @@ void efi_rs_leave(unsigned long cr3)
 
 paddr_t efi_rs_page_table(void)
 {
-    return virt_to_maddr(efi_l4_pgtable);
+    return efi_l4_pgtable ? virt_to_maddr(efi_l4_pgtable) : 0;
 }
 
 unsigned long efi_get_time(void)
@@ -109,6 +114,8 @@ unsigned long efi_get_time(void)
     EFI_STATUS status;
     unsigned long cr3 = efi_rs_enter(), flags;
 
+    if ( !cr3 )
+        return 0;
     spin_lock_irqsave(&rtc_lock, flags);
     status = efi_rs->GetTime(&time, NULL);
     spin_unlock_irqrestore(&rtc_lock, flags);
@@ -126,6 +133,8 @@ void efi_halt_system(void)
     EFI_STATUS status;
     unsigned long cr3 = efi_rs_enter();
 
+    if ( !cr3 )
+        return;
     status = efi_rs->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
     efi_rs_leave(cr3);
 
@@ -137,6 +146,8 @@ void efi_reset_system(bool_t warm)
     EFI_STATUS status;
     unsigned long cr3 = efi_rs_enter();
 
+    if ( !cr3 )
+        return;
     status = efi_rs->ResetSystem(warm ? EfiResetWarm : EfiResetCold,
                                  EFI_SUCCESS, 0, NULL);
     efi_rs_leave(cr3);
@@ -161,6 +172,8 @@ int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
     {
         unsigned long cr3 = efi_rs_enter();
 
+        if ( !cr3 )
+            return -EOPNOTSUPP;
         info->version = efi_rs->Hdr.Revision;
         efi_rs_leave(cr3);
         break;
@@ -170,6 +183,8 @@ int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
         info->cfg.nent = efi_num_ct;
         break;
     case XEN_FW_EFI_VENDOR:
+        if ( !efi_fw_vendor )
+            return -EOPNOTSUPP;
         info->vendor.revision = efi_fw_revision;
         n = info->vendor.bufsz / sizeof(*efi_fw_vendor);
         if ( !guest_handle_okay(guest_handle_cast(info->vendor.name,
@@ -292,6 +307,8 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         cr3 = efi_rs_enter();
+        if ( !cr3 )
+            return -EOPNOTSUPP;
         spin_lock_irqsave(&rtc_lock, flags);
         status = efi_rs->GetTime(cast_time(&op->u.get_time.time), &caps);
         spin_unlock_irqrestore(&rtc_lock, flags);
@@ -312,6 +329,8 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         cr3 = efi_rs_enter();
+        if ( !cr3 )
+            return -EOPNOTSUPP;
         spin_lock_irqsave(&rtc_lock, flags);
         status = efi_rs->SetTime(cast_time(&op->u.set_time));
         spin_unlock_irqrestore(&rtc_lock, flags);
@@ -326,6 +345,8 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         cr3 = efi_rs_enter();
+        if ( !cr3 )
+            return -EOPNOTSUPP;
         spin_lock_irqsave(&rtc_lock, flags);
         status = efi_rs->GetWakeupTime(&enabled, &pending,
                                        cast_time(&op->u.get_wakeup_time));
@@ -348,6 +369,8 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         cr3 = efi_rs_enter();
+        if ( !cr3 )
+            return -EOPNOTSUPP;
         spin_lock_irqsave(&rtc_lock, flags);
         status = efi_rs->SetWakeupTime(!!(op->misc &
                                           XEN_EFI_SET_WAKEUP_TIME_ENABLE),
@@ -366,7 +389,10 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         cr3 = efi_rs_enter();
-        status = efi_rs->GetNextHighMonotonicCount(&op->misc);
+        if ( cr3 )
+            status = efi_rs->GetNextHighMonotonicCount(&op->misc);
+        else
+            rc = -EOPNOTSUPP;
         efi_rs_leave(cr3);
         break;
 
@@ -402,15 +428,20 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             data = NULL;
 
         cr3 = efi_rs_enter();
-        status = efi_rs->GetVariable(
-            name, cast_guid(&op->u.get_variable.vendor_guid),
-            &op->misc, &size, data);
-        efi_rs_leave(cr3);
+        if ( cr3 )
+        {
+            status = efi_rs->GetVariable(
+                name, cast_guid(&op->u.get_variable.vendor_guid),
+                &op->misc, &size, data);
+            efi_rs_leave(cr3);
 
-        if ( !EFI_ERROR(status) &&
-             copy_to_guest(op->u.get_variable.data, data, size) )
-            rc = -EFAULT;
-        op->u.get_variable.size = size;
+            if ( !EFI_ERROR(status) &&
+                 copy_to_guest(op->u.get_variable.data, data, size) )
+                rc = -EFAULT;
+            op->u.get_variable.size = size;
+        }
+        else
+            rc = -EOPNOTSUPP;
 
         xfree(data);
         xfree(name);
@@ -440,9 +471,12 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         else
         {
             cr3 = efi_rs_enter();
-            status = efi_rs->SetVariable(
-                name, cast_guid(&op->u.set_variable.vendor_guid),
-                op->misc, op->u.set_variable.size, data);
+            if ( cr3 )
+                status = efi_rs->SetVariable(
+                    name, cast_guid(&op->u.set_variable.vendor_guid),
+                    op->misc, op->u.set_variable.size, data);
+            else
+                rc = -EOPNOTSUPP;
             efi_rs_leave(cr3);
         }
 
@@ -474,15 +508,21 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         }
 
         cr3 = efi_rs_enter();
-        status = efi_rs->GetNextVariableName(
-            &size, name.str,
-            cast_guid(&op->u.get_next_variable_name.vendor_guid));
-        efi_rs_leave(cr3);
+        if ( cr3 )
+        {
+            status = efi_rs->GetNextVariableName(
+                &size, name.str,
+                cast_guid(&op->u.get_next_variable_name.vendor_guid));
+            efi_rs_leave(cr3);
 
-        if ( !EFI_ERROR(status) &&
-             copy_to_guest(op->u.get_next_variable_name.name, name.raw, size) )
-            rc = -EFAULT;
-        op->u.get_next_variable_name.size = size;
+            if ( !EFI_ERROR(status) &&
+                 copy_to_guest(op->u.get_next_variable_name.name,
+                               name.raw, size) )
+                rc = -EFAULT;
+            op->u.get_next_variable_name.size = size;
+        }
+        else
+            rc = -EOPNOTSUPP;
 
         xfree(name.raw);
     }
@@ -519,7 +559,7 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         }
 
         cr3 = efi_rs_enter();
-        if ( (efi_rs->Hdr.Revision >> 16) < 2 )
+        if ( !cr3 || (efi_rs->Hdr.Revision >> 16) < 2 )
         {
             efi_rs_leave(cr3);
             return -EOPNOTSUPP;
@@ -538,7 +578,7 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         cr3 = efi_rs_enter();
-        if ( (efi_rs->Hdr.Revision >> 16) < 2 )
+        if ( !cr3 || (efi_rs->Hdr.Revision >> 16) < 2 )
         {
             efi_rs_leave(cr3);
             return -EOPNOTSUPP;

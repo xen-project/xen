@@ -565,6 +565,13 @@ Either force retrieval of monitor EDID information via VESA DDC, or
 disable it (edid=no). This option should not normally be required
 except for debugging purposes.
 
+### efi-rs
+> `= <boolean>`
+
+> Default: `true`
+
+Force or disable use of EFI runtime services.
+
 ### extra\_guest\_irqs
 > `= [<domU number>][,<dom0 number>]`
 
