@@ -1312,6 +1312,9 @@ static int lapic_save_regs(struct domain *d, hvm_domain_context_t *h)
 
     for_each_vcpu ( d, v )
     {
+        if ( hvm_funcs.sync_pir_to_irr )
+            hvm_funcs.sync_pir_to_irr(v);
+
         s = vcpu_vlapic(v);
         if ( (rc = hvm_save_entry(LAPIC_REGS, v->vcpu_id, h, s->regs)) != 0 )
             break;

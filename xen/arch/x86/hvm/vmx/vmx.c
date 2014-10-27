@@ -1584,6 +1584,8 @@ static void vmx_process_isr(int isr, struct vcpu *v)
 {
     unsigned long status;
     u8 old;
+    unsigned int i;
+    const struct vlapic *vlapic = vcpu_vlapic(v);
 
     if ( isr < 0 )
         isr = 0;
@@ -1597,6 +1599,28 @@ static void vmx_process_isr(int isr, struct vcpu *v)
         status |= isr << VMX_GUEST_INTR_STATUS_SVI_OFFSET;
         __vmwrite(GUEST_INTR_STATUS, status);
     }
+
+    /*
+     * Theoretically, only level triggered interrupts can have their
+     * corresponding bits set in the eoi exit bitmap. That is, the bits
+     * set in the eoi exit bitmap should also be set in TMR. But a periodic
+     * timer interrupt does not follow the rule: it is edge triggered, but
+     * requires its corresponding bit be set in the eoi exit bitmap. So we
+     * should not construct the eoi exit bitmap based on TMR.
+     * Here we will construct the eoi exit bitmap via (IRR | ISR). This
+     * means that EOIs to the interrupts that are set in the IRR or ISR will
+     * cause VM exits after restoring, regardless of the trigger modes. It
+     * is acceptable because the subsequent interrupts will set up the eoi
+     * bitmap correctly.
+     */
+    for ( i = 0x10; i < NR_VECTORS; ++i )
+        if ( vlapic_test_vector(i, &vlapic->regs->data[APIC_IRR]) ||
+             vlapic_test_vector(i, &vlapic->regs->data[APIC_ISR]) )
+            set_bit(i, v->arch.hvm_vmx.eoi_exit_bitmap);
+
+    for ( i = 0; i < ARRAY_SIZE(v->arch.hvm_vmx.eoi_exit_bitmap); ++i )
+        __vmwrite(EOI_EXIT_BITMAP(i), v->arch.hvm_vmx.eoi_exit_bitmap[i]);
+
     vmx_vmcs_exit(v);
 }
 

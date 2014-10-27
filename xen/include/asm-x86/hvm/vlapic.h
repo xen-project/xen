@@ -61,6 +61,8 @@
 
 #define VEC_POS(v) ((v) % 32)
 #define REG_POS(v) (((v) / 32) * 0x10)
+#define vlapic_test_vector(vec, bitmap)                                 \
+    test_bit(VEC_POS(vec), (const uint32_t *)((bitmap) + REG_POS(vec)))
 #define vlapic_test_and_set_vector(vec, bitmap)                         \
     test_and_set_bit(VEC_POS(vec), (uint32_t *)((bitmap) + REG_POS(vec)))
 #define vlapic_test_and_clear_vector(vec, bitmap)                       \
