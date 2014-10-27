@@ -75,7 +75,7 @@ static size_t wstrlen(const CHAR16 * s);
 static int set_color(u32 mask, int bpp, u8 *pos, u8 *sz);
 static bool_t match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2);
 
-static EFI_BOOT_SERVICES *__initdata efi_bs;
+static const EFI_BOOT_SERVICES *__initdata efi_bs;
 static EFI_HANDLE __initdata efi_ih;
 
 static SIMPLE_TEXT_OUTPUT_INTERFACE *__initdata StdOut;

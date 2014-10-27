@@ -21,13 +21,13 @@ const bool_t efi_enabled = 1;
 #endif
 
 unsigned int __read_mostly efi_num_ct;
-EFI_CONFIGURATION_TABLE *__read_mostly efi_ct;
+const EFI_CONFIGURATION_TABLE *__read_mostly efi_ct;
 
 unsigned int __read_mostly efi_version;
 unsigned int __read_mostly efi_fw_revision;
 const CHAR16 *__read_mostly efi_fw_vendor;
 
-EFI_RUNTIME_SERVICES *__read_mostly efi_rs;
+const EFI_RUNTIME_SERVICES *__read_mostly efi_rs;
 #ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
 static DEFINE_SPINLOCK(efi_rs_lock);
 #endif
