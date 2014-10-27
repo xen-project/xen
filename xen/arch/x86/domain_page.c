@@ -7,6 +7,7 @@
  */
 
 #include <xen/domain_page.h>
+#include <xen/efi.h>
 #include <xen/mm.h>
 #include <xen/perfc.h>
 #include <xen/pfn.h>
@@ -37,11 +38,14 @@ static inline struct vcpu *mapcache_current_vcpu(void)
      */
     if ( unlikely(pagetable_is_null(v->arch.guest_table)) && is_pv_vcpu(v) )
     {
+        unsigned long cr3;
+
         /* If we really are idling, perform lazy context switch now. */
         if ( (v = idle_vcpu[smp_processor_id()]) == current )
             sync_local_execstate();
         /* We must now be running on the idle page table. */
-        ASSERT(read_cr3() == __pa(idle_pg_table));
+        ASSERT((cr3 = read_cr3()) == __pa(idle_pg_table) ||
+               (efi_enabled && cr3 == efi_rs_page_table()));
     }
 
     return v;

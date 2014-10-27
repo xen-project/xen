@@ -98,6 +98,11 @@ void efi_rs_leave(unsigned long cr3)
     stts();
 }
 
+paddr_t efi_rs_page_table(void)
+{
+    return virt_to_maddr(efi_l4_pgtable);
+}
+
 unsigned long efi_get_time(void)
 {
     EFI_TIME time;
