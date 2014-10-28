@@ -1248,7 +1248,7 @@ static void __hwdom_init intel_iommu_hwdom_init(struct domain *d)
 
     if ( !iommu_passthrough && !need_iommu(d) )
     {
-        /* Set up 1:1 page table for dom0 */
+        /* Set up 1:1 page table for hardware domain. */
         vtd_set_hwdom_mapping(d);
     }
 
@@ -1696,7 +1696,7 @@ static int intel_iommu_map_page(
     if ( iommu_use_hap_pt(d) )
         return 0;
 
-    /* do nothing if dom0 and iommu supports pass thru */
+    /* Do nothing if hardware domain and iommu supports pass thru. */
     if ( iommu_passthrough && is_hardware_domain(d) )
         return 0;
 
@@ -1740,7 +1740,7 @@ static int intel_iommu_map_page(
 
 static int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
-    /* Do nothing if dom0 and iommu supports pass thru. */
+    /* Do nothing if hardware domain and iommu supports pass thru. */
     if ( iommu_passthrough && is_hardware_domain(d) )
         return 0;
 
