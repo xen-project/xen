@@ -11,7 +11,7 @@ CFLAGS   += $(CFLAGS_libxenctrl)
 CFLAGS   += $(CFLAGS_libxenstore)
 CFLAGS   += -D_GNU_SOURCE
 
-ifeq ($CONFIG_GCRYPT,y)
+ifeq ($(CONFIG_GCRYPT),y)
 CFLAGS += -DUSE_GCRYPT
 CRYPT_LIB := -lgcrypt
 else
