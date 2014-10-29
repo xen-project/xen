@@ -13,7 +13,7 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-import os, sys, string, struct, tempfile, re, traceback, stat
+import os, sys, string, struct, tempfile, re, traceback, stat, errno
 import copy
 import logging
 import platform
@@ -851,8 +851,14 @@ if __name__ == "__main__":
     if debug:
 	logging.basicConfig(level=logging.DEBUG)
 
-    if not os.path.isdir(output_directory):
-        os.mkdir(output_directory, 0700)
+
+    try:
+        os.makedirs(output_directory, 0700)
+    except OSError,e:
+        if (e.errno == errno.EEXIST) and os.path.isdir(output_directory):
+            pass
+        else:
+            raise
 
     if output is None or output == "-":
         fd = sys.stdout.fileno()
