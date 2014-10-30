@@ -33,6 +33,11 @@
 #ifndef min
 	#define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
 #endif
+#define ADJUST_TIMEOUTS_TO_STANDARD(initial,standard,timeout_no)			\
+	if((initial) < (standard)){							\
+		(initial) = (standard);							\
+		printk("Timeout %c was adjusted to standard value.\n",timeout_no);	\
+	}
 
 #define TPM_HEADER_SIZE 10
 
@@ -997,15 +1002,22 @@ int tpm_get_timeouts(struct tpm_chip *chip)
    }
    if (timeout)
       chip->timeout_a = MICROSECS(timeout * scale); /*Convert to msec */
+   ADJUST_TIMEOUTS_TO_STANDARD(chip->timeout_a,MILLISECS(TIS_SHORT_TIMEOUT),'a');
+
    timeout = be32_to_cpu(timeout_cap->b);
    if (timeout)
       chip->timeout_b = MICROSECS(timeout * scale); /*Convert to msec */
+   ADJUST_TIMEOUTS_TO_STANDARD(chip->timeout_b,MILLISECS(TIS_LONG_TIMEOUT),'b');
+
    timeout = be32_to_cpu(timeout_cap->c);
    if (timeout)
       chip->timeout_c = MICROSECS(timeout * scale); /*Convert to msec */
+   ADJUST_TIMEOUTS_TO_STANDARD(chip->timeout_c,MILLISECS(TIS_SHORT_TIMEOUT),'c');
+
    timeout = be32_to_cpu(timeout_cap->d);
    if (timeout)
       chip->timeout_d = MICROSECS(timeout * scale); /*Convert to msec */
+   ADJUST_TIMEOUTS_TO_STANDARD(chip->timeout_d,MILLISECS(TIS_SHORT_TIMEOUT),'d');
 
 duration:
    tpm_cmd.header.in = tpm_getcap_header;
