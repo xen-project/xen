@@ -253,6 +253,9 @@ static void dump_domains(unsigned char key)
     for_each_domain ( d )
     {
         unsigned int i;
+
+        process_pending_softirqs();
+
         printk("General information for domain %u:\n", d->domain_id);
         cpuset_print(tmpstr, sizeof(tmpstr), d->domain_dirty_cpumask);
         printk("    refcnt=%d dying=%d pause_count=%d\n",
@@ -287,6 +290,9 @@ static void dump_domains(unsigned char key)
                d->domain_id);
         for_each_vcpu ( d, v )
         {
+            if ( !(v->vcpu_id & 0x3f) )
+                process_pending_softirqs();
+
             printk("    VCPU%d: CPU%d [has=%c] poll=%d "
                    "upcall_pend = %02x, upcall_mask = %02x ",
                    v->vcpu_id, v->processor,
@@ -311,6 +317,9 @@ static void dump_domains(unsigned char key)
     {
         for_each_vcpu ( d, v )
         {
+            if ( !(v->vcpu_id & 0x3f) )
+                process_pending_softirqs();
+
             printk("Notifying guest %d:%d (virq %d, port %d)\n",
                    d->domain_id, v->vcpu_id,
                    VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG]);
