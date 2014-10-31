@@ -2273,9 +2273,13 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         __vmwrite(GUEST_SYSENTER_CS, msr_content);
         break;
     case MSR_IA32_SYSENTER_ESP:
+        if ( !is_canonical_address(msr_content) )
+            goto gp_fault;
         __vmwrite(GUEST_SYSENTER_ESP, msr_content);
         break;
     case MSR_IA32_SYSENTER_EIP:
+        if ( !is_canonical_address(msr_content) )
+            goto gp_fault;
         __vmwrite(GUEST_SYSENTER_EIP, msr_content);
         break;
     case MSR_IA32_DEBUGCTLMSR: {
