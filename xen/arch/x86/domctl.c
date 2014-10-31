@@ -62,10 +62,12 @@ long arch_do_domctl(
         d = rcu_lock_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
-            ret = paging_domctl(d,
-                                &domctl->u.shadow_op,
-                                guest_handle_cast(u_domctl, void));
+            ret = paging_domctl(d, &domctl->u.shadow_op,
+                                guest_handle_cast(u_domctl, void), 0);
             rcu_unlock_domain(d);
+            if ( ret == -EAGAIN )
+                return hypercall_create_continuation(__HYPERVISOR_arch_1,
+                                                     "h", u_domctl);
             copy_to_guest(u_domctl, domctl, 1);
         } 
     }
