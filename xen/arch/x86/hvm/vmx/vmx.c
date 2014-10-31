@@ -3161,8 +3161,19 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     /* fall through */
     default:
     exit_and_crash:
-        gdprintk(XENLOG_ERR, "Bad vmexit (reason %#lx)\n", exit_reason);
-        domain_crash(v->domain);
+        {
+            struct segment_register ss;
+
+            gdprintk(XENLOG_WARNING, "Bad vmexit (reason %#lx)\n",
+                     exit_reason);
+
+            vmx_get_segment_register(v, x86_seg_ss, &ss);
+            if ( ss.attr.fields.dpl )
+                hvm_inject_hw_exception(TRAP_invalid_op,
+                                        HVM_DELIVER_NO_ERROR_CODE);
+            else
+                domain_crash(v->domain);
+        }
         break;
     }
 

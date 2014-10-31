@@ -2680,7 +2680,11 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
                  "exitinfo1 = %#"PRIx64", exitinfo2 = %#"PRIx64"\n",
                  exit_reason, 
                  (u64)vmcb->exitinfo1, (u64)vmcb->exitinfo2);
-        domain_crash(v->domain);
+        if ( vmcb_get_cpl(vmcb) )
+            hvm_inject_hw_exception(TRAP_invalid_op,
+                                    HVM_DELIVER_NO_ERROR_CODE);
+        else
+            domain_crash(v->domain);
         break;
     }
 
