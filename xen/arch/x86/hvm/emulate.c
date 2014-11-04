@@ -406,8 +406,13 @@ static int hvmemul_virtual_to_linear(
      * Clip repetitions to avoid overflow when multiplying by @bytes_per_rep.
      * The chosen maximum is very conservative but it's what we use in
      * hvmemul_linear_to_phys() so there is no point in using a larger value.
+     * If introspection has been enabled for this domain, *reps should be
+     * at most 1, since optimization might otherwise cause a single mem_event
+     * being triggered for repeated writes to a whole page.
      */
-    *reps = min_t(unsigned long, *reps, 4096);
+    *reps = min_t(unsigned long, *reps,
+                  unlikely(current->domain->arch.hvm_domain.introspection_enabled)
+                           ? 1 : 4096);
 
     reg = hvmemul_get_seg_reg(seg, hvmemul_ctxt);
 
