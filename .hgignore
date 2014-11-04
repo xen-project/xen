@@ -140,11 +140,6 @@
 ^tools/blktap2/drivers/td-util$
 ^tools/blktap2/vhd/vhd-update$
 ^tools/blktap2/vhd/vhd-util$
-^tools/blktap/drivers/blktapctrl$
-^tools/blktap/drivers/img2qcow$
-^tools/blktap/drivers/qcow-create$
-^tools/blktap/drivers/qcow2raw$
-^tools/blktap/drivers/tapdisk$
 ^tools/check/\..*$
 ^tools/console/xenconsole$
 ^tools/console/xenconsoled$

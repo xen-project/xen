@@ -101,11 +101,6 @@ tools/blktap2/drivers/tapdisk2
 tools/blktap2/drivers/td-util
 tools/blktap2/vhd/vhd-update
 tools/blktap2/vhd/vhd-util
-tools/blktap/drivers/blktapctrl
-tools/blktap/drivers/img2qcow
-tools/blktap/drivers/qcow-create
-tools/blktap/drivers/qcow2raw
-tools/blktap/drivers/tapdisk
 tools/console/xenconsole
 tools/console/xenconsoled
 tools/debugger/gdb/gdb-6.2.1-linux-i386-xen/*
