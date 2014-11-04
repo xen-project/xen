@@ -4876,10 +4876,10 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
                                                    regs->r8, regs->r9);
         curr->arch.hvm_vcpu.hcall_64bit = 0;
     }
+    else if ( unlikely(is_pvh_vcpu(curr)) )
+        regs->_eax = -ENOSYS; /* PVH 32bitfixme. */
     else
     {
-        ASSERT(!is_pvh_vcpu(curr));   /* PVH 32bitfixme. */
-
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%x, %x, %x, %x, %x, %x)", eax,
                     (uint32_t)regs->ebx, (uint32_t)regs->ecx,
                     (uint32_t)regs->edx, (uint32_t)regs->esi,
