@@ -29,6 +29,11 @@ separators will be tried) to be present in the same directory as the binary.
 (To illustrate the name handling, a binary named `xen-4.2-unstable.efi` would
 try `xen-4.2-unstable.cfg`, `xen-4.2.cfg`, `xen-4.cfg`, and `xen.cfg` in
 order.) One can override this with a command line option (`-cfg=<filename>`).
+This configuration file and EFI commandline are only used for booting directly
+from EFI firmware, or when using an EFI loader that does not support
+the multiboot2 protocol.  When booting using GRUB or another multiboot aware
+loader the EFI commandline is ignored and all information is passed from
+the loader to Xen using the multiboot protocol.
 
 The configuration file consists of one or more sections headed by a section
 name enclosed in square brackets, with individual values specified in each

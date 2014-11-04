@@ -697,7 +697,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_STATUS status;
     unsigned int i, argc;
     CHAR16 **argv, *file_name, *cfg_file_name = NULL, *options = NULL;
-    UINTN cols, rows, depth, size, map_key, info_size, gop_mode = ~0;
+    UINTN map_key, info_size, gop_mode = ~0;
     EFI_HANDLE *handles = NULL;
     EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
@@ -705,6 +705,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     union string section = { NULL }, name;
     bool_t base_video = 0;
     char *option_str;
+    bool_t use_cfg_file;
 
     efi_ih = ImageHandle;
     efi_bs = SystemTable->BootServices;
@@ -717,6 +718,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     StdOut = SystemTable->ConOut;
     StdErr = SystemTable->StdErr ?: StdOut;
+    use_cfg_file = efi_arch_use_config_file(SystemTable);
 
     status = efi_bs->HandleProtocol(ImageHandle, &loaded_image_guid,
                                     (void **)&loaded_image);
@@ -725,67 +727,71 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     efi_arch_load_addr_check(loaded_image);
 
-    argc = get_argv(0, NULL, loaded_image->LoadOptions,
-                    loaded_image->LoadOptionsSize, NULL);
-    if ( argc > 0 &&
-         efi_bs->AllocatePool(EfiLoaderData,
-                              (argc + 1) * sizeof(*argv) +
-                                  loaded_image->LoadOptionsSize,
-                              (void **)&argv) == EFI_SUCCESS )
-        get_argv(argc, argv, loaded_image->LoadOptions,
-                 loaded_image->LoadOptionsSize, &options);
-    else
-        argc = 0;
-    for ( i = 1; i < argc; ++i )
+    if ( use_cfg_file )
     {
-        CHAR16 *ptr = argv[i];
-
-        if ( !ptr )
-            break;
-        if ( *ptr == L'/' || *ptr == L'-' )
+        argc = get_argv(0, NULL, loaded_image->LoadOptions,
+                        loaded_image->LoadOptionsSize, NULL);
+        if ( argc > 0 &&
+             efi_bs->AllocatePool(EfiLoaderData,
+                                  (argc + 1) * sizeof(*argv) +
+                                      loaded_image->LoadOptionsSize,
+                                  (void **)&argv) == EFI_SUCCESS )
+            get_argv(argc, argv, loaded_image->LoadOptions,
+                     loaded_image->LoadOptionsSize, &options);
+        else
+            argc = 0;
+        for ( i = 1; i < argc; ++i )
         {
-            if ( wstrcmp(ptr + 1, L"basevideo") == 0 )
-                base_video = 1;
-            else if ( wstrncmp(ptr + 1, L"cfg=", 4) == 0 )
-                cfg_file_name = ptr + 5;
-            else if ( i + 1 < argc && wstrcmp(ptr + 1, L"cfg") == 0 )
-                cfg_file_name = argv[++i];
-            else if ( wstrcmp(ptr + 1, L"help") == 0 ||
-                      (ptr[1] == L'?' && !ptr[2]) )
+            CHAR16 *ptr = argv[i];
+
+            if ( !ptr )
+                break;
+            if ( *ptr == L'/' || *ptr == L'-' )
             {
-                PrintStr(L"Xen EFI Loader options:\r\n");
-                PrintStr(L"-basevideo   retain current video mode\r\n");
-                PrintStr(L"-cfg=<file>  specify configuration file\r\n");
-                PrintStr(L"-help, -?    display this help\r\n");
-                blexit(NULL);
+                if ( wstrcmp(ptr + 1, L"basevideo") == 0 )
+                    base_video = 1;
+                else if ( wstrncmp(ptr + 1, L"cfg=", 4) == 0 )
+                    cfg_file_name = ptr + 5;
+                else if ( i + 1 < argc && wstrcmp(ptr + 1, L"cfg") == 0 )
+                    cfg_file_name = argv[++i];
+                else if ( wstrcmp(ptr + 1, L"help") == 0 ||
+                          (ptr[1] == L'?' && !ptr[2]) )
+                {
+                    PrintStr(L"Xen EFI Loader options:\r\n");
+                    PrintStr(L"-basevideo   retain current video mode\r\n");
+                    PrintStr(L"-cfg=<file>  specify configuration file\r\n");
+                    PrintStr(L"-help, -?    display this help\r\n");
+                    blexit(NULL);
+                }
+                else
+                {
+                    PrintStr(L"WARNING: Unknown command line option '");
+                    PrintStr(ptr);
+                    PrintStr(L"' ignored\r\n");
+                }
             }
             else
-            {
-                PrintStr(L"WARNING: Unknown command line option '");
-                PrintStr(ptr);
-                PrintStr(L"' ignored\r\n");
-            }
+                section.w = ptr;
         }
-        else
-            section.w = ptr;
-    }
 
-    if ( !base_video )
-    {
-        unsigned int best;
-
-        for ( i = 0, size = 0, best = StdOut->Mode->Mode;
-              i < StdOut->Mode->MaxMode; ++i )
+        if ( !base_video )
         {
-            if ( StdOut->QueryMode(StdOut, i, &cols, &rows) == EFI_SUCCESS &&
-                 cols * rows > size )
+            unsigned int best;
+            UINTN cols, rows, size;
+
+            for ( i = 0, size = 0, best = StdOut->Mode->Mode;
+                  i < StdOut->Mode->MaxMode; ++i )
             {
-                size = cols * rows;
-                best = i;
+                if ( StdOut->QueryMode(StdOut, i, &cols, &rows) == EFI_SUCCESS &&
+                     cols * rows > size )
+                {
+                    size = cols * rows;
+                    best = i;
+                }
             }
+            if ( best != StdOut->Mode->Mode )
+                StdOut->SetMode(StdOut, best);
         }
-        if ( best != StdOut->Mode->Mode )
-            StdOut->SetMode(StdOut, best);
     }
 
     PrintStr(L"Xen " __stringify(XEN_VERSION) "." __stringify(XEN_SUBVERSION)
@@ -793,37 +799,38 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     efi_arch_relocate_image(0);
 
-    if ( StdOut->QueryMode(StdOut, StdOut->Mode->Mode,
-                           &cols, &rows) == EFI_SUCCESS )
-        efi_arch_console_init(cols, rows);
-
-    size = 0;
-    status = efi_bs->LocateHandle(ByProtocol, &gop_guid, NULL, &size, NULL);
-    if ( status == EFI_BUFFER_TOO_SMALL )
-        status = efi_bs->AllocatePool(EfiLoaderData, size, (void **)&handles);
-    if ( !EFI_ERROR(status) )
-        status = efi_bs->LocateHandle(ByProtocol, &gop_guid, NULL, &size,
-                                      handles);
-    if ( EFI_ERROR(status) )
-        size = 0;
-    for ( i = 0; i < size / sizeof(*handles); ++i )
-    {
-        status = efi_bs->HandleProtocol(handles[i], &gop_guid, (void **)&gop);
-        if ( EFI_ERROR(status) )
-            continue;
-        status = gop->QueryMode(gop, gop->Mode->Mode, &info_size, &mode_info);
-        if ( !EFI_ERROR(status) )
-            break;
-    }
-    if ( handles )
-        efi_bs->FreePool(handles);
-    if ( EFI_ERROR(status) )
-        gop = NULL;
-
-    cols = rows = depth = 0;
-    if ( efi_arch_use_config_file(SystemTable) )
+    if ( use_cfg_file )
     {
         EFI_FILE_HANDLE dir_handle;
+        UINTN depth, cols, rows, size;
+
+        size = cols = rows = depth = 0;
+
+        if ( StdOut->QueryMode(StdOut, StdOut->Mode->Mode,
+                               &cols, &rows) == EFI_SUCCESS )
+            efi_arch_console_init(cols, rows);
+
+        status = efi_bs->LocateHandle(ByProtocol, &gop_guid, NULL, &size, NULL);
+        if ( status == EFI_BUFFER_TOO_SMALL )
+            status = efi_bs->AllocatePool(EfiLoaderData, size, (void **)&handles);
+        if ( !EFI_ERROR(status) )
+            status = efi_bs->LocateHandle(ByProtocol, &gop_guid, NULL, &size,
+                                          handles);
+        if ( EFI_ERROR(status) )
+            size = 0;
+        for ( i = 0; i < size / sizeof(*handles); ++i )
+        {
+            status = efi_bs->HandleProtocol(handles[i], &gop_guid, (void **)&gop);
+            if ( EFI_ERROR(status) )
+                continue;
+            status = gop->QueryMode(gop, gop->Mode->Mode, &info_size, &mode_info);
+            if ( !EFI_ERROR(status) )
+                break;
+        }
+        if ( handles )
+            efi_bs->FreePool(handles);
+        if ( EFI_ERROR(status) )
+            gop = NULL;
 
         /* Get the file system interface. */
         dir_handle = get_parent_handle(loaded_image, &file_name);
@@ -931,45 +938,44 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
         dir_handle->Close(dir_handle);
 
-    }
-
-    if ( gop && !base_video )
-    {
-        for ( i = size = 0; i < gop->Mode->MaxMode; ++i )
+        if ( gop && !base_video )
         {
-            unsigned int bpp = 0;
+            for ( i = size = 0; i < gop->Mode->MaxMode; ++i )
+            {
+                unsigned int bpp = 0;
 
-            status = gop->QueryMode(gop, i, &info_size, &mode_info);
-            if ( EFI_ERROR(status) )
-                continue;
-            switch ( mode_info->PixelFormat )
-            {
-            case PixelBitMask:
-                bpp = hweight32(mode_info->PixelInformation.RedMask |
-                                mode_info->PixelInformation.GreenMask |
-                                mode_info->PixelInformation.BlueMask);
-                break;
-            case PixelRedGreenBlueReserved8BitPerColor:
-            case PixelBlueGreenRedReserved8BitPerColor:
-                bpp = 24;
-                break;
-            default:
-                continue;
-            }
-            if ( cols == mode_info->HorizontalResolution &&
-                 rows == mode_info->VerticalResolution &&
-                 (!depth || bpp == depth) )
-            {
-                gop_mode = i;
-                break;
-            }
-            if ( !cols && !rows &&
-                 mode_info->HorizontalResolution *
-                 mode_info->VerticalResolution > size )
-            {
-                size = mode_info->HorizontalResolution *
-                       mode_info->VerticalResolution;
-                gop_mode = i;
+                status = gop->QueryMode(gop, i, &info_size, &mode_info);
+                if ( EFI_ERROR(status) )
+                    continue;
+                switch ( mode_info->PixelFormat )
+                {
+                case PixelBitMask:
+                    bpp = hweight32(mode_info->PixelInformation.RedMask |
+                                    mode_info->PixelInformation.GreenMask |
+                                    mode_info->PixelInformation.BlueMask);
+                    break;
+                case PixelRedGreenBlueReserved8BitPerColor:
+                case PixelBlueGreenRedReserved8BitPerColor:
+                    bpp = 24;
+                    break;
+                default:
+                    continue;
+                }
+                if ( cols == mode_info->HorizontalResolution &&
+                     rows == mode_info->VerticalResolution &&
+                     (!depth || bpp == depth) )
+                {
+                    gop_mode = i;
+                    break;
+                }
+                if ( !cols && !rows &&
+                     mode_info->HorizontalResolution *
+                     mode_info->VerticalResolution > size )
+                {
+                    size = mode_info->HorizontalResolution *
+                           mode_info->VerticalResolution;
+                    gop_mode = i;
+                }
             }
         }
     }
