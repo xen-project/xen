@@ -364,10 +364,26 @@ typedef uint64_t xen_callback_t;
  */
 
 /* Physical Address Space */
+
+/* vGIC mappings: Only one set of mapping is used by the guest.
+ * Therefore they can overlap.
+ */
+
+/* vGIC v2 mappings */
 #define GUEST_GICD_BASE   0x03001000ULL
 #define GUEST_GICD_SIZE   0x00001000ULL
 #define GUEST_GICC_BASE   0x03002000ULL
 #define GUEST_GICC_SIZE   0x00000100ULL
+
+/* vGIC v3 mappings */
+#define GUEST_GICV3_GICD_BASE      0x03001000ULL
+#define GUEST_GICV3_GICD_SIZE      0x00010000ULL
+
+#define GUEST_GICV3_RDIST_STRIDE   0x20000ULL
+#define GUEST_GICV3_RDIST_REGIONS  1
+
+#define GUEST_GICV3_GICR0_BASE     0x03020000ULL    /* vCPU0 - vCPU7 */
+#define GUEST_GICV3_GICR0_SIZE     0x00100000ULL
 
 /* 16MB == 4096 pages reserved for guest to use as a region to map its
  * grant table in.

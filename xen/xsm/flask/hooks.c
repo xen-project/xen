@@ -727,6 +727,9 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_psr_cmt_op:
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__PSR_CMT_OP);
 
+    case XEN_DOMCTL_configure_domain:
+        return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__CONFIGURE_DOMAIN);
+
     default:
         printk("flask_domctl: Unknown op %d\n", cmd);
         return -EPERM;

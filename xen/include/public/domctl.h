@@ -68,6 +68,19 @@ struct xen_domctl_createdomain {
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_createdomain_t);
 
+#if defined(__arm__) || defined(__aarch64__)
+#define XEN_DOMCTL_CONFIG_GIC_DEFAULT   0
+#define XEN_DOMCTL_CONFIG_GIC_V2        1
+#define XEN_DOMCTL_CONFIG_GIC_V3        2
+/* XEN_DOMCTL_configure_domain */
+struct xen_domctl_arm_configuredomain {
+    /* IN/OUT parameters */
+    uint8_t gic_version;
+};
+typedef struct xen_domctl_arm_configuredomain xen_domctl_arm_configuredomain_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_arm_configuredomain_t);
+#endif
+
 /* XEN_DOMCTL_getdomaininfo */
 struct xen_domctl_getdomaininfo {
     /* OUT variables. */
@@ -1056,6 +1069,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_set_vcpu_msrs                 73
 #define XEN_DOMCTL_setvnumainfo                  74
 #define XEN_DOMCTL_psr_cmt_op                    75
+#define XEN_DOMCTL_arm_configure_domain          76
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -1064,6 +1078,9 @@ struct xen_domctl {
     domid_t  domain;
     union {
         struct xen_domctl_createdomain      createdomain;
+#if defined(__arm__) || defined(__aarch64__)
+        struct xen_domctl_arm_configuredomain configuredomain;
+#endif
         struct xen_domctl_getdomaininfo     getdomaininfo;
         struct xen_domctl_getmemlist        getmemlist;
         struct xen_domctl_getpageframeinfo  getpageframeinfo;

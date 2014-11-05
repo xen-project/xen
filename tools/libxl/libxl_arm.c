@@ -23,6 +23,18 @@
 #define DT_IRQ_TYPE_LEVEL_HIGH     0x00000004
 #define DT_IRQ_TYPE_LEVEL_LOW      0x00000008
 
+static const char *gicv_to_string(uint8_t gic_version)
+{
+    switch (gic_version) {
+    case XEN_DOMCTL_CONFIG_GIC_V2:
+        return "V2";
+    case XEN_DOMCTL_CONFIG_GIC_V3:
+        return "V3";
+    default:
+        return "unknown";
+    }
+}
+
 int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                               uint32_t domid)
 {
@@ -307,9 +319,9 @@ static int make_memory_nodes(libxl__gc *gc, void *fdt,
     return 0;
 }
 
-static int make_intc_node(libxl__gc *gc, void *fdt,
-                          uint64_t gicd_base, uint64_t gicd_size,
-                          uint64_t gicc_base, uint64_t gicc_size)
+static int make_gicv2_node(libxl__gc *gc, void *fdt,
+                           uint64_t gicd_base, uint64_t gicd_size,
+                           uint64_t gicc_base, uint64_t gicc_size)
 {
     int res;
     const char *name = GCSPRINTF("interrupt-controller@%"PRIx64, gicd_base);
@@ -336,6 +348,56 @@ static int make_intc_node(libxl__gc *gc, void *fdt,
                             2,
                             gicd_base, gicd_size,
                             gicc_base, gicc_size);
+    if (res) return res;
+
+    res = fdt_property_cell(fdt, "linux,phandle", PHANDLE_GIC);
+    if (res) return res;
+
+    res = fdt_property_cell(fdt, "phandle", PHANDLE_GIC);
+    if (res) return res;
+
+    res = fdt_end_node(fdt);
+    if (res) return res;
+
+    return 0;
+}
+
+static int make_gicv3_node(libxl__gc *gc, void *fdt)
+{
+    int res;
+    const uint64_t gicd_base = GUEST_GICV3_GICD_BASE;
+    const uint64_t gicd_size = GUEST_GICV3_GICD_SIZE;
+    const uint64_t gicr0_base = GUEST_GICV3_GICR0_BASE;
+    const uint64_t gicr0_size = GUEST_GICV3_GICR0_SIZE;
+    const char *name = GCSPRINTF("interrupt-controller@%"PRIx64, gicd_base);
+
+    res = fdt_begin_node(fdt, name);
+    if (res) return res;
+
+    res = fdt_property_compat(gc, fdt, 1, "arm,gic-v3");
+    if (res) return res;
+
+    res = fdt_property_cell(fdt, "#interrupt-cells", 3);
+    if (res) return res;
+
+    res = fdt_property_cell(fdt, "#address-cells", 0);
+    if (res) return res;
+
+    res = fdt_property(fdt, "interrupt-controller", NULL, 0);
+    if (res) return res;
+
+    res = fdt_property_cell(fdt, "redistributor-stride",
+                            GUEST_GICV3_RDIST_STRIDE);
+    if (res) return res;
+
+    res = fdt_property_cell(fdt, "#redistributor-regions",
+                            GUEST_GICV3_RDIST_REGIONS);
+    if (res) return res;
+
+    res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
+                            2,
+                            gicd_base, gicd_size,
+                            gicr0_base, gicr0_size);
     if (res) return res;
 
     res = fdt_property_cell(fdt, "linux,phandle", PHANDLE_GIC);
@@ -456,6 +518,7 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
                                            libxl_domain_build_info *info,
                                            struct xc_dom_image *dom)
 {
+    xc_domain_configuration_t config;
     void *fdt = NULL;
     int rc, res;
     size_t fdt_size = 0;
@@ -471,8 +534,16 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
     ainfo = get_arch_info(gc, dom);
     if (ainfo == NULL) return ERROR_FAIL;
 
+    LOG(DEBUG, "configure the domain");
+    config.gic_version = XEN_DOMCTL_CONFIG_GIC_DEFAULT;
+    if (xc_domain_configure(CTX->xch, dom->guest_domid, &config) != 0) {
+        LOG(ERROR, "couldn't configure the domain");
+        return ERROR_FAIL;
+    }
+
     LOG(DEBUG, "constructing DTB for Xen version %d.%d guest",
         vers->xen_version_major, vers->xen_version_minor);
+    LOG(DEBUG, "  - vGIC version: %s", gicv_to_string(config.gic_version));
 
 /*
  * Call "call" handling FDR_ERR_*. Will either:
@@ -520,9 +591,21 @@ next_resize:
         FDT( make_psci_node(gc, fdt) );
 
         FDT( make_memory_nodes(gc, fdt, dom) );
-        FDT( make_intc_node(gc, fdt,
-                            GUEST_GICD_BASE, GUEST_GICD_SIZE,
-                            GUEST_GICC_BASE, GUEST_GICD_SIZE) );
+
+        switch (config.gic_version) {
+        case XEN_DOMCTL_CONFIG_GIC_V2:
+            FDT( make_gicv2_node(gc, fdt,
+                                 GUEST_GICD_BASE, GUEST_GICD_SIZE,
+                                 GUEST_GICC_BASE, GUEST_GICC_SIZE) );
+            break;
+        case XEN_DOMCTL_CONFIG_GIC_V3:
+            FDT( make_gicv3_node(gc, fdt) );
+            break;
+        default:
+            LOG(ERROR, "Unknown GIC version %d", config.gic_version);
+            rc = ERROR_FAIL;
+            goto out;
+        }
 
         FDT( make_timer_node(gc, fdt, ainfo) );
         FDT( make_hypervisor_node(gc, fdt, vers) );

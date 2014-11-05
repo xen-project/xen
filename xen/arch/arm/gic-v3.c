@@ -906,7 +906,21 @@ static int gicv_v3_init(struct domain *d)
         d->arch.vgic.rdist_count = gicv3.rdist_count;
     }
     else
-        d->arch.vgic.dbase = GUEST_GICD_BASE;
+    {
+        d->arch.vgic.dbase = GUEST_GICV3_GICD_BASE;
+        d->arch.vgic.dbase_size = GUEST_GICV3_GICD_SIZE;
+
+        /* XXX: Only one Re-distributor region mapped for the guest */
+        BUILD_BUG_ON(GUEST_GICV3_RDIST_REGIONS != 1);
+
+        d->arch.vgic.rdist_count = GUEST_GICV3_RDIST_REGIONS;
+        d->arch.vgic.rdist_stride = GUEST_GICV3_RDIST_STRIDE;
+
+        /* The first redistributor should contain enough space for all CPUs */
+        BUILD_BUG_ON((GUEST_GICV3_GICR0_SIZE / GUEST_GICV3_RDIST_STRIDE) < MAX_VIRT_CPUS);
+        d->arch.vgic.rbase[0] = GUEST_GICV3_GICR0_BASE;
+        d->arch.vgic.rbase_size[0] = GUEST_GICV3_GICR0_SIZE;
+    }
 
     d->arch.vgic.nr_lines = 0;
 

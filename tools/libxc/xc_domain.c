@@ -48,6 +48,26 @@ int xc_domain_create(xc_interface *xch,
     return 0;
 }
 
+#if defined(__arm__) || defined(__aarch64__)
+int xc_domain_configure(xc_interface *xch, uint32_t domid,
+                        xc_domain_configuration_t *config)
+{
+    int rc;
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_arm_configure_domain;
+    domctl.domain = (domid_t)domid;
+    /* xc_domain_configure_t is an alias of xen_domctl_arm_configuredomain */
+    memcpy(&domctl.u.configuredomain, config, sizeof(*config));
+
+    rc = do_domctl(xch, &domctl);
+    if ( !rc )
+        memcpy(config, &domctl.u.configuredomain, sizeof(*config));
+
+    return rc;
+}
+#endif
+
 int xc_domain_cacheflush(xc_interface *xch, uint32_t domid,
                          xen_pfn_t start_pfn, xen_pfn_t nr_pfns)
 {
