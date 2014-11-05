@@ -2,6 +2,24 @@ LIBXENLIGHT CODING STYLE
 ========================
 
 
+AN APOLOGY AND WARNING
+----------------------
+
+Much of the code in libxl does not yet follow this coding style
+document in every respect.  However, new code is expected to conform.
+
+Patches to improve the style of existing code are welcome.  Please
+separate these out from functional changes.
+
+If it is not feasible to conform fully to the style while patching old
+code, without doing substantial style reengineering first, we may
+accept patches which contain nonconformant elements, provided that
+they don't make the coding style problem worse overall.
+
+In this case, the new code should conform to the prevailing style in
+the area being touched.
+
+
 MEMORY ALLOCATION
 -----------------
 
