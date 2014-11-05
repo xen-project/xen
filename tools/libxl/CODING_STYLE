@@ -239,7 +239,7 @@ variable that is used to hold a temporary value.
 
 Local variables used to store return values should have descriptive name
 like "rc" or "ret". Following the same reasoning the label used as exit
-path should be called "out" or "error".
+path should be called "out".
 
 Variables, type names and function names are
 lower_case_with_underscores.
