@@ -1,5 +1,172 @@
-Libxenlight Coding Style
+LIBXENLIGHT CODING STYLE
 ========================
+
+
+MEMORY ALLOCATION
+-----------------
+
+Memory allocation for libxl-internal purposes should normally be done
+with the provided gc mechanisms; there is then no need to free.  See
+"libxl memory management" in libxl.h.
+
+
+CONVENTIONAL VARIABLE NAMES
+---------------------------
+
+The following local variable names should be used where applicable:
+
+  int rc;    /* a libxl error code - and not anything else */
+  int r;     /* the return value from a system call (or libxc call) */
+
+  uint32_t domid;
+  libxl__gc *gc;
+  libxl__egc *egc;
+  libxl__ao *ao;
+
+  libxl_foo_bar_state *fbs;    /* local variable */
+  libxl_foo_bar_state foo_bar; /* inside another state struct */
+
+
+CONVENIENCE MACROS
+------------------
+
+There are a number of convenience macros which shorten the program and
+avoid opportunity for mistakes.  In some cases non-use of the macros
+produces functional bugs or incorrect error handling.  Use the macros
+whenever they are applicable.  For example:
+
+ Usually, don't use:     Instead, use (see libxl_internal.h):
+  libxl__log[v]           LOG, LOGE, LOGEV
+  libxl__sprintf          GCSPRINTF
+  libxl__*alloc et al.    GCNEW, GCNEW_ARRAY, GCREALLOC_ARRAY
+  malloc et al.           GCNEW, GCNEW_ARRAY, GCREALLOC_ARRAY with NOGC
+  isalnum etc. directly   CTYPE
+  libxl__ctx_[un]lock     CTX_LOCK, CTX_UNLOCK
+  gc=...; ao=...;         EGC_GC, AO_GC, STATE_AO_GC
+  explicit gc creation    GC_INIT, GC_FREE
+
+
+ERROR HANDLING
+--------------
+
+Unless, there are good reasons to do otherwise, the following error
+handling and cleanup paradigm should be used:
+
+  * All local variables referring to resources which might need
+    cleaning up are declared at the top of the function, and
+    initialised to a sentinel value indicating "nothing allocated".
+    For example,
+            libxl_evgen_disk_eject *evg = NULL;
+            int nullfd = -1;
+
+  * If the function is to return a libxl error value, `rc' is
+    used to contain the error code, but it is NOT initialised:
+            int rc;
+
+  * There is only one error cleanup path out of the function.  It
+    starts with a label `out:'.  That error cleanup path checks for
+    each allocated resource and frees it iff necessary.  It then
+    returns rc.  For example,
+         out:
+             if (evg) libxl__evdisable_disk_eject(gc, evg);
+             if (nullfd >= 0) close(nullfd);
+             return rc;
+
+  * Function calls which might fail (ie most function calls) are
+    handled by putting the return/status value into a variable, and
+    then checking it in a separate statement:
+            char *dompath = libxl__xs_get_dompath(gc, bl->domid);
+            if (!dompath) { rc = ERROR_FAIL; goto out; }
+
+  * If a resource is freed in the main body of the function (for
+    example, in a loop), the corresponding variable has to be reset to
+    the sentinel at the point where it's freed.
+
+Whether to use the `out' path for successful returns as well as error
+returns is a matter of taste and convenience for the specific
+function.  Not reusing the out path is fine if the duplicated function
+exit code is only `CTX_UNLOCK; GC_FREE;' (or similar).
+
+If you reuse the `out' path for successful returns, there may be
+resources which are to be returned to the caller rather than freed.
+In that case you have to reset the local variable to `nothing here',
+to avoid the resource being freed on the out path.  That resetting
+should be done immediately after the resource value is stored at the
+applicable _r function parameter (or equivalent).  Do not test `rc' in
+the out section, to discover whether to free things.
+
+The uses of the single-line formatting in the examples above are
+permitted exceptions to the usual libxl code formatting rules.
+
+
+
+IDEMPOTENT DATA STRUCTURE CONSTRUCTION/DESTRUCTION
+--------------------------------------------------
+
+Nontrivial data structures (in structs) should come with an idempotent
+_dispose function, which must free all resources associated with the
+data structure (but not free the struct itself).
+
+Such a struct should also come with an _init function which
+initialises the struct so that _dispose is a no-op.
+
+
+ASYNCHRONOUS/LONG-RUNNING OPERATIONS
+------------------------------------
+
+All long-running operations in libxl need to use the asynchronous
+operation machinery.  Consult the programmer documentation in
+libxl_internal.h for details - search for "Machinery for asynchronous
+operations".
+
+The code for asynchronous operations should be laid out in
+chronological order.  That is, where there is a chain of callback
+functions, each subsequent function should be, textually, the next
+function in the file.  This will normally involve predeclaring the
+callback functions.  Synchronous helper functions should be separated
+out into a section preceding the main callback chain.
+
+Control flow arrangements in asynchronous operations should be made as
+simple as possible, because it can otherwise be very hard to see
+through the tangle.
+
+
+When inventing a new sub-operation in asynchronous code, consider
+whether to structure it formally as a sub-operation with its own state
+structure.  (See, for example, libxl__datacopier_*.)
+
+An ao-suboperation state structure should contain, in this order:
+  * fields that the caller must fill in, and which are,
+    effectively, the parameters to the operation, including:
+      - libxl__ao *ao
+      - the callback function pointer(s), which
+        should be named callback or callback_*.
+  * shared information fields or ones used for returning information
+    to the calling operation
+  * private fields
+These sections should be clearly demarcated by comments.
+
+An asynchronous operation should normally have an idempotent stop or
+cancel function.  It should normally also have an _init function for
+its state struct, which arranges that the stop is a no-op.
+
+The permitted order of calls into your ao operation's methods must be
+documented in comments, if it is nontrivial.
+
+
+When using an ao sub-operation, you should normally:
+ * Physically include the sub-operation state struct in your
+   own state struct;
+ * Use CONTAINER_OF to find your own state struct at the start of
+   your implementations of the sub-operation callback functions;
+ * Unconditionally initialise the sub-operation's struct (with its
+   _init method) in your own _init method.
+ * Unconditionally cancel or destroy the sub-operation in your own
+   cancel or destroy method.
+
+
+FORMATTING AND NAMING
+---------------------
 
 Blatantly copied from qemu and linux with few modifications.
 
