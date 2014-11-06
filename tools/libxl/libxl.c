@@ -2678,7 +2678,7 @@ void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
     }
 
     if (dev != NULL)
-        dls->diskpath = strdup(dev);
+        dls->diskpath = libxl__strdup(gc, dev);
 
     dls->callback(egc, dls, 0);
     return;
