@@ -275,10 +275,12 @@ _hidden int libxl__parse_mac(const char *s, libxl_mac mac)
     char *endptr;
     int i;
 
-    for (i = 0, tok = s; *tok && (i < 6); ++i, tok += 3) {
+    for (i = 0, tok = s; *tok && (i < 6); ++i, tok = endptr) {
         mac[i] = strtol(tok, &endptr, 16);
         if (endptr != (tok + 2) || (*endptr != '\0' && *endptr != ':') )
             return ERROR_INVAL;
+        if (*endptr == ':')
+            endptr++;
     }
     if ( i != 6 )
         return ERROR_INVAL;
