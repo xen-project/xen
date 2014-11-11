@@ -102,7 +102,7 @@ class domain
     unpause
 # XEN_DOMCTL_resumedomain
     resume
-# XEN_DOMCTL_createdomain
+# XEN_DOMCTL_arm_createdomain
     create
 # checked in FLASK_RELABEL_DOMAIN for any relabel operation:
 #  source = the old label of the domain
