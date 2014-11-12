@@ -20,14 +20,116 @@
 
 #include <xen/event.h>
 #include <xen/iommu.h>
+#include <xen/cpu.h>
 #include <xen/irq.h>
 #include <asm/hvm/irq.h>
 #include <asm/hvm/iommu.h>
 #include <asm/hvm/support.h>
 #include <xen/hvm/irq.h>
-#include <xen/tasklet.h>
 
-static void hvm_dirq_assist(unsigned long arg);
+static DEFINE_PER_CPU(struct list_head, dpci_list);
+
+/*
+ * These two bit states help to safely schedule, deschedule, and wait until
+ * the softirq has finished.
+ *
+ * The semantics behind these two bits is as follow:
+ *  - STATE_SCHED - whoever modifies it has to ref-count the domain (->dom).
+ *  - STATE_RUN - only softirq is allowed to set and clear it. If it has
+ *      been set hvm_dirq_assist will RUN with a saved value of the
+ *      'struct domain' copied from 'pirq_dpci->dom' before STATE_RUN was set.
+ *
+ * The usual states are: STATE_SCHED(set) -> STATE_RUN(set) ->
+ * STATE_SCHED(unset) -> STATE_RUN(unset).
+ *
+ * However the states can also diverge such as: STATE_SCHED(set) ->
+ * STATE_SCHED(unset) -> STATE_RUN(set) -> STATE_RUN(unset). That means
+ * the 'hvm_dirq_assist' never run and that the softirq did not do any
+ * ref-counting.
+ */
+
+enum {
+    STATE_SCHED,
+    STATE_RUN
+};
+
+/*
+ * This can be called multiple times, but the softirq is only raised once.
+ * That is until the STATE_SCHED state has been cleared. The state can be
+ * cleared by: the 'dpci_softirq' (when it has executed 'hvm_dirq_assist'),
+ * or by 'pt_pirq_softirq_reset' (which will try to clear the state before
+ * the softirq had a chance to run).
+ */
+static void raise_softirq_for(struct hvm_pirq_dpci *pirq_dpci)
+{
+    unsigned long flags;
+
+    if ( test_and_set_bit(STATE_SCHED, &pirq_dpci->state) )
+        return;
+
+    get_knownalive_domain(pirq_dpci->dom);
+
+    local_irq_save(flags);
+    list_add_tail(&pirq_dpci->softirq_list, &this_cpu(dpci_list));
+    local_irq_restore(flags);
+
+    raise_softirq(HVM_DPCI_SOFTIRQ);
+}
+
+/*
+ * If we are racing with softirq_dpci (STATE_SCHED) we return
+ * true. Otherwise we return false.
+ *
+ * If it is false, it is the callers responsibility to make sure
+ * that the softirq (with the event_lock dropped) has ran.
+ */
+bool_t pt_pirq_softirq_active(struct hvm_pirq_dpci *pirq_dpci)
+{
+    if ( pirq_dpci->state & ((1 << STATE_RUN) | (1 << STATE_SCHED)) )
+        return 1;
+
+    /*
+     * If in the future we would call 'raise_softirq_for' right away
+     * after 'pt_pirq_softirq_active' we MUST reset the list (otherwise it
+     * might have stale data).
+     */
+    return 0;
+}
+
+/*
+ * Reset the pirq_dpci->dom parameter to NULL.
+ *
+ * This function checks the different states to make sure it can do it
+ * at the right time. If it unschedules the 'hvm_dirq_assist' from running
+ * it also refcounts (which is what the softirq would have done) properly.
+ */
+static void pt_pirq_softirq_reset(struct hvm_pirq_dpci *pirq_dpci)
+{
+    struct domain *d = pirq_dpci->dom;
+
+    ASSERT(spin_is_locked(&d->event_lock));
+
+    switch ( cmpxchg(&pirq_dpci->state, 1 << STATE_SCHED, 0) )
+    {
+    case (1 << STATE_SCHED):
+        /*
+         * We are going to try to de-schedule the softirq before it goes in
+         * STATE_RUN. Whoever clears STATE_SCHED MUST refcount the 'dom'.
+         */
+        put_domain(d);
+        /* fallthrough. */
+    case (1 << STATE_RUN):
+    case (1 << STATE_RUN) | (1 << STATE_SCHED):
+        /*
+         * The reason it is OK to reset 'dom' when STATE_RUN bit is set is due
+         * to a shortcut the 'dpci_softirq' implements. It stashes the 'dom'
+         * in local variable before it sets STATE_RUN - and therefore will not
+         * dereference '->dom' which would crash.
+         */
+        pirq_dpci->dom = NULL;
+        break;
+    }
+}
 
 bool_t pt_irq_need_timer(uint32_t flags)
 {
@@ -40,7 +142,7 @@ static int pt_irq_guest_eoi(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
     if ( __test_and_clear_bit(_HVM_IRQ_DPCI_EOI_LATCH_SHIFT,
                               &pirq_dpci->flags) )
     {
-        pirq_dpci->masked = 0;
+        pirq_dpci->state = 0;
         pirq_dpci->pending = 0;
         pirq_guest_eoi(dpci_pirq(pirq_dpci));
     }
@@ -101,6 +203,7 @@ int pt_irq_create_bind(
     if ( pirq < 0 || pirq >= d->nr_pirqs )
         return -EINVAL;
 
+ restart:
     spin_lock(&d->event_lock);
 
     hvm_irq_dpci = domain_get_irq_dpci(d);
@@ -127,6 +230,21 @@ int pt_irq_create_bind(
         return -ENOMEM;
     }
     pirq_dpci = pirq_dpci(info);
+
+    /*
+     * A crude 'while' loop with us dropping the spinlock and giving
+     * the softirq_dpci a chance to run.
+     * We MUST check for this condition as the softirq could be scheduled
+     * and hasn't run yet. Note that this code replaced tasklet_kill which
+     * would have spun forever and would do the same thing (wait to flush out
+     * outstanding hvm_dirq_assist calls.
+     */
+    if ( pt_pirq_softirq_active(pirq_dpci) )
+    {
+        spin_unlock(&d->event_lock);
+        cpu_relax();
+        goto restart;
+    }
 
     switch ( pt_irq_bind->irq_type )
     {
@@ -159,7 +277,16 @@ int pt_irq_create_bind(
             {
                 rc = msixtbl_pt_register(d, info, pt_irq_bind->u.msi.gtable);
                 if ( unlikely(rc) )
+                {
                     pirq_guest_unbind(d, info);
+                    /*
+                     * Between 'pirq_guest_bind' and before 'pirq_guest_unbind'
+                     * an interrupt can be scheduled. No more of them are going
+                     * to be scheduled but we must deal with the one that may be
+                     * in the queue.
+                     */
+                    pt_pirq_softirq_reset(pirq_dpci);
+                }
             }
             if ( unlikely(rc) )
             {
@@ -269,6 +396,10 @@ int pt_irq_create_bind(
             {
                 if ( pt_irq_need_timer(pirq_dpci->flags) )
                     kill_timer(&pirq_dpci->timer);
+                /*
+                 * There is no path for __do_IRQ to schedule softirq as
+                 * IRQ_GUEST is not set. As such we can reset 'dom' directly.
+                 */
                 pirq_dpci->dom = NULL;
                 list_del(&girq->list);
                 list_del(&digl->list);
@@ -402,8 +533,13 @@ int pt_irq_destroy_bind(
         msixtbl_pt_unregister(d, pirq);
         if ( pt_irq_need_timer(pirq_dpci->flags) )
             kill_timer(&pirq_dpci->timer);
-        pirq_dpci->dom   = NULL;
         pirq_dpci->flags = 0;
+        /*
+         * See comment in pt_irq_create_bind's PT_IRQ_TYPE_MSI before the
+         * call to pt_pirq_softirq_reset.
+         */
+        pt_pirq_softirq_reset(pirq_dpci);
+
         pirq_cleanup_check(pirq, d);
     }
 
@@ -426,14 +562,12 @@ void pt_pirq_init(struct domain *d, struct hvm_pirq_dpci *dpci)
 {
     INIT_LIST_HEAD(&dpci->digl_list);
     dpci->gmsi.dest_vcpu_id = -1;
-    softirq_tasklet_init(&dpci->tasklet, hvm_dirq_assist, (unsigned long)dpci);
 }
 
 bool_t pt_pirq_cleanup_check(struct hvm_pirq_dpci *dpci)
 {
-    if ( !dpci->flags )
+    if ( !dpci->flags && !pt_pirq_softirq_active(dpci) )
     {
-        tasklet_kill(&dpci->tasklet);
         dpci->dom = NULL;
         return 1;
     }
@@ -476,8 +610,7 @@ int hvm_do_IRQ_dpci(struct domain *d, struct pirq *pirq)
          !(pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) )
         return 0;
 
-    pirq_dpci->masked = 1;
-    tasklet_schedule(&pirq_dpci->tasklet);
+    raise_softirq_for(pirq_dpci);
     return 1;
 }
 
@@ -531,28 +664,12 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
     spin_unlock(&d->event_lock);
 }
 
-static void hvm_dirq_assist(unsigned long arg)
+static void hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
 {
-    struct hvm_pirq_dpci *pirq_dpci = (struct hvm_pirq_dpci *)arg;
-    struct domain *d = pirq_dpci->dom;
-
-    /*
-     * We can be racing with 'pt_irq_destroy_bind' - with us being scheduled
-     * right before 'pirq_guest_unbind' gets called - but us not yet executed.
-     *
-     * And '->dom' gets cleared later in the destroy path. We exit and clear
-     * 'masked' - which is OK as later in this code we would
-     * do nothing except clear the ->masked field anyhow.
-     */
-    if ( !d )
-    {
-        pirq_dpci->masked = 0;
-        return;
-    }
     ASSERT(d->arch.hvm_domain.irq.dpci);
 
     spin_lock(&d->event_lock);
-    if ( test_and_clear_bool(pirq_dpci->masked) )
+    if ( pirq_dpci->state )
     {
         struct pirq *pirq = dpci_pirq(pirq_dpci);
         const struct dev_intx_gsi_link *digl;
@@ -654,3 +771,83 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
 unlock:
     spin_unlock(&d->event_lock);
 }
+
+/*
+ * Note: 'pt_pirq_softirq_reset' can clear the STATE_SCHED before we get to
+ * doing it. If that is the case we let 'pt_pirq_softirq_reset' do ref-counting.
+ */
+static void dpci_softirq(void)
+{
+    unsigned int cpu = smp_processor_id();
+    LIST_HEAD(our_list);
+
+    local_irq_disable();
+    list_splice_init(&per_cpu(dpci_list, cpu), &our_list);
+    local_irq_enable();
+
+    while ( !list_empty(&our_list) )
+    {
+        struct hvm_pirq_dpci *pirq_dpci;
+        struct domain *d;
+
+        pirq_dpci = list_entry(our_list.next, struct hvm_pirq_dpci, softirq_list);
+        list_del(&pirq_dpci->softirq_list);
+
+        d = pirq_dpci->dom;
+        smp_mb(); /* 'd' MUST be saved before we set/clear the bits. */
+        if ( test_and_set_bit(STATE_RUN, &pirq_dpci->state) )
+            BUG();
+        /*
+         * The one who clears STATE_SCHED MUST refcount the domain.
+         */
+        if ( test_and_clear_bit(STATE_SCHED, &pirq_dpci->state) )
+        {
+            hvm_dirq_assist(d, pirq_dpci);
+            put_domain(d);
+        }
+        clear_bit(STATE_RUN, &pirq_dpci->state);
+    }
+}
+
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        INIT_LIST_HEAD(&per_cpu(dpci_list, cpu));
+        break;
+    case CPU_UP_CANCELED:
+    case CPU_DEAD:
+        /*
+         * On CPU_DYING this callback is called (on the CPU that is dying)
+         * with an possible HVM_DPIC_SOFTIRQ pending - at which point we can
+         * clear out any outstanding domains (by the virtue of the idle loop
+         * calling the softirq later). In CPU_DEAD case the CPU is deaf and
+         * there are no pending softirqs for us to handle so we can chill.
+         */
+        ASSERT(list_empty(&per_cpu(dpci_list, cpu)));
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback,
+};
+
+static int __init setup_dpci_softirq(void)
+{
+    unsigned int cpu;
+
+    for_each_online_cpu(cpu)
+        INIT_LIST_HEAD(&per_cpu(dpci_list, cpu));
+
+    open_softirq(HVM_DPCI_SOFTIRQ, dpci_softirq);
+    register_cpu_notifier(&cpu_nfb);
+    return 0;
+}
+__initcall(setup_dpci_softirq);
