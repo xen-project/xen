@@ -4164,6 +4164,7 @@ DEFINE_DEVICE_REMOVE(vtpm, destroy, 1)
                                                                         \
         GCNEW(aodev);                                                   \
         libxl__prepare_ao_device(ao, aodev);                            \
+        aodev->action = LIBXL__DEVICE_ACTION_ADD;                       \
         aodev->callback = device_addrm_aocomplete;                      \
         aodev->update_json = true;                                      \
         libxl__device_##type##_add(egc, domid, type, aodev);            \
