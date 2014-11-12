@@ -13,11 +13,17 @@ fi
 
 cd $1
 version=$2
-if test "$XEN_TARGET_ARCH" = "x86_32"; then
-  arch=i386
-else
-  arch=amd64
-fi
+
+# map the architecture, if necessary
+case "$XEN_TARGET_ARCH" in
+  x86_32|x86_32p)  arch=i386 ;;
+  x86_64)  arch=amd64 ;;
+  arm32)   arch=armhf ;;
+  arm64)   arch=$XEN_TARGET_ARCH;;
+  *) echo "Unknown XEN_TARGET_ARCH $XEN_TARGET_ARCH" >&2
+     exit 1
+     ;;
+esac
 
 # Prepare the directory to package
 cd dist
