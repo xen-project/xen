@@ -27,7 +27,7 @@
 #include <xen/hvm/irq.h>
 #include <xen/tasklet.h>
 
-static void hvm_dirq_assist(unsigned long _d);
+static void hvm_dirq_assist(unsigned long arg);
 
 bool_t pt_irq_need_timer(uint32_t flags)
 {
@@ -114,9 +114,6 @@ int pt_irq_create_bind(
             spin_unlock(&d->event_lock);
             return -ENOMEM;
         }
-        softirq_tasklet_init(
-            &hvm_irq_dpci->dirq_tasklet,
-            hvm_dirq_assist, (unsigned long)d);
         for ( i = 0; i < NR_HVM_IRQS; i++ )
             INIT_LIST_HEAD(&hvm_irq_dpci->girq[i]);
 
@@ -144,6 +141,18 @@ int pt_irq_create_bind(
                                HVM_IRQ_DPCI_GUEST_MSI;
             pirq_dpci->gmsi.gvec = pt_irq_bind->u.msi.gvec;
             pirq_dpci->gmsi.gflags = pt_irq_bind->u.msi.gflags;
+            /*
+             * 'pt_irq_create_bind' can be called after 'pt_irq_destroy_bind'.
+             * The 'pirq_cleanup_check' which would free the structure is only
+             * called if the event channel for the PIRQ is active. However
+             * OS-es that use event channels usually bind PIRQs to eventds
+             * and unbind them before calling 'pt_irq_destroy_bind' - with the
+             * result that we re-use the 'dpci' structure. This can be
+             * reproduced with unloading and loading the driver for a device.
+             *
+             * As such on every 'pt_irq_create_bind' call we MUST set it.
+             */
+            pirq_dpci->dom = d;
             /* bind after hvm_irq_dpci is setup to avoid race with irq handler*/
             rc = pirq_guest_bind(d->vcpu[0], info, 0);
             if ( rc == 0 && pt_irq_bind->u.msi.gtable )
@@ -156,6 +165,7 @@ int pt_irq_create_bind(
             {
                 pirq_dpci->gmsi.gflags = 0;
                 pirq_dpci->gmsi.gvec = 0;
+                pirq_dpci->dom = NULL;
                 pirq_dpci->flags = 0;
                 pirq_cleanup_check(info, d);
                 spin_unlock(&d->event_lock);
@@ -232,6 +242,7 @@ int pt_irq_create_bind(
         {
             unsigned int share;
 
+            /* MUST be set, as the pirq_dpci can be re-used. */
             pirq_dpci->dom = d;
             if ( pt_irq_bind->irq_type == PT_IRQ_TYPE_MSI_TRANSLATE )
             {
@@ -415,11 +426,18 @@ void pt_pirq_init(struct domain *d, struct hvm_pirq_dpci *dpci)
 {
     INIT_LIST_HEAD(&dpci->digl_list);
     dpci->gmsi.dest_vcpu_id = -1;
+    softirq_tasklet_init(&dpci->tasklet, hvm_dirq_assist, (unsigned long)dpci);
 }
 
 bool_t pt_pirq_cleanup_check(struct hvm_pirq_dpci *dpci)
 {
-    return !dpci->flags;
+    if ( !dpci->flags )
+    {
+        tasklet_kill(&dpci->tasklet);
+        dpci->dom = NULL;
+        return 1;
+    }
+    return 0;
 }
 
 int pt_pirq_iterate(struct domain *d,
@@ -459,7 +477,7 @@ int hvm_do_IRQ_dpci(struct domain *d, struct pirq *pirq)
         return 0;
 
     pirq_dpci->masked = 1;
-    tasklet_schedule(&dpci->dirq_tasklet);
+    tasklet_schedule(&pirq_dpci->tasklet);
     return 1;
 }
 
@@ -513,9 +531,27 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
     spin_unlock(&d->event_lock);
 }
 
-static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
-                            void *arg)
+static void hvm_dirq_assist(unsigned long arg)
 {
+    struct hvm_pirq_dpci *pirq_dpci = (struct hvm_pirq_dpci *)arg;
+    struct domain *d = pirq_dpci->dom;
+
+    /*
+     * We can be racing with 'pt_irq_destroy_bind' - with us being scheduled
+     * right before 'pirq_guest_unbind' gets called - but us not yet executed.
+     *
+     * And '->dom' gets cleared later in the destroy path. We exit and clear
+     * 'masked' - which is OK as later in this code we would
+     * do nothing except clear the ->masked field anyhow.
+     */
+    if ( !d )
+    {
+        pirq_dpci->masked = 0;
+        return;
+    }
+    ASSERT(d->arch.hvm_domain.irq.dpci);
+
+    spin_lock(&d->event_lock);
     if ( test_and_clear_bool(pirq_dpci->masked) )
     {
         struct pirq *pirq = dpci_pirq(pirq_dpci);
@@ -526,13 +562,17 @@ static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
             send_guest_pirq(d, pirq);
 
             if ( pirq_dpci->flags & HVM_IRQ_DPCI_GUEST_MSI )
-                return 0;
+            {
+                spin_unlock(&d->event_lock);
+                return;
+            }
         }
 
         if ( pirq_dpci->flags & HVM_IRQ_DPCI_GUEST_MSI )
         {
             vmsi_deliver_pirq(d, pirq_dpci);
-            return 0;
+            spin_unlock(&d->event_lock);
+            return;
         }
 
         list_for_each_entry ( digl, &pirq_dpci->digl_list, list )
@@ -545,7 +585,8 @@ static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
         {
             /* for translated MSI to INTx interrupt, eoi as early as possible */
             __msi_pirq_eoi(pirq_dpci);
-            return 0;
+            spin_unlock(&d->event_lock);
+            return;
         }
 
         /*
@@ -558,18 +599,6 @@ static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
         ASSERT(pt_irq_need_timer(pirq_dpci->flags));
         set_timer(&pirq_dpci->timer, NOW() + PT_IRQ_TIME_OUT);
     }
-
-    return 0;
-}
-
-static void hvm_dirq_assist(unsigned long _d)
-{
-    struct domain *d = (struct domain *)_d;
-
-    ASSERT(d->arch.hvm_domain.irq.dpci);
-
-    spin_lock(&d->event_lock);
-    pt_pirq_iterate(d, _hvm_dirq_assist, NULL);
     spin_unlock(&d->event_lock);
 }
 
