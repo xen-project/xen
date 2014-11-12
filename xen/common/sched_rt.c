@@ -508,7 +508,6 @@ static void *
 rt_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
 {
     struct rt_vcpu *svc;
-    s_time_t now = NOW();
 
     /* Allocate per-VCPU info */
     svc = xzalloc(struct rt_vcpu);
@@ -525,10 +524,6 @@ rt_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     svc->period = RTDS_DEFAULT_PERIOD;
     if ( !is_idle_vcpu(vc) )
         svc->budget = RTDS_DEFAULT_BUDGET;
-
-    ASSERT( now >= svc->cur_deadline );
-
-    rt_update_deadline(now, svc);
 
     return svc;
 }
@@ -552,10 +547,14 @@ static void
 rt_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 {
     struct rt_vcpu *svc = rt_vcpu(vc);
+    s_time_t now = NOW();
 
     /* not addlocate idle vcpu to dom vcpu list */
     if ( is_idle_vcpu(vc) )
         return;
+
+    if ( now >= svc->cur_deadline )
+        rt_update_deadline(now, svc);
 
     if ( !__vcpu_on_q(svc) && vcpu_runnable(vc) && !vc->is_running )
         __runq_insert(ops, svc);
@@ -573,11 +572,14 @@ rt_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
 {
     struct rt_vcpu * const svc = rt_vcpu(vc);
     struct rt_dom * const sdom = svc->sdom;
+    spinlock_t *lock;
 
     BUG_ON( sdom == NULL );
 
+    lock = vcpu_schedule_lock_irq(vc);
     if ( __vcpu_on_q(svc) )
         __q_remove(svc);
+    vcpu_schedule_unlock_irq(lock, vc);
 
     if ( !is_idle_vcpu(vc) )
         list_del_init(&svc->sdom_elem);
