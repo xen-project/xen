@@ -225,6 +225,35 @@ static int cpupool_destroy(struct cpupool *c)
 }
 
 /*
+ * Move domain to another cpupool
+ */
+static int cpupool_move_domain_locked(struct domain *d, struct cpupool *c)
+{
+    int ret;
+
+    d->cpupool->n_dom--;
+    ret = sched_move_domain(d, c);
+    if ( ret )
+        d->cpupool->n_dom++;
+    else
+        c->n_dom++;
+
+    return ret;
+}
+int cpupool_move_domain(struct domain *d, struct cpupool *c)
+{
+    int ret;
+
+    spin_lock(&cpupool_lock);
+
+    ret = cpupool_move_domain_locked(d, c);
+
+    spin_unlock(&cpupool_lock);
+
+    return ret;
+}
+
+/*
  * assign a specific cpu to a cpupool
  * cpupool_lock must be held
  */
@@ -338,14 +367,9 @@ static int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
                 ret = -EBUSY;
                 break;
             }
-            c->n_dom--;
-            ret = sched_move_domain(d, cpupool0);
+            ret = cpupool_move_domain_locked(d, cpupool0);
             if ( ret )
-            {
-                c->n_dom++;
                 break;
-            }
-            cpupool0->n_dom++;
         }
         rcu_read_unlock(&domlist_read_lock);
         if ( ret )
@@ -613,16 +637,11 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
                         d->domain_id, op->cpupool_id);
         ret = -ENOENT;
         spin_lock(&cpupool_lock);
+
         c = cpupool_find_by_id(op->cpupool_id);
         if ( (c != NULL) && cpumask_weight(c->cpu_valid) )
-        {
-            d->cpupool->n_dom--;
-            ret = sched_move_domain(d, c);
-            if ( ret )
-                d->cpupool->n_dom++;
-            else
-                c->n_dom++;
-        }
+            ret = cpupool_move_domain_locked(d, c);
+
         spin_unlock(&cpupool_lock);
         cpupool_dprintk("cpupool move_domain(dom=%d)->pool=%d ret %d\n",
                         d->domain_id, op->cpupool_id, ret);

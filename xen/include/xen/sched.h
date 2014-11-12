@@ -871,6 +871,7 @@ struct cpupool *cpupool_get_by_id(int poolid);
 void cpupool_put(struct cpupool *pool);
 int cpupool_add_domain(struct domain *d, int poolid);
 void cpupool_rm_domain(struct domain *d);
+int cpupool_move_domain(struct domain *d, struct cpupool *c);
 int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op);
 void schedule_dump(struct cpupool *c);
 extern void dump_runq(unsigned char key);

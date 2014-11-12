@@ -621,7 +621,7 @@ int domain_kill(struct domain *d)
                 rc = -EAGAIN;
             break;
         }
-        if ( sched_move_domain(d, cpupool0) )
+        if ( cpupool_move_domain(d, cpupool0) )
             return -EAGAIN;
         for_each_vcpu ( d, v )
             unmap_vcpu_info(v);
