@@ -6383,6 +6383,7 @@ int main_blockattach(int argc, char **argv)
 
     if (libxl_device_disk_add(ctx, fe_domid, &disk, 0)) {
         fprintf(stderr, "libxl_device_disk_add failed.\n");
+        return 1;
     }
     return 0;
 }
@@ -6444,6 +6445,7 @@ int main_blockdetach(int argc, char **argv)
     rc = libxl_device_disk_remove(ctx, domid, &disk, 0);
     if (rc) {
         fprintf(stderr, "libxl_device_disk_remove failed.\n");
+        return 1;
     }
     libxl_device_disk_dispose(&disk);
     return rc;
