@@ -7908,7 +7908,7 @@ static int psr_cmt_show_cache_occupancy(uint32_t domid)
     /* Each domain */
     if (domid != INVALID_DOMID) {
         libxl_dominfo dominfo;
-        if (!libxl_domain_info(ctx, &dominfo, domid)) {
+        if (libxl_domain_info(ctx, &dominfo, domid)) {
             fprintf(stderr, "Failed to get domain info for %d\n", domid);
             return -1;
         }
