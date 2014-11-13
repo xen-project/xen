@@ -1497,6 +1497,10 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     for( ; ; ); /* not reached */
 }
 
+
+static bool_t __initdata efi_rs_enable = 1;
+boolean_param("efi-rs", efi_rs_enable);
+
 #ifndef USE_SET_VIRTUAL_ADDRESS_MAP
 static __init void copy_mapping(unsigned long mfn, unsigned long end,
                                 bool_t (*is_valid)(unsigned long smfn,
@@ -1570,7 +1574,7 @@ void __init efi_init_memory(void)
                desc->PhysicalStart, desc->PhysicalStart + len - 1,
                desc->Type, desc->Attribute);
 
-        if ( !(desc->Attribute & EFI_MEMORY_RUNTIME) )
+        if ( !efi_rs_enable || !(desc->Attribute & EFI_MEMORY_RUNTIME) )
             continue;
 
         desc->VirtualStart = INVALID_VIRTUAL_ADDRESS;
@@ -1632,6 +1636,12 @@ void __init efi_init_memory(void)
             printk(XENLOG_ERR "No mapping for MFNs %#lx-%#lx\n",
                    smfn, emfn - 1);
         }
+    }
+
+    if ( !efi_rs_enable )
+    {
+        efi_fw_vendor = NULL;
+        return;
     }
 
 #ifdef USE_SET_VIRTUAL_ADDRESS_MAP
