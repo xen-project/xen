@@ -334,6 +334,7 @@ enum vmcs_field {
     EPT_POINTER                     = 0x0000201a,
     EPT_POINTER_HIGH                = 0x0000201b,
     EOI_EXIT_BITMAP0                = 0x0000201c,
+#define EOI_EXIT_BITMAP(n) (EOI_EXIT_BITMAP0 + (n) * 2) /* n = 0...3 */
     EOI_EXIT_BITMAP0_HIGH           = 0x0000201d,
     EOI_EXIT_BITMAP1                = 0x0000201e,
     EOI_EXIT_BITMAP1_HIGH           = 0x0000201f,
