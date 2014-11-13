@@ -9,6 +9,12 @@ const bool_t efi_enabled = 0;
 
 void __init efi_init_memory(void) { }
 
+paddr_t efi_rs_page_table(void)
+{
+    BUG();
+    return 0;
+}
+
 unsigned long efi_get_time(void)
 {
     BUG();
