@@ -62,8 +62,6 @@ obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o
 obj-$(xenoprof)    += xenoprof.o
 
-obj-$(CONFIG_XENCOMM) += xencomm.o
-
 subdir-$(CONFIG_COMPAT) += compat
 
 subdir-$(x86_64) += hvm

@@ -21,7 +21,6 @@ headers-y := \
     compat/vcpu.h \
     compat/version.h \
     compat/xen.h \
-    compat/xencomm.h \
     compat/xenoprof.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen-mca.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen.h
