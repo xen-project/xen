@@ -292,19 +292,22 @@ int _hvm_check_entry(struct hvm_domain_context *h,
 {
     struct hvm_save_descriptor *d 
         = (struct hvm_save_descriptor *)&h->data[h->cur];
-    if ( len + sizeof (*d) > h->size - h->cur)
+    if ( sizeof(*d) > h->size - h->cur)
     {
         printk(XENLOG_G_WARNING
-               "HVM restore: not enough data left to read %u bytes "
-               "for type %u\n", len, type);
+               "HVM restore: not enough data left to read %zu bytes "
+               "for type %u header\n", sizeof(*d), type);
         return -1;
-    }    
-    if ( (type != d->typecode) || (len < d->length) ||
-         (strict_length && (len != d->length)) )
+    }
+    if ( (type != d->typecode) ||
+         (strict_length ? (len != d->length) : (len < d->length)) ||
+         (d->length > (h->size - h->cur - sizeof(*d))) )
     {
         printk(XENLOG_G_WARNING
-               "HVM restore mismatch: expected type %u length %u, "
-               "saw type %u length %u\n", type, len, d->typecode, d->length);
+               "HVM restore mismatch: expected %s type %u length %u, "
+               "saw type %u length %u.  %zu bytes remaining\n",
+               strict_length ? "strict" : "zeroextended", type, len,
+               d->typecode, d->length, h->size - h->cur - sizeof(*d));
         return -1;
     }
     h->cur += sizeof(*d);
