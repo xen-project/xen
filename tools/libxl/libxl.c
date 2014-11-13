@@ -4551,6 +4551,12 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         GC_FREE;
         return NULL;
     }
+
+    if (domaininfo.max_vcpu_id == XEN_INVALID_MAX_VCPU_ID) {
+        GC_FREE;
+        return NULL;
+    }
+
     *nr_cpus_out = libxl_get_max_cpus(ctx);
     ret = ptr = libxl__calloc(NOGC, domaininfo.max_vcpu_id + 1,
                               sizeof(libxl_vcpuinfo));
