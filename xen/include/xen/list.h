@@ -10,12 +10,15 @@
 #include <xen/lib.h>
 #include <asm/system.h>
 
-/* These are non-NULL pointers that will result in page faults
- * under normal circumstances, used to verify that nobody uses
- * non-initialized list entries.
+/*
+ * These are non-NULL pointers that will result in faults under normal
+ * circumstances, used to verify that nobody uses non-initialized list
+ * entries. Architectures can override these.
  */
+#ifndef LIST_POISON1
 #define LIST_POISON1  ((void *) 0x00100100)
 #define LIST_POISON2  ((void *) 0x00200200)
+#endif
 
 /*
  * Simple doubly linked list implementation.

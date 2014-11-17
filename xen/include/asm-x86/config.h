@@ -106,6 +106,10 @@
 /* Return value for zero-size _xmalloc(), distinguished from NULL. */
 #define ZERO_BLOCK_PTR ((void *)0xBAD0BAD0BAD0BAD0UL)
 
+/* Override include/xen/list.h to make these non-canonical addresses. */
+#define LIST_POISON1  ((void *)0x0100100100100100UL)
+#define LIST_POISON2  ((void *)0x0200200200200200UL)
+
 #ifndef __ASSEMBLY__
 extern unsigned long trampoline_phys;
 #define bootsym_phys(sym)                                 \
