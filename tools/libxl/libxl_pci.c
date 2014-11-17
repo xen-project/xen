@@ -175,14 +175,6 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
         rc = libxl__xs_transaction_start(gc, &t);
         if (rc) goto out;
 
-        rc = libxl__device_exists(gc, t, device);
-        if (rc < 0) goto out;
-        if (rc == 1) {
-            LOG(ERROR, "device already exists in xenstore");
-            rc = ERROR_DEVICE_EXISTS;
-            goto out;
-        }
-
         rc = libxl__set_domain_configuration(gc, domid, &d_config);
         if (rc) goto out;
 
