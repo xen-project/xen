@@ -703,7 +703,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
     union string section = { NULL }, name;
-    bool_t base_video = 0;
+    bool_t base_video = 0, retry;
     char *option_str;
     bool_t use_cfg_file;
 
@@ -1051,17 +1051,23 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     if ( !efi_memmap )
         blexit(L"Unable to allocate memory for EFI memory map");
 
-    status = efi_bs->GetMemoryMap(&efi_memmap_size, efi_memmap, &map_key,
-                                  &efi_mdesc_size, &mdesc_ver);
-    if ( EFI_ERROR(status) )
-        PrintErrMesg(L"Cannot obtain memory map", status);
+    for ( retry = 0; ; retry = 1 )
+    {
+        status = efi_bs->GetMemoryMap(&efi_memmap_size, efi_memmap, &map_key,
+                                      &efi_mdesc_size, &mdesc_ver);
+        if ( EFI_ERROR(status) )
+            PrintErrMesg(L"Cannot obtain memory map", status);
 
-    efi_arch_process_memory_map(SystemTable, efi_memmap, efi_memmap_size,
-                                efi_mdesc_size, mdesc_ver);
+        efi_arch_process_memory_map(SystemTable, efi_memmap, efi_memmap_size,
+                                    efi_mdesc_size, mdesc_ver);
 
-    efi_arch_pre_exit_boot();
+        efi_arch_pre_exit_boot();
 
-    status = efi_bs->ExitBootServices(ImageHandle, map_key);
+        status = efi_bs->ExitBootServices(ImageHandle, map_key);
+        if ( status != EFI_INVALID_PARAMETER || retry )
+            break;
+    }
+
     if ( EFI_ERROR(status) )
         PrintErrMesg(L"Cannot exit boot services", status);
 

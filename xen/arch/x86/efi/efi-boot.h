@@ -140,7 +140,7 @@ static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
 
     /* Populate E820 table and check trampoline area availability. */
     e = e820map - 1;
-    for ( i = 0; i < map_size; i += desc_size )
+    for ( e820nr = i = 0; i < map_size; i += desc_size )
     {
         EFI_MEMORY_DESCRIPTOR *desc = map + i;
         u64 len = desc->NumberOfPages << EFI_PAGE_SHIFT;
