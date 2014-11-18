@@ -1114,7 +1114,7 @@ realmode_load_seg(
 static int
 protmode_load_seg(
     enum x86_segment seg,
-    uint16_t sel,
+    uint16_t sel, bool_t is_ret,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
@@ -1180,9 +1180,23 @@ protmode_load_seg(
         /* Code segment? */
         if ( !(desc.b & (1u<<11)) )
             goto raise_exn;
-        /* Non-conforming segment: check DPL against RPL. */
-        if ( ((desc.b & (6u<<9)) != (6u<<9)) && (dpl != rpl) )
+        if ( is_ret
+             ? /*
+                * Really rpl < cpl, but our sole caller doesn't handle
+                * privilege level changes.
+                */
+               rpl != cpl || (desc.b & (1 << 10) ? dpl > rpl : dpl != rpl)
+             : desc.b & (1 << 10)
+               /* Conforming segment: check DPL against CPL. */
+               ? dpl > cpl
+               /* Non-conforming segment: check RPL and DPL against CPL. */
+               : rpl > cpl || dpl != cpl )
             goto raise_exn;
+        /* 64-bit code segments (L bit set) must have D bit clear. */
+        if ( in_longmode(ctxt, ops) &&
+             (desc.b & (1 << 21)) && (desc.b & (1 << 22)) )
+            goto raise_exn;
+        sel = (sel ^ rpl) | cpl;
         break;
     case x86_seg_ss:
         /* Writable data segment? */
@@ -1247,7 +1261,7 @@ protmode_load_seg(
 static int
 load_seg(
     enum x86_segment seg,
-    uint16_t sel,
+    uint16_t sel, bool_t is_ret,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
@@ -1256,7 +1270,7 @@ load_seg(
         return X86EMUL_UNHANDLEABLE;
 
     if ( in_protmode(ctxt, ops) )
-        return protmode_load_seg(seg, sel, ctxt, ops);
+        return protmode_load_seg(seg, sel, is_ret, ctxt, ops);
 
     return realmode_load_seg(seg, sel, ctxt, ops);
 }
@@ -1888,7 +1902,7 @@ x86_emulate(
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
                               &dst.val, op_bytes, ctxt, ops)) != 0 )
             goto done;
-        if ( (rc = load_seg(src.val, (uint16_t)dst.val, ctxt, ops)) != 0 )
+        if ( (rc = load_seg(src.val, dst.val, 0, ctxt, ops)) != 0 )
             return rc;
         break;
 
@@ -2242,7 +2256,7 @@ x86_emulate(
         enum x86_segment seg = decode_segment(modrm_reg);
         generate_exception_if(seg == decode_segment_failed, EXC_UD, -1);
         generate_exception_if(seg == x86_seg_cs, EXC_UD, -1);
-        if ( (rc = load_seg(seg, (uint16_t)src.val, ctxt, ops)) != 0 )
+        if ( (rc = load_seg(seg, src.val, 0, ctxt, ops)) != 0 )
             goto done;
         if ( seg == x86_seg_ss )
             ctxt->retire.flags.mov_ss = 1;
@@ -2323,7 +2337,7 @@ x86_emulate(
                               &_regs.eip, op_bytes, ctxt)) )
             goto done;
 
-        if ( (rc = load_seg(x86_seg_cs, sel, ctxt, ops)) != 0 )
+        if ( (rc = load_seg(x86_seg_cs, sel, 0, ctxt, ops)) != 0 )
             goto done;
         _regs.eip = eip;
         break;
@@ -2547,7 +2561,7 @@ x86_emulate(
         if ( (rc = read_ulong(src.mem.seg, src.mem.off + src.bytes,
                               &sel, 2, ctxt, ops)) != 0 )
             goto done;
-        if ( (rc = load_seg(dst.val, (uint16_t)sel, ctxt, ops)) != 0 )
+        if ( (rc = load_seg(dst.val, sel, 0, ctxt, ops)) != 0 )
             goto done;
         dst.val = src.val;
         break;
@@ -2621,7 +2635,7 @@ x86_emulate(
                               &dst.val, op_bytes, ctxt, ops)) ||
              (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + offset),
                               &src.val, op_bytes, ctxt, ops)) ||
-             (rc = load_seg(x86_seg_cs, (uint16_t)src.val, ctxt, ops)) )
+             (rc = load_seg(x86_seg_cs, src.val, 1, ctxt, ops)) )
             goto done;
         _regs.eip = dst.val;
         break;
@@ -2668,7 +2682,7 @@ x86_emulate(
         _regs.eflags &= mask;
         _regs.eflags |= (uint32_t)(eflags & ~mask) | 0x02;
         _regs.eip = eip;
-        if ( (rc = load_seg(x86_seg_cs, (uint16_t)cs, ctxt, ops)) != 0 )
+        if ( (rc = load_seg(x86_seg_cs, cs, 1, ctxt, ops)) != 0 )
             goto done;
         break;
     }
@@ -3298,7 +3312,7 @@ x86_emulate(
         generate_exception_if(mode_64bit(), EXC_UD, -1);
         eip = insn_fetch_bytes(op_bytes);
         sel = insn_fetch_type(uint16_t);
-        if ( (rc = load_seg(x86_seg_cs, sel, ctxt, ops)) != 0 )
+        if ( (rc = load_seg(x86_seg_cs, sel, 0, ctxt, ops)) != 0 )
             goto done;
         _regs.eip = eip;
         break;
@@ -3596,7 +3610,7 @@ x86_emulate(
                     goto done;
             }
 
-            if ( (rc = load_seg(x86_seg_cs, sel, ctxt, ops)) != 0 )
+            if ( (rc = load_seg(x86_seg_cs, sel, 0, ctxt, ops)) != 0 )
                 goto done;
             _regs.eip = src.val;
 
@@ -3663,7 +3677,7 @@ x86_emulate(
         generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         if ( (rc = load_seg((modrm_reg & 1) ? x86_seg_tr : x86_seg_ldtr,
-                            src.val, ctxt, ops)) != 0 )
+                            src.val, 0, ctxt, ops)) != 0 )
             goto done;
         break;
 
