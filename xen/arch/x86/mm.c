@@ -3509,6 +3509,10 @@ long do_mmu_update(
         {
             p2m_type_t p2mt;
 
+            rc = -EOPNOTSUPP;
+            if ( unlikely(paging_mode_refcounts(pt_owner)) )
+                break;
+
             xsm_needed |= XSM_MMU_NORMAL_UPDATE;
             if ( get_pte_flags(req.val) & _PAGE_PRESENT )
             {
