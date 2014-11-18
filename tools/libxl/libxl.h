@@ -1109,6 +1109,10 @@ void libxl_vtpminfo_list_free(libxl_vtpminfo *, int nr_vtpms);
  *   domain to connect to the device and therefore cannot block on the
  *   guest.
  *
+ *   device is an in/out parameter:  fields left unspecified when the
+ *   structure is passed in are filled in with appropriate values for
+ *   the device created.
+ *
  * libxl_device_<type>_remove(ctx, domid, device):
  *
  *   Removes the given device from the specified domain by performing
