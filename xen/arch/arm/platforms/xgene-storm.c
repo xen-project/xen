@@ -89,22 +89,8 @@ static int xgene_storm_specific_mapping(struct domain *d)
     int ret;
 
     /* Map the PCIe bus resources */
-    ret = map_one_mmio(d, "PCI MEM REGION", paddr_to_pfn(0xe000000000UL),
-                                            paddr_to_pfn(0xe010000000UL));
-    if ( ret )
-        goto err;
-
-    ret = map_one_mmio(d, "PCI IO REGION", paddr_to_pfn(0xe080000000UL),
-                                           paddr_to_pfn(0xe080010000UL));
-    if ( ret )
-        goto err;
-
-    ret = map_one_mmio(d, "PCI CFG REGION", paddr_to_pfn(0xe0d0000000UL),
-                                            paddr_to_pfn(0xe0d0200000UL));
-    if ( ret )
-        goto err;
-    ret = map_one_mmio(d, "PCI MSI REGION", paddr_to_pfn(0xe010000000UL),
-                                            paddr_to_pfn(0xe010800000UL));
+    ret = map_one_mmio(d, "PCI MEMORY", paddr_to_pfn(0x0e000000000UL),
+                                        paddr_to_pfn(0x01000000000UL));
     if ( ret )
         goto err;
 
