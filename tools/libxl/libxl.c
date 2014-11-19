@@ -3605,8 +3605,6 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
     flexarray_append(back, "1");
     flexarray_append(back, "state");
     flexarray_append(back, libxl__sprintf(gc, "%d", 1));
-    flexarray_append(back, "domain");
-    flexarray_append(back, libxl__domid_to_name(gc, domid));
     flexarray_append(back, "protocol");
     flexarray_append(back, LIBXL_XENCONSOLE_PROTOCOL);
 
@@ -3943,8 +3941,6 @@ int libxl__device_vkb_add(libxl__gc *gc, uint32_t domid,
     flexarray_append(back, "1");
     flexarray_append(back, "state");
     flexarray_append(back, libxl__sprintf(gc, "%d", 1));
-    flexarray_append(back, "domain");
-    flexarray_append(back, libxl__domid_to_name(gc, domid));
 
     flexarray_append(front, "backend-id");
     flexarray_append(front, libxl__sprintf(gc, "%d", vkb->backend_domid));
@@ -4041,7 +4037,6 @@ int libxl__device_vfb_add(libxl__gc *gc, uint32_t domid, libxl_device_vfb *vfb)
     flexarray_append_pair(back, "frontend-id", libxl__sprintf(gc, "%d", domid));
     flexarray_append_pair(back, "online", "1");
     flexarray_append_pair(back, "state", libxl__sprintf(gc, "%d", 1));
-    flexarray_append_pair(back, "domain", libxl__domid_to_name(gc, domid));
     flexarray_append_pair(back, "vnc",
                           libxl_defbool_val(vfb->vnc.enable) ? "1" : "0");
     flexarray_append_pair(back, "vnclisten", vfb->vnc.listen);
