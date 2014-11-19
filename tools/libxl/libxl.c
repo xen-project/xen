@@ -359,6 +359,9 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
     uint32_t stub_dm_domid;
     const char *stub_dm_old_name = NULL, *stub_dm_new_name = NULL;
     int rc;
+    libxl_dominfo info;
+    char *uuid;
+    const char *vm_name_path;
 
     dom_path = libxl__xs_get_dompath(gc, domid);
     if (!dom_path) goto x_nomem;
@@ -428,6 +431,16 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
                new_name, domid, old_name);
         goto x_fail;
     }
+
+    /* update /vm/<uuid>/name */
+    rc = libxl_domain_info(ctx, &info, domid);
+    if (rc)
+        goto x_fail;
+
+    uuid = GCSPRINTF(LIBXL_UUID_FMT, LIBXL_UUID_BYTES(info.uuid));
+    vm_name_path = GCSPRINTF("/vm/%s/name", uuid);
+    if (libxl__xs_write_checked(gc, trans, vm_name_path, new_name))
+        goto x_fail;
 
     if (stub_dm_domid) {
         rc = libxl__domain_rename(gc, stub_dm_domid,
