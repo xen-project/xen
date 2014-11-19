@@ -2005,6 +2005,8 @@ int xc_domain_memory_mapping(
 {
     DECLARE_DOMCTL;
     xc_dominfo_t info;
+    int ret = 0, err;
+    unsigned long done = 0, nr, max_batch_sz;
 
     if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 ||
          info.domid != domid )
@@ -2015,14 +2017,50 @@ int xc_domain_memory_mapping(
     if ( !xc_core_arch_auto_translated_physmap(&info) )
         return 0;
 
+    if ( !nr_mfns )
+        return 0;
+
     domctl.cmd = XEN_DOMCTL_memory_mapping;
     domctl.domain = domid;
-    domctl.u.memory_mapping.first_gfn = first_gfn;
-    domctl.u.memory_mapping.first_mfn = first_mfn;
-    domctl.u.memory_mapping.nr_mfns = nr_mfns;
     domctl.u.memory_mapping.add_mapping = add_mapping;
+    max_batch_sz = nr_mfns;
+    do
+    {
+        nr = min(nr_mfns - done, max_batch_sz);
+        domctl.u.memory_mapping.nr_mfns = nr;
+        domctl.u.memory_mapping.first_gfn = first_gfn + done;
+        domctl.u.memory_mapping.first_mfn = first_mfn + done;
+        err = do_domctl(xch, &domctl);
+        if ( err && errno == E2BIG )
+        {
+            if ( max_batch_sz <= 1 )
+                break;
+            max_batch_sz >>= 1;
+            continue;
+        }
+        /* Save the first error... */
+        if ( !ret )
+            ret = err;
+        /* .. and ignore the rest of them when removing. */
+        if ( err && add_mapping != DPCI_REMOVE_MAPPING )
+            break;
 
-    return do_domctl(xch, &domctl);
+        done += nr;
+    } while ( done < nr_mfns );
+
+    /*
+     * Undo what we have done unless unmapping, by unmapping the entire region.
+     * Errors here are ignored.
+     */
+    if ( ret && add_mapping != DPCI_REMOVE_MAPPING )
+        xc_domain_memory_mapping(xch, domid, first_gfn, first_mfn, nr_mfns,
+                                 DPCI_REMOVE_MAPPING);
+
+    /* We might get E2BIG so many times that we never advance. */
+    if ( !done && !ret )
+        ret = -1;
+
+    return ret;
 }
 
 int xc_domain_ioport_mapping(
