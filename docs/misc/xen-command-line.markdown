@@ -247,19 +247,14 @@ Both option `com1` and `com2` follow the same format.
 * Optionally, a clock speed measured in hz can be specified.
 * `DPS` represents the number of data bits, the parity, and the number
   of stop bits.
-
-  `D` is an integer between 5 and 8 for the number of data bits.
-
-  `P` is a single character representing the type of parity:
-
-   * `n` No
-   * `o` Odd
-   * `e` Even
-   * `m` Mark
-   * `s` Space
-
-  `S` is an integer 1 or 2 for the number of stop bits.
-
+  * `D` is an integer between 5 and 8 for the number of data bits.
+  * `P` is a single character representing the type of parity:
+      * `n` No
+      * `o` Odd
+      * `e` Even
+      * `m` Mark
+      * `s` Space
+  * `S` is an integer 1 or 2 for the number of stop bits.
 * `<io-base>` is an integer which specifies the IO base port for UART
   registers.
 * `<irq>` is the IRQ number to use, or `0` to use the UART in poll
