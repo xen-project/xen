@@ -45,11 +45,11 @@ static int map_one_mmio(struct domain *d, const char *what,
 {
     int ret;
 
-    printk("Additional MMIO %"PRIpaddr"-%"PRIpaddr" (%s)\n",
+    printk("Additional MMIO %lx-%lx (%s)\n",
            start, end, what);
-    ret = map_mmio_regions(d, start, end - start + 1, start);
+    ret = map_mmio_regions(d, start, end - start, start);
     if ( ret )
-        printk("Failed to map %s @ %"PRIpaddr" to dom%d\n",
+        printk("Failed to map %s @ %lx to dom%d\n",
                what, start, d->domain_id);
     return ret;
 }
