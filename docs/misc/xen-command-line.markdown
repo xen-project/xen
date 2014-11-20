@@ -475,13 +475,13 @@ defaults of 1 and unlimited respectively are used instead.
 
 For example, with `dom0_max_vcpus=4-8`:
 
-     Number of
-  PCPUs | Dom0 VCPUs
-   2    |  4
-   4    |  4
-   6    |  6
-   8    |  8
-  10    |  8
+>        Number of
+>     PCPUs | Dom0 VCPUs
+>      2    |  4
+>      4    |  4
+>      6    |  6
+>      8    |  8
+>     10    |  8
 
 ### dom0\_mem
 > `= List of ( min:<size> | max:<size> | <size> )`
@@ -684,18 +684,18 @@ supported only when compiled with XSM\_ENABLE=y on x86.
 The specified value is a bit mask with the individual bits having the
 following meaning:
 
-Bit  0 - debug level 0 (unused at present)
-Bit  1 - debug level 1 (Control Register logging)
-Bit  2 - debug level 2 (VMX logging of MSR restores when context switching)
-Bit  3 - debug level 3 (unused at present)
-Bit  4 - I/O operation logging
-Bit  5 - vMMU logging
-Bit  6 - vLAPIC general logging
-Bit  7 - vLAPIC timer logging
-Bit  8 - vLAPIC interrupt logging
-Bit  9 - vIOAPIC logging
-Bit 10 - hypercall logging
-Bit 11 - MSR operation logging
+>     Bit  0 - debug level 0 (unused at present)
+>     Bit  1 - debug level 1 (Control Register logging)
+>     Bit  2 - debug level 2 (VMX logging of MSR restores when context switching)
+>     Bit  3 - debug level 3 (unused at present)
+>     Bit  4 - I/O operation logging
+>     Bit  5 - vMMU logging
+>     Bit  6 - vLAPIC general logging
+>     Bit  7 - vLAPIC timer logging
+>     Bit  8 - vLAPIC interrupt logging
+>     Bit  9 - vIOAPIC logging
+>     Bit 10 - hypercall logging
+>     Bit 11 - MSR operation logging
 
 Recognized in debug builds of the hypervisor only.
 
@@ -1047,12 +1047,11 @@ resource.  RMID is a hardware-provided layer of abstraction between software
 and logical processors.
 
 The following resources are available:
-* Cache Monitoring Technology (Haswell and later).  Information
-regarding the L3 cache occupancy.
 
-`cmt` instructs Xen to enable/disable Cache Monitoring Technology.
-
-`rmid_max` indicates the max value for rmid.
+* Cache Monitoring Technology (Haswell and later).  Information regarding the
+  L3 cache occupancy.
+  * `cmt` instructs Xen to enable/disable Cache Monitoring Technology.
+  * `rmid_max` indicates the max value for rmid.
 
 ### reboot
 > `= t[riple] | k[bd] | a[cpi] | p[ci] | n[o] [, [w]arm | [c]old]`
