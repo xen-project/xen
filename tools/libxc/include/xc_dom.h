@@ -33,8 +33,13 @@ struct xc_dom_seg {
 
 struct xc_dom_mem {
     struct xc_dom_mem *next;
-    void *mmap_ptr;
-    size_t mmap_len;
+    void *ptr;
+    enum {
+        XC_DOM_MEM_TYPE_MALLOC_INTERNAL,
+        XC_DOM_MEM_TYPE_MALLOC_EXTERNAL,
+        XC_DOM_MEM_TYPE_MMAP,
+    } type;
+    size_t len;
     unsigned char memory[0];
 };
 
@@ -298,6 +303,7 @@ void xc_dom_log_memory_footprint(struct xc_dom_image *dom);
 /* --- simple memory pool ------------------------------------------ */
 
 void *xc_dom_malloc(struct xc_dom_image *dom, size_t size);
+int xc_dom_register_external(struct xc_dom_image *dom, void *ptr, size_t size);
 void *xc_dom_malloc_page_aligned(struct xc_dom_image *dom, size_t size);
 void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
                             const char *filename, size_t * size,

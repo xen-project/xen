@@ -161,6 +161,13 @@ static int xc_try_bzip2_decode(
 
     total = (((uint64_t)stream.total_out_hi32) << 32) | stream.total_out_lo32;
 
+    if ( xc_dom_register_external(dom, out_buf, total) )
+    {
+        DOMPRINTF("BZIP2: Error registering stream output");
+        free(out_buf);
+        goto bzip2_cleanup;
+    }
+
     DOMPRINTF("%s: BZIP2 decompress OK, 0x%zx -> 0x%lx",
               __FUNCTION__, *size, (long unsigned int) total);
 
@@ -303,6 +310,13 @@ static int _xc_try_lzma_decode(
             stream->avail_out = (outsize * 2) - outsize;
             outsize *= 2;
         }
+    }
+
+    if ( xc_dom_register_external(dom, out_buf, stream->total_out) )
+    {
+        DOMPRINTF("%s: Error registering stream output", what);
+        free(out_buf);
+        goto lzma_cleanup;
     }
 
     DOMPRINTF("%s: %s decompress OK, 0x%zx -> 0x%zx",
@@ -464,7 +478,13 @@ static int xc_try_lzo1x_decode(
 
         dst_len = lzo_read_32(cur);
         if ( !dst_len )
+        {
+            msg = "Error registering stream output";
+            if ( xc_dom_register_external(dom, out_buf, out_len) )
+                break;
+
             return 0;
+        }
 
         if ( dst_len > LZOP_MAX_BLOCK_SIZE )
         {

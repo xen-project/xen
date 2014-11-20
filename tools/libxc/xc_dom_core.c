@@ -132,6 +132,7 @@ void *xc_dom_malloc(struct xc_dom_image *dom, size_t size)
         return NULL;
     }
     memset(block, 0, sizeof(*block) + size);
+    block->type = XC_DOM_MEM_TYPE_MALLOC_INTERNAL;
     block->next = dom->memblocks;
     dom->memblocks = block;
     dom->alloc_malloc += sizeof(*block) + size;
@@ -151,23 +152,45 @@ void *xc_dom_malloc_page_aligned(struct xc_dom_image *dom, size_t size)
         return NULL;
     }
     memset(block, 0, sizeof(*block));
-    block->mmap_len = size;
-    block->mmap_ptr = mmap(NULL, block->mmap_len,
-                           PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON,
-                           -1, 0);
-    if ( block->mmap_ptr == MAP_FAILED )
+    block->len = size;
+    block->ptr = mmap(NULL, block->len,
+                      PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON,
+                      -1, 0);
+    if ( block->ptr == MAP_FAILED )
     {
         DOMPRINTF("%s: mmap failed", __FUNCTION__);
         free(block);
         return NULL;
     }
+    block->type = XC_DOM_MEM_TYPE_MMAP;
     block->next = dom->memblocks;
     dom->memblocks = block;
     dom->alloc_malloc += sizeof(*block);
-    dom->alloc_mem_map += block->mmap_len;
+    dom->alloc_mem_map += block->len;
     if ( size > (100 * 1024) )
         print_mem(dom, __FUNCTION__, size);
-    return block->mmap_ptr;
+    return block->ptr;
+}
+
+int xc_dom_register_external(struct xc_dom_image *dom, void *ptr, size_t size)
+{
+    struct xc_dom_mem *block;
+
+    block = malloc(sizeof(*block));
+    if ( block == NULL )
+    {
+        DOMPRINTF("%s: allocation failed", __FUNCTION__);
+        return -1;
+    }
+    memset(block, 0, sizeof(*block));
+    block->ptr = ptr;
+    block->len = size;
+    block->type = XC_DOM_MEM_TYPE_MALLOC_EXTERNAL;
+    block->next = dom->memblocks;
+    dom->memblocks = block;
+    dom->alloc_malloc += sizeof(*block);
+    dom->alloc_mem_map += block->len;
+    return 0;
 }
 
 void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
@@ -212,24 +235,25 @@ void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
     }
 
     memset(block, 0, sizeof(*block));
-    block->mmap_len = *size;
-    block->mmap_ptr = mmap(NULL, block->mmap_len, PROT_READ,
+    block->len = *size;
+    block->ptr = mmap(NULL, block->len, PROT_READ,
                            MAP_SHARED, fd, 0);
-    if ( block->mmap_ptr == MAP_FAILED ) {
+    if ( block->ptr == MAP_FAILED ) {
         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
                      "failed to mmap file: %s",
                      strerror(errno));
         goto err;
     }
 
+    block->type = XC_DOM_MEM_TYPE_MMAP;
     block->next = dom->memblocks;
     dom->memblocks = block;
     dom->alloc_malloc += sizeof(*block);
-    dom->alloc_file_map += block->mmap_len;
+    dom->alloc_file_map += block->len;
     close(fd);
     if ( *size > (100 * 1024) )
         print_mem(dom, __FUNCTION__, *size);
-    return block->mmap_ptr;
+    return block->ptr;
 
  err:
     if ( fd != -1 )
@@ -246,8 +270,17 @@ static void xc_dom_free_all(struct xc_dom_image *dom)
     while ( (block = dom->memblocks) != NULL )
     {
         dom->memblocks = block->next;
-        if ( block->mmap_ptr )
-            munmap(block->mmap_ptr, block->mmap_len);
+        switch ( block->type )
+        {
+        case XC_DOM_MEM_TYPE_MALLOC_INTERNAL:
+            break;
+        case XC_DOM_MEM_TYPE_MALLOC_EXTERNAL:
+            free(block->ptr);
+            break;
+        case XC_DOM_MEM_TYPE_MMAP:
+            munmap(block->ptr, block->len);
+            break;
+        }
         free(block);
     }
 }
