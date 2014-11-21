@@ -403,6 +403,8 @@ void gic_clear_lrs(struct vcpu *v)
     if ( is_idle_vcpu(v) )
         return;
 
+    gic_hw_ops->update_hcr_status(GICH_HCR_UIE, 0);
+
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
 
     while ((i = find_next_bit((const unsigned long *) &this_cpu(lr_mask),
@@ -527,8 +529,6 @@ void gic_inject(void)
 
     if ( !list_empty(&current->arch.vgic.lr_pending) && lr_all_full() )
         gic_hw_ops->update_hcr_status(GICH_HCR_UIE, 1);
-    else
-        gic_hw_ops->update_hcr_status(GICH_HCR_UIE, 0);
 }
 
 static void do_sgi(struct cpu_user_regs *regs, enum gic_sgi sgi)
@@ -598,6 +598,11 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
      * Receiving the interrupt is going to cause gic_inject to be called
      * on return to guest that is going to clear the old LRs and inject
      * new interrupts.
+     *
+     * Do not add code here: maintenance interrupts caused by setting
+     * GICH_HCR_UIE, might read as spurious interrupts (1023) because
+     * GICH_HCR_UIE is cleared before reading GICC_IAR. As a consequence
+     * this handler is not called.
      */
 }
 
