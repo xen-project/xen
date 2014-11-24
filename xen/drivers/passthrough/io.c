@@ -129,6 +129,13 @@ static void pt_pirq_softirq_reset(struct hvm_pirq_dpci *pirq_dpci)
         pirq_dpci->dom = NULL;
         break;
     }
+    /*
+     * Inhibit 'hvm_dirq_assist' from doing anything useful and at worst
+     * calling 'set_timer' which will blow up (as we have called kill_timer
+     * or never initialized it). Note that we hold the lock that
+     * 'hvm_dirq_assist' could be spinning on.
+     */
+    pirq_dpci->masked = 0;
 }
 
 bool_t pt_irq_need_timer(uint32_t flags)
@@ -142,7 +149,7 @@ static int pt_irq_guest_eoi(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
     if ( __test_and_clear_bit(_HVM_IRQ_DPCI_EOI_LATCH_SHIFT,
                               &pirq_dpci->flags) )
     {
-        pirq_dpci->state = 0;
+        pirq_dpci->masked = 0;
         pirq_dpci->pending = 0;
         pirq_guest_eoi(dpci_pirq(pirq_dpci));
     }
@@ -610,6 +617,7 @@ int hvm_do_IRQ_dpci(struct domain *d, struct pirq *pirq)
          !(pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) )
         return 0;
 
+    pirq_dpci->masked = 1;
     raise_softirq_for(pirq_dpci);
     return 1;
 }
@@ -669,7 +677,7 @@ static void hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
     ASSERT(d->arch.hvm_domain.irq.dpci);
 
     spin_lock(&d->event_lock);
-    if ( pirq_dpci->state )
+    if ( test_and_clear_bool(pirq_dpci->masked) )
     {
         struct pirq *pirq = dpci_pirq(pirq_dpci);
         const struct dev_intx_gsi_link *digl;
