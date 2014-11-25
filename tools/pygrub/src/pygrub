@@ -457,7 +457,9 @@ class Grub:
         self.cf.parse(buf)
 
     def image_index(self):
-        if self.cf.default.isdigit():
+        if isinstance(self.cf.default, int):
+            sel = self.cf.default
+        elif self.cf.default.isdigit():
             sel = int(self.cf.default)
         else:
             # We don't fully support submenus. Look for the leaf value in
