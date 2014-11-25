@@ -90,6 +90,15 @@ static bool_t amd_erratum383_found __read_mostly;
 static uint64_t osvw_length, osvw_status;
 static DEFINE_SPINLOCK(osvw_lock);
 
+/* Only crash the guest if the problem originates in kernel mode. */
+static void svm_crash_or_fault(struct vcpu *v)
+{
+    if ( vmcb_get_cpl(v->arch.hvm_svm.vmcb) )
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+    else
+        domain_crash(v->domain);
+}
+
 void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
 {
     struct vcpu *curr = current;
@@ -100,7 +109,7 @@ void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
     if ( unlikely(inst_len > 15) )
     {
         gdprintk(XENLOG_ERR, "Bad instruction length %u\n", inst_len);
-        domain_crash(curr->domain);
+        svm_crash_or_fault(curr);
         return;
     }
 
@@ -2680,11 +2689,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
                  "exitinfo1 = %#"PRIx64", exitinfo2 = %#"PRIx64"\n",
                  exit_reason, 
                  (u64)vmcb->exitinfo1, (u64)vmcb->exitinfo2);
-        if ( vmcb_get_cpl(vmcb) )
-            hvm_inject_hw_exception(TRAP_invalid_op,
-                                    HVM_DELIVER_NO_ERROR_CODE);
-        else
-            domain_crash(v->domain);
+        svm_crash_or_fault(v);
         break;
     }
 
