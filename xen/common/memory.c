@@ -972,7 +972,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case XENMEM_get_vnumainfo:
     {
-        struct vnuma_topology_info topology;
+        struct xen_vnuma_topology_info topology;
         struct domain *d;
         unsigned int dom_vnodes, dom_vranges, dom_vcpus;
         struct vnuma_info tmp;
@@ -1033,7 +1033,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         read_unlock(&d->vnuma_rwlock);
 
         tmp.vdistance = xmalloc_array(unsigned int, dom_vnodes * dom_vnodes);
-        tmp.vmemrange = xmalloc_array(vmemrange_t, dom_vranges);
+        tmp.vmemrange = xmalloc_array(xen_vmemrange_t, dom_vranges);
         tmp.vcpu_to_vnode = xmalloc_array(unsigned int, dom_vcpus);
 
         if ( tmp.vdistance == NULL ||

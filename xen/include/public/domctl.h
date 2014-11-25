@@ -980,7 +980,7 @@ struct xen_domctl_vnuma {
     /*
      * memory rages for each vNUMA node
      */
-    XEN_GUEST_HANDLE_64(vmemrange_t) vmemrange;
+    XEN_GUEST_HANDLE_64(xen_vmemrange_t) vmemrange;
 };
 typedef struct xen_domctl_vnuma xen_domctl_vnuma_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vnuma_t);
