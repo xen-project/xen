@@ -100,7 +100,7 @@ struct vnuma_info {
     unsigned int *vdistance;
     unsigned int *vcpu_to_vnode;
     unsigned int *vnode_to_pnode;
-    struct vmemrange *vmemrange;
+    struct xen_vmemrange *vmemrange;
 };
 
 void vnuma_destroy(struct vnuma_info *vnuma);

@@ -530,14 +530,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
 #define XENMEM_get_vnumainfo                26
 
 /* vNUMA node memory ranges */
-struct vmemrange {
+struct xen_vmemrange {
     uint64_t start, end;
     unsigned int flags;
     unsigned int nid;
 };
-
-typedef struct vmemrange vmemrange_t;
-DEFINE_XEN_GUEST_HANDLE(vmemrange_t);
+typedef struct xen_vmemrange xen_vmemrange_t;
+DEFINE_XEN_GUEST_HANDLE(xen_vmemrange_t);
 
 /*
  * vNUMA topology specifies vNUMA node number, distance table,
@@ -548,7 +547,7 @@ DEFINE_XEN_GUEST_HANDLE(vmemrange_t);
  * copied back to guest. Domain returns expected values of nr_vnodes,
  * nr_vmemranges and nr_vcpus to guest if the values where incorrect.
  */
-struct vnuma_topology_info {
+struct xen_vnuma_topology_info {
     /* IN */
     domid_t domid;
     uint16_t pad;
@@ -566,12 +565,12 @@ struct vnuma_topology_info {
         uint64_t pad;
     } vcpu_to_vnode;
     union {
-        XEN_GUEST_HANDLE(vmemrange_t) h;
+        XEN_GUEST_HANDLE(xen_vmemrange_t) h;
         uint64_t pad;
     } vmemrange;
 };
-typedef struct vnuma_topology_info vnuma_topology_info_t;
-DEFINE_XEN_GUEST_HANDLE(vnuma_topology_info_t);
+typedef struct xen_vnuma_topology_info xen_vnuma_topology_info_t;
+DEFINE_XEN_GUEST_HANDLE(xen_vnuma_topology_info_t);
 
 /* Next available subop number is 27 */
 

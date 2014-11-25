@@ -345,7 +345,7 @@ static struct vnuma_info *vnuma_alloc(unsigned int nr_vnodes,
     vnuma->vdistance = xmalloc_array(unsigned int, nr_vnodes * nr_vnodes);
     vnuma->vcpu_to_vnode = xmalloc_array(unsigned int, nr_vcpus);
     vnuma->vnode_to_pnode = xmalloc_array(unsigned int, nr_vnodes);
-    vnuma->vmemrange = xmalloc_array(vmemrange_t, nr_ranges);
+    vnuma->vmemrange = xmalloc_array(xen_vmemrange_t, nr_ranges);
 
     if ( vnuma->vdistance == NULL || vnuma->vmemrange == NULL ||
          vnuma->vcpu_to_vnode == NULL || vnuma->vnode_to_pnode == NULL )
