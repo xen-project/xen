@@ -3618,6 +3618,11 @@ long do_mmu_update(
         break;
 
         case MMU_MACHPHYS_UPDATE:
+            if ( unlikely(d != pt_owner) )
+            {
+                rc = -EPERM;
+                break;
+            }
 
             if ( unlikely(paging_mode_translate(pg_owner)) )
             {
@@ -3693,7 +3698,7 @@ long do_mmu_update(
     perfc_add(num_page_updates, i);
 
  out:
-    if ( pt_owner && (pt_owner != d) )
+    if ( pt_owner != d )
         rcu_unlock_domain(pt_owner);
 
     /* Add incremental work we have done to the @done output parameter. */
