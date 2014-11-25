@@ -3062,23 +3062,23 @@ long do_mmuext_op(
         }
 
         case MMUEXT_NEW_BASEPTR:
-            if ( paging_mode_translate(d) )
-                okay = 0;
+            if ( unlikely(d != pg_owner) )
+                rc = -EPERM;
+            else if ( unlikely(paging_mode_translate(d)) )
+                rc = -EINVAL;
             else
-            {
                 rc = new_guest_cr3(op.arg1.mfn);
-                okay = !rc;
-            }
             break;
 
         case MMUEXT_NEW_USER_BASEPTR: {
             unsigned long old_mfn;
 
-            if ( paging_mode_translate(current->domain) )
-            {
-                okay = 0;
+            if ( unlikely(d != pg_owner) )
+                rc = -EPERM;
+            else if ( unlikely(paging_mode_translate(d)) )
+                rc = -EINVAL;
+            if ( unlikely(rc) )
                 break;
-            }
 
             old_mfn = pagetable_get_pfn(curr->arch.guest_table_user);
             /*
@@ -3136,12 +3136,17 @@ long do_mmuext_op(
         }
         
         case MMUEXT_TLB_FLUSH_LOCAL:
-            flush_tlb_local();
+            if ( likely(d == pg_owner) )
+                flush_tlb_local();
+            else
+                rc = -EPERM;
             break;
     
         case MMUEXT_INVLPG_LOCAL:
-            if ( !paging_mode_enabled(d) 
-                 || paging_invlpg(curr, op.arg1.linear_addr) != 0 )
+            if ( unlikely(d != pg_owner) )
+                rc = -EPERM;
+            else if ( !paging_mode_enabled(d) ||
+                      paging_invlpg(curr, op.arg1.linear_addr) != 0 )
                 flush_tlb_one_local(op.arg1.linear_addr);
             break;
 
@@ -3150,13 +3155,16 @@ long do_mmuext_op(
         {
             cpumask_t pmask;
 
-            if ( unlikely(vcpumask_to_pcpumask(d,
-                            guest_handle_to_param(op.arg2.vcpumask, const_void),
-                            &pmask)) )
-            {
-                okay = 0;
+            if ( unlikely(d != pg_owner) )
+                rc = -EPERM;
+            else if ( unlikely(vcpumask_to_pcpumask(d,
+                                   guest_handle_to_param(op.arg2.vcpumask,
+                                                         const_void),
+                                   &pmask)) )
+                rc = -EINVAL;
+            if ( unlikely(rc) )
                 break;
-            }
+
             if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
                 flush_tlb_mask(&pmask);
             else
@@ -3165,18 +3173,26 @@ long do_mmuext_op(
         }
 
         case MMUEXT_TLB_FLUSH_ALL:
-            flush_tlb_mask(d->domain_dirty_cpumask);
+            if ( likely(d == pg_owner) )
+                flush_tlb_mask(d->domain_dirty_cpumask);
+            else
+                rc = -EPERM;
             break;
     
         case MMUEXT_INVLPG_ALL:
-            flush_tlb_one_mask(d->domain_dirty_cpumask, op.arg1.linear_addr);
+            if ( likely(d == pg_owner) )
+                flush_tlb_one_mask(d->domain_dirty_cpumask, op.arg1.linear_addr);
+            else
+                rc = -EPERM;
             break;
 
         case MMUEXT_FLUSH_CACHE:
-            if ( unlikely(!cache_flush_permitted(d)) )
+            if ( unlikely(d != pg_owner) )
+                rc = -EPERM;
+            else if ( unlikely(!cache_flush_permitted(d)) )
             {
                 MEM_LOG("Non-physdev domain tried to FLUSH_CACHE.");
-                okay = 0;
+                rc = -EACCES;
             }
             else
             {
@@ -3185,8 +3201,8 @@ long do_mmuext_op(
             break;
 
         case MMUEXT_FLUSH_CACHE_GLOBAL:
-            if ( unlikely(foreigndom != DOMID_SELF) )
-                okay = 0;
+            if ( unlikely(d != pg_owner) )
+                rc = -EPERM;
             else if ( likely(cache_flush_permitted(d)) )
             {
                 unsigned int cpu;
@@ -3211,7 +3227,9 @@ long do_mmuext_op(
             unsigned long ptr  = op.arg1.linear_addr;
             unsigned long ents = op.arg2.nr_ents;
 
-            if ( paging_mode_external(d) )
+            if ( unlikely(d != pg_owner) )
+                rc = -EPERM;
+            else if ( paging_mode_external(d) )
             {
                 MEM_LOG("ignoring SET_LDT hypercall from external domain");
                 okay = 0;
@@ -3237,7 +3255,7 @@ long do_mmuext_op(
         case MMUEXT_CLEAR_PAGE: {
             struct page_info *page;
 
-            page = get_page_from_gfn(d, op.arg1.mfn, NULL, P2M_ALLOC);
+            page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL, P2M_ALLOC);
             if ( !page || !get_page_type(page, PGT_writable_page) )
             {
                 if ( page )
@@ -3248,7 +3266,7 @@ long do_mmuext_op(
             }
 
             /* A page is dirtied when it's being cleared. */
-            paging_mark_dirty(d, page_to_mfn(page));
+            paging_mark_dirty(pg_owner, page_to_mfn(page));
 
             clear_domain_page(page_to_mfn(page));
 
@@ -3260,7 +3278,8 @@ long do_mmuext_op(
         {
             struct page_info *src_page, *dst_page;
 
-            src_page = get_page_from_gfn(d, op.arg2.src_mfn, NULL, P2M_ALLOC);
+            src_page = get_page_from_gfn(pg_owner, op.arg2.src_mfn, NULL,
+                                         P2M_ALLOC);
             if ( unlikely(!src_page) )
             {
                 okay = 0;
@@ -3268,7 +3287,8 @@ long do_mmuext_op(
                 break;
             }
 
-            dst_page = get_page_from_gfn(d, op.arg1.mfn, NULL, P2M_ALLOC);
+            dst_page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL,
+                                         P2M_ALLOC);
             okay = (dst_page && get_page_type(dst_page, PGT_writable_page));
             if ( unlikely(!okay) )
             {
@@ -3280,7 +3300,7 @@ long do_mmuext_op(
             }
 
             /* A page is dirtied when it's being copied to. */
-            paging_mark_dirty(d, page_to_mfn(dst_page));
+            paging_mark_dirty(pg_owner, page_to_mfn(dst_page));
 
             copy_domain_page(page_to_mfn(dst_page), page_to_mfn(src_page));
 
@@ -3291,68 +3311,56 @@ long do_mmuext_op(
 
         case MMUEXT_MARK_SUPER:
         {
-            unsigned long mfn;
-            struct spage_info *spage;
+            unsigned long mfn = op.arg1.mfn;
 
-            mfn = op.arg1.mfn;
-            if ( mfn & (L1_PAGETABLE_ENTRIES-1) )
+            if ( unlikely(d != pg_owner) )
+                rc = -EPERM;
+            else if ( mfn & (L1_PAGETABLE_ENTRIES-1) )
             {
                 MEM_LOG("Unaligned superpage reference mfn %lx", mfn);
                 okay = 0;
-                break;
             }
-
-            if ( !opt_allow_superpage )
+            else if ( !opt_allow_superpage )
             {
                 MEM_LOG("Superpages disallowed");
-                okay = 0;
                 rc = -ENOSYS;
-                break;
             }
-
-            spage = mfn_to_spage(mfn);
-            okay = (mark_superpage(spage, d) >= 0);
+            else
+                rc = mark_superpage(mfn_to_spage(mfn), d);
             break;
         }
 
         case MMUEXT_UNMARK_SUPER:
         {
-            unsigned long mfn;
-            struct spage_info *spage;
+            unsigned long mfn = op.arg1.mfn;
 
-            mfn = op.arg1.mfn;
-            if ( mfn & (L1_PAGETABLE_ENTRIES-1) )
+            if ( unlikely(d != pg_owner) )
+                rc = -EPERM;
+            else if ( mfn & (L1_PAGETABLE_ENTRIES-1) )
             {
                 MEM_LOG("Unaligned superpage reference mfn %lx", mfn);
                 okay = 0;
-                break;
             }
-
-            if ( !opt_allow_superpage )
+            else if ( !opt_allow_superpage )
             {
                 MEM_LOG("Superpages disallowed");
-                okay = 0;
                 rc = -ENOSYS;
-                break;
             }
-
-            spage = mfn_to_spage(mfn);
-            okay = (unmark_superpage(spage) >= 0);
+            else
+                rc = unmark_superpage(mfn_to_spage(mfn));
             break;
         }
 
         default:
             MEM_LOG("Invalid extended pt command %#x", op.cmd);
             rc = -ENOSYS;
-            okay = 0;
             break;
         }
 
-        if ( unlikely(!okay) )
-        {
-            rc = rc ? rc : -EINVAL;
+        if ( unlikely(!okay) && !rc )
+            rc = -EINVAL;
+        if ( unlikely(rc) )
             break;
-        }
 
         guest_handle_add_offset(uops, 1);
     }
