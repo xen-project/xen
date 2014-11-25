@@ -1000,7 +1000,7 @@ static void set_cx(
     cx->target_residency = cx->latency * latency_factor;
 
     smp_wmb();
-    acpi_power->count++;
+    acpi_power->count += (cx->type != ACPI_STATE_C1);
     if ( cx->type == ACPI_STATE_C1 || cx->type == ACPI_STATE_C2 )
         acpi_power->safe_state = cx;
 }
