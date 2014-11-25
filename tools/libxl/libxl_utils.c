@@ -614,6 +614,21 @@ void libxl_bitmap_copy(libxl_ctx *ctx, libxl_bitmap *dptr,
     memcpy(dptr->map, sptr->map, sz * sizeof(*dptr->map));
 }
 
+/* This function copies X bytes from source to destination bitmap,
+ * where X is the smaller of the two sizes.
+ *
+ * If destination's size is larger than source, the extra bytes are
+ * untouched.
+ */
+void libxl__bitmap_copy_best_effort(libxl__gc *gc, libxl_bitmap *dptr,
+                                    const libxl_bitmap *sptr)
+{
+    int sz;
+
+    sz = dptr->size < sptr->size ? dptr->size : sptr->size;
+    memcpy(dptr->map, sptr->map, sz * sizeof(*dptr->map));
+}
+
 void libxl_bitmap_copy_alloc(libxl_ctx *ctx,
                              libxl_bitmap *dptr,
                              const libxl_bitmap *sptr)

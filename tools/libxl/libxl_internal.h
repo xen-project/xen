@@ -3617,6 +3617,17 @@ static inline void libxl__update_config_vtpm(libxl__gc *gc,
         libxl_device_##type##_copy(CTX, DA_p, (dev));           \
     })
 
+/* This function copies X bytes from source to destination bitmap,
+ * where X is the smaller of the two sizes.
+ *
+ * If destination's size is larger than source, the extra bytes are
+ * untouched.
+ *
+ * XXX This is introduced to fix a regression for 4.5. It shall
+ * be revisited in 4.6 time frame.
+ */
+void libxl__bitmap_copy_best_effort(libxl__gc *gc, libxl_bitmap *dptr,
+                                    const libxl_bitmap *sptr);
 #endif
 
 /*

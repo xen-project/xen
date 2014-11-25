@@ -5320,7 +5320,7 @@ int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
         if (rc)
             goto out;
 
-        libxl_bitmap_copy(ctx, &hard, cpumap_hard);
+        libxl__bitmap_copy_best_effort(gc, &hard, cpumap_hard);
         flags = XEN_VCPUAFFINITY_HARD;
     }
     if (cpumap_soft) {
@@ -5328,7 +5328,7 @@ int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
         if (rc)
             goto out;
 
-        libxl_bitmap_copy(ctx, &soft, cpumap_soft);
+        libxl__bitmap_copy_best_effort(gc, &soft, cpumap_soft);
         flags |= XEN_VCPUAFFINITY_SOFT;
     }
 
