@@ -56,8 +56,8 @@ CAMLprim value stub_select_on_poll(value fd_events, value timeo) {
 			events = Field(Field(fd_events, i), 1);
 
 			if (c_fds[i].revents & POLLNVAL) unix_error(EBADF, "select", Nothing);
-			Field(events, 0) = Val_bool(c_fds[i].events | POLLIN  && c_fds[i].revents & (POLLIN |POLLHUP|POLLERR));
-			Field(events, 1) = Val_bool(c_fds[i].events | POLLOUT && c_fds[i].revents & (POLLOUT|POLLHUP|POLLERR));
+			Field(events, 0) = Val_bool(c_fds[i].events & POLLIN  && c_fds[i].revents & (POLLIN |POLLHUP|POLLERR));
+			Field(events, 1) = Val_bool(c_fds[i].events & POLLOUT && c_fds[i].revents & (POLLOUT|POLLHUP|POLLERR));
 			Field(events, 2) = Val_bool(c_fds[i].revents & POLLPRI);
 
 		}
