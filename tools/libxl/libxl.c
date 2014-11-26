@@ -148,6 +148,8 @@ int libxl_ctx_free(libxl_ctx *ctx)
 {
     if (!ctx) return 0;
 
+    assert(!ctx->osevent_in_hook);
+
     int i;
     GC_INIT(ctx);
 
