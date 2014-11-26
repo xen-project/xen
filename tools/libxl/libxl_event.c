@@ -739,10 +739,6 @@ int libxl__ctx_evtchn_init(libxl__gc *gc) {
     rc = libxl_fd_set_nonblock(CTX, fd, 1);
     if (rc) goto out;
 
-    rc = libxl__ev_fd_register(gc, &CTX->evtchn_efd,
-                               evtchn_fd_callback, fd, POLLIN);
-    if (rc) goto out;
-
     CTX->xce = xce;
     return 0;
 
@@ -751,12 +747,27 @@ int libxl__ctx_evtchn_init(libxl__gc *gc) {
     return rc;
 }
 
+static void evtchn_check_fd_deregister(libxl__gc *gc)
+{
+    if (CTX->xce && LIBXL_LIST_EMPTY(&CTX->evtchns_waiting))
+        libxl__ev_fd_deregister(gc, &CTX->evtchn_efd);
+}
+
 int libxl__ev_evtchn_wait(libxl__gc *gc, libxl__ev_evtchn *evev)
 {
     int r, rc;
 
     DBG("ev_evtchn=%p port=%d wait (was waiting=%d)",
         evev, evev->port, evev->waiting);
+
+    rc = libxl__ctx_evtchn_init(gc);
+    if (rc) goto out;
+
+    if (!libxl__ev_fd_isregistered(&CTX->evtchn_efd)) {
+        rc = libxl__ev_fd_register(gc, &CTX->evtchn_efd, evtchn_fd_callback,
+                                   xc_evtchn_fd(CTX->xce), POLLIN);
+        if (rc) goto out;
+    }
 
     if (evev->waiting)
         return 0;
@@ -773,6 +784,7 @@ int libxl__ev_evtchn_wait(libxl__gc *gc, libxl__ev_evtchn *evev)
     return 0;
 
  out:
+    evtchn_check_fd_deregister(gc);
     return rc;
 }
 
@@ -786,6 +798,7 @@ void libxl__ev_evtchn_cancel(libxl__gc *gc, libxl__ev_evtchn *evev)
 
     evev->waiting = 0;
     LIBXL_LIST_REMOVE(evev, entry);
+    evtchn_check_fd_deregister(gc);
 }
 
 /*
