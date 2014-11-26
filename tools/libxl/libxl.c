@@ -164,7 +164,7 @@ int libxl_ctx_free(libxl_ctx *ctx)
 
     for (i = 0; i < ctx->watch_nslots; i++)
         assert(!libxl__watch_slot_contents(gc, i));
-    libxl__ev_fd_deregister(gc, &ctx->watch_efd);
+    assert(!libxl__ev_fd_isregistered(&ctx->watch_efd));
     libxl__ev_fd_deregister(gc, &ctx->evtchn_efd);
     libxl__ev_fd_deregister(gc, &ctx->sigchld_selfpipe_efd);
 

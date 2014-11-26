@@ -352,7 +352,7 @@ struct libxl__ctx {
     LIBXL_TAILQ_HEAD(, libxl__ev_time) etimes;
 
     libxl__ev_watch_slot *watch_slots;
-    int watch_nslots;
+    int watch_nslots, nwatches;
     LIBXL_SLIST_HEAD(, libxl__ev_watch_slot) watch_freeslots;
     uint32_t watch_counter; /* helps disambiguate slot reuse */
     libxl__ev_fd watch_efd;

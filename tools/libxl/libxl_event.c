@@ -524,6 +524,13 @@ static char *watch_token(libxl__gc *gc, int slotnum, uint32_t counterval)
     return libxl__sprintf(gc, "%d/%"PRIx32, slotnum, counterval);
 }
 
+static void watches_check_fd_deregister(libxl__gc *gc)
+{
+    assert(CTX->nwatches>=0);
+    if (!CTX->nwatches)
+        libxl__ev_fd_deregister(gc, &CTX->watch_efd);
+}
+
 int libxl__ev_xswatch_register(libxl__gc *gc, libxl__ev_xswatch *w,
                                libxl__ev_xswatch_callback *func,
                                const char *path /* copied */)
@@ -579,6 +586,7 @@ int libxl__ev_xswatch_register(libxl__gc *gc, libxl__ev_xswatch *w,
     w->slotnum = slotnum;
     w->path = path_copy;
     w->callback = func;
+    CTX->nwatches++;
     libxl__set_watch_slot_contents(use, w);
 
     CTX_UNLOCK;
@@ -590,6 +598,7 @@ int libxl__ev_xswatch_register(libxl__gc *gc, libxl__ev_xswatch *w,
     if (use)
         LIBXL_SLIST_INSERT_HEAD(&CTX->watch_freeslots, use, empty);
     free(path_copy);
+    watches_check_fd_deregister(gc);
     CTX_UNLOCK;
     return rc;
 }
@@ -614,6 +623,8 @@ void libxl__ev_xswatch_deregister(libxl__gc *gc, libxl__ev_xswatch *w)
         libxl__ev_watch_slot *slot = &CTX->watch_slots[w->slotnum];
         LIBXL_SLIST_INSERT_HEAD(&CTX->watch_freeslots, slot, empty);
         w->slotnum = -1;
+        CTX->nwatches--;
+        watches_check_fd_deregister(gc);
     } else {
         LOG(DEBUG, "watch w=%p: deregister unregistered", w);
     }
