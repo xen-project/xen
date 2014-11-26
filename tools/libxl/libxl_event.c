@@ -1219,6 +1219,8 @@ void libxl_osevent_register_hooks(libxl_ctx *ctx,
 {
     GC_INIT(ctx);
     CTX_LOCK;
+    assert(LIBXL_LIST_EMPTY(&ctx->efds));
+    assert(LIBXL_TAILQ_EMPTY(&ctx->etimes));
     ctx->osevent_hooks = hooks;
     ctx->osevent_user = user;
     CTX_UNLOCK;

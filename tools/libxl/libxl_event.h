@@ -124,10 +124,8 @@ void libxl_event_register_callbacks(libxl_ctx *ctx,
    * different parameters, as the application likes; the most recent
    * call determines the libxl behaviour.  However it is NOT safe to
    * call _register_callbacks concurrently with, or reentrantly from,
-   * any other libxl function.
-   *
-   * Calls to _register_callbacks do not affect events which have
-   * already occurred.
+   * any other libxl function, nor while any event-generation
+   * facilities are enabled.
    */
 
 
