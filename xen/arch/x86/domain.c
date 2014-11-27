@@ -1653,7 +1653,8 @@ unsigned long hypercall_create_continuation(
     return op;
 }
 
-int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
+int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
+                                unsigned int mask, ...)
 {
     int rc = 0;
     struct mc_state *mcs = &current->mc_state;
@@ -1662,7 +1663,10 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
     unsigned long nval = 0;
     va_list args;
 
-    BUG_ON(id && *id > 5);
+    ASSERT(nr <= ARRAY_SIZE(mcs->call.args));
+    ASSERT(!(mask >> nr));
+
+    BUG_ON(id && *id >= nr);
     BUG_ON(id && (mask & (1U << *id)));
 
     va_start(args, mask);
@@ -1671,7 +1675,7 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
     {
         if ( !test_bit(_MCSF_call_preempted, &mcs->flags) )
             return 0;
-        for ( i = 0; i < 6; ++i, mask >>= 1 )
+        for ( i = 0; i < nr; ++i, mask >>= 1 )
         {
             if ( mask & 1 )
             {
@@ -1699,7 +1703,7 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
     else
     {
         regs = guest_cpu_user_regs();
-        for ( i = 0; i < 6; ++i, mask >>= 1 )
+        for ( i = 0; i < nr; ++i, mask >>= 1 )
         {
             unsigned long *reg;
 
