@@ -128,13 +128,6 @@ original xenstored will be used. Valid names are xenstored and
 oxenstored.
   --with-xenstored=name
 
-Using additional CFLAGS to build tools running in dom0 is required when
-building distro packages. This is the option to pass things like
-RPM_OPT_FLAGS.
-  --with-extra-cflags-tools=EXTRA_CFLAGS
-  --with-extra-cflags-qemu-traditional=EXTRA_CFLAGS
-  --with-extra-cflags-qemu-upstream=EXTRA_CFLAGS
-
 Instead of starting the tools in dom0 with sysv runlevel scripts they
 can also be started by systemd. If this option is enabled xenstored will
 receive the communication socked directly from systemd. So starting it
@@ -241,6 +234,13 @@ QEMU_UPSTREAM_URL=
 QEMU_TRADITIONAL_URL=
 SEABIOS_UPSTREAM_URL=
 
+Using additional CFLAGS to build tools which will run in dom0 is
+required when building distro packages. These variables can be used to
+pass RPM_OPT_FLAGS.
+EXTRA_CFLAGS_XEN_TOOLS=
+EXTRA_CFLAGS_QEMU_TRADITIONAL=
+EXTRA_CFLAGS_QEMU_XEN=
+
 This variable can be used to use DIR/include and DIR/lib during build.
 This is the same as PREPEND_LIB and PREPEND_INCLUDES. APPEND_LIB and
 APPEND_INCLUDES= will be appended to the CFLAGS/LDFLAGS variable.
@@ -310,10 +310,10 @@ sudo make install BOOT_DIR=/ood/path/boot EFI_DIR=/odd/path/efi
 %build
 export WGET=$(type -P false)
 export GIT=$(type -P false)
+export EXTRA_CFLAGS_XEN_TOOLS="$RPM_OPT_FLAGS"
+export EXTRA_CFLAGS_QEMU_TRADITIONAL="$RPM_OPT_FLAGS"
+export EXTRA_CFLAGS_QEMU_XEN="$RPM_OPT_FLAGS"
 %configure \
-        --with-extra-cflags-tools="$RPM_OPT_FLAGS" \
-        --with-extra-cflags-qemu-traditional="$RPM_OPT_FLAGS" \
-        --with-extra-cflags-qemu-upstream="$RPM_OPT_FLAGS" \
         --with-initddir=%{_initddir}
 unset CFLAGS CXXFLAGS FFLAGS LDFLAGS
 make
