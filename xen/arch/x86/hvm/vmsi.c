@@ -235,6 +235,8 @@ static int msixtbl_read(
     rcu_read_lock(&msixtbl_rcu_lock);
 
     entry = msixtbl_find_entry(v, address);
+    if ( !entry )
+        goto out;
     offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
 
     if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
@@ -277,6 +279,8 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     rcu_read_lock(&msixtbl_rcu_lock);
 
     entry = msixtbl_find_entry(v, address);
+    if ( !entry )
+        goto out;
     nr_entry = (address - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
 
     offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
