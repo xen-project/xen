@@ -195,6 +195,8 @@ static inline int name(k xen_ ## n *x, k compat_ ## n *c) \
  * This option is useful for extracting the "op" argument or similar from the
  * hypercall to enable further xlat processing.
  *
+ * nr: Total number of arguments the hypercall has.
+ *
  * mask: Specifies which of the hypercall arguments require compat translation.
  * bit 0 indicates that the 0'th argument requires translation, bit 1 indicates
  * that the first argument requires translation and so on. Native and compat
@@ -214,7 +216,8 @@ static inline int name(k xen_ ## n *x, k compat_ ## n *c) \
  *
  * Return: Number of arguments which were actually translated.
  */
-int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...);
+int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
+                                unsigned int mask, ...);
 
 /* In-place translation functons: */
 struct start_info;

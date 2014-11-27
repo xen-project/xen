@@ -279,7 +279,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             break;
 
         cmd = 0;
-        if ( hypercall_xlat_continuation(&cmd, 0x02, nat.hnd, compat) )
+        if ( hypercall_xlat_continuation(&cmd, 2, 0x02, nat.hnd, compat) )
         {
             BUG_ON(rc != __HYPERVISOR_memory_op);
             BUG_ON((cmd & MEMOP_CMD_MASK) != op);
