@@ -159,6 +159,15 @@ to boot on systems with the following errata:
   triggerable Denial of Service. Override only if you trust all of
   your PV guests.
 
+### apicv
+> `= <boolean>`
+
+> Default: `true`
+
+Permit Xen to use APIC Virtualisation Extensions.  This is an optimisation
+available as part of VT-x, and allows hardware to take care of the guests APIC
+handling, rather than requiring emulation in Xen.
+
 ### apic\_verbosity
 > `= verbose | debug`
 
@@ -172,6 +181,15 @@ Increase the verbosity of the APIC code from the default value.
 Permit Xen to use "Always Running APIC Timer" support on compatible hardware
 in combination with cpuidle.  This option is only expected to be useful for
 developers wishing Xen to fall back to older timing methods on newer hardware.
+
+### asid
+> `= <boolean>`
+
+> Default: `true`
+
+Permit Xen to use Address Space Identifiers.  This is an optimisation which
+tags the TLB entries with an ID per vcpu.  This allows for guest TLB flushes
+to be performed without the overhead of a complete TLB flush.
 
 ### ats
 > `= <boolean>`
@@ -209,7 +227,7 @@ Scrub free RAM during boot.  This is a safety feature to prevent
 accidentally leaking sensitive VM data into other VMs if Xen crashes
 and reboots.
 
-### `bootscrub_chunk`
+### bootscrub\_chunk
 > `= <size>`
 
 > Default: `128M`
@@ -218,11 +236,6 @@ Maximum RAM block size chunks to be scrubbed whilst holding the page heap lock
 and not running softirqs. Reduce this if softirqs are not being run frequently
 enough. Setting this to a high value may cause boot failure, particularly if
 the NMI watchdog is also enabled.
-
-### cachesize
-> `= <size>`
-
-If set, override Xen's calculation of the level 2 cache line size.
 
 ### clocksource
 > `= pit | hpet | acpi`
@@ -328,7 +341,7 @@ into the console ring buffer.
 ### conswitch
 > `= <switch char>[x]`
 
-> Default `conswitch=a`
+> Default: `conswitch=a`
 
 Specify which character should be used to switch serial input between
 Xen and dom0.  The required sequence is CTRL-&lt;switch char&gt; three
@@ -339,6 +352,11 @@ switch the console input to dom0 during boot.  Any other value,
 including omission, causes Xen to automatically switch to the dom0
 console during dom0 boot.  Use `conswitch=ax` to keep the default switch
 character, but for xen to keep the console.
+
+### core\_parking
+> `= power | performance`
+
+> Default: `power`
 
 ### cpu\_type
 > `= arch_perfmon`
@@ -403,7 +421,7 @@ description of the other respective options above.
 ### cpuinfo
 > `= <boolean>`
 
-### crashinfo_maxaddr
+### crashinfo\_maxaddr
 > `= <size>`
 
 > Default: `4G`
@@ -530,6 +548,14 @@ Pin dom0 vcpus to their respective pcpus
 > Default: `false`
 
 Flag that makes a 64bit dom0 boot in PVH mode. No 32bit support at present.
+
+### dtuart (ARM)
+> `= path [,options]`
+
+> Default: `""`
+
+Specify the full path in the device tree for the UART.  If the path doesn't
+start with `/`, it is assumed to be an alias.  The options are device specific.
 
 ### e820-mtrr-clip
 > `= <boolean>`
@@ -674,6 +700,13 @@ Enable late hardware domain creation using the specified domain ID.  This is
 intended to be used when domain 0 is a stub domain which builds a disaggregated
 system including a hardware domain with the specified domain ID.  This option is
 supported only when compiled with XSM\_ENABLE=y on x86.
+
+### hest\_disable
+> ` = <boolean>`
+
+> Default: `false`
+
+Control Xens use of the APEI Hardware Error Source Table, should one be found.
 
 ### hpetbroadcast
 > `= <boolean>`
@@ -881,6 +914,14 @@ which data structures should be deliberately allocated in low memory,
 so the crash kernel may find find them.  Should be used in combination
 with **crashinfo_maxaddr**.
 
+### low\_mem\_virq\_limit
+> `= <size>`
+
+> Default: `64M`
+
+Specify the threshold below which Xen will inform dom0 that the quantity of
+free memory is getting low.  Specifying `0` will disable this notification.
+
 ### max\_cstate
 > `= <integer>`
 
@@ -958,9 +999,6 @@ Because responsibility for APIC setup is shared between Xen and the
 domain 0 kernel this option is automatically propagated to the domain
 0 command line.
 
-### nofxsr
-> `= <boolean>`
-
 ### noirqbalance
 > `= <boolean>`
 
@@ -990,11 +1028,6 @@ Do not automatically reboot after an error.  This is useful for
 catching debug output.  Defaults to automatically reboot after 5
 seconds.
 
-### noserialnumber
-> `= <boolean>`
-
-Disable CPU serial number reporting.
-
 ### nosmp
 > `= <boolean>`
 
@@ -1007,15 +1040,16 @@ Defaults to booting secondary processors.
 ### numa
 > `= on | off | fake=<integer> | noacpi`
 
-Default: `on`
+> Default: `on`
 
 ### pci
 > `= {no-}serr | {no-}perr`
 
+> Default: Signaling left as set by firmware.
+
 Disable signaling of SERR (system errors) and/or PERR (parity errors)
 on all PCI devices.
 
-Default: Signaling left as set by firmware.
 
 ### pci-phantom
 > `=[<seg>:]<bus>:<device>,<stride>`
@@ -1056,7 +1090,7 @@ The following resources are available:
 ### reboot
 > `= t[riple] | k[bd] | a[cpi] | p[ci] | n[o] [, [w]arm | [c]old]`
 
-Default: `0`
+> Default: `0`
 
 Specify the host reboot method.
 
@@ -1187,9 +1221,6 @@ pages) must also be specified via the tbuf\_size parameter.
 ### tmem\_dedup
 > `= <boolean>`
 
-### tmem\_lock
-> `= <integer>`
-
 ### tmem\_shared\_auth
 > `= <boolean>`
 
@@ -1281,8 +1312,8 @@ flushes on VM entry and exit, increasing performance.
 
 Switch on the virtualized performance monitoring unit for HVM guests.
 
-If the current cpu isn't supported a message like  
-'VPMU: Initialization failed. ...'  
+If the current cpu isn't supported a message like
+'VPMU: Initialization failed. ...'
 is printed on the hypervisor serial log.
 
 For some Intel Nehalem processors a quirk handling exist for an unknown
