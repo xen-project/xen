@@ -118,7 +118,7 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             break;
 
         if ( rc == __HYPERVISOR_memory_op )
-            hypercall_xlat_continuation(NULL, 0x2, nat, arg);
+            hypercall_xlat_continuation(NULL, 2, 0x2, nat, arg);
 
         XLAT_pod_target(&cmp, nat);
 
@@ -354,7 +354,7 @@ int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(mmuext_op_compat_t) cmp_uops,
                 left = 1;
                 if ( arg1 != MMU_UPDATE_PREEMPTED )
                 {
-                    BUG_ON(!hypercall_xlat_continuation(&left, 0x01, nat_ops,
+                    BUG_ON(!hypercall_xlat_continuation(&left, 4, 0x01, nat_ops,
                                                         cmp_uops));
                     if ( !test_bit(_MCSF_in_multicall, &mcs->flags) )
                         regs->_ecx += count - i;
@@ -362,7 +362,7 @@ int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(mmuext_op_compat_t) cmp_uops,
                         mcs->compat_call.args[1] += count - i;
                 }
                 else
-                    BUG_ON(hypercall_xlat_continuation(&left, 0));
+                    BUG_ON(hypercall_xlat_continuation(&left, 4, 0));
                 BUG_ON(left != arg1);
             }
             else
