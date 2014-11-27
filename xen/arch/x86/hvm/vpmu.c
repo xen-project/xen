@@ -219,6 +219,9 @@ void vpmu_initialise(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t vendor = current_cpu_data.x86_vendor;
 
+    if ( is_pvh_vcpu(v) )
+        return;
+
     if ( vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
         vpmu_destroy(v);
     vpmu_clear(vpmu);
