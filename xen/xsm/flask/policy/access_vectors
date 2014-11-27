@@ -151,8 +151,10 @@ class domain
 # XEN_DOMCTL_sendtrigger
     trigger
 # XEN_DOMCTL_get_ext_vcpucontext
+# XEN_DOMCTL_set_vcpu_msrs
     getextvcpucontext
 # XEN_DOMCTL_set_ext_vcpucontext
+# XEN_DOMCTL_get_vcpu_msrs
     setextvcpucontext
 # XEN_DOMCTL_getvcpuextstate
     getvcpuextstate

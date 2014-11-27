@@ -672,9 +672,11 @@ static int flask_domctl(struct domain *d, int cmd)
         return current_has_perm(d, SECCLASS_HVM, HVM__CACHEATTR);
 
     case XEN_DOMCTL_set_ext_vcpucontext:
+    case XEN_DOMCTL_set_vcpu_msrs:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETEXTVCPUCONTEXT);
 
     case XEN_DOMCTL_get_ext_vcpucontext:
+    case XEN_DOMCTL_get_vcpu_msrs:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETEXTVCPUCONTEXT);
 
     case XEN_DOMCTL_setvcpuextstate:
