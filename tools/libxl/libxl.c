@@ -162,11 +162,12 @@ int libxl_ctx_free(libxl_ctx *ctx)
     while ((eject = LIBXL_LIST_FIRST(&CTX->disk_eject_evgens)))
         libxl__evdisable_disk_eject(gc, eject);
 
+    libxl_childproc_setmode(CTX,0,0);
     for (i = 0; i < ctx->watch_nslots; i++)
         assert(!libxl__watch_slot_contents(gc, i));
     assert(!libxl__ev_fd_isregistered(&ctx->watch_efd));
     libxl__ev_fd_deregister(gc, &ctx->evtchn_efd);
-    libxl__ev_fd_deregister(gc, &ctx->sigchld_selfpipe_efd);
+    assert(!libxl__ev_fd_isregistered(&ctx->sigchld_selfpipe_efd));
 
     /* Now there should be no more events requested from the application: */
 
