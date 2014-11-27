@@ -1429,6 +1429,12 @@ int vlapic_init(struct vcpu *v)
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "%d", v->vcpu_id);
 
+    if ( is_pvh_vcpu(v) )
+    {
+        vlapic->hw.disabled = VLAPIC_HW_DISABLED;
+        return 0;
+    }
+
     vlapic->pt.source = PTSRC_lapic;
 
     if (vlapic->regs_page == NULL)

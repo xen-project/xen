@@ -2217,8 +2217,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
         goto fail1;
 
     /* NB: vlapic_init must be called before hvm_funcs.vcpu_initialise */
-    if ( is_hvm_vcpu(v) )
-        rc = vlapic_init(v);
+    rc = vlapic_init(v);
     if ( rc != 0 ) /* teardown: vlapic_destroy */
         goto fail2;
 
@@ -4483,7 +4482,8 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
 
     case MSR_IA32_APICBASE:
-        if ( !vlapic_msr_set(vcpu_vlapic(v), msr_content) )
+        if ( unlikely(is_pvh_vcpu(v)) ||
+             !vlapic_msr_set(vcpu_vlapic(v), msr_content) )
             goto gp_fault;
         break;
 
