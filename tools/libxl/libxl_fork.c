@@ -372,15 +372,8 @@ static void sigchld_user_remove(libxl_ctx *ctx) /* idempotent */
 
 void libxl__sigchld_notneeded(libxl__gc *gc) /* non-reentrant, idempotent */
 {
-    int rc;
-
     sigchld_user_remove(CTX);
-
-    if (libxl__ev_fd_isregistered(&CTX->sigchld_selfpipe_efd)) {
-        rc = libxl__ev_fd_modify(gc, &CTX->sigchld_selfpipe_efd, 0);
-        if (rc)
-            libxl__ev_fd_deregister(gc, &CTX->sigchld_selfpipe_efd);
-    }
+    libxl__ev_fd_deregister(gc, &CTX->sigchld_selfpipe_efd);
 }
 
 int libxl__sigchld_needed(libxl__gc *gc) /* non-reentrant, idempotent */
