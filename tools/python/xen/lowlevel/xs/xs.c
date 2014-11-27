@@ -816,7 +816,7 @@ static int parse_transaction_path(XsHandle *self, PyObject *args,
 
     *xh = xshandle(self);
 
-    if (!xh)
+    if (!*xh)
         return 0;
 
     if (!PyArg_ParseTuple(args, "ss", &thstr, path))
