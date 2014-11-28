@@ -1243,7 +1243,7 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
             rc = ERROR_INVAL;
             goto out_fail;
         }
-        if (rc) {
+        if (rc && !force) {
             rc = ERROR_FAIL;
             goto out_fail;
         }
