@@ -59,10 +59,20 @@ typedef uint32_t xs_transaction_t;
 /* On failure, these routines set errno. */
 
 /* Open a connection to the xs daemon.
- * Attempts to make a connection over the socket interface, 
+ * Attempts to make a connection over the socket interface,
  * and if it fails, then over the  xenbus interface.
  * Mode 0 specifies read-write access, XS_OPEN_READONLY for
  * read-only access.
+ *
+ * * Connections made with xs_open(0) (which might be shared page or
+ *   socket based) are only guaranteed to work in the parent after
+ *   fork.
+ * * Connections made with xs_open(XS_OPEN_SOCKETONLY) will be usable
+ *   in either the parent or the child after fork, but not both.
+ * * xs_daemon_open*() and xs_domain_open() are deprecated synonyms
+ *   for xs_open(0).
+ * * XS_OPEN_READONLY has no bearing on any of this.
+ *
  * Returns a handle or NULL.
  */
 struct xs_handle *xs_open(unsigned long flags);
