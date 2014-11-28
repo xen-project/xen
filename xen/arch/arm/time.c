@@ -169,6 +169,19 @@ static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 
 static void vtimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
+    /*
+     * Edge-triggered interrupts can be used for the virtual timer. Even
+     * if the timer output signal is masked in the context switch, the
+     * GIC will keep track that of any interrupts raised while IRQS are
+     * disabled. As soon as IRQs are re-enabled, the virtual interrupt
+     * will be injected to Xen.
+     *
+     * If an IDLE vCPU was scheduled next then we should ignore the
+     * interrupt.
+     */
+    if ( unlikely(is_idle_vcpu(current)) )
+        return;
+
     current->arch.virt_timer.ctl = READ_SYSREG32(CNTV_CTL_EL0);
     WRITE_SYSREG32(current->arch.virt_timer.ctl | CNTx_CTL_MASK, CNTV_CTL_EL0);
     vgic_vcpu_inject_irq(current, current->arch.virt_timer.irq);
