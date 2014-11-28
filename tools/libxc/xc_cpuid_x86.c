@@ -109,6 +109,7 @@ static void amd_xc_cpuid_policy(
         regs[3] &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
                     bitmaskof(X86_FEATURE_NX) |
                     bitmaskof(X86_FEATURE_LM) |
+                    bitmaskof(X86_FEATURE_PAGE1GB) |
                     bitmaskof(X86_FEATURE_SYSCALL) |
                     bitmaskof(X86_FEATURE_MP) |
                     bitmaskof(X86_FEATURE_MMXEXT) |
@@ -192,6 +193,7 @@ static void intel_xc_cpuid_policy(
                     bitmaskof(X86_FEATURE_ABM));
         regs[3] &= (bitmaskof(X86_FEATURE_NX) |
                     bitmaskof(X86_FEATURE_LM) |
+                    bitmaskof(X86_FEATURE_PAGE1GB) |
                     bitmaskof(X86_FEATURE_SYSCALL) |
                     bitmaskof(X86_FEATURE_RDTSCP));
         break;
@@ -386,6 +388,7 @@ static void xc_cpuid_hvm_policy(
             clear_bit(X86_FEATURE_LM, regs[3]);
             clear_bit(X86_FEATURE_NX, regs[3]);
             clear_bit(X86_FEATURE_PSE36, regs[3]);
+            clear_bit(X86_FEATURE_PAGE1GB, regs[3]);
         }
         break;
 
