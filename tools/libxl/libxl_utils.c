@@ -19,7 +19,10 @@
 
 #include "libxl_internal.h"
 
-const char *libxl_basename(const char *name)
+#ifdef LIBXL_HAVE_CONST_LIBXL_BASENAME_RETURN_VALUE
+const
+#endif
+char *libxl_basename(const char *name)
 {
     const char *filename;
     if (name == NULL)

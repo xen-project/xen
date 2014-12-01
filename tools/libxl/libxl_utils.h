@@ -18,7 +18,11 @@
 
 #include "libxl.h"
 
-const char *libxl_basename(const char *name); /* returns string from strdup */
+#ifdef LIBXL_HAVE_CONST_LIBXL_BASENAME_RETURN_VALUE
+const
+#endif
+char *libxl_basename(const char *name); /* returns string from strdup */
+
 unsigned long libxl_get_required_shadow_memory(unsigned long maxmem_kb, unsigned int smp_cpus);
 int libxl_name_to_domid(libxl_ctx *ctx, const char *name, uint32_t *domid);
 int libxl_domain_qualifier_to_domid(libxl_ctx *ctx, const char *name, uint32_t *domid);
