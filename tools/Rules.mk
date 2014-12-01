@@ -54,6 +54,11 @@ CFLAGS_libxenvchan = -I$(XEN_LIBVCHAN)
 LDLIBS_libxenvchan = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) -L$(XEN_LIBVCHAN) -lxenvchan
 SHLIB_libxenvchan  = -Wl,-rpath-link=$(XEN_LIBVCHAN)
 
+ifeq ($(debug),y)
+# Disable optimizations and enable debugging information for macros
+CFLAGS += -O0 -g3
+endif
+
 LIBXL_BLKTAP ?= $(CONFIG_BLKTAP2)
 
 ifeq ($(LIBXL_BLKTAP),y)
