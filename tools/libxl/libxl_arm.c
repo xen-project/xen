@@ -706,3 +706,11 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
 
     return 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
