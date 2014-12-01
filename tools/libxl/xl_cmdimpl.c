@@ -926,6 +926,7 @@ static void parse_config_data(const char *config_source,
     int pci_permissive = 0;
     int pci_seize = 0;
     int i, e;
+    char *kernel_basename;
 
     libxl_domain_create_info *c_info = &d_config->c_info;
     libxl_domain_build_info *b_info = &d_config->b_info;
@@ -1122,13 +1123,15 @@ static void parse_config_data(const char *config_source,
 
     switch(b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        if (!strcmp(libxl_basename(b_info->kernel), "hvmloader")) {
+        kernel_basename = libxl_basename(b_info->kernel);
+        if (!strcmp(kernel_basename, "hvmloader")) {
             fprintf(stderr, "WARNING: you seem to be using \"kernel\" "
                     "directive to override HVM guest firmware. Ignore "
                     "that. Use \"firmware_override\" instead if you "
                     "really want a non-default firmware\n");
             b_info->kernel = NULL;
         }
+        free(kernel_basename);
 
         xlu_cfg_replace_string (config, "firmware_override",
                                 &b_info->u.hvm.firmware, 0);
@@ -7029,7 +7032,7 @@ int main_cpupoolcreate(int argc, char **argv)
     int config_len = 0;
     XLU_Config *config;
     const char *buf;
-    const char *name;
+    char *name = NULL;
     uint32_t poolid;
     libxl_scheduler sched = 0;
     XLU_ConfigList *cpus;
@@ -7203,6 +7206,7 @@ int main_cpupoolcreate(int argc, char **argv)
 out_cfg:
     xlu_cfg_destroy(config);
 out:
+    free(name);
     free(config_data);
     return rc;
 }
