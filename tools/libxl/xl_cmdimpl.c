@@ -381,10 +381,10 @@ out:
 }
 static void printf_info(enum output_format output_format,
                         int domid,
-                        libxl_domain_config *d_config)
+                        libxl_domain_config *d_config, FILE *fh)
 {
     if (output_format == OUTPUT_FORMAT_SXP)
-        return printf_info_sexp(domid, d_config);
+        return printf_info_sexp(domid, d_config, fh);
 
     const char *buf;
     libxl_yajl_length len = 0;
@@ -405,7 +405,7 @@ static void printf_info(enum output_format output_format,
     if (s != yajl_gen_status_ok)
         goto out;
 
-    puts(buf);
+    fputs(buf, fh);
 
 out:
     yajl_gen_free(hand);
@@ -414,7 +414,13 @@ out:
         fprintf(stderr,
                 "unable to format domain config as JSON (YAJL:%d)\n", s);
 
-    if (ferror(stdout) || fflush(stdout)) { perror("stdout"); exit(-1); }
+    if (ferror(fh) || fflush(fh)) {
+        if (fh == stdout)
+            perror("stdout");
+        else
+            perror("stderr");
+        exit(-1);
+    }
 }
 
 static int do_daemonize(char *name)
@@ -2436,7 +2442,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
     }
 
     if (!dom_info->quiet)
-        printf("Parsing config from %s\n", config_source);
+        fprintf(stderr, "Parsing config from %s\n", config_source);
 
     if (config_in_json) {
         libxl_domain_config_from_json(ctx, &d_config,
@@ -2464,7 +2470,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
     }
 
     if (debug || dom_info->dryrun)
-        printf_info(default_output_format, -1, &d_config);
+        printf_info(default_output_format, -1, &d_config, stderr);
 
     ret = 0;
     if (dom_info->dryrun)
@@ -3416,7 +3422,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         if (default_output_format == OUTPUT_FORMAT_JSON)
             s = printf_info_one_json(hand, info[i].domid, &d_config);
         else
-            printf_info_sexp(info[i].domid, &d_config);
+            printf_info_sexp(info[i].domid, &d_config, stdout);
         libxl_domain_config_dispose(&d_config);
         if (s != yajl_gen_status_ok)
             goto out;
@@ -4738,7 +4744,7 @@ int main_config_update(int argc, char **argv)
     parse_config_data(filename, config_data, config_len, &d_config);
 
     if (debug || dryrun_only)
-        printf_info(default_output_format, -1, &d_config);
+        printf_info(default_output_format, -1, &d_config, stdout);
 
     if (!dryrun_only) {
         fprintf(stderr, "setting dom%d configuration\n", domid);

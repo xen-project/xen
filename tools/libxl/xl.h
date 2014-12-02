@@ -186,7 +186,7 @@ enum output_format {
 };
 extern enum output_format default_output_format;
 
-extern void printf_info_sexp(int domid, libxl_domain_config *d_config);
+extern void printf_info_sexp(int domid, libxl_domain_config *d_config, FILE *fh);
 
 #define XL_GLOBAL_CONFIG XEN_CONFIG_DIR "/xl.conf"
 #define XL_LOCK_FILE XEN_LOCK_DIR "/xl"
