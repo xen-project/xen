@@ -1,7 +1,7 @@
 [Unit]
 Description=Xenconsoled - handles logging from guest consoles and hypervisor
-Requires=proc-xen.mount xenstored.socket
-After=proc-xen.mount xenstored.socket
+Requires=proc-xen.mount xenstored.service
+After=proc-xen.mount xenstored.service
 ConditionPathExists=/proc/xen/capabilities
 
 [Service]
