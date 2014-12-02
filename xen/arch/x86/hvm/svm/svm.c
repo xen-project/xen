@@ -2371,8 +2371,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
                 goto out;
             case NESTEDHVM_VMEXIT_FATALERROR:
                 gdprintk(XENLOG_ERR, "unexpected nestedsvm_vmexit() error\n");
-                goto exit_and_crash;
-
+                domain_crash(v->domain);
+                goto out;
             default:
                 BUG();
             case NESTEDHVM_VMEXIT_ERROR:
@@ -2385,18 +2385,22 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         case NESTEDHVM_VMEXIT_FATALERROR:
             gdprintk(XENLOG_ERR,
                 "unexpected nestedsvm_check_intercepts() error\n");
-            goto exit_and_crash;
+            domain_crash(v->domain);
+            goto out;
         default:
             gdprintk(XENLOG_INFO, "nestedsvm_check_intercepts() returned %i\n",
                 nsret);
-            goto exit_and_crash;
+            domain_crash(v->domain);
+            goto out;
         }
     }
 
     if ( unlikely(exit_reason == VMEXIT_INVALID) )
     {
+        gdprintk(XENLOG_ERR, "invalid VMCB state:\n");
         svm_vmcb_dump(__func__, vmcb);
-        goto exit_and_crash;
+        domain_crash(v->domain);
+        goto out;
     }
 
     perfc_incra(svmexits, exit_reason);
@@ -2431,13 +2435,13 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_EXCEPTION_DB:
         if ( !v->domain->debugger_attached )
-            goto exit_and_crash;
+            goto unexpected_exit_type;
         domain_pause_for_debugger();
         break;
 
     case VMEXIT_EXCEPTION_BP:
         if ( !v->domain->debugger_attached )
-            goto exit_and_crash;
+            goto unexpected_exit_type;
         /* AMD Vol2, 15.11: INT3, INTO, BOUND intercepts do not update RIP. */
         if ( (inst_len = __get_instruction_length(v, INSTR_INT3)) == 0 )
             break;
@@ -2684,7 +2688,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     default:
-    exit_and_crash:
+    unexpected_exit_type:
         gdprintk(XENLOG_ERR, "unexpected VMEXIT: exit reason = %#"PRIx64", "
                  "exitinfo1 = %#"PRIx64", exitinfo2 = %#"PRIx64"\n",
                  exit_reason, 
