@@ -613,8 +613,10 @@ int xc_get_pfn_list(xc_interface *xch,
 long xc_get_tot_pages(xc_interface *xch, uint32_t domid)
 {
     xc_dominfo_t info;
-    return (xc_domain_getinfo(xch, domid, 1, &info) != 1) ?
-        -1 : info.nr_pages;
+    if ( (xc_domain_getinfo(xch, domid, 1, &info) != 1) ||
+         (info.domid != domid) )
+        return -1;
+    return info.nr_pages;
 }
 
 int xc_copy_to_domain_page(xc_interface *xch,
