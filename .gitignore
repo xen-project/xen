@@ -145,6 +145,10 @@ tools/hotplug/Linux/init.d/sysconfig.xencommons
 tools/hotplug/Linux/init.d/xen-watchdog
 tools/hotplug/Linux/init.d/xencommons
 tools/hotplug/Linux/init.d/xendomains
+tools/hotplug/Linux/systemd/*.conf
+tools/hotplug/Linux/systemd/*.mount
+tools/hotplug/Linux/systemd/*.socket
+tools/hotplug/Linux/systemd/*.service
 tools/hotplug/Linux/vif-setup
 tools/hotplug/Linux/xen-backend.rules
 tools/hotplug/Linux/xen-hotplug-common.sh
@@ -329,8 +333,3 @@ tools/xenstore/xenstore-watch
 docs/txt/misc/*.txt
 docs/txt/man/*.txt
 docs/figs/*.png
-
-tools/hotplug/Linux/systemd/*.conf
-tools/hotplug/Linux/systemd/*.mount
-tools/hotplug/Linux/systemd/*.socket
-tools/hotplug/Linux/systemd/*.service
