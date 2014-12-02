@@ -42,13 +42,6 @@ AC_DEFUN([AX_ALLOW_SYSTEMD_OPTS], [
 ])
 
 AC_DEFUN([AX_CHECK_SYSTEMD_LIBS], [
-	AC_CHECK_HEADER([systemd/sd-daemon.h], [
-	    AC_CHECK_LIB([systemd-daemon], [sd_listen_fds], [libsystemddaemon="y"])
-	])
-	AS_IF([test "x$libsystemddaemon" = x], [
-	    AC_MSG_ERROR([Unable to find a suitable libsystemd-daemon library])
-	])
-
 	PKG_CHECK_MODULES([SYSTEMD], [libsystemd-daemon])
 	dnl pkg-config older than 0.24 does not set these for
 	dnl PKG_CHECK_MODULES() worth also noting is that as of version 208
@@ -98,9 +91,8 @@ AC_DEFUN([AX_CHECK_SYSTEMD], [
 ])
 
 AC_DEFUN([AX_CHECK_SYSTEMD_ENABLE_AVAILABLE], [
-	AC_CHECK_HEADER([systemd/sd-daemon.h], [
-	    AC_CHECK_LIB([systemd-daemon], [sd_listen_fds], [systemd="y"])
-	])
+	PKG_CHECK_MODULES([SYSTEMD], [libsystemd-daemon], [systemd="y"],
+                          [systemd="n"])
 ])
 
 dnl Enables systemd by default and requires a --disable-systemd option flag
