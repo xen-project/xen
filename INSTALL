@@ -284,7 +284,7 @@ systemctl enable xen-init-dom0.service
 systemctl enable xenconsoled.service
 
 Other optional services are:
-systemctl enable xen-domains.service
+systemctl enable xendomains.service
 systemctl enable xen-watchdog.service
 
 
