@@ -478,13 +478,13 @@ typedef struct libxl__ctx libxl_ctx;
 #endif
 
 /*
- * LIBXL_HAVE_CONST_LIBXL_BASENAME_RETURN_VALUE
+ * LIBXL_HAVE_NONCONST_LIBXL_BASENAME_RETURN_VALUE
  *
  * The return value of libxl_basename is malloc'ed but the erroneously
  * marked as "const" in releases before 4.5.
  */
-#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x040500
-#define LIBXL_HAVE_CONST_LIBXL_BASENAME_RETURN_VALUE 1
+#if !defined(LIBXL_API_VERSION) || LIBXL_API_VERSION >= 0x040500
+#define LIBXL_HAVE_NONCONST_LIBXL_BASENAME_RETURN_VALUE 1
 #endif
 
 /*

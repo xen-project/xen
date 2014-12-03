@@ -18,7 +18,7 @@
 
 #include "libxl.h"
 
-#ifdef LIBXL_HAVE_CONST_LIBXL_BASENAME_RETURN_VALUE
+#ifndef LIBXL_HAVE_NONCONST_LIBXL_BASENAME_RETURN_VALUE
 const
 #endif
 char *libxl_basename(const char *name); /* returns string from strdup */
