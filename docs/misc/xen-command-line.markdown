@@ -1171,7 +1171,12 @@ Flag to enable Supervisor Mode Execution Protection
 Flag to enable Supervisor Mode Access Prevention
 
 ### snb\_igd\_quirk
-> `= <boolean>`
+> `= <boolean> | cap | <integer>`
+
+A true boolean value enables legacy behavior (1s timeout), while `cap`
+enforces the maximum theoretically necessary timeout of 670ms. Any number
+is being interpreted as a custom timeout in milliseconds. Zero or boolean
+false disable the quirk workaround, which is also the default.
 
 ### sync\_console
 > `= <boolean>`
