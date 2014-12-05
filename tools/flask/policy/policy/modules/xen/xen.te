@@ -129,12 +129,14 @@ create_domain(dom0_t, domU_t)
 manage_domain(dom0_t, domU_t)
 domain_comms(dom0_t, domU_t)
 domain_comms(domU_t, domU_t)
+migrate_domain_out(dom0_t, domU_t)
 domain_self_comms(domU_t)
 
 declare_domain(isolated_domU_t)
 create_domain(dom0_t, isolated_domU_t)
 manage_domain(dom0_t, isolated_domU_t)
 domain_comms(dom0_t, isolated_domU_t)
+migrate_domain_out(dom0_t, isolated_domU_t)
 domain_self_comms(isolated_domU_t)
 
 # Declare a boolean that denies creation of prot_domU_t domains
@@ -142,6 +144,7 @@ gen_bool(prot_doms_locked, false)
 declare_domain(prot_domU_t)
 if (!prot_doms_locked) {
 	create_domain(dom0_t, prot_domU_t)
+	migrate_domain_out(dom0_t, prot_domU_t)
 }
 domain_comms(dom0_t, prot_domU_t)
 domain_comms(domU_t, prot_domU_t)
