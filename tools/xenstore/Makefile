@@ -74,10 +74,10 @@ endif
 init-xenstore-domain.o: CFLAGS += $(CFLAGS_libxenguest)
 
 init-xenstore-domain: init-xenstore-domain.o $(LIBXENSTORE)
-	$(CC) $(LDFLAGS) $^ $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) -o $@ $(APPEND_LDFLAGS)
+	$(CC) $^ $(LDFLAGS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) -o $@ $(APPEND_LDFLAGS)
 
 xenstored: $(XENSTORED_OBJS)
-	$(CC) $(LDFLAGS) $^ $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
+	$(CC) $^ $(LDFLAGS) $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
 
 xenstored.a: $(XENSTORED_OBJS)
 	$(AR) cr $@ $^
@@ -86,13 +86,13 @@ $(CLIENTS): xenstore
 	ln -f xenstore $@
 
 xenstore: xenstore_client.o $(LIBXENSTORE)
-	$(CC) $(LDFLAGS) $< $(LDLIBS_libxenstore) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
+	$(CC) $< $(LDFLAGS) $(LDLIBS_libxenstore) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
 
 xenstore-control: xenstore_control.o $(LIBXENSTORE)
-	$(CC) $(LDFLAGS) $< $(LDLIBS_libxenstore) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
+	$(CC) $< $(LDFLAGS) $(LDLIBS_libxenstore) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
 
 xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
-	$(CC) $(LDFLAGS) $^ -o $@ $(APPEND_LDFLAGS)
+	$(CC) $^ $(LDFLAGS) -o $@ $(APPEND_LDFLAGS)
 
 libxenstore.so: libxenstore.so.$(MAJOR)
 	ln -sf $< $@
