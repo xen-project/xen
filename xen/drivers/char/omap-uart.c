@@ -195,6 +195,9 @@ static void __init omap_uart_init_preirq(struct serial_port *port)
     omap_write(uart, UART_MCR, UART_MCR_DTR|UART_MCR_RTS);
 
     omap_write(uart, UART_OMAP_MDR1, UART_OMAP_MDR1_16X_MODE);
+
+    /* setup iddle mode */
+    omap_write(uart, UART_SYSC, OMAP_UART_SYSC_DEF_CONF);
 }
 
 static void __init omap_uart_init_postirq(struct serial_port *port)

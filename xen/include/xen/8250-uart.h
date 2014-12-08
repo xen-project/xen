@@ -32,6 +32,7 @@
 #define UART_MCR          0x04    /* Modem control        */
 #define UART_LSR          0x05    /* line status          */
 #define UART_MSR          0x06    /* Modem status         */
+#define UART_SYSC         0x15    /* System configuration register */
 #define UART_USR          0x1f    /* Status register (DW) */
 #define UART_DLL          0x00    /* divisor latch (ls) (DLAB=1) */
 #define UART_DLM          0x01    /* divisor latch (ms) (DLAB=1) */
@@ -144,6 +145,9 @@
 
 /* SCR register bitmasks */
 #define OMAP_UART_SCR_RX_TRIG_GRANU1_MASK (1 << 7)
+
+/* System configuration register */
+#define OMAP_UART_SYSC_DEF_CONF 0x0d /* autoidle mode, wakeup is enabled */
 
 #endif /* __XEN_8250_UART_H__ */
 
