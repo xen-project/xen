@@ -52,69 +52,6 @@ static always_inline int _raw_spin_trylock(raw_spinlock_t *lock)
     return !tmp;
 }
 
-typedef struct {
-    volatile unsigned int lock;
-} raw_rwlock_t;
-
-#define _RAW_RW_LOCK_UNLOCKED { 0 }
-
-static always_inline int _raw_read_trylock(raw_rwlock_t *rw)
-{
-    unsigned int tmp, tmp2 = 1;
-
-    asm volatile(
-        "       ldaxr   %w0, %2\n"
-        "       add     %w0, %w0, #1\n"
-        "       tbnz    %w0, #31, 1f\n"
-        "       stxr    %w1, %w0, %2\n"
-        "1:\n"
-        : "=&r" (tmp), "+r" (tmp2), "+Q" (rw->lock)
-        :
-        : "cc", "memory");
-
-    return !tmp2;
-}
-
-static always_inline int _raw_write_trylock(raw_rwlock_t *rw)
-{
-    unsigned int tmp;
-
-    asm volatile(
-        "       ldaxr   %w0, %1\n"
-        "       cbnz    %w0, 1f\n"
-        "       stxr    %w0, %w2, %1\n"
-        "1:\n"
-        : "=&r" (tmp), "+Q" (rw->lock)
-        : "r" (0x80000000)
-        : "cc", "memory");
-
-    return !tmp;
-}
-
-static inline void _raw_read_unlock(raw_rwlock_t *rw)
-{
-    unsigned int tmp, tmp2;
-
-    asm volatile(
-        "    1: ldxr    %w0, %2\n"
-        "       sub     %w0, %w0, #1\n"
-        "       stlxr   %w1, %w0, %2\n"
-        "       cbnz    %w1, 1b\n"
-        : "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
-        :
-        : "cc", "memory");
-}
-
-static inline void _raw_write_unlock(raw_rwlock_t *rw)
-{
-    asm volatile(
-        "       stlr    %w1, %0\n"
-        : "=Q" (rw->lock) : "r" (0) : "memory");
-}
-
-#define _raw_rw_is_locked(x) ((x)->lock != 0)
-#define _raw_rw_is_write_locked(x) ((x)->lock == 0x80000000)
-
 #endif /* __ASM_SPINLOCK_H */
 /*
  * Local variables:
