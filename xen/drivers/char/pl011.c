@@ -197,6 +197,20 @@ static const struct vuart_info *pl011_vuart(struct serial_port *port)
     return &uart->vuart;
 }
 
+static void pl011_tx_stop(struct serial_port *port)
+{
+    struct pl011 *uart = port->uart;
+
+    pl011_write(uart, IMSC, pl011_read(uart, IMSC) & ~(TXI));
+}
+
+static void pl011_tx_start(struct serial_port *port)
+{
+    struct pl011 *uart = port->uart;
+
+    pl011_write(uart, IMSC, pl011_read(uart, IMSC) | (TXI));
+}
+
 static struct uart_driver __read_mostly pl011_driver = {
     .init_preirq  = pl011_init_preirq,
     .init_postirq = pl011_init_postirq,
@@ -207,6 +221,8 @@ static struct uart_driver __read_mostly pl011_driver = {
     .putc         = pl011_putc,
     .getc         = pl011_getc,
     .irq          = pl011_irq,
+    .start_tx     = pl011_tx_start,
+    .stop_tx      = pl011_tx_stop,
     .vuart_info   = pl011_vuart,
 };
 

@@ -81,6 +81,10 @@ struct uart_driver {
     int  (*getc)(struct serial_port *, char *);
     /* Get IRQ number for this port's serial line: returns -1 if none. */
     int  (*irq)(struct serial_port *);
+    /* Unmask TX interrupt */
+    void  (*start_tx)(struct serial_port *);
+    /* Mask TX interrupt */
+    void  (*stop_tx)(struct serial_port *);
     /* Get serial information */
     const struct vuart_info *(*vuart_info)(struct serial_port *);
 };
