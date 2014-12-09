@@ -2125,8 +2125,6 @@ static PyObject *pyflask_context_to_sid(PyObject *self, PyObject *args,
 {
     xc_interface *xc_handle;
     char *ctx;
-    char *buf;
-    uint32_t len;
     uint32_t sid;
     int ret;
 
@@ -2136,28 +2134,15 @@ static PyObject *pyflask_context_to_sid(PyObject *self, PyObject *args,
                                       &ctx) )
         return NULL;
 
-    len = strlen(ctx);
-
-    buf = malloc(len);
-    if (!buf) {
-        errno = -ENOMEM;
-        PyErr_SetFromErrno(xc_error_obj);
-    }
-    
-    memcpy(buf, ctx, len);
-    
     xc_handle = xc_interface_open(0,0,0);
     if (!xc_handle) {
-        free(buf);
         return PyErr_SetFromErrno(xc_error_obj);
     }
-    
-    ret = xc_flask_context_to_sid(xc_handle, buf, len, &sid);
-        
+
+    ret = xc_flask_context_to_sid(xc_handle, ctx, strlen(ctx), &sid);
+
     xc_interface_close(xc_handle);
 
-    free(buf);
-    
     if ( ret != 0 ) {
         errno = -ret;
         return PyErr_SetFromErrno(xc_error_obj);
