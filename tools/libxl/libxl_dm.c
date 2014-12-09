@@ -797,11 +797,13 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                     continue;
                 }
 
-                if (disks[i].backend == LIBXL_DISK_BACKEND_TAP)
+                if (disks[i].backend == LIBXL_DISK_BACKEND_TAP) {
+                    format = qemu_disk_format_string(LIBXL_DISK_FORMAT_RAW);
                     pdev_path = libxl__blktap_devpath(gc, disks[i].pdev_path,
                                                       disks[i].format);
-                else
+                } else {
                     pdev_path = disks[i].pdev_path;
+                }
 
                 /*
                  * Explicit sd disks are passed through as is.
