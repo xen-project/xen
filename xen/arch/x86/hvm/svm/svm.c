@@ -90,6 +90,15 @@ static bool_t amd_erratum383_found __read_mostly;
 static uint64_t osvw_length, osvw_status;
 static DEFINE_SPINLOCK(osvw_lock);
 
+/* Only crash the guest if the problem originates in kernel mode. */
+static void svm_crash_or_fault(struct vcpu *v)
+{
+    if ( vmcb_get_cpl(v->arch.hvm_svm.vmcb) )
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+    else
+        domain_crash(v->domain);
+}
+
 void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
 {
     struct vcpu *curr = current;
@@ -100,7 +109,7 @@ void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
     if ( unlikely(inst_len > 15) )
     {
         gdprintk(XENLOG_ERR, "Bad instruction length %u\n", inst_len);
-        domain_crash(curr->domain);
+        svm_crash_or_fault(curr);
         return;
     }
 
@@ -2150,8 +2159,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
                 goto out;
             case NESTEDHVM_VMEXIT_FATALERROR:
                 gdprintk(XENLOG_ERR, "unexpected nestedsvm_vmexit() error\n");
-                goto exit_and_crash;
-
+                domain_crash(v->domain);
+                goto out;
             default:
                 BUG();
             case NESTEDHVM_VMEXIT_ERROR:
@@ -2164,18 +2173,22 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         case NESTEDHVM_VMEXIT_FATALERROR:
             gdprintk(XENLOG_ERR,
                 "unexpected nestedsvm_check_intercepts() error\n");
-            goto exit_and_crash;
+            domain_crash(v->domain);
+            goto out;
         default:
             gdprintk(XENLOG_INFO, "nestedsvm_check_intercepts() returned %i\n",
                 nsret);
-            goto exit_and_crash;
+            domain_crash(v->domain);
+            goto out;
         }
     }
 
     if ( unlikely(exit_reason == VMEXIT_INVALID) )
     {
+        gdprintk(XENLOG_ERR, "invalid VMCB state:\n");
         svm_vmcb_dump(__func__, vmcb);
-        goto exit_and_crash;
+        domain_crash(v->domain);
+        goto out;
     }
 
     perfc_incra(svmexits, exit_reason);
@@ -2210,13 +2223,13 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_EXCEPTION_DB:
         if ( !v->domain->debugger_attached )
-            goto exit_and_crash;
+            goto unexpected_exit_type;
         domain_pause_for_debugger();
         break;
 
     case VMEXIT_EXCEPTION_BP:
         if ( !v->domain->debugger_attached )
-            goto exit_and_crash;
+            goto unexpected_exit_type;
         /* AMD Vol2, 15.11: INT3, INTO, BOUND intercepts do not update RIP. */
         if ( (inst_len = __get_instruction_length(v, INSTR_INT3)) == 0 )
             break;
@@ -2453,16 +2466,12 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     default:
-    exit_and_crash:
+    unexpected_exit_type:
         gdprintk(XENLOG_ERR, "unexpected VMEXIT: exit reason = %#"PRIx64", "
                  "exitinfo1 = %#"PRIx64", exitinfo2 = %#"PRIx64"\n",
                  exit_reason, 
                  (u64)vmcb->exitinfo1, (u64)vmcb->exitinfo2);
-        if ( vmcb_get_cpl(vmcb) )
-            hvm_inject_hw_exception(TRAP_invalid_op,
-                                    HVM_DELIVER_NO_ERROR_CODE);
-        else
-            domain_crash(v->domain);
+        svm_crash_or_fault(v);
         break;
     }
 
