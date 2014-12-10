@@ -782,9 +782,8 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
     EFI_FILE_HANDLE dir_handle;
     union string section = { NULL }, name;
-    struct e820entry *e;
     u64 efer;
-    bool_t base_video = 0;
+    bool_t base_video = 0, retry;
 
     efi_ih = ImageHandle;
     efi_bs = SystemTable->BootServices;
@@ -1387,68 +1386,78 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     if ( mbi.mem_upper < xen_phys_start )
         blexit(L"Out of static memory");
     efi_memmap = (void *)(long)mbi.mem_upper;
-    status = efi_bs->GetMemoryMap(&efi_memmap_size, efi_memmap, &map_key,
-                                  &efi_mdesc_size, &mdesc_ver);
-    if ( EFI_ERROR(status) )
-        blexit(L"Cannot obtain memory map");
-
-    /* Populate E820 table and check trampoline area availability. */
-    e = e820map - 1;
-    for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
+    for ( retry = 0; ; retry = 1 )
     {
-        EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
-        u64 len = desc->NumberOfPages << EFI_PAGE_SHIFT;
-        u32 type;
+        struct e820entry *e;
 
-        switch ( desc->Type )
+        status = efi_bs->GetMemoryMap(&efi_memmap_size, efi_memmap, &map_key,
+                                      &efi_mdesc_size, &mdesc_ver);
+        if ( EFI_ERROR(status) )
+            PrintErrMesg(L"Cannot obtain memory map", status);
+
+        /* Populate E820 table and check trampoline area availability. */
+        e = e820map - 1;
+        for ( e820nr = i = 0; i < efi_memmap_size; i += efi_mdesc_size )
         {
-        default:
-            type = E820_RESERVED;
-            break;
-        case EfiConventionalMemory:
-        case EfiBootServicesCode:
-        case EfiBootServicesData:
-            if ( !trampoline_phys && desc->PhysicalStart + len <= 0x100000 &&
-                 len >= cfg.size && desc->PhysicalStart + len > cfg.addr )
-                cfg.addr = (desc->PhysicalStart + len - cfg.size) & PAGE_MASK;
-            /* fall through */
-        case EfiLoaderCode:
-        case EfiLoaderData:
-            if ( desc->Attribute & EFI_MEMORY_WB )
-                type = E820_RAM;
+            EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
+            u64 len = desc->NumberOfPages << EFI_PAGE_SHIFT;
+            u32 type;
+
+            switch ( desc->Type )
+            {
+            default:
+               type = E820_RESERVED;
+               break;
+            case EfiConventionalMemory:
+            case EfiBootServicesCode:
+            case EfiBootServicesData:
+                if ( !trampoline_phys &&
+                     desc->PhysicalStart + len <= 0x100000 &&
+                     len >= cfg.size &&
+                     desc->PhysicalStart + len > cfg.addr )
+                    cfg.addr = (desc->PhysicalStart + len - cfg.size) &
+                               PAGE_MASK;
+                /* fall through */
+            case EfiLoaderCode:
+            case EfiLoaderData:
+                if ( desc->Attribute & EFI_MEMORY_WB )
+                    type = E820_RAM;
+                else
+            case EfiUnusableMemory:
+                    type = E820_UNUSABLE;
+                break;
+            case EfiACPIReclaimMemory:
+                type = E820_ACPI;
+                break;
+            case EfiACPIMemoryNVS:
+                type = E820_NVS;
+                break;
+            }
+            if ( e820nr && type == e->type &&
+                 desc->PhysicalStart == e->addr + e->size )
+                e->size += len;
+            else if ( !len || e820nr >= E820MAX )
+                continue;
             else
-        case EfiUnusableMemory:
-                type = E820_UNUSABLE;
-            break;
-        case EfiACPIReclaimMemory:
-            type = E820_ACPI;
-            break;
-        case EfiACPIMemoryNVS:
-            type = E820_NVS;
-            break;
+            {
+                ++e;
+                e->addr = desc->PhysicalStart;
+                e->size = len;
+                e->type = type;
+                ++e820nr;
+            }
         }
-        if ( e820nr && type == e->type &&
-             desc->PhysicalStart == e->addr + e->size )
-            e->size += len;
-        else if ( !len || e820nr >= E820MAX )
-            continue;
-        else
+        if ( !trampoline_phys )
         {
-            ++e;
-            e->addr = desc->PhysicalStart;
-            e->size = len;
-            e->type = type;
-            ++e820nr;
+            if ( !cfg.addr )
+                blexit(L"No memory for trampoline");
+            relocate_trampoline(cfg.addr);
         }
-    }
-    if ( !trampoline_phys )
-    {
-        if ( !cfg.addr )
-            blexit(L"No memory for trampoline");
-        relocate_trampoline(cfg.addr);
-    }
 
-    status = efi_bs->ExitBootServices(ImageHandle, map_key);
+        status = efi_bs->ExitBootServices(ImageHandle, map_key);
+        if ( status != EFI_INVALID_PARAMETER || retry )
+            break;
+    }
     if ( EFI_ERROR(status) )
         PrintErrMesg(L"Cannot exit boot services", status);
 
