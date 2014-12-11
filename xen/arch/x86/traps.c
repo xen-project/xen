@@ -3168,7 +3168,6 @@ static void nmi_mce_softirq(void)
     int cpu = smp_processor_id();
     struct softirq_trap *st = &per_cpu(softirq_trap, cpu);
 
-    BUG_ON(st == NULL);
     BUG_ON(st->vcpu == NULL);
 
     /* Set the tmp value unconditionally, so that
@@ -3233,7 +3232,7 @@ static void nmi_hwdom_report(unsigned int reason_idx)
 {
     struct domain *d = hardware_domain;
 
-    if ( (d == NULL) || (d->vcpu == NULL) || (d->vcpu[0] == NULL) )
+    if ( !d || !d->vcpu || !d->vcpu[0] || !is_pv_domain(d) /* PVH fixme */ )
         return;
 
     set_bit(reason_idx, nmi_reason(d));
@@ -3674,7 +3673,6 @@ int send_guest_trap(struct domain *d, uint16_t vcpuid, unsigned int trap_nr)
 
         if ( !test_and_set_bool(v->mce_pending) ) {
                 st->domain = d;
-                st->vcpu = v;
                 st->processor = v->processor;
 
                 /* not safe to wake up a vcpu here */
