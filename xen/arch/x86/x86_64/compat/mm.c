@@ -53,9 +53,8 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     compat_pfn_t mfn;
     unsigned int i;
     int rc = 0;
-    int op = cmd & MEMOP_CMD_MASK;
 
-    switch ( op )
+    switch ( cmd )
     {
     case XENMEM_set_memory_map:
     {
@@ -192,7 +191,7 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         xen_mem_event_op_t meo;
         if ( copy_from_guest(&meo, arg, 1) )
             return -EFAULT;
-        rc = do_mem_event_op(op, meo.domain, (void *) &meo);
+        rc = do_mem_event_op(cmd, meo.domain, &meo);
         if ( !rc && __copy_to_guest(arg, &meo, 1) )
             return -EFAULT;
         break;
@@ -205,7 +204,7 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -EFAULT;
         if ( mso.op == XENMEM_sharing_op_audit )
             return mem_sharing_audit(); 
-        rc = do_mem_event_op(op, mso.domain, (void *) &mso);
+        rc = do_mem_event_op(cmd, mso.domain, &mso);
         if ( !rc && __copy_to_guest(arg, &mso, 1) )
             return -EFAULT;
         break;

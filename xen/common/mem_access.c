@@ -58,6 +58,7 @@ void mem_access_resume(struct domain *d)
 int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg)
 {
+    unsigned long start_iter = cmd & ~MEMOP_CMD_MASK;
     long rc;
     xen_mem_access_op_t mao;
     struct domain *d;
@@ -84,14 +85,16 @@ int mem_access_memop(unsigned long cmd,
     switch ( mao.op )
     {
     case XENMEM_access_op_resume:
-        mem_access_resume(d);
-        rc = 0;
+        if ( unlikely(start_iter) )
+            rc = -ENOSYS;
+        else
+        {
+            mem_access_resume(d);
+            rc = 0;
+        }
         break;
 
     case XENMEM_access_op_set_access:
-    {
-        unsigned long start_iter = cmd & ~MEMOP_CMD_MASK;
-
         rc = -EINVAL;
         if ( (mao.pfn != ~0ull) &&
              (mao.nr < start_iter ||
@@ -108,11 +111,14 @@ int mem_access_memop(unsigned long cmd,
                                                XENMEM_access_op | rc, arg);
         }
         break;
-    }
 
     case XENMEM_access_op_get_access:
     {
         xenmem_access_t access;
+
+        rc = -ENOSYS;
+        if ( unlikely(start_iter) )
+            break;
 
         rc = -EINVAL;
         if ( (mao.pfn > domain_get_maximum_gpfn(d)) && mao.pfn != ~0ull )

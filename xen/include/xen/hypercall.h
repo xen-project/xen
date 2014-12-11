@@ -57,6 +57,11 @@ do_platform_op(
  * To allow safe resume of do_memory_op() after preemption, we need to know
  * at what point in the page list to resume. For this purpose I steal the
  * high-order bits of the @cmd parameter, which are otherwise unused and zero.
+ *
+ * Note that both of these values are effectively part of the ABI, even if
+ * we don't need to make them a formal part of it: A guest suspended for
+ * migration in the middle of a continuation would fail to work if resumed on
+ * a hypervisor using different values.
  */
 #define MEMOP_EXTENT_SHIFT 6 /* cmd[:6] == start_extent */
 #define MEMOP_CMD_MASK     ((1 << MEMOP_EXTENT_SHIFT) - 1)

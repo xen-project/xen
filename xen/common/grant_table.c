@@ -62,6 +62,12 @@ integer_param("gnttab_max_frames", max_grant_frames);
 static unsigned int __read_mostly max_maptrack_frames;
 integer_param("gnttab_max_maptrack_frames", max_maptrack_frames);
 
+/*
+ * Note that the three values below are effectively part of the ABI, even if
+ * we don't need to make them a formal part of it: A guest suspended for
+ * migration in the middle of a continuation would fail to work if resumed on
+ * a hypervisor using different values.
+ */
 #define GNTTABOP_CONTINUATION_ARG_SHIFT 12
 #define GNTTABOP_CMD_MASK               ((1<<GNTTABOP_CONTINUATION_ARG_SHIFT)-1)
 #define GNTTABOP_ARG_MASK               (~GNTTABOP_CMD_MASK)
@@ -2624,9 +2630,12 @@ do_grant_table_op(
     
     if ( (int)count < 0 )
         return -EINVAL;
+
+    if ( (cmd &= GNTTABOP_CMD_MASK) != GNTTABOP_cache_flush && opaque_in )
+        return -ENOSYS;
     
     rc = -EFAULT;
-    switch ( cmd &= GNTTABOP_CMD_MASK )
+    switch ( cmd )
     {
     case GNTTABOP_map_grant_ref:
     {

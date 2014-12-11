@@ -5458,16 +5458,34 @@ static int hvmop_destroy_ioreq_server(
     return rc;
 }
 
+/*
+ * Note that this value is effectively part of the ABI, even if we don't need
+ * to make it a formal part of it: A guest suspended for migration in the
+ * middle of a continuation would fail to work if resumed on a hypervisor
+ * using a different value.
+ */
 #define HVMOP_op_mask 0xff
 
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 {
     struct domain *curr_d = current->domain;
-    unsigned long start_iter = op & ~HVMOP_op_mask;
+    unsigned long start_iter, mask;
     long rc = 0;
 
-    switch ( op &= HVMOP_op_mask )
+    switch ( op & HVMOP_op_mask )
+    {
+    default:
+        mask = ~0UL;
+        break;
+    case HVMOP_modified_memory:
+    case HVMOP_set_mem_type:
+        mask = HVMOP_op_mask;
+        break;
+    }
+
+    start_iter = op & ~mask;
+    switch ( op &= mask )
     {
     case HVMOP_create_ioreq_server:
         rc = hvmop_create_ioreq_server(
@@ -6120,7 +6138,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     if ( rc == -ERESTART )
     {
-        ASSERT(!(start_iter & HVMOP_op_mask));
+        ASSERT(!(start_iter & mask));
         rc = hypercall_create_continuation(__HYPERVISOR_hvm_op, "lh",
                                            op | start_iter, arg);
     }

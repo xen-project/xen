@@ -779,16 +779,25 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
 
     case XENMEM_exchange:
+        if ( unlikely(start_extent) )
+            return -ENOSYS;
+
         rc = memory_exchange(guest_handle_cast(arg, xen_memory_exchange_t));
         break;
 
     case XENMEM_maximum_ram_page:
+        if ( unlikely(start_extent) )
+            return -ENOSYS;
+
         rc = max_page;
         break;
 
     case XENMEM_current_reservation:
     case XENMEM_maximum_reservation:
     case XENMEM_maximum_gpfn:
+        if ( unlikely(start_extent) )
+            return -ENOSYS;
+
         if ( copy_from_guest(&domid, arg, 1) )
             return -EFAULT;
 
@@ -912,6 +921,9 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct page_info *page;
         struct domain *d;
 
+        if ( unlikely(start_extent) )
+            return -ENOSYS;
+
         if ( copy_from_guest(&xrfp, arg, 1) )
             return -EFAULT;
 
@@ -945,6 +957,9 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
 
     case XENMEM_claim_pages:
+        if ( unlikely(start_extent) )
+            return -ENOSYS;
+
         if ( copy_from_guest(&reservation, arg, 1) )
             return -EFAULT;
 
@@ -976,6 +991,9 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct domain *d;
         unsigned int dom_vnodes, dom_vranges, dom_vcpus;
         struct vnuma_info tmp;
+
+        if ( unlikely(start_extent) )
+            return -ENOSYS;
 
         /*
          * Guest passes nr_vnodes, number of regions and nr_vcpus thus

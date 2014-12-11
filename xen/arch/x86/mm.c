@@ -4661,9 +4661,8 @@ int xenmem_add_to_physmap_one(
 long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int rc;
-    int op = cmd & MEMOP_CMD_MASK;
 
-    switch ( op )
+    switch ( cmd )
     {
     case XENMEM_set_memory_map:
     {
@@ -4837,7 +4836,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             return -ESRCH;
 
-        if ( op == XENMEM_set_pod_target )
+        if ( cmd == XENMEM_set_pod_target )
             rc = xsm_set_pod_target(XSM_PRIV, d);
         else
             rc = xsm_get_pod_target(XSM_PRIV, d);
@@ -4845,7 +4844,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( rc != 0 )
             goto pod_target_out_unlock;
 
-        if ( op == XENMEM_set_pod_target )
+        if ( cmd == XENMEM_set_pod_target )
         {
             if ( target.target_pages > d->max_pages )
             {
@@ -4859,7 +4858,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( rc == -ERESTART )
         {
             rc = hypercall_create_continuation(
-                __HYPERVISOR_memory_op, "lh", op, arg);
+                __HYPERVISOR_memory_op, "lh", cmd, arg);
         }
         else if ( rc >= 0 )
         {

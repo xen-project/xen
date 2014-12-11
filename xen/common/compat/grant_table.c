@@ -65,6 +65,8 @@ int compat_grant_table_op(unsigned int cmd,
 
     set_xen_guest_handle(cnt_uop, NULL);
     cmd_op = cmd & GNTTABOP_CMD_MASK;
+    if ( cmd_op != GNTTABOP_cache_flush )
+        cmd_op = cmd;
     switch ( cmd_op )
     {
 #define CASE(name) \
