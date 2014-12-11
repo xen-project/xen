@@ -231,14 +231,14 @@ static int late_hwdom_init(struct domain *d)
 #endif
 }
 
-static unsigned int __read_mostly extra_dom0_irqs = 256;
+static unsigned int __read_mostly extra_hwdom_irqs;
 static unsigned int __read_mostly extra_domU_irqs = 32;
 static void __init parse_extra_guest_irqs(const char *s)
 {
     if ( isdigit(*s) )
         extra_domU_irqs = simple_strtoul(s, &s, 0);
     if ( *s == ',' && isdigit(*++s) )
-        extra_dom0_irqs = simple_strtoul(s, &s, 0);
+        extra_hwdom_irqs = simple_strtoul(s, &s, 0);
 }
 custom_param("extra_guest_irqs", parse_extra_guest_irqs);
 
@@ -326,7 +326,8 @@ struct domain *domain_create(
         if ( !is_hardware_domain(d) )
             d->nr_pirqs = nr_static_irqs + extra_domU_irqs;
         else
-            d->nr_pirqs = nr_static_irqs + extra_dom0_irqs;
+            d->nr_pirqs = extra_hwdom_irqs ? nr_static_irqs + extra_hwdom_irqs
+                                           : arch_hwdom_irqs(domid);
         if ( d->nr_pirqs > nr_irqs )
             d->nr_pirqs = nr_irqs;
 

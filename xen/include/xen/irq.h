@@ -168,4 +168,8 @@ static inline void set_native_irq_info(unsigned int irq, const cpumask_t *mask)
 
 unsigned int set_desc_affinity(struct irq_desc *, const cpumask_t *);
 
+#ifndef arch_hwdom_irqs
+unsigned int arch_hwdom_irqs(domid_t);
+#endif
+
 #endif /* __XEN_IRQ_H__ */

@@ -596,13 +596,16 @@ Force or disable use of EFI runtime services.
 ### extra\_guest\_irqs
 > `= [<domU number>][,<dom0 number>]`
 
-> Default: `32,256`
+> Default: `32,<variable>`
 
 Change the number of PIRQs available for guests.  The optional first number is
 common for all domUs, while the optional second number (preceded by a comma)
 is for dom0.  Changing the setting for domU has no impact on dom0 and vice
 versa.  For example to change dom0 without changing domU, use
-`extra_guest_irqs=,512`
+`extra_guest_irqs=,512`.  The default value for Dom0 and an eventual separate
+hardware domain is architecture dependent.
+Note that specifying zero as domU value means zero, while for dom0 it means
+to use the default.
 
 ### flask\_enabled
 > `= <integer>`

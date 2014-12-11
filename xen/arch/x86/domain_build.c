@@ -101,7 +101,7 @@ static void __init parse_dom0_max_vcpus(const char *s)
 }
 custom_param("dom0_max_vcpus", parse_dom0_max_vcpus);
 
-struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
+unsigned int __init dom0_max_vcpus(void)
 {
     unsigned max_vcpus;
 
@@ -112,6 +112,13 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
         max_vcpus = opt_dom0_max_vcpus_max;
     if ( max_vcpus > MAX_VIRT_CPUS )
         max_vcpus = MAX_VIRT_CPUS;
+
+    return max_vcpus;
+}
+
+struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
+{
+    unsigned int max_vcpus = dom0_max_vcpus();
 
     dom0->vcpu = xzalloc_array(struct vcpu *, max_vcpus);
     if ( !dom0->vcpu )

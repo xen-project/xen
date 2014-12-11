@@ -35,6 +35,8 @@ int construct_dom0(
 unsigned long initial_images_nrpages(void);
 void discard_initial_images(void);
 
+unsigned int dom0_max_vcpus(void);
+
 int xen_in_range(unsigned long mfn);
 
 void microcode_grab_module(

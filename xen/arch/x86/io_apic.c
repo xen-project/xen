@@ -33,6 +33,7 @@
 #include <asm/smp.h>
 #include <asm/desc.h>
 #include <asm/msi.h>
+#include <asm/setup.h>
 #include <mach_apic.h>
 #include <io_ports.h>
 #include <public/physdev.h>
@@ -2606,3 +2607,14 @@ void __init init_ioapic_mappings(void)
            nr_irqs_gsi, nr_irqs - nr_irqs_gsi);
 }
 
+unsigned int arch_hwdom_irqs(domid_t domid)
+{
+    unsigned int n = fls(num_present_cpus());
+
+    if ( !domid )
+        n = min(n, dom0_max_vcpus());
+    n = min(nr_irqs_gsi + n * NR_DYNAMIC_VECTORS, nr_irqs);
+    printk("Dom%d has maximum %u PIRQs\n", domid, n);
+
+    return n;
+}
