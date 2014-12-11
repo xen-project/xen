@@ -3086,7 +3086,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         if ( exit_qualification & 0x10 )
         {
             /* INS, OUTS */
-            if ( !handle_mmio() )
+            if ( unlikely(is_pvh_vcpu(v)) /* PVH fixme */ ||
+                 !handle_mmio() )
                 hvm_inject_hw_exception(TRAP_gp_fault, 0);
         }
         else
