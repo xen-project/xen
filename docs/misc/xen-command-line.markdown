@@ -614,7 +614,7 @@ to use the default.
 > `= <integer>`
 
 ### font
-> `= <height>` where height is `8x8 | 8x14 | 8x16 '`
+> `= <height>` where height is `8x8 | 8x14 | 8x16`
 
 Specify the font size when using the VESA console driver.
 
@@ -648,13 +648,13 @@ Specify the maximum number of frames per grant table operation.
 > `= <integer>`
 
 Specify the maximum number of maptrack frames domain.
-The default value is 8 times gnttab_max_frames.
+The default value is 8 times **gnttab\_max\_frames**.
 
 ### gnttab\_max\_nr\_frames
 > `= <integer>`
 
 *Deprecated*
-Use gnttab\_max\_frames and gnttab\_max\_maptrack\_frames instead.
+Use **gnttab\_max\_frames** and **gnttab\_max\_maptrack\_frames** instead.
 
 Specify the maximum number of frames per grant table operation and the
 maximum number of maptrack frames domain.
@@ -986,7 +986,7 @@ of the ACPI based one.
 ### nmi
 > `= ignore | dom0 | fatal`
 
-> Default: `nmi=fatal`
+> Default: `fatal` for a debug build, or `dom0` for a non-debug build
 
 Specify what Xen should do in the event of an NMI parity or I/O error.
 `ignore` discards the error; `dom0` causes Xen to report the error to
