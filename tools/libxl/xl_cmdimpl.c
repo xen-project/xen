@@ -2473,7 +2473,8 @@ static uint32_t create_domain(struct domain_create *dom_info)
     }
 
     if (debug || dom_info->dryrun)
-        printf_info(default_output_format, -1, &d_config, stderr);
+        printf_info(default_output_format, -1, &d_config,
+                    debug ? stderr : stdout);
 
     ret = 0;
     if (dom_info->dryrun)
