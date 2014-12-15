@@ -1187,6 +1187,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     }
 
     vm_init();
+    console_init_ring();
     vesa_init();
 
     softirq_init();

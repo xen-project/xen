@@ -745,6 +745,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     dt_uart_init();
     console_init_preirq();
+    console_init_ring();
 
     system_state = SYS_STATE_boot;
 

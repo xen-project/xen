@@ -744,15 +744,14 @@ void __init console_init_preirq(void)
     }
 }
 
-void __init console_init_postirq(void)
+void __init console_init_ring(void)
 {
     char *ring;
     unsigned int i, order, memflags;
-
-    serial_init_postirq();
+    unsigned long flags;
 
     if ( !opt_conring_size )
-        opt_conring_size = num_present_cpus() << (9 + xenlog_lower_thresh);
+        return;
 
     order = get_order_from_bytes(max(opt_conring_size, conring_size));
     memflags = MEMF_bits(crashinfo_maxaddr_bits);
@@ -763,15 +762,28 @@ void __init console_init_postirq(void)
     }
     opt_conring_size = PAGE_SIZE << order;
 
-    spin_lock_irq(&console_lock);
+    spin_lock_irqsave(&console_lock, flags);
     for ( i = conringc ; i != conringp; i++ )
         ring[i & (opt_conring_size - 1)] = conring[i & (conring_size - 1)];
     conring = ring;
     smp_wmb(); /* Allow users of console_force_unlock() to see larger buffer. */
     conring_size = opt_conring_size;
-    spin_unlock_irq(&console_lock);
+    spin_unlock_irqrestore(&console_lock, flags);
 
     printk("Allocated console ring of %u KiB.\n", opt_conring_size >> 10);
+}
+
+void __init console_init_postirq(void)
+{
+    serial_init_postirq();
+
+    if ( conring != _conring )
+        return;
+
+    if ( !opt_conring_size )
+        opt_conring_size = num_present_cpus() << (9 + xenlog_lower_thresh);
+
+    console_init_ring();
 }
 
 void __init console_endboot(void)
