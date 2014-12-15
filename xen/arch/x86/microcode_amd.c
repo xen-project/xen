@@ -331,12 +331,17 @@ static int container_fast_forward(const void *data, size_t size_left, size_t *of
              header[1] == UCODE_EQUIV_CPU_TABLE_TYPE )
             break;
 
+        if ( header[0] != UCODE_UCODE_TYPE )
+            return -EINVAL;
         size = header[1] + SECTION_HDR_SIZE;
         if ( size < PATCH_HDR_SIZE || size_left < size )
             return -EINVAL;
 
         size_left -= size;
         *offset += size;
+
+        if ( !size_left )
+            return -ENODATA;
     }
 
     return 0;
@@ -386,10 +391,6 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
             break;
         }
 
-        if ( find_equiv_cpu_id(mc_amd->equiv_cpu_table, current_cpu_id,
-                               &equiv_cpu_id) )
-                break;
-
         /*
          * Could happen as we advance 'offset' early
          * in install_equiv_cpu_table
@@ -401,7 +402,16 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
             break;
         }
 
+        if ( find_equiv_cpu_id(mc_amd->equiv_cpu_table, current_cpu_id,
+                               &equiv_cpu_id) )
+            break;
+
         error = container_fast_forward(buf, bufsize - offset, &offset);
+        if ( error == -ENODATA )
+        {
+            ASSERT(offset == bufsize);
+            break;
+        }
         if ( error )
         {
             printk(KERN_ERR "microcode: CPU%d incorrect or corrupt container file\n"
