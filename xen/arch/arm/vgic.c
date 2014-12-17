@@ -90,6 +90,8 @@ int domain_vgic_init(struct domain *d)
         return -ENODEV;
     }
 
+    spin_lock_init(&d->arch.vgic.lock);
+
     d->arch.vgic.shared_irqs =
         xzalloc_array(struct vgic_irq_rank, DOMAIN_NR_RANKS(d));
     if ( d->arch.vgic.shared_irqs == NULL )
