@@ -311,6 +311,7 @@ static unsigned int __init get_argv(unsigned int argc, CHAR16 **argv,
                 ++argc;
             else if ( prev && wstrcmp(prev, L"--") == 0 )
             {
+                --argv;
                 if ( options )
                     *options = cmdline;
                 break;
