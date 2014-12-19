@@ -9,7 +9,6 @@ ConditionPathExists=/proc/xen/capabilities
 [Service]
 Type=notify
 Environment=XENSTORED_ARGS=
-Environment=XENSTORED_ROOTDIR=@XEN_LIB_STORED@
 Environment=XENSTORED=@XENSTORED@
 EnvironmentFile=-@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons
 ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
