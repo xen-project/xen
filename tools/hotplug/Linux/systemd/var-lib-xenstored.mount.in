@@ -6,9 +6,7 @@ ConditionPathExists=/proc/xen/capabilities
 RefuseManualStop=true
 
 [Mount]
-Environment=XENSTORED_MOUNT_CTX=none
-EnvironmentFile=-@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xenstored
 What=xenstore
 Where=@XEN_LIB_STORED@
 Type=tmpfs
-Options=mode=755,context="$XENSTORED_MOUNT_CTX"
+Options=mode=755
