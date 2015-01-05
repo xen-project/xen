@@ -2046,19 +2046,25 @@ const char *libxl__userdata_path(libxl__gc *gc, uint32_t domid,
                                  const char *wh)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    char *uuid_string;
+    char *uuid_string, *path;
     libxl_dominfo info;
     int rc;
+
+    libxl_dominfo_init(&info);
 
     rc = libxl_domain_info(ctx, &info, domid);
     if (rc) {
         LOGE(ERROR, "unable to find domain info for domain %"PRIu32, domid);
-        return NULL;
+        path = NULL;
+        goto out;
     }
     uuid_string = GCSPRINTF(LIBXL_UUID_FMT, LIBXL_UUID_BYTES(info.uuid));
-
-    return GCSPRINTF("/var/lib/xen/userdata-%s.%u.%s.%s",
+    path = GCSPRINTF("/var/lib/xen/userdata-%s.%u.%s.%s",
                      wh, domid, uuid_string, userdata_userid);
+
+ out:
+    libxl_dominfo_dispose(&info);
+    return path;
 }
 
 static int userdata_delete(libxl__gc *gc, const char *path)
