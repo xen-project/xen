@@ -1824,6 +1824,9 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
     port = xs_suspend_evtchn_port(dss->domid);
 
     if (port >= 0) {
+        rc = libxl__ctx_evtchn_init(gc);
+        if (rc) goto out;
+
         dss->guest_evtchn.port =
             xc_suspend_evtchn_init_exclusive(CTX->xch, CTX->xce,
                                   dss->domid, port, &dss->guest_evtchn_lockfd);
