@@ -1,9 +1,9 @@
 #################################
-__  __            _  _    ____                        _        _     _      
-\ \/ /___ _ __   | || |  | ___|       _   _ _ __  ___| |_ __ _| |__ | | ___ 
- \  // _ \ '_ \  | || |_ |___ \ _____| | | | '_ \/ __| __/ _` | '_ \| |/ _ \
- /  \  __/ | | | |__   _| ___) |_____| |_| | | | \__ \ || (_| | |_) | |  __/
-/_/\_\___|_| |_|    |_|(_)____/       \__,_|_| |_|___/\__\__,_|_.__/|_|\___|
+__  __            _  _    ____   ___
+\ \/ /___ _ __   | || |  | ___| / _ \
+ \  // _ \ '_ \  | || |_ |___ \| | | |
+ /  \  __/ | | | |__   _| ___) | |_| |
+/_/\_\___|_| |_|    |_|(_)____(_)___/
 
 #################################
 
@@ -19,14 +19,33 @@ is freely-distributable Open Source software, released under the GNU
 GPL. Since its initial public release, Xen has grown a large
 development community, spearheaded by xen.org (http://www.xen.org).
 
-The 4.3 release offers a number of improvements, including NUMA
-scheduling affinity, openvswitch integration, and defaulting to
-qemu-xen rather than qemu-traditional for non-stubdom guests.
-(qemu-xen is kept very close to the upstream project.)  We also have a
-number of updates to vTPM, and improvements to XSM and Flask to allow
-greater disaggregation.  Additionally, 4.3 contains a basic version of
-Xen for the new ARM server architecture, both 32- and 64-bit.  And as
-always, there are a number of performance, stability, and security
+The 4.5 release offers a number of improvements, including: improvements for
+large scale machines during bootup and for PCI passthrough; multiple IO-REQ
+servers (many QEMUs for a guest); soft affinity for vCPUs (aka NUMA affinity);
+and API expansion for guest introspection. We also have number of updates for
+CPU specific changes, such as: Broadwell Supervisor Mode Access Prevention;
+Haswell Server Cache QoS Monitoring aka Intel Resource Director Technology;
+further extensions to vAPIC (SandyBridge feature); fixes in AMD microcode
+loading; Data Breaking Extensions and further MSR masking support on AMD.
+
+On the experimental side we have added a new Real-Time Deferrable Server Based
+CPU Scheduler (rtds), and PVH initial domain (dom0) support for Intel CPUs.
+
+Additionally, 4.5 has a huge update to the ARM code, including support for:
+up to 1TB in guests; up to 8 CPUs; Power State Coordination Interface (0.2)
+to power up and down CPUs; UEFI booting; IOMMU support (SMMUv1); Super Page
+(2MB) support; passthrough of MMIO regions to guests; and lower interrupt
+latency.
+
+The toolstack has expanded to include support for: VM Generation ID (a Windows
+2012 Server requirement); Remus initial support (for high availability)
+in libxl (since xend has been removed); libxenlight JSON support and persistent
+configuration support, systemd support; and support in QEMU for expanding the
+PCI hole.
+
+Lastly, we have removed the Python toolstack (xend).
+
+And as always, there are a number of performance, stability, and security
 improvements under-the hood.
 
 This file contains some quick-start instructions to install Xen on
