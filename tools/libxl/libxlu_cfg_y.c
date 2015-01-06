@@ -76,7 +76,7 @@
 /* Line 268 of yacc.c  */
 #line 19 "libxlu_cfg_y.y"
 
-#define YYLEX_PARAM ctx->scanner
+#define ctx_scanner ctx->scanner
 #include "libxlu_cfg_i.h"
 #include "libxlu_cfg_l.h"
 
@@ -656,7 +656,7 @@ while (YYID (0))
 #ifdef YYLEX_PARAM
 # define YYLEX yylex (&yylval, &yylloc, YYLEX_PARAM)
 #else
-# define YYLEX yylex (&yylval, &yylloc, scanner)
+# define YYLEX yylex (&yylval, &yylloc, ctx_scanner)
 #endif
 
 /* Enable debugging if requested.  */
