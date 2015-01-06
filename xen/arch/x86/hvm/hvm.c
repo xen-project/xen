@@ -579,13 +579,13 @@ void hvm_domain_relinquish_resources(struct domain *d)
         hpet_deinit(d);
     }
 
-    xfree(d->arch.hvm_domain.io_handler);
-    xfree(d->arch.hvm_domain.params);
     xfree(d->arch.hvm_domain.pbuf);
 }
 
 void hvm_domain_destroy(struct domain *d)
 {
+    xfree(d->arch.hvm_domain.io_handler);
+    xfree(d->arch.hvm_domain.params);
     hvm_funcs.domain_destroy(d);
     rtc_deinit(d);
     stdvga_deinit(d);
