@@ -17,7 +17,7 @@
  */
 
 %{
-#define YYLEX_PARAM ctx->scanner
+#define ctx_scanner ctx->scanner
 #include "libxlu_cfg_i.h"
 #include "libxlu_cfg_l.h"
 %}
@@ -31,9 +31,9 @@
 %pure-parser
 %defines
 %error-verbose
-%name-prefix="xlu__cfg_yy"
+%name-prefix "xlu__cfg_yy"
 %parse-param { CfgParseContext *ctx }
-%lex-param { void *scanner }
+%lex-param { ctx_scanner }
 
 %token <string>                IDENT STRING NUMBER NEWLINE
 %type <string>            atom
