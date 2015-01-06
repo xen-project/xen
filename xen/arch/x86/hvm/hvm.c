@@ -625,9 +625,6 @@ int hvm_domain_initialise(struct domain *d)
 
 void hvm_domain_relinquish_resources(struct domain *d)
 {
-    xfree(d->arch.hvm_domain.io_handler);
-    xfree(d->arch.hvm_domain.params);
-
     if ( is_pvh_domain(d) )
         return;
 
@@ -650,6 +647,9 @@ void hvm_domain_relinquish_resources(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
+    xfree(d->arch.hvm_domain.io_handler);
+    xfree(d->arch.hvm_domain.params);
+
     hvm_destroy_cacheattr_region_list(d);
 
     if ( is_pvh_domain(d) )
