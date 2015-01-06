@@ -1011,6 +1011,10 @@ int xlu__disk_yyget_lineno (yyscan_t yyscanner );
 
 void xlu__disk_yyset_lineno (int line_number ,yyscan_t yyscanner );
 
+int xlu__disk_yyget_column  (yyscan_t yyscanner );
+
+void xlu__disk_yyset_column (int column_no ,yyscan_t yyscanner );
+
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
  */
@@ -1155,7 +1159,7 @@ YY_DECL
 
  /*----- the scanner rules which do the parsing -----*/
 
-#line 1159 "libxlu_disk_l.c"
+#line 1163 "libxlu_disk_l.c"
 
 	if ( !yyg->yy_init )
 		{
@@ -1498,7 +1502,7 @@ YY_RULE_SETUP
 #line 259 "libxlu_disk_l.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1502 "libxlu_disk_l.c"
+#line 1506 "libxlu_disk_l.c"
 			case YY_STATE_EOF(INITIAL):
 			case YY_STATE_EOF(LEXERR):
 				yyterminate();

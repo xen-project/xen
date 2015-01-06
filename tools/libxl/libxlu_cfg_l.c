@@ -610,6 +610,10 @@ int xlu__cfg_yyget_lineno (yyscan_t yyscanner );
 
 void xlu__cfg_yyset_lineno (int line_number ,yyscan_t yyscanner );
 
+int xlu__cfg_yyget_column  (yyscan_t yyscanner );
+
+void xlu__cfg_yyset_column (int column_no ,yyscan_t yyscanner );
+
 YYSTYPE * xlu__cfg_yyget_lval (yyscan_t yyscanner );
 
 void xlu__cfg_yyset_lval (YYSTYPE * yylval_param ,yyscan_t yyscanner );
@@ -762,7 +766,7 @@ YY_DECL
 #line 53 "libxlu_cfg_l.l"
 
 
-#line 766 "libxlu_cfg_l.c"
+#line 770 "libxlu_cfg_l.c"
 
     yylval = yylval_param;
 
@@ -971,7 +975,7 @@ YY_RULE_SETUP
 #line 104 "libxlu_cfg_l.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 975 "libxlu_cfg_l.c"
+#line 979 "libxlu_cfg_l.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(lexerr):
 	yyterminate();

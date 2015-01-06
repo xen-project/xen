@@ -276,6 +276,10 @@ int xlu__cfg_yyget_lineno (yyscan_t yyscanner );
 
 void xlu__cfg_yyset_lineno (int line_number ,yyscan_t yyscanner );
 
+int xlu__cfg_yyget_column  (yyscan_t yyscanner );
+
+void xlu__cfg_yyset_column (int column_no ,yyscan_t yyscanner );
+
 YYSTYPE * xlu__cfg_yyget_lval (yyscan_t yyscanner );
 
 void xlu__cfg_yyset_lval (YYSTYPE * yylval_param ,yyscan_t yyscanner );
@@ -352,6 +356,6 @@ extern int xlu__cfg_yylex \
 
 #line 104 "libxlu_cfg_l.l"
 
-#line 356 "libxlu_cfg_l.h"
+#line 360 "libxlu_cfg_l.h"
 #undef xlu__cfg_yyIN_HEADER
 #endif /* xlu__cfg_yyHEADER_H */
