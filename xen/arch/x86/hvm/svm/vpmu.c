@@ -403,9 +403,6 @@ static void amd_vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
-        return;
-
     if ( ((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
         amd_vpmu_unset_msr_bitmap(v);
 
