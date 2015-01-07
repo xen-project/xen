@@ -43,8 +43,9 @@ guests; and lower interrupt latency.
 The toolstack has expanded to include support for: VM Generation ID (a
 Windows 2012 Server requirement); Remus initial support (for high
 availability) in libxl (since xend has been removed); libxenlight JSON
-support and persistent configuration support, and systemd support; and
-support in QEMU for expanding the PCI hole.
+support, HVM guest direct kernel boot, and persistent configuration
+support; systemd support; performance optimizations in oxenstored;
+and support in QEMU for expanding the PCI hole.
 
 Lastly, we have removed the Python toolstack (xend).
 
