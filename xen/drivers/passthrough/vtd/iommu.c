@@ -258,8 +258,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     struct dma_pte *parent, *pte = NULL;
     int level = agaw_to_level(hd->arch.agaw);
     int offset;
-    u64 pte_maddr = 0, maddr;
-    u64 *vaddr = NULL;
+    u64 pte_maddr = 0;
 
     addr &= (((u64)1) << addr_width) - 1;
     ASSERT(spin_is_locked(&hd->arch.mapping_lock));
@@ -281,19 +280,19 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
         offset = address_level_offset(addr, level);
         pte = &parent[offset];
 
-        if ( dma_pte_addr(*pte) == 0 )
+        pte_maddr = dma_pte_addr(*pte);
+        if ( !pte_maddr )
         {
             if ( !alloc )
                 break;
 
             pdev = pci_get_pdev_by_domain(domain, -1, -1, -1);
             drhd = acpi_find_matched_drhd_unit(pdev);
-            maddr = alloc_pgtable_maddr(drhd, 1);
-            if ( !maddr )
+            pte_maddr = alloc_pgtable_maddr(drhd, 1);
+            if ( !pte_maddr )
                 break;
 
-            dma_set_pte_addr(*pte, maddr);
-            vaddr = map_vtd_domain_page(maddr);
+            dma_set_pte_addr(*pte, pte_maddr);
 
             /*
              * high level table always sets r/w, last level
@@ -303,21 +302,12 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
             dma_set_pte_writable(*pte);
             iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
         }
-        else
-        {
-            vaddr = map_vtd_domain_page(pte->val);
-        }
 
         if ( level == 2 )
-        {
-            pte_maddr = pte->val & PAGE_MASK_4K;
-            unmap_vtd_domain_page(vaddr);
             break;
-        }
 
         unmap_vtd_domain_page(parent);
-        parent = (struct dma_pte *)vaddr;
-        vaddr = NULL;
+        parent = map_vtd_domain_page(pte_maddr);
         level--;
     }
 
@@ -2449,7 +2439,7 @@ static void vtd_dump_p2m_table_level(paddr_t pt_maddr, int level, paddr_t gpa,
             printk("%*sgfn: %08lx mfn: %08lx\n",
                    indent, "",
                    (unsigned long)(address >> PAGE_SHIFT_4K),
-                   (unsigned long)(pte->val >> PAGE_SHIFT_4K));
+                   (unsigned long)(dma_pte_addr(*pte) >> PAGE_SHIFT_4K));
     }
 
     unmap_vtd_domain_page(pt_vaddr);
