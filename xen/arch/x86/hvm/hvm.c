@@ -2837,7 +2837,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
      * to the mmio handler.
      */
     if ( (p2mt == p2m_mmio_dm) || 
-         (npfec.write_access && (p2mt == p2m_ram_ro)) )
+         (npfec.write_access && (p2m_is_discard_write(p2mt))) )
     {
         put_gfn(p2m->domain, gfn);
 
@@ -2878,16 +2878,6 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
             paging_mark_dirty(v->domain, mfn_x(mfn));
             p2m_change_type_one(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
         }
-        rc = 1;
-        goto out_put_gfn;
-    }
-
-    /* Shouldn't happen: Maybe the guest was writing to a r/o grant mapping? */
-    if ( npfec.write_access && (p2mt == p2m_grant_map_ro) )
-    {
-        gdprintk(XENLOG_WARNING,
-                 "trying to write to read-only grant mapping\n");
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
         rc = 1;
         goto out_put_gfn;
     }
@@ -3941,7 +3931,7 @@ static enum hvm_copy_result __hvm_copy(
 
         if ( flags & HVMCOPY_to_guest )
         {
-            if ( p2mt == p2m_ram_ro )
+            if ( p2m_is_discard_write(p2mt) )
             {
                 static unsigned long lastpage;
                 if ( xchg(&lastpage, gfn) != gfn )
@@ -4035,7 +4025,7 @@ static enum hvm_copy_result __hvm_clear(paddr_t addr, int size)
 
         p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
 
-        if ( p2mt == p2m_ram_ro )
+        if ( p2m_is_discard_write(p2mt) )
         {
             static unsigned long lastpage;
             if ( xchg(&lastpage, gfn) != gfn )

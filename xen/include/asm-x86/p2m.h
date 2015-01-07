@@ -113,6 +113,10 @@ typedef unsigned int p2m_query_t;
                       | p2m_to_mask(p2m_grant_map_ro)   \
                       | p2m_to_mask(p2m_ram_shared) )
 
+/* Write-discard types, which should discard the write operations */
+#define P2M_DISCARD_WRITE_TYPES (p2m_to_mask(p2m_ram_ro)     \
+                      | p2m_to_mask(p2m_grant_map_ro))
+
 /* Types that can be subject to bulk transitions. */
 #define P2M_CHANGEABLE_TYPES (p2m_to_mask(p2m_ram_rw) \
                               | p2m_to_mask(p2m_ram_logdirty) )
@@ -145,6 +149,7 @@ typedef unsigned int p2m_query_t;
 #define p2m_is_hole(_t) (p2m_to_mask(_t) & P2M_HOLE_TYPES)
 #define p2m_is_mmio(_t) (p2m_to_mask(_t) & P2M_MMIO_TYPES)
 #define p2m_is_readonly(_t) (p2m_to_mask(_t) & P2M_RO_TYPES)
+#define p2m_is_discard_write(_t) (p2m_to_mask(_t) & P2M_DISCARD_WRITE_TYPES)
 #define p2m_is_changeable(_t) (p2m_to_mask(_t) & P2M_CHANGEABLE_TYPES)
 #define p2m_is_pod(_t) (p2m_to_mask(_t) & P2M_POD_TYPES)
 #define p2m_is_grant(_t) (p2m_to_mask(_t) & P2M_GRANT_TYPES)
