@@ -220,11 +220,41 @@ typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
 struct arch_shared_info {
-    unsigned long max_pfn;                  /* max pfn that appears in table */
-    /* Frame containing list of mfns containing list of mfns containing p2m. */
+    /*
+     * Number of valid entries in the p2m table(s) anchored at
+     * pfn_to_mfn_frame_list_list and/or p2m_vaddr.
+     */
+    unsigned long max_pfn;
+    /*
+     * Frame containing list of mfns containing list of mfns containing p2m.
+     * A value of 0 indicates it has not yet been set up, ~0 indicates it has
+     * been set to invalid e.g. due to the p2m being too large for the 3-level
+     * p2m tree. In this case the linear mapper p2m list anchored at p2m_vaddr
+     * is to be used.
+     */
     xen_pfn_t     pfn_to_mfn_frame_list_list;
     unsigned long nmi_reason;
-    uint64_t pad[32];
+    /*
+     * Following three fields are valid if p2m_cr3 contains a value different
+     * from 0.
+     * p2m_cr3 is the root of the address space where p2m_vaddr is valid.
+     * p2m_cr3 is in the same format as a cr3 value in the vcpu register state
+     * and holds the folded machine frame number (via xen_pfn_to_cr3) of a
+     * L3 or L4 page table.
+     * p2m_vaddr holds the virtual address of the linear p2m list. All entries
+     * in the range [0...max_pfn[ are accessible via this pointer.
+     * p2m_generation will be incremented by the guest before and after each
+     * change of the mappings of the p2m list. p2m_generation starts at 0 and
+     * a value with the least significant bit set indicates that a mapping
+     * update is in progress. This allows guest external software (e.g. in Dom0)
+     * to verify that read mappings are consistent and whether they have changed
+     * since the last check.
+     * Modifying a p2m element in the linear p2m list is allowed via an atomic
+     * write only.
+     */
+    unsigned long p2m_cr3;         /* cr3 value of the p2m address space */
+    unsigned long p2m_vaddr;       /* virtual address of the p2m list */
+    unsigned long p2m_generation;  /* generation count of p2m mapping */
 };
 typedef struct arch_shared_info arch_shared_info_t;
 
