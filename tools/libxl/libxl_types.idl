@@ -192,6 +192,7 @@ libxl_viridian_enlightenment = Enumeration("viridian_enlightenment", [
     (0, "base"),
     (1, "freq"),
     (2, "time_ref_count"),
+    (3, "reference_tsc"),
     ])
 
 #

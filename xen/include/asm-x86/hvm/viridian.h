@@ -61,11 +61,36 @@ struct viridian_time_ref_count
     int64_t off;
 };
 
+union viridian_reference_tsc
+{
+    uint64_t raw;
+    struct
+    {
+        uint64_t enabled:1;
+        uint64_t reserved_preserved:11;
+        uint64_t pfn:48;
+    } fields;
+};
+
+/*
+ * Type defintion as in Microsoft Hypervisor Top-Level Functional
+ * Specification v4.0a, section 15.4.2.
+ */
+typedef struct _HV_REFERENCE_TSC_PAGE
+{
+    uint32_t TscSequence;
+    uint32_t Reserved1;
+    uint64_t TscScale;
+    int64_t  TscOffset;
+    uint64_t Reserved2[509];
+} HV_REFERENCE_TSC_PAGE, *PHV_REFERENCE_TSC_PAGE;
+
 struct viridian_domain
 {
     union viridian_guest_os_id guest_os_id;
     union viridian_hypercall_gpa hypercall_gpa;
     struct viridian_time_ref_count time_ref_count;
+    union viridian_reference_tsc reference_tsc;
 };
 
 int

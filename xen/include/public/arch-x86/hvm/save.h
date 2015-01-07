@@ -569,6 +569,7 @@ struct hvm_viridian_domain_context {
     uint64_t hypercall_gpa;
     uint64_t guest_os_id;
     uint64_t time_ref_count;
+    uint64_t reference_tsc;
 };
 
 DECLARE_HVM_SAVE_TYPE(VIRIDIAN_DOMAIN, 15, struct hvm_viridian_domain_context);
@@ -617,3 +618,13 @@ struct hvm_msr {
 #define HVM_SAVE_CODE_MAX 20
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_X86_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

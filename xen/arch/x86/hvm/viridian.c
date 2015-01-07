@@ -21,6 +21,7 @@
 #define VIRIDIAN_MSR_HYPERCALL                  0x40000001
 #define VIRIDIAN_MSR_VP_INDEX                   0x40000002
 #define VIRIDIAN_MSR_TIME_REF_COUNT             0x40000020
+#define VIRIDIAN_MSR_REFERENCE_TSC              0x40000021
 #define VIRIDIAN_MSR_TSC_FREQUENCY              0x40000022
 #define VIRIDIAN_MSR_APIC_FREQUENCY             0x40000023
 #define VIRIDIAN_MSR_EOI                        0x40000070
@@ -40,6 +41,7 @@
 #define CPUID3A_MSR_APIC_ACCESS    (1 << 4)
 #define CPUID3A_MSR_HYPERCALL      (1 << 5)
 #define CPUID3A_MSR_VP_INDEX       (1 << 6)
+#define CPUID3A_MSR_REFERENCE_TSC  (1 << 9)
 #define CPUID3A_MSR_FREQ           (1 << 11)
 
 /* Viridian CPUID 4000004, Implementation Recommendations. */
@@ -95,6 +97,8 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
             *eax |= CPUID3A_MSR_FREQ;
         if ( viridian_feature_mask(d) & HVMPV_time_ref_count )
             *eax |= CPUID3A_MSR_TIME_REF_COUNT;
+        if ( viridian_feature_mask(d) & HVMPV_reference_tsc )
+            *eax |= CPUID3A_MSR_REFERENCE_TSC;
         break;
     case 4:
         /* Recommended hypercall usage. */
@@ -153,6 +157,17 @@ static void dump_apic_assist(const struct vcpu *v)
 
     printk(XENLOG_G_INFO "%pv: VIRIDIAN APIC_ASSIST: enabled: %x pfn: %lx\n",
            v, aa->fields.enabled, (unsigned long)aa->fields.pfn);
+}
+
+static void dump_reference_tsc(const struct domain *d)
+{
+    const union viridian_reference_tsc *rt;
+
+    rt = &d->arch.hvm_domain.viridian.reference_tsc;
+    
+    printk(XENLOG_G_INFO "d%d: VIRIDIAN REFERENCE_TSC: enabled: %x pfn: %lx\n",
+           d->domain_id,
+           rt->fields.enabled, (unsigned long)rt->fields.pfn);
 }
 
 static void enable_hypercall_page(struct domain *d)
@@ -224,6 +239,78 @@ static void initialize_apic_assist(struct vcpu *v)
     put_page_and_type(page);
 }
 
+static void update_reference_tsc(struct domain *d, bool_t initialize)
+{
+    unsigned long gmfn = d->arch.hvm_domain.viridian.reference_tsc.fields.pfn;
+    struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
+    HV_REFERENCE_TSC_PAGE *p;
+
+    if ( !page || !get_page_type(page, PGT_writable_page) )
+    {
+        if ( page )
+            put_page(page);
+        gdprintk(XENLOG_WARNING, "Bad GMFN %lx (MFN %lx)\n", gmfn,
+                 page ? page_to_mfn(page) : INVALID_MFN);
+        return;
+    }
+
+    p = __map_domain_page(page);
+
+    if ( initialize )
+        clear_page(p);
+
+    /*
+     * This enlightenment must be disabled is the host TSC is not invariant.
+     * However it is also disabled if vtsc is true (which means rdtsc is being
+     * emulated). This generally happens when guest TSC freq and host TSC freq
+     * don't match. The TscScale value could be adjusted to cope with this,
+     * allowing vtsc to be turned off, but support for this is not yet present
+     * in the hypervisor. Thus is it is possible that migrating a Windows VM
+     * between hosts of differing TSC frequencies may result in large
+     * differences in guest performance.
+     */
+    if ( !host_tsc_is_safe() || d->arch.vtsc )
+    {
+        /*
+         * The specification states that valid values of TscSequence range
+         * from 0 to 0xFFFFFFFE. The value 0xFFFFFFFF is used to indicate
+         * this mechanism is no longer a reliable source of time and that
+         * the VM should fall back to a different source.
+         *
+         * Server 2012 (6.2 kernel) and 2012 R2 (6.3 kernel) actually violate
+         * the spec. and rely on a value of 0 to indicate that this
+         * enlightenment should no longer be used. These two kernel
+         * versions are currently the only ones to make use of this
+         * enlightenment, so just use 0 here.
+         */
+        p->TscSequence = 0;
+
+        printk(XENLOG_G_INFO "d%d: VIRIDIAN REFERENCE_TSC: invalidated\n",
+               d->domain_id);
+        return;
+    }
+
+    /*
+     * The guest will calculate reference time according to the following
+     * formula:
+     *
+     * ReferenceTime = ((RDTSC() * TscScale) >> 64) + TscOffset
+     *
+     * Windows uses a 100ns tick, so we need a scale which is cpu
+     * ticks per 100ns shifted left by 64.
+     */
+    p->TscScale = ((10000ul << 32) / d->arch.tsc_khz) << 32;
+
+    p->TscSequence++;
+    if ( p->TscSequence == 0xFFFFFFFF ||
+         p->TscSequence == 0 ) /* Avoid both 'invalid' values */
+        p->TscSequence = 1;
+
+    unmap_domain_page(p);
+
+    put_page_and_type(page);
+}
+
 int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
 {
     struct vcpu *v = current;
@@ -280,6 +367,17 @@ int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
         dump_apic_assist(v);
         if (v->arch.hvm_vcpu.viridian.apic_assist.fields.enabled)
             initialize_apic_assist(v);
+        break;
+
+    case VIRIDIAN_MSR_REFERENCE_TSC:
+        if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
+            return 0;
+
+        perfc_incr(mshv_wrmsr_tsc_msr);
+        d->arch.hvm_domain.viridian.reference_tsc.raw = val;
+        dump_reference_tsc(d);
+        if ( d->arch.hvm_domain.viridian.reference_tsc.fields.enabled )
+            update_reference_tsc(d, 1);
         break;
 
     default:
@@ -377,6 +475,14 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
     case VIRIDIAN_MSR_APIC_ASSIST:
         perfc_incr(mshv_rdmsr_apic_msr);
         *val = v->arch.hvm_vcpu.viridian.apic_assist.raw;
+        break;
+
+    case VIRIDIAN_MSR_REFERENCE_TSC:
+        if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
+            return 0;
+
+        perfc_incr(mshv_rdmsr_tsc_msr);
+        *val = d->arch.hvm_domain.viridian.reference_tsc.raw;
         break;
 
     case VIRIDIAN_MSR_TIME_REF_COUNT:
@@ -487,6 +593,7 @@ static int viridian_save_domain_ctxt(struct domain *d, hvm_domain_context_t *h)
     ctxt.time_ref_count = d->arch.hvm_domain.viridian.time_ref_count.val;
     ctxt.hypercall_gpa  = d->arch.hvm_domain.viridian.hypercall_gpa.raw;
     ctxt.guest_os_id    = d->arch.hvm_domain.viridian.guest_os_id.raw;
+    ctxt.reference_tsc  = d->arch.hvm_domain.viridian.reference_tsc.raw;
 
     return (hvm_save_entry(VIRIDIAN_DOMAIN, 0, h, &ctxt) != 0);
 }
@@ -501,6 +608,10 @@ static int viridian_load_domain_ctxt(struct domain *d, hvm_domain_context_t *h)
     d->arch.hvm_domain.viridian.time_ref_count.val = ctxt.time_ref_count;
     d->arch.hvm_domain.viridian.hypercall_gpa.raw  = ctxt.hypercall_gpa;
     d->arch.hvm_domain.viridian.guest_os_id.raw    = ctxt.guest_os_id;
+    d->arch.hvm_domain.viridian.reference_tsc.raw  = ctxt.reference_tsc;
+
+    if ( d->arch.hvm_domain.viridian.reference_tsc.fields.enabled )
+        update_reference_tsc(d, 0);
 
     return 0;
 }
