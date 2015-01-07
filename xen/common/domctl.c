@@ -534,8 +534,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         unsigned int domcr_flags;
 
         ret = -EINVAL;
-        if ( supervisor_mode_kernel ||
-             (op->u.createdomain.flags &
+        if ( (op->u.createdomain.flags &
              ~(XEN_DOMCTL_CDF_hvm_guest
                | XEN_DOMCTL_CDF_pvh_guest
                | XEN_DOMCTL_CDF_hap

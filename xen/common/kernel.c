@@ -308,8 +308,6 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
                 fi.submap |= 
                     (1U << XENFEAT_writable_page_tables) |
                     (1U << XENFEAT_auto_translated_physmap);
-            if ( supervisor_mode_kernel )
-                fi.submap |= 1U << XENFEAT_supervisor_mode_kernel;
             if ( is_hardware_domain(current->domain) )
                 fi.submap |= 1U << XENFEAT_dom0;
 #ifdef CONFIG_X86

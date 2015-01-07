@@ -196,8 +196,6 @@ extern unsigned long xenheap_phys_end;
 extern unsigned long frametable_virt_end;
 #endif
 
-#define supervisor_mode_kernel (0)
-
 #define watchdog_disable() ((void)0)
 #define watchdog_enable()  ((void)0)
 

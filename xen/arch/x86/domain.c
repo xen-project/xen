@@ -1726,9 +1726,6 @@ unsigned long hypercall_create_continuation(
         }
         else
         {
-            if ( supervisor_mode_kernel )
-                regs->eip &= ~31; /* re-execute entire hypercall entry stub */
-
             for ( i = 0; *p != '\0'; i++ )
             {
                 arg = next_arg(p, args);

@@ -1410,24 +1410,12 @@ int __init construct_dom0(
             paging_update_paging_modes(v);
     }
 
-    if ( supervisor_mode_kernel )
-    {
-        v->arch.pv_vcpu.kernel_ss &= ~3;
-        v->arch.user_regs.ss &= ~3;
-        v->arch.user_regs.es &= ~3;
-        v->arch.user_regs.ds &= ~3;
-        v->arch.user_regs.fs &= ~3;
-        v->arch.user_regs.gs &= ~3;
-        printk("Dom0 runs in ring 0 (supervisor mode)\n");
-        if ( !test_bit(XENFEAT_supervisor_mode_kernel,
-                       parms.f_supported) )
-            panic("Dom0 does not support supervisor-mode execution");
-    }
-    else
-    {
-        if ( test_bit(XENFEAT_supervisor_mode_kernel, parms.f_required) )
-            panic("Dom0 requires supervisor-mode execution");
-    }
+    /*
+     * PVH Fixme: XENFEAT_supervisor_mode_kernel has been reused in PVH with a
+     * different meaning.
+     */
+    if ( test_bit(XENFEAT_supervisor_mode_kernel, parms.f_required) )
+        panic("Dom0 requires supervisor-mode execution");
 
     rc = 0;
 
