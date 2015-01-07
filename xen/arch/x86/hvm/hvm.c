@@ -4188,6 +4188,10 @@ void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
          * foreign pages) has valid IOMMU entries.
          */
         *eax |= XEN_HVM_CPUID_IOMMU_MAPPINGS;
+
+        /* Indicate presence of vcpu id and set it in ebx */
+        *eax |= XEN_HVM_CPUID_VCPU_ID_PRESENT;
+        *ebx = current->vcpu_id;
     }
 }
 
