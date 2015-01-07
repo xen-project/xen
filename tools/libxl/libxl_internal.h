@@ -3524,7 +3524,7 @@ int libxl__cpuid_policy_is_empty(libxl_cpuid_policy_list *pl);
 
 /* Portability note: a proper flock(2) implementation is required */
 typedef struct {
-    libxl__carefd *lock_carefd;
+    libxl__carefd *carefd;
     char *path; /* path of the lock file itself */
 } libxl__domain_userdata_lock;
 libxl__domain_userdata_lock *libxl__lock_domain_userdata(libxl__gc *gc,

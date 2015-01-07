@@ -405,7 +405,7 @@ libxl__domain_userdata_lock *libxl__lock_domain_userdata(libxl__gc *gc,
         fd = open(lockfile, O_RDWR|O_CREAT, 0666);
         if (fd < 0)
             LOGE(ERROR, "cannot open lockfile %s, errno=%d", lockfile, errno);
-        lock->lock_carefd = libxl__carefd_opened(CTX, fd);
+        lock->carefd = libxl__carefd_opened(CTX, fd);
         if (fd < 0) goto out;
 
         /* Lock the file in exclusive mode, wait indefinitely to
@@ -440,7 +440,7 @@ libxl__domain_userdata_lock *libxl__lock_domain_userdata(libxl__gc *gc,
                 break;
         }
 
-        libxl__carefd_close(lock->lock_carefd);
+        libxl__carefd_close(lock->carefd);
     }
 
     /* Check the domain is still there, if not we should release the
@@ -459,7 +459,7 @@ out:
 void libxl__unlock_domain_userdata(libxl__domain_userdata_lock *lock)
 {
     if (lock->path) unlink(lock->path);
-    if (lock->lock_carefd) libxl__carefd_close(lock->lock_carefd);
+    if (lock->carefd) libxl__carefd_close(lock->carefd);
     free(lock->path);
     free(lock);
 }
