@@ -818,8 +818,6 @@ static void core2_vpmu_destroy(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct core2_vpmu_context *core2_vpmu_cxt = vpmu->context;
 
-    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
-        return;
     xfree(core2_vpmu_cxt->pmu_enable);
     xfree(vpmu->context);
     if ( cpu_has_vmx_msr_bitmap )
