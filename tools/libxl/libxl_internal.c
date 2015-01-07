@@ -458,6 +458,20 @@ out:
 
 void libxl__unlock_domain_userdata(libxl__domain_userdata_lock *lock)
 {
+    /* It's important to unlink the file before closing fd to avoid
+     * the following race (if close before unlink):
+     *
+     *   P1 LOCK                         P2 UNLOCK
+     *   fd1 = open(lockfile)
+     *                                   close(fd2)
+     *   flock(fd1)
+     *   fstat and stat check success
+     *                                   unlink(lockfile)
+     *   return lock
+     *
+     * In above case P1 thinks it has got hold of the lock but
+     * actually lock is released by P2 (lockfile unlinked).
+     */
     if (lock->path) unlink(lock->path);
     if (lock->carefd) libxl__carefd_close(lock->carefd);
     free(lock->path);
