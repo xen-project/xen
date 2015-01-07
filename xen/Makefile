@@ -8,6 +8,9 @@ export XEN_FULLVERSION   = $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION)
 
 export XEN_WHOAMI	?= $(USER)
 export XEN_DOMAIN	?= $(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))
+export XEN_BUILD_DATE	?= $(shell LC_ALL=C date)
+export XEN_BUILD_TIME	?= $(shell LC_ALL=C date +%T)
+export XEN_BUILD_HOST	?= $(shell hostname)
 
 export BASEDIR := $(CURDIR)
 export XEN_ROOT := $(BASEDIR)/..
@@ -126,11 +129,11 @@ delete-unfresh-files:
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
 include/xen/compile.h: include/xen/compile.h.in .banner
-	@sed -e 's/@@date@@/$(shell LC_ALL=C date)/g' \
-	    -e 's/@@time@@/$(shell LC_ALL=C date +%T)/g' \
+	@sed -e 's/@@date@@/$(XEN_BUILD_DATE)/g' \
+	    -e 's/@@time@@/$(XEN_BUILD_TIME)/g' \
 	    -e 's/@@whoami@@/$(XEN_WHOAMI)/g' \
 	    -e 's/@@domain@@/$(XEN_DOMAIN)/g' \
-	    -e 's/@@hostname@@/$(shell hostname)/g' \
+	    -e 's/@@hostname@@/$(XEN_BUILD_HOST)/g' \
 	    -e 's!@@compiler@@!$(shell $(CC) $(CFLAGS) --version 2>&1 | head -1)!g' \
 	    -e 's/@@version@@/$(XEN_VERSION)/g' \
 	    -e 's/@@subversion@@/$(XEN_SUBVERSION)/g' \
