@@ -81,6 +81,7 @@ typedef enum {
     HVMMEM_ram_rw,             /* Normal read/write guest RAM */
     HVMMEM_ram_ro,             /* Read-only; writes are discarded */
     HVMMEM_mmio_dm,            /* Reads and write go to the device model */
+    HVMMEM_mmio_write_dm       /* Read-only; writes go to the device model */
 } hvmmem_type_t;
 
 /* Following tools-only interfaces may change in future. */

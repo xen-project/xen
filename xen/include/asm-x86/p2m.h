@@ -72,6 +72,7 @@ typedef enum {
     p2m_ram_shared = 12,          /* Shared or sharable memory */
     p2m_ram_broken = 13,          /* Broken page, access cause domain crash */
     p2m_map_foreign  = 14,        /* ram pages from foreign domain */
+    p2m_mmio_write_dm = 15,       /* Read-only; writes go to the device model */
 } p2m_type_t;
 
 /* Modifiers to the query */
@@ -111,7 +112,8 @@ typedef unsigned int p2m_query_t;
 #define P2M_RO_TYPES (p2m_to_mask(p2m_ram_logdirty)     \
                       | p2m_to_mask(p2m_ram_ro)         \
                       | p2m_to_mask(p2m_grant_map_ro)   \
-                      | p2m_to_mask(p2m_ram_shared) )
+                      | p2m_to_mask(p2m_ram_shared)     \
+                      | p2m_to_mask(p2m_mmio_write_dm))
 
 /* Write-discard types, which should discard the write operations */
 #define P2M_DISCARD_WRITE_TYPES (p2m_to_mask(p2m_ram_ro)     \

@@ -136,6 +136,7 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type, p2m_acces
             entry->x = 0;
             break;
         case p2m_grant_map_ro:
+        case p2m_mmio_write_dm:
             entry->r = 1;
             entry->w = entry->x = 0;
             break;
