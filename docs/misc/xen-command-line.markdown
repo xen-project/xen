@@ -558,7 +558,7 @@ Pin dom0 vcpus to their respective pcpus
 Flag that makes a 64bit dom0 boot in PVH mode. No 32bit support at present.
 
 ### dtuart (ARM)
-> `= path [,options]`
+> `= path [:options]`
 
 > Default: `""`
 

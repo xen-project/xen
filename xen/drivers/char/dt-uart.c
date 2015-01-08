@@ -25,13 +25,13 @@
 
 /*
  * Configure UART port with a string:
- * path,options
+ * path:options
  *
  * @path: full path used in the device tree for the UART. If the path
  * doesn't start with '/', we assuming that it's an alias.
  * @options: UART speficic options (see in each UART driver)
  */
-static char __initdata opt_dtuart[30] = "";
+static char __initdata opt_dtuart[256] = "";
 string_param("dtuart", opt_dtuart);
 
 void __init dt_uart_init(void)
@@ -50,7 +50,7 @@ void __init dt_uart_init(void)
         return;
     }
 
-    options = strchr(opt_dtuart, ',');
+    options = strchr(opt_dtuart, ':');
     if ( options != NULL )
         *(options++) = '\0';
     else
