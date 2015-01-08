@@ -70,3 +70,13 @@ void __init dt_uart_init(void)
     if ( ret )
         printk("Unable to initialize serial: %d\n", ret);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
