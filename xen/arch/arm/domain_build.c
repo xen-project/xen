@@ -424,6 +424,7 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
          *   bootargs (from module #1, above).
          * * remove bootargs,  xen,dom0-bootargs, xen,xen-bootargs,
          *   linux,initrd-start and linux,initrd-end.
+         * * remove stdout-path.
          * * remove bootargs, linux,uefi-system-table,
          *   linux,uefi-mmap-start, linux,uefi-mmap-size,
          *   linux,uefi-mmap-desc-size, and linux,uefi-mmap-desc-ver
@@ -434,6 +435,7 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
             if ( dt_property_name_is_equal(prop, "xen,xen-bootargs") ||
                  dt_property_name_is_equal(prop, "linux,initrd-start") ||
                  dt_property_name_is_equal(prop, "linux,initrd-end") ||
+                 dt_property_name_is_equal(prop, "stdout-path") ||
                  dt_property_name_is_equal(prop, "linux,uefi-system-table") ||
                  dt_property_name_is_equal(prop, "linux,uefi-mmap-start") ||
                  dt_property_name_is_equal(prop, "linux,uefi-mmap-size") ||

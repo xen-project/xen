@@ -22,6 +22,7 @@
 #include <xen/console.h>
 #include <xen/device_tree.h>
 #include <xen/serial.h>
+#include <xen/errno.h>
 
 /*
  * Configure UART port with a string:
@@ -43,6 +44,27 @@ void __init dt_uart_init(void)
 
     if ( !console_has("dtuart") )
         return; /* Not for us */
+
+    if ( !strcmp(opt_dtuart, "") )
+    {
+        const struct dt_device_node *chosen = dt_find_node_by_path("/chosen");
+
+        if ( chosen )
+        {
+            const char *stdout;
+
+            ret = dt_property_read_string(chosen, "stdout-path", &stdout);
+            if ( ret >= 0 )
+            {
+                printk("Taking dtuart configuration from /chosen/stdout-path\n");
+                if ( strlcpy(opt_dtuart, stdout, sizeof(opt_dtuart))
+                     >= sizeof(opt_dtuart) )
+                    printk("WARNING: /chosen/stdout-path too long, truncated\n");
+            }
+            else if ( ret != -EINVAL /* Not present */ )
+                printk("Failed to read /chosen/stdout-path (%d)\n", ret);
+        }
+    }
 
     if ( !strcmp(opt_dtuart, "") )
     {
