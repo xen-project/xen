@@ -332,6 +332,8 @@ int libxl__device_physdisk_major_minor(const char *physpath, int *major, int *mi
     struct stat buf;
     if (stat(physpath, &buf) < 0)
         return -1;
+    if (!S_ISBLK(buf.st_mode))
+        return -1;
     *major = major(buf.st_rdev);
     *minor = minor(buf.st_rdev);
     return 0;

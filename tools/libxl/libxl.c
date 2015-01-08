@@ -2416,9 +2416,9 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                 if (!disk->script &&
                     disk->backend_domid == LIBXL_TOOLSTACK_DOMID) {
                     int major, minor;
-                    libxl__device_physdisk_major_minor(dev, &major, &minor);
-                    flexarray_append_pair(back, "physical-device",
-                            libxl__sprintf(gc, "%x:%x", major, minor));
+                    if (!libxl__device_physdisk_major_minor(dev, &major, &minor))
+                        flexarray_append_pair(back, "physical-device",
+                                              libxl__sprintf(gc, "%x:%x", major, minor));
                 }
 
                 assert(device->backend_kind == LIBXL__DEVICE_KIND_VBD);
