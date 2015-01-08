@@ -432,8 +432,7 @@ def libxl_C_type_parse_json(ty, w, v, indent = "    ", parent = None, discrimina
         for f in [f for f in ty.fields if not f.const and not f.type.private]:
             saved_var_name = "saved_%s" % f.name
             s += "{\n"
-            s += "    const libxl__json_object *%s = NULL;\n" % saved_var_name
-            s += "    %s = x;\n" % saved_var_name
+            s += "    const libxl__json_object *%s = x;\n" % saved_var_name
             if isinstance(f.type, idl.KeyedUnion):
                 for x in f.type.fields:
                     s += "    x = libxl__json_map_get(\"%s\", %s, JSON_MAP);\n" % \
