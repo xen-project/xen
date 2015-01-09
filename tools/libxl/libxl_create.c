@@ -1167,6 +1167,7 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
                  "failed give dom%d access to ioports %"PRIx32"-%"PRIx32,
                  domid, io->first, io->first + io->number - 1);
             ret = ERROR_FAIL;
+            goto error_out;
         }
     }
 
@@ -1182,6 +1183,7 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         if (ret < 0) {
             LOGE(ERROR, "failed give dom%d access to irq %d", domid, irq);
             ret = ERROR_FAIL;
+            goto error_out;
         }
     }
 
@@ -1198,7 +1200,7 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
                  "failed give dom%d access to iomem range %"PRIx64"-%"PRIx64,
                  domid, io->start, io->start + io->number - 1);
             ret = ERROR_FAIL;
-            continue;
+            goto error_out;
         }
         ret = xc_domain_memory_mapping(CTX->xch, domid,
                                        io->gfn, io->start,
@@ -1209,6 +1211,7 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
                  " to guest address %"PRIx64,
                  domid, io->start, io->start + io->number - 1, io->gfn);
             ret = ERROR_FAIL;
+            goto error_out;
         }
     }
 
