@@ -46,11 +46,9 @@
 
 static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq);
 
-static unsigned long vioapic_read_indirect(struct hvm_hw_vioapic *vioapic,
-                                           unsigned long addr,
-                                           unsigned long length)
+static uint32_t vioapic_read_indirect(const struct hvm_hw_vioapic *vioapic)
 {
-    unsigned long result = 0;
+    uint32_t result = 0;
 
     switch ( vioapic->ioregsel )
     {
@@ -77,9 +75,8 @@ static unsigned long vioapic_read_indirect(struct hvm_hw_vioapic *vioapic,
         }
 
         redir_content = vioapic->redirtbl[redir_index].bits;
-        result = (vioapic->ioregsel & 0x1)?
-            (redir_content >> 32) & 0xffffffff :
-            redir_content & 0xffffffff;
+        result = (vioapic->ioregsel & 1) ? (redir_content >> 32)
+                                         : redir_content;
         break;
     }
     }
@@ -91,21 +88,19 @@ static int vioapic_read(
     struct vcpu *v, unsigned long addr,
     unsigned long length, unsigned long *pval)
 {
-    struct hvm_hw_vioapic *vioapic = domain_vioapic(v->domain);
+    const struct hvm_hw_vioapic *vioapic = domain_vioapic(v->domain);
     uint32_t result;
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "addr %lx", addr);
 
-    addr &= 0xff;
-
-    switch ( addr )
+    switch ( addr & 0xff )
     {
     case VIOAPIC_REG_SELECT:
         result = vioapic->ioregsel;
         break;
 
     case VIOAPIC_REG_WINDOW:
-        result = vioapic_read_indirect(vioapic, addr, length);
+        result = vioapic_read_indirect(vioapic);
         break;
 
     default:
@@ -169,7 +164,7 @@ static void vioapic_write_redirent(
 }
 
 static void vioapic_write_indirect(
-    struct hvm_hw_vioapic *vioapic, unsigned long length, unsigned long val)
+    struct hvm_hw_vioapic *vioapic, uint32_t val)
 {
     switch ( vioapic->ioregsel )
     {
@@ -188,8 +183,8 @@ static void vioapic_write_indirect(
     {
         uint32_t redir_index = (vioapic->ioregsel - 0x10) >> 1;
 
-        HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "change redir index %x val %lx",
-                    redir_index, val);
+        HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "rte[%02x].%s = %08x",
+                    redir_index, vioapic->ioregsel & 1 ? "hi" : "lo", val);
 
         if ( redir_index >= VIOAPIC_NUM_PINS )
         {
@@ -211,16 +206,14 @@ static int vioapic_write(
 {
     struct hvm_hw_vioapic *vioapic = domain_vioapic(v->domain);
 
-    addr &= 0xff;
-
-    switch ( addr )
+    switch ( addr & 0xff )
     {
     case VIOAPIC_REG_SELECT:
         vioapic->ioregsel = val;
         break;
 
     case VIOAPIC_REG_WINDOW:
-        vioapic_write_indirect(vioapic, length, val);
+        vioapic_write_indirect(vioapic, val);
         break;
 
 #if VIOAPIC_VERSION_ID >= 0x20
