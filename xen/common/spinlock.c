@@ -162,7 +162,7 @@ unsigned long _spin_lock_irqsave(spinlock_t *lock)
         local_irq_restore(flags);
         while ( likely(_raw_spin_is_locked(&lock->raw)) )
             cpu_relax();
-        local_irq_save(flags);
+        local_irq_disable();
     }
     LOCK_PROFILE_GOT;
     preempt_disable();
@@ -313,7 +313,7 @@ unsigned long _read_lock_irqsave(rwlock_t *lock)
             local_irq_restore(flags);
             while ( (x = lock->lock) & RW_WRITE_FLAG )
                 cpu_relax();
-            local_irq_save(flags);
+            local_irq_disable();
         }
     } while ( cmpxchg(&lock->lock, x, x+1) != x );
     preempt_disable();
@@ -409,7 +409,7 @@ unsigned long _write_lock_irqsave(rwlock_t *lock)
             local_irq_restore(flags);
             while ( (x = lock->lock) & RW_WRITE_FLAG )
                 cpu_relax();
-            local_irq_save(flags);
+            local_irq_disable();
         }
     } while ( cmpxchg(&lock->lock, x, x|RW_WRITE_FLAG) != x );
     while ( x != 0 )
