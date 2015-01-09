@@ -153,9 +153,9 @@ struct msixtbl_entry
     /* TODO: resolve the potential race by destruction of pdev */
     struct pci_dev *pdev;
     unsigned long gtable;       /* gpa of msix table */
-    unsigned long table_len;
     unsigned long table_flags[BITS_TO_LONGS(MAX_MSIX_TABLE_ENTRIES)];
 #define MAX_MSIX_ACC_ENTRIES 3
+    unsigned int table_len;
     struct { 
         uint32_t msi_ad[3];	/* Shadow of address low, high and data */
     } gentries[MAX_MSIX_ACC_ENTRIES];
@@ -380,16 +380,11 @@ static void add_msixtbl_entry(struct domain *d,
                               uint64_t gtable,
                               struct msixtbl_entry *entry)
 {
-    u32 len;
-
-    memset(entry, 0, sizeof(struct msixtbl_entry));
-        
     INIT_LIST_HEAD(&entry->list);
     INIT_RCU_HEAD(&entry->rcu);
     atomic_set(&entry->refcnt, 0);
 
-    len = pci_msix_get_table_len(pdev);
-    entry->table_len = len;
+    entry->table_len = pci_msix_get_table_len(pdev);
     entry->pdev = pdev;
     entry->gtable = (unsigned long) gtable;
 
@@ -426,7 +421,7 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
      * xmalloc() with irq_disabled causes the failure of check_lock() 
      * for xenpool->lock. So we allocate an entry beforehand.
      */
-    new_entry = xmalloc(struct msixtbl_entry);
+    new_entry = xzalloc(struct msixtbl_entry);
     if ( !new_entry )
         return -ENOMEM;
 
