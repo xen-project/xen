@@ -152,12 +152,12 @@ void vmx_save_host_msrs(void)
         rdmsrl(msr_index[i], host_msr_state->msrs[i]);
 }
 
-#define WRITE_MSR(address)                                              \
+#define WRITE_MSR(address) do {                                         \
         guest_msr_state->msrs[VMX_INDEX_MSR_ ## address] = msr_content; \
         set_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags);    \
         wrmsrl(MSR_ ## address, msr_content);                           \
         set_bit(VMX_INDEX_MSR_ ## address, &host_msr_state->flags);     \
-        break
+    } while ( 0 )
 
 static enum handler_return
 long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
@@ -232,11 +232,13 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 
     case MSR_STAR:
         WRITE_MSR(STAR);
+        break;
 
     case MSR_LSTAR:
         if ( !is_canonical_address(msr_content) )
             goto uncanonical_address;
         WRITE_MSR(LSTAR);
+        break;
 
     case MSR_CSTAR:
         if ( !is_canonical_address(msr_content) )
@@ -246,6 +248,7 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 
     case MSR_SYSCALL_MASK:
         WRITE_MSR(SYSCALL_MASK);
+        break;
 
     default:
         return HNDL_unhandled;
