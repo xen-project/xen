@@ -109,7 +109,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
 
            Method (_CRS, 0, NotSerialized)
            {
-               Name (PRT0, ResourceTemplate ()
+               Store (ResourceTemplate ()
                {
                    /* bus number is from 0 - 255*/
                    WordBusNumber(
@@ -167,11 +167,11 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                         0x0000000000000010,
                         ,, _Y02)
 
-                })
+                }, Local1)
 
-                CreateDWordField(PRT0, \_SB.PCI0._CRS._Y01._MIN, MMIN)
-                CreateDWordField(PRT0, \_SB.PCI0._CRS._Y01._MAX, MMAX)
-                CreateDWordField(PRT0, \_SB.PCI0._CRS._Y01._LEN, MLEN)
+                CreateDWordField(Local1, \_SB.PCI0._CRS._Y01._MIN, MMIN)
+                CreateDWordField(Local1, \_SB.PCI0._CRS._Y01._MAX, MMAX)
+                CreateDWordField(Local1, \_SB.PCI0._CRS._Y01._LEN, MLEN)
 
                 Store(\_SB.PMIN, MMIN)
                 Store(\_SB.PLEN, MLEN)
@@ -192,12 +192,12 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                 } Else {
                     Store(\_SB.PCI0._CRS._Y02, Local0)
                 }
-                CreateDWordField(PRT0, Add(Local0, 14), MINL)
-                CreateDWordField(PRT0, Add(Local0, 18), MINH)
-                CreateDWordField(PRT0, Add(Local0, 22), MAXL)
-                CreateDWordField(PRT0, Add(Local0, 26), MAXH)
-                CreateDWordField(PRT0, Add(Local0, 38), LENL)
-                CreateDWordField(PRT0, Add(Local0, 42), LENH)
+                CreateDWordField(Local1, Add(Local0, 14), MINL)
+                CreateDWordField(Local1, Add(Local0, 18), MINH)
+                CreateDWordField(Local1, Add(Local0, 22), MAXL)
+                CreateDWordField(Local1, Add(Local0, 26), MAXH)
+                CreateDWordField(Local1, Add(Local0, 38), LENL)
+                CreateDWordField(Local1, Add(Local0, 42), LENH)
 
                 Store(\_SB.LMIN, MINL)
                 Store(\_SB.HMIN, MINH)
@@ -215,7 +215,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                     Subtract(MAXL, One, MAXL)
                 }
 
-                Return (PRT0)
+                Return (Local1)
             }
 
             Device(HPET) {
