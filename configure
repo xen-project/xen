@@ -604,6 +604,7 @@ SHAREDIR
 XEN_LIB_STORED
 XEN_LOG_DIR
 XEN_RUN_DIR
+XENFIRMWAREDIR
 LIBEXEC_BIN
 CONFIG_LEAF_DIR
 host_os
@@ -1928,6 +1929,9 @@ if test "$libexecdir" = '${exec_prefix}/libexec' ; then
 fi
 libexecdir=`eval echo $libexecdir`
 LIBEXEC_BIN=`eval echo $libexecdir/$PACKAGE_TARNAME/bin`
+
+
+XENFIRMWAREDIR=`eval echo $libexecdir/$PACKAGE_TARNAME/boot`
 
 
 XEN_RUN_DIR=$localstatedir/run/xen

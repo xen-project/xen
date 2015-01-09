@@ -143,13 +143,15 @@ $(XEN_INIT_DOM0_OBJS): CFLAGS += $(CFLAGS_libxenstore)
 SAVE_HELPER_OBJS = libxl_save_helper.o _libxl_save_msgs_helper.o
 $(SAVE_HELPER_OBJS): CFLAGS += $(CFLAGS_libxenctrl)
 
+PKG_CONFIG = xenlight.pc
+
 testidl.o: CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenlight)
 testidl.c: libxl_types.idl gentest.py libxl.h $(AUTOINCS)
 	$(PYTHON) gentest.py libxl_types.idl testidl.c.new
 	mv testidl.c.new testidl.c
 
 .PHONY: all
-all: $(CLIENTS) $(TEST_PROGS) \
+all: $(CLIENTS) $(TEST_PROGS) $(PKG_CONFIG) \
 		libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
 	$(AUTOSRCS) $(AUTOINCS)
 
@@ -248,6 +250,10 @@ libxl-save-helper: $(SAVE_HELPER_OBJS) libxenlight.so
 testidl: testidl.o libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ testidl.o libxlutil.so $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
+xenlight.pc: xenlight.pc.in Makefile
+	@sed -e 's/@@version@@/$(MAJOR).$(MINOR)/g' < xenlight.pc.in > $@.new
+	@mv -f $@.new $@
+
 .PHONY: install
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
@@ -255,6 +261,7 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(BASH_COMPLETION_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
+	$(INSTALL_DIR) $(DESTDIR)$(SHAREDIR)/pkgconfig
 	$(INSTALL_PROG) xl $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PROG) xen-init-dom0 $(DESTDIR)$(LIBEXEC_BIN)
 	$(INSTALL_PROG) libxl-save-helper $(DESTDIR)$(LIBEXEC_BIN)
@@ -268,12 +275,14 @@ install: all
 	$(INSTALL_DATA) libxlutil.a $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libxl.h libxl_event.h libxl_json.h _libxl_types.h _libxl_types_json.h _libxl_list.h libxl_utils.h libxl_uuid.h libxlutil.h $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DATA) bash-completion $(DESTDIR)$(BASH_COMPLETION_DIR)/xl.sh
+	$(INSTALL_DATA) xenlight.pc $(DESTDIR)$(SHAREDIR)/pkgconfig/
 
 .PHONY: clean
 clean:
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
 	$(RM) -f _*.c *.pyc _paths.*.tmp _*.api-for-check
 	$(RM) -f testidl.c.new testidl.c *.api-ok
+	$(RM) -f xenlight.pc xenlight.pc.in
 
 distclean: clean
 

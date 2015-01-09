@@ -77,6 +77,9 @@ dnl This variable will be substituted in various .in files
 LIBEXEC_BIN=`eval echo $libexecdir/$PACKAGE_TARNAME/bin`
 AC_SUBST(LIBEXEC_BIN)
 
+XENFIRMWAREDIR=`eval echo $libexecdir/$PACKAGE_TARNAME/boot`
+AC_SUBST(XENFIRMWAREDIR)
+
 XEN_RUN_DIR=$localstatedir/run/xen
 AC_SUBST(XEN_RUN_DIR)
 

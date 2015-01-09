@@ -27,6 +27,7 @@ hotplug/Linux/xen-backend.rules
 hotplug/Linux/xen-hotplug-common.sh
 hotplug/Linux/xendomains
 hotplug/NetBSD/rc.d/xencommons
+libxl/xenlight.pc.in
 ])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([../])

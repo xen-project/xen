@@ -1,0 +1,11 @@
+prefix=@prefix@
+includedir=@includedir@
+libdir=@libdir@
+xenfirmwaredir=@XENFIRMWAREDIR@
+libexec_bin=@LIBEXEC_BIN@
+
+Name: Xenlight
+Description: The Xenlight library for Xen hypervisor
+Version: @@version@@
+Cflags: -I${includedir}
+Libs: -L${libdir} -lxenlight
