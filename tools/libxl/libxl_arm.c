@@ -546,7 +546,7 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
     LOG(DEBUG, "  - vGIC version: %s", gicv_to_string(config.gic_version));
 
 /*
- * Call "call" handling FDR_ERR_*. Will either:
+ * Call "call" handling FDT_ERR_*. Will either:
  * - loop back to retry_resize
  * - set rc and goto out
  * - fall through successfully
