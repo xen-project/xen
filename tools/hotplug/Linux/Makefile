@@ -19,7 +19,6 @@ XEN_SCRIPTS += vif-setup
 XEN_SCRIPTS-$(CONFIG_REMUS_NETBUF) += remus-netbuf-setup
 XEN_SCRIPTS += block
 XEN_SCRIPTS += block-enbd block-nbd
-XEN_SCRIPTS-$(CONFIG_BLKTAP1) += blktap
 XEN_SCRIPTS += xen-hotplug-cleanup
 XEN_SCRIPTS += external-device-migrate
 XEN_SCRIPTS += vscsi

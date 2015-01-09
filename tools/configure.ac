@@ -89,7 +89,6 @@ AX_ARG_DEFAULT_ENABLE([xsmpolicy], [Disable XSM policy compilation])
 AX_ARG_DEFAULT_DISABLE([ovmf], [Enable OVMF])
 AX_ARG_DEFAULT_ENABLE([seabios], [Disable SeaBIOS])
 AX_ARG_DEFAULT_ENABLE([debug], [Disable debug build of tools])
-AX_ARG_DEFAULT_DISABLE([blktap1], [Enable blktap1 tools])
 
 AC_ARG_WITH([linux-backend-modules],
     AS_HELP_STRING([--with-linux-backend-modules="mod1 mod2"],
@@ -113,7 +112,6 @@ usbbk
 pciback
 xen-acpi-processor
 blktap2
-blktap
 "
 ;;
 *)
@@ -338,7 +336,7 @@ AC_CHECK_HEADER([lzo/lzo1x.h], [
 AC_CHECK_LIB([lzo2], [lzo1x_decompress], [zlib="$zlib -DHAVE_LZO1X -llzo2"])
 ])
 AC_SUBST(zlib)
-AS_IF([test "x$enable_blktap1" = "xyes" || test "x$enable_blktap2" = "xyes"], [
+AS_IF(test "x$enable_blktap2" = "xyes"], [
 AC_CHECK_LIB([aio], [io_setup], [], [AC_MSG_ERROR([Could not find libaio])])
 ])
 AC_SUBST(system_aio)

@@ -16,7 +16,6 @@ SUBDIRS-y += console
 SUBDIRS-y += xenmon
 SUBDIRS-y += xenstat
 SUBDIRS-$(CONFIG_Linux) += memshr 
-SUBDIRS-$(CONFIG_BLKTAP1) += blktap
 SUBDIRS-$(CONFIG_BLKTAP2) += blktap2
 SUBDIRS-$(CONFIG_NetBSD) += xenbackendd
 SUBDIRS-y += libfsimage
@@ -169,6 +168,7 @@ subdir-all-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
 subdir-install-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
 	set -e; \
 		$(buildmakevars2shellvars); \
+		export CONFIG_BLKTAP1=n; \
 		cd qemu-xen-traditional-dir; \
 		$(QEMU_ROOT)/xen-setup \
 		--extra-cflags="$(EXTRA_CFLAGS_QEMU_TRADITIONAL)" \

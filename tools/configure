@@ -700,7 +700,6 @@ rombios
 qemu_traditional
 blktap2
 LINUX_BACKEND_MODULES
-blktap1
 debug
 seabios
 ovmf
@@ -790,7 +789,6 @@ enable_xsmpolicy
 enable_ovmf
 enable_seabios
 enable_debug
-enable_blktap1
 with_linux_backend_modules
 enable_blktap2
 enable_qemu_traditional
@@ -1463,7 +1461,6 @@ Optional Features:
   --enable-ovmf           Enable OVMF (default is DISABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
   --disable-debug         Disable debug build of tools (default is ENABLED)
-  --enable-blktap1        Enable blktap1 tools (default is DISABLED)
   --enable-blktap2        Enable blktap2, (DEFAULT is on for Linux, otherwise
                           off)
   --enable-qemu-traditional
@@ -3991,29 +3988,6 @@ debug=$ax_cv_debug
 
 
 
-# Check whether --enable-blktap1 was given.
-if test "${enable_blktap1+set}" = set; then :
-  enableval=$enable_blktap1;
-fi
-
-
-if test "x$enable_blktap1" = "xno"; then :
-
-    ax_cv_blktap1="n"
-
-elif test "x$enable_blktap1" = "xyes"; then :
-
-    ax_cv_blktap1="y"
-
-elif test -z $ax_cv_blktap1; then :
-
-    ax_cv_blktap1="n"
-
-fi
-blktap1=$ax_cv_blktap1
-
-
-
 
 # Check whether --with-linux-backend-modules was given.
 if test "${with_linux_backend_modules+set}" = set; then :
@@ -4037,7 +4011,6 @@ usbbk
 pciback
 xen-acpi-processor
 blktap2
-blktap
 "
 ;;
 *)
@@ -7935,7 +7908,7 @@ fi
 
 
 
-if test "x$enable_blktap1" = "xyes" || test "x$enable_blktap2" = "xyes"; then :
+if test "x$enable_blktap2" = "xyes"]; then :
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for io_setup in -laio" >&5
 $as_echo_n "checking for io_setup in -laio... " >&6; }
