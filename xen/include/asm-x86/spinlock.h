@@ -31,4 +31,7 @@ static always_inline int _raw_spin_trylock(raw_spinlock_t *lock)
     return (oldval > 0);
 }
 
+#define _raw_read_unlock(l) \
+    asm volatile ( "lock; dec%z0 %0" : "+m" ((l)->lock) :: "memory" )
+
 #endif /* __ASM_SPINLOCK_H */

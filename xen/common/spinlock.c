@@ -333,14 +333,18 @@ int _read_trylock(rwlock_t *lock)
     return 1;
 }
 
-void _read_unlock(rwlock_t *lock)
-{
-    uint32_t x, y;
+#ifndef _raw_read_unlock
+# define _raw_read_unlock(l) do {                      \
+    uint32_t x = (l)->lock, y;                         \
+    while ( (y = cmpxchg(&(l)->lock, x, x - 1)) != x ) \
+        x = y;                                         \
+} while (0)
+#endif
 
+inline void _read_unlock(rwlock_t *lock)
+{
     preempt_enable();
-    x = lock->lock;
-    while ( (y = cmpxchg(&lock->lock, x, x-1)) != x )
-        x = y;
+    _raw_read_unlock(lock);
 }
 
 void _read_unlock_irq(rwlock_t *lock)
