@@ -12,6 +12,28 @@
 #include <public/xen.h>
 #include <asm/page.h>
 
+/*
+ * Xen's cpu stacks are 8 pages (8-page aligned), arranged as:
+ *
+ * 7 - Primary stack (with a struct cpu_info at the top)
+ * 6 - Primary stack
+ * 5 - Optionally not preset (MEMORY_GUARD)
+ * 4 - unused
+ * 3 - Syscall trampolines
+ * 2 - MCE IST stack
+ * 1 - NMI IST stack
+ * 0 - Double Fault IST stack
+ */
+
+/*
+ * Identify which stack page the stack pointer is on.  Returns an index
+ * as per the comment above.
+ */
+static inline unsigned int get_stack_page(unsigned long sp)
+{
+    return (sp & (STACK_SIZE-1)) >> PAGE_SHIFT;
+}
+
 struct vcpu;
 
 struct cpu_info {
@@ -51,13 +73,12 @@ static inline struct cpu_info *get_cpu_info(void)
     ((unsigned long)&get_cpu_info()->guest_cpu_user_regs.es)
 
 /*
- * Get the bottom-of-stack, as useful for printing stack traces.  This is the
- * highest word on the stack which might be part of a stack trace, and is the
- * adjacent word to a struct cpu_info on the stack.
+ * Get the reasonable stack bounds for stack traces and stack dumps.  Stack
+ * dumps have a slightly larger range to include exception frames in the
+ * printed information.  The returned word is inside the interesting range.
  */
-#define get_printable_stack_bottom(sp)          \
-    ((sp & (~(STACK_SIZE-1))) +                 \
-     (STACK_SIZE - sizeof(struct cpu_info) - sizeof(unsigned long)))
+unsigned long get_stack_trace_bottom(unsigned long sp);
+unsigned long get_stack_dump_bottom (unsigned long sp);
 
 #define reset_stack_and_jump(__fn)                                      \
     ({                                                                  \

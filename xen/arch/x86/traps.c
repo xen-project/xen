@@ -193,6 +193,70 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
     printk("\n");
 }
 
+/*
+ * Notes for get_stack_trace_bottom() and get_stack_dump_bottom()
+ *
+ * Stack pages 0, 1 and 2:
+ *   These are all 1-page IST stacks.  Each of these stacks have an exception
+ *   frame and saved register state at the top.  The interesting bound for a
+ *   trace is the word adjacent to this, while the bound for a dump is the
+ *   very top, including the exception frame.
+ *
+ * Stack pages 3, 4 and 5:
+ *   None of these are particularly interesting.  With MEMORY_GUARD, page 5 is
+ *   explicitly not present, so attempting to dump or trace it is
+ *   counterproductive.  Without MEMORY_GUARD, it is possible for a call chain
+ *   to use the entire primary stack and wander into page 5.  In this case,
+ *   consider these pages an extension of the primary stack to aid debugging
+ *   hopefully rare situations where the primary stack has effective been
+ *   overflown.
+ *
+ * Stack pages 6 and 7:
+ *   These form the primary stack, and have a cpu_info at the top.  For a
+ *   trace, the interesting bound is adjacent to the cpu_info, while for a
+ *   dump, the entire cpu_info is interesting.
+ *
+ * For the cases where the stack should not be inspected, pretend that the
+ * passed stack pointer is already out of reasonable bounds.
+ */
+unsigned long get_stack_trace_bottom(unsigned long sp)
+{
+    switch ( get_stack_page(sp) )
+    {
+    case 0 ... 2:
+        return ROUNDUP(sp, PAGE_SIZE) -
+            offsetof(struct cpu_user_regs, es) - sizeof(unsigned long);
+
+#ifndef MEMORY_GUARD
+    case 3 ... 5:
+#endif
+    case 6 ... 7:
+        return ROUNDUP(sp, STACK_SIZE) -
+            sizeof(struct cpu_info) - sizeof(unsigned long);
+
+    default:
+        return sp - sizeof(unsigned long);
+    }
+}
+
+unsigned long get_stack_dump_bottom(unsigned long sp)
+{
+    switch ( get_stack_page(sp) )
+    {
+    case 0 ... 2:
+        return ROUNDUP(sp, PAGE_SIZE) - sizeof(unsigned long);
+
+#ifndef MEMORY_GUARD
+    case 3 ... 5:
+#endif
+    case 6 ... 7:
+        return ROUNDUP(sp, STACK_SIZE) - sizeof(unsigned long);
+
+    default:
+        return sp - sizeof(unsigned long);
+    }
+}
+
 #if !defined(CONFIG_FRAME_POINTER)
 
 /*
@@ -203,7 +267,7 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
 static void _show_trace(unsigned long sp, unsigned long __maybe_unused bp)
 {
     unsigned long *stack = (unsigned long *)sp, addr;
-    unsigned long *bottom = (unsigned long *)get_printable_stack_bottom(sp);
+    unsigned long *bottom = (unsigned long *)get_stack_trace_bottom(sp);
 
     while ( stack <= bottom )
     {
@@ -221,7 +285,7 @@ static void _show_trace(unsigned long sp, unsigned long bp)
     unsigned long *frame, next, addr;
 
     /* Bounds for range of valid frame pointer. */
-    unsigned long low = sp, high = get_printable_stack_bottom(sp);
+    unsigned long low = sp, high = get_stack_trace_bottom(sp);
 
     /* The initial frame pointer. */
     next = bp;
@@ -292,7 +356,7 @@ static void show_trace(const struct cpu_user_regs *regs)
 
 void show_stack(const struct cpu_user_regs *regs)
 {
-    unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), addr;
+    unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), *stack_bottom, addr;
     int i;
 
     if ( guest_mode(regs) )
@@ -300,10 +364,11 @@ void show_stack(const struct cpu_user_regs *regs)
 
     printk("Xen stack trace from "__OP"sp=%p:\n  ", stack);
 
-    for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
+    stack_bottom = _p(get_stack_dump_bottom(regs->rsp));
+
+    for ( i = 0; i < (debug_stack_lines*stack_words_per_line) &&
+              (stack <= stack_bottom); i++ )
     {
-        if ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) == 0 )
-            break;
         if ( (i != 0) && ((i % stack_words_per_line) == 0) )
             printk("\n  ");
         addr = *stack++;
