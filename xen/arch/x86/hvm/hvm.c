@@ -4818,6 +4818,8 @@ static hvm_hypercall_t *const pvh_hypercall64_table[NR_hypercalls] = {
     [ __HYPERVISOR_arch_1 ] = (hvm_hypercall_t *)paging_domctl_continuation
 };
 
+extern const uint8_t hypercall_args_table[], compat_hypercall_args_table[];
+
 int hvm_do_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
@@ -4856,36 +4858,95 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 
     if ( mode == 8 )
     {
+        unsigned long rdi = regs->rdi;
+        unsigned long rsi = regs->rsi;
+        unsigned long rdx = regs->rdx;
+        unsigned long r10 = regs->r10;
+        unsigned long r8 = regs->r8;
+        unsigned long r9 = regs->r9;
+
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%lx, %lx, %lx, %lx, %lx, %lx)",
-                    eax, regs->rdi, regs->rsi, regs->rdx,
-                    regs->r10, regs->r8, regs->r9);
+                    eax, rdi, rsi, rdx, r10, r8, r9);
+
+#ifndef NDEBUG
+        /* Deliberately corrupt parameter regs not used by this hypercall. */
+        switch ( hypercall_args_table[eax] )
+        {
+        case 0: rdi = 0xdeadbeefdeadf00dUL;
+        case 1: rsi = 0xdeadbeefdeadf00dUL;
+        case 2: rdx = 0xdeadbeefdeadf00dUL;
+        case 3: r10 = 0xdeadbeefdeadf00dUL;
+        case 4: r8 = 0xdeadbeefdeadf00dUL;
+        case 5: r9 = 0xdeadbeefdeadf00dUL;
+        }
+#endif
 
         curr->arch.hvm_vcpu.hcall_64bit = 1;
-        if ( is_pvh_vcpu(curr) )
-            regs->rax = pvh_hypercall64_table[eax](regs->rdi, regs->rsi,
-                                                   regs->rdx, regs->r10,
-                                                   regs->r8, regs->r9);
-        else
-            regs->rax = hvm_hypercall64_table[eax](regs->rdi, regs->rsi,
-                                                   regs->rdx, regs->r10,
-                                                   regs->r8, regs->r9);
+        regs->rax = (is_pvh_vcpu(curr)
+                     ? pvh_hypercall64_table
+                     : hvm_hypercall64_table)[eax](rdi, rsi, rdx, r10, r8, r9);
         curr->arch.hvm_vcpu.hcall_64bit = 0;
+
+#ifndef NDEBUG
+        if ( !curr->arch.hvm_vcpu.hcall_preempted )
+        {
+            /* Deliberately corrupt parameter regs used by this hypercall. */
+            switch ( hypercall_args_table[eax] )
+            {
+            case 6: regs->r9  = 0xdeadbeefdeadf00dUL;
+            case 5: regs->r8  = 0xdeadbeefdeadf00dUL;
+            case 4: regs->r10 = 0xdeadbeefdeadf00dUL;
+            case 3: regs->edx = 0xdeadbeefdeadf00dUL;
+            case 2: regs->esi = 0xdeadbeefdeadf00dUL;
+            case 1: regs->edi = 0xdeadbeefdeadf00dUL;
+            }
+        }
+#endif
     }
     else if ( unlikely(is_pvh_vcpu(curr)) )
         regs->_eax = -ENOSYS; /* PVH 32bitfixme. */
     else
     {
-        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%x, %x, %x, %x, %x, %x)", eax,
-                    (uint32_t)regs->ebx, (uint32_t)regs->ecx,
-                    (uint32_t)regs->edx, (uint32_t)regs->esi,
-                    (uint32_t)regs->edi, (uint32_t)regs->ebp);
+        unsigned int ebx = regs->_ebx;
+        unsigned int ecx = regs->_ecx;
+        unsigned int edx = regs->_edx;
+        unsigned int esi = regs->_esi;
+        unsigned int edi = regs->_edi;
+        unsigned int ebp = regs->_ebp;
 
-        regs->eax = hvm_hypercall32_table[eax]((uint32_t)regs->ebx,
-                                               (uint32_t)regs->ecx,
-                                               (uint32_t)regs->edx,
-                                               (uint32_t)regs->esi,
-                                               (uint32_t)regs->edi,
-                                               (uint32_t)regs->ebp);
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%x, %x, %x, %x, %x, %x)", eax,
+                    ebx, ecx, edx, esi, edi, ebp);
+
+#ifndef NDEBUG
+        /* Deliberately corrupt parameter regs not used by this hypercall. */
+        switch ( compat_hypercall_args_table[eax] )
+        {
+        case 0: ebx = 0xdeadf00d;
+        case 1: ecx = 0xdeadf00d;
+        case 2: edx = 0xdeadf00d;
+        case 3: esi = 0xdeadf00d;
+        case 4: edi = 0xdeadf00d;
+        case 5: ebp = 0xdeadf00d;
+        }
+#endif
+
+        regs->_eax = hvm_hypercall32_table[eax](ebx, ecx, edx, esi, edi, ebp);
+
+#ifndef NDEBUG
+        if ( !curr->arch.hvm_vcpu.hcall_preempted )
+        {
+            /* Deliberately corrupt parameter regs used by this hypercall. */
+            switch ( compat_hypercall_args_table[eax] )
+            {
+            case 6: regs->ebp = 0xdeadf00d;
+            case 5: regs->edi = 0xdeadf00d;
+            case 4: regs->esi = 0xdeadf00d;
+            case 3: regs->edx = 0xdeadf00d;
+            case 2: regs->ecx = 0xdeadf00d;
+            case 1: regs->ebx = 0xdeadf00d;
+            }
+        }
+#endif
     }
 
     HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u -> %lx",
