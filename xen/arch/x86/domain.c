@@ -1675,7 +1675,6 @@ unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...)
 {
     struct mc_state *mcs = &current->mc_state;
-    struct cpu_user_regs *regs;
     const char *p = format;
     unsigned long arg;
     unsigned int i;
@@ -1689,26 +1688,23 @@ unsigned long hypercall_create_continuation(
 
         for ( i = 0; *p != '\0'; i++ )
             mcs->call.args[i] = next_arg(p, args);
-        if ( is_pv_32on64_domain(current->domain) )
-        {
-            for ( ; i < 6; i++ )
-                mcs->call.args[i] = 0;
-        }
     }
     else
     {
-        regs       = guest_cpu_user_regs();
-        regs->eax  = op;
+        struct cpu_user_regs *regs = guest_cpu_user_regs();
+        struct vcpu *curr = current;
+
+        regs->eax = op;
 
         /* Ensure the hypercall trap instruction is re-executed. */
-        if ( is_pv_vcpu(current) )
+        if ( is_pv_vcpu(curr) )
             regs->eip -= 2;  /* re-execute 'syscall' / 'int $xx' */
         else
-            current->arch.hvm_vcpu.hcall_preempted = 1;
+            curr->arch.hvm_vcpu.hcall_preempted = 1;
 
-        if ( is_pv_vcpu(current) ?
-             !is_pv_32on64_vcpu(current) :
-             (hvm_guest_x86_mode(current) == 8) )
+        if ( is_pv_vcpu(curr) ?
+             !is_pv_32on64_vcpu(curr) :
+             curr->arch.hvm_vcpu.hcall_64bit )
         {
             for ( i = 0; *p != '\0'; i++ )
             {
@@ -1759,9 +1755,8 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
 
     ASSERT(nr <= ARRAY_SIZE(mcs->call.args));
     ASSERT(!(mask >> nr));
-
-    BUG_ON(id && *id >= nr);
-    BUG_ON(id && (mask & (1U << *id)));
+    ASSERT(!id || *id < nr);
+    ASSERT(!id || !(mask & (1U << *id)));
 
     va_start(args, mask);
 
