@@ -157,6 +157,9 @@ long arch_do_sysctl(
             sysctl->u.psr_cmt_op.u.data = (ret ? 0 : info.size);
             break;
         }
+        case XEN_SYSCTL_PSR_CMT_get_l3_event_mask:
+            sysctl->u.psr_cmt_op.u.data = psr_cmt->l3.features;
+            break;
         default:
             sysctl->u.psr_cmt_op.u.data = 0;
             ret = -ENOSYS;

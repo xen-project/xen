@@ -641,6 +641,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_coverage_op_t);
 /* The L3 cache size is returned in KB unit */
 #define XEN_SYSCTL_PSR_CMT_get_l3_cache_size         2
 #define XEN_SYSCTL_PSR_CMT_enabled                   3
+#define XEN_SYSCTL_PSR_CMT_get_l3_event_mask         4
 struct xen_sysctl_psr_cmt_op {
     uint32_t cmd;       /* IN: XEN_SYSCTL_PSR_CMT_* */
     uint32_t flags;     /* padding variable, may be extended for future use */
