@@ -222,12 +222,9 @@ int main(int argc, char **argv)
 
     /* Define GPE control method. */
     push_block("Scope", "\\_GPE");
-    if (dm_version == QEMU_XEN_TRADITIONAL) {
-        push_block("Method", "_L02");
-    } else {
-        push_block("Method", "_E02");
-    }
-    stmt("Return", "\\_SB.PRSC()");
+    push_block("Method",
+               dm_version == QEMU_XEN_TRADITIONAL ? "_L02" : "_E02");
+    stmt("\\_SB.PRSC ()", NULL);
     pop_block();
     pop_block();
     /**** Processor end ****/
@@ -374,8 +371,7 @@ int main(int argc, char **argv)
             push_block("Device", "S%i", slot); {
                 stmt("Name", "_ADR, %#06x0000", slot);
                 push_block("Method", "_EJ0,1"); {
-                    stmt("Store", "ShiftLeft(1, %#06x), B0EJ", slot);
-                    stmt("Return", "0x0");
+                    stmt("Store", "%#010x, B0EJ", 1 << slot);
                 } pop_block();
                 stmt("Name", "_SUN, %i", slot);
             } pop_block();
