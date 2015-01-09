@@ -434,7 +434,7 @@ void __init sync_Arb_IDs(void)
  */
 void __init init_bsp_APIC(void)
 {
-    unsigned long value, ver;
+    unsigned long value;
 
     /*
      * Don't do the setup now if we have a SMP BIOS as the
@@ -443,9 +443,6 @@ void __init init_bsp_APIC(void)
     if (smp_found_config || !cpu_has_apic)
         return;
 
-    value = apic_read(APIC_LVR);
-    ver = GET_APIC_VERSION(value);
-    
     /*
      * Do not trust the local APIC being empty at bootup.
      */
