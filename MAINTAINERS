@@ -341,6 +341,7 @@ F:	docs/misc/vtpm.txt
 X86 ARCHITECTURE
 M:	Keir Fraser <keir@xen.org>
 M:	Jan Beulich <jbeulich@suse.com>
+M:	Andrew Cooper <andrew.cooper3@citrix.com>
 S:	Supported
 L:	xen-devel@lists.xen.org
 F:	xen/arch/x86/
