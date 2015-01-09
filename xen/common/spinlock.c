@@ -438,10 +438,14 @@ int _write_trylock(rwlock_t *lock)
     return 1;
 }
 
-void _write_unlock(rwlock_t *lock)
+#ifndef _raw_write_unlock
+# define _raw_write_unlock(l) xchg(&(l)->lock, 0)
+#endif
+
+inline void _write_unlock(rwlock_t *lock)
 {
     preempt_enable();
-    if ( cmpxchg(&lock->lock, RW_WRITE_FLAG, 0) != RW_WRITE_FLAG )
+    if ( _raw_write_unlock(lock) != RW_WRITE_FLAG )
         BUG();
 }
 
