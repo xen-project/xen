@@ -731,6 +731,17 @@ static int hvmemul_rep_movs_discard(
     return X86EMUL_OKAY;
 }
 
+static int hvmemul_rep_stos_discard(
+    void *p_data,
+    enum x86_segment seg,
+    unsigned long offset,
+    unsigned int bytes_per_rep,
+    unsigned long *reps,
+    struct x86_emulate_ctxt *ctxt)
+{
+    return X86EMUL_OKAY;
+}
+
 static int hvmemul_rep_outs_discard(
     enum x86_segment src_seg,
     unsigned long src_offset,
@@ -980,6 +991,113 @@ static int hvmemul_rep_movs(
     }
 
     return X86EMUL_OKAY;
+}
+
+static int hvmemul_rep_stos(
+    void *p_data,
+    enum x86_segment seg,
+    unsigned long offset,
+    unsigned int bytes_per_rep,
+    unsigned long *reps,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct hvm_emulate_ctxt *hvmemul_ctxt =
+        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+    unsigned long addr;
+    paddr_t gpa;
+    p2m_type_t p2mt;
+    bool_t df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
+    int rc = hvmemul_virtual_to_linear(seg, offset, bytes_per_rep, reps,
+                                       hvm_access_write, hvmemul_ctxt, &addr);
+
+    if ( rc == X86EMUL_OKAY )
+    {
+        uint32_t pfec = PFEC_page_present | PFEC_write_access;
+
+        if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3 )
+            pfec |= PFEC_user_mode;
+
+        rc = hvmemul_linear_to_phys(
+            addr, &gpa, bytes_per_rep, reps, pfec, hvmemul_ctxt);
+    }
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    /* Check for MMIO op */
+    (void)get_gfn_query_unlocked(current->domain, gpa >> PAGE_SHIFT, &p2mt);
+
+    switch ( p2mt )
+    {
+        unsigned long bytes;
+        void *buf;
+
+    default:
+        /* Allocate temporary buffer. */
+        for ( ; ; )
+        {
+            bytes = *reps * bytes_per_rep;
+            buf = xmalloc_bytes(bytes);
+            if ( buf || *reps <= 1 )
+                break;
+            *reps >>= 1;
+        }
+
+        if ( !buf )
+            buf = p_data;
+        else
+            switch ( bytes_per_rep )
+            {
+                unsigned long dummy;
+
+#define CASE(bits, suffix)                                     \
+            case (bits) / 8:                                   \
+                asm ( "rep stos" #suffix                       \
+                      : "=m" (*(char (*)[bytes])buf),          \
+                        "=D" (dummy), "=c" (dummy)             \
+                      : "a" (*(const uint##bits##_t *)p_data), \
+                         "1" (buf), "2" (*reps) );             \
+                break
+            CASE(8, b);
+            CASE(16, w);
+            CASE(32, l);
+            CASE(64, q);
+#undef CASE
+
+            default:
+                ASSERT_UNREACHABLE();
+                xfree(buf);
+                return X86EMUL_UNHANDLEABLE;
+            }
+
+        /* Adjust address for reverse store. */
+        if ( df )
+            gpa -= bytes - bytes_per_rep;
+
+        rc = hvm_copy_to_guest_phys(gpa, buf, bytes);
+
+        if ( buf != p_data )
+            xfree(buf);
+
+        switch ( rc )
+        {
+        case HVMCOPY_gfn_paged_out:
+        case HVMCOPY_gfn_shared:
+            return X86EMUL_RETRY;
+        case HVMCOPY_okay:
+            return X86EMUL_OKAY;
+        }
+
+        gdprintk(XENLOG_WARNING,
+                 "Failed REP STOS: gpa=%"PRIpaddr" reps=%lu bytes_per_rep=%u\n",
+                 gpa, *reps, bytes_per_rep);
+        /* fall through */
+    case p2m_mmio_direct:
+        return X86EMUL_UNHANDLEABLE;
+
+    case p2m_mmio_dm:
+        return hvmemul_do_mmio(gpa, reps, bytes_per_rep, 0, IOREQ_WRITE, df,
+                               p_data);
+    }
 }
 
 static int hvmemul_read_segment(
@@ -1239,6 +1357,7 @@ static const struct x86_emulate_ops hvm_emulate_ops = {
     .rep_ins       = hvmemul_rep_ins,
     .rep_outs      = hvmemul_rep_outs,
     .rep_movs      = hvmemul_rep_movs,
+    .rep_stos      = hvmemul_rep_stos,
     .read_segment  = hvmemul_read_segment,
     .write_segment = hvmemul_write_segment,
     .read_io       = hvmemul_read_io,
@@ -1264,6 +1383,7 @@ static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
     .rep_ins       = hvmemul_rep_ins_discard,
     .rep_outs      = hvmemul_rep_outs_discard,
     .rep_movs      = hvmemul_rep_movs_discard,
+    .rep_stos      = hvmemul_rep_stos_discard,
     .read_segment  = hvmemul_read_segment,
     .write_segment = hvmemul_write_segment,
     .read_io       = hvmemul_read_io_discard,

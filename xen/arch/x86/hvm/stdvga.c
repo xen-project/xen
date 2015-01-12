@@ -470,11 +470,11 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
     uint64_t addr = p->addr;
     p2m_type_t p2mt;
     struct domain *d = current->domain;
+    int step = p->df ? -p->size : p->size;
 
     if ( p->data_is_ptr )
     {
         uint64_t data = p->data, tmp;
-        int step = p->df ? -p->size : p->size;
 
         if ( p->dir == IOREQ_READ )
         {
@@ -529,13 +529,18 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
             }
         }
     }
+    else if ( p->dir == IOREQ_WRITE )
+    {
+        for ( i = 0; i < p->count; i++ )
+        {
+            stdvga_mem_write(addr, p->data, p->size);
+            addr += step;
+        }
+    }
     else
     {
         ASSERT(p->count == 1);
-        if ( p->dir == IOREQ_READ )
-            p->data = stdvga_mem_read(addr, p->size);
-        else
-            stdvga_mem_write(addr, p->data, p->size);
+        p->data = stdvga_mem_read(addr, p->size);
     }
 
     read_data = p->data;

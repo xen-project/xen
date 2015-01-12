@@ -241,6 +241,20 @@ struct x86_emulate_ops
         struct x86_emulate_ctxt *ctxt);
 
     /*
+     * rep_stos: Emulate STOS: <*p_data> -> <seg:offset>.
+     *  @bytes_per_rep: [IN ] Bytes transferred per repetition.
+     *  @reps:  [IN ] Maximum repetitions to be emulated.
+     *          [OUT] Number of repetitions actually emulated.
+     */
+    int (*rep_stos)(
+        void *p_data,
+        enum x86_segment seg,
+        unsigned long offset,
+        unsigned int bytes_per_rep,
+        unsigned long *reps,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
      * read_segment: Emulate a read of full context of a segment register.
      *  @reg:   [OUT] Contents of segment register (visible and hidden state).
      */

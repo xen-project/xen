@@ -2568,15 +2568,25 @@ x86_emulate(
     }
 
     case 0xaa ... 0xab: /* stos */ {
-        /* unsigned long max_reps = */get_rep_prefix();
-        dst.type  = OP_MEM;
+        unsigned long nr_reps = get_rep_prefix();
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea(_regs.edi);
-        dst.val   = _regs.eax;
+        if ( (nr_reps == 1) || !ops->rep_stos ||
+             ((rc = ops->rep_stos(&_regs.eax,
+                                  dst.mem.seg, dst.mem.off, dst.bytes,
+                                  &nr_reps, ctxt)) == X86EMUL_UNHANDLEABLE) )
+        {
+            dst.val = _regs.eax;
+            dst.type = OP_MEM;
+            nr_reps = 1;
+        }
+        else if ( rc != X86EMUL_OKAY )
+            goto done;
         register_address_increment(
-            _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
-        put_rep_prefix(1);
+            _regs.edi,
+            nr_reps * ((_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes));
+        put_rep_prefix(nr_reps);
         break;
     }
 
