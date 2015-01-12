@@ -4410,7 +4410,9 @@ x86_emulate(
     case 0xae: /* Grp15 */
         switch ( modrm_reg & 7 )
         {
-        case 7: /* clflush */
+        case 7: /* clflush{,opt} */
+            fail_if(modrm_mod == 3);
+            fail_if(rep_prefix());
             fail_if(ops->wbinvd == NULL);
             if ( (rc = ops->wbinvd(ctxt)) != 0 )
                 goto done;
