@@ -7,8 +7,7 @@
 
 #define MACHINE_CHECK_SOFTIRQ  (NR_COMMON_SOFTIRQS + 3)
 #define PCI_SERR_SOFTIRQ       (NR_COMMON_SOFTIRQS + 4)
-#define HVM_DPCI_SOFTIRQ       (NR_COMMON_SOFTIRQS + 5)
-#define NR_ARCH_SOFTIRQS       6
+#define NR_ARCH_SOFTIRQS       5
 
 bool_t arch_skip_send_event_check(unsigned int cpu);
 

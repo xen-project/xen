@@ -1969,9 +1969,7 @@ int domain_relinquish_resources(struct domain *d)
     switch ( d->arch.relmem )
     {
     case RELMEM_not_started:
-        ret = pci_release_devices(d);
-        if ( ret )
-            return ret;
+        pci_release_devices(d);
 
         /* Tear down paging-assistance stuff. */
         ret = paging_teardown(d);

@@ -767,51 +767,40 @@ static int pci_clean_dpci_irq(struct domain *d,
         xfree(digl);
     }
 
-    return pt_pirq_softirq_active(pirq_dpci) ? -ERESTART : 0;
+    tasklet_kill(&pirq_dpci->tasklet);
+
+    return 0;
 }
 
-static int pci_clean_dpci_irqs(struct domain *d)
+static void pci_clean_dpci_irqs(struct domain *d)
 {
     struct hvm_irq_dpci *hvm_irq_dpci = NULL;
 
     if ( !iommu_enabled )
-        return 0;
+        return;
 
     if ( !is_hvm_domain(d) )
-        return 0;
+        return;
 
     spin_lock(&d->event_lock);
     hvm_irq_dpci = domain_get_irq_dpci(d);
     if ( hvm_irq_dpci != NULL )
     {
-        int ret = pt_pirq_iterate(d, pci_clean_dpci_irq, NULL);
-
-        if ( ret )
-        {
-            spin_unlock(&d->event_lock);
-            return ret;
-        }
+        pt_pirq_iterate(d, pci_clean_dpci_irq, NULL);
 
         d->arch.hvm_domain.irq.dpci = NULL;
         free_hvm_irq_dpci(hvm_irq_dpci);
     }
     spin_unlock(&d->event_lock);
-    return 0;
 }
 
-int pci_release_devices(struct domain *d)
+void pci_release_devices(struct domain *d)
 {
     struct pci_dev *pdev;
     u8 bus, devfn;
-    int ret;
 
     spin_lock(&pcidevs_lock);
-    ret = pci_clean_dpci_irqs(d);
-    if ( ret )
-    {
-        spin_unlock(&pcidevs_lock);
-        return ret;
-    }
+    pci_clean_dpci_irqs(d);
     while ( (pdev = pci_get_pdev_by_domain(d, -1, -1, -1)) )
     {
         bus = pdev->bus;
@@ -822,8 +811,6 @@ int pci_release_devices(struct domain *d)
                    PCI_SLOT(devfn), PCI_FUNC(devfn));
     }
     spin_unlock(&pcidevs_lock);
-
-    return 0;
 }
 
 #define PCI_CLASS_BRIDGE_HOST    0x0600
