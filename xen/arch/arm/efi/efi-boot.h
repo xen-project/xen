@@ -104,7 +104,7 @@ static int __init fdt_set_reg(void *fdt, int node, int addr_cells,
 
 static void __init *lookup_fdt_config_table(EFI_SYSTEM_TABLE *sys_table)
 {
-    const EFI_GUID fdt_guid = DEVICE_TREE_GUID;
+    static const EFI_GUID __initconst fdt_guid = DEVICE_TREE_GUID;
     EFI_CONFIGURATION_TABLE *tables;
     void *fdt = NULL;
     int i;
@@ -135,15 +135,15 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
              || desc_ptr->Type == EfiBootServicesCode
              || desc_ptr->Type == EfiBootServicesData )
         {
-            bootinfo.mem.bank[i].start = desc_ptr->PhysicalStart;
-            bootinfo.mem.bank[i].size = desc_ptr->NumberOfPages * EFI_PAGE_SIZE;
-            if ( ++i >= NR_MEM_BANKS )
+            if ( i >= NR_MEM_BANKS )
             {
-                PrintStr(L"Warning: All ");
-                DisplayUint(NR_MEM_BANKS, -1);
-                PrintStr(L" bootinfo mem banks exhausted.\r\n");
+                PrintStr(L"Warning: All " __stringify(NR_MEM_BANKS)
+                          " bootinfo mem banks exhausted.\r\n");
                 break;
             }
+            bootinfo.mem.bank[i].start = desc_ptr->PhysicalStart;
+            bootinfo.mem.bank[i].size = desc_ptr->NumberOfPages * EFI_PAGE_SIZE;
+            ++i;
         }
         desc_ptr = NextMemoryDescriptor(desc_ptr, desc_size);
     }
@@ -334,7 +334,7 @@ static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
     status = fdt_add_uefi_nodes(SystemTable, fdt, map, map_size, desc_size,
                                 desc_ver);
     if ( EFI_ERROR(status) )
-        PrintErrMesg(L"Updating FDT failed\r\n", status);
+        PrintErrMesg(L"Updating FDT failed", status);
 }
 
 static void __init efi_arch_pre_exit_boot(void)
@@ -408,7 +408,7 @@ static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
 
     status = efi_bs->AllocatePool(EfiBootServicesData, EFI_PAGE_SIZE, (void **)&buf);
     if ( EFI_ERROR(status) )
-        PrintErrMesg(L"Unable to allocate string buffer\r\n", status);
+        PrintErrMesg(L"Unable to allocate string buffer", status);
 
     if ( image_name )
     {
