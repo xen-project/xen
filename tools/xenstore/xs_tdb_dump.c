@@ -33,6 +33,15 @@ static char perm_to_char(enum xs_perm_type perm)
 		'?';
 }
 
+static void tdb_logger(TDB_CONTEXT *tdb, int level, const char * fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+}
+
 int main(int argc, char *argv[])
 {
 	TDB_DATA key;
@@ -41,7 +50,8 @@ int main(int argc, char *argv[])
 	if (argc != 2)
 		barf("Usage: xs_tdb_dump <tdbfile>");
 
-	tdb = tdb_open(talloc_strdup(NULL, argv[1]), 0, 0, O_RDONLY, 0);
+	tdb = tdb_open_ex(talloc_strdup(NULL, argv[1]), 0, 0, O_RDONLY, 0,
+			  &tdb_logger, NULL);
 	if (!tdb)
 		barf_perror("Could not open %s", argv[1]);
 

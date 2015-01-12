@@ -89,9 +89,14 @@ static void check_store(void);
 #define log(...)							\
 	do {								\
 		char *s = talloc_asprintf(NULL, __VA_ARGS__);		\
-		trace("%s\n", s);					\
-		syslog(LOG_ERR, "%s",  s);				\
-		talloc_free(s);						\
+		if (s) {						\
+			trace("%s\n", s);				\
+			syslog(LOG_ERR, "%s",  s);			\
+			talloc_free(s);					\
+		} else {						\
+			trace("talloc failure during logging\n");	\
+			syslog(LOG_ERR, "talloc failure during logging\n"); \
+		}							\
 	} while (0)
 
 
@@ -1479,13 +1484,35 @@ static void manual_node(const char *name, const char *child)
 	talloc_free(node);
 }
 
+static void tdb_logger(TDB_CONTEXT *tdb, int level, const char * fmt, ...)
+{
+	va_list ap;
+	char *s;
+
+	va_start(ap, fmt);
+	s = talloc_vasprintf(NULL, fmt, ap);
+	va_end(ap);
+
+	if (s) {
+		trace("TDB: %s\n", s);
+		syslog(LOG_ERR, "TDB: %s",  s);
+		if (verbose)
+			xprintf("TDB: %s", s);
+		talloc_free(s);
+	} else {
+		trace("talloc failure during logging\n");
+		syslog(LOG_ERR, "talloc failure during logging\n");
+	}
+}
+
 static void setup_structure(void)
 {
 	char *tdbname;
 	tdbname = talloc_strdup(talloc_autofree_context(), xs_daemon_tdb());
 
 	if (!(tdb_flags & TDB_INTERNAL))
-		tdb_ctx = tdb_open(tdbname, 0, tdb_flags, O_RDWR, 0);
+		tdb_ctx = tdb_open_ex(tdbname, 0, tdb_flags, O_RDWR, 0,
+				      &tdb_logger, NULL);
 
 	if (tdb_ctx) {
 		/* XXX When we make xenstored able to restart, this will have
@@ -1516,8 +1543,8 @@ static void setup_structure(void)
 		talloc_free(tlocal);
 	}
 	else {
-		tdb_ctx = tdb_open(tdbname, 7919, tdb_flags, O_RDWR|O_CREAT,
-				   0640);
+		tdb_ctx = tdb_open_ex(tdbname, 7919, tdb_flags, O_RDWR|O_CREAT,
+				      0640, &tdb_logger, NULL);
 		if (!tdb_ctx)
 			barf_perror("Could not create tdb file %s", tdbname);
 
