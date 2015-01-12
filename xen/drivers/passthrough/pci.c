@@ -767,8 +767,6 @@ static int pci_clean_dpci_irq(struct domain *d,
         xfree(digl);
     }
 
-    tasklet_kill(&pirq_dpci->tasklet);
-
     return 0;
 }
 
@@ -786,6 +784,8 @@ static void pci_clean_dpci_irqs(struct domain *d)
     hvm_irq_dpci = domain_get_irq_dpci(d);
     if ( hvm_irq_dpci != NULL )
     {
+        tasklet_kill(&hvm_irq_dpci->dirq_tasklet);
+
         pt_pirq_iterate(d, pci_clean_dpci_irq, NULL);
 
         d->arch.hvm_domain.irq.dpci = NULL;
