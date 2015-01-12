@@ -94,7 +94,6 @@ struct hvm_irq_dpci {
 struct hvm_pirq_dpci {
     uint32_t flags;
     unsigned int state;
-    bool_t masked;
     uint16_t pending;
     struct list_head digl_list;
     struct domain *dom;
