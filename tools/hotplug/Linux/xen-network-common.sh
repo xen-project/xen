@@ -132,3 +132,13 @@ add_to_bridge () {
     ip link set ${dev} up
 }
 
+# Usage: set_mtu bridge dev
+set_mtu () {
+    local bridge=$1
+    local dev=$2
+    mtu="`ip link show ${bridge}| awk '/mtu/ { print $5 }'`"
+    if [ -n "$mtu" ] && [ "$mtu" -gt 0 ]
+    then
+            ip link set ${dev} mtu $mtu || :
+    fi
+}
