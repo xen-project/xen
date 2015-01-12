@@ -87,8 +87,6 @@
 #define K8_HWCR_MCi_STATUS_WREN		(1ULL << 18)
 
 /*Intel Specific bitfield*/
-#define CMCI_THRESHOLD			0x2
-
 #define MCi_MISC_ADDRMOD_MASK (0x7UL << 6)
 #define MCi_MISC_PHYSMOD    (0x2UL << 6)
 

@@ -492,6 +492,9 @@ static int do_cmci_discover(int i)
 {
     unsigned msr = MSR_IA32_MCx_CTL2(i);
     u64 val;
+    unsigned int threshold, max_threshold;
+    static unsigned int cmci_threshold = 2;
+    integer_param("cmci-threshold", cmci_threshold);
 
     rdmsrl(msr, val);
     /* Some other CPU already owns this bank. */
@@ -500,15 +503,28 @@ static int do_cmci_discover(int i)
         goto out;
     }
 
-    val &= ~CMCI_THRESHOLD_MASK;
-    wrmsrl(msr, val | CMCI_EN | CMCI_THRESHOLD);
-    rdmsrl(msr, val);
+    if ( cmci_threshold )
+    {
+        wrmsrl(msr, val | CMCI_EN | CMCI_THRESHOLD_MASK);
+        rdmsrl(msr, val);
+    }
 
     if (!(val & CMCI_EN)) {
         /* This bank does not support CMCI. Polling timer has to handle it. */
         mcabanks_set(i, __get_cpu_var(no_cmci_banks));
+        wrmsrl(msr, val & ~CMCI_THRESHOLD_MASK);
         return 0;
     }
+    max_threshold = MASK_EXTR(val, CMCI_THRESHOLD_MASK);
+    threshold = cmci_threshold;
+    if ( threshold > max_threshold )
+    {
+       mce_printk(MCE_QUIET,
+                  "CMCI: threshold %#x too large for CPU%u bank %u, using %#x\n",
+                  threshold, smp_processor_id(), i, max_threshold);
+       threshold = max_threshold;
+    }
+    wrmsrl(msr, (val & ~CMCI_THRESHOLD_MASK) | CMCI_EN | threshold);
     mcabanks_set(i, __get_cpu_var(mce_banks_owned));
 out:
     mcabanks_clear(i, __get_cpu_var(no_cmci_banks));

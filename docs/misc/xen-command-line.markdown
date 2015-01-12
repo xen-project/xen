@@ -242,6 +242,14 @@ the NMI watchdog is also enabled.
 
 If set, override Xen's default choice for the platform timer.
 
+### cmci-threshold
+> `= <integer>`
+
+> Default: `2`
+
+Specify the event count threshold for raising Corrected Machine Check
+Interrupts.  Specifying zero disables CMCI handling.
+
 ### cmos-rtc-probe
 > `= <boolean>`
 
