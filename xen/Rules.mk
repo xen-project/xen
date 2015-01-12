@@ -170,7 +170,10 @@ _clean_%/: FORCE
 %.o: %.S Makefile
 	$(CC) $(AFLAGS) -c $< -o $@
 
-SPECIAL_DATA_SECTIONS := rodata $(foreach n,1 2 4 8,rodata.str1.$(n)) \
+SPECIAL_DATA_SECTIONS := rodata $(foreach a,1 2 4 8 16, \
+					    $(foreach w,1 2 4, \
+							rodata.str$(w).$(a)) \
+					    rodata.cst$(a)) \
 			 $(foreach r,rel rel.ro,data.$(r).local)
 
 $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o Makefile
