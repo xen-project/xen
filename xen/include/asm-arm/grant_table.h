@@ -3,7 +3,6 @@
 
 #include <xen/grant_table.h>
 
-#define INVALID_GFN (-1UL)
 #define INITIAL_NR_GRANT_FRAMES 1
 
 void gnttab_clear_flag(unsigned long nr, uint16_t *addr);
