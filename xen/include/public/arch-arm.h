@@ -87,15 +87,10 @@
  * unavailable/unsupported.
  *
  *  HYPERVISOR_memory_op
- *   All generic sub-operations.
- *
- *   In addition the following arch specific sub-ops:
- *    * XENMEM_add_to_physmap
- *    * XENMEM_add_to_physmap_batch
+ *   All generic sub-operations
  *
  *  HYPERVISOR_domctl
  *   All generic sub-operations, with the exception of:
- *    * XEN_DOMCTL_iomem_permission (not yet implemented)
  *    * XEN_DOMCTL_irq_permission (not yet implemented)
  *
  *  HYPERVISOR_sched_op
@@ -183,8 +178,8 @@
  * XEN_GUEST_HANDLE represents a guest pointer, when passed as a field
  * in a struct in memory. On ARM is always 8 bytes sizes and 8 bytes
  * aligned.
- * XEN_GUEST_HANDLE_PARAM represent a guest pointer, when passed as an
- * hypercall argument. It is 4 bytes on aarch and 8 bytes on aarch64.
+ * XEN_GUEST_HANDLE_PARAM represents a guest pointer, when passed as an
+ * hypercall argument. It is 4 bytes on aarch32 and 8 bytes on aarch64.
  */
 #define __DEFINE_XEN_GUEST_HANDLE(name, type) \
     ___DEFINE_XEN_GUEST_HANDLE(name, type);   \
@@ -192,7 +187,6 @@
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define __XEN_GUEST_HANDLE(name)        __guest_handle_64_ ## name
 #define XEN_GUEST_HANDLE(name)          __XEN_GUEST_HANDLE(name)
-/* this is going to be changed on 64 bit */
 #define XEN_GUEST_HANDLE_PARAM(name)    __guest_handle_ ## name
 #define set_xen_guest_handle_raw(hnd, val)                  \
     do {                                                    \
@@ -318,7 +312,7 @@ typedef uint64_t xen_callback_t;
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
-/* PSR bits (CPSR, SPSR)*/
+/* PSR bits (CPSR, SPSR) */
 
 #define PSR_THUMB       (1<<5)        /* Thumb Mode enable */
 #define PSR_FIQ_MASK    (1<<6)        /* Fast Interrupt mask */
@@ -365,7 +359,8 @@ typedef uint64_t xen_callback_t;
 
 /* Physical Address Space */
 
-/* vGIC mappings: Only one set of mapping is used by the guest.
+/*
+ * vGIC mappings: Only one set of mapping is used by the guest.
  * Therefore they can overlap.
  */
 
@@ -385,7 +380,8 @@ typedef uint64_t xen_callback_t;
 #define GUEST_GICV3_GICR0_BASE     0x03020000ULL    /* vCPU0 - vCPU7 */
 #define GUEST_GICV3_GICR0_SIZE     0x00100000ULL
 
-/* 16MB == 4096 pages reserved for guest to use as a region to map its
+/*
+ * 16MB == 4096 pages reserved for guest to use as a region to map its
  * grant table in.
  */
 #define GUEST_GNTTAB_BASE 0x38000000ULL
