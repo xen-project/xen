@@ -1031,6 +1031,8 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         DT_MATCH_COMPATIBLE("arm,psci"),
         DT_MATCH_PATH("/cpus"),
         DT_MATCH_TYPE("memory"),
+        /* The memory mapped timer is not supported by Xen. */
+        DT_MATCH_COMPATIBLE("arm,armv7-timer-mem"),
         { /* sentinel */ },
     };
     static const struct dt_device_match gic_matches[] __initconst =
