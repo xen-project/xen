@@ -357,6 +357,7 @@ int __init cpu_up_send_sgi(int cpu)
 int __cpu_up(unsigned int cpu)
 {
     int rc;
+    s_time_t deadline;
 
     printk("Bringing up CPU%d\n", cpu);
 
@@ -369,7 +370,7 @@ int __cpu_up(unsigned int cpu)
     /* Tell the remote CPU which stack to boot on. */
     init_data.stack = idle_vcpu[cpu]->arch.stack;
 
-    /* Tell the remote CPU what is it's logical CPU ID */
+    /* Tell the remote CPU what its logical CPU ID is. */
     init_data.cpuid = cpu;
 
     /* Open the gate for this CPU */
@@ -386,10 +387,32 @@ int __cpu_up(unsigned int cpu)
         return rc;
     }
 
-    while ( !cpu_online(cpu) )
+    deadline = NOW() + MILLISECS(1000);
+
+    while ( !cpu_online(cpu) && NOW() < deadline )
     {
         cpu_relax();
         process_pending_softirqs();
+    }
+
+    /*
+     * Nuke start of day info before checking one last time if the CPU
+     * actually came online. If it is not online it may still be
+     * trying to come up and may show up later unexpectedly.
+     *
+     * This doesn't completely avoid the possibility of the supposedly
+     * failed CPU trying to progress with another CPUs stack settings
+     * etc, but better than nothing, hopefully.
+     */
+    init_data.stack = NULL;
+    init_data.cpuid = ~0;
+    smp_up_cpu = MPIDR_INVALID;
+    clean_dcache(smp_up_cpu);
+
+    if ( !cpu_online(cpu) )
+    {
+        printk("CPU%d never came online\n", cpu);
+        return -EIO;
     }
 
     return 0;
