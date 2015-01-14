@@ -151,6 +151,7 @@ static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     if ( irq == (timer_irq[TIMER_HYP_PPI]) &&
          READ_SYSREG32(CNTHP_CTL_EL2) & CNTx_CTL_PENDING )
     {
+        perfc_incr(hyp_timer_irqs);
         /* Signal the generic timer code to do its work */
         raise_softirq(TIMER_SOFTIRQ);
         /* Disable the timer to avoid more interrupts */
@@ -160,6 +161,7 @@ static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     if ( irq == (timer_irq[TIMER_PHYS_NONSECURE_PPI]) &&
          READ_SYSREG32(CNTP_CTL_EL0) & CNTx_CTL_PENDING )
     {
+        perfc_incr(phys_timer_irqs);
         /* Signal the generic timer code to do its work */
         raise_softirq(TIMER_SOFTIRQ);
         /* Disable the timer to avoid more interrupts */
@@ -181,6 +183,8 @@ static void vtimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
      */
     if ( unlikely(is_idle_vcpu(current)) )
         return;
+
+    perfc_incr(virt_timer_irqs);
 
     current->arch.virt_timer.ctl = READ_SYSREG32(CNTV_CTL_EL0);
     WRITE_SYSREG32(current->arch.virt_timer.ctl | CNTx_CTL_MASK, CNTV_CTL_EL0);

@@ -57,7 +57,7 @@ void perfc_printall(unsigned char key)
                 for_each_online_cpu ( cpu )
                 {
                     if ( k > 0 && (k % 4) == 0 )
-                        printk("\n%46s", "");
+                        printk("\n%53s", "");
                     printk("  CPU%02u[%10"PRIperfc"u]", cpu, per_cpu(perfcounters, cpu)[j]);
                     ++k;
                 }
@@ -103,7 +103,7 @@ void perfc_printall(unsigned char key)
                     if ( perfc_info[i].type == TYPE_S_ARRAY ) 
                         sum = (perfc_t) sum;
                     if ( k > 0 && (k % 4) == 0 )
-                        printk("\n%46s", "");
+                        printk("\n%53s", "");
                     printk("  CPU%02u[%10Lu]", cpu, sum);
                     ++k;
                 }

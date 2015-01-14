@@ -39,6 +39,7 @@
 #include <xen/ctype.h>
 #include <xen/serial.h>
 #include <asm/mmio.h>
+#include <xen/perfc.h>
 
 #include "vuart.h"
 
@@ -112,6 +113,8 @@ static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info)
     register_t *r = select_user_reg(regs, dabt.reg);
     paddr_t offset = info->gpa - d->arch.vuart.info->base_addr;
 
+    perfc_incr(vuart_reads);
+
     /* By default zeroed the register */
     *r = 0;
 
@@ -129,6 +132,8 @@ static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     register_t *r = select_user_reg(regs, dabt.reg);
     paddr_t offset = info->gpa - d->arch.vuart.info->base_addr;
+
+    perfc_incr(vuart_writes);
 
     if ( offset == d->arch.vuart.info->data_off )
         /* ignore any status bits */

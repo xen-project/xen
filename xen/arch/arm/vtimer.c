@@ -21,6 +21,7 @@
 #include <xen/lib.h>
 #include <xen/timer.h>
 #include <xen/sched.h>
+#include <xen/perfc.h>
 #include <asm/irq.h>
 #include <asm/time.h>
 #include <asm/gic.h>
@@ -35,7 +36,12 @@ static void phys_timer_expired(void *data)
     struct vtimer *t = data;
     t->ctl |= CNTx_CTL_PENDING;
     if ( !(t->ctl & CNTx_CTL_MASK) )
+    {
+        perfc_incr(vtimer_phys_inject);
         vgic_vcpu_inject_irq(t->v, t->irq);
+    }
+    else
+        perfc_incr(vtimer_phys_masked);
 }
 
 static void virt_timer_expired(void *data)
@@ -43,6 +49,7 @@ static void virt_timer_expired(void *data)
     struct vtimer *t = data;
     t->ctl |= CNTx_CTL_MASK;
     vgic_vcpu_inject_irq(t->v, t->irq);
+    perfc_incr(vtimer_virt_inject);
 }
 
 int domain_vtimer_init(struct domain *d)
@@ -196,6 +203,11 @@ static int vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
     struct hsr_cp32 cp32 = hsr.cp32;
     uint32_t *r = (uint32_t *)select_user_reg(regs, cp32.reg);
 
+    if ( cp32.read )
+        perfc_incr(vtimer_cp32_reads);
+    else
+        perfc_incr(vtimer_cp32_writes);
+
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
     {
     case HSR_CPREG32(CNTP_CTL):
@@ -217,6 +229,11 @@ static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
     uint32_t *r1 = (uint32_t *)select_user_reg(regs, cp64.reg1);
     uint32_t *r2 = (uint32_t *)select_user_reg(regs, cp64.reg2);
     uint64_t x;
+
+    if ( cp64.read )
+        perfc_incr(vtimer_cp64_reads);
+    else
+        perfc_incr(vtimer_cp64_writes);
 
     switch ( hsr.bits & HSR_CP64_REGS_MASK )
     {
@@ -242,6 +259,11 @@ static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
     struct hsr_sysreg sysreg = hsr.sysreg;
     register_t *x = select_user_reg(regs, sysreg.reg);
     uint32_t r = (uint32_t)*x;
+
+    if ( sysreg.read )
+        perfc_incr(vtimer_sysreg_reads);
+    else
+        perfc_incr(vtimer_sysreg_writes);
 
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {

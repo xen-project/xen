@@ -30,6 +30,7 @@
 #include <xen/hypercall.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
+#include <xen/perfc.h>
 #include <public/sched.h>
 #include <public/xen.h>
 #include <asm/debugger.h>
@@ -1240,6 +1241,7 @@ static void do_trap_psci(struct cpu_user_regs *regs)
     case PSCI_cpu_off:
         {
             uint32_t pstate = PSCI_ARG32(regs,1);
+            perfc_incr(vpsci_cpu_off);
             PSCI_RESULT_REG(regs) = do_psci_cpu_off(pstate);
         }
         break;
@@ -1247,33 +1249,41 @@ static void do_trap_psci(struct cpu_user_regs *regs)
         {
             uint32_t vcpuid = PSCI_ARG32(regs,1);
             register_t epoint = PSCI_ARG(regs,2);
+            perfc_incr(vpsci_cpu_on);
             PSCI_RESULT_REG(regs) = do_psci_cpu_on(vcpuid, epoint);
         }
         break;
     case PSCI_0_2_FN_PSCI_VERSION:
+        perfc_incr(vpsci_version);
         PSCI_RESULT_REG(regs) = do_psci_0_2_version();
         break;
     case PSCI_0_2_FN_CPU_OFF:
+        perfc_incr(vpsci_cpu_off);
         PSCI_RESULT_REG(regs) = do_psci_0_2_cpu_off();
         break;
     case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+        perfc_incr(vpsci_migrate_info_type);
         PSCI_RESULT_REG(regs) = do_psci_0_2_migrate_info_type();
         break;
     case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
     case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+        perfc_incr(vpsci_migrate_info_up_cpu);
         if ( psci_mode_check(current->domain, fid) )
             PSCI_RESULT_REG(regs) = do_psci_0_2_migrate_info_up_cpu();
         break;
     case PSCI_0_2_FN_SYSTEM_OFF:
+        perfc_incr(vpsci_system_off);
         do_psci_0_2_system_off();
         PSCI_RESULT_REG(regs) = PSCI_INTERNAL_FAILURE;
         break;
     case PSCI_0_2_FN_SYSTEM_RESET:
+        perfc_incr(vpsci_system_reset);
         do_psci_0_2_system_reset();
         PSCI_RESULT_REG(regs) = PSCI_INTERNAL_FAILURE;
         break;
     case PSCI_0_2_FN_CPU_ON:
     case PSCI_0_2_FN64_CPU_ON:
+        perfc_incr(vpsci_cpu_on);
         if ( psci_mode_check(current->domain, fid) )
         {
             register_t vcpuid = PSCI_ARG(regs,1);
@@ -1285,6 +1295,7 @@ static void do_trap_psci(struct cpu_user_regs *regs)
         break;
     case PSCI_0_2_FN_CPU_SUSPEND:
     case PSCI_0_2_FN64_CPU_SUSPEND:
+        perfc_incr(vpsci_cpu_suspend);
         if ( psci_mode_check(current->domain, fid) )
         {
             uint32_t pstate = PSCI_ARG32(regs,1);
@@ -1296,6 +1307,7 @@ static void do_trap_psci(struct cpu_user_regs *regs)
         break;
     case PSCI_0_2_FN_AFFINITY_INFO:
     case PSCI_0_2_FN64_AFFINITY_INFO:
+        perfc_incr(vpsci_cpu_affinity_info);
         if ( psci_mode_check(current->domain, fid) )
         {
             register_t taff = PSCI_ARG(regs,1);
@@ -1306,6 +1318,7 @@ static void do_trap_psci(struct cpu_user_regs *regs)
         break;
     case PSCI_0_2_FN_MIGRATE:
     case PSCI_0_2_FN64_MIGRATE:
+        perfc_incr(vpsci_cpu_migrate);
         if ( psci_mode_check(current->domain, fid) )
         {
             uint32_t tcpu = PSCI_ARG32(regs,1);
@@ -1344,15 +1357,19 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
     register_t orig_pc = regs->pc;
 #endif
 
+    BUILD_BUG_ON(NR_hypercalls < ARRAY_SIZE(arm_hypercall_table) );
+
     if ( iss != XEN_HYPERCALL_TAG )
         domain_crash_synchronous();
 
     if ( *nr >= ARRAY_SIZE(arm_hypercall_table) )
     {
+        perfc_incr(invalid_hypercalls);
         HYPERCALL_RESULT_REG(regs) = -ENOSYS;
         return;
     }
 
+    perfc_incra(hypercalls, *nr);
     call = arm_hypercall_table[*nr].fn;
     if ( call == NULL )
     {
@@ -1492,8 +1509,10 @@ static int check_conditional_instr(struct cpu_user_regs *regs, union hsr hsr)
     cpsr_cond = cpsr >> 28;
 
     if ( !((cc_map[cond] >> cpsr_cond) & 1) )
+    {
+        perfc_incr(trap_uncond);
         return 0;
-
+    }
     return 1;
 }
 
@@ -2034,9 +2053,11 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         }
         if ( hsr.wfi_wfe.ti ) {
             /* Yield the VCPU for WFE */
+            perfc_incr(trap_wfe);
             vcpu_yield();
         } else {
             /* Block the VCPU for WFI */
+            perfc_incr(trap_wfi);
             vcpu_block_unless_event_pending(current);
         }
         advance_pc(regs, hsr);
@@ -2044,32 +2065,39 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
     case HSR_EC_CP15_32:
         if ( !is_32bit_domain(current->domain) )
             goto bad_trap;
+        perfc_incr(trap_cp15_32);
         do_cp15_32(regs, hsr);
         break;
     case HSR_EC_CP15_64:
         if ( !is_32bit_domain(current->domain) )
             goto bad_trap;
+        perfc_incr(trap_cp15_64);
         do_cp15_64(regs, hsr);
         break;
     case HSR_EC_CP14_32:
         if ( !is_32bit_domain(current->domain) )
             goto bad_trap;
+        perfc_incr(trap_cp14_32);
         do_cp14_32(regs, hsr);
         break;
     case HSR_EC_CP14_DBG:
         if ( !is_32bit_domain(current->domain) )
             goto bad_trap;
+        perfc_incr(trap_cp14_dbg);
         do_cp14_dbg(regs, hsr);
         break;
     case HSR_EC_CP:
         if ( !is_32bit_domain(current->domain) )
             goto bad_trap;
+        perfc_incr(trap_cp);
         do_cp(regs, hsr);
         break;
     case HSR_EC_SMC32:
+        perfc_incr(trap_smc32);
         inject_undef32_exception(regs);
         break;
     case HSR_EC_HVC32:
+        perfc_incr(trap_hvc32);
 #ifndef NDEBUG
         if ( (hsr.iss & 0xff00) == 0xff00 )
             return do_debug_trap(regs, hsr.iss & 0x00ff);
@@ -2080,6 +2108,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         break;
 #ifdef CONFIG_ARM_64
     case HSR_EC_HVC64:
+        perfc_incr(trap_hvc64);
 #ifndef NDEBUG
         if ( (hsr.iss & 0xff00) == 0xff00 )
             return do_debug_trap(regs, hsr.iss & 0x00ff);
@@ -2089,19 +2118,23 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         do_trap_hypercall(regs, &regs->x16, hsr.iss);
         break;
     case HSR_EC_SMC64:
+        perfc_incr(trap_smc64);
         inject_undef64_exception(regs, hsr.len);
         break;
     case HSR_EC_SYSREG:
         if ( is_32bit_domain(current->domain) )
             goto bad_trap;
+        perfc_incr(trap_sysreg);
         do_sysreg(regs, hsr);
         break;
 #endif
 
     case HSR_EC_INSTR_ABORT_LOWER_EL:
+        perfc_incr(trap_iabt);
         do_trap_instr_abort_guest(regs, hsr);
         break;
     case HSR_EC_DATA_ABORT_LOWER_EL:
+        perfc_incr(trap_dabt);
         do_trap_data_abort_guest(regs, hsr);
         break;
 

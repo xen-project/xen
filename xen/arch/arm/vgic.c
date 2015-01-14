@@ -24,6 +24,7 @@
 #include <xen/softirq.h>
 #include <xen/irq.h>
 #include <xen/sched.h>
+#include <xen/perfc.h>
 
 #include <asm/current.h>
 
@@ -185,6 +186,8 @@ void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
     if ( test_bit(GIC_IRQ_GUEST_MIGRATING, &p->status) )
         return;
 
+    perfc_incr(vgic_irq_migrates);
+
     spin_lock_irqsave(&old->arch.vgic.lock, flags);
 
     if ( list_empty(&p->inflight) )
@@ -301,12 +304,14 @@ int vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode, int 
     switch ( irqmode )
     {
     case SGI_TARGET_LIST:
+        perfc_incr(vgic_sgi_list);
         break;
     case SGI_TARGET_OTHERS:
         /*
          * We expect vcpu_mask to be 0 for SGI_TARGET_OTHERS and
          * SGI_TARGET_SELF mode. So Force vcpu_mask to 0
          */
+        perfc_incr(vgic_sgi_others);
         vcpu_mask = 0;
         for ( i = 0; i < d->max_vcpus; i++ )
         {
@@ -320,6 +325,7 @@ int vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode, int 
          * We expect vcpu_mask to be 0 for SGI_TARGET_OTHERS and
          * SGI_TARGET_SELF mode. So Force vcpu_mask to 0
          */
+        perfc_incr(vgic_sgi_self);
         vcpu_mask = 0;
         set_bit(current->vcpu_id, &vcpu_mask);
         break;
@@ -418,7 +424,10 @@ out:
     running = v->is_running;
     vcpu_unblock(v);
     if ( running && v != current )
+    {
+        perfc_incr(vgic_cross_cpu_intr_inject);
         smp_send_event_check_mask(cpumask_of(v->processor));
+    }
 }
 
 void vgic_vcpu_inject_spi(struct domain *d, unsigned int irq)

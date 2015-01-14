@@ -605,6 +605,8 @@ static int vgic_v3_rdistr_mmio_read(struct vcpu *v, mmio_info_t *info)
 {
     uint32_t offset;
 
+    perfc_incr(vgicr_reads);
+
     if ( v->domain->arch.vgic.rdist_stride != 0 )
         offset = info->gpa & (v->domain->arch.vgic.rdist_stride - 1);
     else
@@ -626,6 +628,8 @@ static int vgic_v3_rdistr_mmio_read(struct vcpu *v, mmio_info_t *info)
 static int vgic_v3_rdistr_mmio_write(struct vcpu *v, mmio_info_t *info)
 {
     uint32_t offset;
+
+    perfc_incr(vgicr_writes);
 
     if ( v->domain->arch.vgic.rdist_stride != 0 )
         offset = info->gpa & (v->domain->arch.vgic.rdist_stride - 1);
@@ -655,6 +659,8 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
     uint64_t irouter;
     unsigned int vcpu_id;
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
+
+    perfc_incr(vgicd_reads);
 
     switch ( gicd_reg )
     {
@@ -800,6 +806,8 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     uint64_t new_irouter, new_target, old_target;
     struct vcpu *old_vcpu, *new_vcpu;
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
+
+    perfc_incr(vgicd_writes);
 
     switch ( gicd_reg )
     {
@@ -979,6 +987,11 @@ static int vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
     register_t *r = select_user_reg(regs, sysreg.reg);
 
     ASSERT (hsr.ec == HSR_EC_SYSREG);
+
+    if ( sysreg.read )
+        perfc_incr(vgic_sysreg_reads);
+    else
+        perfc_incr(vgic_sysreg_writes);
 
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {

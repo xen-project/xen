@@ -179,7 +179,14 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
 {
     struct irq_desc *desc = irq_to_desc(irq);
 
-    /* TODO: perfc_incr(irqs); */
+    perfc_incr(irqs);
+
+    ASSERT(irq >= 16); /* SGIs do not come down this path */
+
+    if (irq < 32)
+        perfc_incr(ppis);
+    else
+        perfc_incr(spis);
 
     /* TODO: this_cpu(irq_count)++; */
 
@@ -199,6 +206,7 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
     {
         struct domain *d = irq_get_domain(desc);
 
+        perfc_incr(guest_irqs);
         desc->handler->end(desc);
 
         set_bit(_IRQ_INPROGRESS, &desc->status);

@@ -41,6 +41,8 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
     unsigned long flags;
 
+    perfc_incr(vgicd_reads);
+
     switch ( gicd_reg )
     {
     case GICD_CTLR:
@@ -270,6 +272,8 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
     uint32_t tr;
     unsigned long flags;
+
+    perfc_incr(vgicd_writes);
 
     switch ( gicd_reg )
     {

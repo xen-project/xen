@@ -536,6 +536,8 @@ static void do_sgi(struct cpu_user_regs *regs, enum gic_sgi sgi)
     /* Lower the priority */
     struct irq_desc *desc = irq_to_desc(sgi);
 
+    perfc_incr(ipis);
+
     /* Lower the priority */
     gic_hw_ops->eoi_irq(desc);
 
@@ -604,6 +606,7 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
      * GICH_HCR_UIE is cleared before reading GICC_IAR. As a consequence
      * this handler is not called.
      */
+    perfc_incr(maintenance_irqs);
 }
 
 void gic_dump_info(struct vcpu *v)
