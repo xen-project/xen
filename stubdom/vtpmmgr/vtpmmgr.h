@@ -46,8 +46,20 @@
 #include "vtpm_manager.h"
 #include "tpm2_types.h"
 
+#define TPM2_EXTRA_OPT "tpm2=1"
 #define RSA_KEY_SIZE 0x0800
 #define RSA_CIPHER_SIZE (RSA_KEY_SIZE / 8)
+
+enum {
+    TPM1_HARDWARE = 1,
+    TPM2_HARDWARE,
+} tpm_version;
+
+struct tpm_hardware_version {
+    int hw_version;
+};
+
+extern struct tpm_hardware_version hardware_version;
 
 struct vtpm_globals {
    int tpm_fd;
@@ -97,5 +109,7 @@ inline TPM_RESULT vtpmmgr_rand(unsigned char* bytes, size_t num_bytes) {
 TPM_RC tpm2_take_ownership(void);
 TPM_RESULT vtpmmgr2_create(void);
 TPM_RESULT vtpmmgr2_init(int argc, char** argv);
+int parse_cmdline_hw(int argc, char** argv);
+int hw_is_tpm2(void);
 
 #endif

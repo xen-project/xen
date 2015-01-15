@@ -45,6 +45,27 @@
 #include "vtpmmgr.h"
 #include "tcg.h"
 
+struct tpm_hardware_version hardware_version = {
+    .hw_version = TPM1_HARDWARE,
+};
+
+int parse_cmdline_hw(int argc, char** argv)
+{
+    int i;
+
+    for (i = 1; i < argc; ++i) {
+        if (!strcmp(argv[i], TPM2_EXTRA_OPT)) {
+            hardware_version.hw_version = TPM2_HARDWARE;
+            break;
+        }
+    }
+    return 0;
+}
+
+int hw_is_tpm2(void)
+{
+    return (hardware_version.hw_version == TPM2_HARDWARE) ? 1 : 0;
+}
 
 void main_loop(void) {
    tpmcmd_t* tpmcmd;
@@ -74,12 +95,25 @@ int main(int argc, char** argv)
    sleep(2);
    vtpmloginfo(VTPM_LOG_VTPM, "Starting vTPM manager domain\n");
 
-   /* Initialize the vtpm manager */
-   if(vtpmmgr_init(argc, argv) != TPM_SUCCESS) {
-      vtpmlogerror(VTPM_LOG_VTPM, "Unable to initialize vtpmmgr domain!\n");
-      rc = -1;
-      goto exit;
-   }
+    /*Parse TPM hardware in extra command line*/
+    parse_cmdline_hw(argc, argv);
+
+    /* Initialize the vtpm manager */
+    if (hw_is_tpm2()) {
+        vtpmloginfo(VTPM_LOG_VTPM, "Hardware : --- TPM 2.0 ---\n");
+        if (vtpmmgr2_init(argc, argv) != TPM_SUCCESS) {
+            vtpmlogerror(VTPM_LOG_VTPM, "Unable to initialize vtpmmgr domain!\n");
+            rc = -1;
+            goto exit;
+        }
+    }else{
+        vtpmloginfo(VTPM_LOG_VTPM, "Hardware : --- TPM 1.x ---\n");
+        if (vtpmmgr_init(argc, argv) != TPM_SUCCESS) {
+            vtpmlogerror(VTPM_LOG_VTPM, "Unable to initialize vtpmmgr domain!\n");
+            rc = -1;
+            goto exit;
+        }
+    }
 
    main_loop();
 
