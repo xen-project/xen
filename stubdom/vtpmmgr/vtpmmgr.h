@@ -95,5 +95,6 @@ inline TPM_RESULT vtpmmgr_rand(unsigned char* bytes, size_t num_bytes) {
 
 /* TPM 2.0 */
 TPM_RC tpm2_take_ownership(void);
+TPM_RESULT vtpmmgr2_create(void);
 
 #endif

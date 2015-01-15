@@ -580,3 +580,68 @@ TPM_RC tpm2_take_ownership(void)
 abort_egress:
     return status;
 }
+
+TPM_RESULT vtpmmgr2_create(void)
+{
+    TPM_RESULT status = TPM_SUCCESS;
+
+    TPMTRYRETURN(tpm2_take_ownership());
+
+   /* create SK */
+    TPM2_Create_Params_out out;
+    TPM2_Create_Params_in in = {
+        .inSensitive = {
+            .size = 4 + 20,
+            .sensitive = {
+                .userAuth.size = 20,
+                .userAuth.buffer = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                .data.size = 0,
+            },
+        },
+        .inPublic = {
+            .size = (60),
+            .publicArea = {
+                 .type = TPM2_ALG_RSA,
+                 .nameAlg = TPM2_ALG_SHA256,
+#define SK_OBJ_ATTR (fixedTPM | fixedParent | userWithAuth |\
+                     sensitiveDataOrigin |decrypt)
+                 .objectAttributes = SK_OBJ_ATTR,
+                 .authPolicy.size = 0,
+                 .parameters.rsaDetail = {
+                     .symmetric = {
+                         .algorithm = TPM2_ALG_NULL,
+                     },
+                     .scheme = {
+                         TPM2_ALG_OAEP,
+                         .details.oaep.hashAlg = TPM2_ALG_SHA256,
+                     },
+                     .keyBits = RSA_KEY_SIZES_BITS,
+                     .exponent = 0,
+                  },
+                  .unique.rsa.size = 0,
+            },
+        },
+        .outsideInfo.size = 0,
+        .creationPCR.count = 0,
+    };/*end in */
+
+    TPMTRYRETURN(TPM2_Create(vtpm_globals.srk_handle, &in, &out));
+    TPMTRYRETURN(TPM2_Load(vtpm_globals.srk_handle,
+                           &vtpm_globals.tpm2_storage_key.Private,
+                           &vtpm_globals.tpm2_storage_key.Public,
+                           &vtpm_globals.sk_handle,
+                           &vtpm_globals.sk_name));
+
+    vtpmloginfo(VTPM_LOG_VTPM, "SK HANDLE: 0x%X\n", vtpm_globals.sk_handle);
+
+    /*Create new disk image*/
+    TPMTRYRETURN(vtpm_new_disk());
+
+    goto egress;
+
+abort_egress:
+egress:
+    vtpmloginfo(VTPM_LOG_VTPM, "Finished initialized new VTPM manager\n");
+    return status;
+}
