@@ -205,6 +205,14 @@ static inline void mm_enforce_order_unlock(int unlock_level,
  *                                                                      *
  ************************************************************************/
 
+/* Nested P2M lock (per-domain)
+ *
+ * A per-domain lock that protects the mapping from nested-CR3 to
+ * nested-p2m.  In particular it covers:
+ * - the array of nested-p2m tables, and all LRU activity therein; and
+ * - setting the "cr3" field of any p2m table to a non-P2M_BASE_EAADR value.
+ *   (i.e. assigning a p2m table to be the shadow of that cr3 */
+
 declare_mm_lock(nestedp2m)
 #define nestedp2m_lock(d)   mm_lock(nestedp2m, &(d)->arch.nested_p2m_lock)
 #define nestedp2m_unlock(d) mm_unlock(&(d)->arch.nested_p2m_lock)
@@ -243,14 +251,6 @@ declare_mm_order_constraint(per_page_sharing)
 #define page_sharing_mm_post_lock(l, r) \
         mm_enforce_order_lock_post_per_page_sharing((l), (r))
 #define page_sharing_mm_unlock(l, r) mm_enforce_order_unlock((l), (r))
-
-/* Nested P2M lock (per-domain)
- *
- * A per-domain lock that protects the mapping from nested-CR3 to 
- * nested-p2m.  In particular it covers:
- * - the array of nested-p2m tables, and all LRU activity therein; and
- * - setting the "cr3" field of any p2m table to a non-P2M_BASE_EAADR value.
- *   (i.e. assigning a p2m table to be the shadow of that cr3 */
 
 /* PoD lock (per-p2m-table)
  * 
