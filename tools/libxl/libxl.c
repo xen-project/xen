@@ -1734,7 +1734,7 @@ int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
     }
 
     tty = libxl__xs_read(gc, XBT_NULL, tty_path);
-    if (!tty) {
+    if (!tty || tty[0] == '\0') {
        LOGE(ERROR,"unable to read console tty path `%s'",tty_path);
        rc = ERROR_FAIL;
        goto out;
