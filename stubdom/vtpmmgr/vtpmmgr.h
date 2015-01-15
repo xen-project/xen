@@ -44,6 +44,7 @@
 #include "uuid.h"
 #include "tcg.h"
 #include "vtpm_manager.h"
+#include "tpm2_types.h"
 
 #define RSA_KEY_SIZE 0x0800
 #define RSA_CIPHER_SIZE (RSA_KEY_SIZE / 8)
@@ -59,6 +60,14 @@ struct vtpm_globals {
    ctr_drbg_context    ctr_drbg;
 
    int hw_locality;
+
+    /* TPM 2.0 */
+    TPM_AuthArea       pw_auth;
+    TPM_AuthArea       srk_auth_area;
+    TPM_HANDLE         srk_handle;
+    TPM_HANDLE         sk_handle;
+    TPM2B_NAME         sk_name;
+    TPM2_RSA_KEY       tpm2_storage_key;
 };
 
 struct tpm_opaque {
