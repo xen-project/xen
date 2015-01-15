@@ -38,6 +38,10 @@ void machine_restart(unsigned int delay_millisecs)
 {
     int timeout = 10;
 
+    watchdog_disable();
+    console_start_sync();
+    spin_debug_disable();
+
     local_irq_enable();
     smp_call_function(halt_this_cpu, NULL, 0);
     local_irq_disable();
