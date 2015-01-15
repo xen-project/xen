@@ -93,4 +93,7 @@ inline TPM_RESULT vtpmmgr_rand(unsigned char* bytes, size_t num_bytes) {
    return ctr_drbg_random(&vtpm_globals.ctr_drbg, bytes, num_bytes) == 0 ? 0 : TPM_FAIL;
 }
 
+/* TPM 2.0 */
+TPM_RC tpm2_take_ownership(void);
+
 #endif

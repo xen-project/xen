@@ -51,6 +51,7 @@
 #include "vtpm_disk.h"
 #include "tpm.h"
 #include "marshal.h"
+#include "tpm2.h"
 
 struct Opts {
    enum {
@@ -508,4 +509,74 @@ void vtpmmgr_shutdown(void)
    close(vtpm_globals.tpm_fd);
 
    vtpmloginfo(VTPM_LOG_VTPM, "VTPM Manager stopped.\n");
+}
+
+/* TPM 2.0 */
+
+static void tpm2_AuthArea_ctor(const char *authValue, UINT32 authLen,
+                               TPM_AuthArea *auth)
+{
+    auth->sessionHandle = TPM_RS_PW;
+    auth->nonce.size = 0;
+    auth->sessionAttributes = 1;
+    auth->auth.size = authLen;
+    memcpy(auth->auth.buffer, authValue, authLen);
+    auth->size = 9 + authLen;
+}
+
+TPM_RC tpm2_take_ownership(void)
+{
+    TPM_RC status = TPM_SUCCESS;
+
+    tpm2_AuthArea_ctor(NULL, 0, &vtpm_globals.pw_auth);
+
+    /* create SRK */
+    TPM2_CreatePrimary_Params_in in = {
+        .inSensitive = {
+            .size = 4,
+            .sensitive = {
+                .userAuth.size = 0,
+                .userAuth.buffer = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                .data.size = 0,
+            },
+        },
+        .inPublic = {
+            .size = 60,
+            .publicArea = {
+                .type = TPM2_ALG_RSA,
+                .nameAlg = TPM2_ALG_SHA256,
+#define SRK_OBJ_ATTR (fixedTPM | fixedParent  | userWithAuth | \
+                      sensitiveDataOrigin | restricted | decrypt)
+                .objectAttributes = SRK_OBJ_ATTR,
+                .authPolicy.size = 0,
+                .parameters.rsaDetail = {
+                    .symmetric = {
+                    .algorithm = TPM2_ALG_AES,
+                    .keyBits.aes = AES_KEY_SIZES_BITS,
+                    .mode.aes = TPM2_ALG_CFB,
+                    },
+                .scheme = { TPM2_ALG_NULL },
+                .keyBits = RSA_KEY_SIZES_BITS,
+                .exponent = 0,
+                },
+                .unique.rsa.size = 0,
+            },
+        },
+            .outsideInfo.size = 0,
+            .creationPCR.count = 0,
+    };
+
+    TPMTRYRETURN(TPM2_CreatePrimary(TPM_RH_OWNER,&in,
+                                    &vtpm_globals.srk_handle, NULL));
+    vtpmloginfo(VTPM_LOG_VTPM, "SRK handle: 0x%X\n", vtpm_globals.srk_handle);
+    {
+        const char data[20] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        tpm2_AuthArea_ctor(data, 20, &vtpm_globals.srk_auth_area);
+    }
+    /*end create SRK*/
+
+abort_egress:
+    return status;
 }
