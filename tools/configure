@@ -644,6 +644,8 @@ zlib
 FETCHER
 FTP
 WGET
+pixman_LIBS
+pixman_CFLAGS
 glib_LIBS
 glib_CFLAGS
 PKG_CONFIG_LIBDIR
@@ -833,6 +835,8 @@ PKG_CONFIG_PATH
 PKG_CONFIG_LIBDIR
 glib_CFLAGS
 glib_LIBS
+pixman_CFLAGS
+pixman_LIBS
 LIBNL3_CFLAGS
 LIBNL3_LIBS
 SYSTEMD_CFLAGS
@@ -1548,6 +1552,9 @@ Some influential environment variables:
               path overriding pkg-config's built-in search path
   glib_CFLAGS C compiler flags for glib, overriding pkg-config
   glib_LIBS   linker flags for glib, overriding pkg-config
+  pixman_CFLAGS
+              C compiler flags for pixman, overriding pkg-config
+  pixman_LIBS linker flags for pixman, overriding pkg-config
   LIBNL3_CFLAGS
               C compiler flags for LIBNL3, overriding pkg-config
   LIBNL3_LIBS linker flags for LIBNL3, overriding pkg-config
@@ -7665,6 +7672,97 @@ See \`config.log' for more details" "$LINENO" 5; }
 else
 	glib_CFLAGS=$pkg_cv_glib_CFLAGS
 	glib_LIBS=$pkg_cv_glib_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+fi
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for pixman" >&5
+$as_echo_n "checking for pixman... " >&6; }
+
+if test -n "$pixman_CFLAGS"; then
+    pkg_cv_pixman_CFLAGS="$pixman_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"pixman-1\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "pixman-1") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_pixman_CFLAGS=`$PKG_CONFIG --cflags "pixman-1" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$pixman_LIBS"; then
+    pkg_cv_pixman_LIBS="$pixman_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"pixman-1\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "pixman-1") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_pixman_LIBS=`$PKG_CONFIG --libs "pixman-1" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        pixman_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "pixman-1" 2>&1`
+        else
+	        pixman_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "pixman-1" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$pixman_PKG_ERRORS" >&5
+
+	as_fn_error $? "Package requirements (pixman-1) were not met:
+
+$pixman_PKG_ERRORS
+
+Consider adjusting the PKG_CONFIG_PATH environment variable if you
+installed software in a non-standard prefix.
+
+Alternatively, you may set the environment variables pixman_CFLAGS
+and pixman_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details." "$LINENO" 5
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	{ { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
+is in your PATH or set the PKG_CONFIG environment variable to the full
+path to pkg-config.
+
+Alternatively, you may set the environment variables pixman_CFLAGS
+and pixman_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details.
+
+To get pkg-config, see <http://pkg-config.freedesktop.org/>.
+See \`config.log' for more details" "$LINENO" 5; }
+else
+	pixman_CFLAGS=$pkg_cv_pixman_CFLAGS
+	pixman_LIBS=$pkg_cv_pixman_LIBS
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 

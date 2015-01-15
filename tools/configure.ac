@@ -324,9 +324,10 @@ esac
  AX_CHECK_UUID
  AX_CHECK_CURSES
 
-dnl Glib 2.0 is only required when QEMU is built
+dnl The following are only required when upstream QEMU is built
 AS_IF([test "x$qemu_xen" = "xy"], [
 PKG_CHECK_MODULES(glib, [glib-2.0 >= 2.12])
+PKG_CHECK_MODULES(pixman, pixman-1)
 ])
 AX_CHECK_FETCHER
 
