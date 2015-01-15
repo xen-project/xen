@@ -12,17 +12,20 @@
 #include <polarssl/sha1.h>
 
 #include "tpm.h"
+#include "tpm2.h"
 #include "tcg.h"
 
 #include "vtpmmgr.h"
 #include "vtpm_disk.h"
 #include "disk_tpm.h"
 
+#include "log.h"
 // Print out input/output of seal/unseal operations (includes keys)
 #undef DEBUG_SEAL_OPS
 
 #ifdef DEBUG_SEAL_OPS
 #include "marshal.h"
+#include "tpm2_marshal.h"
 #endif
 
 struct pcr_list {
@@ -31,11 +34,16 @@ struct pcr_list {
 
 static struct pcr_list hwtpm;
 
+/*Ignore PCR on TPM 2.0, read PCR values for TPM 1.x seal | unseal*/
 void TPM_read_pcrs(void)
 {
 	int i;
-	for(i=0; i < 24; i++)
-		TPM_PCR_Read(i, &hwtpm.pcrs[i]);
+	for (i=0; i < 24; i++) {
+        if (hw_is_tpm2())
+            tpm2_pcr_read(i, (uint8_t *)&hwtpm.pcrs[i]);
+        else
+		    TPM_PCR_Read(i, &hwtpm.pcrs[i]);
+    }
 }
 
 struct pcr_composite_3 {
@@ -136,6 +144,36 @@ int TPM_disk_seal(struct disk_seal_entry *dst, const void* src, size_t size)
 
 	free_TPM_STORED_DATA12(&out);
 	return rc;
+}
+
+TPM_RC TPM2_disk_bind(struct disk_seal_entry *dst, void* src, unsigned int size)
+{
+    TPM_RESULT status = TPM_SUCCESS;
+
+    TPMTRYRETURN(TPM2_Bind(vtpm_globals.sk_handle,
+                           src,
+                           size,
+                           dst->sealed_data));
+
+abort_egress:
+egress:
+   return status;
+}
+
+TPM_RC TPM2_disk_unbind(void *dst, unsigned int *size, const struct disk_seal_entry *src)
+{
+    TPM_RESULT status = TPM_SUCCESS;
+    unsigned char buf[RSA_CIPHER_SIZE];
+
+    memcpy(buf, src->sealed_data, RSA_CIPHER_SIZE);
+    TPMTRYRETURN(TPM2_UnBind(vtpm_globals.sk_handle,
+                             RSA_CIPHER_SIZE,
+                             buf,
+                             size,
+                             dst));
+abort_egress:
+egress:
+   return status;
 }
 
 int TPM_disk_unseal(void *dst, size_t size, const struct disk_seal_entry *src)
