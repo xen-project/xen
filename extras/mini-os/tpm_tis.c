@@ -1363,5 +1363,161 @@ int tpm_tis_posix_fstat(int fd, struct stat* buf)
    return 0;
 }
 
+/* TPM 2.0 */
 
+/*TPM2.0 Selftest*/
+static void tpm2_selftest(struct tpm_chip* chip)
+{
+    uint8_t data[] = {
+        0x80, 0x1,
+        0x0, 0x0, 0x0, 0xb,
+        0x0, 0x0, 0x1, 0x43,
+        0x1,
+    };
+
+    tpm_transmit(chip, data, sizeof(data));
+}
+
+struct tpm_chip* init_tpm2_tis(unsigned long baseaddr, int localities, unsigned int irq)
+{
+    int i;
+    unsigned long addr;
+    struct tpm_chip* tpm = NULL;
+    uint32_t didvid;
+    uint32_t intfcaps;
+    uint32_t intmask;
+
+    printk("============= Init TPM2 TIS Driver ==============\n");
+
+    /*Sanity check the localities input */
+    if (localities & ~TPM_TIS_EN_LOCLALL) {
+        printk("init_tpm2_tis Invalid locality specification! %X\n", localities);
+        goto abort_egress;
+    }
+
+    printk("IOMEM Machine Base Address: %lX\n", baseaddr);
+
+    /* Create the tpm data structure */
+    tpm = malloc(sizeof(struct tpm_chip));
+    __init_tpm_chip(tpm);
+
+    /* Set the enabled localities - if 0 we leave default as all enabled */
+    if (localities != 0) {
+        tpm->enabled_localities = localities;
+    }
+    printk("Enabled Localities: ");
+    for (i = 0; i < 5; ++i) {
+        if (locality_enabled(tpm, i)) {
+            printk("%d ", i);
+        }
+    }
+    printk("\n");
+
+    /* Set the base machine address */
+    tpm->baseaddr = baseaddr;
+
+    /* Set default timeouts */
+    tpm->timeout_a = MILLISECS(TIS_SHORT_TIMEOUT);
+    tpm->timeout_b = MILLISECS(TIS_LONG_TIMEOUT);
+    tpm->timeout_c = MILLISECS(TIS_SHORT_TIMEOUT);
+    tpm->timeout_d = MILLISECS(TIS_SHORT_TIMEOUT);
+
+    /*Map the mmio pages */
+    addr = tpm->baseaddr;
+    for (i = 0; i < 5; ++i) {
+        if (locality_enabled(tpm, i)) {
+
+            /* Map the page in now */
+            if ((tpm->pages[i] = ioremap_nocache(addr, PAGE_SIZE)) == NULL) {
+                printk("Unable to map iomem page a address %p\n", addr);
+                goto abort_egress;
+            }
+
+            /* Set default locality to the first enabled one */
+            if (tpm->locality < 0) {
+                if (tpm_tis_request_locality(tpm, i) < 0) {
+                    printk("Unable to request locality %d??\n", i);
+                    goto abort_egress;
+                }
+            }
+        }
+        addr += PAGE_SIZE;
+    }
+
+    /* Get the vendor and device ids */
+    didvid = ioread32(TPM_DID_VID(tpm, tpm->locality));
+    tpm->did = didvid >> 16;
+    tpm->vid = didvid & 0xFFFF;
+
+    /* Get the revision id */
+    tpm->rid = ioread8(TPM_RID(tpm, tpm->locality));
+    printk("2.0 TPM (device-id=0x%X vendor-id = %X rev-id = %X)\n",
+           tpm->did, tpm->vid, tpm->rid);
+
+    intfcaps = ioread32(TPM_INTF_CAPS(tpm, tpm->locality));
+    printk("TPM interface capabilities (0x%x):\n", intfcaps);
+    if (intfcaps & TPM_INTF_BURST_COUNT_STATIC)
+        printk("\tBurst Count Static\n");
+    if (intfcaps & TPM_INTF_CMD_READY_INT)
+        printk("\tCommand Ready Int Support\n");
+    if (intfcaps & TPM_INTF_INT_EDGE_FALLING)
+        printk("\tInterrupt Edge Falling\n");
+    if (intfcaps & TPM_INTF_INT_EDGE_RISING)
+        printk("\tInterrupt Edge Rising\n");
+    if (intfcaps & TPM_INTF_INT_LEVEL_LOW)
+        printk("\tInterrupt Level Low\n");
+    if (intfcaps & TPM_INTF_INT_LEVEL_HIGH)
+        printk("\tInterrupt Level High\n");
+    if (intfcaps & TPM_INTF_LOCALITY_CHANGE_INT)
+        printk("\tLocality Change Int Support\n");
+    if (intfcaps & TPM_INTF_STS_VALID_INT)
+        printk("\tSts Valid Int Support\n");
+    if (intfcaps & TPM_INTF_DATA_AVAIL_INT)
+        printk("\tData Avail Int Support\n");
+
+    /*Interupt setup */
+    intmask = ioread32(TPM_INT_ENABLE(tpm, tpm->locality));
+
+    intmask |= TPM_INTF_CMD_READY_INT | TPM_INTF_LOCALITY_CHANGE_INT |
+               TPM_INTF_DATA_AVAIL_INT | TPM_INTF_STS_VALID_INT;
+
+    iowrite32(TPM_INT_ENABLE(tpm, tpm->locality), intmask);
+
+    /*If interupts are enabled, handle it */
+    if (irq) {
+        if (irq != TPM_PROBE_IRQ) {
+            tpm->irq = irq;
+        } else {
+        /*FIXME add irq probing feature later */
+        printk("IRQ probing not implemented\n");
+        }
+    }
+
+    if (tpm->irq) {
+        iowrite8(TPM_INT_VECTOR(tpm, tpm->locality), tpm->irq);
+        if (bind_pirq(tpm->irq, 1, tpm_tis_irq_handler, tpm) != 0) {
+            printk("Unabled to request irq: %u for use\n", tpm->irq);
+            printk("Will use polling mode\n");
+            tpm->irq = 0;
+        } else {
+
+            /* Clear all existing */
+            iowrite32(TPM_INT_STATUS(tpm, tpm->locality),
+                                     ioread32(TPM_INT_STATUS(tpm, tpm->locality)));
+
+            /* Turn on interrupts */
+            iowrite32(TPM_INT_ENABLE(tpm, tpm->locality),
+                                     intmask | TPM_GLOBAL_INT_ENABLE);
+        }
+    }
+
+    tpm2_selftest(tpm);
+    return tpm;
+
+abort_egress:
+    if (tpm != NULL) {
+        shutdown_tpm_tis(tpm);
+    }
+    return NULL;
+}
 #endif

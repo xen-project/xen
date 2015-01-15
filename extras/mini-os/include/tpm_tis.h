@@ -36,6 +36,7 @@
 struct tpm_chip;
 
 struct tpm_chip* init_tpm_tis(unsigned long baseaddr, int localities, unsigned int irq);
+struct tpm_chip* init_tpm2_tis(unsigned long baseaddr, int localities, unsigned int irq);
 void shutdown_tpm_tis(struct tpm_chip* tpm);
 
 int tpm_tis_request_locality(struct tpm_chip* tpm, int locality);
