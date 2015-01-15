@@ -12,7 +12,7 @@
 XEN_ROOT=../..
 
 TARGET=vtpmmgr.a
-OBJS=vtpmmgr.o vtpm_cmd_handler.o init.o tpmrsa.o tpm.o log.o
+OBJS=vtpmmgr.o vtpm_cmd_handler.o init.o tpmrsa.o tpm.o tpm2.o log.o
 OBJS += vtpm_disk.o disk_tpm.o disk_io.o disk_crypto.o disk_read.o disk_write.o
 OBJS += mgmt_authority.o
 
