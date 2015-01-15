@@ -88,7 +88,12 @@ static void generate_group_seals(struct mem_group *src, const struct mem_tpm_mgr
 		dst->pcr_selection = src->seals[i].pcr_selection;
 		memcpy(&dst->digest_release, &src->seals[i].digest_release, 20);
 		TPM_pcr_digest(&dst->digest_at_seal, dst->pcr_selection);
-		TPM_disk_seal(dst, &sblob, sizeof(sblob));
+
+        /*TPM 2.0 bind | TPM 1.x seal*/
+        if (hw_is_tpm2())
+            TPM2_disk_bind(dst, &sblob, sizeof(sblob));
+        else
+            TPM_disk_seal(dst, &sblob, sizeof(sblob));
 	}
 	src->seal_bits.nr_cfgs = native_be32(src->nr_seals);
 
@@ -250,7 +255,11 @@ static void disk_write_seal_list(struct mem_tpm_mgr *mgr, struct mem_group *grou
 		memcpy(&dst->digest_release, &src->digest_release, 20);
 		TPM_pcr_digest(&dst->digest_at_seal, dst->pcr_selection);
 
-		TPM_disk_seal(dst, &sblob, sizeof(sblob));
+        /*TPM 2.0 bind / TPM 1.x seal*/
+        if (hw_is_tpm2())
+            TPM2_disk_bind(dst, &sblob, sizeof(sblob));
+        else
+            TPM_disk_seal(dst, &sblob, sizeof(sblob));
 	}
 
 	memcpy(seal->hdr.magic, TPM_MGR_MAGIC, 12);
