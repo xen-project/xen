@@ -1,4 +1,8 @@
-Author: Daniel De Graaf <dgdegra@tycho.nsa.gov>
+================================================================================
+Authors:
+    Daniel De Graaf <dgdegra@tycho.nsa.gov>
+    Quan Xu <quan.xu@intel.com>
+================================================================================
 
 This document describes the operation and command line interface of
 vtpmmgr-stubdom. See docs/misc/vtpm.txt for details on the vTPM subsystem as a
@@ -163,3 +167,152 @@ would look like the following:
 This requires the migration domain to be added to the list of valid vTPM kernel
 hashes. In the current version of the vtpmmgr domain, this is the hash of the
 XSM label, not the kernel.
+
+================================================================================
+Appendix B: vtpmmgr on TPM 2.0
+================================================================================
+
+Manager disk image setup:
+-------------------------
+
+The vTPM Manager requires a disk image to store its encrypted data. The image
+does not require a filesystem and can live anywhere on the host disk. The image
+is not large; the Xen 4.5 vtpmmgr is limited to using the first 2MB of the image
+but can support more than 20,000 vTPMs.
+
+ dd if=/dev/zero of=/home/vtpm2/vmgr bs=16M count=1
+
+Manager config file:
+--------------------
+
+The vTPM Manager domain (vtpmmgr-stubdom) must be started like any other Xen
+virtual machine and requires a config file.  The manager requires a disk image
+for storage and permission to access the hardware memory pages for the TPM. The
+disk must be presented as "hda", and the TPM memory pages are passed using the
+iomem configuration parameter. The TPM TIS uses 5 pages of IO memory (one per
+locality) that start at physical address 0xfed40000. By default, the TPM manager
+uses locality 0 (so only the page at 0xfed40 is needed).
+
+Add:
+..
+     extra="tpm2=1"
+..
+extra option to launch vtpmmgr-stubdom domain on TPM 2.0, and ignore it on TPM
+1.x. for example:
+
+    kernel="/usr/lib/xen/boot/vtpmmgr-stubdom.gz"
+    memory=128
+    disk=["file:/home/vtpm2/vmgr,hda,w"]
+    name="vtpmmgr"
+    iomem=["fed40,5"]
+    extra="tpm2=1"
+
+
+Key Hierarchy
+------------------------------
+
+    +------------------+
+    |  vTPM's secrets  | ...
+    +------------------+
+            |  ^
+            |  |(Bind / Unbind)
+- - - - -  -v  |- - - - - - - - TPM 2.0
+    +------------------+
+    |        SK        +
+    +------------------+
+            |  ^
+            v  |
+    +------------------+
+    |       SRK        |
+    +------------------+
+            |  ^
+            v  |
+    +------------------+
+    | TPM 2.0 Storage  |
+    |   Primary Seed   |
+    +------------------+
+
+Now the secrets for the vTPMs are only being bound to the presence of thephysical
+TPM 2.0. Since using PCRs to seal the data can be an important security feature
+that users of the vtpmmgr rely on. I will replace TPM2_Bind/TPM2_Unbind with
+TPM2_Seal/TPM2_Unseal to provide as much security as it did for TPM 1.2 in later
+series of patch.
+
+DESIGN OVERVIEW
+------------------------------
+
+The architecture of vTPM subsystem on TPM 2.0 is described below:
+
++------------------+
+|    Linux DomU    | ...
+|       |  ^       |
+|       v  |       |
+|   xen-tpmfront   |
++------------------+
+        |  ^
+        v  |
++------------------+
+| mini-os/tpmback  |
+|       |  ^       |
+|       v  |       |
+|  vtpm-stubdom    | ...
+|       |  ^       |
+|       v  |       |
+| mini-os/tpmfront |
++------------------+
+        |  ^
+        v  |
++------------------+
+| mini-os/tpmback  |
+|       |  ^       |
+|       v  |       |
+| vtpmmgr-stubdom  |
+|       |  ^       |
+|       v  |       |
+| mini-os/tpm2_tis |
++------------------+
+        |  ^
+        v  |
++------------------+
+| Hardware TPM 2.0 |
++------------------+
+
+ * Linux DomU: The Linux based guest that wants to use a vTPM. There many be
+               more than one of these.
+
+ * xen-tpmfront.ko: Linux kernel virtual TPM frontend driver. This driver
+                    provides vTPM access to a para-virtualized Linux based DomU.
+
+ * mini-os/tpmback: Mini-os TPM backend driver. The Linux frontend driver
+                    connects to this backend driver to facilitate
+                    communications between the Linux DomU and its vTPM. This
+                    driver is also used by vtpmmgr-stubdom to communicate with
+                    vtpm-stubdom.
+
+ * vtpm-stubdom: A mini-os stub domain that implements a vTPM. There is a
+                 one to one mapping between running vtpm-stubdom instances and
+                 logical vtpms on the system. The vTPM Platform Configuration
+                 Registers (PCRs) are all initialized to zero.
+
+ * mini-os/tpmfront: Mini-os TPM frontend driver. The vTPM mini-os domain
+                     vtpm-stubdom uses this driver to communicate with
+                     vtpmmgr-stubdom. This driver could also be used separately to
+                     implement a mini-os domain that wishes to use a vTPM of
+                     its own.
+
+ * vtpmmgr-stubdom: A mini-os domain that implements the vTPM manager.
+               There is only one vTPM manager and it should be running during
+               the entire lifetime of the machine.  This domain regulates
+               access to the physical TPM on the system and secures the
+               persistent state of each vTPM.
+
+ * mini-os/tpm2_tis: Mini-os TPM version 2.0 TPM Interface Specification (TIS)
+                    driver. This driver used by vtpmmgr-stubdom to talk directly
+                    to the hardware TPM 2.0. Communication is facilitated by mapping
+                    hardware memory pages into vtpmmgr-stubdom.
+
+ * Hardware TPM 2.0: The physical TPM 2.0 that is soldered onto the motherboard.
+
+---------------------
+Noted:
+    functionality for a virtual guest operating system (a DomU) is still TPM 1.2.
