@@ -645,3 +645,112 @@ egress:
     vtpmloginfo(VTPM_LOG_VTPM, "Finished initialized new VTPM manager\n");
     return status;
 }
+
+static int tpm2_entropy_source(void* dummy, unsigned char* data,
+                               size_t len, size_t* olen)
+{
+    UINT32 sz = len;
+    TPM_RESULT rc = TPM2_GetRandom(&sz, data);
+    *olen = sz;
+    return rc == TPM_SUCCESS ? 0 : POLARSSL_ERR_ENTROPY_SOURCE_FAILED;
+}
+
+/*TPM 2.0 Objects flush */
+static TPM_RC flush_tpm2(void)
+{
+    int i;
+
+    for (i = TRANSIENT_FIRST; i < TRANSIENT_LAST; i++)
+         TPM2_FlushContext(i);
+
+    return TPM_SUCCESS;
+}
+
+TPM_RESULT vtpmmgr2_init(int argc, char** argv)
+{
+    TPM_RESULT status = TPM_SUCCESS;
+
+    /* Default commandline options */
+    struct Opts opts = {
+        .tpmdriver = TPMDRV_TPM_TIS,
+        .tpmiomem = TPM_BASEADDR,
+        .tpmirq = 0,
+        .tpmlocality = 0,
+        .gen_owner_auth = 0,
+    };
+
+    if (parse_cmdline_opts(argc, argv, &opts) != 0) {
+        vtpmlogerror(VTPM_LOG_VTPM, "Command line parsing failed! exiting..\n");
+        status = TPM_BAD_PARAMETER;
+        goto abort_egress;
+    }
+
+    /*Setup storage system*/
+    if (vtpm_storage_init() != 0) {
+        vtpmlogerror(VTPM_LOG_VTPM, "Unable to initialize storage subsystem!\n");
+        status = TPM_IOERROR;
+        goto abort_egress;
+    }
+
+    /*Setup tpmback device*/
+    init_tpmback(set_opaque, free_opaque);
+
+    /*Setup tpm access*/
+    switch(opts.tpmdriver) {
+        case TPMDRV_TPM_TIS:
+        {
+            struct tpm_chip* tpm;
+            if ((tpm = init_tpm2_tis(opts.tpmiomem, TPM_TIS_LOCL_INT_TO_FLAG(opts.tpmlocality),
+                                     opts.tpmirq)) == NULL) {
+                vtpmlogerror(VTPM_LOG_VTPM, "Unable to initialize tpmfront device\n");
+                status = TPM_IOERROR;
+                goto abort_egress;
+            }
+            printk("init_tpm2_tis()       ...ok\n");
+            vtpm_globals.tpm_fd = tpm_tis_open(tpm);
+            tpm_tis_request_locality(tpm, opts.tpmlocality);
+        }
+        break;
+        case TPMDRV_TPMFRONT:
+        {
+            struct tpmfront_dev* tpmfront_dev;
+            if ((tpmfront_dev = init_tpmfront(NULL)) == NULL) {
+                vtpmlogerror(VTPM_LOG_VTPM, "Unable to initialize tpmfront device\n");
+                status = TPM_IOERROR;
+                goto abort_egress;
+            }
+            vtpm_globals.tpm_fd = tpmfront_open(tpmfront_dev);
+        }
+        break;
+    }
+    printk("TPM 2.0 access ...ok\n");
+    /* Blow away all stale handles left in the tpm*/
+    if (flush_tpm2() != TPM_SUCCESS) {
+        vtpmlogerror(VTPM_LOG_VTPM, "VTPM_FlushResources failed, continuing anyway..\n");
+    }
+
+    /* Initialize the rng */
+    entropy_init(&vtpm_globals.entropy);
+    entropy_add_source(&vtpm_globals.entropy, tpm2_entropy_source, NULL, 0);
+    entropy_gather(&vtpm_globals.entropy);
+    ctr_drbg_init(&vtpm_globals.ctr_drbg, entropy_func, &vtpm_globals.entropy, NULL, 0);
+    ctr_drbg_set_prediction_resistance( &vtpm_globals.ctr_drbg, CTR_DRBG_PR_OFF );
+
+    /* Generate Auth for Owner*/
+    if (opts.gen_owner_auth) {
+        vtpmmgr_rand(vtpm_globals.owner_auth, sizeof(TPM_AUTHDATA));
+    }
+
+    /* Load the Manager data, if it fails create a new manager */
+    if (vtpm_load_disk()) {
+        vtpmloginfo(VTPM_LOG_VTPM, "Assuming first time initialization.\n");
+        TPMTRYRETURN(vtpmmgr2_create());
+    }
+
+    goto egress;
+
+abort_egress:
+    vtpmmgr_shutdown();
+egress:
+    return status;
+}
