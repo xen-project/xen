@@ -67,13 +67,10 @@ int domain_vgic_init(struct domain *d)
 
     d->arch.vgic.ctlr = 0;
 
-    /* Currently nr_lines in vgic and gic doesn't have the same meanings
-     * Here nr_lines = number of SPIs
-     */
     if ( is_hardware_domain(d) )
-        d->arch.vgic.nr_lines = gic_number_lines() - 32;
+        d->arch.vgic.nr_spis = gic_number_lines() - 32;
     else
-        d->arch.vgic.nr_lines = 0; /* We don't need SPIs for the guest */
+        d->arch.vgic.nr_spis = 0; /* We don't need SPIs for the guest */
 
     switch ( gic_hw_version() )
     {
@@ -99,11 +96,11 @@ int domain_vgic_init(struct domain *d)
         return -ENOMEM;
 
     d->arch.vgic.pending_irqs =
-        xzalloc_array(struct pending_irq, d->arch.vgic.nr_lines);
+        xzalloc_array(struct pending_irq, d->arch.vgic.nr_spis);
     if ( d->arch.vgic.pending_irqs == NULL )
         return -ENOMEM;
 
-    for (i=0; i<d->arch.vgic.nr_lines; i++)
+    for (i=0; i<d->arch.vgic.nr_spis; i++)
     {
         INIT_LIST_HEAD(&d->arch.vgic.pending_irqs[i].inflight);
         INIT_LIST_HEAD(&d->arch.vgic.pending_irqs[i].lr_queue);
@@ -223,7 +220,7 @@ void arch_move_irqs(struct vcpu *v)
     struct vcpu *v_target;
     int i;
 
-    for ( i = 32; i < (d->arch.vgic.nr_lines + 32); i++ )
+    for ( i = 32; i < vgic_num_irqs(d); i++ )
     {
         v_target = vgic_get_target_vcpu(v, i);
         p = irq_to_pending(v_target, i);
@@ -352,7 +349,7 @@ int vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode, int 
 struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq)
 {
     struct pending_irq *n;
-    /* Pending irqs allocation strategy: the first vgic.nr_lines irqs
+    /* Pending irqs allocation strategy: the first vgic.nr_spis irqs
      * are used for SPIs; the rests are used for per cpu irqs */
     if ( irq < 32 )
         n = &v->arch.vgic.pending_irqs[irq];

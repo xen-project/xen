@@ -432,8 +432,6 @@ static int gicv2v_setup(struct domain *d)
         d->arch.vgic.cbase = GUEST_GICC_BASE;
     }
 
-    d->arch.vgic.nr_lines = 0;
-
     /*
      * Map the gic virtual cpu interface in the gic cpu interface
      * region of the guest.

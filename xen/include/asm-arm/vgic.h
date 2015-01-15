@@ -113,7 +113,7 @@ struct vgic_ops {
 };
 
 /* Number of ranks of interrupt registers for a domain */
-#define DOMAIN_NR_RANKS(d) (((d)->arch.vgic.nr_lines+31)/32)
+#define DOMAIN_NR_RANKS(d) (((d)->arch.vgic.nr_spis+31)/32)
 
 #define vgic_lock(v)   spin_lock_irq(&(v)->domain->arch.vgic.lock)
 #define vgic_unlock(v) spin_unlock_irq(&(v)->domain->arch.vgic.lock)
@@ -174,6 +174,8 @@ enum gic_sgi_mode;
  * <b>-bits-per-interrupt.
  */
 #define REG_RANK_INDEX(b, n, s) ((((n) >> s) & ((b)-1)) % 32)
+
+#define vgic_num_irqs(d)        ((d)->arch.vgic.nr_spis + 32)
 
 extern int domain_vgic_init(struct domain *d);
 extern void domain_vgic_free(struct domain *d);

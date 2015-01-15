@@ -922,8 +922,6 @@ static int gicv_v3_init(struct domain *d)
         d->arch.vgic.rbase_size[0] = GUEST_GICV3_GICR0_SIZE;
     }
 
-    d->arch.vgic.nr_lines = 0;
-
     return 0;
 }
 
