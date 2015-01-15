@@ -287,7 +287,7 @@ static void update_reference_tsc(struct domain *d, bool_t initialize)
 
         printk(XENLOG_G_INFO "d%d: VIRIDIAN REFERENCE_TSC: invalidated\n",
                d->domain_id);
-        return;
+        goto out;
     }
 
     /*
@@ -306,6 +306,7 @@ static void update_reference_tsc(struct domain *d, bool_t initialize)
          p->TscSequence == 0 ) /* Avoid both 'invalid' values */
         p->TscSequence = 1;
 
+ out:
     unmap_domain_page(p);
 
     put_page_and_type(page);
