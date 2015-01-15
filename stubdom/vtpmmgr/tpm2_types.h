@@ -432,6 +432,8 @@ typedef struct {
 #define    IMPLEMENTATION_PCR   24
 #define    PLATFORM_PCR         24
 #define    PCR_SELECT_MAX       ((IMPLEMENTATION_PCR+7)/8)
+#define    PCR_SELECT_NUM(x)    (uint8_t)(x/8)
+#define    PCR_SELECT_VALUE(x)  (uint8_t)(0x1)<<(x%8)
 
 //Table 79 -- TPMS_PCR_SELECT Structure <I/O>
 typedef struct {

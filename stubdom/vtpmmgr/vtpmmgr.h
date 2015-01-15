@@ -107,6 +107,7 @@ inline TPM_RESULT vtpmmgr_rand(unsigned char* bytes, size_t num_bytes) {
 
 /* TPM 2.0 */
 TPM_RC tpm2_take_ownership(void);
+TPM_RC tpm2_pcr_read(int index, uint8_t *buf);
 TPM_RESULT vtpmmgr2_create(void);
 TPM_RESULT vtpmmgr2_init(int argc, char** argv);
 int parse_cmdline_hw(int argc, char** argv);

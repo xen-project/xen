@@ -51,6 +51,7 @@
 #include "vtpm_disk.h"
 #include "tpm.h"
 #include "marshal.h"
+#include "tpm2_marshal.h"
 #include "tpm2.h"
 
 struct Opts {
@@ -751,6 +752,39 @@ TPM_RESULT vtpmmgr2_init(int argc, char** argv)
 
 abort_egress:
     vtpmmgr_shutdown();
+egress:
+    return status;
+}
+
+TPM_RC tpm2_pcr_read(int index, uint8_t *buf)
+{
+    TPM_RESULT status = TPM_SUCCESS;
+    TPML_PCR_SELECTION pcrSelectionIn = {
+        .count = 1,};
+
+    TPMS_PCR_SELECTION tpms_pcr_selection = {
+        .hash = TPM2_ALG_SHA1,
+        .sizeofSelect = PCR_SELECT_MAX,};
+
+    UINT32 pcrUpdateCounter;
+    TPML_PCR_SELECTION pcrSelectionOut;
+    TPML_DIGEST pcrValues;
+    TPM2B_DIGEST tpm2b_digest;
+
+    tpms_pcr_selection.pcrSelect[PCR_SELECT_NUM(index)] = PCR_SELECT_VALUE(index);
+    memcpy(&pcrSelectionIn.pcrSelections[0], &tpms_pcr_selection,
+           sizeof(TPMS_PCR_SELECTION));
+
+    TPMTRYRETURN(TPM2_PCR_Read(pcrSelectionIn, &pcrUpdateCounter,
+                               &pcrSelectionOut, &pcrValues));
+
+    if (pcrValues.count < 1)
+        goto egress;
+
+    unpack_TPM2B_DIGEST((uint8_t *) &pcrValues, &tpm2b_digest);
+    memcpy(buf, tpm2b_digest.buffer, SHA1_DIGEST_SIZE);
+
+abort_egress:
 egress:
     return status;
 }
