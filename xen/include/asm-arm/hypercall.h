@@ -4,7 +4,7 @@
 #include <public/domctl.h> /* for arch_do_domctl */
 int do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 
-long do_arm_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg);
+long do_arm_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg);
 
 long subarch_do_domctl(struct xen_domctl *domctl, struct domain *d,
                        XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);

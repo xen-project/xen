@@ -109,7 +109,7 @@ do_vm_assist(
 extern long
 do_vcpu_op(
     int cmd,
-    int vcpuid,
+    unsigned int vcpuid,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
 struct vcpu;
@@ -160,7 +160,7 @@ compat_grant_table_op(
 extern int
 compat_vcpu_op(
     int cmd,
-    int vcpuid,
+    unsigned int vcpuid,
     XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern int

@@ -4659,7 +4659,7 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 }
 
 static long hvm_vcpu_op(
-    int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
+    int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     long rc;
 
@@ -4718,7 +4718,7 @@ static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 }
 
 static long hvm_vcpu_op_compat32(
-    int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
+    int cmd, unsigned vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     long rc;
 

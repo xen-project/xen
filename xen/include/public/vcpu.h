@@ -31,7 +31,7 @@
 
 /*
  * Prototype for this hypercall is:
- *  int vcpu_op(int cmd, int vcpuid, void *extra_args)
+ *  long vcpu_op(int cmd, unsigned int vcpuid, void *extra_args)
  * @cmd        == VCPUOP_??? (VCPU operation).
  * @vcpuid     == VCPU to operate on.
  * @extra_args == Operation-specific extra arguments (NULL if none).
