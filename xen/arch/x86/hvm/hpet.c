@@ -173,6 +173,12 @@ static int hpet_read(
     unsigned long result;
     uint64_t val;
 
+    if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] )
+    {
+        result = ~0ul;
+        goto out;
+    }
+
     addr &= HPET_MMAP_SIZE-1;
 
     if ( hpet_check_access_length(addr, length) != 0 )
@@ -308,6 +314,9 @@ static int hpet_write(
 #define set_stop_timer(n)    (__set_bit((n), &stop_timers))
 #define set_start_timer(n)   (__set_bit((n), &start_timers))
 #define set_restart_timer(n) (set_stop_timer(n),set_start_timer(n))
+
+    if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] )
+        goto out;
 
     addr &= HPET_MMAP_SIZE-1;
 
@@ -491,9 +500,8 @@ static int hpet_write(
 
 static int hpet_range(struct vcpu *v, unsigned long addr)
 {
-    return (v->domain->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] &&
-            (addr >= HPET_BASE_ADDRESS) &&
-            (addr < (HPET_BASE_ADDRESS + HPET_MMAP_SIZE)));
+    return ( (addr >= HPET_BASE_ADDRESS) &&
+             (addr < (HPET_BASE_ADDRESS + HPET_MMAP_SIZE)) );
 }
 
 const struct hvm_mmio_handler hpet_mmio_handler = {
