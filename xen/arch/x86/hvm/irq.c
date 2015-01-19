@@ -218,7 +218,13 @@ void hvm_assert_evtchn_irq(struct vcpu *v)
         return;
     }
 
-    if ( is_hvm_pv_evtchn_vcpu(v) )
+    if ( v->arch.hvm_vcpu.evtchn_upcall_vector != 0 )
+    {
+        uint8_t vector = v->arch.hvm_vcpu.evtchn_upcall_vector;
+
+        vlapic_set_irq(vcpu_vlapic(v), vector, 0);
+    }
+    else if ( is_hvm_pv_evtchn_vcpu(v) )
         vcpu_kick(v);
     else if ( v->vcpu_id == 0 )
         hvm_set_callback_irq_level(v);
