@@ -125,13 +125,10 @@ KERNEL_CS_MASK = 0xfc
 	testl $NMI_MASK,2*8(%rsp)
 	jnz   2f
 
-	testb $1,(xen_features+XENFEAT_supervisor_mode_kernel)
-	jnz   1f
-
 	/* Direct iret to kernel space. Correct CS and SS. */
 	orb   $3,1*8(%rsp)
 	orb   $3,4*8(%rsp)
-1:	iretq
+	iretq
 
 2:	/* Slow iret via hypervisor. */
 	andl  $~NMI_MASK, 16(%rsp)
