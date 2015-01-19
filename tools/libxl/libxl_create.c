@@ -170,6 +170,14 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             break;
         default:abort();
         }
+
+        /* Check HVM direct boot parameters, we should honour ->ramdisk and
+         * ->cmdline iff ->kernel is set.
+         */
+        if (!b_info->kernel && (b_info->ramdisk || b_info->cmdline)) {
+            LOG(ERROR, "direct boot parameters specified but kernel missing");
+            return ERROR_INVAL;
+        }
     }
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM &&
