@@ -198,7 +198,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
 
     case GICD_ICPIDR2:
         if ( dabt.size != DABT_WORD ) goto bad_width;
-        printk("vGICD: unhandled read from ICPIDR2\n");
+        printk(XENLOG_G_ERR "%pv: vGICD: unhandled read from ICPIDR2\n", v);
         return 0;
 
     /* Implementation defined -- read as zero */
@@ -215,14 +215,14 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         goto read_as_zero;
 
     default:
-        printk("vGICD: unhandled read r%d offset %#08x\n",
-               dabt.reg, gicd_reg);
+        printk(XENLOG_G_ERR "%pv: vGICD: unhandled read r%d offset %#08x\n",
+               v, dabt.reg, gicd_reg);
         return 0;
     }
 
 bad_width:
-    printk("vGICD: bad read width %d r%d offset %#08x\n",
-           dabt.size, dabt.reg, gicd_reg);
+    printk(XENLOG_G_ERR "%pv: vGICD: bad read width %d r%d offset %#08x\n",
+           v, dabt.size, dabt.reg, gicd_reg);
     domain_crash_synchronous();
     return 0;
 
@@ -328,14 +328,16 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
 
     case GICD_ISPENDR ... GICD_ISPENDRN:
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
-        printk("vGICD: unhandled %s write %#"PRIregister" to ISPENDR%d\n",
-               dabt.size ? "word" : "byte", *r, gicd_reg - GICD_ISPENDR);
+        printk(XENLOG_G_ERR
+               "%pv: vGICD: unhandled %s write %#"PRIregister" to ISPENDR%d\n",
+               v, dabt.size ? "word" : "byte", *r, gicd_reg - GICD_ISPENDR);
         return 0;
 
     case GICD_ICPENDR ... GICD_ICPENDRN:
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
-        printk("vGICD: unhandled %s write %#"PRIregister" to ICPENDR%d\n",
-               dabt.size ? "word" : "byte", *r, gicd_reg - GICD_ICPENDR);
+        printk(XENLOG_G_ERR
+               "%pv: vGICD: unhandled %s write %#"PRIregister" to ICPENDR%d\n",
+               v, dabt.size ? "word" : "byte", *r, gicd_reg - GICD_ICPENDR);
         return 0;
 
     case GICD_ISACTIVER ... GICD_ISACTIVERN:
@@ -454,14 +456,16 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
 
     case GICD_CPENDSGIR ... GICD_CPENDSGIRN:
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
-        printk("vGICD: unhandled %s write %#"PRIregister" to ICPENDSGIR%d\n",
-               dabt.size ? "word" : "byte", *r, gicd_reg - GICD_CPENDSGIR);
+        printk(XENLOG_G_ERR
+               "%pv: vGICD: unhandled %s write %#"PRIregister" to ICPENDSGIR%d\n",
+               v, dabt.size ? "word" : "byte", *r, gicd_reg - GICD_CPENDSGIR);
         return 0;
 
     case GICD_SPENDSGIR ... GICD_SPENDSGIRN:
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
-        printk("vGICD: unhandled %s write %#"PRIregister" to ISPENDSGIR%d\n",
-               dabt.size ? "word" : "byte", *r, gicd_reg - GICD_SPENDSGIR);
+        printk(XENLOG_G_ERR
+               "%pv: vGICD: unhandled %s write %#"PRIregister" to ISPENDSGIR%d\n",
+               v, dabt.size ? "word" : "byte", *r, gicd_reg - GICD_SPENDSGIR);
         return 0;
 
     /* Implementation defined -- write ignored */
@@ -486,14 +490,16 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         goto write_ignore;
 
     default:
-        printk("vGICD: unhandled write r%d=%"PRIregister" offset %#08x\n",
-               dabt.reg, *r, gicd_reg);
+        printk(XENLOG_G_ERR
+               "%pv: vGICD: unhandled write r%d=%"PRIregister" offset %#08x\n",
+               v, dabt.reg, *r, gicd_reg);
         return 0;
     }
 
 bad_width:
-    printk("vGICD: bad write width %d r%d=%"PRIregister" offset %#08x\n",
-           dabt.size, dabt.reg, *r, gicd_reg);
+    printk(XENLOG_G_ERR
+           "%pv: vGICD: bad write width %d r%d=%"PRIregister" offset %#08x\n",
+           v, dabt.size, dabt.reg, *r, gicd_reg);
     domain_crash_synchronous();
     return 0;
 
