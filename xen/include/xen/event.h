@@ -152,10 +152,11 @@ static inline void evtchn_port_init(struct domain *d, struct evtchn *evtchn)
         d->evtchn_port_ops->init(d, evtchn);
 }
 
-static inline void evtchn_port_set_pending(struct vcpu *v,
+static inline void evtchn_port_set_pending(struct domain *d,
+                                           unsigned int vcpu_id,
                                            struct evtchn *evtchn)
 {
-    v->domain->evtchn_port_ops->set_pending(v, evtchn);
+    d->evtchn_port_ops->set_pending(d->vcpu[vcpu_id], evtchn);
 }
 
 static inline void evtchn_port_clear_pending(struct domain *d,

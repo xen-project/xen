@@ -95,8 +95,6 @@ static uint8_t get_xen_consumer(xen_event_channel_notification_t fn)
 /* Get the notification function for a given Xen-bound event channel. */
 #define xen_notification_fn(e) (xen_consumers[(e)->xen_consumer-1])
 
-static void evtchn_set_pending(struct vcpu *v, int port);
-
 static int virq_is_global(uint32_t virq)
 {
     int rc;
@@ -287,7 +285,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
      * We may have lost notifications on the remote unbound port. Fix that up
      * here by conservatively always setting a notification on the local port.
      */
-    evtchn_set_pending(ld->vcpu[lchn->notify_vcpu_id], lport);
+    evtchn_port_set_pending(ld, lchn->notify_vcpu_id, lchn);
 
     bind->local_port = lport;
 
@@ -599,11 +597,10 @@ static long evtchn_close(evtchn_close_t *close)
     return __evtchn_close(current->domain, close->port);
 }
 
-int evtchn_send(struct domain *d, unsigned int lport)
+int evtchn_send(struct domain *ld, unsigned int lport)
 {
     struct evtchn *lchn, *rchn;
-    struct domain *ld = d, *rd;
-    struct vcpu   *rvcpu;
+    struct domain *rd;
     int            rport, ret = 0;
 
     spin_lock(&ld->event_lock);
@@ -633,14 +630,13 @@ int evtchn_send(struct domain *d, unsigned int lport)
         rd    = lchn->u.interdomain.remote_dom;
         rport = lchn->u.interdomain.remote_port;
         rchn  = evtchn_from_port(rd, rport);
-        rvcpu = rd->vcpu[rchn->notify_vcpu_id];
         if ( consumer_is_xen(rchn) )
-            (*xen_notification_fn(rchn))(rvcpu, rport);
+            xen_notification_fn(rchn)(rd->vcpu[rchn->notify_vcpu_id], rport);
         else
-            evtchn_set_pending(rvcpu, rport);
+            evtchn_port_set_pending(rd, rchn->notify_vcpu_id, rchn);
         break;
     case ECS_IPI:
-        evtchn_set_pending(ld->vcpu[lchn->notify_vcpu_id], lport);
+        evtchn_port_set_pending(ld, lchn->notify_vcpu_id, lchn);
         break;
     case ECS_UNBOUND:
         /* silently drop the notification */
@@ -655,11 +651,6 @@ out:
     return ret;
 }
 
-static void evtchn_set_pending(struct vcpu *v, int port)
-{
-    evtchn_port_set_pending(v, evtchn_from_port(v->domain, port));
-}
-
 int guest_enabled_event(struct vcpu *v, uint32_t virq)
 {
     return ((v != NULL) && (v->virq_to_evtchn[virq] != 0));
@@ -669,6 +660,7 @@ void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
 {
     unsigned long flags;
     int port;
+    struct domain *d;
 
     ASSERT(!virq_is_global(virq));
 
@@ -678,7 +670,8 @@ void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
     if ( unlikely(port == 0) )
         goto out;
 
-    evtchn_set_pending(v, port);
+    d = v->domain;
+    evtchn_port_set_pending(d, v->vcpu_id, evtchn_from_port(d, port));
 
  out:
     spin_unlock_irqrestore(&v->virq_lock, flags);
@@ -707,7 +700,7 @@ static void send_guest_global_virq(struct domain *d, uint32_t virq)
         goto out;
 
     chn = evtchn_from_port(d, port);
-    evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
+    evtchn_port_set_pending(d, chn->notify_vcpu_id, chn);
 
  out:
     spin_unlock_irqrestore(&v->virq_lock, flags);
@@ -731,7 +724,7 @@ void send_guest_pirq(struct domain *d, const struct pirq *pirq)
     }
 
     chn = evtchn_from_port(d, port);
-    evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
+    evtchn_port_set_pending(d, chn->notify_vcpu_id, chn);
 }
 
 static struct domain *global_virq_handlers[NR_VIRQS] __read_mostly;
@@ -1202,7 +1195,6 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
 {
     struct evtchn *lchn, *rchn;
     struct domain *rd;
-    int            rport;
 
     spin_lock(&ld->event_lock);
 
@@ -1219,9 +1211,8 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
     if ( likely(lchn->state == ECS_INTERDOMAIN) )
     {
         rd    = lchn->u.interdomain.remote_dom;
-        rport = lchn->u.interdomain.remote_port;
-        rchn  = evtchn_from_port(rd, rport);
-        evtchn_set_pending(rd->vcpu[rchn->notify_vcpu_id], rport);
+        rchn  = evtchn_from_port(rd, lchn->u.interdomain.remote_port);
+        evtchn_port_set_pending(rd, rchn->notify_vcpu_id, rchn);
     }
 
     spin_unlock(&ld->event_lock);
