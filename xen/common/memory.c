@@ -747,11 +747,10 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return start_extent;
         args.domain = d;
 
-        rc = xsm_memory_adjust_reservation(XSM_TARGET, current->domain, d);
-        if ( rc )
+        if ( xsm_memory_adjust_reservation(XSM_TARGET, current->domain, d) )
         {
             rcu_unlock_domain(d);
-            return rc;
+            return start_extent;
         }
 
         switch ( op )
