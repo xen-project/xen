@@ -78,7 +78,7 @@ static paddr_t __initdata crashinfo_maxaddr = 4ULL << 30;
 
 /* = log base 2 of crashinfo_maxaddr after checking for sanity. Default to
  * larger than the entire physical address space. */
-paddr_t crashinfo_maxaddr_bits = 64;
+unsigned int __initdata crashinfo_maxaddr_bits = 64;
 
 /* Pointers to keep track of the crash heap region. */
 static void *crash_heap_current = NULL, *crash_heap_end = NULL;
@@ -532,7 +532,7 @@ void __init kexec_early_calculations(void)
         low_crashinfo_mode = LOW_CRASHINFO_NONE;
 
     if ( low_crashinfo_mode > LOW_CRASHINFO_NONE )
-        crashinfo_maxaddr_bits = fls(crashinfo_maxaddr) - 1;
+        crashinfo_maxaddr_bits = fls64(crashinfo_maxaddr) - 1;
 }
 
 static int __init kexec_init(void)

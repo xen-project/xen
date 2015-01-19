@@ -10,7 +10,7 @@
 
 typedef struct xen_kexec_reserve {
     unsigned long size;
-    unsigned long start;
+    paddr_t start;
 } xen_kexec_reserve_t;
 
 extern xen_kexec_reserve_t kexec_crash_area;
@@ -38,7 +38,7 @@ enum low_crashinfo {
 /* Low crashinfo mode.  Start as INVALID so serveral codepaths can set up
  * defaults without needing to know the state of the others. */
 extern enum low_crashinfo low_crashinfo_mode;
-extern paddr_t crashinfo_maxaddr_bits;
+extern unsigned int crashinfo_maxaddr_bits;
 void kexec_early_calculations(void);
 
 int machine_kexec_add_page(struct kexec_image *image, unsigned long vaddr,

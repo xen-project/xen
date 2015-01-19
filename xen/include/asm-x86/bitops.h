@@ -429,6 +429,9 @@ static inline int fls(unsigned long x)
     return (int)r+1;
 }
 
+#define ffs64 ffs
+#define fls64 fls
+
 /**
  * hweightN - returns the hamming weight of a N-bit word
  * @x: the word to weigh
