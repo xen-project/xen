@@ -539,6 +539,17 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_SPICE_IMAGECOMPRESSION 1
 
 /*
+ * LIBXL_HAVE_SPICE_STREAMINGVIDEO
+ *
+ * If defined, then the libxl_spice_info structure will contain a string type
+ * field: streaming_video. This value defines what Spice streaming video setting
+ * is used.
+ *
+ * If this is not defined, the Spice streaming video setting support is ignored.
+ */
+#define LIBXL_HAVE_SPICE_STREAMINGVIDEO 1
+
+/*
  * LIBXL_HAVE_DOMAIN_CREATE_RESTORE_PARAMS 1
  *
  * If this is defined, libxl_domain_create_restore()'s API has changed to
