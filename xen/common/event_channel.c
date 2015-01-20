@@ -1148,21 +1148,25 @@ int alloc_unbound_xen_event_channel(
 
     spin_lock(&d->event_lock);
 
-    if ( (port = get_free_port(d)) < 0 )
+    rc = get_free_port(d);
+    if ( rc < 0 )
         goto out;
+    port = rc;
     chn = evtchn_from_port(d, port);
 
     rc = xsm_evtchn_unbound(XSM_TARGET, d, chn, remote_domid);
+    if ( rc )
+        goto out;
 
     chn->state = ECS_UNBOUND;
     chn->xen_consumer = get_xen_consumer(notification_fn);
     chn->notify_vcpu_id = local_vcpu->vcpu_id;
-    chn->u.unbound.remote_domid = !rc ? remote_domid : DOMID_INVALID;
+    chn->u.unbound.remote_domid = remote_domid;
 
  out:
     spin_unlock(&d->event_lock);
 
-    return port;
+    return rc < 0 ? rc : port;
 }
 
 
