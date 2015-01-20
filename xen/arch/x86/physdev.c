@@ -336,7 +336,6 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case PHYSDEVOP_pirq_eoi_gmfn_v2:
     case PHYSDEVOP_pirq_eoi_gmfn_v1: {
         struct physdev_pirq_eoi_gmfn info;
-        unsigned long mfn;
         struct page_info *page;
 
         ret = -EFAULT;
@@ -352,21 +351,20 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             put_page(page);
             break;
         }
-        mfn = page_to_mfn(page);
 
         if ( cmpxchg(&v->domain->arch.pirq_eoi_map_mfn,
-                     0, mfn) != 0 )
+                     0, page_to_mfn(page)) != 0 )
         {
-            put_page_and_type(mfn_to_page(mfn));
+            put_page_and_type(page);
             ret = -EBUSY;
             break;
         }
 
-        v->domain->arch.pirq_eoi_map = map_domain_page_global(mfn);
+        v->domain->arch.pirq_eoi_map = __map_domain_page_global(page);
         if ( v->domain->arch.pirq_eoi_map == NULL )
         {
             v->domain->arch.pirq_eoi_map_mfn = 0;
-            put_page_and_type(mfn_to_page(mfn));
+            put_page_and_type(page);
             ret = -ENOSPC;
             break;
         }
