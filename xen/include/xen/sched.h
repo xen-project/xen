@@ -306,6 +306,9 @@ struct domain
 {
     domid_t          domain_id;
 
+    unsigned int     max_vcpus;
+    struct vcpu    **vcpu;
+
     shared_info_t   *shared_info;     /* shared data area */
 
     spinlock_t       domain_lock;
@@ -314,13 +317,11 @@ struct domain
     struct page_list_head page_list;  /* linked list */
     struct page_list_head xenpage_list; /* linked list (size xenheap_pages) */
     unsigned int     tot_pages;       /* number of pages currently possesed */
+    unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */
     unsigned int     outstanding_pages; /* pages claimed but not possessed  */
     unsigned int     max_pages;       /* maximum value for tot_pages        */
     atomic_t         shr_pages;       /* number of shared pages             */
     atomic_t         paged_pages;     /* number of paged-out pages          */
-    unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */
-
-    unsigned int     max_vcpus;
 
     /* Scheduling. */
     void            *sched_priv;    /* scheduler-specific data */
@@ -347,14 +348,18 @@ struct domain
      * Interrupt to event-channel mappings and other per-guest-pirq data.
      * Protected by the domain's event-channel spinlock.
      */
-    unsigned int     nr_pirqs;
     struct radix_tree_root pirq_tree;
-
-    /* I/O capabilities (access to IRQs and memory-mapped I/O). */
-    struct rangeset *iomem_caps;
-    struct rangeset *irq_caps;
+    unsigned int     nr_pirqs;
 
     enum guest_type guest_type;
+
+    /* Is this guest dying (i.e., a zombie)? */
+    enum { DOMDYING_alive, DOMDYING_dying, DOMDYING_dead } is_dying;
+
+    /* Domain is paused by controller software? */
+    int              controller_pause_count;
+
+    int32_t          time_offset_seconds;
 
 #ifdef HAS_PASSTHROUGH
     /* Does this guest need iommu mappings (-1 meaning "being set up")? */
@@ -364,16 +369,14 @@ struct domain
     bool_t           auto_node_affinity;
     /* Is this guest fully privileged (aka dom0)? */
     bool_t           is_privileged;
-    /* Which guest this guest has privileges on */
-    struct domain   *target;
-    /* Is this guest being debugged by dom0? */
-    bool_t           debugger_attached;
-    /* Is this guest dying (i.e., a zombie)? */
-    enum { DOMDYING_alive, DOMDYING_dying, DOMDYING_dead } is_dying;
-    /* Domain is paused by controller software? */
-    int              controller_pause_count;
     /* Domain's VCPUs are pinned 1:1 to physical CPUs? */
     bool_t           is_pinned;
+    /* Non-migratable and non-restoreable? */
+    bool_t           disable_migrate;
+    /* Is this guest being debugged by dom0? */
+    bool_t           debugger_attached;
+    /* Which guest this guest has privileges on */
+    struct domain   *target;
 
     /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
 #if MAX_VIRT_CPUS <= BITS_PER_LONG
@@ -381,6 +384,10 @@ struct domain
 #else
     unsigned long   *poll_mask;
 #endif
+
+    /* I/O capabilities (access to IRQs and memory-mapped I/O). */
+    struct rangeset *iomem_caps;
+    struct rangeset *irq_caps;
 
     /* Guest has shut down (inc. reason code)? */
     spinlock_t       shutdown_lock;
@@ -390,15 +397,12 @@ struct domain
 
     /* If this is not 0, send suspend notification here instead of
      * raising DOM_EXC */
-    int              suspend_evtchn;
+    evtchn_port_t    suspend_evtchn;
 
     atomic_t         pause_count;
-
-    unsigned long    vm_assist;
-
     atomic_t         refcnt;
 
-    struct vcpu    **vcpu;
+    unsigned long    vm_assist;
 
     /* Bitmask of CPUs which are holding onto this domain's state. */
     cpumask_var_t    domain_dirty_cpumask;
@@ -418,7 +422,6 @@ struct domain
 
     /* OProfile support. */
     struct xenoprof *xenoprof;
-    int32_t time_offset_seconds;
 
     /* Domain watchdog. */
 #define NR_DOMAIN_WATCHDOG_TIMERS 2
@@ -438,9 +441,6 @@ struct domain
     struct client *tmem_client;
 
     struct lock_profile_qhead profile_head;
-
-    /* Non-migratable and non-restoreable? */
-    bool_t disable_migrate;
 
     /* Various mem_events */
     struct mem_event_per_domain *mem_event;
