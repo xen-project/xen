@@ -241,6 +241,7 @@ libxl_spice_info = Struct("spice_info", [
     ("vdagent",     libxl_defbool),
     ("clipboard_sharing", libxl_defbool),
     ("usbredirection", integer),
+    ("image_compression", string),
     ])
 
 libxl_sdl_info = Struct("sdl_info", [

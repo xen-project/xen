@@ -528,6 +528,17 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_SPICE_USBREDIREDIRECTION 1
 
 /*
+ * LIBXL_HAVE_SPICE_IMAGECOMPRESSION
+ *
+ * If defined, then the libxl_spice_info structure will contain a string type
+ * field: image_compression. This value defines what Spice image compression
+ * is used.
+ *
+ * If this is not defined, the Spice image compression setting support is ignored.
+ */
+#define LIBXL_HAVE_SPICE_IMAGECOMPRESSION 1
+
+/*
  * LIBXL_HAVE_DOMAIN_CREATE_RESTORE_PARAMS 1
  *
  * If this is defined, libxl_domain_create_restore()'s API has changed to

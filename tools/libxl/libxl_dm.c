@@ -398,6 +398,10 @@ static char *dm_spice_options(libxl__gc *gc,
     if (!libxl_defbool_val(spice->clipboard_sharing))
         opt = libxl__sprintf(gc, "%s,disable-copy-paste", opt);
 
+    if (spice->image_compression)
+        opt = libxl__sprintf(gc, "%s,image-compression=%s", opt,
+                             spice->image_compression);
+
     return opt;
 }
 

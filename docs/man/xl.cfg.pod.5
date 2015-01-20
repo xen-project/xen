@@ -1427,6 +1427,12 @@ for redirection of up to 4 usb devices from spice client to domU's qemu.
 It requires an usb controller and if not defined it will automatically adds
 an usb2 controller. The default is disabled (0).
 
+=item B<spice_image_compression=[auto_glz|auto_lz|quic|glz|lz|off]>
+
+Specifies what image compression is to be used by spice (if given), otherwise
+the qemu default will be used. Please see documentations of your current qemu
+version for details.
+
 =back
 
 =head3 Miscellaneous Emulated Hardware
