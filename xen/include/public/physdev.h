@@ -344,9 +344,11 @@ DEFINE_XEN_GUEST_HANDLE(physdev_dbgp_op_t);
  */
 #define PHYSDEVOP_IRQ_UNMASK_NOTIFY      4
 
+#if __XEN_INTERFACE_VERSION__ < 0x00040600
 /*
  * These all-capitals physdev operation names are superceded by the new names
- * (defined above) since interface version 0x00030202.
+ * (defined above) since interface version 0x00030202. The guard above was
+ * added post-4.5 only though and hence shouldn't check for 0x00030202.
  */
 #define PHYSDEVOP_IRQ_STATUS_QUERY       PHYSDEVOP_irq_status_query
 #define PHYSDEVOP_SET_IOPL               PHYSDEVOP_set_iopl
@@ -357,6 +359,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_dbgp_op_t);
 #define PHYSDEVOP_FREE_VECTOR            PHYSDEVOP_free_irq_vector
 #define PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY XENIRQSTAT_needs_eoi
 #define PHYSDEVOP_IRQ_SHARED             XENIRQSTAT_shared
+#endif
 
 #if __XEN_INTERFACE_VERSION__ < 0x00040200
 #define PHYSDEVOP_pirq_eoi_gmfn PHYSDEVOP_pirq_eoi_gmfn_v1
