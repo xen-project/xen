@@ -153,8 +153,8 @@ tools/include/xen/*
 tools/include/xen-foreign/*.(c|h|size)
 tools/include/xen-foreign/checker
 tools/libxl/libxlu_cfg_y.output
-tools/libxl/xenlight.pc
-tools/libxl/xenlight.pc.in
+tools/libxl/*.pc
+tools/libxl/*.pc.in
 tools/libxl/xl
 tools/libxl/testenum
 tools/libxl/testenum.c

@@ -1,0 +1,9 @@
+prefix=@prefix@
+includedir=@includedir@
+libdir=@libdir@
+
+Name: Xlutil
+Description: The xl utility library for Xen hypervisor
+Version: @@version@@
+Cflags: -I${includedir}
+Libs: -L${libdir} -lxlutil
