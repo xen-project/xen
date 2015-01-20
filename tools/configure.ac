@@ -12,16 +12,6 @@ hotplug/Linux/init.d/sysconfig.xencommons
 hotplug/Linux/init.d/xen-watchdog
 hotplug/Linux/init.d/xencommons
 hotplug/Linux/init.d/xendomains
-hotplug/Linux/systemd/proc-xen.mount
-hotplug/Linux/systemd/var-lib-xenstored.mount
-hotplug/Linux/systemd/xen-init-dom0.service
-hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service
-hotplug/Linux/systemd/xen-watchdog.service
-hotplug/Linux/systemd/xenconsoled.service
-hotplug/Linux/systemd/xendomains.service
-hotplug/Linux/systemd/xenstored.service
-hotplug/Linux/systemd/xenstored.socket
-hotplug/Linux/systemd/xenstored_ro.socket
 hotplug/Linux/vif-setup
 hotplug/Linux/xen-backend.rules
 hotplug/Linux/xen-hotplug-common.sh
@@ -387,5 +377,21 @@ AC_SUBST(LIBNL3_CFLAGS)
 fi # ! $rump
 
 AX_AVAILABLE_SYSTEMD()
+
+AS_IF([test "x$systemd" = "xy"], [
+    AC_CONFIG_FILES([
+    hotplug/Linux/systemd/proc-xen.mount
+    hotplug/Linux/systemd/var-lib-xenstored.mount
+    hotplug/Linux/systemd/xen-init-dom0.service
+    hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service
+    hotplug/Linux/systemd/xen-watchdog.service
+    hotplug/Linux/systemd/xenconsoled.service
+    hotplug/Linux/systemd/xendomains.service
+    hotplug/Linux/systemd/xenstored.service
+    hotplug/Linux/systemd/xenstored.socket
+    hotplug/Linux/systemd/xenstored_ro.socket
+    ])
+])
+
 AC_OUTPUT()
 

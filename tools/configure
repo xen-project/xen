@@ -2281,7 +2281,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-ac_config_files="$ac_config_files ../config/Tools.mk hotplug/FreeBSD/rc.d/xencommons hotplug/Linux/init.d/sysconfig.xencommons hotplug/Linux/init.d/xen-watchdog hotplug/Linux/init.d/xencommons hotplug/Linux/init.d/xendomains hotplug/Linux/systemd/proc-xen.mount hotplug/Linux/systemd/var-lib-xenstored.mount hotplug/Linux/systemd/xen-init-dom0.service hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service hotplug/Linux/systemd/xen-watchdog.service hotplug/Linux/systemd/xenconsoled.service hotplug/Linux/systemd/xendomains.service hotplug/Linux/systemd/xenstored.service hotplug/Linux/systemd/xenstored.socket hotplug/Linux/systemd/xenstored_ro.socket hotplug/Linux/vif-setup hotplug/Linux/xen-backend.rules hotplug/Linux/xen-hotplug-common.sh hotplug/Linux/xendomains hotplug/NetBSD/rc.d/xencommons libxl/xenlight.pc.in"
+ac_config_files="$ac_config_files ../config/Tools.mk hotplug/FreeBSD/rc.d/xencommons hotplug/Linux/init.d/sysconfig.xencommons hotplug/Linux/init.d/xen-watchdog hotplug/Linux/init.d/xencommons hotplug/Linux/init.d/xendomains hotplug/Linux/vif-setup hotplug/Linux/xen-backend.rules hotplug/Linux/xen-hotplug-common.sh hotplug/Linux/xendomains hotplug/NetBSD/rc.d/xencommons libxl/xenlight.pc.in libxl/xlutil.pc.in"
 
 ac_config_headers="$ac_config_headers config.h"
 
@@ -8953,6 +8953,14 @@ else
 fi
 
 
+
+if test "x$systemd" = "xy"; then :
+
+    ac_config_files="$ac_config_files hotplug/Linux/systemd/proc-xen.mount hotplug/Linux/systemd/var-lib-xenstored.mount hotplug/Linux/systemd/xen-init-dom0.service hotplug/Linux/systemd/xen-qemu-dom0-disk-backend.service hotplug/Linux/systemd/xen-watchdog.service hotplug/Linux/systemd/xenconsoled.service hotplug/Linux/systemd/xendomains.service hotplug/Linux/systemd/xenstored.service hotplug/Linux/systemd/xenstored.socket hotplug/Linux/systemd/xenstored_ro.socket"
+
+
+fi
+
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -9651,6 +9659,14 @@ do
     "hotplug/Linux/init.d/xen-watchdog") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/xen-watchdog" ;;
     "hotplug/Linux/init.d/xencommons") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/xencommons" ;;
     "hotplug/Linux/init.d/xendomains") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/xendomains" ;;
+    "hotplug/Linux/vif-setup") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/vif-setup" ;;
+    "hotplug/Linux/xen-backend.rules") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/xen-backend.rules" ;;
+    "hotplug/Linux/xen-hotplug-common.sh") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/xen-hotplug-common.sh" ;;
+    "hotplug/Linux/xendomains") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/xendomains" ;;
+    "hotplug/NetBSD/rc.d/xencommons") CONFIG_FILES="$CONFIG_FILES hotplug/NetBSD/rc.d/xencommons" ;;
+    "libxl/xenlight.pc.in") CONFIG_FILES="$CONFIG_FILES libxl/xenlight.pc.in" ;;
+    "libxl/xlutil.pc.in") CONFIG_FILES="$CONFIG_FILES libxl/xlutil.pc.in" ;;
+    "config.h") CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
     "hotplug/Linux/systemd/proc-xen.mount") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/proc-xen.mount" ;;
     "hotplug/Linux/systemd/var-lib-xenstored.mount") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/var-lib-xenstored.mount" ;;
     "hotplug/Linux/systemd/xen-init-dom0.service") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xen-init-dom0.service" ;;
@@ -9661,13 +9677,6 @@ do
     "hotplug/Linux/systemd/xenstored.service") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xenstored.service" ;;
     "hotplug/Linux/systemd/xenstored.socket") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xenstored.socket" ;;
     "hotplug/Linux/systemd/xenstored_ro.socket") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/systemd/xenstored_ro.socket" ;;
-    "hotplug/Linux/vif-setup") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/vif-setup" ;;
-    "hotplug/Linux/xen-backend.rules") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/xen-backend.rules" ;;
-    "hotplug/Linux/xen-hotplug-common.sh") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/xen-hotplug-common.sh" ;;
-    "hotplug/Linux/xendomains") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/xendomains" ;;
-    "hotplug/NetBSD/rc.d/xencommons") CONFIG_FILES="$CONFIG_FILES hotplug/NetBSD/rc.d/xencommons" ;;
-    "libxl/xenlight.pc.in") CONFIG_FILES="$CONFIG_FILES libxl/xenlight.pc.in" ;;
-    "config.h") CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
