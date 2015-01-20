@@ -260,8 +260,7 @@ void __init mctelem_init(unsigned int datasz)
 	if ((mctctl.mctc_elems = xmalloc_array(struct mctelem_ent,
 	    MC_NENT)) == NULL ||
 	    (datarr = xmalloc_bytes(MC_NENT * datasz)) == NULL) {
-		if (mctctl.mctc_elems)
-			xfree(mctctl.mctc_elems);
+		xfree(mctctl.mctc_elems);
 		printk("Allocations for MCA telemetry failed\n");
 		return;
 	}

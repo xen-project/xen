@@ -454,8 +454,7 @@ static int kexec_init_cpu_notes(const unsigned long cpu)
         spin_unlock(&crash_notes_lock);
         /* Always return ok, because whether we successfully allocated or not,
          * another CPU has successfully allocated. */
-        if ( note )
-            xfree(note);
+        xfree(note);
     }
     else
     {

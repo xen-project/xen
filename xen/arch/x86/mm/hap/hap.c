@@ -168,8 +168,7 @@ int hap_track_dirty_vram(struct domain *d,
                                   p2m_ram_logdirty, p2m_ram_rw);
     }
 out:
-    if ( dirty_bitmap )
-        xfree(dirty_bitmap);
+    xfree(dirty_bitmap);
 
     return rc;
 }

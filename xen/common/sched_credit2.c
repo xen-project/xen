@@ -2138,8 +2138,7 @@ csched2_deinit(const struct scheduler *ops)
     struct csched2_private *prv;
 
     prv = CSCHED2_PRIV(ops);
-    if ( prv != NULL )
-        xfree(prv);
+    xfree(prv);
 }
 
 

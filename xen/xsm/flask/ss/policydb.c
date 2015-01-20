@@ -682,17 +682,17 @@ void policydb_destroy(struct policydb *p)
 
     for ( tr = p->role_tr; tr; tr = tr->next )
     {
-        if ( ltr ) xfree(ltr);
+        xfree(ltr);
         ltr = tr;
     }
-    if ( ltr ) xfree(ltr);
+    xfree(ltr);
 
     for ( ra = p->role_allow; ra; ra = ra -> next )
     {
-        if ( lra ) xfree(lra);
+        xfree(lra);
         lra = ra;
     }
-    if ( lra ) xfree(lra);
+    xfree(lra);
 
     for ( rt = p->range_tr; rt; rt = rt -> next )
     {

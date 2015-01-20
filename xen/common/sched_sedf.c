@@ -729,8 +729,7 @@ static void sedf_deinit(const struct scheduler *ops)
     struct sedf_priv_info *prv;
 
     prv = SEDF_PRIV(ops);
-    if ( prv != NULL )
-        xfree(prv);
+    xfree(prv);
 }
 
 
