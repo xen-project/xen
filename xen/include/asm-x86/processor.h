@@ -234,8 +234,8 @@ unsigned int apicid_to_socket(unsigned int);
 
 /* Some CPUID calls want 'count' to be placed in ecx */
 static inline void cpuid_count(
-    int op,
-    int count,
+    unsigned int op,
+    unsigned int count,
     unsigned int *eax,
     unsigned int *ebx,
     unsigned int *ecx,
