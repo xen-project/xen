@@ -6,13 +6,15 @@ ROOT = $(XEN_ROOT)/xen/include/public
 architectures := arm32 arm64 x86_32 x86_64
 headers := $(patsubst %, %.h, $(architectures))
 
-.PHONY: all clean check-headers
+.PHONY: all clean distclean check-headers
 all: $(headers) check-headers
 
 clean:
 	rm -f $(headers)
 	rm -f checker checker.c
 	rm -f *.pyc *.o *~
+
+distclean: clean
 
 checker: checker.c $(headers)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<

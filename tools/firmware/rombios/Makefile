@@ -15,6 +15,9 @@ clean: subdirs-clean
 	rm -f  BIOS-bochs-*
 	rm -f  $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 BIOS-bochs-latest: rombios.c biossums 32bitgateway.c tcgbios.c
 	gcc -DBX_SMP_PROCESSORS=1 -E -P $< > _rombios_.c
 	bcc -o rombios.s -C-c -D__i86__ -0 -S _rombios_.c

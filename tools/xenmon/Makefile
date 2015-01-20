@@ -40,6 +40,9 @@ clean:
 	$(RM) -f xenbaked xenbaked.o
 	$(RM) -f xentrace_setmask setmask.o
 
+.PHONY: distclean
+distclean: clean
+
 xenbaked: xenbaked.o Makefile
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
 

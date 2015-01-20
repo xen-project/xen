@@ -31,7 +31,9 @@ install: all
 clean:
 	rm -f *.o *~ $(DEPS) xen TAGS $(IBINS) $(LIB)
 
-.PHONY: clean install
+distclean: clean
+
+.PHONY: clean install distclean
 
 .PHONY: TAGS
 TAGS:

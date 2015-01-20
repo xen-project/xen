@@ -22,6 +22,9 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(DEPS)
 	$(RM) client/*.o daemon/*.o
 
+.PHONY: distclean
+distclean: clean
+
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_xenconsoled) $(APPEND_LDFLAGS)
 

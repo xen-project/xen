@@ -47,6 +47,8 @@ ALL_OCAML_OBJ_SOURCES=$(addsuffix .ml, $(ALL_OCAML_OBJS))
 clean: $(CLEAN_HOOKS)
 	$(Q)rm -f .*.d *.o *.so *.a *.cmo *.cmi *.cma *.cmx *.cmxa *.annot *.spot *.spit $(LIBS) $(PROGRAMS) $(GENERATED_FILES) .ocamldep.make META
 
+distclean: clean
+
 quiet-command = $(if $(V),$1,@printf " %-8s %s\n" "$2" "$3" && $1)
 
 mk-caml-lib-native = $(call quiet-command, $(OCAMLOPT) $(OCAMLOPTFLAGS) -a -o $1 $2 $3,MLA,$1)

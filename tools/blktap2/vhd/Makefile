@@ -44,6 +44,8 @@ install: all
 clean: subdirs-clean
 	rm -rf *.o *~ $(DEPS) $(IBIN)
 
-.PHONY: all build clean install vhd-util vhd-update
+distclean: clean
+
+.PHONY: all build clean distclean install vhd-util vhd-update
 
 -include $(DEPS)

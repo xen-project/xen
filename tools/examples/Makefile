@@ -43,3 +43,6 @@ install-configs: $(XEN_CONFIGS)
 
 .PHONY: clean
 clean:
+
+.PHONY: distclean
+distclean: clean

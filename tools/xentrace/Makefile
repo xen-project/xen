@@ -34,6 +34,9 @@ install: build
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN) $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 xentrace: xentrace.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS) $(APPEND_LDFLAGS)
 

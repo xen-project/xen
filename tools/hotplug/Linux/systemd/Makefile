@@ -28,6 +28,9 @@ all:	$(ALL_XEN_SYSTEMD)
 clean:
 	rm -f $(XEN_SYSTEMD_MODULES)
 
+.PHONY: distclean
+distclean: clean
+
 .PHONY: install
 install: $(ALL_XEN_SYSTEMD)
 	[ -d $(DESTDIR)$(XEN_SYSTEMD_DIR) ] || \

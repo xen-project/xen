@@ -62,6 +62,9 @@ install: build
 clean:
 	$(RM) *.o $(TARGETS_BUILD) *~ $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 xen-hvmctx: xen-hvmctx.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 

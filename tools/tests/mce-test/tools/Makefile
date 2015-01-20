@@ -19,5 +19,8 @@ install: xen-mceinj
 clean:
 	$(RM) *.o xen-mceinj
 
+.PHONY: distclean
+distclean: clean
+
 xen-mceinj: xen-mceinj.o Makefile
 	$(CC) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore)

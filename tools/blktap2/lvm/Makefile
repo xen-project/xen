@@ -29,6 +29,8 @@ lvm-util: lvm-util.o
 clean:
 	rm -rf *.o *.opic *~ $(DEPS) $(IBIN)
 
-.PHONY: all build clean install lvm-util
+distclean: clean
+
+.PHONY: all build clean distclean install lvm-util
 
 -include $(DEPS)

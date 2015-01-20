@@ -37,3 +37,6 @@ install-scripts: build
 .PHONY: clean
 clean:
 	rm -f $(HOTPLUGPATH)
+
+.PHONY: distclean
+distclean: clean

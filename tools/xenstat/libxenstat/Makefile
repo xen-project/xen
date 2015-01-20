@@ -137,4 +137,7 @@ clean:
 	rm -f $(LIB) $(SHLIB) $(SHLIB_LINKS) $(OBJECTS-y) \
 	      $(BINDINGS) $(BINDINGSRC) $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 -include $(DEPS)

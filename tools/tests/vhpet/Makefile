@@ -26,6 +26,9 @@ $(TARGET): hpet.c main.c hpet.h emul.h Makefile
 clean:
 	rm -rf $(TARGET) $(TARGET).out *.o *~ core* hpet.h hpet.c
 
+.PHONY: distclean
+distclean: clean
+
 .PHONY: install
 install:
 

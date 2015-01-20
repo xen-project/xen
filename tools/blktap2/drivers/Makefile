@@ -108,4 +108,6 @@ install: all
 clean:
 	rm -rf .*.d *.o *~ xen TAGS $(IBIN) $(LIB) $(LOCK_UTIL) $(QCOW_UTIL)
 
-.PHONY: clean install
+distclean: clean
+
+.PHONY: clean install distclean

@@ -40,3 +40,6 @@ install-rcd:
 
 .PHONY: clean
 clean:
+
+.PHONY: distclean
+distclean: clean

@@ -115,6 +115,9 @@ clean:
 	rm -f xenstore $(CLIENTS)
 	$(RM) $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 .PHONY: TAGS
 TAGS:
 	etags `find . -name '*.[ch]'`

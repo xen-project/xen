@@ -115,4 +115,6 @@ policy.conf: $(POLICY_SECTIONS)
 clean:
 	$(RM) tmp policy.conf $(POLICY_FILENAME)
 
-.PHONY: all install clean
+distclean: clean
+
+.PHONY: all install clean distclean

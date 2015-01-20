@@ -28,4 +28,7 @@ clean:
 	rm -rf build/
 	rm -f $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 -include $(DEPS)

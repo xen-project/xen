@@ -20,6 +20,9 @@ build: $(TARGETS)
 clean:
 	$(RM) *.o $(TARGETS) *~ $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 memshrtool: memshrtool.o
 	$(CC) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenctrl)
 

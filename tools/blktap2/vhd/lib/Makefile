@@ -75,6 +75,8 @@ install: all
 clean:
 	rm -rf *.a *.so* *.o *.opic *~ $(DEPS) $(LIBVHD)
 
-.PHONY: all build clean install libvhd
+distclean: clean
+
+.PHONY: all build clean distclean install libvhd
 
 -include $(DEPS)

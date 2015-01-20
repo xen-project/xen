@@ -50,3 +50,6 @@ clean:
 	rm -rf xen
 	$(MAKE) -C xen-foreign clean
 
+
+.PHONY: distclean
+distclean: clean

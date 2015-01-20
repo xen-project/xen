@@ -11,6 +11,6 @@ SUBDIRS += xentop
 endif
 endif
 
-.PHONY: all install clean
+.PHONY: all install clean distclean
 
-all install clean: %: subdirs-%
+all install clean distclean: %: subdirs-%

@@ -81,3 +81,6 @@ install-udev:
 
 .PHONY: clean
 clean: subdirs-clean
+
+.PHONY: distclean
+distclean: clean

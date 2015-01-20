@@ -25,6 +25,9 @@ clean:
           temp.awk.* vgabios*.orig _vgabios_* _vgabios-debug_* core vgabios*.bin vgabios*.txt $(RELEASE).bin *.bak
 	rm -f VGABIOS-lgpl-latest*.bin
 
+.PHONY: distclean
+distclean: clean
+
 .PHONY: release
 release: 
 	VGABIOS_VERS=\"-DVGABIOS_VERS=\\\"$(RELVERS)\\\"\" make bios cirrus-bios

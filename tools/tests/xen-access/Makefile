@@ -21,6 +21,9 @@ build: $(TARGETS)
 clean:
 	$(RM) *.o $(TARGETS) *~ $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 xen-access: xen-access.o Makefile
 	$(CC) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
 

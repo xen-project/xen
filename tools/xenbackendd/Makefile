@@ -32,6 +32,9 @@ install: build
 clean:
 	$(RM) *.a *.so *.o $(DEPS) xenbackendd
 
+.PHONY: distclean
+distclean: clean
+
 xenbackendd: xenbackendd.o
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
 

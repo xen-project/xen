@@ -15,3 +15,6 @@ install: subdirs-install
 
 .PHONY: clean
 clean: subdirs-clean
+
+.PHONY: distclean
+distclean: subdirs-distclean

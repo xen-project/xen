@@ -23,4 +23,7 @@ install: all
 clean:
 	rm -rf build tmp *.pyc *.pyo *.o *.a *~ a.out $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 -include $(DEPS)

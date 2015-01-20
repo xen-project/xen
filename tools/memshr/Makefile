@@ -39,6 +39,9 @@ install: all
 clean:
 	rm -rf *.a *.o *~ $(DEPS)
 
-.PHONY: all build clean install
+.PHONY: distclean
+distclean: clean
+
+.PHONY: all build clean install distclean
 
 -include $(DEPS)

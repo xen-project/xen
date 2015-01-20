@@ -66,6 +66,8 @@ clean:
 	rm -rf *.a *.o $(IASL_VER) $(IASL_VER).tar.gz $(DEPS)
 	rm -rf ssdt_*.h dsdt*.c *~ *.aml *.hex mk_dsdt dsdt_*.asl
 
+distclean: clean
+
 install: all
 
 -include $(DEPS)

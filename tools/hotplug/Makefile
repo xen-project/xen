@@ -6,5 +6,5 @@ SUBDIRS-$(CONFIG_NetBSD) += NetBSD
 SUBDIRS-$(CONFIG_Linux) += Linux
 SUBDIRS-$(CONFIG_FreeBSD) += FreeBSD
 
-.PHONY: all clean install
-all clean install: %: subdirs-%
+.PHONY: all clean install distclean
+all clean install distclean: %: subdirs-%

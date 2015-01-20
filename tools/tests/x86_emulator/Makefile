@@ -34,6 +34,9 @@ $(TARGET): x86_emulate.o test_x86_emulator.o
 clean:
 	rm -rf $(TARGET) *.o *~ core blowfish.h blowfish.bin x86_emulate
 
+.PHONY: distclean
+distclean: clean
+
 .PHONY: install
 install:
 

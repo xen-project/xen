@@ -73,6 +73,8 @@ clean:
 	rm -f $(LIBNAME).so $(LIBSONAME)
 	rm -f *~
 
-.PHONY: all build clean install
+distclean: clean
+
+.PHONY: all build clean distclean install
 
 -include $(DEPS)

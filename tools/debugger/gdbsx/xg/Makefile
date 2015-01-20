@@ -33,3 +33,5 @@ xen-headers:
 clean:
 	rm -rf xen xg_all.a $(XG_OBJS)  .*.d
 
+.PHONY: distclean
+distclean: clean

@@ -12,3 +12,6 @@ install:
 .PHONY: clean
 clean:
 	@:
+
+.PHONY: distclean
+distclean: clean

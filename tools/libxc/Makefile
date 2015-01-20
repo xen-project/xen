@@ -170,6 +170,9 @@ clean:
             $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS) \
             $(OSDEP_LIB_OBJS) $(OSDEP_PIC_OBJS)
 
+.PHONY: distclean
+distclean: clean
+
 .PHONY: rpm
 rpm: build
 	rm -rf staging

@@ -121,7 +121,7 @@ subdir-all-% subdir-clean-% subdir-install-%: .phony
 	$(MAKE) -C $* $(patsubst subdir-%-$*,%,$@)
 
 subdir-distclean-%: .phony
-	$(MAKE) -C $* clean
+	$(MAKE) -C $* distclean
 
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 $(XEN_ROOT)/config/Tools.mk:

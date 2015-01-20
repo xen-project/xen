@@ -12,6 +12,9 @@ all: $(TARGET)
 clean:
 	rm -rf *.o $(TARGET) $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 $(TARGET): tcgbios.o tpm_drivers.o
 	$(LD) $(LDFLAGS_DIRECT) -r $^ -o $@
 

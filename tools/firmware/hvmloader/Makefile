@@ -139,4 +139,7 @@ clean: subdirs-clean
 	rm -f roms.inc roms.inc.new acpi.h
 	rm -f hvmloader hvmloader.tmp *.o $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 -include $(DEPS)

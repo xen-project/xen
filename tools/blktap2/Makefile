@@ -14,5 +14,7 @@ SUBDIRS-$(CONFIG_Linux) += control
 clean:
 	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) TAGS
 
-.PHONY: all clean install
-all clean install: %: subdirs-%
+distclean: clean
+
+.PHONY: all clean install distclean
+all clean install distclean: %: subdirs-%

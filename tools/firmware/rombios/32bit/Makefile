@@ -15,6 +15,9 @@ all: subdirs-all
 clean: subdirs-clean
 	rm -rf *.o $(TARGET) $(DEPS)
 
+.PHONY: distclean
+distclean: subdirs-distclean
+
 $(TARGET): 32bitbios_all.o
 	sh mkhex highbios_array 32bitbios_all.o > $@
 

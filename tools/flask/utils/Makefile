@@ -39,6 +39,9 @@ clean:
 	rm -f $(CLIENTS)
 	$(RM) $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 .PHONY: print-dir
 print-dir:
 	@echo -n tools/flask/utils: 

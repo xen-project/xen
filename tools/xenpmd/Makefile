@@ -18,6 +18,9 @@ install: all
 clean:
 	$(RM) -f xenpmd xenpmd.o $(DEPS)
 
+.PHONY: distclean
+distclean: clean
+
 xenpmd: xenpmd.o Makefile
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
 

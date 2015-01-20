@@ -12,6 +12,10 @@ clean:
 	rm -f xg_all.a gx_all.a gdbsx
 	set -e; for d in xg gx; do $(MAKE) -C $$d clean; done
 
+.PHONY: distclean
+distclean: clean
+	set -e; for d in xg gx; do $(MAKE) -c $$d distclean; done
+
 .PHONY: install
 install: all
 	[ -d $(DESTDIR)$(SBINDIR) ] || $(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
