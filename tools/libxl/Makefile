@@ -282,9 +282,10 @@ clean:
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
 	$(RM) -f _*.c *.pyc _paths.*.tmp _*.api-for-check
 	$(RM) -f testidl.c.new testidl.c *.api-ok
-	$(RM) -f xenlight.pc xenlight.pc.in
+	$(RM) -f xenlight.pc
 
 distclean: clean
+	$(RM) -f xenlight.pc.in
 
 realclean: distclean
 	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
