@@ -148,6 +148,9 @@ int xc_core_arch_map_p2m_writable(xc_interface *xch, unsigned int guest_width,
                                   shared_info_any_t *live_shinfo,
                                   xen_pfn_t **live_p2m, unsigned long *pfnp);
 
+int xc_core_arch_get_scratch_gpfn(xc_interface *xch, domid_t domid,
+                                  xen_pfn_t *gpfn);
+
 
 #if defined (__i386__) || defined (__x86_64__)
 # include "xc_core_x86.h"

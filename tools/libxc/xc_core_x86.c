@@ -205,6 +205,23 @@ xc_core_arch_map_p2m_writable(xc_interface *xch, unsigned int guest_width, xc_do
     return xc_core_arch_map_p2m_rw(xch, dinfo, info,
                                    live_shinfo, live_p2m, pfnp, 1);
 }
+
+int
+xc_core_arch_get_scratch_gpfn(xc_interface *xch, domid_t domid,
+                              xen_pfn_t *gpfn)
+{
+    int rc;
+
+    rc = xc_domain_maximum_gpfn(xch, domid);
+
+    if ( rc <= 0 )
+        return rc;
+
+    *gpfn = rc + 1;
+
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C
