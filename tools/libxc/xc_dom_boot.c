@@ -33,6 +33,7 @@
 
 #include "xg_private.h"
 #include "xc_dom.h"
+#include "xc_core.h"
 #include <xen/hvm/params.h>
 #include <xen/grant_table.h>
 
@@ -365,7 +366,7 @@ int xc_dom_gnttab_hvm_seed(xc_interface *xch, domid_t domid,
                            domid_t xenstore_domid)
 {
     int rc;
-    xen_pfn_t max_gfn;
+    xen_pfn_t scratch_gpfn;
     struct xen_add_to_physmap xatp = {
         .domid = domid,
         .space = XENMAPSPACE_grant_table,
@@ -375,16 +376,21 @@ int xc_dom_gnttab_hvm_seed(xc_interface *xch, domid_t domid,
         .domid = domid,
     };
 
-    max_gfn = xc_domain_maximum_gpfn(xch, domid);
-    if ( max_gfn <= 0 ) {
+    rc = xc_core_arch_get_scratch_gpfn(xch, domid, &scratch_gpfn);
+    if ( rc < 0 )
+    {
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
-                     "%s: failed to get max gfn "
+                     "%s: failed to get a scratch gfn "
                      "[errno=%d]\n",
                      __FUNCTION__, errno);
         return -1;
     }
-    xatp.gpfn = max_gfn + 1;
-    xrfp.gpfn = max_gfn + 1;
+    xatp.gpfn = scratch_gpfn;
+    xrfp.gpfn = scratch_gpfn;
+
+    xc_dom_printf(xch, "%s: called, pfn=0x%"PRI_xen_pfn, __FUNCTION__,
+                  scratch_gpfn);
+
 
     rc = do_memory_op(xch, XENMEM_add_to_physmap, &xatp, sizeof(xatp));
     if ( rc != 0 )

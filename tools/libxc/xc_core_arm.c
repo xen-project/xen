@@ -96,6 +96,23 @@ xc_core_arch_map_p2m_writable(xc_interface *xch, unsigned int guest_width, xc_do
     return xc_core_arch_map_p2m_rw(xch, dinfo, info,
                                    live_shinfo, live_p2m, pfnp, 1);
 }
+
+int
+xc_core_arch_get_scratch_gpfn(xc_interface *xch, domid_t domid,
+                              xen_pfn_t *gpfn)
+{
+    /*
+     * The Grant Table region space is not used until the guest is
+     * booting. Use the first page for the scratch pfn.
+     */
+    XC_BUILD_BUG_ON(GUEST_GNTTAB_SIZE < XC_PAGE_SIZE);
+
+    *gpfn = GUEST_GNTTAB_BASE >> XC_PAGE_SHIFT;
+
+    return 0;
+}
+
+
 /*
  * Local variables:
  * mode: C
