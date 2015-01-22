@@ -1129,7 +1129,7 @@ static void vmx_set_interrupt_shadow(struct vcpu *v, unsigned int intr_shadow)
 static void vmx_load_pdptrs(struct vcpu *v)
 {
     unsigned long cr3 = v->arch.hvm_vcpu.guest_cr[3];
-    uint64_t *guest_pdptrs;
+    uint64_t *guest_pdptes;
     struct page_info *page;
     p2m_type_t p2mt;
     char *p;
@@ -1155,7 +1155,7 @@ static void vmx_load_pdptrs(struct vcpu *v)
 
     p = __map_domain_page(page);
 
-    guest_pdptrs = (uint64_t *)(p + (cr3 & ~PAGE_MASK));
+    guest_pdptes = (uint64_t *)(p + (cr3 & ~PAGE_MASK));
 
     /*
      * We do not check the PDPTRs for validity. The CPU will do this during
@@ -1165,10 +1165,10 @@ static void vmx_load_pdptrs(struct vcpu *v)
 
     vmx_vmcs_enter(v);
 
-    __vmwrite(GUEST_PDPTR0, guest_pdptrs[0]);
-    __vmwrite(GUEST_PDPTR1, guest_pdptrs[1]);
-    __vmwrite(GUEST_PDPTR2, guest_pdptrs[2]);
-    __vmwrite(GUEST_PDPTR3, guest_pdptrs[3]);
+    __vmwrite(GUEST_PDPTE(0), guest_pdptes[0]);
+    __vmwrite(GUEST_PDPTE(1), guest_pdptes[1]);
+    __vmwrite(GUEST_PDPTE(2), guest_pdptes[2]);
+    __vmwrite(GUEST_PDPTE(3), guest_pdptes[3]);
 
     vmx_vmcs_exit(v);
 

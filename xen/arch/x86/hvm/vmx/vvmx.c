@@ -881,11 +881,11 @@ static const u16 vmcs_gstate_field[] = {
     GUEST_SYSENTER_EIP,
 };
 
-static const u16 gpdptr_fields[] = {
-    GUEST_PDPTR0,
-    GUEST_PDPTR1,
-    GUEST_PDPTR2,
-    GUEST_PDPTR3,
+static const u16 gpdpte_fields[] = {
+    GUEST_PDPTE(0),
+    GUEST_PDPTE(1),
+    GUEST_PDPTE(2),
+    GUEST_PDPTE(3),
 };
 
 /*
@@ -1173,7 +1173,7 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
 
     if ( nvmx_ept_enabled(v) && hvm_pae_enabled(v) &&
          !(v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
-        vvmcs_to_shadow_bulk(v, ARRAY_SIZE(gpdptr_fields), gpdptr_fields);
+        vvmcs_to_shadow_bulk(v, ARRAY_SIZE(gpdpte_fields), gpdpte_fields);
 
     regs->eip = __get_vvmcs(vvmcs, GUEST_RIP);
     regs->esp = __get_vvmcs(vvmcs, GUEST_RSP);
@@ -1348,7 +1348,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
 
     if ( nvmx_ept_enabled(v) && hvm_pae_enabled(v) &&
          !(v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
-        shadow_to_vvmcs_bulk(v, ARRAY_SIZE(gpdptr_fields), gpdptr_fields);
+        shadow_to_vvmcs_bulk(v, ARRAY_SIZE(gpdpte_fields), gpdpte_fields);
 
     vmx_vmcs_switch(v->arch.hvm_vmx.vmcs, nvcpu->nv_n1vmcx);
 

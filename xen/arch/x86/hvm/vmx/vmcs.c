@@ -1395,6 +1395,16 @@ static inline unsigned long vmr(unsigned long field)
     return __vmread_safe(field, &val) ? val : 0;
 }
 
+#define vmr16(fld) ({             \
+    BUILD_BUG_ON((fld) & 0x6001); \
+    (uint16_t)vmr(fld);           \
+})
+
+#define vmr32(fld) ({                         \
+    BUILD_BUG_ON(((fld) & 0x6001) != 0x4000); \
+    (uint32_t)vmr(fld);                       \
+})
+
 static void vmx_dump_sel(char *name, uint32_t selector)
 {
     uint32_t sel, attr, limit;
@@ -1420,44 +1430,45 @@ static void vmx_dump_sel2(char *name, uint32_t lim)
 void vmcs_dump_vcpu(struct vcpu *v)
 {
     struct cpu_user_regs *regs = &v->arch.user_regs;
-    unsigned long long x;
+    uint32_t vmentry_ctl, vmexit_ctl;
+    unsigned long cr4;
+    uint64_t efer;
+    unsigned int i, n;
 
     if ( v == current )
         regs = guest_cpu_user_regs();
 
     vmx_vmcs_enter(v);
 
+    vmentry_ctl = vmr32(VM_ENTRY_CONTROLS),
+    vmexit_ctl = vmr32(VM_EXIT_CONTROLS);
+    cr4 = vmr(GUEST_CR4);
+    efer = vmr(GUEST_EFER);
+
     printk("*** Guest State ***\n");
-    printk("CR0: actual=0x%016llx, shadow=0x%016llx, gh_mask=%016llx\n",
-           (unsigned long long)vmr(GUEST_CR0),
-           (unsigned long long)vmr(CR0_READ_SHADOW), 
-           (unsigned long long)vmr(CR0_GUEST_HOST_MASK));
-    printk("CR4: actual=0x%016llx, shadow=0x%016llx, gh_mask=%016llx\n",
-           (unsigned long long)vmr(GUEST_CR4),
-           (unsigned long long)vmr(CR4_READ_SHADOW), 
-           (unsigned long long)vmr(CR4_GUEST_HOST_MASK));
-    printk("CR3: actual=0x%016llx, target_count=%d\n",
-           (unsigned long long)vmr(GUEST_CR3),
-           (int)vmr(CR3_TARGET_COUNT));
-    printk("     target0=%016llx, target1=%016llx\n",
-           (unsigned long long)vmr(CR3_TARGET_VALUE0),
-           (unsigned long long)vmr(CR3_TARGET_VALUE1));
-    printk("     target2=%016llx, target3=%016llx\n",
-           (unsigned long long)vmr(CR3_TARGET_VALUE2),
-           (unsigned long long)vmr(CR3_TARGET_VALUE3));
-    printk("RSP = 0x%016llx (0x%016llx)  RIP = 0x%016llx (0x%016llx)\n", 
-           (unsigned long long)vmr(GUEST_RSP),
-           (unsigned long long)regs->esp,
-           (unsigned long long)vmr(GUEST_RIP),
-           (unsigned long long)regs->eip);
-    printk("RFLAGS=0x%016llx (0x%016llx)  DR7 = 0x%016llx\n", 
-           (unsigned long long)vmr(GUEST_RFLAGS),
-           (unsigned long long)regs->eflags,
-           (unsigned long long)vmr(GUEST_DR7));
-    printk("Sysenter RSP=%016llx CS:RIP=%04x:%016llx\n",
-           (unsigned long long)vmr(GUEST_SYSENTER_ESP),
-           (int)vmr(GUEST_SYSENTER_CS),
-           (unsigned long long)vmr(GUEST_SYSENTER_EIP));
+    printk("CR0: actual=0x%016lx, shadow=0x%016lx, gh_mask=%016lx\n",
+           vmr(GUEST_CR0), vmr(CR0_READ_SHADOW), vmr(CR0_GUEST_HOST_MASK));
+    printk("CR4: actual=0x%016lx, shadow=0x%016lx, gh_mask=%016lx\n",
+           cr4, vmr(CR4_READ_SHADOW), vmr(CR4_GUEST_HOST_MASK));
+    printk("CR3 = 0x%016lx\n", vmr(GUEST_CR3));
+    if ( (v->arch.hvm_vmx.secondary_exec_control &
+          SECONDARY_EXEC_ENABLE_EPT) &&
+         (cr4 & X86_CR4_PAE) && !(efer & EFER_LMA) )
+    {
+        printk("PDPTE0 = 0x%016lx  PDPTE1 = 0x%016lx\n",
+               vmr(GUEST_PDPTE(0)), vmr(GUEST_PDPTE(1)));
+        printk("PDPTE2 = 0x%016lx  PDPTE3 = 0x%016lx\n",
+               vmr(GUEST_PDPTE(2)), vmr(GUEST_PDPTE(3)));
+    }
+    printk("RSP = 0x%016lx (0x%016lx)  RIP = 0x%016lx (0x%016lx)\n",
+           vmr(GUEST_RSP), regs->esp,
+           vmr(GUEST_RIP), regs->eip);
+    printk("RFLAGS=0x%08lx (0x%08lx)  DR7 = 0x%016lx\n",
+           vmr(GUEST_RFLAGS), regs->eflags,
+           vmr(GUEST_DR7));
+    printk("Sysenter RSP=%016lx CS:RIP=%04x:%016lx\n",
+           vmr(GUEST_SYSENTER_ESP),
+           vmr32(GUEST_SYSENTER_CS), vmr(GUEST_SYSENTER_EIP));
     vmx_dump_sel("CS", GUEST_CS_SELECTOR);
     vmx_dump_sel("DS", GUEST_DS_SELECTOR);
     vmx_dump_sel("SS", GUEST_SS_SELECTOR);
@@ -1468,18 +1479,21 @@ void vmcs_dump_vcpu(struct vcpu *v)
     vmx_dump_sel("LDTR", GUEST_LDTR_SELECTOR);
     vmx_dump_sel2("IDTR", GUEST_IDTR_LIMIT);
     vmx_dump_sel("TR", GUEST_TR_SELECTOR);
-    printk("Guest PAT = 0x%08x%08x\n",
-           (uint32_t)vmr(GUEST_PAT_HIGH), (uint32_t)vmr(GUEST_PAT));
-    x  = (unsigned long long)vmr(TSC_OFFSET_HIGH) << 32;
-    x |= (uint32_t)vmr(TSC_OFFSET);
-    printk("TSC Offset = %016llx\n", x);
-    x  = (unsigned long long)vmr(GUEST_IA32_DEBUGCTL_HIGH) << 32;
-    x |= (uint32_t)vmr(GUEST_IA32_DEBUGCTL);
-    printk("DebugCtl=%016llx DebugExceptions=%016llx\n", x,
-           (unsigned long long)vmr(GUEST_PENDING_DBG_EXCEPTIONS));
-    printk("Interruptibility=%04x ActivityState=%04x\n",
-           (int)vmr(GUEST_INTERRUPTIBILITY_INFO),
-           (int)vmr(GUEST_ACTIVITY_STATE));
+    if ( (vmexit_ctl & (VM_EXIT_SAVE_GUEST_PAT | VM_EXIT_SAVE_GUEST_EFER)) ||
+         (vmentry_ctl & (VM_ENTRY_LOAD_GUEST_PAT | VM_ENTRY_LOAD_GUEST_EFER)) )
+        printk("EFER = 0x%016lx  PAT = 0x%016lx\n", efer, vmr(GUEST_PAT));
+    printk("PreemptionTimer = 0x%08x  SM Base = 0x%08x\n",
+           vmr32(GUEST_PREEMPTION_TIMER), vmr32(GUEST_SMBASE));
+    printk("DebugCtl = 0x%016lx  DebugExceptions = 0x%016lx\n",
+           vmr(GUEST_IA32_DEBUGCTL), vmr(GUEST_PENDING_DBG_EXCEPTIONS));
+    if ( vmentry_ctl & (VM_ENTRY_LOAD_PERF_GLOBAL_CTRL | VM_ENTRY_LOAD_BNDCFGS) )
+        printk("PerfGlobCtl = 0x%016lx  BndCfgS = 0x%016lx\n",
+               vmr(GUEST_PERF_GLOBAL_CTRL), vmr(GUEST_BNDCFGS));
+    printk("Interruptibility = %08x  ActivityState = %08x\n",
+           vmr32(GUEST_INTERRUPTIBILITY_INFO), vmr32(GUEST_ACTIVITY_STATE));
+    if ( v->arch.hvm_vmx.secondary_exec_control &
+         SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY )
+        printk("InterruptStatus = %04x\n", vmr16(GUEST_INTR_STATUS));
 
     printk("*** Host State ***\n");
     printk("RSP = 0x%016llx  RIP = 0x%016llx\n", 
@@ -1516,9 +1530,7 @@ void vmcs_dump_vcpu(struct vcpu *v)
            (uint32_t)vmr(PIN_BASED_VM_EXEC_CONTROL),
            (uint32_t)vmr(CPU_BASED_VM_EXEC_CONTROL),
            (uint32_t)vmr(SECONDARY_VM_EXEC_CONTROL));
-    printk("EntryControls=%08x ExitControls=%08x\n",
-           (uint32_t)vmr(VM_ENTRY_CONTROLS),
-           (uint32_t)vmr(VM_EXIT_CONTROLS));
+    printk("EntryControls=%08x ExitControls=%08x\n", vmentry_ctl, vmexit_ctl);
     printk("ExceptionBitmap=%08x\n",
            (uint32_t)vmr(EXCEPTION_BITMAP));
     printk("VMEntry: intr_info=%08x errcode=%08x ilen=%08x\n",
@@ -1537,8 +1549,16 @@ void vmcs_dump_vcpu(struct vcpu *v)
            (uint32_t)vmr(IDT_VECTORING_ERROR_CODE));
     printk("TPR Threshold = 0x%02x\n",
            (uint32_t)vmr(TPR_THRESHOLD));
+    printk("TSC Offset = 0x%016lx\n", vmr(TSC_OFFSET));
     printk("EPT pointer = 0x%08x%08x\n",
            (uint32_t)vmr(EPT_POINTER_HIGH), (uint32_t)vmr(EPT_POINTER));
+    n = vmr32(CR3_TARGET_COUNT);
+    for ( i = 0; i + 1 < n; i += 2 )
+        printk("CR3 target%u=%016lx target%u=%016lx\n",
+               i, vmr(CR3_TARGET_VALUE(i)),
+               i + 1, vmr(CR3_TARGET_VALUE(i + 1)));
+    if ( i < n )
+        printk("CR3 target%u=%016lx\n", i, vmr(CR3_TARGET_VALUE(i)));
     printk("Virtual processor ID = 0x%04x\n",
            (uint32_t)vmr(VIRTUAL_PROCESSOR_ID));
 
