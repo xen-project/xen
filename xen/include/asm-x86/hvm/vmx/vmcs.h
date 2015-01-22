@@ -213,6 +213,7 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY    0x00000200
 #define SECONDARY_EXEC_PAUSE_LOOP_EXITING       0x00000400
 #define SECONDARY_EXEC_ENABLE_INVPCID           0x00001000
+#define SECONDARY_EXEC_ENABLE_VMFUNC            0x00002000
 #define SECONDARY_EXEC_ENABLE_VMCS_SHADOWING    0x00004000
 extern u32 vmx_secondary_exec_control;
 
@@ -306,6 +307,7 @@ extern u64 vmx_basic_msr;
 enum vmcs_field {
     VIRTUAL_PROCESSOR_ID            = 0x00000000,
     POSTED_INTR_NOTIFICATION_VECTOR = 0x00000002,
+    EPTP_INDEX                      = 0x00000004,
     GUEST_ES_SELECTOR               = 0x00000800,
     GUEST_CS_SELECTOR               = 0x00000802,
     GUEST_SS_SELECTOR               = 0x00000804,
@@ -342,6 +344,7 @@ enum vmcs_field {
     APIC_ACCESS_ADDR_HIGH           = 0x00002015,
     PI_DESC_ADDR                    = 0x00002016,
     PI_DESC_ADDR_HIGH               = 0x00002017,
+    VMFUNC_CONTROL                  = 0x00002018,
     EPT_POINTER                     = 0x0000201a,
     EPT_POINTER_HIGH                = 0x0000201b,
     EOI_EXIT_BITMAP0                = 0x0000201c,

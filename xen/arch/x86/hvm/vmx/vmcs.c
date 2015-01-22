@@ -1520,31 +1520,35 @@ void vmcs_dump_vcpu(struct vcpu *v)
 
     printk("*** Control State ***\n");
     printk("PinBased=%08x CPUBased=%08x SecondaryExec=%08x\n",
-           (uint32_t)vmr(PIN_BASED_VM_EXEC_CONTROL),
-           (uint32_t)vmr(CPU_BASED_VM_EXEC_CONTROL),
-           (uint32_t)vmr(SECONDARY_VM_EXEC_CONTROL));
+           vmr32(PIN_BASED_VM_EXEC_CONTROL),
+           vmr32(CPU_BASED_VM_EXEC_CONTROL),
+           vmr32(SECONDARY_VM_EXEC_CONTROL));
     printk("EntryControls=%08x ExitControls=%08x\n", vmentry_ctl, vmexit_ctl);
-    printk("ExceptionBitmap=%08x\n",
-           (uint32_t)vmr(EXCEPTION_BITMAP));
+    printk("ExceptionBitmap=%08x PFECmask=%08x PFECmatch=%08x\n",
+           vmr32(EXCEPTION_BITMAP),
+           vmr32(PAGE_FAULT_ERROR_CODE_MASK),
+           vmr32(PAGE_FAULT_ERROR_CODE_MATCH));
     printk("VMEntry: intr_info=%08x errcode=%08x ilen=%08x\n",
-           (uint32_t)vmr(VM_ENTRY_INTR_INFO),
-           (uint32_t)vmr(VM_ENTRY_EXCEPTION_ERROR_CODE),
-           (uint32_t)vmr(VM_ENTRY_INSTRUCTION_LEN));
+           vmr32(VM_ENTRY_INTR_INFO),
+           vmr32(VM_ENTRY_EXCEPTION_ERROR_CODE),
+           vmr32(VM_ENTRY_INSTRUCTION_LEN));
     printk("VMExit: intr_info=%08x errcode=%08x ilen=%08x\n",
-           (uint32_t)vmr(VM_EXIT_INTR_INFO),
-           (uint32_t)vmr(VM_EXIT_INTR_ERROR_CODE),
-           (uint32_t)vmr(VM_ENTRY_INSTRUCTION_LEN));
-    printk("        reason=%08x qualification=%08x\n",
-           (uint32_t)vmr(VM_EXIT_REASON),
-           (uint32_t)vmr(EXIT_QUALIFICATION));
+           vmr32(VM_EXIT_INTR_INFO),
+           vmr32(VM_EXIT_INTR_ERROR_CODE),
+           vmr32(VM_EXIT_INSTRUCTION_LEN));
+    printk("        reason=%08x qualification=%016lx\n",
+           vmr32(VM_EXIT_REASON), vmr(EXIT_QUALIFICATION));
     printk("IDTVectoring: info=%08x errcode=%08x\n",
-           (uint32_t)vmr(IDT_VECTORING_INFO),
-           (uint32_t)vmr(IDT_VECTORING_ERROR_CODE));
-    printk("TPR Threshold = 0x%02x\n",
-           (uint32_t)vmr(TPR_THRESHOLD));
+           vmr32(IDT_VECTORING_INFO), vmr32(IDT_VECTORING_ERROR_CODE));
     printk("TSC Offset = 0x%016lx\n", vmr(TSC_OFFSET));
-    printk("EPT pointer = 0x%08x%08x\n",
-           (uint32_t)vmr(EPT_POINTER_HIGH), (uint32_t)vmr(EPT_POINTER));
+    if ( (v->arch.hvm_vmx.exec_control & CPU_BASED_TPR_SHADOW) ||
+         (vmx_pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT) )
+        printk("TPR Threshold = 0x%02x  PostedIntrVec = 0x%02x\n",
+               vmr32(TPR_THRESHOLD), vmr16(POSTED_INTR_NOTIFICATION_VECTOR));
+    if ( (v->arch.hvm_vmx.secondary_exec_control &
+          SECONDARY_EXEC_ENABLE_EPT) )
+        printk("EPT pointer = 0x%016lx  EPTP index = 0x%04x\n",
+               vmr(EPT_POINTER), vmr16(EPTP_INDEX));
     n = vmr32(CR3_TARGET_COUNT);
     for ( i = 0; i + 1 < n; i += 2 )
         printk("CR3 target%u=%016lx target%u=%016lx\n",
@@ -1552,8 +1556,14 @@ void vmcs_dump_vcpu(struct vcpu *v)
                i + 1, vmr(CR3_TARGET_VALUE(i + 1)));
     if ( i < n )
         printk("CR3 target%u=%016lx\n", i, vmr(CR3_TARGET_VALUE(i)));
-    printk("Virtual processor ID = 0x%04x\n",
-           (uint32_t)vmr(VIRTUAL_PROCESSOR_ID));
+    if ( v->arch.hvm_vmx.secondary_exec_control &
+         SECONDARY_EXEC_PAUSE_LOOP_EXITING )
+        printk("PLE Gap=%08x Window=%08x\n",
+               vmr32(PLE_GAP), vmr32(PLE_WINDOW));
+    if ( v->arch.hvm_vmx.secondary_exec_control &
+         (SECONDARY_EXEC_ENABLE_VPID | SECONDARY_EXEC_ENABLE_VMFUNC) )
+        printk("Virtual processor ID = 0x%04x VMfunc controls = %016lx\n",
+               vmr16(VIRTUAL_PROCESSOR_ID), vmr(VMFUNC_CONTROL));
 
     vmx_vmcs_exit(v);
 }
