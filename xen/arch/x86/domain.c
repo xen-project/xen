@@ -362,10 +362,8 @@ static inline int may_switch_mode(struct domain *d)
 
 int switch_native(struct domain *d)
 {
-    unsigned int vcpuid;
+    struct vcpu *v;
 
-    if ( d == NULL )
-        return -EINVAL;
     if ( !may_switch_mode(d) )
         return -EACCES;
     if ( !is_pv_32on64_domain(d) )
@@ -373,21 +371,16 @@ int switch_native(struct domain *d)
 
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
 
-    for ( vcpuid = 0; vcpuid < d->max_vcpus; vcpuid++ )
-    {
-        if (d->vcpu[vcpuid])
-            release_compat_l4(d->vcpu[vcpuid]);
-    }
+    for_each_vcpu( d, v )
+        release_compat_l4(v);
 
     return 0;
 }
 
 int switch_compat(struct domain *d)
 {
-    unsigned int vcpuid;
-
-    if ( d == NULL )
-        return -EINVAL;
+    struct vcpu *v;
+    int rc;
 
     if ( is_pvh_domain(d) )
     {
@@ -403,12 +396,9 @@ int switch_compat(struct domain *d)
 
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
 
-    for ( vcpuid = 0; vcpuid < d->max_vcpus; vcpuid++ )
-    {
-        if ( (d->vcpu[vcpuid] != NULL) &&
-             (setup_compat_l4(d->vcpu[vcpuid]) != 0) )
+    for_each_vcpu( d, v )
+        if ( (rc = setup_compat_l4(v)) )
             goto undo_and_fail;
-    }
 
     domain_set_alloc_bitsize(d);
 
@@ -416,12 +406,11 @@ int switch_compat(struct domain *d)
 
  undo_and_fail:
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
-    while ( vcpuid-- != 0 )
-    {
-        if ( d->vcpu[vcpuid] != NULL )
-            release_compat_l4(d->vcpu[vcpuid]);
-    }
-    return -ENOMEM;
+    for_each_vcpu( d, v )
+        if ( !pagetable_is_null(v->arch.guest_table) )
+            release_compat_l4(v);
+
+    return rc;
 }
 
 int vcpu_initialise(struct vcpu *v)
