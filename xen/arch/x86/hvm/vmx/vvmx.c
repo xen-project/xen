@@ -98,9 +98,9 @@ int nvmx_vcpu_initialise(struct vcpu *v)
          * Let them vmexit as usual.
          */
         set_bit(IO_BITMAP_A, vw);
-        set_bit(IO_BITMAP_A_HIGH, vw);
+        set_bit(VMCS_HIGH(IO_BITMAP_A), vw);
         set_bit(IO_BITMAP_B, vw);
-        set_bit(IO_BITMAP_B_HIGH, vw);
+        set_bit(VMCS_HIGH(IO_BITMAP_B), vw);
 
         unmap_domain_page(vr);
         unmap_domain_page(vw);
@@ -1761,15 +1761,15 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
     vmcs_encoding = reg_read(regs, decode.reg2);
     __set_vvmcs(nvcpu->nv_vvmcx, vmcs_encoding, operand);
 
-    switch ( vmcs_encoding )
+    switch ( vmcs_encoding & ~VMCS_HIGH(0) )
     {
-    case IO_BITMAP_A: case IO_BITMAP_A_HIGH:
+    case IO_BITMAP_A:
         okay = _map_io_bitmap(v, IO_BITMAP_A);
         break;
-    case IO_BITMAP_B: case IO_BITMAP_B_HIGH:
+    case IO_BITMAP_B:
         okay = _map_io_bitmap(v, IO_BITMAP_B);
         break;
-    case MSR_BITMAP: case MSR_BITMAP_HIGH:
+    case MSR_BITMAP:
         okay = _map_msr_bitmap(v);
         break;
     }
