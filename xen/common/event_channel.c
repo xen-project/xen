@@ -1264,13 +1264,13 @@ int evtchn_init(struct domain *d)
     evtchn_from_port(d, 0)->state = ECS_RESERVED;
 
 #if MAX_VIRT_CPUS > BITS_PER_LONG
-    d->poll_mask = xmalloc_array(unsigned long, BITS_TO_LONGS(MAX_VIRT_CPUS));
+    d->poll_mask = xzalloc_array(unsigned long,
+                                 BITS_TO_LONGS(domain_max_vcpus(d)));
     if ( !d->poll_mask )
     {
         free_evtchn_bucket(d, d->evtchn);
         return -ENOMEM;
     }
-    bitmap_zero(d->poll_mask, MAX_VIRT_CPUS);
 #endif
 
     return 0;
