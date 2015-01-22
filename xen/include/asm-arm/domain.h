@@ -249,6 +249,11 @@ struct arch_vcpu
 void vcpu_show_execution_state(struct vcpu *);
 void vcpu_show_registers(const struct vcpu *);
 
+static inline unsigned int domain_max_vcpus(const struct domain *d)
+{
+    return MAX_VIRT_CPUS;
+}
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

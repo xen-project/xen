@@ -67,9 +67,6 @@
 #define NR_CPUS 256
 #endif
 
-/* Maximum we can support with current vLAPIC ID mapping. */
-#define MAX_HVM_VCPUS 128
-
 /* Linkage for x86 */
 #define __ALIGN .align 16,0x90
 #define __ALIGN_STR ".align 16,0x90"

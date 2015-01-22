@@ -9,6 +9,7 @@
 #include <asm/e820.h>
 #include <asm/mce.h>
 #include <public/vcpu.h>
+#include <public/hvm/hvm_info_table.h>
 
 #define has_32bit_shinfo(d)    ((d)->arch.has_32bit_shinfo)
 #define is_pv_32bit_domain(d)  ((d)->arch.is_32bit_pv)
@@ -526,6 +527,8 @@ void domain_cpuid(struct domain *d,
                   unsigned int  *ebx,
                   unsigned int  *ecx,
                   unsigned int  *edx);
+
+#define domain_max_vcpus(d) (is_hvm_domain(d) ? HVM_MAX_VCPUS : MAX_VIRT_CPUS)
 
 #endif /* __ASM_DOMAIN_H__ */
 

@@ -608,8 +608,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         ret = -EINVAL;
         if ( (d == current->domain) || /* no domain_pause() */
-             (max > MAX_VIRT_CPUS) ||
-             (is_hvm_domain(d) && (max > MAX_HVM_VCPUS)) )
+             (max > domain_max_vcpus(d)) )
             break;
 
         /* Until Xenoprof can dynamically grow its vcpu-s array... */

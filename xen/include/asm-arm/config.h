@@ -48,7 +48,6 @@
 #endif
 
 #define MAX_VIRT_CPUS 8
-#define MAX_HVM_VCPUS MAX_VIRT_CPUS
 
 #define asmlinkage /* Nothing needed */
 
