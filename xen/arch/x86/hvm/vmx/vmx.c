@@ -1474,7 +1474,7 @@ static void vmx_inject_trap(struct hvm_trap *trap)
 
     if ( (_trap.vector == TRAP_page_fault) &&
          (_trap.type == X86_EVENTTYPE_HW_EXCEPTION) )
-        current->arch.hvm_vcpu.guest_cr[2] = _trap.cr2;
+        curr->arch.hvm_vcpu.guest_cr[2] = _trap.cr2;
 
     if ( nestedhvm_vcpu_in_guestmode(curr) )
         intr_info = vcpu_2_nvmx(curr).intr.intr_info;
@@ -1527,7 +1527,7 @@ static void vmx_inject_trap(struct hvm_trap *trap)
     if ( (_trap.vector == TRAP_page_fault) &&
          (_trap.type == X86_EVENTTYPE_HW_EXCEPTION) )
         HVMTRACE_LONG_2D(PF_INJECT, _trap.error_code,
-                         TRC_PAR_LONG(current->arch.hvm_vcpu.guest_cr[2]));
+                         TRC_PAR_LONG(curr->arch.hvm_vcpu.guest_cr[2]));
     else
         HVMTRACE_2D(INJ_EXC, _trap.vector, _trap.error_code);
 }
@@ -2814,7 +2814,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             if ( v->domain->debugger_attached )
             {
                 update_guest_eip(); /* Safe: INT3 */            
-                current->arch.gdbsx_vcpu_event = TRAP_int3;
+                v->arch.gdbsx_vcpu_event = TRAP_int3;
                 domain_pause_for_debugger();
                 break;
             }
@@ -3080,7 +3080,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
         vector = exit_qualification & 0xff;
 
-        vmx_handle_EOI_induced_exit(vcpu_vlapic(current), vector);
+        vmx_handle_EOI_induced_exit(vcpu_vlapic(v), vector);
         break;
     }
 
