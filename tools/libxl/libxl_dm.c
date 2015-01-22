@@ -443,6 +443,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                     "path=%s/qmp-libxl-%d,server,nowait",
                                     libxl__run_dir_path(), guest_domid));
 
+    flexarray_append(dm_args, "-no-shutdown");
     flexarray_append(dm_args, "-mon");
     flexarray_append(dm_args, "chardev=libxl-cmd,mode=control");
 
