@@ -14,7 +14,10 @@
 #include <asm/xstate.h>
 #include <asm/asm_defns.h>
 
-bool_t __read_mostly cpu_has_xsaveopt;
+static bool_t __read_mostly cpu_has_xsaveopt;
+static bool_t __read_mostly cpu_has_xsavec;
+bool_t __read_mostly cpu_has_xgetbv1;
+bool_t __read_mostly cpu_has_xsaves;
 
 /*
  * Maximum size (in byte) of the XSAVE/XRSTOR save area required by all
@@ -320,12 +323,22 @@ void xstate_init(bool_t bsp)
         BUG_ON(xsave_cntxt_size != _xstate_ctxt_size(feature_mask));
     }
 
-    /* Check XSAVEOPT feature. */
+    /* Check extended XSAVE features. */
     cpuid_count(XSTATE_CPUID, 1, &eax, &ebx, &ecx, &edx);
     if ( bsp )
+    {
         cpu_has_xsaveopt = !!(eax & XSTATE_FEATURE_XSAVEOPT);
+        cpu_has_xsavec = !!(eax & XSTATE_FEATURE_XSAVEC);
+        /* XXX cpu_has_xgetbv1 = !!(eax & XSTATE_FEATURE_XGETBV1); */
+        /* XXX cpu_has_xsaves = !!(eax & XSTATE_FEATURE_XSAVES); */
+    }
     else
+    {
         BUG_ON(!cpu_has_xsaveopt != !(eax & XSTATE_FEATURE_XSAVEOPT));
+        BUG_ON(!cpu_has_xsavec != !(eax & XSTATE_FEATURE_XSAVEC));
+        /* XXX BUG_ON(!cpu_has_xgetbv1 != !(eax & XSTATE_FEATURE_XGETBV1)); */
+        /* XXX BUG_ON(!cpu_has_xsaves != !(eax & XSTATE_FEATURE_XSAVES)); */
+    }
 }
 
 static bool_t valid_xcr0(u64 xcr0)
