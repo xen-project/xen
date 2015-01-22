@@ -861,10 +861,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         goto out;
     }
 
-    asm ( 
-        "cpuid"
-        : "=a" (a), "=b" (b), "=c" (c), "=d" (d)
-        : "0" (a), "1" (b), "2" (c), "3" (d) );
+    cpuid_count(a, c, &a, &b, &c, &d);
 
     if ( (regs->eax & 0x7fffffff) == 0x00000001 )
     {
