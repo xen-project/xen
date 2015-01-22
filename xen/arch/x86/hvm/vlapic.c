@@ -643,43 +643,31 @@ static int vlapic_read(
 
 int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
 {
+    static const unsigned long readable[] =
+        {
+#define REG(x) (1UL << (APIC_ ## x >> 4))
+            REG(ID)    | REG(LVR)  | REG(TASKPRI) | REG(PROCPRI) |
+            REG(LDR)   | REG(SPIV) | REG(ESR)     | REG(ICR)     |
+            REG(CMCI)  | REG(LVTT) | REG(LVTTHMR) | REG(LVTPC)   |
+            REG(LVT0)  | REG(LVT1) | REG(LVTERR)  | REG(TMICT)   |
+            REG(TMCCT) | REG(TDCR) |
+#undef REG
+#define REGBLOCK(x) (((1UL << (NR_VECTORS / 32)) - 1) << (APIC_ ## x >> 4))
+            REGBLOCK(ISR) | REGBLOCK(TMR) | REGBLOCK(IRR)
+#undef REGBLOCK
+        };
     struct vlapic *vlapic = vcpu_vlapic(v);
-    uint32_t low, high = 0, offset = (msr - MSR_IA32_APICBASE_MSR) << 4;
+    uint32_t low, high = 0, reg = msr - MSR_IA32_APICBASE_MSR,
+        offset = reg << 4;
 
-    if ( !vlapic_x2apic_mode(vlapic) )
+    if ( !vlapic_x2apic_mode(vlapic) ||
+         (reg >= sizeof(readable) * 8) || !test_bit(reg, readable) )
         return X86EMUL_UNHANDLEABLE;
 
-    switch ( offset )
-    {
-    case APIC_ICR:
+    if ( offset == APIC_ICR )
         vlapic_read_aligned(vlapic, APIC_ICR2, &high);
-        /* Fallthrough. */
-    case APIC_ID:
-    case APIC_LVR:
-    case APIC_TASKPRI:
-    case APIC_PROCPRI:
-    case APIC_LDR:
-    case APIC_SPIV:
-    case APIC_ISR ... APIC_ISR + 0x70:
-    case APIC_TMR ... APIC_TMR + 0x70:
-    case APIC_IRR ... APIC_IRR + 0x70:
-    case APIC_ESR:
-    case APIC_CMCI:
-    case APIC_LVTT:
-    case APIC_LVTTHMR:
-    case APIC_LVTPC:
-    case APIC_LVT0:
-    case APIC_LVT1:
-    case APIC_LVTERR:
-    case APIC_TMICT:
-    case APIC_TMCCT:
-    case APIC_TDCR:
-        vlapic_read_aligned(vlapic, offset, &low);
-        break;
 
-    default:
-        return X86EMUL_UNHANDLEABLE;
-    }
+    vlapic_read_aligned(vlapic, offset, &low);
 
     *msr_content = (((uint64_t)high) << 32) | low;
 
