@@ -29,9 +29,6 @@ int compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) ar
     struct vcpu *v;
     int rc = 0;
 
-    if ( vcpuid >= MAX_VIRT_CPUS )
-        return -EINVAL;
-
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
         return -ENOENT;
 

@@ -37,9 +37,6 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
     else
         vcpuid = target_cpu;
 
-    if ( (vcpuid < 0) || (vcpuid >= MAX_VIRT_CPUS) )
-        return PSCI_INVALID_PARAMETERS;
-
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
         return PSCI_INVALID_PARAMETERS;
 

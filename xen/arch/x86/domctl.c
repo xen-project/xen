@@ -541,10 +541,6 @@ long arch_do_domctl(
     {
         struct vcpu *v;
 
-        ret = -EINVAL;
-        if ( domctl->u.sendtrigger.vcpu >= MAX_VIRT_CPUS )
-            break;
-
         ret = -ESRCH;
         if ( domctl->u.sendtrigger.vcpu >= d->max_vcpus ||
              (v = d->vcpu[domctl->u.sendtrigger.vcpu]) == NULL )

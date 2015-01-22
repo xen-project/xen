@@ -1146,9 +1146,6 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
     struct vcpu_guest_context *ctxt;
     long rc = 0;
 
-    if ( vcpuid >= MAX_VIRT_CPUS )
-        return -EINVAL;
-
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
         return -ENOENT;
 
