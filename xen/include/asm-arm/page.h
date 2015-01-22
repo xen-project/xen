@@ -2,7 +2,6 @@
 #define __ARM_PAGE_H__
 
 #include <xen/config.h>
-#include <xen/errno.h>
 #include <public/xen.h>
 #include <asm/processor.h>
 
@@ -83,6 +82,7 @@
 
 #ifndef __ASSEMBLY__
 
+#include <xen/errno.h>
 #include <xen/types.h>
 #include <xen/lib.h>
 

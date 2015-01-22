@@ -24,7 +24,7 @@
             "    callq *%%rax; "                             \
             "1:  movq  %%rax,%c4(%0)\n"                      \
             ".section .fixup,\"ax\"\n"                       \
-            "2:  movq  $-"STR(ENOSYS)",%%rax\n"              \
+            "2:  movq  %5,%%rax\n"                           \
             "    jmp   1b\n"                                 \
             ".previous\n"                                    \
             :                                                \
@@ -32,7 +32,8 @@
               "i" (offsetof(__typeof__(*_call), op)),        \
               "i" (offsetof(__typeof__(*_call), args)),      \
               "i" (sizeof(*(_call)->args)),                  \
-              "i" (offsetof(__typeof__(*_call), result))     \
+              "i" (offsetof(__typeof__(*_call), result)),    \
+              "i" (-ENOSYS)                                  \
               /* all the caller-saves registers */           \
             : "rax", "rcx", "rdx", "rsi", "rdi",             \
               "r8",  "r9",  "r10", "r11" );                  \
@@ -54,7 +55,7 @@
             "    callq *%%rax; "                             \
             "1:  movl  %%eax,%c4(%0)\n"                      \
             ".section .fixup,\"ax\"\n"                       \
-            "2:  movl  $-"STR(ENOSYS)",%%eax\n"              \
+            "2:  movl  %5,%%eax\n"                           \
             "    jmp   1b\n"                                 \
             ".previous\n"                                    \
             :                                                \
@@ -62,7 +63,8 @@
               "i" (offsetof(__typeof__(*_call), op)),        \
               "i" (offsetof(__typeof__(*_call), args)),      \
               "i" (sizeof(*(_call)->args)),                  \
-              "i" (offsetof(__typeof__(*_call), result))     \
+              "i" (offsetof(__typeof__(*_call), result)),    \
+              "i" (-ENOSYS)                                  \
               /* all the caller-saves registers */           \
             : "rax", "rcx", "rdx", "rsi", "rdi",             \
               "r8",  "r9",  "r10", "r11" )                   \
