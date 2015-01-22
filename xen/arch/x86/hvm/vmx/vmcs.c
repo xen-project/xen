@@ -1496,34 +1496,27 @@ void vmcs_dump_vcpu(struct vcpu *v)
         printk("InterruptStatus = %04x\n", vmr16(GUEST_INTR_STATUS));
 
     printk("*** Host State ***\n");
-    printk("RSP = 0x%016llx  RIP = 0x%016llx\n", 
-           (unsigned long long)vmr(HOST_RSP),
-           (unsigned long long)vmr(HOST_RIP));
-    printk("CS=%04x DS=%04x ES=%04x FS=%04x GS=%04x SS=%04x TR=%04x\n",
-           (uint16_t)vmr(HOST_CS_SELECTOR),
-           (uint16_t)vmr(HOST_DS_SELECTOR),
-           (uint16_t)vmr(HOST_ES_SELECTOR),
-           (uint16_t)vmr(HOST_FS_SELECTOR),
-           (uint16_t)vmr(HOST_GS_SELECTOR),
-           (uint16_t)vmr(HOST_SS_SELECTOR),
-           (uint16_t)vmr(HOST_TR_SELECTOR));
-    printk("FSBase=%016llx GSBase=%016llx TRBase=%016llx\n",
-           (unsigned long long)vmr(HOST_FS_BASE),
-           (unsigned long long)vmr(HOST_GS_BASE),
-           (unsigned long long)vmr(HOST_TR_BASE));
-    printk("GDTBase=%016llx IDTBase=%016llx\n",
-           (unsigned long long)vmr(HOST_GDTR_BASE),
-           (unsigned long long)vmr(HOST_IDTR_BASE));
-    printk("CR0=%016llx CR3=%016llx CR4=%016llx\n",
-           (unsigned long long)vmr(HOST_CR0),
-           (unsigned long long)vmr(HOST_CR3),
-           (unsigned long long)vmr(HOST_CR4));
-    printk("Sysenter RSP=%016llx CS:RIP=%04x:%016llx\n",
-           (unsigned long long)vmr(HOST_SYSENTER_ESP),
-           (int)vmr(HOST_SYSENTER_CS),
-           (unsigned long long)vmr(HOST_SYSENTER_EIP));
-    printk("Host PAT = 0x%08x%08x\n",
-           (uint32_t)vmr(HOST_PAT_HIGH), (uint32_t)vmr(HOST_PAT));
+    printk("RIP = 0x%016lx (%ps)  RSP = 0x%016lx\n",
+           vmr(HOST_RIP), (void *)vmr(HOST_RIP), vmr(HOST_RSP));
+    printk("CS=%04x SS=%04x DS=%04x ES=%04x FS=%04x GS=%04x TR=%04x\n",
+           vmr16(HOST_CS_SELECTOR), vmr16(HOST_SS_SELECTOR),
+           vmr16(HOST_DS_SELECTOR), vmr16(HOST_ES_SELECTOR),
+           vmr16(HOST_FS_SELECTOR), vmr16(HOST_GS_SELECTOR),
+           vmr16(HOST_TR_SELECTOR));
+    printk("FSBase=%016lx GSBase=%016lx TRBase=%016lx\n",
+           vmr(HOST_FS_BASE), vmr(HOST_GS_BASE), vmr(HOST_TR_BASE));
+    printk("GDTBase=%016lx IDTBase=%016lx\n",
+           vmr(HOST_GDTR_BASE), vmr(HOST_IDTR_BASE));
+    printk("CR0=%016lx CR3=%016lx CR4=%016lx\n",
+           vmr(HOST_CR0), vmr(HOST_CR3), vmr(HOST_CR4));
+    printk("Sysenter RSP=%016lx CS:RIP=%04x:%016lx\n",
+           vmr(HOST_SYSENTER_ESP),
+           vmr32(HOST_SYSENTER_CS), vmr(HOST_SYSENTER_EIP));
+    if ( vmexit_ctl & (VM_EXIT_LOAD_HOST_PAT | VM_EXIT_LOAD_HOST_EFER) )
+        printk("EFER = 0x%016lx  PAT = 0x%016lx\n", vmr(HOST_EFER), vmr(HOST_PAT));
+    if ( vmexit_ctl & VM_EXIT_LOAD_PERF_GLOBAL_CTRL )
+        printk("PerfGlobCtl = 0x%016lx\n",
+               vmr(HOST_PERF_GLOBAL_CTRL));
 
     printk("*** Control State ***\n");
     printk("PinBased=%08x CPUBased=%08x SecondaryExec=%08x\n",
