@@ -881,7 +881,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         }
     }
 
-    switch ( (uint32_t)regs->eax )
+    switch ( regs->_eax )
     {
     case 0x00000001:
         /* Modify Feature Information. */
@@ -916,7 +916,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         break;
 
     case 0x00000007:
-        if ( regs->ecx == 0 )
+        if ( regs->_ecx == 0 )
             b &= (cpufeat_mask(X86_FEATURE_BMI1) |
                   cpufeat_mask(X86_FEATURE_HLE)  |
                   cpufeat_mask(X86_FEATURE_AVX2) |
