@@ -218,6 +218,7 @@ void vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t vendor = current_cpu_data.x86_vendor;
+    int ret;
 
     if ( is_pvh_vcpu(v) )
         return;
@@ -230,21 +231,25 @@ void vpmu_initialise(struct vcpu *v)
     switch ( vendor )
     {
     case X86_VENDOR_AMD:
-        if ( svm_vpmu_initialise(v, opt_vpmu_enabled) != 0 )
-            opt_vpmu_enabled = 0;
+        ret = svm_vpmu_initialise(v, opt_vpmu_enabled);
         break;
 
     case X86_VENDOR_INTEL:
-        if ( vmx_vpmu_initialise(v, opt_vpmu_enabled) != 0 )
-            opt_vpmu_enabled = 0;
+        ret = vmx_vpmu_initialise(v, opt_vpmu_enabled);
         break;
 
     default:
-        printk("VPMU: Initialization failed. "
-               "Unknown CPU vendor %d\n", vendor);
-        opt_vpmu_enabled = 0;
-        break;
+        if ( opt_vpmu_enabled )
+        {
+            printk(XENLOG_G_WARNING "VPMU: Unknown CPU vendor %d. "
+                   "Disabling VPMU\n", vendor);
+            opt_vpmu_enabled = 0;
+        }
+        return;
     }
+
+    if ( ret )
+        printk(XENLOG_G_WARNING "VPMU: Initialization failed for %pv\n", v);
 }
 
 static void vpmu_clear_last(void *arg)
