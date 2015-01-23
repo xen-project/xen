@@ -1201,64 +1201,62 @@ int vmx_write_guest_msr(u32 msr, u64 val)
     return -ESRCH;
 }
 
-int vmx_add_guest_msr(u32 msr)
+int vmx_add_msr(u32 msr, int type)
 {
     struct vcpu *curr = current;
-    unsigned int i, msr_count = curr->arch.hvm_vmx.msr_count;
-    struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
+    unsigned int idx, *msr_count;
+    struct vmx_msr_entry **msr_area, *msr_area_elem;
 
-    if ( msr_area == NULL )
+    if ( type == VMX_GUEST_MSR )
     {
-        if ( (msr_area = alloc_xenheap_page()) == NULL )
-            return -ENOMEM;
-        curr->arch.hvm_vmx.msr_area = msr_area;
-        __vmwrite(VM_EXIT_MSR_STORE_ADDR, virt_to_maddr(msr_area));
-        __vmwrite(VM_ENTRY_MSR_LOAD_ADDR, virt_to_maddr(msr_area));
+        msr_count = &curr->arch.hvm_vmx.msr_count;
+        msr_area = &curr->arch.hvm_vmx.msr_area;
+    }
+    else
+    {
+        ASSERT(type == VMX_HOST_MSR);
+        msr_count = &curr->arch.hvm_vmx.host_msr_count;
+        msr_area = &curr->arch.hvm_vmx.host_msr_area;
     }
 
-    for ( i = 0; i < msr_count; i++ )
-        if ( msr_area[i].index == msr )
-            return 0;
-
-    if ( msr_count == (PAGE_SIZE / sizeof(struct vmx_msr_entry)) )
-        return -ENOSPC;
-
-    msr_area[msr_count].index = msr;
-    msr_area[msr_count].mbz   = 0;
-    msr_area[msr_count].data  = 0;
-    curr->arch.hvm_vmx.msr_count = ++msr_count;
-    __vmwrite(VM_EXIT_MSR_STORE_COUNT, msr_count);
-    __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, msr_count);
-
-    return 0;
-}
-
-int vmx_add_host_load_msr(u32 msr)
-{
-    struct vcpu *curr = current;
-    unsigned int i, msr_count = curr->arch.hvm_vmx.host_msr_count;
-    struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.host_msr_area;
-
-    if ( msr_area == NULL )
+    if ( *msr_area == NULL )
     {
-        if ( (msr_area = alloc_xenheap_page()) == NULL )
+        if ( (*msr_area = alloc_xenheap_page()) == NULL )
             return -ENOMEM;
-        curr->arch.hvm_vmx.host_msr_area = msr_area;
-        __vmwrite(VM_EXIT_MSR_LOAD_ADDR, virt_to_maddr(msr_area));
+
+        if ( type == VMX_GUEST_MSR )
+        {
+            __vmwrite(VM_EXIT_MSR_STORE_ADDR, virt_to_maddr(*msr_area));
+            __vmwrite(VM_ENTRY_MSR_LOAD_ADDR, virt_to_maddr(*msr_area));
+        }
+        else
+            __vmwrite(VM_EXIT_MSR_LOAD_ADDR, virt_to_maddr(*msr_area));
     }
 
-    for ( i = 0; i < msr_count; i++ )
-        if ( msr_area[i].index == msr )
+    for ( idx = 0; idx < *msr_count; idx++ )
+        if ( (*msr_area)[idx].index == msr )
             return 0;
 
-    if ( msr_count == (PAGE_SIZE / sizeof(struct vmx_msr_entry)) )
+    if ( *msr_count == (PAGE_SIZE / sizeof(struct vmx_msr_entry)) )
         return -ENOSPC;
 
-    msr_area[msr_count].index = msr;
-    msr_area[msr_count].mbz   = 0;
-    rdmsrl(msr, msr_area[msr_count].data);
-    curr->arch.hvm_vmx.host_msr_count = ++msr_count;
-    __vmwrite(VM_EXIT_MSR_LOAD_COUNT, msr_count);
+    msr_area_elem = *msr_area + *msr_count;
+    msr_area_elem->index = msr;
+    msr_area_elem->mbz = 0;
+
+    ++*msr_count;
+
+    if ( type == VMX_GUEST_MSR )
+    {
+        msr_area_elem->data = 0;
+        __vmwrite(VM_EXIT_MSR_STORE_COUNT, *msr_count);
+        __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, *msr_count);
+    }
+    else
+    {
+        rdmsrl(msr, msr_area_elem->data);
+        __vmwrite(VM_EXIT_MSR_LOAD_COUNT, *msr_count);
+    }
 
     return 0;
 }
