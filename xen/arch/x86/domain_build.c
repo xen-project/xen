@@ -320,11 +320,24 @@ static __init void pvh_add_mem_mapping(struct domain *d, unsigned long gfn,
 {
     unsigned long i;
     p2m_access_t a;
+    mfn_t omfn;
+    p2m_type_t t;
     int rc;
 
-    a = p2m_get_hostp2m(d)->default_access;
     for ( i = 0; i < nr_mfns; i++ )
     {
+        if ( !iomem_access_permitted(d, mfn + i, mfn + i) )
+        {
+            omfn = get_gfn_query_unlocked(d, gfn + i, &t);
+            guest_physmap_remove_page(d, gfn + i, mfn_x(omfn), PAGE_ORDER_4K);
+            continue;
+        }
+
+        if ( rangeset_contains_singleton(mmio_ro_ranges, mfn + i) )
+            a = p2m_access_rx;
+        else
+            a = p2m_access_rwx;
+
         if ( (rc = set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i), a)) )
             panic("pvh_add_mem_mapping: gfn:%lx mfn:%lx i:%ld rc:%d\n",
                   gfn, mfn, i, rc);
