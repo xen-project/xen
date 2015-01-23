@@ -15,6 +15,7 @@ CHECK_TYPE(domid);
 #undef xen_domid_t
 
 CHECK_mem_access_op;
+CHECK_vmemrange;
 
 int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 {
@@ -32,12 +33,14 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             struct xen_add_to_physmap *atp;
             struct xen_add_to_physmap_batch *atpb;
             struct xen_remove_from_physmap *xrfp;
+            struct xen_vnuma_topology_info *vnuma;
         } nat;
         union {
             struct compat_memory_reservation rsrv;
             struct compat_memory_exchange xchg;
             struct compat_add_to_physmap atp;
             struct compat_add_to_physmap_batch atpb;
+            struct compat_vnuma_topology_info vnuma;
         } cmp;
 
         set_xen_guest_handle(nat.hnd, COMPAT_ARG_XLAT_VIRT_BASE);
@@ -273,13 +276,50 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             break;
         }
 
+        case XENMEM_get_vnumainfo:
+        {
+            enum XLAT_vnuma_topology_info_vdistance vdistance =
+                XLAT_vnuma_topology_info_vdistance_h;
+            enum XLAT_vnuma_topology_info_vcpu_to_vnode vcpu_to_vnode =
+                XLAT_vnuma_topology_info_vcpu_to_vnode_h;
+            enum XLAT_vnuma_topology_info_vmemrange vmemrange =
+                XLAT_vnuma_topology_info_vmemrange_h;
+
+            if ( copy_from_guest(&cmp.vnuma, compat, 1) )
+                return -EFAULT;
+
+#define XLAT_vnuma_topology_info_HNDL_vdistance_h(_d_, _s_)		\
+            guest_from_compat_handle((_d_)->vdistance.h, (_s_)->vdistance.h)
+#define XLAT_vnuma_topology_info_HNDL_vcpu_to_vnode_h(_d_, _s_)		\
+            guest_from_compat_handle((_d_)->vcpu_to_vnode.h, (_s_)->vcpu_to_vnode.h)
+#define XLAT_vnuma_topology_info_HNDL_vmemrange_h(_d_, _s_)		\
+            guest_from_compat_handle((_d_)->vmemrange.h, (_s_)->vmemrange.h)
+
+            XLAT_vnuma_topology_info(nat.vnuma, &cmp.vnuma);
+
+#undef XLAT_vnuma_topology_info_HNDL_vdistance_h
+#undef XLAT_vnuma_topology_info_HNDL_vcpu_to_vnode_h
+#undef XLAT_vnuma_topology_info_HNDL_vmemrange_h
+            break;
+        }
+
         default:
             return compat_arch_memory_op(cmd, compat);
         }
 
         rc = do_memory_op(cmd, nat.hnd);
         if ( rc < 0 )
+        {
+            if ( rc == -ENOBUFS && op == XENMEM_get_vnumainfo )
+            {
+                cmp.vnuma.nr_vnodes = nat.vnuma->nr_vnodes;
+                cmp.vnuma.nr_vcpus = nat.vnuma->nr_vcpus;
+                cmp.vnuma.nr_vmemranges = nat.vnuma->nr_vmemranges;
+                if ( __copy_to_guest(compat, &cmp.vnuma, 1) )
+                    rc = -EFAULT;
+            }
             break;
+        }
 
         cmd = 0;
         if ( hypercall_xlat_continuation(&cmd, 2, 0x02, nat.hnd, compat) )
@@ -396,6 +436,14 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
         case XENMEM_maximum_gpfn:
         case XENMEM_add_to_physmap:
         case XENMEM_remove_from_physmap:
+            break;
+
+        case XENMEM_get_vnumainfo:
+            cmp.vnuma.nr_vnodes = nat.vnuma->nr_vnodes;
+            cmp.vnuma.nr_vcpus = nat.vnuma->nr_vcpus;
+            cmp.vnuma.nr_vmemranges = nat.vnuma->nr_vmemranges;
+            if ( __copy_to_guest(compat, &cmp.vnuma, 1) )
+                rc = -EFAULT;
             break;
 
         default:
