@@ -205,6 +205,16 @@ int hvm_event_needs_reinjection(uint8_t type, uint8_t vector)
  */
 uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2)
 {
+    const unsigned int contributory_exceptions =
+        (1 << TRAP_divide_error) |
+        (1 << TRAP_invalid_tss) |
+        (1 << TRAP_no_segment) |
+        (1 << TRAP_stack_error) |
+        (1 << TRAP_gp_fault);
+    const unsigned int page_faults =
+        (1 << TRAP_page_fault) |
+        (1 << TRAP_virtualisation);
+
     /* Exception during double-fault delivery always causes a triple fault. */
     if ( vec1 == TRAP_double_fault )
     {
@@ -213,11 +223,12 @@ uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2)
     }
 
     /* Exception during page-fault delivery always causes a double fault. */
-    if ( vec1 == TRAP_page_fault )
+    if ( (1u << vec1) & page_faults )
         return TRAP_double_fault;
 
     /* Discard the first exception if it's benign or if we now have a #PF. */
-    if ( !((1u << vec1) & 0x7c01u) || (vec2 == TRAP_page_fault) )
+    if ( !((1u << vec1) & contributory_exceptions) ||
+         ((1u << vec2) & page_faults) )
         return vec2;
 
     /* Cannot combine the exceptions: double fault. */
