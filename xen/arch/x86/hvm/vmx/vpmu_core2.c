@@ -326,10 +326,7 @@ static int core2_vpmu_save(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_SAVE) )
-        return 0;
-
-    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) ) 
+    if ( !vpmu_are_all_set(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED) )
         return 0;
 
     __core2_vpmu_save(v);

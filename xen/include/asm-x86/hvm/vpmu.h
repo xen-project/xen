@@ -82,10 +82,27 @@ struct vpmu_struct {
 #define VPMU_CPU_HAS_BTS                    0x200 /* Has Branch Trace Store */
 
 
-#define vpmu_set(_vpmu, _x)    ((_vpmu)->flags |= (_x))
-#define vpmu_reset(_vpmu, _x)  ((_vpmu)->flags &= ~(_x))
-#define vpmu_is_set(_vpmu, _x) ((_vpmu)->flags & (_x))
-#define vpmu_clear(_vpmu)      ((_vpmu)->flags = 0)
+static inline void vpmu_set(struct vpmu_struct *vpmu, const u32 mask)
+{
+    vpmu->flags |= mask;
+}
+static inline void vpmu_reset(struct vpmu_struct *vpmu, const u32 mask)
+{
+    vpmu->flags &= ~mask;
+}
+static inline void vpmu_clear(struct vpmu_struct *vpmu)
+{
+    vpmu->flags = 0;
+}
+static inline bool_t vpmu_is_set(const struct vpmu_struct *vpmu, const u32 mask)
+{
+    return !!(vpmu->flags & mask);
+}
+static inline bool_t vpmu_are_all_set(const struct vpmu_struct *vpmu,
+                                      const u32 mask)
+{
+    return !!((vpmu->flags & mask) == mask);
+}
 
 int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content, uint64_t supported);
 int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content);

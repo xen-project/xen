@@ -143,8 +143,7 @@ void vpmu_save(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     int pcpu = smp_processor_id();
 
-    if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
-           vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED)) )
+    if ( !vpmu_are_all_set(vpmu, VPMU_CONTEXT_ALLOCATED | VPMU_CONTEXT_LOADED) )
        return;
 
     vpmu->last_pcpu = pcpu;
