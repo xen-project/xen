@@ -69,6 +69,27 @@
 static bool_t __read_mostly full_width_write;
 
 /*
+ * MSR_CORE_PERF_FIXED_CTR_CTRL contains the configuration of all fixed
+ * counters. 4 bits for every counter.
+ */
+#define FIXED_CTR_CTRL_BITS 4
+#define FIXED_CTR_CTRL_MASK ((1 << FIXED_CTR_CTRL_BITS) - 1)
+
+#define VPMU_CORE2_MAX_FIXED_PMCS     4
+struct core2_vpmu_context {
+    u64 fixed_ctrl;
+    u64 ds_area;
+    u64 pebs_enable;
+    u64 global_ovf_status;
+    u64 enabled_cntrs;  /* Follows PERF_GLOBAL_CTRL MSR format */
+    u64 fix_counters[VPMU_CORE2_MAX_FIXED_PMCS];
+    struct arch_msr_pair arch_msr_pair[1];
+};
+
+/* Number of general-purpose and fixed performance counters */
+static unsigned int __read_mostly arch_pmc_cnt, fixed_pmc_cnt;
+
+/*
  * QUIRK to workaround an issue on various family 6 cpus.
  * The issue leads to endless PMC interrupt loops on the processor.
  * If the interrupt handler is running and a pmc reaches the value 0, this
@@ -88,11 +109,8 @@ static void check_pmc_quirk(void)
         is_pmc_quirk = 0;    
 }
 
-static int core2_get_pmc_count(void);
 static void handle_pmc_quirk(u64 msr_content)
 {
-    int num_gen_pmc = core2_get_pmc_count();
-    int num_fix_pmc  = 3;
     int i;
     u64 val;
 
@@ -100,7 +118,7 @@ static void handle_pmc_quirk(u64 msr_content)
         return;
 
     val = msr_content;
-    for ( i = 0; i < num_gen_pmc; i++ )
+    for ( i = 0; i < arch_pmc_cnt; i++ )
     {
         if ( val & 0x1 )
         {
@@ -112,7 +130,7 @@ static void handle_pmc_quirk(u64 msr_content)
         val >>= 1;
     }
     val = msr_content >> 32;
-    for ( i = 0; i < num_fix_pmc; i++ )
+    for ( i = 0; i < fixed_pmc_cnt; i++ )
     {
         if ( val & 0x1 )
         {
@@ -125,128 +143,91 @@ static void handle_pmc_quirk(u64 msr_content)
     }
 }
 
-static const u32 core2_fix_counters_msr[] = {
-    MSR_CORE_PERF_FIXED_CTR0,
-    MSR_CORE_PERF_FIXED_CTR1,
-    MSR_CORE_PERF_FIXED_CTR2
-};
-
-/*
- * MSR_CORE_PERF_FIXED_CTR_CTRL contains the configuration of all fixed
- * counters. 4 bits for every counter.
- */
-#define FIXED_CTR_CTRL_BITS 4
-#define FIXED_CTR_CTRL_MASK ((1 << FIXED_CTR_CTRL_BITS) - 1)
-
-/* The index into the core2_ctrls_msr[] of this MSR used in core2_vpmu_dump() */
-#define MSR_CORE_PERF_FIXED_CTR_CTRL_IDX 0
-
-/* Core 2 Non-architectual Performance Control MSRs. */
-static const u32 core2_ctrls_msr[] = {
-    MSR_CORE_PERF_FIXED_CTR_CTRL,
-    MSR_IA32_PEBS_ENABLE,
-    MSR_IA32_DS_AREA
-};
-
-struct pmumsr {
-    unsigned int num;
-    const u32 *msr;
-};
-
-static const struct pmumsr core2_fix_counters = {
-    VPMU_CORE2_NUM_FIXED,
-    core2_fix_counters_msr
-};
-
-static const struct pmumsr core2_ctrls = {
-    VPMU_CORE2_NUM_CTRLS,
-    core2_ctrls_msr
-};
-static int arch_pmc_cnt;
-
 /*
  * Read the number of general counters via CPUID.EAX[0xa].EAX[8..15]
  */
-static int core2_get_pmc_count(void)
+static int core2_get_arch_pmc_count(void)
 {
-    u32 eax, ebx, ecx, edx;
+    u32 eax;
 
-    if ( arch_pmc_cnt == 0 )
-    {
-        cpuid(0xa, &eax, &ebx, &ecx, &edx);
-        arch_pmc_cnt = (eax & PMU_GENERAL_NR_MASK) >> PMU_GENERAL_NR_SHIFT;
-    }
+    eax = cpuid_eax(0xa);
+    return MASK_EXTR(eax, PMU_GENERAL_NR_MASK);
+}
 
-    return arch_pmc_cnt;
+/*
+ * Read the number of fixed counters via CPUID.EDX[0xa].EDX[0..4]
+ */
+static int core2_get_fixed_pmc_count(void)
+{
+    u32 eax;
+
+    eax = cpuid_eax(0xa);
+    return MASK_EXTR(eax, PMU_FIXED_NR_MASK);
 }
 
 static u64 core2_calc_intial_glb_ctrl_msr(void)
 {
-    int arch_pmc_bits = (1 << core2_get_pmc_count()) - 1;
-    u64 fix_pmc_bits  = (1 << 3) - 1;
-    return ((fix_pmc_bits << 32) | arch_pmc_bits);
+    int arch_pmc_bits = (1 << arch_pmc_cnt) - 1;
+    u64 fix_pmc_bits  = (1 << fixed_pmc_cnt) - 1;
+
+    return (fix_pmc_bits << 32) | arch_pmc_bits;
 }
 
 /* edx bits 5-12: Bit width of fixed-function performance counters  */
 static int core2_get_bitwidth_fix_count(void)
 {
-    u32 eax, ebx, ecx, edx;
+    u32 edx;
 
-    cpuid(0xa, &eax, &ebx, &ecx, &edx);
-    return ((edx & PMU_FIXED_WIDTH_MASK) >> PMU_FIXED_WIDTH_SHIFT);
+    edx = cpuid_edx(0xa);
+    return MASK_EXTR(edx, PMU_FIXED_WIDTH_MASK);
 }
 
 static int is_core2_vpmu_msr(u32 msr_index, int *type, int *index)
 {
-    int i;
     u32 msr_index_pmc;
 
-    for ( i = 0; i < core2_fix_counters.num; i++ )
+    switch ( msr_index )
     {
-        if ( core2_fix_counters.msr[i] == msr_index )
-        {
-            *type = MSR_TYPE_COUNTER;
-            *index = i;
-            return 1;
-        }
-    }
+    case MSR_CORE_PERF_FIXED_CTR_CTRL:
+    case MSR_IA32_DS_AREA:
+    case MSR_IA32_PEBS_ENABLE:
+        *type = MSR_TYPE_CTRL;
+        return 1;
 
-    for ( i = 0; i < core2_ctrls.num; i++ )
-    {
-        if ( core2_ctrls.msr[i] == msr_index )
-        {
-            *type = MSR_TYPE_CTRL;
-            *index = i;
-            return 1;
-        }
-    }
-
-    if ( (msr_index == MSR_CORE_PERF_GLOBAL_CTRL) ||
-         (msr_index == MSR_CORE_PERF_GLOBAL_STATUS) ||
-         (msr_index == MSR_CORE_PERF_GLOBAL_OVF_CTRL) )
-    {
+    case MSR_CORE_PERF_GLOBAL_CTRL:
+    case MSR_CORE_PERF_GLOBAL_STATUS:
+    case MSR_CORE_PERF_GLOBAL_OVF_CTRL:
         *type = MSR_TYPE_GLOBAL;
         return 1;
-    }
 
-    msr_index_pmc = msr_index & MSR_PMC_ALIAS_MASK;
-    if ( (msr_index_pmc >= MSR_IA32_PERFCTR0) &&
-         (msr_index_pmc < (MSR_IA32_PERFCTR0 + core2_get_pmc_count())) )
-    {
-        *type = MSR_TYPE_ARCH_COUNTER;
-        *index = msr_index_pmc - MSR_IA32_PERFCTR0;
-        return 1;
-    }
+    default:
 
-    if ( (msr_index >= MSR_P6_EVNTSEL(0)) &&
-         (msr_index < (MSR_P6_EVNTSEL(core2_get_pmc_count()))) )
-    {
-        *type = MSR_TYPE_ARCH_CTRL;
-        *index = msr_index - MSR_P6_EVNTSEL(0);
-        return 1;
-    }
+        if ( (msr_index >= MSR_CORE_PERF_FIXED_CTR0) &&
+             (msr_index < MSR_CORE_PERF_FIXED_CTR0 + fixed_pmc_cnt) )
+        {
+            *index = msr_index - MSR_CORE_PERF_FIXED_CTR0;
+            *type = MSR_TYPE_COUNTER;
+            return 1;
+        }
 
-    return 0;
+        if ( (msr_index >= MSR_P6_EVNTSEL(0)) &&
+             (msr_index < MSR_P6_EVNTSEL(arch_pmc_cnt)) )
+        {
+            *index = msr_index - MSR_P6_EVNTSEL(0);
+            *type = MSR_TYPE_ARCH_CTRL;
+            return 1;
+        }
+
+        msr_index_pmc = msr_index & MSR_PMC_ALIAS_MASK;
+        if ( (msr_index_pmc >= MSR_IA32_PERFCTR0) &&
+             (msr_index_pmc < (MSR_IA32_PERFCTR0 + arch_pmc_cnt)) )
+        {
+            *type = MSR_TYPE_ARCH_COUNTER;
+            *index = msr_index_pmc - MSR_IA32_PERFCTR0;
+            return 1;
+        }
+        return 0;
+    }
 }
 
 static void core2_vpmu_set_msr_bitmap(unsigned long *msr_bitmap)
@@ -254,13 +235,13 @@ static void core2_vpmu_set_msr_bitmap(unsigned long *msr_bitmap)
     int i;
 
     /* Allow Read/Write PMU Counters MSR Directly. */
-    for ( i = 0; i < core2_fix_counters.num; i++ )
+    for ( i = 0; i < fixed_pmc_cnt; i++ )
     {
-        clear_bit(msraddr_to_bitpos(core2_fix_counters.msr[i]), msr_bitmap);
-        clear_bit(msraddr_to_bitpos(core2_fix_counters.msr[i]),
+        clear_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR0 + i), msr_bitmap);
+        clear_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR0 + i),
                   msr_bitmap + 0x800/BYTES_PER_LONG);
     }
-    for ( i = 0; i < core2_get_pmc_count(); i++ )
+    for ( i = 0; i < arch_pmc_cnt; i++ )
     {
         clear_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap);
         clear_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i),
@@ -275,26 +256,28 @@ static void core2_vpmu_set_msr_bitmap(unsigned long *msr_bitmap)
     }
 
     /* Allow Read PMU Non-global Controls Directly. */
-    for ( i = 0; i < core2_ctrls.num; i++ )
-        clear_bit(msraddr_to_bitpos(core2_ctrls.msr[i]), msr_bitmap);
-    for ( i = 0; i < core2_get_pmc_count(); i++ )
-        clear_bit(msraddr_to_bitpos(MSR_P6_EVNTSEL(i)), msr_bitmap);
+    for ( i = 0; i < arch_pmc_cnt; i++ )
+         clear_bit(msraddr_to_bitpos(MSR_P6_EVNTSEL(i)), msr_bitmap);
+
+    clear_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR_CTRL), msr_bitmap);
+    clear_bit(msraddr_to_bitpos(MSR_IA32_PEBS_ENABLE), msr_bitmap);
+    clear_bit(msraddr_to_bitpos(MSR_IA32_DS_AREA), msr_bitmap);
 }
 
 static void core2_vpmu_unset_msr_bitmap(unsigned long *msr_bitmap)
 {
     int i;
 
-    for ( i = 0; i < core2_fix_counters.num; i++ )
+    for ( i = 0; i < fixed_pmc_cnt; i++ )
     {
-        set_bit(msraddr_to_bitpos(core2_fix_counters.msr[i]), msr_bitmap);
-        set_bit(msraddr_to_bitpos(core2_fix_counters.msr[i]),
+        set_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR0 + i), msr_bitmap);
+        set_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR0 + i),
                 msr_bitmap + 0x800/BYTES_PER_LONG);
     }
-    for ( i = 0; i < core2_get_pmc_count(); i++ )
+    for ( i = 0; i < arch_pmc_cnt; i++ )
     {
-        set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap);
-        set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i),
+        set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0 + i), msr_bitmap);
+        set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0 + i),
                 msr_bitmap + 0x800/BYTES_PER_LONG);
 
         if ( full_width_write )
@@ -305,10 +288,12 @@ static void core2_vpmu_unset_msr_bitmap(unsigned long *msr_bitmap)
         }
     }
 
-    for ( i = 0; i < core2_ctrls.num; i++ )
-        set_bit(msraddr_to_bitpos(core2_ctrls.msr[i]), msr_bitmap);
-    for ( i = 0; i < core2_get_pmc_count(); i++ )
+    for ( i = 0; i < arch_pmc_cnt; i++ )
         set_bit(msraddr_to_bitpos(MSR_P6_EVNTSEL(i)), msr_bitmap);
+
+    set_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR_CTRL), msr_bitmap);
+    set_bit(msraddr_to_bitpos(MSR_IA32_PEBS_ENABLE), msr_bitmap);
+    set_bit(msraddr_to_bitpos(MSR_IA32_DS_AREA), msr_bitmap);
 }
 
 static inline void __core2_vpmu_save(struct vcpu *v)
@@ -316,10 +301,10 @@ static inline void __core2_vpmu_save(struct vcpu *v)
     int i;
     struct core2_vpmu_context *core2_vpmu_cxt = vcpu_vpmu(v)->context;
 
-    for ( i = 0; i < core2_fix_counters.num; i++ )
-        rdmsrl(core2_fix_counters.msr[i], core2_vpmu_cxt->fix_counters[i]);
-    for ( i = 0; i < core2_get_pmc_count(); i++ )
-        rdmsrl(MSR_IA32_PERFCTR0+i, core2_vpmu_cxt->arch_msr_pair[i].counter);
+    for ( i = 0; i < fixed_pmc_cnt; i++ )
+        rdmsrl(MSR_CORE_PERF_FIXED_CTR0 + i, core2_vpmu_cxt->fix_counters[i]);
+    for ( i = 0; i < arch_pmc_cnt; i++ )
+        rdmsrl(MSR_IA32_PERFCTR0 + i, core2_vpmu_cxt->arch_msr_pair[i].counter);
 }
 
 static int core2_vpmu_save(struct vcpu *v)
@@ -344,20 +329,22 @@ static inline void __core2_vpmu_load(struct vcpu *v)
     unsigned int i, pmc_start;
     struct core2_vpmu_context *core2_vpmu_cxt = vcpu_vpmu(v)->context;
 
-    for ( i = 0; i < core2_fix_counters.num; i++ )
-        wrmsrl(core2_fix_counters.msr[i], core2_vpmu_cxt->fix_counters[i]);
+    for ( i = 0; i < fixed_pmc_cnt; i++ )
+        wrmsrl(MSR_CORE_PERF_FIXED_CTR0 + i, core2_vpmu_cxt->fix_counters[i]);
 
     if ( full_width_write )
         pmc_start = MSR_IA32_A_PERFCTR0;
     else
         pmc_start = MSR_IA32_PERFCTR0;
-    for ( i = 0; i < core2_get_pmc_count(); i++ )
+    for ( i = 0; i < arch_pmc_cnt; i++ )
+    {
         wrmsrl(pmc_start + i, core2_vpmu_cxt->arch_msr_pair[i].counter);
-
-    for ( i = 0; i < core2_ctrls.num; i++ )
-        wrmsrl(core2_ctrls.msr[i], core2_vpmu_cxt->ctrls[i]);
-    for ( i = 0; i < core2_get_pmc_count(); i++ )
         wrmsrl(MSR_P6_EVNTSEL(i), core2_vpmu_cxt->arch_msr_pair[i].control);
+    }
+
+    wrmsrl(MSR_CORE_PERF_FIXED_CTR_CTRL, core2_vpmu_cxt->fixed_ctrl);
+    wrmsrl(MSR_IA32_DS_AREA, core2_vpmu_cxt->ds_area);
+    wrmsrl(MSR_IA32_PEBS_ENABLE, core2_vpmu_cxt->pebs_enable);
 }
 
 static void core2_vpmu_load(struct vcpu *v)
@@ -376,56 +363,37 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct core2_vpmu_context *core2_vpmu_cxt;
-    struct core2_pmu_enable *pmu_enable;
 
     if ( !acquire_pmu_ownership(PMU_OWNER_HVM) )
         return 0;
 
     wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, 0);
     if ( vmx_add_host_load_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
-        return 0;
+        goto out_err;
 
     if ( vmx_add_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
-        return 0;
+        goto out_err;
     vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL,
                  core2_calc_intial_glb_ctrl_msr());
 
-    pmu_enable = xzalloc_bytes(sizeof(struct core2_pmu_enable) +
-                               core2_get_pmc_count() - 1);
-    if ( !pmu_enable )
-        goto out1;
-
     core2_vpmu_cxt = xzalloc_bytes(sizeof(struct core2_vpmu_context) +
-                    (core2_get_pmc_count()-1)*sizeof(struct arch_msr_pair));
+                    (arch_pmc_cnt-1)*sizeof(struct arch_msr_pair));
     if ( !core2_vpmu_cxt )
-        goto out2;
-    core2_vpmu_cxt->pmu_enable = pmu_enable;
+        goto out_err;
+
     vpmu->context = (void *)core2_vpmu_cxt;
 
+    vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
+
     return 1;
- out2:
-    xfree(pmu_enable);
- out1:
-    gdprintk(XENLOG_WARNING, "Insufficient memory for PMU, PMU feature is "
-             "unavailable on domain %d vcpu %d.\n",
-             v->vcpu_id, v->domain->domain_id);
+
+out_err:
+    release_pmu_ownship(PMU_OWNER_HVM);
+
+    printk("Failed to allocate VPMU resources for domain %u vcpu %u\n",
+           v->vcpu_id, v->domain->domain_id);
+
     return 0;
-}
-
-static void core2_vpmu_save_msr_context(struct vcpu *v, int type,
-                                       int index, u64 msr_data)
-{
-    struct core2_vpmu_context *core2_vpmu_cxt = vcpu_vpmu(v)->context;
-
-    switch ( type )
-    {
-    case MSR_TYPE_CTRL:
-        core2_vpmu_cxt->ctrls[index] = msr_data;
-        break;
-    case MSR_TYPE_ARCH_CTRL:
-        core2_vpmu_cxt->arch_msr_pair[index].control = msr_data;
-        break;
-    }
 }
 
 static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
@@ -436,10 +404,8 @@ static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
         return 0;
 
     if ( unlikely(!vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED)) &&
-	 (vpmu->context != NULL ||
-	  !core2_vpmu_alloc_resource(current)) )
+         !core2_vpmu_alloc_resource(current) )
         return 0;
-    vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
 
     /* Do the lazy load staff. */
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
@@ -456,8 +422,7 @@ static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
 static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
                                uint64_t supported)
 {
-    u64 global_ctrl, non_global_ctrl;
-    char pmu_enable = 0;
+    u64 global_ctrl;
     int i, tmp;
     int type = -1, index = -1;
     struct vcpu *v = current;
@@ -504,6 +469,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         if ( msr_content & 1 )
             gdprintk(XENLOG_WARNING, "Guest is trying to enable PEBS, "
                      "which is not supported.\n");
+        core2_vpmu_cxt->pebs_enable = msr_content;
         return 1;
     case MSR_IA32_DS_AREA:
         if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_DS) )
@@ -516,57 +482,48 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
                 hvm_inject_hw_exception(TRAP_gp_fault, 0);
                 return 1;
             }
-            core2_vpmu_cxt->pmu_enable->ds_area_enable = msr_content ? 1 : 0;
+            core2_vpmu_cxt->ds_area = msr_content;
             break;
         }
         gdprintk(XENLOG_WARNING, "Guest setting of DTS is ignored.\n");
         return 1;
     case MSR_CORE_PERF_GLOBAL_CTRL:
         global_ctrl = msr_content;
-        for ( i = 0; i < core2_get_pmc_count(); i++ )
-        {
-            rdmsrl(MSR_P6_EVNTSEL(i), non_global_ctrl);
-            core2_vpmu_cxt->pmu_enable->arch_pmc_enable[i] =
-                    global_ctrl & (non_global_ctrl >> 22) & 1;
-            global_ctrl >>= 1;
-        }
-
-        rdmsrl(MSR_CORE_PERF_FIXED_CTR_CTRL, non_global_ctrl);
-        global_ctrl = msr_content >> 32;
-        for ( i = 0; i < core2_fix_counters.num; i++ )
-        {
-            core2_vpmu_cxt->pmu_enable->fixed_ctr_enable[i] =
-                (global_ctrl & 1) & ((non_global_ctrl & 0x3)? 1: 0);
-            non_global_ctrl >>= FIXED_CTR_CTRL_BITS;
-            global_ctrl >>= 1;
-        }
         break;
     case MSR_CORE_PERF_FIXED_CTR_CTRL:
-        non_global_ctrl = msr_content;
         vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
-        global_ctrl >>= 32;
-        for ( i = 0; i < core2_fix_counters.num; i++ )
+        core2_vpmu_cxt->enabled_cntrs &=
+                ~(((1ULL << VPMU_CORE2_MAX_FIXED_PMCS) - 1) << 32);
+        if ( msr_content != 0 )
         {
-            core2_vpmu_cxt->pmu_enable->fixed_ctr_enable[i] =
-                (global_ctrl & 1) & ((non_global_ctrl & 0x3)? 1: 0);
-            non_global_ctrl >>= 4;
-            global_ctrl >>= 1;
+            u64 val = msr_content;
+            for ( i = 0; i < fixed_pmc_cnt; i++ )
+            {
+                if ( val & 3 )
+                    core2_vpmu_cxt->enabled_cntrs |= (1ULL << 32) << i;
+                val >>= FIXED_CTR_CTRL_BITS;
+            }
         }
+
+        core2_vpmu_cxt->fixed_ctrl = msr_content;
         break;
     default:
         tmp = msr - MSR_P6_EVNTSEL(0);
-        vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
-        if ( tmp >= 0 && tmp < core2_get_pmc_count() )
-            core2_vpmu_cxt->pmu_enable->arch_pmc_enable[tmp] =
-                (global_ctrl >> tmp) & (msr_content >> 22) & 1;
+        if ( tmp >= 0 && tmp < arch_pmc_cnt )
+        {
+            vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
+
+            if ( msr_content & (1ULL << 22) )
+                core2_vpmu_cxt->enabled_cntrs |= 1ULL << tmp;
+            else
+                core2_vpmu_cxt->enabled_cntrs &= ~(1ULL << tmp);
+
+            core2_vpmu_cxt->arch_msr_pair[tmp].control = msr_content;
+        }
     }
 
-    for ( i = 0; i < core2_fix_counters.num; i++ )
-        pmu_enable |= core2_vpmu_cxt->pmu_enable->fixed_ctr_enable[i];
-    for ( i = 0; i < core2_get_pmc_count(); i++ )
-        pmu_enable |= core2_vpmu_cxt->pmu_enable->arch_pmc_enable[i];
-    pmu_enable |= core2_vpmu_cxt->pmu_enable->ds_area_enable;
-    if ( pmu_enable )
+    if ( (global_ctrl & core2_vpmu_cxt->enabled_cntrs) ||
+         (core2_vpmu_cxt->ds_area != 0)  )
         vpmu_set(vpmu, VPMU_RUNNING);
     else
         vpmu_reset(vpmu, VPMU_RUNNING);
@@ -584,7 +541,6 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR | APIC_LVT_MASKED;
     }
 
-    core2_vpmu_save_msr_context(v, type, index, msr_content);
     if ( type != MSR_TYPE_GLOBAL )
     {
         u64 mask;
@@ -600,7 +556,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
             if  ( msr == MSR_IA32_DS_AREA )
                 break;
             /* 4 bits per counter, currently 3 fixed counters implemented. */
-            mask = ~((1ull << (VPMU_CORE2_NUM_FIXED * FIXED_CTR_CTRL_BITS)) - 1);
+            mask = ~((1ull << (fixed_pmc_cnt * FIXED_CTR_CTRL_BITS)) - 1);
             if (msr_content & mask)
                 inject_gp = 1;
             break;
@@ -685,7 +641,7 @@ static void core2_vpmu_do_cpuid(unsigned int input,
 static void core2_vpmu_dump(const struct vcpu *v)
 {
     const struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    int i, num;
+    unsigned int i;
     const struct core2_vpmu_context *core2_vpmu_cxt = NULL;
     u64 val;
 
@@ -703,27 +659,25 @@ static void core2_vpmu_dump(const struct vcpu *v)
 
     printk("    vPMU running\n");
     core2_vpmu_cxt = vpmu->context;
-    num = core2_get_pmc_count();
+
     /* Print the contents of the counter and its configuration msr. */
-    for ( i = 0; i < num; i++ )
+    for ( i = 0; i < arch_pmc_cnt; i++ )
     {
         const struct arch_msr_pair *msr_pair = core2_vpmu_cxt->arch_msr_pair;
 
-        if ( core2_vpmu_cxt->pmu_enable->arch_pmc_enable[i] )
-            printk("      general_%d: 0x%016lx ctrl: 0x%016lx\n",
-                   i, msr_pair[i].counter, msr_pair[i].control);
+        printk("      general_%d: 0x%016lx ctrl: 0x%016lx\n",
+               i, msr_pair[i].counter, msr_pair[i].control);
     }
     /*
      * The configuration of the fixed counter is 4 bits each in the
      * MSR_CORE_PERF_FIXED_CTR_CTRL.
      */
-    val = core2_vpmu_cxt->ctrls[MSR_CORE_PERF_FIXED_CTR_CTRL_IDX];
-    for ( i = 0; i < core2_fix_counters.num; i++ )
+    val = core2_vpmu_cxt->fixed_ctrl;
+    for ( i = 0; i < fixed_pmc_cnt; i++ )
     {
-        if ( core2_vpmu_cxt->pmu_enable->fixed_ctr_enable[i] )
-            printk("      fixed_%d:   0x%016lx ctrl: %#lx\n",
-                   i, core2_vpmu_cxt->fix_counters[i],
-                   val & FIXED_CTR_CTRL_MASK);
+        printk("      fixed_%d:   0x%016lx ctrl: %#lx\n",
+               i, core2_vpmu_cxt->fix_counters[i],
+               val & FIXED_CTR_CTRL_MASK);
         val >>= FIXED_CTR_CTRL_BITS;
     }
 }
@@ -741,7 +695,7 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
         if ( is_pmc_quirk )
             handle_pmc_quirk(msr_content);
         core2_vpmu_cxt->global_ovf_status |= msr_content;
-        msr_content = 0xC000000700000000 | ((1 << core2_get_pmc_count()) - 1);
+        msr_content = 0xC000000700000000 | ((1 << arch_pmc_cnt) - 1);
         wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, msr_content);
     }
     else
@@ -808,6 +762,16 @@ static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
     }
     ds_warned = 1;
  func_out:
+
+    arch_pmc_cnt = core2_get_arch_pmc_count();
+    fixed_pmc_cnt = core2_get_fixed_pmc_count();
+    if ( fixed_pmc_cnt > VPMU_CORE2_MAX_FIXED_PMCS )
+    {
+        fixed_pmc_cnt = VPMU_CORE2_MAX_FIXED_PMCS;
+        printk(XENLOG_G_WARNING "Limiting number of fixed counters to %d\n",
+               fixed_pmc_cnt);
+    }
+
     check_pmc_quirk();
     return 0;
 }
@@ -815,9 +779,7 @@ static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
 static void core2_vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    struct core2_vpmu_context *core2_vpmu_cxt = vpmu->context;
 
-    xfree(core2_vpmu_cxt->pmu_enable);
     xfree(vpmu->context);
     if ( has_hvm_container_vcpu(v) && cpu_has_vmx_msr_bitmap )
         core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
