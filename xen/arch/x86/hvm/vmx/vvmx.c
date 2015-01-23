@@ -1272,7 +1272,7 @@ static void sync_exception_state(struct vcpu *v)
     if ( !(nvmx->intr.intr_info & INTR_INFO_VALID_MASK) )
         return;
 
-    switch ( (nvmx->intr.intr_info & INTR_INFO_INTR_TYPE_MASK) >> 8 )
+    switch ( MASK_EXTR(nvmx->intr.intr_info, INTR_INFO_INTR_TYPE_MASK) )
     {
     case X86_EVENTTYPE_EXT_INTR:
         /* rename exit_reason to EXTERNAL_INTERRUPT */
@@ -1327,10 +1327,10 @@ static void nvmx_update_apicv(struct vcpu *v)
         ppr = vlapic_set_ppr(vlapic);
         WARN_ON((ppr & 0xf0) != (vector & 0xf0));
 
-        status = vector << 8;
+        status = vector << VMX_GUEST_INTR_STATUS_SVI_OFFSET;
         rvi = vlapic_has_pending_irq(v);
         if ( rvi != -1 )
-            status |= rvi & 0xff;
+            status |= rvi & VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK;
 
         __vmwrite(GUEST_INTR_STATUS, status);
     }
@@ -2161,7 +2161,8 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_EXCEPTION_NMI:
     {
         unsigned long intr_info;
-        u32 valid_mask = (X86_EVENTTYPE_HW_EXCEPTION << 8) |
+        u32 valid_mask = MASK_INSR(X86_EVENTTYPE_HW_EXCEPTION,
+                                  INTR_INFO_INTR_TYPE_MASK) |
                          INTR_INFO_VALID_MASK;
         u64 exec_bitmap;
         int vector;
@@ -2350,8 +2351,8 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         u32 mask = 0;
 
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
-        cr = exit_qualification & 0xf;
-        write = (exit_qualification >> 4) & 3;
+        cr = VMX_CONTROL_REG_ACCESS_NUM(exit_qualification);
+        write = VMX_CONTROL_REG_ACCESS_TYPE(exit_qualification);
         /* also according to guest exec_control */
         ctrl = __n2_exec_control(v);
 
@@ -2443,8 +2444,9 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                 u64 cr0_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR0_GUEST_HOST_MASK);
 
                 __vmread(CR0_READ_SHADOW, &old_val);
-                old_val &= 0xf;
-                val = (exit_qualification >> 16) & 0xf;
+                old_val &= X86_CR0_PE|X86_CR0_MP|X86_CR0_EM|X86_CR0_TS;
+                val = VMX_CONTROL_REG_ACCESS_DATA(exit_qualification) &
+                      (X86_CR0_PE|X86_CR0_MP|X86_CR0_EM|X86_CR0_TS);
                 changed_bits = old_val ^ val;
                 if ( changed_bits & cr0_gh_mask )
                     nvcpu->nv_vmexit_pending = 1;

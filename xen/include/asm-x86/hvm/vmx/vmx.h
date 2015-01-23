@@ -207,8 +207,10 @@ static inline unsigned long pi_get_pir(struct pi_desc *pi_desc, int group)
 # define VMX_CONTROL_REG_ACCESS_TYPE_MOV_FROM_CR 1
 # define VMX_CONTROL_REG_ACCESS_TYPE_CLTS        2
 # define VMX_CONTROL_REG_ACCESS_TYPE_LMSW        3
- /* 10:8 - general purpose register operand */
+ /* 11:8 - general purpose register operand */
 #define VMX_CONTROL_REG_ACCESS_GPR(eq)  (((eq) >> 8) & 0xf)
+ /* 31:16 - LMSW source data */
+#define VMX_CONTROL_REG_ACCESS_DATA(eq)  ((uint32_t)(eq) >> 16)
 
 /*
  * Access Rights

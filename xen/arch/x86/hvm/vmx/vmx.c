@@ -1406,7 +1406,9 @@ static void __vmx_inject_exception(int trap, int type, int error_code)
      *   VM entry]", PRM Vol. 3, 22.6.1 (Interruptibility State).
      */
 
-    intr_fields = (INTR_INFO_VALID_MASK | (type<<8) | trap);
+    intr_fields = INTR_INFO_VALID_MASK |
+                  MASK_INSR(type, INTR_INFO_INTR_TYPE_MASK) |
+                  MASK_INSR(trap, INTR_INFO_VECTOR_MASK);
     if ( error_code != HVM_DELIVER_NO_ERROR_CODE ) {
         __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
         intr_fields |= INTR_INFO_DELIVER_CODE_MASK;
@@ -1430,7 +1432,9 @@ void vmx_inject_extint(int trap, uint8_t source)
                                      PIN_BASED_VM_EXEC_CONTROL);
         if ( pin_based_cntrl & PIN_BASED_EXT_INTR_MASK ) {
             nvmx_enqueue_n2_exceptions (v, 
-               INTR_INFO_VALID_MASK | (X86_EVENTTYPE_EXT_INTR<<8) | trap,
+               INTR_INFO_VALID_MASK |
+               MASK_INSR(X86_EVENTTYPE_EXT_INTR, INTR_INFO_INTR_TYPE_MASK) |
+               MASK_INSR(trap, INTR_INFO_VECTOR_MASK),
                HVM_DELIVER_NO_ERROR_CODE, source);
             return;
         }
@@ -1449,7 +1453,9 @@ void vmx_inject_nmi(void)
                                      PIN_BASED_VM_EXEC_CONTROL);
         if ( pin_based_cntrl & PIN_BASED_NMI_EXITING ) {
             nvmx_enqueue_n2_exceptions (v, 
-               INTR_INFO_VALID_MASK | (X86_EVENTTYPE_NMI<<8) | TRAP_nmi,
+               INTR_INFO_VALID_MASK |
+               MASK_INSR(X86_EVENTTYPE_NMI, INTR_INFO_INTR_TYPE_MASK) |
+               MASK_INSR(TRAP_nmi, INTR_INFO_VECTOR_MASK),
                HVM_DELIVER_NO_ERROR_CODE, hvm_intsrc_nmi);
             return;
         }
@@ -1487,7 +1493,7 @@ static void vmx_inject_trap(struct hvm_trap *trap)
         if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
         {
             __restore_debug_registers(curr);
-            write_debugreg(6, read_debugreg(6) | 0x4000);
+            write_debugreg(6, read_debugreg(6) | DR_STEP);
         }
         if ( cpu_has_monitor_trap_flag )
             break;
@@ -1502,7 +1508,8 @@ static void vmx_inject_trap(struct hvm_trap *trap)
     }
 
     if ( unlikely(intr_info & INTR_INFO_VALID_MASK) &&
-         (((intr_info >> 8) & 7) == X86_EVENTTYPE_HW_EXCEPTION) )
+         (MASK_EXTR(intr_info, INTR_INFO_INTR_TYPE_MASK) ==
+          X86_EVENTTYPE_HW_EXCEPTION) )
     {
         _trap.vector = hvm_combine_hw_exceptions(
             (uint8_t)intr_info, _trap.vector);
@@ -1517,7 +1524,9 @@ static void vmx_inject_trap(struct hvm_trap *trap)
          nvmx_intercepts_exception(curr, _trap.vector, _trap.error_code) )
     {
         nvmx_enqueue_n2_exceptions (curr, 
-            INTR_INFO_VALID_MASK | (_trap.type<<8) | _trap.vector,
+            INTR_INFO_VALID_MASK |
+            MASK_INSR(_trap.type, INTR_INFO_INTR_TYPE_MASK) |
+            MASK_INSR(_trap.vector, INTR_INFO_VECTOR_MASK),
             _trap.error_code, hvm_intsrc_none);
         return;
     }
@@ -1976,8 +1985,11 @@ static int vmx_cr_access(unsigned long exit_qualification)
     }
     case VMX_CONTROL_REG_ACCESS_TYPE_LMSW: {
         unsigned long value = curr->arch.hvm_vcpu.guest_cr[0];
-        /* LMSW can: (1) set bits 0-3; (2) clear bits 1-3. */
-        value = (value & ~0xe) | ((exit_qualification >> 16) & 0xf);
+
+        /* LMSW can (1) set PE; (2) set or clear MP, EM, and TS. */
+        value = (value & ~(X86_CR0_MP|X86_CR0_EM|X86_CR0_TS)) |
+                (VMX_CONTROL_REG_ACCESS_DATA(exit_qualification) &
+                 (X86_CR0_PE|X86_CR0_MP|X86_CR0_EM|X86_CR0_TS));
         HVMTRACE_LONG_1D(LMSW, value);
         return hvm_set_cr0(value);
     }
@@ -2803,7 +2815,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
              */
             __vmread(EXIT_QUALIFICATION, &exit_qualification);
             HVMTRACE_1D(TRAP_DEBUG, exit_qualification);
-            write_debugreg(6, exit_qualification | 0xffff0ff0);
+            write_debugreg(6, exit_qualification | DR_STATUS_RESERVED_ONE);
             if ( !v->domain->debugger_attached || cpu_has_monitor_trap_flag )
                 goto exit_and_crash;
             domain_pause_for_debugger();
@@ -2872,8 +2884,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             hvm_inject_page_fault(regs->error_code, exit_qualification);
             break;
         case TRAP_nmi:
-            if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) !=
-                 (X86_EVENTTYPE_NMI << 8) )
+            if ( MASK_EXTR(intr_info, INTR_INFO_INTR_TYPE_MASK) !=
+                 X86_EVENTTYPE_NMI )
                 goto exit_and_crash;
             HVMTRACE_0D(NMI);
             /* Already handled above. */
@@ -2924,7 +2936,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
          *  - TSW is a vectored event due to a SW exception or SW interrupt.
          */
         inst_len = ((source != 3) ||        /* CALL, IRET, or JMP? */
-                    (idtv_info & (1u<<10))) /* IntrType > 3? */
+                    (MASK_EXTR(idtv_info, INTR_INFO_INTR_TYPE_MASK)
+                     > 3)) /* IntrType > 3? */
             ? get_instruction_length() /* Safe: SDM 3B 23.2.4 */ : 0;
         if ( (source == 3) && (idtv_info & INTR_INFO_DELIVER_CODE_MASK) )
             __vmread(IDT_VECTORING_ERROR_CODE, &ecode);
