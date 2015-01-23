@@ -257,7 +257,10 @@ static int vgic_v2_to_sgi(struct vcpu *v, register_t sgir)
         sgi_mode = SGI_TARGET_SELF;
         break;
     default:
-        BUG();
+        printk(XENLOG_G_DEBUG
+               "%pv: vGICD: unhandled GICD_SGIR write %"PRIregister" with wrong mode\n",
+               v, sgir);
+        return 0;
     }
 
     return vgic_to_sgi(v, sgir, sgi_mode, virq, vcpu_mask);
