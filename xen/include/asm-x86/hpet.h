@@ -52,6 +52,7 @@
 
 extern unsigned long hpet_address;
 extern u8 hpet_blockid;
+extern u8 hpet_flags;
 
 /*
  * Detect and initialise HPET hardware: return counter update frequency.

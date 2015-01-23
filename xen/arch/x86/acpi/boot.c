@@ -309,6 +309,7 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 
 	hpet_address = hpet_tbl->address.address;
 	hpet_blockid = hpet_tbl->sequence;
+	hpet_flags = hpet_tbl->flags;
 	printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n",
 	       hpet_tbl->id, hpet_address);
 

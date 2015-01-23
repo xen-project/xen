@@ -36,6 +36,7 @@
 #include <asm/bzimage.h> /* for bzimage_parse */
 #include <asm/io_apic.h>
 #include <asm/hap.h>
+#include <asm/hpet.h>
 
 #include <public/version.h>
 
@@ -133,6 +134,9 @@ boolean_param("dom0_shadow", opt_dom0_shadow);
 
 static char __initdata opt_dom0_ioports_disable[200] = "";
 string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
+
+static bool_t __initdata ro_hpet = 1;
+boolean_param("ro-hpet", ro_hpet);
 
 /* Allow ring-3 access in long mode as guest cannot use ring 1 ... */
 #define BASE_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
@@ -1493,6 +1497,20 @@ int __init construct_dom0(
              (e820.map[i].size != 0) &&
              (sfn <= efn) )
             rc |= iomem_deny_access(d, sfn, efn);
+    }
+
+    /* Prevent access to HPET */
+    if ( hpet_address )
+    {
+        u8 prot_flags = hpet_flags & ACPI_HPET_PAGE_PROTECT_MASK;
+
+        mfn = paddr_to_pfn(hpet_address);
+        if ( prot_flags == ACPI_HPET_PAGE_PROTECT4 )
+            rc |= iomem_deny_access(d, mfn, mfn);
+        else if ( prot_flags == ACPI_HPET_PAGE_PROTECT64 )
+            rc |= iomem_deny_access(d, mfn, mfn + 15);
+        else if ( ro_hpet )
+            rc |= rangeset_add_singleton(mmio_ro_ranges, mfn);
     }
 
     BUG_ON(rc != 0);

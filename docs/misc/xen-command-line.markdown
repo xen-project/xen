@@ -1119,6 +1119,14 @@ Specify the host reboot method.
 
 `pci` instructs Xen to reboot the host using PCI reset register (port CF9).
 
+### ro-hpet
+> `= <boolean>`
+
+> Default: `true`
+
+Map the HPET page as read only in Dom0. If disabled the page will be mapped
+with read and write permissions.
+
 ### sched
 > `= credit | credit2 | sedf | arinc653`
 

@@ -52,6 +52,7 @@ DEFINE_PER_CPU(struct hpet_event_channel *, cpu_bc_channel);
 
 unsigned long __initdata hpet_address;
 u8 __initdata hpet_blockid;
+u8 __initdata hpet_flags;
 
 /*
  * force_hpet_broadcast: by default legacy hpet broadcast will be stopped
