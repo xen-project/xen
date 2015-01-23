@@ -1683,20 +1683,64 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-static bool_t hvm_efer_valid(struct domain *d,
-                             uint64_t value, uint64_t efer_validbits)
+static bool_t hvm_efer_valid(const struct vcpu *v, uint64_t value,
+                             signed int cr0_pg)
 {
-    if ( nestedhvm_enabled(d) && cpu_has_svm )
-        efer_validbits |= EFER_SVME;
+    unsigned int ext1_ecx = 0, ext1_edx = 0;
 
-    return !((value & ~efer_validbits) ||
-             ((sizeof(long) != 8) && (value & EFER_LME)) ||
-             (!cpu_has_svm && (value & EFER_SVME)) ||
-             (!cpu_has_nx && (value & EFER_NX)) ||
-             (!cpu_has_syscall && (value & EFER_SCE)) ||
-             (!cpu_has_lmsl && (value & EFER_LMSLE)) ||
-             (!cpu_has_ffxsr && (value & EFER_FFXSE)) ||
-             ((value & (EFER_LME|EFER_LMA)) == EFER_LMA));
+    if ( cr0_pg < 0 && !is_hardware_domain(v->domain) )
+    {
+        unsigned int level;
+
+        ASSERT(v == current);
+        hvm_cpuid(0x80000000, &level, NULL, NULL, NULL);
+        if ( level >= 0x80000001 )
+        {
+            unsigned int dummy;
+
+            level = 0x80000001;
+            hvm_funcs.cpuid_intercept(&level, &dummy, &ext1_ecx, &ext1_edx);
+        }
+    }
+    else
+    {
+        ext1_edx = boot_cpu_data.x86_capability[X86_FEATURE_LM / 32];
+        ext1_ecx = boot_cpu_data.x86_capability[X86_FEATURE_SVM / 32];
+    }
+
+    /*
+     * Guests may want to set EFER.SCE and EFER.LME at the same time, so we
+     * can't make the check depend on only X86_FEATURE_SYSCALL (which on VMX
+     * will be clear without the guest having entered 64-bit mode).
+     */
+    if ( (value & EFER_SCE) &&
+         !(ext1_edx & cpufeat_mask(X86_FEATURE_SYSCALL)) &&
+         (cr0_pg >= 0 || !(value & EFER_LME)) )
+        return 0;
+
+    if ( (value & (EFER_LME | EFER_LMA)) &&
+         !(ext1_edx & cpufeat_mask(X86_FEATURE_LM)) )
+        return 0;
+
+    if ( (value & EFER_LMA) && (!(value & EFER_LME) || !cr0_pg) )
+        return 0;
+
+    if ( (value & EFER_NX) && !(ext1_edx & cpufeat_mask(X86_FEATURE_NX)) )
+        return 0;
+
+    if ( (value & EFER_SVME) &&
+         (!(ext1_ecx & cpufeat_mask(X86_FEATURE_SVM)) ||
+          !nestedhvm_enabled(v->domain)) )
+        return 0;
+
+    if ( (value & EFER_LMSLE) && !cpu_has_lmsl )
+        return 0;
+
+    if ( (value & EFER_FFXSE) &&
+         !(ext1_edx & cpufeat_mask(X86_FEATURE_FFXSR)) )
+        return 0;
+
+    return 1;
 }
 
 /* These reserved bits in lower 32 remain 0 after any load of CR0 */
@@ -1774,7 +1818,6 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     struct vcpu *v;
     struct hvm_hw_cpu ctxt;
     struct segment_register seg;
-    uint64_t efer_validbits;
 
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
@@ -1805,9 +1848,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    efer_validbits = EFER_FFXSE | EFER_LMSLE | EFER_LME | EFER_LMA
-                   | EFER_NX | EFER_SCE;
-    if ( !hvm_efer_valid(d, ctxt.msr_efer, efer_validbits) )
+    if ( !hvm_efer_valid(v, ctxt.msr_efer, MASK_EXTR(ctxt.cr0, X86_CR0_PG)) )
     {
         printk(XENLOG_G_ERR "HVM%d restore: bad EFER %#" PRIx64 "\n",
                d->domain_id, ctxt.msr_efer);
@@ -2947,12 +2988,10 @@ err:
 int hvm_set_efer(uint64_t value)
 {
     struct vcpu *v = current;
-    uint64_t efer_validbits;
 
     value &= ~EFER_LMA;
 
-    efer_validbits = EFER_FFXSE | EFER_LMSLE | EFER_LME | EFER_NX | EFER_SCE;
-    if ( !hvm_efer_valid(v->domain, value, efer_validbits) )
+    if ( !hvm_efer_valid(v, value, -1) )
     {
         gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
                  "EFER: %#"PRIx64"\n", value);
