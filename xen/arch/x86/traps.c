@@ -531,9 +531,9 @@ static void instruction_done(
     regs->eflags &= ~X86_EFLAGS_RF;
     if ( bpmatch || (regs->eflags & X86_EFLAGS_TF) )
     {
-        current->arch.debugreg[6] |= bpmatch | 0xffff0ff0;
+        current->arch.debugreg[6] |= bpmatch | DR_STATUS_RESERVED_ONE;
         if ( regs->eflags & X86_EFLAGS_TF )
-            current->arch.debugreg[6] |= 0x4000;
+            current->arch.debugreg[6] |= DR_STEP;
         do_guest_trap(TRAP_debug, regs, 0);
     }
 }
@@ -3872,8 +3872,8 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
          * DR6: Bits 4-11,16-31 reserved (set to 1).
          *      Bit 12 reserved (set to 0).
          */
-        value &= 0xffffefff; /* reserved bits => 0 */
-        value |= 0xffff0ff0; /* reserved bits => 1 */
+        value &= ~DR_STATUS_RESERVED_ZERO; /* reserved bits => 0 */
+        value |=  DR_STATUS_RESERVED_ONE;  /* reserved bits => 1 */
         if ( v == curr ) 
             write_debugreg(6, value);
         break;

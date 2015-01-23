@@ -21,6 +21,8 @@
 #define DR_STEP         (0x4000)        /* single-step */
 #define DR_SWITCH       (0x8000)        /* task switch */
 #define DR_NOT_RTM      (0x10000)       /* clear: #BP inside RTM region */
+#define DR_STATUS_RESERVED_ZERO (~0xffffeffful) /* Reserved, read as zero */
+#define DR_STATUS_RESERVED_ONE  0xffff0ff0ul /* Reserved, read as one */
 
 /* Now define a bunch of things for manipulating the control register.
    The top two bytes of the control register consist of 4 fields of 4
