@@ -128,6 +128,8 @@ static void vpmu_save_force(void *arg)
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
         return;
 
+    vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
+
     if ( vpmu->arch_vpmu_ops )
         (void)vpmu->arch_vpmu_ops->arch_vpmu_save(v);
 
@@ -176,7 +178,6 @@ void vpmu_load(struct vcpu *v)
          */
         if ( vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
         {
-            vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
             on_selected_cpus(cpumask_of(vpmu->last_pcpu),
                              vpmu_save_force, (void *)v, 1);
             vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
@@ -193,7 +194,6 @@ void vpmu_load(struct vcpu *v)
         vpmu = vcpu_vpmu(prev);
 
         /* Someone ran here before us */
-        vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
         vpmu_save_force(prev);
         vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
 
