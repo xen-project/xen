@@ -3,6 +3,9 @@
 
 #include <asm/cpregs.h>
 #include <asm/sysregs.h>
+#ifndef __ASSEMBLY__
+#include <xen/types.h>
+#endif
 #include <public/arch-arm.h>
 
 /* MIDR Main ID Register */
@@ -219,8 +222,6 @@
 #define FSRL_STATUS_DEBUG       (_AC(0x22,UL)<<0)
 
 #ifndef __ASSEMBLY__
-
-#include <xen/types.h>
 
 struct cpuinfo_arm {
     union {

@@ -7,6 +7,15 @@
 #endif
 #include <asm/processor.h>
 
+/* For generic assembly code: use macros to define operand sizes. */
+#if defined(CONFIG_ARM_32)
+# define __OP32
+#elif defined(CONFIG_ARM_64)
+# define __OP32 "w"
+#else
+# error "unknown ARM variant"
+#endif
+
 #endif /* __ARM_ASM_DEFNS_H__ */
 /*
  * Local variables:
