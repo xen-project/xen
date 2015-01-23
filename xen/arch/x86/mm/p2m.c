@@ -810,7 +810,7 @@ void p2m_change_type_range(struct domain *d,
 
 /* Returns: 0 for success, -errno for failure */
 static int set_typed_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
-                               p2m_type_t gfn_p2mt)
+                               p2m_type_t gfn_p2mt, p2m_access_t access)
 {
     int rc = 0;
     p2m_access_t a;
@@ -837,7 +837,7 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     P2M_DEBUG("set %d %lx %lx\n", gfn_p2mt, gfn, mfn_x(mfn));
     rc = p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, gfn_p2mt,
-                       p2m->default_access);
+                       access);
     gfn_unlock(p2m, gfn, 0);
     if ( rc )
         gdprintk(XENLOG_ERR,
@@ -850,12 +850,14 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 static int set_foreign_p2m_entry(struct domain *d, unsigned long gfn,
                                  mfn_t mfn)
 {
-    return set_typed_p2m_entry(d, gfn, mfn, p2m_map_foreign);
+    return set_typed_p2m_entry(d, gfn, mfn, p2m_map_foreign,
+                               p2m_get_hostp2m(d)->default_access);
 }
 
-int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
+                       p2m_access_t access)
 {
-    return set_typed_p2m_entry(d, gfn, mfn, p2m_mmio_direct);
+    return set_typed_p2m_entry(d, gfn, mfn, p2m_mmio_direct, access);
 }
 
 /* Returns: 0 for success, -errno for failure */
@@ -1858,7 +1860,8 @@ int map_mmio_regions(struct domain *d,
 
     for ( i = 0; !ret && i < nr; i++ )
     {
-        ret = set_mmio_p2m_entry(d, start_gfn + i, _mfn(mfn + i));
+        ret = set_mmio_p2m_entry(d, start_gfn + i, _mfn(mfn + i),
+                                 p2m_get_hostp2m(d)->default_access);
         if ( ret )
         {
             unmap_mmio_regions(d, start_gfn, i, mfn);

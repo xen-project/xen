@@ -513,7 +513,8 @@ int p2m_is_logdirty_range(struct p2m_domain *, unsigned long start,
                           unsigned long end);
 
 /* Set mmio addresses in the p2m table (for pass-through) */
-int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
+int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
+                       p2m_access_t access);
 int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 
 /* Add foreign mapping to the guest's p2m table. */

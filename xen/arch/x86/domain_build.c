@@ -319,11 +319,13 @@ static __init void pvh_add_mem_mapping(struct domain *d, unsigned long gfn,
                                        unsigned long mfn, unsigned long nr_mfns)
 {
     unsigned long i;
+    p2m_access_t a;
     int rc;
 
+    a = p2m_get_hostp2m(d)->default_access;
     for ( i = 0; i < nr_mfns; i++ )
     {
-        if ( (rc = set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i))) )
+        if ( (rc = set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i), a)) )
             panic("pvh_add_mem_mapping: gfn:%lx mfn:%lx i:%ld rc:%d\n",
                   gfn, mfn, i, rc);
         if ( !(i & 0xfffff) )
