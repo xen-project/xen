@@ -302,8 +302,6 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         if ( !acquire_pmu_ownership(PMU_OWNER_HVM) )
             return 1;
         vpmu_set(vpmu, VPMU_RUNNING);
-        apic_write(APIC_LVTPC, PMU_APIC_VECTOR);
-        vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR;
 
         if ( has_hvm_container_vcpu(v) &&
              !((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
@@ -314,8 +312,6 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
     if ( (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) &&
         (is_pmu_enabled(msr_content) == 0) && vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
-        apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
-        vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR | APIC_LVT_MASKED;
         vpmu_reset(vpmu, VPMU_RUNNING);
         if ( has_hvm_container_vcpu(v) &&
              ((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
