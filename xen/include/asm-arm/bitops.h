@@ -9,6 +9,8 @@
 #ifndef _ARM_BITOPS_H
 #define _ARM_BITOPS_H
 
+#include <asm/asm_defns.h>
+
 /*
  * Non-atomic bit manipulation.
  *
@@ -111,9 +113,8 @@ static inline int fls(unsigned int x)
         if (__builtin_constant_p(x))
                return generic_fls(x);
 
-        asm("clz\t%0, %1" : "=r" (ret) : "r" (x));
-        ret = BITS_PER_LONG - ret;
-        return ret;
+        asm("clz\t%"__OP32"0, %"__OP32"1" : "=r" (ret) : "r" (x));
+        return 32 - ret;
 }
 
 
