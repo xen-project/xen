@@ -1882,7 +1882,7 @@ static int
 __acquire_grant_for_copy(
     struct domain *rd, unsigned long gref, domid_t ldom, int readonly,
     unsigned long *frame, struct page_info **page, 
-    unsigned *page_off, unsigned *length, unsigned allow_transitive)
+    uint16_t *page_off, uint16_t *length, unsigned allow_transitive)
 {
     struct grant_table *rgt = rd->grant_table;
     grant_entry_v1_t *sha1;
@@ -1895,8 +1895,8 @@ __acquire_grant_for_copy(
     grant_ref_t trans_gref;
     struct domain *td;
     unsigned long grant_frame;
-    unsigned trans_page_off;
-    unsigned trans_length;
+    uint16_t trans_page_off;
+    uint16_t trans_length;
     int is_sub_page;
     s16 rc = GNTST_okay;
 
@@ -2122,7 +2122,7 @@ __gnttab_copy(
 
     if ( src_is_gref )
     {
-        unsigned source_off, source_len;
+        uint16_t source_off, source_len;
         rc = __acquire_grant_for_copy(sd, op->source.u.ref,
                                       current->domain->domain_id, 1,
                                       &s_frame, &s_pg,
@@ -2147,7 +2147,7 @@ __gnttab_copy(
 
     if ( dest_is_gref )
     {
-        unsigned dest_off, dest_len;
+        uint16_t dest_off, dest_len;
         rc = __acquire_grant_for_copy(dd, op->dest.u.ref,
                                       current->domain->domain_id, 0,
                                       &d_frame, &d_pg, &dest_off, &dest_len, 1);
