@@ -165,14 +165,6 @@ static int core2_get_fixed_pmc_count(void)
     return MASK_EXTR(eax, PMU_FIXED_NR_MASK);
 }
 
-static u64 core2_calc_intial_glb_ctrl_msr(void)
-{
-    int arch_pmc_bits = (1 << arch_pmc_cnt) - 1;
-    u64 fix_pmc_bits  = (1 << fixed_pmc_cnt) - 1;
-
-    return (fix_pmc_bits << 32) | arch_pmc_bits;
-}
-
 /* edx bits 5-12: Bit width of fixed-function performance counters  */
 static int core2_get_bitwidth_fix_count(void)
 {
@@ -373,8 +365,7 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
 
     if ( vmx_add_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
         goto out_err;
-    vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL,
-                 core2_calc_intial_glb_ctrl_msr());
+    vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, 0);
 
     core2_vpmu_cxt = xzalloc_bytes(sizeof(struct core2_vpmu_context) +
                     (arch_pmc_cnt-1)*sizeof(struct arch_msr_pair));
