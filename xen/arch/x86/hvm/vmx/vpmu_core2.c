@@ -335,7 +335,8 @@ static int core2_vpmu_save(struct vcpu *v)
     __core2_vpmu_save(v);
 
     /* Unset PMU MSR bitmap to trap lazy load. */
-    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) && cpu_has_vmx_msr_bitmap )
+    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) &&
+         has_hvm_container_vcpu(v) && cpu_has_vmx_msr_bitmap )
         core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
 
     return 1;
@@ -448,7 +449,8 @@ static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
     {
         __core2_vpmu_load(current);
         vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
-        if ( cpu_has_vmx_msr_bitmap )
+        if ( has_hvm_container_vcpu(current) &&
+             cpu_has_vmx_msr_bitmap )
             core2_vpmu_set_msr_bitmap(current->arch.hvm_vmx.msr_bitmap);
     }
     return 1;
@@ -820,7 +822,7 @@ static void core2_vpmu_destroy(struct vcpu *v)
 
     xfree(core2_vpmu_cxt->pmu_enable);
     xfree(vpmu->context);
-    if ( cpu_has_vmx_msr_bitmap )
+    if ( has_hvm_container_vcpu(v) && cpu_has_vmx_msr_bitmap )
         core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
     release_pmu_ownship(PMU_OWNER_HVM);
     vpmu_reset(vpmu, VPMU_CONTEXT_ALLOCATED);

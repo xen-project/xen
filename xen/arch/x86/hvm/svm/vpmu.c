@@ -244,7 +244,8 @@ static int amd_vpmu_save(struct vcpu *v)
 
     context_save(v);
 
-    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) && ctx->msr_bitmap_set )
+    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) &&
+         has_hvm_container_vcpu(v) && ctx->msr_bitmap_set )
         amd_vpmu_unset_msr_bitmap(v);
 
     return 1;
@@ -287,8 +288,9 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
     ASSERT(!supported);
 
     /* For all counters, enable guest only mode for HVM guest */
-    if ( (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) &&
-        !(is_guest_mode(msr_content)) )
+    if ( has_hvm_container_vcpu(v) &&
+         (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) &&
+         !is_guest_mode(msr_content) )
     {
         set_guest_mode(msr_content);
     }
@@ -303,8 +305,9 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         apic_write(APIC_LVTPC, PMU_APIC_VECTOR);
         vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR;
 
-        if ( !((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
-            amd_vpmu_set_msr_bitmap(v);
+        if ( has_hvm_container_vcpu(v) &&
+             !((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
+             amd_vpmu_set_msr_bitmap(v);
     }
 
     /* stop saving & restore if guest stops first counter */
@@ -314,8 +317,9 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
         vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR | APIC_LVT_MASKED;
         vpmu_reset(vpmu, VPMU_RUNNING);
-        if ( ((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
-            amd_vpmu_unset_msr_bitmap(v);
+        if ( has_hvm_container_vcpu(v) &&
+             ((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
+             amd_vpmu_unset_msr_bitmap(v);
         release_pmu_ownship(PMU_OWNER_HVM);
     }
 
@@ -403,7 +407,8 @@ static void amd_vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( ((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
+    if ( has_hvm_container_vcpu(v) &&
+         ((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
         amd_vpmu_unset_msr_bitmap(v);
 
     xfree(vpmu->context);
