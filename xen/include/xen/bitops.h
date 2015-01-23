@@ -70,20 +70,52 @@ static __inline__ int generic_fls(int x)
     return r;
 }
 
+#if BITS_PER_LONG == 64
+
+static inline int generic_ffsl(unsigned long x)
+{
+    return !x || (u32)x ? generic_ffs(x) : generic_ffs(x >> 32) + 32;
+}
+
+static inline int generic_flsl(unsigned long x)
+{
+    u32 h = x >> 32;
+
+    return h ? generic_fls(h) + 32 : generic_fls(x);
+}
+
+#else
+# define generic_ffsl generic_ffs
+# define generic_flsl generic_fls
+#endif
+
 /*
  * Include this here because some architectures need generic_ffs/fls in
  * scope
  */
 #include <asm/bitops.h>
 
-
+#if BITS_PER_LONG == 64
+# define fls64 flsl
+# define ffs64 ffsl
+#else
+# ifndef ffs64
+static inline int generic_ffs64(__u64 x)
+{
+    return !x || (__u32)x ? ffs(x) : ffs(x >> 32) + 32;
+}
+#  define ffs64 generic_ffs64
+# endif
+# ifndef fls64
 static inline int generic_fls64(__u64 x)
 {
     __u32 h = x >> 32;
-    if (h)
-        return fls(x) + 32;
-    return fls(x);
+
+    return h ? fls(h) + 32 : fls(x);
 }
+#  define fls64 generic_fls64
+# endif
+#endif
 
 static __inline__ int get_bitmask_order(unsigned int count)
 {

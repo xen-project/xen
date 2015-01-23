@@ -32,6 +32,17 @@ static /*__*/always_inline unsigned long __ffs(unsigned long word)
  */
 #define ffz(x)  __ffs(~(x))
 
+static inline int flsl(unsigned long x)
+{
+        int ret;
+
+        if (__builtin_constant_p(x))
+               return generic_flsl(x);
+
+        asm("clz\t%0, %1" : "=r" (ret) : "r" (x));
+        return BITS_PER_LONG - ret;
+}
+
 /* Based on linux/include/asm-generic/bitops/find.h */
 
 #ifndef find_next_bit

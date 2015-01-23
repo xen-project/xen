@@ -138,9 +138,9 @@ static inline void MAPPING_SEARCH(unsigned long *r, int *fl, int *sl)
     }
     else
     {
-        t = (1 << (fls(*r) - 1 - MAX_LOG2_SLI)) - 1;
+        t = (1 << (flsl(*r) - 1 - MAX_LOG2_SLI)) - 1;
         *r = *r + t;
-        *fl = fls(*r) - 1;
+        *fl = flsl(*r) - 1;
         *sl = (*r >> (*fl - MAX_LOG2_SLI)) - MAX_SLI;
         *fl -= FLI_OFFSET;
         /*if ((*fl -= FLI_OFFSET) < 0) // FL will be always >0!
@@ -164,7 +164,7 @@ static inline void MAPPING_INSERT(unsigned long r, int *fl, int *sl)
     }
     else
     {
-        *fl = fls(r) - 1;
+        *fl = flsl(r) - 1;
         *sl = (r >> (*fl - MAX_LOG2_SLI)) - MAX_SLI;
         *fl -= FLI_OFFSET;
     }

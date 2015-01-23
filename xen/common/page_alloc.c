@@ -278,7 +278,7 @@ unsigned long __init alloc_boot_pages(
 
 #define bits_to_zone(b) (((b) < (PAGE_SHIFT + 1)) ? 1 : ((b) - PAGE_SHIFT))
 #define page_to_zone(pg) (is_xen_heap_page(pg) ? MEMZONE_XEN :  \
-                          (fls(page_to_mfn(pg)) ? : 1))
+                          (flsl(page_to_mfn(pg)) ? : 1))
 
 typedef struct page_list_head heap_by_zone_and_order_t[NR_ZONES][MAX_ORDER+1];
 static heap_by_zone_and_order_t *_heap[MAX_NUMNODES];
@@ -1259,7 +1259,7 @@ void __init end_boot_allocator(void)
     {
 #ifdef CONFIG_X86
         dma_bitsize = min_t(unsigned int,
-                            fls(NODE_DATA(0)->node_spanned_pages) - 1
+                            flsl(NODE_DATA(0)->node_spanned_pages) - 1
                             + PAGE_SHIFT - 2,
                             32);
 #else
@@ -1544,7 +1544,7 @@ static unsigned int __read_mostly xenheap_bits;
 
 void __init xenheap_max_mfn(unsigned long mfn)
 {
-    xenheap_bits = fls(mfn) + PAGE_SHIFT;
+    xenheap_bits = flsl(mfn) + PAGE_SHIFT;
 }
 
 void init_xenheap_pages(paddr_t ps, paddr_t pe)

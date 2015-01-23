@@ -401,7 +401,7 @@ static inline unsigned int find_first_set_bit(unsigned long word)
  *
  * This is defined the same way as the libc and compiler builtin ffs routines.
  */
-static inline int ffs(unsigned long x)
+static inline int ffsl(unsigned long x)
 {
     long r;
 
@@ -412,13 +412,24 @@ static inline int ffs(unsigned long x)
     return (int)r+1;
 }
 
+static inline int ffs(unsigned int x)
+{
+    int r;
+
+    asm ( "bsf %1,%0\n\t"
+          "jnz 1f\n\t"
+          "mov $-1,%0\n"
+          "1:" : "=r" (r) : "rm" (x));
+    return r + 1;
+}
+
 /**
  * fls - find last bit set
  * @x: the word to search
  *
  * This is defined the same way as ffs.
  */
-static inline int fls(unsigned long x)
+static inline int flsl(unsigned long x)
 {
     long r;
 
@@ -429,8 +440,16 @@ static inline int fls(unsigned long x)
     return (int)r+1;
 }
 
-#define ffs64 ffs
-#define fls64 fls
+static inline int fls(unsigned int x)
+{
+    int r;
+
+    asm ( "bsr %1,%0\n\t"
+          "jnz 1f\n\t"
+          "mov $-1,%0\n"
+          "1:" : "=r" (r) : "rm" (x));
+    return r + 1;
+}
 
 /**
  * hweightN - returns the hamming weight of a N-bit word

@@ -15,6 +15,8 @@ extern int _test_and_change_bit(int nr, volatile void * p);
 #define test_and_clear_bit(n,p)   _test_and_clear_bit(n,p)
 #define test_and_change_bit(n,p)  _test_and_change_bit(n,p)
 
+#define flsl fls
+
 /*
  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
  */
