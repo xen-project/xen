@@ -835,7 +835,7 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
     unsigned int offset = address - vlapic_base_address(vlapic);
     int rc = X86EMUL_OKAY;
 
-    if ( offset != 0xb0 )
+    if ( offset != APIC_EOI )
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                     "offset %#x with length %#lx, and value is %#lx",
                     offset, len, val);

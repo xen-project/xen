@@ -47,6 +47,7 @@
 #define VIOAPIC_REG_APIC_ID 0x00 /* x86 IOAPIC only */
 #define VIOAPIC_REG_VERSION 0x01
 #define VIOAPIC_REG_ARB_ID  0x02 /* x86 IOAPIC only */
+#define VIOAPIC_REG_RTE0    0x10
 
 struct hvm_vioapic {
     struct hvm_hw_vioapic hvm_hw_vioapic;

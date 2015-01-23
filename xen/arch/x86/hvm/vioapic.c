@@ -53,18 +53,26 @@ static uint32_t vioapic_read_indirect(const struct hvm_hw_vioapic *vioapic)
     switch ( vioapic->ioregsel )
     {
     case VIOAPIC_REG_VERSION:
-        result = ((((VIOAPIC_NUM_PINS-1) & 0xff) << 16)
-                  | (VIOAPIC_VERSION_ID & 0xff));
+        result = ((union IO_APIC_reg_01){
+                  .bits = { .version = VIOAPIC_VERSION_ID,
+                            .entries = VIOAPIC_NUM_PINS - 1 }
+                  }).raw;
         break;
 
     case VIOAPIC_REG_APIC_ID:
+        /*
+         * Using union IO_APIC_reg_02 for the ID register too, as
+         * union IO_APIC_reg_00's ID field is 8 bits wide for some reason.
+         */
     case VIOAPIC_REG_ARB_ID:
-        result = ((vioapic->id & 0xf) << 24);
+        result = ((union IO_APIC_reg_02){
+                  .bits = { .arbitration = vioapic->id }
+                  }).raw;
         break;
 
     default:
     {
-        uint32_t redir_index = (vioapic->ioregsel - 0x10) >> 1;
+        uint32_t redir_index = (vioapic->ioregsel - VIOAPIC_REG_RTE0) >> 1;
         uint64_t redir_content;
 
         if ( redir_index >= VIOAPIC_NUM_PINS )
@@ -173,7 +181,12 @@ static void vioapic_write_indirect(
         break;
 
     case VIOAPIC_REG_APIC_ID:
-        vioapic->id = (val >> 24) & 0xf;
+        /*
+         * Presumably because we emulate an Intel IOAPIC which only has a
+         * 4 bit ID field (compared to 8 for AMD), using union IO_APIC_reg_02
+         * for the ID register (union IO_APIC_reg_00's ID field is 8 bits).
+         */
+        vioapic->id = ((union IO_APIC_reg_02){ .raw = val }).bits.arbitration;
         break;
 
     case VIOAPIC_REG_ARB_ID:
@@ -181,7 +194,7 @@ static void vioapic_write_indirect(
 
     default:
     {
-        uint32_t redir_index = (vioapic->ioregsel - 0x10) >> 1;
+        uint32_t redir_index = (vioapic->ioregsel - VIOAPIC_REG_RTE0) >> 1;
 
         HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "rte[%02x].%s = %08x",
                     redir_index, vioapic->ioregsel & 1 ? "hi" : "lo", val);
