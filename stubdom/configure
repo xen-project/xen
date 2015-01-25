@@ -584,7 +584,7 @@ PACKAGE_STRING='Xen Hypervisor Stub Domains 4.6'
 PACKAGE_BUGREPORT='xen-devel@lists.xen.org'
 PACKAGE_URL='http://www.xen.org/'
 
-ac_unique_file="../extras/mini-os/kernel.c"
+ac_unique_file="xenstore-minios.cfg"
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 STUBDOM_INSTALL
