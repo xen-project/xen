@@ -158,6 +158,7 @@ qemu-xen-traditional-dir-force-update: qemu-xen-traditional-dir-find
 subdir-all-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
 	set -e; \
 		$(buildmakevars2shellvars); \
+		export CONFIG_BLKTAP1=n; \
 		cd qemu-xen-traditional-dir; \
 		$(QEMU_ROOT)/xen-setup \
 		$(IOEMU_EXTRA_LDFLAGS) \
