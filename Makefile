@@ -10,6 +10,9 @@ all: dist
 SUBSYSTEMS?=xen tools stubdom docs
 TARGS_DIST=$(patsubst %, dist-%, $(SUBSYSTEMS))
 TARGS_INSTALL=$(patsubst %, install-%, $(SUBSYSTEMS))
+TARGS_BUILD=$(patsubst %, build-%, $(SUBSYSTEMS))
+TARGS_CLEAN=$(patsubst %, clean-%, $(SUBSYSTEMS))
+TARGS_DISTCLEAN=$(patsubst %, distclean-%, $(SUBSYSTEMS))
 
 export XEN_ROOT=$(CURDIR)
 include Config.mk
@@ -23,13 +26,25 @@ export DESTDIR
 install: $(TARGS_INSTALL)
 
 .PHONY: build
-build:
+build: $(TARGS_BUILD)
+
+.PHONY: build-xen
+build-xen:
 	$(MAKE) -C xen build
+
+.PHONY: build-tools
+build-tools:
 	$(MAKE) -C tools build
+
+.PHONY: build-stubdom
+build-stubdom:
 	$(MAKE) -C stubdom build
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom pv-grub
 endif
+
+.PHONY: build-docs
+build-docs:
 	$(MAKE) -C docs build
 
 # The test target is for unit tests that can run without an installation.  Of
@@ -135,28 +150,52 @@ src-tarball: subtree-force-update-all
 	bash ./tools/misc/mktarball $(XEN_ROOT) $$(git describe)
 
 .PHONY: clean
-clean::
+clean: $(TARGS_CLEAN)
+
+.PHONY: clean-xen
+clean-xen:
 	$(MAKE) -C xen clean
+
+.PHONY: clean-tools
+clean-tools:
 	$(MAKE) -C tools clean
+
+.PHONY: clean-stubdom
+clean-stubdom:
 	$(MAKE) -C stubdom crossclean
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom crossclean
 endif
+
+.PHONY: clean-docs
+clean-docs:
 	$(MAKE) -C docs clean
 
 # clean, but blow away tarballs
 .PHONY: distclean
-distclean:
+distclean: $(TARGS_DISTCLEAN)
 	rm -f config/Toplevel.mk
+	rm -rf dist
+	rm -rf config.log config.status config.cache autom4te.cache
+
+.PHONY: distclean-xen
+distclean-xen:
 	$(MAKE) -C xen distclean
+
+.PHONY: distclean-tools
+distclean-tools:
 	$(MAKE) -C tools distclean
+
+.PHONY: distclean-stubdom
+distclean-stubdom:
 	$(MAKE) -C stubdom distclean
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom distclean
 endif
+
+.PHONY: distclean-docs
+distclean-docs:
 	$(MAKE) -C docs distclean
-	rm -rf dist
-	rm -rf config.log config.status config.cache autom4te.cache
 
 # Linux name for GNU distclean
 .PHONY: mrproper
