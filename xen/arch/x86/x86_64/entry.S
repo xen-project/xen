@@ -101,61 +101,8 @@ ENTRY(lstar_enter)
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
         jz    switch_to_kernel
 
-/*hypercall:*/
-        movq  %r10,%rcx
-        cmpq  $NR_hypercalls,%rax
-        jae   bad_hypercall
-#ifndef NDEBUG
-        /* Deliberately corrupt parameter regs not used by this hypercall. */
-        pushq %rdi; pushq %rsi; pushq %rdx; pushq %rcx; pushq %r8 ; pushq %r9 
-        leaq  hypercall_args_table(%rip),%r10
-        movq  $6,%rcx
-        sub   (%r10,%rax,1),%cl
-        movq  %rsp,%rdi
-        movl  $0xDEADBEEF,%eax
-        rep   stosq
-        popq  %r9 ; popq  %r8 ; popq  %rcx; popq  %rdx; popq  %rsi; popq  %rdi
-        movq  UREGS_rax(%rsp),%rax
-        pushq %rax
-        pushq UREGS_rip+8(%rsp)
-#define SHADOW_BYTES 16 /* Shadow EIP + shadow hypercall # */
-#else
-#define SHADOW_BYTES 0  /* No on-stack shadow state */
-#endif
-        cmpb  $0,tb_init_done(%rip)
-UNLIKELY_START(ne, trace)
-        call  __trace_hypercall_entry
-        /* Restore the registers that __trace_hypercall_entry clobbered. */
-        movq  UREGS_rax+SHADOW_BYTES(%rsp),%rax   /* Hypercall #  */
-        movq  UREGS_rdi+SHADOW_BYTES(%rsp),%rdi   /* Arg 1        */
-        movq  UREGS_rsi+SHADOW_BYTES(%rsp),%rsi   /* Arg 2        */
-        movq  UREGS_rdx+SHADOW_BYTES(%rsp),%rdx   /* Arg 3        */
-        movq  UREGS_r10+SHADOW_BYTES(%rsp),%rcx   /* Arg 4        */
-        movq  UREGS_r8 +SHADOW_BYTES(%rsp),%r8    /* Arg 5        */
-        movq  UREGS_r9 +SHADOW_BYTES(%rsp),%r9    /* Arg 6        */
-#undef SHADOW_BYTES
-UNLIKELY_END(trace)
-        leaq  hypercall_table(%rip),%r10
-        PERFC_INCR(hypercalls, %rax, %rbx)
-        callq *(%r10,%rax,8)
-#ifndef NDEBUG
-        /* Deliberately corrupt parameter regs used by this hypercall. */
-        popq  %r10         # Shadow RIP
-        cmpq  %r10,UREGS_rip+8(%rsp)
-        popq  %rcx         # Shadow hypercall index
-        jne   skip_clobber /* If RIP has changed then don't clobber. */
-        leaq  hypercall_args_table(%rip),%r10
-        movb  (%r10,%rcx,1),%cl
-        movl  $0xDEADBEEF,%r10d
-        cmpb  $1,%cl; jb skip_clobber; movq %r10,UREGS_rdi(%rsp)
-        cmpb  $2,%cl; jb skip_clobber; movq %r10,UREGS_rsi(%rsp)
-        cmpb  $3,%cl; jb skip_clobber; movq %r10,UREGS_rdx(%rsp)
-        cmpb  $4,%cl; jb skip_clobber; movq %r10,UREGS_r10(%rsp)
-        cmpb  $5,%cl; jb skip_clobber; movq %r10,UREGS_r8(%rsp)
-        cmpb  $6,%cl; jb skip_clobber; movq %r10,UREGS_r9(%rsp)
-skip_clobber:
-#endif
-        movq  %rax,UREGS_rax(%rsp)       # save the return value
+        mov   %rsp, %rdi
+        call  pv_hypercall
 
 /* %rbx: struct vcpu */
 test_all_events:
@@ -229,10 +176,6 @@ process_nmi:
 process_trap:
         leaq VCPU_trap_bounce(%rbx),%rdx
         call create_bounce_frame
-        jmp  test_all_events
-
-bad_hypercall:
-        movq $-ENOSYS,UREGS_rax(%rsp)
         jmp  test_all_events
 
 ENTRY(sysenter_entry)

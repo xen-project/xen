@@ -6,33 +6,6 @@
 #include <xen/sched.h>
 #include <xen/trace.h>
 
-void __trace_hypercall_entry(void)
-{
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    unsigned long args[6];
-
-    if ( is_pv_32bit_vcpu(current) )
-    {
-        args[0] = regs->ebx;
-        args[1] = regs->ecx;
-        args[2] = regs->edx;
-        args[3] = regs->esi;
-        args[4] = regs->edi;
-        args[5] = regs->ebp;
-    }
-    else
-    {
-        args[0] = regs->rdi;
-        args[1] = regs->rsi;
-        args[2] = regs->rdx;
-        args[3] = regs->r10;
-        args[4] = regs->r8;
-        args[5] = regs->r9;
-    }
-
-    __trace_hypercall(TRC_PV_HYPERCALL_V2, regs->eax, args);
-}
-
 void __trace_pv_trap(int trapnr, unsigned long eip,
                      int use_error_code, unsigned error_code)
 {

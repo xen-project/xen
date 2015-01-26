@@ -153,7 +153,6 @@ void __dummy__(void)
     BLANK();
 
 #ifdef CONFIG_PERF_COUNTERS
-    DEFINE(ASM_PERFC_hypercalls, PERFC_hypercalls);
     DEFINE(ASM_PERFC_exceptions, PERFC_exceptions);
     BLANK();
 #endif

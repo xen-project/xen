@@ -25,71 +25,10 @@ UNLIKELY_START(ne, msi_check)
         LOAD_C_CLOBBERED compat=1 ax=0
 UNLIKELY_END(msi_check)
 
-        movl  UREGS_rax(%rsp),%eax
         GET_CURRENT(bx)
 
-        cmpl  $NR_hypercalls,%eax
-        jae   compat_bad_hypercall
-#ifndef NDEBUG
-        /* Deliberately corrupt parameter regs not used by this hypercall. */
-        pushq UREGS_rbx(%rsp); pushq %rcx; pushq %rdx; pushq %rsi; pushq %rdi
-        pushq UREGS_rbp+5*8(%rsp)
-        leaq  compat_hypercall_args_table(%rip),%r10
-        movl  $6,%ecx
-        subb  (%r10,%rax,1),%cl
-        movq  %rsp,%rdi
-        movl  $0xDEADBEEF,%eax
-        rep   stosq
-        popq  %r8 ; popq  %r9 ; xchgl %r8d,%r9d /* Args 5&6: zero extend */
-        popq  %rdx; popq  %rcx; xchgl %edx,%ecx /* Args 3&4: zero extend */
-        popq  %rdi; popq  %rsi; xchgl %edi,%esi /* Args 1&2: zero extend */
-        movl  UREGS_rax(%rsp),%eax
-        pushq %rax
-        pushq UREGS_rip+8(%rsp)
-#define SHADOW_BYTES 16 /* Shadow EIP + shadow hypercall # */
-#else
-        /* Relocate argument registers and zero-extend to 64 bits. */
-        xchgl %ecx,%esi              /* Arg 2, Arg 4 */
-        movl  %edx,%edx              /* Arg 3        */
-        movl  %edi,%r8d              /* Arg 5        */
-        movl  %ebp,%r9d              /* Arg 6        */
-        movl  UREGS_rbx(%rsp),%edi   /* Arg 1        */
-#define SHADOW_BYTES 0  /* No on-stack shadow state */
-#endif
-        cmpb  $0,tb_init_done(%rip)
-UNLIKELY_START(ne, compat_trace)
-        call  __trace_hypercall_entry
-        /* Restore the registers that __trace_hypercall_entry clobbered. */
-        movl  UREGS_rax+SHADOW_BYTES(%rsp),%eax   /* Hypercall #  */
-        movl  UREGS_rbx+SHADOW_BYTES(%rsp),%edi   /* Arg 1        */
-        movl  UREGS_rcx+SHADOW_BYTES(%rsp),%esi   /* Arg 2        */
-        movl  UREGS_rdx+SHADOW_BYTES(%rsp),%edx   /* Arg 3        */
-        movl  UREGS_rsi+SHADOW_BYTES(%rsp),%ecx   /* Arg 4        */
-        movl  UREGS_rdi+SHADOW_BYTES(%rsp),%r8d   /* Arg 5        */
-        movl  UREGS_rbp+SHADOW_BYTES(%rsp),%r9d   /* Arg 6        */
-#undef SHADOW_BYTES
-UNLIKELY_END(compat_trace)
-        leaq  compat_hypercall_table(%rip),%r10
-        PERFC_INCR(hypercalls, %rax, %rbx)
-        callq *(%r10,%rax,8)
-#ifndef NDEBUG
-        /* Deliberately corrupt parameter regs used by this hypercall. */
-        popq  %r10         # Shadow RIP
-        cmpq  %r10,UREGS_rip+8(%rsp)
-        popq  %rcx         # Shadow hypercall index
-        jne   compat_skip_clobber /* If RIP has changed then don't clobber. */
-        leaq  compat_hypercall_args_table(%rip),%r10
-        movb  (%r10,%rcx,1),%cl
-        movl  $0xDEADBEEF,%r10d
-        testb %cl,%cl; jz compat_skip_clobber; movl %r10d,UREGS_rbx(%rsp)
-        cmpb  $2, %cl; jb compat_skip_clobber; movl %r10d,UREGS_rcx(%rsp)
-        cmpb  $3, %cl; jb compat_skip_clobber; movl %r10d,UREGS_rdx(%rsp)
-        cmpb  $4, %cl; jb compat_skip_clobber; movl %r10d,UREGS_rsi(%rsp)
-        cmpb  $5, %cl; jb compat_skip_clobber; movl %r10d,UREGS_rdi(%rsp)
-        cmpb  $6, %cl; jb compat_skip_clobber; movl %r10d,UREGS_rbp(%rsp)
-compat_skip_clobber:
-#endif
-        movl  %eax,UREGS_rax(%rsp)       # save the return value
+        mov   %rsp, %rdi
+        call  pv_hypercall
 
 /* %rbx: struct vcpu */
 ENTRY(compat_test_all_events)
@@ -166,10 +105,6 @@ compat_process_trap:
         leaq  VCPU_trap_bounce(%rbx),%rdx
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
-
-compat_bad_hypercall:
-        movl $-ENOSYS,UREGS_rax(%rsp)
-        jmp  compat_test_all_events
 
 /* %rbx: struct vcpu, interrupts disabled */
 ENTRY(compat_restore_all_guest)

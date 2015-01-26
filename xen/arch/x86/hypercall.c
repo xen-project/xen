@@ -17,7 +17,12 @@
  * Copyright (c) 2015,2016 Citrix Systems Ltd.
  */
 
+#include <xen/compiler.h>
 #include <xen/hypercall.h>
+#include <xen/trace.h>
+
+extern hypercall_fn_t *const hypercall_table[NR_hypercalls],
+    *const compat_hypercall_table[NR_hypercalls];
 
 #define ARGS(x, n)                              \
     [ __HYPERVISOR_ ## x ] = (n)
@@ -110,6 +115,121 @@ const uint8_t compat_hypercall_args_table[NR_hypercalls] =
 };
 
 #undef ARGS
+
+void pv_hypercall(struct cpu_user_regs *regs)
+{
+    struct vcpu *curr = current;
+#ifndef NDEBUG
+    unsigned long old_rip = regs->rip;
+#endif
+    unsigned long eax;
+
+    ASSERT(guest_kernel_mode(curr, regs));
+
+    eax = is_pv_32bit_vcpu(curr) ? regs->_eax : regs->eax;
+
+    if ( (eax >= NR_hypercalls) || !hypercall_table[eax] )
+    {
+        regs->eax = -ENOSYS;
+        return;
+    }
+
+    if ( !is_pv_32bit_vcpu(curr) )
+    {
+        unsigned long rdi = regs->rdi;
+        unsigned long rsi = regs->rsi;
+        unsigned long rdx = regs->rdx;
+        unsigned long r10 = regs->r10;
+        unsigned long r8 = regs->r8;
+        unsigned long r9 = regs->r9;
+
+#ifndef NDEBUG
+        /* Deliberately corrupt parameter regs not used by this hypercall. */
+        switch ( hypercall_args_table[eax] )
+        {
+        case 0: rdi = 0xdeadbeefdeadf00dUL;
+        case 1: rsi = 0xdeadbeefdeadf00dUL;
+        case 2: rdx = 0xdeadbeefdeadf00dUL;
+        case 3: r10 = 0xdeadbeefdeadf00dUL;
+        case 4: r8 = 0xdeadbeefdeadf00dUL;
+        case 5: r9 = 0xdeadbeefdeadf00dUL;
+        }
+#endif
+        if ( unlikely(tb_init_done) )
+        {
+            unsigned long args[6] = { rdi, rsi, rdx, r10, r8, r9 };
+
+            __trace_hypercall(TRC_PV_HYPERCALL_V2, eax, args);
+        }
+
+        regs->eax = hypercall_table[eax](rdi, rsi, rdx, r10, r8, r9);
+
+#ifndef NDEBUG
+        if ( regs->rip == old_rip )
+        {
+            /* Deliberately corrupt parameter regs used by this hypercall. */
+            switch ( hypercall_args_table[eax] )
+            {
+            case 6: regs->r9  = 0xdeadbeefdeadf00dUL;
+            case 5: regs->r8  = 0xdeadbeefdeadf00dUL;
+            case 4: regs->r10 = 0xdeadbeefdeadf00dUL;
+            case 3: regs->rdx = 0xdeadbeefdeadf00dUL;
+            case 2: regs->rsi = 0xdeadbeefdeadf00dUL;
+            case 1: regs->rdi = 0xdeadbeefdeadf00dUL;
+            }
+        }
+#endif
+    }
+    else
+    {
+        unsigned int ebx = regs->_ebx;
+        unsigned int ecx = regs->_ecx;
+        unsigned int edx = regs->_edx;
+        unsigned int esi = regs->_esi;
+        unsigned int edi = regs->_edi;
+        unsigned int ebp = regs->_ebp;
+
+#ifndef NDEBUG
+        /* Deliberately corrupt parameter regs not used by this hypercall. */
+        switch ( compat_hypercall_args_table[eax] )
+        {
+        case 0: ebx = 0xdeadf00d;
+        case 1: ecx = 0xdeadf00d;
+        case 2: edx = 0xdeadf00d;
+        case 3: esi = 0xdeadf00d;
+        case 4: edi = 0xdeadf00d;
+        case 5: ebp = 0xdeadf00d;
+        }
+#endif
+
+        if ( unlikely(tb_init_done) )
+        {
+            unsigned long args[6] = { ebx, ecx, edx, esi, edi, ebp };
+
+            __trace_hypercall(TRC_PV_HYPERCALL_V2, eax, args);
+        }
+
+        regs->_eax = compat_hypercall_table[eax](ebx, ecx, edx, esi, edi, ebp);
+
+#ifndef NDEBUG
+        if ( regs->rip == old_rip )
+        {
+            /* Deliberately corrupt parameter regs used by this hypercall. */
+            switch ( compat_hypercall_args_table[eax] )
+            {
+            case 6: regs->_ebp = 0xdeadf00d;
+            case 5: regs->_edi = 0xdeadf00d;
+            case 4: regs->_esi = 0xdeadf00d;
+            case 3: regs->_edx = 0xdeadf00d;
+            case 2: regs->_ecx = 0xdeadf00d;
+            case 1: regs->_ebx = 0xdeadf00d;
+            }
+        }
+#endif
+    }
+
+    perfc_incr(hypercalls);
+}
 
 /*
  * Local variables:
