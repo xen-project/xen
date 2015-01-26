@@ -4147,7 +4147,9 @@ static const hypercall_table_t hvm_hypercall_table[NR_hypercalls] = {
     HYPERCALL(hvm_op),
     HYPERCALL(sysctl),
     HYPERCALL(domctl),
+#ifdef CONFIG_TMEM
     HYPERCALL(tmem_op),
+#endif
     COMPAT_CALL(platform_op),
     COMPAT_CALL(mmuext_op),
     HYPERCALL(xenpmu_op),

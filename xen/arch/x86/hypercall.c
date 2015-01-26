@@ -21,9 +21,6 @@
 #include <xen/hypercall.h>
 #include <xen/trace.h>
 
-extern hypercall_fn_t *const hypercall_table[NR_hypercalls],
-    *const compat_hypercall_table[NR_hypercalls];
-
 #define ARGS(x, n)                              \
     [ __HYPERVISOR_ ## x ] = (n)
 
@@ -115,6 +112,118 @@ const uint8_t compat_hypercall_args_table[NR_hypercalls] =
 };
 
 #undef ARGS
+
+#define HYPERCALL(x)                                                \
+    [ __HYPERVISOR_ ## x ] = (hypercall_fn_t *) do_ ## x
+
+#define do_arch_1             paging_domctl_continuation
+
+hypercall_fn_t *const hypercall_table[NR_hypercalls] = {
+    HYPERCALL(set_trap_table),
+    HYPERCALL(mmu_update),
+    HYPERCALL(set_gdt),
+    HYPERCALL(stack_switch),
+    HYPERCALL(set_callbacks),
+    HYPERCALL(fpu_taskswitch),
+    HYPERCALL(sched_op_compat),
+    HYPERCALL(platform_op),
+    HYPERCALL(set_debugreg),
+    HYPERCALL(get_debugreg),
+    HYPERCALL(update_descriptor),
+    HYPERCALL(memory_op),
+    HYPERCALL(multicall),
+    HYPERCALL(update_va_mapping),
+    HYPERCALL(set_timer_op),
+    HYPERCALL(event_channel_op_compat),
+    HYPERCALL(xen_version),
+    HYPERCALL(console_io),
+    HYPERCALL(physdev_op_compat),
+    HYPERCALL(grant_table_op),
+    HYPERCALL(vm_assist),
+    HYPERCALL(update_va_mapping_otherdomain),
+    HYPERCALL(iret),
+    HYPERCALL(vcpu_op),
+    HYPERCALL(set_segment_base),
+    HYPERCALL(mmuext_op),
+    HYPERCALL(xsm_op),
+    HYPERCALL(nmi_op),
+    HYPERCALL(sched_op),
+    HYPERCALL(callback_op),
+#ifdef CONFIG_XENOPROF
+    HYPERCALL(xenoprof_op),
+#endif
+    HYPERCALL(event_channel_op),
+    HYPERCALL(physdev_op),
+    HYPERCALL(hvm_op),
+    HYPERCALL(sysctl),
+    HYPERCALL(domctl),
+#ifdef CONFIG_KEXEC
+    HYPERCALL(kexec_op),
+#endif
+#ifdef CONFIG_TMEM
+    HYPERCALL(tmem_op),
+#endif
+    HYPERCALL(xenpmu_op),
+    HYPERCALL(mca),
+    HYPERCALL(arch_1),
+};
+
+#define COMPAT_CALL(x)                                              \
+    [ __HYPERVISOR_ ## x ] = (hypercall_fn_t *) compat_ ## x
+
+hypercall_fn_t *const compat_hypercall_table[NR_hypercalls] = {
+    COMPAT_CALL(set_trap_table),
+    HYPERCALL(mmu_update),
+    COMPAT_CALL(set_gdt),
+    HYPERCALL(stack_switch),
+    COMPAT_CALL(set_callbacks),
+    HYPERCALL(fpu_taskswitch),
+    HYPERCALL(sched_op_compat),
+    COMPAT_CALL(platform_op),
+    HYPERCALL(set_debugreg),
+    HYPERCALL(get_debugreg),
+    COMPAT_CALL(update_descriptor),
+    COMPAT_CALL(memory_op),
+    COMPAT_CALL(multicall),
+    COMPAT_CALL(update_va_mapping),
+    COMPAT_CALL(set_timer_op),
+    HYPERCALL(event_channel_op_compat),
+    COMPAT_CALL(xen_version),
+    HYPERCALL(console_io),
+    COMPAT_CALL(physdev_op_compat),
+    COMPAT_CALL(grant_table_op),
+    COMPAT_CALL(vm_assist),
+    COMPAT_CALL(update_va_mapping_otherdomain),
+    COMPAT_CALL(iret),
+    COMPAT_CALL(vcpu_op),
+    HYPERCALL(set_segment_base),
+    COMPAT_CALL(mmuext_op),
+    COMPAT_CALL(xsm_op),
+    COMPAT_CALL(nmi_op),
+    COMPAT_CALL(sched_op),
+    COMPAT_CALL(callback_op),
+#ifdef CONFIG_XENOPROF
+    COMPAT_CALL(xenoprof_op),
+#endif
+    HYPERCALL(event_channel_op),
+    COMPAT_CALL(physdev_op),
+    HYPERCALL(hvm_op),
+    HYPERCALL(sysctl),
+    HYPERCALL(domctl),
+#ifdef CONFIG_KEXEC
+    COMPAT_CALL(kexec_op),
+#endif
+#ifdef CONFIG_TMEM
+    HYPERCALL(tmem_op),
+#endif
+    HYPERCALL(xenpmu_op),
+    HYPERCALL(mca),
+    HYPERCALL(arch_1),
+};
+
+#undef do_arch_1
+#undef COMPAT_CALL
+#undef HYPERCALL
 
 void pv_hypercall(struct cpu_user_regs *regs)
 {

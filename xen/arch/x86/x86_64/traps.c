@@ -14,6 +14,7 @@
 #include <xen/nmi.h>
 #include <xen/guest_access.h>
 #include <xen/watchdog.h>
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/traps.h>

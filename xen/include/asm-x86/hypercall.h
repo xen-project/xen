@@ -9,6 +9,7 @@
 #include <public/physdev.h>
 #include <public/event_channel.h>
 #include <public/arch-x86/xen-mca.h> /* for do_mca */
+#include <asm/paging.h>
 
 typedef unsigned long hypercall_fn_t(
     unsigned long, unsigned long, unsigned long,
@@ -31,6 +32,14 @@ extern const uint8_t hypercall_args_table[NR_hypercalls],
 extern long
 do_event_channel_op_compat(
     XEN_GUEST_HANDLE_PARAM(evtchn_op_t) uop);
+
+/* Legacy hypercall (as of 0x00030202). */
+extern long do_physdev_op_compat(
+    XEN_GUEST_HANDLE(physdev_op_t) uop);
+
+/* Legacy hypercall (as of 0x00030101). */
+extern long do_sched_op_compat(
+    int cmd, unsigned long arg);
 
 extern long
 do_set_trap_table(
@@ -98,6 +107,9 @@ do_mmuext_op(
     XEN_GUEST_HANDLE_PARAM(uint) pdone,
     unsigned int foreigndom);
 
+extern long do_callback_op(
+    int cmd, XEN_GUEST_HANDLE_PARAM(const_void) arg);
+
 extern unsigned long
 do_iret(
     void);
@@ -112,6 +124,11 @@ extern long
 do_set_segment_base(
     unsigned int which,
     unsigned long base);
+
+#ifdef CONFIG_COMPAT
+
+#include <compat/arch-x86/xen.h>
+#include <compat/physdev.h>
 
 extern int
 compat_physdev_op(
@@ -130,5 +147,36 @@ extern int compat_mmuext_op(
 
 extern int compat_platform_op(
     XEN_GUEST_HANDLE_PARAM(void) u_xenpf_op);
+
+extern long compat_callback_op(
+    int cmd, XEN_GUEST_HANDLE(void) arg);
+
+extern int compat_update_va_mapping(
+    unsigned int va, u32 lo, u32 hi, unsigned int flags);
+
+extern int compat_update_va_mapping_otherdomain(
+    unsigned long va, u32 lo, u32 hi, unsigned long flags, domid_t domid);
+
+DEFINE_XEN_GUEST_HANDLE(trap_info_compat_t);
+extern int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps);
+
+extern int compat_set_gdt(
+    XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries);
+
+extern int compat_update_descriptor(
+    u32 pa_lo, u32 pa_hi, u32 desc_lo, u32 desc_hi);
+
+extern unsigned int compat_iret(void);
+
+extern int compat_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
+
+extern long compat_set_callbacks(
+    unsigned long event_selector, unsigned long event_address,
+    unsigned long failsafe_selector, unsigned long failsafe_address);
+
+DEFINE_XEN_GUEST_HANDLE(physdev_op_compat_t);
+extern int compat_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_compat_t) uop);
+
+#endif /* CONFIG_COMPAT */
 
 #endif /* __ASM_X86_HYPERCALL_H__ */

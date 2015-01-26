@@ -683,69 +683,6 @@ ENTRY(exception_table)
         .endr
         .size exception_table, . - exception_table
 
-#ifndef CONFIG_KEXEC
-#define do_kexec_op do_ni_hypercall
-#endif
-
-#ifndef CONFIG_TMEM
-#define do_tmem_op do_ni_hypercall
-#endif
-
-#ifndef CONFIG_XENOPROF
-#define do_xenoprof_op do_ni_hypercall
-#endif
-
-ENTRY(hypercall_table)
-        .quad do_set_trap_table     /*  0 */
-        .quad do_mmu_update
-        .quad do_set_gdt
-        .quad do_stack_switch
-        .quad do_set_callbacks
-        .quad do_fpu_taskswitch     /*  5 */
-        .quad do_sched_op_compat
-        .quad do_platform_op
-        .quad do_set_debugreg
-        .quad do_get_debugreg
-        .quad do_update_descriptor  /* 10 */
-        .quad do_ni_hypercall
-        .quad do_memory_op
-        .quad do_multicall
-        .quad do_update_va_mapping
-        .quad do_set_timer_op       /* 15 */
-        .quad do_event_channel_op_compat
-        .quad do_xen_version
-        .quad do_console_io
-        .quad do_physdev_op_compat
-        .quad do_grant_table_op     /* 20 */
-        .quad do_vm_assist
-        .quad do_update_va_mapping_otherdomain
-        .quad do_iret
-        .quad do_vcpu_op
-        .quad do_set_segment_base   /* 25 */
-        .quad do_mmuext_op
-        .quad do_xsm_op
-        .quad do_nmi_op
-        .quad do_sched_op
-        .quad do_callback_op        /* 30 */
-        .quad do_xenoprof_op
-        .quad do_event_channel_op
-        .quad do_physdev_op
-        .quad do_hvm_op
-        .quad do_sysctl             /* 35 */
-        .quad do_domctl
-        .quad do_kexec_op
-        .quad do_tmem_op
-        .quad do_ni_hypercall       /* reserved for XenClient */
-        .quad do_xenpmu_op          /* 40 */
-        .rept __HYPERVISOR_arch_0-((.-hypercall_table)/8)
-        .quad do_ni_hypercall
-        .endr
-        .quad do_mca                /* 48 */
-        .quad paging_domctl_continuation
-        .rept NR_hypercalls-((.-hypercall_table)/8)
-        .quad do_ni_hypercall
-        .endr
-
 /* Table of automatically generated entry points.  One per vector. */
         .section .init.rodata, "a", @progbits
 GLOBAL(autogen_entrypoints)

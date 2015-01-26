@@ -19,10 +19,6 @@
 #include <xsm/xsm.h>
 
 extern long
-do_ni_hypercall(
-    void);
-
-extern long
 do_sched_op(
     int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg);
@@ -137,8 +133,6 @@ do_xsm_op(
 extern long
 do_tmem_op(
     XEN_GUEST_HANDLE_PARAM(tmem_op_t) uops);
-#else
-#define do_tmem_op do_ni_hypercall
 #endif
 
 extern long
@@ -183,6 +177,18 @@ extern int
 compat_set_timer_op(
     u32 lo,
     s32 hi);
+
+extern int compat_xsm_op(
+    XEN_GUEST_HANDLE_PARAM(xsm_op_t) op);
+
+extern int compat_kexec_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg);
+
+extern int compat_vm_assist(unsigned int cmd, unsigned int type);
+
+DEFINE_XEN_GUEST_HANDLE(multicall_entry_compat_t);
+extern int compat_multicall(
+    XEN_GUEST_HANDLE_PARAM(multicall_entry_compat_t) call_list,
+    uint32_t nr_calls);
 
 #endif
 

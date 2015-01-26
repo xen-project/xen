@@ -329,8 +329,6 @@ long compat_set_callbacks(unsigned long event_selector,
     return 0;
 }
 
-DEFINE_XEN_GUEST_HANDLE(trap_info_compat_t);
-
 int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
 {
     struct compat_trap_info cur;
