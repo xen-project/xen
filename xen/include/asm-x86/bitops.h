@@ -391,7 +391,7 @@ static inline unsigned int __scanbit(unsigned long val, unsigned long max)
  */
 static inline unsigned int find_first_set_bit(unsigned long word)
 {
-    asm ( "bsf %1,%0" : "=r" (word) : "r" (word) );
+    asm ( "rep; bsf %1,%0" : "=r" (word) : "rm" (word) );
     return (unsigned int)word;
 }
 

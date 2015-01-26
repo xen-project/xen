@@ -56,7 +56,7 @@ static int vpic_get_priority(struct hvm_hw_vpic *vpic, uint8_t mask)
         return VPIC_PRIO_NONE;
 
     /* prio = ffs(mask ROR vpic->priority_add); */
-    asm ( "ror %%cl,%b1 ; bsf %1,%0"
+    asm ( "ror %%cl,%b1 ; rep; bsf %1,%0"
           : "=r" (prio) : "q" ((uint32_t)mask), "c" (vpic->priority_add) );
     return prio;
 }

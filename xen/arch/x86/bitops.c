@@ -62,7 +62,7 @@ unsigned int __find_first_zero_bit(
         "   je 2f\n\t"
         "   xor -"STR(BITS_PER_LONG/8)"(%2),%3\n\t"
         "   jz 1b\n\t"
-        "   bsf %3,%0\n\t"
+        "   rep; bsf %3,%0\n\t"
         "   lea -"STR(BITS_PER_LONG/8)"(%2),%2\n\t"
         "2: sub %%ebx,%%edi\n\t"
         "   shl $3,%%edi\n\t"
