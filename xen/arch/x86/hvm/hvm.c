@@ -4216,7 +4216,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
-        switch ( hypercall_args_table[eax] )
+        switch ( hypercall_args_table[eax].native )
         {
         case 0: rdi = 0xdeadbeefdeadf00dUL;
         case 1: rsi = 0xdeadbeefdeadf00dUL;
@@ -4237,7 +4237,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         if ( !curr->arch.hvm_vcpu.hcall_preempted )
         {
             /* Deliberately corrupt parameter regs used by this hypercall. */
-            switch ( hypercall_args_table[eax] )
+            switch ( hypercall_args_table[eax].native )
             {
             case 6: regs->r9  = 0xdeadbeefdeadf00dUL;
             case 5: regs->r8  = 0xdeadbeefdeadf00dUL;
@@ -4263,7 +4263,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
-        switch ( compat_hypercall_args_table[eax] )
+        switch ( hypercall_args_table[eax].compat )
         {
         case 0: ebx = 0xdeadf00d;
         case 1: ecx = 0xdeadf00d;
@@ -4281,7 +4281,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         if ( !curr->arch.hvm_vcpu.hcall_preempted )
         {
             /* Deliberately corrupt parameter regs used by this hypercall. */
-            switch ( compat_hypercall_args_table[eax] )
+            switch ( hypercall_args_table[eax].compat )
             {
             case 6: regs->ebp = 0xdeadf00d;
             case 5: regs->edi = 0xdeadf00d;

@@ -22,34 +22,36 @@
 #include <xen/trace.h>
 
 #define ARGS(x, n)                              \
-    [ __HYPERVISOR_ ## x ] = (n)
+    [ __HYPERVISOR_ ## x ] = { n, n }
+#define COMP(x, n, c)                           \
+    [ __HYPERVISOR_ ## x ] = { n, c }
 
-const uint8_t hypercall_args_table[NR_hypercalls] =
+const hypercall_args_t hypercall_args_table[NR_hypercalls] =
 {
     ARGS(set_trap_table, 1),
     ARGS(mmu_update, 4),
     ARGS(set_gdt, 2),
     ARGS(stack_switch, 2),
-    ARGS(set_callbacks, 3),
+    COMP(set_callbacks, 3, 4),
     ARGS(fpu_taskswitch, 1),
     ARGS(sched_op_compat, 2),
     ARGS(platform_op, 1),
     ARGS(set_debugreg, 2),
     ARGS(get_debugreg, 1),
-    ARGS(update_descriptor, 2),
+    COMP(update_descriptor, 2, 4),
     ARGS(memory_op, 2),
     ARGS(multicall, 2),
-    ARGS(update_va_mapping, 3),
-    ARGS(set_timer_op, 1),
+    COMP(update_va_mapping, 3, 4),
+    COMP(set_timer_op, 1, 2),
     ARGS(event_channel_op_compat, 1),
     ARGS(xen_version, 2),
     ARGS(console_io, 3),
     ARGS(physdev_op_compat, 1),
     ARGS(grant_table_op, 3),
     ARGS(vm_assist, 2),
-    ARGS(update_va_mapping_otherdomain, 4),
+    COMP(update_va_mapping_otherdomain, 4, 5),
     ARGS(vcpu_op, 3),
-    ARGS(set_segment_base, 2),
+    COMP(set_segment_base, 2, 0),
     ARGS(mmuext_op, 4),
     ARGS(xsm_op, 1),
     ARGS(nmi_op, 2),
@@ -68,49 +70,7 @@ const uint8_t hypercall_args_table[NR_hypercalls] =
     ARGS(arch_1, 1),
 };
 
-const uint8_t compat_hypercall_args_table[NR_hypercalls] =
-{
-    ARGS(set_trap_table, 1),
-    ARGS(mmu_update, 4),
-    ARGS(set_gdt, 2),
-    ARGS(stack_switch, 2),
-    ARGS(set_callbacks, 4),
-    ARGS(fpu_taskswitch, 1),
-    ARGS(sched_op_compat, 2),
-    ARGS(platform_op, 1),
-    ARGS(set_debugreg, 2),
-    ARGS(get_debugreg, 1),
-    ARGS(update_descriptor, 4),
-    ARGS(memory_op, 2),
-    ARGS(multicall, 2),
-    ARGS(update_va_mapping, 4),
-    ARGS(set_timer_op, 2),
-    ARGS(event_channel_op_compat, 1),
-    ARGS(xen_version, 2),
-    ARGS(console_io, 3),
-    ARGS(physdev_op_compat, 1),
-    ARGS(grant_table_op, 3),
-    ARGS(vm_assist, 2),
-    ARGS(update_va_mapping_otherdomain, 5),
-    ARGS(vcpu_op, 3),
-    ARGS(mmuext_op, 4),
-    ARGS(xsm_op, 1),
-    ARGS(nmi_op, 2),
-    ARGS(sched_op, 2),
-    ARGS(callback_op, 2),
-    ARGS(xenoprof_op, 2),
-    ARGS(event_channel_op, 2),
-    ARGS(physdev_op, 2),
-    ARGS(hvm_op, 2),
-    ARGS(sysctl, 1),
-    ARGS(domctl, 1),
-    ARGS(kexec_op, 2),
-    ARGS(tmem_op, 1),
-    ARGS(xenpmu_op, 2),
-    ARGS(mca, 1),
-    ARGS(arch_1, 1),
-};
-
+#undef COMP
 #undef ARGS
 
 #define HYPERCALL(x)                                                \
@@ -205,7 +165,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
 
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
-        switch ( hypercall_args_table[eax] )
+        switch ( hypercall_args_table[eax].native )
         {
         case 0: rdi = 0xdeadbeefdeadf00dUL;
         case 1: rsi = 0xdeadbeefdeadf00dUL;
@@ -228,7 +188,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
         if ( regs->rip == old_rip )
         {
             /* Deliberately corrupt parameter regs used by this hypercall. */
-            switch ( hypercall_args_table[eax] )
+            switch ( hypercall_args_table[eax].native )
             {
             case 6: regs->r9  = 0xdeadbeefdeadf00dUL;
             case 5: regs->r8  = 0xdeadbeefdeadf00dUL;
@@ -251,7 +211,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
 
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
-        switch ( compat_hypercall_args_table[eax] )
+        switch ( hypercall_args_table[eax].compat )
         {
         case 0: ebx = 0xdeadf00d;
         case 1: ecx = 0xdeadf00d;
@@ -275,7 +235,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
         if ( regs->rip == old_rip )
         {
             /* Deliberately corrupt parameter regs used by this hypercall. */
-            switch ( compat_hypercall_args_table[eax] )
+            switch ( hypercall_args_table[eax].compat )
             {
             case 6: regs->_ebp = 0xdeadf00d;
             case 5: regs->_edi = 0xdeadf00d;

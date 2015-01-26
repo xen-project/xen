@@ -19,8 +19,11 @@ typedef struct {
     hypercall_fn_t *native, *compat;
 } hypercall_table_t;
 
-extern const uint8_t hypercall_args_table[NR_hypercalls],
-  compat_hypercall_args_table[NR_hypercalls];
+typedef struct {
+    uint8_t native, compat;
+} hypercall_args_t;
+
+extern const hypercall_args_t hypercall_args_table[NR_hypercalls];
 
 /*
  * Both do_mmuext_op() and do_mmu_update():
