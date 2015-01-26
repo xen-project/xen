@@ -6,7 +6,6 @@
 #define __XEN_MULTICALL_H__
 
 #include <xen/percpu.h>
-#include <asm/multicall.h>
 #ifdef CONFIG_COMPAT
 #include <compat/xen.h>
 #endif
@@ -24,5 +23,7 @@ struct mc_state {
 #endif
     };
 };
+
+void arch_do_multicall_call(struct mc_state *mc);
 
 #endif /* __XEN_MULTICALL_H__ */

@@ -340,6 +340,34 @@ void pv_hypercall(struct cpu_user_regs *regs)
     perfc_incr(hypercalls);
 }
 
+void arch_do_multicall_call(struct mc_state *state)
+{
+    if ( !is_pv_32bit_vcpu(current) )
+    {
+        struct multicall_entry *call = &state->call;
+
+        if ( (call->op < NR_hypercalls) && hypercall_table[call->op] )
+            call->result = hypercall_table[call->op](
+                call->args[0], call->args[1], call->args[2],
+                call->args[3], call->args[4], call->args[5]);
+        else
+            call->result = -ENOSYS;
+    }
+#ifdef CONFIG_COMPAT
+    else
+    {
+        struct compat_multicall_entry *call = &state->compat_call;
+
+        if ( (call->op < NR_hypercalls) && compat_hypercall_table[call->op] )
+            call->result = compat_hypercall_table[call->op](
+                call->args[0], call->args[1], call->args[2],
+                call->args[3], call->args[4], call->args[5]);
+        else
+            call->result = -ENOSYS;
+    }
+#endif
+}
+
 /*
  * Local variables:
  * mode: C

@@ -63,7 +63,7 @@ do_multicall(
 
         trace_multicall_call(&mcs->call);
 
-        do_multicall_call(&mcs->call);
+        arch_do_multicall_call(mcs);
 
 #ifndef NDEBUG
         {
