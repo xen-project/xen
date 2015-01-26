@@ -1683,8 +1683,9 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-static bool_t hvm_efer_valid(const struct vcpu *v, uint64_t value,
-                             signed int cr0_pg)
+/* Return a string indicating the error, or NULL for valid. */
+static const char * hvm_efer_valid(const struct vcpu *v, uint64_t value,
+                                   signed int cr0_pg)
 {
     unsigned int ext1_ecx = 0, ext1_edx = 0;
 
@@ -1716,31 +1717,31 @@ static bool_t hvm_efer_valid(const struct vcpu *v, uint64_t value,
     if ( (value & EFER_SCE) &&
          !(ext1_edx & cpufeat_mask(X86_FEATURE_SYSCALL)) &&
          (cr0_pg >= 0 || !(value & EFER_LME)) )
-        return 0;
+        return "SCE without feature";
 
     if ( (value & (EFER_LME | EFER_LMA)) &&
          !(ext1_edx & cpufeat_mask(X86_FEATURE_LM)) )
-        return 0;
+        return "LME/LMA without feature";
 
     if ( (value & EFER_LMA) && (!(value & EFER_LME) || !cr0_pg) )
-        return 0;
+        return "LMA/LME/CR0.PG inconsistency";
 
     if ( (value & EFER_NX) && !(ext1_edx & cpufeat_mask(X86_FEATURE_NX)) )
-        return 0;
+        return "NX without feature";
 
     if ( (value & EFER_SVME) &&
          (!(ext1_ecx & cpufeat_mask(X86_FEATURE_SVM)) ||
           !nestedhvm_enabled(v->domain)) )
-        return 0;
+        return "SVME without nested virt";
 
     if ( (value & EFER_LMSLE) && !cpu_has_lmsl )
-        return 0;
+        return "LMSLE without support";
 
     if ( (value & EFER_FFXSE) &&
          !(ext1_edx & cpufeat_mask(X86_FEATURE_FFXSR)) )
-        return 0;
+        return "FFXSE without feature";
 
-    return 1;
+    return NULL;
 }
 
 /* These reserved bits in lower 32 remain 0 after any load of CR0 */
@@ -1818,6 +1819,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     struct vcpu *v;
     struct hvm_hw_cpu ctxt;
     struct segment_register seg;
+    const char *errstr;
 
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
@@ -1848,10 +1850,11 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    if ( !hvm_efer_valid(v, ctxt.msr_efer, MASK_EXTR(ctxt.cr0, X86_CR0_PG)) )
+    errstr = hvm_efer_valid(v, ctxt.msr_efer, MASK_EXTR(ctxt.cr0, X86_CR0_PG));
+    if ( errstr )
     {
-        printk(XENLOG_G_ERR "HVM%d restore: bad EFER %#" PRIx64 "\n",
-               d->domain_id, ctxt.msr_efer);
+        printk(XENLOG_G_ERR "%pv: HVM restore: bad EFER %#" PRIx64 " - %s\n",
+               v, ctxt.msr_efer, errstr);
         return -EINVAL;
     }
 
@@ -2988,13 +2991,16 @@ err:
 int hvm_set_efer(uint64_t value)
 {
     struct vcpu *v = current;
+    const char *errstr;
 
     value &= ~EFER_LMA;
 
-    if ( !hvm_efer_valid(v, value, -1) )
+    errstr = hvm_efer_valid(v, value, -1);
+    if ( errstr )
     {
-        gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
-                 "EFER: %#"PRIx64"\n", value);
+        printk(XENLOG_G_WARNING
+               "%pv: Invalid EFER update: %#"PRIx64" -> %#"PRIx64" - %s\n",
+               v, v->arch.hvm_vcpu.guest_efer, value, errstr);
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
         return X86EMUL_EXCEPTION;
     }
