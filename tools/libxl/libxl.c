@@ -4764,13 +4764,17 @@ retry_transaction:
         goto out;
     }
 
+    videoram_s = libxl__xs_read(gc, t, libxl__sprintf(gc,
+                "%s/memory/videoram", dompath));
+    videoram = videoram_s ? atoi(videoram_s) : 0;
+
     if (relative) {
         if (target_memkb < 0 && abs(target_memkb) > current_target_memkb)
             new_target_memkb = 0;
         else
             new_target_memkb = current_target_memkb + target_memkb;
     } else
-        new_target_memkb = target_memkb;
+        new_target_memkb = target_memkb - videoram;
     if (new_target_memkb > memorykb) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                 "memory_dynamic_max must be less than or equal to"
@@ -4786,12 +4790,9 @@ retry_transaction:
         abort_transaction = 1;
         goto out;
     }
-    videoram_s = libxl__xs_read(gc, t, libxl__sprintf(gc,
-                "%s/memory/videoram", dompath));
-    videoram = videoram_s ? atoi(videoram_s) : 0;
 
     if (enforce) {
-        memorykb = new_target_memkb;
+        memorykb = new_target_memkb + videoram;
         rc = xc_domain_setmaxmem(ctx->xch, domid, memorykb +
                 LIBXL_MAXMEM_CONSTANT);
         if (rc != 0) {
@@ -4803,7 +4804,6 @@ retry_transaction:
         }
     }
 
-    new_target_memkb -= videoram;
     rc = xc_domain_set_pod_target(ctx->xch, domid,
             new_target_memkb / 4, NULL, NULL, NULL);
     if (rc != 0) {
