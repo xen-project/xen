@@ -5,9 +5,21 @@
 #ifndef __ASM_X86_HYPERCALL_H__
 #define __ASM_X86_HYPERCALL_H__
 
-#include <public/physdev.h>
-#include <public/arch-x86/xen-mca.h> /* for do_mca */
 #include <xen/types.h>
+#include <public/physdev.h>
+#include <public/event_channel.h>
+#include <public/arch-x86/xen-mca.h> /* for do_mca */
+
+typedef unsigned long hypercall_fn_t(
+    unsigned long, unsigned long, unsigned long,
+    unsigned long, unsigned long, unsigned long);
+
+typedef struct {
+    hypercall_fn_t *native, *compat;
+} hypercall_table_t;
+
+extern const uint8_t hypercall_args_table[NR_hypercalls],
+  compat_hypercall_args_table[NR_hypercalls];
 
 /*
  * Both do_mmuext_op() and do_mmu_update():

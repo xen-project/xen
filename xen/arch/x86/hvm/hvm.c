@@ -4117,17 +4117,13 @@ static long hvm_physdev_op_compat32(
     }
 }
 
-typedef unsigned long hvm_hypercall_t(
-    unsigned long, unsigned long, unsigned long, unsigned long, unsigned long,
-    unsigned long);
-
 #define HYPERCALL(x)                                         \
-    [ __HYPERVISOR_ ## x ] = { (hvm_hypercall_t *) do_ ## x, \
-                               (hvm_hypercall_t *) do_ ## x }
+    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,  \
+                               (hypercall_fn_t *) do_ ## x }
 
 #define COMPAT_CALL(x)                                       \
-    [ __HYPERVISOR_ ## x ] = { (hvm_hypercall_t *) do_ ## x, \
-                               (hvm_hypercall_t *) compat_ ## x }
+    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,  \
+                               (hypercall_fn_t *) compat_ ## x }
 
 #define do_memory_op          hvm_memory_op
 #define compat_memory_op      hvm_memory_op_compat32
@@ -4137,10 +4133,7 @@ typedef unsigned long hvm_hypercall_t(
 #define compat_grant_table_op hvm_grant_table_op_compat32
 #define do_arch_1             paging_domctl_continuation
 
-static const struct {
-    hvm_hypercall_t *native;
-    hvm_hypercall_t *compat;
-} hvm_hypercall_table[NR_hypercalls] = {
+static const hypercall_table_t hvm_hypercall_table[NR_hypercalls] = {
     COMPAT_CALL(memory_op),
     COMPAT_CALL(grant_table_op),
     COMPAT_CALL(vcpu_op),
@@ -4171,8 +4164,6 @@ static const struct {
 
 #undef HYPERCALL
 #undef COMPAT_CALL
-
-extern const uint8_t hypercall_args_table[], compat_hypercall_args_table[];
 
 int hvm_do_hypercall(struct cpu_user_regs *regs)
 {
