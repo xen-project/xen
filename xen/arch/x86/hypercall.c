@@ -114,64 +114,15 @@ const uint8_t compat_hypercall_args_table[NR_hypercalls] =
 #undef ARGS
 
 #define HYPERCALL(x)                                                \
-    [ __HYPERVISOR_ ## x ] = (hypercall_fn_t *) do_ ## x
+    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,         \
+                               (hypercall_fn_t *) do_ ## x }
+#define COMPAT_CALL(x)                                              \
+    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,         \
+                               (hypercall_fn_t *) compat_ ## x }
 
 #define do_arch_1             paging_domctl_continuation
 
-hypercall_fn_t *const hypercall_table[NR_hypercalls] = {
-    HYPERCALL(set_trap_table),
-    HYPERCALL(mmu_update),
-    HYPERCALL(set_gdt),
-    HYPERCALL(stack_switch),
-    HYPERCALL(set_callbacks),
-    HYPERCALL(fpu_taskswitch),
-    HYPERCALL(sched_op_compat),
-    HYPERCALL(platform_op),
-    HYPERCALL(set_debugreg),
-    HYPERCALL(get_debugreg),
-    HYPERCALL(update_descriptor),
-    HYPERCALL(memory_op),
-    HYPERCALL(multicall),
-    HYPERCALL(update_va_mapping),
-    HYPERCALL(set_timer_op),
-    HYPERCALL(event_channel_op_compat),
-    HYPERCALL(xen_version),
-    HYPERCALL(console_io),
-    HYPERCALL(physdev_op_compat),
-    HYPERCALL(grant_table_op),
-    HYPERCALL(vm_assist),
-    HYPERCALL(update_va_mapping_otherdomain),
-    HYPERCALL(iret),
-    HYPERCALL(vcpu_op),
-    HYPERCALL(set_segment_base),
-    HYPERCALL(mmuext_op),
-    HYPERCALL(xsm_op),
-    HYPERCALL(nmi_op),
-    HYPERCALL(sched_op),
-    HYPERCALL(callback_op),
-#ifdef CONFIG_XENOPROF
-    HYPERCALL(xenoprof_op),
-#endif
-    HYPERCALL(event_channel_op),
-    HYPERCALL(physdev_op),
-    HYPERCALL(hvm_op),
-    HYPERCALL(sysctl),
-    HYPERCALL(domctl),
-#ifdef CONFIG_KEXEC
-    HYPERCALL(kexec_op),
-#endif
-#ifdef CONFIG_TMEM
-    HYPERCALL(tmem_op),
-#endif
-    HYPERCALL(xenpmu_op),
-    HYPERCALL(mca),
-    HYPERCALL(arch_1),
-};
-
-#define COMPAT_CALL(x)                                              \
-    [ __HYPERVISOR_ ## x ] = (hypercall_fn_t *) compat_ ## x
-
-hypercall_fn_t *const compat_hypercall_table[NR_hypercalls] = {
+static const hypercall_table_t pv_hypercall_table[NR_hypercalls] = {
     COMPAT_CALL(set_trap_table),
     HYPERCALL(mmu_update),
     COMPAT_CALL(set_gdt),
@@ -237,7 +188,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
 
     eax = is_pv_32bit_vcpu(curr) ? regs->_eax : regs->eax;
 
-    if ( (eax >= NR_hypercalls) || !hypercall_table[eax] )
+    if ( (eax >= NR_hypercalls) || !pv_hypercall_table[eax].native )
     {
         regs->eax = -ENOSYS;
         return;
@@ -271,7 +222,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
             __trace_hypercall(TRC_PV_HYPERCALL_V2, eax, args);
         }
 
-        regs->eax = hypercall_table[eax](rdi, rsi, rdx, r10, r8, r9);
+        regs->eax = pv_hypercall_table[eax].native(rdi, rsi, rdx, r10, r8, r9);
 
 #ifndef NDEBUG
         if ( regs->rip == old_rip )
@@ -318,7 +269,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
             __trace_hypercall(TRC_PV_HYPERCALL_V2, eax, args);
         }
 
-        regs->_eax = compat_hypercall_table[eax](ebx, ecx, edx, esi, edi, ebp);
+        regs->_eax = pv_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi, ebp);
 
 #ifndef NDEBUG
         if ( regs->rip == old_rip )
@@ -346,8 +297,8 @@ void arch_do_multicall_call(struct mc_state *state)
     {
         struct multicall_entry *call = &state->call;
 
-        if ( (call->op < NR_hypercalls) && hypercall_table[call->op] )
-            call->result = hypercall_table[call->op](
+        if ( (call->op < NR_hypercalls) && pv_hypercall_table[call->op].native )
+            call->result = pv_hypercall_table[call->op].native(
                 call->args[0], call->args[1], call->args[2],
                 call->args[3], call->args[4], call->args[5]);
         else
@@ -358,8 +309,8 @@ void arch_do_multicall_call(struct mc_state *state)
     {
         struct compat_multicall_entry *call = &state->compat_call;
 
-        if ( (call->op < NR_hypercalls) && compat_hypercall_table[call->op] )
-            call->result = compat_hypercall_table[call->op](
+        if ( (call->op < NR_hypercalls) && pv_hypercall_table[call->op].compat )
+            call->result = pv_hypercall_table[call->op].compat(
                 call->args[0], call->args[1], call->args[2],
                 call->args[3], call->args[4], call->args[5]);
         else
