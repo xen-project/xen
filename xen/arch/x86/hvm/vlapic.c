@@ -38,7 +38,6 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/nestedhvm.h>
-#include <asm/hvm/vpmu.h>
 #include <public/hvm/ioreq.h>
 #include <public/hvm/params.h>
 
@@ -778,8 +777,6 @@ static int vlapic_reg_write(struct vcpu *v,
         }
         if ( (offset == APIC_LVTT) && !(val & APIC_LVT_MASKED) )
             pt_may_unmask_irq(NULL, &vlapic->pt);
-        if ( offset == APIC_LVTPC )
-            vpmu_lvtpc_update(val);
         break;
 
     case APIC_TMICT:

@@ -519,6 +519,19 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
     else
         vpmu_reset(vpmu, VPMU_RUNNING);
 
+    /* Setup LVTPC in local apic */
+    if ( vpmu_is_set(vpmu, VPMU_RUNNING) &&
+         is_vlapic_lvtpc_enabled(vcpu_vlapic(v)) )
+    {
+        apic_write_around(APIC_LVTPC, PMU_APIC_VECTOR);
+        vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR;
+    }
+    else
+    {
+        apic_write_around(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
+        vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR | APIC_LVT_MASKED;
+    }
+
     if ( type != MSR_TYPE_GLOBAL )
     {
         u64 mask;
@@ -683,6 +696,10 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
         if ( !(msr_content & IA32_DEBUGCTLMSR_TR) )
             return 0;
     }
+
+    /* HW sets the MASK bit when performance counter interrupt occurs*/
+    vpmu->hw_lapic_lvtpc = apic_read(APIC_LVTPC) & ~APIC_LVT_MASKED;
+    apic_write_around(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
 
     return 1;
 }

@@ -104,7 +104,6 @@ static inline bool_t vpmu_are_all_set(const struct vpmu_struct *vpmu,
     return !!((vpmu->flags & mask) == mask);
 }
 
-void vpmu_lvtpc_update(uint32_t val);
 int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content, uint64_t supported);
 int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content);
 void vpmu_do_interrupt(struct cpu_user_regs *regs);
