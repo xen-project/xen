@@ -28,6 +28,7 @@ obj-y += e820.o
 obj-y += extable.o
 obj-y += flushtlb.o
 obj-$(CONFIG_CRASH_DEBUG) += gdbstub.o
+obj-y += hypercall.o
 obj-y += i387.o
 obj-y += i8259.o
 obj-y += io_apic.o

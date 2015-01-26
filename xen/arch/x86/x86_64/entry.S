@@ -803,57 +803,6 @@ ENTRY(hypercall_table)
         .quad do_ni_hypercall
         .endr
 
-ENTRY(hypercall_args_table)
-        .byte 1 /* do_set_trap_table    */  /*  0 */
-        .byte 4 /* do_mmu_update        */
-        .byte 2 /* do_set_gdt           */
-        .byte 2 /* do_stack_switch      */
-        .byte 3 /* do_set_callbacks     */
-        .byte 1 /* do_fpu_taskswitch    */  /*  5 */
-        .byte 2 /* do_sched_op_compat   */
-        .byte 1 /* do_platform_op       */
-        .byte 2 /* do_set_debugreg      */
-        .byte 1 /* do_get_debugreg      */
-        .byte 2 /* do_update_descriptor */  /* 10 */
-        .byte 0 /* do_ni_hypercall      */
-        .byte 2 /* do_memory_op         */
-        .byte 2 /* do_multicall         */
-        .byte 3 /* do_update_va_mapping */
-        .byte 1 /* do_set_timer_op      */  /* 15 */
-        .byte 1 /* do_event_channel_op_compat */
-        .byte 2 /* do_xen_version       */
-        .byte 3 /* do_console_io        */
-        .byte 1 /* do_physdev_op_compat */
-        .byte 3 /* do_grant_table_op    */  /* 20 */
-        .byte 2 /* do_vm_assist         */
-        .byte 4 /* do_update_va_mapping_otherdomain */
-        .byte 0 /* do_iret              */
-        .byte 3 /* do_vcpu_op           */
-        .byte 2 /* do_set_segment_base  */  /* 25 */
-        .byte 4 /* do_mmuext_op         */
-        .byte 1 /* do_xsm_op            */
-        .byte 2 /* do_nmi_op            */
-        .byte 2 /* do_sched_op          */
-        .byte 2 /* do_callback_op       */  /* 30 */
-        .byte 2 /* do_xenoprof_op       */
-        .byte 2 /* do_event_channel_op  */
-        .byte 2 /* do_physdev_op        */
-        .byte 2 /* do_hvm_op            */
-        .byte 1 /* do_sysctl            */  /* 35 */
-        .byte 1 /* do_domctl            */
-        .byte 2 /* do_kexec             */
-        .byte 1 /* do_tmem_op           */
-        .byte 0 /* reserved for XenClient */
-        .byte 2 /* do_xenpmu_op         */  /* 40 */
-        .rept __HYPERVISOR_arch_0-(.-hypercall_args_table)
-        .byte 0 /* do_ni_hypercall      */
-        .endr
-        .byte 1 /* do_mca               */  /* 48 */
-        .byte 1 /* paging_domctl_continuation */
-        .rept NR_hypercalls-(.-hypercall_args_table)
-        .byte 0 /* do_ni_hypercall      */
-        .endr
-
 /* Table of automatically generated entry points.  One per vector. */
         .section .init.rodata, "a", @progbits
 GLOBAL(autogen_entrypoints)
