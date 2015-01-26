@@ -82,7 +82,7 @@ const hypercall_args_t hypercall_args_table[NR_hypercalls] =
 
 #define do_arch_1             paging_domctl_continuation
 
-static const hypercall_table_t pv_hypercall_table[NR_hypercalls] = {
+static const hypercall_table_t pv_hypercall_table[] = {
     COMPAT_CALL(set_trap_table),
     HYPERCALL(mmu_update),
     COMPAT_CALL(set_gdt),
@@ -148,7 +148,11 @@ void pv_hypercall(struct cpu_user_regs *regs)
 
     eax = is_pv_32bit_vcpu(curr) ? regs->_eax : regs->eax;
 
-    if ( (eax >= NR_hypercalls) || !pv_hypercall_table[eax].native )
+    BUILD_BUG_ON(ARRAY_SIZE(pv_hypercall_table) >
+                 ARRAY_SIZE(hypercall_args_table));
+
+    if ( (eax >= ARRAY_SIZE(pv_hypercall_table)) ||
+         !pv_hypercall_table[eax].native )
     {
         regs->eax = -ENOSYS;
         return;
@@ -257,7 +261,8 @@ void arch_do_multicall_call(struct mc_state *state)
     {
         struct multicall_entry *call = &state->call;
 
-        if ( (call->op < NR_hypercalls) && pv_hypercall_table[call->op].native )
+        if ( (call->op < ARRAY_SIZE(pv_hypercall_table)) &&
+             pv_hypercall_table[call->op].native )
             call->result = pv_hypercall_table[call->op].native(
                 call->args[0], call->args[1], call->args[2],
                 call->args[3], call->args[4], call->args[5]);
@@ -269,7 +274,8 @@ void arch_do_multicall_call(struct mc_state *state)
     {
         struct compat_multicall_entry *call = &state->compat_call;
 
-        if ( (call->op < NR_hypercalls) && pv_hypercall_table[call->op].compat )
+        if ( (call->op < ARRAY_SIZE(pv_hypercall_table)) &&
+             pv_hypercall_table[call->op].compat )
             call->result = pv_hypercall_table[call->op].compat(
                 call->args[0], call->args[1], call->args[2],
                 call->args[3], call->args[4], call->args[5]);

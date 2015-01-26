@@ -4133,7 +4133,7 @@ static long hvm_physdev_op_compat32(
 #define compat_grant_table_op hvm_grant_table_op_compat32
 #define do_arch_1             paging_domctl_continuation
 
-static const hypercall_table_t hvm_hypercall_table[NR_hypercalls] = {
+static const hypercall_table_t hvm_hypercall_table[] = {
     COMPAT_CALL(memory_op),
     COMPAT_CALL(grant_table_op),
     COMPAT_CALL(vcpu_op),
@@ -4194,7 +4194,11 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     if ( (eax & 0x80000000) && is_viridian_domain(currd) )
         return viridian_hypercall(regs);
 
-    if ( (eax >= NR_hypercalls) || !hvm_hypercall_table[eax].native )
+    BUILD_BUG_ON(ARRAY_SIZE(hvm_hypercall_table) >
+                 ARRAY_SIZE(hypercall_args_table));
+
+    if ( (eax >= ARRAY_SIZE(hvm_hypercall_table)) ||
+         !hvm_hypercall_table[eax].native )
     {
         regs->eax = -ENOSYS;
         return HVM_HCALL_completed;
