@@ -457,6 +457,9 @@ CAMLprim value stub_xc_vcpu_getaffinity(value xch, value domid,
 	int i, len = xc_get_max_cpus(_H(xch));
 	int retval;
 
+	if (len < 1)
+		failwith_xc(_H(xch));
+
 	c_cpumap = xc_cpumap_alloc(_H(xch));
 	if (c_cpumap == NULL)
 		failwith_xc(_H(xch));
@@ -821,6 +824,12 @@ CAMLprim value stub_xc_version_version(value xch)
 
 	caml_enter_blocking_section();
 	packed = xc_version(_H(xch), XENVER_version, NULL);
+	caml_leave_blocking_section();
+
+	if (packed < 0)
+		failwith_xc(_H(xch));
+
+	caml_enter_blocking_section();
 	retval = xc_version(_H(xch), XENVER_extraversion, &extra);
 	caml_leave_blocking_section();
 
