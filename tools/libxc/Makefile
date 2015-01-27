@@ -4,6 +4,11 @@ include $(XEN_ROOT)/tools/Rules.mk
 MAJOR    = 4.5
 MINOR    = 0
 
+ifeq ($(CONFIG_LIBXC_MINIOS),y)
+# Save/restore of a domain is currently incompatible with a stubdom environment
+override CONFIG_MIGRATE := n
+endif
+
 CTRL_SRCS-y       :=
 CTRL_SRCS-y       += xc_core.c
 CTRL_SRCS-$(CONFIG_X86) += xc_core_x86.c
