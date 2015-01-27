@@ -250,8 +250,8 @@ libxl-save-helper: $(SAVE_HELPER_OBJS) libxenlight.so
 testidl: testidl.o libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ testidl.o libxlutil.so $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
-$(PKG_CONFIG): %.in : Makefile
-	@sed -e 's/@@version@@/$(MAJOR).$(MINOR)/g' < $@.in > $@.new
+$(PKG_CONFIG): % : %.in Makefile
+	@sed -e 's/@@version@@/$(MAJOR).$(MINOR)/g' < $< > $@.new
 	@mv -f $@.new $@
 
 .PHONY: install
