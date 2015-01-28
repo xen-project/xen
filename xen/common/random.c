@@ -1,9 +1,11 @@
+#include <xen/init.h>
 #include <xen/percpu.h>
 #include <xen/random.h>
 #include <xen/time.h>
 #include <asm/random.h>
 
 static DEFINE_PER_CPU(unsigned int, seed);
+unsigned int __read_mostly boot_random;
 
 unsigned int get_random(void)
 {
@@ -27,3 +29,10 @@ unsigned int get_random(void)
 
     return val;
 }
+
+static int __init init_boot_random(void)
+{
+    boot_random = get_random();
+    return 0;
+}
+__initcall(init_boot_random);

@@ -540,6 +540,16 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_core_parking_t);
 #define XEN_RESOURCE_OP_MSR_READ  0
 #define XEN_RESOURCE_OP_MSR_WRITE 1
 
+/*
+ * Specially handled MSRs:
+ * - MSR_IA32_TSC
+ * READ: Returns the scaled system time(ns) instead of raw timestamp. In
+ *       multiple entry case, if other MSR read is followed by a MSR_IA32_TSC
+ *       read, then both reads are guaranteed to be performed atomically (with
+ *       IRQ disabled). The return time indicates the point of reading that MSR.
+ * WRITE: Not supported.
+ */
+
 struct xenpf_resource_entry {
     union {
         uint32_t cmd;   /* IN: XEN_RESOURCE_OP_* */
