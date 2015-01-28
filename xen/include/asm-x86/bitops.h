@@ -5,7 +5,9 @@
  * Copyright 1992, Linus Torvalds.
  */
 
-#include <xen/config.h>
+#include <asm/alternative.h>
+#define X86_FEATURES_ONLY
+#include <asm/cpufeature.h>
 
 /*
  * We specify the memory operand as both input and output because the memory
@@ -313,9 +315,17 @@ extern unsigned int __find_first_zero_bit(
 extern unsigned int __find_next_zero_bit(
     const unsigned long *addr, unsigned int size, unsigned int offset);
 
-static inline unsigned int __scanbit(unsigned long val, unsigned long max)
+static inline unsigned int __scanbit(unsigned long val, unsigned int max)
 {
-    asm ( "bsf %1,%0 ; cmovz %2,%0" : "=&r" (val) : "r" (val), "r" (max) );
+    if ( __builtin_constant_p(max) && max == BITS_PER_LONG )
+        alternative_io("bsf %[in],%[out]; cmovz %[max],%k[out]",
+                       "rep; bsf %[in],%[out]",
+                       X86_FEATURE_BMI1,
+                       [out] "=&r" (val),
+                       [in] "r" (val), [max] "r" (max));
+    else
+        asm ( "bsf %1,%0 ; cmovz %2,%k0"
+              : "=&r" (val) : "r" (val), "r" (max) );
     return (unsigned int)val;
 }
 

@@ -12,6 +12,7 @@
         .byte \alt_len
 .endm
 #else
+#include <xen/stringify.h>
 #include <xen/types.h>
 
 struct alt_instr {
@@ -72,6 +73,26 @@ extern void alternative_instructions(void);
  */
 #define alternative(oldinstr, newinstr, feature)                        \
         asm volatile (ALTERNATIVE(oldinstr, newinstr, feature) : : : "memory")
+
+/*
+ * Alternative inline assembly with input.
+ *
+ * Pecularities:
+ * No memory clobber here.
+ * Argument numbers start with 1.
+ * Best is to use constraints that are fixed size (like (%1) ... "r")
+ * If you use variable sized constraints like "m" or "g" in the
+ * replacement make sure to pad to the worst case length.
+ * Leaving an unused argument 0 to keep API compatibility.
+ */
+#define alternative_input(oldinstr, newinstr, feature, input...)	\
+	asm volatile (ALTERNATIVE(oldinstr, newinstr, feature)		\
+		: : "i" (0), ## input)
+
+/* Like alternative_input, but with a single output argument */
+#define alternative_io(oldinstr, newinstr, feature, output, input...)	\
+	asm volatile (ALTERNATIVE(oldinstr, newinstr, feature)		\
+		: output : "i" (0), ## input)
 
 #endif  /*  __ASSEMBLY__  */
 
