@@ -214,10 +214,10 @@ xc_core_arch_get_scratch_gpfn(xc_interface *xch, domid_t domid,
 
     rc = xc_domain_maximum_gpfn(xch, domid);
 
-    if ( rc <= 0 )
+    if ( rc < 0 )
         return rc;
 
-    *gpfn = rc + 1;
+    *gpfn = (xen_pfn_t)rc + 1;
 
     return 0;
 }
