@@ -1378,9 +1378,11 @@ Permit use of x2apic setup for SMP environments.
 ### x2apic\_phys
 > `= <boolean>`
 
-> Default: `true`
+> Default: `true` if **FADT** mandates physical mode, `false` otherwise.
 
-Use the x2apic physical apic driver.  The alternative is the x2apic cluster driver.
+In the case that x2apic is in use, this option switches between physical and
+clustered mode.  The default, given no hint from the **FADT**, is cluster
+mode.
 
 ### xsave
 > `= <boolean>`
