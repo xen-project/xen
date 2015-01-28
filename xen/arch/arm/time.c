@@ -61,56 +61,63 @@ unsigned int timer_get_irq(enum timer_ppi ppi)
     return muldiv64(ns, 1000 * cpu_khz, SECONDS(1));
 }
 
-/* Set up the timer on the boot CPU */
-int __init init_xen_time(void)
+static __initdata struct dt_device_node *timer;
+
+/* Set up the timer on the boot CPU (early init function) */
+void __init preinit_xen_time(void)
 {
     static const struct dt_device_match timer_ids[] __initconst =
     {
         DT_MATCH_TIMER,
         { /* sentinel */ },
     };
-    struct dt_device_node *dev;
     int res;
-    unsigned int i;
     u32 rate;
 
-    dev = dt_find_matching_node(NULL, timer_ids);
-    if ( !dev )
+    timer = dt_find_matching_node(NULL, timer_ids);
+    if ( !timer )
         panic("Unable to find a compatible timer in the device tree");
 
-    dt_device_set_used_by(dev, DOMID_XEN);
-
-    /* Retrieve all IRQs for the timer */
-    for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
-    {
-        res = platform_get_irq(dev, i);
-
-        if ( res < 0 )
-            panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
-        timer_irq[i] = res;
-    }
-
-    printk("Generic Timer IRQ: phys=%u hyp=%u virt=%u\n",
-           timer_irq[TIMER_PHYS_NONSECURE_PPI],
-           timer_irq[TIMER_HYP_PPI],
-           timer_irq[TIMER_VIRT_PPI]);
+    dt_device_set_used_by(timer, DOMID_XEN);
 
     res = platform_init_time();
     if ( res )
         panic("Timer: Cannot initialize platform timer");
 
-    /* Check that this CPU supports the Generic Timer interface */
-    if ( !cpu_has_gentimer )
-        panic("CPU does not support the Generic Timer v1 interface");
-
-    res = dt_property_read_u32(dev, "clock-frequency", &rate);
+    res = dt_property_read_u32(timer, "clock-frequency", &rate);
     if ( res )
         cpu_khz = rate / 1000;
     else
         cpu_khz = READ_SYSREG32(CNTFRQ_EL0) / 1000;
 
     boot_count = READ_SYSREG64(CNTPCT_EL0);
-    printk("Using generic timer at %lu KHz\n", cpu_khz);
+}
+
+/* Set up the timer on the boot CPU (late init function) */
+int __init init_xen_time(void)
+{
+    int res;
+    unsigned int i;
+
+    /* Retrieve all IRQs for the timer */
+    for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
+    {
+        res = platform_get_irq(timer, i);
+
+        if ( res < 0 )
+            panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
+        timer_irq[i] = res;
+    }
+
+    /* Check that this CPU supports the Generic Timer interface */
+    if ( !cpu_has_gentimer )
+        panic("CPU does not support the Generic Timer v1 interface");
+
+    printk("Generic Timer IRQ: phys=%u hyp=%u virt=%u Freq: %lu KHz\n",
+           timer_irq[TIMER_PHYS_NONSECURE_PPI],
+           timer_irq[TIMER_HYP_PPI],
+           timer_irq[TIMER_VIRT_PPI],
+           cpu_khz);
 
     return 0;
 }

@@ -743,6 +743,10 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     init_IRQ();
 
+    platform_init();
+
+    preinit_xen_time();
+
     dt_uart_init();
     console_init_preirq();
     console_init_ring();
@@ -750,8 +754,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     system_state = SYS_STATE_boot;
 
     processor_id();
-
-    platform_init();
 
     smp_init_cpus();
     cpus = smp_get_max_cpus();
