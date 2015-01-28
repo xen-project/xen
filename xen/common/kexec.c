@@ -662,8 +662,8 @@ static int kexec_get_range(XEN_GUEST_HANDLE_PARAM(void) uarg)
 
     ret = kexec_get_range_internal(&range);
 
-    if ( ret == 0 && unlikely(copy_to_guest(uarg, &range, 1)) )
-        return -EFAULT;
+    if ( ret == 0 && unlikely(__copy_to_guest(uarg, &range, 1)) )
+        ret = -EFAULT;
 
     return ret;
 }
@@ -686,10 +686,11 @@ static int kexec_get_range_compat(XEN_GUEST_HANDLE_PARAM(void) uarg)
     if ( (range.start | range.size) & ~(unsigned long)(~0u) )
         return -ERANGE;
 
-    if ( ret == 0 ) {
+    if ( ret == 0 )
+    {
         XLAT_kexec_range(&compat_range, &range);
-        if ( unlikely(copy_to_guest(uarg, &compat_range, 1)) )
-             return -EFAULT;
+        if ( unlikely(__copy_to_guest(uarg, &compat_range, 1)) )
+             ret = -EFAULT;
     }
 
     return ret;
