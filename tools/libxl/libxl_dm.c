@@ -981,9 +981,9 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
                               libxl__multidev *aodevs,
                               int rc);
 
-static void spaw_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
-                                           libxl__destroy_domid_state *dis,
-                                           int rc);
+static void spawn_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
+                                            libxl__destroy_domid_state *dis,
+                                            int rc);
 
 char *libxl__stub_dm_name(libxl__gc *gc, const char *guest_name)
 {
@@ -1278,7 +1278,7 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
         if (dm_domid) {
             sdss->dis.ao = ao;
             sdss->dis.domid = dm_domid;
-            sdss->dis.callback = spaw_stubdom_pvqemu_destroy_cb;
+            sdss->dis.callback = spawn_stubdom_pvqemu_destroy_cb;
             libxl__destroy_domid(egc, &sdss->dis);
             return;
         }
@@ -1286,9 +1286,9 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
     sdss->callback(egc, &sdss->dm, rc);
 }
 
-static void spaw_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
-                                           libxl__destroy_domid_state *dis,
-                                           int rc)
+static void spawn_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
+                                            libxl__destroy_domid_state *dis,
+                                            int rc)
 {
     libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(dis, *sdss, dis);
     STATE_AO_GC(sdss->dis.ao);
