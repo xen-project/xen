@@ -427,12 +427,15 @@ int vcpu_initialise(struct vcpu *v)
     if ( rc )
         return rc;
 
-    paging_vcpu_init(v);
+    if ( !is_idle_domain(d) )
+    {
+        paging_vcpu_init(v);
 
-    if ( (rc = vcpu_init_fpu(v)) != 0 )
-        return rc;
+        if ( (rc = vcpu_init_fpu(v)) != 0 )
+            return rc;
 
-    vmce_init_vcpu(v);
+        vmce_init_vcpu(v);
+    }
 
     if ( has_hvm_container_domain(d) )
     {
@@ -559,12 +562,12 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     HYPERVISOR_COMPAT_VIRT_START(d) =
         is_pv_domain(d) ? __HYPERVISOR_COMPAT_VIRT_START : ~0u;
 
-    if ( (rc = paging_domain_init(d, domcr_flags)) != 0 )
-        goto fail;
-    paging_initialised = 1;
-
     if ( !is_idle_domain(d) )
     {
+        if ( (rc = paging_domain_init(d, domcr_flags)) != 0 )
+            goto fail;
+        paging_initialised = 1;
+
         d->arch.cpuids = xmalloc_array(cpuid_input_t, MAX_CPUID_INPUT);
         rc = -ENOMEM;
         if ( d->arch.cpuids == NULL )

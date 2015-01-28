@@ -303,12 +303,8 @@ void save_fpu_enable(void)
 /* Initialize FPU's context save area */
 int vcpu_init_fpu(struct vcpu *v)
 {
-    int rc = 0;
+    int rc;
     
-    /* Idle domain doesn't have FPU state allocated */
-    if ( is_idle_vcpu(v) )
-        goto done;
-
     if ( (rc = xstate_alloc_save_area(v)) != 0 )
         return rc;
 
@@ -318,13 +314,9 @@ int vcpu_init_fpu(struct vcpu *v)
     {
         v->arch.fpu_ctxt = _xzalloc(sizeof(v->arch.xsave_area->fpu_sse), 16);
         if ( !v->arch.fpu_ctxt )
-        {
             rc = -ENOMEM;
-            goto done;
-        }
     }
 
-done:
     return rc;
 }
 
