@@ -1,3 +1,4 @@
+#include <xen/cache.h>
 #include <xen/init.h>
 #include <xen/percpu.h>
 #include <xen/random.h>
