@@ -2077,139 +2077,230 @@ __acquire_grant_for_copy(
     return rc;
 }
 
-static void
-__gnttab_copy(
-    struct gnttab_copy *op)
+struct gnttab_copy_buf {
+    /* Guest provided. */
+    struct gnttab_copy_ptr ptr;
+    uint16_t len;
+
+    /* Mapped etc. */
+    struct domain *domain;
+    unsigned long frame;
+    struct page_info *page;
+    void *virt;
+    bool_t read_only;
+    bool_t have_grant;
+    bool_t have_type;
+};
+
+static int gnttab_copy_lock_domain(domid_t domid, unsigned int gref_flag,
+                                   struct gnttab_copy_buf *buf)
 {
-    struct domain *sd = NULL, *dd = NULL;
-    unsigned long s_frame, d_frame;
-    struct page_info *s_pg = NULL, *d_pg = NULL;
-    char *sp, *dp;
-    s16 rc = GNTST_okay;
-    int have_d_grant = 0, have_s_grant = 0;
-    int src_is_gref, dest_is_gref;
+    int rc;
+
+    if ( domid != DOMID_SELF && !gref_flag )
+        PIN_FAIL(out, GNTST_permission_denied,
+                 "only allow copy-by-mfn for DOMID_SELF.\n");
+
+    if ( domid == DOMID_SELF )
+        buf->domain = rcu_lock_current_domain();
+    else
+    {
+        buf->domain = rcu_lock_domain_by_id(domid);
+        if ( buf->domain == NULL )
+            PIN_FAIL(out, GNTST_bad_domain, "couldn't find %d\n", domid);
+    }
+
+    buf->ptr.domid = domid;
+    rc = GNTST_okay;
+ out:
+    return rc;
+}
+
+static void gnttab_copy_unlock_domains(struct gnttab_copy_buf *src,
+                                       struct gnttab_copy_buf *dest)
+{
+    if ( src->domain )
+    {
+        rcu_unlock_domain(src->domain);
+        src->domain = NULL;
+    }
+    if ( dest->domain )
+    {
+        rcu_unlock_domain(dest->domain);
+        dest->domain = NULL;
+    }
+}
+
+static int gnttab_copy_lock_domains(const struct gnttab_copy *op,
+                                    struct gnttab_copy_buf *src,
+                                    struct gnttab_copy_buf *dest)
+{
+    int rc;
+
+    rc = gnttab_copy_lock_domain(op->source.domid,
+                                 op->flags & GNTCOPY_source_gref, src);
+    if ( rc < 0 )
+        goto error;
+    rc = gnttab_copy_lock_domain(op->dest.domid,
+                                 op->flags & GNTCOPY_dest_gref, dest);
+    if ( rc < 0 )
+        goto error;
+
+    rc = xsm_grant_copy(XSM_HOOK, src->domain, dest->domain);
+    if ( rc < 0 )
+    {
+        rc = GNTST_permission_denied;
+        goto error;
+    }
+    return 0;
+
+ error:
+    gnttab_copy_unlock_domains(src, dest);
+    return rc;
+}
+
+static void gnttab_copy_release_buf(struct gnttab_copy_buf *buf)
+{
+    if ( buf->virt )
+    {
+        unmap_domain_page(buf->virt);
+        buf->virt = NULL;
+    }
+    if ( buf->have_type )
+    {
+        put_page_type(buf->page);
+        buf->have_type = 0;
+    }
+    if ( buf->page )
+    {
+        put_page(buf->page);
+        buf->page = NULL;
+    }
+    if ( buf->have_grant )
+    {
+        __release_grant_for_copy(buf->domain, buf->ptr.u.ref, buf->read_only);
+        buf->have_grant = 0;
+    }
+}
+
+static int gnttab_copy_claim_buf(const struct gnttab_copy *op,
+                                 const struct gnttab_copy_ptr *ptr,
+                                 struct gnttab_copy_buf *buf,
+                                 unsigned int gref_flag)
+{
+    int rc;
+
+    buf->read_only = gref_flag == GNTCOPY_source_gref;
+
+    if ( op->flags & gref_flag )
+    {
+        rc = __acquire_grant_for_copy(buf->domain, ptr->u.ref,
+                                      current->domain->domain_id,
+                                      buf->read_only,
+                                      &buf->frame, &buf->page,
+                                      &buf->ptr.offset, &buf->len, 1);
+        if ( rc != GNTST_okay )
+            goto out;
+        buf->ptr.u.ref = ptr->u.ref;
+        buf->have_grant = 1;
+    }
+    else
+    {
+        rc = __get_paged_frame(ptr->u.gmfn, &buf->frame, &buf->page,
+                               buf->read_only, buf->domain);
+        if ( rc != GNTST_okay )
+            PIN_FAIL(out, rc,
+                     "source frame %lx invalid.\n", ptr->u.gmfn);
+
+        buf->ptr.u.gmfn = ptr->u.gmfn;
+        buf->ptr.offset = 0;
+        buf->len = PAGE_SIZE;
+    }
+
+    if ( !buf->read_only )
+    {
+        if ( !get_page_type(buf->page, PGT_writable_page) )
+        {
+            if ( !buf->domain->is_dying )
+                gdprintk(XENLOG_WARNING, "Could not get writable frame %lx\n", buf->frame);
+            rc = GNTST_general_error;
+            goto out;
+        }
+        buf->have_type = 1;
+    }
+
+    buf->virt = map_domain_page(buf->frame);
+    rc = GNTST_okay;
+
+ out:
+    return rc;
+}
+
+static int gnttab_copy_buf(const struct gnttab_copy *op,
+                           struct gnttab_copy_buf *dest,
+                           const struct gnttab_copy_buf *src)
+{
+    int rc;
 
     if ( ((op->source.offset + op->len) > PAGE_SIZE) ||
          ((op->dest.offset + op->len) > PAGE_SIZE) )
-        PIN_FAIL(error_out, GNTST_bad_copy_arg, "copy beyond page area.\n");
+        PIN_FAIL(out, GNTST_bad_copy_arg, "copy beyond page area.\n");
 
-    src_is_gref = op->flags & GNTCOPY_source_gref;
-    dest_is_gref = op->flags & GNTCOPY_dest_gref;
+    if ( op->source.offset < src->ptr.offset ||
+         op->source.offset + op->len > src->ptr.offset + src->len )
+        PIN_FAIL(out, GNTST_general_error,
+                 "copy source out of bounds: %d < %d || %d > %d\n",
+                 op->source.offset, src->ptr.offset,
+                 op->len, src->len);
 
-    if ( (op->source.domid != DOMID_SELF && !src_is_gref ) ||
-         (op->dest.domid   != DOMID_SELF && !dest_is_gref)   )
-        PIN_FAIL(error_out, GNTST_permission_denied,
-                 "only allow copy-by-mfn for DOMID_SELF.\n");
+    if ( op->dest.offset < dest->ptr.offset ||
+         op->dest.offset + op->len > dest->ptr.offset + dest->len )
+        PIN_FAIL(out, GNTST_general_error,
+                 "copy dest out of bounds: %d < %d || %d > %d\n",
+                 op->dest.offset, dest->ptr.offset,
+                 op->len, dest->len);
 
-    if ( op->source.domid == DOMID_SELF )
-        sd = rcu_lock_current_domain();
-    else if ( (sd = rcu_lock_domain_by_id(op->source.domid)) == NULL )
-        PIN_FAIL(error_out, GNTST_bad_domain,
-                 "couldn't find %d\n", op->source.domid);
-
-    if ( op->dest.domid == DOMID_SELF )
-        dd = rcu_lock_current_domain();
-    else if ( (dd = rcu_lock_domain_by_id(op->dest.domid)) == NULL )
-        PIN_FAIL(error_out, GNTST_bad_domain,
-                 "couldn't find %d\n", op->dest.domid);
-
-    rc = xsm_grant_copy(XSM_HOOK, sd, dd);
-    if ( rc )
-    {
-        rc = GNTST_permission_denied;
-        goto error_out;
-    }
-
-    if ( src_is_gref )
-    {
-        uint16_t source_off, source_len;
-        rc = __acquire_grant_for_copy(sd, op->source.u.ref,
-                                      current->domain->domain_id, 1,
-                                      &s_frame, &s_pg,
-                                      &source_off, &source_len, 1);
-        if ( rc != GNTST_okay )
-            goto error_out;
-        have_s_grant = 1;
-        if ( op->source.offset < source_off ||
-             op->len > source_len )
-            PIN_FAIL(error_out, GNTST_general_error,
-                     "copy source out of bounds: %d < %d || %d > %d\n",
-                     op->source.offset, source_off,
-                     op->len, source_len);
-    }
-    else
-    {
-        rc = __get_paged_frame(op->source.u.gmfn, &s_frame, &s_pg, 1, sd);
-        if ( rc != GNTST_okay )
-            PIN_FAIL(error_out, rc,
-                     "source frame %lx invalid.\n", s_frame);
-    }
-
-    if ( dest_is_gref )
-    {
-        uint16_t dest_off, dest_len;
-        rc = __acquire_grant_for_copy(dd, op->dest.u.ref,
-                                      current->domain->domain_id, 0,
-                                      &d_frame, &d_pg, &dest_off, &dest_len, 1);
-        if ( rc != GNTST_okay )
-            goto error_out;
-        have_d_grant = 1;
-        if ( op->dest.offset < dest_off ||
-             op->len > dest_len )
-            PIN_FAIL(error_out, GNTST_general_error,
-                     "copy dest out of bounds: %d < %d || %d > %d\n",
-                     op->dest.offset, dest_off,
-                     op->len, dest_len);
-    }
-    else
-    {
-        rc = __get_paged_frame(op->dest.u.gmfn, &d_frame, &d_pg, 0, dd);
-        if ( rc != GNTST_okay )
-            PIN_FAIL(error_out, rc,
-                     "destination frame %lx invalid.\n", d_frame);
-    }
-
-    if ( !get_page_type(d_pg, PGT_writable_page) )
-    {
-        if ( !dd->is_dying )
-            gdprintk(XENLOG_WARNING, "Could not get dst frame %lx\n", d_frame);
-        rc = GNTST_general_error;
-        goto error_out;
-    }
-
-    sp = map_domain_page(s_frame);
-    dp = map_domain_page(d_frame);
-
-    memcpy(dp + op->dest.offset, sp + op->source.offset, op->len);
-
-    unmap_domain_page(dp);
-    unmap_domain_page(sp);
-
-    gnttab_mark_dirty(dd, d_frame);
-
-    put_page_type(d_pg);
- error_out:
-    if ( d_pg )
-        put_page(d_pg);
-    if ( s_pg )
-        put_page(s_pg);
-    if ( have_s_grant )
-        __release_grant_for_copy(sd, op->source.u.ref, 1);
-    if ( have_d_grant )
-        __release_grant_for_copy(dd, op->dest.u.ref, 0);
-    if ( sd )
-        rcu_unlock_domain(sd);
-    if ( dd )
-        rcu_unlock_domain(dd);
-    op->status = rc;
+    memcpy(dest->virt + op->dest.offset, src->virt + op->source.offset,
+           op->len);
+    gnttab_mark_dirty(dest->domain, dest->frame);
+    rc = GNTST_okay;
+ out:
+    return rc;
 }
 
-static long
-gnttab_copy(
+static int gnttab_copy_one(const struct gnttab_copy *op,
+                           struct gnttab_copy_buf *dest,
+                           struct gnttab_copy_buf *src)
+{
+    int rc;
+
+    rc = gnttab_copy_lock_domains(op, src, dest);
+    if ( rc < 0 )
+        goto out;
+
+    rc = gnttab_copy_claim_buf(op, &op->source, src, GNTCOPY_source_gref);
+    if ( rc < 0 )
+        goto out;
+
+    rc = gnttab_copy_claim_buf(op, &op->dest, dest, GNTCOPY_dest_gref);
+    if ( rc < 0 )
+        goto out;
+
+    rc = gnttab_copy_buf(op, dest, src);
+ out:
+    gnttab_copy_release_buf(src);
+    gnttab_copy_release_buf(dest);
+    gnttab_copy_unlock_domains(src, dest);
+    return rc;
+}
+
+static long gnttab_copy(
     XEN_GUEST_HANDLE_PARAM(gnttab_copy_t) uop, unsigned int count)
 {
-    int i;
+    unsigned int i;
     struct gnttab_copy op;
+    struct gnttab_copy_buf src = {};
+    struct gnttab_copy_buf dest = {};
 
     for ( i = 0; i < count; i++ )
     {
@@ -2217,7 +2308,9 @@ gnttab_copy(
             return i;
         if ( unlikely(__copy_from_guest(&op, uop, 1)) )
             return -EFAULT;
-        __gnttab_copy(&op);
+
+        op.status = gnttab_copy_one(&op, &dest, &src);
+
         if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
             return -EFAULT;
         guest_handle_add_offset(uop, 1);

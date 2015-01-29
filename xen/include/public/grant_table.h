@@ -453,7 +453,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
 
 struct gnttab_copy {
     /* IN parameters. */
-    struct {
+    struct gnttab_copy_ptr {
         union {
             grant_ref_t ref;
             xen_pfn_t   gmfn;
