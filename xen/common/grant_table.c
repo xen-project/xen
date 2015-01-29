@@ -2236,6 +2236,17 @@ static int gnttab_copy_claim_buf(const struct gnttab_copy *op,
     return rc;
 }
 
+static bool_t gnttab_copy_buf_valid(const struct gnttab_copy_ptr *p,
+                                    const struct gnttab_copy_buf *b,
+                                    bool_t has_gref)
+{
+    if ( !b->virt )
+        return 0;
+    if ( has_gref )
+        return b->have_grant && p->u.ref == b->ptr.u.ref;
+    return p->u.gmfn == b->ptr.u.gmfn;
+}
+
 static int gnttab_copy_buf(const struct gnttab_copy *op,
                            struct gnttab_copy_buf *dest,
                            const struct gnttab_copy_buf *src)
@@ -2274,23 +2285,40 @@ static int gnttab_copy_one(const struct gnttab_copy *op,
 {
     int rc;
 
-    rc = gnttab_copy_lock_domains(op, src, dest);
-    if ( rc < 0 )
-        goto out;
+    if ( !src->domain || op->source.domid != src->ptr.domid ||
+         !dest->domain || op->dest.domid != dest->ptr.domid )
+    {
+        gnttab_copy_release_buf(src);
+        gnttab_copy_release_buf(dest);
+        gnttab_copy_unlock_domains(src, dest);
 
-    rc = gnttab_copy_claim_buf(op, &op->source, src, GNTCOPY_source_gref);
-    if ( rc < 0 )
-        goto out;
+        rc = gnttab_copy_lock_domains(op, src, dest);
+        if ( rc < 0 )
+            goto out;
+    }
 
-    rc = gnttab_copy_claim_buf(op, &op->dest, dest, GNTCOPY_dest_gref);
-    if ( rc < 0 )
-        goto out;
+    /* Different source? */
+    if ( !gnttab_copy_buf_valid(&op->source, src,
+                                op->flags & GNTCOPY_source_gref) )
+    {
+        gnttab_copy_release_buf(src);
+        rc = gnttab_copy_claim_buf(op, &op->source, src, GNTCOPY_source_gref);
+        if ( rc < 0 )
+            goto out;
+    }
+
+    /* Different dest? */
+    if ( !gnttab_copy_buf_valid(&op->dest, dest,
+                                op->flags & GNTCOPY_dest_gref) )
+    {
+        gnttab_copy_release_buf(dest);
+        rc = gnttab_copy_claim_buf(op, &op->dest, dest, GNTCOPY_dest_gref);
+        if ( rc < 0 )
+            goto out;
+    }
 
     rc = gnttab_copy_buf(op, dest, src);
  out:
-    gnttab_copy_release_buf(src);
-    gnttab_copy_release_buf(dest);
-    gnttab_copy_unlock_domains(src, dest);
     return rc;
 }
 
@@ -2301,21 +2329,42 @@ static long gnttab_copy(
     struct gnttab_copy op;
     struct gnttab_copy_buf src = {};
     struct gnttab_copy_buf dest = {};
+    long rc = 0;
 
     for ( i = 0; i < count; i++ )
     {
-        if (i && hypercall_preempt_check())
-            return i;
+        if ( i && hypercall_preempt_check() )
+        {
+            rc = i;
+            break;
+        }
+
         if ( unlikely(__copy_from_guest(&op, uop, 1)) )
-            return -EFAULT;
+        {
+            rc = -EFAULT;
+            break;
+        }
 
         op.status = gnttab_copy_one(&op, &dest, &src);
+        if ( op.status != GNTST_okay )
+        {
+            gnttab_copy_release_buf(&src);
+            gnttab_copy_release_buf(&dest);
+        }
 
         if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
-            return -EFAULT;
+        {
+            rc = -EFAULT;
+            break;
+        }
         guest_handle_add_offset(uop, 1);
     }
-    return 0;
+
+    gnttab_copy_release_buf(&src);
+    gnttab_copy_release_buf(&dest);
+    gnttab_copy_unlock_domains(&src, &dest);
+
+    return rc;
 }
 
 static long
