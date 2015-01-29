@@ -1,0 +1,24 @@
+WARNING - DO NOT EDIT THINGS IN THIS DIRECTORY
+----------------------------------------------
+
+These files were obtained elsewhere and should only be updated by
+copying new versions from the source location, as documented below:
+
+bsd-COPYRIGHT
+bsd-sys-queue.h
+bsd-queue.3
+
+  Obtained from the FreeBSD SVN using the following commands:
+    svn co -r 221843 svn://svn.freebsd.org/base/head/sys/sys/
+    svn co -r 221843 svn://svn.freebsd.org/base/head/share/man/man3
+    svn cat -r 221843 http://svn.freebsd.org/base/head/COPYRIGHT >tools/libxl/external/bsd-COPYRIGHT
+
+Exceptions:
+
+README
+
+  This file
+
+bsd-sys-queue-h-seddery
+
+  Script to transform the above into a new namespace.

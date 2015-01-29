@@ -56,12 +56,12 @@ override CPPFLAGS := $(CPPFLAGS) $(extra_incl)
 # The name of the architecture specific library.
 # This is on x86_32: libx86_32.a
 # $(ARCH_LIB) has to built in the architecture specific directory.
-ARCH_LIB_NAME = $(XEN_TARGET_ARCH)
+ARCH_LIB_NAME = $(MINIOS_TARGET_ARCH)
 ARCH_LIB := lib$(ARCH_LIB_NAME).a
 
 # This object contains the entrypoint for startup from Xen.
 # $(HEAD_ARCH_OBJ) has to be built in the architecture specific directory.
-HEAD_ARCH_OBJ := $(XEN_TARGET_ARCH).o
+HEAD_ARCH_OBJ := $(MINIOS_TARGET_ARCH).o
 HEAD_OBJ := $(OBJ_DIR)/$(TARGET_ARCH_DIR)/$(HEAD_ARCH_OBJ)
 
 

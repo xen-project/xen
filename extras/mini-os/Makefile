@@ -4,9 +4,8 @@
 # Makefile and a arch.mk.
 #
 
-export XEN_ROOT = $(CURDIR)/../..
-include $(XEN_ROOT)/Config.mk
-OBJ_DIR ?= $(CURDIR)
+OBJ_DIR=$(CURDIR)
+TOPLEVEL_DIR=$(CURDIR)
 
 ifeq ($(MINIOS_CONFIG),)
 include Config.mk
@@ -14,6 +13,8 @@ else
 EXTRA_DEPS += $(MINIOS_CONFIG)
 include $(MINIOS_CONFIG)
 endif
+
+include $(MINI-OS_ROOT)/config/MiniOS.mk
 
 # Configuration defaults
 CONFIG_START_NETWORK ?= y
@@ -51,7 +52,7 @@ flags-$(CONFIG_XENBUS) += -DCONFIG_XENBUS
 DEF_CFLAGS += $(flags-y)
 
 # Symlinks and headers that must be created before building the C files
-GENERATED_HEADERS := include/list.h $(ARCH_LINKS) include/mini-os include/xen include/$(TARGET_ARCH_FAM)/mini-os
+GENERATED_HEADERS := include/list.h $(ARCH_LINKS) include/mini-os include/$(TARGET_ARCH_FAM)/mini-os
 
 EXTRA_DEPS += $(GENERATED_HEADERS)
 
@@ -65,7 +66,7 @@ include minios.mk
 LDLIBS := 
 APP_LDLIBS := 
 LDARCHLIB := -L$(OBJ_DIR)/$(TARGET_ARCH_DIR) -l$(ARCH_LIB_NAME)
-LDFLAGS_FINAL := -T $(TARGET_ARCH_DIR)/minios-$(XEN_TARGET_ARCH).lds
+LDFLAGS_FINAL := -T $(TARGET_ARCH_DIR)/minios-$(MINIOS_TARGET_ARCH).lds
 
 # Prefix for global API names. All other symbols are localised before
 # linking with EXTRA_OBJS.
@@ -125,16 +126,13 @@ $(ARCH_LINKS):
 	$(arch_links)
 endif
 
-include/list.h: $(XEN_ROOT)/tools/include/xen-external/bsd-sys-queue-h-seddery $(XEN_ROOT)/tools/include/xen-external/bsd-sys-queue.h
+include/list.h: include/minios-external/bsd-sys-queue-h-seddery include/minios-external/bsd-sys-queue.h
 	perl $^ --prefix=minios  >$@.new
 	$(call move-if-changed,$@.new,$@)
 
 # Used by stubdom's Makefile
 .PHONY: links
 links: $(GENERATED_HEADERS)
-
-include/xen:
-	ln -sf ../../../xen/include/public $@
 
 include/mini-os:
 	ln -sf . $@
