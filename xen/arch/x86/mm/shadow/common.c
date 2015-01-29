@@ -3761,7 +3761,7 @@ void shadow_audit_tables(struct vcpu *v)
 #endif
 
     if ( SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_FULL )
-        mask = ~1; /* Audit every table in the system */
+        mask = SHF_page_type_mask; /* Audit every table in the system */
     else 
     {
         /* Audit only the current mode's tables */
@@ -3776,7 +3776,7 @@ void shadow_audit_tables(struct vcpu *v)
         }
     }
 
-    hash_foreach(v, ~1, callbacks, _mfn(INVALID_MFN));
+    hash_foreach(v, mask, callbacks, _mfn(INVALID_MFN));
 }
 
 #endif /* Shadow audit */
