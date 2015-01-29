@@ -2210,7 +2210,7 @@ static int gnttab_copy_claim_buf(const struct gnttab_copy *op,
                                buf->read_only, buf->domain);
         if ( rc != GNTST_okay )
             PIN_FAIL(out, rc,
-                     "source frame %lx invalid.\n", ptr->u.gmfn);
+                     "source frame %"PRI_xen_pfn" invalid.\n", ptr->u.gmfn);
 
         buf->ptr.u.gmfn = ptr->u.gmfn;
         buf->ptr.offset = 0;
