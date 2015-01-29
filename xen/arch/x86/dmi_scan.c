@@ -38,11 +38,70 @@ struct __packed smbios_eps {
 	struct dmi_eps dmi;
 };
 
+struct __packed smbios3_eps {
+	char anchor[5];			/* "_SM3_" */
+	u8 checksum;
+	u8 length;
+	u8 major, minor;
+	u8 docrev;
+	u8 revision;
+	u8 _rsrvd_;
+	u32 max_size;
+	u64 address;
+};
+
 struct dmi_header
 {
 	u8	type;
 	u8	length;
 	u16	handle;
+};
+
+enum dmi_entry_type {
+	DMI_ENTRY_BIOS = 0,
+	DMI_ENTRY_SYSTEM,
+	DMI_ENTRY_BASEBOARD,
+	DMI_ENTRY_CHASSIS,
+	DMI_ENTRY_PROCESSOR,
+	DMI_ENTRY_MEM_CONTROLLER,
+	DMI_ENTRY_MEM_MODULE,
+	DMI_ENTRY_CACHE,
+	DMI_ENTRY_PORT_CONNECTOR,
+	DMI_ENTRY_SYSTEM_SLOT,
+	DMI_ENTRY_ONBOARD_DEVICE,
+	DMI_ENTRY_OEMSTRINGS,
+	DMI_ENTRY_SYSCONF,
+	DMI_ENTRY_BIOS_LANG,
+	DMI_ENTRY_GROUP_ASSOC,
+	DMI_ENTRY_SYSTEM_EVENT_LOG,
+	DMI_ENTRY_PHYS_MEM_ARRAY,
+	DMI_ENTRY_MEM_DEVICE,
+	DMI_ENTRY_32_MEM_ERROR,
+	DMI_ENTRY_MEM_ARRAY_MAPPED_ADDR,
+	DMI_ENTRY_MEM_DEV_MAPPED_ADDR,
+	DMI_ENTRY_BUILTIN_POINTING_DEV,
+	DMI_ENTRY_PORTABLE_BATTERY,
+	DMI_ENTRY_SYSTEM_RESET,
+	DMI_ENTRY_HW_SECURITY,
+	DMI_ENTRY_SYSTEM_POWER_CONTROLS,
+	DMI_ENTRY_VOLTAGE_PROBE,
+	DMI_ENTRY_COOLING_DEV,
+	DMI_ENTRY_TEMP_PROBE,
+	DMI_ENTRY_ELECTRICAL_CURRENT_PROBE,
+	DMI_ENTRY_OOB_REMOTE_ACCESS,
+	DMI_ENTRY_BIS_ENTRY,
+	DMI_ENTRY_SYSTEM_BOOT,
+	DMI_ENTRY_MGMT_DEV,
+	DMI_ENTRY_MGMT_DEV_COMPONENT,
+	DMI_ENTRY_MGMT_DEV_THRES,
+	DMI_ENTRY_MEM_CHANNEL,
+	DMI_ENTRY_IPMI_DEV,
+	DMI_ENTRY_SYS_POWER_SUPPLY,
+	DMI_ENTRY_ADDITIONAL,
+	DMI_ENTRY_ONBOARD_DEV_EXT,
+	DMI_ENTRY_MGMT_CONTROLLER_HOST,
+	DMI_ENTRY_INACTIVE = 126,
+	DMI_ENTRY_END_OF_TABLE = 127,
 };
 
 #undef DMI_DEBUG
@@ -74,7 +133,8 @@ static char * __init dmi_string(struct dmi_header *dm, u8 s)
  *	pointing to completely the wrong place for example
  */
  
-static int __init dmi_table(u32 base, int len, int num, void (*decode)(struct dmi_header *))
+static int __init dmi_table(paddr_t base, u32 len, int num,
+			    void (*decode)(struct dmi_header *))
 {
 	u8 *buf;
 	struct dmi_header *dm;
@@ -92,7 +152,7 @@ static int __init dmi_table(u32 base, int len, int num, void (*decode)(struct dm
  	 *	OR we run off the end of the table (also happens)
  	 */
  
-	while(i<num && data-buf+sizeof(struct dmi_header)<=len)
+	while((num < 0 || i < num) && data-buf+sizeof(struct dmi_header)<=len)
 	{
 		dm=(struct dmi_header *)data;
 		/*
@@ -105,6 +165,8 @@ static int __init dmi_table(u32 base, int len, int num, void (*decode)(struct dm
 			data++;
 		if(data-buf<len-1)
 			decode(dm);
+		if (dm->type == DMI_ENTRY_END_OF_TABLE)
+		    break;
 		data+=2;
 		i++;
 	}
@@ -127,16 +189,28 @@ static inline bool_t __init dmi_checksum(const void __iomem *buf,
 
 static u32 __initdata efi_dmi_address;
 static u32 __initdata efi_dmi_size;
+static u64 __initdata efi_smbios3_address;
+static u32 __initdata efi_smbios3_size;
 
 /*
  * Important: This function gets called while still in EFI
  * (pseudo-)physical mode.
  */
-void __init dmi_efi_get_table(void *smbios)
+void __init dmi_efi_get_table(const void *smbios, const void *smbios3)
 {
-	struct smbios_eps *eps = smbios;
+	const struct smbios_eps *eps = smbios;
+	const struct smbios3_eps *eps3 = smbios3;
 
-	if (memcmp(eps->anchor, "_SM_", 4) &&
+	if (eps3 && memcmp(eps3->anchor, "_SM3_", 5) &&
+	    eps3->length >= sizeof(*eps3) &&
+	    dmi_checksum(eps3, eps3->length)) {
+		efi_smbios3_address = eps3->address;
+		efi_smbios3_size = eps3->max_size;
+		return;
+	}
+
+	if (eps && memcmp(eps->anchor, "_SM_", 4) &&
+	    eps->length >= sizeof(*eps) &&
 	    dmi_checksum(eps, eps->length) &&
 	    memcmp(eps->dmi.anchor, "_DMI_", 5) == 0 &&
 	    dmi_checksum(&eps->dmi, sizeof(eps->dmi))) {
@@ -145,99 +219,190 @@ void __init dmi_efi_get_table(void *smbios)
 	}
 }
 
-int __init dmi_get_table(u32 *base, u32 *len)
+const char *__init dmi_get_table(paddr_t *base, u32 *len)
 {
-	struct dmi_eps eps;
-	char __iomem *p, *q;
+	static unsigned int __initdata instance;
 
 	if (efi_enabled) {
-		if (!efi_dmi_size)
-			return -1;
-		*base = efi_dmi_address;
-		*len = efi_dmi_size;
-		return 0;
-	}
+		if (efi_smbios3_size && !(instance & 1)) {
+			*base = efi_smbios3_address;
+			*len = efi_smbios3_size;
+			instance |= 1;
+			return "SMBIOSv3";
+		}
+		if (efi_dmi_size && !(instance & 2)) {
+			*base = efi_dmi_address;
+			*len = efi_dmi_size;
+			instance |= 2;
+			return "DMI";
+		}
+	} else {
+		char __iomem *p = maddr_to_virt(0xF0000), *q;
+		union {
+			struct dmi_eps dmi;
+			struct smbios3_eps smbios3;
+		} eps;
 
-	p = maddr_to_virt(0xF0000);
-	for (q = p; q < p + 0x10000; q += 16) {
-		memcpy_fromio(&eps, q, 15);
-		if (memcmp(eps.anchor, "_DMI_", 5) == 0 &&
-		    dmi_checksum(&eps, sizeof(eps))) {
-			*base = eps.address;
-			*len = eps.size;
-			return 0;
+		for (q = p; q <= p + 0x10000 - sizeof(eps.dmi); q += 16) {
+			memcpy_fromio(&eps, q, sizeof(eps.dmi));
+			if (!(instance & 1) &&
+			    memcmp(eps.dmi.anchor, "_DMI_", 5) == 0 &&
+			    dmi_checksum(&eps.dmi, sizeof(eps.dmi))) {
+				*base = eps.dmi.address;
+				*len = eps.dmi.size;
+				instance |= 1;
+				return "DMI";
+			}
+
+			BUILD_BUG_ON(sizeof(eps.smbios3) <= sizeof(eps.dmi));
+			if ((instance & 2) ||
+			    q > p + 0x10000 - sizeof(eps.smbios3))
+				continue;
+			memcpy_fromio(&eps.dmi + 1, q + sizeof(eps.dmi),
+			              sizeof(eps.smbios3) - sizeof(eps.dmi));
+			if (!memcmp(eps.smbios3.anchor, "_SM3_", 5) &&
+			    eps.smbios3.length >= sizeof(eps.smbios3) &&
+			    q <= p + 0x10000 - eps.smbios3.length &&
+			    dmi_checksum(q, eps.smbios3.length)) {
+				*base = eps.smbios3.address;
+				*len = eps.smbios3.max_size;
+				instance |= 2;
+				return "SMBIOSv3";
+			}
 		}
 	}
-	return -1;
+	return NULL;
 }
 
+typedef union {
+	const struct smbios_eps __iomem *legacy;
+	const struct smbios3_eps __iomem *v3;
+} smbios_eps_u __attribute__((transparent_union));
+
 static int __init _dmi_iterate(const struct dmi_eps *dmi,
-			       const struct smbios_eps __iomem *smbios,
+			       const smbios_eps_u smbios,
 			       void (*decode)(struct dmi_header *))
 {
-	u16 num = dmi->num_structures;
-	u16 len = dmi->size;
-	u32 base = dmi->address;
+	int num;
+	u32 len;
+	paddr_t base;
 
-	/*
-	 * DMI version 0.0 means that the real version is taken from
-	 * the SMBIOS version, which we may not know at this point.
-	 */
-	if (dmi->revision)
-		printk(KERN_INFO "DMI %d.%d present.\n",
-		       dmi->revision >> 4,  dmi->revision & 0x0f);
-	else if (!smbios)
-		printk(KERN_INFO "DMI present.\n");
-	dmi_printk((KERN_INFO "%d structures occupying %d bytes.\n",
-		    num, len));
-	dmi_printk((KERN_INFO "DMI table at 0x%08X.\n", base));
+	if (!dmi) {
+		num = -1;
+		len = smbios.v3->max_size;
+		base = smbios.v3->address;
+		printk(KERN_INFO "SMBIOS %d.%d present.\n",
+		       smbios.v3->major, smbios.v3->minor);
+		dmi_printk((KERN_INFO "SMBIOS v3 table at 0x%"PRIpaddr".\n", base));
+	} else {
+		num = dmi->num_structures;
+		len = dmi->size;
+		base = dmi->address;
+
+		/*
+		 * DMI version 0.0 means that the real version is taken from
+		 * the SMBIOS version, which we may not know at this point.
+		 */
+		if (dmi->revision)
+			printk(KERN_INFO "DMI %d.%d present.\n",
+			       dmi->revision >> 4,  dmi->revision & 0x0f);
+		else if (!smbios.legacy)
+			printk(KERN_INFO "DMI present.\n");
+		dmi_printk((KERN_INFO "%d structures occupying %u bytes.\n",
+			    num, len));
+		dmi_printk((KERN_INFO "DMI table at 0x%08X.\n", (u32)base));
+	}
 	return dmi_table(base, len, num, decode);
 }
 
 static int __init dmi_iterate(void (*decode)(struct dmi_header *))
 {
-	struct dmi_eps eps;
+	struct dmi_eps dmi;
+	struct smbios3_eps smbios3;
 	char __iomem *p, *q;
+
+	dmi.size = 0;
+	smbios3.length = 0;
 
 	p = maddr_to_virt(0xF0000);
 	for (q = p; q < p + 0x10000; q += 16) {
-		memcpy_fromio(&eps, q, sizeof(eps));
-		if (memcmp(eps.anchor, "_DMI_", 5) == 0 &&
-		    dmi_checksum(&eps, sizeof(eps)))
-			return _dmi_iterate(&eps, NULL, decode);
+		if (!dmi.size) {
+			memcpy_fromio(&dmi, q, sizeof(dmi));
+			if (memcmp(dmi.anchor, "_DMI_", 5) ||
+			    !dmi_checksum(&dmi, sizeof(dmi)))
+				dmi.size = 0;
+		}
+		if (!smbios3.length &&
+		    q <= p + 0x10000 - sizeof(smbios3)) {
+			memcpy_fromio(&smbios3, q, sizeof(smbios3));
+			if (memcmp(smbios3.anchor, "_SM3_", 5) ||
+			    smbios3.length < sizeof(smbios3) ||
+			    q < p + 0x10000 - smbios3.length ||
+			    !dmi_checksum(q, smbios3.length))
+				smbios3.length = 0;
+		}
 	}
+
+	if (smbios3.length)
+		return _dmi_iterate(NULL, &smbios3, decode);
+	if (dmi.size)
+		return _dmi_iterate(&dmi, NULL, decode);
 	return -1;
 }
 
 static int __init dmi_efi_iterate(void (*decode)(struct dmi_header *))
 {
-	struct smbios_eps eps;
-	const struct smbios_eps __iomem *p;
 	int ret = -1;
 
-	if (efi.smbios == EFI_INVALID_TABLE_ADDR)
-		return -1;
+	while (efi.smbios3 != EFI_INVALID_TABLE_ADDR) {
+		struct smbios3_eps eps;
+		const struct smbios3_eps __iomem *p;
 
-	p = bt_ioremap(efi.smbios, sizeof(eps));
-	if (!p)
-		return -1;
-	memcpy_fromio(&eps, p, sizeof(eps));
-	bt_iounmap(p, sizeof(eps));
+		p = bt_ioremap(efi.smbios3, sizeof(eps));
+		if (!p)
+			break;
+		memcpy_fromio(&eps, p, sizeof(eps));
+		bt_iounmap(p, sizeof(eps));
 
-	if (memcmp(eps.anchor, "_SM_", 4))
-		return -1;
+		if (memcmp(eps.anchor, "_SM3_", 5) ||
+		    eps.length < sizeof(eps))
+			break;
 
-	p = bt_ioremap(efi.smbios, eps.length);
-	if (!p)
-		return -1;
-	if (dmi_checksum(p, eps.length) &&
-	    memcmp(eps.dmi.anchor, "_DMI_", 5) == 0 &&
-	    dmi_checksum(&eps.dmi, sizeof(eps.dmi))) {
-		printk(KERN_INFO "SMBIOS %d.%d present.\n",
-		       eps.major, eps.minor);
-		ret = _dmi_iterate(&eps.dmi, p, decode);
+		p = bt_ioremap(efi.smbios3, eps.length);
+		if (!p)
+			break;
+		if (dmi_checksum(p, eps.length))
+			ret = _dmi_iterate(NULL, p, decode);
+		bt_iounmap(p, eps.length);
+		break;
 	}
-	bt_iounmap(p, eps.length);
+
+	if (ret != 0 && efi.smbios != EFI_INVALID_TABLE_ADDR) {
+		struct smbios_eps eps;
+		const struct smbios_eps __iomem *p;
+
+		p = bt_ioremap(efi.smbios, sizeof(eps));
+		if (!p)
+			return -1;
+		memcpy_fromio(&eps, p, sizeof(eps));
+		bt_iounmap(p, sizeof(eps));
+
+		if (memcmp(eps.anchor, "_SM_", 4) ||
+		    eps.length < sizeof(eps))
+			return -1;
+
+		p = bt_ioremap(efi.smbios, eps.length);
+		if (!p)
+			return -1;
+		if (dmi_checksum(p, eps.length) &&
+		    memcmp(eps.dmi.anchor, "_DMI_", 5) == 0 &&
+		    dmi_checksum(&eps.dmi, sizeof(eps.dmi))) {
+			printk(KERN_INFO "SMBIOS %d.%d present.\n",
+			       eps.major, eps.minor);
+			ret = _dmi_iterate(&eps.dmi, p, decode);
+		}
+		bt_iounmap(p, eps.length);
+	}
 
 	return ret;
 }
@@ -476,7 +641,7 @@ static void __init dmi_decode(struct dmi_header *dm)
 	
 	switch(dm->type)
 	{
-		case  0:
+		case DMI_ENTRY_BIOS:
 			dmi_printk(("BIOS Vendor: %s\n",
 				dmi_string(dm, data[4])));
 			dmi_save_ident(dm, DMI_BIOS_VENDOR, 4);
@@ -487,7 +652,7 @@ static void __init dmi_decode(struct dmi_header *dm)
 				dmi_string(dm, data[8])));
 			dmi_save_ident(dm, DMI_BIOS_DATE, 8);
 			break;
-		case 1:
+		case DMI_ENTRY_SYSTEM:
 			dmi_printk(("System Vendor: %s\n",
 				dmi_string(dm, data[4])));
 			dmi_save_ident(dm, DMI_SYS_VENDOR, 4);
@@ -500,7 +665,7 @@ static void __init dmi_decode(struct dmi_header *dm)
 			dmi_printk(("Serial Number: %s\n",
 				dmi_string(dm, data[7])));
 			break;
-		case 2:
+		case DMI_ENTRY_BASEBOARD:
 			dmi_printk(("Board Vendor: %s\n",
 				dmi_string(dm, data[4])));
 			dmi_save_ident(dm, DMI_BOARD_VENDOR, 4);

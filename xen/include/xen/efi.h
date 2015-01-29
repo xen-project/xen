@@ -15,6 +15,7 @@ struct efi {
     unsigned long acpi;         /* ACPI table (IA64 ext 0.71) */
     unsigned long acpi20;       /* ACPI table (ACPI 2.0) */
     unsigned long smbios;       /* SM BIOS table */
+    unsigned long smbios3;      /* SMBIOS v3 table */
 };
 
 extern struct efi efi;

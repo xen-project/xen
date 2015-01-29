@@ -32,6 +32,8 @@
 /* Using SetVirtualAddressMap() is incompatible with kexec: */
 #undef USE_SET_VIRTUAL_ADDRESS_MAP
 
+#define SMBIOS3_TABLE_GUID \
+  { 0xf2fd1544, 0x9794, 0x4a2c, {0x99, 0x2e, 0xe5, 0xbb, 0xcf, 0x20, 0xe3, 0x94} }
 #define SHIM_LOCK_PROTOCOL_GUID \
   { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} }
 
@@ -993,6 +995,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         static EFI_GUID __initdata acpi_guid = ACPI_TABLE_GUID;
         static EFI_GUID __initdata mps_guid = MPS_TABLE_GUID;
         static EFI_GUID __initdata smbios_guid = SMBIOS_TABLE_GUID;
+        static EFI_GUID __initdata smbios3_guid = SMBIOS3_TABLE_GUID;
 
         if ( match_guid(&acpi2_guid, &efi_ct[i].VendorGuid) )
 	       efi.acpi20 = (long)efi_ct[i].VendorTable;
@@ -1002,11 +1005,15 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 	       efi.mps = (long)efi_ct[i].VendorTable;
         if ( match_guid(&smbios_guid, &efi_ct[i].VendorGuid) )
 	       efi.smbios = (long)efi_ct[i].VendorTable;
+        if ( match_guid(&smbios3_guid, &efi_ct[i].VendorGuid) )
+	       efi.smbios3 = (long)efi_ct[i].VendorTable;
     }
 
 #ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
-    if (efi.smbios != EFI_INVALID_TABLE_ADDR)
-        dmi_efi_get_table((void *)(long)efi.smbios);
+    dmi_efi_get_table(efi.smbios != EFI_INVALID_TABLE_ADDR
+                      ? (void *)(long)efi.smbios : NULL,
+                      efi.smbios3 != EFI_INVALID_TABLE_ADDR
+                      ? (void *)(long)efi.smbios3 : NULL);
 #endif
 
     /* Collect PCI ROM contents. */
