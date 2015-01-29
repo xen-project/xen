@@ -77,15 +77,6 @@ void shadow_teardown(struct domain *d);
 /* Call once all of the references to the domain have gone away */
 void shadow_final_teardown(struct domain *d);
 
-/* shadow code to call when log dirty is enabled */
-int shadow_enable_log_dirty(struct domain *d, bool_t log_global);
-
-/* shadow code to call when log dirty is disabled */
-int shadow_disable_log_dirty(struct domain *d);
-
-/* shadow code to call when bitmap is being cleaned */
-void shadow_clean_dirty_bitmap(struct domain *d);
-
 /* Update all the things that are derived from the guest's CR0/CR3/CR4.
  * Called to initialize paging structures if the paging mode
  * has changed, and when bringing up a VCPU for the first time. */

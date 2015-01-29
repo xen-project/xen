@@ -41,6 +41,10 @@
 
 DEFINE_PER_CPU(uint32_t,trace_shadow_path_flags);
 
+static int sh_enable_log_dirty(struct domain *, bool_t log_global);
+static int sh_disable_log_dirty(struct domain *);
+static void sh_clean_dirty_bitmap(struct domain *);
+
 /* Set up the shadow-specific parts of a domain struct at start of day.
  * Called for every domain from arch_domain_create() */
 void shadow_domain_init(struct domain *d, unsigned int domcr_flags)
@@ -49,8 +53,8 @@ void shadow_domain_init(struct domain *d, unsigned int domcr_flags)
     INIT_PAGE_LIST_HEAD(&d->arch.paging.shadow.pinned_shadows);
 
     /* Use shadow pagetables for log-dirty support */
-    paging_log_dirty_init(d, shadow_enable_log_dirty, 
-                          shadow_disable_log_dirty, shadow_clean_dirty_bitmap);
+    paging_log_dirty_init(d, sh_enable_log_dirty,
+                          sh_disable_log_dirty, sh_clean_dirty_bitmap);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     d->arch.paging.shadow.oos_active = 0;
@@ -3420,7 +3424,7 @@ shadow_write_p2m_entry(struct domain *d, unsigned long gfn,
 /* Shadow specific code which is called in paging_log_dirty_enable().
  * Return 0 if no problem found.
  */
-int shadow_enable_log_dirty(struct domain *d, bool_t log_global)
+static int sh_enable_log_dirty(struct domain *d, bool_t log_global)
 {
     int ret;
 
@@ -3448,7 +3452,7 @@ int shadow_enable_log_dirty(struct domain *d, bool_t log_global)
 }
 
 /* shadow specfic code which is called in paging_log_dirty_disable() */
-int shadow_disable_log_dirty(struct domain *d)
+static int sh_disable_log_dirty(struct domain *d)
 {
     int ret;
 
@@ -3462,7 +3466,7 @@ int shadow_disable_log_dirty(struct domain *d)
 /* This function is called when we CLEAN log dirty bitmap. See 
  * paging_log_dirty_op() for details. 
  */
-void shadow_clean_dirty_bitmap(struct domain *d)
+static void sh_clean_dirty_bitmap(struct domain *d)
 {
     paging_lock(d);
     /* Need to revoke write access to the domain's pages again.
