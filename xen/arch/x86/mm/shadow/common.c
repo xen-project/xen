@@ -2163,12 +2163,12 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
     };
 
     static const unsigned int callback_mask =
-          1 << SH_type_l1_32_shadow
-        | 1 << SH_type_fl1_32_shadow
-        | 1 << SH_type_l1_pae_shadow
-        | 1 << SH_type_fl1_pae_shadow
-        | 1 << SH_type_l1_64_shadow
-        | 1 << SH_type_fl1_64_shadow
+          SHF_L1_32
+        | SHF_FL1_32
+        | SHF_L1_PAE
+        | SHF_FL1_PAE
+        | SHF_L1_64
+        | SHF_FL1_64
         ;
     struct page_info *pg = mfn_to_page(gmfn);
 
@@ -2413,12 +2413,12 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     };
 
     static const unsigned int callback_mask =
-          1 << SH_type_l1_32_shadow
-        | 1 << SH_type_fl1_32_shadow
-        | 1 << SH_type_l1_pae_shadow
-        | 1 << SH_type_fl1_pae_shadow
-        | 1 << SH_type_l1_64_shadow
-        | 1 << SH_type_fl1_64_shadow
+          SHF_L1_32
+        | SHF_FL1_32
+        | SHF_L1_PAE
+        | SHF_FL1_PAE
+        | SHF_L1_64
+        | SHF_FL1_64
         ;
 
     perfc_incr(shadow_mappings);
@@ -2558,20 +2558,18 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     /* Another lookup table, for choosing which mask to use */
     static const unsigned int masks[SH_type_unused] = {
         0, /* none    */
-        1 << SH_type_l2_32_shadow, /* l1_32   */
+        SHF_L2_32, /* l1_32   */
         0, /* fl1_32  */
         0, /* l2_32   */
-        ((1 << SH_type_l2h_pae_shadow)
-         | (1 << SH_type_l2_pae_shadow)), /* l1_pae  */
+        SHF_L2H_PAE | SHF_L2_PAE, /* l1_pae  */
         0, /* fl1_pae */
         0, /* l2_pae  */
         0, /* l2h_pae  */
-        ((1 << SH_type_l2h_64_shadow)
-         | (1 << SH_type_l2_64_shadow)),  /* l1_64   */
+        SHF_L2H_64 | SHF_L2_64, /* l1_64   */
         0, /* fl1_64  */
-        1 << SH_type_l3_64_shadow, /* l2_64   */
-        1 << SH_type_l3_64_shadow, /* l2h_64  */
-        1 << SH_type_l4_64_shadow, /* l3_64   */
+        SHF_L3_64, /* l2_64   */
+        SHF_L3_64, /* l2h_64  */
+        SHF_L4_64, /* l3_64   */
         0, /* l4_64   */
         0, /* p2m     */
         0  /* unused  */
@@ -2701,7 +2699,7 @@ void sh_reset_l3_up_pointers(struct vcpu *v)
         NULL, /* p2m     */
         NULL  /* unused  */
     };
-    static const unsigned int callback_mask = 1 << SH_type_l3_64_shadow;
+    static const unsigned int callback_mask = SHF_L3_64;
 
     hash_foreach(v, callback_mask, callbacks, _mfn(INVALID_MFN));
 }
