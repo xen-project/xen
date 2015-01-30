@@ -1,6 +1,10 @@
 XEN_ROOT = $(CURDIR)/..
 MINI_OS = $(XEN_ROOT)/extras/mini-os
 
+ifeq ($(wildcard $(MINI_OS)/Config.mk),)
+$(error Please run `make mini-os-dir' in top-level directory)
+endif
+
 export XEN_OS=MiniOS
 
 export stubdom=y

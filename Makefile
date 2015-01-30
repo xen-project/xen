@@ -17,6 +17,22 @@ TARGS_DISTCLEAN=$(patsubst %, distclean-%, $(SUBSYSTEMS))
 export XEN_ROOT=$(CURDIR)
 include Config.mk
 
+.PHONY: mini-os-dir
+mini-os-dir:
+	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh \
+		$(MINIOS_UPSTREAM_URL) \
+		$(MINIOS_UPSTREAM_REVISION) \
+		$(XEN_ROOT)/extras/mini-os
+
+.PHONY: mini-os-dir-force-update
+mini-os-dir-force-update: mini-os-dir
+	set -ex; \
+	if [ "$(MINIOS_UPSTREAM_REVISION)" ]; then \
+		cd extras/mini-os-remote; \
+		$(GIT) fetch origin; \
+		$(GIT) reset --hard $(MINIOS_UPSTREAM_REVISION); \
+	fi
+
 SUBARCH := $(subst x86_32,i386,$(XEN_TARGET_ARCH))
 export XEN_TARGET_ARCH SUBARCH
 export DESTDIR
@@ -37,7 +53,7 @@ build-tools:
 	$(MAKE) -C tools build
 
 .PHONY: build-stubdom
-build-stubdom:
+build-stubdom: mini-os-dir
 	$(MAKE) -C stubdom build
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom pv-grub
@@ -84,7 +100,7 @@ install-tools:
 	$(MAKE) -C tools install
 
 .PHONY: install-stubdom
-install-stubdom: install-tools
+install-stubdom: install-tools mini-os-dir
 	$(MAKE) -C stubdom install
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom install-grub
@@ -125,11 +141,11 @@ rpmball: dist
 	bash ./tools/misc/mkrpm $(XEN_ROOT) $$($(MAKE) -C xen xenversion --no-print-directory)
 
 .PHONY: subtree-force-update
-subtree-force-update:
+subtree-force-update: mini-os-dir-force-update
 	$(MAKE) -C tools subtree-force-update
 
 .PHONY: subtree-force-update-all
-subtree-force-update-all:
+subtree-force-update-all: mini-os-dir-force-update
 	$(MAKE) -C tools subtree-force-update-all
 
 # Make a source tarball, including qemu sub-trees.

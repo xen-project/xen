@@ -245,14 +245,20 @@ OVMF_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/ovmf.git
 QEMU_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/qemu-upstream-unstable.git
 QEMU_TRADITIONAL_URL ?= http://xenbits.xen.org/git-http/qemu-xen-unstable.git
 SEABIOS_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/seabios.git
+MINIOS_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/mini-os.git
 else
 OVMF_UPSTREAM_URL ?= git://xenbits.xen.org/ovmf.git
 QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-unstable.git
 QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-unstable.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
+MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 447d264115c476142f884af0be287622cd244423
 QEMU_UPSTREAM_REVISION ?= master
+MINIOS_UPSTREAM_REVISION ?= 55f7cd7427ef3e7fe3563a3da46d8664a2ed0d6d
+# Thu Jan 29 19:10:04 2015 +0000
+# Mini-OS: standalone build
+
 SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 # Thu May 22 16:59:16 2014 -0400
 # python3 fixes for vgabios and csm builds.

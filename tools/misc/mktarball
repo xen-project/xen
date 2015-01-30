@@ -6,7 +6,7 @@
 set -ex
 
 function git_archive_into {
-    mkdir "$2"
+    mkdir -p "$2"
 
     git --git-dir="$1"/.git \
 	archive --format=tar HEAD | \
@@ -32,6 +32,8 @@ git_archive_into $xen_root $tdir/xen-$desc
 git_archive_into $xen_root/tools/qemu-xen-dir-remote $tdir/xen-$desc/tools/qemu-xen
 
 git_archive_into $xen_root/tools/qemu-xen-traditional-dir-remote $tdir/xen-$desc/tools/qemu-xen-traditional
+
+git_archive_into $xen_root/extras/mini-os-remote $tdir/xen-$desc/extras/mini-os
 
 GZIP=-9v tar cz -f $xen_root/dist/xen-$desc.tar.gz -C $tdir xen-$desc
 
