@@ -333,6 +333,8 @@ $(TARGETS_MINIOS): mini-os-%:
 .PHONY: libxc
 libxc: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a libxc-$(XEN_TARGET_ARCH)/libxenguest.a
 libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: cross-zlib
+	$(MAKE) -C $(XEN_ROOT)/tools/include
+	$(MAKE) DESTDIR= -C $(MINI_OS) links
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= CONFIG_LIBXC_MINIOS=y -C libxc-$(XEN_TARGET_ARCH)
 
  libxc-$(XEN_TARGET_ARCH)/libxenguest.a: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a
