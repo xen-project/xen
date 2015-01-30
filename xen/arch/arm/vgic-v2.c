@@ -26,7 +26,6 @@
 #include <xen/sched.h>
 
 #include <asm/current.h>
-#include <asm/device.h>
 
 #include <asm/mmio.h>
 #include <asm/gic.h>
