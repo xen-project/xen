@@ -290,11 +290,12 @@ struct dt_device_node *dt_find_node_by_alias(const char *alias)
     return NULL;
 }
 
-bool_t dt_match_node(const struct dt_device_match *matches,
-                     const struct dt_device_node *node)
+const struct dt_device_match *
+dt_match_node(const struct dt_device_match *matches,
+              const struct dt_device_node *node)
 {
     if ( !matches )
-        return 0;
+        return NULL;
 
     while ( matches->path || matches->type ||
             matches->compatible || matches->not_available )
@@ -314,12 +315,11 @@ bool_t dt_match_node(const struct dt_device_match *matches,
             match &= !dt_device_is_available(node);
 
         if ( match )
-            return match;
-
+            return matches;
         matches++;
     }
 
-    return 0;
+    return NULL;
 }
 
 const struct dt_device_node *dt_get_parent(const struct dt_device_node *node)

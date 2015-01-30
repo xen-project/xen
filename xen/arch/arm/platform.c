@@ -157,7 +157,7 @@ bool_t platform_device_is_blacklisted(const struct dt_device_node *node)
     if ( platform && platform->blacklist_dev )
         blacklist = platform->blacklist_dev;
 
-    return dt_match_node(blacklist, node);
+    return (dt_match_node(blacklist, node) != NULL);
 }
 
 unsigned int platform_dom0_evtchn_ppi(void)

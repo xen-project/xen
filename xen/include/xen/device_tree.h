@@ -28,6 +28,7 @@ struct dt_device_match {
     const char *type;
     const char *compatible;
     const bool_t not_available;
+    const void *data;
 };
 
 #define DT_MATCH_PATH(p)                { .path = p }
@@ -547,8 +548,9 @@ bool_t dt_device_is_available(const struct dt_device_node *device);
  *
  * Returns true if the device node match one of dt_device_match.
  */
-bool_t dt_match_node(const struct dt_device_match *matches,
-                     const struct dt_device_node *node);
+const struct dt_device_match *
+dt_match_node(const struct dt_device_match *matches,
+              const struct dt_device_node *node);
 
 /**
  * dt_find_matching_node - Find a node based on an dt_device_match match table
