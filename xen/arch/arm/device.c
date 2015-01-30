@@ -40,7 +40,7 @@ static bool_t __init device_is_compatible(const struct device_desc *desc,
     return 0;
 }
 
-int __init device_init(struct dt_device_node *dev, enum device_type type,
+int __init device_init(struct dt_device_node *dev, enum device_class class,
                        const void *data)
 {
     const struct device_desc *desc;
@@ -52,7 +52,7 @@ int __init device_init(struct dt_device_node *dev, enum device_type type,
 
     for ( desc = _sdevice; desc != _edevice; desc++ )
     {
-        if ( desc->type != type )
+        if ( desc->class != class )
             continue;
 
         if ( device_is_compatible(desc, dev) )
@@ -67,7 +67,7 @@ int __init device_init(struct dt_device_node *dev, enum device_type type,
     return -EBADF;
 }
 
-enum device_type device_get_type(const struct dt_device_node *dev)
+enum device_class device_get_class(const struct dt_device_node *dev)
 {
     const struct device_desc *desc;
 
@@ -76,7 +76,7 @@ enum device_type device_get_type(const struct dt_device_node *dev)
     for ( desc = _sdevice; desc != _edevice; desc++ )
     {
         if ( device_is_compatible(desc, dev) )
-            return desc->type;
+            return desc->class;
     }
 
     return DEVICE_UNKNOWN;

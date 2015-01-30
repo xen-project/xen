@@ -1084,7 +1084,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     /* Even if the IOMMU device is not used by Xen, it should not be
      * passthrough to DOM0
      */
-    if ( device_get_type(node) == DEVICE_IOMMU )
+    if ( device_get_class(node) == DEVICE_IOMMU )
     {
         DPRINT(" IOMMU, skip it\n");
         return 0;
