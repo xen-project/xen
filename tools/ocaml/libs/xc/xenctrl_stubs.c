@@ -530,26 +530,65 @@ CAMLprim value stub_xc_evtchn_reset(value xch, value domid)
 }
 
 
-#define RING_SIZE 32768
-static char ring[RING_SIZE];
-
 CAMLprim value stub_xc_readconsolering(value xch)
 {
-	unsigned int size = RING_SIZE - 1;
-	char *ring_ptr = ring;
-	int retval;
+	/* Safe to use outside of blocking sections because of Ocaml GC lock. */
+	static unsigned int conring_size = 16384 + 1;
+
+	unsigned int count = conring_size, size = count, index = 0;
+	char *str = NULL, *ptr;
+	int ret;
 
 	CAMLparam1(xch);
+	CAMLlocal1(ring);
 
+	str = malloc(size);
+	if (!str)
+		caml_raise_out_of_memory();
+
+	/* Hopefully our conring_size guess is sufficient */
 	caml_enter_blocking_section();
-	retval = xc_readconsolering(_H(xch), ring_ptr, &size, 0, 0, NULL);
+	ret = xc_readconsolering(_H(xch), str, &count, 0, 0, &index);
 	caml_leave_blocking_section();
 
-	if (retval)
+	if (ret < 0) {
+		free(str);
 		failwith_xc(_H(xch));
+	}
 
-	ring[size] = '\0';
-	CAMLreturn(caml_copy_string(ring));
+	while (count == size && ret >= 0) {
+		size += count - 1;
+		if (size < count)
+			break;
+
+		ptr = realloc(str, size);
+		if (!ptr)
+			break;
+
+		str = ptr + count;
+		count = size - count;
+
+		caml_enter_blocking_section();
+		ret = xc_readconsolering(_H(xch), str, &count, 0, 1, &index);
+		caml_leave_blocking_section();
+
+		count += str - ptr;
+		str = ptr;
+	}
+
+	/*
+	 * If we didn't break because of an overflow with size, and we have
+	 * needed to realloc() ourself more space, update our tracking of the
+	 * real console ring size.
+	 */
+	if (size > conring_size)
+		conring_size = size;
+
+	ring = caml_alloc_string(count);
+	memcpy(String_val(ring), str, count);
+	free(str);
+
+	CAMLreturn(ring);
 }
 
 CAMLprim value stub_xc_send_debug_keys(value xch, value keys)
