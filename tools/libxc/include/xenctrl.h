@@ -2036,22 +2036,22 @@ int xc_hvm_destroy_ioreq_server(xc_interface *xch,
 /* HVM guest pass-through */
 int xc_assign_device(xc_interface *xch,
                      uint32_t domid,
-                     uint32_t machine_bdf);
+                     uint32_t machine_sbdf);
 
 int xc_get_device_group(xc_interface *xch,
                      uint32_t domid,
-                     uint32_t machine_bdf,
+                     uint32_t machine_sbdf,
                      uint32_t max_sdevs,
                      uint32_t *num_sdevs,
                      uint32_t *sdev_array);
 
 int xc_test_assign_device(xc_interface *xch,
                           uint32_t domid,
-                          uint32_t machine_bdf);
+                          uint32_t machine_sbdf);
 
 int xc_deassign_device(xc_interface *xch,
                      uint32_t domid,
-                     uint32_t machine_bdf);
+                     uint32_t machine_sbdf);
 
 int xc_domain_memory_mapping(xc_interface *xch,
                              uint32_t domid,
