@@ -770,7 +770,7 @@ static const char * const gicv2_dt_compat[] __initconst =
     NULL
 };
 
-DT_DEVICE_START(gicv2, "GICv2:", DEVICE_GIC)
+DT_DEVICE_START(gicv2, "GICv2", DEVICE_GIC)
         .compatible = gicv2_dt_compat,
         .init = gicv2_init,
 DT_DEVICE_END
