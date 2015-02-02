@@ -39,16 +39,16 @@ SHADOW_INTERNAL_NAME(sh_map_and_validate_gl4e, GUEST_LEVELS)(
 
 extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, GUEST_LEVELS)(
-    struct vcpu *v, mfn_t smfn);
+    struct domain *d, mfn_t smfn);
 extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, GUEST_LEVELS)(
-    struct vcpu *v, mfn_t smfn);
+    struct domain *d, mfn_t smfn);
 extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l3_shadow, GUEST_LEVELS)(
-    struct vcpu *v, mfn_t smfn);
+    struct domain *d, mfn_t smfn);
 extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l4_shadow, GUEST_LEVELS)(
-    struct vcpu *v, mfn_t smfn);
+    struct domain *d, mfn_t smfn);
 
 extern void
 SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings, GUEST_LEVELS)

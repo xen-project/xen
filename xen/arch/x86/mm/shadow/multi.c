@@ -931,7 +931,7 @@ static int shadow_set_l4e(struct vcpu *v,
         {
             flags |= SHADOW_SET_FLUSH;
         }
-        sh_put_ref(v, osl3mfn, paddr);
+        sh_put_ref(d, osl3mfn, paddr);
     }
     return flags;
 }
@@ -977,7 +977,7 @@ static int shadow_set_l3e(struct vcpu *v,
         {
             flags |= SHADOW_SET_FLUSH;
         }
-        sh_put_ref(v, osl2mfn, paddr);
+        sh_put_ref(d, osl2mfn, paddr);
     }
     return flags;
 }
@@ -1063,7 +1063,7 @@ static int shadow_set_l2e(struct vcpu *v,
         {
             flags |= SHADOW_SET_FLUSH;
         }
-        sh_put_ref(v, osl1mfn, paddr);
+        sh_put_ref(d, osl1mfn, paddr);
     }
     return flags;
 }
@@ -1882,9 +1882,8 @@ static shadow_l1e_t * shadow_get_and_create_l1e(struct vcpu *v,
  */
 
 #if GUEST_PAGING_LEVELS >= 4
-void sh_destroy_l4_shadow(struct vcpu *v, mfn_t smfn)
+void sh_destroy_l4_shadow(struct domain *d, mfn_t smfn)
 {
-    struct domain *d = v->domain;
     shadow_l4e_t *sl4e;
     struct page_info *sp = mfn_to_page(smfn);
     u32 t = sp->u.sh.type;
@@ -1904,7 +1903,7 @@ void sh_destroy_l4_shadow(struct vcpu *v, mfn_t smfn)
     SHADOW_FOREACH_L4E(sl4mfn, sl4e, 0, 0, d, {
         if ( shadow_l4e_get_flags(*sl4e) & _PAGE_PRESENT )
         {
-            sh_put_ref(v, shadow_l4e_get_mfn(*sl4e),
+            sh_put_ref(d, shadow_l4e_get_mfn(*sl4e),
                        (((paddr_t)mfn_x(sl4mfn)) << PAGE_SHIFT)
                        | ((unsigned long)sl4e & ~PAGE_MASK));
         }
@@ -1914,9 +1913,8 @@ void sh_destroy_l4_shadow(struct vcpu *v, mfn_t smfn)
     shadow_free(d, smfn);
 }
 
-void sh_destroy_l3_shadow(struct vcpu *v, mfn_t smfn)
+void sh_destroy_l3_shadow(struct domain *d, mfn_t smfn)
 {
-    struct domain *d = v->domain;
     shadow_l3e_t *sl3e;
     struct page_info *sp = mfn_to_page(smfn);
     u32 t = sp->u.sh.type;
@@ -1936,7 +1934,7 @@ void sh_destroy_l3_shadow(struct vcpu *v, mfn_t smfn)
     sl3mfn = smfn;
     SHADOW_FOREACH_L3E(sl3mfn, sl3e, 0, 0, {
         if ( shadow_l3e_get_flags(*sl3e) & _PAGE_PRESENT )
-            sh_put_ref(v, shadow_l3e_get_mfn(*sl3e),
+            sh_put_ref(d, shadow_l3e_get_mfn(*sl3e),
                         (((paddr_t)mfn_x(sl3mfn)) << PAGE_SHIFT)
                         | ((unsigned long)sl3e & ~PAGE_MASK));
     });
@@ -1947,9 +1945,8 @@ void sh_destroy_l3_shadow(struct vcpu *v, mfn_t smfn)
 #endif /* GUEST_PAGING_LEVELS >= 4 */
 
 
-void sh_destroy_l2_shadow(struct vcpu *v, mfn_t smfn)
+void sh_destroy_l2_shadow(struct domain *d, mfn_t smfn)
 {
-    struct domain *d = v->domain;
     shadow_l2e_t *sl2e;
     struct page_info *sp = mfn_to_page(smfn);
     u32 t = sp->u.sh.type;
@@ -1974,7 +1971,7 @@ void sh_destroy_l2_shadow(struct vcpu *v, mfn_t smfn)
     sl2mfn = smfn;
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, d, {
         if ( shadow_l2e_get_flags(*sl2e) & _PAGE_PRESENT )
-            sh_put_ref(v, shadow_l2e_get_mfn(*sl2e),
+            sh_put_ref(d, shadow_l2e_get_mfn(*sl2e),
                         (((paddr_t)mfn_x(sl2mfn)) << PAGE_SHIFT)
                         | ((unsigned long)sl2e & ~PAGE_MASK));
     });
@@ -1983,9 +1980,8 @@ void sh_destroy_l2_shadow(struct vcpu *v, mfn_t smfn)
     shadow_free(d, smfn);
 }
 
-void sh_destroy_l1_shadow(struct vcpu *v, mfn_t smfn)
+void sh_destroy_l1_shadow(struct domain *d, mfn_t smfn)
 {
-    struct domain *d = v->domain;
     shadow_l1e_t *sl1e;
     struct page_info *sp = mfn_to_page(smfn);
     u32 t = sp->u.sh.type;
@@ -3799,6 +3795,7 @@ sh_update_linear_entries(struct vcpu *v)
 static void
 sh_detach_old_tables(struct vcpu *v)
 {
+    struct domain *d = v->domain;
     mfn_t smfn;
     int i = 0;
 
@@ -3812,7 +3809,6 @@ sh_detach_old_tables(struct vcpu *v)
 #else
     if ( v->arch.paging.shadow.guest_vtable )
     {
-        struct domain *d = v->domain;
         if ( shadow_mode_external(d) || shadow_mode_translate(d) )
             sh_unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
         v->arch.paging.shadow.guest_vtable = NULL;
@@ -3831,7 +3827,7 @@ sh_detach_old_tables(struct vcpu *v)
     {
         smfn = pagetable_get_mfn(v->arch.shadow_table[i]);
         if ( mfn_x(smfn) )
-            sh_put_ref(v, smfn, 0);
+            sh_put_ref(d, smfn, 0);
         v->arch.shadow_table[i] = pagetable_null();
     }
 }
@@ -3904,7 +3900,7 @@ sh_set_toplevel_shadow(struct vcpu *v,
             SHADOW_ERROR("can't re-pin %#lx\n", mfn_x(old_smfn));
             domain_crash(d);
         }
-        sh_put_ref(v, old_smfn, 0);
+        sh_put_ref(d, old_smfn, 0);
     }
 }
 

@@ -2052,9 +2052,8 @@ static void hash_vcpu_foreach(struct vcpu *v, unsigned int callback_mask,
  * which will decrement refcounts appropriately and return memory to the
  * free pool. */
 
-void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
+void sh_destroy_shadow(struct domain *d, mfn_t smfn)
 {
-    struct domain *d = v->domain;
     struct page_info *sp = mfn_to_page(smfn);
     unsigned int t = sp->u.sh.type;
 
@@ -2076,36 +2075,36 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
     {
     case SH_type_l1_32_shadow:
     case SH_type_fl1_32_shadow:
-        SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 2)(v, smfn);
+        SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 2)(d, smfn);
         break;
     case SH_type_l2_32_shadow:
-        SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 2)(v, smfn);
+        SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 2)(d, smfn);
         break;
 
     case SH_type_l1_pae_shadow:
     case SH_type_fl1_pae_shadow:
-        SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 3)(v, smfn);
+        SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 3)(d, smfn);
         break;
     case SH_type_l2_pae_shadow:
     case SH_type_l2h_pae_shadow:
-        SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 3)(v, smfn);
+        SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 3)(d, smfn);
         break;
 
     case SH_type_l1_64_shadow:
     case SH_type_fl1_64_shadow:
-        SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 4)(v, smfn);
+        SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 4)(d, smfn);
         break;
     case SH_type_l2h_64_shadow:
         ASSERT(is_pv_32on64_domain(d));
         /* Fall through... */
     case SH_type_l2_64_shadow:
-        SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 4)(v, smfn);
+        SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 4)(d, smfn);
         break;
     case SH_type_l3_64_shadow:
-        SHADOW_INTERNAL_NAME(sh_destroy_l3_shadow, 4)(v, smfn);
+        SHADOW_INTERNAL_NAME(sh_destroy_l3_shadow, 4)(d, smfn);
         break;
     case SH_type_l4_64_shadow:
-        SHADOW_INTERNAL_NAME(sh_destroy_l4_shadow, 4)(v, smfn);
+        SHADOW_INTERNAL_NAME(sh_destroy_l4_shadow, 4)(d, smfn);
         break;
 
     default:

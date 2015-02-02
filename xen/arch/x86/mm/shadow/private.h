@@ -532,7 +532,7 @@ sh_unmap_domain_page_global(void *p)
 /**************************************************************************/
 /* Shadow-page refcounting. */
 
-void sh_destroy_shadow(struct vcpu *v, mfn_t smfn);
+void sh_destroy_shadow(struct domain *d, mfn_t smfn);
 
 /* Increase the refcount of a shadow page.  Arguments are the mfn to refcount,
  * and the physical address of the shadow entry that holds the ref (or zero
@@ -572,9 +572,8 @@ static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 
 /* Decrease the refcount of a shadow page.  As for get_ref, takes the
  * physical address of the shadow entry that held this reference. */
-static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
+static inline void sh_put_ref(struct domain *d, mfn_t smfn, paddr_t entry_pa)
 {
-    struct domain *d = v->domain;
     u32 x, nx;
     struct page_info *sp = mfn_to_page(smfn);
 
@@ -602,7 +601,7 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
     sp->u.sh.count = nx;
 
     if ( unlikely(nx == 0) )
-        sh_destroy_shadow(v, smfn);
+        sh_destroy_shadow(d, smfn);
 }
 
 
@@ -728,7 +727,7 @@ static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
     }
     sh_terminate_list(&tmp_list);
 
-    sh_put_ref(v, smfn, 0);
+    sh_put_ref(d, smfn, 0);
 }
 
 
