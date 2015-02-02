@@ -94,7 +94,8 @@ static inline mfn_t
 get_fl1_shadow_status(struct vcpu *v, gfn_t gfn)
 /* Look for FL1 shadows in the hash table */
 {
-    mfn_t smfn = shadow_hash_lookup(v, gfn_x(gfn), SH_type_fl1_shadow);
+    struct domain *d = v->domain;
+    mfn_t smfn = shadow_hash_lookup(d, gfn_x(gfn), SH_type_fl1_shadow);
     ASSERT(!mfn_valid(smfn) || mfn_to_page(smfn)->u.sh.head);
     return smfn;
 }
@@ -103,7 +104,8 @@ static inline mfn_t
 get_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
 /* Look for shadows in the hash table */
 {
-    mfn_t smfn = shadow_hash_lookup(v, mfn_x(gmfn), shadow_type);
+    struct domain *d = v->domain;
+    mfn_t smfn = shadow_hash_lookup(d, mfn_x(gmfn), shadow_type);
     ASSERT(!mfn_valid(smfn) || mfn_to_page(smfn)->u.sh.head);
     perfc_incr(shadow_get_shadow_status);
     return smfn;
@@ -113,11 +115,12 @@ static inline void
 set_fl1_shadow_status(struct vcpu *v, gfn_t gfn, mfn_t smfn)
 /* Put an FL1 shadow into the hash table */
 {
+    struct domain *d = v->domain;
     SHADOW_PRINTK("gfn=%"SH_PRI_gfn", type=%08x, smfn=%05lx\n",
                    gfn_x(gfn), SH_type_fl1_shadow, mfn_x(smfn));
 
     ASSERT(mfn_to_page(smfn)->u.sh.head);
-    shadow_hash_insert(v, gfn_x(gfn), SH_type_fl1_shadow, smfn);
+    shadow_hash_insert(d, gfn_x(gfn), SH_type_fl1_shadow, smfn);
 }
 
 static inline void
@@ -140,17 +143,18 @@ set_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
         ASSERT(res == 1);
     }
 
-    shadow_hash_insert(v, mfn_x(gmfn), shadow_type, smfn);
+    shadow_hash_insert(d, mfn_x(gmfn), shadow_type, smfn);
 }
 
 static inline void
 delete_fl1_shadow_status(struct vcpu *v, gfn_t gfn, mfn_t smfn)
 /* Remove a shadow from the hash table */
 {
+    struct domain *d = v->domain;
     SHADOW_PRINTK("gfn=%"SH_PRI_gfn", type=%08x, smfn=%05lx\n",
                    gfn_x(gfn), SH_type_fl1_shadow, mfn_x(smfn));
     ASSERT(mfn_to_page(smfn)->u.sh.head);
-    shadow_hash_delete(v, gfn_x(gfn), SH_type_fl1_shadow, smfn);
+    shadow_hash_delete(d, gfn_x(gfn), SH_type_fl1_shadow, smfn);
 }
 
 static inline void
@@ -162,7 +166,7 @@ delete_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
                    d->domain_id, v->vcpu_id,
                    mfn_x(gmfn), shadow_type, mfn_x(smfn));
     ASSERT(mfn_to_page(smfn)->u.sh.head);
-    shadow_hash_delete(v, mfn_x(gmfn), shadow_type, smfn);
+    shadow_hash_delete(d, mfn_x(gmfn), shadow_type, smfn);
     /* 32-on-64 PV guests don't own their l4 pages; see set_shadow_status */
     if ( !is_pv_32on64_domain(d) || shadow_type != SH_type_l4_64_shadow )
         put_page(mfn_to_page(gmfn));
@@ -4501,7 +4505,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
             gl2a = guest_l3e_get_paddr(gl3e[i]);
             gfn = gl2a >> PAGE_SHIFT;
             gmfn = get_gfn_query_unlocked(d, gfn, &p2mt);
-            smfn = shadow_hash_lookup(v, mfn_x(gmfn), SH_type_l2_pae_shadow);
+            smfn = shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l2_pae_shadow);
         }
 
         if ( mfn_valid(smfn) )
@@ -4539,9 +4543,9 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     paging_lock(d);
 
 #if GUEST_PAGING_LEVELS == 2
-    smfn = shadow_hash_lookup(v, mfn_x(gmfn), SH_type_l2_32_shadow);
+    smfn = shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l2_32_shadow);
 #else
-    smfn = shadow_hash_lookup(v, mfn_x(gmfn), SH_type_l4_64_shadow);
+    smfn = shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l4_64_shadow);
 #endif
 
     if ( mfn_valid(smfn) )

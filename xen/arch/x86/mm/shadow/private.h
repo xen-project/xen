@@ -343,10 +343,10 @@ shadow_size(unsigned int shadow_type)
  */
 
 /* Hash table functions */
-mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t);
-void  shadow_hash_insert(struct vcpu *v,
+mfn_t shadow_hash_lookup(struct domain *d, unsigned long n, unsigned int t);
+void  shadow_hash_insert(struct domain *d,
                          unsigned long n, unsigned int t, mfn_t smfn);
-void  shadow_hash_delete(struct vcpu *v,
+void  shadow_hash_delete(struct domain *d,
                          unsigned long n, unsigned int t, mfn_t smfn);
 
 /* shadow promotion */

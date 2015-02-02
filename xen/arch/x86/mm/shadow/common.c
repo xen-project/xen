@@ -1878,11 +1878,10 @@ static void shadow_hash_teardown(struct domain *d)
 }
 
 
-mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
+mfn_t shadow_hash_lookup(struct domain *d, unsigned long n, unsigned int t)
 /* Find an entry in the hash table.  Returns the MFN of the shadow,
  * or INVALID_MFN if it doesn't exist */
 {
-    struct domain *d = v->domain;
     struct page_info *sp, *prev;
     key_t key;
 
@@ -1932,11 +1931,10 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
     return _mfn(INVALID_MFN);
 }
 
-void shadow_hash_insert(struct vcpu *v, unsigned long n, unsigned int t,
+void shadow_hash_insert(struct domain *d, unsigned long n, unsigned int t,
                         mfn_t smfn)
 /* Put a mapping (n,t)->smfn into the hash table */
 {
-    struct domain *d = v->domain;
     struct page_info *sp;
     key_t key;
 
@@ -1958,11 +1956,10 @@ void shadow_hash_insert(struct vcpu *v, unsigned long n, unsigned int t,
     sh_hash_audit_bucket(d, key);
 }
 
-void shadow_hash_delete(struct vcpu *v, unsigned long n, unsigned int t,
+void shadow_hash_delete(struct domain *d, unsigned long n, unsigned int t,
                         mfn_t smfn)
 /* Excise the mapping (n,t)->smfn from the hash table */
 {
-    struct domain *d = v->domain;
     struct page_info *sp, *x;
     key_t key;
 
@@ -2611,7 +2608,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     if( !(pg->count_info & PGC_page_table)                              \
         || !(pg->shadow_flags & (1 << t)) )                             \
         break;                                                          \
-    smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);                       \
+    smfn = shadow_hash_lookup(d, mfn_x(gmfn), t);                       \
     if ( unlikely(!mfn_valid(smfn)) )                                   \
     {                                                                   \
         SHADOW_ERROR(": gmfn %#lx has flags %#"PRIx32                   \
