@@ -2472,6 +2472,7 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
 /* Follow this shadow's up-pointer, if it has one, and remove the reference
  * found there.  Returns 1 if that was the only reference to this shadow */
 {
+    struct domain *d = v->domain;
     struct page_info *sp = mfn_to_page(smfn);
     mfn_t pmfn;
     void *vaddr;
@@ -2479,7 +2480,7 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
 
     ASSERT(sp->u.sh.type > 0);
     ASSERT(sp->u.sh.type < SH_type_max_shadow);
-    ASSERT(sh_type_has_up_pointer(v, sp->u.sh.type));
+    ASSERT(sh_type_has_up_pointer(d, sp->u.sh.type));
 
     if (sp->up == 0) return 0;
     pmfn = _mfn(sp->up >> PAGE_SHIFT);
@@ -2616,9 +2617,9 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
                      mfn_x(gmfn), (uint32_t)pg->shadow_flags, t);       \
         break;                                                          \
     }                                                                   \
-    if ( sh_type_is_pinnable(v, t) )                                    \
+    if ( sh_type_is_pinnable(d, t) )                                    \
         sh_unpin(v, smfn);                                              \
-    else if ( sh_type_has_up_pointer(v, t) )                            \
+    else if ( sh_type_has_up_pointer(d, t) )                            \
         sh_remove_shadow_via_pointer(v, smfn);                          \
     if( !fast                                                           \
         && (pg->count_info & PGC_page_table)                            \

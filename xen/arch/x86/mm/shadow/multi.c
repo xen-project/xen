@@ -903,7 +903,7 @@ static int shadow_set_l4e(struct vcpu *v,
         mfn_t sl3mfn = shadow_l4e_get_mfn(new_sl4e);
         ok = sh_get_ref(v, sl3mfn, paddr);
         /* Are we pinning l3 shadows to handle wierd linux behaviour? */
-        if ( sh_type_is_pinnable(v, SH_type_l3_64_shadow) )
+        if ( sh_type_is_pinnable(d, SH_type_l3_64_shadow) )
             ok |= sh_pin(v, sl3mfn);
         if ( !ok )
         {
@@ -1501,7 +1501,7 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
     SHADOW_DEBUG(MAKE_SHADOW, "(%05lx, %u)=>%05lx\n",
                   mfn_x(gmfn), shadow_type, mfn_x(smfn));
 
-    if ( sh_type_has_up_pointer(v, shadow_type) )
+    if ( sh_type_has_up_pointer(d, shadow_type) )
         /* Lower-level shadow, not yet linked form a higher level */
         mfn_to_page(smfn)->up = 0;
 
@@ -2367,7 +2367,7 @@ int sh_safe_not_to_sync(struct vcpu *v, mfn_t gl1mfn)
     struct page_info *sp;
     mfn_t smfn;
 
-    if ( !sh_type_has_up_pointer(v, SH_type_l1_shadow) )
+    if ( !sh_type_has_up_pointer(d, SH_type_l1_shadow) )
         return 0;
 
     smfn = get_shadow_status(d, gl1mfn, SH_type_l1_shadow);
@@ -2383,7 +2383,7 @@ int sh_safe_not_to_sync(struct vcpu *v, mfn_t gl1mfn)
 #if (SHADOW_PAGING_LEVELS == 4)
     /* up to l3 */
     sp = mfn_to_page(smfn);
-    ASSERT(sh_type_has_up_pointer(v, SH_type_l2_shadow));
+    ASSERT(sh_type_has_up_pointer(d, SH_type_l2_shadow));
     if ( sp->u.sh.count != 1 || !sp->up )
         return 0;
     smfn = _mfn(sp->up >> PAGE_SHIFT);
@@ -2392,7 +2392,7 @@ int sh_safe_not_to_sync(struct vcpu *v, mfn_t gl1mfn)
     /* up to l4 */
     sp = mfn_to_page(smfn);
     if ( sp->u.sh.count != 1
-         || !sh_type_has_up_pointer(v, SH_type_l3_64_shadow) || !sp->up )
+         || !sh_type_has_up_pointer(d, SH_type_l3_64_shadow) || !sp->up )
         return 0;
     smfn = _mfn(sp->up >> PAGE_SHIFT);
     ASSERT(mfn_valid(smfn));

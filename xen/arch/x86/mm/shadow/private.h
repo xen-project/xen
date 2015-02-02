@@ -195,7 +195,7 @@ extern void shadow_audit_tables(struct vcpu *v);
  * What counts as a pinnable shadow?
  */
 
-static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t)
+static inline int sh_type_is_pinnable(struct domain *d, unsigned int t)
 {
     /* Top-level shadow types in each mode can be pinned, so that they
      * persist even when not currently in use in a guest CR3 */
@@ -211,7 +211,7 @@ static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t)
      * page.  When we're shadowing those kernels, we have to pin l3
      * shadows so they don't just evaporate on every context switch.
      * For all other guests, we'd rather use the up-pointer field in l3s. */
-    if ( unlikely((v->domain->arch.paging.shadow.opt_flags & SHOPT_LINUX_L3_TOPLEVEL)
+    if ( unlikely((d->arch.paging.shadow.opt_flags & SHOPT_LINUX_L3_TOPLEVEL)
                   && t == SH_type_l3_64_shadow) )
         return 1;
 #endif
@@ -220,7 +220,7 @@ static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t)
     return 0;
 }
 
-static inline int sh_type_has_up_pointer(struct vcpu *v, unsigned int t)
+static inline int sh_type_has_up_pointer(struct domain *d, unsigned int t)
 {
     /* Multi-page shadows don't have up-pointers */
     if ( t == SH_type_l1_32_shadow
@@ -228,7 +228,7 @@ static inline int sh_type_has_up_pointer(struct vcpu *v, unsigned int t)
          || t == SH_type_l2_32_shadow )
         return 0;
     /* Pinnable shadows don't have up-pointers either */
-    return !sh_type_is_pinnable(v, t);
+    return !sh_type_is_pinnable(d, t);
 }
 
 static inline void sh_terminate_list(struct page_list_head *tmp_list)
@@ -540,6 +540,7 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn);
  * Returns 0 for failure, 1 for success. */
 static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 {
+    struct domain *d = v->domain;
     u32 x, nx;
     struct page_info *sp = mfn_to_page(smfn);
 
@@ -561,7 +562,7 @@ static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 
     /* We remember the first shadow entry that points to each shadow. */
     if ( entry_pa != 0
-         && sh_type_has_up_pointer(v, sp->u.sh.type)
+         && sh_type_has_up_pointer(d, sp->u.sh.type)
          && sp->up == 0 )
         sp->up = entry_pa;
 
@@ -573,6 +574,7 @@ static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
  * physical address of the shadow entry that held this reference. */
 static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 {
+    struct domain *d = v->domain;
     u32 x, nx;
     struct page_info *sp = mfn_to_page(smfn);
 
@@ -582,7 +584,7 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 
     /* If this is the entry in the up-pointer, remove it */
     if ( entry_pa != 0
-         && sh_type_has_up_pointer(v, sp->u.sh.type)
+         && sh_type_has_up_pointer(d, sp->u.sh.type)
          && sp->up == entry_pa )
         sp->up = 0;
 
@@ -656,7 +658,7 @@ static inline int sh_pin(struct vcpu *v, mfn_t smfn)
     sp[0] = mfn_to_page(smfn);
     pages = shadow_size(sp[0]->u.sh.type);
     already_pinned = sp[0]->u.sh.pinned;
-    ASSERT(sh_type_is_pinnable(v, sp[0]->u.sh.type));
+    ASSERT(sh_type_is_pinnable(d, sp[0]->u.sh.type));
     ASSERT(sp[0]->u.sh.head);
 
     pin_list = &d->arch.paging.shadow.pinned_shadows;
@@ -704,7 +706,7 @@ static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
     ASSERT(mfn_valid(smfn));
     sp = mfn_to_page(smfn);
     head_type = sp->u.sh.type;
-    ASSERT(sh_type_is_pinnable(v, sp->u.sh.type));
+    ASSERT(sh_type_is_pinnable(d, sp->u.sh.type));
     ASSERT(sp->u.sh.head);
 
     if ( !sp->u.sh.pinned )
