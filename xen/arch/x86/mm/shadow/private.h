@@ -401,9 +401,9 @@ void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn, int user_only);
 int sh_unsync(struct vcpu *v, mfn_t gmfn);
 
 /* Pull an out-of-sync page back into sync. */
-void sh_resync(struct vcpu *v, mfn_t gmfn);
+void sh_resync(struct domain *d, mfn_t gmfn);
 
-void oos_fixup_add(struct vcpu *v, mfn_t gmfn, mfn_t smfn, unsigned long off);
+void oos_fixup_add(struct domain *d, mfn_t gmfn, mfn_t smfn, unsigned long off);
 
 int sh_remove_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
                                      mfn_t smfn, unsigned long offset);
@@ -432,7 +432,7 @@ shadow_sync_other_vcpus(struct vcpu *v)
 }
 
 void oos_audit_hash_is_present(struct domain *d, mfn_t gmfn);
-mfn_t oos_snapshot_lookup(struct vcpu *v, mfn_t gmfn);
+mfn_t oos_snapshot_lookup(struct domain *d, mfn_t gmfn);
 
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
 

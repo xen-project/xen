@@ -603,13 +603,13 @@ static inline int oos_fixup_flush_gmfn(struct vcpu *v, mfn_t gmfn,
     return 1;
 }
 
-void oos_fixup_add(struct vcpu *v, mfn_t gmfn,
+void oos_fixup_add(struct domain *d, mfn_t gmfn,
                    mfn_t smfn,  unsigned long off)
 {
     int idx, next;
     mfn_t *oos;
     struct oos_fixup *oos_fixup;
-    struct domain *d = v->domain;
+    struct vcpu *v;
 
     perfc_incr(shadow_oos_fixup_add);
 
@@ -788,13 +788,13 @@ static void oos_hash_add(struct vcpu *v, mfn_t gmfn)
 }
 
 /* Remove an MFN from the list of out-of-sync guest pagetables */
-static void oos_hash_remove(struct vcpu *v, mfn_t gmfn)
+static void oos_hash_remove(struct domain *d, mfn_t gmfn)
 {
     int idx;
     mfn_t *oos;
-    struct domain *d = v->domain;
+    struct vcpu *v;
 
-    SHADOW_PRINTK("%pv gmfn %lx\n", v, mfn_x(gmfn));
+    SHADOW_PRINTK("d%d gmfn %lx\n", d->domain_id, mfn_x(gmfn));
 
     for_each_vcpu(d, v)
     {
@@ -813,12 +813,12 @@ static void oos_hash_remove(struct vcpu *v, mfn_t gmfn)
     BUG();
 }
 
-mfn_t oos_snapshot_lookup(struct vcpu *v, mfn_t gmfn)
+mfn_t oos_snapshot_lookup(struct domain *d, mfn_t gmfn)
 {
     int idx;
     mfn_t *oos;
     mfn_t *oos_snapshot;
-    struct domain *d = v->domain;
+    struct vcpu *v;
 
     for_each_vcpu(d, v)
     {
@@ -839,13 +839,13 @@ mfn_t oos_snapshot_lookup(struct vcpu *v, mfn_t gmfn)
 }
 
 /* Pull a single guest page back into sync */
-void sh_resync(struct vcpu *v, mfn_t gmfn)
+void sh_resync(struct domain *d, mfn_t gmfn)
 {
     int idx;
     mfn_t *oos;
     mfn_t *oos_snapshot;
     struct oos_fixup *oos_fixup;
-    struct domain *d = v->domain;
+    struct vcpu *v;
 
     for_each_vcpu(d, v)
     {
@@ -1000,7 +1000,7 @@ void shadow_promote(struct vcpu *v, mfn_t gmfn, unsigned int type)
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     /* Is the page already shadowed and out of sync? */
     if ( page_is_out_of_sync(page) )
-        sh_resync(v, gmfn);
+        sh_resync(d, gmfn);
 #endif
 
     /* We should never try to promote a gmfn that has writeable mappings */
@@ -1019,6 +1019,7 @@ void shadow_promote(struct vcpu *v, mfn_t gmfn, unsigned int type)
 
 void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
 {
+    struct domain *d = v->domain;
     struct page_info *page = mfn_to_page(gmfn);
 
     ASSERT(test_bit(_PGC_page_table, &page->count_info));
@@ -1032,7 +1033,7 @@ void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
         /* Was the page out of sync? */
         if ( page_is_out_of_sync(page) )
         {
-            oos_hash_remove(v, gmfn);
+            oos_hash_remove(d, gmfn);
         }
 #endif
         clear_bit(_PGC_page_table, &page->count_info);
