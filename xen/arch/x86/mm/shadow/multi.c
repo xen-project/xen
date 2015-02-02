@@ -885,12 +885,11 @@ shadow_put_page_from_l1e(shadow_l1e_t sl1e, struct domain *d)
 }
 
 #if GUEST_PAGING_LEVELS >= 4
-static int shadow_set_l4e(struct vcpu *v,
+static int shadow_set_l4e(struct domain *d,
                           shadow_l4e_t *sl4e,
                           shadow_l4e_t new_sl4e,
                           mfn_t sl4mfn)
 {
-    struct domain *d = v->domain;
     int flags = 0, ok;
     shadow_l4e_t old_sl4e;
     paddr_t paddr;
@@ -936,12 +935,11 @@ static int shadow_set_l4e(struct vcpu *v,
     return flags;
 }
 
-static int shadow_set_l3e(struct vcpu *v,
+static int shadow_set_l3e(struct domain *d,
                           shadow_l3e_t *sl3e,
                           shadow_l3e_t new_sl3e,
                           mfn_t sl3mfn)
 {
-    struct domain *d = v->domain;
     int flags = 0;
     shadow_l3e_t old_sl3e;
     paddr_t paddr;
@@ -983,12 +981,11 @@ static int shadow_set_l3e(struct vcpu *v,
 }
 #endif /* GUEST_PAGING_LEVELS >= 4 */
 
-static int shadow_set_l2e(struct vcpu *v,
+static int shadow_set_l2e(struct domain *d,
                           shadow_l2e_t *sl2e,
                           shadow_l2e_t new_sl2e,
                           mfn_t sl2mfn)
 {
-    struct domain *d = v->domain;
     int flags = 0;
     shadow_l2e_t old_sl2e;
     paddr_t paddr;
@@ -1165,14 +1162,13 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
     }
 }
 
-static int shadow_set_l1e(struct vcpu *v,
+static int shadow_set_l1e(struct domain *d,
                           shadow_l1e_t *sl1e,
                           shadow_l1e_t new_sl1e,
                           p2m_type_t new_type,
                           mfn_t sl1mfn)
 {
     int flags = 0;
-    struct domain *d = v->domain;
     shadow_l1e_t old_sl1e;
 #if SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC
     mfn_t new_gmfn = shadow_l1e_get_mfn(new_sl1e);
@@ -1699,7 +1695,7 @@ static shadow_l3e_t * shadow_get_and_create_l3e(struct vcpu *v,
         }
         /* Install the new sl3 table in the sl4e */
         l4e_propagate_from_guest(v, gw->l4e, *sl3mfn, &new_sl4e, ft);
-        r = shadow_set_l4e(v, sl4e, new_sl4e, sl4mfn);
+        r = shadow_set_l4e(d, sl4e, new_sl4e, sl4mfn);
         ASSERT((r & SHADOW_SET_FLUSH) == 0);
         if ( r & SHADOW_SET_ERROR )
             return NULL;
@@ -1755,7 +1751,7 @@ static shadow_l2e_t * shadow_get_and_create_l2e(struct vcpu *v,
         }
         /* Install the new sl2 table in the sl3e */
         l3e_propagate_from_guest(v, gw->l3e, *sl2mfn, &new_sl3e, ft);
-        r = shadow_set_l3e(v, sl3e, new_sl3e, sl3mfn);
+        r = shadow_set_l3e(d, sl3e, new_sl3e, sl3mfn);
         ASSERT((r & SHADOW_SET_FLUSH) == 0);
         if ( r & SHADOW_SET_ERROR )
             return NULL;
@@ -1845,7 +1841,7 @@ static shadow_l1e_t * shadow_get_and_create_l1e(struct vcpu *v,
         }
         /* Install the new sl1 table in the sl2e */
         l2e_propagate_from_guest(v, gw->l2e, *sl1mfn, &new_sl2e, ft);
-        r = shadow_set_l2e(v, sl2e, new_sl2e, sl2mfn);
+        r = shadow_set_l2e(d, sl2e, new_sl2e, sl2mfn);
         ASSERT((r & SHADOW_SET_FLUSH) == 0);
         if ( r & SHADOW_SET_ERROR )
             return NULL;
@@ -2084,7 +2080,7 @@ void sh_unhook_32b_mappings(struct vcpu *v, mfn_t sl2mfn, int user_only)
     shadow_l2e_t *sl2e;
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, d, {
         if ( !user_only || (sl2e->l2 & _PAGE_USER) )
-            (void) shadow_set_l2e(v, sl2e, shadow_l2e_empty(), sl2mfn);
+            (void) shadow_set_l2e(d, sl2e, shadow_l2e_empty(), sl2mfn);
     });
 }
 
@@ -2097,7 +2093,7 @@ void sh_unhook_pae_mappings(struct vcpu *v, mfn_t sl2mfn, int user_only)
     shadow_l2e_t *sl2e;
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, d, {
         if ( !user_only || (sl2e->l2 & _PAGE_USER) )
-            (void) shadow_set_l2e(v, sl2e, shadow_l2e_empty(), sl2mfn);
+            (void) shadow_set_l2e(d, sl2e, shadow_l2e_empty(), sl2mfn);
     });
 }
 
@@ -2109,7 +2105,7 @@ void sh_unhook_64b_mappings(struct vcpu *v, mfn_t sl4mfn, int user_only)
     shadow_l4e_t *sl4e;
     SHADOW_FOREACH_L4E(sl4mfn, sl4e, 0, 0, d, {
         if ( !user_only || (sl4e->l4 & _PAGE_USER) )
-            (void) shadow_set_l4e(v, sl4e, shadow_l4e_empty(), sl4mfn);
+            (void) shadow_set_l4e(d, sl4e, shadow_l4e_empty(), sl4mfn);
     });
 }
 
@@ -2180,7 +2176,7 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
         }
     }
 
-    result |= shadow_set_l4e(v, sl4p, new_sl4e, sl4mfn);
+    result |= shadow_set_l4e(d, sl4p, new_sl4e, sl4mfn);
     return result;
 }
 
@@ -2212,7 +2208,7 @@ static int validate_gl3e(struct vcpu *v, void *new_ge, mfn_t sl3mfn, void *se)
 #endif
     }
     l3e_propagate_from_guest(v, new_gl3e, sl2mfn, &new_sl3e, ft_prefetch);
-    result |= shadow_set_l3e(v, sl3p, new_sl3e, sl3mfn);
+    result |= shadow_set_l3e(d, sl3p, new_sl3e, sl3mfn);
 
     return result;
 }
@@ -2259,7 +2255,7 @@ static int validate_gl2e(struct vcpu *v, void *new_ge, mfn_t sl2mfn, void *se)
     }
     l2e_propagate_from_guest(v, new_gl2e, sl1mfn, &new_sl2e, ft_prefetch);
 
-    result |= shadow_set_l2e(v, sl2p, new_sl2e, sl2mfn);
+    result |= shadow_set_l2e(d, sl2p, new_sl2e, sl2mfn);
 
     return result;
 }
@@ -2284,7 +2280,7 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
 
     l1e_propagate_from_guest(v, new_gl1e, gmfn, &new_sl1e, ft_prefetch, p2mt);
-    result |= shadow_set_l1e(v, sl1p, new_sl1e, p2mt, sl1mfn);
+    result |= shadow_set_l1e(d, sl1p, new_sl1e, p2mt, sl1mfn);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     gl1mfn = backpointer(mfn_to_page(sl1mfn));
@@ -2344,7 +2340,7 @@ void sh_resync_l1(struct vcpu *v, mfn_t gl1mfn, mfn_t snpmfn)
             gfn = guest_l1e_get_gfn(gl1e);
             gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
             l1e_propagate_from_guest(v, gl1e, gmfn, &nsl1e, ft_prefetch, p2mt);
-            rc |= shadow_set_l1e(v, sl1p, nsl1e, p2mt, sl1mfn);
+            rc |= shadow_set_l1e(d, sl1p, nsl1e, p2mt, sl1mfn);
             *snpl1p = gl1e;
         }
     });
@@ -2673,7 +2669,7 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
 
         /* Propagate the entry.  */
         l1e_propagate_from_guest(v, gl1e, gmfn, &sl1e, ft_prefetch, p2mt);
-        (void) shadow_set_l1e(v, ptr_sl1e + i, sl1e, p2mt, sl1mfn);
+        (void) shadow_set_l1e(d, ptr_sl1e + i, sl1e, p2mt, sl1mfn);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
         if ( snpl1p != NULL )
@@ -3161,7 +3157,7 @@ static int sh_page_fault(struct vcpu *v,
 
     /* Calculate the shadow entry and write it */
     l1e_propagate_from_guest(v, gw.l1e, gmfn, &sl1e, ft, p2mt);
-    r = shadow_set_l1e(v, ptr_sl1e, sl1e, p2mt, sl1mfn);
+    r = shadow_set_l1e(d, ptr_sl1e, sl1e, p2mt, sl1mfn);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     if ( mfn_valid(gw.l1mfn)
@@ -3590,7 +3586,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
                 shadow_l1e_t *sl1;
                 sl1 = sh_linear_l1_table(v) + shadow_l1_linear_offset(va);
                 /* Remove the shadow entry that maps this VA */
-                (void) shadow_set_l1e(v, sl1, shadow_l1e_empty(),
+                (void) shadow_set_l1e(d, sl1, shadow_l1e_empty(),
                                       p2m_invalid, sl1mfn);
             }
             paging_unlock(d);
@@ -4221,7 +4217,7 @@ int sh_rm_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
 
     /* Found it!  Need to remove its write permissions. */
     sl1e = shadow_l1e_remove_flags(sl1e, _PAGE_RW);
-    r = shadow_set_l1e(v, sl1p, sl1e, p2m_ram_rw, smfn);
+    r = shadow_set_l1e(d, sl1p, sl1e, p2m_ram_rw, smfn);
     ASSERT( !(r & SHADOW_SET_ERROR) );
 
     sh_unmap_domain_page(sl1p);
@@ -4239,6 +4235,7 @@ static int sh_guess_wrmap(struct vcpu *v, unsigned long vaddr, mfn_t gmfn)
 /* Look up this vaddr in the current shadow and see if it's a writeable
  * mapping of this gmfn.  If so, remove it.  Returns 1 if it worked. */
 {
+    struct domain *d = v->domain;
     shadow_l1e_t sl1e, *sl1p;
     shadow_l2e_t *sl2p;
     shadow_l3e_t *sl3p;
@@ -4275,7 +4272,7 @@ static int sh_guess_wrmap(struct vcpu *v, unsigned long vaddr, mfn_t gmfn)
     /* Found it!  Need to remove its write permissions. */
     sl1mfn = shadow_l2e_get_mfn(*sl2p);
     sl1e = shadow_l1e_remove_flags(sl1e, _PAGE_RW);
-    r = shadow_set_l1e(v, sl1p, sl1e, p2m_ram_rw, sl1mfn);
+    r = shadow_set_l1e(d, sl1p, sl1e, p2m_ram_rw, sl1mfn);
     if ( r & SHADOW_SET_ERROR ) {
         /* Can only currently happen if we found a grant-mapped
          * page.  Just make the guess fail. */
@@ -4290,11 +4287,11 @@ int sh_rm_write_access_from_l1(struct vcpu *v, mfn_t sl1mfn,
                                mfn_t readonly_mfn)
 /* Excises all writeable mappings to readonly_mfn from this l1 shadow table */
 {
+    struct domain *d = v->domain;
     shadow_l1e_t *sl1e;
     int done = 0;
     int flags;
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
-    struct domain *d = v->domain;
     struct vcpu *curr = current;
     mfn_t base_sl1mfn = sl1mfn; /* Because sl1mfn changes in the foreach */
 #endif
@@ -4307,7 +4304,7 @@ int sh_rm_write_access_from_l1(struct vcpu *v, mfn_t sl1mfn,
              && (mfn_x(shadow_l1e_get_mfn(*sl1e)) == mfn_x(readonly_mfn)) )
         {
             shadow_l1e_t ro_sl1e = shadow_l1e_remove_flags(*sl1e, _PAGE_RW);
-            (void) shadow_set_l1e(v, sl1e, ro_sl1e, p2m_ram_rw, sl1mfn);
+            (void) shadow_set_l1e(d, sl1e, ro_sl1e, p2m_ram_rw, sl1mfn);
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
             /* Remember the last shadow that we shot a writeable mapping in */
             if ( curr->domain == d )
@@ -4326,6 +4323,7 @@ int sh_rm_write_access_from_l1(struct vcpu *v, mfn_t sl1mfn,
 int sh_rm_mappings_from_l1(struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn)
 /* Excises all mappings to guest frame from this shadow l1 table */
 {
+    struct domain *d = v->domain;
     shadow_l1e_t *sl1e;
     int done = 0;
     int flags;
@@ -4336,7 +4334,7 @@ int sh_rm_mappings_from_l1(struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn)
         if ( (flags & _PAGE_PRESENT)
              && (mfn_x(shadow_l1e_get_mfn(*sl1e)) == mfn_x(target_mfn)) )
         {
-            (void) shadow_set_l1e(v, sl1e, shadow_l1e_empty(),
+            (void) shadow_set_l1e(d, sl1e, shadow_l1e_empty(),
                                   p2m_invalid, sl1mfn);
             if ( sh_check_page_has_no_refs(mfn_to_page(target_mfn)) )
                 /* This breaks us cleanly out of the FOREACH macro */
@@ -4352,23 +4350,25 @@ int sh_rm_mappings_from_l1(struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn)
 void sh_clear_shadow_entry(struct vcpu *v, void *ep, mfn_t smfn)
 /* Blank out a single shadow entry */
 {
+    struct domain *d = v->domain;
+
     switch ( mfn_to_page(smfn)->u.sh.type )
     {
     case SH_type_l1_shadow:
-        (void) shadow_set_l1e(v, ep, shadow_l1e_empty(), p2m_invalid, smfn);
+        (void) shadow_set_l1e(d, ep, shadow_l1e_empty(), p2m_invalid, smfn);
         break;
     case SH_type_l2_shadow:
 #if GUEST_PAGING_LEVELS >= 3
     case SH_type_l2h_shadow:
 #endif
-        (void) shadow_set_l2e(v, ep, shadow_l2e_empty(), smfn);
+        (void) shadow_set_l2e(d, ep, shadow_l2e_empty(), smfn);
         break;
 #if GUEST_PAGING_LEVELS >= 4
     case SH_type_l3_shadow:
-        (void) shadow_set_l3e(v, ep, shadow_l3e_empty(), smfn);
+        (void) shadow_set_l3e(d, ep, shadow_l3e_empty(), smfn);
         break;
     case SH_type_l4_shadow:
-        (void) shadow_set_l4e(v, ep, shadow_l4e_empty(), smfn);
+        (void) shadow_set_l4e(d, ep, shadow_l4e_empty(), smfn);
         break;
 #endif
     default: BUG(); /* Called with the wrong kind of shadow. */
@@ -4389,7 +4389,7 @@ int sh_remove_l1_shadow(struct vcpu *v, mfn_t sl2mfn, mfn_t sl1mfn)
         if ( (flags & _PAGE_PRESENT)
              && (mfn_x(shadow_l2e_get_mfn(*sl2e)) == mfn_x(sl1mfn)) )
         {
-            (void) shadow_set_l2e(v, sl2e, shadow_l2e_empty(), sl2mfn);
+            (void) shadow_set_l2e(d, sl2e, shadow_l2e_empty(), sl2mfn);
             if ( mfn_to_page(sl1mfn)->u.sh.type == 0 )
                 /* This breaks us cleanly out of the FOREACH macro */
                 done = 1;
@@ -4402,6 +4402,7 @@ int sh_remove_l1_shadow(struct vcpu *v, mfn_t sl2mfn, mfn_t sl1mfn)
 int sh_remove_l2_shadow(struct vcpu *v, mfn_t sl3mfn, mfn_t sl2mfn)
 /* Remove all mappings of this l2 shadow from this l3 shadow */
 {
+    struct domain *d = v->domain;
     shadow_l3e_t *sl3e;
     int done = 0;
     int flags;
@@ -4412,7 +4413,7 @@ int sh_remove_l2_shadow(struct vcpu *v, mfn_t sl3mfn, mfn_t sl2mfn)
         if ( (flags & _PAGE_PRESENT)
              && (mfn_x(shadow_l3e_get_mfn(*sl3e)) == mfn_x(sl2mfn)) )
         {
-            (void) shadow_set_l3e(v, sl3e, shadow_l3e_empty(), sl3mfn);
+            (void) shadow_set_l3e(d, sl3e, shadow_l3e_empty(), sl3mfn);
             if ( mfn_to_page(sl2mfn)->u.sh.type == 0 )
                 /* This breaks us cleanly out of the FOREACH macro */
                 done = 1;
@@ -4435,7 +4436,7 @@ int sh_remove_l3_shadow(struct vcpu *v, mfn_t sl4mfn, mfn_t sl3mfn)
         if ( (flags & _PAGE_PRESENT)
              && (mfn_x(shadow_l4e_get_mfn(*sl4e)) == mfn_x(sl3mfn)) )
         {
-            (void) shadow_set_l4e(v, sl4e, shadow_l4e_empty(), sl4mfn);
+            (void) shadow_set_l4e(d, sl4e, shadow_l4e_empty(), sl4mfn);
             if ( mfn_to_page(sl3mfn)->u.sh.type == 0 )
                 /* This breaks us cleanly out of the FOREACH macro */
                 done = 1;
