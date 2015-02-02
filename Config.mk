@@ -260,9 +260,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= b0d42741f8e9a00854c3b3faca1da84bfc69bf22
-# Mon Oct 6 16:24:46 2014 +0100
-# qemu-xen-trad: Switch to $(LIBEXEC_BIN) from $(LIBEXEC)
+QEMU_TRADITIONAL_REVISION ?= a4b276b4ce49c8d70dd841ff885b900ec652b994
+# Mon Feb 2 16:49:59 2015 +0000
+# cirrus: fix an uninitialized variable
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
