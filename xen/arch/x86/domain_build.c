@@ -129,8 +129,10 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
     return alloc_vcpu(dom0, 0, 0);
 }
 
+#ifdef CONFIG_SHADOW_PAGING
 static bool_t __initdata opt_dom0_shadow;
 boolean_param("dom0_shadow", opt_dom0_shadow);
+#endif
 
 static char __initdata opt_dom0_ioports_disable[200] = "";
 string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
@@ -1418,6 +1420,7 @@ int __init construct_dom0(
     regs->esi = vstartinfo_start;
     regs->eflags = X86_EFLAGS_IF;
 
+#ifdef CONFIG_SHADOW_PAGING
     if ( opt_dom0_shadow )
     {
         if ( is_pvh_domain(d) )
@@ -1428,6 +1431,7 @@ int __init construct_dom0(
         if ( paging_enable(d, PG_SH_enable) == 0 ) 
             paging_update_paging_modes(v);
     }
+#endif
 
     /*
      * PVH Fixme: XENFEAT_supervisor_mode_kernel has been reused in PVH with a

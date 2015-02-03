@@ -88,6 +88,7 @@ void hypercall_page_initialise(struct domain *d, void *);
 /*          shadow paging extension             */
 /************************************************/
 struct shadow_domain {
+#ifdef CONFIG_SHADOW_PAGING
     unsigned int      opt_flags;    /* runtime tunable optimizations on/off */
     struct page_list_head pinned_shadows;
 
@@ -117,9 +118,11 @@ struct shadow_domain {
 
     /* Has this domain ever used HVMOP_pagetable_dying? */
     bool_t pagetable_dying_op;
+#endif
 };
 
 struct shadow_vcpu {
+#ifdef CONFIG_SHADOW_PAGING
     /* PAE guests: per-vcpu shadow top-level table */
     l3_pgentry_t l3table[4] __attribute__((__aligned__(32)));
     /* PAE guests: per-vcpu cache of the top-level *guest* entries */
@@ -145,6 +148,7 @@ struct shadow_vcpu {
     } oos_fixup[SHADOW_OOS_PAGES];
 
     bool_t pagetable_dying;
+#endif
 };
 
 /************************************************/

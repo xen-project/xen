@@ -635,16 +635,16 @@ int paging_domain_init(struct domain *d, unsigned int domcr_flags)
      * don't want to leak any active log-dirty bitmaps */
     d->arch.paging.log_dirty.top = _mfn(INVALID_MFN);
 
-    /* The order of the *_init calls below is important, as the later
-     * ones may rewrite some common fields.  Shadow pagetables are the
-     * default... */
-    shadow_domain_init(d, domcr_flags);
-
-    /* ... but we will use hardware assistance if it's available. */
+    /*
+     * Shadow pagetables are the default, but we will use
+     * hardware assistance if it's available and enabled.
+     */
     if ( hap_enabled(d) )
         hap_domain_init(d);
+    else
+        rc = shadow_domain_init(d, domcr_flags);
 
-    return 0;
+    return rc;
 }
 
 /* vcpu paging struct initialization goes here */
@@ -822,12 +822,16 @@ int paging_enable(struct domain *d, u32 mode)
  * and therefore its pagetables will soon be discarded */
 void pagetable_dying(struct domain *d, paddr_t gpa)
 {
+#ifdef CONFIG_SHADOW_PAGING
     struct vcpu *v;
 
     ASSERT(paging_mode_shadow(d));
 
     v = d->vcpu[0];
     v->arch.paging.mode->shadow.pagetable_dying(v, gpa);
+#else
+    BUG();
+#endif
 }
 
 /* Print paging-assistance info to the console */

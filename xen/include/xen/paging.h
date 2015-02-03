@@ -7,7 +7,7 @@
 #include <asm/paging.h>
 #include <asm/p2m.h>
 
-#elif defined CONFIG_SHADOW
+#elif defined CONFIG_SHADOW_PAGING
 
 #include <asm/shadow.h>
 

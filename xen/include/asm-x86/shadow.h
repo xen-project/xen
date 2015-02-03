@@ -49,11 +49,13 @@
 
 /* Set up the shadow-specific parts of a domain struct at start of day.
  * Called from paging_domain_init(). */
-void shadow_domain_init(struct domain *d, unsigned int domcr_flags);
+int shadow_domain_init(struct domain *d, unsigned int domcr_flags);
 
 /* Setup the shadow-specific parts of a vcpu struct. It is called by
  * paging_vcpu_init() in paging.c */
 void shadow_vcpu_init(struct vcpu *v);
+
+#ifdef CONFIG_SHADOW_PAGING
 
 /* Enable an arbitrary shadow mode.  Call once at domain creation. */
 int shadow_enable(struct domain *d, u32 mode);
@@ -77,16 +79,39 @@ void shadow_teardown(struct domain *d);
 /* Call once all of the references to the domain have gone away */
 void shadow_final_teardown(struct domain *d);
 
-/* Remove all shadows of the guest mfn. */
 void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all);
+
+/* Discard _all_ mappings from the domain's shadows. */
+void shadow_blow_tables_per_domain(struct domain *d);
+
+#else /* !CONFIG_SHADOW_PAGING */
+
+#define shadow_teardown(d) ASSERT(is_pv_domain(d))
+#define shadow_final_teardown(d) ASSERT(is_pv_domain(d))
+#define shadow_enable(d, mode) \
+    ({ ASSERT(is_pv_domain(d)); -EOPNOTSUPP; })
+#define shadow_track_dirty_vram(d, begin_pfn, nr, bitmap) \
+    ({ ASSERT_UNREACHABLE(); -EOPNOTSUPP; })
+
+static inline void sh_remove_shadows(struct vcpu *v, mfn_t gmfn,
+                                     bool_t fast, bool_t all) {}
+
+static inline void shadow_blow_tables_per_domain(struct domain *d) {}
+
+static inline int shadow_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
+                                XEN_GUEST_HANDLE_PARAM(void) u_domctl)
+{
+    return -EINVAL;
+}
+
+#endif /* CONFIG_SHADOW_PAGING */
+
+/* Remove all shadows of the guest mfn. */
 static inline void shadow_remove_all_shadows(struct vcpu *v, mfn_t gmfn)
 {
     /* See the comment about locking in sh_remove_shadows */
     sh_remove_shadows(v, gmfn, 0 /* Be thorough */, 1 /* Must succeed */);
 }
-
-/* Discard _all_ mappings from the domain's shadows. */
-void shadow_blow_tables_per_domain(struct domain *d);
 
 #endif /* _XEN_SHADOW_H */
 

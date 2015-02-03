@@ -32,9 +32,13 @@ x86 := y
 x86_32 := n
 x86_64 := y
 
+shadow-paging ?= y
+
 CFLAGS += -mno-red-zone -mno-sse -fpic
 CFLAGS += -fno-asynchronous-unwind-tables
 # -fvisibility=hidden reduces -fpic cost, if it's available
 ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
 CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
 endif
+
+CFLAGS-$(shadow-paging) += -DCONFIG_SHADOW_PAGING

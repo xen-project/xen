@@ -39,7 +39,11 @@
 #define PG_SH_shift    20
 #define PG_HAP_shift   21
 /* We're in one of the shadow modes */
+#ifdef CONFIG_SHADOW_PAGING
 #define PG_SH_enable   (1U << PG_SH_shift)
+#else
+#define PG_SH_enable   0
+#endif
 #define PG_HAP_enable  (1U << PG_HAP_shift)
 
 /* common paging mode bits */
@@ -74,6 +78,7 @@
 
 struct sh_emulate_ctxt;
 struct shadow_paging_mode {
+#ifdef CONFIG_SHADOW_PAGING
     void          (*detach_old_tables     )(struct vcpu *v);
     int           (*x86_emulate_write     )(struct vcpu *v, unsigned long va,
                                             void *src, u32 bytes,
@@ -88,6 +93,7 @@ struct shadow_paging_mode {
     int           (*guess_wrmap           )(struct vcpu *v, 
                                             unsigned long vaddr, mfn_t gmfn);
     void          (*pagetable_dying       )(struct vcpu *v, paddr_t gpa);
+#endif
     /* For outsiders to tell what mode we're in */
     unsigned int shadow_levels;
 };

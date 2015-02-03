@@ -47,7 +47,7 @@ static void sh_clean_dirty_bitmap(struct domain *);
 
 /* Set up the shadow-specific parts of a domain struct at start of day.
  * Called for every domain from arch_domain_create() */
-void shadow_domain_init(struct domain *d, unsigned int domcr_flags)
+int shadow_domain_init(struct domain *d, unsigned int domcr_flags)
 {
     INIT_PAGE_LIST_HEAD(&d->arch.paging.shadow.freelist);
     INIT_PAGE_LIST_HEAD(&d->arch.paging.shadow.pinned_shadows);
@@ -61,6 +61,8 @@ void shadow_domain_init(struct domain *d, unsigned int domcr_flags)
     d->arch.paging.shadow.oos_off = (domcr_flags & DOMCRF_oos_off) ?  1 : 0;
 #endif
     d->arch.paging.shadow.pagetable_dying_op = 0;
+
+    return 0;
 }
 
 /* Setup the shadow-specfic parts of a vcpu struct. Note: The most important
