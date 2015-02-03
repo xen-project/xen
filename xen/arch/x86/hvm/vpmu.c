@@ -65,6 +65,19 @@ static void __init parse_vpmu_param(char *s)
     }
 }
 
+void vpmu_lvtpc_update(uint32_t val)
+{
+    struct vpmu_struct *vpmu;
+
+    if ( !opt_vpmu_enabled )
+        return;
+
+    vpmu = vcpu_vpmu(current);
+
+    vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR | (val & APIC_LVT_MASKED);
+    apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
+}
+
 int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content, uint64_t supported)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
