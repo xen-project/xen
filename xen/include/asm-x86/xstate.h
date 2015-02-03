@@ -15,6 +15,9 @@
 
 #define XSTATE_CPUID              0x0000000d
 #define XSTATE_FEATURE_XSAVEOPT   (1 << 0)    /* sub-leaf 1, eax[bit 0] */
+#define XSTATE_FEATURE_XSAVEC     (1 << 1)    /* sub-leaf 1, eax[bit 1] */
+#define XSTATE_FEATURE_XGETBV1    (1 << 2)    /* sub-leaf 1, eax[bit 2] */
+#define XSTATE_FEATURE_XSAVES     (1 << 3)    /* sub-leaf 1, eax[bit 3] */
 
 #define XCR_XFEATURE_ENABLED_MASK 0x00000000  /* index of XCR0 */
 
@@ -34,6 +37,7 @@
 #define XSTATE_LAZY    (XSTATE_ALL & ~XSTATE_NONLAZY)
 
 extern u64 xfeature_mask;
+extern bool_t cpu_has_xsaves, cpu_has_xgetbv1;
 
 /* extended state save area */
 struct xsave_struct
