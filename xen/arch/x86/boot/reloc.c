@@ -90,7 +90,6 @@ multiboot_info_t *reloc(multiboot_info_t *mbi_old)
 
     /* Mask features we don't understand or don't relocate. */
     mbi->flags &= (MBI_MEMLIMITS |
-                   MBI_BOOTDEV |
                    MBI_CMDLINE |
                    MBI_MODULES |
                    MBI_MEMMAP |
