@@ -221,7 +221,6 @@ extern unsigned int nmi_watchdog;
 #define NMI_NONE	0
 #define NMI_IO_APIC	1
 #define NMI_LOCAL_APIC	2
-#define NMI_INVALID	3
 
 #else /* !CONFIG_X86_LOCAL_APIC */
 static inline int lapic_suspend(void) {return 0;}

@@ -3385,7 +3385,8 @@ void do_nmi(const struct cpu_user_regs *regs)
     if ( nmi_callback(regs, cpu) )
         return;
 
-    if ( !nmi_watchdog || (!nmi_watchdog_tick(regs) && watchdog_force) )
+    if ( (nmi_watchdog == NMI_NONE) ||
+         (!nmi_watchdog_tick(regs) && watchdog_force) )
         handle_unknown = 1;
 
     /* Only the BSP gets external NMIs from the system. */

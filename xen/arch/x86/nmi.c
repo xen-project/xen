@@ -148,7 +148,7 @@ int __init check_nmi_watchdog (void)
     int cpu;
     bool_t ok = 1;
 
-    if ( !nmi_watchdog )
+    if ( nmi_watchdog == NMI_NONE )
         return 0;
 
     printk("Testing NMI watchdog on all CPUs:");
@@ -361,7 +361,7 @@ static int __pminit setup_p4_watchdog(void)
 
 void __pminit setup_apic_nmi_watchdog(void)
 {
-    if (!nmi_watchdog)
+    if ( nmi_watchdog == NMI_NONE )
         return;
 
     switch (boot_cpu_data.x86_vendor) {
