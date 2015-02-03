@@ -2677,7 +2677,11 @@ int vcpu_destroy_pagetables(struct vcpu *v)
 
     v->arch.cr3 = 0;
 
-    return rc;
+    /*
+     * put_page_and_type_preemptible() is liable to return -EINTR. The
+     * callers of us expect -ERESTART so convert it over.
+     */
+    return rc != -EINTR ? rc : -ERESTART;
 }
 
 int new_guest_cr3(unsigned long mfn)
