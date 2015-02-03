@@ -769,8 +769,8 @@ out:
     if ( needs_sync != sync_off )
         ept_sync_domain(p2m);
 
-    /* For non-nested p2m, may need to change VT-d page table.*/
-    if ( rc == 0 && !p2m_is_nestedp2m(p2m) && need_iommu(d) &&
+    /* For host p2m, may need to change VT-d page table.*/
+    if ( rc == 0 && p2m_is_hostp2m(p2m) && need_iommu(d) &&
          need_modify_vtd_table )
     {
         if ( iommu_hap_pt_share )

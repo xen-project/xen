@@ -99,7 +99,7 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
                                  q);
     if ( p2m_is_paging(*p2mt) )
     {
-        ASSERT(!p2m_is_nestedp2m(p2m));
+        ASSERT(p2m_is_hostp2m(p2m));
         if ( page )
             put_page(page);
         p2m_mem_paging_populate(p2m->domain, gfn_x(gfn));

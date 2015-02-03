@@ -71,6 +71,7 @@ static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 
     p2m->domain = d;
     p2m->default_access = p2m_access_rwx;
+    p2m->p2m_class = p2m_host;
 
     p2m->np2m_base = P2M_BASE_EADDR;
 
@@ -158,6 +159,7 @@ static int p2m_init_nestedp2m(struct domain *d)
             p2m_teardown_nestedp2m(d);
             return -ENOMEM;
         }
+        p2m->p2m_class = p2m_nested;
         p2m->write_p2m_entry = nestedp2m_write_p2m_entry;
         list_add(&p2m->np2m_list, &p2m_get_hostp2m(d)->np2m_list);
     }
@@ -202,7 +204,7 @@ int p2m_init(struct domain *d)
 int p2m_is_logdirty_range(struct p2m_domain *p2m, unsigned long start,
                           unsigned long end)
 {
-    ASSERT(!p2m_is_nestedp2m(p2m));
+    ASSERT(p2m_is_hostp2m(p2m));
     if ( p2m->global_logdirty ||
          rangeset_contains_range(p2m->logdirty_ranges, start, end) )
         return 1;
@@ -263,7 +265,7 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
 
     if ( (q & P2M_UNSHARE) && p2m_is_shared(*t) )
     {
-        ASSERT(!p2m_is_nestedp2m(p2m));
+        ASSERT(p2m_is_hostp2m(p2m));
         /* Try to unshare. If we fail, communicate ENOMEM without
          * sleeping. */
         if ( mem_sharing_unshare_page(p2m->domain, gfn, 0) < 0 )
@@ -431,7 +433,7 @@ int p2m_alloc_table(struct p2m_domain *p2m)
 
     p2m_lock(p2m);
 
-    if ( !p2m_is_nestedp2m(p2m)
+    if ( p2m_is_hostp2m(p2m)
          && !page_list_empty(&d->page_list) )
     {
         P2M_ERROR("dom %d already has memory allocated\n", d->domain_id);
@@ -1710,7 +1712,7 @@ p2m_flush_table(struct p2m_domain *p2m)
 
     /* "Host" p2m tables can have shared entries &c that need a bit more 
      * care when discarding them */
-    ASSERT(p2m_is_nestedp2m(p2m));
+    ASSERT(!p2m_is_hostp2m(p2m));
     /* Nested p2m's do not do pod, hence the asserts (and no pod lock)*/
     ASSERT(page_list_empty(&p2m->pod.super));
     ASSERT(page_list_empty(&p2m->pod.single));

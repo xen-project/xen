@@ -2914,7 +2914,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     /* Mem sharing: unshare the page and try again */
     if ( npfec.write_access && (p2mt == p2m_ram_shared) )
     {
-        ASSERT(!p2m_is_nestedp2m(p2m));
+        ASSERT(p2m_is_hostp2m(p2m));
         sharing_enomem = 
             (mem_sharing_unshare_page(p2m->domain, gfn, 0) < 0);
         rc = 1;

@@ -172,6 +172,11 @@ typedef unsigned int p2m_query_t;
                              (P2M_RAM_TYPES | P2M_GRANT_TYPES |  \
                               p2m_to_mask(p2m_map_foreign)))
 
+typedef enum {
+    p2m_host,
+    p2m_nested,
+} p2m_class_t;
+
 /* Per-p2m-table state */
 struct p2m_domain {
     /* Lock that protects updates to the p2m */
@@ -187,6 +192,8 @@ struct p2m_domain {
     cpumask_var_t      dirty_cpumask;
 
     struct domain     *domain;   /* back pointer to domain */
+
+    p2m_class_t       p2m_class; /* host/nested/? */
 
     /* Nested p2ms only: nested p2m base value that this p2m shadows.
      * This can be cleared to P2M_BASE_EADDR under the per-p2m lock but
@@ -297,7 +304,15 @@ struct p2m_domain *p2m_get_nestedp2m(struct vcpu *v, uint64_t np2m_base);
  */
 struct p2m_domain *p2m_get_p2m(struct vcpu *v);
 
-#define p2m_is_nestedp2m(p2m)   ((p2m) != p2m_get_hostp2m((p2m->domain)))
+static inline bool_t p2m_is_hostp2m(const struct p2m_domain *p2m)
+{
+    return p2m->p2m_class == p2m_host;
+}
+
+static inline bool_t p2m_is_nestedp2m(const struct p2m_domain *p2m)
+{
+    return p2m->p2m_class == p2m_nested;
+}
 
 #define p2m_get_pagetable(p2m)  ((p2m)->phys_table)
 
