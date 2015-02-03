@@ -24,6 +24,7 @@
 #include <asm/regs.h>
 #include <asm/types.h>
 #include <asm/msr.h>
+#include <asm/nmi.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
@@ -288,3 +289,15 @@ void vpmu_dump(struct vcpu *v)
         vpmu->arch_vpmu_ops->arch_vpmu_dump(v);
 }
 
+static int __init vpmu_init(void)
+{
+    /* NMI watchdog uses LVTPC and HW counter */
+    if ( opt_watchdog && opt_vpmu_enabled )
+    {
+        printk(XENLOG_WARNING "NMI watchdog is enabled. Turning VPMU off.\n");
+        opt_vpmu_enabled = 0;
+    }
+
+    return 0;
+}
+__initcall(vpmu_init);

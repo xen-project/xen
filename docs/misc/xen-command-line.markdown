@@ -1346,6 +1346,8 @@ wrong behaviour (see handle\_pmc\_quirk()).
 If 'vpmu=bts' is specified the virtualisation of the Branch Trace Store (BTS)
 feature is switched on on Intel processors supporting this feature.
 
+Note that if **watchdog** option is also specified vpmu will be turned off.
+
 *Warning:*
 As the BTS virtualisation is not 100% safe and because of the nehalem quirk
 don't use the vpmu flag on production systems with Intel cpus!
