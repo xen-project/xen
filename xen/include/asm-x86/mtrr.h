@@ -1,8 +1,7 @@
 #ifndef __ASM_X86_MTRR_H__
 #define __ASM_X86_MTRR_H__
 
-#include <xen/config.h>
-#include <asm/mm.h>
+#include <xen/mm.h>
 
 /* These are the region types. They match the architectural specification. */
 #define MTRR_TYPE_UNCACHABLE 0

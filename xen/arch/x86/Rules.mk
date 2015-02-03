@@ -33,6 +33,7 @@ x86_32 := n
 x86_64 := y
 
 shadow-paging ?= y
+bigmem        ?= n
 
 CFLAGS += -mno-red-zone -mno-sse -fpic
 CFLAGS += -fno-asynchronous-unwind-tables
@@ -42,3 +43,4 @@ CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
 endif
 
 CFLAGS-$(shadow-paging) += -DCONFIG_SHADOW_PAGING
+CFLAGS-$(bigmem)        += -DCONFIG_BIGMEM

@@ -386,8 +386,13 @@ static void __init setup_max_pdx(unsigned long top_page)
     if ( max_pdx > FRAMETABLE_NR )
         max_pdx = FRAMETABLE_NR;
 
+    if ( max_pdx > MPT_VIRT_SIZE / sizeof(unsigned long) )
+        max_pdx = MPT_VIRT_SIZE / sizeof(unsigned long);
+
+#ifdef PAGE_LIST_NULL
     if ( max_pdx >= PAGE_LIST_NULL )
         max_pdx = PAGE_LIST_NULL - 1;
+#endif
 
     max_page = pdx_to_pfn(max_pdx - 1) + 1;
 }

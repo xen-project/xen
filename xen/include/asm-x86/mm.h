@@ -17,6 +17,7 @@
  */
 #define PFN_ORDER(_pfn) ((_pfn)->v.free.order)
 
+#ifndef CONFIG_BIGMEM
 /*
  * This definition is solely for the use in struct page_info (and
  * struct page_list_head), intended to allow easy adjustment once x86-64
@@ -30,6 +31,9 @@ struct page_list_entry
 {
     __pdx_t next, prev;
 };
+#else
+#define __pdx_t unsigned long
+#endif
 
 struct page_sharing_info;
 

@@ -158,6 +158,7 @@ extern unsigned char boot_edid_info[128];
  *    High read-only compatibility machine-to-phys translation table.
  *  0xffff82d080000000 - 0xffff82d0bfffffff [1GB,   2^30 bytes, PML4:261]
  *    Xen text, static data, bss.
+#ifndef CONFIG_BIGMEM
  *  0xffff82d0c0000000 - 0xffff82dffbffffff [61GB - 64MB,       PML4:261]
  *    Reserved for future use.
  *  0xffff82dffc000000 - 0xffff82dfffffffff [64MB,  2^26 bytes, PML4:261]
@@ -166,6 +167,16 @@ extern unsigned char boot_edid_info[128];
  *    Page-frame information array.
  *  0xffff830000000000 - 0xffff87ffffffffff [5TB, 5*2^40 bytes, PML4:262-271]
  *    1:1 direct mapping of all physical memory.
+#else
+ *  0xffff82d0c0000000 - 0xffff82ffdfffffff [188.5GB,           PML4:261]
+ *    Reserved for future use.
+ *  0xffff82ffe0000000 - 0xffff82ffffffffff [512MB, 2^29 bytes, PML4:261]
+ *    Super-page information array.
+ *  0xffff830000000000 - 0xffff847fffffffff [1.5TB, 3*2^39 bytes, PML4:262-264]
+ *    Page-frame information array.
+ *  0xffff848000000000 - 0xffff87ffffffffff [3.5TB, 7*2^39 bytes, PML4:265-271]
+ *    1:1 direct mapping of all physical memory.
+#endif
  *  0xffff880000000000 - 0xffffffffffffffff [120TB,             PML4:272-511]
  *    PV: Guest-defined use.
  *  0xffff880000000000 - 0xffffff7fffffffff [119.5TB,           PML4:272-510]
@@ -234,21 +245,35 @@ extern unsigned char boot_edid_info[128];
 /* Slot 261: xen text, static data and bss (1GB). */
 #define XEN_VIRT_START          (HIRO_COMPAT_MPT_VIRT_END)
 #define XEN_VIRT_END            (XEN_VIRT_START + GB(1))
-/* Slot 261: superpage information array (64MB). */
+
+/* Slot 261: superpage information array (64MB or 512MB). */
 #define SPAGETABLE_VIRT_END     FRAMETABLE_VIRT_START
 #define SPAGETABLE_NR           (((FRAMETABLE_NR - 1) >> (SUPERPAGE_SHIFT - \
                                                           PAGE_SHIFT)) + 1)
 #define SPAGETABLE_SIZE         (SPAGETABLE_NR * sizeof(struct spage_info))
 #define SPAGETABLE_VIRT_START   ((SPAGETABLE_VIRT_END - SPAGETABLE_SIZE) & \
                                  (_AC(-1,UL) << SUPERPAGE_SHIFT))
+
+#ifndef CONFIG_BIGMEM
 /* Slot 261: page-frame information array (128GB). */
-#define FRAMETABLE_VIRT_END     DIRECTMAP_VIRT_START
 #define FRAMETABLE_SIZE         GB(128)
+#else
+/* Slot 262-264: page-frame information array (1.5TB). */
+#define FRAMETABLE_SIZE         GB(1536)
+#endif
+#define FRAMETABLE_VIRT_END     DIRECTMAP_VIRT_START
 #define FRAMETABLE_NR           (FRAMETABLE_SIZE / sizeof(*frame_table))
 #define FRAMETABLE_VIRT_START   (FRAMETABLE_VIRT_END - FRAMETABLE_SIZE)
+
+#ifndef CONFIG_BIGMEM
 /* Slot 262-271/510: A direct 1:1 mapping of all of physical memory. */
 #define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
 #define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES * (511 - 262))
+#else
+/* Slot 265-271/510: A direct 1:1 mapping of all of physical memory. */
+#define DIRECTMAP_VIRT_START    (PML4_ADDR(265))
+#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES * (511 - 265))
+#endif
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + DIRECTMAP_SIZE)
 
 #ifndef __ASSEMBLY__
