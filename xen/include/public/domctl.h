@@ -37,7 +37,7 @@
 #include "hvm/save.h"
 #include "memory.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x0000000a
+#define XEN_DOMCTL_INTERFACE_VERSION 0x0000000b
 
 /*
  * NB. xen_domctl.domain is an IN/OUT parameter for this operation.
@@ -449,7 +449,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_hypercall_init_t);
 
 /* XEN_DOMCTL_settimeoffset */
 struct xen_domctl_settimeoffset {
-    int32_t  time_offset_seconds; /* applied to domain wallclock time */
+    int64_aligned_t time_offset_seconds; /* applied to domain wallclock time */
 };
 typedef struct xen_domctl_settimeoffset xen_domctl_settimeoffset_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);

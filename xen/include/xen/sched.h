@@ -359,7 +359,7 @@ struct domain
     /* Domain is paused by controller software? */
     int              controller_pause_count;
 
-    int32_t          time_offset_seconds;
+    int64_t          time_offset_seconds;
 
 #ifdef HAS_PASSTHROUGH
     /* Does this guest need iommu mappings (-1 meaning "being set up")? */

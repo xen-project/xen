@@ -187,7 +187,7 @@ static void resource_access(void *info)
 
 ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 {
-    ret_t ret = 0;
+    ret_t ret;
     struct xen_platform_op curop, *op = &curop;
 
     if ( copy_from_guest(op, u_xenpf_op, 1) )
@@ -212,14 +212,20 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
     switch ( op->cmd )
     {
-    case XENPF_settime:
-    {
-        do_settime(op->u.settime.secs, 
-                   op->u.settime.nsecs, 
-                   op->u.settime.system_time);
-        ret = 0;
-    }
-    break;
+    case XENPF_settime32:
+        do_settime(op->u.settime32.secs,
+                   op->u.settime32.nsecs,
+                   op->u.settime32.system_time);
+        break;
+
+    case XENPF_settime64:
+        if ( likely(!op->u.settime64.mbz) )
+            do_settime(op->u.settime64.secs,
+                       op->u.settime64.nsecs,
+                       op->u.settime64.system_time);
+        else
+            ret = -EINVAL;
+        break;
 
     case XENPF_add_memtype:
     {

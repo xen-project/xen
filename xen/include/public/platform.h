@@ -35,13 +35,28 @@
  * Set clock such that it would read <secs,nsecs> after 00:00:00 UTC,
  * 1 January, 1970 if the current system time was <system_time>.
  */
-#define XENPF_settime             17
-struct xenpf_settime {
+#define XENPF_settime32           17
+struct xenpf_settime32 {
     /* IN variables. */
     uint32_t secs;
     uint32_t nsecs;
     uint64_t system_time;
 };
+#define XENPF_settime64           62
+struct xenpf_settime64 {
+    /* IN variables. */
+    uint64_t secs;
+    uint32_t nsecs;
+    uint32_t mbz;
+    uint64_t system_time;
+};
+#if __XEN_INTERFACE_VERSION__ < 0x00040600
+#define XENPF_settime XENPF_settime32
+#define xenpf_settime xenpf_settime32
+#else
+#define XENPF_settime XENPF_settime64
+#define xenpf_settime xenpf_settime64
+#endif
 typedef struct xenpf_settime xenpf_settime_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_settime_t);
 
@@ -579,6 +594,8 @@ struct xen_platform_op {
     uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
     union {
         struct xenpf_settime           settime;
+        struct xenpf_settime32         settime32;
+        struct xenpf_settime64         settime64;
         struct xenpf_add_memtype       add_memtype;
         struct xenpf_del_memtype       del_memtype;
         struct xenpf_read_memtype      read_memtype;

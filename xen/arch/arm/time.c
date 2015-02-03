@@ -239,7 +239,7 @@ void update_vcpu_system_time(struct vcpu *v)
     /* XXX update shared_info->wc_* */
 }
 
-void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds)
+void domain_set_time_offset(struct domain *d, int64_t time_offset_seconds)
 {
     d->time_offset_seconds = time_offset_seconds;
     /* XXX update guest visible wallclock time */

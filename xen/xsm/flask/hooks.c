@@ -1365,7 +1365,8 @@ static int flask_platform_op(uint32_t op)
         return 0;
 #endif
 
-    case XENPF_settime:
+    case XENPF_settime32:
+    case XENPF_settime64:
         return domain_has_xen(current->domain, XEN__SETTIME);
 
     case XENPF_add_memtype:

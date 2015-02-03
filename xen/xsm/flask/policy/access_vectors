@@ -8,7 +8,8 @@
 # executing the hypercall, and the target is the xen initial sid (type xen_t).
 class xen
 {
-# XENPF_settime
+# XENPF_settime32
+# XENPF_settime64
     settime
 # XEN_SYSCTL_tbuf_op
     tbufcontrol

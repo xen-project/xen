@@ -65,11 +65,11 @@ extern void update_vcpu_system_time(struct vcpu *v);
 extern void update_domain_wallclock_time(struct domain *d);
 
 extern void do_settime(
-    unsigned long secs, unsigned long nsecs, u64 system_time_base);
+    unsigned long secs, unsigned int nsecs, u64 system_time_base);
 
 extern void send_timer_event(struct vcpu *v);
 
-void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds);
+void domain_set_time_offset(struct domain *d, int64_t time_offset_seconds);
 
 #include <asm/time.h>
 

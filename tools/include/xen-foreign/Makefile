@@ -17,7 +17,7 @@ clean:
 distclean: clean
 
 checker: checker.c $(headers)
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
+	$(HOSTCC) $(HOSTCFLAGS) -D__XEN_TOOLS__ -o $@ $<
 
 check-headers: checker
 	./checker > tmp.size

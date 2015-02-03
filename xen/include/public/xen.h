@@ -682,6 +682,12 @@ struct shared_info {
     uint32_t wc_version;      /* Version counter: see vcpu_time_info_t. */
     uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
     uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
+#if !defined(__i386__)
+    uint32_t wc_sec_hi;
+# define xen_wc_sec_hi wc_sec_hi
+#elif !defined(__XEN__) && !defined(__XEN_TOOLS__)
+# define xen_wc_sec_hi arch.wc_sec_hi
+#endif
 
     struct arch_shared_info arch;
 
@@ -870,6 +876,9 @@ __DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
 /* Default definitions for macros used by domctl/sysctl. */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
+#ifndef int64_aligned_t
+#define int64_aligned_t int64_t
+#endif
 #ifndef uint64_aligned_t
 #define uint64_aligned_t uint64_t
 #endif

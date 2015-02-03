@@ -47,7 +47,8 @@ string_param("clocksource", opt_clocksource);
 unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
 DEFINE_SPINLOCK(rtc_lock);
 unsigned long pit0_ticks;
-static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
+static unsigned long wc_sec; /* UTC time at last 'time update'. */
+static unsigned int wc_nsec;
 static DEFINE_SPINLOCK(wc_lock);
 
 struct cpu_time {
@@ -902,6 +903,7 @@ void force_update_vcpu_system_time(struct vcpu *v)
 void update_domain_wallclock_time(struct domain *d)
 {
     uint32_t *wc_version;
+    unsigned long sec;
 
     spin_lock(&wc_lock);
 
@@ -909,8 +911,19 @@ void update_domain_wallclock_time(struct domain *d)
     *wc_version = version_update_begin(*wc_version);
     wmb();
 
-    shared_info(d, wc_sec)  = wc_sec + d->time_offset_seconds;
-    shared_info(d, wc_nsec) = wc_nsec;
+    sec = wc_sec + d->time_offset_seconds;
+    if ( likely(!has_32bit_shinfo(d)) )
+    {
+        d->shared_info->native.wc_sec    = sec;
+        d->shared_info->native.wc_nsec   = wc_nsec;
+        d->shared_info->native.wc_sec_hi = sec >> 32;
+    }
+    else
+    {
+        d->shared_info->compat.wc_sec         = sec;
+        d->shared_info->compat.wc_nsec        = wc_nsec;
+        d->shared_info->compat.arch.wc_sec_hi = sec >> 32;
+    }
 
     wmb();
     *wc_version = version_update_end(*wc_version);
@@ -931,7 +944,7 @@ static void update_domain_rtc(void)
     rcu_read_unlock(&domlist_read_lock);
 }
 
-void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds)
+void domain_set_time_offset(struct domain *d, int64_t time_offset_seconds)
 {
     d->time_offset_seconds = time_offset_seconds;
     if ( is_hvm_domain(d) )
@@ -976,13 +989,13 @@ int cpu_frequency_change(u64 freq)
 }
 
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
-void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
+void do_settime(unsigned long secs, unsigned int nsecs, u64 system_time_base)
 {
     u64 x;
     u32 y;
     struct domain *d;
 
-    x = SECONDS(secs) + (u64)nsecs - system_time_base;
+    x = SECONDS(secs) + nsecs - system_time_base;
     y = do_div(x, 1000000000);
 
     spin_lock(&wc_lock);

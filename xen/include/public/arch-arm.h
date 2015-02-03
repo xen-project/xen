@@ -165,6 +165,7 @@
 
 #define XEN_HYPERCALL_TAG   0XEA1
 
+#define  int64_aligned_t  int64_t __attribute__((aligned(8)))
 #define uint64_aligned_t uint64_t __attribute__((aligned(8)))
 
 #ifndef __ASSEMBLY__

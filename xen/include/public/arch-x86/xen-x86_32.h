@@ -104,6 +104,7 @@
     do { if ( sizeof(hnd) == 8 ) *(uint64_t *)&(hnd) = 0;   \
          (hnd).p = val;                                     \
     } while ( 0 )
+#define  int64_aligned_t  int64_t __attribute__((aligned(8)))
 #define uint64_aligned_t uint64_t __attribute__((aligned(8)))
 #define __XEN_GUEST_HANDLE_64(name) __guest_handle_64_ ## name
 #define XEN_GUEST_HANDLE_64(name) __XEN_GUEST_HANDLE_64(name)
