@@ -231,6 +231,17 @@ static inline int sh_type_has_up_pointer(struct vcpu *v, unsigned int t)
     return !sh_type_is_pinnable(v, t);
 }
 
+static inline void sh_terminate_list(struct page_list_head *tmp_list)
+{
+#ifndef PAGE_LIST_NULL
+    /* The temporary list-head is on our stack.  Invalidate the
+     * pointers to it in the shadows, just to get a clean failure if
+     * we accidentally follow them. */
+    tmp_list->prev->next = LIST_POISON1;
+    tmp_list->next->prev = LIST_POISON2;
+#endif
+}
+
 /*
  * Definitions for the shadow_flags field in page_info.
  * These flags are stored on *guest* pages...
@@ -317,6 +328,15 @@ static inline int mfn_oos_may_write(mfn_t gmfn)
     return page_oos_may_write(mfn_to_page(mfn_x(gmfn)));
 }
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
+
+/* Figure out the size (in pages) of a given shadow type */
+extern const u8 sh_type_to_size[SH_type_unused];
+static inline unsigned int
+shadow_size(unsigned int shadow_type)
+{
+    ASSERT(shadow_type < ARRAY_SIZE(sh_type_to_size));
+    return sh_type_to_size[shadow_type];
+}
 
 /******************************************************************************
  * Various function declarations 
@@ -586,22 +606,25 @@ prev_pinned_shadow(const struct page_info *page,
                    const struct domain *d)
 {
     struct page_info *p;
+    const struct page_list_head *pin_list;
 
-    if ( page == d->arch.paging.shadow.pinned_shadows.next ) 
+    pin_list = &d->arch.paging.shadow.pinned_shadows;
+
+    if ( page_list_empty(pin_list) || page == page_list_first(pin_list) )
         return NULL;
-    
+
     if ( page == NULL ) /* If no current place, start at the tail */
-        p = d->arch.paging.shadow.pinned_shadows.tail;
+        p = page_list_last(pin_list);
     else
-        p = pdx_to_page(page->list.prev);
+        p = page_list_prev(page, pin_list);
     /* Skip over the non-tail parts of multi-page shadows */
     if ( p && p->u.sh.type == SH_type_l2_32_shadow )
     {
-        p = pdx_to_page(p->list.prev);
+        p = page_list_prev(p, pin_list);
         ASSERT(p && p->u.sh.type == SH_type_l2_32_shadow);
-        p = pdx_to_page(p->list.prev);
+        p = page_list_prev(p, pin_list);
         ASSERT(p && p->u.sh.type == SH_type_l2_32_shadow);
-        p = pdx_to_page(p->list.prev);
+        p = page_list_prev(p, pin_list);
         ASSERT(p && p->u.sh.type == SH_type_l2_32_shadow);
     }
     ASSERT(!p || p->u.sh.head);
@@ -618,49 +641,48 @@ prev_pinned_shadow(const struct page_info *page,
  * Returns 0 for failure, 1 for success. */
 static inline int sh_pin(struct vcpu *v, mfn_t smfn)
 {
-    struct page_info *sp;
-    struct page_list_head h, *pin_list;
-    
+    struct page_info *sp[4];
+    struct page_list_head *pin_list;
+    unsigned int i, pages;
+    bool_t already_pinned;
+
     ASSERT(mfn_valid(smfn));
-    sp = mfn_to_page(smfn);
-    ASSERT(sh_type_is_pinnable(v, sp->u.sh.type));
-    ASSERT(sp->u.sh.head);
+    sp[0] = mfn_to_page(smfn);
+    pages = shadow_size(sp[0]->u.sh.type);
+    already_pinned = sp[0]->u.sh.pinned;
+    ASSERT(sh_type_is_pinnable(v, sp[0]->u.sh.type));
+    ASSERT(sp[0]->u.sh.head);
+
+    pin_list = &v->domain->arch.paging.shadow.pinned_shadows;
+    if ( already_pinned && sp[0] == page_list_first(pin_list) )
+        return 1;
 
     /* Treat the up-to-four pages of the shadow as a unit in the list ops */
-    h.next = h.tail = sp; 
-    if ( sp->u.sh.type == SH_type_l2_32_shadow ) 
+    for ( i = 1; i < pages; i++ )
     {
-        h.tail = pdx_to_page(h.tail->list.next);
-        h.tail = pdx_to_page(h.tail->list.next);
-        h.tail = pdx_to_page(h.tail->list.next);
-        ASSERT(h.tail->u.sh.type == SH_type_l2_32_shadow); 
+        sp[i] = page_list_next(sp[i - 1], pin_list);
+        ASSERT(sp[i]->u.sh.type == sp[0]->u.sh.type);
+        ASSERT(!sp[i]->u.sh.head);
     }
-    pin_list = &v->domain->arch.paging.shadow.pinned_shadows;
 
-    if ( sp->u.sh.pinned )
+    if ( already_pinned )
     {
-        /* Already pinned: take it out of the pinned-list so it can go 
-         * at the front */
-        if ( pin_list->next == h.next )
-            return 1;
-        page_list_prev(h.next, pin_list)->list.next = h.tail->list.next;
-        if ( pin_list->tail == h.tail )
-            pin_list->tail = page_list_prev(h.next, pin_list);
-        else
-            page_list_next(h.tail, pin_list)->list.prev = h.next->list.prev;
-        h.tail->list.next = h.next->list.prev = PAGE_LIST_NULL;
+        /* Take it out of the pinned-list so it can go at the front */
+        for ( i = 0; i < pages; i++ )
+            page_list_del(sp[i], pin_list);
     }
     else
     {
         /* Not pinned: pin it! */
         if ( !sh_get_ref(v, smfn, 0) )
             return 0;
-        sp->u.sh.pinned = 1;
-        ASSERT(h.next->list.prev == PAGE_LIST_NULL);
-        ASSERT(h.tail->list.next == PAGE_LIST_NULL);
+        sp[0]->u.sh.pinned = 1;
     }
+
     /* Put it at the head of the list of pinned shadows */
-    page_list_splice(&h, pin_list);
+    for ( i = pages; i > 0; i-- )
+        page_list_add(sp[i - 1], pin_list);
+
     return 1;
 }
 
@@ -668,46 +690,35 @@ static inline int sh_pin(struct vcpu *v, mfn_t smfn)
  * of pinned shadows, and release the extra ref. */
 static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
 {
-    struct page_list_head h, *pin_list;
-    struct page_info *sp;
-    
+    struct page_list_head tmp_list, *pin_list;
+    struct page_info *sp, *next;
+    unsigned int i, head_type;
+
     ASSERT(mfn_valid(smfn));
     sp = mfn_to_page(smfn);
+    head_type = sp->u.sh.type;
     ASSERT(sh_type_is_pinnable(v, sp->u.sh.type));
     ASSERT(sp->u.sh.head);
 
-    /* Treat the up-to-four pages of the shadow as a unit in the list ops */
-    h.next = h.tail = sp; 
-    if ( sp->u.sh.type == SH_type_l2_32_shadow ) 
-    {
-        h.tail = pdx_to_page(h.tail->list.next);
-        h.tail = pdx_to_page(h.tail->list.next);
-        h.tail = pdx_to_page(h.tail->list.next);
-        ASSERT(h.tail->u.sh.type == SH_type_l2_32_shadow); 
-    }
-    pin_list = &v->domain->arch.paging.shadow.pinned_shadows;
-
     if ( !sp->u.sh.pinned )
         return;
-
     sp->u.sh.pinned = 0;
 
-    /* Cut the sub-list out of the list of pinned shadows */
-    if ( pin_list->next == h.next && pin_list->tail == h.tail )
-        pin_list->next = pin_list->tail = NULL;
-    else 
+    /* Cut the sub-list out of the list of pinned shadows,
+     * stitching it back into a list fragment of its own. */
+    pin_list = &v->domain->arch.paging.shadow.pinned_shadows;
+    INIT_PAGE_LIST_HEAD(&tmp_list);
+    for ( i = 0; i < shadow_size(head_type); i++ )
     {
-        if ( pin_list->next == h.next )
-            pin_list->next = page_list_next(h.tail, pin_list);
-        else
-            page_list_prev(h.next, pin_list)->list.next = h.tail->list.next;
-        if ( pin_list->tail == h.tail )
-            pin_list->tail = page_list_prev(h.next, pin_list);
-        else
-            page_list_next(h.tail, pin_list)->list.prev = h.next->list.prev;
+        ASSERT(sp->u.sh.type == head_type);
+        ASSERT(!i || !sp->u.sh.head);
+        next = page_list_next(sp, pin_list);
+        page_list_del(sp, pin_list);
+        page_list_add_tail(sp, &tmp_list);
+        sp = next;
     }
-    h.tail->list.next = h.next->list.prev = PAGE_LIST_NULL;
-    
+    sh_terminate_list(&tmp_list);
+
     sh_put_ref(v, smfn, 0);
 }
 

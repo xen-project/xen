@@ -428,20 +428,20 @@ sh_guest_get_eff_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
 /* From one page of a multi-page shadow, find the next one */
 static inline mfn_t sh_next_page(mfn_t smfn)
 {
-    mfn_t next;
-    struct page_info *pg = mfn_to_page(smfn);
+    struct page_info *pg = mfn_to_page(smfn), *next;
+    struct page_list_head h = PAGE_LIST_HEAD_INIT(h);
 
     ASSERT(pg->u.sh.type == SH_type_l1_32_shadow
            || pg->u.sh.type == SH_type_fl1_32_shadow
            || pg->u.sh.type == SH_type_l2_32_shadow);
     ASSERT(pg->u.sh.type == SH_type_l2_32_shadow || pg->u.sh.head);
-    ASSERT(pg->list.next != PAGE_LIST_NULL);
 
-    next = _mfn(pdx_to_pfn(pg->list.next));
+    next = page_list_next(pg, &h);
 
-    ASSERT(mfn_to_page(next)->u.sh.type == pg->u.sh.type);
-    ASSERT(!mfn_to_page(next)->u.sh.head);
-    return next;
+    ASSERT(next);
+    ASSERT(next->u.sh.type == pg->u.sh.type);
+    ASSERT(!next->u.sh.head);
+    return page_to_mfn(next);
 }
 
 static inline u32

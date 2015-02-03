@@ -1196,6 +1196,26 @@ int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
  * the free pool.
  */
 
+const u8 sh_type_to_size[] = {
+    1, /* SH_type_none           */
+    2, /* SH_type_l1_32_shadow   */
+    2, /* SH_type_fl1_32_shadow  */
+    4, /* SH_type_l2_32_shadow   */
+    1, /* SH_type_l1_pae_shadow  */
+    1, /* SH_type_fl1_pae_shadow */
+    1, /* SH_type_l2_pae_shadow  */
+    1, /* SH_type_l2h_pae_shadow */
+    1, /* SH_type_l1_64_shadow   */
+    1, /* SH_type_fl1_64_shadow  */
+    1, /* SH_type_l2_64_shadow   */
+    1, /* SH_type_l2h_64_shadow  */
+    1, /* SH_type_l3_64_shadow   */
+    1, /* SH_type_l4_64_shadow   */
+    1, /* SH_type_p2m_table      */
+    1, /* SH_type_monitor_table  */
+    1  /* SH_type_oos_snapshot   */
+};
+
 /* Figure out the least acceptable quantity of shadow memory.
  * The minimum memory requirement for always being able to free up a
  * chunk of memory is very small -- only three max-order chunks per
@@ -1217,33 +1237,6 @@ static unsigned int shadow_min_acceptable_pages(struct domain *d)
 
     return (vcpu_count * 128);
 } 
-
-/* Figure out the size (in pages) of a given shadow type */
-static inline u32
-shadow_size(unsigned int shadow_type) 
-{
-    static const u32 type_to_size[SH_type_unused] = {
-        1, /* SH_type_none           */
-        2, /* SH_type_l1_32_shadow   */
-        2, /* SH_type_fl1_32_shadow  */
-        4, /* SH_type_l2_32_shadow   */
-        1, /* SH_type_l1_pae_shadow  */
-        1, /* SH_type_fl1_pae_shadow */
-        1, /* SH_type_l2_pae_shadow  */
-        1, /* SH_type_l2h_pae_shadow */
-        1, /* SH_type_l1_64_shadow   */
-        1, /* SH_type_fl1_64_shadow  */
-        1, /* SH_type_l2_64_shadow   */
-        1, /* SH_type_l2h_64_shadow  */
-        1, /* SH_type_l3_64_shadow   */
-        1, /* SH_type_l4_64_shadow   */
-        1, /* SH_type_p2m_table      */
-        1, /* SH_type_monitor_table  */
-        1  /* SH_type_oos_snapshot   */
-        };
-    ASSERT(shadow_type < SH_type_unused);
-    return type_to_size[shadow_type];
-}
 
 /* Dispatcher function: call the per-mode function that will unhook the
  * non-Xen mappings in this top-level shadow mfn.  With user_only == 1,
@@ -1487,9 +1480,6 @@ mfn_t shadow_alloc(struct domain *d,
         break;
     }
 
-    /* Page lists don't have pointers back to the head structure, so
-     * it's safe to use a head structure on the stack to link the pages
-     * together. */
     INIT_PAGE_LIST_HEAD(&tmp_list);
 
     /* Init page info fields and clear the pages */
@@ -1523,6 +1513,9 @@ mfn_t shadow_alloc(struct domain *d,
     if ( shadow_type >= SH_type_min_shadow 
          && shadow_type <= SH_type_max_shadow )
         sp->u.sh.head = 1;
+
+    sh_terminate_list(&tmp_list);
+
     return page_to_mfn(sp);
 }
 
@@ -1531,6 +1524,7 @@ mfn_t shadow_alloc(struct domain *d,
 void shadow_free(struct domain *d, mfn_t smfn)
 {
     struct page_info *next = NULL, *sp = mfn_to_page(smfn); 
+    struct page_list_head *pin_list;
     unsigned int pages;
     u32 shadow_type;
     int i;
@@ -1542,6 +1536,7 @@ void shadow_free(struct domain *d, mfn_t smfn)
     ASSERT(shadow_type != SH_type_none);
     ASSERT(sp->u.sh.head || (shadow_type > SH_type_max_shadow));
     pages = shadow_size(shadow_type);
+    pin_list = &d->arch.paging.shadow.pinned_shadows;
 
     for ( i = 0; i < pages; i++ ) 
     {
@@ -1562,7 +1557,7 @@ void shadow_free(struct domain *d, mfn_t smfn)
 #endif
         /* Get the next page before we overwrite the list header */
         if ( i < pages - 1 )
-            next = pdx_to_page(sp->list.next);
+            next = page_list_next(sp, pin_list);
         /* Strip out the type: this is now a free shadow page */
         sp->u.sh.type = sp->u.sh.head = 0;
         /* Remember the TLB timestamp so we will know whether to flush 

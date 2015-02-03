@@ -172,6 +172,11 @@ page_list_first(const struct page_list_head *head)
     return head->next;
 }
 static inline struct page_info *
+page_list_last(const struct page_list_head *head)
+{
+    return head->tail;
+}
+static inline struct page_info *
 page_list_next(const struct page_info *page,
                const struct page_list_head *head)
 {
@@ -331,7 +336,11 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
 # define page_list_empty                 list_empty
 # define page_list_first(hd)             list_entry((hd)->next, \
                                                     struct page_info, list)
+# define page_list_last(hd)              list_entry((hd)->prev, \
+                                                    struct page_info, list)
 # define page_list_next(pg, hd)          list_entry((pg)->list.next, \
+                                                    struct page_info, list)
+# define page_list_prev(pg, hd)          list_entry((pg)->list.prev, \
                                                     struct page_info, list)
 # define page_list_add(pg, hd)           list_add(&(pg)->list, hd)
 # define page_list_add_tail(pg, hd)      list_add_tail(&(pg)->list, hd)
