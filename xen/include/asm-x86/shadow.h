@@ -77,23 +77,6 @@ void shadow_teardown(struct domain *d);
 /* Call once all of the references to the domain have gone away */
 void shadow_final_teardown(struct domain *d);
 
-/* Update all the things that are derived from the guest's CR0/CR3/CR4.
- * Called to initialize paging structures if the paging mode
- * has changed, and when bringing up a VCPU for the first time. */
-void shadow_update_paging_modes(struct vcpu *v);
-
-
-/* Remove all mappings of the guest page from the shadows. 
- * This is called from common code.  It does not flush TLBs. */
-int sh_remove_all_mappings(struct vcpu *v, mfn_t target_mfn);
-static inline void 
-shadow_drop_references(struct domain *d, struct page_info *p)
-{
-    if ( unlikely(shadow_mode_enabled(d)) )
-        /* See the comment about locking in sh_remove_all_mappings */
-        sh_remove_all_mappings(d->vcpu[0], _mfn(page_to_mfn(p)));
-}
-
 /* Remove all shadows of the guest mfn. */
 void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all);
 static inline void shadow_remove_all_shadows(struct vcpu *v, mfn_t gmfn)

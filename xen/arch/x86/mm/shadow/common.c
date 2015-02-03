@@ -2383,7 +2383,7 @@ int sh_remove_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
 /* Remove all mappings of a guest frame from the shadow tables.
  * Returns non-zero if we need to flush TLBs. */
 
-int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
+static int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
 {
     struct page_info *page = mfn_to_page(gmfn);
 
