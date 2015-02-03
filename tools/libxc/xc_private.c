@@ -33,7 +33,7 @@
 
 #define XENCTRL_OSDEP "XENCTRL_OSDEP"
 
-#if !defined (__MINIOS__) && !defined(__RUMPUSER_XEN__)
+#if !defined (__MINIOS__) && !defined(__RUMPUSER_XEN__) && !defined(__RUMPRUN__)
 #define DO_DYNAMIC_OSDEP
 #endif
 
