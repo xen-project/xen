@@ -85,8 +85,9 @@ int arch_iommu_populate_page_table(struct domain *d)
          * first few entries.
          */
         page_list_move(&d->page_list, &d->arch.relmem_list);
-        while ( (page = page_list_first(&d->page_list)) != NULL &&
-                (page->count_info & (PGC_state|PGC_broken)) )
+        while ( !page_list_empty(&d->page_list) &&
+                (page = page_list_first(&d->page_list),
+                 (page->count_info & (PGC_state|PGC_broken))) )
         {
             page_list_del(page, &d->page_list);
             page_list_add_tail(page, &d->arch.relmem_list);
