@@ -79,7 +79,7 @@ const char *xs_domain_dev(void)
 	char *s = getenv("XENSTORED_PATH");
 	if (s)
 		return s;
-#if defined(__RUMPUSER_XEN__)
+#if defined(__RUMPUSER_XEN__) || defined(__RUMPRUN__)
 	return "/dev/xen/xenbus";
 #elif defined(__linux__)
 	return "/proc/xen/xenbus";
