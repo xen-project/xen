@@ -81,8 +81,7 @@ static int mem_event_enable(
     med->blocked = 0;
 
     /* Allocate event channel */
-    rc = alloc_unbound_xen_event_channel(d->vcpu[0],
-                                         current->domain->domain_id,
+    rc = alloc_unbound_xen_event_channel(d, 0, current->domain->domain_id,
                                          notification_fn);
     if ( rc < 0 )
         goto err;
@@ -221,7 +220,7 @@ static int mem_event_disable(struct domain *d, struct mem_event_domain *med)
         }
 
         /* Free domU's event channel and leave the other one unbound */
-        free_xen_event_channel(d->vcpu[0], med->xen_port);
+        free_xen_event_channel(d, med->xen_port);
 
         /* Unblock all vCPUs */
         for_each_vcpu ( d, v )

@@ -1139,42 +1139,38 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 
 int alloc_unbound_xen_event_channel(
-    struct vcpu *local_vcpu, domid_t remote_domid,
+    struct domain *ld, unsigned int lvcpu, domid_t remote_domid,
     xen_event_channel_notification_t notification_fn)
 {
     struct evtchn *chn;
-    struct domain *d = local_vcpu->domain;
     int            port, rc;
 
-    spin_lock(&d->event_lock);
+    spin_lock(&ld->event_lock);
 
-    rc = get_free_port(d);
+    rc = get_free_port(ld);
     if ( rc < 0 )
         goto out;
     port = rc;
-    chn = evtchn_from_port(d, port);
+    chn = evtchn_from_port(ld, port);
 
-    rc = xsm_evtchn_unbound(XSM_TARGET, d, chn, remote_domid);
+    rc = xsm_evtchn_unbound(XSM_TARGET, ld, chn, remote_domid);
     if ( rc )
         goto out;
 
     chn->state = ECS_UNBOUND;
     chn->xen_consumer = get_xen_consumer(notification_fn);
-    chn->notify_vcpu_id = local_vcpu->vcpu_id;
+    chn->notify_vcpu_id = lvcpu;
     chn->u.unbound.remote_domid = remote_domid;
 
  out:
-    spin_unlock(&d->event_lock);
+    spin_unlock(&ld->event_lock);
 
     return rc < 0 ? rc : port;
 }
 
-
-void free_xen_event_channel(
-    struct vcpu *local_vcpu, int port)
+void free_xen_event_channel(struct domain *d, int port)
 {
     struct evtchn *chn;
-    struct domain *d = local_vcpu->domain;
 
     spin_lock(&d->event_lock);
 

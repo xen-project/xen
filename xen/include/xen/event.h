@@ -58,10 +58,9 @@ void evtchn_move_pirqs(struct vcpu *v);
 typedef void (*xen_event_channel_notification_t)(
     struct vcpu *v, unsigned int port);
 int alloc_unbound_xen_event_channel(
-    struct vcpu *local_vcpu, domid_t remote_domid,
+    struct domain *ld, unsigned int lvcpu, domid_t remote_domid,
     xen_event_channel_notification_t notification_fn);
-void free_xen_event_channel(
-    struct vcpu *local_vcpu, int port);
+void free_xen_event_channel(struct domain *d, int port);
 
 /* Query if event channel is in use by the guest */
 int guest_enabled_event(struct vcpu *v, uint32_t virq);

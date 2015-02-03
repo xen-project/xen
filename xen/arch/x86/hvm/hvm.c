@@ -627,7 +627,8 @@ static int hvm_ioreq_server_add_vcpu(struct hvm_ioreq_server *s,
 
     spin_lock(&s->lock);
 
-    rc = alloc_unbound_xen_event_channel(v, s->domid, NULL);
+    rc = alloc_unbound_xen_event_channel(v->domain, v->vcpu_id, s->domid,
+                                         NULL);
     if ( rc < 0 )
         goto fail2;
 
@@ -637,7 +638,7 @@ static int hvm_ioreq_server_add_vcpu(struct hvm_ioreq_server *s,
     {
         struct domain *d = s->domain;
 
-        rc = alloc_unbound_xen_event_channel(v, s->domid, NULL);
+        rc = alloc_unbound_xen_event_channel(v->domain, 0, s->domid, NULL);
         if ( rc < 0 )
             goto fail3;
 
@@ -658,7 +659,7 @@ static int hvm_ioreq_server_add_vcpu(struct hvm_ioreq_server *s,
     return 0;
 
  fail3:
-    free_xen_event_channel(v, sv->ioreq_evtchn);
+    free_xen_event_channel(v->domain, sv->ioreq_evtchn);
     
  fail2:
     spin_unlock(&s->lock);
@@ -685,9 +686,9 @@ static void hvm_ioreq_server_remove_vcpu(struct hvm_ioreq_server *s,
         list_del(&sv->list_entry);
 
         if ( v->vcpu_id == 0 && s->bufioreq.va != NULL )
-            free_xen_event_channel(v, s->bufioreq_evtchn);
+            free_xen_event_channel(v->domain, s->bufioreq_evtchn);
 
-        free_xen_event_channel(v, sv->ioreq_evtchn);
+        free_xen_event_channel(v->domain, sv->ioreq_evtchn);
 
         xfree(sv);
         break;
@@ -712,9 +713,9 @@ static void hvm_ioreq_server_remove_all_vcpus(struct hvm_ioreq_server *s)
         list_del(&sv->list_entry);
 
         if ( v->vcpu_id == 0 && s->bufioreq.va != NULL )
-            free_xen_event_channel(v, s->bufioreq_evtchn);
+            free_xen_event_channel(v->domain, s->bufioreq_evtchn);
 
-        free_xen_event_channel(v, sv->ioreq_evtchn);
+        free_xen_event_channel(v->domain, sv->ioreq_evtchn);
 
         xfree(sv);
     }
@@ -1338,13 +1339,14 @@ static int hvm_replace_event_channel(struct vcpu *v, domid_t remote_domid,
 {
     int old_port, new_port;
 
-    new_port = alloc_unbound_xen_event_channel(v, remote_domid, NULL);
+    new_port = alloc_unbound_xen_event_channel(v->domain, v->vcpu_id,
+                                               remote_domid, NULL);
     if ( new_port < 0 )
         return new_port;
 
     /* xchg() ensures that only we call free_xen_event_channel(). */
     old_port = xchg(p_port, new_port);
-    free_xen_event_channel(v, old_port);
+    free_xen_event_channel(v->domain, old_port);
     return 0;
 }
 
