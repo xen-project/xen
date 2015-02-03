@@ -247,9 +247,29 @@ void vpmu_initialise(struct vcpu *v)
     }
 }
 
+static void vpmu_clear_last(void *arg)
+{
+    if ( this_cpu(last_vcpu) == arg )
+        this_cpu(last_vcpu) = NULL;
+}
+
 void vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
+
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
+        return;
+
+    /*
+     * Need to clear last_vcpu in case it points to v.
+     * We can check here non-atomically whether it is 'v' since
+     * last_vcpu can never become 'v' again at this point.
+     * We will test it again in vpmu_clear_last() with interrupts
+     * disabled to make sure we don't clear someone else.
+     */
+    if ( per_cpu(last_vcpu, vpmu->last_pcpu) == v )
+        on_selected_cpus(cpumask_of(vpmu->last_pcpu),
+                         vpmu_clear_last, v, 1);
 
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_destroy )
         vpmu->arch_vpmu_ops->arch_vpmu_destroy(v);
