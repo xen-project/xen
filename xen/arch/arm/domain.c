@@ -64,7 +64,7 @@ static void ctxt_switch_from(struct vcpu *p)
      * mode. Therefore we don't need to save the context of an idle VCPU.
      */
     if ( is_idle_vcpu(p) )
-        goto end_context;
+        return;
 
     p2m_save_state(p);
 
@@ -138,9 +138,6 @@ static void ctxt_switch_from(struct vcpu *p)
     gic_save_state(p);
 
     isb();
-
-end_context:
-    context_saved(p);
 }
 
 static void ctxt_switch_to(struct vcpu *n)
@@ -245,6 +242,8 @@ static void schedule_tail(struct vcpu *prev)
     ctxt_switch_to(current);
 
     local_irq_enable();
+
+    context_saved(prev);
 
     if ( prev != current )
         update_runstate_area(current);
