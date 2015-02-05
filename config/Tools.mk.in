@@ -13,6 +13,7 @@ BISON               := @BISON@
 FLEX                := @FLEX@
 PYTHON              := @PYTHON@
 PYTHON_PATH         := @PYTHONPATH@
+PY_NOOPT_CFLAGS     := @PY_NOOPT_CFLAGS@
 PERL                := @PERL@
 CURL_CONFIG         := @CURL@
 XML2_CONFIG         := @XML@

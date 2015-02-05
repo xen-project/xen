@@ -57,6 +57,8 @@ SHLIB_libxenvchan  = -Wl,-rpath-link=$(XEN_LIBVCHAN)
 ifeq ($(debug),y)
 # Disable optimizations and enable debugging information for macros
 CFLAGS += -O0 -g3
+# But allow an override to -O0 in case Python enforces -D_FORTIFY_SOURCE=<n>.
+PY_CFLAGS += $(PY_NOOPT_CFLAGS)
 endif
 
 LIBXL_BLKTAP ?= $(CONFIG_BLKTAP2)

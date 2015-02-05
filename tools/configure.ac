@@ -58,6 +58,7 @@ m4_include([../m4/checkpolicy.m4])
 m4_include([../m4/set_cflags_ldflags.m4])
 m4_include([../m4/python_version.m4])
 m4_include([../m4/python_devel.m4])
+m4_include([../m4/python_fortify_noopt.m4])
 m4_include([../m4/ocaml.m4])
 m4_include([../m4/uuid.m4])
 m4_include([../m4/pkg.m4])
@@ -295,6 +296,7 @@ AX_CHECK_PYTHON_VERSION([2], [3])
 
 AS_IF([test "$cross_compiling" != yes], [
     AX_CHECK_PYTHON_DEVEL()
+    AX_CHECK_PYTHON_FORTIFY_NOOPT()
 ])
 
 if ! $rump; then

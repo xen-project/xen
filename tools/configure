@@ -652,6 +652,7 @@ PKG_CONFIG_LIBDIR
 PKG_CONFIG_PATH
 PKG_CONFIG
 CURSES_LIBS
+PY_NOOPT_CFLAGS
 EGREP
 GREP
 CPP
@@ -3406,6 +3407,10 @@ esac
 
 
 # M4 Macro includes
+
+
+
+
 
 
 
@@ -7041,6 +7046,40 @@ fi
 
 CPPFLAGS=$ac_previous_cppflags
 LDLFAGS=$ac_previous_ldflags
+
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether Python setup.py brokenly enables -D_FORTIFY_SOURCE" >&5
+$as_echo_n "checking whether Python setup.py brokenly enables -D_FORTIFY_SOURCE... " >&6; }
+if ${ax_cv_python_fortify+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+        ax_cv_python_fortify=no
+        for arg in $($PYTHON-config --cflags); do
+            case "$arg" in
+            -D_FORTIFY_SOURCE=0) ax_cv_python_fortify=no ;;
+            -D_FORTIFY_SOURCE=*) ax_cv_python_fortify=yes ;;
+            -Wp,-D_FORTIFY_SOURCE=0) ax_cv_python_fortify=no ;;
+            -Wp,-D_FORTIFY_SOURCE=*) ax_cv_python_fortify=yes ;;
+            *) ;;
+            esac
+        done
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_python_fortify" >&5
+$as_echo "$ax_cv_python_fortify" >&6; }
+
+    if test x$ax_cv_python_fortify = xyes; then :
+
+        PY_NOOPT_CFLAGS=-O1
+
+else
+
+        PY_NOOPT_CFLAGS=''
+
+fi
+
+
 
 
 fi
