@@ -1365,6 +1365,13 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
             }
         }
         d->need_iommu = 1;
+        /*
+         * There may be dirty cache lines when a device is assigned
+         * and before need_iommu(d) becoming true, this will cause
+         * memory_type_changed lose effect if memory type changes.
+         * Call memory_type_changed here to amend this.
+         */
+        memory_type_changed(d);
     }
 
     pdev = pci_get_pdev_by_domain(hardware_domain, seg, bus, devfn);
