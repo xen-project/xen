@@ -671,7 +671,7 @@ static int oos_remove_write_access(struct vcpu *v, mfn_t gmfn,
 
     ftlb |= oos_fixup_flush_gmfn(v, gmfn, fixup);
 
-    switch ( sh_remove_write_access(v, gmfn, 0, 0) )
+    switch ( sh_remove_write_access(d, gmfn, 0, 0) )
     {
     default:
     case 0:
@@ -2180,7 +2180,7 @@ static inline void trace_shadow_wrmap_bf(mfn_t gmfn)
  * level==0 means we have some other reason for revoking write access.
  * If level==0 we are allowed to fail, returning -1. */
 
-int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
+int sh_remove_write_access(struct domain *d, mfn_t gmfn,
                            unsigned int level,
                            unsigned long fault_addr)
 {
@@ -2212,7 +2212,6 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
         | SHF_L1_64
         | SHF_FL1_64
         ;
-    struct domain *d = v->domain;
     struct page_info *pg = mfn_to_page(gmfn);
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     struct vcpu *curr = current;
@@ -3689,7 +3688,7 @@ int shadow_track_dirty_vram(struct domain *d,
                 for ( i = begin_pfn; i < end_pfn; i++ ) {
                     mfn_t mfn = get_gfn_query_unlocked(d, i, &t);
                     if (mfn_x(mfn) != INVALID_MFN)
-                        flush_tlb |= sh_remove_write_access(d->vcpu[0], mfn, 1, 0);
+                        flush_tlb |= sh_remove_write_access(d, mfn, 1, 0);
                 }
                 dirty_vram->last_dirty = -1;
             }

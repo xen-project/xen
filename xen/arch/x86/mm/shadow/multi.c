@@ -278,11 +278,7 @@ shadow_check_gl1e(struct vcpu *v, walk_t *gw)
 static inline uint32_t
 gw_remove_write_accesses(struct vcpu *v, unsigned long va, walk_t *gw)
 {
-#if GUEST_PAGING_LEVELS >= 3 /* PAE or 64... */
-#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     struct domain *d = v->domain;
-#endif
-#endif
     uint32_t rc = 0;
 
 #if GUEST_PAGING_LEVELS >= 3 /* PAE or 64... */
@@ -295,7 +291,7 @@ gw_remove_write_accesses(struct vcpu *v, unsigned long va, walk_t *gw)
     }
     else
 #endif /* OOS */
-     if ( sh_remove_write_access(v, gw->l3mfn, 3, va) )
+     if ( sh_remove_write_access(d, gw->l3mfn, 3, va) )
          rc = GW_RMWR_FLUSHTLB;
 #endif /* GUEST_PAGING_LEVELS >= 4 */
 
@@ -307,7 +303,7 @@ gw_remove_write_accesses(struct vcpu *v, unsigned long va, walk_t *gw)
     }
     else
 #endif /* OOS */
-    if ( sh_remove_write_access(v, gw->l2mfn, 2, va) )
+    if ( sh_remove_write_access(d, gw->l2mfn, 2, va) )
         rc |= GW_RMWR_FLUSHTLB;
 #endif /* GUEST_PAGING_LEVELS >= 3 */
 
@@ -316,7 +312,7 @@ gw_remove_write_accesses(struct vcpu *v, unsigned long va, walk_t *gw)
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
          && !mfn_is_out_of_sync(gw->l1mfn)
 #endif /* OOS */
-         && sh_remove_write_access(v, gw->l1mfn, 1, va) )
+         && sh_remove_write_access(d, gw->l1mfn, 1, va) )
         rc |= GW_RMWR_FLUSHTLB;
 
     return rc;
@@ -4028,7 +4024,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
      * replace the old shadow pagetable(s), so that we can safely use the
      * (old) shadow linear maps in the writeable mapping heuristics. */
 #if GUEST_PAGING_LEVELS == 2
-    if ( sh_remove_write_access(v, gmfn, 2, 0) != 0 )
+    if ( sh_remove_write_access(d, gmfn, 2, 0) != 0 )
         flush_tlb_mask(d->domain_dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l2_shadow);
 #elif GUEST_PAGING_LEVELS == 3
@@ -4048,7 +4044,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
                 gl2gfn = guest_l3e_get_gfn(gl3e[i]);
                 gl2mfn = get_gfn_query_unlocked(d, gfn_x(gl2gfn), &p2mt);
                 if ( p2m_is_ram(p2mt) )
-                    flush |= sh_remove_write_access(v, gl2mfn, 2, 0);
+                    flush |= sh_remove_write_access(d, gl2mfn, 2, 0);
             }
         }
         if ( flush )
@@ -4072,7 +4068,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         }
     }
 #elif GUEST_PAGING_LEVELS == 4
-    if ( sh_remove_write_access(v, gmfn, 4, 0) != 0 )
+    if ( sh_remove_write_access(d, gmfn, 4, 0) != 0 )
         flush_tlb_mask(d->domain_dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l4_shadow);
 #else

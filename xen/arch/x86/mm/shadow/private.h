@@ -374,7 +374,7 @@ void sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
  * Returns non-zero if we need to flush TLBs.
  * level and fault_addr desribe how we found this to be a pagetable;
  * level==0 means we have some other reason for revoking write access. */
-extern int sh_remove_write_access(struct vcpu *v, mfn_t readonly_mfn,
+extern int sh_remove_write_access(struct domain *d, mfn_t readonly_mfn,
                                   unsigned int level,
                                   unsigned long fault_addr);
 
