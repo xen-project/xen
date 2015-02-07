@@ -1280,23 +1280,17 @@ static inline void trace_shadow_prealloc_unpin(struct domain *d, mfn_t smfn)
 
 /* Make sure there are at least count order-sized pages
  * available in the shadow page pool. */
-static void _shadow_prealloc(
-    struct domain *d,
-    unsigned int pages)
+static void _shadow_prealloc(struct domain *d, unsigned int pages)
 {
-    /* Need a vpcu for calling unpins; for now, since we don't have
-     * per-vcpu shadows, any will do */
-    struct vcpu *v, *v2;
+    struct vcpu *v;
     struct page_info *sp, *t;
     mfn_t smfn;
     int i;
 
     if ( d->arch.paging.shadow.free_pages >= pages ) return;
 
-    v = current;
-    if ( v->domain != d )
-        v = d->vcpu[0];
-    ASSERT(v != NULL); /* Shouldn't have enabled shadows if we've no vcpus  */
+    /* Shouldn't have enabled shadows if we've no vcpus. */
+    ASSERT(d->vcpu && d->vcpu[0]);
 
     /* Stage one: walk the list of pinned pages, unpinning them */
     perfc_incr(shadow_prealloc_1);
@@ -1317,14 +1311,14 @@ static void _shadow_prealloc(
      * mappings. */
     perfc_incr(shadow_prealloc_2);
 
-    for_each_vcpu(d, v2)
+    for_each_vcpu(d, v)
         for ( i = 0 ; i < 4 ; i++ )
         {
-            if ( !pagetable_is_null(v2->arch.shadow_table[i]) )
+            if ( !pagetable_is_null(v->arch.shadow_table[i]) )
             {
                 TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_PREALLOC_UNHOOK);
                 shadow_unhook_mappings(d,
-                               pagetable_get_mfn(v2->arch.shadow_table[i]), 0);
+                               pagetable_get_mfn(v->arch.shadow_table[i]), 0);
 
                 /* See if that freed up enough space */
                 if ( d->arch.paging.shadow.free_pages >= pages )
@@ -1361,11 +1355,12 @@ void shadow_prealloc(struct domain *d, u32 type, unsigned int count)
 static void shadow_blow_tables(struct domain *d)
 {
     struct page_info *sp, *t;
-    struct vcpu *v = d->vcpu[0];
+    struct vcpu *v;
     mfn_t smfn;
     int i;
 
-    ASSERT(v != NULL);
+    /* Shouldn't have enabled shadows if we've no vcpus. */
+    ASSERT(d->vcpu && d->vcpu[0]);
 
     /* Pass one: unpin all pinned pages */
     foreach_pinned_shadow(d, sp, t)
@@ -3363,11 +3358,6 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
                                        l1_pgentry_t *p, l1_pgentry_t new,
                                        unsigned int level)
 {
-    struct vcpu *v = current;
-
-    if ( v->domain != d )
-        v = d->vcpu ? d->vcpu[0] : NULL;
-
     /* The following assertion is to make sure we don't step on 1GB host
      * page support of HVM guest. */
     ASSERT(!(level > 2 && (l1e_get_flags(*p) & _PAGE_PRESENT) &&
