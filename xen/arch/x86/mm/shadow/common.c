@@ -2170,6 +2170,9 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
         ;
     struct domain *d = v->domain;
     struct page_info *pg = mfn_to_page(gmfn);
+#if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
+    struct vcpu *curr = current;
+#endif
 
     ASSERT(paging_locked_by_me(d));
 
@@ -2205,7 +2208,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
     }
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
-    if ( v == current )
+    if ( curr->domain == d )
     {
         unsigned long gfn;
         /* Heuristic: there is likely to be only one writeable mapping,
@@ -2213,7 +2216,8 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
          * in the guest's linear map (on non-HIGHPTE linux and windows)*/
 
 #define GUESS(_a, _h) do {                                              \
-            if ( v->arch.paging.mode->shadow.guess_wrmap(v, (_a), gmfn) ) \
+            if ( curr->arch.paging.mode->shadow.guess_wrmap(            \
+                     curr, (_a), gmfn) )                                \
                 perfc_incr(shadow_writeable_h_ ## _h);                  \
             if ( (pg->u.inuse.type_info & PGT_count_mask) == 0 )        \
             {                                                           \
@@ -2222,7 +2226,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
             }                                                           \
         } while (0)
 
-        if ( v->arch.paging.mode->guest_levels == 2 )
+        if ( curr->arch.paging.mode->guest_levels == 2 )
         {
             if ( level == 1 )
                 /* 32bit non-PAE w2k3: linear map at 0xC0000000 */
@@ -2237,7 +2241,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
                 GUESS(0xBFC00000UL
                       + ((fault_addr & VADDR_MASK) >> 10), 6);
         }
-        else if ( v->arch.paging.mode->guest_levels == 3 )
+        else if ( curr->arch.paging.mode->guest_levels == 3 )
         {
             /* 32bit PAE w2k3: linear map at 0xC0000000 */
             switch ( level )
@@ -2259,7 +2263,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
                           + ((fault_addr & VADDR_MASK) >> 18), 6); break;
             }
         }
-        else if ( v->arch.paging.mode->guest_levels == 4 )
+        else if ( curr->arch.paging.mode->guest_levels == 4 )
         {
             /* 64bit w2k3: linear map at 0xfffff68000000000 */
             switch ( level )
@@ -2312,14 +2316,15 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
      * the writeable mapping by looking at the same MFN where the last
      * brute-force search succeeded. */
 
-    if ( v->arch.paging.shadow.last_writeable_pte_smfn != 0 )
+    if ( (curr->domain == d) &&
+         (curr->arch.paging.shadow.last_writeable_pte_smfn != 0) )
     {
         unsigned long old_count = (pg->u.inuse.type_info & PGT_count_mask);
-        mfn_t last_smfn = _mfn(v->arch.paging.shadow.last_writeable_pte_smfn);
+        mfn_t last_smfn = _mfn(curr->arch.paging.shadow.last_writeable_pte_smfn);
         int shtype = mfn_to_page(last_smfn)->u.sh.type;
 
         if ( callbacks[shtype] )
-            callbacks[shtype](v, last_smfn, gmfn);
+            callbacks[shtype](curr, last_smfn, gmfn);
 
         if ( (pg->u.inuse.type_info & PGT_count_mask) != old_count )
             perfc_incr(shadow_writeable_h_5);

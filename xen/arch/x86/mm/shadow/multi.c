@@ -4185,6 +4185,8 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 int sh_rm_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
                                  mfn_t smfn, unsigned long off)
 {
+    struct domain *d = v->domain;
+    struct vcpu *curr = current;
     int r;
     shadow_l1e_t *sl1p, sl1e;
     struct page_info *sp;
@@ -4193,9 +4195,9 @@ int sh_rm_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
     ASSERT(mfn_valid(smfn));
 
     /* Remember if we've been told that this process is being torn down */
-    v->arch.paging.shadow.pagetable_dying
-        = !!(mfn_to_page(gmfn)->shadow_flags & SHF_pagetable_dying);
-
+    if ( curr->domain == d )
+        curr->arch.paging.shadow.pagetable_dying
+            = !!(mfn_to_page(gmfn)->shadow_flags & SHF_pagetable_dying);
 
     sp = mfn_to_page(smfn);
 
@@ -4290,6 +4292,8 @@ int sh_rm_write_access_from_l1(struct vcpu *v, mfn_t sl1mfn,
     int done = 0;
     int flags;
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
+    struct domain *d = v->domain;
+    struct vcpu *curr = current;
     mfn_t base_sl1mfn = sl1mfn; /* Because sl1mfn changes in the foreach */
 #endif
 
@@ -4304,7 +4308,8 @@ int sh_rm_write_access_from_l1(struct vcpu *v, mfn_t sl1mfn,
             (void) shadow_set_l1e(v, sl1e, ro_sl1e, p2m_ram_rw, sl1mfn);
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
             /* Remember the last shadow that we shot a writeable mapping in */
-            v->arch.paging.shadow.last_writeable_pte_smfn = mfn_x(base_sl1mfn);
+            if ( curr->domain == d )
+                curr->arch.paging.shadow.last_writeable_pte_smfn = mfn_x(base_sl1mfn);
 #endif
             if ( (mfn_to_page(readonly_mfn)->u.inuse.type_info
                   & PGT_count_mask) == 0 )
