@@ -394,7 +394,7 @@ void shadow_update_paging_modes(struct vcpu *v);
 
 /* Unhook the non-Xen mappings in this top-level shadow mfn.
  * With user_only == 1, unhooks only the user-mode mappings. */
-void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn, int user_only);
+void shadow_unhook_mappings(struct domain *d, mfn_t smfn, int user_only);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
 /* Allow a shadowed page to go out of sync */

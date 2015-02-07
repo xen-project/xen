@@ -1244,20 +1244,20 @@ static unsigned int shadow_min_acceptable_pages(struct domain *d)
 /* Dispatcher function: call the per-mode function that will unhook the
  * non-Xen mappings in this top-level shadow mfn.  With user_only == 1,
  * unhooks only the user-mode mappings. */
-void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn, int user_only)
+void shadow_unhook_mappings(struct domain *d, mfn_t smfn, int user_only)
 {
     struct page_info *sp = mfn_to_page(smfn);
     switch ( sp->u.sh.type )
     {
     case SH_type_l2_32_shadow:
-        SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings, 2)(v, smfn, user_only);
+        SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings, 2)(d, smfn, user_only);
         break;
     case SH_type_l2_pae_shadow:
     case SH_type_l2h_pae_shadow:
-        SHADOW_INTERNAL_NAME(sh_unhook_pae_mappings, 3)(v, smfn, user_only);
+        SHADOW_INTERNAL_NAME(sh_unhook_pae_mappings, 3)(d, smfn, user_only);
         break;
     case SH_type_l4_64_shadow:
-        SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, 4)(v, smfn, user_only);
+        SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, 4)(d, smfn, user_only);
         break;
     default:
         SHADOW_ERROR("top-level shadow has bad type %08x\n", sp->u.sh.type);
@@ -1322,7 +1322,7 @@ static void _shadow_prealloc(
             if ( !pagetable_is_null(v2->arch.shadow_table[i]) )
             {
                 TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_PREALLOC_UNHOOK);
-                shadow_unhook_mappings(v,
+                shadow_unhook_mappings(d,
                                pagetable_get_mfn(v2->arch.shadow_table[i]), 0);
 
                 /* See if that freed up enough space */
@@ -1377,7 +1377,7 @@ static void shadow_blow_tables(struct domain *d)
     for_each_vcpu(d, v)
         for ( i = 0 ; i < 4 ; i++ )
             if ( !pagetable_is_null(v->arch.shadow_table[i]) )
-                shadow_unhook_mappings(v,
+                shadow_unhook_mappings(d,
                                pagetable_get_mfn(v->arch.shadow_table[i]), 0);
 
     /* Make sure everyone sees the unshadowings */

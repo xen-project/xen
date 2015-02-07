@@ -2074,9 +2074,8 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
 
 #if GUEST_PAGING_LEVELS == 2
 
-void sh_unhook_32b_mappings(struct vcpu *v, mfn_t sl2mfn, int user_only)
+void sh_unhook_32b_mappings(struct domain *d, mfn_t sl2mfn, int user_only)
 {
-    struct domain *d = v->domain;
     shadow_l2e_t *sl2e;
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, d, {
         if ( !user_only || (sl2e->l2 & _PAGE_USER) )
@@ -2086,10 +2085,9 @@ void sh_unhook_32b_mappings(struct vcpu *v, mfn_t sl2mfn, int user_only)
 
 #elif GUEST_PAGING_LEVELS == 3
 
-void sh_unhook_pae_mappings(struct vcpu *v, mfn_t sl2mfn, int user_only)
+void sh_unhook_pae_mappings(struct domain *d, mfn_t sl2mfn, int user_only)
 /* Walk a PAE l2 shadow, unhooking entries from all the subshadows */
 {
-    struct domain *d = v->domain;
     shadow_l2e_t *sl2e;
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, d, {
         if ( !user_only || (sl2e->l2 & _PAGE_USER) )
@@ -2099,9 +2097,8 @@ void sh_unhook_pae_mappings(struct vcpu *v, mfn_t sl2mfn, int user_only)
 
 #elif GUEST_PAGING_LEVELS == 4
 
-void sh_unhook_64b_mappings(struct vcpu *v, mfn_t sl4mfn, int user_only)
+void sh_unhook_64b_mappings(struct domain *d, mfn_t sl4mfn, int user_only)
 {
-    struct domain *d = v->domain;
     shadow_l4e_t *sl4e;
     SHADOW_FOREACH_L4E(sl4mfn, sl4e, 0, 0, d, {
         if ( !user_only || (sl4e->l4 & _PAGE_USER) )
@@ -4506,7 +4503,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
         {
             gmfn = _mfn(mfn_to_page(smfn)->v.sh.back);
             mfn_to_page(gmfn)->shadow_flags |= SHF_pagetable_dying;
-            shadow_unhook_mappings(v, smfn, 1/* user pages only */);
+            shadow_unhook_mappings(d, smfn, 1/* user pages only */);
             flush = 1;
         }
     }
@@ -4545,7 +4542,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     if ( mfn_valid(smfn) )
     {
         mfn_to_page(gmfn)->shadow_flags |= SHF_pagetable_dying;
-        shadow_unhook_mappings(v, smfn, 1/* user pages only */);
+        shadow_unhook_mappings(d, smfn, 1/* user pages only */);
         /* Now flush the TLB: we removed toplevel mappings. */
         flush_tlb_mask(d->domain_dirty_cpumask);
     }
