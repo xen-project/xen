@@ -55,7 +55,7 @@ CAMLprim value ml_interface_read(value ml_interface,
 
 	cons = *(volatile uint32_t*)&intf->req_cons;
 	prod = *(volatile uint32_t*)&intf->req_prod;
-	connection = *(volatile uint32*)&intf->connection;
+	connection = *(volatile uint32_t*)&intf->connection;
 
 	if (connection != XENSTORE_CONNECTED)
 		caml_raise_constant(*caml_named_value("Xb.Reconnect"));
@@ -105,7 +105,7 @@ CAMLprim value ml_interface_write(value ml_interface,
 
 	cons = *(volatile uint32_t*)&intf->rsp_cons;
 	prod = *(volatile uint32_t*)&intf->rsp_prod;
-	connection = *(volatile uint32*)&intf->connection;
+	connection = *(volatile uint32_t*)&intf->connection;
 
 	if (connection != XENSTORE_CONNECTED)
 		caml_raise_constant(*caml_named_value("Xb.Reconnect"));
