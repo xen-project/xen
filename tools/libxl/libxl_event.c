@@ -1878,7 +1878,7 @@ int libxl__ao_inprogress(libxl__ao *ao,
         for (;;) {
             assert(ao->magic == LIBXL__AO_MAGIC);
 
-            if (ao->complete) {
+            if (!ao_work_outstanding(ao)) {
                 rc = ao->rc;
                 ao->notified = 1;
                 break;
