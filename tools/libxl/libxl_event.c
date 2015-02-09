@@ -1773,19 +1773,25 @@ void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc)
     libxl__ao_complete_check_progress_reports(egc, ao);
 }
 
-void libxl__ao_complete_check_progress_reports(libxl__egc *egc, libxl__ao *ao)
+static bool ao_work_outstanding(libxl__ao *ao)
 {
     /*
      * We don't consider an ao complete if it has any outstanding
      * callbacks.  These callbacks might be outstanding on other
      * threads, queued up in the other threads' egc's.  Those threads
      * will, after making the callback, take out the lock again,
-     * decrement progress_reports_outstanding, and call us again.
+     * decrement progress_reports_outstanding, and call
+     * libxl__ao_complete_check_progress_reports.
      */
+    return !ao->complete || ao->progress_reports_outstanding;
+}
+
+void libxl__ao_complete_check_progress_reports(libxl__egc *egc, libxl__ao *ao)
+{
     libxl_ctx *ctx = libxl__gc_owner(&egc->gc);
     assert(ao->progress_reports_outstanding >= 0);
 
-    if (!ao->complete || ao->progress_reports_outstanding)
+    if (ao_work_outstanding(ao))
         return;
 
     if (ao->poller) {
