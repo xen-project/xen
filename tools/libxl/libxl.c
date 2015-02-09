@@ -146,10 +146,12 @@ int libxl_ctx_free(libxl_ctx *ctx)
 {
     if (!ctx) return 0;
 
-    assert(!ctx->osevent_in_hook);
-
     int i;
     GC_INIT(ctx);
+
+    CTX_LOCK;
+    assert(!ctx->osevent_in_hook);
+    CTX->osevent_in_hook += 1000; /* make violations easier to debug */
 
     /* Deregister all libxl__ev_KINDs: */
 
@@ -196,6 +198,7 @@ int libxl_ctx_free(libxl_ctx *ctx)
     libxl__sigchld_notneeded(gc);
     libxl__pipe_close(ctx->sigchld_selfpipe);
 
+    CTX_UNLOCK;
     pthread_mutex_destroy(&ctx->lock);
 
     GC_FREE;
