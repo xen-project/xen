@@ -1335,6 +1335,7 @@ static void egc_run_callbacks(libxl__egc *egc)
         aop->how->callback(CTX, aop->ev, aop->how->for_callback);
 
         CTX_LOCK;
+        assert(aop->ao->magic == LIBXL__AO_MAGIC);
         aop->ao->progress_reports_outstanding--;
         libxl__ao_complete_check_progress_reports(egc, aop->ao);
         CTX_UNLOCK;
