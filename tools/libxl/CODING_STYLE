@@ -62,6 +62,7 @@ whenever they are applicable.  For example:
   libxl__ctx_[un]lock     CTX_LOCK, CTX_UNLOCK
   gc=...; ao=...;         EGC_GC, AO_GC, STATE_AO_GC
   explicit gc creation    GC_INIT, GC_FREE
+  memset(..,0,sizeof..)   FILLZERO
 
 
 ERROR HANDLING

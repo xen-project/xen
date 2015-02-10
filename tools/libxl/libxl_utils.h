@@ -160,6 +160,9 @@ int libxl_cpumap_to_nodemap(libxl_ctx *ctx,
 
 void libxl_string_copy(libxl_ctx *ctx, char **dst, char **src);
 
+
+#define LIBXL_FILLZERO(object) (memset(&(object), 0, sizeof((object))))
+
 #endif
 
 /*
