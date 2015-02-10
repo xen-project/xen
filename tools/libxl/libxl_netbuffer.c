@@ -219,10 +219,10 @@ out:
 
 static void netbuf_setup_script_cb(libxl__egc *egc,
                                    libxl__async_exec_state *aes,
-                                   int status);
+                                   int rc, int status);
 static void netbuf_teardown_script_cb(libxl__egc *egc,
                                       libxl__async_exec_state *aes,
-                                      int status);
+                                      int rc, int status);
 
 /*
  * the script needs the following env & args
@@ -327,14 +327,13 @@ out:
  */
 static void netbuf_setup_script_cb(libxl__egc *egc,
                                    libxl__async_exec_state *aes,
-                                   int status)
+                                   int rc, int status)
 {
     libxl__ao_device *aodev = CONTAINER_OF(aes, *aodev, aes);
     libxl__remus_device *dev = CONTAINER_OF(aodev, *dev, aodev);
     libxl__remus_device_nic *remus_nic = dev->concrete_data;
     libxl__remus_devices_state *rds = dev->rds;
     const char *out_path_base, *hotplug_error = NULL;
-    int rc;
 
     STATE_AO_GC(rds->ao);
 
@@ -343,6 +342,11 @@ static void netbuf_setup_script_cb(libxl__egc *egc,
     const int devid = remus_nic->devid;
     const char *const vif = remus_nic->vif;
     const char **const ifb = &remus_nic->ifb;
+
+    if (status && !rc)
+        rc = ERROR_FAIL;
+    if (rc)
+        goto out;
 
     /*
      * we need to get ifb first because it's needed for teardown
@@ -411,17 +415,14 @@ out:
 
 static void netbuf_teardown_script_cb(libxl__egc *egc,
                                       libxl__async_exec_state *aes,
-                                      int status)
+                                      int rc, int status)
 {
-    int rc;
     libxl__ao_device *aodev = CONTAINER_OF(aes, *aodev, aes);
     libxl__remus_device *dev = CONTAINER_OF(aodev, *dev, aodev);
     libxl__remus_device_nic *remus_nic = dev->concrete_data;
 
-    if (status)
+    if (status && !rc)
         rc = ERROR_FAIL;
-    else
-        rc = 0;
 
     free_qdisc(remus_nic);
 

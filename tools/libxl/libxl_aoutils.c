@@ -534,11 +534,12 @@ static void async_exec_done(libxl__egc *egc,
     libxl__ev_time_deregister(gc, &aes->time);
 
     if (status) {
-        libxl_report_child_exitstatus(CTX, LIBXL__LOG_ERROR,
-                                      aes->what, pid, status);
+        if (!aes->rc)
+            libxl_report_child_exitstatus(CTX, LIBXL__LOG_ERROR,
+                                          aes->what, pid, status);
     }
 
-    aes->callback(egc, aes, status);
+    aes->callback(egc, aes, aes->rc, status);
 }
 
 void libxl__async_exec_init(libxl__async_exec_state *aes)
@@ -556,6 +557,8 @@ int libxl__async_exec_start(libxl__async_exec_state *aes)
     AO_GC;
     libxl__ev_child *const child = &aes->child;
     char ** const args = aes->args;
+
+    aes->rc = 0;
 
     /* Set execution timeout */
     if (libxl__ev_time_register_rel(ao, &aes->time,

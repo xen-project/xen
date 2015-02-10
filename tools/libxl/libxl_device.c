@@ -729,7 +729,7 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev);
 
 static void device_hotplug_child_death_cb(libxl__egc *egc,
                                           libxl__async_exec_state *aes,
-                                          int status);
+                                          int rc, int status);
 
 static void device_destroy_be_watch_cb(libxl__egc *egc,
                                        libxl__xswait_state *xswait,
@@ -1052,7 +1052,7 @@ out:
 
 static void device_hotplug_child_death_cb(libxl__egc *egc,
                                           libxl__async_exec_state *aes,
-                                          int status)
+                                          int rc, int status)
 {
     libxl__ao_device *aodev = CONTAINER_OF(aes, *aodev, aes);
     STATE_AO_GC(aodev->ao);
@@ -1061,12 +1061,17 @@ static void device_hotplug_child_death_cb(libxl__egc *egc,
 
     device_hotplug_clean(gc, aodev);
 
-    if (status) {
+    if (status && !rc) {
         hotplug_error = libxl__xs_read(gc, XBT_NULL,
                                        GCSPRINTF("%s/hotplug-error", be_path));
         if (hotplug_error)
             LOG(ERROR, "script: %s", hotplug_error);
-        aodev->rc = ERROR_FAIL;
+        rc = ERROR_FAIL;
+    }
+
+    if (rc) {
+        if (!aodev->rc)
+            aodev->rc = rc;
         if (aodev->action == LIBXL__DEVICE_ACTION_ADD)
             /*
              * Only fail on device connection, on disconnection

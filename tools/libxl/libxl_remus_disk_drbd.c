@@ -78,7 +78,7 @@ out:
 /* callbacks */
 static void match_async_exec_cb(libxl__egc *egc,
                                 libxl__async_exec_state *aes,
-                                int status);
+                                int rc, int status);
 
 /* implementations */
 
@@ -133,15 +133,17 @@ out:
 
 static void match_async_exec_cb(libxl__egc *egc,
                                 libxl__async_exec_state *aes,
-                                int status)
+                                int rc, int status)
 {
-    int rc;
     libxl__ao_device *aodev = CONTAINER_OF(aes, *aodev, aes);
     libxl__remus_device *dev = CONTAINER_OF(aodev, *dev, aodev);
     libxl__remus_drbd_disk *drbd_disk;
     const libxl_device_disk *disk = dev->backend_dev;
 
     STATE_AO_GC(aodev->ao);
+
+    if (rc)
+        goto out;
 
     if (status) {
         rc = ERROR_REMUS_DEVOPS_DOES_NOT_MATCH;
