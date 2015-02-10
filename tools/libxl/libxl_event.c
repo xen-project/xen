@@ -933,6 +933,18 @@ int libxl__ev_devstate_wait(libxl__ao *ao, libxl__ev_devstate *ds,
  * futile.
  */
 
+void libxl__domaindeathcheck_init(libxl__domaindeathcheck *dc)
+{
+    libxl__ao_abortable_init(&dc->abrt);
+    libxl__ev_xswatch_init(&dc->watch);
+}
+
+void libxl__domaindeathcheck_stop(libxl__gc *gc, libxl__domaindeathcheck *dc)
+{
+    libxl__ao_abortable_deregister(&dc->abrt);
+    libxl__ev_xswatch_deregister(gc,&dc->watch);
+}
+
 static void domaindeathcheck_callback(libxl__egc *egc, libxl__ev_xswatch *w,
                             const char *watch_path, const char *event_path)
 {
@@ -940,6 +952,8 @@ static void domaindeathcheck_callback(libxl__egc *egc, libxl__ev_xswatch *w,
     EGC_GC;
     const char *p = libxl__xs_read(gc, XBT_NULL, watch_path);
     if (p) return;
+
+    libxl__domaindeathcheck_stop(gc,dc);
 
     if (errno!=ENOENT) {
         LIBXL__EVENT_DISASTER(egc,"failed to read xenstore"
@@ -949,15 +963,43 @@ static void domaindeathcheck_callback(libxl__egc *egc, libxl__ev_xswatch *w,
 
     LOG(ERROR,"%s: domain %"PRIu32" removed (%s no longer in xenstore)",
         dc->what, dc->domid, watch_path);
-    dc->callback(egc, dc);
+    dc->callback(egc, dc, ERROR_DOMAIN_DESTROYED);
 }
 
-int libxl__domaindeathcheck_start(libxl__gc *gc,
+static void domaindeathcheck_abort(libxl__egc *egc,
+                                   libxl__ao_abortable *abrt,
+                                   int rc)
+{
+    libxl__domaindeathcheck *dc = CONTAINER_OF(abrt, *dc, abrt);
+    EGC_GC;
+
+    libxl__domaindeathcheck_stop(gc,dc);
+    dc->callback(egc, dc, rc);
+}
+
+int libxl__domaindeathcheck_start(libxl__ao *ao,
                                   libxl__domaindeathcheck *dc)
 {
+    AO_GC;
+    int rc;
     const char *path = GCSPRINTF("/local/domain/%"PRIu32, dc->domid);
-    return libxl__ev_xswatch_register(gc, &dc->watch,
-                                      domaindeathcheck_callback, path);
+
+    libxl__domaindeathcheck_init(dc);
+
+    dc->abrt.ao = ao;
+    dc->abrt.callback = domaindeathcheck_abort;
+    rc = libxl__ao_abortable_register(&dc->abrt);
+    if (rc) goto out;
+
+    rc = libxl__ev_xswatch_register(gc, &dc->watch,
+                                    domaindeathcheck_callback, path);
+    if (rc) goto out;
+
+    return 0;
+
+ out:
+    libxl__domaindeathcheck_stop(gc,dc);
+    return rc;
 }
 
 /*

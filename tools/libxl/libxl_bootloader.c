@@ -33,7 +33,8 @@ static void bootloader_keystrokes_copyfail(libxl__egc *egc,
        libxl__datacopier_state *dc, int onwrite, int errnoval);
 static void bootloader_display_copyfail(libxl__egc *egc,
        libxl__datacopier_state *dc, int onwrite, int errnoval);
-static void bootloader_domaindeath(libxl__egc*, libxl__domaindeathcheck *dc);
+static void bootloader_domaindeath(libxl__egc*, libxl__domaindeathcheck *dc,
+                                   int rc);
 static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
                                 pid_t pid, int status);
 
@@ -496,7 +497,7 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
     bl->deathcheck.what = "stopping bootloader";
     bl->deathcheck.domid = bl->domid;
     bl->deathcheck.callback = bootloader_domaindeath;
-    rc = libxl__domaindeathcheck_start(gc, &bl->deathcheck);
+    rc = libxl__domaindeathcheck_start(ao, &bl->deathcheck);
     if (rc) goto out;
 
     if (bl->console_available)
@@ -610,10 +611,12 @@ static void bootloader_display_copyfail(libxl__egc *egc,
     bootloader_copyfail(egc, "bootloader output", bl, 1, onwrite, errnoval);
 }
 
-static void bootloader_domaindeath(libxl__egc *egc, libxl__domaindeathcheck *dc)
+static void bootloader_domaindeath(libxl__egc *egc,
+                                   libxl__domaindeathcheck *dc,
+                                   int rc)
 {
     libxl__bootloader_state *bl = CONTAINER_OF(dc, *bl, deathcheck);
-    bootloader_stop(egc, bl, ERROR_DOMAIN_DESTROYED);
+    bootloader_stop(egc, bl, rc);
 }
 
 static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,

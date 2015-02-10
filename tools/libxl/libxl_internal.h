@@ -1263,7 +1263,8 @@ _hidden int libxl__ev_devstate_wait(libxl__ao *ao, libxl__ev_devstate *ds,
 
 typedef struct libxl__domaindeathcheck libxl__domaindeathcheck;
 typedef void libxl___domaindeathcheck_callback(libxl__egc *egc,
-                                         libxl__domaindeathcheck*);
+        libxl__domaindeathcheck*,
+        int rc /* DESTROYED or ABORTED */);
 
 struct libxl__domaindeathcheck {
     /* must be filled in by caller, and remain valid: */
@@ -1271,16 +1272,15 @@ struct libxl__domaindeathcheck {
     uint32_t domid;
     libxl___domaindeathcheck_callback *callback;
     /* private */
+    libxl__ao_abortable abrt;
     libxl__ev_xswatch watch;
 };
 
-_hidden int libxl__domaindeathcheck_start(libxl__gc *gc,
+_hidden int libxl__domaindeathcheck_start(libxl__ao *ao,
                                           libxl__domaindeathcheck *dc);
 
-static inline void libxl__domaindeathcheck_init
- (libxl__domaindeathcheck *dc) { libxl__ev_xswatch_init(&dc->watch); }
-static inline void libxl__domaindeathcheck_stop(libxl__gc *gc,
-  libxl__domaindeathcheck *dc) { libxl__ev_xswatch_deregister(gc,&dc->watch); }
+void libxl__domaindeathcheck_init(libxl__domaindeathcheck *dc);
+void libxl__domaindeathcheck_stop(libxl__gc *gc, libxl__domaindeathcheck *dc);
 
 
 /*
