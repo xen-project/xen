@@ -717,7 +717,7 @@ out:
 
 /* This callback is part of the Qemu devices Badge */
 static void device_qemu_timeout(libxl__egc *egc, libxl__ev_time *ev,
-                                const struct timeval *requested_abs);
+                                const struct timeval *requested_abs, int rc);
 
 static void device_backend_callback(libxl__egc *egc, libxl__ev_devstate *ds,
                                    int rc);
@@ -880,7 +880,7 @@ out:
 }
 
 static void device_qemu_timeout(libxl__egc *egc, libxl__ev_time *ev,
-                                const struct timeval *requested_abs)
+                                const struct timeval *requested_abs, int rc)
 {
     libxl__ao_device *aodev = CONTAINER_OF(ev, *aodev, timeout);
     STATE_AO_GC(aodev->ao);
@@ -888,7 +888,9 @@ static void device_qemu_timeout(libxl__egc *egc, libxl__ev_time *ev,
     char *state_path = GCSPRINTF("%s/state", be_path);
     const char *xs_state;
     xs_transaction_t t = 0;
-    int rc = 0;
+
+    if (rc != ERROR_TIMEDOUT)
+        goto out;
 
     libxl__ev_time_deregister(gc, &aodev->timeout);
 

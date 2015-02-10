@@ -28,7 +28,7 @@ static libxl__ao *tao;
 static int seq;
 
 static void occurs(libxl__egc *egc, libxl__ev_time *ev,
-                   const struct timeval *requested_abs);
+                   const struct timeval *requested_abs, int rc);
 
 static void regs(libxl__ao *ao, int j)
 {
@@ -59,13 +59,15 @@ int libxl_test_timedereg(libxl_ctx *ctx, libxl_asyncop_how *ao_how)
 }
 
 static void occurs(libxl__egc *egc, libxl__ev_time *ev,
-                   const struct timeval *requested_abs)
+                   const struct timeval *requested_abs, int rc)
 {
     EGC_GC;
     int i;
 
     int off = ev - &et[0][0];
-    LOG(DEBUG,"occurs[%d][%d] seq=%d", off/NTIMES, off%NTIMES, seq);
+    LOG(DEBUG,"occurs[%d][%d] seq=%d rc=%d", off/NTIMES, off%NTIMES, seq, rc);
+
+    assert(!rc);
 
     switch (seq) {
     case 0:

@@ -195,7 +195,8 @@ struct libxl__ev_fd {
 
 typedef struct libxl__ev_time libxl__ev_time;
 typedef void libxl__ev_time_callback(libxl__egc *egc, libxl__ev_time *ev,
-                                     const struct timeval *requested_abs);
+                                     const struct timeval *requested_abs,
+                                     int rc); /* TIMEDOUT or ABORTED */
 struct libxl__ev_time {
     /* caller should include this in their own struct */
     /* read-only for caller, who may read only when registered: */
@@ -1134,13 +1135,13 @@ typedef struct libxl__xswait_state libxl__xswait_state;
  *     Otherwise, xswait will continue waiting and watching and
  *     will call you back later.
  *
- * rc==ERROR_TIMEDOUT
+ * rc==ERROR_TIMEDOUT, rc==ERROR_ABORTED
  *
  *     The specified timeout was reached.
  *     This has NOT been logged (except to the debug log).
  *     xswait will not continue (but calling libxl__xswait_stop is OK).
  *
- * rc!=0, !=ERROR_TIMEDOUT
+ * rc!=0, !=ERROR_TIMEDOUT, !=ERROR_ABORTED
  *
  *     Some other error occurred.
  *     This HAS been logged.
@@ -1180,8 +1181,9 @@ int libxl__xswait_start(libxl__gc*, libxl__xswait_state*);
 typedef struct libxl__ev_devstate libxl__ev_devstate;
 typedef void libxl__ev_devstate_callback(libxl__egc *egc, libxl__ev_devstate*,
                                          int rc);
-  /* rc will be 0, ERROR_TIMEDOUT, ERROR_INVAL (meaning path was removed),
-   * or ERROR_FAIL if other stuff went wrong (in which latter case, logged) */
+  /* rc will be 0, ERROR_TIMEDOUT, ERROR_ABORTED, ERROR_INVAL
+   * (meaning path was removed), or ERROR_FAIL if other stuff went
+   * wrong (in which latter case, logged) */
 
 struct libxl__ev_devstate {
     /* read-only for caller, who may read only when waiting: */

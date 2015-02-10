@@ -406,7 +406,7 @@ void libxl__ev_time_deregister(libxl__gc *gc, libxl__ev_time *ev)
     return;
 }
 
-static void time_occurs(libxl__egc *egc, libxl__ev_time *etime)
+static void time_occurs(libxl__egc *egc, libxl__ev_time *etime, int rc)
 {
     DBG("ev_time=%p occurs abs=%lu.%06lu",
         etime, (unsigned long)etime->abs.tv_sec,
@@ -414,7 +414,7 @@ static void time_occurs(libxl__egc *egc, libxl__ev_time *etime)
 
     libxl__ev_time_callback *func = etime->func;
     etime->func = 0;
-    func(egc, etime, &etime->abs);
+    func(egc, etime, &etime->abs, rc);
 }
 
 
@@ -1207,7 +1207,7 @@ static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
 
         time_deregister(gc, etime);
 
-        time_occurs(egc, etime);
+        time_occurs(egc, etime, ERROR_TIMEDOUT);
     }
 }
 
@@ -1274,7 +1274,7 @@ void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
 
     LIBXL_TAILQ_REMOVE(&CTX->etimes, ev, entry);
 
-    time_occurs(egc, ev);
+    time_occurs(egc, ev, ERROR_TIMEDOUT);
 
  out:
     CTX_UNLOCK;

@@ -80,12 +80,13 @@ void xswait_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *xsw,
 }
 
 void xswait_timeout_callback(libxl__egc *egc, libxl__ev_time *ev,
-                             const struct timeval *requested_abs)
+                             const struct timeval *requested_abs,
+                             int rc)
 {
     EGC_GC;
     libxl__xswait_state *xswa = CONTAINER_OF(ev, *xswa, time_ev);
     LOG(DEBUG, "%s: xswait timeout (path=%s)", xswa->what, xswa->path);
-    xswait_report_error(egc, xswa, ERROR_TIMEDOUT);
+    xswait_report_error(egc, xswa, rc);
 }
 
 static void xswait_report_error(libxl__egc *egc, libxl__xswait_state *xswa,
@@ -506,10 +507,14 @@ int libxl__openptys(libxl__openpty_state *op,
 
 static void async_exec_timeout(libxl__egc *egc,
                                libxl__ev_time *ev,
-                               const struct timeval *requested_abs)
+                               const struct timeval *requested_abs,
+                               int rc)
 {
     libxl__async_exec_state *aes = CONTAINER_OF(ev, *aes, time);
     STATE_AO_GC(aes->ao);
+
+    if (!aes->rc)
+        aes->rc = rc;
 
     libxl__ev_time_deregister(gc, &aes->time);
 
