@@ -1413,7 +1413,7 @@ _hidden int libxl__spawn_record_pid(libxl__gc*, libxl__spawn_state*,
  * This is a NOT function for waiting for ordinary child processes.
  * If you want to run (fork/exec/wait) subprocesses from libxl:
  *  - Make your libxl entrypoint use the ao machinery
- *  - Use libxl__ev_fork, and use the callback programming style
+ *  - Use libxl__ev_child_fork, and use the callback programming style
  *
  * This function is intended for interprocess communication with a
  * service process.  If the service process does not respond quickly,

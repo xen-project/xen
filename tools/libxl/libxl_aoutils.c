@@ -478,6 +478,8 @@ int libxl__openptys(libxl__openpty_state *op,
     return rc;
 }
 
+/*----- async exec -----*/
+
 static void async_exec_timeout(libxl__egc *egc,
                                libxl__ev_time *ev,
                                const struct timeval *requested_abs)
