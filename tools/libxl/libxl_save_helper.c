@@ -85,6 +85,7 @@ static xentoollog_logger logger = {
     tellparent_destroy,
 };
 static xc_interface *xch;
+static int io_fd;
 
 /*----- error handling -----*/
 
@@ -211,7 +212,7 @@ int main(int argc, char **argv)
 
     if (!strcmp(mode,"--save-domain")) {
 
-        int io_fd =                atoi(NEXTARG);
+        io_fd =                    atoi(NEXTARG);
         uint32_t dom =             strtoul(NEXTARG,0,10);
         uint32_t max_iters =       strtoul(NEXTARG,0,10);
         uint32_t max_factor =      strtoul(NEXTARG,0,10);
@@ -234,7 +235,7 @@ int main(int argc, char **argv)
 
     } else if (!strcmp(mode,"--restore-domain")) {
 
-        int io_fd =                atoi(NEXTARG);
+        io_fd =                    atoi(NEXTARG);
         uint32_t dom =             strtoul(NEXTARG,0,10);
         unsigned store_evtchn =    strtoul(NEXTARG,0,10);
         domid_t store_domid =      strtoul(NEXTARG,0,10);

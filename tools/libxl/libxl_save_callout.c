@@ -237,6 +237,12 @@ static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
     libxl__carefd_close(childs_pipes[1]);
     helper_failed(egc, shs, rc);;
 }
+static void sendsig(libxl__gc *gc, libxl__save_helper_state *shs, int sig)
+{
+    int r = kill(shs->child.pid, sig);
+    if (r) LOGE(WARN, "failed to kill save/restore helper [%lu] (signal %d)",
+                (unsigned long)shs->child.pid, sig);
+}
 
 static void helper_failed(libxl__egc *egc, libxl__save_helper_state *shs,
                           int rc)
@@ -253,9 +259,7 @@ static void helper_failed(libxl__egc *egc, libxl__save_helper_state *shs,
         return;
     }
 
-    int r = kill(shs->child.pid, SIGKILL);
-    if (r) LOGE(WARN, "failed to kill save/restore helper [%lu]",
-                (unsigned long)shs->child.pid);
+    sendsig(gc, shs, SIGKILL);
 }
 
 static void helper_stdout_readable(libxl__egc *egc, libxl__ev_fd *ev,
