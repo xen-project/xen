@@ -319,7 +319,6 @@ u64 hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc)
     {
         tsc = hvm_get_guest_time_fixed(v, at_tsc);
         tsc = gtime_to_gtsc(v->domain, tsc);
-        v->domain->arch.vtsc_kerncount++;
     }
     else if ( at_tsc )
     {
@@ -4396,12 +4395,41 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     }
 }
 
+static uint64_t _hvm_rdtsc_intercept(void)
+{
+    struct vcpu *curr = current;
+#if !defined(NDEBUG) || defined(PERF_COUNTERS)
+    struct domain *currd = curr->domain;
+
+    if ( currd->arch.vtsc )
+        switch ( hvm_guest_x86_mode(curr) )
+        {
+            struct segment_register sreg;
+
+        case 8:
+        case 4:
+        case 2:
+            hvm_get_segment_register(curr, x86_seg_ss, &sreg);
+            if ( unlikely(sreg.attr.fields.dpl) )
+            {
+        case 1:
+                currd->arch.vtsc_usercount++;
+                break;
+            }
+            /* fall through */
+        case 0:
+            currd->arch.vtsc_kerncount++;
+            break;
+        }
+#endif
+
+    return hvm_get_guest_tsc(curr);
+}
+
 void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
 {
-    uint64_t tsc;
-    struct vcpu *v = current;
+    uint64_t tsc = _hvm_rdtsc_intercept();
 
-    tsc = hvm_get_guest_tsc(v);
     regs->eax = (uint32_t)tsc;
     regs->edx = (uint32_t)(tsc >> 32);
 
@@ -4429,7 +4457,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     case MSR_IA32_TSC:
-        *msr_content = hvm_get_guest_tsc(v);
+        *msr_content = _hvm_rdtsc_intercept();
         break;
 
     case MSR_IA32_TSC_ADJUST:

@@ -319,8 +319,10 @@ struct arch_domain
     struct time_scale ns_to_vtsc; /* scaling for certain emulated cases */
     uint32_t incarnation;    /* incremented every restore or live migrate
                                 (possibly other cases in the future */
-    uint64_t vtsc_kerncount; /* for hvm, counts all vtsc */
-    uint64_t vtsc_usercount; /* not used for hvm */
+#if !defined(NDEBUG) || defined(PERF_COUNTERS)
+    uint64_t vtsc_kerncount;
+    uint64_t vtsc_usercount;
+#endif
 
     /* Pseudophysical e820 map (XENMEM_memory_map).  */
     spinlock_t e820_lock;
