@@ -2702,6 +2702,7 @@ typedef struct libxl__save_helper_state {
     int rc;
     int completed; /* retval/errnoval valid iff completed */
     int retval, errnoval; /* from xc_domain_save / xc_domain_restore */
+    libxl__ao_abortable abrt;
     libxl__carefd *pipes[2]; /* 0 = helper's stdin, 1 = helper's stdout */
     libxl__ev_fd readable;
     libxl__ev_child child;

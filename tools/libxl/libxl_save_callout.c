@@ -32,6 +32,7 @@ static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
                        const unsigned long *argnums, int num_argnums);
 
 static void helper_failed(libxl__egc*, libxl__save_helper_state *shs, int rc);
+static void helper_stop(libxl__egc *egc, libxl__ao_abortable*, int rc);
 static void helper_stdout_readable(libxl__egc *egc, libxl__ev_fd *ev,
                                    int fd, short events, short revents);
 static void helper_exited(libxl__egc *egc, libxl__ev_child *ch,
@@ -166,8 +167,14 @@ static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
     shs->rc = 0;
     shs->completed = 0;
     shs->pipes[0] = shs->pipes[1] = 0;
+    libxl__ao_abortable_init(&shs->abrt);
     libxl__ev_fd_init(&shs->readable);
     libxl__ev_child_init(&shs->child);
+
+    shs->abrt.ao = shs->ao;
+    shs->abrt.callback = helper_stop;
+    rc = libxl__ao_abortable_register(&shs->abrt);
+    if (rc) goto out;
 
     shs->stdin_what = GCSPRINTF("domain %"PRIu32" save/restore helper"
                                 " stdin pipe", domid);
@@ -262,6 +269,22 @@ static void helper_failed(libxl__egc *egc, libxl__save_helper_state *shs,
     sendsig(gc, shs, SIGKILL);
 }
 
+static void helper_stop(libxl__egc *egc, libxl__ao_abortable *abrt, int rc)
+{
+    libxl__save_helper_state *shs = CONTAINER_OF(abrt, *shs, abrt);
+    STATE_AO_GC(shs->ao);
+
+    if (!libxl__ev_child_inuse(&shs->child)) {
+        helper_failed(egc, shs, rc);
+        return;
+    }
+
+    if (!shs->rc)
+        shs->rc = rc;
+
+    sendsig(gc, shs, SIGTERM);
+}
+
 static void helper_stdout_readable(libxl__egc *egc, libxl__ev_fd *ev,
                                    int fd, short events, short revents)
 {
@@ -332,6 +355,7 @@ static void helper_done(libxl__egc *egc, libxl__save_helper_state *shs)
 {
     STATE_AO_GC(shs->ao);
 
+    libxl__ao_abortable_deregister(&shs->abrt);
     libxl__ev_fd_deregister(gc, &shs->readable);
     libxl__carefd_close(shs->pipes[0]);  shs->pipes[0] = 0;
     libxl__carefd_close(shs->pipes[1]);  shs->pipes[1] = 0;
