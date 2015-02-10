@@ -226,6 +226,8 @@ static inline void libxl__ao_abortable_init
 static inline bool libxl__ao_abortable_isregistered
   (const libxl__ao_abortable *c) { return c->registered; }
 
+int libxl__ao_aborting(libxl__ao *ao); /* -> 0 or ERROR_ABORTED */
+
 
 typedef struct libxl__ev_time libxl__ev_time;
 typedef void libxl__ev_time_callback(libxl__egc *egc, libxl__ev_time *ev,

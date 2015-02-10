@@ -2033,6 +2033,17 @@ int libxl_ao_abort(libxl_ctx *ctx, const libxl_asyncop_how *how)
     return rc;
 }
 
+int libxl__ao_aborting(libxl__ao *ao)
+{
+    libxl__ao *root = ao_nested_root(ao);
+    if (root->aborting) {
+        DBG("ao=%p: aborting at explicit check (root=%p)", ao, root);
+        return ERROR_ABORTED;
+    }
+
+    return 0;
+}
+
 int libxl__ao_abortable_register(libxl__ao_abortable *abrt)
 {
     libxl__ao *ao = abrt->ao;
