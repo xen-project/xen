@@ -808,7 +808,7 @@ void libxl__initiate_device_remove(libxl__egc *egc,
              * TODO: 4.2 Bodge due to QEMU, see comment on top of
              * libxl__initiate_device_remove in libxl_internal.h
              */
-            rc = libxl__ev_time_register_rel(gc, &aodev->timeout,
+            rc = libxl__ev_time_register_rel(ao, &aodev->timeout,
                                              device_qemu_timeout,
                                              LIBXL_QEMU_BODGE_TIMEOUT * 1000);
             if (rc) {
@@ -1034,7 +1034,7 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
     aes->stdfds[1] = 2;
     aes->stdfds[2] = -1;
 
-    rc = libxl__async_exec_start(gc, aes);
+    rc = libxl__async_exec_start(aes);
     if (rc)
         goto out;
 

@@ -1200,7 +1200,7 @@ static void domain_suspend_switch_qemu_xen_traditional_logdirty
                                 switch_logdirty_xswatch, lds->ret_path);
     if (rc) goto out;
 
-    rc = libxl__ev_time_register_rel(gc, &lds->timeout,
+    rc = libxl__ev_time_register_rel(ao, &lds->timeout,
                                 switch_logdirty_timeout, 10*1000);
     if (rc) goto out;
 
@@ -1480,7 +1480,7 @@ static void domain_suspend_callback_common(libxl__egc *egc,
         rc = libxl__ev_evtchn_wait(gc, &dss->guest_evtchn);
         if (rc) goto err;
 
-        rc = libxl__ev_time_register_rel(gc, &dss->guest_timeout,
+        rc = libxl__ev_time_register_rel(ao, &dss->guest_timeout,
                                          suspend_common_wait_guest_timeout,
                                          60*1000);
         if (rc) goto err;
@@ -1611,7 +1611,7 @@ static void domain_suspend_common_wait_guest(libxl__egc *egc,
                                     "@releaseDomain");
     if (rc) goto err;
 
-    rc = libxl__ev_time_register_rel(gc, &dss->guest_timeout,
+    rc = libxl__ev_time_register_rel(ao, &dss->guest_timeout,
                                      suspend_common_wait_guest_timeout,
                                      60*1000);
     if (rc) goto err;
@@ -1990,7 +1990,7 @@ static void remus_devices_commit_cb(libxl__egc *egc,
      */
 
     /* Set checkpoint interval timeout */
-    rc = libxl__ev_time_register_rel(gc, &dss->checkpoint_timeout,
+    rc = libxl__ev_time_register_rel(ao, &dss->checkpoint_timeout,
                                      remus_next_checkpoint,
                                      dss->interval);
 

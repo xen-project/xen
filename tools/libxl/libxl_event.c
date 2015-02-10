@@ -332,10 +332,11 @@ static void time_done_debug(libxl__gc *gc, const char *func,
 #endif
 }
 
-int libxl__ev_time_register_abs(libxl__gc *gc, libxl__ev_time *ev,
+int libxl__ev_time_register_abs(libxl__ao *ao, libxl__ev_time *ev,
                                 libxl__ev_time_callback *func,
                                 struct timeval absolute)
 {
+    AO_GC;
     int rc;
 
     CTX_LOCK;
@@ -356,10 +357,11 @@ int libxl__ev_time_register_abs(libxl__gc *gc, libxl__ev_time *ev,
 }
 
 
-int libxl__ev_time_register_rel(libxl__gc *gc, libxl__ev_time *ev,
+int libxl__ev_time_register_rel(libxl__ao *ao, libxl__ev_time *ev,
                                 libxl__ev_time_callback *func,
                                 int milliseconds /* as for poll(2) */)
 {
+    AO_GC;
     struct timeval absolute;
     int rc;
 

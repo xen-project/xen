@@ -46,7 +46,7 @@ int libxl__xswait_start(libxl__gc *gc, libxl__xswait_state *xswa)
 {
     int rc;
 
-    rc = libxl__ev_time_register_rel(gc, &xswa->time_ev,
+    rc = libxl__ev_time_register_rel(xswa->ao, &xswa->time_ev,
                                      xswait_timeout_callback, xswa->timeout_ms);
     if (rc) goto err;
 
@@ -547,16 +547,18 @@ void libxl__async_exec_init(libxl__async_exec_state *aes)
     libxl__ev_child_init(&aes->child);
 }
 
-int libxl__async_exec_start(libxl__gc *gc, libxl__async_exec_state *aes)
+int libxl__async_exec_start(libxl__async_exec_state *aes)
 {
     pid_t pid;
 
     /* Convenience aliases */
+    libxl__ao *ao = aes->ao;
+    AO_GC;
     libxl__ev_child *const child = &aes->child;
     char ** const args = aes->args;
 
     /* Set execution timeout */
-    if (libxl__ev_time_register_rel(gc, &aes->time,
+    if (libxl__ev_time_register_rel(ao, &aes->time,
                                     async_exec_timeout,
                                     aes->timeout_ms)) {
         LOG(ERROR, "unable to register timeout for executing: %s", aes->what);

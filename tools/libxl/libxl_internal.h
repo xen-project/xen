@@ -791,10 +791,10 @@ static inline void libxl__ev_fd_init(libxl__ev_fd *efd)
 static inline int libxl__ev_fd_isregistered(const libxl__ev_fd *efd)
                     { return efd->fd >= 0; }
 
-_hidden int libxl__ev_time_register_rel(libxl__gc*, libxl__ev_time *ev_out,
+_hidden int libxl__ev_time_register_rel(libxl__ao*, libxl__ev_time *ev_out,
                                         libxl__ev_time_callback*,
                                         int milliseconds /* as for poll(2) */);
-_hidden int libxl__ev_time_register_abs(libxl__gc*, libxl__ev_time *ev_out,
+_hidden int libxl__ev_time_register_abs(libxl__ao*, libxl__ev_time *ev_out,
                                         libxl__ev_time_callback*,
                                         struct timeval);
 _hidden int libxl__ev_time_modify_rel(libxl__gc*, libxl__ev_time *ev,
@@ -2166,7 +2166,7 @@ struct libxl__async_exec_state {
 };
 
 void libxl__async_exec_init(libxl__async_exec_state *aes);
-int libxl__async_exec_start(libxl__gc *gc, libxl__async_exec_state *aes);
+int libxl__async_exec_start(libxl__async_exec_state *aes);
 bool libxl__async_exec_inuse(const libxl__async_exec_state *aes);
 
 /*----- device addition/removal -----*/

@@ -120,7 +120,7 @@ static void match_async_exec(libxl__egc *egc, libxl__remus_device *dev)
     aes->stdfds[1] = -1;
     aes->stdfds[2] = -1;
 
-    rc = libxl__async_exec_start(gc, aes);
+    rc = libxl__async_exec_start(aes);
     if (rc)
         goto out;
 
