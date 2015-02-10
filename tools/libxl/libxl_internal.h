@@ -2657,6 +2657,7 @@ struct libxl__datacopier_state {
                       fd. The buffer should be at least as large as the
                       bytes_to_read parameter, which should not be -1. */
     /* remaining fields are private to datacopier */
+    libxl__ao_abortable abrt;
     libxl__ev_fd toread, towrite;
     ssize_t used;
     LIBXL_TAILQ_HEAD(libxl__datacopier_bufs, libxl__datacopier_buf) bufs;
