@@ -613,7 +613,7 @@ static void bootloader_display_copyfail(libxl__egc *egc,
 static void bootloader_domaindeath(libxl__egc *egc, libxl__domaindeathcheck *dc)
 {
     libxl__bootloader_state *bl = CONTAINER_OF(dc, *bl, deathcheck);
-    bootloader_stop(egc, bl, ERROR_FAIL);
+    bootloader_stop(egc, bl, ERROR_DOMAIN_DESTROYED);
 }
 
 static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
