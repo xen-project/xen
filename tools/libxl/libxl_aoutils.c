@@ -121,10 +121,10 @@ void libxl__datacopier_kill(libxl__datacopier_state *dc)
 }
 
 static void datacopier_callback(libxl__egc *egc, libxl__datacopier_state *dc,
-                                int onwrite, int errnoval)
+                                int rc, int onwrite, int errnoval)
 {
     libxl__datacopier_kill(dc);
-    dc->callback(egc, dc, onwrite, errnoval);
+    dc->callback(egc, dc, rc, onwrite, errnoval);
 }
 
 static void datacopier_writable(libxl__egc *egc, libxl__ev_fd *ev,
@@ -142,14 +142,14 @@ static void datacopier_check_state(libxl__egc *egc, libxl__datacopier_state *dc)
             if (rc) {
                 LOG(ERROR, "unable to establish write event on %s"
                     " during copy of %s", dc->writewhat, dc->copywhat);
-                datacopier_callback(egc, dc, -1, 0);
+                datacopier_callback(egc, dc, ERROR_FAIL, -1, EIO);
                 return;
             }
         }
     } else if (!libxl__ev_fd_isregistered(&dc->toread) ||
                dc->bytes_to_read == 0) {
         /* we have had eof */
-        datacopier_callback(egc, dc, 0, 0);
+        datacopier_callback(egc, dc, 0, 0, 0);
         return;
     } else {
         /* nothing buffered, but still reading */
@@ -195,7 +195,7 @@ static int datacopier_pollhup_handled(libxl__egc *egc,
             onwrite ? dc->writewhat : dc->readwhat,
             dc->copywhat);
         libxl__datacopier_kill(dc);
-        dc->callback_pollhup(egc, dc, onwrite, -1);
+        dc->callback_pollhup(egc, dc, ERROR_FAIL, onwrite, -1);
         return 1;
     }
     return 0;
@@ -213,7 +213,7 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
         LOG(ERROR,
             "unexpected poll event 0x%x (expected POLLIN and/or POLLHUP)"
             " on %s during copy of %s", revents, dc->readwhat, dc->copywhat);
-        datacopier_callback(egc, dc, -1, 0);
+        datacopier_callback(egc, dc, ERROR_FAIL, -1, EIO);
         return;
     }
     assert(revents & (POLLIN|POLLHUP));
@@ -245,20 +245,21 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
         }
         if (r < 0) {
             if (errno == EINTR) continue;
+            assert(errno);
             if (errno == EWOULDBLOCK) {
                 if (revents & POLLHUP) {
                     LOG(ERROR,
                         "poll reported HUP but fd read gave EWOULDBLOCK"
                         " on %s during copy of %s",
                         dc->readwhat, dc->copywhat);
-                    datacopier_callback(egc, dc, -1, 0);
+                    datacopier_callback(egc, dc, ERROR_FAIL, -1, 0);
                     return;
                 }
                 break;
             }
             LOGE(ERROR, "error reading %s during copy of %s",
                  dc->readwhat, dc->copywhat);
-            datacopier_callback(egc, dc, 0, errno);
+            datacopier_callback(egc, dc, ERROR_FAIL, 0, errno);
             return;
         }
         if (r == 0) {
@@ -287,7 +288,7 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
                 assert(ferror(dc->log));
                 assert(errno);
                 LOGE(ERROR, "error logging %s", dc->copywhat);
-                datacopier_callback(egc, dc, 0, errno);
+                datacopier_callback(egc, dc, ERROR_FAIL, 0, errno);
                 return;
             }
         }
@@ -315,7 +316,7 @@ static void datacopier_writable(libxl__egc *egc, libxl__ev_fd *ev,
     if (revents & ~POLLOUT) {
         LOG(ERROR, "unexpected poll event 0x%x (should be POLLOUT)"
             " on %s during copy of %s", revents, dc->writewhat, dc->copywhat);
-        datacopier_callback(egc, dc, -1, 0);
+        datacopier_callback(egc, dc, ERROR_FAIL, -1, EIO);
         return;
     }
     assert(revents & POLLOUT);
@@ -332,9 +333,10 @@ static void datacopier_writable(libxl__egc *egc, libxl__ev_fd *ev,
         if (r < 0) {
             if (errno == EINTR) continue;
             if (errno == EWOULDBLOCK) break;
+            assert(errno);
             LOGE(ERROR, "error writing to %s during copy of %s",
                  dc->writewhat, dc->copywhat);
-            datacopier_callback(egc, dc, 1, errno);
+            datacopier_callback(egc, dc, ERROR_FAIL, 1, errno);
             return;
         }
         assert(r > 0);

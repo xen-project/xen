@@ -2158,7 +2158,7 @@ out:
 }
 
 static void save_device_model_datacopier_done(libxl__egc *egc,
-     libxl__datacopier_state *dc, int onwrite, int errnoval);
+     libxl__datacopier_state *dc, int rc, int onwrite, int errnoval);
 
 void libxl__domain_save_device_model(libxl__egc *egc,
                                      libxl__domain_suspend_state *dss,
@@ -2218,11 +2218,11 @@ void libxl__domain_save_device_model(libxl__egc *egc,
     return;
 
  out:
-    save_device_model_datacopier_done(egc, dc, -1, 0);
+    save_device_model_datacopier_done(egc, dc, rc, -1, EIO);
 }
 
 static void save_device_model_datacopier_done(libxl__egc *egc,
-     libxl__datacopier_state *dc, int onwrite, int errnoval)
+     libxl__datacopier_state *dc, int our_rc, int onwrite, int errnoval)
 {
     libxl__domain_suspend_state *dss =
         CONTAINER_OF(dc, *dss, save_dm_datacopier);
@@ -2230,13 +2230,9 @@ static void save_device_model_datacopier_done(libxl__egc *egc,
 
     /* Convenience aliases */
     const char *const filename = dss->dm_savefile;
-    int our_rc = 0;
     int rc;
 
     libxl__datacopier_kill(dc);
-
-    if (onwrite || errnoval)
-        our_rc = ERROR_FAIL;
 
     if (dc->readfd >= 0) {
         close(dc->readfd);

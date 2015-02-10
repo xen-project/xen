@@ -30,9 +30,9 @@
 
 static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op);
 static void bootloader_keystrokes_copyfail(libxl__egc *egc,
-       libxl__datacopier_state *dc, int onwrite, int errnoval);
+       libxl__datacopier_state *dc, int rc, int onwrite, int errnoval);
 static void bootloader_display_copyfail(libxl__egc *egc,
-       libxl__datacopier_state *dc, int onwrite, int errnoval);
+       libxl__datacopier_state *dc, int rc, int onwrite, int errnoval);
 static void bootloader_domaindeath(libxl__egc*, libxl__domaindeathcheck *dc,
                                    int rc);
 static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
@@ -579,10 +579,10 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
 
 /* perhaps one of these will be called, but perhaps not */
 static void bootloader_copyfail(libxl__egc *egc, const char *which,
-        libxl__bootloader_state *bl, int ondisplay, int onwrite, int errnoval)
+        libxl__bootloader_state *bl, int ondisplay,
+        int rc, int onwrite, int errnoval)
 {
     STATE_AO_GC(bl->ao);
-    int rc = ERROR_FAIL;
 
     if (errnoval==-1) {
         /* POLLHUP */
@@ -593,22 +593,24 @@ static void bootloader_copyfail(libxl__egc *egc, const char *which,
             LOG(ERROR, "unexpected POLLHUP on %s", which);
         }
     }
-    if (!onwrite && !errnoval)
+    if (!rc) {
         LOG(ERROR, "unexpected eof copying %s", which);
+        rc = ERROR_FAIL;
+    }
 
     bootloader_stop(egc, bl, rc);
 }
 static void bootloader_keystrokes_copyfail(libxl__egc *egc,
-       libxl__datacopier_state *dc, int onwrite, int errnoval)
+       libxl__datacopier_state *dc, int rc, int onwrite, int errnoval)
 {
     libxl__bootloader_state *bl = CONTAINER_OF(dc, *bl, keystrokes);
-    bootloader_copyfail(egc, "bootloader input", bl, 0, onwrite, errnoval);
+    bootloader_copyfail(egc, "bootloader input", bl, 0, rc,onwrite,errnoval);
 }
 static void bootloader_display_copyfail(libxl__egc *egc,
-       libxl__datacopier_state *dc, int onwrite, int errnoval)
+       libxl__datacopier_state *dc, int rc, int onwrite, int errnoval)
 {
     libxl__bootloader_state *bl = CONTAINER_OF(dc, *bl, display);
-    bootloader_copyfail(egc, "bootloader output", bl, 1, onwrite, errnoval);
+    bootloader_copyfail(egc, "bootloader output", bl, 1, rc,onwrite,errnoval);
 }
 
 static void bootloader_domaindeath(libxl__egc *egc,

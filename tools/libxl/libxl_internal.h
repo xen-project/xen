@@ -2620,17 +2620,21 @@ _hidden void libxl__device_disk_local_initiate_detach(libxl__egc *egc,
 typedef struct libxl__datacopier_state libxl__datacopier_state;
 typedef struct libxl__datacopier_buf libxl__datacopier_buf;
 
-/* onwrite==1 means failure happened when writing, logged, errnoval is valid
- * onwrite==0 means failure happened when reading
- *     errnoval==0 means we got eof and all data was written
- *     errnoval!=0 means we had a read error, logged
- * onwrite==-1 means some other internal failure, errnoval not valid, logged
- * If we get POLLHUP, we call callback_pollhup(..., onwrite, -1);
+/* onwrite==1 means problem happened when writing
+ *     rc==FAIL    errnoval >0    we had a write error, logged
+ * onwrite==0 means problem happened when reading
+ *     rc==0       errnoval==0    we got eof and all data was written
+ *     rc==FAIL    errnoval >0    we had a read error, logged
+ * onwrite==-1 means some other internal problem
+ *     rc==FAIL    errnoval==EIO  some other internal failure, logged
+ *     rc==ABORTED errnoval==0    abort requested, not logged
+ * If we get POLLHUP, we call callback_pollhup with
+ *     rc==FAIL    errnoval==-1   POLLHUP signalled
  * or if callback_pollhup==0 this is treated as eof (if POLLIN|POLLHUP
  * on the reading fd) or an internal failure (otherwise), as above.
  * In all cases copier is killed before calling this callback */
 typedef void libxl__datacopier_callback(libxl__egc *egc,
-     libxl__datacopier_state *dc, int onwrite, int errnoval);
+     libxl__datacopier_state *dc, int rc, int onwrite, int errnoval);
 
 struct libxl__datacopier_buf {
     /* private to datacopier */
