@@ -1426,6 +1426,9 @@ libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid,
  * From a libxl API point of view, this starts a long-running
  * operation.  That operation consists of "being a driver domain"
  * and never completes.
+ *
+ * Attempting to abort this operation is not advisable; proper
+ * shutdown of the driver domain task is not supported.
  */
 int libxl_device_events_handler(libxl_ctx *ctx,
                                 const libxl_asyncop_how *ao_how)
