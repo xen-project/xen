@@ -4592,11 +4592,12 @@ int libxl_device_events_handler(libxl_ctx *ctx,
     be_path = GCSPRINTF("/local/domain/%u/backend", domid);
     rc = libxl__ev_xswatch_register(gc, &ddomain.watch, backend_watch_callback,
                                     be_path);
+    if (rc) goto out;
+
+    return AO_INPROGRESS;
 
 out:
-    GC_FREE;
-    if (rc) return AO_ABORT(rc);
-    return AO_INPROGRESS;
+    return AO_ABORT(rc);
 }
 
 /******************************************************************************/
