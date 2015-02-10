@@ -255,12 +255,15 @@ struct arch_domain
 
     unsigned int hv_compat_vstart;
 
-    bool_t s3_integrity;
+    /* Maximum physical-address bitwidth supported by this guest. */
+    unsigned int physaddr_bitsize;
 
     /* I/O-port admin-specified access capabilities. */
     struct rangeset *ioport_caps;
     uint32_t pci_cf8;
     uint8_t cmos_idx;
+
+    bool_t s3_integrity;
 
     struct list_head pdev_list;
 
@@ -275,23 +278,6 @@ struct arch_domain
      * page_alloc lock */
     int page_alloc_unlock_level;
 
-    /* nestedhvm: translate l2 guest physical to host physical */
-    struct p2m_domain *nested_p2m[MAX_NESTEDP2M];
-    mm_lock_t nested_p2m_lock;
-
-    /* NB. protected by d->event_lock and by irq_desc[irq].lock */
-    struct radix_tree_root irq_pirq;
-
-    /* Maximum physical-address bitwidth supported by this guest. */
-    unsigned int physaddr_bitsize;
-
-    /* Is a 32-bit PV (non-HVM) guest? */
-    bool_t is_32bit_pv;
-    /* Is shared-info page in 32-bit format? */
-    bool_t has_32bit_shinfo;
-    /* Domain cannot handle spurious page faults? */
-    bool_t suppress_spurious_page_faults;
-
     /* Continuable domain_relinquish_resources(). */
     enum {
         RELMEM_not_started,
@@ -303,6 +289,24 @@ struct arch_domain
         RELMEM_done,
     } relmem;
     struct page_list_head relmem_list;
+
+    /* nestedhvm: translate l2 guest physical to host physical */
+    struct p2m_domain *nested_p2m[MAX_NESTEDP2M];
+    mm_lock_t nested_p2m_lock;
+
+    /* NB. protected by d->event_lock and by irq_desc[irq].lock */
+    struct radix_tree_root irq_pirq;
+
+    /* Is a 32-bit PV (non-HVM) guest? */
+    bool_t is_32bit_pv;
+    /* Is shared-info page in 32-bit format? */
+    bool_t has_32bit_shinfo;
+
+    /* Domain cannot handle spurious page faults? */
+    bool_t suppress_spurious_page_faults;
+
+    /* Is PHYSDEVOP_eoi to automatically unmask the event channel? */
+    bool_t auto_unmask;
 
     cpuid_input_t *cpuids;
 
@@ -329,15 +333,12 @@ struct arch_domain
     struct e820entry *e820;
     unsigned int nr_e820;
 
-    /* set auto_unmask to 1 if you want PHYSDEVOP_eoi to automatically
-     * unmask the event channel */
-    bool_t auto_unmask;
+    unsigned int psr_rmid; /* RMID assigned to the domain for CMT */
+
     /* Shared page for notifying that explicit PIRQ EOI is required. */
     unsigned long *pirq_eoi_map;
     unsigned long pirq_eoi_map_mfn;
-
-    unsigned int psr_rmid; /* RMID assigned to the domain for CMT */
-} __cacheline_aligned;
+};
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
 
@@ -493,7 +494,7 @@ struct arch_vcpu
         unsigned long eip;
     } mem_event;
 
-} __cacheline_aligned;
+};
 
 smap_check_policy_t smap_policy_change(struct vcpu *v,
                                        smap_check_policy_t new_policy);
