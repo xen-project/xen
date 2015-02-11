@@ -444,9 +444,12 @@ struct __packed __cacheline_aligned tss_struct {
  * descriptor table entry. */
 static always_inline void set_ist(idt_entry_t *idt, unsigned long ist)
 {
+    idt_entry_t new = *idt;
+
     /* IST is a 3 bit field, 32 bits into the IDT entry. */
     ASSERT(ist <= IST_MAX);
-    idt->a = (idt->a & ~(7UL << 32)) | (ist << 32);
+    new.a = (idt->a & ~(7UL << 32)) | (ist << 32);
+    _write_gate_lower(idt, &new);
 }
 
 #define IDT_ENTRIES 256
