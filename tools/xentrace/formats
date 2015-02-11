@@ -68,10 +68,10 @@
 0x00082014  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  INVLPG      [ is invlpga? = %(1)d, virt = 0x%(2)08x ]
 0x00082114  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  INVLPG      [ is invlpga? = %(1)d, virt = 0x%(3)08x%(2)08x ]
 0x00082015  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  MCE
-0x00082016  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  IOPORT_READ [ data = 0x%(1)04x ]
-0x00082216  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  IOPORT_WRITE [ data = 0x%(1)04x ]
-0x00082017  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  MMIO_READ   [ data = 0x%(1)04x ]
-0x00082217  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  MMIO_WRITE  [ data = 0x%(1)04x ]
+0x00082016  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  IOPORT_READ [ port = 0x%(1)04x, data = 0x%(2)08x ]
+0x00082216  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  IOPORT_WRITE [ port = 0x%(1)04x, data = 0x%(2)08x ]
+0x00082017  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  MMIO_READ   [ port = 0x%(1)08x, data = 0x%(2)08x ]
+0x00082217  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  MMIO_WRITE  [ port = 0x%(1)08x, data = 0x%(2)08x ]
 0x00082018  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  CLTS
 0x00082019  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  LMSW        [ value = 0x%(1)08x ]
 0x00082119  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  LMSW        [ value = 0x%(2)08x%(1)08x ]
