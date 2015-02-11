@@ -530,7 +530,6 @@ DECLARE_TRAP_HANDLER(alignment_check);
 
 void trap_nop(void);
 void enable_nmis(void);
-void noreturn do_nmi_crash(struct cpu_user_regs *regs);
 void do_reserved_trap(struct cpu_user_regs *regs);
 
 void syscall_enter(void);
