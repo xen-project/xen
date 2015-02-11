@@ -2659,6 +2659,9 @@ static bool_t hvm_complete_assist_req(ioreq_t *p)
 {
     switch ( p->type )
     {
+    case IOREQ_TYPE_PCI_CONFIG:
+        ASSERT_UNREACHABLE();
+        break;
     case IOREQ_TYPE_COPY:
     case IOREQ_TYPE_PIO:
         if ( p->dir == IOREQ_READ )
