@@ -228,8 +228,11 @@ int hvm_vcpu_cacheattr_init(struct vcpu *v);
 void hvm_vcpu_cacheattr_destroy(struct vcpu *v);
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip);
 
-bool_t hvm_send_assist_req(ioreq_t *p);
+struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
+                                                 ioreq_t *p);
+bool_t hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *p);
 void hvm_broadcast_assist_req(ioreq_t *p);
+void hvm_complete_assist_req(ioreq_t *p);
 
 void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat);
 int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat);
@@ -359,7 +362,6 @@ void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
 void hvm_migrate_timers(struct vcpu *v);
-bool_t hvm_has_dm(struct domain *d);
 bool_t hvm_io_pending(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 void hvm_migrate_pirqs(struct vcpu *v);

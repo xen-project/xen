@@ -2408,8 +2408,8 @@ void hvm_vcpu_down(struct vcpu *v)
     }
 }
 
-static struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
-                                                        ioreq_t *p)
+struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
+                                                 ioreq_t *p)
 {
 #define CF8_BDF(cf8)     (((cf8) & 0x00ffff00) >> 8)
 #define CF8_ADDR_LO(cf8) ((cf8) & 0x000000fc)
@@ -2591,18 +2591,13 @@ int hvm_buffered_io_send(ioreq_t *p)
     return 1;
 }
 
-bool_t hvm_has_dm(struct domain *d)
-{
-    return !list_empty(&d->arch.hvm_domain.ioreq_server.list);
-}
-
-bool_t hvm_send_assist_req_to_ioreq_server(struct hvm_ioreq_server *s,
-                                           ioreq_t *proto_p)
+bool_t hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *proto_p)
 {
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     struct hvm_ioreq_vcpu *sv;
 
+    ASSERT(s);
     if ( unlikely(!vcpu_start_shutdown_deferral(curr)) )
         return 0; /* implicitly bins the i/o operation */
 
@@ -2655,7 +2650,7 @@ bool_t hvm_send_assist_req_to_ioreq_server(struct hvm_ioreq_server *s,
     return 0;
 }
 
-static bool_t hvm_complete_assist_req(ioreq_t *p)
+void hvm_complete_assist_req(ioreq_t *p)
 {
     switch ( p->type )
     {
@@ -2684,18 +2679,6 @@ static bool_t hvm_complete_assist_req(ioreq_t *p)
         hvm_io_assist(p);
         break;
     }
-
-    return 1;
-}
-
-bool_t hvm_send_assist_req(ioreq_t *p)
-{
-    struct hvm_ioreq_server *s = hvm_select_ioreq_server(current->domain, p);
-
-    if ( !s )
-        return hvm_complete_assist_req(p);
-
-    return hvm_send_assist_req_to_ioreq_server(s, p);
 }
 
 void hvm_broadcast_assist_req(ioreq_t *p)
@@ -2708,7 +2691,7 @@ void hvm_broadcast_assist_req(ioreq_t *p)
     list_for_each_entry ( s,
                           &d->arch.hvm_domain.ioreq_server.list,
                           list_entry )
-        (void) hvm_send_assist_req_to_ioreq_server(s, p);
+        (void) hvm_send_assist_req(s, p);
 }
 
 void hvm_hlt(unsigned long rflags)

@@ -218,21 +218,27 @@ static int hvmemul_do_io(
             vio->io_state = HVMIO_handle_mmio_awaiting_completion;
         break;
     case X86EMUL_UNHANDLEABLE:
-        /* If there is no backing DM, just ignore accesses */
-        if ( !hvm_has_dm(curr->domain) )
+    {
+        struct hvm_ioreq_server *s =
+            hvm_select_ioreq_server(curr->domain, &p);
+
+        /* If there is no suitable backing DM, just ignore accesses */
+        if ( !s )
         {
+            hvm_complete_assist_req(&p);
             rc = X86EMUL_OKAY;
             vio->io_state = HVMIO_none;
         }
         else
         {
             rc = X86EMUL_RETRY;
-            if ( !hvm_send_assist_req(&p) )
+            if ( !hvm_send_assist_req(s, &p) )
                 vio->io_state = HVMIO_none;
             else if ( p_data == NULL )
                 rc = X86EMUL_OKAY;
         }
         break;
+    }
     default:
         BUG();
     }
