@@ -320,7 +320,7 @@ esac
 dnl The following are only required when upstream QEMU is built
 AS_IF([test "x$qemu_xen" = "xy"], [
 PKG_CHECK_MODULES(glib, [glib-2.0 >= 2.12])
-PKG_CHECK_MODULES(pixman, pixman-1)
+PKG_CHECK_MODULES(pixman, [pixman-1 >= 0.21.8])
 ])
 AX_CHECK_FETCHER
 
