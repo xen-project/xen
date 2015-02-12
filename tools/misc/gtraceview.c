@@ -1097,6 +1097,7 @@ void choose_cpus(void)
                     this->init();
                 return;
             }
+            /* fallthrough */
         case KEY_F(4):
             exit(EXIT_SUCCESS);
         }

@@ -87,6 +87,7 @@ usage(enum mode mode, int incl_mode, const char *progname)
 	errx(1, "Usage: %s %s[-h] [-s] [-t] key [...]", progname, mstr);
     case MODE_exists:
 	mstr = incl_mode ? "exists " : "";
+	/* fallthrough */
     case MODE_list:
 	mstr = mstr ? : incl_mode ? "list " : "";
 	errx(1, "Usage: %s %s[-h] [-p] [-s] key [...]", progname, mstr);

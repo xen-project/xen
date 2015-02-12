@@ -2752,11 +2752,14 @@ static int64_t parse_mem_size_kb(const char *mem)
     switch (tolower((uint8_t)*endptr)) {
     case 't':
         kbytes <<= 10;
+        /* fallthrough */
     case 'g':
         kbytes <<= 10;
+        /* fallthrough */
     case '\0':
     case 'm':
         kbytes <<= 10;
+        /* fallthrough */
     case 'k':
         break;
     case 'b':

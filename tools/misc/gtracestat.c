@@ -167,6 +167,7 @@ int main(int argc, char *argv[])
             tsc2phase = atoll(optarg);
             if (tsc2phase <= 0)
                 tsc2phase = 55800000UL;
+            break;
         case 'd':
             is_digest = 1;
             break;

@@ -407,6 +407,7 @@ static int handle_key(int ch)
 		case KEY_BACKSPACE:
 			if(prompt_val_len > 0)
 				prompt_val[--prompt_val_len] = '\0';
+                        break;
 		default:
 			if((prompt_val_len+1) < PROMPT_VAL_LEN
 			   && isprint(ch)) {
