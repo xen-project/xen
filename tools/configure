@@ -2402,8 +2402,8 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 case $host_vendor in
-rumpxen) CONFIG_RUMP=y; rump=true ;;
-*)       CONFIG_RUMP=n; rump=false ;;
+rumpxen|rumprun) CONFIG_RUMP=y; rump=true ;;
+*)               CONFIG_RUMP=n; rump=false ;;
 esac
 
 
