@@ -94,41 +94,15 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         vgic_unlock_rank(v, rank, flags);
         return 1;
 
+    /* Read the pending status of an IRQ via GICD is not supported */
     case GICD_ISPENDR ... GICD_ISPENDRN:
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ISPENDR, DABT_WORD);
-        if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank, flags);
-        *r = vgic_byte_read(rank->ipend, dabt.sign, gicd_reg);
-        vgic_unlock_rank(v, rank, flags);
-        return 1;
-
     case GICD_ICPENDR ... GICD_ICPENDRN:
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        rank = vgic_rank_offset(v, 0, gicd_reg - GICD_ICPENDR, DABT_WORD);
-        if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank, flags);
-        *r = vgic_byte_read(rank->ipend, dabt.sign, gicd_reg);
-        vgic_unlock_rank(v, rank, flags);
-        return 1;
+        goto read_as_zero;
 
+    /* Read the active status of an IRQ via GICD is not supported */
     case GICD_ISACTIVER ... GICD_ISACTIVERN:
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ISACTIVER, DABT_WORD);
-        if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank, flags);
-        *r = rank->iactive;
-        vgic_unlock_rank(v, rank, flags);
-        return 1;
-
     case GICD_ICACTIVER ... GICD_ICACTIVERN:
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ICACTIVER, DABT_WORD);
-        if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank, flags);
-        *r = rank->iactive;
-        vgic_unlock_rank(v, rank, flags);
-        return 1;
+        goto read_as_zero;
 
     case GICD_ITARGETSR ... GICD_ITARGETSRN:
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
@@ -174,23 +148,10 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         *r = 0xdeadbeef;
         return 1;
 
+    /* Setting/Clearing the SGI pending bit via GICD is not supported */
     case GICD_CPENDSGIR ... GICD_CPENDSGIRN:
-        if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
-        rank = vgic_rank_offset(v, 1, gicd_reg - GICD_CPENDSGIR, DABT_WORD);
-        if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank, flags);
-        *r = vgic_byte_read(rank->pendsgi, dabt.sign, gicd_reg);
-        vgic_unlock_rank(v, rank, flags);
-        return 1;
-
     case GICD_SPENDSGIR ... GICD_SPENDSGIRN:
-        if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
-        rank = vgic_rank_offset(v, 1, gicd_reg - GICD_SPENDSGIR, DABT_WORD);
-        if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank, flags);
-        *r = vgic_byte_read(rank->pendsgi, dabt.sign, gicd_reg);
-        vgic_unlock_rank(v, rank, flags);
-        return 1;
+        goto read_as_zero;
 
     /* Implementation defined -- read as zero */
     case 0xfd0 ... 0xfe4:
@@ -349,21 +310,17 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
 
     case GICD_ISACTIVER ... GICD_ISACTIVERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
-        rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ISACTIVER, DABT_WORD);
-        if ( rank == NULL) goto write_ignore;
-        vgic_lock_rank(v, rank, flags);
-        rank->iactive &= ~*r;
-        vgic_unlock_rank(v, rank, flags);
-        return 1;
+        printk(XENLOG_G_ERR
+               "%pv: vGICD: unhandled word write %#"PRIregister" to ISACTIVER%d\n",
+               v, *r, gicd_reg - GICD_ISACTIVER);
+        return 0;
 
     case GICD_ICACTIVER ... GICD_ICACTIVERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
-        rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ICACTIVER, DABT_WORD);
-        if ( rank == NULL) goto write_ignore;
-        vgic_lock_rank(v, rank, flags);
-        rank->iactive &= ~*r;
-        vgic_unlock_rank(v, rank, flags);
-        return 1;
+        printk(XENLOG_G_ERR
+               "%pv: vGICD: unhandled word write %#"PRIregister" to ICACTIVER%d\n",
+               v, *r, gicd_reg - GICD_ICACTIVER);
+        return 0;
 
     case GICD_ITARGETSR ... GICD_ITARGETSR + 7:
         /* SGI/PPI target is read only */

@@ -85,7 +85,7 @@ struct pending_irq
 /* Represents state corresponding to a block of 32 interrupts */
 struct vgic_irq_rank {
     spinlock_t lock; /* Covers access to all other members of this struct */
-    uint32_t ienable, iactive, ipend, pendsgi;
+    uint32_t ienable;
     uint32_t icfg[2];
     uint32_t ipriority[8];
     union {
