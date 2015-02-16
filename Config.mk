@@ -237,7 +237,9 @@ ifneq (,$(CONFIG_QEMU))
 QEMU_TRADITIONAL_LOC ?= $(CONFIG_QEMU)
 endif
 ifneq (,$(QEMU_TAG))
-QEMU_TRADITIONAL_REVISION ?= $(QEMU_TAG)
+QEMU_TRADITIONAL_REVISION ?= 3499745d3a8561cce67f3d4fbc2da60401253ad4
+# Mon Feb 2 16:49:59 2015 +0000
+# cirrus: fix an uninitialized variable
 endif
 
 ifeq ($(GIT_HTTP),y)
@@ -260,9 +262,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.5.0
-# Mon Oct 6 16:24:46 2014 +0100
-# qemu-xen-trad: Switch to $(LIBEXEC_BIN) from $(LIBEXEC)
+QEMU_TRADITIONAL_REVISION ?= 3499745d3a8561cce67f3d4fbc2da60401253ad4
+# Mon Feb 2 16:49:59 2015 +0000
+# cirrus: fix an uninitialized variable
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
