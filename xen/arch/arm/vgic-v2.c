@@ -95,7 +95,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         return 1;
 
     case GICD_ISPENDR ... GICD_ISPENDRN:
-        if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
+        if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ISPENDR, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
         vgic_lock_rank(v, rank, flags);
@@ -104,8 +104,8 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         return 1;
 
     case GICD_ICPENDR ... GICD_ICPENDRN:
-        if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
-        rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ICPENDR, DABT_WORD);
+        if ( dabt.size != DABT_WORD ) goto bad_width;
+        rank = vgic_rank_offset(v, 0, gicd_reg - GICD_ICPENDR, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
         vgic_lock_rank(v, rank, flags);
         *r = vgic_byte_read(rank->ipend, dabt.sign, gicd_reg);
@@ -334,17 +334,17 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         return 1;
 
     case GICD_ISPENDR ... GICD_ISPENDRN:
-        if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
+        if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
-               "%pv: vGICD: unhandled %s write %#"PRIregister" to ISPENDR%d\n",
-               v, dabt.size ? "word" : "byte", *r, gicd_reg - GICD_ISPENDR);
+               "%pv: vGICD: unhandled word write %#"PRIregister" to ISPENDR%d\n",
+               v, *r, gicd_reg - GICD_ISPENDR);
         return 0;
 
     case GICD_ICPENDR ... GICD_ICPENDRN:
-        if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
+        if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
-               "%pv: vGICD: unhandled %s write %#"PRIregister" to ICPENDR%d\n",
-               v, dabt.size ? "word" : "byte", *r, gicd_reg - GICD_ICPENDR);
+               "%pv: vGICD: unhandled word write %#"PRIregister" to ICPENDR%d\n",
+               v, *r, gicd_reg - GICD_ICPENDR);
         return 0;
 
     case GICD_ISACTIVER ... GICD_ISACTIVERN:
