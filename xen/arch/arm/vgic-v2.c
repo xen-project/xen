@@ -74,7 +74,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
 
     case GICD_IGROUPR ... GICD_IGROUPRN:
         /* We do not implement security extensions for guests, read zero */
-        goto read_as_zero;
+        goto read_as_zero_32;
 
     case GICD_ISENABLER ... GICD_ISENABLERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -166,7 +166,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
 
     case GICD_NSACR ... GICD_NSACRN:
         /* We do not implement security extensions for guests, read zero */
-        goto read_as_zero;
+        goto read_as_zero_32;
 
     case GICD_SGIR:
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -226,8 +226,9 @@ bad_width:
     domain_crash_synchronous();
     return 0;
 
-read_as_zero:
+read_as_zero_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
+read_as_zero:
     *r = 0;
     return 1;
 }
@@ -289,7 +290,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     /* R/O -- write ignored */
     case GICD_TYPER:
     case GICD_IIDR:
-        goto write_ignore;
+        goto write_ignore_32;
 
     /* Implementation defined -- write ignored */
     case 0x020 ... 0x03c:
@@ -297,7 +298,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
 
     case GICD_IGROUPR ... GICD_IGROUPRN:
         /* We do not implement security extensions for guests, write ignore */
-        goto write_ignore;
+        goto write_ignore_32;
 
     case GICD_ISENABLER ... GICD_ISENABLERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -363,7 +364,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
 
     case GICD_ITARGETSR ... GICD_ITARGETSR + 7:
         /* SGI/PPI target is read only */
-        goto write_ignore;
+        goto write_ignore_32;
 
     case GICD_ITARGETSR + 8 ... GICD_ITARGETSRN:
     {
@@ -436,10 +437,10 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         return 1;
 
     case GICD_ICFGR: /* SGIs */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_ICFGR + 1: /* PPIs */
         /* It is implementation defined if these are writeable. We chose not */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_ICFGR + 2 ... GICD_ICFGRN: /* SPIs */
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 2, gicd_reg - GICD_ICFGR, DABT_WORD);
@@ -451,7 +452,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
 
     case GICD_NSACR ... GICD_NSACRN:
         /* We do not implement security extensions for guests, write ignore */
-        goto write_ignore;
+        goto write_ignore_32;
 
     case GICD_SGIR:
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -477,7 +478,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
 
     /* R/O -- write ignore */
     case GICD_ICPIDR2:
-        goto write_ignore;
+        goto write_ignore_32;
 
     /* Implementation defined -- write ignored */
     case 0xfec ... 0xffc:
@@ -506,8 +507,9 @@ bad_width:
     domain_crash_synchronous();
     return 0;
 
-write_ignore:
+write_ignore_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
+write_ignore:
     return 1;
 }
 
