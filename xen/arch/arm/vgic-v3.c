@@ -1108,13 +1108,14 @@ static int vgic_v3_domain_init(struct domain *d)
                           d->arch.vgic.dbase_size);
 
     /*
-     * Register mmio handler per redistributor region but not for
-     * every sgi rdist region which is per core.
-     * The redistributor region encompasses per core sgi region.
+     * Register mmio handler per contiguous region occupied by the
+     * redistributors. The handler will take care to choose which
+     * redistributor is targeted.
      */
-    for ( i = 0; i < d->arch.vgic.rdist_count; i++ )
+    for ( i = 0; i < d->arch.vgic.nr_regions; i++ )
         register_mmio_handler(d, &vgic_rdistr_mmio_handler,
-            d->arch.vgic.rbase[i], d->arch.vgic.rbase_size[i]);
+            d->arch.vgic.rdist_regions[i].base,
+            d->arch.vgic.rdist_regions[i].size);
 
     d->arch.vgic.ctlr = VGICD_CTLR_DEFAULT;
 

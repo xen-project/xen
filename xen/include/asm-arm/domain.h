@@ -102,10 +102,13 @@ struct arch_domain
 #ifdef CONFIG_ARM_64
         /* GIC V3 addressing */
         paddr_t dbase_size; /* Distributor base size */
-        paddr_t rbase[MAX_RDIST_COUNT];      /* Re-Distributor base address */
-        paddr_t rbase_size[MAX_RDIST_COUNT]; /* Re-Distributor size */
-        uint32_t rdist_stride;               /* Re-Distributor stride */
-        int rdist_count;                     /* No. of Re-Distributors */
+        /* List of contiguous occupied by the redistributors */
+        struct vgic_rdist_region {
+            paddr_t base;                   /* Base address */
+            paddr_t size;                   /* Size */
+        } rdist_regions[MAX_RDIST_COUNT];
+        int nr_regions;                     /* Number of rdist regions */
+        uint32_t rdist_stride;              /* Re-Distributor stride */
 #endif
     } vgic;
 

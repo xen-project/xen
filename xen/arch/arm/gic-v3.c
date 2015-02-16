@@ -909,10 +909,10 @@ static int gicv_v3_init(struct domain *d)
 
         for ( i = 0; i < gicv3.rdist_count; i++ )
         {
-            d->arch.vgic.rbase[i] = gicv3.rdist_regions[i].base;
-            d->arch.vgic.rbase_size[i] = gicv3.rdist_regions[i].size;
+            d->arch.vgic.rdist_regions[i].base = gicv3.rdist_regions[i].base;
+            d->arch.vgic.rdist_regions[i].size = gicv3.rdist_regions[i].size;
         }
-        d->arch.vgic.rdist_count = gicv3.rdist_count;
+        d->arch.vgic.nr_regions = gicv3.rdist_count;
     }
     else
     {
@@ -922,13 +922,13 @@ static int gicv_v3_init(struct domain *d)
         /* XXX: Only one Re-distributor region mapped for the guest */
         BUILD_BUG_ON(GUEST_GICV3_RDIST_REGIONS != 1);
 
-        d->arch.vgic.rdist_count = GUEST_GICV3_RDIST_REGIONS;
+        d->arch.vgic.nr_regions = GUEST_GICV3_RDIST_REGIONS;
         d->arch.vgic.rdist_stride = GUEST_GICV3_RDIST_STRIDE;
 
         /* The first redistributor should contain enough space for all CPUs */
         BUILD_BUG_ON((GUEST_GICV3_GICR0_SIZE / GUEST_GICV3_RDIST_STRIDE) < MAX_VIRT_CPUS);
-        d->arch.vgic.rbase[0] = GUEST_GICV3_GICR0_BASE;
-        d->arch.vgic.rbase_size[0] = GUEST_GICV3_GICR0_SIZE;
+        d->arch.vgic.rdist_regions[0].base = GUEST_GICV3_GICR0_BASE;
+        d->arch.vgic.rdist_regions[0].size = GUEST_GICV3_GICR0_SIZE;
     }
 
     return 0;
@@ -1107,7 +1107,7 @@ static int gicv3_make_dt_node(const struct domain *d,
      * CPU interface and virtual cpu interfaces accessesed as System registers
      * So cells are created only for Distributor and rdist regions
      */
-    len = len * (d->arch.vgic.rdist_count + 1);
+    len = len * (d->arch.vgic.nr_regions + 1);
     new_cells = xzalloc_bytes(len);
     if ( new_cells == NULL )
         return -FDT_ERR_XEN(ENOMEM);
@@ -1116,9 +1116,9 @@ static int gicv3_make_dt_node(const struct domain *d,
 
     dt_set_range(&tmp, node, d->arch.vgic.dbase, d->arch.vgic.dbase_size);
 
-    for ( i = 0; i < d->arch.vgic.rdist_count; i++ )
-        dt_set_range(&tmp, node, d->arch.vgic.rbase[i],
-                     d->arch.vgic.rbase_size[i]);
+    for ( i = 0; i < d->arch.vgic.nr_regions; i++ )
+        dt_set_range(&tmp, node, d->arch.vgic.rdist_regions[i].base,
+                     d->arch.vgic.rdist_regions[i].size);
 
     res = fdt_property(fdt, "reg", new_cells, len);
     xfree(new_cells);
