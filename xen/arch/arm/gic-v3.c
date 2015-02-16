@@ -639,7 +639,7 @@ static int __init gicv3_populate_rdist(void)
                 ptr += gicv3.rdist_stride;
             else
             {
-                ptr += SZ_64K * 2;
+                ptr += SZ_64K * 2; /* Skip RD_base + SGI_base */
                 if ( typer & GICR_TYPER_VLPIS )
                     ptr += SZ_64K * 2; /* Skip VLPI_base + reserved page */
             }
@@ -1250,7 +1250,6 @@ static int __init gicv3_init(struct dt_device_node *node, const void *data)
     /* The vGIC code requires the region to be sorted */
     sort(rdist_regs, gicv3.rdist_count, sizeof(*rdist_regs), cmp_rdist, NULL);
 
-    /* If stride is not set in dt. Set default to 2 * SZ_64K */
     if ( !dt_property_read_u32(node, "redistributor-stride", &gicv3.rdist_stride) )
         gicv3.rdist_stride = 0;
 
