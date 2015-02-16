@@ -275,8 +275,8 @@ write_ignore_32:
     return 1;
 }
 
-static int __vgic_v3_distr_common_mmio_read(struct vcpu *v, mmio_info_t *info,
-                                            uint32_t reg)
+static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
+                                            mmio_info_t *info, uint32_t reg)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
@@ -360,15 +360,14 @@ static int __vgic_v3_distr_common_mmio_read(struct vcpu *v, mmio_info_t *info,
         return 1;
     default:
         printk(XENLOG_G_ERR
-               "%pv: vGICD/vGICR: unhandled read r%d offset %#08x\n",
-               v, dabt.reg, reg);
+               "%pv: %s: unhandled read r%d offset %#08x\n",
+               v, name, dabt.reg, reg);
         return 0;
     }
 
 bad_width:
-    printk(XENLOG_G_ERR
-           "%pv: vGICD/vGICR: bad read width %d r%d offset %#08x\n",
-           v, dabt.size, dabt.reg, reg);
+    printk(XENLOG_G_ERR "%pv: %s: bad read width %d r%d offset %#08x\n",
+           v, name, dabt.size, dabt.reg, reg);
     domain_crash_synchronous();
     return 0;
 
@@ -377,8 +376,8 @@ read_as_zero:
     return 1;
 }
 
-static int __vgic_v3_distr_common_mmio_write(struct vcpu *v, mmio_info_t *info,
-                                             uint32_t reg)
+static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
+                                             mmio_info_t *info, uint32_t reg)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
@@ -473,15 +472,15 @@ static int __vgic_v3_distr_common_mmio_write(struct vcpu *v, mmio_info_t *info,
         return 1;
     default:
         printk(XENLOG_G_ERR
-               "%pv: vGICD/vGICR: unhandled write r%d=%"PRIregister" offset %#08x\n",
-               v, dabt.reg, *r, reg);
+               "%pv: %s: unhandled write r%d=%"PRIregister" offset %#08x\n",
+               v, name, dabt.reg, *r, reg);
         return 0;
     }
 
 bad_width:
     printk(XENLOG_G_ERR
-           "%pv: vGICD/vGICR: bad write width %d r%d=%"PRIregister" offset %#08x\n",
-           v, dabt.size, dabt.reg, *r, reg);
+           "%pv: %s: bad write width %d r%d=%"PRIregister" offset %#08x\n",
+           v, name, dabt.size, dabt.reg, *r, reg);
     domain_crash_synchronous();
     return 0;
 
@@ -516,7 +515,8 @@ static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
           * Above registers offset are common with GICD.
           * So handle in common with GICD handling
           */
-        return __vgic_v3_distr_common_mmio_read(v, info, gicr_reg);
+        return __vgic_v3_distr_common_mmio_read("vGICR: SGI", v, info,
+                                                gicr_reg);
     case GICR_ISPENDR0:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicr_reg - GICR_ISPENDR0, DABT_WORD);
@@ -581,7 +581,8 @@ static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
           * Above registers offset are common with GICD.
           * So handle common with GICD handling
           */
-        return __vgic_v3_distr_common_mmio_write(v, info, gicr_reg);
+        return __vgic_v3_distr_common_mmio_write("vGICR: SGI", v,
+                                                 info, gicr_reg);
     case GICR_ISPENDR0:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, gicr_reg - GICR_ISACTIVER0, DABT_WORD);
@@ -777,7 +778,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
          * Above all register are common with GICR and GICD
          * Manage in common
          */
-        return __vgic_v3_distr_common_mmio_read(v, info, gicd_reg);
+        return __vgic_v3_distr_common_mmio_read("vGICD", v, info, gicd_reg);
     case GICD_IROUTER ... GICD_IROUTER31:
         /* SGI/PPI is RES0 */
         goto read_as_zero_64;
@@ -942,7 +943,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     case GICD_ICFGR ... GICD_ICFGRN:
         /* Above registers are common with GICR and GICD
          * Manage in common */
-        return __vgic_v3_distr_common_mmio_write(v, info, gicd_reg);
+        return __vgic_v3_distr_common_mmio_write("vGICD", v, info, gicd_reg);
     case GICD_IROUTER ... GICD_IROUTER31:
         /* SGI/PPI is RES0 */
         goto write_ignore_64;
