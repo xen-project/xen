@@ -284,7 +284,10 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     case GICD_CTLR:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         /* Ignore all but the enable bit */
+        vgic_lock(v);
         v->domain->arch.vgic.ctlr = (*r) & GICD_CTL_ENABLE;
+        vgic_unlock(v);
+
         return 1;
 
     /* R/O -- write ignored */
