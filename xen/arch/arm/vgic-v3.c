@@ -101,7 +101,7 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
     {
     case GICR_CTLR:
         /* We have not implemented LPI's, read zero */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICR_IIDR:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         *r = GICV3_GICR_IIDR_VAL;
@@ -117,10 +117,10 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         return 1;
     case GICR_STATUSR:
         /* Not implemented */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICR_WAKER:
         /* Power management is not implemented */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICR_SETLPIR:
         /* WO. Read as zero */
         goto read_as_zero_64;
@@ -165,14 +165,14 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
          return 1;
     case GICR_PIDR3:
         /* Manufacture/customer defined */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICR_PIDR4:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         *r = GICV3_GICR_PIDR4;
          return 1;
     case GICR_PIDR5 ... GICR_PIDR7:
         /* Reserved0 */
-        goto read_as_zero;
+        goto read_as_zero_32;
     default:
         printk(XENLOG_G_ERR
                "%pv: vGICR: read r%d offset %#08x\n not found",
@@ -190,7 +190,7 @@ read_as_zero_64:
     *r = 0;
     return 1;
 
-read_as_zero:
+read_as_zero_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
     *r = 0;
     return 1;
@@ -207,19 +207,19 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
     {
     case GICR_CTLR:
         /* LPI's not implemented */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICR_IIDR:
         /* RO */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICR_TYPER:
         /* RO */
         goto write_ignore_64;
     case GICR_STATUSR:
         /* Not implemented */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICR_WAKER:
         /* Power mgmt not implemented */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICR_SETLPIR:
         /* LPI is not implemented */
         goto write_ignore_64;
@@ -240,7 +240,7 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
         goto write_ignore_64;
     case GICR_SYNCR:
         /* RO */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICR_MOVLPIR:
         /* LPI is not implemented */
         goto write_ignore_64;
@@ -249,7 +249,7 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
         goto write_ignore_64;
     case GICR_PIDR7... GICR_PIDR0:
         /* RO */
-        goto write_ignore;
+        goto write_ignore_32;
     default:
         printk(XENLOG_G_ERR "%pv: vGICR: write r%d offset %#08x\n not found",
                v, dabt.reg, gicr_reg);
@@ -266,7 +266,7 @@ write_ignore_64:
     if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
     return 1;
 
-write_ignore:
+write_ignore_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
     return 1;
 }
@@ -284,6 +284,7 @@ static int __vgic_v3_distr_common_mmio_read(struct vcpu *v, mmio_info_t *info,
     {
     case GICD_IGROUPR ... GICD_IGROUPRN:
         /* We do not implement security extensions for guests, read zero */
+        if ( dabt.size != DABT_WORD ) goto bad_width;
         goto read_as_zero;
     case GICD_ISENABLER ... GICD_ISENABLERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -368,7 +369,6 @@ bad_width:
     return 0;
 
 read_as_zero:
-    if ( dabt.size != DABT_WORD ) goto bad_width;
     *r = 0;
     return 1;
 }
@@ -387,7 +387,7 @@ static int __vgic_v3_distr_common_mmio_write(struct vcpu *v, mmio_info_t *info,
     {
     case GICD_IGROUPR ... GICD_IGROUPRN:
         /* We do not implement security extensions for guests, write ignore */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_ISENABLER ... GICD_ISENABLERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, reg - GICD_ISENABLER, DABT_WORD);
@@ -456,7 +456,7 @@ static int __vgic_v3_distr_common_mmio_write(struct vcpu *v, mmio_info_t *info,
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_ICFGR: /* Restricted to configure SGIs */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_ICFGR + 4 ... GICD_ICFGRN: /* PPI + SPIs */
         /* ICFGR1 for PPI's, which is implementation defined
            if ICFGR1 is programmable or not. We chose to program */
@@ -481,8 +481,9 @@ bad_width:
     domain_crash_synchronous();
     return 0;
 
-write_ignore:
+write_ignore_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
+write_ignore:
     return 1;
 }
 
@@ -499,7 +500,7 @@ static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
     {
     case GICR_IGRPMODR0:
         /* We do not implement security extensions for guests, read zero */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICR_IGROUPR0:
     case GICR_ISENABLER0:
     case GICR_ICENABLER0:
@@ -543,8 +544,9 @@ bad_width:
     domain_crash_synchronous();
     return 0;
 
-read_as_zero:
+read_as_zero_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
+read_as_zero:
     *r = 0;
     return 1;
 }
@@ -562,7 +564,7 @@ static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
     {
     case GICR_IGRPMODR0:
         /* We do not implement security extensions for guests, write ignore */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICR_IGROUPR0:
     case GICR_ISENABLER0:
     case GICR_ICENABLER0:
@@ -595,7 +597,7 @@ static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
         return 1;
     case GICR_NSACR:
         /* We do not implement security extensions for guests, write ignore */
-        goto write_ignore;
+        goto write_ignore_32;
     default:
         printk(XENLOG_G_ERR
                "%pv: vGICR: SGI: write r%d offset %#08x\n not found",
@@ -610,8 +612,9 @@ bad_width:
     domain_crash_synchronous();
     return 0;
 
-write_ignore:
+write_ignore_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
+write_ignore:
     return 1;
 }
 
@@ -711,7 +714,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
          *  Optional, Not implemented for now.
          *  Update to support guest debugging.
          */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICD_IIDR:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         *r = GICV3_GICD_IIDR_VAL;
@@ -719,7 +722,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
     case 0x020 ... 0x03c:
     case 0xc000 ... 0xffcc:
         /* Implementation defined -- read as zero */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICD_IGROUPR ... GICD_IGROUPRN:
     case GICD_ISENABLER ... GICD_ISENABLERN:
     case GICD_ICENABLER ... GICD_ICENABLERN:
@@ -757,16 +760,16 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         return 1;
     case GICD_NSACR ... GICD_NSACRN:
         /* We do not implement security extensions for guests, read zero */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICD_SGIR:
         /* Read as ICH_SGIR system register with SRE set. So ignore */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICD_CPENDSGIR ... GICD_CPENDSGIRN:
         /* Replaced with GICR_ICPENDR0. So ignore write */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICD_SPENDSGIR ... GICD_SPENDSGIRN:
         /* Replaced with GICR_ISPENDR0. So ignore write */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICD_PIDR0:
         /* GICv3 identification value */
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -784,7 +787,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         return 1;
     case GICD_PIDR3:
         /* GICv3 identification value. Manufacturer/Customer defined */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case GICD_PIDR4:
         /* GICv3 identification value */
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -792,7 +795,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         return 1;
     case GICD_PIDR5 ... GICD_PIDR7:
         /* Reserved0 */
-        goto read_as_zero;
+        goto read_as_zero_32;
     case 0x00c:
     case 0x044:
     case 0x04c:
@@ -821,8 +824,12 @@ read_as_zero_64:
     *r = 0;
     return 1;
 
-read_as_zero:
+read_as_zero_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
+    *r = 0;
+    return 1;
+
+read_as_zero:
     *r = 0;
     return 1;
 }
@@ -856,32 +863,32 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         return 1;
     case GICD_TYPER:
         /* RO -- write ignored */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_IIDR:
         /* RO -- write ignored */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_STATUSR:
         /* RO -- write ignored */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_SETSPI_NSR:
         /* Message based SPI is not implemented */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_CLRSPI_NSR:
         /* Message based SPI is not implemented */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_SETSPI_SR:
         /* Message based SPI is not implemented */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_CLRSPI_SR:
         /* Message based SPI is not implemented */
-        goto write_ignore;
+        goto write_ignore_32;
     case 0x020 ... 0x03c:
     case 0xc000 ... 0xffcc:
         /* Implementation defined -- write ignored */
         printk(XENLOG_G_DEBUG
                "%pv: vGICD: WI on implementation defined register offset %#08x\n",
                v, gicd_reg);
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_IGROUPR ... GICD_IGROUPRN:
     case GICD_ISENABLER ... GICD_ISENABLERN:
     case GICD_ICENABLER ... GICD_ICENABLERN:
@@ -901,7 +908,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 64, gicd_reg - GICD_IROUTER,
                                 DABT_DOUBLE_WORD);
-        if ( rank == NULL ) goto write_ignore_64;
+        if ( rank == NULL ) goto write_ignore;
         BUG_ON(v->domain->max_vcpus > 8);
         new_irouter = *r;
         vgic_lock_rank(v, rank, flags);
@@ -944,10 +951,10 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         return 1;
     case GICD_NSACR ... GICD_NSACRN:
         /* We do not implement security extensions for guests, write ignore */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_SGIR:
         /* it is accessed as system register in GICv3 */
-        goto write_ignore;
+        goto write_ignore_32;
     case GICD_CPENDSGIR ... GICD_CPENDSGIRN:
         /* Replaced with GICR_ICPENDR0. So ignore write */
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -958,7 +965,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         return 0;
     case GICD_PIDR7... GICD_PIDR0:
         /* RO -- write ignore */
-        goto write_ignore;
+        goto write_ignore_32;
     case 0x00c:
     case 0x044:
     case 0x04c:
@@ -984,12 +991,15 @@ bad_width:
     domain_crash_synchronous();
     return 0;
 
-write_ignore:
+write_ignore_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
     return 1;
 
 write_ignore_64:
     if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
+    return 1;
+
+write_ignore:
     return 1;
 }
 
