@@ -45,6 +45,12 @@
 #define GICV3_GICR_PIDR2  GICV3_GICD_PIDR2
 #define GICV3_GICR_PIDR4  GICV3_GICD_PIDR4
 
+/*
+ * GICD_CTLR default value:
+ *      - No GICv2 compatibility => ARE = 1
+ */
+#define VGICD_CTLR_DEFAULT  (GICD_CTLR_ARE_NS)
+
 static struct vcpu *vgic_v3_irouter_to_vcpu(struct vcpu *v, uint64_t irouter)
 {
     irouter &= ~(GICD_IROUTER_SPI_MODE_ANY);
@@ -838,8 +844,15 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     {
     case GICD_CTLR:
         if ( dabt.size != DABT_WORD ) goto bad_width;
-        /* Ignore all but the enable bit */
-        v->domain->arch.vgic.ctlr = (*r) & GICD_CTL_ENABLE;
+
+        vgic_lock(v);
+        /* Only EnableGrp1A can be changed */
+        if ( *r & GICD_CTLR_ENABLE_G1A )
+            v->domain->arch.vgic.ctlr |= GICD_CTLR_ENABLE_G1A;
+        else
+            v->domain->arch.vgic.ctlr &= ~GICD_CTLR_ENABLE_G1A;
+        vgic_unlock(v);
+
         return 1;
     case GICD_TYPER:
         /* RO -- write ignored */
@@ -1099,6 +1112,8 @@ static int vgic_v3_domain_init(struct domain *d)
     for ( i = 0; i < d->arch.vgic.rdist_count; i++ )
         register_mmio_handler(d, &vgic_rdistr_mmio_handler,
             d->arch.vgic.rbase[i], d->arch.vgic.rbase_size[i]);
+
+    d->arch.vgic.ctlr = VGICD_CTLR_DEFAULT;
 
     return 0;
 }
