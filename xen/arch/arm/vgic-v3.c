@@ -530,8 +530,9 @@ static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICR_NSACR:
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        return 1;
+        /* We do not implement security extensions for guests, read zero */
+        goto read_as_zero_32;
+
     default:
         printk(XENLOG_G_ERR
                "%pv: vGICR: SGI: read r%d offset %#08x\n not found",
