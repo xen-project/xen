@@ -224,9 +224,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.3.3
-# Tue Apr 8 16:50:06 2014 +0000
-# qemu-xen-trad: free all the pirqs for msi/msix when driver unloads
+QEMU_TAG ?= 9550be0726b577cf038691c77d8c924c43e7cebd
+# Mon Feb 2 16:49:59 2015 +0000
+# cirrus: fix an uninitialized variable
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
