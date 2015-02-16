@@ -114,6 +114,10 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
                MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 1) << 40 |
                MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 0) << 32);
         *r = aff;
+
+        if ( v->arch.vgic.flags & VGIC_V3_RDIST_LAST )
+            *r |= GICR_TYPER_LAST;
+
         return 1;
     case GICR_STATUSR:
         /* Not implemented */
@@ -619,13 +623,56 @@ write_ignore:
     return 1;
 }
 
+static inline struct vcpu *get_vcpu_from_rdist(paddr_t gpa,
+                                               struct vcpu *v,
+                                               uint32_t *offset)
+{
+    struct domain *d = v->domain;
+    uint32_t stride = d->arch.vgic.rdist_stride;
+    paddr_t base;
+    int i, vcpu_id;
+    struct vgic_rdist_region *region;
+
+    *offset = gpa & (stride - 1);
+    base = gpa & ~((paddr_t)stride - 1);
+
+    /* Fast path: the VCPU is trying to access its re-distributor */
+    if ( likely(v->arch.vgic.rdist_base == base) )
+        return v;
+
+    /* Slow path: the VCPU is trying to access another re-distributor */
+
+    /*
+     * Find the region where the re-distributor lives. For this purpose,
+     * we look one region ahead as only MMIO range for redistributors
+     * traps here.
+     * Note: The region has been ordered during the GIC initialization
+     */
+    for ( i = 1; i < d->arch.vgic.nr_regions; i++ )
+    {
+        if ( base < d->arch.vgic.rdist_regions[i].base )
+            break;
+    }
+
+    region = &d->arch.vgic.rdist_regions[i - 1];
+
+    vcpu_id = region->first_cpu + ((base - region->base) / stride);
+
+    if ( unlikely(vcpu_id >= d->max_vcpus) )
+        return NULL;
+
+    return d->vcpu[vcpu_id];
+}
+
 static int vgic_v3_rdistr_mmio_read(struct vcpu *v, mmio_info_t *info)
 {
     uint32_t offset;
 
     perfc_incr(vgicr_reads);
 
-    offset = info->gpa & (v->domain->arch.vgic.rdist_stride - 1);
+    v = get_vcpu_from_rdist(info->gpa, v, &offset);
+    if ( unlikely(!v) )
+        return 0;
 
     if ( offset < SZ_64K )
         return __vgic_v3_rdistr_rd_mmio_read(v, info, offset);
@@ -645,7 +692,9 @@ static int vgic_v3_rdistr_mmio_write(struct vcpu *v, mmio_info_t *info)
 
     perfc_incr(vgicr_writes);
 
-    offset = info->gpa & (v->domain->arch.vgic.rdist_stride - 1);
+    v = get_vcpu_from_rdist(info->gpa, v, &offset);
+    if ( unlikely(!v) )
+        return 0;
 
     if ( offset < SZ_64K )
         return __vgic_v3_rdistr_rd_mmio_write(v, info, offset);
@@ -1080,6 +1129,13 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
 {
     int i;
     uint64_t affinity;
+    paddr_t rdist_base;
+    struct vgic_rdist_region *region;
+    unsigned int last_cpu;
+
+    /* Convenient alias */
+    struct domain *d = v->domain;
+    uint32_t rdist_stride = d->arch.vgic.rdist_stride;
 
     /* For SGI and PPI the target is always this CPU */
     affinity = (MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 3) << 32 |
@@ -1089,6 +1145,45 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
 
     for ( i = 0 ; i < 32 ; i++ )
         v->arch.vgic.private_irqs->v3.irouter[i] = affinity;
+
+    /*
+     * Find the region where the re-distributor lives. For this purpose,
+     * we look one region ahead as we have only the first CPU in hand.
+     */
+    for ( i = 1; i < d->arch.vgic.nr_regions; i++ )
+    {
+        if ( v->vcpu_id < d->arch.vgic.rdist_regions[i].first_cpu )
+            break;
+    }
+
+    region = &d->arch.vgic.rdist_regions[i - 1];
+
+    /* Get the base address of the redistributor */
+    rdist_base = region->base;
+    rdist_base += (v->vcpu_id - region->first_cpu) * rdist_stride;
+
+    /* Check if a valid region was found for the re-distributor */
+    if ( (rdist_base < region->base) ||
+         ((rdist_base + rdist_stride) > (region->base + region->size)) )
+    {
+        dprintk(XENLOG_ERR,
+                "d%u: Unable to find a re-distributor for VCPU %u\n",
+                d->domain_id, v->vcpu_id);
+        return -EINVAL;
+    }
+
+    v->arch.vgic.rdist_base = rdist_base;
+
+    /*
+     * If the redistributor is the last one of the
+     * contiguous region of the vCPU is the last of the domain, set
+     * VGIC_V3_RDIST_LAST flags.
+     * Note that we are assuming max_vcpus will never change.
+     */
+    last_cpu = (region->size / rdist_stride) + region->first_cpu - 1;
+
+    if ( v->vcpu_id == last_cpu || (v->vcpu_id == (d->max_vcpus - 1)) )
+        v->arch.vgic.flags |= VGIC_V3_RDIST_LAST;
 
     return 0;
 }

@@ -106,6 +106,7 @@ struct arch_domain
         struct vgic_rdist_region {
             paddr_t base;                   /* Base address */
             paddr_t size;                   /* Size */
+            unsigned int first_cpu;         /* First CPU handled */
         } rdist_regions[MAX_RDIST_COUNT];
         int nr_regions;                     /* Number of rdist regions */
         uint32_t rdist_stride;              /* Re-Distributor stride */
@@ -239,6 +240,11 @@ struct arch_vcpu
          * lr_pending is a subset of vgic.inflight_irqs. */
         struct list_head lr_pending;
         spinlock_t lock;
+
+        /* GICv3: redistributor base and flags for this vCPU */
+        paddr_t rdist_base;
+#define VGIC_V3_RDIST_LAST  (1 << 0)        /* last vCPU of the rdist */
+        uint8_t flags;
     } vgic;
 
     /* Timer registers  */

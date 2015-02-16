@@ -33,6 +33,7 @@
 #include <xen/device_tree.h>
 #include <xen/sizes.h>
 #include <xen/libfdt/libfdt.h>
+#include <xen/sort.h>
 #include <asm/p2m.h>
 #include <asm/domain.h>
 #include <asm/io.h>
@@ -895,6 +896,8 @@ static int gicv_v3_init(struct domain *d)
      */
     if ( is_hardware_domain(d) )
     {
+        unsigned int first_cpu = 0;
+
         d->arch.vgic.dbase = gicv3.dbase;
         d->arch.vgic.dbase_size = gicv3.dbase_size;
 
@@ -909,8 +912,15 @@ static int gicv_v3_init(struct domain *d)
 
         for ( i = 0; i < gicv3.rdist_count; i++ )
         {
+            paddr_t size = gicv3.rdist_regions[i].size;
+
             d->arch.vgic.rdist_regions[i].base = gicv3.rdist_regions[i].base;
-            d->arch.vgic.rdist_regions[i].size = gicv3.rdist_regions[i].size;
+            d->arch.vgic.rdist_regions[i].size = size;
+
+            /* Set the first CPU handled by this region */
+            d->arch.vgic.rdist_regions[i].first_cpu = first_cpu;
+
+            first_cpu += size / d->arch.vgic.rdist_stride;
         }
         d->arch.vgic.nr_regions = gicv3.rdist_count;
     }
@@ -929,6 +939,7 @@ static int gicv_v3_init(struct domain *d)
         BUILD_BUG_ON((GUEST_GICV3_GICR0_SIZE / GUEST_GICV3_RDIST_STRIDE) < MAX_VIRT_CPUS);
         d->arch.vgic.rdist_regions[0].base = GUEST_GICV3_GICR0_BASE;
         d->arch.vgic.rdist_regions[0].size = GUEST_GICV3_GICR0_SIZE;
+        d->arch.vgic.rdist_regions[0].first_cpu = 0;
     }
 
     return 0;
@@ -1173,6 +1184,14 @@ static const struct gic_hw_operations gicv3_ops = {
     .make_dt_node        = gicv3_make_dt_node,
 };
 
+static int __init cmp_rdist(const void *a, const void *b)
+{
+    const struct rdist_region *l = a, *r = a;
+
+    /* We assume that re-distributor regions can never overlap */
+    return ( l->base < r->base) ? -1 : 0;
+}
+
 /* Set up the GIC */
 static int __init gicv3_init(struct dt_device_node *node, const void *data)
 {
@@ -1227,6 +1246,9 @@ static int __init gicv3_init(struct dt_device_node *node, const void *data)
         rdist_regs[i].base = rdist_base;
         rdist_regs[i].size = rdist_size;
     }
+
+    /* The vGIC code requires the region to be sorted */
+    sort(rdist_regs, gicv3.rdist_count, sizeof(*rdist_regs), cmp_rdist, NULL);
 
     /* If stride is not set in dt. Set default to 2 * SZ_64K */
     if ( !dt_property_read_u32(node, "redistributor-stride", &gicv3.rdist_stride) )
