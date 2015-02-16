@@ -625,11 +625,7 @@ static int vgic_v3_rdistr_mmio_read(struct vcpu *v, mmio_info_t *info)
 
     perfc_incr(vgicr_reads);
 
-    if ( v->domain->arch.vgic.rdist_stride != 0 )
-        offset = info->gpa & (v->domain->arch.vgic.rdist_stride - 1);
-    else
-        /* If stride is not set. Default 128K */
-        offset = info->gpa & (SZ_128K - 1);
+    offset = info->gpa & (v->domain->arch.vgic.rdist_stride - 1);
 
     if ( offset < SZ_64K )
         return __vgic_v3_rdistr_rd_mmio_read(v, info, offset);
@@ -649,11 +645,7 @@ static int vgic_v3_rdistr_mmio_write(struct vcpu *v, mmio_info_t *info)
 
     perfc_incr(vgicr_writes);
 
-    if ( v->domain->arch.vgic.rdist_stride != 0 )
-        offset = info->gpa & (v->domain->arch.vgic.rdist_stride - 1);
-    else
-        /* If stride is not set. Default 128K */
-        offset = info->gpa & (SZ_128K - 1);
+    offset = info->gpa & (v->domain->arch.vgic.rdist_stride - 1);
 
     if ( offset < SZ_64K )
         return __vgic_v3_rdistr_rd_mmio_write(v, info, offset);

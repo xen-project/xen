@@ -897,12 +897,21 @@ static int gicv_v3_init(struct domain *d)
     {
         d->arch.vgic.dbase = gicv3.dbase;
         d->arch.vgic.dbase_size = gicv3.dbase_size;
+
+        d->arch.vgic.rdist_stride = gicv3.rdist_stride;
+        /*
+         * If the stride is not set, the default stride for GICv3 is 2 * 64K:
+         *     - first 64k page for Control and Physical LPIs
+         *     - second 64k page for Control and Generation of SGIs
+         */
+        if ( !d->arch.vgic.rdist_stride )
+            d->arch.vgic.rdist_stride = 2 * SZ_64K;
+
         for ( i = 0; i < gicv3.rdist_count; i++ )
         {
             d->arch.vgic.rbase[i] = gicv3.rdist_regions[i].base;
             d->arch.vgic.rbase_size[i] = gicv3.rdist_regions[i].size;
         }
-        d->arch.vgic.rdist_stride = gicv3.rdist_stride;
         d->arch.vgic.rdist_count = gicv3.rdist_count;
     }
     else
