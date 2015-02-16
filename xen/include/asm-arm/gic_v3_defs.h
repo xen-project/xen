@@ -45,6 +45,9 @@
 #define GICC_SRE_EL2_DIB             (1UL << 2)
 #define GICC_SRE_EL2_ENEL1           (1UL << 3)
 
+/* Additional bits in GICD_TYPER defined by GICv3 */
+#define GICD_TYPE_ID_BITS_SHIFT 19
+
 #define GICD_CTLR_RWP                (1UL << 31)
 #define GICD_CTLR_ARE_NS             (1U << 4)
 #define GICD_CTLR_ENABLE_G1A         (1U << 1)

@@ -679,11 +679,22 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         vgic_unlock(v);
         return 1;
     case GICD_TYPER:
+    {
+        /*
+         * Number of interrupt identifier bits supported by the GIC
+         * Stream Protocol Interface
+         */
+        unsigned int irq_bits = get_count_order(vgic_num_irqs(v->domain));
+
         if ( dabt.size != DABT_WORD ) goto bad_width;
         /* No secure world support for guests. */
         *r = (((v->domain->max_vcpus << 5) & GICD_TYPE_CPUS ) |
               ((v->domain->arch.vgic.nr_spis / 32) & GICD_TYPE_LINES));
+
+        *r |= (irq_bits - 1) << GICD_TYPE_ID_BITS_SHIFT;
+
         return 1;
+    }
     case GICD_STATUSR:
         /*
          *  Optional, Not implemented for now.
