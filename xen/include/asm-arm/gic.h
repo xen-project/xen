@@ -93,6 +93,7 @@
 #define GICD_CTL_ENABLE 0x1
 
 #define GICD_TYPE_LINES 0x01f
+#define GICD_TYPE_CPUS_SHIFT 5
 #define GICD_TYPE_CPUS  0x0e0
 #define GICD_TYPE_SEC   0x400
 

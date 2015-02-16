@@ -685,10 +685,15 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
          * Stream Protocol Interface
          */
         unsigned int irq_bits = get_count_order(vgic_num_irqs(v->domain));
+        /*
+         * Number of processors that may be used as interrupt targets when ARE
+         * bit is zero. The maximum is 8.
+         */
+        unsigned int ncpus = min_t(unsigned int, v->domain->max_vcpus, 8);
 
         if ( dabt.size != DABT_WORD ) goto bad_width;
         /* No secure world support for guests. */
-        *r = (((v->domain->max_vcpus << 5) & GICD_TYPE_CPUS ) |
+        *r = ((ncpus - 1) << GICD_TYPE_CPUS_SHIFT |
               ((v->domain->arch.vgic.nr_spis / 32) & GICD_TYPE_LINES));
 
         *r |= (irq_bits - 1) << GICD_TYPE_ID_BITS_SHIFT;
