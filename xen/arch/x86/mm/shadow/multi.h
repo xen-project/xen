@@ -21,42 +21,42 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-extern int 
+extern int
 SHADOW_INTERNAL_NAME(sh_map_and_validate_gl1e, GUEST_LEVELS)(
     struct vcpu *v, mfn_t gl1mfn, void *new_gl1p, u32 size);
-extern int 
+extern int
 SHADOW_INTERNAL_NAME(sh_map_and_validate_gl2e, GUEST_LEVELS)(
     struct vcpu *v, mfn_t gl2mfn, void *new_gl2p, u32 size);
-extern int 
+extern int
 SHADOW_INTERNAL_NAME(sh_map_and_validate_gl2he, GUEST_LEVELS)(
     struct vcpu *v, mfn_t gl2mfn, void *new_gl2p, u32 size);
-extern int 
+extern int
 SHADOW_INTERNAL_NAME(sh_map_and_validate_gl3e, GUEST_LEVELS)(
     struct vcpu *v, mfn_t gl3mfn, void *new_gl3p, u32 size);
-extern int 
+extern int
 SHADOW_INTERNAL_NAME(sh_map_and_validate_gl4e, GUEST_LEVELS)(
     struct vcpu *v, mfn_t gl4mfn, void *new_gl4p, u32 size);
 
-extern void 
+extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, GUEST_LEVELS)(
     struct vcpu *v, mfn_t smfn);
-extern void 
+extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, GUEST_LEVELS)(
     struct vcpu *v, mfn_t smfn);
-extern void 
+extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l3_shadow, GUEST_LEVELS)(
     struct vcpu *v, mfn_t smfn);
-extern void 
+extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l4_shadow, GUEST_LEVELS)(
     struct vcpu *v, mfn_t smfn);
 
-extern void 
+extern void
 SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl2mfn, int user_only);
-extern void 
+extern void
 SHADOW_INTERNAL_NAME(sh_unhook_pae_mappings, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl3mfn, int user_only);
-extern void 
+extern void
 SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl4mfn, int user_only);
 
@@ -82,19 +82,19 @@ SHADOW_INTERNAL_NAME(sh_remove_l3_shadow, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl4mfn, mfn_t sl3mfn);
 
 #if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES
-int 
+int
 SHADOW_INTERNAL_NAME(sh_audit_l1_table, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl1mfn, mfn_t x);
-int 
+int
 SHADOW_INTERNAL_NAME(sh_audit_fl1_table, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl1mfn, mfn_t x);
-int 
+int
 SHADOW_INTERNAL_NAME(sh_audit_l2_table, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl2mfn, mfn_t x);
-int 
+int
 SHADOW_INTERNAL_NAME(sh_audit_l3_table, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl3mfn, mfn_t x);
-int 
+int
 SHADOW_INTERNAL_NAME(sh_audit_l4_table, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl4mfn, mfn_t x);
 #endif
@@ -117,7 +117,7 @@ extern const struct paging_mode
 SHADOW_INTERNAL_NAME(sh_paging_mode, GUEST_LEVELS);
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC
-extern void 
+extern void
 SHADOW_INTERNAL_NAME(sh_resync_l1, GUEST_LEVELS)
      (struct vcpu *v, mfn_t gmfn, mfn_t snpmfn);
 
