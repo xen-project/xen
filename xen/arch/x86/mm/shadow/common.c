@@ -1999,12 +1999,11 @@ void shadow_hash_delete(struct vcpu *v, unsigned long n, unsigned int t,
     sh_hash_audit_bucket(d, key);
 }
 
-typedef int (*hash_callback_t)(struct vcpu *v, mfn_t smfn, mfn_t other_mfn);
+typedef int (*hash_vcpu_callback_t)(struct vcpu *v, mfn_t smfn, mfn_t other_mfn);
 
-static void hash_foreach(struct vcpu *v,
-                         unsigned int callback_mask,
-                         const hash_callback_t callbacks[],
-                         mfn_t callback_mfn)
+static void hash_vcpu_foreach(struct vcpu *v, unsigned int callback_mask,
+                              const hash_vcpu_callback_t callbacks[],
+                              mfn_t callback_mfn)
 /* Walk the hash table looking at the types of the entries and
  * calling the appropriate callback function for each entry.
  * The mask determines which shadow types we call back for, and the array
@@ -2140,7 +2139,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
                            unsigned long fault_addr)
 {
     /* Dispatch table for getting per-type functions */
-    static const hash_callback_t callbacks[SH_type_unused] = {
+    static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2), /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2), /* fl1_32  */
@@ -2334,7 +2333,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
         perfc_incr(shadow_writeable_bf_1);
     else
         perfc_incr(shadow_writeable_bf);
-    hash_foreach(v, callback_mask, callbacks, gmfn);
+    hash_vcpu_foreach(v, callback_mask, callbacks, gmfn);
 
     /* If that didn't catch the mapping, then there's some non-pagetable
      * mapping -- ioreq page, grant mapping, &c. */
@@ -2390,7 +2389,7 @@ static int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     struct page_info *page = mfn_to_page(gmfn);
 
     /* Dispatch table for getting per-type functions */
-    static const hash_callback_t callbacks[SH_type_unused] = {
+    static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2), /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2), /* fl1_32  */
@@ -2432,7 +2431,7 @@ static int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
 
     /* Brute-force search of all the shadows, by walking the hash */
     perfc_incr(shadow_mappings_bf);
-    hash_foreach(v, callback_mask, callbacks, gmfn);
+    hash_vcpu_foreach(v, callback_mask, callbacks, gmfn);
 
     /* If that didn't catch the mapping, something is very wrong */
     if ( !sh_check_page_has_no_refs(page) )
@@ -2533,7 +2532,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
 
     /* Dispatch table for getting per-type functions: each level must
      * be called with the function to remove a lower-level shadow. */
-    static const hash_callback_t callbacks[SH_type_unused] = {
+    static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         NULL, /* l1_32   */
         NULL, /* fl1_32  */
@@ -2594,7 +2593,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     perfc_incr(shadow_unshadow);
 
     /* Lower-level shadows need to be excised from upper-level shadows.
-     * This call to hash_foreach() looks dangerous but is in fact OK: each
+     * This call to hash_vcpu_foreach() looks dangerous but is in fact OK: each
      * call will remove at most one shadow, and terminate immediately when
      * it does remove it, so we never walk the hash after doing a deletion.  */
 #define DO_UNSHADOW(_type) do {                                         \
@@ -2617,7 +2616,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     if( !fast                                                           \
         && (pg->count_info & PGC_page_table)                            \
         && (pg->shadow_flags & (1 << t)) )                              \
-        hash_foreach(v, masks[t], callbacks, smfn);                     \
+        hash_vcpu_foreach(v, masks[t], callbacks, smfn);                \
 } while (0)
 
     DO_UNSHADOW(SH_type_l2_32_shadow);
@@ -2678,7 +2677,7 @@ static int sh_clear_up_pointer(struct vcpu *v, mfn_t smfn, mfn_t unused)
 
 void sh_reset_l3_up_pointers(struct vcpu *v)
 {
-    static const hash_callback_t callbacks[SH_type_unused] = {
+    static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         NULL, /* l1_32   */
         NULL, /* fl1_32  */
@@ -2698,7 +2697,7 @@ void sh_reset_l3_up_pointers(struct vcpu *v)
     };
     static const unsigned int callback_mask = SHF_L3_64;
 
-    hash_foreach(v, callback_mask, callbacks, _mfn(INVALID_MFN));
+    hash_vcpu_foreach(v, callback_mask, callbacks, _mfn(INVALID_MFN));
 }
 
 
@@ -3729,7 +3728,7 @@ int shadow_domctl(struct domain *d,
 void shadow_audit_tables(struct vcpu *v)
 {
     /* Dispatch table for getting per-type functions */
-    static const hash_callback_t callbacks[SH_type_unused] = {
+    static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         SHADOW_INTERNAL_NAME(sh_audit_l1_table, 2),  /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 2), /* fl1_32  */
@@ -3771,7 +3770,7 @@ void shadow_audit_tables(struct vcpu *v)
         }
     }
 
-    hash_foreach(v, mask, callbacks, _mfn(INVALID_MFN));
+    hash_vcpu_foreach(v, mask, callbacks, _mfn(INVALID_MFN));
 }
 
 #endif /* Shadow audit */
