@@ -292,6 +292,7 @@ int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(mmuext_op_compat_t) cmp_uops,
                 break;
             case MMUEXT_NEW_USER_BASEPTR:
                 rc = -EINVAL;
+                /* fallthrough */
             case MMUEXT_TLB_FLUSH_LOCAL:
             case MMUEXT_TLB_FLUSH_MULTI:
             case MMUEXT_TLB_FLUSH_ALL:

@@ -2771,6 +2771,7 @@ int new_guest_cr3(unsigned long mfn)
             {
             case -EINTR:
                 rc = -ERESTART;
+                /* fallthrough */
             case -ERESTART:
                 curr->arch.old_guest_table = page;
                 break;
@@ -3126,6 +3127,7 @@ long do_mmuext_op(
                     {
                     case -EINTR:
                         rc = -ERESTART;
+                        /* fallthrough */
                     case -ERESTART:
                         curr->arch.old_guest_table = page;
                         okay = 0;

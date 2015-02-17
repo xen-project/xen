@@ -461,12 +461,16 @@ unsigned long long parse_size_and_unit(const char *s, const char **ps)
     {
     case 'T': case 't':
         ret <<= 10;
+        /* fallthrough */
     case 'G': case 'g':
         ret <<= 10;
+        /* fallthrough */
     case 'M': case 'm':
         ret <<= 10;
+        /* fallthrough */
     case 'K': case 'k':
         ret <<= 10;
+        /* fallthrough */
     case 'B': case 'b':
         s1++;
         break;

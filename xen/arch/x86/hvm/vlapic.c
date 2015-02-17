@@ -762,6 +762,7 @@ static int vlapic_reg_write(struct vcpu *v,
             vlapic->hw.tdt_msr = 0;
         }
         vlapic->pt.irq = val & APIC_VECTOR_MASK;
+        /* fallthrough */
     case APIC_LVTTHMR:      /* LVT Thermal Monitor */
     case APIC_LVTPC:        /* LVT Performance Counter */
     case APIC_LVT0:         /* LVT LINT0 Reg */

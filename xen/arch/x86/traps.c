@@ -1739,7 +1739,9 @@ static int guest_io_okay(
                                           port>>3, 2) )
         {
         default: x.bytes[0] = ~0;
+            /* fallthrough */
         case 1:  x.bytes[1] = ~0;
+            /* fallthrough */
         case 0:  break;
         }
         TOGGLE_MODE();
@@ -3320,6 +3322,7 @@ static void pci_serr_error(const struct cpu_user_regs *regs)
     {
     case 'd': /* 'dom0' */
         nmi_hwdom_report(_XEN_NMIREASON_pci_serr);
+        /* fallthrough */
     case 'i': /* 'ignore' */
         /* Would like to print a diagnostic here but can't call printk()
            from NMI context -- raise a softirq instead. */

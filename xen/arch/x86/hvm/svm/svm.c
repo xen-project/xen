@@ -2378,6 +2378,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             case NESTEDHVM_VMEXIT_ERROR:
                 break;
             }
+            /* fallthrough */
         case NESTEDHVM_VMEXIT_ERROR:
             gdprintk(XENLOG_ERR,
                 "nestedsvm_check_intercepts() returned NESTEDHVM_VMEXIT_ERROR\n");

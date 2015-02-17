@@ -161,6 +161,7 @@ static int hvmemul_do_io(
                 put_page(ram_page);
             return X86EMUL_RETRY;
         }
+        /* fallthrough */
     default:
         if ( ram_page )
             put_page(ram_page);

@@ -1179,6 +1179,7 @@ static void schedule(void)
     {
     case TASKLET_enqueued:
         set_bit(_TASKLET_scheduled, tasklet_work);
+        /* fallthrough */
     case TASKLET_enqueued|TASKLET_scheduled:
         tasklet_work_scheduled = 1;
         break;
