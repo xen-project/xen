@@ -414,6 +414,12 @@ struct acpi_20_srat_memory {
 #define ACPI_MEM_AFFIN_HOTPLUGGABLE (1 << 1)
 #define ACPI_MEM_AFFIN_NONVOLATILE (1 << 2)
 
+struct acpi_20_slit {
+    struct acpi_header header;
+    uint64_t localities;
+    uint8_t entry[0];
+};
+
 /*
  * Table Signatures.
  */
@@ -427,6 +433,7 @@ struct acpi_20_srat_memory {
 #define ACPI_2_0_HPET_SIGNATURE ASCII32('H','P','E','T')
 #define ACPI_2_0_WAET_SIGNATURE ASCII32('W','A','E','T')
 #define ACPI_2_0_SRAT_SIGNATURE ASCII32('S','R','A','T')
+#define ACPI_2_0_SLIT_SIGNATURE ASCII32('S','L','I','T')
 
 /*
  * Table revision numbers.
@@ -441,6 +448,7 @@ struct acpi_20_srat_memory {
 #define ACPI_2_0_WAET_REVISION 0x01
 #define ACPI_1_0_FADT_REVISION 0x01
 #define ACPI_2_0_SRAT_REVISION 0x01
+#define ACPI_2_0_SLIT_REVISION 0x01
 
 #pragma pack ()
 

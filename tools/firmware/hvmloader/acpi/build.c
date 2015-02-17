@@ -261,6 +261,38 @@ static struct acpi_20_srat *construct_srat(void)
     return srat;
 }
 
+static struct acpi_20_slit *construct_slit(void)
+{
+    struct acpi_20_slit *slit;
+    unsigned int i, num, size;
+
+    num = nr_vnodes * nr_vnodes;
+    size = sizeof(*slit) + num * sizeof(uint8_t);
+
+    slit = mem_alloc(size, 16);
+    if ( !slit )
+        return NULL;
+
+    memset(slit, 0, size);
+    slit->header.signature    = ACPI_2_0_SLIT_SIGNATURE;
+    slit->header.revision     = ACPI_2_0_SLIT_REVISION;
+    fixed_strcpy(slit->header.oem_id, ACPI_OEM_ID);
+    fixed_strcpy(slit->header.oem_table_id, ACPI_OEM_TABLE_ID);
+    slit->header.oem_revision = ACPI_OEM_REVISION;
+    slit->header.creator_id   = ACPI_CREATOR_ID;
+    slit->header.creator_revision = ACPI_CREATOR_REVISION;
+
+    for ( i = 0; i < num; i++ )
+        slit->entry[i] = vdistance[i];
+
+    slit->localities = nr_vnodes;
+
+    slit->header.length = size;
+    set_checksum(slit, offsetof(struct acpi_header, checksum), size);
+
+    return slit;
+}
+
 static int construct_passthrough_tables(unsigned long *table_ptrs,
                                         int nr_tables)
 {
@@ -404,15 +436,20 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
         }
     }
 
-    /* SRAT */
+    /* SRAT and SLIT */
     if ( nr_vnodes > 0 )
     {
         struct acpi_20_srat *srat = construct_srat();
+        struct acpi_20_slit *slit = construct_slit();
 
         if ( srat )
             table_ptrs[nr_tables++] = (unsigned long)srat;
         else
             printf("Failed to build SRAT, skipping...\n");
+        if ( slit )
+            table_ptrs[nr_tables++] = (unsigned long)slit;
+        else
+            printf("Failed to build SLIT, skipping...\n");
     }
 
     /* Load any additional tables passed through. */
