@@ -364,6 +364,57 @@ struct acpi_20_madt_intsrcovr {
 };
 
 /*
+ * System Resource Affinity Table header definition (SRAT)
+ */
+struct acpi_20_srat {
+    struct acpi_header header;
+    uint32_t table_revision;
+    uint32_t reserved2[2];
+};
+
+#define ACPI_SRAT_TABLE_REVISION 1
+
+/*
+ * System Resource Affinity Table structure types.
+ */
+#define ACPI_PROCESSOR_AFFINITY 0x0
+#define ACPI_MEMORY_AFFINITY    0x1
+struct acpi_20_srat_processor {
+    uint8_t type;
+    uint8_t length;
+    uint8_t domain;
+    uint8_t apic_id;
+    uint32_t flags;
+    uint8_t sapic_id;
+    uint8_t domain_hi[3];
+    uint32_t reserved;
+};
+
+/*
+ * Local APIC Affinity Flags.  All other bits are reserved and must be 0.
+ */
+#define ACPI_LOCAL_APIC_AFFIN_ENABLED (1 << 0)
+
+struct acpi_20_srat_memory {
+    uint8_t type;
+    uint8_t length;
+    uint32_t domain;
+    uint16_t reserved;
+    uint64_t base_address;
+    uint64_t mem_length;
+    uint32_t reserved2;
+    uint32_t flags;
+    uint64_t reserved3;
+};
+
+/*
+ * Memory Affinity Flags.  All other bits are reserved and must be 0.
+ */
+#define ACPI_MEM_AFFIN_ENABLED (1 << 0)
+#define ACPI_MEM_AFFIN_HOTPLUGGABLE (1 << 1)
+#define ACPI_MEM_AFFIN_NONVOLATILE (1 << 2)
+
+/*
  * Table Signatures.
  */
 #define ACPI_2_0_RSDP_SIGNATURE ASCII64('R','S','D',' ','P','T','R',' ')
@@ -375,6 +426,7 @@ struct acpi_20_madt_intsrcovr {
 #define ACPI_2_0_TCPA_SIGNATURE ASCII32('T','C','P','A')
 #define ACPI_2_0_HPET_SIGNATURE ASCII32('H','P','E','T')
 #define ACPI_2_0_WAET_SIGNATURE ASCII32('W','A','E','T')
+#define ACPI_2_0_SRAT_SIGNATURE ASCII32('S','R','A','T')
 
 /*
  * Table revision numbers.
@@ -388,6 +440,7 @@ struct acpi_20_madt_intsrcovr {
 #define ACPI_2_0_HPET_REVISION 0x01
 #define ACPI_2_0_WAET_REVISION 0x01
 #define ACPI_1_0_FADT_REVISION 0x01
+#define ACPI_2_0_SRAT_REVISION 0x01
 
 #pragma pack ()
 
