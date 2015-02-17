@@ -646,6 +646,7 @@ prev_pinned_shadow(const struct page_info *page,
  * Returns 0 for failure, 1 for success. */
 static inline int sh_pin(struct vcpu *v, mfn_t smfn)
 {
+    struct domain *d = v->domain;
     struct page_info *sp[4];
     struct page_list_head *pin_list;
     unsigned int i, pages;
@@ -658,7 +659,7 @@ static inline int sh_pin(struct vcpu *v, mfn_t smfn)
     ASSERT(sh_type_is_pinnable(v, sp[0]->u.sh.type));
     ASSERT(sp[0]->u.sh.head);
 
-    pin_list = &v->domain->arch.paging.shadow.pinned_shadows;
+    pin_list = &d->arch.paging.shadow.pinned_shadows;
     if ( already_pinned && sp[0] == page_list_first(pin_list) )
         return 1;
 
@@ -695,6 +696,7 @@ static inline int sh_pin(struct vcpu *v, mfn_t smfn)
  * of pinned shadows, and release the extra ref. */
 static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
 {
+    struct domain *d = v->domain;
     struct page_list_head tmp_list, *pin_list;
     struct page_info *sp, *next;
     unsigned int i, head_type;
@@ -711,7 +713,7 @@ static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
 
     /* Cut the sub-list out of the list of pinned shadows,
      * stitching it back into a list fragment of its own. */
-    pin_list = &v->domain->arch.paging.shadow.pinned_shadows;
+    pin_list = &d->arch.paging.shadow.pinned_shadows;
     INIT_PAGE_LIST_HEAD(&tmp_list);
     for ( i = 0; i < shadow_size(head_type); i++ )
     {

@@ -665,6 +665,7 @@ void oos_fixup_add(struct vcpu *v, mfn_t gmfn,
 static int oos_remove_write_access(struct vcpu *v, mfn_t gmfn,
                                    struct oos_fixup *fixup)
 {
+    struct domain *d = v->domain;
     int ftlb = 0;
 
     ftlb |= oos_fixup_flush_gmfn(v, gmfn, fixup);
@@ -690,7 +691,7 @@ static int oos_remove_write_access(struct vcpu *v, mfn_t gmfn,
     }
 
     if ( ftlb )
-        flush_tlb_mask(v->domain->domain_dirty_cpumask);
+        flush_tlb_mask(d->domain_dirty_cpumask);
 
     return 0;
 }
@@ -991,6 +992,7 @@ int sh_unsync(struct vcpu *v, mfn_t gmfn)
  */
 void shadow_promote(struct vcpu *v, mfn_t gmfn, unsigned int type)
 {
+    struct domain *d = v->domain;
     struct page_info *page = mfn_to_page(gmfn);
 
     ASSERT(mfn_valid(gmfn));
@@ -1004,7 +1006,7 @@ void shadow_promote(struct vcpu *v, mfn_t gmfn, unsigned int type)
     /* We should never try to promote a gmfn that has writeable mappings */
     ASSERT((page->u.inuse.type_info & PGT_type_mask) != PGT_writable_page
            || (page->u.inuse.type_info & PGT_count_mask) == 0
-           || v->domain->is_shutting_down);
+           || d->is_shutting_down);
 
     /* Is the page already shadowed? */
     if ( !test_and_set_bit(_PGC_page_table, &page->count_info) )
@@ -2056,6 +2058,7 @@ static void hash_vcpu_foreach(struct vcpu *v, unsigned int callback_mask,
 
 void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
 {
+    struct domain *d = v->domain;
     struct page_info *sp = mfn_to_page(smfn);
     unsigned int t = sp->u.sh.type;
 
@@ -2068,9 +2071,8 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
            t == SH_type_fl1_pae_shadow ||
            t == SH_type_fl1_64_shadow  ||
            t == SH_type_monitor_table  ||
-           (is_pv_32on64_vcpu(v) && t == SH_type_l4_64_shadow) ||
-           (page_get_owner(mfn_to_page(backpointer(sp)))
-            == v->domain));
+           (is_pv_32on64_domain(d) && t == SH_type_l4_64_shadow) ||
+           (page_get_owner(mfn_to_page(backpointer(sp))) == d));
 
     /* The down-shifts here are so that the switch statement is on nice
      * small numbers that the compiler will enjoy */
@@ -2098,7 +2100,7 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
         SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 4)(v, smfn);
         break;
     case SH_type_l2h_64_shadow:
-        ASSERT(is_pv_32on64_vcpu(v));
+        ASSERT(is_pv_32on64_domain(d));
         /* Fall through... */
     case SH_type_l2_64_shadow:
         SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 4)(v, smfn);
@@ -2166,15 +2168,16 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
         | SHF_L1_64
         | SHF_FL1_64
         ;
+    struct domain *d = v->domain;
     struct page_info *pg = mfn_to_page(gmfn);
 
-    ASSERT(paging_locked_by_me(v->domain));
+    ASSERT(paging_locked_by_me(d));
 
     /* Only remove writable mappings if we are doing shadow refcounts.
      * In guest refcounting, we trust Xen to already be restricting
      * all the writes to the guest page tables, so we do not need to
      * do more. */
-    if ( !shadow_mode_refcounts(v->domain) )
+    if ( !shadow_mode_refcounts(d) )
         return 0;
 
     /* Early exit if it's already a pagetable, or otherwise not writeable */
@@ -2198,7 +2201,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
         SHADOW_ERROR("can't remove write access to mfn %lx, type_info is %"
                       PRtype_info "\n",
                       mfn_x(gmfn), mfn_to_page(gmfn)->u.inuse.type_info);
-        domain_crash(v->domain);
+        domain_crash(d);
     }
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
@@ -2226,7 +2229,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
                 GUESS(0xC0000000UL + (fault_addr >> 10), 1);
 
             /* Linux lowmem: first 896MB is mapped 1-to-1 above 0xC0000000 */
-            if ((gfn = mfn_to_gfn(v->domain, gmfn)) < 0x38000 )
+            if ((gfn = mfn_to_gfn(d, gmfn)) < 0x38000 )
                 GUESS(0xC0000000UL + (gfn << PAGE_SHIFT), 4);
 
             /* FreeBSD: Linear map at 0xBFC00000 */
@@ -2244,7 +2247,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
             }
 
             /* Linux lowmem: first 896MB is mapped 1-to-1 above 0xC0000000 */
-            if ((gfn = mfn_to_gfn(v->domain, gmfn)) < 0x38000 )
+            if ((gfn = mfn_to_gfn(d, gmfn)) < 0x38000 )
                 GUESS(0xC0000000UL + (gfn << PAGE_SHIFT), 4);
 
             /* FreeBSD PAE: Linear map at 0xBF800000 */
@@ -2272,7 +2275,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
             /* 64bit Linux direct map at 0xffff880000000000; older kernels
              * had it at 0xffff810000000000, and older kernels yet had it
              * at 0x0000010000000000UL */
-            gfn = mfn_to_gfn(v->domain, gmfn);
+            gfn = mfn_to_gfn(d, gmfn);
             GUESS(0xffff880000000000UL + (gfn << PAGE_SHIFT), 4);
             GUESS(0xffff810000000000UL + (gfn << PAGE_SHIFT), 4);
             GUESS(0x0000010000000000UL + (gfn << PAGE_SHIFT), 4);
@@ -2345,7 +2348,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
         SHADOW_ERROR("can't remove write access to mfn %lx: guest has "
                       "%lu special-use mappings of it\n", mfn_x(gmfn),
                       (mfn_to_page(gmfn)->u.inuse.type_info&PGT_count_mask));
-        domain_crash(v->domain);
+        domain_crash(d);
     }
 
     /* We killed at least one writeable mapping, so must flush TLBs. */
@@ -2386,6 +2389,7 @@ int sh_remove_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
 
 static int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
 {
+    struct domain *d = v->domain;
     struct page_info *page = mfn_to_page(gmfn);
 
     /* Dispatch table for getting per-type functions */
@@ -2424,7 +2428,7 @@ static int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     /* Although this is an externally visible function, we do not know
      * whether the paging lock will be held when it is called (since it
      * can be called via put_page_type when we clear a shadow l1e).*/
-    paging_lock_recursive(v->domain);
+    paging_lock_recursive(d);
 
     /* XXX TODO:
      * Heuristics for finding the (probably) single mapping of this gmfn */
@@ -2441,7 +2445,7 @@ static int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
          * and the HVM restore program takes another.
          * Also allow one typed refcount for xenheap pages, to match
          * share_xen_page_with_guest(). */
-        if ( !(shadow_mode_external(v->domain)
+        if ( !(shadow_mode_external(d)
                && (page->count_info & PGC_count_mask) <= 3
                && ((page->u.inuse.type_info & PGT_count_mask)
                    == !!is_xen_heap_page(page))) )
@@ -2452,7 +2456,7 @@ static int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
         }
     }
 
-    paging_unlock(v->domain);
+    paging_unlock(d);
 
     /* We killed at least one mapping, so must flush TLBs. */
     return 1;
@@ -2526,6 +2530,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
  * (all != 0 implies fast == 0)
  */
 {
+    struct domain *d = v->domain;
     struct page_info *pg = mfn_to_page(gmfn);
     mfn_t smfn;
     unsigned char t;
@@ -2577,15 +2582,15 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     /* Although this is an externally visible function, we do not know
      * whether the paging lock will be held when it is called (since it
      * can be called via put_page_type when we clear a shadow l1e).*/
-    paging_lock_recursive(v->domain);
+    paging_lock_recursive(d);
 
     SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx\n",
-                   v->domain->domain_id, v->vcpu_id, mfn_x(gmfn));
+                   d->domain_id, v->vcpu_id, mfn_x(gmfn));
 
     /* Bail out now if the page is not shadowed */
     if ( (pg->count_info & PGC_page_table) == 0 )
     {
-        paging_unlock(v->domain);
+        paging_unlock(d);
         return;
     }
 
@@ -2638,14 +2643,14 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
         SHADOW_ERROR("can't find all shadows of mfn %05lx "
                      "(shadow_flags=%08x)\n",
                       mfn_x(gmfn), pg->shadow_flags);
-        domain_crash(v->domain);
+        domain_crash(d);
     }
 
     /* Need to flush TLBs now, so that linear maps are safe next time we
      * take a fault. */
-    flush_tlb_mask(v->domain->domain_dirty_cpumask);
+    flush_tlb_mask(d->domain_dirty_cpumask);
 
-    paging_unlock(v->domain);
+    paging_unlock(d);
 }
 
 static void
