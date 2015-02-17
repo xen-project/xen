@@ -26,6 +26,7 @@
 #include "pci_regs.h"
 #include "apic_regs.h"
 #include "acpi/acpi2_0.h"
+#include "vnuma.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
 
@@ -310,6 +311,8 @@ int main(void)
 
     if ( acpi_enabled )
     {
+        init_vnuma_info();
+
         if ( bios->acpi_build_tables )
         {
             printf("Loading ACPI ...\n");
