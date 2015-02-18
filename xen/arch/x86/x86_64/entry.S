@@ -721,6 +721,7 @@ ENTRY(exception_table)
         .quad do_alignment_check
         .quad do_machine_check
         .quad do_simd_coprocessor_error
+        .size exception_table, . - exception_table
 
 ENTRY(hypercall_table)
         .quad do_set_trap_table     /*  0 */
