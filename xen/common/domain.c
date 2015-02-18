@@ -617,13 +617,9 @@ int domain_kill(struct domain *d)
     case DOMDYING_dying:
         rc = domain_relinquish_resources(d);
         if ( rc != 0 )
-        {
-            if ( rc == -ERESTART )
-                rc = -EAGAIN;
             break;
-        }
         if ( cpupool_move_domain(d, cpupool0) )
-            return -EAGAIN;
+            return -ERESTART;
         for_each_vcpu ( d, v )
             unmap_vcpu_info(v);
         d->is_dying = DOMDYING_dead;
