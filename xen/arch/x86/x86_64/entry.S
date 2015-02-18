@@ -669,15 +669,6 @@ handle_ist_exception:
         je    restore_all_guest
         jmp   compat_restore_all_guest
 
-ENTRY(nmi_crash)
-        pushq $0
-        movl $TRAP_nmi,4(%rsp)
-        /* Set AC to reduce chance of further SMAP faults */
-        SAVE_ALL STAC
-        movq %rsp,%rdi
-        callq do_nmi_crash /* Does not return */
-        ud2
-
 ENTRY(machine_check)
         pushq $0
         movl  $TRAP_machine_check,4(%rsp)

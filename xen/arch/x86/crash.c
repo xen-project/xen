@@ -36,9 +36,11 @@ static unsigned int crashing_cpu;
 static DEFINE_PER_CPU_READ_MOSTLY(bool_t, crash_save_done);
 
 /* This becomes the NMI handler for non-crashing CPUs, when Xen is crashing. */
-void do_nmi_crash(struct cpu_user_regs *regs)
+static void noreturn do_nmi_crash(const struct cpu_user_regs *regs)
 {
-    int cpu = smp_processor_id();
+    unsigned int cpu = smp_processor_id();
+
+    stac();
 
     /* nmi_shootdown_cpus() should ensure that this assertion is correct. */
     ASSERT(cpu != crashing_cpu);
@@ -113,11 +115,10 @@ void do_nmi_crash(struct cpu_user_regs *regs)
         halt();
 }
 
-void nmi_crash(void);
 static void nmi_shootdown_cpus(void)
 {
     unsigned long msecs;
-    int i, cpu = smp_processor_id();
+    unsigned int cpu = smp_processor_id();
 
     disable_lapic_nmi_watchdog();
     local_irq_disable();
@@ -127,38 +128,26 @@ static void nmi_shootdown_cpus(void)
 
     cpumask_andnot(&waiting_to_crash, &cpu_online_map, cpumask_of(cpu));
 
-    /* Change NMI trap handlers.  Non-crashing pcpus get nmi_crash which
-     * invokes do_nmi_crash (above), which cause them to write state and
-     * fall into a loop.  The crashing pcpu gets the nop handler to
-     * cause it to return to this function ASAP.
+    /*
+     * Disable IST for MCEs to avoid stack corruption race conditions, and
+     * change the NMI handler to a nop to avoid deviation from this codepath.
      */
-    for ( i = 0; i < nr_cpu_ids; i++ )
-    {
-        if ( idt_tables[i] == NULL )
-            continue;
+    _set_gate_lower(&idt_tables[cpu][TRAP_nmi],
+                    SYS_DESC_irq_gate, 0, &trap_nop);
+    set_ist(&idt_tables[cpu][TRAP_machine_check], IST_NONE);
 
-        if ( i == cpu )
-        {
-            /*
-             * Disable the interrupt stack tables for this cpu's MCE and NMI 
-             * handlers, and alter the NMI handler to have no operation.  
-             * Disabling the stack tables prevents stack corruption race 
-             * conditions, while changing the handler helps prevent cascading 
-             * faults; we are certainly going to crash by this point.
-             *
-             * This update is safe from a security point of view, as this pcpu 
-             * is never going to try to sysret back to a PV vcpu.
-             */
-            _set_gate_lower(&idt_tables[i][TRAP_nmi],
-                            SYS_DESC_irq_gate, 0, &trap_nop);
-            set_ist(&idt_tables[i][TRAP_machine_check], IST_NONE);
-        }
-        else
-        {
-            /* Do not update stack table for other pcpus. */
-            _update_gate_addr_lower(&idt_tables[i][TRAP_nmi], &nmi_crash);
-        }
-    }
+    /*
+     * Ideally would be:
+     *   exception_table[TRAP_nmi] = &do_nmi_crash;
+     *
+     * but the exception_table is read only.  Borrow an unused fixmap entry
+     * to construct a writable mapping.
+     */
+    set_fixmap(FIX_TBOOT_MAP_ADDRESS, __pa(&exception_table[TRAP_nmi]));
+    write_atomic((unsigned long *)
+                 (fix_to_virt(FIX_TBOOT_MAP_ADDRESS) +
+                  ((unsigned long)&exception_table[TRAP_nmi] & ~PAGE_MASK)),
+                 (unsigned long)&do_nmi_crash);
 
     /* Ensure the new callback function is set before sending out the NMI. */
     wmb();
