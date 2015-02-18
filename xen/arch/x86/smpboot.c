@@ -142,7 +142,7 @@ static void synchronize_tsc_master(unsigned int slave)
 
     for ( i = 1; i <= 5; i++ )
     {
-        rdtscll(tsc_value);
+        tsc_value = rdtsc();
         wmb();
         atomic_inc(&tsc_count);
         while ( atomic_read(&tsc_count) != (i<<1) )

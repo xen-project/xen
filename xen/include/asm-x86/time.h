@@ -28,9 +28,7 @@ extern bool_t disable_tsc_sync;
 
 static inline cycles_t get_cycles(void)
 {
-    cycles_t c;
-    rdtscll(c);
-    return c;
+    return rdtsc();
 }
 
 unsigned long

@@ -235,7 +235,7 @@ static void mca_init_bank(enum mca_source who,
 
     if (who == MCA_CMCI_HANDLER) {
         mib->mc_ctrl2 = mca_rdmsr(MSR_IA32_MC0_CTL2 + bank);
-        rdtscll(mib->mc_tsc);
+        mib->mc_tsc = rdtsc();
     }
 }
 

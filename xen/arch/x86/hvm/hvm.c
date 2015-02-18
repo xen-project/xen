@@ -292,7 +292,7 @@ void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc)
     }
     else
     {
-        rdtscll(tsc);
+        tsc = rdtsc();
     }
 
     delta_tsc = guest_tsc - tsc;
@@ -326,7 +326,7 @@ u64 hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc)
     }
     else
     {
-        rdtscll(tsc);
+        tsc = rdtsc();
     }
 
     return tsc + v->arch.hvm_vcpu.cache_tsc_offset;

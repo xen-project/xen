@@ -805,7 +805,7 @@ static void svm_set_tsc_offset(struct vcpu *v, u64 offset, u64 at_tsc)
         if ( at_tsc )
             host_tsc = at_tsc;
         else
-            rdtscll(host_tsc);
+            host_tsc = rdtsc();
         offset = svm_get_tsc_offset(host_tsc, guest_tsc, vcpu_tsc_ratio(v));
     }
 

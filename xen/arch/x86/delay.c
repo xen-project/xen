@@ -21,10 +21,10 @@ void __udelay(unsigned long usecs)
     unsigned long ticks = usecs * (cpu_khz / 1000);
     unsigned long s, e;
 
-    rdtscl(s);
+    s = rdtsc();
     do
     {
         rep_nop();
-        rdtscl(e);
+        e = rdtsc();
     } while ((e-s) < ticks);
 }

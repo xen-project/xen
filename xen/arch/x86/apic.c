@@ -1148,7 +1148,7 @@ static int __init calibrate_APIC_clock(void)
      * We wrapped around just now. Let's start:
      */
     if (cpu_has_tsc)
-        rdtscll(t1);
+        t1 = rdtsc();
     tt1 = apic_read(APIC_TMCCT);
 
     /*
@@ -1159,7 +1159,7 @@ static int __init calibrate_APIC_clock(void)
 
     tt2 = apic_read(APIC_TMCCT);
     if (cpu_has_tsc)
-        rdtscll(t2);
+        t2 = rdtsc();
 
     /*
      * The APIC bus clock counter is 32 bits only, it

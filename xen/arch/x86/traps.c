@@ -2663,7 +2663,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         if ( v->domain->arch.vtsc )
             pv_soft_rdtsc(v, regs, 0);
         else
-            rdtsc(regs->eax, regs->edx);
+        {
+            val = rdtsc();
+            goto rdmsr_writeback;
+        }
         break;
 
     case 0x32: /* RDMSR */

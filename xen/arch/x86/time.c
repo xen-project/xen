@@ -261,10 +261,10 @@ static u64 init_pit_and_calibrate_tsc(void)
     outb(CALIBRATE_LATCH & 0xff, PIT_CH2); /* LSB of count */
     outb(CALIBRATE_LATCH >> 8, PIT_CH2);   /* MSB of count */
 
-    rdtscll(start);
+    start = rdtsc();
     for ( count = 0; (inb(0x61) & 0x20) == 0; count++ )
         continue;
-    rdtscll(end);
+    end = rdtsc();
 
     /* Error if the CTC doesn't behave itself. */
     if ( count == 0 )
@@ -764,7 +764,7 @@ s_time_t get_s_time_fixed(u64 at_tsc)
     if ( at_tsc )
         tsc = at_tsc;
     else
-        rdtscll(tsc);
+        tsc = rdtsc();
     delta = tsc - t->local_tsc_stamp;
     now = t->stime_local_stamp + scale_delta(delta, &t->tsc_scale);
 
@@ -971,7 +971,7 @@ int cpu_frequency_change(u64 freq)
     /* TSC-extrapolated time may be bogus after frequency change. */
     /*t->stime_local_stamp = get_s_time();*/
     t->stime_local_stamp = t->stime_master_stamp;
-    rdtscll(curr_tsc);
+    curr_tsc = rdtsc();
     t->local_tsc_stamp = curr_tsc;
     set_time_scale(&t->tsc_scale, freq);
     local_irq_enable();
@@ -1307,7 +1307,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
             if ( r->master_stime == 0 )
             {
                 r->master_stime = read_platform_stime();
-                rdtscll(r->master_tsc_stamp);
+                r->master_tsc_stamp = rdtsc();
             }
             atomic_inc(&r->semaphore);
 
@@ -1333,7 +1333,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
         }
     }
 
-    rdtscll(c->local_tsc_stamp);
+    c->local_tsc_stamp = rdtsc();
     c->stime_local_stamp = get_s_time();
     c->stime_master_stamp = r->master_stime;
 
@@ -1363,7 +1363,7 @@ static void time_calibration_std_rendezvous(void *_r)
         mb(); /* receive signal /then/ read r->master_stime */
     }
 
-    rdtscll(c->local_tsc_stamp);
+    c->local_tsc_stamp = rdtsc();
     c->stime_local_stamp = get_s_time();
     c->stime_master_stamp = r->master_stime;
 
@@ -1397,7 +1397,7 @@ void init_percpu_time(void)
     t->tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
 
     local_irq_save(flags);
-    rdtscll(t->local_tsc_stamp);
+    t->local_tsc_stamp = rdtsc();
     now = read_platform_stime();
     local_irq_restore(flags);
 
@@ -1426,13 +1426,13 @@ static void __init tsc_check_writability(void)
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
         return;
 
-    rdtscll(tsc);
+    tsc = rdtsc();
     if ( wrmsr_safe(MSR_IA32_TSC, 0) == 0 )
     {
-        uint64_t tmp, tmp2;
-        rdtscll(tmp2);
+        uint64_t tmp, tmp2 = rdtsc();
+
         write_tsc(tsc | (1ULL << 32));
-        rdtscll(tmp);
+        tmp = rdtsc();
         if ( ABS((s64)tmp - (s64)tmp2) < (1LL << 31) )
             what = "only partially";
     }
@@ -1868,7 +1868,7 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
             *gtsc_khz = d->arch.tsc_khz;
             break;
         }
-        rdtscll(tsc);
+        tsc = rdtsc();
         *elapsed_nsec = scale_delta(tsc, &d->arch.vtsc_to_ns);
         *gtsc_khz = cpu_khz;
         break;
@@ -1880,7 +1880,7 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
         }
         else
         {
-            rdtscll(tsc);
+            tsc = rdtsc();
             *elapsed_nsec = scale_delta(tsc, &d->arch.vtsc_to_ns) -
                             d->arch.vtsc_offset;
             *gtsc_khz = 0; /* ignored by tsc_set_info */
@@ -1973,9 +1973,7 @@ void tsc_set_info(struct domain *d,
         else {
             /* when using native TSC, offset is nsec relative to power-on
              * of physical machine */
-            uint64_t tsc = 0;
-            rdtscll(tsc);
-            d->arch.vtsc_offset = scale_delta(tsc,&d->arch.vtsc_to_ns) -
+            d->arch.vtsc_offset = scale_delta(rdtsc(), &d->arch.vtsc_to_ns) -
                                   elapsed_nsec;
         }
         break;
@@ -1994,7 +1992,7 @@ void tsc_set_info(struct domain *d,
              * call set_tsc_offset() later from hvm_vcpu_reset_state() and they
              * will sync their TSC to BSP's sync_tsc.
              */
-            rdtscll(d->arch.hvm_domain.sync_tsc);
+            d->arch.hvm_domain.sync_tsc = rdtsc();
             hvm_funcs.set_tsc_offset(d->vcpu[0],
                                      d->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset,
                                      d->arch.hvm_domain.sync_tsc);

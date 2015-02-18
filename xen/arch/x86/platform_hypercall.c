@@ -146,7 +146,7 @@ static void resource_access(void *info)
             {
                 unsigned long flags = 0;
                 /*
-                 * If next entry is MSR_IA32_TSC read, then the actual rdtscll
+                 * If next entry is MSR_IA32_TSC read, then the actual rdtsc
                  * is performed together with current entry, with IRQ disabled.
                  */
                 bool_t read_tsc = (i < ra->nr_done - 1 &&
@@ -159,7 +159,7 @@ static void resource_access(void *info)
 
                 if ( unlikely(read_tsc) )
                 {
-                    rdtscll(tsc);
+                    tsc = rdtsc();
                     local_irq_restore(flags);
                 }
             }
