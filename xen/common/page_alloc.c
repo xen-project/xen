@@ -1337,7 +1337,7 @@ static int __init find_non_smt(unsigned int node, cpumask_t *dest)
         if ( cpumask_intersects(dest, per_cpu(cpu_sibling_mask, i)) )
             continue;
         cpu = cpumask_first(per_cpu(cpu_sibling_mask, i));
-        cpumask_set_cpu(cpu, dest);
+        __cpumask_set_cpu(cpu, dest);
     }
     return cpumask_weight(dest);
 }
@@ -1449,7 +1449,7 @@ void __init scrub_heap_pages(void)
         cpus = find_non_smt(best_node, &node_cpus);
         if ( cpus == 0 )
         {
-            cpumask_set_cpu(smp_processor_id(), &node_cpus);
+            __cpumask_set_cpu(smp_processor_id(), &node_cpus);
             cpus = 1;
         }
         /* We already have the node information from round #0. */

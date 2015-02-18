@@ -75,11 +75,10 @@ static unsigned int core_parking_performance(unsigned int event)
             if ( core_weight < core_tmp )
             {
                 core_weight = core_tmp;
-                cpumask_clear(&core_candidate_map);
-                cpumask_set_cpu(cpu, &core_candidate_map);
+                cpumask_copy(&core_candidate_map, cpumask_of(cpu));
             }
             else if ( core_weight == core_tmp )
-                cpumask_set_cpu(cpu, &core_candidate_map);
+                __cpumask_set_cpu(cpu, &core_candidate_map);
         }
 
         for_each_cpu(cpu, &core_candidate_map)
@@ -88,11 +87,10 @@ static unsigned int core_parking_performance(unsigned int event)
             if ( sibling_weight < sibling_tmp )
             {
                 sibling_weight = sibling_tmp;
-                cpumask_clear(&sibling_candidate_map);
-                cpumask_set_cpu(cpu, &sibling_candidate_map);
+                cpumask_copy(&sibling_candidate_map, cpumask_of(cpu));
             }
             else if ( sibling_weight == sibling_tmp )
-                cpumask_set_cpu(cpu, &sibling_candidate_map);
+                __cpumask_set_cpu(cpu, &sibling_candidate_map);
         }
 
         cpu = cpumask_first(&sibling_candidate_map);
@@ -135,11 +133,10 @@ static unsigned int core_parking_power(unsigned int event)
             if ( core_weight > core_tmp )
             {
                 core_weight = core_tmp;
-                cpumask_clear(&core_candidate_map);
-                cpumask_set_cpu(cpu, &core_candidate_map);
+                cpumask_copy(&core_candidate_map, cpumask_of(cpu));
             }
             else if ( core_weight == core_tmp )
-                cpumask_set_cpu(cpu, &core_candidate_map);
+                __cpumask_set_cpu(cpu, &core_candidate_map);
         }
 
         for_each_cpu(cpu, &core_candidate_map)
@@ -148,11 +145,10 @@ static unsigned int core_parking_power(unsigned int event)
             if ( sibling_weight > sibling_tmp )
             {
                 sibling_weight = sibling_tmp;
-                cpumask_clear(&sibling_candidate_map);
-                cpumask_set_cpu(cpu, &sibling_candidate_map);
+                cpumask_copy(&sibling_candidate_map, cpumask_of(cpu));
             }
             else if ( sibling_weight == sibling_tmp )
-                cpumask_set_cpu(cpu, &sibling_candidate_map);
+                __cpumask_set_cpu(cpu, &sibling_candidate_map);
         }
 
         cpu = cpumask_first(&sibling_candidate_map);

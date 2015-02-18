@@ -103,9 +103,19 @@ static inline void cpumask_set_cpu(int cpu, volatile cpumask_t *dstp)
 	set_bit(cpumask_check(cpu), dstp->bits);
 }
 
+static inline void __cpumask_set_cpu(int cpu, cpumask_t *dstp)
+{
+	__set_bit(cpumask_check(cpu), dstp->bits);
+}
+
 static inline void cpumask_clear_cpu(int cpu, volatile cpumask_t *dstp)
 {
 	clear_bit(cpumask_check(cpu), dstp->bits);
+}
+
+static inline void __cpumask_clear_cpu(int cpu, cpumask_t *dstp)
+{
+	__clear_bit(cpumask_check(cpu), dstp->bits);
 }
 
 static inline void cpumask_setall(cpumask_t *dstp)
@@ -122,14 +132,24 @@ static inline void cpumask_clear(cpumask_t *dstp)
 #define cpumask_test_cpu(cpu, cpumask) \
 	test_bit(cpumask_check(cpu), (cpumask)->bits)
 
-static inline int cpumask_test_and_set_cpu(int cpu, cpumask_t *addr)
+static inline int cpumask_test_and_set_cpu(int cpu, volatile cpumask_t *addr)
 {
 	return test_and_set_bit(cpumask_check(cpu), addr->bits);
 }
 
-static inline int cpumask_test_and_clear_cpu(int cpu, cpumask_t *addr)
+static inline int __cpumask_test_and_set_cpu(int cpu, cpumask_t *addr)
+{
+	return __test_and_set_bit(cpumask_check(cpu), addr->bits);
+}
+
+static inline int cpumask_test_and_clear_cpu(int cpu, volatile cpumask_t *addr)
 {
 	return test_and_clear_bit(cpumask_check(cpu), addr->bits);
+}
+
+static inline int __cpumask_test_and_clear_cpu(int cpu, cpumask_t *addr)
+{
+	return __test_and_clear_bit(cpumask_check(cpu), addr->bits);
 }
 
 static inline void cpumask_and(cpumask_t *dstp, const cpumask_t *src1p,

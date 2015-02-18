@@ -372,7 +372,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
     {
         if ( cur->pri != CSCHED_PRI_IDLE )
             SCHED_STAT_CRANK(tickle_idlers_none);
-        cpumask_set_cpu(cpu, &mask);
+        __cpumask_set_cpu(cpu, &mask);
     }
     else if ( !idlers_empty )
     {
@@ -422,7 +422,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
                 SCHED_VCPU_STAT_CRANK(cur, migrate_r);
                 SCHED_STAT_CRANK(migrate_kicked_away);
                 set_bit(_VPF_migrating, &cur->vcpu->pause_flags);
-                cpumask_set_cpu(cpu, &mask);
+                __cpumask_set_cpu(cpu, &mask);
             }
             else if ( !new_idlers_empty )
             {
@@ -432,7 +432,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
                 {
                     this_cpu(last_tickle_cpu) =
                         cpumask_cycle(this_cpu(last_tickle_cpu), &idle_mask);
-                    cpumask_set_cpu(this_cpu(last_tickle_cpu), &mask);
+                    __cpumask_set_cpu(this_cpu(last_tickle_cpu), &mask);
                 }
                 else
                     cpumask_or(&mask, &mask, &idle_mask);
@@ -675,7 +675,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
          */
         cpumask_and(&idlers, &cpu_online_map, CSCHED_PRIV(ops)->idlers);
         if ( vc->processor == cpu && IS_RUNQ_IDLE(cpu) )
-            cpumask_set_cpu(cpu, &idlers);
+            __cpumask_set_cpu(cpu, &idlers);
         cpumask_and(&cpus, &cpus, &idlers);
 
         /*
@@ -692,7 +692,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
          */
         if ( !cpumask_test_cpu(cpu, &cpus) && !cpumask_empty(&cpus) )
             cpu = cpumask_cycle(cpu, &cpus);
-        cpumask_clear_cpu(cpu, &cpus);
+        __cpumask_clear_cpu(cpu, &cpus);
 
         while ( !cpumask_empty(&cpus) )
         {
@@ -1536,7 +1536,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
             /* Find out what the !idle are in this node */
             cpumask_andnot(&workers, online, prv->idlers);
             cpumask_and(&workers, &workers, &node_to_cpumask(peer_node));
-            cpumask_clear_cpu(cpu, &workers);
+            __cpumask_clear_cpu(cpu, &workers);
 
             peer_cpu = cpumask_first(&workers);
             if ( peer_cpu >= nr_cpu_ids )

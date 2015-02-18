@@ -1450,7 +1450,7 @@ void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
         
     cpumask_copy(&cpu_eoi_map, action->cpu_eoi_map);
 
-    if ( cpumask_test_and_clear_cpu(smp_processor_id(), &cpu_eoi_map) )
+    if ( __cpumask_test_and_clear_cpu(smp_processor_id(), &cpu_eoi_map) )
     {
         __set_eoi_ready(desc);
         spin_unlock(&desc->lock);

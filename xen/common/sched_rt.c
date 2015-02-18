@@ -663,7 +663,7 @@ burn_budget(const struct scheduler *ops, struct rt_vcpu *svc, s_time_t now)
  * lock is grabbed before calling this function
  */
 static struct rt_vcpu *
-__runq_pick(const struct scheduler *ops, cpumask_t *mask)
+__runq_pick(const struct scheduler *ops, const cpumask_t *mask)
 {
     struct list_head *runq = rt_runq(ops);
     struct list_head *iter;
@@ -780,10 +780,7 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
     }
     else
     {
-        cpumask_t cur_cpu;
-        cpumask_clear(&cur_cpu);
-        cpumask_set_cpu(cpu, &cur_cpu);
-        snext = __runq_pick(ops, &cur_cpu);
+        snext = __runq_pick(ops, cpumask_of(cpu));
         if ( snext == NULL )
             snext = rt_vcpu(idle_vcpu[cpu]);
 

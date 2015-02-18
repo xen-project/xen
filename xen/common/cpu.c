@@ -192,7 +192,7 @@ int disable_nonboot_cpus(void)
             break;
         }
 
-        cpumask_set_cpu(cpu, &frozen_cpus);
+        __cpumask_set_cpu(cpu, &frozen_cpus);
     }
 
     BUG_ON(!error && (num_online_cpus() != 1));

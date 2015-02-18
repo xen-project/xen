@@ -489,7 +489,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
             if ( !idletime )
             {
-                cpumask_clear_cpu(cpu, cpumap);
+                __cpumask_clear_cpu(cpu, cpumap);
                 continue;
             }
 

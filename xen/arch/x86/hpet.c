@@ -158,7 +158,7 @@ static void evt_do_broadcast(cpumask_t *mask)
 {
     unsigned int cpu = smp_processor_id();
 
-    if ( cpumask_test_and_clear_cpu(cpu, mask) )
+    if ( __cpumask_test_and_clear_cpu(cpu, mask) )
         raise_softirq(TIMER_SOFTIRQ);
 
     cpuidle_wakeup_mwait(mask);
@@ -197,7 +197,7 @@ again:
             continue;
 
         if ( deadline <= now )
-            cpumask_set_cpu(cpu, &mask);
+            __cpumask_set_cpu(cpu, &mask);
         else if ( deadline < next_event )
             next_event = deadline;
     }

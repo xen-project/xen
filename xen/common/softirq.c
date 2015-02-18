@@ -88,7 +88,7 @@ void cpumask_raise_softirq(const cpumask_t *mask, unsigned int nr)
         if ( !test_and_set_bit(nr, &softirq_pending(cpu)) &&
              cpu != this_cpu &&
              !arch_skip_send_event_check(cpu) )
-            cpumask_set_cpu(cpu, raise_mask);
+            __cpumask_set_cpu(cpu, raise_mask);
 
     if ( raise_mask == &send_mask )
         smp_send_event_check_mask(raise_mask);
@@ -106,7 +106,7 @@ void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
     if ( !per_cpu(batching, this_cpu) || in_irq() )
         smp_send_event_check_cpu(cpu);
     else
-        set_bit(nr, &per_cpu(batch_mask, this_cpu));
+        __cpumask_set_cpu(nr, &per_cpu(batch_mask, this_cpu));
 }
 
 void cpu_raise_softirq_batch_begin(void)
@@ -122,7 +122,7 @@ void cpu_raise_softirq_batch_finish(void)
     ASSERT(per_cpu(batching, this_cpu));
     for_each_cpu ( cpu, mask )
         if ( !softirq_pending(cpu) )
-            cpumask_clear_cpu(cpu, mask);
+            __cpumask_clear_cpu(cpu, mask);
     smp_send_event_check_mask(mask);
     cpumask_clear(mask);
     --per_cpu(batching, this_cpu);

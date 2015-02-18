@@ -179,7 +179,7 @@ static void smp_send_timer_broadcast_ipi(void)
 
     if ( cpumask_test_cpu(cpu, &mask) )
     {
-        cpumask_clear_cpu(cpu, &mask);
+        __cpumask_clear_cpu(cpu, &mask);
         raise_softirq(TIMER_SOFTIRQ);
     }
 
