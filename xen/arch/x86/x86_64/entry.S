@@ -728,9 +728,10 @@ ENTRY(exception_table)
         .quad do_alignment_check
         .quad do_machine_check
         .quad do_simd_coprocessor_error
-        .rept TRAP_last_reserved + 1 - ((. - exception_table) / 8)
+        .rept TRAP_nr - ((. - exception_table) / 8)
         .quad do_reserved_trap /* Architecturally reserved exceptions. */
         .endr
+        .size exception_table, . - exception_table
 
 ENTRY(hypercall_table)
         .quad do_set_trap_table     /*  0 */
@@ -857,7 +858,7 @@ autogen_stubs: /* Automatically generated stubs. */
         entrypoint 1b
 
         /* Reserved exceptions, heading towards do_reserved_trap(). */
-        .elseif vec == TRAP_copro_seg || vec == TRAP_spurious_int || (vec > TRAP_simd_error && vec <= TRAP_last_reserved)
+        .elseif vec == TRAP_copro_seg || vec == TRAP_spurious_int || (vec > TRAP_simd_error && vec < TRAP_nr)
 
 1:      test  $8,%spl        /* 64bit exception frames are 16 byte aligned, but the word */
         jz    2f             /* size is 8 bytes.  Check whether the processor gave us an */
