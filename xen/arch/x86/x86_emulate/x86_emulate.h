@@ -24,6 +24,8 @@
 #ifndef __X86_EMULATE_H__
 #define __X86_EMULATE_H__
 
+#define MAX_INST_LEN 15
+
 struct x86_emulate_ctxt;
 
 /* Comprehensive enumeration of x86 segment registers. */

@@ -27,8 +27,6 @@
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/svm/emulate.h>
 
-#define MAX_INST_LEN 15
-
 static unsigned int is_prefix(u8 opc)
 {
     switch ( opc )

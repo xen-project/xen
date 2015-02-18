@@ -1854,7 +1854,7 @@ static int get_instruction_length(void)
     unsigned long len;
 
     __vmread(VM_EXIT_INSTRUCTION_LEN, &len); /* Safe: callers audited */
-    BUG_ON((len < 1) || (len > 15));
+    BUG_ON((len < 1) || (len > MAX_INST_LEN));
     return len;
 }
 

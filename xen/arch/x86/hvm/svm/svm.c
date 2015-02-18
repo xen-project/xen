@@ -106,7 +106,7 @@ void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
     if ( unlikely(inst_len == 0) )
         return;
 
-    if ( unlikely(inst_len > 15) )
+    if ( unlikely(inst_len > MAX_INST_LEN) )
     {
         gdprintk(XENLOG_ERR, "Bad instruction length %u\n", inst_len);
         svm_crash_or_fault(curr);
@@ -859,7 +859,7 @@ static unsigned int svm_get_insn_bytes(struct vcpu *v, uint8_t *buf)
     if ( len != 0 )
     {
         /* Latch and clear the cached instruction. */
-        memcpy(buf, vmcb->guest_ins, 15);
+        memcpy(buf, vmcb->guest_ins, MAX_INST_LEN);
         v->arch.hvm_svm.cached_insn_len = 0;
     }
 

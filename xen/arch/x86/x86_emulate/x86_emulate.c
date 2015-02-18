@@ -579,7 +579,8 @@ do{ asm volatile (                                                      \
 ({ unsigned long _x = 0, _eip = _regs.eip;                              \
    if ( !mode_64bit() ) _eip = (uint32_t)_eip; /* ignore upper dword */ \
    _regs.eip += (_size); /* real hardware doesn't truncate */           \
-   generate_exception_if((uint8_t)(_regs.eip - ctxt->regs->eip) > 15,   \
+   generate_exception_if((uint8_t)(_regs.eip -                          \
+                                   ctxt->regs->eip) > MAX_INST_LEN,     \
                          EXC_GP, 0);                                    \
    rc = ops->insn_fetch(x86_seg_cs, _eip, &_x, (_size), ctxt);          \
    if ( rc ) goto done;                                                 \
