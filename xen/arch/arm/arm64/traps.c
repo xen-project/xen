@@ -24,11 +24,6 @@
 
 #include <public/xen.h>
 
-asmlinkage void do_trap_serror(struct cpu_user_regs *regs)
-{
-    panic("Unhandled serror trap");
-}
-
 static const char *handler[]= {
         "Synchronous Abort",
         "IRQ",
@@ -38,11 +33,14 @@ static const char *handler[]= {
 
 asmlinkage void do_bad_mode(struct cpu_user_regs *regs, int reason)
 {
-    uint64_t esr = READ_SYSREG64(ESR_EL2);
-    printk("Bad mode in %s handler detected, code 0x%08"PRIx64"\n",
-           handler[reason], esr);
+    union hsr hsr = { .bits = READ_SYSREG32(ESR_EL2) };
+
+    printk("Bad mode in %s handler detected\n", handler[reason]);
+    printk("ESR=0x%08"PRIx32":  EC=%"PRIx32", IL=%"PRIx32", ISS=%"PRIx32"\n",
+           hsr.bits, hsr.ec, hsr.len, hsr.iss);
 
     local_irq_disable();
+    show_execution_state(regs);
     panic("bad mode");
 }
 
