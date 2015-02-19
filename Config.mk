@@ -253,9 +253,9 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 447d264115c476142f884af0be287622cd244423
 QEMU_UPSTREAM_REVISION ?= master
-SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
-# Thu May 22 16:59:16 2014 -0400
-# python3 fixes for vgabios and csm builds.
+SEABIOS_UPSTREAM_REVISION ?= rel-1.8.0
+# Wed Feb 18 12:49:59 2015 -0500
+# docs: Note v1.8.0 release
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
