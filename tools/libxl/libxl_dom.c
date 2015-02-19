@@ -2007,7 +2007,7 @@ static void domain_suspend_done(libxl__egc *egc,
                            dss->guest_evtchn.port, &dss->guest_evtchn_lockfd);
 
     if (!dss->remus) {
-        remus_teardown_done(egc, &dss->rds, rc);
+        dss->callback(egc, dss, rc);
         return;
     }
 
