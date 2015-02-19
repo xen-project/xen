@@ -547,6 +547,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     else
         d->arch.evtchn_irq = platform_dom0_evtchn_ppi();
 
+    if ( !vgic_reserve_virq(d, d->arch.evtchn_irq) )
+        BUG();
+
     /*
      * Virtual UART is only used by linux early printk and decompress code.
      * Only use it for the hardware domain because the linux kernel may not

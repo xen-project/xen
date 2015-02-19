@@ -110,6 +110,15 @@ int domain_vgic_init(struct domain *d)
 
     d->arch.vgic.handler->domain_init(d);
 
+    d->arch.vgic.allocated_irqs =
+        xzalloc_array(unsigned long, BITS_TO_LONGS(vgic_num_irqs(d)));
+    if ( !d->arch.vgic.allocated_irqs )
+        return -ENOMEM;
+
+    /* vIRQ0-15 (SGIs) are reserved */
+    for ( i = 0; i < NR_GIC_SGI; i++ )
+        set_bit(i, d->arch.vgic.allocated_irqs);
+
     return 0;
 }
 
@@ -122,6 +131,7 @@ void domain_vgic_free(struct domain *d)
 {
     xfree(d->arch.vgic.shared_irqs);
     xfree(d->arch.vgic.pending_irqs);
+    xfree(d->arch.vgic.allocated_irqs);
 }
 
 int vcpu_vgic_init(struct vcpu *v)
@@ -450,6 +460,51 @@ int vgic_emulate(struct cpu_user_regs *regs, union hsr hsr)
     ASSERT(v->domain->arch.vgic.handler->emulate_sysreg != NULL);
 
     return v->domain->arch.vgic.handler->emulate_sysreg(regs, hsr);
+}
+
+bool_t vgic_reserve_virq(struct domain *d, unsigned int virq)
+{
+    if ( virq >= vgic_num_irqs(d) )
+        return 0;
+
+    return !test_and_set_bit(virq, d->arch.vgic.allocated_irqs);
+}
+
+int vgic_allocate_virq(struct domain *d, bool_t spi)
+{
+    int first, end;
+    unsigned int virq;
+
+    if ( !spi )
+    {
+        /* We only allocate PPIs. SGIs are all reserved */
+        first = 16;
+        end = 32;
+    }
+    else
+    {
+        first = 32;
+        end = vgic_num_irqs(d);
+    }
+
+    /*
+     * There is no spinlock to protect allocated_irqs, therefore
+     * test_and_set_bit may fail. If so retry it.
+     */
+    do
+    {
+        virq = find_next_zero_bit(d->arch.vgic.allocated_irqs, end, first);
+        if ( virq >= end )
+            return -1;
+    }
+    while ( test_and_set_bit(virq, d->arch.vgic.allocated_irqs) );
+
+    return virq;
+}
+
+void vgic_free_virq(struct domain *d, unsigned int virq)
+{
+    clear_bit(virq, d->arch.vgic.allocated_irqs);
 }
 
 /*

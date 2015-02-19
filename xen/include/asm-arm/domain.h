@@ -90,6 +90,7 @@ struct arch_domain
         spinlock_t lock;
         int ctlr;
         int nr_spis; /* Number of SPIs */
+        unsigned long *allocated_irqs; /* bitmap of IRQs allocated */
         struct vgic_irq_rank *shared_irqs;
         /*
          * SPIs are domain global, SGIs and PPIs are per-VCPU and stored in

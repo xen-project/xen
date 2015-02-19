@@ -56,6 +56,31 @@ int domain_vtimer_init(struct domain *d)
 {
     d->arch.phys_timer_base.offset = NOW();
     d->arch.virt_timer_base.offset = READ_SYSREG64(CNTPCT_EL0);
+
+    /* At this stage vgic_reserve_virq can't fail */
+    if ( is_hardware_domain(d) )
+    {
+        if ( !vgic_reserve_virq(d, timer_get_irq(TIMER_PHYS_SECURE_PPI)) )
+            BUG();
+
+        if ( !vgic_reserve_virq(d, timer_get_irq(TIMER_PHYS_NONSECURE_PPI)) )
+            BUG();
+
+        if ( !vgic_reserve_virq(d, timer_get_irq(TIMER_VIRT_PPI)) )
+            BUG();
+    }
+    else
+    {
+        if ( !vgic_reserve_virq(d, GUEST_TIMER_PHYS_S_PPI) )
+            BUG();
+
+        if ( !vgic_reserve_virq(d, GUEST_TIMER_PHYS_NS_PPI) )
+            BUG();
+
+        if ( !vgic_reserve_virq(d, GUEST_TIMER_VIRT_PPI) )
+            BUG();
+    }
+
     return 0;
 }
 

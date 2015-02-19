@@ -71,6 +71,10 @@ static int map_one_spi(struct domain *d, const char *what,
 
     printk("Additional IRQ %u (%s)\n", irq, what);
 
+    if ( !vgic_reserve_virq(d, irq) )
+        printk("Failed to reserve vIRQ %u on dom%d\n",
+               irq, d->domain_id);
+
     ret = route_irq_to_guest(d, irq, what);
     if ( ret )
         printk("Failed to route %s to dom%d\n", what, d->domain_id);
