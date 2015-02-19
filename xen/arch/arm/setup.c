@@ -50,6 +50,11 @@ struct bootinfo __initdata bootinfo;
 
 struct cpuinfo_arm __read_mostly boot_cpu_data;
 
+#ifdef CONFIG_ARM_32
+static unsigned long opt_xenheap_megabytes __initdata;
+integer_param("xenheap_megabytes", opt_xenheap_megabytes);
+#endif
+
 static __used void init_done(void)
 {
     free_init_memory();
@@ -497,20 +502,26 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     total_pages = ram_pages = ram_size >> PAGE_SHIFT;
 
     /*
-     * Locate the xenheap using these constraints:
+     * If the user has not requested otherwise via the command line
+     * then locate the xenheap using these constraints:
      *
      *  - must be 32 MiB aligned
      *  - must not include Xen itself or the boot modules
-     *  - must be at most 1GB or 1/8 the total RAM in the system if less
-     *  - must be at least 128M
+     *  - must be at most 1GB or 1/32 the total RAM in the system if less
+     *  - must be at least 32M
      *
      * We try to allocate the largest xenheap possible within these
      * constraints.
      */
     heap_pages = ram_pages;
-    xenheap_pages = (heap_pages/8 + 0x1fffUL) & ~0x1fffUL;
-    xenheap_pages = max(xenheap_pages, 128UL<<(20-PAGE_SHIFT));
-    xenheap_pages = min(xenheap_pages, 1UL<<(30-PAGE_SHIFT));
+    if ( opt_xenheap_megabytes )
+        xenheap_pages = opt_xenheap_megabytes << (20-PAGE_SHIFT);
+    else
+    {
+        xenheap_pages = (heap_pages/32 + 0x1fffUL) & ~0x1fffUL;
+        xenheap_pages = max(xenheap_pages, 32UL<<(20-PAGE_SHIFT));
+        xenheap_pages = min(xenheap_pages, 1UL<<(30-PAGE_SHIFT));
+    }
 
     do
     {
@@ -521,15 +532,16 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
             break;
 
         xenheap_pages >>= 1;
-    } while ( xenheap_pages > 128<<(20-PAGE_SHIFT) );
+    } while ( !opt_xenheap_megabytes && xenheap_pages > 32<<(20-PAGE_SHIFT) );
 
     if ( ! e )
         panic("Not not enough space for xenheap");
 
     domheap_pages = heap_pages - xenheap_pages;
 
-    printk("Xen heap: %"PRIpaddr"-%"PRIpaddr" (%lu pages)\n",
-            e - (pfn_to_paddr(xenheap_pages)), e, xenheap_pages);
+    printk("Xen heap: %"PRIpaddr"-%"PRIpaddr" (%lu pages%s)\n",
+           e - (pfn_to_paddr(xenheap_pages)), e, xenheap_pages,
+           opt_xenheap_megabytes ? ", from command-line" : "");
     printk("Dom heap: %lu pages\n", domheap_pages);
 
     setup_xenheap_mappings((e >> PAGE_SHIFT) - xenheap_pages, xenheap_pages);

@@ -237,6 +237,17 @@ and not running softirqs. Reduce this if softirqs are not being run frequently
 enough. Setting this to a high value may cause boot failure, particularly if
 the NMI watchdog is also enabled.
 
+### xenheap\_megabytes (arm32)
+> `= <size>`
+
+> Default: `0` (1/32 of RAM)
+
+Amount of RAM to set aside for the Xenheap.
+
+By default will use 1/32 of the RAM up to a maximum of 1GB and with a
+minimum of 32M, subject to a suitably aligned and sized contiguous
+region of memory being available.
+
 ### clocksource
 > `= pit | hpet | acpi`
 
