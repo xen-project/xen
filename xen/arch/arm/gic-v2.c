@@ -211,7 +211,7 @@ static void gicv2_set_irq_properties(struct irq_desc *desc,
                                    const cpumask_t *cpu_mask,
                                    unsigned int priority)
 {
-    uint32_t cfg, edgebit;
+    uint32_t cfg, actual, edgebit;
     unsigned int mask = gicv2_cpu_mask(cpu_mask);
     unsigned int irq = desc->irq;
     unsigned int type = desc->arch.type;
@@ -228,6 +228,20 @@ static void gicv2_set_irq_properties(struct irq_desc *desc,
     else if ( type & DT_IRQ_TYPE_EDGE_BOTH )
         cfg |= edgebit;
     writel_gicd(cfg, GICD_ICFGR + (irq / 16) * 4);
+
+    actual = readl_gicd(GICD_ICFGR + (irq / 16) * 4);
+    if ( ( cfg & edgebit ) ^ ( actual & edgebit ) )
+    {
+        printk(XENLOG_WARNING "GICv2: WARNING: "
+               "CPU%d: Failed to configure IRQ%u as %s-triggered. "
+               "H/w forces to %s-triggered.\n",
+               smp_processor_id(), desc->irq,
+               cfg & edgebit ? "Edge" : "Level",
+               actual & edgebit ? "Edge" : "Level");
+        desc->arch.type = actual & edgebit ?
+            DT_IRQ_TYPE_EDGE_RISING :
+            DT_IRQ_TYPE_LEVEL_LOW;
+    }
 
     /* Set target CPU mask (RAZ/WI on uniprocessor) */
     writeb_gicd(mask, GICD_ITARGETSR + irq);
