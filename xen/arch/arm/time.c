@@ -198,6 +198,32 @@ static void vtimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     vgic_vcpu_inject_irq(current, current->arch.virt_timer.irq);
 }
 
+/*
+ * Arch timer interrupt really ought to be level triggered, since the
+ * design of the timer/comparator mechanism is based around that
+ * concept.
+ *
+ * However some firmware (incorrectly) describes the interrupts as
+ * edge triggered and, worse, some hardware allows us to program the
+ * interrupt controller as edge triggered.
+ *
+ * Check each interrupt and warn if we find ourselves in this situation.
+ */
+static void check_timer_irq_cfg(unsigned int irq, const char *which)
+{
+    struct irq_desc *desc = irq_to_desc(irq);
+
+    /*
+     * The interrupt controller driver will update desc->arch.type with
+     * the actual type which ended up configured in the hardware.
+     */
+    if ( desc->arch.type & DT_IRQ_TYPE_LEVEL_LOW )
+        return;
+
+    printk(XENLOG_WARNING
+           "WARNING: %s-timer IRQ%u is not level triggered.\n", which, irq);
+}
+
 /* Set up the timer interrupt on this CPU */
 void __cpuinit init_timer_interrupt(void)
 {
@@ -215,6 +241,10 @@ void __cpuinit init_timer_interrupt(void)
                    "virtimer", NULL);
     request_irq(timer_irq[TIMER_PHYS_NONSECURE_PPI], 0, timer_interrupt,
                 "phytimer", NULL);
+
+    check_timer_irq_cfg(timer_irq[TIMER_HYP_PPI], "hypervisor");
+    check_timer_irq_cfg(timer_irq[TIMER_VIRT_PPI], "virtual");
+    check_timer_irq_cfg(timer_irq[TIMER_PHYS_NONSECURE_PPI], "NS-physical");
 }
 
 /* Wait a set number of microseconds */
