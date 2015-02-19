@@ -542,13 +542,18 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     if ( (rc = domain_vtimer_init(d)) != 0 )
         goto fail;
 
-    if ( d->domain_id )
+    /*
+     * The hardware domain will get a PPI later in
+     * arch/arm/domain_build.c  depending on the
+     * interrupt map of the hardware.
+     */
+    if ( !is_hardware_domain(d) )
+    {
         d->arch.evtchn_irq = GUEST_EVTCHN_PPI;
-    else
-        d->arch.evtchn_irq = platform_dom0_evtchn_ppi();
-
-    if ( !vgic_reserve_virq(d, d->arch.evtchn_irq) )
-        BUG();
+        /* At this stage vgic_reserve_virq should never fail */
+        if ( !vgic_reserve_virq(d, GUEST_EVTCHN_PPI) )
+            BUG();
+    }
 
     /*
      * Virtual UART is only used by linux early printk and decompress code.

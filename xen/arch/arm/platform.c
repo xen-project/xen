@@ -160,13 +160,6 @@ bool_t platform_device_is_blacklisted(const struct dt_device_node *node)
     return (dt_match_node(blacklist, node) != NULL);
 }
 
-unsigned int platform_dom0_evtchn_ppi(void)
-{
-    if ( platform && platform->dom0_evtchn_ppi )
-        return platform->dom0_evtchn_ppi;
-    return GUEST_EVTCHN_PPI;
-}
-
 void platform_dom0_gnttab(paddr_t *start, paddr_t *size)
 {
     if ( platform && platform->dom0_gnttab_size )

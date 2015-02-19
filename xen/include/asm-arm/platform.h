@@ -38,10 +38,6 @@ struct platform_desc {
      */
     const struct dt_device_match *blacklist_dev;
     /*
-     * The IRQ (PPI) to use to inject event channels to dom0.
-     */
-    unsigned int dom0_evtchn_ppi;
-    /*
      * The location of a region of physical address space which dom0
      * can use for grant table mappings. If size is zero defaults to
      * 0xb0000000-0xb0020000.
