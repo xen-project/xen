@@ -147,7 +147,15 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if (libxl_defbool_val(vnc->findunused)) {
             flexarray_append(dm_args, "-vncunused");
         }
-    }
+    } else
+        /*
+         * VNC is not enabled by default by qemu-xen-traditional,
+         * however passing -vnc none causes SDL to not be
+         * (unexpectedly) enabled by default. This is overridden by
+         * explicitly passing -sdl below as required.
+         */
+        flexarray_append_pair(dm_args, "-vnc", "none");
+
     if (sdl) {
         flexarray_append(dm_args, "-sdl");
         if (!libxl_defbool_val(sdl->opengl)) {
@@ -394,7 +402,18 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             vncarg = libxl__sprintf(gc, "%s,to=99", vncarg);
         }
         flexarray_append(dm_args, vncarg);
-    }
+    } else
+        /*
+         * Ensure that by default no vnc server is created.
+         */
+        flexarray_append_pair(dm_args, "-vnc", "none");
+
+    /*
+     * Ensure that by default no display backend is created. Further
+     * options given below might then enable more.
+     */
+    flexarray_append_pair(dm_args, "-display", "none");
+
     if (sdl) {
         flexarray_append(dm_args, "-sdl");
         /* XXX sdl->{display,xauthority} into $DISPLAY/$XAUTHORITY */
