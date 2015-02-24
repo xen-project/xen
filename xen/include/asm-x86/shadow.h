@@ -79,7 +79,7 @@ void shadow_teardown(struct domain *d);
 /* Call once all of the references to the domain have gone away */
 void shadow_final_teardown(struct domain *d);
 
-void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all);
+void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all);
 
 /* Discard _all_ mappings from the domain's shadows. */
 void shadow_blow_tables_per_domain(struct domain *d);
@@ -93,7 +93,7 @@ void shadow_blow_tables_per_domain(struct domain *d);
 #define shadow_track_dirty_vram(d, begin_pfn, nr, bitmap) \
     ({ ASSERT_UNREACHABLE(); -EOPNOTSUPP; })
 
-static inline void sh_remove_shadows(struct vcpu *v, mfn_t gmfn,
+static inline void sh_remove_shadows(struct domain *d, mfn_t gmfn,
                                      bool_t fast, bool_t all) {}
 
 static inline void shadow_blow_tables_per_domain(struct domain *d) {}
@@ -107,10 +107,10 @@ static inline int shadow_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
 #endif /* CONFIG_SHADOW_PAGING */
 
 /* Remove all shadows of the guest mfn. */
-static inline void shadow_remove_all_shadows(struct vcpu *v, mfn_t gmfn)
+static inline void shadow_remove_all_shadows(struct domain *d, mfn_t gmfn)
 {
     /* See the comment about locking in sh_remove_shadows */
-    sh_remove_shadows(v, gmfn, 0 /* Be thorough */, 1 /* Must succeed */);
+    sh_remove_shadows(d, gmfn, 0 /* Be thorough */, 1 /* Must succeed */);
 }
 
 #endif /* _XEN_SHADOW_H */

@@ -934,3 +934,12 @@ int main(int argc, char **argv)
     printf("failed!\n");
     return 1;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

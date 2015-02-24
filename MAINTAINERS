@@ -347,6 +347,7 @@ L:	xen-devel@lists.xen.org
 F:	xen/arch/x86/
 F:	xen/include/asm-x86/
 F:	tools/firmware/hvmloader/
+F:	tools/tests/x86_emulator/
 
 X86 MEMORY MANAGEMENT
 M:	Tim Deegan <tim@xen.org>

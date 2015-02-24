@@ -39,47 +39,47 @@ SHADOW_INTERNAL_NAME(sh_map_and_validate_gl4e, GUEST_LEVELS)(
 
 extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, GUEST_LEVELS)(
-    struct vcpu *v, mfn_t smfn);
+    struct domain *d, mfn_t smfn);
 extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, GUEST_LEVELS)(
-    struct vcpu *v, mfn_t smfn);
+    struct domain *d, mfn_t smfn);
 extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l3_shadow, GUEST_LEVELS)(
-    struct vcpu *v, mfn_t smfn);
+    struct domain *d, mfn_t smfn);
 extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l4_shadow, GUEST_LEVELS)(
-    struct vcpu *v, mfn_t smfn);
+    struct domain *d, mfn_t smfn);
 
 extern void
 SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl2mfn, int user_only);
+    (struct domain *d, mfn_t sl2mfn, int user_only);
 extern void
 SHADOW_INTERNAL_NAME(sh_unhook_pae_mappings, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl3mfn, int user_only);
+    (struct domain *d, mfn_t sl3mfn, int user_only);
 extern void
 SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl4mfn, int user_only);
+    (struct domain *d, mfn_t sl4mfn, int user_only);
 
 extern int
 SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl1mfn, mfn_t readonly_mfn);
+    (struct domain *d, mfn_t sl1mfn, mfn_t readonly_mfn);
 extern int
 SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn);
+    (struct domain *d, mfn_t sl1mfn, mfn_t target_mfn);
 
 extern void
 SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, GUEST_LEVELS)
-    (struct vcpu *v, void *ep, mfn_t smfn);
+    (struct domain *d, void *ep, mfn_t smfn);
 
 extern int
 SHADOW_INTERNAL_NAME(sh_remove_l1_shadow, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl2mfn, mfn_t sl1mfn);
+    (struct domain *d, mfn_t sl2mfn, mfn_t sl1mfn);
 extern int
 SHADOW_INTERNAL_NAME(sh_remove_l2_shadow, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl3mfn, mfn_t sl2mfn);
+    (struct domain *d, mfn_t sl3mfn, mfn_t sl2mfn);
 extern int
 SHADOW_INTERNAL_NAME(sh_remove_l3_shadow, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t sl4mfn, mfn_t sl3mfn);
+    (struct domain *d, mfn_t sl4mfn, mfn_t sl3mfn);
 
 #if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES
 int
@@ -127,5 +127,5 @@ SHADOW_INTERNAL_NAME(sh_safe_not_to_sync, GUEST_LEVELS)
 
 extern int
 SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p, GUEST_LEVELS)
-     (struct vcpu *v, mfn_t gmfn, mfn_t smfn, unsigned long off);
+     (struct domain *d, mfn_t gmfn, mfn_t smfn, unsigned long off);
 #endif
