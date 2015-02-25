@@ -18,6 +18,13 @@
  *
  * Author: Will Deacon <will.deacon@arm.com>
  *
+ * Based on Linux drivers/iommu/arm-smmu.c
+ *	=> commit e6b5be2be4e30037eb551e0ed09dd97bd00d85d3
+ *
+ * Xen modification:
+ * Julien Grall <julien.grall@linaro.org>
+ * Copyright (C) 2014 Linaro Limited.
+ *
  * This driver currently supports:
  *	- SMMUv1 and v2 implementations
  *	- Stream-matching and stream-indexing
@@ -28,25 +35,287 @@
  *	- Context fault reporting
  */
 
-#define pr_fmt(fmt) "arm-smmu: " fmt
 
-#include <linux/delay.h>
-#include <linux/dma-mapping.h>
-#include <linux/err.h>
-#include <linux/interrupt.h>
-#include <linux/io.h>
-#include <linux/iommu.h>
-#include <linux/mm.h>
-#include <linux/module.h>
-#include <linux/of.h>
-#include <linux/pci.h>
-#include <linux/platform_device.h>
-#include <linux/slab.h>
-#include <linux/spinlock.h>
+#include <xen/config.h>
+#include <xen/delay.h>
+#include <xen/errno.h>
+#include <xen/err.h>
+#include <xen/irq.h>
+#include <xen/lib.h>
+#include <xen/list.h>
+#include <xen/mm.h>
+#include <xen/vmap.h>
+#include <xen/rbtree.h>
+#include <xen/sched.h>
+#include <xen/sizes.h>
+#include <asm/atomic.h>
+#include <asm/device.h>
+#include <asm/io.h>
+#include <asm/platform.h>
 
-#include <linux/amba/bus.h>
+/* Xen: The below defines are redefined within the file. Undef it */
+#undef SCTLR_AFE
+#undef SCTLR_TRE
+#undef SCTLR_M
+#undef TTBCR_EAE
 
-#include <asm/pgalloc.h>
+/* Alias to Xen device tree helpers */
+#define device_node dt_device_node
+#define of_phandle_args dt_phandle_args
+#define of_device_id dt_device_match
+#define of_match_node dt_match_node
+#define of_property_read_u32(np, pname, out) (!dt_property_read_u32(np, pname, out))
+#define of_property_read_bool dt_property_read_bool
+#define of_parse_phandle_with_args dt_parse_phandle_with_args
+
+/* Xen: Helpers to get device MMIO and IRQs */
+struct resource
+{
+	u64 addr;
+	u64 size;
+	unsigned int type;
+};
+
+#define resource_size(res) (res)->size;
+
+#define platform_device dt_device_node
+
+#define IORESOURCE_MEM 0
+#define IORESOURCE_IRQ 1
+
+static struct resource *platform_get_resource(struct platform_device *pdev,
+					      unsigned int type,
+					      unsigned int num)
+{
+	/*
+	 * The resource is only used between 2 calls of platform_get_resource.
+	 * It's quite ugly but it's avoid to add too much code in the part
+	 * imported from Linux
+	 */
+	static struct resource res;
+	int ret = 0;
+
+	res.type = type;
+
+	switch (type) {
+	case IORESOURCE_MEM:
+		ret = dt_device_get_address(pdev, num, &res.addr, &res.size);
+
+		return ((ret) ? NULL : &res);
+
+	case IORESOURCE_IRQ:
+		ret = platform_get_irq(pdev, num);
+		if (ret < 0)
+			return NULL;
+
+		res.addr = ret;
+		res.size = 1;
+
+		return &res;
+
+	default:
+		return NULL;
+	}
+}
+
+/* Xen: Helpers for IRQ functions */
+#define request_irq(irq, func, flags, name, dev) request_irq(irq, flags, func, name, dev)
+#define free_irq release_irq
+
+enum irqreturn {
+	IRQ_NONE	= (0 << 0),
+	IRQ_HANDLED	= (1 << 0),
+};
+
+typedef enum irqreturn irqreturn_t;
+
+/* Device logger functions
+ * TODO: Handle PCI
+ */
+#define dev_print(dev, lvl, fmt, ...)						\
+	 printk(lvl "smmu: %s: " fmt, dt_node_full_name(dev_to_dt(dev)), ## __VA_ARGS__)
+
+#define dev_dbg(dev, fmt, ...) dev_print(dev, XENLOG_DEBUG, fmt, ## __VA_ARGS__)
+#define dev_notice(dev, fmt, ...) dev_print(dev, XENLOG_INFO, fmt, ## __VA_ARGS__)
+#define dev_warn(dev, fmt, ...) dev_print(dev, XENLOG_WARNING, fmt, ## __VA_ARGS__)
+#define dev_err(dev, fmt, ...) dev_print(dev, XENLOG_ERR, fmt, ## __VA_ARGS__)
+
+#define dev_err_ratelimited(dev, fmt, ...)					\
+	 dev_print(dev, XENLOG_ERR, fmt, ## __VA_ARGS__)
+
+#define dev_name(dev) dt_node_full_name(dev_to_dt(dev))
+
+/* Alias to Xen allocation helpers */
+#define kfree xfree
+#define kmalloc(size, flags)		_xmalloc(size, sizeof(void *))
+#define kzalloc(size, flags)		_xzalloc(size, sizeof(void *))
+#define devm_kzalloc(dev, size, flags)	_xzalloc(size, sizeof(void *))
+#define kmalloc_array(size, n, flags)	_xmalloc_array(size, sizeof(void *), n)
+
+static void __iomem *devm_ioremap_resource(struct device *dev,
+					   struct resource *res)
+{
+	void __iomem *ptr;
+
+	if (!res || res->type != IORESOURCE_MEM) {
+		dev_err(dev, "Invalid resource\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	ptr = ioremap_nocache(res->addr, res->size);
+	if (!ptr) {
+		dev_err(dev,
+			"ioremap failed (addr 0x%"PRIx64" size 0x%"PRIx64")\n",
+			res->addr, res->size);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	return ptr;
+}
+
+/* Xen doesn't handle IOMMU fault */
+#define report_iommu_fault(...)	1
+
+#define IOMMU_FAULT_READ	0
+#define IOMMU_FAULT_WRITE	1
+
+/*
+ * Xen: PCI functions
+ * TODO: It should be implemented when PCI will be supported
+ */
+#define to_pci_dev(dev)	(NULL)
+static inline int pci_for_each_dma_alias(struct pci_dev *pdev,
+					 int (*fn) (struct pci_dev *pdev,
+						    u16 alias, void *data),
+					 void *data)
+{
+	BUG();
+	return 0;
+}
+
+/* Xen: misc */
+#define PHYS_MASK_SHIFT		PADDR_BITS
+typedef paddr_t phys_addr_t;
+
+#ifdef CONFIG_ARM_64
+# define CONFIG_64BIT
+#endif
+
+#define VA_BITS		0	/* Only used for configuring stage-1 input size */
+
+/* The macro ACCESS_ONCE start to be replaced in Linux in favor of
+ * {READ, WRITE}_ONCE. Rather than introducing in the common code, keep a
+ * version here. We will have to drop it when the SMMU code in Linux will
+ * switch to {READ, WRITE}_ONCE.
+ */
+#define __ACCESS_ONCE(x) ({ \
+	 __maybe_unused typeof(x) __var = 0; \
+	(volatile typeof(x) *)&(x); })
+#define ACCESS_ONCE(x) (*__ACCESS_ONCE(x))
+
+#define MODULE_DEVICE_TABLE(type, name)
+#define module_param_named(name, value, type, perm)
+#define MODULE_PARM_DESC(_parm, desc)
+
+/* Xen: Dummy iommu_domain */
+struct iommu_domain
+{
+	/* Runtime SMMU configuration for this iommu_domain */
+	struct arm_smmu_domain		*priv;
+
+	/* Used to link iommu_domain contexts for a same domain.
+	 * There is at least one per-SMMU to used by the domain.
+	 * */
+	struct list_head		list;
+};
+
+/* Xen: Describes informations required for a Xen domain */
+struct arm_smmu_xen_domain {
+	spinlock_t			lock;
+	/* List of context (i.e iommu_domain) associated to this domain */
+	struct list_head		contexts;
+};
+
+/*
+ * Xen: Information about each device stored in dev->archdata.iommu
+ *
+ * Initially dev->archdata.iommu only stores the iommu_domain (runtime
+ * configuration of the SMMU) but, on Xen, we also have to store the
+ * iommu_group (list of streamIDs associated to the device).
+ *
+ * This is because Linux has a field iommu_group in the struct device. On Xen,
+ * that would require to move some hackery (dummy iommu_group) in a more generic
+ * place.
+ * */
+struct arm_smmu_xen_device {
+	struct iommu_domain *domain;
+	struct iommu_group *group;
+};
+
+#define dev_archdata(dev) ((struct arm_smmu_xen_device *)dev->archdata.iommu)
+#define dev_iommu_domain(dev) (dev_archdata(dev)->domain)
+#define dev_iommu_group(dev) (dev_archdata(dev)->group)
+
+/* Xen: Dummy iommu_group */
+struct iommu_group
+{
+	/* Streamids of the device */
+	struct arm_smmu_master_cfg *cfg;
+
+	atomic_t ref;
+};
+
+static struct iommu_group *iommu_group_alloc(void)
+{
+	struct iommu_group *group = xzalloc(struct iommu_group);
+
+	if (!group)
+		return ERR_PTR(-ENOMEM);
+
+	atomic_set(&group->ref, 1);
+
+	return group;
+}
+
+static void iommu_group_put(struct iommu_group *group)
+{
+	if (atomic_dec_and_test(&group->ref))
+		xfree(group);
+}
+
+static void iommu_group_set_iommudata(struct iommu_group *group,
+				      struct arm_smmu_master_cfg *cfg,
+				      void (*releasefn)(void *))
+{
+	/* TODO: Store the releasefn for the PCI */
+	ASSERT(releasefn == NULL);
+
+	group->cfg = cfg;
+}
+
+static int iommu_group_add_device(struct iommu_group *group,
+				  struct device *dev)
+{
+	dev_iommu_group(dev) = group;
+
+	atomic_inc(&group->ref);
+
+	return 0;
+}
+
+static struct iommu_group *iommu_group_get(struct device *dev)
+{
+	struct iommu_group *group = dev_iommu_group(dev);
+
+	if (group)
+		atomic_inc(&group->ref);
+
+	return group;
+}
+
+#define iommu_group_get_iommudata(group) (group)->cfg
+
+/***** Start of Linux SMMU code *****/
 
 /* Maximum number of stream IDs assigned to a single device */
 #define MAX_MASTER_STREAMIDS		MAX_PHANDLE_ARGS
@@ -397,7 +666,9 @@ struct arm_smmu_cfg {
 	u8				cbndx;
 	u8				irptndx;
 	u32				cbar;
-	pgd_t				*pgd;
+
+	/* Xen: Domain associated to this configuration */
+	struct domain			*domain;
 };
 #define INVALID_IRPTNDX			0xff
 
@@ -446,6 +717,7 @@ static void parse_driver_options(struct arm_smmu_device *smmu)
 
 static struct device_node *dev_get_dev_node(struct device *dev)
 {
+#if 0 /* Xen: TODO: Add support for PCI */
 	if (dev_is_pci(dev)) {
 		struct pci_bus *bus = to_pci_dev(dev)->bus;
 
@@ -453,6 +725,7 @@ static struct device_node *dev_get_dev_node(struct device *dev)
 			bus = bus->parent;
 		return bus->bridge->parent->of_node;
 	}
+#endif
 
 	return dev->of_node;
 }
@@ -545,6 +818,9 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
 
 	master->of_node			= masterspec->np;
 	master->cfg.num_streamids	= masterspec->args_count;
+
+	/* Xen: Let Xen know that the device is protected by an SMMU */
+	dt_device_set_protected(masterspec->np);
 
 	for (i = 0; i < master->cfg.num_streamids; ++i) {
 		u16 streamid = masterspec->args[i];
@@ -712,6 +988,24 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
 	return IRQ_HANDLED;
 }
 
+/* Xen: Interrupt handlers wrapper */
+static void arm_smmu_context_fault_xen(int irq, void *dev,
+				       struct cpu_user_regs *regs)
+{
+	arm_smmu_context_fault(irq, dev);
+}
+
+#define arm_smmu_context_fault arm_smmu_context_fault_xen
+
+static void arm_smmu_global_fault_xen(int irq, void *dev,
+				      struct cpu_user_regs *regs)
+{
+	arm_smmu_global_fault(irq, dev);
+}
+
+#define arm_smmu_global_fault arm_smmu_global_fault_xen
+
+#if 0 /* Xen: Page tables are shared with the processor */
 static void arm_smmu_flush_pgtable(struct arm_smmu_device *smmu, void *addr,
 				   size_t size)
 {
@@ -733,6 +1027,7 @@ static void arm_smmu_flush_pgtable(struct arm_smmu_device *smmu, void *addr,
 				DMA_TO_DEVICE);
 	}
 }
+#endif
 
 static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
 {
@@ -741,6 +1036,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
 	struct arm_smmu_device *smmu = smmu_domain->smmu;
 	void __iomem *cb_base, *gr0_base, *gr1_base;
+	paddr_t p2maddr;
 
 	gr0_base = ARM_SMMU_GR0(smmu);
 	gr1_base = ARM_SMMU_GR1(smmu);
@@ -824,11 +1120,16 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
 	}
 
 	/* TTBR0 */
-	arm_smmu_flush_pgtable(smmu, cfg->pgd,
-			       PTRS_PER_PGD * sizeof(pgd_t));
-	reg = __pa(cfg->pgd);
+	/* Xen: The page table is shared with the P2M code */
+	ASSERT(smmu_domain->cfg.domain != NULL);
+	p2maddr = page_to_maddr(smmu_domain->cfg.domain->arch.p2m.root);
+
+	dev_notice(smmu->dev, "d%u: p2maddr 0x%"PRIpaddr"\n",
+		   smmu_domain->cfg.domain->domain_id, p2maddr);
+
+	reg = (p2maddr & ((1ULL << 32) - 1));
 	writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
-	reg = (phys_addr_t)__pa(cfg->pgd) >> 32;
+	reg = (p2maddr >> 32);
 	if (stage1)
 		reg |= ARM_SMMU_CB_ASID(cfg) << TTBRn_HI_ASID_SHIFT;
 	writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_HI);
@@ -873,6 +1174,9 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
 		reg = 0;
 	}
 
+	/* Xen: The attributes to walk the page table should be the same as
+	 * VTCR_EL2. Currently doesn't differ from Linux ones.
+	 */
 	reg |= TTBCR_EAE |
 	      (TTBCR_SH_IS << TTBCR_SH0_SHIFT) |
 	      (TTBCR_RGN_WBWA << TTBCR_ORGN0_SHIFT) |
@@ -1015,7 +1319,6 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
 static int arm_smmu_domain_init(struct iommu_domain *domain)
 {
 	struct arm_smmu_domain *smmu_domain;
-	pgd_t *pgd;
 
 	/*
 	 * Allocate the domain and initialise some of its data structures.
@@ -1026,20 +1329,12 @@ static int arm_smmu_domain_init(struct iommu_domain *domain)
 	if (!smmu_domain)
 		return -ENOMEM;
 
-	pgd = kcalloc(PTRS_PER_PGD, sizeof(pgd_t), GFP_KERNEL);
-	if (!pgd)
-		goto out_free_domain;
-	smmu_domain->cfg.pgd = pgd;
-
 	spin_lock_init(&smmu_domain->lock);
 	domain->priv = smmu_domain;
 	return 0;
-
-out_free_domain:
-	kfree(smmu_domain);
-	return -ENOMEM;
 }
 
+#if 0 /* Xen: Page tables are shared with the processor */
 static void arm_smmu_free_ptes(pmd_t *pmd)
 {
 	pgtable_t table = pmd_pgtable(*pmd);
@@ -1102,6 +1397,7 @@ static void arm_smmu_free_pgtables(struct arm_smmu_domain *smmu_domain)
 
 	kfree(pgd_base);
 }
+#endif
 
 static void arm_smmu_domain_destroy(struct iommu_domain *domain)
 {
@@ -1112,7 +1408,6 @@ static void arm_smmu_domain_destroy(struct iommu_domain *domain)
 	 * already been detached.
 	 */
 	arm_smmu_destroy_domain_context(domain);
-	arm_smmu_free_pgtables(smmu_domain);
 	kfree(smmu_domain);
 }
 
@@ -1229,11 +1524,12 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
 	/*
 	 * We *must* clear the S2CR first, because freeing the SMR means
 	 * that it can be re-allocated immediately.
+	 * Xen: Unlike Linux, any access to non-configured stream will fault.
 	 */
 	for (i = 0; i < cfg->num_streamids; ++i) {
 		u32 idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
 
-		writel_relaxed(S2CR_TYPE_BYPASS,
+		writel_relaxed(S2CR_TYPE_FAULT,
 			       gr0_base + ARM_SMMU_GR0_S2CR(idx));
 	}
 
@@ -1253,7 +1549,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		return -ENXIO;
 	}
 
-	if (dev->archdata.iommu) {
+	if (dev_iommu_domain(dev)) {
 		dev_err(dev, "already attached to IOMMU domain\n");
 		return -EEXIST;
 	}
@@ -1285,8 +1581,9 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		return -ENODEV;
 
 	ret = arm_smmu_domain_add_master(smmu_domain, cfg);
+
 	if (!ret)
-		dev->archdata.iommu = domain;
+		dev_iommu_domain(dev) = domain;
 	return ret;
 }
 
@@ -1299,10 +1596,14 @@ static void arm_smmu_detach_dev(struct iommu_domain *domain, struct device *dev)
 	if (!cfg)
 		return;
 
-	dev->archdata.iommu = NULL;
+	dev_iommu_domain(dev) = NULL;
 	arm_smmu_domain_remove_master(smmu_domain, cfg);
 }
 
+#if 0 /*
+       * Xen: The page table is shared with the processor, therefore
+       * helpers to implement separate is not necessary.
+       */
 static bool arm_smmu_pte_is_contiguous_range(unsigned long addr,
 					     unsigned long end)
 {
@@ -1591,7 +1892,9 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
 
 	return __pfn_to_phys(pte_pfn(pte)) | (iova & ~PAGE_MASK);
 }
+#endif
 
+#if 0 /* Xen: arm_smmu_capable is not used at the moment */
 static bool arm_smmu_capable(enum iommu_cap cap)
 {
 	switch (cap) {
@@ -1609,6 +1912,7 @@ static bool arm_smmu_capable(enum iommu_cap cap)
 		return false;
 	}
 }
+#endif
 
 static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void *data)
 {
@@ -1676,6 +1980,7 @@ out_put_group:
 	return ret;
 }
 
+#if 0 /* Xen: We don't support remove device for now. Will be useful for PCI */
 static void arm_smmu_remove_device(struct device *dev)
 {
 	iommu_group_remove_device(dev);
@@ -1733,6 +2038,7 @@ static const struct iommu_ops arm_smmu_ops = {
 				   ARM_SMMU_PTE_CONT_SIZE |
 				   PAGE_SIZE),
 };
+#endif
 
 static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
 {
@@ -1748,7 +2054,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
 	/* Mark all SMRn as invalid and all S2CRn as bypass */
 	for (i = 0; i < smmu->num_mapping_groups; ++i) {
 		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_SMR(i));
-		writel_relaxed(S2CR_TYPE_BYPASS,
+		/*
+		 * Xen: Unlike Linux, any access to a non-configure stream
+		 * will fault by default.
+		 */
+		writel_relaxed(S2CR_TYPE_FAULT,
 			gr0_base + ARM_SMMU_GR0_S2CR(i));
 	}
 
@@ -1774,6 +2084,8 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
 
 	/* Enable client access, but bypass when no mapping is found */
 	reg &= ~(sCR0_CLIENTPD | sCR0_USFCFG);
+	/* Xen: Unlike Linux, generate a fault when no mapping is found */
+	reg |= sCR0_USFCFG;
 
 	/* Disable forced broadcasting */
 	reg &= ~sCR0_FB;
@@ -1882,7 +2194,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 		}
 
 		dev_notice(smmu->dev,
-			   "\tstream matching with %u register groups, mask 0x%x",
+			   "\tstream matching with %u register groups, mask 0x%x\n",
 			   smmu->num_mapping_groups, mask);
 	} else {
 		smmu->num_mapping_groups = (id >> ID0_NUMSIDB_SHIFT) &
@@ -1917,11 +2229,15 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	size = arm_smmu_id_size_to_bits((id >> ID2_IAS_SHIFT) & ID2_IAS_MASK);
 	smmu->s1_output_size = min_t(unsigned long, PHYS_MASK_SHIFT, size);
 
+	/* Xen: Stage-2 input size is not restricted */
+	smmu->s2_input_size = size;
+#if 0
 	/* Stage-2 input size limited due to pgd allocation (PTRS_PER_PGD) */
 #ifdef CONFIG_64BIT
 	smmu->s2_input_size = min_t(unsigned long, VA_BITS, size);
 #else
 	smmu->s2_input_size = min(32UL, size);
+#endif
 #endif
 
 	/* The stage-2 output mask is also applied for bypass */
@@ -1969,6 +2285,10 @@ static const struct of_device_id arm_smmu_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
 
+/*
+ * Xen: We don't have refcount for allocated memory so manually free memory
+ * when an error occured.
+ */
 static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *of_id;
@@ -1991,14 +2311,17 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	smmu->base = devm_ioremap_resource(dev, res);
-	if (IS_ERR(smmu->base))
-		return PTR_ERR(smmu->base);
+	if (IS_ERR(smmu->base)) {
+		err = PTR_ERR(smmu->base);
+		goto out_free;
+	}
 	smmu->size = resource_size(res);
 
 	if (of_property_read_u32(dev->of_node, "#global-interrupts",
 				 &smmu->num_global_irqs)) {
 		dev_err(dev, "missing #global-interrupts property\n");
-		return -ENODEV;
+		err = -ENODEV;
+		goto out_free;
 	}
 
 	num_irqs = 0;
@@ -2011,14 +2334,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 	if (!smmu->num_context_irqs) {
 		dev_err(dev, "found %d interrupts but expected at least %d\n",
 			num_irqs, smmu->num_global_irqs + 1);
-		return -ENODEV;
+		err = -ENODEV;
+		goto out_free;
 	}
 
 	smmu->irqs = devm_kzalloc(dev, sizeof(*smmu->irqs) * num_irqs,
 				  GFP_KERNEL);
 	if (!smmu->irqs) {
 		dev_err(dev, "failed to allocate %d irqs\n", num_irqs);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto out_free;
 	}
 
 	for (i = 0; i < num_irqs; ++i) {
@@ -2026,7 +2351,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 
 		if (irq < 0) {
 			dev_err(dev, "failed to get irq index %d\n", i);
-			return -ENODEV;
+			err = -ENODEV;
+			goto out_free;
 		}
 		smmu->irqs[i] = irq;
 	}
@@ -2091,12 +2417,19 @@ out_put_masters:
 	for (node = rb_first(&smmu->masters); node; node = rb_next(node)) {
 		struct arm_smmu_master *master
 			= container_of(node, struct arm_smmu_master, node);
-		of_node_put(master->of_node);
+		kfree(master);
 	}
+
+out_free:
+	kfree(smmu->irqs);
+	if (!IS_ERR(smmu->base))
+		iounmap(smmu->base);
+	kfree(smmu);
 
 	return err;
 }
 
+#if 0 /* Xen: We never remove SMMU */
 static int arm_smmu_device_remove(struct platform_device *pdev)
 {
 	int i;
@@ -2191,3 +2524,241 @@ module_exit(arm_smmu_exit);
 MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
 MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
 MODULE_LICENSE("GPL v2");
+#endif
+
+/***** Start of Xen specific code *****/
+
+/* Xen only supports stage-2 translation, so force the value to 2. */
+static int force_stage = 2;
+
+static void arm_smmu_iotlb_flush_all(struct domain *d)
+{
+	struct arm_smmu_xen_domain *smmu_domain = domain_hvm_iommu(d)->arch.priv;
+	struct iommu_domain *cfg;
+
+	spin_lock(&smmu_domain->lock);
+	list_for_each_entry(cfg, &smmu_domain->contexts, list) {
+		/*
+		 * Only invalidate the context when SMMU is present.
+		 * This is because the context initialization is delayed
+		 * until a master has been added.
+		 */
+		if (unlikely(!ACCESS_ONCE(cfg->priv->smmu)))
+			continue;
+		arm_smmu_tlb_inv_context(cfg->priv);
+	}
+	spin_unlock(&smmu_domain->lock);
+}
+
+static void arm_smmu_iotlb_flush(struct domain *d, unsigned long gfn,
+                                 unsigned int page_count)
+{
+    /* ARM SMMU v1 doesn't have flush by VMA and VMID */
+    arm_smmu_iotlb_flush_all(d);
+}
+
+static int arm_smmu_assign_dev(struct domain *d, u8 devfn,
+			       struct device *dev)
+{
+	struct iommu_domain *domain;
+	struct arm_smmu_xen_domain *xen_domain;
+	int ret;
+
+	xen_domain = domain_hvm_iommu(d)->arch.priv;
+
+	if (!dev->archdata.iommu) {
+		dev->archdata.iommu = xzalloc(struct arm_smmu_xen_device);
+		if (!dev->archdata.iommu)
+			return -ENOMEM;
+	}
+
+	if (!dev_iommu_group(dev)) {
+		ret = arm_smmu_add_device(dev);
+		if (ret)
+			return ret;
+	}
+
+	/*
+	 * TODO: Share the context bank (i.e iommu_domain) when the device is
+	 * under the same SMMU as another device assigned to this domain.
+	 * Would it useful for PCI
+	 */
+	domain = xzalloc(struct iommu_domain);
+	if (!domain)
+		return -ENOMEM;
+
+	ret = arm_smmu_domain_init(domain);
+	if (ret)
+		goto err_dom_init;
+
+	domain->priv->cfg.domain = d;
+
+	ret = arm_smmu_attach_dev(domain, dev);
+	if (ret)
+		goto err_attach_dev;
+
+	spin_lock(&xen_domain->lock);
+	/* Chain the new context to the domain */
+	list_add(&domain->list, &xen_domain->contexts);
+	spin_unlock(&xen_domain->lock);
+
+	return 0;
+
+err_attach_dev:
+	arm_smmu_domain_destroy(domain);
+err_dom_init:
+	xfree(domain);
+
+	return ret;
+}
+
+static int arm_smmu_deassign_dev(struct domain *d, struct device *dev)
+{
+	struct iommu_domain *domain = dev_iommu_domain(dev);
+	struct arm_smmu_xen_domain *xen_domain;
+
+	xen_domain = domain_hvm_iommu(d)->arch.priv;
+
+	if (!domain || domain->priv->cfg.domain != d) {
+		dev_err(dev, " not attached to domain %d\n", d->domain_id);
+		return -ESRCH;
+	}
+
+	arm_smmu_detach_dev(domain, dev);
+
+	spin_lock(&xen_domain->lock);
+	list_del(&domain->list);
+	spin_unlock(&xen_domain->lock);
+
+	arm_smmu_domain_destroy(domain);
+	xfree(domain);
+
+	return 0;
+}
+
+static int arm_smmu_reassign_dev(struct domain *s, struct domain *t,
+				 u8 devfn,  struct device *dev)
+{
+	int ret = 0;
+
+	/* Don't allow remapping on other domain than hwdom */
+	if (t != hardware_domain)
+		return -EPERM;
+
+	if (t == s)
+		return 0;
+
+	ret = arm_smmu_deassign_dev(s, dev);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int arm_smmu_iommu_domain_init(struct domain *d)
+{
+	struct arm_smmu_xen_domain *xen_domain;
+
+	xen_domain = xzalloc(struct arm_smmu_xen_domain);
+	if ( !xen_domain )
+		return -ENOMEM;
+
+	spin_lock_init(&xen_domain->lock);
+	INIT_LIST_HEAD(&xen_domain->contexts);
+
+	domain_hvm_iommu(d)->arch.priv = xen_domain;
+
+	return 0;
+}
+
+static void __hwdom_init arm_smmu_iommu_hwdom_init(struct domain *d)
+{
+}
+
+static void arm_smmu_iommu_domain_teardown(struct domain *d)
+{
+	struct arm_smmu_xen_domain *xen_domain = domain_hvm_iommu(d)->arch.priv;
+
+	ASSERT(list_empty(&xen_domain->contexts));
+	xfree(xen_domain);
+}
+
+static int arm_smmu_map_page(struct domain *d, unsigned long gfn,
+			     unsigned long mfn, unsigned int flags)
+{
+	p2m_type_t t;
+
+	/*
+	 * Grant mappings can be used for DMA requests. The dev_bus_addr
+	 * returned by the hypercall is the MFN (not the IPA). For device
+	 * protected by an IOMMU, Xen needs to add a 1:1 mapping in the domain
+	 * p2m to allow DMA request to work.
+	 * This is only valid when the domain is directed mapped. Hence this
+	 * function should only be used by gnttab code with gfn == mfn.
+	 */
+	BUG_ON(!is_domain_direct_mapped(d));
+	BUG_ON(mfn != gfn);
+
+	/* We only support readable and writable flags */
+	if (!(flags & (IOMMUF_readable | IOMMUF_writable)))
+		return -EINVAL;
+
+	t = (flags & IOMMUF_writable) ? p2m_iommu_map_rw : p2m_iommu_map_ro;
+
+	/*
+	 * The function guest_physmap_add_entry replaces the current mapping
+	 * if there is already one...
+	 */
+	return guest_physmap_add_entry(d, gfn, mfn, 0, t);
+}
+
+static int arm_smmu_unmap_page(struct domain *d, unsigned long gfn)
+{
+	/*
+	 * This function should only be used by gnttab code when the domain
+	 * is direct mapped
+	 */
+	if ( !is_domain_direct_mapped(d) )
+		return -EINVAL;
+
+	guest_physmap_remove_page(d, gfn, gfn, 0);
+
+	return 0;
+}
+
+static const struct iommu_ops arm_smmu_iommu_ops = {
+    .init = arm_smmu_iommu_domain_init,
+    .hwdom_init = arm_smmu_iommu_hwdom_init,
+    .teardown = arm_smmu_iommu_domain_teardown,
+    .iotlb_flush = arm_smmu_iotlb_flush,
+    .iotlb_flush_all = arm_smmu_iotlb_flush_all,
+    .assign_device = arm_smmu_assign_dev,
+    .reassign_device = arm_smmu_reassign_dev,
+    .map_page = arm_smmu_map_page,
+    .unmap_page = arm_smmu_unmap_page,
+};
+
+static __init int arm_smmu_dt_init(struct dt_device_node *dev,
+				   const void *data)
+{
+	int rc;
+
+	/*
+	 * Even if the device can't be initialized, we don't want to
+	 * give the SMMU device to dom0.
+	 */
+	dt_device_set_used_by(dev, DOMID_XEN);
+
+	rc = arm_smmu_device_dt_probe(dev);
+	if (rc)
+		return rc;
+
+	iommu_set_ops(&arm_smmu_iommu_ops);
+
+	return 0;
+}
+
+DT_DEVICE_START(smmu, "ARM SMMU", DEVICE_IOMMU)
+	.dt_match = arm_smmu_of_match,
+	.init = arm_smmu_dt_init,
+DT_DEVICE_END
