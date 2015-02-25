@@ -4592,13 +4592,11 @@ static int libxl__fill_dom0_memory_info(libxl__gc *gc, uint32_t *target_memkb,
     int rc;
     libxl_dominfo info;
     libxl_physinfo physinfo;
-    char *target = NULL, *staticmax = NULL, *freememslack = NULL, *endptr = NULL;
+    char *target = NULL, *staticmax = NULL, *endptr = NULL;
     char *target_path = "/local/domain/0/memory/target";
     char *max_path = "/local/domain/0/memory/static-max";
-    char *free_mem_slack_path = "/local/domain/0/memory/freemem-slack";
     xs_transaction_t t;
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    uint32_t free_mem_slack_kb = 0;
 
     libxl_dominfo_init(&info);
 
@@ -4607,8 +4605,7 @@ retry_transaction:
 
     target = libxl__xs_read(gc, t, target_path);
     staticmax = libxl__xs_read(gc, t, max_path);
-    freememslack = libxl__xs_read(gc, t, free_mem_slack_path);
-    if (target && staticmax && freememslack) {
+    if (target && staticmax) {
         rc = 0;
         goto out;
     }
@@ -4655,15 +4652,6 @@ retry_transaction:
         *max_memkb = (uint32_t) info.max_memkb;
     }
 
-    if (freememslack == NULL) {
-        free_mem_slack_kb = (uint32_t) (PAGE_TO_MEMKB(physinfo.total_pages) -
-                info.current_memkb);
-        /* From empirical measurements the free_mem_slack shouldn't be more
-         * than 15% of the total memory present on the system. */
-        if (free_mem_slack_kb > PAGE_TO_MEMKB(physinfo.total_pages) * 0.15)
-            free_mem_slack_kb = PAGE_TO_MEMKB(physinfo.total_pages) * 0.15;
-        libxl__xs_write(gc, t, free_mem_slack_path, "%"PRIu32, free_mem_slack_kb);
-    }
     rc = 0;
 
 out:
@@ -4676,33 +4664,6 @@ out:
 
     libxl_dominfo_dispose(&info);
     return rc;
-}
-
-/* returns how much memory should be left free in the system */
-static int libxl__get_free_memory_slack(libxl__gc *gc, uint32_t *free_mem_slack)
-{
-    int rc;
-    char *free_mem_slack_path = "/local/domain/0/memory/freemem-slack";
-    char *free_mem_slack_s, *endptr;
-    uint32_t target_memkb, max_memkb;
-
-retry:
-    free_mem_slack_s = libxl__xs_read(gc, XBT_NULL, free_mem_slack_path);
-    if (!free_mem_slack_s) {
-        rc = libxl__fill_dom0_memory_info(gc, &target_memkb, &max_memkb);
-        if (rc < 0)
-            return rc;
-        goto retry;
-    } else {
-        *free_mem_slack = strtoul(free_mem_slack_s, &endptr, 10);
-        if (*endptr != '\0') {
-            LIBXL__LOG_ERRNO(gc->owner, LIBXL__LOG_ERROR,
-                    "invalid free_mem_slack %s from %s\n",
-                    free_mem_slack_s, free_mem_slack_path);
-            return ERROR_FAIL;
-        }
-    }
-    return 0;
 }
 
 int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
@@ -4953,20 +4914,13 @@ int libxl_get_free_memory(libxl_ctx *ctx, uint32_t *memkb)
 {
     int rc = 0;
     libxl_physinfo info;
-    uint32_t freemem_slack;
     GC_INIT(ctx);
 
     rc = libxl_get_physinfo(ctx, &info);
     if (rc < 0)
         goto out;
-    rc = libxl__get_free_memory_slack(gc, &freemem_slack);
-    if (rc < 0)
-        goto out;
 
-    if ((info.free_pages + info.scrub_pages) * 4 > freemem_slack)
-        *memkb = (info.free_pages + info.scrub_pages) * 4 - freemem_slack;
-    else
-        *memkb = 0;
+    *memkb = (info.free_pages + info.scrub_pages) * 4;
 
 out:
     GC_FREE;
@@ -4978,18 +4932,13 @@ int libxl_wait_for_free_memory(libxl_ctx *ctx, uint32_t domid, uint32_t
 {
     int rc = 0;
     libxl_physinfo info;
-    uint32_t freemem_slack;
     GC_INIT(ctx);
 
-    rc = libxl__get_free_memory_slack(gc, &freemem_slack);
-    if (rc < 0)
-        goto out;
     while (wait_secs > 0) {
         rc = libxl_get_physinfo(ctx, &info);
         if (rc < 0)
             goto out;
-        if (info.free_pages * 4 >= freemem_slack &&
-            info.free_pages * 4 - freemem_slack >= memory_kb) {
+        if (info.free_pages * 4 >= memory_kb) {
             rc = 0;
             goto out;
         }
