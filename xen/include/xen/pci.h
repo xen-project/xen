@@ -13,6 +13,7 @@
 #include <xen/irq.h>
 #include <xen/pci_regs.h>
 #include <xen/pfn.h>
+#include <asm/device.h>
 #include <asm/pci.h>
 
 /*

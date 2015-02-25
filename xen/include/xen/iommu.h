@@ -25,6 +25,7 @@
 #include <xen/pci.h>
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>
+#include <asm/device.h>
 #include <asm/iommu.h>
 
 extern bool_t iommu_enable, iommu_enabled;

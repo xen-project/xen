@@ -2,7 +2,33 @@
 #define __ASM_ARM_DEVICE_H
 
 #include <xen/init.h>
+
+enum device_type
+{
+    DEV_DT,
+};
+
+struct dev_archdata {
+    void *iommu;    /* IOMMU private data */
+};
+
+/* struct device - The basic device structure */
+struct device
+{
+    enum device_type type;
+#ifdef HAS_DEVICE_TREE
+    struct dt_device_node *of_node; /* Used by drivers imported from Linux */
+#endif
+    struct dev_archdata archdata;
+};
+
+typedef struct device device_t;
+
 #include <xen/device_tree.h>
+
+/* TODO: Correctly implement dev_is_pci when PCI is supported on ARM */
+#define dev_is_pci(dev) ((void)(dev), 0)
+#define dev_is_dt(dev)  ((dev->type == DEV_DT)
 
 enum device_class
 {

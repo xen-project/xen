@@ -1454,6 +1454,9 @@ static unsigned long __init unflatten_dt_node(const void *fdt,
             ((char *)pp->value)[sz - 1] = 0;
             dt_dprintk("fixed up name for %s -> %s\n", pathp,
                        (char *)pp->value);
+            /* Generic device initialization */
+            np->dev.type = DEV_DT;
+            np->dev.of_node = np;
         }
     }
     if ( allnextpp )
