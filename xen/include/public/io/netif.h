@@ -137,13 +137,129 @@
 
 /*
  * This is the 'wire' format for packets:
- *  Request 1: netif_tx_request -- NETTXF_* (any flags)
- * [Request 2: netif_tx_extra]  (only if request 1 has NETTXF_extra_info)
- * [Request 3: netif_tx_extra]  (only if request 2 has XEN_NETIF_EXTRA_MORE)
- *  Request 4: netif_tx_request -- NETTXF_more_data
- *  Request 5: netif_tx_request -- NETTXF_more_data
+ *  Request 1: netif_tx_request_t -- NETTXF_* (any flags)
+ * [Request 2: netif_extra_info_t] (only if request 1 has NETTXF_extra_info)
+ * [Request 3: netif_extra_info_t] (only if request 2 has XEN_NETIF_EXTRA_MORE)
+ *  Request 4: netif_tx_request_t -- NETTXF_more_data
+ *  Request 5: netif_tx_request_t -- NETTXF_more_data
  *  ...
- *  Request N: netif_tx_request -- 0
+ *  Request N: netif_tx_request_t -- 0
+ */
+
+/*
+ * Guest transmit
+ * ==============
+ *
+ * Ring slot size is 12 octets, however not all request/response
+ * structs use the full size.
+ *
+ * tx request data (netif_tx_request_t)
+ * ------------------------------------
+ *
+ *    0     1     2     3     4     5     6     7  octet
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * | grant ref             | offset    | flags     |
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * | id        | size      |
+ * +-----+-----+-----+-----+
+ *
+ * grant ref: Reference to buffer page.
+ * offset: Offset within buffer page.
+ * flags: NETTXF_*.
+ * id: request identifier, echoed in response.
+ * size: packet size in bytes.
+ *
+ * tx response (netif_tx_response_t)
+ * ---------------------------------
+ *
+ *    0     1     2     3     4     5     6     7  octet
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * | id        | status    | unused                |
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * | unused                |
+ * +-----+-----+-----+-----+
+ *
+ * id: reflects id in transmit request
+ * status: NETIF_RSP_*
+ *
+ * Guest receive
+ * =============
+ *
+ * Ring slot size is 8 octets.
+ *
+ * rx request (netif_rx_request_t)
+ * -------------------------------
+ *
+ *    0     1     2     3     4     5     6     7  octet
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * | id        | pad       | gref                  |
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ *
+ * id: request identifier, echoed in response.
+ * gref: reference to incoming granted frame.
+ *
+ * rx response (netif_rx_response_t)
+ * ---------------------------------
+ *
+ *    0     1     2     3     4     5     6     7  octet
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * | id        | offset    | flags     | status    |
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ *
+ * id: reflects id in receive request
+ * offset: offset in page of start of received packet
+ * flags: NETRXF_*
+ * status: -ve: NETIF_RSP_*; +ve: Rx'ed pkt size.
+ *
+ * Extra Info
+ * ==========
+ *
+ * Can be present if initial request has NET{T,R}XF_extra_info, or
+ * previous extra request has XEN_NETIF_EXTRA_MORE.
+ *
+ * The struct therefore needs to fit into either a tx or rx slot and
+ * is therefore limited to 8 octets.
+ *
+ * extra info (netif_extra_info_t)
+ * -------------------------------
+ *
+ * General format:
+ *
+ *    0     1     2     3     4     5     6     7  octet
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * |type |flags| type specfic data                 |
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * | padding for tx        |
+ * +-----+-----+-----+-----+
+ *
+ * type: XEN_NETIF_EXTRA_TYPE_*
+ * flags: XEN_NETIF_EXTRA_FLAG_*
+ * padding for tx: present only in the tx case due to 8 octet limit
+ *     from rx case. Not shown in type specific entries below.
+ *
+ * XEN_NETIF_EXTRA_TYPE_GSO:
+ *
+ *    0     1     2     3     4     5     6     7  octet
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * |type |flags| size      |type | pad | features  |
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ *
+ * type: Must be XEN_NETIF_EXTRA_TYPE_GSO
+ * flags: XEN_NETIF_EXTRA_FLAG_*
+ * size: Maximum payload size of each segment.
+ * type: XEN_NETIF_GSO_TYPE_*
+ * features: EN_NETIF_GSO_FEAT_*
+ *
+ * XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL}:
+ *
+ *    0     1     2     3     4     5     6     7  octet
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * |type |flags| addr                              |
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ *
+ * type: Must be XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL}
+ * flags: XEN_NETIF_EXTRA_FLAG_*
+ * addr: address to add/remove
  */
 
 /* Protocol checksum field is blank in the packet (hardware offload)? */
@@ -179,7 +295,7 @@ typedef struct netif_tx_request netif_tx_request_t;
 #define XEN_NETIF_EXTRA_TYPE_MCAST_DEL (3)  /* u.mcast */
 #define XEN_NETIF_EXTRA_TYPE_MAX       (4)
 
-/* netif_extra_info flags. */
+/* netif_extra_info_t flags. */
 #define _XEN_NETIF_EXTRA_FLAG_MORE (0)
 #define XEN_NETIF_EXTRA_FLAG_MORE  (1U<<_XEN_NETIF_EXTRA_FLAG_MORE)
 
@@ -189,8 +305,8 @@ typedef struct netif_tx_request netif_tx_request_t;
 #define XEN_NETIF_GSO_TYPE_TCPV6        (2)
 
 /*
- * This structure needs to fit within both netif_tx_request and
- * netif_rx_response for compatibility.
+ * This structure needs to fit within both netif_tx_request_t and
+ * netif_rx_response_t for compatibility.
  */
 struct netif_extra_info {
     uint8_t type;  /* XEN_NETIF_EXTRA_TYPE_* */
@@ -251,6 +367,7 @@ typedef struct netif_tx_response netif_tx_response_t;
 
 struct netif_rx_request {
     uint16_t    id;        /* Echoed in response message.        */
+    uint16_t    pad;
     grant_ref_t gref;      /* Reference to incoming granted frame */
 };
 typedef struct netif_rx_request netif_rx_request_t;
@@ -289,7 +406,7 @@ DEFINE_RING_TYPES(netif_rx, struct netif_rx_request, struct netif_rx_response);
 #define NETIF_RSP_DROPPED         -2
 #define NETIF_RSP_ERROR           -1
 #define NETIF_RSP_OKAY             0
-/* No response: used for auxiliary requests (e.g., netif_tx_extra). */
+/* No response: used for auxiliary requests (e.g., netif_extra_info_t). */
 #define NETIF_RSP_NULL             1
 
 #endif
