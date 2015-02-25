@@ -1185,16 +1185,16 @@ static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
     return 0;
 }
 
-static const char * const ns16550_dt_compat[] __initconst =
+static const struct dt_device_match ns16550_dt_match[] __initconst =
 {
-    "ns16550",
-    "ns16550a",
-    "snps,dw-apb-uart",
-    NULL
+    DT_MATCH_COMPATIBLE("ns16550"),
+    DT_MATCH_COMPATIBLE("ns16550a"),
+    DT_MATCH_COMPATIBLE("snps,dw-apb-uart"),
+    { /* sentinel */ },
 };
 
 DT_DEVICE_START(ns16550, "NS16550 UART", DEVICE_SERIAL)
-        .compatible = ns16550_dt_compat,
+        .dt_match = ns16550_dt_match,
         .init = ns16550_uart_dt_init,
 DT_DEVICE_END
 

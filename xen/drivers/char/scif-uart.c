@@ -346,14 +346,14 @@ static int __init scif_uart_init(struct dt_device_node *dev,
     return 0;
 }
 
-static const char * const scif_uart_dt_compat[] __initconst =
+static const struct dt_device_match scif_uart_dt_match[] __initconst =
 {
-    "renesas,scif",
-    NULL
+    DT_MATCH_COMPATIBLE("renesas,scif"),
+    { /* sentinel */ },
 };
 
 DT_DEVICE_START(scif_uart, "SCIF UART", DEVICE_SERIAL)
-    .compatible = scif_uart_dt_compat,
+    .dt_match = scif_uart_dt_match,
     .init = scif_uart_init,
 DT_DEVICE_END
 

@@ -352,14 +352,14 @@ static int __init exynos4210_uart_init(struct dt_device_node *dev,
     return 0;
 }
 
-static const char * const exynos4210_dt_compat[] __initconst =
+static const struct dt_device_match exynos4210_dt_match[] __initconst =
 {
-    "samsung,exynos4210-uart",
-    NULL
+    DT_MATCH_COMPATIBLE("samsung,exynos4210-uart"),
+    { /* sentinel */ },
 };
 
 DT_DEVICE_START(exynos4210, "Exynos 4210 UART", DEVICE_SERIAL)
-        .compatible = exynos4210_dt_compat,
+        .dt_match = exynos4210_dt_match,
         .init = exynos4210_uart_init,
 DT_DEVICE_END
 

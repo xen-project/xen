@@ -1320,14 +1320,14 @@ static int __init gicv3_init(struct dt_device_node *node, const void *data)
     return res;
 }
 
-static const char * const gicv3_dt_compat[] __initconst =
+static const struct dt_device_match gicv3_dt_match[] __initconst =
 {
-    DT_COMPAT_GIC_V3,
-    NULL
+    DT_MATCH_GIC_V3,
+    { /* sentinel */ },
 };
 
 DT_DEVICE_START(gicv3, "GICv3", DEVICE_GIC)
-        .compatible = gicv3_dt_compat,
+        .dt_match = gicv3_dt_match,
         .init = gicv3_init,
 DT_DEVICE_END
 

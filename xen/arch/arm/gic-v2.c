@@ -776,16 +776,14 @@ static int __init gicv2_init(struct dt_device_node *node, const void *data)
     return 0;
 }
 
-static const char * const gicv2_dt_compat[] __initconst =
+static const struct dt_device_match gicv2_dt_match[] __initconst =
 {
-    DT_COMPAT_GIC_CORTEX_A15,
-    DT_COMPAT_GIC_CORTEX_A7,
-    DT_COMPAT_GIC_400,
-    NULL
+    DT_MATCH_GIC_V2,
+    { /* sentinel */ },
 };
 
 DT_DEVICE_START(gicv2, "GICv2", DEVICE_GIC)
-        .compatible = gicv2_dt_compat,
+        .dt_match = gicv2_dt_match,
         .init = gicv2_init,
 DT_DEVICE_END
 

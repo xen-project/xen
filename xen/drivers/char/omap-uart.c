@@ -350,14 +350,14 @@ static int __init omap_uart_init(struct dt_device_node *dev,
     return 0;
 }
 
-static const char * const omap_uart_dt_compat[] __initconst =
+static const struct dt_device_match omap_uart_dt_match[] __initconst =
 {
-    "ti,omap4-uart",
-    NULL
+    DT_MATCH_COMPATIBLE("ti,omap4-uart"),
+    { /* sentinel */ },
 };
 
 DT_DEVICE_START(omap_uart, "OMAP UART", DEVICE_SERIAL)
-    .compatible = omap_uart_dt_compat,
+    .dt_match = omap_uart_dt_match,
     .init = omap_uart_init,
 DT_DEVICE_END
 

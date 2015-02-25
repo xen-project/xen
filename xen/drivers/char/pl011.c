@@ -285,14 +285,14 @@ static int __init pl011_uart_init(struct dt_device_node *dev,
     return 0;
 }
 
-static const char * const pl011_dt_compat[] __initconst =
+static const struct dt_device_match pl011_dt_match[] __initconst =
 {
-    "arm,pl011",
-    NULL
+    DT_MATCH_COMPATIBLE("arm,pl011"),
+    { /* sentinel */ },
 };
 
 DT_DEVICE_START(pl011, "PL011 UART", DEVICE_SERIAL)
-        .compatible = pl011_dt_compat,
+        .dt_match = pl011_dt_match,
         .init = pl011_uart_init,
 DT_DEVICE_END
 
