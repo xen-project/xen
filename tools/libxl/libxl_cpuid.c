@@ -28,10 +28,13 @@ void libxl_cpuid_dispose(libxl_cpuid_policy_list *p_cpuid_list)
         return;
     for (i = 0; cpuid_list[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++) {
         for (j = 0; j < 4; j++)
-            if (cpuid_list[i].policy[j] != NULL)
+            if (cpuid_list[i].policy[j] != NULL) {
                 free(cpuid_list[i].policy[j]);
+                cpuid_list[i].policy[j] = NULL;
+            }
     }
     free(cpuid_list);
+    *p_cpuid_list = NULL;
     return;
 }
 

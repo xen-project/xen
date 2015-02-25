@@ -214,9 +214,12 @@ void libxl_string_list_dispose(libxl_string_list *psl)
     if (!sl)
         return;
 
-    for (i = 0; sl[i] != NULL; i++)
+    for (i = 0; sl[i] != NULL; i++) {
         free(sl[i]);
+        sl[i] = NULL;
+    }
     free(sl);
+    *psl = NULL;
 }
 
 void libxl_string_list_copy(libxl_ctx *ctx,
@@ -276,10 +279,14 @@ void libxl_key_value_list_dispose(libxl_key_value_list *pkvl)
 
     for (i = 0; kvl[i] != NULL; i += 2) {
         free(kvl[i]);
-        if (kvl[i + 1])
+        kvl[i] = NULL;
+        if (kvl[i + 1]) {
             free(kvl[i + 1]);
+            kvl[i+1] = NULL;
+        }
     }
     free(kvl);
+    *pkvl = NULL;
 }
 
 void libxl_key_value_list_copy(libxl_ctx *ctx,

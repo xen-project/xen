@@ -604,7 +604,12 @@ void libxl_bitmap_init(libxl_bitmap *map)
 
 void libxl_bitmap_dispose(libxl_bitmap *map)
 {
+    if (!map)
+        return;
+
     free(map->map);
+    map->map = NULL;
+    map->size = 0;
 }
 
 void libxl_bitmap_copy(libxl_ctx *ctx, libxl_bitmap *dptr,
