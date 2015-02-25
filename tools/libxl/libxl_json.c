@@ -247,7 +247,7 @@ int libxl__key_value_list_parse_json(libxl__gc *gc, const libxl__json_object *o,
 
     maps = libxl__json_object_get_map(o);
     size = maps->count * 2;
-    kvl = *p = libxl__calloc(NOGC, size, sizeof(char *));
+    kvl = *p = libxl__calloc(NOGC, size+1, sizeof(char *));
 
     for (i = 0; i < maps->count; i++) {
         int idx = i * 2;
