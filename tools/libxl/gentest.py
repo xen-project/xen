@@ -229,7 +229,7 @@ int main(int argc, char **argv)
                 (ty.typename, ty.typename, ty.typename))
     f.write("""
     int rc;
-    char *s, *new_s;
+    char *s, *new_s, *json_string;
     xentoollog_logger_stdiostream *logger;
     libxl_ctx *ctx;
 
@@ -323,9 +323,13 @@ int main(int argc, char **argv)
 
         f.write("    printf(\"%s -- to JSON:\\n\");\n" % (ty.typename))
         for v in ty.values:
+            f.write("    json_string = %s_to_json(ctx, %s);\n" % \
+                    (ty.typename, v.name))
             f.write("    printf(\"\\t%s = %%d = %%s\", " \
-                    "%s, %s_to_json(ctx, %s));\n" %\
-                    (v.valuename, v.name, ty.typename, v.name))
+                    "%s, json_string);\n" %\
+                    (v.valuename, v.name))
+            f.write("    free(json_string);\n");
+            f.write("    json_string = NULL;\n");
         f.write("\n")
 
         f.write("    printf(\"%s -- from string:\\n\");\n" % (ty.typename))
