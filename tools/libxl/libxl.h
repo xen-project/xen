@@ -308,8 +308,7 @@
  * once afterwards, to clean up, regardless of whether operations on
  * this object succeeded or failed.  See the xl code for examples.
  *
- * "init" is idempotent.  We intend that "dispose" will become
- * idempotent, but this is not currently the case.
+ * "init" and "dispose" are idempotent.
  *
  * void libxl_<type>_init(<type> *p):
  *
