@@ -1254,7 +1254,7 @@ int iommu_add_device(struct pci_dev *pdev)
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
-    rc = hd->platform_ops->add_device(pdev->devfn, pdev);
+    rc = hd->platform_ops->add_device(pdev->devfn, pci_to_dev(pdev));
     if ( rc || !pdev->phantom_stride )
         return rc;
 
@@ -1263,7 +1263,7 @@ int iommu_add_device(struct pci_dev *pdev)
         devfn += pdev->phantom_stride;
         if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
             return 0;
-        rc = hd->platform_ops->add_device(devfn, pdev);
+        rc = hd->platform_ops->add_device(devfn, pci_to_dev(pdev));
         if ( rc )
             printk(XENLOG_WARNING "IOMMU: add %04x:%02x:%02x.%u failed (%d)\n",
                    pdev->seg, pdev->bus, PCI_SLOT(devfn), PCI_FUNC(devfn), rc);
@@ -1284,7 +1284,7 @@ int iommu_enable_device(struct pci_dev *pdev)
          !hd->platform_ops->enable_device )
         return 0;
 
-    return hd->platform_ops->enable_device(pdev);
+    return hd->platform_ops->enable_device(pci_to_dev(pdev));
 }
 
 int iommu_remove_device(struct pci_dev *pdev)
@@ -1306,7 +1306,7 @@ int iommu_remove_device(struct pci_dev *pdev)
         devfn += pdev->phantom_stride;
         if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
             break;
-        rc = hd->platform_ops->remove_device(devfn, pdev);
+        rc = hd->platform_ops->remove_device(devfn, pci_to_dev(pdev));
         if ( !rc )
             continue;
 
@@ -1315,7 +1315,7 @@ int iommu_remove_device(struct pci_dev *pdev)
         return rc;
     }
 
-    return hd->platform_ops->remove_device(pdev->devfn, pdev);
+    return hd->platform_ops->remove_device(pdev->devfn, pci_to_dev(pdev));
 }
 
 /*
@@ -1383,7 +1383,7 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
 
     pdev->fault.count = 0;
 
-    if ( (rc = hd->platform_ops->assign_device(d, devfn, pdev)) )
+    if ( (rc = hd->platform_ops->assign_device(d, devfn, pci_to_dev(pdev))) )
         goto done;
 
     for ( ; pdev->phantom_stride; rc = 0 )
@@ -1391,7 +1391,7 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
         devfn += pdev->phantom_stride;
         if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
             break;
-        rc = hd->platform_ops->assign_device(d, devfn, pdev);
+        rc = hd->platform_ops->assign_device(d, devfn, pci_to_dev(pdev));
         if ( rc )
             printk(XENLOG_G_WARNING "d%d: assign %04x:%02x:%02x.%u failed (%d)\n",
                    d->domain_id, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
@@ -1426,7 +1426,8 @@ int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
         devfn += pdev->phantom_stride;
         if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
             break;
-        ret = hd->platform_ops->reassign_device(d, hardware_domain, devfn, pdev);
+        ret = hd->platform_ops->reassign_device(d, hardware_domain, devfn,
+                                                pci_to_dev(pdev));
         if ( !ret )
             continue;
 
@@ -1436,7 +1437,8 @@ int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
     }
 
     devfn = pdev->devfn;
-    ret = hd->platform_ops->reassign_device(d, hardware_domain, devfn, pdev);
+    ret = hd->platform_ops->reassign_device(d, hardware_domain, devfn,
+                                            pci_to_dev(pdev));
     if ( ret )
     {
         dprintk(XENLOG_G_ERR,

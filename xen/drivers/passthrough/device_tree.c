@@ -41,7 +41,7 @@ int iommu_assign_dt_device(struct domain *d, struct dt_device_node *dev)
     if ( !list_empty(&dev->domain_list) )
         goto fail;
 
-    rc = hd->platform_ops->assign_dt_device(d, dev);
+    rc = hd->platform_ops->assign_device(d, 0, dt_to_dev(dev));
 
     if ( rc )
         goto fail;
@@ -68,7 +68,8 @@ int iommu_deassign_dt_device(struct domain *d, struct dt_device_node *dev)
 
     spin_lock(&dtdevs_lock);
 
-    rc = hd->platform_ops->reassign_dt_device(d, hardware_domain, dev);
+    rc = hd->platform_ops->reassign_device(d, hardware_domain,
+                                           0, dt_to_dev(dev));
     if ( rc )
         goto fail;
 

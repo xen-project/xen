@@ -124,22 +124,17 @@ struct page_info;
 struct iommu_ops {
     int (*init)(struct domain *d);
     void (*hwdom_init)(struct domain *d);
-#ifdef HAS_PCI
-    int (*add_device)(u8 devfn, struct pci_dev *);
-    int (*enable_device)(struct pci_dev *pdev);
-    int (*remove_device)(u8 devfn, struct pci_dev *);
-    int (*assign_device)(struct domain *, u8 devfn, struct pci_dev *);
+    int (*add_device)(u8 devfn, device_t *dev);
+    int (*enable_device)(device_t *dev);
+    int (*remove_device)(u8 devfn, device_t *dev);
+    int (*assign_device)(struct domain *, u8 devfn, device_t *dev);
     int (*reassign_device)(struct domain *s, struct domain *t,
-			   u8 devfn, struct pci_dev *);
+                           u8 devfn, device_t *dev);
+#ifdef HAS_PCI
     int (*get_device_group_id)(u16 seg, u8 bus, u8 devfn);
     int (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);
     void (*read_msi_from_ire)(struct msi_desc *msi_desc, struct msi_msg *msg);
 #endif /* HAS_PCI */
-#ifdef HAS_DEVICE_TREE
-    int (*assign_dt_device)(struct domain *d, const struct dt_device_node *dev);
-    int (*reassign_dt_device)(struct domain *s, struct domain *t,
-                              const struct dt_device_node *dev);
-#endif
 
     void (*teardown)(struct domain *d);
     int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn,
