@@ -249,8 +249,11 @@ int main(int argc, char **argv)
         f.write("    %s_rand_init(%s);\n" % (ty.typename, \
             ty.pass_arg(arg, isref=False, passby=idl.PASS_BY_REFERENCE)))
         if not isinstance(ty, idl.Enumeration):
-            f.write("    %s_init(%s_new);\n" % (ty.typename, \
-                ty.pass_arg(arg, isref=False, passby=idl.PASS_BY_REFERENCE)))
+            iters = random.randrange(1,10)
+            while iters > 0:
+                f.write("    %s_init(%s_new);\n" % (ty.typename, \
+                    ty.pass_arg(arg, isref=False, passby=idl.PASS_BY_REFERENCE)))
+                iters -= 1
         f.write("    s = %s_to_json(ctx, %s);\n" % \
                 (ty.typename, ty.pass_arg(arg, isref=False)))
         f.write("    printf(\"%%s: %%s\\n\", \"%s\", s);\n" % ty.typename)
@@ -269,8 +272,11 @@ int main(int argc, char **argv)
         f.write("    free(s);\n")
         f.write("    free(new_s);\n")
         if ty.dispose_fn is not None:
+            iters = random.randrange(1,10)
             f.write("    %s(&%s_val);\n" % (ty.dispose_fn, ty.typename))
-            f.write("    %s(&%s_val_new);\n" % (ty.dispose_fn, ty.typename))
+            while iters > 0:
+                f.write("    %s(&%s_val_new);\n" % (ty.dispose_fn, ty.typename))
+                iters -= 1
         f.write("\n")
 
     f.write("    printf(\"Testing TYPE_copy()\\n\");\n")
