@@ -581,12 +581,15 @@ static struct page_info *alloc_heap_pages(
     struct domain *d)
 {
     unsigned int i, j, zone = 0, nodemask_retry = 0;
-    nodeid_t first_node, node = (nodeid_t)((memflags >> _MEMF_node) - 1);
+    nodeid_t first_node, node = MEMF_get_node(memflags);
     unsigned long request = 1UL << order;
     struct page_info *pg;
     nodemask_t nodemask = (d != NULL ) ? d->node_affinity : node_online_map;
     bool_t need_tlbflush = 0;
     uint32_t tlbflush_timestamp = 0;
+
+    /* Make sure there are enough bits in memflags for nodeID. */
+    BUILD_BUG_ON((_MEMF_bits - _MEMF_node) < (8 * sizeof(nodeid_t)));
 
     if ( node == NUMA_NO_NODE )
     {

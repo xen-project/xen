@@ -121,7 +121,9 @@ struct npfec {
 #define _MEMF_exact_node  4
 #define  MEMF_exact_node  (1U<<_MEMF_exact_node)
 #define _MEMF_node        8
-#define  MEMF_node(n)     ((((n)+1)&0xff)<<_MEMF_node)
+#define  MEMF_node_mask   ((1U << (8 * sizeof(nodeid_t))) - 1)
+#define  MEMF_node(n)     ((((n) + 1) & MEMF_node_mask) << _MEMF_node)
+#define  MEMF_get_node(f) ((((f) >> _MEMF_node) - 1) & MEMF_node_mask)
 #define _MEMF_bits        24
 #define  MEMF_bits(n)     ((n)<<_MEMF_bits)
 
