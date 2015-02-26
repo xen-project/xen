@@ -141,6 +141,26 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_platform_quirk_t);
 #define XEN_EFI_query_variable_info           9
 #define XEN_EFI_query_capsule_capabilities   10
 #define XEN_EFI_update_capsule               11
+
+struct xenpf_efi_time {
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t min;
+    uint8_t sec;
+    uint32_t ns;
+    int16_t tz;
+    uint8_t daylight;
+};
+
+struct xenpf_efi_guid {
+    uint32_t data1;
+    uint16_t data2;
+    uint16_t data3;
+    uint8_t data4[8];
+};
+
 struct xenpf_efi_runtime_call {
     uint32_t function;
     /*
@@ -153,17 +173,7 @@ struct xenpf_efi_runtime_call {
     union {
 #define XEN_EFI_GET_TIME_SET_CLEARS_NS 0x00000001
         struct {
-            struct xenpf_efi_time {
-                uint16_t year;
-                uint8_t month;
-                uint8_t day;
-                uint8_t hour;
-                uint8_t min;
-                uint8_t sec;
-                uint32_t ns;
-                int16_t tz;
-                uint8_t daylight;
-            } time;
+            struct xenpf_efi_time time;
             uint32_t resolution;
             uint32_t accuracy;
         } get_time;
@@ -185,12 +195,7 @@ struct xenpf_efi_runtime_call {
             XEN_GUEST_HANDLE(void) name;  /* UCS-2/UTF-16 string */
             xen_ulong_t size;
             XEN_GUEST_HANDLE(void) data;
-            struct xenpf_efi_guid {
-                uint32_t data1;
-                uint16_t data2;
-                uint16_t data3;
-                uint8_t data4[8];
-            } vendor_guid;
+            struct xenpf_efi_guid vendor_guid;
         } get_variable, set_variable;
 
         struct {
