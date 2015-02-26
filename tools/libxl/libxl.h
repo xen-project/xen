@@ -1476,10 +1476,13 @@ int libxl_psr_cmt_detach(libxl_ctx *ctx, uint32_t domid);
 int libxl_psr_cmt_domain_attached(libxl_ctx *ctx, uint32_t domid);
 int libxl_psr_cmt_enabled(libxl_ctx *ctx);
 int libxl_psr_cmt_get_total_rmid(libxl_ctx *ctx, uint32_t *total_rmid);
-int libxl_psr_cmt_get_l3_cache_size(libxl_ctx *ctx, uint32_t socketid,
-    uint32_t *l3_cache_size);
-int libxl_psr_cmt_get_cache_occupancy(libxl_ctx *ctx, uint32_t domid,
-    uint32_t socketid, uint32_t *l3_cache_occupancy);
+int libxl_psr_cmt_get_l3_cache_size(libxl_ctx *ctx,
+                                    uint32_t socketid,
+                                    uint32_t *l3_cache_size);
+int libxl_psr_cmt_get_cache_occupancy(libxl_ctx *ctx,
+                                      uint32_t domid,
+                                      uint32_t socketid,
+                                      uint32_t *l3_cache_occupancy);
 #endif
 
 /* misc */

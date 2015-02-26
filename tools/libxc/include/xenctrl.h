@@ -2693,14 +2693,14 @@ typedef enum xc_psr_cmt_type xc_psr_cmt_type;
 int xc_psr_cmt_attach(xc_interface *xch, uint32_t domid);
 int xc_psr_cmt_detach(xc_interface *xch, uint32_t domid);
 int xc_psr_cmt_get_domain_rmid(xc_interface *xch, uint32_t domid,
-    uint32_t *rmid);
+                               uint32_t *rmid);
 int xc_psr_cmt_get_total_rmid(xc_interface *xch, uint32_t *total_rmid);
 int xc_psr_cmt_get_l3_upscaling_factor(xc_interface *xch,
-    uint32_t *upscaling_factor);
+                                       uint32_t *upscaling_factor);
 int xc_psr_cmt_get_l3_cache_size(xc_interface *xch, uint32_t cpu,
-    uint32_t *l3_cache_size);
-int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid,
-    uint32_t cpu, uint32_t psr_cmt_type, uint64_t *monitor_data);
+                                 uint32_t *l3_cache_size);
+int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
+                        uint32_t psr_cmt_type, uint64_t *monitor_data);
 int xc_psr_cmt_enabled(xc_interface *xch);
 #endif
 

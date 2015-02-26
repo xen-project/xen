@@ -7826,7 +7826,7 @@ out:
 
 #ifdef LIBXL_HAVE_PSR_CMT
 static void psr_cmt_print_domain_cache_occupancy(libxl_dominfo *dominfo,
-                                                    uint32_t nr_sockets)
+                                                 uint32_t nr_sockets)
 {
     char *domain_name;
     uint32_t socketid;
@@ -7840,8 +7840,8 @@ static void psr_cmt_print_domain_cache_occupancy(libxl_dominfo *dominfo,
     free(domain_name);
 
     for (socketid = 0; socketid < nr_sockets; socketid++) {
-        if ( !libxl_psr_cmt_get_cache_occupancy(ctx, dominfo->domid,
-                 socketid, &l3_cache_occupancy) )
+        if (!libxl_psr_cmt_get_cache_occupancy(ctx, dominfo->domid, socketid,
+                                               &l3_cache_occupancy))
             printf("%13u KB", l3_cache_occupancy);
     }
 
@@ -7889,8 +7889,9 @@ static int psr_cmt_show_cache_occupancy(uint32_t domid)
     for (socketid = 0; socketid < nr_sockets; socketid++) {
         rc = libxl_psr_cmt_get_l3_cache_size(ctx, socketid, &l3_cache_size);
         if (rc < 0) {
-            fprintf(stderr, "Failed to get system l3 cache size for socket:%d\n",
-                            socketid);
+            fprintf(stderr,
+                    "Failed to get system l3 cache size for socket:%d\n",
+                    socketid);
             return -1;
         }
         printf("%13u KB", l3_cache_size);
