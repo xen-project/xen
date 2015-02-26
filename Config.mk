@@ -251,7 +251,7 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-unstable.git
 QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-unstable.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
-OVMF_UPSTREAM_REVISION ?= 447d264115c476142f884af0be287622cd244423
+OVMF_UPSTREAM_REVISION ?= a065efc7c7ce8bb3e5cb3e463099d023d4a92927
 QEMU_UPSTREAM_REVISION ?= master
 SEABIOS_UPSTREAM_REVISION ?= rel-1.8.0
 # Wed Feb 18 12:49:59 2015 -0500
