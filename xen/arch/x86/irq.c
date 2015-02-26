@@ -153,7 +153,7 @@ int __init bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
 /*
  * Dynamic irq allocate and deallocation for MSI
  */
-int create_irq(int node)
+int create_irq(nodeid_t node)
 {
     int irq, ret;
     struct irq_desc *desc;
@@ -173,7 +173,7 @@ int create_irq(int node)
     {
         cpumask_t *mask = NULL;
 
-        if (node != NUMA_NO_NODE && node >= 0)
+        if ( node != NUMA_NO_NODE )
         {
             mask = &node_to_cpumask(node);
             if (cpumask_empty(mask))

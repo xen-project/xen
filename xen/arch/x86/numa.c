@@ -36,13 +36,13 @@ static typeof(*memnodemap) _memnodemap[64];
 unsigned long memnodemapsize;
 u8 *memnodemap;
 
-unsigned char cpu_to_node[NR_CPUS] __read_mostly = {
+nodeid_t cpu_to_node[NR_CPUS] __read_mostly = {
     [0 ... NR_CPUS-1] = NUMA_NO_NODE
 };
 /*
  * Keep BIOS's CPU2node information, should not be used for memory allocaion
  */
-unsigned char apicid_to_node[MAX_LOCAL_APIC] __cpuinitdata = {
+nodeid_t apicid_to_node[MAX_LOCAL_APIC] __cpuinitdata = {
     [0 ... MAX_LOCAL_APIC-1] = NUMA_NO_NODE
 };
 cpumask_t node_to_cpumask[MAX_NUMNODES] __read_mostly;
@@ -66,7 +66,7 @@ int srat_disabled(void)
  * -1 if node overlap or lost ram (shift too big)
  */
 static int __init populate_memnodemap(const struct node *nodes,
-                                      int numnodes, int shift, int *nodeids)
+                                      int numnodes, int shift, nodeid_t *nodeids)
 {
     unsigned long spdx, epdx;
     int i, res = -1;
@@ -151,7 +151,7 @@ static int __init extract_lsb_from_nodes(const struct node *nodes,
 }
 
 int __init compute_hash_shift(struct node *nodes, int numnodes,
-                              int *nodeids)
+                              nodeid_t *nodeids)
 {
     int shift;
 
@@ -173,7 +173,7 @@ int __init compute_hash_shift(struct node *nodes, int numnodes,
     return shift;
 }
 /* initialize NODE_DATA given nodeid and start/end */
-void __init setup_node_bootmem(int nodeid, u64 start, u64 end)
+void __init setup_node_bootmem(nodeid_t nodeid, u64 start, u64 end)
 { 
     unsigned long start_pfn, end_pfn;
 
@@ -295,7 +295,7 @@ __cpuinit void numa_add_cpu(int cpu)
     cpumask_set_cpu(cpu, &node_to_cpumask[cpu_to_node(cpu)]);
 } 
 
-void __cpuinit numa_set_node(int cpu, int node)
+void __cpuinit numa_set_node(int cpu, nodeid_t node)
 {
     cpu_to_node[cpu] = node;
 }
@@ -341,7 +341,8 @@ static __init int numa_setup(char *opt)
  */
 void __init init_cpu_to_node(void)
 {
-    int i, node;
+    unsigned int i;
+    nodeid_t node;
 
     for ( i = 0; i < nr_cpu_ids; i++ )
     {

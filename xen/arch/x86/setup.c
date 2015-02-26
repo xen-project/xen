@@ -188,7 +188,7 @@ static void __init init_idle_domain(void)
 
 void __devinit srat_detect_node(int cpu)
 {
-    unsigned node;
+    nodeid_t node;
     u32 apicid = x86_cpu_to_apicid[cpu];
 
     node = apicid_to_node[apicid];

@@ -843,7 +843,7 @@ void __cpu_die(unsigned int cpu)
 
 int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 {
-    int node, cpu = -1;
+    int cpu = -1;
 
     dprintk(XENLOG_DEBUG, "cpu_add apic_id %x acpi_id %x pxm %x\n",
             apic_id, acpi_id, pxm);
@@ -877,7 +877,9 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 
     if ( !srat_disabled() )
     {
-        if ( (node = setup_node(pxm)) < 0 )
+        nodeid_t node = setup_node(pxm);
+
+        if ( node == NUMA_NO_NODE )
         {
             dprintk(XENLOG_WARNING,
                     "Setup node failed for pxm %x\n", pxm);

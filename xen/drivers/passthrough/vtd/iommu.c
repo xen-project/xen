@@ -190,14 +190,15 @@ u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
     struct acpi_rhsa_unit *rhsa;
     struct page_info *pg, *cur_pg;
     u64 *vaddr;
-    int node = -1, i;
+    nodeid_t node = NUMA_NO_NODE;
+    unsigned int i;
 
     rhsa = drhd_to_rhsa(drhd);
     if ( rhsa )
         node =  pxm_to_node(rhsa->proximity_domain);
 
     pg = alloc_domheap_pages(NULL, get_order_from_pages(npages),
-                             (node == -1 ) ? 0 : MEMF_node(node));
+                             (node == NUMA_NO_NODE) ? 0 : MEMF_node(node));
     if ( !pg )
         return 0;
 

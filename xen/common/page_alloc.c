@@ -580,8 +580,8 @@ static struct page_info *alloc_heap_pages(
     unsigned int order, unsigned int memflags,
     struct domain *d)
 {
-    unsigned int first_node, i, j, zone = 0, nodemask_retry = 0;
-    unsigned int node = (uint8_t)((memflags >> _MEMF_node) - 1);
+    unsigned int i, j, zone = 0, nodemask_retry = 0;
+    nodeid_t first_node, node = (nodeid_t)((memflags >> _MEMF_node) - 1);
     unsigned long request = 1UL << order;
     struct page_info *pg;
     nodemask_t nodemask = (d != NULL ) ? d->node_affinity : node_online_map;
@@ -1279,7 +1279,8 @@ static void __init smp_scrub_heap_pages(void *data)
     unsigned long mfn, start, end;
     struct page_info *pg;
     struct scrub_region *r;
-    unsigned int temp_cpu, node, cpu_idx = 0;
+    unsigned int temp_cpu, cpu_idx = 0;
+    nodeid_t node;
     unsigned int cpu = smp_processor_id();
 
     if ( data )

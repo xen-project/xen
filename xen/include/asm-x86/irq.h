@@ -5,6 +5,7 @@
 
 #include <xen/config.h>
 #include <asm/atomic.h>
+#include <asm/numa.h>
 #include <xen/cpumask.h>
 #include <xen/smp.h>
 #include <xen/hvm/irq.h>
@@ -155,7 +156,7 @@ int  init_irq_data(void);
 void clear_irq_vector(int irq);
 
 int irq_to_vector(int irq);
-int create_irq(int node);
+int create_irq(nodeid_t node);
 void destroy_irq(unsigned int irq);
 int assign_irq_vector(int irq, const cpumask_t *);
 

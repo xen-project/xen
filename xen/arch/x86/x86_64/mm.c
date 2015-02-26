@@ -1343,7 +1343,8 @@ int mem_hotadd_check(unsigned long spfn, unsigned long epfn)
 int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
 {
     struct mem_hotadd_info info;
-    int ret, node;
+    int ret;
+    nodeid_t node;
     unsigned long old_max = max_page, old_total = total_pages;
     unsigned long old_node_start, old_node_span, orig_online;
     unsigned long i;
@@ -1353,7 +1354,7 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     if ( !mem_hotadd_check(spfn, epfn) )
         return -EINVAL;
 
-    if ( (node = setup_node(pxm)) == -1 )
+    if ( (node = setup_node(pxm)) == NUMA_NO_NODE )
         return -EINVAL;
 
     if ( !valid_numa_range(spfn << PAGE_SHIFT, epfn << PAGE_SHIFT, node) )

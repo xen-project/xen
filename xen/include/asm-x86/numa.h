@@ -5,6 +5,8 @@
 
 #define NODES_SHIFT 6
 
+typedef u8 nodeid_t;
+
 extern int srat_rev;
 
 extern unsigned char cpu_to_node[];
@@ -20,8 +22,8 @@ struct node {
 };
 
 extern int compute_hash_shift(struct node *nodes, int numnodes,
-			      int *nodeids);
-extern int pxm_to_node(unsigned int pxm);
+			      nodeid_t *nodeids);
+extern nodeid_t pxm_to_node(unsigned int pxm);
 
 #define ZONE_ALIGN (1UL << (MAX_ORDER+PAGE_SHIFT))
 #define VIRTUAL_BUG_ON(x) 
@@ -32,12 +34,12 @@ extern int numa_off;
 
 
 extern int srat_disabled(void);
-extern void numa_set_node(int cpu, int node);
-extern int setup_node(unsigned int pxm);
+extern void numa_set_node(int cpu, nodeid_t node);
+extern nodeid_t setup_node(unsigned int pxm);
 extern void srat_detect_node(int cpu);
 
-extern void setup_node_bootmem(int nodeid, u64 start, u64 end);
-extern unsigned char apicid_to_node[];
+extern void setup_node_bootmem(nodeid_t nodeid, u64 start, u64 end);
+extern nodeid_t apicid_to_node[];
 #ifdef CONFIG_NUMA
 extern void init_cpu_to_node(void);
 
@@ -54,14 +56,14 @@ extern u8 *memnodemap;
 struct node_data {
     unsigned long node_start_pfn;
     unsigned long node_spanned_pages;
-    unsigned int  node_id;
+    nodeid_t      node_id;
 };
 
 extern struct node_data node_data[];
 
-static inline __attribute__((pure)) int phys_to_nid(paddr_t addr) 
+static inline __attribute__((pure)) nodeid_t phys_to_nid(paddr_t addr)
 { 
-	unsigned nid;
+	nodeid_t nid;
 	VIRTUAL_BUG_ON((paddr_to_pdx(addr) >> memnode_shift) >= memnodemapsize);
 	nid = memnodemap[paddr_to_pdx(addr) >> memnode_shift]; 
 	VIRTUAL_BUG_ON(nid >= MAX_NUMNODES || !node_data[nid]); 
@@ -75,7 +77,7 @@ static inline __attribute__((pure)) int phys_to_nid(paddr_t addr)
 #define node_end_pfn(nid)       (NODE_DATA(nid)->node_start_pfn + \
 				 NODE_DATA(nid)->node_spanned_pages)
 
-extern int valid_numa_range(u64 start, u64 end, int node);
+extern int valid_numa_range(u64 start, u64 end, nodeid_t node);
 #else
 #define init_cpu_to_node() do {} while (0)
 #define clear_node_cpumask(cpu) do {} while (0)
@@ -83,6 +85,6 @@ extern int valid_numa_range(u64 start, u64 end, int node);
 #endif
 
 void srat_parse_regions(u64 addr);
-extern int __node_distance(int a, int b);
+extern int __node_distance(nodeid_t a, nodeid_t b);
 
 #endif

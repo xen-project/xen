@@ -30,16 +30,16 @@ static struct node nodes[MAX_NUMNODES] __initdata;
 
 struct pxm2node {
 	unsigned pxm;
-	u8 node;
+	nodeid_t node;
 };
 static struct pxm2node __read_mostly pxm2node[MAX_NUMNODES] =
 	{ [0 ... MAX_NUMNODES - 1] = {.node = NUMA_NO_NODE} };
 
-static int node_to_pxm(unsigned n);
+static unsigned node_to_pxm(nodeid_t n);
 
 static int num_node_memblks;
 static struct node node_memblk_range[NR_NODE_MEMBLKS];
-static int memblk_nodeid[NR_NODE_MEMBLKS];
+static nodeid_t memblk_nodeid[NR_NODE_MEMBLKS];
 
 static inline bool_t node_found(unsigned idx, unsigned pxm)
 {
@@ -47,7 +47,7 @@ static inline bool_t node_found(unsigned idx, unsigned pxm)
 		(pxm2node[idx].node != NUMA_NO_NODE));
 }
 
-int pxm_to_node(unsigned pxm)
+nodeid_t pxm_to_node(unsigned pxm)
 {
 	unsigned i;
 
@@ -58,13 +58,12 @@ int pxm_to_node(unsigned pxm)
 		if (node_found(i, pxm))
 			return pxm2node[i].node;
 
-	/* Extend 0xff to (int)-1 */
-	return (signed char)NUMA_NO_NODE;
+	return NUMA_NO_NODE;
 }
 
-__devinit int setup_node(unsigned pxm)
+__devinit nodeid_t setup_node(unsigned pxm)
 {
-	int node;
+	nodeid_t node;
 	unsigned idx;
 	static bool_t warned;
 
@@ -90,7 +89,7 @@ __devinit int setup_node(unsigned pxm)
 		warned = 1;
 	}
 
-	return (signed char)NUMA_NO_NODE;
+	return NUMA_NO_NODE;
 
  finish:
 	node = first_unset_node(nodes_found);
@@ -101,7 +100,7 @@ __devinit int setup_node(unsigned pxm)
 	return node;
 }
 
-int valid_numa_range(u64 start, u64 end, int node)
+int valid_numa_range(u64 start, u64 end, nodeid_t node)
 {
 	int i;
 
@@ -205,8 +204,9 @@ void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 void __init
 acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
 {
-	int pxm, node;
-	int apic_id;
+	unsigned pxm;
+	nodeid_t node;
+	u32 apic_id;
 
 	if (srat_disabled())
 		return;
@@ -218,7 +218,7 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
 		return;
 	pxm = pa->proximity_domain;
 	node = setup_node(pxm);
-	if (node < 0) {
+	if (node == NUMA_NO_NODE) {
 		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
 		bad_srat();
 		return;
@@ -235,7 +235,9 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
 void __init
 acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 {
-	int pxm, node;
+	unsigned pxm;
+	nodeid_t node;
+
 	if (srat_disabled())
 		return;
 	if (pa->header.length != sizeof(struct acpi_srat_cpu_affinity)) {
@@ -251,7 +253,7 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 		pxm |= pa->proximity_domain_hi[2] << 24;
 	}
 	node = setup_node(pxm);
-	if (node < 0) {
+	if (node == NUMA_NO_NODE) {
 		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
 		bad_srat();
 		return;
@@ -269,7 +271,8 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 {
 	struct node *nd;
 	u64 start, end;
-	int node, pxm;
+	unsigned pxm;
+	nodeid_t node;
 	int i;
 
 	if (srat_disabled())
@@ -295,7 +298,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 	if (srat_rev < 2)
 		pxm &= 0xff;
 	node = setup_node(pxm);
-	if (node < 0) {
+	if (node == NUMA_NO_NODE) {
 		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
 		bad_srat();
 		return;
@@ -481,7 +484,7 @@ int __init acpi_scan_nodes(u64 start, u64 end)
 	return 0;
 }
 
-static int node_to_pxm(unsigned n)
+static unsigned node_to_pxm(nodeid_t n)
 {
 	unsigned i;
 
@@ -493,7 +496,7 @@ static int node_to_pxm(unsigned n)
 	return 0;
 }
 
-int __node_distance(int a, int b)
+int __node_distance(nodeid_t a, nodeid_t b)
 {
 	int index;
 
