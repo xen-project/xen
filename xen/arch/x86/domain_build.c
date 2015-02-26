@@ -78,8 +78,6 @@ static void __init parse_dom0_mem(const char *s)
             dom0_max_nrpages = parse_amt(s+4, &s);
         else
             dom0_nrpages = parse_amt(s, &s);
-        if ( *s != ',' )
-            break;
     } while ( *s++ == ',' );
 }
 custom_param("dom0_mem", parse_dom0_mem);
@@ -89,14 +87,14 @@ static unsigned int __initdata opt_dom0_max_vcpus_max = UINT_MAX;
 
 static void __init parse_dom0_max_vcpus(const char *s)
 {
-    if (*s == '-')              /* -M */
+    if ( *s == '-' )                   /* -M */
         opt_dom0_max_vcpus_max = simple_strtoul(s + 1, &s, 0);
-    else                        /* N, N-, or N-M */
+    else                               /* N, N-, or N-M */
     {
         opt_dom0_max_vcpus_min = simple_strtoul(s, &s, 0);
-        if (*s++ == '\0')       /* N */
+        if ( !*s )                    /* N */
             opt_dom0_max_vcpus_max = opt_dom0_max_vcpus_min;
-        else if (*s != '\0')    /* N-M */
+        else if ( *s++ == '-' && *s ) /* N-M */
             opt_dom0_max_vcpus_max = simple_strtoul(s, &s, 0);
     }
 }
