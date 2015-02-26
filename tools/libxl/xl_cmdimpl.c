@@ -7825,8 +7825,9 @@ out:
 }
 
 #ifdef LIBXL_HAVE_PSR_CMT
-static void psr_cmt_print_domain_cache_occupancy(libxl_dominfo *dominfo,
-                                                 uint32_t nr_sockets)
+static void psr_cmt_print_domain_info(libxl_dominfo *dominfo,
+                                      libxl_psr_cmt_type type,
+                                      uint32_t nr_sockets)
 {
     char *domain_name;
     uint32_t socketid;
@@ -7840,15 +7841,23 @@ static void psr_cmt_print_domain_cache_occupancy(libxl_dominfo *dominfo,
     free(domain_name);
 
     for (socketid = 0; socketid < nr_sockets; socketid++) {
-        if (!libxl_psr_cmt_get_cache_occupancy(ctx, dominfo->domid, socketid,
-                                               &l3_cache_occupancy))
-            printf("%13u KB", l3_cache_occupancy);
+        switch (type) {
+        case LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY:
+            if (!libxl_psr_cmt_get_cache_occupancy(ctx,
+                                                   dominfo->domid,
+                                                   socketid,
+                                                   &l3_cache_occupancy))
+                printf("%13u KB", l3_cache_occupancy);
+            break;
+        default:
+            return;
+        }
     }
 
     printf("\n");
 }
 
-static int psr_cmt_show_cache_occupancy(uint32_t domid)
+static int psr_cmt_show(libxl_psr_cmt_type type, uint32_t domid)
 {
     uint32_t i, socketid, nr_sockets, total_rmid;
     uint32_t l3_cache_size;
@@ -7884,19 +7893,22 @@ static int psr_cmt_show_cache_occupancy(uint32_t domid)
         printf("%14s %d", "Socket", socketid);
     printf("\n");
 
-    /* Total L3 cache size */
-    printf("%-46s", "Total L3 Cache Size");
-    for (socketid = 0; socketid < nr_sockets; socketid++) {
-        rc = libxl_psr_cmt_get_l3_cache_size(ctx, socketid, &l3_cache_size);
-        if (rc < 0) {
-            fprintf(stderr,
-                    "Failed to get system l3 cache size for socket:%d\n",
-                    socketid);
-            return -1;
-        }
-        printf("%13u KB", l3_cache_size);
+    if (type == LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY) {
+            /* Total L3 cache size */
+            printf("%-46s", "Total L3 Cache Size");
+            for (socketid = 0; socketid < nr_sockets; socketid++) {
+                rc = libxl_psr_cmt_get_l3_cache_size(ctx, socketid,
+                                                     &l3_cache_size);
+                if (rc < 0) {
+                    fprintf(stderr,
+                            "Failed to get system l3 cache size for socket:%d\n",
+                            socketid);
+                    return -1;
+                }
+                printf("%13u KB", l3_cache_size);
+            }
+            printf("\n");
     }
-    printf("\n");
 
     /* Each domain */
     if (domid != INVALID_DOMID) {
@@ -7905,7 +7917,7 @@ static int psr_cmt_show_cache_occupancy(uint32_t domid)
             fprintf(stderr, "Failed to get domain info for %d\n", domid);
             return -1;
         }
-        psr_cmt_print_domain_cache_occupancy(&dominfo, nr_sockets);
+        psr_cmt_print_domain_info(&dominfo, type, nr_sockets);
     }
     else
     {
@@ -7915,7 +7927,7 @@ static int psr_cmt_show_cache_occupancy(uint32_t domid)
             return -1;
         }
         for (i = 0; i < nr_domains; i++)
-            psr_cmt_print_domain_cache_occupancy(list + i, nr_sockets);
+            psr_cmt_print_domain_info(list + i, type, nr_sockets);
         libxl_dominfo_list_free(list, nr_domains);
     }
     return 0;
@@ -7974,7 +7986,7 @@ int main_psr_cmt_show(int argc, char **argv)
 
     switch (type) {
     case LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY:
-        ret = psr_cmt_show_cache_occupancy(domid);
+        ret = psr_cmt_show(type, domid);
         break;
     default:
         help("psr-cmt-show");
