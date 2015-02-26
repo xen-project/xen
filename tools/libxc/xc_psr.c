@@ -143,7 +143,7 @@ int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
 {
     xc_resource_op_t op;
     xc_resource_entry_t entries[2];
-    uint32_t evtid;
+    uint32_t evtid, nr = 0;
     int rc;
 
     switch ( type )
@@ -155,25 +155,27 @@ int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
         return -1;
     }
 
-    entries[0].u.cmd = XEN_RESOURCE_OP_MSR_WRITE;
-    entries[0].idx = MSR_IA32_CMT_EVTSEL;
-    entries[0].val = (uint64_t)rmid << 32 | evtid;
-    entries[0].rsvd = 0;
+    entries[nr].u.cmd = XEN_RESOURCE_OP_MSR_WRITE;
+    entries[nr].idx = MSR_IA32_CMT_EVTSEL;
+    entries[nr].val = (uint64_t)rmid << 32 | evtid;
+    entries[nr].rsvd = 0;
+    nr++;
 
-    entries[1].u.cmd = XEN_RESOURCE_OP_MSR_READ;
-    entries[1].idx = MSR_IA32_CMT_CTR;
-    entries[1].val = 0;
-    entries[1].rsvd = 0;
+    entries[nr].u.cmd = XEN_RESOURCE_OP_MSR_READ;
+    entries[nr].idx = MSR_IA32_CMT_CTR;
+    entries[nr].val = 0;
+    entries[nr].rsvd = 0;
+    nr++;
 
     op.cpu = cpu;
-    op.nr_entries = 2;
+    op.nr_entries = nr;
     op.entries = entries;
 
     rc = xc_resource_op(xch, 1, &op);
     if ( rc < 0 )
         return rc;
 
-    if ( op.result !=2 || entries[1].val & IA32_CMT_CTR_ERROR_MASK )
+    if ( op.result != nr || entries[1].val & IA32_CMT_CTR_ERROR_MASK )
         return -1;
 
     *monitor_data = entries[1].val;
