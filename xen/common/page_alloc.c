@@ -617,7 +617,8 @@ static struct page_info *alloc_heap_pages(
      */
     if ( (outstanding_claims + request >
           total_avail_pages + tmem_freeable_pages()) &&
-          (d == NULL || d->outstanding_pages < request) )
+          ((memflags & MEMF_no_refcount) ||
+           !d || d->outstanding_pages < request) )
         goto not_found;
 
     /*
