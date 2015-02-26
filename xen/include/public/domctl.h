@@ -958,27 +958,37 @@ typedef struct xen_domctl_vcpu_msrs xen_domctl_vcpu_msrs_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpu_msrs_t);
 #endif
 
-/*
- * Use in XEN_DOMCTL_setvnumainfo to set
- * vNUMA domain topology.
- */
+/* XEN_DOMCTL_setvnumainfo: specifies a virtual NUMA topology for the guest */
 struct xen_domctl_vnuma {
+    /* IN: number of vNUMA nodes to setup. Shall be greater than 0 */
     uint32_t nr_vnodes;
+    /* IN: number of memory ranges to setup */
     uint32_t nr_vmemranges;
+    /*
+     * IN: number of vCPUs of the domain (used as size of the vcpu_to_vnode
+     * array declared below). Shall be equal to the domain's max_vcpus.
+     */
     uint32_t nr_vcpus;
-    uint32_t pad;
-    XEN_GUEST_HANDLE_64(uint) vdistance;
-    XEN_GUEST_HANDLE_64(uint) vcpu_to_vnode;
+    uint32_t pad;                                  /* must be zero */
 
     /*
-     * vnodes to physical NUMA nodes mask.
-     * This kept on per-domain basis for
-     * interested consumers, such as numa aware ballooning.
+     * IN: array for specifying the distances of the vNUMA nodes
+     * between each others. Shall have nr_vnodes*nr_vnodes elements.
+     */
+    XEN_GUEST_HANDLE_64(uint) vdistance;
+    /*
+     * IN: array for specifying to what vNUMA node each vCPU belongs.
+     * Shall have nr_vcpus elements.
+     */
+    XEN_GUEST_HANDLE_64(uint) vcpu_to_vnode;
+    /*
+     * IN: array for specifying on what physical NUMA node each vNUMA
+     * node is placed. Shall have nr_vnodes elements.
      */
     XEN_GUEST_HANDLE_64(uint) vnode_to_pnode;
-
     /*
-     * memory rages for each vNUMA node
+     * IN: array for specifying the memory ranges. Shall have
+     * nr_vmemranges elements.
      */
     XEN_GUEST_HANDLE_64(xen_vmemrange_t) vmemrange;
 };
