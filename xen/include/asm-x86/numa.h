@@ -21,7 +21,7 @@ struct node {
 
 extern int compute_hash_shift(struct node *nodes, int numnodes,
 			      int *nodeids);
-extern int pxm_to_node(int nid);
+extern int pxm_to_node(unsigned int pxm);
 
 #define ZONE_ALIGN (1UL << (MAX_ORDER+PAGE_SHIFT))
 #define VIRTUAL_BUG_ON(x) 
@@ -33,7 +33,7 @@ extern int numa_off;
 
 extern int srat_disabled(void);
 extern void numa_set_node(int cpu, int node);
-extern int setup_node(int pxm);
+extern int setup_node(unsigned int pxm);
 extern void srat_detect_node(int cpu);
 
 extern void setup_node_bootmem(int nodeid, u64 start, u64 end);

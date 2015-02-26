@@ -27,35 +27,78 @@ static nodemask_t memory_nodes_parsed __initdata;
 static nodemask_t processor_nodes_parsed __initdata;
 static nodemask_t nodes_found __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
-static u8 __read_mostly pxm2node[256] = { [0 ... 255] = NUMA_NO_NODE };
 
+struct pxm2node {
+	unsigned pxm;
+	u8 node;
+};
+static struct pxm2node __read_mostly pxm2node[MAX_NUMNODES] =
+	{ [0 ... MAX_NUMNODES - 1] = {.node = NUMA_NO_NODE} };
+
+static int node_to_pxm(unsigned n);
 
 static int num_node_memblks;
 static struct node node_memblk_range[NR_NODE_MEMBLKS];
 static int memblk_nodeid[NR_NODE_MEMBLKS];
 
-
-static int node_to_pxm(int n);
-
-int pxm_to_node(int pxm)
+static inline bool_t node_found(unsigned idx, unsigned pxm)
 {
-	if ((unsigned)pxm >= 256)
-		return -1;
-	/* Extend 0xff to (int)-1 */
-	return (signed char)pxm2node[pxm];
+	return ((pxm2node[idx].pxm == pxm) &&
+		(pxm2node[idx].node != NUMA_NO_NODE));
 }
 
-__devinit int setup_node(int pxm)
+int pxm_to_node(unsigned pxm)
 {
-	unsigned node = pxm2node[pxm];
-	if (node == 0xff) {
-		if (nodes_weight(nodes_found) >= MAX_NUMNODES)
-			return -1;
-		node = first_unset_node(nodes_found); 
-		node_set(node, nodes_found);
-		pxm2node[pxm] = node;
+	unsigned i;
+
+	if ((pxm < ARRAY_SIZE(pxm2node)) && node_found(pxm, pxm))
+		return pxm2node[pxm].node;
+
+	for (i = 0; i < ARRAY_SIZE(pxm2node); i++)
+		if (node_found(i, pxm))
+			return pxm2node[i].node;
+
+	/* Extend 0xff to (int)-1 */
+	return (signed char)NUMA_NO_NODE;
+}
+
+__devinit int setup_node(unsigned pxm)
+{
+	int node;
+	unsigned idx;
+	static bool_t warned;
+
+	BUILD_BUG_ON(MAX_NUMNODES >= NUMA_NO_NODE);
+
+	if (pxm < ARRAY_SIZE(pxm2node)) {
+		if (node_found(pxm, pxm))
+			return pxm2node[pxm].node;
+
+		/* Try to maintain indexing of pxm2node by pxm */
+		if (pxm2node[pxm].node == NUMA_NO_NODE) {
+			idx = pxm;
+			goto finish;
+		}
 	}
-	return pxm2node[pxm];
+
+	for (idx = 0; idx < ARRAY_SIZE(pxm2node); idx++)
+		if (pxm2node[idx].node == NUMA_NO_NODE)
+			goto finish;
+
+	if (!warned) {
+		printk(XENLOG_WARNING "More PXMs than available nodes\n");
+		warned = 1;
+	}
+
+	return (signed char)NUMA_NO_NODE;
+
+ finish:
+	node = first_unset_node(nodes_found);
+	node_set(node, nodes_found);
+	pxm2node[idx].pxm = pxm;
+	pxm2node[idx].node = node;
+
+	return node;
 }
 
 int valid_numa_range(u64 start, u64 end, int node)
@@ -112,7 +155,7 @@ static __init void bad_srat(void)
 	for (i = 0; i < MAX_LOCAL_APIC; i++)
 		apicid_to_node[i] = NUMA_NO_NODE;
 	for (i = 0; i < ARRAY_SIZE(pxm2node); i++)
-		pxm2node[i] = NUMA_NO_NODE;
+		pxm2node[i].node = NUMA_NO_NODE;
 	mem_hotplug = 0;
 }
 
@@ -438,15 +481,16 @@ int __init acpi_scan_nodes(u64 start, u64 end)
 	return 0;
 }
 
-static int node_to_pxm(int n)
+static int node_to_pxm(unsigned n)
 {
-       int i;
-       if (pxm2node[n] == n)
-               return n;
-       for (i = 0; i < 256; i++)
-               if (pxm2node[i] == n)
-                       return i;
-       return 0;
+	unsigned i;
+
+	if ((n < ARRAY_SIZE(pxm2node)) && (pxm2node[n].node == n))
+		return pxm2node[n].pxm;
+	for (i = 0; i < ARRAY_SIZE(pxm2node); i++)
+		if (pxm2node[i].node == n)
+			return pxm2node[i].pxm;
+	return 0;
 }
 
 int __node_distance(int a, int b)
