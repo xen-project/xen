@@ -130,6 +130,8 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 #ifdef CONFIG_SHADOW_PAGING
 static bool_t __initdata opt_dom0_shadow;
 boolean_param("dom0_shadow", opt_dom0_shadow);
+#else
+#define opt_dom0_shadow 0
 #endif
 
 static char __initdata opt_dom0_ioports_disable[200] = "";
@@ -201,13 +203,23 @@ static struct page_info * __init alloc_chunk(
     return page;
 }
 
+static unsigned long __init dom0_paging_pages(const struct domain *d,
+                                              unsigned long nr_pages)
+{
+    /* Copied from: libxl_get_required_shadow_memory() */
+    unsigned long memkb = nr_pages * (PAGE_SIZE / 1024);
+
+    memkb = 4 * (256 * d->max_vcpus + 2 * (memkb / 1024));
+
+    return ((memkb + 1023) / 1024) << (20 - PAGE_SHIFT);
+}
+
 static unsigned long __init compute_dom0_nr_pages(
     struct domain *d, struct elf_dom_parms *parms, unsigned long initrd_len)
 {
     unsigned long avail = avail_domheap_pages() + initial_images_nrpages();
-    unsigned long nr_pages = dom0_nrpages;
-    unsigned long min_pages = dom0_min_nrpages;
-    unsigned long max_pages = dom0_max_nrpages;
+    unsigned long nr_pages, min_pages, max_pages;
+    bool_t need_paging;
 
     /* Reserve memory for further dom0 vcpu-struct allocations... */
     avail -= (d->max_vcpus - 1UL)
@@ -225,23 +237,37 @@ static unsigned long __init compute_dom0_nr_pages(
             avail -= max_pdx >> s;
     }
 
-    /*
-     * If domain 0 allocation isn't specified, reserve 1/16th of available
-     * memory for things like DMA buffers. This reservation is clamped to 
-     * a maximum of 128MB.
-     */
-    if ( nr_pages == 0 )
-        nr_pages = -min(avail / 16, 128UL << (20 - PAGE_SHIFT));
+    need_paging = opt_dom0_shadow || (is_pvh_domain(d) && !iommu_hap_pt_share);
+    for ( ; ; need_paging = 0 )
+    {
+        nr_pages = dom0_nrpages;
+        min_pages = dom0_min_nrpages;
+        max_pages = dom0_max_nrpages;
 
-    /* Negative memory specification means "all memory - specified amount". */
-    if ( (long)nr_pages  < 0 ) nr_pages  += avail;
-    if ( (long)min_pages < 0 ) min_pages += avail;
-    if ( (long)max_pages < 0 ) max_pages += avail;
+        /*
+         * If allocation isn't specified, reserve 1/16th of available memory
+         * for things like DMA buffers. This reservation is clamped to a
+         * maximum of 128MB.
+         */
+        if ( nr_pages == 0 )
+            nr_pages = -min(avail / 16, 128UL << (20 - PAGE_SHIFT));
 
-    /* Clamp dom0 memory according to min/max limits and available memory. */
-    nr_pages = max(nr_pages, min_pages);
-    nr_pages = min(nr_pages, max_pages);
-    nr_pages = min(nr_pages, avail);
+        /* Negative specification means "all memory - specified amount". */
+        if ( (long)nr_pages  < 0 ) nr_pages  += avail;
+        if ( (long)min_pages < 0 ) min_pages += avail;
+        if ( (long)max_pages < 0 ) max_pages += avail;
+
+        /* Clamp according to min/max limits and available memory. */
+        nr_pages = max(nr_pages, min_pages);
+        nr_pages = min(nr_pages, max_pages);
+        nr_pages = min(nr_pages, avail);
+
+        if ( !need_paging )
+            break;
+
+        /* Reserve memory for shadow or HAP. */
+        avail -= dom0_paging_pages(d, nr_pages);
+    }
 
     if ( (parms->p2m_base == UNSET_ADDR) && (dom0_nrpages <= 0) &&
          ((dom0_min_nrpages <= 0) || (nr_pages > min_pages)) )
@@ -1285,14 +1311,7 @@ int __init construct_dom0(
     }
 
     if ( is_pvh_domain(d) )
-    {
-        unsigned long hap_pages, memkb = nr_pages * (PAGE_SIZE / 1024);
-
-        /* Copied from: libxl_get_required_shadow_memory() */
-        memkb = 4 * (256 * d->max_vcpus + 2 * (memkb / 1024));
-        hap_pages = ( (memkb + 1023) / 1024) << (20 - PAGE_SHIFT);
-        hap_set_alloc_for_pvh_dom0(d, hap_pages);
-    }
+        hap_set_alloc_for_pvh_dom0(d, dom0_paging_pages(d, nr_pages));
 
     /*
      * We enable paging mode again so guest_physmap_add_page will do the
