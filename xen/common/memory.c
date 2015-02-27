@@ -692,11 +692,37 @@ out:
     return rc;
 }
 
+static int construct_memop_from_reservation(
+               const struct xen_memory_reservation *r,
+               struct memop_args *a)
+{
+    unsigned int address_bits;
+
+    a->extent_list  = r->extent_start;
+    a->nr_extents   = r->nr_extents;
+    a->extent_order = r->extent_order;
+    a->memflags     = 0;
+
+    address_bits = XENMEMF_get_address_bits(r->mem_flags);
+    if ( (address_bits != 0) &&
+         (address_bits < (get_order_from_pages(max_page) + PAGE_SHIFT)) )
+    {
+        if ( address_bits <= PAGE_SHIFT )
+            return -EINVAL;
+        a->memflags = MEMF_bits(address_bits);
+    }
+
+    a->memflags |= MEMF_node(XENMEMF_get_node(r->mem_flags));
+    if ( r->mem_flags & XENMEMF_exact_node_request )
+        a->memflags |= MEMF_exact_node;
+
+    return 0;
+}
+
 long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d;
     long rc;
-    unsigned int address_bits;
     struct xen_memory_reservation reservation;
     struct memop_args args;
     domid_t domid;
@@ -718,25 +744,11 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( unlikely(start_extent >= reservation.nr_extents) )
             return start_extent;
 
-        args.extent_list  = reservation.extent_start;
-        args.nr_extents   = reservation.nr_extents;
-        args.extent_order = reservation.extent_order;
+        if ( construct_memop_from_reservation(&reservation, &args) )
+            return start_extent;
         args.nr_done      = start_extent;
         args.preempted    = 0;
-        args.memflags     = 0;
 
-        address_bits = XENMEMF_get_address_bits(reservation.mem_flags);
-        if ( (address_bits != 0) &&
-             (address_bits < (get_order_from_pages(max_page) + PAGE_SHIFT)) )
-        {
-            if ( address_bits <= PAGE_SHIFT )
-                return start_extent;
-            args.memflags = MEMF_bits(address_bits);
-        }
-
-        args.memflags |= MEMF_node(XENMEMF_get_node(reservation.mem_flags));
-        if ( reservation.mem_flags & XENMEMF_exact_node_request )
-            args.memflags |= MEMF_exact_node;
 
         if ( op == XENMEM_populate_physmap
              && (reservation.mem_flags & XENMEMF_populate_on_demand) )
