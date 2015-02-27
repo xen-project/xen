@@ -87,13 +87,33 @@ compat/xlat.h: $(addprefix compat/.xlat/,$(xlat-y)) Makefile
 
 ifeq ($(XEN_TARGET_ARCH),$(XEN_COMPILE_ARCH))
 
-all: headers.chk
+all: headers.chk headers++.chk
 
-headers.chk: $(filter-out public/arch-% public/%ctl.h public/xsm/% public/%hvm/save.h, $(wildcard public/*.h public/*/*.h) $(public-y)) Makefile
-	for i in $(filter %.h,$^); do $(CC) -ansi -include stdint.h -Wall -W -Werror -S -o /dev/null -x c $$i || exit 1; echo $$i; done >$@.new
+PUBLIC_HEADERS := $(filter-out public/arch-% public/dom0_ops.h, $(wildcard public/*.h public/*/*.h) $(public-y))
+
+PUBLIC_ANSI_HEADERS := $(filter-out public/%ctl.h public/xsm/% public/%hvm/save.h, $(PUBLIC_HEADERS))
+
+headers.chk: $(PUBLIC_ANSI_HEADERS) Makefile
+	for i in $(filter %.h,$^); do \
+	    $(CC) -x c -ansi -Wall -Werror -include stdint.h \
+	          -S -o /dev/null $$i || exit 1; \
+	    echo $$i; \
+	done >$@.new
+	mv $@.new $@
+
+headers++.chk: $(PUBLIC_HEADERS) Makefile
+	if $(CXX) -v >/dev/null 2>&1; then \
+	    for i in $(filter %.h,$^); do \
+	        $(CXX) -x c++ -std=gnu++98 -Wall -Werror \
+	               -D__XEN_TOOLS__ -Dprivate=private_is_a_keyword_in_cpp \
+	               -include stdint.h -include public/xen.h \
+	               -S -o /dev/null $$i || exit 1; \
+	        echo $$i; \
+	    done ; \
+	fi >$@.new
 	mv $@.new $@
 
 endif
 
 clean::
-	rm -rf compat headers.chk
+	rm -rf compat headers.chk headers++.chk

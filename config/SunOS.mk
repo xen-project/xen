@@ -2,6 +2,7 @@ AS         = $(CROSS_COMPILE)gas
 LD         = $(CROSS_COMPILE)gld
 CC         = $(CROSS_COMPILE)gcc
 CPP        = $(CROSS_COMPILE)gcc -E
+CXX        = $(CROSS_COMPILE)g++
 AR         = $(CROSS_COMPILE)gar
 RANLIB     = $(CROSS_COMPILE)granlib
 NM         = $(CROSS_COMPILE)gnm

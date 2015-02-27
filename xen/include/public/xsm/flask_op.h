@@ -25,6 +25,8 @@
 #ifndef __FLASK_OP_H__
 #define __FLASK_OP_H__
 
+#include "../event_channel.h"
+
 #define XEN_FLASK_INTERFACE_VERSION 1
 
 struct xen_flask_load {
