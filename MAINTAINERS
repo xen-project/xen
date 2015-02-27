@@ -237,6 +237,12 @@ M:	David Scott <dave.scott@eu.citrix.com>
 S:	Supported
 F:	tools/ocaml/
 
+OVMF UPSTREAM
+M:	Anthony PERARD <anthony.perard@citrix.com>
+M:	Wei Liu <wei.liu2@citrix.com>
+S:	Supported
+T:	git git://xenbits.xen.org/ovmf.git
+
 POWER MANAGEMENT
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Liu Jinsong <jinsong.liu@alibaba-inc.com>
