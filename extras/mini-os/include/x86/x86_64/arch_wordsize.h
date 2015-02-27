@@ -1,2 +1,0 @@
-#define __WORDSIZE 64
-#define __WORDSIZE_COMPAT32 1

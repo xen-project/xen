@@ -13,7 +13,7 @@ set -e
 
 if test \! -d $DIR-remote; then
 	rm -rf $DIR-remote $DIR-remote.tmp
-	mkdir $DIR-remote.tmp; rmdir $DIR-remote.tmp
+	mkdir -p $DIR-remote.tmp; rmdir $DIR-remote.tmp
 	$GIT clone $TREE $DIR-remote.tmp
 	if test "$TAG" ; then
 		cd $DIR-remote.tmp

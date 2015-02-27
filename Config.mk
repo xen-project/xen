@@ -245,14 +245,20 @@ OVMF_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/ovmf.git
 QEMU_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/qemu-upstream-unstable.git
 QEMU_TRADITIONAL_URL ?= http://xenbits.xen.org/git-http/qemu-xen-unstable.git
 SEABIOS_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/seabios.git
+MINIOS_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/mini-os.git
 else
 OVMF_UPSTREAM_URL ?= git://xenbits.xen.org/ovmf.git
 QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-unstable.git
 QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-unstable.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
+MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= a065efc7c7ce8bb3e5cb3e463099d023d4a92927
 QEMU_UPSTREAM_REVISION ?= master
+MINIOS_UPSTREAM_REVISION ?= 55f7cd7427ef3e7fe3563a3da46d8664a2ed0d6d
+# Thu Jan 29 19:10:04 2015 +0000
+# Mini-OS: standalone build
+
 SEABIOS_UPSTREAM_REVISION ?= rel-1.8.0
 # Wed Feb 18 12:49:59 2015 -0500
 # docs: Note v1.8.0 release

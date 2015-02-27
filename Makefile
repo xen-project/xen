@@ -10,9 +10,28 @@ all: dist
 SUBSYSTEMS?=xen tools stubdom docs
 TARGS_DIST=$(patsubst %, dist-%, $(SUBSYSTEMS))
 TARGS_INSTALL=$(patsubst %, install-%, $(SUBSYSTEMS))
+TARGS_BUILD=$(patsubst %, build-%, $(SUBSYSTEMS))
+TARGS_CLEAN=$(patsubst %, clean-%, $(SUBSYSTEMS))
+TARGS_DISTCLEAN=$(patsubst %, distclean-%, $(SUBSYSTEMS))
 
 export XEN_ROOT=$(CURDIR)
 include Config.mk
+
+.PHONY: mini-os-dir
+mini-os-dir:
+	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh \
+		$(MINIOS_UPSTREAM_URL) \
+		$(MINIOS_UPSTREAM_REVISION) \
+		$(XEN_ROOT)/extras/mini-os
+
+.PHONY: mini-os-dir-force-update
+mini-os-dir-force-update: mini-os-dir
+	set -ex; \
+	if [ "$(MINIOS_UPSTREAM_REVISION)" ]; then \
+		cd extras/mini-os-remote; \
+		$(GIT) fetch origin; \
+		$(GIT) reset --hard $(MINIOS_UPSTREAM_REVISION); \
+	fi
 
 SUBARCH := $(subst x86_32,i386,$(XEN_TARGET_ARCH))
 export XEN_TARGET_ARCH SUBARCH
@@ -23,13 +42,25 @@ export DESTDIR
 install: $(TARGS_INSTALL)
 
 .PHONY: build
-build:
+build: $(TARGS_BUILD)
+
+.PHONY: build-xen
+build-xen:
 	$(MAKE) -C xen build
+
+.PHONY: build-tools
+build-tools:
 	$(MAKE) -C tools build
+
+.PHONY: build-stubdom
+build-stubdom: mini-os-dir
 	$(MAKE) -C stubdom build
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom pv-grub
 endif
+
+.PHONY: build-docs
+build-docs:
 	$(MAKE) -C docs build
 
 # The test target is for unit tests that can run without an installation.  Of
@@ -69,7 +100,7 @@ install-tools:
 	$(MAKE) -C tools install
 
 .PHONY: install-stubdom
-install-stubdom: install-tools
+install-stubdom: install-tools mini-os-dir
 	$(MAKE) -C stubdom install
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom install-grub
@@ -110,11 +141,11 @@ rpmball: dist
 	bash ./tools/misc/mkrpm $(XEN_ROOT) $$($(MAKE) -C xen xenversion --no-print-directory)
 
 .PHONY: subtree-force-update
-subtree-force-update:
+subtree-force-update: mini-os-dir-force-update
 	$(MAKE) -C tools subtree-force-update
 
 .PHONY: subtree-force-update-all
-subtree-force-update-all:
+subtree-force-update-all: mini-os-dir-force-update
 	$(MAKE) -C tools subtree-force-update-all
 
 # Make a source tarball, including qemu sub-trees.
@@ -135,28 +166,52 @@ src-tarball: subtree-force-update-all
 	bash ./tools/misc/mktarball $(XEN_ROOT) $$(git describe)
 
 .PHONY: clean
-clean::
+clean: $(TARGS_CLEAN)
+
+.PHONY: clean-xen
+clean-xen:
 	$(MAKE) -C xen clean
+
+.PHONY: clean-tools
+clean-tools:
 	$(MAKE) -C tools clean
+
+.PHONY: clean-stubdom
+clean-stubdom:
 	$(MAKE) -C stubdom crossclean
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom crossclean
 endif
+
+.PHONY: clean-docs
+clean-docs:
 	$(MAKE) -C docs clean
 
 # clean, but blow away tarballs
 .PHONY: distclean
-distclean:
+distclean: $(TARGS_DISTCLEAN)
 	rm -f config/Toplevel.mk
+	rm -rf dist
+	rm -rf config.log config.status config.cache autom4te.cache
+
+.PHONY: distclean-xen
+distclean-xen:
 	$(MAKE) -C xen distclean
+
+.PHONY: distclean-tools
+distclean-tools:
 	$(MAKE) -C tools distclean
+
+.PHONY: distclean-stubdom
+distclean-stubdom:
 	$(MAKE) -C stubdom distclean
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom distclean
 endif
+
+.PHONY: distclean-docs
+distclean-docs:
 	$(MAKE) -C docs distclean
-	rm -rf dist
-	rm -rf config.log config.status config.cache autom4te.cache
 
 # Linux name for GNU distclean
 .PHONY: mrproper
