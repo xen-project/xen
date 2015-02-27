@@ -604,7 +604,7 @@ static int gicv2_make_dt_node(const struct domain *d,
     const struct dt_device_node *gic = dt_interrupt_controller;
     const void *compatible = NULL;
     u32 len;
-    __be32 *new_cells, *tmp;
+    const __be32 *regs;
     int res = 0;
 
     compatible = dt_get_property(gic, "compatible", &len);
@@ -631,18 +631,22 @@ static int gicv2_make_dt_node(const struct domain *d,
     if ( res )
         return res;
 
+    /*
+     * DTB provides up to 4 regions to handle virtualization
+     * (in order GICD, GICC, GICH and GICV interfaces)
+     * however dom0 just needs GICD and GICC provided by Xen.
+     */
+    regs = dt_get_property(gic, "reg", &len);
+    if ( !regs )
+    {
+        dprintk(XENLOG_ERR, "Can't find reg property for the gic node\n");
+        return -FDT_ERR_XEN(ENOENT);
+    }
+
     len = dt_cells_to_size(dt_n_addr_cells(node) + dt_n_size_cells(node));
-    len *= 2; /* GIC has two memory regions: Distributor + CPU interface */
-    new_cells = xzalloc_bytes(len);
-    if ( new_cells == NULL )
-        return -FDT_ERR_XEN(ENOMEM);
+    len *= 2;
 
-    tmp = new_cells;
-    dt_set_range(&tmp, node, d->arch.vgic.dbase, PAGE_SIZE);
-    dt_set_range(&tmp, node, d->arch.vgic.cbase, PAGE_SIZE * 2);
-
-    res = fdt_property(fdt, "reg", new_cells, len);
-    xfree(new_cells);
+    res = fdt_property(fdt, "reg", regs, len);
 
     return res;
 }
