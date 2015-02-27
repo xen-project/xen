@@ -2008,7 +2008,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     unsigned long code_base, code_limit;
     char io_emul_stub[32];
     void (*io_emul)(struct cpu_user_regs *) __attribute__((__regparm__(1)));
-    uint64_t val, msr_content;
+    uint64_t val;
 
     if ( !read_descriptor(regs->cs, v, regs,
                           &code_base, &code_limit, &ar,
@@ -2498,8 +2498,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     case 0x30: /* WRMSR */ {
         uint32_t eax = regs->eax;
         uint32_t edx = regs->edx;
-        msr_content = ((uint64_t)edx << 32) | eax;
-        switch ( (u32)regs->ecx )
+        uint64_t msr_content = ((uint64_t)edx << 32) | eax;
+
+        switch ( regs->_ecx )
         {
         case MSR_FS_BASE:
             if ( is_pv_32on64_vcpu(v) )
@@ -2670,7 +2671,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x32: /* RDMSR */
-        switch ( (u32)regs->ecx )
+        switch ( regs->_ecx )
         {
         case MSR_FS_BASE:
             if ( is_pv_32on64_vcpu(v) )
@@ -2686,9 +2687,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_SHADOW_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            regs->eax = v->arch.pv_vcpu.gs_base_user & 0xFFFFFFFFUL;
-            regs->edx = v->arch.pv_vcpu.gs_base_user >> 32;
-            break;
+            val = v->arch.pv_vcpu.gs_base_user;
+            goto rdmsr_writeback;
         case MSR_K7_FID_VID_CTL:
         case MSR_K7_FID_VID_STATUS:
         case MSR_K8_PSTATE_LIMIT:
@@ -2720,12 +2720,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             }
             goto rdmsr_normal;
         case MSR_IA32_MISC_ENABLE:
-            if ( rdmsr_safe(regs->ecx, msr_content) )
+            if ( rdmsr_safe(regs->ecx, val) )
                 goto fail;
-            msr_content = guest_misc_enable(msr_content);
-            regs->eax = (uint32_t)msr_content;
-            regs->edx = (uint32_t)(msr_content >> 32);
-            break;
+            val = guest_misc_enable(val);
+            goto rdmsr_writeback;
 
         case MSR_AMD64_DR0_ADDRESS_MASK:
             if ( !boot_cpu_has(X86_FEATURE_DBEXT) )
@@ -2743,12 +2741,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
         default:
             if ( rdmsr_hypervisor_regs(regs->ecx, &val) )
-            {
- rdmsr_writeback:
-                regs->eax = (uint32_t)val;
-                regs->edx = (uint32_t)(val >> 32);
-                break;
-            }
+                goto rdmsr_writeback;
 
             rc = vmce_rdmsr(regs->ecx, &val);
             if ( rc < 0 )
@@ -2761,10 +2754,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             /* Everyone can read the MSR space. */
             /* gdprintk(XENLOG_WARNING,"Domain attempted RDMSR %p.\n",
                         _p(regs->ecx));*/
-            if ( rdmsr_safe(regs->ecx, msr_content) )
+            if ( rdmsr_safe(regs->ecx, val) )
                 goto fail;
-            regs->eax = (uint32_t)msr_content;
-            regs->edx = (uint32_t)(msr_content >> 32);
+ rdmsr_writeback:
+            regs->eax = (uint32_t)val;
+            regs->edx = (uint32_t)(val >> 32);
             break;
         }
         break;
