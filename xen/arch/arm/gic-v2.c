@@ -240,7 +240,7 @@ static void gicv2_set_irq_properties(struct irq_desc *desc,
                actual & edgebit ? "Edge" : "Level");
         desc->arch.type = actual & edgebit ?
             DT_IRQ_TYPE_EDGE_RISING :
-            DT_IRQ_TYPE_LEVEL_LOW;
+            DT_IRQ_TYPE_LEVEL_HIGH;
     }
 
     /* Set target CPU mask (RAZ/WI on uniprocessor) */

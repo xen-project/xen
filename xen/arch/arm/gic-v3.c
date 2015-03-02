@@ -504,7 +504,7 @@ static void gicv3_set_irq_properties(struct irq_desc *desc,
                actual & edgebit ? "Edge" : "Level");
         desc->arch.type = actual & edgebit ?
             DT_IRQ_TYPE_EDGE_RISING :
-            DT_IRQ_TYPE_LEVEL_LOW;
+            DT_IRQ_TYPE_LEVEL_HIGH;
     }
 
     affinity = gicv3_mpidr_to_affinity(cpu);
