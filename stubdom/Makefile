@@ -1,15 +1,18 @@
 XEN_ROOT = $(CURDIR)/..
 MINI_OS = $(XEN_ROOT)/extras/mini-os
 
-ifeq ($(wildcard $(MINI_OS)/Config.mk),)
-$(error Please run `make mini-os-dir' in top-level directory)
-endif
-
 export XEN_OS=MiniOS
 
 export stubdom=y
 export debug=y
-include $(XEN_ROOT)/Config.mk
+
+ifeq (,$(findstring clean,$(MAKECMDGOALS)))
+  ifeq ($(wildcard $(MINI_OS)/Config.mk),)
+    $(error Please run `make mini-os-dir' in top-level directory)
+  endif
+  include $(XEN_ROOT)/Config.mk
+endif
+
 -include $(XEN_ROOT)/config/Stubdom.mk
 
 GNU_TARGET_ARCH:=$(XEN_TARGET_ARCH)
