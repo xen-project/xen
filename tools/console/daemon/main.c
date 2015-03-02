@@ -26,6 +26,7 @@
 #include <string.h>
 #include <signal.h>
 #include <sys/types.h>
+#include <sys/resource.h>
 
 #include "xenctrl.h"
 
@@ -53,6 +54,41 @@ static void usage(char *name)
 static void version(char *name)
 {
 	printf("Xen Console Daemon 3.0\n");
+}
+
+static void increase_fd_limit(void)
+{
+	/*
+	 * We require many file descriptors:
+	 * - per domain: pty master, pty slave, logfile and evtchn
+	 * - misc extra: hypervisor log, privcmd, gntdev, std...
+	 *
+	 * Allow a generous 1000 for misc, and calculate the maximum possible
+	 * number of fds which could be used.
+	 */
+	unsigned min_fds = (DOMID_FIRST_RESERVED * 4) + 1000;
+	struct rlimit lim, new = { min_fds, min_fds };
+
+	if (getrlimit(RLIMIT_NOFILE, &lim) < 0) {
+		fprintf(stderr, "Failed to obtain fd limit: %s\n",
+			strerror(errno));
+		exit(1);
+	}
+
+	/* Do we already have sufficient? Great! */
+	if (lim.rlim_cur >= min_fds)
+		return;
+
+	/* Try to increase our limit. */
+	if (setrlimit(RLIMIT_NOFILE, &new) < 0)
+		syslog(LOG_WARNING,
+		       "Unable to increase fd limit from {%llu, %llu} to "
+		       "{%llu, %llu}: (%s) - May run out with lots of domains",
+		       (unsigned long long)lim.rlim_cur,
+		       (unsigned long long)lim.rlim_max,
+		       (unsigned long long)new.rlim_cur,
+		       (unsigned long long)new.rlim_max,
+		       strerror(errno));
 }
 
 int main(int argc, char **argv)
@@ -153,6 +189,8 @@ int main(int argc, char **argv)
 
 	openlog("xenconsoled", syslog_option, LOG_DAEMON);
 	setlogmask(syslog_mask);
+
+	increase_fd_limit();
 
 	if (!is_interactive) {
 		daemonize(pidfile ? pidfile : "/var/run/xenconsoled.pid");
