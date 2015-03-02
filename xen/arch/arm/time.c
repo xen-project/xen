@@ -217,7 +217,7 @@ static void check_timer_irq_cfg(unsigned int irq, const char *which)
      * The interrupt controller driver will update desc->arch.type with
      * the actual type which ended up configured in the hardware.
      */
-    if ( desc->arch.type & DT_IRQ_TYPE_LEVEL_LOW )
+    if ( desc->arch.type & DT_IRQ_TYPE_LEVEL_MASK )
         return;
 
     printk(XENLOG_WARNING
