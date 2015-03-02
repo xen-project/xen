@@ -2531,6 +2531,13 @@ MODULE_LICENSE("GPL v2");
 /* Xen only supports stage-2 translation, so force the value to 2. */
 static int force_stage = 2;
 
+/*
+ * Platform features. It indicates the list of features supported by all
+ * SMMUs.
+ * Actually we only care about coherent table walk.
+ */
+static u32 platform_features = ARM_SMMU_FEAT_COHERENT_WALK;
+
 static void arm_smmu_iotlb_flush_all(struct domain *d)
 {
 	struct arm_smmu_xen_domain *smmu_domain = domain_hvm_iommu(d)->arch.priv;
@@ -2668,6 +2675,10 @@ static int arm_smmu_iommu_domain_init(struct domain *d)
 
 	domain_hvm_iommu(d)->arch.priv = xen_domain;
 
+	/* Coherent walk can be enabled only when all SMMUs support it. */
+	if (platform_features & ARM_SMMU_FEAT_COHERENT_WALK)
+		iommu_set_feature(d, IOMMU_FEAT_COHERENT_WALK);
+
 	return 0;
 }
 
@@ -2738,10 +2749,28 @@ static const struct iommu_ops arm_smmu_iommu_ops = {
     .unmap_page = arm_smmu_unmap_page,
 };
 
+static __init const struct arm_smmu_device *find_smmu(const struct device *dev)
+{
+	struct arm_smmu_device *smmu;
+	bool found = false;
+
+	spin_lock(&arm_smmu_devices_lock);
+	list_for_each_entry(smmu, &arm_smmu_devices, list) {
+		if (smmu->dev == dev) {
+			found = true;
+			break;
+		}
+	}
+	spin_unlock(&arm_smmu_devices_lock);
+
+	return (found) ? smmu : NULL;
+}
+
 static __init int arm_smmu_dt_init(struct dt_device_node *dev,
 				   const void *data)
 {
 	int rc;
+	const struct arm_smmu_device *smmu;
 
 	/*
 	 * Even if the device can't be initialized, we don't want to
@@ -2754,6 +2783,12 @@ static __init int arm_smmu_dt_init(struct dt_device_node *dev,
 		return rc;
 
 	iommu_set_ops(&arm_smmu_iommu_ops);
+
+	/* Find the last SMMU added and retrieve its features. */
+	smmu = find_smmu(dt_to_dev(dev));
+	BUG_ON(smmu == NULL);
+
+	platform_features &= smmu->features;
 
 	return 0;
 }
