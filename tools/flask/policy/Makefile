@@ -86,7 +86,7 @@ DETECTED_MODS := $(sort $(foreach dir,$(ALL_LAYERS),$(wildcard $(dir)/*.te)))
 MODENABLED := on
 
 # extract settings from modules.conf
-ENABLED_MODS := $(foreach mod,$(shell awk '/^[[:blank:]]*[[:alpha:]]/{ if ($$3 == "$(MODENABLED)") print $$1 }' $(MOD_CONF) 2> /dev/null),$(subst ./,,$(shell find -iname $(mod).te)))
+ENABLED_MODS := $(foreach mod,$(shell awk '/^[ \t]*[a-z]/{ if ($$3 == "$(MODENABLED)") print $$1 }' $(MOD_CONF) 2> /dev/null),$(subst ./,,$(shell find -iname $(mod).te)))
 
 ALL_MODULES := $(filter $(ENABLED_MODS),$(DETECTED_MODS))
 
