@@ -612,17 +612,21 @@ static int hip04gic_make_dt_node(const struct domain *d,
                               const struct dt_device_node *node, void *fdt)
 {
     const struct dt_device_node *gic = dt_interrupt_controller;
-    const void *compatible = NULL;
+    const void *compatible;
     u32 len;
     const __be32 *regs;
     int res = 0;
 
-    compatible = dt_get_property(gic, "compatible", &len);
-    if ( !compatible )
-    {
-        dprintk(XENLOG_ERR, "Can't find compatible property for the gic node\n");
-        return -FDT_ERR_XEN(ENOENT);
-    }
+    /*
+     * Replace compatibility string with a standard one.
+     * dom0 will see a compatible GIC. This as GICC is compatible
+     * with standard one and GICD (emulated by Xen) is compatible
+     * to standard. Otherwise we should implement HIP04 GICD in
+     * the virtual GIC.
+     * This actually limit CPU number to 8 for dom0.
+     */
+    compatible = DT_COMPAT_GIC_CORTEX_A15;
+    len = strlen((char*) compatible) + 1;
 
     res = fdt_begin_node(fdt, "interrupt-controller");
     if ( res )

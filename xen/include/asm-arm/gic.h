@@ -153,8 +153,10 @@
 #include <xen/irq.h>
 #include <asm-arm/vgic.h>
 
+#define DT_COMPAT_GIC_CORTEX_A15 "arm,cortex-a15-gic"
+
 #define DT_MATCH_GIC_V2                                             \
-    DT_MATCH_COMPATIBLE("arm,cortex-a15-gic"),                      \
+    DT_MATCH_COMPATIBLE(DT_COMPAT_GIC_CORTEX_A15),                  \
     DT_MATCH_COMPATIBLE("arm,cortex-a7-gic"),                       \
     DT_MATCH_COMPATIBLE("arm,gic-400")
 
