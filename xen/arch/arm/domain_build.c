@@ -1035,12 +1035,6 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         DT_MATCH_COMPATIBLE("arm,armv7-timer-mem"),
         { /* sentinel */ },
     };
-    static const struct dt_device_match gic_matches[] __initconst =
-    {
-        DT_MATCH_GIC_V2,
-        DT_MATCH_GIC_V3,
-        { /* sentinel */ },
-    };
     static const struct dt_device_match timer_matches[] __initconst =
     {
         DT_MATCH_TIMER,
@@ -1069,7 +1063,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
 
     /* Replace these nodes with our own. Note that the original may be
      * used_by DOMID_XEN so this check comes first. */
-    if ( dt_match_node(gic_matches, node) )
+    if ( device_get_class(node) == DEVICE_GIC )
         return make_gic_node(d, kinfo->fdt, node);
     if ( dt_match_node(timer_matches, node) )
         return make_timer_node(d, kinfo->fdt, node);
