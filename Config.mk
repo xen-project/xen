@@ -246,7 +246,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= e052bfcd0f2b0776f1f39f8282446ba8601bde82
+QEMU_TAG ?= xen-4.4.2-rc2
 # Mon Feb 2 16:49:59 2015 +0000
 # cirrus: fix an uninitialized variable
 
