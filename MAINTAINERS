@@ -138,6 +138,12 @@ F:	xen/drivers/char/omap-uart.c
 F:	xen/drivers/char/pl011.c
 F:	xen/drivers/passthrough/arm/
 
+HISILICON HIP04 SUPPORT
+M:	Frediano Ziglio <frediano.ziglio@huawei.com>
+M:	Zoltan Kiss <zoltan.kiss@huawei.com>
+S:	Supported
+F:	xen/arch/arm/gic-hip04.c
+
 CPU POOLS
 M:	Juergen Gross <jgross@suse.com>
 S:	Supported

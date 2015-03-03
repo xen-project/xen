@@ -1,7 +1,8 @@
 /*
- * xen/arch/arm/gic-v2.c
+ * xen/arch/arm/gic-hip04.c
  *
- * ARM Generic Interrupt Controller support v2
+ * Generic Interrupt Controller for HiSilicon Hip04 platform
+ * Based heavily on gic-v2.c (id 3bcf563fec26378f7f4cf1e2ad0d4d5b3f341919)
  *
  * Tim Deegan <tim@xen.org>
  * Copyright (c) 2011 Citrix Systems.
@@ -79,14 +80,24 @@ static struct gic_info gicv2_info;
  * logical CPU numbering. Let's use mapping as returned by the GIC
  * itself
  */
-static DEFINE_PER_CPU(u8, gic_cpu_id);
+static DEFINE_PER_CPU(u16, gic_cpu_id);
 
 /* Maximum cpu interface per GIC */
-#define NR_GIC_CPU_IF 8
+#define NR_GIC_CPU_IF 16
+
+#define HIP04_GICD_SGI_TARGET_SHIFT 8
+
+#define HIP04_GICH_APR   0x70
+#define HIP04_GICH_LR    0x80
 
 static inline void writeb_gicd(uint8_t val, unsigned int offset)
 {
     writeb_relaxed(val, gicv2.map_dbase + offset);
+}
+
+static inline void writew_gicd(uint16_t val, unsigned int offset)
+{
+    writew_relaxed(val, gicv2.map_dbase + offset);
 }
 
 static inline void writel_gicd(uint32_t val, unsigned int offset)
@@ -123,7 +134,7 @@ static inline uint32_t readl_gich(int unsigned offset)
     return readl_relaxed(gicv2.map_hbase + offset);
 }
 
-static unsigned int gicv2_cpu_mask(const cpumask_t *cpumask)
+static unsigned int hip04gic_cpu_mask(const cpumask_t *cpumask)
 {
     unsigned int cpu;
     unsigned int mask = 0;
@@ -139,7 +150,7 @@ static unsigned int gicv2_cpu_mask(const cpumask_t *cpumask)
     return mask;
 }
 
-static void gicv2_save_state(struct vcpu *v)
+static void hip04gic_save_state(struct vcpu *v)
 {
     int i;
 
@@ -148,27 +159,27 @@ static void gicv2_save_state(struct vcpu *v)
      * accessed simultaneously by another pCPU.
      */
     for ( i = 0; i < gicv2_info.nr_lrs; i++ )
-        v->arch.gic.v2.lr[i] = readl_gich(GICH_LR + i * 4);
+        v->arch.gic.v2.lr[i] = readl_gich(HIP04_GICH_LR + i * 4);
 
-    v->arch.gic.v2.apr = readl_gich(GICH_APR);
+    v->arch.gic.v2.apr = readl_gich(HIP04_GICH_APR);
     v->arch.gic.v2.vmcr = readl_gich(GICH_VMCR);
     /* Disable until next VCPU scheduled */
     writel_gich(0, GICH_HCR);
 }
 
-static void gicv2_restore_state(const struct vcpu *v)
+static void hip04gic_restore_state(const struct vcpu *v)
 {
     int i;
 
     for ( i = 0; i < gicv2_info.nr_lrs; i++ )
-        writel_gich(v->arch.gic.v2.lr[i], GICH_LR + i * 4);
+        writel_gich(v->arch.gic.v2.lr[i], HIP04_GICH_LR + i * 4);
 
-    writel_gich(v->arch.gic.v2.apr, GICH_APR);
+    writel_gich(v->arch.gic.v2.apr, HIP04_GICH_APR);
     writel_gich(v->arch.gic.v2.vmcr, GICH_VMCR);
     writel_gich(GICH_HCR_EN, GICH_HCR);
 }
 
-static void gicv2_dump_state(const struct vcpu *v)
+static void hip04gic_dump_state(const struct vcpu *v)
 {
     int i;
 
@@ -176,7 +187,7 @@ static void gicv2_dump_state(const struct vcpu *v)
     {
         for ( i = 0; i < gicv2_info.nr_lrs; i++ )
             printk("   HW_LR[%d]=%x\n", i,
-                   readl_gich(GICH_LR + i * 4));
+                   readl_gich(HIP04_GICH_LR + i * 4));
     }
     else
     {
@@ -185,20 +196,20 @@ static void gicv2_dump_state(const struct vcpu *v)
     }
 }
 
-static void gicv2_eoi_irq(struct irq_desc *irqd)
+static void hip04gic_eoi_irq(struct irq_desc *irqd)
 {
     int irq = irqd->irq;
     /* Lower the priority */
     writel_gicc(irq, GICC_EOIR);
 }
 
-static void gicv2_dir_irq(struct irq_desc *irqd)
+static void hip04gic_dir_irq(struct irq_desc *irqd)
 {
     /* Deactivate */
     writel_gicc(irqd->irq, GICC_DIR);
 }
 
-static unsigned int gicv2_read_irq(void)
+static unsigned int hip04gic_read_irq(void)
 {
     return (readl_gicc(GICC_IAR) & GICC_IA_IRQ);
 }
@@ -207,12 +218,12 @@ static unsigned int gicv2_read_irq(void)
  * needs to be called with a valid cpu_mask, ie each cpu in the mask has
  * already called gic_cpu_init
  */
-static void gicv2_set_irq_properties(struct irq_desc *desc,
+static void hip04gic_set_irq_properties(struct irq_desc *desc,
                                    const cpumask_t *cpu_mask,
                                    unsigned int priority)
 {
     uint32_t cfg, actual, edgebit;
-    unsigned int mask = gicv2_cpu_mask(cpu_mask);
+    unsigned int mask = hip04gic_cpu_mask(cpu_mask);
     unsigned int irq = desc->irq;
     unsigned int type = desc->arch.type;
 
@@ -232,7 +243,7 @@ static void gicv2_set_irq_properties(struct irq_desc *desc,
     actual = readl_gicd(GICD_ICFGR + (irq / 16) * 4);
     if ( ( cfg & edgebit ) ^ ( actual & edgebit ) )
     {
-        printk(XENLOG_WARNING "GICv2: WARNING: "
+        printk(XENLOG_WARNING "GIC-HIP04: WARNING: "
                "CPU%d: Failed to configure IRQ%u as %s-triggered. "
                "H/w forces to %s-triggered.\n",
                smp_processor_id(), desc->irq,
@@ -244,22 +255,21 @@ static void gicv2_set_irq_properties(struct irq_desc *desc,
     }
 
     /* Set target CPU mask (RAZ/WI on uniprocessor) */
-    writeb_gicd(mask, GICD_ITARGETSR + irq);
+    writew_gicd(mask, GICD_ITARGETSR + irq * 2);
     /* Set priority */
     writeb_gicd(priority, GICD_IPRIORITYR + irq);
 
     spin_unlock(&gicv2.lock);
 }
 
-static void __init gicv2_dist_init(void)
+static void __init hip04gic_dist_init(void)
 {
     uint32_t type;
     uint32_t cpumask;
     uint32_t gic_cpus;
     int i;
 
-    cpumask = readl_gicd(GICD_ITARGETSR) & 0xff;
-    cpumask |= cpumask << 8;
+    cpumask = readl_gicd(GICD_ITARGETSR) & 0xffff;
     cpumask |= cpumask << 16;
 
     /* Disable the distributor */
@@ -267,8 +277,8 @@ static void __init gicv2_dist_init(void)
 
     type = readl_gicd(GICD_TYPER);
     gicv2_info.nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
-    gic_cpus = 1 + ((type & GICD_TYPE_CPUS) >> 5);
-    printk("GICv2: %d lines, %d cpu%s%s (IID %8.8x).\n",
+    gic_cpus = 16;
+    printk("GIC-HIP04: %d lines, %d cpu%s%s (IID %8.8x).\n",
            gicv2_info.nr_lines, gic_cpus, (gic_cpus == 1) ? "" : "s",
            (type & GICD_TYPE_SEC) ? ", secure" : "",
            readl_gicd(GICD_IIDR));
@@ -278,8 +288,8 @@ static void __init gicv2_dist_init(void)
         writel_gicd(0x0, GICD_ICFGR + (i / 16) * 4);
 
     /* Route all global IRQs to this CPU */
-    for ( i = 32; i < gicv2_info.nr_lines; i += 4 )
-        writel_gicd(cpumask, GICD_ITARGETSR + (i / 4) * 4);
+    for ( i = 32; i < gicv2_info.nr_lines; i += 2 )
+        writel_gicd(cpumask, GICD_ITARGETSR + (i / 2) * 4);
 
     /* Default priority for global interrupts */
     for ( i = 32; i < gicv2_info.nr_lines; i += 4 )
@@ -295,11 +305,11 @@ static void __init gicv2_dist_init(void)
     writel_gicd(GICD_CTL_ENABLE, GICD_CTLR);
 }
 
-static void __cpuinit gicv2_cpu_init(void)
+static void __cpuinit hip04gic_cpu_init(void)
 {
     int i;
 
-    this_cpu(gic_cpu_id) = readl_gicd(GICD_ITARGETSR) & 0xff;
+    this_cpu(gic_cpu_id) = readl_gicd(GICD_ITARGETSR) & 0xffff;
 
     /* The first 32 interrupts (PPI and SGI) are banked per-cpu, so
      * even though they are controlled with GICD registers, they must
@@ -328,12 +338,12 @@ static void __cpuinit gicv2_cpu_init(void)
     writel_gicc(GICC_CTL_ENABLE|GICC_CTL_EOI, GICC_CTLR);
 }
 
-static void gicv2_cpu_disable(void)
+static void hip04gic_cpu_disable(void)
 {
     writel_gicc(0x0, GICC_CTLR);
 }
 
-static void __cpuinit gicv2_hyp_init(void)
+static void __cpuinit hip04gic_hyp_init(void)
 {
     uint32_t vtr;
     uint8_t nr_lrs;
@@ -345,24 +355,24 @@ static void __cpuinit gicv2_hyp_init(void)
     writel_gich(GICH_MISR_EOI, GICH_MISR);
 }
 
-static void __cpuinit gicv2_hyp_disable(void)
+static void __cpuinit hip04gic_hyp_disable(void)
 {
     writel_gich(0, GICH_HCR);
 }
 
-static int gicv2_secondary_cpu_init(void)
+static int hip04gic_secondary_cpu_init(void)
 {
     spin_lock(&gicv2.lock);
 
-    gicv2_cpu_init();
-    gicv2_hyp_init();
+    hip04gic_cpu_init();
+    hip04gic_hyp_init();
 
     spin_unlock(&gicv2.lock);
 
     return 0;
 }
 
-static void gicv2_send_SGI(enum gic_sgi sgi, enum gic_sgi_mode irqmode,
+static void hip04gic_send_SGI(enum gic_sgi sgi, enum gic_sgi_mode irqmode,
                            const cpumask_t *cpu_mask)
 {
     unsigned int mask = 0;
@@ -378,9 +388,9 @@ static void gicv2_send_SGI(enum gic_sgi sgi, enum gic_sgi_mode irqmode,
         break;
     case SGI_TARGET_LIST:
         cpumask_and(&online_mask, cpu_mask, &cpu_online_map);
-        mask = gicv2_cpu_mask(&online_mask);
+        mask = hip04gic_cpu_mask(&online_mask);
         writel_gicd(GICD_SGI_TARGET_LIST |
-                    (mask << GICD_SGI_TARGET_SHIFT) | sgi,
+                    (mask << HIP04_GICD_SGI_TARGET_SHIFT) | sgi,
                     GICD_SGIR);
         break;
     default:
@@ -389,15 +399,15 @@ static void gicv2_send_SGI(enum gic_sgi sgi, enum gic_sgi_mode irqmode,
 }
 
 /* Shut down the per-CPU GIC interface */
-static void gicv2_disable_interface(void)
+static void hip04gic_disable_interface(void)
 {
     spin_lock(&gicv2.lock);
-    gicv2_cpu_disable();
-    gicv2_hyp_disable();
+    hip04gic_cpu_disable();
+    hip04gic_hyp_disable();
     spin_unlock(&gicv2.lock);
 }
 
-static void gicv2_update_lr(int lr, const struct pending_irq *p,
+static void hip04gic_update_lr(int lr, const struct pending_irq *p,
                             unsigned int state)
 {
     uint32_t lr_reg;
@@ -419,15 +429,15 @@ static void gicv2_update_lr(int lr, const struct pending_irq *p,
                             << GICH_V2_LR_PHYSICAL_SHIFT);
     }
 
-    writel_gich(lr_reg, GICH_LR + lr * 4);
+    writel_gich(lr_reg, HIP04_GICH_LR + lr * 4);
 }
 
-static void gicv2_clear_lr(int lr)
+static void hip04gic_clear_lr(int lr)
 {
-    writel_gich(0, GICH_LR + lr * 4);
+    writel_gich(0, HIP04_GICH_LR + lr * 4);
 }
 
-static int gicv2v_setup(struct domain *d)
+static int hip04gicv_setup(struct domain *d)
 {
     int ret;
 
@@ -468,11 +478,11 @@ static int gicv2v_setup(struct domain *d)
     return ret;
 }
 
-static void gicv2_read_lr(int lr, struct gic_lr *lr_reg)
+static void hip04gic_read_lr(int lr, struct gic_lr *lr_reg)
 {
     uint32_t lrv;
 
-    lrv          = readl_gich(GICH_LR + lr * 4);
+    lrv          = readl_gich(HIP04_GICH_LR + lr * 4);
     lr_reg->pirq = (lrv >> GICH_V2_LR_PHYSICAL_SHIFT) & GICH_V2_LR_PHYSICAL_MASK;
     lr_reg->virq = (lrv >> GICH_V2_LR_VIRTUAL_SHIFT) & GICH_V2_LR_VIRTUAL_MASK;
     lr_reg->priority = (lrv >> GICH_V2_LR_PRIORITY_SHIFT) & GICH_V2_LR_PRIORITY_MASK;
@@ -481,7 +491,7 @@ static void gicv2_read_lr(int lr, struct gic_lr *lr_reg)
     lr_reg->grp       = (lrv >> GICH_V2_LR_GRP_SHIFT) & GICH_V2_LR_GRP_MASK;
 }
 
-static void gicv2_write_lr(int lr, const struct gic_lr *lr_reg)
+static void hip04gic_write_lr(int lr, const struct gic_lr *lr_reg)
 {
     uint32_t lrv = 0;
 
@@ -495,10 +505,10 @@ static void gicv2_write_lr(int lr, const struct gic_lr *lr_reg)
                                        << GICH_V2_LR_HW_SHIFT)  |
           ((uint32_t)(lr_reg->grp & GICH_V2_LR_GRP_MASK) << GICH_V2_LR_GRP_SHIFT) );
 
-    writel_gich(lrv, GICH_LR + lr * 4);
+    writel_gich(lrv, HIP04_GICH_LR + lr * 4);
 }
 
-static void gicv2_hcr_status(uint32_t flag, bool_t status)
+static void hip04gic_hcr_status(uint32_t flag, bool_t status)
 {
     uint32_t hcr = readl_gich(GICH_HCR);
 
@@ -510,18 +520,18 @@ static void gicv2_hcr_status(uint32_t flag, bool_t status)
     writel_gich(hcr, GICH_HCR);
 }
 
-static unsigned int gicv2_read_vmcr_priority(void)
+static unsigned int hip04gic_read_vmcr_priority(void)
 {
    return ((readl_gich(GICH_VMCR) >> GICH_V2_VMCR_PRIORITY_SHIFT)
            & GICH_V2_VMCR_PRIORITY_MASK);
 }
 
-static unsigned int gicv2_read_apr(int apr_reg)
+static unsigned int hip04gic_read_apr(int apr_reg)
 {
-   return readl_gich(GICH_APR);
+   return readl_gich(HIP04_GICH_APR);
 }
 
-static void gicv2_irq_enable(struct irq_desc *desc)
+static void hip04gic_irq_enable(struct irq_desc *desc)
 {
     unsigned long flags;
     int irq = desc->irq;
@@ -536,7 +546,7 @@ static void gicv2_irq_enable(struct irq_desc *desc)
     spin_unlock_irqrestore(&gicv2.lock, flags);
 }
 
-static void gicv2_irq_disable(struct irq_desc *desc)
+static void hip04gic_irq_disable(struct irq_desc *desc)
 {
     unsigned long flags;
     int irq = desc->irq;
@@ -550,39 +560,39 @@ static void gicv2_irq_disable(struct irq_desc *desc)
     spin_unlock_irqrestore(&gicv2.lock, flags);
 }
 
-static unsigned int gicv2_irq_startup(struct irq_desc *desc)
+static unsigned int hip04gic_irq_startup(struct irq_desc *desc)
 {
-    gicv2_irq_enable(desc);
+    hip04gic_irq_enable(desc);
 
     return 0;
 }
 
-static void gicv2_irq_shutdown(struct irq_desc *desc)
+static void hip04gic_irq_shutdown(struct irq_desc *desc)
 {
-    gicv2_irq_disable(desc);
+    hip04gic_irq_disable(desc);
 }
 
-static void gicv2_irq_ack(struct irq_desc *desc)
+static void hip04gic_irq_ack(struct irq_desc *desc)
 {
     /* No ACK -- reading IAR has done this for us */
 }
 
-static void gicv2_host_irq_end(struct irq_desc *desc)
+static void hip04gic_host_irq_end(struct irq_desc *desc)
 {
     /* Lower the priority */
-    gicv2_eoi_irq(desc);
+    hip04gic_eoi_irq(desc);
     /* Deactivate */
-    gicv2_dir_irq(desc);
+    hip04gic_dir_irq(desc);
 }
 
-static void gicv2_guest_irq_end(struct irq_desc *desc)
+static void hip04gic_guest_irq_end(struct irq_desc *desc)
 {
     /* Lower the priority of the IRQ */
-    gicv2_eoi_irq(desc);
+    hip04gic_eoi_irq(desc);
     /* Deactivation happens in maintenance interrupt / via GICV */
 }
 
-static void gicv2_irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_mask)
+static void hip04gic_irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_mask)
 {
     unsigned int mask;
 
@@ -590,15 +600,15 @@ static void gicv2_irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_m
 
     spin_lock(&gicv2.lock);
 
-    mask = gicv2_cpu_mask(cpu_mask);
+    mask = hip04gic_cpu_mask(cpu_mask);
 
     /* Set target CPU mask (RAZ/WI on uniprocessor) */
-    writeb_gicd(mask, GICD_ITARGETSR + desc->irq);
+    writew_gicd(mask, GICD_ITARGETSR + desc->irq * 2);
 
     spin_unlock(&gicv2.lock);
 }
 
-static int gicv2_make_dt_node(const struct domain *d,
+static int hip04gic_make_dt_node(const struct domain *d,
                               const struct dt_device_node *node, void *fdt)
 {
     const struct dt_device_node *gic = dt_interrupt_controller;
@@ -652,55 +662,55 @@ static int gicv2_make_dt_node(const struct domain *d,
 }
 
 /* XXX different for level vs edge */
-static hw_irq_controller gicv2_host_irq_type = {
-    .typename     = "gic-v2",
-    .startup      = gicv2_irq_startup,
-    .shutdown     = gicv2_irq_shutdown,
-    .enable       = gicv2_irq_enable,
-    .disable      = gicv2_irq_disable,
-    .ack          = gicv2_irq_ack,
-    .end          = gicv2_host_irq_end,
-    .set_affinity = gicv2_irq_set_affinity,
+static hw_irq_controller hip04gic_host_irq_type = {
+    .typename     = "gic-hip04",
+    .startup      = hip04gic_irq_startup,
+    .shutdown     = hip04gic_irq_shutdown,
+    .enable       = hip04gic_irq_enable,
+    .disable      = hip04gic_irq_disable,
+    .ack          = hip04gic_irq_ack,
+    .end          = hip04gic_host_irq_end,
+    .set_affinity = hip04gic_irq_set_affinity,
 };
 
-static hw_irq_controller gicv2_guest_irq_type = {
-    .typename     = "gic-v2",
-    .startup      = gicv2_irq_startup,
-    .shutdown     = gicv2_irq_shutdown,
-    .enable       = gicv2_irq_enable,
-    .disable      = gicv2_irq_disable,
-    .ack          = gicv2_irq_ack,
-    .end          = gicv2_guest_irq_end,
-    .set_affinity = gicv2_irq_set_affinity,
+static hw_irq_controller hip04gic_guest_irq_type = {
+    .typename     = "gic-hip04",
+    .startup      = hip04gic_irq_startup,
+    .shutdown     = hip04gic_irq_shutdown,
+    .enable       = hip04gic_irq_enable,
+    .disable      = hip04gic_irq_disable,
+    .ack          = hip04gic_irq_ack,
+    .end          = hip04gic_guest_irq_end,
+    .set_affinity = hip04gic_irq_set_affinity,
 };
 
-const static struct gic_hw_operations gicv2_ops = {
+const static struct gic_hw_operations hip04gic_ops = {
     .info                = &gicv2_info,
-    .secondary_init      = gicv2_secondary_cpu_init,
-    .save_state          = gicv2_save_state,
-    .restore_state       = gicv2_restore_state,
-    .dump_state          = gicv2_dump_state,
-    .gicv_setup          = gicv2v_setup,
-    .gic_host_irq_type   = &gicv2_host_irq_type,
-    .gic_guest_irq_type  = &gicv2_guest_irq_type,
-    .eoi_irq             = gicv2_eoi_irq,
-    .deactivate_irq      = gicv2_dir_irq,
-    .read_irq            = gicv2_read_irq,
-    .set_irq_properties  = gicv2_set_irq_properties,
-    .send_SGI            = gicv2_send_SGI,
-    .disable_interface   = gicv2_disable_interface,
-    .update_lr           = gicv2_update_lr,
-    .update_hcr_status   = gicv2_hcr_status,
-    .clear_lr            = gicv2_clear_lr,
-    .read_lr             = gicv2_read_lr,
-    .write_lr            = gicv2_write_lr,
-    .read_vmcr_priority  = gicv2_read_vmcr_priority,
-    .read_apr            = gicv2_read_apr,
-    .make_dt_node        = gicv2_make_dt_node,
+    .secondary_init      = hip04gic_secondary_cpu_init,
+    .save_state          = hip04gic_save_state,
+    .restore_state       = hip04gic_restore_state,
+    .dump_state          = hip04gic_dump_state,
+    .gicv_setup          = hip04gicv_setup,
+    .gic_host_irq_type   = &hip04gic_host_irq_type,
+    .gic_guest_irq_type  = &hip04gic_guest_irq_type,
+    .eoi_irq             = hip04gic_eoi_irq,
+    .deactivate_irq      = hip04gic_dir_irq,
+    .read_irq            = hip04gic_read_irq,
+    .set_irq_properties  = hip04gic_set_irq_properties,
+    .send_SGI            = hip04gic_send_SGI,
+    .disable_interface   = hip04gic_disable_interface,
+    .update_lr           = hip04gic_update_lr,
+    .update_hcr_status   = hip04gic_hcr_status,
+    .clear_lr            = hip04gic_clear_lr,
+    .read_lr             = hip04gic_read_lr,
+    .write_lr            = hip04gic_write_lr,
+    .read_vmcr_priority  = hip04gic_read_vmcr_priority,
+    .read_apr            = hip04gic_read_apr,
+    .make_dt_node        = hip04gic_make_dt_node,
 };
 
 /* Set up the GIC */
-static int __init gicv2_init(struct dt_device_node *node, const void *data)
+static int __init hip04gic_init(struct dt_device_node *node, const void *data)
 {
     int res;
 
@@ -708,23 +718,23 @@ static int __init gicv2_init(struct dt_device_node *node, const void *data)
 
     res = dt_device_get_address(node, 0, &gicv2.dbase, NULL);
     if ( res || !gicv2.dbase || (gicv2.dbase & ~PAGE_MASK) )
-        panic("GICv2: Cannot find a valid address for the distributor");
+        panic("GIC-HIP04: Cannot find a valid address for the distributor");
 
     res = dt_device_get_address(node, 1, &gicv2.cbase, NULL);
     if ( res || !gicv2.cbase || (gicv2.cbase & ~PAGE_MASK) )
-        panic("GICv2: Cannot find a valid address for the CPU");
+        panic("GIC-HIP04: Cannot find a valid address for the CPU");
 
     res = dt_device_get_address(node, 2, &gicv2.hbase, NULL);
     if ( res || !gicv2.hbase || (gicv2.hbase & ~PAGE_MASK) )
-        panic("GICv2: Cannot find a valid address for the hypervisor");
+        panic("GIC-HIP04: Cannot find a valid address for the hypervisor");
 
     res = dt_device_get_address(node, 3, &gicv2.vbase, NULL);
     if ( res || !gicv2.vbase || (gicv2.vbase & ~PAGE_MASK) )
-        panic("GICv2: Cannot find a valid address for the virtual CPU");
+        panic("GIC-HIP04: Cannot find a valid address for the virtual CPU");
 
     res = platform_get_irq(node, 0);
     if ( res < 0 )
-        panic("GICv2: Cannot find the maintenance IRQ");
+        panic("GIC-HIP04: Cannot find the maintenance IRQ");
     gicv2_info.maintenance_irq = res;
 
     /* Set the GIC as the primary interrupt controller */
@@ -732,7 +742,7 @@ static int __init gicv2_init(struct dt_device_node *node, const void *data)
 
     /* TODO: Add check on distributor, cpu size */
 
-    printk("GICv2 initialization:\n"
+    printk("GIC-HIP04 initialization:\n"
               "        gic_dist_addr=%"PRIpaddr"\n"
               "        gic_cpu_addr=%"PRIpaddr"\n"
               "        gic_hyp_addr=%"PRIpaddr"\n"
@@ -743,11 +753,11 @@ static int __init gicv2_init(struct dt_device_node *node, const void *data)
 
     if ( (gicv2.dbase & ~PAGE_MASK) || (gicv2.cbase & ~PAGE_MASK) ||
          (gicv2.hbase & ~PAGE_MASK) || (gicv2.vbase & ~PAGE_MASK) )
-        panic("GICv2 interfaces not page aligned");
+        panic("GIC-HIP04 interfaces not page aligned");
 
     gicv2.map_dbase = ioremap_nocache(gicv2.dbase, PAGE_SIZE);
     if ( !gicv2.map_dbase )
-        panic("GICv2: Failed to ioremap for GIC distributor\n");
+        panic("GIC-HIP04: Failed to ioremap for GIC distributor\n");
 
     gicv2.map_cbase[0] = ioremap_nocache(gicv2.cbase, PAGE_SIZE);
 
@@ -758,37 +768,37 @@ static int __init gicv2_init(struct dt_device_node *node, const void *data)
         gicv2.map_cbase[1] = ioremap_nocache(gicv2.cbase + PAGE_SIZE, PAGE_SIZE);
 
     if ( !gicv2.map_cbase[0] || !gicv2.map_cbase[1] )
-        panic("GICv2: Failed to ioremap for GIC CPU interface\n");
+        panic("GIC-HIP04: Failed to ioremap for GIC CPU interface\n");
 
     gicv2.map_hbase = ioremap_nocache(gicv2.hbase, PAGE_SIZE);
     if ( !gicv2.map_hbase )
-        panic("GICv2: Failed to ioremap for GIC Virtual interface\n");
+        panic("GIC-HIP04: Failed to ioremap for GIC Virtual interface\n");
 
     /* Global settings: interrupt distributor */
     spin_lock_init(&gicv2.lock);
     spin_lock(&gicv2.lock);
 
-    gicv2_dist_init();
-    gicv2_cpu_init();
-    gicv2_hyp_init();
+    hip04gic_dist_init();
+    hip04gic_cpu_init();
+    hip04gic_hyp_init();
 
     spin_unlock(&gicv2.lock);
 
     gicv2_info.hw_version = GIC_V2;
-    register_gic_ops(&gicv2_ops);
+    register_gic_ops(&hip04gic_ops);
 
     return 0;
 }
 
-static const struct dt_device_match gicv2_dt_match[] __initconst =
+static const struct dt_device_match hip04gic_dt_match[] __initconst =
 {
-    DT_MATCH_GIC_V2,
+    DT_MATCH_COMPATIBLE("hisilicon,hip04-intc"),
     { /* sentinel */ },
 };
 
-DT_DEVICE_START(gicv2, "GICv2", DEVICE_GIC)
-        .dt_match = gicv2_dt_match,
-        .init = gicv2_init,
+DT_DEVICE_START(hip04gic, "GIC-HIP04", DEVICE_GIC)
+        .dt_match = hip04gic_dt_match,
+        .init = hip04gic_init,
 DT_DEVICE_END
 
 /*
