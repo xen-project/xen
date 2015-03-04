@@ -696,4 +696,6 @@ libxl_event = Struct("event",[
 
 libxl_psr_cmt_type = Enumeration("psr_cmt_type", [
     (1, "CACHE_OCCUPANCY"),
+    (2, "TOTAL_MEM_COUNT"),
+    (3, "LOCAL_MEM_COUNT"),
     ])

@@ -1108,6 +1108,9 @@ The following resources are available:
   L3 cache occupancy.
   * `cmt` instructs Xen to enable/disable Cache Monitoring Technology.
   * `rmid_max` indicates the max value for rmid.
+* Memory Bandwidth Monitoring (Broadwell and later). Information regarding the
+  total/local memory bandwidth. Follow the same options with Cache Monitoring
+  Technology.
 
 ### reboot
 > `= t[riple] | k[bd] | a[cpi] | p[ci] | n[o] [, [w]arm | [c]old]`

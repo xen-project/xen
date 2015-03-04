@@ -17,12 +17,15 @@
  * GNU Lesser General Public License for more details.
  */
 
+#include <assert.h>
 #include "xc_private.h"
 #include "xc_msr_x86.h"
 
 #define IA32_CMT_CTR_ERROR_MASK         (0x3ull << 62)
 
 #define EVTID_L3_OCCUPANCY             0x1
+#define EVTID_TOTAL_MEM_COUNT          0x2
+#define EVTID_LOCAL_MEM_COUNT          0x3
 
 int xc_psr_cmt_attach(xc_interface *xch, uint32_t domid)
 {
@@ -112,6 +115,23 @@ int xc_psr_cmt_get_l3_upscaling_factor(xc_interface *xch,
     return rc;
 }
 
+int xc_psr_cmt_get_l3_event_mask(xc_interface *xch, uint32_t *event_mask)
+{
+    int rc;
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_psr_cmt_op;
+    sysctl.u.psr_cmt_op.cmd =
+        XEN_SYSCTL_PSR_CMT_get_l3_event_mask;
+    sysctl.u.psr_cmt_op.flags = 0;
+
+    rc = xc_sysctl(xch, &sysctl);
+    if ( !rc )
+        *event_mask = sysctl.u.psr_cmt_op.u.data;
+
+    return rc;
+}
+
 int xc_psr_cmt_get_l3_cache_size(xc_interface *xch, uint32_t cpu,
                                  uint32_t *l3_cache_size)
 {
@@ -139,10 +159,12 @@ int xc_psr_cmt_get_l3_cache_size(xc_interface *xch, uint32_t cpu,
 }
 
 int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
-                        xc_psr_cmt_type type, uint64_t *monitor_data)
+                        xc_psr_cmt_type type, uint64_t *monitor_data,
+                        uint64_t *tsc)
 {
     xc_resource_op_t op;
-    xc_resource_entry_t entries[2];
+    xc_resource_entry_t entries[3];
+    xc_resource_entry_t *tsc_entry = NULL;
     uint32_t evtid, nr = 0;
     int rc;
 
@@ -150,6 +172,12 @@ int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
     {
     case XC_PSR_CMT_L3_OCCUPANCY:
         evtid = EVTID_L3_OCCUPANCY;
+        break;
+    case XC_PSR_CMT_TOTAL_MEM_COUNT:
+        evtid = EVTID_TOTAL_MEM_COUNT;
+        break;
+    case XC_PSR_CMT_LOCAL_MEM_COUNT:
+        evtid = EVTID_LOCAL_MEM_COUNT;
         break;
     default:
         return -1;
@@ -167,6 +195,18 @@ int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
     entries[nr].rsvd = 0;
     nr++;
 
+    if ( tsc != NULL )
+    {
+        tsc_entry = &entries[nr];
+        entries[nr].u.cmd = XEN_RESOURCE_OP_MSR_READ;
+        entries[nr].idx = MSR_IA32_TSC;
+        entries[nr].val = 0;
+        entries[nr].rsvd = 0;
+        nr++;
+    }
+
+    assert(nr <= ARRAY_SIZE(entries));
+
     op.cpu = cpu;
     op.nr_entries = nr;
     op.entries = entries;
@@ -179,6 +219,9 @@ int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
         return -1;
 
     *monitor_data = entries[1].val;
+
+    if ( tsc_entry != NULL )
+        *tsc = tsc_entry->val;
 
     return 0;
 }

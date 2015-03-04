@@ -1461,6 +1461,13 @@ is domain level. To monitor a specific domain, just attach the domain id with
 the monitoring service. When the domain doesn't need to be monitored any more,
 detach the domain id from the monitoring service.
 
+Intel Broadwell and later server platforms also offer total/local memory
+bandwidth monitoring. Xen supports per-domain monitoring for these two
+additional monitoring types. Both memory bandwidth monitoring and L3 cache
+occupancy monitoring share the same set of underlying monitoring service. Once
+a domain is attached to the monitoring service, monitoring data can be showed
+for any of these monitoring types.
+
 =over 4
 
 =item B<psr-cmt-attach> [I<domain-id>]
@@ -1475,7 +1482,9 @@ detach: Detach the platform shared resource monitoring service from a domain.
 
 Show monitoring data for a certain domain or all domains. Current supported
 monitor types are:
- - "cache-occupancy": showing the L3 cache occupancy.
+ - "cache-occupancy": showing the L3 cache occupancy(KB).
+ - "total-mem-bandwidth": showing the total memory bandwidth(KB/s).
+ - "local-mem-bandwidth": showing the local memory bandwidth(KB/s).
 
 =back
 

@@ -2688,6 +2688,8 @@ int xc_resource_op(xc_interface *xch, uint32_t nr_ops, xc_resource_op_t *ops);
 #if defined(__i386__) || defined(__x86_64__)
 enum xc_psr_cmt_type {
     XC_PSR_CMT_L3_OCCUPANCY,
+    XC_PSR_CMT_TOTAL_MEM_COUNT,
+    XC_PSR_CMT_LOCAL_MEM_COUNT,
 };
 typedef enum xc_psr_cmt_type xc_psr_cmt_type;
 int xc_psr_cmt_attach(xc_interface *xch, uint32_t domid);
@@ -2697,10 +2699,12 @@ int xc_psr_cmt_get_domain_rmid(xc_interface *xch, uint32_t domid,
 int xc_psr_cmt_get_total_rmid(xc_interface *xch, uint32_t *total_rmid);
 int xc_psr_cmt_get_l3_upscaling_factor(xc_interface *xch,
                                        uint32_t *upscaling_factor);
+int xc_psr_cmt_get_l3_event_mask(xc_interface *xch, uint32_t *event_mask);
 int xc_psr_cmt_get_l3_cache_size(xc_interface *xch, uint32_t cpu,
                                  uint32_t *l3_cache_size);
 int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
-                        uint32_t psr_cmt_type, uint64_t *monitor_data);
+                        uint32_t psr_cmt_type, uint64_t *monitor_data,
+                        uint64_t *tsc);
 int xc_psr_cmt_enabled(xc_interface *xch);
 #endif
 

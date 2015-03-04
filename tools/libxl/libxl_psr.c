@@ -161,18 +161,36 @@ out:
     return rc;
 }
 
-int libxl_psr_cmt_get_cache_occupancy(libxl_ctx *ctx,
-                                      uint32_t domid,
-                                      uint32_t socketid,
-                                      uint32_t *l3_cache_occupancy)
+int libxl_psr_cmt_type_supported(libxl_ctx *ctx, libxl_psr_cmt_type type)
 {
     GC_INIT(ctx);
+    uint32_t event_mask;
+    int rc;
 
+    rc = xc_psr_cmt_get_l3_event_mask(ctx->xch, &event_mask);
+    if (rc < 0) {
+        libxl__psr_cmt_log_err_msg(gc, errno);
+        rc = 0;
+    } else {
+        rc = event_mask & (1 << (type - 1));
+    }
+
+    GC_FREE;
+    return rc;
+}
+
+int libxl_psr_cmt_get_sample(libxl_ctx *ctx,
+                             uint32_t domid,
+                             libxl_psr_cmt_type type,
+                             uint64_t scope,
+                             uint64_t *sample_r,
+                             uint64_t *tsc_r)
+{
+    GC_INIT(ctx);
     unsigned int rmid;
     uint32_t upscaling_factor;
     uint64_t monitor_data;
     int cpu, rc;
-    xc_psr_cmt_type type;
 
     rc = xc_psr_cmt_get_domain_rmid(ctx->xch, domid, &rmid);
     if (rc < 0 || rmid == 0) {
@@ -182,15 +200,15 @@ int libxl_psr_cmt_get_cache_occupancy(libxl_ctx *ctx,
         goto out;
     }
 
-    cpu = libxl__pick_socket_cpu(gc, socketid);
+    cpu = libxl__pick_socket_cpu(gc, scope);
     if (cpu < 0) {
         LOGE(ERROR, "failed to get socket cpu");
         rc = ERROR_FAIL;
         goto out;
     }
 
-    type = XC_PSR_CMT_L3_OCCUPANCY;
-    rc = xc_psr_cmt_get_data(ctx->xch, rmid, cpu, type, &monitor_data);
+    rc = xc_psr_cmt_get_data(ctx->xch, rmid, cpu, type - 1,
+                             &monitor_data, tsc_r);
     if (rc < 0) {
         LOGE(ERROR, "failed to get monitoring data");
         rc = ERROR_FAIL;
@@ -204,10 +222,28 @@ int libxl_psr_cmt_get_cache_occupancy(libxl_ctx *ctx,
         goto out;
     }
 
-    *l3_cache_occupancy = upscaling_factor * monitor_data / 1024;
-    rc = 0;
+    *sample_r = monitor_data * upscaling_factor;
 out:
     GC_FREE;
+    return rc;
+}
+
+int libxl_psr_cmt_get_cache_occupancy(libxl_ctx *ctx,
+                                      uint32_t domid,
+                                      uint32_t socketid,
+                                      uint32_t *l3_cache_occupancy)
+{
+    uint64_t data;
+    int rc;
+
+    rc = libxl_psr_cmt_get_sample(ctx, domid,
+                                  LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY,
+                                  socketid, &data, NULL);
+    if (rc < 0)
+        goto out;
+
+    *l3_cache_occupancy = data / 1024;
+out:
     return rc;
 }
 

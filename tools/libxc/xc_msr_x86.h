@@ -20,6 +20,7 @@
 #ifndef XC_MSR_X86_H
 #define XC_MSR_X86_H
 
+#define MSR_IA32_TSC            0x00000010
 #define MSR_IA32_CMT_EVTSEL     0x00000c8d
 #define MSR_IA32_CMT_CTR        0x00000c8e
 

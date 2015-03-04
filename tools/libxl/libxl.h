@@ -711,6 +711,13 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
  * If this is defined, the Cache Monitoring Technology feature is supported.
  */
 #define LIBXL_HAVE_PSR_CMT 1
+
+/*
+ * LIBXL_HAVE_PSR_MBM
+ *
+ * If this is defined, the Memory Bandwidth Monitoring feature is supported.
+ */
+#define LIBXL_HAVE_PSR_MBM 1
 #endif
 
 typedef char **libxl_string_list;
@@ -1482,6 +1489,16 @@ int libxl_psr_cmt_get_cache_occupancy(libxl_ctx *ctx,
                                       uint32_t domid,
                                       uint32_t socketid,
                                       uint32_t *l3_cache_occupancy);
+#endif
+
+#ifdef LIBXL_HAVE_PSR_MBM
+int libxl_psr_cmt_type_supported(libxl_ctx *ctx, libxl_psr_cmt_type type);
+int libxl_psr_cmt_get_sample(libxl_ctx *ctx,
+                             uint32_t domid,
+                             libxl_psr_cmt_type type,
+                             uint64_t scope,
+                             uint64_t *sample_r,
+                             uint64_t *tsc_r);
 #endif
 
 /* misc */

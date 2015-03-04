@@ -7825,13 +7825,61 @@ out:
 }
 
 #ifdef LIBXL_HAVE_PSR_CMT
+
+#define MBM_SAMPLE_RETRY_MAX 4
+static int psr_cmt_get_mem_bandwidth(uint32_t domid,
+                                     libxl_psr_cmt_type type,
+                                     uint32_t socketid,
+                                     uint64_t *bandwidth_r)
+{
+    uint64_t sample1, sample2;
+    uint64_t tsc1, tsc2;
+    int retry_attempts = 0;
+    int rc;
+
+    while (1) {
+        rc = libxl_psr_cmt_get_sample(ctx, domid, type, socketid,
+                                      &sample1, &tsc1);
+        if (rc < 0)
+            return rc;
+
+        usleep(10000);
+
+        rc = libxl_psr_cmt_get_sample(ctx, domid, type, socketid,
+                                      &sample2, &tsc2);
+        if (rc < 0)
+            return rc;
+
+        if (tsc2 <= tsc1)
+            return -1;
+
+        /*
+         * Hardware guarantees at most 1 overflow can happen if the duration
+         * between two samples is less than 1 second. Note that tsc returned
+         * from hypervisor is already-scaled time(ns).
+         */
+        if (tsc2 - tsc1 < 1000000000 && sample2 >= sample1)
+            break;
+
+        if (retry_attempts < MBM_SAMPLE_RETRY_MAX) {
+            retry_attempts++;
+        } else {
+            fprintf(stderr, "event counter overflowed\n");
+            return -1;
+        }
+    }
+
+    *bandwidth_r = (sample2 - sample1) * 1000000000 / (tsc2 - tsc1) / 1024;
+    return 0;
+}
+
 static void psr_cmt_print_domain_info(libxl_dominfo *dominfo,
                                       libxl_psr_cmt_type type,
                                       uint32_t nr_sockets)
 {
     char *domain_name;
     uint32_t socketid;
-    uint32_t l3_cache_occupancy;
+    uint64_t monitor_data;
 
     if (!libxl_psr_cmt_domain_attached(ctx, dominfo->domid))
         return;
@@ -7843,11 +7891,15 @@ static void psr_cmt_print_domain_info(libxl_dominfo *dominfo,
     for (socketid = 0; socketid < nr_sockets; socketid++) {
         switch (type) {
         case LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY:
-            if (!libxl_psr_cmt_get_cache_occupancy(ctx,
-                                                   dominfo->domid,
-                                                   socketid,
-                                                   &l3_cache_occupancy))
-                printf("%13u KB", l3_cache_occupancy);
+            if (!libxl_psr_cmt_get_sample(ctx, dominfo->domid, type, socketid,
+                                          &monitor_data, NULL))
+                printf("%13"PRIu64" KB", monitor_data / 1024);
+            break;
+        case LIBXL_PSR_CMT_TYPE_TOTAL_MEM_COUNT:
+        case LIBXL_PSR_CMT_TYPE_LOCAL_MEM_COUNT:
+            if (!psr_cmt_get_mem_bandwidth(dominfo->domid, type, socketid,
+                                           &monitor_data))
+                printf("%11"PRIu64" KB/s", monitor_data);
             break;
         default:
             return;
@@ -7866,6 +7918,12 @@ static int psr_cmt_show(libxl_psr_cmt_type type, uint32_t domid)
 
     if (!libxl_psr_cmt_enabled(ctx)) {
         fprintf(stderr, "CMT is disabled in the system\n");
+        return -1;
+    }
+
+    if (!libxl_psr_cmt_type_supported(ctx, type)) {
+        fprintf(stderr, "Monitor type '%s' is not supported in the system\n",
+                libxl_psr_cmt_type_to_string(type));
         return -1;
     }
 
@@ -7973,7 +8031,16 @@ int main_psr_cmt_show(int argc, char **argv)
         /* No options */
     }
 
-    libxl_psr_cmt_type_from_string(argv[optind], &type);
+    if (!strcmp(argv[optind], "cache_occupancy"))
+        type = LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY;
+    else if (!strcmp(argv[optind], "total_mem_bandwidth"))
+        type = LIBXL_PSR_CMT_TYPE_TOTAL_MEM_COUNT;
+    else if (!strcmp(argv[optind], "local_mem_bandwidth"))
+        type = LIBXL_PSR_CMT_TYPE_LOCAL_MEM_COUNT;
+    else {
+        help("psr-cmt-show");
+        return 2;
+    }
 
     if (optind + 1 >= argc)
         domid = INVALID_DOMID;
@@ -7984,14 +8051,7 @@ int main_psr_cmt_show(int argc, char **argv)
         return 2;
     }
 
-    switch (type) {
-    case LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY:
-        ret = psr_cmt_show(type, domid);
-        break;
-    default:
-        help("psr-cmt-show");
-        return 2;
-    }
+    ret = psr_cmt_show(type, domid);
 
     return ret;
 }
