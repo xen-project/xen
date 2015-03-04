@@ -1029,6 +1029,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         DT_MATCH_COMPATIBLE("xen,multiboot-module"),
         DT_MATCH_COMPATIBLE("multiboot,module"),
         DT_MATCH_COMPATIBLE("arm,psci"),
+        DT_MATCH_COMPATIBLE("arm,psci-0.2"),
         DT_MATCH_PATH("/cpus"),
         DT_MATCH_TYPE("memory"),
         /* The memory mapped timer is not supported by Xen. */
