@@ -138,6 +138,7 @@ void __init tboot_probe(void)
                       TXT_PUB_CONFIG_REGS_BASE + TXTCR_SINIT_BASE);
     tboot_copy_memory((unsigned char *)&sinit_size, sizeof(sinit_size),
                       TXT_PUB_CONFIG_REGS_BASE + TXTCR_SINIT_SIZE);
+    __set_fixmap(FIX_TBOOT_MAP_ADDRESS, 0, 0);
 }
 
 /* definitions from xen/drivers/passthrough/vtd/iommu.h
@@ -476,6 +477,8 @@ int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
     dmar_table_raw = xmalloc_array(unsigned char, dmar_table_length);
     tboot_copy_memory(dmar_table_raw, dmar_table_length, pa);
     dmar_table = (struct acpi_table_header *)dmar_table_raw;
+    __set_fixmap(FIX_TBOOT_MAP_ADDRESS, 0, 0);
+
     rc = dmar_handler(dmar_table);
     xfree(dmar_table_raw);
 
