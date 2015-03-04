@@ -71,6 +71,7 @@ static void __init init_idle_domain(void)
 static const char * __initdata processor_implementers[] = {
     ['A'] = "ARM Limited",
     ['B'] = "Broadcom Corporation",
+    ['C'] = "Cavium Inc.",
     ['D'] = "Digital Equipment Corp",
     ['M'] = "Motorola, Freescale Semiconductor Inc.",
     ['P'] = "Applied Micro",
