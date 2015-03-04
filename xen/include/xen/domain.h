@@ -4,6 +4,7 @@
 
 #include <public/xen.h>
 #include <asm/domain.h>
+#include <asm/numa.h>
 
 typedef union {
     struct vcpu_guest_context *nat;
@@ -99,7 +100,7 @@ struct vnuma_info {
     unsigned int nr_vmemranges;
     unsigned int *vdistance;
     unsigned int *vcpu_to_vnode;
-    unsigned int *vnode_to_pnode;
+    nodeid_t *vnode_to_pnode;
     struct xen_vmemrange *vmemrange;
 };
 

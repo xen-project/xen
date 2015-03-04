@@ -344,7 +344,7 @@ static struct vnuma_info *vnuma_alloc(unsigned int nr_vnodes,
 
     vnuma->vdistance = xmalloc_array(unsigned int, nr_vnodes * nr_vnodes);
     vnuma->vcpu_to_vnode = xmalloc_array(unsigned int, nr_vcpus);
-    vnuma->vnode_to_pnode = xmalloc_array(unsigned int, nr_vnodes);
+    vnuma->vnode_to_pnode = xmalloc_array(nodeid_t, nr_vnodes);
     vnuma->vmemrange = xmalloc_array(xen_vmemrange_t, nr_ranges);
 
     if ( vnuma->vdistance == NULL || vnuma->vmemrange == NULL ||
@@ -382,30 +382,40 @@ static struct vnuma_info *vnuma_init(const struct xen_domctl_vnuma *uinfo,
                          nr_vnodes * nr_vnodes) )
         goto vnuma_fail;
 
+    if ( copy_from_guest(info->vmemrange, uinfo->vmemrange,
+                         uinfo->nr_vmemranges) )
+        goto vnuma_fail;
+
     if ( copy_from_guest(info->vcpu_to_vnode, uinfo->vcpu_to_vnode,
                          d->max_vcpus) )
         goto vnuma_fail;
 
-    if ( copy_from_guest(info->vnode_to_pnode, uinfo->vnode_to_pnode,
-                         nr_vnodes) )
-        goto vnuma_fail;
+    ret = -E2BIG;
+    for ( i = 0; i < d->max_vcpus; ++i )
+        if ( info->vcpu_to_vnode[i] >= nr_vnodes )
+            goto vnuma_fail;
 
-    if (copy_from_guest(info->vmemrange, uinfo->vmemrange,
-                        uinfo->nr_vmemranges))
-        goto vnuma_fail;
+    for ( i = 0; i < nr_vnodes; ++i )
+    {
+        unsigned int pnode;
+
+        ret = -EFAULT;
+        if ( copy_from_guest_offset(&pnode, uinfo->vnode_to_pnode, i, 1) )
+            goto vnuma_fail;
+        ret = -E2BIG;
+        if ( pnode >= MAX_NUMNODES )
+            goto vnuma_fail;
+        info->vnode_to_pnode[i] = pnode;
+    }
 
     info->nr_vnodes = nr_vnodes;
     info->nr_vmemranges = uinfo->nr_vmemranges;
 
     /* Check that vmemranges flags are zero. */
+    ret = -EINVAL;
     for ( i = 0; i < info->nr_vmemranges; i++ )
-    {
         if ( info->vmemrange[i].flags != 0 )
-        {
-            ret = -EINVAL;
             goto vnuma_fail;
-        }
-    }
 
     return info;
 
