@@ -1684,7 +1684,7 @@ tapdisk_vbd_check_ring_message(td_vbd_t *vbd)
 	if (!vbd->ring.sring)
 		return -EINVAL;
 
-	switch (vbd->ring.sring->private.tapif_user.msg) {
+	switch (vbd->ring.sring->pvt.tapif_user.msg) {
 	case 0:
 		return 0;
 
