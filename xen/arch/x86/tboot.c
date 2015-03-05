@@ -435,13 +435,12 @@ int __init tboot_protect_mem_regions(void)
 
 int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
 {
-    struct acpi_table_header *dmar_table;
     int rc;
     uint64_t size;
     uint32_t dmar_table_length;
     unsigned long pa;
     sinit_mle_data_t sinit_mle_data;
-    unsigned char *dmar_table_raw;
+    void *dmar_table;
 
     if ( !tboot_in_measured_env() )
         return acpi_table_parse(ACPI_SIG_DMAR, dmar_handler);
@@ -474,13 +473,12 @@ int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
     tboot_copy_memory((unsigned char *)&dmar_table_length,
                       sizeof(dmar_table_length),
                       pa + sizeof(char) * ACPI_NAME_SIZE);
-    dmar_table_raw = xmalloc_array(unsigned char, dmar_table_length);
-    tboot_copy_memory(dmar_table_raw, dmar_table_length, pa);
-    dmar_table = (struct acpi_table_header *)dmar_table_raw;
+    dmar_table = xmalloc_bytes(dmar_table_length);
+    tboot_copy_memory(dmar_table, dmar_table_length, pa);
     clear_fixmap(FIX_TBOOT_MAP_ADDRESS);
 
     rc = dmar_handler(dmar_table);
-    xfree(dmar_table_raw);
+    xfree(dmar_table);
 
     /* acpi_parse_dmar() zaps APCI DMAR signature in TXT heap table */
     /* but dom0 will read real table, so must zap it there too */
