@@ -2957,6 +2957,7 @@ struct libxl__destroy_domid_state {
     libxl__domid_destroy_cb *callback;
     /* private to implementation */
     libxl__devices_remove_state drs;
+    libxl__ev_child destroyer;
 };
 
 struct libxl__domain_destroy_state {
