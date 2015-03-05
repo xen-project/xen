@@ -696,7 +696,8 @@ static int handle_rtc_io(
 
     if ( bytes != 1 )
     {
-        gdprintk(XENLOG_WARNING, "HVM_RTC bas access\n");
+        gdprintk(XENLOG_WARNING, "HVM_RTC bad access\n");
+        *val = ~0;
         return X86EMUL_OKAY;
     }
     

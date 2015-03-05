@@ -477,6 +477,7 @@ static int handle_pit_io(
     if ( bytes != 1 )
     {
         gdprintk(XENLOG_WARNING, "PIT bad access\n");
+        *val = ~0;
         return X86EMUL_OKAY;
     }
 
