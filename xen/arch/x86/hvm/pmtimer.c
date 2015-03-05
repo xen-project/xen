@@ -213,6 +213,7 @@ static int handle_pmt_io(
     if ( bytes != 4 )
     {
         gdprintk(XENLOG_WARNING, "HVM_PMT bad access\n");
+        *val = ~0;
         return X86EMUL_OKAY;
     }
     
