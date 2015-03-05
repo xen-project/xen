@@ -112,7 +112,7 @@ static void msix_put_fixmap(struct arch_msix *msix, int idx)
 
     if ( --msix->table_refcnt[i] == 0 )
     {
-        __set_fixmap(idx, 0, 0);
+        clear_fixmap(idx);
         msix_fixmap_free(idx);
         msix->table_idx[i] = 0;
     }

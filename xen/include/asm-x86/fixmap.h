@@ -78,6 +78,8 @@ extern void __set_fixmap(
 #define set_fixmap_nocache(idx, phys) \
     __set_fixmap(idx, (phys)>>PAGE_SHIFT, PAGE_HYPERVISOR_NOCACHE)
 
+#define clear_fixmap(idx) __set_fixmap(idx, 0, 0)
+
 #define __fix_to_virt(x) (FIXADDR_TOP - ((x) << PAGE_SHIFT))
 #define __virt_to_fix(x) ((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
 

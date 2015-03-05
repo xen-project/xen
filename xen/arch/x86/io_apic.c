@@ -2552,7 +2552,7 @@ void __init init_ioapic_mappings(void)
 
         if ( bad_ioapic_register(i) )
         {
-            __set_fixmap(idx, 0, 0);
+            clear_fixmap(idx);
             continue;
         }
 

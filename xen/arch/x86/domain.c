@@ -310,7 +310,7 @@ void free_vcpu_guest_context(struct vcpu_guest_context *vgc)
     {
         if ( !per_cpu(vgc_pages[i], cpu) )
             continue;
-        __set_fixmap(idx - i, 0, 0);
+        clear_fixmap(idx - i);
         free_domheap_page(per_cpu(vgc_pages[i], cpu));
         per_cpu(vgc_pages[i], cpu) = NULL;
     }

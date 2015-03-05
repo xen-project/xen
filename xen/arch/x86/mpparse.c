@@ -541,7 +541,7 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 static __init void efi_unmap_mpf(void)
 {
 	if (efi_enabled)
-		__set_fixmap(FIX_EFI_MPF, 0, 0);
+		clear_fixmap(FIX_EFI_MPF);
 }
 
 static struct intel_mp_floating *__initdata mpf_found;
