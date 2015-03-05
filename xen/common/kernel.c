@@ -240,6 +240,8 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case XENVER_extraversion:
     {
         xen_extraversion_t extraversion;
+
+        memset(extraversion, 0, sizeof(extraversion));
         safe_strcpy(extraversion, xen_extra_version());
         if ( copy_to_guest(arg, extraversion, ARRAY_SIZE(extraversion)) )
             return -EFAULT;
@@ -249,6 +251,8 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case XENVER_compile_info:
     {
         struct xen_compile_info info;
+
+        memset(&info, 0, sizeof(info));
         safe_strcpy(info.compiler,       xen_compiler());
         safe_strcpy(info.compile_by,     xen_compile_by());
         safe_strcpy(info.compile_domain, xen_compile_domain());
@@ -284,6 +288,8 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case XENVER_changeset:
     {
         xen_changeset_info_t chgset;
+
+        memset(chgset, 0, sizeof(chgset));
         safe_strcpy(chgset, xen_changeset());
         if ( copy_to_guest(arg, chgset, ARRAY_SIZE(chgset)) )
             return -EFAULT;
