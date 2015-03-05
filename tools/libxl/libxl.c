@@ -1558,6 +1558,10 @@ static void devices_destroy_cb(libxl__egc *egc,
                                libxl__devices_remove_state *drs,
                                int rc);
 
+static void domain_destroy_domid_cb(libxl__egc *egc,
+                                    libxl__ev_child *destroyer,
+                                    pid_t pid, int status);
+
 void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
 {
     STATE_AO_GC(dis->ao);
@@ -1566,6 +1570,8 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
     char *dom_path;
     char *pid;
     int rc, dm_present;
+
+    libxl__ev_child_init(&dis->destroyer);
 
     rc = libxl_domain_info(ctx, NULL, domid);
     switch(rc) {
@@ -1672,17 +1678,58 @@ static void devices_destroy_cb(libxl__egc *egc,
 
     libxl__unlock_domain_userdata(lock);
 
-    rc = xc_domain_destroy(ctx->xch, domid);
-    if (rc < 0) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc, "xc_domain_destroy failed for %d", domid);
+    rc = libxl__ev_child_fork(gc, &dis->destroyer, domain_destroy_domid_cb);
+    if (rc < 0) goto out;
+    if (!rc) { /* child */
+        ctx->xch = xc_interface_open(ctx->lg,0,0);
+        if (!ctx->xch) goto badchild;
+
+        rc = xc_domain_destroy(ctx->xch, domid);
+        if (rc < 0) goto badchild;
+        _exit(0);
+
+    badchild:
+        if (errno > 0  && errno < 126) {
+            _exit(errno);
+        } else {
+            LOGE(ERROR,
+ "xc_domain_destroy failed for %d (with difficult errno value %d)",
+                 domid, errno);
+            _exit(-1);
+        }
+    }
+    LOG(INFO, "forked pid %ld for destroy of domain %d", (long)rc, domid);
+
+    return;
+
+out:
+    dis->callback(egc, dis, rc);
+    return;
+}
+
+static void domain_destroy_domid_cb(libxl__egc *egc,
+                                    libxl__ev_child *destroyer,
+                                    pid_t pid, int status)
+{
+    libxl__destroy_domid_state *dis = CONTAINER_OF(destroyer, *dis, destroyer);
+    STATE_AO_GC(dis->ao);
+    int rc;
+
+    if (status) {
+        if (WIFEXITED(status) && WEXITSTATUS(status)<126) {
+            LOGEV(ERROR, WEXITSTATUS(status),
+                  "xc_domain_destroy failed for %"PRIu32"", dis->domid);
+        } else {
+            libxl_report_child_exitstatus(CTX, XTL_ERROR,
+                                          "async domain destroy", pid, status);
+        }
         rc = ERROR_FAIL;
         goto out;
     }
     rc = 0;
 
-out:
+ out:
     dis->callback(egc, dis, rc);
-    return;
 }
 
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num,
