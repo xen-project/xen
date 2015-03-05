@@ -324,6 +324,7 @@ static int vpic_intercept_pic_io(
     if ( bytes != 1 )
     {
         gdprintk(XENLOG_WARNING, "PIC_IO bad access size %d\n", bytes);
+        *val = ~0;
         return X86EMUL_OKAY;
     }
 
