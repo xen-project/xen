@@ -1677,7 +1677,7 @@ static unsigned int sh_set_allocation(struct domain *d,
         {
             /* Need to allocate more memory from domheap */
             sp = (struct page_info *)
-                alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
+                alloc_domheap_page(d, MEMF_no_owner);
             if ( sp == NULL )
             {
                 SHADOW_PRINTK("failed to allocate shadow pages.\n");

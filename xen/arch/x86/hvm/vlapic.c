@@ -1417,7 +1417,6 @@ HVM_REGISTER_SAVE_RESTORE(LAPIC_REGS, lapic_save_regs, lapic_load_regs,
 int vlapic_init(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
-    unsigned int memflags = MEMF_node(vcpu_to_node(v));
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "%d", v->vcpu_id);
 
@@ -1431,7 +1430,7 @@ int vlapic_init(struct vcpu *v)
 
     if (vlapic->regs_page == NULL)
     {
-        vlapic->regs_page = alloc_domheap_page(NULL, memflags);
+        vlapic->regs_page = alloc_domheap_page(v->domain, MEMF_no_owner);
         if ( vlapic->regs_page == NULL )
         {
             dprintk(XENLOG_ERR, "alloc vlapic regs error: %d/%d\n",

@@ -604,7 +604,7 @@ void stdvga_init(struct domain *d)
     
     for ( i = 0; i != ARRAY_SIZE(s->vram_page); i++ )
     {
-        pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
+        pg = alloc_domheap_page(d, MEMF_no_owner);
         if ( pg == NULL )
             break;
         s->vram_page[i] = pg;

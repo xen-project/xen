@@ -150,7 +150,7 @@ long arch_do_domctl(
                 break;
             }
 
-            page = alloc_domheap_page(NULL, 0);
+            page = alloc_domheap_page(current->domain, MEMF_no_owner);
             if ( !page )
             {
                 ret = -ENOMEM;

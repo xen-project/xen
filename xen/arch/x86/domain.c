@@ -285,7 +285,8 @@ struct vcpu_guest_context *alloc_vcpu_guest_context(void)
 
     for ( i = 0; i < PFN_UP(sizeof(struct vcpu_guest_context)); ++i )
     {
-        struct page_info *pg = alloc_domheap_page(NULL, 0);
+        struct page_info *pg = alloc_domheap_page(current->domain,
+                                                  MEMF_no_owner);
 
         if ( unlikely(pg == NULL) )
         {
@@ -322,7 +323,7 @@ static int setup_compat_l4(struct vcpu *v)
     l4_pgentry_t *l4tab;
     int rc;
 
-    pg = alloc_domheap_page(NULL, MEMF_node(vcpu_to_node(v)));
+    pg = alloc_domheap_page(v->domain, MEMF_no_owner);
     if ( pg == NULL )
         return -ENOMEM;
 

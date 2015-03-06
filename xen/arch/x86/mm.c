@@ -5883,7 +5883,6 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
     l3_pgentry_t *l3tab;
     l2_pgentry_t *l2tab;
     l1_pgentry_t *l1tab;
-    unsigned int memf = MEMF_node(domain_to_node(d));
     int rc = 0;
 
     ASSERT(va >= PERDOMAIN_VIRT_START &&
@@ -5891,7 +5890,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
 
     if ( !d->arch.perdomain_l3_pg )
     {
-        pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
+        pg = alloc_domheap_page(d, MEMF_no_owner);
         if ( !pg )
             return -ENOMEM;
         l3tab = __map_domain_page(pg);
@@ -5912,7 +5911,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
 
     if ( !(l3e_get_flags(l3tab[l3_table_offset(va)]) & _PAGE_PRESENT) )
     {
-        pg = alloc_domheap_page(NULL, memf);
+        pg = alloc_domheap_page(d, MEMF_no_owner);
         if ( !pg )
         {
             unmap_domain_page(l3tab);
@@ -5941,7 +5940,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
         {
             if ( pl1tab && !IS_NIL(pl1tab) )
             {
-                l1tab = alloc_xenheap_pages(0, memf);
+                l1tab = alloc_xenheap_pages(0, MEMF_node(domain_to_node(d)));
                 if ( !l1tab )
                 {
                     rc = -ENOMEM;
@@ -5953,7 +5952,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
             }
             else
             {
-                pg = alloc_domheap_page(NULL, memf);
+                pg = alloc_domheap_page(d, MEMF_no_owner);
                 if ( !pg )
                 {
                     rc = -ENOMEM;
@@ -5970,7 +5969,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
         if ( ppg &&
              !(l1e_get_flags(l1tab[l1_table_offset(va)]) & _PAGE_PRESENT) )
         {
-            pg = alloc_domheap_page(NULL, memf);
+            pg = alloc_domheap_page(d, MEMF_no_owner);
             if ( pg )
             {
                 clear_domain_page(page_to_mfn(pg));

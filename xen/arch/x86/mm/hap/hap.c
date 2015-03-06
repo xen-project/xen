@@ -331,7 +331,7 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
         if ( d->arch.paging.hap.total_pages < pages )
         {
             /* Need to allocate more memory from domheap */
-            pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
+            pg = alloc_domheap_page(d, MEMF_no_owner);
             if ( pg == NULL )
             {
                 HAP_PRINTK("failed to allocate hap pages.\n");

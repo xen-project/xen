@@ -1194,7 +1194,7 @@ int __init construct_dom0(
     }
     else
     {
-        page = alloc_domheap_page(NULL, 0);
+        page = alloc_domheap_page(d, MEMF_no_owner);
         if ( !page )
             panic("Not enough RAM for domain 0 PML4");
         page->u.inuse.type_info = PGT_l4_page_table|PGT_validated|1;
