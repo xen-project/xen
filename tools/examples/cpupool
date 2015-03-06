@@ -9,7 +9,7 @@
 # the name of the new cpupool
 name = "Example-Cpupool"
 
-# the scheduler to use: valid are e.g. credit, sedf, credit2
+# the scheduler to use: valid are e.g. credit, credit2, rtds and sedf
 sched = "credit"
 
 # list of cpus to use
