@@ -4,7 +4,6 @@
  * Copyright (c) 2002-2005 K A Fraser
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
@@ -233,9 +232,7 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     switch ( cmd )
     {
     case XENVER_version:
-    {
         return (xen_major_version() << 16) | xen_minor_version();
-    }
 
     case XENVER_extraversion:
     {
@@ -250,7 +247,7 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case XENVER_compile_info:
     {
-        struct xen_compile_info info;
+        xen_compile_info_t info;
 
         memset(&info, 0, sizeof(info));
         safe_strcpy(info.compiler,       xen_compiler());
@@ -279,6 +276,7 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         xen_platform_parameters_t params = {
             .virt_start = HYPERVISOR_VIRT_START
         };
+
         if ( copy_to_guest(arg, &params, 1) )
             return -EFAULT;
         return 0;
@@ -310,11 +308,11 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             fi.submap = 0;
             if ( VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3) )
                 fi.submap |= (1U << XENFEAT_pae_pgdir_above_4gb);
-            if ( paging_mode_translate(current->domain) )
+            if ( paging_mode_translate(d) )
                 fi.submap |= 
                     (1U << XENFEAT_writable_page_tables) |
                     (1U << XENFEAT_auto_translated_physmap);
-            if ( is_hardware_domain(current->domain) )
+            if ( is_hardware_domain(d) )
                 fi.submap |= 1U << XENFEAT_dom0;
 #ifdef CONFIG_X86
             switch ( d->guest_type )
@@ -341,30 +339,24 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -EINVAL;
         }
 
-        if ( copy_to_guest(arg, &fi, 1) )
+        if ( __copy_to_guest(arg, &fi, 1) )
             return -EFAULT;
         return 0;
     }
 
     case XENVER_pagesize:
-    {
         return (!guest_handle_is_null(arg) ? -EINVAL : PAGE_SIZE);
-    }
 
     case XENVER_guest_handle:
-    {
         if ( copy_to_guest(arg, current->domain->handle,
                            ARRAY_SIZE(current->domain->handle)) )
             return -EFAULT;
         return 0;
-    }
 
     case XENVER_commandline:
-    {
         if ( copy_to_guest(arg, saved_cmdline, ARRAY_SIZE(saved_cmdline)) )
             return -EFAULT;
         return 0;
-    }
     }
 
     return -ENOSYS;
