@@ -4970,7 +4970,7 @@ int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs)
     prev_memkb = UINT64_MAX;
 
     do {
-        sleep(1);
+        sleep(2);
 
         libxl_dominfo_dispose(&info);
         libxl_dominfo_init(&info);
@@ -4986,7 +4986,7 @@ int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs)
             goto out;
         }
         else if (current_memkb == prev_memkb)
-            wait_secs--;
+            wait_secs -= 2;
         /* if current_memkb < prev_memkb loop for free as progress has
          * been made */
 
