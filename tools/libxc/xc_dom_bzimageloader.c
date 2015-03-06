@@ -185,8 +185,9 @@ static int xc_try_bzip2_decode(
 static int xc_try_bzip2_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
 {
-    DOMPRINTF("%s: BZIP2 decompress support unavailable",
-              __FUNCTION__);
+    xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                 "%s: BZIP2 decompress support unavailable",
+                 __FUNCTION__);
     return -1;
 }
 
@@ -367,16 +368,18 @@ static int xc_try_lzma_decode(
 static int xc_try_xz_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
 {
-    DOMPRINTF("%s: XZ decompress support unavailable",
-              __FUNCTION__);
+    xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                 "%s: XZ decompress support unavailable",
+                 __FUNCTION__);
     return -1;
 }
 
 static int xc_try_lzma_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
 {
-    DOMPRINTF("%s: LZMA decompress support unavailable",
-              __FUNCTION__);
+    xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                 "%s: LZMA decompress support unavailable",
+                 __FUNCTION__);
     return -1;
 }
 
@@ -577,8 +580,9 @@ static int xc_try_lzo1x_decode(
 static int xc_try_lzo1x_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
 {
-    DOMPRINTF("%s: LZO1x decompress support unavailable\n",
-                  __FUNCTION__);
+    xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                 "%s: LZO1x decompress support unavailable\n",
+                 __FUNCTION__);
     return -1;
 }
 
