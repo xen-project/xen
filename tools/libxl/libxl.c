@@ -4959,26 +4959,41 @@ int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs)
 {
     int rc = 0;
     uint32_t target_memkb = 0;
+    uint64_t current_memkb, prev_memkb;
     libxl_dominfo info;
 
+    rc = libxl_get_memory_target(ctx, domid, &target_memkb);
+    if (rc < 0)
+        return rc;
+
     libxl_dominfo_init(&info);
+    prev_memkb = UINT64_MAX;
 
     do {
-        wait_secs--;
         sleep(1);
-
-        rc = libxl_get_memory_target(ctx, domid, &target_memkb);
-        if (rc < 0)
-            goto out;
 
         libxl_dominfo_dispose(&info);
         libxl_dominfo_init(&info);
         rc = libxl_domain_info(ctx, &info, domid);
         if (rc < 0)
             goto out;
-    } while (wait_secs > 0 && (info.current_memkb + info.outstanding_memkb) > target_memkb);
 
-    if ((info.current_memkb + info.outstanding_memkb) <= target_memkb)
+        current_memkb = info.current_memkb + info.outstanding_memkb;
+
+        if (current_memkb > prev_memkb)
+        {
+            rc = ERROR_FAIL;
+            goto out;
+        }
+        else if (current_memkb == prev_memkb)
+            wait_secs--;
+        /* if current_memkb < prev_memkb loop for free as progress has
+         * been made */
+
+        prev_memkb = current_memkb;
+    } while (wait_secs > 0 && current_memkb > target_memkb);
+
+    if (current_memkb <= target_memkb)
         rc = 0;
     else
         rc = ERROR_FAIL;

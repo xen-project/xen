@@ -2226,8 +2226,8 @@ static int freemem(uint32_t domid, libxl_domain_build_info *b_info)
         else if (rc != ERROR_NOMEM)
             return rc;
 
-        /* the memory target has been reached but the free memory is still
-         * not enough: loop over again */
+        /* wait until dom0 reaches its target, as long as we are making
+         * progress */
         rc = libxl_wait_for_memory_target(ctx, 0, 1);
         if (rc < 0)
             return rc;

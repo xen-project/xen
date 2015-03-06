@@ -1050,7 +1050,19 @@ int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
 int libxl_get_free_memory(libxl_ctx *ctx, uint32_t *memkb);
 /* wait for a given amount of memory to be free in the system */
 int libxl_wait_for_free_memory(libxl_ctx *ctx, uint32_t domid, uint32_t memory_kb, int wait_secs);
-/* wait for the memory target of a domain to be reached */
+/*
+ * Wait for the memory target of a domain to be reached. Does not
+ * decrement wait_secs if the domain is making progress toward reaching
+ * the target. If the domain is not making progress, wait_secs is
+ * decremented. If the timeout expires before the target is reached, the
+ * function returns ERROR_FAIL.
+ *
+ * Older versions of this function (Xen 4.5 and older), decremented
+ * wait_secs even if the domain was making progress, resulting in far
+ * lower overall wait times. To make sure that your calling routine
+ * works with new and old implementations of the function, pass enough
+ * time for the guest to reach its target as an argument.
+ */
 int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs);
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);
