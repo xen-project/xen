@@ -462,7 +462,8 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         /* Allocate a chunk's worth of anonymous output pages. */
         for ( j = 0; j < (1UL << out_chunk_order); j++ )
         {
-            page = alloc_domheap_pages(NULL, exch.out.extent_order, memflags);
+            page = alloc_domheap_pages(d, exch.out.extent_order,
+                                       MEMF_no_owner | memflags);
             if ( unlikely(page == NULL) )
             {
                 rc = -ENOMEM;

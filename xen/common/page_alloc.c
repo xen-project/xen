@@ -1685,9 +1685,13 @@ struct page_info *alloc_domheap_pages(
 
     ASSERT(!in_irq());
 
-    bits = domain_clamp_alloc_bitsize(d, bits ? : (BITS_PER_LONG+PAGE_SHIFT));
+    bits = domain_clamp_alloc_bitsize(memflags & MEMF_no_owner ? NULL : d,
+                                      bits ? : (BITS_PER_LONG+PAGE_SHIFT));
     if ( (zone_hi = min_t(unsigned int, bits_to_zone(bits), zone_hi)) == 0 )
         return NULL;
+
+    if ( memflags & MEMF_no_owner )
+        memflags |= MEMF_no_refcount;
 
     if ( dma_bitsize && ((dma_zone = bits_to_zone(dma_bitsize)) < zone_hi) )
         pg = alloc_heap_pages(dma_zone + 1, zone_hi, order, memflags, d);
@@ -1698,7 +1702,8 @@ struct page_info *alloc_domheap_pages(
                                   memflags, d)) == NULL)) )
          return NULL;
 
-    if ( (d != NULL) && assign_pages(d, pg, order, memflags) )
+    if ( d && !(memflags & MEMF_no_owner) &&
+         assign_pages(d, pg, order, memflags) )
     {
         free_heap_pages(pg, order);
         return NULL;
