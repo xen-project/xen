@@ -2220,15 +2220,9 @@ static int freemem(uint32_t domid, libxl_domain_build_info *b_info)
         if (rc < 0)
             return rc;
 
-        rc = libxl_wait_for_free_memory(ctx, domid, need_memkb, 10);
-        if (!rc)
-            return 0;
-        else if (rc != ERROR_NOMEM)
-            return rc;
-
         /* wait until dom0 reaches its target, as long as we are making
          * progress */
-        rc = libxl_wait_for_memory_target(ctx, 0, 1);
+        rc = libxl_wait_for_memory_target(ctx, 0, 10);
         if (rc < 0)
             return rc;
 
