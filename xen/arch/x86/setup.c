@@ -140,13 +140,21 @@ static void __init parse_acpi_param(char *s)
 static const module_t *__initdata initial_images;
 static unsigned int __initdata nr_initial_images;
 
-unsigned long __init initial_images_nrpages(void)
+unsigned long __init initial_images_nrpages(nodeid_t node)
 {
+    unsigned long node_start = node_start_pfn(node);
+    unsigned long node_end = node_end_pfn(node);
     unsigned long nr;
     unsigned int i;
 
     for ( nr = i = 0; i < nr_initial_images; ++i )
-        nr += PFN_UP(initial_images[i].mod_end);
+    {
+        unsigned long start = initial_images[i].mod_start;
+        unsigned long end = start + PFN_UP(initial_images[i].mod_end);
+
+        if ( end > node_start && node_end > start )
+            nr += min(node_end, end) - max(node_start, start);
+    }
 
     return nr;
 }

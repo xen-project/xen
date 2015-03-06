@@ -100,11 +100,70 @@ static void __init parse_dom0_max_vcpus(const char *s)
 }
 custom_param("dom0_max_vcpus", parse_dom0_max_vcpus);
 
+static __initdata unsigned int dom0_nr_pxms;
+static __initdata unsigned int dom0_pxms[MAX_NUMNODES] =
+    { [0 ... MAX_NUMNODES - 1] = ~0 };
+static __initdata bool_t dom0_affinity_relaxed;
+
+static void __init parse_dom0_nodes(const char *s)
+{
+    do {
+        if ( isdigit(*s) )
+            dom0_pxms[dom0_nr_pxms] = simple_strtoul(s, &s, 0);
+        else if ( !strncmp(s, "relaxed", 7) && (!s[7] || s[7] == ',') )
+        {
+            dom0_affinity_relaxed = 1;
+            s += 7;
+        }
+        else if ( !strncmp(s, "strict", 6) && (!s[6] || s[6] == ',') )
+        {
+            dom0_affinity_relaxed = 0;
+            s += 6;
+        }
+        else
+            break;
+    } while ( ++dom0_nr_pxms < ARRAY_SIZE(dom0_pxms) && *s++ == ',' );
+}
+custom_param("dom0_nodes", parse_dom0_nodes);
+
+static cpumask_t __initdata dom0_cpus;
+
+static struct vcpu *__init setup_dom0_vcpu(struct domain *d,
+                                           unsigned int vcpu_id,
+                                           unsigned int cpu)
+{
+    struct vcpu *v = alloc_vcpu(d, vcpu_id, cpu);
+
+    if ( v )
+    {
+        if ( !d->is_pinned && !dom0_affinity_relaxed )
+            cpumask_copy(v->cpu_hard_affinity, &dom0_cpus);
+        cpumask_copy(v->cpu_soft_affinity, &dom0_cpus);
+    }
+
+    return v;
+}
+
+static nodemask_t __initdata dom0_nodes;
+
 unsigned int __init dom0_max_vcpus(void)
 {
-    unsigned max_vcpus;
+    unsigned int i, max_vcpus;
+    nodeid_t node;
 
-    max_vcpus = num_cpupool_cpus(cpupool0);
+    for ( i = 0; i < dom0_nr_pxms; ++i )
+        if ( (node = pxm_to_node(dom0_pxms[i])) != NUMA_NO_NODE )
+            node_set(node, dom0_nodes);
+    nodes_and(dom0_nodes, dom0_nodes, node_online_map);
+    if ( nodes_empty(dom0_nodes) )
+        dom0_nodes = node_online_map;
+    for_each_node_mask ( node, dom0_nodes )
+        cpumask_or(&dom0_cpus, &dom0_cpus, &node_to_cpumask(node));
+    cpumask_and(&dom0_cpus, &dom0_cpus, cpupool0->cpu_valid);
+    if ( cpumask_empty(&dom0_cpus) )
+        cpumask_copy(&dom0_cpus, cpupool0->cpu_valid);
+
+    max_vcpus = cpumask_weight(&dom0_cpus);
     if ( opt_dom0_max_vcpus_min > max_vcpus )
         max_vcpus = opt_dom0_max_vcpus_min;
     if ( opt_dom0_max_vcpus_max < max_vcpus )
@@ -119,12 +178,15 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 {
     unsigned int max_vcpus = dom0_max_vcpus();
 
+    dom0->node_affinity = dom0_nodes;
+    dom0->auto_node_affinity = !dom0_nr_pxms;
+
     dom0->vcpu = xzalloc_array(struct vcpu *, max_vcpus);
     if ( !dom0->vcpu )
         return NULL;
     dom0->max_vcpus = max_vcpus;
 
-    return alloc_vcpu(dom0, 0, 0);
+    return setup_dom0_vcpu(dom0, 0, cpumask_first(&dom0_cpus));
 }
 
 #ifdef CONFIG_SHADOW_PAGING
@@ -156,7 +218,7 @@ static struct page_info * __init alloc_chunk(
     struct domain *d, unsigned long max_pages)
 {
     static unsigned int __initdata last_order = MAX_ORDER;
-    static unsigned int __initdata memflags = MEMF_no_dma;
+    static unsigned int __initdata memflags = MEMF_no_dma|MEMF_exact_node;
     struct page_info *page;
     unsigned int order = get_order_from_pages(max_pages), free_order;
 
@@ -190,7 +252,7 @@ static struct page_info * __init alloc_chunk(
 
         if ( d->tot_pages + (1 << order) > d->max_pages )
             continue;
-        pg2 = alloc_domheap_pages(d, order, 0);
+        pg2 = alloc_domheap_pages(d, order, MEMF_exact_node);
         if ( pg2 > page )
         {
             free_domheap_pages(page, free_order);
@@ -217,9 +279,13 @@ static unsigned long __init dom0_paging_pages(const struct domain *d,
 static unsigned long __init compute_dom0_nr_pages(
     struct domain *d, struct elf_dom_parms *parms, unsigned long initrd_len)
 {
-    unsigned long avail = avail_domheap_pages() + initial_images_nrpages();
-    unsigned long nr_pages, min_pages, max_pages;
+    nodeid_t node;
+    unsigned long avail = 0, nr_pages, min_pages, max_pages;
     bool_t need_paging;
+
+    for_each_node_mask ( node, dom0_nodes )
+        avail += avail_domheap_pages_region(node, 0, 0) +
+                 initial_images_nrpages(node);
 
     /* Reserve memory for further dom0 vcpu-struct allocations... */
     avail -= (d->max_vcpus - 1UL)
@@ -1230,11 +1296,11 @@ int __init construct_dom0(
 
     printk("Dom0 has maximum %u VCPUs\n", d->max_vcpus);
 
-    cpu = cpumask_first(cpupool0->cpu_valid);
+    cpu = v->processor;
     for ( i = 1; i < d->max_vcpus; i++ )
     {
-        cpu = cpumask_cycle(cpu, cpupool0->cpu_valid);
-        (void)alloc_vcpu(d, i, cpu);
+        cpu = cpumask_cycle(cpu, &dom0_cpus);
+        setup_dom0_vcpu(d, i, cpu);
     }
 
     /*

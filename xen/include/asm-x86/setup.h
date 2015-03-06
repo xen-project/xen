@@ -2,6 +2,7 @@
 #define __X86_SETUP_H_
 
 #include <xen/multiboot.h>
+#include <asm/numa.h>
 
 extern unsigned long xenheap_initial_phys_start;
 
@@ -32,7 +33,7 @@ int construct_dom0(
     void *(*bootstrap_map)(const module_t *),
     char *cmdline);
 
-unsigned long initial_images_nrpages(void);
+unsigned long initial_images_nrpages(nodeid_t node);
 void discard_initial_images(void);
 
 unsigned int dom0_max_vcpus(void);

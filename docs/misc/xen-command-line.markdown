@@ -551,6 +551,18 @@ any dom0 autoballooning feature present in your toolstack. See the
 _xl.conf(5)_ man page or [Xen Best
 Practices](http://wiki.xen.org/wiki/Xen_Best_Practices#Xen_dom0_dedicated_memory_and_preventing_dom0_memory_ballooning).
 
+### dom0\_nodes
+
+> `= List of [ <integer> | relaxed | strict ]`
+
+> Default: `strict`
+
+Specify the NUMA nodes to place Dom0 on. Defaults for vCPU-s created
+and memory assigned to Dom0 will be adjusted to match the node
+restrictions set up here. Note that the values to be specified here are
+ACPI PXM ones, not Xen internal node numbers. `relaxed` sets up vCPU
+affinities to prefer but be not limited to the specified node(s).
+
 ### dom0\_shadow
 > `= <boolean>`
 
