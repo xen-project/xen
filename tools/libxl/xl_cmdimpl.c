@@ -2198,9 +2198,8 @@ static int preserve_domain(uint32_t *r_domid, libxl_event *event,
 
 static int freemem(uint32_t domid, libxl_domain_build_info *b_info)
 {
-    int rc, retries;
-    const int MAX_RETRIES = 3;
-    uint32_t need_memkb, free_memkb, free_memkb_prev = 0;
+    int rc, retries = 3;
+    uint32_t need_memkb, free_memkb;
 
     if (!autoballoon)
         return 0;
@@ -2209,7 +2208,6 @@ static int freemem(uint32_t domid, libxl_domain_build_info *b_info)
     if (rc < 0)
         return rc;
 
-    retries = MAX_RETRIES;
     do {
         rc = libxl_get_free_memory(ctx, &free_memkb);
         if (rc < 0)
@@ -2234,16 +2232,7 @@ static int freemem(uint32_t domid, libxl_domain_build_info *b_info)
         if (rc < 0)
             return rc;
 
-        /*
-         * If the amount of free mem has increased on this iteration (i.e.
-         * some progress has been made) then reset the retry counter.
-         */
-        if (free_memkb > free_memkb_prev) {
-            retries = MAX_RETRIES;
-            free_memkb_prev = free_memkb;
-        } else {
-            retries--;
-        }
+        retries--;
     } while (retries > 0);
 
     return ERROR_NOMEM;
