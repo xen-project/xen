@@ -279,24 +279,23 @@ __runq_remove(struct csched_vcpu *svc)
 
 /*
  * Hard affinity balancing is always necessary and must never be skipped.
- * OTOH, if the vcpu's soft affinity is full (it spans all the possible
- * pcpus) we can safely avoid dealing with it entirely.
+ * But soft affinity need only be considered when it has a functionally
+ * different effect than other constraints (such as hard affinity, cpus
+ * online, or cpupools).
  *
- * A vcpu's soft affinity is also deemed meaningless in case it has empty
- * intersection with mask, to cover the cases where using the soft affinity
- * mask seems legit, but would instead led to trying to schedule the vcpu
- * on _no_ pcpu! Typical use cases are for mask to be equal to the vcpu's
- * hard affinity, or to the && of hard affinity and the set of online cpus
- * in the domain's cpupool.
+ * Soft affinity only needs to be considered if:
+ * * The cpus in the cpupool are not a subset of soft affinity
+ * * The hard affinity is not a subset of soft affinity
+ * * There is an overlap between the soft affinity and the mask which is
+ *   currently being considered.
  */
 static inline int __vcpu_has_soft_affinity(const struct vcpu *vc,
                                            const cpumask_t *mask)
 {
-    if ( cpumask_full(vc->cpu_soft_affinity)
-         || !cpumask_intersects(vc->cpu_soft_affinity, mask) )
-        return 0;
-
-    return 1;
+    return !cpumask_subset(cpupool_online_cpumask(vc->domain->cpupool),
+                           vc->cpu_soft_affinity) &&
+           !cpumask_subset(vc->cpu_hard_affinity, vc->cpu_soft_affinity) &&
+           cpumask_intersects(vc->cpu_soft_affinity, mask);
 }
 
 /*
