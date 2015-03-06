@@ -21,7 +21,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 uint64_t blowfish_test(uint64_t input);
 
 asm (
-    ".globl _start\n"
+    "\t.text\n"
+    "\t.globl _start\n"
     "_start:\n"
 #if defined(__i386__)
     "push %edx; push %eax; "
