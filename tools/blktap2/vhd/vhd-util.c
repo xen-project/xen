@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <langinfo.h>
+#include <locale.h>
 
 #include "libvhd.h"
 #include "vhd-util.h"
@@ -114,6 +116,7 @@ main(int argc, char *argv[])
 	if (setrlimit(RLIMIT_CORE, &rlim) < 0)
 		fprintf(stderr, "setrlimit failed: %d\n", errno);
 #endif
+	setlocale(LC_CTYPE, "");
 
 	ret = 0;
 
