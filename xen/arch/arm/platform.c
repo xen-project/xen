@@ -44,17 +44,6 @@ static bool_t __init platform_is_compatible(const struct platform_desc *plat)
     return 0;
 }
 
-/* List of possible platform */
-static void dump_platform_table(void)
-{
-    const struct platform_desc *p;
-
-    printk("Available platform support:\n");
-
-    for ( p = _splatform; p != _eplatform; p++ )
-        printk("    - %s\n", p->name);
-}
-
 void __init platform_init(void)
 {
     int res = 0;
@@ -72,9 +61,7 @@ void __init platform_init(void)
     if ( platform == _eplatform )
     {
         /* TODO: dump DT machine compatible node */
-        printk(XENLOG_WARNING "WARNING: Unrecognized/unsupported device tree "
-              "compatible list\n");
-        dump_platform_table();
+        printk(XENLOG_INFO "Platform: Generic System\n");
         platform = NULL;
     }
     else
