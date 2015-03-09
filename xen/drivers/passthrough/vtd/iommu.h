@@ -268,18 +268,22 @@ struct dma_pte {
 };
 #define DMA_PTE_READ (1)
 #define DMA_PTE_WRITE (2)
+#define DMA_PTE_PROT (DMA_PTE_READ | DMA_PTE_WRITE)
+#define DMA_PTE_SP   (1 << 7)
 #define DMA_PTE_SNP  (1 << 11)
 #define dma_clear_pte(p)    do {(p).val = 0;} while(0)
 #define dma_set_pte_readable(p) do {(p).val |= DMA_PTE_READ;} while(0)
 #define dma_set_pte_writable(p) do {(p).val |= DMA_PTE_WRITE;} while(0)
-#define dma_set_pte_superpage(p) do {(p).val |= (1 << 7);} while(0)
+#define dma_set_pte_superpage(p) do {(p).val |= DMA_PTE_SP;} while(0)
 #define dma_set_pte_snp(p)  do {(p).val |= DMA_PTE_SNP;} while(0)
-#define dma_set_pte_prot(p, prot) \
-            do {(p).val = ((p).val & ~3) | ((prot) & 3); } while (0)
+#define dma_set_pte_prot(p, prot) do { \
+        (p).val = ((p).val & ~DMA_PTE_PROT) | ((prot) & DMA_PTE_PROT); \
+    } while (0)
 #define dma_pte_addr(p) ((p).val & PADDR_MASK & PAGE_MASK_4K)
 #define dma_set_pte_addr(p, addr) do {\
             (p).val |= ((addr) & PAGE_MASK_4K); } while (0)
-#define dma_pte_present(p) (((p).val & 3) != 0)
+#define dma_pte_present(p) (((p).val & DMA_PTE_PROT) != 0)
+#define dma_pte_superpage(p) (((p).val & DMA_PTE_SP) != 0)
 
 /* interrupt remap entry */
 struct iremap_entry {
