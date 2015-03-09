@@ -1626,14 +1626,14 @@ static struct xsm_operations flask_ops = {
 #endif
 };
 
-static __init int flask_init(void)
+static __init void flask_init(void)
 {
     int ret = 0;
 
     if ( !flask_enabled )
     {
         printk("Flask:  Disabled at boot.\n");
-        return 0;
+        return;
     }
 
     printk("Flask:  Initializing.\n");
@@ -1650,8 +1650,6 @@ static __init int flask_init(void)
         printk("Flask:  Starting in enforcing mode.\n");
     else
         printk("Flask:  Starting in permissive mode.\n");
-
-    return ret;
 }
 
 xsm_initcall(flask_init);

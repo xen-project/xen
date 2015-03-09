@@ -24,15 +24,11 @@
 #define _copy_to_guest copy_to_guest
 #define _copy_from_guest copy_from_guest
 
-#ifdef FLASK_DEVELOP
 int flask_enforcing = 0;
 integer_param("flask_enforcing", flask_enforcing);
-#endif
 
-#ifdef FLASK_BOOTPARAM
 int flask_enabled = 1;
 integer_param("flask_enabled", flask_enabled);
-#endif
 
 #define MAX_POLICY_SIZE 0x4000000
 

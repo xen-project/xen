@@ -35,12 +35,7 @@
 #define POLICYDB_VERSION_MIN   POLICYDB_VERSION_BASE
 #define POLICYDB_VERSION_MAX   POLICYDB_VERSION_BOUNDARY
 
-#ifdef FLASK_BOOTPARAM
 extern int flask_enabled;
-#else
-#define flask_enabled 1
-#endif
-
 extern int flask_mls_enabled;
 
 int security_load_policy(void * data, size_t len);

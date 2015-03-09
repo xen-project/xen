@@ -17,11 +17,7 @@
 #include "av_permissions.h"
 #include "security.h"
 
-#ifdef FLASK_DEVELOP
 extern int flask_enforcing;
-#else
-#define flask_enforcing 1
-#endif
 
 /*
  * An entry in the AVC.

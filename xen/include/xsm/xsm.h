@@ -42,7 +42,7 @@ typedef enum xsm_default xsm_default_t;
 extern char *policy_buffer;
 extern u32 policy_size;
 
-typedef int (*xsm_initcall_t)(void);
+typedef void (*xsm_initcall_t)(void);
 
 extern xsm_initcall_t __xsm_initcall_start[], __xsm_initcall_end[];
 
