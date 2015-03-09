@@ -785,8 +785,6 @@ void amd_iommu_share_p2m(struct domain *d)
     struct page_info *p2m_table;
     mfn_t pgd_mfn;
 
-    ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
-
     if ( !iommu_use_hap_pt(d) )
         return;
 

@@ -56,7 +56,7 @@ int arch_iommu_populate_page_table(struct domain *d)
 
     while ( !rc && (page = page_list_remove_head(&d->page_list)) )
     {
-        if ( is_hvm_domain(d) ||
+        if ( has_hvm_container_domain(d) ||
             (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page )
         {
             BUG_ON(SHARED_M2P(mfn_to_gmfn(d, page_to_mfn(page))));

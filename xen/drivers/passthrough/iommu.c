@@ -332,7 +332,8 @@ void iommu_share_p2m_table(struct domain* d)
 {
     const struct iommu_ops *ops = iommu_get_ops();
 
-    if ( iommu_enabled && is_hvm_domain(d) )
+    ASSERT( hap_enabled(d) );
+    if ( iommu_enabled )
         ops->share_p2m(d);
 }
 

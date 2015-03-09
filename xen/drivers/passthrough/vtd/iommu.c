@@ -1789,8 +1789,6 @@ static void iommu_set_pgd(struct domain *d)
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
     mfn_t pgd_mfn;
 
-    ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
-
     if ( !iommu_use_hap_pt(d) )
         return;
 
