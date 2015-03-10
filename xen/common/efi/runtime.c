@@ -516,9 +516,13 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
                 cast_guid(&op->u.get_next_variable_name.vendor_guid));
             efi_rs_leave(cr3);
 
+            /*
+             * Copy the variable name if necessary. The caller provided size
+             * is used because some firmwares update size when they shouldn't.
+             * */
             if ( !EFI_ERROR(status) &&
-                 copy_to_guest(op->u.get_next_variable_name.name,
-                               name.raw, size) )
+                 __copy_to_guest(op->u.get_next_variable_name.name,
+                                 name.raw, op->u.get_next_variable_name.size) )
                 rc = -EFAULT;
             op->u.get_next_variable_name.size = size;
         }
