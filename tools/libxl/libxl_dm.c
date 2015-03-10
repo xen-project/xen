@@ -1175,10 +1175,6 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
         num_console++;
 
     console = libxl__calloc(gc, num_console, sizeof(libxl__device_console));
-    if (!console) {
-        ret = ERROR_NOMEM;
-        goto out;
-    }
 
     for (i = 0; i < num_console; i++) {
         libxl__device device;
