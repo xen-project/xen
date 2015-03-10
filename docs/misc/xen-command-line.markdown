@@ -638,11 +638,31 @@ hardware domain is architecture dependent.
 Note that specifying zero as domU value means zero, while for dom0 it means
 to use the default.
 
-### flask\_enabled
-> `= <integer>`
+### flask
+> `= permissive | enforcing | late | disabled`
 
-### flask\_enforcing
-> `= <integer>`
+> Default: `permissive`
+
+Specify how the FLASK security server should be configured.  This option is only
+available if the hypervisor was compiled with XSM support (which can be enabled
+by setting XSM\_ENABLE = y in .config).
+
+* `permissive`: This is intended for development and is not suitable for use
+  with untrusted guests.  If a policy is provided by the bootloader, it will be
+  loaded; errors will be reported to the ring buffer but will not prevent
+  booting.  The policy can be changed to enforcing mode using "xl setenforce".
+* `enforcing`: This requires a security policy to be provided by the bootloader
+  and will enter enforcing mode prior to the creation of domain 0.  If a valid
+  policy is not provided, the hypervisor will not continue booting.
+* `late`: This disables loading of the security policy from the bootloader.
+  FLASK will be enabled but will not enforce access controls until a policy is
+  loaded by a domain using "xl loadpolicy".  Once a policy is loaded, FLASK will
+  run in enforcing mode unless "xl setenforce" has changed that setting.
+* `disabled`: This causes the XSM framework to revert to the dummy module.  The
+  dummy module provides the same security policy as is used when compiling the
+  hypervisor without support for XSM.  The xsm\_op hypercall can also be used to
+  switch to this mode after boot, but there is no way to re-enable FLASK once
+  the dummy module is loaded.
 
 ### font
 > `= <height>` where height is `8x8 | 8x14 | 8x16`

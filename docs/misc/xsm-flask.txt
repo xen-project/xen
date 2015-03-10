@@ -396,32 +396,3 @@ the ranges being denied to more easily determine what resources are required.
 When running in permissive mode, only the first denial of a given
 source/destination is printed to the log, so labeling devices using this method
 may require multiple passes to find all required ranges.
-
-Additional notes on XSM:FLASK
------------------------------
-
-1) xen command line parameters
-
-	a) flask_enforcing
-	
-	The default value for flask_enforcing is '0'.  This parameter causes the 
-	platform to boot in permissive mode which means that the policy is loaded 
-	but not enforced.  This mode is often helpful for developing new systems 
-	and policies as the policy violations are reported on the xen console and 
-	may be viewed in dom0 through 'xl dmesg'.
-	
-	To boot the platform into enforcing mode, which means that the policy is
-	loaded and enforced, append 'flask_enforcing=1' on the grub line.
-	
-	This parameter may also be changed through the flask hypercall.
-	
-	b) flask_enabled
-	
-	The default value for flask_enabled is '1'.  This parameter causes the
-	platform to enable the FLASK security module under the XSM framework.
-	The parameter may be enabled/disabled only once per boot.  If the parameter
-	is set to '0', only a reboot can re-enable flask.  When flask_enabled is '0'
-	the DUMMY module is enforced.
-
-	This parameter may also be changed through the flask hypercall.  But may
-	only be performed once per boot.

@@ -35,7 +35,15 @@
 #define POLICYDB_VERSION_MIN   POLICYDB_VERSION_BASE
 #define POLICYDB_VERSION_MAX   POLICYDB_VERSION_BOUNDARY
 
-extern int flask_enabled;
+enum flask_bootparam_t {
+    FLASK_BOOTPARAM_PERMISSIVE,
+    FLASK_BOOTPARAM_ENFORCING,
+    FLASK_BOOTPARAM_LATELOAD,
+    FLASK_BOOTPARAM_DISABLED,
+    FLASK_BOOTPARAM_INVALID,
+};
+
+extern enum flask_bootparam_t flask_bootparam;
 extern int flask_mls_enabled;
 
 int security_load_policy(void * data, size_t len);

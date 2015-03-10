@@ -24,11 +24,12 @@
 #define _copy_to_guest copy_to_guest
 #define _copy_from_guest copy_from_guest
 
-int flask_enforcing = 0;
-integer_param("flask_enforcing", flask_enforcing);
+enum flask_bootparam_t __read_mostly flask_bootparam = FLASK_BOOTPARAM_PERMISSIVE;
+static void parse_flask_param(char *s);
+custom_param("flask", parse_flask_param);
 
-int flask_enabled = 1;
-integer_param("flask_enabled", flask_enabled);
+bool_t __read_mostly flask_enforcing = 0;
+boolean_param("flask_enforcing", flask_enforcing);
 
 #define MAX_POLICY_SIZE 0x4000000
 
@@ -59,6 +60,26 @@ static int flask_security_make_bools(void);
 extern int ss_initialized;
 
 extern struct xsm_operations *original_ops;
+
+static void __init parse_flask_param(char *s)
+{
+    if ( !strcmp(s, "enforcing") )
+    {
+        flask_enforcing = 1;
+        flask_bootparam = FLASK_BOOTPARAM_ENFORCING;
+    }
+    else if ( !strcmp(s, "late") )
+    {
+        flask_enforcing = 1;
+        flask_bootparam = FLASK_BOOTPARAM_LATELOAD;
+    }
+    else if ( !strcmp(s, "disabled") )
+        flask_bootparam = FLASK_BOOTPARAM_DISABLED;
+    else if ( !strcmp(s, "permissive") )
+        flask_bootparam = FLASK_BOOTPARAM_PERMISSIVE;
+    else
+        flask_bootparam = FLASK_BOOTPARAM_INVALID;
+}
 
 static int domain_has_security(struct domain *d, u32 perms)
 {
@@ -502,6 +523,7 @@ static int flask_security_load(struct xen_flask_load *load)
 {
     int ret;
     void *buf = NULL;
+    bool_t is_reload = ss_initialized;
 
     ret = domain_has_security(current->domain, SECURITY__LOAD_POLICY);
     if ( ret )
@@ -525,6 +547,10 @@ static int flask_security_load(struct xen_flask_load *load)
     ret = security_load_policy(buf, load->size);
     if ( ret )
         goto out;
+
+    if ( !is_reload )
+        printk(XENLOG_INFO "Flask: Policy loaded, continuing in %s mode.\n",
+            flask_enforcing ? "enforcing" : "permissive");
 
     xfree(bool_pending_values);
     bool_pending_values = NULL;

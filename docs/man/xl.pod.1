@@ -1441,8 +1441,8 @@ Determine if the FLASK security module is loaded and enforcing its policy.
 =item B<setenforce> I<1|0|Enforcing|Permissive>
 
 Enable or disable enforcing of the FLASK access controls. The default is
-permissive and can be changed using the flask_enforcing option on the
-hypervisor's command line.
+permissive, but this can be changed to enforcing by specifying "flask=enforcing"
+or "flask=late" on the hypervisor's command line.
 
 =item B<loadpolicy> I<policy-file>
 

@@ -1628,15 +1628,23 @@ static struct xsm_operations flask_ops = {
 
 static __init void flask_init(void)
 {
-    int ret = 0;
+    int ret = -ENOENT;
 
-    if ( !flask_enabled )
+    switch ( flask_bootparam )
     {
-        printk("Flask:  Disabled at boot.\n");
+    case FLASK_BOOTPARAM_DISABLED:
+        printk(XENLOG_INFO "Flask: Disabled at boot.\n");
         return;
-    }
 
-    printk("Flask:  Initializing.\n");
+    case FLASK_BOOTPARAM_PERMISSIVE:
+    case FLASK_BOOTPARAM_ENFORCING:
+    case FLASK_BOOTPARAM_LATELOAD:
+        break;
+
+    case FLASK_BOOTPARAM_INVALID:
+    default:
+        panic("Flask: Invalid value for flask= boot parameter.\n");
+    }
 
     avc_init();
 
@@ -1644,12 +1652,18 @@ static __init void flask_init(void)
     if ( register_xsm(&flask_ops) )
         panic("Flask: Unable to register with XSM");
 
-    ret = security_load_policy(policy_buffer, policy_size);
+    if ( policy_size && flask_bootparam != FLASK_BOOTPARAM_LATELOAD )
+        ret = security_load_policy(policy_buffer, policy_size);
 
-    if ( flask_enforcing )
-        printk("Flask:  Starting in enforcing mode.\n");
+    if ( ret && flask_bootparam == FLASK_BOOTPARAM_ENFORCING )
+        panic("Unable to load FLASK policy");
+
+    if ( ret )
+        printk(XENLOG_INFO "Flask:  Access controls disabled until policy is loaded.\n");
+    else if ( flask_enforcing )
+        printk(XENLOG_INFO "Flask:  Starting in enforcing mode.\n");
     else
-        printk("Flask:  Starting in permissive mode.\n");
+        printk(XENLOG_INFO "Flask:  Starting in permissive mode.\n");
 }
 
 xsm_initcall(flask_init);
