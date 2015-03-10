@@ -1,6 +1,7 @@
 XEN_ROOT = $(CURDIR)/..
 MINI_OS = $(XEN_ROOT)/extras/mini-os
 
+export XEN_ROOT
 export XEN_OS=MiniOS
 
 export stubdom=y
