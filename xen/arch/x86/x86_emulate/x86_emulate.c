@@ -1756,7 +1756,7 @@ x86_emulate(
         }
     }
 
-    if ( override_seg != -1 )
+    if ( override_seg != -1 && ea.type == OP_MEM )
         ea.mem.seg = override_seg;
 
     /* Early operand adjustments. */
