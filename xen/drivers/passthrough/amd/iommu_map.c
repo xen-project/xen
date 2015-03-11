@@ -785,9 +785,6 @@ void amd_iommu_share_p2m(struct domain *d)
     struct page_info *p2m_table;
     mfn_t pgd_mfn;
 
-    if ( !iommu_use_hap_pt(d) )
-        return;
-
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
     p2m_table = mfn_to_page(mfn_x(pgd_mfn));
 

@@ -313,17 +313,11 @@ struct operand {
     enum { OP_REG, OP_MEM, OP_IMM, OP_NONE } type;
     unsigned int bytes;
 
-    /* Up to 128-byte operand value, addressable as ulong or uint32_t[]. */
-    union {
-        unsigned long val;
-        uint32_t bigval[4];
-    };
+    /* Operand value. */
+    unsigned long val;
 
-    /* Up to 128-byte operand value, addressable as ulong or uint32_t[]. */
-    union {
-        unsigned long orig_val;
-        uint32_t orig_bigval[4];
-    };
+    /* Original operand value. */
+    unsigned long orig_val;
 
     union {
         /* OP_REG: Pointer to register field. */

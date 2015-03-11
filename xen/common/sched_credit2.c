@@ -493,7 +493,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *
     BUG_ON(new->rqd != rqd);
 
     /* Look at the cpu it's running on first */
-    cur = CSCHED2_VCPU(per_cpu(schedule_data, cpu).curr);
+    cur = CSCHED2_VCPU(curr_on_cpu(cpu));
     burn_credits(rqd, cur, now);
 
     if ( cur->credit < new->credit )
@@ -526,7 +526,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *
         if ( i == cpu )
             continue;
 
-        cur = CSCHED2_VCPU(per_cpu(schedule_data, i).curr);
+        cur = CSCHED2_VCPU(curr_on_cpu(i));
 
         BUG_ON(is_idle_vcpu(cur->vcpu));
 
@@ -658,7 +658,7 @@ void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_vcpu *svc, s
     s_time_t delta;
 
     /* Assert svc is current */
-    ASSERT(svc==CSCHED2_VCPU(per_cpu(schedule_data, svc->vcpu->processor).curr));
+    ASSERT(svc==CSCHED2_VCPU(curr_on_cpu(svc->vcpu->processor)));
 
     if ( is_idle_vcpu(svc->vcpu) )
     {
@@ -932,7 +932,7 @@ csched2_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
 
     BUG_ON( is_idle_vcpu(vc) );
 
-    if ( per_cpu(schedule_data, vc->processor).curr == vc )
+    if ( curr_on_cpu(vc->processor) == vc )
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
     else if ( __vcpu_on_runq(svc) )
     {
@@ -957,7 +957,7 @@ csched2_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
     BUG_ON( is_idle_vcpu(vc) );
 
     /* Make sure svc priority mod happens before runq check */
-    if ( unlikely(per_cpu(schedule_data, vc->processor).curr == vc) )
+    if ( unlikely(curr_on_cpu(vc->processor) == vc) )
     {
         goto out;
     }
@@ -1815,7 +1815,7 @@ csched2_dump_pcpu(const struct scheduler *ops, int cpu)
     printk("core=%s\n", cpustr);
 
     /* current VCPU */
-    svc = CSCHED2_VCPU(per_cpu(schedule_data, cpu).curr);
+    svc = CSCHED2_VCPU(curr_on_cpu(cpu));
     if ( svc )
     {
         printk("\trun: ");
