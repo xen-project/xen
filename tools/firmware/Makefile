@@ -55,7 +55,7 @@ distclean: subdirs-distclean
 subdir-distclean-etherboot: .phony
 	$(MAKE) -C etherboot distclean
 
-subdir-distclean-ovmf: .phony
+subdir-distclean-ovmf-dir: .phony
 	rm -rf ovmf-dir ovmf-dir-remote
 
 subdir-distclean-seabios-dir: .phony
@@ -70,7 +70,7 @@ ovmf-dir-force-update: ovmf-dir
 		$(GIT) reset --hard $(OVMF_UPSTREAM_REVISION); \
 	fi
 
-subdir-clean-ovmf:
+subdir-clean-ovmf-dir:
 	set -e; if test -d ovmf-dir/.; then \
 		$(MAKE) -C ovmf-dir clean; \
 	fi
