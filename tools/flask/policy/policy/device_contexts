@@ -1,0 +1,32 @@
+###############################################################################
+#
+# Label devices for delegation
+#
+# The PCI, IRQ, memory, and I/O port ranges are hardware-specific.
+#
+###############################################################################
+
+# label e1000e nic
+#pirqcon 33 system_u:object_r:nic_dev_t
+#pirqcon 55 system_u:object_r:nic_dev_t
+#iomemcon 0xfebe0-0xfebff system_u:object_r:nic_dev_t
+#iomemcon 0xfebd9 system_u:object_r:nic_dev_t
+#ioportcon 0xecc0-0xecdf system_u:object_r:nic_dev_t
+#pcidevicecon 0xc800 system_u:object_r:nic_dev_t
+
+# label e100 nic
+#pirqcon 16 system_u:object_r:nic_dev_t
+#iomemcon 0xfe5df system_u:object_r:nic_dev_t
+#iomemcon 0xfe5e0-0xfe5ff system_u:object_r:nic_dev_t
+#iomemcon 0xc2000-0xc200f system_u:object_r:nic_dev_t
+#ioportcon 0xccc0-0xcd00 system_u:object_r:nic_dev_t
+
+# label usb 1d.0-2 1d.7
+#pirqcon 23 system_u:object_r:nic_dev_t
+#pirqcon 17 system_u:object_r:nic_dev_t
+#pirqcon 18 system_u:object_r:nic_dev_t
+#ioportcon 0xff80-0xFF9F system_u:object_r:nic_dev_t
+#ioportcon 0xff60-0xff7f system_u:object_r:nic_dev_t
+#ioportcon 0xff40-0xff5f system_u:object_r:nic_dev_t
+#iomemcon 0xff980 system_u:object_r:nic_dev_t
+#ioportcon 0xff00-0xff1f system_u:object_r:nic_dev_t

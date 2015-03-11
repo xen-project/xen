@@ -335,33 +335,8 @@ memory, or even changing certain BIOS settings). Dynamic labeling requires that
 the domain performing the labeling be trusted to label all the devices in the
 system properly.
 
-To enable static device labeling, a checkpolicy >= 2.0.20 and libsepol >=2.0.39
-are required. The policy Makefile (tools/flask/policy/Makefile) must also be
-changed as follows:
-
-########################################
-#
-# Build a binary policy locally
-#
-$(POLVER): policy.conf
-        @echo "Compiling $(NAME) $(POLVER)"
-       $(QUIET) $(CHECKPOLICY) $^ -o $@            (Comment out this line)
-# Uncomment line below to enable policies for devices
-#        $(QUIET) $(CHECKPOLICY) -t Xen $^ -o $@   (Uncomment this line)
-
-########################################
-#
-# Install a binary policy
-#
-$(LOADPATH): policy.conf
-        @echo "Compiling and installing $(NAME) $(LOADPATH)"
-       $(QUIET) $(CHECKPOLICY) $^ -o $@            (Comment out this line)
-# Uncomment line below to enable policies for devices
-#        $(QUIET) $(CHECKPOLICY) -t Xen $^ -o $@   (Uncomment this line)
-
-
-IRQs, PCI devices, I/O memory and ports can all be labeled.  There are
-commented out lines in xen.te policy for examples on how to label devices.
+IRQs, PCI devices, I/O memory and x86 IO ports can all have labels defined.
+There are examples commented out in tools/flask/policy/policy/device_contexts.
 
 Device Labeling
 ---------------
@@ -378,7 +353,7 @@ lspci output is..
         Region 2: I/O ports at ecc0 [size=32]
         Kernel modules: e1000e
 
-The labeling can be done with these commands
+The labeling can be done with these lines in device_contexts:
 
 pirqcon 33 system_u:object_r:nicP_t
 iomemcon 0xfebe0-0xfebff system_u:object_r:nicP_t
