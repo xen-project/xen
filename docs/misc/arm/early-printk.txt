@@ -9,18 +9,22 @@ option should not be enable for Xens that are intended to be portable.
 
 CONFIG_EARLY_PRINTK=mach
 where mach is the name of the machine:
-  - vexpress: printk with pl011 for versatile express
+  - brcm: printk with 8250 on Broadcom 7445D0 boards with A15 processors.
+  - dra7: printk with 8250 on DRA7 platform
   - exynos5250: printk with the second UART
-  - midway: printk with the pl011 on Calxeda Midway processors
   - fastmodel: printk on ARM Fastmodel software emulators
+  - hip04-d01: printk with 8250 on HiSilicon Hip-04 D01
+  - juno: printk with pl011 on Juno platform
+  - lager: printk with SCIF0 on Renesas R-Car H2 processors
+  - midway: printk with the pl011 on Calxeda Midway processors
   - omap5432: printk with UART3 on TI OMAP5432 processors
+  - seattle: printk with pl011 for AMD Seattle processor
   - sun6i: printk with 8250 on Allwinner A31 processors
   - sun7i: printk with 8250 on Allwinner A20 processors
-  - brcm: printk with 8250 on Broadcom 7445D0 boards with A15 processors.
-  - hip04-d01: printk with 8250 on HiSilicon Hip-04 D01
-  - seattle: printk with pl011 for AMD Seattle processor
-  - lager: printk with SCIF0 on Renesas R-Car H2 processors
   - thunderx: printk with pl011 for Cavium ThunderX processor
+  - vexpress: printk with pl011 for versatile express
+  - xgene-mcdivitt: printk with 820 on Xgene mcdivitt platform
+  - xgene-storm: printk with 820 on Xgene storm platform
   - zynqmp: printk with Cadence UART for Xilinx ZynqMP SoCs
 
 The base address and baud rate is hardcoded in xen/arch/arm/Rules.mk,
