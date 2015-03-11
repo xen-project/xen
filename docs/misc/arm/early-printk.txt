@@ -7,8 +7,32 @@ Note that selecting this option will limit Xen to a single UART definition.
 Attempting to boot Xen image on a different platform *will not work*, so this
 option should not be enable for Xens that are intended to be portable.
 
-CONFIG_EARLY_PRINTK=mach
-where mach is the name of the machine:
+CONFIG_EARLY_PRINTK=<INC>,<BASE_ADDRESS>,<OTHER_OPTIONS>
+
+<INC> and <BASE_ADDRESS> are mandatory arguments:
+
+  - <INC> is the name of the driver, see xen/arch/arm/arm{32,64}/debug-*.inc
+    (where <INC> corresponds to the wildcarded *).
+  - <BASE_ADDRESS> is the base physical address of the UART to use
+
+<OTHER_OPTIONS> varies depending on <INC>:
+
+  - 8250,<BASE_ADDRESS>,<REG_SHIFT>
+    - <REG_SHIFT> is, optionally, the left-shift to apply to the
+      register offsets within the uart.
+  - pl011,<BASE_ADDRESS>,<BAUD_RATE>
+    - <BAUD_RATE> is, optionally a baud rate which should be used to
+      configure the UART at start of day.
+
+      If <BAUD_RATE> is not given then the code will not try to
+      initialize the UART, so that bootloader or firmware settings can
+     be used for maximum compatibility.
+  - For all other uarts there are no additional options.
+
+As a convenience it is also possible to select from a list of
+predefined configurations using CONFIG_EARLY_PRINTK=mach where mach is
+the name of the machine:
+
   - brcm: printk with 8250 on Broadcom 7445D0 boards with A15 processors.
   - dra7: printk with 8250 on DRA7 platform
   - exynos5250: printk with the second UART
@@ -27,11 +51,7 @@ where mach is the name of the machine:
   - xgene-storm: printk with 820 on Xgene storm platform
   - zynqmp: printk with Cadence UART for Xilinx ZynqMP SoCs
 
-The base address and baud rate is hardcoded in xen/arch/arm/Rules.mk,
+These settings are is hardcoded in xen/arch/arm/Rules.mk,
 see there when adding support for new machines.
-If not explicitly requested with "EARLY_PRINTK_INIT_UART := y" in Rules.mk,
-the code will not try to initialize the UART, so that bootloader or
-firmware settings can be used for maximum compatibility. The baud rate
-parameter is ignored in this case.
 
 By default early printk is disabled.
