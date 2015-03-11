@@ -1789,9 +1789,6 @@ static void iommu_set_pgd(struct domain *d)
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
     mfn_t pgd_mfn;
 
-    if ( !iommu_use_hap_pt(d) )
-        return;
-
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
     hd->arch.pgd_maddr = pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
 }
