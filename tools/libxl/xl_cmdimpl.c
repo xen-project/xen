@@ -817,7 +817,8 @@ static char *parse_cmdline(XLU_Config *config)
             if (asprintf(&cmdline, "root=%s %s", root, extra) == -1)
                 cmdline = NULL;
         } else if (root) {
-            cmdline = strdup(root);
+            if (asprintf(&cmdline, "root=%s", root) == -1)
+                cmdline = NULL;
         } else if (extra) {
             cmdline = strdup(extra);
         }
