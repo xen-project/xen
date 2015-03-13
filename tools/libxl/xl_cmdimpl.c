@@ -3699,7 +3699,7 @@ static void print_bitmap(uint8_t *map, int maplen, FILE *stream)
 }
 
 static void list_domains(bool verbose, bool context, bool claim, bool numa,
-                         const libxl_dominfo *info, int nb_domain)
+                         bool cpupool, const libxl_dominfo *info, int nb_domain)
 {
     int i;
     static const char shutdown_reason_letters[]= "-rscw";
@@ -3713,6 +3713,7 @@ static void list_domains(bool verbose, bool context, bool claim, bool numa,
     if (verbose) printf("   UUID                            Reason-Code\tSecurity Label");
     if (context && !verbose) printf("   Security Label");
     if (claim) printf("  Claimed");
+    if (cpupool) printf("         Cpupool");
     if (numa) {
         if (libxl_node_bitmap_alloc(ctx, &nodemap, 0)) {
             fprintf(stderr, "libxl_node_bitmap_alloc_failed.\n");
@@ -3757,6 +3758,11 @@ static void list_domains(bool verbose, bool context, bool claim, bool numa,
             printf(" %5lu", (unsigned long)info[i].outstanding_memkb / 1024);
         if (verbose || context)
             printf(" %16s", info[i].ssid_label ? : "-");
+        if (cpupool) {
+            char *poolname = libxl_cpupoolid_to_name(ctx, info[i].cpupool);
+            printf("%16s", poolname);
+            free(poolname);
+        }
         if (numa) {
             libxl_domain_get_nodeaffinity(ctx, info[i].domid, &nodemap);
 
@@ -4686,11 +4692,13 @@ int main_list(int argc, char **argv)
     bool verbose = false;
     bool context = false;
     bool details = false;
+    bool cpupool = false;
     bool numa = false;
     static struct option opts[] = {
         {"long", 0, 0, 'l'},
         {"verbose", 0, 0, 'v'},
         {"context", 0, 0, 'Z'},
+        {"cpupool", 0, 0, 'c'},
         {"numa", 0, 0, 'n'},
         COMMON_LONG_OPTS,
         {0, 0, 0, 0}
@@ -4700,7 +4708,7 @@ int main_list(int argc, char **argv)
     libxl_dominfo *info, *info_free=0;
     int nb_domain, rc;
 
-    SWITCH_FOREACH_OPT(opt, "lvhZn", opts, "list", 0) {
+    SWITCH_FOREACH_OPT(opt, "lvhZcn", opts, "list", 0) {
     case 'l':
         details = true;
         break;
@@ -4709,6 +4717,9 @@ int main_list(int argc, char **argv)
         break;
     case 'Z':
         context = true;
+        break;
+    case 'c':
+        cpupool = true;
         break;
     case 'n':
         numa = true;
@@ -4744,7 +4755,7 @@ int main_list(int argc, char **argv)
     if (details)
         list_domains_details(info, nb_domain);
     else
-        list_domains(verbose, context, false /* claim */, numa,
+        list_domains(verbose, context, false /* claim */, numa, cpupool,
                      info, nb_domain);
 
     if (info_free)
@@ -6796,7 +6807,7 @@ int main_claims(int argc, char **argv)
     }
 
     list_domains(false /* verbose */, false /* context */, true /* claim */,
-                 false /* numa */, info, nb_domain);
+                 false /* numa */, false /* cpupool */, info, nb_domain);
 
     libxl_dominfo_list_free(info, nb_domain);
     return 0;

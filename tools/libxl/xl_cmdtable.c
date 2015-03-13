@@ -53,6 +53,7 @@ struct cmd_spec cmd_table[] = {
       "-l, --long              Output all VM details\n"
       "-v, --verbose           Prints out UUIDs and security context\n"
       "-Z, --context           Prints out security context\n"
+      "-c, --cpupool           Prints the cpupool the domain is in\n"
       "-n, --numa              Prints out NUMA node affinity"
     },
     { "destroy",
