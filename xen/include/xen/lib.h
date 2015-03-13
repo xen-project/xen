@@ -8,9 +8,6 @@
 #include <xen/string.h>
 #include <asm/bug.h>
 
-void noreturn __bug(const char *file, int line);
-void __warn(const char *file, int line);
-
 #define BUG_ON(p)  do { if (unlikely(p)) BUG();  } while (0)
 #define WARN_ON(p) do { if (unlikely(p)) WARN(); } while (0)
 
@@ -27,15 +24,6 @@ void __warn(const char *file, int line);
 #else
 #define BUILD_BUG_ON_ZERO(cond) sizeof(struct { int:-!!(cond); })
 #define BUILD_BUG_ON(cond) ((void)BUILD_BUG_ON_ZERO(cond))
-#endif
-
-#ifndef assert_failed
-#define assert_failed(p)                                        \
-do {                                                            \
-    printk("Assertion '%s' failed, line %d, file %s\n", p ,     \
-                   __LINE__, __FILE__);                         \
-    BUG();                                                      \
-} while (0)
 #endif
 
 #ifndef NDEBUG
