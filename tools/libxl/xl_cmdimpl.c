@@ -7653,9 +7653,8 @@ int main_cpupoolnumasplit(int argc, char **argv)
     }
     poolid = poolinfo[0].poolid;
     sched = poolinfo[0].sched;
-    for (p = 0; p < n_pools; p++) {
-        libxl_cpupoolinfo_dispose(poolinfo + p);
-    }
+    libxl_cpupoolinfo_list_free(poolinfo, n_pools);
+
     if (n_pools > 1) {
         fprintf(stderr, "splitting not possible, already cpupools in use\n");
         return 1;
@@ -7669,8 +7668,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
 
     if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
         fprintf(stderr, "Failed to allocate cpumap\n");
-        libxl_cputopology_list_free(topology, n_cpus);
-        return 1;
+        goto out;
     }
 
     /* Reset Pool-0 to 1st node: first add cpus, then remove cpus to avoid
@@ -7679,7 +7677,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
     node = topology[0].node;
     if (libxl_cpupool_cpuadd_node(ctx, 0, node, &n)) {
         fprintf(stderr, "error on adding cpu to Pool 0\n");
-        return 1;
+        goto out;
     }
 
     snprintf(name, 15, "Pool-node%d", node);
