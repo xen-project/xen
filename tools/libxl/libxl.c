@@ -6358,15 +6358,33 @@ out:
 
 int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu)
 {
-    int rc;
+    GC_INIT(ctx);
+    int rc = 0;
 
     rc = xc_cpupool_addcpu(ctx->xch, poolid, cpu);
     if (rc) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
-            "Error moving cpu to cpupool");
-        return ERROR_FAIL;
+        LOGE(ERROR, "Error moving cpu %d to cpupool", cpu);
+        rc = ERROR_FAIL;
     }
-    return 0;
+
+    GC_FREE;
+    return rc;
+}
+
+int libxl_cpupool_cpuadd_cpumap(libxl_ctx *ctx, uint32_t poolid,
+                                const libxl_bitmap *cpumap)
+{
+    int c, ncpus = 0, rc = 0;
+
+    libxl_for_each_set_bit(c, *cpumap) {
+        if (!libxl_cpupool_cpuadd(ctx, poolid, c))
+            ncpus++;
+    }
+
+    if (ncpus != libxl_bitmap_count_set(cpumap))
+        rc = ERROR_FAIL;
+
+    return rc;
 }
 
 int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus)
@@ -6403,15 +6421,33 @@ out:
 
 int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu)
 {
-    int rc;
+    GC_INIT(ctx);
+    int rc = 0;
 
     rc = xc_cpupool_removecpu(ctx->xch, poolid, cpu);
     if (rc) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
-            "Error removing cpu from cpupool");
-        return ERROR_FAIL;
+        LOGE(ERROR, "Error removing cpu %d from cpupool", cpu);
+        rc = ERROR_FAIL;
     }
-    return 0;
+
+    GC_FREE;
+    return rc;
+}
+
+int libxl_cpupool_cpuremove_cpumap(libxl_ctx *ctx, uint32_t poolid,
+                                   const libxl_bitmap *cpumap)
+{
+    int c, ncpus = 0, rc = 0;
+
+    libxl_for_each_set_bit(c, *cpumap) {
+        if (!libxl_cpupool_cpuremove(ctx, poolid, c))
+            ncpus++;
+    }
+
+    if (ncpus != libxl_bitmap_count_set(cpumap))
+        rc = ERROR_FAIL;
+
+    return rc;
 }
 
 int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus)

@@ -90,6 +90,15 @@
  */
 #define LIBXL_HAVE_CPUPOOL_QUALIFIER_TO_CPUPOOLID 1
 
+/* LIBXL_HAVE_CPUPOOL_ADD_REM_CPUMAP
+ *
+ * If this is defined, libxl has two library functions called
+ * libxl_cpupool_cpuadd_cpumap and libxl_cpupool_cpuremove_cpumap,
+ * which allow to add to or remove from a cpupool all the cpus
+ * specified in a bitmap.
+ */
+#define LIBXL_HAVE_CPUPOOL_ADD_REM_CPUMAP 1
+
 /*
  * LIBXL_HAVE_FIRMWARE_PASSTHROUGH indicates the feature for
  * passing in SMBIOS and ACPI firmware to HVM guests is present
@@ -1475,8 +1484,12 @@ int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid);
 int libxl_cpupool_rename(libxl_ctx *ctx, const char *name, uint32_t poolid);
 int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu);
 int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
+int libxl_cpupool_cpuadd_cpumap(libxl_ctx *ctx, uint32_t poolid,
+                                const libxl_bitmap *cpumap);
 int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu);
 int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
+int libxl_cpupool_cpuremove_cpumap(libxl_ctx *ctx, uint32_t poolid,
+                                   const libxl_bitmap *cpumap);
 int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid);
 int libxl_cpupool_info(libxl_ctx *ctx, libxl_cpupoolinfo *info, uint32_t poolid);
 
