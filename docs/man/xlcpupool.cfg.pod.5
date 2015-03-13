@@ -93,10 +93,26 @@ Specifies the cpus of the NUMA-nodes given in C<NODES> (an integer or
 a list of integers) to be member of the cpupool. The free cpus in the
 specified nodes are allocated in the new cpupool.
 
-=item B<cpus="CPUS">
+=item B<cpus="CPU-LIST">
 
-The specified C<CPUS> are allocated in the new cpupool. All cpus must
-be free. Must not be specified together with B<nodes>.
+Specifies the cpus that will be member of the cpupool. All the specified
+cpus must be free, or creation will fail. C<CPU-LIST> may be specified
+as follows:
+
+=over 4
+
+=item ["2", "3", "5"]
+
+means that cpus 2,3,5 will be member of the cpupool.
+
+=item "0-3,5,^1"
+
+means that cpus 0,2,3 and 5 will be member of the cpupool. A "node:" or
+"nodes:" modifier can be used. E.g., "0,node:1,nodes:2-3,^10-13" means
+that pcpus 0, plus all the cpus of NUMA nodes 1,2,3 with the exception
+of cpus 10,11,12,13 will be memeber of the cpupool.
+
+=back
 
 If neither B<nodes> nor B<cpus> are specified only the first free cpu
 found will be allocated in the new cpupool.

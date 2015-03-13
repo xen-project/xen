@@ -7341,16 +7341,27 @@ int main_cpupoolcreate(int argc, char **argv)
             fprintf(stderr, "no free cpu found\n");
             goto out_cfg;
         }
-    } else if (!xlu_cfg_get_list(config, "cpus", &cpus, 0, 0)) {
+    } else if (!xlu_cfg_get_list(config, "cpus", &cpus, 0, 1)) {
         n_cpus = 0;
         while ((buf = xlu_cfg_get_listitem(cpus, n_cpus)) != NULL) {
             i = atoi(buf);
-            if ((i < 0) || (i >= freemap.size * 8) ||
-                !libxl_bitmap_test(&freemap, i)) {
+            if ((i < 0) || !libxl_bitmap_test(&freemap, i)) {
                 fprintf(stderr, "cpu %d illegal or not free\n", i);
                 goto out_cfg;
             }
             libxl_bitmap_set(&cpumap, i);
+            n_cpus++;
+        }
+    } else if (!xlu_cfg_get_string(config, "cpus", &buf, 0)) {
+        if (cpurange_parse(buf, &cpumap))
+            goto out_cfg;
+
+        n_cpus = 0;
+        libxl_for_each_set_bit(i, cpumap) {
+            if (!libxl_bitmap_test(&freemap, i)) {
+                fprintf(stderr, "cpu %d illegal or not free\n", i);
+                goto out_cfg;
+            }
             n_cpus++;
         }
     } else
