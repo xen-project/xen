@@ -939,7 +939,11 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     }
 
     /* Get the size of the P2M table */
-    dinfo->p2m_size = xc_domain_maximum_gpfn(xch, dom) + 1;
+    if ( xc_domain_maximum_gpfn(xch, dom, &dinfo->p2m_size) < 0 )
+    {
+        ERROR("Could not get maximum GPFN!");
+        goto out;
+    }
 
     if ( dinfo->p2m_size > ~XEN_DOMCTL_PFINFO_LTAB_MASK )
     {

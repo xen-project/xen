@@ -789,9 +789,16 @@ int xc_domain_get_tsc_info(xc_interface *xch,
 }
 
 
-int xc_domain_maximum_gpfn(xc_interface *xch, domid_t domid)
+int xc_domain_maximum_gpfn(xc_interface *xch, domid_t domid, xen_pfn_t *gpfns)
 {
-    return do_memory_op(xch, XENMEM_maximum_gpfn, &domid, sizeof(domid));
+    int rc = do_memory_op(xch, XENMEM_maximum_gpfn, &domid, sizeof(domid));
+
+    if ( rc >= 0 )
+    {
+        *gpfns = rc + 1;
+        rc = 0;
+    }
+    return rc;
 }
 
 int xc_domain_increase_reservation(xc_interface *xch,
