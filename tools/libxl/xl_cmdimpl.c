@@ -7212,7 +7212,7 @@ int main_cpupoolcreate(int argc, char **argv)
     libxl_bitmap cpumap;
     libxl_uuid uuid;
     libxl_cputopology *topology;
-    int rc = -ERROR_FAIL;
+    int rc = 1;
 
     SWITCH_FOREACH_OPT(opt, "hnf:", opts, "cpupool-create", 0) {
     case 'f':
@@ -7406,7 +7406,6 @@ int main_cpupoollist(int argc, char **argv)
     int n_pools, p, c, n;
     uint32_t poolid;
     char *name;
-    int ret = 0;
 
     SWITCH_FOREACH_OPT(opt, "hc", opts, "cpupool-list", 0) {
     case 'c':
@@ -7418,14 +7417,14 @@ int main_cpupoollist(int argc, char **argv)
         pool = argv[optind];
         if (libxl_name_to_cpupoolid(ctx, pool, &poolid)) {
             fprintf(stderr, "Pool \'%s\' does not exist\n", pool);
-            return -ERROR_FAIL;
+            return 1;
         }
     }
 
     poolinfo = libxl_list_cpupool(ctx, &n_pools);
     if (!poolinfo) {
         fprintf(stderr, "error getting cpupool info\n");
-        return -ERROR_NOMEM;
+        return 1;
     }
 
     printf("%-19s", "Name");
@@ -7435,7 +7434,7 @@ int main_cpupoollist(int argc, char **argv)
         printf("CPUs   Sched     Active   Domain count\n");
 
     for (p = 0; p < n_pools; p++) {
-        if (!ret && (!pool || (poolinfo[p].poolid == poolid))) {
+        if (!pool || (poolinfo[p].poolid == poolid)) {
             name = poolinfo[p].pool_name;
             printf("%-19s", name);
             n = 0;
@@ -7456,7 +7455,7 @@ int main_cpupoollist(int argc, char **argv)
 
     libxl_cpupoolinfo_list_free(poolinfo, n_pools);
 
-    return ret;
+    return 0;
 }
 
 int main_cpupooldestroy(int argc, char **argv)
@@ -7473,11 +7472,14 @@ int main_cpupooldestroy(int argc, char **argv)
 
     if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
-        fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
-        return -ERROR_FAIL;
+        fprintf(stderr, "unknown cpupool '%s'\n", pool);
+        return 1;
     }
 
-    return -libxl_cpupool_destroy(ctx, poolid);
+    if (libxl_cpupool_destroy(ctx, poolid))
+        return 1;
+
+    return 0;
 }
 
 int main_cpupoolrename(int argc, char **argv)
@@ -7495,14 +7497,14 @@ int main_cpupoolrename(int argc, char **argv)
 
     if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
-        fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
-        return -ERROR_FAIL;
+        fprintf(stderr, "unknown cpupool '%s'\n", pool);
+        return 1;
     }
 
     new_name = argv[optind];
 
     if (libxl_cpupool_rename(ctx, new_name, poolid)) {
-        fprintf(stderr, "Can't rename cpupool '%s'.\n", pool);
+        fprintf(stderr, "Can't rename cpupool '%s'\n", pool);
         return 1;
     }
 
@@ -7602,22 +7604,25 @@ int main_cpupoolmigrate(int argc, char **argv)
 
     if (libxl_domain_qualifier_to_domid(ctx, dom, &domid) ||
         !libxl_domid_to_name(ctx, domid)) {
-        fprintf(stderr, "unknown domain \'%s\'\n", dom);
-        return -ERROR_FAIL;
+        fprintf(stderr, "unknown domain '%s'\n", dom);
+        return 1;
     }
 
     if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
-        fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
-        return -ERROR_FAIL;
+        fprintf(stderr, "unknown cpupool '%s'\n", pool);
+        return 1;
     }
 
-    return -libxl_cpupool_movedomain(ctx, poolid, domid);
+    if (libxl_cpupool_movedomain(ctx, poolid, domid))
+        return 1;
+
+    return 0;
 }
 
 int main_cpupoolnumasplit(int argc, char **argv)
 {
-    int ret;
+    int rc;
     int opt;
     int p;
     int c;
@@ -7638,13 +7643,13 @@ int main_cpupoolnumasplit(int argc, char **argv)
         /* No options */
     }
 
-    ret = 0;
+    rc = 1;
 
     libxl_bitmap_init(&cpumap);
     poolinfo = libxl_list_cpupool(ctx, &n_pools);
     if (!poolinfo) {
         fprintf(stderr, "error getting cpupool info\n");
-        return -ERROR_NOMEM;
+        return 1;
     }
     poolid = poolinfo[0].poolid;
     sched = poolinfo[0].sched;
@@ -7653,19 +7658,19 @@ int main_cpupoolnumasplit(int argc, char **argv)
     }
     if (n_pools > 1) {
         fprintf(stderr, "splitting not possible, already cpupools in use\n");
-        return -ERROR_FAIL;
+        return 1;
     }
 
     topology = libxl_get_cpu_topology(ctx, &n_cpus);
     if (topology == NULL) {
         fprintf(stderr, "libxl_get_topologyinfo failed\n");
-        return -ERROR_FAIL;
+        return 1;
     }
 
     if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
         fprintf(stderr, "Failed to allocate cpumap\n");
         libxl_cputopology_list_free(topology, n_cpus);
-        return -ERROR_FAIL;
+        return 1;
     }
 
     /* Reset Pool-0 to 1st node: first add cpus, then remove cpus to avoid
@@ -7674,12 +7679,11 @@ int main_cpupoolnumasplit(int argc, char **argv)
     node = topology[0].node;
     if (libxl_cpupool_cpuadd_node(ctx, 0, node, &n)) {
         fprintf(stderr, "error on adding cpu to Pool 0\n");
-        return -ERROR_FAIL;
+        return 1;
     }
 
     snprintf(name, 15, "Pool-node%d", node);
-    ret = -libxl_cpupool_rename(ctx, name, 0);
-    if (ret) {
+    if (libxl_cpupool_rename(ctx, name, 0)) {
         fprintf(stderr, "error on renaming Pool 0\n");
         goto out;
     }
@@ -7718,8 +7722,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         }
 
         node = topology[c].node;
-        ret = -libxl_cpupool_cpuremove_node(ctx, 0, node, &n);
-        if (ret) {
+        if (libxl_cpupool_cpuremove_node(ctx, 0, node, &n)) {
             fprintf(stderr, "error on removing cpu from Pool 0\n");
             goto out;
         }
@@ -7727,14 +7730,12 @@ int main_cpupoolnumasplit(int argc, char **argv)
         snprintf(name, 15, "Pool-node%d", node);
         libxl_uuid_generate(&uuid);
         poolid = 0;
-        ret = -libxl_cpupool_create(ctx, name, sched, cpumap, &uuid, &poolid);
-        if (ret) {
+        if (libxl_cpupool_create(ctx, name, sched, cpumap, &uuid, &poolid)) {
             fprintf(stderr, "error on creating cpupool\n");
             goto out;
         }
 
-        ret = -libxl_cpupool_cpuadd_node(ctx, poolid, node, &n);
-        if (ret) {
+        if (libxl_cpupool_cpuadd_node(ctx, poolid, node, &n)) {
             fprintf(stderr, "error on adding cpus to cpupool\n");
             goto out;
         }
@@ -7746,11 +7747,13 @@ int main_cpupoolnumasplit(int argc, char **argv)
         }
     }
 
+    rc = 0;
+
 out:
     libxl_cputopology_list_free(topology, n_cpus);
     libxl_bitmap_dispose(&cpumap);
 
-    return ret;
+    return rc;
 }
 
 int main_getenforce(int argc, char **argv)
