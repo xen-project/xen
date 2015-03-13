@@ -428,7 +428,7 @@ typedef union {
 /* Before executing instruction: restore necessary bits in EFLAGS. */
 #define _PRE_EFLAGS(_sav, _msk, _tmp)                           \
 /* EFLAGS = (_sav & _msk) | (EFLAGS & ~_msk); _sav &= ~_msk; */ \
-"movl %"_sav",%"_LO32 _tmp"; "                                  \
+"movl %"_LO32 _sav",%"_LO32 _tmp"; "                            \
 "push %"_tmp"; "                                                \
 "push %"_tmp"; "                                                \
 "movl %"_msk",%"_LO32 _tmp"; "                                  \
@@ -448,7 +448,7 @@ typedef union {
 "pushf; "                                       \
 "pop  %"_tmp"; "                                \
 "andl %"_msk",%"_LO32 _tmp"; "                  \
-"orl  %"_LO32 _tmp",%"_sav"; "
+"orl  %"_LO32 _tmp",%"_LO32 _sav"; "
 
 /* Raw emulation: instruction has two explicit operands. */
 #define __emulate_2op_nobyte(_op,_src,_dst,_eflags,_wx,_wy,_lx,_ly,_qx,_qy)\
@@ -460,18 +460,16 @@ do{ unsigned long _tmp;                                                    \
             _PRE_EFLAGS("0","4","2")                                       \
             _op"w %"_wx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
-            : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : _wy ((_src).val), "i" (EFLAGS_MASK),                         \
-              "m" (_eflags), "m" ((_dst).val) );                           \
+            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
+            : _wy ((_src).val), "i" (EFLAGS_MASK) );                       \
         break;                                                             \
     case 4:                                                                \
         asm volatile (                                                     \
             _PRE_EFLAGS("0","4","2")                                       \
             _op"l %"_lx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
-            : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : _ly ((_src).val), "i" (EFLAGS_MASK),                         \
-              "m" (_eflags), "m" ((_dst).val) );                           \
+            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
+            : _ly ((_src).val), "i" (EFLAGS_MASK) );                       \
         break;                                                             \
     case 8:                                                                \
         __emulate_2op_8byte(_op, _src, _dst, _eflags, _qx, _qy);           \
@@ -487,9 +485,8 @@ do{ unsigned long _tmp;                                                    \
             _PRE_EFLAGS("0","4","2")                                       \
             _op"b %"_bx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
-            : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : _by ((_src).val), "i" (EFLAGS_MASK),                         \
-              "m" (_eflags), "m" ((_dst).val) );                           \
+            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
+            : _by ((_src).val), "i" (EFLAGS_MASK) );                       \
         break;                                                             \
     default:                                                               \
         __emulate_2op_nobyte(_op,_src,_dst,_eflags,_wx,_wy,_lx,_ly,_qx,_qy);\
@@ -519,24 +516,24 @@ do{ unsigned long _tmp;                                                    \
             _PRE_EFLAGS("0","3","2")                                       \
             _op"b %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
-            : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );        \
+            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
+            : "i" (EFLAGS_MASK) );                                         \
         break;                                                             \
     case 2:                                                                \
         asm volatile (                                                     \
             _PRE_EFLAGS("0","3","2")                                       \
             _op"w %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
-            : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );        \
+            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
+            : "i" (EFLAGS_MASK) );                                         \
         break;                                                             \
     case 4:                                                                \
         asm volatile (                                                     \
             _PRE_EFLAGS("0","3","2")                                       \
             _op"l %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
-            : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );        \
+            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
+            : "i" (EFLAGS_MASK) );                                         \
         break;                                                             \
     case 8:                                                                \
         __emulate_1op_8byte(_op, _dst, _eflags);                           \
@@ -551,17 +548,16 @@ do{ asm volatile (                                                      \
         _PRE_EFLAGS("0","4","2")                                        \
         _op"q %"_qx"3,%1; "                                             \
         _POST_EFLAGS("0","4","2")                                       \
-        : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)               \
-        : _qy ((_src).val), "i" (EFLAGS_MASK),                          \
-          "m" (_eflags), "m" ((_dst).val) );                            \
+        : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)               \
+        : _qy ((_src).val), "i" (EFLAGS_MASK) );                        \
 } while (0)
 #define __emulate_1op_8byte(_op, _dst, _eflags)                         \
 do{ asm volatile (                                                      \
         _PRE_EFLAGS("0","3","2")                                        \
         _op"q %1; "                                                     \
         _POST_EFLAGS("0","3","2")                                       \
-        : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)               \
-        : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );         \
+        : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)               \
+        : "i" (EFLAGS_MASK) );                                          \
 } while (0)
 #elif defined(__i386__)
 #define __emulate_2op_8byte(_op, _src, _dst, _eflags, _qx, _qy)
@@ -806,10 +802,9 @@ static int read_ulong(
  */
 static bool_t mul_dbl(unsigned long m[2])
 {
-    bool_t rc;
-    asm ( "mul %4; seto %b2"
-          : "=a" (m[0]), "=d" (m[1]), "=q" (rc)
-          : "0" (m[0]), "1" (m[1]), "2" (0) );
+    bool_t rc = 0;
+    asm ( "mul %1; seto %b2"
+          : "+a" (m[0]), "+d" (m[1]), "+q" (rc) );
     return rc;
 }
 
@@ -820,10 +815,9 @@ static bool_t mul_dbl(unsigned long m[2])
  */
 static bool_t imul_dbl(unsigned long m[2])
 {
-    bool_t rc;
-    asm ( "imul %4; seto %b2"
-          : "=a" (m[0]), "=d" (m[1]), "=q" (rc)
-          : "0" (m[0]), "1" (m[1]), "2" (0) );
+    bool_t rc = 0;
+    asm ( "imul %1; seto %b2"
+          : "+a" (m[0]), "+d" (m[1]), "+q" (rc) );
     return rc;
 }
 
@@ -837,9 +831,7 @@ static bool_t div_dbl(unsigned long u[2], unsigned long v)
 {
     if ( (v == 0) || (u[1] >= v) )
         return 1;
-    asm ( "div %4"
-          : "=a" (u[0]), "=d" (u[1])
-          : "0" (u[0]), "1" (u[1]), "r" (v) );
+    asm ( "div %2" : "+a" (u[0]), "+d" (u[1]) : "r" (v) );
     return 0;
 }
 
