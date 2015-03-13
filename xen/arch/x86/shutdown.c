@@ -28,16 +28,18 @@
 #include <asm/apic.h>
 
 enum reboot_type {
+        BOOT_INVALID,
         BOOT_TRIPLE = 't',
         BOOT_KBD = 'k',
         BOOT_ACPI = 'a',
         BOOT_CF9 = 'p',
+        BOOT_EFI = 'e',
 };
 
 static int reboot_mode;
 
 /*
- * reboot=t[riple] | k[bd] | a[cpi] | p[ci] | n[o] [, [w]arm | [c]old]
+ * reboot=t[riple] | k[bd] | a[cpi] | p[ci] | n[o] | [e]fi [, [w]arm | [c]old]
  * warm   Don't set the cold reboot flag
  * cold   Set the cold reboot flag
  * no     Suppress automatic reboot after panics or crashes
@@ -45,8 +47,9 @@ static int reboot_mode;
  * kbd    Use the keyboard controller. cold reset (default)
  * acpi   Use the RESET_REG in the FADT
  * pci    Use the so-called "PCI reset register", CF9
+ * efi    Use the EFI reboot (if running under EFI)
  */
-static enum reboot_type reboot_type = BOOT_ACPI;
+static enum reboot_type reboot_type = BOOT_INVALID;
 static void __init set_reboot_type(char *str)
 {
     for ( ; ; )
@@ -63,6 +66,7 @@ static void __init set_reboot_type(char *str)
             reboot_mode = 0x0;
             break;
         case 'a':
+        case 'e':
         case 'k':
         case 't':
         case 'p':
@@ -104,6 +108,14 @@ void machine_halt(void)
     }
 
     __machine_halt(NULL);
+}
+
+static void default_reboot_type(void)
+{
+    if ( reboot_type == BOOT_INVALID )
+        reboot_type = efi_enabled ? BOOT_EFI
+                                  : acpi_disabled ? BOOT_KBD
+                                                  : BOOT_ACPI;
 }
 
 static int __init override_reboot(struct dmi_system_id *d)
@@ -452,6 +464,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
 
 static int __init reboot_init(void)
 {
+    default_reboot_type();
     dmi_check_system(reboot_dmi_table);
     return 0;
 }
@@ -465,7 +478,7 @@ static void noreturn __machine_restart(void *pdelay)
 void machine_restart(unsigned int delay_millisecs)
 {
     unsigned int i, attempt;
-    enum reboot_type orig_reboot_type = reboot_type;
+    enum reboot_type orig_reboot_type;
     const struct desc_ptr no_idt = { 0 };
 
     watchdog_disable();
@@ -504,15 +517,20 @@ void machine_restart(unsigned int delay_millisecs)
         tboot_shutdown(TB_SHUTDOWN_REBOOT);
     }
 
-    efi_reset_system(reboot_mode != 0);
+    /* Just in case reboot_init() didn't run yet. */
+    default_reboot_type();
+    orig_reboot_type = reboot_type;
 
     /* Rebooting needs to touch the page at absolute address 0. */
-    *((unsigned short *)__va(0x472)) = reboot_mode;
+    if ( reboot_type != BOOT_EFI )
+        *((unsigned short *)__va(0x472)) = reboot_mode;
 
     for ( attempt = 0; ; attempt++ )
     {
         switch ( reboot_type )
         {
+        case BOOT_INVALID:
+            ASSERT_UNREACHABLE();
         case BOOT_KBD:
             /* Pulse the keyboard reset line. */
             for ( i = 0; i < 100; i++ )
@@ -531,6 +549,11 @@ void machine_restart(unsigned int delay_millisecs)
              */
             reboot_type = (((attempt == 1) && (orig_reboot_type == BOOT_ACPI))
                            ? BOOT_ACPI : BOOT_TRIPLE);
+            break;
+        case BOOT_EFI:
+            reboot_type = acpi_disabled ? BOOT_KBD : BOOT_ACPI;
+            efi_reset_system(reboot_mode != 0);
+            *((unsigned short *)__va(0x472)) = reboot_mode;
             break;
         case BOOT_TRIPLE:
             asm volatile ("lidt %0; int3" : : "m" (no_idt));

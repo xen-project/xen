@@ -1145,7 +1145,7 @@ The following resources are available:
   Technology.
 
 ### reboot
-> `= t[riple] | k[bd] | a[cpi] | p[ci] | n[o] [, [w]arm | [c]old]`
+> `= t[riple] | k[bd] | a[cpi] | p[ci] | e[fi] | n[o] [, [w]arm | [c]old]`
 
 > Default: `0`
 
@@ -1164,6 +1164,9 @@ Specify the host reboot method.
 `acpi` instructs Xen to reboot the host using RESET_REG in the ACPI FADT.
 
 `pci` instructs Xen to reboot the host using PCI reset register (port CF9).
+
+'efi' instructs Xen to reboot using the EFI reboot call (in EFI mode by
+ default it will use that method first).
 
 ### ro-hpet
 > `= <boolean>`
