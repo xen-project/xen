@@ -3698,7 +3698,7 @@ static void print_bitmap(uint8_t *map, int maplen, FILE *stream)
     }
 }
 
-static void list_domains(int verbose, int context, int claim, int numa,
+static void list_domains(bool verbose, bool context, bool claim, bool numa,
                          const libxl_dominfo *info, int nb_domain)
 {
     int i;
@@ -4682,10 +4682,11 @@ int main_reboot(int argc, char **argv)
 
 int main_list(int argc, char **argv)
 {
-    int opt, verbose = 0;
-    int context = 0;
-    int details = 0;
-    int numa = 0;
+    int opt;
+    bool verbose = false;
+    bool context = false;
+    bool details = false;
+    bool numa = false;
     static struct option opts[] = {
         {"long", 0, 0, 'l'},
         {"verbose", 0, 0, 'v'},
@@ -4701,16 +4702,16 @@ int main_list(int argc, char **argv)
 
     SWITCH_FOREACH_OPT(opt, "lvhZn", opts, "list", 0) {
     case 'l':
-        details = 1;
+        details = true;
         break;
     case 'v':
-        verbose = 1;
+        verbose = true;
         break;
     case 'Z':
-        context = 1;
+        context = true;
         break;
     case 'n':
-        numa = 1;
+        numa = true;
         break;
     }
 
@@ -4743,7 +4744,8 @@ int main_list(int argc, char **argv)
     if (details)
         list_domains_details(info, nb_domain);
     else
-        list_domains(verbose, context, 0 /* claim */, numa, info, nb_domain);
+        list_domains(verbose, context, false /* claim */, numa,
+                     info, nb_domain);
 
     if (info_free)
         libxl_dominfo_list_free(info, nb_domain);
@@ -6793,8 +6795,8 @@ int main_claims(int argc, char **argv)
         return 1;
     }
 
-    list_domains(0 /* verbose */, 0 /* context */, 1 /* claim */,
-                 0 /* numa */, info, nb_domain);
+    list_domains(false /* verbose */, false /* context */, true /* claim */,
+                 false /* numa */, info, nb_domain);
 
     libxl_dominfo_list_free(info, nb_domain);
     return 0;
