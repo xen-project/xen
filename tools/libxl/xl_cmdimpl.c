@@ -770,7 +770,7 @@ static int update_cpumap_range(const char *str, libxl_bitmap *cpumap)
  * single cpus or as eintire NUMA nodes) and turns it into the
  * corresponding libxl_bitmap (in cpumap).
  */
-static int vcpupin_parse(const char *cpu, libxl_bitmap *cpumap)
+static int cpurange_parse(const char *cpu, libxl_bitmap *cpumap)
 {
     char *ptr, *saveptr = NULL, *buf = strdup(cpu);
     int rc = 0;
@@ -883,7 +883,7 @@ static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
                 exit(1);
             }
 
-            if (vcpupin_parse(buf, &vcpu_affinity_array[j]))
+            if (cpurange_parse(buf, &vcpu_affinity_array[j]))
                 exit(1);
 
             j++;
@@ -900,7 +900,7 @@ static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
             exit(1);
         }
 
-        if (vcpupin_parse(buf, &vcpu_affinity_array[0]))
+        if (cpurange_parse(buf, &vcpu_affinity_array[0]))
             exit(1);
 
         for (i = 1; i < b_info->max_vcpus; i++) {
@@ -5157,7 +5157,7 @@ int main_vcpupin(int argc, char **argv)
      */
     if (!strcmp(hard_str, "-"))
         hard = NULL;
-    else if (vcpupin_parse(hard_str, hard))
+    else if (cpurange_parse(hard_str, hard))
         goto out;
     /*
      * Soft affinity is handled similarly. Only difference: we also want
@@ -5165,7 +5165,7 @@ int main_vcpupin(int argc, char **argv)
      */
     if (argc <= optind+3 || !strcmp(soft_str, "-"))
         soft = NULL;
-    else if (vcpupin_parse(soft_str, soft))
+    else if (cpurange_parse(soft_str, soft))
         goto out;
 
     if (dryrun_only) {
@@ -7503,44 +7503,37 @@ int main_cpupoolcpuadd(int argc, char **argv)
     int opt;
     const char *pool;
     uint32_t poolid;
-    int cpu;
-    int node;
-    int n;
+    libxl_bitmap cpumap;
+    int rc = 1;
 
     SWITCH_FOREACH_OPT(opt, "", NULL, "cpupool-cpu-add", 2) {
         /* No options */
     }
 
-    pool = argv[optind++];
-    node = -1;
-    cpu = -1;
-    if (strncmp(argv[optind], "node:", 5) == 0) {
-        node = atoi(argv[optind] + 5);
-    } else {
-        cpu = atoi(argv[optind]);
+    libxl_bitmap_init(&cpumap);
+    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
+        fprintf(stderr, "Unable to allocate cpumap");
+        return 1;
     }
+
+    pool = argv[optind++];
+    if (cpurange_parse(argv[optind], &cpumap))
+        goto out;
 
     if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
         fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
-        return -ERROR_FAIL;
+        goto out;
     }
 
-    if (cpu >= 0) {
-        return -libxl_cpupool_cpuadd(ctx, poolid, cpu);
-    }
+    if (libxl_cpupool_cpuadd_cpumap(ctx, poolid, &cpumap))
+        fprintf(stderr, "some cpus may not have been added to %s\n", pool);
 
-    if (libxl_cpupool_cpuadd_node(ctx, poolid, node, &n)) {
-        fprintf(stderr, "libxl_cpupool_cpuadd_node failed\n");
-        return -ERROR_FAIL;
-    }
+    rc = 0;
 
-    if (n > 0) {
-        return 0;
-    }
-
-    fprintf(stderr, "no free cpu found\n");
-    return -ERROR_FAIL;
+out:
+    libxl_bitmap_dispose(&cpumap);
+    return rc;
 }
 
 int main_cpupoolcpuremove(int argc, char **argv)
@@ -7548,44 +7541,37 @@ int main_cpupoolcpuremove(int argc, char **argv)
     int opt;
     const char *pool;
     uint32_t poolid;
-    int cpu;
-    int node;
-    int n;
+    libxl_bitmap cpumap;
+    int rc = 1;
+
+    libxl_bitmap_init(&cpumap);
+    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
+        fprintf(stderr, "Unable to allocate cpumap");
+        return 1;
+    }
 
     SWITCH_FOREACH_OPT(opt, "", NULL, "cpupool-cpu-remove", 2) {
         /* No options */
     }
 
     pool = argv[optind++];
-    node = -1;
-    cpu = -1;
-    if (strncmp(argv[optind], "node:", 5) == 0) {
-        node = atoi(argv[optind] + 5);
-    } else {
-        cpu = atoi(argv[optind]);
-    }
+    if (cpurange_parse(argv[optind], &cpumap))
+        goto out;
 
     if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
         fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
-        return -ERROR_FAIL;
+        goto out;
     }
 
-    if (cpu >= 0) {
-        return -libxl_cpupool_cpuremove(ctx, poolid, cpu);
-    }
+    if (libxl_cpupool_cpuremove_cpumap(ctx, poolid, &cpumap))
+        fprintf(stderr, "some cpus may not have been removed from %s\n", pool);
 
-    if (libxl_cpupool_cpuremove_node(ctx, poolid, node, &n)) {
-        fprintf(stderr, "libxl_cpupool_cpuremove_node failed\n");
-        return -ERROR_FAIL;
-    }
+    rc = 0;
 
-    if (n == 0) {
-        fprintf(stderr, "no cpu of node found in cpupool\n");
-        return -ERROR_FAIL;
-    }
-
-    return 0;
+out:
+    libxl_bitmap_dispose(&cpumap);
+    return rc;
 }
 
 int main_cpupoolmigrate(int argc, char **argv)

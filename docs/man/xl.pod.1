@@ -1147,13 +1147,30 @@ This is possible only if no domain is active in the cpu-pool.
 
 Renames a cpu-pool to I<newname>.
 
-=item B<cpupool-cpu-add> I<cpu-pool> I<cpu-nr|node:node-nr>
+=item B<cpupool-cpu-add> I<cpu-pool> I<cpus|node:nodes>
 
-Adds a cpu or all cpus of a numa node to a cpu-pool.
+Adds one or more CPUs or NUMA nodes to I<cpu-pool>. CPUs and NUMA
+nodes can be specified as single CPU/node IDs or as ranges.
 
-=item B<cpupool-cpu-remove> I<cpu-nr|node:node-nr>
+For example:
 
-Removes a cpu or all cpus of a numa node from a cpu-pool.
+ (a) xl cpupool-cpu-add mypool 4
+ (b) xl cpupool-cpu-add mypool 1,5,10-16,^13
+ (c) xl cpupool-cpu-add mypool node:0,nodes:2-3,^10-12,8
+
+means adding CPU 4 to mypool, in (a); adding CPUs 1,5,10,11,12,14,15
+and 16, in (b); and adding all the CPUs of NUMA nodes 0, 2 and 3,
+plus CPU 8, but keeping out CPUs 10,11,12, in (c).
+
+All the specified CPUs that can be added to the cpupool will be added
+to it. If some CPU can't (e.g., because they're already part of another
+cpupool), an error is reported about each one of them.
+
+=item B<cpupool-cpu-remove> I<cpus|node:nodes>
+
+Removes one or more CPUs or NUMA nodes from I<cpu-pool>. CPUs and NUMA
+nodes can be specified as single CPU/node IDs or as ranges, using the
+exact same syntax as in B<cpupool-cpu-add> above.
 
 =item B<cpupool-migrate> I<domain> I<cpu-pool>
 
