@@ -33,6 +33,7 @@ enum reboot_type {
         BOOT_KBD = 'k',
         BOOT_ACPI = 'a',
         BOOT_CF9 = 'p',
+        BOOT_CF9_PWR = 'P',
         BOOT_EFI = 'e',
 };
 
@@ -47,6 +48,7 @@ static int reboot_mode;
  * kbd    Use the keyboard controller. cold reset (default)
  * acpi   Use the RESET_REG in the FADT
  * pci    Use the so-called "PCI reset register", CF9
+ * Power  Like 'pci' but for a full power-cyle reset
  * efi    Use the EFI reboot (if running under EFI)
  */
 static enum reboot_type reboot_type = BOOT_INVALID;
@@ -68,8 +70,9 @@ static void __init set_reboot_type(char *str)
         case 'a':
         case 'e':
         case 'k':
-        case 't':
+        case 'P':
         case 'p':
+        case 't':
             reboot_type = *str;
             break;
         }
@@ -571,11 +574,18 @@ void machine_restart(unsigned int delay_millisecs)
             reboot_type = BOOT_KBD;
             break;
         case BOOT_CF9:
+        case BOOT_CF9_PWR:
             {
-                u8 cf9 = inb(0xcf9) & ~6;
-                outb(cf9|2, 0xcf9); /* Request hard reset */
+                u8 cf9 = inb(0xcf9) & ~0x0e;
+
+                /* Request warm, hard, or power-cycle reset. */
+                if ( reboot_type == BOOT_CF9_PWR )
+                    cf9 |= 0x0a;
+                else if ( reboot_mode == 0 )
+                    cf9 |= 0x02;
+                outb(cf9, 0xcf9);
                 udelay(50);
-                outb(cf9|6, 0xcf9); /* Actually do the reset */
+                outb(cf9 | 0x04, 0xcf9); /* Actually do the reset. */
                 udelay(50);
             }
             reboot_type = BOOT_ACPI;
