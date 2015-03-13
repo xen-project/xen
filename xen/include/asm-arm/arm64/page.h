@@ -88,9 +88,9 @@ static inline uint64_t gva_to_ma_par(vaddr_t va, unsigned int flags)
     uint64_t par, tmp = READ_SYSREG64(PAR_EL1);
 
     if ( (flags & GV2M_WRITE) == GV2M_WRITE )
-        asm volatile ("at s12e1r, %0;" : : "r" (va));
-    else
         asm volatile ("at s12e1w, %0;" : : "r" (va));
+    else
+        asm volatile ("at s12e1r, %0;" : : "r" (va));
     isb();
     par = READ_SYSREG64(PAR_EL1);
     WRITE_SYSREG64(tmp, PAR_EL1);
