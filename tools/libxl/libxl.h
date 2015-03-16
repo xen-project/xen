@@ -67,6 +67,13 @@
  * the same $(XEN_VERSION) (e.g. throughout a major release).
  */
 
+/* LIBXL_HAVE_VNUMA
+ *
+ * If this is defined the type libxl_vnode_info exists, and a
+ * field 'vnuma_nodes' is present in libxl_domain_build_info.
+ */
+#define LIBXL_HAVE_VNUMA 1
+
 /* LIBXL_HAVE_USERDATA_UNLINK
  *
  * If it is defined, libxl has a library function called
