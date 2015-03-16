@@ -54,7 +54,7 @@ typedef union YYSTYPE
 #line 25 "libxlu_cfg_y.y"
 
   char *string;
-  XLU_ConfigSetting *setting;
+  XLU_ConfigValue *value;
 
 
 

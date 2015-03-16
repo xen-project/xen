@@ -126,7 +126,7 @@ typedef union YYSTYPE
 #line 25 "libxlu_cfg_y.y"
 
   char *string;
-  XLU_ConfigSetting *setting;
+  XLU_ConfigValue *value;
 
 
 
@@ -1148,7 +1148,7 @@ yydestruct (yymsg, yytype, yyvaluep, yylocationp, ctx)
 
 /* Line 1391 of yacc.c  */
 #line 43 "libxlu_cfg_y.y"
-	{ xlu__cfg_set_free((yyvaluep->setting)); };
+	{ xlu__cfg_value_free((yyvaluep->value)); };
 
 /* Line 1391 of yacc.c  */
 #line 1155 "libxlu_cfg_y.c"
@@ -1166,7 +1166,7 @@ yydestruct (yymsg, yytype, yyvaluep, yylocationp, ctx)
 
 /* Line 1391 of yacc.c  */
 #line 43 "libxlu_cfg_y.y"
-	{ xlu__cfg_set_free((yyvaluep->setting)); };
+	{ xlu__cfg_value_free((yyvaluep->value)); };
 
 /* Line 1391 of yacc.c  */
 #line 1173 "libxlu_cfg_y.c"
@@ -1175,7 +1175,7 @@ yydestruct (yymsg, yytype, yyvaluep, yylocationp, ctx)
 
 /* Line 1391 of yacc.c  */
 #line 43 "libxlu_cfg_y.y"
-	{ xlu__cfg_set_free((yyvaluep->setting)); };
+	{ xlu__cfg_value_free((yyvaluep->value)); };
 
 /* Line 1391 of yacc.c  */
 #line 1182 "libxlu_cfg_y.c"
@@ -1508,21 +1508,21 @@ yyreduce:
 
 /* Line 1806 of yacc.c  */
 #line 57 "libxlu_cfg_y.y"
-    { xlu__cfg_set_store(ctx,(yyvsp[(1) - (3)].string),(yyvsp[(3) - (3)].setting),(yylsp[(3) - (3)]).first_line); }
+    { xlu__cfg_set_store(ctx,(yyvsp[(1) - (3)].string),(yyvsp[(3) - (3)].value),(yylsp[(3) - (3)]).first_line); }
     break;
 
   case 12:
 
 /* Line 1806 of yacc.c  */
 #line 62 "libxlu_cfg_y.y"
-    { (yyval.setting)= xlu__cfg_set_mk(ctx,1,(yyvsp[(1) - (1)].string)); }
+    { (yyval.value)= xlu__cfg_string_mk(ctx,(yyvsp[(1) - (1)].string)); }
     break;
 
   case 13:
 
 /* Line 1806 of yacc.c  */
 #line 63 "libxlu_cfg_y.y"
-    { (yyval.setting)= (yyvsp[(3) - (4)].setting); }
+    { (yyval.value)= (yyvsp[(3) - (4)].value); }
     break;
 
   case 14:
@@ -1543,35 +1543,35 @@ yyreduce:
 
 /* Line 1806 of yacc.c  */
 #line 68 "libxlu_cfg_y.y"
-    { (yyval.setting)= xlu__cfg_set_mk(ctx,0,0); }
+    { (yyval.value)= xlu__cfg_list_mk(ctx,NULL); }
     break;
 
   case 17:
 
 /* Line 1806 of yacc.c  */
 #line 69 "libxlu_cfg_y.y"
-    { (yyval.setting)= (yyvsp[(1) - (1)].setting); }
+    { (yyval.value)= (yyvsp[(1) - (1)].value); }
     break;
 
   case 18:
 
 /* Line 1806 of yacc.c  */
 #line 70 "libxlu_cfg_y.y"
-    { (yyval.setting)= (yyvsp[(1) - (3)].setting); }
+    { (yyval.value)= (yyvsp[(1) - (3)].value); }
     break;
 
   case 19:
 
 /* Line 1806 of yacc.c  */
 #line 72 "libxlu_cfg_y.y"
-    { (yyval.setting)= xlu__cfg_set_mk(ctx,2,(yyvsp[(1) - (2)].string)); }
+    { (yyval.value)= xlu__cfg_list_mk(ctx,(yyvsp[(1) - (2)].string)); }
     break;
 
   case 20:
 
 /* Line 1806 of yacc.c  */
 #line 73 "libxlu_cfg_y.y"
-    { xlu__cfg_set_add(ctx,(yyvsp[(1) - (5)].setting),(yyvsp[(4) - (5)].string)); (yyval.setting)= (yyvsp[(1) - (5)].setting); }
+    { xlu__cfg_list_append(ctx,(yyvsp[(1) - (5)].value),(yyvsp[(4) - (5)].string)); (yyval.value)= (yyvsp[(1) - (5)].value); }
     break;
 
 

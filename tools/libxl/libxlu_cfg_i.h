@@ -23,11 +23,15 @@
 #include "libxlu_cfg_y.h"
 
 void xlu__cfg_set_free(XLU_ConfigSetting *set);
-XLU_ConfigSetting *xlu__cfg_set_mk(CfgParseContext*, int alloc, char *atom);
-void xlu__cfg_set_add(CfgParseContext*, XLU_ConfigSetting *set, char *atom);
 void xlu__cfg_set_store(CfgParseContext*, char *name,
-                        XLU_ConfigSetting *set, int lineno);
-
+                        XLU_ConfigValue *val, int lineno);
+XLU_ConfigValue *xlu__cfg_string_mk(CfgParseContext *ctx,
+                                    char *atom);
+XLU_ConfigValue *xlu__cfg_list_mk(CfgParseContext *ctx, char *atom);
+void xlu__cfg_list_append(CfgParseContext *ctx,
+                          XLU_ConfigValue *list,
+                          char *atom);
+void xlu__cfg_value_free(XLU_ConfigValue *value);
 char *xlu__cfgl_strdup(CfgParseContext*, const char *src);
 char *xlu__cfgl_dequote(CfgParseContext*, const char *src);
 
