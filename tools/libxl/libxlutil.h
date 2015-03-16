@@ -20,9 +20,15 @@
 
 #include "libxl.h"
 
+enum XLU_ConfigValueType {
+    XLU_STRING,
+    XLU_LIST,
+};
+
 /* Unless otherwise stated, all functions return an errno value. */
 typedef struct XLU_Config XLU_Config;
 typedef struct XLU_ConfigList XLU_ConfigList;
+typedef struct XLU_ConfigValue XLU_ConfigValue;
 
 XLU_Config *xlu_cfg_init(FILE *report, const char *report_filename);
   /* 0 means we got ENOMEM. */
@@ -66,6 +72,13 @@ const char *xlu_cfg_get_listitem(const XLU_ConfigList*, int entry);
   /* xlu_cfg_get_listitem cannot fail, except that if entry is
    * out of range it returns 0 (not setting errno) */
 
+enum XLU_ConfigValueType xlu_cfg_value_type(const XLU_ConfigValue *value);
+int xlu_cfg_value_get_string(const XLU_Config *cfg,  XLU_ConfigValue *value,
+                             char **value_r, int dont_warn);
+int xlu_cfg_value_get_list(const XLU_Config *cfg, XLU_ConfigValue *value,
+                           XLU_ConfigList **value_r, int dont_warn);
+XLU_ConfigValue *xlu_cfg_get_listitem2(const XLU_ConfigList *list,
+                                       int entry);
 
 /*
  * Disk specification parsing.

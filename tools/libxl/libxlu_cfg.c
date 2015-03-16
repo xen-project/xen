@@ -199,6 +199,53 @@ static int find_atom(const XLU_Config *cfg, const char *n,
     return 0;
 }
 
+
+enum XLU_ConfigValueType xlu_cfg_value_type(const XLU_ConfigValue *value)
+{
+    return value->type;
+}
+
+int xlu_cfg_value_get_string(const XLU_Config *cfg, XLU_ConfigValue *value,
+                             char **value_r, int dont_warn)
+{
+    if (value->type != XLU_STRING) {
+        if (!dont_warn)
+            fprintf(cfg->report,
+                    "%s:%d:%d: warning: value is not a string\n",
+                    cfg->config_source, value->loc.first_line,
+                    value->loc.first_column);
+        *value_r = NULL;
+        return EINVAL;
+    }
+
+    *value_r = value->u.string;
+    return 0;
+}
+
+int xlu_cfg_value_get_list(const XLU_Config *cfg, XLU_ConfigValue *value,
+                           XLU_ConfigList **value_r, int dont_warn)
+{
+    if (value->type != XLU_LIST) {
+        if (!dont_warn)
+            fprintf(cfg->report,
+                    "%s:%d:%d: warning: value is not a list\n",
+                    cfg->config_source, value->loc.first_line,
+                    value->loc.first_column);
+        *value_r = NULL;
+        return EINVAL;
+    }
+
+    *value_r = &value->u.list;
+    return 0;
+}
+
+XLU_ConfigValue *xlu_cfg_get_listitem2(const XLU_ConfigList *list,
+                                       int entry)
+{
+    if (entry < 0 || entry >= list->nvalues) return NULL;
+    return list->values[entry];
+}
+
 int xlu_cfg_get_string(const XLU_Config *cfg, const char *n,
                        const char **value_r, int dont_warn) {
     XLU_ConfigSetting *set;

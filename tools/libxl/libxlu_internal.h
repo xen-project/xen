@@ -25,13 +25,6 @@
 
 #include "libxlutil.h"
 
-enum XLU_ConfigValueType {
-    XLU_STRING,
-    XLU_LIST,
-};
-
-typedef struct XLU_ConfigValue XLU_ConfigValue;
-
 typedef struct XLU_ConfigList {
     int avalues; /* available slots */
     int nvalues; /* actual occupied slots */
