@@ -27,10 +27,11 @@ void xlu__cfg_set_store(CfgParseContext*, char *name,
                         XLU_ConfigValue *val, int lineno);
 XLU_ConfigValue *xlu__cfg_string_mk(CfgParseContext *ctx,
                                     char *atom);
-XLU_ConfigValue *xlu__cfg_list_mk(CfgParseContext *ctx, char *atom);
+XLU_ConfigValue *xlu__cfg_list_mk(CfgParseContext *ctx,
+                                  XLU_ConfigValue *val);
 void xlu__cfg_list_append(CfgParseContext *ctx,
                           XLU_ConfigValue *list,
-                          char *atom);
+                          XLU_ConfigValue *val);
 void xlu__cfg_value_free(XLU_ConfigValue *value);
 char *xlu__cfgl_strdup(CfgParseContext*, const char *src);
 char *xlu__cfgl_dequote(CfgParseContext*, const char *src);

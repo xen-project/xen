@@ -69,8 +69,8 @@ valuelist: /* empty */           { $$= xlu__cfg_list_mk(ctx,NULL); }
  |      values                  { $$= $1; }
  |      values ',' nlok         { $$= $1; }
 
-values: atom nlok                  { $$= xlu__cfg_list_mk(ctx,$1); }
- |      values ',' nlok atom nlok  { xlu__cfg_list_append(ctx,$1,$4); $$= $1; }
+values: value nlok                  { $$= xlu__cfg_list_mk(ctx,$1); }
+ |      values ',' nlok value nlok  { xlu__cfg_list_append(ctx,$1,$4); $$= $1; }
 
 nlok:
         /* nothing */

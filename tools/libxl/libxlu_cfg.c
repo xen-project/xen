@@ -332,18 +332,13 @@ XLU_ConfigValue *xlu__cfg_string_mk(CfgParseContext *ctx, char *atom)
     return NULL;
 }
 
-XLU_ConfigValue *xlu__cfg_list_mk(CfgParseContext *ctx, char *atom)
+XLU_ConfigValue *xlu__cfg_list_mk(CfgParseContext *ctx,
+                                  XLU_ConfigValue *val)
 {
     XLU_ConfigValue *value = NULL;
     XLU_ConfigValue **values = NULL;
-    XLU_ConfigValue *val = NULL;
 
     if (ctx->err) goto x;
-
-    val = malloc(sizeof(*val));
-    if (!val) goto xe;
-    val->type = XLU_STRING;
-    val->u.string = atom;
 
     values = malloc(sizeof(*values));
     if (!values) goto xe;
@@ -363,19 +358,17 @@ XLU_ConfigValue *xlu__cfg_list_mk(CfgParseContext *ctx, char *atom)
  x:
     free(value);
     free(values);
-    free(val);
-    free(atom);
+    xlu__cfg_value_free(val);
     return NULL;
 }
 
 void xlu__cfg_list_append(CfgParseContext *ctx,
                           XLU_ConfigValue *list,
-                          char *atom)
+                          XLU_ConfigValue *val)
 {
-    XLU_ConfigValue *val = NULL;
     if (ctx->err) return;
 
-    assert(atom);
+    assert(val);
     assert(list->type == XLU_LIST);
 
     if (list->u.list.nvalues >= list->u.list.avalues) {
@@ -384,7 +377,7 @@ void xlu__cfg_list_append(CfgParseContext *ctx,
 
         if (list->u.list.avalues > INT_MAX / 100) {
             ctx->err = ERANGE;
-            free(atom);
+            xlu__cfg_value_free(val);
             return;
         }
 
@@ -393,7 +386,7 @@ void xlu__cfg_list_append(CfgParseContext *ctx,
                               sizeof(*new_values) * new_avalues);
         if (!new_values) {
             ctx->err = errno;
-            free(atom);
+            xlu__cfg_value_free(val);
             return;
         }
 
@@ -401,15 +394,6 @@ void xlu__cfg_list_append(CfgParseContext *ctx,
         list->u.list.values  = new_values;
     }
 
-    val = malloc(sizeof(*val));
-    if (!val) {
-        ctx->err = errno;
-        free(atom);
-        return;
-    }
-
-    val->type = XLU_STRING;
-    val->u.string = atom;
     list->u.list.values[list->u.list.nvalues] = val;
     list->u.list.nvalues++;
 }
