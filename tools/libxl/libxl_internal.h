@@ -2524,8 +2524,9 @@ typedef struct libxl__datacopier_buf libxl__datacopier_buf;
 
 /* onwrite==1 means failure happened when writing, logged, errnoval is valid
  * onwrite==0 means failure happened when reading
- *     errnoval==0 means we got eof and all data was written
- *     errnoval!=0 means we had a read error, logged
+ *     errnoval>=0 means we got eof and all data was written or number of bytes
+ *                 written when in read mode
+ *     errnoval<0 means we had a read error, logged
  * onwrite==-1 means some other internal failure, errnoval not valid, logged
  * If we get POLLHUP, we call callback_pollhup(..., onwrite, -1);
  * or if callback_pollhup==0 this is an internal failure, as above.
@@ -2550,6 +2551,9 @@ struct libxl__datacopier_state {
     FILE *log; /* gets a copy of everything */
     libxl__datacopier_callback *callback;
     libxl__datacopier_callback *callback_pollhup;
+    void *readbuf; /* Set this to read data into it without writing to an
+                      fd. The buffer should be at least as large as the
+                      bytes_to_read parameter, which should not be -1. */
     /* remaining fields are private to datacopier */
     libxl__ev_fd toread, towrite;
     ssize_t used;
