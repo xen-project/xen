@@ -316,6 +316,7 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
             if ( pfn == MAP_FAILED )
             {
                 PERROR("xc_map_foreign_bulk: mmap of pfn array failed");
+                (void)munmap(addr, (unsigned long)num << XC_PAGE_SHIFT);
                 return NULL;
             }
         }
