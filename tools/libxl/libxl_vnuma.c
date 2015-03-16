@@ -17,6 +17,11 @@
 #include "libxl_arch.h"
 #include <stdlib.h>
 
+bool libxl__vnuma_configured(const libxl_domain_build_info *b_info)
+{
+    return b_info->num_vnuma_nodes != 0;
+}
+
 /* Sort vmemranges in ascending order with "start" */
 static int compare_vmemrange(const void *a, const void *b)
 {

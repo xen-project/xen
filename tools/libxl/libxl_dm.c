@@ -1378,13 +1378,15 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
                         libxl__sprintf(gc, "%s/hvmloader/bios", path),
                         "%s", libxl_bios_type_to_string(b_info->u.hvm.bios));
         /* Disable relocating memory to make the MMIO hole larger
-         * unless we're running qemu-traditional */
+         * unless we're running qemu-traditional and vNUMA is not
+         * configured. */
         libxl__xs_write(gc, XBT_NULL,
                         libxl__sprintf(gc,
                                        "%s/hvmloader/allow-memory-relocate",
                                        path),
                         "%d",
-                        b_info->device_model_version==LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL);
+                        b_info->device_model_version==LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL &&
+                        !libxl__vnuma_configured(b_info));
         free(path);
     }
 

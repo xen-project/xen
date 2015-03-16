@@ -3434,6 +3434,7 @@ int libxl__vnuma_build_vmemrange_hvm(libxl__gc *gc,
                                      libxl_domain_build_info *b_info,
                                      libxl__domain_build_state *state,
                                      struct xc_hvm_build_args *args);
+bool libxl__vnuma_configured(const libxl_domain_build_info *b_info);
 
 _hidden int libxl__ms_vm_genid_set(libxl__gc *gc, uint32_t domid,
                                    const libxl_ms_vm_genid *id);
