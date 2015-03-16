@@ -772,14 +772,15 @@ int arch_setup_meminit(struct xc_dom_image *dom)
             return rc;
     }
 
-    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
-    if ( dom->p2m_host == NULL )
-        return -EINVAL;
-
     if ( dom->superpages )
     {
         int count = dom->total_pages >> SUPERPAGE_PFN_SHIFT;
         xen_pfn_t extents[count];
+
+        dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) *
+                                      dom->total_pages);
+        if ( dom->p2m_host == NULL )
+            return -EINVAL;
 
         DOMPRINTF("Populating memory with %d superpages", count);
         for ( pfn = 0; pfn < count; pfn++ )
@@ -809,9 +810,13 @@ int arch_setup_meminit(struct xc_dom_image *dom)
                 return rc;
         }
         /* setup initial p2m */
+        dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) *
+                                      dom->total_pages);
+        if ( dom->p2m_host == NULL )
+            return -EINVAL;
         for ( pfn = 0; pfn < dom->total_pages; pfn++ )
             dom->p2m_host[pfn] = pfn;
-        
+
         /* allocate guest memory */
         for ( i = rc = allocsz = 0;
               (i < dom->total_pages) && !rc;
