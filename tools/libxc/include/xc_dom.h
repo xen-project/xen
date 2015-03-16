@@ -119,8 +119,10 @@ struct xc_dom_image {
 
     /* physical memory
      *
-     * An x86 PV guest has a single contiguous block of physical RAM,
-     * consisting of total_pages starting at rambase_pfn.
+     * An x86 PV guest has one or more blocks of physical RAM,
+     * consisting of total_pages starting at rambase_pfn. The start
+     * address and size of each block is controlled by vNUMA
+     * structures.
      *
      * An ARM guest has GUEST_RAM_BANKS regions of RAM, with
      * rambank_size[i] pages in each. The lowest RAM address
@@ -167,6 +169,12 @@ struct xc_dom_image {
     /* kernel loader, arch hooks */
     struct xc_dom_loader *kernel_loader;
     void *private_loader;
+
+    /* vNUMA information */
+    xen_vmemrange_t *vmemranges;
+    unsigned int nr_vmemranges;
+    unsigned int *vnode_to_pnode;
+    unsigned int nr_vnodes;
 
     /* kernel loader */
     struct xc_dom_arch *arch_hooks;

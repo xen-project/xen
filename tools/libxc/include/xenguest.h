@@ -23,6 +23,8 @@
 #ifndef XENGUEST_H
 #define XENGUEST_H
 
+#define XC_NUMA_NO_NODE   (~0U)
+
 #define XCFLAGS_LIVE      (1 << 0)
 #define XCFLAGS_DEBUG     (1 << 1)
 #define XCFLAGS_HVM       (1 << 2)

@@ -760,7 +760,8 @@ static int x86_shadow(xc_interface *xch, domid_t domid)
 int arch_setup_meminit(struct xc_dom_image *dom)
 {
     int rc;
-    xen_pfn_t pfn, allocsz, i, j, mfn;
+    xen_pfn_t pfn, allocsz, mfn, total, pfn_base;
+    int i, j;
 
     rc = x86_compat(dom->xch, dom->guest_domid, dom->guest_type);
     if ( rc )
@@ -811,26 +812,98 @@ int arch_setup_meminit(struct xc_dom_image *dom)
             if ( rc )
                 return rc;
         }
-        /* setup initial p2m */
-        dom->p2m_size = dom->total_pages;
+
+        /* Setup dummy vNUMA information if it's not provided. Note
+         * that this is a valid state if libxl doesn't provide any
+         * vNUMA information.
+         *
+         * The dummy values make libxc allocate all pages from
+         * arbitrary physical nodes. This is the expected behaviour if
+         * no vNUMA configuration is provided to libxc.
+         *
+         * Note that the following hunk is just for the convenience of
+         * allocation code. No defaulting happens in libxc.
+         */
+        if ( dom->nr_vmemranges == 0 )
+        {
+            dom->nr_vmemranges = 1;
+            dom->vmemranges = xc_dom_malloc(dom, sizeof(*dom->vmemranges));
+            dom->vmemranges[0].start = 0;
+            dom->vmemranges[0].end   = dom->total_pages << PAGE_SHIFT;
+            dom->vmemranges[0].flags = 0;
+            dom->vmemranges[0].nid   = 0;
+
+            dom->nr_vnodes = 1;
+            dom->vnode_to_pnode = xc_dom_malloc(dom,
+                                      sizeof(*dom->vnode_to_pnode));
+            dom->vnode_to_pnode[0] = XC_NUMA_NO_NODE;
+        }
+
+        total = dom->p2m_size = 0;
+        for ( i = 0; i < dom->nr_vmemranges; i++ )
+        {
+            total += ((dom->vmemranges[i].end - dom->vmemranges[i].start)
+                      >> PAGE_SHIFT);
+            dom->p2m_size =
+                dom->p2m_size > (dom->vmemranges[i].end >> PAGE_SHIFT) ?
+                dom->p2m_size : (dom->vmemranges[i].end >> PAGE_SHIFT);
+        }
+        if ( total != dom->total_pages )
+        {
+            xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                         "%s: vNUMA page count mismatch (0x%"PRIpfn" != 0x%"PRIpfn")\n",
+                         __func__, total, dom->total_pages);
+            return -EINVAL;
+        }
+
         dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) *
                                       dom->p2m_size);
         if ( dom->p2m_host == NULL )
             return -EINVAL;
-        for ( pfn = 0; pfn < dom->total_pages; pfn++ )
-            dom->p2m_host[pfn] = pfn;
+        for ( pfn = 0; pfn < dom->p2m_size; pfn++ )
+            dom->p2m_host[pfn] = INVALID_P2M_ENTRY;
 
         /* allocate guest memory */
-        for ( i = rc = allocsz = 0;
-              (i < dom->total_pages) && !rc;
-              i += allocsz )
+        for ( i = 0; i < dom->nr_vmemranges; i++ )
         {
-            allocsz = dom->total_pages - i;
-            if ( allocsz > 1024*1024 )
-                allocsz = 1024*1024;
-            rc = xc_domain_populate_physmap_exact(
-                dom->xch, dom->guest_domid, allocsz,
-                0, 0, &dom->p2m_host[i]);
+            unsigned int memflags;
+            uint64_t pages;
+            unsigned int pnode = dom->vnode_to_pnode[dom->vmemranges[i].nid];
+
+            memflags = 0;
+            if ( pnode != XC_NUMA_NO_NODE )
+                memflags |= XENMEMF_exact_node(pnode);
+
+            pages = (dom->vmemranges[i].end - dom->vmemranges[i].start)
+                >> PAGE_SHIFT;
+            pfn_base = dom->vmemranges[i].start >> PAGE_SHIFT;
+
+            for ( pfn = pfn_base; pfn < pfn_base+pages; pfn++ )
+                dom->p2m_host[pfn] = pfn;
+
+            for ( j = 0; j < pages; j += allocsz )
+            {
+                allocsz = pages - j;
+                if ( allocsz > 1024*1024 )
+                    allocsz = 1024*1024;
+
+                rc = xc_domain_populate_physmap_exact(dom->xch,
+                         dom->guest_domid, allocsz, 0, memflags,
+                         &dom->p2m_host[pfn_base+j]);
+
+                if ( rc )
+                {
+                    if ( pnode != XC_NUMA_NO_NODE )
+                        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                                     "%s: failed to allocate 0x%"PRIx64" pages (v=%d, p=%d)\n",
+                                     __func__, pages, i, pnode);
+                    else
+                        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                                     "%s: failed to allocate 0x%"PRIx64" pages\n",
+                                     __func__, pages);
+                    return rc;
+                }
+            }
         }
 
         /* Ensure no unclaimed pages are left unused.
