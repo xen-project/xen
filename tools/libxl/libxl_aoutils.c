@@ -145,7 +145,8 @@ static void datacopier_check_state(libxl__egc *egc, libxl__datacopier_state *dc)
                 return;
             }
         }
-    } else if (!libxl__ev_fd_isregistered(&dc->toread)) {
+    } else if (!libxl__ev_fd_isregistered(&dc->toread) ||
+               dc->bytes_to_read == 0) {
         /* we have had eof */
         datacopier_callback(egc, dc, 0, 0);
         return;
@@ -231,9 +232,9 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
             buf->used = 0;
             LIBXL_TAILQ_INSERT_TAIL(&dc->bufs, buf, entry);
         }
-        int r = read(ev->fd,
-                     buf->buf + buf->used,
-                     sizeof(buf->buf) - buf->used);
+        int r = read(ev->fd, buf->buf + buf->used,
+                     min_t(size_t, sizeof(buf->buf) - buf->used,
+                           (dc->bytes_to_read == -1) ? SIZE_MAX : dc->bytes_to_read));
         if (r < 0) {
             if (errno == EINTR) continue;
             if (errno == EWOULDBLOCK) break;
@@ -259,6 +260,10 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
         buf->used += r;
         dc->used += r;
         assert(buf->used <= sizeof(buf->buf));
+        if (dc->bytes_to_read > 0)
+            dc->bytes_to_read -= r;
+        if (dc->bytes_to_read == 0)
+            break;
     }
     datacopier_check_state(egc, dc);
 }

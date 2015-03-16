@@ -516,6 +516,7 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
 
     bl->keystrokes.ao = ao;
     bl->keystrokes.maxsz = BOOTLOADER_BUF_OUT;
+    bl->keystrokes.bytes_to_read = -1;
     bl->keystrokes.copywhat =
         GCSPRINTF("bootloader input for domain %"PRIu32, bl->domid);
     bl->keystrokes.callback =         bootloader_keystrokes_copyfail;
@@ -527,6 +528,7 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
 
     bl->display.ao = ao;
     bl->display.maxsz = BOOTLOADER_BUF_IN;
+    bl->display.bytes_to_read = -1;
     bl->display.copywhat =
         GCSPRINTF("bootloader output for domain %"PRIu32, bl->domid);
     bl->display.callback =         bootloader_display_copyfail;

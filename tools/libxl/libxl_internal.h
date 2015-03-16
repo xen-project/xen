@@ -2545,6 +2545,7 @@ struct libxl__datacopier_state {
     libxl__ao *ao;
     int readfd, writefd;
     ssize_t maxsz;
+    ssize_t bytes_to_read; /* set to -1 to read until EOF */
     const char *copywhat, *readwhat, *writewhat; /* for error msgs */
     FILE *log; /* gets a copy of everything */
     libxl__datacopier_callback *callback;

@@ -1922,6 +1922,7 @@ void libxl__domain_save_device_model(libxl__egc *egc,
     dc->readfd = -1;
     dc->writefd = fd;
     dc->maxsz = INT_MAX;
+    dc->bytes_to_read = -1;
     dc->copywhat = GCSPRINTF("qemu save file for domain %"PRIu32, dss->domid);
     dc->writewhat = "save/migration stream";
     dc->callback = save_device_model_datacopier_done;
