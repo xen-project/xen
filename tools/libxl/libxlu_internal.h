@@ -38,12 +38,22 @@ typedef struct XLU_ConfigList {
     XLU_ConfigValue **values;
 } XLU_ConfigList;
 
+typedef struct YYLTYPE
+{
+  int first_line;
+  int first_column;
+  int last_line;
+  int last_column;
+} YYLTYPE;
+#define YYLTYPE_IS_DECLARED
+
 struct XLU_ConfigValue {
     enum XLU_ConfigValueType type;
     union {
         char *string;
         XLU_ConfigList list;
     } u;
+    YYLTYPE loc;
 };
 
 typedef struct XLU_ConfigSetting { /* transparent */

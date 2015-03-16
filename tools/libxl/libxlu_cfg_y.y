@@ -59,17 +59,17 @@ assignment: IDENT '=' value { xlu__cfg_set_store(ctx,$1,$3,@3.first_line); }
 endstmt: NEWLINE
  |      ';'
 
-value:  atom                         { $$= xlu__cfg_string_mk(ctx,$1); }
+value:  atom                         { $$= xlu__cfg_string_mk(ctx,$1,&@1); }
  |      '[' nlok valuelist ']'       { $$= $3; }
 
 atom:   STRING                   { $$= $1; }
  |      NUMBER                   { $$= $1; }
 
-valuelist: /* empty */           { $$= xlu__cfg_list_mk(ctx,NULL); }
+valuelist: /* empty */           { $$= xlu__cfg_list_mk(ctx,NULL,&yylloc); }
  |      values                  { $$= $1; }
  |      values ',' nlok         { $$= $1; }
 
-values: value nlok                  { $$= xlu__cfg_list_mk(ctx,$1); }
+values: value nlok                  { $$= xlu__cfg_list_mk(ctx,$1,&@1); }
  |      values ',' nlok value nlok  { xlu__cfg_list_append(ctx,$1,$4); $$= $1; }
 
 nlok:

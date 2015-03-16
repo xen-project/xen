@@ -26,9 +26,10 @@ void xlu__cfg_set_free(XLU_ConfigSetting *set);
 void xlu__cfg_set_store(CfgParseContext*, char *name,
                         XLU_ConfigValue *val, int lineno);
 XLU_ConfigValue *xlu__cfg_string_mk(CfgParseContext *ctx,
-                                    char *atom);
+                                    char *atom, YYLTYPE *loc);
 XLU_ConfigValue *xlu__cfg_list_mk(CfgParseContext *ctx,
-                                  XLU_ConfigValue *val);
+                                  XLU_ConfigValue *val,
+                                  YYLTYPE *loc);
 void xlu__cfg_list_append(CfgParseContext *ctx,
                           XLU_ConfigValue *list,
                           XLU_ConfigValue *val);

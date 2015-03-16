@@ -1515,7 +1515,7 @@ yyreduce:
 
 /* Line 1806 of yacc.c  */
 #line 62 "libxlu_cfg_y.y"
-    { (yyval.value)= xlu__cfg_string_mk(ctx,(yyvsp[(1) - (1)].string)); }
+    { (yyval.value)= xlu__cfg_string_mk(ctx,(yyvsp[(1) - (1)].string),&(yylsp[(1) - (1)])); }
     break;
 
   case 13:
@@ -1543,7 +1543,7 @@ yyreduce:
 
 /* Line 1806 of yacc.c  */
 #line 68 "libxlu_cfg_y.y"
-    { (yyval.value)= xlu__cfg_list_mk(ctx,NULL); }
+    { (yyval.value)= xlu__cfg_list_mk(ctx,NULL,&yylloc); }
     break;
 
   case 17:
@@ -1564,7 +1564,7 @@ yyreduce:
 
 /* Line 1806 of yacc.c  */
 #line 72 "libxlu_cfg_y.y"
-    { (yyval.value)= xlu__cfg_list_mk(ctx,(yyvsp[(1) - (2)].value)); }
+    { (yyval.value)= xlu__cfg_list_mk(ctx,(yyvsp[(1) - (2)].value),&(yylsp[(1) - (2)])); }
     break;
 
   case 20:

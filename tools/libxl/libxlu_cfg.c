@@ -311,7 +311,8 @@ const char *xlu_cfg_get_listitem(const XLU_ConfigList *list, int entry) {
 }
 
 
-XLU_ConfigValue *xlu__cfg_string_mk(CfgParseContext *ctx, char *atom)
+XLU_ConfigValue *xlu__cfg_string_mk(CfgParseContext *ctx, char *atom,
+                                    YYLTYPE *loc)
 {
     XLU_ConfigValue *value = NULL;
 
@@ -321,6 +322,7 @@ XLU_ConfigValue *xlu__cfg_string_mk(CfgParseContext *ctx, char *atom)
     if (!value) goto xe;
     value->type = XLU_STRING;
     value->u.string = atom;
+    memcpy(&value->loc, loc, sizeof(*loc));
 
     return value;
 
@@ -333,7 +335,8 @@ XLU_ConfigValue *xlu__cfg_string_mk(CfgParseContext *ctx, char *atom)
 }
 
 XLU_ConfigValue *xlu__cfg_list_mk(CfgParseContext *ctx,
-                                  XLU_ConfigValue *val)
+                                  XLU_ConfigValue *val,
+                                  YYLTYPE *loc)
 {
     XLU_ConfigValue *value = NULL;
     XLU_ConfigValue **values = NULL;
@@ -350,6 +353,7 @@ XLU_ConfigValue *xlu__cfg_list_mk(CfgParseContext *ctx,
     value->u.list.nvalues = 1;
     value->u.list.avalues = 1;
     value->u.list.values = values;
+    memcpy(&value->loc, loc, sizeof(*loc));
 
     return value;
 
