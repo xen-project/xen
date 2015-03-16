@@ -356,6 +356,13 @@ libxl_domain_sched_params = Struct("domain_sched_params",[
     ("budget",       integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_BUDGET_DEFAULT'}),
     ])
 
+libxl_vnode_info = Struct("vnode_info", [
+    ("memkb", MemKB),
+    ("distances", Array(uint32, "num_distances")), # distances from this node to other nodes
+    ("pnode", uint32), # physical node of this node
+    ("vcpus", libxl_bitmap), # vcpus in this node
+    ])
+
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
     ("avail_vcpus",     libxl_bitmap),
@@ -376,6 +383,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("disable_migrate", libxl_defbool),
     ("cpuid",           libxl_cpuid_policy_list),
     ("blkdev_start",    string),
+
+    ("vnuma_nodes", Array(libxl_vnode_info, "num_vnuma_nodes")),
     
     ("device_model_version", libxl_device_model_version),
     ("device_model_stubdomain", libxl_defbool),
