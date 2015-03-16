@@ -108,6 +108,22 @@
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
+#define min(X, Y) ({                             \
+            const typeof (X) _x = (X);           \
+            const typeof (Y) _y = (Y);           \
+            (void) (&_x == &_y);                 \
+            (_x < _y) ? _x : _y; })
+#define max(X, Y) ({                             \
+            const typeof (X) _x = (X);           \
+            const typeof (Y) _y = (Y);           \
+            (void) (&_x == &_y);                 \
+            (_x > _y) ? _x : _y; })
+
+#define min_t(type, x, y)                                               \
+    ({ const type _x = (x); const type _y = (y); _x < _y ? _x: _y; })
+#define max_t(type, x, y)                                               \
+    ({ const type _x = (x); const type _y = (y); _x > _y ? _x: _y; })
+
 #define LIBXL__LOGGING_ENABLED
 
 #ifdef LIBXL__LOGGING_ENABLED
