@@ -289,6 +289,16 @@ static void *xmalloc(size_t sz) {
     return r;
 }
 
+static void *xcalloc(size_t n, size_t sz) __attribute__((unused));
+static void *xcalloc(size_t n, size_t sz) {
+    void *r = calloc(n, sz);
+    if (!r) {
+        fprintf(stderr,"xl: Unable to calloc %zu bytes.\n", sz*n);
+        exit(-ERROR_FAIL);
+    }
+    return r;
+}
+
 static void *xrealloc(void *ptr, size_t sz) {
     void *r;
     if (!sz) { free(ptr); return 0; }
