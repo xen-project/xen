@@ -160,6 +160,8 @@ void libxl__datacopier_prefixdata(libxl__egc *egc, libxl__datacopier_state *dc,
 {
     EGC_GC;
     libxl__datacopier_buf *buf;
+    const uint8_t *ptr;
+
     /*
      * It is safe for this to be called immediately after _start, as
      * is documented in the public comment.  _start's caller must have
@@ -170,12 +172,14 @@ void libxl__datacopier_prefixdata(libxl__egc *egc, libxl__datacopier_state *dc,
 
     assert(len < dc->maxsz - dc->used);
 
-    buf = libxl__zalloc(NOGC, sizeof(*buf));
-    buf->used = len;
-    memcpy(buf->buf, data, len);
+    for (ptr = data; len; len -= buf->used, ptr += buf->used) {
+        buf = libxl__malloc(NOGC, sizeof(*buf));
+        buf->used = min(len, sizeof(buf->buf));
+        memcpy(buf->buf, ptr, buf->used);
 
-    dc->used += len;
-    LIBXL_TAILQ_INSERT_TAIL(&dc->bufs, buf, entry);
+        dc->used += buf->used;
+        LIBXL_TAILQ_INSERT_TAIL(&dc->bufs, buf, entry);
+    }
 }
 
 static int datacopier_pollhup_handled(libxl__egc *egc,
