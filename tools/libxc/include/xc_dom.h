@@ -129,6 +129,7 @@ struct xc_dom_image {
      */
     xen_pfn_t rambase_pfn;
     xen_pfn_t total_pages;
+    xen_pfn_t p2m_size;         /* number of pfns covered by p2m */
     struct xc_dom_phys *phys_pages;
     int realmodearea_log;
 #if defined (__arm__) || defined(__aarch64__)

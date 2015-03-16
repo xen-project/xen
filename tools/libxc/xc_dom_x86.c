@@ -122,11 +122,11 @@ static int count_pgtables(struct xc_dom_image *dom, int pae,
 
         try_pfn_end = (try_virt_end - dom->parms.virt_base) >> PAGE_SHIFT_X86;
 
-        if ( try_pfn_end > dom->total_pages )
+        if ( try_pfn_end > dom->p2m_size )
         {
             xc_dom_panic(dom->xch, XC_OUT_OF_MEMORY,
                          "%s: not enough memory for initial mapping (%#"PRIpfn" > %#"PRIpfn")",
-                         __FUNCTION__, try_pfn_end, dom->total_pages);
+                         __FUNCTION__, try_pfn_end, dom->p2m_size);
             return -ENOMEM;
         }
 
@@ -440,10 +440,11 @@ pfn_error:
 
 static int alloc_magic_pages(struct xc_dom_image *dom)
 {
-    size_t p2m_size = dom->total_pages * dom->arch_hooks->sizeof_pfn;
+    size_t p2m_alloc_size = dom->p2m_size * dom->arch_hooks->sizeof_pfn;
 
     /* allocate phys2mach table */
-    if ( xc_dom_alloc_segment(dom, &dom->p2m_seg, "phys2mach", 0, p2m_size) )
+    if ( xc_dom_alloc_segment(dom, &dom->p2m_seg, "phys2mach",
+                              0, p2m_alloc_size) )
         return -1;
     dom->p2m_guest = xc_dom_seg_to_ptr(dom, &dom->p2m_seg);
     if ( dom->p2m_guest == NULL )
@@ -777,8 +778,9 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         int count = dom->total_pages >> SUPERPAGE_PFN_SHIFT;
         xen_pfn_t extents[count];
 
+        dom->p2m_size = dom->total_pages;
         dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) *
-                                      dom->total_pages);
+                                      dom->p2m_size);
         if ( dom->p2m_host == NULL )
             return -EINVAL;
 
@@ -810,8 +812,9 @@ int arch_setup_meminit(struct xc_dom_image *dom)
                 return rc;
         }
         /* setup initial p2m */
+        dom->p2m_size = dom->total_pages;
         dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) *
-                                      dom->total_pages);
+                                      dom->p2m_size);
         if ( dom->p2m_host == NULL )
             return -EINVAL;
         for ( pfn = 0; pfn < dom->total_pages; pfn++ )
@@ -860,7 +863,7 @@ static int map_grant_table_frames(struct xc_dom_image *dom)
     {
         rc = xc_domain_add_to_physmap(dom->xch, dom->guest_domid,
                                       XENMAPSPACE_grant_table,
-                                      i, dom->total_pages + i);
+                                      i, dom->p2m_size + i);
         if ( rc != 0 )
         {
             if ( (i > 0) && (errno == EINVAL) )
@@ -870,7 +873,7 @@ static int map_grant_table_frames(struct xc_dom_image *dom)
             }
             xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
                          "%s: mapping grant tables failed " "(pfn=0x%" PRIpfn
-                         ", rc=%d)", __FUNCTION__, dom->total_pages + i, rc);
+                         ", rc=%d)", __FUNCTION__, dom->p2m_size + i, rc);
             return rc;
         }
     }

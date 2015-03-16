@@ -449,6 +449,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
     assert(dom->rambank_size[0] != 0);
     assert(ramsize == 0); /* Too much RAM is rejected above */
 
+    dom->p2m_size = p2m_size;
     dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * p2m_size);
     if ( dom->p2m_host == NULL )
         return -EINVAL;
