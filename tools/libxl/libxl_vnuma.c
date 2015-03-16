@@ -14,6 +14,7 @@
  */
 #include "libxl_osdeps.h" /* must come before any other headers */
 #include "libxl_internal.h"
+#include "libxl_arch.h"
 #include <stdlib.h>
 
 /* Sort vmemranges in ascending order with "start" */
@@ -140,6 +141,45 @@ out:
     libxl_numainfo_list_free(ninfo, nr_nodes);
     libxl_bitmap_dispose(&cpumap);
     return rc;
+}
+
+int libxl__vnuma_build_vmemrange_pv_generic(libxl__gc *gc,
+                                            uint32_t domid,
+                                            libxl_domain_build_info *b_info,
+                                            libxl__domain_build_state *state)
+{
+    int i;
+    uint64_t next;
+    xen_vmemrange_t *v = NULL;
+
+    /* Generate one vmemrange for each virtual node. */
+    GCREALLOC_ARRAY(v, b_info->num_vnuma_nodes);
+    next = 0;
+    for (i = 0; i < b_info->num_vnuma_nodes; i++) {
+        libxl_vnode_info *p = &b_info->vnuma_nodes[i];
+
+        v[i].start = next;
+        v[i].end = next + (p->memkb << 10);
+        v[i].flags = 0;
+        v[i].nid = i;
+
+        next = v[i].end;
+    }
+
+    state->vmemranges = v;
+    state->num_vmemranges = i;
+
+    return 0;
+}
+
+/* Build vmemranges for PV guest */
+int libxl__vnuma_build_vmemrange_pv(libxl__gc *gc,
+                                    uint32_t domid,
+                                    libxl_domain_build_info *b_info,
+                                    libxl__domain_build_state *state)
+{
+    assert(state->vmemranges == NULL);
+    return libxl__arch_vnuma_build_vmemrange(gc, domid, b_info, state);
 }
 
 /*

@@ -27,4 +27,10 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
 int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
                                       libxl_domain_build_info *info,
                                       struct xc_dom_image *dom);
+
+/* build vNUMA vmemrange with arch specific information */
+int libxl__arch_vnuma_build_vmemrange(libxl__gc *gc,
+                                      uint32_t domid,
+                                      libxl_domain_build_info *b_info,
+                                      libxl__domain_build_state *state);
 #endif

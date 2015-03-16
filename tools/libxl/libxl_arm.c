@@ -707,6 +707,14 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
     return 0;
 }
 
+int libxl__arch_vnuma_build_vmemrange(libxl__gc *gc,
+                                      uint32_t domid,
+                                      libxl_domain_build_info *info,
+                                      libxl__domain_build_state *state)
+{
+    return libxl__vnuma_build_vmemrange_pv_generic(gc, domid, info, state);
+}
+
 /*
  * Local variables:
  * mode: C
