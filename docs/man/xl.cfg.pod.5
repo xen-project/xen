@@ -41,8 +41,8 @@ value).
 
 =item B<[ VALUE, VALUE, ... ]>
 
-A list of C<VALUES> of the above types. Lists are homogeneous and are
-not nested.
+A list of C<VALUES> of the above types. Lists can be heterogeneous and
+nested.
 
 =back
 
@@ -263,6 +263,61 @@ In combination with B<memory=> it will start the guest "pre-ballooned",
 if the values of B<memory=> and B<maxmem=> differ.
 A "pre-ballooned" HVM guest needs a balloon driver, without a balloon driver
 it will crash.
+
+=back
+
+=head3 Guest Virtual NUMA Configuration
+
+=over 4
+
+=item B<vnuma=[ VNODE_SPEC, VNODE_SPEC, ... ]
+
+Specify virtual NUMA configuration with positional arguments. The
+nth B<VNODE_SPEC> in the list specifies the configuration of nth
+virtual node.
+
+Each B<VNODE_SPEC> is a list, which has a form of
+"[VNODE_CONFIG_OPTION,VNODE_CONFIG_OPTION, ... ]"  (without quotes).
+
+For example vnuma = [ ["pnode=0","size=512","vcpus=0-4","vdistances=10,20"] ]
+means vnode 0 is mapped to pnode 0, has 512MB ram, has vcpus 0 to 4, the
+distance to itself is 10 and the distance to vnode 1 is 20.
+
+Each B<VNODE_CONFIG_OPTION> is a quoted key=value pair. Supported
+B<VNODE_CONFIG_OPTION>s are (they are all mandatory at the moment):
+
+=over 4
+
+=item B<pnode=NUMBER>
+
+Specify which physical node this virtual node maps to.
+
+=item B<size=MBYTES>
+
+Specify the size of this virtual node. The sum of memory size of all
+vnodes will become B<maxmem=>. If B<maxmem=> is specified separately,
+a check is performed to make sure the sum of all vnode memory matches
+B<maxmem=>.
+
+=item B<vcpus=CPU-STRING>
+
+Specify which vcpus belong to this node. B<CPU-STRING> is a string
+separated by comma. You can specify range and single cpu. An example
+is "vcpus=0-5,8", which means you specify vcpu 0 to vcpu 5, and vcpu
+8.
+
+=item B<vdistances=NUMBER, NUMBER, ... >
+
+Specify virtual distance from this node to all nodes (including
+itself) with positional arguments. For example, "vdistance=10,20"
+for vnode 0 means the distance from vnode 0 to vnode 0 is 10, from
+vnode 0 to vnode 1 is 20. The number of arguments supplied must match
+the total number of vnodes.
+
+Normally you can use the values from "xl info -n" or "numactl
+--hardware" to fill in vdistance list.
+
+=back
 
 =back
 
