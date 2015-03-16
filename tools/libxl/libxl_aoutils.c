@@ -309,9 +309,11 @@ int libxl__datacopier_start(libxl__datacopier_state *dc)
 
     libxl__datacopier_init(dc);
 
-    rc = libxl__ev_fd_register(gc, &dc->toread, datacopier_readable,
-                               dc->readfd, POLLIN);
-    if (rc) goto out;
+    if (dc->readfd >= 0) {
+        rc = libxl__ev_fd_register(gc, &dc->toread, datacopier_readable,
+                                   dc->readfd, POLLIN);
+        if (rc) goto out;
+    }
 
     rc = libxl__ev_fd_register(gc, &dc->towrite, datacopier_writable,
                                dc->writefd, POLLOUT);
