@@ -207,6 +207,27 @@ static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
     return 0;
 }
 
+static int e820_host_sanitize(libxl__gc *gc,
+                              libxl_domain_build_info *b_info,
+                              struct e820entry map[],
+                              uint32_t *nr)
+{
+    int rc;
+
+    rc = xc_get_machine_memory_map(CTX->xch, map, *nr);
+    if (rc < 0) {
+        errno = rc;
+        return ERROR_FAIL;
+    }
+
+    *nr = rc;
+
+    rc = e820_sanitize(CTX, map, nr, b_info->target_memkb,
+                       (b_info->max_memkb - b_info->target_memkb) +
+                       b_info->u.pv.slack_memkb);
+    return rc;
+}
+
 static int libxl__e820_alloc(libxl__gc *gc, uint32_t domid,
         libxl_domain_config *d_config)
 {
@@ -223,15 +244,8 @@ static int libxl__e820_alloc(libxl__gc *gc, uint32_t domid,
     if (!libxl_defbool_val(b_info->u.pv.e820_host))
         return ERROR_INVAL;
 
-    rc = xc_get_machine_memory_map(ctx->xch, map, E820MAX);
-    if (rc < 0) {
-        errno = rc;
-        return ERROR_FAIL;
-    }
-    nr = rc;
-    rc = e820_sanitize(ctx, map, &nr, b_info->target_memkb,
-                       (b_info->max_memkb - b_info->target_memkb) +
-                       b_info->u.pv.slack_memkb);
+    nr = E820MAX;
+    rc = e820_host_sanitize(gc, b_info, map, &nr);
     if (rc)
         return ERROR_FAIL;
 
