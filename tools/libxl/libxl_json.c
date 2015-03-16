@@ -1013,7 +1013,7 @@ out:
 yajl_gen_status libxl__uint64_gen_json(yajl_gen hand, uint64_t val)
 {
     char *num;
-    unsigned int len;
+    int len;
     yajl_gen_status s;
 
 
