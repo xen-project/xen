@@ -853,6 +853,15 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
     }
 
+    /* Disallow PoD and vNUMA to be enabled at the same time because PoD
+     * pool is not vNUMA-aware yet.
+     */
+    if (pod_enabled && d_config->b_info.num_vnuma_nodes) {
+        ret = ERROR_INVAL;
+        LOG(ERROR, "Cannot enable PoD and vNUMA at the same time");
+        goto error_out;
+    }
+
     ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
     if (ret) goto error_out;
 

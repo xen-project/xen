@@ -182,6 +182,62 @@ int libxl__vnuma_build_vmemrange_pv(libxl__gc *gc,
     return libxl__arch_vnuma_build_vmemrange(gc, domid, b_info, state);
 }
 
+/* Build vmemranges for HVM guest */
+int libxl__vnuma_build_vmemrange_hvm(libxl__gc *gc,
+                                     uint32_t domid,
+                                     libxl_domain_build_info *b_info,
+                                     libxl__domain_build_state *state,
+                                     struct xc_hvm_build_args *args)
+{
+    uint64_t hole_start, hole_end, next;
+    int nid, nr_vmemrange;
+    xen_vmemrange_t *vmemranges;
+
+    /* Derive vmemranges from vnode size and memory hole.
+     *
+     * Guest physical address space layout:
+     * [0, hole_start) [hole_start, hole_end) [hole_end, highmem_end)
+     */
+    hole_start = args->lowmem_end < args->mmio_start ?
+        args->lowmem_end : args->mmio_start;
+    hole_end = (args->mmio_start + args->mmio_size) > (1ULL << 32) ?
+        (args->mmio_start + args->mmio_size) : (1ULL << 32);
+
+    assert(state->vmemranges == NULL);
+
+    next = 0;
+    nr_vmemrange = 0;
+    vmemranges = NULL;
+    for (nid = 0; nid < b_info->num_vnuma_nodes; nid++) {
+        libxl_vnode_info *p = &b_info->vnuma_nodes[nid];
+        uint64_t remaining_bytes = p->memkb << 10;
+
+        while (remaining_bytes > 0) {
+            uint64_t count = remaining_bytes;
+
+            if (next >= hole_start && next < hole_end)
+                next = hole_end;
+            if ((next < hole_start) && (next + remaining_bytes >= hole_start))
+                count = hole_start - next;
+
+            GCREALLOC_ARRAY(vmemranges, nr_vmemrange+1);
+            vmemranges[nr_vmemrange].start = next;
+            vmemranges[nr_vmemrange].end = next + count;
+            vmemranges[nr_vmemrange].flags = 0;
+            vmemranges[nr_vmemrange].nid = nid;
+
+            nr_vmemrange++;
+            remaining_bytes -= count;
+            next += count;
+        }
+    }
+
+    state->vmemranges = vmemranges;
+    state->num_vmemranges = nr_vmemrange;
+
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C
