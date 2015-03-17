@@ -929,6 +929,7 @@ runq_tickle(const struct scheduler *ops, struct rt_vcpu *new)
     }
 
     /* didn't tickle any cpu */
+    SCHED_STAT_CRANK(tickle_idlers_none);
     return;
 out:
     /* TRACE */
@@ -944,6 +945,7 @@ out:
     }
 
     cpumask_set_cpu(cpu_to_tickle, &prv->tickled);
+    SCHED_STAT_CRANK(tickle_idlers_some);
     cpu_raise_softirq(cpu_to_tickle, SCHEDULE_SOFTIRQ);
     return;
 }

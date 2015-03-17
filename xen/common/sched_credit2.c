@@ -556,7 +556,10 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *
     /* Only switch to another processor if the credit difference is greater
      * than the migrate resistance */
     if ( ipid == -1 || lowest + CSCHED2_MIGRATE_RESIST > new->credit )
+    {
+        SCHED_STAT_CRANK(tickle_idlers_none);
         goto no_tickle;
+    }
 
 tickle:
     BUG_ON(ipid == -1);
@@ -571,6 +574,7 @@ tickle:
                   (unsigned char *)&d);
     }
     cpumask_set_cpu(ipid, &rqd->tickled);
+    SCHED_STAT_CRANK(tickle_idlers_some);
     cpu_raise_softirq(ipid, SCHEDULE_SOFTIRQ);
 
 no_tickle:
