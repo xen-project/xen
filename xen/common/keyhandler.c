@@ -294,15 +294,15 @@ static void dump_domains(unsigned char key)
                 process_pending_softirqs();
 
             printk("    VCPU%d: CPU%d [has=%c] poll=%d "
-                   "upcall_pend = %02x, upcall_mask = %02x ",
+                   "upcall_pend=%02x upcall_mask=%02x ",
                    v->vcpu_id, v->processor,
                    v->is_running ? 'T':'F', v->poll_evtchn,
                    vcpu_info(v, evtchn_upcall_pending),
                    !vcpu_event_delivery_is_enabled(v));
             cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);
-            printk("dirty_cpus=%s ", tmpstr);
+            printk("dirty_cpus=%s\n", tmpstr);
             cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_hard_affinity);
-            printk("cpu_affinity=%s\n", tmpstr);
+            printk("    cpu_hard_affinity=%s ", tmpstr);
             cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_soft_affinity);
             printk("cpu_soft_affinity=%s\n", tmpstr);
             printk("    pause_count=%d pause_flags=%lx\n",
