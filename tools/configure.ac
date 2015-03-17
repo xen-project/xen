@@ -355,6 +355,12 @@ AC_SUBST(libiconv)
 case "$host_cpu" in
 arm*|aarch64)
 AC_CHECK_LIB([fdt], [fdt_create], [], [AC_MSG_ERROR([Could not find libfdt])])
+
+# The functions fdt_{first,next}_subnode may not be available because:
+#   * It has been introduced in 2013 => Doesn't work on Wheezy
+#   * The prototype exists but the functions are not exposed. Don't ask why...
+AC_CHECK_FUNCS([fdt_first_subnode fdt_next_subnode])
+AC_CHECK_DECLS([fdt_first_subnode, fdt_next_subnode],,,[#include <libfdt.h>])
 esac
 
 # Checks for header files.
