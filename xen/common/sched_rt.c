@@ -444,6 +444,23 @@ rt_alloc_pdata(const struct scheduler *ops, int cpu)
     return (void *)1;
 }
 
+static void
+rt_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
+{
+    struct rt_private *prv = rt_priv(ops);
+    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
+    unsigned long flags;
+
+    spin_lock_irqsave(&prv->lock, flags);
+
+    /* Move spinlock back to the default lock */
+    ASSERT(sd->schedule_lock == &prv->lock);
+    ASSERT(!spin_is_locked(&sd->_lock));
+    sd->schedule_lock = &sd->_lock;
+
+    spin_unlock_irqrestore(&prv->lock, flags);
+}
+
 static void *
 rt_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 {
@@ -1108,6 +1125,7 @@ const struct scheduler sched_rtds_def = {
     .init           = rt_init,
     .deinit         = rt_deinit,
     .alloc_pdata    = rt_alloc_pdata,
+    .free_pdata     = rt_free_pdata,
     .alloc_domdata  = rt_alloc_domdata,
     .free_domdata   = rt_free_domdata,
     .init_domain    = rt_dom_init,
