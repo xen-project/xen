@@ -851,6 +851,7 @@ rt_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
     struct rt_vcpu * const svc = rt_vcpu(vc);
 
     BUG_ON( is_idle_vcpu(vc) );
+    SCHED_STAT_CRANK(vcpu_sleep);
 
     if ( curr_on_cpu(vc->processor) == vc )
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
@@ -966,11 +967,22 @@ rt_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
     BUG_ON( is_idle_vcpu(vc) );
 
     if ( unlikely(curr_on_cpu(vc->processor) == vc) )
+    {
+        SCHED_STAT_CRANK(vcpu_wake_running);
         return;
+    }
 
     /* on RunQ/DepletedQ, just update info is ok */
     if ( unlikely(__vcpu_on_q(svc)) )
+    {
+        SCHED_STAT_CRANK(vcpu_wake_onrunq);
         return;
+    }
+
+    if ( likely(vcpu_runnable(vc)) )
+        SCHED_STAT_CRANK(vcpu_wake_runnable);
+    else
+        SCHED_STAT_CRANK(vcpu_wake_not_runnable);
 
     /* If context hasn't been saved for this vcpu yet, we can't put it on
      * the Runqueue/DepletedQ. Instead, we set a flag so that it will be

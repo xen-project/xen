@@ -931,6 +931,7 @@ csched2_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
     struct csched2_vcpu * const svc = CSCHED2_VCPU(vc);
 
     BUG_ON( is_idle_vcpu(vc) );
+    SCHED_STAT_CRANK(vcpu_sleep);
 
     if ( curr_on_cpu(vc->processor) == vc )
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
@@ -956,18 +957,22 @@ csched2_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 
     BUG_ON( is_idle_vcpu(vc) );
 
-    /* Make sure svc priority mod happens before runq check */
     if ( unlikely(curr_on_cpu(vc->processor) == vc) )
     {
+        SCHED_STAT_CRANK(vcpu_wake_running);
         goto out;
     }
 
     if ( unlikely(__vcpu_on_runq(svc)) )
     {
-        /* If we've boosted someone that's already on a runqueue, prioritize
-         * it and inform the cpu in question. */
+        SCHED_STAT_CRANK(vcpu_wake_onrunq);
         goto out;
     }
+
+    if ( likely(vcpu_runnable(vc)) )
+        SCHED_STAT_CRANK(vcpu_wake_runnable);
+    else
+        SCHED_STAT_CRANK(vcpu_wake_not_runnable);
 
     /* If the context hasn't been saved for this vcpu yet, we can't put it on
      * another runqueue.  Instead, we set a flag so that it will be put on the runqueue
