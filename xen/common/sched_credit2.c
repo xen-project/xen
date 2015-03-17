@@ -654,6 +654,8 @@ static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now,
         }
     }
 
+    SCHED_STAT_CRANK(credit_reset);
+
     /* No need to resort runqueue, as everyone's order should be the same. */
 }
 
@@ -673,6 +675,7 @@ void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_vcpu *svc, s
     delta = now - svc->start_time;
 
     if ( delta > 0 ) {
+        SCHED_STAT_CRANK(burn_credits_t2c);
         t2c_update(rqd, delta, svc);
         svc->start_time = now;
 
@@ -713,6 +716,7 @@ static void update_max_weight(struct csched2_runqueue_data *rqd, int new_weight,
     {
         rqd->max_weight = new_weight;
         d2printk("%s: Runqueue id %d max weight %d\n", __func__, rqd->id, rqd->max_weight);
+        SCHED_STAT_CRANK(upd_max_weight_quick);
     }
     else if ( old_weight == rqd->max_weight )
     {
@@ -729,6 +733,7 @@ static void update_max_weight(struct csched2_runqueue_data *rqd, int new_weight,
 
         rqd->max_weight = max_weight;
         d2printk("%s: Runqueue %d max weight %d\n", __func__, rqd->id, rqd->max_weight);
+        SCHED_STAT_CRANK(upd_max_weight_full);
     }
 }
 
@@ -750,6 +755,7 @@ __csched2_vcpu_check(struct vcpu *vc)
     {
         BUG_ON( !is_idle_vcpu(vc) );
     }
+    SCHED_STAT_CRANK(vcpu_check);
 }
 #define CSCHED2_VCPU_CHECK(_vc)  (__csched2_vcpu_check(_vc))
 #else
@@ -1204,6 +1210,7 @@ static void migrate(const struct scheduler *ops,
         svc->migrate_rqd = trqd;
         set_bit(_VPF_migrating, &svc->vcpu->pause_flags);
         set_bit(__CSFLAG_runq_migrate_request, &svc->flags);
+        SCHED_STAT_CRANK(migrate_requested);
     }
     else
     {
@@ -1224,7 +1231,10 @@ static void migrate(const struct scheduler *ops,
             update_load(ops, svc->rqd, svc, 1, now);
             runq_insert(ops, svc->vcpu->processor, svc);
             runq_tickle(ops, svc->vcpu->processor, svc, now);
+            SCHED_STAT_CRANK(migrate_on_runq);
         }
+        else
+            SCHED_STAT_CRANK(migrate_no_runq);
     }
 }
 
@@ -1578,7 +1588,10 @@ csched2_runtime(const struct scheduler *ops, int cpu, struct csched2_vcpu *snext
     /* The next guy may actually have a higher credit, if we've tried to
      * avoid migrating him from a different cpu.  DTRT.  */
     if ( rt_credit <= 0 )
+    {
         time = CSCHED2_MIN_TIMER;
+        SCHED_STAT_CRANK(runtime_min_timer);
+    }
     else
     {
         /* FIXME: See if we can eliminate this conversion if we know time
@@ -1589,9 +1602,15 @@ csched2_runtime(const struct scheduler *ops, int cpu, struct csched2_vcpu *snext
 
         /* Check limits */
         if ( time < CSCHED2_MIN_TIMER )
+        {
             time = CSCHED2_MIN_TIMER;
+            SCHED_STAT_CRANK(runtime_min_timer);
+        }
         else if ( time > CSCHED2_MAX_TIMER )
+        {
             time = CSCHED2_MAX_TIMER;
+            SCHED_STAT_CRANK(runtime_max_timer);
+        }
     }
 
     return time;
@@ -1624,7 +1643,10 @@ runq_candidate(struct csched2_runqueue_data *rqd,
          * its credit is at least CSCHED2_MIGRATE_RESIST higher. */
         if ( svc->vcpu->processor != cpu
              && snext->credit + CSCHED2_MIGRATE_RESIST > svc->credit )
+        {
+            SCHED_STAT_CRANK(migrate_resisted);
             continue;
+        }
 
         /* If the next one on the list has more credit than current
          * (or idle, if current is not runnable), choose it. */
@@ -1769,6 +1791,7 @@ csched2_schedule(
         {
             snext->credit += CSCHED2_MIGRATE_COMPENSATION;
             snext->vcpu->processor = cpu;
+            SCHED_STAT_CRANK(migrated);
             ret.migrated = 1;
         }
     }

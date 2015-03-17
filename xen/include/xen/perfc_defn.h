@@ -28,10 +28,10 @@ PERFCOUNTER(vcpu_wake_runnable,     "sched: vcpu_wake_runnable")
 PERFCOUNTER(vcpu_wake_not_runnable, "sched: vcpu_wake_not_runnable")
 PERFCOUNTER(tickle_idlers_none,     "sched: tickle_idlers_none")
 PERFCOUNTER(tickle_idlers_some,     "sched: tickle_idlers_some")
+PERFCOUNTER(vcpu_check,             "sched: vcpu_check")
 
 /* credit specific counters */
 PERFCOUNTER(delay_ms,               "csched: delay")
-PERFCOUNTER(vcpu_check,             "csched: vcpu_check")
 PERFCOUNTER(acct_run,               "csched: acct_run")
 PERFCOUNTER(acct_no_work,           "csched: acct_no_work")
 PERFCOUNTER(acct_balance,           "csched: acct_balance")
@@ -50,6 +50,19 @@ PERFCOUNTER(migrate_queued,         "csched: migrate_queued")
 PERFCOUNTER(migrate_running,        "csched: migrate_running")
 PERFCOUNTER(migrate_kicked_away,    "csched: migrate_kicked_away")
 PERFCOUNTER(vcpu_hot,               "csched: vcpu_hot")
+
+/* credit2 specific counters */
+PERFCOUNTER(burn_credits_t2c,       "csched2: burn_credits_t2c")
+PERFCOUNTER(upd_max_weight_quick,   "csched2: update_max_weight_quick")
+PERFCOUNTER(upd_max_weight_full,    "csched2: update_max_weight_full")
+PERFCOUNTER(migrate_requested,      "csched2: migrate_requested")
+PERFCOUNTER(migrate_on_runq,        "csched2: migrate_on_runq")
+PERFCOUNTER(migrate_no_runq,        "csched2: migrate_no_runq")
+PERFCOUNTER(runtime_min_timer,      "csched2: runtime_min_timer")
+PERFCOUNTER(runtime_max_timer,      "csched2: runtime_max_timer")
+PERFCOUNTER(migrated,               "csched2: migrated")
+PERFCOUNTER(migrate_resisted,       "csched2: migrate_resisted")
+PERFCOUNTER(credit_reset,           "csched2: credit_reset")
 
 PERFCOUNTER(need_flush_tlb_flush,   "PG_need_flush tlb flushes")
 
