@@ -1168,22 +1168,20 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
                                         const char *wpath, const char *epath) {
     EGC_GC;
     libxl_evgen_domain_death *evg;
-    uint32_t domid;
     int rc;
 
     CTX_LOCK;
 
     evg = LIBXL_TAILQ_FIRST(&CTX->death_list);
-    if (!evg) goto out;
-
-    domid = evg->domid;
 
     for (;;) {
+        if (!evg) goto out;
+
         int nentries = LIBXL_TAILQ_NEXT(evg, entry) ? 200 : 1;
         xc_domaininfo_t domaininfos[nentries];
         const xc_domaininfo_t *got = domaininfos, *gotend;
 
-        rc = xc_domain_getinfolist(CTX->xch, domid, nentries, domaininfos);
+        rc = xc_domain_getinfolist(CTX->xch, evg->domid, nentries, domaininfos);
         if (rc == -1) {
             LIBXL__EVENT_DISASTER(egc, "xc_domain_getinfolist failed while"
                                   " processing @releaseDomain watch event",
@@ -1193,8 +1191,10 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
         gotend = &domaininfos[rc];
 
         LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "[evg=%p:%"PRIu32"]"
-                   " from domid=%"PRIu32" nentries=%d rc=%d",
-                   evg, evg->domid, domid, nentries, rc);
+                   " nentries=%d rc=%d %ld..%ld",
+                   evg, evg->domid, nentries, rc,
+                   rc>0 ? (long)domaininfos[0].domain : 0,
+                   rc>0 ? (long)domaininfos[rc-1].domain : 0);
 
         for (;;) {
             if (!evg) {
@@ -1257,7 +1257,6 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
         }
 
         assert(rc); /* rc==0 results in us eating all evgs and quitting */
-        domid = gotend[-1].domain;
     }
  all_reported:
  out:
