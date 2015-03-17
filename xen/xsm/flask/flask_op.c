@@ -563,6 +563,27 @@ static int flask_security_load(struct xen_flask_load *load)
     return ret;
 }
 
+static int flask_devicetree_label(struct xen_flask_devicetree_label *arg)
+{
+    int rv;
+    char *buf;
+    u32 sid = arg->sid;
+    u32 perm = sid ? SECURITY__ADD_OCONTEXT : SECURITY__DEL_OCONTEXT;
+
+    rv = domain_has_security(current->domain, perm);
+    if ( rv )
+        return rv;
+
+    rv = flask_copyin_string(arg->path, &buf, arg->length, PAGE_SIZE);
+    if ( rv )
+        return rv;
+
+    /* buf is consumed or freed by this function */
+    rv = security_devicetree_setlabel(buf, sid);
+
+    return rv;
+}
+
 #ifndef COMPAT
 
 static int flask_ocontext_del(struct xen_flask_ocontext *arg)
@@ -790,6 +811,10 @@ ret_t do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op)
         rv = flask_relabel_domain(&op.u.relabel);
         break;
 
+    case FLASK_DEVICETREE_LABEL:
+        rv = flask_devicetree_label(&op.u.devicetree_label);
+        break;
+
     default:
         rv = -ENOSYS;
     }
@@ -847,6 +872,9 @@ CHECK_flask_transition;
 #define flask_security_resolve_bool compat_security_resolve_bool
 #define flask_security_get_bool compat_security_get_bool
 #define flask_security_set_bool compat_security_set_bool
+
+#define xen_flask_devicetree_label compat_flask_devicetree_label
+#define flask_devicetree_label compat_devicetree_label
 
 #define xen_flask_op_t compat_flask_op_t
 #undef ret_t

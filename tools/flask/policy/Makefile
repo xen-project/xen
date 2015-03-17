@@ -20,20 +20,20 @@ MLS_CATS ?= 256
 CHECKPOLICY ?= checkpolicy
 M4 ?= m4
 
+# Output security policy version.  Leave unset to autodetect.
+OUTPUT_POLICY ?= $(BEST_POLICY_VER)
+
 ########################################
 #
 # End of configuration options
 #
 ########################################
 
-# Policy version
-# By default, checkpolicy creates the highest version policy it supports. Force
-# the use of version 24 which is the highest that Xen supports, and the first to
-# include the Xen policy type (needed for static device policy).
-OUTPUT_POLICY = 24
-
 POLICY_FILENAME = xenpolicy-$(shell $(MAKE) -C $(XEN_ROOT)/xen xenversion --no-print-directory)
 POLICY_LOADPATH = /boot
+
+# List of policy versions supported by the hypervisor
+POLICY_VER_LIST_HV = 24 30
 
 # policy source layout
 POLDIR := policy
@@ -63,6 +63,14 @@ MOD_CONF := $(POLDIR)/modules.conf
 
 # checkpolicy can use the #line directives provided by -s for error reporting:
 M4PARAM := -D self_contained_policy -s
+
+# The output of checkpolicy -V is "30 (compatibility range 30-15)", and the
+# first word of the output is the maximum policy version supported.
+CHECKPOLICY_VER_MAX := $(firstword $(shell $(CHECKPOLICY) -V))
+
+# Find the highest version supported by both the hypervisor and checkpolicy
+BEST_POLICY_VER := $(shell best=24; for ver in $(POLICY_VER_LIST_HV); do if test $$ver -le $(CHECKPOLICY_VER_MAX); then best=$$ver; fi; done; echo $$best)
+
 CHECKPOLICY_PARAM := -t Xen -c $(OUTPUT_POLICY)
 
 # enable MLS if requested.

@@ -30,10 +30,16 @@
 #define POLICYDB_VERSION_POLCAP		22
 #define POLICYDB_VERSION_PERMISSIVE	23
 #define POLICYDB_VERSION_BOUNDARY	24
+#define POLICYDB_VERSION_FILENAME_TRANS	25
+#define POLICYDB_VERSION_ROLETRANS	26
+#define POLICYDB_VERSION_NEW_OBJECT_DEFAULTS	27
+#define POLICYDB_VERSION_DEFAULT_TYPE	28
+#define POLICYDB_VERSION_CONSTRAINT_NAMES	29
+#define POLICYDB_VERSION_XEN_DEVICETREE 30
 
 /* Range of policy versions we understand*/
 #define POLICYDB_VERSION_MIN   POLICYDB_VERSION_BASE
-#define POLICYDB_VERSION_MAX   POLICYDB_VERSION_BOUNDARY
+#define POLICYDB_VERSION_MAX   POLICYDB_VERSION_XEN_DEVICETREE
 
 enum flask_bootparam_t {
     FLASK_BOOTPARAM_PERMISSIVE,
@@ -82,6 +88,8 @@ int security_ioport_sid(u32 ioport, u32 *out_sid);
 
 int security_device_sid(u32 device, u32 *out_sid);
 
+int security_devicetree_sid(const char *path, u32 *out_sid);
+
 int security_validate_transition(u32 oldsid, u32 newsid, u32 tasksid,
                                                                     u16 tclass);
 
@@ -96,5 +104,7 @@ int security_iterate_ioport_sids(u32 start, u32 end,
 int security_ocontext_add(u32 ocontext, unsigned long low,
                            unsigned long high, u32 sid);
 
-int security_ocontext_del(u32 ocontext, unsigned int low, unsigned int high);
+int security_ocontext_del(u32 ocontext, unsigned long low, unsigned long high);
+
+int security_devicetree_setlabel(char *path, u32 sid);
 #endif /* _FLASK_SECURITY_H_ */

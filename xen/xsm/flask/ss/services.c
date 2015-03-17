@@ -1831,6 +1831,41 @@ out:
     return rc;
 }
 
+int security_devicetree_sid(const char *path, u32 *out_sid)
+{
+    struct ocontext *c;
+    int rc = 0;
+
+    POLICY_RDLOCK;
+
+    c = policydb.ocontexts[OCON_DTREE];
+    while ( c )
+    {
+        if ( strcmp(c->u.name, path) == 0 )
+            break;
+        c = c->next;
+    }
+
+    if ( c )
+    {
+        if ( !c->sid[0] )
+        {
+            rc = sidtab_context_to_sid(&sidtab, &c->context[0], &c->sid[0]);
+            if ( rc )
+                goto out;
+        }
+        *out_sid = c->sid[0];
+    }
+    else
+    {
+        *out_sid = SECINITSID_DEVICE;
+    }
+
+out:
+    POLICY_RDUNLOCK;
+    return rc;
+}
+
 int security_find_bool(const char *name)
 {
     int i, rv = -ENOENT;
@@ -2131,9 +2166,8 @@ int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
                 c->u.iomem.high_iomem == high && c->sid[0] == sid)
                 break;
 
-            printk("%s: IO Memory overlap with entry %#x - %#x\n",
-                   __FUNCTION__, c->u.iomem.low_iomem,
-                   c->u.iomem.high_iomem);
+            printk("%s: IO Memory overlap with entry %#"PRIx64" - %#"PRIx64"\n",
+                   __FUNCTION__, c->u.iomem.low_iomem, c->u.iomem.high_iomem);
             ret = -EEXIST;
             break;
         }
@@ -2188,7 +2222,7 @@ int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
     return ret;
 }
 
-int security_ocontext_del( u32 ocon, unsigned int low, unsigned int high )
+int security_ocontext_del( u32 ocon, unsigned long low, unsigned long high )
 {
     int ret = 0;
     struct ocontext *c, *before_c;
@@ -2217,7 +2251,7 @@ int security_ocontext_del( u32 ocon, unsigned int low, unsigned int high )
             }
         }
 
-        printk("%s: ocontext not found: pirq %d\n", __FUNCTION__, low);
+        printk("%s: ocontext not found: pirq %ld\n", __FUNCTION__, low);
         ret = -ENOENT;
         break;
 
@@ -2243,8 +2277,8 @@ int security_ocontext_del( u32 ocon, unsigned int low, unsigned int high )
             }
         }
 
-        printk("%s: ocontext not found: ioport %#x - %#x\n", __FUNCTION__,
-                low, high);
+        printk("%s: ocontext not found: ioport %#lx - %#lx\n",
+                __FUNCTION__, low, high);
         ret = -ENOENT;
         break;
 
@@ -2270,8 +2304,8 @@ int security_ocontext_del( u32 ocon, unsigned int low, unsigned int high )
             }
         }
 
-        printk("%s: ocontext not found: iomem %#x - %#x\n", __FUNCTION__,
-                low, high);
+        printk("%s: ocontext not found: iomem %#lx - %#lx\n",
+                __FUNCTION__, low, high);
         ret = -ENOENT;
         break;
 
@@ -2296,7 +2330,7 @@ int security_ocontext_del( u32 ocon, unsigned int low, unsigned int high )
             }
         }
 
-        printk("%s: ocontext not found: pcidevice %#x\n", __FUNCTION__, low);
+        printk("%s: ocontext not found: pcidevice %#lx\n", __FUNCTION__, low);
         ret = -ENOENT;
         break;
 
@@ -2306,5 +2340,69 @@ int security_ocontext_del( u32 ocon, unsigned int low, unsigned int high )
 
   out:
     POLICY_WRUNLOCK;
+    return ret;
+}
+
+int security_devicetree_setlabel(char *path, u32 sid)
+{
+    int ret = 0;
+    struct ocontext *c;
+    struct ocontext **pcurr;
+    struct ocontext *add = NULL;
+
+    if ( sid )
+    {
+        add = xzalloc(struct ocontext);
+        if ( add == NULL )
+        {
+            xfree(path);
+            return -ENOMEM;
+        }
+        add->sid[0] = sid;
+        add->u.name = path;
+    }
+    else
+    {
+        ret = -ENOENT;
+    }
+
+    POLICY_WRLOCK;
+
+    pcurr = &policydb.ocontexts[OCON_DTREE];
+    c = *pcurr;
+    while ( c )
+    {
+        if ( strcmp(c->u.name, path) == 0 )
+        {
+            if ( sid )
+            {
+                ret = -EEXIST;
+                break;
+            }
+            else
+            {
+                *pcurr = c->next;
+                xfree(c->u.name);
+                xfree(c);
+                ret = 0;
+                break;
+            }
+        }
+        pcurr = &c->next;
+        c = *pcurr;
+    }
+
+    if ( add && ret == 0 )
+    {
+        add->next = policydb.ocontexts[OCON_DTREE];
+        policydb.ocontexts[OCON_DTREE] = add;
+        add = NULL;
+        path = NULL;
+    }
+
+    POLICY_WRUNLOCK;
+
+    xfree(add);
+    xfree(path);
     return ret;
 }

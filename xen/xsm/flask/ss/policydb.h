@@ -154,8 +154,8 @@ struct ocontext {
                 u32 high_ioport;
         } ioport;
         struct {
-                u32 low_iomem;
-                u32 high_iomem;
+                u64 low_iomem;
+                u64 high_iomem;
         } iomem;
     } u;
     struct context context[2];    /* security context(s) */
@@ -180,7 +180,8 @@ struct ocontext {
 #define OCON_IOPORT  2    /* io ports */
 #define OCON_IOMEM   3    /* io memory */
 #define OCON_DEVICE  4    /* pci devices */
-#define OCON_NUM     5
+#define OCON_DTREE   5    /* device tree nodes */
+#define OCON_NUM     6
 #define OCON_NUM_OLD 7
 
 /* The policy database */
