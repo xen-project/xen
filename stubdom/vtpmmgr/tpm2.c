@@ -167,7 +167,7 @@ egress:
 TPM_RC TPM2_Load(TPMI_DH_OBJECT parentHandle,
                  TPM2B_PRIVATE *inPrivate, /* in */
                  TPM2B_PUBLIC *inPublic, /* in */
-                 TPM_HANDLE *objectHandle, /* out */
+                 TPM2_HANDLE *objectHandle, /* out */
                  TPM2B_NAME *name /* out */)
 {
     TPM_BEGIN(TPM_ST_SESSIONS, TPM_CC_Load);
@@ -185,7 +185,7 @@ TPM_RC TPM2_Load(TPMI_DH_OBJECT parentHandle,
     if (objectHandle != NULL) {
         ptr = unpack_TPM_HANDLE(ptr, objectHandle);
     } else {
-        TPM_HANDLE tmp;
+        TPM2_HANDLE tmp;
         ptr = unpack_TPM_HANDLE(ptr, &tmp);
     }
 
@@ -248,7 +248,7 @@ egress:
 
 TPM_RC TPM2_CreatePrimary(TPMI_RH_HIERARCHY primaryHandle,
                           TPM2_Create_Params_in *in,
-                          TPM_HANDLE *objHandle,
+                          TPM2_HANDLE *objHandle,
                           TPM2_Create_Params_out *out)
 {
     UINT32 param_size;
@@ -281,7 +281,7 @@ TPM_RC TPM2_CreatePrimary(TPMI_RH_HIERARCHY primaryHandle,
     if (objHandle != NULL)
         ptr = unpack_TPM_HANDLE(ptr, objHandle);
     else {
-        TPM_HANDLE handle;
+        TPM2_HANDLE handle;
         ptr = unpack_TPM_HANDLE(ptr, &handle);
     }
     ptr = unpack_UINT32(ptr, &param_size);
@@ -302,7 +302,7 @@ egress:
    return status;
 }
 
-TPM_RC TPM2_HierachyChangeAuth(TPMI_RH_HIERARCHY_AUTH authHandle, TPM2B_AUTH *newAuth)
+TPM_RC TPM2_HierachyChangeAuth(TPM2I_RH_HIERARCHY_AUTH authHandle, TPM2B_AUTH *newAuth)
 {
     TPM_BEGIN(TPM_ST_SESSIONS, TPM_CC_HierarchyChangeAuth);
     ptr = pack_UINT32(ptr, authHandle);

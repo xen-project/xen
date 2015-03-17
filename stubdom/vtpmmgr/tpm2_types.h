@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include "common_types.h"
 
 // "implementation.h"
 // Table 212 -- Logic Values
@@ -81,14 +82,6 @@
 #define    MAX_SYM_DATA         128
 #define    MAX_ECC_KEY_BITS     256
 #define    MAX_ECC_KEY_BYTES    ((MAX_ECC_KEY_BITS + 7) / 8)
-
-
-typedef unsigned char BYTE;
-typedef unsigned char BOOL;
-typedef uint8_t       UINT8;
-typedef uint16_t      UINT16;
-typedef uint32_t      UINT32;
-typedef uint64_t      UINT64;
 
 // TPM2 command code
 
@@ -216,7 +209,7 @@ typedef UINT16 TPM_ST;
 
 
 // TPM Handle types
-typedef UINT32 TPM_HANDLE;
+typedef UINT32 TPM2_HANDLE;
 typedef UINT8 TPM_HT;
 
 
@@ -233,7 +226,6 @@ typedef UINT32 TPM_RH;
 #define    TPM_RH_LAST           (TPM_RH)(0x4000000C)
 
 // Table 4 -- DocumentationClarity Types <I/O>
-typedef UINT32    TPM_ALGORITHM_ID;
 typedef UINT32    TPM_MODIFIER_INDICATOR;
 typedef UINT32    TPM_SESSION_OFFSET;
 typedef UINT16    TPM_KEY_SIZE;
@@ -261,49 +253,46 @@ typedef BYTE TPMA_LOCALITY;
 // Table 37 -- TPMI_YES_NO Type <I/O>
 typedef BYTE TPMI_YES_NO;
 
-typedef TPM_HANDLE TPMI_RH_HIERARCHY_AUTH;
-
 // Table 38 -- TPMI_DH_OBJECT Type <I/O>
-typedef TPM_HANDLE TPMI_DH_OBJECT;
+typedef TPM2_HANDLE TPMI_DH_OBJECT;
 
 // Table 39 -- TPMI_DH_PERSISTENT Type <I/O>
-typedef TPM_HANDLE TPMI_DH_PERSISTENT;
+typedef TPM2_HANDLE TPMI_DH_PERSISTENT;
 
 // Table 42 -- TPMI_SH_AUTH_SESSION Type <I/O>
-typedef TPM_HANDLE TPMI_SH_AUTH_SESSION;
+typedef TPM2_HANDLE TPMI_SH_AUTH_SESSION;
 
 // Table 40 -- TPMI_DH_ENTITY Type <I>
-typedef TPM_HANDLE TPMI_DH_ENTITY;
+typedef TPM2_HANDLE TPMI_DH_ENTITY;
 
 // Table 45 -- TPMI_DH_CONTEXT Type <I/O>
-typedef TPM_HANDLE TPMI_DH_CONTEXT;
+typedef TPM2_HANDLE TPMI_DH_CONTEXT;
 
 // Table 46 -- TPMI_RH_HIERARCHY Type <I/O>
-typedef TPM_HANDLE TPMI_RH_HIERARCHY;
+typedef TPM2_HANDLE TPMI_RH_HIERARCHY;
 
-// Table 47 -- TPMI_RH_HIERARCHY_AUTH Type <I>
-typedef TPM_HANDLE TPMI_RH_HIERARCHY_AUTH;
+// Table 47 -- TPM2I_RH_HIERARCHY_AUTH Type <I>
+typedef TPM2_HANDLE TPM2I_RH_HIERARCHY_AUTH;
 
 // Table 48 -- TPMI_RH_PLATFORM Type <I>
-typedef TPM_HANDLE TPMI_RH_PLATFORM;
+typedef TPM2_HANDLE TPMI_RH_PLATFORM;
 
 // Table 49 -- TPMI_RH_OWNER Type <I>
-typedef TPM_HANDLE TPMI_RH_OWNER;
+typedef TPM2_HANDLE TPMI_RH_OWNER;
 
 // Table 50 -- TPMI_RH_ENDORSEMENT Type <I>
-typedef TPM_HANDLE TPMI_RH_ENDORSEMENT;
+typedef TPM2_HANDLE TPMI_RH_ENDORSEMENT;
 
 // Table 51 -- TPMI_RH_PROVISION Type <I>
-typedef TPM_HANDLE TPMI_RH_PROVISION;
+typedef TPM2_HANDLE TPMI_RH_PROVISION;
 
 // Table 52 -- TPMI_RH_CLEAR Type <I>
-typedef TPM_HANDLE TPMI_RH_CLEAR;
+typedef TPM2_HANDLE TPMI_RH_CLEAR;
 
 // Table 54 -- TPMI_RH_LOCKOUT Type <I>
-typedef TPM_HANDLE TPMI_RH_LOCKOUT;
+typedef TPM2_HANDLE TPMI_RH_LOCKOUT;
 
 // Table 7 -- TPM_ALG_ID
-typedef UINT16 TPM_ALG_ID;
 typedef UINT16 TPM_ALG_ID;
 
 #define    TPM2_ALG_ERROR             (TPM_ALG_ID)(0x0000) // a: ; D:

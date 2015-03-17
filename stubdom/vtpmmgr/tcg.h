@@ -39,6 +39,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include "common_types.h"
 
 // **************************** CONSTANTS *********************************
 
@@ -401,12 +402,6 @@
 
 
 // *************************** TYPEDEFS *********************************
-typedef unsigned char BYTE;
-typedef unsigned char BOOL;
-typedef uint16_t UINT16;
-typedef uint32_t UINT32;
-typedef uint64_t UINT64;
-
 typedef UINT32 TPM_RESULT;
 typedef UINT32 TPM_PCRINDEX;
 typedef UINT32 TPM_DIRINDEX;

@@ -57,7 +57,7 @@ TPM_RC TPM2_PCR_Read(TPML_PCR_SELECTION pcrSelectionIn,
 TPM_RC TPM2_Load(TPMI_DH_OBJECT parentHandle,
                  TPM2B_PRIVATE *inPrivate,
                  TPM2B_PUBLIC *inPublic,
-                 TPM_HANDLE *objectHandle,
+                 TPM2_HANDLE *objectHandle,
                  TPM2B_NAME *name);
 
 TPM_RC TPM2_Create(TPMI_DH_OBJECT parentHandle,
@@ -66,10 +66,10 @@ TPM_RC TPM2_Create(TPMI_DH_OBJECT parentHandle,
 
 TPM_RC TPM2_CreatePrimary(TPMI_RH_HIERARCHY primaryHandle,
                           TPM2_Create_Params_in *objHandle,
-                          TPM_HANDLE *in,
+                          TPM2_HANDLE *in,
                           TPM2_Create_Params_out *out);
 
-TPM_RC TPM2_HierachyChangeAuth(TPMI_RH_HIERARCHY_AUTH authHandle,
+TPM_RC TPM2_HierachyChangeAuth(TPM2I_RH_HIERARCHY_AUTH authHandle,
                                TPM2B_AUTH *newAuth);
 
 TPM_RC TPM2_RSA_ENCRYPT(TPMI_DH_OBJECT keyHandle,

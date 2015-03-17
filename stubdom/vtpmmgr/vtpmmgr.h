@@ -76,8 +76,8 @@ struct vtpm_globals {
     /* TPM 2.0 */
     TPM_AuthArea       pw_auth;
     TPM_AuthArea       srk_auth_area;
-    TPM_HANDLE         srk_handle;
-    TPM_HANDLE         sk_handle;
+    TPM2_HANDLE        srk_handle;
+    TPM2_HANDLE        sk_handle;
     TPM2B_NAME         sk_name;
     TPM2_RSA_KEY       tpm2_storage_key;
 };
