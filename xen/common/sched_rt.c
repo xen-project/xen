@@ -525,6 +525,8 @@ rt_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     if ( !is_idle_vcpu(vc) )
         svc->budget = RTDS_DEFAULT_BUDGET;
 
+    SCHED_STAT_CRANK(vcpu_init);
+
     return svc;
 }
 
@@ -573,6 +575,8 @@ rt_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
     struct rt_vcpu * const svc = rt_vcpu(vc);
     struct rt_dom * const sdom = svc->sdom;
     spinlock_t *lock;
+
+    SCHED_STAT_CRANK(vcpu_destroy);
 
     BUG_ON( sdom == NULL );
 
