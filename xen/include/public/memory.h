@@ -55,6 +55,8 @@
 /* Flag to request allocation only from the node specified */
 #define XENMEMF_exact_node_request  (1<<17)
 #define XENMEMF_exact_node(n) (XENMEMF_node(n) | XENMEMF_exact_node_request)
+/* Flag to indicate the node specified is virtual node */
+#define XENMEMF_vnode  (1<<18)
 #endif
 
 struct xen_memory_reservation {

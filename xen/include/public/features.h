@@ -99,6 +99,9 @@
 #define XENFEAT_grant_map_identity        12
  */
 
+/* Guest can use XENMEMF_vnode to specify virtual node for memory op. */
+#define XENFEAT_memory_op_vnode_supported 13
+
 #define XENFEAT_NR_SUBMAPS 1
 
 #endif /* __XEN_PUBLIC_FEATURES_H__ */

@@ -305,7 +305,7 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         switch ( fi.submap_idx )
         {
         case 0:
-            fi.submap = 0;
+            fi.submap = (1U << XENFEAT_memory_op_vnode_supported);
             if ( VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3) )
                 fi.submap |= (1U << XENFEAT_pae_pgdir_above_4gb);
             if ( paging_mode_translate(d) )
