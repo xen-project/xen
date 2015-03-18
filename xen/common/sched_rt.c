@@ -264,18 +264,17 @@ rt_dump(const struct scheduler *ops)
     struct list_head *iter_sdom, *iter_svc, *runq, *depletedq, *iter;
     struct rt_private *prv = rt_priv(ops);
     struct rt_vcpu *svc;
-    cpumask_t *online;
     struct rt_dom *sdom;
     unsigned long flags;
 
-    ASSERT(!list_empty(&prv->sdom));
+    spin_lock_irqsave(&prv->lock, flags);
 
-    sdom = list_entry(prv->sdom.next, struct rt_dom, sdom_elem);
-    online = cpupool_scheduler_cpumask(sdom->dom->cpupool);
+    if ( list_empty(&prv->sdom) )
+        goto out;
+
     runq = rt_runq(ops);
     depletedq = rt_depletedq(ops);
 
-    spin_lock_irqsave(&prv->lock, flags);
     printk("Global RunQueue info:\n");
     list_for_each( iter, runq )
     {
@@ -303,6 +302,7 @@ rt_dump(const struct scheduler *ops)
         }
     }
 
+ out:
     spin_unlock_irqrestore(&prv->lock, flags);
 }
 
