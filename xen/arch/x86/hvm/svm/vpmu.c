@@ -359,9 +359,6 @@ static int amd_vpmu_initialise(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t family = current_cpu_data.x86;
 
-    if ( vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
-        return 0;
-
     if ( counters == NULL )
     {
          switch ( family )

@@ -236,10 +236,7 @@ void vpmu_initialise(struct vcpu *v)
     if ( is_pvh_vcpu(v) )
         return;
 
-    if ( vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
-        vpmu_destroy(v);
-    vpmu_clear(vpmu);
-    vpmu->context = NULL;
+    ASSERT(!vpmu->flags && !vpmu->context);
 
     switch ( vendor )
     {
