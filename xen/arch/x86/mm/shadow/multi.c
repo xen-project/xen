@@ -1414,9 +1414,8 @@ do {                                                                    \
 //        shadow-types.h to shadow-private.h
 //
 #if GUEST_PAGING_LEVELS == 4
-void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
+void sh_install_xen_entries_in_l4(struct domain *d, mfn_t gl4mfn, mfn_t sl4mfn)
 {
-    struct domain *d = v->domain;
     shadow_l4e_t *sl4e;
     unsigned int slots;
 
@@ -1444,7 +1443,7 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
         shadow_l4e_from_mfn(sl4mfn, __PAGE_HYPERVISOR);
 
     /* Self linear mapping.  */
-    if ( shadow_mode_translate(v->domain) && !shadow_mode_external(v->domain) )
+    if ( shadow_mode_translate(d) && !shadow_mode_external(d) )
     {
         // linear tables may not be used with translated PV guests
         sl4e[shadow_l4_table_offset(LINEAR_PT_VIRT_START)] =
@@ -1465,12 +1464,11 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
 // place, which means that we need to populate the l2h entry in the l3
 // table.
 
-static void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
+static void sh_install_xen_entries_in_l2h(struct domain *d, mfn_t sl2hmfn)
 {
-    struct domain *d = v->domain;
     shadow_l2e_t *sl2e;
 
-    if ( !is_pv_32on64_vcpu(v) )
+    if ( !is_pv_32on64_domain(d) )
         return;
 
     sl2e = sh_map_domain_page(sl2hmfn);
@@ -1545,11 +1543,13 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
         {
 #if GUEST_PAGING_LEVELS == 4
         case SH_type_l4_shadow:
-            sh_install_xen_entries_in_l4(v, gmfn, smfn); break;
+            sh_install_xen_entries_in_l4(v->domain, gmfn, smfn);
+            break;
 #endif
 #if GUEST_PAGING_LEVELS >= 3
         case SH_type_l2h_shadow:
-            sh_install_xen_entries_in_l2h(v, smfn); break;
+            sh_install_xen_entries_in_l2h(v->domain, smfn);
+            break;
 #endif
         default: /* Do nothing */ break;
         }
@@ -1589,7 +1589,7 @@ sh_make_monitor_table(struct vcpu *v)
     {
         mfn_t m4mfn;
         m4mfn = shadow_alloc(d, SH_type_monitor_table, 0);
-        sh_install_xen_entries_in_l4(v, m4mfn, m4mfn);
+        sh_install_xen_entries_in_l4(d, m4mfn, m4mfn);
         /* Remember the level of this table */
         mfn_to_page(m4mfn)->shadow_flags = 4;
 #if SHADOW_PAGING_LEVELS < 4
@@ -1613,7 +1613,7 @@ sh_make_monitor_table(struct vcpu *v)
             l3e[0] = l3e_from_pfn(mfn_x(m2mfn), __PAGE_HYPERVISOR);
             sh_unmap_domain_page(l3e);
 
-            if ( is_pv_32on64_vcpu(v) )
+            if ( is_pv_32on64_domain(d) )
             {
                 /* For 32-on-64 PV guests, we need to map the 32-bit Xen
                  * area into its usual VAs in the monitor tables */
@@ -1625,7 +1625,7 @@ sh_make_monitor_table(struct vcpu *v)
                 mfn_to_page(m2mfn)->shadow_flags = 2;
                 l3e = sh_map_domain_page(m3mfn);
                 l3e[3] = l3e_from_pfn(mfn_x(m2mfn), _PAGE_PRESENT);
-                sh_install_xen_entries_in_l2h(v, m2mfn);
+                sh_install_xen_entries_in_l2h(d, m2mfn);
                 sh_unmap_domain_page(l3e);
             }
 

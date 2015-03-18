@@ -361,7 +361,7 @@ mfn_t shadow_alloc(struct domain *d,
 void  shadow_free(struct domain *d, mfn_t smfn);
 
 /* Install the xen mappings in various flavours of shadow */
-void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn);
+void sh_install_xen_entries_in_l4(struct domain *, mfn_t gl4mfn, mfn_t sl4mfn);
 
 /* Update the shadows in response to a pagetable write from Xen */
 int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size);
