@@ -25,11 +25,11 @@
 
 #include "libxlutil.h"
 
-typedef struct XLU_ConfigList {
+struct XLU_ConfigList {
     int avalues; /* available slots */
     int nvalues; /* actual occupied slots */
     XLU_ConfigValue **values;
-} XLU_ConfigList;
+};
 
 typedef struct YYLTYPE
 {
