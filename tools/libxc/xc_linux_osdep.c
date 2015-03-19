@@ -122,10 +122,13 @@ out:
 
 static void linux_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
 {
+    int saved_errno = errno;
     /* Recover the VMA flags. Maybe it's not necessary */
     madvise(ptr, npages * XC_PAGE_SIZE, MADV_DOFORK);
 
     munmap(ptr, npages * XC_PAGE_SIZE);
+    /* We MUST propagate the hypercall errno, not unmap call's. */
+    errno = saved_errno;
 }
 
 static int linux_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)

@@ -33,16 +33,22 @@ pthread_mutex_t hypercall_buffer_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void hypercall_buffer_cache_lock(xc_interface *xch)
 {
+    int saved_errno = errno;
     if ( xch->flags & XC_OPENFLAG_NON_REENTRANT )
         return;
     pthread_mutex_lock(&hypercall_buffer_cache_mutex);
+    /* Ignore pthread errors. */
+    errno = saved_errno;
 }
 
 static void hypercall_buffer_cache_unlock(xc_interface *xch)
 {
+    int saved_errno = errno;
     if ( xch->flags & XC_OPENFLAG_NON_REENTRANT )
         return;
     pthread_mutex_unlock(&hypercall_buffer_cache_mutex);
+    /* Ignore pthread errors. */
+    errno = saved_errno;
 }
 
 static void *hypercall_buffer_cache_alloc(xc_interface *xch, int nr_pages)

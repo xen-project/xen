@@ -125,10 +125,13 @@ static void freebsd_privcmd_free_hypercall_buffer(xc_interface *xch,
                                                   int npages)
 {
 
+    int saved_errno = errno;
     /* Unlock pages */
     munlock(ptr, npages * XC_PAGE_SIZE);
 
     munmap(ptr, npages * XC_PAGE_SIZE);
+    /* We MUST propagate the hypercall errno, not unmap call's. */
+    errno = saved_errno;
 }
 
 static int freebsd_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h,
