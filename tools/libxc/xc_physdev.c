@@ -43,8 +43,10 @@ int xc_physdev_map_pirq(xc_interface *xch,
     struct physdev_map_pirq map;
 
     if ( !pirq )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     memset(&map, 0, sizeof(struct physdev_map_pirq));
     map.domid = domid;
     map.type = MAP_PIRQ_TYPE_GSI;
@@ -72,8 +74,10 @@ int xc_physdev_map_pirq_msi(xc_interface *xch,
     struct physdev_map_pirq map;
 
     if ( !pirq )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     memset(&map, 0, sizeof(struct physdev_map_pirq));
     map.domid = domid;
     map.type = MAP_PIRQ_TYPE_MSI;
