@@ -1527,7 +1527,7 @@ void libxl__spawn_qdisk_backend(libxl__egc *egc, libxl__dm_spawn_state *dmss)
     flexarray_t *dm_args;
     char **args;
     const char *dm;
-    int logfile_w, null, rc;
+    int logfile_w, null = -1, rc;
     uint32_t domid = dmss->guest_domid;
 
     /* Always use qemu-xen as device model */
@@ -1553,6 +1553,10 @@ void libxl__spawn_qdisk_backend(libxl__egc *egc, libxl__dm_spawn_state *dmss)
         goto error;
     }
     null = open("/dev/null", O_RDONLY);
+    if (null < 0) {
+       rc = ERROR_FAIL;
+       goto error;
+    }
 
     dmss->guest_config = NULL;
     /*
@@ -1587,6 +1591,8 @@ void libxl__spawn_qdisk_backend(libxl__egc *egc, libxl__dm_spawn_state *dmss)
 
 error:
     assert(rc);
+    if (logfile_w >= 0) close(logfile_w);
+    if (null >= 0) close(null);
     dmss->callback(egc, dmss, rc);
     return;
 }
