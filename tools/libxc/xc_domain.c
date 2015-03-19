@@ -771,7 +771,7 @@ int xc_domain_get_tsc_info(xc_interface *xch,
 
     info = xc_hypercall_buffer_alloc(xch, info, sizeof(*info));
     if ( info == NULL )
-        return -ENOMEM;
+        return -1;
 
     domctl.cmd = XEN_DOMCTL_gettscinfo;
     domctl.domain = (domid_t)domid;
