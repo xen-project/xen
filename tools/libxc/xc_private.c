@@ -516,7 +516,7 @@ int do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len)
 {
     DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(arg, len, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
-    long ret = -EINVAL;
+    long ret = -1;
 
     if ( xc_hypercall_bounce_pre(xch, arg) )
     {
