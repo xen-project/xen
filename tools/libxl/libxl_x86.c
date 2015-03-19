@@ -215,10 +215,8 @@ static int e820_host_sanitize(libxl__gc *gc,
     int rc;
 
     rc = xc_get_machine_memory_map(CTX->xch, map, *nr);
-    if (rc < 0) {
-        errno = rc;
+    if (rc < 0)
         return ERROR_FAIL;
-    }
 
     *nr = rc;
 
@@ -251,10 +249,9 @@ static int libxl__e820_alloc(libxl__gc *gc, uint32_t domid,
 
     rc = xc_domain_set_memory_map(ctx->xch, domid, map, nr);
 
-    if (rc < 0) {
-        errno  = rc;
+    if (rc < 0)
         return ERROR_FAIL;
-    }
+
     return 0;
 }
 
