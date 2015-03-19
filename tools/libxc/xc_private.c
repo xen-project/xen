@@ -427,7 +427,7 @@ int xc_mmuext_op(
 {
     DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(op, nr_ops*sizeof(*op), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
-    long ret = -EINVAL;
+    long ret = -1;
 
     if ( xc_hypercall_bounce_pre(xch, op) )
     {

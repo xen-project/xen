@@ -49,7 +49,7 @@ static int hp_mem_online_func(int argc, char *argv[])
     ret = xc_mark_page_online(xch, mfn, mfn, &status);
 
     if (ret < 0)
-        fprintf(stderr, "Onlining page mfn %lx failed, error %x", mfn, ret);
+        fprintf(stderr, "Onlining page mfn %lx failed, error %x", mfn, errno);
     else if (status & (PG_ONLINE_FAILED |PG_ONLINE_BROKEN)) {
         fprintf(stderr, "Onlining page mfn %lx is broken, "
                         "Memory online failed\n", mfn);
@@ -80,7 +80,7 @@ static int hp_mem_query_func(int argc, char *argv[])
     ret = xc_query_page_offline_status(xch, mfn, mfn, &status);
 
     if (ret < 0)
-        fprintf(stderr, "Querying page mfn %lx failed, error %x", mfn, ret);
+        fprintf(stderr, "Querying page mfn %lx failed, error %x", mfn, errno);
     else
     {
 		printf("Memory Status %x: [", status);
@@ -160,7 +160,7 @@ static int hp_mem_offline_func(int argc, char *argv[])
     printf("Prepare to offline MEMORY mfn %lx\n", mfn);
     ret = xc_mark_page_offline(xch, mfn, mfn, &status);
     if (ret < 0) {
-        fprintf(stderr, "Offlining page mfn %lx failed, error %x\n", mfn, ret);
+        fprintf(stderr, "Offlining page mfn %lx failed, error %x\n", mfn, errno);
         if (status & (PG_OFFLINE_XENPAGE | PG_OFFLINE_FAILED))
             fprintf(stderr, "XEN_PAGE is not permitted be offlined\n");
         else if (status & (PG_OFFLINE_FAILED | PG_OFFLINE_NOT_CONV_RAM))

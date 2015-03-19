@@ -58,12 +58,14 @@ int xc_mark_page_online(xc_interface *xch, unsigned long start,
     int ret = -1;
 
     if ( !status || (end < start) )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     if ( xc_hypercall_bounce_pre(xch, status) )
     {
         ERROR("Could not bounce memory for xc_mark_page_online\n");
-        return -EINVAL;
+        return -1;
     }
 
     sysctl.cmd = XEN_SYSCTL_page_offline_op;
@@ -86,12 +88,14 @@ int xc_mark_page_offline(xc_interface *xch, unsigned long start,
     int ret = -1;
 
     if ( !status || (end < start) )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     if ( xc_hypercall_bounce_pre(xch, status) )
     {
         ERROR("Could not bounce memory for xc_mark_page_offline");
-        return -EINVAL;
+        return -1;
     }
 
     sysctl.cmd = XEN_SYSCTL_page_offline_op;
@@ -114,12 +118,14 @@ int xc_query_page_offline_status(xc_interface *xch, unsigned long start,
     int ret = -1;
 
     if ( !status || (end < start) )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     if ( xc_hypercall_bounce_pre(xch, status) )
     {
         ERROR("Could not bounce memory for xc_query_page_offline_status\n");
-        return -EINVAL;
+        return -1;
     }
 
     sysctl.cmd = XEN_SYSCTL_page_offline_op;
@@ -411,19 +417,19 @@ int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
     if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 )
     {
         ERROR("Could not get domain info");
-        return -EFAULT;
+        return -1;
     }
 
     if (!info.shutdown || info.shutdown_reason != SHUTDOWN_suspend)
     {
+        errno = EINVAL;
         ERROR("Can't exchange page unless domain is suspended\n");
-        return -EINVAL;
+        return -1;
     }
-
     if (!is_page_exchangable(xch, domid, mfn, &info))
     {
         ERROR("Could not exchange page\n");
-        return -EINVAL;
+        return -1;
     }
 
     /* Map M2P and obtain gpfn */
@@ -431,7 +437,7 @@ int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
     if ( !(m2p_table = xc_map_m2p(xch, max_mfn, PROT_READ, NULL)) )
     {
         PERROR("Failed to map live M2P table");
-        return -EFAULT;
+        return -1;
     }
     gpfn = m2p_table[mfn];
 
@@ -440,7 +446,7 @@ int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
     if ( xc_map_domain_meminfo(xch, domid, &minfo) )
     {
         PERROR("Could not map domain's memory information\n");
-        return -EFAULT;
+        return -1;
     }
 
     /* For translation macros */
