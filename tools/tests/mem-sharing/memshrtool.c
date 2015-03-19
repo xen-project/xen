@@ -55,11 +55,19 @@ int main(int argc, const char** argv)
 
     if( !strcasecmp(cmd, "info") )
     {
+        long rc;
         if( argc != 2 )
             return usage(argv[0]);
 
-        printf("used = %ld\n", xc_sharing_used_frames(xch));
-        printf("freed = %ld\n", xc_sharing_freed_pages(xch));
+        rc = xc_sharing_freed_pages(xch);
+        if ( rc < 0 )
+            return 1;
+
+        printf("used = %ld\n", rc);
+        rc = xc_sharing_used_frames(xch);
+        if ( rc < 0 )
+            return 1;
+        printf("freed = %ld\n", rc);
     }
     else if( !strcasecmp(cmd, "enable") )
     {

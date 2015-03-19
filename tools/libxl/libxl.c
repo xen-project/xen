@@ -5071,7 +5071,7 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     physinfo->scrub_pages = xcphysinfo.scrub_pages;
     physinfo->outstanding_pages = xcphysinfo.outstanding_pages;
     l = xc_sharing_freed_pages(ctx->xch);
-    if (l == -ENOSYS) {
+    if (l < 0 && errno == ENOSYS) {
         l = 0;
     } else if (l < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, l,
@@ -5080,7 +5080,7 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     }
     physinfo->sharing_freed_pages = l;
     l = xc_sharing_used_frames(ctx->xch);
-    if (l == -ENOSYS) {
+    if (l < 0 && errno == ENOSYS) {
         l = 0;
     } else if (l < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, l,
