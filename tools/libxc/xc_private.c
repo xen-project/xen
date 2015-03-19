@@ -535,9 +535,16 @@ int do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len)
     return ret;
 }
 
-long xc_maximum_ram_page(xc_interface *xch)
+int xc_maximum_ram_page(xc_interface *xch, unsigned long *max_mfn)
 {
-    return do_memory_op(xch, XENMEM_maximum_ram_page, NULL, 0);
+    long rc = do_memory_op(xch, XENMEM_maximum_ram_page, NULL, 0);
+
+    if ( rc >= 0 )
+    {
+        *max_mfn = rc;
+        rc = 0;
+    }
+    return rc;
 }
 
 long long xc_domain_get_cpu_usage( xc_interface *xch, domid_t domid, int vcpu )

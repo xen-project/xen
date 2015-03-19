@@ -412,7 +412,7 @@ int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
     uint32_t status;
     xen_pfn_t new_mfn, gpfn;
     xen_pfn_t *m2p_table;
-    int max_mfn;
+    unsigned long max_mfn;
 
     if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 )
     {
@@ -433,8 +433,8 @@ int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
     }
 
     /* Map M2P and obtain gpfn */
-    max_mfn = xc_maximum_ram_page(xch);
-    if ( !(m2p_table = xc_map_m2p(xch, max_mfn, PROT_READ, NULL)) )
+    rc = xc_maximum_ram_page(xch, &max_mfn);
+    if ( rc || !(m2p_table = xc_map_m2p(xch, max_mfn, PROT_READ, NULL)) )
     {
         PERROR("Failed to map live M2P table");
         return -1;

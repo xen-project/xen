@@ -311,7 +311,8 @@ static inline int get_platform_info(xc_interface *xch, uint32_t dom,
     if (xc_version(xch, XENVER_capabilities, &xen_caps) != 0)
         return 0;
 
-    *max_mfn = xc_maximum_ram_page(xch);
+    if (xc_maximum_ram_page(xch, max_mfn))
+        return 0;
 
     *hvirt_start = xen_params.virt_start;
 

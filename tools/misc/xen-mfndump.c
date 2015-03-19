@@ -31,7 +31,7 @@ int help_func(int argc, char *argv[])
 int dump_m2p_func(int argc, char *argv[])
 {
     unsigned long i;
-    long max_mfn;
+    unsigned long max_mfn;
     xen_pfn_t *m2p_table;
 
     if ( argc > 0 )
@@ -41,8 +41,7 @@ int dump_m2p_func(int argc, char *argv[])
     }
 
     /* Map M2P and obtain gpfn */
-    max_mfn = xc_maximum_ram_page(xch);
-    if ( max_mfn < 0 )
+    if ( xc_maximum_ram_page(xch, &max_mfn) < 0 );
     {
         ERROR("Failed to get the maximum mfn");
         return -1;
@@ -183,8 +182,8 @@ int dump_ptes_func(int argc, char *argv[])
     }
 
     /* Map M2P and obtain gpfn */
-    max_mfn = xc_maximum_ram_page(xch);
-    if ( (mfn > max_mfn) ||
+    rc = xc_maximum_ram_page(xch, &max_mfn);
+    if ( rc || (mfn > max_mfn) ||
          !(m2p_table = xc_map_m2p(xch, max_mfn, PROT_READ, NULL)) )
     {
         xc_unmap_domain_meminfo(xch, &minfo);
