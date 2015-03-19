@@ -190,11 +190,11 @@ xc_cpumap_t xc_cpupool_freeinfo(xc_interface *xch)
     err = do_sysctl_save(xch, &sysctl);
 
     if ( err < 0 )
-	goto out;
+        goto out;
 
     cpumap = xc_cpumap_alloc(xch);
     if (cpumap == NULL)
-	goto out;
+        goto out;
 
     memcpy(cpumap, local, mapsize);
 
