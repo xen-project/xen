@@ -357,22 +357,32 @@ static libxl__qmp_handler *qmp_init_handler(libxl__gc *gc, uint32_t domid)
 static int qmp_open(libxl__qmp_handler *qmp, const char *qmp_socket_path,
                     int timeout)
 {
-    int ret;
+    int ret = -1;
     int i = 0;
 
     qmp->qmp_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (qmp->qmp_fd < 0) {
-        return -1;
+        goto out;
     }
     ret = libxl_fd_set_nonblock(qmp->ctx, qmp->qmp_fd, 1);
-    if (ret) return -1;
+    if (ret) {
+        ret = -1;
+        goto out;
+    }
     ret = libxl_fd_set_cloexec(qmp->ctx, qmp->qmp_fd, 1);
-    if (ret) return -1;
+    if (ret) {
+        ret = -1;
+        goto out;
+    }
 
+    if (sizeof (qmp->addr.sun_path) <= strlen(qmp_socket_path)) {
+        ret = -1;
+        goto out;
+    }
     memset(&qmp->addr, 0, sizeof (qmp->addr));
     qmp->addr.sun_family = AF_UNIX;
     strncpy(qmp->addr.sun_path, qmp_socket_path,
-            sizeof (qmp->addr.sun_path));
+            sizeof (qmp->addr.sun_path)-1);
 
     do {
         ret = connect(qmp->qmp_fd, (struct sockaddr *) &qmp->addr,
@@ -384,8 +394,12 @@ static int qmp_open(libxl__qmp_handler *qmp, const char *qmp_socket_path,
              * ECONNREFUSED : Leftover socket hasn't been removed yet */
             continue;
         }
-        return -1;
+        ret = -1;
+        goto out;
     } while ((++i / 5 <= timeout) && (usleep(200 * 1000) <= 0));
+
+out:
+    if (ret == -1 && qmp->qmp_fd > -1) close(qmp->qmp_fd);
 
     return ret;
 }
