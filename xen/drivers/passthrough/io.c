@@ -804,7 +804,17 @@ static void dpci_softirq(void)
         d = pirq_dpci->dom;
         smp_mb(); /* 'd' MUST be saved before we set/clear the bits. */
         if ( test_and_set_bit(STATE_RUN, &pirq_dpci->state) )
-            BUG();
+        {
+            unsigned long flags;
+
+            /* Put back on the list and retry. */
+            local_irq_save(flags);
+            list_add_tail(&pirq_dpci->softirq_list, &this_cpu(dpci_list));
+            local_irq_restore(flags);
+
+            raise_softirq(HVM_DPCI_SOFTIRQ);
+            continue;
+        }
         /*
          * The one who clears STATE_SCHED MUST refcount the domain.
          */
