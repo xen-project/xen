@@ -264,6 +264,13 @@ if the values of B<memory=> and B<maxmem=> differ.
 A "pre-ballooned" HVM guest needs a balloon driver, without a balloon driver
 it will crash.
 
+NOTE: Because of the way ballooning works, the guest has to allocate
+memory to keep track of maxmem pages, regardless of how much memory it
+actually has available to it.  A guest with maxmem=262144 and
+memory=8096 will report significantly less memory available for use
+than a system with maxmem=8096 memory=8096 due to the memory overhead
+of having to track the unused pages.
+
 =back
 
 =head3 Guest Virtual NUMA Configuration
