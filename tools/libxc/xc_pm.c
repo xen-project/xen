@@ -51,8 +51,10 @@ int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
     int max_px, ret;
 
     if ( !pxpt->trans_pt || !pxpt->pt )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     if ( (ret = xc_pm_get_max_px(xch, cpuid, &max_px)) != 0)
         return ret;
 
@@ -219,8 +221,10 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
         if ( (!user_para->affected_cpus)                    ||
              (!user_para->scaling_available_frequencies)    ||
              (!user_para->scaling_available_governors) )
-            return -EINVAL;
-
+        {
+            errno = EINVAL;
+            return -1;
+        }
         if ( xc_hypercall_bounce_pre(xch, affected_cpus) )
             goto unlock_1;
         if ( xc_hypercall_bounce_pre(xch, scaling_available_frequencies) )
@@ -293,8 +297,10 @@ int xc_set_cpufreq_gov(xc_interface *xch, int cpuid, char *govname)
     char *scaling_governor = sysctl.u.pm_op.u.set_gov.scaling_governor;
 
     if ( !xch || !govname )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = SET_CPUFREQ_GOV;
     sysctl.u.pm_op.cpuid = cpuid;
@@ -310,8 +316,10 @@ int xc_set_cpufreq_para(xc_interface *xch, int cpuid,
     DECLARE_SYSCTL;
 
     if ( !xch )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = SET_CPUFREQ_PARA;
     sysctl.u.pm_op.cpuid = cpuid;
@@ -327,8 +335,10 @@ int xc_get_cpufreq_avgfreq(xc_interface *xch, int cpuid, int *avg_freq)
     DECLARE_SYSCTL;
 
     if ( !xch || !avg_freq )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = GET_CPUFREQ_AVGFREQ;
     sysctl.u.pm_op.cpuid = cpuid;
@@ -392,8 +402,10 @@ int xc_get_cpuidle_max_cstate(xc_interface *xch, uint32_t *value)
     DECLARE_SYSCTL;
 
     if ( !xch || !value )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_get_max_cstate;
     sysctl.u.pm_op.cpuid = 0;
@@ -409,8 +421,10 @@ int xc_set_cpuidle_max_cstate(xc_interface *xch, uint32_t value)
     DECLARE_SYSCTL;
 
     if ( !xch )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_set_max_cstate;
     sysctl.u.pm_op.cpuid = 0;
@@ -424,8 +438,10 @@ int xc_enable_turbo(xc_interface *xch, int cpuid)
     DECLARE_SYSCTL;
 
     if ( !xch )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_enable_turbo;
     sysctl.u.pm_op.cpuid = cpuid;
@@ -437,8 +453,10 @@ int xc_disable_turbo(xc_interface *xch, int cpuid)
     DECLARE_SYSCTL;
 
     if ( !xch )
-        return -EINVAL;
-
+    {
+        errno = EINVAL;
+        return -1;
+    }
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_disable_turbo;
     sysctl.u.pm_op.cpuid = cpuid;
