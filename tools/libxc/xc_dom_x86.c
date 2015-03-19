@@ -946,7 +946,8 @@ static int map_grant_table_frames(struct xc_dom_image *dom)
             }
             xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
                          "%s: mapping grant tables failed " "(pfn=0x%" PRIpfn
-                         ", rc=%d)", __FUNCTION__, dom->p2m_size + i, rc);
+                         ", rc=%d, errno=%d)", __FUNCTION__, dom->p2m_size + i,
+                         rc, errno);
             return rc;
         }
     }
@@ -999,8 +1000,8 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
         if ( rc != 0 )
         {
             xc_dom_panic(dom->xch, XC_INTERNAL_ERROR, "%s: mapping"
-                         " shared_info failed (pfn=0x%" PRIpfn ", rc=%d)",
-                         __FUNCTION__, dom->shared_info_pfn, rc);
+                         " shared_info failed (pfn=0x%" PRIpfn ", rc=%d, errno: %d)",
+                         __FUNCTION__, dom->shared_info_pfn, rc, errno);
             return rc;
         }
 
