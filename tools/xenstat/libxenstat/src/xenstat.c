@@ -166,6 +166,7 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	xc_domaininfo_t domaininfo[DOMAIN_CHUNK_SIZE];
 	int new_domains;
 	unsigned int i;
+	int rc;
 
 	/* Create the node */
 	node = (xenstat_node *) calloc(1, sizeof(xenstat_node));
@@ -189,9 +190,9 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	node->free_mem = ((unsigned long long)physinfo.free_pages)
 	    * handle->page_size;
 
-	node->freeable_mb = (long)xc_tmem_control(handle->xc_handle, -1,
-				TMEMC_QUERY_FREEABLE_MB, -1, 0, 0, 0, NULL);
-
+	rc = xc_tmem_control(handle->xc_handle, -1,
+                         TMEMC_QUERY_FREEABLE_MB, -1, 0, 0, 0, NULL);
+	node->freeable_mb = (rc < 0) ? 0 : rc;
 	/* malloc(0) is not portable, so allocate a single domain.  This will
 	 * be resized below. */
 	node->domains = malloc(sizeof(xenstat_domain));

@@ -73,11 +73,14 @@ int xc_tmem_control(xc_interface *xch,
     if ( subop == TMEMC_LIST && arg1 != 0 )
     {
         if ( buf == NULL )
-            return -EINVAL;
+        {
+            errno = EINVAL;
+            return -1;
+        }
         if ( xc_hypercall_bounce_pre(xch, buf) )
         {
             PERROR("Could not bounce buffer for tmem control hypercall");
-            return -ENOMEM;
+            return -1;
         }
     }
 
@@ -118,11 +121,14 @@ int xc_tmem_control_oid(xc_interface *xch,
     if ( subop == TMEMC_LIST && arg1 != 0 )
     {
         if ( buf == NULL )
-            return -EINVAL;
+        {
+            errno = EINVAL;
+            return -1;
+        }
         if ( xc_hypercall_bounce_pre(xch, buf) )
         {
             PERROR("Could not bounce buffer for tmem control (OID) hypercall");
-            return -ENOMEM;
+            return -1;
         }
     }
 
