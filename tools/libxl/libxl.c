@@ -1664,8 +1664,6 @@ static void devices_destroy_cb(libxl__egc *egc,
 
     xs_rm(ctx->xsh, XBT_NULL, libxl__xs_libxl_path(gc, domid));
     xs_rm(ctx->xsh, XBT_NULL, libxl__sprintf(gc,
-                                "/local/domain/0/device-model/%d", domid));
-    xs_rm(ctx->xsh, XBT_NULL, libxl__sprintf(gc,
                                 "/local/domain/%d/hvmloader", domid));
 
     /* This is async operation, we already hold CTX lock */

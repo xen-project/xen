@@ -1650,6 +1650,11 @@ out:
 
 int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
 {
+    char *path = libxl__device_model_xs_path(gc, LIBXL_TOOLSTACK_DOMID,
+                                             domid, "");
+    if (!xs_rm(CTX->xsh, XBT_NULL, path))
+        LOG(ERROR, "xs_rm failed for %s", path);
+    /* We should try to destroy the device model anyway. */
     return kill_device_model(gc,
                 GCSPRINTF("/local/domain/%d/image/device-model-pid", domid));
 }
