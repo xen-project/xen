@@ -304,7 +304,12 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
                 {
                     uint32_t distance = ~0u;
                     if ( node_online(i) && node_online(j) )
-                        distance = __node_distance(i, j);
+                    {
+                        u8 d = __node_distance(i, j);
+
+                        if ( d != NUMA_NO_DISTANCE )
+                            distance = d;
+                    }
                     if ( copy_to_guest_offset(
                         ni->node_to_node_distance,
                         i*(max_node_index+1) + j, &distance, 1) )

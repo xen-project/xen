@@ -1434,13 +1434,13 @@ void __init scrub_heap_pages(void)
         /* Figure out which NODE CPUs are close. */
         for_each_online_node ( j )
         {
-            int distance;
+            u8 distance;
 
             if ( cpumask_empty(&node_to_cpumask(j)) )
                 continue;
 
             distance = __node_distance(i, j);
-            if ( distance < last_distance )
+            if ( (distance < last_distance) && (distance != NUMA_NO_DISTANCE) )
             {
                 last_distance = distance;
                 best_node = j;
