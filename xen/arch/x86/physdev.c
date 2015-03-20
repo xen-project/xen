@@ -565,7 +565,8 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&manage_pci, arg, 1) != 0 )
             break;
 
-        ret = pci_add_device(0, manage_pci.bus, manage_pci.devfn, NULL);
+        ret = pci_add_device(0, manage_pci.bus, manage_pci.devfn,
+                             NULL, NUMA_NO_NODE);
         break;
     }
 
@@ -597,13 +598,14 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         pdev_info.physfn.devfn = manage_pci_ext.physfn.devfn;
         ret = pci_add_device(0, manage_pci_ext.bus,
                              manage_pci_ext.devfn,
-                             &pdev_info);
+                             &pdev_info, NUMA_NO_NODE);
         break;
     }
 
     case PHYSDEVOP_pci_device_add: {
         struct physdev_pci_device_add add;
         struct pci_dev_info pdev_info;
+        nodeid_t node;
 
         ret = -EFAULT;
         if ( copy_from_guest(&add, arg, 1) != 0 )
@@ -618,7 +620,22 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         }
         else
             pdev_info.is_virtfn = 0;
-        ret = pci_add_device(add.seg, add.bus, add.devfn, &pdev_info);
+
+        if ( add.flags & XEN_PCI_DEV_PXM )
+        {
+            uint32_t pxm;
+            size_t optarr_off = offsetof(struct physdev_pci_device_add, optarr) /
+                                sizeof(add.optarr[0]);
+
+            if ( copy_from_guest_offset(&pxm, arg, optarr_off, 1) )
+                break;
+
+            node = pxm_to_node(pxm);
+        }
+        else
+            node = NUMA_NO_NODE;
+
+        ret = pci_add_device(add.seg, add.bus, add.devfn, &pdev_info, node);
         break;
     }
 

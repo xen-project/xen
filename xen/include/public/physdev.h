@@ -293,6 +293,11 @@ struct physdev_pci_device_add {
         uint8_t bus;
         uint8_t devfn;
     } physfn;
+    /*
+     * Optional parameters array.
+     * First element ([0]) is PXM domain associated with the device (if
+     * XEN_PCI_DEV_PXM is set)
+     */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
     uint32_t optarr[];
 #elif defined(__GNUC__)
