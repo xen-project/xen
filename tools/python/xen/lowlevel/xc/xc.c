@@ -1220,78 +1220,66 @@ static PyObject *pyxc_getcpuinfo(XcObject *self, PyObject *args, PyObject *kwds)
 
 static PyObject *pyxc_topologyinfo(XcObject *self)
 {
-#define MAX_CPU_INDEX 255
-    xc_topologyinfo_t tinfo = { 0 };
-    int i, max_cpu_index;
+    xc_cputopoinfo_t tinfo = { 0 };
+    unsigned i;
     PyObject *ret_obj = NULL;
     PyObject *cpu_to_core_obj, *cpu_to_socket_obj, *cpu_to_node_obj;
-    DECLARE_HYPERCALL_BUFFER(xc_cpu_to_core_t, coremap);
-    DECLARE_HYPERCALL_BUFFER(xc_cpu_to_socket_t, socketmap);
-    DECLARE_HYPERCALL_BUFFER(xc_cpu_to_node_t, nodemap);
+    DECLARE_HYPERCALL_BUFFER(xen_sysctl_cputopo_t, cputopo);
 
-    coremap = xc_hypercall_buffer_alloc(self->xc_handle, coremap, sizeof(*coremap) * (MAX_CPU_INDEX+1));
-    if ( coremap == NULL )
-        goto out;
-    socketmap = xc_hypercall_buffer_alloc(self->xc_handle, socketmap, sizeof(*socketmap) * (MAX_CPU_INDEX+1));
-    if ( socketmap == NULL  )
-        goto out;
-    nodemap = xc_hypercall_buffer_alloc(self->xc_handle, nodemap, sizeof(*nodemap) * (MAX_CPU_INDEX+1));
-    if ( nodemap == NULL )
+    set_xen_guest_handle(tinfo.cputopo, HYPERCALL_BUFFER_NULL);
+    if ( xc_cputopoinfo(self->xc_handle, &tinfo) != 0 )
         goto out;
 
-    set_xen_guest_handle(tinfo.cpu_to_core, coremap);
-    set_xen_guest_handle(tinfo.cpu_to_socket, socketmap);
-    set_xen_guest_handle(tinfo.cpu_to_node, nodemap);
-    tinfo.max_cpu_index = MAX_CPU_INDEX;
+    cputopo = xc_hypercall_buffer_alloc(self->xc_handle, cputopo,
+                                        sizeof(*cputopo) * tinfo.num_cpus);
+    if ( cputopo == NULL )
+    	goto out;
 
-    if ( xc_topologyinfo(self->xc_handle, &tinfo) != 0 )
+    set_xen_guest_handle(tinfo.cputopo, cputopo);
+    if ( xc_cputopoinfo(self->xc_handle, &tinfo) != 0 )
         goto out;
-
-    max_cpu_index = tinfo.max_cpu_index;
-    if ( max_cpu_index > MAX_CPU_INDEX )
-        max_cpu_index = MAX_CPU_INDEX;
 
     /* Construct cpu-to-* lists. */
     cpu_to_core_obj = PyList_New(0);
     cpu_to_socket_obj = PyList_New(0);
     cpu_to_node_obj = PyList_New(0);
-    for ( i = 0; i <= max_cpu_index; i++ )
+    for ( i = 0; i < tinfo.num_cpus; i++ )
     {
-        if ( coremap[i] == INVALID_TOPOLOGY_ID )
+        if ( cputopo[i].core == XEN_INVALID_CORE_ID )
         {
             PyList_Append(cpu_to_core_obj, Py_None);
         }
         else
         {
-            PyObject *pyint = PyInt_FromLong(coremap[i]);
+            PyObject *pyint = PyInt_FromLong(cputopo[i].core);
             PyList_Append(cpu_to_core_obj, pyint);
             Py_DECREF(pyint);
         }
 
-        if ( socketmap[i] == INVALID_TOPOLOGY_ID )
+        if ( cputopo[i].socket == XEN_INVALID_SOCKET_ID )
         {
             PyList_Append(cpu_to_socket_obj, Py_None);
         }
         else
         {
-            PyObject *pyint = PyInt_FromLong(socketmap[i]);
+            PyObject *pyint = PyInt_FromLong(cputopo[i].socket);
             PyList_Append(cpu_to_socket_obj, pyint);
             Py_DECREF(pyint);
         }
 
-        if ( nodemap[i] == INVALID_TOPOLOGY_ID )
+        if ( cputopo[i].node == XEN_INVALID_NODE_ID )
         {
             PyList_Append(cpu_to_node_obj, Py_None);
         }
         else
         {
-            PyObject *pyint = PyInt_FromLong(nodemap[i]);
+            PyObject *pyint = PyInt_FromLong(cputopo[i].node);
             PyList_Append(cpu_to_node_obj, pyint);
             Py_DECREF(pyint);
         }
     }
 
-    ret_obj = Py_BuildValue("{s:i}", "max_cpu_index", max_cpu_index);
+    ret_obj = Py_BuildValue("{s:i}", "max_cpu_index", tinfo.num_cpus + 1);
 
     PyDict_SetItemString(ret_obj, "cpu_to_core", cpu_to_core_obj);
     Py_DECREF(cpu_to_core_obj);
@@ -1303,11 +1291,8 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
     Py_DECREF(cpu_to_node_obj);
 
 out:
-    xc_hypercall_buffer_free(self->xc_handle, coremap);
-    xc_hypercall_buffer_free(self->xc_handle, socketmap);
-    xc_hypercall_buffer_free(self->xc_handle, nodemap);
+    xc_hypercall_buffer_free(self->xc_handle, cputopo);
     return ret_obj ? ret_obj : pyxc_error_to_exception(self->xc_handle);
-#undef MAX_CPU_INDEX
 }
 
 static PyObject *pyxc_numainfo(XcObject *self)
@@ -1375,7 +1360,7 @@ static PyObject *pyxc_numainfo(XcObject *self)
         for ( j = 0; j <= max_node_index; j++ )
         {
             uint32_t dist = nodes_dist[i*(max_node_index+1) + j];
-            if ( dist == INVALID_TOPOLOGY_ID )
+            if ( dist == ~0u )
             {
                 PyList_Append(node_to_node_dist_obj, Py_None);
             }

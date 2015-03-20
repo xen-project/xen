@@ -177,20 +177,20 @@ int xc_physinfo(xc_interface *xch,
     return 0;
 }
 
-int xc_topologyinfo(xc_interface *xch,
-                xc_topologyinfo_t *put_info)
+int xc_cputopoinfo(xc_interface *xch,
+                   xc_cputopoinfo_t *put_info)
 {
     int ret;
     DECLARE_SYSCTL;
 
-    sysctl.cmd = XEN_SYSCTL_topologyinfo;
+    sysctl.cmd = XEN_SYSCTL_cputopoinfo;
 
-    memcpy(&sysctl.u.topologyinfo, put_info, sizeof(*put_info));
+    memcpy(&sysctl.u.cputopoinfo, put_info, sizeof(*put_info));
 
     if ( (ret = do_sysctl(xch, &sysctl)) != 0 )
         return ret;
 
-    memcpy(put_info, &sysctl.u.topologyinfo, sizeof(*put_info));
+    memcpy(put_info, &sysctl.u.cputopoinfo, sizeof(*put_info));
 
     return 0;
 }
