@@ -7,7 +7,8 @@
 #define NODES_SHIFT     0
 #endif
 
-#define NUMA_NO_NODE    0xFF
+#define NUMA_NO_NODE     0xFF
+#define NUMA_NO_DISTANCE 0xFF
 
 #define MAX_NUMNODES    (1 << NODES_SHIFT)
 

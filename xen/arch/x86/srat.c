@@ -496,14 +496,21 @@ static unsigned node_to_pxm(nodeid_t n)
 	return 0;
 }
 
-int __node_distance(nodeid_t a, nodeid_t b)
+u8 __node_distance(nodeid_t a, nodeid_t b)
 {
-	int index;
+	unsigned index;
+	u8 slit_val;
 
 	if (!acpi_slit)
 		return a == b ? 10 : 20;
 	index = acpi_slit->locality_count * node_to_pxm(a);
-	return acpi_slit->entry[index + node_to_pxm(b)];
+	slit_val = acpi_slit->entry[index + node_to_pxm(b)];
+
+	/* ACPI defines 0xff as an unreachable node and 0-9 are undefined */
+	if ((slit_val == 0xff) || (slit_val <= 9))
+		return NUMA_NO_DISTANCE;
+	else
+		return slit_val;
 }
 
 EXPORT_SYMBOL(__node_distance);

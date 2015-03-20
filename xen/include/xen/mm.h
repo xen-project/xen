@@ -338,14 +338,12 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
 # define INIT_PAGE_LIST_HEAD             INIT_LIST_HEAD
 # define INIT_PAGE_LIST_ENTRY            INIT_LIST_HEAD
 # define page_list_empty                 list_empty
-# define page_list_first(hd)             list_entry((hd)->next, \
-                                                    struct page_info, list)
-# define page_list_last(hd)              list_entry((hd)->prev, \
-                                                    struct page_info, list)
-# define page_list_next(pg, hd)          list_entry((pg)->list.next, \
-                                                    struct page_info, list)
-# define page_list_prev(pg, hd)          list_entry((pg)->list.prev, \
-                                                    struct page_info, list)
+# define page_list_first(hd)             \
+    list_first_entry(hd, struct page_info, list)
+# define page_list_last(hd)              \
+    list_last_entry(hd, struct page_info, list)
+# define page_list_next(pg, hd)          list_next_entry(pg, list)
+# define page_list_prev(pg, hd)          list_prev_entry(pg, list)
 # define page_list_add(pg, hd)           list_add(&(pg)->list, hd)
 # define page_list_add_tail(pg, hd)      list_add_tail(&(pg)->list, hd)
 # define page_list_del(pg, hd)           list_del(&(pg)->list)

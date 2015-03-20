@@ -568,7 +568,8 @@ static void pci_enable_acs(struct pci_dev *pdev)
     pci_conf_write16(seg, bus, dev, func, pos + PCI_ACS_CTRL, ctrl);
 }
 
-int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
+int pci_add_device(u16 seg, u8 bus, u8 devfn,
+                   const struct pci_dev_info *info, nodeid_t node)
 {
     struct pci_seg *pseg;
     struct pci_dev *pdev;
@@ -586,7 +587,8 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
         pdev = pci_get_pdev(seg, info->physfn.bus, info->physfn.devfn);
         spin_unlock(&pcidevs_lock);
         if ( !pdev )
-            pci_add_device(seg, info->physfn.bus, info->physfn.devfn, NULL);
+            pci_add_device(seg, info->physfn.bus, info->physfn.devfn,
+                           NULL, node);
         pdev_type = "virtual function";
     }
     else
@@ -608,6 +610,8 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
     pdev = alloc_pdev(pseg, bus, devfn);
     if ( !pdev )
         goto out;
+
+    pdev->node = node;
 
     if ( info )
         pdev->info = *info;
@@ -1191,10 +1195,11 @@ static int _dump_pci_devices(struct pci_seg *pseg, void *arg)
 
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
     {
-        printk("%04x:%02x:%02x.%u - dom %-3d - MSIs < ",
+        printk("%04x:%02x:%02x.%u - dom %-3d - node %-3d - MSIs < ",
                pseg->nr, pdev->bus,
                PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn),
-               pdev->domain ? pdev->domain->domain_id : -1);
+               pdev->domain ? pdev->domain->domain_id : -1,
+               (pdev->node != NUMA_NO_NODE) ? pdev->node : -1);
         list_for_each_entry ( msi, &pdev->msi_list, list )
                printk("%d ", msi->irq);
         printk(">\n");

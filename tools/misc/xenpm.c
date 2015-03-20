@@ -355,16 +355,21 @@ static void signal_int_handler(int signo)
     int i, j, k;
     struct timeval tv;
     int cx_cap = 0, px_cap = 0;
-    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_core);
-    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_socket);
-    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_node);
-    xc_topologyinfo_t info = { 0 };
+    DECLARE_HYPERCALL_BUFFER(xen_sysctl_cputopo_t, cputopo);
+    xc_cputopoinfo_t info = { 0 };
 
-    cpu_to_core = xc_hypercall_buffer_alloc(xc_handle, cpu_to_core, sizeof(*cpu_to_core) * MAX_NR_CPU);
-    cpu_to_socket = xc_hypercall_buffer_alloc(xc_handle, cpu_to_socket, sizeof(*cpu_to_socket) * MAX_NR_CPU);
-    cpu_to_node = xc_hypercall_buffer_alloc(xc_handle, cpu_to_node, sizeof(*cpu_to_node) * MAX_NR_CPU);
+    set_xen_guest_handle(info.cputopo, HYPERCALL_BUFFER_NULL);
+    if ( xc_cputopoinfo(xc_handle, &info) != 0 )
+    {
+        fprintf(stderr, "failed to discover number of CPUs: %s\n",
+                strerror(errno));
+        goto out;
+    }
 
-    if ( cpu_to_core == NULL || cpu_to_socket == NULL || cpu_to_node == NULL )
+    cputopo = xc_hypercall_buffer_alloc(xc_handle, cputopo,
+                                        sizeof(*cputopo) * info.num_cpus);
+
+    if ( cputopo == NULL )
     {
 	fprintf(stderr, "failed to allocate hypercall buffers\n");
 	goto out;
@@ -448,47 +453,44 @@ static void signal_int_handler(int signo)
             printf("  Avg freq\t%d\tKHz\n", avgfreq[i]);
     }
 
-    set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
-    set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
-    set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
-    info.max_cpu_index = MAX_NR_CPU - 1;
+    set_xen_guest_handle(info.cputopo, cputopo);
 
-    if ( cx_cap && !xc_topologyinfo(xc_handle, &info) )
+    if ( cx_cap && !xc_cputopoinfo(xc_handle, &info) )
     {
         uint32_t socket_ids[MAX_NR_CPU];
         uint32_t core_ids[MAX_NR_CPU];
         uint32_t socket_nr = 0;
         uint32_t core_nr = 0;
 
-        if ( info.max_cpu_index > MAX_NR_CPU - 1 )
-            info.max_cpu_index = MAX_NR_CPU - 1;
+        if ( info.num_cpus > MAX_NR_CPU )
+            info.num_cpus = MAX_NR_CPU;
         /* check validity */
-        for ( i = 0; i <= info.max_cpu_index; i++ )
+        for ( i = 0; i < info.num_cpus; i++ )
         {
-            if ( cpu_to_core[i] == INVALID_TOPOLOGY_ID ||
-                 cpu_to_socket[i] == INVALID_TOPOLOGY_ID )
+            if ( cputopo[i].core == XEN_INVALID_CORE_ID ||
+                 cputopo[i].socket == XEN_INVALID_SOCKET_ID )
                 break;
         }
-        if ( i > info.max_cpu_index )
+        if ( i >= info.num_cpus )
         {
             /* find socket nr & core nr per socket */
-            for ( i = 0; i <= info.max_cpu_index; i++ )
+            for ( i = 0; i < info.num_cpus; i++ )
             {
                 for ( j = 0; j < socket_nr; j++ )
-                    if ( cpu_to_socket[i] == socket_ids[j] )
+                    if ( cputopo[i].socket == socket_ids[j] )
                         break;
                 if ( j == socket_nr )
                 {
-                    socket_ids[j] = cpu_to_socket[i];
+                    socket_ids[j] = cputopo[i].socket;
                     socket_nr++;
                 }
 
                 for ( j = 0; j < core_nr; j++ )
-                    if ( cpu_to_core[i] == core_ids[j] )
+                    if ( cputopo[i].core == core_ids[j] )
                         break;
                 if ( j == core_nr )
                 {
-                    core_ids[j] = cpu_to_core[i];
+                    core_ids[j] = cputopo[i].core;
                     core_nr++;
                 }
             }
@@ -499,9 +501,9 @@ static void signal_int_handler(int signo)
                 unsigned int n;
                 uint64_t res;
 
-                for ( j = 0; j <= info.max_cpu_index; j++ )
+                for ( j = 0; j < info.num_cpus; j++ )
                 {
-                    if ( cpu_to_socket[j] == socket_ids[i] )
+                    if ( cputopo[j].socket == socket_ids[i] )
                         break;
                 }
                 printf("\nSocket %d\n", socket_ids[i]);
@@ -518,10 +520,10 @@ static void signal_int_handler(int signo)
                 }
                 for ( k = 0; k < core_nr; k++ )
                 {
-                    for ( j = 0; j <= info.max_cpu_index; j++ )
+                    for ( j = 0; j < info.num_cpus; j++ )
                     {
-                        if ( cpu_to_socket[j] == socket_ids[i] &&
-                             cpu_to_core[j] == core_ids[k] )
+                        if ( cputopo[j].socket == socket_ids[i] &&
+                             cputopo[j].core == core_ids[k] )
                             break;
                     }
                     printf("\t Core %d CPU %d\n", core_ids[k], j);
@@ -556,9 +558,7 @@ static void signal_int_handler(int signo)
     free(sum);
     free(avgfreq);
 out:
-    xc_hypercall_buffer_free(xc_handle, cpu_to_core);
-    xc_hypercall_buffer_free(xc_handle, cpu_to_socket);
-    xc_hypercall_buffer_free(xc_handle, cpu_to_node);
+    xc_hypercall_buffer_free(xc_handle, cputopo);
     xc_interface_close(xc_handle);
     exit(0);
 }
@@ -965,28 +965,29 @@ void scaling_governor_func(int argc, char *argv[])
 
 void cpu_topology_func(int argc, char *argv[])
 {
-    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_core);
-    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_socket);
-    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_node);
-    xc_topologyinfo_t info = { 0 };
+    DECLARE_HYPERCALL_BUFFER(xen_sysctl_cputopo_t, cputopo);
+    xc_cputopoinfo_t info = { 0 };
     int i, rc = ENOMEM;
 
-    cpu_to_core = xc_hypercall_buffer_alloc(xc_handle, cpu_to_core, sizeof(*cpu_to_core) * MAX_NR_CPU);
-    cpu_to_socket = xc_hypercall_buffer_alloc(xc_handle, cpu_to_socket, sizeof(*cpu_to_socket) * MAX_NR_CPU);
-    cpu_to_node = xc_hypercall_buffer_alloc(xc_handle, cpu_to_node, sizeof(*cpu_to_node) * MAX_NR_CPU);
+    set_xen_guest_handle(info.cputopo, HYPERCALL_BUFFER_NULL);
+    if ( xc_cputopoinfo(xc_handle, &info) )
+    {
+        rc = errno;
+        fprintf(stderr, "failed to discover number of CPUs (%d - %s)\n",
+                errno, strerror(errno));
+        goto out;
+    }
 
-    if ( cpu_to_core == NULL || cpu_to_socket == NULL || cpu_to_node == NULL )
+    cputopo = xc_hypercall_buffer_alloc(xc_handle, cputopo,
+                                        sizeof(*cputopo) * info.num_cpus);
+    if ( cputopo == NULL )
     {
 	fprintf(stderr, "failed to allocate hypercall buffers\n");
 	goto out;
     }
 
-    set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
-    set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
-    set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
-    info.max_cpu_index = MAX_NR_CPU-1;
-
-    if ( xc_topologyinfo(xc_handle, &info) )
+    set_xen_guest_handle(info.cputopo, cputopo);
+    if ( xc_cputopoinfo(xc_handle, &info) )
     {
         rc = errno;
         fprintf(stderr, "Cannot get Xen CPU topology (%d - %s)\n",
@@ -994,22 +995,17 @@ void cpu_topology_func(int argc, char *argv[])
         goto out;
     }
 
-    if ( info.max_cpu_index > (MAX_NR_CPU-1) )
-        info.max_cpu_index = MAX_NR_CPU-1;
-
     printf("CPU\tcore\tsocket\tnode\n");
-    for ( i = 0; i <= info.max_cpu_index; i++ )
+    for ( i = 0; i < info.num_cpus; i++ )
     {
-        if ( cpu_to_core[i] == INVALID_TOPOLOGY_ID )
+        if ( cputopo[i].core == XEN_INVALID_CORE_ID )
             continue;
         printf("CPU%d\t %d\t %d\t %d\n",
-               i, cpu_to_core[i], cpu_to_socket[i], cpu_to_node[i]);
+               i, cputopo[i].core, cputopo[i].socket, cputopo[i].node);
     }
     rc = 0;
 out:
-    xc_hypercall_buffer_free(xc_handle, cpu_to_core);
-    xc_hypercall_buffer_free(xc_handle, cpu_to_socket);
-    xc_hypercall_buffer_free(xc_handle, cpu_to_node);
+    xc_hypercall_buffer_free(xc_handle, cputopo);
     if ( rc )
         exit(rc);
 }

@@ -5101,64 +5101,51 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
 libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out)
 {
     GC_INIT(ctx);
-    xc_topologyinfo_t tinfo;
-    DECLARE_HYPERCALL_BUFFER(xc_cpu_to_core_t, coremap);
-    DECLARE_HYPERCALL_BUFFER(xc_cpu_to_socket_t, socketmap);
-    DECLARE_HYPERCALL_BUFFER(xc_cpu_to_node_t, nodemap);
+    xc_cputopoinfo_t tinfo;
+    DECLARE_HYPERCALL_BUFFER(xen_sysctl_cputopo_t, cputopo);
     libxl_cputopology *ret = NULL;
     int i;
-    int max_cpus;
 
-    max_cpus = libxl_get_max_cpus(ctx);
-    if (max_cpus < 0)
+    /* Setting buffer to NULL makes the hypercall return number of CPUs */
+    set_xen_guest_handle(tinfo.cputopo, HYPERCALL_BUFFER_NULL);
+    if (xc_cputopoinfo(ctx->xch, &tinfo) != 0)
     {
         LIBXL__LOG(ctx, XTL_ERROR, "Unable to determine number of CPUS");
         ret = NULL;
         goto out;
     }
 
-    coremap = xc_hypercall_buffer_alloc
-        (ctx->xch, coremap, sizeof(*coremap) * max_cpus);
-    socketmap = xc_hypercall_buffer_alloc
-        (ctx->xch, socketmap, sizeof(*socketmap) * max_cpus);
-    nodemap = xc_hypercall_buffer_alloc
-        (ctx->xch, nodemap, sizeof(*nodemap) * max_cpus);
-    if ((coremap == NULL) || (socketmap == NULL) || (nodemap == NULL)) {
+    cputopo = xc_hypercall_buffer_alloc(ctx->xch, cputopo,
+                                        sizeof(*cputopo) * tinfo.num_cpus);
+    if (cputopo == NULL) {
         LIBXL__LOG_ERRNOVAL(ctx, XTL_ERROR, ENOMEM,
                             "Unable to allocate hypercall arguments");
         goto fail;
     }
+    set_xen_guest_handle(tinfo.cputopo, cputopo);
 
-    set_xen_guest_handle(tinfo.cpu_to_core, coremap);
-    set_xen_guest_handle(tinfo.cpu_to_socket, socketmap);
-    set_xen_guest_handle(tinfo.cpu_to_node, nodemap);
-    tinfo.max_cpu_index = max_cpus - 1;
-    if (xc_topologyinfo(ctx->xch, &tinfo) != 0) {
-        LIBXL__LOG_ERRNO(ctx, XTL_ERROR, "Topology info hypercall failed");
+    if (xc_cputopoinfo(ctx->xch, &tinfo) != 0) {
+        LIBXL__LOG_ERRNO(ctx, XTL_ERROR, "CPU topology info hypercall failed");
         goto fail;
     }
 
-    if (tinfo.max_cpu_index < max_cpus - 1)
-        max_cpus = tinfo.max_cpu_index + 1;
+    ret = libxl__zalloc(NOGC, sizeof(libxl_cputopology) * tinfo.num_cpus);
 
-    ret = libxl__zalloc(NOGC, sizeof(libxl_cputopology) * max_cpus);
-
-    for (i = 0; i < max_cpus; i++) {
-#define V(map, i) (map[i] == INVALID_TOPOLOGY_ID) ? \
-    LIBXL_CPUTOPOLOGY_INVALID_ENTRY : map[i]
-        ret[i].core = V(coremap, i);
-        ret[i].socket = V(socketmap, i);
-        ret[i].node = V(nodemap, i);
+    for (i = 0; i < tinfo.num_cpus; i++) {
+#define V(map, i, invalid) ( cputopo[i].map == invalid) ? \
+   LIBXL_CPUTOPOLOGY_INVALID_ENTRY : cputopo[i].map
+        ret[i].core = V(core, i, XEN_INVALID_CORE_ID);
+        ret[i].socket = V(socket, i, XEN_INVALID_SOCKET_ID);
+        ret[i].node = V(node, i, XEN_INVALID_NODE_ID);
 #undef V
     }
 
 fail:
-    xc_hypercall_buffer_free(ctx->xch, coremap);
-    xc_hypercall_buffer_free(ctx->xch, socketmap);
-    xc_hypercall_buffer_free(ctx->xch, nodemap);
+    xc_hypercall_buffer_free(ctx->xch, cputopo);
 
     if (ret)
-        *nb_cpu_out = max_cpus;
+        *nb_cpu_out = tinfo.num_cpus;
+
  out:
     GC_FREE;
     return ret;

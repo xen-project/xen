@@ -304,7 +304,12 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
                 {
                     uint32_t distance = ~0u;
                     if ( node_online(i) && node_online(j) )
-                        distance = __node_distance(i, j);
+                    {
+                        u8 d = __node_distance(i, j);
+
+                        if ( d != NUMA_NO_DISTANCE )
+                            distance = d;
+                    }
                     if ( copy_to_guest_offset(
                         ni->node_to_node_distance,
                         i*(max_node_index+1) + j, &distance, 1) )
@@ -320,39 +325,63 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     }
     break;
 
-    case XEN_SYSCTL_topologyinfo:
+    case XEN_SYSCTL_cputopoinfo:
     {
-        uint32_t i, max_cpu_index, last_online_cpu;
-        xen_sysctl_topologyinfo_t *ti = &op->u.topologyinfo;
+        unsigned int i, num_cpus;
+        xen_sysctl_cputopoinfo_t *ti = &op->u.cputopoinfo;
 
-        last_online_cpu = cpumask_last(&cpu_online_map);
-        max_cpu_index = min_t(uint32_t, ti->max_cpu_index, last_online_cpu);
-        ti->max_cpu_index = last_online_cpu;
-
-        for ( i = 0; i <= max_cpu_index; i++ )
+        num_cpus = cpumask_last(&cpu_online_map) + 1;
+        if ( !guest_handle_is_null(ti->cputopo) )
         {
-            if ( !guest_handle_is_null(ti->cpu_to_core) )
+            if ( ti->num_cpus < num_cpus )
             {
-                uint32_t core = cpu_online(i) ? cpu_to_core(i) : ~0u;
-                if ( copy_to_guest_offset(ti->cpu_to_core, i, &core, 1) )
-                    break;
+                ret = -ENOBUFS;
+                i = num_cpus;
             }
-            if ( !guest_handle_is_null(ti->cpu_to_socket) )
+
+            for ( i = 0; i < num_cpus; i++ )
             {
-                uint32_t socket = cpu_online(i) ? cpu_to_socket(i) : ~0u;
-                if ( copy_to_guest_offset(ti->cpu_to_socket, i, &socket, 1) )
+                xen_sysctl_cputopo_t cputopo;
+
+                if ( cpu_present(i) )
+                {
+                    cputopo.core = cpu_to_core(i);
+                    if ( cputopo.core == BAD_APICID )
+                        cputopo.core = XEN_INVALID_CORE_ID;
+                    cputopo.socket = cpu_to_socket(i);
+                    if ( cputopo.socket == BAD_APICID )
+                        cputopo.socket = XEN_INVALID_SOCKET_ID;
+                    cputopo.node = cpu_to_node(i);
+                    if ( cputopo.node == NUMA_NO_NODE )
+                        cputopo.node = XEN_INVALID_NODE_ID;
+                }
+                else
+                {
+                    cputopo.core = XEN_INVALID_CORE_ID;
+                    cputopo.socket = XEN_INVALID_SOCKET_ID;
+                    cputopo.node = XEN_INVALID_NODE_ID;
+                }
+
+                if ( copy_to_guest_offset(ti->cputopo, i, &cputopo, 1) )
+                {
+                    ret = -EFAULT;
                     break;
-            }
-            if ( !guest_handle_is_null(ti->cpu_to_node) )
-            {
-                uint32_t node = cpu_online(i) ? cpu_to_node(i) : ~0u;
-                if ( copy_to_guest_offset(ti->cpu_to_node, i, &node, 1) )
-                    break;
+                }
             }
         }
+        else
+            i = num_cpus;
 
-        ret = ((i <= max_cpu_index) || copy_to_guest(u_sysctl, op, 1))
-            ? -EFAULT : 0;
+        if ( (!ret || (ret == -ENOBUFS)) && (ti->num_cpus != i) )
+        {
+            ti->num_cpus = i;
+            if ( __copy_field_to_guest(u_sysctl, op,
+                                       u.cputopoinfo.num_cpus) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+        }
     }
     break;
 

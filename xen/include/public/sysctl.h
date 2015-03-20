@@ -34,7 +34,7 @@
 #include "xen.h"
 #include "domctl.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x0000000B
+#define XEN_SYSCTL_INTERFACE_VERSION 0x0000000C
 
 /*
  * Read console content from Xen buffer ring.
@@ -462,31 +462,36 @@ struct xen_sysctl_lockprof_op {
 typedef struct xen_sysctl_lockprof_op xen_sysctl_lockprof_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_lockprof_op_t);
 
-/* XEN_SYSCTL_topologyinfo */
-#define INVALID_TOPOLOGY_ID  (~0U)
-struct xen_sysctl_topologyinfo {
-    /*
-     * IN: maximum addressable entry in the caller-provided arrays.
-     * OUT: largest cpu identifier in the system.
-     * If OUT is greater than IN then the arrays are truncated!
-     * If OUT is leass than IN then the array tails are not written by sysctl.
-     */
-    uint32_t max_cpu_index;
+/* XEN_SYSCTL_cputopoinfo */
+#define XEN_INVALID_CORE_ID     (~0U)
+#define XEN_INVALID_SOCKET_ID   (~0U)
+#define XEN_INVALID_NODE_ID     (~0U)
 
-    /*
-     * If not NULL, these arrays are filled with core/socket/node identifier
-     * for each cpu.
-     * If a cpu has no core/socket/node information (e.g., cpu not present) 
-     * then the sentinel value ~0u is written to each array.
-     * The number of array elements written by the sysctl is:
-     *   min(@max_cpu_index_IN,@max_cpu_index_OUT)+1
-     */
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_core;
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_socket;
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_node;
+struct xen_sysctl_cputopo {
+    uint32_t core;
+    uint32_t socket;
+    uint32_t node;
 };
-typedef struct xen_sysctl_topologyinfo xen_sysctl_topologyinfo_t;
-DEFINE_XEN_GUEST_HANDLE(xen_sysctl_topologyinfo_t);
+typedef struct xen_sysctl_cputopo xen_sysctl_cputopo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cputopo_t);
+
+/*
+ * IN:
+ *  - a NULL 'cputopo' handle is a request for maximun 'num_cpus'.
+ *  - otherwise it's the number of entries in 'cputopo'
+ *
+ * OUT:
+ *  - If 'num_cpus' is less than the number Xen needs to write, -ENOBUFS shall
+ *    be returned and 'num_cpus' updated to reflect the intended number.
+ *  - On success, 'num_cpus' shall indicate the number of entries written, which
+ *    may be less than the maximum.
+ */
+struct xen_sysctl_cputopoinfo {
+    uint32_t num_cpus;
+    XEN_GUEST_HANDLE_64(xen_sysctl_cputopo_t) cputopo;
+};
+typedef struct xen_sysctl_cputopoinfo xen_sysctl_cputopoinfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cputopoinfo_t);
 
 /* XEN_SYSCTL_numainfo */
 #define INVALID_NUMAINFO_ID (~0U)
@@ -672,7 +677,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_pm_op                         12
 #define XEN_SYSCTL_page_offline_op               14
 #define XEN_SYSCTL_lockprof_op                   15
-#define XEN_SYSCTL_topologyinfo                  16 
+#define XEN_SYSCTL_cputopoinfo                   16
 #define XEN_SYSCTL_numainfo                      17
 #define XEN_SYSCTL_cpupool_op                    18
 #define XEN_SYSCTL_scheduler_op                  19
@@ -683,7 +688,7 @@ struct xen_sysctl {
         struct xen_sysctl_readconsole       readconsole;
         struct xen_sysctl_tbuf_op           tbuf_op;
         struct xen_sysctl_physinfo          physinfo;
-        struct xen_sysctl_topologyinfo      topologyinfo;
+        struct xen_sysctl_cputopoinfo       cputopoinfo;
         struct xen_sysctl_numainfo          numainfo;
         struct xen_sysctl_sched_id          sched_id;
         struct xen_sysctl_perfc_op          perfc_op;
