@@ -1033,7 +1033,9 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
     }
 
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
-        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
+        uint32_t dm_domid = libxl_get_stubdom_id(ctx, domid);
+
+        path = libxl__device_model_xs_path(gc, dm_domid, domid, "/state");
         state = libxl__xs_read(gc, XBT_NULL, path);
         if (state != NULL && !strcmp(state, "paused")) {
             libxl__qemu_traditional_cmd(gc, domid, "continue");
