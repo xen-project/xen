@@ -148,7 +148,7 @@ static void datacopier_check_state(libxl__egc *egc, libxl__datacopier_state *dc)
     } else if (!libxl__ev_fd_isregistered(&dc->toread) ||
                dc->bytes_to_read == 0) {
         /* we have had eof */
-        datacopier_callback(egc, dc, 0, dc->readbuf ? dc->used : 0);
+        datacopier_callback(egc, dc, 0, 0);
         return;
     } else {
         /* nothing buffered, but still reading */
