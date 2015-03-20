@@ -127,21 +127,33 @@ void *libxl__realloc(libxl__gc *gc, void *ptr, size_t new_size)
     return new_ptr;
 }
 
-char *libxl__sprintf(libxl__gc *gc, const char *fmt, ...)
+char *libxl__vsprintf(libxl__gc *gc, const char *fmt, va_list ap)
 {
     char *s;
-    va_list ap;
+    va_list aq;
     int ret;
 
-    va_start(ap, fmt);
-    ret = vsnprintf(NULL, 0, fmt, ap);
-    va_end(ap);
+    va_copy(aq, ap);
+    ret = vsnprintf(NULL, 0, fmt, aq);
+    va_end(aq);
 
     assert(ret >= 0);
 
     s = libxl__zalloc(gc, ret + 1);
+    va_copy(aq, ap);
+    ret = vsnprintf(s, ret + 1, fmt, aq);
+    va_end(aq);
+
+    return s;
+}
+
+char *libxl__sprintf(libxl__gc *gc, const char *fmt, ...)
+{
+    char *s;
+    va_list ap;
+
     va_start(ap, fmt);
-    ret = vsnprintf(s, ret + 1, fmt, ap);
+    s = libxl__vsprintf(gc, fmt, ap);
     va_end(ap);
 
     return s;
@@ -553,6 +565,22 @@ void libxl__update_domain_configuration(libxl__gc *gc,
 
     /* video ram */
     dst->b_info.video_memkb = src->b_info.video_memkb;
+}
+
+char *libxl__device_model_xs_path(libxl__gc *gc, uint32_t dm_domid,
+                                  uint32_t domid, const char *format,  ...)
+{
+    char *s, *fmt;
+    va_list ap;
+
+    fmt = GCSPRINTF("/local/domain/%u/device-model/%u%s", dm_domid,
+                    domid, format);
+
+    va_start(ap, format);
+    s = libxl__vsprintf(gc, fmt, ap);
+    va_end(ap);
+
+    return s;
 }
 
 /*

@@ -537,6 +537,7 @@ _hidden void *libxl__realloc(libxl__gc *gc_opt, void *ptr, size_t new_size) NN1;
 /* print @fmt into an allocated string large enoughto contain the result.
  * (similar to gc'd asprintf(3)). */
 _hidden char *libxl__sprintf(libxl__gc *gc_opt, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3) NN1;
+_hidden char *libxl__vsprintf(libxl__gc *gc, const char *format, va_list ap);
 /* duplicate the string @c (similar to a gc'd strdup(3)). */
 _hidden char *libxl__strdup(libxl__gc *gc_opt, const char *c) NN1;
 /* duplicate at most @n bytes of string @c (similar to a gc'd strndup(3)). */
@@ -1813,6 +1814,9 @@ _hidden libxl__json_object *libxl__json_parse(libxl__gc *gc_opt, const char *s);
 _hidden int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
   /* Return the system-wide default device model */
 _hidden libxl_device_model_version libxl__default_device_model(libxl__gc *gc);
+_hidden char *libxl__device_model_xs_path(libxl__gc *gc, uint32_t dm_domid,
+                                          uint32_t domid,
+                                          const char *format, ...) PRINTF_ATTRIBUTE(4, 5);
 
 /* Check how executes hotplug script currently */
 int libxl__hotplug_settings(libxl__gc *gc, xs_transaction_t t);
