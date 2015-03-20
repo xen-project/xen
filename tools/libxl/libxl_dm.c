@@ -1390,7 +1390,7 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
         free(path);
     }
 
-    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d", domid);
+    path = libxl__device_model_xs_path(gc, LIBXL_TOOLSTACK_DOMID, domid, "");
     xs_mkdir(ctx->xsh, XBT_NULL, path);
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM &&
@@ -1440,6 +1440,8 @@ retry_transaction:
 
     spawn->what = GCSPRINTF("domain %d device model", domid);
     spawn->xspath = GCSPRINTF("/local/domain/0/device-model/%d/state", domid);
+    spawn->xspath = libxl__device_model_xs_path(gc, LIBXL_TOOLSTACK_DOMID,
+                                                domid, "/state");
     spawn->timeout_ms = LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000;
     spawn->pidpath = GCSPRINTF("%s/image/device-model-pid", dom_path);
     spawn->midproc_cb = libxl__spawn_record_pid;
