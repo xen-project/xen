@@ -372,8 +372,6 @@ struct pv_vcpu
         };
     };
 
-    unsigned long vm_assist;
-
     unsigned long syscall32_callback_eip;
     unsigned long sysenter_callback_eip;
     unsigned short syscall32_callback_cs;

@@ -1436,7 +1436,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             c(event_callback_cs = v->arch.pv_vcpu.event_callback_cs);
             c(failsafe_callback_cs = v->arch.pv_vcpu.failsafe_callback_cs);
         }
-        c(vm_assist = v->arch.pv_vcpu.vm_assist);
 
         /* IOPL privileges are virtualised: merge back into returned eflags. */
         BUG_ON((c(user_regs.eflags) & X86_EFLAGS_IOPL) != 0);

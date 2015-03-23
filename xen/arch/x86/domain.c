@@ -901,7 +901,6 @@ int arch_set_info_guest(
         v->arch.pv_vcpu.event_callback_cs = c(event_callback_cs);
         v->arch.pv_vcpu.failsafe_callback_cs = c(failsafe_callback_cs);
     }
-    v->arch.pv_vcpu.vm_assist = c(vm_assist);
 
     /* Only CR0.TS is modifiable by guest or admin. */
     v->arch.pv_vcpu.ctrlreg[0] &= X86_CR0_TS;
