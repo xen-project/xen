@@ -41,6 +41,11 @@ CHECK_TYPE(domain_handle);
 #define xennmi_callback compat_nmi_callback
 #define xennmi_callback_t compat_nmi_callback_t
 
+#ifdef COMPAT_VM_ASSIST_VALID
+#undef VM_ASSIST_VALID
+#define VM_ASSIST_VALID COMPAT_VM_ASSIST_VALID
+#endif
+
 #define DO(fn) int compat_##fn
 #define COMPAT
 

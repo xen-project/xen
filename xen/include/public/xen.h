@@ -486,7 +486,9 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 /* x86/PAE guests: support PDPTs above 4GB. */
 #define VMASST_TYPE_pae_extended_cr3     3
 
+#if __XEN_INTERFACE_VERSION__ < 0x00040600
 #define MAX_VMASST_TYPE                  3
+#endif
 
 #ifndef __ASSEMBLY__
 

@@ -386,10 +386,12 @@ DO(nmi_op)(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
+#ifdef VM_ASSIST_VALID
 DO(vm_assist)(unsigned int cmd, unsigned int type)
 {
-    return vm_assist(current->domain, cmd, type);
+    return vm_assist(current->domain, cmd, type, VM_ASSIST_VALID);
 }
+#endif
 
 DO(ni_hypercall)(void)
 {

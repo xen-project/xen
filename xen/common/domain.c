@@ -1318,9 +1318,11 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
-long vm_assist(struct domain *p, unsigned int cmd, unsigned int type)
+#ifdef VM_ASSIST_VALID
+long vm_assist(struct domain *p, unsigned int cmd, unsigned int type,
+               unsigned long valid)
 {
-    if ( type > MAX_VMASST_TYPE )
+    if ( type >= BITS_PER_LONG || !test_bit(type, &valid) )
         return -EINVAL;
 
     switch ( cmd )
@@ -1335,6 +1337,7 @@ long vm_assist(struct domain *p, unsigned int cmd, unsigned int type)
 
     return -ENOSYS;
 }
+#endif
 
 struct pirq *pirq_get_info(struct domain *d, int pirq)
 {
