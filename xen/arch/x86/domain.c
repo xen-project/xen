@@ -972,7 +972,7 @@ int arch_set_info_guest(
         case -ERESTART:
             break;
         case 0:
-            if ( !compat && !VM_ASSIST(d, VMASST_TYPE_m2p_strict) &&
+            if ( !compat && !VM_ASSIST(d, m2p_strict) &&
                  !paging_mode_refcounts(d) )
                 fill_ro_mpt(cr3_gfn);
             break;
@@ -1011,7 +1011,7 @@ int arch_set_info_guest(
                         cr3_page = NULL;
                     break;
                 case 0:
-                    if ( VM_ASSIST(d, VMASST_TYPE_m2p_strict) )
+                    if ( VM_ASSIST(d, m2p_strict) )
                         zap_ro_mpt(cr3_gfn);
                     break;
                 }

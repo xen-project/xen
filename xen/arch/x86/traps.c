@@ -1441,7 +1441,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
          !(regs->error_code & (PFEC_reserved_bit | PFEC_insn_fetch)) &&
          (regs->error_code & PFEC_write_access) )
     {
-        if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
+        if ( VM_ASSIST(d, writable_pagetables) &&
              /* Do not check if access-protection fault since the page may
                 legitimately be not present in shadow page tables */
              (paging_mode_enabled(d) ||

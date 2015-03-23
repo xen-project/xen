@@ -1435,7 +1435,7 @@ void sh_install_xen_entries_in_l4(struct domain *d, mfn_t gl4mfn, mfn_t sl4mfn)
         shadow_l4e_from_mfn(page_to_mfn(d->arch.perdomain_l3_pg),
                             __PAGE_HYPERVISOR);
 
-    if ( !VM_ASSIST(d, VMASST_TYPE_m2p_strict) )
+    if ( !VM_ASSIST(d, m2p_strict) )
         sl4e[shadow_l4_table_offset(RO_MPT_VIRT_START)] = shadow_l4e_empty();
 
     /* Shadow linear mapping for 4-level shadows.  N.B. for 3-level
@@ -3983,11 +3983,11 @@ sh_update_cr3(struct vcpu *v, int do_locking)
             shadow_l4e_t *sl4e = v->arch.paging.shadow.guest_vtable;
 
             if ( (v->arch.flags & TF_kernel_mode) &&
-                 !VM_ASSIST(d, VMASST_TYPE_m2p_strict) )
+                 !VM_ASSIST(d, m2p_strict) )
                 sl4e[shadow_l4_table_offset(RO_MPT_VIRT_START)] =
                     idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)];
             else if ( !(v->arch.flags & TF_kernel_mode) &&
-                      VM_ASSIST(d, VMASST_TYPE_m2p_strict) )
+                      VM_ASSIST(d, m2p_strict) )
                 sl4e[shadow_l4_table_offset(RO_MPT_VIRT_START)] =
                     shadow_l4e_empty();
         }

@@ -833,7 +833,7 @@ void watchdog_domain_destroy(struct domain *d);
 /* This check is for functionality specific to a control domain */
 #define is_control_domain(_d) ((_d)->is_privileged)
 
-#define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
+#define VM_ASSIST(d, t) (test_bit(VMASST_TYPE_ ## t, &(d)->vm_assist))
 
 #define is_pv_domain(d) ((d)->guest_type == guest_type_pv)
 #define is_pv_vcpu(v)   (is_pv_domain((v)->domain))

@@ -1464,7 +1464,7 @@ static int alloc_l4_table(struct page_info *page)
         adjust_guest_l4e(pl4e[i], d);
     }
 
-    init_guest_l4_table(pl4e, d, !VM_ASSIST(d, VMASST_TYPE_m2p_strict));
+    init_guest_l4_table(pl4e, d, !VM_ASSIST(d, m2p_strict));
     unmap_domain_page(pl4e);
 
     return rc > 0 ? 0 : rc;
@@ -2775,7 +2775,7 @@ int new_guest_cr3(unsigned long mfn)
 
     invalidate_shadow_ldt(curr, 0);
 
-    if ( !VM_ASSIST(d, VMASST_TYPE_m2p_strict) && !paging_mode_refcounts(d) )
+    if ( !VM_ASSIST(d, m2p_strict) && !paging_mode_refcounts(d) )
         fill_ro_mpt(mfn);
     curr->arch.guest_table = pagetable_from_pfn(mfn);
     update_cr3(curr);
@@ -3134,8 +3134,7 @@ long do_mmuext_op(
                                 op.arg1.mfn);
                     break;
                 }
-                if ( VM_ASSIST(d, VMASST_TYPE_m2p_strict) &&
-                     !paging_mode_refcounts(d) )
+                if ( VM_ASSIST(d, m2p_strict) && !paging_mode_refcounts(d) )
                     zap_ro_mpt(op.arg1.mfn);
             }
 
