@@ -62,6 +62,7 @@
 
 #define GET_HW_RES_IN_NS(msr, val) \
     do { rdmsrl(msr, val); val = tsc_ticks2ns(val); } while( 0 )
+#define GET_MC6_RES(val)  GET_HW_RES_IN_NS(0x664, val) /* Atom E3000 only */
 #define GET_PC2_RES(val)  GET_HW_RES_IN_NS(0x60D, val) /* SNB onwards */
 #define GET_PC3_RES(val)  GET_HW_RES_IN_NS(0x3F8, val)
 #define GET_PC6_RES(val)  GET_HW_RES_IN_NS(0x3F9, val)
@@ -73,6 +74,7 @@
 #define GET_CC3_RES(val)  GET_HW_RES_IN_NS(0x3FC, val)
 #define GET_CC6_RES(val)  GET_HW_RES_IN_NS(0x3FD, val)
 #define GET_CC7_RES(val)  GET_HW_RES_IN_NS(0x3FE, val) /* SNB onwards */
+#define PHI_CC6_RES(val)  GET_HW_RES_IN_NS(0x3FF, val) /* Xeon Phi only */
 
 static void lapic_timer_nop(void) { }
 void (*__read_mostly lapic_timer_off)(void);
@@ -113,6 +115,8 @@ struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];
 
 struct hw_residencies
 {
+    uint64_t mc0;
+    uint64_t mc6;
     uint64_t pc2;
     uint64_t pc3;
     uint64_t pc4;
@@ -153,8 +157,11 @@ static void do_get_hw_residencies(void *arg)
     case 0x3C:
     case 0x3F:
     case 0x46:
-    /* future */
+    /* Broadwell */
     case 0x3D:
+    case 0x4F:
+    case 0x56:
+    /* future */
     case 0x4E:
         GET_PC2_RES(hw_res->pc2);
         GET_CC7_RES(hw_res->cc7);
@@ -174,6 +181,16 @@ static void do_get_hw_residencies(void *arg)
         GET_CC3_RES(hw_res->cc3);
         GET_CC6_RES(hw_res->cc6);
         break;
+    /* next gen Xeon Phi */
+    case 0x57:
+        GET_CC3_RES(hw_res->mc0); /* abusing GET_CC3_RES */
+        GET_CC6_RES(hw_res->mc6); /* abusing GET_CC6_RES */
+        GET_PC2_RES(hw_res->pc2);
+        GET_PC3_RES(hw_res->pc3);
+        GET_PC6_RES(hw_res->pc6);
+        GET_PC7_RES(hw_res->pc7);
+        PHI_CC6_RES(hw_res->cc6);
+        break;
     /* various Atoms */
     case 0x27:
         GET_PC3_RES(hw_res->pc2); /* abusing GET_PC3_RES */
@@ -182,10 +199,13 @@ static void do_get_hw_residencies(void *arg)
         break;
     /* Silvermont */
     case 0x37:
+        GET_MC6_RES(hw_res->mc6);
     case 0x4A:
     case 0x4D:
     case 0x5A:
     case 0x5D:
+    /* Airmont */
+    case 0x4C:
         GET_PC7_RES(hw_res->pc6); /* abusing GET_PC7_RES */
         GET_CC1_RES(hw_res->cc1);
         GET_CC6_RES(hw_res->cc6);
@@ -209,6 +229,9 @@ static void print_hw_residencies(uint32_t cpu)
 
     get_hw_residencies(cpu, &hw_res);
 
+    if ( hw_res.mc0 | hw_res.mc6 )
+        printk("MC0[%"PRIu64"] MC6[%"PRIu64"]\n",
+               hw_res.mc0, hw_res.mc6);
     printk("PC2[%"PRIu64"] PC%d[%"PRIu64"] PC6[%"PRIu64"] PC7[%"PRIu64"]\n",
            hw_res.pc2,
            hw_res.pc4 ? 4 : 3, hw_res.pc4 ?: hw_res.pc3,

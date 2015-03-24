@@ -2055,14 +2055,20 @@ static const struct lbr_info *last_branch_msr_get(void)
         case 58: case 62:
         /* Haswell */
         case 60: case 63: case 69: case 70:
+        /* Broadwell */
+        case 61: case 79: case 86:
         /* future */
-        case 61: case 78:
+        case 78:
             return nh_lbr;
             break;
         /* Atom */
         case 28: case 38: case 39: case 53: case 54:
         /* Silvermont */
         case 55: case 74: case 77: case 90: case 93:
+        /* next gen Xeon Phi */
+        case 87:
+        /* Airmont */
+        case 76:
             return at_lbr;
             break;
         }

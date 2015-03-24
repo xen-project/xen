@@ -859,9 +859,16 @@ int vmx_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
         case 0x45:
         case 0x46:
 
-        /* future: */
+        /* Broadwell */
         case 0x3d:
+        case 0x4f:
+        case 0x56:
+
+        /* future: */
         case 0x4e:
+
+        /* next gen Xeon Phi */
+        case 0x57:
             ret = core2_vpmu_initialise(v, vpmu_flags);
             if ( !ret )
                 vpmu->arch_vpmu_ops = &core2_vpmu_ops;
