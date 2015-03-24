@@ -1001,8 +1001,6 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
 static void spawn_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
                                             libxl__destroy_domid_state *dis,
                                             int rc);
-static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
-                              int rc, const char *p);
 
 char *libxl__stub_dm_name(libxl__gc *gc, const char *guest_name)
 {
@@ -1132,10 +1130,9 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
     xs_mkdir(ctx->xsh, t,
-             libxl__device_model_xs_path(gc, dm_domid, guest_domid, ""));
+        libxl__sprintf(gc, "/local/domain/0/device-model/%d", guest_domid));
     xs_set_permissions(ctx->xsh, t,
-                       libxl__device_model_xs_path(gc, dm_domid,
-                                                   guest_domid, ""),
+        libxl__sprintf(gc, "/local/domain/0/device-model/%d", guest_domid),
                        perm, ARRAY_SIZE(perm));
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
@@ -1281,8 +1278,6 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
     STATE_AO_GC(sdss->dm.spawn.ao);
     uint32_t dm_domid = sdss->pvqemu.guest_domid;
 
-    libxl__xswait_init(&sdss->xswait);
-
     if (rc) {
         LOGE(ERROR, "error connecting nics devices");
         goto out;
@@ -1291,45 +1286,10 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
     rc = libxl_domain_unpause(CTX, dm_domid);
     if (rc) goto out;
 
-    sdss->xswait.ao = ao;
-    sdss->xswait.what = GCSPRINTF("Stubdom %u for %u startup",
-                                  dm_domid, sdss->dm.guest_domid);
-    sdss->xswait.path =
-        libxl__device_model_xs_path(gc, dm_domid, sdss->dm.guest_domid,
-                                    "/state");
-    sdss->xswait.timeout_ms = LIBXL_STUBDOM_START_TIMEOUT * 1000;
-    sdss->xswait.callback = stubdom_xswait_cb;
-    rc = libxl__xswait_start(gc, &sdss->xswait);
-    if (rc) goto out;
-
-    return;
-
  out:
-    stubdom_xswait_cb(egc, &sdss->xswait, rc, NULL);
-}
-
-static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
-                              int rc, const char *p)
-{
-    EGC_GC;
-    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(xswait, *sdss, xswait);
-    uint32_t dm_domid = sdss->pvqemu.guest_domid;
-
-    if (rc) {
-        if (rc == ERROR_TIMEDOUT)
-            LOG(ERROR, "%s: startup timed out", xswait->what);
-        goto out;
-    }
-
-    if (!p) return;
-
-    if (strcmp(p, "running"))
-        return;
- out:
-    libxl__xswait_stop(gc, xswait);
     if (rc) {
         if (dm_domid) {
-            sdss->dis.ao = sdss->dm.spawn.ao;
+            sdss->dis.ao = ao;
             sdss->dis.domid = dm_domid;
             sdss->dis.callback = spawn_stubdom_pvqemu_destroy_cb;
             libxl__destroy_domid(egc, &sdss->dis);
