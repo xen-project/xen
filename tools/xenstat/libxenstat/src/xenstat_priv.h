@@ -109,5 +109,7 @@ extern int xenstat_collect_networks(xenstat_node * node);
 extern void xenstat_uninit_networks(xenstat_handle * handle);
 extern int xenstat_collect_vbds(xenstat_node * node);
 extern void xenstat_uninit_vbds(xenstat_handle * handle);
+extern void read_attributes_qdisk(xenstat_node * node);
+extern xenstat_vbd *xenstat_save_vbd(xenstat_domain * domain, xenstat_vbd * vbd);
 
 #endif /* XENSTAT_PRIV_H */

@@ -737,6 +737,13 @@ void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid)
             LOGE(ERROR, "Failed to remove QMP socket file %s", qmp_socket);
         }
     }
+
+    qmp_socket = GCSPRINTF("%s/qmp-libxenstat-%d", libxl__run_dir_path(), domid);
+    if (unlink(qmp_socket) == -1) {
+        if (errno != ENOENT) {
+            LOGE(ERROR, "Failed to remove QMP socket file %s", qmp_socket);
+        }
+    }
 }
 
 int libxl__qmp_query_serial(libxl__qmp_handler *qmp)

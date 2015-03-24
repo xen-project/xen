@@ -417,6 +417,9 @@ int xenstat_collect_vbds(xenstat_node * node)
 		}
 	}
 
+	/* Get qdisk statistics */
+	read_attributes_qdisk(node);
+
 	rewinddir(priv->sysfsvbd);
 
 	for(dp = readdir(priv->sysfsvbd); dp != NULL ;
@@ -477,18 +480,10 @@ int xenstat_collect_vbds(xenstat_node * node)
 			continue;
 		}
 
-		if (domain->vbds == NULL) {
-			domain->num_vbds = 1;
-			domain->vbds = malloc(sizeof(xenstat_vbd));
-		} else {
-			domain->num_vbds++;
-			domain->vbds = realloc(domain->vbds,
-					       domain->num_vbds *
-					       sizeof(xenstat_vbd));
-		}
-		if (domain->vbds == NULL)
+		if ((xenstat_save_vbd(domain, &vbd)) == NULL) {
+			perror("Allocation error");
 			return 0;
-		domain->vbds[domain->num_vbds - 1] = vbd;
+		}
 	}
 
 	return 1;	

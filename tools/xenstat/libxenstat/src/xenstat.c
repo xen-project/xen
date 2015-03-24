@@ -658,6 +658,27 @@ static void xenstat_uninit_xen_version(xenstat_handle * handle)
  * VBD functions
  */
 
+/* Save VBD information */
+xenstat_vbd *xenstat_save_vbd(xenstat_domain *domain, xenstat_vbd *vbd)
+{
+        xenstat_vbd *vbds = domain->vbds;
+
+        domain->num_vbds++;
+        domain->vbds = realloc(domain->vbds,
+                               domain->num_vbds *
+                               sizeof(xenstat_vbd));
+
+        if (domain->vbds == NULL) {
+                domain->num_vbds = 0;
+                free(vbds);
+        }
+        else {
+                domain->vbds[domain->num_vbds - 1] = *vbd;
+        }
+
+        return domain->vbds;
+}
+
 /* Free VBD information */
 static void xenstat_free_vbds(xenstat_node * node)
 {

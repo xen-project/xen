@@ -454,6 +454,15 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_append(dm_args, "-mon");
     flexarray_append(dm_args, "chardev=libxl-cmd,mode=control");
 
+    flexarray_append(dm_args, "-chardev");
+    flexarray_append(dm_args,
+                     libxl__sprintf(gc, "socket,id=libxenstat-cmd,"
+                                    "path=%s/qmp-libxenstat-%d,server,nowait",
+                                    libxl__run_dir_path(), guest_domid));
+
+    flexarray_append(dm_args, "-mon");
+    flexarray_append(dm_args, "chardev=libxenstat-cmd,mode=control");
+
     for (i = 0; i < guest_config->num_channels; i++) {
         connection = guest_config->channels[i].connection;
         devid = guest_config->channels[i].devid;
