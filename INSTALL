@@ -197,8 +197,10 @@ BOOT_DIR=
 EFI_DIR=
 
 The make target 'rpmball' will build a xen.rpm. This variable can be
-used to append a custom string to the name.
+used to append a custom string to the name. In addition a string can be
+appended to the rpm Release: tag.
 PKG_SUFFIX=
+PKG_RELEASE=
 
 The hypervisor will report a certain version string. This variable can
 be used to append a custom string to the version.

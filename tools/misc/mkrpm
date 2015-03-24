@@ -17,9 +17,7 @@ xenroot="$1"
 # version and release.  Default to "0" if there isn't a release.
 v=(${2/-/ })
 version=${v[0]}
-release=${v[1]}
-
-[[ -n "$release" ]] || release="0"
+release="${v[1]:-0}${PKG_RELEASE:+.$PKG_RELEASE}"
 
 cd $xenroot
 
