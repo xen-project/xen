@@ -223,6 +223,7 @@ struct iommu_domain
 	/* Runtime SMMU configuration for this iommu_domain */
 	struct arm_smmu_domain		*priv;
 
+	atomic_t ref;
 	/* Used to link iommu_domain contexts for a same domain.
 	 * There is at least one per-SMMU to used by the domain.
 	 * */
@@ -2564,12 +2565,45 @@ static void arm_smmu_iotlb_flush(struct domain *d, unsigned long gfn,
     arm_smmu_iotlb_flush_all(d);
 }
 
+static struct iommu_domain *arm_smmu_get_domain(struct domain *d,
+						struct device *dev)
+{
+	struct iommu_domain *domain;
+	struct arm_smmu_xen_domain *xen_domain;
+	struct arm_smmu_device *smmu;
+
+	xen_domain = domain_hvm_iommu(d)->arch.priv;
+
+	smmu = find_smmu_for_device(dev);
+	if (!smmu)
+		return NULL;
+
+	/*
+	 * Loop through the &xen_domain->contexts to locate a context
+	 * assigned to this SMMU
+	 */
+	list_for_each_entry(domain, &xen_domain->contexts, list) {
+		if (domain->priv->smmu == smmu)
+			return domain;
+	}
+
+	return NULL;
+
+}
+
+static void arm_smmu_destroy_iommu_domain(struct iommu_domain *domain)
+{
+	list_del(&domain->list);
+	arm_smmu_domain_destroy(domain);
+	xfree(domain);
+}
+
 static int arm_smmu_assign_dev(struct domain *d, u8 devfn,
 			       struct device *dev)
 {
 	struct iommu_domain *domain;
 	struct arm_smmu_xen_domain *xen_domain;
-	int ret;
+	int ret = 0;
 
 	xen_domain = domain_hvm_iommu(d)->arch.priv;
 
@@ -2585,36 +2619,44 @@ static int arm_smmu_assign_dev(struct domain *d, u8 devfn,
 			return ret;
 	}
 
+	spin_lock(&xen_domain->lock);
+
 	/*
-	 * TODO: Share the context bank (i.e iommu_domain) when the device is
-	 * under the same SMMU as another device assigned to this domain.
-	 * Would it useful for PCI
+	 * Check to see if a context bank (iommu_domain) already exists for
+	 * this xen domain under the same SMMU
 	 */
-	domain = xzalloc(struct iommu_domain);
-	if (!domain)
-		return -ENOMEM;
+	domain = arm_smmu_get_domain(d, dev);
+	if (!domain) {
 
-	ret = arm_smmu_domain_init(domain);
-	if (ret)
-		goto err_dom_init;
+		domain = xzalloc(struct iommu_domain);
+		if (!domain) {
+			ret = -ENOMEM;
+			goto out;
+		}
 
-	domain->priv->cfg.domain = d;
+		ret = arm_smmu_domain_init(domain);
+		if (ret) {
+			xfree(domain);
+			goto out;
+		}
+
+		domain->priv->cfg.domain = d;
+
+		/* Chain the new context to the domain */
+		list_add(&domain->list, &xen_domain->contexts);
+
+	}
 
 	ret = arm_smmu_attach_dev(domain, dev);
-	if (ret)
-		goto err_attach_dev;
+	if (ret) {
+		if (domain->ref.counter == 0)
+			arm_smmu_destroy_iommu_domain(domain);
+	} else {
+		atomic_inc(&domain->ref);
+	}
 
-	spin_lock(&xen_domain->lock);
-	/* Chain the new context to the domain */
-	list_add(&domain->list, &xen_domain->contexts);
+out:
 	spin_unlock(&xen_domain->lock);
-
-	return 0;
-
-err_attach_dev:
-	arm_smmu_domain_destroy(domain);
-err_dom_init:
-	xfree(domain);
 
 	return ret;
 }
@@ -2631,14 +2673,15 @@ static int arm_smmu_deassign_dev(struct domain *d, struct device *dev)
 		return -ESRCH;
 	}
 
-	arm_smmu_detach_dev(domain, dev);
-
 	spin_lock(&xen_domain->lock);
-	list_del(&domain->list);
-	spin_unlock(&xen_domain->lock);
 
-	arm_smmu_domain_destroy(domain);
-	xfree(domain);
+	arm_smmu_detach_dev(domain, dev);
+	atomic_dec(&domain->ref);
+
+	if (domain->ref.counter == 0)
+		arm_smmu_destroy_iommu_domain(domain);
+
+	spin_unlock(&xen_domain->lock);
 
 	return 0;
 }
