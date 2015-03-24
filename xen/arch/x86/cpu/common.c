@@ -12,6 +12,7 @@
 #include <asm/apic.h>
 #include <mach_apic.h>
 #include <asm/setup.h>
+#include <public/sysctl.h> /* for XEN_INVALID_{SOCKET,CORE}_ID */
 
 #include "cpu.h"
 
@@ -277,9 +278,9 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_max_cores = 1;
 	c->x86_num_siblings = 1;
 	c->x86_clflush_size = 0;
-	c->phys_proc_id = BAD_APICID;
-	c->cpu_core_id = BAD_APICID;
-	c->compute_unit_id = BAD_APICID;
+	c->phys_proc_id = XEN_INVALID_SOCKET_ID;
+	c->cpu_core_id = XEN_INVALID_CORE_ID;
+	c->compute_unit_id = INVALID_CUID;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	generic_identify(c);

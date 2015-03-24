@@ -16,7 +16,8 @@
 #include <asm/mpspec.h>
 #endif
 
-#define BAD_APICID -1U
+#define BAD_APICID   (-1U)
+#define INVALID_CUID (~0U)   /* AMD Compute Unit ID */
 #ifndef __ASSEMBLY__
 
 /*

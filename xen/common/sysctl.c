@@ -346,11 +346,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
                 if ( cpu_present(i) )
                 {
                     cputopo.core = cpu_to_core(i);
-                    if ( cputopo.core == BAD_APICID )
-                        cputopo.core = XEN_INVALID_CORE_ID;
                     cputopo.socket = cpu_to_socket(i);
-                    if ( cputopo.socket == BAD_APICID )
-                        cputopo.socket = XEN_INVALID_SOCKET_ID;
                     cputopo.node = cpu_to_node(i);
                     if ( cputopo.node == NUMA_NO_NODE )
                         cputopo.node = XEN_INVALID_NODE_ID;

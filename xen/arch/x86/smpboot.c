@@ -792,9 +792,9 @@ remove_siblinginfo(int cpu)
         cpumask_clear_cpu(cpu, per_cpu(cpu_sibling_mask, sibling));
     cpumask_clear(per_cpu(cpu_sibling_mask, cpu));
     cpumask_clear(per_cpu(cpu_core_mask, cpu));
-    c[cpu].phys_proc_id = BAD_APICID;
-    c[cpu].cpu_core_id = BAD_APICID;
-    c[cpu].compute_unit_id = BAD_APICID;
+    c[cpu].phys_proc_id = XEN_INVALID_SOCKET_ID;
+    c[cpu].cpu_core_id = XEN_INVALID_CORE_ID;
+    c[cpu].compute_unit_id = INVALID_CUID;
     cpumask_clear_cpu(cpu, &cpu_sibling_setup_map);
 }
 

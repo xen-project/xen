@@ -1952,7 +1952,7 @@ static void deactivate_runqueue(struct csched2_private *prv, int rqi)
 
 static void init_pcpu(const struct scheduler *ops, int cpu)
 {
-    int rqi;
+    unsigned rqi;
     unsigned long flags;
     struct csched2_private *prv = CSCHED2_PRIV(ops);
     struct csched2_runqueue_data *rqd;
@@ -1977,7 +1977,7 @@ static void init_pcpu(const struct scheduler *ops, int cpu)
     else
         rqi = cpu_to_socket(cpu);
 
-    if ( rqi < 0 )
+    if ( rqi == XEN_INVALID_SOCKET_ID )
     {
         printk("%s: cpu_to_socket(%d) returned %d!\n",
                __func__, cpu, rqi);
@@ -2020,7 +2020,7 @@ csched2_alloc_pdata(const struct scheduler *ops, int cpu)
 {
     /* Check to see if the cpu is online yet */
     /* Note: cpu 0 doesn't get a STARTING callback */
-    if ( cpu == 0 || cpu_to_socket(cpu) >= 0 )
+    if ( cpu == 0 || cpu_to_socket(cpu) != XEN_INVALID_SOCKET_ID )
         init_pcpu(ops, cpu);
     else
         printk("%s: cpu %d not online yet, deferring initializatgion\n",
