@@ -40,7 +40,7 @@ void __init vm_init(void)
     bitmap_fill(vm_bitmap, vm_low);
 
     /* Populate page tables for the bitmap if necessary. */
-    map_pages_to_xen(va, 0, vm_low - nr, MAP_SMALL_PAGES);
+    populate_pt_range(va, 0, vm_low - nr);
 }
 
 void *vm_alloc(unsigned int nr, unsigned int align)

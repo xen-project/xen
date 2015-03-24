@@ -5725,6 +5725,12 @@ int map_pages_to_xen(
     return 0;
 }
 
+int populate_pt_range(unsigned long virt, unsigned long mfn,
+                      unsigned long nr_mfns)
+{
+    return map_pages_to_xen(virt, mfn, nr_mfns, MAP_SMALL_PAGES);
+}
+
 void destroy_xen_mappings(unsigned long s, unsigned long e)
 {
     bool_t locking = system_state > SYS_STATE_boot;

@@ -55,7 +55,12 @@ int map_pages_to_xen(
     unsigned long nr_mfns,
     unsigned int flags);
 void destroy_xen_mappings(unsigned long v, unsigned long e);
-
+/*
+ * Create only non-leaf page table entries for the
+ * page range in Xen virtual address space.
+ */
+int populate_pt_range(unsigned long virt, unsigned long mfn,
+                      unsigned long nr_mfns);
 /* Claim handling */
 unsigned long domain_adjust_tot_pages(struct domain *d, long pages);
 int domain_set_outstanding_pages(struct domain *d, unsigned long pages);

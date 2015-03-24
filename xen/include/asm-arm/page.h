@@ -64,7 +64,6 @@
 #define PAGE_HYPERVISOR         (WRITEALLOC)
 #define PAGE_HYPERVISOR_NOCACHE (DEV_SHARED)
 #define PAGE_HYPERVISOR_WC      (DEV_WC)
-#define MAP_SMALL_PAGES         PAGE_HYPERVISOR
 
 /*
  * Stage 2 Memory Type.

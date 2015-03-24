@@ -827,7 +827,8 @@ static int create_xen_table(lpae_t *entry)
 
 enum xenmap_operation {
     INSERT,
-    REMOVE
+    REMOVE,
+    RESERVE
 };
 
 static int create_xen_entries(enum xenmap_operation op,
@@ -859,12 +860,15 @@ static int create_xen_entries(enum xenmap_operation op,
 
         switch ( op ) {
             case INSERT:
+            case RESERVE:
                 if ( third[third_table_offset(addr)].pt.valid )
                 {
                     printk("create_xen_entries: trying to replace an existing mapping addr=%lx mfn=%lx\n",
                            addr, mfn);
                     return -EINVAL;
                 }
+                if ( op == RESERVE )
+                    break;
                 pte = mfn_to_xen_entry(mfn, ai);
                 pte.pt.table = 1;
                 write_pte(&third[third_table_offset(addr)], pte);
@@ -898,6 +902,13 @@ int map_pages_to_xen(unsigned long virt,
 {
     return create_xen_entries(INSERT, virt, mfn, nr_mfns, flags);
 }
+
+int populate_pt_range(unsigned long virt, unsigned long mfn,
+                      unsigned long nr_mfns)
+{
+    return create_xen_entries(RESERVE, virt, mfn, nr_mfns, 0);
+}
+
 void destroy_xen_mappings(unsigned long v, unsigned long e)
 {
     create_xen_entries(REMOVE, v, 0, (e - v) >> PAGE_SHIFT, 0);
