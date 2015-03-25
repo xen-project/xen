@@ -770,7 +770,7 @@ int domain_relinquish_resources(struct domain *d)
     {
     case RELMEM_not_started:
         d->arch.relmem = RELMEM_xen;
-        /* Falltrough */
+        /* Fallthrough */
 
     case RELMEM_xen:
         ret = relinquish_memory(d, &d->xenpage_list);
