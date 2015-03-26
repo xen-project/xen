@@ -129,6 +129,41 @@ ifneq ($(QEMU_ROOT),.)
 export QEMU_ROOT
 endif
 
+# Targets for external trees:
+#  ${target}-dir-find
+#    See if the directory exists and check it out if not.
+#  ${target}-dir-force-update
+#    Pull to the most recent update (as if you had checked it out for the
+#    first time)
+#  subdir-all-${target}-dir
+#    Do "make all" for ${target}, including all prerequisites (such as 
+#    configure)
+#  subdir-install-${target}-dir
+#    Do "make install" for $TARGET
+#  subdir-clean-${target}-dir
+#    Do "make clean" for $TARGET
+#
+# Directories for external trees:
+#  ${target}-dir
+#    Used for local builds.  Usually a link to ${target}-dir-remote
+#  ${target}-dir-remote
+#    Where remote repositories are cloned
+#  ${target}
+#    Where a copy of the source files are put when building a source 
+#    tarball for release
+#
+# Expected variables:
+#   ${TARGET}_URL
+#     A url from which to clone a git repo
+#   ${TARGET}_REVISION
+#     The target revision to check out when doing "find" or "force-update"
+#   ${TARGET}_INTREE
+#     The directory where the subtree can be found (usually used when building
+#     a source tarball)
+#   ${TARGET}_LOC
+#     The ultimate location of the source (either a local dir or remote URL)
+
+# External target: qemu-xen-traditional
 qemu-xen-traditional-dir-find:
 	set -ex; \
 	if test -d $(QEMU_TRADITIONAL_LOC); then \
@@ -136,14 +171,6 @@ qemu-xen-traditional-dir-find:
 	else \
 		export GIT=$(GIT); \
 		$(XEN_ROOT)/scripts/git-checkout.sh $(QEMU_TRADITIONAL_LOC) $(QEMU_TRADITIONAL_REVISION) qemu-xen-traditional-dir; \
-	fi
-
-qemu-xen-dir-find:
-	if test -d $(QEMU_UPSTREAM_LOC) ; then \
-		mkdir -p qemu-xen-dir; \
-	else \
-		export GIT=$(GIT); \
-		$(XEN_ROOT)/scripts/git-checkout.sh $(QEMU_UPSTREAM_LOC) $(QEMU_UPSTREAM_REVISION) qemu-xen-dir ; \
 	fi
 
 .PHONY: qemu-xen-traditional-dir-force-update
@@ -181,6 +208,15 @@ subdir-install-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
 subdir-clean-qemu-xen-traditional-dir:
 	set -e; if test -d qemu-xen-traditional-dir/.; then \
 		$(MAKE) -C qemu-xen-traditional-dir clean; \
+	fi
+
+# External target: qemu-xen
+qemu-xen-dir-find:
+	if test -d $(QEMU_UPSTREAM_LOC) ; then \
+		mkdir -p qemu-xen-dir; \
+	else \
+		export GIT=$(GIT); \
+		$(XEN_ROOT)/scripts/git-checkout.sh $(QEMU_UPSTREAM_LOC) $(QEMU_UPSTREAM_REVISION) qemu-xen-dir ; \
 	fi
 
 .PHONY: qemu-xen-dir-force-update
