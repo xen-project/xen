@@ -338,8 +338,10 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
                 ret = -ENOBUFS;
                 i = num_cpus;
             }
+            else
+                i = 0;
 
-            for ( i = 0; i < num_cpus; i++ )
+            for ( ; i < num_cpus; i++ )
             {
                 xen_sysctl_cputopo_t cputopo;
 
