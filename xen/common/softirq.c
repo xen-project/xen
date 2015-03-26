@@ -106,7 +106,7 @@ void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
     if ( !per_cpu(batching, this_cpu) || in_irq() )
         smp_send_event_check_cpu(cpu);
     else
-        set_bit(nr, &per_cpu(batch_mask, this_cpu));
+        cpumask_set_cpu(cpu, &per_cpu(batch_mask, this_cpu));
 }
 
 void cpu_raise_softirq_batch_begin(void)
