@@ -72,16 +72,6 @@
 #define MB(_mb)     (_AC(_mb, UL) << 20)
 #define GB(_gb)     (_AC(_gb, UL) << 30)
 
-#ifndef __ASSEMBLY__
-
-#define dprintk(_l, _f, _a...)                              \
-    printk(_l "%s:%d: " _f, __FILE__ , __LINE__ , ## _a )
-#define gdprintk(_l, _f, _a...)                             \
-    printk(XENLOG_GUEST _l "%s:%d:%pv " _f, __FILE__,       \
-           __LINE__, current, ## _a )
-
-#endif /* !__ASSEMBLY__ */
-
 #define __STR(...) #__VA_ARGS__
 #define STR(...) __STR(__VA_ARGS__)
 
