@@ -33,11 +33,54 @@ static int compare_vmemrange(const void *a, const void *b)
     return 0;
 }
 
+/* Check if a vcpu has an hard (or soft) affinity set in such
+ * a way that it does not match the pnode to which the vcpu itself
+ * is assigned to.
+ */
+static int check_vnuma_affinity(libxl__gc *gc,
+                                 unsigned int vcpu,
+                                 unsigned int pnode,
+                                 unsigned int num_affinity,
+                                 const libxl_bitmap *affinity,
+                                 const char *kind)
+{
+    libxl_bitmap nodemap;
+    int rc = 0;
+
+    libxl_bitmap_init(&nodemap);
+
+    rc = libxl_node_bitmap_alloc(CTX, &nodemap, 0);
+    if (rc) {
+        LOG(ERROR, "Can't allocate nodemap");
+        goto out;
+    }
+
+    rc = libxl_cpumap_to_nodemap(CTX, affinity, &nodemap);
+    if (rc) {
+        LOG(ERROR, "Can't convert Vcpu %d affinity to nodemap", vcpu);
+        goto out;
+    }
+
+    if (libxl_bitmap_count_set(&nodemap) != 1 ||
+        !libxl_bitmap_test(&nodemap, pnode))
+        LOG(WARN, "Vcpu %d %s affinity and vnuma info mismatch", vcpu, kind);
+
+out:
+    libxl_bitmap_dispose(&nodemap);
+    return rc;
+}
+
 /* Check if vNUMA configuration is valid:
  *  1. all pnodes inside vnode_to_pnode array are valid
  *  2. each vcpu belongs to one and only one vnode
  *  3. each vmemrange is valid and doesn't overlap with any other
  *  4. local distance cannot be larger than remote distance
+ *
+ * Check also, if any hard or soft affinity is specified, whether
+ * they match with the vNUMA related bits (namely vcpus to vnodes
+ * mappings and vnodes to pnodes association). If that does not
+ * hold, however, just print a warning, as that has "only"
+ * performance implications.
  */
 int libxl__vnuma_config_check(libxl__gc *gc,
                               const libxl_domain_build_info *b_info,
@@ -98,6 +141,23 @@ int libxl__vnuma_config_check(libxl__gc *gc,
         if (!libxl_bitmap_test(&cpumap, i)) {
             LOG(ERROR, "Vcpu %d is not assigned to any vnode", i);
             goto out;
+        }
+    }
+
+    /* Check whether vcpu affinity (if any) matches vnuma configuration */
+    for (i = 0; i < b_info->num_vnuma_nodes; i++) {
+        v = &b_info->vnuma_nodes[i];
+        libxl_for_each_set_bit(j, v->vcpus) {
+            if (b_info->num_vcpu_hard_affinity > j)
+                check_vnuma_affinity(gc, j, v->pnode,
+                                     b_info->num_vcpu_hard_affinity,
+                                     &b_info->vcpu_hard_affinity[j],
+                                     "hard");
+            if (b_info->num_vcpu_soft_affinity > j)
+                check_vnuma_affinity(gc, j, v->pnode,
+                                     b_info->num_vcpu_soft_affinity,
+                                     &b_info->vcpu_soft_affinity[j],
+                                     "soft");
         }
     }
 
