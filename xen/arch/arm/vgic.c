@@ -337,9 +337,9 @@ int vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode, int 
         set_bit(current->vcpu_id, &vcpu_mask);
         break;
     default:
-        gdprintk(XENLOG_WARNING,
-                 "vGICD:unhandled GICD_SGIR write %"PRIregister" \
-                  with wrong mode\n", sgir);
+        gprintk(XENLOG_WARNING,
+                "vGICD:unhandled GICD_SGIR write %"PRIregister" \
+                 with wrong mode\n", sgir);
         return 0;
     }
 
@@ -347,8 +347,8 @@ int vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode, int 
     {
         if ( d->vcpu[vcpuid] != NULL && !is_vcpu_online(d->vcpu[vcpuid]) )
         {
-            gdprintk(XENLOG_WARNING, "VGIC: write r=%"PRIregister" \
-                     vcpu_mask=%lx, wrong CPUTargetList\n", sgir, vcpu_mask);
+            gprintk(XENLOG_WARNING, "VGIC: write r=%"PRIregister" \
+                    vcpu_mask=%lx, wrong CPUTargetList\n", sgir, vcpu_mask);
             continue;
         }
         vgic_vcpu_inject_irq(d->vcpu[vcpuid], virq);

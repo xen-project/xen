@@ -1644,14 +1644,12 @@ static void do_cp15_32(struct cpu_user_regs *regs,
         break;
 
     default:
-#ifndef NDEBUG
         gdprintk(XENLOG_ERR,
                  "%s p15, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
                  cp32.read ? "mrc" : "mcr",
                  cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
         gdprintk(XENLOG_ERR, "unhandled 32-bit CP15 access %#x\n",
                  hsr.bits & HSR_CP32_REGS_MASK);
-#endif
         inject_undef_exception(regs, hsr.len);
         return;
     }
@@ -1679,7 +1677,6 @@ static void do_cp15_64(struct cpu_user_regs *regs,
         break;
     default:
         {
-#ifndef NDEBUG
             struct hsr_cp64 cp64 = hsr.cp64;
 
             gdprintk(XENLOG_ERR,
@@ -1688,7 +1685,6 @@ static void do_cp15_64(struct cpu_user_regs *regs,
                      cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
             gdprintk(XENLOG_ERR, "unhandled 64-bit CP15 access %#x\n",
                      hsr.bits & HSR_CP64_REGS_MASK);
-#endif
             inject_undef_exception(regs, hsr.len);
             return;
         }
@@ -1750,14 +1746,12 @@ static void do_cp14_32(struct cpu_user_regs *regs, union hsr hsr)
 
     default:
 bad_cp:
-#ifndef NDEBUG
         gdprintk(XENLOG_ERR,
                  "%s p14, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
                   cp32.read ? "mrc" : "mcr",
                   cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
         gdprintk(XENLOG_ERR, "unhandled 32-bit cp14 access %#x\n",
                  hsr.bits & HSR_CP32_REGS_MASK);
-#endif
         inject_undef_exception(regs, hsr.len);
         return;
     }
@@ -1767,9 +1761,7 @@ bad_cp:
 
 static void do_cp14_dbg(struct cpu_user_regs *regs, union hsr hsr)
 {
-#ifndef NDEBUG
     struct hsr_cp64 cp64 = hsr.cp64;
-#endif
 
     if ( !check_conditional_instr(regs, hsr) )
     {
@@ -1777,22 +1769,19 @@ static void do_cp14_dbg(struct cpu_user_regs *regs, union hsr hsr)
         return;
     }
 
-#ifndef NDEBUG
     gdprintk(XENLOG_ERR,
              "%s p14, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
              cp64.read ? "mrrc" : "mcrr",
              cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
     gdprintk(XENLOG_ERR, "unhandled 64-bit CP14 access %#x\n",
              hsr.bits & HSR_CP64_REGS_MASK);
-#endif
+
     inject_undef_exception(regs, hsr.len);
 }
 
 static void do_cp(struct cpu_user_regs *regs, union hsr hsr)
 {
-#ifndef NDEBUG
     struct hsr_cp cp = hsr.cp;
-#endif
 
     if ( !check_conditional_instr(regs, hsr) )
     {
@@ -1800,10 +1789,8 @@ static void do_cp(struct cpu_user_regs *regs, union hsr hsr)
         return;
     }
 
-#ifndef NDEBUG
     ASSERT(!cp.tas); /* We don't trap SIMD instruction */
     gdprintk(XENLOG_ERR, "unhandled CP%d access\n", cp.coproc);
-#endif
     inject_undef_exception(regs, hsr.len);
 }
 
@@ -1880,7 +1867,6 @@ static void do_sysreg(struct cpu_user_regs *regs,
  bad_sysreg:
         {
             struct hsr_sysreg sysreg = hsr.sysreg;
-#ifndef NDEBUG
 
             gdprintk(XENLOG_ERR,
                      "%s %d, %d, c%d, c%d, %d %s x%d @ 0x%"PRIregister"\n",
@@ -1892,7 +1878,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
                      sysreg.reg, regs->pc);
             gdprintk(XENLOG_ERR, "unhandled 64-bit sysreg access %#x\n",
                      hsr.bits & HSR_SYSREG_REGS_MASK);
-#endif
+
             inject_undef_exception(regs, sysreg.len);
             return;
         }
@@ -2005,7 +1991,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
         rc = decode_instruction(regs, &info.dabt);
         if ( rc )
         {
-            gdprintk(XENLOG_DEBUG, "Unable to decode instruction\n");
+            gprintk(XENLOG_DEBUG, "Unable to decode instruction\n");
             goto bad_data_abort;
         }
     }

@@ -1022,7 +1022,7 @@ static int vgic_v3_to_sgi(struct vcpu *v, register_t sgir)
         sgi_mode = SGI_TARGET_OTHERS;
         break;
     default:
-        gdprintk(XENLOG_WARNING, "Wrong irq mode in SGI1R_EL1 register\n");
+        gprintk(XENLOG_WARNING, "Wrong irq mode in SGI1R_EL1 register\n");
         return 0;
     }
 
@@ -1050,7 +1050,7 @@ static int vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
             return vgic_v3_to_sgi(v, *r);
         else
         {
-            gdprintk(XENLOG_WARNING, "Reading SGI1R_EL1 - WO register\n");
+            gprintk(XENLOG_WARNING, "Reading SGI1R_EL1 - WO register\n");
             return 0;
         }
     default:

@@ -78,7 +78,7 @@ static int decode_thumb2(register_t pc, struct hsr_dabt *dabt, uint16_t hw1)
     return 0;
 
 bad_thumb2:
-    gdprintk(XENLOG_ERR, "unhandled THUMB2 instruction 0x%x%x\n", hw1, hw2);
+    gprintk(XENLOG_ERR, "unhandled THUMB2 instruction 0x%x%x\n", hw1, hw2);
 
     return 1;
 }
@@ -145,7 +145,7 @@ static int decode_thumb(register_t pc, struct hsr_dabt *dabt)
     return 0;
 
 bad_thumb:
-    gdprintk(XENLOG_ERR, "unhandled THUMB instruction 0x%x\n", instr);
+    gprintk(XENLOG_ERR, "unhandled THUMB instruction 0x%x\n", instr);
     return 1;
 }
 
@@ -155,7 +155,7 @@ int decode_instruction(const struct cpu_user_regs *regs, struct hsr_dabt *dabt)
         return decode_thumb(regs->pc, dabt);
 
     /* TODO: Handle ARM instruction */
-    gdprintk(XENLOG_ERR, "unhandled ARM instruction\n");
+    gprintk(XENLOG_ERR, "unhandled ARM instruction\n");
 
     return 1;
 }

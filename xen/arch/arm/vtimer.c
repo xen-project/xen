@@ -217,7 +217,7 @@ static int vtimer_cntpct(struct cpu_user_regs *regs, uint64_t *r, int read)
     }
     else
     {
-        gdprintk(XENLOG_DEBUG, "WRITE to R/O CNTPCT\n");
+        gprintk(XENLOG_DEBUG, "WRITE to R/O CNTPCT\n");
         return 0;
     }
 }
