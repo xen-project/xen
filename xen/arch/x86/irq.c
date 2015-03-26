@@ -1974,6 +1974,8 @@ int map_domain_pirq(
             dprintk(XENLOG_G_ERR, "dom%d: irq %d in use\n",
                     d->domain_id, irq);
             pci_disable_msi(msi_desc);
+            msi_desc->irq = -1;
+            msi_free_irq(msi_desc);
             ret = -EBUSY;
             goto done;
         }
@@ -2028,22 +2030,29 @@ int map_domain_pirq(
         if ( ret )
         {
             spin_unlock_irqrestore(&desc->lock, flags);
+            pci_disable_msi(msi_desc);
+            if ( nr )
+            {
+                ASSERT(msi_desc->irq >= 0);
+                desc = irq_to_desc(msi_desc->irq);
+                spin_lock_irqsave(&desc->lock, flags);
+                desc->handler = &no_irq_type;
+                desc->msi_desc = NULL;
+                spin_unlock_irqrestore(&desc->lock, flags);
+            }
             while ( nr-- )
             {
-                if ( irq >= 0 )
-                {
-                    if ( irq_deny_access(d, irq) )
-                        printk(XENLOG_G_ERR
-                               "dom%d: could not revoke access to IRQ%d (pirq %d)\n",
-                               d->domain_id, irq, pirq);
-                    destroy_irq(irq);
-                }
+                if ( irq >= 0 && irq_deny_access(d, irq) )
+                    printk(XENLOG_G_ERR
+                           "dom%d: could not revoke access to IRQ%d (pirq %d)\n",
+                           d->domain_id, irq, pirq);
                 if ( info )
                     cleanup_domain_irq_pirq(d, irq, info);
                 info = pirq_info(d, pirq + nr);
                 irq = info->arch.irq;
             }
-            pci_disable_msi(msi_desc);
+            msi_desc->irq = -1;
+            msi_free_irq(msi_desc);
             goto done;
         }
 
