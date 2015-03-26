@@ -17,8 +17,8 @@
  * modified.
  */
 
-#define ADDR (*(volatile long *) addr)
-#define CONST_ADDR (*(const volatile long *) addr)
+#define ADDR (*(volatile int *) addr)
+#define CONST_ADDR (*(const volatile int *) addr)
 
 extern void __bitop_bad_size(void);
 #define bitop_bad_size(addr) (sizeof(*(addr)) < 4)
@@ -35,10 +35,8 @@ extern void __bitop_bad_size(void);
  */
 static inline void set_bit(int nr, volatile void *addr)
 {
-    asm volatile (
-        "lock; btsl %1,%0"
-        : "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+    asm volatile ( "lock; btsl %1,%0"
+                   : "+m" (ADDR) : "Ir" (nr) : "memory");
 }
 #define set_bit(nr, addr) ({                            \
     if ( bitop_bad_size(addr) ) __bitop_bad_size();     \
@@ -72,10 +70,8 @@ static inline void __set_bit(int nr, void *addr)
  */
 static inline void clear_bit(int nr, volatile void *addr)
 {
-    asm volatile (
-        "lock; btrl %1,%0"
-        : "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+    asm volatile ( "lock; btrl %1,%0"
+                   : "+m" (ADDR) : "Ir" (nr) : "memory");
 }
 #define clear_bit(nr, addr) ({                          \
     if ( bitop_bad_size(addr) ) __bitop_bad_size();     \
@@ -129,10 +125,8 @@ static inline void __change_bit(int nr, void *addr)
  */
 static inline void change_bit(int nr, volatile void *addr)
 {
-    asm volatile (
-        "lock; btcl %1,%0"
-        : "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+    asm volatile ( "lock; btcl %1,%0"
+                    : "+m" (ADDR) : "Ir" (nr) : "memory");
 }
 #define change_bit(nr, addr) ({                         \
     if ( bitop_bad_size(addr) ) __bitop_bad_size();     \
@@ -151,10 +145,8 @@ static inline int test_and_set_bit(int nr, volatile void *addr)
 {
     int oldbit;
 
-    asm volatile (
-        "lock; btsl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+    asm volatile ( "lock; btsl %2,%1\n\tsbbl %0,%0"
+                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory");
     return oldbit;
 }
 #define test_and_set_bit(nr, addr) ({                   \
@@ -198,10 +190,8 @@ static inline int test_and_clear_bit(int nr, volatile void *addr)
 {
     int oldbit;
 
-    asm volatile (
-        "lock; btrl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+    asm volatile ( "lock; btrl %2,%1\n\tsbbl %0,%0"
+                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory");
     return oldbit;
 }
 #define test_and_clear_bit(nr, addr) ({                 \
@@ -261,10 +251,8 @@ static inline int test_and_change_bit(int nr, volatile void *addr)
 {
     int oldbit;
 
-    asm volatile (
-        "lock; btcl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+    asm volatile ( "lock; btcl %2,%1\n\tsbbl %0,%0"
+                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory");
     return oldbit;
 }
 #define test_and_change_bit(nr, addr) ({                \
