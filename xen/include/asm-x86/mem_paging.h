@@ -20,9 +20,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifndef __ASM_X86_MEM_PAGING_H__
+#define __ASM_X86_MEM_PAGING_H__
 
-int mem_paging_memop(struct domain *d, xen_mem_event_op_t *meo);
+int mem_paging_memop(struct domain *d, xen_mem_paging_op_t *mpo);
 
+#endif /*__ASM_X86_MEM_PAGING_H__ */
 
 /*
  * Local variables:

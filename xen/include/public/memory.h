@@ -374,18 +374,17 @@ typedef struct xen_pod_target xen_pod_target_t;
 #define XENMEM_paging_op_evict              1
 #define XENMEM_paging_op_prep               2
 
-struct xen_mem_event_op {
-    uint8_t     op;         /* XENMEM_*_op_* */
+struct xen_mem_paging_op {
+    uint8_t     op;         /* XENMEM_paging_op_* */
     domid_t     domain;
-    
 
     /* PAGING_PREP IN: buffer to immediately fill page in */
     uint64_aligned_t    buffer;
     /* Other OPs */
     uint64_aligned_t    gfn;           /* IN:  gfn of page being operated on */
 };
-typedef struct xen_mem_event_op xen_mem_event_op_t;
-DEFINE_XEN_GUEST_HANDLE(xen_mem_event_op_t);
+typedef struct xen_mem_paging_op xen_mem_paging_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_mem_paging_op_t);
 
 #define XENMEM_access_op                    21
 #define XENMEM_access_op_resume             0

@@ -2274,11 +2274,11 @@ int xc_tmem_restore_extra(xc_interface *xch, int dom, int fd);
 int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
 int xc_mem_paging_disable(xc_interface *xch, domid_t domain_id);
 int xc_mem_paging_nominate(xc_interface *xch, domid_t domain_id,
-                           unsigned long gfn);
-int xc_mem_paging_evict(xc_interface *xch, domid_t domain_id, unsigned long gfn);
-int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, unsigned long gfn);
-int xc_mem_paging_load(xc_interface *xch, domid_t domain_id, 
-                        unsigned long gfn, void *buffer);
+                           uint64_t gfn);
+int xc_mem_paging_evict(xc_interface *xch, domid_t domain_id, uint64_t gfn);
+int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, uint64_t gfn);
+int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
+                       uint64_t gfn, void *buffer);
 
 /** 
  * Access tracking operations.

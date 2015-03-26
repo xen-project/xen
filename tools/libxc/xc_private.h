@@ -425,9 +425,6 @@ int xc_ffs64(uint64_t x);
  */
 int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
                          unsigned int mode, uint32_t *port);
-int xc_mem_event_memop(xc_interface *xch, domid_t domain_id,
-                        unsigned int op, unsigned int mode,
-                        uint64_t gfn, void *buffer);
 /*
  * Enables mem_event and returns the mapped ring page indicated by param.
  * param can be HVM_PARAM_PAGING/ACCESS/SHARING_RING_PFN

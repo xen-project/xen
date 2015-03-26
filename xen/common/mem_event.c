@@ -475,12 +475,12 @@ int do_mem_event_op(int op, uint32_t domain, void *arg)
     {
 #ifdef HAS_MEM_PAGING
         case XENMEM_paging_op:
-            ret = mem_paging_memop(d, (xen_mem_event_op_t *) arg);
+            ret = mem_paging_memop(d, arg);
             break;
 #endif
 #ifdef HAS_MEM_SHARING
         case XENMEM_sharing_op:
-            ret = mem_sharing_memop(d, (xen_mem_sharing_op_t *) arg);
+            ret = mem_sharing_memop(d, arg);
             break;
 #endif
         default:

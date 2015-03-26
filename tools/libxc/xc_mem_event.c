@@ -40,22 +40,6 @@ int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
     return rc;
 }
 
-int xc_mem_event_memop(xc_interface *xch, domid_t domain_id, 
-                        unsigned int op, unsigned int mode,
-                        uint64_t gfn, void *buffer)
-{
-    xen_mem_event_op_t meo;
-
-    memset(&meo, 0, sizeof(meo));
-
-    meo.op      = op;
-    meo.domain  = domain_id;
-    meo.gfn     = gfn;
-    meo.buffer  = (unsigned long) buffer;
-
-    return do_memory_op(xch, mode, &meo, sizeof(meo));
-}
-
 void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
                           uint32_t *port, int enable_introspection)
 {
