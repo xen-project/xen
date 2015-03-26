@@ -1608,12 +1608,13 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
         init_timer(&action->eoi_timer, irq_guest_eoi_timer_fn, desc, 0);
 
         desc->status |= IRQ_GUEST;
-        desc->status &= ~IRQ_DISABLED;
-        desc->handler->startup(desc);
 
         /* Attempt to bind the interrupt target to the correct CPU. */
         if ( !opt_noirqbalance && (desc->handler->set_affinity != NULL) )
             desc->handler->set_affinity(desc, cpumask_of(v->processor));
+
+        desc->status &= ~IRQ_DISABLED;
+        desc->handler->startup(desc);
     }
     else if ( !will_share || !action->shareable )
     {
