@@ -2017,11 +2017,10 @@ int get_page(struct page_info *page, struct domain *domain)
         put_page(page);
 
     if ( !paging_mode_refcounts(domain) && !domain->is_dying )
-        gdprintk(XENLOG_INFO,
-                 "Error pfn %lx: rd=%p, od=%p, caf=%08lx, taf=%"
-                 PRtype_info "\n",
-                 page_to_mfn(page), domain, owner,
-                 page->count_info, page->u.inuse.type_info);
+        gprintk(XENLOG_INFO,
+                "Error pfn %lx: rd=%p, od=%p, caf=%08lx, taf=%" PRtype_info "\n",
+                page_to_mfn(page), domain, owner,
+                page->count_info, page->u.inuse.type_info);
     return 0;
 }
 
@@ -4066,9 +4065,8 @@ static int replace_grant_p2m_mapping(
     if ( !p2m_is_grant(type) || mfn_x(old_mfn) != frame )
     {
         put_gfn(d, gfn);
-        gdprintk(XENLOG_WARNING,
-                 "replace_grant_p2m_mapping: old mapping invalid (type %d, mfn %lx, frame %lx)\n",
-                 type, mfn_x(old_mfn), frame);
+        MEM_LOG("replace_grant_p2m_mapping: old mapping invalid (type %d, mfn %lx, frame %lx)",
+                type, mfn_x(old_mfn), frame);
         return GNTST_general_error;
     }
     guest_physmap_remove_page(d, gfn, frame, PAGE_ORDER_4K);

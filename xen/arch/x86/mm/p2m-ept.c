@@ -912,14 +912,13 @@ void ept_walk_table(struct domain *d, unsigned long gfn)
 
     int i;
 
-    gdprintk(XENLOG_ERR, "Walking EPT tables for domain %d gfn %lx\n",
-           d->domain_id, gfn);
+    gprintk(XENLOG_ERR, "Walking EPT tables for GFN %lx:\n", gfn);
 
     /* This pfn is higher than the highest the p2m map currently holds */
     if ( gfn > p2m->max_mapped_pfn )
     {
-        gdprintk(XENLOG_ERR, " gfn exceeds max_mapped_pfn %lx\n",
-               p2m->max_mapped_pfn);
+        gprintk(XENLOG_ERR, " gfn exceeds max_mapped_pfn %lx\n",
+                p2m->max_mapped_pfn);
         goto out;
     }
 
@@ -932,7 +931,7 @@ void ept_walk_table(struct domain *d, unsigned long gfn)
         index = gfn_remainder >> (i*EPT_TABLE_ORDER);
         ept_entry = table + index;
 
-        gdprintk(XENLOG_ERR, " epte %"PRIx64"\n", ept_entry->epte);
+        gprintk(XENLOG_ERR, " epte %"PRIx64"\n", ept_entry->epte);
 
         if ( (i == 0) || !is_epte_present(ept_entry) ||
              is_epte_superpage(ept_entry) )

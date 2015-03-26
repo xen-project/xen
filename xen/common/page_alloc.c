@@ -1645,9 +1645,9 @@ int assign_pages(
         if ( unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
         {
             if ( !opt_tmem || order != 0 || d->tot_pages != d->max_pages )
-                gdprintk(XENLOG_INFO, "Over-allocation for domain %u: "
-                         "%u > %u\n", d->domain_id,
-                         d->tot_pages + (1 << order), d->max_pages);
+                gprintk(XENLOG_INFO, "Over-allocation for domain %u: "
+                        "%u > %u\n", d->domain_id,
+                        d->tot_pages + (1 << order), d->max_pages);
             goto fail;
         }
 

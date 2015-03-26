@@ -1251,8 +1251,8 @@ static void load_segments(struct vcpu *n)
                  put_user(uregs->es,           esp-6) |
                  put_user(uregs->ds,           esp-7) )
             {
-                gdprintk(XENLOG_ERR, "Error while creating compat "
-                         "failsafe callback frame.\n");
+                gprintk(XENLOG_ERR,
+                        "error while creating compat failsafe callback frame\n");
                 domain_crash(n->domain);
             }
 
@@ -1293,8 +1293,8 @@ static void load_segments(struct vcpu *n)
              put_user(regs->r11,           rsp-10) |
              put_user(regs->rcx,           rsp-11) )
         {
-            gdprintk(XENLOG_ERR, "Error while creating failsafe "
-                    "callback frame.\n");
+            gprintk(XENLOG_ERR,
+                    "error while creating failsafe callback frame\n");
             domain_crash(n->domain);
         }
 

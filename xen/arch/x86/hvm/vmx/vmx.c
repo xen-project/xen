@@ -2479,21 +2479,21 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
 
     /* Everything else is an error. */
     mfn = get_gfn_query_unlocked(d, gfn, &p2mt);
-    gdprintk(XENLOG_ERR, "EPT violation %#lx (%c%c%c/%c%c%c), "
-             "gpa %#"PRIpaddr", mfn %#lx, type %i.\n", 
-             qualification, 
-             (qualification & EPT_READ_VIOLATION) ? 'r' : '-',
-             (qualification & EPT_WRITE_VIOLATION) ? 'w' : '-',
-             (qualification & EPT_EXEC_VIOLATION) ? 'x' : '-',
-             (qualification & EPT_EFFECTIVE_READ) ? 'r' : '-',
-             (qualification & EPT_EFFECTIVE_WRITE) ? 'w' : '-',
-             (qualification & EPT_EFFECTIVE_EXEC) ? 'x' : '-',
-             gpa, mfn_x(mfn), p2mt);
+    gprintk(XENLOG_ERR,
+            "EPT violation %#lx (%c%c%c/%c%c%c) gpa %#"PRIpaddr" mfn %#lx type %i\n",
+            qualification,
+            (qualification & EPT_READ_VIOLATION) ? 'r' : '-',
+            (qualification & EPT_WRITE_VIOLATION) ? 'w' : '-',
+            (qualification & EPT_EXEC_VIOLATION) ? 'x' : '-',
+            (qualification & EPT_EFFECTIVE_READ) ? 'r' : '-',
+            (qualification & EPT_EFFECTIVE_WRITE) ? 'w' : '-',
+            (qualification & EPT_EFFECTIVE_EXEC) ? 'x' : '-',
+            gpa, mfn_x(mfn), p2mt);
 
     ept_walk_table(d, gfn);
 
     if ( qualification & EPT_GLA_VALID )
-        gdprintk(XENLOG_ERR, " --- GLA %#lx\n", gla);
+        gprintk(XENLOG_ERR, " --- GLA %#lx\n", gla);
 
     domain_crash(d);
 }

@@ -519,9 +519,9 @@ static void do_guest_trap(
         tb->flags |= TBF_INTERRUPT;
 
     if ( unlikely(null_trap_bounce(v, tb)) )
-        gdprintk(XENLOG_WARNING, "Unhandled %s fault/trap [#%d] "
-                 "on VCPU %d [ec=%04x]\n",
-                 trapstr(trapnr), trapnr, v->vcpu_id, regs->error_code);
+        gprintk(XENLOG_WARNING,
+                "Unhandled %s fault/trap [#%d, ec=%04x]\n",
+                trapstr(trapnr), trapnr, regs->error_code);
 }
 
 static void instruction_done(

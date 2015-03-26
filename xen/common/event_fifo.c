@@ -74,9 +74,9 @@ static struct evtchn_fifo_queue *lock_old_queue(const struct domain *d,
         spin_unlock_irqrestore(&old_q->lock, *flags);
     }
 
-    gdprintk(XENLOG_WARNING,
-             "domain %d, port %d lost event (too many queue changes)\n",
-             d->domain_id, evtchn->port);
+    gprintk(XENLOG_WARNING,
+            "dom%d port %d lost event (too many queue changes)\n",
+            d->domain_id, evtchn->port);
     return NULL;
 }          
 

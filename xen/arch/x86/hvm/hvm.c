@@ -2613,17 +2613,15 @@ bool_t hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *proto_p)
 
             if ( unlikely(p->state != STATE_IOREQ_NONE) )
             {
-                gdprintk(XENLOG_ERR,
-                         "Device model set bad IO state %d.\n",
-                         p->state);
+                gprintk(XENLOG_ERR, "device model set bad IO state %d\n",
+                        p->state);
                 goto crash;
             }
 
             if ( unlikely(p->vp_eport != port) )
             {
-                gdprintk(XENLOG_ERR,
-                         "Device model set bad event channel %d.\n",
-                         p->vp_eport);
+                gprintk(XENLOG_ERR, "device model set bad event channel %d\n",
+                        p->vp_eport);
                 goto crash;
             }
 
@@ -2721,9 +2719,9 @@ void hvm_triple_fault(void)
     struct domain *d = v->domain;
     u8 reason = d->arch.hvm_domain.params[HVM_PARAM_TRIPLE_FAULT_REASON];
 
-    gdprintk(XENLOG_INFO, "Triple fault on VCPU%d - "
-             "invoking HVM shutdown action %"PRIu8".\n",
-             v->vcpu_id, reason);
+    gprintk(XENLOG_INFO,
+            "Triple fault - invoking HVM shutdown action %d\n",
+            reason);
     domain_shutdown(d, reason);
 }
 

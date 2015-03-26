@@ -1063,9 +1063,8 @@ long do_set_timer_op(s_time_t timeout)
          * timeout in this case can burn a lot of CPU. We therefore go for a
          * reasonable middleground of triggering a timer event in 100ms.
          */
-        gdprintk(XENLOG_INFO,
-                 "Warning: huge timeout set by vcpu %d: %"PRIx64"\n",
-                 v->vcpu_id, (uint64_t)timeout);
+        gprintk(XENLOG_INFO, "Warning: huge timeout set: %"PRIx64"\n",
+                (uint64_t)timeout);
         set_timer(&v->singleshot_timer, NOW() + MILLISECS(100));
     }
     else
