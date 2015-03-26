@@ -179,6 +179,8 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
             printk("    l%d[%x] not present\n", level, l_index);
             break;
         }
+        if ( dma_pte_superpage(pte) )
+            break;
         val = dma_pte_addr(pte);
     } while ( --level );
 }
