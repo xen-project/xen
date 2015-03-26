@@ -35,7 +35,6 @@
 #include <xen/paging.h>
 #include <xen/cpu.h>
 #include <xen/wait.h>
-#include <xen/vm_event.h>
 #include <xen/mem_access.h>
 #include <xen/rangeset.h>
 #include <asm/shadow.h>
@@ -60,6 +59,7 @@
 #include <asm/hvm/cacheattr.h>
 #include <asm/hvm/trace.h>
 #include <asm/hvm/nestedhvm.h>
+#include <asm/hvm/event.h>
 #include <asm/mtrr.h>
 #include <asm/apic.h>
 #include <public/sched.h>
@@ -3290,7 +3290,7 @@ int hvm_set_cr0(unsigned long value)
         hvm_funcs.handle_cd(v, value);
 
     hvm_update_cr(v, 0, value);
-    hvm_memory_event_cr0(value, old_value);
+    hvm_event_cr0(value, old_value);
 
     if ( (value ^ old_value) & X86_CR0_PG ) {
         if ( !nestedhvm_vmswitch_in_progress(v) && nestedhvm_vcpu_in_guestmode(v) )
@@ -3331,7 +3331,7 @@ int hvm_set_cr3(unsigned long value)
     old=v->arch.hvm_vcpu.guest_cr[3];
     v->arch.hvm_vcpu.guest_cr[3] = value;
     paging_update_cr3(v);
-    hvm_memory_event_cr3(value, old);
+    hvm_event_cr3(value, old);
     return X86EMUL_OKAY;
 
  bad_cr3:
@@ -3372,7 +3372,7 @@ int hvm_set_cr4(unsigned long value)
     }
 
     hvm_update_cr(v, 4, value);
-    hvm_memory_event_cr4(value, old_cr);
+    hvm_event_cr4(value, old_cr);
 
     /*
      * Modifying CR4.{PSE,PAE,PGE,SMEP}, or clearing CR4.PCIDE
@@ -4551,7 +4551,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     hvm_cpuid(1, NULL, NULL, NULL, &edx);
     mtrr = !!(edx & cpufeat_mask(X86_FEATURE_MTRR));
 
-    hvm_memory_event_msr(msr, msr_content);
+    hvm_event_msr(msr, msr_content);
 
     switch ( msr )
     {
@@ -6358,148 +6358,6 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
     }
 
     return rc;
-}
-
-static void hvm_mem_event_fill_regs(vm_event_request_t *req)
-{
-    const struct cpu_user_regs *regs = guest_cpu_user_regs();
-    const struct vcpu *curr = current;
-
-    req->regs.x86.rax = regs->eax;
-    req->regs.x86.rcx = regs->ecx;
-    req->regs.x86.rdx = regs->edx;
-    req->regs.x86.rbx = regs->ebx;
-    req->regs.x86.rsp = regs->esp;
-    req->regs.x86.rbp = regs->ebp;
-    req->regs.x86.rsi = regs->esi;
-    req->regs.x86.rdi = regs->edi;
-
-    req->regs.x86.r8  = regs->r8;
-    req->regs.x86.r9  = regs->r9;
-    req->regs.x86.r10 = regs->r10;
-    req->regs.x86.r11 = regs->r11;
-    req->regs.x86.r12 = regs->r12;
-    req->regs.x86.r13 = regs->r13;
-    req->regs.x86.r14 = regs->r14;
-    req->regs.x86.r15 = regs->r15;
-
-    req->regs.x86.rflags = regs->eflags;
-    req->regs.x86.rip    = regs->eip;
-
-    req->regs.x86.msr_efer = curr->arch.hvm_vcpu.guest_efer;
-    req->regs.x86.cr0 = curr->arch.hvm_vcpu.guest_cr[0];
-    req->regs.x86.cr3 = curr->arch.hvm_vcpu.guest_cr[3];
-    req->regs.x86.cr4 = curr->arch.hvm_vcpu.guest_cr[4];
-}
-
-static int hvm_memory_event_traps(uint64_t parameters, vm_event_request_t *req)
-{
-    int rc;
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
-
-    if ( !(parameters & HVMPME_MODE_MASK) )
-        return 0;
-
-    rc = vm_event_claim_slot(d, &d->vm_event->monitor);
-    if ( rc == -ENOSYS )
-    {
-        /* If there was no ring to handle the event, then
-         * simple continue executing normally. */
-        return 1;
-    }
-    else if ( rc < 0 )
-        return rc;
-
-    if ( (parameters & HVMPME_MODE_MASK) == HVMPME_mode_sync )
-    {
-        req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
-        vm_event_vcpu_pause(v);
-    }
-
-    hvm_mem_event_fill_regs(req);
-    vm_event_put_request(d, &d->vm_event->monitor, req);
-
-    return 1;
-}
-
-static void hvm_memory_event_cr(uint32_t reason, unsigned long value,
-                                unsigned long old, uint64_t parameters)
-{
-    vm_event_request_t req = {
-        .reason = reason,
-        .vcpu_id = current->vcpu_id,
-        .u.mov_to_cr.new_value = value,
-        .u.mov_to_cr.old_value = old
-    };
-
-    if ( (parameters & HVMPME_onchangeonly) && (value == old) )
-        return;
-
-    hvm_memory_event_traps(parameters, &req);
-}
-
-void hvm_memory_event_cr0(unsigned long value, unsigned long old) 
-{
-    hvm_memory_event_cr(VM_EVENT_REASON_MOV_TO_CR0, value, old,
-                        current->domain->arch.hvm_domain
-                            .params[HVM_PARAM_MEMORY_EVENT_CR0]);
-}
-
-void hvm_memory_event_cr3(unsigned long value, unsigned long old) 
-{
-    hvm_memory_event_cr(VM_EVENT_REASON_MOV_TO_CR3, value, old,
-                        current->domain->arch.hvm_domain
-                            .params[HVM_PARAM_MEMORY_EVENT_CR3]);
-}
-
-void hvm_memory_event_cr4(unsigned long value, unsigned long old) 
-{
-    hvm_memory_event_cr(VM_EVENT_REASON_MOV_TO_CR4, value, old,
-                        current->domain->arch.hvm_domain
-                            .params[HVM_PARAM_MEMORY_EVENT_CR4]);
-}
-
-void hvm_memory_event_msr(unsigned long msr, unsigned long value)
-{
-    vm_event_request_t req = {
-        .reason = VM_EVENT_REASON_MOV_TO_MSR,
-        .vcpu_id = current->vcpu_id,
-        .u.mov_to_msr.msr = msr,
-        .u.mov_to_msr.value = value,
-    };
-
-    hvm_memory_event_traps(current->domain->arch.hvm_domain
-                             .params[HVM_PARAM_MEMORY_EVENT_MSR],
-                           &req);
-}
-
-int hvm_memory_event_int3(unsigned long gla) 
-{
-    uint32_t pfec = PFEC_page_present;
-    vm_event_request_t req = {
-        .reason = VM_EVENT_REASON_SOFTWARE_BREAKPOINT,
-        .vcpu_id = current->vcpu_id,
-        .u.software_breakpoint.gfn = paging_gva_to_gfn(current, gla, &pfec)
-    };
-
-    return hvm_memory_event_traps(current->domain->arch.hvm_domain
-                                    .params[HVM_PARAM_MEMORY_EVENT_INT3],
-                                  &req);
-}
-
-int hvm_memory_event_single_step(unsigned long gla)
-{
-    uint32_t pfec = PFEC_page_present;
-    vm_event_request_t req = {
-        .reason = VM_EVENT_REASON_SINGLESTEP,
-        .vcpu_id = current->vcpu_id,
-        .u.singlestep.gfn = paging_gva_to_gfn(current, gla, &pfec)
-    };
-
-    return hvm_memory_event_traps(current->domain->arch.hvm_domain
-                                   .params[HVM_PARAM_MEMORY_EVENT_SINGLE_STEP],
-                                  &req);
 }
 
 int nhvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)

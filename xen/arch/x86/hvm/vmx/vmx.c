@@ -52,6 +52,7 @@
 #include <asm/hvm/vpt.h>
 #include <public/hvm/save.h>
 #include <asm/hvm/trace.h>
+#include <asm/hvm/event.h>
 #include <asm/xenoprof.h>
 #include <asm/debugger.h>
 #include <asm/apic.h>
@@ -1979,7 +1980,7 @@ static int vmx_cr_access(unsigned long exit_qualification)
         unsigned long old = curr->arch.hvm_vcpu.guest_cr[0];
         curr->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS;
         vmx_update_guest_cr(curr, 0);
-        hvm_memory_event_cr0(curr->arch.hvm_vcpu.guest_cr[0], old);
+        hvm_event_cr0(curr->arch.hvm_vcpu.guest_cr[0], old);
         HVMTRACE_0D(CLTS);
         break;
     }
@@ -2837,7 +2838,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
                 break;
             }
             else {
-                int handled = hvm_memory_event_int3(regs->eip);
+                int handled = hvm_event_int3(regs->eip);
                 
                 if ( handled < 0 ) 
                 {
@@ -3155,7 +3156,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
         vmx_update_cpu_exec_control(v);
         if ( v->arch.hvm_vcpu.single_step ) {
-          hvm_memory_event_single_step(regs->eip);
+          hvm_event_single_step(regs->eip);
           if ( v->domain->debugger_attached )
               domain_pause_for_debugger();
         }
