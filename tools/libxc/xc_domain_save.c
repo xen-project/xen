@@ -1668,9 +1668,9 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             goto out;
         }
 
-        chunk.id = XC_SAVE_ID_HVM_ACCESS_RING_PFN;
+        chunk.id = XC_SAVE_ID_HVM_MONITOR_RING_PFN;
         chunk.data = 0;
-        xc_hvm_param_get(xch, dom, HVM_PARAM_ACCESS_RING_PFN, &chunk.data);
+        xc_hvm_param_get(xch, dom, HVM_PARAM_MONITOR_RING_PFN, &chunk.data);
 
         if ( (chunk.data != 0) &&
              wrexact(io_fd, &chunk, sizeof(chunk)) )

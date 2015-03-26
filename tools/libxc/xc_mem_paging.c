@@ -34,7 +34,7 @@ int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id,
     }
         
     return xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE,
+                                XEN_MEM_EVENT_PAGING_ENABLE,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING,
                                 port);
 }
@@ -42,7 +42,7 @@ int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id,
 int xc_mem_paging_disable(xc_interface *xch, domid_t domain_id)
 {
     return xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING_DISABLE,
+                                XEN_MEM_EVENT_PAGING_DISABLE,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING,
                                 NULL);
 }

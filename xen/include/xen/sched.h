@@ -288,8 +288,8 @@ struct mem_event_per_domain
     struct mem_event_domain share;
     /* Memory paging support */
     struct mem_event_domain paging;
-    /* Memory access support */
-    struct mem_event_domain access;
+    /* VM event monitor support */
+    struct mem_event_domain monitor;
 };
 
 struct evtchn_port_ops;

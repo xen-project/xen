@@ -609,8 +609,8 @@ int p2m_get_mem_access(struct domain *d, unsigned long pfn,
 
 /* Check for emulation and mark vcpu for skipping one instruction
  * upon rescheduling if required. */
-void p2m_mem_event_emulate_check(struct vcpu *v,
-                                 const mem_event_response_t *rsp);
+void p2m_mem_access_emulate_check(struct vcpu *v,
+                                  const mem_event_response_t *rsp);
 
 /* Enable arch specific introspection options (such as MSR interception). */
 void p2m_setup_introspection(struct domain *d);

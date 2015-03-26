@@ -53,7 +53,7 @@ int xc_memshr_ring_enable(xc_interface *xch,
     }
         
     return xc_mem_event_control(xch, domid,
-                                XEN_DOMCTL_MEM_EVENT_OP_SHARING_ENABLE,
+                                XEN_MEM_EVENT_SHARING_ENABLE,
                                 XEN_DOMCTL_MEM_EVENT_OP_SHARING,
                                 port);
 }
@@ -62,7 +62,7 @@ int xc_memshr_ring_disable(xc_interface *xch,
                            domid_t domid)
 {
     return xc_mem_event_control(xch, domid,
-                                XEN_DOMCTL_MEM_EVENT_OP_SHARING_DISABLE,
+                                XEN_MEM_EVENT_SHARING_DISABLE,
                                 XEN_DOMCTL_MEM_EVENT_OP_SHARING,
                                 NULL);
 }

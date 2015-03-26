@@ -444,7 +444,7 @@ static void mem_paging_notification(struct vcpu *v, unsigned int port)
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void mem_access_notification(struct vcpu *v, unsigned int port)
 {
-    if ( likely(v->domain->mem_event->access.ring_page != NULL) )
+    if ( likely(v->domain->mem_event->monitor.ring_page != NULL) )
         mem_access_resume(v->domain);
 }
 #endif
@@ -496,7 +496,8 @@ int do_mem_event_op(int op, uint32_t domain, void *arg)
 void mem_event_cleanup(struct domain *d)
 {
 #ifdef HAS_MEM_PAGING
-    if ( d->mem_event->paging.ring_page ) {
+    if ( d->mem_event->paging.ring_page )
+    {
         /* Destroying the wait queue head means waking up all
          * queued vcpus. This will drain the list, allowing
          * the disable routine to complete. It will also drop
@@ -509,13 +510,15 @@ void mem_event_cleanup(struct domain *d)
     }
 #endif
 #ifdef HAS_MEM_ACCESS
-    if ( d->mem_event->access.ring_page ) {
-        destroy_waitqueue_head(&d->mem_event->access.wq);
-        (void)mem_event_disable(d, &d->mem_event->access);
+    if ( d->mem_event->monitor.ring_page )
+    {
+        destroy_waitqueue_head(&d->mem_event->monitor.wq);
+        (void)mem_event_disable(d, &d->mem_event->monitor);
     }
 #endif
 #ifdef HAS_MEM_SHARING
-    if ( d->mem_event->share.ring_page ) {
+    if ( d->mem_event->share.ring_page )
+    {
         destroy_waitqueue_head(&d->mem_event->share.wq);
         (void)mem_event_disable(d, &d->mem_event->share);
     }
@@ -564,7 +567,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 
         switch( mec->op )
         {
-        case XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE:
+        case XEN_MEM_EVENT_PAGING_ENABLE:
         {
             struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
@@ -594,7 +597,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         }
         break;
 
-        case XEN_DOMCTL_MEM_EVENT_OP_PAGING_DISABLE:
+        case XEN_MEM_EVENT_PAGING_DISABLE:
         {
             if ( med->ring_page )
                 rc = mem_event_disable(d, med);
@@ -610,32 +613,32 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 #endif
 
 #ifdef HAS_MEM_ACCESS
-    case XEN_DOMCTL_MEM_EVENT_OP_ACCESS:
+    case XEN_DOMCTL_MEM_EVENT_OP_MONITOR:
     {
-        struct mem_event_domain *med = &d->mem_event->access;
+        struct mem_event_domain *med = &d->mem_event->monitor;
         rc = -EINVAL;
 
         switch( mec->op )
         {
-        case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE:
-        case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE_INTROSPECTION:
+        case XEN_MEM_EVENT_MONITOR_ENABLE:
+        case XEN_MEM_EVENT_MONITOR_ENABLE_INTROSPECTION:
         {
             rc = -ENODEV;
             if ( !p2m_mem_event_sanity_check(d) )
                 break;
 
             rc = mem_event_enable(d, mec, med, _VPF_mem_access,
-                                    HVM_PARAM_ACCESS_RING_PFN,
+                                    HVM_PARAM_MONITOR_RING_PFN,
                                     mem_access_notification);
 
-            if ( mec->op == XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE_INTROSPECTION
+            if ( mec->op == XEN_MEM_EVENT_MONITOR_ENABLE_INTROSPECTION
                  && !rc )
                 p2m_setup_introspection(d);
 
         }
         break;
 
-        case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE:
+        case XEN_MEM_EVENT_MONITOR_DISABLE:
         {
             if ( med->ring_page )
             {
@@ -661,7 +664,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 
         switch( mec->op )
         {
-        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_ENABLE:
+        case XEN_MEM_EVENT_SHARING_ENABLE:
         {
             rc = -EOPNOTSUPP;
             /* pvh fixme: p2m_is_foreign types need addressing */
@@ -679,7 +682,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         }
         break;
 
-        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_DISABLE:
+        case XEN_MEM_EVENT_SHARING_DISABLE:
         {
             if ( med->ring_page )
                 rc = mem_event_disable(d, med);

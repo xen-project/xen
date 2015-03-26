@@ -1399,7 +1399,7 @@ static void p2m_mem_event_fill_regs(mem_event_request_t *req)
     req->regs.x86.cs_arbytes = seg.attr.bytes;
 }
 
-void p2m_mem_event_emulate_check(struct vcpu *v,
+void p2m_mem_access_emulate_check(struct vcpu *v,
                                  const mem_event_response_t *rsp)
 {
     /* Mark vcpu for skipping one instruction upon rescheduling. */
@@ -1501,7 +1501,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     gfn_unlock(p2m, gfn, 0);
 
     /* Otherwise, check if there is a memory event listener, and send the message along */
-    if ( !mem_event_check_ring(&d->mem_event->access) || !req_ptr ) 
+    if ( !mem_event_check_ring(&d->mem_event->monitor) || !req_ptr ) 
     {
         /* No listener */
         if ( p2m->access_required ) 
@@ -1546,9 +1546,9 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
 
     if ( v->arch.mem_event.emulate_flags )
     {
-        hvm_mem_event_emulate_one((v->arch.mem_event.emulate_flags &
-                                   MEM_ACCESS_EMULATE_NOWRITE) != 0,
-                                  TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_mem_access_emulate_one((v->arch.mem_event.emulate_flags &
+                                    MEM_ACCESS_EMULATE_NOWRITE) != 0,
+                                   TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
 
         v->arch.mem_event.emulate_flags = 0;
         return 1;

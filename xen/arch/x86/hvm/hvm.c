@@ -6401,7 +6401,7 @@ static int hvm_memory_event_traps(uint64_t parameters, mem_event_request_t *req)
     if ( !(parameters & HVMPME_MODE_MASK) )
         return 0;
 
-    rc = mem_event_claim_slot(d, &d->mem_event->access);
+    rc = mem_event_claim_slot(d, &d->mem_event->monitor);
     if ( rc == -ENOSYS )
     {
         /* If there was no ring to handle the event, then
@@ -6418,7 +6418,7 @@ static int hvm_memory_event_traps(uint64_t parameters, mem_event_request_t *req)
     }
 
     hvm_mem_event_fill_regs(req);
-    mem_event_put_request(d, &d->mem_event->access, req);
+    mem_event_put_request(d, &d->mem_event->monitor, req);
 
     return 1;
 }

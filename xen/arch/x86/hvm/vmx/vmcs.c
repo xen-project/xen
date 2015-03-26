@@ -715,7 +715,7 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
         return;
 
     if ( unlikely(d->arch.hvm_domain.introspection_enabled) &&
-         mem_event_check_ring(&d->mem_event->access) )
+         mem_event_check_ring(&d->mem_event->monitor) )
     {
         unsigned int i;
 

@@ -573,7 +573,7 @@ static int setup_guest(xc_interface *xch,
                      special_pfn(SPECIALPAGE_CONSOLE));
     xc_hvm_param_set(xch, dom, HVM_PARAM_PAGING_RING_PFN,
                      special_pfn(SPECIALPAGE_PAGING));
-    xc_hvm_param_set(xch, dom, HVM_PARAM_ACCESS_RING_PFN,
+    xc_hvm_param_set(xch, dom, HVM_PARAM_MONITOR_RING_PFN,
                      special_pfn(SPECIALPAGE_ACCESS));
     xc_hvm_param_set(xch, dom, HVM_PARAM_SHARING_RING_PFN,
                      special_pfn(SPECIALPAGE_SHARING));

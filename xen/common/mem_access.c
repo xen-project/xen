@@ -34,7 +34,7 @@ void mem_access_resume(struct domain *d)
     mem_event_response_t rsp;
 
     /* Pull all responses off the ring. */
-    while ( mem_event_get_response(d, &d->mem_event->access, &rsp) )
+    while ( mem_event_get_response(d, &d->mem_event->monitor, &rsp) )
     {
         struct vcpu *v;
 
@@ -53,7 +53,7 @@ void mem_access_resume(struct domain *d)
 
         v = d->vcpu[rsp.vcpu_id];
 
-        p2m_mem_event_emulate_check(v, &rsp);
+        p2m_mem_access_emulate_check(v, &rsp);
 
         /* Unpause domain. */
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
@@ -85,7 +85,7 @@ int mem_access_memop(unsigned long cmd,
         goto out;
 
     rc = -ENODEV;
-    if ( unlikely(!d->mem_event->access.ring_page) )
+    if ( unlikely(!d->mem_event->monitor.ring_page) )
         goto out;
 
     switch ( mao.op )
@@ -152,11 +152,11 @@ int mem_access_memop(unsigned long cmd,
 
 int mem_access_send_req(struct domain *d, mem_event_request_t *req)
 {
-    int rc = mem_event_claim_slot(d, &d->mem_event->access);
+    int rc = mem_event_claim_slot(d, &d->mem_event->monitor);
     if ( rc < 0 )
         return rc;
 
-    mem_event_put_request(d, &d->mem_event->access, req);
+    mem_event_put_request(d, &d->mem_event->monitor, req);
 
     return 0;
 }

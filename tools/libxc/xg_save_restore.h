@@ -256,7 +256,7 @@
 #define XC_SAVE_ID_HVM_GENERATION_ID_ADDR -14
 /* Markers for the pfn's hosting these mem event rings */
 #define XC_SAVE_ID_HVM_PAGING_RING_PFN  -15
-#define XC_SAVE_ID_HVM_ACCESS_RING_PFN  -16
+#define XC_SAVE_ID_HVM_MONITOR_RING_PFN -16
 #define XC_SAVE_ID_HVM_SHARING_RING_PFN -17
 #define XC_SAVE_ID_TOOLSTACK          -18 /* Optional toolstack specific info */
 /* These are a pair; it is an error for one to exist without the other */

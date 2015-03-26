@@ -182,7 +182,7 @@
 
 /* Params for the mem event rings */
 #define HVM_PARAM_PAGING_RING_PFN   27
-#define HVM_PARAM_ACCESS_RING_PFN   28
+#define HVM_PARAM_MONITOR_RING_PFN  28
 #define HVM_PARAM_SHARING_RING_PFN  29
 
 /* SHUTDOWN_* action in case of a triple fault */

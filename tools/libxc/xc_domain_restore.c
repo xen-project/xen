@@ -734,7 +734,7 @@ typedef struct {
     uint64_t vcpumap[XC_SR_MAX_VCPUS/64];
     uint64_t identpt;
     uint64_t paging_ring_pfn;
-    uint64_t access_ring_pfn;
+    uint64_t monitor_ring_pfn;
     uint64_t sharing_ring_pfn;
     uint64_t vm86_tss;
     uint64_t console_pfn;
@@ -828,15 +828,15 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         // DPRINTF("paging ring pfn address: %llx\n", buf->paging_ring_pfn);
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
 
-    case XC_SAVE_ID_HVM_ACCESS_RING_PFN:
+    case XC_SAVE_ID_HVM_MONITOR_RING_PFN:
         /* Skip padding 4 bytes then read the mem access ring location. */
-        if ( RDEXACT(fd, &buf->access_ring_pfn, sizeof(uint32_t)) ||
-             RDEXACT(fd, &buf->access_ring_pfn, sizeof(uint64_t)) )
+        if ( RDEXACT(fd, &buf->monitor_ring_pfn, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->monitor_ring_pfn, sizeof(uint64_t)) )
         {
             PERROR("error read the access ring pfn");
             return -1;
         }
-        // DPRINTF("access ring pfn address: %llx\n", buf->access_ring_pfn);
+        // DPRINTF("monitor ring pfn address: %llx\n", buf->monitor_ring_pfn);
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
 
     case XC_SAVE_ID_HVM_SHARING_RING_PFN:
@@ -1660,8 +1660,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                 xc_hvm_param_set(xch, dom, HVM_PARAM_IDENT_PT, pagebuf.identpt);
             if ( pagebuf.paging_ring_pfn )
                 xc_hvm_param_set(xch, dom, HVM_PARAM_PAGING_RING_PFN, pagebuf.paging_ring_pfn);
-            if ( pagebuf.access_ring_pfn )
-                xc_hvm_param_set(xch, dom, HVM_PARAM_ACCESS_RING_PFN, pagebuf.access_ring_pfn);
+            if ( pagebuf.monitor_ring_pfn )
+                xc_hvm_param_set(xch, dom, HVM_PARAM_MONITOR_RING_PFN, pagebuf.monitor_ring_pfn);
             if ( pagebuf.sharing_ring_pfn )
                 xc_hvm_param_set(xch, dom, HVM_PARAM_SHARING_RING_PFN, pagebuf.sharing_ring_pfn);
             if ( pagebuf.vm86_tss )

@@ -71,11 +71,11 @@ typedef enum {
 } p2m_type_t;
 
 static inline
-void p2m_mem_event_emulate_check(struct vcpu *v,
-                                 const mem_event_response_t *rsp)
+void p2m_mem_access_emulate_check(struct vcpu *v,
+                                  const mem_event_response_t *rsp)
 {
     /* Not supported on ARM. */
-};
+}
 
 static inline
 void p2m_setup_introspection(struct domain *d)

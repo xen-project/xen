@@ -26,22 +26,22 @@
 
 void *xc_mem_access_enable(xc_interface *xch, domid_t domain_id, uint32_t *port)
 {
-    return xc_mem_event_enable(xch, domain_id, HVM_PARAM_ACCESS_RING_PFN,
+    return xc_mem_event_enable(xch, domain_id, HVM_PARAM_MONITOR_RING_PFN,
                                port, 0);
 }
 
 void *xc_mem_access_enable_introspection(xc_interface *xch, domid_t domain_id,
                                          uint32_t *port)
 {
-    return xc_mem_event_enable(xch, domain_id, HVM_PARAM_ACCESS_RING_PFN,
+    return xc_mem_event_enable(xch, domain_id, HVM_PARAM_MONITOR_RING_PFN,
                                port, 1);
 }
 
 int xc_mem_access_disable(xc_interface *xch, domid_t domain_id)
 {
     return xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE,
-                                XEN_DOMCTL_MEM_EVENT_OP_ACCESS,
+                                XEN_MEM_EVENT_MONITOR_DISABLE,
+                                XEN_DOMCTL_MEM_EVENT_OP_MONITOR,
                                 NULL);
 }
 

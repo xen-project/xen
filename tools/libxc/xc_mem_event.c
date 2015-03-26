@@ -115,20 +115,20 @@ void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
     switch ( param )
     {
     case HVM_PARAM_PAGING_RING_PFN:
-        op = XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE;
+        op = XEN_MEM_EVENT_PAGING_ENABLE;
         mode = XEN_DOMCTL_MEM_EVENT_OP_PAGING;
         break;
 
-    case HVM_PARAM_ACCESS_RING_PFN:
+    case HVM_PARAM_MONITOR_RING_PFN:
         if ( enable_introspection )
-            op = XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE_INTROSPECTION;
+            op = XEN_MEM_EVENT_MONITOR_ENABLE_INTROSPECTION;
         else
-            op = XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE;
-        mode = XEN_DOMCTL_MEM_EVENT_OP_ACCESS;
+            op = XEN_MEM_EVENT_MONITOR_ENABLE;
+        mode = XEN_DOMCTL_MEM_EVENT_OP_MONITOR;
         break;
 
     case HVM_PARAM_SHARING_RING_PFN:
-        op = XEN_DOMCTL_MEM_EVENT_OP_SHARING_ENABLE;
+        op = XEN_MEM_EVENT_SHARING_ENABLE;
         mode = XEN_DOMCTL_MEM_EVENT_OP_SHARING;
         break;
 

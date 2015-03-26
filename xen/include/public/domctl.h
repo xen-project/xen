@@ -751,7 +751,7 @@ struct xen_domctl_gdbsx_domstatus {
  * pager<->hypervisor interface. Use XENMEM_paging_op*
  * to perform per-page operations.
  *
- * The XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE domctl returns several
+ * The XEN_MEM_EVENT_PAGING_ENABLE domctl returns several
  * non-standard error codes to indicate why paging could not be enabled:
  * ENODEV - host lacks HAP support (EPT/NPT) or HAP is disabled in guest
  * EMLINK - guest has iommu passthrough enabled
@@ -760,33 +760,40 @@ struct xen_domctl_gdbsx_domstatus {
  */
 #define XEN_DOMCTL_MEM_EVENT_OP_PAGING            1
 
-#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE     0
-#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_DISABLE    1
+#define XEN_MEM_EVENT_PAGING_ENABLE               0
+#define XEN_MEM_EVENT_PAGING_DISABLE              1
 
 /*
- * Access permissions.
+ * Monitor helper.
  *
  * As with paging, use the domctl for teardown/setup of the
  * helper<->hypervisor interface.
  *
- * There are HVM hypercalls to set the per-page access permissions of every
- * page in a domain.  When one of these permissions--independent, read, 
- * write, and execute--is violated, the VCPU is paused and a memory event 
- * is sent with what happened.  (See public/mem_event.h) .
+ * The monitor interface can be used to register for various VM events. For
+ * example, there are HVM hypercalls to set the per-page access permissions
+ * of every page in a domain.  When one of these permissions--independent,
+ * read, write, and execute--is violated, the VCPU is paused and a memory event
+ * is sent with what happened. The memory event handler can then resume the
+ * VCPU and redo the access with a XENMEM_access_op_resume hypercall.
  *
- * The memory event handler can then resume the VCPU and redo the access 
- * with a XENMEM_access_op_resume hypercall.
+ * See public/mem_event.h for the list of available events that can be
+ * subscribed to via the monitor interface.
  *
- * The XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE domctl returns several
+ * To enable MOV-TO-MSR interception on x86, it is necessary to enable this
+ * interface with the XEN_MEM_EVENT_MONITOR_ENABLE_INTROSPECTION
+ * operator.
+ *
+ * The XEN_MEM_EVENT_MONITOR_ENABLE* domctls return several
  * non-standard error codes to indicate why access could not be enabled:
  * ENODEV - host lacks HAP support (EPT/NPT) or HAP is disabled in guest
  * EBUSY  - guest has or had access enabled, ring buffer still active
+ *
  */
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS                        2
+#define XEN_DOMCTL_MEM_EVENT_OP_MONITOR                        2
 
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE                 0
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE                1
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE_INTROSPECTION   2
+#define XEN_MEM_EVENT_MONITOR_ENABLE                           0
+#define XEN_MEM_EVENT_MONITOR_DISABLE                          1
+#define XEN_MEM_EVENT_MONITOR_ENABLE_INTROSPECTION             2
 
 /*
  * Sharing ENOMEM helper.
@@ -803,13 +810,13 @@ struct xen_domctl_gdbsx_domstatus {
  */
 #define XEN_DOMCTL_MEM_EVENT_OP_SHARING           3
 
-#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_ENABLE    0
-#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_DISABLE   1
+#define XEN_MEM_EVENT_SHARING_ENABLE              0
+#define XEN_MEM_EVENT_SHARING_DISABLE             1
 
 /* Use for teardown/setup of helper<->hypervisor interface for paging, 
  * access and sharing.*/
 struct xen_domctl_mem_event_op {
-    uint32_t       op;           /* XEN_DOMCTL_MEM_EVENT_OP_*_* */
+    uint32_t       op;           /* XEN_MEM_EVENT_*_* */
     uint32_t       mode;         /* XEN_DOMCTL_MEM_EVENT_OP_* */
 
     uint32_t port;              /* OUT: event channel for ring */

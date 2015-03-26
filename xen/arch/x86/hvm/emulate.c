@@ -1528,7 +1528,7 @@ int hvm_emulate_one_no_write(
     return _hvm_emulate_one(hvmemul_ctxt, &hvm_emulate_ops_no_write);
 }
 
-void hvm_mem_event_emulate_one(bool_t nowrite, unsigned int trapnr,
+void hvm_mem_access_emulate_one(bool_t nowrite, unsigned int trapnr,
     unsigned int errcode)
 {
     struct hvm_emulate_ctxt ctx = {{ 0 }};
