@@ -45,56 +45,6 @@
 #define ERROR(a, b...) fprintf(stderr, a "\n", ## b)
 #define PERROR(a, b...) fprintf(stderr, a ": %s\n", ## b, strerror(errno))
 
-/* Spinlock and mem event definitions */
-
-#define SPIN_LOCK_UNLOCKED 0
-
-#define ADDR (*(volatile long *) addr)
-/**
- * test_and_set_bit - Set a bit and return its old value
- * @nr: Bit to set
- * @addr: Address to count from
- *
- * This operation is atomic and cannot be reordered.
- * It also implies a memory barrier.
- */
-static inline int test_and_set_bit(int nr, volatile void *addr)
-{
-    int oldbit;
-
-    asm volatile (
-        "btsl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
-    return oldbit;
-}
-
-typedef int spinlock_t;
-
-static inline void spin_lock(spinlock_t *lock)
-{
-    while ( test_and_set_bit(1, lock) );
-}
-
-static inline void spin_lock_init(spinlock_t *lock)
-{
-    *lock = SPIN_LOCK_UNLOCKED;
-}
-
-static inline void spin_unlock(spinlock_t *lock)
-{
-    *lock = SPIN_LOCK_UNLOCKED;
-}
-
-static inline int spin_trylock(spinlock_t *lock)
-{
-    return !test_and_set_bit(1, lock);
-}
-
-#define vm_event_ring_lock_init(_m)  spin_lock_init(&(_m)->ring_lock)
-#define vm_event_ring_lock(_m)       spin_lock(&(_m)->ring_lock)
-#define vm_event_ring_unlock(_m)     spin_unlock(&(_m)->ring_lock)
-
 typedef struct vm_event {
     domid_t domain_id;
     xc_evtchn *xce_handle;
@@ -102,7 +52,6 @@ typedef struct vm_event {
     vm_event_back_ring_t back_ring;
     uint32_t evtchn_port;
     void *ring_page;
-    spinlock_t ring_lock;
 } vm_event_t;
 
 typedef struct xenaccess {
@@ -180,6 +129,7 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
         if ( rc != 0 )
         {
             ERROR("Error tearing down domain xenaccess in xen");
+            return rc;
         }
     }
 
@@ -191,6 +141,7 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
         if ( rc != 0 )
         {
             ERROR("Error unbinding event port");
+            return rc;
         }
     }
 
@@ -201,6 +152,7 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
         if ( rc != 0 )
         {
             ERROR("Error closing event channel");
+            return rc;
         }
     }
 
@@ -209,6 +161,7 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
     if ( rc != 0 )
     {
         ERROR("Error closing connection to xen");
+        return rc;
     }
     xenaccess->xc_handle = NULL;
 
@@ -240,9 +193,6 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
 
     /* Set domain id */
     xenaccess->vm_event.domain_id = domain_id;
-
-    /* Initialise lock */
-    vm_event_ring_lock_init(&xenaccess->vm_event);
 
     /* Enable mem_access */
     xenaccess->vm_event.ring_page =
@@ -314,18 +264,23 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     return xenaccess;
 
  err:
-    xenaccess_teardown(xch, xenaccess);
+    rc = xenaccess_teardown(xch, xenaccess);
+    if ( rc )
+    {
+        ERROR("Failed to teardown xenaccess structure!\n");
+    }
 
  err_iface:
     return NULL;
 }
 
-int get_request(vm_event_t *vm_event, vm_event_request_t *req)
+/*
+ * Note that this function is not thread safe.
+ */
+static void get_request(vm_event_t *vm_event, vm_event_request_t *req)
 {
     vm_event_back_ring_t *back_ring;
     RING_IDX req_cons;
-
-    vm_event_ring_lock(vm_event);
 
     back_ring = &vm_event->back_ring;
     req_cons = back_ring->req_cons;
@@ -337,18 +292,15 @@ int get_request(vm_event_t *vm_event, vm_event_request_t *req)
     /* Update ring */
     back_ring->req_cons = req_cons;
     back_ring->sring->req_event = req_cons + 1;
-
-    vm_event_ring_unlock(vm_event);
-
-    return 0;
 }
 
-static int put_response(vm_event_t *vm_event, vm_event_response_t *rsp)
+/*
+ * Note that this function is not thread safe.
+ */
+static void put_response(vm_event_t *vm_event, vm_event_response_t *rsp)
 {
     vm_event_back_ring_t *back_ring;
     RING_IDX rsp_prod;
-
-    vm_event_ring_lock(vm_event);
 
     back_ring = &vm_event->back_ring;
     rsp_prod = back_ring->rsp_prod_pvt;
@@ -360,28 +312,6 @@ static int put_response(vm_event_t *vm_event, vm_event_response_t *rsp)
     /* Update ring */
     back_ring->rsp_prod_pvt = rsp_prod;
     RING_PUSH_RESPONSES(back_ring);
-
-    vm_event_ring_unlock(vm_event);
-
-    return 0;
-}
-
-static int xenaccess_resume_page(xenaccess_t *paging, vm_event_response_t *rsp)
-{
-    int ret;
-
-    /* Put the page info on the ring */
-    ret = put_response(&paging->vm_event, rsp);
-    if ( ret != 0 )
-        goto out;
-
-    /* Tell Xen page is ready */
-    ret = xc_mem_access_resume(paging->xc_handle, paging->vm_event.domain_id);
-    ret = xc_evtchn_notify(paging->vm_event.xce_handle,
-                           paging->vm_event.port);
-
- out:
-    return ret;
 }
 
 void usage(char* progname)
@@ -543,13 +473,7 @@ int main(int argc, char *argv[])
         {
             xenmem_access_t access;
 
-            rc = get_request(&xenaccess->vm_event, &req);
-            if ( rc != 0 )
-            {
-                ERROR("Error getting request");
-                interrupted = -1;
-                continue;
-            }
+            get_request(&xenaccess->vm_event, &req);
 
             if ( req.version != VM_EVENT_INTERFACE_VERSION )
             {
@@ -624,13 +548,18 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "UNKNOWN REASON CODE %d\n", req.reason);
             }
 
-            rc = xenaccess_resume_page(xenaccess, &rsp);
-            if ( rc != 0 )
-            {
-                ERROR("Error resuming page");
-                interrupted = -1;
-                continue;
-            }
+            /* Put the response on the ring */
+            put_response(&xenaccess->vm_event, &rsp);
+        }
+
+        /* Tell Xen page is ready */
+        rc = xc_evtchn_notify(xenaccess->vm_event.xce_handle,
+                              xenaccess->vm_event.port);
+
+        if ( rc != 0 )
+        {
+            ERROR("Error resuming page");
+            interrupted = -1;
         }
 
         if ( shutting_down )
