@@ -1,12 +1,12 @@
 #ifndef _XEN_P2M_COMMON_H
 #define _XEN_P2M_COMMON_H
 
-#include <public/mem_event.h>
+#include <public/vm_event.h>
 
 /*
  * Additional access types, which are used to further restrict
  * the permissions given my the p2m_type_t memory type.  Violations
- * caused by p2m_access_t restrictions are sent to the mem_event
+ * caused by p2m_access_t restrictions are sent to the vm_event
  * interface.
  *
  * The access permissions are soft state: when any ambiguous change of page

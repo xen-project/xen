@@ -25,7 +25,7 @@
 #include <xen/event.h>
 #include <xen/kernel.h>
 #include <xen/keyhandler.h>
-#include <xen/mem_event.h>
+#include <xen/vm_event.h>
 #include <asm/current.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -715,7 +715,7 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
         return;
 
     if ( unlikely(d->arch.hvm_domain.introspection_enabled) &&
-         mem_event_check_ring(&d->mem_event->monitor) )
+         vm_event_check_ring(&d->vm_event->monitor) )
     {
         unsigned int i;
 

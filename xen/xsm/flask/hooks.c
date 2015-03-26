@@ -578,7 +578,7 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_memory_mapping:
     case XEN_DOMCTL_set_target:
 #ifdef HAS_MEM_ACCESS
-    case XEN_DOMCTL_mem_event_op:
+    case XEN_DOMCTL_vm_event_op:
 #endif
 #ifdef CONFIG_X86
     /* These have individual XSM hooks (arch/x86/domctl.c) */
@@ -689,7 +689,7 @@ static int flask_domctl(struct domain *d, int cmd)
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__TRIGGER);
 
     case XEN_DOMCTL_set_access_required:
-        return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
+        return current_has_perm(d, SECCLASS_HVM, HVM__VM_EVENT);
 
     case XEN_DOMCTL_debug_op:
     case XEN_DOMCTL_gdbsx_guestmemio:
@@ -1200,14 +1200,14 @@ static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)
 #endif /* HAS_PASSTHROUGH && HAS_PCI */
 
 #ifdef HAS_MEM_ACCESS
-static int flask_mem_event_control(struct domain *d, int mode, int op)
+static int flask_vm_event_control(struct domain *d, int mode, int op)
 {
-    return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
+    return current_has_perm(d, SECCLASS_HVM, HVM__VM_EVENT);
 }
 
-static int flask_mem_event_op(struct domain *d, int op)
+static int flask_vm_event_op(struct domain *d, int op)
 {
-    return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
+    return current_has_perm(d, SECCLASS_HVM, HVM__VM_EVENT);
 }
 #endif /* HAS_MEM_ACCESS */
 
@@ -1595,8 +1595,8 @@ static struct xsm_operations flask_ops = {
 #endif
 
 #ifdef HAS_MEM_ACCESS
-    .mem_event_control = flask_mem_event_control,
-    .mem_event_op = flask_mem_event_op,
+    .vm_event_control = flask_vm_event_control,
+    .vm_event_op = flask_vm_event_op,
 #endif
 
 #ifdef CONFIG_X86

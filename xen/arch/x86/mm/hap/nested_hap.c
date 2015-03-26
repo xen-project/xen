@@ -19,9 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <xen/mem_event.h>
+#include <xen/vm_event.h>
 #include <xen/event.h>
-#include <public/mem_event.h>
+#include <public/vm_event.h>
 #include <asm/domain.h>
 #include <asm/page.h>
 #include <asm/paging.h>

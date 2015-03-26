@@ -484,13 +484,13 @@ struct arch_vcpu
 
     /*
      * Should we emulate the next matching instruction on VCPU resume
-     * after a mem_event?
+     * after a vm_event?
      */
     struct {
         uint32_t emulate_flags;
         unsigned long gpa;
         unsigned long eip;
-    } mem_event;
+    } vm_event;
 
 };
 

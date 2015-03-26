@@ -15,7 +15,7 @@
 #include <xen/domain.h>
 #include <xen/mm.h>
 #include <xen/event.h>
-#include <xen/mem_event.h>
+#include <xen/vm_event.h>
 #include <xen/time.h>
 #include <xen/console.h>
 #include <xen/softirq.h>
@@ -345,8 +345,8 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
         poolid = 0;
 
         err = -ENOMEM;
-        d->mem_event = xzalloc(struct mem_event_per_domain);
-        if ( !d->mem_event )
+        d->vm_event = xzalloc(struct vm_event_per_domain);
+        if ( !d->vm_event )
             goto fail;
 
         d->pbuf = xzalloc_array(char, DOMAIN_PBUF_SIZE);
@@ -388,7 +388,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
     if ( hardware_domain == d )
         hardware_domain = old_hwdom;
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
-    xfree(d->mem_event);
+    xfree(d->vm_event);
     xfree(d->pbuf);
     if ( init_status & INIT_arch )
         arch_domain_destroy(d);
@@ -626,7 +626,7 @@ int domain_kill(struct domain *d)
         d->is_dying = DOMDYING_dead;
         /* Mem event cleanup has to go here because the rings 
          * have to be put before we call put_domain. */
-        mem_event_cleanup(d);
+        vm_event_cleanup(d);
         put_domain(d);
         send_global_virq(VIRQ_DOM_EXC);
         /* fallthrough */
@@ -805,7 +805,7 @@ static void complete_domain_destroy(struct rcu_head *head)
     free_xenoprof_pages(d);
 #endif
 
-    xfree(d->mem_event);
+    xfree(d->vm_event);
     xfree(d->pbuf);
 
     for ( i = d->max_vcpus - 1; i >= 0; i-- )

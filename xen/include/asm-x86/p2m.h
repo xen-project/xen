@@ -252,7 +252,7 @@ struct p2m_domain {
      * retyped get this access type.  See definition of p2m_access_t. */
     p2m_access_t default_access;
 
-    /* If true, and an access fault comes in and there is no mem_event listener, 
+    /* If true, and an access fault comes in and there is no vm_event listener, 
      * pause domain.  Otherwise, remove access restrictions. */
     bool_t       access_required;
 
@@ -595,7 +595,7 @@ void p2m_mem_paging_resume(struct domain *d);
  * locks -- caller must also xfree the request. */
 bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                             struct npfec npfec,
-                            mem_event_request_t **req_ptr);
+                            vm_event_request_t **req_ptr);
 
 /* Set access type for a region of pfns.
  * If start_pfn == -1ul, sets the default access type */
@@ -610,13 +610,13 @@ int p2m_get_mem_access(struct domain *d, unsigned long pfn,
 /* Check for emulation and mark vcpu for skipping one instruction
  * upon rescheduling if required. */
 void p2m_mem_access_emulate_check(struct vcpu *v,
-                                  const mem_event_response_t *rsp);
+                                  const vm_event_response_t *rsp);
 
 /* Enable arch specific introspection options (such as MSR interception). */
 void p2m_setup_introspection(struct domain *d);
 
-/* Sanity check for mem_event hardware support */
-static inline bool_t p2m_mem_event_sanity_check(struct domain *d)
+/* Sanity check for vm_event hardware support */
+static inline bool_t p2m_vm_event_sanity_check(struct domain *d)
 {
     return hap_enabled(d) && cpu_has_vmx;
 }

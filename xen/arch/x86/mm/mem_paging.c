@@ -22,13 +22,13 @@
 
 
 #include <asm/p2m.h>
-#include <xen/mem_event.h>
+#include <xen/vm_event.h>
 
 
 int mem_paging_memop(struct domain *d, xen_mem_paging_op_t *mpo)
 {
     int rc = -ENODEV;
-    if ( unlikely(!d->mem_event->paging.ring_page) )
+    if ( unlikely(!d->vm_event->paging.ring_page) )
         return rc;
 
     switch( mpo->op )

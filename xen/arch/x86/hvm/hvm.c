@@ -35,7 +35,7 @@
 #include <xen/paging.h>
 #include <xen/cpu.h>
 #include <xen/wait.h>
-#include <xen/mem_event.h>
+#include <xen/vm_event.h>
 #include <xen/mem_access.h>
 #include <xen/rangeset.h>
 #include <asm/shadow.h>
@@ -66,7 +66,7 @@
 #include <public/hvm/ioreq.h>
 #include <public/version.h>
 #include <public/memory.h>
-#include <public/mem_event.h>
+#include <public/vm_event.h>
 #include <public/arch-x86/cpuid.h>
 
 bool_t __read_mostly hvm_enabled;
@@ -2786,7 +2786,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     struct p2m_domain *p2m;
     int rc, fall_through = 0, paged = 0;
     int sharing_enomem = 0;
-    mem_event_request_t *req_ptr = NULL;
+    vm_event_request_t *req_ptr = NULL;
 
     /* On Nested Virtualization, walk the guest page table.
      * If this succeeds, all is fine.
@@ -2856,7 +2856,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     {
         bool_t violation;
 
-        /* If the access is against the permissions, then send to mem_event */
+        /* If the access is against the permissions, then send to vm_event */
         switch (p2ma)
         {
         case p2m_access_n:
@@ -6360,7 +6360,7 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
     return rc;
 }
 
-static void hvm_mem_event_fill_regs(mem_event_request_t *req)
+static void hvm_mem_event_fill_regs(vm_event_request_t *req)
 {
     const struct cpu_user_regs *regs = guest_cpu_user_regs();
     const struct vcpu *curr = current;
@@ -6392,7 +6392,7 @@ static void hvm_mem_event_fill_regs(mem_event_request_t *req)
     req->regs.x86.cr4 = curr->arch.hvm_vcpu.guest_cr[4];
 }
 
-static int hvm_memory_event_traps(uint64_t parameters, mem_event_request_t *req)
+static int hvm_memory_event_traps(uint64_t parameters, vm_event_request_t *req)
 {
     int rc;
     struct vcpu *v = current;
@@ -6401,7 +6401,7 @@ static int hvm_memory_event_traps(uint64_t parameters, mem_event_request_t *req)
     if ( !(parameters & HVMPME_MODE_MASK) )
         return 0;
 
-    rc = mem_event_claim_slot(d, &d->mem_event->monitor);
+    rc = vm_event_claim_slot(d, &d->vm_event->monitor);
     if ( rc == -ENOSYS )
     {
         /* If there was no ring to handle the event, then
@@ -6413,12 +6413,12 @@ static int hvm_memory_event_traps(uint64_t parameters, mem_event_request_t *req)
 
     if ( (parameters & HVMPME_MODE_MASK) == HVMPME_mode_sync )
     {
-        req->flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
-        mem_event_vcpu_pause(v);
+        req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
+        vm_event_vcpu_pause(v);
     }
 
     hvm_mem_event_fill_regs(req);
-    mem_event_put_request(d, &d->mem_event->monitor, req);
+    vm_event_put_request(d, &d->vm_event->monitor, req);
 
     return 1;
 }
@@ -6426,7 +6426,7 @@ static int hvm_memory_event_traps(uint64_t parameters, mem_event_request_t *req)
 static void hvm_memory_event_cr(uint32_t reason, unsigned long value,
                                 unsigned long old, uint64_t parameters)
 {
-    mem_event_request_t req = {
+    vm_event_request_t req = {
         .reason = reason,
         .vcpu_id = current->vcpu_id,
         .u.mov_to_cr.new_value = value,
@@ -6441,29 +6441,29 @@ static void hvm_memory_event_cr(uint32_t reason, unsigned long value,
 
 void hvm_memory_event_cr0(unsigned long value, unsigned long old) 
 {
-    hvm_memory_event_cr(MEM_EVENT_REASON_MOV_TO_CR0, value, old,
+    hvm_memory_event_cr(VM_EVENT_REASON_MOV_TO_CR0, value, old,
                         current->domain->arch.hvm_domain
                             .params[HVM_PARAM_MEMORY_EVENT_CR0]);
 }
 
 void hvm_memory_event_cr3(unsigned long value, unsigned long old) 
 {
-    hvm_memory_event_cr(MEM_EVENT_REASON_MOV_TO_CR3, value, old,
+    hvm_memory_event_cr(VM_EVENT_REASON_MOV_TO_CR3, value, old,
                         current->domain->arch.hvm_domain
                             .params[HVM_PARAM_MEMORY_EVENT_CR3]);
 }
 
 void hvm_memory_event_cr4(unsigned long value, unsigned long old) 
 {
-    hvm_memory_event_cr(MEM_EVENT_REASON_MOV_TO_CR4, value, old,
+    hvm_memory_event_cr(VM_EVENT_REASON_MOV_TO_CR4, value, old,
                         current->domain->arch.hvm_domain
                             .params[HVM_PARAM_MEMORY_EVENT_CR4]);
 }
 
 void hvm_memory_event_msr(unsigned long msr, unsigned long value)
 {
-    mem_event_request_t req = {
-        .reason = MEM_EVENT_REASON_MOV_TO_MSR,
+    vm_event_request_t req = {
+        .reason = VM_EVENT_REASON_MOV_TO_MSR,
         .vcpu_id = current->vcpu_id,
         .u.mov_to_msr.msr = msr,
         .u.mov_to_msr.value = value,
@@ -6477,8 +6477,8 @@ void hvm_memory_event_msr(unsigned long msr, unsigned long value)
 int hvm_memory_event_int3(unsigned long gla) 
 {
     uint32_t pfec = PFEC_page_present;
-    mem_event_request_t req = {
-        .reason = MEM_EVENT_REASON_SOFTWARE_BREAKPOINT,
+    vm_event_request_t req = {
+        .reason = VM_EVENT_REASON_SOFTWARE_BREAKPOINT,
         .vcpu_id = current->vcpu_id,
         .u.software_breakpoint.gfn = paging_gva_to_gfn(current, gla, &pfec)
     };
@@ -6491,8 +6491,8 @@ int hvm_memory_event_int3(unsigned long gla)
 int hvm_memory_event_single_step(unsigned long gla)
 {
     uint32_t pfec = PFEC_page_present;
-    mem_event_request_t req = {
-        .reason = MEM_EVENT_REASON_SINGLESTEP,
+    vm_event_request_t req = {
+        .reason = VM_EVENT_REASON_SINGLESTEP,
         .vcpu_id = current->vcpu_id,
         .u.singlestep.gfn = paging_gva_to_gfn(current, gla, &pfec)
     };

@@ -1,5 +1,5 @@
 #include <xen/event.h>
-#include <xen/mem_event.h>
+#include <xen/vm_event.h>
 #include <xen/mem_access.h>
 #include <xen/multicall.h>
 #include <compat/memory.h>
@@ -192,7 +192,7 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         if ( copy_from_guest(&mpo, arg, 1) )
             return -EFAULT;
-        rc = do_mem_event_op(cmd, mpo.domain, &mpo);
+        rc = do_vm_event_op(cmd, mpo.domain, &mpo);
         if ( !rc && __copy_to_guest(arg, &mpo, 1) )
             return -EFAULT;
         break;
@@ -206,7 +206,7 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -EFAULT;
         if ( mso.op == XENMEM_sharing_op_audit )
             return mem_sharing_audit(); 
-        rc = do_mem_event_op(cmd, mso.domain, &mso);
+        rc = do_vm_event_op(cmd, mso.domain, &mso);
         if ( !rc && __copy_to_guest(arg, &mso, 1) )
             return -EFAULT;
         break;

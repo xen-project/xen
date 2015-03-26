@@ -21,9 +21,9 @@
  */
 
 #include <xen/iommu.h>
-#include <xen/mem_event.h>
+#include <xen/vm_event.h>
 #include <xen/event.h>
-#include <public/mem_event.h>
+#include <public/vm_event.h>
 #include <asm/domain.h>
 #include <asm/page.h>
 #include <asm/paging.h>

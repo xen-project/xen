@@ -63,7 +63,7 @@ static void close_handler(int sig)
 static void xenpaging_mem_paging_flush_ioemu_cache(struct xenpaging *paging)
 {
     struct xs_handle *xsh = paging->xs_handle;
-    domid_t domain_id = paging->mem_event.domain_id;
+    domid_t domain_id = paging->vm_event.domain_id;
     char path[80];
 
     sprintf(path, "/local/domain/0/device-model/%u/command", domain_id);
@@ -74,7 +74,7 @@ static void xenpaging_mem_paging_flush_ioemu_cache(struct xenpaging *paging)
 static int xenpaging_wait_for_event_or_timeout(struct xenpaging *paging)
 {
     xc_interface *xch = paging->xc_handle;
-    xc_evtchn *xce = paging->mem_event.xce_handle;
+    xc_evtchn *xce = paging->vm_event.xce_handle;
     char **vec, *val;
     unsigned int num;
     struct pollfd fd[2];
@@ -111,7 +111,7 @@ static int xenpaging_wait_for_event_or_timeout(struct xenpaging *paging)
             if ( strcmp(vec[XS_WATCH_TOKEN], watch_token) == 0 )
             {
                 /* If our guest disappeared, set interrupt flag and fall through */
-                if ( xs_is_domain_introduced(paging->xs_handle, paging->mem_event.domain_id) == false )
+                if ( xs_is_domain_introduced(paging->xs_handle, paging->vm_event.domain_id) == false )
                 {
                     xs_unwatch(paging->xs_handle, "@releaseDomain", watch_token);
                     interrupted = SIGQUIT;
@@ -171,7 +171,7 @@ static int xenpaging_get_tot_pages(struct xenpaging *paging)
     xc_domaininfo_t domain_info;
     int rc;
 
-    rc = xc_domain_getinfolist(xch, paging->mem_event.domain_id, 1, &domain_info);
+    rc = xc_domain_getinfolist(xch, paging->vm_event.domain_id, 1, &domain_info);
     if ( rc != 1 )
     {
         PERROR("Error getting domain info");
@@ -231,7 +231,7 @@ static int xenpaging_getopts(struct xenpaging *paging, int argc, char *argv[])
     {
         switch(ch) {
         case 'd':
-            paging->mem_event.domain_id = atoi(optarg);
+            paging->vm_event.domain_id = atoi(optarg);
             break;
         case 'f':
             filename = strdup(optarg);
@@ -264,7 +264,7 @@ static int xenpaging_getopts(struct xenpaging *paging, int argc, char *argv[])
     }
 
     /* Set domain id */
-    if ( !paging->mem_event.domain_id )
+    if ( !paging->vm_event.domain_id )
     {
         printf("Numerical <domain_id> missing!\n");
         return 1;
@@ -312,7 +312,7 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     }
 
     /* write domain ID to watch so we can ignore other domain shutdowns */
-    snprintf(watch_token, sizeof(watch_token), "%u", paging->mem_event.domain_id);
+    snprintf(watch_token, sizeof(watch_token), "%u", paging->vm_event.domain_id);
     if ( xs_watch(paging->xs_handle, "@releaseDomain", watch_token) == false )
     {
         PERROR("Could not bind to shutdown watch\n");
@@ -320,7 +320,7 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     }
 
     /* Watch xenpagings working target */
-    dom_path = xs_get_domain_path(paging->xs_handle, paging->mem_event.domain_id);
+    dom_path = xs_get_domain_path(paging->xs_handle, paging->vm_event.domain_id);
     if ( !dom_path )
     {
         PERROR("Could not find domain path\n");
@@ -339,17 +339,17 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     }
 
     /* Map the ring page */
-    xc_get_hvm_param(xch, paging->mem_event.domain_id, 
+    xc_get_hvm_param(xch, paging->vm_event.domain_id, 
                         HVM_PARAM_PAGING_RING_PFN, &ring_pfn);
     mmap_pfn = ring_pfn;
-    paging->mem_event.ring_page = 
-        xc_map_foreign_batch(xch, paging->mem_event.domain_id, 
+    paging->vm_event.ring_page = 
+        xc_map_foreign_batch(xch, paging->vm_event.domain_id, 
                                 PROT_READ | PROT_WRITE, &mmap_pfn, 1);
     if ( mmap_pfn & XEN_DOMCTL_PFINFO_XTAB )
     {
         /* Map failed, populate ring page */
         rc = xc_domain_populate_physmap_exact(paging->xc_handle, 
-                                              paging->mem_event.domain_id,
+                                              paging->vm_event.domain_id,
                                               1, 0, 0, &ring_pfn);
         if ( rc != 0 )
         {
@@ -358,8 +358,8 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
         }
 
         mmap_pfn = ring_pfn;
-        paging->mem_event.ring_page = 
-            xc_map_foreign_batch(xch, paging->mem_event.domain_id, 
+        paging->vm_event.ring_page = 
+            xc_map_foreign_batch(xch, paging->vm_event.domain_id, 
                                     PROT_READ | PROT_WRITE, &mmap_pfn, 1);
         if ( mmap_pfn & XEN_DOMCTL_PFINFO_XTAB )
         {
@@ -369,8 +369,8 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     }
     
     /* Initialise Xen */
-    rc = xc_mem_paging_enable(xch, paging->mem_event.domain_id,
-                             &paging->mem_event.evtchn_port);
+    rc = xc_mem_paging_enable(xch, paging->vm_event.domain_id,
+                             &paging->vm_event.evtchn_port);
     if ( rc != 0 )
     {
         switch ( errno ) {
@@ -394,40 +394,40 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     }
 
     /* Open event channel */
-    paging->mem_event.xce_handle = xc_evtchn_open(NULL, 0);
-    if ( paging->mem_event.xce_handle == NULL )
+    paging->vm_event.xce_handle = xc_evtchn_open(NULL, 0);
+    if ( paging->vm_event.xce_handle == NULL )
     {
         PERROR("Failed to open event channel");
         goto err;
     }
 
     /* Bind event notification */
-    rc = xc_evtchn_bind_interdomain(paging->mem_event.xce_handle,
-                                    paging->mem_event.domain_id,
-                                    paging->mem_event.evtchn_port);
+    rc = xc_evtchn_bind_interdomain(paging->vm_event.xce_handle,
+                                    paging->vm_event.domain_id,
+                                    paging->vm_event.evtchn_port);
     if ( rc < 0 )
     {
         PERROR("Failed to bind event channel");
         goto err;
     }
 
-    paging->mem_event.port = rc;
+    paging->vm_event.port = rc;
 
     /* Initialise ring */
-    SHARED_RING_INIT((mem_event_sring_t *)paging->mem_event.ring_page);
-    BACK_RING_INIT(&paging->mem_event.back_ring,
-                   (mem_event_sring_t *)paging->mem_event.ring_page,
+    SHARED_RING_INIT((vm_event_sring_t *)paging->vm_event.ring_page);
+    BACK_RING_INIT(&paging->vm_event.back_ring,
+                   (vm_event_sring_t *)paging->vm_event.ring_page,
                    PAGE_SIZE);
 
     /* Now that the ring is set, remove it from the guest's physmap */
     if ( xc_domain_decrease_reservation_exact(xch, 
-                    paging->mem_event.domain_id, 1, 0, &ring_pfn) )
+                    paging->vm_event.domain_id, 1, 0, &ring_pfn) )
         PERROR("Failed to remove ring from guest physmap");
 
     /* Get max_pages from guest if not provided via cmdline */
     if ( !paging->max_pages )
     {
-        rc = xc_domain_getinfolist(xch, paging->mem_event.domain_id, 1,
+        rc = xc_domain_getinfolist(xch, paging->vm_event.domain_id, 1,
                                    &domain_info);
         if ( rc != 1 )
         {
@@ -497,9 +497,9 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
             free(paging->paging_buffer);
         }
 
-        if ( paging->mem_event.ring_page )
+        if ( paging->vm_event.ring_page )
         {
-            munmap(paging->mem_event.ring_page, PAGE_SIZE);
+            munmap(paging->vm_event.ring_page, PAGE_SIZE);
         }
 
         free(dom_path);
@@ -524,28 +524,28 @@ static void xenpaging_teardown(struct xenpaging *paging)
 
     paging->xc_handle = NULL;
     /* Tear down domain paging in Xen */
-    munmap(paging->mem_event.ring_page, PAGE_SIZE);
-    rc = xc_mem_paging_disable(xch, paging->mem_event.domain_id);
+    munmap(paging->vm_event.ring_page, PAGE_SIZE);
+    rc = xc_mem_paging_disable(xch, paging->vm_event.domain_id);
     if ( rc != 0 )
     {
         PERROR("Error tearing down domain paging in xen");
     }
 
     /* Unbind VIRQ */
-    rc = xc_evtchn_unbind(paging->mem_event.xce_handle, paging->mem_event.port);
+    rc = xc_evtchn_unbind(paging->vm_event.xce_handle, paging->vm_event.port);
     if ( rc != 0 )
     {
         PERROR("Error unbinding event port");
     }
-    paging->mem_event.port = -1;
+    paging->vm_event.port = -1;
 
     /* Close event channel */
-    rc = xc_evtchn_close(paging->mem_event.xce_handle);
+    rc = xc_evtchn_close(paging->vm_event.xce_handle);
     if ( rc != 0 )
     {
         PERROR("Error closing event channel");
     }
-    paging->mem_event.xce_handle = NULL;
+    paging->vm_event.xce_handle = NULL;
     
     /* Close connection to xenstore */
     xs_close(paging->xs_handle);
@@ -558,12 +558,12 @@ static void xenpaging_teardown(struct xenpaging *paging)
     }
 }
 
-static void get_request(struct mem_event *mem_event, mem_event_request_t *req)
+static void get_request(struct vm_event *vm_event, vm_event_request_t *req)
 {
-    mem_event_back_ring_t *back_ring;
+    vm_event_back_ring_t *back_ring;
     RING_IDX req_cons;
 
-    back_ring = &mem_event->back_ring;
+    back_ring = &vm_event->back_ring;
     req_cons = back_ring->req_cons;
 
     /* Copy request */
@@ -575,12 +575,12 @@ static void get_request(struct mem_event *mem_event, mem_event_request_t *req)
     back_ring->sring->req_event = req_cons + 1;
 }
 
-static void put_response(struct mem_event *mem_event, mem_event_response_t *rsp)
+static void put_response(struct vm_event *vm_event, vm_event_response_t *rsp)
 {
-    mem_event_back_ring_t *back_ring;
+    vm_event_back_ring_t *back_ring;
     RING_IDX rsp_prod;
 
-    back_ring = &mem_event->back_ring;
+    back_ring = &vm_event->back_ring;
     rsp_prod = back_ring->rsp_prod_pvt;
 
     /* Copy response */
@@ -607,7 +607,7 @@ static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int
     DECLARE_DOMCTL;
 
     /* Nominate page */
-    ret = xc_mem_paging_nominate(xch, paging->mem_event.domain_id, gfn);
+    ret = xc_mem_paging_nominate(xch, paging->vm_event.domain_id, gfn);
     if ( ret < 0 )
     {
         /* unpageable gfn is indicated by EBUSY */
@@ -619,7 +619,7 @@ static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int
     }
 
     /* Map page */
-    page = xc_map_foreign_pages(xch, paging->mem_event.domain_id, PROT_READ, &victim, 1);
+    page = xc_map_foreign_pages(xch, paging->vm_event.domain_id, PROT_READ, &victim, 1);
     if ( page == NULL )
     {
         PERROR("Error mapping page %lx", gfn);
@@ -641,7 +641,7 @@ static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int
     munmap(page, PAGE_SIZE);
 
     /* Tell Xen to evict page */
-    ret = xc_mem_paging_evict(xch, paging->mem_event.domain_id, gfn);
+    ret = xc_mem_paging_evict(xch, paging->vm_event.domain_id, gfn);
     if ( ret < 0 )
     {
         /* A gfn in use is indicated by EBUSY */
@@ -671,10 +671,10 @@ static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int
     return ret;
 }
 
-static int xenpaging_resume_page(struct xenpaging *paging, mem_event_response_t *rsp, int notify_policy)
+static int xenpaging_resume_page(struct xenpaging *paging, vm_event_response_t *rsp, int notify_policy)
 {
     /* Put the page info on the ring */
-    put_response(&paging->mem_event, rsp);
+    put_response(&paging->vm_event, rsp);
 
     /* Notify policy of page being paged in */
     if ( notify_policy )
@@ -693,7 +693,7 @@ static int xenpaging_resume_page(struct xenpaging *paging, mem_event_response_t 
     }
 
     /* Tell Xen page is ready */
-    return xc_evtchn_notify(paging->mem_event.xce_handle, paging->mem_event.port);
+    return xc_evtchn_notify(paging->vm_event.xce_handle, paging->vm_event.port);
 }
 
 static int xenpaging_populate_page(struct xenpaging *paging, unsigned long gfn, int i)
@@ -715,7 +715,7 @@ static int xenpaging_populate_page(struct xenpaging *paging, unsigned long gfn, 
     do
     {
         /* Tell Xen to allocate a page for the domain */
-        ret = xc_mem_paging_load(xch, paging->mem_event.domain_id, gfn, paging->paging_buffer);
+        ret = xc_mem_paging_load(xch, paging->vm_event.domain_id, gfn, paging->paging_buffer);
         if ( ret < 0 )
         {
             if ( errno == ENOMEM )
@@ -857,8 +857,8 @@ int main(int argc, char *argv[])
 {
     struct sigaction act;
     struct xenpaging *paging;
-    mem_event_request_t req;
-    mem_event_response_t rsp;
+    vm_event_request_t req;
+    vm_event_response_t rsp;
     int num, prev_num = 0;
     int slot;
     int tot_pages;
@@ -875,7 +875,7 @@ int main(int argc, char *argv[])
     xch = paging->xc_handle;
 
     DPRINTF("starting %s for domain_id %u with pagefile %s\n",
-            argv[0], paging->mem_event.domain_id, filename);
+            argv[0], paging->vm_event.domain_id, filename);
 
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     act.sa_handler = close_handler;
@@ -904,12 +904,12 @@ int main(int argc, char *argv[])
             DPRINTF("Got event from Xen\n");
         }
 
-        while ( RING_HAS_UNCONSUMED_REQUESTS(&paging->mem_event.back_ring) )
+        while ( RING_HAS_UNCONSUMED_REQUESTS(&paging->vm_event.back_ring) )
         {
             /* Indicate possible error */
             rc = 1;
 
-            get_request(&paging->mem_event, &req);
+            get_request(&paging->vm_event, &req);
 
             if ( req.u.mem_paging.gfn > paging->max_pages )
             {
@@ -971,12 +971,12 @@ int main(int argc, char *argv[])
                 DPRINTF("page %s populated (domain = %d; vcpu = %d;"
                         " gfn = %"PRIx64"; paused = %d; evict_fail = %d)\n",
                         req.u.mem_paging.flags & MEM_PAGING_EVICT_FAIL ? "not" : "already",
-                        paging->mem_event.domain_id, req.vcpu_id, req.u.mem_paging.gfn,
-                        !!(req.flags & MEM_EVENT_FLAG_VCPU_PAUSED) ,
+                        paging->vm_event.domain_id, req.vcpu_id, req.u.mem_paging.gfn,
+                        !!(req.flags & VM_EVENT_FLAG_VCPU_PAUSED) ,
                         !!(req.u.mem_paging.flags & MEM_PAGING_EVICT_FAIL) );
 
                 /* Tell Xen to resume the vcpu */
-                if (( req.flags & MEM_EVENT_FLAG_VCPU_PAUSED ) ||
+                if (( req.flags & VM_EVENT_FLAG_VCPU_PAUSED ) ||
                     ( req.u.mem_paging.flags & MEM_PAGING_EVICT_FAIL ))
                 {
                     /* Prepare the response */

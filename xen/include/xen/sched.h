@@ -23,7 +23,7 @@
 #include <public/domctl.h>
 #include <public/sysctl.h>
 #include <public/vcpu.h>
-#include <public/mem_event.h>
+#include <public/vm_event.h>
 #include <public/event_channel.h>
 
 #ifdef CONFIG_COMPAT
@@ -214,8 +214,8 @@ struct vcpu
     unsigned long    pause_flags;
     atomic_t         pause_count;
 
-    /* VCPU paused for mem_event replies. */
-    atomic_t         mem_event_pause_count;
+    /* VCPU paused for vm_event replies. */
+    atomic_t         vm_event_pause_count;
     /* VCPU paused by system controller. */
     int              controller_pause_count;
 
@@ -257,8 +257,8 @@ struct vcpu
 #define domain_unlock(d) spin_unlock_recursive(&(d)->domain_lock)
 #define domain_is_locked(d) spin_is_locked(&(d)->domain_lock)
 
-/* Memory event */
-struct mem_event_domain
+/* VM event */
+struct vm_event_domain
 {
     /* ring lock */
     spinlock_t ring_lock;
@@ -269,10 +269,10 @@ struct mem_event_domain
     void *ring_page;
     struct page_info *ring_pg_struct;
     /* front-end ring */
-    mem_event_front_ring_t front_ring;
+    vm_event_front_ring_t front_ring;
     /* event channel port (vcpu0 only) */
     int xen_port;
-    /* mem_event bit for vcpu->pause_flags */
+    /* vm_event bit for vcpu->pause_flags */
     int pause_flag;
     /* list of vcpus waiting for room in the ring */
     struct waitqueue_head wq;
@@ -282,14 +282,14 @@ struct mem_event_domain
     unsigned int last_vcpu_wake_up;
 };
 
-struct mem_event_per_domain
+struct vm_event_per_domain
 {
     /* Memory sharing support */
-    struct mem_event_domain share;
+    struct vm_event_domain share;
     /* Memory paging support */
-    struct mem_event_domain paging;
+    struct vm_event_domain paging;
     /* VM event monitor support */
-    struct mem_event_domain monitor;
+    struct vm_event_domain monitor;
 };
 
 struct evtchn_port_ops;
@@ -442,8 +442,8 @@ struct domain
 
     struct lock_profile_qhead profile_head;
 
-    /* Various mem_events */
-    struct mem_event_per_domain *mem_event;
+    /* Various vm_events */
+    struct vm_event_per_domain *vm_event;
 
     /*
      * Can be specified by the user. If that is not the case, it is

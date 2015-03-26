@@ -142,8 +142,8 @@ struct xsm_operations {
     int (*get_vnumainfo) (struct domain *d);
 
 #ifdef HAS_MEM_ACCESS
-    int (*mem_event_control) (struct domain *d, int mode, int op);
-    int (*mem_event_op) (struct domain *d, int op);
+    int (*vm_event_control) (struct domain *d, int mode, int op);
+    int (*vm_event_op) (struct domain *d, int op);
 #endif
 
 #ifdef CONFIG_X86
@@ -544,14 +544,14 @@ static inline int xsm_get_vnumainfo (xsm_default_t def, struct domain *d)
 }
 
 #ifdef HAS_MEM_ACCESS
-static inline int xsm_mem_event_control (xsm_default_t def, struct domain *d, int mode, int op)
+static inline int xsm_vm_event_control (xsm_default_t def, struct domain *d, int mode, int op)
 {
-    return xsm_ops->mem_event_control(d, mode, op);
+    return xsm_ops->vm_event_control(d, mode, op);
 }
 
-static inline int xsm_mem_event_op (xsm_default_t def, struct domain *d, int op)
+static inline int xsm_vm_event_op (xsm_default_t def, struct domain *d, int op)
 {
-    return xsm_ops->mem_event_op(d, op);
+    return xsm_ops->vm_event_op(d, op);
 }
 #endif
 

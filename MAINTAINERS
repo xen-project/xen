@@ -375,10 +375,10 @@ F:	xen/arch/x86/mm/mem_sharing.c
 F:	xen/arch/x86/mm/mem_paging.c
 F:	tools/memshr
 
-MEMORY EVENT AND ACCESS
+VM EVENT AND MEM ACCESS
 M:	Tim Deegan <tim@xen.org>
 S:	Supported
-F:	xen/common/mem_event.c
+F:	xen/common/vm_event.c
 F:	xen/common/mem_access.c
 
 XENTRACE

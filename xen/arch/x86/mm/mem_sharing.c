@@ -28,7 +28,7 @@
 #include <xen/grant_table.h>
 #include <xen/sched.h>
 #include <xen/rcupdate.h>
-#include <xen/mem_event.h>
+#include <xen/vm_event.h>
 #include <asm/page.h>
 #include <asm/string.h>
 #include <asm/p2m.h>
@@ -559,24 +559,24 @@ int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
 {
     struct vcpu *v = current;
     int rc;
-    mem_event_request_t req = {
-        .reason = MEM_EVENT_REASON_MEM_SHARING,
+    vm_event_request_t req = {
+        .reason = VM_EVENT_REASON_MEM_SHARING,
         .vcpu_id = v->vcpu_id,
         .u.mem_sharing.gfn = gfn,
         .u.mem_sharing.p2mt = p2m_ram_shared
     };
 
-    if ( (rc = __mem_event_claim_slot(d, 
-                        &d->mem_event->share, allow_sleep)) < 0 )
+    if ( (rc = __vm_event_claim_slot(d, 
+                        &d->vm_event->share, allow_sleep)) < 0 )
         return rc;
 
     if ( v->domain == d )
     {
-        req.flags = MEM_EVENT_FLAG_VCPU_PAUSED;
-        mem_event_vcpu_pause(v);
+        req.flags = VM_EVENT_FLAG_VCPU_PAUSED;
+        vm_event_vcpu_pause(v);
     }
 
-    mem_event_put_request(d, &d->mem_event->share, &req);
+    vm_event_put_request(d, &d->vm_event->share, &req);
 
     return 0;
 }
@@ -593,20 +593,20 @@ unsigned int mem_sharing_get_nr_shared_mfns(void)
 
 int mem_sharing_sharing_resume(struct domain *d)
 {
-    mem_event_response_t rsp;
+    vm_event_response_t rsp;
 
     /* Get all requests off the ring */
-    while ( mem_event_get_response(d, &d->mem_event->share, &rsp) )
+    while ( vm_event_get_response(d, &d->vm_event->share, &rsp) )
     {
         struct vcpu *v;
 
-        if ( rsp.version != MEM_EVENT_INTERFACE_VERSION )
+        if ( rsp.version != VM_EVENT_INTERFACE_VERSION )
         {
-            printk(XENLOG_G_WARNING "mem_event interface version mismatch\n");
+            printk(XENLOG_G_WARNING "vm_event interface version mismatch\n");
             continue;
         }
 
-        if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
+        if ( rsp.flags & VM_EVENT_FLAG_DUMMY )
             continue;
 
         /* Validate the vcpu_id in the response. */
@@ -616,8 +616,8 @@ int mem_sharing_sharing_resume(struct domain *d)
         v = d->vcpu[rsp.vcpu_id];
 
         /* Unpause domain/vcpu */
-        if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
-            mem_event_vcpu_unpause(v);
+        if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )
+            vm_event_vcpu_unpause(v);
     }
 
     return 0;
@@ -1144,7 +1144,7 @@ err_out:
 
 /* A note on the rationale for unshare error handling:
  *  1. Unshare can only fail with ENOMEM. Any other error conditions BUG_ON()'s
- *  2. We notify a potential dom0 helper through a mem_event ring. But we
+ *  2. We notify a potential dom0 helper through a vm_event ring. But we
  *     allow the notification to not go to sleep. If the event ring is full 
  *     of ENOMEM warnings, then it's on the ball.
  *  3. We cannot go to sleep until the unshare is resolved, because we might

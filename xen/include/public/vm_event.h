@@ -1,5 +1,5 @@
 /******************************************************************************
- * mem_event.h
+ * vm_event.h
  *
  * Memory event common structures.
  *
@@ -24,12 +24,12 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef _XEN_PUBLIC_MEM_EVENT_H
-#define _XEN_PUBLIC_MEM_EVENT_H
+#ifndef _XEN_PUBLIC_VM_EVENT_H
+#define _XEN_PUBLIC_VM_EVENT_H
 
 #include "xen.h"
 
-#define MEM_EVENT_INTERFACE_VERSION 0x00000001
+#define VM_EVENT_INTERFACE_VERSION 0x00000001
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
@@ -44,44 +44,41 @@
  *  paused
  * VCPU_PAUSED in a response signals to unpause the vCPU
  */
-#define MEM_EVENT_FLAG_VCPU_PAUSED     (1 << 0)
-
-/*
- * Flags to aid debugging mem_event
- */
-#define MEM_EVENT_FLAG_FOREIGN         (1 << 1)
-#define MEM_EVENT_FLAG_DUMMY           (1 << 2)
+#define VM_EVENT_FLAG_VCPU_PAUSED     (1 << 0)
+/* Flags to aid debugging mem_event */
+#define VM_EVENT_FLAG_FOREIGN         (1 << 1)
+#define VM_EVENT_FLAG_DUMMY           (1 << 2)
 
 /*
  * Reasons for the vm event request
  */
 
 /* Default case */
-#define MEM_EVENT_REASON_UNKNOWN                 0
+#define VM_EVENT_REASON_UNKNOWN                 0
 /* Memory access violation */
-#define MEM_EVENT_REASON_MEM_ACCESS              1
+#define VM_EVENT_REASON_MEM_ACCESS              1
 /* Memory sharing event */
-#define MEM_EVENT_REASON_MEM_SHARING             2
+#define VM_EVENT_REASON_MEM_SHARING             2
 /* Memory paging event */
-#define MEM_EVENT_REASON_MEM_PAGING              3
+#define VM_EVENT_REASON_MEM_PAGING              3
 /* CR0 was updated */
-#define MEM_EVENT_REASON_MOV_TO_CR0              4
+#define VM_EVENT_REASON_MOV_TO_CR0              4
 /* CR3 was updated */
-#define MEM_EVENT_REASON_MOV_TO_CR3              5
+#define VM_EVENT_REASON_MOV_TO_CR3              5
 /* CR4 was updated */
-#define MEM_EVENT_REASON_MOV_TO_CR4              6
+#define VM_EVENT_REASON_MOV_TO_CR4              6
 /* An MSR was updated. Does NOT honour HVMPME_onchangeonly */
-#define MEM_EVENT_REASON_MOV_TO_MSR              7
+#define VM_EVENT_REASON_MOV_TO_MSR              7
 /* Debug operation executed (e.g. int3) */
-#define MEM_EVENT_REASON_SOFTWARE_BREAKPOINT     8
+#define VM_EVENT_REASON_SOFTWARE_BREAKPOINT     8
 /* Single-step (e.g. MTF) */
-#define MEM_EVENT_REASON_SINGLESTEP              9
+#define VM_EVENT_REASON_SINGLESTEP              9
 
 /*
  * Using a custom struct (not hvm_hw_cpu) so as to not fill
  * the mem_event ring buffer too quickly.
  */
-struct mem_event_regs_x86 {
+struct vm_event_regs_x86 {
     uint64_t rax;
     uint64_t rcx;
     uint64_t rdx;
@@ -152,7 +149,7 @@ struct mem_event_regs_x86 {
  */
 #define MEM_ACCESS_EMULATE_NOWRITE      (1 << 7)
 
-struct mem_event_mem_access {
+struct vm_event_mem_access {
     uint64_t gfn;
     uint64_t offset;
     uint64_t gla;   /* if flags has MEM_ACCESS_GLA_VALID set */
@@ -160,16 +157,17 @@ struct mem_event_mem_access {
     uint32_t _pad;
 };
 
-struct mem_event_mov_to_cr {
+struct vm_event_mov_to_cr {
     uint64_t new_value;
     uint64_t old_value;
 };
 
-struct mem_event_debug {
+struct vm_event_debug {
     uint64_t gfn;
+    uint32_t _pad;
 };
 
-struct mem_event_mov_to_msr {
+struct vm_event_mov_to_msr {
     uint64_t msr;
     uint64_t value;
 };
@@ -177,43 +175,43 @@ struct mem_event_mov_to_msr {
 #define MEM_PAGING_DROP_PAGE       (1 << 0)
 #define MEM_PAGING_EVICT_FAIL      (1 << 1)
 
-struct mem_event_paging {
+struct vm_event_paging {
     uint64_t gfn;
     uint32_t p2mt;
     uint32_t flags;
 };
 
-struct mem_event_sharing {
+struct vm_event_sharing {
     uint64_t gfn;
     uint32_t p2mt;
     uint32_t _pad;
 };
 
-typedef struct mem_event_st {
-    uint32_t version;   /* MEM_EVENT_INTERFACE_VERSION */
-    uint32_t flags;     /* MEM_EVENT_FLAG_* */
-    uint32_t reason;    /* MEM_EVENT_REASON_* */
+typedef struct vm_event_st {
+    uint32_t version;   /* VM_EVENT_INTERFACE_VERSION */
+    uint32_t flags;     /* VM_EVENT_FLAG_* */
+    uint32_t reason;    /* VM_EVENT_REASON_* */
     uint32_t vcpu_id;
 
     union {
-        struct mem_event_paging                mem_paging;
-        struct mem_event_sharing               mem_sharing;
-        struct mem_event_mem_access            mem_access;
-        struct mem_event_mov_to_cr             mov_to_cr;
-        struct mem_event_mov_to_msr            mov_to_msr;
-        struct mem_event_debug                 software_breakpoint;
-        struct mem_event_debug                 singlestep;
+        struct vm_event_paging                mem_paging;
+        struct vm_event_sharing               mem_sharing;
+        struct vm_event_mem_access            mem_access;
+        struct vm_event_mov_to_cr             mov_to_cr;
+        struct vm_event_mov_to_msr            mov_to_msr;
+        struct vm_event_debug                 software_breakpoint;
+        struct vm_event_debug                 singlestep;
     } u;
 
     union {
-        struct mem_event_regs_x86 x86;
+        struct vm_event_regs_x86 x86;
     } regs;
-} mem_event_request_t, mem_event_response_t;
+} vm_event_request_t, vm_event_response_t;
 
-DEFINE_RING_TYPES(mem_event, mem_event_request_t, mem_event_response_t);
+DEFINE_RING_TYPES(vm_event, vm_event_request_t, vm_event_response_t);
 
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
-#endif /* _XEN_PUBLIC_MEM_EVENT_H */
+#endif /* _XEN_PUBLIC_VM_EVENT_H */
 
 /*
  * Local variables:

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * xc_mem_event.c
+ * xc_vm_event.c
  *
  * Interface to low-level memory event functionality.
  *
@@ -23,25 +23,25 @@
 
 #include "xc_private.h"
 
-int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
-                         unsigned int mode, uint32_t *port)
+int xc_vm_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
+                        unsigned int mode, uint32_t *port)
 {
     DECLARE_DOMCTL;
     int rc;
 
-    domctl.cmd = XEN_DOMCTL_mem_event_op;
+    domctl.cmd = XEN_DOMCTL_vm_event_op;
     domctl.domain = domain_id;
-    domctl.u.mem_event_op.op = op;
-    domctl.u.mem_event_op.mode = mode;
-    
+    domctl.u.vm_event_op.op = op;
+    domctl.u.vm_event_op.mode = mode;
+
     rc = do_domctl(xch, &domctl);
     if ( !rc && port )
-        *port = domctl.u.mem_event_op.port;
+        *port = domctl.u.vm_event_op.port;
     return rc;
 }
 
-void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
-                          uint32_t *port, int enable_introspection)
+void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
+                         uint32_t *port, int enable_introspection)
 {
     void *ring_page = NULL;
     uint64_t pfn;
@@ -99,26 +99,26 @@ void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
     switch ( param )
     {
     case HVM_PARAM_PAGING_RING_PFN:
-        op = XEN_MEM_EVENT_PAGING_ENABLE;
-        mode = XEN_DOMCTL_MEM_EVENT_OP_PAGING;
+        op = XEN_VM_EVENT_PAGING_ENABLE;
+        mode = XEN_DOMCTL_VM_EVENT_OP_PAGING;
         break;
 
     case HVM_PARAM_MONITOR_RING_PFN:
         if ( enable_introspection )
-            op = XEN_MEM_EVENT_MONITOR_ENABLE_INTROSPECTION;
+            op = XEN_VM_EVENT_MONITOR_ENABLE_INTROSPECTION;
         else
-            op = XEN_MEM_EVENT_MONITOR_ENABLE;
-        mode = XEN_DOMCTL_MEM_EVENT_OP_MONITOR;
+            op = XEN_VM_EVENT_MONITOR_ENABLE;
+        mode = XEN_DOMCTL_VM_EVENT_OP_MONITOR;
         break;
 
     case HVM_PARAM_SHARING_RING_PFN:
-        op = XEN_MEM_EVENT_SHARING_ENABLE;
-        mode = XEN_DOMCTL_MEM_EVENT_OP_SHARING;
+        op = XEN_VM_EVENT_SHARING_ENABLE;
+        mode = XEN_DOMCTL_VM_EVENT_OP_SHARING;
         break;
 
     /*
      * This is for the outside chance that the HVM_PARAM is valid but is invalid
-     * as far as mem_event goes.
+     * as far as vm_event goes.
      */
     default:
         errno = EINVAL;
@@ -126,10 +126,10 @@ void *xc_mem_event_enable(xc_interface *xch, domid_t domain_id, int param,
         goto out;
     }
 
-    rc1 = xc_mem_event_control(xch, domain_id, op, mode, port);
+    rc1 = xc_vm_event_control(xch, domain_id, op, mode, port);
     if ( rc1 != 0 )
     {
-        PERROR("Failed to enable mem_event\n");
+        PERROR("Failed to enable vm_event\n");
         goto out;
     }
 

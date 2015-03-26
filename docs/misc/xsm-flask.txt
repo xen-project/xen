@@ -87,7 +87,7 @@ __HYPERVISOR_domctl (xen/include/public/domctl.h)
  * XEN_DOMCTL_set_machine_address_size
  * XEN_DOMCTL_debug_op
  * XEN_DOMCTL_gethvmcontext_partial
- * XEN_DOMCTL_mem_event_op
+ * XEN_DOMCTL_vm_event_op
  * XEN_DOMCTL_mem_sharing_op
  * XEN_DOMCTL_setvcpuextstate
  * XEN_DOMCTL_getvcpuextstate

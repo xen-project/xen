@@ -54,7 +54,7 @@ obj-y += rbtree.o
 obj-y += lzo.o
 obj-$(HAS_PDX) += pdx.o
 obj-$(HAS_MEM_ACCESS) += mem_access.o
-obj-$(HAS_MEM_ACCESS) += mem_event.o
+obj-$(HAS_MEM_ACCESS) += vm_event.o
 
 obj-bin-$(CONFIG_X86) += $(foreach n,decompress bunzip2 unxz unlzma unlzo unlz4 earlycpio,$(n).init.o)
 

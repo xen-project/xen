@@ -25,9 +25,9 @@
  */
 
 #include <xen/iommu.h>
-#include <xen/mem_event.h>
+#include <xen/vm_event.h>
 #include <xen/event.h>
-#include <public/mem_event.h>
+#include <public/vm_event.h>
 #include <asm/domain.h>
 #include <asm/page.h>
 #include <asm/paging.h>
@@ -1081,8 +1081,8 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
 void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
                                 p2m_type_t p2mt)
 {
-    mem_event_request_t req = {
-        .reason = MEM_EVENT_REASON_MEM_PAGING,
+    vm_event_request_t req = {
+        .reason = VM_EVENT_REASON_MEM_PAGING,
         .u.mem_paging.gfn = gfn
     };
 
@@ -1090,7 +1090,7 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
      * correctness of the guest execution at this point.  If this is the only
      * page that happens to be paged-out, we'll be okay..  but it's likely the
      * guest will crash shortly anyways. */
-    int rc = mem_event_claim_slot(d, &d->mem_event->paging);
+    int rc = vm_event_claim_slot(d, &d->vm_event->paging);
     if ( rc < 0 )
         return;
 
@@ -1104,7 +1104,7 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
         /* Evict will fail now, tag this request for pager */
         req.u.mem_paging.flags |= MEM_PAGING_EVICT_FAIL;
 
-    mem_event_put_request(d, &d->mem_event->paging, &req);
+    vm_event_put_request(d, &d->vm_event->paging, &req);
 }
 
 /**
@@ -1131,8 +1131,8 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
 void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
 {
     struct vcpu *v = current;
-    mem_event_request_t req = {
-        .reason = MEM_EVENT_REASON_MEM_PAGING,
+    vm_event_request_t req = {
+        .reason = VM_EVENT_REASON_MEM_PAGING,
         .u.mem_paging.gfn = gfn
     };
     p2m_type_t p2mt;
@@ -1141,7 +1141,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     /* We're paging. There should be a ring */
-    int rc = mem_event_claim_slot(d, &d->mem_event->paging);
+    int rc = vm_event_claim_slot(d, &d->vm_event->paging);
     if ( rc == -ENOSYS )
     {
         gdprintk(XENLOG_ERR, "Domain %hu paging gfn %lx yet no ring "
@@ -1172,14 +1172,14 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     /* Pause domain if request came from guest and gfn has paging type */
     if ( p2m_is_paging(p2mt) && v->domain == d )
     {
-        mem_event_vcpu_pause(v);
-        req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
+        vm_event_vcpu_pause(v);
+        req.flags |= VM_EVENT_FLAG_VCPU_PAUSED;
     }
     /* No need to inform pager if the gfn is not in the page-out path */
     else if ( p2mt != p2m_ram_paging_out && p2mt != p2m_ram_paged )
     {
         /* gfn is already on its way back and vcpu is not paused */
-        mem_event_cancel_slot(d, &d->mem_event->paging);
+        vm_event_cancel_slot(d, &d->vm_event->paging);
         return;
     }
 
@@ -1187,7 +1187,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     req.u.mem_paging.p2mt = p2mt;
     req.vcpu_id = v->vcpu_id;
 
-    mem_event_put_request(d, &d->mem_event->paging, &req);
+    vm_event_put_request(d, &d->vm_event->paging, &req);
 }
 
 /**
@@ -1296,23 +1296,23 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
 void p2m_mem_paging_resume(struct domain *d)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    mem_event_response_t rsp;
+    vm_event_response_t rsp;
     p2m_type_t p2mt;
     p2m_access_t a;
     mfn_t mfn;
 
     /* Pull all responses off the ring */
-    while( mem_event_get_response(d, &d->mem_event->paging, &rsp) )
+    while( vm_event_get_response(d, &d->vm_event->paging, &rsp) )
     {
         struct vcpu *v;
 
-        if ( rsp.version != MEM_EVENT_INTERFACE_VERSION )
+        if ( rsp.version != VM_EVENT_INTERFACE_VERSION )
         {
-            printk(XENLOG_G_WARNING "mem_event interface version mismatch\n");
+            printk(XENLOG_G_WARNING "vm_event interface version mismatch\n");
             continue;
         }
 
-        if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
+        if ( rsp.flags & VM_EVENT_FLAG_DUMMY )
             continue;
 
         /* Validate the vcpu_id in the response. */
@@ -1339,12 +1339,12 @@ void p2m_mem_paging_resume(struct domain *d)
             gfn_unlock(p2m, gfn, 0);
         }
         /* Unpause domain */
-        if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
-            mem_event_vcpu_unpause(v);
+        if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )
+            vm_event_vcpu_unpause(v);
     }
 }
 
-static void p2m_mem_event_fill_regs(mem_event_request_t *req)
+static void p2m_vm_event_fill_regs(vm_event_request_t *req)
 {
     const struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct segment_register seg;
@@ -1400,14 +1400,14 @@ static void p2m_mem_event_fill_regs(mem_event_request_t *req)
 }
 
 void p2m_mem_access_emulate_check(struct vcpu *v,
-                                 const mem_event_response_t *rsp)
+                                  const vm_event_response_t *rsp)
 {
     /* Mark vcpu for skipping one instruction upon rescheduling. */
     if ( rsp->flags & MEM_ACCESS_EMULATE )
     {
         xenmem_access_t access;
         bool_t violation = 1;
-        const struct mem_event_mem_access *data = &rsp->u.mem_access;
+        const struct vm_event_mem_access *data = &rsp->u.mem_access;
 
         if ( p2m_get_mem_access(v->domain, data->gfn, &access) == 0 )
         {
@@ -1450,7 +1450,7 @@ void p2m_mem_access_emulate_check(struct vcpu *v,
             }
         }
 
-        v->arch.mem_event.emulate_flags = violation ? rsp->flags : 0;
+        v->arch.vm_event.emulate_flags = violation ? rsp->flags : 0;
     }
 }
 
@@ -1465,7 +1465,7 @@ void p2m_setup_introspection(struct domain *d)
 
 bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                             struct npfec npfec,
-                            mem_event_request_t **req_ptr)
+                            vm_event_request_t **req_ptr)
 {
     struct vcpu *v = current;
     unsigned long gfn = gpa >> PAGE_SHIFT;
@@ -1474,7 +1474,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     mfn_t mfn;
     p2m_type_t p2mt;
     p2m_access_t p2ma;
-    mem_event_request_t *req;
+    vm_event_request_t *req;
     int rc;
     unsigned long eip = guest_cpu_user_regs()->eip;
 
@@ -1501,13 +1501,13 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     gfn_unlock(p2m, gfn, 0);
 
     /* Otherwise, check if there is a memory event listener, and send the message along */
-    if ( !mem_event_check_ring(&d->mem_event->monitor) || !req_ptr ) 
+    if ( !vm_event_check_ring(&d->vm_event->monitor) || !req_ptr ) 
     {
         /* No listener */
         if ( p2m->access_required ) 
         {
             gdprintk(XENLOG_INFO, "Memory access permissions failure, "
-                                  "no mem_event listener VCPU %d, dom %d\n",
+                                  "no vm_event listener VCPU %d, dom %d\n",
                                   v->vcpu_id, d->domain_id);
             domain_crash(v->domain);
             return 0;
@@ -1530,40 +1530,40 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
         }
     }
 
-    /* The previous mem_event reply does not match the current state. */
-    if ( v->arch.mem_event.gpa != gpa || v->arch.mem_event.eip != eip )
+    /* The previous vm_event reply does not match the current state. */
+    if ( v->arch.vm_event.gpa != gpa || v->arch.vm_event.eip != eip )
     {
-        /* Don't emulate the current instruction, send a new mem_event. */
-        v->arch.mem_event.emulate_flags = 0;
+        /* Don't emulate the current instruction, send a new vm_event. */
+        v->arch.vm_event.emulate_flags = 0;
 
         /*
          * Make sure to mark the current state to match it again against
-         * the new mem_event about to be sent.
+         * the new vm_event about to be sent.
          */
-        v->arch.mem_event.gpa = gpa;
-        v->arch.mem_event.eip = eip;
+        v->arch.vm_event.gpa = gpa;
+        v->arch.vm_event.eip = eip;
     }
 
-    if ( v->arch.mem_event.emulate_flags )
+    if ( v->arch.vm_event.emulate_flags )
     {
-        hvm_mem_access_emulate_one((v->arch.mem_event.emulate_flags &
+        hvm_mem_access_emulate_one((v->arch.vm_event.emulate_flags &
                                     MEM_ACCESS_EMULATE_NOWRITE) != 0,
                                    TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
 
-        v->arch.mem_event.emulate_flags = 0;
+        v->arch.vm_event.emulate_flags = 0;
         return 1;
     }
 
     *req_ptr = NULL;
-    req = xzalloc(mem_event_request_t);
+    req = xzalloc(vm_event_request_t);
     if ( req )
     {
         *req_ptr = req;
-        req->reason = MEM_EVENT_REASON_MEM_ACCESS;
+        req->reason = VM_EVENT_REASON_MEM_ACCESS;
 
         /* Pause the current VCPU */
         if ( p2ma != p2m_access_n2rwx )
-            req->flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
+            req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
 
         /* Send request to mem event */
         req->u.mem_access.gfn = gfn;
@@ -1583,12 +1583,12 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
         req->u.mem_access.flags |= npfec.insn_fetch     ? MEM_ACCESS_X : 0;
         req->vcpu_id = v->vcpu_id;
 
-        p2m_mem_event_fill_regs(req);
+        p2m_vm_event_fill_regs(req);
     }
 
     /* Pause the current VCPU */
     if ( p2ma != p2m_access_n2rwx )
-        mem_event_vcpu_pause(v);
+        vm_event_vcpu_pause(v);
 
     /* VCPU may be paused, return whether we promoted automatically */
     return (p2ma == p2m_access_n2rwx);

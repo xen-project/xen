@@ -39,7 +39,7 @@
 #include <sys/poll.h>
 
 #include <xenctrl.h>
-#include <xen/mem_event.h>
+#include <xen/vm_event.h>
 
 #define DPRINTF(a, b...) fprintf(stderr, a, ## b)
 #define ERROR(a, b...) fprintf(stderr, a "\n", ## b)
@@ -91,26 +91,26 @@ static inline int spin_trylock(spinlock_t *lock)
     return !test_and_set_bit(1, lock);
 }
 
-#define mem_event_ring_lock_init(_m)  spin_lock_init(&(_m)->ring_lock)
-#define mem_event_ring_lock(_m)       spin_lock(&(_m)->ring_lock)
-#define mem_event_ring_unlock(_m)     spin_unlock(&(_m)->ring_lock)
+#define vm_event_ring_lock_init(_m)  spin_lock_init(&(_m)->ring_lock)
+#define vm_event_ring_lock(_m)       spin_lock(&(_m)->ring_lock)
+#define vm_event_ring_unlock(_m)     spin_unlock(&(_m)->ring_lock)
 
-typedef struct mem_event {
+typedef struct vm_event {
     domid_t domain_id;
     xc_evtchn *xce_handle;
     int port;
-    mem_event_back_ring_t back_ring;
+    vm_event_back_ring_t back_ring;
     uint32_t evtchn_port;
     void *ring_page;
     spinlock_t ring_lock;
-} mem_event_t;
+} vm_event_t;
 
 typedef struct xenaccess {
     xc_interface *xc_handle;
 
     xc_domaininfo_t    *domain_info;
 
-    mem_event_t mem_event;
+    vm_event_t vm_event;
 } xenaccess_t;
 
 static int interrupted;
@@ -170,13 +170,13 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
         return 0;
 
     /* Tear down domain xenaccess in Xen */
-    if ( xenaccess->mem_event.ring_page )
-        munmap(xenaccess->mem_event.ring_page, XC_PAGE_SIZE);
+    if ( xenaccess->vm_event.ring_page )
+        munmap(xenaccess->vm_event.ring_page, XC_PAGE_SIZE);
 
     if ( mem_access_enable )
     {
         rc = xc_mem_access_disable(xenaccess->xc_handle,
-                                   xenaccess->mem_event.domain_id);
+                                   xenaccess->vm_event.domain_id);
         if ( rc != 0 )
         {
             ERROR("Error tearing down domain xenaccess in xen");
@@ -186,8 +186,8 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
     /* Unbind VIRQ */
     if ( evtchn_bind )
     {
-        rc = xc_evtchn_unbind(xenaccess->mem_event.xce_handle,
-                              xenaccess->mem_event.port);
+        rc = xc_evtchn_unbind(xenaccess->vm_event.xce_handle,
+                              xenaccess->vm_event.port);
         if ( rc != 0 )
         {
             ERROR("Error unbinding event port");
@@ -197,7 +197,7 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
     /* Close event channel */
     if ( evtchn_open )
     {
-        rc = xc_evtchn_close(xenaccess->mem_event.xce_handle);
+        rc = xc_evtchn_close(xenaccess->vm_event.xce_handle);
         if ( rc != 0 )
         {
             ERROR("Error closing event channel");
@@ -239,17 +239,17 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     xenaccess->xc_handle = xch;
 
     /* Set domain id */
-    xenaccess->mem_event.domain_id = domain_id;
+    xenaccess->vm_event.domain_id = domain_id;
 
     /* Initialise lock */
-    mem_event_ring_lock_init(&xenaccess->mem_event);
+    vm_event_ring_lock_init(&xenaccess->vm_event);
 
     /* Enable mem_access */
-    xenaccess->mem_event.ring_page =
+    xenaccess->vm_event.ring_page =
             xc_mem_access_enable(xenaccess->xc_handle,
-                                 xenaccess->mem_event.domain_id,
-                                 &xenaccess->mem_event.evtchn_port);
-    if ( xenaccess->mem_event.ring_page == NULL )
+                                 xenaccess->vm_event.domain_id,
+                                 &xenaccess->vm_event.evtchn_port);
+    if ( xenaccess->vm_event.ring_page == NULL )
     {
         switch ( errno ) {
             case EBUSY:
@@ -267,8 +267,8 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     mem_access_enable = 1;
 
     /* Open event channel */
-    xenaccess->mem_event.xce_handle = xc_evtchn_open(NULL, 0);
-    if ( xenaccess->mem_event.xce_handle == NULL )
+    xenaccess->vm_event.xce_handle = xc_evtchn_open(NULL, 0);
+    if ( xenaccess->vm_event.xce_handle == NULL )
     {
         ERROR("Failed to open event channel");
         goto err;
@@ -276,21 +276,21 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     evtchn_open = 1;
 
     /* Bind event notification */
-    rc = xc_evtchn_bind_interdomain(xenaccess->mem_event.xce_handle,
-                                    xenaccess->mem_event.domain_id,
-                                    xenaccess->mem_event.evtchn_port);
+    rc = xc_evtchn_bind_interdomain(xenaccess->vm_event.xce_handle,
+                                    xenaccess->vm_event.domain_id,
+                                    xenaccess->vm_event.evtchn_port);
     if ( rc < 0 )
     {
         ERROR("Failed to bind event channel");
         goto err;
     }
     evtchn_bind = 1;
-    xenaccess->mem_event.port = rc;
+    xenaccess->vm_event.port = rc;
 
     /* Initialise ring */
-    SHARED_RING_INIT((mem_event_sring_t *)xenaccess->mem_event.ring_page);
-    BACK_RING_INIT(&xenaccess->mem_event.back_ring,
-                   (mem_event_sring_t *)xenaccess->mem_event.ring_page,
+    SHARED_RING_INIT((vm_event_sring_t *)xenaccess->vm_event.ring_page);
+    BACK_RING_INIT(&xenaccess->vm_event.back_ring,
+                   (vm_event_sring_t *)xenaccess->vm_event.ring_page,
                    XC_PAGE_SIZE);
 
     /* Get domaininfo */
@@ -320,14 +320,14 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     return NULL;
 }
 
-int get_request(mem_event_t *mem_event, mem_event_request_t *req)
+int get_request(vm_event_t *vm_event, vm_event_request_t *req)
 {
-    mem_event_back_ring_t *back_ring;
+    vm_event_back_ring_t *back_ring;
     RING_IDX req_cons;
 
-    mem_event_ring_lock(mem_event);
+    vm_event_ring_lock(vm_event);
 
-    back_ring = &mem_event->back_ring;
+    back_ring = &vm_event->back_ring;
     req_cons = back_ring->req_cons;
 
     /* Copy request */
@@ -338,19 +338,19 @@ int get_request(mem_event_t *mem_event, mem_event_request_t *req)
     back_ring->req_cons = req_cons;
     back_ring->sring->req_event = req_cons + 1;
 
-    mem_event_ring_unlock(mem_event);
+    vm_event_ring_unlock(vm_event);
 
     return 0;
 }
 
-static int put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
+static int put_response(vm_event_t *vm_event, vm_event_response_t *rsp)
 {
-    mem_event_back_ring_t *back_ring;
+    vm_event_back_ring_t *back_ring;
     RING_IDX rsp_prod;
 
-    mem_event_ring_lock(mem_event);
+    vm_event_ring_lock(vm_event);
 
-    back_ring = &mem_event->back_ring;
+    back_ring = &vm_event->back_ring;
     rsp_prod = back_ring->rsp_prod_pvt;
 
     /* Copy response */
@@ -361,24 +361,24 @@ static int put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
     back_ring->rsp_prod_pvt = rsp_prod;
     RING_PUSH_RESPONSES(back_ring);
 
-    mem_event_ring_unlock(mem_event);
+    vm_event_ring_unlock(vm_event);
 
     return 0;
 }
 
-static int xenaccess_resume_page(xenaccess_t *paging, mem_event_response_t *rsp)
+static int xenaccess_resume_page(xenaccess_t *paging, vm_event_response_t *rsp)
 {
     int ret;
 
     /* Put the page info on the ring */
-    ret = put_response(&paging->mem_event, rsp);
+    ret = put_response(&paging->vm_event, rsp);
     if ( ret != 0 )
         goto out;
 
     /* Tell Xen page is ready */
-    ret = xc_mem_access_resume(paging->xc_handle, paging->mem_event.domain_id);
-    ret = xc_evtchn_notify(paging->mem_event.xce_handle,
-                           paging->mem_event.port);
+    ret = xc_mem_access_resume(paging->xc_handle, paging->vm_event.domain_id);
+    ret = xc_evtchn_notify(paging->vm_event.xce_handle,
+                           paging->vm_event.port);
 
  out:
     return ret;
@@ -400,8 +400,8 @@ int main(int argc, char *argv[])
     struct sigaction act;
     domid_t domain_id;
     xenaccess_t *xenaccess;
-    mem_event_request_t req;
-    mem_event_response_t rsp;
+    vm_event_request_t req;
+    vm_event_response_t rsp;
     int rc = -1;
     int rc1;
     xc_interface *xch;
@@ -507,7 +507,7 @@ int main(int argc, char *argv[])
         rc = xc_hvm_param_set(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_disabled);
     if ( rc < 0 )
     {
-        ERROR("Error %d setting int3 mem_event\n", rc);
+        ERROR("Error %d setting int3 vm_event\n", rc);
         goto exit;
     }
 
@@ -527,7 +527,7 @@ int main(int argc, char *argv[])
             shutting_down = 1;
         }
 
-        rc = xc_wait_for_event_or_timeout(xch, xenaccess->mem_event.xce_handle, 100);
+        rc = xc_wait_for_event_or_timeout(xch, xenaccess->vm_event.xce_handle, 100);
         if ( rc < -1 )
         {
             ERROR("Error getting event");
@@ -539,11 +539,11 @@ int main(int argc, char *argv[])
             DPRINTF("Got event from Xen\n");
         }
 
-        while ( RING_HAS_UNCONSUMED_REQUESTS(&xenaccess->mem_event.back_ring) )
+        while ( RING_HAS_UNCONSUMED_REQUESTS(&xenaccess->vm_event.back_ring) )
         {
             xenmem_access_t access;
 
-            rc = get_request(&xenaccess->mem_event, &req);
+            rc = get_request(&xenaccess->vm_event, &req);
             if ( rc != 0 )
             {
                 ERROR("Error getting request");
@@ -551,20 +551,20 @@ int main(int argc, char *argv[])
                 continue;
             }
 
-            if ( req.version != MEM_EVENT_INTERFACE_VERSION )
+            if ( req.version != VM_EVENT_INTERFACE_VERSION )
             {
-                ERROR("Error: mem_event interface version mismatch!\n");
+                ERROR("Error: vm_event interface version mismatch!\n");
                 interrupted = -1;
                 continue;
             }
 
             memset( &rsp, 0, sizeof (rsp) );
-            rsp.version = MEM_EVENT_INTERFACE_VERSION;
+            rsp.version = VM_EVENT_INTERFACE_VERSION;
             rsp.vcpu_id = req.vcpu_id;
             rsp.flags = req.flags;
 
             switch (req.reason) {
-            case MEM_EVENT_REASON_MEM_ACCESS:
+            case VM_EVENT_REASON_MEM_ACCESS:
                 rc = xc_get_mem_access(xch, domain_id, req.u.mem_access.gfn, &access);
                 if (rc < 0)
                 {
@@ -602,7 +602,7 @@ int main(int argc, char *argv[])
 
                 rsp.u.mem_access.gfn = req.u.mem_access.gfn;
                 break;
-            case MEM_EVENT_REASON_SOFTWARE_BREAKPOINT:
+            case VM_EVENT_REASON_SOFTWARE_BREAKPOINT:
                 printf("INT3: rip=%016"PRIx64", gfn=%"PRIx64" (vcpu %d)\n",
                        req.regs.x86.rip,
                        req.u.software_breakpoint.gfn,
