@@ -132,6 +132,9 @@ static int INIT lz4_uncompress(const unsigned char *source, unsigned char *dest,
 			/* Error: request to write beyond destination buffer */
 			if (cpy > oend)
 				goto _output_error;
+			if ((ref + COPYLENGTH) > oend ||
+					(op + COPYLENGTH) > oend)
+				goto _output_error;
 			LZ4_SECURECOPY(ref, op, (oend - COPYLENGTH));
 			while (op < cpy)
 				*op++ = *ref++;
