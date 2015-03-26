@@ -14,8 +14,7 @@
  * operand is both read from and written to. Since the operand is in fact a
  * word array, we also specify "memory" in the clobbers list to indicate that
  * words other than the one directly addressed by the memory operand may be
- * modified. We don't use "+m" because the gcc manual says that it should be
- * used only when the constraint allows the operand to reside in a register.
+ * modified.
  */
 
 #define ADDR (*(volatile long *) addr)
@@ -55,12 +54,9 @@ static inline void set_bit(int nr, volatile void *addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static inline void __set_bit(int nr, volatile void *addr)
+static inline void __set_bit(int nr, void *addr)
 {
-    asm volatile (
-        "btsl %1,%0"
-        : "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+    asm volatile ( "btsl %1,%0" : "+m" (*(int *)addr) : "Ir" (nr) : "memory" );
 }
 #define __set_bit(nr, addr) ({                          \
     if ( bitop_bad_size(addr) ) __bitop_bad_size();     \
@@ -95,12 +91,9 @@ static inline void clear_bit(int nr, volatile void *addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static inline void __clear_bit(int nr, volatile void *addr)
+static inline void __clear_bit(int nr, void *addr)
 {
-    asm volatile (
-        "btrl %1,%0"
-        : "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+    asm volatile ( "btrl %1,%0" : "+m" (*(int *)addr) : "Ir" (nr) : "memory" );
 }
 #define __clear_bit(nr, addr) ({                        \
     if ( bitop_bad_size(addr) ) __bitop_bad_size();     \
@@ -116,12 +109,9 @@ static inline void __clear_bit(int nr, volatile void *addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static inline void __change_bit(int nr, volatile void *addr)
+static inline void __change_bit(int nr, void *addr)
 {
-    asm volatile (
-        "btcl %1,%0"
-        : "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+    asm volatile ( "btcl %1,%0" : "+m" (*(int *)addr) : "Ir" (nr) : "memory" );
 }
 #define __change_bit(nr, addr) ({                       \
     if ( bitop_bad_size(addr) ) __bitop_bad_size();     \
@@ -181,14 +171,14 @@ static inline int test_and_set_bit(int nr, volatile void *addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static inline int __test_and_set_bit(int nr, volatile void *addr)
+static inline int __test_and_set_bit(int nr, void *addr)
 {
     int oldbit;
 
     asm volatile (
         "btsl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+        : "=r" (oldbit), "+m" (*(int *)addr)
+        : "Ir" (nr) : "memory" );
     return oldbit;
 }
 #define __test_and_set_bit(nr, addr) ({                 \
@@ -228,14 +218,14 @@ static inline int test_and_clear_bit(int nr, volatile void *addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static inline int __test_and_clear_bit(int nr, volatile void *addr)
+static inline int __test_and_clear_bit(int nr, void *addr)
 {
     int oldbit;
 
     asm volatile (
         "btrl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+        : "=r" (oldbit), "+m" (*(int *)addr)
+        : "Ir" (nr) : "memory" );
     return oldbit;
 }
 #define __test_and_clear_bit(nr, addr) ({               \
@@ -244,14 +234,14 @@ static inline int __test_and_clear_bit(int nr, volatile void *addr)
 })
 
 /* WARNING: non atomic and it can be reordered! */
-static inline int __test_and_change_bit(int nr, volatile void *addr)
+static inline int __test_and_change_bit(int nr, void *addr)
 {
     int oldbit;
 
     asm volatile (
         "btcl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "=m" (ADDR)
-        : "Ir" (nr), "m" (ADDR) : "memory");
+        : "=r" (oldbit), "+m" (*(int *)addr)
+        : "Ir" (nr) : "memory" );
     return oldbit;
 }
 #define __test_and_change_bit(nr, addr) ({              \
