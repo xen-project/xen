@@ -829,7 +829,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
             dom->nr_vmemranges = 1;
             dom->vmemranges = xc_dom_malloc(dom, sizeof(*dom->vmemranges));
             dom->vmemranges[0].start = 0;
-            dom->vmemranges[0].end   = dom->total_pages << PAGE_SHIFT;
+            dom->vmemranges[0].end   = (uint64_t)dom->total_pages << PAGE_SHIFT;
             dom->vmemranges[0].flags = 0;
             dom->vmemranges[0].nid   = 0;
 
