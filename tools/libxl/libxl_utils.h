@@ -89,8 +89,8 @@ int libxl_bitmap_is_empty(const libxl_bitmap *bitmap);
 int libxl_bitmap_test(const libxl_bitmap *bitmap, int bit);
 void libxl_bitmap_set(libxl_bitmap *bitmap, int bit);
 void libxl_bitmap_reset(libxl_bitmap *bitmap, int bit);
-int libxl_bitmap_count_set(const libxl_bitmap *cpumap);
-char *libxl_bitmap_to_hex_string(libxl_ctx *ctx, const libxl_bitmap *cpumap);
+int libxl_bitmap_count_set(const libxl_bitmap *bitmap);
+char *libxl_bitmap_to_hex_string(libxl_ctx *ctx, const libxl_bitmap *bitmap);
 static inline void libxl_bitmap_set_any(libxl_bitmap *bitmap)
 {
     memset(bitmap->map, -1, bitmap->size);
@@ -145,7 +145,7 @@ int libxl_node_to_cpumap(libxl_ctx *ctx, int node,
                          libxl_bitmap *cpumap);
 /* Populate nodemap with the nodes of the cpus in cpumap */
 int libxl_cpumap_to_nodemap(libxl_ctx *ctx,
-                            const libxl_bitmap *cpuemap,
+                            const libxl_bitmap *cpumap,
                             libxl_bitmap *nodemap);
 
  static inline uint32_t libxl__sizekb_to_mb(uint32_t s) {

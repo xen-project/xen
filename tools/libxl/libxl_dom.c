@@ -376,7 +376,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     }
     if (info->nodemap.size)
         libxl_domain_set_nodeaffinity(ctx, domid, &info->nodemap);
-    /* As mentioned in libxl.h, vcpu_hard_array takes precedence */
+
     if (info->num_vcpu_hard_affinity || info->num_vcpu_soft_affinity) {
         libxl_bitmap *hard_affinity, *soft_affinity;
         int i, n_vcpus;
