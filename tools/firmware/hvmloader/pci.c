@@ -179,18 +179,31 @@ void pci_setup(void)
                 bar_reg = PCI_ROM_ADDRESS;
 
             bar_data = pci_readl(devfn, bar_reg);
-            is_64bar = !!((bar_data & (PCI_BASE_ADDRESS_SPACE |
-                         PCI_BASE_ADDRESS_MEM_TYPE_MASK)) ==
-                         (PCI_BASE_ADDRESS_SPACE_MEMORY |
-                         PCI_BASE_ADDRESS_MEM_TYPE_64));
-            pci_writel(devfn, bar_reg, ~0);
+            if ( bar_reg != PCI_ROM_ADDRESS )
+            {
+                is_64bar = !!((bar_data & (PCI_BASE_ADDRESS_SPACE |
+                             PCI_BASE_ADDRESS_MEM_TYPE_MASK)) ==
+                             (PCI_BASE_ADDRESS_SPACE_MEMORY |
+                             PCI_BASE_ADDRESS_MEM_TYPE_64));
+                pci_writel(devfn, bar_reg, ~0);
+            }
+            else
+            {
+                is_64bar = 0;
+                pci_writel(devfn, bar_reg,
+                           (bar_data | PCI_ROM_ADDRESS_MASK) &
+                           ~PCI_ROM_ADDRESS_ENABLE);
+            }
             bar_sz = pci_readl(devfn, bar_reg);
             pci_writel(devfn, bar_reg, bar_data);
 
-            bar_sz &= (((bar_data & PCI_BASE_ADDRESS_SPACE) ==
-                        PCI_BASE_ADDRESS_SPACE_MEMORY) ?
-                       PCI_BASE_ADDRESS_MEM_MASK :
-                       (PCI_BASE_ADDRESS_IO_MASK & 0xffff));
+            if ( bar_reg != PCI_ROM_ADDRESS )
+                bar_sz &= (((bar_data & PCI_BASE_ADDRESS_SPACE) ==
+                            PCI_BASE_ADDRESS_SPACE_MEMORY) ?
+                           PCI_BASE_ADDRESS_MEM_MASK :
+                           (PCI_BASE_ADDRESS_IO_MASK & 0xffff));
+            else
+                bar_sz &= PCI_ROM_ADDRESS_MASK;
             if (is_64bar) {
                 bar_data_upper = pci_readl(devfn, bar_reg + 4);
                 pci_writel(devfn, bar_reg + 4, ~0);
@@ -214,8 +227,9 @@ void pci_setup(void)
             bars[i].bar_reg = bar_reg;
             bars[i].bar_sz  = bar_sz;
 
-            if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
-                 PCI_BASE_ADDRESS_SPACE_MEMORY )
+            if ( ((bar_data & PCI_BASE_ADDRESS_SPACE) ==
+                  PCI_BASE_ADDRESS_SPACE_MEMORY) ||
+                 (bar_reg == PCI_ROM_ADDRESS) )
                 mmio_total += bar_sz;
 
             nr_bars++;
