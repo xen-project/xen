@@ -439,6 +439,44 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     return rc;
 }
 
+static int set_vnuma_affinity(libxl__gc *gc, uint32_t domid,
+                              libxl_domain_build_info *info)
+{
+    libxl_bitmap cpumap;
+    libxl_vnode_info *v;
+    unsigned int i, j;
+    int rc = 0;
+
+    libxl_bitmap_init(&cpumap);
+
+    rc = libxl_cpu_bitmap_alloc(CTX, &cpumap, 0);
+    if (rc) {
+        LOG(ERROR, "Can't allocate nodemap");
+        goto out;
+    }
+
+    /*
+     * For each vcpu in each vnode, set its soft affinity to
+     * the pcpus belonging to the pnode the vnode is on
+     */
+    for (i = 0; i < info->num_vnuma_nodes; i++) {
+        v = &info->vnuma_nodes[i];
+
+        rc = libxl_node_to_cpumap(CTX, v->pnode, &cpumap);
+        if (rc) {
+            LOG(ERROR, "Can't get cpumap for vnode %d", i);
+            goto out;
+        }
+
+        libxl_for_each_set_bit(j, v->vcpus)
+            libxl_set_vcpuaffinity(CTX, domid, j, NULL, &cpumap);
+    }
+
+out:
+    libxl_bitmap_dispose(&cpumap);
+    return rc;
+}
+
 int libxl__build_post(libxl__gc *gc, uint32_t domid,
                       libxl_domain_build_info *info,
                       libxl__domain_build_state *state,
@@ -449,6 +487,12 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     xs_transaction_t t;
     char **ents;
     int i, rc;
+
+    if (info->num_vnuma_nodes && !info->num_vcpu_soft_affinity) {
+        rc = set_vnuma_affinity(gc, domid, info);
+        if (rc)
+            return rc;
+    }
 
     rc = libxl_domain_sched_params_set(CTX, domid, &info->sched_params);
     if (rc)
