@@ -41,9 +41,11 @@ do {                                                            \
 #ifndef NDEBUG
 #define ASSERT(p) \
     do { if ( unlikely(!(p)) ) assert_failed(#p); } while (0)
+#define ASSERT_UNREACHABLE() assert_failed("unreachable")
 #define debug_build() 1
 #else
 #define ASSERT(p) do { if ( 0 && (p) ); } while (0)
+#define ASSERT_UNREACHABLE() do { } while (0)
 #define debug_build() 0
 #endif
 
