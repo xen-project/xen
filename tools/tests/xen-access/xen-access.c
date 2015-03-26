@@ -551,13 +551,21 @@ int main(int argc, char *argv[])
                 continue;
             }
 
+            if ( req.version != MEM_EVENT_INTERFACE_VERSION )
+            {
+                ERROR("Error: mem_event interface version mismatch!\n");
+                interrupted = -1;
+                continue;
+            }
+
             memset( &rsp, 0, sizeof (rsp) );
+            rsp.version = MEM_EVENT_INTERFACE_VERSION;
             rsp.vcpu_id = req.vcpu_id;
             rsp.flags = req.flags;
 
             switch (req.reason) {
-            case MEM_EVENT_REASON_VIOLATION:
-                rc = xc_get_mem_access(xch, domain_id, req.gfn, &access);
+            case MEM_EVENT_REASON_MEM_ACCESS:
+                rc = xc_get_mem_access(xch, domain_id, req.u.mem_access.gfn, &access);
                 if (rc < 0)
                 {
                     ERROR("Error %d getting mem_access event\n", rc);
@@ -567,21 +575,21 @@ int main(int argc, char *argv[])
 
                 printf("PAGE ACCESS: %c%c%c for GFN %"PRIx64" (offset %06"
                        PRIx64") gla %016"PRIx64" (valid: %c; fault in gpt: %c; fault with gla: %c) (vcpu %u)\n",
-                       req.access_r ? 'r' : '-',
-                       req.access_w ? 'w' : '-',
-                       req.access_x ? 'x' : '-',
-                       req.gfn,
-                       req.offset,
-                       req.gla,
-                       req.gla_valid ? 'y' : 'n',
-                       req.fault_in_gpt ? 'y' : 'n',
-                       req.fault_with_gla ? 'y': 'n',
+                       (req.u.mem_access.flags & MEM_ACCESS_R) ? 'r' : '-',
+                       (req.u.mem_access.flags & MEM_ACCESS_W) ? 'w' : '-',
+                       (req.u.mem_access.flags & MEM_ACCESS_X) ? 'x' : '-',
+                       req.u.mem_access.gfn,
+                       req.u.mem_access.offset,
+                       req.u.mem_access.gla,
+                       (req.u.mem_access.flags & MEM_ACCESS_GLA_VALID) ? 'y' : 'n',
+                       (req.u.mem_access.flags & MEM_ACCESS_FAULT_IN_GPT) ? 'y' : 'n',
+                       (req.u.mem_access.flags & MEM_ACCESS_FAULT_WITH_GLA) ? 'y': 'n',
                        req.vcpu_id);
 
                 if ( default_access != after_first_access )
                 {
                     rc = xc_set_mem_access(xch, domain_id, after_first_access,
-                                           req.gfn, 1);
+                                           req.u.mem_access.gfn, 1);
                     if (rc < 0)
                     {
                         ERROR("Error %d setting gfn to access_type %d\n", rc,
@@ -592,13 +600,12 @@ int main(int argc, char *argv[])
                 }
 
 
-                rsp.gfn = req.gfn;
-                rsp.p2mt = req.p2mt;
+                rsp.u.mem_access.gfn = req.u.mem_access.gfn;
                 break;
-            case MEM_EVENT_REASON_INT3:
-                printf("INT3: rip=%016"PRIx64", gfn=%"PRIx64" (vcpu %d)\n", 
-                       req.gla, 
-                       req.gfn,
+            case MEM_EVENT_REASON_SOFTWARE_BREAKPOINT:
+                printf("INT3: rip=%016"PRIx64", gfn=%"PRIx64" (vcpu %d)\n",
+                       req.regs.x86.rip,
+                       req.u.software_breakpoint.gfn,
                        req.vcpu_id);
 
                 /* Reinject */

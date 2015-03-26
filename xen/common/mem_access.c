@@ -38,6 +38,12 @@ void mem_access_resume(struct domain *d)
     {
         struct vcpu *v;
 
+        if ( rsp.version != MEM_EVENT_INTERFACE_VERSION )
+        {
+            printk(XENLOG_G_WARNING "mem_event interface version mismatch\n");
+            continue;
+        }
+
         if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
             continue;
 

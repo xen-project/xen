@@ -1081,7 +1081,10 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
 void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
                                 p2m_type_t p2mt)
 {
-    mem_event_request_t req = { .gfn = gfn };
+    mem_event_request_t req = {
+        .reason = MEM_EVENT_REASON_MEM_PAGING,
+        .u.mem_paging.gfn = gfn
+    };
 
     /* We allow no ring in this unique case, because it won't affect
      * correctness of the guest execution at this point.  If this is the only
@@ -1092,14 +1095,14 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
         return;
 
     /* Send release notification to pager */
-    req.flags = MEM_EVENT_FLAG_DROP_PAGE;
+    req.u.mem_paging.flags = MEM_PAGING_DROP_PAGE;
 
     /* Update stats unless the page hasn't yet been evicted */
     if ( p2mt != p2m_ram_paging_out )
         atomic_dec(&d->paged_pages);
     else
         /* Evict will fail now, tag this request for pager */
-        req.flags |= MEM_EVENT_FLAG_EVICT_FAIL;
+        req.u.mem_paging.flags |= MEM_PAGING_EVICT_FAIL;
 
     mem_event_put_request(d, &d->mem_event->paging, &req);
 }
@@ -1128,7 +1131,10 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
 void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
 {
     struct vcpu *v = current;
-    mem_event_request_t req = { .gfn = gfn };
+    mem_event_request_t req = {
+        .reason = MEM_EVENT_REASON_MEM_PAGING,
+        .u.mem_paging.gfn = gfn
+    };
     p2m_type_t p2mt;
     p2m_access_t a;
     mfn_t mfn;
@@ -1157,7 +1163,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     {
         /* Evict will fail now, tag this request for pager */
         if ( p2mt == p2m_ram_paging_out )
-            req.flags |= MEM_EVENT_FLAG_EVICT_FAIL;
+            req.u.mem_paging.flags |= MEM_PAGING_EVICT_FAIL;
 
         p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_paging_in, a);
     }
@@ -1178,7 +1184,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     }
 
     /* Send request to pager */
-    req.p2mt = p2mt;
+    req.u.mem_paging.p2mt = p2mt;
     req.vcpu_id = v->vcpu_id;
 
     mem_event_put_request(d, &d->mem_event->paging, &req);
@@ -1300,6 +1306,12 @@ void p2m_mem_paging_resume(struct domain *d)
     {
         struct vcpu *v;
 
+        if ( rsp.version != MEM_EVENT_INTERFACE_VERSION )
+        {
+            printk(XENLOG_G_WARNING "mem_event interface version mismatch\n");
+            continue;
+        }
+
         if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
             continue;
 
@@ -1310,20 +1322,21 @@ void p2m_mem_paging_resume(struct domain *d)
         v = d->vcpu[rsp.vcpu_id];
 
         /* Fix p2m entry if the page was not dropped */
-        if ( !(rsp.flags & MEM_EVENT_FLAG_DROP_PAGE) )
+        if ( !(rsp.u.mem_paging.flags & MEM_PAGING_DROP_PAGE) )
         {
-            gfn_lock(p2m, rsp.gfn, 0);
-            mfn = p2m->get_entry(p2m, rsp.gfn, &p2mt, &a, 0, NULL);
+            unsigned long gfn = rsp.u.mem_access.gfn;
+            gfn_lock(p2m, gfn, 0);
+            mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, 0, NULL);
             /* Allow only pages which were prepared properly, or pages which
              * were nominated but not evicted */
             if ( mfn_valid(mfn) && (p2mt == p2m_ram_paging_in) )
             {
-                p2m_set_entry(p2m, rsp.gfn, mfn, PAGE_ORDER_4K,
+                p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K,
                               paging_mode_log_dirty(d) ? p2m_ram_logdirty :
                               p2m_ram_rw, a);
-                set_gpfn_from_mfn(mfn_x(mfn), rsp.gfn);
+                set_gpfn_from_mfn(mfn_x(mfn), gfn);
             }
-            gfn_unlock(p2m, rsp.gfn, 0);
+            gfn_unlock(p2m, gfn, 0);
         }
         /* Unpause domain */
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
@@ -1341,92 +1354,94 @@ static void p2m_mem_event_fill_regs(mem_event_request_t *req)
     /* Architecture-specific vmcs/vmcb bits */
     hvm_funcs.save_cpu_ctxt(curr, &ctxt);
 
-    req->x86_regs.rax = regs->eax;
-    req->x86_regs.rcx = regs->ecx;
-    req->x86_regs.rdx = regs->edx;
-    req->x86_regs.rbx = regs->ebx;
-    req->x86_regs.rsp = regs->esp;
-    req->x86_regs.rbp = regs->ebp;
-    req->x86_regs.rsi = regs->esi;
-    req->x86_regs.rdi = regs->edi;
+    req->regs.x86.rax = regs->eax;
+    req->regs.x86.rcx = regs->ecx;
+    req->regs.x86.rdx = regs->edx;
+    req->regs.x86.rbx = regs->ebx;
+    req->regs.x86.rsp = regs->esp;
+    req->regs.x86.rbp = regs->ebp;
+    req->regs.x86.rsi = regs->esi;
+    req->regs.x86.rdi = regs->edi;
 
-    req->x86_regs.r8  = regs->r8;
-    req->x86_regs.r9  = regs->r9;
-    req->x86_regs.r10 = regs->r10;
-    req->x86_regs.r11 = regs->r11;
-    req->x86_regs.r12 = regs->r12;
-    req->x86_regs.r13 = regs->r13;
-    req->x86_regs.r14 = regs->r14;
-    req->x86_regs.r15 = regs->r15;
+    req->regs.x86.r8  = regs->r8;
+    req->regs.x86.r9  = regs->r9;
+    req->regs.x86.r10 = regs->r10;
+    req->regs.x86.r11 = regs->r11;
+    req->regs.x86.r12 = regs->r12;
+    req->regs.x86.r13 = regs->r13;
+    req->regs.x86.r14 = regs->r14;
+    req->regs.x86.r15 = regs->r15;
 
-    req->x86_regs.rflags = regs->eflags;
-    req->x86_regs.rip    = regs->eip;
+    req->regs.x86.rflags = regs->eflags;
+    req->regs.x86.rip    = regs->eip;
 
-    req->x86_regs.dr7 = curr->arch.debugreg[7];
-    req->x86_regs.cr0 = ctxt.cr0;
-    req->x86_regs.cr2 = ctxt.cr2;
-    req->x86_regs.cr3 = ctxt.cr3;
-    req->x86_regs.cr4 = ctxt.cr4;
+    req->regs.x86.dr7 = curr->arch.debugreg[7];
+    req->regs.x86.cr0 = ctxt.cr0;
+    req->regs.x86.cr2 = ctxt.cr2;
+    req->regs.x86.cr3 = ctxt.cr3;
+    req->regs.x86.cr4 = ctxt.cr4;
 
-    req->x86_regs.sysenter_cs = ctxt.sysenter_cs;
-    req->x86_regs.sysenter_esp = ctxt.sysenter_esp;
-    req->x86_regs.sysenter_eip = ctxt.sysenter_eip;
+    req->regs.x86.sysenter_cs = ctxt.sysenter_cs;
+    req->regs.x86.sysenter_esp = ctxt.sysenter_esp;
+    req->regs.x86.sysenter_eip = ctxt.sysenter_eip;
 
-    req->x86_regs.msr_efer = ctxt.msr_efer;
-    req->x86_regs.msr_star = ctxt.msr_star;
-    req->x86_regs.msr_lstar = ctxt.msr_lstar;
+    req->regs.x86.msr_efer = ctxt.msr_efer;
+    req->regs.x86.msr_star = ctxt.msr_star;
+    req->regs.x86.msr_lstar = ctxt.msr_lstar;
 
     hvm_get_segment_register(curr, x86_seg_fs, &seg);
-    req->x86_regs.fs_base = seg.base;
+    req->regs.x86.fs_base = seg.base;
 
     hvm_get_segment_register(curr, x86_seg_gs, &seg);
-    req->x86_regs.gs_base = seg.base;
+    req->regs.x86.gs_base = seg.base;
 
     hvm_get_segment_register(curr, x86_seg_cs, &seg);
-    req->x86_regs.cs_arbytes = seg.attr.bytes;
+    req->regs.x86.cs_arbytes = seg.attr.bytes;
 }
 
-void p2m_mem_event_emulate_check(struct vcpu *v, const mem_event_response_t *rsp)
+void p2m_mem_event_emulate_check(struct vcpu *v,
+                                 const mem_event_response_t *rsp)
 {
     /* Mark vcpu for skipping one instruction upon rescheduling. */
-    if ( rsp->flags & MEM_EVENT_FLAG_EMULATE )
+    if ( rsp->flags & MEM_ACCESS_EMULATE )
     {
         xenmem_access_t access;
         bool_t violation = 1;
+        const struct mem_event_mem_access *data = &rsp->u.mem_access;
 
-        if ( p2m_get_mem_access(v->domain, rsp->gfn, &access) == 0 )
+        if ( p2m_get_mem_access(v->domain, data->gfn, &access) == 0 )
         {
             switch ( access )
             {
             case XENMEM_access_n:
             case XENMEM_access_n2rwx:
             default:
-                violation = rsp->access_r || rsp->access_w || rsp->access_x;
+                violation = data->flags & MEM_ACCESS_RWX;
                 break;
 
             case XENMEM_access_r:
-                violation = rsp->access_w || rsp->access_x;
+                violation = data->flags & MEM_ACCESS_WX;
                 break;
 
             case XENMEM_access_w:
-                violation = rsp->access_r || rsp->access_x;
+                violation = data->flags & MEM_ACCESS_RX;
                 break;
 
             case XENMEM_access_x:
-                violation = rsp->access_r || rsp->access_w;
+                violation = data->flags & MEM_ACCESS_RW;
                 break;
 
             case XENMEM_access_rx:
             case XENMEM_access_rx2rw:
-                violation = rsp->access_w;
+                violation = data->flags & MEM_ACCESS_W;
                 break;
 
             case XENMEM_access_wx:
-                violation = rsp->access_r;
+                violation = data->flags & MEM_ACCESS_R;
                 break;
 
             case XENMEM_access_rw:
-                violation = rsp->access_x;
+                violation = data->flags & MEM_ACCESS_X;
                 break;
 
             case XENMEM_access_rwx:
@@ -1532,7 +1547,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     if ( v->arch.mem_event.emulate_flags )
     {
         hvm_mem_event_emulate_one((v->arch.mem_event.emulate_flags &
-                                   MEM_EVENT_FLAG_EMULATE_NOWRITE) != 0,
+                                   MEM_ACCESS_EMULATE_NOWRITE) != 0,
                                   TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
 
         v->arch.mem_event.emulate_flags = 0;
@@ -1544,24 +1559,28 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     if ( req )
     {
         *req_ptr = req;
-        req->reason = MEM_EVENT_REASON_VIOLATION;
+        req->reason = MEM_EVENT_REASON_MEM_ACCESS;
 
         /* Pause the current VCPU */
         if ( p2ma != p2m_access_n2rwx )
             req->flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
 
         /* Send request to mem event */
-        req->gfn = gfn;
-        req->offset = gpa & ((1 << PAGE_SHIFT) - 1);
-        req->gla_valid = npfec.gla_valid;
-        req->gla = gla;
-        if ( npfec.kind == npfec_kind_with_gla )
-            req->fault_with_gla = 1;
-        else if ( npfec.kind == npfec_kind_in_gpt )
-            req->fault_in_gpt = 1;
-        req->access_r = npfec.read_access;
-        req->access_w = npfec.write_access;
-        req->access_x = npfec.insn_fetch;
+        req->u.mem_access.gfn = gfn;
+        req->u.mem_access.offset = gpa & ((1 << PAGE_SHIFT) - 1);
+        if ( npfec.gla_valid )
+        {
+            req->u.mem_access.flags |= MEM_ACCESS_GLA_VALID;
+            req->u.mem_access.gla = gla;
+
+            if ( npfec.kind == npfec_kind_with_gla )
+                req->u.mem_access.flags |= MEM_ACCESS_FAULT_WITH_GLA;
+            else if ( npfec.kind == npfec_kind_in_gpt )
+                req->u.mem_access.flags |= MEM_ACCESS_FAULT_IN_GPT;
+        }
+        req->u.mem_access.flags |= npfec.read_access    ? MEM_ACCESS_R : 0;
+        req->u.mem_access.flags |= npfec.write_access   ? MEM_ACCESS_W : 0;
+        req->u.mem_access.flags |= npfec.insn_fetch     ? MEM_ACCESS_X : 0;
         req->vcpu_id = v->vcpu_id;
 
         p2m_mem_event_fill_regs(req);

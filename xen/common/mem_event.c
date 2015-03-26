@@ -291,6 +291,8 @@ void mem_event_put_request(struct domain *d,
 #endif
     }
 
+    req->version = MEM_EVENT_INTERFACE_VERSION;
+
     mem_event_ring_lock(med);
 
     /* Due to the reservations, this step must succeed. */

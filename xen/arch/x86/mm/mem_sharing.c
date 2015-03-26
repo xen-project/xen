@@ -559,7 +559,12 @@ int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
 {
     struct vcpu *v = current;
     int rc;
-    mem_event_request_t req = { .gfn = gfn };
+    mem_event_request_t req = {
+        .reason = MEM_EVENT_REASON_MEM_SHARING,
+        .vcpu_id = v->vcpu_id,
+        .u.mem_sharing.gfn = gfn,
+        .u.mem_sharing.p2mt = p2m_ram_shared
+    };
 
     if ( (rc = __mem_event_claim_slot(d, 
                         &d->mem_event->share, allow_sleep)) < 0 )
@@ -570,9 +575,6 @@ int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
         req.flags = MEM_EVENT_FLAG_VCPU_PAUSED;
         mem_event_vcpu_pause(v);
     }
-
-    req.p2mt = p2m_ram_shared;
-    req.vcpu_id = v->vcpu_id;
 
     mem_event_put_request(d, &d->mem_event->share, &req);
 
@@ -597,6 +599,12 @@ int mem_sharing_sharing_resume(struct domain *d)
     while ( mem_event_get_response(d, &d->mem_event->share, &rsp) )
     {
         struct vcpu *v;
+
+        if ( rsp.version != MEM_EVENT_INTERFACE_VERSION )
+        {
+            printk(XENLOG_G_WARNING "mem_event interface version mismatch\n");
+            continue;
+        }
 
         if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
             continue;

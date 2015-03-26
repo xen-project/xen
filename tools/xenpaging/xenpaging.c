@@ -684,9 +684,9 @@ static int xenpaging_resume_page(struct xenpaging *paging, mem_event_response_t 
          * This allows page-out of these gfns if the target grows again.
          */
         if (paging->num_paged_out > paging->policy_mru_size)
-            policy_notify_paged_in(rsp->gfn);
+            policy_notify_paged_in(rsp->u.mem_paging.gfn);
         else
-            policy_notify_paged_in_nomru(rsp->gfn);
+            policy_notify_paged_in_nomru(rsp->u.mem_paging.gfn);
 
        /* Record number of resumed pages */
        paging->num_paged_out--;
@@ -874,7 +874,8 @@ int main(int argc, char *argv[])
     }
     xch = paging->xc_handle;
 
-    DPRINTF("starting %s for domain_id %u with pagefile %s\n", argv[0], paging->mem_event.domain_id, filename);
+    DPRINTF("starting %s for domain_id %u with pagefile %s\n",
+            argv[0], paging->mem_event.domain_id, filename);
 
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     act.sa_handler = close_handler;
@@ -910,49 +911,52 @@ int main(int argc, char *argv[])
 
             get_request(&paging->mem_event, &req);
 
-            if ( req.gfn > paging->max_pages )
+            if ( req.u.mem_paging.gfn > paging->max_pages )
             {
-                ERROR("Requested gfn %"PRIx64" higher than max_pages %x\n", req.gfn, paging->max_pages);
+                ERROR("Requested gfn %"PRIx64" higher than max_pages %x\n",
+                      req.u.mem_paging.gfn, paging->max_pages);
                 goto out;
             }
 
             /* Check if the page has already been paged in */
-            if ( test_and_clear_bit(req.gfn, paging->bitmap) )
+            if ( test_and_clear_bit(req.u.mem_paging.gfn, paging->bitmap) )
             {
                 /* Find where in the paging file to read from */
-                slot = paging->gfn_to_slot[req.gfn];
+                slot = paging->gfn_to_slot[req.u.mem_paging.gfn];
 
                 /* Sanity check */
-                if ( paging->slot_to_gfn[slot] != req.gfn )
+                if ( paging->slot_to_gfn[slot] != req.u.mem_paging.gfn )
                 {
-                    ERROR("Expected gfn %"PRIx64" in slot %d, but found gfn %lx\n", req.gfn, slot, paging->slot_to_gfn[slot]);
+                    ERROR("Expected gfn %"PRIx64" in slot %d, but found gfn %lx\n",
+                          req.u.mem_paging.gfn, slot, paging->slot_to_gfn[slot]);
                     goto out;
                 }
 
-                if ( req.flags & MEM_EVENT_FLAG_DROP_PAGE )
+                if ( req.u.mem_paging.flags & MEM_PAGING_DROP_PAGE )
                 {
-                    DPRINTF("drop_page ^ gfn %"PRIx64" pageslot %d\n", req.gfn, slot);
+                    DPRINTF("drop_page ^ gfn %"PRIx64" pageslot %d\n",
+                            req.u.mem_paging.gfn, slot);
                     /* Notify policy of page being dropped */
-                    policy_notify_dropped(req.gfn);
+                    policy_notify_dropped(req.u.mem_paging.gfn);
                 }
                 else
                 {
                     /* Populate the page */
-                    if ( xenpaging_populate_page(paging, req.gfn, slot) < 0 )
+                    if ( xenpaging_populate_page(paging, req.u.mem_paging.gfn, slot) < 0 )
                     {
-                        ERROR("Error populating page %"PRIx64"", req.gfn);
+                        ERROR("Error populating page %"PRIx64"", req.u.mem_paging.gfn);
                         goto out;
                     }
                 }
 
                 /* Prepare the response */
-                rsp.gfn = req.gfn;
+                rsp.u.mem_paging.gfn = req.u.mem_paging.gfn;
                 rsp.vcpu_id = req.vcpu_id;
                 rsp.flags = req.flags;
 
                 if ( xenpaging_resume_page(paging, &rsp, 1) < 0 )
                 {
-                    PERROR("Error resuming page %"PRIx64"", req.gfn);
+                    PERROR("Error resuming page %"PRIx64"", req.u.mem_paging.gfn);
                     goto out;
                 }
 
@@ -966,22 +970,23 @@ int main(int argc, char *argv[])
             {
                 DPRINTF("page %s populated (domain = %d; vcpu = %d;"
                         " gfn = %"PRIx64"; paused = %d; evict_fail = %d)\n",
-                        req.flags & MEM_EVENT_FLAG_EVICT_FAIL ? "not" : "already",
-                        paging->mem_event.domain_id, req.vcpu_id, req.gfn,
+                        req.u.mem_paging.flags & MEM_PAGING_EVICT_FAIL ? "not" : "already",
+                        paging->mem_event.domain_id, req.vcpu_id, req.u.mem_paging.gfn,
                         !!(req.flags & MEM_EVENT_FLAG_VCPU_PAUSED) ,
-                        !!(req.flags & MEM_EVENT_FLAG_EVICT_FAIL) );
+                        !!(req.u.mem_paging.flags & MEM_PAGING_EVICT_FAIL) );
 
                 /* Tell Xen to resume the vcpu */
-                if (( req.flags & MEM_EVENT_FLAG_VCPU_PAUSED ) || ( req.flags & MEM_EVENT_FLAG_EVICT_FAIL ))
+                if (( req.flags & MEM_EVENT_FLAG_VCPU_PAUSED ) ||
+                    ( req.u.mem_paging.flags & MEM_PAGING_EVICT_FAIL ))
                 {
                     /* Prepare the response */
-                    rsp.gfn = req.gfn;
+                    rsp.u.mem_paging.gfn = req.u.mem_paging.gfn;
                     rsp.vcpu_id = req.vcpu_id;
                     rsp.flags = req.flags;
 
                     if ( xenpaging_resume_page(paging, &rsp, 0) < 0 )
                     {
-                        PERROR("Error resuming page %"PRIx64"", req.gfn);
+                        PERROR("Error resuming page %"PRIx64"", req.u.mem_paging.gfn);
                         goto out;
                     }
                 }
