@@ -31,24 +31,25 @@ build_write_atomic(write_u64_atomic, "q", uint64_t, "r", )
 void __bad_atomic_size(void);
 
 #define read_atomic(p) ({                                               \
-    typeof(*p) __x;                                                     \
-    switch ( sizeof(*p) ) {                                             \
-    case 1: __x = (typeof(*p))read_u8_atomic((uint8_t *)p); break;      \
-    case 2: __x = (typeof(*p))read_u16_atomic((uint16_t *)p); break;    \
-    case 4: __x = (typeof(*p))read_u32_atomic((uint32_t *)p); break;    \
-    case 8: __x = (typeof(*p))read_u64_atomic((uint64_t *)p); break;    \
-    default: __x = 0; __bad_atomic_size(); break;                       \
+    unsigned long x_;                                                   \
+    switch ( sizeof(*(p)) ) {                                           \
+    case 1: x_ = read_u8_atomic((uint8_t *)(p)); break;                 \
+    case 2: x_ = read_u16_atomic((uint16_t *)(p)); break;               \
+    case 4: x_ = read_u32_atomic((uint32_t *)(p)); break;               \
+    case 8: x_ = read_u64_atomic((uint64_t *)(p)); break;               \
+    default: x_ = 0; __bad_atomic_size(); break;                        \
     }                                                                   \
-    __x;                                                                \
+    (typeof(*(p)))x_;                                                   \
 })
 
 #define write_atomic(p, x) ({                                           \
-    typeof(*p) __x = (x);                                               \
-    switch ( sizeof(*p) ) {                                             \
-    case 1: write_u8_atomic((uint8_t *)p, (uint8_t)__x); break;         \
-    case 2: write_u16_atomic((uint16_t *)p, (uint16_t)__x); break;      \
-    case 4: write_u32_atomic((uint32_t *)p, (uint32_t)__x); break;      \
-    case 8: write_u64_atomic((uint64_t *)p, (uint64_t)__x); break;      \
+    typeof(*(p)) __x = (x);                                             \
+    unsigned long x_ = (unsigned long)__x;                              \
+    switch ( sizeof(*(p)) ) {                                           \
+    case 1: write_u8_atomic((uint8_t *)(p), (uint8_t)x_); break;        \
+    case 2: write_u16_atomic((uint16_t *)(p), (uint16_t)x_); break;     \
+    case 4: write_u32_atomic((uint32_t *)(p), (uint32_t)x_); break;     \
+    case 8: write_u64_atomic((uint64_t *)(p), (uint64_t)x_); break;     \
     default: __bad_atomic_size(); break;                                \
     }                                                                   \
     __x;                                                                \
