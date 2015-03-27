@@ -339,7 +339,7 @@ static int setup_compat_l4(struct vcpu *v)
 
     l4tab = __map_domain_page(pg);
     clear_page(l4tab);
-    init_guest_l4_table(l4tab, v->domain, 1);
+    init_guest_l4_table(l4tab, v->domain);
     unmap_domain_page(l4tab);
 
     v->arch.guest_table = pagetable_from_page(pg);
@@ -970,11 +970,7 @@ int arch_set_info_guest(
         case -EINTR:
             rc = -ERESTART;
         case -ERESTART:
-            break;
         case 0:
-            if ( !compat && !VM_ASSIST(d, m2p_strict) &&
-                 !paging_mode_refcounts(d) )
-                fill_ro_mpt(cr3_gfn);
             break;
         default:
             if ( cr3_page == current->arch.old_guest_table )
@@ -1009,10 +1005,7 @@ int arch_set_info_guest(
                 default:
                     if ( cr3_page == current->arch.old_guest_table )
                         cr3_page = NULL;
-                    break;
                 case 0:
-                    if ( VM_ASSIST(d, m2p_strict) )
-                        zap_ro_mpt(cr3_gfn);
                     break;
                 }
             }

@@ -318,10 +318,7 @@ static inline void *__page_to_virt(const struct page_info *pg)
 int free_page_type(struct page_info *page, unsigned long type,
                    int preemptible);
 
-void init_guest_l4_table(l4_pgentry_t[], const struct domain *,
-                         bool_t zap_ro_mpt);
-void fill_ro_mpt(unsigned long mfn);
-void zap_ro_mpt(unsigned long mfn);
+void init_guest_l4_table(l4_pgentry_t[], const struct domain *);
 
 int is_iomem_page(unsigned long mfn);
 

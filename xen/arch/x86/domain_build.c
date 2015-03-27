@@ -1203,7 +1203,7 @@ int __init construct_dom0(
         l3start = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
     }
     clear_page(l4tab);
-    init_guest_l4_table(l4tab, d, 0);
+    init_guest_l4_table(l4tab, d);
     v->arch.guest_table = pagetable_from_paddr(__pa(l4start));
     if ( is_pv_32on64_domain(d) )
         v->arch.guest_table_user = v->arch.guest_table;

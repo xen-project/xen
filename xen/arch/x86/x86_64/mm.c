@@ -480,7 +480,7 @@ static int setup_m2p_table(struct mem_hotadd_info *info)
                 l2_ro_mpt += l2_table_offset(va);
             }
 
-            /* NB. Cannot be GLOBAL: guest user mode should not see it. */
+            /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
             l2e_write(l2_ro_mpt, l2e_from_pfn(mfn,
                    /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));
         }
@@ -583,7 +583,7 @@ void __init paging_init(void)
                        0x77, 1UL << L3_PAGETABLE_SHIFT);
 
                 ASSERT(!l2_table_offset(va));
-                /* NB. Cannot be GLOBAL: guest user mode should not see it. */
+                /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
                 l3e_write(&l3_ro_mpt[l3_table_offset(va)],
                     l3e_from_page(l1_pg,
                         /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));
@@ -621,7 +621,7 @@ void __init paging_init(void)
                       l3e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER));
             ASSERT(!l2_table_offset(va));
         }
-        /* NB. Cannot be GLOBAL: guest user mode should not see it. */
+        /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
         if ( l1_pg )
             l2e_write(l2_ro_mpt, l2e_from_page(
                 l1_pg, /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));

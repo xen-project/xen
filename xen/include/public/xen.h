@@ -486,18 +486,6 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 /* x86/PAE guests: support PDPTs above 4GB. */
 #define VMASST_TYPE_pae_extended_cr3     3
 
-/*
- * x86/64 guests: strictly hide M2P from user mode.
- * This allows the guest to control respective hypervisor behavior:
- * - when not set, L4 tables get created with the respective slot blank,
- *   and whenever the L4 table gets used as a kernel one the missing
- *   mapping gets inserted,
- * - when set, L4 tables get created with the respective slot initialized
- *   as before, and whenever the L4 table gets used as a user one the
- *   mapping gets zapped.
- */
-#define VMASST_TYPE_m2p_strict           32
-
 #if __XEN_INTERFACE_VERSION__ < 0x00040600
 #define MAX_VMASST_TYPE                  3
 #endif
