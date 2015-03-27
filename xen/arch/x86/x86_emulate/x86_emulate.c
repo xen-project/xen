@@ -319,16 +319,20 @@ struct operand {
     /* Original operand value. */
     unsigned long orig_val;
 
-    union {
-        /* OP_REG: Pointer to register field. */
-        unsigned long *reg;
-        /* OP_MEM: Segment and offset. */
-        struct {
-            enum x86_segment seg;
-            unsigned long    off;
-        } mem;
-    };
+    /* OP_REG: Pointer to register field. */
+    unsigned long *reg;
+
+    /* OP_MEM: Segment and offset. */
+    struct {
+        enum x86_segment seg;
+        unsigned long    off;
+    } mem;
 };
+#ifdef __x86_64__
+#define REG_POISON ((unsigned long *) 0x8086000000008086UL) /* non-canonical */
+#else
+#define REG_POISON NULL /* 32-bit builds are for user-space, so NULL is OK. */
+#endif
 
 typedef union {
     uint64_t mmx;
@@ -1447,14 +1451,15 @@ x86_emulate(
     unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
     bool_t lock_prefix = 0;
     int override_seg = -1, rc = X86EMUL_OKAY;
-    struct operand src, dst;
+    struct operand src = { .reg = REG_POISON };
+    struct operand dst = { .reg = REG_POISON };
     enum x86_swint_type swint_type;
     DECLARE_ALIGNED(mmval_t, mmval);
     /*
      * Data operand effective address (usually computed from ModRM).
      * Default is a memory operand relative to segment DS.
      */
-    struct operand ea = { .type = OP_MEM };
+    struct operand ea = { .type = OP_MEM, .reg = REG_POISON };
     ea.mem.seg = x86_seg_ds; /* gcc may reject anon union initializer */
 
     ctxt->retire.byte = 0;
