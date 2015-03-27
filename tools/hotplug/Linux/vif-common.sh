@@ -207,7 +207,7 @@ dom0_ip()
   local result=$(ip_of "$nd")
   if [ -z "$result" ]
   then
-      fatal
+      fatal \
 "$netdev is not up.  Bring it up or specify another interface with " \
 "netdev=<if> as a parameter to $0."
   fi
