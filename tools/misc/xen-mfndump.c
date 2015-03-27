@@ -41,7 +41,7 @@ int dump_m2p_func(int argc, char *argv[])
     }
 
     /* Map M2P and obtain gpfn */
-    if ( xc_maximum_ram_page(xch, &max_mfn) < 0 );
+    if ( xc_maximum_ram_page(xch, &max_mfn) < 0 )
     {
         ERROR("Failed to get the maximum mfn");
         return -1;
