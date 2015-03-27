@@ -800,7 +800,8 @@ static const char *intr_remap_fault_reasons[] =
     "Blocked an interrupt request due to source-id verification failure",
 };
 
-static const char *iommu_get_fault_reason(u8 fault_reason, int *fault_type)
+static const char *iommu_get_fault_reason(u8 fault_reason,
+                                          enum faulttype *fault_type)
 {
     if ( fault_reason >= 0x20 && ( fault_reason < 0x20 +
                 ARRAY_SIZE(intr_remap_fault_reasons)) )
@@ -823,35 +824,48 @@ static const char *iommu_get_fault_reason(u8 fault_reason, int *fault_type)
 static int iommu_page_fault_do_one(struct iommu *iommu, int type,
                                    u8 fault_reason, u16 source_id, u64 addr)
 {
-    const char *reason;
-    int fault_type;
+    const char *reason, *kind;
+    enum faulttype fault_type;
     u16 seg = iommu->intel->drhd->segment;
+
     reason = iommu_get_fault_reason(fault_reason, &fault_type);
-
-    if ( fault_type == DMA_REMAP )
+    switch ( fault_type )
     {
-        INTEL_IOMMU_DEBUG(
-                "DMAR:[%s] Request device [%04x:%02x:%02x.%u] "
-                "fault addr %"PRIx64", iommu reg = %p\n"
-                "DMAR:[fault reason %02xh] %s\n",
-                (type ? "DMA Read" : "DMA Write"),
-                seg, (source_id >> 8), PCI_SLOT(source_id & 0xFF),
-                PCI_FUNC(source_id & 0xFF), addr, iommu->reg,
-                fault_reason, reason);
-	if (iommu_debug)
-            print_vtd_entries(iommu, (source_id >> 8),
-                          (source_id & 0xff), (addr >> PAGE_SHIFT));
+    case DMA_REMAP:
+        printk(XENLOG_G_WARNING VTDPREFIX
+               "DMAR:[%s] Request device [%04x:%02x:%02x.%u] "
+               "fault addr %"PRIx64", iommu reg = %p\n",
+               (type ? "DMA Read" : "DMA Write"),
+               seg, PCI_BUS(source_id), PCI_SLOT(source_id),
+               PCI_FUNC(source_id), addr, iommu->reg);
+        kind = "DMAR";
+        break;
+    case INTR_REMAP:
+        printk(XENLOG_G_WARNING VTDPREFIX
+               "INTR-REMAP: Request device [%04x:%02x:%02x.%u] "
+               "fault index %"PRIx64", iommu reg = %p\n",
+               seg, PCI_BUS(source_id), PCI_SLOT(source_id),
+               PCI_FUNC(source_id), addr >> 48, iommu->reg);
+        kind = "INTR-REMAP";
+        break;
+    default:
+        printk(XENLOG_G_WARNING VTDPREFIX
+               "UNKNOWN: Request device [%04x:%02x:%02x.%u] "
+               "fault addr %"PRIx64", iommu reg = %p\n",
+               seg, PCI_BUS(source_id), PCI_SLOT(source_id),
+               PCI_FUNC(source_id), addr, iommu->reg);
+        kind = "UNKNOWN";
+        break;
     }
-    else
-        INTEL_IOMMU_DEBUG(
-                "INTR-REMAP: Request device [%04x:%02x:%02x.%u] "
-                "fault index %"PRIx64", iommu reg = %p\n"
-                "INTR-REMAP:[fault reason %02xh] %s\n",
-                seg, (source_id >> 8), PCI_SLOT(source_id & 0xFF),
-                PCI_FUNC(source_id & 0xFF), addr >> 48, iommu->reg,
-                fault_reason, reason);
-    return 0;
 
+    gprintk(XENLOG_G_WARNING VTDPREFIX, "%s: reason %02x - %s\n",
+            kind, fault_reason, reason);
+
+    if ( iommu_verbose && fault_type == DMA_REMAP )
+        print_vtd_entries(iommu, PCI_BUS(source_id), PCI_DEVFN2(source_id),
+                          addr >> PAGE_SHIFT);
+
+    return 0;
 }
 
 static void iommu_fault_status(u32 fault_status)
