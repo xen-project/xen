@@ -1564,24 +1564,6 @@ static void do_cp15_32(struct cpu_user_regs *regs,
 
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
     {
-    case HSR_CPREG32(CLIDR):
-        if ( !cp32.read )
-        {
-            dprintk(XENLOG_ERR,
-                    "attempt to write to read-only register CLIDR\n");
-            domain_crash_synchronous();
-        }
-        *r = READ_SYSREG32(CLIDR_EL1);
-        break;
-    case HSR_CPREG32(CCSIDR):
-        if ( !cp32.read )
-        {
-            dprintk(XENLOG_ERR,
-                    "attempt to write to read-only register CCSIDR\n");
-            domain_crash_synchronous();
-        }
-        *r = READ_SYSREG32(CCSIDR_EL1);
-        break;
     case HSR_CPREG32(DCCISW):
         if ( cp32.read )
         {
