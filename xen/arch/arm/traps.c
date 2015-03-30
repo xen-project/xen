@@ -1824,6 +1824,17 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
 
     case HSR_CPREG32(DBGOSLAR):
         return handle_wo_wi(regs, r, cp32.read, hsr, 1);
+
+    /*
+     * CPTR_EL2.TTA
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.16
+     * ARMv8 (DDI 0487A.d): D1-1507 Table D1-54
+     *
+     *  - All implemented trace registers.
+     *
+     * And all other unknown registers.
+     */
     default:
         gdprintk(XENLOG_ERR,
                  "%s p14, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
@@ -1838,9 +1849,38 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
     advance_pc(regs, hsr);
 }
 
-static void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr)
+static void do_cp14_64(struct cpu_user_regs *regs, const union hsr hsr)
 {
     const struct hsr_cp64 cp64 = hsr.cp64;
+
+    if ( !check_conditional_instr(regs, hsr) )
+    {
+        advance_pc(regs, hsr);
+        return;
+    }
+
+    /*
+     * CPTR_EL2.TTA
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.16
+     * ARMv8 (DDI 0487A.d): D1-1507 Table D1-54
+     *
+     *  - All implemented trace registers.
+     *
+     * And all other unknown registers.
+     */
+    gdprintk(XENLOG_ERR,
+             "%s p14, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
+             cp64.read ? "mrrc" : "mcrr",
+             cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
+    gdprintk(XENLOG_ERR, "unhandled 64-bit CP14 access %#x\n",
+             hsr.bits & HSR_CP64_REGS_MASK);
+    inject_undef_exception(regs, hsr);
+}
+
+static void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr)
+{
+    struct hsr_cp64 cp64 = hsr.cp64;
 
     if ( !check_conditional_instr(regs, hsr) )
     {
@@ -1852,7 +1892,7 @@ static void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr)
              "%s p14, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
              cp64.read ? "mrrc" : "mcrr",
              cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
-    gdprintk(XENLOG_ERR, "unhandled 64-bit CP14 access %#x\n",
+    gdprintk(XENLOG_ERR, "unhandled 64-bit CP14 DBG access %#x\n",
              hsr.bits & HSR_CP64_REGS_MASK);
 
     inject_undef_exception(regs, hsr);
@@ -1977,6 +2017,12 @@ static void do_sysreg(struct cpu_user_regs *regs,
      * ARMv8 (DDI 0487A.d): D1-1501 Table D1-43
      *
      *  - Reserved control space for IMPLEMENTATION DEFINED functionality.
+     *
+     * CPTR_EL2.TTA
+     *
+     * ARMv8 (DDI 0487A.d): D1-1507 Table D1-54
+     *
+     *  - All implemented trace registers.
      *
      * And all other unknown registers.
      */
@@ -2236,6 +2282,11 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_cp14_32);
         do_cp14_32(regs, hsr);
+        break;
+    case HSR_EC_CP14_64:
+        GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
+        perfc_incr(trap_cp14_64);
+        do_cp14_64(regs, hsr);
         break;
     case HSR_EC_CP14_DBG:
         GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
