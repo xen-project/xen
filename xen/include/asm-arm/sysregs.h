@@ -40,6 +40,10 @@
     ((__HSR_SYSREG_##crm) << HSR_SYSREG_CRM_SHIFT) | \
     ((__HSR_SYSREG_##op2) << HSR_SYSREG_OP2_SHIFT)
 
+#define HSR_SYSREG_DCISW          HSR_SYSREG(1,0,c7,c6,2)
+#define HSR_SYSREG_DCCSW          HSR_SYSREG(1,0,c7,c10,2)
+#define HSR_SYSREG_DCCISW         HSR_SYSREG(1,0,c7,c14,2)
+
 #define HSR_SYSREG_MDSCR_EL1      HSR_SYSREG(2,0,c0,c2,2)
 #define HSR_SYSREG_OSLAR_EL1      HSR_SYSREG(2,0,c1,c0,4)
 #define HSR_SYSREG_OSDLR_EL1      HSR_SYSREG(2,0,c1,c3,4)

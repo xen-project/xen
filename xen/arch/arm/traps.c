@@ -1564,19 +1564,6 @@ static void do_cp15_32(struct cpu_user_regs *regs,
 
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
     {
-    case HSR_CPREG32(DCCISW):
-        if ( cp32.read )
-        {
-            dprintk(XENLOG_ERR,
-                    "attempt to read from write-only register DCCISW\n");
-            domain_crash_synchronous();
-        }
-#ifdef CONFIG_ARM_32
-        WRITE_CP32(*r, DCCISW);
-#else
-        asm volatile("dc cisw, %0;" : : "r" (*r) : "memory");
-#endif
-        break;
     case HSR_CPREG32(CNTP_CTL):
     case HSR_CPREG32(CNTP_TVAL):
         if ( !vtimer_emulate(regs, hsr) )
