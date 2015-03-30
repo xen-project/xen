@@ -31,6 +31,14 @@
 extern s_time_t ticks_to_ns(uint64_t ticks);
 extern uint64_t ns_to_ticks(s_time_t ns);
 
+/*
+ * Check if regs is allowed access, user_gate is tail end of a
+ * CNTKCTL_EL1_ bit name which gates user access
+ */
+#define ACCESS_ALLOWED(regs, user_gate) \
+    ( !psr_mode_is_user(regs) || \
+      (READ_SYSREG(CNTKCTL_EL1) & CNTKCTL_EL1_##user_gate) )
+
 static void phys_timer_expired(void *data)
 {
     struct vtimer *t = data;
@@ -154,9 +162,13 @@ int virt_timer_restore(struct vcpu *v)
     return 0;
 }
 
-static void vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, int read)
+static int vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, int read)
 {
     struct vcpu *v = current;
+
+    if ( !ACCESS_ALLOWED(regs, EL0PTEN) )
+        return 0;
+
     if ( read )
     {
         *r = v->arch.phys_timer.ctl;
@@ -176,12 +188,16 @@ static void vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, int read)
         else
             stop_timer(&v->arch.phys_timer.timer);
     }
+    return 1;
 }
 
-static void vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r, int read)
+static int vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r, int read)
 {
     struct vcpu *v = current;
     s_time_t now;
+
+    if ( !ACCESS_ALLOWED(regs, EL0PTEN) )
+        return 0;
 
     now = NOW() - v->domain->arch.phys_timer_base.offset;
 
@@ -200,6 +216,7 @@ static void vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r, int read)
                       v->domain->arch.phys_timer_base.offset);
         }
     }
+    return 1;
 }
 
 static int vtimer_cntpct(struct cpu_user_regs *regs, uint64_t *r, int read)
@@ -210,6 +227,8 @@ static int vtimer_cntpct(struct cpu_user_regs *regs, uint64_t *r, int read)
 
     if ( read )
     {
+        if ( !ACCESS_ALLOWED(regs, EL0PCTEN) )
+            return 0;
         now = NOW() - v->domain->arch.phys_timer_base.offset;
         ticks = ns_to_ticks(now);
         *r = ticks;
@@ -236,12 +255,10 @@ static int vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
     {
     case HSR_CPREG32(CNTP_CTL):
-        vtimer_cntp_ctl(regs, r, cp32.read);
-        return 1;
+        return vtimer_cntp_ctl(regs, r, cp32.read);
 
     case HSR_CPREG32(CNTP_TVAL):
-        vtimer_cntp_tval(regs, r, cp32.read);
-        return 1;
+        return vtimer_cntp_tval(regs, r, cp32.read);
 
     default:
         return 0;
@@ -263,7 +280,7 @@ static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
     switch ( hsr.bits & HSR_CP64_REGS_MASK )
     {
     case HSR_CPREG64(CNTPCT):
-        if (!vtimer_cntpct(regs, &x, cp64.read))
+        if ( !vtimer_cntpct(regs, &x, cp64.read) )
             return 0;
 
         if ( cp64.read )
@@ -293,12 +310,14 @@ static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {
     case HSR_SYSREG_CNTP_CTL_EL0:
-        vtimer_cntp_ctl(regs, &r, sysreg.read);
+        if ( !vtimer_cntp_ctl(regs, &r, sysreg.read) )
+            return 0;
         if ( sysreg.read )
             *x = r;
         return 1;
     case HSR_SYSREG_CNTP_TVAL_EL0:
-        vtimer_cntp_tval(regs, &r, sysreg.read);
+        if ( !vtimer_cntp_tval(regs, &r, sysreg.read) )
+            return 0;
         if ( sysreg.read )
             *x = r;
         return 1;
@@ -318,17 +337,11 @@ int vtimer_emulate(struct cpu_user_regs *regs, union hsr hsr)
 
     switch (hsr.ec) {
     case HSR_EC_CP15_32:
-        if ( !is_32bit_domain(current->domain) )
-            return 0;
         return vtimer_emulate_cp32(regs, hsr);
     case HSR_EC_CP15_64:
-        if ( !is_32bit_domain(current->domain) )
-            return 0;
         return vtimer_emulate_cp64(regs, hsr);
 #ifdef CONFIG_ARM_64
     case HSR_EC_SYSREG:
-        if ( is_32bit_domain(current->domain) )
-            return 0;
         return vtimer_emulate_sysreg(regs, hsr);
 #endif
     default:
