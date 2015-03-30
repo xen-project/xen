@@ -1780,7 +1780,6 @@ static void do_cp15_64(struct cpu_user_regs *regs,
 
     switch ( hsr.bits & HSR_CP64_REGS_MASK )
     {
-    case HSR_CPREG64(CNTPCT):
     case HSR_CPREG64(CNTP_CVAL):
         if ( !vtimer_emulate(regs, hsr) )
             return inject_undef_exception(regs, hsr);

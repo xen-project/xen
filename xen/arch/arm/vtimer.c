@@ -243,28 +243,6 @@ static int vtimer_cntp_cval(struct cpu_user_regs *regs, uint64_t *r, int read)
     }
     return 1;
 }
-static int vtimer_cntpct(struct cpu_user_regs *regs, uint64_t *r, int read)
-{
-    struct vcpu *v = current;
-    uint64_t ticks;
-    s_time_t now;
-
-    if ( read )
-    {
-        if ( !ACCESS_ALLOWED(regs, EL0PCTEN) )
-            return 0;
-        now = NOW() - v->domain->arch.phys_timer_base.offset;
-        ticks = ns_to_ticks(now);
-        *r = ticks;
-        return 1;
-    }
-    else
-    {
-        gprintk(XENLOG_DEBUG, "WRITE to R/O CNTPCT\n");
-        return 0;
-    }
-}
-
 
 static int vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
 {
@@ -303,11 +281,6 @@ static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
 
     switch ( hsr.bits & HSR_CP64_REGS_MASK )
     {
-    case HSR_CPREG64(CNTPCT):
-        if ( !vtimer_cntpct(regs, &x, cp64.read) )
-            return 0;
-        break;
-
     case HSR_CPREG64(CNTP_CVAL):
         if ( !vtimer_cntp_cval(regs, &x, cp64.read) )
             return 0;
@@ -355,9 +328,6 @@ static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
 
     case HSR_SYSREG_CNTP_CVAL_EL0:
         return vtimer_cntp_cval(regs, x, sysreg.read);
-
-    case HSR_SYSREG_CNTPCT_EL0:
-        return vtimer_cntpct(regs, x, sysreg.read);
 
     default:
         return 0;
