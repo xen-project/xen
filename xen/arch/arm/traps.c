@@ -63,6 +63,30 @@ static inline void check_stack_alignment_constraints(void) {
 #endif
 }
 
+/*
+ * GUEST_BUG_ON is intended for checking that the guest state has not been
+ * corrupted in hardware and/or that the hardware behaves as we
+ * believe it should (i.e. that certain traps can only occur when the
+ * guest is in a particular mode).
+ *
+ * The intention is to limit the damage such h/w bugs (or spec
+ * misunderstandings) can do by turning them into Denial of Service
+ * attacks instead of e.g. information leaks or privilege escalations.
+ *
+ * GUEST_BUG_ON *MUST* *NOT* be used to check for guest controllable state!
+ *
+ * Compared with regular BUG_ON it dumps the guest vcpu state instead
+ * of Xen's state.
+ */
+#define guest_bug_on_failed(p)                          \
+do {                                                    \
+    show_execution_state(guest_cpu_user_regs());        \
+    panic("Guest Bug: %pv: '%s', line %d, file %s\n",   \
+          current, p, __LINE__, __FILE__);              \
+} while (0)
+#define GUEST_BUG_ON(p) \
+    do { if ( unlikely(p) ) guest_bug_on_failed(#p); } while (0)
+
 #ifdef CONFIG_ARM_32
 static int debug_stack_lines = 20;
 #define stack_words_per_line 8
@@ -2077,37 +2101,37 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         advance_pc(regs, hsr);
         break;
     case HSR_EC_CP15_32:
-        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
+        GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_cp15_32);
         do_cp15_32(regs, hsr);
         break;
     case HSR_EC_CP15_64:
-        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
+        GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_cp15_64);
         do_cp15_64(regs, hsr);
         break;
     case HSR_EC_CP14_32:
-        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
+        GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_cp14_32);
         do_cp14_32(regs, hsr);
         break;
     case HSR_EC_CP14_DBG:
-        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
+        GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_cp14_dbg);
         do_cp14_dbg(regs, hsr);
         break;
     case HSR_EC_CP:
-        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
+        GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_cp);
         do_cp(regs, hsr);
         break;
     case HSR_EC_SMC32:
-        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
+        GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_smc32);
         inject_undef32_exception(regs);
         break;
     case HSR_EC_HVC32:
-        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
+        GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_hvc32);
 #ifndef NDEBUG
         if ( (hsr.iss & 0xff00) == 0xff00 )
@@ -2119,7 +2143,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         break;
 #ifdef CONFIG_ARM_64
     case HSR_EC_HVC64:
-        BUG_ON(psr_mode_is_32bit(regs->cpsr));
+        GUEST_BUG_ON(psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_hvc64);
 #ifndef NDEBUG
         if ( (hsr.iss & 0xff00) == 0xff00 )
@@ -2130,12 +2154,12 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         do_trap_hypercall(regs, &regs->x16, hsr.iss);
         break;
     case HSR_EC_SMC64:
-        BUG_ON(psr_mode_is_32bit(regs->cpsr));
+        GUEST_BUG_ON(psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_smc64);
         inject_undef64_exception(regs, hsr.len);
         break;
     case HSR_EC_SYSREG:
-        BUG_ON(psr_mode_is_32bit(regs->cpsr));
+        GUEST_BUG_ON(psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_sysreg);
         do_sysreg(regs, hsr);
         break;
