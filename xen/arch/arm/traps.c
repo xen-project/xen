@@ -1570,6 +1570,8 @@ static void do_cp15_32(struct cpu_user_regs *regs,
             goto undef_cp15_32;
         break;
     case HSR_CPREG32(ACTLR):
+        if ( psr_mode_is_user(regs) )
+            goto undef_cp15_32;
         if ( cp32.read )
            *r = v->arch.actlr;
         break;
@@ -1582,6 +1584,18 @@ static void do_cp15_32(struct cpu_user_regs *regs,
      * always support PMCCNTR (the cyle counter): we just RAZ/WI for all
      * PM register, which doesn't crash the kernel at least
      */
+    case HSR_CPREG32(PMUSERENR):
+        /* RO at EL0. RAZ/WI at EL1 */
+        if ( psr_mode_is_user(regs) && !hsr.cp32.read )
+            goto undef_cp15_32;
+        goto cp15_32_raz_wi;
+
+    case HSR_CPREG32(PMINTENSET):
+    case HSR_CPREG32(PMINTENCLR):
+        /* EL1 only, however MDCR_EL2.TPM==1 means EL0 may trap here also. */
+        if ( psr_mode_is_user(regs) )
+            goto undef_cp15_32;
+        goto cp15_32_raz_wi;
     case HSR_CPREG32(PMCR):
     case HSR_CPREG32(PMCNTENSET):
     case HSR_CPREG32(PMCNTENCLR):
@@ -1593,12 +1607,17 @@ static void do_cp15_32(struct cpu_user_regs *regs,
     case HSR_CPREG32(PMCCNTR):
     case HSR_CPREG32(PMXEVTYPER):
     case HSR_CPREG32(PMXEVCNTR):
-    case HSR_CPREG32(PMUSERENR):
-    case HSR_CPREG32(PMINTENSET):
-    case HSR_CPREG32(PMINTENCLR):
     case HSR_CPREG32(PMOVSSET):
+        /*
+         * Accessible at EL0 only if PMUSERENR_EL0.EN is set. We
+         * emulate that register as 0 above.
+         */
+        if ( psr_mode_is_user(regs) )
+            goto undef_cp15_32;
+ cp15_32_raz_wi:
         if ( cp32.read )
             *r = 0;
+        /* else: write ignored */
         break;
 
     default:
@@ -2003,8 +2022,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         advance_pc(regs, hsr);
         break;
     case HSR_EC_CP15_32:
-        if ( !is_32bit_domain(current->domain) )
-            goto bad_trap;
+        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_cp15_32);
         do_cp15_32(regs, hsr);
         break;
