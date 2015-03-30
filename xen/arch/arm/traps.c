@@ -1575,11 +1575,24 @@ static void advance_pc(struct cpu_user_regs *regs, const union hsr hsr)
     regs->pc += hsr.len ? 4 : 2;
 }
 
+/* Read as zero + write ignore */
+static void handle_raz_wi(struct cpu_user_regs *regs,
+                          register_t *reg,
+                          bool_t read,
+                          const union hsr hsr)
+{
+    if ( read )
+        *reg = 0;
+    /* else: write ignored */
+
+    advance_pc(regs, hsr);
+}
+
 static void do_cp15_32(struct cpu_user_regs *regs,
                        const union hsr hsr)
 {
     const struct hsr_cp32 cp32 = hsr.cp32;
-    uint32_t *r = (uint32_t*)select_user_reg(regs, cp32.reg);
+    register_t *r = select_user_reg(regs, cp32.reg);
     struct vcpu *v = current;
 
     if ( !check_conditional_instr(regs, hsr) )
@@ -1614,14 +1627,14 @@ static void do_cp15_32(struct cpu_user_regs *regs,
         /* RO at EL0. RAZ/WI at EL1 */
         if ( psr_mode_is_user(regs) && !hsr.cp32.read )
             return inject_undef_exception(regs, hsr);
-        goto cp15_32_raz_wi;
+        return handle_raz_wi(regs, r, cp32.read, hsr);
 
     case HSR_CPREG32(PMINTENSET):
     case HSR_CPREG32(PMINTENCLR):
         /* EL1 only, however MDCR_EL2.TPM==1 means EL0 may trap here also. */
         if ( psr_mode_is_user(regs) )
             return inject_undef_exception(regs, hsr);
-        goto cp15_32_raz_wi;
+        return handle_raz_wi(regs, r, cp32.read, hsr);
     case HSR_CPREG32(PMCR):
     case HSR_CPREG32(PMCNTENSET):
     case HSR_CPREG32(PMCNTENCLR):
@@ -1640,11 +1653,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
          */
         if ( psr_mode_is_user(regs) )
             return inject_undef_exception(regs, hsr);
- cp15_32_raz_wi:
-        if ( cp32.read )
-            *r = 0;
-        /* else: write ignored */
-        break;
+        return handle_raz_wi(regs, r, cp32.read, hsr);
 
     default:
         gdprintk(XENLOG_ERR,
@@ -1695,7 +1704,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
 static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
 {
     const struct hsr_cp32 cp32 = hsr.cp32;
-    uint32_t *r = (uint32_t *)select_user_reg(regs, cp32.reg);
+    register_t *r = select_user_reg(regs, cp32.reg);
     struct domain *d = current->domain;
 
     if ( !check_conditional_instr(regs, hsr) )
@@ -1739,12 +1748,11 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
         if ( usr_mode(regs) )
             return inject_undef_exception(regs, hsr);
 
-        /* Implement debug status and control register as RAZ/WI.
-         * The OS won't use Hardware debug if MDBGen not set
+        /*
+         * Implement debug status and control register as RAZ/WI.
+         * The OS won't use Hardware debug if MDBGen not set.
          */
-        if ( cp32.read )
-           *r = 0;
-        break;
+        return handle_raz_wi(regs, r, cp32.read, hsr);
 
     case HSR_CPREG32(DBGVCR):
     case HSR_CPREG32(DBGBVR0):
@@ -1756,10 +1764,7 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
     case HSR_CPREG32(DBGOSDLR):
         if ( usr_mode(regs) )
             return inject_undef_exception(regs, hsr);
-        /* RAZ/WI */
-        if ( cp32.read )
-            *r = 0;
-        break;
+        return handle_raz_wi(regs, r, cp32.read, hsr);
 
     case HSR_CPREG32(DBGOSLAR):
         if ( usr_mode(regs) )
@@ -1846,7 +1851,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
          */
         if ( psr_mode_is_user(regs) )
             return inject_undef_exception(regs, hsr);
-        goto sysreg_raz_wi;
+        return handle_raz_wi(regs, x, hsr.sysreg.read, hsr);
 
     case HSR_SYSREG_MDCCSR_EL0:
         /*
@@ -1864,7 +1869,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
         /* RO at EL0. RAZ/WI at EL1 */
         if ( psr_mode_is_user(regs) && !hsr.sysreg.read )
             return inject_undef_exception(regs, hsr);
-        goto sysreg_raz_wi;
+        return handle_raz_wi(regs, x, hsr.sysreg.read, hsr);
     case HSR_SYSREG_PMCR_EL0:
     case HSR_SYSREG_PMCNTENSET_EL0:
     case HSR_SYSREG_PMCNTENCLR_EL0:
@@ -1883,11 +1888,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
          */
         if ( psr_mode_is_user(regs) )
             return inject_undef_exception(regs, hsr);
- sysreg_raz_wi:
-        if ( hsr.sysreg.read )
-            *x = 0;
-        /* else: write ignored */
-        break;
+        return handle_raz_wi(regs, x, hsr.sysreg.read, hsr);
 
     /* Write only, Write ignore registers: */
     case HSR_SYSREG_OSLAR_EL1:
