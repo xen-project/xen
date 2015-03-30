@@ -2155,6 +2155,12 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
 
     switch (hsr.ec) {
     case HSR_EC_WFI_WFE:
+        /*
+         * HCR_EL2.TWI, HCR_EL2.TWE
+         *
+         * ARMv7 (DDI 0406C.b): B1.14.9
+         * ARMv8 (DDI 0487A.d): D1-1505 Table D1-51
+         */
         if ( !check_conditional_instr(regs, hsr) )
         {
             advance_pc(regs, hsr);
@@ -2197,6 +2203,12 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         do_cp(regs, hsr);
         break;
     case HSR_EC_SMC32:
+        /*
+         * HCR_EL2.TSC
+         *
+         * ARMv7 (DDI 0406C.b): B1.14.8
+         * ARMv8 (DDI 0487A.d): D1-1501 Table D1-44
+         */
         GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_smc32);
         inject_undef32_exception(regs);
@@ -2225,6 +2237,11 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         do_trap_hypercall(regs, &regs->x16, hsr.iss);
         break;
     case HSR_EC_SMC64:
+        /*
+         * HCR_EL2.TSC
+         *
+         * ARMv8 (DDI 0487A.d): D1-1501 Table D1-44
+         */
         GUEST_BUG_ON(psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_smc64);
         inject_undef64_exception(regs, hsr.len);
