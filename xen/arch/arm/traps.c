@@ -1817,6 +1817,21 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
 
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
     {
+    /*
+     * MDCR_EL2.TDOSA
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.15
+     * ARMv8 (DDI 0487A.d): D1-1509 Table D1-58
+     *
+     * Unhandled:
+     *    DBGOSLSR
+     *    DBGPRCR
+     */
+    case HSR_CPREG32(DBGOSLAR):
+        return handle_wo_wi(regs, r, cp32.read, hsr, 1);
+    case HSR_CPREG32(DBGOSDLR):
+        return handle_raz_wi(regs, r, cp32.read, hsr, 1);
+
     case HSR_CPREG32(DBGDIDR):
         /*
          * Read-only register. Accessible by EL0 if DBGDSCRext.UDCCdis
@@ -1856,11 +1871,7 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
     case HSR_CPREG32(DBGWCR0):
     case HSR_CPREG32(DBGBVR1):
     case HSR_CPREG32(DBGBCR1):
-    case HSR_CPREG32(DBGOSDLR):
         return handle_raz_wi(regs, r, cp32.read, hsr, 1);
-
-    case HSR_CPREG32(DBGOSLAR):
-        return handle_wo_wi(regs, r, cp32.read, hsr, 1);
 
     /*
      * CPTR_EL2.TTA
@@ -1943,6 +1954,18 @@ static void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr)
         return;
     }
 
+    /*
+     * MDCR_EL2.TDOSA
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.15
+     * ARMv8 (DDI 0487A.d): D1-1509 Table D1-58
+     *
+     * Unhandled:
+     *    DBGDTRTXint
+     *    DBGDTRRXint
+     *
+     * And all other unknown registers.
+     */
     gdprintk(XENLOG_ERR,
              "%s p14, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
              cp64.read ? "mrrc" : "mcrr",
@@ -1997,6 +2020,20 @@ static void do_sysreg(struct cpu_user_regs *regs,
     case HSR_SYSREG_MDRAR_EL1:
         return handle_ro_raz(regs, x, hsr.sysreg.read, hsr, 1);
 
+    /*
+     * MDCR_EL2.TDOSA
+     *
+     * ARMv8 (DDI 0487A.d): D1-1509 Table D1-58
+     *
+     * Unhandled:
+     *    OSLSR_EL1
+     *    DBGPRCR_EL1
+     */
+    case HSR_SYSREG_OSLAR_EL1:
+        return handle_wo_wi(regs, x, hsr.sysreg.read, hsr, 1);
+    case HSR_SYSREG_OSDLR_EL1:
+        return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
+
     /* RAZ/WI registers: */
     /*  - Debug */
     case HSR_SYSREG_MDSCR_EL1:
@@ -2006,8 +2043,6 @@ static void do_sysreg(struct cpu_user_regs *regs,
     /*  - Watchpoints */
     HSR_SYSREG_DBG_CASES(DBGWVR):
     HSR_SYSREG_DBG_CASES(DBGWCR):
-    /*  - Double Lock Register */
-    case HSR_SYSREG_OSDLR_EL1:
     /*  - Perf monitors */
     case HSR_SYSREG_PMINTENSET_EL1:
     case HSR_SYSREG_PMINTENCLR_EL1:
@@ -2048,10 +2083,6 @@ static void do_sysreg(struct cpu_user_regs *regs,
          * emulate that register as 0 above.
          */
         return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
-
-    /* Write only, Write ignore registers: */
-    case HSR_SYSREG_OSLAR_EL1:
-        return handle_wo_wi(regs, x, hsr.sysreg.read, hsr, 1);
 
     case HSR_SYSREG_CNTP_CTL_EL0:
     case HSR_SYSREG_CNTP_TVAL_EL0:
