@@ -1909,7 +1909,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
         {
             dprintk(XENLOG_WARNING,
                     "failed emulation of sysreg ICC_SGI1R_EL1 access\n");
-            inject_undef64_exception(regs, hsr.len);
+            return inject_undef64_exception(regs, hsr.len);
         }
         break;
     case HSR_SYSREG_ICC_SGI0R_EL1:
@@ -1917,7 +1917,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
         /* TBD: Implement to support secure grp0/1 SGI forwarding */
         dprintk(XENLOG_WARNING,
                 "Emulation of sysreg ICC_SGI0R_EL1/ASGI1R_EL1 not supported\n");
-        inject_undef64_exception(regs, hsr.len);
+        return inject_undef64_exception(regs, hsr.len);
     default:
         {
             const struct hsr_sysreg sysreg = hsr.sysreg;
