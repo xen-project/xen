@@ -519,13 +519,13 @@ static void inject_iabt64_exception(struct cpu_user_regs *regs,
 #endif
 
 static void inject_undef_exception(struct cpu_user_regs *regs,
-                                   int instr_len)
+                                   const union hsr hsr)
 {
         if ( is_32bit_domain(current->domain) )
             inject_undef32_exception(regs);
 #ifdef CONFIG_ARM_64
         else
-            inject_undef64_exception(regs, instr_len);
+            inject_undef64_exception(regs, hsr.len);
 #endif
 }
 
@@ -1593,11 +1593,11 @@ static void do_cp15_32(struct cpu_user_regs *regs,
     case HSR_CPREG32(CNTP_CTL):
     case HSR_CPREG32(CNTP_TVAL):
         if ( !vtimer_emulate(regs, hsr) )
-            goto undef_cp15_32;
+            return inject_undef_exception(regs, hsr);
         break;
     case HSR_CPREG32(ACTLR):
         if ( psr_mode_is_user(regs) )
-            goto undef_cp15_32;
+            return inject_undef_exception(regs, hsr);
         if ( cp32.read )
            *r = v->arch.actlr;
         break;
@@ -1613,14 +1613,14 @@ static void do_cp15_32(struct cpu_user_regs *regs,
     case HSR_CPREG32(PMUSERENR):
         /* RO at EL0. RAZ/WI at EL1 */
         if ( psr_mode_is_user(regs) && !hsr.cp32.read )
-            goto undef_cp15_32;
+            return inject_undef_exception(regs, hsr);
         goto cp15_32_raz_wi;
 
     case HSR_CPREG32(PMINTENSET):
     case HSR_CPREG32(PMINTENCLR):
         /* EL1 only, however MDCR_EL2.TPM==1 means EL0 may trap here also. */
         if ( psr_mode_is_user(regs) )
-            goto undef_cp15_32;
+            return inject_undef_exception(regs, hsr);
         goto cp15_32_raz_wi;
     case HSR_CPREG32(PMCR):
     case HSR_CPREG32(PMCNTENSET):
@@ -1639,7 +1639,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
          * emulate that register as 0 above.
          */
         if ( psr_mode_is_user(regs) )
-            goto undef_cp15_32;
+            return inject_undef_exception(regs, hsr);
  cp15_32_raz_wi:
         if ( cp32.read )
             *r = 0;
@@ -1653,8 +1653,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
                  cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
         gdprintk(XENLOG_ERR, "unhandled 32-bit CP15 access %#x\n",
                  hsr.bits & HSR_CP32_REGS_MASK);
- undef_cp15_32:
-        inject_undef_exception(regs, hsr.len);
+        inject_undef_exception(regs, hsr);
         return;
     }
     advance_pc(regs, hsr);
@@ -1674,7 +1673,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
     case HSR_CPREG64(CNTPCT):
     case HSR_CPREG64(CNTP_CVAL):
         if ( !vtimer_emulate(regs, hsr) )
-            goto undef_cp15_64;
+            return inject_undef_exception(regs, hsr);
         break;
     default:
         {
@@ -1686,8 +1685,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
                      cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
             gdprintk(XENLOG_ERR, "unhandled 64-bit CP15 access %#x\n",
                      hsr.bits & HSR_CP64_REGS_MASK);
- undef_cp15_64:
-            inject_undef_exception(regs, hsr.len);
+            inject_undef_exception(regs, hsr);
             return;
         }
     }
@@ -1714,7 +1712,7 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
          * is set to 0, which we emulated below.
          */
         if ( !cp32.read )
-            goto undef_cp14_32;
+            return inject_undef_exception(regs, hsr);
 
         /* Implement the minimum requirements:
          *  - Number of watchpoints: 1
@@ -1732,14 +1730,14 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
          * is set to 0, which we emulated below.
          */
         if ( !cp32.read )
-            goto undef_cp14_32;
+            return inject_undef_exception(regs, hsr);
 
         *r = 0;
         break;
 
     case HSR_CPREG32(DBGDSCREXT):
         if ( usr_mode(regs) )
-            goto undef_cp14_32;
+            return inject_undef_exception(regs, hsr);
 
         /* Implement debug status and control register as RAZ/WI.
          * The OS won't use Hardware debug if MDBGen not set
@@ -1757,7 +1755,7 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
     case HSR_CPREG32(DBGBCR1):
     case HSR_CPREG32(DBGOSDLR):
         if ( usr_mode(regs) )
-            goto undef_cp14_32;
+            return inject_undef_exception(regs, hsr);
         /* RAZ/WI */
         if ( cp32.read )
             *r = 0;
@@ -1765,10 +1763,10 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
 
     case HSR_CPREG32(DBGOSLAR):
         if ( usr_mode(regs) )
-            goto undef_cp14_32;
+            return inject_undef_exception(regs, hsr);
         /* WO */
         if ( cp32.read )
-            goto undef_cp14_32;
+            return inject_undef_exception(regs, hsr);
         /* else: ignore */
         break;
     default:
@@ -1778,8 +1776,7 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
                   cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
         gdprintk(XENLOG_ERR, "unhandled 32-bit cp14 access %#x\n",
                  hsr.bits & HSR_CP32_REGS_MASK);
- undef_cp14_32:
-        inject_undef_exception(regs, hsr.len);
+        inject_undef_exception(regs, hsr);
         return;
     }
 
@@ -1803,7 +1800,7 @@ static void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr)
     gdprintk(XENLOG_ERR, "unhandled 64-bit CP14 access %#x\n",
              hsr.bits & HSR_CP64_REGS_MASK);
 
-    inject_undef_exception(regs, hsr.len);
+    inject_undef_exception(regs, hsr);
 }
 
 static void do_cp(struct cpu_user_regs *regs, const union hsr hsr)
@@ -1818,7 +1815,7 @@ static void do_cp(struct cpu_user_regs *regs, const union hsr hsr)
 
     ASSERT(!cp.tas); /* We don't trap SIMD instruction */
     gdprintk(XENLOG_ERR, "unhandled CP%d access\n", cp.coproc);
-    inject_undef_exception(regs, hsr.len);
+    inject_undef_exception(regs, hsr);
 }
 
 #ifdef CONFIG_ARM_64
@@ -1848,7 +1845,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
          * undef.
          */
         if ( psr_mode_is_user(regs) )
-            goto undef_sysreg;
+            return inject_undef_exception(regs, hsr);
         goto sysreg_raz_wi;
 
     case HSR_SYSREG_MDCCSR_EL0:
@@ -1857,7 +1854,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
          * register as RAZ/WI above. So RO at both EL0 and EL1.
          */
         if ( !hsr.sysreg.read )
-            goto undef_sysreg;
+            return inject_undef_exception(regs, hsr);
 
         *x = 0;
         break;
@@ -1866,7 +1863,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
     case HSR_SYSREG_PMUSERENR_EL0:
         /* RO at EL0. RAZ/WI at EL1 */
         if ( psr_mode_is_user(regs) && !hsr.sysreg.read )
-            goto undef_sysreg;
+            return inject_undef_exception(regs, hsr);
         goto sysreg_raz_wi;
     case HSR_SYSREG_PMCR_EL0:
     case HSR_SYSREG_PMCNTENSET_EL0:
@@ -1885,7 +1882,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
          * emulate that register as 0 above.
          */
         if ( psr_mode_is_user(regs) )
-            goto undef_sysreg;
+            return inject_undef_exception(regs, hsr);
  sysreg_raz_wi:
         if ( hsr.sysreg.read )
             *x = 0;
@@ -1895,14 +1892,14 @@ static void do_sysreg(struct cpu_user_regs *regs,
     /* Write only, Write ignore registers: */
     case HSR_SYSREG_OSLAR_EL1:
         if ( hsr.sysreg.read )
-            goto undef_sysreg;
+            return inject_undef_exception(regs, hsr);
         /* else: write ignored */
         break;
     case HSR_SYSREG_CNTP_CTL_EL0:
     case HSR_SYSREG_CNTP_TVAL_EL0:
     case HSR_SYSREG_CNTP_CVAL_EL0:
         if ( !vtimer_emulate(regs, hsr) )
-            goto undef_sysreg;
+            return inject_undef_exception(regs, hsr);
         break;
     case HSR_SYSREG_ICC_SGI1R_EL1:
         if ( !vgic_emulate(regs, hsr) )
@@ -1932,8 +1929,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
                      sysreg.reg, regs->pc);
             gdprintk(XENLOG_ERR, "unhandled 64-bit sysreg access %#x\n",
                      hsr.bits & HSR_SYSREG_REGS_MASK);
- undef_sysreg:
-            inject_undef_exception(regs, hsr.sysreg.len);
+            inject_undef_exception(regs, hsr);
             return;
         }
     }
