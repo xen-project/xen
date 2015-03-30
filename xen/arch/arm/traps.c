@@ -1683,10 +1683,12 @@ static void do_cp14_32(struct cpu_user_regs *regs, union hsr hsr)
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
     {
     case HSR_CPREG32(DBGDIDR):
-
-        /* Read-only register */
+        /*
+         * Read-only register. Accessible by EL0 if DBGDSCRext.UDCCdis
+         * is set to 0, which we emulated below.
+         */
         if ( !cp32.read )
-            goto bad_cp;
+            goto undef_cp14_32;
 
         /* Implement the minimum requirements:
          *  - Number of watchpoints: 1
@@ -1699,15 +1701,28 @@ static void do_cp14_32(struct cpu_user_regs *regs, union hsr hsr)
         break;
 
     case HSR_CPREG32(DBGDSCRINT):
+        /*
+         * Read-only register. Accessible by EL0 if DBGDSCRext.UDCCdis
+         * is set to 0, which we emulated below.
+         */
+        if ( !cp32.read )
+            goto undef_cp14_32;
+
+        *r = 0;
+        break;
+
     case HSR_CPREG32(DBGDSCREXT):
+        if ( usr_mode(regs) )
+            goto undef_cp14_32;
+
         /* Implement debug status and control register as RAZ/WI.
          * The OS won't use Hardware debug if MDBGen not set
          */
         if ( cp32.read )
            *r = 0;
         break;
+
     case HSR_CPREG32(DBGVCR):
-    case HSR_CPREG32(DBGOSLAR):
     case HSR_CPREG32(DBGBVR0):
     case HSR_CPREG32(DBGBCR0):
     case HSR_CPREG32(DBGWVR0):
@@ -1715,19 +1730,29 @@ static void do_cp14_32(struct cpu_user_regs *regs, union hsr hsr)
     case HSR_CPREG32(DBGBVR1):
     case HSR_CPREG32(DBGBCR1):
     case HSR_CPREG32(DBGOSDLR):
+        if ( usr_mode(regs) )
+            goto undef_cp14_32;
         /* RAZ/WI */
         if ( cp32.read )
             *r = 0;
         break;
 
+    case HSR_CPREG32(DBGOSLAR):
+        if ( usr_mode(regs) )
+            goto undef_cp14_32;
+        /* WO */
+        if ( cp32.read )
+            goto undef_cp14_32;
+        /* else: ignore */
+        break;
     default:
-bad_cp:
         gdprintk(XENLOG_ERR,
                  "%s p14, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
                   cp32.read ? "mrc" : "mcr",
                   cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
         gdprintk(XENLOG_ERR, "unhandled 32-bit cp14 access %#x\n",
                  hsr.bits & HSR_CP32_REGS_MASK);
+ undef_cp14_32:
         inject_undef_exception(regs, hsr.len);
         return;
     }
@@ -2032,8 +2057,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         do_cp15_64(regs, hsr);
         break;
     case HSR_EC_CP14_32:
-        if ( !is_32bit_domain(current->domain) )
-            goto bad_trap;
+        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_cp14_32);
         do_cp14_32(regs, hsr);
         break;
