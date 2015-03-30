@@ -1832,6 +1832,28 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
     case HSR_CPREG32(DBGOSDLR):
         return handle_raz_wi(regs, r, cp32.read, hsr, 1);
 
+    /*
+     * MDCR_EL2.TDA
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.15
+     * ARMv8 (DDI 0487A.d): D1-1510 Table D1-59
+     *
+     * Unhandled:
+     *    DBGDCCINT
+     *    DBGDTRRXint
+     *    DBGDTRTXint
+     *    DBGWFAR
+     *    DBGDTRTXext
+     *    DBGDTRRXext,
+     *    DBGBXVR<n>
+     *    DBGCLAIMSET
+     *    DBGCLAIMCLR
+     *    DBGAUTHSTATUS
+     *    DBGDEVID
+     *    DBGDEVID1
+     *    DBGDEVID2
+     *    DBGOSECCR
+     */
     case HSR_CPREG32(DBGDIDR):
         /*
          * Read-only register. Accessible by EL0 if DBGDSCRext.UDCCdis
@@ -2034,15 +2056,38 @@ static void do_sysreg(struct cpu_user_regs *regs,
     case HSR_SYSREG_OSDLR_EL1:
         return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
 
-    /* RAZ/WI registers: */
-    /*  - Debug */
+    /*
+     * MDCR_EL2.TDA
+     *
+     * ARMv8 (DDI 0487A.d): D1-1510 Table D1-59
+     *
+     * Unhandled:
+     *    MDCCINT_EL1
+     *    DBGDTR_EL0
+     *    DBGDTRRX_EL0
+     *    DBGDTRTX_EL0
+     *    OSDTRRX_EL1
+     *    OSDTRTX_EL1
+     *    OSECCR_EL1
+     *    DBGCLAIMSET_EL1
+     *    DBGCLAIMCLR_EL1
+     *    DBGAUTHSTATUS_EL1
+     */
     case HSR_SYSREG_MDSCR_EL1:
-    /*  - Breakpoints */
+        return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
+    case HSR_SYSREG_MDCCSR_EL0:
+        /*
+         * Accessible at EL0 only if MDSCR_EL1.TDCC is set to 0. We emulate that
+         * register as RAZ/WI above. So RO at both EL0 and EL1.
+         */
+        return handle_ro_raz(regs, x, hsr.sysreg.read, hsr, 0);
     HSR_SYSREG_DBG_CASES(DBGBVR):
     HSR_SYSREG_DBG_CASES(DBGBCR):
-    /*  - Watchpoints */
     HSR_SYSREG_DBG_CASES(DBGWVR):
     HSR_SYSREG_DBG_CASES(DBGWCR):
+        return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
+
+    /* RAZ/WI registers: */
     /*  - Perf monitors */
     case HSR_SYSREG_PMINTENSET_EL1:
     case HSR_SYSREG_PMINTENCLR_EL1:
@@ -2051,13 +2096,6 @@ static void do_sysreg(struct cpu_user_regs *regs,
          * undef.
          */
         return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
-
-    case HSR_SYSREG_MDCCSR_EL0:
-        /*
-         * Accessible at EL0 only if MDSCR_EL1.TDCC is set to 0. We emulate that
-         * register as RAZ/WI above. So RO at both EL0 and EL1.
-         */
-        return handle_ro_raz(regs, x, hsr.sysreg.read, hsr, 0);
 
     /* - Perf monitors */
     case HSR_SYSREG_PMUSERENR_EL0:
