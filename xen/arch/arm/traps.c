@@ -1654,6 +1654,12 @@ static void do_cp15_32(struct cpu_user_regs *regs,
 
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
     {
+    /*
+     * !CNTHCTL_EL2.EL1PCEN / !CNTHCTL.PL1PCEN
+     *
+     * ARMv7 (DDI 0406C.b): B4.1.22
+     * ARMv8 (DDI 0487A.d): D1-1510 Table D1-60
+     */
     case HSR_CPREG32(CNTP_CTL):
     case HSR_CPREG32(CNTP_TVAL):
         if ( !vtimer_emulate(regs, hsr) )
@@ -1780,6 +1786,12 @@ static void do_cp15_64(struct cpu_user_regs *regs,
 
     switch ( hsr.bits & HSR_CP64_REGS_MASK )
     {
+    /*
+     * !CNTHCTL_EL2.EL1PCEN / !CNTHCTL.PL1PCEN
+     *
+     * ARMv7 (DDI 0406C.b): B4.1.22
+     * ARMv8 (DDI 0487A.d): D1-1510 Table D1-60
+     */
     case HSR_CPREG64(CNTP_CVAL):
         if ( !vtimer_emulate(regs, hsr) )
             return inject_undef_exception(regs, hsr);
@@ -2150,12 +2162,18 @@ static void do_sysreg(struct cpu_user_regs *regs,
          */
         return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
 
+    /*
+     * !CNTHCTL_EL2.EL1PCEN
+     *
+     * ARMv8 (DDI 0487A.d): D1-1510 Table D1-60
+     */
     case HSR_SYSREG_CNTP_CTL_EL0:
     case HSR_SYSREG_CNTP_TVAL_EL0:
     case HSR_SYSREG_CNTP_CVAL_EL0:
         if ( !vtimer_emulate(regs, hsr) )
             return inject_undef_exception(regs, hsr);
         break;
+
     case HSR_SYSREG_ICC_SGI1R_EL1:
         if ( !vgic_emulate(regs, hsr) )
         {
