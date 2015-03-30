@@ -27,7 +27,7 @@ class xen
     mtrr_read
 # XENPF_microcode_update
     microcode
-# XEN_SYSCTL_physinfo, XEN_SYSCTL_topologyinfo, XEN_SYSCTL_numainfo
+# XEN_SYSCTL_physinfo, XEN_SYSCTL_cputopoinfo, XEN_SYSCTL_numainfo
     physinfo
 # XENPF_platform_quirk
     quirk

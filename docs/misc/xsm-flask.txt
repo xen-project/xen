@@ -116,7 +116,7 @@ __HYPERVISOR_sysctl (xen/include/public/sysctl.h)
  * XEN_SYSCTL_pm_op
  * XEN_SYSCTL_page_offline_op
  * XEN_SYSCTL_lockprof_op
- * XEN_SYSCTL_topologyinfo
+ * XEN_SYSCTL_cputopoinfo
  * XEN_SYSCTL_numainfo
  * XEN_SYSCTL_cpupool_op
  * XEN_SYSCTL_scheduler_op
