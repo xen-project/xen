@@ -1654,6 +1654,13 @@ static void do_cp15_32(struct cpu_user_regs *regs,
         if ( !vtimer_emulate(regs, hsr) )
             return inject_undef_exception(regs, hsr);
         break;
+
+    /*
+     * HCR_EL2.TACR / HCR.TAC
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.6
+     * ARMv8 (DDI 0487A.d): G6.2.1
+     */
     case HSR_CPREG32(ACTLR):
         if ( psr_mode_is_user(regs) )
             return inject_undef_exception(regs, hsr);
@@ -1856,9 +1863,22 @@ static void do_sysreg(struct cpu_user_regs *regs,
                       const union hsr hsr)
 {
     register_t *x = select_user_reg(regs, hsr.sysreg.reg);
+    struct vcpu *v = current;
 
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {
+    /*
+     * HCR_EL2.TACR
+     *
+     * ARMv8 (DDI 0487A.d): D7.2.1
+     */
+    case HSR_SYSREG_ACTLR_EL1:
+        if ( psr_mode_is_user(regs) )
+            return inject_undef_exception(regs, hsr);
+        if ( hsr.sysreg.read )
+           *x = v->arch.actlr;
+        break;
+
     /* RAZ/WI registers: */
     /*  - Debug */
     case HSR_SYSREG_MDSCR_EL1:

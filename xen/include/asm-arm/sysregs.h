@@ -72,6 +72,7 @@
                                   case HSR_SYSREG_##REG##n_EL1(15)
 
 #define HSR_SYSREG_SCTLR_EL1      HSR_SYSREG(3,0,c1, c0,0)
+#define HSR_SYSREG_ACTLR_EL1      HSR_SYSREG(3,0,c1, c0,1)
 #define HSR_SYSREG_TTBR0_EL1      HSR_SYSREG(3,0,c2, c0,0)
 #define HSR_SYSREG_TTBR1_EL1      HSR_SYSREG(3,0,c2, c0,1)
 #define HSR_SYSREG_TCR_EL1        HSR_SYSREG(3,0,c2, c0,2)
