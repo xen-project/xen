@@ -230,7 +230,7 @@ void __cpuinit init_timer_interrupt(void)
     /* Sensible defaults */
     WRITE_SYSREG64(0, CNTVOFF_EL2);     /* No VM-specific offset */
     /* Do not let the VMs program the physical timer, only read the physical counter */
-    WRITE_SYSREG32(CNTHCTL_PA, CNTHCTL_EL2);
+    WRITE_SYSREG32(CNTHCTL_EL2_EL1PCTEN, CNTHCTL_EL2);
     WRITE_SYSREG32(0, CNTP_CTL_EL0);    /* Physical timer disabled */
     WRITE_SYSREG32(0, CNTHP_CTL_EL2);   /* Hypervisor's timer disabled */
     isb();
