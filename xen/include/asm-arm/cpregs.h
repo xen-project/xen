@@ -222,8 +222,8 @@
 #define PMCEID0         p15,0,c9,c12,6  /* Perf. Mon. Common Event Identification register 0 */
 #define PMCEID1         p15,0,c9,c12,7  /* Perf. Mon. Common Event Identification register 1 */
 #define PMCCNTR         p15,0,c9,c13,0  /* Perf. Mon. Cycle Count Register */
-#define PMXEVCNTR       p15,0,c9,c13,1  /* Perf. Mon. Event Type Select Register */
-#define PMXEVCNR        p15,0,c9,c13,2  /* Perf. Mon. Event Count Register */
+#define PMXEVTYPER      p15,0,c9,c13,1  /* Perf. Mon. Event Type Select Register */
+#define PMXEVCNTR       p15,0,c9,c13,2  /* Perf. Mon. Event Count Register */
 #define PMUSERENR       p15,0,c9,c14,0  /* Perf. Mon. User Enable Register */
 #define PMINTENSET      p15,0,c9,c14,1  /* Perf. Mon. Interrupt Enable Set Register */
 #define PMINTENCLR      p15,0,c9,c14,2  /* Perf. Mon. Interrupt Enable Clear Register */

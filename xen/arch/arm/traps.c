@@ -1633,8 +1633,8 @@ static void do_cp15_32(struct cpu_user_regs *regs,
     case HSR_CPREG32(PMCEID0):
     case HSR_CPREG32(PMCEID1):
     case HSR_CPREG32(PMCCNTR):
+    case HSR_CPREG32(PMXEVTYPER):
     case HSR_CPREG32(PMXEVCNTR):
-    case HSR_CPREG32(PMXEVCNR):
     case HSR_CPREG32(PMUSERENR):
     case HSR_CPREG32(PMINTENSET):
     case HSR_CPREG32(PMINTENCLR):
