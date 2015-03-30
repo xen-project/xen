@@ -111,8 +111,13 @@ void __cpuinit init_traps(void)
     /* Trap CP15 c15 used for implementation defined registers */
     WRITE_SYSREG(HSTR_T(15), HSTR_EL2);
 
-    /* Trap all coprocessor registers (0-13) except cp10 and cp11 for VFP
-     * /!\ All processors except cp10 and cp11 cannot be used in Xen
+    /* Trap all coprocessor registers (0-13) except cp10 and
+     * cp11 for VFP.
+     *
+     * /!\ All coprocessors except cp10 and cp11 cannot be used in Xen.
+     *
+     * On ARM64 the TCPx bits which we set here (0..9,12,13) are all
+     * RES1, i.e. they would trap whether we did this write or not.
      */
     WRITE_SYSREG((HCPTR_CP_MASK & ~(HCPTR_CP(10) | HCPTR_CP(11))) | HCPTR_TTA,
                  CPTR_EL2);
@@ -1718,6 +1723,13 @@ static void do_cp15_32(struct cpu_user_regs *regs,
      *  - CRn==c11, opc1=={0-7}, CRm=={c0-c8, c15}, opc2=={0-7}
      *    (VMSA CP15 c11 registers)
      *
+     * CPTR_EL2.T{0..9,12..13}
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.12
+     * ARMv8 (DDI 0487A.d): N/A
+     *
+     *  - All accesses to coprocessors 0..9 and 12..13
+     *
      * And all other unknown registers.
      */
     default:
@@ -1749,6 +1761,17 @@ static void do_cp15_64(struct cpu_user_regs *regs,
         if ( !vtimer_emulate(regs, hsr) )
             return inject_undef_exception(regs, hsr);
         break;
+
+    /*
+     * CPTR_EL2.T{0..9,12..13}
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.12
+     * ARMv8 (DDI 0487A.d): N/A
+     *
+     *  - All accesses to coprocessors 0..9 and 12..13
+     *
+     * And all other unknown registers.
+     */
     default:
         {
             const struct hsr_cp64 cp64 = hsr.cp64;
