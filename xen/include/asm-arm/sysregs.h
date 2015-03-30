@@ -100,8 +100,9 @@
 #define HSR_SYSREG_PMOVSSET_EL0   HSR_SYSREG(3,3,c9,c14,3)
 
 #define HSR_SYSREG_CNTPCT_EL0     HSR_SYSREG(3,3,c14,c0,0)
-#define HSR_SYSREG_CNTP_CTL_EL0   HSR_SYSREG(3,3,c14,c2,1)
 #define HSR_SYSREG_CNTP_TVAL_EL0  HSR_SYSREG(3,3,c14,c2,0)
+#define HSR_SYSREG_CNTP_CTL_EL0   HSR_SYSREG(3,3,c14,c2,1)
+#define HSR_SYSREG_CNTP_CVAL_EL0  HSR_SYSREG(3,3,c14,c2,2)
 
 /*
  * GIC System register assembly aliases picked from kernel
