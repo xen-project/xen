@@ -1806,9 +1806,42 @@ static void do_sysreg(struct cpu_user_regs *regs,
     /* RAZ/WI registers: */
     /*  - Debug */
     case HSR_SYSREG_MDSCR_EL1:
+    /*  - Breakpoints */
+    HSR_SYSREG_DBG_CASES(DBGBVR):
+    HSR_SYSREG_DBG_CASES(DBGBCR):
+    /*  - Watchpoints */
+    HSR_SYSREG_DBG_CASES(DBGWVR):
+    HSR_SYSREG_DBG_CASES(DBGWCR):
+    /*  - Double Lock Register */
+    case HSR_SYSREG_OSDLR_EL1:
     /*  - Perf monitors */
     case HSR_SYSREG_PMINTENSET_EL1:
     case HSR_SYSREG_PMINTENCLR_EL1:
+        /*
+         * Accessible from EL1 only, but if EL0 trap happens handle as
+         * undef.
+         */
+        if ( psr_mode_is_user(regs) )
+            goto undef_sysreg;
+        goto sysreg_raz_wi;
+
+    case HSR_SYSREG_MDCCSR_EL0:
+        /*
+         * Accessible at EL0 only if MDSCR_EL1.TDCC is set to 0. We emulate that
+         * register as RAZ/WI above. So RO at both EL0 and EL1.
+         */
+        if ( !hsr.sysreg.read )
+            goto undef_sysreg;
+
+        *x = 0;
+        break;
+
+    /* - Perf monitors */
+    case HSR_SYSREG_PMUSERENR_EL0:
+        /* RO at EL0. RAZ/WI at EL1 */
+        if ( psr_mode_is_user(regs) && !hsr.sysreg.read )
+            goto undef_sysreg;
+        goto sysreg_raz_wi;
     case HSR_SYSREG_PMCR_EL0:
     case HSR_SYSREG_PMCNTENSET_EL0:
     case HSR_SYSREG_PMCNTENCLR_EL0:
@@ -1820,16 +1853,14 @@ static void do_sysreg(struct cpu_user_regs *regs,
     case HSR_SYSREG_PMCCNTR_EL0:
     case HSR_SYSREG_PMXEVTYPER_EL0:
     case HSR_SYSREG_PMXEVCNTR_EL0:
-    case HSR_SYSREG_PMUSERENR_EL0:
     case HSR_SYSREG_PMOVSSET_EL0:
-    /* - Breakpoints */
-    HSR_SYSREG_DBG_CASES(DBGBVR):
-    HSR_SYSREG_DBG_CASES(DBGBCR):
-    /* - Watchpoints */
-    HSR_SYSREG_DBG_CASES(DBGWVR):
-    HSR_SYSREG_DBG_CASES(DBGWCR):
-    /* - Double Lock Register */
-    case HSR_SYSREG_OSDLR_EL1:
+        /*
+         * Accessible at EL0 only if PMUSERENR_EL0.EN is set. We
+         * emulate that register as 0 above.
+         */
+        if ( psr_mode_is_user(regs) )
+            goto undef_sysreg;
+ sysreg_raz_wi:
         if ( hsr.sysreg.read )
             *x = 0;
         /* else: write ignored */
@@ -1838,7 +1869,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
     /* Write only, Write ignore registers: */
     case HSR_SYSREG_OSLAR_EL1:
         if ( hsr.sysreg.read )
-            goto bad_sysreg;
+            goto undef_sysreg;
         /* else: write ignored */
         break;
     case HSR_SYSREG_CNTP_CTL_EL0:
@@ -1862,7 +1893,6 @@ static void do_sysreg(struct cpu_user_regs *regs,
                 "Emulation of sysreg ICC_SGI0R_EL1/ASGI1R_EL1 not supported\n");
         inject_undef64_exception(regs, hsr.len);
     default:
- bad_sysreg:
         {
             struct hsr_sysreg sysreg = hsr.sysreg;
 
@@ -2103,8 +2133,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         inject_undef64_exception(regs, hsr.len);
         break;
     case HSR_EC_SYSREG:
-        if ( is_32bit_domain(current->domain) )
-            goto bad_trap;
+        BUG_ON(psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_sysreg);
         do_sysreg(regs, hsr);
         break;
