@@ -1870,6 +1870,15 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
      *
      *  - All implemented trace registers.
      *
+     * MDCR_EL2.TDRA
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.15
+     * ARMv8 (DDI 0487A.d): D1-1508 Table D1-57
+     *
+     * Unhandled:
+     *    DBGDRAR (32-bit accesses)
+     *    DBGDSAR (32-bit accesses)
+     *
      * And all other unknown registers.
      */
     default:
@@ -1903,6 +1912,15 @@ static void do_cp14_64(struct cpu_user_regs *regs, const union hsr hsr)
      * ARMv8 (DDI 0487A.d): D1-1507 Table D1-54
      *
      *  - All implemented trace registers.
+     *
+     * MDCR_EL2.TDRA
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.15
+     * ARMv8 (DDI 0487A.d): D1-1508 Table D1-57
+     *
+     * Unhandled:
+     *    DBGDRAR (64-bit accesses)
+     *    DBGDSAR (64-bit accesses)
      *
      * And all other unknown registers.
      */
@@ -1970,6 +1988,14 @@ static void do_sysreg(struct cpu_user_regs *regs,
         if ( hsr.sysreg.read )
            *x = v->arch.actlr;
         break;
+
+    /*
+     * MDCR_EL2.TDRA
+     *
+     * ARMv8 (DDI 0487A.d): D1-1508 Table D1-57
+     */
+    case HSR_SYSREG_MDRAR_EL1:
+        return handle_ro_raz(regs, x, hsr.sysreg.read, hsr, 1);
 
     /* RAZ/WI registers: */
     /*  - Debug */
