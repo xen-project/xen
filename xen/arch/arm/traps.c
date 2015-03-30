@@ -2092,22 +2092,22 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         do_cp14_32(regs, hsr);
         break;
     case HSR_EC_CP14_DBG:
-        if ( !is_32bit_domain(current->domain) )
-            goto bad_trap;
+        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_cp14_dbg);
         do_cp14_dbg(regs, hsr);
         break;
     case HSR_EC_CP:
-        if ( !is_32bit_domain(current->domain) )
-            goto bad_trap;
+        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_cp);
         do_cp(regs, hsr);
         break;
     case HSR_EC_SMC32:
+        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_smc32);
         inject_undef32_exception(regs);
         break;
     case HSR_EC_HVC32:
+        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_hvc32);
 #ifndef NDEBUG
         if ( (hsr.iss & 0xff00) == 0xff00 )
@@ -2119,6 +2119,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         break;
 #ifdef CONFIG_ARM_64
     case HSR_EC_HVC64:
+        BUG_ON(psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_hvc64);
 #ifndef NDEBUG
         if ( (hsr.iss & 0xff00) == 0xff00 )
@@ -2129,6 +2130,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         do_trap_hypercall(regs, &regs->x16, hsr.iss);
         break;
     case HSR_EC_SMC64:
+        BUG_ON(psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_smc64);
         inject_undef64_exception(regs, hsr.len);
         break;
@@ -2155,7 +2157,6 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
 #endif
 
     default:
- bad_trap:
         printk("Hypervisor Trap. HSR=0x%x EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
                hsr.bits, hsr.ec, hsr.len, hsr.iss);
         do_unexpected_trap("Hypervisor", regs);
