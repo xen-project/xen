@@ -1579,11 +1579,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
     case HSR_CPREG32(CNTP_CTL):
     case HSR_CPREG32(CNTP_TVAL):
         if ( !vtimer_emulate(regs, hsr) )
-        {
-            dprintk(XENLOG_ERR,
-                    "failed emulation of 32-bit vtimer CP register access\n");
-            domain_crash_synchronous();
-        }
+            goto undef_cp15_32;
         break;
     case HSR_CPREG32(ACTLR):
         if ( cp32.read )
@@ -1626,6 +1622,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
         gdprintk(XENLOG_ERR, "unhandled 32-bit CP15 access %#x\n",
                  hsr.bits & HSR_CP32_REGS_MASK);
 #endif
+ undef_cp15_32:
         inject_undef_exception(regs, hsr.len);
         return;
     }
@@ -1645,11 +1642,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
     {
     case HSR_CPREG64(CNTPCT):
         if ( !vtimer_emulate(regs, hsr) )
-        {
-            dprintk(XENLOG_ERR,
-                    "failed emulation of 64-bit vtimer CP register access\n");
-            domain_crash_synchronous();
-        }
+            goto undef_cp15_64;
         break;
     default:
         {
@@ -1663,6 +1656,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
             gdprintk(XENLOG_ERR, "unhandled 64-bit CP15 access %#x\n",
                      hsr.bits & HSR_CP64_REGS_MASK);
 #endif
+ undef_cp15_64:
             inject_undef_exception(regs, hsr.len);
             return;
         }
@@ -1830,11 +1824,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
     case HSR_SYSREG_CNTP_CTL_EL0:
     case HSR_SYSREG_CNTP_TVAL_EL0:
         if ( !vtimer_emulate(regs, hsr) )
-        {
-            dprintk(XENLOG_ERR,
-                    "failed emulation of 64-bit vtimer sysreg access\n");
-            domain_crash_synchronous();
-        }
+            goto undef_sysreg;
         break;
     case HSR_SYSREG_ICC_SGI1R_EL1:
         if ( !vgic_emulate(regs, hsr) )
@@ -1853,8 +1843,8 @@ static void do_sysreg(struct cpu_user_regs *regs,
     default:
  bad_sysreg:
         {
-            struct hsr_sysreg sysreg = hsr.sysreg;
 #ifndef NDEBUG
+            struct hsr_sysreg sysreg = hsr.sysreg;
 
             gdprintk(XENLOG_ERR,
                      "%s %d, %d, c%d, c%d, %d %s x%d @ 0x%"PRIregister"\n",
@@ -1867,7 +1857,8 @@ static void do_sysreg(struct cpu_user_regs *regs,
             gdprintk(XENLOG_ERR, "unhandled 64-bit sysreg access %#x\n",
                      hsr.bits & HSR_SYSREG_REGS_MASK);
 #endif
-            inject_undef_exception(regs, sysreg.len);
+ undef_sysreg:
+            inject_undef_exception(regs, hsr.sysreg.len);
             return;
         }
     }
@@ -2040,8 +2031,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         do_cp15_32(regs, hsr);
         break;
     case HSR_EC_CP15_64:
-        if ( !is_32bit_domain(current->domain) )
-            goto bad_trap;
+        BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         do_cp15_64(regs, hsr);
         break;
     case HSR_EC_CP14_32:
