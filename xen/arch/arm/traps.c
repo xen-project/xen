@@ -2174,6 +2174,12 @@ static void do_sysreg(struct cpu_user_regs *regs,
             return inject_undef_exception(regs, hsr);
         break;
 
+    /*
+     * HCR_EL2.FMO or HCR_EL2.IMO
+     *
+     * ARMv8: GIC Architecture Specification (PRD03-GENC-010745 24.0)
+     *        Section 4.6.8.
+     */
     case HSR_SYSREG_ICC_SGI1R_EL1:
         if ( !vgic_emulate(regs, hsr) )
         {
