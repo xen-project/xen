@@ -1705,6 +1705,21 @@ static void do_cp15_32(struct cpu_user_regs *regs,
          */
         return handle_raz_wi(regs, r, cp32.read, hsr, 1);
 
+    /*
+     * HCR_EL2.TIDCP
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.3
+     * ARMv8 (DDI 0487A.d): D1-1501 Table D1-43
+     *
+     *  - CRn==c9, opc1=={0-7}, CRm=={c0-c2, c5-c8}, opc2=={0-7}
+     *    (Cache and TCM lockdown registers)
+     *  - CRn==c10, opc1=={0-7}, CRm=={c0, c1, c4, c8}, opc2=={0-7}
+     *    (VMSA CP15 c10 registers)
+     *  - CRn==c11, opc1=={0-7}, CRm=={c0-c8, c15}, opc2=={0-7}
+     *    (VMSA CP15 c11 registers)
+     *
+     * And all other unknown registers.
+     */
     default:
         gdprintk(XENLOG_ERR,
                  "%s p15, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
@@ -1955,6 +1970,16 @@ static void do_sysreg(struct cpu_user_regs *regs,
         dprintk(XENLOG_WARNING,
                 "Emulation of sysreg ICC_SGI0R_EL1/ASGI1R_EL1 not supported\n");
         return inject_undef64_exception(regs, hsr.len);
+
+    /*
+     * HCR_EL2.TIDCP
+     *
+     * ARMv8 (DDI 0487A.d): D1-1501 Table D1-43
+     *
+     *  - Reserved control space for IMPLEMENTATION DEFINED functionality.
+     *
+     * And all other unknown registers.
+     */
     default:
         {
             const struct hsr_sysreg sysreg = hsr.sysreg;
