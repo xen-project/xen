@@ -1575,7 +1575,7 @@ static void advance_pc(struct cpu_user_regs *regs, const union hsr hsr)
     regs->pc += hsr.len ? 4 : 2;
 }
 
-/* Read as zero + write ignore */
+/* Read as zero and write ignore */
 static void handle_raz_wi(struct cpu_user_regs *regs,
                           register_t *reg,
                           bool_t read,
@@ -1584,6 +1584,34 @@ static void handle_raz_wi(struct cpu_user_regs *regs,
     if ( read )
         *reg = 0;
     /* else: write ignored */
+
+    advance_pc(regs, hsr);
+}
+
+/* Write only as write ignore */
+static void handle_wo_wi(struct cpu_user_regs *regs,
+                         register_t *reg,
+                         bool_t read,
+                         const union hsr hsr)
+{
+    if ( read )
+        return inject_undef_exception(regs, hsr);
+    /* else: ignore */
+
+    advance_pc(regs, hsr);
+}
+
+/* Read only as read as zero */
+static void handle_ro_raz(struct cpu_user_regs *regs,
+                          register_t *reg,
+                          bool_t read,
+                          const union hsr hsr)
+{
+    if ( !read )
+        return inject_undef_exception(regs, hsr);
+    /* else: raz */
+
+    *reg = 0;
 
     advance_pc(regs, hsr);
 }
@@ -1738,11 +1766,7 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
          * Read-only register. Accessible by EL0 if DBGDSCRext.UDCCdis
          * is set to 0, which we emulated below.
          */
-        if ( !cp32.read )
-            return inject_undef_exception(regs, hsr);
-
-        *r = 0;
-        break;
+        return handle_ro_raz(regs, r, cp32.read, hsr);
 
     case HSR_CPREG32(DBGDSCREXT):
         if ( usr_mode(regs) )
@@ -1769,11 +1793,7 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
     case HSR_CPREG32(DBGOSLAR):
         if ( usr_mode(regs) )
             return inject_undef_exception(regs, hsr);
-        /* WO */
-        if ( cp32.read )
-            return inject_undef_exception(regs, hsr);
-        /* else: ignore */
-        break;
+        return handle_wo_wi(regs, r, cp32.read, hsr);
     default:
         gdprintk(XENLOG_ERR,
                  "%s p14, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
@@ -1858,11 +1878,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
          * Accessible at EL0 only if MDSCR_EL1.TDCC is set to 0. We emulate that
          * register as RAZ/WI above. So RO at both EL0 and EL1.
          */
-        if ( !hsr.sysreg.read )
-            return inject_undef_exception(regs, hsr);
-
-        *x = 0;
-        break;
+        return handle_ro_raz(regs, x, hsr.sysreg.read, hsr);
 
     /* - Perf monitors */
     case HSR_SYSREG_PMUSERENR_EL0:
@@ -1892,10 +1908,8 @@ static void do_sysreg(struct cpu_user_regs *regs,
 
     /* Write only, Write ignore registers: */
     case HSR_SYSREG_OSLAR_EL1:
-        if ( hsr.sysreg.read )
-            return inject_undef_exception(regs, hsr);
-        /* else: write ignored */
-        break;
+        return handle_wo_wi(regs, x, hsr.sysreg.read, hsr);
+
     case HSR_SYSREG_CNTP_CTL_EL0:
     case HSR_SYSREG_CNTP_TVAL_EL0:
     case HSR_SYSREG_CNTP_CVAL_EL0:
