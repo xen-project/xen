@@ -1317,6 +1317,8 @@ int xc_domain_disable_migrate(xc_interface *xch, uint32_t domid);
 
 int xc_domain_maximum_gpfn(xc_interface *xch, domid_t domid, xen_pfn_t *gpfns);
 
+int xc_domain_nr_gpfns(xc_interface *xch, domid_t domid, xen_pfn_t *gpfns);
+
 int xc_domain_increase_reservation(xc_interface *xch,
                                    uint32_t domid,
                                    unsigned long nr_extents,

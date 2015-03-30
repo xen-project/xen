@@ -45,7 +45,7 @@ xc_core_arch_memory_map_get(xc_interface *xch, struct xc_core_arch_context *unus
     xen_pfn_t p2m_size = 0;
     xc_core_memory_map_t *map;
 
-    if ( xc_domain_maximum_gpfn(xch, info->domid, &p2m_size) < 0 )
+    if ( xc_domain_nr_gpfns(xch, info->domid, &p2m_size) < 0 )
         return -1;
 
     map = malloc(sizeof(*map));

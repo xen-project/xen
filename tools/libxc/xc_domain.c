@@ -795,9 +795,19 @@ int xc_domain_maximum_gpfn(xc_interface *xch, domid_t domid, xen_pfn_t *gpfns)
 
     if ( rc >= 0 )
     {
-        *gpfns = rc + 1;
+        *gpfns = rc;
         rc = 0;
     }
+    return rc;
+}
+
+int xc_domain_nr_gpfns(xc_interface *xch, domid_t domid, xen_pfn_t *gpfns)
+{
+    int rc = xc_domain_maximum_gpfn(xch, domid, gpfns);
+
+    if ( rc >= 0 )
+        *gpfns += 1;
+
     return rc;
 }
 

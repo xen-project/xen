@@ -50,7 +50,7 @@ xc_core_arch_memory_map_get(xc_interface *xch, struct xc_core_arch_context *unus
     xen_pfn_t p2m_size = 0;
     xc_core_memory_map_t *map;
 
-    if ( xc_domain_maximum_gpfn(xch, info->domid, &p2m_size) < 0 )
+    if ( xc_domain_nr_gpfns(xch, info->domid, &p2m_size) < 0 )
         return -1;
 
     map = malloc(sizeof(*map));
@@ -85,7 +85,7 @@ xc_core_arch_map_p2m_rw(xc_interface *xch, struct domain_info_context *dinfo, xc
     int err;
     int i;
 
-    if ( xc_domain_maximum_gpfn(xch, info->domid, &dinfo->p2m_size) < 0 )
+    if ( xc_domain_nr_gpfns(xch, info->domid, &dinfo->p2m_size) < 0 )
     {
         ERROR("Could not get maximum GPFN!");
         goto out;
@@ -212,7 +212,7 @@ int
 xc_core_arch_get_scratch_gpfn(xc_interface *xch, domid_t domid,
                               xen_pfn_t *gpfn)
 {
-    return xc_domain_maximum_gpfn(xch, domid, gpfn);
+    return xc_domain_nr_gpfns(xch, domid, gpfn);
 }
 
 /*
