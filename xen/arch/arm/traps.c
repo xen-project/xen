@@ -1730,6 +1730,13 @@ static void do_cp15_32(struct cpu_user_regs *regs,
      *
      *  - All accesses to coprocessors 0..9 and 12..13
      *
+     * HSTR_EL2.T15
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.14
+     * ARMv8 (DDI 0487A.d): D1-1507 Table D1-55
+     *
+     *  - All accesses to cp15, c15 registers.
+     *
      * And all other unknown registers.
      */
     default:
@@ -1769,6 +1776,13 @@ static void do_cp15_64(struct cpu_user_regs *regs,
      * ARMv8 (DDI 0487A.d): N/A
      *
      *  - All accesses to coprocessors 0..9 and 12..13
+     *
+     * HSTR_EL2.T15
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.14
+     * ARMv8 (DDI 0487A.d): D1-1507 Table D1-55
+     *
+     *  - All accesses to cp15, c15 registers.
      *
      * And all other unknown registers.
      */
