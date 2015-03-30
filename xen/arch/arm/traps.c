@@ -1658,6 +1658,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
     switch ( hsr.bits & HSR_CP64_REGS_MASK )
     {
     case HSR_CPREG64(CNTPCT):
+    case HSR_CPREG64(CNTP_CVAL):
         if ( !vtimer_emulate(regs, hsr) )
             goto undef_cp15_64;
         break;
@@ -1829,6 +1830,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
         break;
     case HSR_SYSREG_CNTP_CTL_EL0:
     case HSR_SYSREG_CNTP_TVAL_EL0:
+    case HSR_SYSREG_CNTP_CVAL_EL0:
         if ( !vtimer_emulate(regs, hsr) )
             goto undef_sysreg;
         break;

@@ -219,6 +219,30 @@ static int vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r, int read)
     return 1;
 }
 
+static int vtimer_cntp_cval(struct cpu_user_regs *regs, uint64_t *r, int read)
+{
+    struct vcpu *v = current;
+
+    if ( !ACCESS_ALLOWED(regs, EL0PTEN) )
+        return 0;
+
+    if ( read )
+    {
+        *r = ns_to_ticks(v->arch.phys_timer.cval);
+    }
+    else
+    {
+        v->arch.phys_timer.cval = ticks_to_ns(*r);
+        if ( v->arch.phys_timer.ctl & CNTx_CTL_ENABLE )
+        {
+            v->arch.phys_timer.ctl &= ~CNTx_CTL_PENDING;
+            set_timer(&v->arch.phys_timer.timer,
+                      v->arch.phys_timer.cval +
+                      v->domain->arch.phys_timer_base.offset);
+        }
+    }
+    return 1;
+}
 static int vtimer_cntpct(struct cpu_user_regs *regs, uint64_t *r, int read)
 {
     struct vcpu *v = current;
@@ -270,7 +294,7 @@ static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
     struct hsr_cp64 cp64 = hsr.cp64;
     uint32_t *r1 = (uint32_t *)select_user_reg(regs, cp64.reg1);
     uint32_t *r2 = (uint32_t *)select_user_reg(regs, cp64.reg2);
-    uint64_t x;
+    uint64_t x = (uint64_t)(*r1) | ((uint64_t)(*r2) << 32);
 
     if ( cp64.read )
         perfc_incr(vtimer_cp64_reads);
@@ -282,17 +306,24 @@ static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
     case HSR_CPREG64(CNTPCT):
         if ( !vtimer_cntpct(regs, &x, cp64.read) )
             return 0;
+        break;
 
-        if ( cp64.read )
-        {
-            *r1 = (uint32_t)(x & 0xffffffff);
-            *r2 = (uint32_t)(x >> 32);
-        }
-        return 1;
+    case HSR_CPREG64(CNTP_CVAL):
+        if ( !vtimer_cntp_cval(regs, &x, cp64.read) )
+            return 0;
+        break;
 
     default:
         return 0;
     }
+
+    if ( cp64.read )
+    {
+        *r1 = (uint32_t)(x & 0xffffffff);
+        *r2 = (uint32_t)(x >> 32);
+    }
+
+    return 1;
 }
 
 #ifdef CONFIG_ARM_64
@@ -321,6 +352,9 @@ static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
         if ( sysreg.read )
             *x = r;
         return 1;
+
+    case HSR_SYSREG_CNTP_CVAL_EL0:
+        return vtimer_cntp_cval(regs, x, sysreg.read);
 
     case HSR_SYSREG_CNTPCT_EL0:
         return vtimer_cntpct(regs, x, sysreg.read);
