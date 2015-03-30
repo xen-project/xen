@@ -1673,6 +1673,24 @@ static void do_cp15_32(struct cpu_user_regs *regs,
            *r = v->arch.actlr;
         break;
 
+    /*
+     * MDCR_EL2.TPM
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.17
+     * ARMv8 (DDI 0487A.d): D1-1511 Table D1-61
+     *
+     * Unhandled:
+     *    PMEVCNTR<n>
+     *    PMEVTYPER<n>
+     *    PMCCFILTR
+     *
+     * MDCR_EL2.TPMCR
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.17
+     * ARMv8 (DDI 0487A.d): D1-1511 Table D1-62
+     *
+     * NB: Both MDCR_EL2.TPM and MDCR_EL2.TPMCR cause trapping of PMCR.
+     */
     /* We could trap ID_DFR0 and tell the guest we don't support
      * performance monitoring, but Linux doesn't check the ID_DFR0.
      * Therefore it will read PMCR.
@@ -1687,7 +1705,6 @@ static void do_cp15_32(struct cpu_user_regs *regs,
             return handle_ro_raz(regs, r, cp32.read, hsr, 0);
         else
             return handle_raz_wi(regs, r, cp32.read, hsr, 1);
-
     case HSR_CPREG32(PMINTENSET):
     case HSR_CPREG32(PMINTENCLR):
         /* EL1 only, however MDCR_EL2.TPM==1 means EL0 may trap here also. */
@@ -2087,8 +2104,22 @@ static void do_sysreg(struct cpu_user_regs *regs,
     HSR_SYSREG_DBG_CASES(DBGWCR):
         return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
 
-    /* RAZ/WI registers: */
-    /*  - Perf monitors */
+    /*
+     * MDCR_EL2.TPM
+     *
+     * ARMv8 (DDI 0487A.d): D1-1511 Table D1-61
+     *
+     * Unhandled:
+     *    PMEVCNTR<n>_EL0
+     *    PMEVTYPER<n>_EL0
+     *    PMCCFILTR_EL0
+     * MDCR_EL2.TPMCR
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.17
+     * ARMv8 (DDI 0487A.d): D1-1511 Table D1-62
+     *
+     * NB: Both MDCR_EL2.TPM and MDCR_EL2.TPMCR cause trapping of PMCR.
+     */
     case HSR_SYSREG_PMINTENSET_EL1:
     case HSR_SYSREG_PMINTENCLR_EL1:
         /*
@@ -2096,8 +2127,6 @@ static void do_sysreg(struct cpu_user_regs *regs,
          * undef.
          */
         return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
-
-    /* - Perf monitors */
     case HSR_SYSREG_PMUSERENR_EL0:
         /* RO at EL0. RAZ/WI at EL1 */
         if ( psr_mode_is_user(regs) )
