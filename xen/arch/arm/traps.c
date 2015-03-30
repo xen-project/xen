@@ -1487,7 +1487,7 @@ static int check_conditional_instr(struct cpu_user_regs *regs, union hsr hsr)
     {
         unsigned long it;
 
-        BUG_ON( !is_32bit_domain(current->domain) || !(cpsr&PSR_THUMB) );
+        BUG_ON( !psr_mode_is_32bit(regs->cpsr) || !(cpsr&PSR_THUMB) );
 
         it = ( (cpsr >> (10-2)) & 0xfc) | ((cpsr >> 25) & 0x3 );
 
@@ -1496,7 +1496,7 @@ static int check_conditional_instr(struct cpu_user_regs *regs, union hsr hsr)
             return 1;
 
         /* The cond for this instruction works out as the top 4 bits. */
-        cond =  ( it >> 4 );
+        cond = ( it >> 4 );
     }
 
     cpsr_cond = cpsr >> 28;
@@ -1514,10 +1514,10 @@ static void advance_pc(struct cpu_user_regs *regs, union hsr hsr)
     unsigned long itbits, cond, cpsr = regs->cpsr;
 
     /* PSR_IT_MASK bits can only be set for 32-bit processors in Thumb mode. */
-    BUG_ON( (!is_32bit_domain(current->domain)||!(cpsr&PSR_THUMB))
+    BUG_ON( (!psr_mode_is_32bit(cpsr)||!(cpsr&PSR_THUMB))
             && (cpsr&PSR_IT_MASK) );
 
-    if ( is_32bit_domain(current->domain) && (cpsr&PSR_IT_MASK) )
+    if ( cpsr&PSR_IT_MASK )
     {
         /* The ITSTATE[7:0] block is contained in CPSR[15:10],CPSR[26:25]
          *
