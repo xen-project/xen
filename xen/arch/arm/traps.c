@@ -448,7 +448,7 @@ static vaddr_t exception_handler64(struct cpu_user_regs *regs, vaddr_t offset)
 static void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len)
 {
     vaddr_t handler;
-    union hsr esr = {
+    const union hsr esr = {
         .iss = 0,
         .len = instr_len,
         .ec = HSR_EC_UNKNOWN,
@@ -1142,7 +1142,7 @@ int do_bug_frame(struct cpu_user_regs *regs, vaddr_t pc)
 }
 
 #ifdef CONFIG_ARM_64
-static void do_trap_brk(struct cpu_user_regs *regs, union hsr hsr)
+static void do_trap_brk(struct cpu_user_regs *regs, const union hsr hsr)
 {
     /* HCR_EL2.TGE and MDCR_EL2.TDE are not set so we never receive
      * software breakpoint exception for EL1 and EL0 here.
@@ -1489,7 +1489,8 @@ static const unsigned short cc_map[16] = {
         0                       /* NV                     */
 };
 
-static int check_conditional_instr(struct cpu_user_regs *regs, union hsr hsr)
+static int check_conditional_instr(struct cpu_user_regs *regs,
+                                   const union hsr hsr)
 {
     unsigned long cpsr, cpsr_cond;
     int cond;
@@ -1534,7 +1535,7 @@ static int check_conditional_instr(struct cpu_user_regs *regs, union hsr hsr)
     return 1;
 }
 
-static void advance_pc(struct cpu_user_regs *regs, union hsr hsr)
+static void advance_pc(struct cpu_user_regs *regs, const union hsr hsr)
 {
     unsigned long itbits, cond, cpsr = regs->cpsr;
 
@@ -1575,9 +1576,9 @@ static void advance_pc(struct cpu_user_regs *regs, union hsr hsr)
 }
 
 static void do_cp15_32(struct cpu_user_regs *regs,
-                       union hsr hsr)
+                       const union hsr hsr)
 {
-    struct hsr_cp32 cp32 = hsr.cp32;
+    const struct hsr_cp32 cp32 = hsr.cp32;
     uint32_t *r = (uint32_t*)select_user_reg(regs, cp32.reg);
     struct vcpu *v = current;
 
@@ -1660,7 +1661,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
 }
 
 static void do_cp15_64(struct cpu_user_regs *regs,
-                       union hsr hsr)
+                       const union hsr hsr)
 {
     if ( !check_conditional_instr(regs, hsr) )
     {
@@ -1677,7 +1678,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
         break;
     default:
         {
-            struct hsr_cp64 cp64 = hsr.cp64;
+            const struct hsr_cp64 cp64 = hsr.cp64;
 
             gdprintk(XENLOG_ERR,
                      "%s p15, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
@@ -1693,9 +1694,9 @@ static void do_cp15_64(struct cpu_user_regs *regs,
     advance_pc(regs, hsr);
 }
 
-static void do_cp14_32(struct cpu_user_regs *regs, union hsr hsr)
+static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
 {
-    struct hsr_cp32 cp32 = hsr.cp32;
+    const struct hsr_cp32 cp32 = hsr.cp32;
     uint32_t *r = (uint32_t *)select_user_reg(regs, cp32.reg);
     struct domain *d = current->domain;
 
@@ -1785,9 +1786,9 @@ static void do_cp14_32(struct cpu_user_regs *regs, union hsr hsr)
     advance_pc(regs, hsr);
 }
 
-static void do_cp14_dbg(struct cpu_user_regs *regs, union hsr hsr)
+static void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr)
 {
-    struct hsr_cp64 cp64 = hsr.cp64;
+    const struct hsr_cp64 cp64 = hsr.cp64;
 
     if ( !check_conditional_instr(regs, hsr) )
     {
@@ -1805,9 +1806,9 @@ static void do_cp14_dbg(struct cpu_user_regs *regs, union hsr hsr)
     inject_undef_exception(regs, hsr.len);
 }
 
-static void do_cp(struct cpu_user_regs *regs, union hsr hsr)
+static void do_cp(struct cpu_user_regs *regs, const union hsr hsr)
 {
-    struct hsr_cp cp = hsr.cp;
+    const struct hsr_cp cp = hsr.cp;
 
     if ( !check_conditional_instr(regs, hsr) )
     {
@@ -1822,7 +1823,7 @@ static void do_cp(struct cpu_user_regs *regs, union hsr hsr)
 
 #ifdef CONFIG_ARM_64
 static void do_sysreg(struct cpu_user_regs *regs,
-                      union hsr hsr)
+                      const union hsr hsr)
 {
     register_t *x = select_user_reg(regs, hsr.sysreg.reg);
 
@@ -1919,7 +1920,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
         inject_undef64_exception(regs, hsr.len);
     default:
         {
-            struct hsr_sysreg sysreg = hsr.sysreg;
+            const struct hsr_sysreg sysreg = hsr.sysreg;
 
             gdprintk(XENLOG_ERR,
                      "%s %d, %d, c%d, c%d, %d %s x%d @ 0x%"PRIregister"\n",
@@ -1998,7 +1999,7 @@ done:
 }
 
 static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
-                                      union hsr hsr)
+                                      const union hsr hsr)
 {
     int rc;
     register_t gva = READ_SYSREG(FAR_EL2);
@@ -2045,9 +2046,9 @@ bad_insn_abort:
 }
 
 static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
-                                     union hsr hsr)
+                                     const union hsr hsr)
 {
-    struct hsr_dabt dabt = hsr.dabt;
+    const struct hsr_dabt dabt = hsr.dabt;
     int rc;
     mmio_info_t info;
 
@@ -2132,7 +2133,7 @@ static void enter_hypervisor_head(struct cpu_user_regs *regs)
 
 asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
 {
-    union hsr hsr = { .bits = READ_SYSREG32(ESR_EL2) };
+    const union hsr hsr = { .bits = READ_SYSREG32(ESR_EL2) };
 
     enter_hypervisor_head(regs);
 
