@@ -4,9 +4,11 @@
 #include <string.h>
 #include <getopt.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <xen/hvm/hvm_info_table.h>
 
 static unsigned int indent_level;
+static bool debug = false;
 
 typedef enum dm_version {
     QEMU_XEN_TRADITIONAL,
@@ -83,6 +85,7 @@ static void decision_tree(
 static struct option options[] = {
     { "maxcpu", 1, 0, 'c' },
     { "dm-version", 1, 0, 'q' },
+    { "debug", 1, 0, 'd' },
     { 0, 0, 0, 0 }
 };
 
@@ -124,6 +127,10 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Unknown device model version `%s'.\n", optarg);
                 return -1;
             }
+            break;
+        case 'd':
+            if (*optarg == 'y')
+                debug = true;
             break;
         default:
             return -1;
@@ -344,14 +351,20 @@ int main(int argc, char **argv)
             /* _SUN == dev */
             stmt("Name", "_SUN, 0x%08x", slot >> 3);
             push_block("Method", "_EJ0, 1");
-            stmt("Store", "0x%02x, \\_GPE.DPT1", slot);
-            stmt("Store", "0x88, \\_GPE.DPT2");
+            if (debug)
+            {
+                stmt("Store", "0x%02x, \\_GPE.DPT1", slot);
+                stmt("Store", "0x88, \\_GPE.DPT2");
+            }
             stmt("Store", "0x%02x, \\_GPE.PH%02X", /* eject */
                  (slot & 1) ? 0x10 : 0x01, slot & ~1);
             pop_block();
             push_block("Method", "_STA, 0");
-            stmt("Store", "0x%02x, \\_GPE.DPT1", slot);
-            stmt("Store", "0x89, \\_GPE.DPT2");
+            if (debug)
+            {
+                stmt("Store", "0x%02x, \\_GPE.DPT1", slot);
+                stmt("Store", "0x89, \\_GPE.DPT2");
+            }
             if ( slot & 1 )
                 stmt("ShiftRight", "0x4, \\_GPE.PH%02X, Local1", slot & ~1);
             else
@@ -421,9 +434,11 @@ int main(int argc, char **argv)
         stmt("And", "Local1, 0xf, EVT");
         stmt("Store", "PSTB, Local1"); /* XXX: Store (PSTB, SLT) ? */
         stmt("And", "Local1, 0xff, SLT");
-        /* Debug */
-        stmt("Store", "SLT, DPT1");
-        stmt("Store", "EVT, DPT2");
+        if (debug)
+        {
+            stmt("Store", "SLT, DPT1");
+            stmt("Store", "EVT, DPT2");
+        }
         /* Decision tree */
         decision_tree(0x00, 0x100, "SLT", pci_hotplug_notify);
         pop_block();
