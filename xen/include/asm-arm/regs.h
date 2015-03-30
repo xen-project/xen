@@ -24,9 +24,17 @@
 
 #ifdef CONFIG_ARM_32
 #define hyp_mode(r)     psr_mode((r)->cpsr,PSR_MODE_HYP)
+#define psr_mode_is_user(r) usr_mode(r)
 #else
 #define hyp_mode(r)     (psr_mode((r)->cpsr,PSR_MODE_EL2h) || \
                          psr_mode((r)->cpsr,PSR_MODE_EL2t))
+
+/*
+ * Trap may have been taken from EL0, which might be in AArch32 usr
+ * mode, or in AArch64 mode (PSR_MODE_EL0t).
+ */
+#define psr_mode_is_user(r) \
+    (psr_mode((r)->cpsr,PSR_MODE_EL0t) || usr_mode(r))
 #endif
 
 #define guest_mode(r)                                                         \

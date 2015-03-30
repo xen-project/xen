@@ -455,14 +455,7 @@ static void inject_abt64_exception(struct cpu_user_regs *regs,
         .len = instr_len,
     };
 
-    /*
-     * Trap may have been taken from EL0, which might be in AArch32
-     * mode (PSR_MODE_BIT set), or in AArch64 mode (PSR_MODE_EL0t).
-     *
-     * Since we know the kernel must be 64-bit any trap from a 32-bit
-     * mode must have been from EL0.
-     */
-    if ( psr_mode_is_32bit(regs->cpsr) || psr_mode(regs->cpsr,PSR_MODE_EL0t) )
+    if ( psr_mode_is_user(regs) )
         esr.ec = prefetch
             ? HSR_EC_INSTR_ABORT_LOWER_EL : HSR_EC_DATA_ABORT_LOWER_EL;
     else
