@@ -237,9 +237,9 @@ ifneq (,$(CONFIG_QEMU))
 QEMU_TRADITIONAL_LOC ?= $(CONFIG_QEMU)
 endif
 ifneq (,$(QEMU_TAG))
-QEMU_TRADITIONAL_REVISION ?= 3499745d3a8561cce67f3d4fbc2da60401253ad4
-# Mon Feb 2 16:49:59 2015 +0000
-# cirrus: fix an uninitialized variable
+QEMU_TRADITIONAL_REVISION ?= 62e41581f69c3fd4a8f829a773015eb4c17f1f3e
+# Tue Mar 31 16:27:45 2015 +0100
+# xen: limit guest control of PCI command register
 endif
 
 ifeq ($(GIT_HTTP),y)
@@ -262,9 +262,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 3499745d3a8561cce67f3d4fbc2da60401253ad4
-# Mon Feb 2 16:49:59 2015 +0000
-# cirrus: fix an uninitialized variable
+QEMU_TRADITIONAL_REVISION ?= 62e41581f69c3fd4a8f829a773015eb4c17f1f3e
+# Tue Mar 31 16:27:45 2015 +0100
+# xen: limit guest control of PCI command register
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
