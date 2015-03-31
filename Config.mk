@@ -224,9 +224,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.3.4
-# Mon Feb 2 16:49:59 2015 +0000
-# cirrus: fix an uninitialized variable
+QEMU_TAG ?= edb43a7abbec40fb601140fecdc29d693358963b
+# Tue Mar 31 16:27:45 2015 +0100
+# xen: limit guest control of PCI command register
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
