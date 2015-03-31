@@ -149,8 +149,31 @@ struct xs_permissions *xs_get_permissions(struct xs_handle *h,
 					  xs_transaction_t t,
 					  const char *path, unsigned int *num);
 
-/* Set permissions of node (must be owner).
- * Returns false on failure.
+/* Set permissions of node (must be owner).  Returns false on failure.
+ *
+ * Domain 0 may read / write anywhere in the store, regardless of
+ * permission settings.
+ *
+ * Note:
+ * The perms array is a list of (domid, permissions) pairs. The first
+ * element in the list specifies the owner of the list, plus the flags
+ * for every domain not explicitly specified subsequently. The
+ * subsequent entries are normal capabilities.
+ *
+ * Example C code:
+ *
+ *  struct xs_permissions perms[2];
+ *
+ *  perms[0].id = dm_domid;
+ *  perms[0].perms = XS_PERM_NONE;
+ *  perms[1].id = guest_domid;
+ *  perms[1].perms = XS_PERM_READ;
+ *
+ * It means the owner of the path is domain $dm_domid (hence it always
+ * has read and write permission), all other domains (unless specified
+ * in subsequent pair) can neither read from nor write to that
+ * path. It then specifies domain $guest_domid can read from that
+ * path.
  */
 bool xs_set_permissions(struct xs_handle *h, xs_transaction_t t,
 			const char *path, struct xs_permissions *perms,
