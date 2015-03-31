@@ -215,9 +215,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.2.5
-# Wed Dec 18 15:25:14 2013 +0000
-# qemu-traditional: Fix build warnings on Wheezy
+QEMU_TAG ?= fb44e83c346436ae8dc07d91dfedb108b8a4e673
+# Tue Mar 31 16:27:45 2015 +0100
+# xen: limit guest control of PCI command register
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
