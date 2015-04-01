@@ -211,6 +211,12 @@ changed with these variables.
 XEN_WHOAMI=
 XEN_DOMAIN=
 
+Some components of xen and tools will include an unpredictable timestamp
+into the binaries. To allow reproducible builds the following variables
+can be used to provide fixed timestamps in the expected format.
+XEN_BUILD_DATE=<output of date(1)>
+XEN_BUILD_TIME=hh:mm:ss
+
 The following variables can be used to tweak some aspects of the
 hypervisor build.
 verbose=y
