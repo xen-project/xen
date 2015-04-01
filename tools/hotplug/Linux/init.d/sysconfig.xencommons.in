@@ -21,6 +21,14 @@
 #XENSTORED=@XENSTORED@
 
 ## Type: string
+## Default: ""
+#
+# Additional commandline arguments to start xenstored,
+# like "--trace-file /var/log/xen/xenstored-trace.log"
+# See "@sbindir@/xenstored --help" for possible options.
+XENSTORED_ARGS=
+
+## Type: string
 ## Default: Not defined, tracing off
 #
 # Log xenstored messages
