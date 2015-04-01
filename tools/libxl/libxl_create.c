@@ -497,8 +497,8 @@ out:
     return ret;
 }
 
-int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
-                       uint32_t *domid)
+int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
+                       uint32_t *domid, xc_domain_configuration_t *xc_config)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int flags, ret, rc, nb_vm;
@@ -511,6 +511,8 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
     xen_domain_handle_t handle;
     libxl_vminfo *vm_list;
 
+    /* convenience aliases */
+    libxl_domain_create_info *info = &d_config->c_info;
 
     assert(!libxl_domid_valid_guest(*domid));
 
@@ -539,7 +541,16 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
     /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
     libxl_uuid_copy(ctx, (libxl_uuid *)handle, &info->uuid);
 
-    ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid);
+    ret = libxl__arch_domain_prepare_config(gc, d_config, xc_config);
+    if (ret < 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "fail to get domain config");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    ret = xc_domain_create_config(ctx->xch, info->ssidref,
+                                  handle, flags, domid,
+                                  xc_config);
     if (ret < 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "domain creation fail");
         rc = ERROR_FAIL;
@@ -772,6 +783,7 @@ static void initiate_domain_create(libxl__egc *egc,
 
     /* convenience aliases */
     libxl_domain_config *const d_config = dcs->guest_config;
+    libxl__domain_build_state *const state = &dcs->build_state;
     const int restore_fd = dcs->restore_fd;
     memset(&dcs->build_state, 0, sizeof(dcs->build_state));
 
@@ -865,7 +877,7 @@ static void initiate_domain_create(libxl__egc *egc,
     ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
     if (ret) goto error_out;
 
-    ret = libxl__domain_make(gc, &d_config->c_info, &domid);
+    ret = libxl__domain_make(gc, d_config, &domid, &state->config);
     if (ret) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot make domain: %d", ret);
         dcs->guest_domid = domid;

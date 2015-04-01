@@ -1,6 +1,15 @@
 #include "libxl_internal.h"
 #include "libxl_arch.h"
 
+int libxl__arch_domain_prepare_config(libxl__gc *gc,
+                                      libxl_domain_config *d_config,
+                                      xc_domain_configuration_t *xc_config)
+{
+    /* No specific configuration right now */
+
+    return 0;
+}
+
 static const char *e820_names(int type)
 {
     switch (type) {
@@ -324,6 +333,7 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
 
 int libxl__arch_domain_init_hw_description(libxl__gc *gc,
                                            libxl_domain_build_info *info,
+                                           libxl__domain_build_state *state,
                                            struct xc_dom_image *dom)
 {
     return 0;

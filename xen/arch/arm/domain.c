@@ -531,9 +531,11 @@ void vcpu_destroy(struct vcpu *v)
     free_xenheap_pages(v->arch.stack, STACK_ORDER);
 }
 
-int arch_domain_create(struct domain *d, unsigned int domcr_flags)
+int arch_domain_create(struct domain *d, unsigned int domcr_flags,
+                       struct xen_arch_domainconfig *config)
 {
     int rc;
+    uint8_t gic_version;
 
     d->arch.relmem = RELMEM_not_started;
 
@@ -541,6 +543,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     if ( is_idle_domain(d) )
         return 0;
 
+    ASSERT(config != NULL);
     if ( (rc = p2m_init(d)) != 0 )
         goto fail;
 
@@ -560,6 +563,29 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     if ( (rc = p2m_alloc_table(d)) != 0 )
         goto fail;
+
+    /*
+     * Currently the vGIC is emulating the same version of the
+     * hardware GIC. Only the value XEN_DOMCTL_CONFIG_GIC_DEFAULT
+     * is allowed. The DOMCTL will return the actual version of the
+     * GIC.
+     */
+    rc = -EOPNOTSUPP;
+    if ( config->gic_version != XEN_DOMCTL_CONFIG_GIC_DEFAULT )
+        goto fail;
+
+    switch ( gic_hw_version() )
+    {
+    case GIC_V3:
+        gic_version = XEN_DOMCTL_CONFIG_GIC_V3;
+        break;
+    case GIC_V2:
+        gic_version = XEN_DOMCTL_CONFIG_GIC_V2;
+        break;
+    default:
+        BUG();
+    }
+    config->gic_version = gic_version;
 
     if ( (rc = gicv_setup(d)) != 0 )
         goto fail;

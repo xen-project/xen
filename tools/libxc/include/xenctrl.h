@@ -477,18 +477,20 @@ typedef union
 } start_info_any_t;
 #endif
 
+
+typedef struct xen_arch_domainconfig xc_domain_configuration_t;
+int xc_domain_create_config(xc_interface *xch,
+                            uint32_t ssidref,
+                            xen_domain_handle_t handle,
+                            uint32_t flags,
+                            uint32_t *pdomid,
+                            xc_domain_configuration_t *config);
 int xc_domain_create(xc_interface *xch,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
                      uint32_t flags,
                      uint32_t *pdomid);
 
-#if defined(__arm__) || defined(__aarch64__)
-typedef xen_domctl_arm_configuredomain_t xc_domain_configuration_t;
-
-int xc_domain_configure(xc_interface *xch, uint32_t domid,
-                        xc_domain_configuration_t *config);
-#endif
 
 /* Functions to produce a dump of a given domain
  *  xc_domain_dumpcore - produces a dump to a specified file

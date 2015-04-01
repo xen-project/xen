@@ -56,7 +56,8 @@ void vcpu_destroy(struct vcpu *v);
 int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset);
 void unmap_vcpu_info(struct vcpu *v);
 
-int arch_domain_create(struct domain *d, unsigned int domcr_flags);
+int arch_domain_create(struct domain *d, unsigned int domcr_flags,
+                       struct xen_arch_domainconfig *config);
 
 void arch_domain_destroy(struct domain *d);
 

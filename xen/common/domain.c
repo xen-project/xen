@@ -242,8 +242,9 @@ static void __init parse_extra_guest_irqs(const char *s)
 }
 custom_param("extra_guest_irqs", parse_extra_guest_irqs);
 
-struct domain *domain_create(
-    domid_t domid, unsigned int domcr_flags, uint32_t ssidref)
+struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
+                             uint32_t ssidref,
+                             struct xen_arch_domainconfig *config)
 {
     struct domain *d, **pd, *old_hwdom = NULL;
     enum { INIT_xsm = 1u<<0, INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,
@@ -353,7 +354,7 @@ struct domain *domain_create(
             goto fail;
     }
 
-    if ( (err = arch_domain_create(d, domcr_flags)) != 0 )
+    if ( (err = arch_domain_create(d, domcr_flags, config)) != 0 )
         goto fail;
     init_status |= INIT_arch;
 

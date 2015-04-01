@@ -275,7 +275,7 @@ void __init arch_init_memory(void)
      * Hidden PCI devices will also be associated with this domain
      * (but be [partly] controlled by Dom0 nevertheless).
      */
-    dom_xen = domain_create(DOMID_XEN, DOMCRF_dummy, 0);
+    dom_xen = domain_create(DOMID_XEN, DOMCRF_dummy, 0, NULL);
     BUG_ON(IS_ERR(dom_xen));
     INIT_LIST_HEAD(&dom_xen->arch.pdev_list);
 
@@ -284,14 +284,14 @@ void __init arch_init_memory(void)
      * This domain owns I/O pages that are within the range of the page_info
      * array. Mappings occur at the priv of the caller.
      */
-    dom_io = domain_create(DOMID_IO, DOMCRF_dummy, 0);
+    dom_io = domain_create(DOMID_IO, DOMCRF_dummy, 0, NULL);
     BUG_ON(IS_ERR(dom_io));
     
     /*
      * Initialise our COW domain.
      * This domain owns sharable pages.
      */
-    dom_cow = domain_create(DOMID_COW, DOMCRF_dummy, 0);
+    dom_cow = domain_create(DOMID_COW, DOMCRF_dummy, 0, NULL);
     BUG_ON(IS_ERR(dom_cow));
 
     /* First 1MB of RAM is historically marked as I/O. */

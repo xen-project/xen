@@ -1098,7 +1098,8 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     stubdom_state->pv_ramdisk.path = "";
 
     /* fixme: this function can leak the stubdom if it fails */
-    ret = libxl__domain_make(gc, &dm_config->c_info, &sdss->pvqemu.guest_domid);
+    ret = libxl__domain_make(gc, dm_config, &sdss->pvqemu.guest_domid,
+                             &stubdom_state->config);
     if (ret)
         goto out;
     uint32_t dm_domid = sdss->pvqemu.guest_domid;

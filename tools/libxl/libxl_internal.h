@@ -993,6 +993,8 @@ typedef struct {
 
     xen_vmemrange_t *vmemranges;
     uint32_t num_vmemranges;
+
+    xc_domain_configuration_t config;
 } libxl__domain_build_state;
 
 _hidden int libxl__build_pre(libxl__gc *gc, uint32_t domid,
@@ -1482,8 +1484,9 @@ _hidden  void libxl__exec(libxl__gc *gc, int stdinfd, int stdoutfd,
  /* on entry, libxl_domid_valid_guest(domid) must be false;
   * on exit (even error exit), domid may be valid and refer to a domain */
 _hidden int libxl__domain_make(libxl__gc *gc,
-                               libxl_domain_create_info *info,
-                               uint32_t *domid);
+                               libxl_domain_config *d_config,
+                               uint32_t *domid,
+                               xc_domain_configuration_t *xc_config);
 
 _hidden int libxl__domain_build(libxl__gc *gc,
                                 libxl_domain_config *d_config,

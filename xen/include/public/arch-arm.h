@@ -309,6 +309,14 @@ struct arch_shared_info {
 typedef struct arch_shared_info arch_shared_info_t;
 typedef uint64_t xen_callback_t;
 
+#define XEN_DOMCTL_CONFIG_GIC_DEFAULT   0
+#define XEN_DOMCTL_CONFIG_GIC_V2        1
+#define XEN_DOMCTL_CONFIG_GIC_V3        2
+struct xen_arch_domainconfig {
+    /* IN/OUT */
+    uint8_t gic_version;
+};
+
 #endif
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)

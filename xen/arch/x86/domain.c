@@ -507,7 +507,8 @@ void vcpu_destroy(struct vcpu *v)
         xfree(v->arch.pv_vcpu.trap_ctxt);
 }
 
-int arch_domain_create(struct domain *d, unsigned int domcr_flags)
+int arch_domain_create(struct domain *d, unsigned int domcr_flags,
+                       struct xen_arch_domainconfig *config)
 {
     int i, paging_initialised = 0;
     int rc = -ENOMEM;

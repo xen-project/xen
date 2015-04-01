@@ -27,11 +27,12 @@
 #include <xen/memory.h>
 #include <xen/hvm/hvm_op.h>
 
-int xc_domain_create(xc_interface *xch,
-                     uint32_t ssidref,
-                     xen_domain_handle_t handle,
-                     uint32_t flags,
-                     uint32_t *pdomid)
+int xc_domain_create_config(xc_interface *xch,
+                            uint32_t ssidref,
+                            xen_domain_handle_t handle,
+                            uint32_t flags,
+                            uint32_t *pdomid,
+                            xc_domain_configuration_t *config)
 {
     int err;
     DECLARE_DOMCTL;
@@ -41,32 +42,39 @@ int xc_domain_create(xc_interface *xch,
     domctl.u.createdomain.ssidref = ssidref;
     domctl.u.createdomain.flags   = flags;
     memcpy(domctl.u.createdomain.handle, handle, sizeof(xen_domain_handle_t));
+    /* xc_domain_configure_t is an alias of arch_domainconfig_t */
+    memcpy(&domctl.u.createdomain.config, config, sizeof(*config));
     if ( (err = do_domctl(xch, &domctl)) != 0 )
         return err;
 
     *pdomid = (uint16_t)domctl.domain;
+    memcpy(config, &domctl.u.createdomain.config, sizeof(*config));
+
     return 0;
 }
 
-#if defined(__arm__) || defined(__aarch64__)
-int xc_domain_configure(xc_interface *xch, uint32_t domid,
-                        xc_domain_configuration_t *config)
+int xc_domain_create(xc_interface *xch,
+                     uint32_t ssidref,
+                     xen_domain_handle_t handle,
+                     uint32_t flags,
+                     uint32_t *pdomid)
 {
-    int rc;
-    DECLARE_DOMCTL;
+    xc_domain_configuration_t config;
 
-    domctl.cmd = XEN_DOMCTL_arm_configure_domain;
-    domctl.domain = (domid_t)domid;
-    /* xc_domain_configure_t is an alias of xen_domctl_arm_configuredomain */
-    memcpy(&domctl.u.configuredomain, config, sizeof(*config));
+    memset(&config, 0, sizeof(config));
 
-    rc = do_domctl(xch, &domctl);
-    if ( !rc )
-        memcpy(config, &domctl.u.configuredomain, sizeof(*config));
-
-    return rc;
-}
+#if defined (__i386) || defined(__x86_64__)
+    /* No arch-specific configuration for now */
+#elif defined (__arm__) || defined(__aarch64__)
+    config.gic_version = XEN_DOMCTL_CONFIG_GIC_DEFAULT;
+#else
+    errno = ENOSYS;
+    return -1;
 #endif
+
+    return xc_domain_create_config(xch, ssidref, handle,
+                                   flags, pdomid, &config);
+}
 
 int xc_domain_cacheflush(xc_interface *xch, uint32_t domid,
                          xen_pfn_t start_pfn, xen_pfn_t nr_pfns)

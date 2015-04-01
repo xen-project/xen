@@ -35,6 +35,15 @@ static const char *gicv_to_string(uint8_t gic_version)
     }
 }
 
+int libxl__arch_domain_prepare_config(libxl__gc *gc,
+                                      libxl_domain_config *d_config,
+                                      xc_domain_configuration_t *xc_config)
+{
+    xc_config->gic_version = XEN_DOMCTL_CONFIG_GIC_DEFAULT;
+
+    return 0;
+}
+
 int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                               uint32_t domid)
 {
@@ -516,15 +525,18 @@ out:
 
 int libxl__arch_domain_init_hw_description(libxl__gc *gc,
                                            libxl_domain_build_info *info,
+                                           libxl__domain_build_state *state,
                                            struct xc_dom_image *dom)
 {
-    xc_domain_configuration_t config;
     void *fdt = NULL;
     int rc, res;
     size_t fdt_size = 0;
 
     const libxl_version_info *vers;
     const struct arch_info *ainfo;
+
+    /* convenience aliases */
+    xc_domain_configuration_t *xc_config = &state->config;
 
     assert(info->type == LIBXL_DOMAIN_TYPE_PV);
 
@@ -534,16 +546,9 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
     ainfo = get_arch_info(gc, dom);
     if (ainfo == NULL) return ERROR_FAIL;
 
-    LOG(DEBUG, "configure the domain");
-    config.gic_version = XEN_DOMCTL_CONFIG_GIC_DEFAULT;
-    if (xc_domain_configure(CTX->xch, dom->guest_domid, &config) != 0) {
-        LOG(ERROR, "couldn't configure the domain");
-        return ERROR_FAIL;
-    }
-
     LOG(DEBUG, "constructing DTB for Xen version %d.%d guest",
         vers->xen_version_major, vers->xen_version_minor);
-    LOG(DEBUG, "  - vGIC version: %s", gicv_to_string(config.gic_version));
+    LOG(DEBUG, " - vGIC version: %s", gicv_to_string(xc_config->gic_version));
 
 /*
  * Call "call" handling FDT_ERR_*. Will either:
@@ -592,7 +597,7 @@ next_resize:
 
         FDT( make_memory_nodes(gc, fdt, dom) );
 
-        switch (config.gic_version) {
+        switch (xc_config->gic_version) {
         case XEN_DOMCTL_CONFIG_GIC_V2:
             FDT( make_gicv2_node(gc, fdt,
                                  GUEST_GICD_BASE, GUEST_GICD_SIZE,
@@ -602,7 +607,8 @@ next_resize:
             FDT( make_gicv3_node(gc, fdt) );
             break;
         default:
-            LOG(ERROR, "Unknown GIC version %d", config.gic_version);
+            LOG(ERROR, "Unknown GIC version %s",
+                gicv_to_string(xc_config->gic_version));
             rc = ERROR_FAIL;
             goto out;
         }

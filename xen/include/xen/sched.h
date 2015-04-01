@@ -525,8 +525,13 @@ static inline void get_knownalive_domain(struct domain *d)
 int domain_set_node_affinity(struct domain *d, const nodemask_t *affinity);
 void domain_update_node_affinity(struct domain *d);
 
-struct domain *domain_create(
-    domid_t domid, unsigned int domcr_flags, uint32_t ssidref);
+/*
+ * Create a domain: the configuration is only necessary for real domain
+ * (i.e !DOMCRF_dummy, excluded idle domain).
+ */
+struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
+                             uint32_t ssidref,
+                             struct xen_arch_domainconfig *config);
  /* DOMCRF_hvm: Create an HVM domain, as opposed to a PV domain. */
 #define _DOMCRF_hvm           0
 #define DOMCRF_hvm            (1U<<_DOMCRF_hvm)

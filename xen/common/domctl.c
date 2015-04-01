@@ -592,7 +592,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_oos_off )
             domcr_flags |= DOMCRF_oos_off;
 
-        d = domain_create(dom, domcr_flags, op->u.createdomain.ssidref);
+        d = domain_create(dom, domcr_flags, op->u.createdomain.ssidref,
+                          &op->u.createdomain.config);
         if ( IS_ERR(d) )
         {
             ret = PTR_ERR(d);
