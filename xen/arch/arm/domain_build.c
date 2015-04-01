@@ -1020,7 +1020,7 @@ static int handle_device(struct domain *d, struct dt_device_node *dev)
              * twice the IRQ. This can happen if the IRQ is shared
              */
             vgic_reserve_virq(d, irq);
-            res = route_irq_to_guest(d, irq, dt_node_name(dev));
+            res = route_irq_to_guest(d, irq, irq, dt_node_name(dev));
             if ( res )
             {
                 printk(XENLOG_ERR "Unable to route IRQ %u to domain %u\n",

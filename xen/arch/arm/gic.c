@@ -126,7 +126,8 @@ void gic_route_irq_to_xen(struct irq_desc *desc, const cpumask_t *cpu_mask,
 /* Program the GIC to route an interrupt to a guest
  *   - desc.lock must be held
  */
-void gic_route_irq_to_guest(struct domain *d, struct irq_desc *desc,
+void gic_route_irq_to_guest(struct domain *d, unsigned int virq,
+                            struct irq_desc *desc,
                             const cpumask_t *cpu_mask, unsigned int priority)
 {
     struct pending_irq *p;
@@ -139,7 +140,7 @@ void gic_route_irq_to_guest(struct domain *d, struct irq_desc *desc,
 
     /* Use vcpu0 to retrieve the pending_irq struct. Given that we only
      * route SPIs to guests, it doesn't make any difference. */
-    p = irq_to_pending(d->vcpu[0], desc->irq);
+    p = irq_to_pending(d->vcpu[0], virq);
     p->desc = desc;
 }
 

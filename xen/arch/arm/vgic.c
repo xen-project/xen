@@ -382,16 +382,16 @@ void vgic_clear_pending_irqs(struct vcpu *v)
     spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
 }
 
-void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
+void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int virq)
 {
     uint8_t priority;
-    struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
-    struct pending_irq *iter, *n = irq_to_pending(v, irq);
+    struct vgic_irq_rank *rank = vgic_rank_irq(v, virq);
+    struct pending_irq *iter, *n = irq_to_pending(v, virq);
     unsigned long flags;
     bool_t running;
 
     vgic_lock_rank(v, rank, flags);
-    priority = v->domain->arch.vgic.handler->get_irq_priority(v, irq);
+    priority = v->domain->arch.vgic.handler->get_irq_priority(v, virq);
     vgic_unlock_rank(v, rank, flags);
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
@@ -407,7 +407,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
 
     if ( !list_empty(&n->inflight) )
     {
-        gic_raise_inflight_irq(v, irq);
+        gic_raise_inflight_irq(v, virq);
         goto out;
     }
 
@@ -415,7 +415,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq)
 
     /* the irq is enabled */
     if ( test_bit(GIC_IRQ_GUEST_ENABLED, &n->status) )
-        gic_raise_guest_irq(v, irq, priority);
+        gic_raise_guest_irq(v, virq, priority);
 
     list_for_each_entry ( iter, &v->arch.vgic.inflight_irqs, inflight )
     {
@@ -438,15 +438,15 @@ out:
     }
 }
 
-void vgic_vcpu_inject_spi(struct domain *d, unsigned int irq)
+void vgic_vcpu_inject_spi(struct domain *d, unsigned int virq)
 {
     struct vcpu *v;
 
     /* the IRQ needs to be an SPI */
-    ASSERT(irq >= 32 && irq <= gic_number_lines());
+    ASSERT(virq >= 32 && virq <= vgic_num_irqs(d));
 
-    v = vgic_get_target_vcpu(d->vcpu[0], irq);
-    vgic_vcpu_inject_irq(v, irq);
+    v = vgic_get_target_vcpu(d->vcpu[0], virq);
+    vgic_vcpu_inject_irq(v, virq);
 }
 
 void arch_evtchn_inject(struct vcpu *v)

@@ -31,6 +31,13 @@
 static unsigned int local_irqs_type[NR_LOCAL_IRQS];
 static DEFINE_SPINLOCK(local_irqs_type_lock);
 
+/* Describe an IRQ assigned to a guest */
+struct irq_guest
+{
+    struct domain *d;
+    unsigned int virq;
+};
+
 static void ack_none(struct irq_desc *irq)
 {
     printk("unexpected IRQ trap at irq %02x\n", irq->irq);
@@ -122,16 +129,18 @@ void __cpuinit init_secondary_IRQ(void)
     BUG_ON(init_local_irq_data() < 0);
 }
 
-static inline struct domain *irq_get_domain(struct irq_desc *desc)
+static inline struct irq_guest *irq_get_guest_info(struct irq_desc *desc)
 {
     ASSERT(spin_is_locked(&desc->lock));
-
-    if ( !test_bit(_IRQ_GUEST, &desc->status) )
-        return dom_xen;
-
+    ASSERT(test_bit(_IRQ_GUEST, &desc->status));
     ASSERT(desc->action != NULL);
 
     return desc->action->dev_id;
+}
+
+static inline struct domain *irq_get_domain(struct irq_desc *desc)
+{
+    return irq_get_guest_info(desc)->d;
 }
 
 void irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_mask)
@@ -204,7 +213,7 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
 
     if ( test_bit(_IRQ_GUEST, &desc->status) )
     {
-        struct domain *d = irq_get_domain(desc);
+        struct irq_guest *info = irq_get_guest_info(desc);
 
         perfc_incr(guest_irqs);
         desc->handler->end(desc);
@@ -214,7 +223,7 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
 
         /* the irq cannot be a PPI, we only support delivery of SPIs to
          * guests */
-        vgic_vcpu_inject_spi(d, irq);
+        vgic_vcpu_inject_spi(info->d, info->virq);
         goto out_no_end;
     }
 
@@ -378,19 +387,30 @@ err:
     return rc;
 }
 
-int route_irq_to_guest(struct domain *d, unsigned int irq,
-                       const char * devname)
+int route_irq_to_guest(struct domain *d, unsigned int virq,
+                       unsigned int irq, const char * devname)
 {
     struct irqaction *action;
-    struct irq_desc *desc = irq_to_desc(irq);
+    struct irq_guest *info;
+    struct irq_desc *desc;
     unsigned long flags;
     int retval = 0;
 
     action = xmalloc(struct irqaction);
-    if (!action)
+    if ( !action )
         return -ENOMEM;
 
-    action->dev_id = d;
+    info = xmalloc(struct irq_guest);
+    if ( !info )
+    {
+        xfree(action);
+        return -ENOMEM;
+    }
+
+    info->d = d;
+    info->virq = virq;
+
+    action->dev_id = info;
     action->name = devname;
     action->free_on_release = 1;
 
@@ -421,7 +441,7 @@ int route_irq_to_guest(struct domain *d, unsigned int irq,
     if ( retval )
         goto out;
 
-    gic_route_irq_to_guest(d, desc, cpumask_of(smp_processor_id()),
+    gic_route_irq_to_guest(d, virq, desc, cpumask_of(smp_processor_id()),
                            GIC_PRI_IRQ);
     spin_unlock_irqrestore(&desc->lock, flags);
     return 0;
@@ -429,6 +449,7 @@ int route_irq_to_guest(struct domain *d, unsigned int irq,
 out:
     spin_unlock_irqrestore(&desc->lock, flags);
     xfree(action);
+    xfree(info);
 
     return retval;
 }
