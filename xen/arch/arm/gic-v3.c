@@ -528,23 +528,24 @@ static void __init gicv3_dist_init(void)
     uint32_t type;
     uint32_t priority;
     uint64_t affinity;
+    unsigned int nr_lines;
     int i;
 
     /* Disable the distributor */
     writel_relaxed(0, GICD + GICD_CTLR);
 
     type = readl_relaxed(GICD + GICD_TYPER);
-    gicv3_info.nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
+    nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
 
     printk("GICv3: %d lines, (IID %8.8x).\n",
-           gicv3_info.nr_lines, readl_relaxed(GICD + GICD_IIDR));
+           nr_lines, readl_relaxed(GICD + GICD_IIDR));
 
     /* Default all global IRQs to level, active low */
-    for ( i = NR_GIC_LOCAL_IRQS; i < gicv3_info.nr_lines; i += 16 )
+    for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i += 16 )
         writel_relaxed(0, GICD + GICD_ICFGR + (i / 16) * 4);
 
     /* Default priority for global interrupts */
-    for ( i = NR_GIC_LOCAL_IRQS; i < gicv3_info.nr_lines; i += 4 )
+    for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i += 4 )
     {
         priority = (GIC_PRI_IRQ << 24 | GIC_PRI_IRQ << 16 |
                     GIC_PRI_IRQ << 8 | GIC_PRI_IRQ);
@@ -552,7 +553,7 @@ static void __init gicv3_dist_init(void)
     }
 
     /* Disable all global interrupts */
-    for ( i = NR_GIC_LOCAL_IRQS; i < gicv3_info.nr_lines; i += 32 )
+    for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i += 32 )
         writel_relaxed(0xffffffff, GICD + GICD_ICENABLER + (i / 32) * 4);
 
     gicv3_dist_wait_for_rwp();
@@ -566,8 +567,11 @@ static void __init gicv3_dist_init(void)
     /* Make sure we don't broadcast the interrupt */
     affinity &= ~GICD_IROUTER_SPI_MODE_ANY;
 
-    for ( i = NR_GIC_LOCAL_IRQS; i < gicv3_info.nr_lines; i++ )
+    for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i++ )
         writeq_relaxed(affinity, GICD + GICD_IROUTER + i * 8);
+
+    /* Only 1020 interrupts are supported */
+    gicv3_info.nr_lines = min(1020U, nr_lines);
 }
 
 static int gicv3_enable_redist(void)

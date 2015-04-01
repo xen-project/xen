@@ -256,6 +256,7 @@ static void __init gicv2_dist_init(void)
     uint32_t type;
     uint32_t cpumask;
     uint32_t gic_cpus;
+    unsigned int nr_lines;
     int i;
 
     cpumask = readl_gicd(GICD_ITARGETSR) & 0xff;
@@ -266,30 +267,33 @@ static void __init gicv2_dist_init(void)
     writel_gicd(0, GICD_CTLR);
 
     type = readl_gicd(GICD_TYPER);
-    gicv2_info.nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
+    nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
     gic_cpus = 1 + ((type & GICD_TYPE_CPUS) >> 5);
     printk("GICv2: %d lines, %d cpu%s%s (IID %8.8x).\n",
-           gicv2_info.nr_lines, gic_cpus, (gic_cpus == 1) ? "" : "s",
+           nr_lines, gic_cpus, (gic_cpus == 1) ? "" : "s",
            (type & GICD_TYPE_SEC) ? ", secure" : "",
            readl_gicd(GICD_IIDR));
 
     /* Default all global IRQs to level, active low */
-    for ( i = 32; i < gicv2_info.nr_lines; i += 16 )
+    for ( i = 32; i < nr_lines; i += 16 )
         writel_gicd(0x0, GICD_ICFGR + (i / 16) * 4);
 
     /* Route all global IRQs to this CPU */
-    for ( i = 32; i < gicv2_info.nr_lines; i += 4 )
+    for ( i = 32; i < nr_lines; i += 4 )
         writel_gicd(cpumask, GICD_ITARGETSR + (i / 4) * 4);
 
     /* Default priority for global interrupts */
-    for ( i = 32; i < gicv2_info.nr_lines; i += 4 )
+    for ( i = 32; i < nr_lines; i += 4 )
         writel_gicd(GIC_PRI_IRQ << 24 | GIC_PRI_IRQ << 16 |
                     GIC_PRI_IRQ << 8 | GIC_PRI_IRQ,
                     GICD_IPRIORITYR + (i / 4) * 4);
 
     /* Disable all global interrupts */
-    for ( i = 32; i < gicv2_info.nr_lines; i += 32 )
+    for ( i = 32; i < nr_lines; i += 32 )
         writel_gicd(~0x0, GICD_ICENABLER + (i / 32) * 4);
+
+    /* Only 1020 interrupts are supported */
+    gicv2_info.nr_lines = min(1020U, nr_lines);
 
     /* Turn on the distributor */
     writel_gicd(GICD_CTL_ENABLE, GICD_CTLR);
