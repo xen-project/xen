@@ -531,7 +531,10 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         break;
 
     case XEN_DOMCTL_resumedomain:
-        domain_resume(d);
+        if ( d == current->domain ) /* no domain_pause() */
+            ret = -EINVAL;
+        else
+            domain_resume(d);
         break;
 
     case XEN_DOMCTL_createdomain:
