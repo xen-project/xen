@@ -492,14 +492,22 @@ int route_irq_to_guest(struct domain *d, unsigned int virq,
     if ( retval )
         goto out;
 
-    gic_route_irq_to_guest(d, virq, desc, cpumask_of(smp_processor_id()),
-                           GIC_PRI_IRQ);
+    retval = gic_route_irq_to_guest(d, virq, desc, GIC_PRI_IRQ);
+
     spin_unlock_irqrestore(&desc->lock, flags);
+
+    if ( retval )
+    {
+        release_irq(desc->irq, info);
+        goto free_info;
+    }
+
     return 0;
 
 out:
     spin_unlock_irqrestore(&desc->lock, flags);
     xfree(action);
+free_info:
     xfree(info);
 
     return retval;

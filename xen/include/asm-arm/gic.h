@@ -216,10 +216,9 @@ extern enum gic_version gic_hw_version(void);
 /* Program the GIC to route an interrupt */
 extern void gic_route_irq_to_xen(struct irq_desc *desc, const cpumask_t *cpu_mask,
                                  unsigned int priority);
-extern void gic_route_irq_to_guest(struct domain *, unsigned int virq,
-                                   struct irq_desc *desc,
-                                   const cpumask_t *cpu_mask,
-                                   unsigned int priority);
+extern int gic_route_irq_to_guest(struct domain *, unsigned int virq,
+                                  struct irq_desc *desc,
+                                  unsigned int priority);
 
 extern void gic_inject(void);
 extern void gic_clear_pending_irqs(struct vcpu *v);

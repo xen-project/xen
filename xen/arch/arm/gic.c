@@ -126,22 +126,41 @@ void gic_route_irq_to_xen(struct irq_desc *desc, const cpumask_t *cpu_mask,
 /* Program the GIC to route an interrupt to a guest
  *   - desc.lock must be held
  */
-void gic_route_irq_to_guest(struct domain *d, unsigned int virq,
-                            struct irq_desc *desc,
-                            const cpumask_t *cpu_mask, unsigned int priority)
+int gic_route_irq_to_guest(struct domain *d, unsigned int virq,
+                           struct irq_desc *desc, unsigned int priority)
 {
-    struct pending_irq *p;
+    unsigned long flags;
+    /* Use vcpu0 to retrieve the pending_irq struct. Given that we only
+     * route SPIs to guests, it doesn't make any difference. */
+    struct vcpu *v_target = vgic_get_target_vcpu(d->vcpu[0], virq);
+    struct vgic_irq_rank *rank = vgic_rank_irq(v_target, virq);
+    struct pending_irq *p = irq_to_pending(v_target, virq);
+    int res = -EBUSY;
+
     ASSERT(spin_is_locked(&desc->lock));
+    /* Caller has already checked that the IRQ is an SPI */
+    ASSERT(virq >= 32);
+    ASSERT(virq < vgic_num_irqs(d));
+
+    vgic_lock_rank(v_target, rank, flags);
+
+    if ( p->desc ||
+         /* The VIRQ should not be already enabled by the guest */
+         test_bit(GIC_IRQ_GUEST_ENABLED, &p->status) )
+        goto out;
 
     desc->handler = gic_hw_ops->gic_guest_irq_type;
     set_bit(_IRQ_GUEST, &desc->status);
 
-    gic_set_irq_properties(desc, cpumask_of(smp_processor_id()), GIC_PRI_IRQ);
+    gic_set_irq_properties(desc, cpumask_of(v_target->processor), GIC_PRI_IRQ);
 
-    /* Use vcpu0 to retrieve the pending_irq struct. Given that we only
-     * route SPIs to guests, it doesn't make any difference. */
-    p = irq_to_pending(d->vcpu[0], virq);
     p->desc = desc;
+    res = 0;
+
+out:
+    vgic_unlock_rank(v_target, rank, flags);
+
+    return res;
 }
 
 int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
