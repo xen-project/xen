@@ -387,6 +387,16 @@ err:
     return rc;
 }
 
+bool_t is_assignable_irq(unsigned int irq)
+{
+    /* For now, we can only route SPIs to the guest */
+    return ((irq >= NR_LOCAL_IRQS) && (irq < gic_number_lines()));
+}
+
+/*
+ * Route an IRQ to a specific guest.
+ * For now only SPIs are assignable to the guest.
+ */
 int route_irq_to_guest(struct domain *d, unsigned int virq,
                        unsigned int irq, const char * devname)
 {
@@ -395,6 +405,28 @@ int route_irq_to_guest(struct domain *d, unsigned int virq,
     struct irq_desc *desc;
     unsigned long flags;
     int retval = 0;
+
+    if ( virq >= vgic_num_irqs(d) )
+    {
+        printk(XENLOG_G_ERR
+               "the vIRQ number %u is too high for domain %u (max = %u)\n",
+               irq, d->domain_id, vgic_num_irqs(d));
+        return -EINVAL;
+    }
+
+    /* Only routing to virtual SPIs is supported */
+    if ( virq < NR_LOCAL_IRQS )
+    {
+        printk(XENLOG_G_ERR "IRQ can only be routed to an SPI");
+        return -EINVAL;
+    }
+
+    if ( !is_assignable_irq(irq) )
+    {
+        printk(XENLOG_G_ERR "the IRQ%u is not routable\n", irq);
+        return -EINVAL;
+    }
+    desc = irq_to_desc(irq);
 
     action = xmalloc(struct irqaction);
     if ( !action )
@@ -416,8 +448,18 @@ int route_irq_to_guest(struct domain *d, unsigned int virq,
 
     spin_lock_irqsave(&desc->lock, flags);
 
-    /* If the IRQ is already used by someone
-     *  - If it's the same domain -> Xen doesn't need to update the IRQ desc
+    if ( desc->arch.type == DT_IRQ_TYPE_INVALID )
+    {
+        printk(XENLOG_G_ERR "IRQ %u has not been configured\n", irq);
+        retval = -EIO;
+        goto out;
+    }
+
+    /*
+     * If the IRQ is already used by someone
+     *  - If it's the same domain -> Xen doesn't need to update the IRQ desc.
+     *  For safety check if we are not trying to assign the IRQ to a
+     *  different vIRQ.
      *  - Otherwise -> For now, don't allow the IRQ to be shared between
      *  Xen and domains.
      */
@@ -426,13 +468,22 @@ int route_irq_to_guest(struct domain *d, unsigned int virq,
         struct domain *ad = irq_get_domain(desc);
 
         if ( test_bit(_IRQ_GUEST, &desc->status) && d == ad )
+        {
+            if ( irq_get_guest_info(desc)->virq != virq )
+            {
+                printk(XENLOG_G_ERR
+                       "d%u: IRQ %u is already assigned to vIRQ %u\n",
+                       d->domain_id, irq, irq_get_guest_info(desc)->virq);
+                retval = -EBUSY;
+            }
             goto out;
+        }
 
         if ( test_bit(_IRQ_GUEST, &desc->status) )
-            printk(XENLOG_ERR "ERROR: IRQ %u is already used by domain %u\n",
+            printk(XENLOG_G_ERR "IRQ %u is already used by domain %u\n",
                    irq, ad->domain_id);
         else
-            printk(XENLOG_ERR "ERROR: IRQ %u is already used by Xen\n", irq);
+            printk(XENLOG_G_ERR "IRQ %u is already used by Xen\n", irq);
         retval = -EBUSY;
         goto out;
     }
