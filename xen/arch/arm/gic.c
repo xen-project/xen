@@ -630,7 +630,7 @@ void gic_dump_info(struct vcpu *v)
 
     list_for_each_entry ( p, &v->arch.vgic.inflight_irqs, inflight )
     {
-        printk("Inflight irq=%d lr=%u\n", p->irq, p->lr);
+        printk("Inflight irq=%u lr=%u\n", p->irq, p->lr);
     }
 
     list_for_each_entry( p, &v->arch.vgic.lr_pending, lr_queue )
