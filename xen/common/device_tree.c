@@ -1104,6 +1104,12 @@ bool_t dt_device_is_available(const struct dt_device_node *device)
     return 0;
 }
 
+bool_t dt_device_for_passthrough(const struct dt_device_node *device)
+{
+    return (dt_find_property(device, "xen,passthrough", NULL) != NULL);
+
+}
+
 static int __dt_parse_phandle_with_args(const struct dt_device_node *np,
                                         const char *list_name,
                                         const char *cells_name,

@@ -30,7 +30,7 @@ int __init device_init(struct dt_device_node *dev, enum device_class class,
 
     ASSERT(dev != NULL);
 
-    if ( !dt_device_is_available(dev) )
+    if ( !dt_device_is_available(dev) || dt_device_for_passthrough(dev) )
         return  -ENODEV;
 
     for ( desc = _sdevice; desc != _edevice; desc++ )

@@ -1,0 +1,9 @@
+Device passthrough
+===================
+
+Any device with the property "xen,passthrough" set will not be exposed to
+DOM0 and therefore no driver will be loaded.
+
+It is highly recommended to set this property on devices which are passed
+through since many devices will not cope with being accessed by dom0 and
+then handed over to another domain.

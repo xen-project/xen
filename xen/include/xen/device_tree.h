@@ -556,6 +556,17 @@ int dt_n_addr_cells(const struct dt_device_node *np);
 bool_t dt_device_is_available(const struct dt_device_node *device);
 
 /**
+ * dt_device_for_passthrough - Check if a device will be used for
+ * passthrough later
+ *
+ * @device: Node to check
+ *
+ * Return true if the property "xen,passthrough" is present in the node,
+ * false otherwise.
+ */
+bool_t dt_device_for_passthrough(const struct dt_device_node *device);
+
+/**
  * dt_match_node - Tell if a device_node has a matching of dt_device_match
  * @matches: array of dt_device_match structures to search in
  * @node: the dt_device_node structure to match against

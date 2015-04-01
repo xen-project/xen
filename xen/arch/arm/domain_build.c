@@ -402,7 +402,7 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
                             const struct dt_device_node *node)
 {
     const char *bootargs = NULL;
-    const struct dt_property *prop;
+    const struct dt_property *prop, *status = NULL;
     int res = 0;
     int had_dom0_bootargs = 0;
 
@@ -457,6 +457,17 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
             }
         }
 
+        /* Don't expose the property "xen,passthrough" to the guest */
+        if ( dt_property_name_is_equal(prop, "xen,passthrough") )
+            continue;
+
+        /* Remember and skip the status property as Xen may modify it later */
+        if ( dt_property_name_is_equal(prop, "status") )
+        {
+            status = prop;
+            continue;
+        }
+
         res = fdt_property(kinfo->fdt, prop->name, prop_data, prop_len);
 
         xfree(new_data);
@@ -464,6 +475,19 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
         if ( res )
             return res;
     }
+
+    /*
+     * Override the property "status" to disable the device when it's
+     * marked for passthrough.
+     */
+    if ( dt_device_for_passthrough(node) )
+        res = fdt_property_string(kinfo->fdt, "status", "disabled");
+    else if ( status )
+        res = fdt_property(kinfo->fdt, "status", status->value,
+                           status->length);
+
+    if ( res )
+        return res;
 
     if ( dt_node_path_is_equal(node, "/chosen") )
     {
@@ -903,8 +927,15 @@ static int make_timer_node(const struct domain *d, void *fdt,
     return res;
 }
 
-/* Map the device in the domain */
-static int map_device(struct domain *d, struct dt_device_node *dev)
+/*
+ * For a given device node:
+ *  - Give permission to the guest to manage IRQ and MMIO range
+ *  - Retrieve the IRQ configuration (i.e edge/level) from device tree
+ * When the device is not marked for guest passthrough:
+ *  - Assign the device to the guest if it's protected by an IOMMU
+ *  - Map the IRQs and iomem regions to DOM0
+ */
+static int handle_device(struct domain *d, struct dt_device_node *dev)
 {
     unsigned int nirq;
     unsigned int naddr;
@@ -913,13 +944,15 @@ static int map_device(struct domain *d, struct dt_device_node *dev)
     unsigned int irq;
     struct dt_raw_irq rirq;
     u64 addr, size;
+    bool_t need_mapping = !dt_device_for_passthrough(dev);
 
     nirq = dt_number_of_irq(dev);
     naddr = dt_number_of_address(dev);
 
-    DPRINT("%s nirq = %d naddr = %u\n", dt_node_full_name(dev), nirq, naddr);
+    DPRINT("%s passthrough = %d nirq = %d naddr = %u\n", dt_node_full_name(dev),
+           need_mapping, nirq, naddr);
 
-    if ( dt_device_is_protected(dev) )
+    if ( dt_device_is_protected(dev) && need_mapping )
     {
         DPRINT("%s setup iommu\n", dt_node_full_name(dev));
         res = iommu_assign_dt_device(d, dev);
@@ -931,7 +964,7 @@ static int map_device(struct domain *d, struct dt_device_node *dev)
         }
     }
 
-    /* Map IRQs */
+    /* Give permission and map IRQs */
     for ( i = 0; i < nirq; i++ )
     {
         res = dt_device_get_raw_irq(dev, i, &rirq);
@@ -970,16 +1003,34 @@ static int map_device(struct domain *d, struct dt_device_node *dev)
          * the IRQ twice. This can legitimately happen if the IRQ is shared
          */
         vgic_reserve_virq(d, irq);
-        res = route_irq_to_guest(d, irq, dt_node_name(dev));
+
+        res = irq_permit_access(d, irq);
         if ( res )
         {
-            printk(XENLOG_ERR "Unable to route IRQ %u to domain %u\n",
-                   irq, d->domain_id);
+            printk(XENLOG_ERR "Unable to permit to dom%u access to IRQ %u\n",
+                   d->domain_id, irq);
             return res;
+        }
+
+        if ( need_mapping )
+        {
+            /*
+             * Checking the return of vgic_reserve_virq is not
+             * necessary. It should not fail except when we try to map
+             * twice the IRQ. This can happen if the IRQ is shared
+             */
+            vgic_reserve_virq(d, irq);
+            res = route_irq_to_guest(d, irq, dt_node_name(dev));
+            if ( res )
+            {
+                printk(XENLOG_ERR "Unable to route IRQ %u to domain %u\n",
+                       irq, d->domain_id);
+                return res;
+            }
         }
     }
 
-    /* Map the address ranges */
+    /* Give permission and map MMIOs */
     for ( i = 0; i < naddr; i++ )
     {
         res = dt_device_get_address(dev, i, &addr, &size);
@@ -1003,17 +1054,21 @@ static int map_device(struct domain *d, struct dt_device_node *dev)
                    addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1);
             return res;
         }
-        res = map_mmio_regions(d,
-                               paddr_to_pfn(addr & PAGE_MASK),
-                               DIV_ROUND_UP(size, PAGE_SIZE),
-                               paddr_to_pfn(addr & PAGE_MASK));
-        if ( res )
+
+        if ( need_mapping )
         {
-            printk(XENLOG_ERR "Unable to map 0x%"PRIx64
-                   " - 0x%"PRIx64" in domain %d\n",
-                   addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1,
-                   d->domain_id);
-            return res;
+            res = map_mmio_regions(d,
+                                   paddr_to_pfn(addr & PAGE_MASK),
+                                   DIV_ROUND_UP(size, PAGE_SIZE),
+                                   paddr_to_pfn(addr & PAGE_MASK));
+            if ( res )
+            {
+                printk(XENLOG_ERR "Unable to map 0x%"PRIx64
+                       " - 0x%"PRIx64" in domain %d\n",
+                       addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1,
+                       d->domain_id);
+                return res;
+            }
         }
     }
 
@@ -1085,7 +1140,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         return 0;
     }
 
-    res = map_device(d, node);
+    res = handle_device(d, node);
     if ( res)
         return res;
 
