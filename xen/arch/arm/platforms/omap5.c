@@ -155,17 +155,6 @@ static const char * const dra7_dt_compat[] __initconst =
     NULL
 };
 
-static const struct dt_device_match dra7_blacklist_dev[] __initconst =
-{
-    /* OMAP Linux kernel handles devices with status "disabled" in a
-     * weird manner - tries to reset them. While their memory ranges
-     * are not mapped, this leads to data aborts, so skip these devices
-     * from DT for dom0.
-     */
-    DT_MATCH_NOT_AVAILABLE(),
-    { /* sentinel */ },
-};
-
 PLATFORM_START(omap5, "TI OMAP5")
     .compatible = omap5_dt_compat,
     .init_time = omap5_init_time,
@@ -185,7 +174,6 @@ PLATFORM_START(dra7, "TI DRA7")
 
     .dom0_gnttab_start = 0x4b000000,
     .dom0_gnttab_size = 0x20000,
-    .blacklist_dev = dra7_blacklist_dev,
 PLATFORM_END
 
 /*

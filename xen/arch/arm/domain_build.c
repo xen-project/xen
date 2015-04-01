@@ -1085,22 +1085,9 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         return 0;
     }
 
-    /*
-     * Some device doesn't need to be mapped in Xen:
-     *  - Memory: the guest will see a different view of memory. It will
-     *  be allocated later.
-     *  - Disabled device: Linux is able to cope with status="disabled"
-     *  property. Therefore these device doesn't need to be mapped. This
-     *  solution can be use later for pass through.
-     */
-    if ( !dt_device_type_is_equal(node, "memory") &&
-         dt_device_is_available(node) )
-    {
-        res = map_device(d, node);
-
-        if ( res )
-            return res;
-    }
+    res = map_device(d, node);
+    if ( res)
+        return res;
 
     /*
      * The property "name" is used to have a different name on older FDT
