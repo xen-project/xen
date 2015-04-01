@@ -513,6 +513,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_bind_pt_irq_t);
 
 
 /* Bind machine I/O address range -> HVM address range. */
+/* If this returns -E2BIG lower nr_mfns value. */
 /* XEN_DOMCTL_memory_mapping */
 #define DPCI_ADD_MAPPING         1
 #define DPCI_REMOVE_MAPPING      0

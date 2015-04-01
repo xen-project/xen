@@ -655,6 +655,11 @@ long arch_do_domctl(
              (gfn + nr_mfns - 1) < gfn ) /* wrap? */
             break;
 
+        ret = -E2BIG;
+        /* Must break hypercall up as this could take a while. */
+        if ( nr_mfns > 64 )
+            break;
+
         ret = -EPERM;
         if ( !iomem_access_permitted(current->domain, mfn, mfn + nr_mfns - 1) )
             break;
