@@ -888,6 +888,10 @@ long arch_do_domctl(
     {
         xen_guest_tsc_info_t info;
 
+        ret = -EINVAL;
+        if ( d == current->domain ) /* no domain_pause() */
+            break;
+
         domain_pause(d);
         tsc_get_info(d, &info.tsc_mode,
                         &info.elapsed_nsec,
@@ -903,6 +907,10 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_settscinfo:
     {
+        ret = -EINVAL;
+        if ( d == current->domain ) /* no domain_pause() */
+            break;
+
         domain_pause(d);
         tsc_set_info(d, domctl->u.tsc_info.info.tsc_mode,
                      domctl->u.tsc_info.info.elapsed_nsec,
