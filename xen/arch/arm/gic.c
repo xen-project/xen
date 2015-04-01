@@ -152,7 +152,7 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int virq,
     desc->handler = gic_hw_ops->gic_guest_irq_type;
     set_bit(_IRQ_GUEST, &desc->status);
 
-    gic_set_irq_properties(desc, cpumask_of(v_target->processor), GIC_PRI_IRQ);
+    gic_set_irq_properties(desc, cpumask_of(v_target->processor), priority);
 
     p->desc = desc;
     res = 0;
