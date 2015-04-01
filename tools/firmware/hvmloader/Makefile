@@ -26,6 +26,9 @@ SUBDIRS := acpi
 # The HVM loader is started in 32-bit mode at the address below:
 LOADADDR = 0x100000
 
+# SMBIOS spec requires format mm/dd/yyyy
+SMBIOS_REL_DATE ?= $(shell date +%m/%d/%Y)
+
 CFLAGS += $(CFLAGS_xeninclude)
 
 OBJS  = hvmloader.o mp_tables.o util.o smbios.o 
@@ -88,7 +91,7 @@ all: subdirs-all
 	$(MAKE) hvmloader
 
 ovmf.o rombios.o seabios.o hvmloader.o: roms.inc
-smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(shell date +%m/%d/%Y)\""
+smbios.o: CFLAGS += -D__SMBIOS_DATE__="$(SMBIOS_REL_DATE)"
 
 hvmloader: $(OBJS) acpi/acpi.a
 	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(LOADADDR) -o hvmloader.tmp $^
