@@ -163,8 +163,10 @@ int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
     return 0;
 }
 
-/* Set up the GIC */
-void __init gic_init(void)
+/* Find the interrupt controller and set up the callback to translate
+ * device tree IRQ.
+ */
+void __init gic_preinit(void)
 {
     int rc;
     struct dt_device_node *node;
@@ -189,6 +191,16 @@ void __init gic_init(void)
     if ( !num_gics )
         panic("Unable to find compatible GIC in the device tree");
 
+    /* Set the GIC as the primary interrupt controller */
+    dt_interrupt_controller = node;
+    dt_device_set_used_by(node, DOMID_XEN);
+}
+
+/* Set up the GIC */
+void __init gic_init(void)
+{
+    if ( gic_hw_ops->init() )
+        panic("Failed to initialize the GIC drivers");
     /* Clear LR mask for cpu0 */
     clear_cpu_lr_mask();
 }

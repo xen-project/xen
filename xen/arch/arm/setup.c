@@ -752,13 +752,14 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     vm_init();
     dt_unflatten_host_device_tree();
-    dt_irq_xlate = gic_irq_xlate;
 
     init_IRQ();
 
     platform_init();
 
     preinit_xen_time();
+
+    gic_preinit();
 
     dt_uart_init();
     console_init_preirq();
