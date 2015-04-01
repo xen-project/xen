@@ -55,7 +55,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         /* No secure world support for guests. */
         vgic_lock(v);
         *r = ( ((v->domain->max_vcpus - 1) << GICD_TYPE_CPUS_SHIFT) )
-            |( ((v->domain->arch.vgic.nr_spis / 32)) & GICD_TYPE_LINES );
+            | DIV_ROUND_UP(v->domain->arch.vgic.nr_spis, 32);
         vgic_unlock(v);
         return 1;
     case GICD_IIDR:

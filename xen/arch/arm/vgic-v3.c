@@ -700,7 +700,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         if ( dabt.size != DABT_WORD ) goto bad_width;
         /* No secure world support for guests. */
         *r = ((ncpus - 1) << GICD_TYPE_CPUS_SHIFT |
-              ((v->domain->arch.vgic.nr_spis / 32) & GICD_TYPE_LINES));
+              DIV_ROUND_UP(v->domain->arch.vgic.nr_spis, 32));
 
         *r |= (irq_bits - 1) << GICD_TYPE_ID_BITS_SHIFT;
 
