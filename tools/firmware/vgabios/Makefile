@@ -5,10 +5,10 @@ BCC = bcc
 AS86 = as86
 
 RELEASE = `pwd | sed "s-.*/--"`
-RELDATE = `date '+%d %b %Y'`
+VGABIOS_REL_DATE ?= `date '+%d %b %Y'`
 RELVERS = `pwd | sed "s-.*/--" | sed "s/vgabios//" | sed "s/-//"`
 
-VGABIOS_DATE = "-DVGABIOS_DATE=\"$(RELDATE)\""
+VGABIOS_DATE = "-DVGABIOS_DATE=\"$(VGABIOS_REL_DATE)\""
 
 .PHONY: all
 all: bios cirrus-bios

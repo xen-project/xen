@@ -217,6 +217,7 @@ can be used to provide fixed timestamps in the expected format.
 XEN_BUILD_DATE=<output of date(1)>
 XEN_BUILD_TIME=hh:mm:ss
 SMBIOS_REL_DATE=mm/dd/yyyy
+VGABIOS_REL_DATE="dd Mon yyyy"
 
 The following variables can be used to tweak some aspects of the
 hypervisor build.
