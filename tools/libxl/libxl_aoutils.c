@@ -205,9 +205,6 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
     libxl__datacopier_state *dc = CONTAINER_OF(ev, *dc, toread);
     STATE_AO_GC(dc->ao);
 
-    if ((revents & (POLLHUP|POLLIN)) == (POLLHUP|POLLIN))
-        revents &= ~POLLHUP;
-
     if (datacopier_pollhup_handled(egc, dc, revents, 0))
         return;
 
