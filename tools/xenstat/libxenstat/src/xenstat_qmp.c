@@ -298,6 +298,7 @@ static int qmp_read(int qfd, unsigned char **qstats)
 	while ((n = poll(pfd, POLLIN, 10)) > 0) {
 		if (pfd[0].revents & POLLIN) {
 			if ((n = read(qfd, buf, sizeof(buf))) < 0) {
+				free(*qstats);
 				return 0;
 			}
 			ptr = realloc(*qstats, qsize+n+1);
