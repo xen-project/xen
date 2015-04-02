@@ -118,6 +118,36 @@ static int write_hvm_params(struct xc_sr_context *ctx)
     return rc;
 }
 
+#ifdef XG_LIBXL_HVM_COMPAT
+static int write_toolstack(struct xc_sr_context *ctx)
+{
+    xc_interface *xch = ctx->xch;
+    struct xc_sr_record rec = {
+        .type = REC_TYPE_TOOLSTACK,
+        .length = 0,
+    };
+    uint8_t *buf;
+    uint32_t len;
+    int rc;
+
+    if ( !ctx->save.callbacks || !ctx->save.callbacks->toolstack_save )
+        return 0;
+
+    if ( ctx->save.callbacks->toolstack_save(
+             ctx->domid, &buf, &len, ctx->save.callbacks->data) < 0 )
+    {
+        PERROR("Error calling toolstack_save");
+        return -1;
+    }
+
+    rc = write_split_record(ctx, &rec, buf, len);
+    if ( rc < 0 )
+        PERROR("Error writing TOOLSTACK record");
+    free(buf);
+    return rc;
+}
+#endif
+
 static xen_pfn_t x86_hvm_pfn_to_gfn(const struct xc_sr_context *ctx,
                                     xen_pfn_t pfn)
 {
@@ -169,6 +199,12 @@ static int x86_hvm_end_of_stream(struct xc_sr_context *ctx)
     rc = write_tsc_info(ctx);
     if ( rc )
         return rc;
+
+#ifdef XG_LIBXL_HVM_COMPAT
+    rc = write_toolstack(ctx);
+    if ( rc )
+        return rc;
+#endif
 
     /* Write the HVM_CONTEXT record. */
     rc = write_hvm_context(ctx);
