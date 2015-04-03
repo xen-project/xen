@@ -5445,27 +5445,19 @@ int libxl_domain_get_nodeaffinity(libxl_ctx *ctx, uint32_t domid,
 }
 
 static int libxl__set_vcpuonline_xenstore(libxl__gc *gc, uint32_t domid,
-                                         libxl_bitmap *cpumap)
+                                         libxl_bitmap *cpumap,
+                                         const libxl_dominfo *info)
 {
-    libxl_dominfo info;
     char *dompath;
     xs_transaction_t t;
-    int i, rc;
+    int i, rc = ERROR_FAIL;
 
-    libxl_dominfo_init(&info);
-
-    rc = libxl_domain_info(CTX, &info, domid);
-    if (rc < 0) {
-        LOGE(ERROR, "getting domain info list");
-        goto out;
-    }
-    rc = ERROR_FAIL;
     if (!(dompath = libxl__xs_get_dompath(gc, domid)))
         goto out;
 
 retry_transaction:
     t = xs_transaction_start(CTX->xsh);
-    for (i = 0; i <= info.vcpu_max_id; i++)
+    for (i = 0; i <= info->vcpu_max_id; i++)
         libxl__xs_write(gc, t,
                        libxl__sprintf(gc, "%s/cpu/%u/availability", dompath, i),
                        "%s", libxl_bitmap_test(cpumap, i) ? "online" : "offline");
@@ -5475,25 +5467,16 @@ retry_transaction:
     } else
         rc = 0;
 out:
-    libxl_dominfo_dispose(&info);
     return rc;
 }
 
 static int libxl__set_vcpuonline_qmp(libxl__gc *gc, uint32_t domid,
-                                     libxl_bitmap *cpumap)
+                                     libxl_bitmap *cpumap,
+                                     const libxl_dominfo *info)
 {
-    libxl_dominfo info;
-    int i, rc;
+    int i;
 
-    libxl_dominfo_init(&info);
-
-    rc = libxl_domain_info(CTX, &info, domid);
-    if (rc < 0) {
-        LOGE(ERROR, "getting domain info list");
-        libxl_dominfo_dispose(&info);
-        return rc;
-    }
-    for (i = 0; i <= info.vcpu_max_id; i++) {
+    for (i = 0; i <= info->vcpu_max_id; i++) {
         if (libxl_bitmap_test(cpumap, i)) {
             /* Return value is ignore because it does not tell anything useful
              * on the completion of the command.
@@ -5503,33 +5486,53 @@ static int libxl__set_vcpuonline_qmp(libxl__gc *gc, uint32_t domid,
             libxl__qmp_cpu_add(gc, domid, i);
         }
     }
-    libxl_dominfo_dispose(&info);
     return 0;
 }
 
 int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
 {
     GC_INIT(ctx);
-    int rc;
+    int rc, maxcpus;
+    libxl_dominfo info;
+
+    libxl_dominfo_init(&info);
+
+    rc = libxl_domain_info(CTX, &info, domid);
+    if (rc < 0) {
+        LOGE(ERROR, "getting domain info list");
+        goto out;
+    }
+
+    maxcpus = libxl_bitmap_count_set(cpumap);
+    if (maxcpus > info.vcpu_max_id + 1)
+    {
+        LOGE(ERROR, "Requested %d VCPUs, however maxcpus is %d!",
+             maxcpus, info.vcpu_max_id + 1);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
     switch (libxl__domain_type(gc, domid)) {
     case LIBXL_DOMAIN_TYPE_HVM:
         switch (libxl__device_model_version_running(gc, domid)) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-            rc = libxl__set_vcpuonline_xenstore(gc, domid, cpumap);
+            rc = libxl__set_vcpuonline_xenstore(gc, domid, cpumap, &info);
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-            rc = libxl__set_vcpuonline_qmp(gc, domid, cpumap);
+            rc = libxl__set_vcpuonline_qmp(gc, domid, cpumap, &info);
             break;
         default:
             rc = ERROR_INVAL;
         }
         break;
     case LIBXL_DOMAIN_TYPE_PV:
-        rc = libxl__set_vcpuonline_xenstore(gc, domid, cpumap);
+        rc = libxl__set_vcpuonline_xenstore(gc, domid, cpumap, &info);
         break;
     default:
         rc = ERROR_INVAL;
     }
+out:
+    libxl_dominfo_dispose(&info);
     GC_FREE;
     return rc;
 }
