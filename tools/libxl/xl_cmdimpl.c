@@ -5218,7 +5218,7 @@ int main_vcpupin(int argc, char **argv)
     return rc;
 }
 
-static void vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
+static int vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
 {
     char *endptr;
     unsigned int max_vcpus, i;
@@ -5229,7 +5229,7 @@ static void vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
     max_vcpus = strtoul(nr_vcpus, &endptr, 10);
     if (nr_vcpus == endptr) {
         fprintf(stderr, "Error: Invalid argument.\n");
-        return;
+        return 1;
     }
 
     /*
@@ -5242,14 +5242,15 @@ static void vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
             fprintf(stderr, "You are overcommmitting! You have %d physical " \
                     " CPUs and want %d vCPUs! Aborting, use --ignore-host to " \
                     " continue\n", host_cpu, max_vcpus);
-            return;
+            return 1;
         }
         /* NB: This also limits how many are set in the bitmap */
         max_vcpus = (max_vcpus > host_cpu ? host_cpu : max_vcpus);
     }
-    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, max_vcpus)) {
-        fprintf(stderr, "libxl_cpu_bitmap_alloc failed\n");
-        return;
+    rc = libxl_cpu_bitmap_alloc(ctx, &cpumap, max_vcpus);
+    if (rc) {
+        fprintf(stderr, "libxl_cpu_bitmap_alloc failed, rc: %d\n", rc);
+        return 1;
     }
     for (i = 0; i < max_vcpus; i++)
         libxl_bitmap_set(&cpumap, i);
@@ -5262,6 +5263,7 @@ static void vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
                 " rc: %d\n", domid, max_vcpus, rc);
 
     libxl_bitmap_dispose(&cpumap);
+    return rc ? 1 : 0;
 }
 
 int main_vcpuset(int argc, char **argv)
@@ -5280,8 +5282,7 @@ int main_vcpuset(int argc, char **argv)
         break;
     }
 
-    vcpuset(find_domain(argv[optind]), argv[optind + 1], check_host);
-    return 0;
+    return vcpuset(find_domain(argv[optind]), argv[optind + 1], check_host);
 }
 
 static void output_xeninfo(void)
