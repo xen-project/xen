@@ -3963,12 +3963,22 @@ int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
     libxl_dominfo info;
     char *dompath;
     xs_transaction_t t;
-    int i, rc = ERROR_FAIL;
+    int i, maxcpus, rc = ERROR_FAIL;
 
     if (libxl_domain_info(ctx, &info, domid) < 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain info list");
         goto out;
     }
+
+    maxcpus = libxl_bitmap_count_set(cpumap);
+    if (maxcpus > info.vcpu_max_id + 1)
+    {
+        LOGE(ERROR, "Requested %d VCPUs, however maxcpus is %d!",
+             maxcpus, info.vcpu_max_id + 1);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
     if (!(dompath = libxl__xs_get_dompath(gc, domid)))
         goto out;
 
