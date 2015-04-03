@@ -5244,8 +5244,6 @@ static int vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
                     " continue\n", host_cpu, max_vcpus);
             return 1;
         }
-        /* NB: This also limits how many are set in the bitmap */
-        max_vcpus = (max_vcpus > host_cpu ? host_cpu : max_vcpus);
     }
     rc = libxl_cpu_bitmap_alloc(ctx, &cpumap, max_vcpus);
     if (rc) {
