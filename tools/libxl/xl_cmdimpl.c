@@ -5238,12 +5238,21 @@ static int vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
      */
     if (check_host) {
         unsigned int host_cpu = libxl_get_max_cpus(ctx);
-        if (max_vcpus > host_cpu) {
-            fprintf(stderr, "You are overcommmitting! You have %d physical " \
-                    " CPUs and want %d vCPUs! Aborting, use --ignore-host to " \
-                    " continue\n", host_cpu, max_vcpus);
+        libxl_dominfo dominfo;
+
+        rc = libxl_domain_info(ctx, &dominfo, domid);
+        if (rc)
             return 1;
+
+        if (max_vcpus > dominfo.vcpu_online && max_vcpus > host_cpu) {
+            fprintf(stderr, "You are overcommmitting! You have %d physical" \
+                    " CPUs and want %d vCPUs! Aborting, use --ignore-host to" \
+                    " continue\n", host_cpu, max_vcpus);
+            rc = 1;
         }
+        libxl_dominfo_dispose(&dominfo);
+        if (rc)
+            return 1;
     }
     rc = libxl_cpu_bitmap_alloc(ctx, &cpumap, max_vcpus);
     if (rc) {
