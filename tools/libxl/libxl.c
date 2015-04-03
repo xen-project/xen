@@ -455,7 +455,7 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
     /* update /vm/<uuid>/name */
     rc = libxl_domain_info(ctx, &info, domid);
     if (rc)
-        goto x_fail;
+        goto x_rc;
 
     uuid = GCSPRINTF(LIBXL_UUID_FMT, LIBXL_UUID_BYTES(info.uuid));
     vm_name_path = GCSPRINTF("/vm/%s/name", uuid);
@@ -698,7 +698,7 @@ int libxl_domain_info(libxl_ctx *ctx, libxl_dominfo *info_r,
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain info list");
         return ERROR_FAIL;
     }
-    if (ret==0 || xcinfo.domain != domid) return ERROR_INVAL;
+    if (ret==0 || xcinfo.domain != domid) return ERROR_DOMAIN_NOTFOUND;
 
     if (info_r)
         xcinfo2xlinfo(ctx, &xcinfo, info_r);
@@ -1579,7 +1579,7 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
     switch(rc) {
     case 0:
         break;
-    case ERROR_INVAL:
+    case ERROR_DOMAIN_NOTFOUND:
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "non-existant domain %d", domid);
     default:
         goto out;
@@ -5450,14 +5450,16 @@ static int libxl__set_vcpuonline_xenstore(libxl__gc *gc, uint32_t domid,
     libxl_dominfo info;
     char *dompath;
     xs_transaction_t t;
-    int i, rc = ERROR_FAIL;
+    int i, rc;
 
     libxl_dominfo_init(&info);
 
-    if (libxl_domain_info(CTX, &info, domid) < 0) {
+    rc = libxl_domain_info(CTX, &info, domid);
+    if (rc < 0) {
         LOGE(ERROR, "getting domain info list");
         goto out;
     }
+    rc = ERROR_FAIL;
     if (!(dompath = libxl__xs_get_dompath(gc, domid)))
         goto out;
 
@@ -5481,14 +5483,15 @@ static int libxl__set_vcpuonline_qmp(libxl__gc *gc, uint32_t domid,
                                      libxl_bitmap *cpumap)
 {
     libxl_dominfo info;
-    int i;
+    int i, rc;
 
     libxl_dominfo_init(&info);
 
-    if (libxl_domain_info(CTX, &info, domid) < 0) {
+    rc = libxl_domain_info(CTX, &info, domid);
+    if (rc < 0) {
         LOGE(ERROR, "getting domain info list");
         libxl_dominfo_dispose(&info);
-        return ERROR_FAIL;
+        return rc;
     }
     for (i = 0; i <= info.vcpu_max_id; i++) {
         if (libxl_bitmap_test(cpumap, i)) {

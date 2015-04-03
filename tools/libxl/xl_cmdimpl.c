@@ -4736,7 +4736,7 @@ int main_list(int argc, char **argv)
     } else if (optind == argc-1) {
         uint32_t domid = find_domain(argv[optind]);
         rc = libxl_domain_info(ctx, &info_buf, domid);
-        if (rc == ERROR_INVAL) {
+        if (rc == ERROR_DOMAIN_NOTFOUND) {
             fprintf(stderr, "Error: Domain \'%s\' does not exist.\n",
                 argv[optind]);
             return -rc;
@@ -5507,7 +5507,7 @@ int main_sharing(int argc, char **argv)
     } else if (optind == argc-1) {
         uint32_t domid = find_domain(argv[optind]);
         rc = libxl_domain_info(ctx, &info_buf, domid);
-        if (rc == ERROR_INVAL) {
+        if (rc == ERROR_DOMAIN_NOTFOUND) {
             fprintf(stderr, "Error: Domain \'%s\' does not exist.\n",
                 argv[optind]);
             return -rc;

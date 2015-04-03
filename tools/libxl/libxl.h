@@ -179,6 +179,11 @@
 #define LIBXL_HAVE_BUILDINFO_HVM_MMIO_HOLE_MEMKB 1
 
 /*
+ * libxl_domain_info returns ERROR_DOMAIN_NOTFOUND if the domain
+ * is not present, instead of ERROR_INVAL.
+ */
+#define LIBXL_HAVE_ERROR_DOMAIN_NOTFOUND 1
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
@@ -1104,7 +1109,9 @@ int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
  */
 int libxl_primary_console_get_tty(libxl_ctx *ctx, uint32_t domid_vm, char **path);
 
-/* May be called with info_r == NULL to check for domain's existance */
+/* May be called with info_r == NULL to check for domain's existence.
+ * Returns ERROR_DOMAIN_NOTFOUND if domain does not exist (used to return
+ * ERROR_INVAL for this scenario). */
 int libxl_domain_info(libxl_ctx*, libxl_dominfo *info_r,
                       uint32_t domid);
 
