@@ -5223,6 +5223,7 @@ static void vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
     char *endptr;
     unsigned int max_vcpus, i;
     libxl_bitmap cpumap;
+    int rc;
 
     libxl_bitmap_init(&cpumap);
     max_vcpus = strtoul(nr_vcpus, &endptr, 10);
@@ -5253,8 +5254,12 @@ static void vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
     for (i = 0; i < max_vcpus; i++)
         libxl_bitmap_set(&cpumap, i);
 
-    if (libxl_set_vcpuonline(ctx, domid, &cpumap) < 0)
-        fprintf(stderr, "libxl_set_vcpuonline failed domid=%d max_vcpus=%d\n", domid, max_vcpus);
+    rc = libxl_set_vcpuonline(ctx, domid, &cpumap);
+    if (rc == ERROR_DOMAIN_NOTFOUND)
+        fprintf(stderr, "Domain %u does not exist.\n", domid);
+    else if (rc)
+        fprintf(stderr, "libxl_set_vcpuonline failed domid=%d max_vcpus=%d," \
+                " rc: %d\n", domid, max_vcpus, rc);
 
     libxl_bitmap_dispose(&cpumap);
 }
