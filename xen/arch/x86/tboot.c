@@ -48,7 +48,7 @@ static uint64_t __initdata sinit_base, __initdata sinit_size;
 #define TXTCR_HEAP_BASE             0x0300
 #define TXTCR_HEAP_SIZE             0x0308
 
-extern char __init_begin[], __bss_start[];
+extern char __init_begin[], __bss_start[], __bss_end[];
 
 #define SHA1_SIZE      20
 typedef uint8_t   sha1_hash_t[SHA1_SIZE];
@@ -374,7 +374,7 @@ void tboot_shutdown(uint32_t shutdown_type)
                                               __pa(&_stext);
         /* bss */
         g_tboot_shared->mac_regions[2].start = (uint64_t)__pa(&__bss_start);
-        g_tboot_shared->mac_regions[2].size = __pa(&_end) - __pa(&__bss_start);
+        g_tboot_shared->mac_regions[2].size = __pa(&__bss_end) - __pa(&__bss_start);
 
         /*
          * MAC domains and other Xen memory

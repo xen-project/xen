@@ -124,7 +124,7 @@ __start:
 
         /* Initialize BSS (no nasty surprises!) */
         mov     $sym_phys(__bss_start),%edi
-        mov     $sym_phys(_end),%ecx
+        mov     $sym_phys(__bss_end),%ecx
         sub     %edi,%ecx
         xor     %eax,%eax
         rep     stosb

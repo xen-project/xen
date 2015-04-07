@@ -185,7 +185,7 @@ static void free_xen_data(char *s, char *e)
     memguard_guard_range(__va(__pa(s)), e-s);
 }
 
-extern char __init_begin[], __init_end[], __bss_start[];
+extern char __init_begin[], __init_end[], __bss_start[], __bss_end[];
 
 static void __init init_idle_domain(void)
 {
@@ -1497,7 +1497,7 @@ int __hwdom_init xen_in_range(unsigned long mfn)
         xen_regions[region_text].e = __pa(&__init_begin);
         /* bss */
         xen_regions[region_bss].s = __pa(&__bss_start);
-        xen_regions[region_bss].e = __pa(&_end);
+        xen_regions[region_bss].e = __pa(&__bss_end);
     }
 
     start = (paddr_t)mfn << PAGE_SHIFT;
