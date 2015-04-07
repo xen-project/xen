@@ -2628,7 +2628,8 @@ static void vmx_idtv_reinject(unsigned long idtv_info)
          * Clear NMI-blocking interruptibility info if an NMI delivery faulted.
          * Re-delivery will re-set it (see SDM 3B 25.7.1.2).
          */
-        if ( (idtv_info & INTR_INFO_INTR_TYPE_MASK) == (X86_EVENTTYPE_NMI<<8) )
+        if ( cpu_has_vmx_vnmi && ((idtv_info & INTR_INFO_INTR_TYPE_MASK) ==
+                                 (X86_EVENTTYPE_NMI<<8)) )
         {
             unsigned long intr_info;
 
@@ -2779,8 +2780,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     hvm_maybe_deassert_evtchn_irq();
 
     __vmread(IDT_VECTORING_INFO, &idtv_info);
-    if ( !nestedhvm_vcpu_in_guestmode(v) && 
-         exit_reason != EXIT_REASON_TASK_SWITCH )
+    if ( exit_reason != EXIT_REASON_TASK_SWITCH )
         vmx_idtv_reinject(idtv_info);
 
     switch ( exit_reason )
