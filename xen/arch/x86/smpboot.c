@@ -642,7 +642,7 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     if ( node != NUMA_NO_NODE )
         memflags = MEMF_node(node);
 
-    stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, 0);
+    stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, memflags);
     if ( stack_base[cpu] == NULL )
         goto oom;
     memguard_guard_stack(stack_base[cpu]);
