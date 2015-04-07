@@ -128,7 +128,8 @@ __start:
         mov     $sym_phys(__bss_end),%ecx
         sub     %edi,%ecx
         xor     %eax,%eax
-        rep     stosb
+        shr     $2,%ecx
+        rep stosl
 
         /* Interrogate CPU extended features via CPUID. */
         mov     $0x80000000,%eax
@@ -192,8 +193,8 @@ __start:
 
         /* Copy bootstrap trampoline to low memory, below 1MB. */
         mov     $sym_phys(trampoline_start),%esi
-        mov     $trampoline_end - trampoline_start,%ecx
-        rep     movsb
+        mov     $((trampoline_end - trampoline_start) / 4),%ecx
+        rep movsl
 
         /* Jump into the relocated trampoline. */
         lret
@@ -205,6 +206,6 @@ reloc:
 
 ENTRY(trampoline_start)
 #include "trampoline.S"
-GLOBAL(trampoline_end)
+ENTRY(trampoline_end)
 
 #include "x86_64.S"

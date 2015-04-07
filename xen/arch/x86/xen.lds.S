@@ -314,3 +314,8 @@ ASSERT(IS_ALIGNED(cpu0_stack, STACK_SIZE), "cpu0_stack misaligned")
 
 ASSERT(IS_ALIGNED(__init_begin, PAGE_SIZE), "__init_begin misaligned")
 ASSERT(IS_ALIGNED(__init_end,   PAGE_SIZE), "__init_end misaligned")
+
+ASSERT(IS_ALIGNED(trampoline_start, 4), "trampoline_start misaligned")
+ASSERT(IS_ALIGNED(trampoline_end,   4), "trampoline_end misaligned")
+ASSERT(IS_ALIGNED(__bss_start,      4), "__bss_start misaligned")
+ASSERT(IS_ALIGNED(__bss_end,        4), "__bss_end misaligned")
