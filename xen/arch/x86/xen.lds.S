@@ -197,6 +197,8 @@ SECTIONS
        *(.exit.text)
        *(.exit.data)
        *(.exitcall.exit)
+       *(.discard)
+       *(.discard.*)
        *(.eh_frame)
 #ifdef EFI
        *(.comment)
