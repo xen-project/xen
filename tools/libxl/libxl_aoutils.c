@@ -208,13 +208,14 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
     if (datacopier_pollhup_handled(egc, dc, revents, 0))
         return;
 
-    if (revents & ~POLLIN) {
-        LOG(ERROR, "unexpected poll event 0x%x (should be POLLIN)"
+    if (revents & ~(POLLIN|POLLHUP)) {
+        LOG(ERROR,
+            "unexpected poll event 0x%x (expected POLLIN and/or POLLHUP)"
             " on %s during copy of %s", revents, dc->readwhat, dc->copywhat);
         datacopier_callback(egc, dc, -1, 0);
         return;
     }
-    assert(revents & POLLIN);
+    assert(revents & (POLLIN|POLLHUP));
     for (;;) {
         libxl__datacopier_buf *buf = NULL;
         int r;
@@ -243,7 +244,17 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
         }
         if (r < 0) {
             if (errno == EINTR) continue;
-            if (errno == EWOULDBLOCK) break;
+            if (errno == EWOULDBLOCK) {
+                if (revents & POLLHUP) {
+                    LOG(ERROR,
+                        "poll reported HUP but fd read gave EWOULDBLOCK"
+                        " on %s during copy of %s",
+                        dc->readwhat, dc->copywhat);
+                    datacopier_callback(egc, dc, -1, 0);
+                    return;
+                }
+                break;
+            }
             LOGE(ERROR, "error reading %s during copy of %s",
                  dc->readwhat, dc->copywhat);
             datacopier_callback(egc, dc, 0, errno);
