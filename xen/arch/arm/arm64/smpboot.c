@@ -38,7 +38,7 @@ static int __init smp_spin_table_cpu_up(int cpu)
 
     sev();
 
-    return cpu_up_send_sgi(cpu);
+    return 0;
 }
 
 static void __init smp_spin_table_init(int cpu, struct dt_device_node *dn)
