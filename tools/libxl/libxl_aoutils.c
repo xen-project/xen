@@ -250,6 +250,22 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
             return;
         }
         if (r == 0) {
+            if (dc->callback_pollhup) {
+                /* It might be that this "eof" is actually a HUP.  If
+                 * the caller cares about the difference,
+                 * double-check using poll(2). */
+                struct pollfd hupchk;
+                hupchk.fd = ev->fd;
+                hupchk.events = POLLIN;
+                hupchk.revents = 0;
+                r = poll(&hupchk, 1, 0);
+                if (r < 0)
+                    LIBXL__EVENT_DISASTER(egc,
+     "unexpected failure polling fd for datacopier eof hup check",
+                                  errno, 0);
+                if (datacopier_pollhup_handled(egc, dc, hupchk.revents, 0))
+                    return;
+            }
             libxl__ev_fd_deregister(gc, &dc->toread);
             break;
         }
