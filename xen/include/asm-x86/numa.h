@@ -9,7 +9,7 @@ typedef u8 nodeid_t;
 
 extern int srat_rev;
 
-extern unsigned char cpu_to_node[];
+extern nodeid_t      cpu_to_node[NR_CPUS];
 extern cpumask_t     node_to_cpumask[];
 
 #define cpu_to_node(cpu)		(cpu_to_node[cpu])
