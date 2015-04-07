@@ -519,8 +519,7 @@ paging:
         cbnz  x22, 1f
 
         /* Add UART to the fixmap table */
-        ldr   x1, =xen_fixmap
-        add   x1, x1, x20            /* x1 := paddr (xen_fixmap) */
+        ldr   x1, =xen_fixmap        /* x1 := vaddr (xen_fixmap) */
         lsr   x2, x23, #THIRD_SHIFT
         lsl   x2, x2, #THIRD_SHIFT   /* 4K aligned paddr of UART */
         mov   x3, #PT_DEV_L3
