@@ -289,13 +289,13 @@ static size_t qmp_write(int qfd, char *cmd, size_t cmd_len)
 static int qmp_read(int qfd, unsigned char **qstats)
 {
 	unsigned char buf[1024], *ptr;
-	struct pollfd pfd[2];
+	struct pollfd pfd[1];
 	int n, qsize = 0;
 
 	*qstats = NULL;
 	pfd[0].fd = qfd;
 	pfd[0].events = POLLIN;
-	while ((n = poll(pfd, POLLIN, 10)) > 0) {
+	while ((n = poll(pfd, 1, 10)) > 0) {
 		if (pfd[0].revents & POLLIN) {
 			if ((n = read(qfd, buf, sizeof(buf))) < 0) {
 				free(*qstats);
