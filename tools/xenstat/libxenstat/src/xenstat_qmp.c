@@ -357,17 +357,14 @@ static int qmp_connect(char *path)
 }
 
 /* Get up to 1024 active domains */
-static xc_domaininfo_t *get_domain_ids(int *num_doms)
+static xc_domaininfo_t *get_domain_ids(xc_interface *xc_handle, int *num_doms)
 {
 	xc_domaininfo_t *dominfo;
-	xc_interface *xc_handle;
 
 	dominfo = calloc(1024, sizeof(xc_domaininfo_t));
 	if (dominfo == NULL)
 		return NULL;
-	xc_handle = xc_interface_open(0,0,0);
 	*num_doms = xc_domain_getinfolist(xc_handle, 0, 1024, dominfo);
-	xc_interface_close(xc_handle);
 	return dominfo;
 }
 
@@ -406,7 +403,7 @@ void read_attributes_qdisk(xenstat_node * node)
 	char path[80];
 	int i, qfd, num_doms;
 
-	dominfo = get_domain_ids(&num_doms);
+	dominfo = get_domain_ids(node->handle->xc_handle, &num_doms);
 	if (dominfo == NULL)
 		return;
 
