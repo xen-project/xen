@@ -91,7 +91,7 @@ all: subdirs-all
 	$(MAKE) hvmloader
 
 ovmf.o rombios.o seabios.o hvmloader.o: roms.inc
-smbios.o: CFLAGS += -D__SMBIOS_DATE__="$(SMBIOS_REL_DATE)"
+smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(SMBIOS_REL_DATE)\""
 
 hvmloader: $(OBJS) acpi/acpi.a
 	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(LOADADDR) -o hvmloader.tmp $^
