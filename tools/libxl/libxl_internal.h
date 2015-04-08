@@ -1954,28 +1954,41 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
  *        must be copied into the per-operation structure using
  *        libxl__ao_progress_gethow.
  *
- * - If initiation is successful, the initiating function needs
- *   to run libxl__ao_inprogress right before unlocking and
- *   returning, and return whatever it returns (AO_INPROGRESS macro).
- *
  * - If the initiation is unsuccessful, the initiating function must
  *   call libxl__ao_abort before unlocking and returning whatever
  *   error code is appropriate (AO_ABORT macro).
+ *
+ * If initiation is successful:
+ *
+ * - The initiating function must run libxl__ao_inprogress right
+ *   before unlocking and returning, and return whatever it returns.
+ *   This is best achieved with the AO_INPROGRESS macro.
  *
  * - If the operation supports progress reports, it may generate
  *   suitable events with NEW_EVENT and report them with
  *   libxl__ao_progress_report (with the ctx locked).
  *
- * - Later, some callback function, whose callback has been requested
- *   directly or indirectly, should call libxl__ao_complete (with the
- *   ctx locked, as it will generally already be in any event callback
- *   function).  This must happen exactly once for each ao (and not if
- *   the ao has been destroyed, obviously).
+ * - Eventually, some callback function, whose callback has been
+ *   requested directly or indirectly, should call libxl__ao_complete
+ *   (with the ctx locked, as it will generally already be in any
+ *   event callback function).  This must happen exactly once for each
+ *   ao, as the last that happens with that ao.
+ *
+ * - However, it is permissible for the initiating function to call
+ *   libxl__ao_inprogress and/or libxl__ao_complete (directly or
+ *   indirectly), before it uses AO_INPROGRESS to return.  (The ao
+ *   infrastructure will arrange to defer destruction of the ao, etc.,
+ *   until the proper time.)  An initiating function should do this
+ *   if it takes a codepath which completes synchronously.
+ *
+ * - Conversely it is forbidden to call libxl__ao_complete in the
+ *   initiating function _after_ AO_INPROGRESS, because
+ *   libxl__ao_complete requires the ctx to be locked.
  *
  * - Note that during callback functions, two gcs are available:
  *    - The one in egc, whose lifetime is only this callback
  *    - The one in ao, whose lifetime is the asynchronous operation
- *   Usually callback function should use CONTAINER_OF to obtain its
+ *   Usually a callback function should use CONTAINER_OF to obtain its
  *   own state structure, containing a pointer to the ao.  It should
  *   then obtain the ao and use the ao's gc; this is most easily done
  *   using the convenience macro STATE_AO_GC.
