@@ -110,7 +110,7 @@ static char *qmp_get_block_image(xenstat_node *node, char *qmp_devname, int qfd)
 		ptr[0] = qblock[QMP_BLOCK_DEVICE]; /* "device" */
 		if ((dev_obj = yajl_tree_get(n, ptr, yajl_t_any)) != NULL) {
 			tmp = YAJL_GET_STRING(dev_obj);
-			if (strcmp(qmp_devname, tmp))
+			if (!tmp || strcmp(qmp_devname, tmp))
 				continue;
 		}
 		else
