@@ -95,10 +95,10 @@ static char *qmp_get_block_image(xenstat_node *node, char *qmp_devname, int qfd)
 		return NULL;
 
 	/* Use libyajl version 2.0.3 or newer for the tree parser feature with bug fixes */
-	if ((info = yajl_tree_parse((char *)qmp_stats, NULL, 0)) == NULL) {
-		free(qmp_stats);
+	info = yajl_tree_parse((char *)qmp_stats, NULL, 0);
+	free(qmp_stats);
+	if (info == NULL)
 		return NULL;
-	}
 
 	ptr[0] = qblock[QMP_BLOCK_RETURN]; /* "return" */
 	if ((ret_obj = yajl_tree_get(info, ptr, yajl_t_array)) == NULL)
