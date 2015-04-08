@@ -468,8 +468,13 @@ static int set_vnuma_affinity(libxl__gc *gc, uint32_t domid,
             goto out;
         }
 
-        libxl_for_each_set_bit(j, v->vcpus)
-            libxl_set_vcpuaffinity(CTX, domid, j, NULL, &cpumap);
+        libxl_for_each_set_bit(j, v->vcpus) {
+            rc = libxl_set_vcpuaffinity(CTX, domid, j, NULL, &cpumap);
+            if (rc) {
+                LOG(ERROR, "Can't set cpu affinity for %d", j);
+                goto out;
+            }
+        }
     }
 
 out:
