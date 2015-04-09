@@ -124,8 +124,8 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
 
     if ( mem_access_enable )
     {
-        rc = xc_mem_access_disable(xenaccess->xc_handle,
-                                   xenaccess->vm_event.domain_id);
+        rc = xc_monitor_disable(xenaccess->xc_handle,
+                                xenaccess->vm_event.domain_id);
         if ( rc != 0 )
         {
             ERROR("Error tearing down domain xenaccess in xen");
@@ -196,9 +196,9 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
 
     /* Enable mem_access */
     xenaccess->vm_event.ring_page =
-            xc_mem_access_enable(xenaccess->xc_handle,
-                                 xenaccess->vm_event.domain_id,
-                                 &xenaccess->vm_event.evtchn_port);
+            xc_monitor_enable(xenaccess->xc_handle,
+                              xenaccess->vm_event.domain_id,
+                              &xenaccess->vm_event.evtchn_port);
     if ( xenaccess->vm_event.ring_page == NULL )
     {
         switch ( errno ) {

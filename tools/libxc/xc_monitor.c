@@ -23,6 +23,28 @@
 
 #include "xc_private.h"
 
+void *xc_monitor_enable(xc_interface *xch, domid_t domain_id, uint32_t *port)
+{
+    return xc_vm_event_enable(xch, domain_id, HVM_PARAM_MONITOR_RING_PFN,
+                              port);
+}
+
+int xc_monitor_disable(xc_interface *xch, domid_t domain_id)
+{
+    return xc_vm_event_control(xch, domain_id,
+                               XEN_VM_EVENT_DISABLE,
+                               XEN_DOMCTL_VM_EVENT_OP_MONITOR,
+                               NULL);
+}
+
+int xc_monitor_resume(xc_interface *xch, domid_t domain_id)
+{
+    return xc_vm_event_control(xch, domain_id,
+                               XEN_VM_EVENT_RESUME,
+                               XEN_DOMCTL_VM_EVENT_OP_MONITOR,
+                               NULL);
+}
+
 int xc_monitor_mov_to_cr0(xc_interface *xch, domid_t domain_id, bool enable,
                           bool sync, bool onchangeonly)
 {

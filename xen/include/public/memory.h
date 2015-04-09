@@ -387,11 +387,10 @@ typedef struct xen_mem_paging_op xen_mem_paging_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mem_paging_op_t);
 
 #define XENMEM_access_op                    21
-#define XENMEM_access_op_resume             0
-#define XENMEM_access_op_set_access         1
-#define XENMEM_access_op_get_access         2
-#define XENMEM_access_op_enable_emulate     3
-#define XENMEM_access_op_disable_emulate    4
+#define XENMEM_access_op_set_access         0
+#define XENMEM_access_op_get_access         1
+#define XENMEM_access_op_enable_emulate     2
+#define XENMEM_access_op_disable_emulate    3
 
 typedef enum {
     XENMEM_access_n,
@@ -442,12 +441,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_access_op_t);
 #define XENMEM_sharing_op_nominate_gfn      0
 #define XENMEM_sharing_op_nominate_gref     1
 #define XENMEM_sharing_op_share             2
-#define XENMEM_sharing_op_resume            3
-#define XENMEM_sharing_op_debug_gfn         4
-#define XENMEM_sharing_op_debug_mfn         5
-#define XENMEM_sharing_op_debug_gref        6
-#define XENMEM_sharing_op_add_physmap       7
-#define XENMEM_sharing_op_audit             8
+#define XENMEM_sharing_op_debug_gfn         3
+#define XENMEM_sharing_op_debug_mfn         4
+#define XENMEM_sharing_op_debug_gref        5
+#define XENMEM_sharing_op_add_physmap       6
+#define XENMEM_sharing_op_audit             7
 
 #define XENMEM_SHARING_OP_S_HANDLE_INVALID  (-10)
 #define XENMEM_SHARING_OP_C_HANDLE_INVALID  (-9)

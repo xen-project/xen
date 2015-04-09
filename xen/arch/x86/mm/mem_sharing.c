@@ -1472,18 +1472,6 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
         }
         break;
 
-        case XENMEM_sharing_op_resume:
-        {
-            if ( !mem_sharing_enabled(d) )
-            {
-                rc = -EINVAL;
-                goto out;
-            }
-
-            vm_event_resume(d, &d->vm_event->share);
-        }
-        break;
-
         case XENMEM_sharing_op_debug_gfn:
         {
             unsigned long gfn = mso.u.debug.u.gfn;

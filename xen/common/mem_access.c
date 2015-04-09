@@ -58,15 +58,6 @@ int mem_access_memop(unsigned long cmd,
 
     switch ( mao.op )
     {
-    case XENMEM_access_op_resume:
-        if ( unlikely(start_iter) )
-            rc = -ENOSYS;
-        else
-        {
-            vm_event_resume(d, &d->vm_event->monitor);
-            rc = 0;
-        }
-        break;
 
     case XENMEM_access_op_set_access:
         rc = -EINVAL;

@@ -2274,6 +2274,7 @@ int xc_tmem_restore_extra(xc_interface *xch, int dom, int fd);
  */
 int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
 int xc_mem_paging_disable(xc_interface *xch, domid_t domain_id);
+int xc_mem_paging_resume(xc_interface *xch, domid_t domain_id);
 int xc_mem_paging_nominate(xc_interface *xch, domid_t domain_id,
                            uint64_t gfn);
 int xc_mem_paging_evict(xc_interface *xch, domid_t domain_id, uint64_t gfn);
@@ -2285,17 +2286,6 @@ int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
  * Access tracking operations.
  * Supported only on Intel EPT 64 bit processors.
  */
-
-/*
- * Enables mem_access and returns the mapped ring page.
- * Will return NULL on error.
- * Caller has to unmap this page when done.
- */
-void *xc_mem_access_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
-void *xc_mem_access_enable_introspection(xc_interface *xch, domid_t domain_id,
-                                         uint32_t *port);
-int xc_mem_access_disable(xc_interface *xch, domid_t domain_id);
-int xc_mem_access_resume(xc_interface *xch, domid_t domain_id);
 
 /*
  * Set a range of memory to a specific access.
@@ -2325,7 +2315,17 @@ int xc_mem_access_disable_emulate(xc_interface *xch, domid_t domain_id);
 
 /***
  * Monitor control operations.
+ *
+ * Enables the VM event monitor ring and returns the mapped ring page.
+ * This ring is used to deliver mem_access events, as well a set of additional
+ * events that can be enabled with the xc_monitor_* functions.
+ *
+ * Will return NULL on error.
+ * Caller has to unmap this page when done.
  */
+void *xc_monitor_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
+int xc_monitor_disable(xc_interface *xch, domid_t domain_id);
+int xc_monitor_resume(xc_interface *xch, domid_t domain_id);
 int xc_monitor_mov_to_cr0(xc_interface *xch, domid_t domain_id, bool enable,
                           bool sync, bool onchangeonly);
 int xc_monitor_mov_to_cr3(xc_interface *xch, domid_t domain_id, bool enable,

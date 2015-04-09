@@ -99,17 +99,17 @@ void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
     switch ( param )
     {
     case HVM_PARAM_PAGING_RING_PFN:
-        op = XEN_VM_EVENT_PAGING_ENABLE;
+        op = XEN_VM_EVENT_ENABLE;
         mode = XEN_DOMCTL_VM_EVENT_OP_PAGING;
         break;
 
     case HVM_PARAM_MONITOR_RING_PFN:
-        op = XEN_VM_EVENT_MONITOR_ENABLE;
+        op = XEN_VM_EVENT_ENABLE;
         mode = XEN_DOMCTL_VM_EVENT_OP_MONITOR;
         break;
 
     case HVM_PARAM_SHARING_RING_PFN:
-        op = XEN_VM_EVENT_SHARING_ENABLE;
+        op = XEN_VM_EVENT_ENABLE;
         mode = XEN_DOMCTL_VM_EVENT_OP_SHARING;
         break;
 

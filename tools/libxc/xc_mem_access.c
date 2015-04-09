@@ -24,31 +24,6 @@
 #include "xc_private.h"
 #include <xen/memory.h>
 
-void *xc_mem_access_enable(xc_interface *xch, domid_t domain_id, uint32_t *port)
-{
-    return xc_vm_event_enable(xch, domain_id, HVM_PARAM_MONITOR_RING_PFN,
-                              port);
-}
-
-int xc_mem_access_disable(xc_interface *xch, domid_t domain_id)
-{
-    return xc_vm_event_control(xch, domain_id,
-                               XEN_VM_EVENT_MONITOR_DISABLE,
-                               XEN_DOMCTL_VM_EVENT_OP_MONITOR,
-                               NULL);
-}
-
-int xc_mem_access_resume(xc_interface *xch, domid_t domain_id)
-{
-    xen_mem_access_op_t mao =
-    {
-        .op    = XENMEM_access_op_resume,
-        .domid = domain_id
-    };
-
-    return do_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
-}
-
 int xc_set_mem_access(xc_interface *xch,
                       domid_t domain_id,
                       xenmem_access_t access,
