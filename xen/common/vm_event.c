@@ -27,15 +27,6 @@
 #include <xen/vm_event.h>
 #include <xen/mem_access.h>
 #include <asm/p2m.h>
-
-#ifdef HAS_MEM_PAGING
-#include <asm/mem_paging.h>
-#endif
-
-#ifdef HAS_MEM_SHARING
-#include <asm/mem_sharing.h>
-#endif
-
 #include <xsm/xsm.h>
 
 /* for public/io/ring.h macros */
@@ -512,40 +503,6 @@ static void mem_sharing_notification(struct vcpu *v, unsigned int port)
         vm_event_resume(v->domain, &v->domain->vm_event->share);
 }
 #endif
-
-int do_vm_event_op(int op, uint32_t domain, void *arg)
-{
-    int ret;
-    struct domain *d;
-
-    ret = rcu_lock_live_remote_domain_by_id(domain, &d);
-    if ( ret )
-        return ret;
-
-    ret = xsm_vm_event_op(XSM_DM_PRIV, d, op);
-    if ( ret )
-        goto out;
-
-    switch (op)
-    {
-#ifdef HAS_MEM_PAGING
-        case XENMEM_paging_op:
-            ret = mem_paging_memop(d, arg);
-            break;
-#endif
-#ifdef HAS_MEM_SHARING
-        case XENMEM_sharing_op:
-            ret = mem_sharing_memop(d, arg);
-            break;
-#endif
-        default:
-            ret = -ENOSYS;
-    }
-
- out:
-    rcu_unlock_domain(d);
-    return ret;
-}
 
 /* Clean up on domain destruction */
 void vm_event_cleanup(struct domain *d)

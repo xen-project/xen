@@ -69,7 +69,6 @@ int vm_event_get_response(struct domain *d, struct vm_event_domain *ved,
 
 void vm_event_resume(struct domain *d, struct vm_event_domain *ved);
 
-int do_vm_event_op(int op, uint32_t domain, void *arg);
 int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
                     XEN_GUEST_HANDLE_PARAM(void) u_domctl);
 

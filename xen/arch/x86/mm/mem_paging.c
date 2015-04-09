@@ -22,27 +22,45 @@
 
 
 #include <asm/p2m.h>
-#include <xen/vm_event.h>
+#include <xen/guest_access.h>
+#include <xsm/xsm.h>
 
-
-int mem_paging_memop(struct domain *d, xen_mem_paging_op_t *mpo)
+int mem_paging_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_paging_op_t) arg)
 {
-    int rc = -ENODEV;
-    if ( unlikely(!d->vm_event->paging.ring_page) )
+    int rc;
+    xen_mem_paging_op_t mpo;
+    struct domain *d;
+    bool_t copyback = 0;
+
+    if ( copy_from_guest(&mpo, arg, 1) )
+        return -EFAULT;
+
+    rc = rcu_lock_live_remote_domain_by_id(mpo.domain, &d);
+    if ( rc )
         return rc;
 
-    switch( mpo->op )
+    rc = xsm_vm_event_op(XSM_DM_PRIV, d, XENMEM_paging_op);
+    if ( rc )
+        goto out;
+
+    rc = -ENODEV;
+    if ( unlikely(!d->vm_event->paging.ring_page) )
+        goto out;
+
+    switch( mpo.op )
     {
     case XENMEM_paging_op_nominate:
-        rc = p2m_mem_paging_nominate(d, mpo->gfn);
+        rc = p2m_mem_paging_nominate(d, mpo.gfn);
         break;
 
     case XENMEM_paging_op_evict:
-        rc = p2m_mem_paging_evict(d, mpo->gfn);
+        rc = p2m_mem_paging_evict(d, mpo.gfn);
         break;
 
     case XENMEM_paging_op_prep:
-        rc = p2m_mem_paging_prep(d, mpo->gfn, mpo->buffer);
+        rc = p2m_mem_paging_prep(d, mpo.gfn, mpo.buffer);
+        if ( !rc )
+            copyback = 1;
         break;
 
     default:
@@ -50,6 +68,11 @@ int mem_paging_memop(struct domain *d, xen_mem_paging_op_t *mpo)
         break;
     }
 
+    if ( copyback && __copy_to_guest(arg, &mpo, 1) )
+        rc = -EFAULT;
+
+out:
+    rcu_unlock_domain(d);
     return rc;
 }
 

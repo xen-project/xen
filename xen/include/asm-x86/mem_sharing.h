@@ -90,8 +90,7 @@ static inline int mem_sharing_unshare_page(struct domain *d,
  */
 int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
                                 bool_t allow_sleep);
-int mem_sharing_memop(struct domain *d, 
-                       xen_mem_sharing_op_t *mec);
+int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg);
 int mem_sharing_domctl(struct domain *d, 
                        xen_domctl_mem_sharing_op_t *mec);
 int mem_sharing_audit(void);

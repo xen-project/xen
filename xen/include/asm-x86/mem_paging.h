@@ -23,7 +23,7 @@
 #ifndef __ASM_X86_MEM_PAGING_H__
 #define __ASM_X86_MEM_PAGING_H__
 
-int mem_paging_memop(struct domain *d, xen_mem_paging_op_t *mpo);
+int mem_paging_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_paging_op_t) arg);
 
 #endif /*__ASM_X86_MEM_PAGING_H__ */
 
