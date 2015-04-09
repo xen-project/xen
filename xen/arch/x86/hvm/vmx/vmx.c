@@ -1231,7 +1231,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                 v->arch.hvm_vmx.exec_control |= cr3_ctls;
 
             /* Trap CR3 updates if CR3 memory events are enabled. */
-            if ( v->domain->arch.hvm_domain.params[HVM_PARAM_MEMORY_EVENT_CR3] )
+            if ( v->domain->arch.monitor.mov_to_cr3_enabled )
                 v->arch.hvm_vmx.exec_control |= CPU_BASED_CR3_LOAD_EXITING;
 
             vmx_update_cpu_exec_control(v);

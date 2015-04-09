@@ -430,6 +430,6 @@ int xc_vm_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
  * param can be HVM_PARAM_PAGING/ACCESS/SHARING_RING_PFN
  */
 void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
-                         uint32_t *port, int enable_introspection);
+                         uint32_t *port);
 
 #endif /* __XC_PRIVATE_H__ */

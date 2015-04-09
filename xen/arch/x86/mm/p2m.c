@@ -1454,15 +1454,6 @@ void p2m_mem_access_emulate_check(struct vcpu *v,
     }
 }
 
-void p2m_setup_introspection(struct domain *d)
-{
-    if ( hvm_funcs.enable_msr_exit_interception )
-    {
-        d->arch.hvm_domain.introspection_enabled = 1;
-        hvm_funcs.enable_msr_exit_interception(d);
-    }
-}
-
 bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                             struct npfec npfec,
                             vm_event_request_t **req_ptr)

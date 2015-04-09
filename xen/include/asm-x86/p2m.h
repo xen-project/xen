@@ -607,24 +607,39 @@ long p2m_set_mem_access(struct domain *d, unsigned long start_pfn, uint32_t nr,
 int p2m_get_mem_access(struct domain *d, unsigned long pfn,
                        xenmem_access_t *access);
 
+/*
+ * Emulating a memory access requires custom handling. These non-atomic
+ * functions should be called under domctl lock.
+ */
+static inline
+int p2m_mem_access_enable_emulate(struct domain *d)
+{
+    if ( d->arch.mem_access_emulate_enabled )
+        return -EEXIST;
+
+    d->arch.mem_access_emulate_enabled = 1;
+    return 0;
+}
+
+static inline
+int p2m_mem_access_disable_emulate(struct domain *d)
+{
+    if ( !d->arch.mem_access_emulate_enabled )
+        return -EEXIST;
+
+    d->arch.mem_access_emulate_enabled = 0;
+    return 0;
+}
+
 /* Check for emulation and mark vcpu for skipping one instruction
  * upon rescheduling if required. */
 void p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp);
 
-/* Enable arch specific introspection options (such as MSR interception). */
-void p2m_setup_introspection(struct domain *d);
-
-/* Sanity check for vm_event hardware support */
-static inline bool_t p2m_vm_event_sanity_check(struct domain *d)
-{
-    return hap_enabled(d) && cpu_has_vmx;
-}
-
 /* Sanity check for mem_access hardware support */
 static inline bool_t p2m_mem_access_sanity_check(struct domain *d)
 {
-    return is_hvm_domain(d);
+    return is_hvm_domain(d) && cpu_has_vmx && hap_enabled(d);
 }
 
 /* 

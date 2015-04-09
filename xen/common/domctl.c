@@ -29,6 +29,7 @@
 #include <asm/irq.h>
 #include <asm/page.h>
 #include <asm/p2m.h>
+#include <asm/monitor.h>
 #include <public/domctl.h>
 #include <xsm/xsm.h>
 
@@ -1158,6 +1159,14 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         break;
     }
+
+    case XEN_DOMCTL_monitor_op:
+        ret = -EPERM;
+        if ( current->domain == d )
+            break;
+
+        ret = monitor_domctl(d, &op->u.monitor_op);
+        break;
 
     default:
         ret = arch_do_domctl(op, d, u_domctl);

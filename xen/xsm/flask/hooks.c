@@ -691,6 +691,9 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_set_access_required:
         return current_has_perm(d, SECCLASS_HVM, HVM__VM_EVENT);
 
+    case XEN_DOMCTL_monitor_op:
+        return current_has_perm(d, SECCLASS_HVM, HVM__VM_EVENT);
+
     case XEN_DOMCTL_debug_op:
     case XEN_DOMCTL_gdbsx_guestmemio:
     case XEN_DOMCTL_gdbsx_pausevcpu:

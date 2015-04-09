@@ -67,7 +67,7 @@
 #define VM_EVENT_REASON_MOV_TO_CR3              5
 /* CR4 was updated */
 #define VM_EVENT_REASON_MOV_TO_CR4              6
-/* An MSR was updated. Does NOT honour HVMPME_onchangeonly */
+/* An MSR was updated. */
 #define VM_EVENT_REASON_MOV_TO_MSR              7
 /* Debug operation executed (e.g. int3) */
 #define VM_EVENT_REASON_SOFTWARE_BREAKPOINT     8

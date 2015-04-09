@@ -599,11 +599,9 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
         break;
 
         case XEN_VM_EVENT_PAGING_DISABLE:
-        {
             if ( ved->ring_page )
                 rc = vm_event_disable(d, ved);
-        }
-        break;
+            break;
 
         default:
             rc = -ENOSYS;
@@ -622,32 +620,15 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
         switch( vec->op )
         {
         case XEN_VM_EVENT_MONITOR_ENABLE:
-        case XEN_VM_EVENT_MONITOR_ENABLE_INTROSPECTION:
-        {
-            rc = -ENODEV;
-            if ( !p2m_vm_event_sanity_check(d) )
-                break;
-
             rc = vm_event_enable(d, vec, ved, _VPF_mem_access,
                                  HVM_PARAM_MONITOR_RING_PFN,
                                  mem_access_notification);
-
-            if ( vec->op == XEN_VM_EVENT_MONITOR_ENABLE_INTROSPECTION
-                 && !rc )
-                p2m_setup_introspection(d);
-
-        }
-        break;
+            break;
 
         case XEN_VM_EVENT_MONITOR_DISABLE:
-        {
             if ( ved->ring_page )
-            {
                 rc = vm_event_disable(d, ved);
-                d->arch.hvm_domain.introspection_enabled = 0;
-            }
-        }
-        break;
+            break;
 
         default:
             rc = -ENOSYS;
@@ -666,7 +647,6 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
         switch( vec->op )
         {
         case XEN_VM_EVENT_SHARING_ENABLE:
-        {
             rc = -EOPNOTSUPP;
             /* pvh fixme: p2m_is_foreign types need addressing */
             if ( is_pvh_vcpu(current) || is_pvh_domain(hardware_domain) )
@@ -680,15 +660,12 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
             rc = vm_event_enable(d, vec, ved, _VPF_mem_sharing,
                                  HVM_PARAM_SHARING_RING_PFN,
                                  mem_sharing_notification);
-        }
-        break;
+            break;
 
         case XEN_VM_EVENT_SHARING_DISABLE:
-        {
             if ( ved->ring_page )
                 rc = vm_event_disable(d, ved);
-        }
-        break;
+            break;
 
         default:
             rc = -ENOSYS;

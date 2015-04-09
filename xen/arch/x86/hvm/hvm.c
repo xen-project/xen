@@ -5807,19 +5807,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             case HVM_PARAM_MEMORY_EVENT_CR0:
             case HVM_PARAM_MEMORY_EVENT_CR3:
             case HVM_PARAM_MEMORY_EVENT_CR4:
-                if ( d == current->domain )
-                    rc = -EPERM;
-                break;
             case HVM_PARAM_MEMORY_EVENT_INT3:
             case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
             case HVM_PARAM_MEMORY_EVENT_MSR:
-                if ( d == current->domain )
-                {
-                    rc = -EPERM;
-                    break;
-                }
-                if ( a.value & HVMPME_onchangeonly )
-                    rc = -EINVAL;
+                /* Deprecated */
+                rc = -EOPNOTSUPP;
                 break;
             case HVM_PARAM_NESTEDHVM:
                 rc = xsm_hvm_param_nested(XSM_PRIV, d);
@@ -5879,29 +5871,8 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             }
             }
 
-            if ( rc == 0 ) 
-            {
+            if ( rc == 0 )
                 d->arch.hvm_domain.params[a.index] = a.value;
-
-                switch( a.index )
-                {
-                case HVM_PARAM_MEMORY_EVENT_INT3:
-                case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
-                {
-                    domain_pause(d);
-                    domain_unpause(d); /* Causes guest to latch new status */
-                    break;
-                }
-                case HVM_PARAM_MEMORY_EVENT_CR3:
-                {
-                    for_each_vcpu ( d, v )
-                        hvm_funcs.update_guest_cr(v, 0); /* Latches new CR3 mask through CR0 code */
-                    break;
-                }
-                }
-
-            }
-
         }
         else
         {

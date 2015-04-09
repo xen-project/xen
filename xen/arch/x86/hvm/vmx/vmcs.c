@@ -714,7 +714,8 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
     if ( msr_bitmap == NULL )
         return;
 
-    if ( unlikely(d->arch.hvm_domain.introspection_enabled) &&
+    if ( unlikely(d->arch.monitor.mov_to_msr_enabled &&
+                  d->arch.monitor.mov_to_msr_extended) &&
          vm_event_check_ring(&d->vm_event->monitor) )
     {
         unsigned int i;
@@ -1373,8 +1374,8 @@ void vmx_do_resume(struct vcpu *v)
     }
 
     debug_state = v->domain->debugger_attached
-                  || v->domain->arch.hvm_domain.params[HVM_PARAM_MEMORY_EVENT_INT3]
-                  || v->domain->arch.hvm_domain.params[HVM_PARAM_MEMORY_EVENT_SINGLE_STEP];
+                  || v->domain->arch.monitor.software_breakpoint_enabled
+                  || v->domain->arch.monitor.singlestep_enabled;
 
     if ( unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
     {

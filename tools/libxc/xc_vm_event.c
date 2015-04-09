@@ -41,7 +41,7 @@ int xc_vm_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
 }
 
 void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
-                         uint32_t *port, int enable_introspection)
+                         uint32_t *port)
 {
     void *ring_page = NULL;
     uint64_t pfn;
@@ -104,10 +104,7 @@ void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
         break;
 
     case HVM_PARAM_MONITOR_RING_PFN:
-        if ( enable_introspection )
-            op = XEN_VM_EVENT_MONITOR_ENABLE_INTROSPECTION;
-        else
-            op = XEN_VM_EVENT_MONITOR_ENABLE;
+        op = XEN_VM_EVENT_MONITOR_ENABLE;
         mode = XEN_DOMCTL_VM_EVENT_OP_MONITOR;
         break;
 

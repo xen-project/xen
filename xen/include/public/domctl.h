@@ -793,7 +793,6 @@ struct xen_domctl_gdbsx_domstatus {
 
 #define XEN_VM_EVENT_MONITOR_ENABLE                           0
 #define XEN_VM_EVENT_MONITOR_DISABLE                          1
-#define XEN_VM_EVENT_MONITOR_ENABLE_INTROSPECTION             2
 
 /*
  * Sharing ENOMEM helper.
@@ -1001,6 +1000,51 @@ struct xen_domctl_psr_cmt_op {
 typedef struct xen_domctl_psr_cmt_op xen_domctl_psr_cmt_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_psr_cmt_op_t);
 
+/*  XEN_DOMCTL_MONITOR_*
+ *
+ * Enable/disable monitoring various VM events.
+ * This domctl configures what events will be reported to helper apps
+ * via the ring buffer "MONITOR". The ring has to be first enabled
+ * with the domctl XEN_DOMCTL_VM_EVENT_OP_MONITOR.
+ *
+ * NOTICE: mem_access events are also delivered via the "MONITOR" ring buffer;
+ * however, enabling/disabling those events is performed with the use of
+ * memory_op hypercalls!
+ */
+#define XEN_DOMCTL_MONITOR_OP_ENABLE   0
+#define XEN_DOMCTL_MONITOR_OP_DISABLE  1
+
+#define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR0            0
+#define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR3            1
+#define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR4            2
+#define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR            3
+#define XEN_DOMCTL_MONITOR_EVENT_SINGLESTEP            4
+#define XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT   5
+
+struct xen_domctl_monitor_op {
+    uint32_t op; /* XEN_DOMCTL_MONITOR_OP_* */
+    uint32_t event; /* XEN_DOMCTL_MONITOR_EVENT_* */
+
+    /*
+     * Further options when issuing XEN_DOMCTL_MONITOR_OP_ENABLE.
+     */
+    union {
+        struct {
+            /* Pause vCPU until response */
+            uint8_t sync;
+            /* Send event only on a change of value */
+            uint8_t onchangeonly;
+        } mov_to_cr;
+
+        struct {
+            /* Enable the capture of an extended set of MSRs */
+            uint8_t extended_capture;
+        } mov_to_msr;
+    } u;
+};
+typedef struct xen_domctl__op xen_domctl_monitor_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_monitor_op_t);
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -1075,6 +1119,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_set_vcpu_msrs                 73
 #define XEN_DOMCTL_setvnumainfo                  74
 #define XEN_DOMCTL_psr_cmt_op                    75
+#define XEN_DOMCTL_monitor_op                    77
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -1137,6 +1182,7 @@ struct xen_domctl {
         struct xen_domctl_gdbsx_domstatus   gdbsx_domstatus;
         struct xen_domctl_vnuma             vnuma;
         struct xen_domctl_psr_cmt_op        psr_cmt_op;
+        struct xen_domctl_monitor_op        monitor_op;
         uint8_t                             pad[128];
     } u;
 };

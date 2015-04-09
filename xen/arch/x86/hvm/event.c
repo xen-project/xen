@@ -55,14 +55,11 @@ static void hvm_event_fill_regs(vm_event_request_t *req)
     req->regs.x86.cr4 = curr->arch.hvm_vcpu.guest_cr[4];
 }
 
-static int hvm_event_traps(uint64_t parameters, vm_event_request_t *req)
+static int hvm_event_traps(uint8_t sync, vm_event_request_t *req)
 {
     int rc;
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
-
-    if ( !(parameters & HVMPME_MODE_MASK) )
-        return 0;
 
     rc = vm_event_claim_slot(currd, &currd->vm_event->monitor);
     switch ( rc )
@@ -79,7 +76,7 @@ static int hvm_event_traps(uint64_t parameters, vm_event_request_t *req)
         return rc;
     };
 
-    if ( (parameters & HVMPME_MODE_MASK) == HVMPME_mode_sync )
+    if ( sync )
     {
         req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
         vm_event_vcpu_pause(curr);
@@ -91,41 +88,53 @@ static int hvm_event_traps(uint64_t parameters, vm_event_request_t *req)
     return 1;
 }
 
-static void hvm_event_cr(uint32_t reason, unsigned long value,
-                         unsigned long old, uint64_t parameters)
+static inline
+void hvm_event_cr(uint32_t reason, unsigned long value,
+                         unsigned long old, bool_t onchangeonly, bool_t sync)
 {
-    vm_event_request_t req = {
-        .reason = reason,
-        .vcpu_id = current->vcpu_id,
-        .u.mov_to_cr.new_value = value,
-        .u.mov_to_cr.old_value = old
-    };
-
-    if ( (parameters & HVMPME_onchangeonly) && (value == old) )
+    if ( onchangeonly && value == old )
         return;
+    else
+    {
+        vm_event_request_t req = {
+            .reason = reason,
+            .vcpu_id = current->vcpu_id,
+            .u.mov_to_cr.new_value = value,
+            .u.mov_to_cr.old_value = old
+        };
 
-    hvm_event_traps(parameters, &req);
+        hvm_event_traps(sync, &req);
+    }
 }
 
 void hvm_event_cr0(unsigned long value, unsigned long old)
 {
-    hvm_event_cr(VM_EVENT_REASON_MOV_TO_CR0, value, old,
-                 current->domain->arch.hvm_domain
-                      .params[HVM_PARAM_MEMORY_EVENT_CR0]);
+    struct arch_domain *currad = &current->domain->arch;
+
+    if ( currad->monitor.mov_to_cr0_enabled )
+        hvm_event_cr(VM_EVENT_REASON_MOV_TO_CR0, value, old,
+                     currad->monitor.mov_to_cr0_onchangeonly,
+                     currad->monitor.mov_to_cr0_sync);
 }
 
 void hvm_event_cr3(unsigned long value, unsigned long old)
 {
-    hvm_event_cr(VM_EVENT_REASON_MOV_TO_CR3, value, old,
-                 current->domain->arch.hvm_domain
-                      .params[HVM_PARAM_MEMORY_EVENT_CR3]);
+    struct arch_domain *currad = &current->domain->arch;
+
+    if ( currad->monitor.mov_to_cr3_enabled )
+        hvm_event_cr(VM_EVENT_REASON_MOV_TO_CR3, value, old,
+                     currad->monitor.mov_to_cr3_onchangeonly,
+                     currad->monitor.mov_to_cr3_sync);
 }
 
 void hvm_event_cr4(unsigned long value, unsigned long old)
 {
-    hvm_event_cr(VM_EVENT_REASON_MOV_TO_CR4, value, old,
-                 current->domain->arch.hvm_domain
-                      .params[HVM_PARAM_MEMORY_EVENT_CR4]);
+    struct arch_domain *currad = &current->domain->arch;
+
+    if ( currad->monitor.mov_to_cr4_enabled )
+        hvm_event_cr(VM_EVENT_REASON_MOV_TO_CR4, value, old,
+                     currad->monitor.mov_to_cr4_onchangeonly,
+                     currad->monitor.mov_to_cr4_sync);
 }
 
 void hvm_event_msr(unsigned int msr, uint64_t value)
@@ -137,14 +146,14 @@ void hvm_event_msr(unsigned int msr, uint64_t value)
         .u.mov_to_msr.msr = msr,
         .u.mov_to_msr.value = value,
     };
-    uint64_t params = curr->domain->arch.hvm_domain
-                        .params[HVM_PARAM_MEMORY_EVENT_MSR];
 
-    hvm_event_traps(params, &req);
+    if ( curr->domain->arch.monitor.mov_to_msr_enabled )
+        hvm_event_traps(1, &req);
 }
 
 int hvm_event_int3(unsigned long gla)
 {
+    int rc = 0;
     uint32_t pfec = PFEC_page_present;
     struct vcpu *curr = current;
     vm_event_request_t req = {
@@ -152,14 +161,16 @@ int hvm_event_int3(unsigned long gla)
         .vcpu_id = curr->vcpu_id,
         .u.software_breakpoint.gfn = paging_gva_to_gfn(curr, gla, &pfec)
     };
-    uint64_t params = curr->domain->arch.hvm_domain
-                        .params[HVM_PARAM_MEMORY_EVENT_INT3];
 
-    return hvm_event_traps(params, &req);
+    if ( curr->domain->arch.monitor.software_breakpoint_enabled )
+        rc = hvm_event_traps(1, &req);
+
+    return rc;
 }
 
 int hvm_event_single_step(unsigned long gla)
 {
+    int rc = 0;
     uint32_t pfec = PFEC_page_present;
     struct vcpu *curr = current;
     vm_event_request_t req = {
@@ -167,10 +178,11 @@ int hvm_event_single_step(unsigned long gla)
         .vcpu_id = curr->vcpu_id,
         .u.singlestep.gfn = paging_gva_to_gfn(curr, gla, &pfec)
     };
-    uint64_t params = curr->domain->arch.hvm_domain
-                        .params[HVM_PARAM_MEMORY_EVENT_SINGLE_STEP];
 
-    return hvm_event_traps(params, &req);
+    if ( curr->domain->arch.monitor.singlestep_enabled )
+        rc = hvm_event_traps(1, &req);
+
+    return rc;
 }
 
 /*

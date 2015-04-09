@@ -34,6 +34,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <xen/xen.h>
 #include <xen/domctl.h>
 #include <xen/physdev.h>
@@ -2310,6 +2311,32 @@ int xc_set_mem_access(xc_interface *xch, domid_t domain_id,
  */
 int xc_get_mem_access(xc_interface *xch, domid_t domain_id,
                       uint64_t pfn, xenmem_access_t *access);
+
+/*
+ * Instructions causing a mem_access violation can be emulated by Xen
+ * to progress the execution without having to relax the mem_access
+ * permissions.
+ * This feature has to be first enabled, then in the vm_event
+ * response to a mem_access event it can be indicated if the instruction
+ * should be emulated.
+ */
+int xc_mem_access_enable_emulate(xc_interface *xch, domid_t domain_id);
+int xc_mem_access_disable_emulate(xc_interface *xch, domid_t domain_id);
+
+/***
+ * Monitor control operations.
+ */
+int xc_monitor_mov_to_cr0(xc_interface *xch, domid_t domain_id, bool enable,
+                          bool sync, bool onchangeonly);
+int xc_monitor_mov_to_cr3(xc_interface *xch, domid_t domain_id, bool enable,
+                          bool sync, bool onchangeonly);
+int xc_monitor_mov_to_cr4(xc_interface *xch, domid_t domain_id, bool enable,
+                          bool sync, bool onchangeonly);
+int xc_monitor_mov_to_msr(xc_interface *xch, domid_t domain_id, bool enable,
+                          bool extended_capture);
+int xc_monitor_singlestep(xc_interface *xch, domid_t domain_id, bool enable);
+int xc_monitor_software_breakpoint(xc_interface *xch, domid_t domain_id,
+                                   bool enable);
 
 /***
  * Memory sharing operations.

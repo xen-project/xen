@@ -338,7 +338,27 @@ struct arch_domain
     /* Shared page for notifying that explicit PIRQ EOI is required. */
     unsigned long *pirq_eoi_map;
     unsigned long pirq_eoi_map_mfn;
-};
+
+    /* Monitor options */
+    struct {
+        uint16_t mov_to_cr0_enabled          : 1;
+        uint16_t mov_to_cr0_sync             : 1;
+        uint16_t mov_to_cr0_onchangeonly     : 1;
+        uint16_t mov_to_cr3_enabled          : 1;
+        uint16_t mov_to_cr3_sync             : 1;
+        uint16_t mov_to_cr3_onchangeonly     : 1;
+        uint16_t mov_to_cr4_enabled          : 1;
+        uint16_t mov_to_cr4_sync             : 1;
+        uint16_t mov_to_cr4_onchangeonly     : 1;
+        uint16_t mov_to_msr_enabled          : 1;
+        uint16_t mov_to_msr_extended         : 1;
+        uint16_t singlestep_enabled          : 1;
+        uint16_t software_breakpoint_enabled : 1;
+    } monitor;
+
+    /* Mem_access emulation control */
+    bool_t mem_access_emulate_enabled;
+} __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
 

@@ -36,6 +36,7 @@ obj-y += microcode_intel.o
 # This must come after the vendor specific files.
 obj-y += microcode.o
 obj-y += mm.o
+obj-y += monitor.o
 obj-y += mpparse.o
 obj-y += nmi.o
 obj-y += numa.o

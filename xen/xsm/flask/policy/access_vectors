@@ -248,6 +248,8 @@ class hvm
 # HVMOP_inject_trap
     hvmctl
 # XEN_DOMCTL_set_access_required
+# XEN_DOMCTL_monitor_op
+# XEN_DOMCTL_vm_event_op
     vm_event
 # XEN_DOMCTL_mem_sharing_op and XENMEM_sharing_op_{share,add_physmap} with:
 #  source = the domain making the hypercall

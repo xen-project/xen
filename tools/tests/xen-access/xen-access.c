@@ -317,9 +317,9 @@ static void put_response(vm_event_t *vm_event, vm_event_response_t *rsp)
 void usage(char* progname)
 {
     fprintf(stderr,
-            "Usage: %s [-m] <domain_id> write|exec|int3\n"
+            "Usage: %s [-m] <domain_id> write|exec|breakpoint\n"
             "\n"
-            "Logs first page writes, execs, or int3 traps that occur on the domain.\n"
+            "Logs first page writes, execs, or breakpoint traps that occur on the domain.\n"
             "\n"
             "-m requires this program to run, or else the domain may pause\n",
             progname);
@@ -338,7 +338,7 @@ int main(int argc, char *argv[])
     xenmem_access_t default_access = XENMEM_access_rwx;
     xenmem_access_t after_first_access = XENMEM_access_rwx;
     int required = 0;
-    int int3 = 0;
+    int breakpoint = 0;
     int shutting_down = 0;
 
     char* progname = argv[0];
@@ -378,9 +378,9 @@ int main(int argc, char *argv[])
         default_access = XENMEM_access_rw;
         after_first_access = XENMEM_access_rwx;
     }
-    else if ( !strcmp(argv[0], "int3") )
+    else if ( !strcmp(argv[0], "breakpoint") )
     {
-        int3 = 1;
+        breakpoint = 1;
     }
     else
     {
@@ -431,14 +431,14 @@ int main(int argc, char *argv[])
         goto exit;
     }
 
-    if ( int3 )
-        rc = xc_hvm_param_set(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_sync);
-    else
-        rc = xc_hvm_param_set(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_disabled);
-    if ( rc < 0 )
+    if ( breakpoint )
     {
-        ERROR("Error %d setting int3 vm_event\n", rc);
-        goto exit;
+        rc = xc_monitor_software_breakpoint(xch, domain_id, 1);
+        if ( rc < 0 )
+        {
+            ERROR("Error %d setting breakpoint trapping with vm_event\n", rc);
+            goto exit;
+        }
     }
 
     /* Wait for access */
@@ -452,7 +452,7 @@ int main(int argc, char *argv[])
             rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, ~0ull, 0);
             rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, 0,
                                    xenaccess->domain_info->max_pages);
-            rc = xc_hvm_param_set(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_disabled);
+            rc = xc_monitor_software_breakpoint(xch, domain_id, 0);
 
             shutting_down = 1;
         }
@@ -527,7 +527,7 @@ int main(int argc, char *argv[])
                 rsp.u.mem_access.gfn = req.u.mem_access.gfn;
                 break;
             case VM_EVENT_REASON_SOFTWARE_BREAKPOINT:
-                printf("INT3: rip=%016"PRIx64", gfn=%"PRIx64" (vcpu %d)\n",
+                printf("Breakpoint: rip=%016"PRIx64", gfn=%"PRIx64" (vcpu %d)\n",
                        req.regs.x86.rip,
                        req.u.software_breakpoint.gfn,
                        req.vcpu_id);
@@ -538,7 +538,7 @@ int main(int argc, char *argv[])
                     HVMOP_TRAP_sw_exc, -1, 0, 0);
                 if (rc < 0)
                 {
-                    ERROR("Error %d injecting int3\n", rc);
+                    ERROR("Error %d injecting breakpoint\n", rc);
                     interrupted = -1;
                     continue;
                 }
