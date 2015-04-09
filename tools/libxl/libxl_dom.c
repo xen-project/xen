@@ -1010,7 +1010,8 @@ int libxl__qemu_traditional_cmd(libxl__gc *gc, uint32_t domid,
                                 const char *cmd)
 {
     char *path = NULL;
-    path = GCSPRINTF("/local/domain/0/device-model/%d/command", domid);
+    uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
+    path = libxl__device_model_xs_path(gc, dm_domid, domid, "/command");
     return libxl__xs_write(gc, XBT_NULL, path, "%s", cmd);
 }
 
@@ -1024,11 +1025,13 @@ struct libxl__physmap_info {
 
 #define TOOLSTACK_SAVE_VERSION 1
 
-static inline char *restore_helper(libxl__gc *gc, uint32_t domid,
-        uint64_t phys_offset, char *node)
+static inline char *restore_helper(libxl__gc *gc, uint32_t dm_domid,
+                                   uint32_t domid,
+                                   uint64_t phys_offset, char *node)
 {
-    return GCSPRINTF("/local/domain/0/device-model/%d/physmap/%"PRIx64"/%s",
-            domid, phys_offset, node);
+    return libxl__device_model_xs_path(gc, dm_domid, domid,
+                                       "/physmap/%"PRIx64"/%s",
+                                       phys_offset, node);
 }
 
 int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
@@ -1042,6 +1045,7 @@ int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
     uint32_t count = 0, version = 0;
     struct libxl__physmap_info* pi;
     char *xs_path;
+    uint32_t dm_domid;
 
     LOG(DEBUG,"domain=%"PRIu32" toolstack data size=%"PRIu32, domid, size);
 
@@ -1067,20 +1071,23 @@ int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
         return -1;
     }
 
+    dm_domid = libxl_get_stubdom_id(CTX, domid);
     for (i = 0; i < count; i++) {
         pi = (struct libxl__physmap_info*) ptr;
         ptr += sizeof(struct libxl__physmap_info) + pi->namelen;
 
-        xs_path = restore_helper(gc, domid, pi->phys_offset, "start_addr");
+        xs_path = restore_helper(gc, dm_domid, domid,
+                                 pi->phys_offset, "start_addr");
         ret = libxl__xs_write(gc, 0, xs_path, "%"PRIx64, pi->start_addr);
         if (ret)
             return -1;
-        xs_path = restore_helper(gc, domid, pi->phys_offset, "size");
+        xs_path = restore_helper(gc, dm_domid, domid, pi->phys_offset, "size");
         ret = libxl__xs_write(gc, 0, xs_path, "%"PRIx64, pi->size);
         if (ret)
             return -1;
         if (pi->namelen > 0) {
-            xs_path = restore_helper(gc, domid, pi->phys_offset, "name");
+            xs_path = restore_helper(gc, dm_domid, domid,
+                                     pi->phys_offset, "name");
             ret = libxl__xs_write(gc, 0, xs_path, "%s", pi->name);
             if (ret)
                 return -1;
@@ -1133,10 +1140,11 @@ static void domain_suspend_switch_qemu_xen_traditional_logdirty
     const char *got;
 
     if (!lds->cmd_path) {
-        lds->cmd_path = GCSPRINTF(
-                   "/local/domain/0/device-model/%u/logdirty/cmd", domid);
-        lds->ret_path = GCSPRINTF(
-                   "/local/domain/0/device-model/%u/logdirty/ret", domid);
+        uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
+        lds->cmd_path = libxl__device_model_xs_path(gc, dm_domid, domid,
+                                                    "/logdirty/cmd");
+        lds->ret_path = libxl__device_model_xs_path(gc, dm_domid, domid,
+                                                    "/logdirty/ret");
     }
     lds->cmd = enable ? "enable" : "disable";
 
@@ -1655,11 +1663,13 @@ static void domain_suspend_common_done(libxl__egc *egc,
     dss->callback_common_done(egc, dss, ok);
 }
 
-static inline char *physmap_path(libxl__gc *gc, uint32_t domid,
-        char *phys_offset, char *node)
+static inline char *physmap_path(libxl__gc *gc, uint32_t dm_domid,
+                                 uint32_t domid,
+                                 char *phys_offset, char *node)
 {
-    return GCSPRINTF("/local/domain/0/device-model/%d/physmap/%s/%s",
-            domid, phys_offset, node);
+    return libxl__device_model_xs_path(gc, dm_domid, domid,
+                                       "/physmap/%s/%s",
+                                       phys_offset, node);
 }
 
 int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
@@ -1674,9 +1684,13 @@ int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
     uint8_t *ptr = NULL;
     char **entries = NULL;
     struct libxl__physmap_info *pi;
+    uint32_t dm_domid;
 
-    entries = libxl__xs_directory(gc, 0, GCSPRINTF(
-                "/local/domain/0/device-model/%d/physmap", domid), &num);
+    dm_domid = libxl_get_stubdom_id(CTX, domid);
+
+    entries = libxl__xs_directory(gc, 0,
+                libxl__device_model_xs_path(gc, dm_domid, domid, "/physmap"),
+                &num);
     count = num;
 
     *len = sizeof(version) + sizeof(count);
@@ -1699,21 +1713,21 @@ int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
             return -1;
         }
 
-        xs_path = physmap_path(gc, domid, phys_offset, "start_addr");
+        xs_path = physmap_path(gc, dm_domid, domid, phys_offset, "start_addr");
         start_addr = libxl__xs_read(gc, 0, xs_path);
         if (start_addr == NULL) {
             LOG(ERROR, "%s is NULL", xs_path);
             return -1;
         }
 
-        xs_path = physmap_path(gc, domid, phys_offset, "size");
+        xs_path = physmap_path(gc, dm_domid, domid, phys_offset, "size");
         size = libxl__xs_read(gc, 0, xs_path);
         if (size == NULL) {
             LOG(ERROR, "%s is NULL", xs_path);
             return -1;
         }
 
-        xs_path = physmap_path(gc, domid, phys_offset, "name");
+        xs_path = physmap_path(gc, dm_domid, domid, phys_offset, "name");
         name = libxl__xs_read(gc, 0, xs_path);
         if (name == NULL)
             namelen = 0;

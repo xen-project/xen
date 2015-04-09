@@ -268,9 +268,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= ab42b4408cb4fc4f869d73218e3d2034e6f5e8ac
-# Tue Mar 31 16:27:45 2015 +0100
-# xen: limit guest control of PCI command register
+QEMU_TRADITIONAL_REVISION ?= 3b45fcf0c163b9cff4d8115f7b75b42918a9b1b5
+# Thu Apr 9 19:49:24 2015 +0100
+# qemu-trad: xenstore: use relative path for device-model node
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.

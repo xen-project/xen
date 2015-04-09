@@ -86,6 +86,7 @@
 #define LIBXL_DESTROY_TIMEOUT 10
 #define LIBXL_HOTPLUG_TIMEOUT 10
 #define LIBXL_DEVICE_MODEL_START_TIMEOUT 10
+#define LIBXL_STUBDOM_START_TIMEOUT 30
 #define LIBXL_QEMU_BODGE_TIMEOUT 2
 #define LIBXL_XENCONSOLE_LIMIT 1048576
 #define LIBXL_XENCONSOLE_PROTOCOL "vt100"
@@ -3075,6 +3076,7 @@ typedef struct {
     libxl__dm_spawn_state pvqemu;
     libxl__destroy_domid_state dis;
     libxl__multidev multidev;
+    libxl__xswait_state xswait;
 } libxl__stub_dm_spawn_state;
 
 _hidden void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state*);
