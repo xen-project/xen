@@ -92,6 +92,8 @@ static void __init parse_dom0_max_vcpus(const char *s)
     else                               /* N, N-, or N-M */
     {
         opt_dom0_max_vcpus_min = simple_strtoul(s, &s, 0);
+        if ( opt_dom0_max_vcpus_min == 0 )
+            opt_dom0_max_vcpus_min = 1;
         if ( !*s )                    /* N */
             opt_dom0_max_vcpus_max = opt_dom0_max_vcpus_min;
         else if ( *s++ == '-' && *s ) /* N-M */
