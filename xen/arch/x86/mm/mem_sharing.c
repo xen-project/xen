@@ -591,35 +591,6 @@ unsigned int mem_sharing_get_nr_shared_mfns(void)
     return (unsigned int)atomic_read(&nr_shared_mfns);
 }
 
-int mem_sharing_sharing_resume(struct domain *d)
-{
-    vm_event_response_t rsp;
-
-    /* Get all requests off the ring */
-    while ( vm_event_get_response(d, &d->vm_event->share, &rsp) )
-    {
-        struct vcpu *v;
-
-        if ( rsp.version != VM_EVENT_INTERFACE_VERSION )
-        {
-            printk(XENLOG_G_WARNING "vm_event interface version mismatch\n");
-            continue;
-        }
-
-        /* Validate the vcpu_id in the response. */
-        if ( (rsp.vcpu_id >= d->max_vcpus) || !d->vcpu[rsp.vcpu_id] )
-            continue;
-
-        v = d->vcpu[rsp.vcpu_id];
-
-        /* Unpause domain/vcpu */
-        if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )
-            vm_event_vcpu_unpause(v);
-    }
-
-    return 0;
-}
-
 /* Functions that change a page's type and ownership */
 static int page_make_sharable(struct domain *d, 
                        struct page_info *page, 
@@ -1470,7 +1441,8 @@ int mem_sharing_memop(struct domain *d, xen_mem_sharing_op_t *mec)
         {
             if ( !mem_sharing_enabled(d) )
                 return -EINVAL;
-            rc = mem_sharing_sharing_resume(d);
+
+            vm_event_resume(d, &d->vm_event->share);
         }
         break;
 

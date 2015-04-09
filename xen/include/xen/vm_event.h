@@ -26,8 +26,6 @@
 
 #include <xen/sched.h>
 
-#ifdef HAS_MEM_ACCESS
-
 /* Clean up on domain destruction */
 void vm_event_cleanup(struct domain *d);
 
@@ -69,66 +67,14 @@ void vm_event_put_request(struct domain *d, struct vm_event_domain *ved,
 int vm_event_get_response(struct domain *d, struct vm_event_domain *ved,
                           vm_event_response_t *rsp);
 
+void vm_event_resume(struct domain *d, struct vm_event_domain *ved);
+
 int do_vm_event_op(int op, uint32_t domain, void *arg);
 int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
                     XEN_GUEST_HANDLE_PARAM(void) u_domctl);
 
 void vm_event_vcpu_pause(struct vcpu *v);
 void vm_event_vcpu_unpause(struct vcpu *v);
-
-#else
-
-static inline void vm_event_cleanup(struct domain *d) {}
-
-static inline bool_t vm_event_check_ring(struct vm_event_domain *ved)
-{
-    return 0;
-}
-
-static inline int vm_event_claim_slot(struct domain *d,
-                                      struct vm_event_domain *ved)
-{
-    return -ENOSYS;
-}
-
-static inline int vm_event_claim_slot_nosleep(struct domain *d,
-                                              struct vm_event_domain *ved)
-{
-    return -ENOSYS;
-}
-
-static inline
-void vm_event_cancel_slot(struct domain *d, struct vm_event_domain *ved)
-{}
-
-static inline
-void vm_event_put_request(struct domain *d, struct vm_event_domain *ved,
-                          vm_event_request_t *req)
-{}
-
-static inline
-int vm_event_get_response(struct domain *d, struct vm_event_domain *ved,
-                          vm_event_response_t *rsp)
-{
-    return -ENOSYS;
-}
-
-static inline int do_vm_event_op(int op, uint32_t domain, void *arg)
-{
-    return -ENOSYS;
-}
-
-static inline
-int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
-                    XEN_GUEST_HANDLE_PARAM(void) u_domctl)
-{
-    return -ENOSYS;
-}
-
-static inline void vm_event_vcpu_pause(struct vcpu *v) {}
-static inline void vm_event_vcpu_unpause(struct vcpu *v) {}
-
-#endif /* HAS_MEM_ACCESS */
 
 #endif /* __VM_EVENT_H__ */
 

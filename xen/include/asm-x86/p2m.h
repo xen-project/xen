@@ -586,7 +586,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn);
 /* Prepare the p2m for paging a frame in */
 int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer);
 /* Resume normal operation (in case a domain was paused) */
-void p2m_mem_paging_resume(struct domain *d);
+void p2m_mem_paging_resume(struct domain *d, vm_event_response_t *rsp);
 
 /* Send mem event based on the access (gla is -1ull if not available).  Handles
  * the rw2rx conversion. Boolean return value indicates if access rights have 

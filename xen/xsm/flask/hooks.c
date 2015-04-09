@@ -577,9 +577,7 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_iomem_permission:
     case XEN_DOMCTL_memory_mapping:
     case XEN_DOMCTL_set_target:
-#ifdef HAS_MEM_ACCESS
     case XEN_DOMCTL_vm_event_op:
-#endif
 #ifdef CONFIG_X86
     /* These have individual XSM hooks (arch/x86/domctl.c) */
     case XEN_DOMCTL_shadow_op:
@@ -689,10 +687,10 @@ static int flask_domctl(struct domain *d, int cmd)
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__TRIGGER);
 
     case XEN_DOMCTL_set_access_required:
-        return current_has_perm(d, SECCLASS_HVM, HVM__VM_EVENT);
+        return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__VM_EVENT);
 
     case XEN_DOMCTL_monitor_op:
-        return current_has_perm(d, SECCLASS_HVM, HVM__VM_EVENT);
+        return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__VM_EVENT);
 
     case XEN_DOMCTL_debug_op:
     case XEN_DOMCTL_gdbsx_guestmemio:
@@ -1136,6 +1134,16 @@ static int flask_hvm_param_nested(struct domain *d)
     return current_has_perm(d, SECCLASS_HVM, HVM__NESTED);
 }
 
+static int flask_vm_event_control(struct domain *d, int mode, int op)
+{
+    return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__VM_EVENT);
+}
+
+static int flask_vm_event_op(struct domain *d, int op)
+{
+    return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__VM_EVENT);
+}
+
 #if defined(HAS_PASSTHROUGH) && defined(HAS_PCI)
 static int flask_get_device_group(uint32_t machine_bdf)
 {
@@ -1201,18 +1209,6 @@ static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)
     return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__REMOVE_DEVICE, NULL);
 }
 #endif /* HAS_PASSTHROUGH && HAS_PCI */
-
-#ifdef HAS_MEM_ACCESS
-static int flask_vm_event_control(struct domain *d, int mode, int op)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__VM_EVENT);
-}
-
-static int flask_vm_event_op(struct domain *d, int op)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__VM_EVENT);
-}
-#endif /* HAS_MEM_ACCESS */
 
 #ifdef CONFIG_X86
 static int flask_do_mca(void)
@@ -1582,6 +1578,9 @@ static struct xsm_operations flask_ops = {
     .do_xsm_op = do_flask_op,
     .get_vnumainfo = flask_get_vnumainfo,
 
+    .vm_event_control = flask_vm_event_control,
+    .vm_event_op = flask_vm_event_op,
+
 #ifdef CONFIG_COMPAT
     .do_compat_op = compat_flask_op,
 #endif
@@ -1595,11 +1594,6 @@ static struct xsm_operations flask_ops = {
     .test_assign_device = flask_test_assign_device,
     .assign_device = flask_assign_device,
     .deassign_device = flask_deassign_device,
-#endif
-
-#ifdef HAS_MEM_ACCESS
-    .vm_event_control = flask_vm_event_control,
-    .vm_event_op = flask_vm_event_op,
 #endif
 
 #ifdef CONFIG_X86

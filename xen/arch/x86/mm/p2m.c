@@ -1279,13 +1279,13 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
 }
 
 /**
- * p2m_mem_paging_resume - Resume guest gfn and vcpus
+ * p2m_mem_paging_resume - Resume guest gfn
  * @d: guest domain
- * @gfn: guest page in paging state
+ * @rsp: vm_event response received
  *
- * p2m_mem_paging_resume() will forward the p2mt of a gfn to ram_rw and all
- * waiting vcpus will be unpaused again. It is called by the pager.
- * 
+ * p2m_mem_paging_resume() will forward the p2mt of a gfn to ram_rw. It is
+ * called by the pager.
+ *
  * The gfn was previously either evicted and populated, or nominated and
  * populated. If the page was evicted the p2mt will be p2m_ram_paging_in. If
  * the page was just nominated the p2mt will be p2m_ram_paging_in_start because
@@ -1293,51 +1293,33 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
  *
  * If the gfn was dropped the vcpu needs to be unpaused.
  */
-void p2m_mem_paging_resume(struct domain *d)
+
+void p2m_mem_paging_resume(struct domain *d, vm_event_response_t *rsp)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    vm_event_response_t rsp;
     p2m_type_t p2mt;
     p2m_access_t a;
     mfn_t mfn;
 
-    /* Pull all responses off the ring */
-    while( vm_event_get_response(d, &d->vm_event->paging, &rsp) )
+    /* Fix p2m entry if the page was not dropped */
+    if ( !(rsp->u.mem_paging.flags & MEM_PAGING_DROP_PAGE) )
     {
-        struct vcpu *v;
+        unsigned long gfn = rsp->u.mem_access.gfn;
 
-        if ( rsp.version != VM_EVENT_INTERFACE_VERSION )
+        gfn_lock(p2m, gfn, 0);
+        mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, 0, NULL);
+        /*
+         * Allow only pages which were prepared properly, or pages which
+         * were nominated but not evicted.
+         */
+        if ( mfn_valid(mfn) && (p2mt == p2m_ram_paging_in) )
         {
-            printk(XENLOG_G_WARNING "vm_event interface version mismatch\n");
-            continue;
+            p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K,
+                          paging_mode_log_dirty(d) ? p2m_ram_logdirty :
+                          p2m_ram_rw, a);
+            set_gpfn_from_mfn(mfn_x(mfn), gfn);
         }
-
-        /* Validate the vcpu_id in the response. */
-        if ( (rsp.vcpu_id >= d->max_vcpus) || !d->vcpu[rsp.vcpu_id] )
-            continue;
-
-        v = d->vcpu[rsp.vcpu_id];
-
-        /* Fix p2m entry if the page was not dropped */
-        if ( !(rsp.u.mem_paging.flags & MEM_PAGING_DROP_PAGE) )
-        {
-            unsigned long gfn = rsp.u.mem_access.gfn;
-            gfn_lock(p2m, gfn, 0);
-            mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, 0, NULL);
-            /* Allow only pages which were prepared properly, or pages which
-             * were nominated but not evicted */
-            if ( mfn_valid(mfn) && (p2mt == p2m_ram_paging_in) )
-            {
-                p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K,
-                              paging_mode_log_dirty(d) ? p2m_ram_logdirty :
-                              p2m_ram_rw, a);
-                set_gpfn_from_mfn(mfn_x(mfn), gfn);
-            }
-            gfn_unlock(p2m, gfn, 0);
-        }
-        /* Unpause domain */
-        if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )
-            vm_event_vcpu_unpause(v);
+        gfn_unlock(p2m, gfn, 0);
     }
 }
 

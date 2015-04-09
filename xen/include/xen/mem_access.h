@@ -24,6 +24,7 @@
 #define _XEN_ASM_MEM_ACCESS_H
 
 #include <public/memory.h>
+#include <asm/p2m.h>
 
 #ifdef HAS_MEM_ACCESS
 
@@ -31,8 +32,11 @@ int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg);
 int mem_access_send_req(struct domain *d, vm_event_request_t *req);
 
-/* Resumes the running of the VCPU, restarting the last instruction */
-void mem_access_resume(struct domain *d);
+static inline
+void mem_access_resume(struct vcpu *v, vm_event_response_t *rsp)
+{
+    p2m_mem_access_emulate_check(v, rsp);
+}
 
 #else
 
@@ -49,7 +53,11 @@ int mem_access_send_req(struct domain *d, vm_event_request_t *req)
     return -ENOSYS;
 }
 
-static inline void mem_access_resume(struct domain *d) {}
+static inline
+void mem_access_resume(struct vcpu *vcpu, vm_event_response_t *rsp)
+{
+    /* Nothing to do. */
+}
 
 #endif /* HAS_MEM_ACCESS */
 

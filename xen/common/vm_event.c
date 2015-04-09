@@ -358,6 +358,62 @@ int vm_event_get_response(struct domain *d, struct vm_event_domain *ved,
     return 1;
 }
 
+/*
+ * Pull all responses from the given ring and unpause the corresponding vCPU
+ * if required. Based on the response type, here we can also call custom
+ * handlers.
+ *
+ * Note: responses are handled the same way regardless of which ring they
+ * arrive on.
+ */
+void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
+{
+    vm_event_response_t rsp;
+
+    /* Pull all responses off the ring. */
+    while ( vm_event_get_response(d, ved, &rsp) )
+    {
+        struct vcpu *v;
+
+        if ( rsp.version != VM_EVENT_INTERFACE_VERSION )
+        {
+            printk(XENLOG_G_WARNING "vm_event interface version mismatch\n");
+            continue;
+        }
+
+        /* Validate the vcpu_id in the response. */
+        if ( (rsp.vcpu_id >= d->max_vcpus) || !d->vcpu[rsp.vcpu_id] )
+            continue;
+
+        v = d->vcpu[rsp.vcpu_id];
+
+        /*
+         * In some cases the response type needs extra handling, so here
+         * we call the appropriate handlers.
+         */
+        switch ( rsp.reason )
+        {
+
+#ifdef HAS_MEM_ACCESS
+        case VM_EVENT_REASON_MEM_ACCESS:
+            mem_access_resume(v, &rsp);
+            break;
+#endif
+
+#ifdef HAS_MEM_PAGING
+        case VM_EVENT_REASON_MEM_PAGING:
+            p2m_mem_paging_resume(d, &rsp);
+            break;
+#endif
+
+        };
+
+        /* Unpause domain. */
+        if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )
+            vm_event_vcpu_unpause(v);
+    }
+}
+
 void vm_event_cancel_slot(struct domain *d, struct vm_event_domain *ved)
 {
     vm_event_ring_lock(ved);
@@ -437,25 +493,23 @@ int __vm_event_claim_slot(struct domain *d, struct vm_event_domain *ved,
 static void mem_paging_notification(struct vcpu *v, unsigned int port)
 {
     if ( likely(v->domain->vm_event->paging.ring_page != NULL) )
-        p2m_mem_paging_resume(v->domain);
+        vm_event_resume(v->domain, &v->domain->vm_event->paging);
 }
 #endif
 
-#ifdef HAS_MEM_ACCESS
 /* Registered with Xen-bound event channel for incoming notifications. */
-static void mem_access_notification(struct vcpu *v, unsigned int port)
+static void monitor_notification(struct vcpu *v, unsigned int port)
 {
     if ( likely(v->domain->vm_event->monitor.ring_page != NULL) )
-        mem_access_resume(v->domain);
+        vm_event_resume(v->domain, &v->domain->vm_event->monitor);
 }
-#endif
 
 #ifdef HAS_MEM_SHARING
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void mem_sharing_notification(struct vcpu *v, unsigned int port)
 {
     if ( likely(v->domain->vm_event->share.ring_page != NULL) )
-        mem_sharing_sharing_resume(v->domain);
+        vm_event_resume(v->domain, &v->domain->vm_event->share);
 }
 #endif
 
@@ -510,13 +564,11 @@ void vm_event_cleanup(struct domain *d)
         (void)vm_event_disable(d, &d->vm_event->paging);
     }
 #endif
-#ifdef HAS_MEM_ACCESS
     if ( d->vm_event->monitor.ring_page )
     {
         destroy_waitqueue_head(&d->vm_event->monitor.wq);
         (void)vm_event_disable(d, &d->vm_event->monitor);
     }
-#endif
 #ifdef HAS_MEM_SHARING
     if ( d->vm_event->share.ring_page )
     {
@@ -611,7 +663,6 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
     break;
 #endif
 
-#ifdef HAS_MEM_ACCESS
     case XEN_DOMCTL_VM_EVENT_OP_MONITOR:
     {
         struct vm_event_domain *ved = &d->vm_event->monitor;
@@ -622,7 +673,7 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
         case XEN_VM_EVENT_MONITOR_ENABLE:
             rc = vm_event_enable(d, vec, ved, _VPF_mem_access,
                                  HVM_PARAM_MONITOR_RING_PFN,
-                                 mem_access_notification);
+                                 monitor_notification);
             break;
 
         case XEN_VM_EVENT_MONITOR_DISABLE:
@@ -636,7 +687,6 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
         }
     }
     break;
-#endif
 
 #ifdef HAS_MEM_SHARING
     case XEN_DOMCTL_VM_EVENT_OP_SHARING:
