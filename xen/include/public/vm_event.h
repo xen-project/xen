@@ -47,7 +47,6 @@
 #define VM_EVENT_FLAG_VCPU_PAUSED     (1 << 0)
 /* Flags to aid debugging mem_event */
 #define VM_EVENT_FLAG_FOREIGN         (1 << 1)
-#define VM_EVENT_FLAG_DUMMY           (1 << 2)
 
 /*
  * Reasons for the vm event request

@@ -606,9 +606,6 @@ int mem_sharing_sharing_resume(struct domain *d)
             continue;
         }
 
-        if ( rsp.flags & VM_EVENT_FLAG_DUMMY )
-            continue;
-
         /* Validate the vcpu_id in the response. */
         if ( (rsp.vcpu_id >= d->max_vcpus) || !d->vcpu[rsp.vcpu_id] )
             continue;
