@@ -39,7 +39,7 @@ int mem_paging_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_paging_op_t) arg)
     if ( rc )
         return rc;
 
-    rc = xsm_vm_event_op(XSM_DM_PRIV, d, XENMEM_paging_op);
+    rc = xsm_mem_paging(XSM_DM_PRIV, d);
     if ( rc )
         goto out;
 

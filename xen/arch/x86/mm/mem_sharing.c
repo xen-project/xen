@@ -1311,7 +1311,7 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
     if ( rc )
         return rc;
 
-    rc = xsm_vm_event_op(XSM_DM_PRIV, d, XENMEM_sharing_op);
+    rc = xsm_mem_sharing(XSM_DM_PRIV, d);
     if ( rc )
         goto out;
 

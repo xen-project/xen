@@ -223,6 +223,12 @@ class domain2
 # XEN_DOMCTL_monitor_op
 # XEN_DOMCTL_vm_event_op
     vm_event
+# XENMEM_access_op
+    mem_access
+# XENMEM_paging_op
+    mem_paging
+# XENMEM_sharing_op
+    mem_sharing
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains

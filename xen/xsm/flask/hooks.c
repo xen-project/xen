@@ -1139,10 +1139,26 @@ static int flask_vm_event_control(struct domain *d, int mode, int op)
     return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__VM_EVENT);
 }
 
-static int flask_vm_event_op(struct domain *d, int op)
+#ifdef HAS_MEM_ACCESS
+static int flask_mem_access(struct domain *d)
 {
-    return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__VM_EVENT);
+    return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__MEM_ACCESS);
 }
+#endif
+
+#ifdef HAS_MEM_PAGING
+static int flask_mem_paging(struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__MEM_PAGING);
+}
+#endif
+
+#ifdef HAS_MEM_SHARING
+static int flask_mem_sharing(struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__MEM_SHARING);
+}
+#endif
 
 #if defined(HAS_PASSTHROUGH) && defined(HAS_PCI)
 static int flask_get_device_group(uint32_t machine_bdf)
@@ -1579,7 +1595,18 @@ static struct xsm_operations flask_ops = {
     .get_vnumainfo = flask_get_vnumainfo,
 
     .vm_event_control = flask_vm_event_control,
-    .vm_event_op = flask_vm_event_op,
+
+#ifdef HAS_MEM_ACCESS
+    .mem_access = flask_mem_access,
+#endif
+
+#ifdef HAS_MEM_PAGING
+    .mem_paging = flask_mem_paging,
+#endif
+
+#ifdef HAS_MEM_SHARING
+    .mem_sharing = flask_mem_sharing,
+#endif
 
 #ifdef CONFIG_COMPAT
     .do_compat_op = compat_flask_op,

@@ -519,11 +519,29 @@ static XSM_INLINE int xsm_vm_event_control(XSM_DEFAULT_ARG struct domain *d, int
     return xsm_default_action(action, current->domain, d);
 }
 
-static XSM_INLINE int xsm_vm_event_op(XSM_DEFAULT_ARG struct domain *d, int op)
+#ifdef HAS_MEM_ACCESS
+static XSM_INLINE int xsm_mem_access(XSM_DEFAULT_ARG struct domain *d)
 {
     XSM_ASSERT_ACTION(XSM_DM_PRIV);
     return xsm_default_action(action, current->domain, d);
 }
+#endif
+
+#ifdef HAS_MEM_PAGING
+static XSM_INLINE int xsm_mem_paging(XSM_DEFAULT_ARG struct domain *d)
+{
+    XSM_ASSERT_ACTION(XSM_DM_PRIV);
+    return xsm_default_action(action, current->domain, d);
+}
+#endif
+
+#ifdef HAS_MEM_SHARING
+static XSM_INLINE int xsm_mem_sharing(XSM_DEFAULT_ARG struct domain *d)
+{
+    XSM_ASSERT_ACTION(XSM_DM_PRIV);
+    return xsm_default_action(action, current->domain, d);
+}
+#endif
 
 #ifdef CONFIG_X86
 static XSM_INLINE int xsm_do_mca(XSM_DEFAULT_VOID)
