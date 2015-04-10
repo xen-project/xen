@@ -345,8 +345,6 @@ static void __cpuinit gicv2_hyp_init(void)
     vtr = readl_gich(GICH_VTR);
     nr_lrs  = (vtr & GICH_V2_VTR_NRLRGS) + 1;
     gicv2_info.nr_lrs = nr_lrs;
-
-    writel_gich(GICH_MISR_EOI, GICH_MISR);
 }
 
 static void __cpuinit gicv2_hyp_disable(void)
