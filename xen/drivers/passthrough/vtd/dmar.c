@@ -28,6 +28,7 @@
 #include <xen/xmalloc.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#include <asm/atomic.h>
 #include <asm/string.h>
 #include "dmar.h"
 #include "iommu.h"
@@ -838,8 +839,7 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
 
 out:
     /* Zap ACPI DMAR signature to prevent dom0 using vt-d HW. */
-    dmar->header.signature[0] = 'X';
-    dmar->header.checksum -= 'X'-'D';
+    acpi_dmar_zap();
     return ret;
 }
 
@@ -867,18 +867,18 @@ int __init acpi_dmar_init(void)
 
 void acpi_dmar_reinstate(void)
 {
-    if ( dmar_table == NULL )
-        return;
-    dmar_table->signature[0] = 'D';
-    dmar_table->checksum += 'X'-'D';
+    uint32_t sig = 0x52414d44; /* "DMAR" */
+
+    if ( dmar_table )
+        write_atomic((uint32_t*)&dmar_table->signature[0], sig);
 }
 
 void acpi_dmar_zap(void)
 {
-    if ( dmar_table == NULL )
-        return;
-    dmar_table->signature[0] = 'X';
-    dmar_table->checksum -= 'X'-'D';
+    uint32_t sig = 0x44414d52; /* "RMAD" - doesn't alter table checksum */
+
+    if ( dmar_table )
+        write_atomic((uint32_t*)&dmar_table->signature[0], sig);
 }
 
 int platform_supports_intremap(void)
