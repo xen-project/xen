@@ -1352,12 +1352,9 @@ int xc_domain_bind_pt_isa_irq(
                                   PT_IRQ_TYPE_ISA, 0, 0, 0, machine_irq));
 }
 
-#ifndef min
-#define min(X, Y) ({                             \
-            const typeof (X) _x = (X);           \
-            const typeof (Y) _y = (Y);           \
-            (void) (&_x == &_y);                 \
-            (_x < _y) ? _x : _y; })
+#ifndef min_t
+#define min_t(type,x,y) \
+    ({ type __x = (x); type __y = (y); __x < __y ? __x: __y; })
 #endif
 int xc_domain_memory_mapping(
     xc_interface *xch,
@@ -1380,7 +1377,7 @@ int xc_domain_memory_mapping(
     max_batch_sz = nr_mfns;
     do
     {
-        nr = min(nr_mfns - done, max_batch_sz);
+        nr = min_t(unsigned long, nr_mfns - done, max_batch_sz);
         domctl.u.memory_mapping.nr_mfns = nr;
         domctl.u.memory_mapping.first_gfn = first_gfn + done;
         domctl.u.memory_mapping.first_mfn = first_mfn + done;
@@ -1416,7 +1413,7 @@ int xc_domain_memory_mapping(
 
     return ret;
 }
-#undef min
+#undef min_t
 int xc_domain_ioport_mapping(
     xc_interface *xch,
     uint32_t domid,
