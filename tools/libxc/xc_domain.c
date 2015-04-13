@@ -2194,7 +2194,7 @@ int xc_domain_memory_mapping(
     max_batch_sz = nr_mfns;
     do
     {
-        nr = min(nr_mfns - done, max_batch_sz);
+        nr = min_t(unsigned long, nr_mfns - done, max_batch_sz);
         domctl.u.memory_mapping.nr_mfns = nr;
         domctl.u.memory_mapping.first_gfn = first_gfn + done;
         domctl.u.memory_mapping.first_mfn = first_mfn + done;
