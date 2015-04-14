@@ -50,7 +50,7 @@ thus look like this (`#` serving as comment character):
     
     [sle11sp2]
     options=console=vga,com1 com1=57600 loglvl=all noreboot
-    kernel=vmlinuz-3.0.31-0.4-xen ignore_loglevel #earlyprintk=xen
+    kernel=vmlinuz-3.0.31-0.4-xen [domain 0 command line options]
     ramdisk=initrd-3.0.31-0.4-xen
 
     **************************example end********************************
@@ -72,6 +72,12 @@ Line Options](xen-command-line.html).
 ###`kernel=<filename>[ <options>]`
 
 Specifies the Dom0 kernel binary and the options to pass to it.
+
+The options should in general be the same as is used when booting
+natively, e.g. including `root=...` etc.
+
+Check your bootloader (e.g. grub) configuration or `/proc/cmdline` for
+the native configuration.
 
 ###`ramdisk=<filename>`
 
