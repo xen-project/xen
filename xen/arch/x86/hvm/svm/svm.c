@@ -41,7 +41,6 @@
 #include <asm/msr.h>
 #include <asm/i387.h>
 #include <asm/iocap.h>
-#include <asm/spinlock.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>

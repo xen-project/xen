@@ -51,7 +51,6 @@
 #include <asm/xstate.h>
 #include <asm/traps.h>
 #include <asm/mc146818rtc.h>
-#include <asm/spinlock.h>
 #include <asm/mce.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vpt.h>
