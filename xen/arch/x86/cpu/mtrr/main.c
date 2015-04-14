@@ -36,6 +36,7 @@
 #include <xen/lib.h>
 #include <xen/smp.h>
 #include <xen/spinlock.h>
+#include <asm/atomic.h>
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
