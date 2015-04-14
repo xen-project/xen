@@ -26,10 +26,29 @@ struct psr_assoc {
 };
 
 struct psr_cmt *__read_mostly psr_cmt;
-static bool_t __initdata opt_psr;
+static unsigned int __initdata opt_psr;
 static unsigned int __initdata opt_rmid_max = 255;
 static uint64_t rmid_mask;
 static DEFINE_PER_CPU(struct psr_assoc, psr_assoc);
+
+static void __init parse_psr_bool(char *s, char *value, char *feature,
+                                  unsigned int mask)
+{
+    if ( !strcmp(s, feature) )
+    {
+        if ( !value )
+            opt_psr |= mask;
+        else
+        {
+            int val_int = parse_bool(value);
+
+            if ( val_int == 0 )
+                opt_psr &= ~mask;
+            else if ( val_int == 1 )
+                opt_psr |= mask;
+        }
+    }
+}
 
 static void __init parse_psr_param(char *s)
 {
@@ -44,21 +63,9 @@ static void __init parse_psr_param(char *s)
         if ( val_str )
             *val_str++ = '\0';
 
-        if ( !strcmp(s, "cmt") )
-        {
-            if ( !val_str )
-                opt_psr |= PSR_CMT;
-            else
-            {
-                int val_int = parse_bool(val_str);
-                if ( val_int == 1 )
-                    opt_psr |= PSR_CMT;
-                else if ( val_int != 0 )
-                    printk("PSR: unknown cmt value: %s - CMT disabled!\n",
-                                    val_str);
-            }
-        }
-        else if ( val_str && !strcmp(s, "rmid_max") )
+        parse_psr_bool(s, val_str, "cmt", PSR_CMT);
+
+        if ( val_str && !strcmp(s, "rmid_max") )
             opt_rmid_max = simple_strtoul(val_str, NULL, 0);
 
         s = ss + 1;
