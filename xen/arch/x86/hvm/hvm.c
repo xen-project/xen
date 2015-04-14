@@ -893,13 +893,6 @@ static void hvm_ioreq_server_enable(struct hvm_ioreq_server *s,
 
   done:
     spin_unlock(&s->lock);
-
-    /* This check is protected by the domain ioreq server lock. */
-    if ( d->arch.hvm_domain.ioreq_server.waiting )
-    {
-        d->arch.hvm_domain.ioreq_server.waiting = 0;
-        domain_unpause(d);
-    }
 }
 
 static void hvm_ioreq_server_disable(struct hvm_ioreq_server *s,
@@ -1451,20 +1444,6 @@ int hvm_domain_initialise(struct domain *d)
 
     spin_lock_init(&d->arch.hvm_domain.ioreq_server.lock);
     INIT_LIST_HEAD(&d->arch.hvm_domain.ioreq_server.list);
-    
-    /*
-     * In the case where a stub domain is providing emulation for
-     * the guest, there is no interlock in the toolstack to prevent
-     * the guest from running before the stub domain is ready.
-     * Hence the domain must remain paused until at least one ioreq
-     * server is created and enabled.
-     */
-    if ( !is_pvh_domain(d) )
-    {
-        domain_pause(d);
-        d->arch.hvm_domain.ioreq_server.waiting = 1;
-    }
-
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
     spin_lock_init(&d->arch.hvm_domain.uc_lock);
 

@@ -83,7 +83,6 @@ struct hvm_domain {
     struct {
         spinlock_t       lock;
         ioservid_t       id;
-        bool_t           waiting;
         struct list_head list;
     } ioreq_server;
     struct hvm_ioreq_server *default_ioreq_server;
