@@ -25,6 +25,7 @@
 #include <xen/errno.h>
 #include <xen/trace.h>
 #include <xen/cpu.h>
+#include <xen/keyhandler.h>
 
 #define d2printk(x...)
 //#define d2printk printk
@@ -1836,7 +1837,7 @@ csched2_dump_pcpu(const struct scheduler *ops, int cpu)
     unsigned long flags;
     spinlock_t *lock;
     int loop;
-    char cpustr[100];
+#define cpustr keyhandler_scratch
 
     /*
      * We need both locks:
@@ -1877,6 +1878,7 @@ csched2_dump_pcpu(const struct scheduler *ops, int cpu)
 
     spin_unlock(lock);
     spin_unlock_irqrestore(&prv->lock, flags);
+#undef cpustr
 }
 
 static void
@@ -1886,6 +1888,7 @@ csched2_dump(const struct scheduler *ops)
     struct csched2_private *prv = CSCHED2_PRIV(ops);
     unsigned long flags;
     int i, loop;
+#define cpustr keyhandler_scratch
 
     /* We need the private lock as we access global scheduler data
      * and (below) the list of active domains. */
@@ -1901,17 +1904,24 @@ csched2_dump(const struct scheduler *ops)
         
         fraction = prv->rqd[i].avgload * 100 / (1ULL<<prv->load_window_shift);
 
+        cpulist_scnprintf(cpustr, sizeof(cpustr), &prv->rqd[i].active);
         printk("Runqueue %d:\n"
                "\tncpus              = %u\n"
+               "\tcpus               = %s\n"
                "\tmax_weight         = %d\n"
                "\tinstload           = %d\n"
                "\taveload            = %3"PRI_stime"\n",
                i,
                cpumask_weight(&prv->rqd[i].active),
+               cpustr,
                prv->rqd[i].max_weight,
                prv->rqd[i].load,
                fraction);
 
+        cpumask_scnprintf(cpustr, sizeof(cpustr), &prv->rqd[i].idle);
+        printk("\tidlers: %s\n", cpustr);
+        cpumask_scnprintf(cpustr, sizeof(cpustr), &prv->rqd[i].tickled);
+        printk("\ttickled: %s\n", cpustr);
     }
 
     printk("Domain info:\n");
@@ -1942,6 +1952,7 @@ csched2_dump(const struct scheduler *ops)
     }
 
     spin_unlock_irqrestore(&prv->lock, flags);
+#undef cpustr
 }
 
 static void activate_runqueue(struct csched2_private *prv, int rqi)
