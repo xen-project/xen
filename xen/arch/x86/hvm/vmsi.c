@@ -286,11 +286,11 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
         goto out;
     }
 
-    /* exit to device model if address/data has been modified */
-    if ( test_and_clear_bit(nr_entry, &entry->table_flags) )
+    /* Exit to device model when unmasking and address/data got modified. */
+    if ( !(val & PCI_MSIX_VECTOR_BITMASK) &&
+         test_and_clear_bit(nr_entry, &entry->table_flags) )
     {
-        if ( !(val & PCI_MSIX_VECTOR_BITMASK) )
-            v->arch.hvm_vcpu.hvm_io.msix_unmask_address = address;
+        v->arch.hvm_vcpu.hvm_io.msix_unmask_address = address;
         goto out;
     }
 
