@@ -626,6 +626,7 @@ ENTRY(double_fault)
 
         .pushsection .init.text, "ax", @progbits
 ENTRY(early_page_fault)
+        movl  $TRAP_page_fault,4(%rsp)
         SAVE_ALL
         movq  %rsp,%rdi
         call  do_early_page_fault
