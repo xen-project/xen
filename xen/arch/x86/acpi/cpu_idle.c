@@ -200,6 +200,7 @@ static void do_get_hw_residencies(void *arg)
     /* Silvermont */
     case 0x37:
         GET_MC6_RES(hw_res->mc6);
+        /* fall through */
     case 0x4A:
     case 0x4D:
     case 0x5A:
