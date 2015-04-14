@@ -153,12 +153,15 @@ struct msixtbl_entry
     /* TODO: resolve the potential race by destruction of pdev */
     struct pci_dev *pdev;
     unsigned long gtable;       /* gpa of msix table */
-    unsigned long table_flags[BITS_TO_LONGS(MAX_MSIX_TABLE_ENTRIES)];
+    DECLARE_BITMAP(table_flags, MAX_MSIX_TABLE_ENTRIES);
 #define MAX_MSIX_ACC_ENTRIES 3
     unsigned int table_len;
     struct { 
         uint32_t msi_ad[3];	/* Shadow of address low, high and data */
     } gentries[MAX_MSIX_ACC_ENTRIES];
+    DECLARE_BITMAP(acc_valid, 3 * MAX_MSIX_ACC_ENTRIES);
+#define acc_bit(what, ent, slot, idx) \
+        what##_bit((slot) * 3 + (idx), (ent)->acc_valid)
     struct rcu_head rcu;
 };
 
@@ -233,9 +236,10 @@ static int msixtbl_read(
     if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
     {
         nr_entry = (address - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
-        if ( nr_entry >= MAX_MSIX_ACC_ENTRIES )
-            goto out;
         index = offset / sizeof(uint32_t);
+        if ( nr_entry >= MAX_MSIX_ACC_ENTRIES ||
+             !acc_bit(test, entry, nr_entry, index) )
+            goto out;
         *pval = entry->gentries[nr_entry].msi_ad[index];
     }
     else 
@@ -281,6 +285,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
         {
             index = offset / sizeof(uint32_t);
             entry->gentries[nr_entry].msi_ad[index] = val;
+            acc_bit(set, entry, nr_entry, index);
         }
         set_bit(nr_entry, &entry->table_flags);
         goto out;
