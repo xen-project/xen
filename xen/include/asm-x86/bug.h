@@ -5,6 +5,13 @@
 #define BUG_LINE_LO_WIDTH (31 - BUG_DISP_WIDTH)
 #define BUG_LINE_HI_WIDTH (31 - BUG_DISP_WIDTH)
 
+#define BUGFRAME_run_fn 0
+#define BUGFRAME_warn   1
+#define BUGFRAME_bug    2
+#define BUGFRAME_assert 3
+
+#ifndef __ASSEMBLY__
+
 struct bug_frame {
     signed int loc_disp:BUG_DISP_WIDTH;
     unsigned int line_hi:BUG_LINE_HI_WIDTH;
@@ -21,11 +28,6 @@ struct bug_frame {
                      (((b)->line_lo + ((b)->ptr_disp < 0)) &                 \
                       ((1 << BUG_LINE_LO_WIDTH) - 1)))
 #define bug_msg(b) ((const char *)(b) + (b)->msg_disp[1])
-
-#define BUGFRAME_run_fn 0
-#define BUGFRAME_warn   1
-#define BUGFRAME_bug    2
-#define BUGFRAME_assert 3
 
 #define BUG_FRAME(type, line, ptr, second_frame, msg) do {                   \
     BUILD_BUG_ON((line) >> (BUG_LINE_LO_WIDTH + BUG_LINE_HI_WIDTH));         \
@@ -65,5 +67,43 @@ extern const struct bug_frame __start_bug_frames[],
                               __stop_bug_frames_1[],
                               __stop_bug_frames_2[],
                               __stop_bug_frames_3[];
+
+#else  /* !__ASSEMBLY__ */
+
+/*
+ * Construct a bugframe, suitable for using in assembly code.  Should always
+ * match the C version above.  One complication is having to stash the strings
+ * in .rodata
+ */
+    .macro BUG_FRAME type, line, file_str, second_frame, msg
+    .L\@ud: ud2a
+
+    .pushsection .rodata.str1, "aMS", @progbits, 1
+         .L\@s1: .string8 "\file_str"
+    .popsection
+
+    .pushsection .bug_frames.\type, "a", @progbits
+        .L\@bf:
+        .long (.L\@ud - .L\@bf) + \
+               ((\line >> BUG_LINE_LO_WIDTH) << BUG_DISP_WIDTH)
+        .long (.L\@s1 - .L\@bf) + \
+               ((\line & ((1 << BUG_LINE_LO_WIDTH) - 1)) << BUG_DISP_WIDTH)
+
+        .if \second_frame
+            .pushsection .rodata.str1, "aMS", @progbits, 1
+                .L\@s2: .string8 "\msg"
+            .popsection
+            .long 0, (.L\@s2 - .L\@bf)
+        .endif
+    .popsection
+    .endm
+
+#define WARN BUG_FRAME BUGFRAME_warn, __LINE__, __FILE__, 0, 0
+#define BUG  BUG_FRAME BUGFRAME_bug,  __LINE__, __FILE__, 0, 0
+
+#define ASSERT_FAILED(msg)                                      \
+     BUG_FRAME BUGFRAME_assert, __LINE__, __FILE__, 1, msg
+
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __X86_BUG_H__ */
