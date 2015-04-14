@@ -6,6 +6,7 @@
 /* NB. Auto-generated from arch/.../asm-offsets.c */
 #include <asm/asm-offsets.h>
 #endif
+#include <asm/bug.h>
 #include <asm/processor.h>
 #include <asm/percpu.h>
 #include <xen/stringify.h>
@@ -26,18 +27,20 @@ void ret_from_intr(void);
 #endif
 
 #ifndef NDEBUG
-#define ASSERT_INTERRUPT_STATUS(x)              \
+#define ASSERT_INTERRUPT_STATUS(x, msg)         \
         pushf;                                  \
         testb $X86_EFLAGS_IF>>8,1(%rsp);        \
         j##x  1f;                               \
-        ud2a;                                   \
+        ASSERT_FAILED(msg);                     \
 1:      addq  $8,%rsp;
 #else
-#define ASSERT_INTERRUPT_STATUS(x)
+#define ASSERT_INTERRUPT_STATUS(x, msg)
 #endif
 
-#define ASSERT_INTERRUPTS_ENABLED  ASSERT_INTERRUPT_STATUS(nz)
-#define ASSERT_INTERRUPTS_DISABLED ASSERT_INTERRUPT_STATUS(z)
+#define ASSERT_INTERRUPTS_ENABLED \
+    ASSERT_INTERRUPT_STATUS(nz, "INTERRUPTS ENABLED")
+#define ASSERT_INTERRUPTS_DISABLED \
+    ASSERT_INTERRUPT_STATUS(z, "INTERRUPTS DISABLED")
 
 /*
  * This flag is set in an exception frame when registers R12-R15 did not get
