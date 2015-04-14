@@ -1206,12 +1206,25 @@ static void sedf_dump_domain(struct vcpu *d)
 /* Dumps all domains on the specified cpu */
 static void sedf_dump_cpu_state(const struct scheduler *ops, int i)
 {
+    struct sedf_priv_info *prv = SEDF_PRIV(ops);
     struct list_head      *list, *queue, *tmp;
     struct sedf_vcpu_info *d_inf;
     struct domain         *d;
     struct vcpu    *ed;
+    spinlock_t *lock;
+    unsigned long flags;
     int loop = 0;
  
+    /*
+     * We need both locks, as:
+     * - we access domains' parameters, which are protected by the
+     *   private scheduler lock;
+     * - we scan through the various queues, so we need the proper
+     *   runqueue lock (i.e., the one for this pCPU).
+     */
+    spin_lock_irqsave(&prv->lock, flags);
+    lock = pcpu_schedule_lock(i);
+
     printk("now=%"PRIu64"\n",NOW());
     queue = RUNQ(i);
     printk("RUNQ rq %lx   n: %lx, p: %lx\n",  (unsigned long)queue,
@@ -1275,6 +1288,9 @@ static void sedf_dump_cpu_state(const struct scheduler *ops, int i)
         }
     }
     rcu_read_unlock(&domlist_read_lock);
+
+    pcpu_schedule_unlock(lock, i);
+    spin_unlock_irqrestore(&prv->lock, flags);
 }
 
 

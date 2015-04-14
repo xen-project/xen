@@ -1515,6 +1515,8 @@ void schedule_dump(struct cpupool *c)
     struct scheduler *sched;
     cpumask_t        *cpus;
 
+    /* Locking, if necessary, must be handled withing each scheduler */
+
     sched = (c == NULL) ? &ops : c->sched;
     cpus = cpupool_scheduler_cpumask(c);
     printk("Scheduler: %s (%s)\n", sched->name, sched->opt_name);
@@ -1522,11 +1524,8 @@ void schedule_dump(struct cpupool *c)
 
     for_each_cpu (i, cpus)
     {
-        spinlock_t *lock = pcpu_schedule_lock(i);
-
         printk("CPU[%02d] ", i);
         SCHED_OP(sched, dump_cpu_state, i);
-        pcpu_schedule_unlock(lock, i);
     }
 }
 

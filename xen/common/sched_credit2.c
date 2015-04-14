@@ -51,8 +51,6 @@
  * credit2 wiki page:
  *  http://wiki.xen.org/wiki/Credit2_Scheduler_Development
  * TODO:
- * + Immediate bug-fixes
- *  - Do per-runqueue, grab proper lock for dump debugkey
  * + Multiple sockets
  *  - Detect cpu layout and make runqueue map, one per L2 (make_runq_map())
  *  - Simple load balancer / runqueue assignment
@@ -1832,12 +1830,24 @@ csched2_dump_vcpu(struct csched2_vcpu *svc)
 static void
 csched2_dump_pcpu(const struct scheduler *ops, int cpu)
 {
+    struct csched2_private *prv = CSCHED2_PRIV(ops);
     struct list_head *runq, *iter;
     struct csched2_vcpu *svc;
+    unsigned long flags;
+    spinlock_t *lock;
     int loop;
     char cpustr[100];
 
-    /* FIXME: Do locking properly for access to runqueue structures */
+    /*
+     * We need both locks:
+     * - csched2_dump_vcpu() wants to access domains' scheduling
+     *   parameters, which are protected by the private scheduler lock;
+     * - we scan through the runqueue, so we need the proper runqueue
+     *   lock (the one of the runqueue this cpu is associated to).
+     */
+    spin_lock_irqsave(&prv->lock, flags);
+    lock = per_cpu(schedule_data, cpu).schedule_lock;
+    spin_lock(lock);
 
     runq = &RQD(ops, cpu)->runq;
 
@@ -1864,6 +1874,9 @@ csched2_dump_pcpu(const struct scheduler *ops, int cpu)
             csched2_dump_vcpu(svc);
         }
     }
+
+    spin_unlock(lock);
+    spin_unlock_irqrestore(&prv->lock, flags);
 }
 
 static void
@@ -1871,7 +1884,12 @@ csched2_dump(const struct scheduler *ops)
 {
     struct list_head *iter_sdom, *iter_svc;
     struct csched2_private *prv = CSCHED2_PRIV(ops);
+    unsigned long flags;
     int i, loop;
+
+    /* We need the private lock as we access global scheduler data
+     * and (below) the list of active domains. */
+    spin_lock_irqsave(&prv->lock, flags);
 
     printk("Active queues: %d\n"
            "\tdefault-weight     = %d\n",
@@ -1895,7 +1913,6 @@ csched2_dump(const struct scheduler *ops)
                fraction);
 
     }
-    /* FIXME: Locking! */
 
     printk("Domain info:\n");
     loop = 0;
@@ -1904,20 +1921,27 @@ csched2_dump(const struct scheduler *ops)
         struct csched2_dom *sdom;
         sdom = list_entry(iter_sdom, struct csched2_dom, sdom_elem);
 
-       printk("\tDomain: %d w %d v %d\n\t", 
-              sdom->dom->domain_id, 
-              sdom->weight, 
-              sdom->nr_vcpus);
+        printk("\tDomain: %d w %d v %d\n\t",
+               sdom->dom->domain_id,
+               sdom->weight,
+               sdom->nr_vcpus);
 
         list_for_each( iter_svc, &sdom->vcpu )
         {
             struct csched2_vcpu *svc;
+            spinlock_t *lock;
+
             svc = list_entry(iter_svc, struct csched2_vcpu, sdom_elem);
+            lock = vcpu_schedule_lock(svc->vcpu);
 
             printk("\t%3d: ", ++loop);
             csched2_dump_vcpu(svc);
+
+            vcpu_schedule_unlock(lock, svc->vcpu);
         }
     }
+
+    spin_unlock_irqrestore(&prv->lock, flags);
 }
 
 static void activate_runqueue(struct csched2_private *prv, int rqi)

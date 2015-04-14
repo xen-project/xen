@@ -253,9 +253,12 @@ rt_dump_vcpu(const struct scheduler *ops, const struct rt_vcpu *svc)
 static void
 rt_dump_pcpu(const struct scheduler *ops, int cpu)
 {
-    struct rt_vcpu *svc = rt_vcpu(curr_on_cpu(cpu));
+    struct rt_private *prv = rt_priv(ops);
+    unsigned long flags;
 
-    rt_dump_vcpu(ops, svc);
+    spin_lock_irqsave(&prv->lock, flags);
+    rt_dump_vcpu(ops, rt_vcpu(curr_on_cpu(cpu)));
+    spin_unlock_irqrestore(&prv->lock, flags);
 }
 
 static void

@@ -26,6 +26,23 @@
 
 
 /*
+ * Locking:
+ * - Scheduler-lock (a.k.a. runqueue lock):
+ *  + is per-runqueue, and there is one runqueue per-cpu;
+ *  + serializes all runqueue manipulation operations;
+ * - Private data lock (a.k.a. private scheduler lock):
+ *  + serializes accesses to the scheduler global state (weight,
+ *    credit, balance_credit, etc);
+ *  + serializes updates to the domains' scheduling parameters.
+ *
+ * Ordering is "private lock always comes first":
+ *  + if we need both locks, we must acquire the private
+ *    scheduler lock for first;
+ *  + if we already own a runqueue lock, we must never acquire
+ *    the private scheduler lock.
+ */
+
+/*
  * Basic constants
  */
 #define CSCHED_DEFAULT_WEIGHT       256
@@ -1750,10 +1767,23 @@ static void
 csched_dump_pcpu(const struct scheduler *ops, int cpu)
 {
     struct list_head *runq, *iter;
+    struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_pcpu *spc;
     struct csched_vcpu *svc;
+    spinlock_t *lock = lock;
+    unsigned long flags;
     int loop;
 #define cpustr keyhandler_scratch
+
+    /*
+     * We need both locks:
+     * - csched_dump_vcpu() wants to access domains' scheduling
+     *   parameters, which are protected by the private scheduler lock;
+     * - we scan through the runqueue, so we need the proper runqueue
+     *   lock (the one of the runqueue of this cpu).
+     */
+    spin_lock_irqsave(&prv->lock, flags);
+    lock = pcpu_schedule_lock(cpu);
 
     spc = CSCHED_PCPU(cpu);
     runq = &spc->runq;
@@ -1781,6 +1811,9 @@ csched_dump_pcpu(const struct scheduler *ops, int cpu)
             csched_dump_vcpu(svc);
         }
     }
+
+    pcpu_schedule_unlock(lock, cpu);
+    spin_unlock_irqrestore(&prv->lock, flags);
 #undef cpustr
 }
 
@@ -1792,7 +1825,7 @@ csched_dump(const struct scheduler *ops)
     int loop;
     unsigned long flags;
 
-    spin_lock_irqsave(&(prv->lock), flags);
+    spin_lock_irqsave(&prv->lock, flags);
 
 #define idlers_buf keyhandler_scratch
 
@@ -1835,15 +1868,20 @@ csched_dump(const struct scheduler *ops)
         list_for_each( iter_svc, &sdom->active_vcpu )
         {
             struct csched_vcpu *svc;
+            spinlock_t *lock;
+
             svc = list_entry(iter_svc, struct csched_vcpu, active_vcpu_elem);
+            lock = vcpu_schedule_lock(svc->vcpu);
 
             printk("\t%3d: ", ++loop);
             csched_dump_vcpu(svc);
+
+            vcpu_schedule_unlock(lock, svc->vcpu);
         }
     }
 #undef idlers_buf
 
-    spin_unlock_irqrestore(&(prv->lock), flags);
+    spin_unlock_irqrestore(&prv->lock, flags);
 }
 
 static int
