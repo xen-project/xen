@@ -195,6 +195,7 @@ inline int unpack3_UINT32(BYTE* ptr, UINT32* pos, UINT32 max, UINT32 *t)
 #define unpack3_TPM_PHYSICAL_PRESENCE(p, l, m, t) unpack3_UINT16(p, l, m, t)
 #define unpack3_TPM_KEY_FLAGS(p, l, m, t) unpack3_UINT32(p, l, m, t)
 #define unpack3_TPM_LOCALITY_SELECTION(p, l, m, t) unpack3_BYTE(p, l, m, t)
+#define unpack3_TPM_DEEP_QUOTE_INFO(p, l, m, t) unpack3_UINT32(p, l, m, t)
 
 #define sizeof_TPM_RESULT(t) sizeof_UINT32(t)
 #define sizeof_TPM_PCRINDEX(t) sizeof_UINT32(t)

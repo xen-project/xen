@@ -128,6 +128,55 @@ static int do_load_aik(struct mem_group *group, TPM_HANDLE *handle)
 	return TPM_LoadKey(TPM_SRK_KEYHANDLE, &key, handle, (void*)&vtpm_globals.srk_auth, &vtpm_globals.oiap);
 }
 
+static void do_vtpminfo_hash(uint32_t extra_info_flags,struct mem_group *group,
+	const void* uuid, const uint8_t* kern_hash,unsigned char** calc_hashes)
+{
+	int i;
+	sha1_context ctx;
+	if(extra_info_flags & VTPM_QUOTE_FLAGS_HASH_UUID){
+		printk("hashing for FLAGS_HASH_UUID: ");
+		sha1_starts(&ctx);
+		if(uuid){
+			printk("true");
+			sha1_update(&ctx, (void*)uuid, 16);
+		}
+		sha1_finish(&ctx, *calc_hashes);
+		*calc_hashes = *calc_hashes + 20;
+		printk("\n");
+	}
+	if(extra_info_flags & VTPM_QUOTE_FLAGS_VTPM_MEASUREMENTS){
+		printk("hashing for VTPM_QUOTE_FLAGS_VTPM_MEASUREMENTS: ");
+		sha1_starts(&ctx);
+		if(kern_hash){
+			printk("true");
+			sha1_update(&ctx, (void*)kern_hash, 20);
+		}
+		sha1_finish(&ctx, *calc_hashes);
+		*calc_hashes = *calc_hashes + 20;
+		printk("\n");
+	}
+	if(extra_info_flags & VTPM_QUOTE_FLAGS_GROUP_INFO){
+		printk("hashing for VTPM_QUOTE_FLAGS_GROUP_INFO: true\n");
+		sha1_starts(&ctx);
+		sha1_update(&ctx, (void*)&group->id_data.saa_pubkey, sizeof(group->id_data.saa_pubkey));
+		sha1_update(&ctx, (void*)&group->details.cfg_seq, 8);
+		sha1_update(&ctx, (void*)&group->seal_bits.nr_cfgs, 4);
+		for(i=0; i < group->nr_seals; i++)
+			sha1_update(&ctx, (void*)&group->seals[i].digest_release, 20);
+		sha1_update(&ctx, (void*)&group->seal_bits.nr_kerns, 4);
+		sha1_update(&ctx, (void*)&group->seal_bits.kernels, 20 * be32_native(group->seal_bits.nr_kerns));
+		sha1_finish(&ctx, *calc_hashes);
+		*calc_hashes = *calc_hashes + 20;
+	}
+	if(extra_info_flags & VTPM_QUOTE_FLAGS_GROUP_PUBKEY){
+		printk("hashing for VTPM_QUOTE_FLAGS_GROUP_PUBKEY: true\n");
+		sha1_starts(&ctx);
+		sha1_update(&ctx, (void*)&group->id_data.saa_pubkey, sizeof(group->id_data.saa_pubkey));
+		sha1_finish(&ctx, *calc_hashes);
+		*calc_hashes = *calc_hashes + 20;
+	}
+}
+
 /* 
  * Sets up resettable PCRs for a vTPM deep quote request
  */
@@ -273,18 +322,40 @@ int group_do_activate(struct mem_group *group, void* blob, int blobSize,
 
 int vtpm_do_quote(struct mem_group *group, const uuid_t uuid,
 	const uint8_t* kern_hash, const struct tpm_authdata *data, TPM_PCR_SELECTION *sel,
-	void* pcr_out, uint32_t *pcr_size, void* sig_out)
+	uint32_t extra_info_flags, void* pcr_out, uint32_t *pcr_size, void* sig_out)
 {
 	TPM_HANDLE handle;
 	TPM_AUTH_SESSION oiap = TPM_AUTH_SESSION_INIT;
 	TPM_PCR_COMPOSITE pcrs;
 	BYTE* sig;
 	UINT32 size;
-	int rc;
+	sha1_context ctx;
+	TPM_DIGEST externData;
+	const void* data_to_quote = data;
+	unsigned char* ppcr_out = (unsigned char*)pcr_out;
+	unsigned char** pcr_outv = (unsigned char**)&ppcr_out;
 
-	rc = do_pcr_setup(group, uuid, kern_hash);
-	if (rc)
-		return rc;
+	int rc;
+	printk("Extra Info Flags =0x%x\n",extra_info_flags);
+	if((extra_info_flags & ~VTPM_QUOTE_FLAGS_HASH_UUID
+		& ~VTPM_QUOTE_FLAGS_VTPM_MEASUREMENTS
+		& ~VTPM_QUOTE_FLAGS_GROUP_INFO
+		& ~VTPM_QUOTE_FLAGS_GROUP_PUBKEY) != 0)
+		return VTPM_INVALID_REQUEST;
+
+	sha1_starts(&ctx);
+	sha1_update(&ctx, (void*)&extra_info_flags, 4);
+	sha1_update(&ctx, (void*)data, 20);
+	if(pcr_out!=NULL && extra_info_flags!=0)
+	{
+		/*creates hashes and sets them to pcr_out*/
+		do_vtpminfo_hash(extra_info_flags,group, uuid, kern_hash, pcr_outv);
+		*pcr_size = *pcr_outv - (unsigned char*)pcr_out;
+		if(*pcr_size > 0)
+			sha1_update(&ctx, pcr_out, *pcr_size);
+	}
+	sha1_finish(&ctx, externData.digest);
+	data_to_quote = (void*)externData.digest;
 
 	rc = do_load_aik(group, &handle);
 	if (rc)
@@ -296,8 +367,7 @@ int vtpm_do_quote(struct mem_group *group, const uuid_t uuid,
 		return rc;
 	}
 
-	rc = TPM_Quote(handle, (void*)data, sel, (void*)&group->aik_authdata, &oiap, &pcrs, &sig, &size);
-	printk("TPM_Quote: %d\n", rc);
+	rc = TPM_Quote(handle, data_to_quote, sel, (void*)&group->aik_authdata, &oiap, &pcrs, &sig, &size);
 
 	TPM_TerminateHandle(oiap.AuthHandle);
 	TPM_FlushSpecific(handle, TPM_RT_KEY);
@@ -306,16 +376,19 @@ int vtpm_do_quote(struct mem_group *group, const uuid_t uuid,
 		return rc;
 	if (size != 256) {
 		printk("Bad size\n");
-		return TPM_FAIL;
+		rc = TPM_FAIL;
+		goto end;
 	}
 
 	if (pcr_out) {
-		*pcr_size = pcrs.valueSize;
-		memcpy(pcr_out, pcrs.pcrValue, *pcr_size);
+		/*append TPM_PCRVALUEs after externData hashes*/
+		memcpy(pcr_out+*pcr_size, pcrs.pcrValue, pcrs.valueSize);
+		*pcr_size = *pcr_size + pcrs.valueSize;
 	}
 
 	memcpy(sig_out, sig, size);
 
+end:
 	free_TPM_PCR_COMPOSITE(&pcrs);
 	free(sig);
 

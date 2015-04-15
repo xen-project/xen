@@ -282,9 +282,11 @@ static TPM_RESULT vtpmmgr_GetQuote(struct tpm_opaque *opq, tpmcmd_t* tpmcmd)
 	void *ibuf;
 	uint32_t pcr_size;
 	TPM_PCR_SELECTION sel;
+	uint32_t extra_info_flags;
 
 	UNPACK_IN(VPTR, &ibuf, 20, UNPACK_ALIAS);
 	UNPACK_IN(TPM_PCR_SELECTION, &sel, UNPACK_ALIAS);
+	UNPACK_IN(TPM_DEEP_QUOTE_INFO, &extra_info_flags);
 	UNPACK_DONE();
 
 	if (!opq->vtpm) {
@@ -297,7 +299,7 @@ static TPM_RESULT vtpmmgr_GetQuote(struct tpm_opaque *opq, tpmcmd_t* tpmcmd)
 		printk("%02x", ((uint8_t*)ibuf)[i]);
 	printk("\n");
 
-	status = vtpm_do_quote(opq->group, *opq->uuid, opq->kern_hash, ibuf, &sel, PACK_BUF + 256, &pcr_size, PACK_BUF);
+	status = vtpm_do_quote(opq->group, *opq->uuid, opq->kern_hash, ibuf, &sel, extra_info_flags, PACK_BUF + 256, &pcr_size, PACK_BUF);
 	if (status)
 		goto abort_egress;
 	tpmcmd->resp_len += 256 + pcr_size;
@@ -529,6 +531,7 @@ static TPM_RESULT vtpmmgr_GroupRegister(tpmcmd_t* tpmcmd)
 	sha1_context ctx;
 	TPM_PCR_SELECTION sel;
 	void *dhkx1, *dhkx2, *gk, *sig;
+	uint32_t extra_info_flags = 0;
 
 	UNPACK_GROUP(group);
 	UNPACK_IN(VPTR, &dhkx1, 256, UNPACK_ALIAS);
@@ -567,7 +570,7 @@ static TPM_RESULT vtpmmgr_GroupRegister(tpmcmd_t* tpmcmd)
 	sha1_update(&ctx, dhkx2, 256 + 32);
 	sha1_finish(&ctx, digest.bits);
 
-	status = vtpm_do_quote(group, NULL, NULL, &digest, &sel, NULL, NULL, PACK_BUF);
+	status = vtpm_do_quote(group, NULL, NULL, &digest, &sel, extra_info_flags,NULL, NULL, PACK_BUF);
 	tpmcmd->resp_len += 256;
 
 	CMD_END;

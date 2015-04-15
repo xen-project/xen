@@ -46,6 +46,12 @@
 // Header size
 #define VTPM_COMMAND_HEADER_SIZE ( 2 + 4 + 4)
 
+//************************ Command Params ***************************
+#define VTPM_QUOTE_FLAGS_HASH_UUID                  0x00000001
+#define VTPM_QUOTE_FLAGS_VTPM_MEASUREMENTS          0x00000002
+#define VTPM_QUOTE_FLAGS_GROUP_INFO                 0x00000004
+#define VTPM_QUOTE_FLAGS_GROUP_PUBKEY               0x00000008
+
 //************************ Command Codes ****************************
 #define VTPM_ORD_BASE       0x0000
 #define TPM_VENDOR_COMMAND  0x02000000 // TPM Main, part 2, section 17.
@@ -110,6 +116,23 @@
  * Get a hardware TPM quote for this vTPM.  The quote will use the AIK
  * associated with the group this vTPM was created in. Values specific to the
  * vTPM will be extended to certain resettable PCRs.
+ * Additional info can be included when creating the signature by using
+ * quoteSelect as PCR selection and by setting flags param. The externData
+ * param for TPM_Quote is calculated as:
+ * externData = SHA1 (
+ *       extraInfoFlags
+ *       requestData
+ *       [SHA1 (
+ *          [SHA1 (UUIDs if requested)]
+ *          [SHA1 (vTPM measurements if requested)]
+ *          [SHA1 (vTPM group update policy if requested)]
+ *          [SHA1 (vTPM group public key if requested)]
+ *       ) if flags !=0 ]
+ * )
+ * The response param pcrValues is an array containing requested hashes used
+ * for externData calculation : UUIDs, vTPM measurements, vTPM group update
+ * policy, group public key. At the end of these hashes the PCR values are
+ * appended.
  *
  * Input:
  *  TPM_TAG         tag          VTPM_TAG_REQ
@@ -117,12 +140,14 @@
  *  UINT32          ordinal      VTPM_ORD_GET_QUOTE
  *  TPM_NONCE       externData   Data to be quoted
  *  PCR_SELECTION   quoteSelect  PCR selection for quote.
+ *  UINT32          flags        Bit mask of VTPM_QUOTE_FLAGS_*
  * Output:
  *  TPM_TAG         tag          VTPM_TAG_RSP
  *  UINT32          paramSize    total size
  *  UINT32          status       return code
  *  BYTE[]          signature    256 bytes of signature data
- *  TPM_PCRVALUE[]  pcrValues    Values of PCRs selected by the request
+ *  TPM_PCRVALUE[]  pcrValues    Values of additional SHA1 hashes requested,
+ *                               concatenated with PCRs selected by the request
  */
 #define VTPM_ORD_GET_QUOTE        (VTPM_ORD_BASE + 4)
 
