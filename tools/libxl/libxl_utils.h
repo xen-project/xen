@@ -90,6 +90,12 @@ int libxl_bitmap_test(const libxl_bitmap *bitmap, int bit);
 void libxl_bitmap_set(libxl_bitmap *bitmap, int bit);
 void libxl_bitmap_reset(libxl_bitmap *bitmap, int bit);
 int libxl_bitmap_count_set(const libxl_bitmap *bitmap);
+int libxl_bitmap_or(libxl_ctx *ctx, libxl_bitmap *or_map,
+                    const libxl_bitmap *map1,
+                    const libxl_bitmap *map2);
+int libxl_bitmap_and(libxl_ctx *ctx, libxl_bitmap *and_map,
+                     const libxl_bitmap *map1,
+                     const libxl_bitmap *map2);
 char *libxl_bitmap_to_hex_string(libxl_ctx *ctx, const libxl_bitmap *bitmap);
 static inline void libxl_bitmap_set_any(libxl_bitmap *bitmap)
 {

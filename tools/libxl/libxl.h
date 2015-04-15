@@ -100,6 +100,15 @@
 #define LIBXL_HAVE_CPUPOOL_ADD_REM_CPUMAP 1
 
 /*
+ *
+ * LIBXL_HAVE_BITMAP_AND_OR
+ *
+ * If this is defined, libxl has two library functions, libxl_bitmap_and
+ * and libxl_bitmap_or to compute the logical and and or of two bitmaps
+ */
+#define LIBXL_HAVE_BITMAP_AND_OR 1
+
+/*
  * LIBXL_HAVE_FIRMWARE_PASSTHROUGH indicates the feature for
  * passing in SMBIOS and ACPI firmware to HVM guests is present
  * in the library.

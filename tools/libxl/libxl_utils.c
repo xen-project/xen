@@ -691,6 +691,76 @@ void libxl_bitmap_reset(libxl_bitmap *bitmap, int bit)
     bitmap->map[bit / 8] &= ~(1 << (bit & 7));
 }
 
+int libxl_bitmap_or(libxl_ctx *ctx, libxl_bitmap *or_map,
+                    const libxl_bitmap *map1, const libxl_bitmap *map2)
+{
+    GC_INIT(ctx);
+    int rc;
+    uint32_t i;
+    const libxl_bitmap *large_map;
+    const libxl_bitmap *small_map;
+
+    if (map1->size > map2->size) {
+        large_map = map1;
+        small_map = map2;
+    } else {
+        large_map = map2;
+        small_map = map1;
+    }
+
+    rc = libxl_bitmap_alloc(ctx, or_map, large_map->size * 8);
+    if (rc)
+        goto out;
+
+    /*
+     *  If bitmaps aren't the same size, their union (logical or) will
+     *  be size of larger bit map.  Any bit past the end of the
+     *  smaller bit map, will match the larger one.
+     */
+    for (i = 0; i < small_map->size; i++)
+        or_map->map[i] = (small_map->map[i] | large_map->map[i]);
+
+    for (i = small_map->size; i < large_map->size; i++)
+        or_map->map[i] = large_map->map[i];
+
+out:
+    GC_FREE;
+    return rc;
+}
+
+int libxl_bitmap_and(libxl_ctx *ctx, libxl_bitmap *and_map,
+                     const libxl_bitmap *map1, const libxl_bitmap *map2)
+{
+    GC_INIT(ctx);
+    int rc;
+    uint32_t i;
+    const libxl_bitmap *large_map;
+    const libxl_bitmap *small_map;
+
+    if (map1->size > map2->size) {
+        large_map = map1;
+        small_map = map2;
+    } else {
+        large_map = map2;
+        small_map = map1;
+    }
+
+    rc = libxl_bitmap_alloc(ctx, and_map, small_map->size * 8);
+    if (rc)
+        goto out;
+
+    /*
+     *  If bitmaps aren't same size, their 'and' will be size of
+     *  smaller bit map
+     */
+    for (i = 0; i < and_map->size; i++)
+        and_map->map[i] = (large_map->map[i] & small_map->map[i]);
+
+out:
+    GC_FREE;
+    return rc;
+}
+
 int libxl_bitmap_count_set(const libxl_bitmap *bitmap)
 {
     int i, nr_set_bits = 0;
