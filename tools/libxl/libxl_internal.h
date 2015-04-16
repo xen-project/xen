@@ -1587,6 +1587,10 @@ _hidden int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
                                    libxl_device_disk *disk,
                                    libxl__device *device);
 
+/* Calls poll() again - useful to check whether a signaled condition
+ * is still true.  Cannot fail.  Returns currently-true revents. */
+_hidden short libxl__fd_poll_recheck(libxl__egc *egc, int fd, short events);
+
 _hidden char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid);
 
 struct libxl__xen_console_reader {
