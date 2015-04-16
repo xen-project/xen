@@ -177,6 +177,9 @@ typedef void libxl__ev_fd_callback(libxl__egc *egc, libxl__ev_fd *ev,
    *
    * It is not permitted to listen for the same or overlapping events
    * on the same fd using multiple different libxl__ev_fd's.
+   *
+   * (Spurious wakeups, and spurious bits set in revents, are
+   * suppressed by the libxl event core.)
    */
 struct libxl__ev_fd {
     /* caller should include this in their own struct */

@@ -1121,12 +1121,15 @@ static int afterpoll_check_fd(libxl__poller *poller,
     return revents;
 }
 
-static void fd_occurs(libxl__egc *egc, libxl__ev_fd *efd, short revents)
+static void fd_occurs(libxl__egc *egc, libxl__ev_fd *efd, short revents_ign)
 {
-    DBG("ev_fd=%p occurs fd=%d events=%x revents=%x",
-        efd, efd->fd, efd->events, revents);
+    short revents_current = libxl__fd_poll_recheck(egc, efd->fd, efd->events);
 
-    efd->func(egc, efd, efd->fd, efd->events, revents);
+    DBG("ev_fd=%p occurs fd=%d events=%x revents_ign=%x revents_current=%x",
+        efd, efd->fd, efd->events, revents_ign, revents_current);
+
+    if (revents_current)
+        efd->func(egc, efd, efd->fd, efd->events, revents_current);
 }
 
 static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
@@ -1255,10 +1258,7 @@ void libxl_osevent_occurred_fd(libxl_ctx *ctx, void *for_libxl,
     if (!ev) goto out;
     if (ev->fd != fd) goto out;
 
-    short current_revents = libxl__fd_poll_recheck(egc, ev->fd, ev->events);
-
-    if (current_revents)
-        ev->func(egc, ev, fd, ev->events, current_revents);
+    fd_occurs(egc, ev, revents_ign);
 
  out:
     CTX_UNLOCK;
