@@ -1121,6 +1121,14 @@ static int afterpoll_check_fd(libxl__poller *poller,
     return revents;
 }
 
+static void fd_occurs(libxl__egc *egc, libxl__ev_fd *efd, short revents)
+{
+    DBG("ev_fd=%p occurs fd=%d events=%x revents=%x",
+        efd, efd->fd, efd->events, revents);
+
+    efd->func(egc, efd, efd->fd, efd->events, revents);
+}
+
 static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
                                int nfds, const struct pollfd *fds,
                                struct timeval now)
@@ -1183,10 +1191,7 @@ static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
         break;
 
     found_fd_event:
-        DBG("ev_fd=%p occurs fd=%d events=%x revents=%x",
-            efd, efd->fd, efd->events, revents);
-
-        efd->func(egc, efd, efd->fd, efd->events, revents);
+        fd_occurs(egc, efd, revents);
     }
 
     if (afterpoll_check_fd(poller,fds,nfds, poller->wakeup_pipe[0],POLLIN)) {
