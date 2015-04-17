@@ -189,6 +189,8 @@ static inline bool_t __init dmi_checksum(const void __iomem *buf,
 
 static u32 __initdata efi_dmi_address;
 static u32 __initdata efi_dmi_size;
+static u32 __initdata efi_smbios_address;
+static u32 __initdata efi_smbios_size;
 static u64 __initdata efi_smbios3_address;
 static u32 __initdata efi_smbios3_size;
 
@@ -201,7 +203,7 @@ void __init dmi_efi_get_table(const void *smbios, const void *smbios3)
 	const struct smbios_eps *eps = smbios;
 	const struct smbios3_eps *eps3 = smbios3;
 
-	if (eps3 && memcmp(eps3->anchor, "_SM3_", 5) &&
+	if (eps3 && memcmp(eps3->anchor, "_SM3_", 5) == 0 &&
 	    eps3->length >= sizeof(*eps3) &&
 	    dmi_checksum(eps3, eps3->length)) {
 		efi_smbios3_address = eps3->address;
@@ -209,13 +211,17 @@ void __init dmi_efi_get_table(const void *smbios, const void *smbios3)
 		return;
 	}
 
-	if (eps && memcmp(eps->anchor, "_SM_", 4) &&
+	if (eps && memcmp(eps->anchor, "_SM_", 4) == 0 &&
 	    eps->length >= sizeof(*eps) &&
-	    dmi_checksum(eps, eps->length) &&
-	    memcmp(eps->dmi.anchor, "_DMI_", 5) == 0 &&
-	    dmi_checksum(&eps->dmi, sizeof(eps->dmi))) {
-		efi_dmi_address = eps->dmi.address;
-		efi_dmi_size = eps->dmi.size;
+	    dmi_checksum(eps, eps->length)) {
+		efi_smbios_address = (u32)(long)eps;
+		efi_smbios_size = eps->length;
+
+		if (memcmp(eps->dmi.anchor, "_DMI_", 5) == 0 &&
+		    dmi_checksum(&eps->dmi, sizeof(eps->dmi))) {
+			efi_dmi_address = eps->dmi.address;
+			efi_dmi_size = eps->dmi.size;
+		}
 	}
 }
 
@@ -235,6 +241,12 @@ const char *__init dmi_get_table(paddr_t *base, u32 *len)
 			*len = efi_dmi_size;
 			instance |= 2;
 			return "DMI";
+		}
+		if (efi_smbios_size && !(instance & 4)) {
+			*base = efi_smbios_address;
+			*len = efi_smbios_size;
+			instance |= 4;
+			return "SMBIOS";
 		}
 	} else {
 		char __iomem *p = maddr_to_virt(0xF0000), *q;
