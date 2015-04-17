@@ -30,6 +30,7 @@ struct cmd_spec cmd_table[] = {
       "-n, --dryrun            Dry run - prints the resulting configuration\n"
       "                         (deprecated in favour of global -N option).\n"
       "-d                      Enable debug messages.\n"
+      "-F                      Run in foreground until death of the domain.\n"
       "-e                      Do not wait in the background for the death of the domain.\n"
       "-V, --vncviewer         Connect to the VNC display after the domain is created.\n"
       "-A, --vncviewer-autopass\n"
