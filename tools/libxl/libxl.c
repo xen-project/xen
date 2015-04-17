@@ -1698,7 +1698,7 @@ static void devices_destroy_cb(libxl__egc *egc,
             _exit(-1);
         }
     }
-    LOG(INFO, "forked pid %ld for destroy of domain %d", (long)rc, domid);
+    LOG(DEBUG, "forked pid %ld for destroy of domain %d", (long)rc, domid);
 
     return;
 
