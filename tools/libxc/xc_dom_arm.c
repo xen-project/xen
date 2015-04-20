@@ -26,9 +26,10 @@
 #include "xg_private.h"
 #include "xc_dom.h"
 
-#define NR_MAGIC_PAGES 2
+#define NR_MAGIC_PAGES 3
 #define CONSOLE_PFN_OFFSET 0
 #define XENSTORE_PFN_OFFSET 1
+#define MEMACCESS_PFN_OFFSET 2
 
 #define LPAE_SHIFT 9
 
@@ -87,10 +88,13 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
 
     xc_clear_domain_page(dom->xch, dom->guest_domid, dom->console_pfn);
     xc_clear_domain_page(dom->xch, dom->guest_domid, dom->xenstore_pfn);
+    xc_clear_domain_page(dom->xch, dom->guest_domid, base + MEMACCESS_PFN_OFFSET);
     xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_CONSOLE_PFN,
             dom->console_pfn);
     xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_STORE_PFN,
             dom->xenstore_pfn);
+    xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_MONITOR_RING_PFN,
+            base + MEMACCESS_PFN_OFFSET);
     /* allocated by toolstack */
     xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_CONSOLE_EVTCHN,
             dom->console_evtchn);
