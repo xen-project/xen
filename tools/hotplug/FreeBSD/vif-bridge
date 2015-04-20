@@ -22,6 +22,8 @@ action=$2
 case $action in
 add)
 	bridge=$(xenstore-read "$path/bridge")
+	mtu=$(ifconfig $bridge | sed -n 's/.*mtu \([0-9]*\)$/\1/p')
+	ifconfig $iface_dev mtu $mtu
 	ifconfig $bridge addm $iface_dev
 	ifconfig $iface_dev up
 	exit 0
