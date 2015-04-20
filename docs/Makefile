@@ -116,8 +116,7 @@ html/index.html: $(DOC_HTML) $(CURDIR)/gen-html-index INDEX
 html/%.html: %.markdown
 	$(INSTALL_DIR) $(@D)
 ifdef MARKDOWN
-	$(MARKDOWN) $< > $@.tmp ; \
-	$(call move-if-changed,$@.tmp,$@)
+	$(MARKDOWN) $< > $@
 else
 	@echo "markdown not installed; skipping $*.html."
 endif
@@ -129,8 +128,7 @@ html/%.txt: %.txt
 html/man/%.1.html: man/%.pod.1 Makefile
 	$(INSTALL_DIR) $(@D)
 ifdef POD2HTML
-	$(POD2HTML) --infile=$< --outfile=$@.tmp
-	$(call move-if-changed,$@.tmp,$@)
+	$(POD2HTML) --infile=$< --outfile=$@
 else
 	@echo "pod2html not installed; skipping $<."
 endif
@@ -138,8 +136,7 @@ endif
 html/man/%.5.html: man/%.pod.5 Makefile
 	$(INSTALL_DIR) $(@D)
 ifdef POD2HTML
-	$(POD2HTML) --infile=$< --outfile=$@.tmp
-	$(call move-if-changed,$@.tmp,$@)
+	$(POD2HTML) --infile=$< --outfile=$@
 else
 	@echo "pod2html not installed; skipping $<."
 endif
@@ -161,19 +158,16 @@ html/hypercall/%/index.html: $(CURDIR)/xen-headers Makefile
 
 txt/%.txt: %.txt
 	$(INSTALL_DIR) $(@D)
-	cp $< $@.tmp
-	$(call move-if-changed,$@.tmp,$@)
+	$(INSTALL_DATA) $< $@
 
 txt/%.txt: %.markdown
 	$(INSTALL_DIR) $(@D)
-	cp $< $@.tmp
-	$(call move-if-changed,$@.tmp,$@)
+	$(INSTALL_DATA) $< $@
 
 txt/man/%.1.txt: man/%.pod.1 Makefile
 	$(INSTALL_DIR) $(@D)
 ifdef POD2TEXT
-	$(POD2TEXT) $< $@.tmp
-	$(call move-if-changed,$@.tmp,$@)
+	$(POD2TEXT) $< $@
 else
 	@echo "pod2text not installed; skipping $<."
 endif
@@ -181,8 +175,7 @@ endif
 txt/man/%.5.txt: man/%.pod.5 Makefile
 	$(INSTALL_DIR) $(@D)
 ifdef POD2TEXT
-	$(POD2TEXT) $< $@.tmp
-	$(call move-if-changed,$@.tmp,$@)
+	$(POD2TEXT) $< $@
 else
 	@echo "pod2text not installed; skipping $<."
 endif
