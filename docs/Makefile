@@ -103,39 +103,39 @@ install: install-man-pages install-html
 
 # Individual file build targets
 man1/%.1: man/%.pod.1 Makefile
-	$(INSTALL_DIR) $(@D)
+	@$(INSTALL_DIR) $(@D)
 	$(POD2MAN) --release=$(VERSION) --name=$* -s 1 -c "Xen" $< $@
 
 man5/%.5: man/%.pod.5 Makefile
-	$(INSTALL_DIR) $(@D)
+	@$(INSTALL_DIR) $(@D)
 	$(POD2MAN) --release=$(VERSION) --name=$* -s 5 -c "Xen" $< $@
 
 html/index.html: $(DOC_HTML) $(CURDIR)/gen-html-index INDEX
 	$(PERL) -w -- $(CURDIR)/gen-html-index -i INDEX html $(DOC_HTML)
 
 html/%.html: %.markdown
-	$(INSTALL_DIR) $(@D)
 ifdef MARKDOWN
+	@$(INSTALL_DIR) $(@D)
 	$(MARKDOWN) $< > $@
 else
 	@echo "markdown not installed; skipping $*.html."
 endif
 
 html/%.txt: %.txt
-	$(INSTALL_DIR) $(@D)
+	@$(INSTALL_DIR) $(@D)
 	$(INSTALL_DATA) $< $@
 
 html/man/%.1.html: man/%.pod.1 Makefile
-	$(INSTALL_DIR) $(@D)
 ifdef POD2HTML
+	@$(INSTALL_DIR) $(@D)
 	$(POD2HTML) --infile=$< --outfile=$@
 else
 	@echo "pod2html not installed; skipping $<."
 endif
 
 html/man/%.5.html: man/%.pod.5 Makefile
-	$(INSTALL_DIR) $(@D)
 ifdef POD2HTML
+	@$(INSTALL_DIR) $(@D)
 	$(POD2HTML) --infile=$< --outfile=$@
 else
 	@echo "pod2html not installed; skipping $<."
@@ -157,31 +157,31 @@ html/hypercall/%/index.html: $(CURDIR)/xen-headers Makefile
 -include $(wildcard html/hypercall/*/.deps)
 
 txt/%.txt: %.txt
-	$(INSTALL_DIR) $(@D)
+	@$(INSTALL_DIR) $(@D)
 	$(INSTALL_DATA) $< $@
 
 txt/%.txt: %.markdown
-	$(INSTALL_DIR) $(@D)
+	@$(INSTALL_DIR) $(@D)
 	$(INSTALL_DATA) $< $@
 
 txt/man/%.1.txt: man/%.pod.1 Makefile
-	$(INSTALL_DIR) $(@D)
 ifdef POD2TEXT
+	@$(INSTALL_DIR) $(@D)
 	$(POD2TEXT) $< $@
 else
 	@echo "pod2text not installed; skipping $<."
 endif
 
 txt/man/%.5.txt: man/%.pod.5 Makefile
-	$(INSTALL_DIR) $(@D)
 ifdef POD2TEXT
+	@$(INSTALL_DIR) $(@D)
 	$(POD2TEXT) $< $@
 else
 	@echo "pod2text not installed; skipping $<."
 endif
 
 pdf/%.pdf: %.markdown
-	$(INSTALL_DIR) $(@D)
+	@$(INSTALL_DIR) $(@D)
 	$(PANDOC) --number-sections --toc --standalone $< --output $@
 
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
