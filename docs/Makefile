@@ -73,13 +73,11 @@ endif
 
 man1/%.1: man/%.pod.1 Makefile
 	$(INSTALL_DIR) $(@D)
-	$(POD2MAN) --release=$(VERSION) --name=`echo $@ | sed 's/^man1.//'| \
-		sed 's/.1//'` -s 1 -c "Xen" $< $@
+	$(POD2MAN) --release=$(VERSION) --name=$* -s 1 -c "Xen" $< $@
 
 man5/%.5: man/%.pod.5 Makefile
 	$(INSTALL_DIR) $(@D)
-	$(POD2MAN) --release=$(VERSION) --name=`echo $@ | sed 's/^man5.//'| \
-		sed 's/.5//'` -s 5 -c "Xen" $< $@
+	$(POD2MAN) --release=$(VERSION) --name=$* -s 5 -c "Xen" $< $@
 
 .PHONY: clean
 clean:
