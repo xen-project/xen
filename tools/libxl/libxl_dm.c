@@ -196,7 +196,10 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
         if (!libxl_defbool_val(sdl->opengl)) {
             flexarray_append(dm_args, "-disable-opengl");
         }
-        /* XXX sdl->{display,xauthority} into $DISPLAY/$XAUTHORITY */
+        if (sdl->display)
+            flexarray_append_pair(dm_envs, "DISPLAY", sdl->display);
+        if (sdl->xauthority)
+            flexarray_append_pair(dm_envs, "XAUTHORITY", sdl->xauthority);
     }
     if (keymap) {
         flexarray_vappend(dm_args, "-k", keymap, NULL);
@@ -562,7 +565,10 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
 
     if (sdl) {
         flexarray_append(dm_args, "-sdl");
-        /* XXX sdl->{display,xauthority} into $DISPLAY/$XAUTHORITY */
+        if (sdl->display)
+            flexarray_append_pair(dm_envs, "DISPLAY", sdl->display);
+        if (sdl->xauthority)
+            flexarray_append_pair(dm_envs, "XAUTHORITY", sdl->xauthority);
     }
 
     if (keymap) {
