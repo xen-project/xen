@@ -438,6 +438,17 @@ union hsr {
     } sysreg; /* HSR_EC_SYSREG */
 #endif
 
+    struct hsr_iabt {
+        unsigned long ifsc:6;  /* Instruction fault status code */
+        unsigned long res0:1;
+        unsigned long s1ptw:1; /* Stage 2 fault during stage 1 translation */
+        unsigned long res1:1;
+        unsigned long eat:1;   /* External abort type */
+        unsigned long res2:15;
+        unsigned long len:1;   /* Instruction length */
+        unsigned long ec:6;    /* Exception Class */
+    } iabt; /* HSR_EC_INSTR_ABORT_* */
+
     struct hsr_dabt {
         unsigned long dfsc:6;  /* Data Fault Status Code */
         unsigned long write:1; /* Write / not Read */
