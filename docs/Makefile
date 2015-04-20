@@ -84,7 +84,7 @@ man5/%.5: man/%.pod.5 Makefile
 .PHONY: clean
 clean:
 	$(MAKE) -C figs clean
-	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
+	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~
 	rm -rf *.ilg *.log *.ind *.toc *.bak *.tmp core
 	rm -rf html txt pdf
 	rm -rf man5
@@ -115,7 +115,6 @@ html/index.html: $(DOC_HTML) $(CURDIR)/gen-html-index INDEX
 html/%.html: %.markdown
 	$(INSTALL_DIR) $(@D)
 ifdef MARKDOWN
-	@echo "Running markdown to generate $*.html ... "
 	$(MARKDOWN) $< > $@.tmp ; \
 	$(call move-if-changed,$@.tmp,$@)
 else
@@ -189,7 +188,7 @@ endif
 
 pdf/%.pdf: %.markdown
 	$(INSTALL_DIR) $(@D)
-	pandoc -N --toc --standalone $< --output $@
+	$(PANDOC) --number-sections --toc --standalone $< --output $@
 
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 $(XEN_ROOT)/config/Docs.mk:
