@@ -2023,11 +2023,36 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     info.gva = READ_SYSREG64(FAR_EL2);
 #endif
 
-    if (dabt.s1ptw)
-        goto bad_data_abort;
+    if ( dabt.s1ptw )
+        info.gpa = READ_SYSREG(HPFAR_EL2);
+    else
+    {
+        rc = gva_to_ipa(info.gva, &info.gpa, GV2M_READ);
+        if ( rc == -EFAULT )
+            goto bad_data_abort;
+    }
 
-    rc = gva_to_ipa(info.gva, &info.gpa, GV2M_READ);
-    if ( rc == -EFAULT )
+    switch ( dabt.dfsc & 0x3f )
+    {
+    case FSC_FLT_PERM ... FSC_FLT_PERM + 3:
+    {
+        const struct npfec npfec = {
+            .read_access = !dabt.write,
+            .write_access = dabt.write,
+            .gla_valid = 1,
+            .kind = dabt.s1ptw ? npfec_kind_in_gpt : npfec_kind_with_gla
+        };
+
+        rc = p2m_mem_access_check(info.gpa, info.gva, npfec);
+
+        /* Trap was triggered by mem_access, work here is done */
+        if ( !rc )
+            return;
+    }
+    break;
+    }
+
+    if ( dabt.s1ptw )
         goto bad_data_abort;
 
     /* XXX: Decode the instruction if ISS is not valid */

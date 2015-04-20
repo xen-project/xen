@@ -44,4 +44,18 @@ int unmap_mmio_regions(struct domain *d,
                        unsigned long nr,
                        unsigned long mfn);
 
+/*
+ * Set access type for a region of pfns.
+ * If start_pfn == -1ul, sets the default access type.
+ */
+long p2m_set_mem_access(struct domain *d, unsigned long start_pfn, uint32_t nr,
+                        uint32_t start, uint32_t mask, xenmem_access_t access);
+
+/*
+ * Get access type for a pfn.
+ * If pfn == -1ul, gets the default access type.
+ */
+int p2m_get_mem_access(struct domain *d, unsigned long pfn,
+                       xenmem_access_t *access);
+
 #endif /* _XEN_P2M_COMMON_H */

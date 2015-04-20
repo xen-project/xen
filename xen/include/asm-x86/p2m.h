@@ -597,16 +597,6 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                             struct npfec npfec,
                             vm_event_request_t **req_ptr);
 
-/* Set access type for a region of pfns.
- * If start_pfn == -1ul, sets the default access type */
-long p2m_set_mem_access(struct domain *d, unsigned long start_pfn, uint32_t nr,
-                        uint32_t start, uint32_t mask, xenmem_access_t access);
-
-/* Get access type for a pfn
- * If pfn == -1ul, gets the default access type */
-int p2m_get_mem_access(struct domain *d, unsigned long pfn,
-                       xenmem_access_t *access);
-
 /*
  * Emulating a memory access requires custom handling. These non-atomic
  * functions should be called under domctl lock.
