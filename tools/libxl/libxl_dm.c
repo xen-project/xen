@@ -122,9 +122,10 @@ static const char *dm_keymap(const libxl_domain_config *guest_config)
         return NULL;
 }
 
-static char ** libxl__build_device_model_args_old(libxl__gc *gc,
+static int libxl__build_device_model_args_old(libxl__gc *gc,
                                         const char *dm, int domid,
                                         const libxl_domain_config *guest_config,
+                                        char ***args, char ***envs,
                                         const libxl__domain_build_state *state)
 {
     const libxl_domain_create_info *c_info = &guest_config->c_info;
@@ -135,8 +136,9 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     const int num_nics = guest_config->num_nics;
     const char *keymap = dm_keymap(guest_config);
     int i;
-    flexarray_t *dm_args;
+    flexarray_t *dm_args, *dm_envs;
     dm_args = flexarray_make(gc, 16, 1);
+    dm_envs = flexarray_make(gc, 16, 1);
 
     flexarray_vappend(dm_args, dm,
                       "-d", libxl__sprintf(gc, "%d", domid), NULL);
@@ -161,7 +163,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             if (strchr(vnc->listen, ':') != NULL) {
                 if (vnc->display) {
                     LOG(ERROR, "vncdisplay set, vnclisten contains display");
-                    return NULL;
+                    return ERROR_INVAL;
                 }
                 vncarg = vnc->listen;
             } else {
@@ -207,14 +209,14 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if (b_info->kernel) {
             LOG(ERROR, "HVM direct kernel boot is not supported by "
                 "qemu-xen-traditional");
-            return NULL;
+            return ERROR_INVAL;
         }
 
         if (b_info->u.hvm.serial || b_info->u.hvm.serial_list) {
             if ( b_info->u.hvm.serial && b_info->u.hvm.serial_list )
             {
                 LOG(ERROR, "Both serial and serial_list set");
-                return NULL;
+                return ERROR_INVAL;
             }
             if (b_info->u.hvm.serial) {
                 flexarray_vappend(dm_args,
@@ -264,7 +266,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             if ( b_info->u.hvm.usbdevice && b_info->u.hvm.usbdevice_list )
             {
                 LOG(ERROR, "Both usbdevice and usbdevice_list set");
-                return NULL;
+                return ERROR_INVAL;
             }
             flexarray_append(dm_args, "-usb");
             if (b_info->u.hvm.usbdevice) {
@@ -355,7 +357,11 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         abort();
     }
     flexarray_append(dm_args, NULL);
-    return (char **) flexarray_contents(dm_args);
+    *args = (char **) flexarray_contents(dm_args);
+    flexarray_append(dm_envs, NULL);
+    if (envs)
+        *envs = (char **) flexarray_contents(dm_envs);
+    return 0;
 }
 
 static const char *qemu_disk_format_string(libxl_disk_format format)
@@ -418,9 +424,10 @@ static char *dm_spice_options(libxl__gc *gc,
     return opt;
 }
 
-static char ** libxl__build_device_model_args_new(libxl__gc *gc,
+static int libxl__build_device_model_args_new(libxl__gc *gc,
                                         const char *dm, int guest_domid,
                                         const libxl_domain_config *guest_config,
+                                        char ***args, char ***envs,
                                         const libxl__domain_build_state *state,
                                         int *dm_state_fd)
 {
@@ -435,12 +442,13 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     const libxl_sdl_info *sdl = dm_sdl(guest_config);
     const char *keymap = dm_keymap(guest_config);
     char *machinearg;
-    flexarray_t *dm_args;
+    flexarray_t *dm_args, *dm_envs;
     int i, connection, devid;
     uint64_t ram_size;
     const char *path, *chardev;
 
     dm_args = flexarray_make(gc, 16, 1);
+    dm_envs = flexarray_make(gc, 16, 1);
 
     flexarray_vappend(dm_args, dm,
                       "-xen-domid",
@@ -481,7 +489,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                 /* We've forgotten to add the clause */
                 LOG(ERROR, "%s: unknown channel connection %d",
                     __func__, connection);
-                return NULL;
+                return ERROR_INVAL;
         }
         flexarray_append(dm_args, "-chardev");
         flexarray_append(dm_args, (void*)chardev);
@@ -518,7 +526,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             if (strchr(vnc->listen, ':') != NULL) {
                 if (vnc->display) {
                     LOG(ERROR, "vncdisplay set, vnclisten contains display");
-                    return NULL;
+                    return ERROR_INVAL;
                 }
                 vncarg = vnc->listen;
             } else {
@@ -577,7 +585,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             if ( b_info->u.hvm.serial && b_info->u.hvm.serial_list )
             {
                 LOG(ERROR, "Both serial and serial_list set");
-                return NULL;
+                return ERROR_INVAL;
             }
             if (b_info->u.hvm.serial) {
                 flexarray_vappend(dm_args,
@@ -602,7 +610,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             const libxl_spice_info *spice = &b_info->u.hvm.spice;
             char *spiceoptions = dm_spice_options(gc, spice);
             if (!spiceoptions)
-                return NULL;
+                return ERROR_INVAL;
 
             flexarray_append(dm_args, "-spice");
             flexarray_append(dm_args, spiceoptions);
@@ -645,7 +653,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             if ( b_info->u.hvm.usbdevice && b_info->u.hvm.usbdevice_list )
             {
                 LOG(ERROR, "Both usbdevice and usbdevice_list set");
-                return NULL;
+                return ERROR_INVAL;
             }
             flexarray_append(dm_args, "-usb");
             if (b_info->u.hvm.usbdevice) {
@@ -683,7 +691,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             default:
                 LOG(ERROR, "usbversion parameter is invalid, "
                     "must be between 1 and 3");
-                return NULL;
+                return ERROR_INVAL;
             }
             if (b_info->u.hvm.spice.usbredirection >= 0 &&
                 b_info->u.hvm.spice.usbredirection < 5) {
@@ -695,7 +703,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             } else {
                 LOG(ERROR, "usbredirection parameter is invalid, "
                     "it must be between 1 and 4");
-                return NULL;
+                return ERROR_INVAL;
             }
         }
         if (b_info->u.hvm.soundhw) {
@@ -880,12 +888,17 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         }
     }
     flexarray_append(dm_args, NULL);
-    return (char **) flexarray_contents(dm_args);
+    *args = (char **) flexarray_contents(dm_args);
+    flexarray_append(dm_envs, NULL);
+    if (envs)
+        *envs = (char **) flexarray_contents(dm_envs);
+    return 0;
 }
 
-static char ** libxl__build_device_model_args(libxl__gc *gc,
+static int libxl__build_device_model_args(libxl__gc *gc,
                                         const char *dm, int guest_domid,
                                         const libxl_domain_config *guest_config,
+                                        char ***args, char ***envs,
                                         const libxl__domain_build_state *state,
                                         int *dm_state_fd)
 /* dm_state_fd may be NULL iff caller knows we are using old stubdom
@@ -897,17 +910,19 @@ static char ** libxl__build_device_model_args(libxl__gc *gc,
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
         return libxl__build_device_model_args_old(gc, dm,
                                                   guest_domid, guest_config,
+                                                  args, envs,
                                                   state);
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         assert(dm_state_fd != NULL);
         assert(*dm_state_fd < 0);
         return libxl__build_device_model_args_new(gc, dm,
                                                   guest_domid, guest_config,
+                                                  args, envs,
                                                   state, dm_state_fd);
     default:
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unknown device model version %d",
                          guest_config->b_info.device_model_version);
-        return NULL;
+        return ERROR_INVAL;
     }
 }
 
@@ -1117,9 +1132,10 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     if (ret)
         goto out;
 
-    args = libxl__build_device_model_args(gc, "stubdom-dm", guest_domid,
-                                          guest_config, d_state, NULL);
-    if (!args) {
+    ret = libxl__build_device_model_args(gc, "stubdom-dm", guest_domid,
+                                         guest_config, &args, NULL,
+                                         d_state, NULL);
+    if (ret) {
         ret = ERROR_FAIL;
         goto out;
     }
@@ -1401,7 +1417,7 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
     char *path;
     int logfile_w, null;
     int rc;
-    char **args, **arg;
+    char **args, **arg, **envs;
     xs_transaction_t t;
     char *vm_path;
     char **pass_stuff;
@@ -1423,12 +1439,11 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
         rc = ERROR_FAIL;
         goto out;
     }
-    args = libxl__build_device_model_args(gc, dm, domid, guest_config, state,
+    rc = libxl__build_device_model_args(gc, dm, domid, guest_config,
+                                          &args, &envs, state,
                                           &dm_state_fd);
-    if (!args) {
-        rc = ERROR_FAIL;
+    if (rc)
         goto out;
-    }
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         path = xs_get_domain_path(ctx->xsh, domid);
@@ -1495,6 +1510,11 @@ retry_transaction:
     LIBXL__LOG(CTX, XTL_DEBUG, "Spawning device-model %s with arguments:", dm);
     for (arg = args; *arg; arg++)
         LIBXL__LOG(CTX, XTL_DEBUG, "  %s", *arg);
+    if (*envs) {
+        LOG(DEBUG, "Spawning device-model %s with additional environment:", dm);
+        for (arg = envs; *arg; arg += 2)
+            LOG(DEBUG, "  %s=%s", arg[0], arg[1]);
+    }
 
     spawn->what = GCSPRINTF("domain %d device model", domid);
     spawn->xspath = libxl__device_model_xs_path(gc, LIBXL_TOOLSTACK_DOMID,
@@ -1511,7 +1531,7 @@ retry_transaction:
         goto out_close;
     if (!rc) { /* inner child */
         setsid();
-        libxl__exec(gc, null, logfile_w, logfile_w, dm, args, NULL);
+        libxl__exec(gc, null, logfile_w, logfile_w, dm, args, envs);
     }
 
     rc = 0;
