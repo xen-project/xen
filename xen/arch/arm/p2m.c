@@ -139,7 +139,7 @@ void flush_tlb_domain(struct domain *d)
  * There are no processor functions to do a stage 2 only lookup therefore we
  * do a a software walk.
  */
-paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
+static paddr_t __p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
     const unsigned int offsets[4] = {
@@ -179,8 +179,6 @@ paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
     else
         root_table = 0;
 
-    spin_lock(&p2m->lock);
-
     map = __map_domain_page(p2m->root + root_table);
 
     ASSERT(P2M_ROOT_LEVEL < 4);
@@ -215,9 +213,20 @@ paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
         *t = pte.p2m.type;
     }
 
-    spin_unlock(&p2m->lock);
 err:
     return maddr;
+}
+
+paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
+{
+    paddr_t ret;
+    struct p2m_domain *p2m = &d->arch.p2m;
+
+    spin_lock(&p2m->lock);
+    ret = __p2m_lookup(d, paddr, t);
+    spin_unlock(&p2m->lock);
+
+    return ret;
 }
 
 int guest_physmap_mark_populate_on_demand(struct domain *d,
@@ -1168,6 +1177,103 @@ unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)
     return p >> PAGE_SHIFT;
 }
 
+/*
+ * If mem_access is in use it might have been the reason why get_page_from_gva
+ * failed to fetch the page, as it uses the MMU for the permission checking.
+ * Only in these cases we do a software-based type check and fetch the page if
+ * we indeed found a conflicting mem_access setting.
+ */
+static struct page_info*
+p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
+{
+    long rc;
+    paddr_t ipa;
+    unsigned long maddr;
+    unsigned long mfn;
+    xenmem_access_t xma;
+    p2m_type_t t;
+    struct page_info *page = NULL;
+
+    rc = gva_to_ipa(gva, &ipa, flag);
+    if ( rc < 0 )
+        goto err;
+
+    /*
+     * We do this first as this is faster in the default case when no
+     * permission is set on the page.
+     */
+    rc = p2m_get_mem_access(current->domain, paddr_to_pfn(ipa), &xma);
+    if ( rc < 0 )
+        goto err;
+
+    /* Let's check if mem_access limited the access. */
+    switch ( xma )
+    {
+    default:
+    case XENMEM_access_rwx:
+    case XENMEM_access_rw:
+        /*
+         * If mem_access contains no rw perm restrictions at all then the original
+         * fault was correct.
+         */
+        goto err;
+    case XENMEM_access_n2rwx:
+    case XENMEM_access_n:
+    case XENMEM_access_x:
+        /*
+         * If no r/w is permitted by mem_access, this was a fault caused by mem_access.
+         */
+        break;
+    case XENMEM_access_wx:
+    case XENMEM_access_w:
+        /*
+         * If this was a read then it was because of mem_access, but if it was
+         * a write then the original get_page_from_gva fault was correct.
+         */
+        if ( flag == GV2M_READ )
+            break;
+        else
+            goto err;
+    case XENMEM_access_rx2rw:
+    case XENMEM_access_rx:
+    case XENMEM_access_r:
+        /*
+         * If this was a write then it was because of mem_access, but if it was
+         * a read then the original get_page_from_gva fault was correct.
+         */
+        if ( flag == GV2M_WRITE )
+            break;
+        else
+            goto err;
+    }
+
+    /*
+     * We had a mem_access permission limiting the access, but the page type
+     * could also be limiting, so we need to check that as well.
+     */
+    maddr = __p2m_lookup(current->domain, ipa, &t);
+    if ( maddr == INVALID_PADDR )
+        goto err;
+
+    mfn = maddr >> PAGE_SHIFT;
+    if ( !mfn_valid(mfn) )
+        goto err;
+
+    /*
+     * Base type doesn't allow r/w
+     */
+    if ( t != p2m_ram_rw )
+        goto err;
+
+    page = mfn_to_page(mfn);
+
+    if ( unlikely(!get_page(page, current->domain)) )
+        page = NULL;
+
+err:
+    return page;
+}
+
 struct page_info *get_page_from_gva(struct domain *d, vaddr_t va,
                                     unsigned long flags)
 {
@@ -1208,7 +1314,11 @@ struct page_info *get_page_from_gva(struct domain *d, vaddr_t va,
         page = NULL;
 
 err:
+    if ( !page && p2m->mem_access_enabled )
+        page = p2m_mem_access_check_and_get_page(va, flags);
+
     spin_unlock(&p2m->lock);
+
     return page;
 }
 

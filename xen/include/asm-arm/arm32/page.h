@@ -103,11 +103,14 @@ static inline uint64_t gva_to_ma_par(vaddr_t va, unsigned int flags)
     WRITE_CP64(tmp, PAR);
     return par;
 }
-static inline uint64_t gva_to_ipa_par(vaddr_t va)
+static inline uint64_t gva_to_ipa_par(vaddr_t va, unsigned int flags)
 {
     uint64_t par, tmp;
     tmp = READ_CP64(PAR);
-    WRITE_CP32(va, ATS1CPR);
+    if ( (flags & GV2M_WRITE) == GV2M_WRITE )
+        WRITE_CP32(va, ATS1CPW);
+    else
+        WRITE_CP32(va, ATS1CPR);
     isb(); /* Ensure result is available. */
     par = READ_CP64(PAR);
     WRITE_CP64(tmp, PAR);

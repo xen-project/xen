@@ -422,9 +422,9 @@ static inline uint64_t va_to_par(vaddr_t va)
     return par;
 }
 
-static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr)
+static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr, unsigned int flags)
 {
-    uint64_t par = gva_to_ipa_par(va);
+    uint64_t par = gva_to_ipa_par(va, flags);
     if ( par & PAR_F )
         return -EFAULT;
     *paddr = (par & PADDR_MASK & PAGE_MASK) | ((unsigned long) va & ~PAGE_MASK);
