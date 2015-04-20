@@ -17,6 +17,7 @@ struct hvm_domain
 {
     uint64_t              params[HVM_NR_PARAMS];
     struct hvm_iommu      iommu;
+    bool_t                introspection_enabled;
 }  __cacheline_aligned;
 
 #ifdef CONFIG_ARM_64

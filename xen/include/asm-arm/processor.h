@@ -441,7 +441,7 @@ union hsr {
     struct hsr_dabt {
         unsigned long dfsc:6;  /* Data Fault Status Code */
         unsigned long write:1; /* Write / not Read */
-        unsigned long s1ptw:1; /* */
+        unsigned long s1ptw:1; /* Stage 2 fault during stage 1 translation */
         unsigned long cache:1; /* Cache Maintenance */
         unsigned long eat:1;   /* External Abort Type */
 #ifdef CONFIG_ARM_32
