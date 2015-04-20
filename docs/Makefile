@@ -16,7 +16,7 @@ MARKDOWNSRC-y := $(sort $(wildcard misc/*.markdown))
 
 TXTSRC-y := $(sort $(wildcard misc/*.txt))
 
-
+# Documentation targets
 DOC_MAN1 := $(patsubst man/%.pod.1,man1/%.1,$(MAN1SRC-y))
 DOC_MAN5 := $(patsubst man/%.pod.5,man5/%.5,$(MAN5SRC-y))
 DOC_HTML := $(patsubst %.markdown,html/%.html,$(MARKDOWNSRC-y)) \
@@ -30,6 +30,7 @@ DOC_TXT  := $(patsubst %.txt,txt/%.txt,$(TXTSRC-y)) \
             $(patsubst man/%.pod.5,txt/man/%.5.txt,$(MAN5SRC-y))
 DOC_PDF  := $(patsubst %.markdown,pdf/%.pdf,$(MARKDOWNSRC-y))
 
+# Top level build targets
 .PHONY: all
 all: build
 
@@ -71,14 +72,6 @@ else
 	@echo "pandoc not installed; skipping pdfs."
 endif
 
-man1/%.1: man/%.pod.1 Makefile
-	$(INSTALL_DIR) $(@D)
-	$(POD2MAN) --release=$(VERSION) --name=$* -s 1 -c "Xen" $< $@
-
-man5/%.5: man/%.pod.5 Makefile
-	$(INSTALL_DIR) $(@D)
-	$(POD2MAN) --release=$(VERSION) --name=$* -s 5 -c "Xen" $< $@
-
 .PHONY: clean
 clean:
 	$(MAKE) -C figs clean
@@ -93,6 +86,7 @@ distclean: clean
 	rm -rf $(XEN_ROOT)/config/Docs.mk config.log config.status config.cache \
 		autom4te.cache
 
+# Top level install targets
 .PHONY: install-man-pages
 install-man-pages: man-pages
 	$(INSTALL_DIR) $(DESTDIR)$(MANDIR)
@@ -106,6 +100,15 @@ install-html: html txt figs
 
 .PHONY: install
 install: install-man-pages install-html
+
+# Individual file build targets
+man1/%.1: man/%.pod.1 Makefile
+	$(INSTALL_DIR) $(@D)
+	$(POD2MAN) --release=$(VERSION) --name=$* -s 1 -c "Xen" $< $@
+
+man5/%.5: man/%.pod.5 Makefile
+	$(INSTALL_DIR) $(@D)
+	$(POD2MAN) --release=$(VERSION) --name=$* -s 5 -c "Xen" $< $@
 
 html/index.html: $(DOC_HTML) $(CURDIR)/gen-html-index INDEX
 	$(PERL) -w -- $(CURDIR)/gen-html-index -i INDEX html $(DOC_HTML)
