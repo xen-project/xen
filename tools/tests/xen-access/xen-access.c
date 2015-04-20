@@ -41,6 +41,13 @@
 #include <xenctrl.h>
 #include <xen/vm_event.h>
 
+#if defined(__arm__) || defined(__aarch64__)
+#include <xen/arch-arm.h>
+#define START_PFN (GUEST_RAM0_BASE >> 12)
+#elif defined(__i386__) || defined(__x86_64__)
+#define START_PFN 0ULL
+#endif
+
 #define DPRINTF(a, b...) fprintf(stderr, a, ## b)
 #define ERROR(a, b...) fprintf(stderr, a "\n", ## b)
 #define PERROR(a, b...) fprintf(stderr, a ": %s\n", ## b, strerror(errno))
@@ -57,7 +64,7 @@ typedef struct vm_event {
 typedef struct xenaccess {
     xc_interface *xc_handle;
 
-    xc_domaininfo_t    *domain_info;
+    xen_pfn_t max_gpfn;
 
     vm_event_t vm_event;
 } xenaccess_t;
@@ -165,7 +172,6 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
     }
     xenaccess->xc_handle = NULL;
 
-    free(xenaccess->domain_info);
     free(xenaccess);
 
     return 0;
@@ -243,23 +249,18 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
                    (vm_event_sring_t *)xenaccess->vm_event.ring_page,
                    XC_PAGE_SIZE);
 
-    /* Get domaininfo */
-    xenaccess->domain_info = malloc(sizeof(xc_domaininfo_t));
-    if ( xenaccess->domain_info == NULL )
+    /* Get max_gpfn */
+    rc = xc_domain_maximum_gpfn(xenaccess->xc_handle,
+                                xenaccess->vm_event.domain_id,
+                                &xenaccess->max_gpfn);
+
+    if ( rc )
     {
-        ERROR("Error allocating memory for domain info");
+        ERROR("Failed to get max gpfn");
         goto err;
     }
 
-    rc = xc_domain_getinfolist(xenaccess->xc_handle, domain_id, 1,
-                               xenaccess->domain_info);
-    if ( rc != 1 )
-    {
-        ERROR("Error getting domain info");
-        goto err;
-    }
-
-    DPRINTF("max_pages = %"PRIx64"\n", xenaccess->domain_info->max_pages);
+    DPRINTF("max_gpfn = %"PRIx64"\n", xenaccess->max_gpfn);
 
     return xenaccess;
 
@@ -422,8 +423,9 @@ int main(int argc, char *argv[])
         goto exit;
     }
 
-    rc = xc_set_mem_access(xch, domain_id, default_access, 0,
-                           xenaccess->domain_info->max_pages);
+    rc = xc_set_mem_access(xch, domain_id, default_access, START_PFN,
+                           (xenaccess->max_gpfn - START_PFN) );
+
     if ( rc < 0 )
     {
         ERROR("Error %d setting all memory to access type %d\n", rc,
@@ -450,8 +452,8 @@ int main(int argc, char *argv[])
 
             /* Unregister for every event */
             rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, ~0ull, 0);
-            rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, 0,
-                                   xenaccess->domain_info->max_pages);
+            rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, START_PFN,
+                                   (xenaccess->max_gpfn - START_PFN) );
             rc = xc_monitor_software_breakpoint(xch, domain_id, 0);
 
             shutting_down = 1;
