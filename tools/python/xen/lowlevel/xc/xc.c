@@ -1297,55 +1297,52 @@ out:
 
 static PyObject *pyxc_numainfo(XcObject *self)
 {
-#define MAX_NODE_INDEX 31
     xc_numainfo_t ninfo = { 0 };
-    int i, j, max_node_index;
+    unsigned i, j;
     uint64_t free_heap;
     PyObject *ret_obj = NULL, *node_to_node_dist_list_obj;
     PyObject *node_to_memsize_obj, *node_to_memfree_obj;
     PyObject *node_to_dma32_mem_obj, *node_to_node_dist_obj;
-    DECLARE_HYPERCALL_BUFFER(xc_node_to_memsize_t, node_memsize);
-    DECLARE_HYPERCALL_BUFFER(xc_node_to_memfree_t, node_memfree);
-    DECLARE_HYPERCALL_BUFFER(xc_node_to_node_dist_t, nodes_dist);
+    DECLARE_HYPERCALL_BUFFER(xen_sysctl_meminfo_t, meminfo);
+    DECLARE_HYPERCALL_BUFFER(uint32_t, distance);
 
-    node_memsize = xc_hypercall_buffer_alloc(self->xc_handle, node_memsize, sizeof(*node_memsize)*(MAX_NODE_INDEX+1));
-    if ( node_memsize == NULL )
-        goto out;
-    node_memfree = xc_hypercall_buffer_alloc(self->xc_handle, node_memfree, sizeof(*node_memfree)*(MAX_NODE_INDEX+1));
-    if ( node_memfree == NULL )
-        goto out;
-    nodes_dist = xc_hypercall_buffer_alloc(self->xc_handle, nodes_dist, sizeof(*nodes_dist)*(MAX_NODE_INDEX+1)*(MAX_NODE_INDEX+1));
-    if ( nodes_dist == NULL )
-        goto out;
-
-    set_xen_guest_handle(ninfo.node_to_memsize, node_memsize);
-    set_xen_guest_handle(ninfo.node_to_memfree, node_memfree);
-    set_xen_guest_handle(ninfo.node_to_node_distance, nodes_dist);
-    ninfo.max_node_index = MAX_NODE_INDEX;
-
+    set_xen_guest_handle(ninfo.meminfo, HYPERCALL_BUFFER_NULL);
+    set_xen_guest_handle(ninfo.distance, HYPERCALL_BUFFER_NULL);
     if ( xc_numainfo(self->xc_handle, &ninfo) != 0 )
         goto out;
 
-    max_node_index = ninfo.max_node_index;
-    if ( max_node_index > MAX_NODE_INDEX )
-        max_node_index = MAX_NODE_INDEX;
+    meminfo = xc_hypercall_buffer_alloc(self->xc_handle, meminfo,
+                                        sizeof(*meminfo) * ninfo.num_nodes);
+    if ( meminfo == NULL )
+        goto out;
+    distance = xc_hypercall_buffer_alloc(self->xc_handle, distance,
+                                         sizeof(*distance) *
+                                         ninfo.num_nodes * ninfo.num_nodes);
+    if ( distance == NULL )
+        goto out;
+
+    set_xen_guest_handle(ninfo.meminfo, meminfo);
+    set_xen_guest_handle(ninfo.distance, distance);
+    if ( xc_numainfo(self->xc_handle, &ninfo) != 0 )
+        goto out;
 
     /* Construct node-to-* lists. */
     node_to_memsize_obj = PyList_New(0);
     node_to_memfree_obj = PyList_New(0);
     node_to_dma32_mem_obj = PyList_New(0);
     node_to_node_dist_list_obj = PyList_New(0);
-    for ( i = 0; i <= max_node_index; i++ )
+    for ( i = 0; i < ninfo.num_nodes; i++ )
     {
         PyObject *pyint;
+        unsigned invalid_node;
 
         /* Total Memory */
-        pyint = PyInt_FromLong(node_memsize[i] >> 20); /* MB */
+        pyint = PyInt_FromLong(meminfo[i].memsize >> 20); /* MB */
         PyList_Append(node_to_memsize_obj, pyint);
         Py_DECREF(pyint);
 
         /* Free Memory */
-        pyint = PyInt_FromLong(node_memfree[i] >> 20); /* MB */
+        pyint = PyInt_FromLong(meminfo[i].memfree >> 20); /* MB */
         PyList_Append(node_to_memfree_obj, pyint);
         Py_DECREF(pyint);
 
@@ -1357,10 +1354,11 @@ static PyObject *pyxc_numainfo(XcObject *self)
 
         /* Node to Node Distance */
         node_to_node_dist_obj = PyList_New(0);
-        for ( j = 0; j <= max_node_index; j++ )
+        invalid_node = (meminfo[i].memsize == XEN_INVALID_MEM_SZ);
+        for ( j = 0; j < ninfo.num_nodes; j++ )
         {
-            uint32_t dist = nodes_dist[i*(max_node_index+1) + j];
-            if ( dist == ~0u )
+            uint32_t dist = distance[i * ninfo.num_nodes + j];
+            if ( invalid_node || (dist == XEN_INVALID_NODE_DIST) )
             {
                 PyList_Append(node_to_node_dist_obj, Py_None);
             }
@@ -1375,7 +1373,7 @@ static PyObject *pyxc_numainfo(XcObject *self)
         Py_DECREF(node_to_node_dist_obj);
     }
 
-    ret_obj = Py_BuildValue("{s:i}", "max_node_index", max_node_index);
+    ret_obj = Py_BuildValue("{s:i}", "max_node_index", ninfo.num_nodes + 1);
 
     PyDict_SetItemString(ret_obj, "node_memsize", node_to_memsize_obj);
     Py_DECREF(node_to_memsize_obj);
@@ -1391,11 +1389,9 @@ static PyObject *pyxc_numainfo(XcObject *self)
     Py_DECREF(node_to_node_dist_list_obj);
 
 out:
-    xc_hypercall_buffer_free(self->xc_handle, node_memsize);
-    xc_hypercall_buffer_free(self->xc_handle, node_memfree);
-    xc_hypercall_buffer_free(self->xc_handle, nodes_dist);
+    xc_hypercall_buffer_free(self->xc_handle, meminfo);
+    xc_hypercall_buffer_free(self->xc_handle, distance);
     return ret_obj ? ret_obj : pyxc_error_to_exception(self->xc_handle);
-#undef MAX_NODE_INDEX
 }
 
 static PyObject *pyxc_xeninfo(XcObject *self)

@@ -274,54 +274,76 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 
     case XEN_SYSCTL_numainfo:
     {
-        uint32_t i, j, max_node_index, last_online_node;
+        unsigned int i, j, num_nodes;
         xen_sysctl_numainfo_t *ni = &op->u.numainfo;
+        bool_t do_meminfo = !guest_handle_is_null(ni->meminfo);
+        bool_t do_distance = !guest_handle_is_null(ni->distance);
 
-        last_online_node = last_node(node_online_map);
-        max_node_index = min_t(uint32_t, ni->max_node_index, last_online_node);
-        ni->max_node_index = last_online_node;
+        num_nodes = last_node(node_online_map) + 1;
 
-        for ( i = 0; i <= max_node_index; i++ )
+        if ( do_meminfo || do_distance )
         {
-            if ( !guest_handle_is_null(ni->node_to_memsize) )
+            if ( ni->num_nodes < num_nodes )
             {
-                uint64_t memsize = node_online(i) ?
-                                   node_spanned_pages(i) << PAGE_SHIFT : 0ul;
-                if ( copy_to_guest_offset(ni->node_to_memsize, i, &memsize, 1) )
-                    break;
+                ret = -ENOBUFS;
+                i = num_nodes;
             }
-            if ( !guest_handle_is_null(ni->node_to_memfree) )
-            {
-                uint64_t memfree = node_online(i) ?
-                                   avail_node_heap_pages(i) << PAGE_SHIFT : 0ul;
-                if ( copy_to_guest_offset(ni->node_to_memfree, i, &memfree, 1) )
-                    break;
-            }
+            else
+                i = 0;
 
-            if ( !guest_handle_is_null(ni->node_to_node_distance) )
+            for ( ; i < num_nodes; i++ )
             {
-                for ( j = 0; j <= max_node_index; j++)
+                xen_sysctl_meminfo_t meminfo;
+                static uint32_t distance[MAX_NUMNODES];
+
+                if ( do_meminfo )
                 {
-                    uint32_t distance = ~0u;
-                    if ( node_online(i) && node_online(j) )
+                    if ( node_online(i) )
                     {
-                        u8 d = __node_distance(i, j);
-
-                        if ( d != NUMA_NO_DISTANCE )
-                            distance = d;
+                        meminfo.memsize = node_spanned_pages(i) << PAGE_SHIFT;
+                        meminfo.memfree = avail_node_heap_pages(i) << PAGE_SHIFT;
                     }
-                    if ( copy_to_guest_offset(
-                        ni->node_to_node_distance,
-                        i*(max_node_index+1) + j, &distance, 1) )
+                    else
+                        meminfo.memsize = meminfo.memfree = XEN_INVALID_MEM_SZ;
+
+                    if ( copy_to_guest_offset(ni->meminfo, i, &meminfo, 1) )
+                    {
+                        ret = -EFAULT;
                         break;
+                    }
                 }
-                if ( j <= max_node_index )
-                    break;
+
+                if ( do_distance )
+                {
+                    for ( j = 0; j < num_nodes; j++ )
+                    {
+                        distance[j] = __node_distance(i, j);
+                        if ( distance[j] == NUMA_NO_DISTANCE )
+                            distance[j] = XEN_INVALID_NODE_DIST;
+                    }
+
+                    if ( copy_to_guest_offset(ni->distance, i * num_nodes,
+                                              distance, num_nodes) )
+                    {
+                        ret = -EFAULT;
+                        break;
+                    }
+                }
             }
         }
+        else
+            i = num_nodes;
 
-        ret = ((i <= max_node_index) || copy_to_guest(u_sysctl, op, 1))
-            ? -EFAULT : 0;
+        if ( (!ret || (ret == -ENOBUFS)) && (ni->num_nodes != i) )
+        {
+            ni->num_nodes = i;
+            if ( __copy_field_to_guest(u_sysctl, op,
+                                       u.numainfo.num_nodes) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+        }
     }
     break;
 

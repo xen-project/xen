@@ -494,34 +494,42 @@ typedef struct xen_sysctl_cputopoinfo xen_sysctl_cputopoinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cputopoinfo_t);
 
 /* XEN_SYSCTL_numainfo */
-#define INVALID_NUMAINFO_ID (~0U)
+#define XEN_INVALID_MEM_SZ     (~0U)
+#define XEN_INVALID_NODE_DIST  (~0U)
+
+struct xen_sysctl_meminfo {
+    uint64_t memsize;
+    uint64_t memfree;
+};
+typedef struct xen_sysctl_meminfo xen_sysctl_meminfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_meminfo_t);
+
+/*
+ * IN:
+ *  - Both 'meminfo' and 'distance' handles being null is a request
+ *    for maximum value of 'num_nodes'.
+ *  - Otherwise it's the number of entries in 'meminfo' and square root
+ *    of number of entries in 'distance' (when corresponding handle is
+ *    non-null)
+ *
+ * OUT:
+ *  - If 'num_nodes' is less than the number Xen needs to write, -ENOBUFS shall
+ *    be returned and 'num_nodes' updated to reflect the intended number.
+ *  - On success, 'num_nodes' shall indicate the number of entries written, which
+ *    may be less than the maximum.
+ */
+
 struct xen_sysctl_numainfo {
-    /*
-     * IN: maximum addressable entry in the caller-provided arrays.
-     * OUT: largest node identifier in the system.
-     * If OUT is greater than IN then the arrays are truncated!
-     */
-    uint32_t max_node_index;
+    uint32_t num_nodes;
 
-    /* NB. Entries are 0 if node is not present. */
-    XEN_GUEST_HANDLE_64(uint64) node_to_memsize;
-    XEN_GUEST_HANDLE_64(uint64) node_to_memfree;
+    XEN_GUEST_HANDLE_64(xen_sysctl_meminfo_t) meminfo;
 
     /*
-     * Array, of size (max_node_index+1)^2, listing memory access distances
-     * between nodes. If an entry has no node distance information (e.g., node 
-     * not present) then the value ~0u is written.
-     * 
-     * Note that the array rows must be indexed by multiplying by the minimum 
-     * of the caller-provided max_node_index and the returned value of
-     * max_node_index. That is, if the largest node index in the system is
-     * smaller than the caller can handle, a smaller 2-d array is constructed
-     * within the space provided by the caller. When this occurs, trailing
-     * space provided by the caller is not modified. If the largest node index
-     * in the system is larger than the caller can handle, then a 2-d array of
-     * the maximum size handleable by the caller is constructed.
+     * Distance between nodes 'i' and 'j' is stored in index 'i*N + j',
+     * where N is the number of nodes that will be returned in 'num_nodes'
+     * (i.e. not 'num_nodes' provided by the caller)
      */
-    XEN_GUEST_HANDLE_64(uint32) node_to_node_distance;
+    XEN_GUEST_HANDLE_64(uint32) distance;
 };
 typedef struct xen_sysctl_numainfo xen_sysctl_numainfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_numainfo_t);
