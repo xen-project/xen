@@ -958,7 +958,7 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_gettscinfo:
     {
-        xen_guest_tsc_info_t info;
+        xen_guest_tsc_info_t info = { 0 };
 
         ret = -EINVAL;
         if ( d == current->domain ) /* no domain_pause() */
