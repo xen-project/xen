@@ -237,9 +237,7 @@ ifneq (,$(CONFIG_QEMU))
 QEMU_TRADITIONAL_LOC ?= $(CONFIG_QEMU)
 endif
 ifneq (,$(QEMU_TAG))
-QEMU_TRADITIONAL_REVISION ?= 62e41581f69c3fd4a8f829a773015eb4c17f1f3e
-# Tue Mar 31 16:27:45 2015 +0100
-# xen: limit guest control of PCI command register
+QEMU_TRADITIONAL_REVISION ?= $(QEMU_TAG)
 endif
 
 ifeq ($(GIT_HTTP),y)
