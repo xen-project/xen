@@ -411,7 +411,8 @@ long arch_do_domctl(
         struct hvm_domain_context c = { .size = domctl->u.hvmcontext.size };
 
         ret = -EINVAL;
-        if ( !is_hvm_domain(d) )
+        if ( (d == currd) || /* no domain_pause() */
+             !is_hvm_domain(d) )
             goto sethvmcontext_out;
 
         ret = -ENOMEM;
@@ -436,7 +437,8 @@ long arch_do_domctl(
         struct hvm_domain_context c = { 0 };
 
         ret = -EINVAL;
-        if ( !is_hvm_domain(d) )
+        if ( (d == currd) || /* no domain_pause() */
+             !is_hvm_domain(d) )
             goto gethvmcontext_out;
 
         c.size = hvm_save_size(d);
@@ -475,7 +477,8 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_gethvmcontext_partial:
         ret = -EINVAL;
-        if ( !is_hvm_domain(d) )
+        if ( (d == currd) || /* no domain_pause() */
+             !is_hvm_domain(d) )
             break;
 
         domain_pause(d);
@@ -894,7 +897,8 @@ long arch_do_domctl(
             break;
 
         ret = -EINVAL;
-        if ( !is_hvm_domain(d))
+        if ( (v == curr) || /* no vcpu_pause() */
+             !is_hvm_domain(d) )
             break;
 
         ret = hvm_debug_op(v, domctl->u.debug_op.op);
