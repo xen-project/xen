@@ -16,19 +16,24 @@ MARKDOWNSRC-y := $(sort $(wildcard misc/*.markdown))
 
 TXTSRC-y := $(sort $(wildcard misc/*.txt))
 
+PANDOCSRC-y := $(sort $(wildcard specs/*.pandoc))
+
 # Documentation targets
 DOC_MAN1 := $(patsubst man/%.pod.1,man1/%.1,$(MAN1SRC-y))
 DOC_MAN5 := $(patsubst man/%.pod.5,man5/%.5,$(MAN5SRC-y))
 DOC_HTML := $(patsubst %.markdown,html/%.html,$(MARKDOWNSRC-y)) \
+            $(patsubst %.pandoc,html/%.html,$(PANDOCSRC-y)) \
             $(patsubst man/%.pod.1,html/man/%.1.html,$(MAN1SRC-y)) \
             $(patsubst man/%.pod.5,html/man/%.5.html,$(MAN5SRC-y)) \
             $(patsubst %.txt,html/%.txt,$(TXTSRC-y)) \
             $(patsubst %,html/hypercall/%/index.html,$(DOC_ARCHES))
 DOC_TXT  := $(patsubst %.txt,txt/%.txt,$(TXTSRC-y)) \
             $(patsubst %.markdown,txt/%.txt,$(MARKDOWNSRC-y)) \
+            $(patsubst %.pandoc,txt/%.txt,$(PANDOCSRC-y)) \
             $(patsubst man/%.pod.1,txt/man/%.1.txt,$(MAN1SRC-y)) \
             $(patsubst man/%.pod.5,txt/man/%.5.txt,$(MAN5SRC-y))
-DOC_PDF  := $(patsubst %.markdown,pdf/%.pdf,$(MARKDOWNSRC-y))
+DOC_PDF  := $(patsubst %.markdown,pdf/%.pdf,$(MARKDOWNSRC-y)) \
+            $(patsubst %.pandoc,pdf/%.pdf,$(PANDOCSRC-y))
 
 # Top level build targets
 .PHONY: all
@@ -174,6 +179,14 @@ else
 endif
 
 pdf/%.pdf: %.markdown
+ifneq ($(PANDOC),)
+	@$(INSTALL_DIR) $(@D)
+	$(PANDOC) --number-sections --toc --standalone $< --output $@
+else
+	@echo "pandoc not installed; skipping $@"
+endif
+
+pdf/%.pdf txt/%.txt html/%.html: %.pandoc
 ifneq ($(PANDOC),)
 	@$(INSTALL_DIR) $(@D)
 	$(PANDOC) --number-sections --toc --standalone $< --output $@
