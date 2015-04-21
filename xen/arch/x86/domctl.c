@@ -1200,7 +1200,7 @@ long arch_do_domctl(
     case XEN_DOMCTL_gettscinfo:
     {
         struct domain *d;
-        xen_guest_tsc_info_t info;
+        xen_guest_tsc_info_t info = { 0 };
 
         ret = -ESRCH;
         d = rcu_lock_domain_by_id(domctl->domain);

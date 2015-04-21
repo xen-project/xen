@@ -95,7 +95,7 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     case XEN_SYSCTL_getdomaininfolist:
     { 
         struct domain *d;
-        struct xen_domctl_getdomaininfo info;
+        struct xen_domctl_getdomaininfo info = { 0 };
         u32 num_domains = 0;
 
         rcu_read_lock(&domlist_read_lock);
