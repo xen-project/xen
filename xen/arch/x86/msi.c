@@ -470,6 +470,7 @@ static struct msi_desc *alloc_msi_entry(unsigned int nr)
     while ( nr-- )
     {
         entry[nr].dev = NULL;
+        entry[nr].irq = -1;
         entry[nr].remap_index = -1;
     }
 
@@ -487,11 +488,19 @@ int __setup_msi_irq(struct irq_desc *desc, struct msi_desc *msidesc,
                     hw_irq_controller *handler)
 {
     struct msi_msg msg;
+    int ret;
 
     desc->msi_desc = msidesc;
     desc->handler = handler;
     msi_compose_msg(desc->arch.vector, desc->arch.cpu_mask, &msg);
-    return write_msi_msg(msidesc, &msg);
+    ret = write_msi_msg(msidesc, &msg);
+    if ( unlikely(ret) )
+    {
+        desc->handler = &no_irq_type;
+        desc->msi_desc = NULL;
+    }
+
+    return ret;
 }
 
 int msi_free_irq(struct msi_desc *entry)
@@ -501,7 +510,8 @@ int msi_free_irq(struct msi_desc *entry)
 
     while ( nr-- )
     {
-        destroy_irq(entry[nr].irq);
+        if ( entry[nr].irq >= 0 )
+            destroy_irq(entry[nr].irq);
 
         /* Free the unused IRTE if intr remap enabled */
         if ( iommu_intremap )
