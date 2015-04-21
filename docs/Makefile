@@ -41,36 +41,21 @@ build: html txt pdf man-pages figs
 html: $(DOC_HTML) html/index.html
 
 .PHONY: txt
-txt:
-ifdef POD2TEXT
-	$(MAKE) $(DOC_TXT)
-else
-	@echo "pod2text not installed; skipping text outputs."
-endif
+txt: $(DOC_TXT)
 
 .PHONY: figs
 figs:
-ifdef FIG2DEV
+ifneq ($(FIG2DEV),)
 	set -x; $(MAKE) -C figs
 else
 	@echo "fig2dev (transfig) not installed; skipping figs."
 endif
 
 .PHONY: man-pages
-man-pages:
-ifdef POD2MAN
-	$(MAKE) $(DOC_MAN1) $(DOC_MAN5)
-else
-	@echo "pod2man not installed; skipping man-pages."
-endif
+man-pages: $(DOC_MAN1) $(DOC_MAN5)
 
 .PHONY: pdf
-pdf:
-ifdef PANDOC
-	$(MAKE) $(DOC_PDF)
-else
-	@echo "pandoc not installed; skipping pdfs."
-endif
+pdf: $(DOC_PDF)
 
 .PHONY: clean
 clean:
@@ -103,22 +88,30 @@ install: install-man-pages install-html
 
 # Individual file build targets
 man1/%.1: man/%.pod.1 Makefile
+ifneq ($(POD2MAN),)
 	@$(INSTALL_DIR) $(@D)
 	$(POD2MAN) --release=$(VERSION) --name=$* -s 1 -c "Xen" $< $@
+else
+	@echo "pod2man not installed; skipping $@"
+endif
 
 man5/%.5: man/%.pod.5 Makefile
+ifneq ($(POD2MAN),)
 	@$(INSTALL_DIR) $(@D)
 	$(POD2MAN) --release=$(VERSION) --name=$* -s 5 -c "Xen" $< $@
+else
+	@echo "pod2man not installed; skipping $@"
+endif
 
 html/index.html: $(DOC_HTML) $(CURDIR)/gen-html-index INDEX
 	$(PERL) -w -- $(CURDIR)/gen-html-index -i INDEX html $(DOC_HTML)
 
 html/%.html: %.markdown
-ifdef MARKDOWN
+ifneq ($(MARKDOWN),)
 	@$(INSTALL_DIR) $(@D)
 	$(MARKDOWN) $< > $@
 else
-	@echo "markdown not installed; skipping $*.html."
+	@echo "markdown not installed; skipping $@"
 endif
 
 html/%.txt: %.txt
@@ -126,19 +119,19 @@ html/%.txt: %.txt
 	$(INSTALL_DATA) $< $@
 
 html/man/%.1.html: man/%.pod.1 Makefile
-ifdef POD2HTML
+ifneq ($(POD2HTML),)
 	@$(INSTALL_DIR) $(@D)
 	$(POD2HTML) --infile=$< --outfile=$@
 else
-	@echo "pod2html not installed; skipping $<."
+	@echo "pod2html not installed; skipping $@"
 endif
 
 html/man/%.5.html: man/%.pod.5 Makefile
-ifdef POD2HTML
+ifneq ($(POD2HTML),)
 	@$(INSTALL_DIR) $(@D)
 	$(POD2HTML) --infile=$< --outfile=$@
 else
-	@echo "pod2html not installed; skipping $<."
+	@echo "pod2html not installed; skipping $@"
 endif
 
 # For non-x86 arches exclude the subarch whole x86 arch.
@@ -165,24 +158,28 @@ txt/%.txt: %.markdown
 	$(INSTALL_DATA) $< $@
 
 txt/man/%.1.txt: man/%.pod.1 Makefile
-ifdef POD2TEXT
+ifneq ($(POD2TEXT),)
 	@$(INSTALL_DIR) $(@D)
 	$(POD2TEXT) $< $@
 else
-	@echo "pod2text not installed; skipping $<."
+	@echo "pod2text not installed; skipping $@"
 endif
 
 txt/man/%.5.txt: man/%.pod.5 Makefile
-ifdef POD2TEXT
+ifneq ($(POD2TEXT),)
 	@$(INSTALL_DIR) $(@D)
 	$(POD2TEXT) $< $@
 else
-	@echo "pod2text not installed; skipping $<."
+	@echo "pod2text not installed; skipping $@"
 endif
 
 pdf/%.pdf: %.markdown
+ifneq ($(PANDOC),)
 	@$(INSTALL_DIR) $(@D)
 	$(PANDOC) --number-sections --toc --standalone $< --output $@
+else
+	@echo "pandoc not installed; skipping $@"
+endif
 
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 $(XEN_ROOT)/config/Docs.mk:
