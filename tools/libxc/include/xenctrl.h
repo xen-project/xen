@@ -1285,7 +1285,7 @@ int xc_getcpuinfo(xc_interface *xch, int max_cpus,
 
 int xc_domain_setmaxmem(xc_interface *xch,
                         uint32_t domid,
-                        unsigned int max_memkb);
+                        uint64_t max_memkb);
 
 int xc_domain_set_memmap_limit(xc_interface *xch,
                                uint32_t domid,

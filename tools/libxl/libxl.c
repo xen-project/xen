@@ -4726,7 +4726,8 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
 {
     GC_INIT(ctx);
     int rc = 1, abort_transaction = 0;
-    uint32_t memorykb = 0, videoram = 0;
+    uint64_t memorykb;
+    uint32_t videoram = 0;
     uint32_t current_target_memkb = 0, new_target_memkb = 0;
     uint32_t current_max_memkb = 0;
     char *memmax, *endptr, *videoram_s = NULL, *target = NULL;
@@ -4820,7 +4821,7 @@ retry_transaction:
         rc = xc_domain_setmaxmem(ctx->xch, domid, memorykb);
         if (rc != 0) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                    "xc_domain_setmaxmem domid=%d memkb=%d failed "
+                    "xc_domain_setmaxmem domid=%u memkb=%"PRIu64" failed "
                     "rc=%d\n", domid, memorykb, rc);
             abort_transaction = 1;
             goto out;

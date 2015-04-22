@@ -635,7 +635,7 @@ int xc_shadow_control(xc_interface *xch,
 
 int xc_domain_setmaxmem(xc_interface *xch,
                         uint32_t domid,
-                        unsigned int max_memkb)
+                        uint64_t max_memkb)
 {
     DECLARE_DOMCTL;
     domctl.cmd = XEN_DOMCTL_max_mem;
