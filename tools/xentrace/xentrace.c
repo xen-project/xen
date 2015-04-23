@@ -521,23 +521,68 @@ static struct t_struct *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
     return &tbufs;
 }
 
+void print_cpu_mask(xc_cpumap_t map)
+{
+    unsigned int v, had_printed = 0;
+    int i;
+
+    fprintf(stderr, "change cpumask to 0x");
+
+    for ( i = xc_get_cpumap_size(xc_handle); i >= 0; i-- )
+    {
+        v = map[i];
+        if ( v || had_printed || !i ) {
+            if (had_printed)
+                fprintf(stderr,"%02x", v);
+            else
+                fprintf(stderr,"%x", v);
+            had_printed = 1;
+        }
+   }
+   fprintf(stderr, "\n");
+}
+
+static void set_cpu_mask(uint32_t mask)
+{
+    int i, ret = 0;
+    xc_cpumap_t map;
+
+    map = xc_cpumap_alloc(xc_handle);
+    if ( !map )
+        goto out;
+
+    /*
+     * If mask is set, copy the bits out of it.  This still works for
+     * systems with more than 32 cpus, as the shift will just shift
+     * mask down to zero.
+     */
+    for ( i = 0; i < xc_get_cpumap_size(xc_handle); i++ )
+        map[i] = (mask >> (i * 8)) & 0xff;
+
+    ret = xc_tbuf_set_cpu_mask(xc_handle, map);
+    if ( ret != 0 )
+        goto out;
+
+    print_cpu_mask(map);
+    free(map);
+    return;
+out:
+    PERROR("Failure to get trace buffer pointer from Xen and set the new mask");
+    exit(EXIT_FAILURE);
+}
+
 /**
- * set_mask - set the cpu/event mask in HV
+ * set_mask - set the event mask in HV
  * @mask:           the new mask 
  * @type:           the new mask type,0-event mask, 1-cpu mask
  *
  */
-static void set_mask(uint32_t mask, int type)
+static void set_evt_mask(uint32_t mask)
 {
     int ret = 0;
 
-    if (type == 1) {
-        ret = xc_tbuf_set_cpu_mask(xc_handle, mask);
-        fprintf(stderr, "change cpumask to 0x%x\n", mask);
-    } else if (type == 0) {
-        ret = xc_tbuf_set_evt_mask(xc_handle, mask);
-        fprintf(stderr, "change evtmask to 0x%x\n", mask);
-    }
+    ret = xc_tbuf_set_evt_mask(xc_handle, mask);
+    fprintf(stderr, "change evtmask to 0x%x\n", mask);
 
     if ( ret != 0 )
     {
@@ -1018,10 +1063,11 @@ int main(int argc, char **argv)
     }
 
     if ( opts.evt_mask != 0 )
-        set_mask(opts.evt_mask, 0);
+        set_evt_mask(opts.evt_mask);
+
 
     if ( opts.cpu_mask != 0 )
-        set_mask(opts.cpu_mask, 1);
+        set_cpu_mask(opts.cpu_mask);
 
     if ( opts.timeout != 0 ) 
         alarm(opts.timeout);

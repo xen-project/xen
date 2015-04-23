@@ -1588,7 +1588,7 @@ int xc_tbuf_set_size(xc_interface *xch, unsigned long size);
  */
 int xc_tbuf_get_size(xc_interface *xch, unsigned long *size);
 
-int xc_tbuf_set_cpu_mask(xc_interface *xch, uint32_t mask);
+int xc_tbuf_set_cpu_mask(xc_interface *xch, xc_cpumap_t mask);
 
 int xc_tbuf_set_evt_mask(xc_interface *xch, uint32_t mask);
 
