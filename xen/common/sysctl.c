@@ -144,7 +144,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     case XEN_SYSCTL_getcpuinfo:
     {
         uint32_t i, nr_cpus;
-        struct xen_sysctl_cpuinfo cpuinfo;
+        struct xen_sysctl_cpuinfo cpuinfo = { 0 };
 
         nr_cpus = min(op->u.getcpuinfo.max_cpus, nr_cpu_ids);
 
@@ -283,6 +283,8 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 
         if ( do_meminfo || do_distance )
         {
+            xen_sysctl_meminfo_t meminfo = { 0 };
+
             if ( ni->num_nodes < num_nodes )
             {
                 ret = -ENOBUFS;
@@ -293,7 +295,6 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 
             for ( ; i < num_nodes; i++ )
             {
-                xen_sysctl_meminfo_t meminfo;
                 static uint32_t distance[MAX_NUMNODES];
 
                 if ( do_meminfo )
@@ -355,6 +356,8 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         num_cpus = cpumask_last(&cpu_online_map) + 1;
         if ( !guest_handle_is_null(ti->cputopo) )
         {
+            xen_sysctl_cputopo_t cputopo = { 0 };
+
             if ( ti->num_cpus < num_cpus )
             {
                 ret = -ENOBUFS;
@@ -365,8 +368,6 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 
             for ( ; i < num_cpus; i++ )
             {
-                xen_sysctl_cputopo_t cputopo;
-
                 if ( cpu_present(i) )
                 {
                     cputopo.core = cpu_to_core(i);
