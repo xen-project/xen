@@ -808,8 +808,8 @@ static int make_gic_node(const struct domain *d, void *fdt,
 {
     const struct dt_device_node *gic = dt_interrupt_controller;
     int res = 0;
-    const void *addrcells;
-    u32 addrcells_len;
+    const void *addrcells, *sizecells;
+    u32 addrcells_len, sizecells_len;
 
     /*
      * Xen currently supports only a single GIC. Discard any secondary
@@ -823,7 +823,7 @@ static int make_gic_node(const struct domain *d, void *fdt,
 
     DPRINT("Create gic node\n");
 
-    res = gic_make_node(d, node, fdt);
+    res = fdt_begin_node(fdt, "interrupt-controller");
     if ( res )
         return res;
 
@@ -847,11 +847,23 @@ static int make_gic_node(const struct domain *d, void *fdt,
             return res;
     }
 
+    sizecells = dt_get_property(gic, "#size-cells", &sizecells_len);
+    if ( sizecells )
+    {
+        res = fdt_property(fdt, "#size-cells", sizecells, sizecells_len);
+        if ( res )
+            return res;
+    }
+
     res = fdt_property_cell(fdt, "#interrupt-cells", 3);
     if ( res )
         return res;
 
     res = fdt_property(fdt, "interrupt-controller", NULL, 0);
+    if ( res )
+        return res;
+
+    res = gic_make_node(d, node, fdt);
     if ( res )
         return res;
 

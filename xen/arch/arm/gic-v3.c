@@ -1098,10 +1098,6 @@ static int gicv3_make_dt_node(const struct domain *d,
         return -FDT_ERR_XEN(ENOENT);
     }
 
-    res = fdt_begin_node(fdt, "interrupt-controller");
-    if ( res )
-        return res;
-
     res = fdt_property(fdt, "compatible", compatible, len);
     if ( res )
         return res;
