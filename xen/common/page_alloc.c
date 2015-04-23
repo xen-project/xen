@@ -604,7 +604,7 @@ static struct page_info *alloc_heap_pages(
     }
     first_node = node;
 
-    ASSERT(node >= 0);
+    ASSERT(node < MAX_NUMNODES);
     ASSERT(zone_lo <= zone_hi);
     ASSERT(zone_hi < NR_ZONES);
 
