@@ -607,7 +607,7 @@ static inline void sh_put_ref(struct domain *d, mfn_t smfn, paddr_t entry_pa)
 /* Walk the list of pinned shadows, from the tail forwards,
  * skipping the non-head-page entries */
 static inline struct page_info *
-prev_pinned_shadow(const struct page_info *page,
+prev_pinned_shadow(struct page_info *page,
                    const struct domain *d)
 {
     struct page_info *p;
