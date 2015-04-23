@@ -858,8 +858,8 @@ static int iommu_page_fault_do_one(struct iommu *iommu, int type,
         break;
     }
 
-    gprintk(XENLOG_G_WARNING VTDPREFIX, "%s: reason %02x - %s\n",
-            kind, fault_reason, reason);
+    printk(XENLOG_G_WARNING VTDPREFIX "%s: reason %02x - %s\n",
+           kind, fault_reason, reason);
 
     if ( iommu_verbose && fault_type == DMA_REMAP )
         print_vtd_entries(iommu, PCI_BUS(source_id), PCI_DEVFN2(source_id),
