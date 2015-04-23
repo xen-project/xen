@@ -395,6 +395,15 @@ int xc_get_cpumap_size(xc_interface *xch);
 /* allocate a cpumap */
 xc_cpumap_t xc_cpumap_alloc(xc_interface *xch);
 
+/* clear an CPU from the cpumap. */
+void xc_cpumap_clearcpu(int cpu, xc_cpumap_t map);
+
+/* set an CPU in the cpumap. */
+void xc_cpumap_setcpu(int cpu, xc_cpumap_t map);
+
+/* Test whether the CPU in cpumap is set. */
+int xc_cpumap_testcpu(int cpu, xc_cpumap_t map);
+
 /*
  * NODEMAP handling
  */

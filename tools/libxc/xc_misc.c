@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#include "xc_bitops.h"
 #include "xc_private.h"
 #include <xen/hvm/hvm_op.h>
 
@@ -91,6 +92,31 @@ xc_cpumap_t xc_cpumap_alloc(xc_interface *xch)
     if (sz <= 0)
         return NULL;
     return calloc(1, sz);
+}
+
+/*
+ * xc_bitops.h has macros that do this as well - however they assume that
+ * the bitmask is word aligned but xc_cpumap_t is only guaranteed to be
+ * byte aligned and so we need byte versions for architectures which do
+ * not support misaligned accesses (which is basically everyone
+ * but x86, although even on x86 it can be inefficient).
+ */
+#define BITS_PER_CPUMAP(map) (sizeof(*map) * 8)
+#define CPUMAP_ENTRY(cpu, map) ((map))[(cpu) / BITS_PER_CPUMAP(map)]
+#define CPUMAP_SHIFT(cpu, map) ((cpu) % BITS_PER_CPUMAP(map))
+void xc_cpumap_clearcpu(int cpu, xc_cpumap_t map)
+{
+    CPUMAP_ENTRY(cpu, map) &= ~(1U << CPUMAP_SHIFT(cpu, map));
+}
+
+void xc_cpumap_setcpu(int cpu, xc_cpumap_t map)
+{
+    CPUMAP_ENTRY(cpu, map) |= (1U << CPUMAP_SHIFT(cpu, map));
+}
+
+int xc_cpumap_testcpu(int cpu, xc_cpumap_t map)
+{
+    return (CPUMAP_ENTRY(cpu, map) >> CPUMAP_SHIFT(cpu, map)) & 1;
 }
 
 xc_nodemap_t xc_nodemap_alloc(xc_interface *xch)
