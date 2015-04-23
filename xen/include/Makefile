@@ -104,9 +104,10 @@ headers.chk: $(PUBLIC_ANSI_HEADERS) Makefile
 headers++.chk: $(PUBLIC_HEADERS) Makefile
 	if $(CXX) -v >/dev/null 2>&1; then \
 	    for i in $(filter %.h,$^); do \
-	        $(CXX) -x c++ -std=gnu++98 -Wall -Werror -D__XEN_TOOLS__ \
-	               -include stdint.h -include public/xen.h \
-	               -S -o /dev/null $$i || exit 1; \
+	        echo '#include "'$$i'"' \
+	        | $(CXX) -x c++ -std=gnu++98 -Wall -Werror -D__XEN_TOOLS__ \
+	          -include stdint.h -include public/xen.h -S -o /dev/null - \
+	        || exit 1; \
 	        echo $$i; \
 	    done ; \
 	fi >$@.new
