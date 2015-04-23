@@ -2328,7 +2328,10 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                                     HVM_PARAM_PAE_ENABLED, pae))
          || (frc = xc_hvm_param_set(xch, dom,
                                     HVM_PARAM_STORE_EVTCHN,
-                                    store_evtchn)) )
+                                    store_evtchn))
+         || (frc = xc_hvm_param_set(xch, dom,
+                                    HVM_PARAM_CONSOLE_EVTCHN,
+                                    console_evtchn)) )
     {
         PERROR("error setting HVM params: %i", frc);
         goto out;
