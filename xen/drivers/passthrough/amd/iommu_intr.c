@@ -529,10 +529,12 @@ int amd_iommu_msi_msg_update_ire(
     } while ( PCI_SLOT(bdf) == PCI_SLOT(pdev->devfn) );
 
     if ( !rc )
+    {
         for ( i = 1; i < nr; ++i )
             msi_desc[i].remap_index = msi_desc->remap_index + i;
+        msg->data = data;
+    }
 
-    msg->data = data;
     return rc;
 }
 
