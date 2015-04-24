@@ -397,7 +397,7 @@ XLU_ConfigValue *xlu__cfg_list_mk(CfgParseContext *ctx,
     value = malloc(sizeof(*value));
     if (!value) goto xe;
     value->type = XLU_LIST;
-    value->u.list.nvalues = 1;
+    value->u.list.nvalues = !!val;
     value->u.list.avalues = 1;
     value->u.list.values = values;
     memcpy(&value->loc, loc, sizeof(*loc));
