@@ -1497,7 +1497,6 @@ retry_transaction:
         LIBXL__LOG(CTX, XTL_DEBUG, "  %s", *arg);
 
     spawn->what = GCSPRINTF("domain %d device model", domid);
-    spawn->xspath = GCSPRINTF("/local/domain/0/device-model/%d/state", domid);
     spawn->xspath = libxl__device_model_xs_path(gc, LIBXL_TOOLSTACK_DOMID,
                                                 domid, "/state");
     spawn->timeout_ms = LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000;
