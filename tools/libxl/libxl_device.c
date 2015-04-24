@@ -851,7 +851,7 @@ void libxl__initiate_device_remove(libxl__egc *egc,
                 LOG(ERROR, "unable to write to xenstore path %s", online_path);
                 goto out;
             }
-            rc = libxl__xs_write_checked(gc, t, state_path, "5");
+            rc = libxl__xs_write_checked(gc, t, state_path, GCSPRINTF("%d", XenbusStateClosing));
             if (rc) {
                 LOG(ERROR, "unable to write to xenstore path %s", state_path);
                 goto out;
@@ -913,7 +913,7 @@ static void device_qemu_timeout(libxl__egc *egc, libxl__ev_time *ev,
         if (rc) goto out;
 
         if (xs_state && atoi(xs_state) != XenbusStateClosed) {
-            rc = libxl__xs_write_checked(gc, XBT_NULL, state_path, "6");
+            rc = libxl__xs_write_checked(gc, XBT_NULL, state_path, GCSPRINTF("%d", XenbusStateClosed));
             if (rc) goto out;
         }
 

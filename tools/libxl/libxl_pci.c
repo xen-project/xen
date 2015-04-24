@@ -61,7 +61,7 @@ static void libxl_create_pci_backend_device(libxl__gc *gc, flexarray_t *back, in
               libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d,permissive=%d",
                              pcidev->msitranslate, pcidev->power_mgmt,
                              pcidev->permissive));
-    flexarray_append_pair(back, libxl__sprintf(gc, "state-%d", num), libxl__sprintf(gc, "%d", 1));
+    flexarray_append_pair(back, libxl__sprintf(gc, "state-%d", num), GCSPRINTF("%d", XenbusStateInitialising));
 }
 
 static int libxl__device_from_pcidev(libxl__gc *gc, uint32_t domid,
@@ -99,7 +99,7 @@ int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
 
     flexarray_append_pair(back, "frontend-id", libxl__sprintf(gc, "%d", domid));
     flexarray_append_pair(back, "online", "1");
-    flexarray_append_pair(back, "state", libxl__sprintf(gc, "%d", 1));
+    flexarray_append_pair(back, "state", GCSPRINTF("%d", XenbusStateInitialising));
     flexarray_append_pair(back, "domain", libxl__domid_to_name(gc, domid));
 
     for (i = 0; i < num; i++, pcidev++)
@@ -107,7 +107,7 @@ int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
 
     flexarray_append_pair(back, "num_devs", libxl__sprintf(gc, "%d", num));
     flexarray_append_pair(front, "backend-id", libxl__sprintf(gc, "%d", 0));
-    flexarray_append_pair(front, "state", libxl__sprintf(gc, "%d", 1));
+    flexarray_append_pair(front, "state", GCSPRINTF("%d", XenbusStateInitialising));
 
     libxl__device_generic_add(gc, XBT_NULL, &device,
                               libxl__xs_kvs_of_flexarray(gc, back, back->count),
@@ -144,7 +144,7 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
         return ERROR_FAIL;
 
     if (!starting && domtype == LIBXL_DOMAIN_TYPE_PV) {
-        if (libxl__wait_for_backend(gc, be_path, "4") < 0)
+        if (libxl__wait_for_backend(gc, be_path, GCSPRINTF("%d", XenbusStateConnected)) < 0)
             return ERROR_FAIL;
     }
 
@@ -155,7 +155,7 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
     libxl_create_pci_backend_device(gc, back, num, pcidev);
     flexarray_append_pair(back, "num_devs", libxl__sprintf(gc, "%d", num + 1));
     if (!starting)
-        flexarray_append_pair(back, "state", libxl__sprintf(gc, "%d", 7));
+        flexarray_append_pair(back, "state", GCSPRINTF("%d", XenbusStateReconfiguring));
 
     GCNEW(device);
     libxl__device_from_pcidev(gc, domid, pcidev, device);
@@ -213,7 +213,7 @@ static int libxl__device_pci_remove_xenstore(libxl__gc *gc, uint32_t domid, libx
         return ERROR_FAIL;
 
     if (domtype == LIBXL_DOMAIN_TYPE_PV) {
-        if (libxl__wait_for_backend(gc, be_path, "4") < 0) {
+        if (libxl__wait_for_backend(gc, be_path, GCSPRINTF("%d", XenbusStateConnected)) < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "pci backend at %s is not ready", be_path);
             return ERROR_FAIL;
         }
@@ -235,14 +235,14 @@ static int libxl__device_pci_remove_xenstore(libxl__gc *gc, uint32_t domid, libx
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
-    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/state-%d", be_path, i), "5", strlen("5"));
-    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/state", be_path), "7", strlen("7"));
+    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/state-%d", be_path, i), GCSPRINTF("%d", XenbusStateClosing), 1);
+    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/state", be_path), GCSPRINTF("%d", XenbusStateReconfiguring), 1);
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
             goto retry_transaction;
 
     if (domtype == LIBXL_DOMAIN_TYPE_PV) {
-        if (libxl__wait_for_backend(gc, be_path, "4") < 0) {
+        if (libxl__wait_for_backend(gc, be_path, GCSPRINTF("%d", XenbusStateConnected)) < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "pci backend at %s is not ready", be_path);
             return ERROR_FAIL;
         }
