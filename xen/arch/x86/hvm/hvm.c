@@ -961,6 +961,7 @@ static int hvm_ioreq_server_init(struct hvm_ioreq_server *s, struct domain *d,
 static void hvm_ioreq_server_deinit(struct hvm_ioreq_server *s,
                                     bool_t is_default)
 {
+    ASSERT(!s->enabled);
     hvm_ioreq_server_remove_all_vcpus(s);
     hvm_ioreq_server_unmap_pages(s, is_default);
     hvm_ioreq_server_free_rangesets(s, is_default);
@@ -1062,6 +1063,8 @@ static int hvm_destroy_ioreq_server(struct domain *d, ioservid_t id)
             continue;
 
         domain_pause(d);
+
+        hvm_ioreq_server_disable(s, 0);
 
         list_del(&s->list_entry);
         
@@ -1321,11 +1324,10 @@ static void hvm_destroy_all_ioreq_servers(struct domain *d)
     {
         bool_t is_default = (s == d->arch.hvm_domain.default_ioreq_server);
 
+        hvm_ioreq_server_disable(s, is_default);
+
         if ( is_default )
-        {
-            hvm_ioreq_server_disable(s, 1);
             d->arch.hvm_domain.default_ioreq_server = NULL;
-        }
 
         list_del(&s->list_entry);
         
