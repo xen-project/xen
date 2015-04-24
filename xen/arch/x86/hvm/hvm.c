@@ -495,8 +495,8 @@ static void hvm_free_ioreq_gmfn(struct domain *d, unsigned long gmfn)
 {
     unsigned int i = gmfn - d->arch.hvm_domain.ioreq_gmfn.base;
 
-    if (gmfn != INVALID_GFN)
-        clear_bit(i, &d->arch.hvm_domain.ioreq_gmfn.mask);
+    if ( gmfn != INVALID_GFN )
+        set_bit(i, &d->arch.hvm_domain.ioreq_gmfn.mask);
 }
 
 static void hvm_unmap_ioreq_page(struct hvm_ioreq_server *s, bool_t buf)
