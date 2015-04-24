@@ -37,46 +37,40 @@ void hwdom_shutdown(u8 reason)
     switch ( reason )
     {
     case SHUTDOWN_poweroff:
-    {
-        printk("Domain 0 halted: halting machine.\n");
+        printk("Hardware Dom%u halted: halting machine\n",
+               hardware_domain->domain_id);
         machine_halt();
         break; /* not reached */
-    }
 
     case SHUTDOWN_crash:
-    {
         debugger_trap_immediate();
-        printk("Domain 0 crashed: ");
+        printk("Hardware Dom%u crashed: ", hardware_domain->domain_id);
 #ifdef CONFIG_KEXEC
         kexec_crash();
 #endif
         maybe_reboot();
         break; /* not reached */
-    }
 
     case SHUTDOWN_reboot:
-    {
-        printk("Domain 0 shutdown: rebooting machine.\n");
+        printk("Hardware Dom%u shutdown: rebooting machine\n",
+               hardware_domain->domain_id);
         machine_restart(0);
         break; /* not reached */
-    }
 
     case SHUTDOWN_watchdog:
-    {
-        printk("Domain 0 shutdown: watchdog rebooting machine.\n");
+        printk("Hardware Dom%u shutdown: watchdog rebooting machine\n",
+               hardware_domain->domain_id);
 #ifdef CONFIG_KEXEC
         kexec_crash();
 #endif
         machine_restart(0);
         break; /* not reached */
-    }
 
     default:
-    {
-        printk("Domain 0 shutdown (unknown reason %u): ", reason);
+        printk("Hardware Dom%u shutdown (unknown reason %u): ",
+               hardware_domain->domain_id, reason);
         maybe_reboot();
         break; /* not reached */
-    }
     }
 }  
 
