@@ -160,6 +160,7 @@ static paddr_t __p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
     p2m_type_t _t;
     unsigned int level, root_table;
 
+    ASSERT(spin_is_locked(&p2m->lock));
     BUILD_BUG_ON(THIRD_MASK != PAGE_MASK);
 
     /* Allow t to be NULL */
