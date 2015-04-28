@@ -109,7 +109,16 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
         return 0;
     }
     default:
-        return subarch_do_domctl(domctl, d, u_domctl);
+    {
+        int rc;
+
+        rc = subarch_do_domctl(domctl, d, u_domctl);
+
+        if ( rc == -ENOSYS )
+            rc = iommu_do_domctl(domctl, d, u_domctl);
+
+        return rc;
+    }
     }
 }
 
