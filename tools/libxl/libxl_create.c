@@ -1218,11 +1218,9 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
 
         LOG(DEBUG, "dom%d irq %d", domid, irq);
 
-        ret = irq >= 0 ? xc_physdev_map_pirq(CTX->xch, domid, irq, &irq)
+        ret = irq >= 0 ? libxl__arch_domain_map_irq(gc, domid, irq)
                        : -EOVERFLOW;
-        if (!ret)
-            ret = xc_domain_irq_permission(CTX->xch, domid, irq, 1);
-        if (ret < 0) {
+        if (ret) {
             LOGE(ERROR, "failed give dom%d access to irq %d", domid, irq);
             ret = ERROR_FAIL;
             goto error_out;

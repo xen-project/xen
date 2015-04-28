@@ -424,6 +424,19 @@ out:
     return rc;
 }
 
+int libxl__arch_domain_map_irq(libxl__gc *gc, uint32_t domid, int irq)
+{
+    int ret;
+
+    ret = xc_physdev_map_pirq(CTX->xch, domid, irq, &irq);
+    if (ret)
+        return ret;
+
+    ret = xc_domain_irq_permission(CTX->xch, domid, irq, 1);
+
+    return ret;
+}
+
 /*
  * Local variables:
  * mode: C
