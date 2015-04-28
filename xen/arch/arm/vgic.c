@@ -371,6 +371,13 @@ struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq)
     return n;
 }
 
+struct pending_irq *spi_to_pending(struct domain *d, unsigned int irq)
+{
+    ASSERT(irq >= NR_LOCAL_IRQS);
+
+    return &d->arch.vgic.pending_irqs[irq - 32];
+}
+
 void vgic_clear_pending_irqs(struct vcpu *v)
 {
     struct pending_irq *p, *t;

@@ -185,6 +185,7 @@ extern void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int virq);
 extern void vgic_vcpu_inject_spi(struct domain *d, unsigned int virq);
 extern void vgic_clear_pending_irqs(struct vcpu *v);
 extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
+extern struct pending_irq *spi_to_pending(struct domain *d, unsigned int irq);
 extern struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n, int s);
 extern struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq);
 extern int vgic_emulate(struct cpu_user_regs *regs, union hsr hsr);
