@@ -513,6 +513,52 @@ free_info:
     return retval;
 }
 
+int release_guest_irq(struct domain *d, unsigned int virq)
+{
+    struct irq_desc *desc;
+    struct irq_guest *info;
+    unsigned long flags;
+    struct pending_irq *p;
+    int ret;
+
+    /* Only SPIs are supported */
+    if ( virq < NR_LOCAL_IRQS || virq >= vgic_num_irqs(d) )
+        return -EINVAL;
+
+    p = spi_to_pending(d, virq);
+    if ( !p->desc )
+        return -EINVAL;
+
+    desc = p->desc;
+
+    spin_lock_irqsave(&desc->lock, flags);
+
+    ret = -EINVAL;
+    if ( !test_bit(_IRQ_GUEST, &desc->status) )
+        goto unlock;
+
+    info = irq_get_guest_info(desc);
+    ret = -EINVAL;
+    if ( d != info->d )
+        goto unlock;
+
+    ret = gic_remove_irq_from_guest(d, virq, desc);
+    if ( ret )
+        goto unlock;
+
+    spin_unlock_irqrestore(&desc->lock, flags);
+
+    release_irq(desc->irq, info);
+    xfree(info);
+
+    return 0;
+
+unlock:
+    spin_unlock_irqrestore(&desc->lock, flags);
+
+    return ret;
+}
+
 /*
  * pirq event channels. We don't use these on ARM, instead we use the
  * features of the GIC to inject virtualised normal interrupts.

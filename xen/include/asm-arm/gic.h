@@ -220,6 +220,10 @@ extern int gic_route_irq_to_guest(struct domain *, unsigned int virq,
                                   struct irq_desc *desc,
                                   unsigned int priority);
 
+/* Remove an IRQ passthrough to a guest */
+int gic_remove_irq_from_guest(struct domain *d, unsigned int virq,
+                              struct irq_desc *desc);
+
 extern void gic_inject(void);
 extern void gic_clear_pending_irqs(struct vcpu *v);
 extern int gic_events_need_delivery(void);

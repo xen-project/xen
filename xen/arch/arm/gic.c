@@ -163,6 +163,51 @@ out:
     return res;
 }
 
+/* This function only works with SPIs for now */
+int gic_remove_irq_from_guest(struct domain *d, unsigned int virq,
+                              struct irq_desc *desc)
+{
+    struct vcpu *v_target = vgic_get_target_vcpu(d->vcpu[0], virq);
+    struct vgic_irq_rank *rank = vgic_rank_irq(v_target, virq);
+    struct pending_irq *p = irq_to_pending(v_target, virq);
+    unsigned long flags;
+
+    ASSERT(spin_is_locked(&desc->lock));
+    ASSERT(test_bit(_IRQ_GUEST, &desc->status));
+    ASSERT(p->desc == desc);
+
+    vgic_lock_rank(v_target, rank, flags);
+
+    if ( d->is_dying )
+    {
+        desc->handler->shutdown(desc);
+
+        /* EOI the IRQ it it has not been done by the guest */
+        if ( test_bit(_IRQ_INPROGRESS, &desc->status) )
+            gic_hw_ops->deactivate_irq(desc);
+        clear_bit(_IRQ_INPROGRESS, &desc->status);
+    }
+    else
+    {
+        /*
+         * TODO: Handle eviction from LRs For now, deny
+         * remove if the IRQ is inflight or not disabled.
+         */
+        if ( test_bit(_IRQ_INPROGRESS, &desc->status) ||
+             !test_bit(_IRQ_DISABLED, &desc->status) )
+            return -EBUSY;
+    }
+
+    clear_bit(_IRQ_GUEST, &desc->status);
+    desc->handler = &no_irq_type;
+
+    p->desc = NULL;
+
+    vgic_unlock_rank(v_target, rank, flags);
+
+    return 0;
+}
+
 int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
                   unsigned int *out_hwirq,
                   unsigned int *out_type)

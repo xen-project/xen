@@ -135,6 +135,22 @@ void register_vgic_ops(struct domain *d, const struct vgic_ops *ops)
 
 void domain_vgic_free(struct domain *d)
 {
+    int i;
+    int ret;
+
+    for ( i = 0; i < (d->arch.vgic.nr_spis); i++ )
+    {
+        struct pending_irq *p = spi_to_pending(d, i + 32);
+
+        if ( p->desc )
+        {
+            ret = release_guest_irq(d, p->irq);
+            if ( ret )
+                dprintk(XENLOG_G_WARNING, "d%u: Failed to release virq %u ret = %d\n",
+                        d->domain_id, p->irq, ret);
+        }
+    }
+
     xfree(d->arch.vgic.shared_irqs);
     xfree(d->arch.vgic.pending_irqs);
     xfree(d->arch.vgic.allocated_irqs);
