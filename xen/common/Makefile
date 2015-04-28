@@ -9,6 +9,7 @@ obj-y += event_2l.o
 obj-y += event_channel.o
 obj-y += event_fifo.o
 obj-y += grant_table.o
+obj-y += guestcopy.o
 obj-y += irq.o
 obj-y += kernel.o
 obj-y += keyhandler.o
