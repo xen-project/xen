@@ -795,6 +795,10 @@ int domain_relinquish_resources(struct domain *d)
     switch ( d->arch.relmem )
     {
     case RELMEM_not_started:
+        ret = iommu_release_dt_devices(d);
+        if ( ret )
+            return ret;
+
         d->arch.relmem = RELMEM_xen;
         /* Fallthrough */
 

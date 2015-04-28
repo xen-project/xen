@@ -66,7 +66,6 @@ int arch_iommu_domain_init(struct domain *d)
 
 void arch_iommu_domain_destroy(struct domain *d)
 {
-    iommu_dt_domain_destroy(d);
 }
 
 int arch_iommu_populate_page_table(struct domain *d)

@@ -117,7 +117,7 @@ void iommu_read_msi_from_ire(struct msi_desc *msi_desc, struct msi_msg *msg);
 int iommu_assign_dt_device(struct domain *d, struct dt_device_node *dev);
 int iommu_deassign_dt_device(struct domain *d, struct dt_device_node *dev);
 int iommu_dt_domain_init(struct domain *d);
-void iommu_dt_domain_destroy(struct domain *d);
+int iommu_release_dt_devices(struct domain *d);
 
 #endif /* HAS_DEVICE_TREE */
 
