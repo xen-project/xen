@@ -504,6 +504,7 @@ typedef enum pt_irq_type_e {
     PT_IRQ_TYPE_ISA,
     PT_IRQ_TYPE_MSI,
     PT_IRQ_TYPE_MSI_TRANSLATE,
+    PT_IRQ_TYPE_SPI,    /* ARM: valid range 32-1019 */
 } pt_irq_type_t;
 struct xen_domctl_bind_pt_irq {
     uint32_t machine_irq;
@@ -524,6 +525,9 @@ struct xen_domctl_bind_pt_irq {
             uint32_t gflags;
             uint64_aligned_t gtable;
         } msi;
+        struct {
+            uint16_t spi;
+        } spi;
     } u;
 };
 typedef struct xen_domctl_bind_pt_irq xen_domctl_bind_pt_irq_t;

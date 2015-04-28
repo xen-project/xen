@@ -2124,6 +2124,16 @@ int xc_domain_bind_pt_isa_irq(xc_interface *xch,
                               uint32_t domid,
                               uint8_t machine_irq);
 
+int xc_domain_bind_pt_spi_irq(xc_interface *xch,
+                              uint32_t domid,
+                              uint16_t vspi,
+                              uint16_t spi);
+
+int xc_domain_unbind_pt_spi_irq(xc_interface *xch,
+                                uint32_t domid,
+                                uint16_t vspi,
+                                uint16_t spi);
+
 int xc_domain_set_machine_address_size(xc_interface *xch,
 				       uint32_t domid,
 				       unsigned int width);

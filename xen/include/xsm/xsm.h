@@ -107,6 +107,8 @@ struct xsm_operations {
     int (*map_domain_irq) (struct domain *d, int irq, void *data);
     int (*unmap_domain_pirq) (struct domain *d);
     int (*unmap_domain_irq) (struct domain *d, int irq, void *data);
+    int (*bind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
+    int (*unbind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
     int (*irq_permission) (struct domain *d, int pirq, uint8_t allow);
     int (*iomem_permission) (struct domain *d, uint64_t s, uint64_t e, uint8_t allow);
     int (*iomem_mapping) (struct domain *d, uint64_t s, uint64_t e, uint8_t allow);
@@ -178,8 +180,6 @@ struct xsm_operations {
     int (*mmuext_op) (struct domain *d, struct domain *f);
     int (*update_va_mapping) (struct domain *d, struct domain *f, l1_pgentry_t pte);
     int (*priv_mapping) (struct domain *d, struct domain *t);
-    int (*bind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
-    int (*unbind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
     int (*ioport_permission) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
     int (*ioport_mapping) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
 #endif
@@ -428,6 +428,18 @@ static inline int xsm_unmap_domain_irq (xsm_default_t def, struct domain *d, int
     return xsm_ops->unmap_domain_irq(d, irq, data);
 }
 
+static inline int xsm_bind_pt_irq(xsm_default_t def, struct domain *d,
+                                  struct xen_domctl_bind_pt_irq *bind)
+{
+    return xsm_ops->bind_pt_irq(d, bind);
+}
+
+static inline int xsm_unbind_pt_irq(xsm_default_t def, struct domain *d,
+                                    struct xen_domctl_bind_pt_irq *bind)
+{
+    return xsm_ops->unbind_pt_irq(d, bind);
+}
+
 static inline int xsm_irq_permission (xsm_default_t def, struct domain *d, int pirq, uint8_t allow)
 {
     return xsm_ops->irq_permission(d, pirq, allow);
@@ -664,18 +676,6 @@ static inline int xsm_update_va_mapping(xsm_default_t def, struct domain *d, str
 static inline int xsm_priv_mapping(xsm_default_t def, struct domain *d, struct domain *t)
 {
     return xsm_ops->priv_mapping(d, t);
-}
-
-static inline int xsm_bind_pt_irq(xsm_default_t def, struct domain *d,
-                                                struct xen_domctl_bind_pt_irq *bind)
-{
-    return xsm_ops->bind_pt_irq(d, bind);
-}
-
-static inline int xsm_unbind_pt_irq(xsm_default_t def, struct domain *d,
-                                                struct xen_domctl_bind_pt_irq *bind)
-{
-    return xsm_ops->unbind_pt_irq(d, bind);
 }
 
 static inline int xsm_ioport_permission (xsm_default_t def, struct domain *d, uint32_t s, uint32_t e, uint8_t allow)

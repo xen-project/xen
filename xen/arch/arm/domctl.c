@@ -10,6 +10,8 @@
 #include <xen/errno.h>
 #include <xen/sched.h>
 #include <xen/hypercall.h>
+#include <xen/iocap.h>
+#include <xsm/xsm.h>
 #include <public/domctl.h>
 
 long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
@@ -29,6 +31,82 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
             return -EINVAL;
 
         return p2m_cache_flush(d, s, e);
+    }
+    case XEN_DOMCTL_bind_pt_irq:
+    {
+        int rc;
+        xen_domctl_bind_pt_irq_t *bind = &domctl->u.bind_pt_irq;
+        uint32_t irq = bind->u.spi.spi;
+        uint32_t virq = bind->machine_irq;
+
+        /* We only support PT_IRQ_TYPE_SPI */
+        if ( bind->irq_type != PT_IRQ_TYPE_SPI )
+            return -EOPNOTSUPP;
+
+        /*
+         * XXX: For now map the interrupt 1:1. Other support will require to
+         * modify domain_pirq_to_irq macro.
+         */
+        if ( irq != virq )
+            return -EINVAL;
+
+        /*
+         * ARM doesn't require separating IRQ assignation into 2
+         * hypercalls (PHYSDEVOP_map_pirq and DOMCTL_bind_pt_irq).
+         *
+         * Call xsm_map_domain_irq in order to keep the same XSM checks
+         * done by the 2 hypercalls for consistency with other
+         * architectures.
+         */
+        rc = xsm_map_domain_irq(XSM_HOOK, d, irq, NULL);
+        if ( rc )
+            return rc;
+
+        rc = xsm_bind_pt_irq(XSM_HOOK, d, bind);
+        if ( rc )
+            return rc;
+
+        if ( !irq_access_permitted(current->domain, irq) )
+            return -EPERM;
+
+        if ( !vgic_reserve_virq(d, virq) )
+            return -EBUSY;
+
+        rc = route_irq_to_guest(d, virq, irq, "routed IRQ");
+        if ( rc )
+            vgic_free_virq(d, virq);
+
+        return rc;
+    }
+    case XEN_DOMCTL_unbind_pt_irq:
+    {
+        int rc;
+        xen_domctl_bind_pt_irq_t *bind = &domctl->u.bind_pt_irq;
+        uint32_t irq = bind->u.spi.spi;
+        uint32_t virq = bind->machine_irq;
+
+        /* We only support PT_IRQ_TYPE_SPI */
+        if ( bind->irq_type != PT_IRQ_TYPE_SPI )
+            return -EOPNOTSUPP;
+
+        /* For now map the interrupt 1:1 */
+        if ( irq != virq )
+            return -EINVAL;
+
+        rc = xsm_unbind_pt_irq(XSM_HOOK, d, bind);
+        if ( rc )
+            return rc;
+
+        if ( !irq_access_permitted(current->domain, irq) )
+            return -EPERM;
+
+        rc = release_guest_irq(d, virq);
+        if ( rc )
+            return rc;
+
+        vgic_free_virq(d, virq);
+
+        return 0;
     }
     default:
         return subarch_do_domctl(domctl, d, u_domctl);
