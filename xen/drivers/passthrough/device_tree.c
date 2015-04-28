@@ -80,15 +80,12 @@ int iommu_deassign_dt_device(struct domain *d, struct dt_device_node *dev)
 
     spin_lock(&dtdevs_lock);
 
-    rc = hd->platform_ops->reassign_device(d, hardware_domain,
-                                           0, dt_to_dev(dev));
+    rc = hd->platform_ops->reassign_device(d, NULL, 0, dt_to_dev(dev));
     if ( rc )
         goto fail;
 
-    list_del(&dev->domain_list);
-
-    dt_device_set_used_by(dev, hardware_domain->domain_id);
-    list_add(&dev->domain_list, &domain_hvm_iommu(hardware_domain)->dt_devices);
+    list_del_init(&dev->domain_list);
+    dt_device_set_used_by(dev, DOMID_IO);
 
 fail:
     spin_unlock(&dtdevs_lock);

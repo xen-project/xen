@@ -2692,7 +2692,7 @@ static int arm_smmu_reassign_dev(struct domain *s, struct domain *t,
 	int ret = 0;
 
 	/* Don't allow remapping on other domain than hwdom */
-	if (t != hardware_domain)
+	if (t && t != hardware_domain)
 		return -EPERM;
 
 	if (t == s)
@@ -2701,6 +2701,12 @@ static int arm_smmu_reassign_dev(struct domain *s, struct domain *t,
 	ret = arm_smmu_deassign_dev(s, dev);
 	if (ret)
 		return ret;
+
+	if (t) {
+		ret = arm_smmu_assign_dev(t, devfn, dev);
+		if (ret)
+			return ret;
+	}
 
 	return 0;
 }
