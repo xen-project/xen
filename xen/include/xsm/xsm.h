@@ -121,6 +121,12 @@ struct xsm_operations {
     int (*deassign_device) (struct domain *d, uint32_t machine_bdf);
 #endif
 
+#if defined(HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+    int (*test_assign_dtdevice) (const char *dtpath);
+    int (*assign_dtdevice) (struct domain *d, const char *dtpath);
+    int (*deassign_dtdevice) (struct domain *d, const char *dtpath);
+#endif
+
     int (*resource_plug_core) (void);
     int (*resource_unplug_core) (void);
     int (*resource_plug_pci) (uint32_t machine_bdf);
@@ -481,6 +487,27 @@ static inline int xsm_deassign_device(xsm_default_t def, struct domain *d, uint3
     return xsm_ops->deassign_device(d, machine_bdf);
 }
 #endif /* HAS_PASSTHROUGH && HAS_PCI) */
+
+#if defined(HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+static inline int xsm_assign_dtdevice(xsm_default_t def, struct domain *d,
+                                      const char *dtpath)
+{
+    return xsm_ops->assign_dtdevice(d, dtpath);
+}
+
+static inline int xsm_test_assign_dtdevice(xsm_default_t def,
+                                           const char *dtpath)
+{
+    return xsm_ops->test_assign_dtdevice(dtpath);
+}
+
+static inline int xsm_deassign_dtdevice(xsm_default_t def, struct domain *d,
+                                        const char *dtpath)
+{
+    return xsm_ops->deassign_dtdevice(d, dtpath);
+}
+
+#endif /* HAS_PASSTHROUGH && HAS_DEVICE_TREE */
 
 static inline int xsm_resource_plug_pci (xsm_default_t def, uint32_t machine_bdf)
 {

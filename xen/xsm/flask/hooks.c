@@ -587,7 +587,12 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_shadow_op:
     case XEN_DOMCTL_ioport_permission:
     case XEN_DOMCTL_ioport_mapping:
-    /* These have individual XSM hooks (drivers/passthrough/iommu.c) */
+#endif
+#ifdef HAS_PASSTHROUGH
+    /*
+     * These have individual XSM hooks
+     * (drivers/passthrough/{pci,device_tree.c)
+     */
     case XEN_DOMCTL_get_device_group:
     case XEN_DOMCTL_test_assign_device:
     case XEN_DOMCTL_assign_device:
@@ -1259,6 +1264,62 @@ static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)
 }
 #endif /* HAS_PASSTHROUGH && HAS_PCI */
 
+#if defined(HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+static int flask_test_assign_dtdevice(const char *dtpath)
+{
+    u32 rsid;
+    int rc = -EPERM;
+
+    rc = security_devicetree_sid(dtpath, &rsid);
+    if ( rc )
+        return rc;
+
+    return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__STAT_DEVICE,
+                                NULL);
+}
+
+static int flask_assign_dtdevice(struct domain *d, const char *dtpath)
+{
+    u32 dsid, rsid;
+    int rc = -EPERM;
+    struct avc_audit_data ad;
+
+    rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
+    if ( rc )
+        return rc;
+
+    rc = security_devicetree_sid(dtpath, &rsid);
+    if ( rc )
+        return rc;
+
+    AVC_AUDIT_DATA_INIT(&ad, DTDEV);
+    ad.dtdev = dtpath;
+    rc = avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__ADD_DEVICE, &ad);
+    if ( rc )
+        return rc;
+
+    dsid = domain_sid(d);
+    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
+}
+
+static int flask_deassign_dtdevice(struct domain *d, const char *dtpath)
+{
+    u32 rsid;
+    int rc = -EPERM;
+
+    rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
+    if ( rc )
+        return rc;
+
+    rc = security_devicetree_sid(dtpath, &rsid);
+    if ( rc )
+        return rc;
+
+    return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__REMOVE_DEVICE,
+                                NULL);
+}
+#endif /* HAS_PASSTHROUGH && HAS_DEVICE_TREE */
+
 #ifdef CONFIG_X86
 static int flask_do_mca(void)
 {
@@ -1626,6 +1687,12 @@ static struct xsm_operations flask_ops = {
     .test_assign_device = flask_test_assign_device,
     .assign_device = flask_assign_device,
     .deassign_device = flask_deassign_device,
+#endif
+
+#if defined(HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+    .test_assign_dtdevice = flask_test_assign_dtdevice,
+    .assign_dtdevice = flask_assign_dtdevice,
+    .deassign_dtdevice = flask_deassign_dtdevice,
 #endif
 
 #ifdef CONFIG_X86

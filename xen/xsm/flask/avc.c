@@ -600,6 +600,9 @@ void avc_audit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
     case AVC_AUDIT_DATA_MEMORY:
         avc_printk(&buf, "pte=%#lx mfn=%#lx ", a->memory.pte, a->memory.mfn);
         break;
+    case AVC_AUDIT_DATA_DTDEV:
+        avc_printk(&buf, "dtdevice=%s ", a->dtdev);
+        break;
     }
 
     avc_dump_query(&buf, ssid, tsid, tclass);

@@ -96,6 +96,12 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, deassign_device);
 #endif
 
+#if defined(HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+    set_to_dummy_if_null(ops, test_assign_dtdevice);
+    set_to_dummy_if_null(ops, assign_dtdevice);
+    set_to_dummy_if_null(ops, deassign_dtdevice);
+#endif
+
     set_to_dummy_if_null(ops, resource_plug_core);
     set_to_dummy_if_null(ops, resource_unplug_core);
     set_to_dummy_if_null(ops, resource_plug_pci);

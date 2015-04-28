@@ -425,7 +425,7 @@ class resource
     remove_iomem
 # XEN_DOMCTL_get_device_group, XEN_DOMCTL_test_assign_device:
 #  source = domain making the hypercall
-#  target = PCI device being queried
+#  target = device being queried
     stat_device
 # XEN_DOMCTL_assign_device
     add_device

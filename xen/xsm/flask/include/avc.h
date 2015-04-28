@@ -39,6 +39,7 @@ struct avc_audit_data {
 #define AVC_AUDIT_DATA_IRQ   2
 #define AVC_AUDIT_DATA_RANGE 3
 #define AVC_AUDIT_DATA_MEMORY 4
+#define AVC_AUDIT_DATA_DTDEV 5
     struct domain *sdom;
     struct domain *tdom;
     union {
@@ -52,6 +53,7 @@ struct avc_audit_data {
             unsigned long pte;
             unsigned long mfn;
         } memory;
+        const char *dtdev;
     };
 };
 
