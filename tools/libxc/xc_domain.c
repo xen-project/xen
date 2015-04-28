@@ -1674,7 +1674,8 @@ int xc_assign_device(
 
     domctl.cmd = XEN_DOMCTL_assign_device;
     domctl.domain = domid;
-    domctl.u.assign_device.machine_sbdf = machine_sbdf;
+    domctl.u.assign_device.dev = XEN_DOMCTL_DEV_PCI;
+    domctl.u.assign_device.u.pci.machine_sbdf = machine_sbdf;
 
     return do_domctl(xch, &domctl);
 }
@@ -1723,7 +1724,8 @@ int xc_test_assign_device(
 
     domctl.cmd = XEN_DOMCTL_test_assign_device;
     domctl.domain = domid;
-    domctl.u.assign_device.machine_sbdf = machine_sbdf;
+    domctl.u.assign_device.dev = XEN_DOMCTL_DEV_PCI;
+    domctl.u.assign_device.u.pci.machine_sbdf = machine_sbdf;
 
     return do_domctl(xch, &domctl);
 }
@@ -1737,10 +1739,95 @@ int xc_deassign_device(
 
     domctl.cmd = XEN_DOMCTL_deassign_device;
     domctl.domain = domid;
-    domctl.u.assign_device.machine_sbdf = machine_sbdf;
- 
+    domctl.u.assign_device.dev = XEN_DOMCTL_DEV_PCI;
+    domctl.u.assign_device.u.pci.machine_sbdf = machine_sbdf;
+
     return do_domctl(xch, &domctl);
 }
+
+int xc_assign_dt_device(
+    xc_interface *xch,
+    uint32_t domid,
+    char *path)
+{
+    int rc;
+    size_t size = strlen(path);
+    DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BOUNCE(path, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    if ( xc_hypercall_bounce_pre(xch, path) )
+        return -1;
+
+    domctl.cmd = XEN_DOMCTL_assign_device;
+    domctl.domain = (domid_t)domid;
+
+    domctl.u.assign_device.dev = XEN_DOMCTL_DEV_DT;
+    domctl.u.assign_device.u.dt.size = size;
+    set_xen_guest_handle(domctl.u.assign_device.u.dt.path, path);
+
+    rc = do_domctl(xch, &domctl);
+
+    xc_hypercall_bounce_post(xch, path);
+
+    return rc;
+}
+
+int xc_test_assign_dt_device(
+    xc_interface *xch,
+    uint32_t domid,
+    char *path)
+{
+    int rc;
+    size_t size = strlen(path);
+    DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BOUNCE(path, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    if ( xc_hypercall_bounce_pre(xch, path) )
+        return -1;
+
+    domctl.cmd = XEN_DOMCTL_test_assign_device;
+    domctl.domain = (domid_t)domid;
+
+    domctl.u.assign_device.dev = XEN_DOMCTL_DEV_DT;
+    domctl.u.assign_device.u.dt.size = size;
+    set_xen_guest_handle(domctl.u.assign_device.u.dt.path, path);
+
+    rc = do_domctl(xch, &domctl);
+
+    xc_hypercall_bounce_post(xch, path);
+
+    return rc;
+}
+
+int xc_deassign_dt_device(
+    xc_interface *xch,
+    uint32_t domid,
+    char *path)
+{
+    int rc;
+    size_t size = strlen(path);
+    DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BOUNCE(path, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    if ( xc_hypercall_bounce_pre(xch, path) )
+        return -1;
+
+    domctl.cmd = XEN_DOMCTL_deassign_device;
+    domctl.domain = (domid_t)domid;
+
+    domctl.u.assign_device.dev = XEN_DOMCTL_DEV_DT;
+    domctl.u.assign_device.u.dt.size = size;
+    set_xen_guest_handle(domctl.u.assign_device.u.dt.path, path);
+
+    rc = do_domctl(xch, &domctl);
+
+    xc_hypercall_bounce_post(xch, path);
+
+    return rc;
+}
+
+
+
 
 int xc_domain_update_msi_irq(
     xc_interface *xch,

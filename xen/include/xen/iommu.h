@@ -119,6 +119,9 @@ int iommu_deassign_dt_device(struct domain *d, struct dt_device_node *dev);
 int iommu_dt_domain_init(struct domain *d);
 int iommu_release_dt_devices(struct domain *d);
 
+int iommu_do_dt_domctl(struct xen_domctl *, struct domain *,
+                       XEN_GUEST_HANDLE_PARAM(xen_domctl_t));
+
 #endif /* HAS_DEVICE_TREE */
 
 struct page_info;

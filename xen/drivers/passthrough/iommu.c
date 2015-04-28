@@ -335,13 +335,18 @@ int iommu_do_domctl(
     struct xen_domctl *domctl, struct domain *d,
     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
-    int ret = -ENOSYS;
+    int ret = -ENODEV;
 
     if ( !iommu_enabled )
         return -ENOSYS;
 
 #ifdef HAS_PCI
     ret = iommu_do_pci_domctl(domctl, d, u_domctl);
+#endif
+
+#ifdef HAS_DEVICE_TREE
+    if ( ret == -ENODEV )
+        ret = iommu_do_dt_domctl(domctl, d, u_domctl);
 #endif
 
     return ret;

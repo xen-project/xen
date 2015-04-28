@@ -1500,6 +1500,7 @@ int iommu_do_pci_domctl(
     u16 seg;
     u8 bus, devfn;
     int ret = 0;
+    uint32_t machine_sbdf;
 
     switch ( domctl->cmd )
     {
@@ -1513,8 +1514,8 @@ int iommu_do_pci_domctl(
             break;
 
         seg = domctl->u.get_device_group.machine_sbdf >> 16;
-        bus = (domctl->u.get_device_group.machine_sbdf >> 8) & 0xff;
-        devfn = domctl->u.get_device_group.machine_sbdf & 0xff;
+        bus = PCI_BUS(domctl->u.get_device_group.machine_sbdf);
+        devfn = PCI_DEVFN2(domctl->u.get_device_group.machine_sbdf);
         max_sdevs = domctl->u.get_device_group.max_sdevs;
         sdevs = domctl->u.get_device_group.sdev_array;
 
@@ -1536,13 +1537,19 @@ int iommu_do_pci_domctl(
     break;
 
     case XEN_DOMCTL_test_assign_device:
-        ret = xsm_test_assign_device(XSM_HOOK, domctl->u.assign_device.machine_sbdf);
+        ret = -ENODEV;
+        if ( domctl->u.assign_device.dev != XEN_DOMCTL_DEV_PCI )
+            break;
+
+        machine_sbdf = domctl->u.assign_device.u.pci.machine_sbdf;
+
+        ret = xsm_test_assign_device(XSM_HOOK, machine_sbdf);
         if ( ret )
             break;
 
-        seg = domctl->u.assign_device.machine_sbdf >> 16;
-        bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
-        devfn = domctl->u.assign_device.machine_sbdf & 0xff;
+        seg = machine_sbdf >> 16;
+        bus = PCI_BUS(machine_sbdf);
+        devfn = PCI_DEVFN2(machine_sbdf);
 
         if ( device_assigned(seg, bus, devfn) )
         {
@@ -1554,19 +1561,25 @@ int iommu_do_pci_domctl(
         break;
 
     case XEN_DOMCTL_assign_device:
+        ret = -ENODEV;
+        if ( domctl->u.assign_device.dev != XEN_DOMCTL_DEV_PCI )
+            break;
+
         if ( unlikely(d->is_dying) )
         {
             ret = -EINVAL;
             break;
         }
 
-        ret = xsm_assign_device(XSM_HOOK, d, domctl->u.assign_device.machine_sbdf);
+        machine_sbdf = domctl->u.assign_device.u.pci.machine_sbdf;
+
+        ret = xsm_assign_device(XSM_HOOK, d, machine_sbdf);
         if ( ret )
             break;
 
-        seg = domctl->u.assign_device.machine_sbdf >> 16;
-        bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
-        devfn = domctl->u.assign_device.machine_sbdf & 0xff;
+        seg = machine_sbdf >> 16;
+        bus = PCI_BUS(machine_sbdf);
+        devfn = PCI_DEVFN2(machine_sbdf);
 
         ret = device_assigned(seg, bus, devfn) ?:
               assign_device(d, seg, bus, devfn);
@@ -1582,13 +1595,19 @@ int iommu_do_pci_domctl(
         break;
 
     case XEN_DOMCTL_deassign_device:
-        ret = xsm_deassign_device(XSM_HOOK, d, domctl->u.assign_device.machine_sbdf);
+        ret = -ENODEV;
+        if ( domctl->u.assign_device.dev != XEN_DOMCTL_DEV_PCI )
+            break;
+
+        machine_sbdf = domctl->u.assign_device.u.pci.machine_sbdf;
+
+        ret = xsm_deassign_device(XSM_HOOK, d, machine_sbdf);
         if ( ret )
             break;
 
-        seg = domctl->u.assign_device.machine_sbdf >> 16;
-        bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
-        devfn = domctl->u.assign_device.machine_sbdf & 0xff;
+        seg = machine_sbdf >> 16;
+        bus = PCI_BUS(machine_sbdf);
+        devfn = PCI_DEVFN2(machine_sbdf);
 
         spin_lock(&pcidevs_lock);
         ret = deassign_device(d, seg, bus, devfn);
