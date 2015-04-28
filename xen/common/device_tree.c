@@ -13,6 +13,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/init.h>
+#include <xen/guest_access.h>
 #include <xen/device_tree.h>
 #include <xen/kernel.h>
 #include <xen/lib.h>
@@ -23,6 +24,7 @@
 #include <xen/cpumask.h>
 #include <xen/ctype.h>
 #include <asm/setup.h>
+#include <xen/err.h>
 
 const void *device_tree_flattened;
 dt_irq_xlate_func dt_irq_xlate;
@@ -275,6 +277,22 @@ struct dt_device_node *dt_find_node_by_path(const char *path)
             break;
 
     return np;
+}
+
+int dt_find_node_by_gpath(XEN_GUEST_HANDLE(char) u_path, uint32_t u_plen,
+                          struct dt_device_node **node)
+{
+    char *path;
+
+    path = safe_copy_string_from_guest(u_path, u_plen, PAGE_SIZE);
+    if ( IS_ERR(path) )
+        return PTR_ERR(path);
+
+    *node = dt_find_node_by_path(path);
+
+    xfree(path);
+
+    return (*node == NULL) ? -ESRCH : 0;
 }
 
 struct dt_device_node *dt_find_node_by_alias(const char *alias)
