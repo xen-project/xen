@@ -67,6 +67,7 @@ int xc_domain_create(xc_interface *xch,
     /* No arch-specific configuration for now */
 #elif defined (__arm__) || defined(__aarch64__)
     config.gic_version = XEN_DOMCTL_CONFIG_GIC_DEFAULT;
+    config.nr_spis = 0;
 #else
     errno = ENOSYS;
     return -1;

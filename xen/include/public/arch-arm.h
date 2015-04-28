@@ -315,6 +315,8 @@ typedef uint64_t xen_callback_t;
 struct xen_arch_domainconfig {
     /* IN/OUT */
     uint8_t gic_version;
+    /* IN */
+    uint32_t nr_spis;
 };
 
 #endif

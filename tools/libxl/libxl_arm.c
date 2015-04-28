@@ -39,6 +39,27 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
                                       libxl_domain_config *d_config,
                                       xc_domain_configuration_t *xc_config)
 {
+    uint32_t nr_spis = 0;
+    unsigned int i;
+
+    for (i = 0; i < d_config->b_info.num_irqs; i++) {
+        uint32_t irq = d_config->b_info.irqs[i];
+        uint32_t spi;
+
+        if (irq < 32)
+            continue;
+
+        spi = irq - 32;
+
+        if (nr_spis <= spi)
+            nr_spis = spi + 1;
+    }
+
+    LOG(DEBUG, "Configure the domain");
+
+    xc_config->nr_spis = nr_spis;
+    LOG(DEBUG, " - Allocate %u SPIs", nr_spis);
+
     xc_config->gic_version = XEN_DOMCTL_CONFIG_GIC_DEFAULT;
 
     return 0;

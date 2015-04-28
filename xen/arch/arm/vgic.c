@@ -68,16 +68,17 @@ static void vgic_init_pending_irq(struct pending_irq *p, unsigned int virq)
     p->irq = virq;
 }
 
-int domain_vgic_init(struct domain *d)
+int domain_vgic_init(struct domain *d, unsigned int nr_spis)
 {
     int i;
 
     d->arch.vgic.ctlr = 0;
 
-    if ( is_hardware_domain(d) )
-        d->arch.vgic.nr_spis = gic_number_lines() - 32;
-    else
-        d->arch.vgic.nr_spis = 0; /* We don't need SPIs for the guest */
+    /* Limit the number of virtual SPIs supported to (1020 - 32) = 988  */
+    if ( nr_spis > (1020 - NR_LOCAL_IRQS) )
+        return -EINVAL;
+
+    d->arch.vgic.nr_spis = nr_spis;
 
     switch ( gic_hw_version() )
     {
