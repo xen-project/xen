@@ -1358,25 +1358,11 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
     if ( !spin_trylock(&pcidevs_lock) )
         return -ERESTART;
 
-    if ( need_iommu(d) <= 0 )
+    rc = iommu_construct(d);
+    if ( rc )
     {
-        if ( !iommu_use_hap_pt(d) )
-        {
-            rc = arch_iommu_populate_page_table(d);
-            if ( rc )
-            {
-                spin_unlock(&pcidevs_lock);
-                return rc;
-            }
-        }
-        d->need_iommu = 1;
-        /*
-         * There may be dirty cache lines when a device is assigned
-         * and before need_iommu(d) becoming true, this will cause
-         * memory_type_changed lose effect if memory type changes.
-         * Call memory_type_changed here to amend this.
-         */
-        memory_type_changed(d);
+        spin_unlock(&pcidevs_lock);
+        return rc;
     }
 
     pdev = pci_get_pdev_by_domain(hardware_domain, seg, bus, devfn);
