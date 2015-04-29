@@ -535,6 +535,16 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_DOMINFO_OUTSTANDING_MEMKB 1
 
 /*
+ * LIBXL_HAVE_QXL
+ *
+ * If defined, then the libxl_vga_interface_type will contain another value:
+ * "QXL". This value define if qxl vga is supported.
+ *
+ * If this is not defined, the qxl vga support is missed.
+ */
+#define LIBXL_HAVE_QXL 1
+
+/*
  * LIBXL_HAVE_SPICE_VDAGENT
  *
  * If defined, then the libxl_spice_info structure will contain a boolean type:
