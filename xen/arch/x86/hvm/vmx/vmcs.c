@@ -140,6 +140,7 @@ static void __init vmx_display_features(void)
     P(cpu_has_vmx_virtual_intr_delivery, "Virtual Interrupt Delivery");
     P(cpu_has_vmx_posted_intr_processing, "Posted Interrupt Processing");
     P(cpu_has_vmx_vmcs_shadowing, "VMCS shadowing");
+    P(cpu_has_vmx_pml, "Page Modification Logging");
 #undef P
 
     if ( !printed )
@@ -237,6 +238,8 @@ static int vmx_init_vmcs_config(void)
             opt |= SECONDARY_EXEC_ENABLE_VPID;
         if ( opt_unrestricted_guest_enabled )
             opt |= SECONDARY_EXEC_UNRESTRICTED_GUEST;
+        if ( opt_pml_enabled )
+            opt |= SECONDARY_EXEC_ENABLE_PML;
 
         /*
          * "APIC Register Virtualization" and "Virtual Interrupt Delivery"
@@ -283,6 +286,10 @@ static int vmx_init_vmcs_config(void)
          */
         if ( !(_vmx_ept_vpid_cap & VMX_VPID_INVVPID_ALL_CONTEXT) )
             _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VPID;
+
+        /* EPT A/D bits is required for PML */
+        if ( !(_vmx_ept_vpid_cap & VMX_EPT_AD_BIT) )
+            _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
     }
 
     if ( _vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT )
@@ -302,6 +309,14 @@ static int vmx_init_vmcs_config(void)
                 ~(SECONDARY_EXEC_ENABLE_EPT |
                   SECONDARY_EXEC_UNRESTRICTED_GUEST);
     }
+
+    /* PML cannot be supported if EPT is not used */
+    if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT) )
+        _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
+
+    /* Turn off opt_pml_enabled if PML feature is not present */
+    if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_PML) )
+        opt_pml_enabled = 0;
 
     if ( (_vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING) &&
           ple_gap == 0 )
@@ -1038,6 +1053,9 @@ static int construct_vmcs(struct vcpu *v)
         __vmwrite(PI_DESC_ADDR, virt_to_maddr(&v->arch.hvm_vmx.pi_desc));
         __vmwrite(POSTED_INTR_NOTIFICATION_VECTOR, posted_intr_vector);
     }
+
+    /* Disable PML anyway here as it will only be enabled in log dirty mode */
+    v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
 
     /* Host data selectors. */
     __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);

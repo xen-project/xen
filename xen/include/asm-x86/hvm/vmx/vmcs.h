@@ -215,6 +215,7 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_ENABLE_INVPCID           0x00001000
 #define SECONDARY_EXEC_ENABLE_VMFUNC            0x00002000
 #define SECONDARY_EXEC_ENABLE_VMCS_SHADOWING    0x00004000
+#define SECONDARY_EXEC_ENABLE_PML               0x00020000
 extern u32 vmx_secondary_exec_control;
 
 #define VMX_EPT_EXEC_ONLY_SUPPORTED             0x00000001
@@ -226,6 +227,7 @@ extern u32 vmx_secondary_exec_control;
 #define VMX_EPT_INVEPT_INSTRUCTION              0x00100000
 #define VMX_EPT_INVEPT_SINGLE_CONTEXT           0x02000000
 #define VMX_EPT_INVEPT_ALL_CONTEXT              0x04000000
+#define VMX_EPT_AD_BIT                          0x00200000
 
 #define VMX_MISC_VMWRITE_ALL                    0x20000000
 
@@ -274,6 +276,8 @@ extern u32 vmx_secondary_exec_control;
     (vmx_pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT)
 #define cpu_has_vmx_vmcs_shadowing \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VMCS_SHADOWING)
+#define cpu_has_vmx_pml \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_PML)
 
 #define VMCS_RID_TYPE_MASK              0x80000000
 
@@ -318,6 +322,7 @@ enum vmcs_field {
     GUEST_LDTR_SELECTOR             = 0x0000080c,
     GUEST_TR_SELECTOR               = 0x0000080e,
     GUEST_INTR_STATUS               = 0x00000810,
+    GUEST_PML_INDEX                 = 0x00000812,
     HOST_ES_SELECTOR                = 0x00000c00,
     HOST_CS_SELECTOR                = 0x00000c02,
     HOST_SS_SELECTOR                = 0x00000c04,
@@ -331,6 +336,7 @@ enum vmcs_field {
     VM_EXIT_MSR_STORE_ADDR          = 0x00002006,
     VM_EXIT_MSR_LOAD_ADDR           = 0x00002008,
     VM_ENTRY_MSR_LOAD_ADDR          = 0x0000200a,
+    PML_ADDRESS                     = 0x0000200e,
     TSC_OFFSET                      = 0x00002010,
     VIRTUAL_APIC_PAGE_ADDR          = 0x00002012,
     APIC_ACCESS_ADDR                = 0x00002014,

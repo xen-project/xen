@@ -185,6 +185,7 @@ static inline unsigned long pi_get_pir(struct pi_desc *pi_desc, int group)
 #define EXIT_REASON_XSETBV              55
 #define EXIT_REASON_APIC_WRITE          56
 #define EXIT_REASON_INVPCID             58
+#define EXIT_REASON_PML_FULL            62
 
 /*
  * Interruption-information format
