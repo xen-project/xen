@@ -152,6 +152,14 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
 static void vmx_vcpu_destroy(struct vcpu *v)
 {
+    /*
+     * There are cases that domain still remains in log-dirty mode when it is
+     * about to be destroyed (ex, user types 'xl destroy <dom>'), in which case
+     * we should disable PML manually here. Note that vmx_vcpu_destroy is called
+     * prior to vmx_domain_destroy so we need to disable PML for each vcpu
+     * separately here.
+     */
+    vmx_vcpu_disable_pml(v);
     vmx_destroy_vmcs(v);
     vpmu_destroy(v);
     passive_domain_destroy(v);
