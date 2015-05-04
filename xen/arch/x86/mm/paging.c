@@ -266,24 +266,17 @@ static int paging_log_dirty_disable(struct domain *d, bool_t resuming)
     return ret;
 }
 
-/* Mark a page as dirty */
-void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
+/* Mark a page as dirty, with taking guest pfn as parameter */
+void paging_mark_gfn_dirty(struct domain *d, unsigned long pfn)
 {
-    unsigned long pfn;
-    mfn_t gmfn;
     int changed;
     mfn_t mfn, *l4, *l3, *l2;
     unsigned long *l1;
     int i1, i2, i3, i4;
 
-    gmfn = _mfn(guest_mfn);
-
-    if ( !paging_mode_log_dirty(d) || !mfn_valid(gmfn) ||
-         page_get_owner(mfn_to_page(gmfn)) != d )
+    if ( !paging_mode_log_dirty(d) )
         return;
 
-    /* We /really/ mean PFN here, even for non-translated guests. */
-    pfn = get_gpfn_from_mfn(mfn_x(gmfn));
     /* Shared MFNs should NEVER be marked dirty */
     BUG_ON(SHARED_M2P(pfn));
 
@@ -349,6 +342,24 @@ out:
     /* We've already recorded any failed allocations */
     paging_unlock(d);
     return;
+}
+
+/* Mark a page as dirty */
+void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
+{
+    unsigned long pfn;
+    mfn_t gmfn;
+
+    gmfn = _mfn(guest_mfn);
+
+    if ( !paging_mode_log_dirty(d) || !mfn_valid(gmfn) ||
+         page_get_owner(mfn_to_page(gmfn)) != d )
+        return;
+
+    /* We /really/ mean PFN here, even for non-translated guests. */
+    pfn = get_gpfn_from_mfn(mfn_x(gmfn));
+
+    paging_mark_gfn_dirty(d, pfn);
 }
 
 

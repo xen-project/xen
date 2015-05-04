@@ -156,6 +156,8 @@ void paging_log_dirty_init(struct domain *d,
 
 /* mark a page as dirty */
 void paging_mark_dirty(struct domain *d, unsigned long guest_mfn);
+/* mark a page as dirty with taking guest pfn as parameter */
+void paging_mark_gfn_dirty(struct domain *d, unsigned long pfn);
 
 /* is this guest page dirty? 
  * This is called from inside paging code, with the paging lock held. */
