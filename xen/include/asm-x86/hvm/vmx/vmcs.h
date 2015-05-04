@@ -70,8 +70,12 @@ struct ept_data {
     cpumask_var_t synced_mask;
 };
 
+#define _VMX_DOMAIN_PML_ENABLED    0
+#define VMX_DOMAIN_PML_ENABLED     (1ul << _VMX_DOMAIN_PML_ENABLED)
 struct vmx_domain {
     unsigned long apic_access_mfn;
+    /* VMX_DOMAIN_* */
+    unsigned int status;
 };
 
 struct pi_desc {
@@ -84,6 +88,8 @@ struct pi_desc {
 #define ept_get_asr(ept)  ((ept)->asr)
 #define ept_get_eptp(ept) ((ept)->eptp)
 #define ept_get_synced_mask(ept) ((ept)->synced_mask)
+
+#define NR_PML_ENTRIES   512
 
 struct arch_vmx_struct {
     /* Virtual address of VMCS. */
@@ -142,6 +148,8 @@ struct arch_vmx_struct {
     /* Bitmap to control vmexit policy for Non-root VMREAD/VMWRITE */
     struct page_info     *vmread_bitmap;
     struct page_info     *vmwrite_bitmap;
+
+    struct page_info     *pml_pg;
 };
 
 int vmx_create_vmcs(struct vcpu *v);
