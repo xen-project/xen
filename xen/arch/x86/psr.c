@@ -22,7 +22,6 @@
 
 struct psr_assoc {
     uint64_t val;
-    bool_t initialized;
 };
 
 struct psr_cmt *__read_mostly psr_cmt;
@@ -122,14 +121,6 @@ static void __init init_psr_cmt(unsigned int rmid_max)
     printk(XENLOG_INFO "Cache Monitoring Technology enabled\n");
 }
 
-static int __init init_psr(void)
-{
-    if ( (opt_psr & PSR_CMT) && opt_rmid_max )
-        init_psr_cmt(opt_rmid_max);
-    return 0;
-}
-__initcall(init_psr);
-
 /* Called with domain lock held, no psr specific lock needed */
 int psr_alloc_rmid(struct domain *d)
 {
@@ -175,26 +166,64 @@ void psr_free_rmid(struct domain *d)
     d->arch.psr_rmid = 0;
 }
 
-void psr_assoc_rmid(unsigned int rmid)
+static inline void psr_assoc_init(void)
 {
-    uint64_t val;
-    uint64_t new_val;
     struct psr_assoc *psra = &this_cpu(psr_assoc);
 
-    if ( !psra->initialized )
-    {
+    if ( psr_cmt_enabled() )
         rdmsrl(MSR_IA32_PSR_ASSOC, psra->val);
-        psra->initialized = 1;
-    }
-    val = psra->val;
+}
 
-    new_val = (val & ~rmid_mask) | (rmid & rmid_mask);
-    if ( val != new_val )
+static inline void psr_assoc_rmid(uint64_t *reg, unsigned int rmid)
+{
+    *reg = (*reg & ~rmid_mask) | (rmid & rmid_mask);
+}
+
+void psr_ctxt_switch_to(struct domain *d)
+{
+    struct psr_assoc *psra = &this_cpu(psr_assoc);
+    uint64_t reg = psra->val;
+
+    if ( psr_cmt_enabled() )
+        psr_assoc_rmid(&reg, d->arch.psr_rmid);
+
+    if ( reg != psra->val )
     {
-        wrmsrl(MSR_IA32_PSR_ASSOC, new_val);
-        psra->val = new_val;
+        wrmsrl(MSR_IA32_PSR_ASSOC, reg);
+        psra->val = reg;
     }
 }
+
+static void psr_cpu_init(void)
+{
+    psr_assoc_init();
+}
+
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    if ( action == CPU_STARTING )
+        psr_cpu_init();
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
+static int __init psr_presmp_init(void)
+{
+    if ( (opt_psr & PSR_CMT) && opt_rmid_max )
+        init_psr_cmt(opt_rmid_max);
+
+    psr_cpu_init();
+    if ( psr_cmt_enabled() )
+        register_cpu_notifier(&cpu_nfb);
+
+    return 0;
+}
+presmp_initcall(psr_presmp_init);
 
 /*
  * Local variables:

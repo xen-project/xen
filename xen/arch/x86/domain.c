@@ -1444,8 +1444,6 @@ static void __context_switch(void)
     {
         memcpy(&p->arch.user_regs, stack_regs, CTXT_SWITCH_STACK_BYTES);
         vcpu_save_fpu(p);
-        if ( psr_cmt_enabled() )
-            psr_assoc_rmid(0);
         p->arch.ctxt_switch_from(p);
     }
 
@@ -1470,10 +1468,9 @@ static void __context_switch(void)
         }
         vcpu_restore_fpu_eager(n);
         n->arch.ctxt_switch_to(n);
-
-        if ( psr_cmt_enabled() && n->domain->arch.psr_rmid > 0 )
-            psr_assoc_rmid(n->domain->arch.psr_rmid);
     }
+
+    psr_ctxt_switch_to(n->domain);
 
     gdt = !is_pv_32on64_vcpu(n) ? per_cpu(gdt_table, cpu) :
                                   per_cpu(compat_gdt_table, cpu);
