@@ -422,7 +422,17 @@ static int paging_log_dirty_op(struct domain *d,
     int i4, i3, i2;
 
     if ( !resuming )
+    {
         domain_pause(d);
+
+        /*
+         * Flush dirty GFNs potentially cached by hardware. Only need to flush
+         * when not resuming, as domain was paused in resuming case therefore
+         * it's not possible to have any new dirty pages.
+         */
+        p2m_flush_hardware_cached_dirty(d);
+    }
+
     paging_lock(d);
 
     if ( !d->arch.paging.preempt.dom )

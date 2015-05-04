@@ -239,6 +239,42 @@ void p2m_memory_type_changed(struct domain *d)
     }
 }
 
+void p2m_enable_hardware_log_dirty(struct domain *d)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    if ( p2m->enable_hardware_log_dirty )
+    {
+        p2m_lock(p2m);
+        p2m->enable_hardware_log_dirty(p2m);
+        p2m_unlock(p2m);
+    }
+}
+
+void p2m_disable_hardware_log_dirty(struct domain *d)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    if ( p2m->disable_hardware_log_dirty )
+    {
+        p2m_lock(p2m);
+        p2m->disable_hardware_log_dirty(p2m);
+        p2m_unlock(p2m);
+    }
+}
+
+void p2m_flush_hardware_cached_dirty(struct domain *d)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    if ( p2m->flush_hardware_cached_dirty )
+    {
+        p2m_lock(p2m);
+        p2m->flush_hardware_cached_dirty(p2m);
+        p2m_unlock(p2m);
+    }
+}
+
 mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
                     p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
                     unsigned int *page_order, bool_t locked)

@@ -233,6 +233,9 @@ struct p2m_domain {
                                        p2m_access_t *p2ma,
                                        p2m_query_t q,
                                        unsigned int *page_order);
+    void               (*enable_hardware_log_dirty)(struct p2m_domain *p2m);
+    void               (*disable_hardware_log_dirty)(struct p2m_domain *p2m);
+    void               (*flush_hardware_cached_dirty)(struct p2m_domain *p2m);
     void               (*change_entry_type_global)(struct p2m_domain *p2m,
                                                    p2m_type_t ot,
                                                    p2m_type_t nt);
@@ -507,6 +510,14 @@ void guest_physmap_remove_page(struct domain *d,
 /* Set a p2m range as populate-on-demand */
 int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
                                           unsigned int order);
+/* Enable hardware-assisted log-dirty. */
+void p2m_enable_hardware_log_dirty(struct domain *d);
+
+/* Disable hardware-assisted log-dirty */
+void p2m_disable_hardware_log_dirty(struct domain *d);
+
+/* Flush hardware cached dirty GFNs */
+void p2m_flush_hardware_cached_dirty(struct domain *d);
 
 /* Change types across all p2m entries in a domain */
 void p2m_change_entry_type_global(struct domain *d, 

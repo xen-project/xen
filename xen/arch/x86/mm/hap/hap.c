@@ -121,7 +121,10 @@ int hap_track_dirty_vram(struct domain *d,
                 p2m_change_type_range(d, ostart, oend,
                                       p2m_ram_logdirty, p2m_ram_rw);
 
-            /* set l1e entries of range within P2M table to be read-only. */
+            /*
+             * Switch vram to log dirty mode, either by setting l1e entries of
+             * P2M table to be read-only, or via hardware-assisted log-dirty.
+             */
             p2m_change_type_range(d, begin_pfn, begin_pfn + nr,
                                   p2m_ram_rw, p2m_ram_logdirty);
 
@@ -134,6 +137,9 @@ int hap_track_dirty_vram(struct domain *d,
             paging_unlock(d);
 
             domain_pause(d);
+
+            /* Flush dirty GFNs potentially cached by hardware. */
+            p2m_flush_hardware_cached_dirty(d);
 
             /* get the bitmap */
             paging_log_dirty_range(d, begin_pfn, nr, dirty_bitmap);
@@ -190,9 +196,15 @@ static int hap_enable_log_dirty(struct domain *d, bool_t log_global)
     d->arch.paging.mode |= PG_log_dirty;
     paging_unlock(d);
 
+    /* Enable hardware-assisted log-dirty if it is supported. */
+    p2m_enable_hardware_log_dirty(d);
+
     if ( log_global )
     {
-        /* set l1e entries of P2M table to be read-only. */
+        /*
+         * Switch to log dirty mode, either by setting l1e entries of P2M table
+         * to be read-only, or via hardware-assisted log-dirty.
+         */
         p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
         flush_tlb_mask(d->domain_dirty_cpumask);
     }
@@ -205,14 +217,23 @@ static int hap_disable_log_dirty(struct domain *d)
     d->arch.paging.mode &= ~PG_log_dirty;
     paging_unlock(d);
 
-    /* set l1e entries of P2M table with normal mode */
+    /* Disable hardware-assisted log-dirty if it is supported. */
+    p2m_disable_hardware_log_dirty(d);
+
+    /*
+     * switch to normal mode, either by setting l1e entries of P2M table to
+     * normal mode, or via hardware-assisted log-dirty.
+     */
     p2m_change_entry_type_global(d, p2m_ram_logdirty, p2m_ram_rw);
     return 0;
 }
 
 static void hap_clean_dirty_bitmap(struct domain *d)
 {
-    /* set l1e entries of P2M table to be read-only. */
+    /*
+     * Switch to log-dirty mode, either by setting l1e entries of P2M table to
+     * be read-only, or via hardware-assisted log-dirty.
+     */
     p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
     flush_tlb_mask(d->domain_dirty_cpumask);
 }
