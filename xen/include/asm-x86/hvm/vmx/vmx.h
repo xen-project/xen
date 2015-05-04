@@ -37,7 +37,8 @@ typedef union {
         emt         :   3,  /* bits 5:3 - EPT Memory type */
         ipat        :   1,  /* bit 6 - Ignore PAT memory type */
         sp          :   1,  /* bit 7 - Is this a superpage? */
-        rsvd1       :   2,  /* bits 9:8 - Reserved for future use */
+        a           :   1,  /* bit 8 - Access bit */
+        d           :   1,  /* bit 9 - Dirty bit */
         recalc      :   1,  /* bit 10 - Software available 1 */
         snp         :   1,  /* bit 11 - VT-d snoop control in shared
                                EPT/VT-d usage */

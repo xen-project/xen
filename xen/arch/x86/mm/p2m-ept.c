@@ -102,9 +102,20 @@ static int atomic_write_ept_entry(ept_entry_t *entryptr, ept_entry_t new,
     return rc;
 }
 
-static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type, p2m_access_t access)
+static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,
+                                  p2m_type_t type, p2m_access_t access)
 {
-    /* First apply type permissions */
+    /*
+     * First apply type permissions.
+     *
+     * A/D bits are also manually set to avoid overhead of MMU having to set
+     * them later. Both A/D bits are safe to be updated directly as they are
+     * ignored by processor if EPT A/D bits is not turned on.
+     *
+     * A bit is set for all present p2m types in middle and leaf EPT entries.
+     * D bit is set for all writable types in EPT leaf entry, except for
+     * log-dirty type with PML.
+     */
     switch(type)
     {
         case p2m_invalid:
@@ -118,27 +129,51 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type, p2m_acces
             break;
         case p2m_ram_rw:
             entry->r = entry->w = entry->x = 1;
+            entry->a = entry->d = 1;
             break;
         case p2m_mmio_direct:
             entry->r = entry->x = 1;
             entry->w = !rangeset_contains_singleton(mmio_ro_ranges,
                                                     entry->mfn);
+            entry->a = 1;
+            entry->d = entry->w;
             break;
         case p2m_ram_logdirty:
+            entry->r = entry->x = 1;
+            /*
+             * In case of PML, we don't have to write protect 4K page, but
+             * only need to clear D-bit for it, but we still need to write
+             * protect super page in order to split it to 4K pages in EPT
+             * violation.
+             */
+            if ( vmx_domain_pml_enabled(p2m->domain) &&
+                 !is_epte_superpage(entry) )
+                entry->w = 1;
+            else
+                entry->w = 0;
+            entry->a = 1;
+            /* For both PML or non-PML cases we clear D bit anyway */
+            entry->d = 0;
+            break;
         case p2m_ram_ro:
         case p2m_ram_shared:
             entry->r = entry->x = 1;
             entry->w = 0;
+            entry->a = 1;
+            entry->d = 0;
             break;
         case p2m_grant_map_rw:
         case p2m_map_foreign:
             entry->r = entry->w = 1;
             entry->x = 0;
+            entry->a = entry->d = 1;
             break;
         case p2m_grant_map_ro:
         case p2m_mmio_write_dm:
             entry->r = 1;
             entry->w = entry->x = 0;
+            entry->a = 1;
+            entry->d = 0;
             break;
     }
 
@@ -194,6 +229,8 @@ static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
     ept_entry->access = p2m->default_access;
 
     ept_entry->r = ept_entry->w = ept_entry->x = 1;
+    /* Manually set A bit to avoid overhead of MMU having to write it later. */
+    ept_entry->a = 1;
 
     return 1;
 }
@@ -244,10 +281,9 @@ static int ept_split_super_page(struct p2m_domain *p2m, ept_entry_t *ept_entry,
         epte->sp = (level > 1);
         epte->mfn += i * trunk;
         epte->snp = (iommu_enabled && iommu_snoop);
-        ASSERT(!epte->rsvd1);
         ASSERT(!epte->avail3);
 
-        ept_p2m_type_to_flags(epte, epte->sa_p2mt, epte->access);
+        ept_p2m_type_to_flags(p2m, epte, epte->sa_p2mt, epte->access);
 
         if ( (level - 1) == target )
             continue;
@@ -489,7 +525,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                     {
                          e.sa_p2mt = p2m_is_logdirty_range(p2m, gfn + i, gfn + i)
                                      ? p2m_ram_logdirty : p2m_ram_rw;
-                         ept_p2m_type_to_flags(&e, e.sa_p2mt, e.access);
+                         ept_p2m_type_to_flags(p2m, &e, e.sa_p2mt, e.access);
                     }
                     e.recalc = 0;
                     wrc = atomic_write_ept_entry(&epte[i], e, level);
@@ -541,7 +577,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                 e.ipat = ipat;
                 e.recalc = 0;
                 if ( recalc && p2m_is_changeable(e.sa_p2mt) )
-                    ept_p2m_type_to_flags(&e, e.sa_p2mt, e.access);
+                    ept_p2m_type_to_flags(p2m, &e, e.sa_p2mt, e.access);
                 wrc = atomic_write_ept_entry(&epte[i], e, level);
                 ASSERT(wrc == 0);
             }
@@ -752,7 +788,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         if ( ept_entry->mfn == new_entry.mfn )
              need_modify_vtd_table = 0;
 
-        ept_p2m_type_to_flags(&new_entry, p2mt, p2ma);
+        ept_p2m_type_to_flags(p2m, &new_entry, p2mt, p2ma);
     }
 
     rc = atomic_write_ept_entry(ept_entry, new_entry, target);
@@ -1053,6 +1089,26 @@ void ept_sync_domain(struct p2m_domain *p2m)
                      __ept_sync_domain, p2m, 1);
 }
 
+static void ept_enable_pml(struct p2m_domain *p2m)
+{
+    /*
+     * No need to check if vmx_domain_enable_pml has succeeded or not, as
+     * ept_p2m_type_to_flags will do the check, and write protection will be
+     * used if PML is not enabled.
+     */
+    vmx_domain_enable_pml(p2m->domain);
+}
+
+static void ept_disable_pml(struct p2m_domain *p2m)
+{
+    vmx_domain_disable_pml(p2m->domain);
+}
+
+static void ept_flush_pml_buffers(struct p2m_domain *p2m)
+{
+    vmx_domain_flush_pml_buffers(p2m->domain);
+}
+
 int ept_p2m_init(struct p2m_domain *p2m)
 {
     struct ept_data *ept = &p2m->ept;
@@ -1069,6 +1125,15 @@ int ept_p2m_init(struct p2m_domain *p2m)
 
     /* set EPT page-walk length, now it's actual walk length - 1, i.e. 3 */
     ept->ept_wl = 3;
+
+    if ( cpu_has_vmx_pml )
+    {
+        /* Enable EPT A/D bits if we are going to use PML. */
+        ept->ept_ad = cpu_has_vmx_pml ? 1 : 0;
+        p2m->enable_hardware_log_dirty = ept_enable_pml;
+        p2m->disable_hardware_log_dirty = ept_disable_pml;
+        p2m->flush_hardware_cached_dirty = ept_flush_pml_buffers;
+    }
 
     if ( !zalloc_cpumask_var(&ept->synced_mask) )
         return -ENOMEM;

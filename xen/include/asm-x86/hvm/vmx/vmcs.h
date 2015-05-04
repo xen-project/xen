@@ -62,7 +62,8 @@ struct ept_data {
     struct {
             u64 ept_mt :3,
                 ept_wl :3,
-                rsvd   :6,
+                ept_ad :1,  /* bit 6 - enable EPT A/D bits */
+                rsvd   :5,
                 asr    :52;
         };
         u64 eptp;
