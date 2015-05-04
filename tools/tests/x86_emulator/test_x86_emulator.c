@@ -288,7 +288,7 @@ int main(int argc, char **argv)
     rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != X86EMUL_OKAY) || 
          (*res != 0x923456AA) || 
-         ((regs.eflags&0xad5) != 0xa91) ||
+         ((regs.eflags & 0xad5) != 0xa91) ||
          (regs.eax != 0xAABBCCAA) ||
          (regs.ecx != 0xFF) ||
          (regs.eip != (unsigned long)&instr[4]) )

@@ -64,6 +64,36 @@ integer_param("ple_gap", ple_gap);
 static unsigned int __read_mostly ple_window = 4096;
 integer_param("ple_window", ple_window);
 
+static bool_t __read_mostly opt_pml_enabled = 0;
+
+/*
+ * The 'ept' parameter controls functionalities that depend on, or impact the
+ * EPT mechanism. Optional comma separated value may contain:
+ *
+ *  pml                 Enable PML
+ */
+static void __init parse_ept_param(char *s)
+{
+    char *ss;
+
+    do {
+        bool_t val = !!strncmp(s, "no-", 3);
+
+        if ( !val )
+            s += 3;
+
+        ss = strchr(s, ',');
+        if ( ss )
+            *ss = '\0';
+
+        if ( !strcmp(s, "pml") )
+            opt_pml_enabled = val;
+
+        s = ss + 1;
+    } while ( ss );
+}
+custom_param("ept", parse_ept_param);
+
 /* Dynamic (run-time adjusted) execution control flags. */
 u32 vmx_pin_based_exec_control __read_mostly;
 u32 vmx_cpu_based_exec_control __read_mostly;
