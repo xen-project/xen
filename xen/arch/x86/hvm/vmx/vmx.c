@@ -3178,6 +3178,10 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_handle_apic_write();
         break;
 
+    case EXIT_REASON_PML_FULL:
+        vmx_vcpu_flush_pml_buffer(v);
+        break;
+
     case EXIT_REASON_ACCESS_GDTR_OR_IDTR:
     case EXIT_REASON_ACCESS_LDTR_OR_TR:
     case EXIT_REASON_VMX_PREEMPTION_TIMER_EXPIRED:
