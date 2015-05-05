@@ -1435,6 +1435,13 @@ void sh_install_xen_entries_in_l4(struct domain *d, mfn_t gl4mfn, mfn_t sl4mfn)
         shadow_l4e_from_mfn(page_to_mfn(d->arch.perdomain_l3_pg),
                             __PAGE_HYPERVISOR);
 
+    if ( !shadow_mode_external(d) && !is_pv_32on64_domain(d) &&
+         !VM_ASSIST(d, m2p_strict) )
+    {
+        /* open coded zap_ro_mpt(mfn_x(sl4mfn)): */
+        sl4e[shadow_l4_table_offset(RO_MPT_VIRT_START)] = shadow_l4e_empty();
+    }
+
     /* Shadow linear mapping for 4-level shadows.  N.B. for 3-level
      * shadows on 64-bit xen, this linear mapping is later replaced by the
      * monitor pagetable structure, which is built in make_monitor_table
@@ -4071,6 +4078,16 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     if ( sh_remove_write_access(d, gmfn, 4, 0) != 0 )
         flush_tlb_mask(d->domain_dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l4_shadow);
+    if ( !shadow_mode_external(d) && !is_pv_32on64_domain(d) )
+    {
+        mfn_t smfn = pagetable_get_mfn(v->arch.shadow_table[0]);
+
+        if ( !(v->arch.flags & TF_kernel_mode) && VM_ASSIST(d, m2p_strict) )
+            zap_ro_mpt(mfn_x(smfn));
+        else if ( (v->arch.flags & TF_kernel_mode) &&
+                  !VM_ASSIST(d, m2p_strict) )
+            fill_ro_mpt(mfn_x(smfn));
+    }
 #else
 #error This should never happen
 #endif

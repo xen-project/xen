@@ -1380,7 +1380,8 @@ static int alloc_l3_table(struct page_info *page)
     return rc > 0 ? 0 : rc;
 }
 
-void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d)
+void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d,
+                         bool_t zap_ro_mpt)
 {
     /* Xen private mappings. */
     memcpy(&l4tab[ROOT_PAGETABLE_FIRST_XEN_SLOT],
@@ -1395,6 +1396,25 @@ void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d)
         l4e_from_pfn(domain_page_map_to_mfn(l4tab), __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR);
+    if ( zap_ro_mpt || is_pv_32on64_domain(d) || paging_mode_refcounts(d) )
+        l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
+}
+
+void fill_ro_mpt(unsigned long mfn)
+{
+    l4_pgentry_t *l4tab = map_domain_page(mfn);
+
+    l4tab[l4_table_offset(RO_MPT_VIRT_START)] =
+        idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)];
+    unmap_domain_page(l4tab);
+}
+
+void zap_ro_mpt(unsigned long mfn)
+{
+    l4_pgentry_t *l4tab = map_domain_page(mfn);
+
+    l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
+    unmap_domain_page(l4tab);
 }
 
 static int alloc_l4_table(struct page_info *page)
@@ -1444,7 +1464,7 @@ static int alloc_l4_table(struct page_info *page)
         adjust_guest_l4e(pl4e[i], d);
     }
 
-    init_guest_l4_table(pl4e, d);
+    init_guest_l4_table(pl4e, d, !VM_ASSIST(d, m2p_strict));
     unmap_domain_page(pl4e);
 
     return rc > 0 ? 0 : rc;
@@ -2754,6 +2774,8 @@ int new_guest_cr3(unsigned long mfn)
 
     invalidate_shadow_ldt(curr, 0);
 
+    if ( !VM_ASSIST(d, m2p_strict) && !paging_mode_refcounts(d) )
+        fill_ro_mpt(mfn);
     curr->arch.guest_table = pagetable_from_pfn(mfn);
     update_cr3(curr);
 
@@ -3111,6 +3133,8 @@ long do_mmuext_op(
                                 op.arg1.mfn);
                     break;
                 }
+                if ( VM_ASSIST(d, m2p_strict) && !paging_mode_refcounts(d) )
+                    zap_ro_mpt(op.arg1.mfn);
             }
 
             curr->arch.guest_table_user = pagetable_from_pfn(op.arg1.mfn);
