@@ -267,6 +267,7 @@ static void __init hip04gic_dist_init(void)
     uint32_t type;
     uint32_t cpumask;
     uint32_t gic_cpus;
+    unsigned int nr_lines;
     int i;
 
     cpumask = readl_gicd(GICD_ITARGETSR) & 0xffff;
@@ -276,30 +277,33 @@ static void __init hip04gic_dist_init(void)
     writel_gicd(0, GICD_CTLR);
 
     type = readl_gicd(GICD_TYPER);
-    gicv2_info.nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
+    nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
     gic_cpus = 16;
     printk("GIC-HIP04: %d lines, %d cpu%s%s (IID %8.8x).\n",
-           gicv2_info.nr_lines, gic_cpus, (gic_cpus == 1) ? "" : "s",
+           nr_lines, gic_cpus, (gic_cpus == 1) ? "" : "s",
            (type & GICD_TYPE_SEC) ? ", secure" : "",
            readl_gicd(GICD_IIDR));
 
     /* Default all global IRQs to level, active low */
-    for ( i = 32; i < gicv2_info.nr_lines; i += 16 )
+    for ( i = 32; i < nr_lines; i += 16 )
         writel_gicd(0x0, GICD_ICFGR + (i / 16) * 4);
 
     /* Route all global IRQs to this CPU */
-    for ( i = 32; i < gicv2_info.nr_lines; i += 2 )
+    for ( i = 32; i < nr_lines; i += 2 )
         writel_gicd(cpumask, GICD_ITARGETSR + (i / 2) * 4);
 
     /* Default priority for global interrupts */
-    for ( i = 32; i < gicv2_info.nr_lines; i += 4 )
+    for ( i = 32; i < nr_lines; i += 4 )
         writel_gicd(GIC_PRI_IRQ << 24 | GIC_PRI_IRQ << 16 |
                     GIC_PRI_IRQ << 8 | GIC_PRI_IRQ,
                     GICD_IPRIORITYR + (i / 4) * 4);
 
     /* Disable all global interrupts */
-    for ( i = 32; i < gicv2_info.nr_lines; i += 32 )
+    for ( i = 32; i < nr_lines; i += 32 )
         writel_gicd(~0x0, GICD_ICENABLER + (i / 32) * 4);
+
+    /* Only 1020 interrupts are supported */
+    gicv2_info.nr_lines = min(1020U, nr_lines);
 
     /* Turn on the distributor */
     writel_gicd(GICD_CTL_ENABLE, GICD_CTLR);
@@ -351,8 +355,6 @@ static void __cpuinit hip04gic_hyp_init(void)
     vtr = readl_gich(GICH_VTR);
     nr_lrs  = (vtr & GICH_V2_VTR_NRLRGS) + 1;
     gicv2_info.nr_lrs = nr_lrs;
-
-    writel_gich(GICH_MISR_EOI, GICH_MISR);
 }
 
 static void __cpuinit hip04gic_hyp_disable(void)
@@ -670,37 +672,10 @@ static hw_irq_controller hip04gic_guest_irq_type = {
     .set_affinity = hip04gic_irq_set_affinity,
 };
 
-const static struct gic_hw_operations hip04gic_ops = {
-    .info                = &gicv2_info,
-    .secondary_init      = hip04gic_secondary_cpu_init,
-    .save_state          = hip04gic_save_state,
-    .restore_state       = hip04gic_restore_state,
-    .dump_state          = hip04gic_dump_state,
-    .gicv_setup          = hip04gicv_setup,
-    .gic_host_irq_type   = &hip04gic_host_irq_type,
-    .gic_guest_irq_type  = &hip04gic_guest_irq_type,
-    .eoi_irq             = hip04gic_eoi_irq,
-    .deactivate_irq      = hip04gic_dir_irq,
-    .read_irq            = hip04gic_read_irq,
-    .set_irq_properties  = hip04gic_set_irq_properties,
-    .send_SGI            = hip04gic_send_SGI,
-    .disable_interface   = hip04gic_disable_interface,
-    .update_lr           = hip04gic_update_lr,
-    .update_hcr_status   = hip04gic_hcr_status,
-    .clear_lr            = hip04gic_clear_lr,
-    .read_lr             = hip04gic_read_lr,
-    .write_lr            = hip04gic_write_lr,
-    .read_vmcr_priority  = hip04gic_read_vmcr_priority,
-    .read_apr            = hip04gic_read_apr,
-    .make_dt_node        = hip04gic_make_dt_node,
-};
-
-/* Set up the GIC */
-static int __init hip04gic_init(struct dt_device_node *node, const void *data)
+static int __init hip04gic_init(void)
 {
     int res;
-
-    dt_device_set_used_by(node, DOMID_XEN);
+    const struct dt_device_node *node = gicv2_info.node;
 
     res = dt_device_get_address(node, 0, &gicv2.dbase, NULL);
     if ( res || !gicv2.dbase || (gicv2.dbase & ~PAGE_MASK) )
@@ -722,9 +697,6 @@ static int __init hip04gic_init(struct dt_device_node *node, const void *data)
     if ( res < 0 )
         panic("GIC-HIP04: Cannot find the maintenance IRQ");
     gicv2_info.maintenance_irq = res;
-
-    /* Set the GIC as the primary interrupt controller */
-    dt_interrupt_controller = node;
 
     /* TODO: Add check on distributor, cpu size */
 
@@ -770,8 +742,43 @@ static int __init hip04gic_init(struct dt_device_node *node, const void *data)
 
     spin_unlock(&gicv2.lock);
 
+    return 0;
+}
+
+const static struct gic_hw_operations hip04gic_ops = {
+    .info                = &gicv2_info,
+    .init                = hip04gic_init,
+    .secondary_init      = hip04gic_secondary_cpu_init,
+    .save_state          = hip04gic_save_state,
+    .restore_state       = hip04gic_restore_state,
+    .dump_state          = hip04gic_dump_state,
+    .gicv_setup          = hip04gicv_setup,
+    .gic_host_irq_type   = &hip04gic_host_irq_type,
+    .gic_guest_irq_type  = &hip04gic_guest_irq_type,
+    .eoi_irq             = hip04gic_eoi_irq,
+    .deactivate_irq      = hip04gic_dir_irq,
+    .read_irq            = hip04gic_read_irq,
+    .set_irq_properties  = hip04gic_set_irq_properties,
+    .send_SGI            = hip04gic_send_SGI,
+    .disable_interface   = hip04gic_disable_interface,
+    .update_lr           = hip04gic_update_lr,
+    .update_hcr_status   = hip04gic_hcr_status,
+    .clear_lr            = hip04gic_clear_lr,
+    .read_lr             = hip04gic_read_lr,
+    .write_lr            = hip04gic_write_lr,
+    .read_vmcr_priority  = hip04gic_read_vmcr_priority,
+    .read_apr            = hip04gic_read_apr,
+    .make_dt_node        = hip04gic_make_dt_node,
+};
+
+/* Set up the GIC */
+static int __init hip04gic_preinit(struct dt_device_node *node,
+                                   const void *data)
+{
     gicv2_info.hw_version = GIC_V2;
+    gicv2_info.node = node;
     register_gic_ops(&hip04gic_ops);
+    dt_irq_xlate = gic_irq_xlate;
 
     return 0;
 }
@@ -784,7 +791,7 @@ static const struct dt_device_match hip04gic_dt_match[] __initconst =
 
 DT_DEVICE_START(hip04gic, "GIC-HIP04", DEVICE_GIC)
         .dt_match = hip04gic_dt_match,
-        .init = hip04gic_init,
+        .init = hip04gic_preinit,
 DT_DEVICE_END
 
 /*
