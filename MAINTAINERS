@@ -139,7 +139,6 @@ F:	xen/drivers/char/pl011.c
 F:	xen/drivers/passthrough/arm/
 
 HISILICON HIP04 SUPPORT
-M:	Frediano Ziglio <frediano.ziglio@huawei.com>
 M:	Zoltan Kiss <zoltan.kiss@huawei.com>
 S:	Supported
 F:	xen/arch/arm/gic-hip04.c
