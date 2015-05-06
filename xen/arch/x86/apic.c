@@ -1321,7 +1321,18 @@ out: ;
 
 void error_interrupt(struct cpu_user_regs *regs)
 {
-    unsigned long v, v1;
+    static const char *const esr_fields[] = {
+        "Send CS error",
+        "Receive CS error",
+        "Send accept error",
+        "Receive accept error",
+        "Redirectable IPI",
+        "Send illegal vector",
+        "Received illegal vector",
+        "Illegal register address",
+    };
+    unsigned int v, v1;
+    int i;
 
     /* First tickle the hardware, only then report what went on. -- REW */
     v = apic_read(APIC_ESR);
@@ -1329,18 +1340,12 @@ void error_interrupt(struct cpu_user_regs *regs)
     v1 = apic_read(APIC_ESR);
     ack_APIC_irq();
 
-    /* Here is what the APIC error bits mean:
-       0: Send CS error
-       1: Receive CS error
-       2: Send accept error
-       3: Receive accept error
-       4: Reserved
-       5: Send illegal vector
-       6: Received illegal vector
-       7: Illegal register address
-    */
-    printk (KERN_DEBUG "APIC error on CPU%d: %02lx(%02lx)\n",
+    printk(XENLOG_DEBUG "APIC error on CPU%u: %02x(%02x)",
             smp_processor_id(), v , v1);
+    for ( i = 7; i >= 0; --i )
+        if ( v1 & (1 << i) )
+            printk(", %s", esr_fields[i]);
+    printk("\n");
 }
 
 /*
