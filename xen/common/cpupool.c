@@ -458,8 +458,10 @@ void cpupool_rm_domain(struct domain *d)
  * unless we are resuming from S3, in which case we put the cpu back
  * in the cpupool it was in prior to suspend.
  */
-static void cpupool_cpu_add(unsigned int cpu)
+static int cpupool_cpu_add(unsigned int cpu)
 {
+    int ret = -EINVAL;
+
     spin_lock(&cpupool_lock);
     cpumask_clear_cpu(cpu, &cpupool_locked_cpus);
     cpumask_set_cpu(cpu, &cpupool_free_cpus);
@@ -472,15 +474,20 @@ static void cpupool_cpu_add(unsigned int cpu)
         {
             if ( cpumask_test_cpu(cpu, (*c)->cpu_suspended ) )
             {
-                cpupool_assign_cpu_locked(*c, cpu);
+                ret = cpupool_assign_cpu_locked(*c, cpu);
+                if ( ret )
+                    goto out;
                 cpumask_clear_cpu(cpu, (*c)->cpu_suspended);
             }
         }
     }
 
     if ( cpumask_test_cpu(cpu, &cpupool_free_cpus) )
-        cpupool_assign_cpu_locked(cpupool0, cpu);
+        ret = cpupool_assign_cpu_locked(cpupool0, cpu);
+ out:
     spin_unlock(&cpupool_lock);
+
+    return ret;
 }
 
 /*
@@ -715,7 +722,7 @@ static int cpu_callback(
     {
     case CPU_DOWN_FAILED:
     case CPU_ONLINE:
-        cpupool_cpu_add(cpu);
+        rc = cpupool_cpu_add(cpu);
         break;
     case CPU_DOWN_PREPARE:
         rc = cpupool_cpu_remove(cpu);
