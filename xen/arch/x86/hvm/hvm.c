@@ -5615,6 +5615,55 @@ static int hvmop_set_evtchn_upcall_vector(
     return 0;
 }
 
+static int hvm_allow_set_param(struct domain *d,
+                               const struct xen_hvm_param *a)
+{
+    uint64_t value = d->arch.hvm_domain.params[a->index];
+    int rc;
+
+    rc = xsm_hvm_param(XSM_TARGET, d, HVMOP_set_param);
+    if ( rc )
+        return rc;
+
+    switch ( a->index )
+    {
+    /*
+     * The following parameters must not be set by the guest
+     * since the domain may need to be paused.
+     */
+    case HVM_PARAM_IDENT_PT:
+    case HVM_PARAM_DM_DOMAIN:
+    case HVM_PARAM_ACPI_S_STATE:
+    /* The following parameters should not be set by the guest. */
+    case HVM_PARAM_VIRIDIAN:
+    case HVM_PARAM_IOREQ_SERVER_PFN:
+    case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+        if ( d == current->domain )
+            rc = -EPERM;
+        break;
+    default:
+        break;
+    }
+
+    if ( rc )
+        return rc;
+
+    switch ( a->index )
+    {
+    /* The following parameters should only be changed once. */
+    case HVM_PARAM_VIRIDIAN:
+    case HVM_PARAM_IOREQ_SERVER_PFN:
+    case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+        if ( value != 0 && a->value != value )
+            rc = -EEXIST;
+        break;
+    default:
+        break;
+    }
+
+    return rc;
+}
+
 static int hvmop_set_param(
     XEN_GUEST_HANDLE_PARAM(xen_hvm_param_t) arg)
 {
@@ -5639,7 +5688,7 @@ static int hvmop_set_param(
          (is_pvh_domain(d) && (a.index != HVM_PARAM_CALLBACK_IRQ)) )
         goto out;
 
-    rc = xsm_hvm_param(XSM_TARGET, d, HVMOP_set_param);
+    rc = hvm_allow_set_param(d, &a);
     if ( rc )
         goto out;
 
@@ -5654,31 +5703,11 @@ static int hvmop_set_param(
             rc = -EINVAL;
         break;
     case HVM_PARAM_VIRIDIAN:
-        /* This should only ever be set once by the tools and read by the guest. */
-        rc = -EPERM;
-        if ( d == curr_d )
-            break;
-
-        if ( a.value != d->arch.hvm_domain.params[a.index] )
-        {
-            rc = -EEXIST;
-            if ( d->arch.hvm_domain.params[a.index] != 0 )
-                break;
-
+        if ( (a.value & ~HVMPV_feature_mask) ||
+             !(a.value & HVMPV_base_freq) )
             rc = -EINVAL;
-            if ( (a.value & ~HVMPV_feature_mask) ||
-                 !(a.value & HVMPV_base_freq) )
-                break;
-        }
-
-        rc = 0;
         break;
     case HVM_PARAM_IDENT_PT:
-        /* Not reflexive, as we must domain_pause(). */
-        rc = -EPERM;
-        if ( d == curr_d )
-            break;
-
         rc = -EINVAL;
         if ( d->arch.hvm_domain.params[a.index] != 0 )
             break;
@@ -5706,22 +5735,12 @@ static int hvmop_set_param(
         domctl_lock_release();
         break;
     case HVM_PARAM_DM_DOMAIN:
-        /* Not reflexive, as we may need to domain_pause(). */
-        rc = -EPERM;
-        if ( d == curr_d )
-            break;
-
         if ( a.value == DOMID_SELF )
             a.value = curr_d->domain_id;
 
         rc = hvm_set_dm_domain(d, a.value);
         break;
     case HVM_PARAM_ACPI_S_STATE:
-        /* Not reflexive, as we must domain_pause(). */
-        rc = -EPERM;
-        if ( d == curr_d )
-            break;
-
         rc = 0;
         if ( a.value == 3 )
             hvm_s3_suspend(d);
@@ -5773,22 +5792,12 @@ static int hvmop_set_param(
             rc = -EINVAL;
         break;
     case HVM_PARAM_IOREQ_SERVER_PFN:
-        if ( d == curr_d )
-        {
-            rc = -EPERM;
-            break;
-        }
         d->arch.hvm_domain.ioreq_gmfn.base = a.value;
         break;
     case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
     {
         unsigned int i;
 
-        if ( d == curr_d )
-        {
-            rc = -EPERM;
-            break;
-        }
         if ( a.value == 0 ||
              a.value > sizeof(d->arch.hvm_domain.ioreq_gmfn.mask) * 8 )
         {
@@ -5815,10 +5824,40 @@ static int hvmop_set_param(
     return rc;
 }
 
+static int hvm_allow_get_param(struct domain *d,
+                               const struct xen_hvm_param *a)
+{
+    int rc;
+
+    rc = xsm_hvm_param(XSM_TARGET, d, HVMOP_get_param);
+    if ( rc )
+        return rc;
+
+    switch ( a->index )
+    {
+    /*
+     * The following parameters must not be read by the guest
+     * since the domain may need to be paused.
+     */
+    case HVM_PARAM_IOREQ_PFN:
+    case HVM_PARAM_BUFIOREQ_PFN:
+    case HVM_PARAM_BUFIOREQ_EVTCHN:
+    /* The following parameters should not be read by the guest. */
+    case HVM_PARAM_IOREQ_SERVER_PFN:
+    case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+        if ( d == current->domain )
+            rc = -EPERM;
+        break;
+    default:
+        break;
+    }
+
+    return rc;
+}
+
 static int hvmop_get_param(
     XEN_GUEST_HANDLE_PARAM(xen_hvm_param_t) arg)
 {
-    struct domain *curr_d = current->domain;
     struct xen_hvm_param a;
     struct domain *d;
     int rc;
@@ -5838,7 +5877,7 @@ static int hvmop_get_param(
          (is_pvh_domain(d) && (a.index != HVM_PARAM_CALLBACK_IRQ)) )
         goto out;
 
-    rc = xsm_hvm_param(XSM_TARGET, d, HVMOP_get_param);
+    rc = hvm_allow_get_param(d, &a);
     if ( rc )
         goto out;
 
@@ -5847,13 +5886,6 @@ static int hvmop_get_param(
     case HVM_PARAM_ACPI_S_STATE:
         a.value = d->arch.hvm_domain.is_s3_suspended ? 3 : 0;
         break;
-    case HVM_PARAM_IOREQ_SERVER_PFN:
-    case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
-        if ( d == curr_d )
-        {
-            rc = -EPERM;
-            goto out;
-        }
     case HVM_PARAM_IOREQ_PFN:
     case HVM_PARAM_BUFIOREQ_PFN:
     case HVM_PARAM_BUFIOREQ_EVTCHN:
