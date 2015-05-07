@@ -5615,6 +5615,273 @@ static int hvmop_set_evtchn_upcall_vector(
     return 0;
 }
 
+static int hvmop_set_param(
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_param_t) arg)
+{
+    struct domain *curr_d = current->domain;
+    struct xen_hvm_param a;
+    struct domain *d;
+    struct vcpu *v;
+    int rc;
+
+    if ( copy_from_guest(&a, arg, 1) )
+        return -EFAULT;
+
+    if ( a.index >= HVM_NR_PARAMS )
+        return -EINVAL;
+
+    d = rcu_lock_domain_by_any_id(a.domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    rc = -EINVAL;
+    if ( !has_hvm_container_domain(d) ||
+         (is_pvh_domain(d) && (a.index != HVM_PARAM_CALLBACK_IRQ)) )
+        goto out;
+
+    rc = xsm_hvm_param(XSM_TARGET, d, HVMOP_set_param);
+    if ( rc )
+        goto out;
+
+    switch ( a.index )
+    {
+    case HVM_PARAM_CALLBACK_IRQ:
+        hvm_set_callback_via(d, a.value);
+        hvm_latch_shinfo_size(d);
+        break;
+    case HVM_PARAM_TIMER_MODE:
+        if ( a.value > HVMPTM_one_missed_tick_pending )
+            rc = -EINVAL;
+        break;
+    case HVM_PARAM_VIRIDIAN:
+        /* This should only ever be set once by the tools and read by the guest. */
+        rc = -EPERM;
+        if ( d == curr_d )
+            break;
+
+        if ( a.value != d->arch.hvm_domain.params[a.index] )
+        {
+            rc = -EEXIST;
+            if ( d->arch.hvm_domain.params[a.index] != 0 )
+                break;
+
+            rc = -EINVAL;
+            if ( (a.value & ~HVMPV_feature_mask) ||
+                 !(a.value & HVMPV_base_freq) )
+                break;
+        }
+
+        rc = 0;
+        break;
+    case HVM_PARAM_IDENT_PT:
+        /* Not reflexive, as we must domain_pause(). */
+        rc = -EPERM;
+        if ( d == curr_d )
+            break;
+
+        rc = -EINVAL;
+        if ( d->arch.hvm_domain.params[a.index] != 0 )
+            break;
+
+        rc = 0;
+        if ( !paging_mode_hap(d) )
+            break;
+
+        /*
+         * Update GUEST_CR3 in each VMCS to point at identity map.
+         * All foreign updates to guest state must synchronise on
+         * the domctl_lock.
+         */
+        rc = -ERESTART;
+        if ( !domctl_lock_acquire() )
+            break;
+
+        rc = 0;
+        domain_pause(d);
+        d->arch.hvm_domain.params[a.index] = a.value;
+        for_each_vcpu ( d, v )
+            paging_update_cr3(v);
+        domain_unpause(d);
+
+        domctl_lock_release();
+        break;
+    case HVM_PARAM_DM_DOMAIN:
+        /* Not reflexive, as we may need to domain_pause(). */
+        rc = -EPERM;
+        if ( d == curr_d )
+            break;
+
+        if ( a.value == DOMID_SELF )
+            a.value = curr_d->domain_id;
+
+        rc = hvm_set_dm_domain(d, a.value);
+        break;
+    case HVM_PARAM_ACPI_S_STATE:
+        /* Not reflexive, as we must domain_pause(). */
+        rc = -EPERM;
+        if ( d == curr_d )
+            break;
+
+        rc = 0;
+        if ( a.value == 3 )
+            hvm_s3_suspend(d);
+        else if ( a.value == 0 )
+            hvm_s3_resume(d);
+        else
+            rc = -EINVAL;
+
+        break;
+    case HVM_PARAM_ACPI_IOPORTS_LOCATION:
+        rc = pmtimer_change_ioport(d, a.value);
+        break;
+    case HVM_PARAM_MEMORY_EVENT_CR0:
+    case HVM_PARAM_MEMORY_EVENT_CR3:
+    case HVM_PARAM_MEMORY_EVENT_CR4:
+    case HVM_PARAM_MEMORY_EVENT_INT3:
+    case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
+    case HVM_PARAM_MEMORY_EVENT_MSR:
+        /* Deprecated */
+        rc = -EOPNOTSUPP;
+        break;
+    case HVM_PARAM_NESTEDHVM:
+        rc = xsm_hvm_param_nested(XSM_PRIV, d);
+        if ( rc )
+            break;
+        if ( a.value > 1 )
+            rc = -EINVAL;
+        /*
+         * Remove the check below once we have
+         * shadow-on-shadow.
+         */
+        if ( cpu_has_svm && !paging_mode_hap(d) && a.value )
+            rc = -EINVAL;
+        /* Set up NHVM state for any vcpus that are already up. */
+        if ( a.value &&
+             !d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
+            for_each_vcpu(d, v)
+                if ( rc == 0 )
+                    rc = nestedhvm_vcpu_initialise(v);
+        if ( !a.value || rc )
+            for_each_vcpu(d, v)
+                nestedhvm_vcpu_destroy(v);
+        break;
+    case HVM_PARAM_BUFIOREQ_EVTCHN:
+        rc = -EINVAL;
+        break;
+    case HVM_PARAM_TRIPLE_FAULT_REASON:
+        if ( a.value > SHUTDOWN_MAX )
+            rc = -EINVAL;
+        break;
+    case HVM_PARAM_IOREQ_SERVER_PFN:
+        if ( d == curr_d )
+        {
+            rc = -EPERM;
+            break;
+        }
+        d->arch.hvm_domain.ioreq_gmfn.base = a.value;
+        break;
+    case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+    {
+        unsigned int i;
+
+        if ( d == curr_d )
+        {
+            rc = -EPERM;
+            break;
+        }
+        if ( a.value == 0 ||
+             a.value > sizeof(d->arch.hvm_domain.ioreq_gmfn.mask) * 8 )
+        {
+            rc = -EINVAL;
+            break;
+        }
+        for ( i = 0; i < a.value; i++ )
+            set_bit(i, &d->arch.hvm_domain.ioreq_gmfn.mask);
+
+        break;
+    }
+    }
+
+    if ( rc != 0 )
+        goto out;
+
+    d->arch.hvm_domain.params[a.index] = a.value;
+
+    HVM_DBG_LOG(DBG_LEVEL_HCALL, "set param %u = %"PRIx64,
+                a.index, a.value);
+
+ out:
+    rcu_unlock_domain(d);
+    return rc;
+}
+
+static int hvmop_get_param(
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_param_t) arg)
+{
+    struct domain *curr_d = current->domain;
+    struct xen_hvm_param a;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&a, arg, 1) )
+        return -EFAULT;
+
+    if ( a.index >= HVM_NR_PARAMS )
+        return -EINVAL;
+
+    d = rcu_lock_domain_by_any_id(a.domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    rc = -EINVAL;
+    if ( !has_hvm_container_domain(d) ||
+         (is_pvh_domain(d) && (a.index != HVM_PARAM_CALLBACK_IRQ)) )
+        goto out;
+
+    rc = xsm_hvm_param(XSM_TARGET, d, HVMOP_get_param);
+    if ( rc )
+        goto out;
+
+    switch ( a.index )
+    {
+    case HVM_PARAM_ACPI_S_STATE:
+        a.value = d->arch.hvm_domain.is_s3_suspended ? 3 : 0;
+        break;
+    case HVM_PARAM_IOREQ_SERVER_PFN:
+    case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+        if ( d == curr_d )
+        {
+            rc = -EPERM;
+            goto out;
+        }
+    case HVM_PARAM_IOREQ_PFN:
+    case HVM_PARAM_BUFIOREQ_PFN:
+    case HVM_PARAM_BUFIOREQ_EVTCHN:
+    {
+        domid_t domid;
+
+        /* May need to create server. */
+        domid = d->arch.hvm_domain.params[HVM_PARAM_DM_DOMAIN];
+        rc = hvm_create_ioreq_server(d, domid, 1, 1, NULL);
+        if ( rc != 0 && rc != -EEXIST )
+            goto out;
+    }
+    /*FALLTHRU*/
+    default:
+        a.value = d->arch.hvm_domain.params[a.index];
+        break;
+    }
+
+    rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+
+    HVM_DBG_LOG(DBG_LEVEL_HCALL, "get param %u = %"PRIx64,
+                a.index, a.value);
+
+ out:
+    rcu_unlock_domain(d);
+    return rc;
+}
+
 /*
  * Note that this value is effectively part of the ABI, even if we don't need
  * to make it a formal part of it: A guest suspended for migration in the
@@ -5626,7 +5893,6 @@ static int hvmop_set_evtchn_upcall_vector(
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 {
-    struct domain *curr_d = current->domain;
     unsigned long start_iter, mask;
     long rc = 0;
 
@@ -5680,240 +5946,14 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     
     case HVMOP_set_param:
-    case HVMOP_get_param:
-    {
-        struct xen_hvm_param a;
-        struct domain *d;
-        struct vcpu *v;
-
-        if ( copy_from_guest(&a, arg, 1) )
-            return -EFAULT;
-
-        if ( a.index >= HVM_NR_PARAMS )
-            return -EINVAL;
-
-        d = rcu_lock_domain_by_any_id(a.domid);
-        if ( d == NULL )
-            return -ESRCH;
-
-        rc = -EINVAL;
-        if ( !has_hvm_container_domain(d) )
-            goto param_fail;
-
-        if ( is_pvh_domain(d)
-             && (a.index != HVM_PARAM_CALLBACK_IRQ) )
-            goto param_fail;
-
-        rc = xsm_hvm_param(XSM_TARGET, d, op);
-        if ( rc )
-            goto param_fail;
-
-        if ( op == HVMOP_set_param )
-        {
-            rc = 0;
-
-            switch ( a.index )
-            {
-            case HVM_PARAM_CALLBACK_IRQ:
-                hvm_set_callback_via(d, a.value);
-                hvm_latch_shinfo_size(d);
-                break;
-            case HVM_PARAM_TIMER_MODE:
-                if ( a.value > HVMPTM_one_missed_tick_pending )
-                    rc = -EINVAL;
-                break;
-            case HVM_PARAM_VIRIDIAN:
-                /* This should only ever be set once by the tools and read by the guest. */
-                rc = -EPERM;
-                if ( curr_d == d )
-                    break;
-
-                if ( a.value != d->arch.hvm_domain.params[a.index] )
-                {
-                    rc = -EEXIST;
-                    if ( d->arch.hvm_domain.params[a.index] != 0 )
-                        break;
-
-                    rc = -EINVAL;
-                    if ( (a.value & ~HVMPV_feature_mask) ||
-                         !(a.value & HVMPV_base_freq) )
-                        break;
-                }
-
-                rc = 0;
-                break;
-            case HVM_PARAM_IDENT_PT:
-                /* Not reflexive, as we must domain_pause(). */
-                rc = -EPERM;
-                if ( curr_d == d )
-                    break;
-
-                rc = -EINVAL;
-                if ( d->arch.hvm_domain.params[a.index] != 0 )
-                    break;
-
-                rc = 0;
-                if ( !paging_mode_hap(d) )
-                    break;
-
-                /*
-                 * Update GUEST_CR3 in each VMCS to point at identity map.
-                 * All foreign updates to guest state must synchronise on
-                 * the domctl_lock.
-                 */
-                rc = -ERESTART;
-                if ( !domctl_lock_acquire() )
-                    break;
-
-                rc = 0;
-                domain_pause(d);
-                d->arch.hvm_domain.params[a.index] = a.value;
-                for_each_vcpu ( d, v )
-                    paging_update_cr3(v);
-                domain_unpause(d);
-
-                domctl_lock_release();
-                break;
-            case HVM_PARAM_DM_DOMAIN:
-                /* Not reflexive, as we may need to domain_pause(). */
-                rc = -EPERM;
-                if ( curr_d == d )
-                    break;
-
-                if ( a.value == DOMID_SELF )
-                    a.value = curr_d->domain_id;
-
-                rc = hvm_set_dm_domain(d, a.value);
-                break;
-            case HVM_PARAM_ACPI_S_STATE:
-                /* Not reflexive, as we must domain_pause(). */
-                rc = -EPERM;
-                if ( curr_d == d )
-                    break;
-
-                rc = 0;
-                if ( a.value == 3 )
-                    hvm_s3_suspend(d);
-                else if ( a.value == 0 )
-                    hvm_s3_resume(d);
-                else
-                    rc = -EINVAL;
-
-                break;
-            case HVM_PARAM_ACPI_IOPORTS_LOCATION:
-                rc = pmtimer_change_ioport(d, a.value);
-                break;
-            case HVM_PARAM_MEMORY_EVENT_CR0:
-            case HVM_PARAM_MEMORY_EVENT_CR3:
-            case HVM_PARAM_MEMORY_EVENT_CR4:
-            case HVM_PARAM_MEMORY_EVENT_INT3:
-            case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
-            case HVM_PARAM_MEMORY_EVENT_MSR:
-                /* Deprecated */
-                rc = -EOPNOTSUPP;
-                break;
-            case HVM_PARAM_NESTEDHVM:
-                rc = xsm_hvm_param_nested(XSM_PRIV, d);
-                if ( rc )
-                    break;
-                if ( a.value > 1 )
-                    rc = -EINVAL;
-                /* Remove the check below once we have
-                 * shadow-on-shadow.
-                 */
-                if ( cpu_has_svm && !paging_mode_hap(d) && a.value )
-                    rc = -EINVAL;
-                /* Set up NHVM state for any vcpus that are already up */
-                if ( a.value &&
-                     !d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
-                    for_each_vcpu(d, v)
-                        if ( rc == 0 )
-                            rc = nestedhvm_vcpu_initialise(v);
-                if ( !a.value || rc )
-                    for_each_vcpu(d, v)
-                        nestedhvm_vcpu_destroy(v);
-                break;
-            case HVM_PARAM_BUFIOREQ_EVTCHN:
-                rc = -EINVAL;
-                break;
-            case HVM_PARAM_TRIPLE_FAULT_REASON:
-                if ( a.value > SHUTDOWN_MAX )
-                    rc = -EINVAL;
-                break;
-            case HVM_PARAM_IOREQ_SERVER_PFN:
-                if ( d == current->domain )
-                {
-                    rc = -EPERM;
-                    break;
-                }
-                d->arch.hvm_domain.ioreq_gmfn.base = a.value;
-                break;
-            case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
-            {
-                unsigned int i;
-
-                if ( d == current->domain )
-                {
-                    rc = -EPERM;
-                    break;
-                }
-                if ( a.value == 0 ||
-                     a.value > sizeof(d->arch.hvm_domain.ioreq_gmfn.mask) * 8 )
-                {
-                    rc = -EINVAL;
-                    break;
-                }
-                for ( i = 0; i < a.value; i++ )
-                    set_bit(i, &d->arch.hvm_domain.ioreq_gmfn.mask);
-
-                break;
-            }
-            }
-
-            if ( rc == 0 )
-                d->arch.hvm_domain.params[a.index] = a.value;
-        }
-        else
-        {
-            switch ( a.index )
-            {
-            case HVM_PARAM_ACPI_S_STATE:
-                a.value = d->arch.hvm_domain.is_s3_suspended ? 3 : 0;
-                break;
-            case HVM_PARAM_IOREQ_SERVER_PFN:
-            case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
-                if ( d == current->domain )
-                {
-                    rc = -EPERM;
-                    break;
-                }
-            case HVM_PARAM_IOREQ_PFN:
-            case HVM_PARAM_BUFIOREQ_PFN:
-            case HVM_PARAM_BUFIOREQ_EVTCHN: {
-                domid_t domid;
-                
-                /* May need to create server */
-                domid = d->arch.hvm_domain.params[HVM_PARAM_DM_DOMAIN];
-                rc = hvm_create_ioreq_server(d, domid, 1, 1, NULL);
-                if ( rc != 0 && rc != -EEXIST )
-                    goto param_fail;
-                /*FALLTHRU*/
-            }
-            default:
-                a.value = d->arch.hvm_domain.params[a.index];
-                break;
-            }
-            rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
-        }
-
-        HVM_DBG_LOG(DBG_LEVEL_HCALL, "%s param %u = %"PRIx64,
-                    op == HVMOP_set_param ? "set" : "get",
-                    a.index, a.value);
-
-    param_fail:
-        rcu_unlock_domain(d);
+        rc = hvmop_set_param(
+            guest_handle_cast(arg, xen_hvm_param_t));
         break;
-    }
+
+    case HVMOP_get_param:
+        rc = hvmop_get_param(
+            guest_handle_cast(arg, xen_hvm_param_t));
+        break;
 
     case HVMOP_set_pci_intx_level:
         rc = hvmop_set_pci_intx_level(
