@@ -159,6 +159,7 @@ void xlu__cfg_set_free(XLU_ConfigSetting *set) {
 void xlu_cfg_destroy(XLU_Config *cfg) {
     XLU_ConfigSetting *set, *set_next;
 
+    if (!cfg) return;
     for (set= cfg->settings;
          set;
          set= set_next) {
