@@ -5627,6 +5627,12 @@ static int hvm_allow_set_param(struct domain *d,
 
     switch ( a->index )
     {
+    /* The following parameters can be set by the guest. */
+    case HVM_PARAM_CALLBACK_IRQ:
+    case HVM_PARAM_VM86_TSS:
+    case HVM_PARAM_ACPI_IOPORTS_LOCATION:
+    case HVM_PARAM_VM_GENERATION_ID_ADDR:
+        break;
     /*
      * The following parameters must not be set by the guest
      * since the domain may need to be paused.
@@ -5634,14 +5640,10 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_IDENT_PT:
     case HVM_PARAM_DM_DOMAIN:
     case HVM_PARAM_ACPI_S_STATE:
-    /* The following parameters should not be set by the guest. */
-    case HVM_PARAM_VIRIDIAN:
-    case HVM_PARAM_IOREQ_SERVER_PFN:
-    case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+    /* The remaining parameters should not be set by the guest. */
+    default:
         if ( d == current->domain )
             rc = -EPERM;
-        break;
-    default:
         break;
     }
 
@@ -5835,6 +5837,16 @@ static int hvm_allow_get_param(struct domain *d,
 
     switch ( a->index )
     {
+    /* The following parameters can be read by the guest. */
+    case HVM_PARAM_CALLBACK_IRQ:
+    case HVM_PARAM_VM86_TSS:
+    case HVM_PARAM_ACPI_IOPORTS_LOCATION:
+    case HVM_PARAM_VM_GENERATION_ID_ADDR:
+    case HVM_PARAM_STORE_PFN:
+    case HVM_PARAM_STORE_EVTCHN:
+    case HVM_PARAM_CONSOLE_PFN:
+    case HVM_PARAM_CONSOLE_EVTCHN:
+        break;
     /*
      * The following parameters must not be read by the guest
      * since the domain may need to be paused.
@@ -5842,13 +5854,10 @@ static int hvm_allow_get_param(struct domain *d,
     case HVM_PARAM_IOREQ_PFN:
     case HVM_PARAM_BUFIOREQ_PFN:
     case HVM_PARAM_BUFIOREQ_EVTCHN:
-    /* The following parameters should not be read by the guest. */
-    case HVM_PARAM_IOREQ_SERVER_PFN:
-    case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+    /* The remaining parameters should not be read by the guest. */
+    default:
         if ( d == current->domain )
             rc = -EPERM;
-        break;
-    default:
         break;
     }
 
