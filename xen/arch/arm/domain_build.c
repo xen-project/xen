@@ -847,6 +847,14 @@ static int make_gic_node(const struct domain *d, void *fdt,
             return res;
     }
 
+    res = fdt_property_cell(fdt, "#interrupt-cells", 3);
+    if ( res )
+        return res;
+
+    res = fdt_property(fdt, "interrupt-controller", NULL, 0);
+    if ( res )
+        return res;
+
     res = fdt_end_node(fdt);
 
     return res;

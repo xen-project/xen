@@ -1106,14 +1106,6 @@ static int gicv3_make_dt_node(const struct domain *d,
     if ( res )
         return res;
 
-    res = fdt_property_cell(fdt, "#interrupt-cells", 3);
-    if ( res )
-        return res;
-
-    res = fdt_property(fdt, "interrupt-controller", NULL, 0);
-    if ( res )
-        return res;
-
     res = dt_property_read_u32(gic, "redistributor-stride", &rd_stride);
     if ( !res )
         rd_stride = 0;

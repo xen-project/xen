@@ -636,15 +636,6 @@ static int hip04gic_make_dt_node(const struct domain *d,
     if ( res )
         return res;
 
-    res = fdt_property_cell(fdt, "#interrupt-cells", 3);
-    if ( res )
-        return res;
-
-    res = fdt_property(fdt, "interrupt-controller", NULL, 0);
-
-    if ( res )
-        return res;
-
     /*
      * DTB provides up to 4 regions to handle virtualization
      * (in order GICD, GICC, GICH and GICV interfaces)
