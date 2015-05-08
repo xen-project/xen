@@ -808,8 +808,7 @@ out:
     return tlist;
 }
 
-static void gicv3_send_sgi(enum gic_sgi sgi, enum gic_sgi_mode mode,
-                           const cpumask_t *cpumask)
+static void gicv3_send_sgi_list(enum gic_sgi sgi, const cpumask_t *cpumask)
 {
     int cpu = 0;
     uint64_t val;
@@ -833,10 +832,32 @@ static void gicv3_send_sgi(enum gic_sgi sgi, enum gic_sgi_mode mode,
                MPIDR_AFFINITY_LEVEL(cluster_id, 1) << 16  |
                tlist);
 
-        WRITE_SYSREG(val, ICC_SGI1R_EL1);
+        WRITE_SYSREG64(val, ICC_SGI1R_EL1);
     }
     /* Force above writes to ICC_SGI1R_EL1 */
     isb();
+}
+
+static void gicv3_send_sgi(enum gic_sgi sgi, enum gic_sgi_mode mode,
+                           const cpumask_t *cpumask)
+{
+    switch ( mode )
+    {
+    case SGI_TARGET_OTHERS:
+        WRITE_SYSREG64(ICH_SGI_TARGET_OTHERS << ICH_SGI_IRQMODE_SHIFT |
+                       (uint64_t)sgi << ICH_SGI_IRQ_SHIFT,
+                       ICC_SGI1R_EL1);
+        isb();
+        break;
+    case SGI_TARGET_SELF:
+        gicv3_send_sgi_list(sgi, cpumask_of(smp_processor_id()));
+        break;
+    case SGI_TARGET_LIST:
+        gicv3_send_sgi_list(sgi, cpumask);
+        break;
+    default:
+        BUG();
+    }
 }
 
 /* Shut down the per-CPU GIC interface */
