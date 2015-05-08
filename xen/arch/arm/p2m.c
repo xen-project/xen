@@ -27,6 +27,8 @@ static unsigned int __read_mostly p2m_root_level;
 
 #define P2M_ROOT_PAGES    (1<<P2M_ROOT_ORDER)
 
+unsigned int __read_mostly p2m_ipa_bits;
+
 static bool_t p2m_valid(lpae_t pte)
 {
     return pte.p2m.valid;
@@ -1518,6 +1520,7 @@ void __init setup_virt_paging(void)
 
 #ifdef CONFIG_ARM_32
     printk("P2M: 40-bit IPA\n");
+    p2m_ipa_bits = 40;
     val |= VTCR_T0SZ(0x18); /* 40 bit IPA */
     val |= VTCR_SL0(0x1); /* P2M starts at first level */
 #else /* CONFIG_ARM_64 */
@@ -1560,9 +1563,10 @@ void __init setup_virt_paging(void)
 
     p2m_root_order = pa_range_info[pa_range].root_order;
     p2m_root_level = 2 - pa_range_info[pa_range].sl0;
+    p2m_ipa_bits = 64 - pa_range_info[pa_range].t0sz;
 
     printk("P2M: %d-bit IPA with %d-bit PA\n",
-           64 - pa_range_info[pa_range].t0sz,
+           p2m_ipa_bits,
            pa_range_info[pa_range].pabits);
 #endif
     printk("P2M: %d levels with order-%d root, VTCR 0x%lx\n",
