@@ -412,6 +412,61 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         break;
 #endif
 
+#ifdef HAS_PCI
+    case XEN_SYSCTL_pcitopoinfo:
+    {
+        xen_sysctl_pcitopoinfo_t *ti = &op->u.pcitopoinfo;
+        unsigned int i = 0;
+
+        if ( guest_handle_is_null(ti->devs) ||
+             guest_handle_is_null(ti->nodes) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        while ( i < ti->num_devs )
+        {
+            physdev_pci_device_t dev;
+            uint32_t node;
+            const struct pci_dev *pdev;
+
+            if ( copy_from_guest_offset(&dev, ti->devs, i, 1) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            spin_lock(&pcidevs_lock);
+            pdev = pci_get_pdev(dev.seg, dev.bus, dev.devfn);
+            if ( !pdev )
+                node = XEN_INVALID_DEV;
+            else if ( pdev->node == NUMA_NO_NODE )
+                node = XEN_INVALID_NODE_ID;
+            else
+                node = pdev->node;
+            spin_unlock(&pcidevs_lock);
+
+            if ( copy_to_guest_offset(ti->nodes, i, &node, 1) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            if ( (++i > 0x3f) && hypercall_preempt_check() )
+                break;
+        }
+
+        if ( !ret && (ti->num_devs != i) )
+        {
+            ti->num_devs = i;
+            if ( __copy_field_to_guest(u_sysctl, op, u.pcitopoinfo.num_devs) )
+                ret = -EFAULT;
+        }
+        break;
+    }
+#endif
+
     default:
         ret = arch_do_sysctl(op, u_sysctl);
         copyback = 0;

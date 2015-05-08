@@ -783,6 +783,7 @@ static int flask_sysctl(int cmd)
     case XEN_SYSCTL_physinfo:
     case XEN_SYSCTL_cputopoinfo:
     case XEN_SYSCTL_numainfo:
+    case XEN_SYSCTL_pcitopoinfo:
         return domain_has_xen(current->domain, XEN__PHYSINFO);
 
     case XEN_SYSCTL_psr_cmt_op:

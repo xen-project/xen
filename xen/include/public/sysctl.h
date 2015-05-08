@@ -33,6 +33,7 @@
 
 #include "xen.h"
 #include "domctl.h"
+#include "physdev.h"
 
 #define XEN_SYSCTL_INTERFACE_VERSION 0x0000000C
 
@@ -669,6 +670,30 @@ struct xen_sysctl_psr_cmt_op {
 typedef struct xen_sysctl_psr_cmt_op xen_sysctl_psr_cmt_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_psr_cmt_op_t);
 
+/* XEN_SYSCTL_pcitopoinfo */
+#define XEN_INVALID_DEV (XEN_INVALID_NODE_ID - 1)
+struct xen_sysctl_pcitopoinfo {
+    /*
+     * IN: Number of elements in 'pcitopo' and 'nodes' arrays.
+     * OUT: Number of processed elements of those arrays.
+     */
+    uint32_t num_devs;
+
+    /* IN: list of devices for which node IDs are requested. */
+    XEN_GUEST_HANDLE_64(physdev_pci_device_t) devs;
+
+    /*
+     * OUT: node identifier for each device.
+     * If information for a particular device is not available then
+     * corresponding entry will be set to XEN_INVALID_NODE_ID. If
+     * device is not known to the hypervisor then XEN_INVALID_DEV
+     * will be provided.
+     */
+    XEN_GUEST_HANDLE_64(uint32) nodes;
+};
+typedef struct xen_sysctl_pcitopoinfo xen_sysctl_pcitopoinfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_pcitopoinfo_t);
+
 struct xen_sysctl {
     uint32_t cmd;
 #define XEN_SYSCTL_readconsole                    1
@@ -691,12 +716,14 @@ struct xen_sysctl {
 #define XEN_SYSCTL_scheduler_op                  19
 #define XEN_SYSCTL_coverage_op                   20
 #define XEN_SYSCTL_psr_cmt_op                    21
+#define XEN_SYSCTL_pcitopoinfo                   22
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
         struct xen_sysctl_tbuf_op           tbuf_op;
         struct xen_sysctl_physinfo          physinfo;
         struct xen_sysctl_cputopoinfo       cputopoinfo;
+        struct xen_sysctl_pcitopoinfo       pcitopoinfo;
         struct xen_sysctl_numainfo          numainfo;
         struct xen_sysctl_sched_id          sched_id;
         struct xen_sysctl_perfc_op          perfc_op;
