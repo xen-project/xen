@@ -1978,6 +1978,7 @@ static int xc_domain_unbind_pt_irq_int(
         break;
     case PT_IRQ_TYPE_SPI:
         bind->u.spi.spi = spi;
+        break;
     default:
         errno = EINVAL;
         return -1;
