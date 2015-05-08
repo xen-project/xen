@@ -118,7 +118,7 @@ S:	Supported
 F:	xen/arch/x86/hvm/svm/
 
 ARINC653 SCHEDULER
-M:	Nathan Studer <nate.studer@dornerworks.com>
+M:	Josh Whitehead <josh.whitehead@dornerworks.com>
 M:	Robert VanVossen <robert.vanvossen@dornerworks.com>
 S:	Supported
 F:	xen/common/sched_arinc653.c
