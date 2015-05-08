@@ -186,6 +186,8 @@ struct paging_domain {
 
     /* flags to control paging operation */
     u32                     mode;
+    /* Has that pool ever run out of memory? */
+    bool_t                  p2m_alloc_failed;
     /* extension for shadow paging support */
     struct shadow_domain    shadow;
     /* extension for hardware-assited paging */
@@ -210,8 +212,6 @@ struct paging_domain {
      * (used by p2m and log-dirty code for their tries) */
     struct page_info * (*alloc_page)(struct domain *d);
     void (*free_page)(struct domain *d, struct page_info *pg);
-    /* Has that pool ever run out of memory? */
-    bool_t p2m_alloc_failed;
 };
 
 struct paging_vcpu {
