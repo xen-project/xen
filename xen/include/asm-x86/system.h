@@ -41,25 +41,25 @@ static always_inline unsigned long __xchg(
     case 1:
         asm volatile ( "xchgb %b0,%1"
                        : "=q" (x)
-                       : "m" (*__xg((volatile void *)ptr)), "0" (x)
+                       : "m" (*__xg(ptr)), "0" (x)
                        : "memory" );
         break;
     case 2:
         asm volatile ( "xchgw %w0,%1"
                        : "=r" (x)
-                       : "m" (*__xg((volatile void *)ptr)), "0" (x)
+                       : "m" (*__xg(ptr)), "0" (x)
                        : "memory" );
         break;
     case 4:
         asm volatile ( "xchgl %k0,%1"
                        : "=r" (x)
-                       : "m" (*__xg((volatile void *)ptr)), "0" (x)
+                       : "m" (*__xg(ptr)), "0" (x)
                        : "memory" );
         break;
     case 8:
         asm volatile ( "xchgq %0,%1"
                        : "=r" (x)
-                       : "m" (*__xg((volatile void *)ptr)), "0" (x)
+                       : "m" (*__xg(ptr)), "0" (x)
                        : "memory" );
         break;
     }
@@ -81,28 +81,28 @@ static always_inline unsigned long __cmpxchg(
     case 1:
         asm volatile ( "lock; cmpxchgb %b1,%2"
                        : "=a" (prev)
-                       : "q" (new), "m" (*__xg((volatile void *)ptr)),
+                       : "q" (new), "m" (*__xg(ptr)),
                        "0" (old)
                        : "memory" );
         return prev;
     case 2:
         asm volatile ( "lock; cmpxchgw %w1,%2"
                        : "=a" (prev)
-                       : "r" (new), "m" (*__xg((volatile void *)ptr)),
+                       : "r" (new), "m" (*__xg(ptr)),
                        "0" (old)
                        : "memory" );
         return prev;
     case 4:
         asm volatile ( "lock; cmpxchgl %k1,%2"
                        : "=a" (prev)
-                       : "r" (new), "m" (*__xg((volatile void *)ptr)),
+                       : "r" (new), "m" (*__xg(ptr)),
                        "0" (old)
                        : "memory" );
         return prev;
     case 8:
         asm volatile ( "lock; cmpxchgq %1,%2"
                        : "=a" (prev)
-                       : "r" (new), "m" (*__xg((volatile void *)ptr)),
+                       : "r" (new), "m" (*__xg(ptr)),
                        "0" (old)
                        : "memory" );
         return prev;
