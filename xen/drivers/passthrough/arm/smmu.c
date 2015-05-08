@@ -2230,8 +2230,14 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	size = arm_smmu_id_size_to_bits((id >> ID2_IAS_SHIFT) & ID2_IAS_MASK);
 	smmu->s1_output_size = min_t(unsigned long, PHYS_MASK_SHIFT, size);
 
-	/* Xen: Stage-2 input size is not restricted */
-	smmu->s2_input_size = size;
+	/* Xen: Stage-2 input size has to match p2m_ipa_bits.  */
+	if (size < p2m_ipa_bits) {
+		dev_err(smmu->dev,
+			"P2M IPA size not supported (P2M=%u SMMU=%lu)!\n",
+			p2m_ipa_bits, size);
+		return -ENODEV;
+	}
+	smmu->s2_input_size = p2m_ipa_bits;
 #if 0
 	/* Stage-2 input size limited due to pgd allocation (PTRS_PER_PGD) */
 #ifdef CONFIG_64BIT
