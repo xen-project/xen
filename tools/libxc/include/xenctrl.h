@@ -270,7 +270,7 @@ typedef struct xc_hypercall_buffer xc_hypercall_buffer_t;
  * transparently converted to the hypercall buffer as necessary.
  */
 #define DECLARE_HYPERCALL_BUFFER(_type, _name)                 \
-    _type *_name = NULL;                                       \
+    _type *(_name) = NULL;                                     \
     xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(_name) = { \
         .hbuf = NULL,                                          \
         .param_shadow = NULL,                                  \
@@ -288,10 +288,10 @@ typedef struct xc_hypercall_buffer xc_hypercall_buffer_t;
  * required.
  */
 #define DECLARE_HYPERCALL_BUFFER_SHADOW(_type, _name, _hbuf)   \
-    _type *_name = _hbuf->hbuf;                                \
+    _type *(_name) = (_hbuf)->hbuf;                            \
     xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(_name) = { \
         .hbuf = (void *)-1,                                    \
-        .param_shadow = _hbuf,                                 \
+        .param_shadow = (_hbuf),                               \
         HYPERCALL_BUFFER_INIT_NO_BOUNCE                        \
     }
 
@@ -302,7 +302,7 @@ typedef struct xc_hypercall_buffer xc_hypercall_buffer_t;
 #define DECLARE_HYPERCALL_BUFFER_ARGUMENT(_name)               \
     xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(_name) = { \
         .hbuf = (void *)-1,                                    \
-        .param_shadow = _name,                                 \
+        .param_shadow = (_name),                               \
         HYPERCALL_BUFFER_INIT_NO_BOUNCE                        \
     }
 
