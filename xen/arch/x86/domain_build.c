@@ -37,6 +37,7 @@
 #include <asm/io_apic.h>
 #include <asm/hap.h>
 #include <asm/hpet.h>
+#include <asm/mc146818rtc.h>
 
 #include <public/version.h>
 
@@ -1548,6 +1549,8 @@ int __init construct_dom0(
         rc |= ioports_deny_access(d, pmtmr_ioport, pmtmr_ioport + 3);
     /* PCI configuration space (NB. 0xcf8 has special treatment). */
     rc |= ioports_deny_access(d, 0xcfc, 0xcff);
+    /* Never permit direct access to the RTC/CMOS registers. */
+    rc |= ioports_deny_access(d, RTC_PORT(0), RTC_PORT(1));
     /* Command-line I/O ranges. */
     process_dom0_ioports_disable(d);
 
