@@ -800,8 +800,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     local_irq_enable();
     local_abort_enable();
 
-    iommu_setup();
-
     smp_prepare_cpus(cpus);
 
     initialize_keytable();
@@ -824,6 +822,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     /* TODO: smp_cpus_done(); */
 
     setup_virt_paging();
+
+    iommu_setup();
 
     do_initcalls();
 
