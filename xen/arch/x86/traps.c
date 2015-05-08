@@ -1765,6 +1765,10 @@ static int admin_io_okay(
     if ( (port == 0xcf8) && (bytes == 4) )
         return 0;
 
+    /* We also never permit direct access to the RTC/CMOS registers. */
+    if ( ((port & ~1) == RTC_PORT(0)) )
+        return 0;
+
     return ioports_access_permitted(v->domain, port, port + bytes - 1);
 }
 
