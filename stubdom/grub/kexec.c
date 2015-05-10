@@ -276,12 +276,13 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     dom->total_pages = start_info.nr_pages;
 
     /* equivalent of arch_setup_meminit */
+    dom->p2m_size = dom->total_pages;
 
     /* setup initial p2m */
-    dom->p2m_host = malloc(sizeof(*dom->p2m_host) * dom->total_pages);
+    dom->p2m_host = malloc(sizeof(*dom->p2m_host) * dom->p2m_size);
 
     /* Start with our current P2M */
-    for (i = 0; i < dom->total_pages; i++)
+    for (i = 0; i < dom->p2m_size; i++)
         dom->p2m_host[i] = pfn_to_mfn(i);
 
     if ( (rc = xc_dom_build_image(dom)) != 0 ) {
