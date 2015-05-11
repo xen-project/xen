@@ -225,8 +225,6 @@ static int late_hwdom_init(struct domain *d)
 
     iommu_hwdom_init(d);
 
-    setup_io_bitmap(d);
-
     return rv;
 #else
     return 0;

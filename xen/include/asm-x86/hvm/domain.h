@@ -141,8 +141,6 @@ struct hvm_domain {
      */
     uint64_t sync_tsc;
 
-    unsigned long         *io_bitmap;
-
     union {
         struct vmx_domain vmx;
         struct svm_domain svm;

@@ -1446,9 +1446,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     dmi_end_boot();
 
-    if ( is_hardware_domain(dom0) )
-        setup_io_bitmap(dom0);
-
     system_state = SYS_STATE_active;
 
     domain_unpause_by_systemcontroller(dom0);
@@ -1510,32 +1507,6 @@ int __hwdom_init xen_in_range(unsigned long mfn)
             return 1;
 
     return 0;
-}
-
-static int __hwdom_init io_bitmap_cb(unsigned long s, unsigned long e,
-                                     void *ctx)
-{
-    struct domain *d = ctx;
-    int i;
-
-    ASSERT(s <= INT_MAX && e <= INT_MAX);
-    for ( i = s; i <= e; i++ )
-        __clear_bit(i, d->arch.hvm_domain.io_bitmap);
-
-    return 0;
-}
-
-void __hwdom_init setup_io_bitmap(struct domain *d)
-{
-    int rc;
-
-    ASSERT(is_hardware_domain(d));
-    if ( has_hvm_container_domain(d) )
-    {
-        rc = rangeset_report_ranges(d->arch.ioport_caps, 0, 0x10000,
-                                    io_bitmap_cb, d);
-        BUG_ON(rc);
-    }
 }
 
 /*
