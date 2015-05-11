@@ -230,22 +230,38 @@ out:
     return ret;
 }
 
-int xc_numainfo(xc_interface *xch,
-                xc_numainfo_t *put_info)
+int xc_numainfo(xc_interface *xch, unsigned *max_nodes,
+                xc_meminfo_t *meminfo, uint32_t *distance)
 {
     int ret;
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BOUNCE(meminfo, *max_nodes * sizeof(*meminfo),
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_HYPERCALL_BOUNCE(distance,
+                             *max_nodes * *max_nodes * sizeof(*distance),
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( (ret = xc_hypercall_bounce_pre(xch, meminfo)) )
+        goto out;
+    if ((ret = xc_hypercall_bounce_pre(xch, distance)) )
+        goto out;
+
+    sysctl.u.numainfo.num_nodes = *max_nodes;
+    set_xen_guest_handle(sysctl.u.numainfo.meminfo, meminfo);
+    set_xen_guest_handle(sysctl.u.numainfo.distance, distance);
 
     sysctl.cmd = XEN_SYSCTL_numainfo;
 
-    memcpy(&sysctl.u.numainfo, put_info, sizeof(*put_info));
+    if ( (ret = do_sysctl(xch, &sysctl)) != 0 )
+        goto out;
 
-    if ((ret = do_sysctl(xch, &sysctl)) != 0)
-        return ret;
+    *max_nodes = sysctl.u.numainfo.num_nodes;
 
-    memcpy(put_info, &sysctl.u.numainfo, sizeof(*put_info));
+out:
+    xc_hypercall_bounce_post(xch, meminfo);
+    xc_hypercall_bounce_post(xch, distance);
 
-    return 0;
+    return ret;
 }
 
 
