@@ -157,7 +157,7 @@ define move-if-changed
 	if ! cmp -s $(1) $(2); then mv -f $(1) $(2); else rm -f $(1); fi
 endef
 
-BUILD_MAKE_VARS := sbindir bindir LIBEXEC LIBEXEC_BIN LIBDIR SHAREDIR \
+BUILD_MAKE_VARS := sbindir bindir LIBEXEC LIBEXEC_BIN libdir SHAREDIR \
                    XENFIRMWAREDIR XEN_CONFIG_DIR XEN_SCRIPT_DIR XEN_LOCK_DIR \
                    XEN_RUN_DIR XEN_PAGING_DIR
 
@@ -204,7 +204,7 @@ CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
 LDFLAGS += $(foreach i, $(PREPEND_LIB), -L$(i))
 CFLAGS += $(foreach i, $(PREPEND_INCLUDES), -I$(i))
 ifeq ($(XEN_TOOLS_RPATH),y)
-LDFLAGS += -Wl,-rpath,$(LIBDIR)
+LDFLAGS += -Wl,-rpath,$(libdir)
 endif
 APPEND_LDFLAGS += $(foreach i, $(APPEND_LIB), -L$(i))
 APPEND_CFLAGS += $(foreach i, $(APPEND_INCLUDES), -I$(i))

@@ -7,7 +7,7 @@
 
 . @XEN_SCRIPT_DIR@/hotplugpath.sh
 
-LD_LIBRARY_PATH="${LIBDIR}"
+LD_LIBRARY_PATH="${libdir}"
 export LD_LIBRARY_PATH
 
 name="xencommons"

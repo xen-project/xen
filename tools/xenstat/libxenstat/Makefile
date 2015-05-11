@@ -57,10 +57,10 @@ src/libxenstat.so: src/libxenstat.so.$(MAJOR)
 .PHONY: install
 install: all
 	$(INSTALL_DATA) src/xenstat.h $(DESTDIR)$(includedir)
-	$(INSTALL_DATA) $(LIB) $(DESTDIR)$(LIBDIR)/libxenstat.a
-	$(INSTALL_PROG) src/libxenstat.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
-	ln -sf libxenstat.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenstat.so.$(MAJOR)
-	ln -sf libxenstat.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenstat.so
+	$(INSTALL_DATA) $(LIB) $(DESTDIR)$(libdir)/libxenstat.a
+	$(INSTALL_PROG) src/libxenstat.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)
+	ln -sf libxenstat.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxenstat.so.$(MAJOR)
+	ln -sf libxenstat.so.$(MAJOR) $(DESTDIR)$(libdir)/libxenstat.so
 
 PYLIB=bindings/swig/python/_xenstat.so
 PYMOD=bindings/swig/python/xenstat.py

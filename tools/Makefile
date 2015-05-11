@@ -89,9 +89,9 @@ uninstall:
 	rm -rf $(D)$(includedir)/xen
 	rm -rf $(D)$(includedir)/_libxl* $(D)$(includedir)/libxl*
 	rm -rf $(D)$(includedir)/xenstat.h $(D)$(includedir)/xentoollog.h
-	rm -rf $(D)$(LIBDIR)/libxenctrl* $(D)$(LIBDIR)/libxenguest*
-	rm -rf $(D)$(LIBDIR)/libxenstore* $(D)$(LIBDIR)/libxlutil*
-	rm -rf $(D)$(LIBDIR)/python/xen $(D)$(LIBDIR)/python/grub
+	rm -rf $(D)$(libdir)/libxenctrl* $(D)$(libdir)/libxenguest*
+	rm -rf $(D)$(libdir)/libxenstore* $(D)$(libdir)/libxlutil*
+	rm -rf $(D)$(libdir)/python/xen $(D)$(libdir)/python/grub
 	rm -rf $(D)$(LIBEXEC)
 	rm -rf $(D)$(sbindir)/setmask
 	rm -rf $(D)$(sbindir)/xen* $(D)$(sbindir)/netfix $(D)$(sbindir)/xm
@@ -117,8 +117,8 @@ IOEMU_CONFIGURE_CROSS ?= --cross-prefix=$(CROSS_COMPILE) \
 endif
 
 ifeq ($(XEN_TOOLS_RPATH),y)
-QEMU_UPSTREAM_RPATH := -Wl,-rpath,$(LIBEXEC_LIB):$(LIBDIR)
-IOEMU_EXTRA_LDFLAGS := --extra-ldflags="-Wl,-rpath,$(LIBDIR)"
+QEMU_UPSTREAM_RPATH := -Wl,-rpath,$(LIBEXEC_LIB):$(libdir)
+IOEMU_EXTRA_LDFLAGS := --extra-ldflags="-Wl,-rpath,$(libdir)"
 else
 QEMU_UPSTREAM_RPATH := -Wl,-rpath,$(LIBEXEC_LIB)
 IOEMU_EXTRA_LDFLAGS :=

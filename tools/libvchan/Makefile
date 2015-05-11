@@ -42,13 +42,13 @@ vchan-node2: $(NODE2_OBJS) libxenvchan.so
 
 .PHONY: install
 install: all
-	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(libdir)
 	$(INSTALL_DIR) $(DESTDIR)$(includedir)
-	$(INSTALL_PROG) libxenvchan.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
-	ln -sf libxenvchan.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenvchan.so.$(MAJOR)
-	ln -sf libxenvchan.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenvchan.so
+	$(INSTALL_PROG) libxenvchan.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)
+	ln -sf libxenvchan.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxenvchan.so.$(MAJOR)
+	ln -sf libxenvchan.so.$(MAJOR) $(DESTDIR)$(libdir)/libxenvchan.so
 	$(INSTALL_DATA) libxenvchan.h $(DESTDIR)$(includedir)
-	$(INSTALL_DATA) libxenvchan.a $(DESTDIR)$(LIBDIR)
+	$(INSTALL_DATA) libxenvchan.a $(DESTDIR)$(libdir)
 
 .PHONY: clean
 clean:

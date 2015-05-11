@@ -141,11 +141,11 @@ endif
 	set -e ; for c in $(CLIENTS) ; do \
 		ln -f $(DESTDIR)$(bindir)/xenstore $(DESTDIR)$(bindir)/$${c} ; \
 	done
-	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
-	$(INSTALL_SHLIB) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
-	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenstore.so.$(MAJOR)
-	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenstore.so
-	$(INSTALL_DATA) libxenstore.a $(DESTDIR)$(LIBDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(libdir)
+	$(INSTALL_SHLIB) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)
+	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxenstore.so.$(MAJOR)
+	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)$(libdir)/libxenstore.so
+	$(INSTALL_DATA) libxenstore.a $(DESTDIR)$(libdir)
 	$(INSTALL_DATA) include/xenstore.h $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) include/xenstore_lib.h $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) include/compat/xs.h $(DESTDIR)$(includedir)/xenstore-compat/xs.h

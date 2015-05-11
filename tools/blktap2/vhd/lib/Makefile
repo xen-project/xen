@@ -10,7 +10,7 @@ LVM-UTIL-OBJ    := $(BLKTAP_ROOT)/lvm/lvm-util.o
 
 LIBVHD-BUILD    := libvhd.a
 
-INST-DIR         = $(LIBDIR)
+INST-DIR         = $(libdir)
 
 CFLAGS          += -Werror
 CFLAGS          += -Wno-unused

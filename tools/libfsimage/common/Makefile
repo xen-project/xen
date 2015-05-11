@@ -22,11 +22,11 @@ all: $(LIB)
 
 .PHONY: install
 install: all
-	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(libdir)
 	$(INSTALL_DIR) $(DESTDIR)$(includedir)
-	$(INSTALL_PROG) libfsimage.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
-	ln -sf libfsimage.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libfsimage.so.$(MAJOR)
-	ln -sf libfsimage.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libfsimage.so
+	$(INSTALL_PROG) libfsimage.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)
+	ln -sf libfsimage.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libfsimage.so.$(MAJOR)
+	ln -sf libfsimage.so.$(MAJOR) $(DESTDIR)$(libdir)/libfsimage.so
 	$(INSTALL_DATA) fsimage.h $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) fsimage_plugin.h $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) fsimage_grub.h $(DESTDIR)$(includedir)
