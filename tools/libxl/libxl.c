@@ -5139,6 +5139,51 @@ libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out)
     return ret;
 }
 
+libxl_pcitopology *libxl_get_pci_topology(libxl_ctx *ctx, int *num_devs)
+{
+    GC_INIT(ctx);
+    physdev_pci_device_t *devs;
+    uint32_t *nodes;
+    libxl_pcitopology *ret = NULL;
+    int i, rc;
+
+    *num_devs = libxl__pci_numdevs(gc);
+    if (*num_devs < 0) {
+        LOG(ERROR, "Unable to determine number of PCI devices, rc %d",
+            *num_devs);
+        goto out;
+    }
+
+    devs = libxl__zalloc(gc, sizeof(*devs) * *num_devs);
+    nodes = libxl__zalloc(gc, sizeof(*nodes) * *num_devs);
+
+    rc = libxl__pci_topology_init(gc, devs, *num_devs);
+    if (rc) {
+        LOG(ERROR, "Cannot initialize PCI hypercall structure, rc %d", rc);
+        goto out;
+    }
+
+    if (xc_pcitopoinfo(ctx->xch, *num_devs, devs, nodes) != 0) {
+        LOGE(ERROR, "PCI topology info hypercall failed");
+        goto out;
+    }
+
+    ret = libxl__zalloc(NOGC, sizeof(libxl_pcitopology) * *num_devs);
+
+    for (i = 0; i < *num_devs; i++) {
+        ret[i].seg = devs[i].seg;
+        ret[i].bus = devs[i].bus;
+        ret[i].devfn = devs[i].devfn;
+        ret[i].node = ((nodes[i] == XEN_INVALID_NODE_ID) ||
+                       (nodes[i] == XEN_INVALID_DEV)) ?
+            LIBXL_PCITOPOLOGY_INVALID_ENTRY : nodes[i];
+    }
+
+ out:
+    GC_FREE;
+    return ret;
+}
+
 libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr)
 {
     GC_INIT(ctx);

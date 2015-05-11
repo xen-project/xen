@@ -264,6 +264,45 @@ out:
     return ret;
 }
 
+int xc_pcitopoinfo(xc_interface *xch, unsigned num_devs,
+                   physdev_pci_device_t *devs,
+                   uint32_t *nodes)
+{
+    int ret = 0;
+    unsigned processed = 0;
+    DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BOUNCE(devs, num_devs * sizeof(*devs),
+                             XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    DECLARE_HYPERCALL_BOUNCE(nodes, num_devs* sizeof(*nodes),
+                             XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+
+    if ( (ret = xc_hypercall_bounce_pre(xch, devs)) )
+        goto out;
+    if ( (ret = xc_hypercall_bounce_pre(xch, nodes)) )
+        goto out;
+
+    sysctl.cmd = XEN_SYSCTL_pcitopoinfo;
+
+    while ( processed < num_devs )
+    {
+        sysctl.u.pcitopoinfo.num_devs = num_devs - processed;
+        set_xen_guest_handle_offset(sysctl.u.pcitopoinfo.devs, devs,
+                                    processed);
+        set_xen_guest_handle_offset(sysctl.u.pcitopoinfo.nodes, nodes,
+                                    processed);
+
+        if ( (ret = do_sysctl(xch, &sysctl)) != 0 )
+                break;
+
+        processed += sysctl.u.pcitopoinfo.num_devs;
+    }
+
+ out:
+    xc_hypercall_bounce_post(xch, devs);
+    xc_hypercall_bounce_post(xch, nodes);
+
+    return ret;
+}
 
 int xc_sched_id(xc_interface *xch,
                 int *sched_id)

@@ -657,6 +657,13 @@ libxl_cputopology = Struct("cputopology", [
     ("node", uint32),
     ], dir=DIR_OUT)
 
+libxl_pcitopology = Struct("pcitopology", [
+    ("seg", uint16),
+    ("bus", uint8),
+    ("devfn", uint8),
+    ("node", uint32),
+    ], dir=DIR_OUT)
+
 libxl_sched_credit_params = Struct("sched_credit_params", [
     ("tslice_ms", integer),
     ("ratelimit_us", integer),

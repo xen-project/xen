@@ -5420,12 +5420,15 @@ static void output_numainfo(void)
 
 static void output_topologyinfo(void)
 {
-    libxl_cputopology *info;
+    libxl_cputopology *cpuinfo;
     int i, nr;
+    libxl_pcitopology *pciinfo;
+    int valid_devs;
 
-    info = libxl_get_cpu_topology(ctx, &nr);
-    if (info == NULL) {
-        fprintf(stderr, "libxl_get_topologyinfo failed.\n");
+
+    cpuinfo = libxl_get_cpu_topology(ctx, &nr);
+    if (cpuinfo == NULL) {
+        fprintf(stderr, "libxl_get_cpu_topology failed.\n");
         return;
     }
 
@@ -5433,12 +5436,35 @@ static void output_topologyinfo(void)
     printf("cpu:    core    socket     node\n");
 
     for (i = 0; i < nr; i++) {
-        if (info[i].core != LIBXL_CPUTOPOLOGY_INVALID_ENTRY)
+        if (cpuinfo[i].core != LIBXL_CPUTOPOLOGY_INVALID_ENTRY)
             printf("%3d:    %4d     %4d     %4d\n", i,
-                   info[i].core, info[i].socket, info[i].node);
+                   cpuinfo[i].core, cpuinfo[i].socket, cpuinfo[i].node);
     }
 
-    libxl_cputopology_list_free(info, nr);
+    libxl_cputopology_list_free(cpuinfo, nr);
+
+    pciinfo = libxl_get_pci_topology(ctx, &nr);
+    if (pciinfo == NULL) {
+        fprintf(stderr, "libxl_get_pci_topology failed.\n");
+        return;
+    }
+
+    printf("device topology        :\n");
+    printf("device           node\n");
+    for (i = 0; i < nr; i++) {
+        if (pciinfo[i].node != LIBXL_PCITOPOLOGY_INVALID_ENTRY) {
+            printf("%04x:%02x:%02x.%01x      %d\n", pciinfo[i].seg,
+                   pciinfo[i].bus,
+                   ((pciinfo[i].devfn >> 3) & 0x1f), (pciinfo[i].devfn & 7),
+                   pciinfo[i].node);
+            valid_devs++;
+        }
+    }
+
+    if (valid_devs == 0)
+        printf("No device topology data available\n");
+
+    libxl_pcitopology_list_free(pciinfo, nr);
 
     return;
 }

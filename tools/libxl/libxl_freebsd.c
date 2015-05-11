@@ -131,3 +131,15 @@ libxl_device_model_version libxl__default_device_model(libxl__gc *gc)
 {
     return LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
 }
+
+int libxl__pci_numdevs(libxl__gc *gc)
+{
+    return ERROR_NI;
+}
+
+int libxl__pci_topology_init(libxl__gc *gc,
+                             physdev_pci_device_t *devs,
+                             int num_devs)
+{
+    return ERROR_NI;
+}

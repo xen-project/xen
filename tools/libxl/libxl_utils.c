@@ -952,6 +952,14 @@ void libxl_cputopology_list_free(libxl_cputopology *list, int nr)
     free(list);
 }
 
+void libxl_pcitopology_list_free(libxl_pcitopology *list, int nr)
+{
+    int i;
+    for (i = 0; i < nr; i++)
+        libxl_pcitopology_dispose(&list[i]);
+    free(list);
+}
+
 void libxl_numainfo_list_free(libxl_numainfo *list, int nr)
 {
     int i;

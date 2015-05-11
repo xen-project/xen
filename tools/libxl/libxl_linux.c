@@ -279,3 +279,73 @@ libxl_device_model_version libxl__default_device_model(libxl__gc *gc)
 {
     return LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
 }
+
+int libxl__pci_numdevs(libxl__gc *gc)
+{
+    DIR *dir;
+    struct dirent *entry;
+    int num_devs = 0;
+
+    dir = opendir("/sys/bus/pci/devices");
+    if (!dir) {
+        LOGE(ERROR, "Cannot open /sys/bus/pci/devices");
+        return ERROR_FAIL;
+    }
+
+    while ((entry = readdir(dir))) {
+        if (entry->d_name[0] == '.')
+            continue;
+        num_devs++;
+    }
+    closedir(dir);
+
+    return num_devs;
+}
+
+int libxl__pci_topology_init(libxl__gc *gc,
+                             physdev_pci_device_t *devs,
+                             int num_devs)
+{
+
+    DIR *dir;
+    struct dirent *entry;
+    int i, err = 0;
+
+    dir = opendir("/sys/bus/pci/devices");
+    if (!dir) {
+        LOGE(ERROR, "Cannot open /sys/bus/pci/devices");
+        return ERROR_FAIL;
+    }
+
+    i = 0;
+    while ((entry = readdir(dir))) {
+        unsigned int dom, bus, dev, func;
+
+        if (entry->d_name[0] == '.')
+            continue;
+
+        if (i == num_devs) {
+            LOG(ERROR, "Too many devices");
+            err = ERROR_FAIL;
+            errno = -ENOSPC;
+            goto out;
+        }
+
+        if (sscanf(entry->d_name, "%x:%x:%x.%d", &dom, &bus, &dev, &func) < 4) {
+            LOGE(ERROR, "Error processing /sys/bus/pci/devices");
+            err = ERROR_FAIL;
+            goto out;
+        }
+
+        devs[i].seg = dom;
+        devs[i].bus = bus;
+        devs[i].devfn = ((dev & 0x1f) << 3) | (func & 7);
+
+        i++;
+    }
+
+ out:
+    closedir(dir);
+
+    return err;
+}

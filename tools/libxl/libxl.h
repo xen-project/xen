@@ -760,6 +760,14 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
 #define LIBXL_HAVE_PSR_MBM 1
 #endif
 
+/*
+ * LIBXL_HAVE_PCITOPOLOGY
+ *
+ * If this is defined, then interface to query hypervisor about PCI device
+ * topology is available.
+ */
+#define LIBXL_HAVE_PCITOPOLOGY 1
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
@@ -1151,6 +1159,10 @@ void libxl_vminfo_list_free(libxl_vminfo *list, int nb_vm);
 #define LIBXL_CPUTOPOLOGY_INVALID_ENTRY (~(uint32_t)0)
 libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out);
 void libxl_cputopology_list_free(libxl_cputopology *, int nb_cpu);
+
+#define LIBXL_PCITOPOLOGY_INVALID_ENTRY (~(uint32_t)0)
+libxl_pcitopology *libxl_get_pci_topology(libxl_ctx *ctx, int *num_devs);
+void libxl_pcitopology_list_free(libxl_pcitopology *, int num_devs);
 
 #define LIBXL_NUMAINFO_INVALID_ENTRY (~(uint32_t)0)
 libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr);

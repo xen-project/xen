@@ -1249,6 +1249,7 @@ typedef xen_sysctl_physinfo_t xc_physinfo_t;
 typedef xen_sysctl_cputopo_t xc_cputopo_t;
 typedef xen_sysctl_numainfo_t xc_numainfo_t;
 typedef xen_sysctl_meminfo_t xc_meminfo_t;
+typedef xen_sysctl_pcitopoinfo_t xc_pcitopoinfo_t;
 
 typedef uint32_t xc_cpu_to_node_t;
 typedef uint32_t xc_cpu_to_socket_t;
@@ -1262,6 +1263,8 @@ int xc_cputopoinfo(xc_interface *xch, unsigned *max_cpus,
                    xc_cputopo_t *cputopo);
 int xc_numainfo(xc_interface *xch, unsigned *max_nodes,
                 xc_meminfo_t *meminfo, uint32_t *distance);
+int xc_pcitopoinfo(xc_interface *xch, unsigned num_devs,
+                   physdev_pci_device_t *devs, uint32_t *nodes);
 
 int xc_sched_id(xc_interface *xch,
                 int *sched_id);
