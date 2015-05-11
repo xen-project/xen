@@ -523,7 +523,7 @@ static void domain_unmap_interface(struct domain *dom)
 	if (xcg_handle && dom->ring_ref == -1)
 		xc_gnttab_munmap(xcg_handle, dom->interface, 1);
 	else
-		munmap(dom->interface, getpagesize());
+		munmap(dom->interface, XC_PAGE_SIZE);
 	dom->interface = NULL;
 	dom->ring_ref = -1;
 }
@@ -562,7 +562,7 @@ static int domain_create_ring(struct domain *dom)
 	if (!dom->interface) {
 		/* Fall back to xc_map_foreign_range */
 		dom->interface = xc_map_foreign_range(
-			xc, dom->domid, getpagesize(),
+			xc, dom->domid, XC_PAGE_SIZE,
 			PROT_READ|PROT_WRITE,
 			(unsigned long)ring_ref);
 		if (dom->interface == NULL) {
