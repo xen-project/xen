@@ -82,13 +82,13 @@ uninstall:
 	rm -rf $(D)$(bindir)/xenstore* $(D)$(bindir)/xentrace*
 	rm -rf $(D)$(bindir)/xen-detect $(D)$(bindir)/xencons
 	rm -rf $(D)$(bindir)/xenpvnetboot $(D)$(bindir)/qemu-*-xen
-	rm -rf $(D)$(INCLUDEDIR)/xenctrl* $(D)$(INCLUDEDIR)/xenguest.h
-	rm -rf $(D)$(INCLUDEDIR)/xs_lib.h $(D)$(INCLUDEDIR)/xs.h
-	rm -rf $(D)$(INCLUDEDIR)/xenstore-compat/xs_lib.h $(D)$(INCLUDEDIR)/xenstore-compat/xs.h
-	rm -rf $(D)$(INCLUDEDIR)/xenstore_lib.h $(D)$(INCLUDEDIR)/xenstore.h
-	rm -rf $(D)$(INCLUDEDIR)/xen
-	rm -rf $(D)$(INCLUDEDIR)/_libxl* $(D)$(INCLUDEDIR)/libxl*
-	rm -rf $(D)$(INCLUDEDIR)/xenstat.h $(D)$(INCLUDEDIR)/xentoollog.h
+	rm -rf $(D)$(includedir)/xenctrl* $(D)$(includedir)/xenguest.h
+	rm -rf $(D)$(includedir)/xs_lib.h $(D)$(includedir)/xs.h
+	rm -rf $(D)$(includedir)/xenstore-compat/xs_lib.h $(D)$(includedir)/xenstore-compat/xs.h
+	rm -rf $(D)$(includedir)/xenstore_lib.h $(D)$(includedir)/xenstore.h
+	rm -rf $(D)$(includedir)/xen
+	rm -rf $(D)$(includedir)/_libxl* $(D)$(includedir)/libxl*
+	rm -rf $(D)$(includedir)/xenstat.h $(D)$(includedir)/xentoollog.h
 	rm -rf $(D)$(LIBDIR)/libxenctrl* $(D)$(LIBDIR)/libxenguest*
 	rm -rf $(D)$(LIBDIR)/libxenstore* $(D)$(LIBDIR)/libxlutil*
 	rm -rf $(D)$(LIBDIR)/python/xen $(D)$(LIBDIR)/python/grub

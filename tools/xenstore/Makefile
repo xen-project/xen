@@ -129,8 +129,8 @@ tarball: clean
 .PHONY: install
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)
-	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
-	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xenstore-compat
+	$(INSTALL_DIR) $(DESTDIR)$(includedir)
+	$(INSTALL_DIR) $(DESTDIR)$(includedir)/xenstore-compat
 ifeq ($(XENSTORE_XENSTORED),y)
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_LIB_STORED)
@@ -146,12 +146,12 @@ endif
 	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenstore.so.$(MAJOR)
 	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenstore.so
 	$(INSTALL_DATA) libxenstore.a $(DESTDIR)$(LIBDIR)
-	$(INSTALL_DATA) include/xenstore.h $(DESTDIR)$(INCLUDEDIR)
-	$(INSTALL_DATA) include/xenstore_lib.h $(DESTDIR)$(INCLUDEDIR)
-	$(INSTALL_DATA) include/compat/xs.h $(DESTDIR)$(INCLUDEDIR)/xenstore-compat/xs.h
-	$(INSTALL_DATA) include/compat/xs_lib.h $(DESTDIR)$(INCLUDEDIR)/xenstore-compat/xs_lib.h
-	ln -sf xenstore-compat/xs.h  $(DESTDIR)$(INCLUDEDIR)/xs.h
-	ln -sf xenstore-compat/xs_lib.h $(DESTDIR)$(INCLUDEDIR)/xs_lib.h
+	$(INSTALL_DATA) include/xenstore.h $(DESTDIR)$(includedir)
+	$(INSTALL_DATA) include/xenstore_lib.h $(DESTDIR)$(includedir)
+	$(INSTALL_DATA) include/compat/xs.h $(DESTDIR)$(includedir)/xenstore-compat/xs.h
+	$(INSTALL_DATA) include/compat/xs_lib.h $(DESTDIR)$(includedir)/xenstore-compat/xs_lib.h
+	ln -sf xenstore-compat/xs.h  $(DESTDIR)$(includedir)/xs.h
+	ln -sf xenstore-compat/xs_lib.h $(DESTDIR)$(includedir)/xs_lib.h
 
 .PHONY: clients-install
 clients-install: clients

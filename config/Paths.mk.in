@@ -34,7 +34,6 @@ LIBEXEC_BIN              := @LIBEXEC_BIN@
 LIBEXEC_LIB              := $(LIBEXEC)/lib
 LIBEXEC_INC              := $(LIBEXEC)/include
 
-INCLUDEDIR               := $(includedir)
 SHAREDIR                 := @SHAREDIR@
 MANDIR                   := $(mandir)
 MAN1DIR                  := $(MANDIR)/man1

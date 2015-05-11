@@ -163,17 +163,17 @@ libs: $(LIB)
 .PHONY: install
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
-	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(includedir)
 	$(INSTALL_SHLIB) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libxenctrl.a $(DESTDIR)$(LIBDIR)
 	$(SYMLINK_SHLIB) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenctrl.so.$(MAJOR)
 	$(SYMLINK_SHLIB) libxenctrl.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenctrl.so
-	$(INSTALL_DATA) include/xenctrl.h include/xenctrlosdep.h include/xentoollog.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) include/xenctrl.h include/xenctrlosdep.h include/xentoollog.h $(DESTDIR)$(includedir)
 	$(INSTALL_SHLIB) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libxenguest.a $(DESTDIR)$(LIBDIR)
 	$(SYMLINK_SHLIB) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenguest.so.$(MAJOR)
 	$(SYMLINK_SHLIB) libxenguest.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenguest.so
-	$(INSTALL_DATA) include/xenguest.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) include/xenguest.h $(DESTDIR)$(includedir)
 
 .PHONY: TAGS
 TAGS:
