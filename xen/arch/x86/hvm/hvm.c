@@ -5712,13 +5712,15 @@ static int hvmop_set_param(
             rc = -EINVAL;
         break;
     case HVM_PARAM_IDENT_PT:
-        rc = -EINVAL;
-        if ( d->arch.hvm_domain.params[a.index] != 0 )
+        /*
+         * Only actually required for VT-x lacking unrestricted_guest
+         * capabilities.  Short circuit the pause if possible.
+         */
+        if ( !paging_mode_hap(d) || !cpu_has_vmx )
+        {
+            d->arch.hvm_domain.params[a.index] = a.value;
             break;
-
-        rc = 0;
-        if ( !paging_mode_hap(d) )
-            break;
+        }
 
         /*
          * Update GUEST_CR3 in each VMCS to point at identity map.
