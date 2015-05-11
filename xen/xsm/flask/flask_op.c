@@ -829,10 +829,10 @@ CHECK_flask_setenforce;
 CHECK_flask_transition;
 
 #define COMPAT
-#define flask_copyin_string(ch, pb, sz, mx) ({ \
-	XEN_GUEST_HANDLE_PARAM(char) gh; \
-	guest_from_compat_handle(gh, ch); \
-	flask_copyin_string(gh, pb, sz, mx); \
+#define safe_copy_string_from_guest(ch, sz, mx) ({ \
+    XEN_GUEST_HANDLE_PARAM(char) gh; \
+    guest_from_compat_handle(gh, ch); \
+    safe_copy_string_from_guest(gh, sz, mx); \
 })
 
 #define xen_flask_load compat_flask_load
