@@ -2238,7 +2238,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( op_bytes == 4 )
                 regs->eax = 0;
             else
-                regs->eax &= ~((1u << (op_bytes * 8)) - 1);
+                regs->eax &= ~((1 << (op_bytes * 8)) - 1);
             regs->eax |= guest_io_read(port, op_bytes, v, regs);
         }
         bpmatch = check_guest_io_breakpoint(v, port, op_bytes);
