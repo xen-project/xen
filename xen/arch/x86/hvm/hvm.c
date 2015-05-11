@@ -5632,6 +5632,8 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_VM86_TSS:
     case HVM_PARAM_ACPI_IOPORTS_LOCATION:
     case HVM_PARAM_VM_GENERATION_ID_ADDR:
+    case HVM_PARAM_STORE_EVTCHN:
+    case HVM_PARAM_CONSOLE_EVTCHN:
         break;
     /*
      * The following parameters must not be set by the guest
