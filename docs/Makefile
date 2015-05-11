@@ -79,9 +79,9 @@ distclean: clean
 # Top level install targets
 .PHONY: install-man-pages
 install-man-pages: man-pages
-	$(INSTALL_DIR) $(DESTDIR)$(MANDIR)
-	cp -R man1 $(DESTDIR)$(MANDIR)
-	cp -R man5 $(DESTDIR)$(MANDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(mandir)
+	cp -R man1 $(DESTDIR)$(mandir)
+	cp -R man5 $(DESTDIR)$(mandir)
 
 .PHONY: install-html
 install-html: html txt figs

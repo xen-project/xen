@@ -35,9 +35,8 @@ LIBEXEC_LIB              := $(LIBEXEC)/lib
 LIBEXEC_INC              := $(LIBEXEC)/include
 
 SHAREDIR                 := @SHAREDIR@
-MANDIR                   := $(mandir)
-MAN1DIR                  := $(MANDIR)/man1
-MAN8DIR                  := $(MANDIR)/man8
+MAN1DIR                  := $(mandir)/man1
+MAN8DIR                  := $(mandir)/man8
 LIBDIR                   := $(libdir)
 DOCDIR                   := $(docdir)
 
