@@ -75,8 +75,8 @@ EXTRA_LIB += $(EXTRA_PREFIX)/lib
 endif
 
 PYTHON      ?= python
-PYTHON_PREFIX_ARG ?= --prefix="$(PREFIX)"
-# The above requires that PREFIX contains *no spaces*. This variable is here
+PYTHON_PREFIX_ARG ?= --prefix="$(prefix)"
+# The above requires that prefix contains *no spaces*. This variable is here
 # to permit the user to set PYTHON_PREFIX_ARG to '' to workaround this bug:
 #  https://bugs.launchpad.net/ubuntu/+bug/362570
 
@@ -142,7 +142,7 @@ define as-insn-check-closure
 endef
 
 define buildmakevars2shellvars
-    export PREFIX="$(PREFIX)";                                            \
+    export PREFIX="$(prefix)";                                            \
     export XEN_SCRIPT_DIR="$(XEN_SCRIPT_DIR)";                            \
     export XEN_ROOT="$(XEN_ROOT)"
 endef
