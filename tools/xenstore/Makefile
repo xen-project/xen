@@ -128,7 +128,7 @@ tarball: clean
 
 .PHONY: install
 install: all
-	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(bindir)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xenstore-compat
 ifeq ($(XENSTORE_XENSTORED),y)
@@ -136,10 +136,10 @@ ifeq ($(XENSTORE_XENSTORED),y)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_LIB_STORED)
 	$(INSTALL_PROG) xenstored $(DESTDIR)$(sbindir)
 endif
-	$(INSTALL_PROG) xenstore-control $(DESTDIR)$(BINDIR)
-	$(INSTALL_PROG) xenstore $(DESTDIR)$(BINDIR)
+	$(INSTALL_PROG) xenstore-control $(DESTDIR)$(bindir)
+	$(INSTALL_PROG) xenstore $(DESTDIR)$(bindir)
 	set -e ; for c in $(CLIENTS) ; do \
-		ln -f $(DESTDIR)$(BINDIR)/xenstore $(DESTDIR)$(BINDIR)/$${c} ; \
+		ln -f $(DESTDIR)$(bindir)/xenstore $(DESTDIR)$(bindir)/$${c} ; \
 	done
 	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_SHLIB) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
@@ -155,10 +155,10 @@ endif
 
 .PHONY: clients-install
 clients-install: clients
-	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
-	$(INSTALL_PROG) xenstore $(DESTDIR)$(BINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(bindir)
+	$(INSTALL_PROG) xenstore $(DESTDIR)$(bindir)
 	set -e ; for c in $(CLIENTS) ; do \
-		ln -f $(DESTDIR)$(BINDIR)/xenstore $(DESTDIR)$(BINDIR)/$${c} ; \
+		ln -f $(DESTDIR)$(bindir)/xenstore $(DESTDIR)$(bindir)/$${c} ; \
 	done
 
 -include $(DEPS)

@@ -46,7 +46,7 @@ xen_startcmd()
 			XENSTORED_ARGS="${XENSTORED_ARGS} -T /var/log/xen/xenstored-trace.log"
 		fi
 		${sbindir}/xenstored ${XENSTORED_ARGS}
-		while [ $time -lt $timeout ] && ! `${BINDIR}/xenstore-read -s / >/dev/null 2>&1` ; do
+		while [ $time -lt $timeout ] && ! `${bindir}/xenstore-read -s / >/dev/null 2>&1` ; do
 			printf "."
 			time=$(($time+1))
 			sleep 1

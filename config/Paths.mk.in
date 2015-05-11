@@ -31,7 +31,6 @@ sysconfdir               := @sysconfdir@
 
 PREFIX                   := $(prefix)
 
-BINDIR                   := $(bindir)
 LIBEXEC                  := $(libexecdir)/$(PACKAGE_TARNAME)
 LIBEXEC_BIN              := @LIBEXEC_BIN@
 LIBEXEC_LIB              := $(LIBEXEC)/lib

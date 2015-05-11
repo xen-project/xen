@@ -62,7 +62,7 @@ do_start () {
 	mkdir -p ${XEN_RUN_DIR}
 	mkdir -p ${XEN_LOCK_DIR}
 
-	if ! `${BINDIR}/xenstore-read -s / >/dev/null 2>&1`
+	if ! `${bindir}/xenstore-read -s / >/dev/null 2>&1`
 	then
 		test -z "$XENSTORED_ROOTDIR" && XENSTORED_ROOTDIR="@XEN_LIB_STORED@"
 		rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
@@ -77,7 +77,7 @@ do_start () {
 		fi
 
 		# Wait for xenstored to actually come up, timing out after 30 seconds
-                while [ $time -lt $timeout ] && ! `${BINDIR}/xenstore-read -s / >/dev/null 2>&1` ; do
+                while [ $time -lt $timeout ] && ! `${bindir}/xenstore-read -s / >/dev/null 2>&1` ; do
                     echo -n .
 		    time=$(($time+1))
                     sleep 1
@@ -126,7 +126,7 @@ case "$1" in
 	do_start
 	;;
   status)
-        ${BINDIR}/xenstore-read -s /
+        ${bindir}/xenstore-read -s /
 	;;
   stop)
 	do_stop

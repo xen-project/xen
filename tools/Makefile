@@ -74,14 +74,14 @@ uninstall:
 	rm -f  $(D)$(sbindir)/xendomains
 	rm -f  $(D)$(SYSCONFIG_DIR)/xencommons
 	rm -rf $(D)/var/lib/xen*
-	rm -rf $(D)$(BINDIR)/cpuperf-perfcntr $(D)$(BINDIR)/cpuperf-xen
-	rm -rf $(D)$(BINDIR)/xc_shadow
-	rm -rf $(D)$(BINDIR)/pygrub
-	rm -rf $(D)$(BINDIR)/setsize $(D)$(BINDIR)/tbctl
-	rm -rf $(D)$(BINDIR)/xsls
-	rm -rf $(D)$(BINDIR)/xenstore* $(D)$(BINDIR)/xentrace*
-	rm -rf $(D)$(BINDIR)/xen-detect $(D)$(BINDIR)/xencons
-	rm -rf $(D)$(BINDIR)/xenpvnetboot $(D)$(BINDIR)/qemu-*-xen
+	rm -rf $(D)$(bindir)/cpuperf-perfcntr $(D)$(bindir)/cpuperf-xen
+	rm -rf $(D)$(bindir)/xc_shadow
+	rm -rf $(D)$(bindir)/pygrub
+	rm -rf $(D)$(bindir)/setsize $(D)$(bindir)/tbctl
+	rm -rf $(D)$(bindir)/xsls
+	rm -rf $(D)$(bindir)/xenstore* $(D)$(bindir)/xentrace*
+	rm -rf $(D)$(bindir)/xen-detect $(D)$(bindir)/xencons
+	rm -rf $(D)$(bindir)/xenpvnetboot $(D)$(bindir)/qemu-*-xen
 	rm -rf $(D)$(INCLUDEDIR)/xenctrl* $(D)$(INCLUDEDIR)/xenguest.h
 	rm -rf $(D)$(INCLUDEDIR)/xs_lib.h $(D)$(INCLUDEDIR)/xs.h
 	rm -rf $(D)$(INCLUDEDIR)/xenstore-compat/xs_lib.h $(D)$(INCLUDEDIR)/xenstore-compat/xs.h
