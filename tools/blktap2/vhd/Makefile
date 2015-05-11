@@ -6,7 +6,7 @@ SUBDIRS-y         :=
 SUBDIRS-y         += lib
 
 IBIN               = vhd-util vhd-update
-INST_DIR           = $(SBINDIR)
+INST_DIR           = $(sbindir)
 
 CFLAGS            += -Werror
 CFLAGS            += -Wno-unused

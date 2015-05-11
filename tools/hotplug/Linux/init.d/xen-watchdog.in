@@ -19,7 +19,7 @@
 
 . @XEN_SCRIPT_DIR@/hotplugpath.sh
 
-DAEMON=${SBINDIR}/xenwatchdogd
+DAEMON=${sbindir}/xenwatchdogd
 base=$(basename $DAEMON)
 
 # Source function library.

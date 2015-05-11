@@ -34,7 +34,7 @@ LD_LIBRARY_PATH="${LIBDIR}"
 export LD_LIBRARY_PATH
 
 name="xendomains"
-ctl_command="${SBINDIR}/xl"
+ctl_command="${sbindir}/xl"
 start_cmd="xendomains_start"
 stop_cmd="xendomains_stop"
 list_cmd="xendomains_list"

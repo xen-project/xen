@@ -29,7 +29,7 @@
 
 . @XEN_SCRIPT_DIR@/hotplugpath.sh
 
-CMD=${SBINDIR}/xl
+CMD=${sbindir}/xl
 HEADCOMP="Xen saved domain"
 $CMD list &> /dev/null
 if test $? -ne 0

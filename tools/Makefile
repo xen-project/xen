@@ -71,7 +71,7 @@ uninstall:
 	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xen-backend.rules
 	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xend.rules
 	rm -f  $(D)$(SYSCONFIG_DIR)/xendomains
-	rm -f  $(D)$(SBINDIR)/xendomains
+	rm -f  $(D)$(sbindir)/xendomains
 	rm -f  $(D)$(SYSCONFIG_DIR)/xencommons
 	rm -rf $(D)/var/lib/xen*
 	rm -rf $(D)$(BINDIR)/cpuperf-perfcntr $(D)$(BINDIR)/cpuperf-xen
@@ -93,8 +93,8 @@ uninstall:
 	rm -rf $(D)$(LIBDIR)/libxenstore* $(D)$(LIBDIR)/libxlutil*
 	rm -rf $(D)$(LIBDIR)/python/xen $(D)$(LIBDIR)/python/grub
 	rm -rf $(D)$(LIBEXEC)
-	rm -rf $(D)$(SBINDIR)/setmask
-	rm -rf $(D)$(SBINDIR)/xen* $(D)$(SBINDIR)/netfix $(D)$(SBINDIR)/xm
+	rm -rf $(D)$(sbindir)/setmask
+	rm -rf $(D)$(sbindir)/xen* $(D)$(sbindir)/netfix $(D)$(sbindir)/xm
 	rm -rf $(D)$(SHAREDIR)/doc/xen
 	rm -rf $(D)$(SHAREDIR)/xen
 	rm -rf $(D)$(SHAREDIR)/qemu-xen

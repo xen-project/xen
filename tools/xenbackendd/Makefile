@@ -25,8 +25,8 @@ build: xenbackendd
 
 .PHONY: install
 install: build
-	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
-	$(INSTALL_PROG) xenbackendd $(DESTDIR)$(SBINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
+	$(INSTALL_PROG) xenbackendd $(DESTDIR)$(sbindir)
 
 .PHONY: clean
 clean:

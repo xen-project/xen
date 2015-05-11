@@ -18,8 +18,8 @@ distclean: clean
 
 .PHONY: install
 install: all
-	[ -d $(DESTDIR)$(SBINDIR) ] || $(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
-	$(INSTALL_PROG) gdbsx $(DESTDIR)$(SBINDIR)/gdbsx
+	[ -d $(DESTDIR)$(sbindir) ] || $(INSTALL_DIR) $(DESTDIR)$(sbindir)
+	$(INSTALL_PROG) gdbsx $(DESTDIR)$(sbindir)/gdbsx
 
 gdbsx: gx/gx_all.a xg/xg_all.a 
 	$(CC) -o $@ $^

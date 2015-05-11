@@ -132,9 +132,9 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xenstore-compat
 ifeq ($(XENSTORE_XENSTORED),y)
-	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_LIB_STORED)
-	$(INSTALL_PROG) xenstored $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PROG) xenstored $(DESTDIR)$(sbindir)
 endif
 	$(INSTALL_PROG) xenstore-control $(DESTDIR)$(BINDIR)
 	$(INSTALL_PROG) xenstore $(DESTDIR)$(BINDIR)

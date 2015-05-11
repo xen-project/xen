@@ -37,7 +37,7 @@ xen_startcmd()
 	local time=0
 	local timeout=30
 
-	xenstored_pid=$(check_pidfile ${XENSTORED_PIDFILE} ${SBINDIR}/xenstored)
+	xenstored_pid=$(check_pidfile ${XENSTORED_PIDFILE} ${sbindir}/xenstored)
 	if test -z "$xenstored_pid"; then
 		printf "Cleaning xenstore database.\n"
 		if [ -z "${XENSTORED_ROOTDIR}" ]; then
@@ -49,7 +49,7 @@ xen_startcmd()
 		if [ -n "${XENSTORED_TRACE}" ]; then
 			XENSTORED_ARGS="${XENSTORED_ARGS} -T /var/log/xen/xenstored-trace.log"
 		fi
-		${SBINDIR}/xenstored ${XENSTORED_ARGS}
+		${sbindir}/xenstored ${XENSTORED_ARGS}
 		while [ $time -lt $timeout ] && ! `${BINDIR}/xenstore-read -s / >/dev/null 2>&1` ; do
 			printf "."
 			time=$(($time+1))
@@ -64,7 +64,7 @@ xen_startcmd()
 		XENCONSOLED_ARGS="${XENCONSOLED_ARGS} --log=${XENCONSOLED_TRACE}"
 	fi
 
-	${SBINDIR}/xenconsoled ${XENCONSOLED_ARGS}
+	${sbindir}/xenconsoled ${XENCONSOLED_ARGS}
 
 	printf "\n"
 
@@ -78,7 +78,7 @@ xen_stop()
 	printf "Stopping xencommons.\n"
 	printf "WARNING: Not stopping xenstored, as it cannot be restarted.\n"
 
-	rc_pid=$(check_pidfile ${XENCONSOLED_PIDFILE} ${SBINDIR}/xenconsoled)
+	rc_pid=$(check_pidfile ${XENCONSOLED_PIDFILE} ${sbindir}/xenconsoled)
 	pids="$pids $rc_pid"
 
 	kill -${sig_stop:-TERM} $pids
@@ -87,12 +87,12 @@ xen_stop()
 
 xen_status()
 {
-	xenstored_pid=$(check_pidfile ${XENSTORED_PIDFILE} ${SBINDIR}/xenstored)
+	xenstored_pid=$(check_pidfile ${XENSTORED_PIDFILE} ${sbindir}/xenstored)
 	if test -n ${xenstored_pid}; then
 		pids="$pids $xenstored_pid"
 	fi
 
-	xenconsoled_pid=$(check_pidfile ${XENCONSOLED_PIDFILE} ${SBINDIR}/xenconsoled)
+	xenconsoled_pid=$(check_pidfile ${XENCONSOLED_PIDFILE} ${sbindir}/xenconsoled)
 	if test -n ${xenconsoled_pid}; then
 		pids="$pids $xenconsoled_pid"
 	fi

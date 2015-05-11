@@ -31,8 +31,8 @@ all: xentop
 
 .PHONY: install
 install: xentop xentop.1
-	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
-	$(INSTALL_PROG) xentop $(DESTDIR)$(SBINDIR)/xentop
+	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
+	$(INSTALL_PROG) xentop $(DESTDIR)$(sbindir)/xentop
 	$(INSTALL_DIR) $(DESTDIR)$(MAN1DIR)
 	$(INSTALL_DATA) xentop.1 $(DESTDIR)$(MAN1DIR)/xentop.1
 

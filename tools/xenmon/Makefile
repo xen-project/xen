@@ -27,10 +27,10 @@ build: xentrace_setmask xenbaked
 
 .PHONY: install
 install: build
-	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
-	$(INSTALL_PROG) xenbaked $(DESTDIR)$(SBINDIR)/xenbaked
-	$(INSTALL_PROG) xentrace_setmask  $(DESTDIR)$(SBINDIR)/xentrace_setmask
-	$(INSTALL_PROG) xenmon.py  $(DESTDIR)$(SBINDIR)/xenmon.py
+	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
+	$(INSTALL_PROG) xenbaked $(DESTDIR)$(sbindir)/xenbaked
+	$(INSTALL_PROG) xentrace_setmask  $(DESTDIR)$(sbindir)/xentrace_setmask
+	$(INSTALL_PROG) xenmon.py  $(DESTDIR)$(sbindir)/xenmon.py
 	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
 	$(INSTALL_DATA) README $(DESTDIR)$(DOCDIR)/README.xenmon
 
