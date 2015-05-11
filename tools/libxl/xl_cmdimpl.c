@@ -2324,7 +2324,7 @@ static int handle_domain_death(uint32_t *r_domid,
         char *corefile;
         int rc;
 
-        if (asprintf(&corefile, "/var/xen/dump/%s", d_config->c_info.name) < 0) {
+        if (asprintf(&corefile, XEN_DUMP_DIR "/%s", d_config->c_info.name) < 0) {
             LOG("failed to construct core dump path");
         } else {
             LOG("dumping core to %s", corefile);

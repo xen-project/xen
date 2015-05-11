@@ -62,6 +62,12 @@ AC_ARG_WITH([sysconfig-leaf-dir],
 CONFIG_LEAF_DIR=$config_leaf_dir
 AC_SUBST(CONFIG_LEAF_DIR)
 
+AC_ARG_WITH([xen-dumpdir],
+    AS_HELP_STRING([--with-xen-dumpdir=DIR],
+    [Path to directory for domU crash dumps. [LOCALSTATEDIR/lib/xen/dump]]),
+    [xen_dumpdir_path=$withval],
+    [xen_dumpdir_path=$localstatedir/lib/xen/dump])
+
 if test "$libexecdir" = '${exec_prefix}/libexec' ; then
     case "$host_os" in
          *netbsd*) ;;
@@ -113,4 +119,7 @@ AC_SUBST(XEN_LOCK_DIR)
 
 XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
 AC_SUBST(XEN_PAGING_DIR)
+
+XEN_DUMP_DIR=$xen_dumpdir_path
+AC_SUBST(XEN_DUMP_DIR)
 ])

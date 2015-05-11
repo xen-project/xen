@@ -128,6 +128,10 @@ original xenstored will be used. Valid names are xenstored and
 oxenstored.
   --with-xenstored=name
 
+The path where to store core dumps for domUs which are configured with
+coredump-destroy or coredump-restart can be specified with this option.
+  --with-xen-dumpdir=DIR
+
 Instead of starting the tools in dom0 with sysv runlevel scripts they
 can also be started by systemd. If this option is enabled xenstored will
 receive the communication socked directly from systemd. So starting it
