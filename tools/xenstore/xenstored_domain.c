@@ -172,7 +172,7 @@ static void *map_interface(domid_t domid, unsigned long mfn)
 			GNTTAB_RESERVED_XENSTORE, PROT_READ|PROT_WRITE);
 	} else {
 		return xc_map_foreign_range(*xc_handle, domid,
-			getpagesize(), PROT_READ|PROT_WRITE, mfn);
+			XC_PAGE_SIZE, PROT_READ|PROT_WRITE, mfn);
 	}
 }
 
@@ -181,7 +181,7 @@ static void unmap_interface(void *interface)
 	if (*xcg_handle != NULL)
 		xc_gnttab_munmap(*xcg_handle, interface, 1);
 	else
-		munmap(interface, getpagesize());
+		munmap(interface, XC_PAGE_SIZE);
 }
 
 static int destroy_domain(void *_domain)
