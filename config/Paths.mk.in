@@ -37,7 +37,6 @@ LIBEXEC_INC              := $(LIBEXEC)/include
 SHAREDIR                 := @SHAREDIR@
 MAN1DIR                  := $(mandir)/man1
 MAN8DIR                  := $(mandir)/man8
-DOCDIR                   := $(docdir)
 
 XEN_RUN_DIR              := @XEN_RUN_DIR@
 XEN_LOG_DIR              := @XEN_LOG_DIR@

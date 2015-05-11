@@ -469,8 +469,8 @@ install: $(STUBDOMPATH)
 endif
 
 install-readme:
-	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
-	$(INSTALL_DATA) README $(DESTDIR)$(DOCDIR)/README.stubdom
+	$(INSTALL_DIR) $(DESTDIR)$(docdir)
+	$(INSTALL_DATA) README $(DESTDIR)$(docdir)/README.stubdom
 
 install-ioemu: ioemu-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC_BIN)"

@@ -85,8 +85,8 @@ install-man-pages: man-pages
 
 .PHONY: install-html
 install-html: html txt figs
-	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
-	[ ! -d html ] || cp -R html $(DESTDIR)$(DOCDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(docdir)
+	[ ! -d html ] || cp -R html $(DESTDIR)$(docdir)
 
 .PHONY: install
 install: install-man-pages install-html
