@@ -1238,7 +1238,7 @@ int xc_readconsolering(xc_interface *xch,
 int xc_send_debug_keys(xc_interface *xch, char *keys);
 
 typedef xen_sysctl_physinfo_t xc_physinfo_t;
-typedef xen_sysctl_cputopoinfo_t xc_cputopoinfo_t;
+typedef xen_sysctl_cputopo_t xc_cputopo_t;
 typedef xen_sysctl_numainfo_t xc_numainfo_t;
 
 typedef uint32_t xc_cpu_to_node_t;
@@ -1249,7 +1249,8 @@ typedef uint64_t xc_node_to_memfree_t;
 typedef uint32_t xc_node_to_node_dist_t;
 
 int xc_physinfo(xc_interface *xch, xc_physinfo_t *info);
-int xc_cputopoinfo(xc_interface *xch, xc_cputopoinfo_t *info);
+int xc_cputopoinfo(xc_interface *xch, unsigned *max_cpus,
+                   xc_cputopo_t *cputopo);
 int xc_numainfo(xc_interface *xch, xc_numainfo_t *info);
 
 int xc_sched_id(xc_interface *xch,

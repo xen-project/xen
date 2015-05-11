@@ -203,22 +203,31 @@ int xc_physinfo(xc_interface *xch,
     return 0;
 }
 
-int xc_cputopoinfo(xc_interface *xch,
-                   xc_cputopoinfo_t *put_info)
+int xc_cputopoinfo(xc_interface *xch, unsigned *max_cpus,
+                   xc_cputopo_t *cputopo)
 {
     int ret;
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BOUNCE(cputopo, *max_cpus * sizeof(*cputopo),
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( (ret = xc_hypercall_bounce_pre(xch, cputopo)) )
+        goto out;
+
+    sysctl.u.cputopoinfo.num_cpus = *max_cpus;
+    set_xen_guest_handle(sysctl.u.cputopoinfo.cputopo, cputopo);
 
     sysctl.cmd = XEN_SYSCTL_cputopoinfo;
 
-    memcpy(&sysctl.u.cputopoinfo, put_info, sizeof(*put_info));
-
     if ( (ret = do_sysctl(xch, &sysctl)) != 0 )
-        return ret;
+        goto out;
 
-    memcpy(put_info, &sysctl.u.cputopoinfo, sizeof(*put_info));
+    *max_cpus = sysctl.u.cputopoinfo.num_cpus;
 
-    return 0;
+out:
+    xc_hypercall_bounce_post(xch, cputopo);
+
+    return ret;
 }
 
 int xc_numainfo(xc_interface *xch,

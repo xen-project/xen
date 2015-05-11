@@ -355,20 +355,17 @@ static void signal_int_handler(int signo)
     int i, j, k;
     struct timeval tv;
     int cx_cap = 0, px_cap = 0;
-    DECLARE_HYPERCALL_BUFFER(xen_sysctl_cputopo_t, cputopo);
-    xc_cputopoinfo_t info = { 0 };
+    xc_cputopo_t *cputopo;
+    unsigned max_cpus;
 
-    set_xen_guest_handle(info.cputopo, HYPERCALL_BUFFER_NULL);
-    if ( xc_cputopoinfo(xc_handle, &info) != 0 )
+    if ( xc_cputopoinfo(xc_handle, &max_cpus, NULL) != 0 )
     {
         fprintf(stderr, "failed to discover number of CPUs: %s\n",
                 strerror(errno));
         goto out;
     }
 
-    cputopo = xc_hypercall_buffer_alloc(xc_handle, cputopo,
-                                        sizeof(*cputopo) * info.num_cpus);
-
+    cputopo = calloc(max_cpus, sizeof(*cputopo));
     if ( cputopo == NULL )
     {
 	fprintf(stderr, "failed to allocate hypercall buffers\n");
@@ -453,28 +450,26 @@ static void signal_int_handler(int signo)
             printf("  Avg freq\t%d\tKHz\n", avgfreq[i]);
     }
 
-    set_xen_guest_handle(info.cputopo, cputopo);
-
-    if ( cx_cap && !xc_cputopoinfo(xc_handle, &info) )
+    if ( cx_cap && !xc_cputopoinfo(xc_handle, &max_cpus, cputopo) )
     {
         uint32_t socket_ids[MAX_NR_CPU];
         uint32_t core_ids[MAX_NR_CPU];
         uint32_t socket_nr = 0;
         uint32_t core_nr = 0;
 
-        if ( info.num_cpus > MAX_NR_CPU )
-            info.num_cpus = MAX_NR_CPU;
+        if ( max_cpus > MAX_NR_CPU )
+            max_cpus = MAX_NR_CPU;
         /* check validity */
-        for ( i = 0; i < info.num_cpus; i++ )
+        for ( i = 0; i < max_cpus; i++ )
         {
             if ( cputopo[i].core == XEN_INVALID_CORE_ID ||
                  cputopo[i].socket == XEN_INVALID_SOCKET_ID )
                 break;
         }
-        if ( i >= info.num_cpus )
+        if ( i >= max_cpus )
         {
             /* find socket nr & core nr per socket */
-            for ( i = 0; i < info.num_cpus; i++ )
+            for ( i = 0; i < max_cpus; i++ )
             {
                 for ( j = 0; j < socket_nr; j++ )
                     if ( cputopo[i].socket == socket_ids[j] )
@@ -501,7 +496,7 @@ static void signal_int_handler(int signo)
                 unsigned int n;
                 uint64_t res;
 
-                for ( j = 0; j < info.num_cpus; j++ )
+                for ( j = 0; j < max_cpus; j++ )
                 {
                     if ( cputopo[j].socket == socket_ids[i] )
                         break;
@@ -520,7 +515,7 @@ static void signal_int_handler(int signo)
                 }
                 for ( k = 0; k < core_nr; k++ )
                 {
-                    for ( j = 0; j < info.num_cpus; j++ )
+                    for ( j = 0; j < max_cpus; j++ )
                     {
                         if ( cputopo[j].socket == socket_ids[i] &&
                              cputopo[j].core == core_ids[k] )
@@ -558,7 +553,7 @@ static void signal_int_handler(int signo)
     free(sum);
     free(avgfreq);
 out:
-    xc_hypercall_buffer_free(xc_handle, cputopo);
+    free(cputopo);
     xc_interface_close(xc_handle);
     exit(0);
 }
@@ -965,12 +960,11 @@ void scaling_governor_func(int argc, char *argv[])
 
 void cpu_topology_func(int argc, char *argv[])
 {
-    DECLARE_HYPERCALL_BUFFER(xen_sysctl_cputopo_t, cputopo);
-    xc_cputopoinfo_t info = { 0 };
-    int i, rc = ENOMEM;
+    xc_cputopo_t *cputopo;
+    unsigned max_cpus;
+    int i, rc;
 
-    set_xen_guest_handle(info.cputopo, HYPERCALL_BUFFER_NULL);
-    if ( xc_cputopoinfo(xc_handle, &info) )
+    if ( xc_cputopoinfo(xc_handle, &max_cpus, NULL) != 0 )
     {
         rc = errno;
         fprintf(stderr, "failed to discover number of CPUs (%d - %s)\n",
@@ -978,16 +972,15 @@ void cpu_topology_func(int argc, char *argv[])
         goto out;
     }
 
-    cputopo = xc_hypercall_buffer_alloc(xc_handle, cputopo,
-                                        sizeof(*cputopo) * info.num_cpus);
+    cputopo = calloc(max_cpus, sizeof(*cputopo));
     if ( cputopo == NULL )
     {
+	rc = ENOMEM;
 	fprintf(stderr, "failed to allocate hypercall buffers\n");
 	goto out;
     }
 
-    set_xen_guest_handle(info.cputopo, cputopo);
-    if ( xc_cputopoinfo(xc_handle, &info) )
+    if ( xc_cputopoinfo(xc_handle, &max_cpus, cputopo) )
     {
         rc = errno;
         fprintf(stderr, "Cannot get Xen CPU topology (%d - %s)\n",
@@ -996,7 +989,7 @@ void cpu_topology_func(int argc, char *argv[])
     }
 
     printf("CPU\tcore\tsocket\tnode\n");
-    for ( i = 0; i < info.num_cpus; i++ )
+    for ( i = 0; i < max_cpus; i++ )
     {
         if ( cputopo[i].core == XEN_INVALID_CORE_ID )
             continue;
@@ -1005,7 +998,7 @@ void cpu_topology_func(int argc, char *argv[])
     }
     rc = 0;
 out:
-    xc_hypercall_buffer_free(xc_handle, cputopo);
+    free(cputopo);
     if ( rc )
         exit(rc);
 }

@@ -1220,30 +1220,26 @@ static PyObject *pyxc_getcpuinfo(XcObject *self, PyObject *args, PyObject *kwds)
 
 static PyObject *pyxc_topologyinfo(XcObject *self)
 {
-    xc_cputopoinfo_t tinfo = { 0 };
-    unsigned i;
+    xc_cputopo_t *cputopo = NULL;
+    unsigned i, num_cpus;
     PyObject *ret_obj = NULL;
     PyObject *cpu_to_core_obj, *cpu_to_socket_obj, *cpu_to_node_obj;
-    DECLARE_HYPERCALL_BUFFER(xen_sysctl_cputopo_t, cputopo);
 
-    set_xen_guest_handle(tinfo.cputopo, HYPERCALL_BUFFER_NULL);
-    if ( xc_cputopoinfo(self->xc_handle, &tinfo) != 0 )
+    if ( xc_cputopoinfo(self->xc_handle, &num_cpus, NULL) != 0 )
         goto out;
 
-    cputopo = xc_hypercall_buffer_alloc(self->xc_handle, cputopo,
-                                        sizeof(*cputopo) * tinfo.num_cpus);
+    cputopo = calloc(num_cpus, sizeof(*cputopo));
     if ( cputopo == NULL )
     	goto out;
 
-    set_xen_guest_handle(tinfo.cputopo, cputopo);
-    if ( xc_cputopoinfo(self->xc_handle, &tinfo) != 0 )
+    if ( xc_cputopoinfo(self->xc_handle, &num_cpus, cputopo) != 0 )
         goto out;
 
     /* Construct cpu-to-* lists. */
     cpu_to_core_obj = PyList_New(0);
     cpu_to_socket_obj = PyList_New(0);
     cpu_to_node_obj = PyList_New(0);
-    for ( i = 0; i < tinfo.num_cpus; i++ )
+    for ( i = 0; i < num_cpus; i++ )
     {
         if ( cputopo[i].core == XEN_INVALID_CORE_ID )
         {
@@ -1279,7 +1275,7 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
         }
     }
 
-    ret_obj = Py_BuildValue("{s:i}", "max_cpu_index", tinfo.num_cpus + 1);
+    ret_obj = Py_BuildValue("{s:i}", "max_cpu_index", num_cpus + 1);
 
     PyDict_SetItemString(ret_obj, "cpu_to_core", cpu_to_core_obj);
     Py_DECREF(cpu_to_core_obj);
@@ -1291,7 +1287,7 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
     Py_DECREF(cpu_to_node_obj);
 
 out:
-    xc_hypercall_buffer_free(self->xc_handle, cputopo);
+    free(cputopo);
     return ret_obj ? ret_obj : pyxc_error_to_exception(self->xc_handle);
 }
 

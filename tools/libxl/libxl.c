@@ -5102,37 +5102,28 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
 libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out)
 {
     GC_INIT(ctx);
-    xc_cputopoinfo_t tinfo;
-    DECLARE_HYPERCALL_BUFFER(xen_sysctl_cputopo_t, cputopo);
+    xc_cputopo_t *cputopo;
     libxl_cputopology *ret = NULL;
     int i;
+    unsigned num_cpus;
 
-    /* Setting buffer to NULL makes the hypercall return number of CPUs */
-    set_xen_guest_handle(tinfo.cputopo, HYPERCALL_BUFFER_NULL);
-    if (xc_cputopoinfo(ctx->xch, &tinfo) != 0)
+    /* Setting buffer to NULL makes the call return number of CPUs */
+    if (xc_cputopoinfo(ctx->xch, &num_cpus, NULL))
     {
-        LIBXL__LOG(ctx, XTL_ERROR, "Unable to determine number of CPUS");
-        ret = NULL;
+        LOGE(ERROR, "Unable to determine number of CPUS");
         goto out;
     }
 
-    cputopo = xc_hypercall_buffer_alloc(ctx->xch, cputopo,
-                                        sizeof(*cputopo) * tinfo.num_cpus);
-    if (cputopo == NULL) {
-        LIBXL__LOG_ERRNOVAL(ctx, XTL_ERROR, ENOMEM,
-                            "Unable to allocate hypercall arguments");
-        goto fail;
-    }
-    set_xen_guest_handle(tinfo.cputopo, cputopo);
+    cputopo = libxl__zalloc(gc, sizeof(*cputopo) * num_cpus);
 
-    if (xc_cputopoinfo(ctx->xch, &tinfo) != 0) {
-        LIBXL__LOG_ERRNO(ctx, XTL_ERROR, "CPU topology info hypercall failed");
-        goto fail;
+    if (xc_cputopoinfo(ctx->xch, &num_cpus, cputopo)) {
+        LOGE(ERROR, "CPU topology info hypercall failed");
+        goto out;
     }
 
-    ret = libxl__zalloc(NOGC, sizeof(libxl_cputopology) * tinfo.num_cpus);
+    ret = libxl__zalloc(NOGC, sizeof(libxl_cputopology) * num_cpus);
 
-    for (i = 0; i < tinfo.num_cpus; i++) {
+    for (i = 0; i < num_cpus; i++) {
 #define V(map, i, invalid) ( cputopo[i].map == invalid) ? \
    LIBXL_CPUTOPOLOGY_INVALID_ENTRY : cputopo[i].map
         ret[i].core = V(core, i, XEN_INVALID_CORE_ID);
@@ -5141,11 +5132,7 @@ libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out)
 #undef V
     }
 
-fail:
-    xc_hypercall_buffer_free(ctx->xch, cputopo);
-
-    if (ret)
-        *nb_cpu_out = tinfo.num_cpus;
+    *nb_cpu_out = num_cpus;
 
  out:
     GC_FREE;
