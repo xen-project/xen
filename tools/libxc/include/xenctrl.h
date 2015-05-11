@@ -322,15 +322,23 @@ typedef struct xc_hypercall_buffer xc_hypercall_buffer_t;
  * Set a xen_guest_handle in a type safe manner, ensuring that the
  * data pointer has been correctly allocated.
  */
-#undef set_xen_guest_handle
-#define set_xen_guest_handle(_hnd, _val)                        \
+#define set_xen_guest_handle_impl(_hnd, _val, _byte_off)        \
     do {                                                        \
         xc_hypercall_buffer_t _hcbuf_hnd1;                      \
         typeof(XC__HYPERCALL_BUFFER_NAME(_val)) *_hcbuf_hnd2 =  \
                 HYPERCALL_BUFFER(_val);                         \
         (void) (&_hcbuf_hnd1 == _hcbuf_hnd2);                   \
-        set_xen_guest_handle_raw(_hnd, (_hcbuf_hnd2)->hbuf);    \
+        set_xen_guest_handle_raw(_hnd,                          \
+                (_hcbuf_hnd2)->hbuf + (_byte_off));             \
     } while (0)
+
+#undef set_xen_guest_handle
+#define set_xen_guest_handle(_hnd, _val)                        \
+    set_xen_guest_handle_impl(_hnd, _val, 0)
+
+#define set_xen_guest_handle_offset(_hnd, _val, _off)           \
+    set_xen_guest_handle_impl(_hnd, _val,                       \
+            ((sizeof(*_val)*(_off))))
 
 /* Use with set_xen_guest_handle in place of NULL */
 extern xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(HYPERCALL_BUFFER_NULL);
