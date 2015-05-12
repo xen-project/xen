@@ -115,6 +115,9 @@ Create will return B<as soon> as the domain is started.  This B<does
 not> mean the guest OS in the domain has actually booted, or is
 available for input.
 
+If the I<-F> option is specified, create will start the domain and not
+return until its death.
+
 B<OPTIONS>
 
 =over 4 
@@ -130,6 +133,10 @@ Use the given configuration file.
 =item B<-p>
 
 Leave the domain paused after it is created.
+
+=item B<-F>
+
+Run in foreground until death of the domain.
 
 =item B<-V>, B<--vncviewer>
 
