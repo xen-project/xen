@@ -1,0 +1,62 @@
+Passthrough a device described in the Device Tree to a guest
+============================================================
+
+The example will use the secondary network card for the midway server.
+
+1) Mark the device to let Xen know the device will be used for passthrough.
+This is done in the device tree node describing the device by adding the
+property "xen,passthrough". The command to do it in U-Boot is:
+
+    fdt set /soc/ethernet@fff51000 xen,passthrough
+
+2) Create a partial device tree describing the device. The IRQ are mapped
+1:1 to the guest (i.e VIRQ == IRQ). For MMIO, you will have to find a hole
+in the guest memory layout (see xen/include/public/arch-arm.h, note that
+the layout is not stable and can change between versions of Xen).
+
+/dts-v1/;
+
+/ {
+    /* #*cells are here to keep DTC happy */
+    #address-cells = <2>;
+    #size-cells = <2>;
+
+    aliases {
+        net = &mac0;
+    };
+
+    passthrough {
+        compatible = "simple-bus";
+        ranges;
+        #address-cells = <2>;
+        #size-cells = <2>;
+        mac0: ethernet@10000000 {
+            compatible = "calxeda,hb-xgmac";
+            reg = <0 0x10000000 0 0x1000>;
+            interrupts = <0 80 4  0 81 4  0 82 4>;
+        };
+    };
+};
+
+Note:
+    * The interrupt-parent property will be added by the toolstack in the
+    root node;
+    * The following properties are mandatory with the /passthrough node:
+        - compatible: It should always contain "simple-bus"
+        - ranges
+        - #address-cells
+        - #size-cells
+    * See http://www.devicetree.org/Device_Tree_Usage for more
+    information about device tree.
+
+3) Compile the partial guest device with dtc (Device Tree Compiler).
+For our purpose, the compiled file will be called guest-midway.dtb and
+placed in /root in DOM0.
+
+3) Add the following options in the guest configuration file:
+
+device_tree = "/root/guest-midway.dtb"
+dtdev = [ "/soc/ethernet@fff51000" ]
+irqs = [ 112, 113, 114 ]
+iomem = [ "0xfff51,1@0x10000" ]
+
