@@ -764,6 +764,8 @@ static void domcreate_attach_vtpms(libxl__egc *egc, libxl__multidev *multidev,
                                    int ret);
 static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *aodevs,
                                  int ret);
+static void domcreate_attach_dtdev(libxl__egc *egc,
+                                   libxl__domain_create_state *dcs);
 
 static void domcreate_console_available(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
@@ -1453,6 +1455,36 @@ static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *multidev,
         if (ret < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                 "libxl_create_pci_backend failed: %d", ret);
+            goto error_out;
+        }
+    }
+
+    domcreate_attach_dtdev(egc, dcs);
+    return;
+
+error_out:
+    assert(ret);
+    domcreate_complete(egc, dcs, ret);
+}
+
+static void domcreate_attach_dtdev(libxl__egc *egc,
+                                   libxl__domain_create_state *dcs)
+{
+    STATE_AO_GC(dcs->ao);
+    int i;
+    int ret;
+    int domid = dcs->guest_domid;
+
+    /* convenience aliases */
+    libxl_domain_config *const d_config = dcs->guest_config;
+
+    for (i = 0; i < d_config->num_dtdevs; i++) {
+        const libxl_device_dtdev *dtdev = &d_config->dtdevs[i];
+
+        LOG(DEBUG, "Assign device \"%s\" to dom%u", dtdev->path, domid);
+        ret = xc_assign_dt_device(CTX->xch, domid, dtdev->path);
+        if (ret < 0) {
+            LOG(ERROR, "xc_assign_dtdevice failed: %d\n", ret);
             goto error_out;
         }
     }

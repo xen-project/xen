@@ -192,6 +192,13 @@
  * is not present, instead of ERROR_INVAL.
  */
 #define LIBXL_HAVE_ERROR_DOMAIN_NOTFOUND 1
+
+/*
+ * libxl_domain_build_info has device_tree and libxl_device_dtdev
+ * exists. This mean Device Tree passthrough is supported for ARM
+ */
+#define LIBXL_HAVE_DEVICETREE_PASSTHROUGH 1
+
 /*
  * libxl ABI compatibility
  *

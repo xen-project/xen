@@ -1208,6 +1208,11 @@ _hidden int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
                                       libxl_device_pci *pcidev, int num);
 _hidden int libxl__device_pci_destroy_all(libxl__gc *gc, uint32_t domid);
 
+/* from libxl_dtdev */
+
+_hidden int libxl__device_dt_add(libxl__gc *gc, uint32_t domid,
+                                 const libxl_device_dtdev *dtdev);
+
 /*----- xswait: wait for a xenstore node to be suitable -----*/
 
 typedef struct libxl__xswait_state libxl__xswait_state;
