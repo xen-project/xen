@@ -453,14 +453,16 @@ void cpupool_rm_domain(struct domain *d)
 }
 
 /*
- * called to add a new cpu to pool admin
- * we add a hotplugged cpu to the cpupool0 to be able to add it to dom0,
- * unless we are resuming from S3, in which case we put the cpu back
- * in the cpupool it was in prior to suspend.
+ * Called to add a cpu to a pool. CPUs being hot-plugged are added to pool0,
+ * as they must have been in there when unplugged.
+ *
+ * If, on the other hand, we are adding CPUs because we are resuming (e.g.,
+ * after ACPI S3) we put the cpu back in the pool where it was in prior when
+ * we suspended.
  */
 static int cpupool_cpu_add(unsigned int cpu)
 {
-    int ret = -EINVAL;
+    int ret = 0;
 
     spin_lock(&cpupool_lock);
     cpumask_clear_cpu(cpu, &cpupool_locked_cpus);
@@ -478,12 +480,28 @@ static int cpupool_cpu_add(unsigned int cpu)
                 if ( ret )
                     goto out;
                 cpumask_clear_cpu(cpu, (*c)->cpu_suspended);
+                break;
             }
         }
-    }
 
-    if ( cpumask_test_cpu(cpu, &cpupool_free_cpus) )
+        /*
+         * Either cpu has been found as suspended in a pool, and added back
+         * there, or it stayed free (if it did not belong to any pool when
+         * suspending), and we don't want to do anything.
+         */
+        ASSERT(cpumask_test_cpu(cpu, &cpupool_free_cpus) ||
+               cpumask_test_cpu(cpu, (*c)->cpu_valid));
+    }
+    else
+    {
+        /*
+         * If we are not resuming, we are hot-plugging cpu, and in which case
+         * we add it to pool0, as it certainly was there when hot-unplagged
+         * (or unplugging would have failed) and that is the default behavior
+         * anyway.
+         */
         ret = cpupool_assign_cpu_locked(cpupool0, cpu);
+    }
  out:
     spin_unlock(&cpupool_lock);
 
@@ -491,29 +509,52 @@ static int cpupool_cpu_add(unsigned int cpu)
 }
 
 /*
- * called to remove a cpu from pool admin
- * the cpu to be removed is locked to avoid removing it from dom0
- * returns failure if not in pool0
+ * Called to remove a CPU from a pool. The CPU is locked, to forbid removing
+ * it from pool0. In fact, if we want to hot-unplug a CPU, it must belong to
+ * pool0, or we fail.
+ *
+ * However, if we are suspending (e.g., to ACPI S3), we mark the CPU in such
+ * a way that it can be put back in its pool when resuming.
  */
 static int cpupool_cpu_remove(unsigned int cpu)
 {
     int ret = -EBUSY;
-    struct cpupool **c;
 
     spin_lock(&cpupool_lock);
-    if ( cpumask_test_cpu(cpu, cpupool0->cpu_valid) )
-        ret = 0;
-    else
+    if ( system_state == SYS_STATE_suspend )
     {
+        struct cpupool **c;
+
         for_each_cpupool(c)
         {
-            if ( cpumask_test_cpu(cpu, (*c)->cpu_suspended ) )
+            if ( cpumask_test_cpu(cpu, (*c)->cpu_valid ) )
             {
-                ret = 0;
+                cpumask_set_cpu(cpu, (*c)->cpu_suspended);
                 break;
             }
         }
+
+        /*
+         * Either we found cpu in a pool, or it must be free (if it has been
+         * hot-unplagged, then we must have found it in pool0). It is, of
+         * course, fine to suspend or shutdown with CPUs not assigned to a
+         * pool, and (in case of suspend) they will stay free when resuming.
+         */
+        ASSERT(cpumask_test_cpu(cpu, &cpupool_free_cpus) ||
+               cpumask_test_cpu(cpu, (*c)->cpu_suspended));
+        ASSERT(cpumask_test_cpu(cpu, &cpu_online_map) ||
+               cpumask_test_cpu(cpu, cpupool0->cpu_suspended));
+        ret = 0;
     }
+    else if ( cpumask_test_cpu(cpu, cpupool0->cpu_valid) )
+    {
+        /*
+         * If we are not suspending, we are hot-unplugging cpu, and that is
+         * allowed only for CPUs in pool0.
+         */
+        ret = 0;
+    }
+
     if ( !ret )
         cpumask_set_cpu(cpu, &cpupool_locked_cpus);
     spin_unlock(&cpupool_lock);
@@ -708,15 +749,6 @@ static int cpu_callback(
 {
     unsigned int cpu = (unsigned long)hcpu;
     int rc = 0;
-
-    if ( system_state == SYS_STATE_suspend )
-    {
-        struct cpupool **c;
-
-        for_each_cpupool(c)
-            if ( cpumask_test_cpu(cpu, (*c)->cpu_valid ) )
-                cpumask_set_cpu(cpu, (*c)->cpu_suspended);
-    }
 
     switch ( action )
     {
