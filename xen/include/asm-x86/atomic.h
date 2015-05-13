@@ -14,6 +14,14 @@ static inline void name(volatile type *addr, type val) \
 { asm volatile("mov" size " %1,%0": "=m" (*(volatile type *)addr) \
 :reg (val) barrier); }
 
+#define build_add_sized(name, size, type, reg) \
+    static inline void name(volatile type *addr, type val)              \
+    {                                                                   \
+        asm volatile("add" size " %1,%0"                                \
+                     : "=m" (*addr)                                     \
+                     : reg (val));                                      \
+    }
+
 build_read_atomic(read_u8_atomic, "b", uint8_t, "=q", )
 build_read_atomic(read_u16_atomic, "w", uint16_t, "=r", )
 build_read_atomic(read_u32_atomic, "l", uint32_t, "=r", )
@@ -24,8 +32,14 @@ build_write_atomic(write_u16_atomic, "w", uint16_t, "r", )
 build_write_atomic(write_u32_atomic, "l", uint32_t, "r", )
 build_write_atomic(write_u64_atomic, "q", uint64_t, "r", )
 
+build_add_sized(add_u8_sized, "b", uint8_t, "qi")
+build_add_sized(add_u16_sized, "w", uint16_t, "ri")
+build_add_sized(add_u32_sized, "l", uint32_t, "ri")
+build_add_sized(add_u64_sized, "q", uint64_t, "ri")
+
 #undef build_read_atomic
 #undef build_write_atomic
+#undef build_add_sized
 
 void __bad_atomic_size(void);
 
@@ -49,6 +63,18 @@ void __bad_atomic_size(void);
     case 2: write_u16_atomic((uint16_t *)(p), x_); break; \
     case 4: write_u32_atomic((uint32_t *)(p), x_); break; \
     case 8: write_u64_atomic((uint64_t *)(p), x_); break; \
+    default: __bad_atomic_size(); break;                  \
+    }                                                     \
+})
+
+#define add_sized(p, x) ({                                \
+    typeof(*(p)) x_ = (x);                                \
+    switch ( sizeof(*(p)) )                               \
+    {                                                     \
+    case 1: add_u8_sized((uint8_t *)(p), x_); break;      \
+    case 2: add_u16_sized((uint16_t *)(p), x_); break;    \
+    case 4: add_u32_sized((uint32_t *)(p), x_); break;    \
+    case 8: add_u64_sized((uint64_t *)(p), x_); break;    \
     default: __bad_atomic_size(); break;                  \
     }                                                     \
 })
