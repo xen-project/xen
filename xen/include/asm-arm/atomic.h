@@ -23,6 +23,17 @@ static inline void name(volatile type *addr, type val) \
                  : reg (val));                         \
 }
 
+#define build_add_sized(name, size, width, type, reg) \
+static inline void name(volatile type *addr, type val)                  \
+{                                                                       \
+    type t;                                                             \
+    asm volatile("ldr" size " %"width"1,%0\n"                           \
+                 "add %"width"1,%"width"1,%"width"2\n"                  \
+                 "str" size " %"width"1,%0"                             \
+                 : "=m" (*(volatile type *)addr), "=r" (t)              \
+                 : reg (val));                                          \
+}
+
 #if defined (CONFIG_ARM_32)
 #define BYTE ""
 #define WORD ""
@@ -45,6 +56,10 @@ build_atomic_write(write_int_atomic, "",  WORD, int, "r")
 build_atomic_read(read_u64_atomic, "x", uint64_t, "=r")
 build_atomic_write(write_u64_atomic, "x", uint64_t, "r")
 #endif
+
+build_add_sized(add_u8_sized, "b", BYTE, uint8_t, "ri")
+build_add_sized(add_u16_sized, "h", WORD, uint16_t, "ri")
+build_add_sized(add_u32_sized, "", WORD, uint32_t, "ri")
 
 void __bad_atomic_size(void);
 
@@ -70,6 +85,17 @@ void __bad_atomic_size(void);
     __x;                                                                \
 })
 
+#define add_sized(p, x) ({                                              \
+    typeof(*(p)) __x = (x);                                             \
+    switch ( sizeof(*(p)) )                                             \
+    {                                                                   \
+    case 1: add_u8_sized((uint8_t *)(p), __x); break;                   \
+    case 2: add_u16_sized((uint16_t *)(p), __x); break;                 \
+    case 4: add_u32_sized((uint32_t *)(p), __x); break;                 \
+    default: __bad_atomic_size(); break;                                \
+    }                                                                   \
+})
+    
 /*
  * NB. I've pushed the volatile qualifier into the operations. This allows
  * fast accessors such as _atomic_read() and _atomic_set() which don't give
