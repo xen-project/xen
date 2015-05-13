@@ -789,6 +789,11 @@ More information about Xen gfx_passthru feature is available
 on the XenVGAPassthrough L<http://wiki.xen.org/wiki/XenVGAPassthrough>
 wiki page.
 
+=item B<dtdev=[ "DTDEV_PATH", "DTDEV_PATH", ... ]>
+
+Specifies the host device tree nodes to passthrough to this guest. Each
+DTDEV_PATH is the absolute path in the device tree.
+
 =item B<ioports=[ "IOPORT_RANGE", "IOPORT_RANGE", ... ]>
 
 Allow guest to access specific legacy I/O ports. Each B<IOPORT_RANGE>
