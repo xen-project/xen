@@ -470,6 +470,9 @@ the user to defined aliases which can be used by the guest kernel.
 Given the complexity of verifying the validity of a device tree, this
 option should only be used with trusted device tree.
 
+Note that the partial device tree should avoid to use the phandle 65000
+which is reserved by the toolstack.
+
 =back
 
 =head2 Devices

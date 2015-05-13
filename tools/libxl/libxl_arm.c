@@ -81,10 +81,11 @@ static struct arch_info {
     {"xen-3.0-aarch64", "arm,armv8-timer", "arm,armv8" },
 };
 
-enum {
-    PHANDLE_NONE = 0,
-    PHANDLE_GIC,
-};
+/*
+ * The device tree compiler (DTC) is allocating the phandle from 1 to
+ * onwards. Reserve a high value for the GIC phandle.
+ */
+#define PHANDLE_GIC (65000)
 
 typedef uint32_t be32;
 typedef be32 gic_interrupt[3];
