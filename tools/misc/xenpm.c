@@ -355,7 +355,7 @@ static void signal_int_handler(int signo)
     int i, j, k;
     struct timeval tv;
     int cx_cap = 0, px_cap = 0;
-    xc_cputopo_t *cputopo;
+    xc_cputopo_t *cputopo = NULL;
     unsigned max_cpus;
 
     if ( xc_cputopoinfo(xc_handle, &max_cpus, NULL) != 0 )
@@ -960,7 +960,7 @@ void scaling_governor_func(int argc, char *argv[])
 
 void cpu_topology_func(int argc, char *argv[])
 {
-    xc_cputopo_t *cputopo;
+    xc_cputopo_t *cputopo = NULL;
     unsigned max_cpus;
     int i, rc;
 
