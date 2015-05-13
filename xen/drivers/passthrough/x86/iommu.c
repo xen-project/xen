@@ -59,10 +59,17 @@ int arch_iommu_populate_page_table(struct domain *d)
         if ( has_hvm_container_domain(d) ||
             (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page )
         {
-            BUG_ON(SHARED_M2P(mfn_to_gmfn(d, page_to_mfn(page))));
-            rc = hd->platform_ops->map_page(
-                d, mfn_to_gmfn(d, page_to_mfn(page)), page_to_mfn(page),
-                IOMMUF_readable|IOMMUF_writable);
+            unsigned long mfn = page_to_mfn(page);
+            unsigned long gfn = mfn_to_gmfn(d, mfn);
+
+            if ( gfn != INVALID_MFN )
+            {
+                ASSERT(!(gfn >> DEFAULT_DOMAIN_ADDRESS_WIDTH));
+                BUG_ON(SHARED_M2P(gfn));
+                rc = hd->platform_ops->map_page(d, gfn, mfn,
+                                                IOMMUF_readable |
+                                                IOMMUF_writable);
+            }
             if ( rc )
             {
                 page_list_add(page, &d->page_list);

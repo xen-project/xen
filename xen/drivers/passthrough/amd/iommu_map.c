@@ -557,6 +557,10 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
     unsigned long old_root_mfn;
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
+    if ( gfn == INVALID_MFN )
+        return -EADDRNOTAVAIL;
+    ASSERT(!(gfn >> DEFAULT_DOMAIN_ADDRESS_WIDTH));
+
     level = hd->arch.paging_mode;
     old_root = hd->arch.root_table;
     offset = gfn >> (PTE_PER_TABLE_SHIFT * (level - 1));
@@ -729,12 +733,15 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
      * we might need a deeper page table for lager gfn now */
     if ( is_hvm_domain(d) )
     {
-        if ( update_paging_mode(d, gfn) )
+        int rc = update_paging_mode(d, gfn);
+
+        if ( rc )
         {
             spin_unlock(&hd->arch.mapping_lock);
             AMD_IOMMU_DEBUG("Update page mode failed gfn = %lx\n", gfn);
-            domain_crash(d);
-            return -EFAULT;
+            if ( rc != -EADDRNOTAVAIL )
+                domain_crash(d);
+            return rc;
         }
     }
 
