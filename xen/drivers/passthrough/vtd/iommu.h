@@ -482,7 +482,6 @@ struct qinval_entry {
 #define VTD_PAGE_TABLE_LEVEL_3  3
 #define VTD_PAGE_TABLE_LEVEL_4  4
 
-#define DEFAULT_DOMAIN_ADDRESS_WIDTH 48
 #define MAX_IOMMU_REGS 0xc0
 
 extern struct list_head acpi_drhd_units;

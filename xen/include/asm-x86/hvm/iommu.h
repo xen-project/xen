@@ -46,6 +46,8 @@ struct g2m_ioport {
     unsigned int np;
 };
 
+#define DEFAULT_DOMAIN_ADDRESS_WIDTH 48
+
 struct arch_hvm_iommu
 {
     u64 pgd_maddr;                 /* io page directory machine address */
