@@ -460,6 +460,16 @@ not emulated.
 Specify that this domain is a driver domain. This enables certain
 features needed in order to run a driver domain.
 
+=item B<device_tree=PATH>
+
+Specify a partial device tree (compiled via the Device Tree Compiler).
+Everything under the node "/passthrough" will be copied into the guest
+device tree. For convenience, the node "/aliases" is also copied to allow
+the user to defined aliases which can be used by the guest kernel.
+
+Given the complexity of verifying the validity of a device tree, this
+option should only be used with trusted device tree.
+
 =back
 
 =head2 Devices

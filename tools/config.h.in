@@ -1,5 +1,8 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+/* Enabling support partial device tree in libxl */
+#undef ENABLE_PARTIAL_DEVICE_TREE
+
 /* Blktap2 enabled */
 #undef HAVE_BLKTAP2
 

@@ -1379,6 +1379,7 @@ static void parse_config_data(const char *config_source,
 
     xlu_cfg_replace_string (config, "kernel", &b_info->kernel, 0);
     xlu_cfg_replace_string (config, "ramdisk", &b_info->ramdisk, 0);
+    xlu_cfg_replace_string (config, "device_tree", &b_info->device_tree, 0);
     b_info->cmdline = parse_cmdline(config);
 
     xlu_cfg_get_defbool(config, "driver_domain", &c_info->driver_domain, 0);

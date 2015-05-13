@@ -356,6 +356,18 @@ case "$host_cpu" in
 arm*|aarch64)
 AC_CHECK_LIB([fdt], [fdt_create], [], [AC_MSG_ERROR([Could not find libfdt])])
 
+# Check for libfdt >= 1.4.0. If present enable passthrough
+# Note that libfdt doesn't provide versionning. So we need to rely on
+# function present in new version.
+# Use fdt_first_property_offset which has been correctly exported since v1.4.0
+AC_CHECK_FUNC(fdt_first_property_offset, [partial_dt="y"], [partial_dt="n"])
+
+AS_IF([test "x$partial_dt" = "xy" ],
+      [AC_DEFINE([ENABLE_PARTIAL_DEVICE_TREE], [1],
+                 [Enabling support partial device tree in libxl])],
+      [AC_MSG_WARN([Disabling support for partial device tree in libxl.
+       Please install libfdt library - version 1.4.0 or higher])])
+
 # The functions fdt_{first,next}_subnode may not be available because:
 #   * It has been introduced in 2013 => Doesn't work on Wheezy
 #   * The prototype exists but the functions are not exposed. Don't ask why...

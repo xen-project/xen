@@ -413,6 +413,10 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("kernel",           string),
     ("cmdline",          string),
     ("ramdisk",          string),
+    # Given the complexity of verifying the validity of a device tree,
+    # libxl doesn't do any security check on it. It's the responsibility
+    # of the caller to provide only trusted device tree.
+    ("device_tree",      string),
     ("u", KeyedUnion(None, libxl_domain_type, "type",
                 [("hvm", Struct(None, [("firmware",         string),
                                        ("bios",             libxl_bios_type),

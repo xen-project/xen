@@ -1,5 +1,6 @@
 #include "libxl_internal.h"
 #include "libxl_arch.h"
+#include "libxl_libfdt_compat.h"
 
 #include <xc_dom.h>
 #include <stdbool.h>
@@ -542,6 +543,157 @@ out:
     }
 }
 
+#ifdef ENABLE_PARTIAL_DEVICE_TREE
+
+static int check_partial_fdt(libxl__gc *gc, void *fdt, size_t size)
+{
+    int r;
+
+    if (fdt_magic(fdt) != FDT_MAGIC) {
+        LOG(ERROR, "Partial FDT is not a valid Flat Device Tree");
+        return ERROR_FAIL;
+    }
+
+    r = fdt_check_header(fdt);
+    if (r) {
+        LOG(ERROR, "Failed to check the partial FDT (%d)", r);
+        return ERROR_FAIL;
+    }
+
+    if (fdt_totalsize(fdt) > size) {
+        LOG(ERROR, "Partial FDT totalsize is too big");
+        return ERROR_FAIL;
+    }
+
+    return 0;
+}
+
+static int copy_properties(libxl__gc *gc, void *fdt, void *pfdt,
+                           int nodeoff)
+{
+    int propoff, nameoff, r;
+    const struct fdt_property *prop;
+
+    for (propoff = fdt_first_property_offset(pfdt, nodeoff);
+         propoff >= 0;
+         propoff = fdt_next_property_offset(pfdt, propoff)) {
+
+        if (!(prop = fdt_get_property_by_offset(pfdt, propoff, NULL))) {
+            return -FDT_ERR_INTERNAL;
+        }
+
+        nameoff = fdt32_to_cpu(prop->nameoff);
+        r = fdt_property(fdt, fdt_string(pfdt, nameoff),
+                         prop->data, fdt32_to_cpu(prop->len));
+        if (r) return r;
+    }
+
+    /* FDT_ERR_NOTFOUND => There is no more properties for this node */
+    return (propoff != -FDT_ERR_NOTFOUND)? propoff : 0;
+}
+
+/* Copy a node from the partial device tree to the guest device tree */
+static int copy_node(libxl__gc *gc, void *fdt, void *pfdt,
+                     int nodeoff, int depth)
+{
+    int r;
+
+    r = fdt_begin_node(fdt, fdt_get_name(pfdt, nodeoff, NULL));
+    if (r) return r;
+
+    r = copy_properties(gc, fdt, pfdt, nodeoff);
+    if (r) return r;
+
+    for (nodeoff = fdt_first_subnode(pfdt, nodeoff);
+         nodeoff >= 0;
+         nodeoff = fdt_next_subnode(pfdt, nodeoff)) {
+        r = copy_node(gc, fdt, pfdt, nodeoff, depth + 1);
+        if (r) return r;
+    }
+
+    if (nodeoff != -FDT_ERR_NOTFOUND)
+        return nodeoff;
+
+    r = fdt_end_node(fdt);
+    if (r) return r;
+
+    return 0;
+}
+
+static int copy_node_by_path(libxl__gc *gc, const char *path,
+                             void *fdt, void *pfdt)
+{
+    int nodeoff, r;
+    const char *name = strrchr(path, '/');
+
+    if (!name)
+        return -FDT_ERR_INTERNAL;
+
+    name++;
+
+    /*
+     * The FDT function to look at a node doesn't take into account the
+     * unit (i.e anything after @) when search by name. Check if the
+     * name exactly matches.
+     */
+    nodeoff = fdt_path_offset(pfdt, path);
+    if (nodeoff < 0)
+        return nodeoff;
+
+    if (strcmp(fdt_get_name(pfdt, nodeoff, NULL), name))
+        return -FDT_ERR_NOTFOUND;
+
+    r = copy_node(gc, fdt, pfdt, nodeoff, 0);
+    if (r) return r;
+
+    return 0;
+}
+
+/*
+ * The partial device tree is not copied entirely. Only the relevant bits are
+ * copied to the guest device tree:
+ *  - /passthrough node
+ *  - /aliases node
+ */
+static int copy_partial_fdt(libxl__gc *gc, void *fdt, void *pfdt)
+{
+    int r;
+
+    r = copy_node_by_path(gc, "/passthrough", fdt, pfdt);
+    if (r < 0) {
+        LOG(ERROR, "Can't copy the node \"/passthrough\" from the partial FDT");
+        return r;
+    }
+
+    r = copy_node_by_path(gc, "/aliases", fdt, pfdt);
+    if (r < 0 && r != -FDT_ERR_NOTFOUND) {
+        LOG(ERROR, "Can't copy the node \"/aliases\" from the partial FDT");
+        return r;
+    }
+
+    return 0;
+}
+
+#else
+
+static int check_partial_fdt(libxl__gc *gc, void *fdt, size_t size)
+{
+    LOG(ERROR, "partial device tree not supported");
+
+    return ERROR_FAIL;
+}
+
+static int copy_partial_fdt(libxl__gc *gc, void *fdt, void *pfdt)
+{
+    /*
+     * We should never be here when the partial device tree is not
+     * supported.
+     * */
+    return -FDT_ERR_INTERNAL;
+}
+
+#endif /* ENABLE_PARTIAL_DEVICE_TREE */
+
 #define FDT_MAX_SIZE (1<<20)
 
 int libxl__arch_domain_init_hw_description(libxl__gc *gc,
@@ -550,8 +702,10 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
                                            struct xc_dom_image *dom)
 {
     void *fdt = NULL;
+    void *pfdt = NULL;
     int rc, res;
     size_t fdt_size = 0;
+    int pfdt_size = 0;
 
     const libxl_version_info *vers;
     const struct arch_info *ainfo;
@@ -570,6 +724,22 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
     LOG(DEBUG, "constructing DTB for Xen version %d.%d guest",
         vers->xen_version_major, vers->xen_version_minor);
     LOG(DEBUG, " - vGIC version: %s", gicv_to_string(xc_config->gic_version));
+
+    if (info->device_tree) {
+        LOG(DEBUG, " - Partial device tree provided: %s", info->device_tree);
+
+        rc = libxl_read_file_contents(CTX, info->device_tree,
+                                      &pfdt, &pfdt_size);
+        if (rc) {
+            LOGEV(ERROR, rc, "failed to read the partial device file %s",
+                  info->device_tree);
+            return ERROR_FAIL;
+        }
+        libxl__ptr_add(gc, pfdt);
+
+        if (check_partial_fdt(gc, pfdt, pfdt_size))
+            return ERROR_FAIL;
+    }
 
 /*
  * Call "call" handling FDT_ERR_*. Will either:
@@ -636,6 +806,9 @@ next_resize:
 
         FDT( make_timer_node(gc, fdt, ainfo) );
         FDT( make_hypervisor_node(gc, fdt, vers) );
+
+        if (pfdt)
+            FDT( copy_partial_fdt(gc, fdt, pfdt) );
 
         FDT( fdt_end_node(fdt) );
 

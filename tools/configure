@@ -8735,6 +8735,29 @@ else
 fi
 
 
+# Check for libfdt >= 1.4.0. If present enable passthrough
+# Note that libfdt doesn't provide versionning. So we need to rely on
+# function present in new version.
+# Use fdt_first_property_offset which has been correctly exported since v1.4.0
+ac_fn_c_check_func "$LINENO" "fdt_first_property_offset" "ac_cv_func_fdt_first_property_offset"
+if test "x$ac_cv_func_fdt_first_property_offset" = xyes; then :
+  partial_dt="y"
+else
+  partial_dt="n"
+fi
+
+
+if test "x$partial_dt" = "xy" ; then :
+
+$as_echo "#define ENABLE_PARTIAL_DEVICE_TREE 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Disabling support for partial device tree in libxl.
+       Please install libfdt library - version 1.4.0 or higher" >&5
+$as_echo "$as_me: WARNING: Disabling support for partial device tree in libxl.
+       Please install libfdt library - version 1.4.0 or higher" >&2;}
+fi
+
 # The functions fdt_{first,next}_subnode may not be available because:
 #   * It has been introduced in 2013 => Doesn't work on Wheezy
 #   * The prototype exists but the functions are not exposed. Don't ask why...
