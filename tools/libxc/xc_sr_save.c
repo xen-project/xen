@@ -344,36 +344,6 @@ static int suspend_domain(struct xc_sr_context *ctx)
 }
 
 /*
- * Send all pages in the guests p2m.  Used as the first iteration of the live
- * migration loop, and for a non-live save.
- */
-static int send_all_pages(struct xc_sr_context *ctx)
-{
-    xc_interface *xch = ctx->xch;
-    xen_pfn_t p;
-    int rc;
-
-    for ( p = 0; p < ctx->save.p2m_size; ++p )
-    {
-        rc = add_to_batch(ctx, p);
-        if ( rc )
-            return rc;
-
-        /* Update progress every 4MB worth of memory sent. */
-        if ( (p & ((1U << (22 - 12)) - 1)) == 0 )
-            xc_report_progress_step(xch, p, ctx->save.p2m_size);
-    }
-
-    rc = flush_batch(ctx);
-    if ( rc )
-        return rc;
-
-    xc_report_progress_step(xch, ctx->save.p2m_size,
-                            ctx->save.p2m_size);
-    return 0;
-}
-
-/*
  * Send a subset of pages in the guests p2m, according to the dirty bitmap.
  * Used for each subsequent iteration of the live migration loop.
  *
@@ -414,6 +384,20 @@ static int send_dirty_pages(struct xc_sr_context *ctx,
 
     xc_report_progress_step(xch, entries, entries);
     return 0;
+}
+
+/*
+ * Send all pages in the guests p2m.  Used as the first iteration of the live
+ * migration loop, and for a non-live save.
+ */
+static int send_all_pages(struct xc_sr_context *ctx)
+{
+    DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
+                                    &ctx->save.dirty_bitmap_hbuf);
+
+    bitmap_set(dirty_bitmap, ctx->save.p2m_size);
+
+    return send_dirty_pages(ctx, ctx->save.p2m_size);
 }
 
 static int enable_logdirty(struct xc_sr_context *ctx)

@@ -26,6 +26,11 @@ static inline unsigned long *bitmap_alloc(int nr_bits)
     return calloc(1, bitmap_size(nr_bits));
 }
 
+static inline void bitmap_set(unsigned long *addr, int nr_bits)
+{
+    memset(addr, 0xff, bitmap_size(nr_bits));
+}
+
 static inline void bitmap_clear(unsigned long *addr, int nr_bits)
 {
     memset(addr, 0, bitmap_size(nr_bits));
