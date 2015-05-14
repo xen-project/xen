@@ -475,20 +475,20 @@ static int update_progress_string(struct xc_sr_context *ctx,
 static int send_domain_memory_live(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    DECLARE_HYPERCALL_BUFFER(unsigned long, to_send);
+    DECLARE_HYPERCALL_BUFFER(unsigned long, dirty_bitmap);
     xc_shadow_op_stats_t stats = { 0, ctx->save.p2m_size };
     char *progress_str = NULL;
     unsigned x;
     int rc = -1;
 
-    to_send = xc_hypercall_buffer_alloc_pages(
-        xch, to_send, NRPAGES(bitmap_size(ctx->save.p2m_size)));
+    dirty_bitmap = xc_hypercall_buffer_alloc_pages(
+        xch, dirty_bitmap, NRPAGES(bitmap_size(ctx->save.p2m_size)));
 
     ctx->save.batch_pfns = malloc(MAX_BATCH_SIZE *
                                   sizeof(*ctx->save.batch_pfns));
     ctx->save.deferred_pages = calloc(1, bitmap_size(ctx->save.p2m_size));
 
-    if ( !ctx->save.batch_pfns || !to_send || !ctx->save.deferred_pages )
+    if ( !ctx->save.batch_pfns || !dirty_bitmap || !ctx->save.deferred_pages )
     {
         ERROR("Unable to allocate memory for to_{send,fix}/batch bitmaps");
         goto out;
@@ -512,7 +512,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
     {
         if ( xc_shadow_control(
                  xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
-                 HYPERCALL_BUFFER(to_send), ctx->save.p2m_size,
+                 HYPERCALL_BUFFER(dirty_bitmap), ctx->save.p2m_size,
                  NULL, 0, &stats) != ctx->save.p2m_size )
         {
             PERROR("Failed to retrieve logdirty bitmap");
@@ -527,7 +527,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
         if ( rc )
             goto out;
 
-        rc = send_some_pages(ctx, to_send, stats.dirty_count);
+        rc = send_some_pages(ctx, dirty_bitmap, stats.dirty_count);
         if ( rc )
             goto out;
     }
@@ -538,7 +538,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
 
     if ( xc_shadow_control(
              xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
-             HYPERCALL_BUFFER(to_send), ctx->save.p2m_size,
+             HYPERCALL_BUFFER(dirty_bitmap), ctx->save.p2m_size,
              NULL, 0, &stats) != ctx->save.p2m_size )
     {
         PERROR("Failed to retrieve logdirty bitmap");
@@ -550,9 +550,9 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
     if ( rc )
         goto out;
 
-    bitmap_or(to_send, ctx->save.deferred_pages, ctx->save.p2m_size);
+    bitmap_or(dirty_bitmap, ctx->save.deferred_pages, ctx->save.p2m_size);
 
-    rc = send_some_pages(ctx, to_send,
+    rc = send_some_pages(ctx, dirty_bitmap,
                          stats.dirty_count + ctx->save.nr_deferred_pages);
     if ( rc )
         goto out;
@@ -578,7 +578,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
 
         if ( xc_shadow_control(
                  xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_PEEK,
-                 HYPERCALL_BUFFER(to_send), ctx->save.p2m_size,
+                 HYPERCALL_BUFFER(dirty_bitmap), ctx->save.p2m_size,
                  NULL, 0, &stats) != ctx->save.p2m_size )
         {
             PERROR("Failed to retrieve logdirty bitmap");
@@ -593,7 +593,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
   out:
     xc_set_progress_prefix(xch, NULL);
     free(progress_str);
-    xc_hypercall_buffer_free_pages(xch, to_send,
+    xc_hypercall_buffer_free_pages(xch, dirty_bitmap,
                                    NRPAGES(bitmap_size(ctx->save.p2m_size)));
     free(ctx->save.deferred_pages);
     free(ctx->save.batch_pfns);
