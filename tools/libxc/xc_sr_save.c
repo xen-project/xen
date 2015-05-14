@@ -379,8 +379,8 @@ static int send_all_pages(struct xc_sr_context *ctx)
  *
  * Bitmap is bounded by p2m_size.
  */
-static int send_some_pages(struct xc_sr_context *ctx,
-                           unsigned long entries)
+static int send_dirty_pages(struct xc_sr_context *ctx,
+                            unsigned long entries)
 {
     xc_interface *xch = ctx->xch;
     xen_pfn_t p;
@@ -516,7 +516,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
         if ( rc )
             goto out;
 
-        rc = send_some_pages(ctx, stats.dirty_count);
+        rc = send_dirty_pages(ctx, stats.dirty_count);
         if ( rc )
             goto out;
     }
@@ -541,7 +541,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
 
     bitmap_or(dirty_bitmap, ctx->save.deferred_pages, ctx->save.p2m_size);
 
-    rc = send_some_pages(ctx, stats.dirty_count + ctx->save.nr_deferred_pages);
+    rc = send_dirty_pages(ctx, stats.dirty_count + ctx->save.nr_deferred_pages);
     if ( rc )
         goto out;
 
