@@ -174,6 +174,9 @@ struct xc_sr_context
             /* Live migrate vs non live suspend. */
             bool live;
 
+            /* Plain VM, or checkpoints over time. */
+            bool checkpointed;
+
             /* Further debugging information in the stream. */
             bool debug;
 

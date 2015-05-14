@@ -732,6 +732,7 @@ int xc_domain_save2(xc_interface *xch, int io_fd, uint32_t dom,
     ctx.save.callbacks = callbacks;
     ctx.save.live  = !!(flags & XCFLAGS_LIVE);
     ctx.save.debug = !!(flags & XCFLAGS_DEBUG);
+    ctx.save.checkpointed = !!(flags & XCFLAGS_CHECKPOINTED);
 
     /*
      * TODO: Find some time to better tweak the live migration algorithm.
@@ -745,6 +746,8 @@ int xc_domain_save2(xc_interface *xch, int io_fd, uint32_t dom,
     /* Sanity checks for callbacks. */
     if ( hvm )
         assert(callbacks->switch_qemu_logdirty);
+    if ( ctx.save.checkpointed )
+        assert(callbacks->checkpoint && callbacks->postcopy);
 
     IPRINTF("In experimental %s", __func__);
     DPRINTF("fd %d, dom %u, max_iters %u, max_factor %u, flags %u, hvm %d",
