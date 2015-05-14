@@ -475,24 +475,12 @@ static int update_progress_string(struct xc_sr_context *ctx,
 static int send_domain_memory_live(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    DECLARE_HYPERCALL_BUFFER(unsigned long, dirty_bitmap);
     xc_shadow_op_stats_t stats = { 0, ctx->save.p2m_size };
     char *progress_str = NULL;
     unsigned x;
     int rc = -1;
-
-    dirty_bitmap = xc_hypercall_buffer_alloc_pages(
-        xch, dirty_bitmap, NRPAGES(bitmap_size(ctx->save.p2m_size)));
-
-    ctx->save.batch_pfns = malloc(MAX_BATCH_SIZE *
-                                  sizeof(*ctx->save.batch_pfns));
-    ctx->save.deferred_pages = calloc(1, bitmap_size(ctx->save.p2m_size));
-
-    if ( !ctx->save.batch_pfns || !dirty_bitmap || !ctx->save.deferred_pages )
-    {
-        ERROR("Unable to allocate memory for to_{send,fix}/batch bitmaps");
-        goto out;
-    }
+    DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
+                                    &ctx->save.dirty_bitmap_hbuf);
 
     rc = enable_logdirty(ctx);
     if ( rc )
@@ -593,10 +581,6 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
   out:
     xc_set_progress_prefix(xch, NULL);
     free(progress_str);
-    xc_hypercall_buffer_free_pages(xch, dirty_bitmap,
-                                   NRPAGES(bitmap_size(ctx->save.p2m_size)));
-    free(ctx->save.deferred_pages);
-    free(ctx->save.batch_pfns);
     return rc;
 }
 
@@ -609,17 +593,6 @@ static int send_domain_memory_nonlive(struct xc_sr_context *ctx)
     xc_interface *xch = ctx->xch;
     int rc = -1;
 
-    ctx->save.batch_pfns = malloc(MAX_BATCH_SIZE *
-                                  sizeof(*ctx->save.batch_pfns));
-    ctx->save.deferred_pages = calloc(1, bitmap_size(ctx->save.p2m_size));
-
-    if ( !ctx->save.batch_pfns || !ctx->save.deferred_pages )
-    {
-        PERROR("Failed to allocate memory for nonlive tracking structures");
-        errno = ENOMEM;
-        goto err;
-    }
-
     rc = suspend_domain(ctx);
     if ( rc )
         goto err;
@@ -631,15 +604,30 @@ static int send_domain_memory_nonlive(struct xc_sr_context *ctx)
         goto err;
 
  err:
-    free(ctx->save.deferred_pages);
-    free(ctx->save.batch_pfns);
-
     return rc;
 }
 
 static int setup(struct xc_sr_context *ctx)
 {
+    xc_interface *xch = ctx->xch;
     int rc;
+    DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
+                                    &ctx->save.dirty_bitmap_hbuf);
+
+    dirty_bitmap = xc_hypercall_buffer_alloc_pages(
+                   xch, dirty_bitmap, NRPAGES(bitmap_size(ctx->save.p2m_size)));
+    ctx->save.batch_pfns = malloc(MAX_BATCH_SIZE *
+                                  sizeof(*ctx->save.batch_pfns));
+    ctx->save.deferred_pages = calloc(1, bitmap_size(ctx->save.p2m_size));
+
+    if ( !ctx->save.batch_pfns || !dirty_bitmap || !ctx->save.deferred_pages )
+    {
+        ERROR("Unable to allocate memory for dirty bitmaps, batch pfns and"
+              " deferred pages");
+        rc = -1;
+        errno = ENOMEM;
+        goto err;
+    }
 
     rc = ctx->save.ops.setup(ctx);
     if ( rc )
@@ -654,12 +642,20 @@ static int setup(struct xc_sr_context *ctx)
 static void cleanup(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
+    DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
+                                    &ctx->save.dirty_bitmap_hbuf);
+
 
     xc_shadow_control(xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_OFF,
                       NULL, 0, NULL, 0, NULL);
 
     if ( ctx->save.ops.cleanup(ctx) )
         PERROR("Failed to clean up");
+
+    xc_hypercall_buffer_free_pages(xch, dirty_bitmap,
+                                   NRPAGES(bitmap_size(ctx->save.p2m_size)));
+    free(ctx->save.deferred_pages);
+    free(ctx->save.batch_pfns);
 }
 
 /*

@@ -190,6 +190,7 @@ struct xc_sr_context
             unsigned nr_batch_pfns;
             unsigned long *deferred_pages;
             unsigned long nr_deferred_pages;
+            xc_hypercall_buffer_t dirty_bitmap_hbuf;
         } save;
 
         struct /* Restore data. */
