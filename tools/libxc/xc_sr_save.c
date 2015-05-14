@@ -738,6 +738,10 @@ int xc_domain_save2(xc_interface *xch, int io_fd, uint32_t dom,
     ctx.save.max_iterations = 5;
     ctx.save.dirty_threshold = 50;
 
+    /* Sanity checks for callbacks. */
+    if ( hvm )
+        assert(callbacks->switch_qemu_logdirty);
+
     IPRINTF("In experimental %s", __func__);
     DPRINTF("fd %d, dom %u, max_iters %u, max_factor %u, flags %u, hvm %d",
             io_fd, dom, max_iters, max_factor, flags, hvm);

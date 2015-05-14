@@ -166,13 +166,6 @@ static int x86_hvm_setup(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
 
-    if ( !ctx->save.callbacks->switch_qemu_logdirty )
-    {
-        ERROR("No switch_qemu_logdirty callback provided");
-        errno = EINVAL;
-        return -1;
-    }
-
     if ( ctx->save.callbacks->switch_qemu_logdirty(
              ctx->domid, 1, ctx->save.callbacks->data) )
     {
