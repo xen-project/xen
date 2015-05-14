@@ -184,7 +184,13 @@ static int x86_hvm_start_of_stream(struct xc_sr_context *ctx)
     return 0;
 }
 
-static int x86_hvm_end_of_stream(struct xc_sr_context *ctx)
+static int x86_hvm_start_of_checkpoint(struct xc_sr_context *ctx)
+{
+    /* no-op */
+    return 0;
+}
+
+static int x86_hvm_end_of_checkpoint(struct xc_sr_context *ctx)
 {
     int rc;
 
@@ -209,7 +215,7 @@ static int x86_hvm_end_of_stream(struct xc_sr_context *ctx)
     if ( rc )
         return rc;
 
-    return rc;
+    return 0;
 }
 
 static int x86_hvm_cleanup(struct xc_sr_context *ctx)
@@ -230,12 +236,13 @@ static int x86_hvm_cleanup(struct xc_sr_context *ctx)
 
 struct xc_sr_save_ops save_ops_x86_hvm =
 {
-    .pfn_to_gfn      = x86_hvm_pfn_to_gfn,
-    .normalise_page  = x86_hvm_normalise_page,
-    .setup           = x86_hvm_setup,
-    .start_of_stream = x86_hvm_start_of_stream,
-    .end_of_stream   = x86_hvm_end_of_stream,
-    .cleanup         = x86_hvm_cleanup,
+    .pfn_to_gfn          = x86_hvm_pfn_to_gfn,
+    .normalise_page      = x86_hvm_normalise_page,
+    .setup               = x86_hvm_setup,
+    .start_of_stream     = x86_hvm_start_of_stream,
+    .start_of_checkpoint = x86_hvm_start_of_checkpoint,
+    .end_of_checkpoint   = x86_hvm_end_of_checkpoint,
+    .cleanup             = x86_hvm_cleanup,
 };
 
 /*

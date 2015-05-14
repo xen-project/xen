@@ -662,6 +662,10 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
     if ( rc )
         goto err;
 
+    rc = ctx->save.ops.start_of_checkpoint(ctx);
+    if ( rc )
+        goto err;
+
     if ( ctx->save.live )
         rc = send_domain_memory_live(ctx);
     else
@@ -678,11 +682,11 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
         goto err;
     }
 
-    xc_report_progress_single(xch, "End of stream");
-
-    rc = ctx->save.ops.end_of_stream(ctx);
+    rc = ctx->save.ops.end_of_checkpoint(ctx);
     if ( rc )
         goto err;
+
+    xc_report_progress_single(xch, "End of stream");
 
     rc = write_end_record(ctx);
     if ( rc )

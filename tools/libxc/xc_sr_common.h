@@ -61,19 +61,24 @@ struct xc_sr_save_ops
     int (*setup)(struct xc_sr_context *ctx);
 
     /**
-     * Write records which need to be at the start of the stream.  This is
-     * called after the Image and Domain headers are written.  (Any records
-     * which need to be ahead of the memory.)
+     * Send records which need to be at the start of the stream.  This is
+     * called once, after the Image and Domain headers are written.
      */
     int (*start_of_stream)(struct xc_sr_context *ctx);
 
     /**
-     * Write records which need to be at the end of the stream, following the
-     * complete memory contents.  The caller shall handle writing the END
-     * record into the stream.  (Any records which need to be after the memory
-     * is complete.)
+     * Send records which need to be at the start of a checkpoint.  This is
+     * called once, or once per checkpoint in a checkpointed stream, and is
+     * ahead of memory data.
      */
-    int (*end_of_stream)(struct xc_sr_context *ctx);
+    int (*start_of_checkpoint)(struct xc_sr_context *ctx);
+
+    /**
+     * Send records which need to be at the end of the checkpoint.  This is
+     * called once, or once per checkpoint in a checkpointed stream, and is
+     * after the memory data.
+     */
+    int (*end_of_checkpoint)(struct xc_sr_context *ctx);
 
     /**
      * Clean up the local environment.  Will be called exactly once, either

@@ -816,6 +816,12 @@ static int x86_pv_start_of_stream(struct xc_sr_context *ctx)
     if ( rc )
         return rc;
 
+    /*
+     * Ideally should be able to change during migration.  Currently
+     * corruption will occur if the contents or location of the P2M changes
+     * during the live migration loop.  If one is very lucky, the breakage
+     * will not be subtle.
+     */
     rc = write_x86_pv_p2m_frames(ctx);
     if ( rc )
         return rc;
@@ -823,10 +829,12 @@ static int x86_pv_start_of_stream(struct xc_sr_context *ctx)
     return 0;
 }
 
-/*
- * save_ops function.  Writes tail records information into the stream.
- */
-static int x86_pv_end_of_stream(struct xc_sr_context *ctx)
+static int x86_pv_start_of_checkpoint(struct xc_sr_context *ctx)
+{
+    return 0;
+}
+
+static int x86_pv_end_of_checkpoint(struct xc_sr_context *ctx)
 {
     int rc;
 
@@ -866,12 +874,13 @@ static int x86_pv_cleanup(struct xc_sr_context *ctx)
 
 struct xc_sr_save_ops save_ops_x86_pv =
 {
-    .pfn_to_gfn      = x86_pv_pfn_to_gfn,
-    .normalise_page  = x86_pv_normalise_page,
-    .setup           = x86_pv_setup,
-    .start_of_stream = x86_pv_start_of_stream,
-    .end_of_stream   = x86_pv_end_of_stream,
-    .cleanup         = x86_pv_cleanup,
+    .pfn_to_gfn          = x86_pv_pfn_to_gfn,
+    .normalise_page      = x86_pv_normalise_page,
+    .setup               = x86_pv_setup,
+    .start_of_stream     = x86_pv_start_of_stream,
+    .start_of_checkpoint = x86_pv_start_of_checkpoint,
+    .end_of_checkpoint   = x86_pv_end_of_checkpoint,
+    .cleanup             = x86_pv_cleanup,
 };
 
 /*
