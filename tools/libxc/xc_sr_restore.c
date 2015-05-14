@@ -468,6 +468,48 @@ static int handle_page_data(struct xc_sr_context *ctx, struct xc_sr_record *rec)
     return rc;
 }
 
+static int process_record(struct xc_sr_context *ctx, struct xc_sr_record *rec)
+{
+    xc_interface *xch = ctx->xch;
+    int rc = 0;
+
+    switch ( rec->type )
+    {
+    case REC_TYPE_END:
+        break;
+
+    case REC_TYPE_PAGE_DATA:
+        rc = handle_page_data(ctx, rec);
+        break;
+
+    case REC_TYPE_VERIFY:
+        DPRINTF("Verify mode enabled");
+        ctx->restore.verify = true;
+        break;
+
+    default:
+        rc = ctx->restore.ops.process_record(ctx, rec);
+        break;
+    }
+
+    free(rec->data);
+
+    if ( rc == RECORD_NOT_PROCESSED )
+    {
+        if ( rec->type & REC_TYPE_OPTIONAL )
+            DPRINTF("Ignoring optional record %#x (%s)",
+                    rec->type, rec_type_to_str(rec->type));
+        else
+        {
+            ERROR("Mandatory record %#x (%s) not handled",
+                  rec->type, rec_type_to_str(rec->type));
+            rc = -1;
+        }
+    }
+
+    return rc;
+}
+
 /*
  * Restore a domain.
  */
@@ -498,40 +540,7 @@ static int restore(struct xc_sr_context *ctx)
         if ( rc )
             goto err;
 
-        switch ( rec.type )
-        {
-        case REC_TYPE_END:
-            break;
-
-        case REC_TYPE_PAGE_DATA:
-            rc = handle_page_data(ctx, &rec);
-            break;
-
-        case REC_TYPE_VERIFY:
-            DPRINTF("Verify mode enabled");
-            ctx->restore.verify = true;
-            break;
-
-        default:
-            rc = ctx->restore.ops.process_record(ctx, &rec);
-            break;
-        }
-
-        free(rec.data);
-
-        if ( rc == RECORD_NOT_PROCESSED )
-        {
-            if ( rec.type & REC_TYPE_OPTIONAL )
-                DPRINTF("Ignoring optional record %#x (%s)",
-                        rec.type, rec_type_to_str(rec.type));
-            else
-            {
-                ERROR("Mandatory record %#x (%s) not handled",
-                      rec.type, rec_type_to_str(rec.type));
-                rc = -1;
-            }
-        }
-
+        rc = process_record(ctx, &rec);
         if ( rc )
             goto err;
 
