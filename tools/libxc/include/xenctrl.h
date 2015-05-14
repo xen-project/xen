@@ -289,6 +289,7 @@ typedef struct xc_hypercall_buffer xc_hypercall_buffer_t;
  */
 #define DECLARE_HYPERCALL_BUFFER_SHADOW(_type, _name, _hbuf)   \
     _type *(_name) = (_hbuf)->hbuf;                            \
+    __attribute__((unused))                                    \
     xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(_name) = { \
         .hbuf = (void *)-1,                                    \
         .param_shadow = (_hbuf),                               \
