@@ -34,6 +34,7 @@ static const char *mandatory_rec_types[] =
     [REC_TYPE_TOOLSTACK]            = "Toolstack",
     [REC_TYPE_X86_PV_VCPU_MSRS]     = "x86 PV vcpu msrs",
     [REC_TYPE_VERIFY]               = "Verify",
+    [REC_TYPE_CHECKPOINT]           = "Checkpoint",
 };
 
 const char *rec_type_to_str(uint32_t type)

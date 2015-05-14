@@ -74,6 +74,7 @@ struct xc_sr_rhdr
 #define REC_TYPE_TOOLSTACK            0x0000000bU
 #define REC_TYPE_X86_PV_VCPU_MSRS     0x0000000cU
 #define REC_TYPE_VERIFY               0x0000000dU
+#define REC_TYPE_CHECKPOINT           0x0000000eU
 
 #define REC_TYPE_OPTIONAL             0x80000000U
 
