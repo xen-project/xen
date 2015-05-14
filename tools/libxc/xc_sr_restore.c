@@ -624,6 +624,7 @@ int xc_domain_restore2(xc_interface *xch, int io_fd, uint32_t dom,
     ctx.restore.console_domid = console_domid;
     ctx.restore.xenstore_evtchn = store_evtchn;
     ctx.restore.xenstore_domid = store_domid;
+    ctx.restore.checkpointed = checkpointed_stream;
     ctx.restore.callbacks = callbacks;
 
     IPRINTF("In experimental %s", __func__);

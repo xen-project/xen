@@ -205,6 +205,9 @@ struct xc_sr_context
             uint32_t guest_type;
             uint32_t guest_page_size;
 
+            /* Plain VM, or checkpoints over time. */
+            bool checkpointed;
+
             /*
              * Xenstore and Console parameters.
              * INPUT:  evtchn & domid
