@@ -4521,6 +4521,7 @@ int main_migrate(int argc, char **argv)
     int opt, daemonize = 1, monitor = 1, debug = 0;
     static struct option opts[] = {
         {"debug", 0, 0, 0x100},
+        {"live", 0, 0, 0x200},
         COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
@@ -4539,8 +4540,11 @@ int main_migrate(int argc, char **argv)
         daemonize = 0;
         monitor = 0;
         break;
-    case 0x100:
+    case 0x100: /* --debug */
         debug = 1;
+        break;
+    case 0x200: /* --live */
+        /* ignored for compatibility with xm */
         break;
     }
 
