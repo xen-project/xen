@@ -637,6 +637,31 @@ static int send_domain_memory_nonlive(struct xc_sr_context *ctx)
     return rc;
 }
 
+static int setup(struct xc_sr_context *ctx)
+{
+    int rc;
+
+    rc = ctx->save.ops.setup(ctx);
+    if ( rc )
+        goto err;
+
+    rc = 0;
+
+ err:
+    return rc;
+}
+
+static void cleanup(struct xc_sr_context *ctx)
+{
+    xc_interface *xch = ctx->xch;
+
+    xc_shadow_control(xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_OFF,
+                      NULL, 0, NULL, 0, NULL);
+
+    if ( ctx->save.ops.cleanup(ctx) )
+        PERROR("Failed to clean up");
+}
+
 /*
  * Save a domain.
  */
@@ -648,7 +673,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
     IPRINTF("Saving domain %d, type %s",
             ctx->domid, dhdr_type_to_str(guest_type));
 
-    rc = ctx->save.ops.setup(ctx);
+    rc = setup(ctx);
     if ( rc )
         goto err;
 
@@ -701,12 +726,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
     PERROR("Save failed");
 
  done:
-    xc_shadow_control(xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_OFF,
-                      NULL, 0, NULL, 0, NULL);
-
-    rc = ctx->save.ops.cleanup(ctx);
-    if ( rc )
-        PERROR("Failed to clean up");
+    cleanup(ctx);
 
     if ( saved_rc )
     {
