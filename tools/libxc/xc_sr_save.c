@@ -374,23 +374,24 @@ static int send_all_pages(struct xc_sr_context *ctx)
 }
 
 /*
- * Send a subset of pages in the guests p2m, according to the provided bitmap.
+ * Send a subset of pages in the guests p2m, according to the dirty bitmap.
  * Used for each subsequent iteration of the live migration loop.
  *
  * Bitmap is bounded by p2m_size.
  */
 static int send_some_pages(struct xc_sr_context *ctx,
-                           unsigned long *bitmap,
                            unsigned long entries)
 {
     xc_interface *xch = ctx->xch;
     xen_pfn_t p;
     unsigned long written;
     int rc;
+    DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
+                                    &ctx->save.dirty_bitmap_hbuf);
 
     for ( p = 0, written = 0; p < ctx->save.p2m_size; ++p )
     {
-        if ( !test_bit(p, bitmap) )
+        if ( !test_bit(p, dirty_bitmap) )
             continue;
 
         rc = add_to_batch(ctx, p);
@@ -515,7 +516,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
         if ( rc )
             goto out;
 
-        rc = send_some_pages(ctx, dirty_bitmap, stats.dirty_count);
+        rc = send_some_pages(ctx, stats.dirty_count);
         if ( rc )
             goto out;
     }
@@ -540,8 +541,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
 
     bitmap_or(dirty_bitmap, ctx->save.deferred_pages, ctx->save.p2m_size);
 
-    rc = send_some_pages(ctx, dirty_bitmap,
-                         stats.dirty_count + ctx->save.nr_deferred_pages);
+    rc = send_some_pages(ctx, stats.dirty_count + ctx->save.nr_deferred_pages);
     if ( rc )
         goto out;
 
