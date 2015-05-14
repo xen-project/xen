@@ -510,6 +510,9 @@ static int process_record(struct xc_sr_context *ctx, struct xc_sr_record *rec)
     return rc;
 }
 
+#ifdef XG_LIBXL_HVM_COMPAT
+extern int read_qemu(struct xc_sr_context *ctx);
+#endif
 /*
  * Restore a domain.
  */
@@ -545,6 +548,15 @@ static int restore(struct xc_sr_context *ctx)
             goto err;
 
     } while ( rec.type != REC_TYPE_END );
+
+#ifdef XG_LIBXL_HVM_COMPAT
+    if ( ctx->dominfo.hvm )
+    {
+        rc = read_qemu(ctx);
+        if ( rc )
+            goto err;
+    }
+#endif
 
     rc = ctx->restore.ops.stream_complete(ctx);
     if ( rc )

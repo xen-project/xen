@@ -94,14 +94,14 @@ static int handle_hvm_params(struct xc_sr_context *ctx,
 }
 
 #ifdef XG_LIBXL_HVM_COMPAT
-static int handle_qemu(struct xc_sr_context *ctx)
+int read_qemu(struct xc_sr_context *ctx);
+int read_qemu(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    char qemusig[21], path[256];
+    char qemusig[21];
     uint32_t qlen;
     void *qbuf = NULL;
     int rc = -1;
-    FILE *fp = NULL;
 
     if ( read_exact(ctx->fd, qemusig, sizeof(qemusig)) )
     {
@@ -136,6 +136,28 @@ static int handle_qemu(struct xc_sr_context *ctx)
               (int)sizeof(qemusig), (int)sizeof(qemusig), qemusig);
         goto out;
     }
+
+    /* With Remus, this could be read many times */
+    if ( ctx->x86_hvm.restore.qbuf )
+        free(ctx->x86_hvm.restore.qbuf);
+    ctx->x86_hvm.restore.qbuf = qbuf;
+    ctx->x86_hvm.restore.qlen = qlen;
+    rc = 0;
+
+out:
+    if (rc)
+        free(qbuf);
+    return rc;
+}
+
+static int handle_qemu(struct xc_sr_context *ctx)
+{
+    xc_interface *xch = ctx->xch;
+    char path[256];
+    uint32_t qlen = ctx->x86_hvm.restore.qlen;
+    void *qbuf = ctx->x86_hvm.restore.qbuf;
+    int rc = -1;
+    FILE *fp = NULL;
 
     sprintf(path, XC_DEVICE_MODEL_RESTORE_FILE".%u", ctx->domid);
     fp = fopen(path, "wb");
