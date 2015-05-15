@@ -182,7 +182,7 @@ int gic_remove_irq_from_guest(struct domain *d, unsigned int virq,
     {
         desc->handler->shutdown(desc);
 
-        /* EOI the IRQ it it has not been done by the guest */
+        /* EOI the IRQ if it has not been done by the guest */
         if ( test_bit(_IRQ_INPROGRESS, &desc->status) )
             gic_hw_ops->deactivate_irq(desc);
         clear_bit(_IRQ_INPROGRESS, &desc->status);
