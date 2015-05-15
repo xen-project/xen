@@ -421,13 +421,8 @@ static void hip04gic_update_lr(int lr, const struct pending_irq *p,
               ((p->irq & GICH_V2_LR_VIRTUAL_MASK) << GICH_V2_LR_VIRTUAL_SHIFT));
 
     if ( p->desc != NULL )
-    {
-        if ( platform_has_quirk(PLATFORM_QUIRK_GUEST_PIRQ_NEED_EOI) )
-            lr_reg |= GICH_V2_LR_MAINTENANCE_IRQ;
-        else
-            lr_reg |= GICH_V2_LR_HW | ((p->desc->irq & GICH_V2_LR_PHYSICAL_MASK )
-                            << GICH_V2_LR_PHYSICAL_SHIFT);
-    }
+        lr_reg |= GICH_V2_LR_HW | ((p->desc->irq & GICH_V2_LR_PHYSICAL_MASK )
+                                   << GICH_V2_LR_PHYSICAL_SHIFT);
 
     writel_gich(lr_reg, HIP04_GICH_LR + lr * 4);
 }

@@ -51,11 +51,6 @@ struct platform_desc {
  */
 #define PLATFORM_QUIRK_GIC_64K_STRIDE (1 << 0)
 
-/*
- * Quirk for platforms where GICH_LR_HW does not work as expected.
- */
-#define PLATFORM_QUIRK_GUEST_PIRQ_NEED_EOI       (1 << 1)
-
 void __init platform_init(void);
 int __init platform_init_time(void);
 int __init platform_specific_mapping(struct domain *d);

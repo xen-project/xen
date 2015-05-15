@@ -37,7 +37,6 @@ static u32 reset_mask;
 static bool reset_vals_valid = false;
 
 #define XGENE_SEC_GICV2_DIST_ADDR    0x78010000
-static u32 __read_mostly xgene_quirks = PLATFORM_QUIRK_GIC_64K_STRIDE;
 
 static void __init xgene_check_pirq_eoi(void)
 {
@@ -60,20 +59,18 @@ static void __init xgene_check_pirq_eoi(void)
 
     /*
      * In old X-Gene Storm firmware and DT, secure mode addresses have
-     * been mentioned in GICv2 node. We have to use maintenance interrupt
-     * instead of EOI HW in this case. We check the GIC Distributor Base
-     * Address to maintain compatibility with older firmware.
+     * been mentioned in GICv2 node. EOI HW won't work in this case.
+     * We check the GIC Distributor Base Address to deny Xen booting
+     * with older firmware.
      */
     if ( dbase == XGENE_SEC_GICV2_DIST_ADDR )
-    {
-        xgene_quirks |= PLATFORM_QUIRK_GUEST_PIRQ_NEED_EOI;
-        printk("Xen: WARNING: OLD X-Gene Firmware, disabling PIRQ EOI mode\n");
-    }
+        panic("OLD X-Gene Firmware is not supported by Xen.\n"
+              "Please upgrade your firmware to the latest version");
 }
 
 static uint32_t xgene_storm_quirks(void)
 {
-    return xgene_quirks;
+    return PLATFORM_QUIRK_GIC_64K_STRIDE;
 }
 
 static int map_one_mmio(struct domain *d, const char *what,
