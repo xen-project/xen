@@ -5448,7 +5448,7 @@ static void output_topologyinfo(void)
     libxl_cputopology *cpuinfo;
     int i, nr;
     libxl_pcitopology *pciinfo;
-    int valid_devs;
+    int valid_devs = 0;
 
 
     cpuinfo = libxl_get_cpu_topology(ctx, &nr);
