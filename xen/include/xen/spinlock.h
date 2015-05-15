@@ -2,7 +2,6 @@
 #define __SPINLOCK_H__
 
 #include <asm/system.h>
-#include <asm/spinlock.h>
 
 #ifndef NDEBUG
 struct lock_debug {

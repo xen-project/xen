@@ -25,16 +25,6 @@ linux/arch/arm64/include/asm/atomic.h   xen/include/asm-arm/arm64/atomic.h
 
 ---------------------------------------------------------------------
 
-spinlocks: last sync @ v3.16-rc6 (last commit: 95c4189689f9)
-
-linux/arch/arm64/include/asm/spinlock.h xen/include/asm-arm/arm64/spinlock.h
-
-Skipped:
-  5686b06 arm64: lockref: add support for lockless lockrefs using cmpxchg
-  52ea2a5 arm64: locks: introduce ticket-based spinlock implementation
-
----------------------------------------------------------------------
-
 mem*: last sync @ v3.16-rc6 (last commit: d875c9b37240)
 
 linux/arch/arm64/lib/memchr.S           xen/arch/arm/arm64/lib/memchr.S
@@ -100,24 +90,6 @@ linux/arch/arm/include/asm/cmpxchg.h    xen/include/asm-arm/arm32/cmpxchg.h
 atomics: last sync @ v3.16-rc6 (last commit: 030d0178bdbd)
 
 linux/arch/arm/include/asm/atomic.h     xen/include/asm-arm/arm32/atomic.h
-
----------------------------------------------------------------------
-
-spinlocks: last sync: 15e7e5c1ebf5
-
-linux/arch/arm/include/asm/spinlock.h   xen/include/asm-arm/arm32/spinlock.h
-
-*** Linux has switched to ticket locks but we still use bitlocks.
-
-resync to v3.14-rc7:
-
-  7c8746a ARM: 7955/1: spinlock: ensure we have a compiler barrier before sev
-  0cbad9c ARM: 7854/1: lockref: add support for lockless lockrefs using cmpxchg64
-  9bb17be ARM: locks: prefetch the destination word for write prior to strex
-  27a8479 ARM: smp_on_up: move inline asm ALT_SMP patching macro out of spinlock.
-  00efaa0 ARM: 7812/1: rwlocks: retry trylock operation if strex fails on free lo
-  afa31d8 ARM: 7811/1: locks: use early clobber in arch_spin_trylock
-  73a6fdc ARM: spinlock: use inner-shareable dsb variant prior to sev instruction
 
 ---------------------------------------------------------------------
 
