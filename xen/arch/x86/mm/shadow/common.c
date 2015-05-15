@@ -3516,7 +3516,7 @@ static void sh_clean_dirty_bitmap(struct domain *d)
 int shadow_track_dirty_vram(struct domain *d,
                             unsigned long begin_pfn,
                             unsigned long nr,
-                            XEN_GUEST_HANDLE_64(uint8) dirty_bitmap)
+                            XEN_GUEST_HANDLE_64(uint8) guest_dirty_bitmap)
 {
     int rc;
     unsigned long end_pfn = begin_pfn + nr;
@@ -3526,6 +3526,7 @@ int shadow_track_dirty_vram(struct domain *d,
     p2m_type_t t;
     struct sh_dirty_vram *dirty_vram;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    uint8_t *dirty_bitmap = NULL;
 
     if ( end_pfn < begin_pfn || end_pfn > p2m->max_mapped_pfn + 1 )
         return -EINVAL;
@@ -3554,6 +3555,12 @@ int shadow_track_dirty_vram(struct domain *d,
         goto out;
     }
 
+    dirty_bitmap = vzalloc(dirty_size);
+    if ( dirty_bitmap == NULL )
+    {
+        rc = -ENOMEM;
+        goto out;
+    }
     /* This should happen seldomly (Video mode change),
      * no need to be careful. */
     if ( !dirty_vram )
@@ -3584,12 +3591,8 @@ int shadow_track_dirty_vram(struct domain *d,
         rc = -ENODATA;
     }
     else if (dirty_vram->last_dirty == -1)
-    {
         /* still completely clean, just copy our empty bitmap */
-        rc = -EFAULT;
-        if ( copy_to_guest(dirty_bitmap, dirty_vram->dirty_bitmap, dirty_size) == 0 )
-            rc = 0;
-    }
+        memcpy(dirty_bitmap, dirty_vram->dirty_bitmap, dirty_size);
     else
     {
         unsigned long map_mfn = INVALID_MFN;
@@ -3668,21 +3671,19 @@ int shadow_track_dirty_vram(struct domain *d,
         if ( map_sl1p )
             sh_unmap_domain_page(map_sl1p);
 
-        rc = -EFAULT;
-        if ( copy_to_guest(dirty_bitmap, dirty_vram->dirty_bitmap, dirty_size) == 0 ) {
-            memset(dirty_vram->dirty_bitmap, 0, dirty_size);
-            if (dirty_vram->last_dirty + SECONDS(2) < NOW())
+        memcpy(dirty_bitmap, dirty_vram->dirty_bitmap, dirty_size);
+        memset(dirty_vram->dirty_bitmap, 0, dirty_size);
+        if ( dirty_vram->last_dirty + SECONDS(2) < NOW() )
+        {
+            /* was clean for more than two seconds, try to disable guest
+             * write access */
+            for ( i = begin_pfn; i < end_pfn; i++ )
             {
-                /* was clean for more than two seconds, try to disable guest
-                 * write access */
-                for ( i = begin_pfn; i < end_pfn; i++ ) {
-                    mfn_t mfn = get_gfn_query_unlocked(d, i, &t);
-                    if (mfn_x(mfn) != INVALID_MFN)
-                        flush_tlb |= sh_remove_write_access(d, mfn, 1, 0);
-                }
-                dirty_vram->last_dirty = -1;
+                mfn_t mfn = get_gfn_query_unlocked(d, i, &t);
+                if ( mfn_x(mfn) != INVALID_MFN )
+                    flush_tlb |= sh_remove_write_access(d, mfn, 1, 0);
             }
-            rc = 0;
+            dirty_vram->last_dirty = -1;
         }
     }
     if ( flush_tlb )
@@ -3697,6 +3698,16 @@ out_dirty_vram:
 
 out:
     paging_unlock(d);
+    if ( rc == 0 && dirty_bitmap != NULL &&
+         copy_to_guest(guest_dirty_bitmap, dirty_bitmap, dirty_size) )
+    {
+        paging_lock(d);
+        for ( i = 0; i < dirty_size; i++ )
+            dirty_vram->dirty_bitmap[i] |= dirty_bitmap[i];
+        paging_unlock(d);
+        rc = -EFAULT;
+    }
+    vfree(dirty_bitmap);
     p2m_unlock(p2m_get_hostp2m(d));
     return rc;
 }
