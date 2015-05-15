@@ -408,6 +408,51 @@ int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn)
     return rv;
 }
 
+static inline void *map_dirty_bitmap(XEN_GUEST_HANDLE_64(uint8) dirty_bitmap,
+                                     unsigned long pages,
+                                     struct page_info **page)
+{
+    uint32_t pfec = PFEC_page_present | PFEC_write_access;
+    unsigned long gfn;
+    p2m_type_t p2mt;
+
+    gfn = paging_gva_to_gfn(current,
+                            (unsigned long)(dirty_bitmap.p + (pages >> 3)),
+                            &pfec);
+    if ( gfn == INVALID_GFN )
+        return NULL;
+
+    *page = get_page_from_gfn(current->domain, gfn, &p2mt, P2M_UNSHARE);
+
+    if ( !p2m_is_ram(p2mt) )
+    {
+        put_page(*page);
+        return NULL;
+    }
+    if ( p2m_is_paging(p2mt) )
+    {
+        put_page(*page);
+        p2m_mem_paging_populate(current->domain, gfn);
+        return NULL;
+    }
+    if ( p2m_is_shared(p2mt) || p2m_is_discard_write(p2mt) )
+    {
+        put_page(*page);
+        return NULL;
+    }
+
+    return __map_domain_page(*page);
+}
+
+static inline void unmap_dirty_bitmap(void *addr, struct page_info *page)
+{
+    if ( addr != NULL )
+    {
+        unmap_domain_page(addr);
+        put_page(page);
+    }
+}
+
 
 /* Read a domain's log-dirty bitmap and stats.  If the operation is a CLEAN,
  * clear the bitmap and stats as well. */
@@ -420,7 +465,11 @@ static int paging_log_dirty_op(struct domain *d,
     mfn_t *l4 = NULL, *l3 = NULL, *l2 = NULL;
     unsigned long *l1 = NULL;
     int i4, i3, i2;
+    uint8_t *dirty_bitmap;
+    struct page_info *page;
+    unsigned long index_mapped;
 
+ again:
     if ( !resuming )
     {
         domain_pause(d);
@@ -431,6 +480,14 @@ static int paging_log_dirty_op(struct domain *d,
          * it's not possible to have any new dirty pages.
          */
         p2m_flush_hardware_cached_dirty(d);
+    }
+
+    index_mapped = resuming ? d->arch.paging.preempt.log_dirty.done : 0;
+    dirty_bitmap = map_dirty_bitmap(sc->dirty_bitmap, index_mapped, &page);
+    if ( dirty_bitmap == NULL )
+    {
+        domain_unpause(d);
+        return -EFAULT;
     }
 
     paging_lock(d);
@@ -472,18 +529,18 @@ static int paging_log_dirty_op(struct domain *d,
     l4 = paging_map_log_dirty_bitmap(d);
     i4 = d->arch.paging.preempt.log_dirty.i4;
     i3 = d->arch.paging.preempt.log_dirty.i3;
+    i2 = d->arch.paging.preempt.log_dirty.i2;
     pages = d->arch.paging.preempt.log_dirty.done;
 
     for ( ; (pages < sc->pages) && (i4 < LOGDIRTY_NODE_ENTRIES); i4++, i3 = 0 )
     {
         l3 = (l4 && mfn_valid(l4[i4])) ? map_domain_page(mfn_x(l4[i4])) : NULL;
-        for ( ; (pages < sc->pages) && (i3 < LOGDIRTY_NODE_ENTRIES); i3++ )
+        for ( ; (pages < sc->pages) && (i3 < LOGDIRTY_NODE_ENTRIES);
+             i3++, i2 = 0 )
         {
             l2 = ((l3 && mfn_valid(l3[i3])) ?
                   map_domain_page(mfn_x(l3[i3])) : NULL);
-            for ( i2 = 0;
-                  (pages < sc->pages) && (i2 < LOGDIRTY_NODE_ENTRIES);
-                  i2++ )
+            for ( ; (pages < sc->pages) && (i2 < LOGDIRTY_NODE_ENTRIES); i2++ )
             {
                 unsigned int bytes = PAGE_SIZE;
                 l1 = ((l2 && mfn_valid(l2[i2])) ?
@@ -492,15 +549,28 @@ static int paging_log_dirty_op(struct domain *d,
                     bytes = (unsigned int)((sc->pages - pages + 7) >> 3);
                 if ( likely(peek) )
                 {
-                    if ( (l1 ? copy_to_guest_offset(sc->dirty_bitmap,
-                                                    pages >> 3, (uint8_t *)l1,
-                                                    bytes)
-                             : clear_guest_offset(sc->dirty_bitmap,
-                                                  pages >> 3, bytes)) != 0 )
+                    if ( pages >> (3 + PAGE_SHIFT) !=
+                         index_mapped >> (3 + PAGE_SHIFT) )
                     {
-                        rv = -EFAULT;
-                        goto out;
+                        /* We need to map next page */
+                        d->arch.paging.preempt.log_dirty.i4 = i4;
+                        d->arch.paging.preempt.log_dirty.i3 = i3;
+                        d->arch.paging.preempt.log_dirty.i2 = i2;
+                        d->arch.paging.preempt.log_dirty.done = pages;
+                        d->arch.paging.preempt.dom = current->domain;
+                        d->arch.paging.preempt.op = sc->op;
+                        resuming = 1;
+                        paging_unlock(d);
+                        unmap_dirty_bitmap(dirty_bitmap, page);
+                        goto again;
                     }
+                    ASSERT(((pages >> 3) % PAGE_SIZE) + bytes <= PAGE_SIZE);
+                    if ( l1 )
+                        memcpy(dirty_bitmap + ((pages >> 3) % PAGE_SIZE), l1,
+                               bytes);
+                    else
+                        memset(dirty_bitmap + ((pages >> 3) % PAGE_SIZE), 0,
+                               bytes);
                 }
                 pages += bytes << 3;
                 if ( l1 )
@@ -517,6 +587,7 @@ static int paging_log_dirty_op(struct domain *d,
             {
                 d->arch.paging.preempt.log_dirty.i4 = i4;
                 d->arch.paging.preempt.log_dirty.i3 = i3 + 1;
+                d->arch.paging.preempt.log_dirty.i2 = 0;
                 rv = -ERESTART;
                 break;
             }
@@ -529,6 +600,7 @@ static int paging_log_dirty_op(struct domain *d,
         {
             d->arch.paging.preempt.log_dirty.i4 = i4 + 1;
             d->arch.paging.preempt.log_dirty.i3 = 0;
+            d->arch.paging.preempt.log_dirty.i2 = 0;
             rv = -ERESTART;
         }
         if ( rv )
@@ -558,6 +630,7 @@ static int paging_log_dirty_op(struct domain *d,
     if ( rv )
     {
         /* Never leave the domain paused on real errors. */
+        unmap_dirty_bitmap(dirty_bitmap, page);
         ASSERT(rv == -ERESTART);
         return rv;
     }
@@ -570,12 +643,14 @@ static int paging_log_dirty_op(struct domain *d,
          * paging modes (shadow or hap).  Safe because the domain is paused. */
         d->arch.paging.log_dirty.clean_dirty_bitmap(d);
     }
+    unmap_dirty_bitmap(dirty_bitmap, page);
     domain_unpause(d);
     return rv;
 
  out:
     d->arch.paging.preempt.dom = NULL;
     paging_unlock(d);
+    unmap_dirty_bitmap(dirty_bitmap, page);
     domain_unpause(d);
 
     if ( l1 )

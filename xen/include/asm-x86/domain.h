@@ -204,6 +204,7 @@ struct paging_domain {
                 unsigned long done:PADDR_BITS - PAGE_SHIFT;
                 unsigned long i4:PAGETABLE_ORDER;
                 unsigned long i3:PAGETABLE_ORDER;
+                unsigned long i2:PAGETABLE_ORDER;
             } log_dirty;
         };
     } preempt;
