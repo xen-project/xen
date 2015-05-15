@@ -87,7 +87,7 @@ int hap_track_dirty_vram(struct domain *d,
         }
 
         rc = -ENOMEM;
-        dirty_bitmap = xzalloc_bytes(size);
+        dirty_bitmap = vzalloc(size);
         if ( !dirty_bitmap )
             goto out;
 
@@ -174,7 +174,7 @@ int hap_track_dirty_vram(struct domain *d,
                                   p2m_ram_logdirty, p2m_ram_rw);
     }
 out:
-    xfree(dirty_bitmap);
+    vfree(dirty_bitmap);
 
     return rc;
 }
