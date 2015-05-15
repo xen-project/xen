@@ -23,6 +23,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <assert.h>
+#include <ctype.h>
 #include <sys/poll.h>
 #include <sys/statvfs.h>
 
@@ -52,7 +53,7 @@ typedef struct settings_st {
     char *outfile;
     unsigned long poll_sleep; /* milliseconds to sleep between polls */
     uint32_t evt_mask;
-    uint32_t cpu_mask;
+    char *cpu_mask_str;
     unsigned long tbuf_size;
     unsigned long disk_rsvd;
     unsigned long timeout;
@@ -542,33 +543,17 @@ void print_cpu_mask(xc_cpumap_t map)
    fprintf(stderr, "\n");
 }
 
-static void set_cpu_mask(uint32_t mask)
+static int set_cpu_mask(xc_cpumap_t map)
 {
-    int i, ret = 0;
-    xc_cpumap_t map;
+    int ret = xc_tbuf_set_cpu_mask(xc_handle, map);
 
-    map = xc_cpumap_alloc(xc_handle);
-    if ( !map )
-        goto out;
-
-    /*
-     * If mask is set, copy the bits out of it.  This still works for
-     * systems with more than 32 cpus, as the shift will just shift
-     * mask down to zero.
-     */
-    for ( i = 0; i < xc_get_cpumap_size(xc_handle); i++ )
-        map[i] = (mask >> (i * 8)) & 0xff;
-
-    ret = xc_tbuf_set_cpu_mask(xc_handle, map);
-    if ( ret != 0 )
-        goto out;
-
-    print_cpu_mask(map);
-    free(map);
-    return;
-out:
+    if ( ret == 0 )
+    {
+        print_cpu_mask(map);
+        return 0;
+    }
     PERROR("Failure to get trace buffer pointer from Xen and set the new mask");
-    exit(EXIT_FAILURE);
+    return EXIT_FAILURE;
 }
 
 /**
@@ -819,7 +804,8 @@ static void usage(void)
 "Usage: xentrace [OPTION...] [output file]\n" \
 "Tool to capture Xen trace buffer data\n" \
 "\n" \
-"  -c, --cpu-mask=c        Set cpu-mask\n" \
+"  -c, --cpu-mask=c        Set cpu-mask, using either hex, CPU ranges, or\n" \
+"                          for all CPUs\n" \
 "  -e, --evt-mask=e        Set evt-mask\n" \
 "  -s, --poll-sleep=p      Set sleep time, p, in milliseconds between\n" \
 "                          polling the trace buffer for new data\n" \
@@ -951,6 +937,134 @@ static int parse_evtmask(char *arg)
     return 0;
 }
 
+#define ZERO_DIGIT '0'
+
+#define is_terminator(c) ((c)=='\0' || (c)==',')
+
+static int parse_cpumask_range(const char *mask_str, xc_cpumap_t map)
+{
+    unsigned int a, b;
+    int nmaskbits;
+    char c;
+    int in_range;
+    const char *s;
+
+    nmaskbits = xc_get_max_cpus(xc_handle);
+    if ( nmaskbits <= 0 )
+    {
+        fprintf(stderr, "Failed to get max number of CPUs! rc: %d\n", nmaskbits);
+        return EXIT_FAILURE;
+    }
+
+    c = 0;
+    s = mask_str;
+    do {
+        in_range = 0;
+        a = b = 0;
+
+        /* Process until we find a range terminator */
+        for ( c=*s++; !is_terminator(c); c=*s++ )
+        {
+            if ( c == '-' )
+            {
+                if ( in_range )
+                        goto err_out;
+                b = 0;
+                in_range = 1;
+                continue;
+            }
+
+            if ( !isdigit(c) )
+            {
+                fprintf(stderr, "Invalid character in cpumask: %s\n", mask_str);
+                goto err_out;
+            }
+
+            b = b * 10 + (c - ZERO_DIGIT);
+            if ( !in_range )
+                a = b;
+        }
+
+        /* Syntax: <digit>-[,] - expand to number of CPUs. */
+        if ( b == 0 && in_range )
+            b = nmaskbits-1;
+
+        if ( a > b )
+        {
+            fprintf(stderr, "Wrong order of %d and %d\n", a, b);
+            goto err_out;
+        }
+
+        if ( b >= nmaskbits )
+        {
+            fprintf(stderr, "Specified higher value then there are CPUS!\n");
+            goto err_out;
+        }
+
+        while ( a <= b )
+        {
+            xc_cpumap_setcpu(a, map);
+            a++;
+        }
+    } while ( c );
+
+    return 0;
+ err_out:
+    errno = EINVAL;
+    return EXIT_FAILURE;
+}
+
+/**
+ * Figure out which of the CPU types the user has provided - either the hex
+ * variant, the cpu-list, or 'all'. Once done set the CPU mask.
+ */
+static int parse_cpu_mask(void)
+{
+    int i, ret = EXIT_FAILURE;
+    xc_cpumap_t map;
+
+    map = xc_cpumap_alloc(xc_handle);
+    if ( !map )
+        goto out;
+
+    if ( strlen(opts.cpu_mask_str) < 1 )
+    {
+        errno = ENOSPC;
+        goto out;
+    }
+
+    ret = 0;
+    if ( strncmp("0x", opts.cpu_mask_str, 2) == 0 )
+    {
+        uint32_t v;
+
+        v = argtol(opts.cpu_mask_str, 0);
+        /*
+         * If mask is set, copy the bits out of it.  This still works for
+         * systems with more than 32 cpus, as the shift will just shift
+         * mask down to zero.
+         */
+        for ( i = 0; i < sizeof(uint32_t); i++ )
+            map[i] = (v >> (i * 8)) & 0xff;
+    }
+    else if ( strcmp("all", opts.cpu_mask_str) == 0 )
+    {
+        for ( i = 0; i < xc_get_cpumap_size(xc_handle); i++ )
+            map[i] = 0xff;
+    }
+    else
+        ret = parse_cpumask_range(opts.cpu_mask_str, map);
+
+    if ( !ret )
+        ret = set_cpu_mask(map);
+ out:
+    /* We don't use them pass this point. */
+    free(map);
+    free(opts.cpu_mask_str);
+    opts.cpu_mask_str = NULL;
+    return ret;
+}
+
 /* parse command line arguments */
 static void parse_args(int argc, char **argv)
 {
@@ -981,10 +1095,9 @@ static void parse_args(int argc, char **argv)
             opts.poll_sleep = argtol(optarg, 0);
             break;
 
-        case 'c': /* set new cpu mask for filtering*/
-            opts.cpu_mask = argtol(optarg, 0);
+        case 'c': /* set new cpu mask for filtering (when xch is set). */
+            opts.cpu_mask_str = strdup(optarg);
             break;
-        
         case 'e': /* set new event mask for filtering*/
             parse_evtmask(optarg);
             break;
@@ -1047,7 +1160,7 @@ int main(int argc, char **argv)
     opts.outfile = 0;
     opts.poll_sleep = POLL_SLEEP_MILLIS;
     opts.evt_mask = 0;
-    opts.cpu_mask = 0;
+    opts.cpu_mask_str = NULL;
     opts.disk_rsvd = 0;
     opts.disable_tracing = 1;
     opts.start_disabled = 0;
@@ -1065,9 +1178,11 @@ int main(int argc, char **argv)
     if ( opts.evt_mask != 0 )
         set_evt_mask(opts.evt_mask);
 
-
-    if ( opts.cpu_mask != 0 )
-        set_cpu_mask(opts.cpu_mask);
+    if ( opts.cpu_mask_str )
+    {
+        if ( parse_cpu_mask() )
+            exit(EXIT_FAILURE);
+    }
 
     if ( opts.timeout != 0 ) 
         alarm(opts.timeout);

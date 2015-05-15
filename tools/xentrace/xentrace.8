@@ -36,8 +36,38 @@ all new records to the output
 set the time, p, (in milliseconds) to sleep between polling the buffers
 for new data.
 .TP
-.B -c, --cpu-mask=c
-set bitmask of CPUs to trace. It is limited to 32-bits.
+.B -c, --cpu-mask=[\fIc\fP|\fICPU-LIST\fP|\fIall\fP]
+This can be: a hex value (of the form 0xNNNN...), or a set of cpu
+ranges as described below, or the string \fIall\fP. Hex values are limited
+to 32 bits. If not specified, the cpu-mask as set during bootup will be
+constructed. If using the \fICPU-LIST\fP it expects decimal numbers, which
+may be specified as follows:
+
+.RS 4
+.ie n .IP """0-3""" 4
+.el .IP "``0-3''" 4
+.IX Item "0-3"
+Trace only on CPUs 0 through 3
+.ie n .IP """0,2,5-7""" 4
+.el .IP "``0,2,5-7''" 4
+.IX Item "0,2,5-7"
+Trace only on CPUs 0, 2, and 5 through 7.
+.ie n .IP """-3""" 4
+.el .IP "``-3''" 4
+.IX Item "-3"
+Trace only on CPUs 0 through 3
+.ie n .IP """-3,7""" 4
+.el .IP "``-3,7''" 4
+.IX Item "-3,7"
+Trace only on CPUs 0 through 3 and 7
+.ie n .IP """3-""" 4
+.el .IP "``3-''" 4
+.IX Item "-3-"
+Trace only on CPUs 3 up to maximum numbers of CPUs the host has.
+.RE
+.Sp
+
+If using \fIall\fP it will use all of the CPUs the host has.
 .TP
 .B -e, --evt-mask=e
 set event capture mask. If not specified the TRC_ALL will be used.
