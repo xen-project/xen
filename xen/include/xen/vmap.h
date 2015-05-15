@@ -11,6 +11,9 @@ void *__vmap(const unsigned long *mfn, unsigned int granularity,
              unsigned int nr, unsigned int align, unsigned int flags);
 void *vmap(const unsigned long *mfn, unsigned int nr);
 void vunmap(const void *);
+void *vmalloc(size_t size);
+void *vzalloc(size_t size);
+void vfree(void *va);
 
 void __iomem *ioremap(paddr_t, size_t);
 

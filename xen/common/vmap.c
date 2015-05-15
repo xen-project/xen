@@ -215,4 +215,71 @@ void vunmap(const void *va)
 #endif
     vm_free(va);
 }
+
+void *vmalloc(size_t size)
+{
+    unsigned long *mfn;
+    size_t pages, i;
+    struct page_info *pg;
+    void *va;
+
+    ASSERT(size);
+
+    pages = PFN_UP(size);
+    mfn = xmalloc_array(unsigned long, pages);
+    if ( mfn == NULL )
+        return NULL;
+
+    for ( i = 0; i < pages; i++ )
+    {
+        pg = alloc_domheap_page(NULL, 0);
+        if ( pg == NULL )
+            goto error;
+        mfn[i] = page_to_mfn(pg);
+    }
+
+    va = vmap(mfn, pages);
+    if ( va == NULL )
+        goto error;
+
+    xfree(mfn);
+    return va;
+
+ error:
+    while ( i-- )
+         free_domheap_page(mfn_to_page(mfn[i]));
+    xfree(mfn);
+    return NULL;
+}
+
+void *vzalloc(size_t size)
+{
+    void *p = vmalloc(size);
+    int i;
+
+    if ( p == NULL )
+        return NULL;
+
+    for ( i = 0; i < size; i += PAGE_SIZE )
+        clear_page(p + i);
+
+    return p;
+}
+
+void vfree(void *va)
+{
+    unsigned int i, pages = vm_size(va);
+    struct page_info *pg;
+    PAGE_LIST_HEAD(pg_list);
+
+    ASSERT(pages);
+
+    for ( i = 0; i < pages; i++ )
+        page_list_add(vmap_to_page(va + i * PAGE_SIZE), &pg_list);
+
+    vunmap(va);
+
+    while ( (pg = page_list_remove_head(&pg_list)) != NULL )
+        free_domheap_page(pg);
+}
 #endif
