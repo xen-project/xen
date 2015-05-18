@@ -57,6 +57,16 @@ static int write_end_record(struct xc_sr_context *ctx)
 }
 
 /*
+ * Writes a CHECKPOINT record into the stream.
+ */
+static int write_checkpoint_record(struct xc_sr_context *ctx)
+{
+    struct xc_sr_record checkpoint = { REC_TYPE_CHECKPOINT, 0, NULL };
+
+    return write_record(ctx, &checkpoint);
+}
+
+/*
  * Writes a batch of memory as a PAGE_DATA record into the stream.  The batch
  * is constructed in ctx->save.batch_pfns.
  *
@@ -628,6 +638,14 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
 }
 
 /*
+ * Checkpointed save.
+ */
+static int send_domain_memory_checkpointed(struct xc_sr_context *ctx)
+{
+    return suspend_and_send_dirty(ctx);
+}
+
+/*
  * Send all domain memory, pausing the domain first.  Generally used for
  * suspend-to-file.
  */
@@ -726,29 +744,53 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
     if ( rc )
         goto err;
 
-    rc = ctx->save.ops.start_of_checkpoint(ctx);
-    if ( rc )
-        goto err;
+    do {
+        rc = ctx->save.ops.start_of_checkpoint(ctx);
+        if ( rc )
+            goto err;
 
-    if ( ctx->save.live )
-        rc = send_domain_memory_live(ctx);
-    else
-        rc = send_domain_memory_nonlive(ctx);
+        if ( ctx->save.live )
+            rc = send_domain_memory_live(ctx);
+        else if ( ctx->save.checkpointed )
+            rc = send_domain_memory_checkpointed(ctx);
+        else
+            rc = send_domain_memory_nonlive(ctx);
 
-    if ( rc )
-        goto err;
+        if ( rc )
+            goto err;
 
-    if ( !ctx->dominfo.shutdown ||
-         (ctx->dominfo.shutdown_reason != SHUTDOWN_suspend) )
-    {
-        ERROR("Domain has not been suspended");
-        rc = -1;
-        goto err;
-    }
+        if ( !ctx->dominfo.shutdown ||
+             (ctx->dominfo.shutdown_reason != SHUTDOWN_suspend) )
+        {
+            ERROR("Domain has not been suspended");
+            rc = -1;
+            goto err;
+        }
 
-    rc = ctx->save.ops.end_of_checkpoint(ctx);
-    if ( rc )
-        goto err;
+        rc = ctx->save.ops.end_of_checkpoint(ctx);
+        if ( rc )
+            goto err;
+
+        if ( ctx->save.checkpointed )
+        {
+            /*
+             * We have now completed the initial live portion of the checkpoint
+             * process. Therefore switch into periodically sending synchronous
+             * batches of pages.
+             */
+            ctx->save.live = false;
+
+            rc = write_checkpoint_record(ctx);
+            if ( rc )
+                goto err;
+
+            ctx->save.callbacks->postcopy(ctx->save.callbacks->data);
+
+            rc = ctx->save.callbacks->checkpoint(ctx->save.callbacks->data);
+            if ( rc <= 0 )
+                ctx->save.checkpointed = false;
+        }
+    } while ( ctx->save.checkpointed );
 
     xc_report_progress_single(xch, "End of stream");
 
