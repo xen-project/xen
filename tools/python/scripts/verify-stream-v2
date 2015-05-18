@@ -1,0 +1,174 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+""" Verify a v2 format migration stream """
+
+import sys
+import struct
+import os, os.path
+import syslog
+import traceback
+
+from xen.migration.verify import StreamError, RecordError
+from xen.migration.libxc import VerifyLibxc
+from xen.migration.libxl import VerifyLibxl
+
+fin = None             # Input file/fd
+log_to_syslog = False  # Boolean - Log to syslog instead of stdout/err?
+verbose = False        # Boolean - Summarise stream contents
+quiet = False          # Boolean - Suppress error printing
+
+def info(msg):
+    """Info message, routed to appropriate destination"""
+    if not quiet and verbose:
+        if log_to_syslog:
+            for line in msg.split("\n"):
+                syslog.syslog(syslog.LOG_INFO, line)
+        else:
+            print msg
+
+def err(msg):
+    """Error message, routed to appropriate destination"""
+    if not quiet:
+        if log_to_syslog:
+            for line in msg.split("\n"):
+                syslog.syslog(syslog.LOG_ERR, line)
+        print >> sys.stderr, msg
+
+def stream_read(_ = None):
+    """Read from input"""
+    return fin.read(_)
+
+def rdexact(nr_bytes):
+    """Read exactly nr_bytes from fin"""
+    _ = stream_read(nr_bytes)
+    if len(_) != nr_bytes:
+        raise IOError("Stream truncated")
+    return _
+
+def unpack_exact(fmt):
+    """Unpack a format from fin"""
+    sz = struct.calcsize(fmt)
+    return struct.unpack(fmt, rdexact(sz))
+
+
+def skip_xl_header():
+    """Skip over an xl header in the stream"""
+
+    hdr = rdexact(32)
+    if hdr != "Xen saved domain, xl format\n \0 \r":
+        raise StreamError("No xl header")
+
+    _, mflags, _, optlen = unpack_exact("=IIII")
+    _ = rdexact(optlen)
+
+    info("Processed xl header")
+
+    if mflags & 2: # XL_MANDATORY_FLAG_STREAMv2
+        return "libxl"
+    else:
+        return "libxc"
+
+def read_stream(fmt):
+    """ Read an entire stream """
+
+    try:
+        if fmt == "xl":
+            fmt = skip_xl_header()
+
+        if fmt == "libxc":
+            VerifyLibxc(info, stream_read).verify()
+        else:
+            VerifyLibxl(info, stream_read).verify()
+
+    except (IOError, StreamError, RecordError):
+        err("Stream Error:")
+        err(traceback.format_exc())
+        return 1
+
+    except StandardError:
+        err("Script Error:")
+        err(traceback.format_exc())
+        err("Please fix me")
+        return 2
+
+    return 0
+
+def open_file_or_fd(val, mode, buffering):
+    """
+    If 'val' looks like a decimal integer, open it as an fd.  If not, try to
+    open it as a regular file.
+    """
+
+    fd = -1
+    try:
+        # Does it look like an integer?
+        try:
+            fd = int(val, 10)
+        except ValueError:
+            pass
+
+        # Try to open it...
+        if fd != -1:
+            return os.fdopen(fd, mode, buffering)
+        else:
+            return open(val, mode, buffering)
+
+    except StandardError, e:
+        if fd != -1:
+            err("Unable to open fd %d: %s: %s" %
+                (fd, e.__class__.__name__, e))
+        else:
+            err("Unable to open file '%s': %s: %s" %
+                (val, e.__class__.__name__, e))
+
+    raise SystemExit(2)
+
+def main():
+    """ main """
+    from optparse import OptionParser
+    global fin, quiet, verbose
+
+    # Change stdout to be line-buffered.
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 1)
+
+    parser = OptionParser(usage = "%prog [options]",
+                          description =
+                          "Verify a stream according to the v2 spec")
+
+    # Optional options
+    parser.add_option("-i", "--in", dest = "fin", metavar = "<FD or FILE>",
+                      default = "0",
+                      help = "Stream to verify (defaults to stdin)")
+    parser.add_option("-v", "--verbose", action = "store_true", default = False,
+                      help = "Summarise stream contents")
+    parser.add_option("-q", "--quiet", action = "store_true", default = False,
+                      help = "Suppress all logging/errors")
+    parser.add_option("-f", "--format", dest = "format",
+                      metavar = "<libxc|libxl|xl>", default = "libxc",
+                      choices = ["libxc", "libxl", "xl"],
+                      help = "Format of the incoming stream (defaults to libxc)")
+    parser.add_option("--syslog", action = "store_true", default = False,
+                      help = "Log to syslog instead of stdout")
+
+    opts, _ = parser.parse_args()
+
+    if opts.syslog:
+        global log_to_syslog
+
+        syslog.openlog("verify-stream-v2", syslog.LOG_PID)
+        log_to_syslog = True
+
+    verbose = opts.verbose
+    quiet = opts.quiet
+    fin = open_file_or_fd(opts.fin, "rb", 0)
+
+    return read_stream(opts.format)
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except SystemExit, e:
+        sys.exit(e.code)
+    except KeyboardInterrupt:
+        sys.exit(2)
