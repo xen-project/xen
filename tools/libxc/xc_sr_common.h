@@ -208,6 +208,21 @@ struct xc_sr_context
             /* Plain VM, or checkpoints over time. */
             bool checkpointed;
 
+            /* Currently buffering records between a checkpoint */
+            bool buffer_all_records;
+
+/*
+ * With Remus, we buffer the records sent by the primary at checkpoint,
+ * in case the primary will fail, we can recover from the last
+ * checkpoint state.
+ * This should be enough for most of the cases because primary only send
+ * dirty pages at checkpoint.
+ */
+#define DEFAULT_BUF_RECORDS 1024
+            struct xc_sr_record *buffered_records;
+            unsigned allocated_rec_num;
+            unsigned buffered_rec_num;
+
             /*
              * Xenstore and Console parameters.
              * INPUT:  evtchn & domid
