@@ -455,21 +455,15 @@ static int update_progress_string(struct xc_sr_context *ctx,
 }
 
 /*
- * Send all domain memory.  This is the heart of the live migration loop.
+ * Send memory while guest is running.
  */
-static int send_domain_memory_live(struct xc_sr_context *ctx)
+static int send_memory_live(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
     xc_shadow_op_stats_t stats = { 0, ctx->save.p2m_size };
     char *progress_str = NULL;
     unsigned x;
     int rc = -1;
-    DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
-                                    &ctx->save.dirty_bitmap_hbuf);
-
-    rc = enable_logdirty(ctx);
-    if ( rc )
-        goto out;
 
     rc = update_progress_string(ctx, &progress_str, 0);
     if ( rc )
@@ -485,7 +479,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
     {
         if ( xc_shadow_control(
                  xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
-                 HYPERCALL_BUFFER(dirty_bitmap), ctx->save.p2m_size,
+                 &ctx->save.dirty_bitmap_hbuf, ctx->save.p2m_size,
                  NULL, 0, &stats) != ctx->save.p2m_size )
         {
             PERROR("Failed to retrieve logdirty bitmap");
@@ -505,6 +499,26 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
             goto out;
     }
 
+ out:
+    xc_set_progress_prefix(xch, NULL);
+    free(progress_str);
+    return rc;
+}
+
+/*
+ * Suspend the domain and send dirty memory.
+ * This is the last iteration of the live migration and the
+ * heart of the checkpointed stream.
+ */
+static int suspend_and_send_dirty(struct xc_sr_context *ctx)
+{
+    xc_interface *xch = ctx->xch;
+    xc_shadow_op_stats_t stats = { 0, ctx->save.p2m_size };
+    char *progress_str = NULL;
+    int rc = -1;
+    DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
+                                    &ctx->save.dirty_bitmap_hbuf);
+
     rc = suspend_domain(ctx);
     if ( rc )
         goto out;
@@ -519,9 +533,15 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
         goto out;
     }
 
-    rc = update_progress_string(ctx, &progress_str, ctx->save.max_iterations);
-    if ( rc )
-        goto out;
+    if ( ctx->save.live )
+    {
+        rc = update_progress_string(ctx, &progress_str,
+                                    ctx->save.max_iterations);
+        if ( rc )
+            goto out;
+    }
+    else
+        xc_set_progress_prefix(xch, "Checkpointed save");
 
     bitmap_or(dirty_bitmap, ctx->save.deferred_pages, ctx->save.p2m_size);
 
@@ -529,42 +549,81 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
     if ( rc )
         goto out;
 
-    if ( ctx->save.debug )
+    bitmap_clear(ctx->save.deferred_pages, ctx->save.p2m_size);
+    ctx->save.nr_deferred_pages = 0;
+
+ out:
+    xc_set_progress_prefix(xch, NULL);
+    free(progress_str);
+    return rc;
+}
+
+static int send_memory_verify(struct xc_sr_context *ctx)
+{
+    xc_interface *xch = ctx->xch;
+    xc_shadow_op_stats_t stats = { 0, ctx->save.p2m_size };
+    int rc = -1;
+    struct xc_sr_record rec =
     {
-        struct xc_sr_record rec =
-        {
-            .type = REC_TYPE_VERIFY,
-            .length = 0,
-        };
+        .type = REC_TYPE_VERIFY,
+        .length = 0,
+    };
 
-        DPRINTF("Enabling verify mode");
+    DPRINTF("Enabling verify mode");
 
-        rc = write_record(ctx, &rec);
+    rc = write_record(ctx, &rec);
+    if ( rc )
+        goto out;
+
+    xc_set_progress_prefix(xch, "Memory verify");
+    rc = send_all_pages(ctx);
+    if ( rc )
+        goto out;
+
+    if ( xc_shadow_control(
+             xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_PEEK,
+             &ctx->save.dirty_bitmap_hbuf, ctx->save.p2m_size,
+             NULL, 0, &stats) != ctx->save.p2m_size )
+    {
+        PERROR("Failed to retrieve logdirty bitmap");
+        rc = -1;
+        goto out;
+    }
+
+    DPRINTF("  Further stats: faults %u, dirty %u",
+            stats.fault_count, stats.dirty_count);
+
+ out:
+    return rc;
+}
+
+/*
+ * Send all domain memory.  This is the heart of the live migration loop.
+ */
+static int send_domain_memory_live(struct xc_sr_context *ctx)
+{
+    int rc = -1;
+
+    rc = enable_logdirty(ctx);
+    if ( rc )
+        goto out;
+
+    rc = send_memory_live(ctx);
+    if ( rc )
+        goto out;
+
+    rc = suspend_and_send_dirty(ctx);
+    if ( rc )
+        goto out;
+
+    if ( ctx->save.debug && !ctx->save.checkpointed )
+    {
+        rc = send_memory_verify(ctx);
         if ( rc )
             goto out;
-
-        xc_set_progress_prefix(xch, "Memory verify");
-        rc = send_all_pages(ctx);
-        if ( rc )
-            goto out;
-
-        if ( xc_shadow_control(
-                 xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_PEEK,
-                 HYPERCALL_BUFFER(dirty_bitmap), ctx->save.p2m_size,
-                 NULL, 0, &stats) != ctx->save.p2m_size )
-        {
-            PERROR("Failed to retrieve logdirty bitmap");
-            rc = -1;
-            goto out;
-        }
-
-        DPRINTF("  Further stats: faults %u, dirty %u",
-                stats.fault_count, stats.dirty_count);
     }
 
   out:
-    xc_set_progress_prefix(xch, NULL);
-    free(progress_str);
     return rc;
 }
 
