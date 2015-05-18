@@ -30,10 +30,23 @@ class TestLibxc(unittest.TestCase):
             self.assertEqual(calcsize(fmt), sz)
 
 
+class TestLibxl(unittest.TestCase):
+
+    def test_format_sizes(self):
+
+        for fmt, sz in ( (libxl.HDR_FORMAT, 16),
+                         (libxl.RH_FORMAT, 8),
+
+                         (libxl.EMULATOR_CONTEXT_FORMAT, 8),
+                         ):
+            self.assertEqual(calcsize(fmt), sz)
+
+
 def test_suite():
     suite = unittest.TestSuite()
 
     suite.addTest(unittest.makeSuite(TestLibxc))
+    suite.addTest(unittest.makeSuite(TestLibxl))
 
     return suite
 
