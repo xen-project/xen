@@ -17,8 +17,12 @@ build: genwrap.py $(XEN_ROOT)/tools/libxl/libxl_types.idl \
 
 .PHONY: install
 install:
+	$(INSTALL_DIR) $(DESTDIR)$(PRIVATE_BINDIR)
+
 	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" $(PYTHON) setup.py install \
 		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" --force
+
+	$(INSTALL_PROG) scripts/convert-legacy-stream $(DESTDIR)$(PRIVATE_BINDIR)
 
 .PHONY: test
 test:
