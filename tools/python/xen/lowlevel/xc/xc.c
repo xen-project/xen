@@ -1221,7 +1221,7 @@ static PyObject *pyxc_getcpuinfo(XcObject *self, PyObject *args, PyObject *kwds)
 static PyObject *pyxc_topologyinfo(XcObject *self)
 {
     xc_cputopo_t *cputopo = NULL;
-    unsigned i, num_cpus;
+    unsigned i, num_cpus = 0;
     PyObject *ret_obj = NULL;
     PyObject *cpu_to_core_obj, *cpu_to_socket_obj, *cpu_to_node_obj;
 
@@ -1293,7 +1293,7 @@ out:
 
 static PyObject *pyxc_numainfo(XcObject *self)
 {
-    unsigned i, j, num_nodes;
+    unsigned i, j, num_nodes = 0;
     uint64_t free_heap;
     PyObject *ret_obj = NULL, *node_to_node_dist_list_obj;
     PyObject *node_to_memsize_obj, *node_to_memfree_obj;

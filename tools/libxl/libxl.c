@@ -5106,7 +5106,7 @@ libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out)
     xc_cputopo_t *cputopo;
     libxl_cputopology *ret = NULL;
     int i;
-    unsigned num_cpus;
+    unsigned num_cpus = 0;
 
     /* Setting buffer to NULL makes the call return number of CPUs */
     if (xc_cputopoinfo(ctx->xch, &num_cpus, NULL))
@@ -5192,7 +5192,7 @@ libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr)
     uint32_t *distance;
     libxl_numainfo *ret = NULL;
     int i, j;
-    unsigned num_nodes;
+    unsigned num_nodes = 0;
 
     if (xc_numainfo(ctx->xch, &num_nodes, NULL, NULL)) {
         LOGE(ERROR, "Unable to determine number of nodes");
