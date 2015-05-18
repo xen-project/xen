@@ -384,7 +384,11 @@ struct x86_emulate_ops
         enum x86_emulate_fpu_type type,
         struct x86_emulate_ctxt *ctxt);
 
-    /* put_fpu: Relinquish the FPU. Unhook from FPU/SIMD exception handlers. */
+    /*
+     * put_fpu: Relinquish the FPU. Unhook from FPU/SIMD exception handlers.
+     *  The handler, if installed, must be prepared to get called without
+     *  the get_fpu one having got called before!
+     */
     void (*put_fpu)(
         struct x86_emulate_ctxt *ctxt);
 

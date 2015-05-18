@@ -670,10 +670,14 @@ do{ (_fic)->exn_raised = 0;                                     \
     rc = ops->get_fpu(fpu_handle_exception, _fic, _type, ctxt); \
     if ( rc ) goto done;                                        \
 } while (0)
-#define put_fpu(_fic)                                           \
-do{                                                             \
+#define _put_fpu()                                              \
+do {                                                            \
     if ( ops->put_fpu != NULL )                                 \
-        ops->put_fpu(ctxt);                                     \
+        (ops->put_fpu)(ctxt);                                   \
+} while (0)
+#define put_fpu(_fic)                                           \
+do {                                                            \
+    _put_fpu();                                                 \
     generate_exception_if((_fic)->exn_raised, EXC_MF, -1);      \
 } while (0)
 
@@ -3787,6 +3791,7 @@ x86_emulate(
     *ctxt->regs = _regs;
 
  done:
+    _put_fpu();
     return rc;
 
  twobyte_insn:
@@ -4632,5 +4637,6 @@ x86_emulate(
     goto writeback;
 
  cannot_emulate:
+    _put_fpu();
     return X86EMUL_UNHANDLEABLE;
 }
