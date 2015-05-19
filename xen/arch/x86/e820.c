@@ -504,11 +504,19 @@ static uint64_t __init mtrr_top_of_ram(void)
 
 static void __init reserve_dmi_region(void)
 {
-    u32 base, len;
-    if ( (dmi_get_table(&base, &len) == 0) && ((base + len) > base) &&
-         reserve_e820_ram(&e820, base, base + len) )
-        printk("WARNING: DMI table located in E820 RAM %08x-%08x. Fixed.\n",
-               base, base+len);
+    for ( ; ; )
+    {
+        paddr_t base;
+        u32 len;
+        const char *what = dmi_get_table(&base, &len);
+
+        if ( !what )
+            break;
+        if ( ((base + len) > base) &&
+             reserve_e820_ram(&e820, base, base + len) )
+            printk("WARNING: %s table located in E820 RAM %"PRIpaddr"-%"PRIpaddr". Fixed.\n",
+                   what, base, base + len);
+    }
 }
 
 static void __init machine_specific_memory_setup(
