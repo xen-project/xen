@@ -5311,7 +5311,10 @@ static l3_pgentry_t *virt_to_xen_l3e(unsigned long v)
             spin_lock(&map_pgdir_lock);
         if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
         {
-            l4e_write(pl4e, l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR));
+            l4_pgentry_t l4e = l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR);
+
+            l4e_write(pl4e, l4e);
+            efi_update_l4_pgtable(l4_table_offset(v), l4e);
             pl3e = NULL;
         }
         if ( locking )

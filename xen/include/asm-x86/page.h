@@ -288,6 +288,7 @@ extern l2_pgentry_t l2_identmap[4*L2_PAGETABLE_ENTRIES];
 extern l1_pgentry_t l1_identmap[L1_PAGETABLE_ENTRIES],
     l1_fixmap[L1_PAGETABLE_ENTRIES];
 void paging_init(void);
+void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t);
 #endif /* !defined(__ASSEMBLY__) */
 
 #define _PAGE_NONE     _AC(0x000,U)
