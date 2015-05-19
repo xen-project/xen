@@ -132,6 +132,8 @@ typedef union {
     };
 } spinlock_tickets_t;
 
+#define SPINLOCK_TICKET_INC { .head_tail = 0x10000, }
+
 typedef struct spinlock {
     spinlock_tickets_t tickets;
     u16 recurse_cpu:12;
