@@ -127,6 +127,8 @@ static inline bool_t __init dmi_checksum(const void __iomem *buf,
 
 static u32 __initdata efi_dmi_address;
 static u32 __initdata efi_dmi_size;
+static u32 __initdata efi_smbios_address;
+static u32 __initdata efi_smbios_size;
 
 /*
  * Important: This function gets called while still in EFI
@@ -136,39 +138,54 @@ void __init dmi_efi_get_table(void *smbios)
 {
 	struct smbios_eps *eps = smbios;
 
-	if (memcmp(eps->anchor, "_SM_", 4) &&
-	    dmi_checksum(eps, eps->length) &&
-	    memcmp(eps->dmi.anchor, "_DMI_", 5) == 0 &&
-	    dmi_checksum(&eps->dmi, sizeof(eps->dmi))) {
-		efi_dmi_address = eps->dmi.address;
-		efi_dmi_size = eps->dmi.size;
+	if (memcmp(eps->anchor, "_SM_", 4) == 0 &&
+	    eps->length >= sizeof(*eps) &&
+	    dmi_checksum(eps, eps->length)) {
+		efi_smbios_address = (u32)(long)eps;
+		efi_smbios_size = eps->length;
+
+		if (memcmp(eps->dmi.anchor, "_DMI_", 5) == 0 &&
+		    dmi_checksum(&eps->dmi, sizeof(eps->dmi))) {
+			efi_dmi_address = eps->dmi.address;
+			efi_dmi_size = eps->dmi.size;
+		}
 	}
 }
 
-int __init dmi_get_table(u32 *base, u32 *len)
+const char *__init dmi_get_table(paddr_t *base, u32 *len)
 {
-	struct dmi_eps eps;
-	char __iomem *p, *q;
+	static unsigned int __initdata instance;
 
 	if (efi_enabled) {
-		if (!efi_dmi_size)
-			return -1;
-		*base = efi_dmi_address;
-		*len = efi_dmi_size;
-		return 0;
-	}
+		if (efi_dmi_size && !(instance & 2)) {
+			*base = efi_dmi_address;
+			*len = efi_dmi_size;
+			instance |= 2;
+			return "DMI";
+		}
+		if (efi_smbios_size && !(instance & 4)) {
+			*base = efi_smbios_address;
+			*len = efi_smbios_size;
+			instance |= 4;
+			return "SMBIOS";
+		}
+	} else {
+		char __iomem *p = maddr_to_virt(0xF0000), *q;
+		struct dmi_eps eps;
 
-	p = maddr_to_virt(0xF0000);
-	for (q = p; q < p + 0x10000; q += 16) {
-		memcpy_fromio(&eps, q, 15);
-		if (memcmp(eps.anchor, "_DMI_", 5) == 0 &&
-		    dmi_checksum(&eps, sizeof(eps))) {
-			*base = eps.address;
-			*len = eps.size;
-			return 0;
+		for (q = p; q <= p + 0x10000 - sizeof(eps); q += 16) {
+			memcpy_fromio(&eps, q, sizeof(eps));
+			if (!(instance & 1) &&
+			    memcmp(eps.anchor, "_DMI_", 5) == 0 &&
+			    dmi_checksum(&eps, sizeof(eps))) {
+				*base = eps.address;
+				*len = eps.size;
+				instance |= 1;
+				return "DMI";
+			}
 		}
 	}
-	return -1;
+	return NULL;
 }
 
 static int __init _dmi_iterate(const struct dmi_eps *dmi,
