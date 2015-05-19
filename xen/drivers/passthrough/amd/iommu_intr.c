@@ -365,15 +365,17 @@ unsigned int amd_iommu_read_ioapic_from_ire(
     unsigned int apic, unsigned int reg)
 {
     unsigned int val = __io_apic_read(apic, reg);
+    unsigned int pin = (reg - 0x10) / 2;
+    unsigned int offset = ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx[pin];
 
-    if ( !(reg & 1) )
+    if ( !(reg & 1) && offset < INTREMAP_ENTRIES )
     {
-        unsigned int offset = val & (INTREMAP_ENTRIES - 1);
         u16 bdf = ioapic_sbdf[IO_APIC_ID(apic)].bdf;
         u16 seg = ioapic_sbdf[IO_APIC_ID(apic)].seg;
         u16 req_id = get_intremap_requestor_id(seg, bdf);
         const u32 *entry = get_intremap_entry(seg, req_id, offset);
 
+        ASSERT(offset == (val & (INTREMAP_ENTRIES - 1)));
         val &= ~(INTREMAP_ENTRIES - 1);
         val |= get_field_from_reg_u32(*entry,
                                       INT_REMAP_ENTRY_INTTYPE_MASK,
