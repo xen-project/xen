@@ -25,6 +25,8 @@
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/e820.h>
 
+#include <xen-xsm/flask/flask.h>
+
 int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                          libxl_domain_create_info *c_info)
 {
@@ -41,6 +43,9 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
 
     libxl_defbool_setdefault(&c_info->run_hotplug_scripts, true);
     libxl_defbool_setdefault(&c_info->driver_domain, false);
+
+    if (!c_info->ssidref)
+        c_info->ssidref = SECINITSID_DOMU;
 
     return 0;
 }
@@ -110,6 +115,10 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         return ERROR_INVAL;
 
     libxl_defbool_setdefault(&b_info->device_model_stubdomain, false);
+
+    if (libxl_defbool_val(b_info->device_model_stubdomain) &&
+        !b_info->device_model_ssidref)
+        b_info->device_model_ssidref = SECINITSID_DOMDM;
 
     if (!b_info->device_model_version) {
         if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
