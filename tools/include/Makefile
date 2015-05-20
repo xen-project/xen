@@ -1,8 +1,11 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
+# Relative to $(XEN_ROOT)/xen/xsm/flask
+FLASK_H_DEPEND := policy/initial_sids
+
 .PHONY: all
-all: xen-foreign xen/.dir
+all: xen-foreign xen/.dir xen-xsm/.dir
 
 .PHONY: xen-foreign
 xen-foreign:
@@ -17,6 +20,15 @@ xen/.dir:
 	ln -sf ../xen-sys/$(XEN_OS) xen/sys
 	ln -sf $(addprefix $(XEN_ROOT)/xen/include/xen/,libelf.h elfstructs.h) xen/libelf/
 	ln -s ../xen-foreign xen/foreign
+	touch $@
+
+# Not xen/xsm as that clashes with link to
+# $(XEN_ROOT)/xen/include/public/xsm above.
+xen-xsm/.dir: $(XEN_ROOT)/xen/xsm/flask/policy/mkflask.sh \
+	      $(patsubst %,$(XEN_ROOT)/xen/xsm/flask/%,$(FLASK_H_DEPEND))
+	mkdir -p xen-xsm/flask
+	cd $(XEN_ROOT)/xen/xsm/flask/ && \
+		$(SHELL) policy/mkflask.sh $(AWK) $(CURDIR)/xen-xsm/flask $(FLASK_H_DEPEND)
 	touch $@
 
 .PHONY: install
@@ -47,7 +59,7 @@ install: all
 
 .PHONY: clean
 clean:
-	rm -rf xen
+	rm -rf xen xen-xsm
 	$(MAKE) -C xen-foreign clean
 
 

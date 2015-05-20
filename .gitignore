@@ -147,6 +147,7 @@ tools/hotplug/Linux/xen-hotplug-common.sh
 tools/hotplug/Linux/xendomains
 tools/hotplug/NetBSD/rc.d/xencommons
 tools/include/xen/*
+tools/include/xen-xsm/*
 tools/include/xen-foreign/*.(c|h|size)
 tools/include/xen-foreign/checker
 tools/libxl/libxlu_cfg_y.output
