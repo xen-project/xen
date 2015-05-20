@@ -524,7 +524,7 @@ acpi_parse_one_drhd(struct acpi_dmar_header *header)
             d = PCI_SLOT(dmaru->scope.devices[i]);
             f = PCI_FUNC(dmaru->scope.devices[i]);
 
-            if ( pci_device_detect(drhd->segment, b, d, f) == 0 )
+            if ( !pci_device_detect(drhd->segment, b, d, f) )
             {
                 dprintk(XENLOG_WARNING VTDPREFIX,
                         " Non-existent device (%04x:%02x:%02x.%u) is reported"
@@ -636,7 +636,7 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
             d = PCI_SLOT(rmrru->scope.devices[i]);
             f = PCI_FUNC(rmrru->scope.devices[i]);
 
-            if ( pci_device_detect(rmrr->segment, b, d, f) == 0 )
+            if ( !pci_device_detect(rmrr->segment, b, d, f) )
             {
                 dprintk(XENLOG_WARNING VTDPREFIX,
                         " Non-existent device (%04x:%02x:%02x.%u) is reported"

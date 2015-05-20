@@ -93,7 +93,7 @@ struct pci_dev {
 extern spinlock_t pcidevs_lock;
 
 bool_t pci_known_segment(u16 seg);
-int pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func);
+bool_t pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func);
 int scan_pci_devices(void);
 enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn);
 int find_upstream_bridge(u16 seg, u8 *bus, u8 *devfn, u8 *secbus);

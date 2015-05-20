@@ -904,10 +904,7 @@ out:
     return ret;
 }
 
-/*
- * detect pci device, return 0 if it exists, or return 0
- */
-int __init pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func)
+bool_t __init pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func)
 {
     u32 vendor;
 
@@ -965,7 +962,7 @@ static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
         {
             for ( func = 0; func < 8; func++ )
             {
-                if ( pci_device_detect(pseg->nr, bus, dev, func) == 0 )
+                if ( !pci_device_detect(pseg->nr, bus, dev, func) )
                 {
                     if ( !func )
                         break;
