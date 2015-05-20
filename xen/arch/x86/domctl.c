@@ -91,237 +91,6 @@ long arch_do_domctl(
         break;
     }
 
-    case XEN_DOMCTL_getpageframeinfo:
-    {
-        struct page_info *page;
-        unsigned long mfn = domctl->u.getpageframeinfo.gmfn;
-
-        ret = -EINVAL;
-        if ( unlikely(!mfn_valid(mfn)) )
-            break;
-
-        page = mfn_to_page(mfn);
-
-        if ( likely(get_page(page, d)) )
-        {
-            ret = 0;
-
-            domctl->u.getpageframeinfo.type = XEN_DOMCTL_PFINFO_NOTAB;
-
-            if ( (page->u.inuse.type_info & PGT_count_mask) != 0 )
-            {
-                switch ( page->u.inuse.type_info & PGT_type_mask )
-                {
-                case PGT_l1_page_table:
-                    domctl->u.getpageframeinfo.type = XEN_DOMCTL_PFINFO_L1TAB;
-                    break;
-                case PGT_l2_page_table:
-                    domctl->u.getpageframeinfo.type = XEN_DOMCTL_PFINFO_L2TAB;
-                    break;
-                case PGT_l3_page_table:
-                    domctl->u.getpageframeinfo.type = XEN_DOMCTL_PFINFO_L3TAB;
-                    break;
-                case PGT_l4_page_table:
-                    domctl->u.getpageframeinfo.type = XEN_DOMCTL_PFINFO_L4TAB;
-                    break;
-                }
-            }
-
-            put_page(page);
-        }
-
-        copyback = 1;
-        break;
-    }
-
-    case XEN_DOMCTL_getpageframeinfo3:
-        if ( !has_32bit_shinfo(currd) )
-        {
-            unsigned int n, j;
-            unsigned int num = domctl->u.getpageframeinfo3.num;
-            struct page_info *page;
-            xen_pfn_t *arr;
-
-            if ( unlikely(num > 1024) ||
-                 unlikely(num != domctl->u.getpageframeinfo3.num) )
-            {
-                ret = -E2BIG;
-                break;
-            }
-
-            page = alloc_domheap_page(currd, MEMF_no_owner);
-            if ( !page )
-            {
-                ret = -ENOMEM;
-                break;
-            }
-            arr = __map_domain_page(page);
-
-            for ( n = ret = 0; n < num; )
-            {
-                unsigned int k = min_t(unsigned int, num - n,
-                                       PAGE_SIZE / sizeof(*arr));
-
-                if ( copy_from_guest_offset(arr,
-                                            domctl->u.getpageframeinfo3.array,
-                                            n, k) )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-
-                for ( j = 0; j < k; j++ )
-                {
-                    unsigned long type = 0;
-                    p2m_type_t t;
-
-                    page = get_page_from_gfn(d, arr[j], &t, P2M_ALLOC);
-
-                    if ( unlikely(!page) ||
-                         unlikely(is_xen_heap_page(page)) )
-                    {
-                        if ( p2m_is_broken(t) )
-                            type = XEN_DOMCTL_PFINFO_BROKEN;
-                        else
-                            type = XEN_DOMCTL_PFINFO_XTAB;
-                    }
-                    else
-                    {
-                        switch( page->u.inuse.type_info & PGT_type_mask )
-                        {
-                        case PGT_l1_page_table:
-                            type = XEN_DOMCTL_PFINFO_L1TAB;
-                            break;
-                        case PGT_l2_page_table:
-                            type = XEN_DOMCTL_PFINFO_L2TAB;
-                            break;
-                        case PGT_l3_page_table:
-                            type = XEN_DOMCTL_PFINFO_L3TAB;
-                            break;
-                        case PGT_l4_page_table:
-                            type = XEN_DOMCTL_PFINFO_L4TAB;
-                            break;
-                        }
-
-                        if ( page->u.inuse.type_info & PGT_pinned )
-                            type |= XEN_DOMCTL_PFINFO_LPINTAB;
-
-                        if ( page->count_info & PGC_broken )
-                            type = XEN_DOMCTL_PFINFO_BROKEN;
-                    }
-
-                    if ( page )
-                        put_page(page);
-                    arr[j] = type;
-                }
-
-                if ( copy_to_guest_offset(domctl->u.getpageframeinfo3.array,
-                                          n, arr, k) )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-
-                n += k;
-            }
-
-            page = mfn_to_page(domain_page_map_to_mfn(arr));
-            unmap_domain_page(arr);
-            free_domheap_page(page);
-
-            break;
-        }
-        /* fall thru */
-    case XEN_DOMCTL_getpageframeinfo2:
-    {
-        int n,j;
-        int num = domctl->u.getpageframeinfo2.num;
-        uint32_t *arr32;
-
-        if ( unlikely(num > 1024) )
-        {
-            ret = -E2BIG;
-            break;
-        }
-
-        arr32 = alloc_xenheap_page();
-        if ( !arr32 )
-        {
-            ret = -ENOMEM;
-            break;
-        }
-
-        ret = 0;
-        for ( n = 0; n < num; )
-        {
-            int k = PAGE_SIZE / 4;
-            if ( (num - n) < k )
-                k = num - n;
-
-            if ( copy_from_guest_offset(arr32,
-                                        domctl->u.getpageframeinfo2.array,
-                                        n, k) )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            for ( j = 0; j < k; j++ )
-            {
-                struct page_info *page;
-                unsigned long gfn = arr32[j];
-
-                page = get_page_from_gfn(d, gfn, NULL, P2M_ALLOC);
-
-                if ( domctl->cmd == XEN_DOMCTL_getpageframeinfo3)
-                    arr32[j] = 0;
-
-                if ( unlikely(!page) ||
-                     unlikely(is_xen_heap_page(page)) )
-                    arr32[j] |= XEN_DOMCTL_PFINFO_XTAB;
-                else
-                {
-                    unsigned long type = 0;
-
-                    switch( page->u.inuse.type_info & PGT_type_mask )
-                    {
-                    case PGT_l1_page_table:
-                        type = XEN_DOMCTL_PFINFO_L1TAB;
-                        break;
-                    case PGT_l2_page_table:
-                        type = XEN_DOMCTL_PFINFO_L2TAB;
-                        break;
-                    case PGT_l3_page_table:
-                        type = XEN_DOMCTL_PFINFO_L3TAB;
-                        break;
-                    case PGT_l4_page_table:
-                        type = XEN_DOMCTL_PFINFO_L4TAB;
-                        break;
-                    }
-
-                    if ( page->u.inuse.type_info & PGT_pinned )
-                        type |= XEN_DOMCTL_PFINFO_LPINTAB;
-                    arr32[j] |= type;
-                }
-
-                if ( page )
-                    put_page(page);
-            }
-
-            if ( copy_to_guest_offset(domctl->u.getpageframeinfo2.array,
-                                      n, arr32, k) )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            n += k;
-        }
-
-        free_xenheap_page(arr32);
-        break;
-    }
-
     case XEN_DOMCTL_getmemlist:
     {
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
@@ -375,6 +144,81 @@ long arch_do_domctl(
 
         domctl->u.getmemlist.num_pfns = i;
         copyback = 1;
+        break;
+    }
+
+    case XEN_DOMCTL_getpageframeinfo3:
+    {
+        unsigned int num = domctl->u.getpageframeinfo3.num;
+        unsigned int width = has_32bit_shinfo(currd) ? 4 : 8;
+
+        /* Games to allow this code block to handle a compat guest. */
+        void __user *guest_handle = domctl->u.getpageframeinfo3.array.p;
+
+        if ( unlikely(num > 1024) ||
+             unlikely(num != domctl->u.getpageframeinfo3.num) )
+        {
+            ret = -E2BIG;
+            break;
+        }
+
+        for ( i = 0; i < num; ++i )
+        {
+            unsigned long gfn = 0, type = 0;
+            struct page_info *page;
+            p2m_type_t t;
+
+            if ( raw_copy_from_guest(&gfn, guest_handle + (i * width), width) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            page = get_page_from_gfn(d, gfn, &t, P2M_ALLOC);
+
+            if ( unlikely(!page) ||
+                 unlikely(is_xen_heap_page(page)) )
+            {
+                if ( unlikely(p2m_is_broken(t)) )
+                    type = XEN_DOMCTL_PFINFO_BROKEN;
+                else
+                    type = XEN_DOMCTL_PFINFO_XTAB;
+            }
+            else
+            {
+                switch( page->u.inuse.type_info & PGT_type_mask )
+                {
+                case PGT_l1_page_table:
+                    type = XEN_DOMCTL_PFINFO_L1TAB;
+                    break;
+                case PGT_l2_page_table:
+                    type = XEN_DOMCTL_PFINFO_L2TAB;
+                    break;
+                case PGT_l3_page_table:
+                    type = XEN_DOMCTL_PFINFO_L3TAB;
+                    break;
+                case PGT_l4_page_table:
+                    type = XEN_DOMCTL_PFINFO_L4TAB;
+                    break;
+                }
+
+                if ( page->u.inuse.type_info & PGT_pinned )
+                    type |= XEN_DOMCTL_PFINFO_LPINTAB;
+
+                if ( page->count_info & PGC_broken )
+                    type = XEN_DOMCTL_PFINFO_BROKEN;
+            }
+
+            if ( page )
+                put_page(page);
+
+            if ( __raw_copy_to_guest(guest_handle + (i * width), &type, width) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+        }
+
         break;
     }
 

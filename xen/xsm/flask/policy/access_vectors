@@ -339,7 +339,7 @@ class mmu
 #  source = domain making the hypercall
 #  target = domain whose pages are being mapped
     map_write
-# XEN_DOMCTL_getpageframeinfo*
+# XEN_DOMCTL_getpageframeinfo3
     pageinfo
 # XEN_DOMCTL_getmemlist
     pagelist

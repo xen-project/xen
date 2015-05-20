@@ -644,8 +644,6 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_setdebugging:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETDEBUGGING);
 
-    case XEN_DOMCTL_getpageframeinfo:
-    case XEN_DOMCTL_getpageframeinfo2:
     case XEN_DOMCTL_getpageframeinfo3:
         return current_has_perm(d, SECCLASS_MMU, MMU__PAGEINFO);
 

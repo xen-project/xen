@@ -149,27 +149,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getmemlist_t);
 #define XEN_DOMCTL_PFINFO_BROKEN  (0xdU<<28) /* broken page */
 #define XEN_DOMCTL_PFINFO_LTAB_MASK (0xfU<<28)
 
-struct xen_domctl_getpageframeinfo {
-    /* IN variables. */
-    uint64_aligned_t gmfn; /* GMFN to query */
-    /* OUT variables. */
-    /* Is the page PINNED to a type? */
-    uint32_t type;         /* see above type defs */
-};
-typedef struct xen_domctl_getpageframeinfo xen_domctl_getpageframeinfo_t;
-DEFINE_XEN_GUEST_HANDLE(xen_domctl_getpageframeinfo_t);
-
-
-/* XEN_DOMCTL_getpageframeinfo2 */
-struct xen_domctl_getpageframeinfo2 {
-    /* IN variables. */
-    uint64_aligned_t num;
-    /* IN/OUT variables. */
-    XEN_GUEST_HANDLE_64(uint32) array;
-};
-typedef struct xen_domctl_getpageframeinfo2 xen_domctl_getpageframeinfo2_t;
-DEFINE_XEN_GUEST_HANDLE(xen_domctl_getpageframeinfo2_t);
-
 /* XEN_DOMCTL_getpageframeinfo3 */
 struct xen_domctl_getpageframeinfo3 {
     /* IN variables. */
@@ -1073,8 +1052,8 @@ struct xen_domctl {
 #define XEN_DOMCTL_unpausedomain                  4
 #define XEN_DOMCTL_getdomaininfo                  5
 #define XEN_DOMCTL_getmemlist                     6
-#define XEN_DOMCTL_getpageframeinfo               7
-#define XEN_DOMCTL_getpageframeinfo2              8
+/* #define XEN_DOMCTL_getpageframeinfo            7 Obsolete - use getpageframeinfo3 */
+/* #define XEN_DOMCTL_getpageframeinfo2           8 Obsolete - use getpageframeinfo3 */
 #define XEN_DOMCTL_setvcpuaffinity                9
 #define XEN_DOMCTL_shadow_op                     10
 #define XEN_DOMCTL_max_mem                       11
@@ -1150,8 +1129,6 @@ struct xen_domctl {
         struct xen_domctl_createdomain      createdomain;
         struct xen_domctl_getdomaininfo     getdomaininfo;
         struct xen_domctl_getmemlist        getmemlist;
-        struct xen_domctl_getpageframeinfo  getpageframeinfo;
-        struct xen_domctl_getpageframeinfo2 getpageframeinfo2;
         struct xen_domctl_getpageframeinfo3 getpageframeinfo3;
         struct xen_domctl_nodeaffinity      nodeaffinity;
         struct xen_domctl_vcpuaffinity      vcpuaffinity;
