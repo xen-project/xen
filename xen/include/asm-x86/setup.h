@@ -32,6 +32,7 @@ int construct_dom0(
     module_t *initrd,
     void *(*bootstrap_map)(const module_t *),
     char *cmdline);
+void setup_io_bitmap(struct domain *d);
 
 unsigned long initial_images_nrpages(nodeid_t node);
 void discard_initial_images(void);

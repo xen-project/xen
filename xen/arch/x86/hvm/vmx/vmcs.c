@@ -1032,8 +1032,8 @@ static int construct_vmcs(struct vcpu *v)
     }
 
     /* I/O access bitmap. */
-    __vmwrite(IO_BITMAP_A, virt_to_maddr((char *)hvm_io_bitmap + 0));
-    __vmwrite(IO_BITMAP_B, virt_to_maddr((char *)hvm_io_bitmap + PAGE_SIZE));
+    __vmwrite(IO_BITMAP_A, __pa(d->arch.hvm_domain.io_bitmap));
+    __vmwrite(IO_BITMAP_B, __pa(d->arch.hvm_domain.io_bitmap) + PAGE_SIZE);
 
     if ( cpu_has_vmx_virtual_intr_delivery )
     {

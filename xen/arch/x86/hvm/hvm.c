@@ -77,9 +77,13 @@ integer_param("hvm_debug", opt_hvm_debug_level);
 
 struct hvm_function_table hvm_funcs __read_mostly;
 
-/* I/O permission bitmap is globally shared by all HVM guests. */
+/*
+ * The I/O permission bitmap is globally shared by all HVM guests except
+ * the hardware domain which needs a more permissive one.
+ */
+#define HVM_IOBITMAP_SIZE (3 * PAGE_SIZE)
 unsigned long __attribute__ ((__section__ (".bss.page_aligned")))
-    hvm_io_bitmap[3*PAGE_SIZE/BYTES_PER_LONG];
+    hvm_io_bitmap[HVM_IOBITMAP_SIZE / BYTES_PER_LONG];
 
 /* Xen command-line option to enable HAP */
 static bool_t __initdata opt_hap_enabled = 1;
@@ -1461,6 +1465,20 @@ int hvm_domain_initialise(struct domain *d)
         goto fail1;
     d->arch.hvm_domain.io_handler->num_slot = 0;
 
+    /* Set the default IO Bitmap. */
+    if ( is_hardware_domain(d) )
+    {
+        d->arch.hvm_domain.io_bitmap = _xmalloc(HVM_IOBITMAP_SIZE, PAGE_SIZE);
+        if ( d->arch.hvm_domain.io_bitmap == NULL )
+        {
+            rc = -ENOMEM;
+            goto fail1;
+        }
+        memset(d->arch.hvm_domain.io_bitmap, ~0, HVM_IOBITMAP_SIZE);
+    }
+    else
+        d->arch.hvm_domain.io_bitmap = hvm_io_bitmap;
+
     if ( is_pvh_domain(d) )
     {
         register_portio_handler(d, 0, 0x10003, handle_pvh_io);
@@ -1496,6 +1514,8 @@ int hvm_domain_initialise(struct domain *d)
     stdvga_deinit(d);
     vioapic_deinit(d);
  fail1:
+    if ( is_hardware_domain(d) )
+        xfree(d->arch.hvm_domain.io_bitmap);
     xfree(d->arch.hvm_domain.io_handler);
     xfree(d->arch.hvm_domain.params);
  fail0:

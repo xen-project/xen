@@ -42,6 +42,7 @@
 #include <xsm/xsm.h>
 #include <xen/trace.h>
 #include <xen/tmem.h>
+#include <asm/setup.h>
 
 /* Linux config option: propageted to domain0 */
 /* xen_processor_pmbits: xen control Cx, Px, ... */
@@ -219,6 +220,8 @@ static int late_hwdom_init(struct domain *d)
     rangeset_swap(d->iomem_caps, dom0->iomem_caps);
 #ifdef CONFIG_X86
     rangeset_swap(d->arch.ioport_caps, dom0->arch.ioport_caps);
+    setup_io_bitmap(d);
+    setup_io_bitmap(dom0);
 #endif
 
     rcu_unlock_domain(dom0);
