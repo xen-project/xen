@@ -213,9 +213,9 @@ that can be used without dom0 disaggregation. The main types for domUs are:
  - nomigrate_t is a domain that must be created via the nomigrate_t_building
    type, and whose memory cannot be read by dom0 once created
 
-HVM domains with stubdomain device models use two types (one per domain):
- - domHVM_t is an HVM domain that uses a stubdomain device model
- - dm_dom_t is the device model for a domain with type domHVM_t
+HVM domains with stubdomain device models also need a type for the stub domain.
+The example policy defines dm_dom_t for the device model of a domU_t domain;
+there are no device model types defined for the other domU types.
 
 One disadvantage of using type enforcement to enforce isolation is that a new
 type is needed for each group of domains. The user field can be used to address

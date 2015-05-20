@@ -12,3 +12,7 @@ sid irq gen_context(system_u:object_r:irq_t,s0)
 sid iomem gen_context(system_u:object_r:iomem_t,s0)
 sid ioport gen_context(system_u:object_r:ioport_t,s0)
 sid device gen_context(system_u:object_r:device_t,s0)
+
+# Initial SIDs used by the toolstack for domains without defined labels
+sid domU gen_context(system_u:system_r:domU_t,s0)
+sid domDM gen_context(system_u:system_r:dm_dom_t,s0)

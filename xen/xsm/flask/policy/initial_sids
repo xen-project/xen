@@ -13,4 +13,6 @@ sid ioport
 sid iomem
 sid irq
 sid device
+sid domU
+sid domDM
 # FLASK
