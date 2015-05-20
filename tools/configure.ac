@@ -247,6 +247,7 @@ AC_ARG_VAR([AS86], [Path to as86 tool])
 AC_ARG_VAR([LD86], [Path to ld86 tool])
 AC_ARG_VAR([BCC], [Path to bcc tool])
 AC_ARG_VAR([IASL], [Path to iasl tool])
+AC_ARG_VAR([AWK], [Path to awk tool])
 
 # Checks for programs.
 AC_PROG_CC
@@ -255,6 +256,7 @@ AC_PROG_INSTALL
 AC_PATH_PROG([BISON], [bison])
 AC_PATH_PROG([FLEX], [flex])
 AX_PATH_PROG_OR_FAIL([PERL], [perl])
+AX_PATH_PROG_OR_FAIL([AWK], [awk])
 
 AC_PROG_OCAML
 AC_PROG_FINDLIB

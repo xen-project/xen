@@ -23,6 +23,7 @@ AS86                := @AS86@
 LD86                := @LD86@
 BCC                 := @BCC@
 IASL                := @IASL@
+AWK                 := @AWK@
 FETCHER             := @FETCHER@
 SEABIOS_PATH        := @seabios_path@
 OVMF_PATH           := @ovmf_path@
