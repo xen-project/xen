@@ -8,10 +8,13 @@ set -e
 awk=$1
 shift 1
 
+output_dir=$1
+shift 1
+
 # output file
-output_file="include/flask.h"
-debug_file="include/class_to_string.h"
-debug_file2="include/initial_sid_to_string.h"
+output_file="$output_dir/flask.h"
+debug_file="$output_dir/class_to_string.h"
+debug_file2="$output_dir/initial_sid_to_string.h"
 
 cat $* | $awk "
 BEGIN	{

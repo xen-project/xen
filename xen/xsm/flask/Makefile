@@ -22,7 +22,7 @@ ALL_H_FILES = $(FLASK_H_FILES) $(AV_H_FILES)
 $(obj-y) ss/built_in.o: $(ALL_H_FILES)
 
 $(FLASK_H_FILES): $(FLASK_H_DEPEND)
-	$(CONFIG_SHELL) policy/mkflask.sh $(AWK) $(FLASK_H_DEPEND)
+	$(CONFIG_SHELL) policy/mkflask.sh $(AWK) include $(FLASK_H_DEPEND)
 
 $(AV_H_FILES): $(AV_H_DEPEND)
 	$(CONFIG_SHELL) policy/mkaccess_vector.sh $(AWK) $(AV_H_DEPEND)
