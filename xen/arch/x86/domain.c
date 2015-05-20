@@ -513,12 +513,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     int i, paging_initialised = 0;
     int rc = -ENOMEM;
 
-    d->arch.hvm_domain.hap_enabled =
-        has_hvm_container_domain(d) &&
-        hvm_funcs.hap_supported &&
-        (domcr_flags & DOMCRF_hap);
-    d->arch.hvm_domain.mem_sharing_enabled = 0;
-
     d->arch.s3_integrity = !!(domcr_flags & DOMCRF_s3_integrity);
 
     INIT_LIST_HEAD(&d->arch.pdev_list);
@@ -541,7 +535,12 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     }
 
     if ( has_hvm_container_domain(d) )
+    {
+        d->arch.hvm_domain.hap_enabled =
+            hvm_funcs.hap_supported && (domcr_flags & DOMCRF_hap);
+
         rc = create_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0, NULL, NULL);
+    }
     else if ( is_idle_domain(d) )
         rc = 0;
     else
