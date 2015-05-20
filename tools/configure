@@ -8167,7 +8167,7 @@ fi
 
 
 
-if test "x$enable_blktap2" = "xyes"]; then :
+if test "x$enable_blktap2" = "xyes"; then :
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for io_setup in -laio" >&5
 $as_echo_n "checking for io_setup in -laio... " >&6; }
