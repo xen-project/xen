@@ -12,7 +12,6 @@
 #include <public/xen.h>
 
 extern int init_xen_time(void);
-void preinit_xen_time(void);
 extern void cstate_restore_tsc(void);
 
 extern unsigned long cpu_khz;

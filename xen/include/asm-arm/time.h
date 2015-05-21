@@ -31,6 +31,8 @@ extern void __cpuinit init_timer_interrupt(void);
 /* Counter value at boot time */
 extern uint64_t boot_count;
 
+void preinit_xen_time(void);
+
 #endif /* __ARM_TIME_H__ */
 /*
  * Local variables:
