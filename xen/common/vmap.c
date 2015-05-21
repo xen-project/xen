@@ -268,10 +268,14 @@ void *vzalloc(size_t size)
 
 void vfree(void *va)
 {
-    unsigned int i, pages = vm_size(va);
+    unsigned int i, pages;
     struct page_info *pg;
     PAGE_LIST_HEAD(pg_list);
 
+    if ( !va )
+        return;
+
+    pages = vm_size(va);
     ASSERT(pages);
 
     for ( i = 0; i < pages; i++ )
