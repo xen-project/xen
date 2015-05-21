@@ -309,6 +309,10 @@ struct arch_shared_info {
 typedef struct arch_shared_info arch_shared_info_t;
 typedef uint64_t xen_callback_t;
 
+/*
+ * struct xen_arch_domainconfig's ABI is covered by
+ * XEN_DOMCTL_INTERFACE_VERSION.
+ */
 #define XEN_DOMCTL_CONFIG_GIC_DEFAULT   0
 #define XEN_DOMCTL_CONFIG_GIC_V2        1
 #define XEN_DOMCTL_CONFIG_GIC_V3        2
