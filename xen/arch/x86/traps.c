@@ -2006,7 +2006,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                            ? (*(u32 *)&regs->reg = (val)) \
                            : (*(u16 *)&regs->reg = (val)))
     unsigned long code_base, code_limit;
-    char io_emul_stub[32];
+    char *io_emul_stub = NULL;
     void (*io_emul)(struct cpu_user_regs *) __attribute__((__regparm__(1)));
     uint64_t val;
 
@@ -2191,10 +2191,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     /*
      * Very likely to be an I/O instruction (IN/OUT).
-     * Build an on-stack stub to execute the instruction with full guest
-     * GPR context. This is needed for some systems which (ab)use IN/OUT
+     * Build an stub to execute the instruction with full guest GPR
+     * context. This is needed for some systems which (ab)use IN/OUT
      * to communicate with BIOS code in system-management mode.
      */
+    io_emul_stub = map_domain_page(this_cpu(stubs.mfn)) +
+                   (this_cpu(stubs.addr) & ~PAGE_MASK) +
+                   STUB_BUF_SIZE / 2;
     /* movq $host_to_guest_gpr_switch,%rcx */
     io_emul_stub[0] = 0x48;
     io_emul_stub[1] = 0xb9;
@@ -2210,9 +2213,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     io_emul_stub[14] = 0x90;
     /* ret (jumps to guest_to_host_gpr_switch) */
     io_emul_stub[15] = 0xc3;
+    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < 16);
 
     /* Handy function-typed pointer to the stub. */
-    io_emul = (void *)io_emul_stub;
+    io_emul = (void *)(this_cpu(stubs.addr) + STUB_BUF_SIZE / 2);
 
     if ( ioemul_handle_quirk )
         ioemul_handle_quirk(opcode, &io_emul_stub[12], regs);
@@ -2777,9 +2781,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
  done:
     instruction_done(regs, eip, bpmatch);
  skip:
+    if ( io_emul_stub )
+        unmap_domain_page(io_emul_stub);
     return EXCRET_fault_fixed;
 
  fail:
+    if ( io_emul_stub )
+        unmap_domain_page(io_emul_stub);
     return 0;
 }
 
