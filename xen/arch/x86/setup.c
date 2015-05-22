@@ -1271,6 +1271,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     init_idle_domain();
 
+    this_cpu(stubs.addr) = alloc_stub_page(smp_processor_id(),
+                                           &this_cpu(stubs).mfn);
+    BUG_ON(!this_cpu(stubs.addr));
+
     trap_init();
 
     rcu_init();

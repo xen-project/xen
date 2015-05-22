@@ -337,70 +337,78 @@ unsigned long do_iret(void)
     return 0;
 }
 
-static int write_stack_trampoline(
-    char *stack, char *stack_bottom, uint16_t cs_seg)
+static unsigned int write_stub_trampoline(
+    unsigned char *stub, unsigned long stub_va,
+    unsigned long stack_bottom, unsigned long target_va)
 {
-    /* movq %rsp, saversp(%rip) */
-    stack[0] = 0x48;
-    stack[1] = 0x89;
-    stack[2] = 0x25;
-    *(u32 *)&stack[3] = (stack_bottom - &stack[7]) - 16;
+    /* movabsq %rax, stack_bottom - 8 */
+    stub[0] = 0x48;
+    stub[1] = 0xa3;
+    *(uint64_t *)&stub[2] = stack_bottom - 8;
 
-    /* leaq saversp(%rip), %rsp */
-    stack[7] = 0x48;
-    stack[8] = 0x8d;
-    stack[9] = 0x25;
-    *(u32 *)&stack[10] = (stack_bottom - &stack[14]) - 16;
+    /* movq %rsp, %rax */
+    stub[10] = 0x48;
+    stub[11] = 0x89;
+    stub[12] = 0xe0;
 
-    /* pushq %r11 */
-    stack[14] = 0x41;
-    stack[15] = 0x53;
+    /* movabsq $stack_bottom - 8, %rsp */
+    stub[13] = 0x48;
+    stub[14] = 0xbc;
+    *(uint64_t *)&stub[15] = stack_bottom - 8;
 
-    /* pushq $<cs_seg> */
-    stack[16] = 0x68;
-    *(u32 *)&stack[17] = cs_seg;
+    /* pushq %rax */
+    stub[23] = 0x50;
 
-    /* movq $syscall_enter,%r11 */
-    stack[21] = 0x49;
-    stack[22] = 0xbb;
-    *(void **)&stack[23] = (void *)syscall_enter;
+    /* jmp target_va */
+    stub[24] = 0xe9;
+    *(int32_t *)&stub[25] = target_va - (stub_va + 29);
 
-    /* jmpq *%r11 */
-    stack[31] = 0x41;
-    stack[32] = 0xff;
-    stack[33] = 0xe3;
-
-    return 34;
+    /* Round up to a multiple of 16 bytes. */
+    return 32;
 }
+
+DEFINE_PER_CPU(struct stubs, stubs);
+void lstar_enter(void);
+void cstar_enter(void);
 
 void __devinit subarch_percpu_traps_init(void)
 {
-    char *stack_bottom, *stack;
-
-    stack_bottom = (char *)get_stack_bottom();
-    stack        = (char *)((unsigned long)stack_bottom & ~(STACK_SIZE - 1));
+    unsigned long stack_bottom = get_stack_bottom();
+    unsigned long stub_va = this_cpu(stubs.addr);
+    unsigned char *stub_page;
+    unsigned int offset;
 
     /* IST_MAX IST pages + 1 syscall page + 1 guard page + primary stack. */
     BUILD_BUG_ON((IST_MAX + 2) * PAGE_SIZE + PRIMARY_STACK_SIZE > STACK_SIZE);
 
-    /* Trampoline for SYSCALL entry from long mode. */
-    stack = &stack[IST_MAX * PAGE_SIZE]; /* Skip the IST stacks. */
-    wrmsrl(MSR_LSTAR, (unsigned long)stack);
-    stack += write_stack_trampoline(stack, stack_bottom, FLAT_KERNEL_CS64);
+    stub_page = map_domain_page(this_cpu(stubs.mfn));
+
+    /* Trampoline for SYSCALL entry from 64-bit mode. */
+    wrmsrl(MSR_LSTAR, stub_va);
+    offset = write_stub_trampoline(stub_page + (stub_va & ~PAGE_MASK),
+                                   stub_va, stack_bottom,
+                                   (unsigned long)lstar_enter);
+    stub_va += offset;
 
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ||
          boot_cpu_data.x86_vendor == X86_VENDOR_CENTAUR )
     {
         /* SYSENTER entry. */
-        wrmsrl(MSR_IA32_SYSENTER_ESP, (unsigned long)stack_bottom);
+        wrmsrl(MSR_IA32_SYSENTER_ESP, stack_bottom);
         wrmsrl(MSR_IA32_SYSENTER_EIP, (unsigned long)sysenter_entry);
         wrmsr(MSR_IA32_SYSENTER_CS, __HYPERVISOR_CS, 0);
     }
 
     /* Trampoline for SYSCALL entry from compatibility mode. */
-    stack = (char *)L1_CACHE_ALIGN((unsigned long)stack);
-    wrmsrl(MSR_CSTAR, (unsigned long)stack);
-    stack += write_stack_trampoline(stack, stack_bottom, FLAT_USER_CS32);
+    wrmsrl(MSR_CSTAR, stub_va);
+    offset += write_stub_trampoline(stub_page + (stub_va & ~PAGE_MASK),
+                                    stub_va, stack_bottom,
+                                    (unsigned long)cstar_enter);
+
+    /* Don't consume more than half of the stub space here. */
+    ASSERT(offset <= STUB_BUF_SIZE / 2);
+
+    unmap_domain_page(stub_page);
 
     /* Common SYSCALL parameters. */
     wrmsr(MSR_STAR, 0, (FLAT_RING3_CS32<<16) | __HYPERVISOR_CS);

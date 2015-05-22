@@ -148,6 +148,7 @@ typedef l4_pgentry_t root_pgentry_t;
 #define _PAGE_GUEST_KERNEL (1U<<12)
 
 #define PAGE_HYPERVISOR         (__PAGE_HYPERVISOR         | _PAGE_GLOBAL)
+#define PAGE_HYPERVISOR_RX      (__PAGE_HYPERVISOR_RX      | _PAGE_GLOBAL)
 #define PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR_NOCACHE | _PAGE_GLOBAL)
 
 #endif /* __X86_64_PAGE_H__ */

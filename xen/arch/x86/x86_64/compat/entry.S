@@ -219,7 +219,20 @@ ENTRY(compat_post_handle_exception)
         movb  $0,TRAPBOUNCE_flags(%rdx)
         jmp   compat_test_all_events
 
-ENTRY(compat_syscall)
+/* See lstar_enter for entry register state. */
+ENTRY(cstar_enter)
+        sti
+        movq  8(%rsp),%rax /* Restore %rax. */
+        movq  $FLAT_KERNEL_SS,8(%rsp)
+        pushq %r11
+        pushq $FLAT_USER_CS32
+        pushq %rcx
+        pushq $0
+        SAVE_VOLATILE TRAP_syscall
+        GET_CURRENT(%rbx)
+        movq  VCPU_domain(%rbx),%rcx
+        cmpb  $0,DOMAIN_is_32bit_pv(%rcx)
+        je    switch_to_kernel
         cmpb  $0,VCPU_syscall32_disables_events(%rbx)
         movzwl VCPU_syscall32_sel(%rbx),%esi
         movq  VCPU_syscall32_addr(%rbx),%rax

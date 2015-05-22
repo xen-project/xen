@@ -25,6 +25,7 @@
 #include <xen/kernel.h>
 #include <xen/mm.h>
 #include <xen/domain.h>
+#include <xen/domain_page.h>
 #include <xen/sched.h>
 #include <xen/sched-if.h>
 #include <xen/irq.h>
@@ -603,6 +604,43 @@ static int do_boot_cpu(int apicid, int cpu)
     return rc;
 }
 
+#define STUB_BUF_CPU_OFFS(cpu) (((cpu) & (STUBS_PER_PAGE - 1)) * STUB_BUF_SIZE)
+
+unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn)
+{
+    unsigned long stub_va;
+    struct page_info *pg;
+
+    BUILD_BUG_ON(STUBS_PER_PAGE & (STUBS_PER_PAGE - 1));
+
+    if ( *mfn )
+        pg = mfn_to_page(*mfn);
+    else
+    {
+        nodeid_t node = cpu_to_node(cpu);
+        unsigned int memflags = node != NUMA_NO_NODE ? MEMF_node(node) : 0;
+
+        pg = alloc_domheap_page(NULL, memflags);
+        if ( !pg )
+            return 0;
+
+        unmap_domain_page(memset(__map_domain_page(pg), 0xcc, PAGE_SIZE));
+    }
+
+    stub_va = XEN_VIRT_END - (cpu + 1) * PAGE_SIZE;
+    if ( map_pages_to_xen(stub_va, page_to_mfn(pg), 1,
+                          PAGE_HYPERVISOR_RX | MAP_SMALL_PAGES) )
+    {
+        if ( !*mfn )
+            free_domheap_page(pg);
+        stub_va = 0;
+    }
+    else if ( !*mfn )
+        *mfn = page_to_mfn(pg);
+
+    return stub_va;
+}
+
 void cpu_exit_clear(unsigned int cpu)
 {
     cpu_uninit(cpu);
@@ -615,6 +653,23 @@ static void cpu_smpboot_free(unsigned int cpu)
 
     free_cpumask_var(per_cpu(cpu_sibling_mask, cpu));
     free_cpumask_var(per_cpu(cpu_core_mask, cpu));
+
+    if ( per_cpu(stubs.addr, cpu) )
+    {
+        unsigned long mfn = per_cpu(stubs.mfn, cpu);
+        unsigned char *stub_page = map_domain_page(mfn);
+        unsigned int i;
+
+        memset(stub_page + STUB_BUF_CPU_OFFS(cpu), 0xcc, STUB_BUF_SIZE);
+        for ( i = 0; i < STUBS_PER_PAGE; ++i )
+            if ( stub_page[i * STUB_BUF_SIZE] != 0xcc )
+                break;
+        unmap_domain_page(stub_page);
+        destroy_xen_mappings(per_cpu(stubs.addr, cpu) & PAGE_MASK,
+                             (per_cpu(stubs.addr, cpu) | ~PAGE_MASK) + 1);
+        if ( i == STUBS_PER_PAGE )
+            free_domheap_page(mfn_to_page(mfn));
+    }
 
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
     free_xenheap_pages(per_cpu(gdt_table, cpu), order);
@@ -635,9 +690,10 @@ static void cpu_smpboot_free(unsigned int cpu)
 
 static int cpu_smpboot_alloc(unsigned int cpu)
 {
-    unsigned int order, memflags = 0;
+    unsigned int i, order, memflags = 0;
     nodeid_t node = cpu_to_node(cpu);
     struct desc_struct *gdt;
+    unsigned long stub_page;
 
     if ( node != NUMA_NO_NODE )
         memflags = MEMF_node(node);
@@ -666,6 +722,19 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     if ( idt_tables[cpu] == NULL )
         goto oom;
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES * sizeof(idt_entry_t));
+
+    for ( stub_page = 0, i = cpu & ~(STUBS_PER_PAGE - 1);
+          i < nr_cpu_ids && i <= (cpu | (STUBS_PER_PAGE - 1)); ++i )
+        if ( cpu_online(i) && cpu_to_node(i) == node )
+        {
+            per_cpu(stubs.mfn, cpu) = per_cpu(stubs.mfn, i);
+            break;
+        }
+    BUG_ON(i == cpu);
+    stub_page = alloc_stub_page(cpu, &per_cpu(stubs.mfn, cpu));
+    if ( !stub_page )
+        goto oom;
+    per_cpu(stubs.addr, cpu) = stub_page + STUB_BUF_CPU_OFFS(cpu);
 
     if ( zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
          zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) )

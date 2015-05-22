@@ -217,4 +217,7 @@ SECTIONS
   .comment 0 : { *(.comment) }
 }
 
+ASSERT(__image_base__ > XEN_VIRT_START ||
+       _end <= XEN_VIRT_END - NR_CPUS * PAGE_SIZE,
+       "Xen image overlaps stubs area")
 ASSERT(kexec_reloc_size - kexec_reloc <= PAGE_SIZE, "kexec_reloc is too large")

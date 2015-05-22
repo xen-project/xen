@@ -532,11 +532,23 @@ void trap_nop(void);
 void enable_nmis(void);
 void do_reserved_trap(struct cpu_user_regs *regs);
 
-void syscall_enter(void);
 void sysenter_entry(void);
 void sysenter_eflags_saved(void);
 void compat_hypercall(void);
 void int80_direct_trap(void);
+
+#define STUBS_PER_PAGE (PAGE_SIZE / STUB_BUF_SIZE)
+
+struct stubs {
+    union {
+        void(*func)(void);
+        unsigned long addr;
+    };
+    unsigned long mfn;
+};
+
+DECLARE_PER_CPU(struct stubs, stubs);
+unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn);
 
 extern int hypercall(void);
 

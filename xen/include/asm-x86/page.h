@@ -323,10 +323,10 @@ void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t);
 #define _PAGE_GNTTAB   0
 #endif
 
-#define __PAGE_HYPERVISOR \
-    (_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED)
-#define __PAGE_HYPERVISOR_NOCACHE \
-    (_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_PCD | _PAGE_ACCESSED)
+#define __PAGE_HYPERVISOR_RX      (_PAGE_PRESENT | _PAGE_ACCESSED)
+#define __PAGE_HYPERVISOR         (__PAGE_HYPERVISOR_RX | \
+                                   _PAGE_DIRTY | _PAGE_RW)
+#define __PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR | _PAGE_PCD)
 
 #define MAP_SMALL_PAGES _PAGE_AVAIL0 /* don't use superpages mappings */
 
