@@ -717,11 +717,15 @@ do{ struct fpu_insn_ctxt fic;                           \
 } while (0)
 
 #define emulate_fpu_insn_stub(_bytes...)                                \
-do{ uint8_t stub[] = { _bytes, 0xc3 };                                  \
-    struct fpu_insn_ctxt fic = { .insn_bytes = sizeof(stub)-1 };        \
+do {                                                                    \
+    uint8_t *buf = get_stub(stub);                                      \
+    unsigned int _nr = sizeof((uint8_t[]){ _bytes });                   \
+    struct fpu_insn_ctxt fic = { .insn_bytes = _nr };                   \
+    memcpy(buf, ((uint8_t[]){ _bytes, 0xc3 }), _nr + 1);                \
     get_fpu(X86EMUL_FPU_fpu, &fic);                                     \
-    (*(void(*)(void))stub)();                                           \
+    stub.func();                                                        \
     put_fpu(&fic);                                                      \
+    put_stub(stub);                                                     \
 } while (0)
 
 static unsigned long _get_rep_prefix(
@@ -1458,6 +1462,7 @@ x86_emulate(
     struct operand src = { .reg = REG_POISON };
     struct operand dst = { .reg = REG_POISON };
     enum x86_swint_type swint_type;
+    struct x86_emulate_stub stub = {};
     DECLARE_ALIGNED(mmval_t, mmval);
     /*
      * Data operand effective address (usually computed from ModRM).
@@ -3792,6 +3797,7 @@ x86_emulate(
 
  done:
     _put_fpu();
+    put_stub(stub);
     return rc;
 
  twobyte_insn:
@@ -4007,9 +4013,15 @@ x86_emulate(
                /* {,v}movss xmm,xmm/m32 */
                /* {,v}movsd xmm,xmm/m64 */
     {
-        uint8_t stub[] = { 0x3e, 0x3e, 0x0f, b, modrm, 0xc3 };
-        struct fpu_insn_ctxt fic = { .insn_bytes = sizeof(stub)-1 };
+        uint8_t *buf = get_stub(stub);
+        struct fpu_insn_ctxt fic = { .insn_bytes = 5 };
 
+        buf[0] = 0x3e;
+        buf[1] = 0x3e;
+        buf[2] = 0x0f;
+        buf[3] = b;
+        buf[4] = modrm;
+        buf[5] = 0xc3;
         if ( vex.opcx == vex_none )
         {
             if ( vex.pfx & VEX_PREFIX_DOUBLE_MASK )
@@ -4017,7 +4029,7 @@ x86_emulate(
             else
                 vcpu_must_have_sse();
             ea.bytes = 16;
-            SET_SSE_PREFIX(stub[0], vex.pfx);
+            SET_SSE_PREFIX(buf[0], vex.pfx);
             get_fpu(X86EMUL_FPU_xmm, &fic);
         }
         else
@@ -4044,15 +4056,16 @@ x86_emulate(
             /* convert memory operand to (%rAX) */
             rex_prefix &= ~REX_B;
             vex.b = 1;
-            stub[4] &= 0x38;
+            buf[4] &= 0x38;
         }
         if ( !rc )
         {
-           copy_REX_VEX(stub, rex_prefix, vex);
-           asm volatile ( "call *%0" : : "r" (stub), "a" (mmvalp)
+           copy_REX_VEX(buf, rex_prefix, vex);
+           asm volatile ( "call *%0" : : "r" (stub.func), "a" (mmvalp)
                                      : "memory" );
         }
         put_fpu(&fic);
+        put_stub(stub);
         if ( !rc && (b & 1) && (ea.type == OP_MEM) )
             rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
                             ea.bytes, ctxt);
@@ -4242,9 +4255,15 @@ x86_emulate(
                /* {,v}movdq{a,u} xmm,xmm/m128 */
                /* vmovdq{a,u} ymm,ymm/m256 */
     {
-        uint8_t stub[] = { 0x3e, 0x3e, 0x0f, b, modrm, 0xc3 };
-        struct fpu_insn_ctxt fic = { .insn_bytes = sizeof(stub)-1 };
+        uint8_t *buf = get_stub(stub);
+        struct fpu_insn_ctxt fic = { .insn_bytes = 5 };
 
+        buf[0] = 0x3e;
+        buf[1] = 0x3e;
+        buf[2] = 0x0f;
+        buf[3] = b;
+        buf[4] = modrm;
+        buf[5] = 0xc3;
         if ( vex.opcx == vex_none )
         {
             switch ( vex.pfx )
@@ -4252,7 +4271,7 @@ x86_emulate(
             case vex_66:
             case vex_f3:
                 vcpu_must_have_sse2();
-                stub[0] = 0x66; /* movdqa */
+                buf[0] = 0x66; /* movdqa */
                 get_fpu(X86EMUL_FPU_xmm, &fic);
                 ea.bytes = 16;
                 break;
@@ -4288,15 +4307,16 @@ x86_emulate(
             /* convert memory operand to (%rAX) */
             rex_prefix &= ~REX_B;
             vex.b = 1;
-            stub[4] &= 0x38;
+            buf[4] &= 0x38;
         }
         if ( !rc )
         {
-           copy_REX_VEX(stub, rex_prefix, vex);
-           asm volatile ( "call *%0" : : "r" (stub), "a" (mmvalp)
+           copy_REX_VEX(buf, rex_prefix, vex);
+           asm volatile ( "call *%0" : : "r" (stub.func), "a" (mmvalp)
                                      : "memory" );
         }
         put_fpu(&fic);
+        put_stub(stub);
         if ( !rc && (b != 0x6f) && (ea.type == OP_MEM) )
             rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
                             ea.bytes, ctxt);
@@ -4638,5 +4658,6 @@ x86_emulate(
 
  cannot_emulate:
     _put_fpu();
+    put_stub(stub);
     return X86EMUL_UNHANDLEABLE;
 }

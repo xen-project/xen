@@ -429,6 +429,19 @@ struct x86_emulate_ctxt
     } retire;
 };
 
+struct x86_emulate_stub {
+    union {
+        void (*func)(void);
+        uintptr_t addr;
+    };
+#ifdef __XEN__
+    void *ptr;
+#else
+    /* Room for one insn and a (single byte) RET. */
+    uint8_t buf[MAX_INST_LEN + 1];
+#endif
+};
+
 /*
  * x86_emulate: Emulate an instruction.
  * Returns -1 on failure, 0 on success.
