@@ -253,11 +253,32 @@ static char* acpi_cstate_method_name[] =
     "HALT"
 };
 
+static uint64_t get_stime_tick(void) { return (uint64_t)NOW(); }
+static uint64_t stime_ticks_elapsed(uint64_t t1, uint64_t t2) { return t2 - t1; }
+static uint64_t stime_tick_to_ns(uint64_t ticks) { return ticks; }
+
+static uint64_t get_acpi_pm_tick(void) { return (uint64_t)inl(pmtmr_ioport); }
+static uint64_t acpi_pm_ticks_elapsed(uint64_t t1, uint64_t t2)
+{
+    if ( t2 >= t1 )
+        return (t2 - t1);
+    else if ( !(acpi_gbl_FADT.flags & ACPI_FADT_32BIT_TIMER) )
+        return (((0x00FFFFFF - t1) + t2 + 1) & 0x00FFFFFF);
+    else
+        return ((0xFFFFFFFF - t1) + t2 +1);
+}
+
+uint64_t (*__read_mostly cpuidle_get_tick)(void) = get_acpi_pm_tick;
+static uint64_t (*__read_mostly ticks_elapsed)(uint64_t, uint64_t)
+    = acpi_pm_ticks_elapsed;
+
 static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
 {
-    uint32_t i, idle_usage = 0;
-    uint64_t res, idle_res = 0;
-    u32 usage;
+    uint64_t idle_res = 0, idle_usage = 0;
+    uint64_t last_state_update_tick, current_tick, current_stime;
+    uint64_t usage[ACPI_PROCESSOR_MAX_POWER] = { 0 };
+    uint64_t res_tick[ACPI_PROCESSOR_MAX_POWER] = { 0 };
+    unsigned int i;
     u8 last_state_idx;
 
     printk("==cpu%d==\n", cpu);
@@ -265,28 +286,37 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
     printk("active state:\t\tC%d\n", last_state_idx);
     printk("max_cstate:\t\tC%d\n", max_cstate);
     printk("states:\n");
-    
+
+    spin_lock_irq(&power->stat_lock);
+    current_tick = cpuidle_get_tick();
+    current_stime = NOW();
     for ( i = 1; i < power->count; i++ )
     {
-        spin_lock_irq(&power->stat_lock);	
-        res = tick_to_ns(power->states[i].time);
-        usage = power->states[i].usage;
-        spin_unlock_irq(&power->stat_lock);
+        res_tick[i] = power->states[i].time;
+        usage[i] = power->states[i].usage;
+    }
+    last_state_update_tick = power->last_state_update_tick;
+    spin_unlock_irq(&power->stat_lock);
 
-        idle_usage += usage;
-        idle_res += res;
+    res_tick[last_state_idx] += ticks_elapsed(last_state_update_tick, current_tick);
+    usage[last_state_idx]++;
+
+    for ( i = 1; i < power->count; i++ )
+    {
+        idle_usage += usage[i];
+        idle_res += tick_to_ns(res_tick[i]);
 
         printk((last_state_idx == i) ? "   *" : "    ");
         printk("C%d:\t", i);
         printk("type[C%d] ", power->states[i].type);
         printk("latency[%03d] ", power->states[i].latency);
-        printk("usage[%08d] ", usage);
+        printk("usage[%08"PRIu64"] ", usage[i]);
         printk("method[%5s] ", acpi_cstate_method_name[power->states[i].entry_method]);
-        printk("duration[%"PRId64"]\n", res);
+        printk("duration[%"PRIu64"]\n", tick_to_ns(res_tick[i]));
     }
     printk((last_state_idx == 0) ? "   *" : "    ");
-    printk("C0:\tusage[%08d] duration[%"PRId64"]\n",
-           idle_usage, NOW() - idle_res);
+    printk("C0:\tusage[%08"PRIu64"] duration[%"PRIu64"]\n",
+           usage[0] + idle_usage, current_stime - idle_res);
 
     print_hw_residencies(cpu);
 }
@@ -313,25 +343,6 @@ static int __init cpu_idle_key_init(void)
     return 0;
 }
 __initcall(cpu_idle_key_init);
-
-static uint64_t get_stime_tick(void) { return (uint64_t)NOW(); }
-static uint64_t stime_ticks_elapsed(uint64_t t1, uint64_t t2) { return t2 - t1; }
-static uint64_t stime_tick_to_ns(uint64_t ticks) { return ticks; }
-
-static uint64_t get_acpi_pm_tick(void) { return (uint64_t)inl(pmtmr_ioport); }
-static uint64_t acpi_pm_ticks_elapsed(uint64_t t1, uint64_t t2)
-{
-    if ( t2 >= t1 )
-        return (t2 - t1);
-    else if ( !(acpi_gbl_FADT.flags & ACPI_FADT_32BIT_TIMER) )
-        return (((0x00FFFFFF - t1) + t2 + 1) & 0x00FFFFFF);
-    else
-        return ((0xFFFFFFFF - t1) + t2 +1);
-}
-
-uint64_t (*__read_mostly cpuidle_get_tick)(void) = get_acpi_pm_tick;
-static uint64_t (*__read_mostly ticks_elapsed)(uint64_t, uint64_t)
-    = acpi_pm_ticks_elapsed;
 
 /*
  * The bit is set iff cpu use monitor/mwait to enter C state
@@ -487,6 +498,17 @@ bool_t errata_c6_eoi_workaround(void)
     return (fix_needed && cpu_has_pending_apic_eoi());
 }
 
+void update_last_cx_stat(struct acpi_processor_power *power,
+                         struct acpi_processor_cx *cx, uint64_t ticks)
+{
+    ASSERT(!local_irq_is_enabled());
+
+    spin_lock(&power->stat_lock);
+    power->last_state = cx;
+    power->last_state_update_tick = ticks;
+    spin_unlock(&power->stat_lock);
+}
+
 void update_idle_stats(struct acpi_processor_power *power,
                        struct acpi_processor_cx *cx,
                        uint64_t before, uint64_t after)
@@ -502,6 +524,8 @@ void update_idle_stats(struct acpi_processor_power *power,
         power->last_residency = tick_to_ns(sleep_ticks) / 1000UL;
         cx->time += sleep_ticks;
     }
+    power->last_state = &power->states[0];
+    power->last_state_update_tick = after;
 
     spin_unlock(&power->stat_lock);
 }
@@ -558,7 +582,6 @@ static void acpi_processor_idle(void)
     if ( (cx->type == ACPI_STATE_C3) && errata_c6_eoi_workaround() )
         cx = power->safe_state;
 
-    power->last_state = cx;
 
     /*
      * Sleep:
@@ -575,6 +598,9 @@ static void acpi_processor_idle(void)
             t1 = cpuidle_get_tick();
             /* Trace cpu idle entry */
             TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
+
+            update_last_cx_stat(power, cx, t1);
+
             /* Invoke C2 */
             acpi_idle_do_entry(cx);
             /* Get end time (ticks) */
@@ -603,6 +629,8 @@ static void acpi_processor_idle(void)
         t1 = cpuidle_get_tick();
         /* Trace cpu idle entry */
         TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
+
+        update_last_cx_stat(power, cx, t1);
 
         /*
          * disable bus master
@@ -1173,7 +1201,9 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
 {
     struct acpi_processor_power *power = processor_powers[cpuid];
     uint64_t idle_usage = 0, idle_res = 0;
-    uint64_t usage[ACPI_PROCESSOR_MAX_POWER], res[ACPI_PROCESSOR_MAX_POWER];
+    uint64_t last_state_update_tick, current_stime, current_tick;
+    uint64_t usage[ACPI_PROCESSOR_MAX_POWER] = { 0 };
+    uint64_t res[ACPI_PROCESSOR_MAX_POWER] = { 0 };
     unsigned int i, nr, nr_pc = 0, nr_cc = 0;
 
     if ( power == NULL )
@@ -1186,7 +1216,6 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
         return 0;
     }
 
-    stat->last = power->last_state ? power->last_state->idx : 0;
     stat->idle_time = get_cpu_idle_time(cpuid);
     nr = min(stat->nr, power->count);
 
@@ -1194,9 +1223,12 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
     if ( pm_idle_save == NULL )
     {
         stat->nr = 2;
+        stat->last = power->last_state ? power->last_state->idx : 0;
 
         usage[1] = idle_usage = 1;
         res[1] = idle_res = stat->idle_time;
+
+        current_stime = NOW();
     }
     else
     {
@@ -1204,13 +1236,24 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
 
         stat->nr = power->count;
 
+        spin_lock_irq(&power->stat_lock);
+        current_tick = cpuidle_get_tick();
+        current_stime = NOW();
         for ( i = 1; i < nr; i++ )
         {
-            spin_lock_irq(&power->stat_lock);
             usage[i] = power->states[i].usage;
-            res[i] = tick_to_ns(power->states[i].time);
-            spin_unlock_irq(&power->stat_lock);
+            res[i] = power->states[i].time;
+        }
+        last_state_update_tick = power->last_state_update_tick;
+        stat->last = power->last_state ? power->last_state->idx : 0;
+        spin_unlock_irq(&power->stat_lock);
 
+        usage[stat->last]++;
+        res[stat->last] += ticks_elapsed(last_state_update_tick, current_tick);
+
+        for ( i = 1; i < nr; i++ )
+        {
+            res[i] = tick_to_ns(res[i]);
             idle_usage += usage[i];
             idle_res += res[i];
         }
@@ -1243,8 +1286,8 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
 #undef PUT_xC
     }
 
-    usage[0] = idle_usage;
-    res[0] = NOW() - idle_res;
+    usage[0] += idle_usage;
+    res[0] = current_stime - idle_res;
 
     if ( copy_to_guest(stat->triggers, usage, nr) ||
          copy_to_guest(stat->residencies, res, nr) )

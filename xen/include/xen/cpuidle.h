@@ -66,6 +66,7 @@ struct acpi_processor_power
     struct acpi_processor_cx *last_state;
     struct acpi_processor_cx *safe_state;
     void *gdata; /* governor specific data */
+    u64 last_state_update_tick;
     u32 last_residency;
     u32 count;
     spinlock_t stat_lock;

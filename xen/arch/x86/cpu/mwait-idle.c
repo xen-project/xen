@@ -564,7 +564,6 @@ static void mwait_idle(void)
 		return;
 	}
 
-	power->last_state = cx;
 	eax = cx->address;
 	cstate = ((eax >> MWAIT_SUBSTATE_SIZE) & MWAIT_CSTATE_MASK) + 1;
 
@@ -583,6 +582,8 @@ static void mwait_idle(void)
 	before = cpuidle_get_tick();
 	TRACE_4D(TRC_PM_IDLE_ENTRY, cx->type, before, exp, pred);
 
+	update_last_cx_stat(power, cx, before);
+
 	if (cpu_is_haltable(cpu))
 		mwait_idle_with_hints(eax, MWAIT_ECX_INTERRUPT_BREAK);
 
@@ -593,14 +594,12 @@ static void mwait_idle(void)
 	TRACE_6D(TRC_PM_IDLE_EXIT, cx->type, after,
 		irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
 
+	/* Now back in C0. */
 	update_idle_stats(power, cx, before, after);
 	local_irq_enable();
 
 	if (!(lapic_timer_reliable_states & (1 << cstate)))
 		lapic_timer_on();
-
-	/* Now back in C0. */
-	power->last_state = &power->states[0];
 
 	sched_tick_resume();
 	cpufreq_dbs_timer_resume();

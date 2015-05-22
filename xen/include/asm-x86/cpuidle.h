@@ -23,6 +23,8 @@ void acpi_dead_idle(void);
 void trace_exit_reason(u32 *irq_traced);
 void update_idle_stats(struct acpi_processor_power *,
                        struct acpi_processor_cx *, uint64_t, uint64_t);
+void update_last_cx_stat(struct acpi_processor_power *,
+                         struct acpi_processor_cx *, uint64_t);
 
 /*
  * vcpu is urgent if vcpu is polling event channel
