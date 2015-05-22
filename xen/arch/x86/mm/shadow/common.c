@@ -3518,7 +3518,7 @@ int shadow_track_dirty_vram(struct domain *d,
                             unsigned long nr,
                             XEN_GUEST_HANDLE_64(uint8) guest_dirty_bitmap)
 {
-    int rc;
+    int rc = 0;
     unsigned long end_pfn = begin_pfn + nr;
     unsigned long dirty_size = (nr + 7) / 8;
     int flush_tlb = 0;
@@ -3550,10 +3550,7 @@ int shadow_track_dirty_vram(struct domain *d,
     }
 
     if ( !nr )
-    {
-        rc = 0;
         goto out;
-    }
 
     dirty_bitmap = vzalloc(dirty_size);
     if ( dirty_bitmap == NULL )
