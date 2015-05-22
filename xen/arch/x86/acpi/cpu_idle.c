@@ -279,7 +279,7 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
     uint64_t usage[ACPI_PROCESSOR_MAX_POWER] = { 0 };
     uint64_t res_tick[ACPI_PROCESSOR_MAX_POWER] = { 0 };
     unsigned int i;
-    u8 last_state_idx;
+    signed int last_state_idx;
 
     printk("==cpu%d==\n", cpu);
     last_state_idx = power->last_state ? power->last_state->idx : -1;
@@ -298,8 +298,12 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
     last_state_update_tick = power->last_state_update_tick;
     spin_unlock_irq(&power->stat_lock);
 
-    res_tick[last_state_idx] += ticks_elapsed(last_state_update_tick, current_tick);
-    usage[last_state_idx]++;
+    if ( last_state_idx >= 0 )
+    {
+        res_tick[last_state_idx] += ticks_elapsed(last_state_update_tick,
+                                                  current_tick);
+        usage[last_state_idx]++;
+    }
 
     for ( i = 1; i < power->count; i++ )
     {
@@ -1233,6 +1237,7 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
     else
     {
         struct hw_residencies hw_res;
+        signed int last_state_idx;
 
         stat->nr = power->count;
 
@@ -1245,11 +1250,18 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
             res[i] = power->states[i].time;
         }
         last_state_update_tick = power->last_state_update_tick;
-        stat->last = power->last_state ? power->last_state->idx : 0;
+        last_state_idx = power->last_state ? power->last_state->idx : -1;
         spin_unlock_irq(&power->stat_lock);
 
-        usage[stat->last]++;
-        res[stat->last] += ticks_elapsed(last_state_update_tick, current_tick);
+        if ( last_state_idx >= 0 )
+        {
+            usage[last_state_idx]++;
+            res[last_state_idx] += ticks_elapsed(last_state_update_tick,
+                                                 current_tick);
+            stat->last = last_state_idx;
+        }
+        else
+            stat->last = 0;
 
         for ( i = 1; i < nr; i++ )
         {
