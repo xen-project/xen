@@ -262,6 +262,7 @@ struct arch_shared_info {
 };
 typedef struct arch_shared_info arch_shared_info_t;
 
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
 /*
  * struct xen_arch_domainconfig's ABI is covered by
  * XEN_DOMCTL_INTERFACE_VERSION.
@@ -269,6 +270,7 @@ typedef struct arch_shared_info arch_shared_info_t;
 struct xen_arch_domainconfig {
     char dummy;
 };
+#endif
 
 #endif /* !__ASSEMBLY__ */
 
