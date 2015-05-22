@@ -1639,8 +1639,7 @@ static void vmx_dump_sel(char *name, uint32_t selector)
     attr = vmr(selector + (GUEST_ES_AR_BYTES - GUEST_ES_SELECTOR));
     limit = vmr(selector + (GUEST_ES_LIMIT - GUEST_ES_SELECTOR));
     base = vmr(selector + (GUEST_ES_BASE - GUEST_ES_SELECTOR));
-    printk("%s: sel=0x%04x, attr=0x%05x, limit=0x%08x, base=0x%016"PRIx64"\n",
-           name, sel, attr, limit, base);
+    printk("%s: %04x %05x %08x %016"PRIx64"\n", name, sel, attr, limit, base);
 }
 
 static void vmx_dump_sel2(char *name, uint32_t lim)
@@ -1649,8 +1648,7 @@ static void vmx_dump_sel2(char *name, uint32_t lim)
     uint64_t base;
     limit = vmr(lim);
     base = vmr(lim + (GUEST_GDTR_BASE - GUEST_GDTR_LIMIT));
-    printk("%s:                           limit=0x%08x, base=0x%016"PRIx64"\n",
-           name, limit, base);
+    printk("%s:            %08x %016"PRIx64"\n", name, limit, base);
 }
 
 void vmcs_dump_vcpu(struct vcpu *v)
@@ -1695,16 +1693,17 @@ void vmcs_dump_vcpu(struct vcpu *v)
     printk("Sysenter RSP=%016lx CS:RIP=%04x:%016lx\n",
            vmr(GUEST_SYSENTER_ESP),
            vmr32(GUEST_SYSENTER_CS), vmr(GUEST_SYSENTER_EIP));
-    vmx_dump_sel("CS", GUEST_CS_SELECTOR);
-    vmx_dump_sel("DS", GUEST_DS_SELECTOR);
-    vmx_dump_sel("SS", GUEST_SS_SELECTOR);
-    vmx_dump_sel("ES", GUEST_ES_SELECTOR);
-    vmx_dump_sel("FS", GUEST_FS_SELECTOR);
-    vmx_dump_sel("GS", GUEST_GS_SELECTOR);
+    printk("       sel  attr  limit   base\n");
+    vmx_dump_sel("  CS", GUEST_CS_SELECTOR);
+    vmx_dump_sel("  DS", GUEST_DS_SELECTOR);
+    vmx_dump_sel("  SS", GUEST_SS_SELECTOR);
+    vmx_dump_sel("  ES", GUEST_ES_SELECTOR);
+    vmx_dump_sel("  FS", GUEST_FS_SELECTOR);
+    vmx_dump_sel("  GS", GUEST_GS_SELECTOR);
     vmx_dump_sel2("GDTR", GUEST_GDTR_LIMIT);
     vmx_dump_sel("LDTR", GUEST_LDTR_SELECTOR);
     vmx_dump_sel2("IDTR", GUEST_IDTR_LIMIT);
-    vmx_dump_sel("TR", GUEST_TR_SELECTOR);
+    vmx_dump_sel("  TR", GUEST_TR_SELECTOR);
     if ( (vmexit_ctl & (VM_EXIT_SAVE_GUEST_PAT | VM_EXIT_SAVE_GUEST_EFER)) ||
          (vmentry_ctl & (VM_ENTRY_LOAD_GUEST_PAT | VM_ENTRY_LOAD_GUEST_EFER)) )
         printk("EFER = 0x%016lx  PAT = 0x%016lx\n", efer, vmr(GUEST_PAT));
