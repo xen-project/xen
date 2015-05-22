@@ -992,7 +992,7 @@ void __init init_apic_mappings(void)
         apic_phys = mp_lapic_addr;
 
     set_fixmap_nocache(FIX_APIC_BASE, apic_phys);
-    apic_printk(APIC_VERBOSE, "mapped APIC to %08lx (%08lx)\n", APIC_BASE,
+    apic_printk(APIC_VERBOSE, "mapped APIC to %08Lx (%08lx)\n", APIC_BASE,
                 apic_phys);
 
 __next:

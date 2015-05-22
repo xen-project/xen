@@ -2546,7 +2546,7 @@ void __init init_ioapic_mappings(void)
             clear_page(__va(ioapic_phys));
         }
         set_fixmap_nocache(idx, ioapic_phys);
-        apic_printk(APIC_VERBOSE, "mapped IOAPIC to %08lx (%08lx)\n",
+        apic_printk(APIC_VERBOSE, "mapped IOAPIC to %08Lx (%08lx)\n",
                     __fix_to_virt(idx), ioapic_phys);
         idx++;
 
