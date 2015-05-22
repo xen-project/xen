@@ -1162,7 +1162,7 @@ void __init efi_init_memory(void)
         EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
         u64 len = desc->NumberOfPages << EFI_PAGE_SHIFT;
         unsigned long smfn, emfn;
-        unsigned int prot = PAGE_HYPERVISOR;
+        unsigned int prot = PAGE_HYPERVISOR_RWX;
 
         printk(XENLOG_INFO " %013" PRIx64 "-%013" PRIx64
                            " type=%u attr=%016" PRIx64 "\n",
@@ -1195,7 +1195,7 @@ void __init efi_init_memory(void)
         if ( desc->Attribute & EFI_MEMORY_WP )
             prot &= _PAGE_RW;
         if ( desc->Attribute & EFI_MEMORY_XP )
-            prot |= _PAGE_NX_BIT;
+            prot |= _PAGE_NX;
 
         if ( pfn_to_pdx(emfn - 1) < (DIRECTMAP_SIZE >> PAGE_SHIFT) &&
              !(smfn & pfn_hole_mask) &&

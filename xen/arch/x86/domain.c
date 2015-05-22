@@ -293,7 +293,7 @@ struct vcpu_guest_context *alloc_vcpu_guest_context(void)
             free_vcpu_guest_context(NULL);
             return NULL;
         }
-        __set_fixmap(idx - i, page_to_mfn(pg), __PAGE_HYPERVISOR);
+        __set_fixmap(idx - i, page_to_mfn(pg), __PAGE_HYPERVISOR_RW);
         per_cpu(vgc_pages[i], cpu) = pg;
     }
     return (void *)fix_to_virt(idx);

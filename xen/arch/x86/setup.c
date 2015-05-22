@@ -901,7 +901,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             /* The only data mappings to be relocated are in the Xen area. */
             pl2e = __va(__pa(l2_xenmap));
             *pl2e++ = l2e_from_pfn(xen_phys_start >> PAGE_SHIFT,
-                                   PAGE_HYPERVISOR | _PAGE_PSE);
+                                   PAGE_HYPERVISOR_RWX | _PAGE_PSE);
             for ( i = 1; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
             {
                 if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
@@ -1088,7 +1088,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             /* This range must not be passed to the boot allocator and
              * must also not be mapped with _PAGE_GLOBAL. */
             map_pages_to_xen((unsigned long)__va(map_e), PFN_DOWN(map_e),
-                             PFN_DOWN(e - map_e), __PAGE_HYPERVISOR);
+                             PFN_DOWN(e - map_e), __PAGE_HYPERVISOR_RW);
         }
         if ( s < map_s )
         {
@@ -1423,6 +1423,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
      */
     if ( cpu_has_smap )
         write_cr4(read_cr4() & ~X86_CR4_SMAP);
+
+    printk("%sNX (Execute Disable) protection %sactive\n",
+           cpu_has_nx ? XENLOG_INFO : XENLOG_WARNING "Warning: ",
+           cpu_has_nx ? "" : "not ");
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely

@@ -160,7 +160,7 @@ void *map_domain_page(unsigned long mfn)
 
     spin_unlock(&dcache->lock);
 
-    l1e_write(&MAPCACHE_L1ENT(idx), l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
+    l1e_write(&MAPCACHE_L1ENT(idx), l1e_from_pfn(mfn, __PAGE_HYPERVISOR_RW));
 
  out:
     local_irq_restore(flags);

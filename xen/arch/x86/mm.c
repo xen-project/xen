@@ -4412,7 +4412,7 @@ long set_gdt(struct vcpu *v,
     for ( i = 0; i < nr_pages; i++ )
     {
         v->arch.pv_vcpu.gdt_frames[i] = frames[i];
-        l1e_write(&pl1e[i], l1e_from_pfn(frames[i], __PAGE_HYPERVISOR));
+        l1e_write(&pl1e[i], l1e_from_pfn(frames[i], __PAGE_HYPERVISOR_RW));
     }
 
     xfree(pfns);
@@ -6003,7 +6003,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
                 if ( !IS_NIL(ppg) )
                     *ppg++ = pg;
                 l1tab[l1_table_offset(va)] =
-                    l1e_from_page(pg, __PAGE_HYPERVISOR | _PAGE_AVAIL0);
+                    l1e_from_page(pg, __PAGE_HYPERVISOR_RW | _PAGE_AVAIL0);
                 l2e_add_flags(*pl2e, _PAGE_AVAIL0);
             }
             else
@@ -6132,7 +6132,7 @@ void memguard_init(void)
         (unsigned long)__va(start),
         start >> PAGE_SHIFT,
         (__pa(&_end) + PAGE_SIZE - 1 - start) >> PAGE_SHIFT,
-        __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
+        __PAGE_HYPERVISOR_RW|MAP_SMALL_PAGES);
     BUG_ON(start != xen_phys_start);
     map_pages_to_xen(
         XEN_VIRT_START,
@@ -6145,7 +6145,7 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
 {
     unsigned long _p = (unsigned long)p;
     unsigned long _l = (unsigned long)l;
-    unsigned int flags = __PAGE_HYPERVISOR | MAP_SMALL_PAGES;
+    unsigned int flags = __PAGE_HYPERVISOR_RW | MAP_SMALL_PAGES;
 
     /* Ensure we are dealing with a page-aligned whole number of pages. */
     ASSERT((_p&~PAGE_MASK) == 0);
