@@ -50,42 +50,36 @@
  */
 #define VGICD_CTLR_DEFAULT  (GICD_CTLR_ARE_NS)
 
-static struct vcpu *vgic_v3_irouter_to_vcpu(struct vcpu *v, uint64_t irouter)
+static struct vcpu *vgic_v3_irouter_to_vcpu(struct domain *d, uint64_t irouter)
 {
-    irouter &= ~(GICD_IROUTER_SPI_MODE_ANY);
-    irouter = irouter & MPIDR_AFF0_MASK;
+    unsigned int vcpu_id;
 
-    return v->domain->vcpu[irouter];
-}
+    /*
+     * When the Interrupt Route Mode is set, the IRQ targets any vCPUs.
+     * For simplicity, the IRQ is always routed to vCPU0.
+     */
+    if ( irouter & GICD_IROUTER_SPI_MODE_ANY )
+        return d->vcpu[0];
 
-static uint64_t vgic_v3_vcpu_to_irouter(struct vcpu *v,
-                                        unsigned int vcpu_id)
-{
-    uint64_t irq_affinity;
-    struct vcpu *v_target;
+    vcpu_id = irouter & MPIDR_AFF0_MASK;
+    if ( vcpu_id >= d->max_vcpus )
+        return NULL;
 
-    v_target = v->domain->vcpu[vcpu_id];
-    irq_affinity = (MPIDR_AFFINITY_LEVEL(v_target->arch.vmpidr, 3) << 32 |
-                    MPIDR_AFFINITY_LEVEL(v_target->arch.vmpidr, 2) << 16 |
-                    MPIDR_AFFINITY_LEVEL(v_target->arch.vmpidr, 1) << 8  |
-                    MPIDR_AFFINITY_LEVEL(v_target->arch.vmpidr, 0));
-
-    return irq_affinity;
+    return d->vcpu[vcpu_id];
 }
 
 static struct vcpu *vgic_v3_get_target_vcpu(struct vcpu *v, unsigned int irq)
 {
-    uint64_t target;
+    struct vcpu *v_target;
     struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
 
     ASSERT(spin_is_locked(&rank->lock));
 
-    target = rank->v3.irouter[irq % 32];
-    target &= ~(GICD_IROUTER_SPI_MODE_ANY);
-    target &= MPIDR_AFF0_MASK;
-    ASSERT(target >= 0 && target < v->domain->max_vcpus);
+    v_target = vgic_v3_irouter_to_vcpu(v->domain, rank->v3.irouter[irq % 32]);
 
-    return v->domain->vcpu[target];
+    ASSERT(v_target != NULL);
+
+    return v_target;
 }
 
 static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
@@ -670,8 +664,6 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
     register_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
     unsigned long flags;
-    uint64_t irouter;
-    unsigned int vcpu_id;
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
 
     perfc_incr(vgicd_reads);
@@ -742,17 +734,8 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
                                 DABT_DOUBLE_WORD);
         if ( rank == NULL ) goto read_as_zero;
         vgic_lock_rank(v, rank, flags);
-        irouter = rank->v3.irouter[REG_RANK_INDEX(64,
-                                  (gicd_reg - GICD_IROUTER), DABT_DOUBLE_WORD)];
-        /* XXX: bit[31] stores IRQ mode. Just return */
-        if ( irouter & GICD_IROUTER_SPI_MODE_ANY )
-        {
-            *r = GICD_IROUTER_SPI_MODE_ANY;
-            vgic_unlock_rank(v, rank, flags);
-            return 1;
-        }
-        vcpu_id = irouter;
-        *r = vgic_v3_vcpu_to_irouter(v, vcpu_id);
+        *r = rank->v3.irouter[REG_RANK_INDEX(64,
+                              (gicd_reg - GICD_IROUTER), DABT_DOUBLE_WORD)];
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_NSACR ... GICD_NSACRN:
@@ -838,7 +821,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     register_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
     unsigned long flags;
-    uint64_t new_irouter, new_target, old_target;
+    uint64_t new_irouter, old_irouter;
     struct vcpu *old_vcpu, *new_vcpu;
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
 
@@ -910,40 +893,29 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         new_irouter = *r;
         vgic_lock_rank(v, rank, flags);
 
-        old_target = rank->v3.irouter[REG_RANK_INDEX(64,
-                              (gicd_reg - GICD_IROUTER), DABT_DOUBLE_WORD)];
-        old_target &= ~(GICD_IROUTER_SPI_MODE_ANY);
-        if ( new_irouter & GICD_IROUTER_SPI_MODE_ANY )
-        {
-            /*
-             * IRQ routing mode set. Route any one processor in the entire
-             * system. We chose vcpu 0 and set IRQ mode bit[31] in irouter.
-             */
-            new_target = 0;
-            new_vcpu = v->domain->vcpu[0];
-            new_irouter = GICD_IROUTER_SPI_MODE_ANY;
-        }
-        else
-        {
-            new_target = new_irouter & MPIDR_AFF0_MASK;
-            if ( new_target >= v->domain->max_vcpus )
-            {
-                printk(XENLOG_G_DEBUG
-                       "%pv: vGICD: wrong irouter at offset %#08x\n val 0x%lx vcpu %x",
-                       v, gicd_reg, new_target, v->domain->max_vcpus);
-                vgic_unlock_rank(v, rank, flags);
-                return 0;
-            }
-            new_vcpu = vgic_v3_irouter_to_vcpu(v, new_irouter);
-        }
+        old_irouter = rank->v3.irouter[REG_RANK_INDEX(64,
+                                       (gicd_reg - GICD_IROUTER),
+                                       DABT_DOUBLE_WORD)];
+        old_vcpu = vgic_v3_irouter_to_vcpu(v->domain, old_irouter);
+        new_vcpu = vgic_v3_irouter_to_vcpu(v->domain, new_irouter);
 
+        if ( !new_vcpu )
+        {
+            printk(XENLOG_G_DEBUG
+                   "%pv: vGICD: wrong irouter at offset %#08x val %#"PRIregister,
+                   v, gicd_reg, *r);
+            vgic_unlock_rank(v, rank, flags);
+            /*
+             * TODO: Don't inject a fault to the guest when the MPIDR is
+             * not valid. From the spec, the interrupt should be
+             * ignored.
+             */
+            return 0;
+        }
         rank->v3.irouter[REG_RANK_INDEX(64, (gicd_reg - GICD_IROUTER),
                          DABT_DOUBLE_WORD)] = new_irouter;
-        if ( old_target != new_target )
-        {
-            old_vcpu = v->domain->vcpu[old_target];
+        if ( old_vcpu != new_vcpu )
             vgic_migrate_irq(old_vcpu, new_vcpu, (gicd_reg - GICD_IROUTER)/8);
-        }
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_NSACR ... GICD_NSACRN:
