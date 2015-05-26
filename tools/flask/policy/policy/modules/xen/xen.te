@@ -117,6 +117,16 @@ domain_comms(dom0_t, dom0_t)
 # Allow all domains to use (unprivileged parts of) the tmem hypercall
 allow domain_type xen_t:xen tmem_op;
 
+# Allow guest console output to the serial console.  This is used by PV Linux
+# and stub domains for early boot output, so don't audit even when we deny it.
+# Without XSM, this is enabled only if the Xen was compiled in debug mode.
+gen_bool(guest_writeconsole, true)
+if (guest_writeconsole) {
+	allow domain_type xen_t : xen writeconsole;
+} else {
+	dontaudit domain_type xen_t : xen writeconsole;
+}
+
 ###############################################################################
 #
 # Domain creation
