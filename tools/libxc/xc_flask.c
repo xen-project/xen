@@ -191,6 +191,12 @@ int xc_flask_getbool_byname(xc_interface *xch, char *name, int *curr, int *pend)
     DECLARE_FLASK_OP;
     DECLARE_HYPERCALL_BOUNCE(name, strlen(name), XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
+    if ( xc_hypercall_bounce_pre(xch, name) )
+    {
+        PERROR("Could not bounce memory for flask op hypercall");
+        return -1;
+    }
+
     op.cmd = FLASK_GETBOOL;
     op.u.boolean.bool_id = -1;
     op.u.boolean.size = strlen(name);
@@ -216,6 +222,12 @@ int xc_flask_setbool(xc_interface *xch, char *name, int value, int commit)
     int rv;
     DECLARE_FLASK_OP;
     DECLARE_HYPERCALL_BOUNCE(name, strlen(name), XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    if ( xc_hypercall_bounce_pre(xch, name) )
+    {
+        PERROR("Could not bounce memory for flask op hypercall");
+        return -1;
+    }
 
     op.cmd = FLASK_SETBOOL;
     op.u.boolean.bool_id = -1;
