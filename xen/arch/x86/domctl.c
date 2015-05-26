@@ -703,13 +703,16 @@ long arch_do_domctl(
             ret = -EINVAL;
         else
         {
+            xen_guest_tsc_info_t info = { 0 };
+
             domain_pause(d);
-            tsc_get_info(d, &domctl->u.tsc_info.info.tsc_mode,
-                         &domctl->u.tsc_info.info.elapsed_nsec,
-                         &domctl->u.tsc_info.info.gtsc_khz,
-                         &domctl->u.tsc_info.info.incarnation);
+            tsc_get_info(d, &info.tsc_mode,
+                            &info.elapsed_nsec,
+                            &info.gtsc_khz,
+                            &info.incarnation);
             domain_unpause(d);
-            copyback = 1;
+            if ( copy_to_guest(domctl->u.tsc_info.out_info, &info, 1) )
+                ret = -EFAULT;
         }
         break;
 
