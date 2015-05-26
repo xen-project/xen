@@ -55,7 +55,6 @@ static DEFINE_SPINLOCK(sel_sem);
 /* global data for booleans */
 static int bool_num = 0;
 static int *bool_pending_values = NULL;
-static size_t bool_maxstr;
 static int flask_security_make_bools(void);
 
 extern int ss_initialized;
@@ -318,7 +317,7 @@ static int flask_security_resolve_bool(struct xen_flask_boolean *arg)
     if ( arg->bool_id != -1 )
         return 0;
 
-    name = safe_copy_string_from_guest(arg->name, arg->size, bool_maxstr);
+    name = safe_copy_string_from_guest(arg->name, arg->size, PAGE_SIZE);
     if ( IS_ERR(name) )
         return PTR_ERR(name);
 
@@ -459,7 +458,7 @@ static int flask_security_make_bools(void)
     
     xfree(bool_pending_values);
     
-    ret = security_get_bools(&num, NULL, &values, &bool_maxstr);
+    ret = security_get_bools(&num, NULL, &values, NULL);
     if ( ret != 0 )
         goto out;
 
