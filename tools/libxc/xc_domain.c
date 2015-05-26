@@ -760,10 +760,10 @@ int xc_domain_set_tsc_info(xc_interface *xch,
     DECLARE_DOMCTL;
     domctl.cmd = XEN_DOMCTL_settscinfo;
     domctl.domain = (domid_t)domid;
-    domctl.u.tsc_info.info.tsc_mode = tsc_mode;
-    domctl.u.tsc_info.info.elapsed_nsec = elapsed_nsec;
-    domctl.u.tsc_info.info.gtsc_khz = gtsc_khz;
-    domctl.u.tsc_info.info.incarnation = incarnation;
+    domctl.u.tsc_info.tsc_mode = tsc_mode;
+    domctl.u.tsc_info.elapsed_nsec = elapsed_nsec;
+    domctl.u.tsc_info.gtsc_khz = gtsc_khz;
+    domctl.u.tsc_info.incarnation = incarnation;
     return do_domctl(xch, &domctl);
 }
 
@@ -776,24 +776,17 @@ int xc_domain_get_tsc_info(xc_interface *xch,
 {
     int rc;
     DECLARE_DOMCTL;
-    DECLARE_HYPERCALL_BUFFER(xen_guest_tsc_info_t, info);
-
-    info = xc_hypercall_buffer_alloc(xch, info, sizeof(*info));
-    if ( info == NULL )
-        return -1;
 
     domctl.cmd = XEN_DOMCTL_gettscinfo;
     domctl.domain = (domid_t)domid;
-    set_xen_guest_handle(domctl.u.tsc_info.out_info, info);
     rc = do_domctl(xch, &domctl);
     if ( rc == 0 )
     {
-        *tsc_mode = info->tsc_mode;
-        *elapsed_nsec = info->elapsed_nsec;
-        *gtsc_khz = info->gtsc_khz;
-        *incarnation = info->incarnation;
+        *tsc_mode = domctl.u.tsc_info.tsc_mode;
+        *elapsed_nsec = domctl.u.tsc_info.elapsed_nsec;
+        *gtsc_khz = domctl.u.tsc_info.gtsc_khz;
+        *incarnation = domctl.u.tsc_info.incarnation;
     }
-    xc_hypercall_buffer_free(xch, info);
     return rc;
 }
 

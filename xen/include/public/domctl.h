@@ -699,18 +699,13 @@ typedef struct xen_domctl_disable_migrate {
 
 /* XEN_DOMCTL_gettscinfo */
 /* XEN_DOMCTL_settscinfo */
-struct xen_guest_tsc_info {
+typedef struct xen_domctl_tsc_info {
+    /* IN/OUT */
     uint32_t tsc_mode;
     uint32_t gtsc_khz;
     uint32_t incarnation;
     uint32_t pad;
     uint64_aligned_t elapsed_nsec;
-};
-typedef struct xen_guest_tsc_info xen_guest_tsc_info_t;
-DEFINE_XEN_GUEST_HANDLE(xen_guest_tsc_info_t);
-typedef struct xen_domctl_tsc_info {
-    XEN_GUEST_HANDLE_64(xen_guest_tsc_info_t) out_info; /* OUT */
-    xen_guest_tsc_info_t info; /* IN */
 } xen_domctl_tsc_info_t;
 
 /* XEN_DOMCTL_gdbsx_guestmemio      guest mem io */
