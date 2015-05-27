@@ -224,9 +224,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= edb43a7abbec40fb601140fecdc29d693358963b
-# Tue Mar 31 16:27:45 2015 +0100
-# xen: limit guest control of PCI command register
+QEMU_TAG ?= c545d0dfcc5ab5e69d0eabc14ec101293236055c
+# Wed May 6 09:48:59 2015 +0200
+# fdc: force the fifo access to be in bounds of the allocated buffer
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
