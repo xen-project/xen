@@ -260,9 +260,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.5.1-rc1
-# Tue Mar 31 16:27:45 2015 +0100
-# xen: limit guest control of PCI command register
+QEMU_TRADITIONAL_REVISION ?= e42b84cf1c524d017208b981c7749dc5945dda72
+# Wed May 6 09:48:59 2015 +0200
+# fdc: force the fifo access to be in bounds of the allocated buffer
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
