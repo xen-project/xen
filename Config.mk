@@ -266,9 +266,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 3b45fcf0c163b9cff4d8115f7b75b42918a9b1b5
-# Thu Apr 9 19:49:24 2015 +0100
-# qemu-trad: xenstore: use relative path for device-model node
+QEMU_TRADITIONAL_REVISION ?= 4de1422ea306832b6ef2cba34e9febb73dd139a7
+# Wed May 6 09:48:59 2015 +0200
+# fdc: force the fifo access to be in bounds of the allocated buffer
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
