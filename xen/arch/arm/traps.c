@@ -2413,6 +2413,8 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     }
 
 bad_data_abort:
+    gdprintk(XENLOG_DEBUG, "HSR=0x%x pc=%#"PRIregister" gva=%#"PRIvaddr
+             " gpa=%#"PRIpaddr"\n", hsr.bits, regs->pc, info.gva, info.gpa);
     inject_dabt_exception(regs, info.gva, hsr.len);
 }
 
