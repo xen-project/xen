@@ -1073,13 +1073,19 @@ bool_t cpu_has_pending_apic_eoi(void)
 static inline void set_pirq_eoi(struct domain *d, unsigned int irq)
 {
     if ( d->arch.pirq_eoi_map )
+    {
+        ASSERT(irq < PAGE_SIZE * BITS_PER_BYTE);
         set_bit(irq, d->arch.pirq_eoi_map);
+    }
 }
 
 static inline void clear_pirq_eoi(struct domain *d, unsigned int irq)
 {
     if ( d->arch.pirq_eoi_map )
+    {
+        ASSERT(irq < PAGE_SIZE * BITS_PER_BYTE);
         clear_bit(irq, d->arch.pirq_eoi_map);
+    }
 }
 
 static void set_eoi_ready(void *data);

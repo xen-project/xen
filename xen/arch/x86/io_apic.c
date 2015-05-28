@@ -2614,6 +2614,10 @@ unsigned int arch_hwdom_irqs(domid_t domid)
     if ( !domid )
         n = min(n, dom0_max_vcpus());
     n = min(nr_irqs_gsi + n * NR_DYNAMIC_VECTORS, nr_irqs);
+
+    /* Bounded by the domain pirq eoi bitmap gfn. */
+    n = min_t(unsigned int, n, PAGE_SIZE * BITS_PER_BYTE);
+
     printk("Dom%d has maximum %u PIRQs\n", domid, n);
 
     return n;
