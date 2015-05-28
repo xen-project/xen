@@ -132,7 +132,7 @@ static always_inline u16 observe_head(spinlock_tickets_t *t)
 
 void _spin_lock(spinlock_t *lock)
 {
-    spinlock_tickets_t tickets = SPINLOCK_TICKET_INC;
+    spinlock_tickets_t tickets = { .tail = 1, };
     LOCK_PROFILE_VAR;
 
     check_lock(&lock->debug);
