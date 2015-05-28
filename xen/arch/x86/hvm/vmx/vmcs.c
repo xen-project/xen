@@ -976,6 +976,10 @@ static int construct_vmcs(struct vcpu *v)
               | SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY);
         v->arch.hvm_vmx.exec_control &= ~CPU_BASED_TPR_SHADOW;
 
+        /* In turn, disable posted interrupts. */
+        __vmwrite(PIN_BASED_VM_EXEC_CONTROL,
+                  vmx_pin_based_exec_control & ~PIN_BASED_POSTED_INTERRUPT);
+
         /* Unrestricted guest (real mode for EPT) */
         v->arch.hvm_vmx.secondary_exec_control &=
             ~SECONDARY_EXEC_UNRESTRICTED_GUEST;
