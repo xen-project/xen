@@ -19,7 +19,7 @@
 #include <xen/spinlock.h>
 
 #ifdef SYMBOLS_ORIGIN
-extern const unsigned int symbols_offsets[1];
+extern const unsigned int symbols_offsets[];
 #define symbols_address(n) (SYMBOLS_ORIGIN + symbols_offsets[n])
 #else
 extern const unsigned long symbols_addresses[];
