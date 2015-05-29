@@ -53,9 +53,6 @@
 
 #define arch_fetch_and_add(x, v) __sync_fetch_and_add(x, v)
 
-#define arch_lock_acquire_barrier() smp_mb()
-#define arch_lock_release_barrier() smp_mb()
-
 extern struct vcpu *__context_switch(struct vcpu *prev, struct vcpu *next);
 
 #endif

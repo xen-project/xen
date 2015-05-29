@@ -1036,7 +1036,7 @@ struct xen_domctl_monitor_op {
         } mov_to_msr;
     } u;
 };
-typedef struct xen_domctl__op xen_domctl_monitor_op_t;
+typedef struct xen_domctl_monitor_op xen_domctl_monitor_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_monitor_op_t);
 
 struct xen_domctl {
