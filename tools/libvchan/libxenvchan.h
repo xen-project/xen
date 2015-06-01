@@ -44,6 +44,7 @@
 
 #include <xen/io/libxenvchan.h>
 #include <xen/sys/evtchn.h>
+#include <xenevtchn.h>
 #include <xenctrl.h>
 
 struct libxenvchan_ring {
@@ -71,7 +72,7 @@ struct libxenvchan {
 	/* Pointer to shared ring page */
 	struct vchan_interface *ring;
 	/* event channel interface */
-	xc_evtchn *event;
+	xenevtchn_handle *event;
 	uint32_t event_port;
 	/* informative flags: are we acting as server? */
 	int is_server:1;

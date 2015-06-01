@@ -117,7 +117,6 @@
  */
 
 typedef struct xc_interface_core xc_interface;
-typedef struct xenevtchn_handle xc_evtchn;
 typedef struct xc_interface_core xc_gnttab;
 typedef struct xc_interface_core xc_gntshr;
 
@@ -1085,7 +1084,6 @@ int xc_cpupool_movedomain(xc_interface *xch,
  */
 xc_cpumap_t xc_cpupool_freeinfo(xc_interface *xch);
 
-
 /*
  * EVENT CHANNEL FUNCTIONS
  *
@@ -1120,101 +1118,7 @@ int xc_evtchn_reset(xc_interface *xch,
 typedef struct evtchn_status xc_evtchn_status_t;
 int xc_evtchn_status(xc_interface *xch, xc_evtchn_status_t *status);
 
-/*
- * Return a handle to the event channel driver, or NULL on failure, in
- * which case errno will be set appropriately.
- *
- * Note:
- * After fork a child process must not use any opened xc evtchn
- * handle inherited from their parent. They must open a new handle if
- * they want to interact with xc.
- *
- * Before Xen pre-4.1 this function would sometimes report errors with perror.
- */
-xc_evtchn *xc_evtchn_open(xentoollog_logger *logger,
-                             unsigned open_flags);
 
-/*
- * Close a handle previously allocated with xc_evtchn_open().
- */
-int xc_evtchn_close(xc_evtchn *xce);
-
-/*
- * Return an fd that can be select()ed on.
- *
- * Note that due to bugs, setting this fd to non blocking may not
- * work: you would hope that it would result in xc_evtchn_pending
- * failing with EWOULDBLOCK if there are no events signaled, but in
- * fact it may block.  (Bug is present in at least Linux 3.12, and
- * perhaps on other platforms or later version.)
- *
- * To be safe, you must use poll() or select() before each call to
- * xc_evtchn_pending.  If you have multiple threads (or processes)
- * sharing a single xce handle this will not work, and there is no
- * straightforward workaround.  Please design your program some other
- * way.
- */
-int xc_evtchn_fd(xc_evtchn *xce);
-
-/*
- * Notify the given event channel. Returns -1 on failure, in which case
- * errno will be set appropriately.
- */
-int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port);
-
-/*
- * Returns a new event port awaiting interdomain connection from the given
- * domain ID, or -1 on failure, in which case errno will be set appropriately.
- */
-evtchn_port_or_error_t
-xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid);
-
-/*
- * Returns a new event port bound to the remote port for the given domain ID,
- * or -1 on failure, in which case errno will be set appropriately.
- */
-evtchn_port_or_error_t
-xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
-                           evtchn_port_t remote_port);
-
-/*
- * Bind an event channel to the given VIRQ. Returns the event channel bound to
- * the VIRQ, or -1 on failure, in which case errno will be set appropriately.
- */
-evtchn_port_or_error_t
-xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq);
-
-/*
- * Unbind the given event channel. Returns -1 on failure, in which case errno
- * will be set appropriately.
- */
-int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port);
-
-/*
- * Return the next event channel to become pending, or -1 on failure, in which
- * case errno will be set appropriately.
- *
- * At the hypervisor level the event channel will have been masked,
- * and then cleared, by the underlying machinery (evtchn kernel
- * driver, or equivalent).  So if the event channel is signaled again
- * after it is returned here, it will be queued up, and delivered
- * again after you unmask it.  (See the documentation in the Xen
- * public header event_channel.h.)
- *
- * On receiving the notification from xc_evtchn_pending, you should
- * normally: check (by other means) what work needs doing; do the
- * necessary work (if any); unmask the event channel with
- * xc_evtchn_unmask (if you want to receive any further
- * notifications).
- */
-evtchn_port_or_error_t
-xc_evtchn_pending(xc_evtchn *xce);
-
-/*
- * Unmask the given event channel. Returns -1 on failure, in which case errno
- * will be set appropriately.
- */
-int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port);
 
 int xc_physdev_pci_access_modify(xc_interface *xch,
                                  uint32_t domid,
@@ -2850,6 +2754,9 @@ int xc_psr_cat_get_l3_info(xc_interface *xch, uint32_t socket,
                            uint32_t *cos_max, uint32_t *cbm_len,
                            bool *cdp_enabled);
 #endif
+
+/* Compat shims */
+#include "xenctrl_compat.h"
 
 #endif /* XENCTRL_H */
 

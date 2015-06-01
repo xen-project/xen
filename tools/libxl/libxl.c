@@ -186,7 +186,7 @@ int libxl_ctx_free(libxl_ctx *ctx)
     if (ctx->xch) xc_interface_close(ctx->xch);
     libxl_version_info_dispose(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh);
-    if (ctx->xce) xc_evtchn_close(ctx->xce);
+    if (ctx->xce) xenevtchn_close(ctx->xce);
 
     libxl__poller_put(ctx, ctx->poller_app);
     ctx->poller_app = NULL;

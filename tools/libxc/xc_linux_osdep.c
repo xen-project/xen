@@ -31,7 +31,6 @@
 #include <sys/ioctl.h>
 
 #include <xen/memory.h>
-#include <xen/sys/evtchn.h>
 #include <xen/sys/gntdev.h>
 #include <xen/sys/gntalloc.h>
 
@@ -460,100 +459,6 @@ static struct xc_osdep_ops linux_privcmd_ops = {
 };
 
 #define DEVXEN "/dev/xen/"
-
-int osdep_evtchn_open(xc_evtchn *xce)
-{
-    int fd = open(DEVXEN "evtchn", O_RDWR);
-    if ( fd == -1 )
-        return -1;
-    xce->fd = fd;
-    return 0;
-}
-
-int osdep_evtchn_close(xc_evtchn *xce)
-{
-    if ( xce->fd == -1 )
-        return 0;
-
-    return close(xce->fd);
-}
-
-int xc_evtchn_fd(xc_evtchn *xce)
-{
-    return xce->fd;
-}
-
-int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
-{
-    int fd = xce->fd;
-    struct ioctl_evtchn_notify notify;
-
-    notify.port = port;
-
-    return ioctl(fd, IOCTL_EVTCHN_NOTIFY, &notify);
-}
-
-evtchn_port_or_error_t xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid)
-{
-    int fd = xce->fd;
-    struct ioctl_evtchn_bind_unbound_port bind;
-
-    bind.remote_domain = domid;
-
-    return ioctl(fd, IOCTL_EVTCHN_BIND_UNBOUND_PORT, &bind);
-}
-
-evtchn_port_or_error_t xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
-                                                  evtchn_port_t remote_port)
-{
-    int fd = xce->fd;
-    struct ioctl_evtchn_bind_interdomain bind;
-
-    bind.remote_domain = domid;
-    bind.remote_port = remote_port;
-
-    return ioctl(fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
-}
-
-evtchn_port_or_error_t xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
-{
-    int fd = xce->fd;
-    struct ioctl_evtchn_bind_virq bind;
-
-    bind.virq = virq;
-
-    return ioctl(fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
-}
-
-int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
-{
-    int fd = xce->fd;
-    struct ioctl_evtchn_unbind unbind;
-
-    unbind.port = port;
-
-    return ioctl(fd, IOCTL_EVTCHN_UNBIND, &unbind);
-}
-
-evtchn_port_or_error_t xc_evtchn_pending(xc_evtchn *xce)
-{
-    int fd = xce->fd;
-    evtchn_port_t port;
-
-    if ( read(fd, &port, sizeof(port)) != sizeof(port) )
-        return -1;
-
-    return port;
-}
-
-int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
-{
-    int fd = xce->fd;
-
-    if ( write(fd, &port, sizeof(port)) != sizeof(port) )
-        return -1;
-    return 0;
-}
 
 static xc_osdep_handle linux_gnttab_open(xc_gnttab *xcg)
 {

@@ -10,9 +10,9 @@ NODE_OBJS = node.o
 NODE2_OBJS = node-select.o
 
 LIBVCHAN_PIC_OBJS = $(patsubst %.o,%.opic,$(LIBVCHAN_OBJS))
-LIBVCHAN_LIBS = $(LDLIBS_libxenstore) $(LDLIBS_libxenctrl)
-$(LIBVCHAN_OBJS) $(LIBVCHAN_PIC_OBJS): CFLAGS += $(CFLAGS_libxenstore) $(CFLAGS_libxenctrl)
-$(NODE_OBJS) $(NODE2_OBJS): CFLAGS += $(CFLAGS_libxenctrl)
+LIBVCHAN_LIBS = $(LDLIBS_libxenstore) $(LDLIBS_libxenctrl) $(LDLIBS_libxenevtchn)
+$(LIBVCHAN_OBJS) $(LIBVCHAN_PIC_OBJS): CFLAGS += $(CFLAGS_libxenstore) $(CFLAGS_libxenctrl) $(CFLAGS_libxenevtchn)
+$(NODE_OBJS) $(NODE2_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenevtchn)
 
 MAJOR = 1.0
 MINOR = 0

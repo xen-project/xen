@@ -216,25 +216,25 @@ static int init_evt_srv(struct libxenvchan *ctrl, int domain, xentoollog_logger 
 {
 	evtchn_port_or_error_t port;
 
-	ctrl->event = xc_evtchn_open(logger, 0);
+	ctrl->event = xenevtchn_open(logger, 0);
 	if (!ctrl->event)
 		return -1;
 
-	port = xc_evtchn_bind_unbound_port(ctrl->event, domain);
+	port = xenevtchn_bind_unbound_port(ctrl->event, domain);
 	if (port < 0)
 		goto fail;
 	ctrl->event_port = port;
 
-	if (xc_evtchn_unmask(ctrl->event, ctrl->event_port))
+	if (xenevtchn_unmask(ctrl->event, ctrl->event_port))
 		goto fail;
 
 	return 0;
 
 fail:
 	if (port >= 0)
-		xc_evtchn_unbind(ctrl->event, port);
+		xenevtchn_unbind(ctrl->event, port);
 
-	xc_evtchn_close(ctrl->event);
+	xenevtchn_close(ctrl->event);
 	ctrl->event = NULL;
 
 	return -1;
@@ -346,26 +346,26 @@ static int init_evt_cli(struct libxenvchan *ctrl, int domain, xentoollog_logger 
 {
 	evtchn_port_or_error_t port;
 
-	ctrl->event = xc_evtchn_open(logger, 0);
+	ctrl->event = xenevtchn_open(logger, 0);
 	if (!ctrl->event)
 		return -1;
 
-	port = xc_evtchn_bind_interdomain(ctrl->event,
+	port = xenevtchn_bind_interdomain(ctrl->event,
 		domain, ctrl->event_port);
 	if (port < 0)
 		goto fail;
 	ctrl->event_port = port;
 
-	if (xc_evtchn_unmask(ctrl->event, ctrl->event_port))
+	if (xenevtchn_unmask(ctrl->event, ctrl->event_port))
 		goto fail;
 
 	return 0;
 
 fail:
 	if (port >= 0)
-		xc_evtchn_unbind(ctrl->event, port);
+		xenevtchn_unbind(ctrl->event, port);
 
-	xc_evtchn_close(ctrl->event);
+	xenevtchn_close(ctrl->event);
 	ctrl->event = NULL;
 
 	return -1;

@@ -21,6 +21,7 @@
 
 #include "utils.h"
 #include "io.h"
+#include <xenevtchn.h>
 #include <xenstore.h>
 #include <xen/io/console.h>
 #include <xen/grant_table.h>
@@ -101,7 +102,7 @@ struct domain {
 	int ring_ref;
 	evtchn_port_or_error_t local_port;
 	evtchn_port_or_error_t remote_port;
-	xc_evtchn *xce_handle;
+	xenevtchn_handle *xce_handle;
 	int xce_pollfd_idx;
 	struct xencons_interface *interface;
 	int event_count;
@@ -185,7 +186,7 @@ static void buffer_append(struct domain *dom)
 
 	xen_mb();
 	intf->out_cons = cons;
-	xc_evtchn_notify(dom->xce_handle, dom->local_port);
+	xenevtchn_notify(dom->xce_handle, dom->local_port);
 
 	/* Get the data to the logfile as early as possible because if
 	 * no one is listening on the console pty then it will fill up
@@ -584,22 +585,22 @@ static int domain_create_ring(struct domain *dom)
 	dom->local_port = -1;
 	dom->remote_port = -1;
 	if (dom->xce_handle != NULL)
-		xc_evtchn_close(dom->xce_handle);
+		xenevtchn_close(dom->xce_handle);
 
 	/* Opening evtchn independently for each console is a bit
 	 * wasteful, but that's how the code is structured... */
-	dom->xce_handle = xc_evtchn_open(NULL, 0);
+	dom->xce_handle = xenevtchn_open(NULL, 0);
 	if (dom->xce_handle == NULL) {
 		err = errno;
 		goto out;
 	}
  
-	rc = xc_evtchn_bind_interdomain(dom->xce_handle,
+	rc = xenevtchn_bind_interdomain(dom->xce_handle,
 		dom->domid, remote_port);
 
 	if (rc == -1) {
 		err = errno;
-		xc_evtchn_close(dom->xce_handle);
+		xenevtchn_close(dom->xce_handle);
 		dom->xce_handle = NULL;
 		goto out;
 	}
@@ -609,7 +610,7 @@ static int domain_create_ring(struct domain *dom)
 	if (dom->master_fd == -1) {
 		if (!domain_create_tty(dom)) {
 			err = errno;
-			xc_evtchn_close(dom->xce_handle);
+			xenevtchn_close(dom->xce_handle);
 			dom->xce_handle = NULL;
 			dom->local_port = -1;
 			dom->remote_port = -1;
@@ -749,7 +750,7 @@ static void shutdown_domain(struct domain *d)
 	watch_domain(d, false);
 	domain_unmap_interface(d);
 	if (d->xce_handle != NULL)
-		xc_evtchn_close(d->xce_handle);
+		xenevtchn_close(d->xce_handle);
 	d->xce_handle = NULL;
 }
 
@@ -839,7 +840,7 @@ static void handle_tty_read(struct domain *dom)
 		}
 		xen_wmb();
 		intf->in_prod = prod;
-		xc_evtchn_notify(dom->xce_handle, dom->local_port);
+		xenevtchn_notify(dom->xce_handle, dom->local_port);
 	} else {
 		domain_close_tty(dom);
 		shutdown_domain(dom);
@@ -871,7 +872,7 @@ static void handle_ring_read(struct domain *dom)
 	if (dom->is_dead)
 		return;
 
-	if ((port = xc_evtchn_pending(dom->xce_handle)) == -1)
+	if ((port = xenevtchn_pending(dom->xce_handle)) == -1)
 		return;
 
 	dom->event_count++;
@@ -879,7 +880,7 @@ static void handle_ring_read(struct domain *dom)
 	buffer_append(dom);
 
 	if (dom->event_count < RATE_LIMIT_ALLOWANCE)
-		(void)xc_evtchn_unmask(dom->xce_handle, port);
+		(void)xenevtchn_unmask(dom->xce_handle, port);
 }
 
 static void handle_xs(void)
@@ -906,7 +907,7 @@ static void handle_xs(void)
 	free(vec);
 }
 
-static void handle_hv_logs(xc_evtchn *xce_handle, bool force)
+static void handle_hv_logs(xenevtchn_handle *xce_handle, bool force)
 {
 	static char buffer[1024*16];
 	char *bufptr = buffer;
@@ -914,7 +915,7 @@ static void handle_hv_logs(xc_evtchn *xce_handle, bool force)
 	static uint32_t index = 0;
 	evtchn_port_or_error_t port = -1;
 
-	if (!force && ((port = xc_evtchn_pending(xce_handle)) == -1))
+	if (!force && ((port = xenevtchn_pending(xce_handle)) == -1))
 		return;
 
 	do
@@ -938,7 +939,7 @@ static void handle_hv_logs(xc_evtchn *xce_handle, bool force)
 	} while (size == sizeof(buffer));
 
 	if (port != -1)
-		(void)xc_evtchn_unmask(xce_handle, port);
+		(void)xenevtchn_unmask(xce_handle, port);
 }
 
 static void handle_log_reload(void)
@@ -1006,10 +1007,10 @@ void handle_io(void)
 	evtchn_port_or_error_t log_hv_evtchn = -1;
 	int xce_pollfd_idx = -1;
 	int xs_pollfd_idx = -1;
-	xc_evtchn *xce_handle = NULL;
+	xenevtchn_handle *xce_handle = NULL;
 
 	if (log_hv) {
-		xce_handle = xc_evtchn_open(NULL, 0);
+		xce_handle = xenevtchn_open(NULL, 0);
 		if (xce_handle == NULL) {
 			dolog(LOG_ERR, "Failed to open xce handle: %d (%s)",
 			      errno, strerror(errno));
@@ -1018,7 +1019,7 @@ void handle_io(void)
 		log_hv_fd = create_hv_log();
 		if (log_hv_fd == -1)
 			goto out;
-		log_hv_evtchn = xc_evtchn_bind_virq(xce_handle, VIRQ_CON_RING);
+		log_hv_evtchn = xenevtchn_bind_virq(xce_handle, VIRQ_CON_RING);
 		if (log_hv_evtchn == -1) {
 			dolog(LOG_ERR, "Failed to bind to VIRQ_CON_RING: "
 			      "%d (%s)", errno, strerror(errno));
@@ -1047,7 +1048,7 @@ void handle_io(void)
 		xs_pollfd_idx = set_fds(xs_fileno(xs), POLLIN|POLLPRI);
 
 		if (log_hv)
-			xce_pollfd_idx = set_fds(xc_evtchn_fd(xce_handle),
+			xce_pollfd_idx = set_fds(xenevtchn_fd(xce_handle),
 						 POLLIN|POLLPRI);
 
 		if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0)
@@ -1066,7 +1067,7 @@ void handle_io(void)
 			if ((now+5) > d->next_period) {
 				d->next_period = now + RATE_LIMIT_PERIOD;
 				if (d->event_count >= RATE_LIMIT_ALLOWANCE) {
-					(void)xc_evtchn_unmask(d->xce_handle, d->local_port);
+					(void)xenevtchn_unmask(d->xce_handle, d->local_port);
 				}
 				d->event_count = 0;
 			}
@@ -1082,7 +1083,7 @@ void handle_io(void)
 				if (discard_overflowed_data ||
 				    !d->buffer.max_capacity ||
 				    d->buffer.size < d->buffer.max_capacity) {
-					int evtchn_fd = xc_evtchn_fd(d->xce_handle);
+					int evtchn_fd = xenevtchn_fd(d->xce_handle);
 					d->xce_pollfd_idx = set_fds(evtchn_fd,
 								    POLLIN|POLLPRI);
 				}
@@ -1202,7 +1203,7 @@ void handle_io(void)
 		log_hv_fd = -1;
 	}
 	if (xce_handle != NULL) {
-		xc_evtchn_close(xce_handle);
+		xenevtchn_close(xce_handle);
 		xce_handle = NULL;
 	}
 	if (xcg_handle != NULL) {

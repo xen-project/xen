@@ -739,7 +739,7 @@ static void evtchn_fd_callback(libxl__egc *egc, libxl__ev_fd *ev,
         /* OK, that's that workaround done.  We can actually check for
          * work for us to do: */
 
-        port = xc_evtchn_pending(CTX->xce);
+        port = xenevtchn_pending(CTX->xce);
         if (port < 0) {
             if (errno == EAGAIN)
                 break;
@@ -765,20 +765,20 @@ static void evtchn_fd_callback(libxl__egc *egc, libxl__ev_fd *ev,
 }
 
 int libxl__ctx_evtchn_init(libxl__gc *gc) {
-    xc_evtchn *xce;
+    xenevtchn_handle *xce;
     int rc, fd;
 
     if (CTX->xce)
         return 0;
 
-    xce = xc_evtchn_open(CTX->lg, 0);
+    xce = xenevtchn_open(CTX->lg, 0);
     if (!xce) {
         LOGE(ERROR,"cannot open libxc evtchn handle");
         rc = ERROR_FAIL;
         goto out;
     }
 
-    fd = xc_evtchn_fd(xce);
+    fd = xenevtchn_fd(xce);
     assert(fd >= 0);
 
     rc = libxl_fd_set_nonblock(CTX, fd, 1);
@@ -788,7 +788,7 @@ int libxl__ctx_evtchn_init(libxl__gc *gc) {
     return 0;
 
  out:
-    xc_evtchn_close(xce);
+    xenevtchn_close(xce);
     return rc;
 }
 
@@ -810,14 +810,14 @@ int libxl__ev_evtchn_wait(libxl__gc *gc, libxl__ev_evtchn *evev)
 
     if (!libxl__ev_fd_isregistered(&CTX->evtchn_efd)) {
         rc = libxl__ev_fd_register(gc, &CTX->evtchn_efd, evtchn_fd_callback,
-                                   xc_evtchn_fd(CTX->xce), POLLIN);
+                                   xenevtchn_fd(CTX->xce), POLLIN);
         if (rc) goto out;
     }
 
     if (evev->waiting)
         return 0;
 
-    r = xc_evtchn_unmask(CTX->xce, evev->port);
+    r = xenevtchn_unmask(CTX->xce, evev->port);
     if (r) {
         LOGE(ERROR,"cannot unmask event channel %d",evev->port);
         rc = ERROR_FAIL;

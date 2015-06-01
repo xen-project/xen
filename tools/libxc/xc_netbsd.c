@@ -19,7 +19,6 @@
 
 #include "xc_private.h"
 
-#include <xen/sys/evtchn.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <malloc.h>
@@ -222,114 +221,6 @@ static struct xc_osdep_ops netbsd_privcmd_ops = {
         .map_foreign_ranges = &netbsd_privcmd_map_foreign_ranges,
     },
 };
-
-#define EVTCHN_DEV_NAME  "/dev/xenevt"
-
-int osdep_evtchn_open(xc_evtchn *xce)
-{
-    int fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
-    if ( fd == -1 )
-        return -1;
-    xce->fd = fd;
-    return 0;
-}
-
-int osdep_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
-{
-    if ( xce->fd == -1 )
-        return 0;
-
-    return close(xce->fd);
-}
-
-int xc_evtchn_fd(xc_evtchn *xce)
-{
-    return xce->fd;
-}
-
-int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
-{
-    int fd = xce->fd;
-    struct ioctl_evtchn_notify notify;
-
-    notify.port = port;
-
-    return ioctl(fd, IOCTL_EVTCHN_NOTIFY, &notify);
-}
-
-evtchn_port_or_error_t xc_evtchn_bind_unbound_port(xc_evtchn * xce, int domid)
-{
-    int fd = xce->fd;
-    struct ioctl_evtchn_bind_unbound_port bind;
-    int ret;
-
-    bind.remote_domain = domid;
-
-    ret = ioctl(fd, IOCTL_EVTCHN_BIND_UNBOUND_PORT, &bind);
-    if (ret == 0)
-	return bind.port;
-    else
-	return -1;
-}
-
-evtchn_port_or_error_t xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
-                                                  evtchn_port_t remote_port)
-{
-    int fd = xce->fd;
-    struct ioctl_evtchn_bind_interdomain bind;
-    int ret;
-
-    bind.remote_domain = domid;
-    bind.remote_port = remote_port;
-
-    ret = ioctl(fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
-    if (ret == 0)
-	return bind.port;
-    else
-	return -1;
-}
-
-int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
-{
-    int fd = xce->fd;
-    struct ioctl_evtchn_unbind unbind;
-
-    unbind.port = port;
-
-    return ioctl(fd, IOCTL_EVTCHN_UNBIND, &unbind);
-}
-
-evtchn_port_or_error_t xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
-{
-    int fd = xce->fd;
-    struct ioctl_evtchn_bind_virq bind;
-    int err;
-
-    bind.virq = virq;
-
-    err = ioctl(fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
-    if (err)
-	return -1;
-    else
-	return bind.port;
-}
-
-evtchn_port_or_error_t xc_evtchn_pending(xc_evtchn *xce)
-{
-    int fd = xce->fd;
-    evtchn_port_t port;
-
-    if ( read_exact(fd, (char *)&port, sizeof(port)) == -1 )
-        return -1;
-
-    return port;
-}
-
-int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
-{
-    int fd = xce->fd;
-    return write_exact(fd, (char *)&port, sizeof(port));
-}
 
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush) 

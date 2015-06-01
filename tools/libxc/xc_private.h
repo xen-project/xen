@@ -123,13 +123,6 @@ struct xc_interface_core {
     xc_osdep_handle  ops_handle; /* opaque data for xc_osdep_ops */
 };
 
-struct xenevtchn_handle {
-    xentoollog_logger *logger, *logger_tofree;
-    int fd;
-};
-int osdep_evtchn_open(xc_evtchn *xce);
-int osdep_evtchn_close(xc_evtchn *xce);
-
 void xc_report_error(xc_interface *xch, int code, const char *fmt, ...)
     __attribute__((format(printf,3,4)));
 void xc_reportv(xc_interface *xch, xentoollog_logger *lg, xentoollog_level,

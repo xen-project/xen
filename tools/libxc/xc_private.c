@@ -251,46 +251,6 @@ int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
     return xch->ops->u.privcmd.hypercall(xch, xch->ops_handle, hypercall);
 }
 
-xc_evtchn *xc_evtchn_open(xentoollog_logger *logger, unsigned open_flags)
-{
-    xc_evtchn *xce = malloc(sizeof(*xce));
-    int rc;
-
-    if (!xce) return NULL;
-
-    xce->fd = -1;
-    xce->logger = logger;
-    xce->logger_tofree  = NULL;
-
-    if (!xce->logger) {
-        xce->logger = xce->logger_tofree =
-            (xentoollog_logger*)
-            xtl_createlogger_stdiostream(stderr, XTL_PROGRESS, 0);
-        if (!xce->logger) goto err;
-    }
-
-    rc = osdep_evtchn_open(xce);
-    if ( rc  < 0 ) goto err;
-
-    return xce;
-
-err:
-    osdep_evtchn_close(xce);
-    xtl_logger_destroy(xce->logger_tofree);
-    free(xce);
-    return NULL;
-}
-
-int xc_evtchn_close(xc_evtchn *xce)
-{
-    int rc;
-
-    rc = osdep_evtchn_close(xce);
-    xtl_logger_destroy(xce->logger_tofree);
-    free(xce);
-    return rc;
-}
-
 xc_gnttab *xc_gnttab_open(xentoollog_logger *logger,
                              unsigned open_flags)
 {

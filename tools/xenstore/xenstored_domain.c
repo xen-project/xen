@@ -29,6 +29,7 @@
 #include "xenstored_transaction.h"
 #include "xenstored_watch.h"
 
+#include <xenevtchn.h>
 #include <xenctrl.h>
 #include <xen/grant_table.h>
 
@@ -36,7 +37,7 @@ static xc_interface **xc_handle;
 xc_gnttab **xcg_handle;
 static evtchn_port_t virq_port;
 
-xc_evtchn *xce_handle = NULL;
+xenevtchn_handle *xce_handle = NULL;
 
 struct domain
 {
@@ -128,7 +129,7 @@ static int writechn(struct connection *conn,
 	xen_mb();
 	intf->rsp_prod += len;
 
-	xc_evtchn_notify(xce_handle, conn->domain->port);
+	xenevtchn_notify(xce_handle, conn->domain->port);
 
 	return len;
 }
@@ -158,7 +159,7 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 	xen_mb();
 	intf->req_cons += len;
 
-	xc_evtchn_notify(xce_handle, conn->domain->port);
+	xenevtchn_notify(xce_handle, conn->domain->port);
 
 	return len;
 }
@@ -190,7 +191,7 @@ static int destroy_domain(void *_domain)
 	list_del(&domain->list);
 
 	if (domain->port) {
-		if (xc_evtchn_unbind(xce_handle, domain->port) == -1)
+		if (xenevtchn_unbind(xce_handle, domain->port) == -1)
 			eprintf("> Unbinding port %i failed!\n", domain->port);
 	}
 
@@ -239,13 +240,13 @@ void handle_event(void)
 {
 	evtchn_port_t port;
 
-	if ((port = xc_evtchn_pending(xce_handle)) == -1)
+	if ((port = xenevtchn_pending(xce_handle)) == -1)
 		barf_perror("Failed to read from event fd");
 
 	if (port == virq_port)
 		domain_cleanup();
 
-	if (xc_evtchn_unmask(xce_handle, port) == -1)
+	if (xenevtchn_unmask(xce_handle, port) == -1)
 		barf_perror("Failed to write to event fd");
 }
 
@@ -287,7 +288,7 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	talloc_set_destructor(domain, destroy_domain);
 
 	/* Tell kernel we're interested in this event. */
-	rc = xc_evtchn_bind_interdomain(xce_handle, domid, port);
+	rc = xenevtchn_bind_interdomain(xce_handle, domid, port);
 	if (rc == -1)
 	    return NULL;
 	domain->port = rc;
@@ -392,8 +393,8 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 	} else if ((domain->mfn == mfn) && (domain->conn != conn)) {
 		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
 		if (domain->port)
-			xc_evtchn_unbind(xce_handle, domain->port);
-		rc = xc_evtchn_bind_interdomain(xce_handle, domid, port);
+			xenevtchn_unbind(xce_handle, domain->port);
+		rc = xenevtchn_bind_interdomain(xce_handle, domid, port);
 		domain->port = (rc == -1) ? 0 : rc;
 		domain->remote_port = port;
 	} else {
@@ -614,7 +615,7 @@ static int dom0_init(void)
 
 	talloc_steal(dom0->conn, dom0); 
 
-	xc_evtchn_notify(xce_handle, dom0->port); 
+	xenevtchn_notify(xce_handle, dom0->port);
 
 	return 0; 
 }
@@ -643,7 +644,7 @@ void domain_init(void)
 	else
 		talloc_set_destructor(xcg_handle, close_xcg_handle);
 
-	xce_handle = xc_evtchn_open(NULL, 0);
+	xce_handle = xenevtchn_open(NULL, 0);
 
 	if (xce_handle == NULL)
 		barf_perror("Failed to open evtchn device");
@@ -651,7 +652,7 @@ void domain_init(void)
 	if (dom0_init() != 0) 
 		barf_perror("Failed to initialize dom0 state"); 
 
-	if ((rc = xc_evtchn_bind_virq(xce_handle, VIRQ_DOM_EXC)) == -1)
+	if ((rc = xenevtchn_bind_virq(xce_handle, VIRQ_DOM_EXC)) == -1)
 		barf_perror("Failed to bind to domain exception virq port");
 	virq_port = rc;
 }

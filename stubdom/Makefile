@@ -319,6 +319,12 @@ mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET)
 	  ln -sf $(XEN_ROOT)/tools/libs/toollog/include/*.h . && \
 	  ln -sf $(XEN_ROOT)/tools/libs/toollog/*.c . && \
 	  ln -sf $(XEN_ROOT)/tools/libs/toollog/Makefile . )
+	mkdir -p libs-$(XEN_TARGET_ARCH)/evtchn/include
+	[ -h libs-$(XEN_TARGET_ARCH)/evtchn/Makefile ] || ( cd libs-$(XEN_TARGET_ARCH)/evtchn && \
+	  ln -sf $(XEN_ROOT)/tools/libs/evtchn/*.h . && \
+	  ln -sf $(XEN_ROOT)/tools/libs/evtchn/include/*.h include/ && \
+	  ln -sf $(XEN_ROOT)/tools/libs/evtchn/*.c . && \
+	  ln -sf $(XEN_ROOT)/tools/libs/evtchn/Makefile . )
 	mkdir -p libxc-$(XEN_TARGET_ARCH)
 	[ -h libxc-$(XEN_TARGET_ARCH)/Makefile ] || ( cd libxc-$(XEN_TARGET_ARCH) && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/*.h . && \
@@ -351,12 +357,21 @@ libs-$(XEN_TARGET_ARCH)/toollog/libxentoollog.a: mk-headers-$(XEN_TARGET_ARCH) $
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/toollog
 
 #######
+# libxenevtchn
+#######
+
+.PHONY: libxenevtchn
+libxenevtchn: libs-$(XEN_TARGET_ARCH)/evtchn/libxenevtchn.a
+libs-$(XEN_TARGET_ARCH)/evtchn/libxenevtchn.a: mk-headers-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE)
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/evtchn
+
+#######
 # libxc
 #######
 
 .PHONY: libxc
 libxc: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a libxc-$(XEN_TARGET_ARCH)/libxenguest.a
-libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: mk-headers-$(XEN_TARGET_ARCH) libxentoollog cross-zlib
+libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: mk-headers-$(XEN_TARGET_ARCH) libxentoollog libxenevtchn cross-zlib
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= CONFIG_LIBXC_MINIOS=y -C libxc-$(XEN_TARGET_ARCH)
 
  libxc-$(XEN_TARGET_ARCH)/libxenguest.a: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a

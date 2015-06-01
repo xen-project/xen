@@ -81,3 +81,13 @@ void xtl_logger_destroy(struct xentoollog_logger *logger) {
     if (!logger) return;
     logger->destroy(logger);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

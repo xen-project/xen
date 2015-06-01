@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
+#include <xenevtchn.h>
 #include <xenctrl.h>
 #include <xen/xen.h>
 #include <string.h>
@@ -267,7 +268,7 @@ static void log_event(int event_id)
 }
 
 int virq_port;
-xc_evtchn *xce_handle = NULL;
+xenevtchn_handle *xce_handle = NULL;
 
 /* Returns the event channel handle. */
 /* Stolen from xenstore code */
@@ -279,12 +280,12 @@ static int eventchn_init(void)
     if (0)
         return -1;
   
-    xce_handle = xc_evtchn_open(NULL, 0);
+    xce_handle = xenevtchn_open(NULL, 0);
 
     if (xce_handle == NULL)
         perror("Failed to open evtchn device");
   
-    if ((rc = xc_evtchn_bind_virq(xce_handle, VIRQ_TBUF)) == -1)
+    if ((rc = xenevtchn_bind_virq(xce_handle, VIRQ_TBUF)) == -1)
         perror("Failed to bind to domain exception virq port");
     virq_port = rc;
   
@@ -304,7 +305,7 @@ static void wait_for_event(void)
         return;
     }
 
-    evtchn_fd = xc_evtchn_fd(xce_handle);
+    evtchn_fd = xenevtchn_fd(xce_handle);
 
     FD_ZERO(&inset);
     FD_SET(evtchn_fd, &inset);
@@ -314,13 +315,13 @@ static void wait_for_event(void)
     ret = select(evtchn_fd+1, &inset, NULL, NULL, &tv);
   
     if ( (ret == 1) && FD_ISSET(evtchn_fd, &inset)) {
-        if ((port = xc_evtchn_pending(xce_handle)) == -1)
+        if ((port = xenevtchn_pending(xce_handle)) == -1)
             perror("Failed to read from event fd");
     
         //    if (port == virq_port)
         //      printf("got the event I was looking for\r\n");
 
-        if (xc_evtchn_unmask(xce_handle, port) == -1)
+        if (xenevtchn_unmask(xce_handle, port) == -1)
             perror("Failed to write to event fd");
     }
 }

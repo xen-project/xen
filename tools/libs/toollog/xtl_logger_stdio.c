@@ -190,3 +190,13 @@ xentoollog_logger_stdiostream *xtl_createlogger_stdiostream
 
     return XTL_NEW_LOGGER(stdiostream, newlogger);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

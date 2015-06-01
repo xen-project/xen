@@ -3,8 +3,11 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS += -Werror
 
+CFLAGS += $(CFLAGS_libxenevtchn)
 CFLAGS += $(CFLAGS_libxenctrl)
-LDLIBS += $(LDLIBS_libxenctrl) $(ARGP_LDFLAGS)
+LDLIBS += $(LDLIBS_libxenevtchn)
+LDLIBS += $(LDLIBS_libxenctrl)
+LDLIBS += $(ARGP_LDFLAGS)
 
 BIN-$(CONFIG_X86) = xenalyze
 BIN      = $(BIN-y)

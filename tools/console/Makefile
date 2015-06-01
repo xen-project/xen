@@ -3,8 +3,10 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS  += -Werror
 
+CFLAGS  += $(CFLAGS_libxenevtchn)
 CFLAGS  += $(CFLAGS_libxenctrl)
 CFLAGS  += $(CFLAGS_libxenstore)
+LDLIBS += $(LDLIBS_libxenevtchn)
 LDLIBS += $(LDLIBS_libxenctrl)
 LDLIBS += $(LDLIBS_libxenstore)
 LDLIBS += $(SOCKET_LIBS)

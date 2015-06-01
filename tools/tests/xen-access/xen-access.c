@@ -39,6 +39,7 @@
 #include <sys/poll.h>
 
 #include <xenctrl.h>
+#include <xenevtchn.h>
 #include <xen/vm_event.h>
 
 #if defined(__arm__) || defined(__aarch64__)
@@ -54,7 +55,7 @@
 
 typedef struct vm_event {
     domid_t domain_id;
-    xc_evtchn *xce_handle;
+    xenevtchn_handle *xce_handle;
     int port;
     vm_event_back_ring_t back_ring;
     uint32_t evtchn_port;
@@ -77,9 +78,9 @@ static void close_handler(int sig)
     interrupted = sig;
 }
 
-int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned long ms)
+int xc_wait_for_event_or_timeout(xc_interface *xch, xenevtchn_handle *xce, unsigned long ms)
 {
-    struct pollfd fd = { .fd = xc_evtchn_fd(xce), .events = POLLIN | POLLERR };
+    struct pollfd fd = { .fd = xenevtchn_fd(xce), .events = POLLIN | POLLERR };
     int port;
     int rc;
 
@@ -95,14 +96,14 @@ int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned lon
 
     if ( rc == 1 )
     {
-        port = xc_evtchn_pending(xce);
+        port = xenevtchn_pending(xce);
         if ( port == -1 )
         {
             ERROR("Failed to read port from event channel");
             goto err;
         }
 
-        rc = xc_evtchn_unmask(xce, port);
+        rc = xenevtchn_unmask(xce, port);
         if ( rc != 0 )
         {
             ERROR("Failed to unmask event channel port");
@@ -143,7 +144,7 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
     /* Unbind VIRQ */
     if ( evtchn_bind )
     {
-        rc = xc_evtchn_unbind(xenaccess->vm_event.xce_handle,
+        rc = xenevtchn_unbind(xenaccess->vm_event.xce_handle,
                               xenaccess->vm_event.port);
         if ( rc != 0 )
         {
@@ -155,7 +156,7 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
     /* Close event channel */
     if ( evtchn_open )
     {
-        rc = xc_evtchn_close(xenaccess->vm_event.xce_handle);
+        rc = xenevtchn_close(xenaccess->vm_event.xce_handle);
         if ( rc != 0 )
         {
             ERROR("Error closing event channel");
@@ -223,7 +224,7 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     mem_access_enable = 1;
 
     /* Open event channel */
-    xenaccess->vm_event.xce_handle = xc_evtchn_open(NULL, 0);
+    xenaccess->vm_event.xce_handle = xenevtchn_open(NULL, 0);
     if ( xenaccess->vm_event.xce_handle == NULL )
     {
         ERROR("Failed to open event channel");
@@ -232,7 +233,7 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     evtchn_open = 1;
 
     /* Bind event notification */
-    rc = xc_evtchn_bind_interdomain(xenaccess->vm_event.xce_handle,
+    rc = xenevtchn_bind_interdomain(xenaccess->vm_event.xce_handle,
                                     xenaccess->vm_event.domain_id,
                                     xenaccess->vm_event.evtchn_port);
     if ( rc < 0 )
@@ -678,7 +679,7 @@ int main(int argc, char *argv[])
         }
 
         /* Tell Xen page is ready */
-        rc = xc_evtchn_notify(xenaccess->vm_event.xce_handle,
+        rc = xenevtchn_notify(xenaccess->vm_event.xce_handle,
                               xenaccess->vm_event.port);
 
         if ( rc != 0 )

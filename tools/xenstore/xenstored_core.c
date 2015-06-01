@@ -40,6 +40,8 @@
 #include <assert.h>
 #include <setjmp.h>
 
+#include <xenevtchn.h>
+
 #include "utils.h"
 #include "list.h"
 #include "talloc.h"
@@ -63,7 +65,7 @@
 #include <systemd/sd-daemon.h>
 #endif
 
-extern xc_evtchn *xce_handle; /* in xenstored_domain.c */
+extern xenevtchn_handle *xce_handle; /* in xenstored_domain.c */
 static int xce_pollfd_idx = -1;
 static struct pollfd *fds;
 static unsigned int current_array_size;
@@ -372,7 +374,7 @@ static void initialize_fds(int sock, int *p_sock_pollfd_idx,
 			set_fd(reopen_log_pipe[0], POLLIN|POLLPRI);
 
 	if (xce_handle != NULL)
-		xce_pollfd_idx = set_fd(xc_evtchn_fd(xce_handle),
+		xce_pollfd_idx = set_fd(xenevtchn_fd(xce_handle),
 					POLLIN|POLLPRI);
 
 	list_for_each_entry(conn, &connections, list) {

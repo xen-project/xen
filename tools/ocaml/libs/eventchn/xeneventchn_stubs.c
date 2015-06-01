@@ -24,7 +24,7 @@
 #include <xen/sysctl.h>
 #include <xen/xen.h>
 #include <xen/sys/evtchn.h>
-#include <xenctrl.h>
+#include <xenevtchn.h>
 
 #define CAML_NAME_SPACE
 #include <caml/mlvalues.h>
@@ -34,14 +34,14 @@
 #include <caml/callback.h>
 #include <caml/fail.h>
 
-#define _H(__h) ((xc_evtchn *)(__h))
+#define _H(__h) ((xenevtchn_handle *)(__h))
 
 CAMLprim value stub_eventchn_init(void)
 {
 	CAMLparam0();
 	CAMLlocal1(result);
 
-	xc_evtchn *xce = xc_evtchn_open(NULL, XC_OPENFLAG_NON_REENTRANT);
+	xenevtchn_handle *xce = xenevtchn_open(NULL, 0);
 	if (xce == NULL)
 		caml_failwith("open failed");
 
@@ -55,7 +55,7 @@ CAMLprim value stub_eventchn_fd(value xce)
 	CAMLlocal1(result);
 	int fd;
 
-	fd = xc_evtchn_fd(_H(xce));
+	fd = xenevtchn_fd(_H(xce));
 	if (fd == -1)
 		caml_failwith("evtchn fd failed");
 
@@ -69,7 +69,7 @@ CAMLprim value stub_eventchn_notify(value xce, value port)
 	CAMLparam2(xce, port);
 	int rc;
 
-	rc = xc_evtchn_notify(_H(xce), Int_val(port));
+	rc = xenevtchn_notify(_H(xce), Int_val(port));
 	if (rc == -1)
 		caml_failwith("evtchn notify failed");
 
@@ -83,7 +83,7 @@ CAMLprim value stub_eventchn_bind_interdomain(value xce, value domid,
 	CAMLlocal1(port);
 	evtchn_port_or_error_t rc;
 
-	rc = xc_evtchn_bind_interdomain(_H(xce), Int_val(domid), Int_val(remote_port));
+	rc = xenevtchn_bind_interdomain(_H(xce), Int_val(domid), Int_val(remote_port));
 	if (rc == -1)
 		caml_failwith("evtchn bind_interdomain failed");
 	port = Val_int(rc);
@@ -97,7 +97,7 @@ CAMLprim value stub_eventchn_bind_dom_exc_virq(value xce)
 	CAMLlocal1(port);
 	evtchn_port_or_error_t rc;
 
-	rc = xc_evtchn_bind_virq(_H(xce), VIRQ_DOM_EXC);
+	rc = xenevtchn_bind_virq(_H(xce), VIRQ_DOM_EXC);
 	if (rc == -1)
 		caml_failwith("evtchn bind_dom_exc_virq failed");
 	port = Val_int(rc);
@@ -110,7 +110,7 @@ CAMLprim value stub_eventchn_unbind(value xce, value port)
 	CAMLparam2(xce, port);
 	int rc;
 
-	rc = xc_evtchn_unbind(_H(xce), Int_val(port));
+	rc = xenevtchn_unbind(_H(xce), Int_val(port));
 	if (rc == -1)
 		caml_failwith("evtchn unbind failed");
 
@@ -123,7 +123,7 @@ CAMLprim value stub_eventchn_pending(value xce)
 	CAMLlocal1(result);
 	evtchn_port_or_error_t port;
 
-	port = xc_evtchn_pending(_H(xce));
+	port = xenevtchn_pending(_H(xce));
 	if (port == -1)
 		caml_failwith("evtchn pending failed");
 	result = Val_int(port);
@@ -137,7 +137,7 @@ CAMLprim value stub_eventchn_unmask(value xce, value _port)
 	evtchn_port_t port;
 
 	port = Int_val(_port);
-	if (xc_evtchn_unmask(_H(xce), port))
+	if (xenevtchn_unmask(_H(xce), port))
 		caml_failwith("evtchn unmask failed");
 	CAMLreturn(Val_unit);
 }

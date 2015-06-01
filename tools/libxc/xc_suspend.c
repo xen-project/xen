@@ -16,6 +16,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include <xenevtchn.h>
+
 #include "xc_private.h"
 #include "xenguest.h"
 
@@ -124,12 +126,12 @@ static int unlock_suspend_event(xc_interface *xch, int domid, int *lockfd)
     return -1;
 }
 
-int xc_await_suspend(xc_interface *xch, xc_evtchn *xce, int suspend_evtchn)
+int xc_await_suspend(xc_interface *xch, xenevtchn_handle *xce, int suspend_evtchn)
 {
     int rc;
 
     do {
-        rc = xc_evtchn_pending(xce);
+        rc = xenevtchn_pending(xce);
         if (rc < 0) {
             ERROR("error polling suspend notification channel: %d", rc);
             return -1;
@@ -137,7 +139,7 @@ int xc_await_suspend(xc_interface *xch, xc_evtchn *xce, int suspend_evtchn)
     } while (rc != suspend_evtchn);
 
     /* harmless for one-off suspend */
-    if (xc_evtchn_unmask(xce, suspend_evtchn) < 0)
+    if (xenevtchn_unmask(xce, suspend_evtchn) < 0)
         ERROR("failed to unmask suspend notification channel: %d", rc);
 
     return 0;
@@ -145,16 +147,16 @@ int xc_await_suspend(xc_interface *xch, xc_evtchn *xce, int suspend_evtchn)
 
 /* Internal callers are allowed to call this with suspend_evtchn<0
  * but *lockfd>0. */
-int xc_suspend_evtchn_release(xc_interface *xch, xc_evtchn *xce,
+int xc_suspend_evtchn_release(xc_interface *xch, xenevtchn_handle *xce,
                               int domid, int suspend_evtchn, int *lockfd)
 {
     if (suspend_evtchn >= 0)
-        xc_evtchn_unbind(xce, suspend_evtchn);
+        xenevtchn_unbind(xce, suspend_evtchn);
 
     return unlock_suspend_event(xch, domid, lockfd);
 }
 
-int xc_suspend_evtchn_init_sane(xc_interface *xch, xc_evtchn *xce,
+int xc_suspend_evtchn_init_sane(xc_interface *xch, xenevtchn_handle *xce,
                                 int domid, int port, int *lockfd)
 {
     int rc, suspend_evtchn = -1;
@@ -164,7 +166,7 @@ int xc_suspend_evtchn_init_sane(xc_interface *xch, xc_evtchn *xce,
         goto cleanup;
     }
 
-    suspend_evtchn = xc_evtchn_bind_interdomain(xce, domid, port);
+    suspend_evtchn = xenevtchn_bind_interdomain(xce, domid, port);
     if (suspend_evtchn < 0) {
         ERROR("failed to bind suspend event channel: %d", suspend_evtchn);
         goto cleanup;
@@ -184,7 +186,7 @@ cleanup:
     return -1;
 }
 
-int xc_suspend_evtchn_init_exclusive(xc_interface *xch, xc_evtchn *xce,
+int xc_suspend_evtchn_init_exclusive(xc_interface *xch, xenevtchn_handle *xce,
                                      int domid, int port, int *lockfd)
 {
     int suspend_evtchn;

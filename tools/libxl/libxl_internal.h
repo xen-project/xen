@@ -48,6 +48,7 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 
+#include <xenevtchn.h>
 #include <xenstore.h>
 #include <xenctrl.h>
 #include <xenguest.h>
@@ -448,7 +449,7 @@ struct libxl__ctx {
     uint32_t watch_counter; /* helps disambiguate slot reuse */
     libxl__ev_fd watch_efd;
 
-    xc_evtchn *xce; /* waiting must be done only with libxl__ev_evtchn* */
+    xenevtchn_handle *xce; /* waiting must be done only with libxl__ev_evtchn* */
     LIBXL_LIST_HEAD(, libxl__ev_evtchn) evtchns_waiting;
     libxl__ev_fd evtchn_efd;
 
@@ -925,7 +926,7 @@ static inline int libxl__ev_xswatch_isregistered(const libxl__ev_xswatch *xw)
  * When the event is signaled then the callback will be made, once.
  * Then you must call libxl__ev_evtchn_wait again, if desired.
  *
- * You must NOT call xc_evtchn_unmask.  wait will do that for you.
+ * You must NOT call xenevtchn_unmask.  wait will do that for you.
  *
  * Calling libxl__ev_evtchn_cancel will arrange for libxl to disregard
  * future occurrences of event.  Both libxl__ev_evtchn_wait and

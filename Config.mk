@@ -251,9 +251,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= d25773c8afa2f4dbbb466116daeb60159ddd22bd
-# Thu Dec 3 11:23:25 2015 +0000
-# mini-os: Include libxentoollog with libxc
+MINIOS_UPSTREAM_REVISION ?= fb66c855c983aa07644cb179fd9bfe96d55f317d
+# Fri Jan 15 13:24:00 2016 +0000
+# mini-os: Include libxenevtchn with libxc
 
 SEABIOS_UPSTREAM_REVISION ?= 3403ac4313812752be6e6aac35239ca6888a8cab
 # Mon Dec 28 13:50:41 2015 +0100
@@ -262,9 +262,9 @@ SEABIOS_UPSTREAM_REVISION ?= 3403ac4313812752be6e6aac35239ca6888a8cab
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 569eac99e8ddccd15fe78e8a3af5622afe780e3b
-# Mon Jan 4 15:34:29 2016 +0000
-# MSI-X: avoid array overrun upon MSI-X table writes
+QEMU_TRADITIONAL_REVISION ?= ca2ff968de42d47dcda8973aa1528a14f99992d3
+# Fri Jan 15 13:23:53 2016 +0000
+# qemu-xen-traditional: Use libxenevtchn
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.

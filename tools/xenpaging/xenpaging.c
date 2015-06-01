@@ -73,7 +73,7 @@ static void xenpaging_mem_paging_flush_ioemu_cache(struct xenpaging *paging)
 static int xenpaging_wait_for_event_or_timeout(struct xenpaging *paging)
 {
     xc_interface *xch = paging->xc_handle;
-    xc_evtchn *xce = paging->vm_event.xce_handle;
+    xenevtchn_handle *xce = paging->vm_event.xce_handle;
     char **vec, *val;
     unsigned int num;
     struct pollfd fd[2];
@@ -82,7 +82,7 @@ static int xenpaging_wait_for_event_or_timeout(struct xenpaging *paging)
     int timeout;
 
     /* Wait for event channel and xenstore */
-    fd[0].fd = xc_evtchn_fd(xce);
+    fd[0].fd = xenevtchn_fd(xce);
     fd[0].events = POLLIN | POLLERR;
     fd[1].fd = xs_fileno(paging->xs_handle);
     fd[1].events = POLLIN | POLLERR;
@@ -146,7 +146,7 @@ static int xenpaging_wait_for_event_or_timeout(struct xenpaging *paging)
     if ( rc && fd[0].revents & POLLIN )
     {
         DPRINTF("Got event from evtchn\n");
-        port = xc_evtchn_pending(xce);
+        port = xenevtchn_pending(xce);
         if ( port == -1 )
         {
             PERROR("Failed to read port from event channel");
@@ -154,7 +154,7 @@ static int xenpaging_wait_for_event_or_timeout(struct xenpaging *paging)
             goto err;
         }
 
-        rc = xc_evtchn_unmask(xce, port);
+        rc = xenevtchn_unmask(xce, port);
         if ( rc < 0 )
         {
             PERROR("Failed to unmask event channel port");
@@ -393,7 +393,7 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     }
 
     /* Open event channel */
-    paging->vm_event.xce_handle = xc_evtchn_open(NULL, 0);
+    paging->vm_event.xce_handle = xenevtchn_open(NULL, 0);
     if ( paging->vm_event.xce_handle == NULL )
     {
         PERROR("Failed to open event channel");
@@ -401,7 +401,7 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     }
 
     /* Bind event notification */
-    rc = xc_evtchn_bind_interdomain(paging->vm_event.xce_handle,
+    rc = xenevtchn_bind_interdomain(paging->vm_event.xce_handle,
                                     paging->vm_event.domain_id,
                                     paging->vm_event.evtchn_port);
     if ( rc < 0 )
@@ -531,7 +531,7 @@ static void xenpaging_teardown(struct xenpaging *paging)
     }
 
     /* Unbind VIRQ */
-    rc = xc_evtchn_unbind(paging->vm_event.xce_handle, paging->vm_event.port);
+    rc = xenevtchn_unbind(paging->vm_event.xce_handle, paging->vm_event.port);
     if ( rc != 0 )
     {
         PERROR("Error unbinding event port");
@@ -539,7 +539,7 @@ static void xenpaging_teardown(struct xenpaging *paging)
     paging->vm_event.port = -1;
 
     /* Close event channel */
-    rc = xc_evtchn_close(paging->vm_event.xce_handle);
+    rc = xenevtchn_close(paging->vm_event.xce_handle);
     if ( rc != 0 )
     {
         PERROR("Error closing event channel");
@@ -692,7 +692,7 @@ static int xenpaging_resume_page(struct xenpaging *paging, vm_event_response_t *
     }
 
     /* Tell Xen page is ready */
-    return xc_evtchn_notify(paging->vm_event.xce_handle, paging->vm_event.port);
+    return xenevtchn_notify(paging->vm_event.xce_handle, paging->vm_event.port);
 }
 
 static int xenpaging_populate_page(struct xenpaging *paging, unsigned long gfn, int i)

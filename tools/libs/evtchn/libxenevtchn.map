@@ -1,0 +1,19 @@
+VERS_1.0 {
+	global:
+		xenevtchn_open;
+		xenevtchn_close;
+
+		xenevtchn_fd;
+
+		xenevtchn_bind_unbound_port;
+		xenevtchn_bind_interdomain;
+		xenevtchn_bind_virq;
+
+		xenevtchn_notify;
+
+		xenevtchn_unbind;
+		xenevtchn_unmask;
+
+		xenevtchn_pending;
+	local: *; /* Do not expose anything by default */
+};

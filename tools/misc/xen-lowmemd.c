@@ -4,22 +4,23 @@
  */
 
 #include <stdio.h>
+#include <xenevtchn.h>
 #include <xenctrl.h>
 #include <xenstore.h>
 #include <stdlib.h>
 #include <string.h>
 
 static evtchn_port_t virq_port      = -1;
-static xc_evtchn *xce_handle        = NULL;
+static xenevtchn_handle *xce_handle = NULL;
 static xc_interface *xch            = NULL;
 static struct xs_handle *xs_handle  = NULL;
 
 void cleanup(void)
 {
     if (virq_port > -1)
-        xc_evtchn_unbind(xce_handle, virq_port);
+        xenevtchn_unbind(xce_handle, virq_port);
     if (xce_handle)
-        xc_evtchn_close(xce_handle);
+        xenevtchn_close(xce_handle);
     if (xch)
         xc_interface_close(xch);
     if (xs_handle)
@@ -94,7 +95,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-	xce_handle = xc_evtchn_open(NULL, 0);
+	xce_handle = xenevtchn_open(NULL, 0);
 	if (xce_handle == NULL)
     {
         perror("Failed to open evtchn device");
@@ -108,7 +109,7 @@ int main(int argc, char *argv[])
         return 3;
     }
 
-	if ((rc = xc_evtchn_bind_virq(xce_handle, VIRQ_ENOMEM)) == -1)
+	if ((rc = xenevtchn_bind_virq(xce_handle, VIRQ_ENOMEM)) == -1)
     {
         perror("Failed to bind to domain exception virq port");
         return 4;
@@ -120,7 +121,7 @@ int main(int argc, char *argv[])
     {
         evtchn_port_t port;
 
-        if ((port = xc_evtchn_pending(xce_handle)) == -1)
+        if ((port = xenevtchn_pending(xce_handle)) == -1)
         {
             perror("Failed to listen for pending event channel");
             return 5;
@@ -134,7 +135,7 @@ int main(int argc, char *argv[])
             return 6;
         }
 
-        if (xc_evtchn_unmask(xce_handle, port) == -1)
+        if (xenevtchn_unmask(xce_handle, port) == -1)
         {
             perror("Failed to unmask port");
             return 7;
