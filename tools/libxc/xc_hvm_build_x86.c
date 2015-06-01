@@ -238,6 +238,7 @@ static int setup_guest(xc_interface *xch,
 {
     xen_pfn_t *page_array = NULL;
     unsigned long i, vmemid, nr_pages = args->mem_size >> PAGE_SHIFT;
+    unsigned long p2m_size;
     unsigned long target_pages = args->mem_target >> PAGE_SHIFT;
     unsigned long entry_eip, cur_pages, cur_pfn;
     void *hvm_info_page;
@@ -254,8 +255,9 @@ static int setup_guest(xc_interface *xch,
     xen_pfn_t special_array[NR_SPECIAL_PAGES];
     xen_pfn_t ioreq_server_array[NR_IOREQ_SERVER_PAGES];
     uint64_t total_pages;
-    xen_vmemrange_t dummy_vmemrange;
-    unsigned int dummy_vnode_to_pnode;
+    xen_vmemrange_t dummy_vmemrange[2];
+    unsigned int dummy_vnode_to_pnode[1];
+    bool use_dummy = false;
 
     memset(&elf, 0, sizeof(elf));
     if ( elf_init(&elf, image, image_size) != 0 )
@@ -275,17 +277,36 @@ static int setup_guest(xc_interface *xch,
 
     if ( args->nr_vmemranges == 0 )
     {
-        /* Build dummy vnode information */
-        dummy_vmemrange.start = 0;
-        dummy_vmemrange.end   = args->mem_size;
-        dummy_vmemrange.flags = 0;
-        dummy_vmemrange.nid   = 0;
-        args->nr_vmemranges = 1;
-        args->vmemranges = &dummy_vmemrange;
+        /* Build dummy vnode information
+         *
+         * Guest physical address space layout:
+         * [0, hole_start) [hole_start, 4G) [4G, highmem_end)
+         *
+         * Of course if there is no high memory, the second vmemrange
+         * has no effect on the actual result.
+         */
 
-        dummy_vnode_to_pnode = XC_NUMA_NO_NODE;
+        dummy_vmemrange[0].start = 0;
+        dummy_vmemrange[0].end   = args->lowmem_end;
+        dummy_vmemrange[0].flags = 0;
+        dummy_vmemrange[0].nid   = 0;
+        args->nr_vmemranges = 1;
+
+        if ( args->highmem_end > (1ULL << 32) )
+        {
+            dummy_vmemrange[1].start = 1ULL << 32;
+            dummy_vmemrange[1].end   = args->highmem_end;
+            dummy_vmemrange[1].flags = 0;
+            dummy_vmemrange[1].nid   = 0;
+
+            args->nr_vmemranges++;
+        }
+
+        dummy_vnode_to_pnode[0] = XC_NUMA_NO_NODE;
         args->nr_vnodes = 1;
-        args->vnode_to_pnode = &dummy_vnode_to_pnode;
+        args->vmemranges = dummy_vmemrange;
+        args->vnode_to_pnode = dummy_vnode_to_pnode;
+        use_dummy = true;
     }
     else
     {
@@ -297,9 +318,15 @@ static int setup_guest(xc_interface *xch,
     }
 
     total_pages = 0;
+    p2m_size = 0;
     for ( i = 0; i < args->nr_vmemranges; i++ )
+    {
         total_pages += ((args->vmemranges[i].end - args->vmemranges[i].start)
                         >> PAGE_SHIFT);
+        p2m_size = p2m_size > (args->vmemranges[i].end >> PAGE_SHIFT) ?
+            p2m_size : (args->vmemranges[i].end >> PAGE_SHIFT);
+    }
+
     if ( total_pages != (args->mem_size >> PAGE_SHIFT) )
     {
         PERROR("vNUMA memory pages mismatch (0x%"PRIx64" != 0x%"PRIx64")",
@@ -325,16 +352,23 @@ static int setup_guest(xc_interface *xch,
     DPRINTF("  TOTAL:    %016"PRIx64"->%016"PRIx64"\n", v_start, v_end);
     DPRINTF("  ENTRY:    %016"PRIx64"\n", elf_uval(&elf, elf.ehdr, e_entry));
 
-    if ( (page_array = malloc(nr_pages * sizeof(xen_pfn_t))) == NULL )
+    if ( (page_array = malloc(p2m_size * sizeof(xen_pfn_t))) == NULL )
     {
         PERROR("Could not allocate memory.");
         goto error_out;
     }
 
-    for ( i = 0; i < nr_pages; i++ )
-        page_array[i] = i;
-    for ( i = args->mmio_start >> PAGE_SHIFT; i < nr_pages; i++ )
-        page_array[i] += args->mmio_size >> PAGE_SHIFT;
+    for ( i = 0; i < p2m_size; i++ )
+        page_array[i] = ((xen_pfn_t)-1);
+    for ( vmemid = 0; vmemid < args->nr_vmemranges; vmemid++ )
+    {
+        uint64_t pfn;
+
+        for ( pfn = args->vmemranges[vmemid].start >> PAGE_SHIFT;
+              pfn < args->vmemranges[vmemid].end >> PAGE_SHIFT;
+              pfn++ )
+            page_array[pfn] = pfn;
+    }
 
     /*
      * Try to claim pages for early warning of insufficient memory available.
@@ -645,6 +679,12 @@ static int setup_guest(xc_interface *xch,
  error_out:
     rc = -1;
  out:
+    if ( use_dummy )
+    {
+        args->nr_vnodes = 0;
+        args->vmemranges = NULL;
+        args->vnode_to_pnode = NULL;
+    }
     if ( elf_check_broken(&elf) )
         ERROR("HVM ELF broken: %s", elf_check_broken(&elf));
 
