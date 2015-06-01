@@ -88,21 +88,13 @@ static int modules_init(struct xc_hvm_build_args *args,
     return 0;
 }
 
-static void build_hvm_info(void *hvm_info_page, uint64_t mem_size,
-                           uint64_t mmio_start, uint64_t mmio_size,
+static void build_hvm_info(void *hvm_info_page,
                            struct xc_hvm_build_args *args)
 {
     struct hvm_info_table *hvm_info = (struct hvm_info_table *)
         (((unsigned char *)hvm_info_page) + HVM_INFO_OFFSET);
-    uint64_t lowmem_end = mem_size, highmem_end = 0;
     uint8_t sum;
     int i;
-
-    if ( lowmem_end > mmio_start )
-    {
-        highmem_end = (1ull<<32) + (lowmem_end - mmio_start);
-        lowmem_end = mmio_start;
-    }
 
     memset(hvm_info_page, 0, PAGE_SIZE);
 
@@ -116,13 +108,9 @@ static void build_hvm_info(void *hvm_info_page, uint64_t mem_size,
     memset(hvm_info->vcpu_online, 0xff, sizeof(hvm_info->vcpu_online));
 
     /* Memory parameters. */
-    hvm_info->low_mem_pgend = lowmem_end >> PAGE_SHIFT;
-    hvm_info->high_mem_pgend = highmem_end >> PAGE_SHIFT;
+    hvm_info->low_mem_pgend = args->lowmem_end >> PAGE_SHIFT;
+    hvm_info->high_mem_pgend = args->highmem_end >> PAGE_SHIFT;
     hvm_info->reserved_mem_pgstart = ioreq_server_pfn(0);
-
-    args->lowmem_end = lowmem_end;
-    args->highmem_end = highmem_end;
-    args->mmio_start = mmio_start;
 
     /* Finish with the checksum. */
     for ( i = 0, sum = 0; i < hvm_info->length; i++ )
@@ -251,8 +239,6 @@ static int setup_guest(xc_interface *xch,
     xen_pfn_t *page_array = NULL;
     unsigned long i, vmemid, nr_pages = args->mem_size >> PAGE_SHIFT;
     unsigned long target_pages = args->mem_target >> PAGE_SHIFT;
-    uint64_t mmio_start = (1ull << 32) - args->mmio_size;
-    uint64_t mmio_size = args->mmio_size;
     unsigned long entry_eip, cur_pages, cur_pfn;
     void *hvm_info_page;
     uint32_t *ident_pt;
@@ -344,8 +330,8 @@ static int setup_guest(xc_interface *xch,
 
     for ( i = 0; i < nr_pages; i++ )
         page_array[i] = i;
-    for ( i = mmio_start >> PAGE_SHIFT; i < nr_pages; i++ )
-        page_array[i] += mmio_size >> PAGE_SHIFT;
+    for ( i = args->mmio_start >> PAGE_SHIFT; i < nr_pages; i++ )
+        page_array[i] += args->mmio_size >> PAGE_SHIFT;
 
     /*
      * Try to claim pages for early warning of insufficient memory available.
@@ -446,7 +432,7 @@ static int setup_guest(xc_interface *xch,
                   * range */
                  !check_mmio_hole(cur_pfn << PAGE_SHIFT,
                                   SUPERPAGE_1GB_NR_PFNS << PAGE_SHIFT,
-                                  mmio_start, mmio_size) )
+                                  args->mmio_start, args->mmio_size) )
             {
                 long done;
                 unsigned long nr_extents = count >> SUPERPAGE_1GB_SHIFT;
@@ -545,7 +531,7 @@ static int setup_guest(xc_interface *xch,
               xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
               HVM_INFO_PFN)) == NULL )
         goto error_out;
-    build_hvm_info(hvm_info_page, v_end, mmio_start, mmio_size, args);
+    build_hvm_info(hvm_info_page, args);
     munmap(hvm_info_page, PAGE_SIZE);
 
     /* Allocate and clear special pages. */
@@ -661,12 +647,6 @@ int xc_hvm_build(xc_interface *xch, uint32_t domid,
     if ( args.image_file_name == NULL )
         return -1;
 
-    if ( args.mem_target == 0 )
-        args.mem_target = args.mem_size;
-
-    if ( args.mmio_size == 0 )
-        args.mmio_size = HVM_BELOW_4G_MMIO_LENGTH;
-
     /* An HVM guest must be initialised with at least 2MB memory. */
     if ( args.mem_size < (2ull << 20) || args.mem_target < (2ull << 20) )
         return -1;
@@ -684,9 +664,6 @@ int xc_hvm_build(xc_interface *xch, uint32_t domid,
             args.acpi_module.guest_addr_out;
         hvm_args->smbios_module.guest_addr_out = 
             args.smbios_module.guest_addr_out;
-        hvm_args->lowmem_end = args.lowmem_end;
-        hvm_args->highmem_end = args.highmem_end;
-        hvm_args->mmio_start = args.mmio_start;
     }
 
     free(image);

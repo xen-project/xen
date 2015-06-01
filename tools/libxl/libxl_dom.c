@@ -920,6 +920,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     struct xc_hvm_build_args args = {};
     int ret, rc = ERROR_FAIL;
+    uint64_t mmio_start, lowmem_end, highmem_end;
 
     memset(&args, 0, sizeof(struct xc_hvm_build_args));
     /* The params from the configuration file are in Mb, which are then
@@ -941,6 +942,21 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         LOG(ERROR, "initializing domain firmware failed");
         goto out;
     }
+    if (args.mem_target == 0)
+        args.mem_target = args.mem_size;
+    if (args.mmio_size == 0)
+        args.mmio_size = HVM_BELOW_4G_MMIO_LENGTH;
+    lowmem_end = args.mem_size;
+    highmem_end = 0;
+    mmio_start = (1ull << 32) - args.mmio_size;
+    if (lowmem_end > mmio_start)
+    {
+        highmem_end = (1ull << 32) + (lowmem_end - mmio_start);
+        lowmem_end = mmio_start;
+    }
+    args.lowmem_end = lowmem_end;
+    args.highmem_end = highmem_end;
+    args.mmio_start = mmio_start;
 
     if (info->num_vnuma_nodes != 0) {
         int i;
