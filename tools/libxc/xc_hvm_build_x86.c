@@ -259,7 +259,10 @@ static int setup_guest(xc_interface *xch,
 
     memset(&elf, 0, sizeof(elf));
     if ( elf_init(&elf, image, image_size) != 0 )
+    {
+        PERROR("Could not initialise ELF image");
         goto error_out;
+    }
 
     xc_elf_set_logfile(xch, &elf, 1);
 
@@ -522,15 +525,24 @@ static int setup_guest(xc_interface *xch,
     DPRINTF("  1GB PAGES: 0x%016lx\n", stat_1gb_pages);
     
     if ( loadelfimage(xch, &elf, dom, page_array) != 0 )
+    {
+        PERROR("Could not load ELF image");
         goto error_out;
+    }
 
     if ( loadmodules(xch, args, m_start, m_end, dom, page_array) != 0 )
-        goto error_out;    
+    {
+        PERROR("Could not load ACPI modules");
+        goto error_out;
+    }
 
     if ( (hvm_info_page = xc_map_foreign_range(
               xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
               HVM_INFO_PFN)) == NULL )
+    {
+        PERROR("Could not map hvm info page");
         goto error_out;
+    }
     build_hvm_info(hvm_info_page, args);
     munmap(hvm_info_page, PAGE_SIZE);
 
@@ -547,7 +559,10 @@ static int setup_guest(xc_interface *xch,
     }
 
     if ( xc_clear_domain_pages(xch, dom, special_pfn(0), NR_SPECIAL_PAGES) )
-            goto error_out;
+    {
+        PERROR("Could not clear special pages");
+        goto error_out;
+    }
 
     xc_hvm_param_set(xch, dom, HVM_PARAM_STORE_PFN,
                      special_pfn(SPECIALPAGE_XENSTORE));
@@ -580,7 +595,10 @@ static int setup_guest(xc_interface *xch,
     }
 
     if ( xc_clear_domain_pages(xch, dom, ioreq_server_pfn(0), NR_IOREQ_SERVER_PAGES) )
-            goto error_out;
+    {
+        PERROR("Could not clear ioreq page");
+        goto error_out;
+    }
 
     /* Tell the domain where the pages are and how many there are */
     xc_hvm_param_set(xch, dom, HVM_PARAM_IOREQ_SERVER_PFN,
@@ -595,7 +613,10 @@ static int setup_guest(xc_interface *xch,
     if ( (ident_pt = xc_map_foreign_range(
               xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
               special_pfn(SPECIALPAGE_IDENT_PT))) == NULL )
+    {
+        PERROR("Could not map special page ident_pt");
         goto error_out;
+    }
     for ( i = 0; i < PAGE_SIZE / sizeof(*ident_pt); i++ )
         ident_pt[i] = ((i << 22) | _PAGE_PRESENT | _PAGE_RW | _PAGE_USER |
                        _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_PSE);
@@ -610,7 +631,10 @@ static int setup_guest(xc_interface *xch,
         char *page0 = xc_map_foreign_range(
             xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, 0);
         if ( page0 == NULL )
+        {
+            PERROR("Could not map page0");
             goto error_out;
+        }
         page0[0] = 0xe9;
         *(uint32_t *)&page0[1] = entry_eip - 5;
         munmap(page0, PAGE_SIZE);
