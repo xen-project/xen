@@ -30,6 +30,7 @@
 
 #include "_paths.h"
 #include "xenctrl.h"
+#include <xencall.h>
 
 #include <xen/sys/privcmd.h>
 
@@ -53,7 +54,6 @@ struct iovec {
 #include <sys/uio.h>
 #endif
 
-#define DECLARE_HYPERCALL privcmd_hypercall_t hypercall
 #define DECLARE_DOMCTL struct xen_domctl domctl
 #define DECLARE_SYSCTL struct xen_sysctl sysctl
 #define DECLARE_PHYSDEV_OP struct physdev_op physdev_op
@@ -94,29 +94,11 @@ struct xc_interface_core {
     FILE *dombuild_logger_file;
     const char *currently_progress_reporting;
 
-    /*
-     * A simple cache of unused, single page, hypercall buffers
-     *
-     * Protected by a global lock.
-     */
-#define HYPERCALL_BUFFER_CACHE_SIZE 4
-    int hypercall_buffer_cache_nr;
-    void *hypercall_buffer_cache[HYPERCALL_BUFFER_CACHE_SIZE];
-
-    /*
-     * Hypercall buffer statistics. All protected by the global
-     * hypercall_buffer_cache lock.
-     */
-    int hypercall_buffer_total_allocations;
-    int hypercall_buffer_total_releases;
-    int hypercall_buffer_current_allocations;
-    int hypercall_buffer_maximum_allocations;
-    int hypercall_buffer_cache_hits;
-    int hypercall_buffer_cache_misses;
-    int hypercall_buffer_cache_toobig;
-
     /* Privcmd interface */
     int privcmdfd;
+
+    /* Hypercall interface */
+    xencall_handle *xcall;
 };
 
 int osdep_privcmd_open(xc_interface *xch);
@@ -232,24 +214,16 @@ void xc__hypercall_buffer_cache_release(xc_interface *xch);
  * Hypercall interfaces.
  */
 
-int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall);
-
 static inline int do_xen_version(xc_interface *xch, int cmd, xc_hypercall_buffer_t *dest)
 {
-    DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BUFFER_ARGUMENT(dest);
-
-    hypercall.op     = __HYPERVISOR_xen_version;
-    hypercall.arg[0] = (unsigned long) cmd;
-    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(dest);
-
-    return do_xen_hypercall(xch, &hypercall);
+    return xencall2(xch->xcall, __HYPERVISOR_xen_version,
+                    cmd, HYPERCALL_BUFFER_AS_ARG(dest));
 }
 
 static inline int do_physdev_op(xc_interface *xch, int cmd, void *op, size_t len)
 {
     int ret = -1;
-    DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(op, len, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     if ( xc_hypercall_bounce_pre(xch, op) )
@@ -258,11 +232,9 @@ static inline int do_physdev_op(xc_interface *xch, int cmd, void *op, size_t len
         goto out1;
     }
 
-    hypercall.op = __HYPERVISOR_physdev_op;
-    hypercall.arg[0] = (unsigned long) cmd;
-    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(op);
-
-    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
+    ret = xencall2(xch->xcall, __HYPERVISOR_physdev_op,
+                   cmd, HYPERCALL_BUFFER_AS_ARG(op));
+    if ( ret < 0 )
     {
         if ( errno == EACCES )
             DPRINTF("physdev operation failed -- need to"
@@ -277,7 +249,6 @@ out1:
 static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
 {
     int ret = -1;
-    DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(domctl, sizeof(*domctl), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     domctl->interface_version = XEN_DOMCTL_INTERFACE_VERSION;
@@ -288,10 +259,9 @@ static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
         goto out1;
     }
 
-    hypercall.op     = __HYPERVISOR_domctl;
-    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(domctl);
-
-    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
+    ret = xencall1(xch->xcall, __HYPERVISOR_domctl,
+                   HYPERCALL_BUFFER_AS_ARG(domctl));
+    if ( ret < 0 )
     {
         if ( errno == EACCES )
             DPRINTF("domctl operation failed -- need to"
@@ -306,7 +276,6 @@ static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
 static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
 {
     int ret = -1;
-    DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(sysctl, sizeof(*sysctl), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     sysctl->interface_version = XEN_SYSCTL_INTERFACE_VERSION;
@@ -317,9 +286,9 @@ static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
         goto out1;
     }
 
-    hypercall.op     = __HYPERVISOR_sysctl;
-    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(sysctl);
-    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
+    ret = xencall1(xch->xcall, __HYPERVISOR_sysctl,
+                   HYPERCALL_BUFFER_AS_ARG(sysctl));
+    if ( ret < 0 )
     {
         if ( errno == EACCES )
             DPRINTF("sysctl operation failed -- need to"
@@ -335,7 +304,6 @@ static inline int do_platform_op(xc_interface *xch,
                                  struct xen_platform_op *platform_op)
 {
     int ret = -1;
-    DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(platform_op, sizeof(*platform_op),
                              XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
@@ -347,9 +315,9 @@ static inline int do_platform_op(xc_interface *xch,
         return -1;
     }
 
-    hypercall.op     = __HYPERVISOR_platform_op;
-    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(platform_op);
-    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
+    ret = xencall1(xch->xcall, __HYPERVISOR_platform_op,
+                   HYPERCALL_BUFFER_AS_ARG(platform_op));
+    if ( ret < 0 )
     {
         if ( errno == EACCES )
             DPRINTF("platform operation failed -- need to"
@@ -365,13 +333,11 @@ static inline int do_multicall_op(xc_interface *xch,
                                   uint32_t nr_calls)
 {
     int ret = -1;
-    DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BUFFER_ARGUMENT(call_list);
 
-    hypercall.op     = __HYPERVISOR_multicall;
-    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(call_list);
-    hypercall.arg[1] = nr_calls;
-    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
+    ret = xencall2(xch->xcall, __HYPERVISOR_multicall,
+                   HYPERCALL_BUFFER_AS_ARG(call_list), nr_calls);
+    if ( ret < 0 )
     {
         if ( errno == EACCES )
             DPRINTF("multicall operation failed -- need to"

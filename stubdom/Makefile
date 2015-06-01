@@ -331,6 +331,12 @@ mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET)
 	  ln -sf $(XEN_ROOT)/tools/libs/gnttab/include/*.h include/ && \
 	  ln -sf $(XEN_ROOT)/tools/libs/gnttab/*.c . && \
 	  ln -sf $(XEN_ROOT)/tools/libs/gnttab/Makefile . )
+	mkdir -p libs-$(XEN_TARGET_ARCH)/call/include
+	[ -h libs-$(XEN_TARGET_ARCH)/call/Makefile ] || ( cd libs-$(XEN_TARGET_ARCH)/call && \
+	  ln -sf $(XEN_ROOT)/tools/libs/call/*.h . && \
+	  ln -sf $(XEN_ROOT)/tools/libs/call/include/*.h include/ && \
+	  ln -sf $(XEN_ROOT)/tools/libs/call/*.c . && \
+	  ln -sf $(XEN_ROOT)/tools/libs/call/Makefile . )
 	mkdir -p libxc-$(XEN_TARGET_ARCH)
 	[ -h libxc-$(XEN_TARGET_ARCH)/Makefile ] || ( cd libxc-$(XEN_TARGET_ARCH) && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/*.h . && \
@@ -381,12 +387,21 @@ libs-$(XEN_TARGET_ARCH)/gnttab/libxengnttab.a: mk-headers-$(XEN_TARGET_ARCH) $(N
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/gnttab
 
 #######
+# libxencall
+#######
+
+.PHONY: libxencall
+libxencall: libs-$(XEN_TARGET_ARCH)/call/libxencall.a
+libs-$(XEN_TARGET_ARCH)/call/libxencall.a: mk-headers-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE)
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/call
+
+#######
 # libxc
 #######
 
 .PHONY: libxc
 libxc: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a libxc-$(XEN_TARGET_ARCH)/libxenguest.a
-libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: mk-headers-$(XEN_TARGET_ARCH) libxentoollog libxenevtchn libxengnttab cross-zlib
+libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: mk-headers-$(XEN_TARGET_ARCH) libxentoollog libxenevtchn libxengnttab libxencall cross-zlib
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= CONFIG_LIBXC_MINIOS=y -C libxc-$(XEN_TARGET_ARCH)
 
  libxc-$(XEN_TARGET_ARCH)/libxenguest.a: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a

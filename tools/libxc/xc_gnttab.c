@@ -21,7 +21,6 @@
 int xc_gnttab_op(xc_interface *xch, int cmd, void * op, int op_size, int count)
 {
     int ret = 0;
-    DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(op, count * op_size, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     if ( xc_hypercall_bounce_pre(xch, op) )
@@ -30,12 +29,8 @@ int xc_gnttab_op(xc_interface *xch, int cmd, void * op, int op_size, int count)
         goto out1;
     }
 
-    hypercall.op = __HYPERVISOR_grant_table_op;
-    hypercall.arg[0] = cmd;
-    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(op);
-    hypercall.arg[2] = count;
-
-    ret = do_xen_hypercall(xch, &hypercall);
+    ret = xencall3(xch->xcall,  __HYPERVISOR_grant_table_op,
+                   cmd, HYPERCALL_BUFFER_AS_ARG(op), count);
 
     xc_hypercall_bounce_post(xch, op);
 

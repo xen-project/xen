@@ -88,53 +88,6 @@ int osdep_privcmd_close(xc_interface *xch)
     return close(fd);
 }
 
-/*------------------------ Privcmd hypercall interface -----------------------*/
-void *osdep_alloc_hypercall_buffer(xc_interface *xch, int npages)
-{
-    size_t size = npages * XC_PAGE_SIZE;
-    void *p;
-
-    /* Address returned by mmap is page aligned. */
-    p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS,
-             -1, 0);
-    if (p == NULL)
-        return NULL;
-
-    /*
-     * Since FreeBSD doesn't have the MAP_LOCKED flag,
-     * lock memory using mlock.
-     */
-    if ( mlock(p, size) < 0 )
-    {
-        munmap(p, size);
-        return NULL;
-    }
-
-    return p;
-}
-
-void osdep_free_hypercall_buffer(xc_interface *xch, void *ptr, int npages)
-{
-
-    int saved_errno = errno;
-    /* Unlock pages */
-    munlock(ptr, npages * XC_PAGE_SIZE);
-
-    munmap(ptr, npages * XC_PAGE_SIZE);
-    /* We MUST propagate the hypercall errno, not unmap call's. */
-    errno = saved_errno;
-}
-
-int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
-{
-    int fd = xch->privcmdfd;
-    int ret;
-
-    ret = ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
-
-    return (ret == 0) ? hypercall->retval : ret;
-}
-
 /*----------------------- Privcmd foreign map interface ----------------------*/
 void *xc_map_foreign_bulk(xc_interface *xch,
                           uint32_t dom, int prot,

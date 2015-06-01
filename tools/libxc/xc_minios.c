@@ -61,38 +61,6 @@ void minios_interface_close_fd(int fd)
     files[fd].type = FTYPE_NONE;
 }
 
-void *osdep_alloc_hypercall_buffer(xc_interface *xch, int npages)
-{
-    return xc_memalign(xch, PAGE_SIZE, npages * PAGE_SIZE);
-}
-
-void osdep_free_hypercall_buffer(xc_interface *xch, void *ptr, int npages)
-{
-    free(ptr);
-}
-
-int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
-{
-    multicall_entry_t call;
-    int i, ret;
-
-    call.op = hypercall->op;
-    for (i = 0; i < ARRAY_SIZE(hypercall->arg); i++)
-	call.args[i] = hypercall->arg[i];
-
-    ret = HYPERVISOR_multicall(&call, 1);
-
-    if (ret < 0) {
-	errno = -ret;
-	return -1;
-    }
-    if ((long) call.result < 0) {
-        errno = - (long) call.result;
-        return -1;
-    }
-    return call.result;
-}
-
 void *xc_map_foreign_bulk(xc_interface *xch,
                           uint32_t dom, int prot,
                           const xen_pfn_t *arr, int *err, unsigned int num)

@@ -23,7 +23,6 @@
 static int do_tmem_op(xc_interface *xch, tmem_op_t *op)
 {
     int ret;
-    DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(op, sizeof(*op), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     if ( xc_hypercall_bounce_pre(xch, op) )
@@ -32,9 +31,9 @@ static int do_tmem_op(xc_interface *xch, tmem_op_t *op)
         return -EFAULT;
     }
 
-    hypercall.op = __HYPERVISOR_tmem_op;
-    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(op);
-    if ((ret = do_xen_hypercall(xch, &hypercall)) < 0)
+    ret = xencall1(xch->xcall, __HYPERVISOR_tmem_op,
+                   HYPERCALL_BUFFER_AS_ARG(op));
+    if ( ret < 0 )
     {
         if ( errno == EACCES )
             DPRINTF("tmem operation failed -- need to"

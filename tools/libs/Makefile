@@ -5,5 +5,6 @@ SUBDIRS-y :=
 SUBDIRS-y += toollog
 SUBDIRS-y += evtchn
 SUBDIRS-y += gnttab
+SUBDIRS-y += call
 
 all clean install distclean: %: subdirs-%

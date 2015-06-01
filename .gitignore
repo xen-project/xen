@@ -62,6 +62,7 @@ stubdom/ioemu
 stubdom/ioemu/
 stubdom/libs-*
 stubdom/libxc-*
+stubdom/libxencall-*
 stubdom/libxenevtchn-*
 stubdom/libxengnttab-*
 stubdom/libxentoollog-*
@@ -91,6 +92,7 @@ config/Docs.mk
 tools/libs/toollog/headers.chk
 tools/libs/evtchn/headers.chk
 tools/libs/gnttab/headers.chk
+tools/libs/call/headers.chk
 tools/blktap2/daemon/blktapctrl
 tools/blktap2/drivers/img2qcow
 tools/blktap2/drivers/lock-util

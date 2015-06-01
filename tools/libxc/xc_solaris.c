@@ -67,22 +67,6 @@ int osdep_privcmd_close(xc_interface *xch)
     return close(fd);
 }
 
-void *osdep_alloc_hypercall_buffer(xc_interface *xch, int npages)
-{
-    return xc_memalign(xch, XC_PAGE_SIZE, npages * XC_PAGE_SIZE);
-}
-
-static void osdep_free_hypercall_buffer(xc_interface *xch, void *ptr, int npages)
-{
-    free(ptr);
-}
-
-int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
-{
-    int fd = xch->privcmdfd;
-    return ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
-}
-
 void *xc_map_foreign_batch(xc_interface *xch,
                           uint32_t dom, int prot,
                           xen_pfn_t *arr, int num)

@@ -91,55 +91,6 @@ int osdep_privcmd_close(xc_interface *xch)
     return close(fd);
 }
 
-void *osdep_alloc_hypercall_buffer(xc_interface *xch, int npages)
-{
-    size_t size = npages * XC_PAGE_SIZE;
-    void *p;
-    int rc, saved_errno;
-
-    /* Address returned by mmap is page aligned. */
-    p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED, -1, 0);
-    if ( p == MAP_FAILED )
-    {
-        PERROR("xc_alloc_hypercall_buffer: mmap failed");
-        return NULL;
-    }
-
-    /* Do not copy the VMA to child process on fork. Avoid the page being COW
-        on hypercall. */
-    rc = madvise(p, npages * XC_PAGE_SIZE, MADV_DONTFORK);
-    if ( rc < 0 )
-    {
-        PERROR("xc_alloc_hypercall_buffer: madvise failed");
-        goto out;
-    }
-
-    return p;
-
-out:
-    saved_errno = errno;
-    (void)munmap(p, size);
-    errno = saved_errno;
-    return NULL;
-}
-
-void osdep_free_hypercall_buffer(xc_interface *xch, void *ptr, int npages)
-{
-    int saved_errno = errno;
-    /* Recover the VMA flags. Maybe it's not necessary */
-    madvise(ptr, npages * XC_PAGE_SIZE, MADV_DOFORK);
-
-    munmap(ptr, npages * XC_PAGE_SIZE);
-    /* We MUST propagate the hypercall errno, not unmap call's. */
-    errno = saved_errno;
-}
-
-int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
-{
-    int fd = xch->privcmdfd;
-    return ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
-}
-
 static int xc_map_foreign_batch_single(int fd, uint32_t dom,
                                        xen_pfn_t *mfn, unsigned long addr)
 {

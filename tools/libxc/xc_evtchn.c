@@ -25,7 +25,6 @@ static int do_evtchn_op(xc_interface *xch, int cmd, void *arg,
                         size_t arg_size, int silently_fail)
 {
     int ret = -1;
-    DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(arg, arg_size, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     if ( xc_hypercall_bounce_pre(xch, arg) )
@@ -34,11 +33,9 @@ static int do_evtchn_op(xc_interface *xch, int cmd, void *arg,
         goto out;
     }
 
-    hypercall.op     = __HYPERVISOR_event_channel_op;
-    hypercall.arg[0] = cmd;
-    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
-
-    if ((ret = do_xen_hypercall(xch, &hypercall)) < 0 && !silently_fail)
+    ret = xencall2(xch->xcall, __HYPERVISOR_event_channel_op,
+                   cmd, HYPERCALL_BUFFER_AS_ARG(arg));
+    if ( ret < 0 && !silently_fail )
         ERROR("do_evtchn_op: HYPERVISOR_event_channel_op failed: %d", ret);
 
     xc_hypercall_bounce_post(xch, arg);

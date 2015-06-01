@@ -39,16 +39,6 @@ struct xc_interface_core *xc_interface_open(xentoollog_logger *logger,
     xch->error_handler   = logger;           xch->error_handler_tofree   = 0;
     xch->dombuild_logger = dombuild_logger;  xch->dombuild_logger_tofree = 0;
 
-    xch->hypercall_buffer_cache_nr = 0;
-
-    xch->hypercall_buffer_total_allocations = 0;
-    xch->hypercall_buffer_total_releases = 0;
-    xch->hypercall_buffer_current_allocations = 0;
-    xch->hypercall_buffer_maximum_allocations = 0;
-    xch->hypercall_buffer_cache_hits = 0;
-    xch->hypercall_buffer_cache_misses = 0;
-    xch->hypercall_buffer_cache_toobig = 0;
-
     if (!xch->error_handler) {
         xch->error_handler = xch->error_handler_tofree =
             (xentoollog_logger*)
@@ -65,14 +55,22 @@ struct xc_interface_core *xc_interface_open(xentoollog_logger *logger,
     }
     *xch = xch_buf;
 
-    if (!(open_flags & XC_OPENFLAG_DUMMY)) {
-        if ( osdep_privcmd_open(xch) < 0 )
-            goto err;
-    }
+    if (open_flags & XC_OPENFLAG_DUMMY)
+        return xch; /* We are done */
+
+    if ( osdep_privcmd_open(xch) < 0 )
+        goto err;
+
+    xch->xcall = xencall_open(xch->error_handler,
+        open_flags & XC_OPENFLAG_NON_REENTRANT ? XENCALL_OPENFLAG_NON_REENTRANT : 0U);
+
+    if ( xch->xcall == NULL )
+        goto err;
 
     return xch;
 
  err:
+    osdep_privcmd_close(xch);
     xtl_logger_destroy(xch->error_handler_tofree);
     if (xch != &xch_buf) free(xch);
     return NULL;
@@ -85,10 +83,11 @@ int xc_interface_close(xc_interface *xch)
     if (!xch)
         return 0;
 
+    rc = xencall_close(xch->xcall);
+    if (rc) PERROR("Could not close xencall interface");
+
     rc = osdep_privcmd_close(xch);
     if (rc) PERROR("Could not close hypervisor interface");
-
-    xc__hypercall_buffer_cache_release(xch);
 
     xtl_logger_destroy(xch->dombuild_logger_tofree);
     xtl_logger_destroy(xch->error_handler_tofree);
@@ -228,7 +227,6 @@ int xc_mmuext_op(
     unsigned int nr_ops,
     domid_t dom)
 {
-    DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(op, nr_ops*sizeof(*op), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     long ret = -1;
 
@@ -238,13 +236,9 @@ int xc_mmuext_op(
         goto out1;
     }
 
-    hypercall.op     = __HYPERVISOR_mmuext_op;
-    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(op);
-    hypercall.arg[1] = (unsigned long)nr_ops;
-    hypercall.arg[2] = (unsigned long)0;
-    hypercall.arg[3] = (unsigned long)dom;
-
-    ret = do_xen_hypercall(xch, &hypercall);
+    ret = xencall4(xch->xcall, __HYPERVISOR_mmuext_op,
+                   HYPERCALL_BUFFER_AS_ARG(op),
+                   nr_ops, 0, dom);
 
     xc_hypercall_bounce_post(xch, op);
 
@@ -254,8 +248,7 @@ int xc_mmuext_op(
 
 static int flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
 {
-    int err = 0;
-    DECLARE_HYPERCALL;
+    int rc, err = 0;
     DECLARE_NAMED_HYPERCALL_BOUNCE(updates, mmu->updates, mmu->idx*sizeof(*mmu->updates), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     if ( mmu->idx == 0 )
@@ -268,13 +261,10 @@ static int flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
         goto out;
     }
 
-    hypercall.op     = __HYPERVISOR_mmu_update;
-    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(updates);
-    hypercall.arg[1] = (unsigned long)mmu->idx;
-    hypercall.arg[2] = 0;
-    hypercall.arg[3] = mmu->subject;
-
-    if ( do_xen_hypercall(xch, &hypercall) < 0 )
+    rc = xencall4(xch->xcall, __HYPERVISOR_mmu_update,
+                  HYPERCALL_BUFFER_AS_ARG(updates),
+                  mmu->idx, 0, mmu->subject);
+    if ( rc < 0 )
     {
         ERROR("Failure when submitting mmu updates");
         err = 1;
@@ -317,7 +307,6 @@ int xc_flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
 
 long do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len)
 {
-    DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(arg, len, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     long ret = -1;
 
@@ -327,11 +316,8 @@ long do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len)
         goto out1;
     }
 
-    hypercall.op     = __HYPERVISOR_memory_op;
-    hypercall.arg[0] = (unsigned long) cmd;
-    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
-
-    ret = do_xen_hypercall(xch, &hypercall);
+    ret = xencall2(xch->xcall, __HYPERVISOR_memory_op,
+                   cmd, HYPERCALL_BUFFER_AS_ARG(arg));
 
     xc_hypercall_bounce_post(xch, arg);
  out1:

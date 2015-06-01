@@ -264,6 +264,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/toollog \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/evtchn \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/gnttab \
+		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/call \
 		$(QEMU_UPSTREAM_RPATH)" \
 		--bindir=$(LIBEXEC_BIN) \
 		--datadir=$(SHAREDIR)/qemu-xen \

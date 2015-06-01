@@ -1,0 +1,19 @@
+VERS_1.0 {
+	global:
+		xencall_open;
+		xencall_close;
+
+		xencall0;
+		xencall1;
+		xencall2;
+		xencall3;
+		xencall4;
+		xencall5;
+		xencall6;
+
+		xencall_alloc_buffer;
+		xencall_free_buffer;
+		xencall_alloc_buffer_pages;
+		xencall_free_buffer_pages;
+	local: *; /* Do not expose anything by default */
+};

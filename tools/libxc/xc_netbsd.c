@@ -67,46 +67,6 @@ int osdep_privcmd_close(xc_interface *xch)
     return close(fd);
 }
 
-void *osdep_alloc_hypercall_buffer(xc_interface *xch, int npages)
-{
-    size_t size = npages * XC_PAGE_SIZE;
-    void *p;
-
-    p = xc_memalign(xch, XC_PAGE_SIZE, size);
-    if (!p)
-        return NULL;
-
-    if ( mlock(p, size) < 0 )
-    {
-        free(p);
-        return NULL;
-    }
-    return p;
-}
-
-void osdep_free_hypercall_buffer(xc_interface *xch, void *ptr, int npages)
-{
-    (void) munlock(ptr, npages * XC_PAGE_SIZE);
-    free(ptr);
-}
-
-int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
-{
-    int fd = xch->privcmdfd;
-    int error = ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
-
-    /*
-     * Since NetBSD ioctl can only return 0 on success or < 0 on
-     * error, if we want to return a value from ioctl we should
-     * do so by setting hypercall->retval, to mimic Linux ioctl
-     * implementation.
-     */
-    if (error < 0)
-        return error;
-    else
-        return hypercall->retval;
-}
-
 void *xc_map_foreign_bulk(xc_interface *xch,
                           uint32_t dom, int prot,
                           const xen_pfn_t *arr, int *err, unsigned int num)
