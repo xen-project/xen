@@ -257,6 +257,7 @@ int libxl__vnuma_build_vmemrange_hvm(libxl__gc *gc,
     uint64_t hole_start, hole_end, next;
     int nid, nr_vmemrange;
     xen_vmemrange_t *vmemranges;
+    int rc;
 
     /* Derive vmemranges from vnode size and memory hole.
      *
@@ -276,6 +277,16 @@ int libxl__vnuma_build_vmemrange_hvm(libxl__gc *gc,
     for (nid = 0; nid < b_info->num_vnuma_nodes; nid++) {
         libxl_vnode_info *p = &b_info->vnuma_nodes[nid];
         uint64_t remaining_bytes = p->memkb << 10;
+
+        /* Consider video ram belongs to vnode 0 */
+        if (nid == 0) {
+            if (p->memkb < b_info->video_memkb) {
+                LOG(ERROR, "vnode 0 too small to contain video ram");
+                rc = ERROR_INVAL;
+                goto out;
+            }
+            remaining_bytes -= (b_info->video_memkb << 10);
+        }
 
         while (remaining_bytes > 0) {
             uint64_t count = remaining_bytes;
@@ -300,7 +311,9 @@ int libxl__vnuma_build_vmemrange_hvm(libxl__gc *gc,
     state->vmemranges = vmemranges;
     state->num_vmemranges = nr_vmemrange;
 
-    return 0;
+    rc = 0;
+out:
+    return rc;
 }
 
 /*
