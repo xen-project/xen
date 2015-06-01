@@ -29,7 +29,7 @@ struct xenpf_efi_runtime_call;
 struct compat_pf_efi_runtime_call;
 
 void efi_init_memory(void);
-paddr_t efi_rs_page_table(void);
+bool_t efi_rs_using_pgtables(void);
 unsigned long efi_get_time(void);
 void efi_halt_system(void);
 void efi_reset_system(bool_t warm);
