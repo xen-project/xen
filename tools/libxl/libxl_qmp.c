@@ -849,6 +849,18 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
         QMP_PARAMETERS_SPRINTF(&args, "addr", "%x.%x",
                                PCI_SLOT(pcidev->vdevfn), PCI_FUNC(pcidev->vdevfn));
     }
+    /*
+     * Version of QEMU prior to the XSA-131 fix did not support this
+     * property and were effectively always in permissive mode. The
+     * fix for XSA-131 switched the default to be restricted by
+     * default and added the permissive property.
+     *
+     * Therefore in order to support both old and new QEMU we only set
+     * the permissive flag if it is true. Users of older QEMU have no
+     * reason to set the flag so this is ok.
+     */
+    if (pcidev->permissive)
+        qmp_parameters_add_bool(gc, &args, "permissive", true);
 
     rc = qmp_synchronous_send(qmp, "device_add", args,
                               NULL, NULL, qmp->timeout);
