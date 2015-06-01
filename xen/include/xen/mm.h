@@ -1,28 +1,45 @@
 /******************************************************************************
  * include/xen/mm.h
- * 
+ *
  * Definitions for memory pages, frame numbers, addresses, allocations, etc.
- * 
- * Note that Xen must handle several different physical 'address spaces' and
- * there is a consistent terminology for these:
- * 
- * 1. gpfn/gpaddr: A guest-specific pseudo-physical frame number or address.
- * 2. gmfn/gmaddr: A machine address from the p.o.v. of a particular guest.
- * 3. mfn/maddr:   A real machine frame number or address.
- * 4. pfn/paddr:   Used in 'polymorphic' functions that work across all
- *                 address spaces, depending on context. See the pagetable
- *                 conversion macros in asm-x86/page.h for examples.
- *                 Also 'paddr_t' is big enough to store any physical address.
- * 
- * This scheme provides consistent function and variable names even when
- * different guests are running in different memory-management modes.
- * 1. A guest running in auto-translated mode (e.g., shadow_mode_translate())
- *    will have gpfn == gmfn and gmfn != mfn.
- * 2. A paravirtualised x86 guest will have gpfn != gmfn and gmfn == mfn.
- * 3. A paravirtualised guest with no pseudophysical overlay will have
- *    gpfn == gpmfn == mfn.
- * 
+ *
  * Copyright (c) 2002-2006, K A Fraser <keir@xensource.com>
+ *
+ *                         +---------------------+
+ *                          Xen Memory Management
+ *                         +---------------------+
+ *
+ * Xen has to handle many different address spaces.  It is important not to
+ * get these spaces mixed up.  The following is a consistent terminology which
+ * should be adhered to.
+ *
+ * mfn: Machine Frame Number
+ *   The values Xen puts into its own pagetables.  This is the host physical
+ *   memory address space with RAM, MMIO etc.
+ *
+ * gfn: Guest Frame Number
+ *   The values a guest puts in its own pagetables.  For an auto-translated
+ *   guest (hardware assisted with 2nd stage translation, or shadowed), gfn !=
+ *   mfn.  For a non-translated guest which is aware of Xen, gfn == mfn.
+ *
+ * pfn: Pseudophysical Frame Number
+ *   A linear idea of a guest physical address space. For an auto-translated
+ *   guest, pfn == gfn while for a non-translated guest, pfn != gfn.
+ *
+ * WARNING: Some of these terms have changed over time while others have been
+ * used inconsistently, meaning that a lot of existing code does not match the
+ * definitions above.  New code should use these terms as described here, and
+ * over time older code should be corrected to be consistent.
+ *
+ * An incomplete list of larger work area:
+ * - Phase out the use of 'pfn' from the x86 pagetable code.  Callers should
+ *   know explicitly whether they are talking about mfns or gfns.
+ * - Phase out the use of 'pfn' from the ARM mm code.  A cursory glance
+ *   suggests that 'mfn' and 'pfn' are currently used interchangeably, where
+ *   'mfn' is the appropriate term to use.
+ * - Phase out the use of gpfn/gmfn where pfn/mfn are meant.  This excludes
+ *   the x86 shadow code, which uses gmfn/smfn pairs with different,
+ *   documented, meanings.
  */
 
 #ifndef __XEN_MM_H__
