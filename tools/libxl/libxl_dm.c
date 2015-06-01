@@ -1036,9 +1036,6 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
                               libxl__multidev *aodevs,
                               int rc);
 
-static void spawn_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
-                                            libxl__destroy_domid_state *dis,
-                                            int rc);
 static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
                               int rc, const char *p);
 
@@ -1353,7 +1350,6 @@ static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
 {
     EGC_GC;
     libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(xswait, *sdss, xswait);
-    uint32_t dm_domid = sdss->pvqemu.guest_domid;
 
     if (rc) {
         if (rc == ERROR_TIMEDOUT)
@@ -1367,29 +1363,6 @@ static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
         return;
  out:
     libxl__xswait_stop(gc, xswait);
-    if (rc) {
-        if (dm_domid) {
-            sdss->dis.ao = sdss->dm.spawn.ao;
-            sdss->dis.domid = dm_domid;
-            sdss->dis.callback = spawn_stubdom_pvqemu_destroy_cb;
-            libxl__destroy_domid(egc, &sdss->dis);
-            return;
-        }
-    }
-    sdss->callback(egc, &sdss->dm, rc);
-}
-
-static void spawn_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
-                                            libxl__destroy_domid_state *dis,
-                                            int rc)
-{
-    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(dis, *sdss, dis);
-    STATE_AO_GC(sdss->dis.ao);
-
-    if (rc)
-        LOG(ERROR, "destruction of domain %u after failed creation failed",
-                   sdss->pvqemu.guest_domid);
-
     sdss->callback(egc, &sdss->dm, rc);
 }
 
