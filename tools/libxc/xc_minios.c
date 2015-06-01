@@ -23,8 +23,6 @@
 #include <mini-os/os.h>
 #include <mini-os/mm.h>
 #include <mini-os/lib.h>
-#include <mini-os/gntmap.h>
-#include <sys/mman.h>
 
 #include <xen/memory.h>
 #include <unistd.h>
@@ -38,7 +36,6 @@
 #include "xc_private.h"
 
 void minios_interface_close_fd(int fd);
-void minios_gnttab_close_fd(int fd);
 
 extern void minios_interface_close_fd(int fd);
 
@@ -200,76 +197,6 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
 void *xc_memalign(xc_interface *xch, size_t alignment, size_t size)
 {
     return memalign(alignment, size);
-}
-
-int osdep_gnttab_open(xc_gnttab *xgt)
-{
-    int fd = alloc_fd(FTYPE_GNTMAP);
-    if ( fd == -1 )
-        return -1;
-    gntmap_init(&files[fd].gntmap);
-    xgt->fd = fd;
-    return 0;
-}
-
-int osdep_gnttab_close(xc_gnttab *xgt)
-{
-    if ( xgt->fd == -1 )
-        return 0;
-
-    return close(xgt->fd);
-}
-
-void minios_gnttab_close_fd(int fd)
-{
-    gntmap_fini(&files[fd].gntmap);
-    files[fd].type = FTYPE_NONE;
-}
-
-void *osdep_gnttab_grant_map(xc_gnttab *xgt,
-                             uint32_t count, int flags, int prot,
-                             uint32_t *domids, uint32_t *refs,
-                             uint32_t notify_offset,
-                             evtchn_port_t notify_port)
-{
-    int fd = xgt->fd;
-    int stride = 1;
-    if (flags & XC_GRANT_MAP_SINGLE_DOMAIN)
-        stride = 0;
-    if (notify_offset != -1 || notify_port != -1) {
-        errno = ENOSYS;
-        return NULL;
-    }
-    return gntmap_map_grant_refs(&files[fd].gntmap,
-                                 count, domids, stride,
-                                 refs, prot & PROT_WRITE);
-}
-
-int xc_gnttab_munmap(xc_gnttab *xgt, void *start_address, uint32_t count)
-{
-    int fd = xgt->fd;
-    int ret;
-    ret = gntmap_munmap(&files[fd].gntmap,
-                        (unsigned long) start_address,
-                        count);
-    if (ret < 0) {
-        errno = -ret;
-        return -1;
-    }
-    return ret;
-}
-
-int xc_gnttab_set_max_grants(xc_gnttab *xgt, uint32_t count)
-{
-    int fd = xgt->fd;
-    int ret;
-    ret = gntmap_set_max_grants(&files[fd].gntmap,
-                                count);
-    if (ret < 0) {
-        errno = -ret;
-        return -1;
-    }
-    return ret;
 }
 
 static struct xc_osdep_ops *minios_osdep_init(xc_interface *xch, enum xc_osdep_type type)

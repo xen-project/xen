@@ -12,6 +12,7 @@ INSTALL = $(XEN_ROOT)/tools/cross-install
 XEN_INCLUDE        = $(XEN_ROOT)/tools/include
 XEN_LIBXENTOOLLOG  = $(XEN_ROOT)/tools/libs/toollog
 XEN_LIBXENEVTCHN   = $(XEN_ROOT)/tools/libs/evtchn
+XEN_LIBXENGNTTAB   = $(XEN_ROOT)/tools/libs/gnttab
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 XEN_XENLIGHT       = $(XEN_ROOT)/tools/libxl
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
@@ -88,8 +89,17 @@ SHDEPS_libxenevtchn =
 LDLIBS_libxenevtchn = $(XEN_LIBXENEVTCHN)/libxenevtchn$(libextension)
 SHLIB_libxenevtchn  = -Wl,-rpath-link=$(XEN_LIBXENEVTCHN)
 
+CFLAGS_libxengnttab = -I$(XEN_LIBXENGNTTAB)/include $(CFLAGS_xeninclude)
+LDLIBS_libxengnttab = $(XEN_LIBXENGNTTAB)/libxengnttab$(libextension)
+SHLIB_libxengnttab  = -Wl,-rpath-link=$(XEN_LIBXENGNTTAB)
+
+# xengntshr_* interfaces are actually part of libxengnttab.so
+CFLAGS_libxengntshr = -I$(XEN_LIBXENGNTTAB)/include $(CFLAGS_xeninclude)
+LDLIBS_libxengntshr = $(XEN_LIBXENGNTTAB)/libxengnttab$(libextension)
+SHLIB_libxengntshr  = -Wl,-rpath-link=$(XEN_LIBXENGNTTAB)
+
 CFLAGS_libxenctrl = -I$(XEN_LIBXC)/include $(CFLAGS_libxentoollog) $(CFLAGS_xeninclude)
-SHDEPS_libxenctrl = $(SHLIB_libxentoollog) $(SHLIB_libxenevtchn)
+SHDEPS_libxenctrl = $(SHLIB_libxentoollog) $(SHLIB_libxenevtchn) $(SHLIB_libxengnttab) $(SHLIB_libxengntshr)
 LDLIBS_libxenctrl = $(SHDEPS_libxenctrl) $(XEN_LIBXC)/libxenctrl$(libextension)
 SHLIB_libxenctrl  = $(SHDEPS_libxenctrl) -Wl,-rpath-link=$(XEN_LIBXC)
 
@@ -109,7 +119,7 @@ LDLIBS_libxenstat  = $(SHDEPS_libxenstat) $(XEN_LIBXENSTAT)/libxenstat$(libexten
 SHLIB_libxenstat   = $(SHDEPS_libxenstat) -Wl,-rpath-link=$(XEN_LIBXENSTAT)
 
 CFLAGS_libxenvchan = -I$(XEN_LIBVCHAN)
-SHDEPS_libxenvchan = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libxenevtchn)
+SHDEPS_libxenvchan = $(SHLIB_libxentoollog) $(SHLIB_libxenstore) $(SHLIB_libxenevtchn) $(SHLIB_libxengnttab) $(SHLIB_libxengntshr)
 LDLIBS_libxenvchan = $(SHDEPS_libxenvchan) $(XEN_LIBVCHAN)/libxenvchan$(libextension)
 SHLIB_libxenvchan  = $(SHDEPS_libxenvchan) -Wl,-rpath-link=$(XEN_LIBVCHAN)
 

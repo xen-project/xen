@@ -20,12 +20,14 @@
 #define _XENSTORED_CORE_H
 
 #include <xenctrl.h>
+#include <xengnttab.h>
 
 #include <sys/types.h>
 #include <dirent.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <errno.h>
+
 #include "xenstore_lib.h"
 #include "list.h"
 #include "tdb.h"
@@ -196,7 +198,7 @@ void finish_daemonize(void);
 /* Open a pipe for signal handling */
 void init_pipe(int reopen_log_pipe[2]);
 
-xc_gnttab **xcg_handle;
+xengnttab_handle **xgt_handle;
 
 #endif /* _XENSTORED_CORE_H */
 

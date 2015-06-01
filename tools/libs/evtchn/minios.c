@@ -27,13 +27,12 @@
 #include <mini-os/events.h>
 #include <mini-os/wait.h>
 
-#include <sys/socket.h>
-
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <inttypes.h>
 #include <malloc.h>
 
@@ -42,8 +41,6 @@
 extern void minios_evtchn_close_fd(int fd);
 
 extern struct wait_queue_head event_queue;
-
-//void minios_evtchn_close_fd(int fd);
 
 /* XXX Note: This is not threadsafe */
 static struct evtchn_port_info* port_alloc(int fd) {

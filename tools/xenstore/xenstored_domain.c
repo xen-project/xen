@@ -34,7 +34,7 @@
 #include <xen/grant_table.h>
 
 static xc_interface **xc_handle;
-xc_gnttab **xcg_handle;
+xengnttab_handle **xgt_handle;
 static evtchn_port_t virq_port;
 
 xenevtchn_handle *xce_handle = NULL;
@@ -166,9 +166,9 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 
 static void *map_interface(domid_t domid, unsigned long mfn)
 {
-	if (*xcg_handle != NULL) {
+	if (*xgt_handle != NULL) {
 		/* this is the preferred method */
-		return xc_gnttab_map_grant_ref(*xcg_handle, domid,
+		return xengnttab_map_grant_ref(*xgt_handle, domid,
 			GNTTAB_RESERVED_XENSTORE, PROT_READ|PROT_WRITE);
 	} else {
 		return xc_map_foreign_range(*xc_handle, domid,
@@ -178,8 +178,8 @@ static void *map_interface(domid_t domid, unsigned long mfn)
 
 static void unmap_interface(void *interface)
 {
-	if (*xcg_handle != NULL)
-		xc_gnttab_munmap(*xcg_handle, interface, 1);
+	if (*xgt_handle != NULL)
+		xengnttab_unmap(*xgt_handle, interface, 1);
 	else
 		munmap(interface, XC_PAGE_SIZE);
 }
@@ -577,9 +577,9 @@ static int close_xc_handle(void *_handle)
 	return 0;
 }
 
-static int close_xcg_handle(void *_handle)
+static int close_xgt_handle(void *_handle)
 {
-	xc_gnttab_close(*(xc_gnttab **)_handle);
+	xengnttab_close(*(xengnttab_handle **)_handle);
 	return 0;
 }
 
@@ -634,15 +634,15 @@ void domain_init(void)
 
 	talloc_set_destructor(xc_handle, close_xc_handle);
 
-	xcg_handle = talloc(talloc_autofree_context(), xc_gnttab*);
-	if (!xcg_handle)
+	xgt_handle = talloc(talloc_autofree_context(), xengnttab_handle*);
+	if (!xgt_handle)
 		barf_perror("Failed to allocate domain gnttab handle");
 
-	*xcg_handle = xc_gnttab_open(NULL, 0);
-	if (*xcg_handle == NULL)
+	*xgt_handle = xengnttab_open(NULL, 0);
+	if (*xgt_handle == NULL)
 		xprintf("WARNING: Failed to open connection to gnttab\n");
 	else
-		talloc_set_destructor(xcg_handle, close_xcg_handle);
+		talloc_set_destructor(xgt_handle, close_xgt_handle);
 
 	xce_handle = xenevtchn_open(NULL, 0);
 

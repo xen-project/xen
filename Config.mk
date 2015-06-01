@@ -251,9 +251,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= fb66c855c983aa07644cb179fd9bfe96d55f317d
-# Fri Jan 15 13:24:00 2016 +0000
-# mini-os: Include libxenevtchn with libxc
+MINIOS_UPSTREAM_REVISION ?= 9faa4c3b862291315912b81fe1d4ccca800f530d
+# Fri Jan 15 13:24:01 2016 +0000
+# mini-os: Include libxengnttab with libxc
 
 SEABIOS_UPSTREAM_REVISION ?= 3403ac4313812752be6e6aac35239ca6888a8cab
 # Mon Dec 28 13:50:41 2015 +0100
@@ -262,9 +262,9 @@ SEABIOS_UPSTREAM_REVISION ?= 3403ac4313812752be6e6aac35239ca6888a8cab
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= ca2ff968de42d47dcda8973aa1528a14f99992d3
-# Fri Jan 15 13:23:53 2016 +0000
-# qemu-xen-traditional: Use libxenevtchn
+QEMU_TRADITIONAL_REVISION ?= d8b5666074fdbc4ddba5283d70898a2edd785028
+# Fri Jan 15 13:23:54 2016 +0000
+# qemu-xen-traditional: Use libxengnttab
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.

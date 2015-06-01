@@ -3,10 +3,8 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS  += -Werror
 
-CFLAGS  += $(CFLAGS_libxenevtchn)
 CFLAGS  += $(CFLAGS_libxenctrl)
 CFLAGS  += $(CFLAGS_libxenstore)
-LDLIBS += $(LDLIBS_libxenevtchn)
 LDLIBS += $(LDLIBS_libxenctrl)
 LDLIBS += $(LDLIBS_libxenstore)
 LDLIBS += $(SOCKET_LIBS)
@@ -28,8 +26,9 @@ clean:
 .PHONY: distclean
 distclean: clean
 
+daemon/io.o: CFLAGS += $(CFLAGS_libxenevtchn) $(CFLAGS_libxengnttab)
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
-	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_xenconsoled) $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_xenconsoled) $(APPEND_LDFLAGS)
 
 xenconsole: client/_paths.h $(patsubst %.c,%.o,$(wildcard client/*.c))
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_xenconsole) $(APPEND_LDFLAGS)

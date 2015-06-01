@@ -35,6 +35,54 @@ int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port);
 
 #endif /* XC_WANT_COMPAT_EVTCHN_API */
 
+#ifdef XC_WANT_COMPAT_GNTTAB_API
+
+typedef struct xengntdev_handle xc_gnttab;
+
+xc_gnttab *xc_gnttab_open(xentoollog_logger *logger,
+                          unsigned open_flags);
+int xc_gnttab_close(xc_gnttab *xcg);
+void *xc_gnttab_map_grant_ref(xc_gnttab *xcg,
+                              uint32_t domid,
+                              uint32_t ref,
+                              int prot);
+void *xc_gnttab_map_grant_refs(xc_gnttab *xcg,
+                               uint32_t count,
+                               uint32_t *domids,
+                               uint32_t *refs,
+                               int prot);
+void *xc_gnttab_map_domain_grant_refs(xc_gnttab *xcg,
+                                      uint32_t count,
+                                      uint32_t domid,
+                                      uint32_t *refs,
+                                      int prot);
+void *xc_gnttab_map_grant_ref_notify(xc_gnttab *xcg,
+                                     uint32_t domid,
+                                     uint32_t ref,
+                                     int prot,
+                                     uint32_t notify_offset,
+                                     evtchn_port_t notify_port);
+int xc_gnttab_munmap(xc_gnttab *xcg,
+                     void *start_address,
+                     uint32_t count);
+int xc_gnttab_set_max_grants(xc_gnttab *xcg,
+                             uint32_t count);
+
+typedef struct xengntdev_handle xc_gntshr;
+
+xc_gntshr *xc_gntshr_open(xentoollog_logger *logger,
+                          unsigned open_flags);
+int xc_gntshr_close(xc_gntshr *xcg);
+void *xc_gntshr_share_pages(xc_gntshr *xcg, uint32_t domid,
+                            int count, uint32_t *refs, int writable);
+void *xc_gntshr_share_page_notify(xc_gntshr *xcg, uint32_t domid,
+                                  uint32_t *ref, int writable,
+                                  uint32_t notify_offset,
+                                  evtchn_port_t notify_port);
+int xc_gntshr_munmap(xc_gntshr *xcg, void *start_address, uint32_t count);
+
+#endif /* XC_WANT_COMPAT_GNTTAB_API */
+
 #endif
 
 /*

@@ -69,8 +69,10 @@ xenstored_probes.o: xenstored_solaris.o
 CFLAGS += -DHAVE_DTRACE=1
 endif
 
+$(XENSTORED_OBJS): CFLAGS += $(CFLAGS_libxengnttab)
+
 xenstored: $(XENSTORED_OBJS)
-	$(CC) $^ $(LDFLAGS) $(LDLIBS_libxenevtchn) $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
+	$(CC) $^ $(LDFLAGS) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
 
 xenstored.a: $(XENSTORED_OBJS)
 	$(AR) cr $@ $^

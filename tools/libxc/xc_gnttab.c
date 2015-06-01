@@ -143,59 +143,6 @@ grant_entry_v2_t *xc_gnttab_map_table_v2(xc_interface *xch, int domid,
     return _gnttab_map_table(xch, domid, gnt_num);
 }
 
-void *xc_gnttab_map_grant_ref(xc_gnttab *xgt,
-                              uint32_t domid,
-                              uint32_t ref,
-                              int prot)
-{
-    return osdep_gnttab_grant_map(xgt, 1, 0, prot, &domid, &ref, -1, -1);
-}
-
-void *xc_gnttab_map_grant_refs(xc_gnttab *xgt,
-                               uint32_t count,
-                               uint32_t *domids,
-                               uint32_t *refs,
-                               int prot)
-{
-    return osdep_gnttab_grant_map(xgt, count, 0, prot, domids, refs, -1, -1);
-}
-
-void *xc_gnttab_map_domain_grant_refs(xc_gnttab *xgt,
-                                      uint32_t count,
-                                      uint32_t domid,
-                                      uint32_t *refs,
-                                      int prot)
-{
-    return osdep_gnttab_grant_map(xgt, count, XC_GRANT_MAP_SINGLE_DOMAIN,
-                                  prot, &domid, refs, -1, -1);
-}
-
-void *xc_gnttab_map_grant_ref_notify(xc_gnttab *xgt,
-                                     uint32_t domid,
-                                     uint32_t ref,
-                                     int prot,
-                                     uint32_t notify_offset,
-                                     evtchn_port_t notify_port)
-{
-    return osdep_gnttab_grant_map(xgt, 1, 0, prot,  &domid, &ref,
-                                  notify_offset, notify_port);
-}
-
-void *xc_gntshr_share_pages(xc_gntshr *xcg, uint32_t domid,
-                            int count, uint32_t *refs, int writable)
-{
-    return osdep_gntshr_share_pages(xcg, domid, count, refs, writable, -1, -1);
-}
-
-void *xc_gntshr_share_page_notify(xc_gntshr *xcg, uint32_t domid,
-                                  uint32_t *ref, int writable,
-                                  uint32_t notify_offset,
-                                  evtchn_port_t notify_port)
-{
-    return osdep_gntshr_share_pages(xcg, domid, 1, ref, writable,
-                                    notify_offset, notify_port);
-}
-
 /*
  * Local variables:
  * mode: C

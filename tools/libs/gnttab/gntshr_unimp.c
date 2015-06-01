@@ -14,33 +14,49 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Split out from xc_gnttab.c
  */
 
 #include <stdlib.h>
 
-#include "xc_private.h"
+#include "private.h"
 
-int osdep_gntshr_open(xc_gnttab *xgt)
+xengntshr_handle *xengntshr_open(xentoollog_logger *logger, unsigned open_flags)
 {
-    return -1;
+    return NULL;
 }
 
-int osdep_gntshr_close(xc_gnttab *xgt)
+int xengntshr_close(xengntshr_handle *xgs)
 {
     return 0;
 }
 
-void *osdep_gntshr_share_pages(xc_gntshr *xgs,
-                               uint32_t domid, int count,
-                               uint32_t *refs, int writable,
-                               uint32_t notify_offset,
-                               evtchn_port_t notify_port)
-{
-    abort()
-}
-
-int xc_gntshr_munmap(xc_gntshr *xgs,
-                     void *start_address, uint32_t count)
+void *xengntshr_share_pages(xengntshr_handle *xcg, uint32_t domid,
+                            int count, uint32_t *refs, int writable)
 {
     abort();
 }
+
+void *xengntshr_share_page_notify(xengntshr_handle *xcg, uint32_t domid,
+                                  uint32_t *ref, int writable,
+                                  uint32_t notify_offset,
+                                  evtchn_port_t notify_port)
+{
+    abort();
+}
+
+int xengntshr_unshare(xengntshr_handle *xgs, void *start_address, uint32_t count)
+{
+    abort();
+}
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

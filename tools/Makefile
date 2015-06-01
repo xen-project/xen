@@ -250,9 +250,11 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		--includedir=$(LIBEXEC_INC) \
 		--source-path=$$source \
 		--extra-cflags="-DXC_WANT_COMPAT_EVTCHN_API=1 \
+		-DXC_WANT_COMPAT_GNTTAB_API=1 \
 		-I$(XEN_ROOT)/tools/include \
 		-I$(XEN_ROOT)/tools/libs/toollog/include \
 		-I$(XEN_ROOT)/tools/libs/evtchn/include \
+		-I$(XEN_ROOT)/tools/libs/gnttab/include \
 		-I$(XEN_ROOT)/tools/libxc/include \
 		-I$(XEN_ROOT)/tools/xenstore/include \
 		-I$(XEN_ROOT)/tools/xenstore/compat/include \
@@ -261,6 +263,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		-L$(XEN_ROOT)/tools/xenstore \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/toollog \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/evtchn \
+		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/gnttab \
 		$(QEMU_UPSTREAM_RPATH)" \
 		--bindir=$(LIBEXEC_BIN) \
 		--datadir=$(SHAREDIR)/qemu-xen \
