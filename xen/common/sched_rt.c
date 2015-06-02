@@ -124,6 +124,24 @@
 #define TRC_RTDS_BUDGET_REPLENISH TRC_SCHED_CLASS_EVT(RTDS, 4)
 #define TRC_RTDS_SCHED_TASKLET    TRC_SCHED_CLASS_EVT(RTDS, 5)
 
+ /*
+  * Useful to avoid too many cpumask_var_t on the stack.
+  */
+static cpumask_t **_cpumask_scratch;
+#define cpumask_scratch _cpumask_scratch[smp_processor_id()]
+
+/*
+ * We want to only allocate the _cpumask_scratch array the first time an
+ * instance of this scheduler is used, and avoid reallocating and leaking
+ * the old one when more instance are activated inside new cpupools. We
+ * also want to get rid of it when the last instance is de-inited.
+ *
+ * So we (sort of) reference count the number of initialized instances. This
+ * does not need to happen via atomic_t refcounters, as it only happens either
+ * during boot, or under the protection of the cpupool_lock spinlock.
+ */
+static unsigned int nr_rt_ops;
+
 /*
  * Systme-wide private data, include global RunQueue/DepletedQ
  * Global lock is referenced by schedule_data.schedule_lock from all
@@ -218,8 +236,7 @@ __q_elem(struct list_head *elem)
 static void
 rt_dump_vcpu(const struct scheduler *ops, const struct rt_vcpu *svc)
 {
-    char cpustr[1024];
-    cpumask_t *cpupool_mask;
+    cpumask_t *cpupool_mask, *mask;
 
     ASSERT(svc != NULL);
     /* idle vcpu */
@@ -229,10 +246,22 @@ rt_dump_vcpu(const struct scheduler *ops, const struct rt_vcpu *svc)
         return;
     }
 
-    cpumask_scnprintf(cpustr, sizeof(cpustr), svc->vcpu->cpu_hard_affinity);
+    /*
+     * We can't just use 'cpumask_scratch' because the dumping can
+     * happen from a pCPU outside of this scheduler's cpupool, and
+     * hence it's not right to use the pCPU's scratch mask (which
+     * may even not exist!). On the other hand, it is safe to use
+     * svc->vcpu->processor's own scratch space, since we hold the
+     * runqueue lock.
+     */
+    mask = _cpumask_scratch[svc->vcpu->processor];
+
+    cpupool_mask = cpupool_scheduler_cpumask(svc->vcpu->domain->cpupool);
+    cpumask_and(mask, cpupool_mask, svc->vcpu->cpu_hard_affinity);
+    cpulist_scnprintf(keyhandler_scratch, sizeof(keyhandler_scratch), mask);
     printk("[%5d.%-2u] cpu %u, (%"PRI_stime", %"PRI_stime"),"
            " cur_b=%"PRI_stime" cur_d=%"PRI_stime" last_start=%"PRI_stime"\n"
-           " \t\t onQ=%d runnable=%d cpu_hard_affinity=%s ",
+           " \t\t onQ=%d runnable=%d flags=%x effective hard_affinity=%s\n",
             svc->vcpu->domain->domain_id,
             svc->vcpu->vcpu_id,
             svc->vcpu->processor,
@@ -243,11 +272,8 @@ rt_dump_vcpu(const struct scheduler *ops, const struct rt_vcpu *svc)
             svc->last_start,
             __vcpu_on_q(svc),
             vcpu_runnable(svc->vcpu),
-            cpustr);
-    memset(cpustr, 0, sizeof(cpustr));
-    cpupool_mask = cpupool_scheduler_cpumask(svc->vcpu->domain->cpupool);
-    cpumask_scnprintf(cpustr, sizeof(cpustr), cpupool_mask);
-    printk("cpupool=%s\n", cpustr);
+            svc->flags,
+            keyhandler_scratch);
 }
 
 static void
@@ -409,6 +435,16 @@ rt_init(struct scheduler *ops)
     if ( prv == NULL )
         return -ENOMEM;
 
+    ASSERT( _cpumask_scratch == NULL || nr_rt_ops > 0 );
+
+    if ( !_cpumask_scratch )
+    {
+        _cpumask_scratch = xmalloc_array(cpumask_var_t, nr_cpu_ids);
+        if ( !_cpumask_scratch )
+            return -ENOMEM;
+    }
+    nr_rt_ops++;
+
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->sdom);
     INIT_LIST_HEAD(&prv->runq);
@@ -426,6 +462,13 @@ rt_deinit(const struct scheduler *ops)
 {
     struct rt_private *prv = rt_priv(ops);
 
+    ASSERT( _cpumask_scratch && nr_rt_ops > 0 );
+
+    if ( (--nr_rt_ops) == 0 )
+    {
+        xfree(_cpumask_scratch);
+        _cpumask_scratch = NULL;
+    }
     xfree(prv);
 }
 
@@ -442,6 +485,9 @@ rt_alloc_pdata(const struct scheduler *ops, int cpu)
     spin_lock_irqsave(&prv->lock, flags);
     per_cpu(schedule_data, cpu).schedule_lock = &prv->lock;
     spin_unlock_irqrestore(&prv->lock, flags);
+
+    if ( !alloc_cpumask_var(&_cpumask_scratch[cpu]) )
+        return NULL;
 
     /* 1 indicates alloc. succeed in schedule.c */
     return (void *)1;
@@ -462,6 +508,8 @@ rt_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     sd->schedule_lock = &sd->_lock;
 
     spin_unlock_irqrestore(&prv->lock, flags);
+
+    free_cpumask_var(_cpumask_scratch[cpu]);
 }
 
 static void *
