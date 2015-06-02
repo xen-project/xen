@@ -370,16 +370,14 @@ static void __init efi_arch_cfg_file_late(EFI_FILE_HANDLE dir_handle, char *sect
 {
 }
 
-static void *__init efi_arch_allocate_mmap_buffer(UINTN *map_size)
+static void *__init efi_arch_allocate_mmap_buffer(UINTN map_size)
 {
     void *ptr;
     EFI_STATUS status;
-    UINTN map_size_alloc = *map_size + EFI_PAGE_SIZE;
 
-    status = efi_bs->AllocatePool(EfiLoaderData, map_size_alloc, &ptr);
+    status = efi_bs->AllocatePool(EfiLoaderData, map_size, &ptr);
     if ( status != EFI_SUCCESS )
         return NULL;
-    *map_size = map_size_alloc;
     return ptr;
 }
 
