@@ -318,6 +318,10 @@ i[[3456]]86|x86_64)
 esac
  AX_CHECK_UUID
  AX_CHECK_CURSES
+AS_IF([test "$ncurses" = "y"], [
+AC_CHECK_LIB([tinfo], [define_key], [TINFO_LIBS=-ltinfo])
+])
+AC_SUBST(TINFO_LIBS)
 
 dnl The following are only required when upstream QEMU is built
 AS_IF([test "x$qemu_xen" = "xy"], [

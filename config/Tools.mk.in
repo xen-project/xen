@@ -77,5 +77,6 @@ CONFIG_LIBICONV     := @libiconv@
 CONFIG_GCRYPT       := @libgcrypt@
 EXTFS_LIBS          := @EXTFS_LIBS@
 CURSES_LIBS         := @CURSES_LIBS@
+TINFO_LIBS          := @TINFO_LIBS@
 
 FILE_OFFSET_BITS    := @FILE_OFFSET_BITS@

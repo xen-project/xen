@@ -100,7 +100,7 @@ xen-lowmemd: xen-lowmemd.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore) $(APPEND_LDFLAGS)
 
 gtraceview: gtraceview.o
-	$(CC) $(LDFLAGS) -o $@ $< $(CURSES_LIBS) $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) -o $@ $< $(CURSES_LIBS) $(TINFO_LIBS) $(APPEND_LDFLAGS)
 
 xencov: xencov.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
