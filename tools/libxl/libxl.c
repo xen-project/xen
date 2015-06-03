@@ -1678,6 +1678,16 @@ static void devices_destroy_cb(libxl__egc *egc,
 
     libxl__unlock_domain_userdata(lock);
 
+    /* Clean up qemu-save and qemu-resume files. They are
+     * intermediate files created by libxc. Unfortunately they
+     * don't fit in existing userdata scheme very well.
+     */
+    rc = libxl__remove_file(gc, libxl__device_model_savefile(gc, domid));
+    if (rc < 0) goto out;
+    rc = libxl__remove_file(gc,
+             GCSPRINTF(XC_DEVICE_MODEL_RESTORE_FILE".%u", domid));
+    if (rc < 0) goto out;
+
     rc = libxl__ev_child_fork(gc, &dis->destroyer, domain_destroy_domid_cb);
     if (rc < 0) goto out;
     if (!rc) { /* child */
