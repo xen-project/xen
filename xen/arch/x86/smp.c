@@ -311,9 +311,9 @@ void smp_send_stop(void)
         mdelay(1);
 
     local_irq_disable();
-    __stop_this_cpu();
     disable_IO_APIC();
     hpet_disable();
+    __stop_this_cpu();
     local_irq_enable();
 }
 
