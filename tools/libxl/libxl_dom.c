@@ -1155,8 +1155,8 @@ out:
 
 static void stream_done(libxl__egc *egc,
                         libxl__stream_write_state *sws, int rc);
-static void domain_suspend_done(libxl__egc *egc,
-                        libxl__domain_suspend_state *dss, int rc);
+static void domain_save_done(libxl__egc *egc,
+                             libxl__domain_suspend_state *dss, int rc);
 static void domain_suspend_callback_common_done(libxl__egc *egc,
                                 libxl__domain_suspend_state *dss, int rc);
 
@@ -2039,9 +2039,9 @@ static void remus_next_checkpoint(libxl__egc *egc, libxl__ev_time *ev,
     libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, !rc);
 }
 
-/*----- main code for suspending, in order of execution -----*/
+/*----- main code for saving, in order of execution -----*/
 
-void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
+void libxl__domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss)
 {
     STATE_AO_GC(dss->ao);
     int port;
@@ -2128,13 +2128,13 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
     return;
 
  out:
-    domain_suspend_done(egc, dss, rc);
+    domain_save_done(egc, dss, rc);
 }
 
 static void stream_done(libxl__egc *egc,
                         libxl__stream_write_state *sws, int rc)
 {
-    domain_suspend_done(egc, sws->dss, rc);
+    domain_save_done(egc, sws->dss, rc);
 }
 
 static void save_device_model_datacopier_done(libxl__egc *egc,
@@ -2232,8 +2232,8 @@ static void remus_teardown_done(libxl__egc *egc,
                                        libxl__remus_devices_state *rds,
                                        int rc);
 
-static void domain_suspend_done(libxl__egc *egc,
-                        libxl__domain_suspend_state *dss, int rc)
+static void domain_save_done(libxl__egc *egc,
+                             libxl__domain_suspend_state *dss, int rc)
 {
     STATE_AO_GC(dss->ao);
 

@@ -2959,6 +2959,13 @@ static inline bool libxl__conversion_helper_inuse
 
 
 /*----- Domain suspend (save) state structure -----*/
+/*
+ * "suspend" refers to quiescing the VM, so pausing qemu, making a
+ * remote_shutdown(SHUTDOWN_suspend) hypercall etc.
+ *
+ * "save" refers to the actions involved in actually shuffling the
+ * state of the VM, so xc_domain_save() etc.
+ */
 
 typedef struct libxl__domain_suspend_state libxl__domain_suspend_state;
 
@@ -3023,7 +3030,7 @@ typedef struct libxl__logdirty_switch {
 } libxl__logdirty_switch;
 
 struct libxl__domain_suspend_state {
-    /* set by caller of libxl__domain_suspend */
+    /* set by caller of libxl__domain_save */
     libxl__ao *ao;
     libxl__domain_suspend_cb *callback;
 
@@ -3388,8 +3395,8 @@ struct libxl__domain_create_state {
 /*----- Domain suspend (save) functions -----*/
 
 /* calls dss->callback when done */
-_hidden void libxl__domain_suspend(libxl__egc *egc,
-                                   libxl__domain_suspend_state *dss);
+_hidden void libxl__domain_save(libxl__egc *egc,
+                                libxl__domain_suspend_state *dss);
 
 
 /* calls libxl__xc_domain_suspend_done when done */

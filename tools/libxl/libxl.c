@@ -921,7 +921,7 @@ static void libxl__remus_setup_done(libxl__egc *egc,
     STATE_AO_GC(dss->ao);
 
     if (!rc) {
-        libxl__domain_suspend(egc, dss);
+        libxl__domain_save(egc, dss);
         return;
     }
 
@@ -988,7 +988,7 @@ int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd, int flags,
     dss->live = flags & LIBXL_SUSPEND_LIVE;
     dss->debug = flags & LIBXL_SUSPEND_DEBUG;
 
-    libxl__domain_suspend(egc, dss);
+    libxl__domain_save(egc, dss);
     return AO_INPROGRESS;
 
  out_err:
