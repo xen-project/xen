@@ -140,13 +140,10 @@ static void nmi_shootdown_cpus(void)
      * Ideally would be:
      *   exception_table[TRAP_nmi] = &do_nmi_crash;
      *
-     * but the exception_table is read only.  Borrow an unused fixmap entry
-     * to construct a writable mapping.
+     * but the exception_table is read only.  Access it via its directmap
+     * mappings.
      */
-    set_fixmap(FIX_TBOOT_MAP_ADDRESS, __pa(&exception_table[TRAP_nmi]));
-    write_atomic((unsigned long *)
-                 (fix_to_virt(FIX_TBOOT_MAP_ADDRESS) +
-                  ((unsigned long)&exception_table[TRAP_nmi] & ~PAGE_MASK)),
+    write_atomic((unsigned long *)__va(__pa(&exception_table[TRAP_nmi])),
                  (unsigned long)&do_nmi_crash);
 
     /* Ensure the new callback function is set before sending out the NMI. */
