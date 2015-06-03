@@ -37,14 +37,14 @@
 #include <asm/debugger.h>
 #include <asm/psr.h>
 
-static int gdbsx_guest_mem_io(
-    domid_t domid, struct xen_domctl_gdbsx_memio *iop)
+static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 {
-    ulong l_uva = (ulong)iop->uva;
-    iop->remain = dbg_rw_mem(
-        (dbgva_t)iop->gva, (dbgbyte_t *)l_uva, iop->len, domid,
-        iop->gwr, iop->pgd3val);
-    return (iop->remain ? -EFAULT : 0);
+    void * __user gva = (void *)iop->gva, * __user uva = (void *)iop->uva;
+
+    iop->remain = dbg_rw_mem(gva, uva, iop->len, domid,
+                             !!iop->gwr, iop->pgd3val);
+
+    return iop->remain ? -EFAULT : 0;
 }
 
 #define MAX_IOPORTS 0x10000
