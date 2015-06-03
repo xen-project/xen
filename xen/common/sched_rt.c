@@ -127,7 +127,7 @@
  /*
   * Useful to avoid too many cpumask_var_t on the stack.
   */
-static cpumask_t **_cpumask_scratch;
+static cpumask_var_t *_cpumask_scratch;
 #define cpumask_scratch _cpumask_scratch[smp_processor_id()]
 
 /*
