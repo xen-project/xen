@@ -417,7 +417,7 @@ int route_irq_to_guest(struct domain *d, unsigned int virq,
     /* Only routing to virtual SPIs is supported */
     if ( virq < NR_LOCAL_IRQS )
     {
-        printk(XENLOG_G_ERR "IRQ can only be routed to an SPI");
+        printk(XENLOG_G_ERR "IRQ can only be routed to an SPI\n");
         return -EINVAL;
     }
 
