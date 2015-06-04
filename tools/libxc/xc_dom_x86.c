@@ -762,6 +762,11 @@ int arch_setup_meminit(struct xc_dom_image *dom)
     int rc;
     xen_pfn_t pfn, allocsz, mfn, total, pfn_base;
     int i, j;
+    xen_vmemrange_t dummy_vmemrange[1];
+    unsigned int dummy_vnode_to_pnode[1];
+    xen_vmemrange_t *vmemranges;
+    unsigned int *vnode_to_pnode;
+    unsigned int nr_vmemranges, nr_vnodes;
 
     rc = x86_compat(dom->xch, dom->guest_domid, dom->guest_type);
     if ( rc )
@@ -826,27 +831,33 @@ int arch_setup_meminit(struct xc_dom_image *dom)
          */
         if ( dom->nr_vmemranges == 0 )
         {
-            dom->nr_vmemranges = 1;
-            dom->vmemranges = xc_dom_malloc(dom, sizeof(*dom->vmemranges));
-            dom->vmemranges[0].start = 0;
-            dom->vmemranges[0].end   = (uint64_t)dom->total_pages << PAGE_SHIFT;
-            dom->vmemranges[0].flags = 0;
-            dom->vmemranges[0].nid   = 0;
+            nr_vmemranges = 1;
+            vmemranges = dummy_vmemrange;
+            vmemranges[0].start = 0;
+            vmemranges[0].end   = (uint64_t)dom->total_pages << PAGE_SHIFT;
+            vmemranges[0].flags = 0;
+            vmemranges[0].nid   = 0;
 
-            dom->nr_vnodes = 1;
-            dom->vnode_to_pnode = xc_dom_malloc(dom,
-                                      sizeof(*dom->vnode_to_pnode));
-            dom->vnode_to_pnode[0] = XC_NUMA_NO_NODE;
+            nr_vnodes = 1;
+            vnode_to_pnode = dummy_vnode_to_pnode;
+            vnode_to_pnode[0] = XC_NUMA_NO_NODE;
+        }
+        else
+        {
+            nr_vmemranges = dom->nr_vmemranges;
+            nr_vnodes = dom->nr_vnodes;
+            vmemranges = dom->vmemranges;
+            vnode_to_pnode = dom->vnode_to_pnode;
         }
 
         total = dom->p2m_size = 0;
-        for ( i = 0; i < dom->nr_vmemranges; i++ )
+        for ( i = 0; i < nr_vmemranges; i++ )
         {
-            total += ((dom->vmemranges[i].end - dom->vmemranges[i].start)
+            total += ((vmemranges[i].end - vmemranges[i].start)
                       >> PAGE_SHIFT);
             dom->p2m_size =
-                dom->p2m_size > (dom->vmemranges[i].end >> PAGE_SHIFT) ?
-                dom->p2m_size : (dom->vmemranges[i].end >> PAGE_SHIFT);
+                dom->p2m_size > (vmemranges[i].end >> PAGE_SHIFT) ?
+                dom->p2m_size : (vmemranges[i].end >> PAGE_SHIFT);
         }
         if ( total != dom->total_pages )
         {
@@ -864,19 +875,19 @@ int arch_setup_meminit(struct xc_dom_image *dom)
             dom->p2m_host[pfn] = INVALID_P2M_ENTRY;
 
         /* allocate guest memory */
-        for ( i = 0; i < dom->nr_vmemranges; i++ )
+        for ( i = 0; i < nr_vmemranges; i++ )
         {
             unsigned int memflags;
             uint64_t pages;
-            unsigned int pnode = dom->vnode_to_pnode[dom->vmemranges[i].nid];
+            unsigned int pnode = vnode_to_pnode[vmemranges[i].nid];
 
             memflags = 0;
             if ( pnode != XC_NUMA_NO_NODE )
                 memflags |= XENMEMF_exact_node(pnode);
 
-            pages = (dom->vmemranges[i].end - dom->vmemranges[i].start)
+            pages = (vmemranges[i].end - vmemranges[i].start)
                 >> PAGE_SHIFT;
-            pfn_base = dom->vmemranges[i].start >> PAGE_SHIFT;
+            pfn_base = vmemranges[i].start >> PAGE_SHIFT;
 
             for ( pfn = pfn_base; pfn < pfn_base+pages; pfn++ )
                 dom->p2m_host[pfn] = pfn;
