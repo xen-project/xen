@@ -433,41 +433,6 @@ extern paddr_t mem_hotplug;
  * guest L2 page), etc...
  */
 
-/* With this defined, we do some ugly things to force the compiler to
- * give us type safety between mfns and gfns and other integers.
- * TYPE_SAFE(int foo) defines a foo_t, and _foo() and foo_x() functions 
- * that translate beween int and foo_t.
- * 
- * It does have some performance cost because the types now have 
- * a different storage attribute, so may not want it on all the time. */
-
-#ifndef NDEBUG
-#define TYPE_SAFETY 1
-#endif
-
-#ifdef TYPE_SAFETY
-#define TYPE_SAFE(_type,_name)                                  \
-typedef struct { _type _name; } _name##_t;                      \
-static inline _name##_t _##_name(_type n) { return (_name##_t) { n }; } \
-static inline _type _name##_x(_name##_t n) { return n._name; }
-#else
-#define TYPE_SAFE(_type,_name)                                          \
-typedef _type _name##_t;                                                \
-static inline _name##_t _##_name(_type n) { return n; }                 \
-static inline _type _name##_x(_name##_t n) { return n; }
-#endif
-
-TYPE_SAFE(unsigned long,mfn);
-
-#ifndef mfn_t
-#define mfn_t /* Grep fodder: mfn_t, _mfn() and mfn_x() are defined above */
-#undef mfn_t
-#endif
-
-/* Macro for printk formats: use as printk("%"PRI_mfn"\n", mfn_x(foo)); */
-#define PRI_mfn "05lx"
-
-
 /*
  * The MPT (machine->physical mapping table) is an array of word-sized
  * values, indexed on machine frame number. It is expected that guest OSes
@@ -509,8 +474,6 @@ extern struct rangeset *mmio_ro_ranges;
     ( (paging_mode_translate(_d))                       \
       ? get_gpfn_from_mfn(mfn)                          \
       : (mfn) )
-
-#define INVALID_MFN             (~0UL)
 
 #define compat_pfn_to_cr3(pfn) (((unsigned)(pfn) << 12) | ((unsigned)(pfn) >> 20))
 #define compat_cr3_to_pfn(cr3) (((unsigned)(cr3) >> 12) | ((unsigned)(cr3) << 20))

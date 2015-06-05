@@ -310,8 +310,6 @@ static inline int relinquish_shared_pages(struct domain *d)
     return 0;
 }
 
-#define INVALID_MFN             (~0UL)
-
 /* Xen always owns P2M on ARM */
 #define set_gpfn_from_mfn(mfn, pfn) do { (void) (mfn), (void)(pfn); } while (0)
 #define mfn_to_gmfn(_d, mfn)  (mfn)
