@@ -109,6 +109,7 @@ static const char migrate_report[]=
    */
 
 #define XL_MANDATORY_FLAG_JSON (1U << 0) /* config data is in JSON format */
+#define XL_MANDATORY_FLAG_STREAMv2 (1U << 1) /* stream is v2 */
 #define XL_MANDATORY_FLAG_ALL  (XL_MANDATORY_FLAG_JSON)
 struct save_file_header {
     char magic[32]; /* savefileheader_magic */
