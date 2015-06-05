@@ -1,15 +1,15 @@
 #if !defined(__XEN_VMAP_H__) && defined(VMAP_VIRT_START)
 #define __XEN_VMAP_H__
 
-#include <xen/types.h>
+#include <xen/mm.h>
 #include <asm/page.h>
 
 void *vm_alloc(unsigned int nr, unsigned int align);
 void vm_free(const void *);
 
-void *__vmap(const unsigned long *mfn, unsigned int granularity,
+void *__vmap(const mfn_t *mfn, unsigned int granularity,
              unsigned int nr, unsigned int align, unsigned int flags);
-void *vmap(const unsigned long *mfn, unsigned int nr);
+void *vmap(const mfn_t *mfn, unsigned int nr);
 void vunmap(const void *);
 void *vmalloc(size_t size);
 void *vzalloc(size_t size);

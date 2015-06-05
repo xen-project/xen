@@ -48,6 +48,34 @@
 #include <xen/types.h>
 #include <xen/list.h>
 #include <xen/spinlock.h>
+#include <xen/typesafe.h>
+
+TYPE_SAFE(unsigned long, mfn);
+#define PRI_mfn          "05lx"
+#define INVALID_MFN      (~0UL)
+
+#ifndef mfn_t
+#define mfn_t /* Grep fodder: mfn_t, _mfn() and mfn_x() are defined above */
+#undef mfn_t
+#endif
+
+TYPE_SAFE(unsigned long, gfn);
+#define PRI_gfn          "05lx"
+#define INVALID_GFN      (~0UL)
+
+#ifndef gfn_t
+#define gfn_t /* Grep fodder: gfn_t, _gfn() and gfn_x() are defined above */
+#undef gfn_t
+#endif
+
+TYPE_SAFE(unsigned long, pfn);
+#define PRI_pfn          "05lx"
+#define INVALID_PFN      (~0UL)
+
+#ifndef pfn_t
+#define pfn_t /* Grep fodder: pfn_t, _pfn() and pfn_x() are defined above */
+#undef pfn_t
+#endif
 
 struct domain;
 struct page_info;

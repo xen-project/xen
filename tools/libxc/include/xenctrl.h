@@ -2375,12 +2375,9 @@ int xc_mem_access_disable_emulate(xc_interface *xch, domid_t domain_id);
 void *xc_monitor_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
 int xc_monitor_disable(xc_interface *xch, domid_t domain_id);
 int xc_monitor_resume(xc_interface *xch, domid_t domain_id);
-int xc_monitor_mov_to_cr0(xc_interface *xch, domid_t domain_id, bool enable,
-                          bool sync, bool onchangeonly);
-int xc_monitor_mov_to_cr3(xc_interface *xch, domid_t domain_id, bool enable,
-                          bool sync, bool onchangeonly);
-int xc_monitor_mov_to_cr4(xc_interface *xch, domid_t domain_id, bool enable,
-                          bool sync, bool onchangeonly);
+int xc_monitor_write_ctrlreg(xc_interface *xch, domid_t domain_id,
+                             uint16_t index, bool enable, bool sync,
+                             bool onchangeonly);
 int xc_monitor_mov_to_msr(xc_interface *xch, domid_t domain_id, bool enable,
                           bool extended_capture);
 int xc_monitor_singlestep(xc_interface *xch, domid_t domain_id, bool enable);

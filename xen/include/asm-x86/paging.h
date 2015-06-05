@@ -255,7 +255,6 @@ static inline int paging_invlpg(struct vcpu *v, unsigned long va)
  * pfec[0] is used to determine which kind of access this is when
  * walking the tables.  The caller should set the PFEC_page_present bit
  * in pfec[0]; in the failure case, that bit will be cleared if appropriate. */
-#define INVALID_GFN (-1UL)
 unsigned long paging_gva_to_gfn(struct vcpu *v,
                                 unsigned long va,
                                 uint32_t *pfec);

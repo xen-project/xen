@@ -67,59 +67,42 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
 
     switch ( mop->event )
     {
-    case XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR0:
+    case XEN_DOMCTL_MONITOR_EVENT_WRITE_CTRLREG:
     {
-        bool_t status = ad->monitor.mov_to_cr0_enabled;
-
-        rc = status_check(mop, status);
-        if ( rc )
-            return rc;
-
-        ad->monitor.mov_to_cr0_sync = mop->u.mov_to_cr.sync;
-        ad->monitor.mov_to_cr0_onchangeonly = mop->u.mov_to_cr.onchangeonly;
-
-        domain_pause(d);
-        ad->monitor.mov_to_cr0_enabled = !status;
-        domain_unpause(d);
-        break;
-    }
-
-    case XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR3:
-    {
-        bool_t status = ad->monitor.mov_to_cr3_enabled;
+        unsigned int ctrlreg_bitmask =
+            monitor_ctrlreg_bitmask(mop->u.mov_to_cr.index);
+        bool_t status =
+            !!(ad->monitor.write_ctrlreg_enabled & ctrlreg_bitmask);
         struct vcpu *v;
 
         rc = status_check(mop, status);
         if ( rc )
             return rc;
 
-        ad->monitor.mov_to_cr3_sync = mop->u.mov_to_cr.sync;
-        ad->monitor.mov_to_cr3_onchangeonly = mop->u.mov_to_cr.onchangeonly;
+        if ( mop->u.mov_to_cr.sync )
+            ad->monitor.write_ctrlreg_sync |= ctrlreg_bitmask;
+        else
+            ad->monitor.write_ctrlreg_sync &= ~ctrlreg_bitmask;
+
+        if ( mop->u.mov_to_cr.onchangeonly )
+            ad->monitor.write_ctrlreg_onchangeonly |= ctrlreg_bitmask;
+        else
+            ad->monitor.write_ctrlreg_onchangeonly &= ~ctrlreg_bitmask;
 
         domain_pause(d);
-        ad->monitor.mov_to_cr3_enabled = !status;
+
+        if ( !status )
+            ad->monitor.write_ctrlreg_enabled |= ctrlreg_bitmask;
+        else
+            ad->monitor.write_ctrlreg_enabled &= ~ctrlreg_bitmask;
+
         domain_unpause(d);
 
-        /* Latches new CR3 mask through CR0 code */
-        for_each_vcpu ( d, v )
-            hvm_funcs.update_guest_cr(v, 0);
-        break;
-    }
+        if ( mop->u.mov_to_cr.index == VM_EVENT_X86_CR3 )
+            /* Latches new CR3 mask through CR0 code */
+            for_each_vcpu ( d, v )
+                hvm_funcs.update_guest_cr(v, 0);
 
-    case XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR4:
-    {
-        bool_t status = ad->monitor.mov_to_cr4_enabled;
-
-        rc = status_check(mop, status);
-        if ( rc )
-            return rc;
-
-        ad->monitor.mov_to_cr4_sync = mop->u.mov_to_cr.sync;
-        ad->monitor.mov_to_cr4_onchangeonly = mop->u.mov_to_cr.onchangeonly;
-
-        domain_pause(d);
-        ad->monitor.mov_to_cr4_enabled = !status;
-        domain_unpause(d);
         break;
     }
 

@@ -464,13 +464,6 @@ int hap_enable(struct domain *d, u32 mode)
 
     domain_pause(d);
 
-    /* error check */
-    if ( (d == current->domain) )
-    {
-        rv = -EINVAL;
-        goto out;
-    }
-
     old_pages = d->arch.paging.hap.total_pages;
     if ( old_pages == 0 )
     {

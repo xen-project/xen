@@ -2972,8 +2972,7 @@ int shadow_enable(struct domain *d, u32 mode)
     domain_pause(d);
 
     /* Sanity check the arguments */
-    if ( (d == current->domain) ||
-         shadow_mode_enabled(d) ||
+    if ( shadow_mode_enabled(d) ||
          ((mode & PG_translate) && !(mode & PG_refcounts)) ||
          ((mode & PG_external) && !(mode & PG_translate)) )
     {

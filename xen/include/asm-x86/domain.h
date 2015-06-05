@@ -341,15 +341,9 @@ struct arch_domain
 
     /* Monitor options */
     struct {
-        uint16_t mov_to_cr0_enabled          : 1;
-        uint16_t mov_to_cr0_sync             : 1;
-        uint16_t mov_to_cr0_onchangeonly     : 1;
-        uint16_t mov_to_cr3_enabled          : 1;
-        uint16_t mov_to_cr3_sync             : 1;
-        uint16_t mov_to_cr3_onchangeonly     : 1;
-        uint16_t mov_to_cr4_enabled          : 1;
-        uint16_t mov_to_cr4_sync             : 1;
-        uint16_t mov_to_cr4_onchangeonly     : 1;
+        uint16_t write_ctrlreg_enabled       : 4;
+        uint16_t write_ctrlreg_sync          : 4;
+        uint16_t write_ctrlreg_onchangeonly  : 4;
         uint16_t mov_to_msr_enabled          : 1;
         uint16_t mov_to_msr_extended         : 1;
         uint16_t singlestep_enabled          : 1;

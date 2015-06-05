@@ -26,6 +26,8 @@
 struct domain;
 struct xen_domctl_monitor_op;
 
+#define monitor_ctrlreg_bitmask(ctrlreg_index) (1U << (ctrlreg_index))
+
 int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *op);
 
 #endif /* __ASM_X86_MONITOR_H__ */

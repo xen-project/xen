@@ -322,6 +322,7 @@ int mapcache_vcpu_init(struct vcpu *v)
 
 void *map_domain_page_global(unsigned long mfn)
 {
+    mfn_t m = _mfn(mfn);
     ASSERT(!in_irq() && local_irq_is_enabled());
 
 #ifdef NDEBUG
@@ -329,7 +330,7 @@ void *map_domain_page_global(unsigned long mfn)
         return mfn_to_virt(mfn);
 #endif
 
-    return vmap(&mfn, 1);
+    return vmap(&m, 1);
 }
 
 void unmap_domain_page_global(const void *ptr)

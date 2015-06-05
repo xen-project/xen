@@ -273,7 +273,9 @@ void clear_fixmap(unsigned map)
 #ifdef CONFIG_DOMAIN_PAGE
 void *map_domain_page_global(unsigned long mfn)
 {
-    return vmap(&mfn, 1);
+    mfn_t m = _mfn(mfn);
+
+    return vmap(&m, 1);
 }
 
 void unmap_domain_page_global(const void *va)
@@ -794,10 +796,10 @@ void *__init arch_vmap_virt_end(void)
  */
 void *ioremap_attr(paddr_t pa, size_t len, unsigned int attributes)
 {
-    unsigned long pfn = PFN_DOWN(pa);
+    mfn_t mfn = _mfn(PFN_DOWN(pa));
     unsigned int offs = pa & (PAGE_SIZE - 1);
     unsigned int nr = PFN_UP(offs + len);
-    void *ptr = __vmap(&pfn, nr, 1, 1, attributes);
+    void *ptr = __vmap(&mfn, nr, 1, 1, attributes);
 
     if ( ptr == NULL )
         return NULL;

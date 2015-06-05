@@ -88,13 +88,14 @@ void __iomem *
 acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 {
 	if (system_state >= SYS_STATE_active) {
-		unsigned long pfn = PFN_DOWN(phys);
+		mfn_t mfn = _mfn(PFN_DOWN(phys));
 		unsigned int offs = phys & (PAGE_SIZE - 1);
 
 		/* The low first Mb is always mapped. */
 		if ( !((phys + size - 1) >> 20) )
 			return __va(phys);
-		return __vmap(&pfn, PFN_UP(offs + size), 1, 1, PAGE_HYPERVISOR_NOCACHE) + offs;
+		return __vmap(&mfn, PFN_UP(offs + size), 1, 1,
+			      PAGE_HYPERVISOR_NOCACHE) + offs;
 	}
 	return __acpi_map_table(phys, size);
 }

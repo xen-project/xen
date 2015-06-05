@@ -45,8 +45,9 @@ int xc_monitor_resume(xc_interface *xch, domid_t domain_id)
                                NULL);
 }
 
-int xc_monitor_mov_to_cr0(xc_interface *xch, domid_t domain_id, bool enable,
-                          bool sync, bool onchangeonly)
+int xc_monitor_write_ctrlreg(xc_interface *xch, domid_t domain_id,
+                             uint16_t index, bool enable, bool sync,
+                             bool onchangeonly)
 {
     DECLARE_DOMCTL;
 
@@ -54,39 +55,8 @@ int xc_monitor_mov_to_cr0(xc_interface *xch, domid_t domain_id, bool enable,
     domctl.domain = domain_id;
     domctl.u.monitor_op.op = enable ? XEN_DOMCTL_MONITOR_OP_ENABLE
                                     : XEN_DOMCTL_MONITOR_OP_DISABLE;
-    domctl.u.monitor_op.event = XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR0;
-    domctl.u.monitor_op.u.mov_to_cr.sync = sync;
-    domctl.u.monitor_op.u.mov_to_cr.onchangeonly = onchangeonly;
-
-    return do_domctl(xch, &domctl);
-}
-
-int xc_monitor_mov_to_cr3(xc_interface *xch, domid_t domain_id, bool enable,
-                          bool sync, bool onchangeonly)
-{
-    DECLARE_DOMCTL;
-
-    domctl.cmd = XEN_DOMCTL_monitor_op;
-    domctl.domain = domain_id;
-    domctl.u.monitor_op.op = enable ? XEN_DOMCTL_MONITOR_OP_ENABLE
-                                    : XEN_DOMCTL_MONITOR_OP_DISABLE;
-    domctl.u.monitor_op.event = XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR3;
-    domctl.u.monitor_op.u.mov_to_cr.sync = sync;
-    domctl.u.monitor_op.u.mov_to_cr.onchangeonly = onchangeonly;
-
-    return do_domctl(xch, &domctl);
-}
-
-int xc_monitor_mov_to_cr4(xc_interface *xch, domid_t domain_id, bool enable,
-                          bool sync, bool onchangeonly)
-{
-    DECLARE_DOMCTL;
-
-    domctl.cmd = XEN_DOMCTL_monitor_op;
-    domctl.domain = domain_id;
-    domctl.u.monitor_op.op = enable ? XEN_DOMCTL_MONITOR_OP_ENABLE
-                                    : XEN_DOMCTL_MONITOR_OP_DISABLE;
-    domctl.u.monitor_op.event = XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR4;
+    domctl.u.monitor_op.event = XEN_DOMCTL_MONITOR_EVENT_WRITE_CTRLREG;
+    domctl.u.monitor_op.u.mov_to_cr.index = index;
     domctl.u.monitor_op.u.mov_to_cr.sync = sync;
     domctl.u.monitor_op.u.mov_to_cr.onchangeonly = onchangeonly;
 
