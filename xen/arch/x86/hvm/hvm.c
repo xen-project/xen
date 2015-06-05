@@ -2985,10 +2985,13 @@ out:
 int hvm_handle_xsetbv(u32 index, u64 new_bv)
 {
     struct segment_register sreg;
+    struct vcpu *curr = current;
 
-    hvm_get_segment_register(current, x86_seg_ss, &sreg);
+    hvm_get_segment_register(curr, x86_seg_ss, &sreg);
     if ( sreg.attr.fields.dpl != 0 )
         goto err;
+
+    hvm_event_crX(XCR0, new_bv, curr->arch.xcr0);
 
     if ( handle_xsetbv(index, new_bv) )
         goto err;
@@ -3287,7 +3290,7 @@ int hvm_set_cr0(unsigned long value)
         hvm_funcs.handle_cd(v, value);
 
     hvm_update_cr(v, 0, value);
-    hvm_event_cr0(value, old_value);
+    hvm_event_crX(CR0, value, old_value);
 
     if ( (value ^ old_value) & X86_CR0_PG ) {
         if ( !nestedhvm_vmswitch_in_progress(v) && nestedhvm_vcpu_in_guestmode(v) )
@@ -3328,7 +3331,7 @@ int hvm_set_cr3(unsigned long value)
     old=v->arch.hvm_vcpu.guest_cr[3];
     v->arch.hvm_vcpu.guest_cr[3] = value;
     paging_update_cr3(v);
-    hvm_event_cr3(value, old);
+    hvm_event_crX(CR3, value, old);
     return X86EMUL_OKAY;
 
  bad_cr3:
@@ -3369,7 +3372,7 @@ int hvm_set_cr4(unsigned long value)
     }
 
     hvm_update_cr(v, 4, value);
-    hvm_event_cr4(value, old_cr);
+    hvm_event_crX(CR4, value, old_cr);
 
     /*
      * Modifying CR4.{PSE,PAE,PGE,SMEP}, or clearing CR4.PCIDE

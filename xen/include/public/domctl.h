@@ -1008,12 +1008,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_psr_cmt_op_t);
 #define XEN_DOMCTL_MONITOR_OP_ENABLE   0
 #define XEN_DOMCTL_MONITOR_OP_DISABLE  1
 
-#define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR0            0
-#define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR3            1
-#define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_CR4            2
-#define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR            3
-#define XEN_DOMCTL_MONITOR_EVENT_SINGLESTEP            4
-#define XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT   5
+#define XEN_DOMCTL_MONITOR_EVENT_WRITE_CTRLREG         0
+#define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR            1
+#define XEN_DOMCTL_MONITOR_EVENT_SINGLESTEP            2
+#define XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT   3
 
 struct xen_domctl_monitor_op {
     uint32_t op; /* XEN_DOMCTL_MONITOR_OP_* */
@@ -1024,6 +1022,8 @@ struct xen_domctl_monitor_op {
      */
     union {
         struct {
+            /* Which control register */
+            uint8_t index;
             /* Pause vCPU until response */
             uint8_t sync;
             /* Send event only on a change of value */

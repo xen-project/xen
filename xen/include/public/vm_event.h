@@ -60,22 +60,24 @@
 #define VM_EVENT_REASON_MEM_SHARING             2
 /* Memory paging event */
 #define VM_EVENT_REASON_MEM_PAGING              3
-/* CR0 was updated */
-#define VM_EVENT_REASON_MOV_TO_CR0              4
-/* CR3 was updated */
-#define VM_EVENT_REASON_MOV_TO_CR3              5
-/* CR4 was updated */
-#define VM_EVENT_REASON_MOV_TO_CR4              6
+/* A control register was updated */
+#define VM_EVENT_REASON_WRITE_CTRLREG           4
 /* An MSR was updated. */
-#define VM_EVENT_REASON_MOV_TO_MSR              7
+#define VM_EVENT_REASON_MOV_TO_MSR              5
 /* Debug operation executed (e.g. int3) */
-#define VM_EVENT_REASON_SOFTWARE_BREAKPOINT     8
+#define VM_EVENT_REASON_SOFTWARE_BREAKPOINT     6
 /* Single-step (e.g. MTF) */
-#define VM_EVENT_REASON_SINGLESTEP              9
+#define VM_EVENT_REASON_SINGLESTEP              7
+
+/* Supported values for the vm_event_write_ctrlreg index. */
+#define VM_EVENT_X86_CR0    0
+#define VM_EVENT_X86_CR3    1
+#define VM_EVENT_X86_CR4    2
+#define VM_EVENT_X86_XCR0   3
 
 /*
  * Using a custom struct (not hvm_hw_cpu) so as to not fill
- * the mem_event ring buffer too quickly.
+ * the vm_event ring buffer too quickly.
  */
 struct vm_event_regs_x86 {
     uint64_t rax;
@@ -156,14 +158,15 @@ struct vm_event_mem_access {
     uint32_t _pad;
 };
 
-struct vm_event_mov_to_cr {
+struct vm_event_write_ctrlreg {
+    uint32_t index;
+    uint32_t _pad;
     uint64_t new_value;
     uint64_t old_value;
 };
 
 struct vm_event_debug {
     uint64_t gfn;
-    uint32_t _pad;
 };
 
 struct vm_event_mov_to_msr {
@@ -196,7 +199,7 @@ typedef struct vm_event_st {
         struct vm_event_paging                mem_paging;
         struct vm_event_sharing               mem_sharing;
         struct vm_event_mem_access            mem_access;
-        struct vm_event_mov_to_cr             mov_to_cr;
+        struct vm_event_write_ctrlreg         write_ctrlreg;
         struct vm_event_mov_to_msr            mov_to_msr;
         struct vm_event_debug                 software_breakpoint;
         struct vm_event_debug                 singlestep;

@@ -21,6 +21,8 @@
 
 #include <xen/vm_event.h>
 #include <xen/paging.h>
+#include <asm/hvm/event.h>
+#include <asm/monitor.h>
 #include <public/vm_event.h>
 
 static void hvm_event_fill_regs(vm_event_request_t *req)
@@ -88,53 +90,26 @@ static int hvm_event_traps(uint8_t sync, vm_event_request_t *req)
     return 1;
 }
 
-static inline
-void hvm_event_cr(uint32_t reason, unsigned long value,
-                         unsigned long old, bool_t onchangeonly, bool_t sync)
+void hvm_event_cr(unsigned int index, unsigned long value, unsigned long old)
 {
-    if ( onchangeonly && value == old )
-        return;
-    else
+    struct arch_domain *currad = &current->domain->arch;
+    unsigned int ctrlreg_bitmask = monitor_ctrlreg_bitmask(index);
+
+    if ( (currad->monitor.write_ctrlreg_enabled & ctrlreg_bitmask) &&
+         (!(currad->monitor.write_ctrlreg_onchangeonly & ctrlreg_bitmask) ||
+          value != old) )
     {
         vm_event_request_t req = {
-            .reason = reason,
+            .reason = VM_EVENT_REASON_WRITE_CTRLREG,
             .vcpu_id = current->vcpu_id,
-            .u.mov_to_cr.new_value = value,
-            .u.mov_to_cr.old_value = old
+            .u.write_ctrlreg.index = index,
+            .u.write_ctrlreg.new_value = value,
+            .u.write_ctrlreg.old_value = old
         };
 
-        hvm_event_traps(sync, &req);
+        hvm_event_traps(currad->monitor.write_ctrlreg_sync & ctrlreg_bitmask,
+                        &req);
     }
-}
-
-void hvm_event_cr0(unsigned long value, unsigned long old)
-{
-    struct arch_domain *currad = &current->domain->arch;
-
-    if ( currad->monitor.mov_to_cr0_enabled )
-        hvm_event_cr(VM_EVENT_REASON_MOV_TO_CR0, value, old,
-                     currad->monitor.mov_to_cr0_onchangeonly,
-                     currad->monitor.mov_to_cr0_sync);
-}
-
-void hvm_event_cr3(unsigned long value, unsigned long old)
-{
-    struct arch_domain *currad = &current->domain->arch;
-
-    if ( currad->monitor.mov_to_cr3_enabled )
-        hvm_event_cr(VM_EVENT_REASON_MOV_TO_CR3, value, old,
-                     currad->monitor.mov_to_cr3_onchangeonly,
-                     currad->monitor.mov_to_cr3_sync);
-}
-
-void hvm_event_cr4(unsigned long value, unsigned long old)
-{
-    struct arch_domain *currad = &current->domain->arch;
-
-    if ( currad->monitor.mov_to_cr4_enabled )
-        hvm_event_cr(VM_EVENT_REASON_MOV_TO_CR4, value, old,
-                     currad->monitor.mov_to_cr4_onchangeonly,
-                     currad->monitor.mov_to_cr4_sync);
 }
 
 void hvm_event_msr(unsigned int msr, uint64_t value)

@@ -57,6 +57,7 @@
 #include <asm/apic.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/event.h>
+#include <asm/monitor.h>
 #include <public/arch-x86/cpuid.h>
 
 static bool_t __initdata opt_force_ept;
@@ -1262,7 +1263,8 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                 v->arch.hvm_vmx.exec_control |= cr3_ctls;
 
             /* Trap CR3 updates if CR3 memory events are enabled. */
-            if ( v->domain->arch.monitor.mov_to_cr3_enabled )
+            if ( v->domain->arch.monitor.write_ctrlreg_enabled &
+                 monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3) )
                 v->arch.hvm_vmx.exec_control |= CPU_BASED_CR3_LOAD_EXITING;
 
             vmx_update_cpu_exec_control(v);
@@ -2010,7 +2012,7 @@ static int vmx_cr_access(unsigned long exit_qualification)
         unsigned long old = curr->arch.hvm_vcpu.guest_cr[0];
         curr->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS;
         vmx_update_guest_cr(curr, 0);
-        hvm_event_cr0(curr->arch.hvm_vcpu.guest_cr[0], old);
+        hvm_event_crX(CR0, curr->arch.hvm_vcpu.guest_cr[0], old);
         HVMTRACE_0D(CLTS);
         break;
     }

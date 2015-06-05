@@ -19,9 +19,9 @@
 #define __ASM_X86_HVM_EVENT_H__
 
 /* Called for current VCPU on crX/MSR changes by guest */
-void hvm_event_cr0(unsigned long value, unsigned long old);
-void hvm_event_cr3(unsigned long value, unsigned long old);
-void hvm_event_cr4(unsigned long value, unsigned long old);
+void hvm_event_cr(unsigned int index, unsigned long value, unsigned long old);
+#define hvm_event_crX(what, new, old) \
+    hvm_event_cr(VM_EVENT_X86_##what, new, old)
 void hvm_event_msr(unsigned int msr, uint64_t value);
 /* Called for current VCPU: returns -1 if no listener */
 int hvm_event_int3(unsigned long gla);
