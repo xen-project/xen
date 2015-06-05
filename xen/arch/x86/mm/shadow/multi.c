@@ -4670,7 +4670,7 @@ static void *emulate_map_dest(struct vcpu *v,
     }
     else
     {
-        unsigned long mfns[2];
+        mfn_t mfns[2];
 
         /* Cross-page emulated writes are only supported for HVM guests;
          * PV guests ought to know better */
@@ -4689,8 +4689,8 @@ static void *emulate_map_dest(struct vcpu *v,
         /* Cross-page writes mean probably not a pagetable */
         sh_remove_shadows(d, sh_ctxt->mfn2, 0, 0 /* Slow, can fail */ );
 
-        mfns[0] = mfn_x(sh_ctxt->mfn1);
-        mfns[1] = mfn_x(sh_ctxt->mfn2);
+        mfns[0] = sh_ctxt->mfn1;
+        mfns[1] = sh_ctxt->mfn2;
         map = vmap(mfns, 2);
         if ( !map )
             return MAPPING_UNHANDLEABLE;

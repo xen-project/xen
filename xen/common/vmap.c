@@ -181,7 +181,7 @@ void vm_free(const void *va)
     spin_unlock(&vm_lock);
 }
 
-void *__vmap(const unsigned long *mfn, unsigned int granularity,
+void *__vmap(const mfn_t *mfn, unsigned int granularity,
              unsigned int nr, unsigned int align, unsigned int flags)
 {
     void *va = vm_alloc(nr * granularity, align);
@@ -189,7 +189,7 @@ void *__vmap(const unsigned long *mfn, unsigned int granularity,
 
     for ( ; va && nr--; ++mfn, cur += PAGE_SIZE * granularity )
     {
-        if ( map_pages_to_xen(cur, *mfn, granularity, flags) )
+        if ( map_pages_to_xen(cur, mfn_x(*mfn), granularity, flags) )
         {
             vunmap(va);
             va = NULL;
@@ -199,7 +199,7 @@ void *__vmap(const unsigned long *mfn, unsigned int granularity,
     return va;
 }
 
-void *vmap(const unsigned long *mfn, unsigned int nr)
+void *vmap(const mfn_t *mfn, unsigned int nr)
 {
     return __vmap(mfn, 1, nr, 1, PAGE_HYPERVISOR);
 }
@@ -218,7 +218,7 @@ void vunmap(const void *va)
 
 void *vmalloc(size_t size)
 {
-    unsigned long *mfn;
+    mfn_t *mfn;
     size_t pages, i;
     struct page_info *pg;
     void *va;
@@ -226,7 +226,7 @@ void *vmalloc(size_t size)
     ASSERT(size);
 
     pages = PFN_UP(size);
-    mfn = xmalloc_array(unsigned long, pages);
+    mfn = xmalloc_array(mfn_t, pages);
     if ( mfn == NULL )
         return NULL;
 
@@ -235,7 +235,7 @@ void *vmalloc(size_t size)
         pg = alloc_domheap_page(NULL, 0);
         if ( pg == NULL )
             goto error;
-        mfn[i] = page_to_mfn(pg);
+        mfn[i] = _mfn(page_to_mfn(pg));
     }
 
     va = vmap(mfn, pages);
@@ -247,7 +247,7 @@ void *vmalloc(size_t size)
 
  error:
     while ( i-- )
-         free_domheap_page(mfn_to_page(mfn[i]));
+        free_domheap_page(mfn_to_page(mfn_x(mfn[i])));
     xfree(mfn);
     return NULL;
 }
