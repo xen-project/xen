@@ -110,6 +110,9 @@
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
+#define ROUNDUP(_val, _order)                                           \
+    (((unsigned long)(_val)+(1UL<<(_order))-1) & ~((1UL<<(_order))-1))
+
 #define min(X, Y) ({                             \
             const typeof (X) _x = (X);           \
             const typeof (Y) _y = (Y);           \
