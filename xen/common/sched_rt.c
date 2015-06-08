@@ -441,7 +441,7 @@ rt_init(struct scheduler *ops)
     {
         _cpumask_scratch = xmalloc_array(cpumask_var_t, nr_cpu_ids);
         if ( !_cpumask_scratch )
-            return -ENOMEM;
+            goto no_mem;
     }
     nr_rt_ops++;
 
@@ -455,6 +455,10 @@ rt_init(struct scheduler *ops)
     ops->sched_data = prv;
 
     return 0;
+
+ no_mem:
+    xfree(prv);
+    return -ENOMEM;
 }
 
 static void
