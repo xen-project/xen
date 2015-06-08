@@ -2008,14 +2008,16 @@ int get_page(struct page_info *page, struct domain *domain)
     if ( likely(owner == domain) )
         return 1;
 
-    if ( owner != NULL )
-        put_page(page);
-
     if ( !paging_mode_refcounts(domain) && !domain->is_dying )
         gprintk(XENLOG_INFO,
-                "Error pfn %lx: rd=%p, od=%p, caf=%08lx, taf=%" PRtype_info "\n",
-                page_to_mfn(page), domain, owner,
-                page->count_info, page->u.inuse.type_info);
+                "Error pfn %lx: rd=%d od=%d caf=%08lx taf=%" PRtype_info "\n",
+                page_to_mfn(page), domain->domain_id,
+                owner ? owner->domain_id : DOMID_INVALID,
+                page->count_info - !!owner, page->u.inuse.type_info);
+
+    if ( owner )
+        put_page(page);
+
     return 0;
 }
 
@@ -4150,9 +4152,11 @@ int replace_grant_host_mapping(
 int donate_page(
     struct domain *d, struct page_info *page, unsigned int memflags)
 {
+    const struct domain *owner = dom_xen;
+
     spin_lock(&d->page_alloc_lock);
 
-    if ( is_xen_heap_page(page) || (page_get_owner(page) != NULL) )
+    if ( is_xen_heap_page(page) || ((owner = page_get_owner(page)) != NULL) )
         goto fail;
 
     if ( d->is_dying )
@@ -4177,9 +4181,10 @@ int donate_page(
 
  fail:
     spin_unlock(&d->page_alloc_lock);
-    MEM_LOG("Bad donate %p: ed=%p(%u), sd=%p, caf=%08lx, taf=%" PRtype_info,
-            (void *)page_to_mfn(page), d, d->domain_id,
-            page_get_owner(page), page->count_info, page->u.inuse.type_info);
+    MEM_LOG("Bad donate %lx: ed=%d sd=%d caf=%08lx taf=%" PRtype_info,
+            page_to_mfn(page), d->domain_id,
+            owner ? owner->domain_id : DOMID_INVALID,
+            page->count_info, page->u.inuse.type_info);
     return -1;
 }
 
@@ -4188,10 +4193,11 @@ int steal_page(
 {
     unsigned long x, y;
     bool_t drop_dom_ref = 0;
+    const struct domain *owner = dom_xen;
 
     spin_lock(&d->page_alloc_lock);
 
-    if ( is_xen_heap_page(page) || (page_get_owner(page) != d) )
+    if ( is_xen_heap_page(page) || ((owner = page_get_owner(page)) != d) )
         goto fail;
 
     /*
@@ -4226,9 +4232,10 @@ int steal_page(
 
  fail:
     spin_unlock(&d->page_alloc_lock);
-    MEM_LOG("Bad page %p: ed=%p(%u), sd=%p, caf=%08lx, taf=%" PRtype_info,
-            (void *)page_to_mfn(page), d, d->domain_id,
-            page_get_owner(page), page->count_info, page->u.inuse.type_info);
+    MEM_LOG("Bad page %lx: ed=%d sd=%d caf=%08lx taf=%" PRtype_info,
+            page_to_mfn(page), d->domain_id,
+            owner ? owner->domain_id : DOMID_INVALID,
+            page->count_info, page->u.inuse.type_info);
     return -1;
 }
 
