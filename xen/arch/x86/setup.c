@@ -101,7 +101,7 @@ unsigned long __read_mostly xen_virt_end;
 
 DEFINE_PER_CPU(struct tss_struct, init_tss);
 
-char __attribute__ ((__section__(".bss.stack_aligned"))) cpu0_stack[STACK_SIZE];
+char __section(".bss.stack_aligned") cpu0_stack[STACK_SIZE];
 
 struct cpuinfo_x86 __read_mostly boot_cpu_data = { 0, 0, 0, 0, -1 };
 

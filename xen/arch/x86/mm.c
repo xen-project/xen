@@ -126,8 +126,7 @@
 #include <asm/pci.h>
 
 /* Mapping of the fixmap space needed early. */
-l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
-    l1_fixmap[L1_PAGETABLE_ENTRIES];
+l1_pgentry_t __section(".bss.page_aligned") l1_fixmap[L1_PAGETABLE_ENTRIES];
 
 #define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING , _f "\n" , ## _a)
 
