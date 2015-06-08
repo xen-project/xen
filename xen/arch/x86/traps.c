@@ -1072,8 +1072,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
         return;
     }
 
-    if ( (!is_kernel_text(eip) &&
-          (system_state > SYS_STATE_boot || !is_kernel_inittext(eip))) ||
+    if ( !is_active_kernel_text(regs->eip) ||
          __copy_from_user(bug_insn, eip, sizeof(bug_insn)) ||
          memcmp(bug_insn, "\xf\xb", sizeof(bug_insn)) )
         goto die;

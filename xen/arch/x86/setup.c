@@ -507,12 +507,33 @@ static void __init kexec_reserve_area(struct e820map *e820)
 
 static void noinline init_done(void)
 {
+    system_state = SYS_STATE_active;
+
+    domain_unpause_by_systemcontroller(hardware_domain);
+
     /* Free (or page-protect) the init areas. */
     memset(__init_begin, 0xcc, __init_end - __init_begin); /* int3 poison */
     free_xen_data(__init_begin, __init_end);
     printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
 
     startup_cpu_idle_loop();
+}
+
+/* Reinitalise all state referring to the old virtual address of the stack. */
+static void __init noreturn reinit_bsp_stack(void)
+{
+    unsigned long *stack = (void*)(get_stack_bottom() & ~(STACK_SIZE - 1));
+
+    /* Update TSS and ISTs */
+    load_system_tables();
+
+    /* Update SYSCALL trampolines */
+    percpu_traps_init();
+
+    stack_base[0] = stack;
+    memguard_guard_stack(stack);
+
+    reset_stack_and_jump(init_done);
 }
 
 static bool_t __init loader_is_grub2(const char *loader_name)
@@ -1210,9 +1231,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     tboot_probe();
 
-    /* Unmap the first page of CPU0's stack. */
-    memguard_guard_stack(cpu0_stack);
-
     open_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ, new_tlbflush_clock_period);
 
     if ( opt_watchdog ) 
@@ -1454,11 +1472,11 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     setup_io_bitmap(dom0);
 
-    system_state = SYS_STATE_active;
-
-    domain_unpause_by_systemcontroller(dom0);
-
-    reset_stack_and_jump(init_done);
+    /* Jump to the 1:1 virtual mappings of cpu0_stack. */
+    asm volatile ("mov %[stk], %%rsp; jmp %c[fn]" ::
+                  [stk] "g" (__va(__pa(get_stack_bottom()))),
+                  [fn] "i" (reinit_bsp_stack) : "memory");
+    unreachable();
 }
 
 void arch_get_xen_caps(xen_capabilities_info_t *info)
