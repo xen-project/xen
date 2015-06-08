@@ -848,7 +848,7 @@ int vmx_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
         /* Westmere: */
         case 0x25: /* 32 nm nehalem, "Clarkdale", "Arrandale" */
         case 0x2c: /* 32 nm nehalem, "Gulftown", "Westmere-EP" */
-        case 0x27: /* 32 nm Westmere-EX */
+        case 0x2f: /* 32 nm Westmere-EX */
 
         case 0x3a: /* IvyBridge */
         case 0x3e: /* IvyBridge EP */
