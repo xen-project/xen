@@ -71,7 +71,7 @@ enum device_class device_get_class(const struct dt_device_node *dev);
 
 #define DT_DEVICE_START(_name, _namestr, _class)                    \
 static const struct device_desc __dev_desc_##_name __used           \
-__attribute__((__section__(".dev.info"))) = {                       \
+__section(".dev.info") = {                                          \
     .name = _namestr,                                               \
     .class = _class,                                                \
 

@@ -67,7 +67,7 @@ void platform_dom0_gnttab(paddr_t *start, paddr_t *size);
 
 #define PLATFORM_START(_name, _namestr)                         \
 static const struct platform_desc  __plat_desc_##_name __used   \
-__attribute__((__section__(".arch.info"))) = {                  \
+__section(".arch.info") = {                                     \
     .name = _namestr,
 
 #define PLATFORM_END                                            \
