@@ -23,7 +23,7 @@ ENTRY(start)
         jmp     __start
 
         .align 4
-/*** MULTIBOOT HEADER ****/
+multiboot1_header_start:       /*** MULTIBOOT1 HEADER ****/
 #define MULTIBOOT_HEADER_FLAGS (MULTIBOOT_HEADER_MODS_ALIGNED | \
                                 MULTIBOOT_HEADER_WANT_MEMORY)
         /* Magic number indicating a Multiboot header. */
@@ -32,6 +32,7 @@ ENTRY(start)
         .long   MULTIBOOT_HEADER_FLAGS
         /* Checksum: must be the negated sum of the first two fields. */
         .long   -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
+multiboot1_header_end:
 
         .section .init.rodata, "a", @progbits
         .align 4
@@ -212,27 +213,4 @@ ENTRY(trampoline_start)
 #include "trampoline.S"
 GLOBAL(trampoline_end)
 
-        .text
-__high_start:
 #include "x86_64.S"
-
-        .section .data.page_aligned, "aw", @progbits
-        .p2align PAGE_SHIFT
-/*
- * Mapping of first 2 megabytes of memory. This is mapped with 4kB mappings
- * to avoid type conflicts with fixed-range MTRRs covering the lowest megabyte
- * of physical memory. In any case the VGA hole should be mapped with type UC.
- */
-GLOBAL(l1_identmap)
-        pfn = 0
-        .rept L1_PAGETABLE_ENTRIES
-        /* VGA hole (0xa0000-0xc0000) should be mapped UC. */
-        .if pfn >= 0xa0 && pfn < 0xc0
-        .long (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR_NOCACHE | MAP_SMALL_PAGES
-        .else
-        .long (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR | MAP_SMALL_PAGES
-        .endif
-        .long 0
-        pfn = pfn + 1
-        .endr
-        .size l1_identmap, . - l1_identmap

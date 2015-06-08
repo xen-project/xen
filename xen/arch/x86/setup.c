@@ -674,9 +674,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
         panic("dom0 kernel not specified. Check bootloader configuration.");
 
-    if ( ((unsigned long)cpu0_stack & (STACK_SIZE-1)) != 0 )
-        panic("Misaligned CPU0 stack.");
-
     if ( efi_enabled )
     {
         set_pdx_range(xen_phys_start >> PAGE_SHIFT,

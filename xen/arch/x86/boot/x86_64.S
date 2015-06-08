@@ -1,5 +1,7 @@
+        .text
         .code64
 
+ENTRY(__high_start)
         /* Install relocated data selectors. */
         lgdt    gdt_descr(%rip)
         mov     $(__HYPERVISOR_DS64),%ecx
@@ -80,6 +82,24 @@ GLOBAL(boot_cpu_compat_gdt_table)
         .align PAGE_SIZE, 0
 
 GLOBAL(__page_tables_start)
+/*
+ * Mapping of first 2 megabytes of memory. This is mapped with 4kB mappings
+ * to avoid type conflicts with fixed-range MTRRs covering the lowest megabyte
+ * of physical memory. In any case the VGA hole should be mapped with type UC.
+ */
+GLOBAL(l1_identmap)
+        pfn = 0
+        .rept L1_PAGETABLE_ENTRIES
+        /* VGA hole (0xa0000-0xc0000) should be mapped UC. */
+        .if pfn >= 0xa0 && pfn < 0xc0
+        .long (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR_NOCACHE | MAP_SMALL_PAGES
+        .else
+        .long (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR | MAP_SMALL_PAGES
+        .endif
+        .long 0
+        pfn = pfn + 1
+        .endr
+        .size l1_identmap, . - l1_identmap
 
 /* Mapping of first 16 megabytes of memory. */
 GLOBAL(l2_identmap)
