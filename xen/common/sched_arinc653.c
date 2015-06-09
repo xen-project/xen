@@ -705,6 +705,7 @@ a653sched_adjust_global(const struct scheduler *ops,
         rc = arinc653_sched_set(ops, &local_sched);
         break;
     case XEN_SYSCTL_SCHEDOP_getinfo:
+        memset(&local_sched, -1, sizeof(local_sched));
         rc = arinc653_sched_get(ops, &local_sched);
         if ( rc )
             break;
