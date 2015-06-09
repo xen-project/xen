@@ -10,6 +10,8 @@
 #ifndef __XEN_RANGESET_H__
 #define __XEN_RANGESET_H__
 
+#include <xen/types.h>
+
 struct domain;
 struct rangeset;
 
@@ -50,17 +52,17 @@ void rangeset_limit(
 #define _RANGESETF_prettyprint_hex 0
 #define RANGESETF_prettyprint_hex  (1U << _RANGESETF_prettyprint_hex)
 
-int __must_check rangeset_is_empty(
-    struct rangeset *r);
+bool_t __must_check rangeset_is_empty(
+    const struct rangeset *r);
 
 /* Add/remove/query a numeric range. */
 int __must_check rangeset_add_range(
     struct rangeset *r, unsigned long s, unsigned long e);
 int __must_check rangeset_remove_range(
     struct rangeset *r, unsigned long s, unsigned long e);
-int __must_check rangeset_contains_range(
+bool_t __must_check rangeset_contains_range(
     struct rangeset *r, unsigned long s, unsigned long e);
-int __must_check rangeset_overlaps_range(
+bool_t __must_check rangeset_overlaps_range(
     struct rangeset *r, unsigned long s, unsigned long e);
 int rangeset_report_ranges(
     struct rangeset *r, unsigned long s, unsigned long e,
@@ -71,7 +73,7 @@ int __must_check rangeset_add_singleton(
     struct rangeset *r, unsigned long s);
 int __must_check rangeset_remove_singleton(
     struct rangeset *r, unsigned long s);
-int __must_check rangeset_contains_singleton(
+bool_t __must_check rangeset_contains_singleton(
     struct rangeset *r, unsigned long s);
 
 /* swap contents */

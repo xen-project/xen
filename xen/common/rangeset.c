@@ -248,11 +248,11 @@ int rangeset_remove_range(
     return rc;
 }
 
-int rangeset_contains_range(
+bool_t rangeset_contains_range(
     struct rangeset *r, unsigned long s, unsigned long e)
 {
     struct range *x;
-    int contains;
+    bool_t contains;
 
     ASSERT(s <= e);
 
@@ -264,11 +264,11 @@ int rangeset_contains_range(
     return contains;
 }
 
-int rangeset_overlaps_range(
+bool_t rangeset_overlaps_range(
     struct rangeset *r, unsigned long s, unsigned long e)
 {
     struct range *x;
-    int overlaps;
+    bool_t overlaps;
 
     ASSERT(s <= e);
 
@@ -310,14 +310,14 @@ int rangeset_remove_singleton(
     return rangeset_remove_range(r, s, s);
 }
 
-int rangeset_contains_singleton(
+bool_t rangeset_contains_singleton(
     struct rangeset *r, unsigned long s)
 {
     return rangeset_contains_range(r, s, s);
 }
 
-int rangeset_is_empty(
-    struct rangeset *r)
+bool_t rangeset_is_empty(
+    const struct rangeset *r)
 {
     return ((r == NULL) || list_empty(&r->range_list));
 }
