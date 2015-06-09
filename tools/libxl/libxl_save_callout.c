@@ -146,6 +146,13 @@ void libxl__xc_domain_saverestore_async_callback_done(libxl__egc *egc,
     shs->egc = 0;
 }
 
+void libxl__save_helper_init(libxl__save_helper_state *shs)
+{
+    libxl__ao_abortable_init(&shs->abrt);
+    libxl__ev_fd_init(&shs->readable);
+    libxl__ev_child_init(&shs->child);
+}
+
 /*----- helper execution -----*/
 
 static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
@@ -167,9 +174,7 @@ static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
     shs->rc = 0;
     shs->completed = 0;
     shs->pipes[0] = shs->pipes[1] = 0;
-    libxl__ao_abortable_init(&shs->abrt);
-    libxl__ev_fd_init(&shs->readable);
-    libxl__ev_child_init(&shs->child);
+    libxl__save_helper_init(shs);
 
     shs->abrt.ao = shs->ao;
     shs->abrt.callback = helper_stop;
@@ -255,7 +260,7 @@ static void helper_failed(libxl__egc *egc, libxl__save_helper_state *shs,
 
     libxl__ev_fd_deregister(gc, &shs->readable);
 
-    if (!libxl__ev_child_inuse(&shs->child)) {
+    if (!libxl__save_helper_inuse(shs)) {
         helper_done(egc, shs);
         return;
     }
@@ -268,7 +273,7 @@ static void helper_stop(libxl__egc *egc, libxl__ao_abortable *abrt, int rc)
     libxl__save_helper_state *shs = CONTAINER_OF(abrt, *shs, abrt);
     STATE_AO_GC(shs->ao);
 
-    if (!libxl__ev_child_inuse(&shs->child)) {
+    if (!libxl__save_helper_inuse(shs)) {
         helper_failed(egc, shs, rc);
         return;
     }
@@ -277,6 +282,12 @@ static void helper_stop(libxl__egc *egc, libxl__ao_abortable *abrt, int rc)
         shs->rc = rc;
 
     libxl__kill(gc, shs->child.pid, SIGTERM, "save/restore helper");
+}
+
+void libxl__save_helper_abort(libxl__egc *egc,
+                              libxl__save_helper_state *shs)
+{
+    helper_stop(egc, &shs->abrt, ERROR_FAIL);
 }
 
 static void helper_stdout_readable(libxl__egc *egc, libxl__ev_fd *ev,
@@ -356,7 +367,7 @@ static void helper_done(libxl__egc *egc, libxl__save_helper_state *shs)
     libxl__ev_fd_deregister(gc, &shs->readable);
     libxl__carefd_close(shs->pipes[0]);  shs->pipes[0] = 0;
     libxl__carefd_close(shs->pipes[1]);  shs->pipes[1] = 0;
-    assert(!libxl__ev_child_inuse(&shs->child));
+    assert(!libxl__save_helper_inuse(shs));
     if (shs->toolstack_data_file) fclose(shs->toolstack_data_file);
 
     shs->egc = egc;

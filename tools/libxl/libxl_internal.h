@@ -3272,6 +3272,15 @@ _hidden void libxl__xc_domain_restore(libxl__egc *egc,
 _hidden void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
                                            int rc, int retval, int errnoval);
 
+_hidden void libxl__save_helper_init(libxl__save_helper_state *shs);
+_hidden void libxl__save_helper_abort(libxl__egc *egc,
+                                      libxl__save_helper_state *shs);
+
+static inline bool libxl__save_helper_inuse(const libxl__save_helper_state *shs)
+{
+    return libxl__ev_child_inuse(&shs->child);
+}
+
 /* Each time the dm needs to be saved, we must call suspend and then save */
 _hidden int libxl__domain_suspend_device_model(libxl__gc *gc,
                                            libxl__domain_suspend_state *dss);
