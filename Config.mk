@@ -260,9 +260,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.5.1-rc2
-# Wed May 6 09:48:59 2015 +0200
-# fdc: force the fifo access to be in bounds of the allocated buffer
+QEMU_TRADITIONAL_REVISION ?= afaa35b4bc975b2b89ad44c481d0d7623e3d1c49
+# Tue Jun 9 16:32:24 2015 +0100
+# ... by default. Add a per-device "permissive" mode similar to pciback's
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
