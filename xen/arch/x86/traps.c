@@ -1753,9 +1753,8 @@ static int guest_io_okay(
 }
 
 /* Has the administrator granted sufficient permission for this I/O access? */
-static int admin_io_okay(
-    unsigned int port, unsigned int bytes,
-    struct vcpu *v, struct cpu_user_regs *regs)
+static bool_t admin_io_okay(unsigned int port, unsigned int bytes,
+                            const struct domain *d)
 {
     /*
      * Port 0xcf8 (CONFIG_ADDRESS) is only visible for DWORD accesses.
@@ -1768,17 +1767,18 @@ static int admin_io_okay(
     if ( ((port & ~1) == RTC_PORT(0)) )
         return 0;
 
-    return ioports_access_permitted(v->domain, port, port + bytes - 1);
+    return ioports_access_permitted(d, port, port + bytes - 1);
 }
 
-static int pci_cfg_ok(struct domain *d, int write, int size)
+static bool_t pci_cfg_ok(struct domain *currd, bool_t write, unsigned int size)
 {
     uint32_t machine_bdf;
-    uint16_t start, end;
-    if (!is_hardware_domain(d))
+    unsigned int start;
+
+    if ( !is_hardware_domain(currd) )
         return 0;
 
-    machine_bdf = (d->arch.pci_cf8 >> 8) & 0xFFFF;
+    machine_bdf = (currd->arch.pci_cf8 >> 8) & 0xFFFF;
     if ( write )
     {
         const unsigned long *ro_map = pci_get_ro_map(0);
@@ -1786,9 +1786,9 @@ static int pci_cfg_ok(struct domain *d, int write, int size)
         if ( ro_map && test_bit(machine_bdf, ro_map) )
             return 0;
     }
-    start = d->arch.pci_cf8 & 0xFF;
+    start = currd->arch.pci_cf8 & 0xFF;
     /* AMD extended configuration space access? */
-    if ( (d->arch.pci_cf8 & 0x0F000000) &&
+    if ( (currd->arch.pci_cf8 & 0x0F000000) &&
          boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
          boot_cpu_data.x86 >= 0x10 && boot_cpu_data.x86 <= 0x17 )
     {
@@ -1797,22 +1797,20 @@ static int pci_cfg_ok(struct domain *d, int write, int size)
         if ( rdmsr_safe(MSR_AMD64_NB_CFG, msr_val) )
             return 0;
         if ( msr_val & (1ULL << AMD64_NB_CFG_CF8_EXT_ENABLE_BIT) )
-            start |= (d->arch.pci_cf8 >> 16) & 0xF00;
+            start |= (currd->arch.pci_cf8 >> 16) & 0xF00;
     }
-    end = start + size - 1;
-    if (xsm_pci_config_permission(XSM_HOOK, d, machine_bdf, start, end, write))
-        return 0;
-    return 1;
+
+    return !xsm_pci_config_permission(XSM_HOOK, currd, machine_bdf,
+                                      start, start + size - 1, write);
 }
 
-uint32_t guest_io_read(
-    unsigned int port, unsigned int bytes,
-    struct vcpu *v, struct cpu_user_regs *regs)
+uint32_t guest_io_read(unsigned int port, unsigned int bytes,
+                       struct domain *currd)
 {
     uint32_t data = 0;
     unsigned int shift = 0;
 
-    if ( admin_io_okay(port, bytes, v, regs) )
+    if ( admin_io_okay(port, bytes, currd) )
     {
         switch ( bytes )
         {
@@ -1833,31 +1831,30 @@ uint32_t guest_io_read(
         }
         else if ( (port == RTC_PORT(0)) )
         {
-            sub_data = v->domain->arch.cmos_idx;
+            sub_data = currd->arch.cmos_idx;
         }
         else if ( (port == RTC_PORT(1)) &&
-                  ioports_access_permitted(v->domain, RTC_PORT(0),
-                                           RTC_PORT(1)) )
+                  ioports_access_permitted(currd, RTC_PORT(0), RTC_PORT(1)) )
         {
             unsigned long flags;
 
             spin_lock_irqsave(&rtc_lock, flags);
-            outb(v->domain->arch.cmos_idx & 0x7f, RTC_PORT(0));
+            outb(currd->arch.cmos_idx & 0x7f, RTC_PORT(0));
             sub_data = inb(RTC_PORT(1));
             spin_unlock_irqrestore(&rtc_lock, flags);
         }
         else if ( (port == 0xcf8) && (bytes == 4) )
         {
             size = 4;
-            sub_data = v->domain->arch.pci_cf8;
+            sub_data = currd->arch.pci_cf8;
         }
         else if ( (port & 0xfffc) == 0xcfc )
         {
             size = min(bytes, 4 - (port & 3));
             if ( size == 3 )
                 size = 2;
-            if ( pci_cfg_ok(v->domain, 0, size) )
-                sub_data = pci_conf_read(v->domain->arch.pci_cf8, port & 3, size);
+            if ( pci_cfg_ok(currd, 0, size) )
+                sub_data = pci_conf_read(currd->arch.pci_cf8, port & 3, size);
         }
 
         if ( size == 4 )
@@ -1872,11 +1869,10 @@ uint32_t guest_io_read(
     return data;
 }
 
-void guest_io_write(
-    unsigned int port, unsigned int bytes, uint32_t data,
-    struct vcpu *v, struct cpu_user_regs *regs)
+void guest_io_write(unsigned int port, unsigned int bytes, uint32_t data,
+                    struct domain *currd)
 {
-    if ( admin_io_okay(port, bytes, v, regs) )
+    if ( admin_io_okay(port, bytes, currd) )
     {
         switch ( bytes ) {
         case 1:
@@ -1904,33 +1900,32 @@ void guest_io_write(
         }
         else if ( (port == RTC_PORT(0)) )
         {
-            v->domain->arch.cmos_idx = data;
+            currd->arch.cmos_idx = data;
         }
         else if ( (port == RTC_PORT(1)) &&
-                  ioports_access_permitted(v->domain, RTC_PORT(0),
-                                           RTC_PORT(1)) )
+                  ioports_access_permitted(currd, RTC_PORT(0), RTC_PORT(1)) )
         {
             unsigned long flags;
 
             if ( pv_rtc_handler )
-                pv_rtc_handler(v->domain->arch.cmos_idx & 0x7f, data);
+                pv_rtc_handler(currd->arch.cmos_idx & 0x7f, data);
             spin_lock_irqsave(&rtc_lock, flags);
-            outb(v->domain->arch.cmos_idx & 0x7f, RTC_PORT(0));
+            outb(currd->arch.cmos_idx & 0x7f, RTC_PORT(0));
             outb(data, RTC_PORT(1));
             spin_unlock_irqrestore(&rtc_lock, flags);
         }
         else if ( (port == 0xcf8) && (bytes == 4) )
         {
             size = 4;
-            v->domain->arch.pci_cf8 = data;
+            currd->arch.pci_cf8 = data;
         }
         else if ( (port & 0xfffc) == 0xcfc )
         {
             size = min(bytes, 4 - (port & 3));
             if ( size == 3 )
                 size = 2;
-            if ( pci_cfg_ok(v->domain, 1, size) )
-                pci_conf_write(v->domain->arch.pci_cf8, port & 3, size, data);
+            if ( pci_cfg_ok(currd, 1, size) )
+                pci_conf_write(currd->arch.pci_cf8, port & 3, size, data);
         }
 
         if ( size == 4 )
@@ -1988,6 +1983,7 @@ static int is_cpufreq_controller(struct domain *d)
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
+    struct domain *currd = v->domain;
     unsigned long *reg, eip = regs->eip;
     u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0, lock = 0, rex = 0;
     enum { lm_seg_none, lm_seg_fs, lm_seg_gs } lm_ovr = lm_seg_none;
@@ -2144,7 +2140,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                  (rd_ad(edi) > (data_limit - (op_bytes - 1))) ||
                  !guest_io_okay(port, op_bytes, v, regs) )
                 goto fail;
-            data = guest_io_read(port, op_bytes, v, regs);
+            data = guest_io_read(port, op_bytes, currd);
             if ( (rc = copy_to_user((void *)data_base + rd_ad(edi),
                                     &data, op_bytes)) != 0 )
             {
@@ -2170,7 +2166,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                                      + op_bytes - rc, 0);
                 return EXCRET_fault_fixed;
             }
-            guest_io_write(port, op_bytes, data, v, regs);
+            guest_io_write(port, op_bytes, data, currd);
             wr_ad(esi, regs->esi + (int)((regs->eflags & X86_EFLAGS_DF)
                                          ? -op_bytes : op_bytes));
             break;
@@ -2231,7 +2227,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     exec_in:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
-        if ( admin_io_okay(port, op_bytes, v, regs) )
+        if ( admin_io_okay(port, op_bytes, currd) )
         {
             mark_regs_dirty(regs);
             io_emul(regs);            
@@ -2242,7 +2238,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 regs->eax = 0;
             else
                 regs->eax &= ~((1 << (op_bytes * 8)) - 1);
-            regs->eax |= guest_io_read(port, op_bytes, v, regs);
+            regs->eax |= guest_io_read(port, op_bytes, currd);
         }
         bpmatch = check_guest_io_breakpoint(v, port, op_bytes);
         goto done;
@@ -2261,7 +2257,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     exec_out:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
-        if ( admin_io_okay(port, op_bytes, v, regs) )
+        if ( admin_io_okay(port, op_bytes, currd) )
         {
             mark_regs_dirty(regs);
             io_emul(regs);            
@@ -2270,7 +2266,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         }
         else
         {
-            guest_io_write(port, op_bytes, regs->eax, v, regs);
+            guest_io_write(port, op_bytes, regs->eax, currd);
         }
         bpmatch = check_guest_io_breakpoint(v, port, op_bytes);
         goto done;
@@ -2352,7 +2348,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x09: /* WBINVD */
         /* Ignore the instruction if unprivileged. */
-        if ( !cache_flush_permitted(v->domain) )
+        if ( !cache_flush_permitted(currd) )
             /* Non-physdev domain attempted WBINVD; ignore for now since
                newer linux uses this in some start-of-day timing loops */
             ;
@@ -2385,8 +2381,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( !is_pv_32on64_vcpu(v) )
             {
                 mfn = pagetable_get_pfn(v->arch.guest_table);
-                *reg = xen_pfn_to_cr3(mfn_to_gmfn(
-                    v->domain, mfn));
+                *reg = xen_pfn_to_cr3(mfn_to_gmfn(currd, mfn));
             }
             else
             {
@@ -2395,8 +2390,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
                 mfn = l4e_get_pfn(*pl4e);
                 unmap_domain_page(pl4e);
-                *reg = compat_pfn_to_cr3(mfn_to_gmfn(
-                    v->domain, mfn));
+                *reg = compat_pfn_to_cr3(mfn_to_gmfn(currd, mfn));
             }
             /* PTs should not be shared */
             BUG_ON(page_get_owner(mfn_to_page(mfn)) == dom_cow);
@@ -2456,7 +2450,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
             gfn = !is_pv_32on64_vcpu(v)
                 ? xen_cr3_to_pfn(*reg) : compat_cr3_to_pfn(*reg);
-            page = get_page_from_gfn(v->domain, gfn, NULL, P2M_ALLOC);
+            page = get_page_from_gfn(currd, gfn, NULL, P2M_ALLOC);
             if ( page )
             {
                 rc = new_guest_cr3(page_to_mfn(page));
@@ -2540,7 +2534,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_K8_HWCR:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
                 goto fail;
-            if ( !is_cpufreq_controller(v->domain) )
+            if ( !is_cpufreq_controller(currd) )
                 break;
             if ( wrmsr_safe(regs->ecx, msr_content) != 0 )
                 goto fail;
@@ -2549,7 +2543,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
                  boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x17 )
                 goto fail;
-            if ( !is_hardware_domain(v->domain) || !is_pinned_vcpu(v) )
+            if ( !is_hardware_domain(currd) || !is_pinned_vcpu(v) )
                 break;
             if ( (rdmsr_safe(MSR_AMD64_NB_CFG, val) != 0) ||
                  (eax != (uint32_t)val) ||
@@ -2562,7 +2556,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
                  boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x17 )
                 goto fail;
-            if ( !is_hardware_domain(v->domain) || !is_pinned_vcpu(v) )
+            if ( !is_hardware_domain(currd) || !is_pinned_vcpu(v) )
                 break;
             if ( (rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, val) != 0) )
                 goto fail;
@@ -2582,7 +2576,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_IA32_UCODE_REV:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 goto fail;
-            if ( !is_hardware_domain(v->domain) || !is_pinned_vcpu(v) )
+            if ( !is_hardware_domain(currd) || !is_pinned_vcpu(v) )
                 break;
             if ( rdmsr_safe(regs->ecx, val) )
                 goto fail;
@@ -2601,7 +2595,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if (( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ) &&
                 ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ) )
                 goto fail;
-            if ( !is_cpufreq_controller(v->domain) )
+            if ( !is_cpufreq_controller(currd) )
                 break;
             if ( wrmsr_safe(regs->ecx, msr_content ) != 0 )
                 goto fail;
@@ -2609,7 +2603,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_IA32_PERF_CTL:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 goto fail;
-            if ( !is_cpufreq_controller(v->domain) )
+            if ( !is_cpufreq_controller(currd) )
                 break;
             if ( wrmsr_safe(regs->ecx, msr_content) != 0 )
                 goto fail;
@@ -2618,7 +2612,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_IA32_ENERGY_PERF_BIAS:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 goto fail;
-            if ( !is_hardware_domain(v->domain) || !is_pinned_vcpu(v) )
+            if ( !is_hardware_domain(currd) || !is_pinned_vcpu(v) )
                 break;
             if ( wrmsr_safe(regs->ecx, msr_content) != 0 )
                 goto fail;
@@ -2664,7 +2658,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         if ( (v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_TSD) &&
              !guest_kernel_mode(v, regs) )
             goto fail;
-        if ( v->domain->arch.vtsc )
+        if ( currd->arch.vtsc )
             pv_soft_rdtsc(v, regs, 0);
         else
         {
@@ -2707,7 +2701,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_K8_PSTATE7:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
                 goto fail;
-            if ( !is_cpufreq_controller(v->domain) )
+            if ( !is_cpufreq_controller(currd) )
             {
                 regs->eax = regs->edx = 0;
                 break;

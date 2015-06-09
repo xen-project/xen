@@ -599,13 +599,12 @@ static int hvm_access_cf8(
 static int handle_pvh_io(
     int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
-    struct vcpu *curr = current;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    struct domain *currd = current->domain;
 
     if ( dir == IOREQ_WRITE )
-        guest_io_write(port, bytes, *val, curr, regs);
+        guest_io_write(port, bytes, *val, currd);
     else
-        *val = guest_io_read(port, bytes, curr, regs);
+        *val = guest_io_read(port, bytes, currd);
 
     return X86EMUL_OKAY;
 }
