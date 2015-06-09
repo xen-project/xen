@@ -22,11 +22,6 @@ do_ni_hypercall(
     void);
 
 extern long
-do_sched_op_compat(
-    int cmd,
-    unsigned long arg);
-
-extern long
 do_sched_op(
     int cmd,
     XEN_GUEST_HANDLE_PARAM(void) arg);

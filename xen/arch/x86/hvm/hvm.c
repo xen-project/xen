@@ -2705,7 +2705,7 @@ void hvm_hlt(unsigned long rflags)
     if ( unlikely(!(rflags & X86_EFLAGS_IF)) )
         return hvm_vcpu_down(curr);
 
-    do_sched_op_compat(SCHEDOP_block, 0);
+    do_sched_op(SCHEDOP_block, guest_handle_from_ptr(NULL, void));
 
     HVMTRACE_1D(HLT, /* pending = */ vcpu_runnable(curr));
 }

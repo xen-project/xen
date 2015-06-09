@@ -882,39 +882,6 @@ void watchdog_domain_destroy(struct domain *d)
         kill_timer(&d->watchdog_timer[i]);
 }
 
-long do_sched_op_compat(int cmd, unsigned long arg)
-{
-    long ret = 0;
-
-    switch ( cmd )
-    {
-    case SCHEDOP_yield:
-    {
-        ret = vcpu_yield();
-        break;
-    }
-
-    case SCHEDOP_block:
-    {
-        vcpu_block_enable_events();
-        break;
-    }
-
-    case SCHEDOP_shutdown:
-    {
-        TRACE_3D(TRC_SCHED_SHUTDOWN,
-                 current->domain->domain_id, current->vcpu_id, arg);
-        domain_shutdown(current->domain, (u8)arg);
-        break;
-    }
-
-    default:
-        ret = -ENOSYS;
-    }
-
-    return ret;
-}
-
 typedef long ret_t;
 
 #endif /* !COMPAT */

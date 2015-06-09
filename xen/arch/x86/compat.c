@@ -5,9 +5,10 @@
  * hypercall after doing necessary argument munging.
  */
 
-#include <xen/config.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
+#include <xen/trace.h>
+#include <public/sched.h>
 
 #ifndef COMPAT
 typedef long ret_t;
@@ -25,6 +26,28 @@ ret_t do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop)
 }
 
 #ifndef COMPAT
+
+/* Legacy hypercall (as of 0x00030101). */
+long do_sched_op_compat(int cmd, unsigned long arg)
+{
+    switch ( cmd )
+    {
+    case SCHEDOP_yield:
+    case SCHEDOP_block:
+        return do_sched_op(cmd, guest_handle_from_ptr(NULL, void));
+
+    case SCHEDOP_shutdown:
+        TRACE_3D(TRC_SCHED_SHUTDOWN,
+                 current->domain->domain_id, current->vcpu_id, arg);
+        domain_shutdown(current->domain, (u8)arg);
+        break;
+
+    default:
+        return -ENOSYS;
+    }
+
+    return 0;
+}
 
 /* Legacy hypercall (as of 0x00030202). */
 long do_event_channel_op_compat(XEN_GUEST_HANDLE_PARAM(evtchn_op_t) uop)

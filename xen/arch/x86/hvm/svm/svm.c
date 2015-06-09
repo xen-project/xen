@@ -36,7 +36,7 @@
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
 #include <asm/amd.h>
-#include <asm/types.h>
+#include <asm/guest_access.h>
 #include <asm/debugreg.h>
 #include <asm/msr.h>
 #include <asm/i387.h>
@@ -1988,7 +1988,7 @@ static void svm_vmexit_do_pause(struct cpu_user_regs *regs)
      * Do something useful, like reschedule the guest
      */
     perfc_incr(pauseloop_exits);
-    do_sched_op_compat(SCHEDOP_yield, 0);
+    do_sched_op(SCHEDOP_yield, guest_handle_from_ptr(NULL, void));
 }
 
 static void

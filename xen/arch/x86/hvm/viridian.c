@@ -9,6 +9,7 @@
 #include <xen/perfc.h>
 #include <xen/hypercall.h>
 #include <xen/domain_page.h>
+#include <asm/guest_access.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
 #include <asm/apic.h>
@@ -561,7 +562,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
     {
     case HvNotifyLongSpinWait:
         perfc_incr(mshv_call_long_wait);
-        do_sched_op_compat(SCHEDOP_yield, 0);
+        do_sched_op(SCHEDOP_yield, guest_handle_from_ptr(NULL, void));
         status = HV_STATUS_SUCCESS;
         break;
     default:
