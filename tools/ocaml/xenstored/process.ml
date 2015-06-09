@@ -272,6 +272,11 @@ let do_restrict con t domains cons data =
 	in
 	Connection.restrict con domid
 
+(* only in xen >= 4.2 *)
+let do_reset_watches con t domains cons data =
+  Connection.del_watches con;
+  Connection.del_transactions con
+
 (* only in >= xen3.3                                                                                    *)
 (* we ensure backward compatibility with restrict by counting the number of argument of set_target ...  *)
 (* This is not very elegant, but it is safe as 'restrict' only restricts permission of dom0 connections *)
@@ -324,6 +329,7 @@ let function_of_type ty =
 	| Xenbus.Xb.Op.Resume            -> reply_ack do_resume
 	| Xenbus.Xb.Op.Set_target        -> reply_ack do_set_target
 	| Xenbus.Xb.Op.Restrict          -> reply_ack do_restrict
+	| Xenbus.Xb.Op.Reset_watches     -> reply_ack do_reset_watches
 	| Xenbus.Xb.Op.Invalid           -> reply_ack do_error
 	| _                              -> reply_ack do_error
 

@@ -186,6 +186,13 @@ let del_watch con path token =
 	con.nb_watches <- con.nb_watches - 1;
 	apath, w
 
+let del_watches con =
+  Hashtbl.clear con.watches
+
+let del_transactions con =
+  Hashtbl.clear con.transactions;
+  con.nb_watches <- 0
+
 let list_watches con =
 	let ll = Hashtbl.fold 
 		(fun _ watches acc -> List.map (fun watch -> watch.path, watch.token) watches :: acc)
