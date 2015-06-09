@@ -51,7 +51,6 @@
 
 enum xc_osdep_type {
     XC_OSDEP_PRIVCMD,
-    XC_OSDEP_EVTCHN,
     XC_OSDEP_GNTTAB,
     XC_OSDEP_GNTSHR,
 };
@@ -89,21 +88,6 @@ struct xc_osdep_ops
                                         size_t chunksize, privcmd_mmap_entry_t entries[],
                                         int nentries);
         } privcmd;
-        struct {
-            int (*fd)(xc_evtchn *xce, xc_osdep_handle h);
-
-            int (*notify)(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port);
-
-            evtchn_port_or_error_t (*bind_unbound_port)(xc_evtchn *xce, xc_osdep_handle h, int domid);
-            evtchn_port_or_error_t (*bind_interdomain)(xc_evtchn *xce, xc_osdep_handle h, int domid,
-                                                       evtchn_port_t remote_port);
-            evtchn_port_or_error_t (*bind_virq)(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq);
-
-            int (*unbind)(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port);
-
-            evtchn_port_or_error_t (*pending)(xc_evtchn *xce, xc_osdep_handle h);
-            int (*unmask)(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port);
-        } evtchn;
         struct {
 #define XC_GRANT_MAP_SINGLE_DOMAIN 0x1
             void *(*grant_map)(xc_gnttab *xcg, xc_osdep_handle h,

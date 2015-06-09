@@ -219,20 +219,23 @@ static void port_dealloc(struct evtchn_port_info *port_info) {
     free(port_info);
 }
 
-static xc_osdep_handle minios_evtchn_open(xc_evtchn *xce)
+int osdep_evtchn_open(xc_evtchn *xce)
 {
     int fd = alloc_fd(FTYPE_EVTCHN);
     if ( fd == -1 )
-        return XC_OSDEP_OPEN_ERROR;
+        return -1;
     LIST_INIT(&files[fd].evtchn.ports);
+    xce->fd = fd;
     printf("evtchn_open() -> %d\n", fd);
-    return (xc_osdep_handle)fd;
+    return 0;
 }
 
-static int minios_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
+int osdep_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
 {
-    int fd = (int)h;
-    return close(fd);
+    if ( xce->fd == -1 )
+        return 0;
+
+    return close(xce->fd);
 }
 
 void minios_evtchn_close_fd(int fd)
@@ -244,12 +247,12 @@ void minios_evtchn_close_fd(int fd)
     files[fd].type = FTYPE_NONE;
 }
 
-static int minios_evtchn_fd(xc_evtchn *xce, xc_osdep_handle h)
+int xc_evtchn_fd(xc_evtchn *xce)
 {
-    return (int)h;
+    return xce->fd;
 }
 
-static int minios_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
 {
     int ret;
 
@@ -281,9 +284,9 @@ static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     wake_up(&event_queue);
 }
 
-static evtchn_port_or_error_t minios_evtchn_bind_unbound_port(xc_evtchn *xce, xc_osdep_handle h, int domid)
+evtchn_port_or_error_t xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct evtchn_port_info *port_info;
     int ret;
     evtchn_port_t port;
@@ -308,10 +311,10 @@ static evtchn_port_or_error_t minios_evtchn_bind_unbound_port(xc_evtchn *xce, xc
     return port;
 }
 
-static evtchn_port_or_error_t minios_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
-    evtchn_port_t remote_port)
+evtchn_port_or_error_t xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
+                                                  evtchn_port_t remote_port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct evtchn_port_info *port_info;
     evtchn_port_t local_port;
     int ret;
@@ -336,9 +339,9 @@ static evtchn_port_or_error_t minios_evtchn_bind_interdomain(xc_evtchn *xce, xc_
     return local_port;
 }
 
-static int minios_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct evtchn_port_info *port_info;
 
     LIST_FOREACH(port_info, &files[fd].evtchn.ports, list) {
@@ -352,9 +355,9 @@ static int minios_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t
     return -1;
 }
 
-static evtchn_port_or_error_t minios_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
+evtchn_port_or_error_t xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct evtchn_port_info *port_info;
     evtchn_port_t port;
 
@@ -377,9 +380,9 @@ static evtchn_port_or_error_t minios_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_h
     return port;
 }
 
-static evtchn_port_or_error_t minios_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
+evtchn_port_or_error_t xc_evtchn_pending(xc_evtchn *xce)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct evtchn_port_info *port_info;
     unsigned long flags;
     evtchn_port_t ret = -1;
@@ -402,27 +405,11 @@ static evtchn_port_or_error_t minios_evtchn_pending(xc_evtchn *xce, xc_osdep_han
     return ret;
 }
 
-static int minios_evtchn_unmask(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
 {
     unmask_evtchn(port);
     return 0;
 }
-
-static struct xc_osdep_ops minios_evtchn_ops = {
-    .open = &minios_evtchn_open,
-    .close = &minios_evtchn_close,
-
-    .u.evtchn = {
-        .fd = &minios_evtchn_fd,
-        .notify = &minios_evtchn_notify,
-        .bind_unbound_port = &minios_evtchn_bind_unbound_port,
-        .bind_interdomain = &minios_evtchn_bind_interdomain,
-        .bind_virq = &minios_evtchn_bind_virq,
-        .unbind = &minios_evtchn_unbind,
-        .pending = &minios_evtchn_pending,
-        .unmask = &minios_evtchn_unmask,
-   },
-};
 
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush)
@@ -523,8 +510,6 @@ static struct xc_osdep_ops *minios_osdep_init(xc_interface *xch, enum xc_osdep_t
     {
     case XC_OSDEP_PRIVCMD:
         return &minios_privcmd_ops;
-    case XC_OSDEP_EVTCHN:
-        return &minios_evtchn_ops;
     case XC_OSDEP_GNTTAB:
         return &minios_gnttab_ops;
     default:

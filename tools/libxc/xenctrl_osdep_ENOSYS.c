@@ -81,90 +81,6 @@ static struct xc_osdep_ops ENOSYS_privcmd_ops =
     }
 };
 
-static xc_osdep_handle ENOSYS_evtchn_open(xc_interface *xce)
-{
-    IPRINTF(xce, "ENOSYS_evtchn: opening handle %p\n", (void *)1);
-    return (xc_osdep_handle)2; /*dummy*/
-}
-
-static int ENOSYS_evtchn_close(xc_interface *xce, xc_osdep_handle h)
-{
-    IPRINTF(xce, "ENOSYS_evtchn: closing handle %lx\n", h);
-    return 0;
-}
-
-static int ENOSYS_evtchn_fd(xc_interface *xce, xc_osdep_handle h)
-{
-    IPRINTF(xce, "ENOSYS_fd %lx fd\n", h);
-    return (int)h;
-}
-
-static int ENOSYS_evtchn_notify(xc_interface *xce, xc_osdep_handle h, evtchn_port_t port)
-{
-    IPRINTF(xce, "ENOSYS_evtchn %lx notify: %d\n", h, port);
-    return -ENOSYS;
-}
-
-static int ENOSYS_evtchn_bind_unbound_port(xc_interface *xce, xc_osdep_handle h, int domid)
-{
-    IPRINTF(xce, "ENOSYS_evtchn %lx bind_unbound_port: dom%d\n", h, domid);
-    return -ENOSYS;
-}
-
-
-static int ENOSYS_evtchn_bind_interdomain(xc_interface *xce, xc_osdep_handle h, int domid, evtchn_port_t remote_port)
-{
-    IPRINTF(xce, "ENOSYS_evtchn %lx bind_interdomain: dmo%d %d\n", h, domid, remote_port);
-    return -ENOSYS;
-}
-
-
-static int ENOSYS_evtchn_bind_virq(xc_interface *xce, xc_osdep_handle h, unsigned int virq)
-{
-    IPRINTF(xce, "ENOSYS_evtchn %lx bind_virq: %d\n", h, virq);
-    return -ENOSYS;
-}
-
-
-static int ENOSYS_evtchn_unbind(xc_interface *xce, xc_osdep_handle h, evtchn_port_t port)
-{
-    IPRINTF(xce, "ENOSYS_evtchn %lx unbind: %d\n", h, port);
-    return -ENOSYS;
-}
-
-
-static evtchn_port_or_error_t ENOSYS_evtchn_pending(xc_interface *xce, xc_osdep_handle h)
-{
-    IPRINTF(xce, "ENOSYS_evtchn %lx pending\n", h);
-    return -ENOSYS;
-}
-
-static int ENOSYS_evtchn_unmask(xc_interface *xce, xc_osdep_handle h, evtchn_port_t port)
-{
-    IPRINTF(xce, "ENOSYS_evtchn %lx unmask: %d\n", h, port);
-    return -ENOSYS;
-}
-
-static struct xc_osdep_ops ENOSYS_evtchn_ops = {
-    .open = &ENOSYS_evtchn_open,
-    .close = &ENOSYS_evtchn_close,
-
-    .u.evtchn = {
-        .fd = &ENOSYS_evtchn_fd,
-
-        .notify = &ENOSYS_evtchn_notify,
-
-        .bind_unbound_port = &ENOSYS_evtchn_bind_unbound_port,
-        .bind_interdomain = &ENOSYS_evtchn_bind_interdomain,
-        .bind_virq = &ENOSYS_evtchn_bind_virq,
-
-        .unbind = &ENOSYS_evtchn_unbind,
-
-        .pending = &ENOSYS_evtchn_pending,
-        .unmask = &ENOSYS_evtchn_unmask,
-    },
-};
-
 static struct xc_osdep_ops * ENOSYS_osdep_init(xc_interface *xch, enum xc_osdep_type type)
 {
     struct xc_osdep_ops *ops;
@@ -179,9 +95,6 @@ static struct xc_osdep_ops * ENOSYS_osdep_init(xc_interface *xch, enum xc_osdep_
     {
     case XC_OSDEP_PRIVCMD:
         ops = &ENOSYS_privcmd_ops;
-        break;
-    case XC_OSDEP_EVTCHN:
-        ops = &ENOSYS_evtchn_ops;
         break;
     default:
         ops = NULL;

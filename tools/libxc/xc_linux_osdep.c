@@ -38,10 +38,9 @@
 #include "xenctrl.h"
 #include "xenctrlosdep.h"
 
+#include "xc_private.h"
+
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
-#define ERROR(_m, _a...)  xc_osdep_log(xch,XTL_ERROR,XC_INTERNAL_ERROR,_m , ## _a )
-#define PERROR(_m, _a...) xc_osdep_log(xch,XTL_ERROR,XC_INTERNAL_ERROR,_m \
-                  " (%d = %s)", ## _a , errno, xc_strerror(xch, errno))
 
 static xc_osdep_handle linux_privcmd_open(xc_interface *xch)
 {
@@ -462,29 +461,31 @@ static struct xc_osdep_ops linux_privcmd_ops = {
 
 #define DEVXEN "/dev/xen/"
 
-static xc_osdep_handle linux_evtchn_open(xc_evtchn *xce)
+int osdep_evtchn_open(xc_evtchn *xce)
 {
     int fd = open(DEVXEN "evtchn", O_RDWR);
     if ( fd == -1 )
-        return XC_OSDEP_OPEN_ERROR;
-
-    return (xc_osdep_handle)fd;
+        return -1;
+    xce->fd = fd;
+    return 0;
 }
 
-static int linux_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
+int osdep_evtchn_close(xc_evtchn *xce)
 {
-    int fd = (int)h;
-    return close(fd);
+    if ( xce->fd == -1 )
+        return 0;
+
+    return close(xce->fd);
 }
 
-static int linux_evtchn_fd(xc_evtchn *xce, xc_osdep_handle h)
+int xc_evtchn_fd(xc_evtchn *xce)
 {
-    return (int)h;
+    return xce->fd;
 }
 
-static int linux_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_notify notify;
 
     notify.port = port;
@@ -492,10 +493,9 @@ static int linux_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t 
     return ioctl(fd, IOCTL_EVTCHN_NOTIFY, &notify);
 }
 
-static evtchn_port_or_error_t
-linux_evtchn_bind_unbound_port(xc_evtchn *xce, xc_osdep_handle h, int domid)
+evtchn_port_or_error_t xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_bind_unbound_port bind;
 
     bind.remote_domain = domid;
@@ -503,11 +503,10 @@ linux_evtchn_bind_unbound_port(xc_evtchn *xce, xc_osdep_handle h, int domid)
     return ioctl(fd, IOCTL_EVTCHN_BIND_UNBOUND_PORT, &bind);
 }
 
-static evtchn_port_or_error_t
-linux_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
-                              evtchn_port_t remote_port)
+evtchn_port_or_error_t xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
+                                                  evtchn_port_t remote_port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_bind_interdomain bind;
 
     bind.remote_domain = domid;
@@ -516,10 +515,9 @@ linux_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
     return ioctl(fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
 }
 
-static evtchn_port_or_error_t
-linux_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
+evtchn_port_or_error_t xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_bind_virq bind;
 
     bind.virq = virq;
@@ -527,9 +525,9 @@ linux_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
     return ioctl(fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
 }
 
-static int linux_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_unbind unbind;
 
     unbind.port = port;
@@ -537,9 +535,9 @@ static int linux_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t 
     return ioctl(fd, IOCTL_EVTCHN_UNBIND, &unbind);
 }
 
-static evtchn_port_or_error_t linux_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
+evtchn_port_or_error_t xc_evtchn_pending(xc_evtchn *xce)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     evtchn_port_t port;
 
     if ( read(fd, &port, sizeof(port)) != sizeof(port) )
@@ -548,30 +546,14 @@ static evtchn_port_or_error_t linux_evtchn_pending(xc_evtchn *xce, xc_osdep_hand
     return port;
 }
 
-static int linux_evtchn_unmask(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
 
     if ( write(fd, &port, sizeof(port)) != sizeof(port) )
         return -1;
     return 0;
 }
-
-static struct xc_osdep_ops linux_evtchn_ops = {
-    .open = &linux_evtchn_open,
-    .close = &linux_evtchn_close,
-
-    .u.evtchn = {
-        .fd = &linux_evtchn_fd,
-        .notify = &linux_evtchn_notify,
-        .bind_unbound_port = &linux_evtchn_bind_unbound_port,
-        .bind_interdomain = &linux_evtchn_bind_interdomain,
-        .bind_virq = &linux_evtchn_bind_virq,
-        .unbind = &linux_evtchn_unbind,
-        .pending = &linux_evtchn_pending,
-        .unmask = &linux_evtchn_unmask,
-    },
-};
 
 static xc_osdep_handle linux_gnttab_open(xc_gnttab *xcg)
 {
@@ -876,8 +858,6 @@ static struct xc_osdep_ops *linux_osdep_init(xc_interface *xch, enum xc_osdep_ty
     {
     case XC_OSDEP_PRIVCMD:
         return &linux_privcmd_ops;
-    case XC_OSDEP_EVTCHN:
-        return &linux_evtchn_ops;
     case XC_OSDEP_GNTTAB:
         return &linux_gnttab_ops;
     case XC_OSDEP_GNTSHR:

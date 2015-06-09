@@ -123,6 +123,13 @@ struct xc_interface_core {
     xc_osdep_handle  ops_handle; /* opaque data for xc_osdep_ops */
 };
 
+struct xenevtchn_handle {
+    xentoollog_logger *logger, *logger_tofree;
+    int fd;
+};
+int osdep_evtchn_open(xc_evtchn *xce);
+int osdep_evtchn_close(xc_evtchn *xce);
+
 void xc_report_error(xc_interface *xch, int code, const char *fmt, ...)
     __attribute__((format(printf,3,4)));
 void xc_reportv(xc_interface *xch, xentoollog_logger *lg, xentoollog_level,
@@ -446,3 +453,13 @@ void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
                          uint32_t *port);
 
 #endif /* __XC_PRIVATE_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

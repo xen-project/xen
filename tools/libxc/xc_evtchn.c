@@ -77,51 +77,6 @@ int xc_evtchn_status(xc_interface *xch, xc_evtchn_status_t *status)
                         sizeof(*status), 1);
 }
 
-int xc_evtchn_fd(xc_evtchn *xce)
-{
-    return xce->ops->u.evtchn.fd(xce, xce->ops_handle);
-}
-
-int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
-{
-    return xce->ops->u.evtchn.notify(xce, xce->ops_handle, port);
-}
-
-evtchn_port_or_error_t
-xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid)
-{
-    return xce->ops->u.evtchn.bind_unbound_port(xce, xce->ops_handle, domid);
-}
-
-evtchn_port_or_error_t
-xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
-                           evtchn_port_t remote_port)
-{
-    return xce->ops->u.evtchn.bind_interdomain(xce, xce->ops_handle, domid, remote_port);
-}
-
-evtchn_port_or_error_t
-xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
-{
-    return xce->ops->u.evtchn.bind_virq(xce, xce->ops_handle, virq);
-}
-
-int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
-{
-    return xce->ops->u.evtchn.unbind(xce, xce->ops_handle, port);
-}
-
-evtchn_port_or_error_t
-xc_evtchn_pending(xc_evtchn *xce)
-{
-    return xce->ops->u.evtchn.pending(xce, xce->ops_handle);
-}
-
-int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
-{
-    return xce->ops->u.evtchn.unmask(xce, xce->ops_handle, port);
-}
-
 /*
  * Local variables:
  * mode: C

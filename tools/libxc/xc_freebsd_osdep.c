@@ -252,34 +252,32 @@ static struct xc_osdep_ops freebsd_privcmd_ops = {
 };
 
 /*-------------------------- Evtchn device interface -------------------------*/
-static xc_osdep_handle
-freebsd_evtchn_open(xc_evtchn *xce)
+int osdep_evtchn_open(xc_evtchn *xce)
 {
     int fd = open(EVTCHN_DEV, O_RDWR);
     if ( fd == -1 )
-        return XC_OSDEP_OPEN_ERROR;
-
-    return (xc_osdep_handle)fd;
+        return -1;
+    xce->fd = fd;
+    return 0;
 }
 
-static int
-freebsd_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
+int osdep_evtchn_close(xc_evtchn *xce)
 {
-    int fd = (int)h;
-    return close(fd);
+    if ( xce->fd == -1 )
+        return 0;
+
+    return close(xce->fd);
 }
 
-static int
-freebsd_evtchn_fd(xc_evtchn *xce, xc_osdep_handle h)
+int xc_evtchn_fd(xc_evtchn *xce)
 {
-    return (int)h;
+    return xce->fd;
 }
 
 /*------------------------------ Evtchn interface ----------------------------*/
-static int
-freebsd_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_notify notify;
 
     notify.port = port;
@@ -287,10 +285,9 @@ freebsd_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
     return ioctl(fd, IOCTL_EVTCHN_NOTIFY, &notify);
 }
 
-static evtchn_port_or_error_t
-freebsd_evtchn_bind_unbound_port(xc_evtchn *xce, xc_osdep_handle h, int domid)
+evtchn_port_or_error_t xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid)
 {
-    int ret, fd = (int)h;
+    int ret, fd = xce->fd;
     struct ioctl_evtchn_bind_unbound_port bind;
 
     bind.remote_domain = domid;
@@ -299,11 +296,10 @@ freebsd_evtchn_bind_unbound_port(xc_evtchn *xce, xc_osdep_handle h, int domid)
     return ( ret == 0 ) ? bind.port : ret;
 }
 
-static evtchn_port_or_error_t
-freebsd_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
-                                evtchn_port_t remote_port)
+evtchn_port_or_error_t
+xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid, evtchn_port_t remote_port)
 {
-    int ret, fd = (int)h;
+    int ret, fd = xce->fd;
     struct ioctl_evtchn_bind_interdomain bind;
 
     bind.remote_domain = domid;
@@ -313,10 +309,9 @@ freebsd_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
     return ( ret == 0 ) ? bind.port : ret;
 }
 
-static evtchn_port_or_error_t
-freebsd_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
+evtchn_port_or_error_t xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
 {
-    int ret, fd = (int)h;
+    int ret, fd = xce->fd;
     struct ioctl_evtchn_bind_virq bind;
 
     bind.virq = virq;
@@ -325,10 +320,9 @@ freebsd_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
     return ( ret == 0 ) ? bind.port : ret;
 }
 
-static int
-freebsd_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_unbind unbind;
 
     unbind.port = port;
@@ -336,10 +330,9 @@ freebsd_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
     return ioctl(fd, IOCTL_EVTCHN_UNBIND, &unbind);
 }
 
-static evtchn_port_or_error_t
-freebsd_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
+evtchn_port_or_error_t xc_evtchn_pending(xc_evtchn *xce)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     evtchn_port_t port;
 
     if ( read(fd, &port, sizeof(port)) != sizeof(port) )
@@ -348,32 +341,14 @@ freebsd_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
     return port;
 }
 
-static int
-freebsd_evtchn_unmask(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
 
     if ( write(fd, &port, sizeof(port)) != sizeof(port) )
         return -1;
     return 0;
 }
-
-/*----------------------------- Evtchn handlers ------------------------------*/
-static struct xc_osdep_ops freebsd_evtchn_ops = {
-    .open = &freebsd_evtchn_open,
-    .close = &freebsd_evtchn_close,
-
-    .u.evtchn = {
-        .fd = &freebsd_evtchn_fd,
-        .notify = &freebsd_evtchn_notify,
-        .bind_unbound_port = &freebsd_evtchn_bind_unbound_port,
-        .bind_interdomain = &freebsd_evtchn_bind_interdomain,
-        .bind_virq = &freebsd_evtchn_bind_virq,
-        .unbind = &freebsd_evtchn_unbind,
-        .pending = &freebsd_evtchn_pending,
-        .unmask = &freebsd_evtchn_unmask,
-    },
-};
 
 /*---------------------------- FreeBSD interface -----------------------------*/
 static struct xc_osdep_ops *
@@ -383,8 +358,6 @@ freebsd_osdep_init(xc_interface *xch, enum xc_osdep_type type)
     {
     case XC_OSDEP_PRIVCMD:
         return &freebsd_privcmd_ops;
-    case XC_OSDEP_EVTCHN:
-        return &freebsd_evtchn_ops;
     default:
         return NULL;
     }

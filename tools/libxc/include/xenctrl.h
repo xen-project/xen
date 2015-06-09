@@ -117,7 +117,7 @@
  */
 
 typedef struct xc_interface_core xc_interface;
-typedef struct xc_interface_core xc_evtchn;
+typedef struct xenevtchn_handle xc_evtchn;
 typedef struct xc_interface_core xc_gnttab;
 typedef struct xc_interface_core xc_gntshr;
 

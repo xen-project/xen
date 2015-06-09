@@ -225,29 +225,31 @@ static struct xc_osdep_ops netbsd_privcmd_ops = {
 
 #define EVTCHN_DEV_NAME  "/dev/xenevt"
 
-static xc_osdep_handle netbsd_evtchn_open(xc_evtchn *xce)
+int osdep_evtchn_open(xc_evtchn *xce)
 {
     int fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
     if ( fd == -1 )
-        return XC_OSDEP_OPEN_ERROR;
-
-    return (xc_osdep_handle)fd;
+        return -1;
+    xce->fd = fd;
+    return 0;
 }
 
-static int netbsd_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
+int osdep_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
 {
-    int fd = (int)h;
-    return close(fd);
+    if ( xce->fd == -1 )
+        return 0;
+
+    return close(xce->fd);
 }
 
-static int netbsd_evtchn_fd(xc_evtchn *xce, xc_osdep_handle h)
+int xc_evtchn_fd(xc_evtchn *xce)
 {
-    return (int)h;
+    return xce->fd;
 }
 
-static int netbsd_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_notify notify;
 
     notify.port = port;
@@ -255,10 +257,9 @@ static int netbsd_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t
     return ioctl(fd, IOCTL_EVTCHN_NOTIFY, &notify);
 }
 
-static evtchn_port_or_error_t
-netbsd_evtchn_bind_unbound_port(xc_evtchn * xce, xc_osdep_handle h, int domid)
+evtchn_port_or_error_t xc_evtchn_bind_unbound_port(xc_evtchn * xce, int domid)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_bind_unbound_port bind;
     int ret;
 
@@ -271,11 +272,10 @@ netbsd_evtchn_bind_unbound_port(xc_evtchn * xce, xc_osdep_handle h, int domid)
 	return -1;
 }
 
-static evtchn_port_or_error_t
-netbsd_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
-                               evtchn_port_t remote_port)
+evtchn_port_or_error_t xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
+                                                  evtchn_port_t remote_port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_bind_interdomain bind;
     int ret;
 
@@ -289,9 +289,9 @@ netbsd_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
 	return -1;
 }
 
-static int netbsd_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_unbind unbind;
 
     unbind.port = port;
@@ -299,10 +299,9 @@ static int netbsd_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t
     return ioctl(fd, IOCTL_EVTCHN_UNBIND, &unbind);
 }
 
-static evtchn_port_or_error_t
-netbsd_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
+evtchn_port_or_error_t xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_bind_virq bind;
     int err;
 
@@ -315,10 +314,9 @@ netbsd_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
 	return bind.port;
 }
 
-static evtchn_port_or_error_t
-netbsd_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
+evtchn_port_or_error_t xc_evtchn_pending(xc_evtchn *xce)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     evtchn_port_t port;
 
     if ( read_exact(fd, (char *)&port, sizeof(port)) == -1 )
@@ -327,27 +325,11 @@ netbsd_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
     return port;
 }
 
-static int netbsd_evtchn_unmask(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     return write_exact(fd, (char *)&port, sizeof(port));
 }
-
-static struct xc_osdep_ops netbsd_evtchn_ops = {
-    .open = &netbsd_evtchn_open,
-    .close = &netbsd_evtchn_close,
-
-    .u.evtchn = {
-         .fd = &netbsd_evtchn_fd,
-         .notify = &netbsd_evtchn_notify,
-         .bind_unbound_port = &netbsd_evtchn_bind_unbound_port,
-         .bind_interdomain = &netbsd_evtchn_bind_interdomain,
-         .bind_virq = &netbsd_evtchn_bind_virq,
-         .unbind = &netbsd_evtchn_unbind,
-         .pending = &netbsd_evtchn_pending,
-         .unmask = &netbsd_evtchn_unmask,
-    },
-};
 
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush) 
@@ -395,8 +377,6 @@ static struct xc_osdep_ops *netbsd_osdep_init(xc_interface *xch, enum xc_osdep_t
     {
     case XC_OSDEP_PRIVCMD:
         return &netbsd_privcmd_ops;
-    case XC_OSDEP_EVTCHN:
-        return &netbsd_evtchn_ops;
     default:
         return NULL;
     }

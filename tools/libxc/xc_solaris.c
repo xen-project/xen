@@ -194,33 +194,36 @@ static struct xc_osdep_ops solaris_privcmd_ops = {
     },
 };
 
-static xc_osdep_handle solaris_evtchn_open(xc_evtchn *xce)
+int osdep_evtchn_open(xc_evtchn *xce)
 {
     int fd;
 
     if ( (fd = open("/dev/xen/evtchn", O_RDWR)) == -1 )
     {
         PERROR("Could not open event channel interface");
-        return XC_OSDEP_OPEN_ERROR;
+        return -1;
     }
 
-    return (xc_osdep_handle)fd;
+    xce->fd = fd;
+    return 0;
 }
 
-static int solaris_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
+int osdep_evtchn_close(xc_evtchn *xce)
 {
-    int fd = (int)h;
-    return close(fd);
+    if ( xce->fd == -1 )
+        return 0;
+
+    return close(xce->fd);
 }
 
-static int solaris_evtchn_fd(xc_evtchn *xce, xc_osdep_handle h)
+int xc_evtchn_fd(xc_evtchn *xce)
 {
-    return (int)h;
+    return xce->fd;
 }
 
-static int solaris_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_notify notify;
 
     notify.port = port;
@@ -228,10 +231,9 @@ static int solaris_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_
     return ioctl(fd, IOCTL_EVTCHN_NOTIFY, &notify);
 }
 
-static evtchn_port_or_error_t
-solaris_evtchn_bind_unbound_port(xc_evtchn *xce, xc_osdep_handle h, int domid)
+evtchn_port_or_error_t xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_bind_unbound_port bind;
 
     bind.remote_domain = domid;
@@ -239,11 +241,10 @@ solaris_evtchn_bind_unbound_port(xc_evtchn *xce, xc_osdep_handle h, int domid)
     return ioctl(fd, IOCTL_EVTCHN_BIND_UNBOUND_PORT, &bind);
 }
 
-evtchn_port_or_error_t
-solaris_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
-                           evtchn_port_t remote_port)
+evtchn_port_or_error_t xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
+                                                  evtchn_port_t remote_port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_bind_interdomain bind;
 
     bind.remote_domain = domid;
@@ -252,10 +253,9 @@ solaris_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
     return ioctl(fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
 }
 
-static evtchn_port_or_error_t
-solaris_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
+evtchn_port_or_error_t xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_bind_virq bind;
 
     bind.virq = virq;
@@ -263,9 +263,9 @@ solaris_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
     return ioctl(fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
 }
 
-static int solaris_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
+int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     struct ioctl_evtchn_unbind unbind;
 
     unbind.port = port;
@@ -273,10 +273,9 @@ static int solaris_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_
     return ioctl(fd, IOCTL_EVTCHN_UNBIND, &unbind);
 }
 
-static evtchn_port_or_error_t
-solaris_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
+evtchn_port_or_error_t xc_evtchn_pending(xc_evtchn *xce)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     evtchn_port_t port;
 
     if ( read_exact(fd, (char *)&port, sizeof(port)) == -1 )
@@ -285,27 +284,11 @@ solaris_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
     return port;
 }
 
-static int solaris_evtchn_unmask(xc_evtchn *xce, xc_osdep_handle h,evtchn_port_t port)
+int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
 {
-    int fd = (int)h;
+    int fd = xce->fd;
     return write_exact(fd, (char *)&port, sizeof(port));
 }
-
-static struct xc_osdep_ops solaris_evtchn_ops = {
-    .open = &solaris_evtchn_open,
-    .close = &solaris_evtchn_close,
-
-    .u.evtchn = {
-        .fd = &solaris_evtchn_fd,
-        .notify = &solaris_evtchn_notify,
-        .bind_unbound_port = &solaris_evtchn_bind_unbound_port,
-        .bind_interdomain = &solaris_evtchn_bind_interdomain,
-        .bind_virq = &solaris_evtchn_bind_virq,
-        .unbind = &solaris_evtchn_unbind,
-        .pending = &solaris_evtchn_pending,
-        .unmask = &solaris_evtchn_unmask,
-    },
-};
 
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush) 
@@ -324,8 +307,6 @@ static struct xc_osdep_ops *solaris_osdep_init(xc_interface *xch, enum xc_osdep_
     {
     case XC_OSDEP_PRIVCMD:
         return &solaris_privcmd_ops;
-    case XC_OSDEP_EVTCHN:
-        return &solaris_evtchn_ops;
     default:
         return NULL;
     }

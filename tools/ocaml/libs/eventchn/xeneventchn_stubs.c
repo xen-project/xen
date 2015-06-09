@@ -34,14 +34,14 @@
 #include <caml/callback.h>
 #include <caml/fail.h>
 
-#define _H(__h) ((xc_interface *)(__h))
+#define _H(__h) ((xc_evtchn *)(__h))
 
 CAMLprim value stub_eventchn_init(void)
 {
 	CAMLparam0();
 	CAMLlocal1(result);
 
-	xc_interface *xce = xc_evtchn_open(NULL, XC_OPENFLAG_NON_REENTRANT);
+	xc_evtchn *xce = xc_evtchn_open(NULL, XC_OPENFLAG_NON_REENTRANT);
 	if (xce == NULL)
 		caml_failwith("open failed");
 
