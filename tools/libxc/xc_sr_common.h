@@ -307,10 +307,10 @@ struct xc_sr_context
                     void *context;
                     size_t contextsz;
 
-#ifdef XG_LIBXL_HVM_COMPAT
+/* #ifdef XG_LIBXL_HVM_COMPAT */
                     uint32_t qlen;
                     void *qbuf;
-#endif
+/* #endif */
                 } restore;
             };
         } x86_hvm;
