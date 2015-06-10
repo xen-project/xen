@@ -1202,7 +1202,7 @@ void __init efi_init_memory(void)
         }
 
         if ( desc->Attribute & EFI_MEMORY_WP )
-            prot &= _PAGE_RW;
+            prot &= ~_PAGE_RW;
         if ( desc->Attribute & EFI_MEMORY_XP )
             prot |= _PAGE_NX;
 
