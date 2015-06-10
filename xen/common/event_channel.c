@@ -1251,7 +1251,7 @@ int evtchn_init(struct domain *d)
     if ( !d->evtchn )
         return -ENOMEM;
 
-    spin_lock_init(&d->event_lock);
+    spin_lock_init_prof(d, event_lock);
     if ( get_free_port(d) != 0 )
     {
         free_evtchn_bucket(d, d->evtchn);
