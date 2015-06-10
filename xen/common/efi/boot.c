@@ -1107,7 +1107,31 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 #ifndef CONFIG_ARM /* TODO - runtime service support */
 
 static bool_t __initdata efi_rs_enable = 1;
-boolean_param("efi-rs", efi_rs_enable);
+static bool_t __initdata efi_map_uc;
+
+static void __init parse_efi_param(char *s)
+{
+    char *ss;
+
+    do {
+        bool_t val = !!strncmp(s, "no-", 3);
+
+        if ( !val )
+            s += 3;
+
+        ss = strchr(s, ',');
+        if ( ss )
+            *ss = '\0';
+
+        if ( !strcmp(s, "rs") )
+            efi_rs_enable = val;
+        else if ( !strcmp(s, "attr=uc") )
+            efi_map_uc = val;
+
+        s = ss + 1;
+    } while ( ss );
+}
+custom_param("efi", parse_efi_param);
 
 #ifndef USE_SET_VIRTUAL_ADDRESS_MAP
 static __init void copy_mapping(unsigned long mfn, unsigned long end,
@@ -1205,9 +1229,11 @@ void __init efi_init_memory(void)
             prot |= _PAGE_PWT | _PAGE_PCD | MAP_SMALL_PAGES;
         else
         {
-            printk(XENLOG_ERR "Unknown cachability for MFNs %#lx-%#lx\n",
-                   smfn, emfn - 1);
-            continue;
+            printk(XENLOG_ERR "Unknown cachability for MFNs %#lx-%#lx%s\n",
+                   smfn, emfn - 1, efi_map_uc ? ", assuming UC" : "");
+            if ( !efi_map_uc )
+                continue;
+            prot |= _PAGE_PWT | _PAGE_PCD | MAP_SMALL_PAGES;
         }
 
         if ( desc->Attribute & EFI_MEMORY_WP )

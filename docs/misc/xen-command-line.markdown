@@ -617,12 +617,24 @@ Either force retrieval of monitor EDID information via VESA DDC, or
 disable it (edid=no). This option should not normally be required
 except for debugging purposes.
 
-### efi-rs
-> `= <boolean>`
+### efi
+> `= List of [ rs | attr ]`
+
+All options are of boolean kind and can be prefixed with `no-` to
+effect the inverse meaning.
+
+> `rs`
 
 > Default: `true`
 
-Force or disable use of EFI runtime services.
+>> Force or disable use of EFI runtime services.
+
+> `attr=uc`
+
+> Default: `off`
+
+>> Allows mapping of RuntimeServices which have no cachability attribute
+>> set as UC.
 
 ### extra\_guest\_irqs
 > `= [<domU number>][,<dom0 number>]`
