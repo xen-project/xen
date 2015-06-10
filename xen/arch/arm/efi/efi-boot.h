@@ -6,6 +6,7 @@
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
 #include <asm/setup.h>
+#include <asm/smp.h>
 
 void noreturn efi_xen_start(void *fdt_ptr, uint32_t fdt_size);
 
@@ -520,6 +521,11 @@ static void __init efi_arch_blexit(void)
         efi_bs->FreePages(dtbfile.addr, PFN_UP(dtbfile.size));
     if ( memmap )
         efi_bs->FreePool(memmap);
+}
+
+static void __init efi_arch_halt(void)
+{
+    stop_cpu();
 }
 
 static void __init efi_arch_load_addr_check(EFI_LOADED_IMAGE *loaded_image)

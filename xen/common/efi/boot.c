@@ -216,6 +216,9 @@ static void __init noreturn blexit(const CHAR16 *str)
         PrintStr((CHAR16 *)str);
     PrintStr(newline);
 
+    if ( !efi_bs )
+        efi_arch_halt();
+
     if ( cfg.addr )
         efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
     if ( kernel.addr )
@@ -1063,8 +1066,10 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     for ( retry = 0; ; retry = 1 )
     {
         efi_memmap_size = map_alloc_size;
-        status = efi_bs->GetMemoryMap(&efi_memmap_size, efi_memmap, &map_key,
-                                      &efi_mdesc_size, &mdesc_ver);
+        status = SystemTable->BootServices->GetMemoryMap(&efi_memmap_size,
+                                                         efi_memmap, &map_key,
+                                                         &efi_mdesc_size,
+                                                         &mdesc_ver);
         if ( EFI_ERROR(status) )
             PrintErrMesg(L"Cannot obtain memory map", status);
 
@@ -1073,7 +1078,9 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
         efi_arch_pre_exit_boot();
 
-        status = efi_bs->ExitBootServices(ImageHandle, map_key);
+        status = SystemTable->BootServices->ExitBootServices(ImageHandle,
+                                                             map_key);
+        efi_bs = NULL;
         if ( status != EFI_INVALID_PARAMETER || retry )
             break;
     }
