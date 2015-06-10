@@ -148,12 +148,16 @@ static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
 
         switch ( desc->Type )
         {
-        default:
-            type = E820_RESERVED;
-            break;
-        case EfiConventionalMemory:
         case EfiBootServicesCode:
         case EfiBootServicesData:
+            if ( map_bs )
+            {
+        default:
+                type = E820_RESERVED;
+                break;
+            }
+            /* fall through */
+        case EfiConventionalMemory:
             if ( !trampoline_phys && desc->PhysicalStart + len <= 0x100000 &&
                  len >= cfg.size && desc->PhysicalStart + len > cfg.addr )
                 cfg.addr = (desc->PhysicalStart + len - cfg.size) & PAGE_MASK;

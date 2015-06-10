@@ -84,6 +84,7 @@ static SIMPLE_TEXT_OUTPUT_INTERFACE *__initdata StdOut;
 static SIMPLE_TEXT_OUTPUT_INTERFACE *__initdata StdErr;
 
 static UINT32 __initdata mdesc_ver;
+static bool_t __initdata map_bs;
 
 static struct file __initdata cfg;
 static struct file __initdata kernel;
@@ -756,6 +757,8 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             {
                 if ( wstrcmp(ptr + 1, L"basevideo") == 0 )
                     base_video = 1;
+                else if ( wstrcmp(ptr + 1, L"mapbs") == 0 )
+                    map_bs = 1;
                 else if ( wstrncmp(ptr + 1, L"cfg=", 4) == 0 )
                     cfg_file_name = ptr + 5;
                 else if ( i + 1 < argc && wstrcmp(ptr + 1, L"cfg") == 0 )
@@ -765,6 +768,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
                 {
                     PrintStr(L"Xen EFI Loader options:\r\n");
                     PrintStr(L"-basevideo   retain current video mode\r\n");
+                    PrintStr(L"-mapbs       map EfiBootServices{Code,Data}\r\n");
                     PrintStr(L"-cfg=<file>  specify configuration file\r\n");
                     PrintStr(L"-help, -?    display this help\r\n");
                     blexit(NULL);
@@ -1165,7 +1169,8 @@ void __init efi_init_memory(void)
     } *extra, *extra_head = NULL;
 #endif
 
-    printk(XENLOG_INFO "EFI memory map:\n");
+    printk(XENLOG_INFO "EFI memory map:%s\n",
+           map_bs ? " (mapping BootServices)" : "");
     for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
     {
         EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
@@ -1178,7 +1183,11 @@ void __init efi_init_memory(void)
                desc->PhysicalStart, desc->PhysicalStart + len - 1,
                desc->Type, desc->Attribute);
 
-        if ( !efi_rs_enable || !(desc->Attribute & EFI_MEMORY_RUNTIME) )
+        if ( !efi_rs_enable ||
+             (!(desc->Attribute & EFI_MEMORY_RUNTIME) &&
+              (!map_bs ||
+               (desc->Type != EfiBootServicesCode &&
+                desc->Type != EfiBootServicesData))) )
             continue;
 
         desc->VirtualStart = INVALID_VIRTUAL_ADDRESS;
@@ -1264,7 +1273,10 @@ void __init efi_init_memory(void)
     {
         const EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
 
-        if ( (desc->Attribute & EFI_MEMORY_RUNTIME) &&
+        if ( ((desc->Attribute & EFI_MEMORY_RUNTIME) ||
+              (map_bs &&
+               (desc->Type == EfiBootServicesCode ||
+                desc->Type == EfiBootServicesData))) &&
              desc->VirtualStart != INVALID_VIRTUAL_ADDRESS &&
              desc->VirtualStart != desc->PhysicalStart )
             copy_mapping(PFN_DOWN(desc->PhysicalStart),
