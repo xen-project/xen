@@ -223,7 +223,7 @@ static int msixtbl_read(
     unsigned int nr_entry, index;
     int r = X86EMUL_UNHANDLEABLE;
 
-    if ( len != 4 || (address & 3) )
+    if ( (len != 4 && len != 8) || (address & (len - 1)) )
         return r;
 
     rcu_read_lock(&msixtbl_rcu_lock);
@@ -241,13 +241,25 @@ static int msixtbl_read(
              !acc_bit(test, entry, nr_entry, index) )
             goto out;
         *pval = entry->gentries[nr_entry].msi_ad[index];
+        if ( len == 8 )
+        {
+            if ( index )
+                offset = PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET;
+            else if ( acc_bit(test, entry, nr_entry, 1) )
+                *pval |= (u64)entry->gentries[nr_entry].msi_ad[1] << 32;
+            else
+                goto out;
+        }
     }
-    else 
+    if ( offset == PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
     {
         virt = msixtbl_addr_to_virt(entry, address);
         if ( !virt )
             goto out;
-        *pval = readl(virt);
+        if ( len == 4 )
+            *pval = readl(virt);
+        else
+            *pval |= (u64)readl(virt) << 32;
     }
     
     r = X86EMUL_OKAY;
@@ -268,7 +280,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     unsigned long flags, orig;
     struct irq_desc *desc;
 
-    if ( len != 4 || (address & 3) )
+    if ( (len != 4 && len != 8) || (address & (len - 1)) )
         return r;
 
     rcu_read_lock(&msixtbl_rcu_lock);
@@ -279,16 +291,23 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     nr_entry = (address - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
 
     offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
-    if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET)
+    if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
     {
+        index = offset / sizeof(uint32_t);
         if ( nr_entry < MAX_MSIX_ACC_ENTRIES ) 
         {
-            index = offset / sizeof(uint32_t);
             entry->gentries[nr_entry].msi_ad[index] = val;
             acc_bit(set, entry, nr_entry, index);
+            if ( len == 8 && !index )
+            {
+                entry->gentries[nr_entry].msi_ad[1] = val >> 32;
+                acc_bit(set, entry, nr_entry, 1);
+            }
         }
         set_bit(nr_entry, &entry->table_flags);
-        goto out;
+        if ( len != 8 || !index )
+            goto out;
+        val >>= 32;
     }
 
     /* Exit to device model when unmasking and address/data got modified. */
@@ -352,7 +371,8 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
 
 unlock:
     spin_unlock_irqrestore(&desc->lock, flags);
-    r = X86EMUL_OKAY;
+    if ( len == 4 )
+        r = X86EMUL_OKAY;
 
 out:
     rcu_read_unlock(&msixtbl_rcu_lock);
