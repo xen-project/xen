@@ -10346,7 +10346,6 @@ const struct argp parser_def = {
     .doc = "",
 };
 
-const char *argp_program_version = "xenalyze - Open-source xen-unstable (3.4)";
 const char *argp_program_bug_address = "George Dunlap <george.dunlap@eu.citrix.com>";
 
 
