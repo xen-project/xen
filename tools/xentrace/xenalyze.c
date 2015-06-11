@@ -8469,6 +8469,8 @@ void base_process(struct pcpu_info *p) {
     struct record_info *ri = &p->ri;
     switch(ri->event)
     {
+    case TRC_TRACE_WRAP_BUFFER:
+        break;
     case TRC_LOST_RECORDS:
         process_lost_records(p);
         break;
