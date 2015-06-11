@@ -173,6 +173,7 @@ tools/misc/gtracestat
 tools/misc/xenlockprof
 tools/misc/lowmemd
 tools/misc/xencov
+tools/xentrace/xenalyze
 tools/pygrub/build/*
 tools/python/build/*
 tools/security/secpol_tool

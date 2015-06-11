@@ -6,7 +6,8 @@ CFLAGS += -Werror
 CFLAGS += $(CFLAGS_libxenctrl)
 LDLIBS += $(LDLIBS_libxenctrl)
 
-BIN      =
+BIN-$(CONFIG_X86) = xenalyze
+BIN      = $(BIN-y)
 SBIN     = xentrace xentrace_setsize
 LIBBIN   = xenctx
 SCRIPTS  = xentrace_format
@@ -26,6 +27,9 @@ install: build
 	[ -z "$(LIBBIN)" ] || $(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
 	$(INSTALL_DIR) $(DESTDIR)$(MAN1DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(MAN8DIR)
+ifneq ($(BIN),)
+	$(INSTALL_PROG) $(BIN) $(DESTDIR)$(bindir)
+endif
 	$(INSTALL_PROG) $(SBIN) $(DESTDIR)$(sbindir)
 	$(INSTALL_PYTHON_PROG) $(SCRIPTS) $(DESTDIR)$(bindir)
 	[ -z "$(LIBBIN)" ] || $(INSTALL_PROG) $(LIBBIN) $(DESTDIR)$(LIBEXEC_BIN)
@@ -47,6 +51,9 @@ xenctx: xenctx.o
 
 xentrace_setsize: setsize.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS) $(APPEND_LDFLAGS)
+
+xenalyze: xenalyze.o mread.o
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(APPEND_LDFLAGS)
 
 -include $(DEPS)
 
