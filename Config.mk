@@ -215,9 +215,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 63a2748f7a97462c9d967daaabaeb5749aee24ea
-# Wed May 6 09:48:59 2015 +0200
-# fdc: force the fifo access to be in bounds of the allocated buffer
+QEMU_TAG ?= 1259e092ee27f444f683f0d76a13a8a72d3f26cb
+# Wed Jun 10 14:17:55 2015 +0100
+# xen/pt: unknown PCI config space fields should be read-only
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
