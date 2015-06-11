@@ -1908,8 +1908,9 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
  * All "slow" functions (see below for the exact definition) need to
  * use the asynchronous operation ("ao") machinery.  The function
  * should take a parameter const libxl_asyncop_how *ao_how and must
- * start with a call to AO_INITIATOR_ENTRY.  These functions MAY NOT
- * be called from inside libxl, because they can cause reentrancy
+ * start with a call to AO_CREATE or equivalent.  These functions MAY
+ * NOT be called from inside libxl (regardless of what is passed for
+ * ao_how), because they can cause reentrancy hazards due to
  * callbacks.
  *
  * For the same reason functions taking an ao_how may make themselves
