@@ -707,7 +707,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_STATUS status;
     unsigned int i, argc;
     CHAR16 **argv, *file_name, *cfg_file_name = NULL, *options = NULL;
-    UINTN map_alloc_size, map_key, info_size, gop_mode = ~0;
+    UINTN map_key, info_size, gop_mode = ~0;
     EFI_HANDLE *handles = NULL;
     EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
@@ -1064,16 +1064,17 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             efi_arch_video_init(gop, info_size, mode_info);
     }
 
-    efi_bs->GetMemoryMap(&map_alloc_size, NULL, &map_key,
+    info_size = 0;
+    efi_bs->GetMemoryMap(&info_size, NULL, &map_key,
                          &efi_mdesc_size, &mdesc_ver);
-    map_alloc_size += 8 * efi_mdesc_size;
-    efi_memmap = efi_arch_allocate_mmap_buffer(map_alloc_size);
+    info_size += 8 * efi_mdesc_size;
+    efi_memmap = efi_arch_allocate_mmap_buffer(info_size);
     if ( !efi_memmap )
         blexit(L"Unable to allocate memory for EFI memory map");
 
     for ( retry = 0; ; retry = 1 )
     {
-        efi_memmap_size = map_alloc_size;
+        efi_memmap_size = info_size;
         status = SystemTable->BootServices->GetMemoryMap(&efi_memmap_size,
                                                          efi_memmap, &map_key,
                                                          &efi_mdesc_size,
