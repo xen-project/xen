@@ -2,7 +2,7 @@
  * xenalyze.c: Analyzing xentrace output
  *
  * Written by George Dunlap.
- * 
+ *
  * Copyright (c) 2006-2007, XenSource Inc.
  * Copyright (c) 2007-2008, Citrix Systems R&D Ltd, UK
  *
@@ -61,7 +61,7 @@ struct array_struct {
             fprintf(warn, ##_x);                  \
         }                                         \
     } while(0)                                    \
-        
+
 /* -- Global variables -- */
 struct {
     int fd;
@@ -87,7 +87,7 @@ struct {
     .progress = { .update_offset = 0 },
 };
 
-/* 
+/*
   Kinds of errors:
    Unexpected values
     - RIP with information in high bits (not all 0 or 1)
@@ -115,7 +115,7 @@ struct {
      - domain runstates
      - runstate / tsc skew
     - vcpu_{prev,next}_update p->current{==,!=}null
-    - vcpu start conditions 
+    - vcpu start conditions
     - lost_cpu count higher than # of seen cpus / < 0
     - lost cpu has non-null p->current
    Symbol file
@@ -146,7 +146,7 @@ enum error_level {
 int verbosity = 5;
 
 struct {
-    unsigned 
+    unsigned
         scatterplot_interrupt_eip:1,
         scatterplot_cpi:1,
         scatterplot_unpin_promote:1,
@@ -225,7 +225,7 @@ struct {
 } opt = {
     .scatterplot_interrupt_eip=0,
     .scatterplot_cpi=0,
-    .scatterplot_unpin_promote=0, 
+    .scatterplot_unpin_promote=0,
     .scatterplot_cr3_switch=0,
     .scatterplot_wake_to_halt=0,
     .scatterplot_vmexit_eip=0,
@@ -355,7 +355,7 @@ void parse_symbol_file(char *fn) {
             error(ERR_ASSERT, NULL);
         } else
             last_addr = (*p)->symbols[(*p)->count].addr;
-            
+
         (*p)->count++;
 
         /* If this struct is full, point to the next.  It will be allocated
@@ -418,7 +418,7 @@ struct {
     void (*dump)(struct eip_list_struct *);
 } eip_list_type[EIP_LIST_TYPE_MAX] = {
     [EIP_LIST_TYPE_NONE] = {
-        .update=NULL, 
+        .update=NULL,
         .new=NULL,
         .dump=NULL },
 };
@@ -427,7 +427,7 @@ struct {
 /* --- HVM class of events --- */
 
 /*
- *  -- Algorithms -- 
+ *  -- Algorithms --
  *
  * Interrupt Wake-to-halt detection
  *
@@ -450,7 +450,7 @@ struct {
  *
  *  The "waking" interrupts we want to sub-classify into
  *  "wake-only" (when interrupt was the only interrupt from wake to halt) and
- *  "wake-all"  (whether this was the only interrupt or not). 
+ *  "wake-all"  (whether this was the only interrupt or not).
  */
 
 /* VMX data */
@@ -968,7 +968,7 @@ char * hvm_event_handler_name[HVM_EVENT_HANDLER_MAX] = {
     "pf_inject",
     "inj_exc",
     "inj_virq",
-    "reinj_virq", 
+    "reinj_virq",
     "io_read",
     "io_write",
     "cr_read", /* 8 */
@@ -1469,7 +1469,7 @@ void init_hvm_data(struct hvm_data *h, struct vcpu_data *v) {
                     size);
             error(ERR_SYSTEM, NULL);
         }
-            
+
     }
     for(i=0; i<GUEST_INTERRUPT_MAX+1; i++)
         h->summary.guest_interrupt[i].count=0;
@@ -1757,7 +1757,7 @@ struct domain_data {
     struct cr3_value_struct *cr3_value_head;
     struct eip_list_struct *emulate_eip_list;
     struct eip_list_struct *interrupt_eip_list;
-    
+
     int guest_interrupt[GUEST_INTERRUPT_MAX+1];
     struct hvm_short_summary_struct hvm_short;
     struct {
@@ -1840,7 +1840,7 @@ void volume_summary(struct trace_volume *vol)
                         printf(" +-%-7s: %10lld\n",
                                hvm_vol_name[k], vol->hvm[k]);
                 }
-                
+
                 break;
             }
         }
@@ -2049,7 +2049,7 @@ long long percentile(long long * A, int N, int ple) {
                 I++; J--;
             }
         } while (I <= J); /* Keep going until our pointers meet or pass */
-    
+
         /* Re-adjust L and R, based on which element we're looking for */
         if(J<K)
             L=I;
@@ -2133,9 +2133,9 @@ float weighted_percentile(float * A, /* values */
         } while (I <= J); /* Keep going until our pointers meet or pass */
 
         /* Re-adjust L and R, based on which element we're looking for */
-        if(J_weight<K_weight) 
+        if(J_weight<K_weight)
             L=I; L_weight = I_weight;
-        if(K_weight<I_weight) 
+        if(K_weight<I_weight)
             R=J; R_weight = J_weight;
     }
 
@@ -2364,7 +2364,7 @@ static inline void clear_interval_cpi(struct weighted_cpi_summary *s) {
 static inline void print_cpu_affinity(struct cycle_summary *s, char *p) {
     if(s->count) {
         long long avg;
- 
+
         avg = s->cycles / s->count;
 
         if ( opt.sample_size ) {
@@ -2441,7 +2441,7 @@ static inline void print_cycle_percent_summary(struct cycle_summary *s,
                    avg, p5, p50, p95);
         } else {
             printf("%s: %7d %5.2lfs %5.2lf%% %6lld\n",
-                   p, s->count, 
+                   p, s->count,
                    seconds,
                    percent,
                    avg);
@@ -2454,7 +2454,7 @@ static inline void print_cycle_summary(struct cycle_summary *s, char *p) {
         long long avg;
 
         avg = s->cycles / s->count;
-            
+
         if ( opt.sample_size ) {
             long long p5, p50, p95;
             int data_size = s->count;
@@ -2578,9 +2578,9 @@ void interval_list_add(struct interval_element *e, char *desc) {
     struct interval_list *p;
 
     fprintf(warn, "%s: Adding element '%s'\n", __func__, desc);
-    
+
     if((p=malloc(sizeof(*p)))==NULL) {
-        fprintf(stderr, "malloc() failed.\n"); 
+        fprintf(stderr, "malloc() failed.\n");
         error(ERR_SYSTEM, NULL);
     }
 
@@ -2627,7 +2627,7 @@ void interval_cr3_value_check(struct cr3_value_struct *cr3) {
                         __func__, cr3->gmfn);
 
                 P.interval.array.values[i] = &cr3->total_time.interval;
-            } 
+            }
         }
     } else if(opt.interval.mode == INTERVAL_MODE_LIST) {
         char desc[32];
@@ -2713,14 +2713,14 @@ void interval_cr3_short_summary_output(void) {
         struct cr3_value_struct *p = P.interval.cr3;
 
         interval_time_output();
-    
+
         hss_array = p->hvm.s;
 
         printf(" %.02lf",
                __cycles_percent(p->total_time.interval.cycles,
                                 opt.interval.cycles));
 
-        for(i=0; i<HVM_SHORT_SUMMARY_MAX; i++) 
+        for(i=0; i<HVM_SHORT_SUMMARY_MAX; i++)
             __interval_cycle_percent_output(&hss_array[i].interval,
                                             p->total_time.interval.cycles);
 
@@ -2743,7 +2743,7 @@ void interval_domain_value_check(struct domain_data *d) {
                 }
 
                 P.interval.array.values[i] = &d->total_time.interval;
-            } 
+            }
         }
     } else if(opt.interval.mode == INTERVAL_MODE_LIST) {
         char desc[32];
@@ -2776,7 +2776,7 @@ void interval_domain_short_summary_output(void) {
 
         interval_cycle_percent_output(&d->total_time.interval);
 
-        for(i=0; i<HVM_SHORT_SUMMARY_MAX; i++) 
+        for(i=0; i<HVM_SHORT_SUMMARY_MAX; i++)
             interval_cycle_percent_output(&d->hvm_short.s[i].interval);
 
         printf("\n");
@@ -2841,7 +2841,7 @@ void interval_domain_guest_interrupt_output(void) {
 
         printf("\n");
     }
-        
+
 }
 
 void interval_domain_grant_maps_output(void) {
@@ -2860,7 +2860,7 @@ void interval_domain_grant_maps_output(void) {
         printf("\n");
     }
 }
-         
+
 /* General interval gateways */
 
 void interval_callback(void) {
@@ -2928,11 +2928,11 @@ void interval_tail(void) {
 void update_eip(struct eip_list_struct **head, unsigned long long eip,
                 unsigned long long cycles, int type, void * extra) {
     struct eip_list_struct *p, **last=head;
-    
+
     for(p=*head; p; last = (&p->next), p=p->next)
         if(p->eip >= eip)
             break;
-    
+
     if(!p || p->eip != eip) {
         p=malloc(sizeof(*p));
         if(!p) {
@@ -3008,7 +3008,7 @@ void dump_eip(struct eip_list_struct *head) {
 #endif
 
     printf("   Total samples: %d\n", total);
-    
+
     for(i=0; i<N; i++) {
         p = qsort_array[i];
         if ( p->summary.cycles )
@@ -3025,7 +3025,7 @@ void dump_eip(struct eip_list_struct *head) {
                    ((double)p->summary.count*100)/total);
         }
 
-            
+
         if(eip_list_type[p->type].dump) {
             eip_list_type[p->type].dump(p);
         }
@@ -3052,7 +3052,7 @@ struct hvm_pf_xen_record {
 void hvm_update_short_summary(struct hvm_data *h, int element) {
     struct vcpu_data *v = h->v;
 
-    if(v->cr3.data) 
+    if(v->cr3.data)
         update_cycles(&v->cr3.data->hvm.s[element], h->arc_cycles);
 
     update_cycles(&v->d->hvm_short.s[element], h->arc_cycles);
@@ -3250,7 +3250,7 @@ void pf_preprocess(struct pf_xen_extra *e, int guest_paging_levels)
 
     e->corresponding_va = CORR_VA_INVALID;
     e->pt_level = 0;
-    
+
     /* Detect accesses to Windows linear pagetables */
     switch(guest_paging_levels)
     {
@@ -3269,7 +3269,7 @@ void pf_preprocess(struct pf_xen_extra *e, int guest_paging_levels)
                     | e->pt_index[1]<<22
                     | e->pt_index[0]<<12;
             }
-        } 
+        }
         break;
     case 3:
         if(e->pt_index[3]==3 && (e->pt_index[2]>>2==0))
@@ -3298,7 +3298,7 @@ void pf_preprocess(struct pf_xen_extra *e, int guest_paging_levels)
                     | e->pt_index[1]<<21
                     | e->pt_index[2]<<30;
             }
-        } 
+        }
         break;
     case 4:
         if(e->pt_index[4] == 0x1ed)
@@ -3322,7 +3322,7 @@ void pf_preprocess(struct pf_xen_extra *e, int guest_paging_levels)
                     }
                 }
                 else
-                { 
+                {
                     e->pt_level = 2;
                     e->corresponding_va = ((1ULL<<21)-1)
                         | (unsigned long long)e->pt_index[0]<<21
@@ -3339,7 +3339,7 @@ void pf_preprocess(struct pf_xen_extra *e, int guest_paging_levels)
                     | (unsigned long long)e->pt_index[2]<<30
                     | (unsigned long long)e->pt_index[3]<<39;
             }
-            
+
             if(HIGH_BIT(e->corresponding_va))
                 e->corresponding_va |= SIGN_EXTENDED_BITS;
         }
@@ -3453,7 +3453,7 @@ void hvm_pf_xen_process(struct record_info *ri, struct hvm_data *h) {
                 h->v->guest_paging_levels);
 
     hvm_pf_xen_preprocess(ri->event, h);
-    
+
     if(opt.dump_all)
     {
         if(e->pf_case == PF_XEN_EMULATE)
@@ -3482,7 +3482,7 @@ char * hvm_vlapic_icr_dest_shorthand_name[4] = {
 void hvm_vlapic_vmentry_cleanup(struct vcpu_data *v, tsc_t tsc)
 {
     int i;
-    
+
     struct vlapic_struct *vla = &v->vlapic;
 
     for(i=0; i<MAX_VLAPIC_LIST; i++)
@@ -3591,7 +3591,7 @@ void hvm_vlapic_icr_handler(struct hvm_data *h)
             return;
         }
 
-        if(!o->first_tsc) 
+        if(!o->first_tsc)
             o->first_tsc = P.now;
 
         if(opt.dump_all && o->count == 0 && o->injected)
@@ -3602,7 +3602,7 @@ void hvm_vlapic_icr_handler(struct hvm_data *h)
         if((opt.dump_all)
 #if 0
            && (ov->runstate.state != RUNSTATE_RUNNING
-               || ov->hvm.vmexit_valid) 
+               || ov->hvm.vmexit_valid)
 #endif
             )
             printf(" [vla] d%dv%d vec %d state %s (outstanding ipis %d)\n",
@@ -3828,7 +3828,7 @@ void hvm_inj_virq_process(struct record_info *ri, struct hvm_data *h) {
                ri->dump_header,
                r->vector, r->fake?"fake":"real");
     }
-    
+
     if(opt.summary_info)
     {
         int vector = r->vector;
@@ -3867,7 +3867,7 @@ void hvm_inj_virq_process(struct record_info *ri, struct hvm_data *h) {
                 h->w2h.vector = vector;
             h->summary.guest_interrupt[vector].is_wake = 1;
         }
-            
+
         if( h->summary.guest_interrupt[vector].start_tsc == 0 ) {
             /* Note that we want start_tsc set at the next vmentry */
             h->summary.guest_interrupt[vector].start_tsc = 1;
@@ -3897,19 +3897,19 @@ void update_io_address(struct io_address ** list, unsigned int pa, int dir,
 
     /* Keep list in order */
     for(p=*list; p && (p->pa != pa) && (p->pa < pa); q=p, p=p->next);
-    
+
     /* If we didn't find it, make a new element. */
     if(!p || (p->pa != pa)) {
         if((p=malloc(sizeof(*p)))==NULL) {
             fprintf(stderr, "malloc() failed.\n");
             error(ERR_SYSTEM, NULL);
         }
-        
+
         bzero(p, sizeof(*p));
 
         p->pa=pa;
         p->va=va;
-    
+
         /* If we stopped in the middle or at the end, add it in */
         if(q) {
             p->next=q->next;
@@ -4028,7 +4028,7 @@ void cr3_switch(unsigned long long val, struct hvm_data *h) {
 
         if(gmfn) {
             struct cr3_value_struct *p, **last=&v->d->cr3_value_head;
-        
+
             /* Always add to tail, so that we get consistent interval
                ouptut as the number of cr3s grow */
             for(p=*last; p; last = (&p->next), p=p->next)
@@ -4056,7 +4056,7 @@ void cr3_switch(unsigned long long val, struct hvm_data *h) {
                 else
                     P.cr3.head = p;
                 P.cr3.tail = &p->gnext;
-                
+
                 P.cr3.id++;
 
                 /* Add to the interval list if appropriate */
@@ -4098,20 +4098,20 @@ void cr3_prealloc_unpin(struct vcpu_data *v, unsigned long long gmfn) {
     struct cr3_value_struct *cr3;
 
     /* Look for it in the list */
-    for(cr3 = v->d->cr3_value_head; cr3; cr3=cr3->next) 
+    for(cr3 = v->d->cr3_value_head; cr3; cr3=cr3->next)
         if(cr3->gmfn == gmfn)
             break;
 
     if(!cr3)
         return;
 
-    if(cr3->prealloc_unpin.now) 
+    if(cr3->prealloc_unpin.now)
         fprintf(warn, "Strange, gmfn %llx multiple unpins w/o access!\n",
                 gmfn);
 
     cr3->prealloc_unpin.now = 1;
     cr3->prealloc_unpin.count++;
-    
+
     if(opt.dump_all)
         printf(" cr3 %llx unpinned %d times\n",
                gmfn, cr3->prealloc_unpin.count);
@@ -4189,7 +4189,7 @@ void cr3_dump_list(struct cr3_value_struct *head){
         abs_cycles_to_time(p->first_time, &first);
         abs_cycles_to_time(p->last_time, &last);
 
-        
+
         snprintf(desc, 30, "  %8llx (id %d)", p->gmfn, p->cr3_id);
         print_cycle_summary(&p->total_time, desc);
         snprintf(desc, 30, "          guest");
@@ -4242,7 +4242,7 @@ void hvm_cr_write_postprocess(struct hvm_data *h)
         int flush=0;
 
         if(v->cr3.val) {
-            oval = v->cr3.val; 
+            oval = v->cr3.val;
 
             if(new_val == oval) {
                 if(v->cr3.data) {
@@ -4291,7 +4291,7 @@ void hvm_cr_write_postprocess(struct hvm_data *h)
 #define case_cr(_x)                                                     \
             case (_x):                                                  \
                 hvm_set_summary_handler(h, hvm_cr_write_summary, (void *)(_x)); \
-                break                              
+                break
             case_cr(0);
             case_cr(1);
             case_cr(2);
@@ -4350,13 +4350,13 @@ void hvm_cr_write_process(struct record_info *ri, struct hvm_data *h)
     {
         if(cr == 3 && h->v->cr3.val) {
             printf("]%s cr_write cr3 val %llx oval %llx %s\n",
-                   ri->dump_header, 
+                   ri->dump_header,
                    val,
                    h->v->cr3.val,
                    (h->v->cr3.val == val)?"flush":"switch");
         } else {
             printf(" %s cr_write cr%d val %llx\n",
-                   ri->dump_header, 
+                   ri->dump_header,
                    cr, val);
 
         }
@@ -4510,7 +4510,7 @@ void hvm_inj_exc_process(struct record_info *ri, struct hvm_data *h)
                    ri->t.s, ri->t.ns, pcpu_string(ri->cpu),
                    r->vec, r->ec);
     }
-    
+
 }
 
 void hvm_intr_summary(struct hvm_data *h, void *d)
@@ -4577,9 +4577,9 @@ void hvm_intr_process(struct record_info *ri, struct hvm_data *h)
 
         /* Want absolute tsc to global tsc */
         abs_cycles_to_time(h->exit_tsc, &t);
-        printf("d%dv%d %u.%09u %lld\n", 
+        printf("d%dv%d %u.%09u %lld\n",
                h->v->d->did, h->v->vid,
-               t.s, t.ns, 
+               t.s, t.ns,
                rip);
     }
 
@@ -4589,7 +4589,7 @@ void hvm_intr_process(struct record_info *ri, struct hvm_data *h)
         /* Truncate to 40 bits */
         unsigned long long rip = h->rip & ((1ULL << ADDR_SPACE_BITS)-1);
         unsigned index = rip / opt.histogram_interrupt_increment;
-        
+
         h->summary.extint_histogram[index]++;
     }
 
@@ -4752,7 +4752,7 @@ void hvm_generic_postprocess_init(struct record_info *ri, struct hvm_data *h)
         fprintf(warn, "%s: Strange, h->postprocess set!\n",
                 __func__);
     h->inflight.generic.event = ri->event;
-    bcopy(h->d, h->inflight.generic.d, sizeof(unsigned int) * 4); 
+    bcopy(h->d, h->inflight.generic.d, sizeof(unsigned int) * 4);
 }
 
 void hvm_generic_postprocess(struct hvm_data *h)
@@ -4862,7 +4862,7 @@ void hvm_generic_dump(struct record_info *ri, char * prefix)
            ri->dump_header,
            evt_string,
            is_64?"64":"");
-        
+
     for(i=0; i<ri->extra_words; i++) {
         printf(" %x", ri->d[i]);
     }
@@ -4927,7 +4927,7 @@ void hvm_handler_process(struct record_info *ri, struct hvm_data *h) {
 
     return;
 
-needs_vmexit:    
+needs_vmexit:
     /* Wait for the next vmexit */
     if(!h->vmexit_valid)
     {
@@ -5014,7 +5014,7 @@ int domain_runstate(struct domain_data *d) {
     int runstates[RUNSTATE_MAX];
     int ret=-1;
     int max_vcpus = 0;
-    
+
     if(d->did == DEFAULT_DOMAIN)
         return 0;
 
@@ -5065,7 +5065,7 @@ int domain_runstate(struct domain_data *d) {
             fprintf(warn, " %s: %d\n",
                     runstate_name[i], runstates[i]);
     }
-                   
+
     if(ret >= 0)
         return ret;
 
@@ -5093,17 +5093,17 @@ static inline void runstate_update(struct vcpu_data *v, int new_runstate,
                t.s, t.ns,
                runstate_graph[new_runstate]);
     }
-        
+
     if(v->runstate.tsc > 0 && v->runstate.tsc < tsc) {
         update_cycles(v->runstates + v->runstate.state, tsc - v->runstate.tsc);
 
         if ( opt.scatterplot_runstate_time )
         {
             struct time_struct t, dt;
-            
+
             abs_cycles_to_time(tsc, &t);
             cycles_to_time(tsc - v->runstate.tsc, &dt);
-            
+
             printf("%dv%d %u.%09u %u.%09u\n",
                    d->did, v->vid,
                    t.s, t.ns,
@@ -5164,7 +5164,7 @@ static inline void runstate_update(struct vcpu_data *v, int new_runstate,
     v->runstate.tsc = tsc;
 
     /* Determine the domain runstate */
-    if(d->runstate_tsc > 0 && d->runstate_tsc < tsc) 
+    if(d->runstate_tsc > 0 && d->runstate_tsc < tsc)
         update_cycles(d->runstates + d->runstate, tsc - d->runstate_tsc);
 
     d->runstate = domain_runstate(d);
@@ -5251,7 +5251,7 @@ void hvm_vmexit_process(struct record_info *ri, struct hvm_data *h,
 
     if(opt.dump_all) {
         if ( h->exit_reason < h->exit_reason_max
-             && h->exit_reason_name[h->exit_reason] != NULL) 
+             && h->exit_reason_name[h->exit_reason] != NULL)
             printf("]%s vmexit exit_reason %s eip %llx%s\n",
                    ri->dump_header,
                    h->exit_reason_name[h->exit_reason],
@@ -5333,12 +5333,12 @@ void hvm_close_vmexit(struct hvm_data *h, tsc_t tsc) {
                 break;
             }
         }
-        
+
 
         if(h->v->cr3.data) {
             h->v->cr3.data->run_time += h->arc_cycles;
 
-            if(opt.summary_info) 
+            if(opt.summary_info)
                 update_cycles(&h->v->cr3.data->hv_time,
                               h->arc_cycles);
         }
@@ -5359,12 +5359,12 @@ void hvm_vmentry_process(struct record_info *ri, struct hvm_data *h) {
         return;
     }
 
-    /* Vista bug 
+    /* Vista bug
      * This has to be done here because irqs are injected on the path out
      * to vmexit. */
     hvm_vlapic_vmentry_cleanup(h->v, ri->tsc);
 
-    if(h->w2h.waking && opt.dump_all) 
+    if(h->w2h.waking && opt.dump_all)
         printf(" [w2h] d%dv%d Finishing waking\n",
                h->v->d->did, h->v->vid);
 
@@ -5506,7 +5506,7 @@ void hvm_summary(struct hvm_data *h) {
 }
 
 /* ---- Shadow records ---- */
-union shadow_event 
+union shadow_event
 {
     unsigned event;
     struct {
@@ -5530,7 +5530,7 @@ char * flag_string(struct pf_xen_extra *e)
         flagstring[i]='-';
 
     i=0;
-    
+
     if(e->flag_set_ad)
         flagstring[i]='d';
     else if(e->flag_set_a)
@@ -5630,7 +5630,7 @@ void shadow_emulate_process(struct record_info *ri, struct hvm_data *h)
             unsigned flags:29, emulation_count:3;
         } gpl4;
     } *r = (typeof(r))ri->d;
- 
+
     union shadow_event sevt = { .event = ri->event };
     int rec_gpl = sevt.paging_levels + 2;
 
@@ -5650,7 +5650,7 @@ void shadow_emulate_process(struct record_info *ri, struct hvm_data *h)
             fprintf(warn, "%s: expected %zd bytes for %d-level guest, got %d!\n",
                     __func__, sizeof(r->gpl2), h->v->guest_paging_levels,
                     ri->extra_words * 4);
-                
+
             error(ERR_RECORD, ri);
             return;
         }
@@ -5792,7 +5792,7 @@ void shadow_parse_other(struct record_info *ri,
 void shadow_unsync_postprocess(struct hvm_data *h)
 {
     struct pf_xen_extra *e = &h->inflight.pf_xen;
-    
+
     if(h->resyncs > 1)
         fprintf(warn, "Strange, %d resyncs for an unsync!\n",
                 h->resyncs);
@@ -5893,7 +5893,7 @@ void shadow_fixup_postprocess(struct hvm_data *h)
         }
 
 
-        if(!(e->flag_promote || h->prealloc_unpin || e->flag_unsync)) 
+        if(!(e->flag_promote || h->prealloc_unpin || e->flag_unsync))
             update_summary(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_UPDATE_ONLY], h->arc_cycles);
         /* more summary info */
 
@@ -6207,8 +6207,8 @@ void shadow_fault_generic_dump(unsigned int event, uint32_t *d, char *prefix,
            dump_header,
            evt_string,
            sevt.paging_levels);
-        
-    for(i=0; i<4; i++) 
+
+    for(i=0; i<4; i++)
     {
         printf(" %x", d[i]);
     }
@@ -6240,7 +6240,7 @@ void shadow_fault_generic_process(struct record_info *ri, struct hvm_data *h)
 
     /* pf-case traces, vs others */
     h->inflight.generic.event = ri->event;
-    bcopy(ri->d, h->inflight.generic.d, sizeof(unsigned int) * 4); 
+    bcopy(ri->d, h->inflight.generic.d, sizeof(unsigned int) * 4);
 
     if(opt.dump_all)
         shadow_fault_generic_dump(h->inflight.generic.event,
@@ -6311,7 +6311,7 @@ void shadow_process(struct pcpu_info *p)
         return;
 
     h = &p->current->hvm;
-    
+
     if(!h->init || !h->vmexit_valid)
     {
         if(opt.dump_all)
@@ -6420,7 +6420,7 @@ void pv_hypercall_process(struct record_info *ri, struct pv_data *pv) {
     }
 
     if(opt.summary_info) {
-        if(eax < PV_HYPERCALL_MAX) 
+        if(eax < PV_HYPERCALL_MAX)
             pv->hypercall_count[eax]++;
     }
 
@@ -6467,7 +6467,7 @@ void pv_trap_process(struct record_info *ri, struct pv_data *pv) {
     }
 
     if(opt.summary_info) {
-        if(trapnr < PV_TRAP_MAX) 
+        if(trapnr < PV_TRAP_MAX)
             pv->trap_count[trapnr]++;
     }
 
@@ -6497,7 +6497,7 @@ void pv_ptwr_emulation_process(struct record_info *ri, struct pv_data *pv) {
     struct {
         unsigned long long pte, addr, eip;
     } e;
-    
+
     switch ( pevt.minor ) {
     case PV_PTWR_EMULATION_PAE:
         if ( pevt.x64 )
@@ -6553,7 +6553,7 @@ void pv_generic_process(struct record_info *ri, struct pv_data *pv) {
                 printf("%x ", (unsigned)ri->d[i]);
             }
             printf("]");
-                
+
         }
         printf("\n");
     }
@@ -6615,7 +6615,7 @@ static const char *vcpu_op_str[] = {
 };
 
 static const char *sched_op_str[] = {
-    "yield", "block", "shutdown", "poll", "remote_shutdown", "shutdown_code", 
+    "yield", "block", "shutdown", "poll", "remote_shutdown", "shutdown_code",
     "watchdog",
 };
 
@@ -6648,7 +6648,7 @@ void pv_hypercall_gather_args(const struct record_info *ri, uint64_t *args)
 
     for (i = 0, word = 1; i < 6 && word < ri->extra_words; i++) {
         int present = pv_hypercall_arg_present(ri, i);
-        
+
         switch (present) {
         case ARG_32BIT:
             args[i] = ri->d[word];
@@ -6692,7 +6692,7 @@ void pv_hypercall_v2_process(struct record_info *ri, struct pv_data *pv,
     int op = pv_hypercall_op(ri);
 
     if(opt.summary_info) {
-        if(op < PV_HYPERCALL_MAX) 
+        if(op < PV_HYPERCALL_MAX)
             pv->hypercall_count[op]++;
     }
 
@@ -6745,12 +6745,12 @@ void pv_process(struct pcpu_info *p)
     struct record_info *ri = &p->ri;
     struct vcpu_data *v = p->current;
     struct pv_data *pv = &v->pv;
-    
+
     union pv_event pevt = { .event = ri->event };
 
     if(vcpu_set_data_type(p->current, VCPU_DATA_PV))
         return;
-        
+
     if(opt.summary_info) {
         pv->summary_info=1;
 
@@ -6832,7 +6832,7 @@ void domain_init(struct domain_data *d, int did)
 struct domain_data * domain_create(int did)
 {
     struct domain_data *d;
-    
+
     fprintf(warn, "Creating domain %d\n", did);
 
     if((d=malloc(sizeof(*d)))==NULL)
@@ -6862,7 +6862,7 @@ struct domain_data * domain_find(int did)
 
     /* Make a new domain */
     n = domain_create(did);
-    
+
     /* Insert it into the list */
     n->next = d;
     *q = n;
@@ -6926,7 +6926,7 @@ void vcpu_prev_update(struct pcpu_info *p, struct vcpu_data *prev,
         prev->runstate.tsc = 0;
         goto set;
     }
-        
+
     if(prev->runstate.state != RUNSTATE_RUNNING)
     {
         fprintf(warn, "Strange, prev d%dv%d not running!\n",
@@ -6959,7 +6959,7 @@ void vcpu_next_update(struct pcpu_info *p, struct vcpu_data *next, tsc_t tsc)
         else
         {
             fprintf(warn, "%s: FATAL: p->current not NULL! (d%dv%d, runstate %s)\n",
-                    __func__, 
+                    __func__,
                     p->current->d->did,
                     p->current->vid,
                     runstate_name[p->current->runstate.state]);
@@ -6986,9 +6986,9 @@ void vcpu_next_update(struct pcpu_info *p, struct vcpu_data *next, tsc_t tsc)
             {
                 update_cycles(&next->cpu_affinity_all, tsc - next->pcpu_tsc);
                 update_cycles(&next->cpu_affinity_pcpu[p->pid], tsc - next->pcpu_tsc);
-            }            
+            }
             next->pcpu_tsc = tsc;
-        } 
+        }
     }
     else
     {
@@ -7050,7 +7050,7 @@ void vcpu_start(struct pcpu_info *p, struct vcpu_data *v) {
 
     /* Change default domain to 'queued' */
     runstate_update(p->current, RUNSTATE_QUEUED, p->first_tsc);
-        
+
     /* FIXME: Copy over data from the default domain this interval */
     fprintf(warn, "Using first_tsc for d%dv%d (%lld cycles)\n",
             v->d->did, v->vid, p->last_tsc - p->first_tsc);
@@ -7145,7 +7145,7 @@ void sched_runstate_process(struct pcpu_info *p)
                     runstate_name[sevt.new_runstate]);
         }
     }
-    
+
     if(r->vcpu > MAX_CPUS)
     {
         fprintf(warn, "%s: vcpu %u > MAX_VCPUS %d!\n",
@@ -7168,7 +7168,7 @@ void sched_runstate_process(struct pcpu_info *p)
        && v->hvm.vmexit_valid) {
         hvm_close_vmexit(&v->hvm, ri->tsc);
     }
-     
+
     /* Track waking state */
     if ( v->data_type == VCPU_DATA_HVM && v->runstate.state != RUNSTATE_LOST ) {
         if ( sevt.new_runstate == RUNSTATE_RUNNABLE
@@ -7212,12 +7212,12 @@ void sched_runstate_process(struct pcpu_info *p)
                                    i,
                                    g->is_wake,
                                    t);
-                                   
+
                         if(opt.scatterplot_wake_to_halt
                            && t
                            && g->is_wake)
                             scatterplot_vs_time(ri->tsc, t);
-                        
+
                         if(opt.summary && t) {
                             if(g->is_wake) {
                                 if(v->hvm.w2h.interrupts==1)
@@ -7256,23 +7256,23 @@ void sched_runstate_process(struct pcpu_info *p)
                    && last_oldstate.actual == sevt.old_runstate) {
             tsc_t lag, old_offset;
             struct pcpu_info *p2;
- 
+
             if(ri->tsc < last_oldstate.tsc) {
                 fprintf(warn, "WARNING: new tsc %lld < detected runstate tsc %lld! Not updating\n",
                         ri->tsc, last_oldstate.tsc);
                 goto no_update;
             }
- 
+
             p2 = P.pcpu + last_oldstate.pid;
- 
+
             lag = ri->tsc
                 - last_oldstate.tsc;
- 
+
             old_offset = p2->tsc_skew.offset;
- 
+
             cpumask_union(&p2->tsc_skew.downstream, &p->tsc_skew.downstream);
             cpumask_set(&p2->tsc_skew.downstream, p->pid);
- 
+
             if(cpumask_isset(&p2->tsc_skew.downstream, p2->pid)) {
                 if ( opt.tsc_loop_fatal )
                 {
@@ -7293,22 +7293,22 @@ void sched_runstate_process(struct pcpu_info *p)
                     goto no_update;
                 }
             }
- 
+
             p2->tsc_skew.offset += lag * 2;
-             
+
             fprintf(warn, "TSC skew detected p%d->p%d, %lld cycles. Changing p%d offset from %lld to %lld\n",
                     p->pid, p2->pid, lag,
                     p2->pid,
                     old_offset,
                     p2->tsc_skew.offset);
-             
+
             goto no_update;
         } else {
             fprintf(warn, "runstate_change old_runstate %s, d%dv%d runstate %s.  Possible tsc skew.\n",
                     runstate_name[sevt.old_runstate],
                     v->d->did, v->vid,
                     runstate_name[v->runstate.state]);
- 
+
             v->runstate.last_oldstate.wrong = sevt.old_runstate;
             v->runstate.last_oldstate.actual = v->runstate.state;
             v->runstate.last_oldstate.tsc = ri->tsc;
@@ -7324,7 +7324,7 @@ void sched_runstate_process(struct pcpu_info *p)
         fprintf(stderr, "FATAL: Logic hole in %s\n", __func__);
         error(ERR_ASSERT, NULL);
     }
- 
+
 update:
     /* Actually update the runstate.  Special things to do if we're starting
      * or stopping actually running on a physical cpu. */
@@ -7353,7 +7353,7 @@ update:
                         v->p ? v->p->pid : -1);
                 error(ERR_FILE, NULL);
             }
-            
+
             runstate_update(v, RUNSTATE_RUNNING, ri->tsc);
         }
     }
@@ -7365,10 +7365,10 @@ update:
         if(perfctrs && v->runstate.tsc) {
             unsigned long long run_cycles, run_instr;
             double cpi;
-            
+
             //run_cycles = r->p1 - v->runstate_p1_start;
             run_cycles = ri->tsc - v->runstate.tsc;
-            run_instr  = r->p2 - v->runstate.p2_start;            
+            run_instr  = r->p2 - v->runstate.p2_start;
 
             cpi = ((double)run_cycles) / run_instr;
 
@@ -7376,12 +7376,12 @@ update:
                 printf("   cpi: %2.2lf ( %lld / %lld )\n",
                        cpi, run_cycles, run_instr);
             }
-            
+
             if(opt.scatterplot_cpi && v->d->did == 1)
                 printf("%lld,%2.2lf\n",
                        ri->tsc, cpi);
 
-            if(opt.summary_info) 
+            if(opt.summary_info)
                 update_cpi(&v->cpi, run_instr, run_cycles);
         }
 #endif
@@ -7412,7 +7412,7 @@ update:
         } else {
             vcpu_prev_update(v->p, v, ri->tsc, sevt.new_runstate);
         }
-        
+
         if(P.lost_cpus && v->d->did != IDLE_DOMAIN) {
             if(opt.dump_all)
                 fprintf(warn, "%s: %d lost cpus, setting d%dv%d runstate to RUNSTATE_LOST\n",
@@ -7535,7 +7535,7 @@ void sched_summary_vcpu(struct vcpu_data *v)
 
     printf(" Runstates:\n");
     for(i=0; i<RUNSTATE_MAX; i++) {
-        snprintf(desc,30, "  %8s", runstate_name[i]); 
+        snprintf(desc,30, "  %8s", runstate_name[i]);
         print_cycle_summary(v->runstates+i, desc);
         if ( i==RUNSTATE_RUNNABLE )
         {
@@ -7543,7 +7543,7 @@ void sched_summary_vcpu(struct vcpu_data *v)
             for(j=0; j<RUNNABLE_STATE_MAX; j++) {
                 if ( j == RUNNABLE_STATE_INVALID )
                     continue;
-                snprintf(desc,30, "    %8s", runnable_state_name[j]); 
+                snprintf(desc,30, "    %8s", runnable_state_name[j]);
                 print_cycle_summary(v->runnable_states+j, desc);
             }
         }
@@ -7564,7 +7564,7 @@ void sched_summary_domain(struct domain_data *d)
 
     printf(" Runstates:\n");
     for(i=0; i<DOMAIN_RUNSTATE_MAX; i++) {
-        snprintf(desc,30, "  %8s", domain_runstate_name[i]); 
+        snprintf(desc,30, "  %8s", domain_runstate_name[i]);
         print_cycle_summary(d->runstates+i, desc);
     }
 }
@@ -7657,7 +7657,7 @@ int p2m_canonical_order(int order)
     } else {
         order /= 9;
     }
-    return order;           
+    return order;
 }
 
 void mem_pod_zero_reclaim_process(struct pcpu_info *p)
@@ -7741,7 +7741,7 @@ void mem_pod_populate_process(struct pcpu_info *p)
             order = p2m_canonical_order(r->order);
 
             d->pod.populate_order[order]++;
-        }        
+        }
     }
 }
 
@@ -7791,7 +7791,7 @@ void mem_set_p2m_entry_process(struct pcpu_info *p)
         printf(" %s set_p2m_entry d%d o%d t %d g %llx m %llx\n",
                ri->dump_header,
                r->d, r->order,
-               r->p2mt, 
+               r->p2mt,
                (unsigned long long)r->gfn, (unsigned long long)r->mfn);
     }
 }
@@ -7865,7 +7865,7 @@ void mem_process(struct pcpu_info *p) {
         }
         break;
     }
-    
+
 }
 
 /* ---- PM ---- */
@@ -7912,7 +7912,7 @@ void pm_process(struct pcpu_info *p) {
         }
         break;
     }
-    
+
 }
 
 /*
@@ -7965,7 +7965,7 @@ struct pci_dev * pdev_find(uint8_t bus, uint8_t devfn)
 
     n->bus=bus;
     n->devfn=devfn;
-    
+
     /* Insert it into the list */
     n->next = d;
     *q = n;
@@ -8013,9 +8013,9 @@ void irq_process(struct pcpu_info *p) {
         if ( opt.scatterplot_irq )
         {
             struct time_struct t;
-            
+
             abs_cycles_to_time(ri->tsc, &t);
-            
+
             printf("i%x %u.%09u %d\n",
                    (unsigned)r->irq,
                    t.s, t.ns,
@@ -8051,7 +8051,7 @@ void irq_process(struct pcpu_info *p) {
             if( irq_table[r->irq].dev )
             {
                 struct pci_dev * pdev=irq_table[r->irq].dev;
-            
+
                 if(pdev->vector_used[r->vec])
                     fprintf(warn, "  Vector collision on %02x.%02x!\n",
                             pdev->bus, pdev->devfn);
@@ -8088,7 +8088,7 @@ void irq_process(struct pcpu_info *p) {
                    ri->dump_header,
                    r->irq, r->vec, r->cpu);
         }
-        if ( r->irq < MAX_IRQ 
+        if ( r->irq < MAX_IRQ
              && r->vec < MAX_VECTOR )
         {
             if ( irq_table[r->irq].type == IRQ_MSI )
@@ -8100,7 +8100,7 @@ void irq_process(struct pcpu_info *p) {
             if ( irq_table[r->irq].dev )
             {
                 struct pci_dev * pdev=irq_table[r->irq].dev;
-            
+
                 if(!pdev->vector_used[r->vec])
                     fprintf(warn,"  Strange, cleanup on non-used vector\n");
                 pdev->vector_used[r->vec]=0;
@@ -8159,7 +8159,7 @@ void dump_generic(FILE * f, struct record_info *ri)
            ri->event,
            ri->evt.main,
            ri->evt.sub,
-           ri->evt.minor, 
+           ri->evt.minor,
            ri->extra_words);
 
     for(i=0; i<ri->extra_words; i++) {
@@ -8186,7 +8186,7 @@ void dump_raw(char * s, struct record_info *ri)
         else
             printf("         ");
     }
-        
+
     printf(" ] | ");
 
     for (i=0; i<8; i++) {
@@ -8212,7 +8212,7 @@ int check_extra_words(struct record_info *ri,
 {
     static int off_by_one = 0;
     int expected_extra = expected_size / sizeof(unsigned int);
-    
+
     if(ri->extra_words != expected_extra
        && !(off_by_one && ri->extra_words == expected_extra + 1) )
     {
@@ -8228,7 +8228,7 @@ int check_extra_words(struct record_info *ri,
             error(ERR_RECORD, ri);
             return 1;
         }
-    } 
+    }
     return 0;
 }
 
@@ -8330,7 +8330,7 @@ void process_lost_records(struct pcpu_info *p)
 #endif
 
     if ( p->current ) {
-    
+
         hvm_vlapic_clear(&p->current->vlapic);
         if(p->current->data_type == VCPU_DATA_HVM) {
             p->current->hvm.vmexit_valid=0;
@@ -8372,7 +8372,7 @@ void process_lost_records(struct pcpu_info *p)
     p->lost_record.active = 1;
     p->lost_record.tsc = first_tsc;
     pcpu_string_draw(p);
-    
+
     {
         /* Any vcpu which is not actively running may be scheduled on the
          * lost cpu.  To avoid mis-accounting, we need to reset */
@@ -8452,8 +8452,8 @@ void process_lost_records_end(struct pcpu_info *p)
                 printf("               %s lost_records end (domain invalid)---\n",
                        pcpu_string(p->pid));
         }
-        
-        
+
+
         p->lost_record.active = 0;
         pcpu_string_draw(p);
         P.lost_cpus--;
@@ -8516,7 +8516,7 @@ loff_t scan_for_new_pcpu(loff_t offset) {
     ssize_t r;
     struct trace_record rec;
     struct cpu_change_data *cd;
-    
+
     r=__read_record(&rec, offset);
 
     if(r==0)
@@ -8539,7 +8539,7 @@ loff_t scan_for_new_pcpu(loff_t offset) {
         /* FIXME: Figure out if we could handle this more gracefully */
         error(ERR_ASSERT, NULL);
     }
-        
+
     if(cd->cpu > P.max_active_pcpu || !P.pcpu[cd->cpu].active) {
         struct pcpu_info *p = P.pcpu + cd->cpu;
 
@@ -8570,7 +8570,7 @@ loff_t scan_for_new_pcpu(loff_t offset) {
     }
 }
 
-/* 
+/*
  * Conceptually, when we reach a cpu_change record that's not for our pcpu,
  * we want to scan forward through the file until we reach one that's for us.
  * However, looping through involves reading the file, which we'd rather
@@ -8625,7 +8625,7 @@ void deactivate_pcpu(struct pcpu_info *p)
         fprintf(warn, "%s: Setting max_active_pcpu to %d\n",
                 __func__, max_active_pcpu);
     }
-        
+
 }
 
 /* Helper function to process tsc-related record info */
@@ -8690,11 +8690,11 @@ void create_dump_header(struct record_info *ri, struct pcpu_info *p)
         c+=r;
         len-=r;
     }
-        
+
     r = snprintf(c, len, " %s", pcpu_string(ri->cpu));
     c+=r;
     len-=r;
-        
+
     if ( p->current )
     {
         r = snprintf(c, len, " d%dv%d", p->current->d->did, p->current->vid);
@@ -8733,7 +8733,7 @@ int find_toplevel_event(struct record_info *ri)
 
     return toplevel;
 }
-    
+
 
 void process_cpu_change(struct pcpu_info *p) {
     struct record_info *ri = &p->ri;
@@ -8785,7 +8785,7 @@ void process_cpu_change(struct pcpu_info *p) {
 
         fprintf(warn, "%s: Activating pcpu %d at offset %lld\n",
                 __func__, r->cpu, (unsigned long long)p->file_offset);
-        
+
         record_order_insert(p2);
 
         sched_default_vcpu_activate(p2);
@@ -8806,7 +8806,7 @@ void process_cpu_change(struct pcpu_info *p) {
                     __func__, p->pid, (unsigned long long)P.last_epoch_offset);
             deactivate_pcpu(p);
         }
-    } 
+    }
     else
     {
         /* Track information about dom0 scheduling and records */
@@ -8820,7 +8820,7 @@ void process_cpu_change(struct pcpu_info *p) {
                 p->volume.buffer_dom0_runstate_tsc;
             p->volume.buffer_dom0_runstate_cycles[p->volume.buffer_dom0_runstate]
                 += ri->tsc - cycles;
-            
+
             printf(" - updated p%d dom0_runstate %s to %lld cycles (+%lld)\n",
                    p->pid, runstate_name[p->volume.buffer_dom0_runstate],
                    p->volume.buffer_dom0_runstate_cycles[p->volume.buffer_dom0_runstate],
@@ -8951,7 +8951,7 @@ void process_record(struct pcpu_info *p) {
 
     process_record_tsc(p->order_tsc, ri);
 
-    if(opt.dump_all) 
+    if(opt.dump_all)
         create_dump_header(ri, p);
 
 
@@ -9003,9 +9003,9 @@ void process_record(struct pcpu_info *p) {
 
 static inline ssize_t get_rec_size(struct trace_record *rec) {
     ssize_t s;
-    
+
     s = sizeof(uint32_t);
-        
+
     if(rec->cycle_flag)
         s += sizeof(tsc_t);
 
@@ -9032,7 +9032,7 @@ void progress_init(void) {
 
     if(!(pid = fork())) {
         progress_child_exec();
-        
+
         fprintf(stderr, "%s: exec failed (%s), disabling progress bar\n",
                 __func__, strerror(errno));
         opt.progress = 0;
@@ -9202,7 +9202,7 @@ ssize_t read_record(struct pcpu_info * p) {
  * - Updating the current one
  *
  * FIXME: Need to deal with pcpu states changing...
- * 
+ *
  * WARNING not thread-safe
  */
 
@@ -9233,7 +9233,7 @@ char * pcpu_string(int pcpu)
 {
     char *s = __pcpu_string;
     static int max_active_pcpu=-1, last_pcpu=-1;
-    
+
     assert(P.max_active_pcpu < MAX_CPUS);
     assert(pcpu <= P.max_active_pcpu);
 
@@ -9243,7 +9243,7 @@ char * pcpu_string(int pcpu)
     if(P.max_active_pcpu > max_active_pcpu)
     {
         int i;
-        for(i=max_active_pcpu + 1; i<= P.max_active_pcpu; i++) 
+        for(i=max_active_pcpu + 1; i<= P.max_active_pcpu; i++)
             pcpu_string_draw(P.pcpu+i);
         max_active_pcpu=P.max_active_pcpu;
     }
@@ -9338,7 +9338,7 @@ void record_order_remove(struct pcpu_info *rem)
     assert(record_order[i]);
 
     /* And move everyone forward */
-    for(; (record_order[i]=record_order[i+1]); i++) 
+    for(; (record_order[i]=record_order[i+1]); i++)
         ;
 }
 
@@ -9410,7 +9410,7 @@ void domain_summary(void)
     if(opt.show_default_domain_summary) {
         d = &default_domain;
         printf("|-- Default domain --|\n");
-    
+
         for( i = 0; i < MAX_CPUS ; i++ )
         {
             if(d->vcpu[i])
@@ -9475,7 +9475,7 @@ void report_pcpu(void) {
         if(!p->summary)
             continue;
         printf("pcpu %d\n", i);
-        
+
         print_cycle_summary(&p->time.running, " running");
         print_cycle_summary(&p->time.idle,    "    idle");
         print_cycle_summary(&p->time.lost,    "    lost");
@@ -9484,7 +9484,7 @@ void report_pcpu(void) {
             active++;
     }
     printf("Total active cpus: %d\n", active);
-    
+
 }
 
 void init_pcpus(void) {
@@ -9592,7 +9592,7 @@ enum {
 void parse_cpu_hz(char * arg) {
     float hz_base;
     char * next_ptr;
-    
+
     hz_base=strtof(arg, &next_ptr);
     if(next_ptr == arg) {
         fprintf(stderr, "Invalid cpu_hz %s\n", arg);
@@ -9888,7 +9888,7 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
         opt.with_cr3_enumeration = 1;
         G.output_defined = 1;
         break;
- 
+
     case OPT_INTERVAL_CR3_SCHEDULE_ORDERED:
         opt.interval.output = INTERVAL_CR3_SCHEDULE_ORDERED;
         opt.interval.check = INTERVAL_CHECK_CR3;
@@ -9938,7 +9938,7 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
         opt.summary_info = 1;
         G.output_defined = 1;
         break;
- 
+
     case OPT_INTERVAL_DOMAIN_SHORT_SUMMARY:
     {
         if((parse_array(arg, &opt.interval.array) < 0)
@@ -9998,7 +9998,7 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
         char *inval;
         opt.default_guest_paging_levels = (int)strtol(arg, &inval, 0);
         if ( inval == arg )
-            argp_usage(state);        
+            argp_usage(state);
     }
     break;
     case OPT_SYMBOL_FILE:
@@ -10291,19 +10291,19 @@ const struct argp_option cmd_opts[] =  {
       .key = OPT_SUMMARY,
       .group = OPT_GROUP_SUMMARY,
       .doc = "Output a summary", },
-    
+
     { .name = "report-pcpu",
       .key = OPT_REPORT_PCPU,
       .group = OPT_GROUP_SUMMARY,
       .doc = "Report utilization for pcpus", },
-    
+
     /* Guest info */
     { .name = "default-guest-paging-levels",
       .key = OPT_DEFAULT_GUEST_PAGING_LEVELS,
       .group = OPT_GROUP_GUEST,
       .arg = "L",
       .doc = "Default guest paging levels.  Mainly necessary for Rio, as Miami traces include guest paging levels where appropriate.", },
-    
+
     { .name = "symbol-file",
       .key = OPT_SYMBOL_FILE,
       .group = OPT_GROUP_GUEST,
@@ -10376,7 +10376,7 @@ int main(int argc, char *argv[]) {
 
     if(opt.dump_all)
         warn = stdout;
-        
+
     init_pcpus();
 
     if(opt.progress)
@@ -10395,7 +10395,7 @@ int main(int argc, char *argv[]) {
 
     if(opt.progress)
         progress_finish();
-              
+
     return 0;
 }
 /*
