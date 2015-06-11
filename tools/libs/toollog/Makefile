@@ -27,7 +27,9 @@ build:
 	$(MAKE) libs
 
 .PHONY: libs
-libs: $(LIB)
+libs: headers.chk $(LIB)
+
+headers.chk: $(wildcard include/*.h)
 
 libxentoollog.a: $(LIB_OBJS)
 	$(AR) rc $@ $^
@@ -58,6 +60,7 @@ TAGS:
 clean:
 	rm -rf *.rpm $(LIB) *~ $(DEPS) $(LIB_OBJS) $(PIC_OBJS)
 	rm -f libxentoollog.so.$(MAJOR).$(MINOR) libxentoollog.so.$(MAJOR)
+	rm -f headers.chk
 
 .PHONY: distclean
 distclean: clean

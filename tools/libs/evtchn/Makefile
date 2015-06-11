@@ -32,8 +32,9 @@ build:
 	$(MAKE) libs
 
 .PHONY: libs
-libs: $(LIB)
+libs: headers.chk $(LIB)
 
+headers.chk: $(wildcard include/*.h)
 
 libxenevtchn.a: $(LIB_OBJS)
 	$(AR) rc $@ $^
@@ -64,6 +65,7 @@ TAGS:
 clean:
 	rm -rf *.rpm $(LIB) *~ $(DEPS) $(LIB_OBJS) $(PIC_OBJS)
 	rm -f libxenevtchn.so.$(MAJOR).$(MINOR) libxenevtchn.so.$(MAJOR)
+	rm -f headers.chk
 
 .PHONY: distclean
 distclean: clean

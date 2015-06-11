@@ -87,6 +87,8 @@ tools/config.cache
 config/Tools.mk
 config/Stubdom.mk
 config/Docs.mk
+tools/libs/toollog/headers.chk
+tools/libs/evtchn/headers.chk
 tools/blktap2/daemon/blktapctrl
 tools/blktap2/drivers/img2qcow
 tools/blktap2/drivers/lock-util
