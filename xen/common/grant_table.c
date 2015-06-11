@@ -2393,6 +2393,9 @@ __gnttab_swap_grant_ref(grant_ref_t ref_a, grant_ref_t ref_b)
 
     spin_lock(&gt->lock);
 
+    if ( gt->gt_version == 0 )
+        PIN_FAIL(out, GNTST_general_error, "grant table not yet set up\n");
+
     /* Bounds check on the grant refs */
     if ( unlikely(ref_a >= nr_grant_entries(d->grant_table)))
         PIN_FAIL(out, GNTST_bad_gntref, "Bad ref-a (%d).\n", ref_a);
