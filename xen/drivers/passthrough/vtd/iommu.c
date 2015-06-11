@@ -1054,8 +1054,7 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writel(iommu->reg, DMAR_FEDATA_REG, msg.data);
-    dmar_writel(iommu->reg, DMAR_FEADDR_REG, msg.address_lo);
-    dmar_writel(iommu->reg, DMAR_FEUADDR_REG, msg.address_hi);
+    dmar_writeq(iommu->reg, DMAR_FEADDR_REG, msg.address);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 

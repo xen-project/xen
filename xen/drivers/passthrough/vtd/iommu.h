@@ -51,17 +51,10 @@
 #define    DMAR_IRTA_REG   0xB8    /* intr remap */
 
 #define OFFSET_STRIDE        (9)
-#define dmar_readl(dmar, reg) readl(dmar + reg)
-#define dmar_writel(dmar, reg, val) writel(val, dmar + reg)
-#define dmar_readq(dmar, reg) ({ \
-        u32 lo, hi; \
-        lo = dmar_readl(dmar, reg); \
-        hi = dmar_readl(dmar, reg + 4); \
-        (((u64) hi) << 32) + lo; })
-#define dmar_writeq(dmar, reg, val) do {\
-        dmar_writel(dmar, reg, (u32)val); \
-        dmar_writel(dmar, reg + 4, (u32)((u64) val >> 32)); \
-    } while (0)
+#define dmar_readl(dmar, reg) readl((dmar) + (reg))
+#define dmar_readq(dmar, reg) readq((dmar) + (reg))
+#define dmar_writel(dmar, reg, val) writel(val, (dmar) + (reg))
+#define dmar_writeq(dmar, reg, val) writeq(val, (dmar) + (reg))
 
 #define VER_MAJOR(v)        (((v) & 0xf0) >> 4)
 #define VER_MINOR(v)        ((v) & 0x0f)
