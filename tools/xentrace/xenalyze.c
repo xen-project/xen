@@ -5435,7 +5435,7 @@ void hvm_process(struct pcpu_info *p)
             hvm_vmentry_process(ri, &p->current->hvm);
             break;
         default:
-            fprintf(warn, "Unknown hvm event: %x", ri->event);
+            fprintf(warn, "Unknown hvm event: %x\n", ri->event);
         }
     }
 }
