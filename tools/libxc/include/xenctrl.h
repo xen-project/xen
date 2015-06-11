@@ -117,8 +117,8 @@
  */
 
 typedef struct xc_interface_core xc_interface;
-typedef struct xc_interface_core xc_gnttab;
-typedef struct xc_interface_core xc_gntshr;
+typedef struct xengntdev_handle xc_gnttab;
+typedef struct xengntdev_handle xc_gntshr;
 
 enum xc_error_code {
   XC_ERROR_NONE = 0,

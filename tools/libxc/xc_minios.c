@@ -202,19 +202,22 @@ void *xc_memalign(xc_interface *xch, size_t alignment, size_t size)
     return memalign(alignment, size);
 }
 
-static xc_osdep_handle minios_gnttab_open(xc_gnttab *xcg)
+int osdep_gnttab_open(xc_gnttab *xgt)
 {
     int fd = alloc_fd(FTYPE_GNTMAP);
     if ( fd == -1 )
-        return XC_OSDEP_OPEN_ERROR;
+        return -1;
     gntmap_init(&files[fd].gntmap);
-    return (xc_osdep_handle)fd;
+    xgt->fd = fd;
+    return 0;
 }
 
-static int minios_gnttab_close(xc_gnttab *xcg, xc_osdep_handle h)
+int osdep_gnttab_close(xc_gnttab *xgt)
 {
-    int fd = (int)h;
-    return close(fd);
+    if ( xgt->fd == -1 )
+        return 0;
+
+    return close(xgt->fd);
 }
 
 void minios_gnttab_close_fd(int fd)
@@ -223,13 +226,13 @@ void minios_gnttab_close_fd(int fd)
     files[fd].type = FTYPE_NONE;
 }
 
-static void *minios_gnttab_grant_map(xc_gnttab *xcg, xc_osdep_handle h,
-                                     uint32_t count, int flags, int prot,
-                                     uint32_t *domids, uint32_t *refs,
-                                     uint32_t notify_offset,
-                                     evtchn_port_t notify_port)
+void *osdep_gnttab_grant_map(xc_gnttab *xgt,
+                             uint32_t count, int flags, int prot,
+                             uint32_t *domids, uint32_t *refs,
+                             uint32_t notify_offset,
+                             evtchn_port_t notify_port)
 {
-    int fd = (int)h;
+    int fd = xgt->fd;
     int stride = 1;
     if (flags & XC_GRANT_MAP_SINGLE_DOMAIN)
         stride = 0;
@@ -242,11 +245,9 @@ static void *minios_gnttab_grant_map(xc_gnttab *xcg, xc_osdep_handle h,
                                  refs, prot & PROT_WRITE);
 }
 
-static int minios_gnttab_munmap(xc_gnttab *xcg, xc_osdep_handle h,
-                                void *start_address,
-                                uint32_t count)
+int xc_gnttab_munmap(xc_gnttab *xgt, void *start_address, uint32_t count)
 {
-    int fd = (int)h;
+    int fd = xgt->fd;
     int ret;
     ret = gntmap_munmap(&files[fd].gntmap,
                         (unsigned long) start_address,
@@ -258,10 +259,9 @@ static int minios_gnttab_munmap(xc_gnttab *xcg, xc_osdep_handle h,
     return ret;
 }
 
-static int minios_gnttab_set_max_grants(xc_gnttab *xcg, xc_osdep_handle h,
-                             uint32_t count)
+int xc_gnttab_set_max_grants(xc_gnttab *xgt, uint32_t count)
 {
-    int fd = (int)h;
+    int fd = xgt->fd;
     int ret;
     ret = gntmap_set_max_grants(&files[fd].gntmap,
                                 count);
@@ -272,25 +272,12 @@ static int minios_gnttab_set_max_grants(xc_gnttab *xcg, xc_osdep_handle h,
     return ret;
 }
 
-static struct xc_osdep_ops minios_gnttab_ops = {
-    .open = &minios_gnttab_open,
-    .close = &minios_gnttab_close,
-
-    .u.gnttab = {
-        .grant_map = &minios_gnttab_grant_map,
-        .munmap = &minios_gnttab_munmap,
-        .set_max_grants = &minios_gnttab_set_max_grants,
-    },
-};
-
 static struct xc_osdep_ops *minios_osdep_init(xc_interface *xch, enum xc_osdep_type type)
 {
     switch ( type )
     {
     case XC_OSDEP_PRIVCMD:
         return &minios_privcmd_ops;
-    case XC_OSDEP_GNTTAB:
-        return &minios_gnttab_ops;
     default:
         return NULL;
     }

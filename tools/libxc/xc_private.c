@@ -119,8 +119,6 @@ static const char *xc_osdep_type_name(enum xc_osdep_type type)
     switch ( type )
     {
     case XC_OSDEP_PRIVCMD: return "privcmd";
-    case XC_OSDEP_GNTTAB:  return "gnttab";
-    case XC_OSDEP_GNTSHR:  return "gntshr";
     }
     return "unknown";
 }
@@ -251,30 +249,85 @@ int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
     return xch->ops->u.privcmd.hypercall(xch, xch->ops_handle, hypercall);
 }
 
-xc_gnttab *xc_gnttab_open(xentoollog_logger *logger,
-                             unsigned open_flags)
+xc_gnttab *xc_gnttab_open(xentoollog_logger *logger, unsigned open_flags)
 {
-    return xc_interface_open_common(logger, NULL, open_flags,
-                                    XC_OSDEP_GNTTAB);
+    xc_gnttab *xgt = malloc(sizeof(*xgt));
+    int rc;
+
+    if (!xgt) return NULL;
+
+    xgt->fd = -1;
+    xgt->logger = logger;
+    xgt->logger_tofree  = NULL;
+
+    if (!xgt->logger) {
+        xgt->logger = xgt->logger_tofree =
+            (xentoollog_logger*)
+            xtl_createlogger_stdiostream(stderr, XTL_PROGRESS, 0);
+        if (!xgt->logger) goto err;
+    }
+
+    rc = osdep_gnttab_open(xgt);
+    if ( rc  < 0 ) goto err;
+
+    return xgt;
+
+err:
+    osdep_gnttab_close(xgt);
+    xtl_logger_destroy(xgt->logger_tofree);
+    free(xgt);
+    return NULL;
 }
 
-int xc_gnttab_close(xc_gnttab *xcg)
+int xc_gnttab_close(xc_gnttab *xgt)
 {
-    return xc_interface_close_common(xcg);
+    int rc;
+
+    rc = osdep_gnttab_close(xgt);
+    xtl_logger_destroy(xgt->logger_tofree);
+    free(xgt);
+    return rc;
 }
 
-xc_gntshr *xc_gntshr_open(xentoollog_logger *logger,
-                             unsigned open_flags)
+xc_gntshr *xc_gntshr_open(xentoollog_logger *logger, unsigned open_flags)
 {
-    return xc_interface_open_common(logger, NULL, open_flags,
-                                    XC_OSDEP_GNTSHR);
+    xc_gntshr *xgs = malloc(sizeof(*xgs));
+    int rc;
+
+    if (!xgs) return NULL;
+
+    xgs->fd = -1;
+    xgs->logger = logger;
+    xgs->logger_tofree  = NULL;
+
+    if (!xgs->logger) {
+        xgs->logger = xgs->logger_tofree =
+            (xentoollog_logger*)
+            xtl_createlogger_stdiostream(stderr, XTL_PROGRESS, 0);
+        if (!xgs->logger) goto err;
+    }
+
+    rc = osdep_gntshr_open(xgs);
+    if ( rc  < 0 ) goto err;
+
+    return xgs;
+
+err:
+    osdep_gntshr_close(xgs);
+    xtl_logger_destroy(xgs->logger_tofree);
+    free(xgs);
+    return NULL;
 }
 
-int xc_gntshr_close(xc_gntshr *xcg)
+int xc_gntshr_close(xc_gntshr *xgs)
 {
-    return xc_interface_close_common(xcg);
-}
+    int rc;
 
+    rc = osdep_gntshr_close(xgs);
+    xtl_logger_destroy(xgs->logger_tofree);
+    free(xgs);
+    return rc;
+}
 
 static pthread_key_t errbuf_pkey;
 static pthread_once_t errbuf_pkey_once = PTHREAD_ONCE_INIT;

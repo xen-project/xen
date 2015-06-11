@@ -123,6 +123,30 @@ struct xc_interface_core {
     xc_osdep_handle  ops_handle; /* opaque data for xc_osdep_ops */
 };
 
+struct xengntdev_handle {
+    xentoollog_logger *logger, *logger_tofree;
+    int fd;
+};
+
+int osdep_gnttab_open(xc_gnttab *xgt);
+int osdep_gnttab_close(xc_gnttab *xgt);
+
+#define XC_GRANT_MAP_SINGLE_DOMAIN 0x1
+void *osdep_gnttab_grant_map(xc_gnttab *xgt,
+                             uint32_t count, int flags, int prot,
+                             uint32_t *domids, uint32_t *refs,
+                             uint32_t notify_offset,
+                             evtchn_port_t notify_port);
+
+int osdep_gntshr_open(xc_gntshr *xgs);
+int osdep_gntshr_close(xc_gntshr *xgs);
+
+void *osdep_gntshr_share_pages(xc_gntshr *xgs,
+                               uint32_t domid, int count,
+                               uint32_t *refs, int writable,
+                               uint32_t notify_offset,
+                               evtchn_port_t notify_port);
+
 void xc_report_error(xc_interface *xch, int code, const char *fmt, ...)
     __attribute__((format(printf,3,4)));
 void xc_reportv(xc_interface *xch, xentoollog_logger *lg, xentoollog_level,

@@ -41,6 +41,9 @@
 
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
+#define GTERROR(_l, _f...) xtl_log(_l, XTL_ERROR, errno, "gnttab", _f)
+#define GSERROR(_l, _f...) xtl_log(_l, XTL_ERROR, errno, "gntshr", _f)
+
 static xc_osdep_handle linux_privcmd_open(xc_interface *xch)
 {
     int flags, saved_errno;
@@ -460,26 +463,26 @@ static struct xc_osdep_ops linux_privcmd_ops = {
 
 #define DEVXEN "/dev/xen/"
 
-static xc_osdep_handle linux_gnttab_open(xc_gnttab *xcg)
+int osdep_gnttab_open(xc_gnttab *xgt)
 {
     int fd = open(DEVXEN "gntdev", O_RDWR);
-
     if ( fd == -1 )
-        return XC_OSDEP_OPEN_ERROR;
-
-    return (xc_osdep_handle)fd;
+        return -1;
+    xgt->fd = fd;
+    return 0;
 }
 
-static int linux_gnttab_close(xc_gnttab *xcg, xc_osdep_handle h)
+int osdep_gnttab_close(xc_gnttab *xgt)
 {
-    int fd = (int)h;
-    return close(fd);
+    if ( xgt->fd == -1 )
+        return 0;
+
+    return close(xgt->fd);
 }
 
-static int linux_gnttab_set_max_grants(xc_gnttab *xch, xc_osdep_handle h,
-                                       uint32_t count)
+int xc_gnttab_set_max_grants(xc_gnttab *xgt, uint32_t count)
 {
-    int fd = (int)h, rc;
+    int fd = xgt->fd, rc;
     struct ioctl_gntdev_set_max_grants max_grants = { .count = count };
 
     rc = ioctl(fd, IOCTL_GNTDEV_SET_MAX_GRANTS, &max_grants);
@@ -491,19 +494,19 @@ static int linux_gnttab_set_max_grants(xc_gnttab *xch, xc_osdep_handle h,
         if (errno == ENOTTY)
             rc = 0;
         else
-            PERROR("linux_gnttab_set_max_grants: ioctl SET_MAX_GRANTS failed");
+            GTERROR(xgt->logger, "ioctl SET_MAX_GRANTS failed");
     }
 
     return rc;
 }
 
-static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
-                                    uint32_t count, int flags, int prot,
-                                    uint32_t *domids, uint32_t *refs,
-                                    uint32_t notify_offset,
-                                    evtchn_port_t notify_port)
+void *osdep_gnttab_grant_map(xc_gnttab *xgt,
+                             uint32_t count, int flags, int prot,
+                             uint32_t *domids, uint32_t *refs,
+                             uint32_t notify_offset,
+                             evtchn_port_t notify_port)
 {
-    int fd = (int)h;
+    int fd = xgt->fd;
     struct ioctl_gntdev_map_grant_ref *map;
     unsigned int map_size = ROUNDUP((sizeof(*map) + (count - 1) *
                                     sizeof(struct ioctl_gntdev_map_grant_ref)),
@@ -524,7 +527,7 @@ static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
                    MAP_PRIVATE | MAP_ANON | MAP_POPULATE, -1, 0);
         if ( map == MAP_FAILED )
         {
-            PERROR("linux_gnttab_grant_map: mmap of map failed");
+            GTERROR(xgt->logger, "mmap of map failed");
             return NULL;
         }
     }
@@ -538,7 +541,7 @@ static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
     map->count = count;
 
     if ( ioctl(fd, IOCTL_GNTDEV_MAP_GRANT_REF, map) ) {
-        PERROR("linux_gnttab_grant_map: ioctl MAP_GRANT_REF failed");
+        GTERROR(xgt->logger, "ioctl MAP_GRANT_REF failed");
         goto out;
     }
 
@@ -577,7 +580,7 @@ static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
         if (notify.action)
             rv = ioctl(fd, IOCTL_GNTDEV_SET_UNMAP_NOTIFY, &notify);
         if (rv) {
-            PERROR("linux_gnttab_grant_map: ioctl SET_UNMAP_NOTIFY failed");
+            GTERROR(xgt->logger, "ioctl SET_UNMAP_NOTIFY failed");
             munmap(addr, count * XC_PAGE_SIZE);
             addr = MAP_FAILED;
         }
@@ -589,7 +592,7 @@ static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
         struct ioctl_gntdev_unmap_grant_ref unmap_grant;
 
         /* Unmap the driver slots used to store the grant information. */
-        PERROR("xc_gnttab_map_grant_refs: mmap failed");
+        GTERROR(xgt->logger, "mmap failed");
         unmap_grant.index = map->index;
         unmap_grant.count = count;
         ioctl(fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant);
@@ -604,12 +607,9 @@ static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
     return addr;
 }
 
-
-
-static int linux_gnttab_munmap(xc_gnttab *xcg, xc_osdep_handle h,
-                               void *start_address, uint32_t count)
+int xc_gnttab_munmap(xc_gnttab *xgt, void *start_address, uint32_t count)
 {
-    int fd = (int)h;
+    int fd = xgt->fd;
     struct ioctl_gntdev_get_offset_for_vaddr get_offset;
     struct ioctl_gntdev_unmap_grant_ref unmap_grant;
     int rc;
@@ -647,43 +647,33 @@ static int linux_gnttab_munmap(xc_gnttab *xcg, xc_osdep_handle h,
     return 0;
 }
 
-static struct xc_osdep_ops linux_gnttab_ops = {
-    .open = &linux_gnttab_open,
-    .close = &linux_gnttab_close,
-
-    .u.gnttab = {
-        .set_max_grants = linux_gnttab_set_max_grants,
-        .grant_map = &linux_gnttab_grant_map,
-        .munmap = &linux_gnttab_munmap,
-    },
-};
-
-static xc_osdep_handle linux_gntshr_open(xc_gntshr *xcg)
+int osdep_gntshr_open(xc_gntshr *xgs)
 {
     int fd = open(DEVXEN "gntalloc", O_RDWR);
-
     if ( fd == -1 )
-        return XC_OSDEP_OPEN_ERROR;
-
-    return (xc_osdep_handle)fd;
+        return -1;
+    xgs->fd = fd;
+    return 0;
 }
 
-static int linux_gntshr_close(xc_gntshr *xcg, xc_osdep_handle h)
+int osdep_gntshr_close(xc_gntshr *xgs)
 {
-    int fd = (int)h;
-    return close(fd);
+    if ( xgs->fd == -1 )
+        return 0;
+
+    return close(xgs->fd);
 }
 
-static void *linux_gntshr_share_pages(xc_gntshr *xch, xc_osdep_handle h,
-                                      uint32_t domid, int count,
-                                      uint32_t *refs, int writable,
-                                      uint32_t notify_offset,
-                                      evtchn_port_t notify_port)
+void *osdep_gntshr_share_pages(xc_gntshr *xgs,
+                               uint32_t domid, int count,
+                               uint32_t *refs, int writable,
+                               uint32_t notify_offset,
+                               evtchn_port_t notify_port)
 {
     struct ioctl_gntalloc_alloc_gref *gref_info = NULL;
     struct ioctl_gntalloc_unmap_notify notify;
     struct ioctl_gntalloc_dealloc_gref gref_drop;
-    int fd = (int)h;
+    int fd = xgs->fd;
     int err;
     void *area = NULL;
     gref_info = malloc(sizeof(*gref_info) + count * sizeof(uint32_t));
@@ -695,7 +685,7 @@ static void *linux_gntshr_share_pages(xc_gntshr *xch, xc_osdep_handle h,
 
     err = ioctl(fd, IOCTL_GNTALLOC_ALLOC_GREF, gref_info);
     if (err) {
-        PERROR("linux_gntshr_share_pages: ioctl failed");
+        GSERROR(xgs->logger, "ioctl failed");
         goto out;
     }
 
@@ -704,7 +694,7 @@ static void *linux_gntshr_share_pages(xc_gntshr *xch, xc_osdep_handle h,
 
     if (area == MAP_FAILED) {
         area = NULL;
-        PERROR("linux_gntshr_share_pages: mmap failed");
+        GSERROR(xgs->logger, "mmap failed");
         goto out_remove_fdmap;
     }
 
@@ -721,7 +711,7 @@ static void *linux_gntshr_share_pages(xc_gntshr *xch, xc_osdep_handle h,
     if (notify.action)
         err = ioctl(fd, IOCTL_GNTALLOC_SET_UNMAP_NOTIFY, &notify);
     if (err) {
-        PERROR("linux_gntshr_share_page_notify: ioctl SET_UNMAP_NOTIFY failed");
+        GSERROR(xgs->logger, "ioctl SET_UNMAP_NOTIFY failed");
 		munmap(area, count * XC_PAGE_SIZE);
 		area = NULL;
 	}
@@ -740,22 +730,11 @@ static void *linux_gntshr_share_pages(xc_gntshr *xch, xc_osdep_handle h,
     return area;
 }
 
-static int linux_gntshr_munmap(xc_gntshr *xcg, xc_osdep_handle h,
-                               void *start_address, uint32_t count)
+int xc_gntshr_munmap(xc_gntshr *xgs,
+                     void *start_address, uint32_t count)
 {
     return munmap(start_address, count * XC_PAGE_SIZE);
 }
-
-static struct xc_osdep_ops linux_gntshr_ops = {
-    .open = &linux_gntshr_open,
-    .close = &linux_gntshr_close,
-
-    .u.gntshr = {
-        .share_pages = &linux_gntshr_share_pages,
-        .munmap = &linux_gntshr_munmap,
-    },
-};
-
 
 static struct xc_osdep_ops *linux_osdep_init(xc_interface *xch, enum xc_osdep_type type)
 {
@@ -763,10 +742,6 @@ static struct xc_osdep_ops *linux_osdep_init(xc_interface *xch, enum xc_osdep_ty
     {
     case XC_OSDEP_PRIVCMD:
         return &linux_privcmd_ops;
-    case XC_OSDEP_GNTTAB:
-        return &linux_gnttab_ops;
-    case XC_OSDEP_GNTSHR:
-        return &linux_gntshr_ops;
     default:
         return NULL;
     }
