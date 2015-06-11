@@ -128,6 +128,8 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
         return 0;
     }
 
+    size = elf->bsd_symtab_pend - elf->bsd_symtab_pstart;
+
     if ( load )
     {
         char *hdr_ptr;
@@ -135,11 +137,10 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
 
         if ( !dom->bsd_symtab_start )
             return 0;
-        size = dom->kernel_seg.vend - dom->bsd_symtab_start;
         hdr_ptr = xc_dom_vaddr_to_ptr(dom, dom->bsd_symtab_start, &allow_size);
         if ( hdr_ptr == NULL )
         {
-            DOMPRINTF("%s/load: xc_dom_vaddr_to_ptr(dom,dom->bsd_symtab_start"
+            DOMPRINTF("%s: xc_dom_vaddr_to_ptr(dom,dom->bsd_symtab_start"
                       " => NULL", __FUNCTION__);
             return -1;
         }
@@ -152,8 +153,6 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
     {
         char *hdr_ptr;
 
-        size = sizeof(unsigned) + elf_size(elf, elf->ehdr) +
-            elf_shdr_count(elf) * elf_size(elf, shdr);
         hdr_ptr = xc_dom_malloc(dom, size);
         if ( hdr_ptr == NULL )
             return 0;
@@ -161,6 +160,8 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
         elf->caller_xdest_size = size;
         hdr = ELF_REALPTR2PTRVAL(hdr_ptr);
         dom->bsd_symtab_start = elf_round_up(elf, dom->kernel_seg.vend);
+        dom->kernel_seg.vend = elf_round_up(elf, dom->bsd_symtab_start + size);
+        return 0;
     }
 
     elf_memcpy_safe(elf, hdr + sizeof(unsigned),
@@ -189,9 +190,8 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
     }
     if ( elf->caller_xdest_size < sizeof(unsigned) )
     {
-        DOMPRINTF("%s/%s: header size %"PRIx64" too small",
-                  __FUNCTION__, load ? "load" : "parse",
-                  (uint64_t)elf->caller_xdest_size);
+        DOMPRINTF("%s: header size %"PRIx64" too small",
+                  __FUNCTION__, (uint64_t)elf->caller_xdest_size);
         return -1;
     }
     if ( elf_init(&syms, elf->caller_xdest_base + sizeof(unsigned),
@@ -219,10 +219,9 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
     maxaddr = elf_round_up(&syms, symtab + elf_size(&syms, syms.ehdr) +
                            elf_shdr_count(&syms) * elf_size(&syms, shdr));
 
-    DOMPRINTF("%s/%s: bsd_symtab_start=%" PRIx64 ", kernel.end=0x%" PRIx64
+    DOMPRINTF("%s: bsd_symtab_start=%" PRIx64 ", kernel.end=0x%" PRIx64
               " -- symtab=0x%" PRIx64 ", maxaddr=0x%" PRIx64 "",
-              __FUNCTION__, load ? "load" : "parse",
-              dom->bsd_symtab_start, dom->kernel_seg.vend,
+              __FUNCTION__, dom->bsd_symtab_start, dom->kernel_seg.vend,
               symtab, maxaddr);
 
     count = elf_shdr_count(&syms);
@@ -279,13 +278,10 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
                       type == SHT_SYMTAB ? "symtab" : "strtab",
                       size, maxaddr);
 
-            if ( load )
-            {
-                shdr2 = elf_shdr_by_index(elf, h);
-                elf_memcpy_safe(elf, elf_section_start(&syms, shdr),
-                       elf_section_start(elf, shdr2),
-                       size);
-            }
+            shdr2 = elf_shdr_by_index(elf, h);
+            elf_memcpy_safe(elf, elf_section_start(&syms, shdr),
+                   elf_section_start(elf, shdr2),
+                   size);
         }
 
         /* Name is NULL. */
@@ -308,8 +304,7 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
         dom->bsd_symtab_start = 0;
         return 0;
     }
-    if ( !load )
-        dom->kernel_seg.vend = maxaddr;
+
     return 0;
 }
 
