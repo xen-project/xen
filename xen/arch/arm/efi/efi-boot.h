@@ -132,9 +132,10 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
 
     for ( Index = 0; Index < (mmap_size / desc_size); Index++ )
     {
-        if ( desc_ptr->Type == EfiConventionalMemory
-             || desc_ptr->Type == EfiBootServicesCode
-             || desc_ptr->Type == EfiBootServicesData )
+        if ( desc_ptr->Type == EfiConventionalMemory ||
+             (!map_bs &&
+              (desc_ptr->Type == EfiBootServicesCode ||
+               desc_ptr->Type == EfiBootServicesData)) )
         {
             if ( i >= NR_MEM_BANKS )
             {
