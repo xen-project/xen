@@ -3740,7 +3740,7 @@ void hvm_mmio_assist_postprocess(struct hvm_data *h)
         static int warned = 0;
         if (!warned)
         {
-            fprintf(stderr, "%s: Strange, MMIO with unexpected exit reason %d\n",
+            fprintf(warn, "%s: Strange, MMIO with unexpected exit reason %d\n",
                     __func__, h->exit_reason);
             warned=1;
         }
