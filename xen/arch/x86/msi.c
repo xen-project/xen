@@ -198,8 +198,7 @@ static void read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
         void __iomem *base;
         base = entry->mask_base;
 
-        msg->address_lo = readl(base + PCI_MSIX_ENTRY_LOWER_ADDR_OFFSET);
-        msg->address_hi = readl(base + PCI_MSIX_ENTRY_UPPER_ADDR_OFFSET);
+        msg->address = readq(base + PCI_MSIX_ENTRY_ADDRESS_OFFSET);
         msg->data = readl(base + PCI_MSIX_ENTRY_DATA_OFFSET);
         break;
     }
@@ -260,10 +259,7 @@ static int write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
         void __iomem *base;
         base = entry->mask_base;
 
-        writel(msg->address_lo,
-               base + PCI_MSIX_ENTRY_LOWER_ADDR_OFFSET);
-        writel(msg->address_hi,
-               base + PCI_MSIX_ENTRY_UPPER_ADDR_OFFSET);
+        writeq(msg->address, base + PCI_MSIX_ENTRY_ADDRESS_OFFSET);
         writel(msg->data, base + PCI_MSIX_ENTRY_DATA_OFFSET);
         break;
     }
