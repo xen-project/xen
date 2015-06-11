@@ -50,37 +50,8 @@ void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
     return res;
 }
 
-void *xc_map_foreign_range(xc_interface *xch, uint32_t dom,
-                           int size, int prot, unsigned long mfn)
-{
-    return xch->ops->u.privcmd.map_foreign_range(xch, xch->ops_handle,
-                                                 dom, size, prot, mfn);
-}
-
-void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
-                            size_t size, int prot, size_t chunksize,
-                            privcmd_mmap_entry_t entries[], int nentries)
-{
-    return xch->ops->u.privcmd.map_foreign_ranges(xch, xch->ops_handle,
-                                                  dom, size, prot, chunksize, entries, nentries);
-}
-
-void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
-                           xen_pfn_t *arr, int num)
-{
-    return xch->ops->u.privcmd.map_foreign_batch(xch, xch->ops_handle,
-                                                 dom, prot, arr, num);
-}
-
-void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
-                          const xen_pfn_t *arr, int *err, unsigned int num)
-{
-    return xch->ops->u.privcmd.map_foreign_bulk(xch, xch->ops_handle,
-                                                dom, prot, arr, err, num);
-}
-
 /* stub for all not yet converted OSes */
-void *xc_map_foreign_bulk_compat(xc_interface *xch, xc_osdep_handle h,
+void *xc_map_foreign_bulk_compat(xc_interface *xch,
                                  uint32_t dom, int prot,
                                  const xen_pfn_t *arr, int *err, unsigned int num)
 {

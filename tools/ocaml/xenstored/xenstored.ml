@@ -176,7 +176,7 @@ let from_channel store cons doms chan =
 			if domid > 0 then
 				Domains.create xc doms domid mfn port
 			else
-				Domains.create0 false doms
+				Domains.create0 doms
 			in
 		Connections.add_domain cons ndom;
 		in
@@ -278,8 +278,7 @@ let _ =
 			Store.mkdir store (Perms.Connection.create 0) localpath;
 
 		if cf.domain_init then (
-			let usingxiu = Xenctrl.is_fake () in
-			Connections.add_domain cons (Domains.create0 usingxiu domains);
+			Connections.add_domain cons (Domains.create0 domains);
 			Event.bind_dom_exc_virq eventchn
 		);
 	);

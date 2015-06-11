@@ -65,11 +65,9 @@ let create xc doms domid mfn port =
 	Domain.bind_interdomain dom;
 	dom
 
-let create0 fake doms =
+let create0 doms =
 	let port, interface =
-		if fake then (
-			0, Xenctrl.with_intf (fun xc -> Xenctrl.map_foreign_range xc 0 (Xenmmap.getpagesize()) 0n)
-		) else (
+		(
 			let port = Utils.read_file_single_integer Define.xenstored_proc_port
 			and fd = Unix.openfile Define.xenstored_proc_kva
 					       [ Unix.O_RDWR ] 0o600 in

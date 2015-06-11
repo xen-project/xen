@@ -39,19 +39,20 @@ void minios_interface_close_fd(int fd);
 
 extern void minios_interface_close_fd(int fd);
 
-static xc_osdep_handle minios_privcmd_open(xc_interface *xch)
+int osdep_privcmd_open(xc_interface *xch)
 {
     int fd = alloc_fd(FTYPE_XC);
 
     if ( fd == -1)
-        return XC_OSDEP_OPEN_ERROR;
+        return -1;
 
-    return (xc_osdep_handle)fd;
+    xch->privcmdfd = fd;
+    return 0;
 }
 
-static int minios_privcmd_close(xc_interface *xch, xc_osdep_handle h)
+int osdep_privcmd_close(xc_interface *xch)
 {
-    int fd = (int)h;
+    int fd = xch->privcmdfd;
     return close(fd);
 }
 
@@ -60,17 +61,17 @@ void minios_interface_close_fd(int fd)
     files[fd].type = FTYPE_NONE;
 }
 
-static void *minios_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, int npages)
+void *osdep_alloc_hypercall_buffer(xc_interface *xch, int npages)
 {
     return xc_memalign(xch, PAGE_SIZE, npages * PAGE_SIZE);
 }
 
-static void minios_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
+void osdep_free_hypercall_buffer(xc_interface *xch, void *ptr, int npages)
 {
     free(ptr);
 }
 
-static int minios_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
+int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
 {
     multicall_entry_t call;
     int i, ret;
@@ -92,21 +93,21 @@ static int minios_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcm
     return call.result;
 }
 
-static void *minios_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h,
-                                             uint32_t dom, int prot,
-                                             const xen_pfn_t *arr, int *err, unsigned int num)
+void *xc_map_foreign_bulk(xc_interface *xch,
+                          uint32_t dom, int prot,
+                          const xen_pfn_t *arr, int *err, unsigned int num)
 {
     unsigned long pt_prot = 0;
     if (prot & PROT_READ)
 	pt_prot = L1_PROT_RO;
     if (prot & PROT_WRITE)
 	pt_prot = L1_PROT;
-    return map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);    
+    return map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);
 }
 
-static void *minios_privcmd_map_foreign_batch(xc_interface *xch,  xc_osdep_handle h,
-                                              uint32_t dom, int prot,
-                                              xen_pfn_t *arr, int num)
+void *xc_map_foreign_batch(xc_interface *xch,
+                           uint32_t dom, int prot,
+                           xen_pfn_t *arr, int num)
 {
     unsigned long pt_prot = 0;
     int err[num];
@@ -126,10 +127,10 @@ static void *minios_privcmd_map_foreign_batch(xc_interface *xch,  xc_osdep_handl
     return (void *) addr;
 }
 
-static void *minios_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle h,
-                                              uint32_t dom,
-                                              int size, int prot,
-                                              unsigned long mfn)
+void *xc_map_foreign_range(xc_interface *xch,
+                           uint32_t dom,
+                           int size, int prot,
+                           unsigned long mfn)
 {
     unsigned long pt_prot = 0;
 
@@ -142,10 +143,10 @@ static void *minios_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle
     return map_frames_ex(&mfn, size / getpagesize(), 0, 1, 1, dom, NULL, pt_prot);
 }
 
-static void *minios_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handle h,
-                                               uint32_t dom,
-                                               size_t size, int prot, size_t chunksize,
-                                               privcmd_mmap_entry_t entries[], int nentries)
+void *xc_map_foreign_ranges(xc_interface *xch,
+                            uint32_t dom,
+                            size_t size, int prot, size_t chunksize,
+                            privcmd_mmap_entry_t entries[], int nentries)
 {
     unsigned long *mfns;
     int i, j, n;
@@ -169,24 +170,6 @@ static void *minios_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handl
     return ret;
 }
 
-
-static struct xc_osdep_ops minios_privcmd_ops = {
-    .open = &minios_privcmd_open,
-    .close = &minios_privcmd_close,
-
-    .u.privcmd = {
-        .alloc_hypercall_buffer = &minios_privcmd_alloc_hypercall_buffer,
-        .free_hypercall_buffer = &minios_privcmd_free_hypercall_buffer,
-
-        .hypercall = &minios_privcmd_hypercall,
-
-        .map_foreign_batch = &minios_privcmd_map_foreign_batch,
-        .map_foreign_bulk = &minios_privcmd_map_foreign_bulk,
-        .map_foreign_range = &minios_privcmd_map_foreign_range,
-        .map_foreign_ranges = &minios_privcmd_map_foreign_ranges,
-    },
-};
-
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush)
 {
@@ -198,23 +181,6 @@ void *xc_memalign(xc_interface *xch, size_t alignment, size_t size)
 {
     return memalign(alignment, size);
 }
-
-static struct xc_osdep_ops *minios_osdep_init(xc_interface *xch, enum xc_osdep_type type)
-{
-    switch ( type )
-    {
-    case XC_OSDEP_PRIVCMD:
-        return &minios_privcmd_ops;
-    default:
-        return NULL;
-    }
-}
-
-xc_osdep_info_t xc_osdep_info = {
-    .name = "Minios Native OS interface",
-    .init = &minios_osdep_init,
-    .fake = 0,
-};
 
 /*
  * Local variables:

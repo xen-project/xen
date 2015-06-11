@@ -24,7 +24,7 @@
 #include <fcntl.h>
 #include <malloc.h>
 
-static xc_osdep_handle solaris_privcmd_open(xc_interface *xch)
+int osdep_privcmd_open(xc_interface *xch)
 {
     int flags, saved_errno;
     int fd = open("/dev/xen/privcmd", O_RDWR);
@@ -32,7 +32,7 @@ static xc_osdep_handle solaris_privcmd_open(xc_interface *xch)
     if ( fd == -1 )
     {
         PERROR("Could not obtain handle on privileged command interface");
-        return XC_OSDEP_OPEN_ERROR;
+        return -1;
     }
 
     /* Although we return the file handle as the 'xc handle' the API
@@ -51,42 +51,43 @@ static xc_osdep_handle solaris_privcmd_open(xc_interface *xch)
         goto error;
     }
 
-    return (xc_osdep_handle)fd;
+    xch->privcmdfd = fd;
+    return 0;
 
  error:
     saved_errno = errno;
     close(fd);
     errno = saved_errno;
-    return XC_OSDEP_OPEN_ERROR;
+    return -1;
 }
 
-static int solaris_privcmd_close(xc_interface *xch, xc_osdep_handle h)
+int osdep_privcmd_close(xc_interface *xch)
 {
-    int fd = (int)h;
+    int fd = xch->privcmdfd;
     return close(fd);
 }
 
-static void *solaris_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, int npages)
+void *osdep_alloc_hypercall_buffer(xc_interface *xch, int npages)
 {
     return xc_memalign(xch, XC_PAGE_SIZE, npages * XC_PAGE_SIZE);
 }
 
-static void solaris_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
+static void osdep_free_hypercall_buffer(xc_interface *xch, void *ptr, int npages)
 {
     free(ptr);
 }
 
-static int solaris_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
+int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
 {
-    int fd = (int)h;
+    int fd = xch->privcmdfd;
     return ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
 }
 
-static void *solaris_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handle h,
-                                               uint32_t dom, int prot,
-                                               xen_pfn_t *arr, int num)
+void *xc_map_foreign_batch(xc_interface *xch,
+                          uint32_t dom, int prot,
+                          xen_pfn_t *arr, int num)
 {
-    int fd = (int)h;
+    int fd = xch->privcmdfd;
     privcmd_mmapbatch_t ioctlx;
     void *addr;
     addr = mmap(NULL, num*XC_PAGE_SIZE, prot, MAP_SHARED, fd, 0);
@@ -109,12 +110,19 @@ static void *solaris_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handl
 
 }
 
-static void *xc_map_foreign_range(xc_interface *xch, xc_osdep_handle h,
-                                  uint32_t dom,
-                                  int size, int prot,
-                                  unsigned long mfn)
+void *xc_map_foreign_bulk(xc_interface *xch,
+                          uint32_t dom, int prot,
+                          const xen_pfn_t *arr, int *err, unsigned int num)
 {
-    int fd = (int)fd;
+    return xc_map_foreign_bulk_compat(xch, dom, prot, arr, err, num);
+}
+
+void *xc_map_foreign_range(xc_interface *xch,
+                           uint32_t dom,
+                           int size, int prot,
+                           unsigned long mfn)
+{
+    int fd = xch->privcmdfd;
     privcmd_mmap_t ioctlx;
     privcmd_mmap_entry_t entry;
     void *addr;
@@ -138,12 +146,12 @@ static void *xc_map_foreign_range(xc_interface *xch, xc_osdep_handle h,
     return addr;
 }
 
-static void *solaric_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handle h,
-                                                uint32_t dom,
-                                                size_t size, int prot, size_t chunksize,
-                                                privcmd_mmap_entry_t entries[], int nentries)
+void *xc_map_foreign_ranges(xc_interface *xch,
+                            uint32_t dom,
+                            size_t size, int prot, size_t chunksize,
+                            privcmd_mmap_entry_t entries[], int nentries)
 {
-    int fd = (int)fd;
+    int fd = xch->privcmdfd;
     privcmd_mmap_t ioctlx;
     int i, rc;
     void *addr;
@@ -176,23 +184,6 @@ mmap_failed:
     return NULL;
 }
 
-static struct xc_osdep_ops solaris_privcmd_ops = {
-    .open = &solaris_privcmd_open,
-    .close = &solaris_privcmd_close,
-
-    .u.privcmd = {
-        .alloc_hypercall_buffer = &solaris_privcmd_alloc_hypercall_buffer,
-        .free_hypercall_buffer = &solaris_privcmd_free_hypercall_buffer,
-
-        .hypercall = &solaris_privcmd_hypercall;
-
-        .map_foreign_batch = &solaris_privcmd_map_foreign_batch,
-        .map_foreign_bulk = &xc_map_foreign_bulk_compat,
-        .map_foreign_range = &solaris_privcmd_map_foreign_range,
-        .map_foreign_ranges = &solaris_privcmd_map_foreign_ranges,
-    },
-};
-
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush) 
 {
@@ -203,23 +194,6 @@ void *xc_memalign(xc_interface *xch, size_t alignment, size_t size)
 {
     return memalign(alignment, size);
 }
-
-static struct xc_osdep_ops *solaris_osdep_init(xc_interface *xch, enum xc_osdep_type type)
-{
-    switch ( type )
-    {
-    case XC_OSDEP_PRIVCMD:
-        return &solaris_privcmd_ops;
-    default:
-        return NULL;
-    }
-}
-
-xc_osdep_info_t xc_osdep_info = {
-    .name = "Solaris Native OS interface",
-    .init = &solaris_osdep_init,
-    .fake = 0,
-};
 
 /*
  * Local variables:

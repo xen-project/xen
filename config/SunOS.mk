@@ -27,7 +27,6 @@ SunOS_LIBDIR_x86_64 = /usr/sfw/lib/amd64
 SOCKET_LIBS = -lsocket
 PTHREAD_LIBS = -lpthread
 UTIL_LIBS =
-DLOPEN_LIBS = -ldl
 
 SONAME_LDFLAG = -h
 SHLIB_LDFLAGS = -R $(SunOS_LIBDIR) -shared

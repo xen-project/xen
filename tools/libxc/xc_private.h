@@ -30,7 +30,6 @@
 
 #include "_paths.h"
 #include "xenctrl.h"
-#include "xenctrlosdep.h"
 
 #include <xen/sys/privcmd.h>
 
@@ -88,7 +87,6 @@ struct iovec {
 #define MAX_PAGECACHE_USAGE (4*1024)
 
 struct xc_interface_core {
-    enum xc_osdep_type type;
     int flags;
     xentoollog_logger *error_handler,   *error_handler_tofree;
     xentoollog_logger *dombuild_logger, *dombuild_logger_tofree;
@@ -117,11 +115,20 @@ struct xc_interface_core {
     int hypercall_buffer_cache_misses;
     int hypercall_buffer_cache_toobig;
 
-    /* Low lovel OS interface */
-    xc_osdep_info_t  osdep;
-    xc_osdep_ops    *ops; /* backend operations */
-    xc_osdep_handle  ops_handle; /* opaque data for xc_osdep_ops */
+    /* Privcmd interface */
+    int privcmdfd;
 };
+
+int osdep_privcmd_open(xc_interface *xch);
+int osdep_privcmd_close(xc_interface *xch);
+
+void *osdep_alloc_hypercall_buffer(xc_interface *xch, int npages);
+void osdep_free_hypercall_buffer(xc_interface *xch, void *ptr, int npages);
+
+/* Stub for not yet converted OSes */
+void *xc_map_foreign_bulk_compat(xc_interface *xch,
+                                 uint32_t dom, int prot,
+                                 const xen_pfn_t *arr, int *err, unsigned int num);
 
 void xc_report_error(xc_interface *xch, int code, const char *fmt, ...)
     __attribute__((format(printf,3,4)));

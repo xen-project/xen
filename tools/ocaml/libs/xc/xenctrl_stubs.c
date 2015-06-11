@@ -126,13 +126,6 @@ CAMLprim value stub_xc_interface_open(void)
 }
 
 
-CAMLprim value stub_xc_interface_is_fake(void)
-{
-	CAMLparam0();
-	int is_fake = xc_interface_is_fake();
-	CAMLreturn(Val_int(is_fake));
-}
-
 CAMLprim value stub_xc_interface_close(value xch)
 {
 	CAMLparam1(xch);

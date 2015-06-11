@@ -72,7 +72,6 @@ external sizeof_vcpu_guest_context : unit -> int
   = "stub_sizeof_vcpu_guest_context"
 external sizeof_xen_pfn : unit -> int = "stub_sizeof_xen_pfn"
 external interface_open : unit -> handle = "stub_xc_interface_open"
-external is_fake : unit -> bool = "stub_xc_interface_is_fake"
 external interface_close : handle -> unit = "stub_xc_interface_close"
 val with_intf : (handle -> 'a) -> 'a
 val domain_create : handle -> int32 -> domain_create_flag list -> string -> domid

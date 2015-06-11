@@ -33,13 +33,12 @@
 #include <xen/memory.h>
 
 #include "xenctrl.h"
-#include "xenctrlosdep.h"
 
 #include "xc_private.h"
 
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
-static xc_osdep_handle linux_privcmd_open(xc_interface *xch)
+int osdep_privcmd_open(xc_interface *xch)
 {
     int flags, saved_errno;
     int fd = open("/dev/xen/privcmd", O_RDWR); /* prefer this newer interface */
@@ -53,7 +52,7 @@ static xc_osdep_handle linux_privcmd_open(xc_interface *xch)
     if ( fd == -1 )
     {
         PERROR("Could not obtain handle on privileged command interface");
-        return XC_OSDEP_OPEN_ERROR;
+        return -1;
     }
 
     /* Although we return the file handle as the 'xc handle' the API
@@ -74,22 +73,25 @@ static xc_osdep_handle linux_privcmd_open(xc_interface *xch)
         goto error;
     }
 
-    return (xc_osdep_handle)fd;
+    xch->privcmdfd = fd;
+    return 0;
 
  error:
     saved_errno = errno;
     close(fd);
     errno = saved_errno;
-    return XC_OSDEP_OPEN_ERROR;
+    return -1;
 }
 
-static int linux_privcmd_close(xc_interface *xch, xc_osdep_handle h)
+int osdep_privcmd_close(xc_interface *xch)
 {
-    int fd = (int)h;
+    int fd = xch->privcmdfd;
+    if (fd == -1)
+        return 0;
     return close(fd);
 }
 
-static void *linux_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, int npages)
+void *osdep_alloc_hypercall_buffer(xc_interface *xch, int npages)
 {
     size_t size = npages * XC_PAGE_SIZE;
     void *p;
@@ -121,7 +123,7 @@ out:
     return NULL;
 }
 
-static void linux_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
+void osdep_free_hypercall_buffer(xc_interface *xch, void *ptr, int npages)
 {
     int saved_errno = errno;
     /* Recover the VMA flags. Maybe it's not necessary */
@@ -132,9 +134,9 @@ static void linux_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_hand
     errno = saved_errno;
 }
 
-static int linux_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
+int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
 {
-    int fd = (int)h;
+    int fd = xch->privcmdfd;
     return ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
 }
 
@@ -160,11 +162,11 @@ static int xc_map_foreign_batch_single(int fd, uint32_t dom,
     return rc;
 }
 
-static void *linux_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handle h,
-                                             uint32_t dom, int prot,
-                                             xen_pfn_t *arr, int num)
+void *xc_map_foreign_batch(xc_interface *xch,
+                           uint32_t dom, int prot,
+                           xen_pfn_t *arr, int num)
 {
-    int fd = (int)h;
+    int fd = xch->privcmdfd;
     privcmd_mmapbatch_t ioctlx;
     void *addr;
     int rc;
@@ -266,11 +268,11 @@ out:
     return rc;
 }
 
-static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h,
-                                            uint32_t dom, int prot,
-                                            const xen_pfn_t *arr, int *err, unsigned int num)
+void *xc_map_foreign_bulk(xc_interface *xch,
+                          uint32_t dom, int prot,
+                          const xen_pfn_t *arr, int *err, unsigned int num)
 {
-    int fd = (int)h;
+    int fd = xch->privcmdfd;
     privcmd_mmapbatch_v2_t ioctlx;
     void *addr;
     unsigned int i;
@@ -390,9 +392,9 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
     return addr;
 }
 
-static void *linux_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle h,
-                                             uint32_t dom, int size, int prot,
-                                             unsigned long mfn)
+void *xc_map_foreign_range(xc_interface *xch,
+                           uint32_t dom, int size, int prot,
+                           unsigned long mfn)
 {
     xen_pfn_t *arr;
     int num;
@@ -412,10 +414,10 @@ static void *linux_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle 
     return ret;
 }
 
-static void *linux_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handle h,
-                                              uint32_t dom, size_t size, int prot,
-                                              size_t chunksize, privcmd_mmap_entry_t entries[],
-                                              int nentries)
+void *xc_map_foreign_ranges(xc_interface *xch,
+                            uint32_t dom, size_t size, int prot,
+                            size_t chunksize, privcmd_mmap_entry_t entries[],
+                            int nentries)
 {
     xen_pfn_t *arr;
     int num_per_entry;
@@ -438,40 +440,6 @@ static void *linux_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handle
     free(arr);
     return ret;
 }
-
-static struct xc_osdep_ops linux_privcmd_ops = {
-    .open = &linux_privcmd_open,
-    .close = &linux_privcmd_close,
-
-    .u.privcmd = {
-        .alloc_hypercall_buffer = &linux_privcmd_alloc_hypercall_buffer,
-        .free_hypercall_buffer = &linux_privcmd_free_hypercall_buffer,
-
-        .hypercall = &linux_privcmd_hypercall,
-
-        .map_foreign_batch = &linux_privcmd_map_foreign_batch,
-        .map_foreign_bulk = &linux_privcmd_map_foreign_bulk,
-        .map_foreign_range = &linux_privcmd_map_foreign_range,
-        .map_foreign_ranges = &linux_privcmd_map_foreign_ranges,
-    },
-};
-
-static struct xc_osdep_ops *linux_osdep_init(xc_interface *xch, enum xc_osdep_type type)
-{
-    switch ( type )
-    {
-    case XC_OSDEP_PRIVCMD:
-        return &linux_privcmd_ops;
-    default:
-        return NULL;
-    }
-}
-
-xc_osdep_info_t xc_osdep_info = {
-    .name = "Linux Native OS interface",
-    .init = &linux_osdep_init,
-    .fake = 0,
-};
 
 /*
  * Local variables:

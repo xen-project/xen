@@ -26,111 +26,12 @@
 #include <pthread.h>
 #include <assert.h>
 
-#ifndef __MINIOS__
-#include <dlfcn.h>
-#endif
-
-#define XENCTRL_OSDEP "XENCTRL_OSDEP"
-
-#if !defined (__MINIOS__) && !defined(__RUMPUSER_XEN__) && !defined(__RUMPRUN__)
-#define DO_DYNAMIC_OSDEP
-#endif
-
-/*
- * Returns a (shallow) copy of the xc_osdep_info_t for the
- * active OS interface.
- *
- * On success a handle to the relevant library is opened.  The user
- * must subsequently call xc_osdep_put_info() when it is
- * finished with the library.
- *
- * Logs IFF xch != NULL.
- *
- * Returns:
- *  0 - on success
- * -1 - on error
- */
-static int xc_osdep_get_info(xc_interface *xch, xc_osdep_info_t *info)
-{
-    int rc = -1;
-#ifdef DO_DYNAMIC_OSDEP
-    const char *lib = getenv(XENCTRL_OSDEP);
-    xc_osdep_info_t *pinfo;
-    void *dl_handle = NULL;
-
-    if ( lib != NULL )
-    {
-        if ( getuid() != geteuid() )
-        {
-            if ( xch ) ERROR("cannot use %s=%s with setuid application", XENCTRL_OSDEP, lib);
-            abort();
-        }
-        if ( getgid() != getegid() )
-        {
-            if ( xch ) ERROR("cannot use %s=%s with setgid application", XENCTRL_OSDEP, lib);
-            abort();
-        }
-
-        dl_handle = dlopen(lib, RTLD_LAZY|RTLD_LOCAL);
-        if ( !dl_handle )
-        {
-            if ( xch ) ERROR("unable to open osdep library %s: %s", lib, dlerror());
-            goto out;
-        }
-
-        pinfo = dlsym(dl_handle, "xc_osdep_info");
-        if ( !pinfo )
-        {
-            if ( xch ) ERROR("unable to find xc_osinteface_info in %s: %s", lib, dlerror());
-            goto out;
-        }
-
-        *info = *pinfo;
-        info->dl_handle = dl_handle;
-    }
-    else
-#endif /*DO_DYNAMIC_OSDEP*/
-    {
-        *info = xc_osdep_info;
-        info->dl_handle = NULL;
-    }
-
-    rc = 0;
-
-#ifdef DO_DYNAMIC_OSDEP
-out:
-    if ( dl_handle && rc == -1 )
-        dlclose(dl_handle);
-#endif /*DO_DYNAMIC_OSDEP*/
-
-    return rc;
-}
-
-static void xc_osdep_put(xc_osdep_info_t *info)
-{
-#ifdef DO_DYNAMIC_OSDEP
-    if ( info->dl_handle )
-        dlclose(info->dl_handle);
-#endif /*DO_DYNAMIC_OSDEP*/
-}
-
-static const char *xc_osdep_type_name(enum xc_osdep_type type)
-{
-    switch ( type )
-    {
-    case XC_OSDEP_PRIVCMD: return "privcmd";
-    }
-    return "unknown";
-}
-
-static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *logger,
-                                                          xentoollog_logger *dombuild_logger,
-                                                          unsigned open_flags,
-                                                          enum xc_osdep_type type)
+struct xc_interface_core *xc_interface_open(xentoollog_logger *logger,
+                                            xentoollog_logger *dombuild_logger,
+                                            unsigned open_flags)
 {
     struct xc_interface_core xch_buf, *xch = &xch_buf;
 
-    xch->type = type;
     xch->flags = open_flags;
     xch->dombuild_logger_file = 0;
     xc_clear_last_error(xch);
@@ -147,9 +48,6 @@ static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *log
     xch->hypercall_buffer_cache_hits = 0;
     xch->hypercall_buffer_cache_misses = 0;
     xch->hypercall_buffer_cache_toobig = 0;
-
-    xch->ops_handle = XC_OSDEP_OPEN_ERROR;
-    xch->ops = NULL;
 
     if (!xch->error_handler) {
         xch->error_handler = xch->error_handler_tofree =
@@ -168,40 +66,26 @@ static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *log
     *xch = xch_buf;
 
     if (!(open_flags & XC_OPENFLAG_DUMMY)) {
-        if ( xc_osdep_get_info(xch, &xch->osdep) < 0 )
+        if ( osdep_privcmd_open(xch) < 0 )
             goto err;
-
-        xch->ops = xch->osdep.init(xch, type);
-        if ( xch->ops == NULL )
-        {
-            DPRINTF("OSDEP: interface %d (%s) not supported on this platform",
-                  type, xc_osdep_type_name(type));
-            goto err_put_iface;
-        }
-
-        xch->ops_handle = xch->ops->open(xch);
-        if (xch->ops_handle == XC_OSDEP_OPEN_ERROR)
-            goto err_put_iface;
     }
 
     return xch;
 
-err_put_iface:
-    xc_osdep_put(&xch->osdep);
  err:
     xtl_logger_destroy(xch->error_handler_tofree);
     if (xch != &xch_buf) free(xch);
     return NULL;
 }
 
-static int xc_interface_close_common(xc_interface *xch)
+int xc_interface_close(xc_interface *xch)
 {
     int rc = 0;
 
     if (!xch)
-	return 0;
+        return 0;
 
-    rc = xch->ops->close(xch, xch->ops_handle);
+    rc = osdep_privcmd_close(xch);
     if (rc) PERROR("Could not close hypervisor interface");
 
     xc__hypercall_buffer_cache_release(xch);
@@ -211,42 +95,6 @@ static int xc_interface_close_common(xc_interface *xch)
 
     free(xch);
     return rc;
-}
-
-int xc_interface_is_fake(void)
-{
-    xc_osdep_info_t info;
-
-    if ( xc_osdep_get_info(NULL, &info) < 0 )
-        return -1;
-
-    /* Have a copy of info so can release the interface now. */
-    xc_osdep_put(&info);
-
-    return info.fake;
-}
-
-xc_interface *xc_interface_open(xentoollog_logger *logger,
-                                xentoollog_logger *dombuild_logger,
-                                unsigned open_flags)
-{
-    xc_interface *xch;
-
-    xch = xc_interface_open_common(logger, dombuild_logger, open_flags,
-                                   XC_OSDEP_PRIVCMD);
-
-    return xch;
-}
-
-int xc_interface_close(xc_interface *xch)
-{
-    return xc_interface_close_common(xch);
-}
-
-
-int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
-{
-    return xch->ops->u.privcmd.hypercall(xch, xch->ops_handle, hypercall);
 }
 
 static pthread_key_t errbuf_pkey;
@@ -332,14 +180,6 @@ void xc_report_error(xc_interface *xch, int code, const char *fmt, ...)
     va_list args;
     va_start(args, fmt);
     xc_reportv(xch, xch->error_handler, XTL_ERROR, code, fmt, args);
-    va_end(args);
-}
-
-void xc_osdep_log(xc_interface *xch, xentoollog_level level, int code, const char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    xc_reportv(xch, xch->error_handler, level, code, fmt, args);
     va_end(args);
 }
 

@@ -122,7 +122,7 @@ void xc__hypercall_buffer_cache_release(xc_interface *xch)
     while ( xch->hypercall_buffer_cache_nr > 0 )
     {
         p = xch->hypercall_buffer_cache[--xch->hypercall_buffer_cache_nr];
-        xch->ops->u.privcmd.free_hypercall_buffer(xch, xch->ops_handle, p, 1);
+        osdep_free_hypercall_buffer(xch, p, 1);
     }
 
     hypercall_buffer_cache_unlock(xch);
@@ -133,7 +133,7 @@ void *xc__hypercall_buffer_alloc_pages(xc_interface *xch, xc_hypercall_buffer_t 
     void *p = hypercall_buffer_cache_alloc(xch, nr_pages);
 
     if ( !p )
-        p = xch->ops->u.privcmd.alloc_hypercall_buffer(xch, xch->ops_handle, nr_pages);
+        p = osdep_alloc_hypercall_buffer(xch, nr_pages);
 
     if (!p)
         return NULL;
@@ -151,7 +151,7 @@ void xc__hypercall_buffer_free_pages(xc_interface *xch, xc_hypercall_buffer_t *b
         return;
 
     if ( !hypercall_buffer_cache_free(xch, b->hbuf, nr_pages) )
-        xch->ops->u.privcmd.free_hypercall_buffer(xch, xch->ops_handle, b->hbuf, nr_pages);
+        osdep_free_hypercall_buffer(xch, b->hbuf, nr_pages);
 }
 
 struct allocation_header {

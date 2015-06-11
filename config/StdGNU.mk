@@ -31,7 +31,6 @@ DEBUG_DIR ?= /usr/lib/debug
 
 SOCKET_LIBS =
 UTIL_LIBS = -lutil
-DLOPEN_LIBS = -ldl
 
 SONAME_LDFLAG = -soname
 SHLIB_LDFLAGS = -shared
