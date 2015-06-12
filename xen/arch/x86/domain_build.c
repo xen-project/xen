@@ -930,6 +930,8 @@ int __init construct_dom0(
     BUG_ON(d->vcpu[0] == NULL);
     BUG_ON(v->is_initialised);
 
+    process_pending_softirqs();
+
     printk("*** LOADING DOMAIN 0 ***\n");
 
     d->max_pages = ~0U;
@@ -1166,6 +1168,8 @@ int __init construct_dom0(
            _p(vstack_start), _p(vstack_end),
            _p(v_start), _p(v_end));
     printk(" ENTRY ADDRESS: %p\n", _p(parms.virt_entry));
+
+    process_pending_softirqs();
 
     mpt_alloc = (vpt_start - v_start) + pfn_to_paddr(alloc_spfn);
     if ( vinitrd_start )

@@ -18,11 +18,9 @@
 
 #ifdef __XEN__
 
-#include <xen/config.h>
-#include <xen/types.h>
-#include <xen/string.h>
 #include <xen/lib.h>
 #include <xen/libelf.h>
+#include <xen/softirq.h>
 #include <asm/byteorder.h>
 #include <public/elfnote.h>
 
