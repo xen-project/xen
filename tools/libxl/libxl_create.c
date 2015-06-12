@@ -1525,7 +1525,7 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     cdcs->dcs.guest_config = d_config;
     libxl_domain_config_init(&cdcs->dcs.guest_config_saved);
     libxl_domain_config_copy(ctx, &cdcs->dcs.guest_config_saved, d_config);
-    cdcs->dcs.restore_fd = restore_fd;
+    cdcs->dcs.restore_fd = cdcs->dcs.libxc_fd = restore_fd;
     if (restore_fd > -1)
         cdcs->dcs.restore_params = *params;
     cdcs->dcs.callback = domain_create_cb;

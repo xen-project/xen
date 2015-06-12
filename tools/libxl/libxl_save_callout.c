@@ -48,7 +48,7 @@ void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
 
     /* Convenience aliases */
     const uint32_t domid = dcs->guest_domid;
-    const int restore_fd = dcs->restore_fd;
+    const int restore_fd = dcs->libxc_fd;
     libxl__domain_build_state *const state = &dcs->build_state;
 
     unsigned cbflags = libxl__srm_callout_enumcallbacks_restore

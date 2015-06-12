@@ -3216,7 +3216,7 @@ struct libxl__domain_create_state {
     libxl__ao *ao;
     libxl_domain_config *guest_config;
     libxl_domain_config guest_config_saved; /* vanilla config */
-    int restore_fd;
+    int restore_fd, libxc_fd;
     libxl_domain_restore_params restore_params;
     libxl__domain_create_cb *callback;
     libxl_asyncprogress_how aop_console_how;
