@@ -495,7 +495,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
 
 #ifdef CONFIG_COMPAT
-        if ( !is_pv_32on64_vcpu(v) )
+        if ( !is_pv_32on64_domain(d) )
             ret = copy_from_guest(c.nat, op->u.vcpucontext.ctxt, 1);
         else
             ret = copy_from_guest(c.cmp,
@@ -901,7 +901,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         vcpu_unpause(v);
 
 #ifdef CONFIG_COMPAT
-        if ( !is_pv_32on64_vcpu(v) )
+        if ( !is_pv_32on64_domain(d) )
             ret = copy_to_guest(op->u.vcpucontext.ctxt, c.nat, 1);
         else
             ret = copy_to_guest(guest_handle_cast(op->u.vcpucontext.ctxt,
