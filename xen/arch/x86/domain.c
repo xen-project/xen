@@ -481,7 +481,7 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.pv_vcpu.ctrlreg[4] = real_cr4_to_pv_guest_cr4(mmu_cr4_features);
 
-    rc = is_pv_32on64_vcpu(v) ? setup_compat_l4(v) : 0;
+    rc = is_pv_32on64_domain(d) ? setup_compat_l4(v) : 0;
  done:
     if ( rc )
     {
@@ -722,7 +722,7 @@ int arch_set_info_guest(
 #define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))
     flags = c(flags);
 
-    if ( is_pv_vcpu(v) )
+    if ( is_pv_domain(d) )
     {
         if ( !compat )
         {
@@ -763,7 +763,7 @@ int arch_set_info_guest(
              (c(ldt_ents) > 8192) )
             return -EINVAL;
     }
-    else if ( is_pvh_vcpu(v) )
+    else if ( is_pvh_domain(d) )
     {
         /* PVH 32bitfixme */
         ASSERT(!compat);
@@ -781,7 +781,7 @@ int arch_set_info_guest(
     v->fpu_initialised = !!(flags & VGCF_I387_VALID);
 
     v->arch.flags &= ~TF_kernel_mode;
-    if ( (flags & VGCF_in_kernel) || has_hvm_container_vcpu(v)/*???*/ )
+    if ( (flags & VGCF_in_kernel) || has_hvm_container_domain(d)/*???*/ )
         v->arch.flags |= TF_kernel_mode;
 
     v->arch.vgc_flags = flags;
@@ -796,7 +796,7 @@ int arch_set_info_guest(
     if ( !compat )
     {
         memcpy(&v->arch.user_regs, &c.nat->user_regs, sizeof(c.nat->user_regs));
-        if ( is_pv_vcpu(v) )
+        if ( is_pv_domain(d) )
             memcpy(v->arch.pv_vcpu.trap_ctxt, c.nat->trap_ctxt,
                    sizeof(c.nat->trap_ctxt));
     }
@@ -808,14 +808,14 @@ int arch_set_info_guest(
                            c.cmp->trap_ctxt + i);
     }
 
-    if ( has_hvm_container_vcpu(v) )
+    if ( has_hvm_container_domain(d) )
     {
         for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
             v->arch.debugreg[i] = c(debugreg[i]);
 
         hvm_set_info_guest(v);
 
-        if ( is_hvm_vcpu(v) || v->is_initialised )
+        if ( is_hvm_domain(d) || v->is_initialised )
             goto out;
 
         /* NB: No need to use PV cr3 un-pickling macros */

@@ -1150,10 +1150,11 @@ CHECK_FIELD_(struct, vcpu_guest_context, fpu_ctxt);
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
     unsigned int i;
-    bool_t compat = is_pv_32on64_domain(v->domain);
+    const struct domain *d = v->domain;
+    bool_t compat = is_pv_32on64_domain(d);
 #define c(fld) (!compat ? (c.nat->fld) : (c.cmp->fld))
 
-    if ( !is_pv_vcpu(v) )
+    if ( !is_pv_domain(d) )
         memset(c.nat, 0, sizeof(*c.nat));
     memcpy(&c.nat->fpu_ctxt, v->arch.fpu_ctxt, sizeof(c.nat->fpu_ctxt));
     c(flags = v->arch.vgc_flags & ~(VGCF_i387_valid|VGCF_in_kernel));
@@ -1164,7 +1165,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     if ( !compat )
     {
         memcpy(&c.nat->user_regs, &v->arch.user_regs, sizeof(c.nat->user_regs));
-        if ( is_pv_vcpu(v) )
+        if ( is_pv_domain(d) )
             memcpy(c.nat->trap_ctxt, v->arch.pv_vcpu.trap_ctxt,
                    sizeof(c.nat->trap_ctxt));
     }
@@ -1179,7 +1180,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
         c(debugreg[i] = v->arch.debugreg[i]);
 
-    if ( has_hvm_container_vcpu(v) )
+    if ( has_hvm_container_domain(d) )
     {
         struct segment_register sreg;
 
@@ -1245,7 +1246,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         BUG_ON((c(user_regs.eflags) & X86_EFLAGS_IOPL) != 0);
         c(user_regs.eflags |= v->arch.pv_vcpu.iopl << 12);
 
-        if ( !is_pv_32on64_domain(v->domain) )
+        if ( !compat )
         {
             c.nat->ctrlreg[3] = xen_pfn_to_cr3(
                 pagetable_get_pfn(v->arch.guest_table));
@@ -1274,7 +1275,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             c(flags |= VGCF_in_kernel);
     }
 
-    c(vm_assist = v->domain->vm_assist);
+    c(vm_assist = d->vm_assist);
 #undef c
 }
 

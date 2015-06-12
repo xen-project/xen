@@ -749,16 +749,16 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
 int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
                uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
 {
-    struct domain *d = current->domain;
+    struct domain *currd = current->domain;
     /* Optionally shift out of the way of Viridian architectural leaves. */
-    uint32_t base = is_viridian_domain(d) ? 0x40000100 : 0x40000000;
+    uint32_t base = is_viridian_domain(currd) ? 0x40000100 : 0x40000000;
     uint32_t limit, dummy;
 
     idx -= base;
     if ( idx > XEN_CPUID_MAX_NUM_LEAVES )
         return 0; /* Avoid unnecessary pass through domain_cpuid() */
 
-    domain_cpuid(d, base, 0, &limit, &dummy, &dummy, &dummy);
+    domain_cpuid(currd, base, 0, &limit, &dummy, &dummy, &dummy);
     if ( limit == 0 )
         /* Default number of leaves */
         limit = XEN_CPUID_MAX_NUM_LEAVES;
@@ -794,11 +794,11 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
     case 2:
         *eax = 1;          /* Number of hypercall-transfer pages */
         *ebx = 0x40000000; /* MSR base address */
-        if ( is_viridian_domain(d) )
+        if ( is_viridian_domain(currd) )
             *ebx = 0x40000200;
         *ecx = 0;          /* Features 1 */
         *edx = 0;          /* Features 2 */
-        if ( is_pv_vcpu(current) )
+        if ( is_pv_domain(currd) )
             *ecx |= XEN_CPUID_FEAT1_MMU_PT_UPDATE_PRESERVE_AD;
         break;
 
@@ -822,18 +822,19 @@ void pv_cpuid(struct cpu_user_regs *regs)
 {
     uint32_t a, b, c, d;
     struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
 
     a = regs->eax;
     b = regs->ebx;
     c = regs->ecx;
     d = regs->edx;
 
-    if ( !is_control_domain(curr->domain) && !is_hardware_domain(curr->domain) )
+    if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
     {
         unsigned int cpuid_leaf = a, sub_leaf = c;
 
         if ( !cpuid_hypervisor_leaves(a, c, &a, &b, &c, &d) )
-            domain_cpuid(curr->domain, a, c, &a, &b, &c, &d);
+            domain_cpuid(currd, a, c, &a, &b, &c, &d);
 
         switch ( cpuid_leaf )
         {
@@ -849,7 +850,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
                 {
                     if ( !(curr->arch.xcr0 & (1ULL << sub_leaf)) )
                         continue;
-                    domain_cpuid(curr->domain, cpuid_leaf, sub_leaf,
+                    domain_cpuid(currd, cpuid_leaf, sub_leaf,
                                  &_eax, &_ebx, &_ecx, &_edx);
                     if ( (_eax + _ebx) > b )
                         b = _eax + _ebx;
@@ -869,7 +870,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         if ( !cpu_has_apic )
             __clear_bit(X86_FEATURE_APIC, &d);
 
-        if ( !is_pvh_vcpu(curr) )
+        if ( !is_pvh_domain(currd) )
         {
             __clear_bit(X86_FEATURE_PSE, &d);
             __clear_bit(X86_FEATURE_PGE, &d);
@@ -887,7 +888,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_DS, &d);
         __clear_bit(X86_FEATURE_ACC, &d);
         __clear_bit(X86_FEATURE_PBE, &d);
-        if ( is_pvh_vcpu(curr) )
+        if ( is_pvh_domain(currd) )
             __clear_bit(X86_FEATURE_MTRR, &d);
 
         __clear_bit(X86_FEATURE_DTES64 % 32, &c);
@@ -896,7 +897,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_VMXE % 32, &c);
         __clear_bit(X86_FEATURE_SMXE % 32, &c);
         __clear_bit(X86_FEATURE_TM2 % 32, &c);
-        if ( is_pv_32bit_vcpu(curr) )
+        if ( is_pv_32bit_domain(currd) )
             __clear_bit(X86_FEATURE_CX16 % 32, &c);
         __clear_bit(X86_FEATURE_XTPR % 32, &c);
         __clear_bit(X86_FEATURE_PDCM % 32, &c);
@@ -945,12 +946,12 @@ void pv_cpuid(struct cpu_user_regs *regs)
 
     case 0x80000001:
         /* Modify Feature Information. */
-        if ( is_pv_32bit_vcpu(curr) )
+        if ( is_pv_32bit_domain(currd) )
         {
             __clear_bit(X86_FEATURE_LM % 32, &d);
             __clear_bit(X86_FEATURE_LAHF_LM % 32, &c);
         }
-        if ( is_pv_32on64_vcpu(curr) &&
+        if ( is_pv_32on64_domain(currd) &&
              boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
             __clear_bit(X86_FEATURE_SYSCALL % 32, &d);
         __clear_bit(X86_FEATURE_PAGE1GB % 32, &d);
