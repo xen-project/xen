@@ -3217,11 +3217,11 @@ struct libxl__domain_create_state {
     libxl_domain_config *guest_config;
     libxl_domain_config guest_config_saved; /* vanilla config */
     int restore_fd;
+    libxl_domain_restore_params restore_params;
     libxl__domain_create_cb *callback;
     libxl_asyncprogress_how aop_console_how;
     /* private to domain_create */
     int guest_domid;
-    int checkpointed_stream;
     libxl__domain_build_state build_state;
     libxl__bootloader_state bl;
     libxl__stub_dm_spawn_state dmss;
