@@ -438,7 +438,7 @@ static elf_errorstatus elf_xen_addr_calc_check(struct elf_binary *elf,
 
     if ( parms->bsd_symtab )
     {
-        elf_parse_bsdsyms(elf, parms->virt_kend);
+        elf_parse_bsdsyms(elf, elf->pend);
         if ( elf->bsd_symtab_pend )
             parms->virt_kend = elf->bsd_symtab_pend + parms->virt_offset;
     }
