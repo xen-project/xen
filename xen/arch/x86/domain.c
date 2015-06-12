@@ -1429,9 +1429,9 @@ static void _update_runstate_area(struct vcpu *v)
         v->arch.pv_vcpu.need_update_runstate_area = 1;
 }
 
-static inline int need_full_gdt(struct vcpu *v)
+static inline bool_t need_full_gdt(const struct domain *d)
 {
-    return (is_pv_vcpu(v) && !is_idle_vcpu(v));
+    return is_pv_domain(d) && !is_idle_domain(d);
 }
 
 static void __context_switch(void)
@@ -1440,13 +1440,14 @@ static void __context_switch(void)
     unsigned int          cpu = smp_processor_id();
     struct vcpu          *p = per_cpu(curr_vcpu, cpu);
     struct vcpu          *n = current;
+    struct domain        *pd = p->domain, *nd = n->domain;
     struct desc_struct   *gdt;
     struct desc_ptr       gdt_desc;
 
     ASSERT(p != n);
     ASSERT(cpumask_empty(n->vcpu_dirty_cpumask));
 
-    if ( !is_idle_vcpu(p) )
+    if ( !is_idle_domain(pd) )
     {
         memcpy(&p->arch.user_regs, stack_regs, CTXT_SWITCH_STACK_BYTES);
         vcpu_save_fpu(p);
@@ -1458,11 +1459,11 @@ static void __context_switch(void)
      * ctxt_switch_to(). This avoids a race on things like EPT flushing,
      * which is synchronised on that function.
      */
-    if ( p->domain != n->domain )
-        cpumask_set_cpu(cpu, n->domain->domain_dirty_cpumask);
+    if ( pd != nd )
+        cpumask_set_cpu(cpu, nd->domain_dirty_cpumask);
     cpumask_set_cpu(cpu, n->vcpu_dirty_cpumask);
 
-    if ( !is_idle_vcpu(n) )
+    if ( !is_idle_domain(nd) )
     {
         memcpy(stack_regs, &n->arch.user_regs, CTXT_SWITCH_STACK_BYTES);
         if ( cpu_has_xsave )
@@ -1476,14 +1477,14 @@ static void __context_switch(void)
         n->arch.ctxt_switch_to(n);
     }
 
-    psr_ctxt_switch_to(n->domain);
+    psr_ctxt_switch_to(nd);
 
-    gdt = !is_pv_32on64_vcpu(n) ? per_cpu(gdt_table, cpu) :
-                                  per_cpu(compat_gdt_table, cpu);
-    if ( need_full_gdt(n) )
+    gdt = !is_pv_32on64_domain(nd) ? per_cpu(gdt_table, cpu) :
+                                     per_cpu(compat_gdt_table, cpu);
+    if ( need_full_gdt(nd) )
     {
         unsigned long mfn = virt_to_mfn(gdt);
-        l1_pgentry_t *pl1e = gdt_ldt_ptes(n->domain, n);
+        l1_pgentry_t *pl1e = gdt_ldt_ptes(nd, n);
         unsigned int i;
 
         for ( i = 0; i < NR_RESERVED_GDT_PAGES; i++ )
@@ -1491,8 +1492,8 @@ static void __context_switch(void)
                       l1e_from_pfn(mfn + i, __PAGE_HYPERVISOR));
     }
 
-    if ( need_full_gdt(p) &&
-         ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(n)) )
+    if ( need_full_gdt(pd) &&
+         ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(nd)) )
     {
         gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
         gdt_desc.base  = (unsigned long)(gdt - FIRST_RESERVED_GDT_ENTRY);
@@ -1501,16 +1502,16 @@ static void __context_switch(void)
 
     write_ptbase(n);
 
-    if ( need_full_gdt(n) &&
-         ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(p)) )
+    if ( need_full_gdt(nd) &&
+         ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(pd)) )
     {
         gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
         gdt_desc.base = GDT_VIRT_START(n);
         asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
     }
 
-    if ( p->domain != n->domain )
-        cpumask_clear_cpu(cpu, p->domain->domain_dirty_cpumask);
+    if ( pd != nd )
+        cpumask_clear_cpu(cpu, pd->domain_dirty_cpumask);
     cpumask_clear_cpu(cpu, p->vcpu_dirty_cpumask);
 
     per_cpu(curr_vcpu, cpu) = n;
@@ -1520,6 +1521,7 @@ static void __context_switch(void)
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
+    const struct domain *prevd = prev->domain, *nextd = next->domain;
     cpumask_t dirty_mask;
 
     ASSERT(local_irq_is_enabled());
@@ -1537,7 +1539,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     if ( prev != next )
         _update_runstate_area(prev);
 
-    if ( is_hvm_vcpu(prev) )
+    if ( is_hvm_domain(prevd) )
     {
         if (prev != next)
             vpmu_save(prev);
@@ -1551,7 +1553,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     set_current(next);
 
     if ( (per_cpu(curr_vcpu, cpu) == next) ||
-         (is_idle_vcpu(next) && cpu_online(cpu)) )
+         (is_idle_domain(nextd) && cpu_online(cpu)) )
     {
         local_irq_enable();
     }
@@ -1559,10 +1561,10 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     {
         __context_switch();
 
-        if ( is_pv_vcpu(next) &&
-             (is_idle_vcpu(prev) ||
-              has_hvm_container_vcpu(prev) ||
-              is_pv_32on64_vcpu(prev) != is_pv_32on64_vcpu(next)) )
+        if ( is_pv_domain(nextd) &&
+             (is_idle_domain(prevd) ||
+              has_hvm_container_domain(prevd) ||
+              is_pv_32on64_domain(prevd) != is_pv_32on64_domain(nextd)) )
         {
             uint64_t efer = read_efer();
             if ( !(efer & EFER_SCE) )
@@ -1572,18 +1574,18 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         /* Re-enable interrupts before restoring state which may fault. */
         local_irq_enable();
 
-        if ( is_pv_vcpu(next) )
+        if ( is_pv_domain(nextd) )
         {
             load_LDT(next);
             load_segments(next);
         }
 
-        set_cpuid_faulting(is_pv_vcpu(next) &&
-                           !is_control_domain(next->domain) &&
-                           !is_hardware_domain(next->domain));
+        set_cpuid_faulting(is_pv_domain(nextd) &&
+                           !is_control_domain(nextd) &&
+                           !is_hardware_domain(nextd));
     }
 
-    if (is_hvm_vcpu(next) && (prev != next) )
+    if (is_hvm_domain(nextd) && (prev != next) )
         /* Must be done with interrupts enabled */
         vpmu_load(next);
 
