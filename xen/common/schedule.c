@@ -1303,9 +1303,10 @@ static int cpu_schedule_up(unsigned int cpu)
 static void cpu_schedule_down(unsigned int cpu)
 {
     struct schedule_data *sd = &per_cpu(schedule_data, cpu);
+    struct scheduler *sched = per_cpu(scheduler, cpu);
 
     if ( sd->sched_priv != NULL )
-        SCHED_OP(&ops, free_pdata, sd->sched_priv, cpu);
+        SCHED_OP(sched, free_pdata, sd->sched_priv, cpu);
 
     kill_timer(&sd->s_timer);
 }
