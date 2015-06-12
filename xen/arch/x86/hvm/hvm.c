@@ -445,7 +445,7 @@ void hvm_do_resume(struct vcpu *v)
 
     check_wakeup_from_wait();
 
-    if ( is_hvm_vcpu(v) )
+    if ( is_hvm_domain(d) )
         pt_restore_timer(v);
 
     list_for_each_entry ( s,
@@ -2312,7 +2312,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     v->arch.hvm_vcpu.inject_trap.vector = -1;
 
-    if ( is_pvh_vcpu(v) )
+    if ( is_pvh_domain(d) )
     {
         v->arch.hvm_vcpu.hcall_64bit = 1;    /* PVH 32bitfixme. */
         /* This is for hvm_long_mode_enabled(v). */
@@ -2364,9 +2364,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
-    struct domain *d = v->domain;
-
-    hvm_all_ioreq_servers_remove_vcpu(d, v);
+    hvm_all_ioreq_servers_remove_vcpu(v->domain, v);
 
     nestedhvm_vcpu_destroy(v);
 
@@ -4921,6 +4919,7 @@ extern const uint8_t hypercall_args_table[], compat_hypercall_args_table[];
 int hvm_do_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
     struct segment_register sreg;
     int mode = hvm_guest_x86_mode(curr);
     uint32_t eax = regs->eax;
@@ -4941,12 +4940,12 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         break;
     }
 
-    if ( (eax & 0x80000000) && is_viridian_domain(curr->domain) )
+    if ( (eax & 0x80000000) && is_viridian_domain(currd) )
         return viridian_hypercall(regs);
 
     if ( (eax >= NR_hypercalls) ||
-         (is_pvh_vcpu(curr) ? !pvh_hypercall64_table[eax]
-                            : !hvm_hypercall32_table[eax]) )
+         (is_pvh_domain(currd) ? !pvh_hypercall64_table[eax]
+                               : !hvm_hypercall32_table[eax]) )
     {
         regs->eax = -ENOSYS;
         return HVM_HCALL_completed;
@@ -4980,7 +4979,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 #endif
 
         curr->arch.hvm_vcpu.hcall_64bit = 1;
-        regs->rax = (is_pvh_vcpu(curr)
+        regs->rax = (is_pvh_domain(currd)
                      ? pvh_hypercall64_table
                      : hvm_hypercall64_table)[eax](rdi, rsi, rdx, r10, r8, r9);
         curr->arch.hvm_vcpu.hcall_64bit = 0;
@@ -5001,7 +5000,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         }
 #endif
     }
-    else if ( unlikely(is_pvh_vcpu(curr)) )
+    else if ( unlikely(is_pvh_domain(currd)) )
         regs->_eax = -ENOSYS; /* PVH 32bitfixme. */
     else
     {
@@ -5053,8 +5052,8 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     if ( curr->arch.hvm_vcpu.hcall_preempted )
         return HVM_HCALL_preempted;
 
-    if ( unlikely(curr->domain->arch.hvm_domain.qemu_mapcache_invalidate) &&
-         test_and_clear_bool(curr->domain->arch.hvm_domain.
+    if ( unlikely(currd->arch.hvm_domain.qemu_mapcache_invalidate) &&
+         test_and_clear_bool(currd->arch.hvm_domain.
                              qemu_mapcache_invalidate) )
         return HVM_HCALL_invalidate;
 
