@@ -807,6 +807,23 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
  */
 #define LIBXL_HAVE_SOCKET_BITMAP_ALLOC 1
 
+/*
+ * LIBXL_HAVE_SRM_V2
+ *
+ * If this is defined, then the libxl_domain_create_restore() interface takes
+ * a "stream_version" parameter and supports a value of 2.
+ */
+#define LIBXL_HAVE_SRM_V2 1
+
+/*
+ * LIBXL_HAVE_SRM_V1
+ *
+ * In the case that LIBXL_HAVE_SRM_V2 is set, LIBXL_HAVE_SRM_V1
+ * indicates that libxl_domain_create_restore() can handle a "stream_version"
+ * parameter of 1, and convert the stream format automatically.
+ */
+#define LIBXL_HAVE_SRM_V1 1
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);

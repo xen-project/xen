@@ -3265,6 +3265,7 @@ struct libxl__stream_read_state {
     /* Private */
     int rc;
     bool running;
+    libxl__save_helper_state shs;
     libxl__conversion_helper_state chs;
 
     /* Main stream-reading data. */
@@ -3312,7 +3313,7 @@ struct libxl__domain_create_state {
     libxl__stub_dm_spawn_state dmss;
         /* If we're not doing stubdom, we use only dmss.dm,
          * for the non-stubdom device model. */
-    libxl__save_helper_state shs;
+    libxl__stream_read_state srs;
     /* necessary if the domain creation failed and we have to destroy it */
     libxl__domain_destroy_state dds;
     libxl__multidev multidev;

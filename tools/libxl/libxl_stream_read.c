@@ -159,6 +159,7 @@ void libxl__stream_read_init(libxl__stream_read_state *stream)
 {
     stream->rc = 0;
     stream->running = false;
+    libxl__save_helper_init(&stream->shs);
     libxl__conversion_helper_init(&stream->chs);
     FILLZERO(stream->dc);
     FILLZERO(stream->hdr);
@@ -445,9 +446,13 @@ static bool process_record(libxl__egc *egc,
         stream_complete(egc, stream, 0);
         break;
 
+    case REC_TYPE_LIBXC_CONTEXT:
+        libxl__xc_domain_restore(egc, dcs, &stream->shs, 0, 0, 0);
+        break;
+
     case REC_TYPE_XENSTORE_DATA:
         rc = libxl__toolstack_restore(dcs->guest_domid, rec->body,
-                                      rec->hdr.length, &dcs->shs);
+                                      rec->hdr.length, &stream->shs);
         if (rc)
             goto err;
 
@@ -592,6 +597,32 @@ static void stream_done(libxl__egc *egc,
     check_all_finished(egc, stream, stream->rc);
 }
 
+void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
+                                   int rc, int retval, int errnoval)
+{
+    libxl__domain_create_state *dcs = dcs_void;
+    libxl__stream_read_state *stream = &dcs->srs;
+    STATE_AO_GC(dcs->ao);
+
+    if (rc)
+        goto err;
+
+    if (retval) {
+        LOGEV(ERROR, errnoval, "restoring domain");
+        rc = ERROR_FAIL;
+        goto err;
+    }
+
+    /*
+     * Libxc has indicated that it is done with the stream.  Resume reading
+     * libxl records from it.
+     */
+    stream_continue(egc, stream);
+
+ err:
+    check_all_finished(egc, stream, rc);
+}
+
 static void conversion_done(libxl__egc *egc,
                             libxl__conversion_helper_state *chs, int rc)
 {
@@ -610,11 +641,13 @@ static void check_all_finished(libxl__egc *egc,
         stream->rc = rc;
 
         libxl__stream_read_abort(egc, stream, rc);
+        libxl__save_helper_abort(egc, &stream->shs);
         libxl__conversion_helper_abort(egc, &stream->chs, rc);
     }
 
     /* Don't fire the callback until all our parallel tasks have stopped. */
     if (libxl__stream_read_inuse(stream) ||
+        libxl__save_helper_inuse(&stream->shs) ||
         libxl__conversion_helper_inuse(&stream->chs))
         return;
 

@@ -313,7 +313,7 @@ int main(int argc, char **argv)
         startup("restore");
         setup_signals(SIG_DFL);
 
-        r = xc_domain_restore(xch, io_fd, dom, store_evtchn, &store_mfn,
+        r = xc_domain_restore2(xch, io_fd, dom, store_evtchn, &store_mfn,
                               store_domid, console_evtchn, &console_mfn,
                               console_domid, hvm, pae, superpages,
                               checkpointed,

@@ -64,8 +64,8 @@ GUEST_SRCS-$(CONFIG_X86) += xc_sr_save_x86_hvm.c
 GUEST_SRCS-y += xc_sr_restore.c
 GUEST_SRCS-y += xc_sr_save.c
 GUEST_SRCS-y += xc_offline_page.c xc_compression.c
-$(patsubst %.c,%.o,$(GUEST_SRCS-y)): CFLAGS += -DXG_LIBXL_HVM_COMPAT
-$(patsubst %.c,%.opic,$(GUEST_SRCS-y)): CFLAGS += -DXG_LIBXL_HVM_COMPAT
+xc_sr_save_x86_hvm.o: CFLAGS += -DXG_LIBXL_HVM_COMPAT
+xc_sr_save_x86_hvm.opic: CFLAGS += -DXG_LIBXL_HVM_COMPAT
 else
 GUEST_SRCS-y += xc_nomigrate.c
 endif

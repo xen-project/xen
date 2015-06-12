@@ -110,7 +110,9 @@ static const char migrate_report[]=
 
 #define XL_MANDATORY_FLAG_JSON (1U << 0) /* config data is in JSON format */
 #define XL_MANDATORY_FLAG_STREAMv2 (1U << 1) /* stream is v2 */
-#define XL_MANDATORY_FLAG_ALL  (XL_MANDATORY_FLAG_JSON)
+#define XL_MANDATORY_FLAG_ALL  (XL_MANDATORY_FLAG_JSON |        \
+                                XL_MANDATORY_FLAG_STREAMv2)
+
 struct save_file_header {
     char magic[32]; /* savefileheader_magic */
     /* All uint32_ts are in domain's byte order. */
@@ -2757,6 +2759,9 @@ start:
         libxl_domain_restore_params_init(&params);
 
         params.checkpointed_stream = dom_info->checkpointed_stream;
+        params.stream_version =
+            (hdr.mandatory_flags & XL_MANDATORY_FLAG_STREAMv2) ? 2 : 1;
+
         ret = libxl_domain_create_restore(ctx, &d_config,
                                           &domid, restore_fd,
                                           &params,

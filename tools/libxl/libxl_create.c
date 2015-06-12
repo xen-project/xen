@@ -704,6 +704,10 @@ static void domcreate_attach_dtdev(libxl__egc *egc,
 static void domcreate_console_available(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
 
+static void domcreate_stream_done(libxl__egc *egc,
+                                  libxl__stream_read_state *srs,
+                                  int ret);
+
 static void domcreate_rebuild_done(libxl__egc *egc,
                                    libxl__domain_create_state *dcs,
                                    int ret);
@@ -933,11 +937,8 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     /* convenience aliases */
     const uint32_t domid = dcs->guest_domid;
     libxl_domain_config *const d_config = dcs->guest_config;
-    libxl_domain_build_info *const info = &d_config->b_info;
     const int restore_fd = dcs->restore_fd;
     libxl__domain_build_state *const state = &dcs->build_state;
-    libxl__srm_restore_autogen_callbacks *const callbacks =
-        &dcs->shs.callbacks.restore.a;
 
     if (rc) {
         domcreate_rebuild_done(egc, dcs, rc);
@@ -970,30 +971,17 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     if (rc)
         goto out;
 
-    /* read signature */
-    int hvm, pae, superpages;
-    switch (info->type) {
-    case LIBXL_DOMAIN_TYPE_HVM:
-        hvm = 1;
-        superpages = 1;
-        pae = libxl_defbool_val(info->u.hvm.pae);
-        callbacks->toolstack_restore = libxl__toolstack_restore;
-        break;
-    case LIBXL_DOMAIN_TYPE_PV:
-        hvm = 0;
-        superpages = 0;
-        pae = 1;
-        break;
-    default:
-        rc = ERROR_INVAL;
-        goto out;
-    }
-    libxl__xc_domain_restore(egc, dcs, &dcs->shs,
-                             hvm, pae, superpages);
+    dcs->srs.ao = ao;
+    dcs->srs.dcs = dcs;
+    dcs->srs.fd = restore_fd;
+    dcs->srs.legacy = (dcs->restore_params.stream_version == 1);
+    dcs->srs.completion_callback = domcreate_stream_done;
+
+    libxl__stream_read_start(egc, &dcs->srs);
     return;
 
  out:
-    libxl__xc_domain_restore_done(egc, dcs, rc, 0, 0);
+    domcreate_stream_done(egc, &dcs->srs, rc);
 }
 
 void libxl__srm_callout_callback_restore_results(unsigned long store_mfn,
@@ -1009,10 +997,11 @@ void libxl__srm_callout_callback_restore_results(unsigned long store_mfn,
     shs->need_results =           0;
 }
 
-void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
-                                   int ret, int retval, int errnoval)
+static void domcreate_stream_done(libxl__egc *egc,
+                                  libxl__stream_read_state *srs,
+                                  int ret)
 {
-    libxl__domain_create_state *dcs = dcs_void;
+    libxl__domain_create_state *dcs = srs->dcs;
     STATE_AO_GC(dcs->ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char **vments = NULL, **localents = NULL;
@@ -1028,12 +1017,6 @@ void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
 
     if (ret)
         goto out;
-
-    if (retval) {
-        LOGEV(ERROR, errnoval, "restoring domain");
-        ret = ERROR_FAIL;
-        goto out;
-    }
 
     gettimeofday(&start_time, NULL);
 
