@@ -19,6 +19,8 @@
 
 #include "libxl_osdeps.h" /* must come before any other headers */
 
+#include "libxl_sr_stream_format.h"
+
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -3210,6 +3212,57 @@ typedef struct libxl__domain_create_state libxl__domain_create_state;
 typedef void libxl__domain_create_cb(libxl__egc *egc,
                                      libxl__domain_create_state*,
                                      int rc, uint32_t domid);
+
+/* State for manipulating a libxl migration v2 stream */
+typedef struct libxl__stream_read_state libxl__stream_read_state;
+
+typedef struct libxl__sr_record_buf {
+    /* private to stream read helper */
+    LIBXL_STAILQ_ENTRY(struct libxl__sr_record_buf) entry;
+    libxl__sr_rec_hdr hdr;
+    void *body; /* iff hdr.length != 0 */
+} libxl__sr_record_buf;
+
+struct libxl__stream_read_state {
+    /* filled by the user */
+    libxl__ao *ao;
+    libxl__domain_create_state *dcs;
+    int fd;
+    void (*completion_callback)(libxl__egc *egc,
+                                libxl__stream_read_state *srs,
+                                int rc);
+    /* Private */
+    int rc;
+    bool running;
+
+    /* Main stream-reading data. */
+    libxl__datacopier_state dc; /* Only used when reading a record */
+    libxl__sr_hdr hdr;
+    LIBXL_STAILQ_HEAD(, libxl__sr_record_buf) record_queue; /* NOGC */
+    enum {
+        SRS_PHASE_NORMAL,
+    } phase;
+    bool recursion_guard;
+
+    /* Only used while actively reading a record from the stream. */
+    libxl__sr_record_buf *incoming_record; /* NOGC */
+
+    /* Both only used when processing an EMULATOR record. */
+    libxl__datacopier_state emu_dc;
+    libxl__carefd *emu_carefd;
+};
+
+_hidden void libxl__stream_read_init(libxl__stream_read_state *stream);
+_hidden void libxl__stream_read_start(libxl__egc *egc,
+                                      libxl__stream_read_state *stream);
+_hidden void libxl__stream_read_abort(libxl__egc *egc,
+                                      libxl__stream_read_state *stream, int rc);
+static inline bool
+libxl__stream_read_inuse(const libxl__stream_read_state *stream)
+{
+    return stream->running;
+}
+
 
 struct libxl__domain_create_state {
     /* filled in by user */
