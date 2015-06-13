@@ -3258,12 +3258,14 @@ struct libxl__stream_read_state {
     libxl__ao *ao;
     libxl__domain_create_state *dcs;
     int fd;
+    bool legacy;
     void (*completion_callback)(libxl__egc *egc,
                                 libxl__stream_read_state *srs,
                                 int rc);
     /* Private */
     int rc;
     bool running;
+    libxl__conversion_helper_state chs;
 
     /* Main stream-reading data. */
     libxl__datacopier_state dc; /* Only used when reading a record */
