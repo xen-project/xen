@@ -3309,9 +3309,13 @@ struct libxl__stream_read_state {
     void (*completion_callback)(libxl__egc *egc,
                                 libxl__stream_read_state *srs,
                                 int rc);
+    void (*checkpoint_callback)(libxl__egc *egc,
+                                libxl__stream_read_state *srs,
+                                int rc);
     /* Private */
     int rc;
     bool running;
+    bool in_checkpoint;
     libxl__save_helper_state shs;
     libxl__conversion_helper_state chs;
 
@@ -3321,6 +3325,8 @@ struct libxl__stream_read_state {
     LIBXL_STAILQ_HEAD(, libxl__sr_record_buf) record_queue; /* NOGC */
     enum {
         SRS_PHASE_NORMAL,
+        SRS_PHASE_BUFFERING,
+        SRS_PHASE_UNBUFFERING,
     } phase;
     bool recursion_guard;
 
@@ -3335,6 +3341,8 @@ struct libxl__stream_read_state {
 _hidden void libxl__stream_read_init(libxl__stream_read_state *stream);
 _hidden void libxl__stream_read_start(libxl__egc *egc,
                                       libxl__stream_read_state *stream);
+_hidden void libxl__stream_read_start_checkpoint(libxl__egc *egc,
+                                                 libxl__stream_read_state *stream);
 _hidden void libxl__stream_read_abort(libxl__egc *egc,
                                       libxl__stream_read_state *stream, int rc);
 static inline bool

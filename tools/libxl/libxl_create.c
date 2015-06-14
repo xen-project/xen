@@ -672,6 +672,27 @@ static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
         libxl_device_model_version_to_string(b_info->device_model_version));
 }
 
+/*----- remus asynchronous checkpoint callback -----*/
+
+static void remus_checkpoint_stream_done(
+    libxl__egc *egc, libxl__stream_read_state *srs, int rc);
+
+static void libxl__remus_domain_checkpoint_callback(void *data)
+{
+    libxl__save_helper_state *shs = data;
+    libxl__domain_create_state *dcs = shs->caller_state;
+    libxl__egc *egc = shs->egc;
+    STATE_AO_GC(dcs->ao);
+
+    libxl__stream_read_start_checkpoint(egc, &dcs->srs);
+}
+
+static void remus_checkpoint_stream_done(
+    libxl__egc *egc, libxl__stream_read_state *stream, int rc)
+{
+    libxl__xc_domain_saverestore_async_callback_done(egc, &stream->shs, rc);
+}
+
 /*----- main domain creation -----*/
 
 /* We have a linear control flow; only one event callback is
@@ -939,6 +960,8 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     libxl_domain_config *const d_config = dcs->guest_config;
     const int restore_fd = dcs->restore_fd;
     libxl__domain_build_state *const state = &dcs->build_state;
+    libxl__srm_restore_autogen_callbacks *const callbacks =
+        &dcs->srs.shs.callbacks.restore.a;
 
     if (rc) {
         domcreate_rebuild_done(egc, dcs, rc);
@@ -966,6 +989,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     }
 
     /* Restore */
+    callbacks->checkpoint = libxl__remus_domain_checkpoint_callback;
 
     rc = libxl__build_pre(gc, domid, d_config, state);
     if (rc)
@@ -976,6 +1000,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     dcs->srs.fd = restore_fd;
     dcs->srs.legacy = (dcs->restore_params.stream_version == 1);
     dcs->srs.completion_callback = domcreate_stream_done;
+    dcs->srs.checkpoint_callback = remus_checkpoint_stream_done;
 
     libxl__stream_read_start(egc, &dcs->srs);
     return;
