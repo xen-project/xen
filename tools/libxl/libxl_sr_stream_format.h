@@ -35,6 +35,7 @@ typedef struct libxl__sr_rec_hdr
 #define REC_TYPE_LIBXC_CONTEXT       0x00000001U
 #define REC_TYPE_XENSTORE_DATA       0x00000002U
 #define REC_TYPE_EMULATOR_CONTEXT    0x00000003U
+#define REC_TYPE_CHECKPOINT_END      0x00000004U
 
 typedef struct libxl__sr_emulator_hdr
 {
