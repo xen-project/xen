@@ -2956,6 +2956,45 @@ typedef void libxl__domain_suspend_cb(libxl__egc*,
 typedef void libxl__save_device_model_cb(libxl__egc*,
                                          libxl__domain_suspend_state*, int rc);
 
+/* State for writing a libxl migration v2 stream */
+typedef struct libxl__stream_write_state libxl__stream_write_state;
+typedef void (*sws_record_done_cb)(libxl__egc *egc,
+                                   libxl__stream_write_state *sws);
+struct libxl__stream_write_state {
+    /* filled by the user */
+    libxl__ao *ao;
+    libxl__domain_suspend_state *dss;
+    int fd;
+    void (*completion_callback)(libxl__egc *egc,
+                                libxl__stream_write_state *sws,
+                                int rc);
+    /* Private */
+    int rc;
+    bool running;
+
+    /* Main stream-writing data. */
+    libxl__datacopier_state dc;
+    sws_record_done_cb record_done_callback;
+
+    /* Only used when constructing an EMULATOR record. */
+    libxl__datacopier_state emu_dc;
+    libxl__carefd *emu_carefd;
+    libxl__sr_rec_hdr emu_rec_hdr;
+    void *emu_body;
+};
+
+_hidden void libxl__stream_write_init(libxl__stream_write_state *stream);
+_hidden void libxl__stream_write_start(libxl__egc *egc,
+                                       libxl__stream_write_state *stream);
+_hidden void libxl__stream_write_abort(libxl__egc *egc,
+                                       libxl__stream_write_state *stream,
+                                       int rc);
+static inline bool
+libxl__stream_write_inuse(const libxl__stream_write_state *stream)
+{
+    return stream->running;
+}
+
 typedef struct libxl__logdirty_switch {
     const char *cmd;
     const char *cmd_path;
