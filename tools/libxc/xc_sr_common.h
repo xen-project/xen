@@ -130,10 +130,13 @@ struct xc_sr_restore_ops
      * Process an individual record from the stream.  The caller shall take
      * care of processing common records (e.g. END, PAGE_DATA).
      *
-     * @return 0 for success, -1 for failure, or the sentinel value
-     * RECORD_NOT_PROCESSED.
+     * @return 0 for success, -1 for failure, or the following sentinels:
+     *  - RECORD_NOT_PROCESSED
+     *  - BROKEN_CHANNEL: under Remus/COLO, this means master may be dead, and
+     *    a failover is needed.
      */
 #define RECORD_NOT_PROCESSED 1
+#define BROKEN_CHANNEL 2
     int (*process_record)(struct xc_sr_context *ctx, struct xc_sr_record *rec);
 
     /**

@@ -102,6 +102,13 @@ struct restore_callbacks {
     int (*toolstack_restore)(uint32_t domid, const uint8_t *buf,
             uint32_t size, void* data);
 
+    /* A checkpoint record has been found in the stream.
+     * returns: */
+#define XGR_CHECKPOINT_ERROR    0 /* Terminate processing */
+#define XGR_CHECKPOINT_SUCCESS  1 /* Continue reading more data from the stream */
+#define XGR_CHECKPOINT_FAILOVER 2 /* Failover and resume VM */
+    int (*checkpoint)(void* data);
+
     /* to be provided as the last argument to each callback function */
     void* data;
 };

@@ -1,5 +1,7 @@
 #include <arpa/inet.h>
 
+#include <assert.h>
+
 #include "xc_sr_common.h"
 
 /*
@@ -472,12 +474,27 @@ static int process_record(struct xc_sr_context *ctx, struct xc_sr_record *rec);
 static int handle_checkpoint(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    int rc = 0;
+    int rc = 0, ret;
     unsigned i;
 
     if ( !ctx->restore.checkpointed )
     {
         ERROR("Found checkpoint in non-checkpointed stream");
+        rc = -1;
+        goto err;
+    }
+
+    ret = ctx->restore.callbacks->checkpoint(ctx->restore.callbacks->data);
+    switch ( ret )
+    {
+    case XGR_CHECKPOINT_SUCCESS:
+        break;
+
+    case XGR_CHECKPOINT_FAILOVER:
+        rc = BROKEN_CHANNEL;
+        goto err;
+
+    default: /* Other fatal error */
         rc = -1;
         goto err;
     }
@@ -559,19 +576,6 @@ static int process_record(struct xc_sr_context *ctx, struct xc_sr_record *rec)
 
     free(rec->data);
     rec->data = NULL;
-
-    if ( rc == RECORD_NOT_PROCESSED )
-    {
-        if ( rec->type & REC_TYPE_OPTIONAL )
-            DPRINTF("Ignoring optional record %#x (%s)",
-                    rec->type, rec_type_to_str(rec->type));
-        else
-        {
-            ERROR("Mandatory record %#x (%s) not handled",
-                  rec->type, rec_type_to_str(rec->type));
-            rc = -1;
-        }
-    }
 
     return rc;
 }
@@ -678,7 +682,22 @@ static int restore(struct xc_sr_context *ctx)
         else
         {
             rc = process_record(ctx, &rec);
-            if ( rc )
+            if ( rc == RECORD_NOT_PROCESSED )
+            {
+                if ( rec.type & REC_TYPE_OPTIONAL )
+                    DPRINTF("Ignoring optional record %#x (%s)",
+                            rec.type, rec_type_to_str(rec.type));
+                else
+                {
+                    ERROR("Mandatory record %#x (%s) not handled",
+                          rec.type, rec_type_to_str(rec.type));
+                    rc = -1;
+                    goto err;
+                }
+            }
+            else if ( rc == BROKEN_CHANNEL )
+                goto remus_failover;
+            else if ( rc )
                 goto err;
         }
 
@@ -734,6 +753,10 @@ int xc_domain_restore2(xc_interface *xch, int io_fd, uint32_t dom,
     ctx.restore.xenstore_domid = store_domid;
     ctx.restore.checkpointed = checkpointed_stream;
     ctx.restore.callbacks = callbacks;
+
+    /* Sanity checks for callbacks. */
+    if ( checkpointed_stream )
+        assert(callbacks->checkpoint);
 
     IPRINTF("In experimental %s", __func__);
     DPRINTF("fd %d, dom %u, hvm %u, pae %u, superpages %d"
