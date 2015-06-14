@@ -627,9 +627,6 @@ static void cleanup(struct xc_sr_context *ctx)
         PERROR("Failed to clean up");
 }
 
-#ifdef XG_LIBXL_HVM_COMPAT
-extern int read_qemu(struct xc_sr_context *ctx);
-#endif
 /*
  * Restore a domain.
  */
@@ -655,21 +652,6 @@ static int restore(struct xc_sr_context *ctx)
             else
                 goto err;
         }
-
-#ifdef XG_LIBXL_HVM_COMPAT
-        if ( ctx->dominfo.hvm &&
-             (rec.type == REC_TYPE_END || rec.type == REC_TYPE_CHECKPOINT) )
-        {
-            rc = read_qemu(ctx);
-            if ( rc )
-            {
-                if ( ctx->restore.buffer_all_records )
-                    goto remus_failover;
-                else
-                    goto err;
-            }
-        }
-#endif
 
         if ( ctx->restore.buffer_all_records &&
              rec.type != REC_TYPE_END &&

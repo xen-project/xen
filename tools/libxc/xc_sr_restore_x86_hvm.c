@@ -3,24 +3,6 @@
 
 #include "xc_sr_common_x86.h"
 
-#ifdef XG_LIBXL_HVM_COMPAT
-static int handle_toolstack(struct xc_sr_context *ctx, struct xc_sr_record *rec)
-{
-    xc_interface *xch = ctx->xch;
-    int rc;
-
-    if ( !ctx->restore.callbacks || !ctx->restore.callbacks->toolstack_restore )
-        return 0;
-
-    rc = ctx->restore.callbacks->toolstack_restore(
-        ctx->domid, rec->data, rec->length, ctx->restore.callbacks->data);
-
-    if ( rc < 0 )
-        PERROR("restoring toolstack");
-    return rc;
-}
-#endif
-
 /*
  * Process an HVM_CONTEXT record from the stream.
  */
@@ -92,98 +74,6 @@ static int handle_hvm_params(struct xc_sr_context *ctx,
     }
     return 0;
 }
-
-#ifdef XG_LIBXL_HVM_COMPAT
-int read_qemu(struct xc_sr_context *ctx);
-int read_qemu(struct xc_sr_context *ctx)
-{
-    xc_interface *xch = ctx->xch;
-    char qemusig[21];
-    uint32_t qlen;
-    void *qbuf = NULL;
-    int rc = -1;
-
-    if ( read_exact(ctx->fd, qemusig, sizeof(qemusig)) )
-    {
-        PERROR("Error reading QEMU signature");
-        goto out;
-    }
-
-    if ( !memcmp(qemusig, "DeviceModelRecord0002", sizeof(qemusig)) )
-    {
-        if ( read_exact(ctx->fd, &qlen, sizeof(qlen)) )
-        {
-            PERROR("Error reading QEMU record length");
-            goto out;
-        }
-
-        qbuf = malloc(qlen);
-        if ( !qbuf )
-        {
-            PERROR("no memory for device model state");
-            goto out;
-        }
-
-        if ( read_exact(ctx->fd, qbuf, qlen) )
-        {
-            PERROR("Error reading device model state");
-            goto out;
-        }
-    }
-    else
-    {
-        ERROR("Invalid device model state signature '%*.*s'",
-              (int)sizeof(qemusig), (int)sizeof(qemusig), qemusig);
-        goto out;
-    }
-
-    /* With Remus, this could be read many times */
-    if ( ctx->x86_hvm.restore.qbuf )
-        free(ctx->x86_hvm.restore.qbuf);
-    ctx->x86_hvm.restore.qbuf = qbuf;
-    ctx->x86_hvm.restore.qlen = qlen;
-    rc = 0;
-
-out:
-    if (rc)
-        free(qbuf);
-    return rc;
-}
-
-static int handle_qemu(struct xc_sr_context *ctx)
-{
-    xc_interface *xch = ctx->xch;
-    char path[256];
-    uint32_t qlen = ctx->x86_hvm.restore.qlen;
-    void *qbuf = ctx->x86_hvm.restore.qbuf;
-    int rc = -1;
-    FILE *fp = NULL;
-
-    sprintf(path, XC_DEVICE_MODEL_RESTORE_FILE".%u", ctx->domid);
-    fp = fopen(path, "wb");
-    if ( !fp )
-    {
-        PERROR("Failed to open '%s' for writing", path);
-        goto out;
-    }
-
-    DPRINTF("Writing %u bytes of QEMU data", qlen);
-    if ( fwrite(qbuf, 1, qlen, fp) != qlen )
-    {
-        PERROR("Failed to write %u bytes of QEMU data", qlen);
-        goto out;
-    }
-
-    rc = 0;
-
- out:
-    if ( fp )
-        fclose(fp);
-    free(qbuf);
-
-    return rc;
-}
-#endif
 
 /* restore_ops function. */
 static bool x86_hvm_pfn_is_valid(const struct xc_sr_context *ctx, xen_pfn_t pfn)
@@ -260,11 +150,6 @@ static int x86_hvm_process_record(struct xc_sr_context *ctx,
     case REC_TYPE_HVM_PARAMS:
         return handle_hvm_params(ctx, rec);
 
-#ifdef XG_LIBXL_HVM_COMPAT
-    case REC_TYPE_TOOLSTACK:
-        return handle_toolstack(ctx, rec);
-#endif
-
     default:
         return RECORD_NOT_PROCESSED;
     }
@@ -313,15 +198,6 @@ static int x86_hvm_stream_complete(struct xc_sr_context *ctx)
         PERROR("Failed to seed grant table");
         return rc;
     }
-
-#ifdef XG_LIBXL_HVM_COMPAT
-    rc = handle_qemu(ctx);
-    if ( rc )
-    {
-        ERROR("Failed to dump qemu");
-        return rc;
-    }
-#endif
 
     return rc;
 }
