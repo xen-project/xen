@@ -3922,6 +3922,7 @@ static void save_domain_core_writeconfig(int fd, const char *source,
     memset(&hdr, 0, sizeof(hdr));
     memcpy(hdr.magic, savefileheader_magic, sizeof(hdr.magic));
     hdr.byteorder = SAVEFILE_BYTEORDER_VALUE;
+    hdr.mandatory_flags = XL_MANDATORY_FLAG_STREAMv2;
 
     optdata_begin= 0;
 

@@ -2971,6 +2971,7 @@ struct libxl__stream_write_state {
     /* Private */
     int rc;
     bool running;
+    libxl__save_helper_state shs;
 
     /* Main stream-writing data. */
     libxl__datacopier_state dc;
@@ -3028,7 +3029,7 @@ struct libxl__domain_suspend_state {
     libxl__remus_devices_state rds;
     libxl__ev_time checkpoint_timeout; /* used for Remus checkpoint */
     int interval; /* checkpoint interval (for Remus) */
-    libxl__save_helper_state shs;
+    libxl__stream_write_state sws;
     libxl__logdirty_switch logdirty;
     void (*callback_common_done)(libxl__egc*,
                                  struct libxl__domain_suspend_state*, int ok);

@@ -218,11 +218,40 @@ static void stream_header_done(libxl__egc *egc,
 static void libxc_header_done(libxl__egc *egc,
                               libxl__stream_write_state *stream)
 {
-    libxl__xc_domain_save(egc, stream->dss, &stream->dss->shs);
+    libxl__xc_domain_save(egc, stream->dss, &stream->shs);
 }
 
-static void __attribute__((unused))
-write_toolstack_record(libxl__egc *egc,
+void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
+                                int rc, int retval, int errnoval)
+{
+    libxl__domain_suspend_state *dss = dss_void;
+    libxl__stream_write_state *stream = &dss->sws;
+    STATE_AO_GC(dss->ao);
+
+    if (rc)
+        goto err;
+
+    if (retval) {
+        LOGEV(ERROR, errnoval, "saving domain: %s",
+              dss->guest_responded ?
+              "domain responded to suspend request" :
+              "domain did not respond to suspend request");
+        if (!dss->guest_responded)
+            rc = ERROR_GUEST_TIMEDOUT;
+        else if (dss->rc)
+            rc = dss->rc;
+        else
+            rc = ERROR_FAIL;
+        goto err;
+    }
+
+    write_toolstack_record(egc, stream);
+
+ err:
+    check_all_finished(egc, stream, rc);
+}
+
+static void write_toolstack_record(libxl__egc *egc,
                                    libxl__stream_write_state *stream)
 {
     libxl__domain_suspend_state *dss = stream->dss;
@@ -417,7 +446,6 @@ static void check_all_finished(libxl__egc *egc,
                                libxl__stream_write_state *stream,
                                int rc)
 {
-    libxl__domain_suspend_state *dss = stream->dss;
     STATE_AO_GC(stream->ao);
 
     if (!stream->rc && rc) {
@@ -425,12 +453,12 @@ static void check_all_finished(libxl__egc *egc,
         stream->rc = rc;
 
         libxl__stream_write_abort(egc, stream, rc);
-        libxl__save_helper_abort(egc, &dss->shs);
+        libxl__save_helper_abort(egc, &stream->shs);
     }
 
     /* Don't fire the callback until all our parallel tasks have stopped. */
     if (libxl__stream_write_inuse(stream) ||
-        libxl__save_helper_inuse(&dss->shs))
+        libxl__save_helper_inuse(&stream->shs))
         return;
 
     stream->completion_callback(egc, stream, stream->rc);

@@ -1153,6 +1153,8 @@ out:
 
 /*==================== Domain suspend (save) ====================*/
 
+static void stream_done(libxl__egc *egc,
+                        libxl__stream_write_state *sws, int rc);
 static void domain_suspend_done(libxl__egc *egc,
                         libxl__domain_suspend_state *dss, int rc);
 static void domain_suspend_callback_common_done(libxl__egc *egc,
@@ -1379,7 +1381,7 @@ static void switch_logdirty_done(libxl__egc *egc,
     } else {
         broke = 0;
     }
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, broke);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, broke);
 }
 
 /*----- callbacks, called by xc_domain_save -----*/
@@ -1842,7 +1844,7 @@ static void domain_suspend_callback_common_done(libxl__egc *egc,
                                 libxl__domain_suspend_state *dss, int rc)
 {
     dss->rc = rc;
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, !rc);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, !rc);
 }
 
 /*----- remus callbacks -----*/
@@ -1878,7 +1880,7 @@ static void remus_domain_suspend_callback_common_done(libxl__egc *egc,
 
 out:
     dss->rc = rc;
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, !rc);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, !rc);
 }
 
 static void remus_devices_postsuspend_cb(libxl__egc *egc,
@@ -1895,7 +1897,7 @@ static void remus_devices_postsuspend_cb(libxl__egc *egc,
 out:
     if (rc)
         dss->rc = rc;
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, !rc);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, !rc);
 }
 
 static void libxl__remus_domain_resume_callback(void *data)
@@ -1930,7 +1932,7 @@ static void remus_devices_preresume_cb(libxl__egc *egc,
 out:
     if (rc)
         dss->rc = rc;
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, !rc);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, !rc);
 }
 
 /*----- remus asynchronous checkpoint callback -----*/
@@ -1978,7 +1980,7 @@ static void remus_checkpoint_dm_saved(libxl__egc *egc,
     return;
 
 out:
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, 0);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, 0);
 }
 
 static void remus_devices_commit_cb(libxl__egc *egc,
@@ -2013,7 +2015,7 @@ static void remus_devices_commit_cb(libxl__egc *egc,
     return;
 
 out:
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, 0);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, 0);
 }
 
 static void remus_next_checkpoint(libxl__egc *egc, libxl__ev_time *ev,
@@ -2034,7 +2036,7 @@ static void remus_next_checkpoint(libxl__egc *egc, libxl__ev_time *ev,
     if (rc)
         dss->rc = rc;
 
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, !rc);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, !rc);
 }
 
 /*----- main code for suspending, in order of execution -----*/
@@ -2052,7 +2054,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
     const int debug = dss->debug;
     const libxl_domain_remus_info *const r_info = dss->remus;
     libxl__srm_save_autogen_callbacks *const callbacks =
-        &dss->shs.callbacks.save.a;
+        &dss->sws.shs.callbacks.save.a;
 
     dss->rc = 0;
     logdirty_init(&dss->logdirty);
@@ -2115,53 +2117,24 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
         callbacks->suspend = libxl__domain_suspend_callback;
 
     callbacks->switch_qemu_logdirty = libxl__domain_suspend_common_switch_qemu_logdirty;
-    dss->shs.callbacks.save.toolstack_save = libxl__toolstack_save;
+    dss->sws.shs.callbacks.save.toolstack_save = libxl__toolstack_save;
 
-    libxl__xc_domain_save(egc, dss, &dss->shs);
+    dss->sws.ao  = dss->ao;
+    dss->sws.dss = dss;
+    dss->sws.fd  = dss->fd;
+    dss->sws.completion_callback = stream_done;
+
+    libxl__stream_write_start(egc, &dss->sws);
     return;
 
  out:
     domain_suspend_done(egc, dss, rc);
 }
 
-void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
-                                int rc, int retval, int errnoval)
+static void stream_done(libxl__egc *egc,
+                        libxl__stream_write_state *sws, int rc)
 {
-    libxl__domain_suspend_state *dss = dss_void;
-    STATE_AO_GC(dss->ao);
-
-    /* Convenience aliases */
-    const libxl_domain_type type = dss->type;
-
-    if (rc)
-        goto out;
-
-    if (retval) {
-        LOGEV(ERROR, errnoval, "saving domain: %s",
-                         dss->guest_responded ?
-                         "domain responded to suspend request" :
-                         "domain did not respond to suspend request");
-        if ( !dss->guest_responded )
-            rc = ERROR_GUEST_TIMEDOUT;
-        else if (dss->rc)
-            rc = dss->rc;
-        else
-            rc = ERROR_FAIL;
-        goto out;
-    }
-
-    if (type == LIBXL_DOMAIN_TYPE_HVM) {
-        rc = libxl__domain_suspend_device_model(gc, dss);
-        if (rc) goto out;
-
-        libxl__domain_save_device_model(egc, dss, domain_suspend_done);
-        return;
-    }
-
-    rc = 0;
-
-out:
-    domain_suspend_done(egc, dss, rc);
+    domain_suspend_done(egc, sws->dss, rc);
 }
 
 static void save_device_model_datacopier_done(libxl__egc *egc,

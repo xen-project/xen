@@ -812,6 +812,8 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
  *
  * If this is defined, then the libxl_domain_create_restore() interface takes
  * a "stream_version" parameter and supports a value of 2.
+ *
+ * libxl_domain_suspend() will produce a v2 stream.
  */
 #define LIBXL_HAVE_SRM_V2 1
 

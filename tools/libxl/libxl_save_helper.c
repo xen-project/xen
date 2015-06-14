@@ -286,7 +286,7 @@ int main(int argc, char **argv)
         startup("save");
         setup_signals(save_signal_handler);
 
-        r = xc_domain_save(xch, io_fd, dom, max_iters, max_factor, flags,
+        r = xc_domain_save2(xch, io_fd, dom, max_iters, max_factor, flags,
                            &helper_save_callbacks, hvm);
         complete(r);
 
