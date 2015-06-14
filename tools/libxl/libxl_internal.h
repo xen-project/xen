@@ -2699,8 +2699,6 @@ _hidden void libxl__datacopier_prefixdata(libxl__egc*, libxl__datacopier_state*,
 
 typedef struct libxl__srm_save_callbacks {
     libxl__srm_save_autogen_callbacks a;
-    int (*toolstack_save)(uint32_t domid, uint8_t **buf,
-                          uint32_t *len, void *data);
 } libxl__srm_save_callbacks;
 
 typedef struct libxl__srm_restore_callbacks {

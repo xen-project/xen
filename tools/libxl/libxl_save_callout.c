@@ -80,41 +80,12 @@ void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss,
                            libxl__save_helper_state *shs)
 {
     STATE_AO_GC(dss->ao);
-    int r, rc, toolstack_data_fd = -1;
-    uint32_t toolstack_data_len = 0;
-
-    /* Resources we need to free */
-    uint8_t *toolstack_data_buf = 0;
 
     unsigned cbflags =
         libxl__srm_callout_enumcallbacks_save(&shs->callbacks.save.a);
 
-    if (shs->callbacks.save.toolstack_save) {
-        r = shs->callbacks.save.toolstack_save
-            (dss->domid, &toolstack_data_buf, &toolstack_data_len, dss);
-        if (r) { rc = ERROR_FAIL; goto out; }
-
-        shs->toolstack_data_file = tmpfile();
-        if (!shs->toolstack_data_file) {
-            LOGE(ERROR, "cannot create toolstack data tmpfile");
-            rc = ERROR_FAIL;
-            goto out;
-        }
-        toolstack_data_fd = fileno(shs->toolstack_data_file);
-
-        r = libxl_write_exactly(CTX, toolstack_data_fd,
-                                toolstack_data_buf, toolstack_data_len,
-                                "toolstack data tmpfile", 0);
-        if (r) { rc = ERROR_FAIL; goto out; }
-
-        /* file position must be reset before passing to libxl-save-helper. */
-        r = lseek(toolstack_data_fd, 0, SEEK_SET);
-        if (r) { rc = ERROR_FAIL; goto out; }
-    }
-
     const unsigned long argnums[] = {
         dss->domid, 0, 0, dss->xcflags, dss->hvm,
-        toolstack_data_fd, toolstack_data_len,
         cbflags,
     };
 
@@ -125,18 +96,10 @@ void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss,
     shs->caller_state = dss;
     shs->need_results = 0;
 
-    free(toolstack_data_buf);
-
     run_helper(egc, shs, "--save-domain", dss->fd,
-               &toolstack_data_fd, 1,
+               NULL, 0,
                argnums, ARRAY_SIZE(argnums));
     return;
-
- out:
-    free(toolstack_data_buf);
-    if (shs->toolstack_data_file) fclose(shs->toolstack_data_file);
-
-    libxl__xc_domain_save_done(egc, dss, rc, 0, 0);
 }
 
 

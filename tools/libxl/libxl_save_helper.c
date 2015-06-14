@@ -213,31 +213,7 @@ int helper_getreply(void *user)
 
 /*----- other callbacks -----*/
 
-static int toolstack_save_fd;
-static uint32_t toolstack_save_len;
 static struct save_callbacks helper_save_callbacks;
-
-static int toolstack_save_cb(uint32_t domid, uint8_t **buf,
-                             uint32_t *len, void *data)
-{
-    int r;
-
-    assert(toolstack_save_fd > 0);
-
-    /* This is a hack for remus */
-    if (helper_save_callbacks.checkpoint) {
-        r = lseek(toolstack_save_fd, 0, SEEK_SET);
-        if (r) fail(errno,"rewind toolstack data tmpfile");
-    }
-
-    *buf = xmalloc(toolstack_save_len);
-    r = read_exactly(toolstack_save_fd, *buf, toolstack_save_len);
-    if (r<0) fail(errno,"read toolstack data");
-    if (r==0) fail(0,"read toolstack data eof");
-
-    *len = toolstack_save_len;
-    return 0;
-}
 
 static void startup(const char *op) {
     xtl_log(&logger,XTL_DEBUG,0,program,"starting %s",op);
@@ -273,13 +249,8 @@ int main(int argc, char **argv)
         uint32_t max_factor =      strtoul(NEXTARG,0,10);
         uint32_t flags =           strtoul(NEXTARG,0,10);
         int hvm =                  atoi(NEXTARG);
-        toolstack_save_fd  =       atoi(NEXTARG);
-        toolstack_save_len =       strtoul(NEXTARG,0,10);
         unsigned cbflags =         strtoul(NEXTARG,0,10);
         assert(!*++argv);
-
-        if (toolstack_save_fd >= 0)
-            helper_save_callbacks.toolstack_save = toolstack_save_cb;
 
         helper_setcallbacks_save(&helper_save_callbacks, cbflags);
 
