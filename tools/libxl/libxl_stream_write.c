@@ -22,6 +22,8 @@
  * Entry points from outside:
  *  - libxl__stream_write_start()
  *     - Start writing a stream from the start.
+ *  - libxl__stream_write_start_checkpoint()
+ *     - Write the records which form a checkpoint into a stream.
  *
  * In normal operation, there are two tasks running at once; this
  * stream processing, and the libxl-save-helper.  check_all_finished()
@@ -39,6 +41,12 @@
  *  - Toolstack record
  *  - if (hvm), Qemu record
  *  - End record
+ *
+ * For checkpointed stream, there is a second loop which is triggered by a
+ * save-helper checkpoint callback.  It writes:
+ *  - Toolstack record
+ *  - if (hvm), Qemu record
+ *  - Checkpoint end record
  */
 
 /* Success/error/cleanup handling. */
@@ -48,6 +56,9 @@ static void stream_complete(libxl__egc *egc,
                             libxl__stream_write_state *stream, int rc);
 static void stream_done(libxl__egc *egc,
                         libxl__stream_write_state *stream);
+static void checkpoint_done(libxl__egc *egc,
+                            libxl__stream_write_state *stream,
+                            int rc);
 static void check_all_finished(libxl__egc *egc,
                                libxl__stream_write_state *stream, int rc);
 
@@ -71,6 +82,12 @@ static void emulator_record_done(libxl__egc *egc,
                                  libxl__stream_write_state *stream);
 static void write_end_record(libxl__egc *egc,
                              libxl__stream_write_state *stream);
+
+/* Event chain unique to checkpointed streams. */
+static void write_checkpoint_end_record(libxl__egc *egc,
+                                        libxl__stream_write_state *stream);
+static void checkpoint_end_record_done(libxl__egc *egc,
+                                       libxl__stream_write_state *stream);
 
 /*----- Helpers -----*/
 
@@ -140,6 +157,7 @@ void libxl__stream_write_init(libxl__stream_write_state *stream)
 {
     stream->rc = 0;
     stream->running = false;
+    stream->in_checkpoint = false;
     FILLZERO(stream->dc);
     stream->record_done_callback = NULL;
     FILLZERO(stream->emu_dc);
@@ -182,6 +200,16 @@ void libxl__stream_write_start(libxl__egc *egc,
  err:
     assert(rc);
     stream_complete(egc, stream, rc);
+}
+
+void libxl__stream_write_start_checkpoint(libxl__egc *egc,
+                                          libxl__stream_write_state *stream)
+{
+    assert(stream->running);
+    assert(!stream->in_checkpoint);
+    stream->in_checkpoint = true;
+
+    write_toolstack_record(egc, stream);
 }
 
 void libxl__stream_write_abort(libxl__egc *egc,
@@ -290,8 +318,12 @@ static void toolstack_record_done(libxl__egc *egc,
 
     if (dss->type == LIBXL_DOMAIN_TYPE_HVM)
         write_emulator_record(egc, stream);
-    else
-        write_end_record(egc, stream);
+    else {
+        if (stream->in_checkpoint)
+            write_checkpoint_end_record(egc, stream);
+        else
+            write_end_record(egc, stream);
+    }
 }
 
 static void write_emulator_record(libxl__egc *egc,
@@ -397,7 +429,10 @@ static void emulator_record_done(libxl__egc *egc,
     free(stream->emu_body);
     stream->emu_body = NULL;
 
-    write_end_record(egc, stream);
+    if (stream->in_checkpoint)
+        write_checkpoint_end_record(egc, stream);
+    else
+        write_end_record(egc, stream);
 }
 
 static void write_end_record(libxl__egc *egc,
@@ -412,6 +447,24 @@ static void write_end_record(libxl__egc *egc,
                 &rec, NULL, stream_success);
 }
 
+static void write_checkpoint_end_record(libxl__egc *egc,
+                                        libxl__stream_write_state *stream)
+{
+    struct libxl__sr_rec_hdr rec;
+
+    FILLZERO(rec);
+    rec.type = REC_TYPE_CHECKPOINT_END;
+
+    setup_write(egc, stream, "checkpoint end record",
+                &rec, NULL, checkpoint_end_record_done);
+}
+
+static void checkpoint_end_record_done(libxl__egc *egc,
+                                       libxl__stream_write_state *stream)
+{
+    checkpoint_done(egc, stream, 0);
+}
+
 /*----- Success/error/cleanup handling. -----*/
 
 static void stream_success(libxl__egc *egc, libxl__stream_write_state *stream)
@@ -423,6 +476,18 @@ static void stream_complete(libxl__egc *egc,
                             libxl__stream_write_state *stream, int rc)
 {
     assert(stream->running);
+
+    if (stream->in_checkpoint) {
+        assert(rc);
+
+        /*
+         * If an error is encountered while in a checkpoint, pass it
+         * back to libxc.  The failure will come back around to us via
+         * libxl__xc_domain_save_done()
+         */
+        checkpoint_done(egc, stream, rc);
+        return;
+    }
 
     if (!stream->rc)
         stream->rc = rc;
@@ -440,6 +505,16 @@ static void stream_done(libxl__egc *egc,
     free(stream->emu_body);
 
     check_all_finished(egc, stream, stream->rc);
+}
+
+static void checkpoint_done(libxl__egc *egc,
+                            libxl__stream_write_state *stream,
+                            int rc)
+{
+    assert(stream->in_checkpoint);
+
+    stream->in_checkpoint = false;
+    stream->checkpoint_callback(egc, stream, rc);
 }
 
 static void check_all_finished(libxl__egc *egc,

@@ -2968,9 +2968,13 @@ struct libxl__stream_write_state {
     void (*completion_callback)(libxl__egc *egc,
                                 libxl__stream_write_state *sws,
                                 int rc);
+    void (*checkpoint_callback)(libxl__egc *egc,
+                                libxl__stream_write_state *sws,
+                                int rc);
     /* Private */
     int rc;
     bool running;
+    bool in_checkpoint;
     libxl__save_helper_state shs;
 
     /* Main stream-writing data. */
@@ -2987,6 +2991,9 @@ struct libxl__stream_write_state {
 _hidden void libxl__stream_write_init(libxl__stream_write_state *stream);
 _hidden void libxl__stream_write_start(libxl__egc *egc,
                                        libxl__stream_write_state *stream);
+_hidden void
+libxl__stream_write_start_checkpoint(libxl__egc *egc,
+                                     libxl__stream_write_state *stream);
 _hidden void libxl__stream_write_abort(libxl__egc *egc,
                                        libxl__stream_write_state *stream,
                                        int rc);
