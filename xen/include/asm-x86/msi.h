@@ -65,8 +65,13 @@ struct msi_info {
 };
 
 struct msi_msg {
-	u32	address_lo;	/* low 32 bits of msi message address */
-	u32	address_hi;	/* high 32 bits of msi message address */
+	union {
+		u64	address; /* message address */
+		struct {
+			u32	address_lo; /* message address low 32 bits */
+			u32	address_hi; /* message address high 32 bits */
+		};
+	};
 	u32	data;		/* 16 bits of msi message data */
 	u32	dest32;		/* used when Interrupt Remapping with EIM is enabled */
 };
