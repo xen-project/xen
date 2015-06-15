@@ -326,15 +326,23 @@ static char *xstrdup(const char *x)
     return r;
 }
 
-#define ARRAY_EXTEND_INIT(array,count,initfn)                           \
+#define ARRAY_EXTEND_INIT__CORE(array,count,initfn,more)                \
     ({                                                                  \
         typeof((count)) array_extend_old_count = (count);               \
         (count)++;                                                      \
         (array) = xrealloc((array), sizeof(*array) * (count));          \
         (initfn)(&(array)[array_extend_old_count]);                     \
-        (array)[array_extend_old_count].devid = array_extend_old_count; \
+        more;                                                           \
         &(array)[array_extend_old_count];                               \
     })
+
+#define ARRAY_EXTEND_INIT(array,count,initfn)                           \
+    ARRAY_EXTEND_INIT__CORE((array),(count),(initfn), ({                \
+        (array)[array_extend_old_count].devid = array_extend_old_count; \
+        }))
+
+#define ARRAY_EXTEND_INIT_NODEVID(array,count,initfn) \
+    ARRAY_EXTEND_INIT__CORE((array),(count),(initfn), /* nothing */ )
 
 #define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f "\n", ##_a)
 
@@ -1686,12 +1694,12 @@ static void parse_config_data(const char *config_source,
             libxl_device_disk *disk;
             char *buf2 = strdup(buf);
 
-            d_config->disks = (libxl_device_disk *) realloc(d_config->disks, sizeof (libxl_device_disk) * (d_config->num_disks + 1));
-            disk = d_config->disks + d_config->num_disks;
+            disk = ARRAY_EXTEND_INIT_NODEVID(d_config->disks,
+                                             d_config->num_disks,
+                                             libxl_device_disk_init);
             parse_disk_config(&config, buf2, disk);
 
             free(buf2);
-            d_config->num_disks++;
         }
     }
 
@@ -1932,10 +1940,9 @@ skip_vfb:
         for(i = 0; (buf = xlu_cfg_get_listitem (pcis, i)) != NULL; i++) {
             libxl_device_pci *pcidev;
 
-            d_config->pcidevs = (libxl_device_pci *) realloc(d_config->pcidevs, sizeof (libxl_device_pci) * (d_config->num_pcidevs + 1));
-            pcidev = d_config->pcidevs + d_config->num_pcidevs;
-            libxl_device_pci_init(pcidev);
-
+            pcidev = ARRAY_EXTEND_INIT_NODEVID(d_config->pcidevs,
+                                               d_config->num_pcidevs,
+                                               libxl_device_pci_init);
             pcidev->msitranslate = pci_msitranslate;
             pcidev->power_mgmt = pci_power_mgmt;
             pcidev->permissive = pci_permissive;
@@ -1947,7 +1954,6 @@ skip_vfb:
                         buf);
                 exit(-e);
             }
-            d_config->num_pcidevs++;
         }
         if (d_config->num_pcidevs && c_info->type == LIBXL_DOMAIN_TYPE_PV)
             libxl_defbool_set(&b_info->u.pv.e820_host, true);
@@ -1959,17 +1965,15 @@ skip_vfb:
         for (i = 0; (buf = xlu_cfg_get_listitem(dtdevs, i)) != NULL; i++) {
             libxl_device_dtdev *dtdev;
 
-            d_config->dtdevs = xrealloc(d_config->dtdevs,
-                                        sizeof (libxl_device_dtdev) * (i + 1));
-            dtdev = d_config->dtdevs + d_config->num_dtdevs;
-            libxl_device_dtdev_init(dtdev);
+            dtdev = ARRAY_EXTEND_INIT_NODEVID(d_config->dtdevs,
+                                              d_config->num_dtdevs,
+                                              libxl_device_dtdev_init);
 
             dtdev->path = strdup(buf);
             if (dtdev->path == NULL) {
                 fprintf(stderr, "unable to duplicate string for dtdevs\n");
                 exit(-1);
             }
-            d_config->num_dtdevs++;
         }
     }
 
