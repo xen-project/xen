@@ -7622,7 +7622,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
     int n_pools;
     int node;
     int n_cpus;
-    char name[16];
+    char *name = NULL;
     libxl_uuid uuid;
     libxl_bitmap cpumap;
     libxl_cpupoolinfo *poolinfo;
@@ -7670,7 +7670,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         goto out;
     }
 
-    snprintf(name, 15, "Pool-node%d", node);
+    xasprintf(&name, "Pool-node%d", node);
     if (libxl_cpupool_rename(ctx, name, 0)) {
         fprintf(stderr, "error on renaming Pool 0\n");
         goto out;
@@ -7715,7 +7715,8 @@ int main_cpupoolnumasplit(int argc, char **argv)
             goto out;
         }
 
-        snprintf(name, 15, "Pool-node%d", node);
+        free(name);
+        xasprintf(&name, "Pool-node%d", node);
         libxl_uuid_generate(&uuid);
         poolid = 0;
         if (libxl_cpupool_create(ctx, name, sched, cpumap, &uuid, &poolid)) {
@@ -7740,6 +7741,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
 out:
     libxl_cputopology_list_free(topology, n_cpus);
     libxl_bitmap_dispose(&cpumap);
+    free(name);
 
     return rc;
 }
