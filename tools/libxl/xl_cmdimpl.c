@@ -1945,8 +1945,14 @@ skip_vfb:
             pcidev->power_mgmt = pci_power_mgmt;
             pcidev->permissive = pci_permissive;
             pcidev->seize = pci_seize;
-            if (!xlu_pci_parse_bdf(config, pcidev, buf))
-                d_config->num_pcidevs++;
+            e = xlu_pci_parse_bdf(config, pcidev, buf);
+            if (e) {
+                fprintf(stderr,
+                        "unable to parse PCI BDF `%s' for passthrough\n",
+                        buf);
+                exit(-e);
+            }
+            d_config->num_pcidevs++;
         }
         if (d_config->num_pcidevs && c_info->type == LIBXL_DOMAIN_TYPE_PV)
             libxl_defbool_set(&b_info->u.pv.e820_host, true);
