@@ -1704,11 +1704,9 @@ static void parse_config_data(const char *config_source,
             char *p, *p2;
             bool got_backend = false;
 
-            d_config->vtpms = (libxl_device_vtpm *) realloc(d_config->vtpms,
-                  sizeof(libxl_device_vtpm) * (d_config->num_vtpms+1));
-            vtpm = d_config->vtpms + d_config->num_vtpms;
-            libxl_device_vtpm_init(vtpm);
-            vtpm->devid = d_config->num_vtpms;
+            vtpm = ARRAY_EXTEND_INIT(d_config->vtpms,
+                                     d_config->num_vtpms,
+                                     libxl_device_vtpm_init);
 
             p = strtok(buf2, ",");
             if(p) {
@@ -1738,7 +1736,6 @@ static void parse_config_data(const char *config_source,
                exit(1);
             }
             free(buf2);
-            d_config->num_vtpms++;
         }
     }
 
@@ -1828,10 +1825,9 @@ static void parse_config_data(const char *config_source,
             char *buf2 = strdup(buf);
             char *p;
 
-            d_config->nics = (libxl_device_nic *) realloc(d_config->nics, sizeof (libxl_device_nic) * (d_config->num_nics+1));
-            nic = d_config->nics + d_config->num_nics;
-            libxl_device_nic_init(nic);
-            nic->devid = d_config->num_nics;
+            nic = ARRAY_EXTEND_INIT(d_config->nics,
+                                    d_config->num_nics,
+                                    libxl_device_nic_init);
             set_default_nic_values(nic);
 
             p = strtok(buf2, ",");
@@ -1844,7 +1840,6 @@ static void parse_config_data(const char *config_source,
             } while ((p = strtok(NULL, ",")) != NULL);
 skip_nic:
             free(buf2);
-            d_config->num_nics++;
         }
     }
 
