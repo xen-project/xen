@@ -83,7 +83,7 @@ is complete.
  ~~~~~~~
  Xen uses several locks to serialize access to the internal grant table state.
 
-  grant_table->lock          : lock used to prevent readers from accessing
+  grant_table->lock          : rwlock used to prevent readers from accessing
                                inconsistent grant table state such as current
                                version, partially initialized active table pages,
                                etc.
@@ -91,34 +91,43 @@ is complete.
   active_grant_entry->lock   : spinlock used to serialize modifications to
                                active entries
 
- The primary lock for the grant table is a spinlock. All functions
- that access members of struct grant_table must acquire the lock
- around critical sections.
+ The primary lock for the grant table is a read/write spinlock. All
+ functions that access members of struct grant_table must acquire a
+ read lock around critical sections. Any modification to the members
+ of struct grant_table (e.g., nr_status_frames, nr_grant_frames,
+ active frames, etc.) must only be made if the write lock is
+ held. These elements are read-mostly, and read critical sections can
+ be large, which makes a rwlock a good choice.
 
  The maptrack free list is protected by its own spinlock. The maptrack
  lock may be locked while holding the grant table lock.
 
  Active entries are obtained by calling active_entry_acquire(gt, ref).
  This function returns a pointer to the active entry after locking its
- spinlock. The caller must hold the grant table lock for the gt in
- question before calling active_entry_acquire(). This is because the
- grant table can be dynamically extended via gnttab_grow_table() while
- a domain is running and must be fully initialized. Once all access to
- the active entry is complete, release the lock by calling
- active_entry_release(act).
+ spinlock. The caller must hold the grant table read lock before
+ calling active_entry_acquire(). This is because the grant table can
+ be dynamically extended via gnttab_grow_table() while a domain is
+ running and must be fully initialized. Once all access to the active
+ entry is complete, release the lock by calling active_entry_release(act).
 
  Summary of rules for locking:
   active_entry_acquire() and active_entry_release() can only be
-  called when holding the relevant grant table's lock. I.e.:
-    spin_lock(&gt->lock);
+  called when holding the relevant grant table's read lock. I.e.:
+    read_lock(&gt->lock);
     act = active_entry_acquire(gt, ref);
     ...
     active_entry_release(act);
-    spin_unlock(&gt->lock);
+    read_unlock(&gt->lock);
 
  Active entries cannot be acquired while holding the maptrack lock.
  Multiple active entries can be acquired while holding the grant table
- lock.
+ _write_ lock.
+
+ Maptrack entries are protected by the corresponding active entry
+ lock.  As an exception, new maptrack entries may be populated without
+ holding the lock, provided the flags field is written last.  This
+ requires any maptrack entry user validates the flags field as
+ non-zero first.
 
 ********************************************************************************
 

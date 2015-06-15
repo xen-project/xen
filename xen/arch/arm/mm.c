@@ -1050,7 +1050,7 @@ int xenmem_add_to_physmap_one(
     switch ( space )
     {
     case XENMAPSPACE_grant_table:
-        spin_lock(&d->grant_table->lock);
+        write_lock(&d->grant_table->lock);
 
         if ( d->grant_table->gt_version == 0 )
             d->grant_table->gt_version = 1;
@@ -1080,7 +1080,7 @@ int xenmem_add_to_physmap_one(
 
         t = p2m_ram_rw;
 
-        spin_unlock(&d->grant_table->lock);
+        write_unlock(&d->grant_table->lock);
         break;
     case XENMAPSPACE_shared_info:
         if ( idx != 0 )

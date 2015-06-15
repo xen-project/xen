@@ -64,6 +64,11 @@ struct grant_mapping {
 
 /* Per-domain grant information. */
 struct grant_table {
+    /*
+     * Lock protecting updates to grant table state (version, active
+     * entry list, etc.)
+     */
+    rwlock_t              lock;
     /* Table size. Number of frames shared with guest */
     unsigned int          nr_grant_frames;
     /* Shared grant table (see include/public/grant_table.h). */
@@ -84,8 +89,6 @@ struct grant_table {
     unsigned int          maptrack_limit;
     /* Lock protecting the maptrack page list, head, and limit */
     spinlock_t            maptrack_lock;
-    /* Lock protecting updates to active and shared grant tables. */
-    spinlock_t            lock;
     /* The defined versions are 1 and 2.  Set to 0 if we don't know
        what version to use yet. */
     unsigned              gt_version;
@@ -103,7 +106,7 @@ gnttab_release_mappings(
     struct domain *d);
 
 /* Increase the size of a domain's grant table.
- * Caller must hold d's grant table lock.
+ * Caller must hold d's grant table write lock.
  */
 int
 gnttab_grow_table(struct domain *d, unsigned int req_nr_frames);
