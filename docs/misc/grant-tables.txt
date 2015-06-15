@@ -63,6 +63,7 @@ is complete.
   act->domid : remote domain being granted rights
   act->frame : machine frame being granted
   act->pin   : used to hold reference counts
+  act->lock  : spinlock used to serialize access to active entry state
 
  Map tracking
  ~~~~~~~~~~~~
@@ -74,7 +75,46 @@ is complete.
  matching map track entry is then removed, as if unmap had been invoked.
  These are not used by the transfer mechanism.
   map->domid         : owner of the mapped frame
-  map->ref_and_flags : grant reference, ro/rw, mapped for host or device access
+  map->ref           : grant reference
+  map->flags         : ro/rw, mapped for host or device access
+
+********************************************************************************
+ Locking
+ ~~~~~~~
+ Xen uses several locks to serialize access to the internal grant table state.
+
+  grant_table->lock          : lock used to prevent readers from accessing
+                               inconsistent grant table state such as current
+                               version, partially initialized active table pages,
+                               etc.
+  active_grant_entry->lock   : spinlock used to serialize modifications to
+                               active entries
+
+ The primary lock for the grant table is a spinlock. All functions
+ that access members of struct grant_table must acquire the lock
+ around critical sections.
+
+ Active entries are obtained by calling active_entry_acquire(gt, ref).
+ This function returns a pointer to the active entry after locking its
+ spinlock. The caller must hold the grant table lock for the gt in
+ question before calling active_entry_acquire(). This is because the
+ grant table can be dynamically extended via gnttab_grow_table() while
+ a domain is running and must be fully initialized. Once all access to
+ the active entry is complete, release the lock by calling
+ active_entry_release(act).
+
+ Summary of rules for locking:
+  active_entry_acquire() and active_entry_release() can only be
+  called when holding the relevant grant table's lock. I.e.:
+    spin_lock(&gt->lock);
+    act = active_entry_acquire(gt, ref);
+    ...
+    active_entry_release(act);
+    spin_unlock(&gt->lock);
+
+ Active entries cannot be acquired while holding the maptrack lock.
+ Multiple active entries can be acquired while holding the grant table
+ lock.
 
 ********************************************************************************
 
