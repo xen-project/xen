@@ -650,26 +650,23 @@ typedef int (*char_predicate_t)(const int c);
 
 static void trim(char_predicate_t predicate, const char *input, char **output)
 {
-    char *p, *q, *tmp;
+    const char *first, *after;
 
-    *output = NULL;
-    if (*input == '\000')
-        return;
-    /* Input has length >= 1 */
+    for (first = input;
+         *first && predicate((unsigned char)first[0]);
+         first++)
+        ;
 
-    p = tmp = xstrdup(input);
-    /* Skip past the characters for which predicate is true */
-    while ((*p != '\000') && (predicate((unsigned char)*p)))
-        p ++;
-    q = p + strlen(p) - 1;
-    /* q points to the last non-NULL character */
-    while ((q > p) && (predicate((unsigned char)*q)))
-        q --;
-    /* q points to the last character we want */
-    q ++;
-    *q = '\000';
-    *output = xstrdup(p);
-    free(tmp);
+    for (after = first + strlen(first);
+         after > first && predicate((unsigned char)after[-1]);
+         after--)
+        ;
+
+    size_t len_nonnull = after - first;
+
+    *output = xmalloc(len_nonnull + 1);
+    memcpy(output, first, len_nonnull);
+    output[len_nonnull] = 0;
 }
 
 static int split_string_into_pair(const char *str,
