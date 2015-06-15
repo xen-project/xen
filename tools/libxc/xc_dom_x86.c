@@ -42,6 +42,7 @@
 
 #define SUPERPAGE_PFN_SHIFT  9
 #define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
+#define SUPERPAGE_BATCH_SIZE 512
 
 #define bits_to_mask(bits)       (((xen_vaddr_t)1 << (bits))-1)
 #define round_down(addr, mask)   ((addr) & ~(mask))
@@ -761,7 +762,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
 {
     int rc;
     xen_pfn_t pfn, allocsz, mfn, total, pfn_base;
-    int i, j;
+    int i, j, k;
     xen_vmemrange_t dummy_vmemrange[1];
     unsigned int dummy_vnode_to_pnode[1];
     xen_vmemrange_t *vmemranges;
@@ -880,6 +881,9 @@ int arch_setup_meminit(struct xc_dom_image *dom)
             unsigned int memflags;
             uint64_t pages;
             unsigned int pnode = vnode_to_pnode[vmemranges[i].nid];
+            int nr_spages = dom->total_pages >> SUPERPAGE_PFN_SHIFT;
+            xen_pfn_t extents[SUPERPAGE_BATCH_SIZE];
+            xen_pfn_t pfn_base_idx;
 
             memflags = 0;
             if ( pnode != XC_NUMA_NO_NODE )
@@ -892,7 +896,33 @@ int arch_setup_meminit(struct xc_dom_image *dom)
             for ( pfn = pfn_base; pfn < pfn_base+pages; pfn++ )
                 dom->p2m_host[pfn] = pfn;
 
-            for ( j = 0; j < pages; j += allocsz )
+            pfn_base_idx = pfn_base;
+            while (nr_spages) {
+                int count = min(nr_spages, SUPERPAGE_BATCH_SIZE);
+                nr_spages -= count;
+
+                for ( pfn = pfn_base_idx, j = 0;
+                      pfn < pfn_base_idx + (count << SUPERPAGE_PFN_SHIFT);
+                      pfn += SUPERPAGE_NR_PFNS, j++ )
+                    extents[j] = dom->p2m_host[pfn];
+                rc = xc_domain_populate_physmap(dom->xch, dom->guest_domid, count,
+                                                SUPERPAGE_PFN_SHIFT, memflags,
+                                                extents);
+                if ( rc < 0 )
+                    return rc;
+
+                /* Expand the returned mfns into the p2m array. */
+                pfn = pfn_base_idx;
+                for ( j = 0; j < rc; j++ )
+                {
+                    mfn = extents[j];
+                    for ( k = 0; k < SUPERPAGE_NR_PFNS; k++, pfn++ )
+                        dom->p2m_host[pfn] = mfn + k;
+                }
+                pfn_base_idx = pfn;
+            }
+
+            for ( j = pfn_base_idx - pfn_base; j < pages; j += allocsz )
             {
                 allocsz = pages - j;
                 if ( allocsz > 1024*1024 )
@@ -915,6 +945,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
                     return rc;
                 }
             }
+            rc = 0;
         }
 
         /* Ensure no unclaimed pages are left unused.
