@@ -288,10 +288,10 @@ static inline void
 put_maptrack_handle(
     struct grant_table *t, int handle)
 {
-    spin_lock(&t->lock);
+    spin_lock(&t->maptrack_lock);
     maptrack_entry(t, handle).ref = t->maptrack_head;
     t->maptrack_head = handle;
-    spin_unlock(&t->lock);
+    spin_unlock(&t->maptrack_lock);
 }
 
 static inline int
@@ -303,7 +303,7 @@ get_maptrack_handle(
     struct grant_mapping *new_mt;
     unsigned int          new_mt_limit, nr_frames;
 
-    spin_lock(&lgt->lock);
+    spin_lock(&lgt->maptrack_lock);
 
     while ( unlikely((handle = __get_maptrack_handle(lgt)) == -1) )
     {
@@ -332,7 +332,7 @@ get_maptrack_handle(
                  nr_frames + 1);
     }
 
-    spin_unlock(&lgt->lock);
+    spin_unlock(&lgt->maptrack_lock);
 
     return handle;
 }
@@ -3017,6 +3017,7 @@ grant_table_create(
 
     /* Simple stuff. */
     spin_lock_init(&t->lock);
+    spin_lock_init(&t->maptrack_lock);
     t->nr_grant_frames = INITIAL_NR_GRANT_FRAMES;
 
     /* Active grant table. */

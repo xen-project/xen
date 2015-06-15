@@ -87,12 +87,16 @@ is complete.
                                inconsistent grant table state such as current
                                version, partially initialized active table pages,
                                etc.
+  grant_table->maptrack_lock : spinlock used to protect the maptrack free list
   active_grant_entry->lock   : spinlock used to serialize modifications to
                                active entries
 
  The primary lock for the grant table is a spinlock. All functions
  that access members of struct grant_table must acquire the lock
  around critical sections.
+
+ The maptrack free list is protected by its own spinlock. The maptrack
+ lock may be locked while holding the grant table lock.
 
  Active entries are obtained by calling active_entry_acquire(gt, ref).
  This function returns a pointer to the active entry after locking its
