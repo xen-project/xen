@@ -133,7 +133,7 @@ struct domain_create {
     int vncautopass;
     int console_autoconnect;
     const char *config_file;
-    const char *extra_config; /* extra config string */
+    char *extra_config; /* extra config string */
     const char *restore_file;
     int migrate_fd; /* -1 means none */
     char **migration_domname_r; /* from malloc */
@@ -4123,11 +4123,25 @@ int main_vm_list(int argc, char **argv)
     return 0;
 }
 
+static void string_realloc_append(char **accumulate, const char *more)
+{
+    /* Appends more to accumulate.  Accumulate is either NULL, or
+     * points (always) to a malloc'd nul-terminated string. */
+
+    size_t oldlen = *accumulate ? strlen(*accumulate) : 0;
+    size_t morelen = strlen(more) + 1/*nul*/;
+    if (oldlen > SSIZE_MAX || morelen > SSIZE_MAX - oldlen) {
+        fprintf(stderr,"Additional config data far too large\n");
+        exit(-ERROR_FAIL);
+    }
+
+    *accumulate = xrealloc(*accumulate, oldlen + morelen);
+    memcpy(*accumulate + oldlen, more, morelen);
+}
+
 int main_create(int argc, char **argv)
 {
     const char *filename = NULL;
-    char *p;
-    char extra_config[1024];
     struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
         quiet = 0, monitor = 1, vnc = 0, vncautopass = 0;
@@ -4141,6 +4155,8 @@ int main_create(int argc, char **argv)
         COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
+
+    dom_info.extra_config = NULL;
 
     if (argv[1] && argv[1][0] != '-' && !strchr(argv[1], '=')) {
         filename = argv[1];
@@ -4181,20 +4197,21 @@ int main_create(int argc, char **argv)
         break;
     }
 
-    extra_config[0] = '\0';
-    for (p = extra_config; optind < argc; optind++) {
+    memset(&dom_info, 0, sizeof(dom_info));
+
+    for (; optind < argc; optind++) {
         if (strchr(argv[optind], '=') != NULL) {
-            p += snprintf(p, sizeof(extra_config) - (p - extra_config),
-                "%s\n", argv[optind]);
+            string_realloc_append(&dom_info.extra_config, argv[optind]);
+            string_realloc_append(&dom_info.extra_config, "\n");
         } else if (!filename) {
             filename = argv[optind];
         } else {
             help("create");
+            free(dom_info.extra_config);
             return 2;
         }
     }
 
-    memset(&dom_info, 0, sizeof(dom_info));
     dom_info.debug = debug;
     dom_info.daemonize = daemonize;
     dom_info.monitor = monitor;
@@ -4202,16 +4219,18 @@ int main_create(int argc, char **argv)
     dom_info.dryrun = dryrun_only;
     dom_info.quiet = quiet;
     dom_info.config_file = filename;
-    dom_info.extra_config = extra_config;
     dom_info.migrate_fd = -1;
     dom_info.vnc = vnc;
     dom_info.vncautopass = vncautopass;
     dom_info.console_autoconnect = console_autoconnect;
 
     rc = create_domain(&dom_info);
-    if (rc < 0)
+    if (rc < 0) {
+        free(dom_info.extra_config);
         return -rc;
+    }
 
+    free(dom_info.extra_config);
     return 0;
 }
 
@@ -4219,8 +4238,7 @@ int main_config_update(int argc, char **argv)
 {
     uint32_t domid;
     const char *filename = NULL;
-    char *p;
-    char extra_config[1024];
+    char *extra_config = NULL;
     void *config_data = 0;
     int config_len = 0;
     libxl_domain_config d_config;
@@ -4255,15 +4273,15 @@ int main_config_update(int argc, char **argv)
         break;
     }
 
-    extra_config[0] = '\0';
-    for (p = extra_config; optind < argc; optind++) {
+    for (; optind < argc; optind++) {
         if (strchr(argv[optind], '=') != NULL) {
-            p += snprintf(p, sizeof(extra_config) - (p - extra_config),
-                "%s\n", argv[optind]);
+            string_realloc_append(&extra_config, argv[optind]);
+            string_realloc_append(&extra_config, "\n");
         } else if (!filename) {
             filename = argv[optind];
         } else {
             help("create");
+            free(extra_config);
             return 2;
         }
     }
@@ -4272,7 +4290,8 @@ int main_config_update(int argc, char **argv)
         rc = libxl_read_file_contents(ctx, filename,
                                       &config_data, &config_len);
         if (rc) { fprintf(stderr, "Failed to read config file: %s: %s\n",
-                           filename, strerror(errno)); return ERROR_FAIL; }
+                           filename, strerror(errno));
+                  free(extra_config); return ERROR_FAIL; }
         if (strlen(extra_config)) {
             if (config_len > INT_MAX - (strlen(extra_config) + 2 + 1)) {
                 fprintf(stderr, "Failed to attach extra configration\n");
@@ -4313,7 +4332,7 @@ int main_config_update(int argc, char **argv)
     libxl_domain_config_dispose(&d_config);
 
     free(config_data);
-
+    free(extra_config);
     return 0;
 }
 
@@ -6333,7 +6352,7 @@ int main_cpupoolcreate(int argc, char **argv)
 {
     const char *filename = NULL, *config_src=NULL;
     const char *p;
-    char extra_config[1024];
+    char *extra_config = NULL;
     int opt;
     static struct option opts[] = {
         {"defconfig", 1, 0, 'f'},
@@ -6367,13 +6386,10 @@ int main_cpupoolcreate(int argc, char **argv)
         break;
     }
 
-    memset(extra_config, 0, sizeof(extra_config));
     while (optind < argc) {
         if ((p = strchr(argv[optind], '='))) {
-            if (strlen(extra_config) + 1 + strlen(argv[optind]) < sizeof(extra_config)) {
-                strcat(extra_config, "\n");
-                strcat(extra_config, argv[optind]);
-            }
+            string_realloc_append(&extra_config, "\n");
+            string_realloc_append(&extra_config, argv[optind]);
         } else if (!filename) {
             filename = argv[optind];
         } else {
