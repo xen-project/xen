@@ -365,6 +365,27 @@ static void dolog(const char *file, int line, const char *func, char *fmt, ...)
     free(s);
 }
 
+static void xvasprintf(char **strp, const char *fmt, va_list ap)
+    __attribute__((format(printf,2,0)));
+static void xvasprintf(char **strp, const char *fmt, va_list ap)
+{
+    int r = vasprintf(strp, fmt, ap);
+    if (r == -1) {
+        perror("asprintf failed");
+        exit(-ERROR_FAIL);
+    }
+}
+
+static void xasprintf(char **strp, const char *fmt, ...)
+    __attribute__((format(printf,2,3)));
+static void xasprintf(char **strp, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    xvasprintf(strp, fmt, ap);
+    va_end(ap);
+}
+
 static yajl_gen_status printf_info_one_json(yajl_gen hand, int domid,
                                             libxl_domain_config *d_config)
 {
@@ -843,11 +864,9 @@ static char *parse_cmdline(XLU_Config *config)
                     "in favour of cmdline=\n");
     } else {
         if (root && extra) {
-            if (asprintf(&cmdline, "root=%s %s", root, extra) == -1)
-                cmdline = NULL;
+            xasprintf(&cmdline, "root=%s %s", root, extra);
         } else if (root) {
-            if (asprintf(&cmdline, "root=%s", root) == -1)
-                cmdline = NULL;
+            xasprintf(&cmdline, "root=%s", root);
         } else if (extra) {
             cmdline = strdup(extra);
         }
@@ -2356,14 +2375,11 @@ static int handle_domain_death(uint32_t *r_domid,
         char *corefile;
         int rc;
 
-        if (asprintf(&corefile, XEN_DUMP_DIR "/%s", d_config->c_info.name) < 0) {
-            LOG("failed to construct core dump path");
-        } else {
-            LOG("dumping core to %s", corefile);
-            rc=libxl_domain_core_dump(ctx, *r_domid, corefile, NULL);
-            if (rc) LOG("core dump failed (rc=%d).", rc);
-            free(corefile);
-        }
+        xasprintf(&corefile, XEN_DUMP_DIR "/%s", d_config->c_info.name);
+        LOG("dumping core to %s", corefile);
+        rc = libxl_domain_core_dump(ctx, *r_domid, corefile, NULL);
+        if (rc) LOG("core dump failed (rc=%d).", rc);
+        free(corefile);
         /* No point crying over spilled milk, continue on failure. */
 
         if (action == LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY)
@@ -2710,11 +2726,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
             common_domname = d_config.c_info.name;
             d_config.c_info.name = 0; /* steals allocation from config */
 
-            if (asprintf(&d_config.c_info.name,
-                         "%s--incoming", common_domname) < 0) {
-                fprintf(stderr, "Failed to allocate memory in asprintf\n");
-                exit(1);
-            }
+            xasprintf(&d_config.c_info.name, "%s--incoming", common_domname);
             *dom_info->migration_domname_r = strdup(d_config.c_info.name);
         }
     }
@@ -2801,10 +2813,7 @@ start:
     if (need_daemon) {
         char *name;
 
-        if (asprintf(&name, "xl-%s", d_config.c_info.name) < 0) {
-            LOG("Failed to allocate memory in asprintf");
-            exit(1);
-        }
+        xasprintf(&name, "xl-%s", d_config.c_info.name);
         ret = do_daemonize(name);
         free(name);
         if (ret) {
@@ -3197,11 +3206,8 @@ static int cd_insert(uint32_t domid, const char *virtdev, char *phys)
     struct stat b;
     int rc = 0;
 
-    if (asprintf(&buf, "vdev=%s,access=r,devtype=cdrom,target=%s",
-                 virtdev, phys ? phys : "") < 0) {
-        fprintf(stderr, "out of memory\n");
-        return 1;
-    }
+    xasprintf(&buf, "vdev=%s,access=r,devtype=cdrom,target=%s",
+              virtdev, phys ? phys : "");
 
     parse_disk_config(&config, buf, &disk);
 
@@ -4203,8 +4209,7 @@ static void migrate_domain(uint32_t domid, const char *rune, int debug,
     fprintf(stderr, "migration sender: Target has acknowledged transfer.\n");
 
     if (common_domname) {
-        if (asprintf(&away_domname, "%s--migratedaway", common_domname) < 0)
-            goto failed_resume;
+        xasprintf(&away_domname, "%s--migratedaway", common_domname);
         rc = libxl_domain_rename(ctx, domid, common_domname, away_domname);
         if (rc) goto failed_resume;
     }
@@ -4612,13 +4617,12 @@ int main_migrate(int argc, char **argv)
         } else {
             verbose_len = (minmsglevel_default - minmsglevel) + 2;
         }
-        if (asprintf(&rune, "exec %s %s xl%s%.*s migrate-receive%s%s",
-                     ssh_command, host,
-                     pass_tty_arg ? " -t" : "",
-                     verbose_len, verbose_buf,
-                     daemonize ? "" : " -e",
-                     debug ? " -d" : "") < 0)
-            return 1;
+        xasprintf(&rune, "exec %s %s xl%s%.*s migrate-receive%s%s",
+                  ssh_command, host,
+                  pass_tty_arg ? " -t" : "",
+                  verbose_len, verbose_buf,
+                  daemonize ? "" : " -e",
+                  debug ? " -d" : "");
     }
 
     migrate_domain(domid, rune, debug, config_filename);
@@ -6748,7 +6752,6 @@ static char *uptime_to_string(unsigned long uptime, int short_mode)
 {
     int sec, min, hour, day;
     char *time_string;
-    int ret;
 
     day = (int)(uptime / 86400);
     uptime -= (day * 86400);
@@ -6760,21 +6763,19 @@ static char *uptime_to_string(unsigned long uptime, int short_mode)
 
     if (short_mode)
         if (day > 1)
-            ret = asprintf(&time_string, "%d days, %2d:%02d", day, hour, min);
+            xasprintf(&time_string, "%d days, %2d:%02d", day, hour, min);
         else if (day == 1)
-            ret = asprintf(&time_string, "%d day, %2d:%02d", day, hour, min);
+            xasprintf(&time_string, "%d day, %2d:%02d", day, hour, min);
         else
-            ret = asprintf(&time_string, "%2d:%02d", hour, min);
+            xasprintf(&time_string, "%2d:%02d", hour, min);
     else
         if (day > 1)
-            ret = asprintf(&time_string, "%d days, %2d:%02d:%02d", day, hour, min, sec);
+            xasprintf(&time_string, "%d days, %2d:%02d:%02d", day, hour, min, sec);
         else if (day == 1)
-            ret = asprintf(&time_string, "%d day, %2d:%02d:%02d", day, hour, min, sec);
+            xasprintf(&time_string, "%d day, %2d:%02d:%02d", day, hour, min, sec);
         else
-            ret = asprintf(&time_string, "%2d:%02d:%02d", hour, min, sec);
+            xasprintf(&time_string, "%2d:%02d:%02d", hour, min, sec);
 
-    if (ret < 0)
-        return NULL;
     return time_string;
 }
 
@@ -7927,10 +7928,9 @@ int main_remus(int argc, char **argv)
         if (!ssh_command[0]) {
             rune = host;
         } else {
-            if (asprintf(&rune, "exec %s %s xl migrate-receive -r %s",
-                         ssh_command, host,
-                         daemonize ? "" : " -e") < 0)
-                return 1;
+            xasprintf(&rune, "exec %s %s xl migrate-receive -r %s",
+                      ssh_command, host,
+                      daemonize ? "" : " -e");
         }
 
         save_domain_core_begin(domid, NULL, &config_data, &config_len);
