@@ -1708,7 +1708,8 @@ gnttab_transfer(
         }
 
         max_bitsize = domain_clamp_alloc_bitsize(
-            e, BITS_PER_LONG+PAGE_SHIFT-1);
+            e, e->grant_table->gt_version > 1 || paging_mode_translate(e)
+               ? BITS_PER_LONG + PAGE_SHIFT : 32 + PAGE_SHIFT);
         if ( (1UL << (max_bitsize - PAGE_SHIFT)) <= mfn )
         {
             struct page_info *new_page;
@@ -1806,14 +1807,18 @@ gnttab_transfer(
         if ( e->grant_table->gt_version == 1 )
         {
             grant_entry_v1_t *sha = &shared_entry_v1(e->grant_table, gop.ref);
+
             guest_physmap_add_page(e, sha->frame, mfn, 0);
-            sha->frame = mfn;
+            if ( !paging_mode_translate(e) )
+                sha->frame = mfn;
         }
         else
         {
             grant_entry_v2_t *sha = &shared_entry_v2(e->grant_table, gop.ref);
+
             guest_physmap_add_page(e, sha->full_page.frame, mfn, 0);
-            sha->full_page.frame = mfn;
+            if ( !paging_mode_translate(e) )
+                sha->full_page.frame = mfn;
         }
         smp_wmb();
         shared_entry_header(e->grant_table, gop.ref)->flags |=
