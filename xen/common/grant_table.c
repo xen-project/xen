@@ -344,11 +344,15 @@ get_maptrack_handle(
 /* Number of grant table entries. Caller must hold d's grant table lock. */
 static unsigned int nr_grant_entries(struct grant_table *gt)
 {
-    ASSERT(gt->gt_version != 0);
-    if (gt->gt_version == 1)
+    switch ( gt->gt_version )
+    {
+    case 1:
         return (nr_grant_frames(gt) << PAGE_SHIFT) / sizeof(grant_entry_v1_t);
-    else
+    case 2:
         return (nr_grant_frames(gt) << PAGE_SHIFT) / sizeof(grant_entry_v2_t);
+    }
+
+    return 0;
 }
 
 static int _set_status_v1(domid_t  domid,
@@ -667,10 +671,6 @@ __gnttab_map_grant_ref(
 
     rgt = rd->grant_table;
     read_lock(&rgt->lock);
-
-    if ( rgt->gt_version == 0 )
-        PIN_FAIL(unlock_out, GNTST_general_error,
-                 "remote grant table not yet set up\n");
 
     /* Bounds check on the grant ref */
     if ( unlikely(op->ref >= nr_grant_entries(rgt)))
@@ -1570,14 +1570,6 @@ gnttab_prepare_for_transfer(
 
     read_lock(&rgt->lock);
 
-    if ( rgt->gt_version == 0 )
-    {
-        gdprintk(XENLOG_INFO,
-                 "Grant table not ready for transfer to domain(%d).\n",
-                 rd->domain_id);
-        goto fail;
-    }
-
     if ( unlikely(ref >= nr_grant_entries(rgt)) )
     {
         gdprintk(XENLOG_INFO,
@@ -1976,10 +1968,6 @@ __acquire_grant_for_copy(
     *page = NULL;
 
     read_lock(&rgt->lock);
-
-    if ( rgt->gt_version == 0 )
-        PIN_FAIL(gt_unlock_out, GNTST_general_error,
-                 "remote grant table not ready\n");
 
     if ( unlikely(gref >= nr_grant_entries(rgt)) )
         PIN_FAIL(gt_unlock_out, GNTST_bad_gntref,
@@ -2482,19 +2470,15 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
        change the version number, except for the first 8 entries which
        are allowed to be in use (xenstore/xenconsole keeps them mapped).
        (You need to change the version number for e.g. kexec.) */
-    if ( gt->gt_version != 0 )
+    for ( i = GNTTAB_NR_RESERVED_ENTRIES; i < nr_grant_entries(gt); i++ )
     {
-        for ( i = GNTTAB_NR_RESERVED_ENTRIES; i < nr_grant_entries(gt); i++ )
+        if ( read_atomic(&_active_entry(gt, i).pin) != 0 )
         {
-            if ( read_atomic(&_active_entry(gt, i).pin) != 0 )
-            {
-                gdprintk(XENLOG_WARNING,
-                         "tried to change grant table version from %d to %d, but some grant entries still in use\n",
-                         gt->gt_version,
-                         op.version);
-                res = -EBUSY;
-                goto out_unlock;
-            }
+            gdprintk(XENLOG_WARNING,
+                     "tried to change grant table version from %u to %u, but some grant entries still in use\n",
+                     gt->gt_version, op.version);
+            res = -EBUSY;
+            goto out_unlock;
         }
     }
 
@@ -2678,9 +2662,6 @@ __gnttab_swap_grant_ref(grant_ref_t ref_a, grant_ref_t ref_b)
     s16 rc = GNTST_okay;
 
     write_lock(&gt->lock);
-
-    if ( gt->gt_version == 0 )
-        PIN_FAIL(out, GNTST_general_error, "grant table not yet set up\n");
 
     /* Bounds check on the grant refs */
     if ( unlikely(ref_a >= nr_grant_entries(d->grant_table)))
@@ -3264,9 +3245,6 @@ static void gnttab_usage_print(struct domain *rd)
 
     read_lock(&gt->lock);
 
-    if ( gt->gt_version == 0 )
-        goto out;
-
     for ( ref = 0; ref != nr_grant_entries(gt); ref++ )
     {
         struct active_grant_entry *act;
@@ -3314,7 +3292,6 @@ static void gnttab_usage_print(struct domain *rd)
         active_entry_release(act);
     }
 
- out:
     read_unlock(&gt->lock);
 
     if ( first )
