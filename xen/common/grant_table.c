@@ -624,8 +624,6 @@ __gnttab_map_grant_ref(
     unsigned int   cache_flags;
     struct active_grant_entry *act = NULL;
     struct grant_mapping *mt;
-    grant_entry_v1_t *sha1;
-    grant_entry_v2_t *sha2;
     grant_entry_header_t *shah;
     uint16_t *status;
     bool_t need_iommu;
@@ -682,15 +680,7 @@ __gnttab_map_grant_ref(
 
     act = active_entry_acquire(rgt, op->ref);
     shah = shared_entry_header(rgt, op->ref);
-    if (rgt->gt_version == 1) {
-        sha1 = &shared_entry_v1(rgt, op->ref);
-        sha2 = NULL;
-        status = &shah->flags;
-    } else {
-        sha2 = &shared_entry_v2(rgt, op->ref);
-        sha1 = NULL;
-        status = &status_entry(rgt, op->ref);
-    }
+    status = rgt->gt_version == 1 ? &shah->flags : &status_entry(rgt, op->ref);
 
     /* If already pinned, check the active domid and avoid refcnt overflow. */
     if ( act->pin &&
@@ -713,8 +703,10 @@ __gnttab_map_grant_ref(
         if ( !act->pin )
         {
             unsigned long frame;
+            unsigned long gfn = rgt->gt_version == 1 ?
+                                shared_entry_v1(rgt, op->ref).frame :
+                                shared_entry_v2(rgt, op->ref).full_page.frame;
 
-            unsigned long gfn = sha1 ? sha1->frame : sha2->full_page.frame;
             rc = __get_paged_frame(gfn, &frame, &pg, 
                                     !!(op->flags & GNTMAP_readonly), rd);
             if ( rc != GNTST_okay )
@@ -1954,7 +1946,6 @@ __acquire_grant_for_copy(
     uint16_t *page_off, uint16_t *length, unsigned allow_transitive)
 {
     struct grant_table *rgt = rd->grant_table;
-    grant_entry_v1_t *sha1;
     grant_entry_v2_t *sha2;
     grant_entry_header_t *shah;
     struct active_grant_entry *act;
@@ -1981,13 +1972,11 @@ __acquire_grant_for_copy(
     shah = shared_entry_header(rgt, gref);
     if ( rgt->gt_version == 1 )
     {
-        sha1 = &shared_entry_v1(rgt, gref);
         sha2 = NULL;
         status = &shah->flags;
     }
     else
     {
-        sha1 = NULL;
         sha2 = &shared_entry_v2(rgt, gref);
         status = &status_entry(rgt, gref);
     }
@@ -2009,7 +1998,19 @@ __acquire_grant_for_copy(
 
         td = rd;
         trans_gref = gref;
-        if ( sha2 && (shah->flags & GTF_type_mask) == GTF_transitive )
+        if ( !sha2 )
+        {
+            unsigned long gfn = shared_entry_v1(rgt, gref).frame;
+
+            rc = __get_paged_frame(gfn, &grant_frame, page, readonly, rd);
+            if ( rc != GNTST_okay )
+                goto unlock_out_clear;
+            act->gfn = gfn;
+            is_sub_page = 0;
+            trans_page_off = 0;
+            trans_length = PAGE_SIZE;
+        }
+        else if ( (shah->flags & GTF_type_mask) == GTF_transitive )
         {
             if ( !allow_transitive )
                 PIN_FAIL(unlock_out_clear, GNTST_general_error,
@@ -2081,16 +2082,6 @@ __acquire_grant_for_copy(
                blocks mappings of transitive grants. */
             is_sub_page = 1;
             act->gfn = -1ul;
-        }
-        else if ( sha1 )
-        {
-            rc = __get_paged_frame(sha1->frame, &grant_frame, page, readonly, rd);
-            if ( rc != GNTST_okay )
-                goto unlock_out_clear;
-            act->gfn = sha1->frame;
-            is_sub_page = 0;
-            trans_page_off = 0;
-            trans_length = PAGE_SIZE;
         }
         else if ( !(sha2->hdr.flags & GTF_sub_page) )
         {
@@ -3253,8 +3244,6 @@ static void gnttab_usage_print(struct domain *rd)
     {
         struct active_grant_entry *act;
         struct grant_entry_header *sha;
-        grant_entry_v1_t *sha1;
-        grant_entry_v2_t *sha2;
         uint16_t status;
         uint64_t frame;
 
@@ -3269,16 +3258,12 @@ static void gnttab_usage_print(struct domain *rd)
 
         if ( gt->gt_version == 1 )
         {
-            sha1 = &shared_entry_v1(gt, ref);
-            sha2 = NULL;
             status = sha->flags;
-            frame = sha1->frame;
+            frame = shared_entry_v1(gt, ref).frame;
         }
         else
         {
-            sha2 = &shared_entry_v2(gt, ref);
-            sha1 = NULL;
-            frame = sha2->full_page.frame;
+            frame = shared_entry_v2(gt, ref).full_page.frame;
             status = status_entry(gt, ref);
         }
 
