@@ -1170,6 +1170,26 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
+#ifdef CONFIG_DOMAIN_PAGE
+void clear_domain_page(unsigned long mfn)
+{
+    void *ptr = map_domain_page(mfn);
+
+    clear_page(ptr);
+    unmap_domain_page(ptr);
+}
+
+void copy_domain_page(unsigned long dmfn, unsigned long smfn)
+{
+    const void *src = map_domain_page(smfn);
+    void *dst = map_domain_page(dmfn);
+
+    copy_page(dst, src);
+    unmap_domain_page(dst);
+    unmap_domain_page(src);
+}
+#endif
+
 void destroy_ring_for_helper(
     void **_va, struct page_info *page)
 {

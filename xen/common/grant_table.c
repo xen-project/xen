@@ -1712,7 +1712,6 @@ gnttab_transfer(
         if ( (1UL << (max_bitsize - PAGE_SHIFT)) <= mfn )
         {
             struct page_info *new_page;
-            void *sp, *dp;
 
             new_page = alloc_domheap_page(e, MEMF_no_owner |
                                              MEMF_bits(max_bitsize));
@@ -1722,11 +1721,7 @@ gnttab_transfer(
                 goto unlock_and_copyback;
             }
 
-            sp = map_domain_page(mfn);
-            dp = __map_domain_page(new_page);
-            memcpy(dp, sp, PAGE_SIZE);
-            unmap_domain_page(dp);
-            unmap_domain_page(sp);
+            copy_domain_page(page_to_mfn(new_page), mfn);
 
             page->count_info &= ~(PGC_count_mask|PGC_allocated);
             free_domheap_page(page);
@@ -2520,7 +2515,7 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
     /* Make sure there's no crud left over in the table from the
        old version. */
     for ( i = 0; i < nr_grant_frames(gt); i++ )
-        memset(gt->shared_raw[i], 0, PAGE_SIZE);
+        clear_page(gt->shared_raw[i]);
 
     /* Restore the first 8 entries (toolstack reserved grants) */
     if ( gt->gt_version != 0 && op.version == 1 )

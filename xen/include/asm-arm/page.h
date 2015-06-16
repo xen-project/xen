@@ -264,6 +264,8 @@ static inline lpae_t mfn_to_xen_entry(unsigned long mfn, unsigned attr)
 /* Actual cacheline size on the boot CPU. */
 extern size_t cacheline_bytes;
 
+#define copy_page(dp, sp) memcpy(dp, sp, PAGE_SIZE)
+
 /* Functions for flushing medium-sized areas.
  * if 'range' is large enough we might want to use model-specific
  * full-cache flushes. */
