@@ -52,16 +52,6 @@
 /* The maximum size of a grant table. */
 extern unsigned int max_grant_frames;
 
-/*
- * Tracks a mapping of another domain's grant reference. Each domain has a
- * table of these, indexes into which are returned as a 'mapping handle'.
- */
-struct grant_mapping {
-    u32      ref;           /* grant ref */
-    u16      flags;         /* 0-4: GNTMAP_* ; 5-15: unused */
-    domid_t  domid;         /* granting domain */
-};
-
 /* Per-domain grant information. */
 struct grant_table {
     /*

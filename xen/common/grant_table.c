@@ -113,6 +113,16 @@ struct gnttab_unmap_common {
         goto _lbl;                              \
     } while ( 0 )
 
+/*
+ * Tracks a mapping of another domain's grant reference. Each domain has a
+ * table of these, indexes into which are returned as a 'mapping handle'.
+ */
+struct grant_mapping {
+    u32      ref;           /* grant ref */
+    u16      flags;         /* 0-4: GNTMAP_* ; 5-15: unused */
+    domid_t  domid;         /* granting domain */
+};
+
 #define MAPTRACK_PER_PAGE (PAGE_SIZE / sizeof(struct grant_mapping))
 #define maptrack_entry(t, e) \
     ((t)->maptrack[(e)/MAPTRACK_PER_PAGE][(e)%MAPTRACK_PER_PAGE])
