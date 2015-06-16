@@ -253,7 +253,7 @@ static inline void
 double_gt_lock(struct grant_table *lgt, struct grant_table *rgt)
 {
     /*
-     * See mapcount() for why the write lock is also required for the
+     * See mapkind() for why the write lock is also required for the
      * remote domain.
      */
     if ( lgt < rgt )
@@ -566,14 +566,14 @@ static int grant_map_exists(const struct domain *ld,
     return -EINVAL;
 }
 
-static void mapcount(
-    struct grant_table *lgt, struct domain *rd, unsigned long mfn,
-    unsigned int *wrc, unsigned int *rdc)
+#define MAPKIND_READ 1
+#define MAPKIND_WRITE 2
+static unsigned int mapkind(
+    struct grant_table *lgt, const struct domain *rd, unsigned long mfn)
 {
     struct grant_mapping *map;
     grant_handle_t handle;
-
-    *wrc = *rdc = 0;
+    unsigned int kind = 0;
 
     /*
      * Must have the local domain's grant table write lock when
@@ -586,15 +586,19 @@ static void mapcount(
      */
     ASSERT(rw_is_write_locked(&rd->grant_table->lock));
 
-    for ( handle = 0; handle < lgt->maptrack_limit; handle++ )
+    for ( handle = 0; !(kind & MAPKIND_WRITE) &&
+                      handle < lgt->maptrack_limit; handle++ )
     {
         map = &maptrack_entry(lgt, handle);
         if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) ||
              map->domid != rd->domain_id )
             continue;
         if ( _active_entry(rd->grant_table, map->ref).frame == mfn )
-            (map->flags & GNTMAP_readonly) ? (*rdc)++ : (*wrc)++;
+            kind |= map->flags & GNTMAP_readonly ?
+                    MAPKIND_READ : MAPKIND_WRITE;
     }
+
+    return kind;
 }
 
 /*
@@ -819,24 +823,24 @@ __gnttab_map_grant_ref(
     need_iommu = gnttab_need_iommu_mapping(ld);
     if ( need_iommu )
     {
-        unsigned int wrc, rdc;
+        unsigned int kind;
         int err = 0;
 
         double_gt_lock(lgt, rgt);
 
         /* We're not translated, so we know that gmfns and mfns are
            the same things, so the IOMMU entry is always 1-to-1. */
-        mapcount(lgt, rd, frame, &wrc, &rdc);
+        kind = mapkind(lgt, rd, frame);
         if ( (act_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
              !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
         {
-            if ( wrc == 0 )
+            if ( !(kind & MAPKIND_WRITE) )
                 err = iommu_map_page(ld, frame, frame,
                                      IOMMUF_readable|IOMMUF_writable);
         }
         else if ( act_pin && !old_pin )
         {
-            if ( (wrc + rdc) == 0 )
+            if ( !kind )
                 err = iommu_map_page(ld, frame, frame, IOMMUF_readable);
         }
         if ( err )
@@ -1050,15 +1054,15 @@ __gnttab_unmap_common(
 
     if ( rc == GNTST_okay && gnttab_need_iommu_mapping(ld) )
     {
-        unsigned int wrc, rdc;
+        unsigned int kind;
         int err = 0;
 
         double_gt_lock(lgt, rgt);
 
-        mapcount(lgt, rd, op->frame, &wrc, &rdc);
-        if ( (wrc + rdc) == 0 )
+        kind = mapkind(lgt, rd, op->frame);
+        if ( !kind )
             err = iommu_unmap_page(ld, op->frame);
-        else if ( wrc == 0 )
+        else if ( !(kind & MAPKIND_WRITE) )
             err = iommu_map_page(ld, op->frame, op->frame, IOMMUF_readable);
 
         double_gt_unlock(lgt, rgt);
