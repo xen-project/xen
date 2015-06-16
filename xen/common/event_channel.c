@@ -192,6 +192,17 @@ static int get_free_port(struct domain *d)
     return port;
 }
 
+static void free_evtchn(struct domain *d, struct evtchn *chn)
+{
+    /* Clear pending event to avoid unexpected behavior on re-bind. */
+    evtchn_port_clear_pending(d, chn);
+
+    /* Reset binding to vcpu0 when the channel is freed. */
+    chn->state          = ECS_FREE;
+    chn->notify_vcpu_id = 0;
+
+    xsm_evtchn_close_post(chn);
+}
 
 static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 {
@@ -569,14 +580,7 @@ static long __evtchn_close(struct domain *d1, int port1)
         BUG();
     }
 
-    /* Clear pending event to avoid unexpected behavior on re-bind. */
-    evtchn_port_clear_pending(d1, chn1);
-
-    /* Reset binding to vcpu0 when the channel is freed. */
-    chn1->state          = ECS_FREE;
-    chn1->notify_vcpu_id = 0;
-
-    xsm_evtchn_close_post(chn1);
+    free_evtchn(d1, chn1);
 
  out:
     if ( d2 != NULL )

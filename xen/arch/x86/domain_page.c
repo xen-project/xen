@@ -230,24 +230,6 @@ void unmap_domain_page(const void *ptr)
     local_irq_restore(flags);
 }
 
-void clear_domain_page(unsigned long mfn)
-{
-    void *ptr = map_domain_page(mfn);
-
-    clear_page(ptr);
-    unmap_domain_page(ptr);
-}
-
-void copy_domain_page(unsigned long dmfn, unsigned long smfn)
-{
-    const void *src = map_domain_page(smfn);
-    void *dst = map_domain_page(dmfn);
-
-    copy_page(dst, src);
-    unmap_domain_page(dst);
-    unmap_domain_page(src);
-}
-
 int mapcache_domain_init(struct domain *d)
 {
     struct mapcache_domain *dcache = &d->arch.pv_domain.mapcache;

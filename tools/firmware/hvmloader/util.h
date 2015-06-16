@@ -82,9 +82,9 @@ uint32_t pci_read(uint32_t devfn, uint32_t reg, uint32_t len);
 #define pci_readw(devfn, reg) ((uint16_t)pci_read(devfn, reg, 2))
 #define pci_readl(devfn, reg) ((uint32_t)pci_read(devfn, reg, 4))
 void pci_write(uint32_t devfn, uint32_t reg, uint32_t len, uint32_t val);
-#define pci_writeb(devfn, reg, val) (pci_write(devfn, reg, 1, (uint8_t) val))
-#define pci_writew(devfn, reg, val) (pci_write(devfn, reg, 2, (uint16_t)val))
-#define pci_writel(devfn, reg, val) (pci_write(devfn, reg, 4, (uint32_t)val))
+#define pci_writeb(devfn, reg, val) pci_write(devfn, reg, 1, (uint8_t) (val))
+#define pci_writew(devfn, reg, val) pci_write(devfn, reg, 2, (uint16_t)(val))
+#define pci_writel(devfn, reg, val) pci_write(devfn, reg, 4, (uint32_t)(val))
 
 /* Get a pointer to the shared-info page */
 struct shared_info *get_shared_info(void) __attribute__ ((const));
