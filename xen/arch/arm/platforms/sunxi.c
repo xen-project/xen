@@ -69,9 +69,6 @@ PLATFORM_START(sunxi, "Allwinner A20")
     .compatible = sunxi_dt_compat,
     .blacklist_dev = sunxi_blacklist_dev,
     .reset = sunxi_reset,
-
-    .dom0_gnttab_start = 0x01d00000,
-    .dom0_gnttab_size = 0x20000,
 PLATFORM_END
 
 /*

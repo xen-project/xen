@@ -56,9 +56,6 @@ PLATFORM_START(rcar2, "Renesas R-Car Gen2")
     .compatible = rcar2_dt_compat,
     .cpu_up = cpu_up_send_sgi,
     .smp_init = rcar2_smp_init,
-
-    .dom0_gnttab_start = 0xc0000000,
-    .dom0_gnttab_size = 0x20000,
 PLATFORM_END
 
 /*

@@ -22,6 +22,10 @@ struct kernel_info {
     /* kernel entry point */
     paddr_t entry;
 
+    /* grant table region */
+    paddr_t gnttab_start;
+    paddr_t gnttab_size;
+
     /* boot blob load addresses */
     const struct bootmodule *kernel_bootmodule, *initrd_bootmodule;
     paddr_t dtb_paddr;

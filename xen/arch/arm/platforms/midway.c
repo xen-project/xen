@@ -51,9 +51,6 @@ static const char * const midway_dt_compat[] __initconst =
 PLATFORM_START(midway, "CALXEDA MIDWAY")
     .compatible = midway_dt_compat,
     .reset = midway_reset,
-
-    .dom0_gnttab_start = 0xff800000,
-    .dom0_gnttab_size = 0x20000,
 PLATFORM_END
 
 /*

@@ -176,8 +176,6 @@ PLATFORM_START(vexpress, "VERSATILE EXPRESS")
 #endif
     .reset = vexpress_reset,
     .blacklist_dev = vexpress_blacklist_dev,
-    .dom0_gnttab_start = 0x10000000,
-    .dom0_gnttab_size = 0x20000,
 PLATFORM_END
 
 /*

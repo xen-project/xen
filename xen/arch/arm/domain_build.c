@@ -21,6 +21,7 @@
 
 #include <asm/gic.h>
 #include <xen/irq.h>
+#include <xen/grant_table.h>
 #include "kernel.h"
 
 static unsigned int __initdata opt_dom0_max_vcpus;
@@ -605,8 +606,8 @@ static int make_memory_node(const struct domain *d,
     return res;
 }
 
-static int make_hypervisor_node(struct domain *d,
-                                void *fdt, const struct dt_device_node *parent)
+static int make_hypervisor_node(const struct kernel_info *kinfo,
+                                const struct dt_device_node *parent)
 {
     const char compat[] =
         "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
@@ -615,9 +616,10 @@ static int make_hypervisor_node(struct domain *d,
     gic_interrupt_t intr;
     __be32 *cells;
     int res;
+    /* Convenience alias */
     int addrcells = dt_n_addr_cells(parent);
     int sizecells = dt_n_size_cells(parent);
-    paddr_t gnttab_start, gnttab_size;
+    void *fdt = kinfo->fdt;
 
     DPRINT("Create hypervisor node\n");
 
@@ -639,12 +641,9 @@ static int make_hypervisor_node(struct domain *d,
     if ( res )
         return res;
 
-    platform_dom0_gnttab(&gnttab_start, &gnttab_size);
-    DPRINT("  Grant table range: %#"PRIpaddr"-%#"PRIpaddr"\n",
-           gnttab_start, gnttab_start + gnttab_size);
     /* reg 0 is grant table space */
     cells = &reg[0];
-    dt_set_range(&cells, parent, gnttab_start, gnttab_size);
+    dt_set_range(&cells, parent, kinfo->gnttab_start, kinfo->gnttab_size);
     res = fdt_property(fdt, "reg", reg,
                        dt_cells_to_size(addrcells + sizecells));
     if ( res )
@@ -1192,7 +1191,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
 
     if ( node == dt_host )
     {
-        res = make_hypervisor_node(d, kinfo->fdt, node);
+        res = make_hypervisor_node(kinfo, node);
         if ( res )
             return res;
 
@@ -1368,6 +1367,37 @@ static void evtchn_fixup(struct domain *d, struct kernel_info *kinfo)
         panic("Cannot fix up \"interrupts\" property of the hypervisor node");
 }
 
+static void __init find_gnttab_region(struct domain *d,
+                                      struct kernel_info *kinfo)
+{
+    /*
+     * The region used by Xen on the memory will never be mapped in DOM0
+     * memory layout. Therefore it can be used for the grant table.
+     *
+     * Only use the text section as it's always present and will contain
+     * enough space for a large grant table
+     */
+    kinfo->gnttab_start = __pa(_stext);
+    kinfo->gnttab_size = (_etext - _stext) & PAGE_MASK;
+
+    /* Make sure the grant table will fit in the region */
+    if ( (kinfo->gnttab_size >> PAGE_SHIFT) < max_grant_frames )
+        panic("Cannot find a space for the grant table region\n");
+
+#ifdef CONFIG_ARM_32
+    /*
+     * The gnttab region must be under 4GB in order to work with DOM0
+     * using short page table.
+     * In practice it's always the case because Xen is always located
+     * below 4GB, but be safe.
+     */
+    BUG_ON((kinfo->gnttab_start + kinfo->gnttab_size) > GB(4));
+#endif
+
+    printk("Grant table range: %#"PRIpaddr"-%#"PRIpaddr"\n",
+           kinfo->gnttab_start, kinfo->gnttab_start + kinfo->gnttab_size);
+}
+
 int construct_dom0(struct domain *d)
 {
     struct kernel_info kinfo = {};
@@ -1405,6 +1435,7 @@ int construct_dom0(struct domain *d)
 #endif
 
     allocate_memory(d, &kinfo);
+    find_gnttab_region(d, &kinfo);
 
     rc = prepare_dtb(d, &kinfo);
     if ( rc < 0 )

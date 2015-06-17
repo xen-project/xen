@@ -45,9 +45,6 @@ PLATFORM_START(seattle, "SEATTLE")
     .compatible = seattle_dt_compat,
     .reset      = seattle_system_reset,
     .poweroff   = seattle_system_off,
-
-    .dom0_gnttab_start = 0xe1700000,
-    .dom0_gnttab_size = 0x20000,
 PLATFORM_END
 
 /*
