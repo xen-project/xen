@@ -187,11 +187,11 @@ let del_watch con path token =
 	apath, w
 
 let del_watches con =
-  Hashtbl.clear con.watches
+  Hashtbl.clear con.watches;
+  con.nb_watches <- 0
 
 let del_transactions con =
-  Hashtbl.clear con.transactions;
-  con.nb_watches <- 0
+  Hashtbl.clear con.transactions
 
 let list_watches con =
 	let ll = Hashtbl.fold 
