@@ -4,6 +4,7 @@
 #include <xen/guest_access.h>
 #include <xen/irq.h>
 #include <xen/time.h>
+#include <asm/atomic.h>
 #include <asm/mc146818rtc.h>
 
 DEFINE_XEN_GUEST_HANDLE(CHAR16);
@@ -44,6 +45,12 @@ struct efi __read_mostly efi = {
 l4_pgentry_t *__read_mostly efi_l4_pgtable;
 
 const struct efi_pci_rom *__read_mostly efi_pci_roms;
+
+void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t l4e)
+{
+    if ( efi_l4_pgtable )
+        l4e_write(efi_l4_pgtable + l4idx, l4e);
+}
 
 unsigned long efi_rs_enter(void)
 {
