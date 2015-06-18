@@ -811,7 +811,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     int live  = (flags & XCFLAGS_LIVE);
     int debug = (flags & XCFLAGS_DEBUG);
     int superpages = !!hvm;
-    int race = 0, sent_last_iter, skip_this_iter = 0;
+    int race = 0, skip_this_iter = 0;
     unsigned int sent_this_iter = 0;
     int tmem_saved = 0;
 
@@ -1013,9 +1013,6 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     }
 
     last_iter = !live;
-
-    /* pretend we sent all the pages last iteration */
-    sent_last_iter = dinfo->p2m_size;
 
     /* Setup to_send / to_fix and to_skip bitmaps */
     to_send = xc_hypercall_buffer_alloc_pages(xch, to_send, NRPAGES(bitmap_size(dinfo->p2m_size)));
@@ -1585,8 +1582,6 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                 PERROR("Error flushing shadow PT");
                 goto out;
             }
-
-            sent_last_iter = sent_this_iter;
 
             print_stats(xch, dom, sent_this_iter, &time_stats, &shadow_stats, 1);
 
