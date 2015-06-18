@@ -927,8 +927,6 @@ int evtchn_unmask(unsigned int port)
     struct domain *d = current->domain;
     struct evtchn *evtchn;
 
-    ASSERT(spin_is_locked(&d->event_lock));
-
     if ( unlikely(!port_is_valid(d, port)) )
         return -EINVAL;
 
@@ -1095,9 +1093,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct evtchn_unmask unmask;
         if ( copy_from_guest(&unmask, arg, 1) != 0 )
             return -EFAULT;
-        spin_lock(&current->domain->event_lock);
         rc = evtchn_unmask(unmask.port);
-        spin_unlock(&current->domain->event_lock);
         break;
     }
 
