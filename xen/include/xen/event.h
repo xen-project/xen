@@ -89,11 +89,7 @@ static inline bool_t port_is_valid(struct domain *d, unsigned int p)
 {
     if ( p >= d->max_evtchns )
         return 0;
-    if ( !d->evtchn )
-        return 0;
-    if ( p < EVTCHNS_PER_BUCKET )
-        return 1;
-    return group_from_port(d, p) != NULL && bucket_from_port(d, p) != NULL;
+    return p < read_atomic(&d->valid_evtchns);
 }
 
 static inline struct evtchn *evtchn_from_port(struct domain *d, unsigned int p)

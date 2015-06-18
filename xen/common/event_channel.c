@@ -189,6 +189,8 @@ static int get_free_port(struct domain *d)
         return -ENOMEM;
     bucket_from_port(d, port) = chn;
 
+    write_atomic(&d->valid_evtchns, d->valid_evtchns + EVTCHNS_PER_BUCKET);
+
     return port;
 }
 
@@ -1254,6 +1256,7 @@ int evtchn_init(struct domain *d)
     d->evtchn = alloc_evtchn_bucket(d, 0);
     if ( !d->evtchn )
         return -ENOMEM;
+    d->valid_evtchns = EVTCHNS_PER_BUCKET;
 
     spin_lock_init_prof(d, event_lock);
     if ( get_free_port(d) != 0 )
