@@ -2776,7 +2776,8 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     p2m_type_t p2mt;
     p2m_access_t p2ma;
     mfn_t mfn;
-    struct vcpu *v = current;
+    struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
     struct p2m_domain *p2m;
     int rc, fall_through = 0, paged = 0;
     int sharing_enomem = 0;
@@ -2786,9 +2787,9 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
      * If this succeeds, all is fine.
      * If this fails, inject a nested page fault into the guest.
      */
-    if ( nestedhvm_enabled(v->domain)
-        && nestedhvm_vcpu_in_guestmode(v)
-        && nestedhvm_paging_mode_hap(v) )
+    if ( nestedhvm_enabled(currd)
+        && nestedhvm_vcpu_in_guestmode(curr)
+        && nestedhvm_paging_mode_hap(curr) )
     {
         int rv;
 
@@ -2800,7 +2801,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          * the same as for shadow paging.
          */
 
-         rv = nestedhvm_hap_nested_page_fault(v, &gpa,
+         rv = nestedhvm_hap_nested_page_fault(curr, &gpa,
                                               npfec.read_access,
                                               npfec.write_access,
                                               npfec.insn_fetch);
@@ -2830,8 +2831,8 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
      * - 32-bit WinXP (& older Windows) on AMD CPUs for LAPIC accesses,
      * - newer Windows (like Server 2012) for HPET accesses.
      */
-    if ( !nestedhvm_vcpu_in_guestmode(v)
-         && is_hvm_vcpu(v)
+    if ( !nestedhvm_vcpu_in_guestmode(curr)
+         && is_hvm_domain(currd)
          && hvm_mmio_internal(gpa) )
     {
         if ( !handle_mmio_with_translation(gla, gpa >> PAGE_SHIFT, npfec) )
@@ -2840,7 +2841,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         goto out;
     }
 
-    p2m = p2m_get_hostp2m(v->domain);
+    p2m = p2m_get_hostp2m(currd);
     mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 
                               P2M_ALLOC | (npfec.write_access ? P2M_UNSHARE : 0),
                               NULL);
@@ -2903,10 +2904,10 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          (npfec.write_access &&
           (p2m_is_discard_write(p2mt) || (p2mt == p2m_mmio_write_dm))) )
     {
-        put_gfn(p2m->domain, gfn);
+        put_gfn(currd, gfn);
 
         rc = 0;
-        if ( unlikely(is_pvh_vcpu(v)) )
+        if ( unlikely(is_pvh_domain(currd)) )
             goto out;
 
         if ( !handle_mmio_with_translation(gla, gpa >> PAGE_SHIFT, npfec) )
@@ -2924,7 +2925,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     {
         ASSERT(p2m_is_hostp2m(p2m));
         sharing_enomem = 
-            (mem_sharing_unshare_page(p2m->domain, gfn, 0) < 0);
+            (mem_sharing_unshare_page(currd, gfn, 0) < 0);
         rc = 1;
         goto out_put_gfn;
     }
@@ -2939,8 +2940,8 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          */
         if ( npfec.write_access )
         {
-            paging_mark_dirty(v->domain, mfn_x(mfn));
-            p2m_change_type_one(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
+            paging_mark_dirty(currd, mfn_x(mfn));
+            p2m_change_type_one(currd, gfn, p2m_ram_logdirty, p2m_ram_rw);
         }
         rc = 1;
         goto out_put_gfn;
@@ -2952,28 +2953,28 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     rc = fall_through;
 
 out_put_gfn:
-    put_gfn(p2m->domain, gfn);
+    put_gfn(currd, gfn);
 out:
     /* All of these are delayed until we exit, since we might 
      * sleep on event ring wait queues, and we must not hold
      * locks in such circumstance */
     if ( paged )
-        p2m_mem_paging_populate(v->domain, gfn);
+        p2m_mem_paging_populate(currd, gfn);
     if ( sharing_enomem )
     {
         int rv;
-        if ( (rv = mem_sharing_notify_enomem(v->domain, gfn, 1)) < 0 )
+        if ( (rv = mem_sharing_notify_enomem(currd, gfn, 1)) < 0 )
         {
             gdprintk(XENLOG_ERR, "Domain %hu attempt to unshare "
                      "gfn %lx, ENOMEM and no helper (rc %d)\n",
-                        v->domain->domain_id, gfn, rv);
+                     currd->domain_id, gfn, rv);
             /* Crash the domain */
             rc = 0;
         }
     }
     if ( req_ptr )
     {
-        mem_access_send_req(v->domain, req_ptr);
+        mem_access_send_req(currd, req_ptr);
         xfree(req_ptr);
     }
     return rc;
