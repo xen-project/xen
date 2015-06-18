@@ -12,7 +12,7 @@ void __init efi_init_memory(void) { }
 
 void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t l4e) { }
 
-paddr_t efi_rs_page_table(void)
+bool_t efi_rs_using_pgtables(void)
 {
     BUG();
     return 0;

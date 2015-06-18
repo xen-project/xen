@@ -26,6 +26,7 @@ const CHAR16 *__read_mostly efi_fw_vendor;
 
 EFI_RUNTIME_SERVICES *__read_mostly efi_rs;
 static DEFINE_SPINLOCK(efi_rs_lock);
+static unsigned int efi_rs_on_cpu = NR_CPUS;
 
 UINTN __read_mostly efi_memmap_size;
 UINTN __read_mostly efi_mdesc_size;
@@ -67,6 +68,8 @@ unsigned long efi_rs_enter(void)
 
     spin_lock(&efi_rs_lock);
 
+    efi_rs_on_cpu = smp_processor_id();
+
     /* prevent fixup_page_fault() from doing anything */
     irq_enter();
 
@@ -101,13 +104,16 @@ void efi_rs_leave(unsigned long cr3)
         asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
     }
     irq_exit();
+    efi_rs_on_cpu = NR_CPUS;
     spin_unlock(&efi_rs_lock);
     stts();
 }
 
-paddr_t efi_rs_page_table(void)
+bool_t efi_rs_using_pgtables(void)
 {
-    return efi_l4_pgtable ? virt_to_maddr(efi_l4_pgtable) : 0;
+    return efi_l4_pgtable &&
+           (smp_processor_id() == efi_rs_on_cpu) &&
+           (read_cr3() == virt_to_maddr(efi_l4_pgtable));
 }
 
 unsigned long efi_get_time(void)
