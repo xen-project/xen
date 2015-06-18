@@ -1,6 +1,5 @@
 /* Trigger a page-in in a separate thread-of-execution to avoid deadlock */
 #include <pthread.h>
-#include <xc_private.h>
 #include "xenpaging.h"
 
 struct page_in_args {

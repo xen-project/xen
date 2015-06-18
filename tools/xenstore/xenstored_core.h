@@ -19,6 +19,7 @@
 #ifndef _XENSTORED_CORE_H
 #define _XENSTORED_CORE_H
 
+#define XC_WANT_COMPAT_MAP_FOREIGN_API
 #include <xenctrl.h>
 #include <xengnttab.h>
 

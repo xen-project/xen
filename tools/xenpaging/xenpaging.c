@@ -27,7 +27,6 @@
 #include <signal.h>
 #include <unistd.h>
 #include <poll.h>
-#include <xc_private.h>
 #include <xenstore.h>
 #include <getopt.h>
 

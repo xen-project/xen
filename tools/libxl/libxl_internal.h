@@ -50,6 +50,7 @@
 
 #include <xenevtchn.h>
 #include <xenstore.h>
+#define XC_WANT_COMPAT_MAP_FOREIGN_API
 #include <xenctrl.h>
 #include <xenguest.h>
 #include <xc_dom.h>

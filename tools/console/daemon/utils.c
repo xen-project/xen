@@ -33,7 +33,6 @@
 #include <string.h>
 #include <signal.h>
 
-#include "xenctrl.h"
 #include "utils.h"
 
 struct xs_handle *xs;

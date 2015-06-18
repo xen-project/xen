@@ -1,0 +1,7 @@
+VERS_1.0 {
+	global:
+		xenforeignmemory_open;
+		xenforeignmemory_close;
+		xenforeignmemory_map;
+	local: *; /* Do not expose anything by default */
+};

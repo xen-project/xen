@@ -42,8 +42,8 @@ CTRL_SRCS-y       += xc_kexec.c
 CTRL_SRCS-y       += xc_resource.c
 CTRL_SRCS-$(CONFIG_X86) += xc_psr.c
 CTRL_SRCS-$(CONFIG_X86) += xc_pagetab.c
-CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c xc_linux_osdep.c
-CTRL_SRCS-$(CONFIG_FreeBSD) += xc_freebsd.c xc_freebsd_osdep.c
+CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c
+CTRL_SRCS-$(CONFIG_FreeBSD) += xc_freebsd.c
 CTRL_SRCS-$(CONFIG_SunOS) += xc_solaris.c
 CTRL_SRCS-$(CONFIG_NetBSD) += xc_netbsd.c
 CTRL_SRCS-$(CONFIG_NetBSDRump) += xc_netbsd.c
@@ -125,7 +125,7 @@ $(CTRL_PIC_OBJS) $(GUEST_PIC_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.
 # libxenguest includes xc_private.h, so needs this despite not using
 # this functionality directly.
 $(CTRL_LIB_OBJS) $(GUEST_LIB_OBJS) \
-$(CTRL_PIC_OBJS) $(GUEST_PIC_OBJS): CFLAGS += $(CFLAGS_libxencall)
+$(CTRL_PIC_OBJS) $(GUEST_PIC_OBJS): CFLAGS += $(CFLAGS_libxencall) $(CFLAGS_libxenforeignmemory)
 
 $(CTRL_LIB_OBJS) $(CTRL_PIC_OBJS): CFLAGS += $(CFLAGS_libxengnttab) $(CFLAGS_libxengntshr)
 
@@ -207,7 +207,7 @@ libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
 	$(SYMLINK_SHLIB) $< $@
 
 libxenctrl.so.$(MAJOR).$(MINOR): $(CTRL_PIC_OBJS)
-	$(CC) $(LDFLAGS) $(PTHREAD_LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LDLIBS_libxentoollog) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_libxengntshr) $(LDLIBS_libxencall) $(PTHREAD_LIBS) $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) $(PTHREAD_LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LDLIBS_libxentoollog) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_libxengntshr) $(LDLIBS_libxencall) $(LDLIBS_libxenforeignmemory) $(PTHREAD_LIBS) $(APPEND_LDFLAGS)
 
 # libxenguest
 

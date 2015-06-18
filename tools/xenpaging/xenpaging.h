@@ -25,6 +25,8 @@
 
 
 #include <xenevtchn.h>
+#define XC_WANT_COMPAT_MAP_FOREIGN_API
+#include <xenctrl.h>
 #include <xc_private.h>
 #include <xen/event_channel.h>
 #include <xen/vm_event.h>

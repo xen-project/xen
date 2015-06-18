@@ -50,7 +50,6 @@
 #include "xenstored_watch.h"
 #include "xenstored_transaction.h"
 #include "xenstored_domain.h"
-#include "xenctrl.h"
 #include "tdb.h"
 
 #include "hashtable.h"

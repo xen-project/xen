@@ -17,6 +17,7 @@
  * License along with this library; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define XC_BUILDING_COMPAT_MAP_FOREIGN_API
 #include "xc_private.h"
 
 void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
@@ -34,7 +35,7 @@ void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
     if (!err)
         return NULL;
 
-    res = xc_map_foreign_bulk(xch, dom, prot, arr, err, num);
+    res = xenforeignmemory_map(xch->fmem, dom, prot, arr, err, num);
     if (res) {
         for (i = 0; i < num; i++) {
             if (err[i]) {
@@ -100,53 +101,11 @@ void *xc_map_foreign_ranges(xc_interface *xch,
     return ret;
 }
 
-/*
- * stub for all not yet converted OSes (NetBSD and Solaris). New OSes should
- * just implement xc_map_foreign_bulk.
- */
-#if defined(__NetBSD__) || defined(__sun__)
-void *osdep_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
-                              xen_pfn_t *arr, int num );
-void *xc_map_foreign_bulk(xc_interface *xch,
-                          uint32_t dom, int prot,
+void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
                           const xen_pfn_t *arr, int *err, unsigned int num)
 {
-    xen_pfn_t *pfn;
-    unsigned int i;
-    void *ret;
-
-    if ((int)num <= 0) {
-        errno = EINVAL;
-        return NULL;
-    }
-
-    pfn = malloc(num * sizeof(*pfn));
-    if (!pfn) {
-        errno = ENOMEM;
-        return NULL;
-    }
-
-    memcpy(pfn, arr, num * sizeof(*arr));
-    ret = osdep_map_foreign_batch(xch, dom, prot, pfn, num);
-
-    if (ret) {
-        for (i = 0; i < num; ++i)
-            switch (pfn[i] ^ arr[i]) {
-            case 0:
-                err[i] = 0;
-                break;
-            default:
-                err[i] = -EINVAL;
-                break;
-            }
-    } else
-        memset(err, 0, num * sizeof(*err));
-
-    free(pfn);
-
-    return ret;
+    return xenforeignmemory_map(xch->fmem, dom, prot, arr, err, num);
 }
-#endif
 
 /*
  * Local variables:

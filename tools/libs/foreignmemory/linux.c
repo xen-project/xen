@@ -1,11 +1,4 @@
- /******************************************************************************
- *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
- * xc_gnttab functions:
- * Copyright (c) 2007-2008, D G Murray <Derek.Murray@cl.cam.ac.uk>
- *
+/*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -18,27 +11,26 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Split out from xc_linus_osdep.c:
+ *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  */
 
+#include <alloca.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+#include <string.h>
 
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 
-#include <xen/memory.h>
-
-#include "xenctrl.h"
-
-#include "xc_private.h"
+#include "private.h"
 
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
-int osdep_privcmd_open(xc_interface *xch)
+int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem)
 {
     int flags, saved_errno;
     int fd = open("/dev/xen/privcmd", O_RDWR); /* prefer this newer interface */
@@ -73,7 +65,7 @@ int osdep_privcmd_open(xc_interface *xch)
         goto error;
     }
 
-    xch->privcmdfd = fd;
+    fmem->fd = fd;
     return 0;
 
  error:
@@ -83,9 +75,9 @@ int osdep_privcmd_open(xc_interface *xch)
     return -1;
 }
 
-int osdep_privcmd_close(xc_interface *xch)
+int osdep_xenforeignmemory_close(xenforeignmemory_handle *fmem)
 {
-    int fd = xch->privcmdfd;
+    int fd = fmem->fd;
     if (fd == -1)
         return 0;
     return close(fd);
@@ -127,7 +119,7 @@ static int retry_paged(int fd, uint32_t dom, void *addr,
 {
     privcmd_mmapbatch_v2_t ioctlx;
     int rc, paged = 0, i = 0;
-    
+
     do
     {
         /* Skip gfns not in paging state */
@@ -142,10 +134,10 @@ static int retry_paged(int fd, uint32_t dom, void *addr,
         /* At least one gfn is still in paging state */
         ioctlx.num = 1;
         ioctlx.dom = dom;
-        ioctlx.addr = (unsigned long)addr + ((unsigned long)i<<XC_PAGE_SHIFT);
+        ioctlx.addr = (unsigned long)addr + ((unsigned long)i<<PAGE_SHIFT);
         ioctlx.arr = arr + i;
         ioctlx.err = err + i;
-        
+
         /* Assemble a batch of requests */
         while ( ++i < num )
         {
@@ -153,34 +145,34 @@ static int retry_paged(int fd, uint32_t dom, void *addr,
                 break;
             ioctlx.num++;
         }
-        
+
         /* Send request and abort on fatal error */
         rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH_V2, &ioctlx);
         if ( rc < 0 && errno != ENOENT )
             goto out;
 
     } while ( i < num );
-    
+
     rc = paged;
 out:
     return rc;
 }
 
-void *xc_map_foreign_bulk(xc_interface *xch,
-                          uint32_t dom, int prot,
-                          const xen_pfn_t *arr, int *err, unsigned int num)
+void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
+                                 uint32_t dom, int prot,
+                                 const xen_pfn_t *arr, int *err, unsigned int num)
 {
-    int fd = xch->privcmdfd;
+    int fd = fmem->fd;
     privcmd_mmapbatch_v2_t ioctlx;
     void *addr;
     unsigned int i;
     int rc;
 
-    addr = mmap(NULL, (unsigned long)num << XC_PAGE_SHIFT, prot, MAP_SHARED,
+    addr = mmap(NULL, (unsigned long)num << PAGE_SHIFT, prot, MAP_SHARED,
                 fd, 0);
     if ( addr == MAP_FAILED )
     {
-        PERROR("xc_map_foreign_bulk: mmap failed");
+        PERROR("mmap failed");
         return NULL;
     }
 
@@ -209,9 +201,9 @@ void *xc_map_foreign_bulk(xc_interface *xch,
          */
         privcmd_mmapbatch_t ioctlx;
         xen_pfn_t *pfn;
-        unsigned int pfn_arr_size = ROUNDUP((num * sizeof(*pfn)), XC_PAGE_SHIFT);
+        unsigned int pfn_arr_size = ROUNDUP((num * sizeof(*pfn)), PAGE_SHIFT);
 
-        if ( pfn_arr_size <= XC_PAGE_SIZE )
+        if ( pfn_arr_size <= PAGE_SIZE )
             pfn = alloca(num * sizeof(*pfn));
         else
         {
@@ -219,8 +211,8 @@ void *xc_map_foreign_bulk(xc_interface *xch,
                        MAP_PRIVATE | MAP_ANON | MAP_POPULATE, -1, 0);
             if ( pfn == MAP_FAILED )
             {
-                PERROR("xc_map_foreign_bulk: mmap of pfn array failed");
-                (void)munmap(addr, (unsigned long)num << XC_PAGE_SHIFT);
+                PERROR("mmap of pfn array failed");
+                (void)munmap(addr, (unsigned long)num << PAGE_SHIFT);
                 return NULL;
             }
         }
@@ -253,7 +245,7 @@ void *xc_map_foreign_bulk(xc_interface *xch,
                     continue;
                 }
                 rc = map_foreign_batch_single(fd, dom, pfn + i,
-                        (unsigned long)addr + ((unsigned long)i<<XC_PAGE_SHIFT));
+                        (unsigned long)addr + ((unsigned long)i<<PAGE_SHIFT));
                 if ( rc < 0 )
                 {
                     rc = -errno;
@@ -265,7 +257,7 @@ void *xc_map_foreign_bulk(xc_interface *xch,
             break;
         }
 
-        if ( pfn_arr_size > XC_PAGE_SIZE )
+        if ( pfn_arr_size > PAGE_SIZE )
             munmap(pfn, pfn_arr_size);
 
         if ( rc == -ENOENT && i == num )
@@ -281,8 +273,8 @@ void *xc_map_foreign_bulk(xc_interface *xch,
     {
         int saved_errno = errno;
 
-        PERROR("xc_map_foreign_bulk: ioctl failed");
-        (void)munmap(addr, (unsigned long)num << XC_PAGE_SHIFT);
+        PERROR("ioctl failed");
+        (void)munmap(addr, (unsigned long)num << PAGE_SHIFT);
         errno = saved_errno;
         return NULL;
     }

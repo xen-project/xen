@@ -26,9 +26,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "xenctrl.h"
-#include "xenguest.h"
 #include "xc_private.h"
+#include "xenguest.h"
 
 #include <xen/memory.h>
 #include <xen/elfnote.h>

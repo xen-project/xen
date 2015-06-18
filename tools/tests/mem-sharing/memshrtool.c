@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/mman.h>
 
+#define XC_WANT_COMPAT_MAP_FOREIGN_API
 #include "xenctrl.h"
 
 static int usage(const char* prog)

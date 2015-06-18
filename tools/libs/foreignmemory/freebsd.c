@@ -3,9 +3,6 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * xc_gnttab functions:
- * Copyright (c) 2007-2008, D G Murray <Derek.Murray@cl.cam.ac.uk>
- *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -30,14 +27,11 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 
-#include <xen/memory.h>
-
-#include "xc_private.h"
+#include "private.h"
 
 #define PRIVCMD_DEV     "/dev/xen/privcmd"
 
-/*------------------------- Privcmd device interface -------------------------*/
-int osdep_privcmd_open(xc_interface *xch)
+int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem)
 {
     int flags, saved_errno;
     int fd = open(PRIVCMD_DEV, O_RDWR);
@@ -46,7 +40,7 @@ int osdep_privcmd_open(xc_interface *xch)
     {
         PERROR("Could not obtain handle on privileged command interface "
                PRIVCMD_DEV);
-        return -1
+        return -1;
     }
 
     /*
@@ -69,7 +63,7 @@ int osdep_privcmd_open(xc_interface *xch)
         goto error;
     }
 
-    xch->privcmdfd = fd;
+    fmem->fd = fd;
     return 0;
 
  error:
@@ -80,26 +74,25 @@ int osdep_privcmd_open(xc_interface *xch)
     return -1;
 }
 
-int osdep_privcmd_close(xc_interface *xch)
+int osdep_xenforeignmemory_close(xenforeignmemory_handle *fmem)
 {
-    int fd = xch->privcmdfd;
+    int fd = fmem->fd;
     if ( fd == -1 )
         return 0;
     return close(fd);
 }
 
-/*----------------------- Privcmd foreign map interface ----------------------*/
-void *xc_map_foreign_bulk(xc_interface *xch,
-                          uint32_t dom, int prot,
-                          const xen_pfn_t *arr, int *err,
-                          unsigned int num)
+void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
+                                 uint32_t dom, int prot,
+                                 const xen_pfn_t *arr, int *err,
+                                 unsigned int num)
 {
-    int fd = xch->privcmdfd;
+    int fd = fmem->fd;
     privcmd_mmapbatch_t ioctlx;
     void *addr;
     int rc;
 
-    addr = mmap(NULL, num << XC_PAGE_SHIFT, prot, MAP_SHARED, fd, 0);
+    addr = mmap(NULL, num << PAGE_SHIFT, prot, MAP_SHARED, fd, 0);
     if ( addr == MAP_FAILED )
     {
         PERROR("xc_map_foreign_bulk: mmap failed");
@@ -117,7 +110,7 @@ void *xc_map_foreign_bulk(xc_interface *xch,
     {
         int saved_errno = errno;
         PERROR("xc_map_foreign_bulk: ioctl failed");
-        (void)munmap(addr, num << XC_PAGE_SHIFT);
+        (void)munmap(addr, num << PAGE_SHIFT);
         errno = saved_errno;
         return NULL;
     }

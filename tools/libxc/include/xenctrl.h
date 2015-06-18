@@ -1369,32 +1369,6 @@ int xc_lockprof_query(xc_interface *xch,
 void *xc_memalign(xc_interface *xch, size_t alignment, size_t size);
 
 /**
- * Memory maps a range within one domain to a local address range.  Mappings
- * should be unmapped with munmap and should follow the same rules as mmap
- * regarding page alignment.  Returns NULL on failure.
- *
- * @parm xch a handle on an open hypervisor interface
- * @parm dom the domain to map memory from
- * @parm size the amount of memory to map (in multiples of page size)
- * @parm prot same flag as in mmap().
- * @parm mfn the frame address to map.
- */
-void *xc_map_foreign_range(xc_interface *xch, uint32_t dom,
-                            int size, int prot,
-                            unsigned long mfn );
-
-void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
-                           const xen_pfn_t *arr, int num );
-
-/**
- * Like xc_map_foreign_pages(), except it can succeed partially.
- * When a page cannot be mapped, its respective field in @err is
- * set to the corresponding errno value.
- */
-void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
-                          const xen_pfn_t *arr, int *err, unsigned int num);
-
-/**
  * Translates a virtual address in the context of a given domain and
  * vcpu returning the GFN containing the address (that is, an MFN for 
  * PV guests, a PFN for HVM guests).  Returns 0 for failure.

@@ -5,6 +5,7 @@
  */
 
 #include <Python.h>
+#define XC_WANT_COMPAT_MAP_FOREIGN_API
 #include <xenctrl.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -15,6 +16,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include <xen/elfnote.h>
 #include <xen/tmem.h>
 #include "xc_dom.h"
 #include <xen/hvm/hvm_info_table.h>

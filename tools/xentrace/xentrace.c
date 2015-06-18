@@ -30,6 +30,7 @@
 #include <xen/xen.h>
 #include <xen/trace.h>
 
+#define XC_WANT_COMPAT_MAP_FOREIGN_API
 #include <xenevtchn.h>
 #include <xenctrl.h>
 

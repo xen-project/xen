@@ -29,8 +29,13 @@
 #include <sys/ioctl.h>
 
 #include "_paths.h"
+
+#define XC_WANT_COMPAT_MAP_FOREIGN_API
+#define XC_INTERNAL_COMPAT_MAP_FOREIGN_API
 #include "xenctrl.h"
+
 #include <xencall.h>
+#include <xenforeignmemory.h>
 
 #include <xen/sys/privcmd.h>
 
@@ -94,11 +99,11 @@ struct xc_interface_core {
     FILE *dombuild_logger_file;
     const char *currently_progress_reporting;
 
-    /* Privcmd interface */
-    int privcmdfd;
-
     /* Hypercall interface */
     xencall_handle *xcall;
+
+    /* Foreign mappings */
+    xenforeignmemory_handle *fmem;
 };
 
 int osdep_privcmd_open(xc_interface *xch);

@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <xenevtchn.h>
+#define XC_WANT_COMPAT_MAP_FOREIGN_API
 #include <xenctrl.h>
 #include <xen/xen.h>
 #include <string.h>

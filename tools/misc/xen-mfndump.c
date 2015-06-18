@@ -1,3 +1,4 @@
+#define XC_WANT_COMPAT_MAP_FOREIGN_API
 #include <xenctrl.h>
 #include <xc_private.h>
 #include <xc_core.h>

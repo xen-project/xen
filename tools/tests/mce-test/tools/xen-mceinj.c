@@ -30,6 +30,7 @@
 #include <signal.h>
 #include <stdarg.h>
 
+#define XC_WANT_COMPAT_MAP_FOREIGN_API
 #include <xenctrl.h>
 #include <xenguest.h>
 #include <inttypes.h>

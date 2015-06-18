@@ -58,11 +58,12 @@ struct xc_interface_core *xc_interface_open(xentoollog_logger *logger,
     if (open_flags & XC_OPENFLAG_DUMMY)
         return xch; /* We are done */
 
-    if ( osdep_privcmd_open(xch) < 0 )
-        goto err;
-
     xch->xcall = xencall_open(xch->error_handler,
         open_flags & XC_OPENFLAG_NON_REENTRANT ? XENCALL_OPENFLAG_NON_REENTRANT : 0U);
+    if ( xch->xcall == NULL )
+        goto err;
+
+    xch->fmem = xenforeignmemory_open(xch->error_handler, 0);
 
     if ( xch->xcall == NULL )
         goto err;
@@ -70,7 +71,7 @@ struct xc_interface_core *xc_interface_open(xentoollog_logger *logger,
     return xch;
 
  err:
-    osdep_privcmd_close(xch);
+    xencall_close(xch->xcall);
     xtl_logger_destroy(xch->error_handler_tofree);
     if (xch != &xch_buf) free(xch);
     return NULL;
@@ -86,8 +87,8 @@ int xc_interface_close(xc_interface *xch)
     rc = xencall_close(xch->xcall);
     if (rc) PERROR("Could not close xencall interface");
 
-    rc = osdep_privcmd_close(xch);
-    if (rc) PERROR("Could not close hypervisor interface");
+    rc = xenforeignmemory_close(xch->fmem);
+    if (rc) PERROR("Could not close foreign memory interface");
 
     xtl_logger_destroy(xch->dombuild_logger_tofree);
     xtl_logger_destroy(xch->error_handler_tofree);
