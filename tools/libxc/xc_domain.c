@@ -1411,7 +1411,7 @@ int xc_hvm_create_ioreq_server(xc_interface *xch,
     hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
 
     arg->domid = domid;
-    arg->handle_bufioreq = !!handle_bufioreq;
+    arg->handle_bufioreq = handle_bufioreq;
 
     rc = do_xen_hypercall(xch, &hypercall);
 

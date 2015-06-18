@@ -266,6 +266,13 @@ typedef uint16_t ioservid_t;
 #define HVMOP_create_ioreq_server 17
 struct xen_hvm_create_ioreq_server {
     domid_t domid;           /* IN - domain to be serviced */
+#define HVM_IOREQSRV_BUFIOREQ_OFF    0
+#define HVM_IOREQSRV_BUFIOREQ_LEGACY 1
+/*
+ * Use this when read_pointer gets updated atomically and
+ * the pointer pair gets read atomically:
+ */
+#define HVM_IOREQSRV_BUFIOREQ_ATOMIC 2
     uint8_t handle_bufioreq; /* IN - should server handle buffered ioreqs */
     ioservid_t id;           /* OUT - server id */
 };

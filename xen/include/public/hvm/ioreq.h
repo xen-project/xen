@@ -83,8 +83,17 @@ typedef struct buf_ioreq buf_ioreq_t;
 
 #define IOREQ_BUFFER_SLOT_NUM     511 /* 8 bytes each, plus 2 4-byte indexes */
 struct buffered_iopage {
-    unsigned int read_pointer;
-    unsigned int write_pointer;
+#ifdef __XEN__
+    union bufioreq_pointers {
+        struct {
+#endif
+            uint32_t read_pointer;
+            uint32_t write_pointer;
+#ifdef __XEN__
+        };
+        uint64_t full;
+    } ptrs;
+#endif
     buf_ioreq_t buf_ioreq[IOREQ_BUFFER_SLOT_NUM];
 }; /* NB. Size of this structure must be no greater than one page. */
 typedef struct buffered_iopage buffered_iopage_t;

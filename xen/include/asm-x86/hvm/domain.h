@@ -70,6 +70,7 @@ struct hvm_ioreq_server {
     evtchn_port_t          bufioreq_evtchn;
     struct rangeset        *range[NR_IO_RANGE_TYPES];
     bool_t                 enabled;
+    bool_t                 bufioreq_atomic;
 };
 
 struct hvm_domain {

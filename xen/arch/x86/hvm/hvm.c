@@ -921,7 +921,7 @@ static void hvm_ioreq_server_disable(struct hvm_ioreq_server *s,
 
 static int hvm_ioreq_server_init(struct hvm_ioreq_server *s, struct domain *d,
                                  domid_t domid, bool_t is_default,
-                                 bool_t handle_bufioreq, ioservid_t id)
+                                 int bufioreq_handling, ioservid_t id)
 {
     struct vcpu *v;
     int rc;
@@ -938,7 +938,11 @@ static int hvm_ioreq_server_init(struct hvm_ioreq_server *s, struct domain *d,
     if ( rc )
         return rc;
 
-    rc = hvm_ioreq_server_setup_pages(s, is_default, handle_bufioreq);
+    if ( bufioreq_handling == HVM_IOREQSRV_BUFIOREQ_ATOMIC )
+        s->bufioreq_atomic = 1;
+
+    rc = hvm_ioreq_server_setup_pages(
+             s, is_default, bufioreq_handling != HVM_IOREQSRV_BUFIOREQ_OFF);
     if ( rc )
         goto fail_map;
 
@@ -997,11 +1001,14 @@ static ioservid_t next_ioservid(struct domain *d)
 }
 
 static int hvm_create_ioreq_server(struct domain *d, domid_t domid,
-                                   bool_t is_default, bool_t handle_bufioreq,
+                                   bool_t is_default, int bufioreq_handling,
                                    ioservid_t *id)
 {
     struct hvm_ioreq_server *s;
     int rc;
+
+    if ( bufioreq_handling > HVM_IOREQSRV_BUFIOREQ_ATOMIC )
+        return -EINVAL;
 
     rc = -ENOMEM;
     s = xzalloc(struct hvm_ioreq_server);
@@ -1015,7 +1022,7 @@ static int hvm_create_ioreq_server(struct domain *d, domid_t domid,
     if ( is_default && d->arch.hvm_domain.default_ioreq_server != NULL )
         goto fail2;
 
-    rc = hvm_ioreq_server_init(s, d, domid, is_default, handle_bufioreq,
+    rc = hvm_ioreq_server_init(s, d, domid, is_default, bufioreq_handling,
                                next_ioservid(d));
     if ( rc )
         goto fail3;
@@ -2560,7 +2567,7 @@ int hvm_buffered_io_send(ioreq_t *p)
 
     spin_lock(&s->bufioreq_lock);
 
-    if ( (pg->write_pointer - pg->read_pointer) >=
+    if ( (pg->ptrs.write_pointer - pg->ptrs.read_pointer) >=
          (IOREQ_BUFFER_SLOT_NUM - qw) )
     {
         /* The queue is full: send the iopacket through the normal path. */
@@ -2568,17 +2575,29 @@ int hvm_buffered_io_send(ioreq_t *p)
         return 0;
     }
 
-    pg->buf_ioreq[pg->write_pointer % IOREQ_BUFFER_SLOT_NUM] = bp;
+    pg->buf_ioreq[pg->ptrs.write_pointer % IOREQ_BUFFER_SLOT_NUM] = bp;
 
     if ( qw )
     {
         bp.data = p->data >> 32;
-        pg->buf_ioreq[(pg->write_pointer+1) % IOREQ_BUFFER_SLOT_NUM] = bp;
+        pg->buf_ioreq[(pg->ptrs.write_pointer+1) % IOREQ_BUFFER_SLOT_NUM] = bp;
     }
 
     /* Make the ioreq_t visible /before/ write_pointer. */
     wmb();
-    pg->write_pointer += qw ? 2 : 1;
+    pg->ptrs.write_pointer += qw ? 2 : 1;
+
+    /* Canonicalize read/write pointers to prevent their overflow. */
+    while ( s->bufioreq_atomic && qw++ < IOREQ_BUFFER_SLOT_NUM &&
+            pg->ptrs.read_pointer >= IOREQ_BUFFER_SLOT_NUM )
+    {
+        union bufioreq_pointers old = pg->ptrs, new;
+        unsigned int n = old.read_pointer / IOREQ_BUFFER_SLOT_NUM;
+
+        new.read_pointer = old.read_pointer - n * IOREQ_BUFFER_SLOT_NUM;
+        new.write_pointer = old.write_pointer - n * IOREQ_BUFFER_SLOT_NUM;
+        cmpxchg(&pg->ptrs.full, old.full, new.full);
+    }
 
     notify_via_xen_event_channel(d, s->bufioreq_evtchn);
     spin_unlock(&s->bufioreq_lock);
@@ -5447,7 +5466,7 @@ static int hvmop_create_ioreq_server(
         goto out;
 
     rc = hvm_create_ioreq_server(d, curr_d->domain_id, 0,
-                                 !!op.handle_bufioreq, &op.id);
+                                 op.handle_bufioreq, &op.id);
     if ( rc != 0 )
         goto out;
 
@@ -5929,7 +5948,8 @@ static int hvmop_get_param(
 
         /* May need to create server. */
         domid = d->arch.hvm_domain.params[HVM_PARAM_DM_DOMAIN];
-        rc = hvm_create_ioreq_server(d, domid, 1, 1, NULL);
+        rc = hvm_create_ioreq_server(d, domid, 1,
+                                     HVM_IOREQSRV_BUFIOREQ_LEGACY, NULL);
         if ( rc != 0 && rc != -EEXIST )
             goto out;
     }
