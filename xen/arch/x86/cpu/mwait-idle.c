@@ -689,12 +689,11 @@ static const struct idle_cpu idle_cpu_avn = {
 	.disable_promotion_to_c1e = 1,
 };
 
-#define ICPU(model, cpu) { 6, model, &idle_cpu_##cpu }
+#define ICPU(model, cpu) \
+    { X86_VENDOR_INTEL, 6, model, X86_FEATURE_MWAIT, \
+        &idle_cpu_##cpu}
 
-static struct intel_idle_id {
-	unsigned int family, model;
-	const struct idle_cpu *data;
-} intel_idle_ids[] __initdata = {
+static const struct x86_cpu_id intel_idle_ids[] __initconst = {
 	ICPU(0x1a, nehalem),
 	ICPU(0x1e, nehalem),
 	ICPU(0x1f, nehalem),
@@ -757,22 +756,16 @@ static void __init mwait_idle_state_table_update(void)
 static int __init mwait_idle_probe(void)
 {
 	unsigned int eax, ebx, ecx;
-	const struct intel_idle_id *id;
+	const struct x86_cpu_id *id = x86_match_cpu(intel_idle_ids);
 
-	if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-	    !boot_cpu_has(X86_FEATURE_MWAIT) ||
-	    boot_cpu_data.cpuid_level < CPUID_MWAIT_LEAF)
-		return -ENODEV;
-
-	for (id = intel_idle_ids; id->family; ++id)
-		if (id->family == boot_cpu_data.x86 &&
-		    id->model == boot_cpu_data.x86_model)
-			break;
-	if (!id->family) {
+	if (!id) {
 		pr_debug(PREFIX "does not run on family %d model %d\n",
 			 boot_cpu_data.x86, boot_cpu_data.x86_model);
 		return -ENODEV;
 	}
+
+	if (boot_cpu_data.cpuid_level < CPUID_MWAIT_LEAF)
+		return -ENODEV;
 
 	cpuid(CPUID_MWAIT_LEAF, &eax, &ebx, &ecx, &mwait_substates);
 
@@ -788,7 +781,7 @@ static int __init mwait_idle_probe(void)
 
 	pr_debug(PREFIX "MWAIT substates: %#x\n", mwait_substates);
 
-	icpu = id->data;
+	icpu = id->driver_data;
 	cpuidle_state_table = icpu->state_table;
 
 	if (boot_cpu_has(X86_FEATURE_ARAT))
