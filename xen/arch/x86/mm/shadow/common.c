@@ -3157,12 +3157,10 @@ void shadow_teardown(struct domain *d)
      * destroyed any shadows of it or sh_destroy_shadow will get confused. */
     if ( !pagetable_is_null(d->arch.paging.shadow.unpaged_pagetable) )
     {
+        ASSERT(is_hvm_domain(d));
         for_each_vcpu(d, v)
-        {
-            ASSERT(is_hvm_vcpu(v));
             if ( !hvm_paging_enabled(v) )
                 v->arch.guest_table = pagetable_null();
-        }
         unpaged_pagetable =
             pagetable_get_page(d->arch.paging.shadow.unpaged_pagetable);
         d->arch.paging.shadow.unpaged_pagetable = pagetable_null();

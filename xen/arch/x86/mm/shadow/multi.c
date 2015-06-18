@@ -2043,7 +2043,7 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
         sh_unmap_domain_page(l3e);
         shadow_free(d, m3mfn);
 
-        if ( is_pv_32on64_vcpu(v) )
+        if ( is_pv_32on64_domain(d) )
         {
             /* Need to destroy the l3 and l2 monitor pages that map the
              * Xen VAs at 3GB-4GB */
@@ -3963,7 +3963,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
                    (unsigned long)pagetable_get_pfn(v->arch.guest_table));
 
 #if GUEST_PAGING_LEVELS == 4
-    if ( !(v->arch.flags & TF_kernel_mode) && !is_pv_32on64_vcpu(v) )
+    if ( !(v->arch.flags & TF_kernel_mode) && !is_pv_32on64_domain(d) )
         gmfn = pagetable_get_mfn(v->arch.guest_table_user);
     else
 #endif
@@ -4674,7 +4674,7 @@ static void *emulate_map_dest(struct vcpu *v,
 
         /* Cross-page emulated writes are only supported for HVM guests;
          * PV guests ought to know better */
-        if ( !is_hvm_vcpu(v) )
+        if ( !is_hvm_domain(d) )
             return MAPPING_UNHANDLEABLE;
 
         /* This write crosses a page boundary.  Translate the second page */
@@ -5104,7 +5104,7 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
             gmfn = get_shadow_status(d, get_gfn_query_unlocked(
                                         d, gfn_x(gfn), &p2mt),
                                      ((GUEST_PAGING_LEVELS == 3 ||
-                                       is_pv_32on64_vcpu(v))
+                                       is_pv_32on64_domain(d))
                                       && !shadow_mode_external(d)
                                       && (guest_index(gl3e) % 4) == 3)
                                      ? SH_type_l2h_shadow

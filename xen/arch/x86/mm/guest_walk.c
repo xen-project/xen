@@ -159,7 +159,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     mflags = mandatory_flags(v, pfec);
     iflags = (_PAGE_NX_BIT | _PAGE_INVALID_BITS);
 
-    if ( is_hvm_vcpu(v) && !(pfec & PFEC_user_mode) )
+    if ( is_hvm_domain(d) && !(pfec & PFEC_user_mode) )
     {
         struct segment_register seg;
         const struct cpu_user_regs *regs = guest_cpu_user_regs();
