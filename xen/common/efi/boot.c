@@ -1046,14 +1046,17 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             efi_arch_video_init(gop, info_size, mode_info);
     }
 
-    efi_bs->GetMemoryMap(&efi_memmap_size, NULL, &map_key,
+    info_size = 0;
+    efi_bs->GetMemoryMap(&info_size, NULL, &map_key,
                          &efi_mdesc_size, &mdesc_ver);
-    efi_memmap = efi_arch_allocate_mmap_buffer(&efi_memmap_size);
+    info_size += 8 * efi_mdesc_size;
+    efi_memmap = efi_arch_allocate_mmap_buffer(info_size);
     if ( !efi_memmap )
         blexit(L"Unable to allocate memory for EFI memory map");
 
     for ( retry = 0; ; retry = 1 )
     {
+        efi_memmap_size = info_size;
         status = efi_bs->GetMemoryMap(&efi_memmap_size, efi_memmap, &map_key,
                                       &efi_mdesc_size, &mdesc_ver);
         if ( EFI_ERROR(status) )

@@ -190,10 +190,10 @@ static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
 
 }
 
-static void *__init efi_arch_allocate_mmap_buffer(UINTN *map_size)
+static void *__init efi_arch_allocate_mmap_buffer(UINTN map_size)
 {
     place_string(&mbi.mem_upper, NULL);
-    mbi.mem_upper -= *map_size;
+    mbi.mem_upper -= map_size;
     mbi.mem_upper &= -__alignof__(EFI_MEMORY_DESCRIPTOR);
     if ( mbi.mem_upper < xen_phys_start )
         return NULL;
