@@ -970,16 +970,10 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             break;
 
         ret = xsm_schedop_shutdown(XSM_DM_PRIV, current->domain, d);
-        if ( ret )
-        {
-            rcu_unlock_domain(d);
-            return ret;
-        }
-
-        domain_shutdown(d, (u8)sched_remote_shutdown.reason);
+        if ( likely(!ret) )
+            domain_shutdown(d, sched_remote_shutdown.reason);
 
         rcu_unlock_domain(d);
-        ret = 0;
 
         break;
     }
