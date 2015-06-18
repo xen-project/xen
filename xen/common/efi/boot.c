@@ -1196,8 +1196,8 @@ void __init efi_init_memory(void)
         }
 
         if ( desc->Attribute & EFI_MEMORY_WP )
-            prot &= _PAGE_RW;
-        if ( desc->Attribute & EFI_MEMORY_XP )
+            prot &= ~_PAGE_RW;
+        if ( (desc->Attribute & EFI_MEMORY_XP) && cpu_has_nx )
             prot |= _PAGE_NX_BIT;
 
         if ( pfn_to_pdx(emfn - 1) < (DIRECTMAP_SIZE >> PAGE_SHIFT) &&
