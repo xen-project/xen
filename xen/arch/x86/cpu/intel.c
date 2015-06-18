@@ -286,7 +286,7 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 		set_bit(X86_FEATURE_ARAT, c->x86_capability);
 }
 
-static struct cpu_dev intel_cpu_dev __cpuinitdata = {
+static const struct cpu_dev intel_cpu_dev = {
 	.c_vendor	= "Intel",
 	.c_ident 	= { "GenuineIntel" },
 	.c_init		= init_intel,

@@ -35,7 +35,7 @@ integer_param("cpuid_mask_ext_ecx", opt_cpuid_mask_ext_ecx);
 unsigned int __devinitdata opt_cpuid_mask_ext_edx = ~0u;
 integer_param("cpuid_mask_ext_edx", opt_cpuid_mask_ext_edx);
 
-struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
+const struct cpu_dev *__read_mostly cpu_devs[X86_VENDOR_NUM] = {};
 
 unsigned int paddr_bits __read_mostly = 36;
 
@@ -61,11 +61,11 @@ static void default_init(struct cpuinfo_x86 * c)
 	__clear_bit(X86_FEATURE_SEP, c->x86_capability);
 }
 
-static struct cpu_dev default_cpu = {
+static const struct cpu_dev default_cpu = {
 	.c_init	= default_init,
 	.c_vendor = "Unknown",
 };
-static struct cpu_dev * this_cpu = &default_cpu;
+static const struct cpu_dev *this_cpu = &default_cpu;
 
 bool_t opt_cpu_info;
 boolean_param("cpuinfo", opt_cpu_info);
@@ -126,9 +126,8 @@ void __cpuinit display_cacheinfo(struct cpuinfo_x86 *c)
 		       l2size, ecx & 0xFF);
 }
 
-static void __cpuinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
+int get_cpu_vendor(const char v[], enum get_cpu_vendor mode)
 {
-	char *v = c->x86_vendor_id;
 	int i;
 	static int printed;
 
@@ -137,20 +136,22 @@ static void __cpuinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 			if (!strcmp(v,cpu_devs[i]->c_ident[0]) ||
 			    (cpu_devs[i]->c_ident[1] && 
 			     !strcmp(v,cpu_devs[i]->c_ident[1]))) {
-				c->x86_vendor = i;
-				if (!early)
+				if (mode == gcv_host_late)
 					this_cpu = cpu_devs[i];
-				return;
+				return i;
 			}
 		}
 	}
+	if (mode == gcv_guest)
+		return X86_VENDOR_UNKNOWN;
 	if (!printed) {
 		printed++;
 		printk(KERN_ERR "CPU: Vendor unknown, using generic init.\n");
 		printk(KERN_ERR "CPU: Your system may be unstable.\n");
 	}
-	c->x86_vendor = X86_VENDOR_UNKNOWN;
 	this_cpu = &default_cpu;
+
+	return X86_VENDOR_UNKNOWN;
 }
 
 static inline u32 _phys_pkg_id(u32 cpuid_apic, int index_msb)
@@ -189,7 +190,7 @@ static void __init early_cpu_detect(void)
 	      (int *)&c->x86_vendor_id[8],
 	      (int *)&c->x86_vendor_id[4]);
 
-	get_cpu_vendor(c, 1);
+	c->x86_vendor = get_cpu_vendor(c->x86_vendor_id, gcv_host_early);
 
 	cpuid(0x00000001, &tfms, &misc, &cap4, &cap0);
 	c->x86 = (tfms >> 8) & 15;
@@ -218,7 +219,7 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 	      (int *)&c->x86_vendor_id[8],
 	      (int *)&c->x86_vendor_id[4]);
 		
-	get_cpu_vendor(c, 0);
+	c->x86_vendor = get_cpu_vendor(c->x86_vendor_id, gcv_host_late);
 	/* Initialize the standard set of capabilities */
 	/* Note that the vendor-specific code below might override */
 	

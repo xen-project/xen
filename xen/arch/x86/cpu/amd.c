@@ -620,7 +620,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	check_syscfg_dram_mod_en();
 }
 
-static struct cpu_dev amd_cpu_dev __cpuinitdata = {
+static const struct cpu_dev amd_cpu_dev = {
 	.c_vendor	= "AMD",
 	.c_ident 	= { "AuthenticAMD" },
 	.c_init		= init_amd,

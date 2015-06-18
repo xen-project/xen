@@ -308,6 +308,11 @@ struct arch_domain
     /* Is PHYSDEVOP_eoi to automatically unmask the event channel? */
     bool_t auto_unmask;
 
+    /* Values snooped from updates to cpuids[] (below). */
+    u8 x86;                  /* CPU family */
+    u8 x86_vendor;           /* CPU vendor */
+    u8 x86_model;            /* CPU model */
+
     cpuid_input_t *cpuids;
 
     struct PITState vpit;

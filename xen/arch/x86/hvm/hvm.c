@@ -2406,11 +2406,6 @@ void hvm_vcpu_down(struct vcpu *v)
 struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
                                                  ioreq_t *p)
 {
-#define CF8_BDF(cf8)     (((cf8) & 0x00ffff00) >> 8)
-#define CF8_ADDR_LO(cf8) ((cf8) & 0x000000fc)
-#define CF8_ADDR_HI(cf8) (((cf8) & 0x0f000000) >> 16)
-#define CF8_ENABLED(cf8) (!!((cf8) & 0x80000000))
-
     struct hvm_ioreq_server *s;
     uint32_t cf8;
     uint8_t type;
@@ -2439,9 +2434,19 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
 
         type = IOREQ_TYPE_PCI_CONFIG;
         addr = ((uint64_t)sbdf << 32) |
-               CF8_ADDR_HI(cf8) |
                CF8_ADDR_LO(cf8) |
                (p->addr & 3);
+        /* AMD extended configuration space access? */
+        if ( CF8_ADDR_HI(cf8) &&
+             d->arch.x86_vendor == X86_VENDOR_AMD &&
+             d->arch.x86 >= 0x10 && d->arch.x86 <= 0x17 )
+        {
+            uint64_t msr_val;
+
+            if ( !rdmsr_safe(MSR_AMD64_NB_CFG, msr_val) &&
+                 (msr_val & (1ULL << AMD64_NB_CFG_CF8_EXT_ENABLE_BIT)) )
+                addr |= CF8_ADDR_HI(cf8);
+        }
     }
     else
     {
@@ -2495,11 +2500,6 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
     }
 
     return d->arch.hvm_domain.default_ioreq_server;
-
-#undef CF8_ADDR_ENABLED
-#undef CF8_ADDR_HI
-#undef CF8_ADDR_LO
-#undef CF8_BDF
 }
 
 int hvm_buffered_io_send(ioreq_t *p)

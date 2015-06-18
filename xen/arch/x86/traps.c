@@ -1771,15 +1771,18 @@ static bool_t admin_io_okay(unsigned int port, unsigned int bytes,
     return ioports_access_permitted(d, port, port + bytes - 1);
 }
 
-static bool_t pci_cfg_ok(struct domain *currd, bool_t write, unsigned int size)
+static bool_t pci_cfg_ok(struct domain *currd, bool_t write,
+                         unsigned int start, unsigned int size)
 {
     uint32_t machine_bdf;
-    unsigned int start;
 
     if ( !is_hardware_domain(currd) )
         return 0;
 
-    machine_bdf = (currd->arch.pci_cf8 >> 8) & 0xFFFF;
+    if ( !CF8_ENABLED(currd->arch.pci_cf8) )
+        return 1;
+
+    machine_bdf = CF8_BDF(currd->arch.pci_cf8);
     if ( write )
     {
         const unsigned long *ro_map = pci_get_ro_map(0);
@@ -1787,9 +1790,9 @@ static bool_t pci_cfg_ok(struct domain *currd, bool_t write, unsigned int size)
         if ( ro_map && test_bit(machine_bdf, ro_map) )
             return 0;
     }
-    start = currd->arch.pci_cf8 & 0xFF;
+    start |= CF8_ADDR_LO(currd->arch.pci_cf8);
     /* AMD extended configuration space access? */
-    if ( (currd->arch.pci_cf8 & 0x0F000000) &&
+    if ( CF8_ADDR_HI(currd->arch.pci_cf8) &&
          boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
          boot_cpu_data.x86 >= 0x10 && boot_cpu_data.x86 <= 0x17 )
     {
@@ -1798,7 +1801,7 @@ static bool_t pci_cfg_ok(struct domain *currd, bool_t write, unsigned int size)
         if ( rdmsr_safe(MSR_AMD64_NB_CFG, msr_val) )
             return 0;
         if ( msr_val & (1ULL << AMD64_NB_CFG_CF8_EXT_ENABLE_BIT) )
-            start |= (currd->arch.pci_cf8 >> 16) & 0xF00;
+            start |= CF8_ADDR_HI(currd->arch.pci_cf8);
     }
 
     return !xsm_pci_config_permission(XSM_HOOK, currd, machine_bdf,
@@ -1854,7 +1857,7 @@ uint32_t guest_io_read(unsigned int port, unsigned int bytes,
             size = min(bytes, 4 - (port & 3));
             if ( size == 3 )
                 size = 2;
-            if ( pci_cfg_ok(currd, 0, size) )
+            if ( pci_cfg_ok(currd, 0, port & 3, size) )
                 sub_data = pci_conf_read(currd->arch.pci_cf8, port & 3, size);
         }
 
@@ -1925,7 +1928,7 @@ void guest_io_write(unsigned int port, unsigned int bytes, uint32_t data,
             size = min(bytes, 4 - (port & 3));
             if ( size == 3 )
                 size = 2;
-            if ( pci_cfg_ok(currd, 1, size) )
+            if ( pci_cfg_ok(currd, 1, port & 3, size) )
                 pci_conf_write(currd->arch.pci_cf8, port & 3, size, data);
         }
 

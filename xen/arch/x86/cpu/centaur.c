@@ -60,7 +60,7 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 		init_c3(c);
 }
 
-static struct cpu_dev centaur_cpu_dev __cpuinitdata = {
+static const struct cpu_dev centaur_cpu_dev = {
 	.c_vendor	= "Centaur",
 	.c_ident	= { "CentaurHauls" },
 	.c_init		= init_centaur,
