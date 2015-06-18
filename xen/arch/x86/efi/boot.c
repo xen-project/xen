@@ -189,6 +189,13 @@ static void __init __attribute__((__noreturn__)) blexit(const CHAR16 *str)
         PrintStr((CHAR16 *)str);
     PrintStr(newline);
 
+    if ( !efi_bs )
+    {
+        local_irq_disable();
+        for ( ; ; )
+            halt();
+    }
+
     if ( cfg.addr )
         efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
     if ( kernel.addr )
@@ -1393,8 +1400,10 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         struct e820entry *e;
 
         efi_memmap_size = info_size;
-        status = efi_bs->GetMemoryMap(&efi_memmap_size, efi_memmap, &map_key,
-                                      &efi_mdesc_size, &mdesc_ver);
+        status = SystemTable->BootServices->GetMemoryMap(&efi_memmap_size,
+                                                         efi_memmap, &map_key,
+                                                         &efi_mdesc_size,
+                                                         &mdesc_ver);
         if ( EFI_ERROR(status) )
             PrintErrMesg(L"Cannot obtain memory map", status);
 
@@ -1457,7 +1466,9 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             relocate_trampoline(cfg.addr);
         }
 
-        status = efi_bs->ExitBootServices(ImageHandle, map_key);
+        status = SystemTable->BootServices->ExitBootServices(ImageHandle,
+                                                             map_key);
+        efi_bs = NULL;
         if ( status != EFI_INVALID_PARAMETER || retry )
             break;
     }
