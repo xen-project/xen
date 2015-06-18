@@ -107,11 +107,6 @@ int osdep_privcmd_close(xc_interface *xch);
 void *osdep_alloc_hypercall_buffer(xc_interface *xch, int npages);
 void osdep_free_hypercall_buffer(xc_interface *xch, void *ptr, int npages);
 
-/* Stub for not yet converted OSes */
-void *xc_map_foreign_bulk_compat(xc_interface *xch,
-                                 uint32_t dom, int prot,
-                                 const xen_pfn_t *arr, int *err, unsigned int num);
-
 void xc_report_error(xc_interface *xch, int code, const char *fmt, ...)
     __attribute__((format(printf,3,4)));
 void xc_reportv(xc_interface *xch, xentoollog_logger *lg, xentoollog_level,

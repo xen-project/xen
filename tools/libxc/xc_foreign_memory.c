@@ -50,10 +50,14 @@ void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
     return res;
 }
 
-/* stub for all not yet converted OSes */
-void *xc_map_foreign_bulk_compat(xc_interface *xch,
-                                 uint32_t dom, int prot,
-                                 const xen_pfn_t *arr, int *err, unsigned int num)
+/*
+ * stub for all not yet converted OSes (NetBSD and Solaris). New OSes should
+ * just implement xc_map_foreign_bulk.
+ */
+#if defined(__NetBSD__) || defined(__sun__)
+void *xc_map_foreign_bulk(xc_interface *xch,
+                          uint32_t dom, int prot,
+                          const xen_pfn_t *arr, int *err, unsigned int num)
 {
     xen_pfn_t *pfn;
     unsigned int i;
@@ -90,6 +94,7 @@ void *xc_map_foreign_bulk_compat(xc_interface *xch,
 
     return ret;
 }
+#endif
 
 /*
  * Local variables:

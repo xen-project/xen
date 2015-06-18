@@ -94,13 +94,6 @@ void *xc_map_foreign_batch(xc_interface *xch,
 
 }
 
-void *xc_map_foreign_bulk(xc_interface *xch,
-                          uint32_t dom, int prot,
-                          const xen_pfn_t *arr, int *err, unsigned int num)
-{
-    return xc_map_foreign_bulk_compat(xch, dom, prot, arr, err, num);
-}
-
 void *xc_map_foreign_range(xc_interface *xch,
                            uint32_t dom,
                            int size, int prot,
