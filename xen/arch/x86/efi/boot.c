@@ -1379,9 +1379,11 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         }
     }
 
-    status = efi_bs->GetMemoryMap(&efi_memmap_size, NULL, &map_key,
-                                  &efi_mdesc_size, &mdesc_ver);
-    mbi.mem_upper -= efi_memmap_size;
+    info_size = 0;
+    efi_bs->GetMemoryMap(&info_size, NULL, &map_key,
+                         &efi_mdesc_size, &mdesc_ver);
+    info_size += 8 * efi_mdesc_size;
+    mbi.mem_upper -= info_size;
     mbi.mem_upper &= -__alignof__(EFI_MEMORY_DESCRIPTOR);
     if ( mbi.mem_upper < xen_phys_start )
         blexit(L"Out of static memory");
@@ -1390,6 +1392,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     {
         struct e820entry *e;
 
+        efi_memmap_size = info_size;
         status = efi_bs->GetMemoryMap(&efi_memmap_size, efi_memmap, &map_key,
                                       &efi_mdesc_size, &mdesc_ver);
         if ( EFI_ERROR(status) )
