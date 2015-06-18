@@ -73,49 +73,6 @@ void *xc_map_foreign_bulk(xc_interface *xch,
     return map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);
 }
 
-void *xc_map_foreign_range(xc_interface *xch,
-                           uint32_t dom,
-                           int size, int prot,
-                           unsigned long mfn)
-{
-    unsigned long pt_prot = 0;
-
-    if (prot & PROT_READ)
-	pt_prot = L1_PROT_RO;
-    if (prot & PROT_WRITE)
-	pt_prot = L1_PROT;
-
-    assert(!(size % getpagesize()));
-    return map_frames_ex(&mfn, size / getpagesize(), 0, 1, 1, dom, NULL, pt_prot);
-}
-
-void *xc_map_foreign_ranges(xc_interface *xch,
-                            uint32_t dom,
-                            size_t size, int prot, size_t chunksize,
-                            privcmd_mmap_entry_t entries[], int nentries)
-{
-    unsigned long *mfns;
-    int i, j, n;
-    unsigned long pt_prot = 0;
-    void *ret;
-
-    if (prot & PROT_READ)
-	pt_prot = L1_PROT_RO;
-    if (prot & PROT_WRITE)
-	pt_prot = L1_PROT;
-
-    mfns = malloc((size / XC_PAGE_SIZE) * sizeof(*mfns));
-
-    n = 0;
-    for (i = 0; i < nentries; i++)
-        for (j = 0; j < chunksize / XC_PAGE_SIZE; j++)
-            mfns[n++] = entries[i].mfn + j;
-
-    ret = map_frames_ex(mfns, n, 1, 0, 1, dom, NULL, pt_prot);
-    free(mfns);
-    return ret;
-}
-
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush)
 {

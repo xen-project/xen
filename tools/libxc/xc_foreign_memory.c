@@ -50,6 +50,56 @@ void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
     return res;
 }
 
+void *xc_map_foreign_range(xc_interface *xch,
+                           uint32_t dom, int size, int prot,
+                           unsigned long mfn)
+{
+    xen_pfn_t *arr;
+    int num;
+    int i;
+    void *ret;
+
+    num = (size + XC_PAGE_SIZE - 1) >> XC_PAGE_SHIFT;
+    arr = calloc(num, sizeof(xen_pfn_t));
+    if ( arr == NULL )
+        return NULL;
+
+    for ( i = 0; i < num; i++ )
+        arr[i] = mfn + i;
+
+    ret = xc_map_foreign_pages(xch, dom, prot, arr, num);
+    free(arr);
+    return ret;
+}
+
+void *xc_map_foreign_ranges(xc_interface *xch,
+                            uint32_t dom, size_t size,
+                            int prot, size_t chunksize,
+                            privcmd_mmap_entry_t entries[],
+                            int nentries)
+{
+    xen_pfn_t *arr;
+    int num_per_entry;
+    int num;
+    int i;
+    int j;
+    void *ret;
+
+    num_per_entry = chunksize >> XC_PAGE_SHIFT;
+    num = num_per_entry * nentries;
+    arr = calloc(num, sizeof(xen_pfn_t));
+    if ( arr == NULL )
+        return NULL;
+
+    for ( i = 0; i < nentries; i++ )
+        for ( j = 0; j < num_per_entry; j++ )
+            arr[i * num_per_entry + j] = entries[i].mfn + j;
+
+    ret = xc_map_foreign_pages(xch, dom, prot, arr, num);
+    free(arr);
+    return ret;
+}
+
 /*
  * stub for all not yet converted OSes (NetBSD and Solaris). New OSes should
  * just implement xc_map_foreign_bulk.
