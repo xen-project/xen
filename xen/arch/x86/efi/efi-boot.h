@@ -614,6 +614,13 @@ static void __init efi_arch_blexit(void)
         efi_bs->FreePages(ucode.addr, PFN_UP(ucode.size));
 }
 
+static void __init efi_arch_halt(void)
+{
+    local_irq_disable();
+    for ( ; ; )
+        halt();
+}
+
 static void __init efi_arch_load_addr_check(EFI_LOADED_IMAGE *loaded_image)
 {
     xen_phys_start = (UINTN)loaded_image->ImageBase;
