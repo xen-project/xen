@@ -508,7 +508,7 @@ static struct t_struct *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
         for ( j=0; j<tbufs.t_info->tbuf_size; j++)
             pfn_list[j] = (xen_pfn_t)mfn_list[j];
 
-        tbufs.meta[i] = xc_map_foreign_batch(xc_handle, DOMID_XEN,
+        tbufs.meta[i] = xc_map_foreign_pages(xc_handle, DOMID_XEN,
                                              PROT_READ | PROT_WRITE,
                                              pfn_list,
                                              tbufs.t_info->tbuf_size);
@@ -1221,6 +1221,7 @@ int main(int argc, char **argv)
 
     return ret;
 }
+
 /*
  * Local variables:
  * mode: C

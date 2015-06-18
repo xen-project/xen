@@ -73,28 +73,6 @@ void *xc_map_foreign_bulk(xc_interface *xch,
     return map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);
 }
 
-void *xc_map_foreign_batch(xc_interface *xch,
-                           uint32_t dom, int prot,
-                           xen_pfn_t *arr, int num)
-{
-    unsigned long pt_prot = 0;
-    int err[num];
-    int i;
-    unsigned long addr;
-
-    if (prot & PROT_READ)
-	pt_prot = L1_PROT_RO;
-    if (prot & PROT_WRITE)
-	pt_prot = L1_PROT;
-
-    addr = (unsigned long) map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);
-    for (i = 0; i < num; i++) {
-        if (err[i])
-            arr[i] |= 0xF0000000;
-    }
-    return (void *) addr;
-}
-
 void *xc_map_foreign_range(xc_interface *xch,
                            uint32_t dom,
                            int size, int prot,

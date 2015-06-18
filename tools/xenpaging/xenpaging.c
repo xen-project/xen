@@ -342,9 +342,9 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
                         HVM_PARAM_PAGING_RING_PFN, &ring_pfn);
     mmap_pfn = ring_pfn;
     paging->vm_event.ring_page = 
-        xc_map_foreign_batch(xch, paging->vm_event.domain_id, 
-                                PROT_READ | PROT_WRITE, &mmap_pfn, 1);
-    if ( mmap_pfn & XEN_DOMCTL_PFINFO_XTAB )
+        xc_map_foreign_pages(xch, paging->vm_event.domain_id,
+                             PROT_READ | PROT_WRITE, &mmap_pfn, 1);
+    if ( !paging->vm_event.ring_page )
     {
         /* Map failed, populate ring page */
         rc = xc_domain_populate_physmap_exact(paging->xc_handle, 
@@ -356,11 +356,11 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
             goto err;
         }
 
-        mmap_pfn = ring_pfn;
         paging->vm_event.ring_page = 
-            xc_map_foreign_batch(xch, paging->vm_event.domain_id, 
-                                    PROT_READ | PROT_WRITE, &mmap_pfn, 1);
-        if ( mmap_pfn & XEN_DOMCTL_PFINFO_XTAB )
+            xc_map_foreign_pages(xch, paging->vm_event.domain_id,
+                                 PROT_READ | PROT_WRITE,
+                                 &mmap_pfn, 1);
+        if ( !paging->vm_event.ring_page )
         {
             PERROR("Could not map the ring page\n");
             goto err;

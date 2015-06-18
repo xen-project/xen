@@ -67,9 +67,9 @@ int osdep_privcmd_close(xc_interface *xch)
     return close(fd);
 }
 
-void *xc_map_foreign_batch(xc_interface *xch,
-                          uint32_t dom, int prot,
-                          xen_pfn_t *arr, int num)
+void *osdep_map_foreign_batch(xc_interface *xch,
+                              uint32_t dom, int prot,
+                              xen_pfn_t *arr, int num)
 {
     int fd = xch->privcmdfd;
     privcmd_mmapbatch_t ioctlx;

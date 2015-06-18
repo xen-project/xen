@@ -72,9 +72,9 @@ void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
 
     ring_pfn = pfn;
     mmap_pfn = pfn;
-    ring_page = xc_map_foreign_batch(xch, domain_id, PROT_READ | PROT_WRITE,
+    ring_page = xc_map_foreign_pages(xch, domain_id, PROT_READ | PROT_WRITE,
                                      &mmap_pfn, 1);
-    if ( mmap_pfn & XEN_DOMCTL_PFINFO_XTAB )
+    if ( !ring_page )
     {
         /* Map failed, populate ring page */
         rc1 = xc_domain_populate_physmap_exact(xch, domain_id, 1, 0, 0,
@@ -86,9 +86,9 @@ void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
         }
 
         mmap_pfn = ring_pfn;
-        ring_page = xc_map_foreign_batch(xch, domain_id, PROT_READ | PROT_WRITE,
+        ring_page = xc_map_foreign_pages(xch, domain_id, PROT_READ | PROT_WRITE,
                                          &mmap_pfn, 1);
-        if ( mmap_pfn & XEN_DOMCTL_PFINFO_XTAB )
+        if ( !ring_page )
         {
             PERROR("Could not map the ring page\n");
             goto out;
@@ -156,3 +156,13 @@ void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
 
     return ring_page;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

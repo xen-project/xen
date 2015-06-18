@@ -55,6 +55,8 @@ void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
  * just implement xc_map_foreign_bulk.
  */
 #if defined(__NetBSD__) || defined(__sun__)
+void *osdep_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
+                              xen_pfn_t *arr, int num );
 void *xc_map_foreign_bulk(xc_interface *xch,
                           uint32_t dom, int prot,
                           const xen_pfn_t *arr, int *err, unsigned int num)
@@ -75,7 +77,7 @@ void *xc_map_foreign_bulk(xc_interface *xch,
     }
 
     memcpy(pfn, arr, num * sizeof(*arr));
-    ret = xc_map_foreign_batch(xch, dom, prot, pfn, num);
+    ret = osdep_map_foreign_batch(xch, dom, prot, pfn, num);
 
     if (ret) {
         for (i = 0; i < num; ++i)

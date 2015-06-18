@@ -91,8 +91,8 @@ int osdep_privcmd_close(xc_interface *xch)
     return close(fd);
 }
 
-static int xc_map_foreign_batch_single(int fd, uint32_t dom,
-                                       xen_pfn_t *mfn, unsigned long addr)
+static int map_foreign_batch_single(int fd, uint32_t dom,
+                                    xen_pfn_t *mfn, unsigned long addr)
 {
     privcmd_mmapbatch_t ioctlx;
     int rc;
@@ -111,59 +111,6 @@ static int xc_map_foreign_batch_single(int fd, uint32_t dom,
     while ( (rc < 0) && (errno == ENOENT) );
 
     return rc;
-}
-
-void *xc_map_foreign_batch(xc_interface *xch,
-                           uint32_t dom, int prot,
-                           xen_pfn_t *arr, int num)
-{
-    int fd = xch->privcmdfd;
-    privcmd_mmapbatch_t ioctlx;
-    void *addr;
-    int rc;
-
-    addr = mmap(NULL, num << XC_PAGE_SHIFT, prot, MAP_SHARED, fd, 0);
-    if ( addr == MAP_FAILED )
-    {
-        PERROR("xc_map_foreign_batch: mmap failed");
-        return NULL;
-    }
-
-    ioctlx.num = num;
-    ioctlx.dom = dom;
-    ioctlx.addr = (unsigned long)addr;
-    ioctlx.arr = arr;
-
-    rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx);
-    if ( (rc < 0) && (errno == ENOENT) )
-    {
-        int i;
-
-        for ( i = 0; i < num; i++ )
-        {
-            if ( (arr[i] & PRIVCMD_MMAPBATCH_MFN_ERROR) ==
-                           PRIVCMD_MMAPBATCH_PAGED_ERROR )
-            {
-                unsigned long paged_addr = (unsigned long)addr + (i << XC_PAGE_SHIFT);
-                rc = xc_map_foreign_batch_single(fd, dom, &arr[i],
-                                                 paged_addr);
-                if ( rc < 0 )
-                    goto out;
-            }
-        }
-    }
-
- out:
-    if ( rc < 0 )
-    {
-        int saved_errno = errno;
-        PERROR("xc_map_foreign_batch: ioctl failed");
-        (void)munmap(addr, num << XC_PAGE_SHIFT);
-        errno = saved_errno;
-        return NULL;
-    }
-
-    return addr;
 }
 
 /*
@@ -305,7 +252,7 @@ void *xc_map_foreign_bulk(xc_interface *xch,
                     err[i] = rc ?: -EINVAL;
                     continue;
                 }
-                rc = xc_map_foreign_batch_single(fd, dom, pfn + i,
+                rc = map_foreign_batch_single(fd, dom, pfn + i,
                         (unsigned long)addr + ((unsigned long)i<<XC_PAGE_SHIFT));
                 if ( rc < 0 )
                 {

@@ -67,16 +67,16 @@ int osdep_privcmd_close(xc_interface *xch)
     return close(fd);
 }
 
-void *xc_map_foreign_batch(xc_interface *xch,
-                           uint32_t dom, int prot,
-                           xen_pfn_t *arr, int num)
+void *osdep_map_foreign_batch(xc_interface *xch,
+                              uint32_t dom, int prot,
+                              xen_pfn_t *arr, int num)
 {
     int fd = xch->privcmdfd;
     privcmd_mmapbatch_t ioctlx;
     void *addr;
     addr = mmap(NULL, num*XC_PAGE_SIZE, prot, MAP_ANON | MAP_SHARED, -1, 0);
     if ( addr == MAP_FAILED ) {
-        PERROR("xc_map_foreign_batch: mmap failed");
+        PERROR("osdep_map_foreign_batch: mmap failed");
         return NULL;
     }
 
@@ -87,7 +87,7 @@ void *xc_map_foreign_batch(xc_interface *xch,
     if ( ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx) < 0 )
     {
         int saved_errno = errno;
-        PERROR("xc_map_foreign_batch: ioctl failed");
+        PERROR("osdep_map_foreign_batch: ioctl failed");
         (void)munmap(addr, num*XC_PAGE_SIZE);
         errno = saved_errno;
         return NULL;

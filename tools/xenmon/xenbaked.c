@@ -411,7 +411,7 @@ static struct t_struct *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
         for ( j=0; j<tbufs.t_info->tbuf_size; j++)
             pfn_list[j] = (xen_pfn_t)mfn_list[j];
 
-        tbufs.meta[i] = xc_map_foreign_batch(xc_handle, DOMID_XEN,
+        tbufs.meta[i] = xc_map_foreign_pages(xc_handle, DOMID_XEN,
                                              PROT_READ | PROT_WRITE,
                                              pfn_list,
                                              tbufs.t_info->tbuf_size);
@@ -1175,3 +1175,13 @@ static int process_record(int cpu, struct t_rec *r)
 
     return 4 + (r->cycles_included ? 8 : 0) + (r->extra_u32 * 4);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
