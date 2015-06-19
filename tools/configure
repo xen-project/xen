@@ -632,6 +632,7 @@ systemd
 remus_netbuf
 LIBNL3_LIBS
 LIBNL3_CFLAGS
+argp_ldflags
 libiconv
 PTYFUNCS_LIBS
 PTHREAD_LIBS
@@ -8791,6 +8792,56 @@ if test "x$ac_cv_lib_iconv_libiconv_open" = xyes; then :
 else
   libiconv="n"
 fi
+
+
+ac_fn_c_check_header_mongrel "$LINENO" "argp.h" "ac_cv_header_argp_h" "$ac_includes_default"
+if test "x$ac_cv_header_argp_h" = xyes; then :
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for argp_usage in -largp" >&5
+$as_echo_n "checking for argp_usage in -largp... " >&6; }
+if ${ac_cv_lib_argp_argp_usage+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-largp  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char argp_usage ();
+int
+main ()
+{
+return argp_usage ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_argp_argp_usage=yes
+else
+  ac_cv_lib_argp_argp_usage=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_argp_argp_usage" >&5
+$as_echo "$ac_cv_lib_argp_argp_usage" >&6; }
+if test "x$ac_cv_lib_argp_argp_usage" = xyes; then :
+  argp_ldflags="-largp"
+fi
+
+
+else
+  as_fn_error $? "Could not find argp" "$LINENO" 5
+fi
+
 
 
 
