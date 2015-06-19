@@ -295,24 +295,68 @@ __get_maptrack_handle(
     struct grant_table *t,
     struct vcpu *v)
 {
-    unsigned int head, next;
+    unsigned int head, next, prev_head;
 
-    /* No maptrack pages allocated for this VCPU yet? */
-    head = v->maptrack_head;
-    if ( unlikely(head == MAPTRACK_TAIL) )
-        return -1;
+    do {
+        /* No maptrack pages allocated for this VCPU yet? */
+        head = read_atomic(&v->maptrack_head);
+        if ( unlikely(head == MAPTRACK_TAIL) )
+            return -1;
 
-    /*
-     * Always keep one entry in the free list to make it easier to add
-     * free entries to the tail.
-     */
-    next = read_atomic(&maptrack_entry(t, head).ref);
-    if ( unlikely(next == MAPTRACK_TAIL) )
-        return -1;
+        /*
+         * Always keep one entry in the free list to make it easier to
+         * add free entries to the tail.
+         */
+        next = read_atomic(&maptrack_entry(t, head).ref);
+        if ( unlikely(next == MAPTRACK_TAIL) )
+            return -1;
 
-    v->maptrack_head = next;
+        prev_head = head;
+        head = cmpxchg(&v->maptrack_head, prev_head, next);
+    } while ( head != prev_head );
 
     return head;
+}
+
+/*
+ * Try to "steal" a free maptrack entry from another VCPU.
+ *
+ * A stolen entry is transferred to the thief, so the number of
+ * entries for each VCPU should tend to the usage pattern.
+ *
+ * To avoid having to atomically count the number of free entries on
+ * each VCPU and to avoid two VCPU repeatedly stealing entries from
+ * each other, the initial victim VCPU is selected randomly.
+ */
+static int steal_maptrack_handle(struct grant_table *t,
+                                 const struct vcpu *curr)
+{
+    const struct domain *currd = curr->domain;
+    unsigned int first, i;
+
+    /* Find an initial victim. */
+    first = i = get_random() % currd->max_vcpus;
+
+    do {
+        if ( currd->vcpu[i] )
+        {
+            int handle;
+
+            handle = __get_maptrack_handle(t, currd->vcpu[i]);
+            if ( handle != -1 )
+            {
+                maptrack_entry(t, handle).vcpu = curr->vcpu_id;
+                return handle;
+            }
+        }
+
+        i++;
+        if ( i == currd->max_vcpus )
+            i = 0;
+    } while ( i != first );
+
+    /* No free handles on any VCPU. */
+    return -1;
 }
 
 static inline void
@@ -354,10 +398,31 @@ get_maptrack_handle(
 
     spin_lock(&lgt->maptrack_lock);
 
+    /*
+     * If we've run out of frames, try stealing an entry from another
+     * VCPU (in case the guest isn't mapping across its VCPUs evenly).
+     */
     if ( nr_maptrack_frames(lgt) >= max_maptrack_frames )
     {
+        /*
+         * Can drop the lock since no other VCPU can be adding a new
+         * frame once they've run out.
+         */
         spin_unlock(&lgt->maptrack_lock);
-        return -1;
+
+        /*
+         * Uninitialized free list? Steal an extra entry for the tail
+         * sentinel.
+         */
+        if ( curr->maptrack_tail == MAPTRACK_TAIL )
+        {
+            handle = steal_maptrack_handle(lgt, curr);
+            if ( handle == -1 )
+                return -1;
+            curr->maptrack_tail = handle;
+            write_atomic(&curr->maptrack_head, handle);
+        }
+        return steal_maptrack_handle(lgt, curr);
     }
 
     new_mt = alloc_xenheap_page();
@@ -385,7 +450,7 @@ get_maptrack_handle(
     if ( curr->maptrack_tail == MAPTRACK_TAIL )
         curr->maptrack_tail = handle + MAPTRACK_PER_PAGE - 1;
 
-    curr->maptrack_head = handle + 1;
+    write_atomic(&curr->maptrack_head, handle + 1);
 
     lgt->maptrack[nr_maptrack_frames(lgt)] = new_mt;
     lgt->maptrack_limit += MAPTRACK_PER_PAGE;
