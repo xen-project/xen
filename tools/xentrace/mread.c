@@ -9,7 +9,7 @@
 
 mread_handle_t mread_init(int fd)
 {
-    struct stat64 s;
+    struct stat s;
     mread_handle_t h;
     
     h=malloc(sizeof(struct mread_ctrl));
@@ -24,13 +24,13 @@ mread_handle_t mread_init(int fd)
 
     h->fd = fd;
 
-    fstat64(fd, &s);
+    fstat(fd, &s);
     h->file_size = s.st_size;
 
     return h;
 }
 
-ssize_t mread64(mread_handle_t h, void *rec, ssize_t len, loff_t offset)
+ssize_t mread64(mread_handle_t h, void *rec, ssize_t len, off_t offset)
 {
     /* Idea: have a "cache" of N mmaped regions.  If the offset is
      * in one of the regions, just copy it.  If not, evict one of the
@@ -45,7 +45,7 @@ ssize_t mread64(mread_handle_t h, void *rec, ssize_t len, loff_t offset)
      */
     char * b=NULL;
     int bind=-1;
-    loff_t boffset=0;
+    off_t boffset=0;
     ssize_t bsize;
 
 #define dprintf(x...)

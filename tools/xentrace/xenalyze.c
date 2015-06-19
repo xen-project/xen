@@ -70,9 +70,9 @@ struct {
     char * symbol_file;
     char * trace_file;
     int output_defined;
-    loff_t file_size;
+    off_t file_size;
     struct {
-        loff_t update_offset;
+        off_t update_offset;
         int pipe[2];
         FILE* out;
         int pid;
@@ -1853,8 +1853,8 @@ struct pcpu_info {
 
     /* Information related to scanning thru the file */
     tsc_t first_tsc, last_tsc, order_tsc;
-    loff_t file_offset;
-    loff_t next_cpu_change_offset;
+    off_t file_offset;
+    off_t next_cpu_change_offset;
     struct record_info ri;
     int last_cpu_change_pid;
     int power_state;
@@ -1898,7 +1898,7 @@ void __fill_in_record_info(struct pcpu_info *p);
 
 struct {
     int max_active_pcpu;
-    loff_t last_epoch_offset;
+    off_t last_epoch_offset;
     int early_eof;
     int lost_cpus;
     tsc_t now;
@@ -1937,7 +1937,7 @@ char * pcpu_string(int pcpu);
 void pcpu_string_draw(struct pcpu_info *p);
 void process_generic(struct record_info *ri);
 void dump_generic(FILE *f, struct record_info *ri);
-ssize_t __read_record(struct trace_record *rec, loff_t offset);
+ssize_t __read_record(struct trace_record *rec, off_t offset);
 void error(enum error_level l, struct record_info *ri);
 void update_io_address(struct io_address ** list, unsigned int pa, int dir,
                        tsc_t arc_cycles, unsigned int va);
@@ -8512,7 +8512,7 @@ void activate_early_eof(void) {
     }
 }
 
-loff_t scan_for_new_pcpu(loff_t offset) {
+off_t scan_for_new_pcpu(off_t offset) {
     ssize_t r;
     struct trace_record rec;
     struct cpu_change_data *cd;
@@ -9051,7 +9051,7 @@ void progress_init(void) {
 
 }
 
-void progress_update(loff_t offset) {
+void progress_update(off_t offset) {
     long long p;
 
     p = ( offset * 100 ) / G.file_size;
@@ -9089,7 +9089,7 @@ void progress_finish(void) {
     }
 }
 
-ssize_t __read_record(struct trace_record *rec, loff_t offset)
+ssize_t __read_record(struct trace_record *rec, off_t offset)
 {
     ssize_t r, rsize;
 
@@ -9172,7 +9172,7 @@ void __fill_in_record_info(struct pcpu_info *p)
 }
 
 ssize_t read_record(struct pcpu_info * p) {
-    loff_t * offset;
+    off_t * offset;
     struct record_info *ri;
 
     offset = &p->file_offset;
@@ -9489,7 +9489,7 @@ void report_pcpu(void) {
 
 void init_pcpus(void) {
     int i=0;
-    loff_t offset = 0;
+    off_t offset = 0;
 
     for(i=0; i<MAX_CPUS; i++)
     {
@@ -10358,12 +10358,12 @@ int main(int argc, char *argv[]) {
     if (G.trace_file == NULL)
         exit(1);
 
-    if ( (G.fd = open(G.trace_file, O_RDONLY|O_LARGEFILE)) < 0) {
+    if ( (G.fd = open(G.trace_file, O_RDONLY)) < 0) {
         perror("open");
         error(ERR_SYSTEM, NULL);
     } else {
-        struct stat64 s;
-        fstat64(G.fd, &s);
+        struct stat s;
+        fstat(G.fd, &s);
         G.file_size = s.st_size;
     }
 
