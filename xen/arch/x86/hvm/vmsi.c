@@ -219,7 +219,6 @@ static int msixtbl_read(
 {
     unsigned long offset;
     struct msixtbl_entry *entry;
-    void *virt;
     unsigned int nr_entry, index;
     int r = X86EMUL_UNHANDLEABLE;
 
@@ -253,13 +252,20 @@ static int msixtbl_read(
     }
     if ( offset == PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
     {
-        virt = msixtbl_addr_to_virt(entry, address);
+        const struct msi_desc *msi_desc;
+        void *virt = msixtbl_addr_to_virt(entry, address);
+
         if ( !virt )
             goto out;
+        msi_desc = virt_to_msi_desc(entry->pdev, virt);
+        if ( !msi_desc )
+            goto out;
         if ( len == 4 )
-            *pval = readl(virt);
+            *pval = MASK_INSR(msi_desc->msi_attrib.guest_masked,
+                              PCI_MSIX_VECTOR_BITMASK);
         else
-            *pval |= (u64)readl(virt) << 32;
+            *pval |= (u64)MASK_INSR(msi_desc->msi_attrib.guest_masked,
+                                    PCI_MSIX_VECTOR_BITMASK) << 32;
     }
     
     r = X86EMUL_OKAY;
@@ -277,7 +283,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     void *virt;
     unsigned int nr_entry, index;
     int r = X86EMUL_UNHANDLEABLE;
-    unsigned long flags, orig;
+    unsigned long flags;
     struct irq_desc *desc;
 
     if ( (len != 4 && len != 8) || (address & (len - 1)) )
@@ -337,37 +343,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
 
     ASSERT(msi_desc == desc->msi_desc);
    
-    orig = readl(virt);
-
-    /*
-     * Do not allow guest to modify MSI-X control bit if it is masked 
-     * by Xen. We'll only handle the case where Xen thinks that
-     * bit is unmasked, but hardware has silently masked the bit
-     * (in case of SR-IOV VF reset, etc). On the other hand, if Xen 
-     * thinks that the bit is masked, but it's really not, 
-     * we log a warning.
-     */
-    if ( msi_desc->msi_attrib.masked )
-    {
-        if ( !(orig & PCI_MSIX_VECTOR_BITMASK) )
-            printk(XENLOG_WARNING "MSI-X control bit is unmasked when"
-                   " it is expected to be masked [%04x:%02x:%02x.%u]\n", 
-                   entry->pdev->seg, entry->pdev->bus,
-                   PCI_SLOT(entry->pdev->devfn), 
-                   PCI_FUNC(entry->pdev->devfn));
-
-        goto unlock;
-    }
-
-    /*
-     * The mask bit is the only defined bit in the word. But we 
-     * ought to preserve the reserved bits. Clearing the reserved 
-     * bits can result in undefined behaviour (see PCI Local Bus
-     * Specification revision 2.3).
-     */
-    val &= PCI_MSIX_VECTOR_BITMASK;
-    val |= (orig & ~PCI_MSIX_VECTOR_BITMASK);
-    writel(val, virt);
+    guest_mask_msi_irq(desc, !!(val & PCI_MSIX_VECTOR_BITMASK));
 
 unlock:
     spin_unlock_irqrestore(&desc->lock, flags);

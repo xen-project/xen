@@ -451,7 +451,7 @@ static void iommu_msi_unmask(struct irq_desc *desc)
     spin_lock_irqsave(&iommu->lock, flags);
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
     spin_unlock_irqrestore(&iommu->lock, flags);
-    iommu->msi.msi_attrib.masked = 0;
+    iommu->msi.msi_attrib.host_masked = 0;
 }
 
 static void iommu_msi_mask(struct irq_desc *desc)
@@ -464,7 +464,7 @@ static void iommu_msi_mask(struct irq_desc *desc)
     spin_lock_irqsave(&iommu->lock, flags);
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_DISABLED);
     spin_unlock_irqrestore(&iommu->lock, flags);
-    iommu->msi.msi_attrib.masked = 1;
+    iommu->msi.msi_attrib.host_masked = 1;
 }
 
 static unsigned int iommu_msi_startup(struct irq_desc *desc)

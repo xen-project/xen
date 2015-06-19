@@ -95,12 +95,13 @@ extern unsigned int pci_msix_get_table_len(struct pci_dev *pdev);
 
 struct msi_desc {
 	struct msi_attrib {
-		__u8	type	: 5; 	/* {0: unused, 5h:MSI, 11h:MSI-X} */
-		__u8	maskbit	: 1; 	/* mask-pending bit supported ?   */
-		__u8	masked	: 1;
+		__u8	type;		/* {0: unused, 5h:MSI, 11h:MSI-X} */
+		__u8	pos;		/* Location of the MSI capability */
+		__u8	maskbit	: 1;	/* mask/pending bit supported ?   */
 		__u8	is_64	: 1;	/* Address size: 0=32bit 1=64bit  */
-		__u8	pos;	 	/* Location of the msi capability */
-		__u16	entry_nr;    	/* specific enabled entry 	  */
+		__u8	host_masked : 1;
+		__u8	guest_masked : 1;
+		__u16	entry_nr;	/* specific enabled entry 	  */
 	} msi_attrib;
 
 	struct list_head list;
@@ -241,6 +242,7 @@ void msi_compose_msg(unsigned vector, const cpumask_t *mask,
 void __msi_set_enable(u16 seg, u8 bus, u8 slot, u8 func, int pos, int enable);
 void mask_msi_irq(struct irq_desc *);
 void unmask_msi_irq(struct irq_desc *);
+void guest_mask_msi_irq(struct irq_desc *, bool_t mask);
 void ack_nonmaskable_msi_irq(struct irq_desc *);
 void end_nonmaskable_msi_irq(struct irq_desc *, u8 vector);
 void set_msi_affinity(struct irq_desc *, const cpumask_t *);

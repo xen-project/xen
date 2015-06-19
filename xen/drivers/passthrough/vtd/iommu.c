@@ -997,7 +997,7 @@ static void dma_msi_unmask(struct irq_desc *desc)
     spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writel(iommu->reg, DMAR_FECTL_REG, 0);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
-    iommu->msi.msi_attrib.masked = 0;
+    iommu->msi.msi_attrib.host_masked = 0;
 }
 
 static void dma_msi_mask(struct irq_desc *desc)
@@ -1009,7 +1009,7 @@ static void dma_msi_mask(struct irq_desc *desc)
     spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writel(iommu->reg, DMAR_FECTL_REG, DMA_FECTL_IM);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
-    iommu->msi.msi_attrib.masked = 1;
+    iommu->msi.msi_attrib.host_masked = 1;
 }
 
 static unsigned int dma_msi_startup(struct irq_desc *desc)

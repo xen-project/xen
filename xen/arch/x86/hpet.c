@@ -241,7 +241,7 @@ static void hpet_msi_unmask(struct irq_desc *desc)
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
     cfg |= HPET_TN_ENABLE;
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
-    ch->msi.msi_attrib.masked = 0;
+    ch->msi.msi_attrib.host_masked = 0;
 }
 
 static void hpet_msi_mask(struct irq_desc *desc)
@@ -252,7 +252,7 @@ static void hpet_msi_mask(struct irq_desc *desc)
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
     cfg &= ~HPET_TN_ENABLE;
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
-    ch->msi.msi_attrib.masked = 1;
+    ch->msi.msi_attrib.host_masked = 1;
 }
 
 static int hpet_msi_write(struct hpet_event_channel *ch, struct msi_msg *msg)

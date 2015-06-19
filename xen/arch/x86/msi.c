@@ -349,9 +349,10 @@ int msi_maskable_irq(const struct msi_desc *entry)
            || entry->msi_attrib.maskbit;
 }
 
-static void msi_set_mask_bit(struct irq_desc *desc, int flag)
+static void msi_set_mask_bit(struct irq_desc *desc, bool_t host, bool_t guest)
 {
     struct msi_desc *entry = desc->msi_desc;
+    bool_t flag = host || guest;
 
     ASSERT(spin_is_locked(&desc->lock));
     BUG_ON(!entry || !entry->dev);
@@ -383,7 +384,8 @@ static void msi_set_mask_bit(struct irq_desc *desc, int flag)
         BUG();
         break;
     }
-    entry->msi_attrib.masked = !!flag;
+    entry->msi_attrib.host_masked = host;
+    entry->msi_attrib.guest_masked = guest;
 }
 
 static int msi_get_mask_bit(const struct msi_desc *entry)
@@ -405,18 +407,31 @@ static int msi_get_mask_bit(const struct msi_desc *entry)
 
 void mask_msi_irq(struct irq_desc *desc)
 {
-    msi_set_mask_bit(desc, 1);
+    msi_set_mask_bit(desc, 1, desc->msi_desc->msi_attrib.guest_masked);
 }
 
 void unmask_msi_irq(struct irq_desc *desc)
 {
-    msi_set_mask_bit(desc, 0);
+    msi_set_mask_bit(desc, 0, desc->msi_desc->msi_attrib.guest_masked);
+}
+
+void guest_mask_msi_irq(struct irq_desc *desc, bool_t mask)
+{
+    msi_set_mask_bit(desc, desc->msi_desc->msi_attrib.host_masked, mask);
 }
 
 static unsigned int startup_msi_irq(struct irq_desc *desc)
 {
-    unmask_msi_irq(desc);
+    bool_t guest_masked = (desc->status & IRQ_GUEST) &&
+                          is_hvm_domain(desc->msi_desc->dev->domain);
+
+    msi_set_mask_bit(desc, 0, guest_masked);
     return 0;
+}
+
+static void shutdown_msi_irq(struct irq_desc *desc)
+{
+    msi_set_mask_bit(desc, 1, 1);
 }
 
 void ack_nonmaskable_msi_irq(struct irq_desc *desc)
@@ -443,7 +458,7 @@ void end_nonmaskable_msi_irq(struct irq_desc *desc, u8 vector)
 static hw_irq_controller pci_msi_maskable = {
     .typename     = "PCI-MSI/-X",
     .startup      = startup_msi_irq,
-    .shutdown     = mask_msi_irq,
+    .shutdown     = shutdown_msi_irq,
     .enable       = unmask_msi_irq,
     .disable      = mask_msi_irq,
     .ack          = ack_maskable_msi_irq,
@@ -591,7 +606,8 @@ static int msi_capability_init(struct pci_dev *dev,
         entry[i].msi_attrib.is_64 = is_64bit_address(control);
         entry[i].msi_attrib.entry_nr = i;
         entry[i].msi_attrib.maskbit = is_mask_bit_support(control);
-        entry[i].msi_attrib.masked = 1;
+        entry[i].msi_attrib.host_masked = 1;
+        entry[i].msi_attrib.guest_masked = 0;
         entry[i].msi_attrib.pos = pos;
         if ( entry[i].msi_attrib.maskbit )
             entry[i].msi.mpos = mpos;
@@ -817,7 +833,8 @@ static int msix_capability_init(struct pci_dev *dev,
         entry->msi_attrib.is_64 = 1;
         entry->msi_attrib.entry_nr = msi->entry_nr;
         entry->msi_attrib.maskbit = 1;
-        entry->msi_attrib.masked = 1;
+        entry->msi_attrib.host_masked = 1;
+        entry->msi_attrib.guest_masked = 1;
         entry->msi_attrib.pos = pos;
         entry->irq = msi->irq;
         entry->dev = dev;
@@ -1152,7 +1169,8 @@ int pci_restore_msi_state(struct pci_dev *pdev)
 
         for ( i = 0; ; )
         {
-            msi_set_mask_bit(desc, entry[i].msi_attrib.masked);
+            msi_set_mask_bit(desc, entry[i].msi_attrib.host_masked,
+                             entry[i].msi_attrib.guest_masked);
 
             if ( !--nr )
                 break;
@@ -1304,7 +1322,7 @@ static void dump_msi(unsigned char key)
         else
             mask = '?';
         printk(" %-6s%4u vec=%02x%7s%6s%3sassert%5s%7s"
-               " dest=%08x mask=%d/%d/%c\n",
+               " dest=%08x mask=%d/%c%c/%c\n",
                type, irq,
                (data & MSI_DATA_VECTOR_MASK) >> MSI_DATA_VECTOR_SHIFT,
                data & MSI_DATA_DELIVERY_LOWPRI ? "lowest" : "fixed",
@@ -1312,7 +1330,10 @@ static void dump_msi(unsigned char key)
                data & MSI_DATA_LEVEL_ASSERT ? "" : "de",
                addr & MSI_ADDR_DESTMODE_LOGIC ? "log" : "phys",
                addr & MSI_ADDR_REDIRECTION_LOWPRI ? "lowest" : "cpu",
-               dest32, attr.maskbit, attr.masked, mask);
+               dest32, attr.maskbit,
+               attr.host_masked ? 'H' : ' ',
+               attr.guest_masked ? 'G' : ' ',
+               mask);
     }
 }
 
