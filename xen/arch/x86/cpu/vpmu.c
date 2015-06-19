@@ -28,10 +28,10 @@
 #include <asm/msr.h>
 #include <asm/nmi.h>
 #include <asm/p2m.h>
+#include <asm/vpmu.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
-#include <asm/hvm/vpmu.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/apic.h>

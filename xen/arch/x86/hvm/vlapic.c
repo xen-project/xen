@@ -33,12 +33,12 @@
 #include <asm/page.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
+#include <asm/vpmu.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/nestedhvm.h>
-#include <asm/hvm/vpmu.h>
 #include <public/hvm/ioreq.h>
 #include <public/hvm/params.h>
 

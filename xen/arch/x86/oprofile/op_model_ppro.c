@@ -19,7 +19,7 @@
 #include <asm/processor.h>
 #include <asm/regs.h>
 #include <asm/current.h>
-#include <asm/hvm/vpmu.h>
+#include <asm/vpmu.h>
 
 #include "op_x86_model.h"
 #include "op_counter.h"

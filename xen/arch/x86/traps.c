@@ -72,7 +72,7 @@
 #include <asm/apic.h>
 #include <asm/mc146818rtc.h>
 #include <asm/hpet.h>
-#include <asm/hvm/vpmu.h>
+#include <asm/vpmu.h>
 #include <public/arch-x86/cpuid.h>
 #include <xsm/xsm.h>
 

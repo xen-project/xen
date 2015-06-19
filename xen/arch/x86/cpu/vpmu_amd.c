@@ -28,8 +28,8 @@
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <asm/apic.h>
+#include <asm/vpmu.h>
 #include <asm/hvm/vlapic.h>
-#include <asm/hvm/vpmu.h>
 #include <public/pmu.h>
 
 #define MSR_F10H_EVNTSEL_GO_SHIFT   40

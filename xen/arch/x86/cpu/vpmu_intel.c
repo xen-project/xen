@@ -30,6 +30,7 @@
 #include <asm/traps.h>
 #include <asm/msr.h>
 #include <asm/msr-index.h>
+#include <asm/vpmu.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vmx/vmx.h>
@@ -37,7 +38,6 @@
 #include <public/sched.h>
 #include <public/hvm/save.h>
 #include <public/pmu.h>
-#include <asm/hvm/vpmu.h>
 
 /*
  * See Intel SDM Vol 2a Instruction Set Reference chapter 3 for CPUID

@@ -19,8 +19,8 @@
 #ifndef __ASM_X86_HVM_VMX_VMCS_H__
 #define __ASM_X86_HVM_VMX_VMCS_H__
 
+#include <asm/vpmu.h>
 #include <asm/hvm/io.h>
-#include <asm/hvm/vpmu.h>
 #include <irq_vectors.h>
 
 extern void vmcs_dump_vcpu(struct vcpu *v);
