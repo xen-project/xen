@@ -181,36 +181,23 @@ static struct msixtbl_entry *msixtbl_find_entry(
     return NULL;
 }
 
-static struct msi_desc *virt_to_msi_desc(struct pci_dev *dev, void *virt)
+static struct msi_desc *msixtbl_addr_to_desc(
+    const struct msixtbl_entry *entry, unsigned long addr)
 {
+    unsigned int nr_entry;
     struct msi_desc *desc;
-
-    list_for_each_entry( desc, &dev->msi_list, list )
-        if ( desc->msi_attrib.type == PCI_CAP_ID_MSIX  &&
-             virt >= desc->mask_base &&
-             virt < desc->mask_base + PCI_MSIX_ENTRY_SIZE ) 
-            return desc;
-
-    return NULL;
-}
-
-static void __iomem *msixtbl_addr_to_virt(
-    struct msixtbl_entry *entry, unsigned long addr)
-{
-    unsigned int idx, nr_page;
 
     if ( !entry || !entry->pdev )
         return NULL;
 
-    nr_page = (addr >> PAGE_SHIFT) -
-              (entry->gtable >> PAGE_SHIFT);
+    nr_entry = (addr - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
 
-    idx = entry->pdev->msix->table_idx[nr_page];
-    if ( !idx )
-        return NULL;
+    list_for_each_entry( desc, &entry->pdev->msi_list, list )
+        if ( desc->msi_attrib.type == PCI_CAP_ID_MSIX &&
+             desc->msi_attrib.entry_nr == nr_entry )
+            return desc;
 
-    return (void *)(fix_to_virt(idx) +
-                    (addr & ((1UL << PAGE_SHIFT) - 1)));
+    return NULL;
 }
 
 static int msixtbl_read(
@@ -252,12 +239,8 @@ static int msixtbl_read(
     }
     if ( offset == PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
     {
-        const struct msi_desc *msi_desc;
-        void *virt = msixtbl_addr_to_virt(entry, address);
+        const struct msi_desc *msi_desc = msixtbl_addr_to_desc(entry, address);
 
-        if ( !virt )
-            goto out;
-        msi_desc = virt_to_msi_desc(entry->pdev, virt);
         if ( !msi_desc )
             goto out;
         if ( len == 4 )
@@ -280,7 +263,6 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     unsigned long offset;
     struct msixtbl_entry *entry;
     const struct msi_desc *msi_desc;
-    void *virt;
     unsigned int nr_entry, index;
     int r = X86EMUL_UNHANDLEABLE;
     unsigned long flags;
@@ -324,11 +306,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
         goto out;
     }
 
-    virt = msixtbl_addr_to_virt(entry, address);
-    if ( !virt )
-        goto out;
-
-    msi_desc = virt_to_msi_desc(entry->pdev, virt);
+    msi_desc = msixtbl_addr_to_desc(entry, address);
     if ( !msi_desc || msi_desc->irq < 0 )
         goto out;
     
@@ -357,17 +335,13 @@ out:
 
 static int msixtbl_range(struct vcpu *v, unsigned long addr)
 {
-    struct msixtbl_entry *entry;
-    void *virt;
+    const struct msi_desc *desc;
 
     rcu_read_lock(&msixtbl_rcu_lock);
-
-    entry = msixtbl_find_entry(v, addr);
-    virt = msixtbl_addr_to_virt(entry, addr);
-
+    desc = msixtbl_addr_to_desc(msixtbl_find_entry(v, addr), addr);
     rcu_read_unlock(&msixtbl_rcu_lock);
 
-    return !!virt;
+    return !!desc;
 }
 
 const struct hvm_mmio_handler msixtbl_mmio_handler = {
