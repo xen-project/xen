@@ -127,6 +127,8 @@ struct vcpu *alloc_vcpu(
 
     tasklet_init(&v->continue_hypercall_tasklet, NULL, 0);
 
+    grant_table_init_vcpu(v);
+
     if ( !zalloc_cpumask_var(&v->cpu_hard_affinity) ||
          !zalloc_cpumask_var(&v->cpu_hard_affinity_tmp) ||
          !zalloc_cpumask_var(&v->cpu_hard_affinity_saved) ||

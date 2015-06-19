@@ -37,6 +37,7 @@
 #include <xen/iommu.h>
 #include <xen/paging.h>
 #include <xen/keyhandler.h>
+#include <xen/vmap.h>
 #include <xsm/xsm.h>
 #include <asm/flushtlb.h>
 
@@ -57,7 +58,7 @@ integer_param("gnttab_max_frames", max_grant_frames);
  * New options allow to set max_maptrack_frames and
  * map_grant_table_frames independently.
  */
-#define DEFAULT_MAX_MAPTRACK_FRAMES 256
+#define DEFAULT_MAX_MAPTRACK_FRAMES 1024
 
 static unsigned int __read_mostly max_maptrack_frames;
 integer_param("gnttab_max_maptrack_frames", max_maptrack_frames);
@@ -121,6 +122,8 @@ struct grant_mapping {
     u32      ref;           /* grant ref */
     u16      flags;         /* 0-4: GNTMAP_* ; 5-15: unused */
     domid_t  domid;         /* granting domain */
+    u32      vcpu;          /* vcpu which created the grant mapping */
+    u32      pad;           /* round size to a power of 2 */
 };
 
 #define MAPTRACK_PER_PAGE (PAGE_SIZE / sizeof(struct grant_mapping))
@@ -289,62 +292,103 @@ double_gt_unlock(struct grant_table *lgt, struct grant_table *rgt)
 
 static inline int
 __get_maptrack_handle(
-    struct grant_table *t)
+    struct grant_table *t,
+    struct vcpu *v)
 {
-    unsigned int h;
-    if ( unlikely((h = t->maptrack_head) == MAPTRACK_TAIL) )
+    unsigned int head, next;
+
+    /* No maptrack pages allocated for this VCPU yet? */
+    head = v->maptrack_head;
+    if ( unlikely(head == MAPTRACK_TAIL) )
         return -1;
-    t->maptrack_head = maptrack_entry(t, h).ref;
-    return h;
+
+    /*
+     * Always keep one entry in the free list to make it easier to add
+     * free entries to the tail.
+     */
+    next = read_atomic(&maptrack_entry(t, head).ref);
+    if ( unlikely(next == MAPTRACK_TAIL) )
+        return -1;
+
+    v->maptrack_head = next;
+
+    return head;
 }
 
 static inline void
 put_maptrack_handle(
     struct grant_table *t, int handle)
 {
-    spin_lock(&t->maptrack_lock);
-    maptrack_entry(t, handle).ref = t->maptrack_head;
-    t->maptrack_head = handle;
-    spin_unlock(&t->maptrack_lock);
+    struct domain *currd = current->domain;
+    struct vcpu *v;
+    unsigned int prev_tail, cur_tail;
+
+    /* 1. Set entry to be a tail. */
+    maptrack_entry(t, handle).ref = MAPTRACK_TAIL;
+
+    /* 2. Add entry to the tail of the list on the original VCPU. */
+    v = currd->vcpu[maptrack_entry(t, handle).vcpu];
+
+    cur_tail = read_atomic(&v->maptrack_tail);
+    do {
+        prev_tail = cur_tail;
+        cur_tail = cmpxchg(&v->maptrack_tail, prev_tail, handle);
+    } while ( cur_tail != prev_tail );
+
+    /* 3. Update the old tail entry to point to the new entry. */
+    write_atomic(&maptrack_entry(t, prev_tail).ref, handle);
 }
 
 static inline int
 get_maptrack_handle(
     struct grant_table *lgt)
 {
+    struct vcpu          *curr = current;
     int                   i;
     grant_handle_t        handle;
     struct grant_mapping *new_mt;
-    unsigned int          new_mt_limit, nr_frames;
+
+    handle = __get_maptrack_handle(lgt, curr);
+    if ( likely(handle != -1) )
+        return handle;
 
     spin_lock(&lgt->maptrack_lock);
 
-    while ( unlikely((handle = __get_maptrack_handle(lgt)) == -1) )
+    if ( nr_maptrack_frames(lgt) >= max_maptrack_frames )
     {
-        nr_frames = nr_maptrack_frames(lgt);
-        if ( nr_frames >= max_maptrack_frames )
-            break;
-
-        new_mt = alloc_xenheap_page();
-        if ( !new_mt )
-            break;
-
-        clear_page(new_mt);
-
-        new_mt_limit = lgt->maptrack_limit + MAPTRACK_PER_PAGE;
-
-        for ( i = 1; i < MAPTRACK_PER_PAGE; i++ )
-            new_mt[i - 1].ref = lgt->maptrack_limit + i;
-        new_mt[i - 1].ref = lgt->maptrack_head;
-        lgt->maptrack_head = lgt->maptrack_limit;
-
-        lgt->maptrack[nr_frames] = new_mt;
-        smp_wmb();
-        lgt->maptrack_limit      = new_mt_limit;
-
-        gdprintk(XENLOG_INFO, "Increased maptrack size to %u frames\n",
-                 nr_frames + 1);
+        spin_unlock(&lgt->maptrack_lock);
+        return -1;
     }
+
+    new_mt = alloc_xenheap_page();
+    if ( !new_mt )
+    {
+        spin_unlock(&lgt->maptrack_lock);
+        return -1;
+    }
+    clear_page(new_mt);
+
+    /*
+     * Use the first new entry and add the remaining entries to the
+     * head of the free list.
+     */
+    handle = lgt->maptrack_limit;
+
+    for ( i = 0; i < MAPTRACK_PER_PAGE; i++ )
+    {
+        new_mt[i].ref = handle + i + 1;
+        new_mt[i].vcpu = curr->vcpu_id;
+    }
+    new_mt[i - 1].ref = curr->maptrack_head;
+
+    /* Set tail directly if this is the first page for this VCPU. */
+    if ( curr->maptrack_tail == MAPTRACK_TAIL )
+        curr->maptrack_tail = handle + MAPTRACK_PER_PAGE - 1;
+
+    curr->maptrack_head = handle + 1;
+
+    lgt->maptrack[nr_maptrack_frames(lgt)] = new_mt;
+    lgt->maptrack_limit += MAPTRACK_PER_PAGE;
 
     spin_unlock(&lgt->maptrack_lock);
 
@@ -3048,16 +3092,9 @@ grant_table_create(
     }
 
     /* Tracking of mapped foreign frames table */
-    if ( (t->maptrack = xzalloc_array(struct grant_mapping *,
-                                      max_maptrack_frames)) == NULL )
+    t->maptrack = vzalloc(max_maptrack_frames * sizeof(*t->maptrack));
+    if ( t->maptrack == NULL )
         goto no_mem_2;
-    if ( (t->maptrack[0] = alloc_xenheap_page()) == NULL )
-        goto no_mem_3;
-    clear_page(t->maptrack[0]);
-    t->maptrack_limit = MAPTRACK_PER_PAGE;
-    for ( i = 1; i < MAPTRACK_PER_PAGE; i++ )
-        t->maptrack[0][i - 1].ref = i;
-    t->maptrack[0][i - 1].ref = MAPTRACK_TAIL;
 
     /* Shared grant table. */
     if ( (t->shared_raw = xzalloc_array(void *, max_grant_frames)) == NULL )
@@ -3089,8 +3126,7 @@ grant_table_create(
         free_xenheap_page(t->shared_raw[i]);
     xfree(t->shared_raw);
  no_mem_3:
-    free_xenheap_page(t->maptrack[0]);
-    xfree(t->maptrack);
+    vfree(t->maptrack);
  no_mem_2:
     for ( i = 0;
           i < num_act_frames_from_sha_frames(INITIAL_NR_GRANT_FRAMES); i++ )
@@ -3225,7 +3261,7 @@ grant_table_destroy(
 
     for ( i = 0; i < nr_maptrack_frames(t); i++ )
         free_xenheap_page(t->maptrack[i]);
-    xfree(t->maptrack);
+    vfree(t->maptrack);
 
     for ( i = 0; i < nr_active_grant_frames(t); i++ )
         free_xenheap_page(t->active[i]);
@@ -3237,6 +3273,12 @@ grant_table_destroy(
 
     xfree(t);
     d->grant_table = NULL;
+}
+
+void grant_table_init_vcpu(struct vcpu *v)
+{
+    v->maptrack_head = MAPTRACK_TAIL;
+    v->maptrack_tail = MAPTRACK_TAIL;
 }
 
 static void gnttab_usage_print(struct domain *rd)

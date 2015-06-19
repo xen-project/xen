@@ -219,6 +219,10 @@ struct vcpu
     /* VCPU paused by system controller. */
     int              controller_pause_count;
 
+    /* Maptrack */
+    unsigned int     maptrack_head;
+    unsigned int     maptrack_tail;
+
     /* IRQ-safe virq_lock protects against delivering VIRQ to stale evtchn. */
     evtchn_port_t    virq_to_evtchn[NR_VIRQS];
     spinlock_t       virq_lock;

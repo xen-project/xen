@@ -73,9 +73,8 @@ struct grant_table {
     grant_status_t       **status;
     /* Active grant table. */
     struct active_grant_entry **active;
-    /* Mapping tracking table. */
+    /* Mapping tracking table per vcpu. */
     struct grant_mapping **maptrack;
-    unsigned int          maptrack_head;
     unsigned int          maptrack_limit;
     /* Lock protecting the maptrack page list, head, and limit */
     spinlock_t            maptrack_lock;
@@ -89,6 +88,7 @@ int grant_table_create(
     struct domain *d);
 void grant_table_destroy(
     struct domain *d);
+void grant_table_init_vcpu(struct vcpu *v);
 
 /* Domain death release of granted mappings of other domains' memory. */
 void
