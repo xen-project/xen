@@ -14,6 +14,10 @@
    you don't. */
 #undef HAVE_DECL_FDT_NEXT_SUBNODE
 
+/* Define to 1 if you have the declaration of `fdt_property_u32', and to 0 if
+   you don't. */
+#undef HAVE_DECL_FDT_PROPERTY_U32
+
 /* Define to 1 if you have the `fdt_first_subnode' function. */
 #undef HAVE_FDT_FIRST_SUBNODE
 

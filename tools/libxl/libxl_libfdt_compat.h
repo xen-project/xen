@@ -61,6 +61,7 @@
 #define LIBXL_LIBFDT_COMPAT_H
 
 #include "libxl_internal.h"
+#include <libfdt.h>
 
 #if !HAVE_DECL_FDT_FIRST_SUBNODE
 _hidden int fdt_first_subnode(const void *fdt, int offset);
@@ -68,6 +69,14 @@ _hidden int fdt_first_subnode(const void *fdt, int offset);
 
 #if !HAVE_DECL_FDT_NEXT_SUBNODE
 _hidden int fdt_next_subnode(const void *fdt, int offset);
+#endif
+
+#if !HAVE_DECL_FDT_PROPERTY_U32
+static inline int fdt_property_u32(void *fdt, const char *name, uint32_t val)
+{
+	uint32_t tmp = cpu_to_fdt32(val);
+	return fdt_property(fdt, name, &tmp, sizeof(tmp));
+}
 #endif
 
 #endif

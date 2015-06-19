@@ -8906,6 +8906,21 @@ cat >>confdefs.h <<_ACEOF
 #define HAVE_DECL_FDT_NEXT_SUBNODE $ac_have_decl
 _ACEOF
 
+
+# The helper fdt_property_u32 is only present in libfdt >= 1.4.0
+# It's an inline function, so only check if the declaration is present
+ac_fn_c_check_decl "$LINENO" "fdt_property_u32" "ac_cv_have_decl_fdt_property_u32" "#include <libfdt.h>
+"
+if test "x$ac_cv_have_decl_fdt_property_u32" = xyes; then :
+  ac_have_decl=1
+else
+  ac_have_decl=0
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_DECL_FDT_PROPERTY_U32 $ac_have_decl
+_ACEOF
+
 esac
 
 # Checks for header files.

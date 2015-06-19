@@ -42,6 +42,8 @@ uint64_t __read_mostly boot_count;
  * register-mapped time source in the SoC. */
 unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
 
+uint32_t __read_mostly timer_dt_clock_frequency;
+
 static unsigned int timer_irq[MAX_TIMER_PPI];
 
 unsigned int timer_get_irq(enum timer_ppi ppi)
@@ -86,7 +88,10 @@ void __init preinit_xen_time(void)
 
     res = dt_property_read_u32(timer, "clock-frequency", &rate);
     if ( res )
+    {
         cpu_khz = rate / 1000;
+        timer_dt_clock_frequency = rate;
+    }
     else
         cpu_khz = READ_SYSREG32(CNTFRQ_EL0) / 1000;
 

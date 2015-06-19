@@ -444,7 +444,9 @@ static int make_gicv3_node(libxl__gc *gc, void *fdt)
     return 0;
 }
 
-static int make_timer_node(libxl__gc *gc, void *fdt, const struct arch_info *ainfo)
+static int make_timer_node(libxl__gc *gc, void *fdt,
+                           const struct arch_info *ainfo,
+                           uint32_t frequency)
 {
     int res;
     gic_interrupt ints[3];
@@ -461,6 +463,9 @@ static int make_timer_node(libxl__gc *gc, void *fdt, const struct arch_info *ain
 
     res = fdt_property_interrupts(gc, fdt, ints, 3);
     if (res) return res;
+
+    if ( frequency )
+        fdt_property_u32(fdt, "clock-frequency", frequency);
 
     res = fdt_end_node(fdt);
     if (res) return res;
@@ -805,7 +810,7 @@ next_resize:
             goto out;
         }
 
-        FDT( make_timer_node(gc, fdt, ainfo) );
+        FDT( make_timer_node(gc, fdt, ainfo, xc_config->clock_frequency) );
         FDT( make_hypervisor_node(gc, fdt, vers) );
 
         if (pfdt)

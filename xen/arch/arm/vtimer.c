@@ -60,10 +60,12 @@ static void virt_timer_expired(void *data)
     perfc_incr(vtimer_virt_inject);
 }
 
-int domain_vtimer_init(struct domain *d)
+int domain_vtimer_init(struct domain *d, struct xen_arch_domainconfig *config)
 {
     d->arch.phys_timer_base.offset = NOW();
     d->arch.virt_timer_base.offset = READ_SYSREG64(CNTPCT_EL0);
+
+    config->clock_frequency = timer_dt_clock_frequency;
 
     /* At this stage vgic_reserve_virq can't fail */
     if ( is_hardware_domain(d) )

@@ -379,6 +379,10 @@ AS_IF([test "x$partial_dt" = "xy" ],
 #   * The prototype exists but the functions are not exposed. Don't ask why...
 AC_CHECK_FUNCS([fdt_first_subnode fdt_next_subnode])
 AC_CHECK_DECLS([fdt_first_subnode, fdt_next_subnode],,,[#include <libfdt.h>])
+
+# The helper fdt_property_u32 is only present in libfdt >= 1.4.0
+# It's an inline function, so only check if the declaration is present
+AC_CHECK_DECLS([fdt_property_u32],,,[#include <libfdt.h>])
 esac
 
 # Checks for header files.
