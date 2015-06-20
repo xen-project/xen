@@ -7,16 +7,16 @@ VERSION		:= $(shell $(MAKE) -C $(XEN_ROOT)/xen --no-print-directory xenversion)
 DOC_ARCHES      := arm x86_32 x86_64
 
 # Documentation sources to build
-MAN1SRC-y := $(sort $(wildcard man/xl*.pod.1))
-MAN1SRC-y += $(sort $(wildcard man/xenstore*.pod.1))
+MAN1SRC-y += $(sort $(shell find man -name 'xl*.pod.1' -print))
+MAN1SRC-y += $(sort $(shell find man -name 'xenstore*.pod.1' -print))
 
-MAN5SRC-y := $(sort $(wildcard man/xl*.pod.5))
+MAN5SRC-y := $(sort $(shell find man 'xl*.pod.5' -print))
 
-MARKDOWNSRC-y := $(sort $(wildcard misc/*.markdown))
+MARKDOWNSRC-y := $(sort $(shell find misc '*.markdown' -print))
 
-TXTSRC-y := $(sort $(wildcard misc/*.txt))
+TXTSRC-y := $(sort $(shell find misc -name '*.txt' -print))
 
-PANDOCSRC-y := $(sort $(wildcard specs/*.pandoc))
+PANDOCSRC-y := $(sort $(shell find specs -name '*.pandoc' -print))
 
 # Documentation targets
 DOC_MAN1 := $(patsubst man/%.pod.1,man1/%.1,$(MAN1SRC-y))
