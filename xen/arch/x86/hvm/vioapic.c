@@ -386,7 +386,7 @@ void vioapic_irq_positive_edge(struct domain *d, unsigned int irq)
     }
 }
 
-void vioapic_update_EOI(struct domain *d, int vector)
+void vioapic_update_EOI(struct domain *d, u8 vector)
 {
     struct hvm_hw_vioapic *vioapic = domain_vioapic(d);
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;

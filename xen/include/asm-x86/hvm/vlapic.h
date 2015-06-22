@@ -127,7 +127,7 @@ uint32_t vlapic_set_ppr(struct vlapic *vlapic);
 void vlapic_adjust_i8259_target(struct domain *d);
 
 void vlapic_EOI_set(struct vlapic *vlapic);
-void vlapic_handle_EOI_induced_exit(struct vlapic *vlapic, int vector);
+void vlapic_handle_EOI(struct vlapic *vlapic, u8 vector);
 
 void vlapic_ipi(struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high);
 

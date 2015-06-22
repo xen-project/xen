@@ -421,18 +421,17 @@ void vlapic_EOI_set(struct vlapic *vlapic)
     if ( hvm_funcs.handle_eoi )
         hvm_funcs.handle_eoi(vector);
 
-    if ( vlapic_test_and_clear_vector(vector, &vlapic->regs->data[APIC_TMR]) )
-        vioapic_update_EOI(vlapic_domain(vlapic), vector);
-
-    hvm_dpci_msi_eoi(current->domain, vector);
+    vlapic_handle_EOI(vlapic, vector);
 }
 
-void vlapic_handle_EOI_induced_exit(struct vlapic *vlapic, int vector)
+void vlapic_handle_EOI(struct vlapic *vlapic, u8 vector)
 {
-    if ( vlapic_test_and_clear_vector(vector, &vlapic->regs->data[APIC_TMR]) )
-        vioapic_update_EOI(vlapic_domain(vlapic), vector);
+    struct domain *d = vlapic_domain(vlapic);
 
-    hvm_dpci_msi_eoi(current->domain, vector);
+    if ( vlapic_test_and_clear_vector(vector, &vlapic->regs->data[APIC_TMR]) )
+        vioapic_update_EOI(d, vector);
+
+    hvm_dpci_msi_eoi(d, vector);
 }
 
 static bool_t is_multicast_dest(struct vlapic *vlapic, unsigned int short_hand,

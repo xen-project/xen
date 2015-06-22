@@ -2683,17 +2683,6 @@ static int vmx_handle_apic_write(void)
     return vlapic_apicv_write(current, exit_qualification & 0xfff);
 }
 
-/*
- * When "Virtual Interrupt Delivery" is enabled, this function is used
- * to handle EOI-induced VM exit
- */
-void vmx_handle_EOI_induced_exit(struct vlapic *vlapic, int vector)
-{
-    ASSERT(cpu_has_vmx_virtual_intr_delivery);
-
-    vlapic_handle_EOI_induced_exit(vlapic, vector);
-}
-
 void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned long exit_qualification, exit_reason, idtv_info, intr_info = 0;
@@ -3127,15 +3116,12 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_EOI_INDUCED:
-    {
-        int vector;
-
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
-        vector = exit_qualification & 0xff;
 
-        vmx_handle_EOI_induced_exit(vcpu_vlapic(v), vector);
+        ASSERT(cpu_has_vmx_virtual_intr_delivery);
+
+        vlapic_handle_EOI(vcpu_vlapic(v), exit_qualification);
         break;
-    }
 
     case EXIT_REASON_IO_INSTRUCTION:
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
