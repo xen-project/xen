@@ -769,16 +769,14 @@ int arch_set_info_guest(
     }
     else if ( is_pvh_domain(d) )
     {
-        /* PVH 32bitfixme */
-        ASSERT(!compat);
-
         if ( c(ctrlreg[0]) || c(ctrlreg[1]) || c(ctrlreg[2]) ||
              c(ctrlreg[4]) || c(ctrlreg[5]) || c(ctrlreg[6]) ||
              c(ctrlreg[7]) ||  c(ldt_base) || c(ldt_ents) ||
              c(user_regs.cs) || c(user_regs.ss) || c(user_regs.es) ||
              c(user_regs.ds) || c(user_regs.fs) || c(user_regs.gs) ||
-             c(kernel_ss) || c(kernel_sp) || c.nat->gs_base_kernel ||
-             c.nat->gdt_ents || c.nat->fs_base || c.nat->gs_base_user )
+             c(kernel_ss) || c(kernel_sp) || c(gdt_ents) ||
+             (!compat && (c.nat->gs_base_kernel ||
+              c.nat->fs_base || c.nat->gs_base_user)) )
             return -EINVAL;
     }
 
