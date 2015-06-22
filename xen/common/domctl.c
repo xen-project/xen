@@ -443,6 +443,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_createdomain:
     case XEN_DOMCTL_getdomaininfo:
     case XEN_DOMCTL_test_assign_device:
+    case XEN_DOMCTL_gdbsx_guestmemio:
         d = NULL;
         break;
     default:
