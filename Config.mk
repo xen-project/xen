@@ -252,7 +252,7 @@ QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-4.5-testing.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 447d264115c476142f884af0be287622cd244423
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.5.1-rc2
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.5.1
 SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 # Thu May 22 16:59:16 2014 -0400
 # python3 fixes for vgabios and csm builds.
@@ -260,7 +260,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= afaa35b4bc975b2b89ad44c481d0d7623e3d1c49
+QEMU_TRADITIONAL_REVISION ?= xen-4.5.1
 # Tue Jun 9 16:32:24 2015 +0100
 # ... by default. Add a per-device "permissive" mode similar to pciback's
 
