@@ -1167,21 +1167,7 @@ int alloc_unbound_xen_event_channel(
 
 void free_xen_event_channel(struct domain *d, int port)
 {
-    struct evtchn *chn;
-
-    spin_lock(&d->event_lock);
-
-    if ( unlikely(d->is_dying) )
-    {
-        spin_unlock(&d->event_lock);
-        return;
-    }
-
     BUG_ON(!port_is_valid(d, port));
-    chn = evtchn_from_port(d, port);
-    BUG_ON(!consumer_is_xen(chn));
-
-    spin_unlock(&d->event_lock);
 
     evtchn_close(d, port, 0);
 }
@@ -1194,18 +1180,12 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
 
     spin_lock(&ld->event_lock);
 
-    if ( unlikely(ld->is_dying) )
-    {
-        spin_unlock(&ld->event_lock);
-        return;
-    }
-
     ASSERT(port_is_valid(ld, lport));
     lchn = evtchn_from_port(ld, lport);
-    ASSERT(consumer_is_xen(lchn));
 
     if ( likely(lchn->state == ECS_INTERDOMAIN) )
     {
+        ASSERT(consumer_is_xen(lchn));
         rd    = lchn->u.interdomain.remote_dom;
         rchn  = evtchn_from_port(rd, lchn->u.interdomain.remote_port);
         evtchn_port_set_pending(rd, rchn->notify_vcpu_id, rchn);
@@ -1272,7 +1252,7 @@ int evtchn_init(struct domain *d)
 
 void evtchn_destroy(struct domain *d)
 {
-    unsigned int i, j;
+    unsigned int i;
 
     /* After this barrier no new event-channel allocations can occur. */
     BUG_ON(!d->is_dying);
@@ -1282,21 +1262,6 @@ void evtchn_destroy(struct domain *d)
     for ( i = 0; port_is_valid(d, i); i++ )
         evtchn_close(d, i, 0);
 
-    /* Free all event-channel buckets. */
-    spin_lock(&d->event_lock);
-    for ( i = 0; i < NR_EVTCHN_GROUPS; i++ )
-    {
-        if ( !d->evtchn_group[i] )
-            continue;
-        for ( j = 0; j < BUCKETS_PER_GROUP; j++ )
-            free_evtchn_bucket(d, d->evtchn_group[i][j]);
-        xfree(d->evtchn_group[i]);
-        d->evtchn_group[i] = NULL;
-    }
-    free_evtchn_bucket(d, d->evtchn);
-    d->evtchn = NULL;
-    spin_unlock(&d->event_lock);
-
     clear_global_virq_handlers(d);
 
     evtchn_fifo_destroy(d);
@@ -1305,6 +1270,19 @@ void evtchn_destroy(struct domain *d)
 
 void evtchn_destroy_final(struct domain *d)
 {
+    unsigned int i, j;
+
+    /* Free all event-channel buckets. */
+    for ( i = 0; i < NR_EVTCHN_GROUPS; i++ )
+    {
+        if ( !d->evtchn_group[i] )
+            continue;
+        for ( j = 0; j < BUCKETS_PER_GROUP; j++ )
+            free_evtchn_bucket(d, d->evtchn_group[i][j]);
+        xfree(d->evtchn_group[i]);
+    }
+    free_evtchn_bucket(d, d->evtchn);
+
 #if MAX_VIRT_CPUS > BITS_PER_LONG
     xfree(d->poll_mask);
     d->poll_mask = NULL;
