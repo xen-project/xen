@@ -805,9 +805,12 @@ int arch_set_info_guest(
     else
     {
         XLAT_cpu_user_regs(&v->arch.user_regs, &c.cmp->user_regs);
-        for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); ++i )
-            XLAT_trap_info(v->arch.pv_vcpu.trap_ctxt + i,
-                           c.cmp->trap_ctxt + i);
+        if ( is_pv_domain(d) )
+        {
+            for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); ++i )
+                XLAT_trap_info(v->arch.pv_vcpu.trap_ctxt + i,
+                               c.cmp->trap_ctxt + i);
+        }
     }
 
     if ( has_hvm_container_domain(d) )

@@ -1204,9 +1204,12 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     else
     {
         XLAT_cpu_user_regs(&c.cmp->user_regs, &v->arch.user_regs);
-        for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); ++i )
-            XLAT_trap_info(c.cmp->trap_ctxt + i,
-                           v->arch.pv_vcpu.trap_ctxt + i);
+        if ( is_pv_domain(d) )
+        {
+            for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); ++i )
+                XLAT_trap_info(c.cmp->trap_ctxt + i,
+                               v->arch.pv_vcpu.trap_ctxt + i);
+        }
     }
 
     for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
