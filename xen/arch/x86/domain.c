@@ -828,7 +828,7 @@ int arch_set_info_guest(
         cr3_page = get_page_from_gfn(d, cr3_gfn, NULL, P2M_ALLOC);
 
         v->arch.cr3 = page_to_maddr(cr3_page);
-        v->arch.hvm_vcpu.guest_cr[3] = c.nat->ctrlreg[3];
+        v->arch.hvm_vcpu.guest_cr[3] = c(ctrlreg[3]);
         v->arch.guest_table = pagetable_from_page(cr3_page);
 
         ASSERT(paging_mode_enabled(d));
