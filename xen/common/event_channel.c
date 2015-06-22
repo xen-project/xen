@@ -202,6 +202,7 @@ static void free_evtchn(struct domain *d, struct evtchn *chn)
     /* Reset binding to vcpu0 when the channel is freed. */
     chn->state          = ECS_FREE;
     chn->notify_vcpu_id = 0;
+    chn->xen_consumer   = 0;
 
     xsm_evtchn_close_post(chn);
 }
@@ -468,7 +469,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 }
 
 
-static long __evtchn_close(struct domain *d1, int port1)
+static long evtchn_close(struct domain *d1, int port1, bool_t guest)
 {
     struct domain *d2 = NULL;
     struct vcpu   *v;
@@ -488,7 +489,7 @@ static long __evtchn_close(struct domain *d1, int port1)
     chn1 = evtchn_from_port(d1, port1);
 
     /* Guest cannot close a Xen-attached event channel. */
-    if ( unlikely(consumer_is_xen(chn1)) )
+    if ( unlikely(consumer_is_xen(chn1)) && guest )
     {
         rc = -EINVAL;
         goto out;
@@ -595,12 +596,6 @@ static long __evtchn_close(struct domain *d1, int port1)
     spin_unlock(&d1->event_lock);
 
     return rc;
-}
-
-
-static long evtchn_close(evtchn_close_t *close)
-{
-    return __evtchn_close(current->domain, close->port);
 }
 
 int evtchn_send(struct domain *ld, unsigned int lport)
@@ -952,7 +947,7 @@ static long evtchn_reset(evtchn_reset_t *r)
         goto out;
 
     for ( i = 0; port_is_valid(d, i); i++ )
-        (void)__evtchn_close(d, i);
+        evtchn_close(d, i, 1);
 
     spin_lock(&d->event_lock);
 
@@ -1059,7 +1054,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct evtchn_close close;
         if ( copy_from_guest(&close, arg, 1) != 0 )
             return -EFAULT;
-        rc = evtchn_close(&close);
+        rc = evtchn_close(current->domain, close.port, 1);
         break;
     }
 
@@ -1185,11 +1180,10 @@ void free_xen_event_channel(struct domain *d, int port)
     BUG_ON(!port_is_valid(d, port));
     chn = evtchn_from_port(d, port);
     BUG_ON(!consumer_is_xen(chn));
-    chn->xen_consumer = 0;
 
     spin_unlock(&d->event_lock);
 
-    (void)__evtchn_close(d, port);
+    evtchn_close(d, port, 0);
 }
 
 
@@ -1286,10 +1280,7 @@ void evtchn_destroy(struct domain *d)
 
     /* Close all existing event channels. */
     for ( i = 0; port_is_valid(d, i); i++ )
-    {
-        evtchn_from_port(d, i)->xen_consumer = 0;
-        (void)__evtchn_close(d, i);
-    }
+        evtchn_close(d, i, 0);
 
     /* Free all event-channel buckets. */
     spin_lock(&d->event_lock);
