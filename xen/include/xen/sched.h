@@ -79,6 +79,7 @@ extern domid_t hardware_domid;
 
 struct evtchn
 {
+    spinlock_t lock;
 #define ECS_FREE         0 /* Channel is available for use.                  */
 #define ECS_RESERVED     1 /* Channel is reserved.                           */
 #define ECS_UNBOUND      2 /* Channel is waiting to bind to a remote domain. */
