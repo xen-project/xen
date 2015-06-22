@@ -129,7 +129,7 @@ struct evtchn
 #endif
     } ssid;
 #endif
-};
+} __attribute__((aligned(64)));
 
 int  evtchn_init(struct domain *d); /* from domain_create */
 void evtchn_destroy(struct domain *d); /* from domain_kill */
