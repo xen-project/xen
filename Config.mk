@@ -259,9 +259,9 @@ MINIOS_UPSTREAM_REVISION ?= edfd5aae6ec5ba7d0a8834a3e9dfe5e69424150a
 # Thu Mar 12 19:08:05 2015 +0100
 # Fix accidentally removed brace causing a build error.
 
-SEABIOS_UPSTREAM_REVISION ?= rel-1.8.0
-# Wed Feb 18 12:49:59 2015 -0500
-# docs: Note v1.8.0 release
+SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
+# Tue Mar 17 10:52:16 2015 -0400
+# vgabios: On bda_save_restore() the saved vbe_mode also has flags in it
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
