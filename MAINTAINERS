@@ -362,7 +362,7 @@ F:	tools/firmware/hvmloader/
 F:	tools/tests/x86_emulator/
 
 X86 MEMORY MANAGEMENT
-M:	Tim Deegan <tim@xen.org>
+M:	George Dunlap <george.dunlap@eu.citrix.com>
 S:	Supported
 F:	xen/arch/x86/mm/
 
@@ -373,6 +373,11 @@ S:	Supported
 F:	xen/arch/x86/mm/mem_sharing.c
 F:	xen/arch/x86/mm/mem_paging.c
 F:	tools/memshr
+
+X86 SHADOW PAGETABLES
+M:	Tim Deegan <tim@xen.org>
+S:	Maintained
+F:	xen/arch/x86/mm/shadow/
 
 VM EVENT AND MEM ACCESS
 M:	Razvan Cojocaru <rcojocaru@bitdefender.com>
