@@ -224,9 +224,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 8fcecdca2dd1e6b4e78114977388ff0ddb85db20
-# Wed Jun 10 14:14:25 2015 +0100
-# xen/pt: unknown PCI config space fields should be read-only
+QEMU_TAG ?= 8d882026216a2b9afe74d4b1ef99433620e0ba0a
+# Sun May 24 10:53:44 2015 +0200
+# pcnet: force the buffer access to be in bounds during tx
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
