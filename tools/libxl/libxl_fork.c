@@ -447,9 +447,10 @@ static int perhaps_sigchld_needed(libxl__gc *gc, bool creating)
 static void childproc_reaped_ours(libxl__egc *egc, libxl__ev_child *ch,
                                  int status)
 {
+    pid_t pid = ch->pid;
     LIBXL_LIST_REMOVE(ch, entry);
     ch->pid = -1;
-    ch->callback(egc, ch, ch->pid, status);
+    ch->callback(egc, ch, pid, status);
 }
 
 static int childproc_reaped(libxl__egc *egc, pid_t pid, int status)
