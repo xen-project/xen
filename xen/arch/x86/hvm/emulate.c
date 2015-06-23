@@ -23,7 +23,7 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/svm/svm.h>
 
-static void hvmtrace_io_assist(int is_mmio, ioreq_t *p)
+static void hvmtrace_io_assist(const ioreq_t *p)
 {
     unsigned int size, event;
     unsigned char buffer[12];
@@ -31,7 +31,7 @@ static void hvmtrace_io_assist(int is_mmio, ioreq_t *p)
     if ( likely(!tb_init_done) )
         return;
 
-    if ( is_mmio )
+    if ( p->type == IOREQ_TYPE_COPY )
         event = p->dir ? TRC_HVM_IOMEM_READ : TRC_HVM_IOMEM_WRITE;
     else
         event = p->dir ? TRC_HVM_IOPORT_READ : TRC_HVM_IOPORT_WRITE;
@@ -139,7 +139,7 @@ static int hvmemul_do_io(
         if ( !data_is_addr )
             memcpy(&p.data, p_data, size);
 
-        hvmtrace_io_assist(is_mmio, &p);
+        hvmtrace_io_assist(&p);
     }
 
     if ( is_mmio )
@@ -200,7 +200,7 @@ static int hvmemul_do_io(
  finish_access:
     if ( dir == IOREQ_READ )
     {
-        hvmtrace_io_assist(is_mmio, &p);
+        hvmtrace_io_assist(&p);
 
         if ( !data_is_addr )
             memcpy(p_data, &vio->io_data, size);
