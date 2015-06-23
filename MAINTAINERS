@@ -367,9 +367,7 @@ S:	Supported
 F:	xen/arch/x86/mm/
 
 X86 MEMORY SHARING AND PAGING
-M:	Andres Lagar-Cavilla <andres@lagarcavilla.org>
-M:	Tim Deegan <tim@xen.org>
-S:	Supported
+S:	Orphaned
 F:	xen/arch/x86/mm/mem_sharing.c
 F:	xen/arch/x86/mm/mem_paging.c
 F:	tools/memshr
