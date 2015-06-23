@@ -321,18 +321,10 @@ static int setup_compat_l4(struct vcpu *v)
 {
     struct page_info *pg;
     l4_pgentry_t *l4tab;
-    int rc;
 
     pg = alloc_domheap_page(v->domain, MEMF_no_owner);
     if ( pg == NULL )
         return -ENOMEM;
-
-    rc = setup_compat_arg_xlat(v);
-    if ( rc )
-    {
-        free_domheap_page(pg);
-        return rc;
-    }
 
     /* This page needs to look like a pagetable so that it can be shadowed */
     pg->u.inuse.type_info = PGT_l4_page_table|PGT_validated|1;
@@ -350,7 +342,6 @@ static int setup_compat_l4(struct vcpu *v)
 
 static void release_compat_l4(struct vcpu *v)
 {
-    free_compat_arg_xlat(v);
     free_domheap_page(pagetable_get_page(v->arch.guest_table));
     v->arch.guest_table = pagetable_null();
     v->arch.guest_table_user = pagetable_null();
@@ -373,7 +364,10 @@ int switch_native(struct domain *d)
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
 
     for_each_vcpu( d, v )
+    {
+        free_compat_arg_xlat(v);
         release_compat_l4(v);
+    }
 
     return 0;
 }
@@ -398,8 +392,13 @@ int switch_compat(struct domain *d)
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
 
     for_each_vcpu( d, v )
-        if ( (rc = setup_compat_l4(v)) )
+    {
+        rc = setup_compat_arg_xlat(v);
+        if ( !rc )
+            rc = setup_compat_l4(v);
+        if ( rc )
             goto undo_and_fail;
+    }
 
     domain_set_alloc_bitsize(d);
 
@@ -408,8 +407,12 @@ int switch_compat(struct domain *d)
  undo_and_fail:
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
     for_each_vcpu( d, v )
+    {
+        free_compat_arg_xlat(v);
+
         if ( !pagetable_is_null(v->arch.guest_table) )
             release_compat_l4(v);
+    }
 
     return rc;
 }
@@ -481,7 +484,17 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.pv_vcpu.ctrlreg[4] = real_cr4_to_pv_guest_cr4(mmu_cr4_features);
 
-    rc = is_pv_32on64_domain(d) ? setup_compat_l4(v) : 0;
+    if ( is_pv_32on64_domain(d) )
+    {
+        if ( (rc = setup_compat_arg_xlat(v)) )
+            goto done;
+
+        if ( (rc = setup_compat_l4(v)) )
+        {
+            free_compat_arg_xlat(v);
+            goto done;
+        }
+    }
  done:
     if ( rc )
     {
@@ -497,7 +510,10 @@ int vcpu_initialise(struct vcpu *v)
 void vcpu_destroy(struct vcpu *v)
 {
     if ( is_pv_32on64_vcpu(v) )
+    {
+        free_compat_arg_xlat(v);
         release_compat_l4(v);
+    }
 
     vcpu_destroy_fpu(v);
 
