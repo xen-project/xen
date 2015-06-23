@@ -127,7 +127,6 @@ F:	tools/libxc/xc_arinc653.c
 ARM (W/ VIRTUALISATION EXTENSIONS) ARCHITECTURE
 M:	Ian Campbell <ian.campbell@citrix.com>
 M:	Stefano Stabellini <stefano.stabellini@citrix.com>
-M:	Tim Deegan <tim@xen.org>
 S:	Supported
 L:	xen-devel@lists.xen.org
 F:	xen/arch/arm/
@@ -151,7 +150,6 @@ F:	xen/common/cpupool.c
 DEVICE TREE
 M:	Ian Campbell <ian.campbell@citrix.com>
 M:	Stefano Stabellini <stefano.stabellini@citrix.com>
-M:	Tim Deegan <tim@xen.org>
 S:	Supported
 F:	xen/common/libfdt/
 F:	xen/common/device_tree.c
