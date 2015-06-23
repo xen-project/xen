@@ -266,9 +266,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 38609ae72b0a9e09b42be94f469fef928a1049fa
-# Tue Jun 9 16:13:11 2015 +0100
-# ... by default. Add a per-device "permissive" mode similar to pciback's
+QEMU_TRADITIONAL_REVISION ?= 3e2e51ecc1120bd59537ed19b6bc7066511c7e2e
+# Sun May 24 10:53:44 2015 +0200
+# pcnet: force the buffer access to be in bounds during tx
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
