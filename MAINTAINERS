@@ -375,7 +375,8 @@ F:	xen/arch/x86/mm/mem_paging.c
 F:	tools/memshr
 
 VM EVENT AND MEM ACCESS
-M:	Tim Deegan <tim@xen.org>
+M:	Razvan Cojocaru <rcojocaru@bitdefender.com>
+M:	Tamas K Lengyel <tlengyel@novetta.com>
 S:	Supported
 F:	xen/common/vm_event.c
 F:	xen/common/mem_access.c
