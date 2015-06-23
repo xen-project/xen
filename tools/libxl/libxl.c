@@ -1962,8 +1962,10 @@ int libxl__get_domid(libxl__gc *gc, uint32_t *domid)
     const char *xs_domid;
 
     rc = libxl__xs_read_checked(gc, XBT_NULL, DOMID_XS_PATH, &xs_domid);
-    if (rc || !xs_domid) {
-        rc = rc ? rc : ERROR_FAIL;
+    if (rc) goto out;
+    if (!xs_domid) {
+        LOG(ERROR, "failed to get own domid (%s)", DOMID_XS_PATH);
+        rc = ERROR_FAIL;
         goto out;
     }
 
