@@ -230,7 +230,7 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip);
 
 struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
                                                  ioreq_t *p);
-bool_t hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *p);
+int hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *p);
 void hvm_broadcast_assist_req(ioreq_t *p);
 void hvm_complete_assist_req(ioreq_t *p);
 

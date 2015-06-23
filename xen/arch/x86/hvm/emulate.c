@@ -121,12 +121,6 @@ static int hvmemul_do_io(
         return X86EMUL_UNHANDLEABLE;
     }
 
-    if ( hvm_io_pending(curr) )
-    {
-        gdprintk(XENLOG_WARNING, "WARNING: io already pending?\n");
-        return X86EMUL_UNHANDLEABLE;
-    }
-
     vio->io_state = (data_is_addr || dir == IOREQ_WRITE) ?
         HVMIO_dispatched : HVMIO_awaiting_completion;
     vio->io_size = size;
@@ -188,8 +182,8 @@ static int hvmemul_do_io(
         }
         else
         {
-            rc = X86EMUL_RETRY;
-            if ( !hvm_send_assist_req(s, &p) )
+            rc = hvm_send_assist_req(s, &p);
+            if ( rc != X86EMUL_RETRY )
                 vio->io_state = HVMIO_none;
             else if ( data_is_addr || dir == IOREQ_WRITE )
                 rc = X86EMUL_OKAY;

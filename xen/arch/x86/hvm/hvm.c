@@ -2605,7 +2605,7 @@ int hvm_buffered_io_send(ioreq_t *p)
     return 1;
 }
 
-bool_t hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *proto_p)
+int hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *proto_p)
 {
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
@@ -2613,7 +2613,7 @@ bool_t hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *proto_p)
 
     ASSERT(s);
     if ( unlikely(!vcpu_start_shutdown_deferral(curr)) )
-        return 0; /* implicitly bins the i/o operation */
+        return X86EMUL_OKAY;
 
     list_for_each_entry ( sv,
                           &s->ioreq_vcpu_list,
@@ -2628,14 +2628,14 @@ bool_t hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *proto_p)
             {
                 gprintk(XENLOG_ERR, "device model set bad IO state %d\n",
                         p->state);
-                goto crash;
+                break;
             }
 
             if ( unlikely(p->vp_eport != port) )
             {
                 gprintk(XENLOG_ERR, "device model set bad event channel %d\n",
                         p->vp_eport);
-                goto crash;
+                break;
             }
 
             proto_p->state = STATE_IOREQ_NONE;
@@ -2651,15 +2651,11 @@ bool_t hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *proto_p)
              */
             p->state = STATE_IOREQ_READY;
             notify_via_xen_event_channel(d, port);
-            break;
+            return X86EMUL_RETRY;
         }
     }
 
-    return 1;
-
- crash:
-    domain_crash(d);
-    return 0;
+    return X86EMUL_UNHANDLEABLE;
 }
 
 void hvm_complete_assist_req(ioreq_t *p)
