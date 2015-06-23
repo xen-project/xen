@@ -182,7 +182,7 @@ F:	tools/debugger/gdbsx/
 
 KDD DEBUGGER
 M:	Tim Deegan <tim@xen.org>
-S:	Supported
+S:	Odd Fixes
 F:	tools/debugger/kdd/
 
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
