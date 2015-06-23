@@ -180,9 +180,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 2d4fa397ba0fbae0c62282de619e1f088a320b33
-# Mon Nov 11 13:42:56 2013 -0500
-# hw/piix4acpi: Make writes to ACPI_DBG_IO_ADDR actually work.
+QEMU_TAG ?= 77d9bdb27c4237a007ba93a6f159791eed317abc
+# Sun May 24 10:53:44 2015 +0200
+# pcnet: force the buffer access to be in bounds during tx
 
 # Optional components
 XENSTAT_XENTOP     ?= y
