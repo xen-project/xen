@@ -1370,7 +1370,8 @@ static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
 static void device_model_confirm(libxl__egc *egc, libxl__spawn_state *spawn,
                                  const char *xsdata);
 static void device_model_startup_failed(libxl__egc *egc,
-                                        libxl__spawn_state *spawn);
+                                        libxl__spawn_state *spawn,
+                                        int rc);
 static void device_model_detached(libxl__egc *egc,
                                   libxl__spawn_state *spawn);
 
@@ -1540,10 +1541,11 @@ static void device_model_confirm(libxl__egc *egc, libxl__spawn_state *spawn,
 }
 
 static void device_model_startup_failed(libxl__egc *egc,
-                                        libxl__spawn_state *spawn)
+                                        libxl__spawn_state *spawn,
+                                        int rc)
 {
     libxl__dm_spawn_state *dmss = CONTAINER_OF(spawn, *dmss, spawn);
-    device_model_spawn_outcome(egc, dmss, ERROR_FAIL);
+    device_model_spawn_outcome(egc, dmss, rc);
 }
 
 static void device_model_detached(libxl__egc *egc,

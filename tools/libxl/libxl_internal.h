@@ -1365,7 +1365,8 @@ libxl__spawn_midproc_cb(libxl__gc*, libxl__spawn_state*, pid_t inner);
  * The spawn state will be Idle on entry to the callback (and
  * it may be reused immediately if desired).
  */
-typedef void libxl__spawn_failure_cb(libxl__egc*, libxl__spawn_state*);
+typedef void libxl__spawn_failure_cb(libxl__egc*, libxl__spawn_state*,
+                                     int rc);
 
 /*
  * Called when the xspath watch triggers.  xspath will have been read
@@ -1406,7 +1407,7 @@ struct libxl__spawn_state {
 
     /* remaining fields are private to libxl_spawn_... */
     int detaching; /* we are in Detaching */
-    int failed; /* might be true whenever we are not Idle */
+    int rc; /* might be non-0 whenever we are not Idle */
     libxl__ev_child mid; /* always in use whenever we are not Idle */
     libxl__xswait_state xswait;
 };

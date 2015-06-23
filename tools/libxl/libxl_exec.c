@@ -238,11 +238,11 @@ err:
 /*
  * Full set of possible states of a libxl__spawn_state and its _detachable:
  *
- *                   detaching failed  mid     timeout      xswatch          
+ *                   detaching rc      mid     timeout      xswatch
  *  - Undefined         undef   undef   -        undef        undef
  *  - Idle              any     any     Idle     Idle         Idle
  *  - Attached OK       0       0       Active   Active       Active
- *  - Attached Failed   0       1       Active   Idle         Idle
+ *  - Attached Failed   0       non-0   Active   Idle         Idle
  *  - Detaching         1       maybe   Active   Idle         Idle
  *  - Partial           any     any     Idle     Active/Idle  Active/Idle
  *
@@ -267,7 +267,7 @@ static void spawn_cleanup(libxl__gc *gc, libxl__spawn_state *ss);
 
 /* Precondition: Attached or Detaching; caller has logged failure reason.
  * Results: Detaching, or Attached Failed */
-static void spawn_fail(libxl__egc *egc, libxl__spawn_state *ss);
+static void spawn_fail(libxl__egc *egc, libxl__spawn_state *ss, int rc);
 
 void libxl__spawn_init(libxl__spawn_state *ss)
 {
@@ -283,7 +283,7 @@ int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *ss)
     int status, rc;
 
     libxl__spawn_init(ss);
-    ss->failed = ss->detaching = 0;
+    ss->rc = ss->detaching = 0;
 
     ss->xswait.ao = ao;
     ss->xswait.what = GCSPRINTF("%s startup", ss->what);
@@ -352,12 +352,13 @@ static void spawn_cleanup(libxl__gc *gc, libxl__spawn_state *ss)
 
 static void spawn_detach(libxl__gc *gc, libxl__spawn_state *ss)
 /* Precondition: Attached or Detaching, but caller must have just set
- * at least one of detaching or failed.
+ * at least one of detaching or rc.
  * Results: Detaching or Attached Failed */
 {
     int r;
 
     assert(libxl__ev_child_inuse(&ss->mid));
+    assert(ss->detaching || ss->rc);
     libxl__xswait_stop(gc, &ss->xswait);
 
     pid_t child = ss->mid.pid;
@@ -373,12 +374,13 @@ void libxl__spawn_initiate_detach(libxl__gc *gc, libxl__spawn_state *ss)
     spawn_detach(gc, ss);
 }
 
-static void spawn_fail(libxl__egc *egc, libxl__spawn_state *ss)
+static void spawn_fail(libxl__egc *egc, libxl__spawn_state *ss, int rc)
 /* Caller must have logged.  Must be last thing in calling function,
  * as it may make the callback.  Precondition: Attached or Detaching. */
 {
     EGC_GC;
-    ss->failed = 1;
+    assert(rc);
+    ss->rc = rc;
     spawn_detach(gc, ss);
 }
 
@@ -391,9 +393,10 @@ static void spawn_watch_event(libxl__egc *egc, libxl__xswait_state *xswa,
     if (rc) {
         if (rc == ERROR_TIMEDOUT)
             LOG(ERROR, "%s: startup timed out", ss->what);
-        spawn_fail(egc, ss); /* must be last */
+        spawn_fail(egc, ss, rc); /* must be last */
         return;
     }
+    LOG(DEBUG, "%s: spawn watch p=%s", ss->what, p);
     ss->confirm_cb(egc, ss, p); /* must be last */
 }
 
@@ -404,7 +407,7 @@ static void spawn_middle_death(libxl__egc *egc, libxl__ev_child *childw,
     EGC_GC;
     libxl__spawn_state *ss = CONTAINER_OF(childw, *ss, mid);
 
-    if ((ss->failed || ss->detaching) &&
+    if ((ss->rc || ss->detaching) &&
         ((WIFEXITED(status) && WEXITSTATUS(status)==0) ||
          (WIFSIGNALED(status) && WTERMSIG(status)==SIGKILL))) {
         /* as expected */
@@ -413,7 +416,7 @@ static void spawn_middle_death(libxl__egc *egc, libxl__ev_child *childw,
         const char *what =
             GCSPRINTF("%s intermediate process (startup monitor)", ss->what);
         libxl_report_child_exitstatus(CTX, loglevel, what, pid, status);
-        ss->failed = 1;
+        ss->rc = ERROR_FAIL;
     } else {
         if (!status)
             LOG(ERROR, "%s [%ld]: unexpectedly exited with exit status 0,"
@@ -432,19 +435,20 @@ static void spawn_middle_death(libxl__egc *egc, libxl__ev_child *childw,
                 LOG(ERROR, "%s [%ld]: died during startup due to unknown fatal"
                     " signal number %d", ss->what, (unsigned long)pid, sig);
         }
-        ss->failed = 1;
+        ss->rc = ERROR_FAIL;
     }
 
     spawn_cleanup(gc, ss);
 
-    if (ss->failed && !ss->detaching) {
-        ss->failure_cb(egc, ss); /* must be last */
+    if (ss->rc && !ss->detaching) {
+        ss->failure_cb(egc, ss, ss->rc); /* must be last */
         return;
     }
     
-    if (ss->failed && ss->detaching)
-        LOG(WARN,"%s underlying machinery seemed to fail,"
-            " but its function seems to have been successful", ss->what);
+    if (ss->rc && ss->detaching)
+        LOG(WARN,"%s underlying machinery seemed to fail (%d),"
+            " but its function seems to have been successful",
+            ss->what, ss->rc);
 
     assert(ss->detaching);
     ss->detached_cb(egc, ss);
