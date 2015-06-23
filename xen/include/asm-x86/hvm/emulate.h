@@ -50,11 +50,22 @@ struct segment_register *hvmemul_get_seg_reg(
     enum x86_segment seg,
     struct hvm_emulate_ctxt *hvmemul_ctxt);
 
-int hvmemul_do_pio(
-    unsigned long port, unsigned long *reps, int size,
-    paddr_t ram_gpa, int dir, int df, void *p_data);
+int hvmemul_do_pio_buffer(uint16_t port,
+                          unsigned int size,
+                          uint8_t dir,
+                          void *buffer);
 
 void hvm_dump_emulation_state(const char *prefix,
                               struct hvm_emulate_ctxt *hvmemul_ctxt);
 
 #endif /* __ASM_X86_HVM_EMULATE_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

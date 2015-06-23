@@ -132,7 +132,7 @@ int handle_pio(uint16_t port, unsigned int size, int dir)
 {
     struct vcpu *curr = current;
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
-    unsigned long data, reps = 1;
+    unsigned long data;
     int rc;
 
     ASSERT((size - 1) < 4 && size != 3);
@@ -140,7 +140,7 @@ int handle_pio(uint16_t port, unsigned int size, int dir)
     if ( dir == IOREQ_WRITE )
         data = guest_cpu_user_regs()->eax;
 
-    rc = hvmemul_do_pio(port, &reps, size, 0, dir, 0, &data);
+    rc = hvmemul_do_pio_buffer(port, size, dir, &data);
 
     switch ( rc )
     {

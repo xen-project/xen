@@ -51,40 +51,22 @@ static void hvmtrace_io_assist(int is_mmio, ioreq_t *p)
 }
 
 static int hvmemul_do_io(
-    int is_mmio, paddr_t addr, unsigned long *reps, int size,
-    paddr_t ram_gpa, int dir, int df, void *p_data)
+    bool_t is_mmio, paddr_t addr, unsigned long *reps, unsigned int size,
+    uint8_t dir, bool_t df, bool_t data_is_addr, uintptr_t data)
 {
     struct vcpu *curr = current;
-    struct hvm_vcpu_io *vio;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     ioreq_t p = {
         .type = is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO,
         .addr = addr,
         .size = size,
         .dir = dir,
         .df = df,
-        .data = ram_gpa,
-        .data_is_ptr = (p_data == NULL),
+        .data = data,
+        .data_is_ptr = data_is_addr, /* ioreq_t field name is misleading */
     };
-    unsigned long ram_gfn = paddr_to_pfn(ram_gpa);
-    p2m_type_t p2mt;
-    struct page_info *ram_page;
+    void *p_data = (void *)data;
     int rc;
-
-    /* Check for paged out page */
-    ram_page = get_page_from_gfn(curr->domain, ram_gfn, &p2mt, P2M_UNSHARE);
-    if ( p2m_is_paging(p2mt) )
-    {
-        if ( ram_page )
-            put_page(ram_page);
-        p2m_mem_paging_populate(curr->domain, ram_gfn);
-        return X86EMUL_RETRY;
-    }
-    if ( p2m_is_shared(p2mt) )
-    {
-        if ( ram_page )
-            put_page(ram_page);
-        return X86EMUL_RETRY;
-    }
 
     /*
      * Weird-sized accesses have undefined behaviour: we discard writes
@@ -93,23 +75,10 @@ static int hvmemul_do_io(
     if ( unlikely((size > sizeof(long)) || (size & (size - 1))) )
     {
         gdprintk(XENLOG_WARNING, "bad mmio size %d\n", size);
-        ASSERT(p_data != NULL); /* cannot happen with a REP prefix */
-        if ( dir == IOREQ_READ )
-            memset(p_data, ~0, size);
-        if ( ram_page )
-            put_page(ram_page);
         return X86EMUL_UNHANDLEABLE;
     }
 
-    if ( !p.data_is_ptr && (dir == IOREQ_WRITE) )
-    {
-        memcpy(&p.data, p_data, size);
-        p_data = NULL;
-    }
-
-    vio = &curr->arch.hvm_vcpu.hvm_io;
-
-    if ( is_mmio && !p.data_is_ptr )
+    if ( is_mmio && !data_is_addr )
     {
         /* Part of a multi-cycle read or write? */
         if ( dir == IOREQ_WRITE )
@@ -117,11 +86,7 @@ static int hvmemul_do_io(
             paddr_t pa = vio->mmio_large_write_pa;
             unsigned int bytes = vio->mmio_large_write_bytes;
             if ( (addr >= pa) && ((addr + size) <= (pa + bytes)) )
-            {
-                if ( ram_page )
-                    put_page(ram_page);
                 return X86EMUL_OKAY;
-            }
         }
         else
         {
@@ -131,8 +96,6 @@ static int hvmemul_do_io(
             {
                 memcpy(p_data, &vio->mmio_large_read[addr - pa],
                        size);
-                if ( ram_page )
-                    put_page(ram_page);
                 return X86EMUL_OKAY;
             }
         }
@@ -144,40 +107,28 @@ static int hvmemul_do_io(
         break;
     case HVMIO_completed:
         vio->io_state = HVMIO_none;
-        if ( p_data == NULL )
-        {
-            if ( ram_page )
-                put_page(ram_page);
+        if ( data_is_addr || dir == IOREQ_WRITE )
             return X86EMUL_UNHANDLEABLE;
-        }
         goto finish_access;
     case HVMIO_dispatched:
         /* May have to wait for previous cycle of a multi-write to complete. */
-        if ( is_mmio && !p.data_is_ptr && (dir == IOREQ_WRITE) &&
+        if ( is_mmio && !data_is_addr && (dir == IOREQ_WRITE) &&
              (addr == (vio->mmio_large_write_pa +
                        vio->mmio_large_write_bytes)) )
-        {
-            if ( ram_page )
-                put_page(ram_page);
             return X86EMUL_RETRY;
-        }
         /* fallthrough */
     default:
-        if ( ram_page )
-            put_page(ram_page);
         return X86EMUL_UNHANDLEABLE;
     }
 
     if ( hvm_io_pending(curr) )
     {
         gdprintk(XENLOG_WARNING, "WARNING: io already pending?\n");
-        if ( ram_page )
-            put_page(ram_page);
         return X86EMUL_UNHANDLEABLE;
     }
 
-    vio->io_state =
-        (p_data == NULL) ? HVMIO_dispatched : HVMIO_awaiting_completion;
+    vio->io_state = (data_is_addr || dir == IOREQ_WRITE) ?
+        HVMIO_dispatched : HVMIO_awaiting_completion;
     vio->io_size = size;
 
     /*
@@ -190,7 +141,12 @@ static int hvmemul_do_io(
     p.count = *reps;
 
     if ( dir == IOREQ_WRITE )
+    {
+        if ( !data_is_addr )
+            memcpy(&p.data, p_data, size);
+
         hvmtrace_io_assist(is_mmio, &p);
+    }
 
     if ( is_mmio )
     {
@@ -235,7 +191,7 @@ static int hvmemul_do_io(
             rc = X86EMUL_RETRY;
             if ( !hvm_send_assist_req(s, &p) )
                 vio->io_state = HVMIO_none;
-            else if ( p_data == NULL )
+            else if ( data_is_addr || dir == IOREQ_WRITE )
                 rc = X86EMUL_OKAY;
         }
         break;
@@ -245,20 +201,18 @@ static int hvmemul_do_io(
     }
 
     if ( rc != X86EMUL_OKAY )
-    {
-        if ( ram_page )
-            put_page(ram_page);
         return rc;
-    }
 
  finish_access:
     if ( dir == IOREQ_READ )
+    {
         hvmtrace_io_assist(is_mmio, &p);
 
-    if ( p_data != NULL )
-        memcpy(p_data, &vio->io_data, size);
+        if ( !data_is_addr )
+            memcpy(p_data, &vio->io_data, size);
+    }
 
-    if ( is_mmio && !p.data_is_ptr )
+    if ( is_mmio && !data_is_addr )
     {
         /* Part of a multi-cycle read or write? */
         if ( dir == IOREQ_WRITE )
@@ -285,23 +239,153 @@ static int hvmemul_do_io(
         }
     }
 
-    if ( ram_page )
-        put_page(ram_page);
     return X86EMUL_OKAY;
 }
 
-int hvmemul_do_pio(
-    unsigned long port, unsigned long *reps, int size,
-    paddr_t ram_gpa, int dir, int df, void *p_data)
+static int hvmemul_do_io_buffer(
+    bool_t is_mmio, paddr_t addr, unsigned long *reps, unsigned int size,
+    uint8_t dir, bool_t df, void *buffer)
 {
-    return hvmemul_do_io(0, port, reps, size, ram_gpa, dir, df, p_data);
+    int rc;
+
+    BUG_ON(buffer == NULL);
+
+    rc = hvmemul_do_io(is_mmio, addr, reps, size, dir, df, 0,
+                       (uintptr_t)buffer);
+    if ( rc == X86EMUL_UNHANDLEABLE && dir == IOREQ_READ )
+        memset(buffer, 0xff, size);
+
+    return rc;
 }
 
-static int hvmemul_do_mmio(
-    paddr_t gpa, unsigned long *reps, int size,
-    paddr_t ram_gpa, int dir, int df, void *p_data)
+static int hvmemul_acquire_page(unsigned long gmfn, struct page_info **page)
 {
-    return hvmemul_do_io(1, gpa, reps, size, ram_gpa, dir, df, p_data);
+    struct domain *curr_d = current->domain;
+    p2m_type_t p2mt;
+
+    *page = get_page_from_gfn(curr_d, gmfn, &p2mt, P2M_UNSHARE);
+
+    if ( *page == NULL )
+        return X86EMUL_UNHANDLEABLE;
+
+    if ( p2m_is_paging(p2mt) )
+    {
+        put_page(*page);
+        p2m_mem_paging_populate(curr_d, gmfn);
+        return X86EMUL_RETRY;
+    }
+
+    if ( p2m_is_shared(p2mt) )
+    {
+        put_page(*page);
+        return X86EMUL_RETRY;
+    }
+
+    return X86EMUL_OKAY;
+}
+
+static inline void hvmemul_release_page(struct page_info *page)
+{
+    put_page(page);
+}
+
+static int hvmemul_do_io_addr(
+    bool_t is_mmio, paddr_t addr, unsigned long *reps,
+    unsigned int size, uint8_t dir, bool_t df, paddr_t ram_gpa)
+{
+    struct page_info *ram_page;
+    int rc;
+
+    rc = hvmemul_acquire_page(paddr_to_pfn(ram_gpa), &ram_page);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    rc = hvmemul_do_io(is_mmio, addr, reps, size, dir, df, 1,
+                       ram_gpa);
+
+    hvmemul_release_page(ram_page);
+
+    return rc;
+}
+
+/*
+ * Perform I/O between <port> and <buffer>. <dir> indicates the
+ * direction: IOREQ_READ means a read from <port> to <buffer> and
+ * IOREQ_WRITE means a write from <buffer> to <port>. Each access has
+ * width <size>.
+ */
+int hvmemul_do_pio_buffer(uint16_t port,
+                          unsigned int size,
+                          uint8_t dir,
+                          void *buffer)
+{
+    unsigned long one_rep = 1;
+
+    return hvmemul_do_io_buffer(0, port, &one_rep, size, dir, 0, buffer);
+}
+
+/*
+ * Perform I/O between <port> and guest RAM starting at <ram_addr>.
+ * <dir> indicates the direction: IOREQ_READ means a read from <port> to
+ * RAM and IOREQ_WRITE means a write from RAM to <port>. Each access has
+ * width <size> and up to *<reps> accesses will be performed. If
+ * X86EMUL_OKAY is returned then <reps> will be updated with the number
+ * of accesses actually performed.
+ * Each access will be done to/from successive RAM addresses, increasing
+ * if <df> is 0 or decreasing if <df> is 1.
+ */
+static int hvmemul_do_pio_addr(uint16_t port,
+                               unsigned long *reps,
+                               unsigned int size,
+                               uint8_t dir,
+                               bool_t df,
+                               paddr_t ram_addr)
+{
+    return hvmemul_do_io_addr(0, port, reps, size, dir, df, ram_addr);
+}
+
+/*
+ * Perform I/O between MMIO space starting at <mmio_gpa> and <buffer>.
+ * <dir> indicates the direction: IOREQ_READ means a read from MMIO to
+ * <buffer> and IOREQ_WRITE means a write from <buffer> to MMIO. Each
+ * access has width <size> and up to *<reps> accesses will be performed.
+ * If X86EMUL_OKAY is returned then <reps> will be updated with the number
+ * of accesses actually performed.
+ * Each access will be done to/from successive MMIO addresses, increasing
+ * if <df> is 0 or decreasing if <df> is 1.
+ *
+ * NOTE: If *<reps> is greater than 1, each access will use the
+ *       <buffer> pointer; there is no implicit interation over a
+ *       block of memory starting at <buffer>.
+ */
+static int hvmemul_do_mmio_buffer(paddr_t mmio_gpa,
+                                  unsigned long *reps,
+                                  unsigned int size,
+                                  uint8_t dir,
+                                  bool_t df,
+                                  void *buffer)
+{
+    return hvmemul_do_io_buffer(1, mmio_gpa, reps, size, dir, df, buffer);
+}
+
+/*
+ * Perform I/O between MMIO space starting at <mmio_gpa> and guest RAM
+ * starting at <ram_gpa>. <dir> indicates the direction: IOREQ_READ
+ * means a read from MMIO to RAM and IOREQ_WRITE means a write from RAM
+ * to MMIO. Each access has width <size> and up to *<reps> accesses will
+ * be performed. If X86EMUL_OKAY is returned then <reps> will be updated
+ * with the number of accesses actually performed.
+ * Each access will be done to/from successive RAM *and* MMIO addresses,
+ * increasing if <df> is 0 or decreasing if <df> is 1.
+ */
+static int hvmemul_do_mmio_addr(paddr_t mmio_gpa,
+                                unsigned long *reps,
+                                unsigned int size,
+                                uint8_t dir,
+                                bool_t df,
+                                paddr_t ram_gpa)
+{
+    return hvmemul_do_io_addr(1, mmio_gpa, reps, size, dir, df, ram_gpa);
 }
 
 /*
@@ -503,7 +587,8 @@ static int __hvmemul_read(
         gpa = (((paddr_t)vio->mmio_gpfn << PAGE_SHIFT) | off);
         while ( (off + chunk) <= PAGE_SIZE )
         {
-            rc = hvmemul_do_mmio(gpa, &reps, chunk, 0, IOREQ_READ, 0, p_data);
+            rc = hvmemul_do_mmio_buffer(gpa, &reps, chunk, IOREQ_READ, 0,
+                                        p_data);
             if ( rc != X86EMUL_OKAY || bytes == chunk )
                 return rc;
             addr += chunk;
@@ -537,7 +622,8 @@ static int __hvmemul_read(
                                     hvmemul_ctxt);
         while ( rc == X86EMUL_OKAY )
         {
-            rc = hvmemul_do_mmio(gpa, &reps, chunk, 0, IOREQ_READ, 0, p_data);
+            rc = hvmemul_do_mmio_buffer(gpa, &reps, chunk, IOREQ_READ, 0,
+                                        p_data);
             if ( rc != X86EMUL_OKAY || bytes == chunk )
                 break;
             addr += chunk;
@@ -645,7 +731,8 @@ static int hvmemul_write(
         gpa = (((paddr_t)vio->mmio_gpfn << PAGE_SHIFT) | off);
         while ( (off + chunk) <= PAGE_SIZE )
         {
-            rc = hvmemul_do_mmio(gpa, &reps, chunk, 0, IOREQ_WRITE, 0, p_data);
+            rc = hvmemul_do_mmio_buffer(gpa, &reps, chunk, IOREQ_WRITE, 0,
+                                        p_data);
             if ( rc != X86EMUL_OKAY || bytes == chunk )
                 return rc;
             addr += chunk;
@@ -675,7 +762,8 @@ static int hvmemul_write(
                                     hvmemul_ctxt);
         while ( rc == X86EMUL_OKAY )
         {
-            rc = hvmemul_do_mmio(gpa, &reps, chunk, 0, IOREQ_WRITE, 0, p_data);
+            rc = hvmemul_do_mmio_buffer(gpa, &reps, chunk, IOREQ_WRITE, 0,
+                                        p_data);
             if ( rc != X86EMUL_OKAY || bytes == chunk )
                 break;
             addr += chunk;
@@ -849,8 +937,8 @@ static int hvmemul_rep_ins(
     if ( p2mt == p2m_mmio_direct || p2mt == p2m_mmio_dm )
         return X86EMUL_UNHANDLEABLE;
 
-    return hvmemul_do_pio(src_port, reps, bytes_per_rep, gpa, IOREQ_READ,
-                          !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
+    return hvmemul_do_pio_addr(src_port, reps, bytes_per_rep, IOREQ_READ,
+                               !!(ctxt->regs->eflags & X86_EFLAGS_DF), gpa);
 }
 
 static int hvmemul_rep_outs(
@@ -887,8 +975,8 @@ static int hvmemul_rep_outs(
     if ( p2mt == p2m_mmio_direct || p2mt == p2m_mmio_dm )
         return X86EMUL_UNHANDLEABLE;
 
-    return hvmemul_do_pio(dst_port, reps, bytes_per_rep, gpa, IOREQ_WRITE,
-                          !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
+    return hvmemul_do_pio_addr(dst_port, reps, bytes_per_rep, IOREQ_WRITE,
+                               !!(ctxt->regs->eflags & X86_EFLAGS_DF), gpa);
 }
 
 static int hvmemul_rep_movs(
@@ -944,12 +1032,12 @@ static int hvmemul_rep_movs(
         return X86EMUL_UNHANDLEABLE;
 
     if ( sp2mt == p2m_mmio_dm )
-        return hvmemul_do_mmio(
-            sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ, df, NULL);
+        return hvmemul_do_mmio_addr(
+            sgpa, reps, bytes_per_rep, IOREQ_READ, df, dgpa);
 
     if ( dp2mt == p2m_mmio_dm )
-        return hvmemul_do_mmio(
-            dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE, df, NULL);
+        return hvmemul_do_mmio_addr(
+            dgpa, reps, bytes_per_rep, IOREQ_WRITE, df, sgpa);
 
     /* RAM-to-RAM copy: emulate as equivalent of memmove(dgpa, sgpa, bytes). */
     bytes = *reps * bytes_per_rep;
@@ -1102,8 +1190,8 @@ static int hvmemul_rep_stos(
         return X86EMUL_UNHANDLEABLE;
 
     case p2m_mmio_dm:
-        return hvmemul_do_mmio(gpa, reps, bytes_per_rep, 0, IOREQ_WRITE, df,
-                               p_data);
+        return hvmemul_do_mmio_buffer(gpa, reps, bytes_per_rep, IOREQ_WRITE, df,
+                                      p_data);
     }
 }
 
@@ -1140,9 +1228,8 @@ static int hvmemul_read_io(
     unsigned long *val,
     struct x86_emulate_ctxt *ctxt)
 {
-    unsigned long reps = 1;
     *val = 0;
-    return hvmemul_do_pio(port, &reps, bytes, 0, IOREQ_READ, 0, val);
+    return hvmemul_do_pio_buffer(port, bytes, IOREQ_READ, val);
 }
 
 static int hvmemul_write_io(
@@ -1151,8 +1238,7 @@ static int hvmemul_write_io(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
 {
-    unsigned long reps = 1;
-    return hvmemul_do_pio(port, &reps, bytes, 0, IOREQ_WRITE, 0, &val);
+    return hvmemul_do_pio_buffer(port, bytes, IOREQ_WRITE, &val);
 }
 
 static int hvmemul_read_cr(
