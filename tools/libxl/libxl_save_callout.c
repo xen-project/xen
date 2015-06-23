@@ -332,19 +332,22 @@ static void helper_exited(libxl__egc *egc, libxl__ev_child *ch,
 
     if (status) {
         libxl_report_child_exitstatus(CTX, XTL_ERROR, what, pid, status);
-        shs->rc = ERROR_FAIL;
+        if (!shs->rc)
+            shs->rc = ERROR_FAIL;
     }
 
     if (shs->need_results) {
-        if (!shs->rc)
+        if (!shs->rc) {
             LOG(ERROR,"%s exited without providing results",what);
-        shs->rc = ERROR_FAIL;
+            shs->rc = ERROR_FAIL;
+        }
     }
 
     if (!shs->completed) {
-        if (!shs->rc)
+        if (!shs->rc) {
             LOG(ERROR,"%s exited without signaling completion",what);
-        shs->rc = ERROR_FAIL;
+            shs->rc = ERROR_FAIL;
+        }
     }
 
     helper_done(egc, shs);
