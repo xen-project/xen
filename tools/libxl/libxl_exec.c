@@ -411,6 +411,8 @@ static void spawn_middle_death(libxl__egc *egc, libxl__ev_child *childw,
         ((WIFEXITED(status) && WEXITSTATUS(status)==0) ||
          (WIFSIGNALED(status) && WTERMSIG(status)==SIGKILL))) {
         /* as expected */
+        const char *what = GCSPRINTF("%s (dying as expected)", ss->what);
+        libxl_report_child_exitstatus(CTX, XTL_DEBUG, what, pid, status);
     } else if (!WIFEXITED(status)) {
         int loglevel = ss->detaching ? XTL_WARN : XTL_ERROR;
         const char *what =
