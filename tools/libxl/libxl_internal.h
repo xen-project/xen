@@ -3600,6 +3600,7 @@ typedef struct {
     libxl__carefd *carefd;
     char *path; /* path of the lock file itself */
 } libxl__domain_userdata_lock;
+/* The CTX_LOCK must be held around uses of this lock */
 libxl__domain_userdata_lock *libxl__lock_domain_userdata(libxl__gc *gc,
                                                          uint32_t domid);
 void libxl__unlock_domain_userdata(libxl__domain_userdata_lock *lock);

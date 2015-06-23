@@ -4621,6 +4621,15 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t max_memkb)
     uint32_t memorykb;
     char *dompath = libxl__xs_get_dompath(gc, domid);
     int rc = 1;
+    libxl__domain_userdata_lock *lock = NULL;
+
+    CTX_LOCK;
+
+    lock = libxl__lock_domain_userdata(gc, domid);
+    if (!lock) {
+        rc = ERROR_LOCK_FAIL;
+        goto out;
+    }
 
     mem = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/memory/target", dompath));
     if (!mem) {
@@ -4647,6 +4656,8 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t max_memkb)
 
     rc = 0;
 out:
+    if (lock) libxl__unlock_domain_userdata(lock);
+    CTX_UNLOCK;
     GC_FREE;
     return rc;
 }
@@ -4746,6 +4757,15 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
     libxl_dominfo ptr;
     char *uuid;
     xs_transaction_t t;
+    libxl__domain_userdata_lock *lock;
+
+    CTX_LOCK;
+
+    lock = libxl__lock_domain_userdata(gc, domid);
+    if (!lock) {
+        rc = ERROR_LOCK_FAIL;
+        goto out_no_transaction;
+    }
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
@@ -4867,6 +4887,8 @@ out:
             goto retry_transaction;
 
 out_no_transaction:
+    if (lock) libxl__unlock_domain_userdata(lock);
+    CTX_UNLOCK;
     GC_FREE;
     return rc;
 }
