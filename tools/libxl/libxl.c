@@ -4742,15 +4742,10 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
     uint32_t current_max_memkb = 0;
     char *memmax, *endptr, *videoram_s = NULL, *target = NULL;
     char *dompath = libxl__xs_get_dompath(gc, domid);
+    xc_domaininfo_t info;
     libxl_dominfo ptr;
     char *uuid;
     xs_transaction_t t;
-
-    libxl_dominfo_init(&ptr);
-    if (libxl_domain_info(ctx, &ptr, domid) < 0)
-        goto out_no_transaction;
-
-    uuid = libxl__uuid2string(gc, ptr.uuid);
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
@@ -4827,12 +4822,13 @@ retry_transaction:
     }
 
     if (enforce) {
-        memorykb = ptr.max_memkb - current_target_memkb + new_target_memkb;
-        rc = xc_domain_setmaxmem(ctx->xch, domid, memorykb);
+        memorykb = new_target_memkb + videoram;
+        rc = xc_domain_setmaxmem(ctx->xch, domid, memorykb +
+                LIBXL_MAXMEM_CONSTANT);
         if (rc != 0) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                     "xc_domain_setmaxmem domid=%u memkb=%"PRIu64" failed "
-                    "rc=%d\n", domid, memorykb, rc);
+                    "rc=%d\n", domid, memorykb + LIBXL_MAXMEM_CONSTANT, rc);
             abort_transaction = 1;
             goto out;
         }
@@ -4851,9 +4847,18 @@ retry_transaction:
 
     libxl__xs_write(gc, t, libxl__sprintf(gc, "%s/memory/target",
                 dompath), "%"PRIu32, new_target_memkb);
+    rc = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
+    if (rc != 1 || info.domain != domid) {
+        abort_transaction = 1;
+        goto out;
+    }
 
+    libxl_dominfo_init(&ptr);
+    xcinfo2xlinfo(ctx, &info, &ptr);
+    uuid = libxl__uuid2string(gc, ptr.uuid);
     libxl__xs_write(gc, t, libxl__sprintf(gc, "/vm/%s/memory", uuid),
             "%"PRIu32, new_target_memkb / 1024);
+    libxl_dominfo_dispose(&ptr);
 
 out:
     if (!xs_transaction_end(ctx->xsh, t, abort_transaction)
@@ -4862,7 +4867,6 @@ out:
             goto retry_transaction;
 
 out_no_transaction:
-    libxl_dominfo_dispose(&ptr);
     GC_FREE;
     return rc;
 }
