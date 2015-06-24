@@ -79,7 +79,7 @@ extern const struct bug_frame __start_bug_frames[],
     .L\@ud: ud2a
 
     .pushsection .rodata.str1, "aMS", @progbits, 1
-         .L\@s1: .string8 "\file_str"
+         .L\@s1: .asciz "\file_str"
     .popsection
 
     .pushsection .bug_frames.\type, "a", @progbits
@@ -91,7 +91,7 @@ extern const struct bug_frame __start_bug_frames[],
 
         .if \second_frame
             .pushsection .rodata.str1, "aMS", @progbits, 1
-                .L\@s2: .string8 "\msg"
+                .L\@s2: .asciz "\msg"
             .popsection
             .long 0, (.L\@s2 - .L\@bf)
         .endif
