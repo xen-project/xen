@@ -48,6 +48,7 @@ CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c xc_linux_osdep.c
 CTRL_SRCS-$(CONFIG_FreeBSD) += xc_freebsd.c xc_freebsd_osdep.c
 CTRL_SRCS-$(CONFIG_SunOS) += xc_solaris.c
 CTRL_SRCS-$(CONFIG_NetBSD) += xc_netbsd.c
+CTRL_SRCS-$(CONFIG_NetBSDRump) += xc_netbsd.c
 CTRL_SRCS-$(CONFIG_MiniOS) += xc_minios.c
 
 GUEST_SRCS-y :=
