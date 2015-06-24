@@ -1851,9 +1851,7 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
     struct p2m_domain *hostp2m = p2m_get_hostp2m(v->domain);
     const struct paging_mode *hostmode = paging_get_hostmode(v);
 
-    if ( is_hvm_domain(v->domain)
-        && paging_mode_hap(v->domain) 
-        && nestedhvm_is_n2(v) )
+    if ( is_hvm_vcpu(v) && paging_mode_hap(v->domain) && nestedhvm_is_n2(v) )
     {
         unsigned long gfn;
         struct p2m_domain *p2m;

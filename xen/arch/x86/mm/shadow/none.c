@@ -73,6 +73,6 @@ static const struct paging_mode sh_paging_none = {
 
 void shadow_vcpu_init(struct vcpu *v)
 {
-    ASSERT(is_pv_domain(v->domain));
+    ASSERT(is_pv_vcpu(v));
     v->arch.paging.mode = &sh_paging_none;
 }
