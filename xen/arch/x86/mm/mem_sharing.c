@@ -1320,10 +1320,6 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
     if ( !hap_enabled(d) || !d->arch.hvm_domain.mem_sharing_enabled )
         goto out;
 
-    rc = -ENODEV;
-    if ( unlikely(!d->vm_event->share.ring_page) )
-        goto out;
-
     switch ( mso.op )
     {
         case XENMEM_sharing_op_nominate_gfn:
