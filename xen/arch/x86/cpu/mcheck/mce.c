@@ -1339,7 +1339,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
             mctelem_cookie_t cookie = ID2COOKIE(mc_fetch.nat->fetch_id);
             mctelem_ack(which, cookie);
         } else {
-            if (!is_pv_32on64_vcpu(v)
+            if (!is_pv_32bit_vcpu(v)
                 ? guest_handle_is_null(mc_fetch.nat->data)
                 : compat_handle_is_null(mc_fetch.cmp->data))
                 return x86_mcerr("do_mca fetch: guest buffer "
@@ -1347,7 +1347,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 
             if ((mctc = mctelem_consume_oldest_begin(which))) {
                 struct mc_info *mcip = mctelem_dataptr(mctc);
-                if (!is_pv_32on64_vcpu(v)
+                if (!is_pv_32bit_vcpu(v)
                     ? copy_to_guest(mc_fetch.nat->data, mcip, 1)
                     : copy_to_compat(mc_fetch.cmp->data,
                                      mcip, 1)) {
@@ -1378,7 +1378,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         mc_physcpuinfo.nat = &op->u.mc_physcpuinfo;
         nlcpu = num_online_cpus();
 
-        if (!is_pv_32on64_vcpu(v)
+        if (!is_pv_32bit_vcpu(v)
             ? !guest_handle_is_null(mc_physcpuinfo.nat->info)
             : !compat_handle_is_null(mc_physcpuinfo.cmp->info)) {
             if (mc_physcpuinfo.nat->ncpus <= 0)
@@ -1389,7 +1389,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
             if (log_cpus == NULL)
                 return x86_mcerr("do_mca cpuinfo", -ENOMEM);
             on_each_cpu(do_mc_get_cpu_info, log_cpus, 1);
-            if (!is_pv_32on64_vcpu(v)
+            if (!is_pv_32bit_vcpu(v)
                 ? copy_to_guest(mc_physcpuinfo.nat->info,
                                 log_cpus, nlcpu)
                 : copy_to_compat(mc_physcpuinfo.cmp->info,

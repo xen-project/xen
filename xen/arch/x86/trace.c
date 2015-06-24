@@ -11,7 +11,7 @@ void __trace_hypercall_entry(void)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     unsigned long args[6];
 
-    if ( is_pv_32on64_vcpu(current) )
+    if ( is_pv_32bit_vcpu(current) )
     {
         args[0] = regs->ebx;
         args[1] = regs->ecx;
@@ -36,7 +36,7 @@ void __trace_hypercall_entry(void)
 void __trace_pv_trap(int trapnr, unsigned long eip,
                      int use_error_code, unsigned error_code)
 {
-    if ( is_pv_32on64_vcpu(current) )
+    if ( is_pv_32bit_vcpu(current) )
     {
         struct __packed {
             unsigned eip:32,
@@ -77,7 +77,7 @@ void __trace_pv_page_fault(unsigned long addr, unsigned error_code)
 {
     unsigned long eip = guest_cpu_user_regs()->eip;
 
-    if ( is_pv_32on64_vcpu(current) )
+    if ( is_pv_32bit_vcpu(current) )
     {
         struct __packed {
             u32 eip, addr, error_code;
@@ -108,7 +108,7 @@ void __trace_pv_page_fault(unsigned long addr, unsigned error_code)
 
 void __trace_trap_one_addr(unsigned event, unsigned long va)
 {
-    if ( is_pv_32on64_vcpu(current) )
+    if ( is_pv_32bit_vcpu(current) )
     {
         u32 d = va;
         __trace_var(event, 1, sizeof(d), &d);
@@ -123,7 +123,7 @@ void __trace_trap_one_addr(unsigned event, unsigned long va)
 void __trace_trap_two_addr(unsigned event, unsigned long va1,
                            unsigned long va2)
 {
-    if ( is_pv_32on64_vcpu(current) )
+    if ( is_pv_32bit_vcpu(current) )
     {
         struct __packed {
             u32 va1, va2;
@@ -156,7 +156,7 @@ void __trace_ptwr_emulation(unsigned long addr, l1_pgentry_t npte)
      * cases, "unsigned long" is the size of a guest virtual address.
      */
 
-    if ( is_pv_32on64_vcpu(current) )
+    if ( is_pv_32bit_vcpu(current) )
     {
         struct __packed {
             l1_pgentry_t pte;

@@ -124,7 +124,7 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
     if ( is_hvm_vcpu(v) )
         return;
 
-    if ( is_pv_32on64_vcpu(v) )
+    if ( is_pv_32bit_vcpu(v) )
     {
         compat_show_guest_stack(v, regs, debug_stack_lines);
         return;
@@ -2382,7 +2382,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         {
             unsigned long mfn;
             
-            if ( !is_pv_32on64_vcpu(v) )
+            if ( !is_pv_32bit_domain(currd) )
             {
                 mfn = pagetable_get_pfn(v->arch.guest_table);
                 *reg = xen_pfn_to_cr3(mfn_to_gmfn(currd, mfn));
@@ -2452,7 +2452,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             unsigned long gfn;
             struct page_info *page;
 
-            gfn = !is_pv_32on64_vcpu(v)
+            gfn = !is_pv_32bit_domain(currd)
                 ? xen_cr3_to_pfn(*reg) : compat_cr3_to_pfn(*reg);
             page = get_page_from_gfn(currd, gfn, NULL, P2M_ALLOC);
             if ( page )
@@ -2504,19 +2504,19 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         switch ( regs->_ecx )
         {
         case MSR_FS_BASE:
-            if ( is_pv_32on64_vcpu(v) )
+            if ( is_pv_32bit_domain(currd) )
                 goto fail;
             wrfsbase(msr_content);
             v->arch.pv_vcpu.fs_base = msr_content;
             break;
         case MSR_GS_BASE:
-            if ( is_pv_32on64_vcpu(v) )
+            if ( is_pv_32bit_domain(currd) )
                 goto fail;
             wrgsbase(msr_content);
             v->arch.pv_vcpu.gs_base_kernel = msr_content;
             break;
         case MSR_SHADOW_GS_BASE:
-            if ( is_pv_32on64_vcpu(v) )
+            if ( is_pv_32bit_domain(currd) )
                 goto fail;
             if ( wrmsr_safe(MSR_SHADOW_GS_BASE, msr_content) )
                 goto fail;
@@ -2675,18 +2675,18 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         switch ( regs->_ecx )
         {
         case MSR_FS_BASE:
-            if ( is_pv_32on64_vcpu(v) )
+            if ( is_pv_32bit_domain(currd) )
                 goto fail;
             val = cpu_has_fsgsbase ? __rdfsbase() : v->arch.pv_vcpu.fs_base;
             goto rdmsr_writeback;
         case MSR_GS_BASE:
-            if ( is_pv_32on64_vcpu(v) )
+            if ( is_pv_32bit_domain(currd) )
                 goto fail;
             val = cpu_has_fsgsbase ? __rdgsbase()
                                    : v->arch.pv_vcpu.gs_base_kernel;
             goto rdmsr_writeback;
         case MSR_SHADOW_GS_BASE:
-            if ( is_pv_32on64_vcpu(v) )
+            if ( is_pv_32bit_domain(currd) )
                 goto fail;
             val = v->arch.pv_vcpu.gs_base_user;
             goto rdmsr_writeback;
@@ -3201,7 +3201,7 @@ void do_general_protection(struct cpu_user_regs *regs)
             return;
         }
     }
-    else if ( is_pv_32on64_vcpu(v) && regs->error_code )
+    else if ( is_pv_32bit_vcpu(v) && regs->error_code )
     {
         emulate_gate_op(regs);
         return;

@@ -509,7 +509,7 @@ int vcpu_initialise(struct vcpu *v)
 
 void vcpu_destroy(struct vcpu *v)
 {
-    if ( is_pv_32on64_vcpu(v) )
+    if ( is_pv_32bit_vcpu(v) )
     {
         free_compat_arg_xlat(v);
         release_compat_l4(v);
@@ -1722,7 +1722,7 @@ unsigned long hypercall_create_continuation(
             curr->arch.hvm_vcpu.hcall_preempted = 1;
 
         if ( is_pv_vcpu(curr) ?
-             !is_pv_32on64_vcpu(curr) :
+             !is_pv_32bit_vcpu(curr) :
              curr->arch.hvm_vcpu.hcall_64bit )
         {
             for ( i = 0; *p != '\0'; i++ )

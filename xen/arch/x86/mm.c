@@ -2652,7 +2652,7 @@ int vcpu_destroy_pagetables(struct vcpu *v)
     if ( rc )
         return rc;
 
-    if ( is_pv_32on64_vcpu(v) )
+    if ( is_pv_32bit_vcpu(v) )
     {
         l4tab = map_domain_page(mfn);
         mfn = l4e_get_pfn(*l4tab);

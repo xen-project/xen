@@ -285,7 +285,7 @@ static inline int tmem_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
 #ifdef CONFIG_COMPAT
     if ( has_hvm_container_vcpu(current) ?
          hvm_guest_x86_mode(current) != 8 :
-         is_pv_32on64_vcpu(current) )
+         is_pv_32bit_vcpu(current) )
     {
         int rc;
         enum XLAT_tmem_op_u u;
