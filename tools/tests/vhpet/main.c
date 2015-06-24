@@ -70,7 +70,7 @@ static int skip_error_on_load;
 
 static char *global_thousep;
 
-extern const struct hvm_mmio_handler hpet_mmio_handler;
+extern const struct hvm_mmio_ops hpet_mmio_ops;
 
 struct domain dom1;
 struct vcpu vcpu0;
@@ -297,13 +297,13 @@ void udelay(int w)
 unsigned int hpet_readl(unsigned long a)
 {
     unsigned long ret = 0;
-    hpet_mmio_handler.read_handler(current, a, 4, &ret);
+    hpet_mmio_ops.read(current, a, 4, &ret);
     return ret;
 }
 
 void hpet_writel(unsigned long d, unsigned long a)
 {
-    hpet_mmio_handler.write_handler(current, a, 4, d);
+    hpet_mmio_ops.write(current, a, 4, d);
     return;
 }
 

@@ -237,11 +237,11 @@ typedef int (*hvm_mmio_write_t)(struct vcpu *v,
 typedef int (*hvm_mmio_check_t)(struct vcpu *v, unsigned long addr);
 
 
-struct hvm_mmio_handler
+struct hvm_mmio_ops
 {
-    hvm_mmio_check_t check_handler;
-    hvm_mmio_read_t read_handler;
-    hvm_mmio_write_t write_handler;
+    hvm_mmio_check_t check;
+    hvm_mmio_read_t  read;
+    hvm_mmio_write_t write;
 };
 
 /* Marshalling and unmarshalling uses a buffer with size and cursor. */

@@ -32,20 +32,20 @@
 #include <xen/event.h>
 #include <xen/iommu.h>
 
-static const struct hvm_mmio_handler *const
+static const struct hvm_mmio_ops *const
 hvm_mmio_handlers[HVM_MMIO_HANDLER_NR] =
 {
-    &hpet_mmio_handler,
-    &vlapic_mmio_handler,
-    &vioapic_mmio_handler,
-    &msixtbl_mmio_handler,
-    &iommu_mmio_handler
+    &hpet_mmio_ops,
+    &vlapic_mmio_ops,
+    &vioapic_mmio_ops,
+    &msixtbl_mmio_ops,
+    &iommu_mmio_ops
 };
 
 static int hvm_mmio_access(struct vcpu *v,
                            ioreq_t *p,
-                           hvm_mmio_read_t read_handler,
-                           hvm_mmio_write_t write_handler)
+                           hvm_mmio_read_t read,
+                           hvm_mmio_write_t write)
 {
     struct hvm_vcpu_io *vio = &v->arch.hvm_vcpu.hvm_io;
     unsigned long data;
@@ -64,11 +64,11 @@ static int hvm_mmio_access(struct vcpu *v,
                 vio->mmio_retrying = 0;
             }
             else
-                rc = read_handler(v, p->addr, p->size, &data);
+                rc = read(v, p->addr, p->size, &data);
             p->data = data;
         }
         else /* p->dir == IOREQ_WRITE */
-            rc = write_handler(v, p->addr, p->size, p->data);
+            rc = write(v, p->addr, p->size, p->data);
         return rc;
     }
 
@@ -86,7 +86,7 @@ static int hvm_mmio_access(struct vcpu *v,
             }
             else
             {
-                rc = read_handler(v, p->addr + step * i, p->size, &data);
+                rc = read(v, p->addr + step * i, p->size, &data);
                 if ( rc != X86EMUL_OKAY )
                     break;
             }
@@ -145,7 +145,7 @@ static int hvm_mmio_access(struct vcpu *v,
             }
             if ( rc != X86EMUL_OKAY )
                 break;
-            rc = write_handler(v, p->addr + step * i, p->size, data);
+            rc = write(v, p->addr + step * i, p->size, data);
             if ( rc != X86EMUL_OKAY )
                 break;
         }
@@ -169,7 +169,7 @@ bool_t hvm_mmio_internal(paddr_t gpa)
     unsigned int i;
 
     for ( i = 0; i < HVM_MMIO_HANDLER_NR; ++i )
-        if ( hvm_mmio_handlers[i]->check_handler(curr, gpa) )
+        if ( hvm_mmio_handlers[i]->check(curr, gpa) )
             return 1;
 
     return 0;
@@ -182,21 +182,20 @@ int hvm_mmio_intercept(ioreq_t *p)
 
     for ( i = 0; i < HVM_MMIO_HANDLER_NR; i++ )
     {
-        hvm_mmio_check_t check_handler =
-            hvm_mmio_handlers[i]->check_handler;
+        hvm_mmio_check_t check = hvm_mmio_handlers[i]->check;
 
-        if ( check_handler(v, p->addr) )
+        if ( check(v, p->addr) )
         {
             if ( unlikely(p->count > 1) &&
-                 !check_handler(v, unlikely(p->df)
-                                   ? p->addr - (p->count - 1L) * p->size
-                                   : p->addr + (p->count - 1L) * p->size) )
+                 !check(v, unlikely(p->df)
+                        ? p->addr - (p->count - 1L) * p->size
+                        : p->addr + (p->count - 1L) * p->size) )
                 p->count = 1;
 
             return hvm_mmio_access(
                 v, p,
-                hvm_mmio_handlers[i]->read_handler,
-                hvm_mmio_handlers[i]->write_handler);
+                hvm_mmio_handlers[i]->read,
+                hvm_mmio_handlers[i]->write);
         }
     }
 

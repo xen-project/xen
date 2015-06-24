@@ -250,10 +250,10 @@ static int vioapic_range(struct vcpu *v, unsigned long addr)
              (addr < vioapic->base_address + VIOAPIC_MEM_LENGTH)));
 }
 
-const struct hvm_mmio_handler vioapic_mmio_handler = {
-    .check_handler = vioapic_range,
-    .read_handler = vioapic_read,
-    .write_handler = vioapic_write
+const struct hvm_mmio_ops vioapic_mmio_ops = {
+    .check = vioapic_range,
+    .read = vioapic_read,
+    .write = vioapic_write
 };
 
 static void ioapic_inj_irq(

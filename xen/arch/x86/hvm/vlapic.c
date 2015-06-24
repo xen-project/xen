@@ -977,10 +977,10 @@ static int vlapic_range(struct vcpu *v, unsigned long addr)
            (offset < PAGE_SIZE);
 }
 
-const struct hvm_mmio_handler vlapic_mmio_handler = {
-    .check_handler = vlapic_range,
-    .read_handler = vlapic_read,
-    .write_handler = vlapic_write
+const struct hvm_mmio_ops vlapic_mmio_ops = {
+    .check = vlapic_range,
+    .read = vlapic_read,
+    .write = vlapic_write
 };
 
 static void set_x2apic_id(struct vlapic *vlapic)

@@ -59,17 +59,17 @@ struct hvm_io_handler {
     struct  io_handler hdl_list[MAX_IO_HANDLER];
 };
 
-struct hvm_mmio_handler {
-    hvm_mmio_check_t check_handler;
-    hvm_mmio_read_t read_handler;
-    hvm_mmio_write_t write_handler;
+struct hvm_mmio_ops {
+    hvm_mmio_check_t check;
+    hvm_mmio_read_t  read;
+    hvm_mmio_write_t write;
 };
 
-extern const struct hvm_mmio_handler hpet_mmio_handler;
-extern const struct hvm_mmio_handler vlapic_mmio_handler;
-extern const struct hvm_mmio_handler vioapic_mmio_handler;
-extern const struct hvm_mmio_handler msixtbl_mmio_handler;
-extern const struct hvm_mmio_handler iommu_mmio_handler;
+extern const struct hvm_mmio_ops hpet_mmio_ops;
+extern const struct hvm_mmio_ops vlapic_mmio_ops;
+extern const struct hvm_mmio_ops vioapic_mmio_ops;
+extern const struct hvm_mmio_ops msixtbl_mmio_ops;
+extern const struct hvm_mmio_ops iommu_mmio_ops;
 
 #define HVM_MMIO_HANDLER_NR 5
 

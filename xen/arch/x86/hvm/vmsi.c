@@ -344,10 +344,10 @@ static int msixtbl_range(struct vcpu *v, unsigned long addr)
     return !!desc;
 }
 
-const struct hvm_mmio_handler msixtbl_mmio_handler = {
-    .check_handler = msixtbl_range,
-    .read_handler = msixtbl_read,
-    .write_handler = msixtbl_write
+const struct hvm_mmio_ops msixtbl_mmio_ops = {
+    .check = msixtbl_range,
+    .read = msixtbl_read,
+    .write = msixtbl_write
 };
 
 static void add_msixtbl_entry(struct domain *d,
