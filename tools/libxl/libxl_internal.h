@@ -1953,8 +1953,8 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
  *        libxl__ao_progress_gethow.
  *
  * - If the initiation is unsuccessful, the initiating function must
- *   call libxl__ao_abort before unlocking and returning whatever
- *   error code is appropriate (AO_ABORT macro).
+ *   call libxl__ao_create_fail before unlocking and returning whatever
+ *   error code is appropriate (AO_CREATE_FAIL macro).
  *
  * If initiation is successful:
  *
@@ -2011,10 +2011,10 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
         (ao__rc);                                               \
    })
 
-#define AO_ABORT(rc) ({                                         \
+#define AO_CREATE_FAIL(rc) ({                                   \
         libxl_ctx *ao__ctx = libxl__gc_owner(&ao->gc);          \
         assert(rc);                                             \
-        libxl__ao_abort(ao);                                    \
+        libxl__ao_create_fail(ao);                              \
         libxl__ctx_unlock(ao__ctx); /* gc is now invalid */     \
         EGC_FREE;                                               \
         (rc);                                                   \
@@ -2035,7 +2035,7 @@ _hidden libxl__ao *libxl__ao_create(libxl_ctx*, uint32_t domid,
        const char *file, int line, const char *func);
 _hidden int libxl__ao_inprogress(libxl__ao *ao,
        const char *file, int line, const char *func); /* temporarily unlocks */
-_hidden void libxl__ao_abort(libxl__ao *ao);
+_hidden void libxl__ao_create_fail(libxl__ao *ao);
 _hidden void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc);
 _hidden libxl__gc *libxl__ao_inprogress_gc(libxl__ao *ao);
 
@@ -2064,7 +2064,7 @@ _hidden void libxl__ao_complete_check_progress_reports(libxl__egc*, libxl__ao*);
  * The returned sub-ao is suitable for passing to gc-related functions
  * and macros such as libxl__ao_inprogress_gc, AO_GC, and STATE_AO_GC.
  *
- * It MUST NOT be used with AO_INPROGRESS, AO_ABORT,
+ * It MUST NOT be used with AO_INPROGRESS, AO_CREATE_FAIL,
  * libxl__ao_complete, libxl__ao_progress_report, and so on.
  *
  * The caller must ensure that all of the sub-ao's are freed before

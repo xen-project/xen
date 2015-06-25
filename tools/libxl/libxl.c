@@ -901,7 +901,7 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
     return AO_INPROGRESS;
 
  out:
-    return AO_ABORT(rc);
+    return AO_CREATE_FAIL(rc);
 }
 
 static void libxl__remus_setup_done(libxl__egc *egc,
@@ -982,7 +982,7 @@ int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd, int flags,
     return AO_INPROGRESS;
 
  out_err:
-    return AO_ABORT(rc);
+    return AO_CREATE_FAIL(rc);
 }
 
 int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid)
@@ -3008,7 +3008,7 @@ out:
 
     if (lock) libxl__unlock_domain_userdata(lock);
 
-    if (rc) return AO_ABORT(rc);
+    if (rc) return AO_CREATE_FAIL(rc);
     return AO_INPROGRESS;
 }
 
@@ -4198,7 +4198,7 @@ out:
         libxl__initiate_device_remove(egc, aodev);                      \
                                                                         \
     out:                                                                \
-        if (rc) return AO_ABORT(rc);                                    \
+        if (rc) return AO_CREATE_FAIL(rc);                                    \
         return AO_INPROGRESS;                                           \
     }
 
@@ -4609,7 +4609,7 @@ int libxl_device_events_handler(libxl_ctx *ctx,
     return AO_INPROGRESS;
 
 out:
-    return AO_ABORT(rc);
+    return AO_CREATE_FAIL(rc);
 }
 
 /******************************************************************************/

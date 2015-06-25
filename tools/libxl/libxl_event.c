@@ -1735,10 +1735,10 @@ void libxl__ao__destroy(libxl_ctx *ctx, libxl__ao *ao)
     free(ao);
 }
 
-void libxl__ao_abort(libxl__ao *ao)
+void libxl__ao_create_fail(libxl__ao *ao)
 {
     AO_GC;
-    LOG(DEBUG,"ao %p: abort",ao);
+    LOG(DEBUG,"ao %p: create fail",ao);
     assert(ao->magic == LIBXL__AO_MAGIC);
     assert(ao->in_initiator);
     assert(!ao->complete);
