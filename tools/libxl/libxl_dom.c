@@ -1242,7 +1242,7 @@ static void domain_suspend_switch_qemu_xen_traditional_logdirty
     return;
 
  out:
-    LOG(ERROR,"logdirty switch failed (rc=%d), aborting suspend",rc);
+    LOG(ERROR,"logdirty switch failed (rc=%d), abandoning suspend",rc);
     libxl__xs_transaction_abort(gc, &t);
     switch_logdirty_done(egc,dss,rc);
 }
@@ -1260,7 +1260,7 @@ static void domain_suspend_switch_qemu_xen_logdirty
     if (!rc) {
         libxl__xc_domain_saverestore_async_callback_done(egc, shs, 0);
     } else {
-        LOG(ERROR,"logdirty switch failed (rc=%d), aborting suspend",rc);
+        LOG(ERROR,"logdirty switch failed (rc=%d), abandoning suspend",rc);
         dss->rc = rc;
         libxl__xc_domain_saverestore_async_callback_done(egc, shs, -1);
     }
@@ -1283,7 +1283,7 @@ void libxl__domain_suspend_common_switch_qemu_logdirty
         break;
     default:
         LOG(ERROR,"logdirty switch failed"
-            ", no valid device model version found, aborting suspend");
+            ", no valid device model version found, abandoning suspend");
         dss->rc = ERROR_FAIL;
         libxl__xc_domain_saverestore_async_callback_done(egc, shs, -1);
     }
