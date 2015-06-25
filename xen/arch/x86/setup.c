@@ -1284,20 +1284,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     timer_init();
 
-    init_idle_domain();
-
-    this_cpu(stubs.addr) = alloc_stub_page(smp_processor_id(),
-                                           &this_cpu(stubs).mfn);
-    BUG_ON(!this_cpu(stubs.addr));
-
-    trap_init();
-
-    rcu_init();
-    
-    early_time_init();
-
-    arch_init_memory();
-
     identify_cpu(&boot_cpu_data);
 
     if ( cpu_has_fxsr )
@@ -1317,6 +1303,20 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( cpu_has_fsgsbase )
         set_in_cr4(X86_CR4_FSGSBASE);
+
+    init_idle_domain();
+
+    this_cpu(stubs.addr) = alloc_stub_page(smp_processor_id(),
+                                           &this_cpu(stubs).mfn);
+    BUG_ON(!this_cpu(stubs.addr));
+
+    trap_init();
+
+    rcu_init();
+
+    early_time_init();
+
+    arch_init_memory();
 
     alternative_instructions();
 
