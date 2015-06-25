@@ -336,9 +336,14 @@ static char *pointer(char *str, char *end, const char **fmt_ptr,
         const struct vcpu *v = arg;
 
         ++*fmt_ptr;
-        if ( str < end )
-            *str = 'd';
-        str = number(str + 1, end, v->domain->domain_id, 10, -1, -1, 0);
+        if ( unlikely(v->domain->domain_id == DOMID_IDLE) )
+            str = string(str, end, "IDLE", -1, -1, 0);
+        else
+        {
+            if ( str < end )
+                *str = 'd';
+            str = number(str + 1, end, v->domain->domain_id, 10, -1, -1, 0);
+        }
         if ( str < end )
             *str = 'v';
         return number(str + 1, end, v->vcpu_id, 10, -1, -1, 0);
