@@ -71,24 +71,25 @@
 /*
  * Intel CPU features in CR4
  */
-#define X86_CR4_VME		0x0001	/* enable vm86 extensions */
-#define X86_CR4_PVI		0x0002	/* virtual interrupts flag enable */
-#define X86_CR4_TSD		0x0004	/* disable time stamp at ipl 3 */
-#define X86_CR4_DE		0x0008	/* enable debugging extensions */
-#define X86_CR4_PSE		0x0010	/* enable page size extensions */
-#define X86_CR4_PAE		0x0020	/* enable physical address extensions */
-#define X86_CR4_MCE		0x0040	/* Machine check enable */
-#define X86_CR4_PGE		0x0080	/* enable global pages */
-#define X86_CR4_PCE		0x0100	/* enable performance counters at ipl 3 */
-#define X86_CR4_OSFXSR		0x0200	/* enable fast FPU save and restore */
-#define X86_CR4_OSXMMEXCPT	0x0400	/* enable unmasked SSE exceptions */
-#define X86_CR4_VMXE		0x2000  /* enable VMX */
-#define X86_CR4_SMXE		0x4000  /* enable SMX */
-#define X86_CR4_FSGSBASE	0x10000 /* enable {rd,wr}{fs,gs}base */
-#define X86_CR4_PCIDE		0x20000 /* enable PCID */
-#define X86_CR4_OSXSAVE	0x40000 /* enable XSAVE/XRSTOR */
-#define X86_CR4_SMEP		0x100000/* enable SMEP */
-#define X86_CR4_SMAP		0x200000/* enable SMAP */
+#define X86_CR4_VME        0x00000001 /* enable vm86 extensions */
+#define X86_CR4_PVI        0x00000002 /* virtual interrupts flag enable */
+#define X86_CR4_TSD        0x00000004 /* disable time stamp at ipl 3 */
+#define X86_CR4_DE         0x00000008 /* enable debugging extensions */
+#define X86_CR4_PSE        0x00000010 /* enable page size extensions */
+#define X86_CR4_PAE        0x00000020 /* enable physical address extensions */
+#define X86_CR4_MCE        0x00000040 /* Machine check enable */
+#define X86_CR4_PGE        0x00000080 /* enable global pages */
+#define X86_CR4_PCE        0x00000100 /* enable performance counters at ipl 3 */
+#define X86_CR4_OSFXSR     0x00000200 /* enable fast FPU save and restore */
+#define X86_CR4_OSXMMEXCPT 0x00000400 /* enable unmasked SSE exceptions */
+#define X86_CR4_VMXE       0x00002000 /* enable VMX */
+#define X86_CR4_SMXE       0x00004000 /* enable SMX */
+#define X86_CR4_FSGSBASE   0x00010000 /* enable {rd,wr}{fs,gs}base */
+#define X86_CR4_PCIDE      0x00020000 /* enable PCID */
+#define X86_CR4_OSXSAVE    0x00040000 /* enable XSAVE/XRSTOR */
+#define X86_CR4_SMEP       0x00100000 /* enable SMEP */
+#define X86_CR4_SMAP       0x00200000 /* enable SMAP */
+#define X86_CR4_PKE        0x00400000 /* enable PKE */
 
 /*
  * Trap/fault mnemonics.
