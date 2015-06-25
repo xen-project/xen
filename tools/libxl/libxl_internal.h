@@ -2380,7 +2380,7 @@ struct libxl__multidev {
  *          any stale entry
  *       for loop -- xs transaction
  *           open xs transaction
- *           check device existence, abort if it exists
+ *           check device existence, bail if it exists
  *           write in-memory json config to disk
  *           commit xs transaction
  *       end for loop
