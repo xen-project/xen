@@ -102,7 +102,7 @@ int __init psci_init_0_2(void)
 
     psci = dt_find_compatible_node(NULL, NULL, "arm,psci-0.2");
     if ( !psci )
-	return -EOPNOTSUPP;
+        return -EOPNOTSUPP;
 
     ret = psci_is_smc_method(psci);
     if ( ret )
