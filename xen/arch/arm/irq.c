@@ -219,10 +219,11 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
         desc->handler->end(desc);
 
         set_bit(_IRQ_INPROGRESS, &desc->status);
-        desc->arch.eoi_cpu = smp_processor_id();
 
-        /* the irq cannot be a PPI, we only support delivery of SPIs to
-         * guests */
+        /*
+         * The irq cannot be a PPI, we only support delivery of SPIs to
+         * guests.
+	 */
         vgic_vcpu_inject_spi(info->d, info->virq);
         goto out_no_end;
     }

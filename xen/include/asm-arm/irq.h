@@ -15,7 +15,6 @@ struct arch_pirq
 };
 
 struct arch_irq_desc {
-    int eoi_cpu;
     unsigned int type;
 };
 
