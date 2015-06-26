@@ -2695,9 +2695,18 @@ static uint32_t create_domain(struct domain_create *dom_info)
         }
     }
 
-    if (debug || dom_info->dryrun)
-        printf_info(default_output_format, -1, &d_config,
-                    debug ? stderr : stdout);
+    if (debug || dom_info->dryrun) {
+        FILE *cfg_print_fh = debug ? stderr : stdout;
+        if (default_output_format == OUTPUT_FORMAT_SXP) {
+            printf_info_sexp(-1, &d_config, cfg_print_fh);
+        } else {
+            char *json = libxl_domain_config_to_json(ctx, &d_config);
+            fputs(json, cfg_print_fh);
+            free(json);
+            flush_stream(cfg_print_fh);
+        }
+    }
+
 
     ret = 0;
     if (dom_info->dryrun)
