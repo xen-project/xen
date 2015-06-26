@@ -41,6 +41,7 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #include "libxl.h"
 #include "libxl_utils.h"
