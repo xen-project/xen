@@ -196,8 +196,10 @@ OCAMLFIND_DESTDIR= and OCAMLFIND_METADIR= will have the same effect.
 OCAMLDESTDIR=
 
 The xen subsystem will install the hypervisor into fixed locations.
-BOOT_DIR defaults to /boot, EFI_DIR to /usr/lib64/efi.
+BOOT_DIR defaults to /boot, DEBUG_DIR defaults to /usr/lib/debug and
+EFI_DIR to /usr/lib64/efi.
 BOOT_DIR=
+DEBUG_DIR=
 EFI_DIR=
 
 The make target 'rpmball' will build a xen.rpm. This variable can be

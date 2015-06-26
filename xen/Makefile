@@ -44,7 +44,8 @@ _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)$(BOOT_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)$(Z)
 	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)$(BOOT_DIR)/$(T)-$(XEN_VERSION)$(Z)
 	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)$(BOOT_DIR)/$(T)$(Z)
-	$(INSTALL_DATA) $(TARGET)-syms $(D)$(BOOT_DIR)/$(T)-syms-$(XEN_FULLVERSION)
+	[ -d "$(D)$(DEBUG_DIR)" ] || $(INSTALL_DIR) $(D)$(DEBUG_DIR)
+	$(INSTALL_DATA) $(TARGET)-syms $(D)$(DEBUG_DIR)/$(T)-syms-$(XEN_FULLVERSION)
 	if [ -r $(TARGET).efi -a -n '$(EFI_DIR)' ]; then \
 		[ -d $(D)$(EFI_DIR) ] || $(INSTALL_DIR) $(D)$(EFI_DIR); \
 		$(INSTALL_DATA) $(TARGET).efi $(D)$(EFI_DIR)/$(T)-$(XEN_FULLVERSION).efi; \
@@ -67,7 +68,7 @@ _uninstall:
 	rm -f $(D)$(BOOT_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)$(Z)
 	rm -f $(D)$(BOOT_DIR)/$(T)-$(XEN_VERSION)$(Z)
 	rm -f $(D)$(BOOT_DIR)/$(T)$(Z)
-	rm -f $(D)$(BOOT_DIR)/$(T)-syms-$(XEN_FULLVERSION)
+	rm -f $(D)$(DEBUG_DIR)/$(T)-syms-$(XEN_FULLVERSION)
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_FULLVERSION).efi
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION).efi
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).efi

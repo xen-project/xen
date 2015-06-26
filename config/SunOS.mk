@@ -19,6 +19,7 @@ INSTALL_DATA = $(INSTALL) -m0644 -p
 INSTALL_PROG = $(INSTALL) -m0755 -p
 
 BOOT_DIR ?= /boot
+DEBUG_DIR ?= /usr/lib/debug
 
 SunOS_LIBDIR = /usr/sfw/lib
 SunOS_LIBDIR_x86_64 = /usr/sfw/lib/amd64
