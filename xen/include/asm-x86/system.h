@@ -185,6 +185,17 @@ static always_inline unsigned long __xadd(
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
+/*
+ * On x86 the only reordering is of reads with older writes.  In the
+ * lock case, the read in observe_head() can only be reordered with
+ * writes that precede it, and moving a write _into_ a locked section
+ * is OK.  In the release case, the write in add_sized() can only be
+ * reordered with reads that follow it, and hoisting a read _into_ a
+ * locked region is OK.
+ */
+#define arch_lock_acquire_barrier() barrier()
+#define arch_lock_release_barrier() barrier()
+
 #define local_irq_disable()     asm volatile ( "cli" : : : "memory" )
 #define local_irq_enable()      asm volatile ( "sti" : : : "memory" )
 

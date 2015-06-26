@@ -80,8 +80,7 @@ struct lock_profile_qhead {
     static struct lock_profile *__lock_profile_##name                         \
     __used_section(".lockprofile.data") =                                     \
     &__lock_profile_data_##name
-#define _SPIN_LOCK_UNLOCKED(x) { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0,          \
-                                 _LOCK_DEBUG, x }
+#define _SPIN_LOCK_UNLOCKED(x) { { 0 }, 0xfffu, 0, _LOCK_DEBUG, x }
 #define SPIN_LOCK_UNLOCKED _SPIN_LOCK_UNLOCKED(NULL)
 #define DEFINE_SPINLOCK(l)                                                    \
     spinlock_t l = _SPIN_LOCK_UNLOCKED(NULL);                                 \
@@ -117,8 +116,7 @@ extern void spinlock_profile_reset(unsigned char key);
 
 struct lock_profile_qhead { };
 
-#define SPIN_LOCK_UNLOCKED                                                    \
-    { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0, _LOCK_DEBUG }
+#define SPIN_LOCK_UNLOCKED { { 0 }, 0xfffu, 0, _LOCK_DEBUG }
 #define DEFINE_SPINLOCK(l) spinlock_t l = SPIN_LOCK_UNLOCKED
 
 #define spin_lock_init_prof(s, l) spin_lock_init(&((s)->l))
@@ -127,8 +125,18 @@ struct lock_profile_qhead { };
 
 #endif
 
+typedef union {
+    u32 head_tail;
+    struct {
+        u16 head;
+        u16 tail;
+    };
+} spinlock_tickets_t;
+
+#define SPINLOCK_TICKET_INC { .head_tail = 0x10000, }
+
 typedef struct spinlock {
-    raw_spinlock_t raw;
+    spinlock_tickets_t tickets;
     u16 recurse_cpu:12;
     u16 recurse_cnt:4;
     struct lock_debug debug;
