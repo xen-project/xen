@@ -182,6 +182,18 @@ static void __init print_mtrr_state(const char *level)
 		else
 			printk("%s  %u disabled\n", level, i);
 	}
+
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD
+	    && boot_cpu_data.x86 >= 0xf) {
+		uint64_t syscfg, tom2;
+
+		rdmsrl(MSR_K8_SYSCFG, syscfg);
+		if (syscfg & (1 << 21)) {
+			rdmsrl(MSR_K8_TOP_MEM2, tom2);
+			printk("%sTOM2: %012"PRIx64"%s\n", level, tom2,
+			       syscfg & (1 << 22) ? " (WB)" : "");
+		}
+	}
 }
 
 /*  Some BIOS's are fucked and don't set all MTRRs the same!  */
