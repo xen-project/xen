@@ -548,18 +548,18 @@ int vtpm_load_disk(void)
 	TPM_read_pcrs();
 
 	printk("TPM Manager - disk format %d\n", TPM_MGR_VERSION);
-	printk(" root seal: %lu; sector of %d: %lu\n",
+	printk(" root seal: %zu; sector of %d: %zu\n",
 		sizeof(struct disk_root_sealed_data), SEALS_PER_ROOT_SEAL_LIST, sizeof(struct disk_seal_list));
-	printk(" root: %lu v=%lu\n", sizeof(root1), sizeof(root1.v));
-	printk(" itree: %lu; sector of %d: %lu\n",
+	printk(" root: %zu v=%zu\n", sizeof(root1), sizeof(root1.v));
+	printk(" itree: %u; sector of %d: %zu\n",
 		4 + 32, NR_ENTRIES_PER_ITREE, sizeof(struct disk_itree_sector));
-	printk(" group: %lu v=%lu id=%lu md=%lu\n",
+	printk(" group: %zu v=%zu id=%zu md=%zu\n",
 		sizeof(struct disk_group_sector), sizeof(struct disk_group_sector_mac3_area),
 		sizeof(struct group_id_data), sizeof(struct group_details));
-	printk(" group seal: %lu; %d in parent: %lu; sector of %d: %lu\n",
+	printk(" group seal: %zu; %d in parent: %zu; sector of %d: %zu\n",
 		sizeof(struct disk_group_sealed_data), NR_SEALS_PER_GROUP, sizeof(struct disk_group_boot_config_list),
 		SEALS_PER_GROUP_SEAL_LIST, sizeof(struct disk_group_seal_list));
-	printk(" vtpm: %lu+%lu; sector of %d: %lu\n",
+	printk(" vtpm: %zu+%zu; sector of %d: %zu\n",
 		sizeof(struct disk_vtpm_plain), sizeof(struct disk_vtpm_secret),
 		VTPMS_PER_SECTOR, sizeof(struct disk_vtpm_sector));
 

@@ -255,9 +255,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= cb9a7ebabcd6b8a49dc0854b2f9592d732b5afbd
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= edfd5aae6ec5ba7d0a8834a3e9dfe5e69424150a
-# Thu Mar 12 19:08:05 2015 +0100
-# Fix accidentally removed brace causing a build error.
+MINIOS_UPSTREAM_REVISION ?= b36bcb370d611ad7f41e8c21d061e6291e088c58
+# Fri Jun 26 11:58:40 2015 +0100
+# Correct printf formatting for tpm_tis message.
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 # Tue Mar 17 10:52:16 2015 -0400
