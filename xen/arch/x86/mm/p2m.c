@@ -1742,6 +1742,12 @@ p2m_flush_table(struct p2m_domain *p2m)
     ASSERT(page_list_empty(&p2m->pod.super));
     ASSERT(page_list_empty(&p2m->pod.single));
 
+    if ( p2m->np2m_base == P2M_BASE_EADDR )
+    {
+        p2m_unlock(p2m);
+        return;
+    }
+
     /* This is no longer a valid nested p2m for any address space */
     p2m->np2m_base = P2M_BASE_EADDR;
     

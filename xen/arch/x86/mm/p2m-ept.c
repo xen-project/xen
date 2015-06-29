@@ -26,6 +26,7 @@
 #include <asm/p2m.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
+#include <asm/hvm/nestedhvm.h>
 #include <xen/iommu.h>
 #include <asm/mtrr.h>
 #include <asm/hvm/cacheattr.h>
@@ -1075,6 +1076,9 @@ void ept_sync_domain(struct p2m_domain *p2m)
         return;
 
     ASSERT(local_irq_is_enabled());
+
+    if ( nestedhvm_enabled(d) && !p2m_is_nestedp2m(p2m) )
+        p2m_flush_nestedp2m(d);
 
     /*
      * Flush active cpus synchronously. Flush others the next time this domain
