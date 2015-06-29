@@ -754,6 +754,8 @@ int xc_hvm_build_target_mem(xc_interface *xch,
     args.mem_size = (uint64_t)memsize << 20;
     args.mem_target = (uint64_t)target << 20;
     args.image_file_name = image_name;
+    if ( args.mmio_size == 0 )
+        args.mmio_size = HVM_BELOW_4G_MMIO_LENGTH;
 
     return xc_hvm_build(xch, domid, &args);
 }
