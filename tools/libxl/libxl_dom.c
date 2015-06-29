@@ -2190,17 +2190,20 @@ void libxl__domain_save_device_model(libxl__egc *egc,
     dc->readfd = open(filename, O_RDONLY);
     if (dc->readfd < 0) {
         LOGE(ERROR, "unable to open %s", dc->readwhat);
+        rc = ERROR_FAIL;
         goto out;
     }
 
     if (fstat(dc->readfd, &st))
     {
         LOGE(ERROR, "unable to fstat %s", dc->readwhat);
+        rc = ERROR_FAIL;
         goto out;
     }
 
     if (!S_ISREG(st.st_mode)) {
         LOG(ERROR, "%s is not a plain file!", dc->readwhat);
+        rc = ERROR_FAIL;
         goto out;
     }
 
