@@ -620,3 +620,18 @@ bool libxl__async_exec_inuse(const libxl__async_exec_state *aes)
     assert(time_inuse == child_inuse);
     return child_inuse;
 }
+
+void libxl__kill(libxl__gc *gc, pid_t pid, int sig, const char *what)
+{
+    int r = kill(pid, sig);
+    if (r) LOGE(WARN, "failed to kill() %s [%lu] (signal %d)",
+                what, (unsigned long)pid, sig);
+}
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
