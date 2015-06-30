@@ -253,7 +253,7 @@ QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-unstable.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
-OVMF_UPSTREAM_REVISION ?= a065efc7c7ce8bb3e5cb3e463099d023d4a92927
+OVMF_UPSTREAM_REVISION ?= cb9a7ebabcd6b8a49dc0854b2f9592d732b5afbd
 QEMU_UPSTREAM_REVISION ?= master
 MINIOS_UPSTREAM_REVISION ?= edfd5aae6ec5ba7d0a8834a3e9dfe5e69424150a
 # Thu Mar 12 19:08:05 2015 +0100
