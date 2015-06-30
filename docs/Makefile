@@ -10,9 +10,9 @@ DOC_ARCHES      := arm x86_32 x86_64
 MAN1SRC-y += $(sort $(shell find man -name 'xl*.pod.1' -print))
 MAN1SRC-y += $(sort $(shell find man -name 'xenstore*.pod.1' -print))
 
-MAN5SRC-y := $(sort $(shell find man 'xl*.pod.5' -print))
+MAN5SRC-y := $(sort $(shell find man -name 'xl*.pod.5' -print))
 
-MARKDOWNSRC-y := $(sort $(shell find misc '*.markdown' -print))
+MARKDOWNSRC-y := $(sort $(shell find misc -name '*.markdown' -print))
 
 TXTSRC-y := $(sort $(shell find misc -name '*.txt' -print))
 
