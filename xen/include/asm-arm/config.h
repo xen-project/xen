@@ -47,7 +47,11 @@
 #define NR_CPUS 128
 #endif
 
+#ifdef CONFIG_ARM_64
+#define MAX_VIRT_CPUS 128
+#else
 #define MAX_VIRT_CPUS 8
+#endif
 
 #define asmlinkage /* Nothing needed */
 

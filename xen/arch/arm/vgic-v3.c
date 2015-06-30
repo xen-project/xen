@@ -910,7 +910,6 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         rank = vgic_rank_offset(v, 64, gicd_reg - GICD_IROUTER,
                                 DABT_DOUBLE_WORD);
         if ( rank == NULL ) goto write_ignore;
-        BUG_ON(v->domain->max_vcpus > 8);
         new_irouter = *r;
         vgic_lock_rank(v, rank, flags);
 
