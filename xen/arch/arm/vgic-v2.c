@@ -218,16 +218,17 @@ static int vgic_v2_to_sgi(struct vcpu *v, register_t sgir)
     int virq;
     int irqmode;
     enum gic_sgi_mode sgi_mode;
-    unsigned long vcpu_mask = 0;
+    struct sgi_target target;
 
     irqmode = (sgir & GICD_SGI_TARGET_LIST_MASK) >> GICD_SGI_TARGET_LIST_SHIFT;
     virq = (sgir & GICD_SGI_INTID_MASK);
-    vcpu_mask = (sgir & GICD_SGI_TARGET_MASK) >> GICD_SGI_TARGET_SHIFT;
 
     /* Map GIC sgi value to enum value */
     switch ( irqmode )
     {
     case GICD_SGI_TARGET_LIST_VAL:
+        sgi_target_init(&target);
+        target.list = (sgir & GICD_SGI_TARGET_MASK) >> GICD_SGI_TARGET_SHIFT;
         sgi_mode = SGI_TARGET_LIST;
         break;
     case GICD_SGI_TARGET_OTHERS_VAL:
@@ -243,7 +244,7 @@ static int vgic_v2_to_sgi(struct vcpu *v, register_t sgir)
         return 0;
     }
 
-    return vgic_to_sgi(v, sgir, sgi_mode, virq, vcpu_mask);
+    return vgic_to_sgi(v, sgir, sgi_mode, virq, &target);
 }
 
 static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)

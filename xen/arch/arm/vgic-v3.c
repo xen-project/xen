@@ -998,17 +998,19 @@ static int vgic_v3_to_sgi(struct vcpu *v, register_t sgir)
     int virq;
     int irqmode;
     enum gic_sgi_mode sgi_mode;
-    unsigned long vcpu_mask = 0;
+    struct sgi_target target;
 
     irqmode = (sgir >> ICH_SGI_IRQMODE_SHIFT) & ICH_SGI_IRQMODE_MASK;
     virq = (sgir >> ICH_SGI_IRQ_SHIFT ) & ICH_SGI_IRQ_MASK;
-    /* SGI's are injected at Rdist level 0. ignoring affinity 1, 2, 3 */
-    vcpu_mask = sgir & ICH_SGI_TARGETLIST_MASK;
 
     /* Map GIC sgi value to enum value */
     switch ( irqmode )
     {
     case ICH_SGI_TARGET_LIST:
+        sgi_target_init(&target);
+        /* We assume that only AFF1 is used in ICC_SGI1R_EL1. */
+        target.aff1 = (sgir >> ICH_SGI_AFFINITY_LEVEL(1)) & ICH_SGI_AFFx_MASK;
+        target.list = sgir & ICH_SGI_TARGETLIST_MASK;
         sgi_mode = SGI_TARGET_LIST;
         break;
     case ICH_SGI_TARGET_OTHERS:
@@ -1019,7 +1021,7 @@ static int vgic_v3_to_sgi(struct vcpu *v, register_t sgir)
         return 0;
     }
 
-    return vgic_to_sgi(v, sgir, sgi_mode, virq, vcpu_mask);
+    return vgic_to_sgi(v, sgir, sgi_mode, virq, &target);
 }
 
 static int vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)

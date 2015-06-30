@@ -98,6 +98,17 @@ struct vgic_irq_rank {
     };
 };
 
+struct sgi_target {
+    uint8_t aff1;
+    uint16_t list;
+};
+
+static inline void sgi_target_init(struct sgi_target *sgi_target)
+{
+    sgi_target->aff1 = 0;
+    sgi_target->list = 0;
+}
+
 struct vgic_ops {
     /* Initialize vGIC */
     int (*vcpu_init)(struct vcpu *v);
@@ -198,7 +209,7 @@ int vgic_v3_init(struct domain *d);
 extern int vcpu_vgic_free(struct vcpu *v);
 extern int vgic_to_sgi(struct vcpu *v, register_t sgir,
                        enum gic_sgi_mode irqmode, int virq,
-                       unsigned long vcpu_mask);
+                       const struct sgi_target *target);
 extern void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq);
 
 /* Reserve a specific guest vIRQ */

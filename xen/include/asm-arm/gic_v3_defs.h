@@ -152,6 +152,8 @@
 #define ICH_SGI_IRQ_SHIFT            24
 #define ICH_SGI_IRQ_MASK             0xf
 #define ICH_SGI_TARGETLIST_MASK      0xffff
+#define ICH_SGI_AFFx_MASK            0xff
+#define ICH_SGI_AFFINITY_LEVEL(x)    (16 * (x))
 
 struct rdist_region {
     paddr_t base;
