@@ -259,6 +259,7 @@ static int make_cpus_node(libxl__gc *gc, void *fdt, int nr_cpus,
                           const struct arch_info *ainfo)
 {
     int res, i;
+    uint64_t mpidr_aff;
 
     res = fdt_begin_node(fdt, "cpus");
     if (res) return res;
@@ -270,7 +271,16 @@ static int make_cpus_node(libxl__gc *gc, void *fdt, int nr_cpus,
     if (res) return res;
 
     for (i = 0; i < nr_cpus; i++) {
-        const char *name = GCSPRINTF("cpu@%d", i);
+        const char *name;
+
+        /*
+         * According to ARM CPUs bindings, the reg field should match
+         * the MPIDR's affinity bits. We will use AFF0 and AFF1 when
+         * constructing the reg value of the guest at the moment, for it
+         * is enough for the current max vcpu number.
+         */
+        mpidr_aff = (i & 0x0f) | (((i >> 4) & 0xff) << 8);
+        name = GCSPRINTF("cpu@%"PRIx64, mpidr_aff);
 
         res = fdt_begin_node(fdt, name);
         if (res) return res;
@@ -284,7 +294,7 @@ static int make_cpus_node(libxl__gc *gc, void *fdt, int nr_cpus,
         res = fdt_property_string(fdt, "enable-method", "psci");
         if (res) return res;
 
-        res = fdt_property_regs(gc, fdt, 1, 0, 1, (uint64_t)i);
+        res = fdt_property_regs(gc, fdt, 1, 0, 1, mpidr_aff);
         if (res) return res;
 
         res = fdt_end_node(fdt);
