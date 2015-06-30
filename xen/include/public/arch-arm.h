@@ -406,8 +406,8 @@ typedef uint64_t xen_callback_t;
 #define GUEST_GICV3_RDIST_STRIDE   0x20000ULL
 #define GUEST_GICV3_RDIST_REGIONS  1
 
-#define GUEST_GICV3_GICR0_BASE     0x03020000ULL    /* vCPU0 - vCPU7 */
-#define GUEST_GICV3_GICR0_SIZE     0x00100000ULL
+#define GUEST_GICV3_GICR0_BASE     0x03020000ULL    /* vCPU0 - vCPU127 */
+#define GUEST_GICV3_GICR0_SIZE     0x01000000ULL
 
 /*
  * 16MB == 4096 pages reserved for guest to use as a region to map its
