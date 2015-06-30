@@ -310,7 +310,7 @@ static void nic_setup(libxl__egc *egc, libxl__remus_device *dev)
     }
 
     setup_async_exec(dev, "setup");
-    rc = libxl__async_exec_start(gc, &dev->aodev.aes);
+    rc = libxl__async_exec_start(&dev->aodev.aes);
     if (rc)
         goto out;
 
@@ -402,7 +402,7 @@ static void nic_teardown(libxl__egc *egc, libxl__remus_device *dev)
 
     setup_async_exec(dev, "teardown");
 
-    rc = libxl__async_exec_start(gc, &dev->aodev.aes);
+    rc = libxl__async_exec_start(&dev->aodev.aes);
     if (rc)
         goto out;
 
