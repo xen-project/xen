@@ -711,6 +711,7 @@ static int make_cpus_node(const struct domain *d, void *fdt,
     char buf[15];
     u32 clock_frequency;
     bool_t clock_valid;
+    uint64_t mpidr_aff;
 
     DPRINT("Create cpus node\n");
 
@@ -760,9 +761,16 @@ static int make_cpus_node(const struct domain *d, void *fdt,
 
     for ( cpu = 0; cpu < d->max_vcpus; cpu++ )
     {
-        DPRINT("Create cpu@%u node\n", cpu);
+        /*
+         * According to ARM CPUs bindings, the reg field should match
+         * the MPIDR's affinity bits. We will use AFF0 and AFF1 when
+         * constructing the reg value of the guest at the moment, for it
+         * is enough for the current max vcpu number.
+         */
+        mpidr_aff = vcpuid_to_vaffinity(cpu);
+        DPRINT("Create cpu@%"PRIx64" (logical CPUID: %d) node\n", mpidr_aff, cpu);
 
-        snprintf(buf, sizeof(buf), "cpu@%u", cpu);
+        snprintf(buf, sizeof(buf), "cpu@%"PRIx64, mpidr_aff);
         res = fdt_begin_node(fdt, buf);
         if ( res )
             return res;
@@ -775,7 +783,7 @@ static int make_cpus_node(const struct domain *d, void *fdt,
         if ( res )
             return res;
 
-        res = fdt_property_cell(fdt, "reg", cpu);
+        res = fdt_property_cell(fdt, "reg", mpidr_aff);
         if ( res )
             return res;
 
