@@ -82,7 +82,7 @@ static struct vcpu *vgic_v3_irouter_to_vcpu(struct domain *d, uint64_t irouter)
     if ( irouter & GICD_IROUTER_SPI_MODE_ANY )
         return d->vcpu[0];
 
-    vcpu_id = irouter & MPIDR_AFF0_MASK;
+    vcpu_id = vaffinity_to_vcpuid(irouter);
     if ( vcpu_id >= d->max_vcpus )
         return NULL;
 

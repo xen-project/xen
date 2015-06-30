@@ -32,10 +32,7 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
     int is_thumb = entry_point & 1;
     register_t vcpuid;
 
-    if( ver == XEN_PSCI_V_0_2 )
-        vcpuid = (target_cpu & MPIDR_HWID_MASK);
-    else
-        vcpuid = target_cpu;
+    vcpuid = vaffinity_to_vcpuid(target_cpu);
 
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
         return PSCI_INVALID_PARAMETERS;
