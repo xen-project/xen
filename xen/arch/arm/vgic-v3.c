@@ -1224,6 +1224,11 @@ static const struct vgic_ops v3_ops = {
     .get_irq_priority = vgic_v3_get_irq_priority,
     .get_target_vcpu  = vgic_v3_get_target_vcpu,
     .emulate_sysreg  = vgic_v3_emulate_sysreg,
+    /*
+     * We use both AFF1 and AFF0 in (v)MPIDR. Thus, the max number of CPU
+     * that can be supported is up to 4096(==256*16) in theory.
+     */
+    .max_vcpus = 4096,
 };
 
 int vgic_v3_init(struct domain *d)

@@ -259,10 +259,7 @@ struct arch_vcpu
 void vcpu_show_execution_state(struct vcpu *);
 void vcpu_show_registers(const struct vcpu *);
 
-static inline unsigned int domain_max_vcpus(const struct domain *d)
-{
-    return MAX_VIRT_CPUS;
-}
+unsigned int domain_max_vcpus(const struct domain *);
 
 /*
  * Due to the restriction of GICv3, the number of vCPUs in AFF0 is

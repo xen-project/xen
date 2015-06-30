@@ -600,6 +600,7 @@ static const struct vgic_ops vgic_v2_ops = {
     .domain_init = vgic_v2_domain_init,
     .get_irq_priority = vgic_v2_get_irq_priority,
     .get_target_vcpu = vgic_v2_get_target_vcpu,
+    .max_vcpus = 8,
 };
 
 int vgic_v2_init(struct domain *d)

@@ -121,6 +121,8 @@ struct vgic_ops {
     struct vcpu *(*get_target_vcpu)(struct vcpu *v, unsigned int irq);
     /* vGIC sysreg emulation */
     int (*emulate_sysreg)(struct cpu_user_regs *regs, union hsr hsr);
+    /* Maximum number of vCPU supported */
+    const unsigned int max_vcpus;
 };
 
 /* Number of ranks of interrupt registers for a domain */
