@@ -330,50 +330,48 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
      * reflect the placement result if that is the case
      */
     if (libxl_defbool_val(info->numa_placement)) {
-        libxl_bitmap cpumap_soft;
+        if (info->cpumap.size || info->num_vcpu_hard_affinity ||
+            info->num_vcpu_soft_affinity)
+            LOG(WARN, "Can't run NUMA placement, as an (hard or soft) "
+                      "affinity has been specified explicitly");
+        else if (info->nodemap.size)
+            LOG(WARN, "Can't run NUMA placement, as the domain has "
+                      "NUMA node affinity set already");
+        else {
+            libxl_bitmap cpumap_soft;
 
-        if (info->cpumap.size ||
-            info->num_vcpu_hard_affinity || info->num_vcpu_soft_affinity) {
-            LOG(ERROR, "Can run NUMA placement only if no vcpu "
-                       "(hard or soft) affinity is specified explicitly");
-            return ERROR_INVAL;
-        }
-        if (info->nodemap.size) {
-            LOG(ERROR, "Can run NUMA placement only if the domain does not "
-                       "have any NUMA node affinity set already");
-            return ERROR_INVAL;
-        }
+            rc = libxl_node_bitmap_alloc(ctx, &info->nodemap, 0);
+            if (rc)
+                return rc;
+            libxl_bitmap_set_any(&info->nodemap);
 
-        rc = libxl_node_bitmap_alloc(ctx, &info->nodemap, 0);
-        if (rc)
-            return rc;
-        libxl_bitmap_set_any(&info->nodemap);
+            rc = libxl_cpu_bitmap_alloc(ctx, &cpumap_soft, 0);
+            if (rc)
+                return rc;
 
-        rc = libxl_cpu_bitmap_alloc(ctx, &cpumap_soft, 0);
-        if (rc)
-            return rc;
+            rc = numa_place_domain(gc, domid, info);
+            if (rc) {
+                libxl_bitmap_dispose(&cpumap_soft);
+                return rc;
+            }
 
-        rc = numa_place_domain(gc, domid, info);
-        if (rc) {
+            /*
+             * All we need to do now is converting the result of automatic
+             * placement from nodemap to cpumap, and then use such cpumap
+             * as the soft affinity for all the vcpus of the domain.
+             *
+             * When calling libxl_set_vcpuaffinity_all(), it is ok to use
+             * NULL as hard affinity, as we know we don't have one, or we
+             * won't be here.
+             */
+            libxl_nodemap_to_cpumap(ctx, &info->nodemap, &cpumap_soft);
+            libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus,
+                                       NULL, &cpumap_soft);
+
             libxl_bitmap_dispose(&cpumap_soft);
-            return rc;
         }
-
-        /*
-         * All we need to do now is converting the result of automatic
-         * placement from nodemap to cpumap, and then use such cpumap as
-         * the soft affinity for all the vcpus of the domain.
-         *
-         * When calling libxl_set_vcpuaffinity_all(), it is ok to use NULL
-         * as hard affinity, as we know we don't have one, or we won't be
-         * here.
-         */
-        libxl_nodemap_to_cpumap(ctx, &info->nodemap, &cpumap_soft);
-        libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus,
-                                   NULL, &cpumap_soft);
-
-        libxl_bitmap_dispose(&cpumap_soft);
     }
+
     if (info->nodemap.size)
         libxl_domain_set_nodeaffinity(ctx, domid, &info->nodemap);
 
