@@ -1262,18 +1262,20 @@ static int __init gicv3_init(void)
     }
 
     printk("GICv3 initialization:\n"
-           "      gic_dist_addr=%"PRIpaddr"\n"
-           "      gic_dist_mapaddr=%p\n"
-           "      gic_rdist_regions=%d\n"
-           "      gic_rdist_stride=%x\n"
-           "      gic_rdist_base=%"PRIpaddr"\n"
-           "      gic_rdist_base_size=%"PRIpaddr"\n"
-           "      gic_rdist_base_mapaddr=%p\n"
-           "      gic_maintenance_irq=%u\n",
-           gicv3.dbase, gicv3.map_dbase, gicv3.rdist_count,
-           gicv3.rdist_stride, gicv3.rdist_regions[0].base,
-           gicv3.rdist_regions[0].size, gicv3.rdist_regions[0].map_base,
-           gicv3_info.maintenance_irq);
+           "      gic_dist_addr=%#"PRIpaddr"\n"
+           "      gic_maintenance_irq=%u\n"
+           "      gic_rdist_stride=%#x\n"
+           "      gic_rdist_regions=%d\n",
+           gicv3.dbase, gicv3_info.maintenance_irq,
+           gicv3.rdist_stride, gicv3.rdist_count);
+    printk("      redistributor regions:\n");
+    for ( i = 0; i < gicv3.rdist_count; i++ )
+    {
+        const struct rdist_region *r = &gicv3.rdist_regions[i];
+
+        printk("        - region %u: %#"PRIpaddr" - %#"PRIpaddr"\n",
+               i, r->base, r->base + r->size);
+    }
 
     spin_lock_init(&gicv3.lock);
 
