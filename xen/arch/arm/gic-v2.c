@@ -68,7 +68,6 @@ static struct {
     void __iomem * map_dbase; /* IO mapped Address of distributor registers */
     paddr_t cbase;            /* Address of CPU interface registers */
     void __iomem * map_cbase[2]; /* IO mapped Address of CPU interface registers */
-    paddr_t hbase;            /* Address of virtual interface registers */
     void __iomem * map_hbase; /* IO Address of virtual interface registers */
     paddr_t vbase;            /* Address of virtual cpu interface registers */
     spinlock_t lock;
@@ -663,6 +662,7 @@ static hw_irq_controller gicv2_guest_irq_type = {
 static int __init gicv2_init(void)
 {
     int res;
+    paddr_t hbase;
     const struct dt_device_node *node = gicv2_info.node;
 
     res = dt_device_get_address(node, 0, &gicv2.dbase, NULL);
@@ -673,7 +673,7 @@ static int __init gicv2_init(void)
     if ( res )
         panic("GICv2: Cannot find a valid address for the CPU");
 
-    res = dt_device_get_address(node, 2, &gicv2.hbase, NULL);
+    res = dt_device_get_address(node, 2, &hbase, NULL);
     if ( res )
         panic("GICv2: Cannot find a valid address for the hypervisor");
 
@@ -694,11 +694,11 @@ static int __init gicv2_init(void)
               "        gic_hyp_addr=%"PRIpaddr"\n"
               "        gic_vcpu_addr=%"PRIpaddr"\n"
               "        gic_maintenance_irq=%u\n",
-              gicv2.dbase, gicv2.cbase, gicv2.hbase, gicv2.vbase,
+              gicv2.dbase, gicv2.cbase, hbase, gicv2.vbase,
               gicv2_info.maintenance_irq);
 
     if ( (gicv2.dbase & ~PAGE_MASK) || (gicv2.cbase & ~PAGE_MASK) ||
-         (gicv2.hbase & ~PAGE_MASK) || (gicv2.vbase & ~PAGE_MASK) )
+         (hbase & ~PAGE_MASK) || (gicv2.vbase & ~PAGE_MASK) )
         panic("GICv2 interfaces not page aligned");
 
     gicv2.map_dbase = ioremap_nocache(gicv2.dbase, PAGE_SIZE);
@@ -715,7 +715,7 @@ static int __init gicv2_init(void)
     if ( !gicv2.map_cbase[0] || !gicv2.map_cbase[1] )
         panic("GICv2: Failed to ioremap for GIC CPU interface\n");
 
-    gicv2.map_hbase = ioremap_nocache(gicv2.hbase, PAGE_SIZE);
+    gicv2.map_hbase = ioremap_nocache(hbase, PAGE_SIZE);
     if ( !gicv2.map_hbase )
         panic("GICv2: Failed to ioremap for GIC Virtual interface\n");
 
