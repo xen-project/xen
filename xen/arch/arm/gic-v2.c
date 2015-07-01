@@ -665,19 +665,19 @@ static int __init gicv2_init(void)
     const struct dt_device_node *node = gicv2_info.node;
 
     res = dt_device_get_address(node, 0, &gicv2.dbase, NULL);
-    if ( res || !gicv2.dbase || (gicv2.dbase & ~PAGE_MASK) )
+    if ( res || !gicv2.dbase )
         panic("GICv2: Cannot find a valid address for the distributor");
 
     res = dt_device_get_address(node, 1, &gicv2.cbase, NULL);
-    if ( res || !gicv2.cbase || (gicv2.cbase & ~PAGE_MASK) )
+    if ( res || !gicv2.cbase )
         panic("GICv2: Cannot find a valid address for the CPU");
 
     res = dt_device_get_address(node, 2, &gicv2.hbase, NULL);
-    if ( res || !gicv2.hbase || (gicv2.hbase & ~PAGE_MASK) )
+    if ( res || !gicv2.hbase )
         panic("GICv2: Cannot find a valid address for the hypervisor");
 
     res = dt_device_get_address(node, 3, &gicv2.vbase, NULL);
-    if ( res || !gicv2.vbase || (gicv2.vbase & ~PAGE_MASK) )
+    if ( res || !gicv2.vbase )
         panic("GICv2: Cannot find a valid address for the virtual CPU");
 
     res = platform_get_irq(node, 0);
