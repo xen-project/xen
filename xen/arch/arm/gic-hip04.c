@@ -29,6 +29,7 @@
 #include <xen/list.h>
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
+#include <xen/sizes.h>
 #include <asm/p2m.h>
 #include <asm/domain.h>
 #include <asm/platform.h>
@@ -470,7 +471,7 @@ static int hip04gicv_setup(struct domain *d)
                                2, paddr_to_pfn(gicv2.vbase + PAGE_SIZE));
     else
         ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase + PAGE_SIZE),
-                               2, paddr_to_pfn(gicv2.vbase + 16*PAGE_SIZE));
+                               2, paddr_to_pfn(gicv2.vbase + SZ_64K));
 
     return ret;
 }
@@ -721,8 +722,7 @@ static int __init hip04gic_init(void)
     gicv2.map_cbase[0] = ioremap_nocache(gicv2.cbase, PAGE_SIZE);
 
     if ( platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
-        gicv2.map_cbase[1] = ioremap_nocache(gicv2.cbase + PAGE_SIZE * 0x10,
-                                           PAGE_SIZE);
+        gicv2.map_cbase[1] = ioremap_nocache(gicv2.cbase + SZ_64K, PAGE_SIZE);
     else
         gicv2.map_cbase[1] = ioremap_nocache(gicv2.cbase + PAGE_SIZE, PAGE_SIZE);
 
