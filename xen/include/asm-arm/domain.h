@@ -101,7 +101,7 @@ struct arch_domain
         /* Base address for guest GIC */
         paddr_t dbase; /* Distributor base address */
         paddr_t cbase; /* CPU base address */
-#ifdef CONFIG_ARM_64
+#ifdef HAS_GICV3
         /* GIC V3 addressing */
         paddr_t dbase_size; /* Distributor base size */
         /* List of contiguous occupied by the redistributors */

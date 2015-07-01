@@ -10,6 +10,7 @@ HAS_PL011 := y
 HAS_CADENCE_UART := y
 HAS_NS16550 := y
 HAS_MEM_ACCESS := y
+HAS_GICV3 := y
 
 # Use only if calling $(LD) directly.
 LDFLAGS_DIRECT += -EL
