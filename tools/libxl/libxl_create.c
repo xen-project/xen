@@ -1543,7 +1543,7 @@ static void domcreate_complete(libxl__egc *egc,
     libxl_domain_config_dispose(d_config_saved);
 
     if (!retain_domain) {
-        if (dcs->guest_domid) {
+        if (dcs->guest_domid > 0) {
             dcs->dds.ao = ao;
             dcs->dds.domid = dcs->guest_domid;
             dcs->dds.callback = domcreate_destruction_cb;
