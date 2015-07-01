@@ -369,6 +369,15 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
                                        NULL, &cpumap_soft);
 
             libxl_bitmap_dispose(&cpumap_soft);
+
+            /*
+             * Placement has run, so avoid for it to be re-run, if this
+             * same config we are using and building here is ever re-used.
+             * This means that people re-using configs will get the same
+             * results, consistently, across every re-use, which is what
+             * we expect most people to want.
+             */
+            libxl_defbool_set(&info->numa_placement, false);
         }
     }
 
