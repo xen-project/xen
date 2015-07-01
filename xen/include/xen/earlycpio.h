@@ -6,6 +6,7 @@
 struct cpio_data {
 	void *data;
 	size_t size;
+	char name[MAX_CPIO_FILE_NAME];
 };
 
 struct cpio_data find_cpio_data(const char *path, void *data, size_t len,
