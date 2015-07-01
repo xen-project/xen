@@ -99,7 +99,7 @@ static void build_hvm_info(void *hvm_info_page,
     memset(hvm_info_page, 0, PAGE_SIZE);
 
     /* Fill in the header. */
-    strncpy(hvm_info->signature, "HVM INFO", 8);
+    memcpy(hvm_info->signature, "HVM INFO", sizeof(hvm_info->signature));
     hvm_info->length = sizeof(struct hvm_info_table);
 
     /* Sensible defaults: these can be overridden by the caller. */
