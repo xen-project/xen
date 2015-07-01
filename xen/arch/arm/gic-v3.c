@@ -1105,9 +1105,6 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
     const void *compatible = NULL;
     uint32_t len;
     __be32 *new_cells, *tmp;
-    uint32_t rd_stride = 0;
-    uint32_t rd_count = 0;
-
     int i, res = 0;
 
     compatible = dt_get_property(gic, "compatible", &len);
@@ -1121,19 +1118,13 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
     if ( res )
         return res;
 
-    res = dt_property_read_u32(gic, "redistributor-stride", &rd_stride);
-    if ( !res )
-        rd_stride = 0;
-
-    res = dt_property_read_u32(gic, "#redistributor-regions", &rd_count);
-    if ( !res )
-        rd_count = 1;
-
-    res = fdt_property_cell(fdt, "redistributor-stride", rd_stride);
+    res = fdt_property_cell(fdt, "redistributor-stride",
+                            d->arch.vgic.rdist_stride);
     if ( res )
         return res;
 
-    res = fdt_property_cell(fdt, "#redistributor-regions", rd_count);
+    res = fdt_property_cell(fdt, "#redistributor-regions",
+                            d->arch.vgic.nr_regions);
     if ( res )
         return res;
 
