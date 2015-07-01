@@ -42,15 +42,8 @@
 #include <asm/gic_v3_defs.h>
 #include <asm/cpufeature.h>
 
-struct rdist_region {
-    paddr_t base;
-    paddr_t size;
-    void __iomem *map_base;
-};
-
 /* Global state */
 static struct {
-    paddr_t dbase;            /* Address of distributor registers */
     void __iomem *map_dbase;  /* Mapped address of distributor registers */
     struct rdist_region *rdist_regions;
     uint32_t  rdist_stride;
@@ -924,63 +917,6 @@ static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
     gicv3_ich_write_lr(lr_reg, lrv);
 }
 
-static int gicv_v3_init(struct domain *d)
-{
-    int i;
-
-    /*
-     * Domain 0 gets the hardware address.
-     * Guests get the virtual platform layout.
-     */
-    if ( is_hardware_domain(d) )
-    {
-        unsigned int first_cpu = 0;
-
-        d->arch.vgic.dbase = gicv3.dbase;
-
-        d->arch.vgic.rdist_stride = gicv3.rdist_stride;
-        /*
-         * If the stride is not set, the default stride for GICv3 is 2 * 64K:
-         *     - first 64k page for Control and Physical LPIs
-         *     - second 64k page for Control and Generation of SGIs
-         */
-        if ( !d->arch.vgic.rdist_stride )
-            d->arch.vgic.rdist_stride = 2 * SZ_64K;
-
-        for ( i = 0; i < gicv3.rdist_count; i++ )
-        {
-            paddr_t size = gicv3.rdist_regions[i].size;
-
-            d->arch.vgic.rdist_regions[i].base = gicv3.rdist_regions[i].base;
-            d->arch.vgic.rdist_regions[i].size = size;
-
-            /* Set the first CPU handled by this region */
-            d->arch.vgic.rdist_regions[i].first_cpu = first_cpu;
-
-            first_cpu += size / d->arch.vgic.rdist_stride;
-        }
-        d->arch.vgic.nr_regions = gicv3.rdist_count;
-    }
-    else
-    {
-        d->arch.vgic.dbase = GUEST_GICV3_GICD_BASE;
-
-        /* XXX: Only one Re-distributor region mapped for the guest */
-        BUILD_BUG_ON(GUEST_GICV3_RDIST_REGIONS != 1);
-
-        d->arch.vgic.nr_regions = GUEST_GICV3_RDIST_REGIONS;
-        d->arch.vgic.rdist_stride = GUEST_GICV3_RDIST_STRIDE;
-
-        /* The first redistributor should contain enough space for all CPUs */
-        BUILD_BUG_ON((GUEST_GICV3_GICR0_SIZE / GUEST_GICV3_RDIST_STRIDE) < MAX_VIRT_CPUS);
-        d->arch.vgic.rdist_regions[0].base = GUEST_GICV3_GICR0_BASE;
-        d->arch.vgic.rdist_regions[0].size = GUEST_GICV3_GICR0_SIZE;
-        d->arch.vgic.rdist_regions[0].first_cpu = 0;
-    }
-
-    return 0;
-}
-
 static void gicv3_hcr_status(uint32_t flag, bool_t status)
 {
     uint32_t hcr;
@@ -1190,6 +1126,7 @@ static int __init gicv3_init(void)
     int res, i;
     uint32_t reg;
     const struct dt_device_node *node = gicv3_info.node;
+    paddr_t dbase;
 
     if ( !cpu_has_gicv3 )
     {
@@ -1197,15 +1134,15 @@ static int __init gicv3_init(void)
         return -ENODEV;
     }
 
-    res = dt_device_get_address(node, 0, &gicv3.dbase, NULL);
+    res = dt_device_get_address(node, 0, &dbase, NULL);
     if ( res )
         panic("GICv3: Cannot find a valid distributor address");
 
-    if ( (gicv3.dbase & ~PAGE_MASK) )
+    if ( (dbase & ~PAGE_MASK) )
         panic("GICv3:  Found unaligned distributor address %"PRIpaddr"",
-              gicv3.dbase);
+              dbase);
 
-    gicv3.map_dbase = ioremap_nocache(gicv3.dbase, SZ_64K);
+    gicv3.map_dbase = ioremap_nocache(dbase, SZ_64K);
     if ( !gicv3.map_dbase )
         panic("GICv3: Failed to ioremap for GIC distributor\n");
 
@@ -1266,7 +1203,7 @@ static int __init gicv3_init(void)
            "      gic_maintenance_irq=%u\n"
            "      gic_rdist_stride=%#x\n"
            "      gic_rdist_regions=%d\n",
-           gicv3.dbase, gicv3_info.maintenance_irq,
+           dbase, gicv3_info.maintenance_irq,
            gicv3.rdist_stride, gicv3.rdist_count);
     printk("      redistributor regions:\n");
     for ( i = 0; i < gicv3.rdist_count; i++ )
@@ -1276,6 +1213,9 @@ static int __init gicv3_init(void)
         printk("        - region %u: %#"PRIpaddr" - %#"PRIpaddr"\n",
                i, r->base, r->base + r->size);
     }
+
+    vgic_v3_setup_hw(dbase, gicv3.rdist_count, gicv3.rdist_regions,
+                     gicv3.rdist_stride);
 
     spin_lock_init(&gicv3.lock);
 
@@ -1296,7 +1236,6 @@ static const struct gic_hw_operations gicv3_ops = {
     .save_state          = gicv3_save_state,
     .restore_state       = gicv3_restore_state,
     .dump_state          = gicv3_dump_state,
-    .gicv_setup          = gicv_v3_init,
     .gic_host_irq_type   = &gicv3_host_irq_type,
     .gic_guest_irq_type  = &gicv3_guest_irq_type,
     .eoi_irq             = gicv3_eoi_irq,

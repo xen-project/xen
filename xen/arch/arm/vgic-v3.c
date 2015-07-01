@@ -29,7 +29,6 @@
 #include <asm/current.h>
 #include <asm/mmio.h>
 #include <asm/gic_v3_defs.h>
-#include <asm/gic.h>
 #include <asm/vgic.h>
 
 /* GICD_PIDRn register values for ARM implementations */
@@ -49,6 +48,28 @@
  *      - No GICv2 compatibility => ARE = 1
  */
 #define VGICD_CTLR_DEFAULT  (GICD_CTLR_ARE_NS)
+
+static struct {
+    bool_t enabled;
+    /* Distributor interface address */
+    paddr_t dbase;
+    /* Re-distributor regions */
+    unsigned int nr_rdist_regions;
+    const struct rdist_region *regions;
+    uint32_t rdist_stride; /* Re-distributor stride */
+} vgic_v3_hw;
+
+void vgic_v3_setup_hw(paddr_t dbase,
+                      unsigned int nr_rdist_regions,
+                      const struct rdist_region *regions,
+                      uint32_t rdist_stride)
+{
+    vgic_v3_hw.enabled = 1;
+    vgic_v3_hw.dbase = dbase;
+    vgic_v3_hw.nr_rdist_regions = nr_rdist_regions;
+    vgic_v3_hw.regions = regions;
+    vgic_v3_hw.rdist_stride = rdist_stride;
+}
 
 static struct vcpu *vgic_v3_irouter_to_vcpu(struct domain *d, uint64_t irouter)
 {
@@ -1119,13 +1140,64 @@ static int vgic_v3_domain_init(struct domain *d)
 {
     int i, idx;
 
+    /*
+     * Domain 0 gets the hardware address.
+     * Guests get the virtual platform layout.
+     */
+    if ( is_hardware_domain(d) )
+    {
+        unsigned int first_cpu = 0;
+
+        d->arch.vgic.dbase = vgic_v3_hw.dbase;
+
+        d->arch.vgic.rdist_stride = vgic_v3_hw.rdist_stride;
+        /*
+         * If the stride is not set, the default stride for GICv3 is 2 * 64K:
+         *     - first 64k page for Control and Physical LPIs
+         *     - second 64k page for Control and Generation of SGIs
+         */
+        if ( !d->arch.vgic.rdist_stride )
+            d->arch.vgic.rdist_stride = 2 * SZ_64K;
+
+        for ( i = 0; i < vgic_v3_hw.nr_rdist_regions; i++ )
+        {
+            paddr_t size = vgic_v3_hw.regions[i].size;
+
+            d->arch.vgic.rdist_regions[i].base = vgic_v3_hw.regions[i].base;
+            d->arch.vgic.rdist_regions[i].size = size;
+
+            /* Set the first CPU handled by this region */
+            d->arch.vgic.rdist_regions[i].first_cpu = first_cpu;
+
+            first_cpu += size / d->arch.vgic.rdist_stride;
+        }
+        d->arch.vgic.nr_regions = vgic_v3_hw.nr_rdist_regions;
+    }
+    else
+    {
+        d->arch.vgic.dbase = GUEST_GICV3_GICD_BASE;
+
+        /* XXX: Only one Re-distributor region mapped for the guest */
+        BUILD_BUG_ON(GUEST_GICV3_RDIST_REGIONS != 1);
+
+        d->arch.vgic.nr_regions = GUEST_GICV3_RDIST_REGIONS;
+        d->arch.vgic.rdist_stride = GUEST_GICV3_RDIST_STRIDE;
+
+        /* The first redistributor should contain enough space for all CPUs */
+        BUILD_BUG_ON((GUEST_GICV3_GICR0_SIZE / GUEST_GICV3_RDIST_STRIDE) < MAX_VIRT_CPUS);
+        d->arch.vgic.rdist_regions[0].base = GUEST_GICV3_GICR0_BASE;
+        d->arch.vgic.rdist_regions[0].size = GUEST_GICV3_GICR0_SIZE;
+        d->arch.vgic.rdist_regions[0].first_cpu = 0;
+    }
+
     /* By default deliver to CPU0 */
     for ( i = 0; i < DOMAIN_NR_RANKS(d); i++ )
     {
         for ( idx = 0; idx < 32; idx++ )
             d->arch.vgic.shared_irqs[i].v3.irouter[idx] = 0;
     }
-    /* We rely on gicv init to get dbase and size */
+
+    /* Register mmio handle for the Distributor */
     register_mmio_handler(d, &vgic_distr_mmio_handler, d->arch.vgic.dbase,
                           SZ_64K);
 
@@ -1154,6 +1226,14 @@ static const struct vgic_ops v3_ops = {
 
 int vgic_v3_init(struct domain *d)
 {
+    if ( !vgic_v3_hw.enabled )
+    {
+        printk(XENLOG_G_ERR
+               "d%d: vGICv3 is not supported on this platform.\n",
+               d->domain_id);
+        return -ENODEV;
+    }
+
     register_vgic_ops(d, &v3_ops);
 
     return 0;

@@ -587,9 +587,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     }
     config->gic_version = gic_version;
 
-    if ( (rc = gicv_setup(d)) != 0 )
-        goto fail;
-
     if ( (rc = domain_vgic_init(d, config->nr_spis)) != 0 )
         goto fail;
 

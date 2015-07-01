@@ -661,11 +661,6 @@ void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
     } while (1);
 }
 
-int gicv_setup(struct domain *d)
-{
-    return gic_hw_ops->gicv_setup(d);
-}
-
 static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     /*

@@ -223,6 +223,16 @@ static inline int vgic_allocate_spi(struct domain *d)
 
 extern void vgic_free_virq(struct domain *d, unsigned int virq);
 
+void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t vbase);
+
+#ifdef HAS_GICV3
+struct rdist_region;
+void vgic_v3_setup_hw(paddr_t dbase,
+                      unsigned int nr_rdist_regions,
+                      const struct rdist_region *regions,
+                      uint32_t rdist_stride);
+#endif
+
 #endif /* __ASM_ARM_VGIC_H__ */
 
 /*

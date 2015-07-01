@@ -94,6 +94,8 @@ int domain_vgic_init(struct domain *d, unsigned int nr_spis)
             return -ENODEV;
         break;
     default:
+        printk(XENLOG_G_ERR "d%d: Unknown vGIC version %u\n",
+               d->domain_id, gic_hw_version());
         return -ENODEV;
     }
 

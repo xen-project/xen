@@ -24,12 +24,31 @@
 #include <xen/softirq.h>
 #include <xen/irq.h>
 #include <xen/sched.h>
+#include <xen/sizes.h>
 
 #include <asm/current.h>
 
 #include <asm/mmio.h>
-#include <asm/gic.h>
+#include <asm/platform.h>
 #include <asm/vgic.h>
+
+static struct {
+    bool_t enabled;
+    /* Distributor interface address */
+    paddr_t dbase;
+    /* CPU interface address */
+    paddr_t cbase;
+    /* Virtual CPU interface address */
+    paddr_t vbase;
+} vgic_v2_hw;
+
+void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t vbase)
+{
+    vgic_v2_hw.enabled = 1;
+    vgic_v2_hw.dbase = dbase;
+    vgic_v2_hw.cbase = cbase;
+    vgic_v2_hw.vbase = vbase;
+}
 
 static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
 {
@@ -525,14 +544,50 @@ static int vgic_v2_vcpu_init(struct vcpu *v)
 
 static int vgic_v2_domain_init(struct domain *d)
 {
-    int i;
+    int i, ret;
+
+    /*
+     * The hardware domain gets the hardware address.
+     * Guests get the virtual platform layout.
+     */
+    if ( is_hardware_domain(d) )
+    {
+        d->arch.vgic.dbase = vgic_v2_hw.dbase;
+        d->arch.vgic.cbase = vgic_v2_hw.cbase;
+    }
+    else
+    {
+        d->arch.vgic.dbase = GUEST_GICD_BASE;
+        d->arch.vgic.cbase = GUEST_GICC_BASE;
+    }
+
+    /*
+     * Map the gic virtual cpu interface in the gic cpu interface
+     * region of the guest.
+     *
+     * The second page is always mapped at +4K irrespective of the
+     * GIC_64K_STRIDE quirk. The DTB passed to the guest reflects this.
+     */
+    ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase), 1,
+                           paddr_to_pfn(vgic_v2_hw.vbase));
+    if ( ret )
+        return ret;
+
+    if ( !platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
+        ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase + PAGE_SIZE),
+                               2, paddr_to_pfn(vgic_v2_hw.vbase + PAGE_SIZE));
+    else
+        ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase + PAGE_SIZE),
+                               2, paddr_to_pfn(vgic_v2_hw.vbase + SZ_64K));
+
+    if ( ret )
+        return ret;
 
     /* By default deliver to CPU0 */
     for ( i = 0; i < DOMAIN_NR_RANKS(d); i++ )
         memset(d->arch.vgic.shared_irqs[i].v2.itargets, 0x1,
                sizeof(d->arch.vgic.shared_irqs[i].v2.itargets));
 
-    /* We rely on gicv_setup() to initialize dbase(vGIC distributor base) */
     register_mmio_handler(d, &vgic_v2_distr_mmio_handler, d->arch.vgic.dbase,
                           PAGE_SIZE);
 
@@ -548,6 +603,14 @@ static const struct vgic_ops vgic_v2_ops = {
 
 int vgic_v2_init(struct domain *d)
 {
+    if ( !vgic_v2_hw.enabled )
+    {
+        printk(XENLOG_G_ERR
+               "d%d: vGICv2 is not supported on this platform.\n",
+               d->domain_id);
+        return -ENODEV;
+    }
+
     register_vgic_ops(d, &vgic_v2_ops);
 
     return 0;

@@ -311,8 +311,6 @@ struct gic_hw_operations {
     void (*restore_state)(const struct vcpu *);
     /* Dump GIC LR register information */
     void (*dump_state)(const struct vcpu *);
-    /* Map MMIO region of GIC */
-    int (*gicv_setup)(struct domain *);
 
     /* hw_irq_controller to enable/disable/eoi host irq */
     hw_irq_controller *gic_host_irq_type;

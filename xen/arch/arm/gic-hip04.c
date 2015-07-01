@@ -65,12 +65,9 @@
 
 /* Global state */
 static struct {
-    paddr_t dbase;            /* Address of distributor registers */
     void __iomem * map_dbase; /* IO mapped Address of distributor registers */
-    paddr_t cbase;            /* Address of CPU interface registers */
     void __iomem * map_cbase[2]; /* IO mapped Address of CPU interface registers */
     void __iomem * map_hbase; /* IO Address of virtual interface registers */
-    paddr_t vbase;            /* Address of virtual cpu interface registers */
     spinlock_t lock;
 } gicv2;
 
@@ -434,47 +431,6 @@ static void hip04gic_clear_lr(int lr)
     writel_gich(0, HIP04_GICH_LR + lr * 4);
 }
 
-static int hip04gicv_setup(struct domain *d)
-{
-    int ret;
-
-    /*
-     * The hardware domain gets the hardware address.
-     * Guests get the virtual platform layout.
-     */
-    if ( is_hardware_domain(d) )
-    {
-        d->arch.vgic.dbase = gicv2.dbase;
-        d->arch.vgic.cbase = gicv2.cbase;
-    }
-    else
-    {
-        d->arch.vgic.dbase = GUEST_GICD_BASE;
-        d->arch.vgic.cbase = GUEST_GICC_BASE;
-    }
-
-    /*
-     * Map the gic virtual cpu interface in the gic cpu interface
-     * region of the guest.
-     *
-     * The second page is always mapped at +4K irrespective of the
-     * GIC_64K_STRIDE quirk. The DTB passed to the guest reflects this.
-     */
-    ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase), 1,
-                            paddr_to_pfn(gicv2.vbase));
-    if ( ret )
-        return ret;
-
-    if ( !platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
-        ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase + PAGE_SIZE),
-                               2, paddr_to_pfn(gicv2.vbase + PAGE_SIZE));
-    else
-        ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase + PAGE_SIZE),
-                               2, paddr_to_pfn(gicv2.vbase + SZ_64K));
-
-    return ret;
-}
-
 static void hip04gic_read_lr(int lr, struct gic_lr *lr_reg)
 {
     uint32_t lrv;
@@ -676,14 +632,14 @@ static hw_irq_controller hip04gic_guest_irq_type = {
 static int __init hip04gic_init(void)
 {
     int res;
-    paddr_t hbase;
+    paddr_t hbase, dbase, cbase, vbase;
     const struct dt_device_node *node = gicv2_info.node;
 
-    res = dt_device_get_address(node, 0, &gicv2.dbase, NULL);
+    res = dt_device_get_address(node, 0, &dbase, NULL);
     if ( res )
         panic("GIC-HIP04: Cannot find a valid address for the distributor");
 
-    res = dt_device_get_address(node, 1, &gicv2.cbase, NULL);
+    res = dt_device_get_address(node, 1, &cbase, NULL);
     if ( res )
         panic("GIC-HIP04: Cannot find a valid address for the CPU");
 
@@ -691,7 +647,7 @@ static int __init hip04gic_init(void)
     if ( res )
         panic("GIC-HIP04: Cannot find a valid address for the hypervisor");
 
-    res = dt_device_get_address(node, 3, &gicv2.vbase, NULL);
+    res = dt_device_get_address(node, 3, &vbase, NULL);
     if ( res )
         panic("GIC-HIP04: Cannot find a valid address for the virtual CPU");
 
@@ -708,23 +664,23 @@ static int __init hip04gic_init(void)
               "        gic_hyp_addr=%"PRIpaddr"\n"
               "        gic_vcpu_addr=%"PRIpaddr"\n"
               "        gic_maintenance_irq=%u\n",
-              gicv2.dbase, gicv2.cbase, hbase, gicv2.vbase,
+              dbase, cbase, hbase, vbase,
               gicv2_info.maintenance_irq);
 
-    if ( (gicv2.dbase & ~PAGE_MASK) || (gicv2.cbase & ~PAGE_MASK) ||
-         (hbase & ~PAGE_MASK) || (gicv2.vbase & ~PAGE_MASK) )
+    if ( (dbase & ~PAGE_MASK) || (cbase & ~PAGE_MASK) ||
+         (hbase & ~PAGE_MASK) || (vbase & ~PAGE_MASK) )
         panic("GIC-HIP04 interfaces not page aligned");
 
-    gicv2.map_dbase = ioremap_nocache(gicv2.dbase, PAGE_SIZE);
+    gicv2.map_dbase = ioremap_nocache(dbase, PAGE_SIZE);
     if ( !gicv2.map_dbase )
         panic("GIC-HIP04: Failed to ioremap for GIC distributor\n");
 
-    gicv2.map_cbase[0] = ioremap_nocache(gicv2.cbase, PAGE_SIZE);
+    gicv2.map_cbase[0] = ioremap_nocache(cbase, PAGE_SIZE);
 
     if ( platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
-        gicv2.map_cbase[1] = ioremap_nocache(gicv2.cbase + SZ_64K, PAGE_SIZE);
+        gicv2.map_cbase[1] = ioremap_nocache(cbase + SZ_64K, PAGE_SIZE);
     else
-        gicv2.map_cbase[1] = ioremap_nocache(gicv2.cbase + PAGE_SIZE, PAGE_SIZE);
+        gicv2.map_cbase[1] = ioremap_nocache(cbase + PAGE_SIZE, PAGE_SIZE);
 
     if ( !gicv2.map_cbase[0] || !gicv2.map_cbase[1] )
         panic("GIC-HIP04: Failed to ioremap for GIC CPU interface\n");
@@ -732,6 +688,8 @@ static int __init hip04gic_init(void)
     gicv2.map_hbase = ioremap_nocache(hbase, PAGE_SIZE);
     if ( !gicv2.map_hbase )
         panic("GIC-HIP04: Failed to ioremap for GIC Virtual interface\n");
+
+    vgic_v2_setup_hw(dbase, cbase, vbase);
 
     /* Global settings: interrupt distributor */
     spin_lock_init(&gicv2.lock);
@@ -753,7 +711,6 @@ const static struct gic_hw_operations hip04gic_ops = {
     .save_state          = hip04gic_save_state,
     .restore_state       = hip04gic_restore_state,
     .dump_state          = hip04gic_dump_state,
-    .gicv_setup          = hip04gicv_setup,
     .gic_host_irq_type   = &hip04gic_host_irq_type,
     .gic_guest_irq_type  = &hip04gic_guest_irq_type,
     .eoi_irq             = hip04gic_eoi_irq,
