@@ -1198,7 +1198,7 @@ static int __init gicv3_init(void)
     }
 
     res = dt_device_get_address(node, 0, &gicv3.dbase, NULL);
-    if ( res || !gicv3.dbase )
+    if ( res )
         panic("GICv3: Cannot find a valid distributor address");
 
     if ( (gicv3.dbase & ~PAGE_MASK) )
@@ -1230,7 +1230,7 @@ static int __init gicv3_init(void)
         uint64_t rdist_base, rdist_size;
 
         res = dt_device_get_address(node, 1 + i, &rdist_base, &rdist_size);
-        if ( res || !rdist_base )
+        if ( res )
             panic("GICv3: No rdist base found for region %d\n", i);
 
         rdist_regs[i].base = rdist_base;

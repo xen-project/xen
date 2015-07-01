@@ -680,19 +680,19 @@ static int __init hip04gic_init(void)
     const struct dt_device_node *node = gicv2_info.node;
 
     res = dt_device_get_address(node, 0, &gicv2.dbase, NULL);
-    if ( res || !gicv2.dbase )
+    if ( res )
         panic("GIC-HIP04: Cannot find a valid address for the distributor");
 
     res = dt_device_get_address(node, 1, &gicv2.cbase, NULL);
-    if ( res || !gicv2.cbase )
+    if ( res )
         panic("GIC-HIP04: Cannot find a valid address for the CPU");
 
     res = dt_device_get_address(node, 2, &gicv2.hbase, NULL);
-    if ( res || !gicv2.hbase )
+    if ( res )
         panic("GIC-HIP04: Cannot find a valid address for the hypervisor");
 
     res = dt_device_get_address(node, 3, &gicv2.vbase, NULL);
-    if ( res || !gicv2.vbase )
+    if ( res )
         panic("GIC-HIP04: Cannot find a valid address for the virtual CPU");
 
     res = platform_get_irq(node, 0);
