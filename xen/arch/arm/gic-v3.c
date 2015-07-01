@@ -51,7 +51,6 @@ struct rdist_region {
 /* Global state */
 static struct {
     paddr_t dbase;            /* Address of distributor registers */
-    paddr_t dbase_size;
     void __iomem *map_dbase;  /* Mapped address of distributor registers */
     struct rdist_region *rdist_regions;
     uint32_t  rdist_stride;
@@ -938,7 +937,6 @@ static int gicv_v3_init(struct domain *d)
         unsigned int first_cpu = 0;
 
         d->arch.vgic.dbase = gicv3.dbase;
-        d->arch.vgic.dbase_size = gicv3.dbase_size;
 
         d->arch.vgic.rdist_stride = gicv3.rdist_stride;
         /*
@@ -966,7 +964,6 @@ static int gicv_v3_init(struct domain *d)
     else
     {
         d->arch.vgic.dbase = GUEST_GICV3_GICD_BASE;
-        d->arch.vgic.dbase_size = GUEST_GICV3_GICD_SIZE;
 
         /* XXX: Only one Re-distributor region mapped for the guest */
         BUILD_BUG_ON(GUEST_GICV3_RDIST_REGIONS != 1);
@@ -1153,7 +1150,7 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
 
     tmp = new_cells;
 
-    dt_set_range(&tmp, node, d->arch.vgic.dbase, d->arch.vgic.dbase_size);
+    dt_set_range(&tmp, node, d->arch.vgic.dbase, SZ_64K);
 
     for ( i = 0; i < d->arch.vgic.nr_regions; i++ )
         dt_set_range(&tmp, node, d->arch.vgic.rdist_regions[i].base,
@@ -1209,15 +1206,15 @@ static int __init gicv3_init(void)
         return -ENODEV;
     }
 
-    res = dt_device_get_address(node, 0, &gicv3.dbase, &gicv3.dbase_size);
+    res = dt_device_get_address(node, 0, &gicv3.dbase, NULL);
     if ( res || !gicv3.dbase )
         panic("GICv3: Cannot find a valid distributor address");
 
-    if ( (gicv3.dbase & ~PAGE_MASK) || (gicv3.dbase_size & ~PAGE_MASK) )
+    if ( (gicv3.dbase & ~PAGE_MASK) )
         panic("GICv3:  Found unaligned distributor address %"PRIpaddr"",
               gicv3.dbase);
 
-    gicv3.map_dbase = ioremap_nocache(gicv3.dbase, gicv3.dbase_size);
+    gicv3.map_dbase = ioremap_nocache(gicv3.dbase, SZ_64K);
     if ( !gicv3.map_dbase )
         panic("GICv3: Failed to ioremap for GIC distributor\n");
 
@@ -1275,7 +1272,6 @@ static int __init gicv3_init(void)
 
     printk("GICv3 initialization:\n"
            "      gic_dist_addr=%"PRIpaddr"\n"
-           "      gic_dist_size=%"PRIpaddr"\n"
            "      gic_dist_mapaddr=%p\n"
            "      gic_rdist_regions=%d\n"
            "      gic_rdist_stride=%x\n"
@@ -1283,7 +1279,7 @@ static int __init gicv3_init(void)
            "      gic_rdist_base_size=%"PRIpaddr"\n"
            "      gic_rdist_base_mapaddr=%p\n"
            "      gic_maintenance_irq=%u\n",
-           gicv3.dbase, gicv3.dbase_size, gicv3.map_dbase, gicv3.rdist_count,
+           gicv3.dbase, gicv3.map_dbase, gicv3.rdist_count,
            gicv3.rdist_stride, gicv3.rdist_regions[0].base,
            gicv3.rdist_regions[0].size, gicv3.rdist_regions[0].map_base,
            gicv3_info.maintenance_irq);

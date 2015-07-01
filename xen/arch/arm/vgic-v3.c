@@ -1127,7 +1127,7 @@ static int vgic_v3_domain_init(struct domain *d)
     }
     /* We rely on gicv init to get dbase and size */
     register_mmio_handler(d, &vgic_distr_mmio_handler, d->arch.vgic.dbase,
-                          d->arch.vgic.dbase_size);
+                          SZ_64K);
 
     /*
      * Register mmio handler per contiguous region occupied by the

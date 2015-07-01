@@ -103,7 +103,6 @@ struct arch_domain
         paddr_t cbase; /* CPU base address */
 #ifdef HAS_GICV3
         /* GIC V3 addressing */
-        paddr_t dbase_size; /* Distributor base size */
         /* List of contiguous occupied by the redistributors */
         struct vgic_rdist_region {
             paddr_t base;                   /* Base address */
