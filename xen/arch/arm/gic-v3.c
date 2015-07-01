@@ -1100,8 +1100,9 @@ static void gicv3_irq_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     spin_unlock(&gicv3.lock);
 }
 
-static int gicv3_make_dt_node(const struct domain *d,
-                              const struct dt_device_node *node, void *fdt)
+static int gicv3_make_hwdom_dt_node(const struct domain *d,
+                                    const struct dt_device_node *node,
+                                    void *fdt)
 {
     const struct dt_device_node *gic = dt_interrupt_controller;
     const void *compatible = NULL;
@@ -1323,7 +1324,7 @@ static const struct gic_hw_operations gicv3_ops = {
     .read_vmcr_priority  = gicv3_read_vmcr_priority,
     .read_apr            = gicv3_read_apr,
     .secondary_init      = gicv3_secondary_cpu_init,
-    .make_dt_node        = gicv3_make_dt_node,
+    .make_hwdom_dt_node  = gicv3_make_hwdom_dt_node,
 };
 
 static int __init gicv3_preinit(struct dt_device_node *node, const void *data)

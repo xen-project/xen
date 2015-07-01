@@ -605,8 +605,9 @@ static void hip04gic_irq_set_affinity(struct irq_desc *desc, const cpumask_t *cp
     spin_unlock(&gicv2.lock);
 }
 
-static int hip04gic_make_dt_node(const struct domain *d,
-                              const struct dt_device_node *node, void *fdt)
+static int hip04gic_make_hwdom_dt_node(const struct domain *d,
+                                       const struct dt_device_node *node,
+                                       void *fdt)
 {
     const struct dt_device_node *gic = dt_interrupt_controller;
     const void *compatible;
@@ -768,7 +769,7 @@ const static struct gic_hw_operations hip04gic_ops = {
     .write_lr            = hip04gic_write_lr,
     .read_vmcr_priority  = hip04gic_read_vmcr_priority,
     .read_apr            = hip04gic_read_apr,
-    .make_dt_node        = hip04gic_make_dt_node,
+    .make_hwdom_dt_node  = hip04gic_make_hwdom_dt_node,
 };
 
 /* Set up the GIC */

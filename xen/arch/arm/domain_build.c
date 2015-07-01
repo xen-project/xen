@@ -862,7 +862,7 @@ static int make_gic_node(const struct domain *d, void *fdt,
     if ( res )
         return res;
 
-    res = gic_make_node(d, node, fdt);
+    res = gic_make_hwdom_dt_node(d, node, fdt);
     if ( res )
         return res;
 

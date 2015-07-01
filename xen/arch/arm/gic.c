@@ -706,10 +706,11 @@ void __cpuinit init_maintenance_interrupt(void)
                 "irq-maintenance", NULL);
 }
 
-int gic_make_node(const struct domain *d,const struct dt_device_node *node,
-                   void *fdt)
+int gic_make_hwdom_dt_node(const struct domain *d,
+                           const struct dt_device_node *node,
+                           void *fdt)
 {
-    return gic_hw_ops->make_dt_node(d, node, fdt);
+    return gic_hw_ops->make_hwdom_dt_node(d, node, fdt);
 }
 
 /*
