@@ -71,6 +71,7 @@ static void vgic_init_pending_irq(struct pending_irq *p, unsigned int virq)
 int domain_vgic_init(struct domain *d, unsigned int nr_spis)
 {
     int i;
+    int ret;
 
     d->arch.vgic.ctlr = 0;
 
@@ -114,7 +115,9 @@ int domain_vgic_init(struct domain *d, unsigned int nr_spis)
     for (i=0; i<DOMAIN_NR_RANKS(d); i++)
         spin_lock_init(&d->arch.vgic.shared_irqs[i].lock);
 
-    d->arch.vgic.handler->domain_init(d);
+    ret = d->arch.vgic.handler->domain_init(d);
+    if ( ret )
+        return ret;
 
     d->arch.vgic.allocated_irqs =
         xzalloc_array(unsigned long, BITS_TO_LONGS(vgic_num_irqs(d)));
