@@ -213,7 +213,7 @@ void libxl_evdisable_disk_eject(libxl_ctx *ctx, libxl_evgen_disk_eject*);
  *      libxl_osevent_afterpoll(...);
  *      for (;;) {
  *          r = libxl_event_check(...);
- *          if (r==LIBXL_NOT_READY) break;
+ *          if (r==ERROR_NOT_READY) break;
  *          if (r) goto error_out;
  *          do something with the event;
  *      }
