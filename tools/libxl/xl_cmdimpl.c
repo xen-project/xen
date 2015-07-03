@@ -389,6 +389,20 @@ static yajl_gen_status printf_info_one_json(yajl_gen hand, int domid,
 out:
     return s;
 }
+
+static void flush_stream(FILE *fh)
+{
+    const char *fh_name =
+        fh == stdout ? "stdout" :
+        fh == stderr ? "stderr" :
+        (abort(), (const char*)0);
+
+    if (ferror(fh) || fflush(fh)) {
+        perror(fh_name);
+        exit(-1);
+    }
+}
+
 static void printf_info(enum output_format output_format,
                         int domid,
                         libxl_domain_config *d_config, FILE *fh)
@@ -424,13 +438,7 @@ out:
         fprintf(stderr,
                 "unable to format domain config as JSON (YAJL:%d)\n", s);
 
-    if (ferror(fh) || fflush(fh)) {
-        if (fh == stdout)
-            perror("stdout");
-        else
-            perror("stderr");
-        exit(-1);
-    }
+    flush_stream(fh);
 }
 
 static int do_daemonize(char *name)
