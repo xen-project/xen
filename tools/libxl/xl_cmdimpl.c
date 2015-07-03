@@ -2696,7 +2696,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
     }
 
     if (debug || dom_info->dryrun) {
-        FILE *cfg_print_fh = debug ? stderr : stdout;
+        FILE *cfg_print_fh = (debug && !dom_info->dryrun) ? stderr : stdout;
         if (default_output_format == OUTPUT_FORMAT_SXP) {
             printf_info_sexp(-1, &d_config, cfg_print_fh);
         } else {
