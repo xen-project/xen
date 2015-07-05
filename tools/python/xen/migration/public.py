@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+Xen public ABI constants, used in migration
+"""
+
+HVM_PARAM_STORE_PFN             = 1
+HVM_PARAM_IOREQ_PFN             = 5
+HVM_PARAM_BUFIOREQ_PFN          = 6
+HVM_PARAM_VIRIDIAN              = 9
+HVM_PARAM_IDENT_PT              = 12
+HVM_PARAM_VM86_TSS              = 15
+HVM_PARAM_CONSOLE_PFN           = 17
+HVM_PARAM_ACPI_IOPORTS_LOCATION = 19
+HVM_PARAM_PAGING_RING_PFN       = 27
+HVM_PARAM_MONITOR_RING_PFN      = 28
+HVM_PARAM_SHARING_RING_PFN      = 29
+HVM_PARAM_IOREQ_SERVER_PFN      = 32
+HVM_PARAM_NR_IOREQ_SERVER_PAGES = 33
+HVM_PARAM_VM_GENERATION_ID_ADDR = 34
