@@ -2067,9 +2067,22 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
         (rc);                                                   \
     })
 
+
+/*
+ * Given, in scope,
+ *   libxl__ao *ao;
+ * produces, in scope,
+ *   libxl__gc *gc;
+ */
 #define AO_GC                                   \
     libxl__gc *const gc __attribute__((unused)) = &ao->gc
 
+/*
+ * void STATE_AO_GC(libxl__ao *ao_spec);
+ * // Produces, in scope:
+ *   libxl__ao *ao;  // set from ao_spec
+ *   libxl__gc *gc;
+ */
 #define STATE_AO_GC(op_ao)                      \
     libxl__ao *const ao = (op_ao);              \
     libxl__gc *const gc __attribute__((unused)) = libxl__ao_inprogress_gc(ao)
