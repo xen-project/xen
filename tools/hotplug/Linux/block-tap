@@ -1,0 +1,123 @@
+#!/bin/bash -e
+#
+# tapdisk Xen block device hotplug script
+#
+# Author George Dunlap <george.dunlap@eu.citrix.com>
+#
+# Based on block-iscsi by Roger Pau Monné <roger.pau@citrix.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published
+# by the Free Software Foundation; version 2.1 only. with the special
+# exception on linking described in file LICENSE.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# Usage:
+#
+# Target should be specified using the following syntax:
+#
+# script=block-tap,vdev=xvda,target=<type>:<file>
+#
+# Type is either "aio" (for raw files), or "vhd"
+
+dir=$(dirname "$0")
+. "$dir/block-common.sh"
+
+remove_label()
+{
+    echo $1 | sed "s/^\("$2"\)//"
+}
+
+check_tools()
+{
+    if ! command -v tap-ctl > /dev/null 2>&1; then
+        fatal "Unable to find tap-ctl tool"
+    fi
+    modprobe blktap
+    if ! tap-ctl check >& /dev/null ; then
+	fatal "Blocktap kernel module not available"
+    fi
+}
+
+# Sets the following global variables based on the params field passed in as
+# a parameter: type file
+parse_target()
+{
+    params=($(echo "$1" | tr ":" "\n"))
+
+    type=${params[0]}
+    file=${params[1]}
+    if [ -z "$type" ] || [ -z "$file" ]; then
+        fatal "Cannot parse required parameters"
+    fi
+}
+
+# Sets $pid and $minor to point to the device associated with the target
+find_device()
+{
+    local info
+    local param
+
+    if [ -z "$type" ] || [ -z "$file" ]; then
+        fatal "required parameters not set"
+    fi
+
+    info=$(tap-ctl list -t $type -f $file)
+
+    for param in $(echo "$info" | tr "," "\n")
+    do
+        case $param in
+        pid=*)
+            pid=$(remove_label $param "pid=")
+            ;;
+        minor=*)
+            minor=$(remove_label $param "minor=")
+            ;;
+        esac
+    done
+
+    if [ -z "$pid" ] || [ -z "$minor" ]; then
+        fatal "cannot find required parameters"
+    fi
+}
+
+# Attaches the device and writes xenstore backend entries to connect
+# the device
+add()
+{
+    dev=$(tap-ctl create -a $target)
+    write_dev $dev
+}
+
+# Disconnects the device
+remove()
+{
+    find_device
+    do_or_die tap-ctl destroy -p ${pid} -m ${minor} > /dev/null
+}
+
+command=$1
+target=$(xenstore-read $XENBUS_PATH/params || true)
+if [ -z "$target" ]; then
+    fatal "No information about the target"
+fi
+
+parse_target "$target"
+
+check_tools || exit 1
+
+case $command in
+add)
+    add
+    ;;
+remove)
+    remove
+    ;;
+*)
+    exit 1
+    ;;
+esac
