@@ -934,11 +934,13 @@ static void device_backend_callback(libxl__egc *egc, libxl__ev_devstate *ds,
     libxl__ao_device *aodev = CONTAINER_OF(ds, *aodev, backend_ds);
     STATE_AO_GC(aodev->ao);
 
+    LOG(DEBUG, "calling device_backend_cleanup");
     device_backend_cleanup(gc, aodev);
 
     if (rc == ERROR_TIMEDOUT &&
         aodev->action == LIBXL__DEVICE_ACTION_REMOVE &&
         !aodev->force) {
+        LOG(DEBUG, "Timeout reached, initiating forced remove");
         aodev->force = 1;
         libxl__initiate_device_remove(egc, aodev);
         return;
@@ -981,10 +983,18 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
      * hotplug scripts
      */
     rc = libxl__get_domid(gc, &domid);
-    if (rc) goto out;
+    if (rc) {
+        LOG(ERROR, "Failed to get domid");
+        goto out;
+    }
     if (aodev->dev->backend_domid != domid) {
-        if (aodev->action != LIBXL__DEVICE_ACTION_REMOVE)
+        LOG(DEBUG, "Backend domid %d, domid %d, assuming driver domains",
+            aodev->dev->backend_domid, domid);
+
+        if (aodev->action != LIBXL__DEVICE_ACTION_REMOVE) {
+            LOG(DEBUG, "Not a remove, not executing hotplug scripts");
             goto out;
+        }
 
         aodev->xswait.ao = ao;
         aodev->xswait.what = "removal of backend path";
@@ -992,8 +1002,11 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
         aodev->xswait.timeout_ms = LIBXL_DESTROY_TIMEOUT * 1000;
         aodev->xswait.callback = device_destroy_be_watch_cb;
         rc = libxl__xswait_start(gc, &aodev->xswait);
-        if (rc)
+        if (rc) {
+            LOG(ERROR, "Setup of backend removal watch failed (path %s)", be_path);
             goto out;
+        }
+
         return;
     }
 
@@ -1005,6 +1018,7 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
     switch (hotplug) {
     case 0:
         /* no hotplug script to execute */
+        LOG(DEBUG, "No hotplug script to execute");
         goto out;
     case 1:
         /* execute hotplug script */

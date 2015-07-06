@@ -214,6 +214,7 @@ static int libxl__hotplug_disk(libxl__gc *gc, libxl__device *dev,
 
     *env = get_hotplug_env(gc, script, dev);
     if (!*env) {
+        LOG(ERROR, "Failed to get hotplug environment");
         rc = ERROR_FAIL;
         goto error;
     }
@@ -225,6 +226,7 @@ static int libxl__hotplug_disk(libxl__gc *gc, libxl__device *dev,
     (*args)[nr++] = NULL;
     assert(nr == arraysize);
 
+    LOG(DEBUG, "Args and environment ready");
     rc = 1;
 
 error:
@@ -241,6 +243,7 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
     switch (dev->backend_kind) {
     case LIBXL__DEVICE_KIND_VBD:
         if (num_exec != 0) {
+            LOG(DEBUG, "num_exec %d, not running hotplug scripts\n", num_exec);
             rc = 0;
             goto out;
         }
@@ -253,6 +256,7 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
          */
         if ((num_exec > 1) ||
             (libxl_get_stubdom_id(CTX, dev->domid) && num_exec)) {
+            LOG(DEBUG, "num_exec %d, not running hotplug scripts\n", num_exec);
             rc = 0;
             goto out;
         }
@@ -260,6 +264,7 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
         break;
     default:
         /* No need to execute any hotplug scripts */
+        LOG(DEBUG, "backend_kind %d, no need to execute scripts", dev->backend_kind);
         rc = 0;
         break;
     }
