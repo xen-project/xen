@@ -863,7 +863,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         if ( total != dom->total_pages )
         {
             xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                         "%s: vNUMA page count mismatch (0x%"PRIpfn" != 0x%"PRIpfn")\n",
+                         "%s: vNUMA page count mismatch (0x%"PRIpfn" != 0x%"PRIpfn")",
                          __func__, total, dom->total_pages);
             return -EINVAL;
         }
@@ -936,11 +936,11 @@ int arch_setup_meminit(struct xc_dom_image *dom)
                 {
                     if ( pnode != XC_NUMA_NO_NODE )
                         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                                     "%s: failed to allocate 0x%"PRIx64" pages (v=%d, p=%d)\n",
+                                     "%s: failed to allocate 0x%"PRIx64" pages (v=%d, p=%d)",
                                      __func__, pages, i, pnode);
                     else
                         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                                     "%s: failed to allocate 0x%"PRIx64" pages\n",
+                                     "%s: failed to allocate 0x%"PRIx64" pages",
                                      __func__, pages);
                     return rc;
                 }
