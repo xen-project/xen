@@ -879,9 +879,8 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         for ( i = 0; i < nr_vmemranges; i++ )
         {
             unsigned int memflags;
-            uint64_t pages;
+            uint64_t pages, super_pages;
             unsigned int pnode = vnode_to_pnode[vmemranges[i].nid];
-            int nr_spages = dom->total_pages >> SUPERPAGE_PFN_SHIFT;
             xen_pfn_t extents[SUPERPAGE_BATCH_SIZE];
             xen_pfn_t pfn_base_idx;
 
@@ -891,15 +890,17 @@ int arch_setup_meminit(struct xc_dom_image *dom)
 
             pages = (vmemranges[i].end - vmemranges[i].start)
                 >> PAGE_SHIFT;
+            super_pages = pages >> SUPERPAGE_PFN_SHIFT;
             pfn_base = vmemranges[i].start >> PAGE_SHIFT;
 
             for ( pfn = pfn_base; pfn < pfn_base+pages; pfn++ )
                 dom->p2m_host[pfn] = pfn;
 
             pfn_base_idx = pfn_base;
-            while (nr_spages) {
-                int count = min(nr_spages, SUPERPAGE_BATCH_SIZE);
-                nr_spages -= count;
+            while (super_pages) {
+                uint64_t count =
+                    min_t(uint64_t, super_pages,SUPERPAGE_BATCH_SIZE);
+                super_pages -= count;
 
                 for ( pfn = pfn_base_idx, j = 0;
                       pfn < pfn_base_idx + (count << SUPERPAGE_PFN_SHIFT);
