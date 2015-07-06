@@ -682,33 +682,6 @@ retry_transaction:
         goto out;
     }
     libxl_vminfo_list_free(vm_list, nb_vm);
-    int hotplug_setting = libxl__hotplug_settings(gc, t);
-    if (hotplug_setting < 0) {
-        LOG(ERROR, "unable to get current hotplug scripts execution setting");
-        rc = ERROR_FAIL;
-        goto out;
-    }
-    if (libxl_defbool_val(info->run_hotplug_scripts) != hotplug_setting &&
-        (nb_vm - 1)) {
-        LOG(ERROR, "cannot change hotplug execution option once set, "
-                    "please shutdown all guests before changing it");
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
-    if (libxl_defbool_val(info->run_hotplug_scripts)) {
-        rc = libxl__xs_write_checked(gc, t, DISABLE_UDEV_PATH, "1");
-        if (rc) {
-            LOGE(ERROR, "unable to write %s = 1", DISABLE_UDEV_PATH);
-            goto out;
-        }
-    } else {
-        rc = libxl__xs_rm_checked(gc, t, DISABLE_UDEV_PATH);
-        if (rc) {
-            LOGE(ERROR, "unable to delete %s", DISABLE_UDEV_PATH);
-            goto out;
-        }
-    }
 
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/name", vm_path), info->name, strlen(info->name));

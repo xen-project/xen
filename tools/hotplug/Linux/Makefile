@@ -32,9 +32,6 @@ XEN_SCRIPT_DATA = xen-script-common.sh locking.sh logging.sh
 XEN_SCRIPT_DATA += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
 XEN_SCRIPT_DATA += block-common.sh
 
-UDEV_RULES_DIR = $(CONFIG_DIR)/udev
-UDEV_RULES = xen-backend.rules $(UDEV_RULES-y)
-
 .PHONY: all
 all: subdirs-all
 
@@ -42,7 +39,7 @@ all: subdirs-all
 build:
 
 .PHONY: install
-install: install-initd install-scripts install-udev subdirs-install
+install: install-initd install-scripts subdirs-install
 
 # See docs/misc/distro_mapping.txt for INITD_DIR location
 .PHONY: install-initd
@@ -68,15 +65,6 @@ install-scripts:
 	set -e; for i in $(XEN_SCRIPT_DATA); \
 	    do \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
-	done
-
-.PHONY: install-udev
-install-udev:
-	[ -d $(DESTDIR)$(UDEV_RULES_DIR) ] || \
-		$(INSTALL_DIR) $(DESTDIR)$(UDEV_RULES_DIR)/rules.d
-	set -e; for i in $(UDEV_RULES); \
-	    do \
-	    $(INSTALL_DATA) $$i $(DESTDIR)$(UDEV_RULES_DIR)/rules.d; \
 	done
 
 .PHONY: clean

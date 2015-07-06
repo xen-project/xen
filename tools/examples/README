@@ -24,7 +24,6 @@ vif-nat             - xen virtual network start/stop script in NAT mode
 vif-route           - xen virtual network start/stop script in routed mode
 xen-backend.agent   - calls block, vif-* scripts to add, remove, hotplug
                       devices  
-xen-backend.rules   - hotplug script rules
 xen-hotplug-common.sh - sourced by vif-common.sh
 xen-network-common.sh - sourced by vif-common.sh
 xen-script-common.sh  - sourced by xen-hotplug-common.sh

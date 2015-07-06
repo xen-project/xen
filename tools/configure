@@ -2403,7 +2403,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-ac_config_files="$ac_config_files ../config/Tools.mk hotplug/FreeBSD/rc.d/xencommons hotplug/Linux/init.d/sysconfig.xencommons hotplug/Linux/init.d/xen-watchdog hotplug/Linux/init.d/xencommons hotplug/Linux/init.d/xendomains hotplug/Linux/vif-setup hotplug/Linux/xen-backend.rules hotplug/Linux/xen-hotplug-common.sh hotplug/Linux/xendomains hotplug/NetBSD/rc.d/xencommons libxl/xenlight.pc.in libxl/xlutil.pc.in"
+ac_config_files="$ac_config_files ../config/Tools.mk hotplug/FreeBSD/rc.d/xencommons hotplug/Linux/init.d/sysconfig.xencommons hotplug/Linux/init.d/xen-watchdog hotplug/Linux/init.d/xencommons hotplug/Linux/init.d/xendomains hotplug/Linux/vif-setup hotplug/Linux/xen-hotplug-common.sh hotplug/Linux/xendomains hotplug/NetBSD/rc.d/xencommons libxl/xenlight.pc.in libxl/xlutil.pc.in"
 
 ac_config_headers="$ac_config_headers config.h"
 
@@ -10050,7 +10050,6 @@ do
     "hotplug/Linux/init.d/xencommons") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/xencommons" ;;
     "hotplug/Linux/init.d/xendomains") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/init.d/xendomains" ;;
     "hotplug/Linux/vif-setup") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/vif-setup" ;;
-    "hotplug/Linux/xen-backend.rules") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/xen-backend.rules" ;;
     "hotplug/Linux/xen-hotplug-common.sh") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/xen-hotplug-common.sh" ;;
     "hotplug/Linux/xendomains") CONFIG_FILES="$CONFIG_FILES hotplug/Linux/xendomains" ;;
     "hotplug/NetBSD/rc.d/xencommons") CONFIG_FILES="$CONFIG_FILES hotplug/NetBSD/rc.d/xencommons" ;;

@@ -3211,7 +3211,6 @@ out:
 int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
                                  uint32_t domid)
 {
-    int run_hotplug_scripts;
     int rc;
 
     if (!nic->mtu)
@@ -3241,12 +3240,6 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
     if ( !nic->script && asprintf(&nic->script, "%s/vif-bridge",
                                   libxl__xen_script_dir_path()) < 0 )
         return ERROR_FAIL;
-
-    run_hotplug_scripts = libxl__hotplug_settings(gc, XBT_NULL);
-    if (run_hotplug_scripts < 0) {
-        LOG(ERROR, "unable to get current hotplug scripts execution setting");
-        return run_hotplug_scripts;
-    }
 
     rc = libxl__resolve_domid(gc, nic->backend_domname, &nic->backend_domid);
     if (rc < 0) return rc;
@@ -4547,12 +4540,6 @@ int libxl_device_events_handler(libxl_ctx *ctx,
     rc = libxl__get_domid(gc, &domid);
     if (rc) {
         LOG(ERROR, "unable to get domain id");
-        goto out;
-    }
-
-    rc = libxl__xs_write_checked(gc, XBT_NULL, DISABLE_UDEV_PATH, "1");
-    if (rc) {
-        LOGE(ERROR, "unable to write %s = 1", DISABLE_UDEV_PATH);
         goto out;
     }
 

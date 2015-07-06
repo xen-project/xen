@@ -13,7 +13,6 @@ hotplug/Linux/init.d/xen-watchdog
 hotplug/Linux/init.d/xencommons
 hotplug/Linux/init.d/xendomains
 hotplug/Linux/vif-setup
-hotplug/Linux/xen-backend.rules
 hotplug/Linux/xen-hotplug-common.sh
 hotplug/Linux/xendomains
 hotplug/NetBSD/rc.d/xencommons

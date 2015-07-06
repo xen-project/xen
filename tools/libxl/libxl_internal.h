@@ -104,7 +104,6 @@
 #define STUBDOM_CONSOLE_SERIAL 3
 #define STUBDOM_SPECIAL_CONSOLES 3
 #define TAP_DEVICE_SUFFIX "-emu"
-#define DISABLE_UDEV_PATH "libxl/disable_udev"
 #define DOMID_XS_PATH "domid"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
