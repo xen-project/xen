@@ -954,6 +954,129 @@ static int make_timer_node(const struct domain *d, void *fdt,
     return res;
 }
 
+static int map_interrupt_to_domain(const struct dt_device_node *dev,
+                                   const struct dt_irq *dt_irq,
+                                   void *data)
+{
+    struct domain *d = data;
+    bool_t need_mapping = !dt_device_for_passthrough(dev);
+    unsigned int irq = dt_irq->irq;
+    int res;
+
+    if ( irq < NR_LOCAL_IRQS )
+    {
+        printk(XENLOG_ERR "%s: IRQ%"PRId32" is not a SPI\n",
+               dt_node_name(dev), irq);
+        return -EINVAL;
+    }
+
+    /* Setup the IRQ type */
+    res = irq_set_spi_type(irq, dt_irq->type);
+    if ( res )
+    {
+        printk(XENLOG_ERR
+               "%s: Unable to setup IRQ%"PRId32" to dom%d\n",
+               dt_node_name(dev), irq, d->domain_id);
+        return res;
+    }
+
+    res = irq_permit_access(d, irq);
+    if ( res )
+    {
+        printk(XENLOG_ERR "Unable to permit to dom%u access to IRQ %u\n",
+               d->domain_id, irq);
+        return res;
+    }
+
+    if ( need_mapping )
+    {
+        /*
+         * Checking the return of vgic_reserve_virq is not
+         * necessary. It should not fail except when we try to map
+         * the IRQ twice. This can legitimately happen if the IRQ is shared
+         */
+        vgic_reserve_virq(d, irq);
+
+        res = route_irq_to_guest(d, irq, irq, dt_node_name(dev));
+        if ( res < 0 )
+        {
+            printk(XENLOG_ERR "Unable to map IRQ%"PRId32" to dom%d\n",
+                   irq, d->domain_id);
+            return res;
+        }
+    }
+
+    DPRINT("  - IRQ: %u\n", irq);
+
+    return 0;
+}
+
+static int map_range_to_domain(const struct dt_device_node *dev,
+                               u64 addr, u64 len,
+                               void *data)
+{
+    struct domain *d = data;
+    bool_t need_mapping = !dt_device_for_passthrough(dev);
+    int res;
+
+    res = iomem_permit_access(d, paddr_to_pfn(addr),
+                              paddr_to_pfn(PAGE_ALIGN(addr + len - 1)));
+    if ( res )
+    {
+        printk(XENLOG_ERR "Unable to permit to dom%d access to"
+               " 0x%"PRIx64" - 0x%"PRIx64"\n",
+               d->domain_id,
+               addr & PAGE_MASK, PAGE_ALIGN(addr + len) - 1);
+        return res;
+    }
+
+    if ( need_mapping )
+    {
+        res = map_mmio_regions(d,
+                               paddr_to_pfn(addr),
+                               DIV_ROUND_UP(len, PAGE_SIZE),
+                               paddr_to_pfn(addr));
+        if ( res < 0 )
+        {
+            printk(XENLOG_ERR "Unable to map 0x%"PRIx64
+                   " - 0x%"PRIx64" in domain %d\n",
+                   addr & PAGE_MASK, PAGE_ALIGN(addr + len) - 1,
+                   d->domain_id);
+            return res;
+        }
+    }
+
+    DPRINT("  - MMIO: %010"PRIx64" - %010"PRIx64"\n", addr, addr + len);
+
+    return 0;
+}
+
+/*
+ * For a node which describes a discoverable bus (such as a PCI bus)
+ * then we may need to perform additional mappings in order to make
+ * the child resources available to domain 0.
+ */
+static int map_device_children(struct domain *d,
+                               const struct dt_device_node *dev)
+{
+    int ret;
+
+    if ( dt_device_type_is_equal(dev, "pci") )
+    {
+        DPRINT("Mapping children of %s to guest\n", dt_node_full_name(dev));
+
+        ret = dt_for_each_irq_map(dev, &map_interrupt_to_domain, d);
+        if ( ret < 0 )
+            return ret;
+
+        ret = dt_for_each_range(dev, &map_range_to_domain, d);
+        if ( ret < 0 )
+            return ret;
+    }
+
+    return 0;
+}
+
 /*
  * For a given device node:
  *  - Give permission to the guest to manage IRQ and MMIO range
@@ -1092,6 +1215,10 @@ static int handle_device(struct domain *d, struct dt_device_node *dev)
             }
         }
     }
+
+    res = map_device_children(d, dev);
+    if ( res )
+        return res;
 
     return 0;
 }
