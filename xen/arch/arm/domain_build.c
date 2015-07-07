@@ -1024,12 +1024,6 @@ static int handle_device(struct domain *d, struct dt_device_node *dev)
         irq = res;
 
         DPRINT("irq %u = %u\n", i, irq);
-        /*
-         * Checking the return of vgic_reserve_virq is not
-         * necessary. It should not fail except when we try to map
-         * the IRQ twice. This can legitimately happen if the IRQ is shared
-         */
-        vgic_reserve_virq(d, irq);
 
         res = irq_permit_access(d, irq);
         if ( res )
