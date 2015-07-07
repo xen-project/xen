@@ -160,7 +160,7 @@ static void *freebsd_privcmd_map_foreign_bulk(xc_interface *xch,
     addr = mmap(NULL, num << XC_PAGE_SHIFT, prot, MAP_SHARED, fd, 0);
     if ( addr == MAP_FAILED )
     {
-        PERROR("xc_map_foreign_batch: mmap failed");
+        PERROR("xc_map_foreign_bulk: mmap failed");
         return NULL;
     }
 
@@ -174,7 +174,7 @@ static void *freebsd_privcmd_map_foreign_bulk(xc_interface *xch,
     if ( rc < 0 )
     {
         int saved_errno = errno;
-        PERROR("xc_map_foreign_batch: ioctl failed");
+        PERROR("xc_map_foreign_bulk: ioctl failed");
         (void)munmap(addr, num << XC_PAGE_SHIFT);
         errno = saved_errno;
         return NULL;
