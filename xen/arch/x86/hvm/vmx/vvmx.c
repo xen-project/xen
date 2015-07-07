@@ -174,13 +174,6 @@ int nvmx_vcpu_reset(struct vcpu *v)
     return 0;
 }
 
-uint64_t nvmx_vcpu_guestcr3(struct vcpu *v)
-{
-    /* TODO */
-    ASSERT(0);
-    return 0;
-}
-
 uint64_t nvmx_vcpu_eptp_base(struct vcpu *v)
 {
     uint64_t eptp_base;
@@ -188,13 +181,6 @@ uint64_t nvmx_vcpu_eptp_base(struct vcpu *v)
 
     eptp_base = __get_vvmcs(nvcpu->nv_vvmcx, EPT_POINTER);
     return eptp_base & PAGE_MASK;
-}
-
-uint32_t nvmx_vcpu_asid(struct vcpu *v)
-{
-    /* TODO */
-    ASSERT(0);
-    return 0;
 }
 
 bool_t nvmx_ept_enabled(struct vcpu *v)
@@ -514,8 +500,8 @@ static void vmreturn(struct cpu_user_regs *regs, enum vmx_ops_result ops_res)
     regs->eflags = eflags;
 }
 
-int nvmx_intercepts_exception(struct vcpu *v, unsigned int trap,
-                               int error_code)
+bool_t nvmx_intercepts_exception(struct vcpu *v, unsigned int trap,
+                                 int error_code)
 {
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     u32 exception_bitmap, pfec_match=0, pfec_mask=0;

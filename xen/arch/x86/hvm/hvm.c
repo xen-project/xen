@@ -6431,66 +6431,6 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
     return rc;
 }
 
-int nhvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
-{
-    if (hvm_funcs.nhvm_vcpu_hostrestore)
-        return hvm_funcs.nhvm_vcpu_hostrestore(v, regs);
-    return -EOPNOTSUPP;
-}
-
-int nhvm_vcpu_vmexit(struct vcpu *v, struct cpu_user_regs *regs,
-                     uint64_t exitcode)
-{
-    if (hvm_funcs.nhvm_vcpu_vmexit)
-        return hvm_funcs.nhvm_vcpu_vmexit(v, regs, exitcode);
-    return -EOPNOTSUPP;
-}
-
-int nhvm_vcpu_vmexit_trap(struct vcpu *v, struct hvm_trap *trap)
-{
-    return hvm_funcs.nhvm_vcpu_vmexit_trap(v, trap);
-}
-
-uint64_t nhvm_vcpu_guestcr3(struct vcpu *v)
-{
-    if (hvm_funcs.nhvm_vcpu_guestcr3)
-        return hvm_funcs.nhvm_vcpu_guestcr3(v);
-    return -EOPNOTSUPP;
-}
-
-uint64_t nhvm_vcpu_p2m_base(struct vcpu *v)
-{
-    if ( hvm_funcs.nhvm_vcpu_p2m_base )
-        return hvm_funcs.nhvm_vcpu_p2m_base(v);
-    return -EOPNOTSUPP;
-}
-
-uint32_t nhvm_vcpu_asid(struct vcpu *v)
-{
-    if (hvm_funcs.nhvm_vcpu_asid)
-        return hvm_funcs.nhvm_vcpu_asid(v);
-    return -EOPNOTSUPP;
-}
-
-int nhvm_vmcx_guest_intercepts_trap(struct vcpu *v, unsigned int trap, int errcode)
-{
-    if (hvm_funcs.nhvm_vmcx_guest_intercepts_trap)
-        return hvm_funcs.nhvm_vmcx_guest_intercepts_trap(v, trap, errcode);
-    return -EOPNOTSUPP;
-}
-
-bool_t nhvm_vmcx_hap_enabled(struct vcpu *v)
-{
-    if (hvm_funcs.nhvm_vmcx_hap_enabled)
-        return hvm_funcs.nhvm_vmcx_hap_enabled(v);
-    return -EOPNOTSUPP;
-}
-
-enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v)
-{
-    return hvm_funcs.nhvm_intr_blocked(v);
-}
-
 /*
  * Local variables:
  * mode: C

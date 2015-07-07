@@ -172,16 +172,11 @@ struct hvm_function_table {
     int (*nhvm_vcpu_initialise)(struct vcpu *v);
     void (*nhvm_vcpu_destroy)(struct vcpu *v);
     int (*nhvm_vcpu_reset)(struct vcpu *v);
-    int (*nhvm_vcpu_hostrestore)(struct vcpu *v,
-                                struct cpu_user_regs *regs);
-    int (*nhvm_vcpu_vmexit)(struct vcpu *v, struct cpu_user_regs *regs,
-                                uint64_t exitcode);
     int (*nhvm_vcpu_vmexit_trap)(struct vcpu *v, struct hvm_trap *trap);
-    uint64_t (*nhvm_vcpu_guestcr3)(struct vcpu *v);
     uint64_t (*nhvm_vcpu_p2m_base)(struct vcpu *v);
-    uint32_t (*nhvm_vcpu_asid)(struct vcpu *v);
-    int (*nhvm_vmcx_guest_intercepts_trap)(struct vcpu *v, 
-                               unsigned int trapnr, int errcode);
+    bool_t (*nhvm_vmcx_guest_intercepts_trap)(struct vcpu *v,
+                                              unsigned int trapnr,
+                                              int errcode);
 
     bool_t (*nhvm_vmcx_hap_enabled)(struct vcpu *v);
 
@@ -479,35 +474,42 @@ int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
  * Nested HVM
  */
 
-/* Restores l1 guest state */
-int nhvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs);
-/* Fill l1 guest's VMCB/VMCS with data provided by generic exit codes
- * (do conversion as needed), other misc SVM/VMX specific tweaks to make
- * it work */
-int nhvm_vcpu_vmexit(struct vcpu *v, struct cpu_user_regs *regs,
-                     uint64_t exitcode);
 /* inject vmexit into l1 guest. l1 guest will see a VMEXIT due to
  * 'trapnr' exception.
  */ 
-int nhvm_vcpu_vmexit_trap(struct vcpu *v, struct hvm_trap *trap);
+static inline int nhvm_vcpu_vmexit_trap(struct vcpu *v, struct hvm_trap *trap)
+{
+    return hvm_funcs.nhvm_vcpu_vmexit_trap(v, trap);
+}
 
-/* returns l2 guest cr3 in l2 guest physical address space. */
-uint64_t nhvm_vcpu_guestcr3(struct vcpu *v);
 /* returns l1 guest's cr3 that points to the page table used to
  * translate l2 guest physical address to l1 guest physical address.
  */
-uint64_t nhvm_vcpu_p2m_base(struct vcpu *v);
-/* returns the asid number l1 guest wants to use to run the l2 guest */
-uint32_t nhvm_vcpu_asid(struct vcpu *v);
+static inline uint64_t nhvm_vcpu_p2m_base(struct vcpu *v)
+{
+    return hvm_funcs.nhvm_vcpu_p2m_base(v);
+}
 
 /* returns true, when l1 guest intercepts the specified trap */
-int nhvm_vmcx_guest_intercepts_trap(struct vcpu *v, 
-                                    unsigned int trapnr, int errcode);
+static inline bool_t nhvm_vmcx_guest_intercepts_trap(struct vcpu *v,
+                                                     unsigned int trap,
+                                                     int errcode)
+{
+    return hvm_funcs.nhvm_vmcx_guest_intercepts_trap(v, trap, errcode);
+}
 
 /* returns true when l1 guest wants to use hap to run l2 guest */
-bool_t nhvm_vmcx_hap_enabled(struct vcpu *v);
+static inline bool_t nhvm_vmcx_hap_enabled(struct vcpu *v)
+{
+    return hvm_funcs.nhvm_vmcx_hap_enabled(v);
+}
+
 /* interrupt */
-enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v);
+static inline enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v)
+{
+    return hvm_funcs.nhvm_intr_blocked(v);
+}
+
 
 #ifndef NDEBUG
 /* Permit use of the Forced Emulation Prefix in HVM guests */

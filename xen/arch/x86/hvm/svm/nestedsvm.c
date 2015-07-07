@@ -246,7 +246,7 @@ static int nsvm_vcpu_hostsave(struct vcpu *v, unsigned int inst_len)
     return 0;
 }
 
-int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
+static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
@@ -761,7 +761,7 @@ nsvm_vcpu_vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     return 0;
 }
 
-int
+static int
 nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
     uint64_t exitcode)
 {
@@ -821,19 +821,9 @@ nsvm_vcpu_vmexit_trap(struct vcpu *v, struct hvm_trap *trap)
     return NESTEDHVM_VMEXIT_DONE;
 }
 
-uint64_t nsvm_vcpu_guestcr3(struct vcpu *v)
-{
-    return vcpu_nestedsvm(v).ns_vmcb_guestcr3;
-}
-
 uint64_t nsvm_vcpu_hostcr3(struct vcpu *v)
 {
     return vcpu_nestedsvm(v).ns_vmcb_hostcr3;
-}
-
-uint32_t nsvm_vcpu_asid(struct vcpu *v)
-{
-    return vcpu_nestedsvm(v).ns_guest_asid;
 }
 
 static int
@@ -911,7 +901,7 @@ nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
     return NESTEDHVM_VMEXIT_INJECT;
 }
 
-int
+static bool_t
 nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
     struct cpu_user_regs *regs, uint64_t exitcode)
 {
@@ -994,7 +984,7 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
     return 1;
 }
 
-int
+bool_t
 nsvm_vmcb_guest_intercepts_trap(struct vcpu *v, unsigned int trapnr, int errcode)
 {
     return nsvm_vmcb_guest_intercepts_exitcode(v,
@@ -1409,7 +1399,7 @@ nestedsvm_vmexit_n2n1(struct vcpu *v, struct cpu_user_regs *regs)
     if (rc)
         ret = NESTEDHVM_VMEXIT_ERROR;
 
-    rc = nhvm_vcpu_hostrestore(v, regs);
+    rc = nsvm_vcpu_hostrestore(v, regs);
     if (rc)
         ret = NESTEDHVM_VMEXIT_FATALERROR;
 
@@ -1461,7 +1451,7 @@ nestedsvm_vcpu_vmexit(struct vcpu *v, struct cpu_user_regs *regs,
     /* Prepare for running the l1 guest. Make the actual
      * modifications to the virtual VMCB/VMCS.
      */
-    rc = nhvm_vcpu_vmexit(v, regs, exitcode);
+    rc = nsvm_vcpu_vmexit_inject(v, regs, exitcode);
 
     /* If l1 guest uses shadow paging, update the paging mode. */
     if (!nestedhvm_paging_mode_hap(v))
