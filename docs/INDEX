@@ -20,7 +20,6 @@ misc/xl-disk-configuration	XL Disk Configuration
 misc/xl-network-configuration	XL Network Configuration
 misc/distro_mapping		Distro Directory Layouts
 misc/dump-core-format		Xen Core Dump Format
-misc/sedf_scheduler_mini-HOWTO	sEDF Mini HOWTO
 misc/vtd			VT-d HOWTO
 misc/vtpm			Virtual TPM
 misc/xen-error-handling		Xen Error Handling
