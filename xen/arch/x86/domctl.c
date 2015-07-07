@@ -1162,6 +1162,26 @@ long arch_do_domctl(
         }
         break;
 
+    case XEN_DOMCTL_psr_cat_op:
+        switch ( domctl->u.psr_cat_op.cmd )
+        {
+        case XEN_DOMCTL_PSR_CAT_OP_SET_L3_CBM:
+            ret = psr_set_l3_cbm(d, domctl->u.psr_cat_op.target,
+                                 domctl->u.psr_cat_op.data);
+            break;
+
+        case XEN_DOMCTL_PSR_CAT_OP_GET_L3_CBM:
+            ret = psr_get_l3_cbm(d, domctl->u.psr_cat_op.target,
+                                 &domctl->u.psr_cat_op.data);
+            copyback = 1;
+            break;
+
+        default:
+            ret = -EOPNOTSUPP;
+            break;
+        }
+        break;
+
     default:
         ret = iommu_do_domctl(domctl, d, u_domctl);
         break;

@@ -49,6 +49,14 @@ static unsigned int __read_mostly opt_cos_max = 255;
 static uint64_t rmid_mask;
 static DEFINE_PER_CPU(struct psr_assoc, psr_assoc);
 
+static unsigned int get_socket_cpu(unsigned int socket)
+{
+    if ( likely(socket < nr_sockets) )
+        return cpumask_any(socket_cpumask[socket]);
+
+    return nr_cpu_ids;
+}
+
 static void __init parse_psr_bool(char *s, char *value, char *feature,
                                   unsigned int mask)
 {
@@ -240,6 +248,139 @@ int psr_get_cat_l3_info(unsigned int socket, uint32_t *cbm_len,
 
     *cbm_len = info->cbm_len;
     *cos_max = info->cos_max;
+
+    return 0;
+}
+
+int psr_get_l3_cbm(struct domain *d, unsigned int socket, uint64_t *cbm)
+{
+    struct psr_cat_socket_info *info = get_cat_socket_info(socket);
+
+    if ( IS_ERR(info) )
+        return PTR_ERR(info);
+
+    *cbm = info->cos_to_cbm[d->arch.psr_cos_ids[socket]].cbm;
+
+    return 0;
+}
+
+static bool_t psr_check_cbm(unsigned int cbm_len, uint64_t cbm)
+{
+    unsigned int first_bit, zero_bit;
+
+    /* Set bits should only in the range of [0, cbm_len). */
+    if ( cbm & (~0ull << cbm_len) )
+        return 0;
+
+    /* At least one bit need to be set. */
+    if ( cbm == 0 )
+        return 0;
+
+    first_bit = find_first_bit(&cbm, cbm_len);
+    zero_bit = find_next_zero_bit(&cbm, cbm_len, first_bit);
+
+    /* Set bits should be contiguous. */
+    if ( zero_bit < cbm_len &&
+         find_next_bit(&cbm, cbm_len, zero_bit) < cbm_len )
+        return 0;
+
+    return 1;
+}
+
+struct cos_cbm_info
+{
+    unsigned int cos;
+    uint64_t cbm;
+};
+
+static void do_write_l3_cbm(void *data)
+{
+    struct cos_cbm_info *info = data;
+
+    wrmsrl(MSR_IA32_PSR_L3_MASK(info->cos), info->cbm);
+}
+
+static int write_l3_cbm(unsigned int socket, unsigned int cos, uint64_t cbm)
+{
+    struct cos_cbm_info info = { .cos = cos, .cbm = cbm };
+
+    if ( socket == cpu_to_socket(smp_processor_id()) )
+        do_write_l3_cbm(&info);
+    else
+    {
+        unsigned int cpu = get_socket_cpu(socket);
+
+        if ( cpu >= nr_cpu_ids )
+            return -EBADSLT;
+        on_selected_cpus(cpumask_of(cpu), do_write_l3_cbm, &info, 1);
+    }
+
+    return 0;
+}
+
+int psr_set_l3_cbm(struct domain *d, unsigned int socket, uint64_t cbm)
+{
+    unsigned int old_cos, cos;
+    struct psr_cat_cbm *map, *found = NULL;
+    struct psr_cat_socket_info *info = get_cat_socket_info(socket);
+
+    if ( IS_ERR(info) )
+        return PTR_ERR(info);
+
+    if ( !psr_check_cbm(info->cbm_len, cbm) )
+        return -EINVAL;
+
+    old_cos = d->arch.psr_cos_ids[socket];
+    map = info->cos_to_cbm;
+
+    spin_lock(&info->cbm_lock);
+
+    for ( cos = 0; cos <= info->cos_max; cos++ )
+    {
+        /* If still not found, then keep unused one. */
+        if ( !found && cos != 0 && map[cos].ref == 0 )
+            found = map + cos;
+        else if ( map[cos].cbm == cbm )
+        {
+            if ( unlikely(cos == old_cos) )
+            {
+                ASSERT(cos == 0 || map[cos].ref != 0);
+                spin_unlock(&info->cbm_lock);
+                return 0;
+            }
+            found = map + cos;
+            break;
+        }
+    }
+
+    /* If old cos is referred only by the domain, then use it. */
+    if ( !found && map[old_cos].ref == 1 )
+        found = map + old_cos;
+
+    if ( !found )
+    {
+        spin_unlock(&info->cbm_lock);
+        return -EUSERS;
+    }
+
+    cos = found - map;
+    if ( found->cbm != cbm )
+    {
+        int ret = write_l3_cbm(socket, cos, cbm);
+
+        if ( ret )
+        {
+            spin_unlock(&info->cbm_lock);
+            return ret;
+        }
+        found->cbm = cbm;
+    }
+
+    found->ref++;
+    map[old_cos].ref--;
+    spin_unlock(&info->cbm_lock);
+
+    d->arch.psr_cos_ids[socket] = cos;
 
     return 0;
 }
