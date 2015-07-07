@@ -15,6 +15,7 @@
  */
 #include <xen/init.h>
 #include <xen/cpu.h>
+#include <xen/err.h>
 #include <xen/sched.h>
 #include <asm/psr.h>
 
@@ -214,6 +215,33 @@ void psr_ctxt_switch_to(struct domain *d)
         wrmsrl(MSR_IA32_PSR_ASSOC, reg);
         psra->val = reg;
     }
+}
+static struct psr_cat_socket_info *get_cat_socket_info(unsigned int socket)
+{
+    if ( !cat_socket_info )
+        return ERR_PTR(-ENODEV);
+
+    if ( socket >= nr_sockets )
+        return ERR_PTR(-EBADSLT);
+
+    if ( !test_bit(socket, cat_socket_enable) )
+        return ERR_PTR(-ENOENT);
+
+    return cat_socket_info + socket;
+}
+
+int psr_get_cat_l3_info(unsigned int socket, uint32_t *cbm_len,
+                        uint32_t *cos_max)
+{
+    struct psr_cat_socket_info *info = get_cat_socket_info(socket);
+
+    if ( IS_ERR(info) )
+        return PTR_ERR(info);
+
+    *cbm_len = info->cbm_len;
+    *cos_max = info->cos_max;
+
+    return 0;
 }
 
 /* Called with domain lock held, no extra lock needed for 'psr_cos_ids' */

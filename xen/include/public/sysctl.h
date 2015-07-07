@@ -694,6 +694,20 @@ struct xen_sysctl_pcitopoinfo {
 typedef struct xen_sysctl_pcitopoinfo xen_sysctl_pcitopoinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_pcitopoinfo_t);
 
+#define XEN_SYSCTL_PSR_CAT_get_l3_info               0
+struct xen_sysctl_psr_cat_op {
+    uint32_t cmd;       /* IN: XEN_SYSCTL_PSR_CAT_* */
+    uint32_t target;    /* IN */
+    union {
+        struct {
+            uint32_t cbm_len;   /* OUT: CBM length */
+            uint32_t cos_max;   /* OUT: Maximum COS */
+        } l3_info;
+    } u;
+};
+typedef struct xen_sysctl_psr_cat_op xen_sysctl_psr_cat_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_psr_cat_op_t);
+
 struct xen_sysctl {
     uint32_t cmd;
 #define XEN_SYSCTL_readconsole                    1
@@ -717,6 +731,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_coverage_op                   20
 #define XEN_SYSCTL_psr_cmt_op                    21
 #define XEN_SYSCTL_pcitopoinfo                   22
+#define XEN_SYSCTL_psr_cat_op                    23
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
@@ -740,6 +755,7 @@ struct xen_sysctl {
         struct xen_sysctl_scheduler_op      scheduler_op;
         struct xen_sysctl_coverage_op       coverage_op;
         struct xen_sysctl_psr_cmt_op        psr_cmt_op;
+        struct xen_sysctl_psr_cat_op        psr_cat_op;
         uint8_t                             pad[128];
     } u;
 };
