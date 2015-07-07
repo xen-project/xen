@@ -698,24 +698,47 @@ void arch_domain_unpause(struct domain *d)
         viridian_time_ref_count_thaw(d);
 }
 
+/*
+ * These are the masks of CR4 bits (subject to hardware availability) which a
+ * PV guest may not legitimiately attempt to modify.
+ */
+static unsigned long __read_mostly pv_cr4_mask, compat_pv_cr4_mask;
+
+static int __init init_pv_cr4_masks(void)
+{
+    unsigned long common_mask = ~X86_CR4_TSD;
+
+    /*
+     * All PV guests may attempt to modify TSD, DE and OSXSAVE.
+     */
+    if ( cpu_has_de )
+        common_mask &= ~X86_CR4_DE;
+    if ( cpu_has_xsave )
+        common_mask &= ~X86_CR4_OSXSAVE;
+
+    pv_cr4_mask = compat_pv_cr4_mask = common_mask;
+
+    /*
+     * 64bit PV guests may attempt to modify FSGSBASE.
+     */
+    if ( cpu_has_fsgsbase )
+        pv_cr4_mask &= ~X86_CR4_FSGSBASE;
+
+    return 0;
+}
+__initcall(init_pv_cr4_masks);
+
 unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)
 {
-    unsigned long hv_cr4_mask, hv_cr4 = real_cr4_to_pv_guest_cr4(read_cr4());
+    unsigned long hv_cr4 = real_cr4_to_pv_guest_cr4(read_cr4());
+    unsigned long mask = is_pv_32bit_vcpu(v) ? compat_pv_cr4_mask : pv_cr4_mask;
 
-    hv_cr4_mask = ~X86_CR4_TSD;
-    if ( cpu_has_de )
-        hv_cr4_mask &= ~X86_CR4_DE;
-    if ( cpu_has_fsgsbase && !is_pv_32bit_vcpu(v) )
-        hv_cr4_mask &= ~X86_CR4_FSGSBASE;
-    if ( cpu_has_xsave )
-        hv_cr4_mask &= ~X86_CR4_OSXSAVE;
-
-    if ( (guest_cr4 & hv_cr4_mask) != (hv_cr4 & hv_cr4_mask) )
+    if ( (guest_cr4 & mask) != (hv_cr4 & mask) )
         printk(XENLOG_G_WARNING
                "d%d attempted to change %pv's CR4 flags %08lx -> %08lx\n",
                current->domain->domain_id, v, hv_cr4, guest_cr4);
 
-    return (hv_cr4 & hv_cr4_mask) | (guest_cr4 & ~hv_cr4_mask);
+    return (hv_cr4 & mask) | (guest_cr4 & ~mask);
 }
 
 #define xen_vcpu_guest_context vcpu_guest_context
