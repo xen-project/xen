@@ -728,10 +728,10 @@ void dump_runq(unsigned char key)
 
     print_cpumap("Online Cpus", &cpu_online_map);
     if ( !cpumask_empty(&cpupool_free_cpus) )
+    {
         print_cpumap("Free Cpus", &cpupool_free_cpus);
-
-    printk("Idle cpupool:\n");
-    schedule_dump(NULL);
+        schedule_dump(NULL);
+    }
 
     for_each_cpupool(c)
     {

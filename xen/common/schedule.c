@@ -1473,16 +1473,24 @@ void scheduler_free(struct scheduler *sched)
 
 void schedule_dump(struct cpupool *c)
 {
-    int               i;
+    unsigned int      i;
     struct scheduler *sched;
     cpumask_t        *cpus;
 
     /* Locking, if necessary, must be handled withing each scheduler */
 
-    sched = (c == NULL) ? &ops : c->sched;
-    cpus = cpupool_scheduler_cpumask(c);
-    printk("Scheduler: %s (%s)\n", sched->name, sched->opt_name);
-    SCHED_OP(sched, dump_settings);
+    if ( c != NULL )
+    {
+        sched = c->sched;
+        cpus = c->cpu_valid;
+        printk("Scheduler: %s (%s)\n", sched->name, sched->opt_name);
+        SCHED_OP(sched, dump_settings);
+    }
+    else
+    {
+        sched = &ops;
+        cpus = &cpupool_free_cpus;
+    }
 
     for_each_cpu (i, cpus)
     {
