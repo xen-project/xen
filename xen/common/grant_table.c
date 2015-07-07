@@ -1829,7 +1829,8 @@ gnttab_transfer(
         max_bitsize = domain_clamp_alloc_bitsize(
             e, e->grant_table->gt_version > 1 || paging_mode_translate(e)
                ? BITS_PER_LONG + PAGE_SHIFT : 32 + PAGE_SHIFT);
-        if ( (1UL << (max_bitsize - PAGE_SHIFT)) <= mfn )
+        if ( max_bitsize < BITS_PER_LONG + PAGE_SHIFT &&
+             (mfn >> (max_bitsize - PAGE_SHIFT)) )
         {
             struct page_info *new_page;
 
