@@ -530,6 +530,7 @@ static int cpupool_cpu_remove(unsigned int cpu)
             if ( cpumask_test_cpu(cpu, (*c)->cpu_valid ) )
             {
                 cpumask_set_cpu(cpu, (*c)->cpu_suspended);
+                cpumask_clear_cpu(cpu, (*c)->cpu_valid);
                 break;
             }
         }
@@ -552,6 +553,7 @@ static int cpupool_cpu_remove(unsigned int cpu)
          * If we are not suspending, we are hot-unplugging cpu, and that is
          * allowed only for CPUs in pool0.
          */
+        cpumask_clear_cpu(cpu, cpupool0->cpu_valid);
         ret = 0;
     }
 

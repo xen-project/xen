@@ -887,7 +887,6 @@ void __cpu_disable(void)
     remove_siblinginfo(cpu);
 
     /* It's now safe to remove this processor from the online map */
-    cpumask_clear_cpu(cpu, cpupool0->cpu_valid);
     cpumask_clear_cpu(cpu, &cpu_online_map);
     fixup_irqs();
 
