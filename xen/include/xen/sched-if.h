@@ -165,7 +165,6 @@ struct scheduler {
     void         (*tick_resume)     (const struct scheduler *, unsigned int);
 };
 
-extern const struct scheduler sched_sedf_def;
 extern const struct scheduler sched_credit_def;
 extern const struct scheduler sched_credit2_def;
 extern const struct scheduler sched_arinc653_def;

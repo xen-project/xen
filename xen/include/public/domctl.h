@@ -324,7 +324,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_max_vcpus_t);
 
 /* XEN_DOMCTL_scheduler_op */
 /* Scheduler types. */
-#define XEN_SCHEDULER_SEDF     4
+/* #define XEN_SCHEDULER_SEDF  4 (Removed) */
 #define XEN_SCHEDULER_CREDIT   5
 #define XEN_SCHEDULER_CREDIT2  6
 #define XEN_SCHEDULER_ARINC653 7
@@ -337,13 +337,6 @@ struct xen_domctl_scheduler_op {
     uint32_t sched_id;  /* XEN_SCHEDULER_* */
     uint32_t cmd;       /* XEN_DOMCTL_SCHEDOP_* */
     union {
-        struct xen_domctl_sched_sedf {
-            uint64_aligned_t period;
-            uint64_aligned_t slice;
-            uint64_aligned_t latency;
-            uint32_t extratime;
-            uint32_t weight;
-        } sedf;
         struct xen_domctl_sched_credit {
             uint16_t weight;
             uint16_t cap;

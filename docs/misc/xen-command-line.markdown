@@ -1217,7 +1217,7 @@ Map the HPET page as read only in Dom0. If disabled the page will be mapped
 with read and write permissions.
 
 ### sched
-> `= credit | credit2 | sedf | arinc653`
+> `= credit | credit2 | arinc653`
 
 > Default: `sched=credit`
 

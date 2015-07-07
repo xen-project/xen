@@ -75,7 +75,7 @@
 /* Per-scheduler IDs, to identify scheduler specific events */
 #define TRC_SCHED_CSCHED   0
 #define TRC_SCHED_CSCHED2  1
-#define TRC_SCHED_SEDF     2
+/* #define XEN_SCHEDULER_SEDF 2 (Removed) */
 #define TRC_SCHED_ARINC653 3
 #define TRC_SCHED_RTDS     4
 
