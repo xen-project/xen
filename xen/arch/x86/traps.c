@@ -1552,8 +1552,8 @@ void do_page_fault(struct cpu_user_regs *regs)
  */
 void __init do_early_page_fault(struct cpu_user_regs *regs)
 {
-    static int stuck;
-    static unsigned long prev_eip, prev_cr2;
+    static unsigned int __initdata stuck;
+    static unsigned long __initdata prev_eip, prev_cr2;
     unsigned long cr2 = read_cr2();
 
     BUG_ON(smp_processor_id() != 0);
