@@ -36,6 +36,7 @@ struct psr_cat_socket_info {
 
 struct psr_assoc {
     uint64_t val;
+    uint64_t cos_mask;
 };
 
 struct psr_cmt *__read_mostly psr_cmt;
@@ -201,13 +202,28 @@ static inline void psr_assoc_init(void)
 {
     struct psr_assoc *psra = &this_cpu(psr_assoc);
 
-    if ( psr_cmt_enabled() )
+    if ( cat_socket_info )
+    {
+        unsigned int socket = cpu_to_socket(smp_processor_id());
+
+        if ( test_bit(socket, cat_socket_enable) )
+            psra->cos_mask = ((1ull << get_count_order(
+                             cat_socket_info[socket].cos_max)) - 1) << 32;
+    }
+
+    if ( psr_cmt_enabled() || psra->cos_mask )
         rdmsrl(MSR_IA32_PSR_ASSOC, psra->val);
 }
 
 static inline void psr_assoc_rmid(uint64_t *reg, unsigned int rmid)
 {
     *reg = (*reg & ~rmid_mask) | (rmid & rmid_mask);
+}
+
+static inline void psr_assoc_cos(uint64_t *reg, unsigned int cos,
+                                 uint64_t cos_mask)
+{
+    *reg = (*reg & ~cos_mask) | (((uint64_t)cos << 32) & cos_mask);
 }
 
 void psr_ctxt_switch_to(struct domain *d)
@@ -217,6 +233,11 @@ void psr_ctxt_switch_to(struct domain *d)
 
     if ( psr_cmt_enabled() )
         psr_assoc_rmid(&reg, d->arch.psr_rmid);
+
+    if ( psra->cos_mask )
+        psr_assoc_cos(&reg, d->arch.psr_cos_ids ?
+                      d->arch.psr_cos_ids[cpu_to_socket(smp_processor_id())] :
+                      0, psra->cos_mask);
 
     if ( reg != psra->val )
     {
