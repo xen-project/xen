@@ -51,7 +51,7 @@ LDLIBS_libxenstat  = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(XEN_LIBXENSTAT)/
 SHLIB_libxenstat  = -Wl,-rpath-link=$(XEN_LIBXENSTAT)
 
 CFLAGS_libxenvchan = -I$(XEN_LIBVCHAN)
-LDLIBS_libxenvchan = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) -L$(XEN_LIBVCHAN) -lxenvchan
+LDLIBS_libxenvchan = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(XEN_LIBVCHAN)/libxenvchan$(libextension)
 SHLIB_libxenvchan  = -Wl,-rpath-link=$(XEN_LIBVCHAN)
 
 ifeq ($(debug),y)
@@ -65,7 +65,7 @@ LIBXL_BLKTAP ?= $(CONFIG_BLKTAP2)
 
 ifeq ($(LIBXL_BLKTAP),y)
 CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_xeninclude)
-LDLIBS_libblktapctl = -L$(XEN_BLKTAP2)/control -lblktapctl
+LDLIBS_libblktapctl = $(XEN_BLKTAP2)/control/libblktapctl$(libextension)
 SHLIB_libblktapctl  = -Wl,-rpath-link=$(XEN_BLKTAP2)/control
 else
 CFLAGS_libblktapctl =
