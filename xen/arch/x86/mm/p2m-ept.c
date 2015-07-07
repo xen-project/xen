@@ -801,8 +801,6 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         p2m->max_mapped_pfn = gfn + (1UL << order) - 1;
 
 out:
-    unmap_domain_page(table);
-
     if ( needs_sync != sync_off )
         ept_sync_domain(p2m);
 
@@ -824,6 +822,8 @@ out:
                     iommu_unmap_page(d, gfn + i);
         }
     }
+
+    unmap_domain_page(table);
 
     /* Release the old intermediate tables, if any.  This has to be the
        last thing we do, after the ept_sync_domain() and removal
