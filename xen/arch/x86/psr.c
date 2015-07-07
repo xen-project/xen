@@ -19,14 +19,25 @@
 #include <asm/psr.h>
 
 #define PSR_CMT        (1<<0)
+#define PSR_CAT        (1<<1)
+
+struct psr_cat_socket_info {
+    unsigned int cbm_len;
+    unsigned int cos_max;
+};
 
 struct psr_assoc {
     uint64_t val;
 };
 
 struct psr_cmt *__read_mostly psr_cmt;
+
+static unsigned long *__read_mostly cat_socket_enable;
+static struct psr_cat_socket_info *__read_mostly cat_socket_info;
+
 static unsigned int __initdata opt_psr;
 static unsigned int __initdata opt_rmid_max = 255;
+static unsigned int __read_mostly opt_cos_max = 255;
 static uint64_t rmid_mask;
 static DEFINE_PER_CPU(struct psr_assoc, psr_assoc);
 
@@ -63,9 +74,13 @@ static void __init parse_psr_param(char *s)
             *val_str++ = '\0';
 
         parse_psr_bool(s, val_str, "cmt", PSR_CMT);
+        parse_psr_bool(s, val_str, "cat", PSR_CAT);
 
         if ( val_str && !strcmp(s, "rmid_max") )
             opt_rmid_max = simple_strtoul(val_str, NULL, 0);
+
+        if ( val_str && !strcmp(s, "cos_max") )
+            opt_cos_max = simple_strtoul(val_str, NULL, 0);
 
         s = ss + 1;
     } while ( ss );
@@ -194,22 +209,103 @@ void psr_ctxt_switch_to(struct domain *d)
     }
 }
 
+static void cat_cpu_init(void)
+{
+    unsigned int eax, ebx, ecx, edx;
+    struct psr_cat_socket_info *info;
+    unsigned int socket;
+    unsigned int cpu = smp_processor_id();
+    const struct cpuinfo_x86 *c = cpu_data + cpu;
+
+    if ( !cpu_has(c, X86_FEATURE_CAT) || c->cpuid_level < PSR_CPUID_LEVEL_CAT )
+        return;
+
+    socket = cpu_to_socket(cpu);
+    if ( test_bit(socket, cat_socket_enable) )
+        return;
+
+    cpuid_count(PSR_CPUID_LEVEL_CAT, 0, &eax, &ebx, &ecx, &edx);
+    if ( ebx & PSR_RESOURCE_TYPE_L3 )
+    {
+        cpuid_count(PSR_CPUID_LEVEL_CAT, 1, &eax, &ebx, &ecx, &edx);
+        info = cat_socket_info + socket;
+        info->cbm_len = (eax & 0x1f) + 1;
+        info->cos_max = min(opt_cos_max, edx & 0xffff);
+
+        set_bit(socket, cat_socket_enable);
+        printk(XENLOG_INFO "CAT: enabled on socket %u, cos_max:%u, cbm_len:%u\n",
+               socket, info->cos_max, info->cbm_len);
+    }
+}
+
+static void cat_cpu_fini(unsigned int cpu)
+{
+    unsigned int socket = cpu_to_socket(cpu);
+
+    if ( !socket_cpumask[socket] || cpumask_empty(socket_cpumask[socket]) )
+        clear_bit(socket, cat_socket_enable);
+}
+
+static void __init init_psr_cat(void)
+{
+    if ( opt_cos_max < 1 )
+    {
+        printk(XENLOG_INFO "CAT: disabled, cos_max is too small\n");
+        return;
+    }
+
+    cat_socket_enable = xzalloc_array(unsigned long, BITS_TO_LONGS(nr_sockets));
+    cat_socket_info = xzalloc_array(struct psr_cat_socket_info, nr_sockets);
+
+    if ( !cat_socket_enable || !cat_socket_info )
+    {
+        xfree(cat_socket_enable);
+        cat_socket_enable = NULL;
+        xfree(cat_socket_info);
+        cat_socket_info = NULL;
+    }
+}
+
 static void psr_cpu_init(void)
 {
+    if ( cat_socket_info )
+        cat_cpu_init();
+
     psr_assoc_init();
+}
+
+static void psr_cpu_fini(unsigned int cpu)
+{
+    if ( cat_socket_info )
+        cat_cpu_fini(cpu);
 }
 
 static int cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
-    if ( action == CPU_STARTING )
+    unsigned int cpu = (unsigned long)hcpu;
+
+    switch ( action )
+    {
+    case CPU_STARTING:
         psr_cpu_init();
+        break;
+    case CPU_DEAD:
+        psr_cpu_fini(cpu);
+        break;
+    }
 
     return NOTIFY_DONE;
 }
 
 static struct notifier_block cpu_nfb = {
-    .notifier_call = cpu_callback
+    .notifier_call = cpu_callback,
+    /*
+     * Ensure socket_cpumask is still valid in CPU_DEAD notification
+     * (E.g. our CPU_DEAD notification should be called ahead of
+     * cpu_smpboot_free).
+     */
+    .priority = -1
 };
 
 static int __init psr_presmp_init(void)
@@ -217,8 +313,11 @@ static int __init psr_presmp_init(void)
     if ( (opt_psr & PSR_CMT) && opt_rmid_max )
         init_psr_cmt(opt_rmid_max);
 
+    if ( opt_psr & PSR_CAT )
+        init_psr_cat();
+
     psr_cpu_init();
-    if ( psr_cmt_enabled() )
+    if ( psr_cmt_enabled() || cat_socket_info )
         register_cpu_notifier(&cpu_nfb);
 
     return 0;

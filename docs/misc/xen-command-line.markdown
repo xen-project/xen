@@ -1149,9 +1149,9 @@ This option can be specified more than once (up to 8 times at present).
 > `= <integer>`
 
 ### psr (Intel)
-> `= List of ( cmt:<boolean> | rmid_max:<integer> )`
+> `= List of ( cmt:<boolean> | rmid_max:<integer> | cat:<boolean> | cos_max:<integer> )`
 
-> Default: `psr=cmt:0,rmid_max:255`
+> Default: `psr=cmt:0,rmid_max:255,cat:0,cos_max:255`
 
 Platform Shared Resource(PSR) Services.  Intel Haswell and later server
 platforms offer information about the sharing of resources.
@@ -1160,6 +1160,12 @@ To use the PSR monitoring service for a certain domain, a Resource
 Monitoring ID(RMID) is used to bind the domain to corresponding shared
 resource.  RMID is a hardware-provided layer of abstraction between software
 and logical processors.
+
+To use the PSR cache allocation service for a certain domain, a capacity
+bitmasks(CBM) is used to bind the domain to corresponding shared resource.
+CBM represents cache capacity and indicates the degree of overlap and isolation
+between domains. In hypervisor a Class of Service(COS) ID is allocated for each
+unique CBM.
 
 The following resources are available:
 
@@ -1170,6 +1176,11 @@ The following resources are available:
 * Memory Bandwidth Monitoring (Broadwell and later). Information regarding the
   total/local memory bandwidth. Follow the same options with Cache Monitoring
   Technology.
+
+* Cache Allocation Technology (Broadwell and later).  Information regarding
+  the cache allocation.
+  * `cat` instructs Xen to enable/disable Cache Allocation Technology.
+  * `cos_max` indicates the max value for COS ID.
 
 ### reboot
 > `= t[riple] | k[bd] | a[cpi] | p[ci] | P[ower] | e[fi] | n[o] [, [w]arm | [c]old]`

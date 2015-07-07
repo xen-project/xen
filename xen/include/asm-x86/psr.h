@@ -18,6 +18,9 @@
 
 #include <xen/types.h>
 
+/* CAT cpuid level */
+#define PSR_CPUID_LEVEL_CAT   0x10
+
 /* Resource Type Enumeration */
 #define PSR_RESOURCE_TYPE_L3            0x2
 
