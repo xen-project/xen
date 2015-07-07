@@ -16,9 +16,6 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-/* Include output from configure */
-#include <config.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

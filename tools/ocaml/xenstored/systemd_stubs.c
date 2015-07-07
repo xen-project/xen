@@ -22,7 +22,6 @@
 #include <caml/custom.h>
 #include <caml/signals.h>
 #include <caml/fail.h>
-#include <config.h>
 
 #if defined(HAVE_SYSTEMD)
 

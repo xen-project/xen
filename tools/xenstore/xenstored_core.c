@@ -40,7 +40,6 @@
 #include <signal.h>
 #include <assert.h>
 #include <setjmp.h>
-#include <config.h>
 
 #include "utils.h"
 #include "list.h"

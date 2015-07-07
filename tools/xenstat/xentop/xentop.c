@@ -19,9 +19,6 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* Include output from configure */
-#include <config.h>
-
 /* get curses header from configure */
 #include INCLUDE_CURSES_H
 

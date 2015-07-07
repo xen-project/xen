@@ -6,7 +6,8 @@ MINOR = 3
 
 CFLAGS += -Werror
 CFLAGS += -I.
-CFLAGS += -I$(XEN_ROOT)/tools/
+# Include configure output (config.h)
+CFLAGS += -include $(XEN_ROOT)/tools/config.h
 CFLAGS += -I./include
 CFLAGS += $(CFLAGS_libxenctrl)
 CFLAGS += -DXEN_LIB_STORED="\"$(XEN_LIB_STORED)\""

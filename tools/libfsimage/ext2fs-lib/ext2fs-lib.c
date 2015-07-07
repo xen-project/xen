@@ -21,9 +21,6 @@
  * Use is subject to license terms.
  */
 
-/* Include output from configure */
-#include <config.h>
-
 #include <fsimage_plugin.h>
 #include INCLUDE_EXTFS_H
 #include <errno.h>
