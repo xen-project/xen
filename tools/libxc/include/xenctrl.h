@@ -376,7 +376,7 @@ void xc__hypercall_buffer_free_pages(xc_interface *xch, xc_hypercall_buffer_t *b
  * buffer and call xc_hypercall_buffer_array_get().
  *
  * Destroy the array with xc_hypercall_buffer_array_destroy() to free
- * the array and all its alocated hypercall buffers.
+ * the array and all its allocated hypercall buffers.
  */
 struct xc_hypercall_buffer_array;
 typedef struct xc_hypercall_buffer_array xc_hypercall_buffer_array_t;
