@@ -58,6 +58,17 @@ int hard_smp_processor_id(void);
 
 void __stop_this_cpu(void);
 
+/*
+ * The value may be greater than the actual socket number in the system and
+ * is required not to change from the initial startup.
+ */
+extern unsigned int nr_sockets;
+
+void set_nr_sockets(void);
+
+/* Representing HT and core siblings in each socket. */
+extern cpumask_var_t *socket_cpumask;
+
 #endif /* !__ASSEMBLY__ */
 
 #endif

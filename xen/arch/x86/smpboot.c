@@ -60,6 +60,9 @@ DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_core_mask);
 cpumask_t cpu_online_map __read_mostly;
 EXPORT_SYMBOL(cpu_online_map);
 
+unsigned int __read_mostly nr_sockets;
+cpumask_var_t *__read_mostly socket_cpumask;
+
 struct cpuinfo_x86 cpu_data[NR_CPUS];
 
 u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
@@ -244,6 +247,8 @@ static void set_cpu_sibling_map(int cpu)
     struct cpuinfo_x86 *c = cpu_data;
 
     cpumask_set_cpu(cpu, &cpu_sibling_setup_map);
+
+    cpumask_set_cpu(cpu, socket_cpumask[cpu_to_socket(cpu)]);
 
     if ( c[cpu].x86_num_siblings > 1 )
     {
@@ -649,7 +654,13 @@ void cpu_exit_clear(unsigned int cpu)
 
 static void cpu_smpboot_free(unsigned int cpu)
 {
-    unsigned int order;
+    unsigned int order, socket = cpu_to_socket(cpu);
+
+    if ( cpumask_empty(socket_cpumask[socket]) )
+    {
+        free_cpumask_var(socket_cpumask[socket]);
+        socket_cpumask[socket] = NULL;
+    }
 
     free_cpumask_var(per_cpu(cpu_sibling_mask, cpu));
     free_cpumask_var(per_cpu(cpu_core_mask, cpu));
@@ -694,6 +705,7 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     nodeid_t node = cpu_to_node(cpu);
     struct desc_struct *gdt;
     unsigned long stub_page;
+    unsigned int socket = cpu_to_socket(cpu);
 
     if ( node != NUMA_NO_NODE )
         memflags = MEMF_node(node);
@@ -735,6 +747,10 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     if ( !stub_page )
         goto oom;
     per_cpu(stubs.addr, cpu) = stub_page + STUB_BUF_CPU_OFFS(cpu);
+
+    if ( !socket_cpumask[socket] &&
+         !zalloc_cpumask_var(socket_cpumask + socket) )
+        goto oom;
 
     if ( zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
          zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) )
@@ -785,6 +801,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
     x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
 
     stack_base[0] = stack_start;
+
+    set_nr_sockets();
+
+    socket_cpumask = xzalloc_array(cpumask_var_t, nr_sockets);
+    if ( !socket_cpumask || !zalloc_cpumask_var(socket_cpumask) )
+        panic("No memory for socket CPU siblings map");
 
     if ( !zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, 0)) ||
          !zalloc_cpumask_var(&per_cpu(cpu_core_mask, 0)) )
@@ -850,6 +872,8 @@ remove_siblinginfo(int cpu)
 {
     int sibling;
     struct cpuinfo_x86 *c = cpu_data;
+
+    cpumask_clear_cpu(cpu, socket_cpumask[cpu_to_socket(cpu)]);
 
     for_each_cpu ( sibling, per_cpu(cpu_core_mask, cpu) )
     {
