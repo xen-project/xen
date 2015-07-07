@@ -92,6 +92,12 @@
  *      backend driver to open the backing device.  (e.g. the path to the
  *      file or block device representing the backing store.)
  *
+ * physical-device
+ *      Values:         "MAJOR:MINOR"
+ *
+ *      MAJOR and MINOR are the major number and minor number of the
+ *      backing device respectively.
+ *
  * type
  *      Values:         "file", "phy", "tap"
  *
