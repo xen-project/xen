@@ -65,7 +65,7 @@
  */
 #define guest_gate_selector_okay(d, sel)                                \
     ((((sel)>>3) < FIRST_RESERVED_GDT_ENTRY) || /* Guest seg? */        \
-     ((sel) == (!is_pv_32on64_domain(d) ?                               \
+     ((sel) == (!is_pv_32bit_domain(d) ?                                \
                 FLAT_KERNEL_CS :                /* Xen default seg? */  \
                 FLAT_COMPAT_KERNEL_CS)) ||                              \
      ((sel) & 4))                               /* LDT seg? */

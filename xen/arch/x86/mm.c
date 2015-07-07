@@ -163,9 +163,8 @@ static uint32_t base_disallow_mask;
 #define L1_DISALLOW_MASK ((base_disallow_mask | _PAGE_GNTTAB) & ~_PAGE_GLOBAL)
 #define L2_DISALLOW_MASK (base_disallow_mask & ~_PAGE_PSE)
 
-#define l3_disallow_mask(d) (!is_pv_32on64_domain(d) ?  \
-                             base_disallow_mask :       \
-                             0xFFFFF198U)
+#define l3_disallow_mask(d) (!is_pv_32bit_domain(d) ? \
+                             base_disallow_mask : 0xFFFFF198U)
 
 #define L4_DISALLOW_MASK (base_disallow_mask)
 
@@ -985,7 +984,7 @@ get_page_from_l4e(
 #define adjust_guest_l1e(pl1e, d)                                            \
     do {                                                                     \
         if ( likely(l1e_get_flags((pl1e)) & _PAGE_PRESENT) &&                \
-             likely(!is_pv_32on64_domain(d)) )                               \
+             likely(!is_pv_32bit_domain(d)) )                                \
         {                                                                    \
             /* _PAGE_GUEST_KERNEL page cannot have the Global bit set. */    \
             if ( (l1e_get_flags((pl1e)) & (_PAGE_GUEST_KERNEL|_PAGE_GLOBAL)) \
@@ -1002,14 +1001,14 @@ get_page_from_l4e(
 #define adjust_guest_l2e(pl2e, d)                               \
     do {                                                        \
         if ( likely(l2e_get_flags((pl2e)) & _PAGE_PRESENT) &&   \
-             likely(!is_pv_32on64_domain(d)) )                  \
+             likely(!is_pv_32bit_domain(d)) )                   \
             l2e_add_flags((pl2e), _PAGE_USER);                  \
     } while ( 0 )
 
 #define adjust_guest_l3e(pl3e, d)                                   \
     do {                                                            \
         if ( likely(l3e_get_flags((pl3e)) & _PAGE_PRESENT) )        \
-            l3e_add_flags((pl3e), likely(!is_pv_32on64_domain(d)) ? \
+            l3e_add_flags((pl3e), likely(!is_pv_32bit_domain(d)) ?  \
                                          _PAGE_USER :               \
                                          _PAGE_USER|_PAGE_RW);      \
     } while ( 0 )
@@ -1017,13 +1016,13 @@ get_page_from_l4e(
 #define adjust_guest_l4e(pl4e, d)                               \
     do {                                                        \
         if ( likely(l4e_get_flags((pl4e)) & _PAGE_PRESENT) &&   \
-             likely(!is_pv_32on64_domain(d)) )                  \
+             likely(!is_pv_32bit_domain(d)) )                   \
             l4e_add_flags((pl4e), _PAGE_USER);                  \
     } while ( 0 )
 
 #define unadjust_guest_l3e(pl3e, d)                                         \
     do {                                                                    \
-        if ( unlikely(is_pv_32on64_domain(d)) &&                            \
+        if ( unlikely(is_pv_32bit_domain(d)) &&                             \
              likely(l3e_get_flags((pl3e)) & _PAGE_PRESENT) )                \
             l3e_remove_flags((pl3e), _PAGE_USER|_PAGE_RW|_PAGE_ACCESSED);   \
     } while ( 0 )
@@ -1314,7 +1313,7 @@ static int alloc_l3_table(struct page_info *page)
      * 512 entries must be valid/verified, which is most easily achieved
      * by clearing them out.
      */
-    if ( is_pv_32on64_domain(d) )
+    if ( is_pv_32bit_domain(d) )
         memset(pl3e + 4, 0, (L3_PAGETABLE_ENTRIES - 4) * sizeof(*pl3e));
 
     for ( i = page->nr_validated_ptes; i < L3_PAGETABLE_ENTRIES;
@@ -1391,7 +1390,7 @@ void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d,
         l4e_from_pfn(domain_page_map_to_mfn(l4tab), __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR);
-    if ( zap_ro_mpt || is_pv_32on64_domain(d) || paging_mode_refcounts(d) )
+    if ( zap_ro_mpt || is_pv_32bit_domain(d) || paging_mode_refcounts(d) )
         l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
 }
 
@@ -2707,7 +2706,7 @@ int new_guest_cr3(unsigned long mfn)
     int rc;
     unsigned long old_base_mfn;
 
-    if ( is_pv_32on64_domain(d) )
+    if ( is_pv_32bit_domain(d) )
     {
         unsigned long gt_mfn = pagetable_get_pfn(curr->arch.guest_table);
         l4_pgentry_t *pl4e = map_domain_page(gt_mfn);
@@ -2856,7 +2855,7 @@ static inline int vcpumask_to_pcpumask(
     unsigned int vcpu_id, vcpu_bias, offs;
     unsigned long vmask;
     struct vcpu *v;
-    bool_t is_native = !is_pv_32on64_domain(d);
+    bool_t is_native = !is_pv_32bit_domain(d);
 
     cpumask_clear(pmask);
     for ( vmask = 0, offs = 0; ; ++offs)
@@ -5165,7 +5164,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     ptwr_ctxt.ctxt.regs = regs;
     ptwr_ctxt.ctxt.force_writeback = 0;
     ptwr_ctxt.ctxt.addr_size = ptwr_ctxt.ctxt.sp_size =
-        is_pv_32on64_domain(d) ? 32 : BITS_PER_LONG;
+        is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG;
     ptwr_ctxt.ctxt.swint_emulate = x86_swint_emulate_none;
     ptwr_ctxt.cr2 = addr;
     ptwr_ctxt.pte = pte;
@@ -5235,10 +5234,9 @@ static const struct x86_emulate_ops mmio_ro_emulate_ops = {
 int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
                           struct cpu_user_regs *regs)
 {
-    l1_pgentry_t      pte;
-    unsigned long     mfn;
-    unsigned int      addr_size = is_pv_32on64_domain(v->domain) ?
-                                  32 : BITS_PER_LONG;
+    l1_pgentry_t pte;
+    unsigned long mfn;
+    unsigned int addr_size = is_pv_32bit_vcpu(v) ? 32 : BITS_PER_LONG;
     struct mmio_ro_emulate_ctxt mmio_ro_ctxt = {
         .ctxt.regs = regs,
         .ctxt.addr_size = addr_size,

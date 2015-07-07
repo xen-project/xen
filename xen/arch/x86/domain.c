@@ -358,7 +358,7 @@ int switch_native(struct domain *d)
 
     if ( !may_switch_mode(d) )
         return -EACCES;
-    if ( !is_pv_32on64_domain(d) )
+    if ( !is_pv_32bit_domain(d) )
         return 0;
 
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
@@ -386,7 +386,7 @@ int switch_compat(struct domain *d)
 
     if ( !may_switch_mode(d) )
         return -EACCES;
-    if ( is_pv_32on64_domain(d) )
+    if ( is_pv_32bit_domain(d) )
         return 0;
 
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
@@ -484,7 +484,7 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.pv_vcpu.ctrlreg[4] = real_cr4_to_pv_guest_cr4(mmu_cr4_features);
 
-    if ( is_pv_32on64_domain(d) )
+    if ( is_pv_32bit_domain(d) )
     {
         if ( (rc = setup_compat_arg_xlat(v)) )
             goto done;
@@ -705,7 +705,7 @@ unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)
     hv_cr4_mask = ~X86_CR4_TSD;
     if ( cpu_has_de )
         hv_cr4_mask &= ~X86_CR4_DE;
-    if ( cpu_has_fsgsbase && !is_pv_32bit_domain(v->domain) )
+    if ( cpu_has_fsgsbase && !is_pv_32bit_vcpu(v) )
         hv_cr4_mask &= ~X86_CR4_FSGSBASE;
     if ( cpu_has_xsave )
         hv_cr4_mask &= ~X86_CR4_OSXSAVE;
@@ -737,7 +737,7 @@ int arch_set_info_guest(
 
     /* The context is a compat-mode one if the target domain is compat-mode;
      * we expect the tools to DTRT even in compat-mode callers. */
-    compat = is_pv_32on64_domain(d);
+    compat = is_pv_32bit_domain(d);
 
 #define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))
     flags = c(flags);
@@ -1212,7 +1212,7 @@ static void load_segments(struct vcpu *n)
             all_segs_okay &= loadsegment(gs, uregs->gs);
     }
 
-    if ( !is_pv_32on64_domain(n->domain) )
+    if ( !is_pv_32bit_vcpu(n) )
     {
         /* This can only be non-zero if selector is NULL. */
         if ( n->arch.pv_vcpu.fs_base )
@@ -1241,7 +1241,7 @@ static void load_segments(struct vcpu *n)
             (unsigned long *)pv->kernel_sp;
         unsigned long cs_and_mask, rflags;
 
-        if ( is_pv_32on64_domain(n->domain) )
+        if ( is_pv_32bit_vcpu(n) )
         {
             unsigned int *esp = ring_1(regs) ?
                                 (unsigned int *)regs->rsp :
@@ -1357,7 +1357,7 @@ static void save_segments(struct vcpu *v)
     if ( regs->es )
         dirty_segment_mask |= DIRTY_ES;
 
-    if ( regs->fs || is_pv_32on64_domain(v->domain) )
+    if ( regs->fs || is_pv_32bit_vcpu(v) )
     {
         dirty_segment_mask |= DIRTY_FS;
         v->arch.pv_vcpu.fs_base = 0; /* != 0 selector kills fs_base */
@@ -1367,7 +1367,7 @@ static void save_segments(struct vcpu *v)
         dirty_segment_mask |= DIRTY_FS_BASE;
     }
 
-    if ( regs->gs || is_pv_32on64_domain(v->domain) )
+    if ( regs->gs || is_pv_32bit_vcpu(v) )
     {
         dirty_segment_mask |= DIRTY_GS;
         v->arch.pv_vcpu.gs_base_user = 0; /* != 0 selector kills gs_base_user */
@@ -1500,8 +1500,8 @@ static void __context_switch(void)
 
     psr_ctxt_switch_to(nd);
 
-    gdt = !is_pv_32on64_domain(nd) ? per_cpu(gdt_table, cpu) :
-                                     per_cpu(compat_gdt_table, cpu);
+    gdt = !is_pv_32bit_domain(nd) ? per_cpu(gdt_table, cpu) :
+                                    per_cpu(compat_gdt_table, cpu);
     if ( need_full_gdt(nd) )
     {
         unsigned long mfn = virt_to_mfn(gdt);
@@ -1585,7 +1585,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         if ( is_pv_domain(nextd) &&
              (is_idle_domain(prevd) ||
               has_hvm_container_domain(prevd) ||
-              is_pv_32on64_domain(prevd) != is_pv_32on64_domain(nextd)) )
+              is_pv_32bit_domain(prevd) != is_pv_32bit_domain(nextd)) )
         {
             uint64_t efer = read_efer();
             if ( !(efer & EFER_SCE) )

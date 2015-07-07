@@ -293,7 +293,7 @@ static unsigned long __init compute_dom0_nr_pages(
     avail -= (d->max_vcpus - 1UL)
              << get_order_from_bytes(sizeof(struct vcpu));
     /* ...and compat_l4's, if needed. */
-    if ( is_pv_32on64_domain(d) )
+    if ( is_pv_32bit_domain(d) )
         avail -= d->max_vcpus - 1;
 
     /* Reserve memory for iommu_dom0_init() (rough estimate). */
@@ -608,7 +608,7 @@ static __init void dom0_update_physmap(struct domain *d, unsigned long pfn,
         BUG_ON(rc);
         return;
     }
-    if ( !is_pv_32on64_domain(d) )
+    if ( !is_pv_32bit_domain(d) )
         ((unsigned long *)vphysmap_s)[pfn] = mfn;
     else
         ((unsigned int *)vphysmap_s)[pfn] = mfn;
@@ -718,7 +718,7 @@ static __init void mark_pv_pt_pages_rdonly(struct domain *d,
 
         /* Top-level p.t. is pinned. */
         if ( (page->u.inuse.type_info & PGT_type_mask) ==
-             (!is_pv_32on64_domain(d) ?
+             (!is_pv_32bit_domain(d) ?
               PGT_l4_page_table : PGT_l3_page_table) )
         {
             page->count_info        += 1;
@@ -1048,7 +1048,7 @@ int __init construct_dom0(
         vinitrd_end    = vinitrd_start + initrd_len;
         vphysmap_start = round_pgup(vinitrd_end);
     }
-    vphysmap_end     = vphysmap_start + (nr_pages * (!is_pv_32on64_domain(d) ?
+    vphysmap_end     = vphysmap_start + (nr_pages * (!is_pv_32bit_domain(d) ?
                                                      sizeof(unsigned long) :
                                                      sizeof(unsigned int)));
     if ( parms.p2m_base != UNSET_ADDR )
@@ -1076,9 +1076,9 @@ int __init construct_dom0(
 #define NR(_l,_h,_s) \
     (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
        ((_l) & ~((1UL<<(_s))-1))) >> (_s))
-        if ( (!is_pv_32on64_domain(d) + /* # L4 */
+        if ( (!is_pv_32bit_domain(d) + /* # L4 */
               NR(v_start, v_end, L4_PAGETABLE_SHIFT) + /* # L3 */
-              (!is_pv_32on64_domain(d) ?
+              (!is_pv_32bit_domain(d) ?
                NR(v_start, v_end, L3_PAGETABLE_SHIFT) : /* # L2 */
                4) + /* # compat L2 */
               NR(v_start, v_end, L2_PAGETABLE_SHIFT))  /* # L1 */
@@ -1176,7 +1176,7 @@ int __init construct_dom0(
         mpt_alloc -= PAGE_ALIGN(initrd_len);
 
     /* Overlap with Xen protected area? */
-    if ( !is_pv_32on64_domain(d) ?
+    if ( !is_pv_32bit_domain(d) ?
          ((v_start < HYPERVISOR_VIRT_END) &&
           (v_end > HYPERVISOR_VIRT_START)) :
          (v_end > HYPERVISOR_COMPAT_VIRT_START(d)) )
@@ -1186,14 +1186,14 @@ int __init construct_dom0(
         goto out;
     }
 
-    if ( is_pv_32on64_domain(d) )
+    if ( is_pv_32bit_domain(d) )
     {
         v->arch.pv_vcpu.failsafe_callback_cs = FLAT_COMPAT_KERNEL_CS;
         v->arch.pv_vcpu.event_callback_cs    = FLAT_COMPAT_KERNEL_CS;
     }
 
     /* WARNING: The new domain must have its 'processor' field filled in! */
-    if ( !is_pv_32on64_domain(d) )
+    if ( !is_pv_32bit_domain(d) )
     {
         maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
         l4start = l4tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
@@ -1211,7 +1211,7 @@ int __init construct_dom0(
     clear_page(l4tab);
     init_guest_l4_table(l4tab, d, 0);
     v->arch.guest_table = pagetable_from_paddr(__pa(l4start));
-    if ( is_pv_32on64_domain(d) )
+    if ( is_pv_32bit_domain(d) )
         v->arch.guest_table_user = v->arch.guest_table;
 
     l4tab += l4_table_offset(v_start);
@@ -1257,7 +1257,7 @@ int __init construct_dom0(
             mfn = pfn++;
         else
             mfn = initrd_mfn++;
-        *l1tab = l1e_from_pfn(mfn, (!is_pv_32on64_domain(d) ?
+        *l1tab = l1e_from_pfn(mfn, (!is_pv_32bit_domain(d) ?
                                     L1_PROT : COMPAT_L1_PROT));
         l1tab++;
 
@@ -1270,7 +1270,7 @@ int __init construct_dom0(
         }
     }
 
-    if ( is_pv_32on64_domain(d) )
+    if ( is_pv_32bit_domain(d) )
     {
         /* Ensure the first four L3 entries are all populated. */
         for ( i = 0, l3tab = l3start; i < 4; ++i, ++l3tab )
@@ -1477,7 +1477,7 @@ int __init construct_dom0(
     if ( is_pvh_domain(d) )
         si->shared_info = shared_info_paddr;
 
-    if ( is_pv_32on64_domain(d) )
+    if ( is_pv_32bit_domain(d) )
         xlat_start_info(si, XLAT_start_info_console_dom0);
 
     /* Return to idle domain's page tables. */
@@ -1499,10 +1499,10 @@ int __init construct_dom0(
      */
     regs = &v->arch.user_regs;
     regs->ds = regs->es = regs->fs = regs->gs =
-        !is_pv_32on64_domain(d) ? FLAT_KERNEL_DS : FLAT_COMPAT_KERNEL_DS;
-    regs->ss = (!is_pv_32on64_domain(d) ?
+        !is_pv_32bit_domain(d) ? FLAT_KERNEL_DS : FLAT_COMPAT_KERNEL_DS;
+    regs->ss = (!is_pv_32bit_domain(d) ?
                 FLAT_KERNEL_SS : FLAT_COMPAT_KERNEL_SS);
-    regs->cs = (!is_pv_32on64_domain(d) ?
+    regs->cs = (!is_pv_32bit_domain(d) ?
                 FLAT_KERNEL_CS : FLAT_COMPAT_KERNEL_CS);
     regs->eip = parms.virt_entry;
     regs->esp = vstack_end;

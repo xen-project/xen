@@ -951,7 +951,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
             __clear_bit(X86_FEATURE_LM % 32, &d);
             __clear_bit(X86_FEATURE_LAHF_LM % 32, &c);
         }
-        if ( is_pv_32on64_domain(currd) &&
+        if ( is_pv_32bit_domain(currd) &&
              boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
             __clear_bit(X86_FEATURE_SYSCALL % 32, &d);
         __clear_bit(X86_FEATURE_PAGE1GB % 32, &d);
@@ -3675,7 +3675,7 @@ long register_guest_nmi_callback(unsigned long address)
 
     t->vector  = TRAP_nmi;
     t->flags   = 0;
-    t->cs      = (is_pv_32on64_domain(d) ?
+    t->cs      = (is_pv_32bit_domain(d) ?
                   FLAT_COMPAT_KERNEL_CS : FLAT_KERNEL_CS);
     t->address = address;
     TI_SET_IF(t, 1);

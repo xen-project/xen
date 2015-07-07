@@ -1188,7 +1188,7 @@ int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs)
     unsigned long mfn, idle_index;
     int ret = 0;
 
-    if (!is_pv_32on64_domain(d))
+    if (!is_pv_32bit_domain(d))
         return 0;
 
     if ( (addr < HYPERVISOR_COMPAT_VIRT_START(d)) ||
@@ -1247,7 +1247,7 @@ unmap:
 
 void domain_set_alloc_bitsize(struct domain *d)
 {
-    if ( !is_pv_32on64_domain(d) ||
+    if ( !is_pv_32bit_domain(d) ||
          (MACH2PHYS_COMPAT_NR_ENTRIES(d) >= max_page) ||
          d->arch.physaddr_bitsize > 0 )
         return;

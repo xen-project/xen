@@ -2110,7 +2110,7 @@ void sh_destroy_shadow(struct domain *d, mfn_t smfn)
            t == SH_type_fl1_pae_shadow ||
            t == SH_type_fl1_64_shadow  ||
            t == SH_type_monitor_table  ||
-           (is_pv_32on64_domain(d) && t == SH_type_l4_64_shadow) ||
+           (is_pv_32bit_domain(d) && t == SH_type_l4_64_shadow) ||
            (page_get_owner(mfn_to_page(backpointer(sp))) == d));
 
     /* The down-shifts here are so that the switch statement is on nice
@@ -2139,7 +2139,7 @@ void sh_destroy_shadow(struct domain *d, mfn_t smfn)
         SHADOW_INTERNAL_NAME(sh_destroy_l1_shadow, 4)(d, smfn);
         break;
     case SH_type_l2h_64_shadow:
-        ASSERT(is_pv_32on64_domain(d));
+        ASSERT(is_pv_32bit_domain(d));
         /* Fall through... */
     case SH_type_l2_64_shadow:
         SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 4)(d, smfn);
@@ -3472,7 +3472,7 @@ static int sh_enable_log_dirty(struct domain *d, bool_t log_global)
     /* 32bit PV guests on 64bit xen behave like older 64bit linux: they
      * change an l4e instead of cr3 to switch tables.  Give them the
      * same optimization */
-    if ( is_pv_32on64_domain(d) )
+    if ( is_pv_32bit_domain(d) )
         d->arch.paging.shadow.opt_flags = SHOPT_LINUX_L3_TOPLEVEL;
 #endif
 

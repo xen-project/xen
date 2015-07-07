@@ -131,8 +131,8 @@ set_shadow_status(struct domain *d, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
 
     ASSERT(mfn_to_page(smfn)->u.sh.head);
 
-    /* 32-on-64 PV guests don't own their l4 pages so can't get_page them */
-    if ( !is_pv_32on64_domain(d) || shadow_type != SH_type_l4_64_shadow )
+    /* 32-bit PV guests don't own their l4 pages so can't get_page them */
+    if ( !is_pv_32bit_domain(d) || shadow_type != SH_type_l4_64_shadow )
     {
         res = get_page(mfn_to_page(gmfn), d);
         ASSERT(res == 1);
@@ -159,8 +159,8 @@ delete_shadow_status(struct domain *d, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
                   d->domain_id, mfn_x(gmfn), shadow_type, mfn_x(smfn));
     ASSERT(mfn_to_page(smfn)->u.sh.head);
     shadow_hash_delete(d, mfn_x(gmfn), shadow_type, smfn);
-    /* 32-on-64 PV guests don't own their l4 pages; see set_shadow_status */
-    if ( !is_pv_32on64_domain(d) || shadow_type != SH_type_l4_64_shadow )
+    /* 32-bit PV guests don't own their l4 pages; see set_shadow_status */
+    if ( !is_pv_32bit_domain(d) || shadow_type != SH_type_l4_64_shadow )
         put_page(mfn_to_page(gmfn));
 }
 
@@ -698,7 +698,7 @@ _sh_propagate(struct vcpu *v,
     // PV guests in 64-bit mode use two different page tables for user vs
     // supervisor permissions, making the guest's _PAGE_USER bit irrelevant.
     // It is always shadowed as present...
-    if ( (GUEST_PAGING_LEVELS == 4) && !is_pv_32on64_domain(d)
+    if ( (GUEST_PAGING_LEVELS == 4) && !is_pv_32bit_domain(d)
          && is_pv_domain(d) )
     {
         sflags |= _PAGE_USER;
@@ -1346,8 +1346,8 @@ do {                                                                        \
     for ( _i = 0; _i < SHADOW_L2_PAGETABLE_ENTRIES; _i++ )                  \
     {                                                                       \
         if ( (!(_xen))                                                      \
-             || !is_pv_32on64_domain(_dom)                                  \
-             || mfn_to_page(_sl2mfn)->u.sh.type != SH_type_l2h_64_shadow\
+             || !is_pv_32bit_domain(_dom)                                   \
+             || mfn_to_page(_sl2mfn)->u.sh.type != SH_type_l2h_64_shadow    \
              || (_i < COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(_dom)) )           \
         {                                                                   \
             (_sl2e) = _sp + _i;                                             \
@@ -1435,7 +1435,7 @@ void sh_install_xen_entries_in_l4(struct domain *d, mfn_t gl4mfn, mfn_t sl4mfn)
         shadow_l4e_from_mfn(page_to_mfn(d->arch.perdomain_l3_pg),
                             __PAGE_HYPERVISOR);
 
-    if ( !shadow_mode_external(d) && !is_pv_32on64_domain(d) &&
+    if ( !shadow_mode_external(d) && !is_pv_32bit_domain(d) &&
          !VM_ASSIST(d, m2p_strict) )
     {
         /* open coded zap_ro_mpt(mfn_x(sl4mfn)): */
@@ -1475,7 +1475,7 @@ static void sh_install_xen_entries_in_l2h(struct domain *d, mfn_t sl2hmfn)
 {
     shadow_l2e_t *sl2e;
 
-    if ( !is_pv_32on64_domain(d) )
+    if ( !is_pv_32bit_domain(d) )
         return;
 
     sl2e = sh_map_domain_page(sl2hmfn);
@@ -1620,9 +1620,9 @@ sh_make_monitor_table(struct vcpu *v)
             l3e[0] = l3e_from_pfn(mfn_x(m2mfn), __PAGE_HYPERVISOR);
             sh_unmap_domain_page(l3e);
 
-            if ( is_pv_32on64_domain(d) )
+            if ( is_pv_32bit_domain(d) )
             {
-                /* For 32-on-64 PV guests, we need to map the 32-bit Xen
+                /* For 32-bit PV guests, we need to map the 32-bit Xen
                  * area into its usual VAs in the monitor tables */
                 m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
                 mfn_to_page(m3mfn)->shadow_flags = 3;
@@ -1740,7 +1740,7 @@ static shadow_l2e_t * shadow_get_and_create_l2e(struct vcpu *v,
         unsigned int t = SH_type_l2_shadow;
 
         /* Tag compat L2 containing hypervisor (m2p) mappings */
-        if ( is_pv_32on64_domain(v->domain) &&
+        if ( is_pv_32bit_vcpu(v) &&
              guest_l4_table_offset(gw->va) == 0 &&
              guest_l3_table_offset(gw->va) == 3 )
             t = SH_type_l2h_shadow;
@@ -2043,7 +2043,7 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
         sh_unmap_domain_page(l3e);
         shadow_free(d, m3mfn);
 
-        if ( is_pv_32on64_domain(d) )
+        if ( is_pv_32bit_domain(d) )
         {
             /* Need to destroy the l3 and l2 monitor pages that map the
              * Xen VAs at 3GB-4GB */
@@ -3963,7 +3963,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
                    (unsigned long)pagetable_get_pfn(v->arch.guest_table));
 
 #if GUEST_PAGING_LEVELS == 4
-    if ( !(v->arch.flags & TF_kernel_mode) && !is_pv_32on64_domain(d) )
+    if ( !(v->arch.flags & TF_kernel_mode) && !is_pv_32bit_domain(d) )
         gmfn = pagetable_get_mfn(v->arch.guest_table_user);
     else
 #endif
@@ -4078,7 +4078,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     if ( sh_remove_write_access(d, gmfn, 4, 0) != 0 )
         flush_tlb_mask(d->domain_dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l4_shadow);
-    if ( !shadow_mode_external(d) && !is_pv_32on64_domain(d) )
+    if ( !shadow_mode_external(d) && !is_pv_32bit_domain(d) )
     {
         mfn_t smfn = pagetable_get_mfn(v->arch.shadow_table[0]);
 
@@ -5104,7 +5104,7 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
             gmfn = get_shadow_status(d, get_gfn_query_unlocked(
                                         d, gfn_x(gfn), &p2mt),
                                      ((GUEST_PAGING_LEVELS == 3 ||
-                                       is_pv_32on64_domain(d))
+                                       is_pv_32bit_domain(d))
                                       && !shadow_mode_external(d)
                                       && (guest_index(gl3e) % 4) == 3)
                                      ? SH_type_l2h_shadow
