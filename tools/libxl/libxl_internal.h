@@ -85,7 +85,9 @@
 #define LIBXL_INIT_TIMEOUT 10
 #define LIBXL_DESTROY_TIMEOUT 10
 #define LIBXL_HOTPLUG_TIMEOUT 10
-#define LIBXL_DEVICE_MODEL_START_TIMEOUT 10
+/* QEMU may be slow to load and start due to a bug in Linux where the I/O
+ * subsystem sometime produce high latency under load. */
+#define LIBXL_DEVICE_MODEL_START_TIMEOUT 60
 #define LIBXL_STUBDOM_START_TIMEOUT 30
 #define LIBXL_QEMU_BODGE_TIMEOUT 2
 #define LIBXL_XENCONSOLE_LIMIT 1048576
