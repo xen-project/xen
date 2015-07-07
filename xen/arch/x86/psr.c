@@ -21,9 +21,15 @@
 #define PSR_CMT        (1<<0)
 #define PSR_CAT        (1<<1)
 
+struct psr_cat_cbm {
+    uint64_t cbm;
+    unsigned int ref;
+};
+
 struct psr_cat_socket_info {
     unsigned int cbm_len;
     unsigned int cos_max;
+    struct psr_cat_cbm *cos_to_cbm;
 };
 
 struct psr_assoc {
@@ -209,6 +215,26 @@ void psr_ctxt_switch_to(struct domain *d)
     }
 }
 
+static int cat_cpu_prepare(unsigned int cpu)
+{
+    struct psr_cat_socket_info *info;
+    unsigned int socket;
+
+    if ( !cat_socket_info )
+        return 0;
+
+    socket = cpu_to_socket(cpu);
+    if ( socket >= nr_sockets )
+        return -ENOSPC;
+
+    info = cat_socket_info + socket;
+    if ( info->cos_to_cbm )
+        return 0;
+
+    info->cos_to_cbm = xzalloc_array(struct psr_cat_cbm, opt_cos_max + 1UL);
+    return info->cos_to_cbm ? 0 : -ENOMEM;
+}
+
 static void cat_cpu_init(void)
 {
     unsigned int eax, ebx, ecx, edx;
@@ -232,6 +258,9 @@ static void cat_cpu_init(void)
         info->cbm_len = (eax & 0x1f) + 1;
         info->cos_max = min(opt_cos_max, edx & 0xffff);
 
+        /* cos=0 is reserved as default cbm(all ones). */
+        info->cos_to_cbm[0].cbm = (1ull << info->cbm_len) - 1;
+
         set_bit(socket, cat_socket_enable);
         printk(XENLOG_INFO "CAT: enabled on socket %u, cos_max:%u, cbm_len:%u\n",
                socket, info->cos_max, info->cbm_len);
@@ -243,7 +272,24 @@ static void cat_cpu_fini(unsigned int cpu)
     unsigned int socket = cpu_to_socket(cpu);
 
     if ( !socket_cpumask[socket] || cpumask_empty(socket_cpumask[socket]) )
+    {
+        struct psr_cat_socket_info *info = cat_socket_info + socket;
+
+        if ( info->cos_to_cbm )
+        {
+            xfree(info->cos_to_cbm);
+            info->cos_to_cbm = NULL;
+        }
         clear_bit(socket, cat_socket_enable);
+    }
+}
+
+static void __init psr_cat_free(void)
+{
+    xfree(cat_socket_enable);
+    cat_socket_enable = NULL;
+    xfree(cat_socket_info);
+    cat_socket_info = NULL;
 }
 
 static void __init init_psr_cat(void)
@@ -258,12 +304,12 @@ static void __init init_psr_cat(void)
     cat_socket_info = xzalloc_array(struct psr_cat_socket_info, nr_sockets);
 
     if ( !cat_socket_enable || !cat_socket_info )
-    {
-        xfree(cat_socket_enable);
-        cat_socket_enable = NULL;
-        xfree(cat_socket_info);
-        cat_socket_info = NULL;
-    }
+        psr_cat_free();
+}
+
+static int psr_cpu_prepare(unsigned int cpu)
+{
+    return cat_cpu_prepare(cpu);
 }
 
 static void psr_cpu_init(void)
@@ -283,19 +329,24 @@ static void psr_cpu_fini(unsigned int cpu)
 static int cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
+    int rc = 0;
     unsigned int cpu = (unsigned long)hcpu;
 
     switch ( action )
     {
+    case CPU_UP_PREPARE:
+        rc = psr_cpu_prepare(cpu);
+        break;
     case CPU_STARTING:
         psr_cpu_init();
         break;
+    case CPU_UP_CANCELED:
     case CPU_DEAD:
         psr_cpu_fini(cpu);
         break;
     }
 
-    return NOTIFY_DONE;
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
 }
 
 static struct notifier_block cpu_nfb = {
@@ -315,6 +366,9 @@ static int __init psr_presmp_init(void)
 
     if ( opt_psr & PSR_CAT )
         init_psr_cat();
+
+    if ( psr_cpu_prepare(0) )
+        psr_cat_free();
 
     psr_cpu_init();
     if ( psr_cmt_enabled() || cat_socket_info )
