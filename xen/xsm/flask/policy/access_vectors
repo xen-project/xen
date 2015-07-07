@@ -85,6 +85,8 @@ class xen2
     resource_op
 # XEN_SYSCTL_psr_cmt_op
     psr_cmt_op
+# XEN_SYSCTL_psr_cat_op
+    psr_cat_op
 }
 
 # Classes domain and domain2 consist of operations that a domain performs on
@@ -230,6 +232,8 @@ class domain2
     mem_paging
 # XENMEM_sharing_op
     mem_sharing
+# XEN_DOMCTL_psr_cat_op
+    psr_cat_op
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains

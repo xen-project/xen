@@ -735,6 +735,9 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_psr_cmt_op:
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__PSR_CMT_OP);
 
+    case XEN_DOMCTL_psr_cat_op:
+        return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__PSR_CAT_OP);
+
     default:
         printk("flask_domctl: Unknown op %d\n", cmd);
         return -EPERM;
@@ -794,6 +797,9 @@ static int flask_sysctl(int cmd)
     case XEN_SYSCTL_psr_cmt_op:
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
                                     XEN2__PSR_CMT_OP, NULL);
+    case XEN_SYSCTL_psr_cat_op:
+        return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
+                                    XEN2__PSR_CAT_OP, NULL);
 
     default:
         printk("flask_sysctl: Unknown op %d\n", cmd);
