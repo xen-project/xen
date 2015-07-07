@@ -216,6 +216,8 @@
 
 #define cpu_has_cpuid_faulting	boot_cpu_has(X86_FEATURE_CPUID_FAULTING)
 
+#define cpu_has_cx16            boot_cpu_has(X86_FEATURE_CX16)
+
 enum _cache_type {
     CACHE_TYPE_NULL = 0,
     CACHE_TYPE_DATA = 1,
