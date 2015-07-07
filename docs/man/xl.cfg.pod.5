@@ -198,7 +198,7 @@ For more details, see F<docs/misc/xl-numa-placement.markdown>.
 A domain with a weight of 512 will get twice as much CPU as a domain
 with a weight of 256 on a contended host.
 Legal weights range from 1 to 65535 and the default is 256.
-Honoured by the credit, credit2 and sedf schedulers.
+Honoured by the credit and credit2 schedulers.
 
 =item B<cap=N>
 
@@ -221,28 +221,6 @@ that your VM gets 25% of the available power (50% of 1GHz) rather than
 50% (50% of 2GHz).  If you are not getting the performance you expect,
 look at performance and cpufreq options in your operating system and
 your BIOS.
-
-=item B<period=NANOSECONDS>
-
-The normal EDF scheduling usage in nanoseconds. This means every period
-the domain gets cpu time defined in slice.
-Honoured by the sedf scheduler.
-
-=item B<slice=NANOSECONDS>
-
-The normal EDF scheduling usage in nanoseconds. it defines the time 
-a domain get every period time.
-Honoured by the sedf scheduler.
-
-=item B<latency=N>
-
-Scaled period if domain is doing heavy I/O.
-Honoured by the sedf scheduler.
-
-=item B<extratime=BOOLEAN>
-
-Flag for allowing domain to run in extra time.
-Honoured by the sedf scheduler.
 
 =back
 
