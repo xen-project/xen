@@ -542,6 +542,18 @@ int dt_device_get_raw_irq(const struct dt_device_node *device,
 int dt_irq_translate(const struct dt_raw_irq *raw, struct dt_irq *out_irq);
 
 /**
+ * dt_for_each_irq_map - Iterate over a nodes interrupt-map property
+ * @dev: The node whose interrupt-map property should be iterated over
+ * @cb: Call back to call for each entry
+ * @data: Caller data passed to callback
+ */
+int dt_for_each_irq_map(const struct dt_device_node *dev,
+                        int (*cb)(const struct dt_device_node *,
+                                  const struct dt_irq *,
+                                  void *),
+                        void *data);
+
+/**
  * dt_n_size_cells - Helper to retrieve the number of cell for the size
  * @np: node to get the value
  *

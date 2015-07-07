@@ -829,6 +829,160 @@ unsigned int dt_number_of_address(const struct dt_device_node *dev)
     return (psize / onesize);
 }
 
+int dt_for_each_irq_map(const struct dt_device_node *dev,
+                        int (*cb)(const struct dt_device_node *,
+                                  const struct dt_irq *,
+                                  void *),
+                        void *data)
+{
+    const struct dt_device_node *ipar, *tnode, *old = NULL;
+    const __be32 *tmp, *imap;
+    u32 intsize = 1, addrsize, pintsize = 0, paddrsize = 0;
+    u32 imaplen;
+    int i, ret;
+
+    struct dt_raw_irq dt_raw_irq;
+    struct dt_irq dt_irq;
+
+    dt_dprintk("%s: par=%s cb=%p data=%p\n", __func__,
+               dev->full_name, cb, data);
+
+    ipar = dev;
+
+    /* First get the #interrupt-cells property of the current cursor
+     * that tells us how to interpret the passed-in intspec. If there
+     * is none, we are nice and just walk up the tree
+     */
+    do {
+        tmp = dt_get_property(ipar, "#interrupt-cells", NULL);
+        if ( tmp != NULL )
+        {
+            intsize = be32_to_cpu(*tmp);
+            break;
+        }
+        tnode = ipar;
+        ipar = dt_irq_find_parent(ipar);
+    } while ( ipar );
+    if ( ipar == NULL )
+    {
+        dt_dprintk(" -> no parent found !\n");
+        goto fail;
+    }
+
+    dt_dprintk("%s: ipar=%s, size=%d\n", __func__, ipar->full_name, intsize);
+
+    if ( intsize > DT_MAX_IRQ_SPEC )
+    {
+        dt_dprintk(" -> too many irq specifier cells\n");
+        goto fail;
+    }
+
+    /* Look for this #address-cells. We have to implement the old linux
+     * trick of looking for the parent here as some device-trees rely on it
+     */
+    old = ipar;
+    do {
+        tmp = dt_get_property(old, "#address-cells", NULL);
+        tnode = dt_get_parent(old);
+        old = tnode;
+    } while ( old && tmp == NULL );
+
+    old = NULL;
+    addrsize = (tmp == NULL) ? 2 : be32_to_cpu(*tmp);
+
+    dt_dprintk(" -> addrsize=%d\n", addrsize);
+
+    /* Now look for an interrupt-map */
+    imap = dt_get_property(dev, "interrupt-map", &imaplen);
+    /* No interrupt map, check for an interrupt parent */
+    if ( imap == NULL )
+    {
+        dt_dprintk(" -> no map, ignoring\n");
+        goto fail;
+    }
+    imaplen /= sizeof(u32);
+
+    /* Parse interrupt-map */
+    while ( imaplen > (addrsize + intsize + 1) )
+    {
+        /* skip child unit address and child interrupt specifier */
+        imap += addrsize + intsize;
+        imaplen -= addrsize + intsize;
+
+        /* Get the interrupt parent */
+        ipar = dt_find_node_by_phandle(be32_to_cpup(imap));
+        imap++;
+        --imaplen;
+
+        /* Check if not found */
+        if ( ipar == NULL )
+        {
+            dt_dprintk(" -> imap parent not found !\n");
+            goto fail;
+        }
+
+        dt_dprintk(" -> ipar %s\n", dt_node_name(ipar));
+
+        /* Get #interrupt-cells and #address-cells of new
+         * parent
+         */
+        tmp = dt_get_property(ipar, "#interrupt-cells", NULL);
+        if ( tmp == NULL )
+        {
+            dt_dprintk(" -> parent lacks #interrupt-cells!\n");
+            goto fail;
+        }
+        pintsize = be32_to_cpu(*tmp);
+        tmp = dt_get_property(ipar, "#address-cells", NULL);
+        paddrsize = (tmp == NULL) ? 0 : be32_to_cpu(*tmp);
+
+        dt_dprintk(" -> pintsize=%d, paddrsize=%d\n",
+                   pintsize, paddrsize);
+
+        if ( pintsize > DT_MAX_IRQ_SPEC )
+        {
+            dt_dprintk(" -> too many irq specifier cells in parent\n");
+            goto fail;
+        }
+
+        /* Check for malformed properties */
+        if ( imaplen < (paddrsize + pintsize) )
+            goto fail;
+
+        imap += paddrsize;
+        imaplen -= paddrsize;
+
+        dt_raw_irq.controller = ipar;
+        dt_raw_irq.size = pintsize;
+        for ( i = 0; i < pintsize; i++ )
+            dt_raw_irq.specifier[i] = dt_read_number(imap + i, 1);
+
+        ret = dt_irq_translate(&dt_raw_irq, &dt_irq);
+        if ( ret )
+        {
+            dt_dprintk(" -> failed to translate IRQ: %d\n", ret);
+            return ret;
+        }
+
+        ret = cb(dev, &dt_irq, data);
+        if ( ret )
+        {
+            dt_dprintk(" -> callback failed=%d\n", ret);
+            return ret;
+        }
+
+        imap += pintsize;
+        imaplen -= pintsize;
+
+        dt_dprintk(" -> imaplen=%d\n", imaplen);
+    }
+
+    return 0;
+
+fail:
+    return -EINVAL;
+}
+
 /**
  * dt_irq_map_raw - Low level interrupt tree parsing
  * @parent:     the device interrupt parent
