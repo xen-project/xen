@@ -2613,7 +2613,7 @@ int hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *proto_p)
 
     ASSERT(s);
     if ( unlikely(!vcpu_start_shutdown_deferral(curr)) )
-        return X86EMUL_OKAY;
+        return X86EMUL_RETRY;
 
     list_for_each_entry ( sv,
                           &s->ioreq_vcpu_list,

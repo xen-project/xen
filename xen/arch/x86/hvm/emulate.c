@@ -183,7 +183,7 @@ static int hvmemul_do_io(
         else
         {
             rc = hvm_send_assist_req(s, &p);
-            if ( rc != X86EMUL_RETRY )
+            if ( rc != X86EMUL_RETRY || curr->domain->is_shutting_down )
                 vio->io_state = HVMIO_none;
             else if ( data_is_addr || dir == IOREQ_WRITE )
                 rc = X86EMUL_OKAY;
