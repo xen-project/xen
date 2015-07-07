@@ -1680,6 +1680,40 @@ The default is B<en-us>.
 
 See L<qemu(1)> for more information.
 
+=head2 Architecture Specific options
+
+=head3 ARM
+
+=over 4
+
+=item B<gic_version="vN">
+
+Version of the GIC emulated for the guest. Currently, the following
+versions are supported:
+
+=over 4
+
+=item B<v2>
+
+Emulate a GICv2
+
+=item B<v3>
+
+Emulate a GICv3. Note that the emulated GIC does not support the
+GICv2 compatibility mode.
+
+=item B<default>
+
+Emulate the same version as the native GIC hardware used by host where
+the domain was created.
+
+=back
+
+This requires hardware compatibility with the requested version. Either
+natively or via hardware backwards compatibility support.
+
+=back
+
 =head1 SEE ALSO
 
 =over 4

@@ -531,7 +531,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
                        struct xen_arch_domainconfig *config)
 {
     int rc;
-    uint8_t gic_version;
 
     d->arch.relmem = RELMEM_not_started;
 
@@ -560,28 +559,38 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     if ( (rc = p2m_alloc_table(d)) != 0 )
         goto fail;
 
-    /*
-     * Currently the vGIC is emulating the same version of the
-     * hardware GIC. Only the value XEN_DOMCTL_CONFIG_GIC_NATIVE
-     * is allowed. The DOMCTL will return the actual version of the
-     * GIC.
-     */
-    rc = -EOPNOTSUPP;
-    if ( config->gic_version != XEN_DOMCTL_CONFIG_GIC_NATIVE )
-        goto fail;
-
-    switch ( gic_hw_version() )
+    switch ( config->gic_version )
     {
-    case GIC_V3:
-        gic_version = XEN_DOMCTL_CONFIG_GIC_V3;
+    case XEN_DOMCTL_CONFIG_GIC_NATIVE:
+        switch ( gic_hw_version () )
+        {
+        case GIC_V2:
+            config->gic_version = XEN_DOMCTL_CONFIG_GIC_V2;
+            d->arch.vgic.version = GIC_V2;
+            break;
+
+        case GIC_V3:
+            config->gic_version = XEN_DOMCTL_CONFIG_GIC_V3;
+            d->arch.vgic.version = GIC_V3;
+            break;
+
+        default:
+            BUG();
+        }
         break;
-    case GIC_V2:
-        gic_version = XEN_DOMCTL_CONFIG_GIC_V2;
+
+    case XEN_DOMCTL_CONFIG_GIC_V2:
+        d->arch.vgic.version = GIC_V2;
         break;
+
+    case XEN_DOMCTL_CONFIG_GIC_V3:
+        d->arch.vgic.version = GIC_V3;
+        break;
+
     default:
-        BUG();
+        rc = -EOPNOTSUPP;
+        goto fail;
     }
-    config->gic_version = gic_version;
 
     if ( (rc = domain_vgic_init(d, config->nr_spis)) != 0 )
         goto fail;

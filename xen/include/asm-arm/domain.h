@@ -77,6 +77,8 @@ struct arch_domain
     } virt_timer_base;
 
     struct {
+        /* Version of the vGIC */
+        enum gic_version version;
         /* GIC HW version specific vGIC driver handler */
         const struct vgic_ops *handler;
         /*

@@ -2257,6 +2257,15 @@ skip_vfb:
         }
     }
 
+    if (!xlu_cfg_get_string (config, "gic_version", &buf, 1)) {
+        e = libxl_gic_version_from_string(buf, &b_info->arch_arm.gic_version);
+        if (e) {
+            fprintf(stderr,
+                    "Unknown gic_version \"%s\" specified\n", buf);
+            exit(-ERROR_FAIL);
+        }
+     }
+
     xlu_cfg_destroy(config);
 }
 

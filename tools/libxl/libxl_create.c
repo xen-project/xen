@@ -527,6 +527,10 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
         goto out;
     }
 
+    rc = libxl__arch_domain_save_config(gc, d_config, xc_config);
+    if (rc < 0)
+        goto out;
+
     ret = xc_cpupool_movedomain(ctx->xch, info->poolid, *domid);
     if (ret < 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "domain move fail");
