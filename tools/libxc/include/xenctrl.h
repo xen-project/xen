@@ -875,18 +875,6 @@ int xc_shadow_control(xc_interface *xch,
                       uint32_t mode,
                       xc_shadow_op_stats_t *stats);
 
-int xc_sedf_domain_set(xc_interface *xch,
-                       uint32_t domid,
-                       uint64_t period, uint64_t slice,
-                       uint64_t latency, uint16_t extratime,
-                       uint16_t weight);
-
-int xc_sedf_domain_get(xc_interface *xch,
-                       uint32_t domid,
-                       uint64_t* period, uint64_t *slice,
-                       uint64_t *latency, uint16_t *extratime,
-                       uint16_t *weight);
-
 int xc_sched_credit_domain_set(xc_interface *xch,
                                uint32_t domid,
                                struct xen_domctl_sched_credit *sdom);
