@@ -872,7 +872,10 @@ static void initiate_domain_create(libxl__egc *egc,
     }
 
     ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
-    if (ret) goto error_out;
+    if (ret) {
+        LOG(ERROR, "Unable to set domain create info defaults");
+        goto error_out;
+    }
 
     ret = libxl__domain_make(gc, d_config, &domid, &state->config);
     if (ret) {
@@ -886,7 +889,10 @@ static void initiate_domain_create(libxl__egc *egc,
     dcs->dmss.dm.guest_domid = 0; /* means we haven't spawned */
 
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
-    if (ret) goto error_out;
+    if (ret) {
+        LOG(ERROR, "Unable to set domain build info defaults");
+        goto error_out;
+    }
 
     if (!sched_params_valid(gc, domid, &d_config->b_info.sched_params)) {
         LOG(ERROR, "Invalid scheduling parameters\n");
@@ -896,7 +902,10 @@ static void initiate_domain_create(libxl__egc *egc,
 
     for (i = 0; i < d_config->num_disks; i++) {
         ret = libxl__device_disk_setdefault(gc, &d_config->disks[i]);
-        if (ret) goto error_out;
+        if (ret) {
+            LOG(ERROR, "Unable to set disk defaults for disk %d", i);
+            goto error_out;
+        }
     }
 
     dcs->bl.ao = ao;
@@ -916,7 +925,10 @@ static void initiate_domain_create(libxl__egc *egc,
          * but qemu needs the nic information to be complete.
          */
         ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid);
-        if (ret) goto error_out;
+        if (ret) {
+            LOG(ERROR, "Unable to set nic defaults for nic %d", i);
+            goto error_out;
+        }
 
         if (d_config->nics[i].devid > last_devid)
             last_devid = d_config->nics[i].devid;
