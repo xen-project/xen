@@ -465,10 +465,16 @@ static unsigned int nr_grant_entries(struct grant_table *gt)
 {
     switch ( gt->gt_version )
     {
+#define f2e(nr, ver) (((nr) << PAGE_SHIFT) / sizeof(grant_entry_v##ver##_t))
     case 1:
-        return (nr_grant_frames(gt) << PAGE_SHIFT) / sizeof(grant_entry_v1_t);
+        BUILD_BUG_ON(f2e(INITIAL_NR_GRANT_FRAMES, 1) <
+                     GNTTAB_NR_RESERVED_ENTRIES);
+        return f2e(nr_grant_frames(gt), 1);
     case 2:
-        return (nr_grant_frames(gt) << PAGE_SHIFT) / sizeof(grant_entry_v2_t);
+        BUILD_BUG_ON(f2e(INITIAL_NR_GRANT_FRAMES, 2) <
+                     GNTTAB_NR_RESERVED_ENTRIES);
+        return f2e(nr_grant_frames(gt), 2);
+#undef f2e
     }
 
     return 0;
@@ -2563,17 +2569,17 @@ static long
 gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
 {
     gnttab_set_version_t op;
-    struct domain *d = current->domain;
-    struct grant_table *gt = d->grant_table;
+    struct domain *currd = current->domain;
+    struct grant_table *gt = currd->grant_table;
     grant_entry_v1_t reserved_entries[GNTTAB_NR_RESERVED_ENTRIES];
-    long res;
-    int i;
+    int res;
+    unsigned int i;
 
-    if (copy_from_guest(&op, uop, 1))
+    if ( copy_from_guest(&op, uop, 1) )
         return -EFAULT;
 
     res = -EINVAL;
-    if (op.version != 1 && op.version != 2)
+    if ( op.version != 1 && op.version != 2 )
         goto out;
 
     res = 0;
@@ -2581,10 +2587,12 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
         goto out;
 
     write_lock(&gt->lock);
-    /* Make sure that the grant table isn't currently in use when we
-       change the version number, except for the first 8 entries which
-       are allowed to be in use (xenstore/xenconsole keeps them mapped).
-       (You need to change the version number for e.g. kexec.) */
+    /*
+     * Make sure that the grant table isn't currently in use when we
+     * change the version number, except for the first 8 entries which
+     * are allowed to be in use (xenstore/xenconsole keeps them mapped).
+     * (You need to change the version number for e.g. kexec.)
+     */
     for ( i = GNTTAB_NR_RESERVED_ENTRIES; i < nr_grant_entries(gt); i++ )
     {
         if ( read_atomic(&_active_entry(gt, i).pin) != 0 )
@@ -2604,7 +2612,7 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
         {
     case 1:
             /* XXX: We could maybe shrink the active grant table here. */
-            res = gnttab_populate_status_frames(d, gt, nr_grant_frames(gt));
+            res = gnttab_populate_status_frames(currd, gt, nr_grant_frames(gt));
             if ( res < 0)
                 goto out_unlock;
         }
@@ -2625,66 +2633,78 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
         break;
     }
 
-    /* Preserve the first 8 entries (toolstack reserved grants) */
-    if ( gt->gt_version == 1 )
+    /* Preserve the first 8 entries (toolstack reserved grants). */
+    switch ( gt->gt_version )
     {
-        memcpy(reserved_entries, &shared_entry_v1(gt, 0), sizeof(reserved_entries));
-    }
-    else if ( gt->gt_version == 2 )
-    {
-        for ( i = 0; i < GNTTAB_NR_RESERVED_ENTRIES && i < nr_grant_entries(gt); i++ )
+    case 1:
+        memcpy(reserved_entries, &shared_entry_v1(gt, 0),
+               sizeof(reserved_entries));
+        break;
+    case 2:
+        for ( i = 0; i < GNTTAB_NR_RESERVED_ENTRIES; i++ )
         {
-            int flags = status_entry(gt, i);
-            flags |= shared_entry_v2(gt, i).hdr.flags;
-            if ((flags & GTF_type_mask) == GTF_permit_access)
+            unsigned int flags = shared_entry_v2(gt, i).hdr.flags;
+
+            switch ( flags & GTF_type_mask )
             {
-                reserved_entries[i].flags = flags;
+            case GTF_permit_access:
+                reserved_entries[i].flags = flags | status_entry(gt, i);
                 reserved_entries[i].domid = shared_entry_v2(gt, i).hdr.domid;
                 reserved_entries[i].frame = shared_entry_v2(gt, i).full_page.frame;
-            }
-            else
-            {
-                if ((flags & GTF_type_mask) != GTF_invalid)
-                    gdprintk(XENLOG_INFO, "d%d: bad flags %x in grant %d when switching grant version\n",
-                           d->domain_id, flags, i);
+                break;
+            default:
+                gdprintk(XENLOG_INFO,
+                         "bad flags %#x in grant %u when switching version\n",
+                         flags, i);
+                /* fall through */
+            case GTF_invalid:
                 memset(&reserved_entries[i], 0, sizeof(reserved_entries[i]));
+                break;
             }
         }
+        break;
     }
 
     if ( op.version < 2 && gt->gt_version == 2 )
-        gnttab_unpopulate_status_frames(d, gt);
+        gnttab_unpopulate_status_frames(currd, gt);
 
-    /* Make sure there's no crud left over in the table from the
-       old version. */
+    /* Make sure there's no crud left over from the old version. */
     for ( i = 0; i < nr_grant_frames(gt); i++ )
         clear_page(gt->shared_raw[i]);
 
-    /* Restore the first 8 entries (toolstack reserved grants) */
-    if ( gt->gt_version != 0 && op.version == 1 )
+    /* Restore the first 8 entries (toolstack reserved grants). */
+    if ( gt->gt_version )
     {
-        memcpy(&shared_entry_v1(gt, 0), reserved_entries, sizeof(reserved_entries));
-    }
-    else if ( gt->gt_version != 0 && op.version == 2 )
-    {
-        for ( i = 0; i < GNTTAB_NR_RESERVED_ENTRIES; i++ )
+        switch ( op.version )
         {
-            status_entry(gt, i) = reserved_entries[i].flags & (GTF_reading|GTF_writing);
-            shared_entry_v2(gt, i).hdr.flags = reserved_entries[i].flags & ~(GTF_reading|GTF_writing);
-            shared_entry_v2(gt, i).hdr.domid = reserved_entries[i].domid;
-            shared_entry_v2(gt, i).full_page.frame = reserved_entries[i].frame;
+        case 1:
+            memcpy(&shared_entry_v1(gt, 0), reserved_entries, sizeof(reserved_entries));
+            break;
+        case 2:
+            for ( i = 0; i < GNTTAB_NR_RESERVED_ENTRIES; i++ )
+            {
+                status_entry(gt, i) =
+                    reserved_entries[i].flags & (GTF_reading | GTF_writing);
+                shared_entry_v2(gt, i).hdr.flags =
+                    reserved_entries[i].flags & ~(GTF_reading | GTF_writing);
+                shared_entry_v2(gt, i).hdr.domid =
+                    reserved_entries[i].domid;
+                shared_entry_v2(gt, i).full_page.frame =
+                    reserved_entries[i].frame;
+            }
+            break;
         }
     }
 
     gt->gt_version = op.version;
 
-out_unlock:
+ out_unlock:
     write_unlock(&gt->lock);
 
-out:
+ out:
     op.version = gt->gt_version;
 
-    if (__copy_to_guest(uop, &op, 1))
+    if ( __copy_to_guest(uop, &op, 1) )
         res = -EFAULT;
 
     return res;
