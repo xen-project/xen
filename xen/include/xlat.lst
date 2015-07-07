@@ -6,7 +6,6 @@
 ?	mmu_update			xen.h
 !	mmuext_op			xen.h
 !	start_info			xen.h
-?	vcpu_info			xen.h
 ?	vcpu_time_info			xen.h
 !	cpu_user_regs			arch-x86/xen-@arch@.h
 !	trap_info			arch-x86/xen.h

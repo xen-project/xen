@@ -18,7 +18,7 @@ typedef union {
 #define __shared_info(d, s, field)                      \
     (*(!has_32bit_shinfo(d) ?                           \
        (typeof(&(s)->compat.field))&(s)->native.field : \
-       (typeof(&(s)->compat.field))&(s)->compat.field))
+       &(s)->compat.field))
 
 typedef union {
     struct vcpu_info native;
@@ -29,7 +29,7 @@ typedef union {
 #define __vcpu_info(v, i, field)                        \
     (*(!has_32bit_shinfo((v)->domain) ?                 \
        (typeof(&(i)->compat.field))&(i)->native.field : \
-       (typeof(&(i)->compat.field))&(i)->compat.field))
+       &(i)->compat.field))
 
 #else
 
@@ -40,8 +40,6 @@ typedef struct vcpu_info vcpu_info_t;
 #define __vcpu_info(v, i, field)   ((i)->field)
 
 #endif
-
-extern vcpu_info_t dummy_vcpu_info;
 
 #define shared_info(d, field)      __shared_info(d, (d)->shared_info, field)
 #define vcpu_info(v, field)        __vcpu_info(v, (v)->vcpu_info, field)
