@@ -68,6 +68,7 @@ libxl_error = Enumeration("error", [
     (-22, "ABORTED"),
     (-23, "NOTFOUND"),
     (-24, "DOMAIN_DESTROYED"), # Target domain ceased to exist during op
+    (-25, "FEATURE_REMOVED"), # For functionality that has been removed
     ], value_namespace = "")
 
 libxl_domain_type = Enumeration("domain_type", [
@@ -356,10 +357,15 @@ libxl_domain_sched_params = Struct("domain_sched_params",[
     ("weight",       integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT'}),
     ("cap",          integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_CAP_DEFAULT'}),
     ("period",       integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT'}),
+    ("budget",       integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_BUDGET_DEFAULT'}),
+
+    # The following three parameters ('slice', 'latency' and 'extratime') are deprecated,
+    # and will have no effect if used, since the SEDF scheduler has been removed.
+    # Note that 'period' was an SDF parameter too, but it is still effective as it is
+    # now used (together with 'budget') by the RTDS scheduler.
     ("slice",        integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_SLICE_DEFAULT'}),
     ("latency",      integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_LATENCY_DEFAULT'}),
     ("extratime",    integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT'}),
-    ("budget",       integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_BUDGET_DEFAULT'}),
     ])
 
 libxl_vnode_info = Struct("vnode_info", [

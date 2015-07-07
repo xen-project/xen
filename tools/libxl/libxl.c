@@ -5728,73 +5728,6 @@ static int sched_credit2_domain_set(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
-static int sched_sedf_domain_get(libxl__gc *gc, uint32_t domid,
-                                 libxl_domain_sched_params *scinfo)
-{
-    uint64_t period;
-    uint64_t slice;
-    uint64_t latency;
-    uint16_t extratime;
-    uint16_t weight;
-    int rc;
-
-    rc = xc_sedf_domain_get(CTX->xch, domid, &period, &slice, &latency,
-                            &extratime, &weight);
-    if (rc != 0) {
-        LOGE(ERROR, "getting domain sched sedf");
-        return ERROR_FAIL;
-    }
-
-    libxl_domain_sched_params_init(scinfo);
-    scinfo->sched = LIBXL_SCHEDULER_SEDF;
-    scinfo->period = period / 1000000;
-    scinfo->slice = slice / 1000000;
-    scinfo->latency = latency / 1000000;
-    scinfo->extratime = extratime;
-    scinfo->weight = weight;
-
-    return 0;
-}
-
-static int sched_sedf_domain_set(libxl__gc *gc, uint32_t domid,
-                                 const libxl_domain_sched_params *scinfo)
-{
-    uint64_t period;
-    uint64_t slice;
-    uint64_t latency;
-    uint16_t extratime;
-    uint16_t weight;
-
-    int ret;
-
-    ret = xc_sedf_domain_get(CTX->xch, domid, &period, &slice, &latency,
-                            &extratime, &weight);
-    if (ret != 0) {
-        LOGE(ERROR, "getting domain sched sedf");
-        return ERROR_FAIL;
-    }
-
-    if (scinfo->period != LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT)
-        period = (uint64_t)scinfo->period * 1000000;
-    if (scinfo->slice != LIBXL_DOMAIN_SCHED_PARAM_SLICE_DEFAULT)
-        slice = (uint64_t)scinfo->slice * 1000000;
-    if (scinfo->latency != LIBXL_DOMAIN_SCHED_PARAM_LATENCY_DEFAULT)
-        latency = (uint64_t)scinfo->latency * 1000000;
-    if (scinfo->extratime != LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT)
-        extratime = scinfo->extratime;
-    if (scinfo->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT)
-        weight = scinfo->weight;
-
-    ret = xc_sedf_domain_set(CTX->xch, domid, period, slice, latency,
-                            extratime, weight);
-    if ( ret < 0 ) {
-        LOGE(ERROR, "setting domain sched sedf");
-        return ERROR_FAIL;
-    }
-
-    return 0;
-}
-
 static int sched_rtds_domain_get(libxl__gc *gc, uint32_t domid,
                                libxl_domain_sched_params *scinfo)
 {
@@ -5873,7 +5806,8 @@ int libxl_domain_sched_params_set(libxl_ctx *ctx, uint32_t domid,
 
     switch (sched) {
     case LIBXL_SCHEDULER_SEDF:
-        ret=sched_sedf_domain_set(gc, domid, scinfo);
+        LOG(ERROR, "SEDF scheduler no longer available");
+        ret=ERROR_FEATURE_REMOVED;
         break;
     case LIBXL_SCHEDULER_CREDIT:
         ret=sched_credit_domain_set(gc, domid, scinfo);
@@ -5909,7 +5843,8 @@ int libxl_domain_sched_params_get(libxl_ctx *ctx, uint32_t domid,
 
     switch (scinfo->sched) {
     case LIBXL_SCHEDULER_SEDF:
-        ret=sched_sedf_domain_get(gc, domid, scinfo);
+        LOG(ERROR, "SEDF scheduler no longer available");
+        ret=ERROR_FEATURE_REMOVED;
         break;
     case LIBXL_SCHEDULER_CREDIT:
         ret=sched_credit_domain_get(gc, domid, scinfo);

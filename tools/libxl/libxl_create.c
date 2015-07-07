@@ -50,61 +50,6 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     return 0;
 }
 
-static int sched_params_valid(libxl__gc *gc,
-                              uint32_t domid, libxl_domain_sched_params *scp)
-{
-    int has_weight = scp->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT;
-    int has_period = scp->period != LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT;
-    int has_slice = scp->slice != LIBXL_DOMAIN_SCHED_PARAM_SLICE_DEFAULT;
-    int has_extratime =
-                scp->extratime != LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT;
-
-    /* The sedf scheduler needs some more consistency checking */
-    if (libxl__domain_scheduler(gc, domid) == LIBXL_SCHEDULER_SEDF) {
-        if (has_weight && (has_period || has_slice))
-            return 0;
-        /* If you want a real-time domain, with its own period and
-         * slice, please, do provide both! */
-        if (has_period != has_slice)
-            return 0;
-
-        /*
-         * Idea is, if we specify a weight, then both period and
-         * slice has to be zero. OTOH, if we do specify a period and
-         * slice, it is weight that should be zeroed. See
-         * docs/misc/sedf_scheduler_mini-HOWTO.txt for more details
-         * on the meaningful combinations and their meanings.
-         */
-        if (has_weight) {
-            scp->slice = 0;
-            scp->period = 0;
-        }
-        else if (!has_period) {
-            /* No weight nor slice/period means best effort. Parameters needs
-             * some mangling in order to properly ask for that, though. */
-
-            /*
-             * Providing no weight does not make any sense if we do not allow
-             * the domain to run in extra time. On the other hand, if we have
-             * extra time, weight will be ignored (and zeroed) by Xen, but it
-             * can't be zero here, or the call for setting the scheduling
-             * parameters will fail. So, avoid the latter by setting a random
-             * weight (namely, 1), as it will be ignored anyway.
-             */
-
-            /* We can setup a proper best effort domain (extra time only)
-             * iff we either already have or are asking for some extra time. */
-            scp->weight = has_extratime ? scp->extratime : 1;
-            scp->period = 0;
-        } else {
-            /* Real-time domain: will get slice CPU time over every period */
-            scp->weight = 0;
-        }
-    }
-
-    return 1;
-}
-
 int libxl__domain_build_info_setdefault(libxl__gc *gc,
                                         libxl_domain_build_info *b_info)
 {
@@ -891,12 +836,6 @@ static void initiate_domain_create(libxl__egc *egc,
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
     if (ret) {
         LOG(ERROR, "Unable to set domain build info defaults");
-        goto error_out;
-    }
-
-    if (!sched_params_valid(gc, domid, &d_config->b_info.sched_params)) {
-        LOG(ERROR, "Invalid scheduling parameters\n");
-        ret = ERROR_INVAL;
         goto error_out;
     }
 
