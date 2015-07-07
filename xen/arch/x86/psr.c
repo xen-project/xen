@@ -30,6 +30,7 @@ struct psr_cat_socket_info {
     unsigned int cbm_len;
     unsigned int cos_max;
     struct psr_cat_cbm *cos_to_cbm;
+    spinlock_t cbm_lock;
 };
 
 struct psr_assoc {
@@ -215,6 +216,49 @@ void psr_ctxt_switch_to(struct domain *d)
     }
 }
 
+/* Called with domain lock held, no extra lock needed for 'psr_cos_ids' */
+static void psr_free_cos(struct domain *d)
+{
+    unsigned int socket;
+    unsigned int cos;
+    struct psr_cat_socket_info *info;
+
+    if( !d->arch.psr_cos_ids )
+        return;
+
+    for_each_set_bit(socket, cat_socket_enable, nr_sockets)
+    {
+        if ( (cos = d->arch.psr_cos_ids[socket]) == 0 )
+            continue;
+
+        info = cat_socket_info + socket;
+        spin_lock(&info->cbm_lock);
+        info->cos_to_cbm[cos].ref--;
+        spin_unlock(&info->cbm_lock);
+    }
+
+    xfree(d->arch.psr_cos_ids);
+    d->arch.psr_cos_ids = NULL;
+}
+
+int psr_domain_init(struct domain *d)
+{
+    if ( cat_socket_info )
+    {
+        d->arch.psr_cos_ids = xzalloc_array(unsigned int, nr_sockets);
+        if ( !d->arch.psr_cos_ids )
+            return -ENOMEM;
+    }
+
+    return 0;
+}
+
+void psr_domain_free(struct domain *d)
+{
+    psr_free_rmid(d);
+    psr_free_cos(d);
+}
+
 static int cat_cpu_prepare(unsigned int cpu)
 {
     struct psr_cat_socket_info *info;
@@ -260,6 +304,8 @@ static void cat_cpu_init(void)
 
         /* cos=0 is reserved as default cbm(all ones). */
         info->cos_to_cbm[0].cbm = (1ull << info->cbm_len) - 1;
+
+        spin_lock_init(&info->cbm_lock);
 
         set_bit(socket, cat_socket_enable);
         printk(XENLOG_INFO "CAT: enabled on socket %u, cos_max:%u, cbm_len:%u\n",

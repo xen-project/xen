@@ -51,6 +51,9 @@ int psr_alloc_rmid(struct domain *d);
 void psr_free_rmid(struct domain *d);
 void psr_ctxt_switch_to(struct domain *d);
 
+int psr_domain_init(struct domain *d);
+void psr_domain_free(struct domain *d);
+
 #endif /* __ASM_PSR_H__ */
 
 /*

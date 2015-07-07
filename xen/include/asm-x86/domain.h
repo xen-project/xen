@@ -336,7 +336,10 @@ struct arch_domain
     struct e820entry *e820;
     unsigned int nr_e820;
 
-    unsigned int psr_rmid; /* RMID assigned to the domain for CMT */
+    /* RMID assigned to the domain for CMT */
+    unsigned int psr_rmid;
+    /* COS assigned to the domain for each socket */
+    unsigned int *psr_cos_ids;
 
     /* Shared page for notifying that explicit PIRQ EOI is required. */
     unsigned long *pirq_eoi_map;

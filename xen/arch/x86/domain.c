@@ -636,6 +636,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         /* 64-bit PV guest by default. */
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
 
+    if ( (rc = psr_domain_init(d)) != 0 )
+        goto fail;
+
     /* initialize default tsc behavior in case tools don't */
     tsc_set_info(d, TSC_MODE_DEFAULT, 0UL, 0, 0);
     spin_lock_init(&d->arch.vtsc_lock);
@@ -654,6 +657,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     free_perdomain_mappings(d);
     if ( is_pv_domain(d) )
         free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
+    psr_domain_free(d);
     return rc;
 }
 
@@ -677,7 +681,7 @@ void arch_domain_destroy(struct domain *d)
     free_xenheap_page(d->shared_info);
     cleanup_domain_irq_mapping(d);
 
-    psr_free_rmid(d);
+    psr_domain_free(d);
 }
 
 void arch_domain_shutdown(struct domain *d)
