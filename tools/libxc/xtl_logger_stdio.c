@@ -61,10 +61,13 @@ static void stdiostream_vmessage(xentoollog_logger *logger_in,
         struct tm lt_buf;
         time_t now = time(0);
         struct tm *lt= localtime_r(&now, &lt_buf);
-        fprintf(lg->f, "%04d-%02d-%02d %02d:%02d:%02d %s ",
-                lt->tm_year+1900, lt->tm_mon+1, lt->tm_mday,
-                lt->tm_hour, lt->tm_min, lt->tm_sec,
-                tzname[!!lt->tm_isdst]);
+        if (lt != NULL)
+            fprintf(lg->f, "%04d-%02d-%02d %02d:%02d:%02d %s ",
+                    lt->tm_year+1900, lt->tm_mon+1, lt->tm_mday,
+                    lt->tm_hour, lt->tm_min, lt->tm_sec,
+                    tzname[!!lt->tm_isdst]);
+        else
+            fprintf(lg->f, "[localtime_r failed: %d] ", errno);
     }
     if (lg->flags & XTL_STDIOSTREAM_SHOW_PID)
         fprintf(lg->f, "[%lu] ", (unsigned long)getpid());
