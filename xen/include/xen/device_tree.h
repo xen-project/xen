@@ -554,6 +554,18 @@ int dt_for_each_irq_map(const struct dt_device_node *dev,
                         void *data);
 
 /**
+ * dt_for_each_range - Iterate over a nodes ranges property
+ * @dev: The node whose interrupt-map property should be iterated over
+ * @cb: Call back to call for each entry
+ * @data: Caller data passed to callback
+ */
+int dt_for_each_range(const struct dt_device_node *dev,
+                      int (*cb)(const struct dt_device_node *,
+                                u64 addr, u64 length,
+                                void *),
+                      void *data);
+
+/**
  * dt_n_size_cells - Helper to retrieve the number of cell for the size
  * @np: node to get the value
  *

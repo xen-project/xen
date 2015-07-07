@@ -722,6 +722,91 @@ int dt_device_get_address(const struct dt_device_node *dev, unsigned int index,
     return 0;
 }
 
+
+int dt_for_each_range(const struct dt_device_node *dev,
+                      int (*cb)(const struct dt_device_node *,
+                                u64 addr, u64 length,
+                                void *),
+                      void *data)
+{
+    const struct dt_device_node *parent = NULL;
+    const struct dt_bus *bus, *pbus;
+    const __be32 *ranges;
+    __be32 addr[DT_MAX_ADDR_CELLS];
+    unsigned int rlen;
+    int na, ns, pna, pns, rone;
+
+    bus = dt_match_bus(dev);
+    if ( !bus )
+        return 0; /* device is not a bus */
+
+    parent = dt_get_parent(dev);
+    if ( parent == NULL )
+        return -EINVAL;
+
+    ranges = dt_get_property(dev, "ranges", &rlen);
+    if ( ranges == NULL )
+    {
+        printk(XENLOG_ERR "DT: no ranges; cannot enumerate\n");
+        return -EINVAL;
+    }
+    if ( rlen == 0 ) /* Nothing to do */
+        return 0;
+
+    bus->count_cells(dev, &na, &ns);
+    if ( !DT_CHECK_COUNTS(na, ns) )
+    {
+        printk(XENLOG_ERR "dt_parse: Bad cell count for device %s\n",
+                  dev->full_name);
+        return -EINVAL;
+    }
+
+    pbus = dt_match_bus(parent);
+    if ( pbus == NULL )
+    {
+        printk("DT: %s is not a valid bus\n", parent->full_name);
+        return -EINVAL;
+    }
+
+    pbus->count_cells(dev, &pna, &pns);
+    if ( !DT_CHECK_COUNTS(pna, pns) )
+    {
+        printk(XENLOG_ERR "dt_parse: Bad cell count for parent %s\n",
+               dev->full_name);
+        return -EINVAL;
+    }
+
+    /* Now walk through the ranges */
+    rlen /= 4;
+    rone = na + pna + ns;
+
+    dt_dprintk("%s: dev=%s, bus=%s, parent=%s, rlen=%d, rone=%d\n",
+               __func__,
+               dt_node_name(dev), bus->name,
+               dt_node_name(parent), rlen, rone);
+
+    for ( ; rlen >= rone; rlen -= rone, ranges += rone )
+    {
+        u64 a, s;
+        int ret;
+
+        memcpy(addr, ranges + na, 4 * pna);
+
+        a = __dt_translate_address(dev, addr, "ranges");
+        s = dt_read_number(ranges + na + pna, ns);
+
+        ret = cb(dev, a, s, data);
+        if ( ret )
+        {
+            dt_dprintk(" -> callback failed=%d\n", ret);
+            return ret;
+        }
+
+    }
+
+    return 0;
+}
+
 /**
  * dt_find_node_by_phandle - Find a node given a phandle
  * @handle: phandle of the node to find
