@@ -2597,14 +2597,32 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
         }
     }
 
-    /* XXX: If we're going to version 2, we could maybe shrink the
-       active grant table here. */
-
-    if ( op.version == 2 && gt->gt_version < 2 )
+    switch ( gt->gt_version )
     {
-        res = gnttab_populate_status_frames(d, gt, nr_grant_frames(gt));
-        if ( res < 0)
-            goto out_unlock;
+    case 0:
+        if ( op.version == 2 )
+        {
+    case 1:
+            /* XXX: We could maybe shrink the active grant table here. */
+            res = gnttab_populate_status_frames(d, gt, nr_grant_frames(gt));
+            if ( res < 0)
+                goto out_unlock;
+        }
+        break;
+    case 2:
+        for ( i = 0; i < GNTTAB_NR_RESERVED_ENTRIES; i++ )
+        {
+            if ( ((shared_entry_v2(gt, i).hdr.flags & GTF_type_mask) ==
+                  GTF_permit_access) &&
+                 (shared_entry_v2(gt, i).full_page.frame >> 32) )
+            {
+                gdprintk(XENLOG_WARNING,
+                         "tried to change grant table version to 1 with non-representable entries\n");
+                res = -ERANGE;
+                goto out_unlock;
+            }
+        }
+        break;
     }
 
     /* Preserve the first 8 entries (toolstack reserved grants) */
