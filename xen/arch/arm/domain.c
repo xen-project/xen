@@ -562,12 +562,12 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
 
     /*
      * Currently the vGIC is emulating the same version of the
-     * hardware GIC. Only the value XEN_DOMCTL_CONFIG_GIC_DEFAULT
+     * hardware GIC. Only the value XEN_DOMCTL_CONFIG_GIC_NATIVE
      * is allowed. The DOMCTL will return the actual version of the
      * GIC.
      */
     rc = -EOPNOTSUPP;
-    if ( config->gic_version != XEN_DOMCTL_CONFIG_GIC_DEFAULT )
+    if ( config->gic_version != XEN_DOMCTL_CONFIG_GIC_NATIVE )
         goto fail;
 
     switch ( gic_hw_version() )

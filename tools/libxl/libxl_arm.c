@@ -61,7 +61,7 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
     xc_config->nr_spis = nr_spis;
     LOG(DEBUG, " - Allocate %u SPIs", nr_spis);
 
-    xc_config->gic_version = XEN_DOMCTL_CONFIG_GIC_DEFAULT;
+    xc_config->gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
 
     return 0;
 }
