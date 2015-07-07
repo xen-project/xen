@@ -1433,51 +1433,6 @@ static PyObject *pyxc_xeninfo(XcObject *self)
                          "cc_compile_date", xen_cc.compile_date);
 }
 
-
-static PyObject *pyxc_sedf_domain_set(XcObject *self,
-                                      PyObject *args,
-                                      PyObject *kwds)
-{
-    uint32_t domid;
-    uint64_t period, slice, latency;
-    uint16_t extratime, weight;
-    static char *kwd_list[] = { "domid", "period", "slice",
-                                "latency", "extratime", "weight",NULL };
-    
-    if( !PyArg_ParseTupleAndKeywords(args, kwds, "iLLLhh", kwd_list, 
-                                     &domid, &period, &slice,
-                                     &latency, &extratime, &weight) )
-        return NULL;
-   if ( xc_sedf_domain_set(self->xc_handle, domid, period,
-                           slice, latency, extratime,weight) != 0 )
-        return pyxc_error_to_exception(self->xc_handle);
-
-    Py_INCREF(zero);
-    return zero;
-}
-
-static PyObject *pyxc_sedf_domain_get(XcObject *self, PyObject *args)
-{
-    uint32_t domid;
-    uint64_t period, slice,latency;
-    uint16_t weight, extratime;
-    
-    if(!PyArg_ParseTuple(args, "i", &domid))
-        return NULL;
-    
-    if (xc_sedf_domain_get(self->xc_handle, domid, &period,
-                           &slice,&latency,&extratime,&weight))
-        return pyxc_error_to_exception(self->xc_handle);
-
-    return Py_BuildValue("{s:i,s:L,s:L,s:L,s:i,s:i}",
-                         "domid",    domid,
-                         "period",    period,
-                         "slice",     slice,
-                         "latency",   latency,
-                         "extratime", extratime,
-                         "weight",    weight);
-}
-
 static PyObject *pyxc_shadow_control(PyObject *self,
                                      PyObject *args,
                                      PyObject *kwds)
@@ -2490,30 +2445,6 @@ static PyMethodDef pyxc_methods[] = {
       "Get the current scheduler type in use.\n"
       "Returns: [int] sched_id.\n" },    
 
-    { "sedf_domain_set",
-      (PyCFunction)pyxc_sedf_domain_set,
-      METH_KEYWORDS, "\n"
-      "Set the scheduling parameters for a domain when running with Atropos.\n"
-      " dom       [int]:  domain to set\n"
-      " period    [long]: domain's scheduling period\n"
-      " slice     [long]: domain's slice per period\n"
-      " latency   [long]: domain's wakeup latency hint\n"
-      " extratime [int]:  domain aware of extratime?\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
-
-    { "sedf_domain_get",
-      (PyCFunction)pyxc_sedf_domain_get,
-      METH_VARARGS, "\n"
-      "Get the current scheduling parameters for a domain when running with\n"
-      "the Atropos scheduler."
-      " dom       [int]: domain to query\n"
-      "Returns:   [dict]\n"
-      " domain    [int]: domain ID\n"
-      " period    [long]: scheduler period\n"
-      " slice     [long]: CPU reservation per period\n"
-      " latency   [long]: domain's wakeup latency hint\n"
-      " extratime [int]:  domain aware of extratime?\n"},
-    
     { "sched_credit_domain_set",
       (PyCFunction)pyxc_sched_credit_domain_set,
       METH_KEYWORDS, "\n"
@@ -3033,7 +2964,6 @@ PyMODINIT_FUNC initxc(void)
     PyModule_AddObject(m, "Error", xc_error_obj);
 
     /* Expose some libxc constants to Python */
-    PyModule_AddIntConstant(m, "XEN_SCHEDULER_SEDF", XEN_SCHEDULER_SEDF);
     PyModule_AddIntConstant(m, "XEN_SCHEDULER_CREDIT", XEN_SCHEDULER_CREDIT);
     PyModule_AddIntConstant(m, "XEN_SCHEDULER_CREDIT2", XEN_SCHEDULER_CREDIT2);
 
