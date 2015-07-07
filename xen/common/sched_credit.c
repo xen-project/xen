@@ -366,12 +366,17 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
 {
     struct csched_vcpu * const cur = CSCHED_VCPU(curr_on_cpu(cpu));
     struct csched_private *prv = CSCHED_PRIV(per_cpu(scheduler, cpu));
-    cpumask_t mask, idle_mask;
+    cpumask_t mask, idle_mask, *online;
     int balance_step, idlers_empty;
 
     ASSERT(cur);
     cpumask_clear(&mask);
-    idlers_empty = cpumask_empty(prv->idlers);
+
+    /* cpu is vc->processor, so it must be in a cpupool. */
+    ASSERT(per_cpu(cpupool, cpu) != NULL);
+    online = cpupool_online_cpumask(per_cpu(cpupool, cpu));
+    cpumask_and(&idle_mask, prv->idlers, online);
+    idlers_empty = cpumask_empty(&idle_mask);
 
 
     /*
@@ -408,8 +413,8 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
             /* Are there idlers suitable for new (for this balance step)? */
             csched_balance_cpumask(new->vcpu, balance_step,
                                    csched_balance_mask);
-            cpumask_and(&idle_mask, prv->idlers, csched_balance_mask);
-            new_idlers_empty = cpumask_empty(&idle_mask);
+            cpumask_and(csched_balance_mask, csched_balance_mask, &idle_mask);
+            new_idlers_empty = cpumask_empty(csched_balance_mask);
 
             /*
              * Let's not be too harsh! If there aren't idlers suitable
@@ -1510,6 +1515,7 @@ static struct csched_vcpu *
 csched_load_balance(struct csched_private *prv, int cpu,
     struct csched_vcpu *snext, bool_t *stolen)
 {
+    struct cpupool *c = per_cpu(cpupool, cpu);
     struct csched_vcpu *speer;
     cpumask_t workers;
     cpumask_t *online;
@@ -1517,10 +1523,13 @@ csched_load_balance(struct csched_private *prv, int cpu,
     int node = cpu_to_node(cpu);
 
     BUG_ON( cpu != snext->vcpu->processor );
-    online = cpupool_scheduler_cpumask(per_cpu(cpupool, cpu));
+    online = cpupool_online_cpumask(c);
 
-    /* If this CPU is going offline we shouldn't steal work. */
-    if ( unlikely(!cpumask_test_cpu(cpu, online)) )
+    /*
+     * If this CPU is going offline, or is not (yet) part of any cpupool
+     * (as it happens, e.g., during cpu bringup), we shouldn't steal work.
+     */
+    if ( unlikely(!cpumask_test_cpu(cpu, online) || c == NULL) )
         goto out;
 
     if ( snext->pri == CSCHED_PRI_IDLE )

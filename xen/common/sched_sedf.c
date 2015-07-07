@@ -790,7 +790,8 @@ static struct task_slice sedf_do_schedule(
     if ( tasklet_work_scheduled ||
          (list_empty(runq) && list_empty(waitq)) ||
          unlikely(!cpumask_test_cpu(cpu,
-                   cpupool_scheduler_cpumask(per_cpu(cpupool, cpu)))) )
+                   cpupool_online_cpumask(per_cpu(cpupool, cpu))) ||
+                  per_cpu(cpupool, cpu) == NULL) )
     {
         ret.task = IDLETASK(cpu);
         ret.time = SECONDS(1);
