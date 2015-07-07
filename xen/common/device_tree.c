@@ -417,6 +417,26 @@ int dt_n_size_cells(const struct dt_device_node *np)
 }
 
 /*
+ * These are defined in Linux where much of this code comes from, but
+ * are currently unused outside this file in the context of Xen.
+ */
+#define IORESOURCE_BITS         0x000000ff      /* Bus-specific bits */
+
+#define IORESOURCE_TYPE_BITS    0x00001f00      /* Resource type */
+#define IORESOURCE_IO           0x00000100      /* PCI/ISA I/O ports */
+#define IORESOURCE_MEM          0x00000200
+#define IORESOURCE_REG          0x00000300      /* Register offsets */
+#define IORESOURCE_IRQ          0x00000400
+#define IORESOURCE_DMA          0x00000800
+#define IORESOURCE_BUS          0x00001000
+
+#define IORESOURCE_PREFETCH     0x00002000      /* No side effects */
+#define IORESOURCE_READONLY     0x00004000
+#define IORESOURCE_CACHEABLE    0x00008000
+#define IORESOURCE_RANGELENGTH  0x00010000
+#define IORESOURCE_SHADOWABLE   0x00020000
+
+/*
  * Default translator (generic bus)
  */
 static bool_t dt_bus_default_match(const struct dt_device_node *node)
@@ -480,9 +500,81 @@ static int dt_bus_default_translate(__be32 *addr, u64 offset, int na)
 }
 static unsigned int dt_bus_default_get_flags(const __be32 *addr)
 {
-    /* TODO: Return the type of memory (device, ...) for caching
-     * attribute during mapping */
-    return 0;
+    return IORESOURCE_MEM;
+}
+
+/*
+ * PCI bus specific translator
+ */
+
+static bool_t dt_bus_pci_match(const struct dt_device_node *np)
+{
+    /*
+     * "pciex" is PCI Express "vci" is for the /chaos bridge on 1st-gen PCI
+     * powermacs "ht" is hypertransport
+     */
+    return !strcmp(np->type, "pci") || !strcmp(np->type, "pciex") ||
+        !strcmp(np->type, "vci") || !strcmp(np->type, "ht");
+}
+
+static void dt_bus_pci_count_cells(const struct dt_device_node *np,
+				   int *addrc, int *sizec)
+{
+    if (addrc)
+        *addrc = 3;
+    if (sizec)
+        *sizec = 2;
+}
+
+static unsigned int dt_bus_pci_get_flags(const __be32 *addr)
+{
+    unsigned int flags = 0;
+    u32 w = be32_to_cpup(addr);
+
+    switch((w >> 24) & 0x03) {
+    case 0x01:
+        flags |= IORESOURCE_IO;
+        break;
+    case 0x02: /* 32 bits */
+    case 0x03: /* 64 bits */
+        flags |= IORESOURCE_MEM;
+        break;
+    }
+    if (w & 0x40000000)
+        flags |= IORESOURCE_PREFETCH;
+    return flags;
+}
+
+static u64 dt_bus_pci_map(__be32 *addr, const __be32 *range, int na, int ns,
+		int pna)
+{
+    u64 cp, s, da;
+    unsigned int af, rf;
+
+    af = dt_bus_pci_get_flags(addr);
+    rf = dt_bus_pci_get_flags(range);
+
+    /* Check address type match */
+    if ((af ^ rf) & (IORESOURCE_MEM | IORESOURCE_IO))
+        return DT_BAD_ADDR;
+
+    /* Read address values, skipping high cell */
+    cp = dt_read_number(range + 1, na - 1);
+    s  = dt_read_number(range + na + pna, ns);
+    da = dt_read_number(addr + 1, na - 1);
+
+    dt_dprintk("DT: PCI map, cp=%llx, s=%llx, da=%llx\n",
+               (unsigned long long)cp, (unsigned long long)s,
+               (unsigned long long)da);
+
+    if (da < cp || da >= (cp + s))
+        return DT_BAD_ADDR;
+    return da - cp;
+}
+
+static int dt_bus_pci_translate(__be32 *addr, u64 offset, int na)
+{
+    return dt_bus_default_translate(addr + 1, offset, na - 1);
 }
 
 /*
@@ -490,6 +582,16 @@ static unsigned int dt_bus_default_get_flags(const __be32 *addr)
  */
 static const struct dt_bus dt_busses[] =
 {
+    /* PCI */
+    {
+        .name = "pci",
+        .addresses = "assigned-addresses",
+        .match = dt_bus_pci_match,
+        .count_cells = dt_bus_pci_count_cells,
+        .map = dt_bus_pci_map,
+        .translate = dt_bus_pci_translate,
+        .get_flags = dt_bus_pci_get_flags,
+    },
     /* Default */
     {
         .name = "default",
