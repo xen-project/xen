@@ -47,6 +47,19 @@
 #define VM_EVENT_FLAG_VCPU_PAUSED     (1 << 0)
 /* Flags to aid debugging mem_event */
 #define VM_EVENT_FLAG_FOREIGN         (1 << 1)
+/*
+ * The following flags can be set in response to a mem_access event.
+ *
+ * Emulate the fault-causing instruction (if set in the event response flags).
+ * This will allow the guest to continue execution without lifting the page
+ * access restrictions.
+ */
+#define VM_EVENT_FLAG_EMULATE         (1 << 2)
+/*
+ * Same as MEM_ACCESS_EMULATE, but with write operations or operations
+ * potentially having side effects (like memory mapped or port I/O) disabled.
+ */
+#define VM_EVENT_FLAG_EMULATE_NOWRITE (1 << 3)
 
 /*
  * Reasons for the vm event request
@@ -136,19 +149,6 @@ struct vm_event_regs_x86 {
 #define MEM_ACCESS_GLA_VALID            (1 << 3)
 #define MEM_ACCESS_FAULT_WITH_GLA       (1 << 4)
 #define MEM_ACCESS_FAULT_IN_GPT         (1 << 5)
-/*
- * The following flags can be set in the response.
- *
- * Emulate the fault-causing instruction (if set in the event response flags).
- * This will allow the guest to continue execution without lifting the page
- * access restrictions.
- */
-#define MEM_ACCESS_EMULATE              (1 << 6)
-/*
- * Same as MEM_ACCESS_EMULATE, but with write operations or operations
- * potentially having side effects (like memory mapped or port I/O) disabled.
- */
-#define MEM_ACCESS_EMULATE_NOWRITE      (1 << 7)
 
 struct vm_event_mem_access {
     uint64_t gfn;

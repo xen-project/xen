@@ -1418,7 +1418,7 @@ void p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp)
 {
     /* Mark vcpu for skipping one instruction upon rescheduling. */
-    if ( rsp->flags & MEM_ACCESS_EMULATE )
+    if ( rsp->flags & VM_EVENT_FLAG_EMULATE )
     {
         xenmem_access_t access;
         bool_t violation = 1;
@@ -1553,7 +1553,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     if ( v->arch.vm_event.emulate_flags )
     {
         hvm_mem_access_emulate_one((v->arch.vm_event.emulate_flags &
-                                    MEM_ACCESS_EMULATE_NOWRITE) != 0,
+                                    VM_EVENT_FLAG_EMULATE_NOWRITE) != 0,
                                    TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
 
         v->arch.vm_event.emulate_flags = 0;
