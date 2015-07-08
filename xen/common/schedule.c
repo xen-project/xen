@@ -450,6 +450,34 @@ void vcpu_unblock(struct vcpu *v)
     vcpu_wake(v);
 }
 
+/*
+ * Do the actual movement of a vcpu from old to new CPU. Locks for *both*
+ * CPUs needs to have been taken already when calling this!
+ */
+static void vcpu_move(struct vcpu *v, unsigned int old_cpu,
+                      unsigned int new_cpu)
+{
+    /*
+     * Transfer urgency status to new CPU before switching CPUs, as
+     * once the switch occurs, v->is_urgent is no longer protected by
+     * the per-CPU scheduler lock we are holding.
+     */
+    if ( unlikely(v->is_urgent) && (old_cpu != new_cpu) )
+    {
+        atomic_inc(&per_cpu(schedule_data, new_cpu).urgent_count);
+        atomic_dec(&per_cpu(schedule_data, old_cpu).urgent_count);
+    }
+
+    /*
+     * Actual CPU switch to new CPU.  This is safe because the lock
+     * pointer cant' change while the current lock is held.
+     */
+    if ( VCPU2OP(v)->migrate )
+        SCHED_OP(VCPU2OP(v), migrate, v, new_cpu);
+    else
+        v->processor = new_cpu;
+}
+
 static void vcpu_migrate(struct vcpu *v)
 {
     unsigned long flags;
@@ -514,25 +542,7 @@ static void vcpu_migrate(struct vcpu *v)
         return;
     }
 
-    /*
-     * Transfer urgency status to new CPU before switching CPUs, as once
-     * the switch occurs, v->is_urgent is no longer protected by the per-CPU
-     * scheduler lock we are holding.
-     */
-    if ( unlikely(v->is_urgent) && (old_cpu != new_cpu) )
-    {
-        atomic_inc(&per_cpu(schedule_data, new_cpu).urgent_count);
-        atomic_dec(&per_cpu(schedule_data, old_cpu).urgent_count);
-    }
-
-    /*
-     * Switch to new CPU, then unlock new and old CPU.  This is safe because
-     * the lock pointer cant' change while the current lock is held.
-     */
-    if ( VCPU2OP(v)->migrate )
-        SCHED_OP(VCPU2OP(v), migrate, v, new_cpu);
-    else
-        v->processor = new_cpu;
+    vcpu_move(v, old_cpu, new_cpu);
 
     sched_spin_unlock_double(old_lock, new_lock, flags);
 
