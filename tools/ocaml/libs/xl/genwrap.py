@@ -87,7 +87,10 @@ def ocaml_type_of(ty):
     elif isinstance(ty,idl.KeyedUnion):
         return ty.union_name
     elif isinstance(ty,idl.Aggregate):
-        return ty.rawname.capitalize() + ".t"
+        if ty.rawname is None:
+            return ty.anon_struct
+        else:
+            return ty.rawname.capitalize() + ".t"
     else:
         return ty.rawname
 
@@ -111,14 +114,14 @@ def ocaml_instance_of_field(f):
         name = f.name
     return "%s : %s" % (munge_name(name), ocaml_type_of(f.type))
 
-def gen_struct(ty):
+def gen_struct(ty, indent):
     s = ""
     for f in ty.fields:
         if f.type.private:
             continue
         x = ocaml_instance_of_field(f)
-        x = x.replace("\n", "\n\t\t")
-        s += "\t\t" + x + ";\n"
+        x = x.replace("\n", "\n"+indent)
+        s += indent + x + ";\n"
     return s
 
 def gen_ocaml_keyedunions(ty, interface, indent, parent = None):
@@ -140,7 +143,7 @@ def gen_ocaml_keyedunions(ty, interface, indent, parent = None):
             if isinstance(f.type, idl.Struct) and not f.type.has_fields(): continue
             s += "\ntype %s_%s =\n" % (nparent,f.name)
             s += "{\n"
-            s += gen_struct(f.type)
+            s += gen_struct(f.type, indent + "\t")
             s += "}\n"
 
         name = "%s__union" % ty.keyvar.name
@@ -168,6 +171,23 @@ def gen_ocaml_keyedunions(ty, interface, indent, parent = None):
     if s == "":
         return None, None
     return s.replace("\n", "\n%s" % indent), union_type
+
+def gen_ocaml_anonstruct(ty, interface, indent, parent = None):
+    s= ""
+
+    if ty.rawname is not None:
+        # Non-anonymous types need no special handling
+        pass
+    elif isinstance(ty, idl.Struct):
+        name = "%s__anon" % parent
+        s += "type %s = {\n" % name
+        s += gen_struct(ty, indent)
+        s += "}\n"
+        ty.anon_struct = name
+    if s == "":
+        return None
+    s = indent + s
+    return s.replace("\n", "\n%s" % indent)
 
 def gen_ocaml_ml(ty, interface, indent=""):
 
@@ -212,9 +232,16 @@ def gen_ocaml_ml(ty, interface, indent=""):
             if union_type is not None:
                 union_types.append(union_type)
 
+        # Handle anonymous structs...
+        for f in ty.fields:
+            anon = gen_ocaml_anonstruct(f.type, interface, "\t", f.name)
+            if anon is not None:
+                s += anon
+                s += "\n"
+
         s += "\ttype t =\n"
         s += "\t{\n"
-        s += gen_struct(ty)
+        s += gen_struct(ty, "\t\t")
         s += "\t}\n"
 
         if ty.init_fn is not None:
