@@ -184,6 +184,38 @@ uint64_t get_cpu_idle_time(unsigned int cpu)
     return state.time[RUNSTATE_running];
 }
 
+/*
+ * If locks are different, take the one with the lower address first.
+ * This avoids dead- or live-locks when this code is running on both
+ * cpus at the same time.
+ */
+static void sched_spin_lock_double(spinlock_t *lock1, spinlock_t *lock2,
+                                   unsigned long *flags)
+{
+    if ( lock1 == lock2 )
+    {
+        spin_lock_irqsave(lock1, *flags);
+    }
+    else if ( lock1 < lock2 )
+    {
+        spin_lock_irqsave(lock1, *flags);
+        spin_lock(lock2);
+    }
+    else
+    {
+        spin_lock_irqsave(lock2, *flags);
+        spin_lock(lock1);
+    }
+}
+
+static void sched_spin_unlock_double(spinlock_t *lock1, spinlock_t *lock2,
+                                     unsigned long flags)
+{
+    if ( lock1 != lock2 )
+        spin_unlock(lock2);
+    spin_unlock_irqrestore(lock1, flags);
+}
+
 int sched_init_vcpu(struct vcpu *v, unsigned int processor) 
 {
     struct domain *d = v->domain;
@@ -429,31 +461,14 @@ static void vcpu_migrate(struct vcpu *v)
     for ( ; ; )
     {
         /*
-         * If per-cpu locks for old and new cpu are different, take the one
-         * with the lower lock address first. This avoids dead- or live-locks
-         * when this code is running on both cpus at the same time.
          * We need another iteration if the pre-calculated lock addresses
          * are not correct any longer after evaluating old and new cpu holding
          * the locks.
          */
-
         old_lock = per_cpu(schedule_data, old_cpu).schedule_lock;
         new_lock = per_cpu(schedule_data, new_cpu).schedule_lock;
 
-        if ( old_lock == new_lock )
-        {
-            spin_lock_irqsave(old_lock, flags);
-        }
-        else if ( old_lock < new_lock )
-        {
-            spin_lock_irqsave(old_lock, flags);
-            spin_lock(new_lock);
-        }
-        else
-        {
-            spin_lock_irqsave(new_lock, flags);
-            spin_lock(old_lock);
-        }
+        sched_spin_lock_double(old_lock, new_lock, &flags);
 
         old_cpu = v->processor;
         if ( old_lock == per_cpu(schedule_data, old_cpu).schedule_lock )
@@ -484,9 +499,7 @@ static void vcpu_migrate(struct vcpu *v)
             pick_called = 0;
         }
 
-        if ( old_lock != new_lock )
-            spin_unlock(new_lock);
-        spin_unlock_irqrestore(old_lock, flags);
+        sched_spin_unlock_double(old_lock, new_lock, flags);
     }
 
     /*
@@ -497,9 +510,7 @@ static void vcpu_migrate(struct vcpu *v)
     if ( v->is_running ||
          !test_and_clear_bit(_VPF_migrating, &v->pause_flags) )
     {
-        if ( old_lock != new_lock )
-            spin_unlock(new_lock);
-        spin_unlock_irqrestore(old_lock, flags);
+        sched_spin_unlock_double(old_lock, new_lock, flags);
         return;
     }
 
@@ -523,10 +534,7 @@ static void vcpu_migrate(struct vcpu *v)
     else
         v->processor = new_cpu;
 
-
-    if ( old_lock != new_lock )
-        spin_unlock(new_lock);
-    spin_unlock_irqrestore(old_lock, flags);
+    sched_spin_unlock_double(old_lock, new_lock, flags);
 
     if ( old_cpu != new_cpu )
         sched_move_irqs(v);
