@@ -882,6 +882,20 @@ default is B<cd>.
 
 =back
 
+=head3 Emulated disk controller type
+
+=over 4
+
+=item B<hdtype="STRING">
+
+Select the hd disk type (ide|ahci).
+If hdtype=ahci adds ich9 disk controller in AHCI mode and uses it with
+upstream qemu to emulate disks instead of IDE. It decreases boot time
+but may not be supported by default in Windows xp and older Windows.
+The default is ide.
+
+=back
+
 =head3 Paging
 
 The following options control the mechanisms used to virtualise guest

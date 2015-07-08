@@ -3,18 +3,20 @@ Xen guest interface
 
 A Xen guest can be provided with block devices.  These are always
 provided as Xen VBDs; for HVM guests they may also be provided as
-emulated IDE or SCSI disks.
+emulated IDE, AHCI or SCSI disks.
 
 The abstract interface involves specifying, for each block device:
 
  * Nominal disk type: Xen virtual disk (aka xvd*, the default); SCSI
-   (sd*); IDE (hd*).
+   (sd*); IDE or AHCI (hd*).
 
    For HVM guests, each whole-disk hd* and and sd* device is made
    available _both_ via emulated IDE resp. SCSI controller, _and_ as a
    Xen VBD.  The HVM guest is entitled to assume that the IDE or SCSI
    disks available via the emulated IDE controller target the same
    underlying devices as the corresponding Xen VBD (ie, multipath).
+   In hd* case with hdtype=ahci, disk will be AHCI via emulated
+   ich9 disk controller.
 
    For PV guests every device is made available to the guest only as a
    Xen VBD.  For these domains the type is advisory, for use by the

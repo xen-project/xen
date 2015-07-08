@@ -2154,6 +2154,13 @@ skip_vfb:
             b_info->u.hvm.vga.kind = l ? LIBXL_VGA_INTERFACE_TYPE_STD :
                                          LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
 
+        if (!xlu_cfg_get_string(config, "hdtype", &buf, 0) &&
+            libxl_hdtype_from_string(buf, &b_info->u.hvm.hdtype)) {
+                fprintf(stderr, "ERROR: invalid value \"%s\" for \"hdtype\"\n",
+                    buf);
+                exit (1);
+        }
+
         xlu_cfg_replace_string (config, "keymap", &b_info->u.hvm.keymap, 0);
         xlu_cfg_get_defbool (config, "spice", &b_info->u.hvm.spice.enable, 0);
         if (!xlu_cfg_get_long (config, "spiceport", &l, 0))

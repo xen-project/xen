@@ -818,6 +818,8 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_append(dm_args, libxl__sprintf(gc, "%"PRId64, ram_size));
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        if (b_info->u.hvm.hdtype == LIBXL_HDTYPE_AHCI)
+            flexarray_append_pair(dm_args, "-device", "ahci,id=ahci0");
         for (i = 0; i < num_disks; i++) {
             int disk, part;
             int dev_number =
@@ -872,7 +874,14 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     drive = libxl__sprintf
                         (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s,cache=writeback",
                          pdev_path, disk, format);
-                else if (disk < 4)
+                else if (disk < 6 && b_info->u.hvm.hdtype == LIBXL_HDTYPE_AHCI) {
+                    flexarray_vappend(dm_args, "-drive",
+                        GCSPRINTF("file=%s,if=none,id=ahcidisk-%d,format=%s,cache=writeback",
+                        pdev_path, disk, format),
+                        "-device", GCSPRINTF("ide-hd,bus=ahci0.%d,unit=0,drive=ahcidisk-%d",
+                        disk, disk), NULL);
+                    continue;
+                } else if (disk < 4)
                     drive = libxl__sprintf
                         (gc, "file=%s,if=ide,index=%d,media=disk,format=%s,cache=writeback",
                          pdev_path, disk, format);

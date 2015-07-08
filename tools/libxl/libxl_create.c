@@ -195,6 +195,9 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         if (!b_info->u.hvm.vga.kind)
             b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
 
+        if (!b_info->u.hvm.hdtype)
+            b_info->u.hvm.hdtype = LIBXL_HDTYPE_IDE;
+
         switch (b_info->device_model_version) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
             switch (b_info->u.hvm.vga.kind) {

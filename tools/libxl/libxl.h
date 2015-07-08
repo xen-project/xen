@@ -596,6 +596,14 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_SPICE_STREAMINGVIDEO 1
 
 /*
+ * LIBXL_HAVE_HVM_HDTYPE
+ *
+ * If defined, then the u.hvm structure will contain a enum type
+ * hdtype.
+ */
+#define LIBXL_HAVE_HVM_HDTYPE 1
+
+/*
  * LIBXL_HAVE_DOMAIN_CREATE_RESTORE_PARAMS 1
  *
  * If this is defined, libxl_domain_create_restore()'s API has changed to
