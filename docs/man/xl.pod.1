@@ -1448,6 +1448,9 @@ Intel Haswell and later server platforms offer shared resource monitoring
 and control technologies. The availability of these technologies and the
 hardware capabilities can be shown with B<psr-hwinfo>.
 
+See L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html> for more
+information.
+
 =over 4
 
 =item B<psr-hwinfo> [I<OPTIONS>]
@@ -1531,7 +1534,8 @@ on VM basis. To enforce cache on a specific domain, just set capacity bitmasks
 
 =item B<psr-cat-cbm-set> [I<OPTIONS>] I<domain-id> I<cbm>
 
-Set cache capacity bitmasks(CBM) for a domain.
+Set cache capacity bitmasks(CBM) for a domain. For how to specify I<cbm>
+please refer to L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html>.
 
 B<OPTIONS>
 
@@ -1572,6 +1576,7 @@ And the following documents on the xen.org website:
 L<http://xenbits.xen.org/docs/unstable/misc/xl-network-configuration.html>
 L<http://xenbits.xen.org/docs/unstable/misc/xl-disk-configuration.txt>
 L<http://xenbits.xen.org/docs/unstable/misc/xsm-flask.txt>
+L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html>
 
 For systems that don't automatically bring CPU online:
 
