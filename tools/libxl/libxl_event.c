@@ -1378,20 +1378,19 @@ libxl__poller *libxl__poller_get(libxl_ctx *ctx)
     libxl__poller *p = LIBXL_LIST_FIRST(&ctx->pollers_idle);
     if (p) {
         LIBXL_LIST_REMOVE(p, entry);
-        return p;
-    }
+    } else {
+        p = malloc(sizeof(*p));
+        if (!p) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "cannot allocate poller");
+            return 0;
+        }
+        memset(p, 0, sizeof(*p));
 
-    p = malloc(sizeof(*p));
-    if (!p) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "cannot allocate poller");
-        return 0;
-    }
-    memset(p, 0, sizeof(*p));
-
-    rc = libxl__poller_init(ctx, p);
-    if (rc) {
-        free(p);
-        return NULL;
+        rc = libxl__poller_init(ctx, p);
+        if (rc) {
+            free(p);
+            return NULL;
+        }
     }
 
     return p;
