@@ -147,7 +147,7 @@ static int hvmemul_do_io(
              (p.data_is_ptr != data_is_addr) )
             domain_crash(curr->domain);
 
-        if ( data_is_addr || dir == IOREQ_WRITE )
+        if ( data_is_addr )
             return X86EMUL_UNHANDLEABLE;
         goto finish_access;
     default:
@@ -187,7 +187,7 @@ static int hvmemul_do_io(
             rc = hvm_send_assist_req(s, &p);
             if ( rc != X86EMUL_RETRY || curr->domain->is_shutting_down )
                 vio->io_req.state = STATE_IOREQ_NONE;
-            else if ( data_is_addr || dir == IOREQ_WRITE )
+            else if ( data_is_addr )
                 rc = X86EMUL_OKAY;
         }
         break;

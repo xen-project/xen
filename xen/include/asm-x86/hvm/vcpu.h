@@ -81,8 +81,7 @@ struct hvm_vcpu_io {
 static inline bool_t hvm_vcpu_io_need_completion(const struct hvm_vcpu_io *vio)
 {
     return (vio->io_req.state == STATE_IOREQ_READY) &&
-           !vio->io_req.data_is_ptr &&
-           (vio->io_req.dir == IOREQ_READ);
+           !vio->io_req.data_is_ptr;
 }
 
 #define VMCX_EADDR    (~0ULL)
