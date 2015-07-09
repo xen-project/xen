@@ -116,7 +116,13 @@ LIBXL_TESTS += timedereg
 # "outside libxl" file is compiled exactly like a piece of application
 # code.  They must share information via explicit libxl entrypoints.
 # Unlike proper parts of libxl, it is permissible for libxl_test_FOO.c
-# to use private global variables for its state.
+# to use private global variables for its state.  Note that all the
+# "inside" parts are compiled into a single test library, so their
+# symbol names must be unique.
+#
+# To run these tests, either use LD_PRELOAD to get libxenlight_test.so
+# loaded, or rename it to libxenlight.so so it is the target of the
+# appropriate symlinks.
 
 LIBXL_TEST_OBJS += $(foreach t, $(LIBXL_TESTS),libxl_test_$t.o)
 TEST_PROG_OBJS += $(foreach t, $(LIBXL_TESTS),test_$t.o) test_common.o
