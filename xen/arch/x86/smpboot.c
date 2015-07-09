@@ -61,7 +61,8 @@ cpumask_t cpu_online_map __read_mostly;
 EXPORT_SYMBOL(cpu_online_map);
 
 unsigned int __read_mostly nr_sockets;
-cpumask_var_t *__read_mostly socket_cpumask;
+cpumask_t **__read_mostly socket_cpumask;
+static cpumask_t *secondary_socket_cpumask;
 
 struct cpuinfo_x86 cpu_data[NR_CPUS];
 
@@ -84,10 +85,20 @@ void *stack_base[NR_CPUS];
 static void smp_store_cpu_info(int id)
 {
     struct cpuinfo_x86 *c = cpu_data + id;
+    unsigned int socket;
 
     *c = boot_cpu_data;
     if ( id != 0 )
+    {
         identify_cpu(c);
+
+        socket = cpu_to_socket(id);
+        if ( !socket_cpumask[socket] )
+        {
+            socket_cpumask[socket] = secondary_socket_cpumask;
+            secondary_socket_cpumask = NULL;
+        }
+    }
 
     /*
      * Certain Athlons might work (for various values of 'work') in SMP
@@ -658,7 +669,7 @@ static void cpu_smpboot_free(unsigned int cpu)
 
     if ( cpumask_empty(socket_cpumask[socket]) )
     {
-        free_cpumask_var(socket_cpumask[socket]);
+        xfree(socket_cpumask[socket]);
         socket_cpumask[socket] = NULL;
     }
 
@@ -705,7 +716,6 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     nodeid_t node = cpu_to_node(cpu);
     struct desc_struct *gdt;
     unsigned long stub_page;
-    unsigned int socket = cpu_to_socket(cpu);
 
     if ( node != NUMA_NO_NODE )
         memflags = MEMF_node(node);
@@ -748,8 +758,8 @@ static int cpu_smpboot_alloc(unsigned int cpu)
         goto oom;
     per_cpu(stubs.addr, cpu) = stub_page + STUB_BUF_CPU_OFFS(cpu);
 
-    if ( !socket_cpumask[socket] &&
-         !zalloc_cpumask_var(socket_cpumask + socket) )
+    if ( secondary_socket_cpumask == NULL &&
+         (secondary_socket_cpumask = xzalloc(cpumask_t)) == NULL )
         goto oom;
 
     if ( zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
@@ -804,8 +814,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
     set_nr_sockets();
 
-    socket_cpumask = xzalloc_array(cpumask_var_t, nr_sockets);
-    if ( !socket_cpumask || !zalloc_cpumask_var(socket_cpumask) )
+    socket_cpumask = xzalloc_array(cpumask_t *, nr_sockets);
+    if ( socket_cpumask == NULL ||
+         (socket_cpumask[cpu_to_socket(0)] = xzalloc(cpumask_t)) == NULL )
         panic("No memory for socket CPU siblings map");
 
     if ( !zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, 0)) ||

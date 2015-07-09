@@ -67,7 +67,7 @@ extern unsigned int nr_sockets;
 void set_nr_sockets(void);
 
 /* Representing HT and core siblings in each socket. */
-extern cpumask_var_t *socket_cpumask;
+extern cpumask_t **socket_cpumask;
 
 #endif /* !__ASSEMBLY__ */
 
