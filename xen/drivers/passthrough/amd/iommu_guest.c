@@ -682,7 +682,7 @@ static uint64_t iommu_mmio_read64(struct guest_iommu *iommu,
 }
 
 static int guest_iommu_mmio_read(struct vcpu *v, unsigned long addr,
-                                 unsigned long len, unsigned long *pval)
+                                 unsigned int len, unsigned long *pval)
 {
     struct guest_iommu *iommu = vcpu_iommu(v);
     unsigned long offset;
@@ -695,7 +695,7 @@ static int guest_iommu_mmio_read(struct vcpu *v, unsigned long addr,
     if ( unlikely((offset & (len - 1 )) || (len > 8)) )
     {
         AMD_IOMMU_DEBUG("iommu mmio read access is not aligned:"
-                        " offset = %lx, len = %lx\n", offset, len);
+                        " offset = %lx, len = %x\n", offset, len);
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -772,7 +772,7 @@ static void guest_iommu_mmio_write64(struct guest_iommu *iommu,
 }
 
 static int guest_iommu_mmio_write(struct vcpu *v, unsigned long addr,
-                                  unsigned long len, unsigned long val)
+                                  unsigned int len, unsigned long val)
 {
     struct guest_iommu *iommu = vcpu_iommu(v);
     unsigned long offset;
@@ -785,7 +785,7 @@ static int guest_iommu_mmio_write(struct vcpu *v, unsigned long addr,
     if ( unlikely((offset & (len - 1)) || (len > 8)) )
     {
         AMD_IOMMU_DEBUG("iommu mmio write access is not aligned:"
-                        " offset = %lx, len = %lx\n", offset, len);
+                        " offset = %lx, len = %x\n", offset, len);
         return X86EMUL_UNHANDLEABLE;
     }
 

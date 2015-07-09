@@ -202,7 +202,7 @@ static struct msi_desc *msixtbl_addr_to_desc(
 
 static int msixtbl_read(
     struct vcpu *v, unsigned long address,
-    unsigned long len, unsigned long *pval)
+    unsigned int len, unsigned long *pval)
 {
     unsigned long offset;
     struct msixtbl_entry *entry;
@@ -258,7 +258,7 @@ out:
 }
 
 static int msixtbl_write(struct vcpu *v, unsigned long address,
-                         unsigned long len, unsigned long val)
+                         unsigned int len, unsigned long val)
 {
     unsigned long offset;
     struct msixtbl_entry *entry;

@@ -581,7 +581,7 @@ static uint32_t vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset)
 
 static int vlapic_read(
     struct vcpu *v, unsigned long address,
-    unsigned long len, unsigned long *pval)
+    unsigned int len, unsigned long *pval)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned int offset = address - vlapic_base_address(vlapic);
@@ -611,12 +611,12 @@ static int vlapic_read(
         break;
 
     default:
-        gdprintk(XENLOG_ERR, "Local APIC read with len=%#lx, "
+        gdprintk(XENLOG_ERR, "Local APIC read with len=%#x, "
                  "should be 4 instead.\n", len);
         goto exit_and_crash;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "offset %#x with length %#lx, "
+    HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "offset %#x with length %#x, "
                 "and the result is %#x", offset, len, result);
 
  out:
@@ -624,7 +624,7 @@ static int vlapic_read(
     return X86EMUL_OKAY;
 
  unaligned_exit_and_crash:
-    gdprintk(XENLOG_ERR, "Unaligned LAPIC read len=%#lx at offset=%#x.\n",
+    gdprintk(XENLOG_ERR, "Unaligned LAPIC read len=%#x at offset=%#x.\n",
              len, offset);
  exit_and_crash:
     domain_crash(v->domain);
@@ -819,7 +819,7 @@ static int vlapic_reg_write(struct vcpu *v,
 }
 
 static int vlapic_write(struct vcpu *v, unsigned long address,
-                        unsigned long len, unsigned long val)
+                        unsigned int len, unsigned long val)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned int offset = address - vlapic_base_address(vlapic);
@@ -827,7 +827,7 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
 
     if ( offset != APIC_EOI )
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                    "offset %#x with length %#lx, and value is %#lx",
+                    "offset %#x with length %#x, and value is %#lx",
                     offset, len, val);
 
     /*
@@ -854,11 +854,11 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
             break;
 
         default:
-            gprintk(XENLOG_ERR, "LAPIC write with len %lu\n", len);
+            gprintk(XENLOG_ERR, "LAPIC write with len %u\n", len);
             goto exit_and_crash;
         }
 
-        gdprintk(XENLOG_INFO, "Notice: LAPIC write with len %lu\n", len);
+        gdprintk(XENLOG_INFO, "Notice: LAPIC write with len %u\n", len);
         offset &= ~3;
     }
     else if ( unlikely(offset & 3) )
@@ -867,7 +867,7 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
     return vlapic_reg_write(v, offset, val);
 
  unaligned_exit_and_crash:
-    gprintk(XENLOG_ERR, "Unaligned LAPIC write: len=%lu offset=%#x.\n",
+    gprintk(XENLOG_ERR, "Unaligned LAPIC write: len=%u offset=%#x.\n",
             len, offset);
  exit_and_crash:
     domain_crash(v->domain);

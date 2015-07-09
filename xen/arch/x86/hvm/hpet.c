@@ -166,7 +166,7 @@ static inline int hpet_check_access_length(
 }
 
 static int hpet_read(
-    struct vcpu *v, unsigned long addr, unsigned long length,
+    struct vcpu *v, unsigned long addr, unsigned int length,
     unsigned long *pval)
 {
     HPETState *h = vcpu_vhpet(v);
@@ -301,7 +301,7 @@ static inline uint64_t hpet_fixup_reg(
 
 static int hpet_write(
     struct vcpu *v, unsigned long addr,
-    unsigned long length, unsigned long val)
+    unsigned int length, unsigned long val)
 {
     HPETState *h = vcpu_vhpet(v);
     uint64_t old_val, new_val;

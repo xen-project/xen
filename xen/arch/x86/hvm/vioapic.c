@@ -94,7 +94,7 @@ static uint32_t vioapic_read_indirect(const struct hvm_hw_vioapic *vioapic)
 
 static int vioapic_read(
     struct vcpu *v, unsigned long addr,
-    unsigned long length, unsigned long *pval)
+    unsigned int length, unsigned long *pval)
 {
     const struct hvm_hw_vioapic *vioapic = domain_vioapic(v->domain);
     uint32_t result;
@@ -215,7 +215,7 @@ static void vioapic_write_indirect(
 
 static int vioapic_write(
     struct vcpu *v, unsigned long addr,
-    unsigned long length, unsigned long val)
+    unsigned int length, unsigned long val)
 {
     struct hvm_hw_vioapic *vioapic = domain_vioapic(v->domain);
 

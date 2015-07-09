@@ -32,11 +32,11 @@
 
 typedef int (*hvm_mmio_read_t)(struct vcpu *v,
                                unsigned long addr,
-                               unsigned long length,
+                               unsigned int length,
                                unsigned long *val);
 typedef int (*hvm_mmio_write_t)(struct vcpu *v,
                                 unsigned long addr,
-                                unsigned long length,
+                                unsigned int length,
                                 unsigned long val);
 typedef int (*hvm_mmio_check_t)(struct vcpu *v, unsigned long addr);
 
@@ -111,7 +111,7 @@ static inline void relocate_portio_handler(
 
 static inline void register_buffered_io_handler(
     struct domain *d, unsigned long addr,
-    unsigned long size, mmio_action_t action)
+    unsigned int size, mmio_action_t action)
 {
     register_io_handler(d, addr, size, action, HVM_BUFFERED_IO);
 }
