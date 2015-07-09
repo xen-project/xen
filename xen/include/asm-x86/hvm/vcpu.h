@@ -34,9 +34,14 @@ enum hvm_io_state {
     HVMIO_none = 0,
     HVMIO_dispatched,
     HVMIO_awaiting_completion,
-    HVMIO_handle_mmio_awaiting_completion,
-    HVMIO_handle_pio_awaiting_completion,
     HVMIO_completed
+};
+
+enum hvm_io_completion {
+    HVMIO_no_completion,
+    HVMIO_mmio_completion,
+    HVMIO_pio_completion,
+    HVMIO_realmode_completion
 };
 
 struct hvm_vcpu_asid {
@@ -46,9 +51,10 @@ struct hvm_vcpu_asid {
 
 struct hvm_vcpu_io {
     /* I/O request in flight to device model. */
-    enum hvm_io_state   io_state;
-    unsigned long       io_data;
-    int                 io_size;
+    enum hvm_io_state      io_state;
+    enum hvm_io_completion io_completion;
+    unsigned long          io_data;
+    unsigned int           io_size;
 
     /*
      * HVM emulation:

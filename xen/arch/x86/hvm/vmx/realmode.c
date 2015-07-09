@@ -101,14 +101,18 @@ static void realmode_deliver_exception(
     }
 }
 
-static void realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
+void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
     struct vcpu *curr = current;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     int rc;
 
     perfc_incr(realmode_emulations);
 
     rc = hvm_emulate_one(hvmemul_ctxt);
+
+    if ( vio->io_state == HVMIO_awaiting_completion || vio->mmio_retry )
+        vio->io_completion = HVMIO_realmode_completion;
 
     if ( rc == X86EMUL_UNHANDLEABLE )
     {
@@ -177,9 +181,6 @@ void vmx_realmode(struct cpu_user_regs *regs)
 
     hvm_emulate_prepare(&hvmemul_ctxt, regs);
 
-    if ( vio->io_state == HVMIO_completed )
-        realmode_emulate_one(&hvmemul_ctxt);
-
     /* Only deliver interrupts into emulated real mode. */
     if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) &&
          (intr_info & INTR_INFO_VALID_MASK) )
@@ -190,8 +191,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
 
     curr->arch.hvm_vmx.vmx_emulate = 1;
     while ( curr->arch.hvm_vmx.vmx_emulate &&
-            !softirq_pending(smp_processor_id()) &&
-            (vio->io_state == HVMIO_none) )
+            !softirq_pending(smp_processor_id()) )
     {
         /*
          * Check for pending interrupts only every 16 instructions, because
@@ -203,7 +203,10 @@ void vmx_realmode(struct cpu_user_regs *regs)
              hvm_local_events_need_delivery(curr) )
             break;
 
-        realmode_emulate_one(&hvmemul_ctxt);
+        vmx_realmode_emulate_one(&hvmemul_ctxt);
+
+        if ( vio->io_state != HVMIO_none || vio->mmio_retry )
+            break;
 
         /* Stop emulating unless our segment state is not safe */
         if ( curr->arch.hvm_vmx.vmx_realmode )
@@ -245,3 +248,13 @@ void vmx_realmode(struct cpu_user_regs *regs)
     if ( intr_info & INTR_INFO_VALID_MASK )
         __vmwrite(VM_ENTRY_INTR_INFO, intr_info);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

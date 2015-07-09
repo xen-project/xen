@@ -59,6 +59,7 @@
 #include <asm/hvm/trace.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/event.h>
+#include <asm/hvm/vmx/vmx.h>
 #include <asm/mtrr.h>
 #include <asm/apic.h>
 #include <public/sched.h>
@@ -428,17 +429,6 @@ static void hvm_io_assist(ioreq_t *p)
         vio->io_state = HVMIO_completed;
         vio->io_data = p->data;
         break;
-    case HVMIO_handle_mmio_awaiting_completion:
-        vio->io_state = HVMIO_completed;
-        vio->io_data = p->data;
-        (void)handle_mmio();
-        break;
-    case HVMIO_handle_pio_awaiting_completion:
-        if ( vio->io_size == 4 ) /* Needs zero extension. */
-            guest_cpu_user_regs()->rax = (uint32_t)p->data;
-        else
-            memcpy(&guest_cpu_user_regs()->rax, &p->data, vio->io_size);
-        break;
     default:
         break;
     }
@@ -479,6 +469,7 @@ void hvm_do_resume(struct vcpu *v)
     struct hvm_vcpu_io *vio = &v->arch.hvm_vcpu.hvm_io;
     struct domain *d = v->domain;
     struct hvm_ioreq_server *s;
+    enum hvm_io_completion io_completion;
 
     check_wakeup_from_wait();
 
@@ -505,8 +496,37 @@ void hvm_do_resume(struct vcpu *v)
         }
     }
 
-    if ( vio->mmio_retry )
+    io_completion = vio->io_completion;
+    vio->io_completion = HVMIO_no_completion;
+
+    switch ( io_completion )
+    {
+    case HVMIO_no_completion:
+        break;
+    case HVMIO_mmio_completion:
         handle_mmio();
+        break;
+    case HVMIO_pio_completion:
+        if ( vio->io_size == 4 ) /* Needs zero extension. */
+            guest_cpu_user_regs()->rax = (uint32_t)vio->io_data;
+        else
+            memcpy(&guest_cpu_user_regs()->rax, &vio->io_data, vio->io_size);
+        vio->io_state = HVMIO_none;
+        break;
+    case HVMIO_realmode_completion:
+    {
+        struct hvm_emulate_ctxt ctxt;
+
+        hvm_emulate_prepare(&ctxt, guest_cpu_user_regs());
+        vmx_realmode_emulate_one(&ctxt);
+        hvm_emulate_writeback(&ctxt);
+
+        break;
+    }
+    default:
+        ASSERT_UNREACHABLE();
+        break;
+    }
 
     /* Inject pending hw/sw trap */
     if ( v->arch.hvm_vcpu.inject_trap.vector != -1 ) 

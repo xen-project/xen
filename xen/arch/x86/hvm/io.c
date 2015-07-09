@@ -92,8 +92,8 @@ int handle_mmio(void)
 
     if ( rc != X86EMUL_RETRY )
         vio->io_state = HVMIO_none;
-    if ( vio->io_state == HVMIO_awaiting_completion )
-        vio->io_state = HVMIO_handle_mmio_awaiting_completion;
+    if ( vio->io_state == HVMIO_awaiting_completion || vio->mmio_retry )
+        vio->io_completion = HVMIO_mmio_completion;
     else
         vio->mmio_access = (struct npfec){};
 
@@ -158,7 +158,7 @@ int handle_pio(uint16_t port, unsigned int size, int dir)
             return 0;
         /* Completion in hvm_io_assist() with no re-emulation required. */
         ASSERT(dir == IOREQ_READ);
-        vio->io_state = HVMIO_handle_pio_awaiting_completion;
+        vio->io_completion = HVMIO_pio_completion;
         break;
     default:
         gdprintk(XENLOG_ERR, "Weird HVM ioemulation status %d.\n", rc);

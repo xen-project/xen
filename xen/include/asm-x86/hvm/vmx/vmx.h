@@ -94,6 +94,7 @@ void vmx_asm_do_vmentry(void);
 void vmx_intr_assist(void);
 void noreturn vmx_do_resume(struct vcpu *);
 void vmx_vlapic_msr_changed(struct vcpu *v);
+void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt);
 void vmx_realmode(struct cpu_user_regs *regs);
 void vmx_update_debug_state(struct vcpu *v);
 void vmx_update_exception_bitmap(struct vcpu *v);
