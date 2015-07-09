@@ -69,4 +69,6 @@ s/\b struct \s+ type \b/type/xg;
 
 s,^\#include.*sys/cdefs.*,/* $& */,xg;
 
+s,\b __offsetof \b ,offsetof,xg;
+
 s/\b( NULL )/0/xg;
