@@ -106,29 +106,6 @@ static int hvmemul_do_io(
         return X86EMUL_UNHANDLEABLE;
     }
 
-    if ( is_mmio && !data_is_addr )
-    {
-        /* Part of a multi-cycle read or write? */
-        if ( dir == IOREQ_WRITE )
-        {
-            paddr_t pa = vio->mmio_large_write_pa;
-            unsigned int bytes = vio->mmio_large_write_bytes;
-            if ( (addr >= pa) && ((addr + size) <= (pa + bytes)) )
-                return X86EMUL_OKAY;
-        }
-        else
-        {
-            paddr_t pa = vio->mmio_large_read_pa;
-            unsigned int bytes = vio->mmio_large_read_bytes;
-            if ( (addr >= pa) && ((addr + size) <= (pa + bytes)) )
-            {
-                memcpy(p_data, &vio->mmio_large_read[addr - pa],
-                       size);
-                return X86EMUL_OKAY;
-            }
-        }
-    }
-
     switch ( vio->io_req.state )
     {
     case STATE_IOREQ_NONE:
@@ -206,33 +183,6 @@ static int hvmemul_do_io(
 
         if ( !data_is_addr )
             memcpy(p_data, &p.data, size);
-    }
-
-    if ( is_mmio && !data_is_addr )
-    {
-        /* Part of a multi-cycle read or write? */
-        if ( dir == IOREQ_WRITE )
-        {
-            paddr_t pa = vio->mmio_large_write_pa;
-            unsigned int bytes = vio->mmio_large_write_bytes;
-            if ( bytes == 0 )
-                pa = vio->mmio_large_write_pa = addr;
-            if ( addr == (pa + bytes) )
-                vio->mmio_large_write_bytes += size;
-        }
-        else
-        {
-            paddr_t pa = vio->mmio_large_read_pa;
-            unsigned int bytes = vio->mmio_large_read_bytes;
-            if ( bytes == 0 )
-                pa = vio->mmio_large_read_pa = addr;
-            if ( (addr == (pa + bytes)) &&
-                 ((bytes + size) <= sizeof(vio->mmio_large_read)) )
-            {
-                memcpy(&vio->mmio_large_read[bytes], p_data, size);
-                vio->mmio_large_read_bytes += size;
-            }
-        }
     }
 
     return X86EMUL_OKAY;
@@ -590,11 +540,12 @@ static int hvmemul_virtual_to_linear(
 }
 
 static int hvmemul_phys_mmio_access(
-    paddr_t gpa, unsigned int size, uint8_t dir, uint8_t *buffer)
+    struct hvm_mmio_cache *cache, paddr_t gpa, unsigned int size, uint8_t dir,
+    uint8_t *buffer, unsigned int offset)
 {
     unsigned long one_rep = 1;
     unsigned int chunk;
-    int rc;
+    int rc = X86EMUL_OKAY;
 
     /* Accesses must fall within a page. */
     BUG_ON((gpa & ~PAGE_MASK) + size > PAGE_SIZE);
@@ -611,14 +562,33 @@ static int hvmemul_phys_mmio_access(
 
     for ( ;; )
     {
-        rc = hvmemul_do_mmio_buffer(gpa, &one_rep, chunk, dir, 0,
-                                    buffer);
-        if ( rc != X86EMUL_OKAY )
-            break;
+        /* Have we already done this chunk? */
+        if ( offset < cache->size )
+        {
+            ASSERT((offset + chunk) <= cache->size);
+
+            if ( dir == IOREQ_READ )
+                memcpy(&buffer[offset], &cache->buffer[offset], chunk);
+            else if ( memcmp(&buffer[offset], &cache->buffer[offset], chunk) != 0 )
+                domain_crash(current->domain);
+        }
+        else
+        {
+            ASSERT(offset == cache->size);
+
+            rc = hvmemul_do_mmio_buffer(gpa, &one_rep, chunk, dir, 0,
+                                        &buffer[offset]);
+            if ( rc != X86EMUL_OKAY )
+                break;
+
+            /* Note that we have now done this chunk. */
+            memcpy(&cache->buffer[offset], &buffer[offset], chunk);
+            cache->size += chunk;
+        }
 
         /* Advance to the next chunk. */
         gpa += chunk;
-        buffer += chunk;
+        offset += chunk;
         size -= chunk;
 
         if ( size == 0 )
@@ -635,16 +605,58 @@ static int hvmemul_phys_mmio_access(
     return rc;
 }
 
+/*
+ * Multi-cycle MMIO handling is based upon the assumption that emulation
+ * of the same instruction will not access the same MMIO region more
+ * than once. Hence we can deal with re-emulation (for secondary or
+ * subsequent cycles) by looking up the result or previous I/O in a
+ * cache indexed by linear MMIO address.
+ */
+static struct hvm_mmio_cache *hvmemul_find_mmio_cache(
+    struct hvm_vcpu_io *vio, unsigned long gla, uint8_t dir)
+{
+    unsigned int i;
+    struct hvm_mmio_cache *cache;
+
+    for ( i = 0; i < vio->mmio_cache_count; i ++ )
+    {
+        cache = &vio->mmio_cache[i];
+
+        if ( gla == cache->gla &&
+             dir == cache->dir )
+            return cache;
+    }
+
+    i = vio->mmio_cache_count++;
+    if( i == ARRAY_SIZE(vio->mmio_cache) )
+    {
+        domain_crash(current->domain);
+        return NULL;
+    }
+
+    cache = &vio->mmio_cache[i];
+    memset(cache, 0, sizeof (*cache));
+
+    cache->gla = gla;
+    cache->dir = dir;
+
+    return cache;
+}
+
 static int hvmemul_linear_mmio_access(
-    unsigned long gla, unsigned int size, uint8_t dir, uint8_t *buffer,
+    unsigned long gla, unsigned int size, uint8_t dir, void *buffer,
     uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt, bool_t known_gpfn)
 {
     struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
     unsigned long offset = gla & ~PAGE_MASK;
-    unsigned int chunk;
+    struct hvm_mmio_cache *cache = hvmemul_find_mmio_cache(vio, gla, dir);
+    unsigned int chunk, buffer_offset = 0;
     paddr_t gpa;
     unsigned long one_rep = 1;
     int rc;
+
+    if ( cache == NULL )
+        return X86EMUL_UNHANDLEABLE;
 
     chunk = min_t(unsigned int, size, PAGE_SIZE - offset);
 
@@ -660,12 +672,12 @@ static int hvmemul_linear_mmio_access(
 
     for ( ;; )
     {
-        rc = hvmemul_phys_mmio_access(gpa, chunk, dir, buffer);
+        rc = hvmemul_phys_mmio_access(cache, gpa, chunk, dir, buffer, buffer_offset);
         if ( rc != X86EMUL_OKAY )
             break;
 
         gla += chunk;
-        buffer += chunk;
+        buffer_offset += chunk;
         size -= chunk;
 
         if ( size == 0 )
@@ -1611,7 +1623,7 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
         rc = X86EMUL_RETRY;
     if ( rc != X86EMUL_RETRY )
     {
-        vio->mmio_large_read_bytes = vio->mmio_large_write_bytes = 0;
+        vio->mmio_cache_count = 0;
         vio->mmio_insn_bytes = 0;
     }
     else

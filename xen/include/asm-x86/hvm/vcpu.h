@@ -42,6 +42,18 @@ struct hvm_vcpu_asid {
     uint32_t asid;
 };
 
+/*
+ * We may read or write up to m256 as a number of device-model
+ * transactions.
+ */
+struct hvm_mmio_cache {
+    unsigned long gla;
+    unsigned int size;
+    uint8_t dir;
+    uint8_t pad[3]; /* make buffer[] long-aligned */
+    uint8_t buffer[32];
+};
+
 struct hvm_vcpu_io {
     /* I/O request in flight to device model. */
     enum hvm_io_completion io_completion;
@@ -57,13 +69,13 @@ struct hvm_vcpu_io {
     unsigned long       mmio_gva;
     unsigned long       mmio_gpfn;
 
-    /* We may read up to m256 as a number of device-model transactions. */
-    paddr_t mmio_large_read_pa;
-    uint8_t mmio_large_read[32];
-    unsigned int mmio_large_read_bytes;
-    /* We may write up to m256 as a number of device-model transactions. */
-    unsigned int mmio_large_write_bytes;
-    paddr_t mmio_large_write_pa;
+    /*
+     * We may need to handle up to 3 distinct memory accesses per
+     * instruction.
+     */
+    struct hvm_mmio_cache mmio_cache[3];
+    unsigned int mmio_cache_count;
+
     /* For retries we shouldn't re-fetch the instruction. */
     unsigned int mmio_insn_bytes;
     unsigned char mmio_insn[16];
