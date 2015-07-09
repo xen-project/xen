@@ -1600,6 +1600,8 @@ static int flask_pmu_op (struct domain *d, unsigned int op)
                             XEN2__PMU_CTRL, NULL);
     case XENPMU_init:
     case XENPMU_finish:
+    case XENPMU_lvtpc_set:
+    case XENPMU_flush:
         return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_XEN2,
                             XEN2__PMU_USE, NULL);
     default:

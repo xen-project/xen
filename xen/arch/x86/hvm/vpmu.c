@@ -85,31 +85,56 @@ static void __init parse_vpmu_param(char *s)
 void vpmu_lvtpc_update(uint32_t val)
 {
     struct vpmu_struct *vpmu;
+    struct vcpu *curr = current;
 
-    if ( vpmu_mode == XENPMU_MODE_OFF )
+    if ( likely(vpmu_mode == XENPMU_MODE_OFF) )
         return;
 
-    vpmu = vcpu_vpmu(current);
+    vpmu = vcpu_vpmu(curr);
 
     vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR | (val & APIC_LVT_MASKED);
-    apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
+
+    /* Postpone APIC updates for PV(H) guests if PMU interrupt is pending */
+    if ( is_hvm_vcpu(curr) || !vpmu->xenpmu_data ||
+         !vpmu_is_set(vpmu, VPMU_CACHED) )
+        apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
 }
 
 int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content, uint64_t supported)
 {
-    struct vpmu_struct *vpmu = vcpu_vpmu(current);
+    struct vcpu *curr = current;
+    struct vpmu_struct *vpmu;
 
     if ( vpmu_mode == XENPMU_MODE_OFF )
         return 0;
 
+    vpmu = vcpu_vpmu(curr);
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_wrmsr )
-        return vpmu->arch_vpmu_ops->do_wrmsr(msr, msr_content, supported);
+    {
+        int ret = vpmu->arch_vpmu_ops->do_wrmsr(msr, msr_content, supported);
+
+        /*
+         * We may have received a PMU interrupt during WRMSR handling
+         * and since do_wrmsr may load VPMU context we should save
+         * (and unload) it again.
+         */
+        if ( !is_hvm_vcpu(curr) && vpmu->xenpmu_data &&
+             vpmu_is_set(vpmu, VPMU_CACHED) )
+        {
+            vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
+            vpmu->arch_vpmu_ops->arch_vpmu_save(curr, 0);
+            vpmu_reset(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED);
+        }
+        return ret;
+    }
+
     return 0;
 }
 
 int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
-    struct vpmu_struct *vpmu = vcpu_vpmu(current);
+    struct vcpu *curr = current;
+    struct vpmu_struct *vpmu;
 
     if ( vpmu_mode == XENPMU_MODE_OFF )
     {
@@ -117,39 +142,184 @@ int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
         return 0;
     }
 
+    vpmu = vcpu_vpmu(curr);
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_rdmsr )
-        return vpmu->arch_vpmu_ops->do_rdmsr(msr, msr_content);
+    {
+        int ret = vpmu->arch_vpmu_ops->do_rdmsr(msr, msr_content);
+
+        if ( !is_hvm_vcpu(curr) && vpmu->xenpmu_data &&
+             vpmu_is_set(vpmu, VPMU_CACHED) )
+        {
+            vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
+            vpmu->arch_vpmu_ops->arch_vpmu_save(curr, 0);
+            vpmu_reset(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED);
+        }
+        return ret;
+    }
     else
         *msr_content = 0;
 
     return 0;
 }
 
+static inline struct vcpu *choose_hwdom_vcpu(void)
+{
+    unsigned idx;
+
+    if ( hardware_domain->max_vcpus == 0 )
+        return NULL;
+
+    idx = smp_processor_id() % hardware_domain->max_vcpus;
+
+    return hardware_domain->vcpu[idx];
+}
+
 void vpmu_do_interrupt(struct cpu_user_regs *regs)
 {
-    struct vcpu *v = current;
-    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    struct vcpu *sampled = current, *sampling;
+    struct vpmu_struct *vpmu;
+    struct vlapic *vlapic;
+    u32 vlapic_lvtpc;
 
-    if ( vpmu->arch_vpmu_ops )
+    /* dom0 will handle interrupt for special domains (e.g. idle domain) */
+    if ( sampled->domain->domain_id >= DOMID_FIRST_RESERVED )
     {
-        struct vlapic *vlapic = vcpu_vlapic(v);
-        u32 vlapic_lvtpc;
+        sampling = choose_hwdom_vcpu();
+        if ( !sampling )
+            return;
+    }
+    else
+        sampling = sampled;
 
-        if ( !vpmu->arch_vpmu_ops->do_interrupt(regs) ||
-             !is_vlapic_lvtpc_enabled(vlapic) )
+    vpmu = vcpu_vpmu(sampling);
+    if ( !vpmu->arch_vpmu_ops )
+        return;
+
+    /* PV(H) guest */
+    if ( !is_hvm_vcpu(sampling) )
+    {
+        const struct cpu_user_regs *cur_regs;
+        uint64_t *flags = &vpmu->xenpmu_data->pmu.pmu_flags;
+        domid_t domid = DOMID_SELF;
+
+        if ( !vpmu->xenpmu_data )
             return;
 
-        vlapic_lvtpc = vlapic_get_reg(vlapic, APIC_LVTPC);
+        if ( is_pvh_vcpu(sampling) &&
+             !vpmu->arch_vpmu_ops->do_interrupt(regs) )
+            return;
 
-        switch ( GET_APIC_DELIVERY_MODE(vlapic_lvtpc) )
+        if ( vpmu_is_set(vpmu, VPMU_CACHED) )
+            return;
+
+        /* PV guest will be reading PMU MSRs from xenpmu_data */
+        vpmu_set(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED);
+        vpmu->arch_vpmu_ops->arch_vpmu_save(sampling, 1);
+        vpmu_reset(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED);
+
+        if ( has_hvm_container_vcpu(sampled) )
+            *flags = 0;
+        else
+            *flags = PMU_SAMPLE_PV;
+
+        /* Store appropriate registers in xenpmu_data */
+        /* FIXME: 32-bit PVH should go here as well */
+        if ( is_pv_32bit_vcpu(sampling) )
         {
-        case APIC_MODE_FIXED:
-            vlapic_set_irq(vlapic, vlapic_lvtpc & APIC_VECTOR_MASK, 0);
-            break;
-        case APIC_MODE_NMI:
-            v->nmi_pending = 1;
-            break;
+            /*
+             * 32-bit dom0 cannot process Xen's addresses (which are 64 bit)
+             * and therefore we treat it the same way as a non-privileged
+             * PV 32-bit domain.
+             */
+            struct compat_pmu_regs *cmp;
+
+            cur_regs = guest_cpu_user_regs();
+
+            cmp = (void *)&vpmu->xenpmu_data->pmu.r.regs;
+            cmp->ip = cur_regs->rip;
+            cmp->sp = cur_regs->rsp;
+            cmp->flags = cur_regs->eflags;
+            cmp->ss = cur_regs->ss;
+            cmp->cs = cur_regs->cs;
+            if ( (cmp->cs & 3) > 1 )
+                *flags |= PMU_SAMPLE_USER;
         }
+        else
+        {
+            struct xen_pmu_regs *r = &vpmu->xenpmu_data->pmu.r.regs;
+
+            if ( (vpmu_mode & XENPMU_MODE_SELF) )
+                cur_regs = guest_cpu_user_regs();
+            else if ( !guest_mode(regs) && is_hardware_domain(sampling->domain) )
+            {
+                cur_regs = regs;
+                domid = DOMID_XEN;
+            }
+            else
+                cur_regs = guest_cpu_user_regs();
+
+            r->ip = cur_regs->rip;
+            r->sp = cur_regs->rsp;
+            r->flags = cur_regs->eflags;
+
+            if ( !has_hvm_container_vcpu(sampled) )
+            {
+                r->ss = cur_regs->ss;
+                r->cs = cur_regs->cs;
+                if ( !(sampled->arch.flags & TF_kernel_mode) )
+                    *flags |= PMU_SAMPLE_USER;
+            }
+            else
+            {
+                struct segment_register seg;
+
+                hvm_get_segment_register(sampled, x86_seg_cs, &seg);
+                r->cs = seg.sel;
+                hvm_get_segment_register(sampled, x86_seg_ss, &seg);
+                r->ss = seg.sel;
+                r->cpl = seg.attr.fields.dpl;
+                if ( !(sampled->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) )
+                    *flags |= PMU_SAMPLE_REAL;
+            }
+        }
+
+        vpmu->xenpmu_data->domain_id = domid;
+        vpmu->xenpmu_data->vcpu_id = sampled->vcpu_id;
+        if ( is_hardware_domain(sampling->domain) )
+            vpmu->xenpmu_data->pcpu_id = smp_processor_id();
+        else
+            vpmu->xenpmu_data->pcpu_id = sampled->vcpu_id;
+
+        vpmu->hw_lapic_lvtpc |= APIC_LVT_MASKED;
+        apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
+        *flags |= PMU_CACHED;
+        vpmu_set(vpmu, VPMU_CACHED);
+
+        send_guest_vcpu_virq(sampling, VIRQ_XENPMU);
+
+        return;
+    }
+
+    /* HVM guests */
+    vlapic = vcpu_vlapic(sampling);
+
+    /* We don't support (yet) HVM dom0 */
+    ASSERT(sampling == sampled);
+
+    if ( !vpmu->arch_vpmu_ops->do_interrupt(regs) ||
+         !is_vlapic_lvtpc_enabled(vlapic) )
+        return;
+
+    vlapic_lvtpc = vlapic_get_reg(vlapic, APIC_LVTPC);
+
+    switch ( GET_APIC_DELIVERY_MODE(vlapic_lvtpc) )
+    {
+    case APIC_MODE_FIXED:
+        vlapic_set_irq(vlapic, vlapic_lvtpc & APIC_VECTOR_MASK, 0);
+        break;
+    case APIC_MODE_NMI:
+        sampling->nmi_pending = 1;
+        break;
     }
 }
 
@@ -174,7 +344,7 @@ static void vpmu_save_force(void *arg)
     vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
 
     if ( vpmu->arch_vpmu_ops )
-        (void)vpmu->arch_vpmu_ops->arch_vpmu_save(v);
+        (void)vpmu->arch_vpmu_ops->arch_vpmu_save(v, 0);
 
     vpmu_reset(vpmu, VPMU_CONTEXT_SAVE);
 
@@ -193,20 +363,20 @@ void vpmu_save(struct vcpu *v)
     per_cpu(last_vcpu, pcpu) = v;
 
     if ( vpmu->arch_vpmu_ops )
-        if ( vpmu->arch_vpmu_ops->arch_vpmu_save(v) )
+        if ( vpmu->arch_vpmu_ops->arch_vpmu_save(v, 0) )
             vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
 
     apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
 }
 
-void vpmu_load(struct vcpu *v)
+int vpmu_load(struct vcpu *v, bool_t from_guest)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     int pcpu = smp_processor_id();
     struct vcpu *prev = NULL;
 
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
-        return;
+        return 0;
 
     /* First time this VCPU is running here */
     if ( vpmu->last_pcpu != pcpu )
@@ -245,15 +415,26 @@ void vpmu_load(struct vcpu *v)
     local_irq_enable();
 
     /* Only when PMU is counting, we load PMU context immediately. */
-    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) )
-        return;
+    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) ||
+         (!is_hvm_vcpu(vpmu_vcpu(vpmu)) && vpmu_is_set(vpmu, VPMU_CACHED)) )
+        return 0;
 
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_load )
     {
+        int ret;
+
         apic_write_around(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
         /* Arch code needs to set VPMU_CONTEXT_LOADED */
-        vpmu->arch_vpmu_ops->arch_vpmu_load(v);
+        ret = vpmu->arch_vpmu_ops->arch_vpmu_load(v, from_guest);
+        if ( ret )
+        {
+            apic_write_around(APIC_LVTPC,
+                              vpmu->hw_lapic_lvtpc | APIC_LVT_MASKED);
+            return ret;
+        }
     }
+
+    return 0;
 }
 
 void vpmu_initialise(struct vcpu *v)
@@ -265,6 +446,8 @@ void vpmu_initialise(struct vcpu *v)
 
     BUILD_BUG_ON(sizeof(struct xen_pmu_intel_ctxt) > XENPMU_CTXT_PAD_SZ);
     BUILD_BUG_ON(sizeof(struct xen_pmu_amd_ctxt) > XENPMU_CTXT_PAD_SZ);
+    BUILD_BUG_ON(sizeof(struct xen_pmu_regs) > XENPMU_REGS_PAD_SZ);
+    BUILD_BUG_ON(sizeof(struct compat_pmu_regs) > XENPMU_REGS_PAD_SZ);
 
     ASSERT(!vpmu->flags && !vpmu->context);
 
@@ -449,7 +632,10 @@ void vpmu_dump(struct vcpu *v)
 long do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg)
 {
     int ret;
+    struct vcpu *curr;
     struct xen_pmu_params pmu_params = {.val = 0};
+    struct xen_pmu_data *xenpmu_data;
+    struct vpmu_struct *vpmu;
 
     if ( !opt_vpmu_enabled )
         return -EOPNOTSUPP;
@@ -551,6 +737,31 @@ long do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg)
     case XENPMU_finish:
         pvpmu_finish(current->domain, &pmu_params);
         break;
+
+    case XENPMU_lvtpc_set:
+        xenpmu_data = current->arch.vpmu.xenpmu_data;
+        if ( xenpmu_data != NULL )
+            vpmu_lvtpc_update(xenpmu_data->pmu.l.lapic_lvtpc);
+        else
+            ret = -EINVAL;
+        break;
+
+    case XENPMU_flush:
+        curr = current;
+        vpmu = vcpu_vpmu(curr);
+        xenpmu_data = curr->arch.vpmu.xenpmu_data;
+        if ( xenpmu_data == NULL )
+            return -EINVAL;
+        xenpmu_data->pmu.pmu_flags &= ~PMU_CACHED;
+        vpmu_reset(vpmu, VPMU_CACHED);
+        vpmu_lvtpc_update(xenpmu_data->pmu.l.lapic_lvtpc);
+        if ( vpmu_load(curr, 1) )
+        {
+            xenpmu_data->pmu.pmu_flags |= PMU_CACHED;
+            vpmu_set(vpmu, VPMU_CACHED);
+            ret = -EIO;
+        }
+        break ;
 
     default:
         ret = -EINVAL;

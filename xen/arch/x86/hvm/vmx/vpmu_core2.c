@@ -90,6 +90,13 @@ static unsigned int __read_mostly arch_pmc_cnt, fixed_pmc_cnt;
 static uint64_t __read_mostly fixed_ctrl_mask, fixed_counters_mask;
 static uint64_t __read_mostly global_ovf_ctrl_mask;
 
+/* Total size of PMU registers block (copied to/from PV(H) guest) */
+static unsigned int __read_mostly regs_sz;
+/* Offset into context of the beginning of PMU register block */
+static const unsigned int regs_off =
+        sizeof(((struct xen_pmu_intel_ctxt *)0)->fixed_counters) +
+        sizeof(((struct xen_pmu_intel_ctxt *)0)->arch_counters);
+
 /*
  * QUIRK to workaround an issue on various family 6 cpus.
  * The issue leads to endless PMC interrupt loops on the processor.
@@ -312,7 +319,7 @@ static inline void __core2_vpmu_save(struct vcpu *v)
         rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, core2_vpmu_cxt->global_status);
 }
 
-static int core2_vpmu_save(struct vcpu *v)
+static int core2_vpmu_save(struct vcpu *v, bool_t to_guest)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
@@ -328,6 +335,13 @@ static int core2_vpmu_save(struct vcpu *v)
     if ( !vpmu_is_set(vpmu, VPMU_RUNNING) &&
          has_hvm_container_vcpu(v) && cpu_has_vmx_msr_bitmap )
         core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
+
+    if ( to_guest )
+    {
+        ASSERT(!is_hvm_vcpu(v));
+        memcpy((void *)(&vpmu->xenpmu_data->pmu.c.intel) + regs_off,
+               vpmu->context + regs_off, regs_sz);
+    }
 
     return 1;
 }
@@ -365,16 +379,93 @@ static inline void __core2_vpmu_load(struct vcpu *v)
     }
 }
 
-static void core2_vpmu_load(struct vcpu *v)
+static int core2_vpmu_verify(struct vcpu *v)
+{
+    unsigned int i;
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    struct xen_pmu_intel_ctxt *core2_vpmu_cxt = vcpu_vpmu(v)->context;
+    uint64_t *fixed_counters = vpmu_reg_pointer(core2_vpmu_cxt, fixed_counters);
+    struct xen_pmu_cntr_pair *xen_pmu_cntr_pair =
+        vpmu_reg_pointer(core2_vpmu_cxt, arch_counters);
+    uint64_t fixed_ctrl;
+    uint64_t *priv_context = vpmu->priv_context;
+    uint64_t enabled_cntrs = 0;
+
+    if ( core2_vpmu_cxt->global_ovf_ctrl & global_ovf_ctrl_mask )
+        return -EINVAL;
+
+    fixed_ctrl = core2_vpmu_cxt->fixed_ctrl;
+    if ( fixed_ctrl & fixed_ctrl_mask )
+        return -EINVAL;
+
+    for ( i = 0; i < fixed_pmc_cnt; i++ )
+    {
+        if ( fixed_counters[i] & fixed_counters_mask )
+            return -EINVAL;
+        if ( (fixed_ctrl >> (i * FIXED_CTR_CTRL_BITS)) & 3 )
+            enabled_cntrs |= (1ULL << i);
+    }
+    enabled_cntrs <<= 32;
+
+    for ( i = 0; i < arch_pmc_cnt; i++ )
+    {
+        uint64_t control = xen_pmu_cntr_pair[i].control;
+
+        if ( control & ARCH_CTRL_MASK )
+            return -EINVAL;
+        if ( control & ARCH_CNTR_ENABLED )
+            enabled_cntrs |= (1ULL << i);
+    }
+
+    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_DS) &&
+         !is_canonical_address(core2_vpmu_cxt->ds_area) )
+        return -EINVAL;
+
+    if ( (core2_vpmu_cxt->global_ctrl & enabled_cntrs) ||
+         (core2_vpmu_cxt->ds_area != 0) )
+        vpmu_set(vpmu, VPMU_RUNNING);
+    else
+        vpmu_reset(vpmu, VPMU_RUNNING);
+
+    *priv_context = enabled_cntrs;
+
+    return 0;
+}
+
+static int core2_vpmu_load(struct vcpu *v, bool_t from_guest)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
     if ( vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
-        return;
+        return 0;
+
+    if ( from_guest )
+    {
+        int ret;
+
+        ASSERT(!is_hvm_vcpu(v));
+
+        memcpy(vpmu->context + regs_off,
+               (void *)&v->arch.vpmu.xenpmu_data->pmu.c.intel + regs_off,
+               regs_sz);
+
+        ret = core2_vpmu_verify(v);
+        if ( ret )
+        {
+            /*
+             * Not necessary since we should never load the context until
+             * guest provides valid values. But just to be safe.
+             */
+            memset(vpmu->context + regs_off, 0, regs_sz);
+            return ret;
+        }
+    }
 
     vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
 
     __core2_vpmu_load(v);
+
+    return 0;
 }
 
 static int core2_vpmu_alloc_resource(struct vcpu *v)
@@ -411,6 +502,13 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
 
     vpmu->context = core2_vpmu_cxt;
     vpmu->priv_context = p;
+
+    if ( !is_hvm_vcpu(v) )
+    {
+        /* Copy fixed/arch register offsets to shared area */
+        ASSERT(vpmu->xenpmu_data);
+        memcpy(&vpmu->xenpmu_data->pmu.c.intel, core2_vpmu_cxt, regs_off);
+    }
 
     vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
 
@@ -922,6 +1020,10 @@ int __init core2_vpmu_init(void)
     global_ovf_ctrl_mask = ~(0xC000000000000000 |
                              (((1ULL << fixed_pmc_cnt) - 1) << 32) |
                              ((1ULL << arch_pmc_cnt) - 1));
+
+    regs_sz = (sizeof(struct xen_pmu_intel_ctxt) - regs_off) +
+              sizeof(uint64_t) * fixed_pmc_cnt +
+              sizeof(struct xen_pmu_cntr_pair) * arch_pmc_cnt;
 
     check_pmc_quirk();
 

@@ -27,6 +27,8 @@
 #define XENPMU_feature_set     3
 #define XENPMU_init            4
 #define XENPMU_finish          5
+#define XENPMU_lvtpc_set       6
+#define XENPMU_flush           7 /* Write cached MSR values to HW     */
 /* ` } */
 
 /* Parameters structure for HYPERVISOR_xenpmu_op call */

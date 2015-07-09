@@ -46,6 +46,9 @@ static const u32 __read_mostly *counters;
 static const u32 __read_mostly *ctrls;
 static bool_t __read_mostly k7_counters_mirrored;
 
+/* Total size of PMU registers block (copied to/from PV(H) guest) */
+static unsigned int __read_mostly regs_sz;
+
 #define F10H_NUM_COUNTERS   4
 #define F15H_NUM_COUNTERS   6
 #define MAX_NUM_COUNTERS    F15H_NUM_COUNTERS
@@ -158,7 +161,7 @@ static void amd_vpmu_init_regs(struct xen_pmu_amd_ctxt *ctxt)
     unsigned i;
     uint64_t *ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
 
-    memset(&ctxt->regs[0], 0, 2 * sizeof(uint64_t) * num_counters);
+    memset(&ctxt->regs[0], 0, regs_sz);
     for ( i = 0; i < num_counters; i++ )
         ctrl_regs[i] = ctrl_rsvd[i];
 }
@@ -211,27 +214,65 @@ static inline void context_load(struct vcpu *v)
     }
 }
 
-static void amd_vpmu_load(struct vcpu *v)
+static int amd_vpmu_load(struct vcpu *v, bool_t from_guest)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    struct xen_pmu_amd_ctxt *ctxt = vpmu->context;
-    uint64_t *ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
+    struct xen_pmu_amd_ctxt *ctxt;
+    uint64_t *ctrl_regs;
+    unsigned int i;
 
     vpmu_reset(vpmu, VPMU_FROZEN);
 
-    if ( vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
+    if ( !from_guest && vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
     {
-        unsigned int i;
+        ctxt = vpmu->context;
+        ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
 
         for ( i = 0; i < num_counters; i++ )
             wrmsrl(ctrls[i], ctrl_regs[i]);
 
-        return;
+        return 0;
+    }
+
+    if ( from_guest )
+    {
+        bool_t is_running = 0;
+        struct xen_pmu_amd_ctxt *guest_ctxt = &vpmu->xenpmu_data->pmu.c.amd;
+
+        ASSERT(!is_hvm_vcpu(v));
+
+        ctxt = vpmu->context;
+        ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
+
+        memcpy(&ctxt->regs[0], &guest_ctxt->regs[0], regs_sz);
+
+        for ( i = 0; i < num_counters; i++ )
+        {
+            if ( (ctrl_regs[i] & CTRL_RSVD_MASK) != ctrl_rsvd[i] )
+            {
+                /*
+                 * Not necessary to re-init context since we should never load
+                 * it until guest provides valid values. But just to be safe.
+                 */
+                amd_vpmu_init_regs(ctxt);
+                return -EINVAL;
+            }
+
+            if ( is_pmu_enabled(ctrl_regs[i]) )
+                is_running = 1;
+        }
+
+        if ( is_running )
+            vpmu_set(vpmu, VPMU_RUNNING);
+        else
+            vpmu_reset(vpmu, VPMU_RUNNING);
     }
 
     vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
 
     context_load(v);
+
+    return 0;
 }
 
 static inline void context_save(struct vcpu *v)
@@ -246,22 +287,18 @@ static inline void context_save(struct vcpu *v)
         rdmsrl(counters[i], counter_regs[i]);
 }
 
-static int amd_vpmu_save(struct vcpu *v)
+static int amd_vpmu_save(struct vcpu *v,  bool_t to_guest)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     unsigned int i;
 
-    /*
-     * Stop the counters. If we came here via vpmu_save_force (i.e.
-     * when VPMU_CONTEXT_SAVE is set) counters are already stopped.
-     */
+    /* Stop the counters. */
+    for ( i = 0; i < num_counters; i++ )
+        wrmsrl(ctrls[i], 0);
+
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_SAVE) )
     {
         vpmu_set(vpmu, VPMU_FROZEN);
-
-        for ( i = 0; i < num_counters; i++ )
-            wrmsrl(ctrls[i], 0);
-
         return 0;
     }
 
@@ -273,6 +310,16 @@ static int amd_vpmu_save(struct vcpu *v)
     if ( !vpmu_is_set(vpmu, VPMU_RUNNING) &&
          has_hvm_container_vcpu(v) && is_msr_bitmap_on(vpmu) )
         amd_vpmu_unset_msr_bitmap(v);
+
+    if ( to_guest )
+    {
+        struct xen_pmu_amd_ctxt *guest_ctxt, *ctxt;
+
+        ASSERT(!is_hvm_vcpu(v));
+        ctxt = vpmu->context;
+        guest_ctxt = &vpmu->xenpmu_data->pmu.c.amd;
+        memcpy(&guest_ctxt->regs[0], &ctxt->regs[0], regs_sz);
+    }
 
     return 1;
 }
@@ -461,8 +508,7 @@ int svm_vpmu_initialise(struct vcpu *v)
     if ( !counters )
         return -EINVAL;
 
-    ctxt = xmalloc_bytes(sizeof(*ctxt) +
-                         2 * sizeof(uint64_t) * num_counters);
+    ctxt = xmalloc_bytes(sizeof(*ctxt) + regs_sz);
     if ( !ctxt )
     {
         printk(XENLOG_G_WARNING "Insufficient memory for PMU, "
@@ -477,6 +523,14 @@ int svm_vpmu_initialise(struct vcpu *v)
 
     vpmu->context = ctxt;
     vpmu->priv_context = NULL;
+
+    if ( !is_hvm_vcpu(v) )
+    {
+        /* Copy register offsets to shared area */
+        ASSERT(vpmu->xenpmu_data);
+        memcpy(&vpmu->xenpmu_data->pmu.c.amd, ctxt,
+               offsetof(struct xen_pmu_amd_ctxt, regs));
+    }
 
     vpmu->arch_vpmu_ops = &amd_vpmu_ops;
 
@@ -526,6 +580,8 @@ int __init amd_vpmu_init(void)
         rdmsrl(ctrls[i], ctrl_rsvd[i]);
         ctrl_rsvd[i] &= CTRL_RSVD_MASK;
     }
+
+    regs_sz = 2 * sizeof(uint64_t) * num_counters;
 
     return 0;
 }

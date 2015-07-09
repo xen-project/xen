@@ -705,7 +705,9 @@ static XSM_INLINE int xsm_pmu_op (XSM_DEFAULT_ARG struct domain *d, unsigned int
     case XENPMU_feature_get:
         return xsm_default_action(XSM_PRIV, d, current->domain);
     case XENPMU_init:
-    case XENPMU_finish: 
+    case XENPMU_finish:
+    case XENPMU_lvtpc_set:
+    case XENPMU_flush:
         return xsm_default_action(XSM_HOOK, d, current->domain);
     default:
         return -EPERM;

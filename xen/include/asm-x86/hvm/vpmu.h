@@ -47,8 +47,8 @@ struct arch_vpmu_ops {
                      unsigned int *eax, unsigned int *ebx,
                      unsigned int *ecx, unsigned int *edx);
     void (*arch_vpmu_destroy)(struct vcpu *v);
-    int (*arch_vpmu_save)(struct vcpu *v);
-    void (*arch_vpmu_load)(struct vcpu *v);
+    int (*arch_vpmu_save)(struct vcpu *v, bool_t to_guest);
+    int (*arch_vpmu_load)(struct vcpu *v, bool_t from_guest);
     void (*arch_vpmu_dump)(const struct vcpu *);
 };
 
@@ -75,6 +75,8 @@ struct vpmu_struct {
 #define VPMU_CONTEXT_SAVE                   0x8   /* Force context save */
 #define VPMU_FROZEN                         0x10  /* Stop counters while VCPU is not running */
 #define VPMU_PASSIVE_DOMAIN_ALLOCATED       0x20
+/* PV(H) guests: VPMU registers are accessed by guest from shared page */
+#define VPMU_CACHED                         0x40
 
 static inline void vpmu_set(struct vpmu_struct *vpmu, const u32 mask)
 {
@@ -107,7 +109,7 @@ void vpmu_do_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 void vpmu_initialise(struct vcpu *v);
 void vpmu_destroy(struct vcpu *v);
 void vpmu_save(struct vcpu *v);
-void vpmu_load(struct vcpu *v);
+int vpmu_load(struct vcpu *v, bool_t from_guest);
 void vpmu_dump(struct vcpu *v);
 
 extern int acquire_pmu_ownership(int pmu_ownership);
@@ -126,7 +128,7 @@ static inline void vpmu_switch_from(struct vcpu *prev)
 static inline void vpmu_switch_to(struct vcpu *next)
 {
     if ( vpmu_mode & (XENPMU_MODE_SELF | XENPMU_MODE_HV) )
-        vpmu_load(next);
+        vpmu_load(next, 0);
 }
 
 #endif /* __ASM_X86_HVM_VPMU_H_*/
