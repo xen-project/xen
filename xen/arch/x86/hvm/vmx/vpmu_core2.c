@@ -80,8 +80,15 @@ static bool_t __read_mostly full_width_write;
 #define FIXED_CTR_CTRL_BITS 4
 #define FIXED_CTR_CTRL_MASK ((1 << FIXED_CTR_CTRL_BITS) - 1)
 
+#define ARCH_CNTR_ENABLED   (1ULL << 22)
+
 /* Number of general-purpose and fixed performance counters */
 static unsigned int __read_mostly arch_pmc_cnt, fixed_pmc_cnt;
+
+/* Masks used for testing whether and MSR is valid */
+#define ARCH_CTRL_MASK  (~((1ull << 32) - 1) | (1ull << 21))
+static uint64_t __read_mostly fixed_ctrl_mask, fixed_counters_mask;
+static uint64_t __read_mostly global_ovf_ctrl_mask;
 
 /*
  * QUIRK to workaround an issue on various family 6 cpus.
@@ -479,9 +486,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
 
     ASSERT(!supported);
 
-    if ( type == MSR_TYPE_COUNTER &&
-         (msr_content &
-          ~((1ull << core2_get_bitwidth_fix_count()) - 1)) )
+    if ( (type == MSR_TYPE_COUNTER) && (msr_content & fixed_counters_mask) )
         /* Writing unsupported bits to a fixed counter */
         return -EINVAL;
 
@@ -490,9 +495,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
     switch ( msr )
     {
     case MSR_CORE_PERF_GLOBAL_OVF_CTRL:
-        if ( msr_content & ~(0xC000000000000000 |
-                             (((1ULL << fixed_pmc_cnt) - 1) << 32) |
-                             ((1ULL << arch_pmc_cnt) - 1)) )
+        if ( msr_content & global_ovf_ctrl_mask )
             return -EINVAL;
         core2_vpmu_cxt->global_status &= ~msr_content;
         wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, msr_content);
@@ -526,8 +529,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         core2_vpmu_cxt->global_ctrl = msr_content;
         break;
     case MSR_CORE_PERF_FIXED_CTR_CTRL:
-        if ( msr_content &
-             ( ~((1ull << (fixed_pmc_cnt * FIXED_CTR_CTRL_BITS)) - 1)) )
+        if ( msr_content & fixed_ctrl_mask )
             return -EINVAL;
 
         if ( has_hvm_container_vcpu(v) )
@@ -556,7 +558,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
             struct xen_pmu_cntr_pair *xen_pmu_cntr_pair =
                 vpmu_reg_pointer(core2_vpmu_cxt, arch_counters);
 
-            if ( msr_content & (~((1ull << 32) - 1)) )
+            if ( msr_content & ARCH_CTRL_MASK )
                 return -EINVAL;
 
             if ( has_hvm_container_vcpu(v) )
@@ -565,7 +567,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
             else
                 rdmsrl(MSR_CORE_PERF_GLOBAL_CTRL, core2_vpmu_cxt->global_ctrl);
 
-            if ( msr_content & (1ULL << 22) )
+            if ( msr_content & ARCH_CNTR_ENABLED )
                 *enabled_cntrs |= 1ULL << tmp;
             else
                 *enabled_cntrs &= ~(1ULL << tmp);
@@ -914,6 +916,12 @@ int __init core2_vpmu_init(void)
     fixed_pmc_cnt = core2_get_fixed_pmc_count();
     rdmsrl(MSR_IA32_PERF_CAPABILITIES, caps);
     full_width_write = (caps >> 13) & 1;
+
+    fixed_ctrl_mask = ~((1ull << (fixed_pmc_cnt * FIXED_CTR_CTRL_BITS)) - 1);
+    fixed_counters_mask = ~((1ull << core2_get_bitwidth_fix_count()) - 1);
+    global_ovf_ctrl_mask = ~(0xC000000000000000 |
+                             (((1ULL << fixed_pmc_cnt) - 1) << 32) |
+                             ((1ULL << arch_pmc_cnt) - 1));
 
     check_pmc_quirk();
 
