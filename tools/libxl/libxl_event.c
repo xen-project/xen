@@ -1138,7 +1138,7 @@ int libxl_osevent_beforepoll(libxl_ctx *ctx, int *nfds_io,
 {
     EGC_INIT(ctx);
     CTX_LOCK;
-    int rc = beforepoll_internal(gc, &ctx->poller_app,
+    int rc = beforepoll_internal(gc, ctx->poller_app,
                                  nfds_io, fds, timeout_upd, now);
     CTX_UNLOCK;
     EGC_FREE;
@@ -1291,7 +1291,7 @@ void libxl_osevent_afterpoll(libxl_ctx *ctx, int nfds, const struct pollfd *fds,
 {
     EGC_INIT(ctx);
     CTX_LOCK;
-    afterpoll_internal(egc, &ctx->poller_app, nfds, fds, now);
+    afterpoll_internal(egc, ctx->poller_app, nfds, fds, now);
     CTX_UNLOCK;
     EGC_FREE;
 }

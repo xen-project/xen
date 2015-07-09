@@ -407,7 +407,7 @@ struct libxl__ctx {
       /* See the comment for OSEVENT_HOOK_INTERN in libxl_event.c
        * for restrictions on the use of the osevent fields. */
 
-    libxl__poller poller_app; /* libxl_osevent_beforepoll and _afterpoll */
+    libxl__poller *poller_app; /* libxl_osevent_beforepoll and _afterpoll */
     LIBXL_LIST_HEAD(, libxl__poller) pollers_event, pollers_idle;
 
     LIBXL_SLIST_HEAD(libxl__osevent_hook_nexi, libxl__osevent_hook_nexus)
