@@ -17,6 +17,8 @@
 #include <xen/lib.h>
 #include <xen/string.h>
 #include <xen/spinlock.h>
+#include <public/platform.h>
+#include <xen/guest_access.h>
 
 #ifdef SYMBOLS_ORIGIN
 extern const unsigned int symbols_offsets[];
@@ -147,4 +149,56 @@ const char *symbols_lookup(unsigned long addr,
     *symbolsize = symbol_end - symbols_address(low);
     *offset = addr - symbols_address(low);
     return namebuf;
+}
+
+/*
+ * Get symbol type information. This is encoded as a single char at the
+ * beginning of the symbol name.
+ */
+static char symbols_get_symbol_type(unsigned int off)
+{
+    /*
+     * Get just the first code, look it up in the token table,
+     * and return the first char from this token.
+     */
+    return symbols_token_table[symbols_token_index[symbols_names[off + 1]]];
+}
+
+int xensyms_read(uint32_t *symnum, char *type,
+                 uint64_t *address, char *name)
+{
+    /*
+     * Symbols are most likely accessed sequentially so we remember position
+     * from previous read. This can help us avoid the extra call to
+     * get_symbol_offset().
+     */
+    static uint64_t next_symbol, next_offset;
+    static DEFINE_SPINLOCK(symbols_mutex);
+
+    if ( *symnum > symbols_num_syms )
+        return -ERANGE;
+    if ( *symnum == symbols_num_syms )
+    {
+        /* No more symbols */
+        name[0] = '\0';
+        return 0;
+    }
+
+    spin_lock(&symbols_mutex);
+
+    if ( *symnum == 0 )
+        next_offset = next_symbol = 0;
+    if ( next_symbol != *symnum )
+        /* Non-sequential access */
+        next_offset = get_symbol_offset(*symnum);
+
+    *type = symbols_get_symbol_type(next_offset);
+    next_offset = symbols_expand_symbol(next_offset, name);
+    *address = symbols_address(*symnum);
+
+    next_symbol = ++*symnum;
+
+    spin_unlock(&symbols_mutex);
+
+    return 0;
 }

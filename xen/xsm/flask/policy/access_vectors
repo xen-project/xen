@@ -87,6 +87,8 @@ class xen2
     psr_cmt_op
 # XEN_SYSCTL_psr_cat_op
     psr_cat_op
+# XENPF_get_symbol
+    get_symbol
 }
 
 # Classes domain and domain2 consist of operations that a domain performs on

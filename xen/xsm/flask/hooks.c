@@ -1521,6 +1521,10 @@ static int flask_platform_op(uint32_t op)
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
                                     XEN2__RESOURCE_OP, NULL);
 
+    case XENPF_get_symbol:
+        return avc_has_perm(domain_sid(current->domain), SECINITSID_XEN,
+                            SECCLASS_XEN2, XEN2__GET_SYMBOL, NULL);
+
     default:
         printk("flask_platform_op: Unknown op %d\n", op);
         return -EPERM;

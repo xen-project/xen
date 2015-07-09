@@ -23,6 +23,7 @@
 #include <xen/cpu.h>
 #include <xen/pmstat.h>
 #include <xen/irq.h>
+#include <xen/symbols.h>
 #include <asm/current.h>
 #include <public/platform.h>
 #include <acpi/cpufreq/processor_perf.h>
@@ -795,6 +796,33 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
             ret = ra.nr_done;
 
         xfree(ra.entries);
+    }
+    break;
+
+    case XENPF_get_symbol:
+    {
+        static char name[KSYM_NAME_LEN + 1]; /* protected by xenpf_lock */
+        XEN_GUEST_HANDLE(char) nameh;
+        uint32_t namelen, copylen;
+
+        guest_from_compat_handle(nameh, op->u.symdata.name);
+
+        ret = xensyms_read(&op->u.symdata.symnum, &op->u.symdata.type,
+                           &op->u.symdata.address, name);
+
+        namelen = strlen(name) + 1;
+
+        if ( namelen > op->u.symdata.namelen )
+            copylen = op->u.symdata.namelen;
+        else
+            copylen = namelen;
+
+        op->u.symdata.namelen = namelen;
+
+        if ( !ret && copy_to_guest(nameh, name, copylen) )
+            ret = -EFAULT;
+        if ( !ret && __copy_field_to_guest(u_xenpf_op, op, u.symdata) )
+            ret = -EFAULT;
     }
     break;
 

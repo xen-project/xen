@@ -88,6 +88,7 @@
 ?	processor_px			platform.h
 !	psd_package			platform.h
 ?	xenpf_enter_acpi_sleep		platform.h
+!	xenpf_symdata			platform.h
 ?	xenpf_pcpuinfo			platform.h
 ?	xenpf_pcpu_version		platform.h
 ?	xenpf_resource_entry		platform.h
