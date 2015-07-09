@@ -132,6 +132,10 @@ if (guest_writeconsole) {
 	dontaudit domain_type xen_t : xen writeconsole;
 }
 
+# Allow all domains to use PMU (but not to change its settings --- that's what
+# pmu_ctrl is for)
+allow domain_type xen_t:xen2 pmu_use;
+
 ###############################################################################
 #
 # Domain creation

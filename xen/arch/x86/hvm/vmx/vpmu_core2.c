@@ -365,13 +365,16 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
     if ( !acquire_pmu_ownership(PMU_OWNER_HVM) )
         return 0;
 
-    wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, 0);
-    if ( vmx_add_host_load_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
-        goto out_err;
+    if ( has_hvm_container_vcpu(v) )
+    {
+        wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, 0);
+        if ( vmx_add_host_load_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
+            goto out_err;
 
-    if ( vmx_add_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
-        goto out_err;
-    vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, 0);
+        if ( vmx_add_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
+            goto out_err;
+        vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, 0);
+    }
 
     core2_vpmu_cxt = xzalloc_bytes(sizeof(*core2_vpmu_cxt) +
                                    sizeof(uint64_t) * fixed_pmc_cnt +
@@ -717,7 +720,7 @@ static void core2_vpmu_destroy(struct vcpu *v)
     if ( has_hvm_container_vcpu(v) && cpu_has_vmx_msr_bitmap )
         core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
     release_pmu_ownship(PMU_OWNER_HVM);
-    vpmu_reset(vpmu, VPMU_CONTEXT_ALLOCATED);
+    vpmu_clear(vpmu);
 }
 
 struct arch_vpmu_ops core2_vpmu_ops = {
@@ -827,6 +830,10 @@ int vmx_vpmu_initialise(struct vcpu *v)
     ds_warned = 1;
  func_out:
 
+    /* PV domains can allocate resources immediately */
+    if ( is_pv_vcpu(v) && !core2_vpmu_alloc_resource(v) )
+        return -EIO;
+
     vpmu->arch_vpmu_ops = &core2_vpmu_ops;
 
     return 0;
@@ -896,6 +903,15 @@ int __init core2_vpmu_init(void)
     full_width_write = (caps >> 13) & 1;
 
     check_pmc_quirk();
+
+    if ( sizeof(struct xen_pmu_data) + sizeof(uint64_t) * fixed_pmc_cnt +
+         sizeof(struct xen_pmu_cntr_pair) * arch_pmc_cnt > PAGE_SIZE )
+    {
+        printk(XENLOG_WARNING
+               "VPMU: Register bank does not fit into VPMU share page\n");
+        arch_pmc_cnt = fixed_pmc_cnt = 0;
+        return -ENOSPC;
+    }
 
     return 0;
 }

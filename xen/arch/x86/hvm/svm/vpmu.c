@@ -364,13 +364,11 @@ static void amd_vpmu_destroy(struct vcpu *v)
         amd_vpmu_unset_msr_bitmap(v);
 
     xfree(vpmu->context);
-    vpmu_reset(vpmu, VPMU_CONTEXT_ALLOCATED);
 
     if ( vpmu_is_set(vpmu, VPMU_RUNNING) )
-    {
-        vpmu_reset(vpmu, VPMU_RUNNING);
         release_pmu_ownship(PMU_OWNER_HVM);
-    }
+
+    vpmu_clear(vpmu);
 }
 
 /* VPMU part of the 'q' keyhandler */
@@ -480,6 +478,16 @@ int __init amd_vpmu_init(void)
         printk(XENLOG_WARNING "VPMU: Unsupported CPU family %#x\n",
                current_cpu_data.x86);
         return -EINVAL;
+    }
+
+    if ( sizeof(struct xen_pmu_data) +
+         2 * sizeof(uint64_t) * num_counters > PAGE_SIZE )
+    {
+        printk(XENLOG_WARNING
+               "VPMU: Register bank does not fit into VPMU shared page\n");
+        counters = ctrls = NULL;
+        num_counters = 0;
+        return -ENOSPC;
     }
 
     return 0;

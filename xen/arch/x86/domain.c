@@ -441,6 +441,8 @@ int vcpu_initialise(struct vcpu *v)
         vmce_init_vcpu(v);
     }
 
+    spin_lock_init(&v->arch.vpmu.vpmu_lock);
+
     if ( has_hvm_container_domain(d) )
     {
         rc = hvm_vcpu_initialise(v);

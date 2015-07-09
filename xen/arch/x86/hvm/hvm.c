@@ -4927,6 +4927,7 @@ static hvm_hypercall_t *const pvh_hypercall64_table[NR_hypercalls] = {
     HYPERCALL(hvm_op),
     HYPERCALL(sysctl),
     HYPERCALL(domctl),
+    HYPERCALL(xenpmu_op),
     [ __HYPERVISOR_arch_1 ] = (hvm_hypercall_t *)paging_domctl_continuation
 };
 

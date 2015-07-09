@@ -1165,7 +1165,9 @@ static int svm_vcpu_initialise(struct vcpu *v)
         return rc;
     }
 
-    vpmu_initialise(v);
+    /* PVH's VPMU is initialized via hypercall */
+    if ( is_hvm_vcpu(v) )
+        vpmu_initialise(v);
 
     svm_guest_osvw_init(v);
 

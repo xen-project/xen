@@ -140,7 +140,9 @@ static int vmx_vcpu_initialise(struct vcpu *v)
         }
     }
 
-    vpmu_initialise(v);
+    /* PVH's VPMU is initialized via hypercall */
+    if ( is_hvm_vcpu(v) )
+        vpmu_initialise(v);
 
     vmx_install_vlapic_mapping(v);
 

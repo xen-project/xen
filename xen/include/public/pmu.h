@@ -25,6 +25,8 @@
 #define XENPMU_mode_set        1
 #define XENPMU_feature_get     2
 #define XENPMU_feature_set     3
+#define XENPMU_init            4
+#define XENPMU_finish          5
 /* ` } */
 
 /* Parameters structure for HYPERVISOR_xenpmu_op call */

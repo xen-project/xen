@@ -27,6 +27,7 @@
 #include <asm/types.h>
 #include <asm/msr.h>
 #include <asm/nmi.h>
+#include <asm/p2m.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
@@ -257,22 +258,25 @@ void vpmu_initialise(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t vendor = current_cpu_data.x86_vendor;
     int ret;
+    bool_t is_priv_vpmu = is_hardware_domain(v->domain);
 
     BUILD_BUG_ON(sizeof(struct xen_pmu_intel_ctxt) > XENPMU_CTXT_PAD_SZ);
     BUILD_BUG_ON(sizeof(struct xen_pmu_amd_ctxt) > XENPMU_CTXT_PAD_SZ);
 
-    if ( is_pvh_vcpu(v) )
-        return;
-
     ASSERT(!vpmu->flags && !vpmu->context);
 
-    /*
-     * Count active VPMUs so that we won't try to change vpmu_mode while
-     * they are in use.
-     */
-    spin_lock(&vpmu_lock);
-    vpmu_count++;
-    spin_unlock(&vpmu_lock);
+    if ( !is_priv_vpmu )
+    {
+        /*
+         * Count active VPMUs so that we won't try to change vpmu_mode while
+         * they are in use.
+         * vpmu_mode can be safely updated while dom0's VPMUs are active and
+         * so we don't need to include it in the count.
+         */
+        spin_lock(&vpmu_lock);
+        vpmu_count++;
+        spin_unlock(&vpmu_lock);
+    }
 
     switch ( vendor )
     {
@@ -299,7 +303,7 @@ void vpmu_initialise(struct vcpu *v)
         printk(XENLOG_G_WARNING "VPMU: Initialization failed for %pv\n", v);
 
     /* Intel needs to initialize VPMU ops even if VPMU is not in use */
-    if ( ret || (vpmu_mode == XENPMU_MODE_OFF) )
+    if ( !is_priv_vpmu && (ret || (vpmu_mode == XENPMU_MODE_OFF)) )
     {
         spin_lock(&vpmu_lock);
         vpmu_count--;
@@ -332,11 +336,102 @@ void vpmu_destroy(struct vcpu *v)
                          vpmu_clear_last, v, 1);
 
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_destroy )
-        vpmu->arch_vpmu_ops->arch_vpmu_destroy(v);
+    {
+        /* Unload VPMU first. This will stop counters */
+        on_selected_cpus(cpumask_of(vcpu_vpmu(v)->last_pcpu),
+                         vpmu_save_force, v, 1);
+         vpmu->arch_vpmu_ops->arch_vpmu_destroy(v);
+    }
 
     spin_lock(&vpmu_lock);
-    vpmu_count--;
+    if ( !is_hardware_domain(v->domain) )
+        vpmu_count--;
     spin_unlock(&vpmu_lock);
+}
+
+static int pvpmu_init(struct domain *d, xen_pmu_params_t *params)
+{
+    struct vcpu *v;
+    struct vpmu_struct *vpmu;
+    struct page_info *page;
+    uint64_t gfn = params->val;
+
+    if ( vpmu_mode == XENPMU_MODE_OFF )
+        return -EINVAL;
+
+    if ( (params->vcpu >= d->max_vcpus) || (d->vcpu[params->vcpu] == NULL) )
+        return -EINVAL;
+
+    page = get_page_from_gfn(d, gfn, NULL, P2M_ALLOC);
+    if ( !page )
+        return -EINVAL;
+
+    if ( !get_page_type(page, PGT_writable_page) )
+    {
+        put_page(page);
+        return -EINVAL;
+    }
+
+    v = d->vcpu[params->vcpu];
+    vpmu = vcpu_vpmu(v);
+
+    spin_lock(&vpmu->vpmu_lock);
+
+    if ( v->arch.vpmu.xenpmu_data )
+    {
+        spin_unlock(&vpmu->vpmu_lock);
+        put_page_and_type(page);
+        return -EEXIST;
+    }
+
+    v->arch.vpmu.xenpmu_data = __map_domain_page_global(page);
+    if ( !v->arch.vpmu.xenpmu_data )
+    {
+        spin_unlock(&vpmu->vpmu_lock);
+        put_page_and_type(page);
+        return -ENOMEM;
+    }
+
+    vpmu_initialise(v);
+
+    spin_unlock(&vpmu->vpmu_lock);
+
+    return 0;
+}
+
+static void pvpmu_finish(struct domain *d, xen_pmu_params_t *params)
+{
+    struct vcpu *v;
+    struct vpmu_struct *vpmu;
+    uint64_t mfn;
+    void *xenpmu_data;
+
+    if ( (params->vcpu >= d->max_vcpus) || (d->vcpu[params->vcpu] == NULL) )
+        return;
+
+    v = d->vcpu[params->vcpu];
+    if ( v != current )
+        vcpu_pause(v);
+
+    vpmu = vcpu_vpmu(v);
+    spin_lock(&vpmu->vpmu_lock);
+
+    vpmu_destroy(v);
+    xenpmu_data = vpmu->xenpmu_data;
+    vpmu->xenpmu_data = NULL;
+
+    spin_unlock(&vpmu->vpmu_lock);
+
+    if ( xenpmu_data )
+    {
+        mfn = domain_page_map_to_mfn(xenpmu_data);
+        ASSERT(mfn_valid(mfn));
+        unmap_domain_page_global(xenpmu_data);
+        put_page_and_type(mfn_to_page(mfn));
+    }
+
+    if ( v != current )
+        vcpu_unpause(v);
 }
 
 /* Dump some vpmu informations on console. Used in keyhandler dump_domains(). */
@@ -365,6 +460,8 @@ long do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg)
     {
     case XENPMU_mode_set:
     case XENPMU_feature_set:
+    case XENPMU_init:
+    case XENPMU_finish:
         if ( copy_from_guest(&pmu_params, arg, 1) )
             return -EFAULT;
 
@@ -442,6 +539,14 @@ long do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg)
         if ( copy_field_to_guest(arg, &pmu_params, val) )
             ret = -EFAULT;
 
+        break;
+
+    case XENPMU_init:
+        ret = pvpmu_init(current->domain, &pmu_params);
+        break;
+
+    case XENPMU_finish:
+        pvpmu_finish(current->domain, &pmu_params);
         break;
 
     default:

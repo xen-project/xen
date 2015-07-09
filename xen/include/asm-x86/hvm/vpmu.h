@@ -64,6 +64,8 @@ struct vpmu_struct {
     void *context;      /* May be shared with PV guest */
     void *priv_context; /* hypervisor-only */
     struct arch_vpmu_ops *arch_vpmu_ops;
+    struct xen_pmu_data *xenpmu_data;
+    spinlock_t vpmu_lock;
 };
 
 /* VPMU states */
