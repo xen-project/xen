@@ -108,7 +108,7 @@ LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 
 LIBXL_TESTS += timedereg
 LIBXL_TESTS_PROGS = $(LIBXL_TESTS)
-LIBXL_TESTS_INSIDE = $(LIBXL_TESTS)
+LIBXL_TESTS_INSIDE = $(LIBXL_TESTS) fdevent
 
 # Each entry FOO in LIBXL_TESTS has two main .c files:
 #   libxl_test_FOO.c  "inside libxl" code to support the test case
