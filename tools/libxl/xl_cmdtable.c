@@ -509,6 +509,11 @@ struct cmd_spec cmd_table[] = {
       "-F                      Run in the foreground",
     },
 #ifdef LIBXL_HAVE_PSR_CMT
+    { "psr-hwinfo",
+      &main_psr_hwinfo, 0, 1,
+      "Show hardware information for Platform Shared Resource",
+      "",
+    },
     { "psr-cmt-attach",
       &main_psr_cmt_attach, 0, 1,
       "Attach Cache Monitoring Technology service to a domain",

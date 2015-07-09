@@ -7974,6 +7974,36 @@ out:
 }
 
 #ifdef LIBXL_HAVE_PSR_CMT
+static int psr_cmt_hwinfo(void)
+{
+    int rc;
+    int enabled;
+    uint32_t total_rmid;
+
+    printf("Cache Monitoring Technology (CMT):\n");
+
+    enabled = libxl_psr_cmt_enabled(ctx);
+    printf("%-16s: %s\n", "Enabled", enabled ? "1" : "0");
+    if (!enabled)
+        return 0;
+
+    rc = libxl_psr_cmt_get_total_rmid(ctx, &total_rmid);
+    if (rc) {
+        fprintf(stderr, "Failed to get max RMID value\n");
+        return rc;
+    }
+    printf("%-16s: %u\n", "Total RMID", total_rmid);
+
+    printf("Supported monitor types:\n");
+    if (libxl_psr_cmt_type_supported(ctx, LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY))
+        printf("cache-occupancy\n");
+    if (libxl_psr_cmt_type_supported(ctx, LIBXL_PSR_CMT_TYPE_TOTAL_MEM_COUNT))
+        printf("total-mem-bandwidth\n");
+    if (libxl_psr_cmt_type_supported(ctx, LIBXL_PSR_CMT_TYPE_LOCAL_MEM_COUNT))
+        printf("local-mem-bandwidth\n");
+
+    return rc;
+}
 
 #define MBM_SAMPLE_RETRY_MAX 4
 static int psr_cmt_get_mem_bandwidth(uint32_t domid,
@@ -8138,6 +8168,17 @@ static int psr_cmt_show(libxl_psr_cmt_type type, uint32_t domid)
         libxl_dominfo_list_free(list, nr_domains);
     }
     return 0;
+}
+
+int main_psr_hwinfo(int argc, char **argv)
+{
+    int opt;
+
+    SWITCH_FOREACH_OPT(opt, "", NULL, "psr-hwinfo", 0) {
+        /* No options */
+    }
+
+    return psr_cmt_hwinfo();
 }
 
 int main_psr_cmt_attach(int argc, char **argv)

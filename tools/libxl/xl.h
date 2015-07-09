@@ -112,6 +112,7 @@ int main_remus(int argc, char **argv);
 #endif
 int main_devd(int argc, char **argv);
 #ifdef LIBXL_HAVE_PSR_CMT
+int main_psr_hwinfo(int argc, char **argv);
 int main_psr_cmt_attach(int argc, char **argv);
 int main_psr_cmt_detach(int argc, char **argv);
 int main_psr_cmt_show(int argc, char **argv);
