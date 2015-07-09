@@ -67,7 +67,7 @@ static void occurs(libxl__egc *egc, libxl__ev_time *ev,
     int off = ev - &et[0][0];
     LOG(DEBUG,"occurs[%d][%d] seq=%d rc=%d", off/NTIMES, off%NTIMES, seq, rc);
 
-    assert(!rc);
+    assert(rc == ERROR_TIMEDOUT);
 
     switch (seq) {
     case 0:
