@@ -100,63 +100,46 @@ void vpmu_lvtpc_update(uint32_t val)
         apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
 }
 
-int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content, uint64_t supported)
+int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
+                uint64_t supported, bool_t is_write)
 {
     struct vcpu *curr = current;
     struct vpmu_struct *vpmu;
+    const struct arch_vpmu_ops *ops;
+    int ret = 0;
 
-    if ( vpmu_mode == XENPMU_MODE_OFF )
-        return 0;
-
-    vpmu = vcpu_vpmu(curr);
-    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_wrmsr )
-    {
-        int ret = vpmu->arch_vpmu_ops->do_wrmsr(msr, msr_content, supported);
-
-        /*
-         * We may have received a PMU interrupt during WRMSR handling
-         * and since do_wrmsr may load VPMU context we should save
-         * (and unload) it again.
-         */
-        if ( !is_hvm_vcpu(curr) && vpmu->xenpmu_data &&
-             vpmu_is_set(vpmu, VPMU_CACHED) )
-        {
-            vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
-            vpmu->arch_vpmu_ops->arch_vpmu_save(curr, 0);
-            vpmu_reset(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED);
-        }
-        return ret;
-    }
-
-    return 0;
-}
-
-int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
-{
-    struct vcpu *curr = current;
-    struct vpmu_struct *vpmu;
-
-    if ( vpmu_mode == XENPMU_MODE_OFF )
-    {
-        *msr_content = 0;
-        return 0;
-    }
+    if ( likely(vpmu_mode == XENPMU_MODE_OFF) )
+        goto nop;
 
     vpmu = vcpu_vpmu(curr);
-    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_rdmsr )
-    {
-        int ret = vpmu->arch_vpmu_ops->do_rdmsr(msr, msr_content);
+    ops = vpmu->arch_vpmu_ops;
+    if ( !ops )
+        goto nop;
 
-        if ( !is_hvm_vcpu(curr) && vpmu->xenpmu_data &&
-             vpmu_is_set(vpmu, VPMU_CACHED) )
-        {
-            vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
-            vpmu->arch_vpmu_ops->arch_vpmu_save(curr, 0);
-            vpmu_reset(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED);
-        }
-        return ret;
-    }
+    if ( is_write && ops->do_wrmsr )
+        ret = ops->do_wrmsr(msr, *msr_content, supported);
+    else if ( !is_write && ops->do_rdmsr )
+        ret = ops->do_rdmsr(msr, msr_content);
     else
+        goto nop;
+
+    /*
+     * We may have received a PMU interrupt while handling MSR access
+     * and since do_wr/rdmsr may load VPMU context we should save
+     * (and unload) it again.
+     */
+    if ( !is_hvm_vcpu(curr) && vpmu->xenpmu_data &&
+        vpmu_is_set(vpmu, VPMU_CACHED) )
+    {
+        vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
+        ops->arch_vpmu_save(curr, 0);
+        vpmu_reset(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED);
+    }
+
+    return ret;
+
+ nop:
+    if ( !is_write )
         *msr_content = 0;
 
     return 0;

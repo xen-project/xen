@@ -101,8 +101,8 @@ static inline bool_t vpmu_are_all_set(const struct vpmu_struct *vpmu,
 }
 
 void vpmu_lvtpc_update(uint32_t val);
-int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content, uint64_t supported);
-int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content);
+int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
+                uint64_t supported, bool_t is_write);
 void vpmu_do_interrupt(struct cpu_user_regs *regs);
 void vpmu_do_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                        unsigned int *ecx, unsigned int *edx);
@@ -111,6 +111,16 @@ void vpmu_destroy(struct vcpu *v);
 void vpmu_save(struct vcpu *v);
 int vpmu_load(struct vcpu *v, bool_t from_guest);
 void vpmu_dump(struct vcpu *v);
+
+static inline int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
+                                uint64_t supported)
+{
+    return vpmu_do_msr(msr, &msr_content, supported, 1);
+}
+static inline int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
+{
+    return vpmu_do_msr(msr, msr_content, 0, 0);
+}
 
 extern int acquire_pmu_ownership(int pmu_ownership);
 extern void release_pmu_ownership(int pmu_ownership);
