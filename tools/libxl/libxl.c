@@ -50,6 +50,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 
     ctx->osevent_hooks = 0;
 
+    ctx->poller_app = 0;
     LIBXL_LIST_INIT(&ctx->pollers_event);
     LIBXL_LIST_INIT(&ctx->pollers_idle);
 
@@ -83,8 +84,11 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     rc = libxl__atfork_init(ctx);
     if (rc) goto out;
 
-    rc = libxl__poller_init(ctx, &ctx->poller_app);
-    if (rc) goto out;
+    ctx->poller_app = libxl__poller_get(ctx);
+    if (!ctx->poller_app) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
 
     if ( stat(XENSTORE_PID_FILE, &stat_buf) != 0 ) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Is xenstore daemon running?\n"
@@ -160,7 +164,8 @@ int libxl_ctx_free(libxl_ctx *ctx)
     libxl_version_info_dispose(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh);
 
-    libxl__poller_dispose(&ctx->poller_app);
+    libxl__poller_put(ctx, ctx->poller_app);
+    ctx->poller_app = NULL;
     assert(LIBXL_LIST_EMPTY(&ctx->pollers_event));
     libxl__poller *poller, *poller_tmp;
     LIBXL_LIST_FOREACH_SAFE(poller, &ctx->pollers_idle, entry, poller_tmp) {
