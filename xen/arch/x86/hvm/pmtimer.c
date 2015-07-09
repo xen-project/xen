@@ -142,7 +142,7 @@ static void pmt_timer_callback(void *opaque)
 
 /* Handle port I/O to the PM1a_STS and PM1a_EN registers */
 static int handle_evt_io(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct vcpu *v = current;
     PMTState *s = &v->domain->arch.hvm_domain.pl_time.vpmt;
@@ -205,7 +205,7 @@ static int handle_evt_io(
 
 /* Handle port I/O to the TMR_VAL register */
 static int handle_pmt_io(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct vcpu *v = current;
     PMTState *s = &v->domain->arch.hvm_domain.pl_time.vpmt;

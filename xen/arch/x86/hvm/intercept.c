@@ -369,7 +369,7 @@ int hvm_io_intercept(ioreq_t *p, int type)
 }
 
 void register_io_handler(
-    struct domain *d, unsigned long addr, unsigned long size,
+    struct domain *d, unsigned long addr, unsigned int size,
     void *action, int type)
 {
     struct hvm_io_handler *handler = d->arch.hvm_domain.io_handler;
@@ -386,7 +386,7 @@ void register_io_handler(
 
 void relocate_io_handler(
     struct domain *d, unsigned long old_addr, unsigned long new_addr,
-    unsigned long size, int type)
+    unsigned int size, int type)
 {
     struct hvm_io_handler *handler = d->arch.hvm_domain.io_handler;
     int i;

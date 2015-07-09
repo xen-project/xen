@@ -50,9 +50,9 @@
 #define RW_STATE_WORD1 4
 
 static int handle_pit_io(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val);
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val);
 static int handle_speaker_io(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val);
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val);
 
 #define get_guest_time(v) \
    (is_hvm_vcpu(v) ? hvm_get_guest_time(v) : (u64)get_s_time())
@@ -479,7 +479,7 @@ void pit_deinit(struct domain *d)
 
 /* the intercept action for PIT DM retval:0--not handled; 1--handled */  
 static int handle_pit_io(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct PITState *vpit = vcpu_vpit(current);
 
@@ -522,7 +522,7 @@ static uint32_t speaker_ioport_read(
 }
 
 static int handle_speaker_io(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+    int dir, unsigned int port, uint32_t bytes, uint32_t *val)
 {
     struct PITState *vpit = vcpu_vpit(current);
 

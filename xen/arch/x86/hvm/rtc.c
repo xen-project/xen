@@ -697,7 +697,7 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
 }
 
 static int handle_rtc_io(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct RTCState *vrtc = vcpu_vrtc(current);
 

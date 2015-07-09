@@ -559,7 +559,7 @@ static int hvm_add_ioreq_gmfn(
 }
 
 static int hvm_print_line(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct domain *cd = current->domain;
     char c = *val;
@@ -585,7 +585,7 @@ static int hvm_print_line(
 }
 
 static int hvm_access_cf8(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct domain *d = current->domain;
 
@@ -597,7 +597,7 @@ static int hvm_access_cf8(
 }
 
 static int handle_pvh_io(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct domain *currd = current->domain;
 

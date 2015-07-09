@@ -41,12 +41,12 @@ typedef int (*hvm_mmio_write_t)(struct vcpu *v,
 typedef int (*hvm_mmio_check_t)(struct vcpu *v, unsigned long addr);
 
 typedef int (*portio_action_t)(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val);
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val);
 typedef int (*mmio_action_t)(ioreq_t *);
 struct io_handler {
     int                 type;
+    unsigned int        size;
     unsigned long       addr;
-    unsigned long       size;
     union {
         portio_action_t portio;
         mmio_action_t   mmio;
@@ -75,11 +75,11 @@ extern const struct hvm_mmio_ops iommu_mmio_ops;
 
 int hvm_io_intercept(ioreq_t *p, int type);
 void register_io_handler(
-    struct domain *d, unsigned long addr, unsigned long size,
+    struct domain *d, unsigned long addr, unsigned int size,
     void *action, int type);
 void relocate_io_handler(
     struct domain *d, unsigned long old_addr, unsigned long new_addr,
-    unsigned long size, int type);
+    unsigned int size, int type);
 
 static inline int hvm_portio_intercept(ioreq_t *p)
 {
@@ -96,17 +96,17 @@ int hvm_mmio_intercept(ioreq_t *p);
 int hvm_buffered_io_send(ioreq_t *p);
 
 static inline void register_portio_handler(
-    struct domain *d, unsigned long addr,
-    unsigned long size, portio_action_t action)
+    struct domain *d, unsigned int port, unsigned int size,
+    portio_action_t action)
 {
-    register_io_handler(d, addr, size, action, HVM_PORTIO);
+    register_io_handler(d, port, size, action, HVM_PORTIO);
 }
 
 static inline void relocate_portio_handler(
-    struct domain *d, unsigned long old_addr, unsigned long new_addr,
-    unsigned long size)
+    struct domain *d, unsigned int old_port, unsigned int new_port,
+    unsigned int size)
 {
-    relocate_io_handler(d, old_addr, new_addr, size, HVM_PORTIO);
+    relocate_io_handler(d, old_port, new_port, size, HVM_PORTIO);
 }
 
 static inline void register_buffered_io_handler(

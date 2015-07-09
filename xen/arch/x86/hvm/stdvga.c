@@ -173,7 +173,7 @@ static void stdvga_out(uint32_t port, uint32_t bytes, uint32_t val)
 }
 
 static int stdvga_intercept_pio(
-    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+    int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
 
