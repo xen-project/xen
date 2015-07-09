@@ -421,11 +421,11 @@ static void hvm_io_assist(ioreq_t *p)
 
     if ( hvm_vcpu_io_need_completion(vio) )
     {
-        vio->io_state = HVMIO_completed;
+        vio->io_state = STATE_IORESP_READY;
         vio->io_data = p->data;
     }
     else
-        vio->io_state = HVMIO_none;
+        vio->io_state = STATE_IOREQ_NONE;
 
     msix_write_completion(curr);
     vcpu_end_shutdown_deferral(curr);
@@ -505,7 +505,7 @@ void hvm_do_resume(struct vcpu *v)
             guest_cpu_user_regs()->rax = (uint32_t)vio->io_data;
         else
             memcpy(&guest_cpu_user_regs()->rax, &vio->io_data, vio->io_size);
-        vio->io_state = HVMIO_none;
+        vio->io_state = STATE_IOREQ_NONE;
         break;
     case HVMIO_realmode_completion:
     {

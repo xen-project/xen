@@ -130,10 +130,10 @@ static int hvmemul_do_io(
 
     switch ( vio->io_state )
     {
-    case HVMIO_none:
+    case STATE_IOREQ_NONE:
         break;
-    case HVMIO_completed:
-        vio->io_state = HVMIO_none;
+    case STATE_IORESP_READY:
+        vio->io_state = STATE_IOREQ_NONE;
         if ( data_is_addr || dir == IOREQ_WRITE )
             return X86EMUL_UNHANDLEABLE;
         goto finish_access;
@@ -141,7 +141,7 @@ static int hvmemul_do_io(
         return X86EMUL_UNHANDLEABLE;
     }
 
-    vio->io_state = HVMIO_awaiting_completion;
+    vio->io_state = STATE_IOREQ_READY;
     vio->io_size = size;
     vio->io_dir = dir;
     vio->io_data_is_addr = data_is_addr;
@@ -160,7 +160,7 @@ static int hvmemul_do_io(
     {
     case X86EMUL_OKAY:
         vio->io_data = p.data;
-        vio->io_state = HVMIO_none;
+        vio->io_state = STATE_IOREQ_NONE;
         break;
     case X86EMUL_UNHANDLEABLE:
     {
@@ -173,13 +173,13 @@ static int hvmemul_do_io(
             rc = hvm_process_io_intercept(&null_handler, &p);
             if ( rc == X86EMUL_OKAY )
                 vio->io_data = p.data;
-            vio->io_state = HVMIO_none;
+            vio->io_state = STATE_IOREQ_NONE;
         }
         else
         {
             rc = hvm_send_assist_req(s, &p);
             if ( rc != X86EMUL_RETRY || curr->domain->is_shutting_down )
-                vio->io_state = HVMIO_none;
+                vio->io_state = STATE_IOREQ_NONE;
             else if ( data_is_addr || dir == IOREQ_WRITE )
                 rc = X86EMUL_OKAY;
         }
