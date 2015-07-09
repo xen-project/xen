@@ -151,9 +151,6 @@ struct hvm_vcpu {
     u32                 msr_tsc_aux;
     u64                 msr_tsc_adjust;
 
-    /* VPMU */
-    struct vpmu_struct  vpmu;
-
     union {
         struct arch_vmx_struct vmx;
         struct arch_svm_struct svm;

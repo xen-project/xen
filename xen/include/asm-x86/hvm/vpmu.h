@@ -31,9 +31,8 @@
 #define VPMU_BOOT_ENABLED 0x1    /* vpmu generally enabled. */
 #define VPMU_BOOT_BTS     0x2    /* Intel BTS feature wanted. */
 
-#define vcpu_vpmu(vcpu)   (&((vcpu)->arch.hvm_vcpu.vpmu))
-#define vpmu_vcpu(vpmu)   (container_of((vpmu), struct vcpu, \
-                                          arch.hvm_vcpu.vpmu))
+#define vcpu_vpmu(vcpu)   (&(vcpu)->arch.vpmu)
+#define vpmu_vcpu(vpmu)   container_of((vpmu), struct vcpu, arch.vpmu)
 
 #define MSR_TYPE_COUNTER            0
 #define MSR_TYPE_CTRL               1

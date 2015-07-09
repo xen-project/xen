@@ -452,6 +452,8 @@ struct arch_vcpu
     void (*ctxt_switch_from) (struct vcpu *);
     void (*ctxt_switch_to) (struct vcpu *);
 
+    struct vpmu_struct vpmu;
+
     /* Virtual Machine Extensions */
     union {
         struct pv_vcpu pv_vcpu;
