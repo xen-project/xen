@@ -770,6 +770,13 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
  * If this is defined, the Memory Bandwidth Monitoring feature is supported.
  */
 #define LIBXL_HAVE_PSR_MBM 1
+
+/*
+ * LIBXL_HAVE_PSR_CAT
+ *
+ * If this is defined, the Cache Allocation Technology feature is supported.
+ */
+#define LIBXL_HAVE_PSR_CAT 1
 #endif
 
 /*
@@ -1648,6 +1655,34 @@ int libxl_psr_cmt_get_sample(libxl_ctx *ctx,
                              uint64_t scope,
                              uint64_t *sample_r,
                              uint64_t *tsc_r);
+#endif
+
+#ifdef LIBXL_HAVE_PSR_CAT
+/*
+ * Function to set a domain's cbm. It operates on a single or multiple
+ * target(s) defined in 'target_map'. The definition of 'target_map' is
+ * related to 'type':
+ * 'L3_CBM': 'target_map' specifies all the sockets to be operated on.
+ */
+int libxl_psr_cat_set_cbm(libxl_ctx *ctx, uint32_t domid,
+                          libxl_psr_cbm_type type, libxl_bitmap *target_map,
+                          uint64_t cbm);
+/*
+ * Function to get a domain's cbm. It operates on a single 'target'.
+ * The definition of 'target' is related to 'type':
+ * 'L3_CBM': 'target' specifies which socket to be operated on.
+ */
+int libxl_psr_cat_get_cbm(libxl_ctx *ctx, uint32_t domid,
+                          libxl_psr_cbm_type type, uint32_t target,
+                          uint64_t *cbm_r);
+
+/*
+ * On success, the function returns an array of elements in 'info',
+ * and the length in 'nr'.
+ */
+int libxl_psr_cat_get_l3_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
+                              int *nr);
+void libxl_psr_cat_info_list_free(libxl_psr_cat_info *list, int nr);
 #endif
 
 /* misc */

@@ -117,6 +117,10 @@ int main_psr_cmt_attach(int argc, char **argv);
 int main_psr_cmt_detach(int argc, char **argv);
 int main_psr_cmt_show(int argc, char **argv);
 #endif
+#ifdef LIBXL_HAVE_PSR_CAT
+int main_psr_cat_cbm_set(int argc, char **argv);
+int main_psr_cat_show(int argc, char **argv);
+#endif
 
 void help(const char *command);
 

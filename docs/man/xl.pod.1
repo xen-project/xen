@@ -1442,27 +1442,51 @@ policy. Loading new security policy will reset runtime changes to device labels.
 
 =back
 
-=head1 CACHE MONITORING TECHNOLOGY
+=head1 PLATFORM SHARED RESOURCE MONITORING/CONTROL
+
+Intel Haswell and later server platforms offer shared resource monitoring
+and control technologies. The availability of these technologies and the
+hardware capabilities can be shown with B<psr-hwinfo>.
+
+=over 4
+
+=item B<psr-hwinfo> [I<OPTIONS>]
+
+Show Platform Shared Resource (PSR) hardware information.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-m>, B<--cmt>
+
+Show Cache Monitoring Technology (CMT) hardware information.
+
+=item B<-a>, B<--cat>
+
+Show Cache Allocation Technology (CAT) hardware information.
+
+=back
+
+=back
+
+=head2 CACHE MONITORING TECHNOLOGY
 
 Intel Haswell and later server platforms offer monitoring capability in each
 logical processor to measure specific platform shared resource metric, for
-example, L3 cache occupancy. In Xen implementation, the monitoring granularity
-is domain level. To monitor a specific domain, just attach the domain id with
-the monitoring service. When the domain doesn't need to be monitored any more,
-detach the domain id from the monitoring service.
+example, L3 cache occupancy. In the Xen implementation, the monitoring
+granularity is domain level. To monitor a specific domain, just attach the
+domain id with the monitoring service. When the domain doesn't need to be
+monitored any more, detach the domain id from the monitoring service.
 
 Intel Broadwell and later server platforms also offer total/local memory
 bandwidth monitoring. Xen supports per-domain monitoring for these two
 additional monitoring types. Both memory bandwidth monitoring and L3 cache
 occupancy monitoring share the same set of underlying monitoring service. Once
-a domain is attached to the monitoring service, monitoring data can be showed
+a domain is attached to the monitoring service, monitoring data can be shown
 for any of these monitoring types.
 
 =over 4
-
-=item B<psr-hwinfo>
-
-Show CMT hardware information.
 
 =item B<psr-cmt-attach> [I<domain-id>]
 
@@ -1491,6 +1515,37 @@ ignored:
 =over 4
 
 =item B<xl migrate --live>
+
+=back
+
+=head2 CACHE ALLOCATION TECHNOLOGY
+
+Intel Broadwell and later server platforms offer capabilities to configure and
+make use of the Cache Allocation Technology (CAT) mechanisms, which enable more
+cache resources (i.e. L3 cache) to be made available for high priority
+applications. In the Xen implementation, CAT is used to control cache allocation
+on VM basis. To enforce cache on a specific domain, just set capacity bitmasks
+(CBM) for the domain.
+
+=over 4
+
+=item B<psr-cat-cbm-set> [I<OPTIONS>] I<domain-id> I<cbm>
+
+Set cache capacity bitmasks(CBM) for a domain.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-s SOCKET>, B<--socket=SOCKET>
+
+Specify the socket to process, otherwise all sockets are processed.
+
+=back
+
+=item B<psr-cat-show> [I<domain-id>]
+
+Show CAT settings for a certain domain or all domains.
 
 =back
 

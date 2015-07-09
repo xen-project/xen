@@ -248,6 +248,82 @@ int xc_psr_cmt_enabled(xc_interface *xch)
 
     return 0;
 }
+int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
+                               xc_psr_cat_type type, uint32_t target,
+                               uint64_t data)
+{
+    DECLARE_DOMCTL;
+    uint32_t cmd;
+
+    switch ( type )
+    {
+    case XC_PSR_CAT_L3_CBM:
+        cmd = XEN_DOMCTL_PSR_CAT_OP_SET_L3_CBM;
+        break;
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+
+    domctl.cmd = XEN_DOMCTL_psr_cat_op;
+    domctl.domain = (domid_t)domid;
+    domctl.u.psr_cat_op.cmd = cmd;
+    domctl.u.psr_cat_op.target = target;
+    domctl.u.psr_cat_op.data = data;
+
+    return do_domctl(xch, &domctl);
+}
+
+int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
+                               xc_psr_cat_type type, uint32_t target,
+                               uint64_t *data)
+{
+    int rc;
+    DECLARE_DOMCTL;
+    uint32_t cmd;
+
+    switch ( type )
+    {
+    case XC_PSR_CAT_L3_CBM:
+        cmd = XEN_DOMCTL_PSR_CAT_OP_GET_L3_CBM;
+        break;
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+
+    domctl.cmd = XEN_DOMCTL_psr_cat_op;
+    domctl.domain = (domid_t)domid;
+    domctl.u.psr_cat_op.cmd = cmd;
+    domctl.u.psr_cat_op.target = target;
+
+    rc = do_domctl(xch, &domctl);
+
+    if ( !rc )
+        *data = domctl.u.psr_cat_op.data;
+
+    return rc;
+}
+
+int xc_psr_cat_get_l3_info(xc_interface *xch, uint32_t socket,
+                           uint32_t *cos_max, uint32_t *cbm_len)
+{
+    int rc;
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_psr_cat_op;
+    sysctl.u.psr_cat_op.cmd = XEN_SYSCTL_PSR_CAT_get_l3_info;
+    sysctl.u.psr_cat_op.target = socket;
+
+    rc = xc_sysctl(xch, &sysctl);
+    if ( !rc )
+    {
+        *cos_max = sysctl.u.psr_cat_op.u.l3_info.cos_max;
+        *cbm_len = sysctl.u.psr_cat_op.u.l3_info.cbm_len;
+    }
+
+    return rc;
+}
 
 /*
  * Local variables:

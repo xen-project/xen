@@ -512,7 +512,9 @@ struct cmd_spec cmd_table[] = {
     { "psr-hwinfo",
       &main_psr_hwinfo, 0, 1,
       "Show hardware information for Platform Shared Resource",
-      "",
+      "[options]",
+      "-m, --cmt       Show Cache Monitoring Technology (CMT) hardware info\n"
+      "-a, --cat       Show Cache Allocation Technology (CAT) hardware info\n"
     },
     { "psr-cmt-attach",
       &main_psr_cmt_attach, 0, 1,
@@ -533,6 +535,20 @@ struct cmd_spec cmd_table[] = {
       "\"total-mem-bandwidth\":     Show total memory bandwidth(KB/s)\n"
       "\"local-mem-bandwidth\":     Show local memory bandwidth(KB/s)\n",
     },
+#endif
+#ifdef LIBXL_HAVE_PSR_CAT
+    { "psr-cat-cbm-set",
+      &main_psr_cat_cbm_set, 0, 1,
+      "Set cache capacity bitmasks(CBM) for a domain",
+      "[options] <Domain> <CBM>",
+      "-s <socket>       Specify the socket to process, otherwise all sockets are processed\n"
+    },
+    { "psr-cat-show",
+      &main_psr_cat_show, 0, 1,
+      "Show Cache Allocation Technology information",
+      "<Domain>",
+    },
+
 #endif
 };
 

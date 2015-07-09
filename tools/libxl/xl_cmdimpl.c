@@ -8170,17 +8170,6 @@ static int psr_cmt_show(libxl_psr_cmt_type type, uint32_t domid)
     return 0;
 }
 
-int main_psr_hwinfo(int argc, char **argv)
-{
-    int opt;
-
-    SWITCH_FOREACH_OPT(opt, "", NULL, "psr-hwinfo", 0) {
-        /* No options */
-    }
-
-    return psr_cmt_hwinfo();
-}
-
 int main_psr_cmt_attach(int argc, char **argv)
 {
     uint32_t domid;
@@ -8245,6 +8234,233 @@ int main_psr_cmt_show(int argc, char **argv)
 
     return ret;
 }
+#endif
+
+#ifdef LIBXL_HAVE_PSR_CAT
+static int psr_cat_hwinfo(void)
+{
+    int rc;
+    int socketid, nr_sockets;
+    uint32_t l3_cache_size;
+    libxl_psr_cat_info *info;
+
+    printf("Cache Allocation Technology (CAT):\n");
+
+    rc = libxl_psr_cat_get_l3_info(ctx, &info, &nr_sockets);
+    if (rc) {
+        fprintf(stderr, "Failed to get cat info\n");
+        return rc;
+    }
+
+    for (socketid = 0; socketid < nr_sockets; socketid++) {
+        rc = libxl_psr_cmt_get_l3_cache_size(ctx, socketid, &l3_cache_size);
+        if (rc) {
+            fprintf(stderr, "Failed to get l3 cache size for socket:%d\n",
+                    socketid);
+            goto out;
+        }
+        printf("%-16s: %u\n", "Socket ID", socketid);
+        printf("%-16s: %uKB\n", "L3 Cache", l3_cache_size);
+        printf("%-16s: %u\n", "Maximum COS", info->cos_max);
+        printf("%-16s: %u\n", "CBM length", info->cbm_len);
+        printf("%-16s: %#llx\n", "Default CBM",
+               (1ull << info->cbm_len) - 1);
+    }
+
+out:
+    libxl_psr_cat_info_list_free(info, nr_sockets);
+    return rc;
+}
+
+static void psr_cat_print_one_domain_cbm(uint32_t domid, uint32_t socketid)
+{
+    char *domain_name;
+    uint64_t cbm;
+
+    domain_name = libxl_domid_to_name(ctx, domid);
+    printf("%5d%25s", domid, domain_name);
+    free(domain_name);
+
+    if (!libxl_psr_cat_get_cbm(ctx, domid, LIBXL_PSR_CBM_TYPE_L3_CBM,
+                               socketid, &cbm))
+         printf("%#16"PRIx64, cbm);
+
+    printf("\n");
+}
+
+static int psr_cat_print_domain_cbm(uint32_t domid, uint32_t socketid)
+{
+    int i, nr_domains;
+    libxl_dominfo *list;
+
+    if (domid != INVALID_DOMID) {
+        psr_cat_print_one_domain_cbm(domid, socketid);
+        return 0;
+    }
+
+    if (!(list = libxl_list_domain(ctx, &nr_domains))) {
+        fprintf(stderr, "Failed to get domain list for cbm display\n");
+        return -1;
+    }
+
+    for (i = 0; i < nr_domains; i++)
+        psr_cat_print_one_domain_cbm(list[i].domid, socketid);
+    libxl_dominfo_list_free(list, nr_domains);
+
+    return 0;
+}
+
+static int psr_cat_print_socket(uint32_t domid, uint32_t socketid,
+                                libxl_psr_cat_info *info)
+{
+    int rc;
+    uint32_t l3_cache_size;
+
+    rc = libxl_psr_cmt_get_l3_cache_size(ctx, socketid, &l3_cache_size);
+    if (rc) {
+        fprintf(stderr, "Failed to get l3 cache size for socket:%d\n",
+                socketid);
+        return -1;
+    }
+
+    printf("%-16s: %u\n", "Socket ID", socketid);
+    printf("%-16s: %uKB\n", "L3 Cache", l3_cache_size);
+    printf("%-16s: %#llx\n", "Default CBM", (1ull << info->cbm_len) - 1);
+    printf("%5s%25s%16s\n", "ID", "NAME", "CBM");
+
+    return psr_cat_print_domain_cbm(domid, socketid);
+}
+
+static int psr_cat_show(uint32_t domid)
+{
+    int socketid, nr_sockets;
+    int rc;
+    libxl_psr_cat_info *info;
+
+    rc = libxl_psr_cat_get_l3_info(ctx, &info, &nr_sockets);
+    if (rc) {
+        fprintf(stderr, "Failed to get cat info\n");
+        return rc;
+    }
+
+    for (socketid = 0; socketid < nr_sockets; socketid++) {
+        rc = psr_cat_print_socket(domid, socketid, info + socketid);
+        if (rc)
+            goto out;
+    }
+
+out:
+    libxl_psr_cat_info_list_free(info, nr_sockets);
+    return rc;
+}
+
+int main_psr_cat_cbm_set(int argc, char **argv)
+{
+    uint32_t domid;
+    libxl_psr_cbm_type type = LIBXL_PSR_CBM_TYPE_L3_CBM;
+    uint64_t cbm;
+    int ret, opt = 0;
+    libxl_bitmap target_map;
+    char *value;
+    libxl_string_list socket_list;
+    unsigned long start, end;
+    int i, j, len;
+
+    static struct option opts[] = {
+        {"socket", 0, 0, 's'},
+        COMMON_LONG_OPTS,
+        {0, 0, 0, 0}
+    };
+
+    libxl_socket_bitmap_alloc(ctx, &target_map, 0);
+    libxl_bitmap_set_none(&target_map);
+
+    SWITCH_FOREACH_OPT(opt, "s", opts, "psr-cat-cbm-set", 1) {
+    case 's':
+        trim(isspace, optarg, &value);
+        split_string_into_string_list(value, ",", &socket_list);
+        len = libxl_string_list_length(&socket_list);
+        for (i = 0; i < len; i++) {
+            parse_range(socket_list[i], &start, &end);
+            for (j = start; j < end; j++)
+                libxl_bitmap_set(&target_map, j);
+        }
+
+        libxl_string_list_dispose(&socket_list);
+        free(value);
+        break;
+    }
+
+    if (libxl_bitmap_is_empty(&target_map))
+        libxl_bitmap_set_any(&target_map);
+
+    domid = find_domain(argv[optind]);
+    cbm = strtoll(argv[optind + 1], NULL , 0);
+
+    ret = libxl_psr_cat_set_cbm(ctx, domid, type, &target_map, cbm);
+
+    libxl_bitmap_dispose(&target_map);
+    return ret;
+}
+
+int main_psr_cat_show(int argc, char **argv)
+{
+    int opt;
+    uint32_t domid;
+
+    SWITCH_FOREACH_OPT(opt, "", NULL, "psr-cat-show", 0) {
+        /* No options */
+    }
+
+    if (optind >= argc)
+        domid = INVALID_DOMID;
+    else if (optind == argc - 1)
+        domid = find_domain(argv[optind]);
+    else {
+        help("psr-cat-show");
+        return 2;
+    }
+
+    return psr_cat_show(domid);
+}
+
+int main_psr_hwinfo(int argc, char **argv)
+{
+    int opt, ret;
+    int cmt = 0, cat = 0;
+    static struct option opts[] = {
+        {"cmt", 0, 0, 'm'},
+        {"cat", 0, 0, 'a'},
+        COMMON_LONG_OPTS,
+        {0, 0, 0, 0}
+    };
+
+    SWITCH_FOREACH_OPT(opt, "ma", opts, "psr-hwinfo", 0) {
+    case 'm':
+        cmt = 1;
+        break;
+    case 'a':
+        cat = 1;
+        break;
+    }
+
+    if (!(cmt | cat)) {
+        cmt = 1;
+        cat = 1;
+    }
+
+    if (cmt)
+        ret = psr_cmt_hwinfo();
+
+    if (ret)
+        return ret;
+
+    if (cat)
+        ret = psr_cat_hwinfo();
+
+    return ret;
+}
+
 #endif
 
 /*

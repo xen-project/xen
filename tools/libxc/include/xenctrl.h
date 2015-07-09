@@ -2758,6 +2758,12 @@ enum xc_psr_cmt_type {
     XC_PSR_CMT_LOCAL_MEM_COUNT,
 };
 typedef enum xc_psr_cmt_type xc_psr_cmt_type;
+
+enum xc_psr_cat_type {
+    XC_PSR_CAT_L3_CBM = 1,
+};
+typedef enum xc_psr_cat_type xc_psr_cat_type;
+
 int xc_psr_cmt_attach(xc_interface *xch, uint32_t domid);
 int xc_psr_cmt_detach(xc_interface *xch, uint32_t domid);
 int xc_psr_cmt_get_domain_rmid(xc_interface *xch, uint32_t domid,
@@ -2772,6 +2778,15 @@ int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
                         uint32_t psr_cmt_type, uint64_t *monitor_data,
                         uint64_t *tsc);
 int xc_psr_cmt_enabled(xc_interface *xch);
+
+int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
+                               xc_psr_cat_type type, uint32_t target,
+                               uint64_t data);
+int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
+                               xc_psr_cat_type type, uint32_t target,
+                               uint64_t *data);
+int xc_psr_cat_get_l3_info(xc_interface *xch, uint32_t socket,
+                           uint32_t *cos_max, uint32_t *cbm_len);
 #endif
 
 #endif /* XENCTRL_H */

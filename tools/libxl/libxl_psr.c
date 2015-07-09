@@ -19,14 +19,37 @@
 
 #define IA32_QM_CTR_ERROR_MASK         (0x3ul << 62)
 
-static void libxl__psr_cmt_log_err_msg(libxl__gc *gc, int err)
+static void libxl__psr_log_err_msg(libxl__gc *gc, int err)
 {
     char *msg;
 
     switch (err) {
     case ENOSYS:
+    case EOPNOTSUPP:
         msg = "unsupported operation";
         break;
+    case ESRCH:
+        msg = "invalid domain ID";
+        break;
+    case EBADSLT:
+        msg = "socket is not supported";
+        break;
+    case EFAULT:
+        msg = "failed to exchange data with Xen";
+        break;
+    default:
+        msg = "unknown error";
+        break;
+    }
+
+    LOGE(ERROR, "%s", msg);
+}
+
+static void libxl__psr_cmt_log_err_msg(libxl__gc *gc, int err)
+{
+    char *msg;
+
+    switch (err) {
     case ENODEV:
         msg = "CMT is not supported in this system";
         break;
@@ -39,15 +62,35 @@ static void libxl__psr_cmt_log_err_msg(libxl__gc *gc, int err)
     case EUSERS:
         msg = "no free RMID available";
         break;
-    case ESRCH:
-        msg = "invalid domain ID";
-        break;
-    case EFAULT:
-        msg = "failed to exchange data with Xen";
-        break;
     default:
-        msg = "unknown error";
+        libxl__psr_log_err_msg(gc, err);
+        return;
+    }
+
+    LOGE(ERROR, "%s", msg);
+}
+
+static void libxl__psr_cat_log_err_msg(libxl__gc *gc, int err)
+{
+    char *msg;
+
+    switch (err) {
+    case ENODEV:
+        msg = "CAT is not supported in this system";
         break;
+    case ENOENT:
+        msg = "CAT is not enabled on the socket";
+        break;
+    case EUSERS:
+        msg = "no free COS available";
+        break;
+    case EEXIST:
+        msg = "The same CBM is already set to this domain";
+        break;
+
+    default:
+        libxl__psr_log_err_msg(gc, err);
+        return;
     }
 
     LOGE(ERROR, "%s", msg);
@@ -245,6 +288,92 @@ int libxl_psr_cmt_get_cache_occupancy(libxl_ctx *ctx,
     *l3_cache_occupancy = data / 1024;
 out:
     return rc;
+}
+
+int libxl_psr_cat_set_cbm(libxl_ctx *ctx, uint32_t domid,
+                          libxl_psr_cbm_type type, libxl_bitmap *target_map,
+                          uint64_t cbm)
+{
+    GC_INIT(ctx);
+    int rc;
+    int socketid, nr_sockets;
+
+    rc = libxl__count_physical_sockets(gc, &nr_sockets);
+    if (rc) {
+        LOGE(ERROR, "failed to get system socket count");
+        goto out;
+    }
+
+    libxl_for_each_set_bit(socketid, *target_map) {
+        if (socketid >= nr_sockets)
+            break;
+        if (xc_psr_cat_set_domain_data(ctx->xch, domid, type, socketid, cbm)) {
+            libxl__psr_cat_log_err_msg(gc, errno);
+            rc = ERROR_FAIL;
+        }
+    }
+
+out:
+    GC_FREE;
+    return rc;
+}
+
+int libxl_psr_cat_get_cbm(libxl_ctx *ctx, uint32_t domid,
+                          libxl_psr_cbm_type type, uint32_t target,
+                          uint64_t *cbm_r)
+{
+    GC_INIT(ctx);
+    int rc = 0;
+
+    if (xc_psr_cat_get_domain_data(ctx->xch, domid, type, target, cbm_r)) {
+        libxl__psr_cat_log_err_msg(gc, errno);
+        rc = ERROR_FAIL;
+    }
+
+    GC_FREE;
+    return rc;
+}
+
+int libxl_psr_cat_get_l3_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
+                              int *nr)
+{
+    GC_INIT(ctx);
+    int rc;
+    int i, nr_sockets;
+    libxl_psr_cat_info *ptr;
+
+    rc = libxl__count_physical_sockets(gc, &nr_sockets);
+    if (rc) {
+        LOGE(ERROR, "failed to get system socket count");
+        goto out;
+    }
+
+    ptr = libxl__malloc(NOGC, nr_sockets * sizeof(libxl_psr_cat_info));
+
+    for (i = 0; i < nr_sockets; i++) {
+        if (xc_psr_cat_get_l3_info(ctx->xch, i, &ptr[i].cos_max,
+                                                &ptr[i].cbm_len)) {
+            libxl__psr_cat_log_err_msg(gc, errno);
+            rc = ERROR_FAIL;
+            free(ptr);
+            goto out;
+        }
+    }
+
+    *info = ptr;
+    *nr = nr_sockets;
+out:
+    GC_FREE;
+    return rc;
+}
+
+void libxl_psr_cat_info_list_free(libxl_psr_cat_info *list, int nr)
+{
+    int i;
+
+    for (i = 0; i < nr; i++)
+        libxl_psr_cat_info_dispose(&list[i]);
+    free(list);
 }
 
 /*
