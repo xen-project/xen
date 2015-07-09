@@ -716,7 +716,7 @@ static inline int xsm_ioport_mapping (xsm_default_t def, struct domain *d, uint3
     return xsm_ops->ioport_mapping(d, s, e, allow);
 }
 
-static inline int xsm_pmu_op (xsm_default_t def, struct domain *d, int op)
+static inline int xsm_pmu_op (xsm_default_t def, struct domain *d, unsigned int op)
 {
     return xsm_ops->pmu_op(d, op);
 }
