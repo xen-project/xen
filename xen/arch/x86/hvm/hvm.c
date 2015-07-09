@@ -411,6 +411,42 @@ bool_t hvm_io_pending(struct vcpu *v)
     return 0;
 }
 
+static void hvm_io_assist(ioreq_t *p)
+{
+    struct vcpu *curr = current;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+    enum hvm_io_state io_state;
+
+    p->state = STATE_IOREQ_NONE;
+
+    io_state = vio->io_state;
+    vio->io_state = HVMIO_none;
+
+    switch ( io_state )
+    {
+    case HVMIO_awaiting_completion:
+        vio->io_state = HVMIO_completed;
+        vio->io_data = p->data;
+        break;
+    case HVMIO_handle_mmio_awaiting_completion:
+        vio->io_state = HVMIO_completed;
+        vio->io_data = p->data;
+        (void)handle_mmio();
+        break;
+    case HVMIO_handle_pio_awaiting_completion:
+        if ( vio->io_size == 4 ) /* Needs zero extension. */
+            guest_cpu_user_regs()->rax = (uint32_t)p->data;
+        else
+            memcpy(&guest_cpu_user_regs()->rax, &p->data, vio->io_size);
+        break;
+    default:
+        break;
+    }
+
+    msix_write_completion(curr);
+    vcpu_end_shutdown_deferral(curr);
+}
+
 static bool_t hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
 {
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
@@ -2661,37 +2697,6 @@ int hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *proto_p)
     }
 
     return X86EMUL_UNHANDLEABLE;
-}
-
-void hvm_complete_assist_req(ioreq_t *p)
-{
-    switch ( p->type )
-    {
-    case IOREQ_TYPE_PCI_CONFIG:
-        ASSERT_UNREACHABLE();
-        break;
-    case IOREQ_TYPE_COPY:
-    case IOREQ_TYPE_PIO:
-        if ( p->dir == IOREQ_READ )
-        {
-            if ( !p->data_is_ptr )
-                p->data = ~0ul;
-            else
-            {
-                int i, step = p->df ? -p->size : p->size;
-                uint32_t data = ~0;
-
-                for ( i = 0; i < p->count; i++ )
-                    hvm_copy_to_guest_phys(p->data + step * i, &data,
-                                           p->size);
-            }
-        }
-        /* FALLTHRU */
-    default:
-        p->state = STATE_IORESP_READY;
-        hvm_io_assist(p);
-        break;
-    }
 }
 
 void hvm_broadcast_assist_req(ioreq_t *p)

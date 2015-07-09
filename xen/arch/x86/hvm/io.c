@@ -169,45 +169,6 @@ int handle_pio(uint16_t port, unsigned int size, int dir)
     return 1;
 }
 
-void hvm_io_assist(ioreq_t *p)
-{
-    struct vcpu *curr = current;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
-    enum hvm_io_state io_state;
-
-    p->state = STATE_IOREQ_NONE;
-
-    io_state = vio->io_state;
-    vio->io_state = HVMIO_none;
-
-    switch ( io_state )
-    {
-    case HVMIO_awaiting_completion:
-        vio->io_state = HVMIO_completed;
-        vio->io_data = p->data;
-        break;
-    case HVMIO_handle_mmio_awaiting_completion:
-        vio->io_state = HVMIO_completed;
-        vio->io_data = p->data;
-        (void)handle_mmio();
-        break;
-    case HVMIO_handle_pio_awaiting_completion:
-        if ( vio->io_size == 4 ) /* Needs zero extension. */
-            guest_cpu_user_regs()->rax = (uint32_t)p->data;
-        else
-            memcpy(&guest_cpu_user_regs()->rax, &p->data, vio->io_size);
-        break;
-    default:
-        break;
-    }
-
-    if ( p->state == STATE_IOREQ_NONE )
-    {
-        msix_write_completion(curr);
-        vcpu_end_shutdown_deferral(curr);
-    }
-}
-
 static bool_t dpci_portio_accept(const struct hvm_io_handler *handler,
                                  const ioreq_t *p)
 {

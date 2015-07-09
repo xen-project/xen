@@ -50,6 +50,32 @@ static void hvmtrace_io_assist(const ioreq_t *p)
     trace_var(event, 0/*!cycles*/, size, buffer);
 }
 
+static int null_read(const struct hvm_io_handler *io_handler,
+                     uint64_t addr,
+                     uint32_t size,
+                     uint64_t *data)
+{
+    *data = ~0ul;
+    return X86EMUL_OKAY;
+}
+
+static int null_write(const struct hvm_io_handler *handler,
+                      uint64_t addr,
+                      uint32_t size,
+                      uint64_t data)
+{
+    return X86EMUL_OKAY;
+}
+
+static const struct hvm_io_ops null_ops = {
+    .read = null_read,
+    .write = null_write
+};
+
+static const struct hvm_io_handler null_handler = {
+    .ops = &null_ops
+};
+
 static int hvmemul_do_io(
     bool_t is_mmio, paddr_t addr, unsigned long reps, unsigned int size,
     uint8_t dir, bool_t df, bool_t data_is_addr, uintptr_t data)
@@ -139,8 +165,7 @@ static int hvmemul_do_io(
     switch ( rc )
     {
     case X86EMUL_OKAY:
-        p.state = STATE_IORESP_READY;
-        hvm_io_assist(&p);
+        vio->io_data = p.data;
         vio->io_state = HVMIO_none;
         break;
     case X86EMUL_UNHANDLEABLE:
@@ -151,8 +176,9 @@ static int hvmemul_do_io(
         /* If there is no suitable backing DM, just ignore accesses */
         if ( !s )
         {
-            hvm_complete_assist_req(&p);
-            rc = X86EMUL_OKAY;
+            rc = hvm_process_io_intercept(&null_handler, &p);
+            if ( rc == X86EMUL_OKAY )
+                vio->io_data = p.data;
             vio->io_state = HVMIO_none;
         }
         else

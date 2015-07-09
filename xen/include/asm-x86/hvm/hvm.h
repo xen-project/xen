@@ -227,7 +227,6 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
                                                  ioreq_t *p);
 int hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *p);
 void hvm_broadcast_assist_req(ioreq_t *p);
-void hvm_complete_assist_req(ioreq_t *p);
 
 void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat);
 int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat);
