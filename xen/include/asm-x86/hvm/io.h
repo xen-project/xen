@@ -43,6 +43,22 @@ struct hvm_mmio_ops {
     hvm_mmio_write_t write;
 };
 
+static inline paddr_t hvm_mmio_first_byte(const ioreq_t *p)
+{
+    return p->df ?
+           p->addr - (p->count - 1ul) * p->size :
+           p->addr;
+}
+
+static inline paddr_t hvm_mmio_last_byte(const ioreq_t *p)
+{
+    unsigned long count = p->count;
+
+    return p->df ?
+           p->addr + p->size - 1:
+           p->addr + (count * p->size) - 1;
+}
+
 typedef int (*portio_action_t)(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val);
 
