@@ -1587,16 +1587,13 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     }
 
     if ( prev != next )
-        _update_runstate_area(prev);
-
-    if ( is_hvm_domain(prevd) )
     {
-        if (prev != next)
-            vpmu_switch_from(prev);
-
-        if ( !list_empty(&prev->arch.hvm_vcpu.tm_list) )
-            pt_save_timer(prev);
+        _update_runstate_area(prev);
+        vpmu_switch_from(prev);
     }
+
+    if ( is_hvm_domain(prevd) && !list_empty(&prev->arch.hvm_vcpu.tm_list) )
+        pt_save_timer(prev);
 
     local_irq_disable();
 
@@ -1635,14 +1632,15 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
                            !is_hardware_domain(nextd));
     }
 
-    if (is_hvm_domain(nextd) && (prev != next) )
-        /* Must be done with interrupts enabled */
-        vpmu_switch_to(next);
-
     context_saved(prev);
 
     if ( prev != next )
+    {
         _update_runstate_area(next);
+
+        /* Must be done with interrupts enabled */
+        vpmu_switch_to(next);
+    }
 
     /* Ensure that the vcpu has an up-to-date time base. */
     update_vcpu_system_time(next);
