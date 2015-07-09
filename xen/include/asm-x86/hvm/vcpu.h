@@ -45,11 +45,7 @@ struct hvm_vcpu_asid {
 struct hvm_vcpu_io {
     /* I/O request in flight to device model. */
     enum hvm_io_completion io_completion;
-    unsigned long          io_data;
-    unsigned int           io_size;
-    uint8_t                io_state;
-    uint8_t                io_dir;
-    uint8_t                io_data_is_addr;
+    ioreq_t                io_req;
 
     /*
      * HVM emulation:
@@ -84,9 +80,9 @@ struct hvm_vcpu_io {
 
 static inline bool_t hvm_vcpu_io_need_completion(const struct hvm_vcpu_io *vio)
 {
-    return (vio->io_state == STATE_IOREQ_READY) &&
-           !vio->io_data_is_addr &&
-           (vio->io_dir == IOREQ_READ);
+    return (vio->io_req.state == STATE_IOREQ_READY) &&
+           !vio->io_req.data_is_ptr &&
+           (vio->io_req.dir == IOREQ_READ);
 }
 
 #define VMCX_EADDR    (~0ULL)

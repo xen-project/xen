@@ -205,7 +205,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
 
         vmx_realmode_emulate_one(&hvmemul_ctxt);
 
-        if ( vio->io_state != STATE_IOREQ_NONE || vio->mmio_retry )
+        if ( vio->io_req.state != STATE_IOREQ_NONE || vio->mmio_retry )
             break;
 
         /* Stop emulating unless our segment state is not safe */
@@ -219,7 +219,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
     }
 
     /* Need to emulate next time if we've started an IO operation */
-    if ( vio->io_state != STATE_IOREQ_NONE )
+    if ( vio->io_req.state != STATE_IOREQ_NONE )
         curr->arch.hvm_vmx.vmx_emulate = 1;
 
     if ( !curr->arch.hvm_vmx.vmx_emulate && !curr->arch.hvm_vmx.vmx_realmode )

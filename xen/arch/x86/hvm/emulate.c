@@ -91,6 +91,7 @@ static int hvmemul_do_io(
         .df = df,
         .data = data,
         .data_is_ptr = data_is_addr, /* ioreq_t field name is misleading */
+        .state = STATE_IOREQ_READY,
     };
     void *p_data = (void *)data;
     int rc;
@@ -128,23 +129,30 @@ static int hvmemul_do_io(
         }
     }
 
-    switch ( vio->io_state )
+    switch ( vio->io_req.state )
     {
     case STATE_IOREQ_NONE:
         break;
     case STATE_IORESP_READY:
-        vio->io_state = STATE_IOREQ_NONE;
+        vio->io_req.state = STATE_IOREQ_NONE;
+        p = vio->io_req;
+
+        /* Verify the emulation request has been correctly re-issued */
+        if ( (p.type != is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO) ||
+             (p.addr != addr) ||
+             (p.size != size) ||
+             (p.count != reps) ||
+             (p.dir != dir) ||
+             (p.df != df) ||
+             (p.data_is_ptr != data_is_addr) )
+            domain_crash(curr->domain);
+
         if ( data_is_addr || dir == IOREQ_WRITE )
             return X86EMUL_UNHANDLEABLE;
         goto finish_access;
     default:
         return X86EMUL_UNHANDLEABLE;
     }
-
-    vio->io_state = STATE_IOREQ_READY;
-    vio->io_size = size;
-    vio->io_dir = dir;
-    vio->io_data_is_addr = data_is_addr;
 
     if ( dir == IOREQ_WRITE )
     {
@@ -154,13 +162,14 @@ static int hvmemul_do_io(
         hvmtrace_io_assist(&p);
     }
 
+    vio->io_req = p;
+
     rc = hvm_io_intercept(&p);
 
     switch ( rc )
     {
     case X86EMUL_OKAY:
-        vio->io_data = p.data;
-        vio->io_state = STATE_IOREQ_NONE;
+        vio->io_req.state = STATE_IOREQ_NONE;
         break;
     case X86EMUL_UNHANDLEABLE:
     {
@@ -171,15 +180,13 @@ static int hvmemul_do_io(
         if ( !s )
         {
             rc = hvm_process_io_intercept(&null_handler, &p);
-            if ( rc == X86EMUL_OKAY )
-                vio->io_data = p.data;
-            vio->io_state = STATE_IOREQ_NONE;
+            vio->io_req.state = STATE_IOREQ_NONE;
         }
         else
         {
             rc = hvm_send_assist_req(s, &p);
             if ( rc != X86EMUL_RETRY || curr->domain->is_shutting_down )
-                vio->io_state = STATE_IOREQ_NONE;
+                vio->io_req.state = STATE_IOREQ_NONE;
             else if ( data_is_addr || dir == IOREQ_WRITE )
                 rc = X86EMUL_OKAY;
         }
@@ -198,7 +205,7 @@ static int hvmemul_do_io(
         hvmtrace_io_assist(&p);
 
         if ( !data_is_addr )
-            memcpy(p_data, &vio->io_data, size);
+            memcpy(p_data, &p.data, size);
     }
 
     if ( is_mmio && !data_is_addr )
