@@ -356,54 +356,6 @@ static int amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
     return 1;
 }
 
-static int amd_vpmu_initialise(struct vcpu *v)
-{
-    struct xen_pmu_amd_ctxt *ctxt;
-    struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    uint8_t family = current_cpu_data.x86;
-
-    if ( counters == NULL )
-    {
-         switch ( family )
-	 {
-	 case 0x15:
-	     num_counters = F15H_NUM_COUNTERS;
-	     counters = AMD_F15H_COUNTERS;
-	     ctrls = AMD_F15H_CTRLS;
-	     k7_counters_mirrored = 1;
-	     break;
-	 case 0x10:
-	 case 0x12:
-	 case 0x14:
-	 case 0x16:
-	 default:
-	     num_counters = F10H_NUM_COUNTERS;
-	     counters = AMD_F10H_COUNTERS;
-	     ctrls = AMD_F10H_CTRLS;
-	     k7_counters_mirrored = 0;
-	     break;
-	 }
-    }
-
-    ctxt = xzalloc_bytes(sizeof(*ctxt) +
-                         2 * sizeof(uint64_t) * num_counters);
-    if ( !ctxt )
-    {
-        gdprintk(XENLOG_WARNING, "Insufficient memory for PMU, "
-            " PMU feature is unavailable on domain %d vcpu %d.\n",
-            v->vcpu_id, v->domain->domain_id);
-        return -ENOMEM;
-    }
-
-    ctxt->counters = sizeof(*ctxt);
-    ctxt->ctrls = ctxt->counters + sizeof(uint64_t) * num_counters;
-
-    vpmu->context = ctxt;
-    vpmu->priv_context = NULL;
-    vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
-    return 0;
-}
-
 static void amd_vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
@@ -474,30 +426,62 @@ struct arch_vpmu_ops amd_vpmu_ops = {
 
 int svm_vpmu_initialise(struct vcpu *v)
 {
+    struct xen_pmu_amd_ctxt *ctxt;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    uint8_t family = current_cpu_data.x86;
-    int ret = 0;
 
-    /* vpmu enabled? */
     if ( vpmu_mode == XENPMU_MODE_OFF )
         return 0;
 
-    switch ( family )
+    if ( !counters )
+        return -EINVAL;
+
+    ctxt = xzalloc_bytes(sizeof(*ctxt) +
+                         2 * sizeof(uint64_t) * num_counters);
+    if ( !ctxt )
     {
+        printk(XENLOG_G_WARNING "Insufficient memory for PMU, "
+               " PMU feature is unavailable on domain %d vcpu %d.\n",
+               v->vcpu_id, v->domain->domain_id);
+        return -ENOMEM;
+    }
+
+    ctxt->counters = sizeof(*ctxt);
+    ctxt->ctrls = ctxt->counters + sizeof(uint64_t) * num_counters;
+
+    vpmu->context = ctxt;
+    vpmu->priv_context = NULL;
+
+    vpmu->arch_vpmu_ops = &amd_vpmu_ops;
+
+    vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
+    return 0;
+}
+
+int __init amd_vpmu_init(void)
+{
+    switch ( current_cpu_data.x86 )
+    {
+    case 0x15:
+        num_counters = F15H_NUM_COUNTERS;
+        counters = AMD_F15H_COUNTERS;
+        ctrls = AMD_F15H_CTRLS;
+        k7_counters_mirrored = 1;
+        break;
     case 0x10:
     case 0x12:
     case 0x14:
-    case 0x15:
     case 0x16:
-        ret = amd_vpmu_initialise(v);
-        if ( !ret )
-            vpmu->arch_vpmu_ops = &amd_vpmu_ops;
-        return ret;
+        num_counters = F10H_NUM_COUNTERS;
+        counters = AMD_F10H_COUNTERS;
+        ctrls = AMD_F10H_CTRLS;
+        k7_counters_mirrored = 0;
+        break;
+    default:
+        printk(XENLOG_WARNING "VPMU: Unsupported CPU family %#x\n",
+               current_cpu_data.x86);
+        return -EINVAL;
     }
 
-    printk("VPMU: Initialization failed. "
-           "AMD processor family %d has not "
-           "been supported\n", family);
-    return -EINVAL;
+    return 0;
 }
 

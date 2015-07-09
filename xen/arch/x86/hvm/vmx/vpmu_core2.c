@@ -708,62 +708,6 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
     return 1;
 }
 
-static int core2_vpmu_initialise(struct vcpu *v)
-{
-    struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    u64 msr_content;
-    static bool_t ds_warned;
-
-    if ( !(vpmu_features & XENPMU_FEATURE_INTEL_BTS) )
-        goto func_out;
-    /* Check the 'Debug Store' feature in the CPUID.EAX[1]:EDX[21] */
-    while ( boot_cpu_has(X86_FEATURE_DS) )
-    {
-        if ( !boot_cpu_has(X86_FEATURE_DTES64) )
-        {
-            if ( !ds_warned )
-                printk(XENLOG_G_WARNING "CPU doesn't support 64-bit DS Area"
-                       " - Debug Store disabled for guests\n");
-            break;
-        }
-        vpmu_set(vpmu, VPMU_CPU_HAS_DS);
-        rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
-        if ( msr_content & MSR_IA32_MISC_ENABLE_BTS_UNAVAIL )
-        {
-            /* If BTS_UNAVAIL is set reset the DS feature. */
-            vpmu_reset(vpmu, VPMU_CPU_HAS_DS);
-            if ( !ds_warned )
-                printk(XENLOG_G_WARNING "CPU has set BTS_UNAVAIL"
-                       " - Debug Store disabled for guests\n");
-            break;
-        }
-
-        vpmu_set(vpmu, VPMU_CPU_HAS_BTS);
-        if ( !ds_warned )
-        {
-            if ( !boot_cpu_has(X86_FEATURE_DSCPL) )
-                printk(XENLOG_G_INFO
-                       "vpmu: CPU doesn't support CPL-Qualified BTS\n");
-            printk("******************************************************\n");
-            printk("** WARNING: Emulation of BTS Feature is switched on **\n");
-            printk("** Using this processor feature in a virtualized    **\n");
-            printk("** environment is not 100%% safe.                    **\n");
-            printk("** Setting the DS buffer address with wrong values  **\n");
-            printk("** may lead to hypervisor hangs or crashes.         **\n");
-            printk("** It is NOT recommended for production use!        **\n");
-            printk("******************************************************\n");
-        }
-        break;
-    }
-    ds_warned = 1;
- func_out:
-
-    arch_pmc_cnt = core2_get_arch_pmc_count();
-    fixed_pmc_cnt = core2_get_fixed_pmc_count();
-    check_pmc_quirk();
-    return 0;
-}
-
 static void core2_vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
@@ -829,23 +773,77 @@ struct arch_vpmu_ops core2_no_vpmu_ops = {
 int vmx_vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    uint8_t family = current_cpu_data.x86;
-    uint8_t cpu_model = current_cpu_data.x86_model;
-    int ret = 0;
+    u64 msr_content;
+    static bool_t ds_warned;
 
     vpmu->arch_vpmu_ops = &core2_no_vpmu_ops;
     if ( vpmu_mode == XENPMU_MODE_OFF )
         return 0;
 
-    if ( family == 6 )
+    if ( (arch_pmc_cnt + fixed_pmc_cnt) == 0 )
+        return -EINVAL;
+
+    if ( !(vpmu_features & XENPMU_FEATURE_INTEL_BTS) )
+        goto func_out;
+    /* Check the 'Debug Store' feature in the CPUID.EAX[1]:EDX[21] */
+    while ( boot_cpu_has(X86_FEATURE_DS) )
     {
-        u64 caps;
-
-        rdmsrl(MSR_IA32_PERF_CAPABILITIES, caps);
-        full_width_write = (caps >> 13) & 1;
-
-        switch ( cpu_model )
+        if ( !boot_cpu_has(X86_FEATURE_DTES64) )
         {
+            if ( !ds_warned )
+                printk(XENLOG_G_WARNING "CPU doesn't support 64-bit DS Area"
+                       " - Debug Store disabled for guests\n");
+            break;
+        }
+        vpmu_set(vpmu, VPMU_CPU_HAS_DS);
+        rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
+        if ( msr_content & MSR_IA32_MISC_ENABLE_BTS_UNAVAIL )
+        {
+            /* If BTS_UNAVAIL is set reset the DS feature. */
+            vpmu_reset(vpmu, VPMU_CPU_HAS_DS);
+            if ( !ds_warned )
+                printk(XENLOG_G_WARNING "CPU has set BTS_UNAVAIL"
+                       " - Debug Store disabled for guests\n");
+            break;
+        }
+
+        vpmu_set(vpmu, VPMU_CPU_HAS_BTS);
+        if ( !ds_warned )
+        {
+            if ( !boot_cpu_has(X86_FEATURE_DSCPL) )
+                printk(XENLOG_G_INFO
+                       "vpmu: CPU doesn't support CPL-Qualified BTS\n");
+            printk("******************************************************\n");
+            printk("** WARNING: Emulation of BTS Feature is switched on **\n");
+            printk("** Using this processor feature in a virtualized    **\n");
+            printk("** environment is not 100%% safe.                    **\n");
+            printk("** Setting the DS buffer address with wrong values  **\n");
+            printk("** may lead to hypervisor hangs or crashes.         **\n");
+            printk("** It is NOT recommended for production use!        **\n");
+            printk("******************************************************\n");
+        }
+        break;
+    }
+    ds_warned = 1;
+ func_out:
+
+    vpmu->arch_vpmu_ops = &core2_vpmu_ops;
+
+    return 0;
+}
+
+int __init core2_vpmu_init(void)
+{
+    u64 caps;
+
+    if ( current_cpu_data.x86 != 6 )
+    {
+        printk(XENLOG_WARNING "VPMU: only family 6 is supported\n");
+        return -EINVAL;
+    }
+
+    switch ( current_cpu_data.x86_model )
+    {
         /* Core2: */
         case 0x0f: /* original 65 nm celeron/pentium/core2/xeon, "Merom"/"Conroe" */
         case 0x16: /* single-core 65 nm celeron/core2solo "Merom-L"/"Conroe-L" */
@@ -884,16 +882,21 @@ int vmx_vpmu_initialise(struct vcpu *v)
 
         /* next gen Xeon Phi */
         case 0x57:
-            ret = core2_vpmu_initialise(v);
-            if ( !ret )
-                vpmu->arch_vpmu_ops = &core2_vpmu_ops;
-            return ret;
-        }
+            break;
+
+        default:
+            printk(XENLOG_WARNING "VPMU: Unsupported CPU model %#x\n",
+                   current_cpu_data.x86_model);
+            return -EINVAL;
     }
 
-    printk("VPMU: Initialization failed. "
-           "Intel processor family %d model %d has not "
-           "been supported\n", family, cpu_model);
-    return -EINVAL;
+    arch_pmc_cnt = core2_get_arch_pmc_count();
+    fixed_pmc_cnt = core2_get_fixed_pmc_count();
+    rdmsrl(MSR_IA32_PERF_CAPABILITIES, caps);
+    full_width_write = (caps >> 13) & 1;
+
+    check_pmc_quirk();
+
+    return 0;
 }
 
