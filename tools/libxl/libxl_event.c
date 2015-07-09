@@ -1627,15 +1627,14 @@ libxl__poller *libxl__poller_get(libxl__gc *gc)
     libxl__poller *p = LIBXL_LIST_FIRST(&CTX->pollers_idle);
     if (p) {
         LIBXL_LIST_REMOVE(p, entry);
-        return p;
-    }
+    } else {
+        p = libxl__zalloc(NOGC, sizeof(*p));
 
-    p = libxl__zalloc(NOGC, sizeof(*p));
-
-    rc = libxl__poller_init(gc, p);
-    if (rc) {
-        free(p);
-        return NULL;
+        rc = libxl__poller_init(gc, p);
+        if (rc) {
+            free(p);
+            return NULL;
+        }
     }
 
     return p;
