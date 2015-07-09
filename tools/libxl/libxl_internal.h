@@ -3797,6 +3797,8 @@ static inline void libxl__update_config_vtpm(libxl__gc *gc,
  */
 void libxl__bitmap_copy_best_effort(libxl__gc *gc, libxl_bitmap *dptr,
                                     const libxl_bitmap *sptr);
+
+int libxl__count_physical_sockets(libxl__gc *gc, int *sockets);
 #endif
 
 /*

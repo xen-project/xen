@@ -840,6 +840,52 @@ int libxl_node_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *nodemap,
     return rc;
 }
 
+int libxl__count_physical_sockets(libxl__gc *gc, int *sockets)
+{
+    int rc;
+    libxl_physinfo info;
+
+    libxl_physinfo_init(&info);
+
+    rc = libxl_get_physinfo(CTX, &info);
+    if (rc)
+        return rc;
+
+    *sockets = info.nr_cpus / info.threads_per_core
+                            / info.cores_per_socket;
+
+    libxl_physinfo_dispose(&info);
+    return 0;
+}
+
+int libxl_socket_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *socketmap,
+                              int max_sockets)
+{
+    GC_INIT(ctx);
+    int rc = 0;
+
+    if (max_sockets < 0) {
+        rc = ERROR_INVAL;
+        LOG(ERROR, "invalid number of sockets provided");
+        goto out;
+    }
+
+    if (max_sockets == 0) {
+        rc = libxl__count_physical_sockets(gc, &max_sockets);
+        if (rc) {
+            LOGE(ERROR, "failed to get system socket count");
+            goto out;
+        }
+    }
+    /* This can't fail: no need to check and log */
+    libxl_bitmap_alloc(ctx, socketmap, max_sockets);
+
+ out:
+    GC_FREE;
+    return rc;
+
+}
+
 int libxl_nodemap_to_cpumap(libxl_ctx *ctx,
                             const libxl_bitmap *nodemap,
                             libxl_bitmap *cpumap)

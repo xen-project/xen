@@ -141,6 +141,8 @@ static inline int libxl_bitmap_equal(const libxl_bitmap *ba,
 int libxl_cpu_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *cpumap, int max_cpus);
 int libxl_node_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *nodemap,
                             int max_nodes);
+int libxl_socket_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *socketmap,
+                              int max_sockets);
 
 /* Populate cpumap with the cpus spanned by the nodes in nodemap */
 int libxl_nodemap_to_cpumap(libxl_ctx *ctx,
