@@ -266,6 +266,15 @@ static int hvmemul_acquire_page(unsigned long gmfn, struct page_info **page)
         return X86EMUL_RETRY;
     }
 
+    /* This code should not be reached if the gmfn is not RAM */
+    if ( p2m_is_mmio(p2mt) )
+    {
+        domain_crash(curr_d);
+
+        put_page(*page);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
     return X86EMUL_OKAY;
 }
 

@@ -148,7 +148,7 @@ static int stdvga_outb(uint64_t addr, uint8_t val)
     }
     else if ( prev_stdvga && !s->stdvga )
     {
-        gdprintk(XENLOG_INFO, "leaving stdvga\n");
+        gdprintk(XENLOG_INFO, "leaving stdvga mode\n");
     }
 
     return rc;
@@ -275,9 +275,10 @@ static uint8_t stdvga_mem_readb(uint64_t addr)
     return ret;
 }
 
-static uint64_t stdvga_mem_read(uint64_t addr, uint64_t size)
+static int stdvga_mem_read(const struct hvm_io_handler *handler,
+                           uint64_t addr, uint32_t size, uint64_t *p_data)
 {
-    uint64_t data = 0;
+    uint64_t data = ~0ul;
 
     switch ( size )
     {
@@ -309,11 +310,12 @@ static uint64_t stdvga_mem_read(uint64_t addr, uint64_t size)
         break;
 
     default:
-        gdprintk(XENLOG_WARNING, "invalid io size: %"PRId64"\n", size);
+        gdprintk(XENLOG_WARNING, "invalid io size: %u\n", size);
         break;
     }
 
-    return data;
+    *p_data = data;
+    return X86EMUL_OKAY;
 }
 
 static void stdvga_mem_writeb(uint64_t addr, uint32_t val)
@@ -424,8 +426,23 @@ static void stdvga_mem_writeb(uint64_t addr, uint32_t val)
     }
 }
 
-static void stdvga_mem_write(uint64_t addr, uint64_t data, uint64_t size)
+static int stdvga_mem_write(const struct hvm_io_handler *handler,
+                            uint64_t addr, uint32_t size,
+                            uint64_t data)
 {
+    struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
+    ioreq_t p = {
+        .type = IOREQ_TYPE_COPY,
+        .addr = addr,
+        .size = size,
+        .count = 1,
+        .dir = IOREQ_WRITE,
+        .data = data,
+    };
+
+    if ( !s->cache )
+        goto done;
+
     /* Intercept mmio write */
     switch ( size )
     {
@@ -457,155 +474,73 @@ static void stdvga_mem_write(uint64_t addr, uint64_t data, uint64_t size)
         break;
 
     default:
-        gdprintk(XENLOG_WARNING, "invalid io size: %"PRId64"\n", size);
+        gdprintk(XENLOG_WARNING, "invalid io size: %u\n", size);
         break;
     }
+
+ done:
+    if ( hvm_buffered_io_send(&p) )
+        return X86EMUL_OKAY;
+
+    return X86EMUL_UNHANDLEABLE;
 }
 
-static uint32_t read_data;
-
-static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
+static bool_t stdvga_mem_accept(const struct hvm_io_handler *handler,
+                                const ioreq_t *p)
 {
-    int i;
-    uint64_t addr = p->addr;
-    p2m_type_t p2mt;
-    struct domain *d = current->domain;
-    int step = p->df ? -p->size : p->size;
-
-    if ( p->data_is_ptr )
-    {
-        uint64_t data = p->data, tmp;
-
-        if ( p->dir == IOREQ_READ )
-        {
-            for ( i = 0; i < p->count; i++ ) 
-            {
-                tmp = stdvga_mem_read(addr, p->size);
-                if ( hvm_copy_to_guest_phys(data, &tmp, p->size) !=
-                     HVMCOPY_okay )
-                {
-                    struct page_info *dp = get_page_from_gfn(
-                            d, data >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
-                    /*
-                     * The only case we handle is vga_mem <-> vga_mem.
-                     * Anything else disables caching and leaves it to qemu-dm.
-                     */
-                    if ( (p2mt != p2m_mmio_dm) || (data < VGA_MEM_BASE) ||
-                         ((data + p->size) > (VGA_MEM_BASE + VGA_MEM_SIZE)) )
-                    {
-                        if ( dp )
-                            put_page(dp);
-                        return 0;
-                    }
-                    ASSERT(!dp);
-                    stdvga_mem_write(data, tmp, p->size);
-                }
-                data += step;
-                addr += step;
-            }
-        }
-        else
-        {
-            for ( i = 0; i < p->count; i++ )
-            {
-                if ( hvm_copy_from_guest_phys(&tmp, data, p->size) !=
-                     HVMCOPY_okay )
-                {
-                    struct page_info *dp = get_page_from_gfn(
-                        d, data >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
-                    if ( (p2mt != p2m_mmio_dm) || (data < VGA_MEM_BASE) ||
-                         ((data + p->size) > (VGA_MEM_BASE + VGA_MEM_SIZE)) )
-                    {
-                        if ( dp )
-                            put_page(dp);
-                        return 0;
-                    }
-                    ASSERT(!dp);
-                    tmp = stdvga_mem_read(data, p->size);
-                }
-                stdvga_mem_write(addr, tmp, p->size);
-                data += step;
-                addr += step;
-            }
-        }
-    }
-    else if ( p->dir == IOREQ_WRITE )
-    {
-        for ( i = 0; i < p->count; i++ )
-        {
-            stdvga_mem_write(addr, p->data, p->size);
-            addr += step;
-        }
-    }
-    else
-    {
-        ASSERT(p->count == 1);
-        p->data = stdvga_mem_read(addr, p->size);
-    }
-
-    read_data = p->data;
-    return 1;
-}
-
-int stdvga_intercept_mmio(ioreq_t *p)
-{
-    struct domain *d = current->domain;
-    struct hvm_hw_stdvga *s = &d->arch.hvm_domain.stdvga;
-    uint64_t start, end, addr = p->addr, count = p->count, size = p->size;
-    int buf = 0, rc;
-
-    if ( unlikely(p->df) )
-    {
-        start = (addr - (count - 1) * size);
-        end = addr + size;
-    }
-    else
-    {
-        start = addr;
-        end = addr + count * size;
-    }
-
-    if ( (start < VGA_MEM_BASE) || (end > (VGA_MEM_BASE + VGA_MEM_SIZE)) )
-        return X86EMUL_UNHANDLEABLE;
-
-    if ( size > 8 )
-    {
-        gdprintk(XENLOG_WARNING, "invalid mmio size %d\n", (int)p->size);
-        return X86EMUL_UNHANDLEABLE;
-    }
+    struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
 
     spin_lock(&s->lock);
 
-    if ( s->stdvga && s->cache )
+    if ( !s->stdvga ||
+         (hvm_mmio_first_byte(p) < VGA_MEM_BASE) ||
+         (hvm_mmio_last_byte(p) >= (VGA_MEM_BASE + VGA_MEM_SIZE)) )
+        goto reject;
+
+    if ( p->dir == IOREQ_WRITE && p->count > 1 )
     {
-        switch ( p->type )
+        /*
+         * We cannot return X86EMUL_UNHANDLEABLE on anything other then the
+         * first cycle of an I/O. So, since we cannot guarantee to always be
+         * able to send buffered writes, we have to reject any multi-cycle
+         * I/O and, since we are rejecting an I/O, we must invalidate the
+         * cache.
+         * Single-cycle write transactions are accepted even if the cache is
+         * not active since we can assert, when in stdvga mode, that writes
+         * to VRAM have no side effect and thus we can try to buffer them.
+         */
+        if ( s->cache )
         {
-        case IOREQ_TYPE_COPY:
-            buf = mmio_move(s, p);
-            if ( !buf )
-                s->cache = 0;
-            break;
-        default:
-            gdprintk(XENLOG_WARNING, "unsupported mmio request type:%d "
-                     "addr:0x%04x data:0x%04x size:%d count:%d state:%d "
-                     "isptr:%d dir:%d df:%d\n",
-                     p->type, (int)p->addr, (int)p->data, (int)p->size,
-                     (int)p->count, p->state,
-                     p->data_is_ptr, p->dir, p->df);
+            gdprintk(XENLOG_INFO, "leaving caching mode\n");
             s->cache = 0;
         }
-    }
-    else
-    {
-        buf = (p->dir == IOREQ_WRITE);
-    }
 
-    rc = (buf && hvm_buffered_io_send(p));
+        goto reject;
+    }
+    else if ( p->dir == IOREQ_READ && !s->cache )
+        goto reject;
+
+    /* s->lock intentionally held */
+    return 1;
+
+ reject:
+    spin_unlock(&s->lock);
+    return 0;
+}
+
+static void stdvga_mem_complete(const struct hvm_io_handler *handler)
+{
+    struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
 
     spin_unlock(&s->lock);
-
-    return rc ? X86EMUL_OKAY : X86EMUL_UNHANDLEABLE;
 }
+
+static const struct hvm_io_ops stdvga_mem_ops = {
+    .accept = stdvga_mem_accept,
+    .read = stdvga_mem_read,
+    .write = stdvga_mem_write,
+    .complete = stdvga_mem_complete
+};
 
 void stdvga_init(struct domain *d)
 {
@@ -630,10 +565,17 @@ void stdvga_init(struct domain *d)
 
     if ( i == ARRAY_SIZE(s->vram_page) )
     {
+        struct hvm_io_handler *handler;
+
         /* Sequencer registers. */
         register_portio_handler(d, 0x3c4, 2, stdvga_intercept_pio);
         /* Graphics registers. */
         register_portio_handler(d, 0x3ce, 2, stdvga_intercept_pio);
+
+        /* VGA memory */
+        handler = hvm_next_io_handler(d);
+        handler->type = IOREQ_TYPE_COPY;
+        handler->ops = &stdvga_mem_ops;
     }
 }
 

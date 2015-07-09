@@ -263,20 +263,21 @@ const struct hvm_io_handler *hvm_find_io_handler(ioreq_t *p)
 int hvm_io_intercept(ioreq_t *p)
 {
     const struct hvm_io_handler *handler;
-
-    if ( p->type == IOREQ_TYPE_COPY )
-    {
-        int rc = stdvga_intercept_mmio(p);
-        if ( (rc == X86EMUL_OKAY) || (rc == X86EMUL_RETRY) )
-            return rc;
-    }
+    const struct hvm_io_ops *ops;
+    int rc;
 
     handler = hvm_find_io_handler(p);
 
     if ( handler == NULL )
         return X86EMUL_UNHANDLEABLE;
 
-    return hvm_process_io_intercept(handler, p);
+    rc = hvm_process_io_intercept(handler, p);
+
+    ops = handler->ops;
+    if ( ops->complete != NULL )
+        ops->complete(handler);
+
+    return rc;
 }
 
 struct hvm_io_handler *hvm_next_io_handler(struct domain *d)
@@ -338,6 +339,8 @@ void relocate_portio_handler(struct domain *d, unsigned int old_port,
 
 bool_t hvm_mmio_internal(paddr_t gpa)
 {
+    const struct hvm_io_handler *handler;
+    const struct hvm_io_ops *ops;
     ioreq_t p = {
         .type = IOREQ_TYPE_COPY,
         .addr = gpa,
@@ -345,7 +348,16 @@ bool_t hvm_mmio_internal(paddr_t gpa)
         .size = 1,
     };
 
-    return hvm_find_io_handler(&p) != NULL;
+    handler = hvm_find_io_handler(&p);
+
+    if ( handler == NULL )
+        return 0;
+
+    ops = handler->ops;
+    if ( ops->complete != NULL )
+        ops->complete(handler);
+
+    return 1;
 }
 
 /*
