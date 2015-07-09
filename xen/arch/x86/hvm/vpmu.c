@@ -32,6 +32,11 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/apic.h>
+#include <public/pmu.h>
+
+#include <compat/pmu.h>
+CHECK_pmu_cntr_pair;
+CHECK_pmu_data;
 
 /*
  * "vpmu" :     vpmu generally enabled
@@ -232,6 +237,9 @@ void vpmu_initialise(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t vendor = current_cpu_data.x86_vendor;
     int ret;
+
+    BUILD_BUG_ON(sizeof(struct xen_pmu_intel_ctxt) > XENPMU_CTXT_PAD_SZ);
+    BUILD_BUG_ON(sizeof(struct xen_pmu_amd_ctxt) > XENPMU_CTXT_PAD_SZ);
 
     if ( is_pvh_vcpu(v) )
         return;

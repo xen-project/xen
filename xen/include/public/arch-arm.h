@@ -448,6 +448,11 @@ typedef uint64_t xen_callback_t;
 
 #endif
 
+#ifndef __ASSEMBLY__
+/* Stub definition of PMU structure */
+typedef struct xen_pmu_arch { uint8_t dummy; } xen_pmu_arch_t;
+#endif
+
 #endif /*  __XEN_PUBLIC_ARCH_ARM_H__ */
 
 /*

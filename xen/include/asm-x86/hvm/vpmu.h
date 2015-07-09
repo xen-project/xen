@@ -22,6 +22,8 @@
 #ifndef __ASM_X86_HVM_VPMU_H_
 #define __ASM_X86_HVM_VPMU_H_
 
+#include <public/pmu.h>
+
 /*
  * Flag bits given as a string on the hypervisor boot parameter 'vpmu'.
  * See arch/x86/hvm/vpmu.c.
@@ -29,12 +31,9 @@
 #define VPMU_BOOT_ENABLED 0x1    /* vpmu generally enabled. */
 #define VPMU_BOOT_BTS     0x2    /* Intel BTS feature wanted. */
 
-
-#define msraddr_to_bitpos(x) (((x)&0xffff) + ((x)>>31)*0x2000)
 #define vcpu_vpmu(vcpu)   (&((vcpu)->arch.hvm_vcpu.vpmu))
 #define vpmu_vcpu(vpmu)   (container_of((vpmu), struct vcpu, \
                                           arch.hvm_vcpu.vpmu))
-#define vpmu_domain(vpmu) (vpmu_vcpu(vpmu)->domain)
 
 #define MSR_TYPE_COUNTER            0
 #define MSR_TYPE_CTRL               1
@@ -42,6 +41,9 @@
 #define MSR_TYPE_ARCH_COUNTER       3
 #define MSR_TYPE_ARCH_CTRL          4
 
+/* Start of PMU register bank */
+#define vpmu_reg_pointer(ctxt, offset) ((void *)((uintptr_t)ctxt + \
+                                                 (uintptr_t)ctxt->offset))
 
 /* Arch specific operations shared by all vpmus */
 struct arch_vpmu_ops {
@@ -65,7 +67,8 @@ struct vpmu_struct {
     u32 flags;
     u32 last_pcpu;
     u32 hw_lapic_lvtpc;
-    void *context;
+    void *context;      /* May be shared with PV guest */
+    void *priv_context; /* hypervisor-only */
     struct arch_vpmu_ops *arch_vpmu_ops;
 };
 
@@ -76,11 +79,6 @@ struct vpmu_struct {
 #define VPMU_CONTEXT_SAVE                   0x8   /* Force context save */
 #define VPMU_FROZEN                         0x10  /* Stop counters while VCPU is not running */
 #define VPMU_PASSIVE_DOMAIN_ALLOCATED       0x20
-
-/* VPMU features */
-#define VPMU_CPU_HAS_DS                     0x100 /* Has Debug Store */
-#define VPMU_CPU_HAS_BTS                    0x200 /* Has Branch Trace Store */
-
 
 static inline void vpmu_set(struct vpmu_struct *vpmu, const u32 mask)
 {

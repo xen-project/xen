@@ -20,10 +20,14 @@
 #include <asm/regs.h>
 #include <asm/current.h>
 #include <asm/hvm/vpmu.h>
-#include <asm/hvm/vmx/vpmu_core2.h>
 
 #include "op_x86_model.h"
 #include "op_counter.h"
+
+struct arch_msr_pair {
+    u64 counter;
+    u64 control;
+};
 
 /*
  * Intel "Architectural Performance Monitoring" CPUID

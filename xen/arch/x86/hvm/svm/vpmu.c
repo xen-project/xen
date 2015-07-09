@@ -30,10 +30,7 @@
 #include <asm/apic.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vpmu.h>
-
-#define F10H_NUM_COUNTERS 4
-#define F15H_NUM_COUNTERS 6
-#define MAX_NUM_COUNTERS F15H_NUM_COUNTERS
+#include <public/pmu.h>
 
 #define MSR_F10H_EVNTSEL_GO_SHIFT   40
 #define MSR_F10H_EVNTSEL_EN_SHIFT   22
@@ -48,6 +45,9 @@ static unsigned int __read_mostly num_counters;
 static const u32 __read_mostly *counters;
 static const u32 __read_mostly *ctrls;
 static bool_t __read_mostly k7_counters_mirrored;
+
+#define F10H_NUM_COUNTERS   4
+#define F15H_NUM_COUNTERS   6
 
 /* PMU Counter MSRs. */
 static const u32 AMD_F10H_COUNTERS[] = {
@@ -83,12 +83,14 @@ static const u32 AMD_F15H_CTRLS[] = {
     MSR_AMD_FAM15H_EVNTSEL5
 };
 
-/* storage for context switching */
-struct amd_vpmu_context {
-    u64 counters[MAX_NUM_COUNTERS];
-    u64 ctrls[MAX_NUM_COUNTERS];
-    bool_t msr_bitmap_set;
-};
+/* Use private context as a flag for MSR bitmap */
+#define msr_bitmap_on(vpmu)    do {                                    \
+                                   (vpmu)->priv_context = (void *)-1L; \
+                               } while (0)
+#define msr_bitmap_off(vpmu)   do {                                    \
+                                   (vpmu)->priv_context = NULL;        \
+                               } while (0)
+#define is_msr_bitmap_on(vpmu) ((vpmu)->priv_context != NULL)
 
 static inline int get_pmu_reg_type(u32 addr)
 {
@@ -142,7 +144,6 @@ static void amd_vpmu_set_msr_bitmap(struct vcpu *v)
 {
     unsigned int i;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    struct amd_vpmu_context *ctxt = vpmu->context;
 
     for ( i = 0; i < num_counters; i++ )
     {
@@ -150,14 +151,13 @@ static void amd_vpmu_set_msr_bitmap(struct vcpu *v)
         svm_intercept_msr(v, ctrls[i], MSR_INTERCEPT_WRITE);
     }
 
-    ctxt->msr_bitmap_set = 1;
+    msr_bitmap_on(vpmu);
 }
 
 static void amd_vpmu_unset_msr_bitmap(struct vcpu *v)
 {
     unsigned int i;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    struct amd_vpmu_context *ctxt = vpmu->context;
 
     for ( i = 0; i < num_counters; i++ )
     {
@@ -165,7 +165,7 @@ static void amd_vpmu_unset_msr_bitmap(struct vcpu *v)
         svm_intercept_msr(v, ctrls[i], MSR_INTERCEPT_RW);
     }
 
-    ctxt->msr_bitmap_set = 0;
+    msr_bitmap_off(vpmu);
 }
 
 static int amd_vpmu_do_interrupt(struct cpu_user_regs *regs)
@@ -177,19 +177,22 @@ static inline void context_load(struct vcpu *v)
 {
     unsigned int i;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    struct amd_vpmu_context *ctxt = vpmu->context;
+    struct xen_pmu_amd_ctxt *ctxt = vpmu->context;
+    uint64_t *counter_regs = vpmu_reg_pointer(ctxt, counters);
+    uint64_t *ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
 
     for ( i = 0; i < num_counters; i++ )
     {
-        wrmsrl(counters[i], ctxt->counters[i]);
-        wrmsrl(ctrls[i], ctxt->ctrls[i]);
+        wrmsrl(counters[i], counter_regs[i]);
+        wrmsrl(ctrls[i], ctrl_regs[i]);
     }
 }
 
 static void amd_vpmu_load(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    struct amd_vpmu_context *ctxt = vpmu->context;
+    struct xen_pmu_amd_ctxt *ctxt = vpmu->context;
+    uint64_t *ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
 
     vpmu_reset(vpmu, VPMU_FROZEN);
 
@@ -198,7 +201,7 @@ static void amd_vpmu_load(struct vcpu *v)
         unsigned int i;
 
         for ( i = 0; i < num_counters; i++ )
-            wrmsrl(ctrls[i], ctxt->ctrls[i]);
+            wrmsrl(ctrls[i], ctrl_regs[i]);
 
         return;
     }
@@ -212,17 +215,17 @@ static inline void context_save(struct vcpu *v)
 {
     unsigned int i;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    struct amd_vpmu_context *ctxt = vpmu->context;
+    struct xen_pmu_amd_ctxt *ctxt = vpmu->context;
+    uint64_t *counter_regs = vpmu_reg_pointer(ctxt, counters);
 
     /* No need to save controls -- they are saved in amd_vpmu_do_wrmsr */
     for ( i = 0; i < num_counters; i++ )
-        rdmsrl(counters[i], ctxt->counters[i]);
+        rdmsrl(counters[i], counter_regs[i]);
 }
 
 static int amd_vpmu_save(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    struct amd_vpmu_context *ctx = vpmu->context;
     unsigned int i;
 
     /*
@@ -245,7 +248,7 @@ static int amd_vpmu_save(struct vcpu *v)
     context_save(v);
 
     if ( !vpmu_is_set(vpmu, VPMU_RUNNING) &&
-         has_hvm_container_vcpu(v) && ctx->msr_bitmap_set )
+         has_hvm_container_vcpu(v) && is_msr_bitmap_on(vpmu) )
         amd_vpmu_unset_msr_bitmap(v);
 
     return 1;
@@ -256,7 +259,9 @@ static void context_update(unsigned int msr, u64 msr_content)
     unsigned int i;
     struct vcpu *v = current;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    struct amd_vpmu_context *ctxt = vpmu->context;
+    struct xen_pmu_amd_ctxt *ctxt = vpmu->context;
+    uint64_t *counter_regs = vpmu_reg_pointer(ctxt, counters);
+    uint64_t *ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
 
     if ( k7_counters_mirrored &&
         ((msr >= MSR_K7_EVNTSEL0) && (msr <= MSR_K7_PERFCTR3)) )
@@ -268,12 +273,12 @@ static void context_update(unsigned int msr, u64 msr_content)
     {
        if ( msr == ctrls[i] )
        {
-           ctxt->ctrls[i] = msr_content;
+           ctrl_regs[i] = msr_content;
            return;
        }
         else if (msr == counters[i] )
         {
-            ctxt->counters[i] = msr_content;
+            counter_regs[i] = msr_content;
             return;
         }
     }
@@ -303,8 +308,7 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
             return 1;
         vpmu_set(vpmu, VPMU_RUNNING);
 
-        if ( has_hvm_container_vcpu(v) &&
-             !((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
+        if ( has_hvm_container_vcpu(v) && is_msr_bitmap_on(vpmu) )
              amd_vpmu_set_msr_bitmap(v);
     }
 
@@ -313,8 +317,7 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         (is_pmu_enabled(msr_content) == 0) && vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
         vpmu_reset(vpmu, VPMU_RUNNING);
-        if ( has_hvm_container_vcpu(v) &&
-             ((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
+        if ( has_hvm_container_vcpu(v) && is_msr_bitmap_on(vpmu) )
              amd_vpmu_unset_msr_bitmap(v);
         release_pmu_ownship(PMU_OWNER_HVM);
     }
@@ -355,7 +358,7 @@ static int amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 
 static int amd_vpmu_initialise(struct vcpu *v)
 {
-    struct amd_vpmu_context *ctxt;
+    struct xen_pmu_amd_ctxt *ctxt;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t family = current_cpu_data.x86;
 
@@ -382,7 +385,8 @@ static int amd_vpmu_initialise(struct vcpu *v)
 	 }
     }
 
-    ctxt = xzalloc(struct amd_vpmu_context);
+    ctxt = xzalloc_bytes(sizeof(*ctxt) +
+                         2 * sizeof(uint64_t) * num_counters);
     if ( !ctxt )
     {
         gdprintk(XENLOG_WARNING, "Insufficient memory for PMU, "
@@ -391,7 +395,11 @@ static int amd_vpmu_initialise(struct vcpu *v)
         return -ENOMEM;
     }
 
+    ctxt->counters = sizeof(*ctxt);
+    ctxt->ctrls = ctxt->counters + sizeof(uint64_t) * num_counters;
+
     vpmu->context = ctxt;
+    vpmu->priv_context = NULL;
     vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
     return 0;
 }
@@ -400,8 +408,7 @@ static void amd_vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( has_hvm_container_vcpu(v) &&
-         ((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
+    if ( has_hvm_container_vcpu(v) && is_msr_bitmap_on(vpmu) )
         amd_vpmu_unset_msr_bitmap(v);
 
     xfree(vpmu->context);
@@ -418,7 +425,9 @@ static void amd_vpmu_destroy(struct vcpu *v)
 static void amd_vpmu_dump(const struct vcpu *v)
 {
     const struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    const struct amd_vpmu_context *ctxt = vpmu->context;
+    const struct xen_pmu_amd_ctxt *ctxt = vpmu->context;
+    const uint64_t *counter_regs = vpmu_reg_pointer(ctxt, counters);
+    const uint64_t *ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
     unsigned int i;
 
     printk("    VPMU state: 0x%x ", vpmu->flags);
@@ -448,8 +457,8 @@ static void amd_vpmu_dump(const struct vcpu *v)
         rdmsrl(ctrls[i], ctrl);
         rdmsrl(counters[i], cntr);
         printk("      %#x: %#lx (%#lx in HW)    %#x: %#lx (%#lx in HW)\n",
-               ctrls[i], ctxt->ctrls[i], ctrl,
-               counters[i], ctxt->counters[i], cntr);
+               ctrls[i], ctrl_regs[i], ctrl,
+               counters[i], counter_regs[i], cntr);
     }
 }
 

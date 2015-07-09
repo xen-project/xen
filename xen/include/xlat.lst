@@ -7,6 +7,11 @@
 !	mmuext_op			xen.h
 !	start_info			xen.h
 ?	vcpu_time_info			xen.h
+?	pmu_amd_ctxt			arch-x86/pmu.h
+?	pmu_arch			arch-x86/pmu.h
+?	pmu_cntr_pair			arch-x86/pmu.h
+?	pmu_intel_ctxt			arch-x86/pmu.h
+?	pmu_regs			arch-x86/pmu.h
 !	cpu_user_regs			arch-x86/xen-@arch@.h
 !	trap_info			arch-x86/xen.h
 ?	cpu_offline_action		arch-x86/xen-mca.h
@@ -92,6 +97,7 @@
 ?	xenpf_pcpuinfo			platform.h
 ?	xenpf_pcpu_version		platform.h
 ?	xenpf_resource_entry		platform.h
+?	pmu_data			pmu.h
 !	sched_poll			sched.h
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h
