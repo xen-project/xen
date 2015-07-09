@@ -10,6 +10,13 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
     return 0;
 }
 
+int libxl__arch_domain_save_config(libxl__gc *gc,
+                                   libxl_domain_config *d_config,
+                                   const xc_domain_configuration_t *xc_config)
+{
+    return 0;
+}
+
 static const char *e820_names(int type)
 {
     switch (type) {

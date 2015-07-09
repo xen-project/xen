@@ -247,7 +247,7 @@ static void gicv3_enable_sre(void)
     uint32_t val;
 
     val = READ_SYSREG32(ICC_SRE_EL2);
-    val |= GICC_SRE_EL2_SRE | GICC_SRE_EL2_ENEL1;
+    val |= GICC_SRE_EL2_SRE;
 
     WRITE_SYSREG32(val, ICC_SRE_EL2);
     isb();
@@ -375,6 +375,19 @@ static void gicv3_save_state(struct vcpu *v)
 
 static void gicv3_restore_state(const struct vcpu *v)
 {
+    uint32_t val;
+
+    val = READ_SYSREG32(ICC_SRE_EL2);
+    /*
+     * Don't give access to system registers when the guest is using
+     * GICv2
+     */
+    if ( v->domain->arch.vgic.version == GIC_V2 )
+        val &= ~GICC_SRE_EL2_ENEL1;
+    else
+        val |= GICC_SRE_EL2_ENEL1;
+    WRITE_SYSREG32(val, ICC_SRE_EL2);
+
     WRITE_SYSREG32(v->arch.gic.v3.sre_el1, ICC_SRE_EL1);
     WRITE_SYSREG32(v->arch.gic.v3.vmcr, ICH_VMCR_EL2);
     restore_aprn_regs(&v->arch.gic);
@@ -866,13 +879,20 @@ static void gicv3_disable_interface(void)
 static void gicv3_update_lr(int lr, const struct pending_irq *p,
                             unsigned int state)
 {
-    uint64_t grp = GICH_LR_GRP1;
     uint64_t val = 0;
 
     BUG_ON(lr >= gicv3_info.nr_lrs);
     BUG_ON(lr < 0);
 
-    val =  (((uint64_t)state & 0x3) << GICH_LR_STATE_SHIFT) | grp;
+    val =  (((uint64_t)state & 0x3) << GICH_LR_STATE_SHIFT);
+
+    /*
+     * When the guest is GICv3, all guest IRQs are Group 1, as Group0
+     * would result in a FIQ in the guest, which it wouldn't expect
+     */
+    if ( current->domain->arch.vgic.version == GIC_V3 )
+        val |= GICH_LR_GRP1;
+
     val |= ((uint64_t)p->priority & 0xff) << GICH_LR_PRIORITY_SHIFT;
     val |= ((uint64_t)p->irq & GICH_LR_VIRTUAL_MASK) << GICH_LR_VIRTUAL_SHIFT;
 
@@ -1119,6 +1139,33 @@ static int __init cmp_rdist(const void *a, const void *b)
     return ( l->base < r->base) ? -1 : 0;
 }
 
+/* If the GICv3 supports GICv2, initialize it */
+static void __init gicv3_init_v2(const struct dt_device_node *node,
+                                 paddr_t dbase)
+{
+    int res;
+    paddr_t cbase, vbase;
+
+    /*
+     * For GICv3 supporting GICv2, GICC and GICV base address will be
+     * provided.
+     */
+    res = dt_device_get_address(node, 1 + gicv3.rdist_count,
+                                &cbase, NULL);
+    if ( res )
+        return;
+
+    res = dt_device_get_address(node, 1 + gicv3.rdist_count + 2,
+                                &vbase, NULL);
+    if ( res )
+        return;
+
+    printk("GICv3 compatible with GICv2 cbase %#"PRIpaddr" vbase %#"PRIpaddr"\n",
+           cbase, vbase);
+
+    vgic_v2_setup_hw(dbase, cbase, vbase);
+}
+
 /* Set up the GIC */
 static int __init gicv3_init(void)
 {
@@ -1216,6 +1263,7 @@ static int __init gicv3_init(void)
 
     vgic_v3_setup_hw(dbase, gicv3.rdist_count, gicv3.rdist_regions,
                      gicv3.rdist_stride);
+    gicv3_init_v2(node, dbase);
 
     spin_lock_init(&gicv3.lock);
 

@@ -200,6 +200,11 @@
 #define LIBXL_HAVE_DEVICETREE_PASSTHROUGH 1
 
 /*
+ * libxl_domain_build_info has the arm.gic_version field.
+ */
+#define LIBXL_HAVE_BUILDINFO_ARM_GIC_VERSION 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
@@ -594,6 +599,14 @@ typedef struct libxl__ctx libxl_ctx;
  * If this is not defined, the Spice streaming video setting support is ignored.
  */
 #define LIBXL_HAVE_SPICE_STREAMINGVIDEO 1
+
+/*
+ * LIBXL_HAVE_HVM_HDTYPE
+ *
+ * If defined, then the u.hvm structure will contain a enum type
+ * hdtype.
+ */
+#define LIBXL_HAVE_HVM_HDTYPE 1
 
 /*
  * LIBXL_HAVE_DOMAIN_CREATE_RESTORE_PARAMS 1

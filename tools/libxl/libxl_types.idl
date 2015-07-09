@@ -202,6 +202,11 @@ libxl_viridian_enlightenment = Enumeration("viridian_enlightenment", [
     (3, "reference_tsc"),
     ])
 
+libxl_hdtype = Enumeration("hdtype", [
+    (1, "IDE"),
+    (2, "AHCI"),
+    ], init_val = "LIBXL_HDTYPE_IDE")
+
 #
 # Complex libxl types
 #
@@ -375,6 +380,12 @@ libxl_vnode_info = Struct("vnode_info", [
     ("vcpus", libxl_bitmap), # vcpus in this node
     ])
 
+libxl_gic_version = Enumeration("gic_version", [
+    (0, "DEFAULT"),
+    (0x20, "v2"),
+    (0x30, "v3")
+    ], init_val = "LIBXL_GIC_VERSION_DEFAULT")
+
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
     ("avail_vcpus",     libxl_bitmap),
@@ -448,6 +459,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("nested_hvm",       libxl_defbool),
                                        ("smbios_firmware",  string),
                                        ("acpi_firmware",    string),
+                                       ("hdtype",           libxl_hdtype),
                                        ("nographic",        libxl_defbool),
                                        ("vga",              libxl_vga_interface_info),
                                        ("vnc",              libxl_vnc_info),
@@ -486,6 +498,11 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                       ])),
                  ("invalid", None),
                  ], keyvar_init_val = "LIBXL_DOMAIN_TYPE_INVALID")),
+
+
+    ("arch_arm", Struct(None, [("gic_version", libxl_gic_version),
+                              ])),
+
     ], dir=DIR_IN
 )
 

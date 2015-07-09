@@ -195,6 +195,9 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         if (!b_info->u.hvm.vga.kind)
             b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
 
+        if (!b_info->u.hvm.hdtype)
+            b_info->u.hvm.hdtype = LIBXL_HDTYPE_IDE;
+
         switch (b_info->device_model_version) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
             switch (b_info->u.hvm.vga.kind) {
@@ -523,6 +526,10 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
         rc = ERROR_FAIL;
         goto out;
     }
+
+    rc = libxl__arch_domain_save_config(gc, d_config, xc_config);
+    if (rc < 0)
+        goto out;
 
     ret = xc_cpupool_movedomain(ctx->xch, info->poolid, *domid);
     if (ret < 0) {

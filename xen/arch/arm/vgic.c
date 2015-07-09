@@ -81,7 +81,7 @@ int domain_vgic_init(struct domain *d, unsigned int nr_spis)
 
     d->arch.vgic.nr_spis = nr_spis;
 
-    switch ( gic_hw_version() )
+    switch ( d->arch.vgic.version )
     {
 #ifdef HAS_GICV3
     case GIC_V3:
@@ -95,7 +95,7 @@ int domain_vgic_init(struct domain *d, unsigned int nr_spis)
         break;
     default:
         printk(XENLOG_G_ERR "d%d: Unknown vGIC version %u\n",
-               d->domain_id, gic_hw_version());
+               d->domain_id, d->arch.vgic.version);
         return -ENODEV;
     }
 
