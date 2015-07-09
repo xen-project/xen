@@ -48,6 +48,7 @@ static bool_t __read_mostly k7_counters_mirrored;
 
 #define F10H_NUM_COUNTERS   4
 #define F15H_NUM_COUNTERS   6
+#define MAX_NUM_COUNTERS    F15H_NUM_COUNTERS
 
 /* PMU Counter MSRs. */
 static const u32 AMD_F10H_COUNTERS[] = {
@@ -83,6 +84,11 @@ static const u32 AMD_F15H_CTRLS[] = {
     MSR_AMD_FAM15H_EVNTSEL5
 };
 
+/* Bits [63:42], [39:36], 21 and 19 are reserved */
+#define CTRL_RSVD_MASK ((-1ULL & (~((1ULL << 42) - 1))) | \
+                        (0xfULL << 36) | (1ULL << 21) | (1ULL << 19))
+static uint64_t __read_mostly ctrl_rsvd[MAX_NUM_COUNTERS];
+
 /* Use private context as a flag for MSR bitmap */
 #define msr_bitmap_on(vpmu)    do {                                    \
                                    (vpmu)->priv_context = (void *)-1L; \
@@ -92,17 +98,24 @@ static const u32 AMD_F15H_CTRLS[] = {
                                } while (0)
 #define is_msr_bitmap_on(vpmu) ((vpmu)->priv_context != NULL)
 
-static inline int get_pmu_reg_type(u32 addr)
+static inline int get_pmu_reg_type(u32 addr, unsigned int *idx)
 {
     if ( (addr >= MSR_K7_EVNTSEL0) && (addr <= MSR_K7_EVNTSEL3) )
+    {
+        *idx = addr - MSR_K7_EVNTSEL0;
         return MSR_TYPE_CTRL;
+    }
 
     if ( (addr >= MSR_K7_PERFCTR0) && (addr <= MSR_K7_PERFCTR3) )
+    {
+        *idx = addr - MSR_K7_PERFCTR0;
         return MSR_TYPE_COUNTER;
+    }
 
     if ( (addr >= MSR_AMD_FAM15H_EVNTSEL0) &&
          (addr <= MSR_AMD_FAM15H_PERFCTR5 ) )
     {
+        *idx = (addr - MSR_AMD_FAM15H_EVNTSEL0) >> 1;
         if (addr & 1)
             return MSR_TYPE_COUNTER;
         else
@@ -138,6 +151,16 @@ static inline u32 get_fam15h_addr(u32 addr)
     }
 
     return addr;
+}
+
+static void amd_vpmu_init_regs(struct xen_pmu_amd_ctxt *ctxt)
+{
+    unsigned i;
+    uint64_t *ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
+
+    memset(&ctxt->regs[0], 0, 2 * sizeof(uint64_t) * num_counters);
+    for ( i = 0; i < num_counters; i++ )
+        ctrl_regs[i] = ctrl_rsvd[i];
 }
 
 static void amd_vpmu_set_msr_bitmap(struct vcpu *v)
@@ -289,19 +312,24 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
 {
     struct vcpu *v = current;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    unsigned int idx = 0;
+    int type = get_pmu_reg_type(msr, &idx);
 
     ASSERT(!supported);
 
+    if ( (type == MSR_TYPE_CTRL ) &&
+         ((msr_content & CTRL_RSVD_MASK) != ctrl_rsvd[idx]) )
+        return -EINVAL;
+
     /* For all counters, enable guest only mode for HVM guest */
-    if ( has_hvm_container_vcpu(v) &&
-         (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) &&
+    if ( has_hvm_container_vcpu(v) && (type == MSR_TYPE_CTRL) &&
          !is_guest_mode(msr_content) )
     {
         set_guest_mode(msr_content);
     }
 
     /* check if the first counter is enabled */
-    if ( (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) &&
+    if ( (type == MSR_TYPE_CTRL) &&
         is_pmu_enabled(msr_content) && !vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
         if ( !acquire_pmu_ownership(PMU_OWNER_HVM) )
@@ -313,7 +341,7 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
     }
 
     /* stop saving & restore if guest stops first counter */
-    if ( (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) &&
+    if ( (type == MSR_TYPE_CTRL) &&
         (is_pmu_enabled(msr_content) == 0) && vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
         vpmu_reset(vpmu, VPMU_RUNNING);
@@ -433,7 +461,7 @@ int svm_vpmu_initialise(struct vcpu *v)
     if ( !counters )
         return -EINVAL;
 
-    ctxt = xzalloc_bytes(sizeof(*ctxt) +
+    ctxt = xmalloc_bytes(sizeof(*ctxt) +
                          2 * sizeof(uint64_t) * num_counters);
     if ( !ctxt )
     {
@@ -445,6 +473,7 @@ int svm_vpmu_initialise(struct vcpu *v)
 
     ctxt->counters = sizeof(*ctxt);
     ctxt->ctrls = ctxt->counters + sizeof(uint64_t) * num_counters;
+    amd_vpmu_init_regs(ctxt);
 
     vpmu->context = ctxt;
     vpmu->priv_context = NULL;
@@ -457,6 +486,8 @@ int svm_vpmu_initialise(struct vcpu *v)
 
 int __init amd_vpmu_init(void)
 {
+    unsigned int i;
+
     switch ( current_cpu_data.x86 )
     {
     case 0x15:
@@ -488,6 +519,12 @@ int __init amd_vpmu_init(void)
         counters = ctrls = NULL;
         num_counters = 0;
         return -ENOSPC;
+    }
+
+    for ( i = 0; i < num_counters; i++ )
+    {
+        rdmsrl(ctrls[i], ctrl_rsvd[i]);
+        ctrl_rsvd[i] &= CTRL_RSVD_MASK;
     }
 
     return 0;
