@@ -1482,6 +1482,8 @@ int hvm_domain_initialise(struct domain *d)
     else
         d->arch.hvm_domain.io_bitmap = hvm_io_bitmap;
 
+    register_dpci_portio_handler(d);
+
     if ( is_pvh_domain(d) )
     {
         register_portio_handler(d, 0, 0x10003, handle_pvh_io);

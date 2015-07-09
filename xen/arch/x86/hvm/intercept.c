@@ -119,8 +119,7 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
 {
     struct vcpu *curr = current;
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
-    const struct hvm_io_ops *ops = (p->type == IOREQ_TYPE_COPY) ?
-                                   &mmio_ops : &portio_ops;
+    const struct hvm_io_ops *ops = handler->ops;
     int rc = X86EMUL_OKAY, i, step = p->df ? -p->size : p->size;
     uint64_t data;
     uint64_t addr;
@@ -240,8 +239,6 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
 const struct hvm_io_handler *hvm_find_io_handler(ioreq_t *p)
 {
     struct domain *curr_d = current->domain;
-    const struct hvm_io_ops *ops = (p->type == IOREQ_TYPE_COPY) ?
-                                   &mmio_ops : &portio_ops;
     unsigned int i;
 
     BUG_ON((p->type != IOREQ_TYPE_PIO) &&
@@ -251,6 +248,7 @@ const struct hvm_io_handler *hvm_find_io_handler(ioreq_t *p)
     {
         const struct hvm_io_handler *handler =
             &curr_d->arch.hvm_domain.io_handler[i];
+        const struct hvm_io_ops *ops = handler->ops;
 
         if ( handler->type != p->type )
             continue;
@@ -266,13 +264,7 @@ int hvm_io_intercept(ioreq_t *p)
 {
     const struct hvm_io_handler *handler;
 
-    if ( p->type == IOREQ_TYPE_PIO )
-    {
-        int rc = dpci_ioport_intercept(p);
-        if ( (rc == X86EMUL_OKAY) || (rc == X86EMUL_RETRY) )
-            return rc;
-    }
-    else if ( p->type == IOREQ_TYPE_COPY )
+    if ( p->type == IOREQ_TYPE_COPY )
     {
         int rc = stdvga_intercept_mmio(p);
         if ( (rc == X86EMUL_OKAY) || (rc == X86EMUL_RETRY) )
@@ -306,6 +298,7 @@ void register_mmio_handler(struct domain *d,
     struct hvm_io_handler *handler = hvm_next_io_handler(d);
 
     handler->type = IOREQ_TYPE_COPY;
+    handler->ops = &mmio_ops;
     handler->mmio.ops = ops;
 }
 
@@ -315,6 +308,7 @@ void register_portio_handler(struct domain *d, unsigned int port,
     struct hvm_io_handler *handler = hvm_next_io_handler(d);
 
     handler->type = IOREQ_TYPE_PIO;
+    handler->ops = &portio_ops;
     handler->portio.port = port;
     handler->portio.size = size;
     handler->portio.action = action;

@@ -93,7 +93,6 @@ void pt_pci_init(void);
 
 struct pirq;
 int hvm_do_IRQ_dpci(struct domain *, struct pirq *);
-int dpci_ioport_intercept(ioreq_t *p);
 int pt_irq_create_bind(struct domain *, xen_domctl_bind_pt_irq_t *);
 int pt_irq_destroy_bind(struct domain *, xen_domctl_bind_pt_irq_t *);
 

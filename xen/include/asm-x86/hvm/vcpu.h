@@ -77,6 +77,8 @@ struct hvm_vcpu_io {
     bool_t mmio_retry, mmio_retrying;
 
     unsigned long msix_unmask_address;
+
+    const struct g2m_ioport *g2m_ioport;
 };
 
 #define VMCX_EADDR    (~0ULL)

@@ -72,6 +72,7 @@ struct hvm_io_handler {
             portio_action_t action;
         } portio;
     };
+    const struct hvm_io_ops *ops;
     uint8_t type;
 };
 
@@ -144,6 +145,9 @@ int stdvga_intercept_mmio(ioreq_t *p);
 void stdvga_deinit(struct domain *d);
 
 extern void hvm_dpci_msi_eoi(struct domain *d, int vector);
+
+void register_dpci_portio_handler(struct domain *d);
+
 #endif /* __ASM_X86_HVM_IO_H__ */
 
 
