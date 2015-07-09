@@ -107,6 +107,9 @@ LIBXL_OBJS += libxl_genid.o
 LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 
 LIBXL_TESTS += timedereg
+LIBXL_TESTS_PROGS = $(LIBXL_TESTS)
+LIBXL_TESTS_INSIDE = $(LIBXL_TESTS)
+
 # Each entry FOO in LIBXL_TESTS has two main .c files:
 #   libxl_test_FOO.c  "inside libxl" code to support the test case
 #   test_FOO.c        "outside libxl" code to exercise the test case
@@ -124,9 +127,9 @@ LIBXL_TESTS += timedereg
 # loaded, or rename it to libxenlight.so so it is the target of the
 # appropriate symlinks.
 
-LIBXL_TEST_OBJS += $(foreach t, $(LIBXL_TESTS),libxl_test_$t.o)
-TEST_PROG_OBJS += $(foreach t, $(LIBXL_TESTS),test_$t.o) test_common.o
-TEST_PROGS += $(foreach t, $(LIBXL_TESTS),test_$t)
+LIBXL_TEST_OBJS += $(foreach t, $(LIBXL_TESTS_INSIDE),libxl_test_$t.o)
+TEST_PROG_OBJS += $(foreach t, $(LIBXL_TESTS_PROGS),test_$t.o) test_common.o
+TEST_PROGS += $(foreach t, $(LIBXL_TESTS_PROGS),test_$t)
 
 $(LIBXL_OBJS) $(LIBXL_TEST_OBJS): CFLAGS += $(CFLAGS_LIBXL) -include $(XEN_ROOT)/tools/config.h
 
