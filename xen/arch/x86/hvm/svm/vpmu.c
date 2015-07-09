@@ -305,7 +305,7 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         is_pmu_enabled(msr_content) && !vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
         if ( !acquire_pmu_ownership(PMU_OWNER_HVM) )
-            return 1;
+            return 0;
         vpmu_set(vpmu, VPMU_RUNNING);
 
         if ( has_hvm_container_vcpu(v) && is_msr_bitmap_on(vpmu) )
@@ -335,7 +335,7 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
 
     /* Write to hw counters */
     wrmsrl(msr, msr_content);
-    return 1;
+    return 0;
 }
 
 static int amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
@@ -353,7 +353,7 @@ static int amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 
     rdmsrl(msr, *msr_content);
 
-    return 1;
+    return 0;
 }
 
 static void amd_vpmu_destroy(struct vcpu *v)

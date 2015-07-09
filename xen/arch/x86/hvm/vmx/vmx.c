@@ -2164,12 +2164,17 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         *msr_content |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
                        MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
         /* Perhaps vpmu will change some bits. */
+        /* FALLTHROUGH */
+    case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
+    case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(3):
+    case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:
+    case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
+    case MSR_IA32_PEBS_ENABLE:
+    case MSR_IA32_DS_AREA:
         if ( vpmu_do_rdmsr(msr, msr_content) )
-            goto done;
+            goto gp_fault;
         break;
     default:
-        if ( vpmu_do_rdmsr(msr, msr_content) )
-            break;
         if ( passive_domain_do_rdmsr(msr, msr_content) )
             goto done;
         switch ( long_mode_do_msr_read(msr, msr_content) )
@@ -2345,7 +2350,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         if ( msr_content & ~supported )
         {
             /* Perhaps some other bits are supported in vpmu. */
-            if ( !vpmu_do_wrmsr(msr, msr_content, supported) )
+            if ( vpmu_do_wrmsr(msr, msr_content, supported) )
                 break;
         }
         if ( msr_content & IA32_DEBUGCTLMSR_LBR )
@@ -2373,9 +2378,16 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         if ( !nvmx_msr_write_intercept(msr, msr_content) )
             goto gp_fault;
         break;
+    case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
+    case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(7):
+    case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:
+    case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
+    case MSR_IA32_PEBS_ENABLE:
+    case MSR_IA32_DS_AREA:
+         if ( vpmu_do_wrmsr(msr, msr_content, 0) )
+            goto gp_fault;
+        break;
     default:
-        if ( vpmu_do_wrmsr(msr, msr_content, 0) )
-            return X86EMUL_OKAY;
         if ( passive_domain_do_wrmsr(msr, msr_content) )
             return X86EMUL_OKAY;
 

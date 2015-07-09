@@ -1708,7 +1708,8 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_AMD_FAM15H_EVNTSEL3:
     case MSR_AMD_FAM15H_EVNTSEL4:
     case MSR_AMD_FAM15H_EVNTSEL5:
-        vpmu_do_rdmsr(msr, msr_content);
+        if ( vpmu_do_rdmsr(msr, msr_content) )
+            goto gpf;
         break;
 
     case MSR_AMD64_DR0_ADDRESS_MASK:
@@ -1859,7 +1860,8 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_AMD_FAM15H_EVNTSEL3:
     case MSR_AMD_FAM15H_EVNTSEL4:
     case MSR_AMD_FAM15H_EVNTSEL5:
-        vpmu_do_wrmsr(msr, msr_content, 0);
+        if ( vpmu_do_wrmsr(msr, msr_content, 0) )
+            goto gpf;
         break;
 
     case MSR_IA32_MCx_MISC(4): /* Threshold register */

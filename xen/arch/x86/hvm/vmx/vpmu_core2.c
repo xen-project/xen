@@ -454,17 +454,23 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
                              IA32_DEBUGCTLMSR_BTS_OFF_USR;
             if ( !(msr_content & ~supported) &&
                  vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
-                return 1;
+                return 0;
             if ( (msr_content & supported) &&
                  !vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
                 printk(XENLOG_G_WARNING
                        "%pv: Debug Store unsupported on this CPU\n",
                        current);
         }
-        return 0;
+        return -EINVAL;
     }
 
     ASSERT(!supported);
+
+    if ( type == MSR_TYPE_COUNTER &&
+         (msr_content &
+          ~((1ull << core2_get_bitwidth_fix_count()) - 1)) )
+        /* Writing unsupported bits to a fixed counter */
+        return -EINVAL;
 
     core2_vpmu_cxt = vpmu->context;
     enabled_cntrs = vpmu->priv_context;
@@ -472,18 +478,17 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
     {
     case MSR_CORE_PERF_GLOBAL_OVF_CTRL:
         core2_vpmu_cxt->global_status &= ~msr_content;
-        return 1;
+        return 0;
     case MSR_CORE_PERF_GLOBAL_STATUS:
         gdprintk(XENLOG_INFO, "Can not write readonly MSR: "
                  "MSR_PERF_GLOBAL_STATUS(0x38E)!\n");
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
-        return 1;
+        return -EINVAL;
     case MSR_IA32_PEBS_ENABLE:
         if ( msr_content & 1 )
             gdprintk(XENLOG_WARNING, "Guest is trying to enable PEBS, "
                      "which is not supported.\n");
         core2_vpmu_cxt->pebs_enable = msr_content;
-        return 1;
+        return 0;
     case MSR_IA32_DS_AREA:
         if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_DS) )
         {
@@ -492,18 +497,21 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
                 gdprintk(XENLOG_WARNING,
                          "Illegal address for IA32_DS_AREA: %#" PRIx64 "x\n",
                          msr_content);
-                hvm_inject_hw_exception(TRAP_gp_fault, 0);
-                return 1;
+                return -EINVAL;
             }
             core2_vpmu_cxt->ds_area = msr_content;
             break;
         }
         gdprintk(XENLOG_WARNING, "Guest setting of DTS is ignored.\n");
-        return 1;
+        return 0;
     case MSR_CORE_PERF_GLOBAL_CTRL:
         global_ctrl = msr_content;
         break;
     case MSR_CORE_PERF_FIXED_CTR_CTRL:
+        if ( msr_content &
+             ( ~((1ull << (fixed_pmc_cnt * FIXED_CTR_CTRL_BITS)) - 1)) )
+            return -EINVAL;
+
         vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
         *enabled_cntrs &= ~(((1ULL << fixed_pmc_cnt) - 1) << 32);
         if ( msr_content != 0 )
@@ -526,6 +534,9 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
             struct xen_pmu_cntr_pair *xen_pmu_cntr_pair =
                 vpmu_reg_pointer(core2_vpmu_cxt, arch_counters);
 
+            if ( msr_content & (~((1ull << 32) - 1)) )
+                return -EINVAL;
+
             vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
 
             if ( msr_content & (1ULL << 22) )
@@ -537,45 +548,17 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         }
     }
 
+    if ( type != MSR_TYPE_GLOBAL )
+        wrmsrl(msr, msr_content);
+    else
+        vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
+
     if ( (global_ctrl & *enabled_cntrs) || (core2_vpmu_cxt->ds_area != 0) )
         vpmu_set(vpmu, VPMU_RUNNING);
     else
         vpmu_reset(vpmu, VPMU_RUNNING);
 
-    if ( type != MSR_TYPE_GLOBAL )
-    {
-        u64 mask;
-        int inject_gp = 0;
-        switch ( type )
-        {
-        case MSR_TYPE_ARCH_CTRL:      /* MSR_P6_EVNTSEL[0,...] */
-            mask = ~((1ull << 32) - 1);
-            if (msr_content & mask)
-                inject_gp = 1;
-            break;
-        case MSR_TYPE_CTRL:           /* IA32_FIXED_CTR_CTRL */
-            if  ( msr == MSR_IA32_DS_AREA )
-                break;
-            /* 4 bits per counter, currently 3 fixed counters implemented. */
-            mask = ~((1ull << (fixed_pmc_cnt * FIXED_CTR_CTRL_BITS)) - 1);
-            if (msr_content & mask)
-                inject_gp = 1;
-            break;
-        case MSR_TYPE_COUNTER:        /* IA32_FIXED_CTR[0-2] */
-            mask = ~((1ull << core2_get_bitwidth_fix_count()) - 1);
-            if (msr_content & mask)
-                inject_gp = 1;
-            break;
-        }
-        if (inject_gp)
-            hvm_inject_hw_exception(TRAP_gp_fault, 0);
-        else
-            wrmsrl(msr, msr_content);
-    }
-    else
-        vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
-
-    return 1;
+    return 0;
 }
 
 static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
@@ -603,19 +586,14 @@ static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
             rdmsrl(msr, *msr_content);
         }
     }
-    else
+    else if ( msr == MSR_IA32_MISC_ENABLE )
     {
         /* Extension for BTS */
-        if ( msr == MSR_IA32_MISC_ENABLE )
-        {
-            if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
-                *msr_content &= ~MSR_IA32_MISC_ENABLE_BTS_UNAVAIL;
-        }
-        else
-            return 0;
+        if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
+            *msr_content &= ~MSR_IA32_MISC_ENABLE_BTS_UNAVAIL;
     }
 
-    return 1;
+    return 0;
 }
 
 static void core2_vpmu_do_cpuid(unsigned int input,
@@ -760,9 +738,9 @@ static int core2_no_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
     int type = -1, index = -1;
     if ( !is_core2_vpmu_msr(msr, &type, &index) )
-        return 0;
+        return -EINVAL;
     *msr_content = 0;
-    return 1;
+    return 0;
 }
 
 /*
