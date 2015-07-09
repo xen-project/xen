@@ -51,7 +51,7 @@ static void hvmtrace_io_assist(const ioreq_t *p)
 }
 
 static int hvmemul_do_io(
-    bool_t is_mmio, paddr_t addr, unsigned long *reps, unsigned int size,
+    bool_t is_mmio, paddr_t addr, unsigned long reps, unsigned int size,
     uint8_t dir, bool_t df, bool_t data_is_addr, uintptr_t data)
 {
     struct vcpu *curr = current;
@@ -60,6 +60,7 @@ static int hvmemul_do_io(
         .type = is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO,
         .addr = addr,
         .size = size,
+        .count = reps,
         .dir = dir,
         .df = df,
         .data = data,
@@ -125,15 +126,6 @@ static int hvmemul_do_io(
         HVMIO_dispatched : HVMIO_awaiting_completion;
     vio->io_size = size;
 
-    /*
-     * When retrying a repeated string instruction, force exit to guest after
-     * completion of the retried iteration to allow handling of interrupts.
-     */
-    if ( vio->mmio_retrying )
-        *reps = 1;
-
-    p.count = *reps;
-
     if ( dir == IOREQ_WRITE )
     {
         if ( !data_is_addr )
@@ -147,17 +139,9 @@ static int hvmemul_do_io(
     switch ( rc )
     {
     case X86EMUL_OKAY:
-    case X86EMUL_RETRY:
-        *reps = p.count;
         p.state = STATE_IORESP_READY;
-        if ( !vio->mmio_retry )
-        {
-            hvm_io_assist(&p);
-            vio->io_state = HVMIO_none;
-        }
-        else
-            /* Defer hvm_io_assist() invocation to hvm_do_resume(). */
-            vio->io_state = HVMIO_handle_mmio_awaiting_completion;
+        hvm_io_assist(&p);
+        vio->io_state = HVMIO_none;
         break;
     case X86EMUL_UNHANDLEABLE:
     {
@@ -235,7 +219,7 @@ static int hvmemul_do_io_buffer(
 
     BUG_ON(buffer == NULL);
 
-    rc = hvmemul_do_io(is_mmio, addr, reps, size, dir, df, 0,
+    rc = hvmemul_do_io(is_mmio, addr, *reps, size, dir, df, 0,
                        (uintptr_t)buffer);
     if ( rc == X86EMUL_UNHANDLEABLE && dir == IOREQ_READ )
         memset(buffer, 0xff, size);
@@ -287,17 +271,56 @@ static int hvmemul_do_io_addr(
     bool_t is_mmio, paddr_t addr, unsigned long *reps,
     unsigned int size, uint8_t dir, bool_t df, paddr_t ram_gpa)
 {
-    struct page_info *ram_page;
+    struct vcpu *v = current;
+    unsigned long ram_gmfn = paddr_to_pfn(ram_gpa);
+    unsigned int page_off = ram_gpa & (PAGE_SIZE - 1);
+    struct page_info *ram_page[2];
+    unsigned int nr_pages = 0;
+    unsigned long count;
     int rc;
 
-    rc = hvmemul_acquire_page(paddr_to_pfn(ram_gpa), &ram_page);
+    rc = hvmemul_acquire_page(ram_gmfn, &ram_page[nr_pages]);
     if ( rc != X86EMUL_OKAY )
-        return rc;
+        goto out;
 
-    rc = hvmemul_do_io(is_mmio, addr, reps, size, dir, df, 1,
+    nr_pages++;
+
+    /* Detemine how many reps will fit within this page */
+    count = min_t(unsigned long,
+                  *reps,
+                  df ?
+                  ((page_off + size - 1) & ~PAGE_MASK) / size :
+                  (PAGE_SIZE - page_off) / size);
+
+    if ( count == 0 )
+    {
+        /*
+         * This access must span two pages, so grab a reference to
+         * the next page and do a single rep.
+         * It is safe to assume multiple pages are physically
+         * contiguous at this point as hvmemul_linear_to_phys() will
+         * ensure this is the case.
+         */
+        rc = hvmemul_acquire_page(df ? ram_gmfn - 1 : ram_gmfn + 1,
+                                  &ram_page[nr_pages]);
+        if ( rc != X86EMUL_OKAY )
+            goto out;
+
+        nr_pages++;
+        count = 1;
+    }
+
+    rc = hvmemul_do_io(is_mmio, addr, count, size, dir, df, 1,
                        ram_gpa);
+    if ( rc == X86EMUL_OKAY )
+    {
+        v->arch.hvm_vcpu.hvm_io.mmio_retry = (count < *reps);
+        *reps = count;
+    }
 
-    hvmemul_release_page(ram_page);
+ out:
+    while ( nr_pages )
+        hvmemul_release_page(ram_page[--nr_pages]);
 
     return rc;
 }
@@ -1546,7 +1569,6 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     }
 
     hvmemul_ctxt->exn_pending = 0;
-    vio->mmio_retrying = vio->mmio_retry;
     vio->mmio_retry = 0;
 
     if ( cpu_has_vmx )

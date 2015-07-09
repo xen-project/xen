@@ -117,8 +117,6 @@ static const struct hvm_io_ops portio_ops = {
 int hvm_process_io_intercept(const struct hvm_io_handler *handler,
                              ioreq_t *p)
 {
-    struct vcpu *curr = current;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     const struct hvm_io_ops *ops = handler->ops;
     int rc = X86EMUL_OKAY, i, step = p->df ? -p->size : p->size;
     uint64_t data;
@@ -128,23 +126,12 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
     {
         for ( i = 0; i < p->count; i++ )
         {
-            if ( vio->mmio_retrying )
-            {
-                if ( vio->mmio_large_read_bytes != p->size )
-                    return X86EMUL_UNHANDLEABLE;
-                memcpy(&data, vio->mmio_large_read, p->size);
-                vio->mmio_large_read_bytes = 0;
-                vio->mmio_retrying = 0;
-            }
-            else
-            {
-                addr = (p->type == IOREQ_TYPE_COPY) ?
-                       p->addr + step * i :
-                       p->addr;
-                rc = ops->read(handler, addr, p->size, &data);
-                if ( rc != X86EMUL_OKAY )
-                    break;
-            }
+            addr = (p->type == IOREQ_TYPE_COPY) ?
+                   p->addr + step * i :
+                   p->addr;
+            rc = ops->read(handler, addr, p->size, &data);
+            if ( rc != X86EMUL_OKAY )
+                break;
 
             if ( p->data_is_ptr )
             {
@@ -153,14 +140,12 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
                 {
                 case HVMCOPY_okay:
                     break;
-                case HVMCOPY_gfn_paged_out:
-                case HVMCOPY_gfn_shared:
-                    rc = X86EMUL_RETRY;
-                    break;
                 case HVMCOPY_bad_gfn_to_mfn:
                     /* Drop the write as real hardware would. */
                     continue;
                 case HVMCOPY_bad_gva_to_gfn:
+                case HVMCOPY_gfn_paged_out:
+                case HVMCOPY_gfn_shared:
                     ASSERT_UNREACHABLE();
                     /* fall through */
                 default:
@@ -172,13 +157,6 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
             }
             else
                 p->data = data;
-        }
-
-        if ( rc == X86EMUL_RETRY )
-        {
-            vio->mmio_retry = 1;
-            vio->mmio_large_read_bytes = p->size;
-            memcpy(vio->mmio_large_read, &data, p->size);
         }
     }
     else /* p->dir == IOREQ_WRITE */
@@ -192,14 +170,12 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
                 {
                 case HVMCOPY_okay:
                     break;
-                case HVMCOPY_gfn_paged_out:
-                case HVMCOPY_gfn_shared:
-                    rc = X86EMUL_RETRY;
-                    break;
                 case HVMCOPY_bad_gfn_to_mfn:
                     data = ~0;
                     break;
                 case HVMCOPY_bad_gva_to_gfn:
+                case HVMCOPY_gfn_paged_out:
+                case HVMCOPY_gfn_shared:
                     ASSERT_UNREACHABLE();
                     /* fall through */
                 default:
@@ -219,19 +195,10 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
             if ( rc != X86EMUL_OKAY )
                 break;
         }
-
-        if ( rc == X86EMUL_RETRY )
-            vio->mmio_retry = 1;
     }
 
-    if ( i != 0 )
-    {
-        if ( rc == X86EMUL_UNHANDLEABLE )
-            domain_crash(curr->domain);
-
-        p->count = i;
-        rc = X86EMUL_OKAY;
-    }
+    if ( i != 0 && rc == X86EMUL_UNHANDLEABLE )
+        domain_crash(current->domain);
 
     return rc;
 }

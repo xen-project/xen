@@ -440,6 +440,7 @@ static bool_t hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
 
 void hvm_do_resume(struct vcpu *v)
 {
+    struct hvm_vcpu_io *vio = &v->arch.hvm_vcpu.hvm_io;
     struct domain *d = v->domain;
     struct hvm_ioreq_server *s;
 
@@ -467,6 +468,9 @@ void hvm_do_resume(struct vcpu *v)
             }
         }
     }
+
+    if ( vio->mmio_retry )
+        handle_mmio();
 
     /* Inject pending hw/sw trap */
     if ( v->arch.hvm_vcpu.inject_trap.vector != -1 ) 

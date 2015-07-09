@@ -74,7 +74,7 @@ struct hvm_vcpu_io {
      * For string instruction emulation we need to be able to signal a
      * necessary retry through other than function return codes.
      */
-    bool_t mmio_retry, mmio_retrying;
+    bool_t mmio_retry;
 
     unsigned long msix_unmask_address;
 
