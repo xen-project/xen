@@ -137,20 +137,14 @@ static int hvmemul_do_io(
         if ( data_is_addr || dir == IOREQ_WRITE )
             return X86EMUL_UNHANDLEABLE;
         goto finish_access;
-    case HVMIO_dispatched:
-        /* May have to wait for previous cycle of a multi-write to complete. */
-        if ( is_mmio && !data_is_addr && (dir == IOREQ_WRITE) &&
-             (addr == (vio->mmio_large_write_pa +
-                       vio->mmio_large_write_bytes)) )
-            return X86EMUL_RETRY;
-        /* fallthrough */
     default:
         return X86EMUL_UNHANDLEABLE;
     }
 
-    vio->io_state = (data_is_addr || dir == IOREQ_WRITE) ?
-        HVMIO_dispatched : HVMIO_awaiting_completion;
+    vio->io_state = HVMIO_awaiting_completion;
     vio->io_size = size;
+    vio->io_dir = dir;
+    vio->io_data_is_addr = data_is_addr;
 
     if ( dir == IOREQ_WRITE )
     {

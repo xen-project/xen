@@ -32,7 +32,6 @@
 
 enum hvm_io_state {
     HVMIO_none = 0,
-    HVMIO_dispatched,
     HVMIO_awaiting_completion,
     HVMIO_completed
 };
@@ -55,6 +54,8 @@ struct hvm_vcpu_io {
     enum hvm_io_completion io_completion;
     unsigned long          io_data;
     unsigned int           io_size;
+    uint8_t                io_dir;
+    uint8_t                io_data_is_addr;
 
     /*
      * HVM emulation:
@@ -86,6 +87,13 @@ struct hvm_vcpu_io {
 
     const struct g2m_ioport *g2m_ioport;
 };
+
+static inline bool_t hvm_vcpu_io_need_completion(const struct hvm_vcpu_io *vio)
+{
+    return (vio->io_state == HVMIO_awaiting_completion) &&
+           !vio->io_data_is_addr &&
+           (vio->io_dir == IOREQ_READ);
+}
 
 #define VMCX_EADDR    (~0ULL)
 

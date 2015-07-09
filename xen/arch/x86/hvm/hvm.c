@@ -416,22 +416,16 @@ static void hvm_io_assist(ioreq_t *p)
 {
     struct vcpu *curr = current;
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
-    enum hvm_io_state io_state;
 
     p->state = STATE_IOREQ_NONE;
 
-    io_state = vio->io_state;
-    vio->io_state = HVMIO_none;
-
-    switch ( io_state )
+    if ( hvm_vcpu_io_need_completion(vio) )
     {
-    case HVMIO_awaiting_completion:
         vio->io_state = HVMIO_completed;
         vio->io_data = p->data;
-        break;
-    default:
-        break;
     }
+    else
+        vio->io_state = HVMIO_none;
 
     msix_write_completion(curr);
     vcpu_end_shutdown_deferral(curr);
