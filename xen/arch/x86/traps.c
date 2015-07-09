@@ -2654,6 +2654,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_AMD_FAM15H_EVNTSEL0...MSR_AMD_FAM15H_PERFCTR5:
                 if ( vpmu_msr || (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
                 {
+                    if ( (vpmu_mode & XENPMU_MODE_ALL) &&
+                         !is_hardware_domain(v->domain) )
+                        break;
+
                     if ( vpmu_do_wrmsr(regs->ecx, msr_content, 0) )
                         goto fail;
                 }
@@ -2777,6 +2781,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_AMD_FAM15H_EVNTSEL0...MSR_AMD_FAM15H_PERFCTR5:
                 if ( vpmu_msr || (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
                 {
+
+                    if ( (vpmu_mode & XENPMU_MODE_ALL) &&
+                         !is_hardware_domain(v->domain) )
+                    {
+                        /* Don't leak PMU MSRs to unprivileged domains */
+                        regs->eax = regs->edx = 0;
+                        break;
+                    }
+
                     if ( vpmu_do_rdmsr(regs->ecx, &val) )
                         goto fail;
 

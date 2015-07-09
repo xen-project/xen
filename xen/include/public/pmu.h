@@ -52,10 +52,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_pmu_params_t);
  * - XENPMU_MODE_SELF:  Guests can profile themselves
  * - XENPMU_MODE_HV:    Guests can profile themselves, dom0 profiles
  *                      itself and Xen
+ * - XENPMU_MODE_ALL:   Only dom0 has access to VPMU and it profiles
+ *                      everyone: itself, the hypervisor and the guests.
  */
 #define XENPMU_MODE_OFF           0
 #define XENPMU_MODE_SELF          (1<<0)
 #define XENPMU_MODE_HV            (1<<1)
+#define XENPMU_MODE_ALL           (1<<2)
 
 /*
  * PMU features:

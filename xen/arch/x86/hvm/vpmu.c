@@ -108,8 +108,10 @@ int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
     const struct arch_vpmu_ops *ops;
     int ret = 0;
 
-    if ( likely(vpmu_mode == XENPMU_MODE_OFF) )
-        goto nop;
+    if ( likely(vpmu_mode == XENPMU_MODE_OFF) ||
+         ((vpmu_mode & XENPMU_MODE_ALL) &&
+          !is_hardware_domain(current->domain)) )
+         goto nop;
 
     vpmu = vcpu_vpmu(curr);
     ops = vpmu->arch_vpmu_ops;
@@ -164,8 +166,12 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
     struct vlapic *vlapic;
     u32 vlapic_lvtpc;
 
-    /* dom0 will handle interrupt for special domains (e.g. idle domain) */
-    if ( sampled->domain->domain_id >= DOMID_FIRST_RESERVED )
+    /*
+     * dom0 will handle interrupt for special domains (e.g. idle domain) or,
+     * in XENPMU_MODE_ALL, for everyone.
+     */
+    if ( (vpmu_mode & XENPMU_MODE_ALL) ||
+         (sampled->domain->domain_id >= DOMID_FIRST_RESERVED) )
     {
         sampling = choose_hwdom_vcpu();
         if ( !sampling )
@@ -179,16 +185,17 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
         return;
 
     /* PV(H) guest */
-    if ( !is_hvm_vcpu(sampling) )
+    if ( !is_hvm_vcpu(sampling) || (vpmu_mode & XENPMU_MODE_ALL) )
     {
         const struct cpu_user_regs *cur_regs;
         uint64_t *flags = &vpmu->xenpmu_data->pmu.pmu_flags;
-        domid_t domid = DOMID_SELF;
+        domid_t domid;
 
         if ( !vpmu->xenpmu_data )
             return;
 
         if ( is_pvh_vcpu(sampling) &&
+             !(vpmu_mode & XENPMU_MODE_ALL) &&
              !vpmu->arch_vpmu_ops->do_interrupt(regs) )
             return;
 
@@ -204,6 +211,11 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
             *flags = 0;
         else
             *flags = PMU_SAMPLE_PV;
+
+        if ( sampled == sampling )
+            domid = DOMID_SELF;
+        else
+            domid = sampled->domain->domain_id;
 
         /* Store appropriate registers in xenpmu_data */
         /* FIXME: 32-bit PVH should go here as well */
@@ -233,7 +245,8 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
 
             if ( (vpmu_mode & XENPMU_MODE_SELF) )
                 cur_regs = guest_cpu_user_regs();
-            else if ( !guest_mode(regs) && is_hardware_domain(sampling->domain) )
+            else if ( !guest_mode(regs) &&
+                      is_hardware_domain(sampling->domain) )
             {
                 cur_regs = regs;
                 domid = DOMID_XEN;
@@ -472,7 +485,9 @@ void vpmu_initialise(struct vcpu *v)
         printk(XENLOG_G_WARNING "VPMU: Initialization failed for %pv\n", v);
 
     /* Intel needs to initialize VPMU ops even if VPMU is not in use */
-    if ( !is_priv_vpmu && (ret || (vpmu_mode == XENPMU_MODE_OFF)) )
+    if ( !is_priv_vpmu &&
+         (ret || (vpmu_mode == XENPMU_MODE_OFF) ||
+          (vpmu_mode == XENPMU_MODE_ALL)) )
     {
         spin_lock(&vpmu_lock);
         vpmu_count--;
@@ -525,7 +540,8 @@ static int pvpmu_init(struct domain *d, xen_pmu_params_t *params)
     struct page_info *page;
     uint64_t gfn = params->val;
 
-    if ( vpmu_mode == XENPMU_MODE_OFF )
+    if ( (vpmu_mode == XENPMU_MODE_OFF) ||
+         ((vpmu_mode & XENPMU_MODE_ALL) && !is_hardware_domain(d)) )
         return -EINVAL;
 
     if ( (params->vcpu >= d->max_vcpus) || (d->vcpu[params->vcpu] == NULL) )
@@ -645,12 +661,14 @@ long do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg)
     {
     case XENPMU_mode_set:
     {
-        if ( (pmu_params.val & ~(XENPMU_MODE_SELF | XENPMU_MODE_HV)) ||
+        if ( (pmu_params.val &
+              ~(XENPMU_MODE_SELF | XENPMU_MODE_HV | XENPMU_MODE_ALL)) ||
              (hweight64(pmu_params.val) > 1) )
             return -EINVAL;
 
         /* 32-bit dom0 can only sample itself. */
-        if ( is_pv_32bit_vcpu(current) && (pmu_params.val & XENPMU_MODE_HV) )
+        if ( is_pv_32bit_vcpu(current) &&
+             (pmu_params.val & (XENPMU_MODE_HV | XENPMU_MODE_ALL)) )
             return -EINVAL;
 
         spin_lock(&vpmu_lock);
