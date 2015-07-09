@@ -72,6 +72,7 @@
 #include <asm/apic.h>
 #include <asm/mc146818rtc.h>
 #include <asm/hpet.h>
+#include <asm/hvm/vpmu.h>
 #include <public/arch-x86/cpuid.h>
 #include <xsm/xsm.h>
 
@@ -969,8 +970,10 @@ void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_TOPOEXT % 32, &c);
         break;
 
+    case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */
+        break;
+
     case 0x00000005: /* MONITOR/MWAIT */
-    case 0x0000000a: /* Architectural Performance Monitor Features */
     case 0x0000000b: /* Extended Topology Enumeration */
     case 0x8000000a: /* SVM revision and features */
     case 0x8000001b: /* Instruction Based Sampling */
@@ -986,6 +989,9 @@ void pv_cpuid(struct cpu_user_regs *regs)
     }
 
  out:
+    /* VPMU may decide to modify some of the leaves */
+    vpmu_do_cpuid(regs->eax, &a, &b, &c, &d);
+
     regs->eax = a;
     regs->ebx = b;
     regs->ecx = c;
@@ -2008,6 +2014,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     char *io_emul_stub = NULL;
     void (*io_emul)(struct cpu_user_regs *) __attribute__((__regparm__(1)));
     uint64_t val;
+    bool_t vpmu_msr;
 
     if ( !read_descriptor(regs->cs, v, regs,
                           &code_base, &code_limit, &ar,
@@ -2500,7 +2507,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         uint32_t eax = regs->eax;
         uint32_t edx = regs->edx;
         uint64_t msr_content = ((uint64_t)edx << 32) | eax;
-
+        vpmu_msr = 0;
         switch ( regs->_ecx )
         {
         case MSR_FS_BASE:
@@ -2637,6 +2644,22 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( v->arch.debugreg[7] & DR7_ACTIVE_MASK )
                 wrmsrl(regs->_ecx, msr_content);
             break;
+        case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
+        case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(3):
+        case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:
+        case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+            {
+                vpmu_msr = 1;
+        case MSR_AMD_FAM15H_EVNTSEL0...MSR_AMD_FAM15H_PERFCTR5:
+                if ( vpmu_msr || (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
+                {
+                    if ( vpmu_do_wrmsr(regs->ecx, msr_content, 0) )
+                        goto fail;
+                }
+                break;
+            }
+            /*FALLTHROUGH*/
 
         default:
             if ( wrmsr_hypervisor_regs(regs->ecx, msr_content) == 1 )
@@ -2672,6 +2695,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x32: /* RDMSR */
+        vpmu_msr = 0;
         switch ( regs->_ecx )
         {
         case MSR_FS_BASE:
@@ -2739,6 +2763,29 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                             [regs->_ecx - MSR_AMD64_DR1_ADDRESS_MASK + 1];
             regs->edx = 0;
             break;
+        case MSR_IA32_PERF_CAPABILITIES:
+            /* No extra capabilities are supported */
+            regs->eax = regs->edx = 0;
+            break;
+        case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
+        case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(3):
+        case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:
+        case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+            {
+                vpmu_msr = 1;
+        case MSR_AMD_FAM15H_EVNTSEL0...MSR_AMD_FAM15H_PERFCTR5:
+                if ( vpmu_msr || (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
+                {
+                    if ( vpmu_do_rdmsr(regs->ecx, &val) )
+                        goto fail;
+
+                    regs->eax = (uint32_t)val;
+                    regs->edx = (uint32_t)(val >> 32);
+                }
+                break;
+            }
+            /*FALLTHROUGH*/
 
         default:
             if ( rdmsr_hypervisor_regs(regs->ecx, &val) )

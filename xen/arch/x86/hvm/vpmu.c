@@ -119,6 +119,9 @@ int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_rdmsr )
         return vpmu->arch_vpmu_ops->do_rdmsr(msr, msr_content);
+    else
+        *msr_content = 0;
+
     return 0;
 }
 

@@ -27,6 +27,7 @@
 #include <asm/regs.h>
 #include <asm/types.h>
 #include <asm/apic.h>
+#include <asm/traps.h>
 #include <asm/msr.h>
 #include <asm/msr-index.h>
 #include <asm/hvm/support.h>
@@ -299,11 +300,17 @@ static inline void __core2_vpmu_save(struct vcpu *v)
         rdmsrl(MSR_CORE_PERF_FIXED_CTR0 + i, fixed_counters[i]);
     for ( i = 0; i < arch_pmc_cnt; i++ )
         rdmsrl(MSR_IA32_PERFCTR0 + i, xen_pmu_cntr_pair[i].counter);
+
+    if ( !has_hvm_container_vcpu(v) )
+        rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, core2_vpmu_cxt->global_status);
 }
 
 static int core2_vpmu_save(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
+
+    if ( !has_hvm_container_vcpu(v) )
+        wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, 0);
 
     if ( !vpmu_are_all_set(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED) )
         return 0;
@@ -342,6 +349,13 @@ static inline void __core2_vpmu_load(struct vcpu *v)
     wrmsrl(MSR_CORE_PERF_FIXED_CTR_CTRL, core2_vpmu_cxt->fixed_ctrl);
     wrmsrl(MSR_IA32_DS_AREA, core2_vpmu_cxt->ds_area);
     wrmsrl(MSR_IA32_PEBS_ENABLE, core2_vpmu_cxt->pebs_enable);
+
+    if ( !has_hvm_container_vcpu(v) )
+    {
+        wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, core2_vpmu_cxt->global_ovf_ctrl);
+        core2_vpmu_cxt->global_ovf_ctrl = 0;
+        wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, core2_vpmu_cxt->global_ctrl);
+    }
 }
 
 static void core2_vpmu_load(struct vcpu *v)
@@ -433,7 +447,6 @@ static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
 static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
                                uint64_t supported)
 {
-    u64 global_ctrl;
     int i, tmp;
     int type = -1, index = -1;
     struct vcpu *v = current;
@@ -477,7 +490,12 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
     switch ( msr )
     {
     case MSR_CORE_PERF_GLOBAL_OVF_CTRL:
+        if ( msr_content & ~(0xC000000000000000 |
+                             (((1ULL << fixed_pmc_cnt) - 1) << 32) |
+                             ((1ULL << arch_pmc_cnt) - 1)) )
+            return -EINVAL;
         core2_vpmu_cxt->global_status &= ~msr_content;
+        wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, msr_content);
         return 0;
     case MSR_CORE_PERF_GLOBAL_STATUS:
         gdprintk(XENLOG_INFO, "Can not write readonly MSR: "
@@ -505,14 +523,18 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         gdprintk(XENLOG_WARNING, "Guest setting of DTS is ignored.\n");
         return 0;
     case MSR_CORE_PERF_GLOBAL_CTRL:
-        global_ctrl = msr_content;
+        core2_vpmu_cxt->global_ctrl = msr_content;
         break;
     case MSR_CORE_PERF_FIXED_CTR_CTRL:
         if ( msr_content &
              ( ~((1ull << (fixed_pmc_cnt * FIXED_CTR_CTRL_BITS)) - 1)) )
             return -EINVAL;
 
-        vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
+        if ( has_hvm_container_vcpu(v) )
+            vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL,
+                               &core2_vpmu_cxt->global_ctrl);
+        else
+            rdmsrl(MSR_CORE_PERF_GLOBAL_CTRL, core2_vpmu_cxt->global_ctrl);
         *enabled_cntrs &= ~(((1ULL << fixed_pmc_cnt) - 1) << 32);
         if ( msr_content != 0 )
         {
@@ -537,7 +559,11 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
             if ( msr_content & (~((1ull << 32) - 1)) )
                 return -EINVAL;
 
-            vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
+            if ( has_hvm_container_vcpu(v) )
+                vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL,
+                                   &core2_vpmu_cxt->global_ctrl);
+            else
+                rdmsrl(MSR_CORE_PERF_GLOBAL_CTRL, core2_vpmu_cxt->global_ctrl);
 
             if ( msr_content & (1ULL << 22) )
                 *enabled_cntrs |= 1ULL << tmp;
@@ -551,9 +577,15 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
     if ( type != MSR_TYPE_GLOBAL )
         wrmsrl(msr, msr_content);
     else
-        vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
+    {
+        if ( has_hvm_container_vcpu(v) )
+            vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
+        else
+            wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
+    }
 
-    if ( (global_ctrl & *enabled_cntrs) || (core2_vpmu_cxt->ds_area != 0) )
+    if ( (core2_vpmu_cxt->global_ctrl & *enabled_cntrs) ||
+         (core2_vpmu_cxt->ds_area != 0) )
         vpmu_set(vpmu, VPMU_RUNNING);
     else
         vpmu_reset(vpmu, VPMU_RUNNING);
@@ -580,7 +612,10 @@ static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
             *msr_content = core2_vpmu_cxt->global_status;
             break;
         case MSR_CORE_PERF_GLOBAL_CTRL:
-            vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
+            if ( has_hvm_container_vcpu(v) )
+                vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
+            else
+                rdmsrl(MSR_CORE_PERF_GLOBAL_CTRL, *msr_content);
             break;
         default:
             rdmsrl(msr, *msr_content);
