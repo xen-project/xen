@@ -234,7 +234,7 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-4.4-testing.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 447d264115c476142f884af0be287622cd244423
-QEMU_UPSTREAM_REVISION ?= master
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.4.3-rc1
 SEABIOS_UPSTREAM_TAG ?= rel-1.7.3.1
 # Fri Aug 2 14:12:09 2013 -0400
 # Fix bug in CBFS file walking with compressed files.
@@ -246,7 +246,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= fd5c04144e204539f04e2f7994b12eef7724c31a
+QEMU_TAG ?= xen-4.4.3-rc1
 # Sun May 24 10:53:44 2015 +0200
 # pcnet: force the buffer access to be in bounds during tx
 
