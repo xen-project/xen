@@ -694,4 +694,19 @@ static XSM_INLINE int xsm_ioport_mapping(XSM_DEFAULT_ARG struct domain *d, uint3
     return xsm_default_action(action, current->domain, d);
 }
 
+static XSM_INLINE int xsm_pmu_op (XSM_DEFAULT_ARG struct domain *d, int op)
+{
+    XSM_ASSERT_ACTION(XSM_OTHER);
+    switch ( op )
+    {
+    case XENPMU_mode_set:
+    case XENPMU_mode_get:
+    case XENPMU_feature_set:
+    case XENPMU_feature_get:
+        return xsm_default_action(XSM_PRIV, d, current->domain);
+    default:
+        return -EPERM;
+    }
+}
+
 #endif /* CONFIG_X86 */

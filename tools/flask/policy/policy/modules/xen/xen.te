@@ -69,6 +69,9 @@ allow dom0_t xen_t:xen2 {
     psr_cmt_op
     psr_cat_op
 };
+allow dom0_t xen_t:xen2 {
+    pmu_ctrl
+};
 allow dom0_t xen_t:mmu memorymap;
 
 # Allow dom0 to use these domctls on itself. For domctls acting on other

@@ -89,6 +89,8 @@ class xen2
     psr_cat_op
 # XENPF_get_symbol
     get_symbol
+# PMU control
+    pmu_ctrl
 }
 
 # Classes domain and domain2 consist of operations that a domain performs on

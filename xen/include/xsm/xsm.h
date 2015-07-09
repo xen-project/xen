@@ -188,6 +188,7 @@ struct xsm_operations {
     int (*priv_mapping) (struct domain *d, struct domain *t);
     int (*ioport_permission) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
     int (*ioport_mapping) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
+    int (*pmu_op) (struct domain *d, unsigned int op);
 #endif
 };
 
@@ -713,6 +714,11 @@ static inline int xsm_ioport_permission (xsm_default_t def, struct domain *d, ui
 static inline int xsm_ioport_mapping (xsm_default_t def, struct domain *d, uint32_t s, uint32_t e, uint8_t allow)
 {
     return xsm_ops->ioport_mapping(d, s, e, allow);
+}
+
+static inline int xsm_pmu_op (xsm_default_t def, struct domain *d, int op)
+{
+    return xsm_ops->pmu_op(d, op);
 }
 
 #endif /* CONFIG_X86 */

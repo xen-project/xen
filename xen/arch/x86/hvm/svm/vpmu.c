@@ -472,14 +472,14 @@ struct arch_vpmu_ops amd_vpmu_ops = {
     .arch_vpmu_dump = amd_vpmu_dump
 };
 
-int svm_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
+int svm_vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t family = current_cpu_data.x86;
     int ret = 0;
 
     /* vpmu enabled? */
-    if ( !vpmu_flags )
+    if ( vpmu_mode == XENPMU_MODE_OFF )
         return 0;
 
     switch ( family )

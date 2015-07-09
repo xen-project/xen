@@ -430,6 +430,8 @@ ENTRY(compat_hypercall_table)
         .quad do_domctl
         .quad compat_kexec_op
         .quad do_tmem_op
+        .quad do_ni_hypercall           /* reserved for XenClient */
+        .quad do_xenpmu_op              /* 40 */
         .rept __HYPERVISOR_arch_0-((.-compat_hypercall_table)/8)
         .quad compat_ni_hypercall
         .endr
@@ -479,6 +481,8 @@ ENTRY(compat_hypercall_args_table)
         .byte 1 /* do_domctl                */
         .byte 2 /* compat_kexec_op          */
         .byte 1 /* do_tmem_op               */
+        .byte 0 /* reserved for XenClient   */
+        .byte 2 /* do_xenpmu_op             */  /* 40 */
         .rept __HYPERVISOR_arch_0-(.-compat_hypercall_args_table)
         .byte 0 /* compat_ni_hypercall      */
         .endr

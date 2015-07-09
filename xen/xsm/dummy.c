@@ -159,5 +159,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, priv_mapping);
     set_to_dummy_if_null(ops, ioport_permission);
     set_to_dummy_if_null(ops, ioport_mapping);
+    set_to_dummy_if_null(ops, pmu_op);
 #endif
 }

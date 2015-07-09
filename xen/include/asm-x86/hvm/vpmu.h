@@ -24,13 +24,6 @@
 
 #include <public/pmu.h>
 
-/*
- * Flag bits given as a string on the hypervisor boot parameter 'vpmu'.
- * See arch/x86/hvm/vpmu.c.
- */
-#define VPMU_BOOT_ENABLED 0x1    /* vpmu generally enabled. */
-#define VPMU_BOOT_BTS     0x2    /* Intel BTS feature wanted. */
-
 #define vcpu_vpmu(vcpu)   (&(vcpu)->arch.vpmu)
 #define vpmu_vcpu(vpmu)   container_of((vpmu), struct vcpu, arch.vpmu)
 
@@ -59,8 +52,8 @@ struct arch_vpmu_ops {
     void (*arch_vpmu_dump)(const struct vcpu *);
 };
 
-int vmx_vpmu_initialise(struct vcpu *, unsigned int flags);
-int svm_vpmu_initialise(struct vcpu *, unsigned int flags);
+int vmx_vpmu_initialise(struct vcpu *);
+int svm_vpmu_initialise(struct vcpu *);
 
 struct vpmu_struct {
     u32 flags;
@@ -115,6 +108,22 @@ void vpmu_dump(struct vcpu *v);
 
 extern int acquire_pmu_ownership(int pmu_ownership);
 extern void release_pmu_ownership(int pmu_ownership);
+
+extern unsigned int vpmu_mode;
+extern unsigned int vpmu_features;
+
+/* Context switch */
+static inline void vpmu_switch_from(struct vcpu *prev)
+{
+    if ( vpmu_mode & (XENPMU_MODE_SELF | XENPMU_MODE_HV) )
+        vpmu_save(prev);
+}
+
+static inline void vpmu_switch_to(struct vcpu *next)
+{
+    if ( vpmu_mode & (XENPMU_MODE_SELF | XENPMU_MODE_HV) )
+        vpmu_load(next);
+}
 
 #endif /* __ASM_X86_HVM_VPMU_H_*/
 

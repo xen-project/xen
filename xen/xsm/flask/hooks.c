@@ -1585,6 +1585,23 @@ static int flask_priv_mapping(struct domain *d, struct domain *t)
 {
     return domain_has_perm(d, t, SECCLASS_MMU, MMU__TARGET_HACK);
 }
+
+static int flask_pmu_op (struct domain *d, unsigned int op)
+{
+    u32 dsid = domain_sid(d);
+
+    switch ( op )
+    {
+    case XENPMU_mode_set:
+    case XENPMU_mode_get:
+    case XENPMU_feature_set:
+    case XENPMU_feature_get:
+        return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_XEN2,
+                            XEN2__PMU_CTRL, NULL);
+    default:
+        return -EPERM;
+    }
+}
 #endif /* CONFIG_X86 */
 
 long do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
@@ -1722,6 +1739,7 @@ static struct xsm_operations flask_ops = {
     .priv_mapping = flask_priv_mapping,
     .ioport_permission = flask_ioport_permission,
     .ioport_mapping = flask_ioport_mapping,
+    .pmu_op = flask_pmu_op,
 #endif
 };
 

@@ -98,6 +98,7 @@
 ?	xenpf_pcpu_version		platform.h
 ?	xenpf_resource_entry		platform.h
 ?	pmu_data			pmu.h
+?	pmu_params			pmu.h
 !	sched_poll			sched.h
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h

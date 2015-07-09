@@ -21,6 +21,8 @@
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/xenoprof.h>
+#include <xen/event.h>
+#include <xen/guest_access.h>
 #include <asm/regs.h>
 #include <asm/types.h>
 #include <asm/msr.h>
@@ -33,10 +35,12 @@
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/apic.h>
 #include <public/pmu.h>
+#include <xsm/xsm.h>
 
 #include <compat/pmu.h>
 CHECK_pmu_cntr_pair;
 CHECK_pmu_data;
+CHECK_pmu_params;
 
 /*
  * "vpmu" :     vpmu generally enabled
@@ -44,8 +48,13 @@ CHECK_pmu_data;
  * "vpmu=bts" : vpmu enabled and Intel BTS feature switched on.
  */
 static unsigned int __read_mostly opt_vpmu_enabled;
+unsigned int __read_mostly vpmu_mode = XENPMU_MODE_OFF;
+unsigned int __read_mostly vpmu_features = 0;
 static void parse_vpmu_param(char *s);
 custom_param("vpmu", parse_vpmu_param);
+
+static DEFINE_SPINLOCK(vpmu_lock);
+static unsigned vpmu_count;
 
 static DEFINE_PER_CPU(struct vcpu *, last_vcpu);
 
@@ -57,7 +66,7 @@ static void __init parse_vpmu_param(char *s)
         break;
     default:
         if ( !strcmp(s, "bts") )
-            opt_vpmu_enabled |= VPMU_BOOT_BTS;
+            vpmu_features |= XENPMU_FEATURE_INTEL_BTS;
         else if ( *s )
         {
             printk("VPMU: unknown flag: %s - vpmu disabled!\n", s);
@@ -65,7 +74,9 @@ static void __init parse_vpmu_param(char *s)
         }
         /* fall through */
     case 1:
-        opt_vpmu_enabled |= VPMU_BOOT_ENABLED;
+        /* Default VPMU mode */
+        vpmu_mode = XENPMU_MODE_SELF;
+        opt_vpmu_enabled = 1;
         break;
     }
 }
@@ -74,7 +85,7 @@ void vpmu_lvtpc_update(uint32_t val)
 {
     struct vpmu_struct *vpmu;
 
-    if ( !opt_vpmu_enabled )
+    if ( vpmu_mode == XENPMU_MODE_OFF )
         return;
 
     vpmu = vcpu_vpmu(current);
@@ -87,6 +98,9 @@ int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content, uint64_t supported)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
+    if ( vpmu_mode == XENPMU_MODE_OFF )
+        return 0;
+
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_wrmsr )
         return vpmu->arch_vpmu_ops->do_wrmsr(msr, msr_content, supported);
     return 0;
@@ -95,6 +109,12 @@ int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content, uint64_t supported)
 int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
+
+    if ( vpmu_mode == XENPMU_MODE_OFF )
+    {
+        *msr_content = 0;
+        return 0;
+    }
 
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_rdmsr )
         return vpmu->arch_vpmu_ops->do_rdmsr(msr, msr_content);
@@ -246,28 +266,45 @@ void vpmu_initialise(struct vcpu *v)
 
     ASSERT(!vpmu->flags && !vpmu->context);
 
+    /*
+     * Count active VPMUs so that we won't try to change vpmu_mode while
+     * they are in use.
+     */
+    spin_lock(&vpmu_lock);
+    vpmu_count++;
+    spin_unlock(&vpmu_lock);
+
     switch ( vendor )
     {
     case X86_VENDOR_AMD:
-        ret = svm_vpmu_initialise(v, opt_vpmu_enabled);
+        ret = svm_vpmu_initialise(v);
         break;
 
     case X86_VENDOR_INTEL:
-        ret = vmx_vpmu_initialise(v, opt_vpmu_enabled);
+        ret = vmx_vpmu_initialise(v);
         break;
 
     default:
-        if ( opt_vpmu_enabled )
+        if ( vpmu_mode != XENPMU_MODE_OFF )
         {
             printk(XENLOG_G_WARNING "VPMU: Unknown CPU vendor %d. "
                    "Disabling VPMU\n", vendor);
             opt_vpmu_enabled = 0;
+            vpmu_mode = XENPMU_MODE_OFF;
         }
-        return;
+        return; /* Don't bother restoring vpmu_count, VPMU is off forever */
     }
 
     if ( ret )
         printk(XENLOG_G_WARNING "VPMU: Initialization failed for %pv\n", v);
+
+    /* Intel needs to initialize VPMU ops even if VPMU is not in use */
+    if ( ret || (vpmu_mode == XENPMU_MODE_OFF) )
+    {
+        spin_lock(&vpmu_lock);
+        vpmu_count--;
+        spin_unlock(&vpmu_lock);
+    }
 }
 
 static void vpmu_clear_last(void *arg)
@@ -296,6 +333,10 @@ void vpmu_destroy(struct vcpu *v)
 
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_destroy )
         vpmu->arch_vpmu_ops->arch_vpmu_destroy(v);
+
+    spin_lock(&vpmu_lock);
+    vpmu_count--;
+    spin_unlock(&vpmu_lock);
 }
 
 /* Dump some vpmu informations on console. Used in keyhandler dump_domains(). */
@@ -307,6 +348,109 @@ void vpmu_dump(struct vcpu *v)
         vpmu->arch_vpmu_ops->arch_vpmu_dump(v);
 }
 
+long do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg)
+{
+    int ret;
+    struct xen_pmu_params pmu_params = {.val = 0};
+
+    if ( !opt_vpmu_enabled )
+        return -EOPNOTSUPP;
+
+    ret = xsm_pmu_op(XSM_OTHER, current->domain, op);
+    if ( ret )
+        return ret;
+
+    /* Check major version when parameters are specified */
+    switch ( op )
+    {
+    case XENPMU_mode_set:
+    case XENPMU_feature_set:
+        if ( copy_from_guest(&pmu_params, arg, 1) )
+            return -EFAULT;
+
+        if ( pmu_params.version.maj != XENPMU_VER_MAJ )
+            return -EINVAL;
+    }
+
+    switch ( op )
+    {
+    case XENPMU_mode_set:
+    {
+        if ( (pmu_params.val & ~(XENPMU_MODE_SELF | XENPMU_MODE_HV)) ||
+             (hweight64(pmu_params.val) > 1) )
+            return -EINVAL;
+
+        /* 32-bit dom0 can only sample itself. */
+        if ( is_pv_32bit_vcpu(current) && (pmu_params.val & XENPMU_MODE_HV) )
+            return -EINVAL;
+
+        spin_lock(&vpmu_lock);
+
+        /*
+         * We can always safely switch between XENPMU_MODE_SELF and
+         * XENPMU_MODE_HV while other VPMUs are active.
+         */
+        if ( (vpmu_count == 0) ||
+             ((vpmu_mode ^ pmu_params.val) ==
+              (XENPMU_MODE_SELF | XENPMU_MODE_HV)) )
+            vpmu_mode = pmu_params.val;
+        else if ( vpmu_mode != pmu_params.val )
+        {
+            printk(XENLOG_WARNING
+                   "VPMU: Cannot change mode while active VPMUs exist\n");
+            ret = -EBUSY;
+        }
+
+        spin_unlock(&vpmu_lock);
+
+        break;
+    }
+
+    case XENPMU_mode_get:
+        memset(&pmu_params, 0, sizeof(pmu_params));
+        pmu_params.val = vpmu_mode;
+
+        pmu_params.version.maj = XENPMU_VER_MAJ;
+        pmu_params.version.min = XENPMU_VER_MIN;
+
+        if ( copy_to_guest(arg, &pmu_params, 1) )
+            ret = -EFAULT;
+
+        break;
+
+    case XENPMU_feature_set:
+        if ( pmu_params.val & ~XENPMU_FEATURE_INTEL_BTS )
+            return -EINVAL;
+
+        spin_lock(&vpmu_lock);
+
+        if ( (vpmu_count == 0) || (vpmu_features == pmu_params.val) )
+            vpmu_features = pmu_params.val;
+        else
+        {
+            printk(XENLOG_WARNING "VPMU: Cannot change features while"
+                                  " active VPMUs exist\n");
+            ret = -EBUSY;
+        }
+
+        spin_unlock(&vpmu_lock);
+
+        break;
+
+    case XENPMU_feature_get:
+        pmu_params.val = vpmu_features;
+        if ( copy_field_to_guest(arg, &pmu_params, val) )
+            ret = -EFAULT;
+
+        break;
+
+    default:
+        ret = -EINVAL;
+    }
+
+    return ret;
+}
+
 static int __init vpmu_init(void)
 {
     /* NMI watchdog uses LVTPC and HW counter */
@@ -314,6 +458,7 @@ static int __init vpmu_init(void)
     {
         printk(XENLOG_WARNING "NMI watchdog is enabled. Turning VPMU off.\n");
         opt_vpmu_enabled = 0;
+        vpmu_mode = XENPMU_MODE_OFF;
     }
 
     return 0;

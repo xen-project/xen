@@ -708,13 +708,13 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
     return 1;
 }
 
-static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
+static int core2_vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     u64 msr_content;
     static bool_t ds_warned;
 
-    if ( !(vpmu_flags & VPMU_BOOT_BTS) )
+    if ( !(vpmu_features & XENPMU_FEATURE_INTEL_BTS) )
         goto func_out;
     /* Check the 'Debug Store' feature in the CPUID.EAX[1]:EDX[21] */
     while ( boot_cpu_has(X86_FEATURE_DS) )
@@ -826,7 +826,7 @@ struct arch_vpmu_ops core2_no_vpmu_ops = {
     .do_cpuid = core2_no_vpmu_do_cpuid,
 };
 
-int vmx_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
+int vmx_vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t family = current_cpu_data.x86;
@@ -834,7 +834,7 @@ int vmx_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
     int ret = 0;
 
     vpmu->arch_vpmu_ops = &core2_no_vpmu_ops;
-    if ( !vpmu_flags )
+    if ( vpmu_mode == XENPMU_MODE_OFF )
         return 0;
 
     if ( family == 6 )
@@ -884,7 +884,7 @@ int vmx_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
 
         /* next gen Xeon Phi */
         case 0x57:
-            ret = core2_vpmu_initialise(v, vpmu_flags);
+            ret = core2_vpmu_initialise(v);
             if ( !ret )
                 vpmu->arch_vpmu_ops = &core2_vpmu_ops;
             return ret;

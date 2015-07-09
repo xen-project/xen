@@ -14,6 +14,7 @@
 #include <public/event_channel.h>
 #include <public/tmem.h>
 #include <public/version.h>
+#include <public/pmu.h>
 #include <asm/hypercall.h>
 #include <xsm/xsm.h>
 
@@ -138,6 +139,9 @@ do_tmem_op(
 
 extern long
 do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
+
+extern long
+do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg);
 
 #ifdef CONFIG_COMPAT
 

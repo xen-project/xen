@@ -1590,7 +1590,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     if ( is_hvm_domain(prevd) )
     {
         if (prev != next)
-            vpmu_save(prev);
+            vpmu_switch_from(prev);
 
         if ( !list_empty(&prev->arch.hvm_vcpu.tm_list) )
             pt_save_timer(prev);
@@ -1635,7 +1635,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     if (is_hvm_domain(nextd) && (prev != next) )
         /* Must be done with interrupts enabled */
-        vpmu_load(next);
+        vpmu_switch_to(next);
 
     context_saved(prev);
 
