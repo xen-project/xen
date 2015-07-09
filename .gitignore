@@ -289,6 +289,7 @@ tools/libxl/testidl.c
 tools/libxl/*.pyc
 tools/libxl/libxl-save-helper
 tools/libxl/test_timedereg
+tools/libxl/test_fdderegrace
 tools/libxl/xen-init-dom0
 tools/blktap2/control/tap-ctl
 tools/firmware/etherboot/eb-roms.h
