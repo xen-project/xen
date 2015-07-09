@@ -32,205 +32,86 @@
 #include <xen/event.h>
 #include <xen/iommu.h>
 
-static const struct hvm_mmio_ops *const
-hvm_mmio_handlers[HVM_MMIO_HANDLER_NR] =
+static bool_t hvm_mmio_accept(const struct hvm_io_handler *handler,
+                              const ioreq_t *p)
 {
-    &hpet_mmio_ops,
-    &vlapic_mmio_ops,
-    &vioapic_mmio_ops,
-    &msixtbl_mmio_ops,
-    &iommu_mmio_ops
+    BUG_ON(handler->type != IOREQ_TYPE_COPY);
+
+    return handler->mmio.ops->check(current, p->addr);
+}
+
+static int hvm_mmio_read(const struct hvm_io_handler *handler,
+                         uint64_t addr, uint32_t size, uint64_t *data)
+{
+    BUG_ON(handler->type != IOREQ_TYPE_COPY);
+
+    return handler->mmio.ops->read(current, addr, size, data);
+}
+
+static int hvm_mmio_write(const struct hvm_io_handler *handler,
+                          uint64_t addr, uint32_t size, uint64_t data)
+{
+    BUG_ON(handler->type != IOREQ_TYPE_COPY);
+
+    return handler->mmio.ops->write(current, addr, size, data);
+}
+
+static const struct hvm_io_ops mmio_ops = {
+    .accept = hvm_mmio_accept,
+    .read = hvm_mmio_read,
+    .write = hvm_mmio_write
 };
 
-static int hvm_mmio_access(struct vcpu *v,
-                           ioreq_t *p,
-                           hvm_mmio_read_t read,
-                           hvm_mmio_write_t write)
+static bool_t hvm_portio_accept(const struct hvm_io_handler *handler,
+                                const ioreq_t *p)
 {
-    struct hvm_vcpu_io *vio = &v->arch.hvm_vcpu.hvm_io;
-    unsigned long data;
-    int rc = X86EMUL_OKAY, i, step = p->df ? -p->size : p->size;
+    unsigned int start = handler->portio.port;
+    unsigned int end = start + handler->portio.size;
 
-    if ( !p->data_is_ptr )
-    {
-        if ( p->dir == IOREQ_READ )
-        {
-            if ( vio->mmio_retrying )
-            {
-                if ( vio->mmio_large_read_bytes != p->size )
-                    return X86EMUL_UNHANDLEABLE;
-                memcpy(&data, vio->mmio_large_read, p->size);
-                vio->mmio_large_read_bytes = 0;
-                vio->mmio_retrying = 0;
-            }
-            else
-                rc = read(v, p->addr, p->size, &data);
-            p->data = data;
-        }
-        else /* p->dir == IOREQ_WRITE */
-            rc = write(v, p->addr, p->size, p->data);
-        return rc;
-    }
+    BUG_ON(handler->type != IOREQ_TYPE_PIO);
 
-    if ( p->dir == IOREQ_READ )
-    {
-        for ( i = 0; i < p->count; i++ )
-        {
-            if ( vio->mmio_retrying )
-            {
-                if ( vio->mmio_large_read_bytes != p->size )
-                    return X86EMUL_UNHANDLEABLE;
-                memcpy(&data, vio->mmio_large_read, p->size);
-                vio->mmio_large_read_bytes = 0;
-                vio->mmio_retrying = 0;
-            }
-            else
-            {
-                rc = read(v, p->addr + step * i, p->size, &data);
-                if ( rc != X86EMUL_OKAY )
-                    break;
-            }
-            switch ( hvm_copy_to_guest_phys(p->data + step * i,
-                                            &data, p->size) )
-            {
-            case HVMCOPY_okay:
-                break;
-            case HVMCOPY_gfn_paged_out:
-            case HVMCOPY_gfn_shared:
-                rc = X86EMUL_RETRY;
-                break;
-            case HVMCOPY_bad_gfn_to_mfn:
-                /* Drop the write as real hardware would. */
-                continue;
-            case HVMCOPY_bad_gva_to_gfn:
-                ASSERT(0);
-                /* fall through */
-            default:
-                rc = X86EMUL_UNHANDLEABLE;
-                break;
-            }
-            if ( rc != X86EMUL_OKAY)
-                break;
-        }
+    return (p->addr >= start) && ((p->addr + p->size) <= end);
+}
 
-        if ( rc == X86EMUL_RETRY )
-        {
-            vio->mmio_retry = 1;
-            vio->mmio_large_read_bytes = p->size;
-            memcpy(vio->mmio_large_read, &data, p->size);
-        }
-    }
-    else
-    {
-        for ( i = 0; i < p->count; i++ )
-        {
-            switch ( hvm_copy_from_guest_phys(&data, p->data + step * i,
-                                              p->size) )
-            {
-            case HVMCOPY_okay:
-                break;
-            case HVMCOPY_gfn_paged_out:
-            case HVMCOPY_gfn_shared:
-                rc = X86EMUL_RETRY;
-                break;
-            case HVMCOPY_bad_gfn_to_mfn:
-                data = ~0;
-                break;
-            case HVMCOPY_bad_gva_to_gfn:
-                ASSERT(0);
-                /* fall through */
-            default:
-                rc = X86EMUL_UNHANDLEABLE;
-                break;
-            }
-            if ( rc != X86EMUL_OKAY )
-                break;
-            rc = write(v, p->addr + step * i, p->size, data);
-            if ( rc != X86EMUL_OKAY )
-                break;
-        }
+static int hvm_portio_read(const struct hvm_io_handler *handler,
+                           uint64_t addr, uint32_t size, uint64_t *data)
+{
+    uint32_t val = ~0u;
+    int rc;
 
-        if ( rc == X86EMUL_RETRY )
-            vio->mmio_retry = 1;
-    }
+    BUG_ON(handler->type != IOREQ_TYPE_PIO);
 
-    if ( i != 0 )
-    {
-        p->count = i;
-        rc = X86EMUL_OKAY;
-    }
+    rc = handler->portio.action(IOREQ_READ, addr, size, &val);
+    *data = val;
 
     return rc;
 }
 
-bool_t hvm_mmio_internal(paddr_t gpa)
+static int hvm_portio_write(const struct hvm_io_handler *handler,
+                            uint64_t addr, uint32_t size, uint64_t data)
 {
-    struct vcpu *curr = current;
-    unsigned int i;
+    uint32_t val = data;
 
-    for ( i = 0; i < HVM_MMIO_HANDLER_NR; ++i )
-        if ( hvm_mmio_handlers[i]->check(curr, gpa) )
-            return 1;
+    BUG_ON(handler->type != IOREQ_TYPE_PIO);
 
-    return 0;
+    return handler->portio.action(IOREQ_WRITE, addr, size, &val);
 }
 
-int hvm_mmio_intercept(ioreq_t *p)
-{
-    struct vcpu *v = current;
-    int i;
+static const struct hvm_io_ops portio_ops = {
+    .accept = hvm_portio_accept,
+    .read = hvm_portio_read,
+    .write = hvm_portio_write
+};
 
-    for ( i = 0; i < HVM_MMIO_HANDLER_NR; i++ )
-    {
-        hvm_mmio_check_t check = hvm_mmio_handlers[i]->check;
-
-        if ( check(v, p->addr) )
-        {
-            if ( unlikely(p->count > 1) &&
-                 !check(v, unlikely(p->df)
-                        ? p->addr - (p->count - 1L) * p->size
-                        : p->addr + (p->count - 1L) * p->size) )
-                p->count = 1;
-
-            return hvm_mmio_access(
-                v, p,
-                hvm_mmio_handlers[i]->read,
-                hvm_mmio_handlers[i]->write);
-        }
-    }
-
-    return X86EMUL_UNHANDLEABLE;
-}
-
-static int process_portio_intercept(portio_action_t action, ioreq_t *p)
+int hvm_process_io_intercept(const struct hvm_io_handler *handler,
+                             ioreq_t *p)
 {
     struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
+    const struct hvm_io_ops *ops = (p->type == IOREQ_TYPE_COPY) ?
+                                   &mmio_ops : &portio_ops;
     int rc = X86EMUL_OKAY, i, step = p->df ? -p->size : p->size;
-    uint32_t data;
-
-    if ( !p->data_is_ptr )
-    {
-        if ( p->dir == IOREQ_READ )
-        {
-            if ( vio->mmio_retrying )
-            {
-                if ( vio->mmio_large_read_bytes != p->size )
-                    return X86EMUL_UNHANDLEABLE;
-                memcpy(&data, vio->mmio_large_read, p->size);
-                vio->mmio_large_read_bytes = 0;
-                vio->mmio_retrying = 0;
-            }
-            else
-                rc = action(IOREQ_READ, p->addr, p->size, &data);
-            p->data = data;
-        }
-        else
-        {
-            data = p->data;
-            rc = action(IOREQ_WRITE, p->addr, p->size, &data);
-        }
-        return rc;
-    }
+    uint64_t data;
+    uint64_t addr;
 
     if ( p->dir == IOREQ_READ )
     {
@@ -246,31 +127,40 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
             }
             else
             {
-                rc = action(IOREQ_READ, p->addr, p->size, &data);
+                addr = (p->type == IOREQ_TYPE_COPY) ?
+                       p->addr + step * i :
+                       p->addr;
+                rc = ops->read(handler, addr, p->size, &data);
                 if ( rc != X86EMUL_OKAY )
                     break;
             }
-            switch ( hvm_copy_to_guest_phys(p->data + step * i,
-                                            &data, p->size) )
+
+            if ( p->data_is_ptr )
             {
-            case HVMCOPY_okay:
-                break;
-            case HVMCOPY_gfn_paged_out:
-            case HVMCOPY_gfn_shared:
-                rc = X86EMUL_RETRY;
-                break;
-            case HVMCOPY_bad_gfn_to_mfn:
-                /* Drop the write as real hardware would. */
-                continue;
-            case HVMCOPY_bad_gva_to_gfn:
-                ASSERT(0);
-                /* fall through */
-            default:
-                rc = X86EMUL_UNHANDLEABLE;
-                break;
+                switch ( hvm_copy_to_guest_phys(p->data + step * i,
+                                                &data, p->size) )
+                {
+                case HVMCOPY_okay:
+                    break;
+                case HVMCOPY_gfn_paged_out:
+                case HVMCOPY_gfn_shared:
+                    rc = X86EMUL_RETRY;
+                    break;
+                case HVMCOPY_bad_gfn_to_mfn:
+                    /* Drop the write as real hardware would. */
+                    continue;
+                case HVMCOPY_bad_gva_to_gfn:
+                    ASSERT_UNREACHABLE();
+                    /* fall through */
+                default:
+                    rc = X86EMUL_UNHANDLEABLE;
+                    break;
+                }
+                if ( rc != X86EMUL_OKAY )
+                    break;
             }
-            if ( rc != X86EMUL_OKAY)
-                break;
+            else
+                p->data = data;
         }
 
         if ( rc == X86EMUL_RETRY )
@@ -284,29 +174,37 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
     {
         for ( i = 0; i < p->count; i++ )
         {
-            data = 0;
-            switch ( hvm_copy_from_guest_phys(&data, p->data + step * i,
-                                              p->size) )
+            if ( p->data_is_ptr )
             {
-            case HVMCOPY_okay:
-                break;
-            case HVMCOPY_gfn_paged_out:
-            case HVMCOPY_gfn_shared:
-                rc = X86EMUL_RETRY;
-                break;
-            case HVMCOPY_bad_gfn_to_mfn:
-                data = ~0;
-                break;
-            case HVMCOPY_bad_gva_to_gfn:
-                ASSERT(0);
-                /* fall through */
-            default:
-                rc = X86EMUL_UNHANDLEABLE;
-                break;
+                switch ( hvm_copy_from_guest_phys(&data, p->data + step * i,
+                                                  p->size) )
+                {
+                case HVMCOPY_okay:
+                    break;
+                case HVMCOPY_gfn_paged_out:
+                case HVMCOPY_gfn_shared:
+                    rc = X86EMUL_RETRY;
+                    break;
+                case HVMCOPY_bad_gfn_to_mfn:
+                    data = ~0;
+                    break;
+                case HVMCOPY_bad_gva_to_gfn:
+                    ASSERT_UNREACHABLE();
+                    /* fall through */
+                default:
+                    rc = X86EMUL_UNHANDLEABLE;
+                    break;
+                }
+                if ( rc != X86EMUL_OKAY )
+                    break;
             }
-            if ( rc != X86EMUL_OKAY )
-                break;
-            rc = action(IOREQ_WRITE, p->addr, p->size, &data);
+            else
+                data = p->data;
+
+            addr = (p->type == IOREQ_TYPE_COPY) ?
+                   p->addr + step * i :
+                   p->addr;
+            rc = ops->write(handler, addr, p->size, data);
             if ( rc != X86EMUL_OKAY )
                 break;
         }
@@ -324,78 +222,119 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
     return rc;
 }
 
-/*
- * Check if the request is handled inside xen
- * return value: 0 --not handled; 1 --handled
- */
-int hvm_io_intercept(ioreq_t *p, int type)
+const struct hvm_io_handler *hvm_find_io_handler(ioreq_t *p)
 {
-    struct vcpu *v = current;
-    struct hvm_io_handler *handler = v->domain->arch.hvm_domain.io_handler;
-    int i;
-    unsigned long addr, size;
+    struct domain *curr_d = current->domain;
+    const struct hvm_io_ops *ops = (p->type == IOREQ_TYPE_COPY) ?
+                                   &mmio_ops : &portio_ops;
+    unsigned int i;
 
-    if ( type == HVM_PORTIO )
+    BUG_ON((p->type != IOREQ_TYPE_PIO) &&
+           (p->type != IOREQ_TYPE_COPY));
+
+    for ( i = 0; i < curr_d->arch.hvm_domain.io_handler_count; i++ )
+    {
+        const struct hvm_io_handler *handler =
+            &curr_d->arch.hvm_domain.io_handler[i];
+
+        if ( handler->type != p->type )
+            continue;
+
+        if ( ops->accept(handler, p) )
+            return handler;
+    }
+
+    return NULL;
+}
+
+int hvm_io_intercept(ioreq_t *p)
+{
+    const struct hvm_io_handler *handler;
+
+    if ( p->type == IOREQ_TYPE_PIO )
     {
         int rc = dpci_ioport_intercept(p);
         if ( (rc == X86EMUL_OKAY) || (rc == X86EMUL_RETRY) )
             return rc;
     }
-
-    for ( i = 0; i < handler->num_slot; i++ )
+    else if ( p->type == IOREQ_TYPE_COPY )
     {
-        if ( type != handler->hdl_list[i].type )
-            continue;
-        addr = handler->hdl_list[i].addr;
-        size = handler->hdl_list[i].size;
-        if ( (p->addr >= addr) &&
-             ((p->addr + p->size) <= (addr + size)) )
-        {
-            if ( type == HVM_PORTIO )
-                return process_portio_intercept(
-                    handler->hdl_list[i].action.portio, p);
-
-            if ( unlikely(p->count > 1) &&
-                 (unlikely(p->df)
-                  ? p->addr - (p->count - 1L) * p->size < addr
-                  : p->addr + p->count * 1L * p->size - 1 >= addr + size) )
-                p->count = 1;
-
-            return handler->hdl_list[i].action.mmio(p);
-        }
+        int rc = stdvga_intercept_mmio(p);
+        if ( (rc == X86EMUL_OKAY) || (rc == X86EMUL_RETRY) )
+            return rc;
     }
 
-    return X86EMUL_UNHANDLEABLE;
+    handler = hvm_find_io_handler(p);
+
+    if ( handler == NULL )
+        return X86EMUL_UNHANDLEABLE;
+
+    return hvm_process_io_intercept(handler, p);
 }
 
-void register_io_handler(
-    struct domain *d, unsigned long addr, unsigned int size,
-    void *action, int type)
+struct hvm_io_handler *hvm_next_io_handler(struct domain *d)
 {
-    struct hvm_io_handler *handler = d->arch.hvm_domain.io_handler;
-    int num = handler->num_slot;
+    unsigned int i = d->arch.hvm_domain.io_handler_count++;
 
-    BUG_ON(num >= MAX_IO_HANDLER);
+    if ( i == NR_IO_HANDLERS )
+    {
+        domain_crash(d);
+        return NULL;
+    }
 
-    handler->hdl_list[num].addr = addr;
-    handler->hdl_list[num].size = size;
-    handler->hdl_list[num].action.ptr = action;
-    handler->hdl_list[num].type = type;
-    handler->num_slot++;
+    return &d->arch.hvm_domain.io_handler[i];
 }
 
-void relocate_io_handler(
-    struct domain *d, unsigned long old_addr, unsigned long new_addr,
-    unsigned int size, int type)
+void register_mmio_handler(struct domain *d,
+                           const struct hvm_mmio_ops *ops)
 {
-    struct hvm_io_handler *handler = d->arch.hvm_domain.io_handler;
-    int i;
+    struct hvm_io_handler *handler = hvm_next_io_handler(d);
 
-    for ( i = 0; i < handler->num_slot; i++ )
-        if ( (handler->hdl_list[i].addr == old_addr) &&
-             (handler->hdl_list[i].size == size) &&
-             (handler->hdl_list[i].type == type) )
-            handler->hdl_list[i].addr = new_addr;
+    handler->type = IOREQ_TYPE_COPY;
+    handler->mmio.ops = ops;
+}
+
+void register_portio_handler(struct domain *d, unsigned int port,
+                             unsigned int size, portio_action_t action)
+{
+    struct hvm_io_handler *handler = hvm_next_io_handler(d);
+
+    handler->type = IOREQ_TYPE_PIO;
+    handler->portio.port = port;
+    handler->portio.size = size;
+    handler->portio.action = action;
+}
+
+void relocate_portio_handler(struct domain *d, unsigned int old_port,
+                             unsigned int new_port, unsigned int size)
+{
+    unsigned int i;
+
+    for ( i = 0; i < d->arch.hvm_domain.io_handler_count; i++ )
+    {
+        struct hvm_io_handler *handler =
+            &d->arch.hvm_domain.io_handler[i];
+
+        if ( handler->type != IOREQ_TYPE_PIO )
+            continue;
+
+        if ( (handler->portio.port == old_port) &&
+             (handler->portio.size = size) )
+        {
+            handler->portio.port = new_port;
+            break;
+        }
+    }
+}
+
+bool_t hvm_mmio_internal(paddr_t gpa)
+{
+    ioreq_t p = {
+        .type = IOREQ_TYPE_COPY,
+        .addr = gpa
+    };
+
+    return hvm_find_io_handler(&p) != NULL;
 }
 
 /*

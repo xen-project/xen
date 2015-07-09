@@ -1455,9 +1455,6 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
     spin_lock_init(&d->arch.hvm_domain.uc_lock);
 
-    INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);
-    spin_lock_init(&d->arch.hvm_domain.msixtbl_list_lock);
-
     hvm_init_cacheattr_region_list(d);
 
     rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
@@ -1465,11 +1462,11 @@ int hvm_domain_initialise(struct domain *d)
         goto fail0;
 
     d->arch.hvm_domain.params = xzalloc_array(uint64_t, HVM_NR_PARAMS);
-    d->arch.hvm_domain.io_handler = xmalloc(struct hvm_io_handler);
+    d->arch.hvm_domain.io_handler = xzalloc_array(struct hvm_io_handler,
+                                                  NR_IO_HANDLERS);
     rc = -ENOMEM;
     if ( !d->arch.hvm_domain.params || !d->arch.hvm_domain.io_handler )
         goto fail1;
-    d->arch.hvm_domain.io_handler->num_slot = 0;
 
     /* Set the default IO Bitmap. */
     if ( is_hardware_domain(d) )
@@ -1505,6 +1502,8 @@ int hvm_domain_initialise(struct domain *d)
     stdvga_init(d);
 
     rtc_init(d);
+
+    msixtbl_init(d);
 
     register_portio_handler(d, 0xe9, 1, hvm_print_line);
     register_portio_handler(d, 0xcf8, 4, hvm_access_cf8);

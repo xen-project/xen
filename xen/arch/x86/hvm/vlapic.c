@@ -977,7 +977,7 @@ static int vlapic_range(struct vcpu *v, unsigned long addr)
            (offset < PAGE_SIZE);
 }
 
-const struct hvm_mmio_ops vlapic_mmio_ops = {
+static const struct hvm_mmio_ops vlapic_mmio_ops = {
     .check = vlapic_range,
     .read = vlapic_read,
     .write = vlapic_write
@@ -1442,6 +1442,9 @@ int vlapic_init(struct vcpu *v)
     tasklet_init(&vlapic->init_sipi.tasklet,
                  vlapic_init_sipi_action,
                  (unsigned long)v);
+
+    if ( v->vcpu_id == 0 )
+        register_mmio_handler(v->domain, &vlapic_mmio_ops);
 
     return 0;
 }

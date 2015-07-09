@@ -504,7 +504,7 @@ static int hpet_range(struct vcpu *v, unsigned long addr)
              (addr < (HPET_BASE_ADDRESS + HPET_MMAP_SIZE)) );
 }
 
-const struct hvm_mmio_ops hpet_mmio_ops = {
+static const struct hvm_mmio_ops hpet_mmio_ops = {
     .check = hpet_range,
     .read  = hpet_read,
     .write = hpet_write
@@ -659,6 +659,8 @@ void hpet_init(struct domain *d)
         h->hpet.comparator64[i] = ~0ULL;
         h->pt[i].source = PTSRC_isa;
     }
+
+    register_mmio_handler(d, &hpet_mmio_ops);
 }
 
 void hpet_deinit(struct domain *d)

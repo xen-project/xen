@@ -868,6 +868,20 @@ static void guest_iommu_reg_init(struct guest_iommu *iommu)
     iommu->reg_ext_feature.hi = upper;
 }
 
+static int guest_iommu_mmio_range(struct vcpu *v, unsigned long addr)
+{
+    struct guest_iommu *iommu = vcpu_iommu(v);
+
+    return iommu && addr >= iommu->mmio_base &&
+           addr < iommu->mmio_base + IOMMU_MMIO_SIZE;
+}
+
+static const struct hvm_mmio_ops iommu_mmio_ops = {
+    .check = guest_iommu_mmio_range,
+    .read = guest_iommu_mmio_read,
+    .write = guest_iommu_mmio_write
+};
+
 /* Domain specific initialization */
 int guest_iommu_init(struct domain* d)
 {
@@ -894,6 +908,8 @@ int guest_iommu_init(struct domain* d)
 
     spin_lock_init(&iommu->lock);
 
+    register_mmio_handler(d, &iommu_mmio_ops);
+
     return 0;
 }
 
@@ -910,17 +926,3 @@ void guest_iommu_destroy(struct domain *d)
 
     domain_hvm_iommu(d)->arch.g_iommu = NULL;
 }
-
-static int guest_iommu_mmio_range(struct vcpu *v, unsigned long addr)
-{
-    struct guest_iommu *iommu = vcpu_iommu(v);
-
-    return iommu && addr >= iommu->mmio_base &&
-           addr < iommu->mmio_base + IOMMU_MMIO_SIZE;
-}
-
-const struct hvm_mmio_ops iommu_mmio_ops = {
-    .check = guest_iommu_mmio_range,
-    .read = guest_iommu_mmio_read,
-    .write = guest_iommu_mmio_write
-};

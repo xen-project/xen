@@ -142,16 +142,7 @@ static int hvmemul_do_io(
         hvmtrace_io_assist(&p);
     }
 
-    if ( is_mmio )
-    {
-        rc = hvm_mmio_intercept(&p);
-        if ( rc == X86EMUL_UNHANDLEABLE )
-            rc = hvm_buffered_io_intercept(&p);
-    }
-    else
-    {
-        rc = hvm_portio_intercept(&p);
-    }
+    rc = hvm_io_intercept(&p);
 
     switch ( rc )
     {

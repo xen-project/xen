@@ -250,7 +250,7 @@ static int vioapic_range(struct vcpu *v, unsigned long addr)
              (addr < vioapic->base_address + VIOAPIC_MEM_LENGTH)));
 }
 
-const struct hvm_mmio_ops vioapic_mmio_ops = {
+static const struct hvm_mmio_ops vioapic_mmio_ops = {
     .check = vioapic_range,
     .read = vioapic_read,
     .write = vioapic_write
@@ -455,6 +455,8 @@ int vioapic_init(struct domain *d)
 
     d->arch.hvm_domain.vioapic->domain = d;
     vioapic_reset(d);
+
+    register_mmio_handler(d, &vioapic_mmio_ops);
 
     return 0;
 }

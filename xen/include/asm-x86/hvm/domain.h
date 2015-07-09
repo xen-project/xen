@@ -94,6 +94,7 @@ struct hvm_domain {
     struct pl_time         pl_time;
 
     struct hvm_io_handler *io_handler;
+    unsigned int          io_handler_count;
 
     /* Lock protects access to irq, vpic and vioapic. */
     spinlock_t             irq_lock;
