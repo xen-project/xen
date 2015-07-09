@@ -8442,8 +8442,8 @@ int main_psr_cat_show(int argc, char **argv)
 
 int main_psr_hwinfo(int argc, char **argv)
 {
-    int opt, ret;
-    int cmt = 0, cat = 0;
+    int opt, ret = 0;
+    bool all = true, cmt = false, cat = false;
     static struct option opts[] = {
         {"cmt", 0, 0, 'm'},
         {"cat", 0, 0, 'a'},
@@ -8453,25 +8453,17 @@ int main_psr_hwinfo(int argc, char **argv)
 
     SWITCH_FOREACH_OPT(opt, "ma", opts, "psr-hwinfo", 0) {
     case 'm':
-        cmt = 1;
+        all = false; cmt = true;
         break;
     case 'a':
-        cat = 1;
+        all = false; cat = true;
         break;
     }
 
-    if (!(cmt | cat)) {
-        cmt = 1;
-        cat = 1;
-    }
-
-    if (cmt)
+    if (!ret && (all || cmt))
         ret = psr_cmt_hwinfo();
 
-    if (ret)
-        return ret;
-
-    if (cat)
+    if (!ret && (all || cat))
         ret = psr_cat_hwinfo();
 
     return ret;
