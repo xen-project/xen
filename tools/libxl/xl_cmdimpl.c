@@ -8180,11 +8180,11 @@ int main_psr_cmt_show(int argc, char **argv)
         /* No options */
     }
 
-    if (!strcmp(argv[optind], "cache_occupancy"))
+    if (!strcmp(argv[optind], "cache-occupancy"))
         type = LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY;
-    else if (!strcmp(argv[optind], "total_mem_bandwidth"))
+    else if (!strcmp(argv[optind], "total-mem-bandwidth"))
         type = LIBXL_PSR_CMT_TYPE_TOTAL_MEM_COUNT;
-    else if (!strcmp(argv[optind], "local_mem_bandwidth"))
+    else if (!strcmp(argv[optind], "local-mem-bandwidth"))
         type = LIBXL_PSR_CMT_TYPE_LOCAL_MEM_COUNT;
     else {
         help("psr-cmt-show");

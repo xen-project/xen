@@ -524,9 +524,9 @@ struct cmd_spec cmd_table[] = {
       "Show Cache Monitoring Technology information",
       "<PSR-CMT-Type> <Domain>",
       "Available monitor types:\n"
-      "\"cache_occupancy\":         Show L3 cache occupancy(KB)\n"
-      "\"total_mem_bandwidth\":     Show total memory bandwidth(KB/s)\n"
-      "\"local_mem_bandwidth\":     Show local memory bandwidth(KB/s)\n",
+      "\"cache-occupancy\":         Show L3 cache occupancy(KB)\n"
+      "\"total-mem-bandwidth\":     Show total memory bandwidth(KB/s)\n"
+      "\"local-mem-bandwidth\":     Show local memory bandwidth(KB/s)\n",
     },
 #endif
 };
