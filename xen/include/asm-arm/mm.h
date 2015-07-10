@@ -5,7 +5,6 @@
 #include <xen/kernel.h>
 #include <asm/page.h>
 #include <public/xen.h>
-#include <xen/domain_page.h>
 #include <xen/pdx.h>
 
 /* Align Xen to a 2 MiB boundary. */

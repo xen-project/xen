@@ -271,11 +271,9 @@ void clear_fixmap(unsigned map)
 }
 
 #ifdef CONFIG_DOMAIN_PAGE
-void *map_domain_page_global(unsigned long mfn)
+void *map_domain_page_global(mfn_t mfn)
 {
-    mfn_t m = _mfn(mfn);
-
-    return vmap(&m, 1);
+    return vmap(&mfn, 1);
 }
 
 void unmap_domain_page_global(const void *va)

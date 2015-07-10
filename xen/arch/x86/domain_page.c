@@ -302,17 +302,16 @@ int mapcache_vcpu_init(struct vcpu *v)
     return 0;
 }
 
-void *map_domain_page_global(unsigned long mfn)
+void *map_domain_page_global(mfn_t mfn)
 {
-    mfn_t m = _mfn(mfn);
     ASSERT(!in_irq() && local_irq_is_enabled());
 
 #ifdef NDEBUG
-    if ( mfn <= PFN_DOWN(__pa(HYPERVISOR_VIRT_END - 1)) )
-        return mfn_to_virt(mfn);
+    if ( mfn_x(mfn) <= PFN_DOWN(__pa(HYPERVISOR_VIRT_END - 1)) )
+        return mfn_to_virt(mfn_x(mfn));
 #endif
 
-    return vmap(&m, 1);
+    return vmap(&mfn, 1);
 }
 
 void unmap_domain_page_global(const void *ptr)

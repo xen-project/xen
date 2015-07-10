@@ -3806,7 +3806,7 @@ sh_detach_old_tables(struct vcpu *v)
     if ( v->arch.paging.shadow.guest_vtable )
     {
         if ( shadow_mode_external(d) || shadow_mode_translate(d) )
-            sh_unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
+            unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
         v->arch.paging.shadow.guest_vtable = NULL;
     }
 #endif // !NDEBUG
@@ -3977,8 +3977,8 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     if ( shadow_mode_external(d) || shadow_mode_translate(d) )
     {
         if ( v->arch.paging.shadow.guest_vtable )
-            sh_unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
-        v->arch.paging.shadow.guest_vtable = sh_map_domain_page_global(gmfn);
+            unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
+        v->arch.paging.shadow.guest_vtable = map_domain_page_global(gmfn);
         /* PAGING_LEVELS==4 implies 64-bit, which means that
          * map_domain_page_global can't fail */
         BUG_ON(v->arch.paging.shadow.guest_vtable == NULL);
@@ -4010,8 +4010,8 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     if ( shadow_mode_external(d) || shadow_mode_translate(d) )
     {
         if ( v->arch.paging.shadow.guest_vtable )
-            sh_unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
-        v->arch.paging.shadow.guest_vtable = sh_map_domain_page_global(gmfn);
+            unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
+        v->arch.paging.shadow.guest_vtable = map_domain_page_global(gmfn);
         /* Does this really need map_domain_page_global?  Handle the
          * error properly if so. */
         BUG_ON(v->arch.paging.shadow.guest_vtable == NULL); /* XXX */

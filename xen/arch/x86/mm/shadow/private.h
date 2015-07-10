@@ -517,18 +517,6 @@ sh_unmap_domain_page(void *p)
     unmap_domain_page(p);
 }
 
-static inline void *
-sh_map_domain_page_global(mfn_t mfn)
-{
-    return map_domain_page_global(mfn_x(mfn));
-}
-
-static inline void
-sh_unmap_domain_page_global(void *p)
-{
-    unmap_domain_page_global(p);
-}
-
 /**************************************************************************/
 /* Shadow-page refcounting. */
 

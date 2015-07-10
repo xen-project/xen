@@ -41,11 +41,15 @@ unsigned long domain_page_map_to_mfn(const void *va);
  * address spaces (not just within the VCPU that created the mapping). Global
  * mappings can also be unmapped from any context.
  */
-void *map_domain_page_global(unsigned long mfn);
+void *map_domain_page_global(mfn_t mfn);
 void unmap_domain_page_global(const void *va);
 
 #define __map_domain_page(pg)        map_domain_page(__page_to_mfn(pg))
-#define __map_domain_page_global(pg) map_domain_page_global(__page_to_mfn(pg))
+
+static inline void *__map_domain_page_global(const struct page_info *pg)
+{
+    return map_domain_page_global(_mfn(__page_to_mfn(pg)));
+}
 
 #define DMCACHE_ENTRY_VALID 1U
 #define DMCACHE_ENTRY_HELD  2U
@@ -117,9 +121,17 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
                                                       mfn_to_virt(smfn))
 #define domain_page_map_to_mfn(va)          virt_to_mfn((unsigned long)(va))
 
-#define map_domain_page_global(mfn)         mfn_to_virt(mfn)
-#define __map_domain_page_global(pg)        page_to_virt(pg)
-#define unmap_domain_page_global(va)        ((void)(va))
+static inline void *map_domain_page_global(mfn_t mfn)
+{
+    return mfn_to_virt(mfn_x(mfn));
+}
+
+static inline void *__map_domain_page_global(const struct page_info *pg)
+{
+    return page_to_virt(pg);
+}
+
+static inline void unmap_domain_page_global(const void *va) {};
 
 struct domain_mmap_cache { 
 };
