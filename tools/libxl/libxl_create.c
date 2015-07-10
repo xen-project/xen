@@ -677,7 +677,7 @@ static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
 static void remus_checkpoint_stream_done(
     libxl__egc *egc, libxl__stream_read_state *srs, int rc);
 
-static void libxl__remus_domain_checkpoint_callback(void *data)
+static void libxl__remus_domain_restore_checkpoint_callback(void *data)
 {
     libxl__save_helper_state *shs = data;
     libxl__domain_create_state *dcs = shs->caller_state;
@@ -989,7 +989,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     }
 
     /* Restore */
-    callbacks->checkpoint = libxl__remus_domain_checkpoint_callback;
+    callbacks->checkpoint = libxl__remus_domain_restore_checkpoint_callback;
 
     rc = libxl__build_pre(gc, domid, d_config, state);
     if (rc)

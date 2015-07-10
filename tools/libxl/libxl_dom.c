@@ -1586,7 +1586,7 @@ static void remus_next_checkpoint(libxl__egc *egc, libxl__ev_time *ev,
                                   const struct timeval *requested_abs,
                                   int rc);
 
-static void libxl__remus_domain_checkpoint_callback(void *data)
+static void libxl__remus_domain_save_checkpoint_callback(void *data)
 {
     libxl__save_helper_state *shs = data;
     libxl__domain_suspend_state *dss = shs->caller_state;
@@ -1752,7 +1752,7 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss)
     if (r_info != NULL) {
         callbacks->suspend = libxl__remus_domain_suspend_callback;
         callbacks->postcopy = libxl__remus_domain_resume_callback;
-        callbacks->checkpoint = libxl__remus_domain_checkpoint_callback;
+        callbacks->checkpoint = libxl__remus_domain_save_checkpoint_callback;
         dss->sws.checkpoint_callback = remus_checkpoint_stream_written;
     } else
         callbacks->suspend = libxl__domain_suspend_callback;
