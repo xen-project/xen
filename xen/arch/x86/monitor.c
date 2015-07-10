@@ -128,7 +128,7 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
         if ( mop->u.mov_to_cr.index == VM_EVENT_X86_CR3 )
             /* Latches new CR3 mask through CR0 code */
             for_each_vcpu ( d, v )
-                hvm_funcs.update_guest_cr(v, 0);
+                hvm_update_guest_cr(v, 0);
 
         break;
     }
@@ -144,11 +144,8 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
         if ( mop->op == XEN_DOMCTL_MONITOR_OP_ENABLE &&
              mop->u.mov_to_msr.extended_capture )
         {
-            if ( hvm_funcs.enable_msr_exit_interception )
-            {
+            if ( hvm_enable_msr_exit_interception(d) )
                 ad->monitor.mov_to_msr_extended = 1;
-                hvm_funcs.enable_msr_exit_interception(d);
-            }
             else
                 return -EOPNOTSUPP;
         } else

@@ -510,6 +510,17 @@ static inline enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v)
     return hvm_funcs.nhvm_intr_blocked(v);
 }
 
+static inline bool_t hvm_enable_msr_exit_interception(struct domain *d)
+{
+    if ( hvm_funcs.enable_msr_exit_interception )
+    {
+        hvm_funcs.enable_msr_exit_interception(d);
+        return 1;
+    }
+
+    return 0;
+}
+
 static inline bool_t hvm_is_singlestep_supported(void)
 {
     return (hvm_funcs.is_singlestep_supported &&
