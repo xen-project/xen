@@ -27,6 +27,7 @@
 #include <xen/vm_event.h>
 #include <xen/mem_access.h>
 #include <asm/p2m.h>
+#include <asm/vm_event.h>
 #include <xsm/xsm.h>
 
 /* for public/io/ring.h macros */
@@ -399,9 +400,13 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
 
         };
 
-        /* Unpause domain. */
         if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )
+        {
+            if ( rsp.flags & VM_EVENT_FLAG_TOGGLE_SINGLESTEP )
+                vm_event_toggle_singlestep(d, v);
+
             vm_event_vcpu_unpause(v);
+        }
     }
 }
 

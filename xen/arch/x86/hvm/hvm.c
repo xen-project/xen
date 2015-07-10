@@ -6453,6 +6453,16 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
     return rc;
 }
 
+void hvm_toggle_singlestep(struct vcpu *v)
+{
+    ASSERT(atomic_read(&v->pause_count));
+
+    if ( !hvm_is_singlestep_supported() )
+        return;
+
+    v->arch.hvm_vcpu.single_step = !v->arch.hvm_vcpu.single_step;
+}
+
 /*
  * Local variables:
  * mode: C

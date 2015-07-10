@@ -443,6 +443,9 @@ static inline void hvm_set_info_guest(struct vcpu *v)
 
 int hvm_debug_op(struct vcpu *v, int32_t op);
 
+/* Caller should pause vcpu before calling this function */
+void hvm_toggle_singlestep(struct vcpu *v);
+
 static inline void hvm_invalidate_regs_fields(struct cpu_user_regs *regs)
 {
 #ifndef NDEBUG

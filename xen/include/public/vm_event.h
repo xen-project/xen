@@ -44,9 +44,9 @@
  *  paused
  * VCPU_PAUSED in a response signals to unpause the vCPU
  */
-#define VM_EVENT_FLAG_VCPU_PAUSED     (1 << 0)
-/* Flags to aid debugging mem_event */
-#define VM_EVENT_FLAG_FOREIGN         (1 << 1)
+#define VM_EVENT_FLAG_VCPU_PAUSED       (1 << 0)
+/* Flags to aid debugging vm_event */
+#define VM_EVENT_FLAG_FOREIGN           (1 << 1)
 /*
  * The following flags can be set in response to a mem_access event.
  *
@@ -54,12 +54,17 @@
  * This will allow the guest to continue execution without lifting the page
  * access restrictions.
  */
-#define VM_EVENT_FLAG_EMULATE         (1 << 2)
+#define VM_EVENT_FLAG_EMULATE           (1 << 2)
 /*
  * Same as MEM_ACCESS_EMULATE, but with write operations or operations
  * potentially having side effects (like memory mapped or port I/O) disabled.
  */
-#define VM_EVENT_FLAG_EMULATE_NOWRITE (1 << 3)
+#define VM_EVENT_FLAG_EMULATE_NOWRITE   (1 << 3)
+/*
+ * Toggle singlestepping on vm_event response.
+ * Requires the vCPU to be paused already (synchronous events only).
+ */
+#define VM_EVENT_FLAG_TOGGLE_SINGLESTEP (1 << 4)
 
 /*
  * Reasons for the vm event request
