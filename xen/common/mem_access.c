@@ -67,7 +67,7 @@ int mem_access_memop(unsigned long cmd,
               ((mao.pfn + mao.nr - 1) > domain_get_maximum_gpfn(d))) )
             break;
 
-        rc = p2m_set_mem_access(d, mao.pfn, mao.nr, start_iter,
+        rc = p2m_set_mem_access(d, _gfn(mao.pfn), mao.nr, start_iter,
                                 MEMOP_CMD_MASK, mao.access);
         if ( rc > 0 )
         {
@@ -89,7 +89,7 @@ int mem_access_memop(unsigned long cmd,
         if ( (mao.pfn > domain_get_maximum_gpfn(d)) && mao.pfn != ~0ull )
             break;
 
-        rc = p2m_get_mem_access(d, mao.pfn, &access);
+        rc = p2m_get_mem_access(d, _gfn(mao.pfn), &access);
         if ( rc != 0 )
             break;
 

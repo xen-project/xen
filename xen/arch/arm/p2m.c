@@ -436,7 +436,7 @@ static int p2m_create_table(struct domain *d, lpae_t *entry,
     return 0;
 }
 
-static int __p2m_get_mem_access(struct domain *d, unsigned long gpfn,
+static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
                                 xenmem_access_t *access)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
@@ -465,14 +465,14 @@ static int __p2m_get_mem_access(struct domain *d, unsigned long gpfn,
         return 0;
     }
 
-    /* If request to get default access */
-    if ( gpfn == ~0ul )
+    /* If request to get default access. */
+    if ( gfn_x(gfn) == INVALID_GFN )
     {
         *access = memaccess[p2m->default_access];
         return 0;
     }
 
-    i = radix_tree_lookup(&p2m->mem_access_settings, gpfn);
+    i = radix_tree_lookup(&p2m->mem_access_settings, gfn_x(gfn));
 
     if ( !i )
     {
@@ -480,7 +480,7 @@ static int __p2m_get_mem_access(struct domain *d, unsigned long gpfn,
          * No setting was found in the Radix tree. Check if the
          * entry exists in the page-tables.
          */
-        paddr_t maddr = p2m_lookup(d, gpfn << PAGE_SHIFT, NULL);
+        paddr_t maddr = p2m_lookup(d, gfn_x(gfn) << PAGE_SHIFT, NULL);
         if ( INVALID_PADDR == maddr )
             return -ESRCH;
 
@@ -1386,7 +1386,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
      * We do this first as this is faster in the default case when no
      * permission is set on the page.
      */
-    rc = __p2m_get_mem_access(current->domain, paddr_to_pfn(ipa), &xma);
+    rc = __p2m_get_mem_access(current->domain, _gfn(paddr_to_pfn(ipa)), &xma);
     if ( rc < 0 )
         goto err;
 
@@ -1590,7 +1590,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
     if ( !p2m->mem_access_enabled )
         return true;
 
-    rc = p2m_get_mem_access(v->domain, paddr_to_pfn(gpa), &xma);
+    rc = p2m_get_mem_access(v->domain, _gfn(paddr_to_pfn(gpa)), &xma);
     if ( rc )
         return true;
 
@@ -1632,13 +1632,13 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
     /* First, handle rx2rw and n2rwx conversion automatically. */
     if ( npfec.write_access && xma == XENMEM_access_rx2rw )
     {
-        rc = p2m_set_mem_access(v->domain, paddr_to_pfn(gpa), 1,
+        rc = p2m_set_mem_access(v->domain, _gfn(paddr_to_pfn(gpa)), 1,
                                 0, ~0, XENMEM_access_rw);
         return false;
     }
     else if ( xma == XENMEM_access_n2rwx )
     {
-        rc = p2m_set_mem_access(v->domain, paddr_to_pfn(gpa), 1,
+        rc = p2m_set_mem_access(v->domain, _gfn(paddr_to_pfn(gpa)), 1,
                                 0, ~0, XENMEM_access_rwx);
     }
 
@@ -1660,7 +1660,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
             {
                 /* A listener is not required, so clear the access
                  * restrictions. */
-                rc = p2m_set_mem_access(v->domain, paddr_to_pfn(gpa), 1,
+                rc = p2m_set_mem_access(v->domain, _gfn(paddr_to_pfn(gpa)), 1,
                                         0, ~0, XENMEM_access_rwx);
             }
         }
@@ -1709,9 +1709,9 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
 
 /*
  * Set access type for a region of pfns.
- * If start_pfn == -1ul, sets the default access type.
+ * If gfn == INVALID_GFN, sets the default access type.
  */
-long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
+long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
                         uint32_t start, uint32_t mask, xenmem_access_t access)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
@@ -1752,14 +1752,15 @@ long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
     p2m->mem_access_enabled = true;
 
     /* If request to set default access. */
-    if ( pfn == ~0ul )
+    if ( gfn_x(gfn) == INVALID_GFN )
     {
         p2m->default_access = a;
         return 0;
     }
 
     rc = apply_p2m_changes(d, MEMACCESS,
-                           pfn_to_paddr(pfn+start), pfn_to_paddr(pfn+nr),
+                           pfn_to_paddr(gfn_x(gfn) + start),
+                           pfn_to_paddr(gfn_x(gfn) + nr),
                            0, MATTR_MEM, mask, 0, a);
     if ( rc < 0 )
         return rc;
@@ -1769,14 +1770,14 @@ long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
     return 0;
 }
 
-int p2m_get_mem_access(struct domain *d, unsigned long gpfn,
+int p2m_get_mem_access(struct domain *d, gfn_t gfn,
                        xenmem_access_t *access)
 {
     int ret;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     spin_lock(&p2m->lock);
-    ret = __p2m_get_mem_access(d, gpfn, access);
+    ret = __p2m_get_mem_access(d, gfn, access);
     spin_unlock(&p2m->lock);
 
     return ret;

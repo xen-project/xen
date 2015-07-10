@@ -1424,7 +1424,7 @@ void p2m_mem_access_emulate_check(struct vcpu *v,
         bool_t violation = 1;
         const struct vm_event_mem_access *data = &rsp->u.mem_access;
 
-        if ( p2m_get_mem_access(v->domain, data->gfn, &access) == 0 )
+        if ( p2m_get_mem_access(v->domain, _gfn(data->gfn), &access) == 0 )
         {
             switch ( access )
             {
@@ -1600,15 +1600,18 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     return (p2ma == p2m_access_n2rwx);
 }
 
-/* Set access type for a region of pfns.
- * If start_pfn == -1ul, sets the default access type */
-long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
+/*
+ * Set access type for a region of gfns.
+ * If gfn == INVALID_GFN, sets the default access type.
+ */
+long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
                         uint32_t start, uint32_t mask, xenmem_access_t access)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_access_t a, _a;
     p2m_type_t t;
     mfn_t mfn;
+    unsigned long gfn_l;
     long rc = 0;
 
     static const p2m_access_t memaccess[] = {
@@ -1638,18 +1641,18 @@ long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
         return -EINVAL;
     }
 
-    /* If request to set default access */
-    if ( pfn == ~0ul )
+    /* If request to set default access. */
+    if ( gfn_x(gfn) == INVALID_GFN )
     {
         p2m->default_access = a;
         return 0;
     }
 
     p2m_lock(p2m);
-    for ( pfn += start; nr > start; ++pfn )
+    for ( gfn_l = gfn_x(gfn) + start; nr > start; ++gfn_l )
     {
-        mfn = p2m->get_entry(p2m, pfn, &t, &_a, 0, NULL);
-        rc = p2m->set_entry(p2m, pfn, mfn, PAGE_ORDER_4K, t, a);
+        mfn = p2m->get_entry(p2m, gfn_l, &t, &_a, 0, NULL);
+        rc = p2m->set_entry(p2m, gfn_l, mfn, PAGE_ORDER_4K, t, a);
         if ( rc )
             break;
 
@@ -1664,10 +1667,11 @@ long p2m_set_mem_access(struct domain *d, unsigned long pfn, uint32_t nr,
     return rc;
 }
 
-/* Get access type for a pfn
- * If pfn == -1ul, gets the default access type */
-int p2m_get_mem_access(struct domain *d, unsigned long pfn, 
-                       xenmem_access_t *access)
+/*
+ * Get access type for a gfn.
+ * If gfn == INVALID_GFN, gets the default access type.
+ */
+int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_type_t t;
@@ -1689,15 +1693,15 @@ int p2m_get_mem_access(struct domain *d, unsigned long pfn,
 #undef ACCESS
     };
 
-    /* If request to get default access */
-    if ( pfn == ~0ull ) 
+    /* If request to get default access. */
+    if ( gfn_x(gfn) == INVALID_GFN )
     {
         *access = memaccess[p2m->default_access];
         return 0;
     }
 
     gfn_lock(p2m, gfn, 0);
-    mfn = p2m->get_entry(p2m, pfn, &t, &a, 0, NULL);
+    mfn = p2m->get_entry(p2m, gfn_x(gfn), &t, &a, 0, NULL);
     gfn_unlock(p2m, gfn, 0);
 
     if ( mfn_x(mfn) == INVALID_MFN )
