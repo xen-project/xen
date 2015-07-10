@@ -520,39 +520,6 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-int libxl__domain_resume(libxl__gc *gc, uint32_t domid, int suspend_cancel)
-{
-    int rc = 0;
-
-    if (xc_domain_resume(CTX->xch, domid, suspend_cancel)) {
-        LOGE(ERROR, "xc_domain_resume failed for domain %u", domid);
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
-    libxl_domain_type type = libxl__domain_type(gc, domid);
-    if (type == LIBXL_DOMAIN_TYPE_INVALID) {
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
-    if (type == LIBXL_DOMAIN_TYPE_HVM) {
-        rc = libxl__domain_resume_device_model(gc, domid);
-        if (rc) {
-            LOG(ERROR, "failed to resume device model for domain %u:%d",
-                domid, rc);
-            goto out;
-        }
-    }
-
-    if (!xs_resume_domain(CTX->xsh, domid)) {
-        LOGE(ERROR, "xs_resume_domain failed for domain %u", domid);
-        rc = ERROR_FAIL;
-    }
-out:
-    return rc;
-}
-
 int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel,
                         const libxl_asyncop_how *ao_how)
 {

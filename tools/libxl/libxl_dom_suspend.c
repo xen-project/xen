@@ -371,6 +371,61 @@ static void domain_suspend_callback_common_done(libxl__egc *egc,
     libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, !rc);
 }
 
+/*======================= Domain resume ========================*/
+
+int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
+{
+
+    switch (libxl__device_model_version_running(gc, domid)) {
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
+        libxl__qemu_traditional_cmd(gc, domid, "continue");
+        libxl__wait_for_device_model_deprecated(gc, domid, "running", NULL, NULL, NULL);
+        break;
+    }
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+        if (libxl__qmp_resume(gc, domid))
+            return ERROR_FAIL;
+        break;
+    default:
+        return ERROR_INVAL;
+    }
+
+    return 0;
+}
+
+int libxl__domain_resume(libxl__gc *gc, uint32_t domid, int suspend_cancel)
+{
+    int rc = 0;
+
+    if (xc_domain_resume(CTX->xch, domid, suspend_cancel)) {
+        LOGE(ERROR, "xc_domain_resume failed for domain %u", domid);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    libxl_domain_type type = libxl__domain_type(gc, domid);
+    if (type == LIBXL_DOMAIN_TYPE_INVALID) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    if (type == LIBXL_DOMAIN_TYPE_HVM) {
+        rc = libxl__domain_resume_device_model(gc, domid);
+        if (rc) {
+            LOG(ERROR, "failed to resume device model for domain %u:%d",
+                domid, rc);
+            goto out;
+        }
+    }
+
+    if (!xs_resume_domain(CTX->xsh, domid)) {
+        LOGE(ERROR, "xs_resume_domain failed for domain %u", domid);
+        rc = ERROR_FAIL;
+    }
+out:
+    return rc;
+}
+
 /*
  * Local variables:
  * mode: C

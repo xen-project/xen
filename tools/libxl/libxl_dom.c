@@ -1384,26 +1384,6 @@ static void switch_logdirty_done(libxl__egc *egc,
 
 /*----- callbacks, called by xc_domain_save -----*/
 
-int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
-{
-
-    switch (libxl__device_model_version_running(gc, domid)) {
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
-        libxl__qemu_traditional_cmd(gc, domid, "continue");
-        libxl__wait_for_device_model_deprecated(gc, domid, "running", NULL, NULL, NULL);
-        break;
-    }
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-        if (libxl__qmp_resume(gc, domid))
-            return ERROR_FAIL;
-        break;
-    default:
-        return ERROR_INVAL;
-    }
-
-    return 0;
-}
-
 static inline char *physmap_path(libxl__gc *gc, uint32_t dm_domid,
                                  uint32_t domid,
                                  char *phys_offset, char *node)
