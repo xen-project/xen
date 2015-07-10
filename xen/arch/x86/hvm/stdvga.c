@@ -574,6 +574,10 @@ void stdvga_init(struct domain *d)
 
         /* VGA memory */
         handler = hvm_next_io_handler(d);
+
+        if ( handler == NULL )
+            return;
+
         handler->type = IOREQ_TYPE_COPY;
         handler->ops = &stdvga_mem_ops;
     }

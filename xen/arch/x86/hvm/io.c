@@ -256,6 +256,9 @@ void register_dpci_portio_handler(struct domain *d)
 {
     struct hvm_io_handler *handler = hvm_next_io_handler(d);
 
+    if ( handler == NULL )
+        return;
+
     handler->type = IOREQ_TYPE_PIO;
     handler->ops = &dpci_portio_ops;
 }

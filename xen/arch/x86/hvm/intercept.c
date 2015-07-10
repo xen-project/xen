@@ -265,6 +265,9 @@ void register_mmio_handler(struct domain *d,
 {
     struct hvm_io_handler *handler = hvm_next_io_handler(d);
 
+    if ( handler == NULL )
+        return;
+
     handler->type = IOREQ_TYPE_COPY;
     handler->ops = &mmio_ops;
     handler->mmio.ops = ops;
@@ -274,6 +277,9 @@ void register_portio_handler(struct domain *d, unsigned int port,
                              unsigned int size, portio_action_t action)
 {
     struct hvm_io_handler *handler = hvm_next_io_handler(d);
+
+    if ( handler == NULL )
+        return;
 
     handler->type = IOREQ_TYPE_PIO;
     handler->ops = &portio_ops;
