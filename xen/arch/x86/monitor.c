@@ -46,6 +46,10 @@ static inline uint32_t get_capabilities(struct domain *d)
 {
     uint32_t capabilities = 0;
 
+    /*
+     * At the moment only Intel HVM domains are supported. However, event
+     * delivery could be extended to AMD and PV domains.
+     */
     if ( !is_hvm_domain(d) || !cpu_has_vmx )
         return capabilities;
 
@@ -69,11 +73,6 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
     rc = xsm_vm_event_control(XSM_PRIV, d, mop->op, mop->event);
     if ( rc )
         return rc;
-
-    /*
-     * At the moment only Intel HVM domains are supported. However, event
-     * delivery could be extended to AMD and PV domains.
-     */
 
     if ( mop->op == XEN_DOMCTL_MONITOR_OP_GET_CAPABILITIES )
     {
