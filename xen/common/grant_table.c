@@ -1848,7 +1848,7 @@ gnttab_transfer(
                 goto unlock_and_copyback;
             }
 
-            copy_domain_page(page_to_mfn(new_page), mfn);
+            copy_domain_page(_mfn(page_to_mfn(new_page)), _mfn(mfn));
 
             page->count_info &= ~(PGC_count_mask|PGC_allocated);
             free_domheap_page(page);

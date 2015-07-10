@@ -11,6 +11,12 @@
 
 #include <xen/mm.h>
 
+/*
+ * Clear a given page frame, or copy between two of them.
+ */
+void clear_domain_page(mfn_t mfn);
+void copy_domain_page(mfn_t dst, const mfn_t src);
+
 #ifdef CONFIG_DOMAIN_PAGE
 
 /*
@@ -24,12 +30,6 @@ void *map_domain_page(unsigned long mfn);
  * currently-executing VCPU via a call to map_domain_page().
  */
 void unmap_domain_page(const void *va);
-
-/*
- * Clear a given page frame, or copy between two of them.
- */
-void clear_domain_page(unsigned long mfn);
-void copy_domain_page(unsigned long dmfn, unsigned long smfn);
 
 /* 
  * Given a VA from map_domain_page(), return its underlying MFN.
@@ -116,9 +116,6 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 #define map_domain_page(mfn)                mfn_to_virt(mfn)
 #define __map_domain_page(pg)               page_to_virt(pg)
 #define unmap_domain_page(va)               ((void)(va))
-#define clear_domain_page(mfn)              clear_page(mfn_to_virt(mfn))
-#define copy_domain_page(dmfn, smfn)        copy_page(mfn_to_virt(dmfn), \
-                                                      mfn_to_virt(smfn))
 #define domain_page_map_to_mfn(va)          virt_to_mfn((unsigned long)(va))
 
 static inline void *map_domain_page_global(mfn_t mfn)

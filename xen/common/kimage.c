@@ -77,7 +77,7 @@ static struct page_info *kimage_alloc_zeroed_page(unsigned memflags)
     if ( !page )
         return NULL;
 
-    clear_domain_page(page_to_mfn(page));
+    clear_domain_page(_mfn(page_to_mfn(page)));
 
     return page;
 }
@@ -409,7 +409,7 @@ static struct page_info *kimage_alloc_crash_control_page(struct kexec_image *ima
     if ( page )
     {
         image->next_crash_page = hole_end;
-        clear_domain_page(page_to_mfn(page));
+        clear_domain_page(_mfn(page_to_mfn(page)));
     }
 
     return page;
@@ -637,15 +637,15 @@ static struct page_info *kimage_alloc_page(struct kexec_image *image,
         if ( old )
         {
             /* If so move it. */
-            unsigned long old_mfn = *old >> PAGE_SHIFT;
-            unsigned long mfn = addr >> PAGE_SHIFT;
+            mfn_t old_mfn = _mfn(*old >> PAGE_SHIFT);
+            mfn_t mfn = _mfn(addr >> PAGE_SHIFT);
 
             copy_domain_page(mfn, old_mfn);
             clear_domain_page(old_mfn);
             *old = (addr & ~PAGE_MASK) | IND_SOURCE;
             unmap_domain_page(old);
 
-            page = mfn_to_page(old_mfn);
+            page = mfn_to_page(mfn_x(old_mfn));
             break;
         }
         else
@@ -917,7 +917,7 @@ int kimage_build_ind(struct kexec_image *image, unsigned long ind_mfn,
                 goto done;
             }
 
-            copy_domain_page(page_to_mfn(xen_page), mfn);
+            copy_domain_page(_mfn(page_to_mfn(xen_page)), _mfn(mfn));
             put_page(guest_page);
 
             ret = kimage_add_page(image, page_to_maddr(xen_page));

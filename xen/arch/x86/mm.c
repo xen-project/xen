@@ -3293,7 +3293,7 @@ long do_mmuext_op(
             /* A page is dirtied when it's being cleared. */
             paging_mark_dirty(pg_owner, page_to_mfn(page));
 
-            clear_domain_page(page_to_mfn(page));
+            clear_domain_page(_mfn(page_to_mfn(page)));
 
             put_page_and_type(page);
             break;
@@ -3327,7 +3327,8 @@ long do_mmuext_op(
             /* A page is dirtied when it's being copied to. */
             paging_mark_dirty(pg_owner, page_to_mfn(dst_page));
 
-            copy_domain_page(page_to_mfn(dst_page), page_to_mfn(src_page));
+            copy_domain_page(_mfn(page_to_mfn(dst_page)),
+                             _mfn(page_to_mfn(src_page)));
 
             put_page_and_type(dst_page);
             put_page(src_page);
@@ -6003,7 +6004,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
             pg = alloc_domheap_page(d, MEMF_no_owner);
             if ( pg )
             {
-                clear_domain_page(page_to_mfn(pg));
+                clear_domain_page(_mfn(page_to_mfn(pg)));
                 if ( !IS_NIL(ppg) )
                     *ppg++ = pg;
                 l1tab[l1_table_offset(va)] =
