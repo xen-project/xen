@@ -1167,6 +1167,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
 
         ret = monitor_domctl(d, &op->u.monitor_op);
+        if ( !ret )
+            copyback = 1;
         break;
 
     default:

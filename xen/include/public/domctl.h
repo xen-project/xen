@@ -994,12 +994,16 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_psr_cmt_op_t);
  * via the ring buffer "MONITOR". The ring has to be first enabled
  * with the domctl XEN_DOMCTL_VM_EVENT_OP_MONITOR.
  *
+ * GET_CAPABILITIES can be used to determine which of these features is
+ * available on a given platform.
+ *
  * NOTICE: mem_access events are also delivered via the "MONITOR" ring buffer;
  * however, enabling/disabling those events is performed with the use of
  * memory_op hypercalls!
  */
-#define XEN_DOMCTL_MONITOR_OP_ENABLE   0
-#define XEN_DOMCTL_MONITOR_OP_DISABLE  1
+#define XEN_DOMCTL_MONITOR_OP_ENABLE            0
+#define XEN_DOMCTL_MONITOR_OP_DISABLE           1
+#define XEN_DOMCTL_MONITOR_OP_GET_CAPABILITIES  2
 
 #define XEN_DOMCTL_MONITOR_EVENT_WRITE_CTRLREG         0
 #define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR            1
@@ -1008,7 +1012,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_psr_cmt_op_t);
 
 struct xen_domctl_monitor_op {
     uint32_t op; /* XEN_DOMCTL_MONITOR_OP_* */
-    uint32_t event; /* XEN_DOMCTL_MONITOR_EVENT_* */
+
+    /*
+     * When used with ENABLE/DISABLE this has to be set to
+     * the requested XEN_DOMCTL_MONITOR_EVENT_* value.
+     * With GET_CAPABILITIES this field returns a bitmap of
+     * events supported by the platform, in the format
+     * (1 << XEN_DOMCTL_MONITOR_EVENT_*).
+     */
+    uint32_t event;
 
     /*
      * Further options when issuing XEN_DOMCTL_MONITOR_OP_ENABLE.

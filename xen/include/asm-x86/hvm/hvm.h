@@ -202,6 +202,7 @@ struct hvm_function_table {
                                   uint32_t *ecx, uint32_t *edx);
 
     void (*enable_msr_exit_interception)(struct domain *d);
+    bool_t (*is_singlestep_supported)(void);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -509,6 +510,11 @@ static inline enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v)
     return hvm_funcs.nhvm_intr_blocked(v);
 }
 
+static inline bool_t hvm_is_singlestep_supported(void)
+{
+    return (hvm_funcs.is_singlestep_supported &&
+            hvm_funcs.is_singlestep_supported());
+}
 
 #ifndef NDEBUG
 /* Permit use of the Forced Emulation Prefix in HVM guests */

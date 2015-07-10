@@ -1765,6 +1765,11 @@ static void vmx_enable_msr_exit_interception(struct domain *d)
                                          MSR_TYPE_W);
 }
 
+static bool_t vmx_is_singlestep_supported(void)
+{
+    return cpu_has_monitor_trap_flag;
+}
+
 static struct hvm_function_table __initdata vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -1822,6 +1827,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
     .hypervisor_cpuid_leaf = vmx_hypervisor_cpuid_leaf,
     .enable_msr_exit_interception = vmx_enable_msr_exit_interception,
+    .is_singlestep_supported = vmx_is_singlestep_supported,
 };
 
 const struct hvm_function_table * __init start_vmx(void)

@@ -2364,6 +2364,12 @@ int xc_mem_access_disable_emulate(xc_interface *xch, domid_t domain_id);
 void *xc_monitor_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
 int xc_monitor_disable(xc_interface *xch, domid_t domain_id);
 int xc_monitor_resume(xc_interface *xch, domid_t domain_id);
+/*
+ * Get a bitmap of supported monitor events in the form
+ * (1 << XEN_DOMCTL_MONITOR_EVENT_*).
+ */
+int xc_monitor_get_capabilities(xc_interface *xch, domid_t domain_id,
+                                uint32_t *capabilities);
 int xc_monitor_write_ctrlreg(xc_interface *xch, domid_t domain_id,
                              uint16_t index, bool enable, bool sync,
                              bool onchangeonly);

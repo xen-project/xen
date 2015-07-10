@@ -45,6 +45,30 @@ int xc_monitor_resume(xc_interface *xch, domid_t domain_id)
                                NULL);
 }
 
+int xc_monitor_get_capabilities(xc_interface *xch, domid_t domain_id,
+                                uint32_t *capabilities)
+{
+    int rc;
+    DECLARE_DOMCTL;
+
+    if ( !capabilities )
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    domctl.cmd = XEN_DOMCTL_monitor_op;
+    domctl.domain = domain_id;
+    domctl.u.monitor_op.op = XEN_DOMCTL_MONITOR_OP_GET_CAPABILITIES;
+
+    rc = do_domctl(xch, &domctl);
+    if ( rc )
+        return rc;
+
+    *capabilities = domctl.u.monitor_op.event;
+    return 0;
+}
+
 int xc_monitor_write_ctrlreg(xc_interface *xch, domid_t domain_id,
                              uint16_t index, bool enable, bool sync,
                              bool onchangeonly)

@@ -42,10 +42,29 @@ int status_check(struct xen_domctl_monitor_op *mop, bool_t status)
     return 0;
 }
 
+static inline uint32_t get_capabilities(struct domain *d)
+{
+    uint32_t capabilities = 0;
+
+    if ( !is_hvm_domain(d) || !cpu_has_vmx )
+        return capabilities;
+
+    capabilities = (1 << XEN_DOMCTL_MONITOR_EVENT_WRITE_CTRLREG) |
+                   (1 << XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR) |
+                   (1 << XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT);
+
+    /* Since we know this is on VMX, we can just call the hvm func */
+    if ( hvm_is_singlestep_supported() )
+        capabilities |= (1 << XEN_DOMCTL_MONITOR_EVENT_SINGLESTEP);
+
+    return capabilities;
+}
+
 int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
 {
     int rc;
     struct arch_domain *ad = &d->arch;
+    uint32_t capabilities = get_capabilities(d);
 
     rc = xsm_vm_event_control(XSM_PRIV, d, mop->op, mop->event);
     if ( rc )
@@ -55,14 +74,22 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
      * At the moment only Intel HVM domains are supported. However, event
      * delivery could be extended to AMD and PV domains.
      */
-    if ( !is_hvm_domain(d) || !cpu_has_vmx )
-        return -EOPNOTSUPP;
+
+    if ( mop->op == XEN_DOMCTL_MONITOR_OP_GET_CAPABILITIES )
+    {
+        mop->event = capabilities;
+        return 0;
+    }
 
     /*
      * Sanity check
      */
     if ( mop->op != XEN_DOMCTL_MONITOR_OP_ENABLE &&
          mop->op != XEN_DOMCTL_MONITOR_OP_DISABLE )
+        return -EOPNOTSUPP;
+
+    /* Check if event type is available. */
+    if ( !(capabilities & (1 << mop->event)) )
         return -EOPNOTSUPP;
 
     switch ( mop->event )
