@@ -503,10 +503,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 
     bind->port = port;
 
-#ifdef CONFIG_X86
-    if ( is_hvm_domain(d) && domain_pirq_to_irq(d, pirq) > 0 )
-        map_domain_emuirq_pirq(d, pirq, IRQ_PT);
-#endif
+    arch_evtchn_bind_pirq(d, pirq);
 
  out:
     spin_unlock(&d->event_lock);

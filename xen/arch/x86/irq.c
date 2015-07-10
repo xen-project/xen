@@ -2502,6 +2502,25 @@ int unmap_domain_pirq_emuirq(struct domain *d, int pirq)
     return ret;
 }
 
+void arch_evtchn_bind_pirq(struct domain *d, int pirq)
+{
+    int irq = domain_pirq_to_irq(d, pirq);
+    struct irq_desc *desc;
+    unsigned long flags;
+
+    if ( irq <= 0 )
+        return;
+
+    if ( is_hvm_domain(d) )
+        map_domain_emuirq_pirq(d, pirq, IRQ_PT);
+
+    desc = irq_to_desc(irq);
+    spin_lock_irqsave(&desc->lock, flags);
+    if ( desc->msi_desc )
+        guest_mask_msi_irq(desc, 0);
+    spin_unlock_irqrestore(&desc->lock, flags);
+}
+
 bool_t hvm_domain_use_pirq(const struct domain *d, const struct pirq *pirq)
 {
     return is_hvm_domain(d) && pirq &&

@@ -422,10 +422,7 @@ void guest_mask_msi_irq(struct irq_desc *desc, bool_t mask)
 
 static unsigned int startup_msi_irq(struct irq_desc *desc)
 {
-    bool_t guest_masked = (desc->status & IRQ_GUEST) &&
-                          is_hvm_domain(desc->msi_desc->dev->domain);
-
-    msi_set_mask_bit(desc, 0, guest_masked);
+    msi_set_mask_bit(desc, 0, !!(desc->status & IRQ_GUEST));
     return 0;
 }
 

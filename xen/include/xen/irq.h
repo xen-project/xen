@@ -172,4 +172,8 @@ unsigned int set_desc_affinity(struct irq_desc *, const cpumask_t *);
 unsigned int arch_hwdom_irqs(domid_t);
 #endif
 
+#ifndef arch_evtchn_bind_pirq
+void arch_evtchn_bind_pirq(struct domain *, int pirq);
+#endif
+
 #endif /* __XEN_IRQ_H__ */
