@@ -1096,7 +1096,8 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     libxl_domain_build_info_init_type(&dm_config->b_info, LIBXL_DOMAIN_TYPE_PV);
 
     dm_config->b_info.max_vcpus = 1;
-    dm_config->b_info.max_memkb = 32 * 1024;
+    dm_config->b_info.max_memkb = 28 * 1024 +
+        guest_config->b_info.video_memkb;
     dm_config->b_info.target_memkb = dm_config->b_info.max_memkb;
 
     dm_config->b_info.u.pv.features = "";
