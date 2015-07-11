@@ -42,6 +42,7 @@ static void helper_done(libxl__egc *egc, libxl__save_helper_state *shs);
 /*----- entrypoints -----*/
 
 void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
+                              libxl__save_helper_state *shs,
                               int hvm, int pae, int superpages)
 {
     STATE_AO_GC(dcs->ao);
@@ -51,8 +52,8 @@ void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
     const int restore_fd = dcs->libxc_fd;
     libxl__domain_build_state *const state = &dcs->build_state;
 
-    unsigned cbflags = libxl__srm_callout_enumcallbacks_restore
-        (&dcs->shs.callbacks.restore.a);
+    unsigned cbflags =
+        libxl__srm_callout_enumcallbacks_restore(&shs->callbacks.restore.a);
 
     const unsigned long argnums[] = {
         domid,
@@ -63,19 +64,20 @@ void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
         cbflags, dcs->restore_params.checkpointed_stream,
     };
 
-    dcs->shs.ao = ao;
-    dcs->shs.domid = domid;
-    dcs->shs.recv_callback = libxl__srm_callout_received_restore;
-    dcs->shs.completion_callback = libxl__xc_domain_restore_done;
-    dcs->shs.caller_state = dcs;
-    dcs->shs.need_results = 1;
-    dcs->shs.toolstack_data_file = 0;
+    shs->ao = ao;
+    shs->domid = domid;
+    shs->recv_callback = libxl__srm_callout_received_restore;
+    shs->completion_callback = libxl__xc_domain_restore_done;
+    shs->caller_state = dcs;
+    shs->need_results = 1;
+    shs->toolstack_data_file = 0;
 
-    run_helper(egc, &dcs->shs, "--restore-domain", restore_fd, 0,0,
+    run_helper(egc, shs, "--restore-domain", restore_fd, 0, 0,
                argnums, ARRAY_SIZE(argnums));
 }
 
-void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss)
+void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss,
+                           libxl__save_helper_state *shs)
 {
     STATE_AO_GC(dss->ao);
     int r, rc, toolstack_data_fd = -1;
@@ -84,21 +86,21 @@ void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss)
     /* Resources we need to free */
     uint8_t *toolstack_data_buf = 0;
 
-    unsigned cbflags = libxl__srm_callout_enumcallbacks_save
-        (&dss->shs.callbacks.save.a);
+    unsigned cbflags =
+        libxl__srm_callout_enumcallbacks_save(&shs->callbacks.save.a);
 
-    if (dss->shs.callbacks.save.toolstack_save) {
-        r = dss->shs.callbacks.save.toolstack_save
+    if (shs->callbacks.save.toolstack_save) {
+        r = shs->callbacks.save.toolstack_save
             (dss->domid, &toolstack_data_buf, &toolstack_data_len, dss);
         if (r) { rc = ERROR_FAIL; goto out; }
 
-        dss->shs.toolstack_data_file = tmpfile();
-        if (!dss->shs.toolstack_data_file) {
+        shs->toolstack_data_file = tmpfile();
+        if (!shs->toolstack_data_file) {
             LOGE(ERROR, "cannot create toolstack data tmpfile");
             rc = ERROR_FAIL;
             goto out;
         }
-        toolstack_data_fd = fileno(dss->shs.toolstack_data_file);
+        toolstack_data_fd = fileno(shs->toolstack_data_file);
 
         r = libxl_write_exactly(CTX, toolstack_data_fd,
                                 toolstack_data_buf, toolstack_data_len,
@@ -116,23 +118,23 @@ void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss)
         cbflags,
     };
 
-    dss->shs.ao = ao;
-    dss->shs.domid = dss->domid;
-    dss->shs.recv_callback = libxl__srm_callout_received_save;
-    dss->shs.completion_callback = libxl__xc_domain_save_done;
-    dss->shs.caller_state = dss;
-    dss->shs.need_results = 0;
+    shs->ao = ao;
+    shs->domid = dss->domid;
+    shs->recv_callback = libxl__srm_callout_received_save;
+    shs->completion_callback = libxl__xc_domain_save_done;
+    shs->caller_state = dss;
+    shs->need_results = 0;
 
     free(toolstack_data_buf);
 
-    run_helper(egc, &dss->shs, "--save-domain", dss->fd,
+    run_helper(egc, shs, "--save-domain", dss->fd,
                &toolstack_data_fd, 1,
                argnums, ARRAY_SIZE(argnums));
     return;
 
  out:
     free(toolstack_data_buf);
-    if (dss->shs.toolstack_data_file) fclose(dss->shs.toolstack_data_file);
+    if (shs->toolstack_data_file) fclose(shs->toolstack_data_file);
 
     libxl__xc_domain_save_done(egc, dss, rc, 0, 0);
 }

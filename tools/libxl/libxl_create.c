@@ -988,7 +988,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
         rc = ERROR_INVAL;
         goto out;
     }
-    libxl__xc_domain_restore(egc, dcs,
+    libxl__xc_domain_restore(egc, dcs, &dcs->shs,
                              hvm, pae, superpages);
     return;
 
@@ -1000,7 +1000,7 @@ void libxl__srm_callout_callback_restore_results(unsigned long store_mfn,
           unsigned long console_mfn, void *user)
 {
     libxl__save_helper_state *shs = user;
-    libxl__domain_create_state *dcs = CONTAINER_OF(shs, *dcs, shs);
+    libxl__domain_create_state *dcs = shs->caller_state;
     STATE_AO_GC(dcs->ao);
     libxl__domain_build_state *const state = &dcs->build_state;
 

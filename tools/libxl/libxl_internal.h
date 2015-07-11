@@ -3241,7 +3241,9 @@ _hidden void libxl__domain_suspend(libxl__egc *egc,
 
 
 /* calls libxl__xc_domain_suspend_done when done */
-_hidden void libxl__xc_domain_save(libxl__egc*, libxl__domain_suspend_state*);
+_hidden void libxl__xc_domain_save(libxl__egc *egc,
+                                   libxl__domain_suspend_state *dss,
+                                   libxl__save_helper_state *shs);
 /* If rc==0 then retval is the return value from xc_domain_save
  * and errnoval is the errno value it provided.
  * If rc!=0, retval and errnoval are undefined. */
@@ -3265,6 +3267,7 @@ _hidden int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
 /* calls libxl__xc_domain_restore_done when done */
 _hidden void libxl__xc_domain_restore(libxl__egc *egc,
                                       libxl__domain_create_state *dcs,
+                                      libxl__save_helper_state *shs,
                                       int hvm, int pae, int superpages);
 /* If rc==0 then retval is the return value from xc_domain_save
  * and errnoval is the errno value it provided.
