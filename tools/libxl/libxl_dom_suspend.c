@@ -375,11 +375,19 @@ static void domain_suspend_callback_common_done(libxl__egc *egc,
 
 int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
 {
+    const char *path, *state;
 
     switch (libxl__device_model_version_running(gc, domid)) {
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
-        libxl__qemu_traditional_cmd(gc, domid, "continue");
-        libxl__wait_for_device_model_deprecated(gc, domid, "running", NULL, NULL, NULL);
+        uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
+
+        path = libxl__device_model_xs_path(gc, dm_domid, domid, "/state");
+        state = libxl__xs_read(gc, XBT_NULL, path);
+        if (state != NULL && !strcmp(state, "paused")) {
+            libxl__qemu_traditional_cmd(gc, domid, "continue");
+            libxl__wait_for_device_model_deprecated(gc, domid, "running",
+                                                    NULL, NULL, NULL);
+        }
         break;
     }
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
