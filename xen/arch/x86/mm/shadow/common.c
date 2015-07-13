@@ -781,11 +781,11 @@ static void oos_hash_add(struct vcpu *v, mfn_t gmfn)
     if ( swap )
         SWAP(oos_snapshot[idx], oos_snapshot[oidx]);
 
-    gptr = sh_map_domain_page(oos[oidx]);
-    gsnpptr = sh_map_domain_page(oos_snapshot[oidx]);
+    gptr = map_domain_page(oos[oidx]);
+    gsnpptr = map_domain_page(oos_snapshot[oidx]);
     memcpy(gsnpptr, gptr, PAGE_SIZE);
-    sh_unmap_domain_page(gptr);
-    sh_unmap_domain_page(gsnpptr);
+    unmap_domain_page(gptr);
+    unmap_domain_page(gsnpptr);
 }
 
 /* Remove an MFN from the list of out-of-sync guest pagetables */
@@ -1498,7 +1498,7 @@ mfn_t shadow_alloc(struct domain *d,
         p = __map_domain_page(sp);
         ASSERT(p != NULL);
         clear_page(p);
-        sh_unmap_domain_page(p);
+        unmap_domain_page(p);
         INIT_PAGE_LIST_ENTRY(&sp->list);
         page_list_add(sp, &tmp_list);
         sp->u.sh.type = shadow_type;
@@ -2524,7 +2524,7 @@ static int sh_remove_shadow_via_pointer(struct domain *d, mfn_t smfn)
     if (sp->up == 0) return 0;
     pmfn = _mfn(sp->up >> PAGE_SHIFT);
     ASSERT(mfn_valid(pmfn));
-    vaddr = sh_map_domain_page(pmfn);
+    vaddr = map_domain_page(pmfn);
     ASSERT(vaddr);
     vaddr += sp->up & (PAGE_SIZE-1);
     ASSERT(l1e_get_pfn(*(l1_pgentry_t *)vaddr) == mfn_x(smfn));
@@ -2554,7 +2554,7 @@ static int sh_remove_shadow_via_pointer(struct domain *d, mfn_t smfn)
     default: BUG(); /* Some wierd unknown shadow type */
     }
 
-    sh_unmap_domain_page(vaddr);
+    unmap_domain_page(vaddr);
     if ( rc )
         perfc_incr(shadow_up_pointer);
     else
@@ -3028,7 +3028,7 @@ int shadow_enable(struct domain *d, u32 mode)
             e[i] = ((0x400000U * i)
                     | _PAGE_PRESENT | _PAGE_RW | _PAGE_USER
                     | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_PSE);
-        sh_unmap_domain_page(e);
+        unmap_domain_page(e);
         pg->u.inuse.type_info = PGT_l2_page_table | 1 | PGT_validated;
     }
 
@@ -3631,8 +3631,8 @@ int shadow_track_dirty_vram(struct domain *d,
                         if ( sl1mfn != map_mfn )
                         {
                             if ( map_sl1p )
-                                sh_unmap_domain_page(map_sl1p);
-                            map_sl1p = sh_map_domain_page(_mfn(sl1mfn));
+                                unmap_domain_page(map_sl1p);
+                            map_sl1p = map_domain_page(_mfn(sl1mfn));
                             map_mfn = sl1mfn;
                         }
                         sl1e = map_sl1p + (sl1ma & ~PAGE_MASK);
@@ -3663,7 +3663,7 @@ int shadow_track_dirty_vram(struct domain *d,
         }
 
         if ( map_sl1p )
-            sh_unmap_domain_page(map_sl1p);
+            unmap_domain_page(map_sl1p);
 
         memcpy(dirty_bitmap, dirty_vram->dirty_bitmap, dirty_size);
         memset(dirty_vram->dirty_bitmap, 0, dirty_size);

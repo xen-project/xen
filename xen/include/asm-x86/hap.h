@@ -32,21 +32,6 @@
     printk("hap error: %s(): " _f, __func__, ##_a)
 
 /************************************************/
-/*          hap domain page mapping             */
-/************************************************/
-static inline void *
-hap_map_domain_page(mfn_t mfn)
-{
-    return map_domain_page(mfn);
-}
-
-static inline void
-hap_unmap_domain_page(void *p)
-{
-    unmap_domain_page(p);
-}
-
-/************************************************/
 /*        hap domain level functions            */
 /************************************************/
 void  hap_domain_init(struct domain *d);

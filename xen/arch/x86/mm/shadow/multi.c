@@ -221,16 +221,16 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw, int version)
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
     l4p = (guest_l4e_t *)v->arch.paging.shadow.guest_vtable;
     mismatch |= (gw->l4e.l4 != l4p[guest_l4_table_offset(va)].l4);
-    l3p = sh_map_domain_page(gw->l3mfn);
+    l3p = map_domain_page(gw->l3mfn);
     mismatch |= (gw->l3e.l3 != l3p[guest_l3_table_offset(va)].l3);
-    sh_unmap_domain_page(l3p);
+    unmap_domain_page(l3p);
 #else
     mismatch |= (gw->l3e.l3 !=
                  v->arch.paging.shadow.gl3e[guest_l3_table_offset(va)].l3);
 #endif
-    l2p = sh_map_domain_page(gw->l2mfn);
+    l2p = map_domain_page(gw->l2mfn);
     mismatch |= (gw->l2e.l2 != l2p[guest_l2_table_offset(va)].l2);
-    sh_unmap_domain_page(l2p);
+    unmap_domain_page(l2p);
 #else
     l2p = (guest_l2e_t *)v->arch.paging.shadow.guest_vtable;
     mismatch |= (gw->l2e.l2 != l2p[guest_l2_table_offset(va)].l2);
@@ -238,9 +238,9 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw, int version)
     if ( !(guest_supports_superpages(v) &&
            (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE)) )
     {
-        l1p = sh_map_domain_page(gw->l1mfn);
+        l1p = map_domain_page(gw->l1mfn);
         mismatch |= (gw->l1e.l1 != l1p[guest_l1_table_offset(va)].l1);
-        sh_unmap_domain_page(l1p);
+        unmap_domain_page(l1p);
     }
 
     return !mismatch;
@@ -802,7 +802,7 @@ shadow_write_entries(void *d, void *s, int entries, mfn_t mfn)
     if ( __copy_to_user(d, d, sizeof (unsigned long)) != 0 )
     {
         perfc_incr(shadow_linear_map_failed);
-        map = sh_map_domain_page(mfn);
+        map = map_domain_page(mfn);
         dst = map + ((unsigned long)dst & (PAGE_SIZE - 1));
     }
 
@@ -810,7 +810,7 @@ shadow_write_entries(void *d, void *s, int entries, mfn_t mfn)
     for ( i = 0; i < entries; i++ )
         safe_write_entry(dst++, src++);
 
-    if ( map != NULL ) sh_unmap_domain_page(map);
+    if ( map != NULL ) unmap_domain_page(map);
 }
 
 /* type is only used to distinguish grant map pages from ordinary RAM
@@ -1256,7 +1256,7 @@ static inline void increment_ptr_to_guest_entry(void *ptr)
 #define _SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code)        \
 do {                                                                    \
     int _i;                                                             \
-    shadow_l1e_t *_sp = sh_map_domain_page((_sl1mfn));                  \
+    shadow_l1e_t *_sp = map_domain_page((_sl1mfn));                     \
     ASSERT(mfn_to_page(_sl1mfn)->u.sh.type == SH_type_l1_shadow  \
            || mfn_to_page(_sl1mfn)->u.sh.type == SH_type_fl1_shadow);\
     for ( _i = 0; _i < SHADOW_L1_PAGETABLE_ENTRIES; _i++ )              \
@@ -1267,7 +1267,7 @@ do {                                                                    \
         if ( _done ) break;                                             \
         increment_ptr_to_guest_entry(_gl1p);                            \
     }                                                                   \
-    sh_unmap_domain_page(_sp);                                          \
+    unmap_domain_page(_sp);                                             \
 } while (0)
 
 /* 32-bit l1, on PAE or 64-bit shadows: need to walk both pages of shadow */
@@ -1298,7 +1298,7 @@ do {                                                                      \
     ASSERT(mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2_32_shadow);      \
     for ( _j = 0; _j < 4 && !__done; _j++ )                               \
     {                                                                     \
-        shadow_l2e_t *_sp = sh_map_domain_page(_sl2mfn);                  \
+        shadow_l2e_t *_sp = map_domain_page(_sl2mfn);                     \
         for ( _i = 0; _i < SHADOW_L2_PAGETABLE_ENTRIES; _i += 2 )         \
         {                                                                 \
             (_sl2e) = _sp + _i;                                           \
@@ -1307,7 +1307,7 @@ do {                                                                      \
             if ( (__done = (_done)) ) break;                              \
             increment_ptr_to_guest_entry(_gl2p);                          \
         }                                                                 \
-        sh_unmap_domain_page(_sp);                                        \
+        unmap_domain_page(_sp);                                           \
         if ( _j < 3 ) _sl2mfn = sh_next_page(_sl2mfn);                    \
     }                                                                     \
 } while (0)
@@ -1318,7 +1318,7 @@ do {                                                                      \
 #define SHADOW_FOREACH_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)      \
 do {                                                                       \
     int _i;                                                                \
-    shadow_l2e_t *_sp = sh_map_domain_page((_sl2mfn));                     \
+    shadow_l2e_t *_sp = map_domain_page((_sl2mfn));                        \
     ASSERT(shadow_mode_external(_dom));                                    \
     ASSERT(mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2_pae_shadow        \
            || mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2h_pae_shadow);  \
@@ -1330,7 +1330,7 @@ do {                                                                       \
         if ( _done ) break;                                                \
         increment_ptr_to_guest_entry(_gl2p);                               \
     }                                                                      \
-    sh_unmap_domain_page(_sp);                                             \
+    unmap_domain_page(_sp);                                                \
 } while (0)
 
 #else
@@ -1340,7 +1340,7 @@ do {                                                                       \
 do {                                                                        \
     int _i;                                                                 \
     int _xen = !shadow_mode_external(_dom);                                 \
-    shadow_l2e_t *_sp = sh_map_domain_page((_sl2mfn));                      \
+    shadow_l2e_t *_sp = map_domain_page((_sl2mfn));                         \
     ASSERT(mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2_64_shadow ||\
            mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2h_64_shadow);\
     for ( _i = 0; _i < SHADOW_L2_PAGETABLE_ENTRIES; _i++ )                  \
@@ -1357,7 +1357,7 @@ do {                                                                        \
             increment_ptr_to_guest_entry(_gl2p);                            \
         }                                                                   \
     }                                                                       \
-    sh_unmap_domain_page(_sp);                                              \
+    unmap_domain_page(_sp);                                                 \
 } while (0)
 
 #endif /* different kinds of l2 */
@@ -1368,7 +1368,7 @@ do {                                                                        \
 #define SHADOW_FOREACH_L3E(_sl3mfn, _sl3e, _gl3p, _done, _code)         \
 do {                                                                    \
     int _i;                                                             \
-    shadow_l3e_t *_sp = sh_map_domain_page((_sl3mfn));                  \
+    shadow_l3e_t *_sp = map_domain_page((_sl3mfn));                     \
     ASSERT(mfn_to_page(_sl3mfn)->u.sh.type == SH_type_l3_64_shadow);\
     for ( _i = 0; _i < SHADOW_L3_PAGETABLE_ENTRIES; _i++ )              \
     {                                                                   \
@@ -1378,13 +1378,13 @@ do {                                                                    \
         if ( _done ) break;                                             \
         increment_ptr_to_guest_entry(_gl3p);                            \
     }                                                                   \
-    sh_unmap_domain_page(_sp);                                          \
+    unmap_domain_page(_sp);                                             \
 } while (0)
 
 /* 64-bit l4: avoid Xen mappings */
 #define SHADOW_FOREACH_L4E(_sl4mfn, _sl4e, _gl4p, _done, _dom, _code)   \
 do {                                                                    \
-    shadow_l4e_t *_sp = sh_map_domain_page((_sl4mfn));                  \
+    shadow_l4e_t *_sp = map_domain_page((_sl4mfn));                     \
     int _xen = !shadow_mode_external(_dom);                             \
     int _i;                                                             \
     ASSERT(mfn_to_page(_sl4mfn)->u.sh.type == SH_type_l4_64_shadow);\
@@ -1399,7 +1399,7 @@ do {                                                                    \
         }                                                               \
         increment_ptr_to_guest_entry(_gl4p);                            \
     }                                                                   \
-    sh_unmap_domain_page(_sp);                                          \
+    unmap_domain_page(_sp);                                             \
 } while (0)
 
 #endif
@@ -1419,7 +1419,7 @@ void sh_install_xen_entries_in_l4(struct domain *d, mfn_t gl4mfn, mfn_t sl4mfn)
     shadow_l4e_t *sl4e;
     unsigned int slots;
 
-    sl4e = sh_map_domain_page(sl4mfn);
+    sl4e = map_domain_page(sl4mfn);
     BUILD_BUG_ON(sizeof (l4_pgentry_t) != sizeof (shadow_l4e_t));
 
     /* Copy the common Xen mappings from the idle domain */
@@ -1462,7 +1462,7 @@ void sh_install_xen_entries_in_l4(struct domain *d, mfn_t gl4mfn, mfn_t sl4mfn)
             shadow_l4e_from_mfn(gl4mfn, __PAGE_HYPERVISOR);
     }
 
-    sh_unmap_domain_page(sl4e);
+    unmap_domain_page(sl4e);
 }
 #endif
 
@@ -1478,7 +1478,7 @@ static void sh_install_xen_entries_in_l2h(struct domain *d, mfn_t sl2hmfn)
     if ( !is_pv_32bit_domain(d) )
         return;
 
-    sl2e = sh_map_domain_page(sl2hmfn);
+    sl2e = map_domain_page(sl2hmfn);
     BUILD_BUG_ON(sizeof (l2_pgentry_t) != sizeof (shadow_l2e_t));
 
     /* Copy the common Xen mappings from the idle domain */
@@ -1487,7 +1487,7 @@ static void sh_install_xen_entries_in_l2h(struct domain *d, mfn_t sl2hmfn)
         &compat_idle_pg_table_l2[l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
         COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*sl2e));
 
-    sh_unmap_domain_page(sl2e);
+    unmap_domain_page(sl2e);
 }
 #endif
 
@@ -1607,7 +1607,7 @@ sh_make_monitor_table(struct vcpu *v)
             /* Install an l3 table and an l2 table that will hold the shadow
              * linear map entries.  This overrides the linear map entry that
              * was installed by sh_install_xen_entries_in_l4. */
-            l4e = sh_map_domain_page(m4mfn);
+            l4e = map_domain_page(m4mfn);
 
             m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
             mfn_to_page(m3mfn)->shadow_flags = 3;
@@ -1616,9 +1616,9 @@ sh_make_monitor_table(struct vcpu *v)
 
             m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
             mfn_to_page(m2mfn)->shadow_flags = 2;
-            l3e = sh_map_domain_page(m3mfn);
+            l3e = map_domain_page(m3mfn);
             l3e[0] = l3e_from_pfn(mfn_x(m2mfn), __PAGE_HYPERVISOR);
-            sh_unmap_domain_page(l3e);
+            unmap_domain_page(l3e);
 
             if ( is_pv_32bit_domain(d) )
             {
@@ -1630,13 +1630,13 @@ sh_make_monitor_table(struct vcpu *v)
 
                 m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
                 mfn_to_page(m2mfn)->shadow_flags = 2;
-                l3e = sh_map_domain_page(m3mfn);
+                l3e = map_domain_page(m3mfn);
                 l3e[3] = l3e_from_pfn(mfn_x(m2mfn), _PAGE_PRESENT);
                 sh_install_xen_entries_in_l2h(d, m2mfn);
-                sh_unmap_domain_page(l3e);
+                unmap_domain_page(l3e);
             }
 
-            sh_unmap_domain_page(l4e);
+            unmap_domain_page(l4e);
         }
 #endif /* SHADOW_PAGING_LEVELS < 4 */
         return m4mfn;
@@ -2029,7 +2029,7 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
 #if SHADOW_PAGING_LEVELS != 4
     {
         mfn_t m3mfn;
-        l4_pgentry_t *l4e = sh_map_domain_page(mmfn);
+        l4_pgentry_t *l4e = map_domain_page(mmfn);
         l3_pgentry_t *l3e;
         int linear_slot = shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START);
 
@@ -2037,10 +2037,10 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
          * for the linear map */
         ASSERT(l4e_get_flags(l4e[linear_slot]) & _PAGE_PRESENT);
         m3mfn = _mfn(l4e_get_pfn(l4e[linear_slot]));
-        l3e = sh_map_domain_page(m3mfn);
+        l3e = map_domain_page(m3mfn);
         ASSERT(l3e_get_flags(l3e[0]) & _PAGE_PRESENT);
         shadow_free(d, _mfn(l3e_get_pfn(l3e[0])));
-        sh_unmap_domain_page(l3e);
+        unmap_domain_page(l3e);
         shadow_free(d, m3mfn);
 
         if ( is_pv_32bit_domain(d) )
@@ -2049,13 +2049,13 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
              * Xen VAs at 3GB-4GB */
             ASSERT(l4e_get_flags(l4e[0]) & _PAGE_PRESENT);
             m3mfn = _mfn(l4e_get_pfn(l4e[0]));
-            l3e = sh_map_domain_page(m3mfn);
+            l3e = map_domain_page(m3mfn);
             ASSERT(l3e_get_flags(l3e[3]) & _PAGE_PRESENT);
             shadow_free(d, _mfn(l3e_get_pfn(l3e[3])));
-            sh_unmap_domain_page(l3e);
+            unmap_domain_page(l3e);
             shadow_free(d, m3mfn);
         }
-        sh_unmap_domain_page(l4e);
+        unmap_domain_page(l4e);
     }
 #endif
 
@@ -2293,9 +2293,9 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
 
         ASSERT(mfn_valid(snpmfn));
 
-        snp = sh_map_domain_page(snpmfn);
+        snp = map_domain_page(snpmfn);
         snp[guest_index(new_ge)] = new_gl1e;
-        sh_unmap_domain_page(snp);
+        unmap_domain_page(snp);
     }
 #endif /* OOS */
 
@@ -2322,8 +2322,8 @@ void sh_resync_l1(struct vcpu *v, mfn_t gl1mfn, mfn_t snpmfn)
     sl1mfn = get_shadow_status(d, gl1mfn, SH_type_l1_shadow);
     ASSERT(mfn_valid(sl1mfn)); /* Otherwise we would not have been called */
 
-    snp = sh_map_domain_page(snpmfn);
-    gp = sh_map_domain_page(gl1mfn);
+    snp = map_domain_page(snpmfn);
+    gp = map_domain_page(gl1mfn);
     gl1p = gp;
 
    SHADOW_FOREACH_L1E(sl1mfn, sl1p, &gl1p, 0, {
@@ -2345,8 +2345,8 @@ void sh_resync_l1(struct vcpu *v, mfn_t gl1mfn, mfn_t snpmfn)
         }
     });
 
-    sh_unmap_domain_page(gp);
-    sh_unmap_domain_page(snp);
+    unmap_domain_page(gp);
+    unmap_domain_page(snp);
 
     /* Setting shadow L1 entries should never need us to flush the TLB */
     ASSERT(!(rc & SHADOW_SET_FLUSH));
@@ -2442,7 +2442,7 @@ sh_map_and_validate(struct vcpu *v, mfn_t gmfn,
     guest_idx = guest_index(new_gp);
     map_mfn = smfn;
     shadow_idx = shadow_index(&map_mfn, guest_idx);
-    sl1p = sh_map_domain_page(map_mfn);
+    sl1p = map_domain_page(map_mfn);
 
     /* Validate one entry at a time */
     while ( size )
@@ -2454,8 +2454,8 @@ sh_map_and_validate(struct vcpu *v, mfn_t gmfn,
         {
             /* We have moved to another page of the shadow */
             map_mfn = smfn2;
-            sh_unmap_domain_page(sl1p);
-            sl1p = sh_map_domain_page(map_mfn);
+            unmap_domain_page(sl1p);
+            sl1p = map_domain_page(map_mfn);
         }
         result |= validate_ge(v,
                               new_gp,
@@ -2464,7 +2464,7 @@ sh_map_and_validate(struct vcpu *v, mfn_t gmfn,
         size -= sizeof(guest_l1e_t);
         new_gp += sizeof(guest_l1e_t);
     }
-    sh_unmap_domain_page(sl1p);
+    unmap_domain_page(sl1p);
     return result;
 }
 
@@ -2620,7 +2620,7 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
     if ( mfn_valid(gw->l1mfn) )
     {
         /* Normal guest page; grab the next guest entry */
-        gl1p = sh_map_domain_page(gw->l1mfn);
+        gl1p = map_domain_page(gw->l1mfn);
         gl1p += guest_l1_table_offset(gw->va);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
@@ -2629,7 +2629,7 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
             mfn_t snpmfn = oos_snapshot_lookup(d, gw->l1mfn);
 
             ASSERT(mfn_valid(snpmfn));
-            snpl1p = sh_map_domain_page(snpmfn);
+            snpl1p = map_domain_page(snpmfn);
             snpl1p += guest_l1_table_offset(gw->va);
         }
 #endif /* OOS */
@@ -2677,10 +2677,10 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
 #endif /* OOS */
     }
     if ( gl1p != NULL )
-        sh_unmap_domain_page(gl1p);
+        unmap_domain_page(gl1p);
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     if ( snpl1p != NULL )
-        sh_unmap_domain_page(snpl1p);
+        unmap_domain_page(snpl1p);
 #endif /* OOS */
 }
 
@@ -3169,9 +3169,9 @@ static int sh_page_fault(struct vcpu *v,
 
         ASSERT(mfn_valid(snpmfn));
 
-        snp = sh_map_domain_page(snpmfn);
+        snp = map_domain_page(snpmfn);
         snp[guest_l1_table_offset(va)] = gw.l1e;
-        sh_unmap_domain_page(snp);
+        unmap_domain_page(snp);
     }
 #endif /* OOS */
 
@@ -3695,11 +3695,11 @@ sh_update_linear_entries(struct vcpu *v)
         else
         {
             l4_pgentry_t *ml4e;
-            ml4e = sh_map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
+            ml4e = map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
             ml4e[l4_table_offset(SH_LINEAR_PT_VIRT_START)] =
                 l4e_from_pfn(pagetable_get_pfn(v->arch.shadow_table[0]),
                              __PAGE_HYPERVISOR);
-            sh_unmap_domain_page(ml4e);
+            unmap_domain_page(ml4e);
         }
     }
 
@@ -3733,17 +3733,17 @@ sh_update_linear_entries(struct vcpu *v)
             l4_pgentry_t *ml4e;
             l3_pgentry_t *ml3e;
             int linear_slot = shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START);
-            ml4e = sh_map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
+            ml4e = map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
 
             ASSERT(l4e_get_flags(ml4e[linear_slot]) & _PAGE_PRESENT);
             l3mfn = _mfn(l4e_get_pfn(ml4e[linear_slot]));
-            ml3e = sh_map_domain_page(l3mfn);
-            sh_unmap_domain_page(ml4e);
+            ml3e = map_domain_page(l3mfn);
+            unmap_domain_page(ml4e);
 
             ASSERT(l3e_get_flags(ml3e[0]) & _PAGE_PRESENT);
             l2mfn = _mfn(l3e_get_pfn(ml3e[0]));
-            ml2e = sh_map_domain_page(l2mfn);
-            sh_unmap_domain_page(ml3e);
+            ml2e = map_domain_page(l2mfn);
+            unmap_domain_page(ml3e);
         }
 
         /* Shadow l3 tables are made up by sh_update_cr3 */
@@ -3759,7 +3759,7 @@ sh_update_linear_entries(struct vcpu *v)
         }
 
         if ( v != current )
-            sh_unmap_domain_page(ml2e);
+            unmap_domain_page(ml2e);
     }
     else
         domain_crash(d); /* XXX */
@@ -4002,10 +4002,10 @@ sh_update_cr3(struct vcpu *v, int do_locking)
      // cache control.
      guest_idx &= ~3;
 
-     gl3e = ((guest_l3e_t *)sh_map_domain_page(gmfn)) + guest_idx;
+     gl3e = ((guest_l3e_t *)map_domain_page(gmfn)) + guest_idx;
      for ( i = 0; i < 4 ; i++ )
          v->arch.paging.shadow.gl3e[i] = gl3e[i];
-     sh_unmap_domain_page(gl3e);
+     unmap_domain_page(gl3e);
 #elif GUEST_PAGING_LEVELS == 2
     if ( shadow_mode_external(d) || shadow_mode_translate(d) )
     {
@@ -4213,14 +4213,14 @@ int sh_rm_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
              && sp->u.sh.type != SH_type_fl1_shadow) )
         goto fail;
 
-    sl1p = sh_map_domain_page(smfn);
+    sl1p = map_domain_page(smfn);
     sl1p += off;
     sl1e = *sl1p;
     if ( ((shadow_l1e_get_flags(sl1e) & (_PAGE_PRESENT|_PAGE_RW))
           != (_PAGE_PRESENT|_PAGE_RW))
          || (mfn_x(shadow_l1e_get_mfn(sl1e)) != mfn_x(gmfn)) )
     {
-        sh_unmap_domain_page(sl1p);
+        unmap_domain_page(sl1p);
         goto fail;
     }
 
@@ -4229,7 +4229,7 @@ int sh_rm_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
     r = shadow_set_l1e(d, sl1p, sl1e, p2m_ram_rw, smfn);
     ASSERT( !(r & SHADOW_SET_ERROR) );
 
-    sh_unmap_domain_page(sl1p);
+    unmap_domain_page(sl1p);
     perfc_incr(shadow_writeable_h_7);
     return 1;
 
@@ -4486,7 +4486,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
 
     if ( !fast_path )
     {
-        gl3pa = sh_map_domain_page(l3mfn);
+        gl3pa = map_domain_page(l3mfn);
         gl3e = (guest_l3e_t *)(gl3pa + ((unsigned long)gpa & ~PAGE_MASK));
     }
     for ( i = 0; i < 4; i++ )
@@ -4666,7 +4666,7 @@ static void *emulate_map_dest(struct vcpu *v,
     {
         /* Whole write fits on a single page */
         sh_ctxt->mfn2 = _mfn(INVALID_MFN);
-        map = sh_map_domain_page(sh_ctxt->mfn1) + (vaddr & ~PAGE_MASK);
+        map = map_domain_page(sh_ctxt->mfn1) + (vaddr & ~PAGE_MASK);
     }
     else
     {
@@ -4775,7 +4775,7 @@ static void emulate_unmap_dest(struct vcpu *v,
         vunmap((void *)((unsigned long)addr & PAGE_MASK));
     }
     else
-        sh_unmap_domain_page(addr);
+        unmap_domain_page(addr);
 
     atomic_inc(&v->domain->arch.paging.shadow.gtable_dirty_version);
 }
@@ -4946,7 +4946,7 @@ int sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
     }
 #endif
 
-    gl1e = gp = sh_map_domain_page(gl1mfn);
+    gl1e = gp = map_domain_page(gl1mfn);
     SHADOW_FOREACH_L1E(sl1mfn, sl1e, &gl1e, done, {
 
         if ( sh_l1e_is_magic(*sl1e) )
@@ -4987,7 +4987,7 @@ int sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
             }
         }
     });
-    sh_unmap_domain_page(gp);
+    unmap_domain_page(gp);
     return done;
 }
 
@@ -5038,7 +5038,7 @@ int sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
         AUDIT_FAIL_MIN(2, "gmfn %lx is out of sync", mfn_x(gl2mfn));
 #endif
 
-    gl2e = gp = sh_map_domain_page(gl2mfn);
+    gl2e = gp = map_domain_page(gl2mfn);
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, &gl2e, done, d, {
 
         s = sh_audit_flags(v, 2, guest_l2e_get_flags(*gl2e),
@@ -5064,7 +5064,7 @@ int sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
                                    gfn_x(gfn), &p2mt)), mfn_x(gmfn), mfn_x(mfn));
         }
     });
-    sh_unmap_domain_page(gp);
+    unmap_domain_page(gp);
     return 0;
 }
 
@@ -5090,7 +5090,7 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
         AUDIT_FAIL_MIN(3, "gmfn %lx is out of sync", mfn_x(gl3mfn));
 #endif
 
-    gl3e = gp = sh_map_domain_page(gl3mfn);
+    gl3e = gp = map_domain_page(gl3mfn);
     SHADOW_FOREACH_L3E(sl3mfn, sl3e, &gl3e, done, {
 
         s = sh_audit_flags(v, 3, guest_l3e_get_flags(*gl3e),
@@ -5115,7 +5115,7 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
                            gfn_x(gfn), mfn_x(gmfn), mfn_x(mfn));
         }
     });
-    sh_unmap_domain_page(gp);
+    unmap_domain_page(gp);
     return 0;
 }
 
@@ -5140,7 +5140,7 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
         AUDIT_FAIL_MIN(4, "gmfn %lx is out of sync", mfn_x(gl4mfn));
 #endif
 
-    gl4e = gp = sh_map_domain_page(gl4mfn);
+    gl4e = gp = map_domain_page(gl4mfn);
     SHADOW_FOREACH_L4E(sl4mfn, sl4e, &gl4e, done, d,
     {
         s = sh_audit_flags(v, 4, guest_l4e_get_flags(*gl4e),
@@ -5160,7 +5160,7 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
                            gfn_x(gfn), mfn_x(gmfn), mfn_x(mfn));
         }
     });
-    sh_unmap_domain_page(gp);
+    unmap_domain_page(gp);
     return 0;
 }
 #endif /* GUEST_PAGING_LEVELS >= 4 */

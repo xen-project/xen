@@ -504,19 +504,6 @@ sh_mfn_is_a_page_table(mfn_t gmfn)
     return type_info && (type_info <= PGT_l4_page_table);
 }
 
-// Provide mfn_t-aware versions of common xen functions
-static inline void *
-sh_map_domain_page(mfn_t mfn)
-{
-    return map_domain_page(mfn);
-}
-
-static inline void
-sh_unmap_domain_page(void *p)
-{
-    unmap_domain_page(p);
-}
-
 /**************************************************************************/
 /* Shadow-page refcounting. */
 

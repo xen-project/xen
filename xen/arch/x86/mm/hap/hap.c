@@ -395,7 +395,7 @@ static void hap_install_xen_entries_in_l4(struct vcpu *v, mfn_t l4mfn)
     struct domain *d = v->domain;
     l4_pgentry_t *l4e;
 
-    l4e = hap_map_domain_page(l4mfn);
+    l4e = map_domain_page(l4mfn);
 
     /* Copy the common Xen mappings from the idle domain */
     memcpy(&l4e[ROOT_PAGETABLE_FIRST_XEN_SLOT],
@@ -411,7 +411,7 @@ static void hap_install_xen_entries_in_l4(struct vcpu *v, mfn_t l4mfn)
     l4e[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_pfn(mfn_x(l4mfn), __PAGE_HYPERVISOR);
 
-    hap_unmap_domain_page(l4e);
+    unmap_domain_page(l4e);
 }
 
 static mfn_t hap_make_monitor_table(struct vcpu *v)
