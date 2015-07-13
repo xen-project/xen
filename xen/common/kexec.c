@@ -1003,6 +1003,24 @@ static int kexec_do_load_v1(xen_kexec_load_v1_t *load, int compat)
     if ( ret < 0 )
         goto error;
 
+    if ( arch == EM_386 || arch == EM_X86_64 )
+    {
+        /*
+         * Ensure 0 - 1 MiB is mapped and accessible by the image.
+         *
+         * This allows access to VGA memory and the region purgatory copies
+         * in the crash case.
+         */
+        unsigned long addr;
+
+        for ( addr = 0; addr < MB(1); addr += PAGE_SIZE )
+        {
+            ret = machine_kexec_add_page(kimage, addr, addr);
+            if ( ret < 0 )
+                goto error;
+        }
+    }
+
     ret = kexec_load_slot(kimage);
     if ( ret < 0 )
         goto error;
