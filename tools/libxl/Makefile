@@ -102,7 +102,8 @@ LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_json.o libxl_aoutils.o libxl_numa.o libxl_vnuma.o \
 			libxl_stream_read.o libxl_stream_write.o \
 			libxl_save_callout.o _libxl_save_msgs_callout.o \
-			libxl_qmp.o libxl_event.o libxl_fork.o $(LIBXL_OBJS-y)
+			libxl_qmp.o libxl_event.o libxl_fork.o \
+			libxl_dom_suspend.o $(LIBXL_OBJS-y)
 LIBXL_OBJS += libxl_genid.o
 LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 

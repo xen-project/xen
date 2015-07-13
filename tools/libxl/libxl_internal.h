@@ -3452,6 +3452,12 @@ _hidden void libxl__domain_save_device_model(libxl__egc *egc,
 
 _hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
 
+/* calls dss->callback_common_done when done */
+_hidden void libxl__domain_suspend(libxl__egc *egc,
+                                   libxl__domain_suspend_state *dss);
+/* used by libxc to suspend the guest during migration */
+_hidden void libxl__domain_suspend_callback(void *data);
+
 
 /*
  * Convenience macros.
