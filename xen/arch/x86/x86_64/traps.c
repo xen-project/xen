@@ -53,9 +53,11 @@ static void _show_registers(
     printk("\nRFLAGS: %016lx   ", regs->rflags);
     if ( (context == CTXT_pv_guest) && v && v->vcpu_info )
         printk("EM: %d   ", !!vcpu_info(v, evtchn_upcall_mask));
-    printk("CONTEXT: %s\n", context_names[context]);
+    printk("CONTEXT: %s", context_names[context]);
+    if ( v && !is_idle_vcpu(v) )
+        printk(" (%pv)", v);
 
-    printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
+    printk("\nrax: %016lx   rbx: %016lx   rcx: %016lx\n",
            regs->rax, regs->rbx, regs->rcx);
     printk("rdx: %016lx   rsi: %016lx   rdi: %016lx\n",
            regs->rdx, regs->rsi, regs->rdi);
