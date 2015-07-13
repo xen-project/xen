@@ -29,6 +29,8 @@
 /* Using SetVirtualAddressMap() is incompatible with kexec: */
 #undef USE_SET_VIRTUAL_ADDRESS_MAP
 
+#define EFI_REVISION(major, minor) (((major) << 16) | (minor))
+
 #define SHIM_LOCK_PROTOCOL_GUID \
   { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} }
 
@@ -59,6 +61,7 @@ struct file {
 };
 
 static EFI_BOOT_SERVICES *__initdata efi_bs;
+static UINT32 __initdata efi_bs_revision;
 static EFI_HANDLE __initdata efi_ih;
 
 static SIMPLE_TEXT_OUTPUT_INTERFACE *__initdata StdOut;
@@ -795,6 +798,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     efi_ih = ImageHandle;
     efi_bs = SystemTable->BootServices;
+    efi_bs_revision = efi_bs->Hdr.Revision;
     efi_rs = SystemTable->RuntimeServices;
     efi_ct = SystemTable->ConfigurationTable;
     efi_num_ct = SystemTable->NumberOfTableEntries;
@@ -1650,6 +1654,9 @@ void __init efi_init_memory(void)
             prot |= _PAGE_PAT | MAP_SMALL_PAGES;
         else if ( desc->Attribute & (EFI_MEMORY_UC | EFI_MEMORY_UCE) )
             prot |= _PAGE_PWT | _PAGE_PCD | MAP_SMALL_PAGES;
+        else if ( efi_bs_revision >= EFI_REVISION(2, 5) &&
+                  (desc->Attribute & EFI_MEMORY_WP) )
+            prot |= _PAGE_PAT | _PAGE_PWT | MAP_SMALL_PAGES;
         else
         {
             printk(XENLOG_ERR "Unknown cachability for MFNs %#lx-%#lx%s\n",
@@ -1659,7 +1666,8 @@ void __init efi_init_memory(void)
             prot |= _PAGE_PWT | _PAGE_PCD | MAP_SMALL_PAGES;
         }
 
-        if ( desc->Attribute & EFI_MEMORY_WP )
+        if ( desc->Attribute & (efi_bs_revision < EFI_REVISION(2, 5)
+                                ? EFI_MEMORY_WP : EFI_MEMORY_RO) )
             prot &= ~_PAGE_RW;
         if ( (desc->Attribute & EFI_MEMORY_XP) && cpu_has_nx )
             prot |= _PAGE_NX_BIT;
