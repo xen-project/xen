@@ -235,6 +235,10 @@ static unsigned elf_xen_parse_notes(struct elf_binary *elf,
           ELF_HANDLE_PTRVAL(note) < parms->elf_note_end;
           note = elf_note_next(elf, note) )
     {
+#ifdef __XEN__
+        process_pending_softirqs();
+#endif
+
         if ( *total_note_count >= ELF_MAX_TOTAL_NOTE_COUNT )
         {
             elf_mark_broken(elf, "too many ELF notes");
