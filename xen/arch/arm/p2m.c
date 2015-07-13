@@ -206,7 +206,7 @@ static paddr_t __p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
 
         /* Map for next level */
         unmap_domain_page(map);
-        map = map_domain_page(pte.p2m.base);
+        map = map_domain_page(_mfn(pte.p2m.base));
     }
 
     unmap_domain_page(map);
@@ -1078,7 +1078,7 @@ static int apply_p2m_changes(struct domain *d,
                 int i;
                 if ( mappings[level+1] )
                     unmap_domain_page(mappings[level+1]);
-                mappings[level+1] = map_domain_page(entry->p2m.base);
+                mappings[level+1] = map_domain_page(_mfn(entry->p2m.base));
                 cur_offset[level] = offset;
                 /* Any mapping further down is now invalid */
                 for ( i = level+1; i < 4; i++ )

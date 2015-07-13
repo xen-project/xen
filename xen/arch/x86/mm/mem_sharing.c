@@ -1210,8 +1210,8 @@ int __mem_sharing_unshare_page(struct domain *d,
         return -ENOMEM;
     }
 
-    s = map_domain_page(__page_to_mfn(old_page));
-    t = map_domain_page(__page_to_mfn(page));
+    s = map_domain_page(_mfn(__page_to_mfn(old_page)));
+    t = map_domain_page(_mfn(__page_to_mfn(page)));
     memcpy(t, s, PAGE_SIZE);
     unmap_domain_page(s);
     unmap_domain_page(t);

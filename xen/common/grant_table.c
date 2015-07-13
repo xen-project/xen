@@ -2427,7 +2427,7 @@ static int gnttab_copy_claim_buf(const struct gnttab_copy *op,
         buf->have_type = 1;
     }
 
-    buf->virt = map_domain_page(buf->frame);
+    buf->virt = map_domain_page(_mfn(buf->frame));
     rc = GNTST_okay;
 
  out:
@@ -2945,7 +2945,7 @@ static int __gnttab_cache_flush(gnttab_cache_flush_t *cflush,
         }
     }
 
-    v = map_domain_page(mfn);
+    v = map_domain_page(_mfn(mfn));
     v += cflush->offset;
 
     if ( (cflush->op & GNTTAB_CACHE_INVAL) && (cflush->op & GNTTAB_CACHE_CLEAN) )

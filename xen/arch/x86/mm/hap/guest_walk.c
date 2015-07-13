@@ -87,7 +87,7 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
 
     /* Map the top-level table and call the tree-walker */
     ASSERT(mfn_valid(mfn_x(top_mfn)));
-    top_map = map_domain_page(mfn_x(top_mfn));
+    top_map = map_domain_page(top_mfn);
 #if GUEST_PAGING_LEVELS == 3
     top_map += (cr3 & ~(PAGE_MASK | 31));
 #endif

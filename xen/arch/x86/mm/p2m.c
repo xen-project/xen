@@ -1285,7 +1285,7 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
         int rc;
 
         ASSERT( mfn_valid(mfn) );
-        guest_map = map_domain_page(mfn_x(mfn));
+        guest_map = map_domain_page(mfn);
         rc = copy_from_user(guest_map, user_ptr, PAGE_SIZE);
         unmap_domain_page(guest_map);
         if ( rc )

@@ -246,7 +246,7 @@ static void ept_free_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry, int l
 
     if ( level > 1 )
     {
-        ept_entry_t *epte = map_domain_page(ept_entry->mfn);
+        ept_entry_t *epte = map_domain_page(_mfn(ept_entry->mfn));
         for ( int i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
             ept_free_entry(p2m, epte + i, level - 1);
         unmap_domain_page(epte);
@@ -271,7 +271,7 @@ static int ept_split_super_page(struct p2m_domain *p2m, ept_entry_t *ept_entry,
     if ( !ept_set_middle_entry(p2m, &new_ept) )
         return 0;
 
-    table = map_domain_page(new_ept.mfn);
+    table = map_domain_page(_mfn(new_ept.mfn));
     trunk = 1UL << ((level - 1) * EPT_TABLE_ORDER);
 
     for ( int i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
@@ -359,7 +359,7 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
 
     mfn = e.mfn;
     unmap_domain_page(*table);
-    *table = map_domain_page(mfn);
+    *table = map_domain_page(_mfn(mfn));
     *gfn_remainder &= (1UL << shift) - 1;
     return GUEST_TABLE_NORMAL_PAGE;
 }
@@ -372,7 +372,7 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
 static bool_t ept_invalidate_emt(mfn_t mfn, bool_t recalc, int level)
 {
     int rc;
-    ept_entry_t *epte = map_domain_page(mfn_x(mfn));
+    ept_entry_t *epte = map_domain_page(mfn);
     unsigned int i;
     bool_t changed = 0;
 
@@ -414,7 +414,7 @@ static int ept_invalidate_emt_range(struct p2m_domain *p2m,
     unsigned int i, index;
     int wrc, rc = 0, ret = GUEST_TABLE_MAP_FAILED;
 
-    table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
+    table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
     for ( i = ept_get_wl(&p2m->ept); i > target; --i )
     {
         ret = ept_next_level(p2m, 1, &table, &gfn_remainder, i);
@@ -498,7 +498,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
         ept_entry_t e;
         unsigned int i;
 
-        epte = map_domain_page(mfn);
+        epte = map_domain_page(_mfn(mfn));
         i = (gfn >> (level * EPT_TABLE_ORDER)) & (EPT_PAGETABLE_ENTRIES - 1);
         e = atomic_read_ept_entry(&epte[i]);
 
@@ -689,7 +689,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
            (target == 0));
     ASSERT(!p2m_is_foreign(p2mt) || target == 0);
 
-    table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
+    table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
 
     ret = GUEST_TABLE_MAP_FAILED;
     for ( i = ept_get_wl(ept); i > target; i-- )
@@ -840,7 +840,7 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
                            unsigned long gfn, p2m_type_t *t, p2m_access_t* a,
                            p2m_query_t q, unsigned int *page_order)
 {
-    ept_entry_t *table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
+    ept_entry_t *table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
     unsigned long gfn_remainder = gfn;
     ept_entry_t *ept_entry;
     u32 index;
@@ -944,7 +944,7 @@ void ept_walk_table(struct domain *d, unsigned long gfn)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     struct ept_data *ept = &p2m->ept;
-    ept_entry_t *table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
+    ept_entry_t *table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
     unsigned long gfn_remainder = gfn;
 
     int i;
@@ -977,7 +977,7 @@ void ept_walk_table(struct domain *d, unsigned long gfn)
         {
             gfn_remainder &= (1UL << (i*EPT_TABLE_ORDER)) - 1;
 
-            next = map_domain_page(ept_entry->mfn);
+            next = map_domain_page(_mfn(ept_entry->mfn));
 
             unmap_domain_page(table);
 
@@ -1188,7 +1188,7 @@ static void ept_dump_p2m_table(unsigned char key)
             char c = 0;
 
             gfn_remainder = gfn;
-            table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
+            table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
 
             for ( i = ept_get_wl(ept); i > 0; i-- )
             {

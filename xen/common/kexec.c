@@ -912,7 +912,7 @@ static int kexec_segments_from_ind_page(unsigned long mfn,
     kimage_entry_t *entry;
     int ret = 0;
 
-    page = map_domain_page(mfn);
+    page = map_domain_page(_mfn(mfn));
 
     /*
      * Walk the indirection page list, adding destination pages to the
@@ -934,7 +934,7 @@ static int kexec_segments_from_ind_page(unsigned long mfn,
             break;
         case IND_INDIRECTION:
             unmap_domain_page(page);
-            entry = page = map_domain_page(mfn);
+            entry = page = map_domain_page(_mfn(mfn));
             continue;
         case IND_DONE:
             goto done;

@@ -175,7 +175,7 @@ void show_page_walk(unsigned long addr)
     if ( !is_canonical_address(addr) )
         return;
 
-    l4t = map_domain_page(mfn);
+    l4t = map_domain_page(_mfn(mfn));
     l4e = l4t[l4_table_offset(addr)];
     unmap_domain_page(l4t);
     mfn = l4e_get_pfn(l4e);
@@ -187,7 +187,7 @@ void show_page_walk(unsigned long addr)
          !mfn_valid(mfn) )
         return;
 
-    l3t = map_domain_page(mfn);
+    l3t = map_domain_page(_mfn(mfn));
     l3e = l3t[l3_table_offset(addr)];
     unmap_domain_page(l3t);
     mfn = l3e_get_pfn(l3e);
@@ -201,7 +201,7 @@ void show_page_walk(unsigned long addr)
          !mfn_valid(mfn) )
         return;
 
-    l2t = map_domain_page(mfn);
+    l2t = map_domain_page(_mfn(mfn));
     l2e = l2t[l2_table_offset(addr)];
     unmap_domain_page(l2t);
     mfn = l2e_get_pfn(l2e);
@@ -215,7 +215,7 @@ void show_page_walk(unsigned long addr)
          !mfn_valid(mfn) )
         return;
 
-    l1t = map_domain_page(mfn);
+    l1t = map_domain_page(_mfn(mfn));
     l1e = l1t[l1_table_offset(addr)];
     unmap_domain_page(l1t);
     mfn = l1e_get_pfn(l1e);
@@ -381,7 +381,7 @@ void __devinit subarch_percpu_traps_init(void)
     /* IST_MAX IST pages + 1 syscall page + 1 guard page + primary stack. */
     BUILD_BUG_ON((IST_MAX + 2) * PAGE_SIZE + PRIMARY_STACK_SIZE > STACK_SIZE);
 
-    stub_page = map_domain_page(this_cpu(stubs.mfn));
+    stub_page = map_domain_page(_mfn(this_cpu(stubs.mfn)));
 
     /* Trampoline for SYSCALL entry from 64-bit mode. */
     wrmsrl(MSR_LSTAR, stub_va);

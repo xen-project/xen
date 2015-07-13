@@ -630,7 +630,7 @@ static __init void pvh_fixup_page_tables_for_hap(struct vcpu *v,
 
     ASSERT(paging_mode_enabled(v->domain));
 
-    l4start = map_domain_page(pagetable_get_pfn(v->arch.guest_table));
+    l4start = map_domain_page(_mfn(pagetable_get_pfn(v->arch.guest_table)));
 
     /* Clear entries prior to guest L4 start */
     pl4e = l4start + l4_table_offset(v_start);
@@ -746,7 +746,7 @@ static __init void setup_pv_physmap(struct domain *d, unsigned long pgtbl_pfn,
                                     unsigned long nr_pages)
 {
     struct page_info *page = NULL;
-    l4_pgentry_t *pl4e, *l4start = map_domain_page(pgtbl_pfn);
+    l4_pgentry_t *pl4e, *l4start = map_domain_page(_mfn(pgtbl_pfn));
     l3_pgentry_t *pl3e = NULL;
     l2_pgentry_t *pl2e = NULL;
     l1_pgentry_t *pl1e = NULL;
@@ -789,7 +789,7 @@ static __init void setup_pv_physmap(struct domain *d, unsigned long pgtbl_pfn,
             clear_page(pl3e);
             *pl4e = l4e_from_page(page, L4_PROT);
         } else
-            pl3e = map_domain_page(l4e_get_pfn(*pl4e));
+            pl3e = map_domain_page(_mfn(l4e_get_pfn(*pl4e)));
 
         pl3e += l3_table_offset(vphysmap_start);
         if ( !l3e_get_intpte(*pl3e) )
@@ -816,7 +816,7 @@ static __init void setup_pv_physmap(struct domain *d, unsigned long pgtbl_pfn,
             *pl3e = l3e_from_page(page, L3_PROT);
         }
         else
-           pl2e = map_domain_page(l3e_get_pfn(*pl3e));
+            pl2e = map_domain_page(_mfn(l3e_get_pfn(*pl3e)));
 
         pl2e += l2_table_offset(vphysmap_start);
         if ( !l2e_get_intpte(*pl2e) )
@@ -844,7 +844,7 @@ static __init void setup_pv_physmap(struct domain *d, unsigned long pgtbl_pfn,
             *pl2e = l2e_from_page(page, L2_PROT);
         }
         else
-            pl1e = map_domain_page(l2e_get_pfn(*pl2e));
+            pl1e = map_domain_page(_mfn(l2e_get_pfn(*pl2e)));
 
         pl1e += l1_table_offset(vphysmap_start);
         BUG_ON(l1e_get_intpte(*pl1e));

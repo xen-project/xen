@@ -508,7 +508,7 @@ sh_mfn_is_a_page_table(mfn_t gmfn)
 static inline void *
 sh_map_domain_page(mfn_t mfn)
 {
-    return map_domain_page(mfn_x(mfn));
+    return map_domain_page(mfn);
 }
 
 static inline void

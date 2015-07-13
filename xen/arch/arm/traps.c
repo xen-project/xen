@@ -2293,7 +2293,7 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
         printk("Failed TTBR0 maddr lookup\n");
         goto done;
     }
-    first = map_domain_page(paddr>>PAGE_SHIFT);
+    first = map_domain_page(_mfn(paddr_to_pfn(paddr)));
 
     offset = addr >> (12+10);
     printk("1ST[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
@@ -2309,7 +2309,7 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
         printk("Failed L1 entry maddr lookup\n");
         goto done;
     }
-    second = map_domain_page(paddr>>PAGE_SHIFT);
+    second = map_domain_page(_mfn(paddr_to_pfn(paddr)));
     offset = (addr >> 12) & 0x3FF;
     printk("2ND[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
            offset, paddr, second[offset]);

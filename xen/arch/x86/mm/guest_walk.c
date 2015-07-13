@@ -121,7 +121,7 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
     *mfn = _mfn(page_to_mfn(page));
     ASSERT(mfn_valid(mfn_x(*mfn)));
 
-    map = map_domain_page(mfn_x(*mfn));
+    map = map_domain_page(*mfn);
     return map;
 }
 

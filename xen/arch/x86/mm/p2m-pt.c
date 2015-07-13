@@ -146,7 +146,7 @@ p2m_free_entry(struct p2m_domain *p2m, l1_pgentry_t *p2m_entry, int page_order)
 
     if ( page_order > PAGE_ORDER_2M )
     {
-        l1_pgentry_t *l3_table = map_domain_page(l1e_get_pfn(*p2m_entry));
+        l1_pgentry_t *l3_table = map_domain_page(_mfn(l1e_get_pfn(*p2m_entry)));
         for ( int i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
             p2m_free_entry(p2m, l3_table + i, page_order - 9);
         unmap_domain_page(l3_table);
@@ -280,7 +280,7 @@ p2m_next_level(struct p2m_domain *p2m, void **table,
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, new_entry, 2);
     }
 
-    next = map_domain_page(l1e_get_pfn(*p2m_entry));
+    next = map_domain_page(_mfn(l1e_get_pfn(*p2m_entry)));
     if ( unmap )
         unmap_domain_page(*table);
     *table = next;
@@ -304,7 +304,7 @@ static int p2m_pt_set_recalc_range(struct p2m_domain *p2m,
     l1_pgentry_t *pent, *plast;
     int err = 0;
 
-    table = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
+    table = map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
     for ( i = 4; i-- > level; )
     {
         remainder = gfn_remainder;
@@ -366,7 +366,7 @@ static int do_recalc(struct p2m_domain *p2m, unsigned long gfn)
     l1_pgentry_t *pent;
     int err = 0;
 
-    table = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
+    table = map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
     while ( --level )
     {
         unsigned long remainder = gfn_remainder;
@@ -524,7 +524,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     if ( rc < 0 )
         return rc;
 
-    table = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
+    table = map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
     rc = p2m_next_level(p2m, &table, &gfn_remainder, gfn,
                         L4_PAGETABLE_SHIFT - PAGE_SHIFT,
                         L4_PAGETABLE_ENTRIES, PGT_l3_page_table, 1);
@@ -716,7 +716,7 @@ p2m_pt_get_entry(struct p2m_domain *p2m, unsigned long gfn,
     mfn = pagetable_get_mfn(p2m_get_pagetable(p2m));
 
     {
-        l4_pgentry_t *l4e = map_domain_page(mfn_x(mfn));
+        l4_pgentry_t *l4e = map_domain_page(mfn);
         l4e += l4_table_offset(addr);
         if ( (l4e_get_flags(*l4e) & _PAGE_PRESENT) == 0 )
         {
@@ -728,7 +728,7 @@ p2m_pt_get_entry(struct p2m_domain *p2m, unsigned long gfn,
         unmap_domain_page(l4e);
     }
     {
-        l3_pgentry_t *l3e = map_domain_page(mfn_x(mfn));
+        l3_pgentry_t *l3e = map_domain_page(mfn);
         l3e += l3_table_offset(addr);
 pod_retry_l3:
         flags = l3e_get_flags(*l3e);
@@ -769,7 +769,7 @@ pod_retry_l3:
         unmap_domain_page(l3e);
     }
 
-    l2e = map_domain_page(mfn_x(mfn));
+    l2e = map_domain_page(mfn);
     l2e += l2_table_offset(addr);
 
 pod_retry_l2:
@@ -807,7 +807,7 @@ pod_retry_l2:
         recalc = 1;
     unmap_domain_page(l2e);
 
-    l1e = map_domain_page(mfn_x(mfn));
+    l1e = map_domain_page(mfn);
     l1e += l1_table_offset(addr);
 pod_retry_l1:
     flags = l1e_get_flags(*l1e);
@@ -849,7 +849,7 @@ static void p2m_pt_change_entry_type_global(struct p2m_domain *p2m,
 
     ASSERT(hap_enabled(p2m->domain));
 
-    tab = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
+    tab = map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
     for ( changed = i = 0; i < (1 << PAGETABLE_ORDER); ++i )
     {
         l1_pgentry_t e = tab[i];
@@ -929,7 +929,7 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
         l4_pgentry_t *l4e;
         l3_pgentry_t *l3e;
         int i4, i3;
-        l4e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
+        l4e = map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
 
         gfn = 0;
         for ( i4 = 0; i4 < L4_PAGETABLE_ENTRIES; i4++ )
@@ -939,7 +939,7 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
                 gfn += 1 << (L4_PAGETABLE_SHIFT - PAGE_SHIFT);
                 continue;
             }
-            l3e = map_domain_page(l4e_get_pfn(l4e[i4]));
+            l3e = map_domain_page(_mfn(l4e_get_pfn(l4e[i4])));
             for ( i3 = 0;
                   i3 < L3_PAGETABLE_ENTRIES;
                   i3++ )
@@ -974,7 +974,7 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
                     }
                 }
 
-                l2e = map_domain_page(l3e_get_pfn(l3e[i3]));
+                l2e = map_domain_page(_mfn(l3e_get_pfn(l3e[i3])));
                 for ( i2 = 0; i2 < L2_PAGETABLE_ENTRIES; i2++ )
                 {
                     if ( !(l2e_get_flags(l2e[i2]) & _PAGE_PRESENT) )
@@ -1010,7 +1010,7 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
                         continue;
                     }
 
-                    l1e = map_domain_page(l2e_get_pfn(l2e[i2]));
+                    l1e = map_domain_page(_mfn(l2e_get_pfn(l2e[i2])));
 
                     for ( i1 = 0; i1 < L1_PAGETABLE_ENTRIES; i1++, gfn++ )
                     {

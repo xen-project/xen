@@ -203,7 +203,7 @@ void guest_iommu_add_ppr_log(struct domain *d, u32 entry[])
                                     sizeof(ppr_entry_t), tail);
     ASSERT(mfn_valid(mfn));
 
-    log_base = map_domain_page(mfn);
+    log_base = map_domain_page(_mfn(mfn));
     log = log_base + tail % (PAGE_SIZE / sizeof(ppr_entry_t));
 
     /* Convert physical device id back into virtual device id */
@@ -252,7 +252,7 @@ void guest_iommu_add_event_log(struct domain *d, u32 entry[])
                                     sizeof(event_entry_t), tail);
     ASSERT(mfn_valid(mfn));
 
-    log_base = map_domain_page(mfn);
+    log_base = map_domain_page(_mfn(mfn));
     log = log_base + tail % (PAGE_SIZE / sizeof(event_entry_t));
 
     /* re-write physical device id into virtual device id */
@@ -377,7 +377,7 @@ static int do_completion_wait(struct domain *d, cmd_entry_t *cmd)
         gaddr_64 = (gaddr_hi << 32) | (gaddr_lo << 3);
 
         gfn = gaddr_64 >> PAGE_SHIFT;
-        vaddr = map_domain_page(mfn_x(get_gfn(d, gfn ,&p2mt)));
+        vaddr = map_domain_page(get_gfn(d, gfn ,&p2mt));
         put_gfn(d, gfn);
 
         write_u64_atomic((uint64_t *)(vaddr + (gaddr_64 & (PAGE_SIZE-1))),
@@ -425,7 +425,7 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
     ASSERT(mfn_valid(dte_mfn));
 
     /* Read guest dte information */
-    dte_base = map_domain_page(dte_mfn);
+    dte_base = map_domain_page(_mfn(dte_mfn));
 
     gdte = dte_base + gbdf % (PAGE_SIZE / sizeof(dev_entry_t));
 
@@ -506,7 +506,7 @@ static void guest_iommu_process_command(unsigned long _d)
                                             sizeof(cmd_entry_t), head);
         ASSERT(mfn_valid(cmd_mfn));
 
-        cmd_base = map_domain_page(cmd_mfn);
+        cmd_base = map_domain_page(_mfn(cmd_mfn));
         cmd = cmd_base + head % entries_per_page;
 
         opcode = get_field_from_reg_u32(cmd->data[1],

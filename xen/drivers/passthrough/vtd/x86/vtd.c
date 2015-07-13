@@ -41,7 +41,7 @@ boolean_param("iommu_inclusive_mapping", iommu_inclusive_mapping);
 
 void *map_vtd_domain_page(u64 maddr)
 {
-    return map_domain_page(maddr >> PAGE_SHIFT_4K);
+    return map_domain_page(_mfn(paddr_to_pfn(maddr)));
 }
 
 void unmap_vtd_domain_page(void *va)

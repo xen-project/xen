@@ -77,7 +77,7 @@ static inline void *cli_get_page(xen_pfn_t cmfn, unsigned long *pcli_mfn,
 
     *pcli_mfn = page_to_mfn(page);
     *pcli_pfp = page;
-    return map_domain_page(*pcli_mfn);
+    return map_domain_page(_mfn(*pcli_mfn));
 }
 
 static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
@@ -104,7 +104,7 @@ int tmem_copy_from_client(struct page_info *pfp,
 
     ASSERT(pfp != NULL);
     tmem_mfn = page_to_mfn(pfp);
-    tmem_va = map_domain_page(tmem_mfn);
+    tmem_va = map_domain_page(_mfn(tmem_mfn));
     if ( guest_handle_is_null(clibuf) )
     {
         cli_va = cli_get_page(cmfn, &cli_mfn, &cli_pfp, 0);
@@ -174,7 +174,7 @@ int tmem_copy_to_client(xen_pfn_t cmfn, struct page_info *pfp,
             return -EFAULT;
     }
     tmem_mfn = page_to_mfn(pfp);
-    tmem_va = map_domain_page(tmem_mfn);
+    tmem_va = map_domain_page(_mfn(tmem_mfn));
     if ( cli_va )
     {
         memcpy(cli_va, tmem_va, PAGE_SIZE);

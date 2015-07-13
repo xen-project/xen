@@ -495,10 +495,10 @@ static void kimage_terminate(struct kexec_image *image)
  * Call unmap_domain_page(ptr) after the loop exits.
  */
 #define for_each_kimage_entry(image, ptr, entry)                        \
-    for ( ptr = map_domain_page(image->head >> PAGE_SHIFT);             \
+    for ( ptr = map_domain_page(_mfn(paddr_to_pfn(image->head)));       \
           (entry = *ptr) && !(entry & IND_DONE);                        \
           ptr = (entry & IND_INDIRECTION) ?                             \
-              (unmap_domain_page(ptr), map_domain_page(entry >> PAGE_SHIFT)) \
+              (unmap_domain_page(ptr), map_domain_page(_mfn(paddr_to_pfn(entry)))) \
               : ptr + 1 )
 
 static void kimage_free_entry(kimage_entry_t entry)
@@ -748,7 +748,7 @@ static int kimage_load_crash_segment(struct kexec_image *image,
         dchunk = PAGE_SIZE;
         schunk = min(dchunk, sbytes);
 
-        dest_va = map_domain_page(dest_mfn);
+        dest_va = map_domain_page(_mfn(dest_mfn));
         if ( !dest_va )
             return -EINVAL;
 
@@ -866,7 +866,7 @@ int kimage_build_ind(struct kexec_image *image, unsigned long ind_mfn,
     int ret = 0;
     paddr_t dest = KIMAGE_NO_DEST;
 
-    page = map_domain_page(ind_mfn);
+    page = map_domain_page(_mfn(ind_mfn));
     if ( !page )
         return -ENOMEM;
 
@@ -892,7 +892,7 @@ int kimage_build_ind(struct kexec_image *image, unsigned long ind_mfn,
             break;
         case IND_INDIRECTION:
             unmap_domain_page(page);
-            page = map_domain_page(mfn);
+            page = map_domain_page(_mfn(mfn));
             entry = page;
             continue;
         case IND_DONE:

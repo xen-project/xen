@@ -376,7 +376,7 @@ guest_map_l1e(struct vcpu *v, unsigned long addr, unsigned long *gl1mfn)
          != _PAGE_PRESENT )
         return NULL;
     *gl1mfn = l2e_get_pfn(l2e);
-    return (l1_pgentry_t *)map_domain_page(*gl1mfn) + l1_table_offset(addr);
+    return (l1_pgentry_t *)map_domain_page(_mfn(*gl1mfn)) + l1_table_offset(addr);
 }
 
 /* Pull down the mapping we got from guest_map_l1e() */

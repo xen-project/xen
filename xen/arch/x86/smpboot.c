@@ -679,7 +679,7 @@ static void cpu_smpboot_free(unsigned int cpu)
     if ( per_cpu(stubs.addr, cpu) )
     {
         unsigned long mfn = per_cpu(stubs.mfn, cpu);
-        unsigned char *stub_page = map_domain_page(mfn);
+        unsigned char *stub_page = map_domain_page(_mfn(mfn));
         unsigned int i;
 
         memset(stub_page + STUB_BUF_CPU_OFFS(cpu), 0xcc, STUB_BUF_SIZE);

@@ -256,7 +256,7 @@ shadow_check_gl1e(struct vcpu *v, walk_t *gw)
         return 0;
 
     /* Can't just pull-through because mfn may have changed */
-    l1p = map_domain_page(mfn_x(gw->l1mfn));
+    l1p = map_domain_page(gw->l1mfn);
     nl1e.l1 = l1p[guest_l1_table_offset(gw->va)].l1;
     unmap_domain_page(l1p);
 
@@ -384,7 +384,7 @@ sh_guest_map_l1e(struct vcpu *v, unsigned long addr,
     {
         if ( gl1mfn )
             *gl1mfn = mfn_x(gw.l1mfn);
-        pl1e = map_domain_page(mfn_x(gw.l1mfn)) +
+        pl1e = map_domain_page(gw.l1mfn) +
             (guest_l1_table_offset(addr) * sizeof(guest_l1e_t));
     }
 

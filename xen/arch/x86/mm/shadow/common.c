@@ -3393,7 +3393,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
             if ( (l1e_get_flags(new) & _PAGE_PRESENT)
                  && !(l1e_get_flags(new) & _PAGE_PSE)
                  && mfn_valid(nmfn) )
-                npte = map_domain_page(mfn_x(nmfn));
+                npte = map_domain_page(nmfn);
 
             for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
             {

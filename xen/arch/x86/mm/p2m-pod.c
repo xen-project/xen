@@ -109,7 +109,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
      */
     for ( i = 0; i < (1 << order); i++ )
     {
-        char *b = map_domain_page(mfn_x(page_to_mfn(page)) + i);
+        char *b = map_domain_page(_mfn(mfn_x(page_to_mfn(page)) + i));
         clear_page(b);
         unmap_domain_page(b);
     }
@@ -710,7 +710,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     for ( i=0; i<SUPERPAGE_PAGES; i++ )
     {
         /* Quick zero-check */
-        map = map_domain_page(mfn_x(mfn0) + i);
+        map = map_domain_page(_mfn(mfn_x(mfn0) + i));
 
         for ( j=0; j<16; j++ )
             if( *(map+j) != 0 )
@@ -743,7 +743,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     /* Finally, do a full zero-check */
     for ( i=0; i < SUPERPAGE_PAGES; i++ )
     {
-        map = map_domain_page(mfn_x(mfn0) + i);
+        map = map_domain_page(_mfn(mfn_x(mfn0) + i));
 
         for ( j=0; j<PAGE_SIZE/sizeof(*map); j++ )
             if( *(map+j) != 0 )
@@ -815,7 +815,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
              && ( (mfn_to_page(mfns[i])->count_info & PGC_allocated) != 0 ) 
              && ( (mfn_to_page(mfns[i])->count_info & (PGC_page_table|PGC_xen_heap)) == 0 ) 
              && ( (mfn_to_page(mfns[i])->count_info & PGC_count_mask) <= max_ref ) )
-            map[i] = map_domain_page(mfn_x(mfns[i]));
+            map[i] = map_domain_page(mfns[i]);
         else
             map[i] = NULL;
     }

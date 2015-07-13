@@ -23,11 +23,11 @@
 #define cpu_has_amd_erratum(nr) \
         cpu_has_amd_erratum(&current_cpu_data, AMD_ERRATUM_##nr)
 
-#define get_stub(stb) ({                                   \
-    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < MAX_INST_LEN + 1);    \
-    (stb).addr = this_cpu(stubs.addr) + STUB_BUF_SIZE / 2; \
-    ((stb).ptr = map_domain_page(this_cpu(stubs.mfn))) +   \
-        ((stb).addr & ~PAGE_MASK);                         \
+#define get_stub(stb) ({                                        \
+    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < MAX_INST_LEN + 1);         \
+    (stb).addr = this_cpu(stubs.addr) + STUB_BUF_SIZE / 2;      \
+    ((stb).ptr = map_domain_page(_mfn(this_cpu(stubs.mfn)))) +  \
+        ((stb).addr & ~PAGE_MASK);                              \
 })
 #define put_stub(stb) ({                                   \
     if ( (stb).ptr )                                       \

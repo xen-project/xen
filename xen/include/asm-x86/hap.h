@@ -37,7 +37,7 @@
 static inline void *
 hap_map_domain_page(mfn_t mfn)
 {
-    return map_domain_page(mfn_x(mfn));
+    return map_domain_page(mfn);
 }
 
 static inline void

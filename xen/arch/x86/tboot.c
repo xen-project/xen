@@ -161,7 +161,7 @@ static void update_iommu_mac(vmac_ctx_t *ctx, uint64_t pt_maddr, int level)
     if ( pt_maddr == 0 )
         return;
 
-    pt_vaddr = (struct dma_pte *)map_domain_page(pt_maddr >> PAGE_SHIFT_4K);
+    pt_vaddr = (struct dma_pte *)map_domain_page(_mfn(paddr_to_pfn(pt_maddr)));
     vmac_update((void *)pt_vaddr, PAGE_SIZE, ctx);
 
     for ( i = 0; i < PTE_NUM; i++ )
@@ -194,7 +194,8 @@ static void update_pagetable_mac(vmac_ctx_t *ctx)
         {
             if ( page->count_info & PGC_page_table )
             {
-                void *pg = map_domain_page(mfn);
+                void *pg = map_domain_page(_mfn(mfn));
+
                 vmac_update(pg, PAGE_SIZE, ctx);
                 unmap_domain_page(pg);
             }

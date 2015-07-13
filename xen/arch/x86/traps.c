@@ -1325,7 +1325,7 @@ static enum pf_type __page_fault_type(
 
     mfn = cr3 >> PAGE_SHIFT;
 
-    l4t = map_domain_page(mfn);
+    l4t = map_domain_page(_mfn(mfn));
     l4e = l4e_read_atomic(&l4t[l4_table_offset(addr)]);
     mfn = l4e_get_pfn(l4e);
     unmap_domain_page(l4t);
@@ -1334,7 +1334,7 @@ static enum pf_type __page_fault_type(
         return real_fault;
     page_user &= l4e_get_flags(l4e);
 
-    l3t  = map_domain_page(mfn);
+    l3t  = map_domain_page(_mfn(mfn));
     l3e = l3e_read_atomic(&l3t[l3_table_offset(addr)]);
     mfn = l3e_get_pfn(l3e);
     unmap_domain_page(l3t);
@@ -1345,7 +1345,7 @@ static enum pf_type __page_fault_type(
     if ( l3e_get_flags(l3e) & _PAGE_PSE )
         goto leaf;
 
-    l2t = map_domain_page(mfn);
+    l2t = map_domain_page(_mfn(mfn));
     l2e = l2e_read_atomic(&l2t[l2_table_offset(addr)]);
     mfn = l2e_get_pfn(l2e);
     unmap_domain_page(l2t);
@@ -1356,7 +1356,7 @@ static enum pf_type __page_fault_type(
     if ( l2e_get_flags(l2e) & _PAGE_PSE )
         goto leaf;
 
-    l1t = map_domain_page(mfn);
+    l1t = map_domain_page(_mfn(mfn));
     l1e = l1e_read_atomic(&l1t[l1_table_offset(addr)]);
     mfn = l1e_get_pfn(l1e);
     unmap_domain_page(l1t);
@@ -2201,7 +2201,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
      * context. This is needed for some systems which (ab)use IN/OUT
      * to communicate with BIOS code in system-management mode.
      */
-    io_emul_stub = map_domain_page(this_cpu(stubs.mfn)) +
+    io_emul_stub = map_domain_page(_mfn(this_cpu(stubs.mfn))) +
                    (this_cpu(stubs.addr) & ~PAGE_MASK) +
                    STUB_BUF_SIZE / 2;
     /* movq $host_to_guest_gpr_switch,%rcx */
@@ -2397,7 +2397,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             else
             {
                 l4_pgentry_t *pl4e =
-                    map_domain_page(pagetable_get_pfn(v->arch.guest_table));
+                    map_domain_page(_mfn(pagetable_get_pfn(v->arch.guest_table)));
 
                 mfn = l4e_get_pfn(*pl4e);
                 unmap_domain_page(pl4e);

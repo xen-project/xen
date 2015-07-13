@@ -1174,7 +1174,7 @@ static int alloc_l1_table(struct page_info *page)
     unsigned int   i;
     int            ret = 0;
 
-    pl1e = map_domain_page(pfn);
+    pl1e = map_domain_page(_mfn(pfn));
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
@@ -1255,7 +1255,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type,
     unsigned int   i;
     int            rc = 0;
 
-    pl2e = map_domain_page(pfn);
+    pl2e = map_domain_page(_mfn(pfn));
 
     for ( i = page->nr_validated_ptes; i < L2_PAGETABLE_ENTRIES; i++ )
     {
@@ -1304,7 +1304,7 @@ static int alloc_l3_table(struct page_info *page)
     unsigned int   i;
     int            rc = 0, partial = page->partial_pte;
 
-    pl3e = map_domain_page(pfn);
+    pl3e = map_domain_page(_mfn(pfn));
 
     /*
      * PAE guests allocate full pages, but aren't required to initialize
@@ -1396,7 +1396,7 @@ void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d,
 
 void fill_ro_mpt(unsigned long mfn)
 {
-    l4_pgentry_t *l4tab = map_domain_page(mfn);
+    l4_pgentry_t *l4tab = map_domain_page(_mfn(mfn));
 
     l4tab[l4_table_offset(RO_MPT_VIRT_START)] =
         idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)];
@@ -1405,7 +1405,7 @@ void fill_ro_mpt(unsigned long mfn)
 
 void zap_ro_mpt(unsigned long mfn)
 {
-    l4_pgentry_t *l4tab = map_domain_page(mfn);
+    l4_pgentry_t *l4tab = map_domain_page(_mfn(mfn));
 
     l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
     unmap_domain_page(l4tab);
@@ -1415,7 +1415,7 @@ static int alloc_l4_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
     unsigned long  pfn = page_to_mfn(page);
-    l4_pgentry_t  *pl4e = map_domain_page(pfn);
+    l4_pgentry_t  *pl4e = map_domain_page(_mfn(pfn));
     unsigned int   i;
     int            rc = 0, partial = page->partial_pte;
 
@@ -1471,7 +1471,7 @@ static void free_l1_table(struct page_info *page)
     l1_pgentry_t *pl1e;
     unsigned int  i;
 
-    pl1e = map_domain_page(pfn);
+    pl1e = map_domain_page(_mfn(pfn));
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         if ( is_guest_l1_slot(i) )
@@ -1489,7 +1489,7 @@ static int free_l2_table(struct page_info *page, int preemptible)
     unsigned int  i = page->nr_validated_ptes - 1;
     int err = 0;
 
-    pl2e = map_domain_page(pfn);
+    pl2e = map_domain_page(_mfn(pfn));
 
     ASSERT(page->nr_validated_ptes);
     do {
@@ -1518,7 +1518,7 @@ static int free_l3_table(struct page_info *page)
     int rc = 0, partial = page->partial_pte;
     unsigned int  i = page->nr_validated_ptes - !partial;
 
-    pl3e = map_domain_page(pfn);
+    pl3e = map_domain_page(_mfn(pfn));
 
     do {
         if ( is_guest_l3_slot(i) )
@@ -1553,7 +1553,7 @@ static int free_l4_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
     unsigned long pfn = page_to_mfn(page);
-    l4_pgentry_t *pl4e = map_domain_page(pfn);
+    l4_pgentry_t *pl4e = map_domain_page(_mfn(pfn));
     int rc = 0, partial = page->partial_pte;
     unsigned int  i = page->nr_validated_ptes - !partial;
 
@@ -2653,7 +2653,7 @@ int vcpu_destroy_pagetables(struct vcpu *v)
 
     if ( is_pv_32bit_vcpu(v) )
     {
-        l4tab = map_domain_page(mfn);
+        l4tab = map_domain_page(_mfn(mfn));
         mfn = l4e_get_pfn(*l4tab);
     }
 
@@ -2709,7 +2709,7 @@ int new_guest_cr3(unsigned long mfn)
     if ( is_pv_32bit_domain(d) )
     {
         unsigned long gt_mfn = pagetable_get_pfn(curr->arch.guest_table);
-        l4_pgentry_t *pl4e = map_domain_page(gt_mfn);
+        l4_pgentry_t *pl4e = map_domain_page(_mfn(gt_mfn));
 
         rc = paging_mode_refcounts(d)
              ? -EINVAL /* Old code was broken, but what should it be? */
@@ -3768,7 +3768,7 @@ static int create_grant_pte_mapping(
     }
     
     mfn = page_to_mfn(page);
-    va = map_domain_page(mfn);
+    va = map_domain_page(_mfn(mfn));
     va = (void *)((unsigned long)va + ((unsigned long)pte_addr & ~PAGE_MASK));
 
     if ( !page_lock(page) )
@@ -3823,7 +3823,7 @@ static int destroy_grant_pte_mapping(
     }
     
     mfn = page_to_mfn(page);
-    va = map_domain_page(mfn);
+    va = map_domain_page(_mfn(mfn));
     va = (void *)((unsigned long)va + ((unsigned long)addr & ~PAGE_MASK));
 
     if ( !page_lock(page) )
@@ -4501,7 +4501,7 @@ long do_update_descriptor(u64 pa, u64 desc)
     paging_mark_dirty(dom, mfn);
 
     /* All is good so make the update. */
-    gdt_pent = map_domain_page(mfn);
+    gdt_pent = map_domain_page(_mfn(mfn));
     write_atomic((uint64_t *)&gdt_pent[offset], *(uint64_t *)&d);
     unmap_domain_page(gdt_pent);
 
@@ -5039,7 +5039,7 @@ static int ptwr_emulated_update(
     adjust_guest_l1e(nl1e, d);
 
     /* Checked successfully: do the update (write or cmpxchg). */
-    pl1e = map_domain_page(mfn);
+    pl1e = map_domain_page(_mfn(mfn));
     pl1e = (l1_pgentry_t *)((unsigned long)pl1e + (addr & ~PAGE_MASK));
     if ( do_cmpxchg )
     {
@@ -5954,7 +5954,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
         l3tab[l3_table_offset(va)] = l3e_from_page(pg, __PAGE_HYPERVISOR);
     }
     else
-        l2tab = map_domain_page(l3e_get_pfn(l3tab[l3_table_offset(va)]));
+        l2tab = map_domain_page(_mfn(l3e_get_pfn(l3tab[l3_table_offset(va)])));
 
     unmap_domain_page(l3tab);
 
@@ -5996,7 +5996,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
             *pl2e = l2e_from_page(pg, __PAGE_HYPERVISOR);
         }
         else if ( !l1tab )
-            l1tab = map_domain_page(l2e_get_pfn(*pl2e));
+            l1tab = map_domain_page(_mfn(l2e_get_pfn(*pl2e)));
 
         if ( ppg &&
              !(l1e_get_flags(l1tab[l1_table_offset(va)]) & _PAGE_PRESENT) )
@@ -6047,7 +6047,7 @@ void destroy_perdomain_mapping(struct domain *d, unsigned long va,
 
     if ( l3e_get_flags(*pl3e) & _PAGE_PRESENT )
     {
-        const l2_pgentry_t *l2tab = map_domain_page(l3e_get_pfn(*pl3e));
+        const l2_pgentry_t *l2tab = map_domain_page(_mfn(l3e_get_pfn(*pl3e)));
         const l2_pgentry_t *pl2e = l2tab + l2_table_offset(va);
         unsigned int i = l1_table_offset(va);
 
@@ -6055,7 +6055,7 @@ void destroy_perdomain_mapping(struct domain *d, unsigned long va,
         {
             if ( l2e_get_flags(*pl2e) & _PAGE_PRESENT )
             {
-                l1_pgentry_t *l1tab = map_domain_page(l2e_get_pfn(*pl2e));
+                l1_pgentry_t *l1tab = map_domain_page(_mfn(l2e_get_pfn(*pl2e)));
 
                 for ( ; nr && i < L1_PAGETABLE_ENTRIES; --nr, ++i )
                 {

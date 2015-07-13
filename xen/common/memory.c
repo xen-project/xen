@@ -1172,7 +1172,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 void clear_domain_page(mfn_t mfn)
 {
-    void *ptr = map_domain_page(mfn_x(mfn));
+    void *ptr = map_domain_page(mfn);
 
     clear_page(ptr);
     unmap_domain_page(ptr);
@@ -1180,8 +1180,8 @@ void clear_domain_page(mfn_t mfn)
 
 void copy_domain_page(mfn_t dest, mfn_t source)
 {
-    const void *src = map_domain_page(mfn_x(source));
-    void *dst = map_domain_page(mfn_x(dest));
+    const void *src = map_domain_page(source);
+    void *dst = map_domain_page(dest);
 
     copy_page(dst, src);
     unmap_domain_page(dst);

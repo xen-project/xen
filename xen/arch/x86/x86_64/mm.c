@@ -59,7 +59,7 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
     if ( !is_pv_vcpu(v) || !is_canonical_address(addr) )
         return NULL;
 
-    l4t = map_domain_page(mfn);
+    l4t = map_domain_page(_mfn(mfn));
     l4e = l4t[l4_table_offset(addr)];
     unmap_domain_page(l4t);
     if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
@@ -77,7 +77,7 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
         goto ret;
     }
 
-    l2t = map_domain_page(mfn);
+    l2t = map_domain_page(_mfn(mfn));
     l2e = l2t[l2_table_offset(addr)];
     unmap_domain_page(l2t);
     mfn = l2e_get_pfn(l2e);
@@ -89,7 +89,7 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
         goto ret;
     }
 
-    l1t = map_domain_page(mfn);
+    l1t = map_domain_page(_mfn(mfn));
     l1e = l1t[l1_table_offset(addr)];
     unmap_domain_page(l1t);
     mfn = l1e_get_pfn(l1e);
@@ -97,7 +97,7 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
         return NULL;
 
  ret:
-    return map_domain_page(mfn) + (addr & ~PAGE_MASK);
+    return map_domain_page(_mfn(mfn)) + (addr & ~PAGE_MASK);
 }
 
 /*
@@ -1197,7 +1197,7 @@ int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs)
 
     mfn = (read_cr3()) >> PAGE_SHIFT;
 
-    pl4e = map_domain_page(mfn);
+    pl4e = map_domain_page(_mfn(mfn));
 
     l4e = pl4e[0];
 
@@ -1206,7 +1206,7 @@ int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs)
 
     mfn = l4e_get_pfn(l4e);
     /* We don't need get page type here since it is current CR3 */
-    pl3e = map_domain_page(mfn);
+    pl3e = map_domain_page(_mfn(mfn));
 
     l3e = pl3e[3];
 
@@ -1214,7 +1214,7 @@ int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs)
         goto unmap;
 
     mfn = l3e_get_pfn(l3e);
-    pl2e = map_domain_page(mfn);
+    pl2e = map_domain_page(_mfn(mfn));
 
     l2e = pl2e[l2_table_offset(addr)];
 
