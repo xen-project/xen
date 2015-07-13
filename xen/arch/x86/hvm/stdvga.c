@@ -492,11 +492,18 @@ static bool_t stdvga_mem_accept(const struct hvm_io_handler *handler,
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
 
+    /*
+     * The range check must be done without taking the lock, to avoid
+     * deadlock when hvm_mmio_internal() is called from
+     * hvm_copy_to/from_guest_phys() in hvm_process_io_intercept().
+     */
+    if ( (hvm_mmio_first_byte(p) < VGA_MEM_BASE) ||
+         (hvm_mmio_last_byte(p) >= (VGA_MEM_BASE + VGA_MEM_SIZE)) )
+        return 0;
+
     spin_lock(&s->lock);
 
-    if ( !s->stdvga ||
-         (hvm_mmio_first_byte(p) < VGA_MEM_BASE) ||
-         (hvm_mmio_last_byte(p) >= (VGA_MEM_BASE + VGA_MEM_SIZE)) )
+    if ( !s->stdvga )
         goto reject;
 
     if ( p->dir == IOREQ_WRITE && p->count > 1 )
