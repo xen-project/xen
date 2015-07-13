@@ -923,6 +923,11 @@ int kimage_build_ind(struct kexec_image *image, unsigned long ind_mfn,
             ret = kimage_add_page(image, page_to_maddr(xen_page));
             if ( ret < 0 )
                 goto done;
+
+            ret = machine_kexec_add_page(image, dest, dest);
+            if ( ret < 0 )
+                goto done;
+
             dest += PAGE_SIZE;
             break;
         }
