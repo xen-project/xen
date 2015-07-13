@@ -86,7 +86,7 @@ void show_registers(struct cpu_user_regs *regs)
     struct cpu_user_regs fault_regs = *regs;
     unsigned long fault_crs[8];
     enum context context;
-    struct vcpu *v = current;
+    struct vcpu *v = this_cpu(curr_vcpu) ? current : NULL;
 
     if ( has_hvm_container_vcpu(v) && guest_mode(regs) )
     {
