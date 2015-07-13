@@ -666,12 +666,18 @@ void cpu_exit_clear(unsigned int cpu)
 static void cpu_smpboot_free(unsigned int cpu)
 {
     unsigned int order, socket = cpu_to_socket(cpu);
+    struct cpuinfo_x86 *c = cpu_data;
 
     if ( cpumask_empty(socket_cpumask[socket]) )
     {
         xfree(socket_cpumask[socket]);
         socket_cpumask[socket] = NULL;
     }
+
+    c[cpu].phys_proc_id = XEN_INVALID_SOCKET_ID;
+    c[cpu].cpu_core_id = XEN_INVALID_CORE_ID;
+    c[cpu].compute_unit_id = INVALID_CUID;
+    cpumask_clear_cpu(cpu, &cpu_sibling_setup_map);
 
     free_cpumask_var(per_cpu(cpu_sibling_mask, cpu));
     free_cpumask_var(per_cpu(cpu_core_mask, cpu));
@@ -882,7 +888,6 @@ static void
 remove_siblinginfo(int cpu)
 {
     int sibling;
-    struct cpuinfo_x86 *c = cpu_data;
 
     cpumask_clear_cpu(cpu, socket_cpumask[cpu_to_socket(cpu)]);
 
@@ -891,17 +896,13 @@ remove_siblinginfo(int cpu)
         cpumask_clear_cpu(cpu, per_cpu(cpu_core_mask, sibling));
         /* Last thread sibling in this cpu core going down. */
         if ( cpumask_weight(per_cpu(cpu_sibling_mask, cpu)) == 1 )
-            c[sibling].booted_cores--;
+            cpu_data[sibling].booted_cores--;
     }
    
     for_each_cpu(sibling, per_cpu(cpu_sibling_mask, cpu))
         cpumask_clear_cpu(cpu, per_cpu(cpu_sibling_mask, sibling));
     cpumask_clear(per_cpu(cpu_sibling_mask, cpu));
     cpumask_clear(per_cpu(cpu_core_mask, cpu));
-    c[cpu].phys_proc_id = XEN_INVALID_SOCKET_ID;
-    c[cpu].cpu_core_id = XEN_INVALID_CORE_ID;
-    c[cpu].compute_unit_id = INVALID_CUID;
-    cpumask_clear_cpu(cpu, &cpu_sibling_setup_map);
 }
 
 void __cpu_disable(void)
