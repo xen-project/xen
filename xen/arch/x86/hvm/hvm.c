@@ -2561,10 +2561,9 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
     return d->arch.hvm_domain.default_ioreq_server;
 }
 
-int hvm_buffered_io_send(ioreq_t *p)
+static int hvm_send_buffered_ioreq(struct hvm_ioreq_server *s, ioreq_t *p)
 {
     struct domain *d = current->domain;
-    struct hvm_ioreq_server *s = hvm_select_ioreq_server(d, p);
     struct hvm_ioreq_page *iorp;
     buffered_iopage_t *pg;
     buf_ioreq_t bp = { .data = p->data,
@@ -2577,14 +2576,11 @@ int hvm_buffered_io_send(ioreq_t *p)
     /* Ensure buffered_iopage fits in a page */
     BUILD_BUG_ON(sizeof(buffered_iopage_t) > PAGE_SIZE);
 
-    if ( !s )
-        return 0;
-
     iorp = &s->bufioreq;
     pg = iorp->va;
 
     if ( !pg )
-        return 0;
+        return X86EMUL_UNHANDLEABLE;
 
     /*
      * Return 0 for the cases we can't deal with:
@@ -2614,7 +2610,7 @@ int hvm_buffered_io_send(ioreq_t *p)
         break;
     default:
         gdprintk(XENLOG_WARNING, "unexpected ioreq size: %u\n", p->size);
-        return 0;
+        return X86EMUL_UNHANDLEABLE;
     }
 
     spin_lock(&s->bufioreq_lock);
@@ -2624,7 +2620,7 @@ int hvm_buffered_io_send(ioreq_t *p)
     {
         /* The queue is full: send the iopacket through the normal path. */
         spin_unlock(&s->bufioreq_lock);
-        return 0;
+        return X86EMUL_UNHANDLEABLE;
     }
 
     pg->buf_ioreq[pg->ptrs.write_pointer % IOREQ_BUFFER_SLOT_NUM] = bp;
@@ -2654,16 +2650,21 @@ int hvm_buffered_io_send(ioreq_t *p)
     notify_via_xen_event_channel(d, s->bufioreq_evtchn);
     spin_unlock(&s->bufioreq_lock);
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
-int hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *proto_p)
+int hvm_send_ioreq(struct hvm_ioreq_server *s, ioreq_t *proto_p,
+                   bool_t buffered)
 {
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     struct hvm_ioreq_vcpu *sv;
 
     ASSERT(s);
+
+    if ( buffered )
+        return hvm_send_buffered_ioreq(s, proto_p);
+
     if ( unlikely(!vcpu_start_shutdown_deferral(curr)) )
         return X86EMUL_RETRY;
 
@@ -2710,17 +2711,21 @@ int hvm_send_assist_req(struct hvm_ioreq_server *s, ioreq_t *proto_p)
     return X86EMUL_UNHANDLEABLE;
 }
 
-void hvm_broadcast_assist_req(ioreq_t *p)
+unsigned int hvm_broadcast_ioreq(ioreq_t *p, bool_t buffered)
 {
     struct domain *d = current->domain;
     struct hvm_ioreq_server *s;
+    unsigned int failed = 0;
 
     ASSERT(p->type == IOREQ_TYPE_INVALIDATE);
 
     list_for_each_entry ( s,
                           &d->arch.hvm_domain.ioreq_server.list,
                           list_entry )
-        (void) hvm_send_assist_req(s, p);
+        if ( hvm_send_ioreq(s, p, buffered) == X86EMUL_UNHANDLEABLE )
+            failed++;
+
+    return failed;
 }
 
 void hvm_hlt(unsigned long rflags)

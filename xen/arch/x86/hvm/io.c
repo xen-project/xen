@@ -60,8 +60,8 @@ void send_timeoffset_req(unsigned long timeoff)
     if ( timeoff == 0 )
         return;
 
-    if ( !hvm_buffered_io_send(&p) )
-        printk("Unsuccessful timeoffset update\n");
+    if ( hvm_broadcast_ioreq(&p, 1) != 0 )
+        gprintk(XENLOG_ERR, "Unsuccessful timeoffset update\n");
 }
 
 /* Ask ioemu mapcache to invalidate mappings. */
@@ -74,7 +74,8 @@ void send_invalidate_req(void)
         .data = ~0UL, /* flush all */
     };
 
-    hvm_broadcast_assist_req(&p);
+    if ( hvm_broadcast_ioreq(&p, 0) != 0 )
+        gprintk(XENLOG_ERR, "Unsuccessful map-cache invalidate\n");
 }
 
 int handle_mmio(void)

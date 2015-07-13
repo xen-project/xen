@@ -117,7 +117,6 @@ void relocate_portio_handler(
     struct domain *d, unsigned int old_port, unsigned int new_port,
     unsigned int size);
 
-int hvm_buffered_io_send(ioreq_t *p);
 void send_timeoffset_req(unsigned long timeoff);
 void send_invalidate_req(void);
 int handle_mmio(void);

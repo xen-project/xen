@@ -439,6 +439,7 @@ static int stdvga_mem_write(const struct hvm_io_handler *handler,
         .dir = IOREQ_WRITE,
         .data = data,
     };
+    struct hvm_ioreq_server *srv;
 
     if ( !s->cache )
         goto done;
@@ -479,10 +480,11 @@ static int stdvga_mem_write(const struct hvm_io_handler *handler,
     }
 
  done:
-    if ( hvm_buffered_io_send(&p) )
-        return X86EMUL_OKAY;
+    srv = hvm_select_ioreq_server(current->domain, &p);
+    if ( !srv )
+        return X86EMUL_UNHANDLEABLE;
 
-    return X86EMUL_UNHANDLEABLE;
+    return hvm_send_ioreq(srv, &p, 1);
 }
 
 static bool_t stdvga_mem_accept(const struct hvm_io_handler *handler,
