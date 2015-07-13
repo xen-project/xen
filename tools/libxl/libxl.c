@@ -1013,8 +1013,6 @@ out:
 int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
 {
     GC_INIT(ctx);
-    char *path;
-    char *state;
     int ret, rc = 0;
 
     libxl_domain_type type = libxl__domain_type(gc, domid);
@@ -1024,14 +1022,11 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
     }
 
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
-        uint32_t dm_domid = libxl_get_stubdom_id(ctx, domid);
-
-        path = libxl__device_model_xs_path(gc, dm_domid, domid, "/state");
-        state = libxl__xs_read(gc, XBT_NULL, path);
-        if (state != NULL && !strcmp(state, "paused")) {
-            libxl__qemu_traditional_cmd(gc, domid, "continue");
-            libxl__wait_for_device_model_deprecated(gc, domid, "running",
-                                         NULL, NULL, NULL);
+        rc = libxl__domain_resume_device_model(gc, domid);
+        if (rc < 0) {
+            LOG(ERROR, "failed to unpause device model for domain %u:%d",
+                domid, rc);
+            goto out;
         }
     }
     ret = xc_domain_unpause(ctx->xch, domid);
