@@ -46,9 +46,11 @@ static const char *qemu_xen_path(libxl__gc *gc)
 static int libxl__create_qemu_logfile(libxl__gc *gc, char *name)
 {
     char *logfile;
-    int logfile_w;
+    int rc, logfile_w;
 
-    libxl_create_logfile(CTX, name, &logfile);
+    rc = libxl_create_logfile(CTX, name, &logfile);
+    if (rc) return rc;
+
     logfile_w = open(logfile, O_WRONLY|O_CREAT|O_APPEND, 0644);
     free(logfile);
 
