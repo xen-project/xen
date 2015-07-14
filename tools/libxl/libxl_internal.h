@@ -2189,7 +2189,7 @@ _hidden void libxl__carefd_unlock(void);
 _hidden libxl__carefd *libxl__carefd_record(libxl_ctx *ctx, int fd);
 
 /* Combines _record and _unlock in a single call.  If fd==-1,
- * still does the unlock, but returns 0.  Cannot fail. */
+ * still does the unlock, but returns 0. */
 _hidden libxl__carefd *libxl__carefd_opened(libxl_ctx *ctx, int fd);
 
 /* Works just like close(2).  You may pass NULL, in which case it's

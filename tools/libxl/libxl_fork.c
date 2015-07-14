@@ -112,9 +112,12 @@ libxl__carefd *libxl__carefd_record(libxl_ctx *ctx, int fd)
 libxl__carefd *libxl__carefd_opened(libxl_ctx *ctx, int fd)
 {
     libxl__carefd *cf = 0;
+    int saved_errno = errno;
 
-    cf = libxl__carefd_record(ctx, fd);
+    if (fd >= 0)
+        cf = libxl__carefd_record(ctx, fd);
     libxl__carefd_unlock();
+    errno = saved_errno;
     return cf;
 }
 
