@@ -1012,7 +1012,7 @@ static int libxl__write_stub_dmargs(libxl__gc *gc,
         i++;
     }
     dmargs_size++;
-    dmargs = (char *) malloc(dmargs_size);
+    dmargs = (char *) libxl__malloc(gc, dmargs_size);
     i = 1;
     dmargs[0] = '\0';
     while (args[i] != NULL) {
@@ -1032,7 +1032,6 @@ retry_transaction:
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
             goto retry_transaction;
-    free(dmargs);
     return 0;
 }
 

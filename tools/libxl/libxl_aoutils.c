@@ -245,8 +245,7 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
 
             buf = LIBXL_TAILQ_LAST(&dc->bufs, libxl__datacopier_bufs);
             if (!buf || buf->used >= sizeof(buf->buf)) {
-                buf = malloc(sizeof(*buf));
-                if (!buf) libxl__alloc_failed(CTX, __func__, 1, sizeof(*buf));
+                buf = libxl__malloc(NOGC, sizeof(*buf));
                 buf->used = 0;
                 LIBXL_TAILQ_INSERT_TAIL(&dc->bufs, buf, entry);
             }
