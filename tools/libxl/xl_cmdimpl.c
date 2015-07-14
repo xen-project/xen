@@ -2658,7 +2658,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
         }
         if (!restoring && extra_config && strlen(extra_config)) {
             if (config_len > INT_MAX - (strlen(extra_config) + 2 + 1)) {
-                fprintf(stderr, "Failed to attach extra configration\n");
+                fprintf(stderr, "Failed to attach extra configuration\n");
                 return ERROR_FAIL;
             }
             /* allocate space for the extra config plus two EOLs plus \0 */
