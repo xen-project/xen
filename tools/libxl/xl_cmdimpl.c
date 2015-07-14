@@ -5010,9 +5010,9 @@ int main_config_update(int argc, char **argv)
         if (rc) { fprintf(stderr, "Failed to read config file: %s: %s\n",
                            filename, strerror(errno));
                   free(extra_config); return ERROR_FAIL; }
-        if (strlen(extra_config)) {
+        if (extra_config && strlen(extra_config)) {
             if (config_len > INT_MAX - (strlen(extra_config) + 2 + 1)) {
-                fprintf(stderr, "Failed to attach extra configration\n");
+                fprintf(stderr, "Failed to attach extra configuration\n");
                 exit(1);
             }
             /* allocate space for the extra config plus two EOLs plus \0 */
