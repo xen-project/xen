@@ -2717,8 +2717,6 @@ unsigned int hvm_broadcast_ioreq(ioreq_t *p, bool_t buffered)
     struct hvm_ioreq_server *s;
     unsigned int failed = 0;
 
-    ASSERT(p->type == IOREQ_TYPE_INVALIDATE);
-
     list_for_each_entry ( s,
                           &d->arch.hvm_domain.ioreq_server.list,
                           list_entry )
