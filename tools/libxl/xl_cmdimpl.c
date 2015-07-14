@@ -7228,9 +7228,9 @@ int main_cpupoolcreate(int argc, char **argv)
     else
         config_src="command line";
 
-    if (strlen(extra_config)) {
+    if (extra_config && strlen(extra_config)) {
         if (config_len > INT_MAX - (strlen(extra_config) + 2)) {
-            fprintf(stderr, "Failed to attach extra configration\n");
+            fprintf(stderr, "Failed to attach extra configuration\n");
             goto out;
         }
         config_data = xrealloc(config_data,
@@ -7365,6 +7365,7 @@ out_cfg:
 out:
     free(name);
     free(config_data);
+    free(extra_config);
     return rc;
 }
 
