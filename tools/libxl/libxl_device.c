@@ -816,7 +816,7 @@ void libxl__initiate_device_remove(libxl__egc *egc,
                            be_path);
                 goto out;
             }
-            return;
+            goto out_success;
         }
     }
 
@@ -868,6 +868,7 @@ void libxl__initiate_device_remove(libxl__egc *egc,
         goto out;
     }
 
+out_success:
     libxl_dominfo_dispose(&info);
     return;
 
