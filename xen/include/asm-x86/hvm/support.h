@@ -124,11 +124,12 @@ void hvm_shadow_handle_cd(struct vcpu *v, unsigned long value);
 
 /* These functions all return X86EMUL return codes. */
 int hvm_set_efer(uint64_t value);
-int hvm_set_cr0(unsigned long value);
-int hvm_set_cr3(unsigned long value);
-int hvm_set_cr4(unsigned long value);
+int hvm_set_cr0(unsigned long value, bool_t may_defer);
+int hvm_set_cr3(unsigned long value, bool_t may_defer);
+int hvm_set_cr4(unsigned long value, bool_t may_defer);
 int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
-int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content);
+int hvm_msr_write_intercept(
+    unsigned int msr, uint64_t msr_content, bool_t may_defer);
 int hvm_mov_to_cr(unsigned int cr, unsigned int gpr);
 int hvm_mov_from_cr(unsigned int cr, unsigned int gpr);
 

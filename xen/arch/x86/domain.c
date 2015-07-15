@@ -668,6 +668,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
 
 void arch_domain_destroy(struct domain *d)
 {
+    vfree(d->arch.event_write_data);
+    d->arch.event_write_data = NULL;
+
     if ( has_hvm_container_domain(d) )
         hvm_domain_destroy(d);
 

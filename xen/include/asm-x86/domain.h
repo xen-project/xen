@@ -247,6 +247,21 @@ struct pv_domain
     struct mapcache_domain mapcache;
 };
 
+struct monitor_write_data {
+    struct {
+        unsigned int msr : 1;
+        unsigned int cr0 : 1;
+        unsigned int cr3 : 1;
+        unsigned int cr4 : 1;
+    } do_write;
+
+    uint32_t msr;
+    uint64_t value;
+    uint64_t cr0;
+    uint64_t cr3;
+    uint64_t cr4;
+};
+
 struct arch_domain
 {
     struct page_info *perdomain_l3_pg;
@@ -360,6 +375,8 @@ struct arch_domain
 
     /* Mem_access emulation control */
     bool_t mem_access_emulate_enabled;
+
+    struct monitor_write_data *event_write_data;
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
@@ -516,7 +533,6 @@ struct arch_vcpu
         unsigned long eip;
         struct vm_event_emul_read_data *emul_read_data;
     } vm_event;
-
 };
 
 smap_check_policy_t smap_policy_change(struct vcpu *v,

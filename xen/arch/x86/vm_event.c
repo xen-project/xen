@@ -22,11 +22,19 @@
 
 #include <xen/sched.h>
 #include <asm/hvm/hvm.h>
+#include <asm/vm_event.h>
 
 /* Implicitly serialized by the domctl lock. */
 int vm_event_init_domain(struct domain *d)
 {
     struct vcpu *v;
+
+    if ( !d->arch.event_write_data )
+        d->arch.event_write_data =
+            vzalloc(sizeof(struct monitor_write_data) * d->max_vcpus);
+
+    if ( !d->arch.event_write_data )
+        return -ENOMEM;
 
     for_each_vcpu ( d, v )
     {
@@ -51,6 +59,9 @@ void vm_event_cleanup_domain(struct domain *d)
 {
     struct vcpu *v;
 
+    vfree(d->arch.event_write_data);
+    d->arch.event_write_data = NULL;
+
     for_each_vcpu ( d, v )
     {
         xfree(v->arch.vm_event.emul_read_data);
@@ -64,6 +75,38 @@ void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v)
         return;
 
     hvm_toggle_singlestep(v);
+}
+
+void vm_event_register_write_resume(struct vcpu *v, vm_event_response_t *rsp)
+{
+    if ( rsp->flags & VM_EVENT_FLAG_DENY )
+    {
+        struct monitor_write_data *w =
+            &v->domain->arch.event_write_data[v->vcpu_id];
+
+        ASSERT(v->domain->arch.event_write_data != NULL);
+
+        switch ( rsp->reason )
+        {
+        case VM_EVENT_REASON_MOV_TO_MSR:
+            w->do_write.msr = 0;
+            break;
+        case VM_EVENT_REASON_WRITE_CTRLREG:
+            switch ( rsp->u.write_ctrlreg.index )
+            {
+            case VM_EVENT_X86_CR0:
+                w->do_write.cr0 = 0;
+                break;
+            case VM_EVENT_X86_CR3:
+                w->do_write.cr3 = 0;
+                break;
+            case VM_EVENT_X86_CR4:
+                w->do_write.cr4 = 0;
+                break;
+            }
+            break;
+        }
+    }
 }
 
 /*

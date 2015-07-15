@@ -52,6 +52,7 @@
 #include <asm/traps.h>
 #include <asm/mc146818rtc.h>
 #include <asm/mce.h>
+#include <asm/monitor.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/support.h>
@@ -517,6 +518,35 @@ void hvm_do_resume(struct vcpu *v)
     default:
         ASSERT_UNREACHABLE();
         break;
+    }
+
+    if ( unlikely(d->arch.event_write_data) )
+    {
+        struct monitor_write_data *w = &d->arch.event_write_data[v->vcpu_id];
+
+        if ( w->do_write.msr )
+        {
+            hvm_msr_write_intercept(w->msr, w->value, 0);
+            w->do_write.msr = 0;
+        }
+
+        if ( w->do_write.cr0 )
+        {
+            hvm_set_cr0(w->cr0, 0);
+            w->do_write.cr0 = 0;
+        }
+
+        if ( w->do_write.cr4 )
+        {
+            hvm_set_cr4(w->cr4, 0);
+            w->do_write.cr4 = 0;
+        }
+
+        if ( w->do_write.cr3 )
+        {
+            hvm_set_cr3(w->cr3, 0);
+            w->do_write.cr3 = 0;
+        }
     }
 
     /* Inject pending hw/sw trap */
@@ -3123,13 +3153,13 @@ int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
     switch ( cr )
     {
     case 0:
-        return hvm_set_cr0(val);
+        return hvm_set_cr0(val, 1);
 
     case 3:
-        return hvm_set_cr3(val);
+        return hvm_set_cr3(val, 1);
 
     case 4:
-        return hvm_set_cr4(val);
+        return hvm_set_cr4(val, 1);
 
     case 8:
         vlapic_set_reg(vcpu_vlapic(curr), APIC_TASKPRI, ((val & 0x0f) << 4));
@@ -3226,12 +3256,13 @@ static void hvm_update_cr(struct vcpu *v, unsigned int cr, unsigned long value)
     hvm_update_guest_cr(v, cr);
 }
 
-int hvm_set_cr0(unsigned long value)
+int hvm_set_cr0(unsigned long value, bool_t may_defer)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
     unsigned long gfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
     struct page_info *page;
+    struct arch_domain *currad = &v->domain->arch;
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
@@ -3259,6 +3290,22 @@ int hvm_set_cr0(unsigned long value)
         printk(XENLOG_G_WARNING
                "PVH attempting to turn off PE/PG. CR0:%lx\n", value);
         goto gpf;
+    }
+
+    if ( may_defer && unlikely(currad->monitor.write_ctrlreg_enabled &
+                               monitor_ctrlreg_bitmask(VM_EVENT_X86_CR0)) &&
+         value != old_value )
+    {
+        ASSERT(currad->event_write_data != NULL);
+
+        if ( hvm_event_crX(CR0, value, old_value) )
+        {
+            /* The actual write will occur in hvm_do_resume(), if permitted. */
+            currad->event_write_data[v->vcpu_id].do_write.cr0 = 1;
+            currad->event_write_data[v->vcpu_id].cr0 = value;
+
+            return X86EMUL_OKAY;
+        }
     }
 
     if ( (value & X86_CR0_PG) && !(old_value & X86_CR0_PG) )
@@ -3327,7 +3374,6 @@ int hvm_set_cr0(unsigned long value)
         hvm_funcs.handle_cd(v, value);
 
     hvm_update_cr(v, 0, value);
-    hvm_event_crX(CR0, value, old_value);
 
     if ( (value ^ old_value) & X86_CR0_PG ) {
         if ( !nestedhvm_vmswitch_in_progress(v) && nestedhvm_vcpu_in_guestmode(v) )
@@ -3343,11 +3389,28 @@ int hvm_set_cr0(unsigned long value)
     return X86EMUL_EXCEPTION;
 }
 
-int hvm_set_cr3(unsigned long value)
+int hvm_set_cr3(unsigned long value, bool_t may_defer)
 {
     struct vcpu *v = current;
     struct page_info *page;
-    unsigned long old;
+    unsigned long old = v->arch.hvm_vcpu.guest_cr[3];
+    struct arch_domain *currad = &v->domain->arch;
+
+    if ( may_defer && unlikely(currad->monitor.write_ctrlreg_enabled &
+                               monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3)) &&
+         value != old )
+    {
+        ASSERT(currad->event_write_data != NULL);
+
+        if ( hvm_event_crX(CR3, value, old) )
+        {
+            /* The actual write will occur in hvm_do_resume(), if permitted. */
+            currad->event_write_data[v->vcpu_id].do_write.cr3 = 1;
+            currad->event_write_data[v->vcpu_id].cr3 = value;
+
+            return X86EMUL_OKAY;
+        }
+    }
 
     if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) &&
          (value != v->arch.hvm_vcpu.guest_cr[3]) )
@@ -3365,10 +3428,8 @@ int hvm_set_cr3(unsigned long value)
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
     }
 
-    old=v->arch.hvm_vcpu.guest_cr[3];
     v->arch.hvm_vcpu.guest_cr[3] = value;
     paging_update_cr3(v);
-    hvm_event_crX(CR3, value, old);
     return X86EMUL_OKAY;
 
  bad_cr3:
@@ -3377,10 +3438,11 @@ int hvm_set_cr3(unsigned long value)
     return X86EMUL_UNHANDLEABLE;
 }
 
-int hvm_set_cr4(unsigned long value)
+int hvm_set_cr4(unsigned long value, bool_t may_defer)
 {
     struct vcpu *v = current;
     unsigned long old_cr;
+    struct arch_domain *currad = &v->domain->arch;
 
     if ( value & hvm_cr4_guest_reserved_bits(v, 0) )
     {
@@ -3408,8 +3470,23 @@ int hvm_set_cr4(unsigned long value)
         goto gpf;
     }
 
+    if ( may_defer && unlikely(currad->monitor.write_ctrlreg_enabled &
+                               monitor_ctrlreg_bitmask(VM_EVENT_X86_CR4)) &&
+         value != old_cr )
+    {
+        ASSERT(currad->event_write_data != NULL);
+
+        if ( hvm_event_crX(CR4, value, old_cr) )
+        {
+            /* The actual write will occur in hvm_do_resume(), if permitted. */
+            currad->event_write_data[v->vcpu_id].do_write.cr4 = 1;
+            currad->event_write_data[v->vcpu_id].cr4 = value;
+
+            return X86EMUL_OKAY;
+        }
+    }
+
     hvm_update_cr(v, 4, value);
-    hvm_event_crX(CR4, value, old_cr);
 
     /*
      * Modifying CR4.{PSE,PAE,PGE,SMEP}, or clearing CR4.PCIDE
@@ -3873,7 +3950,7 @@ void hvm_task_switch(
         goto out;
 
 
-    if ( hvm_set_cr3(tss.cr3) )
+    if ( hvm_set_cr3(tss.cr3, 1) )
         goto out;
 
     regs->eip    = tss.eip;
@@ -4575,12 +4652,14 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     goto out;
 }
 
-int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
+int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
+                            bool_t may_defer)
 {
     struct vcpu *v = current;
     bool_t mtrr;
     unsigned int edx, index;
     int ret = X86EMUL_OKAY;
+    struct arch_domain *currad = &current->domain->arch;
 
     HVMTRACE_3D(MSR_WRITE, msr,
                (uint32_t)msr_content, (uint32_t)(msr_content >> 32));
@@ -4588,7 +4667,18 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     hvm_cpuid(1, NULL, NULL, NULL, &edx);
     mtrr = !!(edx & cpufeat_mask(X86_FEATURE_MTRR));
 
-    hvm_event_msr(msr, msr_content);
+    if ( may_defer && unlikely(currad->monitor.mov_to_msr_enabled) )
+    {
+        ASSERT(currad->event_write_data != NULL);
+
+        /* The actual write will occur in hvm_do_resume() (if permitted). */
+        currad->event_write_data[v->vcpu_id].do_write.msr = 1;
+        currad->event_write_data[v->vcpu_id].msr = msr;
+        currad->event_write_data[v->vcpu_id].value = msr_content;
+
+        hvm_event_msr(msr, msr_content);
+        return X86EMUL_OKAY;
+    }
 
     switch ( msr )
     {

@@ -393,6 +393,10 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
          */
         switch ( rsp.reason )
         {
+        case VM_EVENT_REASON_MOV_TO_MSR:
+        case VM_EVENT_REASON_WRITE_CTRLREG:
+            vm_event_register_write_resume(v, &rsp);
+            break;
 
 #ifdef HAS_MEM_ACCESS
         case VM_EVENT_REASON_MEM_ACCESS:

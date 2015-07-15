@@ -1949,7 +1949,7 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
         if ( (inst_len = __get_instruction_length(v, INSTR_WRMSR)) == 0 )
             return;
         msr_content = ((uint64_t)regs->edx << 32) | (uint32_t)regs->eax;
-        rc = hvm_msr_write_intercept(regs->ecx, msr_content);
+        rc = hvm_msr_write_intercept(regs->ecx, msr_content, 1);
     }
 
     if ( rc == X86EMUL_OKAY )

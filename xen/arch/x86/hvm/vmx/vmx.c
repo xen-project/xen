@@ -2016,9 +2016,16 @@ static int vmx_cr_access(unsigned long exit_qualification)
     }
     case VMX_CONTROL_REG_ACCESS_TYPE_CLTS: {
         unsigned long old = curr->arch.hvm_vcpu.guest_cr[0];
-        curr->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS;
+        unsigned long value = old & ~X86_CR0_TS;
+
+        /*
+         * Special case unlikely to be interesting to a
+         * VM_EVENT_FLAG_DENY-capable application, so the hvm_event_crX()
+         * return value is ignored for now.
+         */
+        hvm_event_crX(CR0, value, old);
+        curr->arch.hvm_vcpu.guest_cr[0] = value;
         vmx_update_guest_cr(curr, 0);
-        hvm_event_crX(CR0, curr->arch.hvm_vcpu.guest_cr[0], old);
         HVMTRACE_0D(CLTS);
         break;
     }
@@ -2030,7 +2037,7 @@ static int vmx_cr_access(unsigned long exit_qualification)
                 (VMX_CONTROL_REG_ACCESS_DATA(exit_qualification) &
                  (X86_CR0_PE|X86_CR0_MP|X86_CR0_EM|X86_CR0_TS));
         HVMTRACE_LONG_1D(LMSW, value);
-        return hvm_set_cr0(value);
+        return hvm_set_cr0(value, 1);
     }
     default:
         BUG();
@@ -3053,7 +3060,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     {
         uint64_t msr_content;
         msr_content = ((uint64_t)regs->edx << 32) | (uint32_t)regs->eax;
-        if ( hvm_msr_write_intercept(regs->ecx, msr_content) == X86EMUL_OKAY )
+        if ( hvm_msr_write_intercept(regs->ecx, msr_content, 1) == X86EMUL_OKAY )
             update_guest_eip(); /* Safe: WRMSR */
         break;
     }

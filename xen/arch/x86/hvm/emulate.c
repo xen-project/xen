@@ -1422,14 +1422,14 @@ static int hvmemul_write_cr(
     switch ( reg )
     {
     case 0:
-        return hvm_set_cr0(val);
+        return hvm_set_cr0(val, 1);
     case 2:
         current->arch.hvm_vcpu.guest_cr[2] = val;
         return X86EMUL_OKAY;
     case 3:
-        return hvm_set_cr3(val);
+        return hvm_set_cr3(val, 1);
     case 4:
-        return hvm_set_cr4(val);
+        return hvm_set_cr4(val, 1);
     default:
         break;
     }
@@ -1450,7 +1450,7 @@ static int hvmemul_write_msr(
     uint64_t val,
     struct x86_emulate_ctxt *ctxt)
 {
-    return hvm_msr_write_intercept(reg, val);
+    return hvm_msr_write_intercept(reg, val, 1);
 }
 
 static int hvmemul_wbinvd(

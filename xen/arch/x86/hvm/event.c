@@ -90,7 +90,7 @@ static int hvm_event_traps(uint8_t sync, vm_event_request_t *req)
     return 1;
 }
 
-void hvm_event_cr(unsigned int index, unsigned long value, unsigned long old)
+bool_t hvm_event_cr(unsigned int index, unsigned long value, unsigned long old)
 {
     struct arch_domain *currad = &current->domain->arch;
     unsigned int ctrlreg_bitmask = monitor_ctrlreg_bitmask(index);
@@ -109,7 +109,10 @@ void hvm_event_cr(unsigned int index, unsigned long value, unsigned long old)
 
         hvm_event_traps(currad->monitor.write_ctrlreg_sync & ctrlreg_bitmask,
                         &req);
+        return 1;
     }
+
+    return 0;
 }
 
 void hvm_event_msr(unsigned int msr, uint64_t value)

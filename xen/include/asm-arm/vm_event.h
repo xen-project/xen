@@ -21,6 +21,7 @@
 #define __ASM_ARM_VM_EVENT_H__
 
 #include <xen/sched.h>
+#include <xen/vm_event.h>
 
 static inline
 int vm_event_init_domain(struct domain *d)
@@ -37,6 +38,12 @@ void vm_event_cleanup_domain(struct domain *d)
 
 static inline
 void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v)
+{
+    /* Not supported on ARM. */
+}
+
+static inline
+void vm_event_register_write_resume(struct vcpu *v, vm_event_response_t *rsp)
 {
     /* Not supported on ARM. */
 }

@@ -74,6 +74,11 @@
  * VM_EVENT_FLAG_SET_EMUL_READ_DATA are set, only the latter will be honored).
  */
 #define VM_EVENT_FLAG_SET_EMUL_READ_DATA (1 << 5)
+ /*
+  * Deny completion of the operation that triggered the event.
+  * Currently only useful for MSR, CR0, CR3 and CR4 write events.
+  */
+#define VM_EVENT_FLAG_DENY               (1 << 6)
 
 /*
  * Reasons for the vm event request

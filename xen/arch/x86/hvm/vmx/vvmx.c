@@ -1034,15 +1034,16 @@ static void load_shadow_guest_state(struct vcpu *v)
 
     nvcpu->guest_cr[0] = __get_vvmcs(vvmcs, CR0_READ_SHADOW);
     nvcpu->guest_cr[4] = __get_vvmcs(vvmcs, CR4_READ_SHADOW);
-    hvm_set_cr0(__get_vvmcs(vvmcs, GUEST_CR0));
-    hvm_set_cr4(__get_vvmcs(vvmcs, GUEST_CR4));
-    hvm_set_cr3(__get_vvmcs(vvmcs, GUEST_CR3));
+    hvm_set_cr0(__get_vvmcs(vvmcs, GUEST_CR0), 1);
+    hvm_set_cr4(__get_vvmcs(vvmcs, GUEST_CR4), 1);
+    hvm_set_cr3(__get_vvmcs(vvmcs, GUEST_CR3), 1);
 
     control = __get_vvmcs(vvmcs, VM_ENTRY_CONTROLS);
     if ( control & VM_ENTRY_LOAD_GUEST_PAT )
         hvm_set_guest_pat(v, __get_vvmcs(vvmcs, GUEST_PAT));
     if ( control & VM_ENTRY_LOAD_PERF_GLOBAL_CTRL )
-        hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL, __get_vvmcs(vvmcs, GUEST_PERF_GLOBAL_CTRL));
+        hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
+                                __get_vvmcs(vvmcs, GUEST_PERF_GLOBAL_CTRL), 0);
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
 
@@ -1235,15 +1236,16 @@ static void load_vvmcs_host_state(struct vcpu *v)
         __vmwrite(vmcs_h2g_field[i].guest_field, r);
     }
 
-    hvm_set_cr0(__get_vvmcs(vvmcs, HOST_CR0));
-    hvm_set_cr4(__get_vvmcs(vvmcs, HOST_CR4));
-    hvm_set_cr3(__get_vvmcs(vvmcs, HOST_CR3));
+    hvm_set_cr0(__get_vvmcs(vvmcs, HOST_CR0), 1);
+    hvm_set_cr4(__get_vvmcs(vvmcs, HOST_CR4), 1);
+    hvm_set_cr3(__get_vvmcs(vvmcs, HOST_CR3), 1);
 
     control = __get_vvmcs(vvmcs, VM_EXIT_CONTROLS);
     if ( control & VM_EXIT_LOAD_HOST_PAT )
         hvm_set_guest_pat(v, __get_vvmcs(vvmcs, HOST_PAT));
     if ( control & VM_EXIT_LOAD_PERF_GLOBAL_CTRL )
-        hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL, __get_vvmcs(vvmcs, HOST_PERF_GLOBAL_CTRL));
+        hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
+                                __get_vvmcs(vvmcs, HOST_PERF_GLOBAL_CTRL), 1);
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
 
