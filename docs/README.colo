@@ -1,0 +1,9 @@
+COLO FT/HA (COarse-grain LOck-stepping Virtual Machines for Non-stop Service)
+project is a high availability solution. Both primary VM (PVM) and secondary VM
+(SVM) run in parallel. They receive the same request from client, and generate
+response in parallel too. If the response packets from PVM and SVM are
+identical, they are released immediately. Otherwise, a VM checkpoint (on demand)
+is conducted.
+
+See the website at http://wiki.xen.org/wiki/COLO_-_Coarse_Grain_Lock_Stepping
+for details.
