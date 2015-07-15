@@ -2818,7 +2818,8 @@ typedef struct libxl__save_helper_state {
  * Each device type needs to implement the interfaces specified in
  * the libxl__checkpoint_device_instance_ops if it wishes to support Remus.
  *
- * The high-level control flow through the checkpoint device layer is shown below:
+ * The high-level control flow through the checkpoint device layer is shown
+ * below:
  *
  * xl remus
  *  |->  libxl_domain_remus_start
@@ -2879,7 +2880,8 @@ int init_subkind_drbd_disk(libxl__checkpoint_devices_state *cds);
 void cleanup_subkind_drbd_disk(libxl__checkpoint_devices_state *cds);
 
 typedef void libxl__checkpoint_callback(libxl__egc *,
-                                   libxl__checkpoint_devices_state *, int rc);
+                                        libxl__checkpoint_devices_state *,
+                                        int rc);
 
 /*
  * State associated with a checkpoint invocation, including parameters
@@ -2887,7 +2889,7 @@ typedef void libxl__checkpoint_callback(libxl__egc *,
  * save/restore machinery.
  */
 struct libxl__checkpoint_devices_state {
-    /*---- must be set by caller of libxl__checkpoint_device_(setup|teardown) ----*/
+    /*-- must be set by caller of libxl__checkpoint_device_(setup|teardown) --*/
 
     libxl__ao *ao;
     uint32_t domid;
@@ -2900,7 +2902,8 @@ struct libxl__checkpoint_devices_state {
     /*
      * this array is allocated before setup the checkpoint devices by the
      * checkpoint abstract layer.
-     * devs may be NULL, means there's no checkpoint devices that has been set up.
+     * devs may be NULL, means there's no checkpoint devices that has been
+     * set up.
      * the size of this array is 'num_devices', which is the total number
      * of libxl nic devices and disk devices(num_nics + num_disks).
      */
@@ -2962,13 +2965,13 @@ struct libxl__checkpoint_device {
 _hidden void libxl__checkpoint_devices_setup(libxl__egc *egc,
                                         libxl__checkpoint_devices_state *cds);
 _hidden void libxl__checkpoint_devices_teardown(libxl__egc *egc,
-                                           libxl__checkpoint_devices_state *cds);
+                                        libxl__checkpoint_devices_state *cds);
 _hidden void libxl__checkpoint_devices_postsuspend(libxl__egc *egc,
-                                              libxl__checkpoint_devices_state *cds);
+                                        libxl__checkpoint_devices_state *cds);
 _hidden void libxl__checkpoint_devices_preresume(libxl__egc *egc,
-                                            libxl__checkpoint_devices_state *cds);
+                                        libxl__checkpoint_devices_state *cds);
 _hidden void libxl__checkpoint_devices_commit(libxl__egc *egc,
-                                         libxl__checkpoint_devices_state *cds);
+                                        libxl__checkpoint_devices_state *cds);
 _hidden int libxl__netbuffer_enabled(libxl__gc *gc);
 
 /*----- Legacy conversion helper -----*/
