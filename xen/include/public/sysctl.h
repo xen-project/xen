@@ -482,10 +482,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cputopo_t);
  *  - otherwise it's the number of entries in 'cputopo'
  *
  * OUT:
- *  - If 'num_cpus' is less than the number Xen needs to write, -ENOBUFS shall
- *    be returned and 'num_cpus' updated to reflect the intended number.
- *  - On success, 'num_cpus' shall indicate the number of entries written, which
- *    may be less than the maximum.
+ *  - If 'num_cpus' is less than the number Xen wants to write but the handle
+ *    handle is not a NULL one, partial data gets returned and 'num_cpus' gets
+ *    updated to reflect the intended number.
+ *  - Otherwise, 'num_cpus' shall indicate the number of entries written, which
+ *    may be less than the input value.
  */
 struct xen_sysctl_cputopoinfo {
     uint32_t num_cpus;

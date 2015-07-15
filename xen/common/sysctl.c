@@ -358,15 +358,9 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         {
             xen_sysctl_cputopo_t cputopo = { 0 };
 
-            if ( ti->num_cpus < num_cpus )
-            {
-                ret = -ENOBUFS;
-                i = num_cpus;
-            }
-            else
-                i = 0;
-
-            for ( ; i < num_cpus; i++ )
+            if ( num_cpus > ti->num_cpus )
+                num_cpus = ti->num_cpus;
+            for ( i = 0; i < num_cpus; ++i )
             {
                 if ( cpu_present(i) )
                 {
@@ -393,7 +387,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         else
             i = num_cpus;
 
-        if ( (!ret || (ret == -ENOBUFS)) && (ti->num_cpus != i) )
+        if ( !ret && (ti->num_cpus != i) )
         {
             ti->num_cpus = i;
             if ( __copy_field_to_guest(u_sysctl, op,
