@@ -89,6 +89,55 @@ int write_split_record(struct xc_sr_context *ctx, struct xc_sr_record *rec,
     return -1;
 }
 
+int read_record(struct xc_sr_context *ctx, int fd, struct xc_sr_record *rec)
+{
+    xc_interface *xch = ctx->xch;
+    struct xc_sr_rhdr rhdr;
+    size_t datasz;
+
+    if ( read_exact(fd, &rhdr, sizeof(rhdr)) )
+    {
+        PERROR("Failed to read Record Header from stream");
+        return -1;
+    }
+    else if ( rhdr.length > REC_LENGTH_MAX )
+    {
+        ERROR("Record (0x%08x, %s) length %#x exceeds max (%#x)", rhdr.type,
+              rec_type_to_str(rhdr.type), rhdr.length, REC_LENGTH_MAX);
+        return -1;
+    }
+
+    datasz = ROUNDUP(rhdr.length, REC_ALIGN_ORDER);
+
+    if ( datasz )
+    {
+        rec->data = malloc(datasz);
+
+        if ( !rec->data )
+        {
+            ERROR("Unable to allocate %zu bytes for record data (0x%08x, %s)",
+                  datasz, rhdr.type, rec_type_to_str(rhdr.type));
+            return -1;
+        }
+
+        if ( read_exact(fd, rec->data, datasz) )
+        {
+            free(rec->data);
+            rec->data = NULL;
+            PERROR("Failed to read %zu bytes of data for record (0x%08x, %s)",
+                   datasz, rhdr.type, rec_type_to_str(rhdr.type));
+            return -1;
+        }
+    }
+    else
+        rec->data = NULL;
+
+    rec->type   = rhdr.type;
+    rec->length = rhdr.length;
+
+    return 0;
+};
+
 static void __attribute__((unused)) build_assertions(void)
 {
     XC_BUILD_BUG_ON(sizeof(struct xc_sr_ihdr) != 24);

@@ -372,6 +372,20 @@ static inline int write_record(struct xc_sr_context *ctx,
 }
 
 /*
+ * Reads a record from the stream, and fills in the record structure.
+ *
+ * Returns 0 on success and non-0 on failure.
+ *
+ * On success, the records type and size shall be valid.
+ * - If size is 0, data shall be NULL.
+ * - If size is non-0, data shall be a buffer allocated by malloc() which must
+ *   be passed to free() by the caller.
+ *
+ * On failure, the contents of the record structure are undefined.
+ */
+int read_record(struct xc_sr_context *ctx, int fd, struct xc_sr_record *rec);
+
+/*
  * This would ideally be private in restore.c, but is needed by
  * x86_pv_localise_page() if we receive pagetables frames ahead of the
  * contents of the frames they point at.

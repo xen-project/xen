@@ -69,67 +69,6 @@ static int read_headers(struct xc_sr_context *ctx)
 }
 
 /*
- * Reads a record from the stream, and fills in the record structure.
- *
- * Returns 0 on success and non-0 on failure.
- *
- * On success, the records type and size shall be valid.
- * - If size is 0, data shall be NULL.
- * - If size is non-0, data shall be a buffer allocated by malloc() which must
- *   be passed to free() by the caller.
- *
- * On failure, the contents of the record structure are undefined.
- */
-static int read_record(struct xc_sr_context *ctx, struct xc_sr_record *rec)
-{
-    xc_interface *xch = ctx->xch;
-    struct xc_sr_rhdr rhdr;
-    size_t datasz;
-
-    if ( read_exact(ctx->fd, &rhdr, sizeof(rhdr)) )
-    {
-        PERROR("Failed to read Record Header from stream");
-        return -1;
-    }
-    else if ( rhdr.length > REC_LENGTH_MAX )
-    {
-        ERROR("Record (0x%08x, %s) length %#x exceeds max (%#x)", rhdr.type,
-              rec_type_to_str(rhdr.type), rhdr.length, REC_LENGTH_MAX);
-        return -1;
-    }
-
-    datasz = ROUNDUP(rhdr.length, REC_ALIGN_ORDER);
-
-    if ( datasz )
-    {
-        rec->data = malloc(datasz);
-
-        if ( !rec->data )
-        {
-            ERROR("Unable to allocate %zu bytes for record data (0x%08x, %s)",
-                  datasz, rhdr.type, rec_type_to_str(rhdr.type));
-            return -1;
-        }
-
-        if ( read_exact(ctx->fd, rec->data, datasz) )
-        {
-            free(rec->data);
-            rec->data = NULL;
-            PERROR("Failed to read %zu bytes of data for record (0x%08x, %s)",
-                   datasz, rhdr.type, rec_type_to_str(rhdr.type));
-            return -1;
-        }
-    }
-    else
-        rec->data = NULL;
-
-    rec->type   = rhdr.type;
-    rec->length = rhdr.length;
-
-    return 0;
-};
-
-/*
  * Is a pfn populated?
  */
 static bool pfn_is_populated(const struct xc_sr_context *ctx, xen_pfn_t pfn)
@@ -650,7 +589,7 @@ static int restore(struct xc_sr_context *ctx)
 
     do
     {
-        rc = read_record(ctx, &rec);
+        rc = read_record(ctx, ctx->fd, &rec);
         if ( rc )
         {
             if ( ctx->restore.buffer_all_records )
