@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
     rc = libxl_event_check(ctx, &event, LIBXL_EVENTMASK_ALL, 0,0);
     assert(!rc);
     assert(event);
-    assert(event->for_user = how.u.for_event);
+    assert(event->for_user == how.u.for_event);
     assert(event->type == LIBXL_EVENT_TYPE_OPERATION_COMPLETE);
     assert(event->u.operation_complete.rc == ERROR_ABORTED);
 
