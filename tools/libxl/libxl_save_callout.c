@@ -75,7 +75,7 @@ void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
                argnums, ARRAY_SIZE(argnums));
 }
 
-void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss,
+void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_save_state *dss,
                            libxl__save_helper_state *shs)
 {
     STATE_AO_GC(dss->ao);

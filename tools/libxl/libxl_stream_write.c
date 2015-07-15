@@ -216,7 +216,7 @@ void libxl__stream_write_start(libxl__egc *egc,
                                libxl__stream_write_state *stream)
 {
     libxl__datacopier_state *dc = &stream->dc;
-    libxl__domain_suspend_state *dss = stream->dss;
+    libxl__domain_save_state *dss = stream->dss;
     STATE_AO_GC(stream->ao);
     struct libxl__sr_hdr hdr;
     int rc = 0;
@@ -324,7 +324,7 @@ static void libxc_header_done(libxl__egc *egc,
 void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
                                 int rc, int retval, int errnoval)
 {
-    libxl__domain_suspend_state *dss = dss_void;
+    libxl__domain_save_state *dss = dss_void;
     libxl__stream_write_state *stream = &dss->sws;
     STATE_AO_GC(dss->ao);
 
@@ -333,10 +333,10 @@ void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
 
     if (retval) {
         LOGEV(ERROR, errnoval, "saving domain: %s",
-              dss->guest_responded ?
+              dss->dsps.guest_responded ?
               "domain responded to suspend request" :
               "domain did not respond to suspend request");
-        if (!dss->guest_responded)
+        if (!dss->dsps.guest_responded)
             rc = ERROR_GUEST_TIMEDOUT;
         else if (dss->rc)
             rc = dss->rc;
@@ -371,7 +371,7 @@ void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
 static void write_emulator_xenstore_record(libxl__egc *egc,
                                            libxl__stream_write_state *stream)
 {
-    libxl__domain_suspend_state *dss = stream->dss;
+    libxl__domain_save_state *dss = stream->dss;
     STATE_AO_GC(stream->ao);
     struct libxl__sr_rec_hdr rec;
     int rc;
@@ -410,7 +410,7 @@ static void write_emulator_xenstore_record(libxl__egc *egc,
 static void emulator_xenstore_record_done(libxl__egc *egc,
                                           libxl__stream_write_state *stream)
 {
-    libxl__domain_suspend_state *dss = stream->dss;
+    libxl__domain_save_state *dss = stream->dss;
 
     if (dss->type == LIBXL_DOMAIN_TYPE_HVM)
         write_emulator_context_record(egc, stream);
@@ -425,7 +425,7 @@ static void emulator_xenstore_record_done(libxl__egc *egc,
 static void write_emulator_context_record(libxl__egc *egc,
                                           libxl__stream_write_state *stream)
 {
-    libxl__domain_suspend_state *dss = stream->dss;
+    libxl__domain_save_state *dss = stream->dss;
     libxl__datacopier_state *dc = &stream->emu_dc;
     STATE_AO_GC(stream->ao);
     struct libxl__sr_rec_hdr *rec = &stream->emu_rec_hdr;
@@ -440,7 +440,7 @@ static void write_emulator_context_record(libxl__egc *egc,
     }
 
     /* Convenience aliases */
-    const char *const filename = dss->dm_savefile;
+    const char *const filename = dss->dsps.dm_savefile;
 
     libxl__carefd_begin();
     int readfd = open(filename, O_RDONLY);

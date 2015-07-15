@@ -832,7 +832,7 @@ out:
 }
 
 static void remus_failover_cb(libxl__egc *egc,
-                              libxl__domain_suspend_state *dss, int rc);
+                              libxl__domain_save_state *dss, int rc);
 
 /* TODO: Explicit Checkpoint acknowledgements via recv_fd. */
 int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
@@ -840,7 +840,7 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
                              const libxl_asyncop_how *ao_how)
 {
     AO_CREATE(ctx, domid, ao_how);
-    libxl__domain_suspend_state *dss;
+    libxl__domain_save_state *dss;
     int rc;
 
     libxl_domain_type type = libxl__domain_type(gc, domid);
@@ -888,7 +888,7 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
 }
 
 static void remus_failover_cb(libxl__egc *egc,
-                              libxl__domain_suspend_state *dss, int rc)
+                              libxl__domain_save_state *dss, int rc)
 {
     STATE_AO_GC(dss->ao);
     /*
@@ -900,7 +900,7 @@ static void remus_failover_cb(libxl__egc *egc,
 }
 
 static void domain_suspend_cb(libxl__egc *egc,
-                              libxl__domain_suspend_state *dss, int rc)
+                              libxl__domain_save_state *dss, int rc)
 {
     STATE_AO_GC(dss->ao);
     int flrc;
@@ -925,7 +925,7 @@ int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd, int flags,
         goto out_err;
     }
 
-    libxl__domain_suspend_state *dss;
+    libxl__domain_save_state *dss;
     GCNEW(dss);
 
     dss->ao = ao;

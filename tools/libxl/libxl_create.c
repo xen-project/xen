@@ -1558,7 +1558,7 @@ typedef struct {
 typedef struct {
     libxl__app_domain_create_state cdcs;
     libxl__domain_destroy_state dds;
-    libxl__domain_suspend_state dss;
+    libxl__domain_save_state dss;
     char *toolstack_buf;
     uint32_t toolstack_len;
 } libxl__domain_soft_reset_state;
@@ -1653,7 +1653,7 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
     libxl__app_domain_create_state *cdcs;
     libxl__domain_create_state *dcs;
     libxl__domain_build_state *state;
-    libxl__domain_suspend_state *dss;
+    libxl__domain_save_state *dss;
     char *dom_path, *xs_store_mfn, *xs_console_mfn;
     uint32_t domid_out;
     int rc;
@@ -1697,8 +1697,8 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
 
     dss->ao = ao;
     dss->domid = domid_soft_reset;
-    dss->dm_savefile = GCSPRINTF(LIBXL_DEVICE_MODEL_SAVE_FILE".%d",
-                                 domid_soft_reset);
+    dss->dsps.dm_savefile = GCSPRINTF(LIBXL_DEVICE_MODEL_SAVE_FILE".%d",
+                                      domid_soft_reset);
 
     rc = libxl__save_emulator_xenstore_data(dss, &srs->toolstack_buf,
                                             &srs->toolstack_len);
@@ -1707,7 +1707,7 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
         goto out;
     }
 
-    rc = libxl__domain_suspend_device_model(gc, dss);
+    rc = libxl__domain_suspend_device_model(gc, &dss->dsps);
     if (rc) {
         LOG(ERROR, "failed to suspend device model.");
         goto out;

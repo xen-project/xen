@@ -41,7 +41,7 @@ int libxl__netbuffer_enabled(libxl__gc *gc)
 int init_subkind_nic(libxl__remus_devices_state *rds)
 {
     int rc, ret;
-    libxl__domain_suspend_state *dss = CONTAINER_OF(rds, *dss, rds);
+    libxl__domain_save_state *dss = CONTAINER_OF(rds, *dss, rds);
 
     STATE_AO_GC(rds->ao);
 

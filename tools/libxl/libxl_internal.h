@@ -3011,11 +3011,12 @@ static inline bool libxl__conversion_helper_inuse
  */
 
 typedef struct libxl__domain_suspend_state libxl__domain_suspend_state;
+typedef struct libxl__domain_save_state libxl__domain_save_state;
 
-typedef void libxl__domain_suspend_cb(libxl__egc*,
-                                      libxl__domain_suspend_state*, int rc);
+typedef void libxl__domain_save_cb(libxl__egc*,
+                                   libxl__domain_save_state*, int rc);
 typedef void libxl__save_device_model_cb(libxl__egc*,
-                                         libxl__domain_suspend_state*, int rc);
+                                         libxl__domain_save_state*, int rc);
 
 /* State for writing a libxl migration v2 stream */
 typedef struct libxl__stream_write_state libxl__stream_write_state;
@@ -3024,7 +3025,7 @@ typedef void (*sws_record_done_cb)(libxl__egc *egc,
 struct libxl__stream_write_state {
     /* filled by the user */
     libxl__ao *ao;
-    libxl__domain_suspend_state *dss;
+    libxl__domain_save_state *dss;
     int fd;
     void (*completion_callback)(libxl__egc *egc,
                                 libxl__stream_write_state *sws,
@@ -3078,9 +3079,33 @@ typedef struct libxl__logdirty_switch {
 } libxl__logdirty_switch;
 
 struct libxl__domain_suspend_state {
+    /* set by caller of libxl__domain_suspend_init */
+    libxl__ao *ao;
+    uint32_t domid;
+
+    /* private */
+    libxl_domain_type type;
+
+    libxl__ev_evtchn guest_evtchn;
+    int guest_evtchn_lockfd;
+    int guest_responded;
+
+    libxl__xswait_state pvcontrol;
+    libxl__ev_xswatch guest_watch;
+    libxl__ev_time guest_timeout;
+
+    const char *dm_savefile;
+    void (*callback_common_done)(libxl__egc*,
+                                 struct libxl__domain_suspend_state*, int ok);
+};
+int libxl__domain_suspend_init(libxl__egc *egc,
+                               libxl__domain_suspend_state *dsps,
+                               libxl_domain_type type);
+
+struct libxl__domain_save_state {
     /* set by caller of libxl__domain_save */
     libxl__ao *ao;
-    libxl__domain_suspend_cb *callback;
+    libxl__domain_save_cb *callback;
 
     uint32_t domid;
     int fd;
@@ -3091,22 +3116,14 @@ struct libxl__domain_suspend_state {
     const libxl_domain_remus_info *remus;
     /* private */
     int rc;
-    libxl__ev_evtchn guest_evtchn;
-    int guest_evtchn_lockfd;
     int hvm;
     int xcflags;
-    int guest_responded;
-    libxl__xswait_state pvcontrol;
-    libxl__ev_xswatch guest_watch;
-    libxl__ev_time guest_timeout;
-    const char *dm_savefile;
+    libxl__domain_suspend_state dsps;
     libxl__remus_devices_state rds;
     libxl__ev_time checkpoint_timeout; /* used for Remus checkpoint */
     int interval; /* checkpoint interval (for Remus) */
     libxl__stream_write_state sws;
     libxl__logdirty_switch logdirty;
-    void (*callback_common_done)(libxl__egc*,
-                                 struct libxl__domain_suspend_state*, int ok);
 };
 
 
@@ -3447,12 +3464,12 @@ struct libxl__domain_create_state {
 
 /* calls dss->callback when done */
 _hidden void libxl__domain_save(libxl__egc *egc,
-                                libxl__domain_suspend_state *dss);
+                                libxl__domain_save_state *dss);
 
 
 /* calls libxl__xc_domain_suspend_done when done */
 _hidden void libxl__xc_domain_save(libxl__egc *egc,
-                                   libxl__domain_suspend_state *dss,
+                                   libxl__domain_save_state *dss,
                                    libxl__save_helper_state *shs);
 /* If rc==0 then retval is the return value from xc_domain_save
  * and errnoval is the errno value it provided.
@@ -3470,7 +3487,7 @@ void libxl__xc_domain_saverestore_async_callback_done(libxl__egc *egc,
 
 _hidden void libxl__domain_suspend_common_switch_qemu_logdirty
                                (int domid, unsigned int enable, void *data);
-_hidden int libxl__save_emulator_xenstore_data(libxl__domain_suspend_state *dss,
+_hidden int libxl__save_emulator_xenstore_data(libxl__domain_save_state *dss,
                                                char **buf, uint32_t *len);
 _hidden int libxl__restore_emulator_xenstore_data
     (libxl__domain_create_state *dcs, const char *ptr, uint32_t size);
@@ -3498,21 +3515,21 @@ static inline bool libxl__save_helper_inuse(const libxl__save_helper_state *shs)
 
 /* Each time the dm needs to be saved, we must call suspend and then save */
 _hidden int libxl__domain_suspend_device_model(libxl__gc *gc,
-                                           libxl__domain_suspend_state *dss);
+                                           libxl__domain_suspend_state *dsps);
 
 _hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
 
-/* calls dss->callback_common_done when done */
+/* calls dsps->callback_common_done when done */
 _hidden void libxl__domain_suspend(libxl__egc *egc,
-                                   libxl__domain_suspend_state *dss);
+                                   libxl__domain_suspend_state *dsps);
 /* used by libxc to suspend the guest during migration */
 _hidden void libxl__domain_suspend_callback(void *data);
 
 /* Remus setup and teardown */
 _hidden void libxl__remus_setup(libxl__egc *egc,
-                                libxl__domain_suspend_state *dss);
+                                libxl__domain_save_state *dss);
 _hidden void libxl__remus_teardown(libxl__egc *egc,
-                                   libxl__domain_suspend_state *dss,
+                                   libxl__domain_save_state *dss,
                                    int rc);
 _hidden void libxl__remus_restore_setup(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
