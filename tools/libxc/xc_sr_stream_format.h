@@ -60,21 +60,22 @@ struct xc_sr_rhdr
 /* Somewhat arbitrary - 8MB */
 #define REC_LENGTH_MAX                (8U << 20)
 
-#define REC_TYPE_END                  0x00000000U
-#define REC_TYPE_PAGE_DATA            0x00000001U
-#define REC_TYPE_X86_PV_INFO          0x00000002U
-#define REC_TYPE_X86_PV_P2M_FRAMES    0x00000003U
-#define REC_TYPE_X86_PV_VCPU_BASIC    0x00000004U
-#define REC_TYPE_X86_PV_VCPU_EXTENDED 0x00000005U
-#define REC_TYPE_X86_PV_VCPU_XSAVE    0x00000006U
-#define REC_TYPE_SHARED_INFO          0x00000007U
-#define REC_TYPE_TSC_INFO             0x00000008U
-#define REC_TYPE_HVM_CONTEXT          0x00000009U
-#define REC_TYPE_HVM_PARAMS           0x0000000aU
-#define REC_TYPE_TOOLSTACK            0x0000000bU
-#define REC_TYPE_X86_PV_VCPU_MSRS     0x0000000cU
-#define REC_TYPE_VERIFY               0x0000000dU
-#define REC_TYPE_CHECKPOINT           0x0000000eU
+#define REC_TYPE_END                        0x00000000U
+#define REC_TYPE_PAGE_DATA                  0x00000001U
+#define REC_TYPE_X86_PV_INFO                0x00000002U
+#define REC_TYPE_X86_PV_P2M_FRAMES          0x00000003U
+#define REC_TYPE_X86_PV_VCPU_BASIC          0x00000004U
+#define REC_TYPE_X86_PV_VCPU_EXTENDED       0x00000005U
+#define REC_TYPE_X86_PV_VCPU_XSAVE          0x00000006U
+#define REC_TYPE_SHARED_INFO                0x00000007U
+#define REC_TYPE_TSC_INFO                   0x00000008U
+#define REC_TYPE_HVM_CONTEXT                0x00000009U
+#define REC_TYPE_HVM_PARAMS                 0x0000000aU
+#define REC_TYPE_TOOLSTACK                  0x0000000bU
+#define REC_TYPE_X86_PV_VCPU_MSRS           0x0000000cU
+#define REC_TYPE_VERIFY                     0x0000000dU
+#define REC_TYPE_CHECKPOINT                 0x0000000eU
+#define REC_TYPE_CHECKPOINT_DIRTY_PFN_LIST  0x0000000fU
 
 #define REC_TYPE_OPTIONAL             0x80000000U
 

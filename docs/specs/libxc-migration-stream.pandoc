@@ -1,6 +1,8 @@
 % LibXenCtrl Domain Image Format
 % David Vrabel <<david.vrabel@citrix.com>>
   Andrew Cooper <<andrew.cooper3@citrix.com>>
+  Wen Congyang <<wency@cn.fujitsu.com>>
+  Yang Hongyang <<hongyang.yang@easystack.cn>>
 % Revision 1
 
 Introduction
@@ -227,7 +229,9 @@ type         0x00000000: END
 
              0x0000000E: CHECKPOINT
 
-             0x0000000F - 0x7FFFFFFF: Reserved for future _mandatory_
+             0x0000000F: CHECKPOINT_DIRTY_PFN_LIST (Secondary -> Primary)
+
+             0x00000010 - 0x7FFFFFFF: Reserved for future _mandatory_
              records.
 
              0x80000000 - 0xFFFFFFFF: Reserved for future _optional_
@@ -596,6 +600,27 @@ The higher level stream may then hand the stream back to libxc to
 process another set of records for the next consistent VM state
 snapshot.  This next set of records may be terminated by another
 CHECKPOINT record or an END record.
+
+\clearpage
+
+CHECKPOINT_DIRTY_PFN_LIST
+-------------------------
+
+A checkpoint dirty pfn list record is used to convey information about
+dirty memory in the VM. It is an unordered list of PFNs. Currently only
+applicable in the backchannel of a checkpointed stream. It is only used
+by COLO, more detail please reference README.colo.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+    | pfn[0]                                          |
+    +-------------------------------------------------+
+    ...
+    +-------------------------------------------------+
+    | pfn[C-1]                                        |
+    +-------------------------------------------------+
+
+The count of pfns is: record->length/sizeof(uint64_t).
 
 \clearpage
 

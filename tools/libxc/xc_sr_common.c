@@ -20,21 +20,22 @@ const char *dhdr_type_to_str(uint32_t type)
 
 static const char *mandatory_rec_types[] =
 {
-    [REC_TYPE_END]                  = "End",
-    [REC_TYPE_PAGE_DATA]            = "Page data",
-    [REC_TYPE_X86_PV_INFO]          = "x86 PV info",
-    [REC_TYPE_X86_PV_P2M_FRAMES]    = "x86 PV P2M frames",
-    [REC_TYPE_X86_PV_VCPU_BASIC]    = "x86 PV vcpu basic",
-    [REC_TYPE_X86_PV_VCPU_EXTENDED] = "x86 PV vcpu extended",
-    [REC_TYPE_X86_PV_VCPU_XSAVE]    = "x86 PV vcpu xsave",
-    [REC_TYPE_SHARED_INFO]          = "Shared info",
-    [REC_TYPE_TSC_INFO]             = "TSC info",
-    [REC_TYPE_HVM_CONTEXT]          = "HVM context",
-    [REC_TYPE_HVM_PARAMS]           = "HVM params",
-    [REC_TYPE_TOOLSTACK]            = "Toolstack",
-    [REC_TYPE_X86_PV_VCPU_MSRS]     = "x86 PV vcpu msrs",
-    [REC_TYPE_VERIFY]               = "Verify",
-    [REC_TYPE_CHECKPOINT]           = "Checkpoint",
+    [REC_TYPE_END]                          = "End",
+    [REC_TYPE_PAGE_DATA]                    = "Page data",
+    [REC_TYPE_X86_PV_INFO]                  = "x86 PV info",
+    [REC_TYPE_X86_PV_P2M_FRAMES]            = "x86 PV P2M frames",
+    [REC_TYPE_X86_PV_VCPU_BASIC]            = "x86 PV vcpu basic",
+    [REC_TYPE_X86_PV_VCPU_EXTENDED]         = "x86 PV vcpu extended",
+    [REC_TYPE_X86_PV_VCPU_XSAVE]            = "x86 PV vcpu xsave",
+    [REC_TYPE_SHARED_INFO]                  = "Shared info",
+    [REC_TYPE_TSC_INFO]                     = "TSC info",
+    [REC_TYPE_HVM_CONTEXT]                  = "HVM context",
+    [REC_TYPE_HVM_PARAMS]                   = "HVM params",
+    [REC_TYPE_TOOLSTACK]                    = "Toolstack",
+    [REC_TYPE_X86_PV_VCPU_MSRS]             = "x86 PV vcpu msrs",
+    [REC_TYPE_VERIFY]                       = "Verify",
+    [REC_TYPE_CHECKPOINT]                   = "Checkpoint",
+    [REC_TYPE_CHECKPOINT_DIRTY_PFN_LIST]    = "Checkpoint dirty pfn list",
 };
 
 const char *rec_type_to_str(uint32_t type)

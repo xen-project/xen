@@ -45,38 +45,40 @@ dhdr_type_to_str = {
 # Records
 RH_FORMAT = "II"
 
-REC_TYPE_end                  = 0x00000000
-REC_TYPE_page_data            = 0x00000001
-REC_TYPE_x86_pv_info          = 0x00000002
-REC_TYPE_x86_pv_p2m_frames    = 0x00000003
-REC_TYPE_x86_pv_vcpu_basic    = 0x00000004
-REC_TYPE_x86_pv_vcpu_extended = 0x00000005
-REC_TYPE_x86_pv_vcpu_xsave    = 0x00000006
-REC_TYPE_shared_info          = 0x00000007
-REC_TYPE_tsc_info             = 0x00000008
-REC_TYPE_hvm_context          = 0x00000009
-REC_TYPE_hvm_params           = 0x0000000a
-REC_TYPE_toolstack            = 0x0000000b
-REC_TYPE_x86_pv_vcpu_msrs     = 0x0000000c
-REC_TYPE_verify               = 0x0000000d
-REC_TYPE_checkpoint           = 0x0000000e
+REC_TYPE_end                        = 0x00000000
+REC_TYPE_page_data                  = 0x00000001
+REC_TYPE_x86_pv_info                = 0x00000002
+REC_TYPE_x86_pv_p2m_frames          = 0x00000003
+REC_TYPE_x86_pv_vcpu_basic          = 0x00000004
+REC_TYPE_x86_pv_vcpu_extended       = 0x00000005
+REC_TYPE_x86_pv_vcpu_xsave          = 0x00000006
+REC_TYPE_shared_info                = 0x00000007
+REC_TYPE_tsc_info                   = 0x00000008
+REC_TYPE_hvm_context                = 0x00000009
+REC_TYPE_hvm_params                 = 0x0000000a
+REC_TYPE_toolstack                  = 0x0000000b
+REC_TYPE_x86_pv_vcpu_msrs           = 0x0000000c
+REC_TYPE_verify                     = 0x0000000d
+REC_TYPE_checkpoint                 = 0x0000000e
+REC_TYPE_checkpoint_dirty_pfn_list  = 0x0000000f
 
 rec_type_to_str = {
-    REC_TYPE_end                  : "End",
-    REC_TYPE_page_data            : "Page data",
-    REC_TYPE_x86_pv_info          : "x86 PV info",
-    REC_TYPE_x86_pv_p2m_frames    : "x86 PV P2M frames",
-    REC_TYPE_x86_pv_vcpu_basic    : "x86 PV vcpu basic",
-    REC_TYPE_x86_pv_vcpu_extended : "x86 PV vcpu extended",
-    REC_TYPE_x86_pv_vcpu_xsave    : "x86 PV vcpu xsave",
-    REC_TYPE_shared_info          : "Shared info",
-    REC_TYPE_tsc_info             : "TSC info",
-    REC_TYPE_hvm_context          : "HVM context",
-    REC_TYPE_hvm_params           : "HVM params",
-    REC_TYPE_toolstack            : "Toolstack",
-    REC_TYPE_x86_pv_vcpu_msrs     : "x86 PV vcpu msrs",
-    REC_TYPE_verify               : "Verify",
-    REC_TYPE_checkpoint           : "Checkpoint",
+    REC_TYPE_end                        : "End",
+    REC_TYPE_page_data                  : "Page data",
+    REC_TYPE_x86_pv_info                : "x86 PV info",
+    REC_TYPE_x86_pv_p2m_frames          : "x86 PV P2M frames",
+    REC_TYPE_x86_pv_vcpu_basic          : "x86 PV vcpu basic",
+    REC_TYPE_x86_pv_vcpu_extended       : "x86 PV vcpu extended",
+    REC_TYPE_x86_pv_vcpu_xsave          : "x86 PV vcpu xsave",
+    REC_TYPE_shared_info                : "Shared info",
+    REC_TYPE_tsc_info                   : "TSC info",
+    REC_TYPE_hvm_context                : "HVM context",
+    REC_TYPE_hvm_params                 : "HVM params",
+    REC_TYPE_toolstack                  : "Toolstack",
+    REC_TYPE_x86_pv_vcpu_msrs           : "x86 PV vcpu msrs",
+    REC_TYPE_verify                     : "Verify",
+    REC_TYPE_checkpoint                 : "Checkpoint",
+    REC_TYPE_checkpoint_dirty_pfn_list  : "Checkpoint dirty pfn list"
 }
 
 # page_data
@@ -403,6 +405,10 @@ class VerifyLibxc(VerifyBase):
         if len(content) != 0:
             raise RecordError("Checkpoint record with non-zero length")
 
+    def verify_record_checkpoint_dirty_pfn_list(self, content):
+        """ checkpoint dirty pfn list """
+        raise RecordError("Found checkpoint dirty pfn list record in stream")
+
 
 record_verifiers = {
     REC_TYPE_end:
@@ -443,4 +449,6 @@ record_verifiers = {
         VerifyLibxc.verify_record_verify,
     REC_TYPE_checkpoint:
         VerifyLibxc.verify_record_checkpoint,
+    REC_TYPE_checkpoint_dirty_pfn_list:
+        VerifyLibxc.verify_record_checkpoint_dirty_pfn_list,
     }
