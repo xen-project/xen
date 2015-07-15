@@ -17,38 +17,6 @@
 
 #include "libxl_internal.h"
 
-/*----- helper functions -----*/
-
-static int init_device_subkind(libxl__checkpoint_devices_state *cds)
-{
-    /* init device subkind-specific state in the libxl ctx */
-    int rc;
-    STATE_AO_GC(cds->ao);
-
-    if (libxl__netbuffer_enabled(gc)) {
-        rc = init_subkind_nic(cds);
-        if (rc) goto out;
-    }
-
-    rc = init_subkind_drbd_disk(cds);
-    if (rc) goto out;
-
-    rc = 0;
-out:
-    return rc;
-}
-
-static void cleanup_device_subkind(libxl__checkpoint_devices_state *cds)
-{
-    /* cleanup device subkind-specific state in the libxl ctx */
-    STATE_AO_GC(cds->ao);
-
-    if (libxl__netbuffer_enabled(gc))
-        cleanup_subkind_nic(cds);
-
-    cleanup_subkind_drbd_disk(cds);
-}
-
 /*----- setup() and teardown() -----*/
 
 /* callbacks */
@@ -86,13 +54,9 @@ static void checkpoint_devices_setup(libxl__egc *egc,
 void libxl__checkpoint_devices_setup(libxl__egc *egc,
                                      libxl__checkpoint_devices_state *cds)
 {
-    int i, rc;
+    int i;
 
     STATE_AO_GC(cds->ao);
-
-    rc = init_device_subkind(cds);
-    if (rc)
-        goto out;
 
     cds->num_devices = 0;
     cds->num_nics = 0;
@@ -126,7 +90,7 @@ void libxl__checkpoint_devices_setup(libxl__egc *egc,
     return;
 
 out:
-    cds->callback(egc, cds, rc);
+    cds->callback(egc, cds, 0);
 }
 
 static void checkpoint_devices_setup(libxl__egc *egc,
@@ -262,8 +226,6 @@ static void devices_teardown_cb(libxl__egc *egc,
     free(cds->disks);
     cds->disks = NULL;
     cds->num_disks = 0;
-
-    cleanup_device_subkind(cds);
 
     cds->callback(egc, cds, rc);
 }

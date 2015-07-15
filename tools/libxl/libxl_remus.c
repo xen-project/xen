@@ -26,6 +26,38 @@ static const libxl__checkpoint_device_instance_ops *remus_ops[] = {
     NULL,
 };
 
+/*----- helper functions -----*/
+
+static int init_device_subkind(libxl__checkpoint_devices_state *cds)
+{
+    /* init device subkind-specific state in the libxl ctx */
+    int rc;
+    STATE_AO_GC(cds->ao);
+
+    if (libxl__netbuffer_enabled(gc)) {
+        rc = init_subkind_nic(cds);
+        if (rc) goto out;
+    }
+
+    rc = init_subkind_drbd_disk(cds);
+    if (rc) goto out;
+
+    rc = 0;
+out:
+    return rc;
+}
+
+static void cleanup_device_subkind(libxl__checkpoint_devices_state *cds)
+{
+    /* cleanup device subkind-specific state in the libxl ctx */
+    STATE_AO_GC(cds->ao);
+
+    if (libxl__netbuffer_enabled(gc))
+        cleanup_subkind_nic(cds);
+
+    cleanup_subkind_drbd_disk(cds);
+}
+
 /*-------------------- Remus setup and teardown ---------------------*/
 
 static void remus_setup_done(libxl__egc *egc,
@@ -68,6 +100,12 @@ void libxl__remus_setup(libxl__egc *egc, libxl__remus_state *rs)
     cds->concrete_data = rs;
     rs->interval = info->interval;
 
+    if (init_device_subkind(cds)) {
+        LOG(ERROR, "Remus: failed to init device subkind for guest %u",
+            dss->domid);
+        goto out;
+    }
+
     dss->sws.checkpoint_callback = remus_checkpoint_stream_written;
 
     callbacks->suspend = libxl__remus_domain_suspend_callback;
@@ -108,6 +146,8 @@ static void remus_setup_failed(libxl__egc *egc,
         LOG(ERROR, "Remus: failed to teardown device after setup failed"
             " for guest with domid %u, rc %d", dss->domid, rc);
 
+    cleanup_device_subkind(cds);
+
     dss->callback(egc, dss, rc);
 }
 
@@ -141,6 +181,8 @@ static void remus_teardown_done(libxl__egc *egc,
     if (rc)
         LOG(ERROR, "Remus: failed to teardown device for guest with domid %u,"
             " rc %d", dss->domid, rc);
+
+    cleanup_device_subkind(cds);
 
     dss->callback(egc, dss, rc);
 }
