@@ -289,7 +289,7 @@ int rangeset_report_ranges(
 
     read_lock(&r->lock);
 
-    for ( x = find_range(r, s); x && (x->s <= e) && !rc; x = next_range(r, x) )
+    for ( x = first_range(r); x && (x->s <= e) && !rc; x = next_range(r, x) )
         if ( x->e >= s )
             rc = cb(max(x->s, s), min(x->e, e), ctxt);
 
