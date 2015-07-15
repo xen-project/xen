@@ -126,6 +126,22 @@ void hvm_event_msr(unsigned int msr, uint64_t value)
         hvm_event_traps(1, &req);
 }
 
+void hvm_event_guest_request(void)
+{
+    struct vcpu *curr = current;
+    struct arch_domain *currad = &curr->domain->arch;
+
+    if ( currad->monitor.guest_request_enabled )
+    {
+        vm_event_request_t req = {
+            .reason = VM_EVENT_REASON_GUEST_REQUEST,
+            .vcpu_id = curr->vcpu_id,
+        };
+
+        hvm_event_traps(currad->monitor.guest_request_sync, &req);
+    }
+}
+
 int hvm_event_int3(unsigned long gla)
 {
     int rc = 0;

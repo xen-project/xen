@@ -1009,6 +1009,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_psr_cmt_op_t);
 #define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR            1
 #define XEN_DOMCTL_MONITOR_EVENT_SINGLESTEP            2
 #define XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT   3
+#define XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST         4
 
 struct xen_domctl_monitor_op {
     uint32_t op; /* XEN_DOMCTL_MONITOR_OP_* */
@@ -1039,6 +1040,11 @@ struct xen_domctl_monitor_op {
             /* Enable the capture of an extended set of MSRs */
             uint8_t extended_capture;
         } mov_to_msr;
+
+        struct {
+            /* Pause vCPU until response */
+            uint8_t sync;
+        } guest_request;
     } u;
 };
 typedef struct xen_domctl_monitor_op xen_domctl_monitor_op_t;

@@ -5999,7 +5999,6 @@ static int hvmop_get_param(
 #define HVMOP_op_mask 0xff
 
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
-
 {
     unsigned long start_iter, mask;
     long rc = 0;
@@ -6412,6 +6411,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         rcu_unlock_domain(d);
         break;
     }
+
+    case HVMOP_guest_request_vm_event:
+        if ( guest_handle_is_null(arg) )
+            hvm_event_guest_request();
+        else
+            rc = -EINVAL;
+        break;
 
     default:
     {

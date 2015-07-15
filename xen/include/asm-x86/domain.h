@@ -347,13 +347,15 @@ struct arch_domain
 
     /* Monitor options */
     struct {
-        uint16_t write_ctrlreg_enabled       : 4;
-        uint16_t write_ctrlreg_sync          : 4;
-        uint16_t write_ctrlreg_onchangeonly  : 4;
-        uint16_t mov_to_msr_enabled          : 1;
-        uint16_t mov_to_msr_extended         : 1;
-        uint16_t singlestep_enabled          : 1;
-        uint16_t software_breakpoint_enabled : 1;
+        unsigned int write_ctrlreg_enabled       : 4;
+        unsigned int write_ctrlreg_sync          : 4;
+        unsigned int write_ctrlreg_onchangeonly  : 4;
+        unsigned int mov_to_msr_enabled          : 1;
+        unsigned int mov_to_msr_extended         : 1;
+        unsigned int singlestep_enabled          : 1;
+        unsigned int software_breakpoint_enabled : 1;
+        unsigned int guest_request_enabled       : 1;
+        unsigned int guest_request_sync          : 1;
     } monitor;
 
     /* Mem_access emulation control */

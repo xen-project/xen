@@ -396,6 +396,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_evtchn_upcall_vector_t);
 
 #endif /* defined(__i386__) || defined(__x86_64__) */
 
+#define HVMOP_guest_request_vm_event 24
+
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */
 
 /*

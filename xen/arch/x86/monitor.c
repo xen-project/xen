@@ -55,7 +55,8 @@ static inline uint32_t get_capabilities(struct domain *d)
 
     capabilities = (1 << XEN_DOMCTL_MONITOR_EVENT_WRITE_CTRLREG) |
                    (1 << XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR) |
-                   (1 << XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT);
+                   (1 << XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT) |
+                   (1 << XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST);
 
     /* Since we know this is on VMX, we can just call the hvm func */
     if ( hvm_is_singlestep_supported() )
@@ -180,6 +181,22 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
 
         domain_pause(d);
         ad->monitor.software_breakpoint_enabled = !status;
+        domain_unpause(d);
+        break;
+    }
+
+    case XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST:
+    {
+        bool_t status = ad->monitor.guest_request_enabled;
+
+        rc = status_check(mop, status);
+        if ( rc )
+            return rc;
+
+        ad->monitor.guest_request_sync = mop->u.guest_request.sync;
+
+        domain_pause(d);
+        ad->monitor.guest_request_enabled = !status;
         domain_unpause(d);
         break;
     }
