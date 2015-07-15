@@ -1,0 +1,135 @@
+#! /bin/bash
+
+dir=$(dirname "$0")
+. "$dir/xen-hotplug-common.sh"
+. "$dir/hotplugpath.sh"
+
+findCommand "$@"
+
+if [ "$command" != "setup" -a  "$command" != "teardown" ]
+then
+    echo "Invalid command: $command"
+    log err "Invalid command: $command"
+    exit 1
+fi
+
+evalVariables "$@"
+
+: ${vifname:?}
+: ${forwarddev:?}
+: ${mode:?}
+: ${index:?}
+: ${bridge:?}
+
+forwardbr="colobr0"
+
+if [ "$mode" != "primary" -a "$mode" != "secondary" ]
+then
+    echo "Invalid mode: $mode"
+    log err "Invalid mode: $mode"
+    exit 1
+fi
+
+if [ $index -lt 0 ] || [ $index -gt 100 ]; then
+    echo "index overflow"
+    exit 1
+fi
+
+function setup_primary()
+{
+    do_without_error tc qdisc add dev $vifname root handle 1: prio
+    do_without_error tc filter add dev $vifname parent 1: protocol ip prio 10 \
+        u32 match u32 0 0 flowid 1:2 action mirred egress mirror dev $forwarddev
+    do_without_error tc filter add dev $vifname parent 1: protocol arp prio 11 \
+        u32 match u32 0 0 flowid 1:2 action mirred egress mirror dev $forwarddev
+    do_without_error tc filter add dev $vifname parent 1: protocol ipv6 prio \
+        12 u32 match u32 0 0 flowid 1:2 action mirred egress mirror \
+        dev $forwarddev
+
+    do_without_error modprobe nf_conntrack_ipv4
+    do_without_error modprobe xt_PMYCOLO sec_dev=$forwarddev
+
+    iptables -t mangle -I PREROUTING -m physdev --physdev-in \
+        $vifname -j PMYCOLO --index $index
+    ip6tables -t mangle -I PREROUTING -m physdev --physdev-in \
+        $vifname -j PMYCOLO --index $index
+    do_without_error arptables -I INPUT -i $forwarddev -j MARK --set-mark $index
+}
+
+function teardown_primary()
+{
+    do_without_error tc filter del dev $vifname parent 1: protocol ip prio 10 u32 match u32 \
+        0 0 flowid 1:2 action mirred egress mirror dev $forwarddev
+    do_without_error tc filter del dev $vifname parent 1: protocol arp prio 11 u32 match u32 \
+        0 0 flowid 1:2 action mirred egress mirror dev $forwarddev
+    do_without_error tc filter del dev $vifname parent 1: protocol ipv6 prio 12 u32 match u32 \
+        0 0 flowid 1:2 action mirred egress mirror dev $forwarddev
+    do_without_error tc qdisc del dev $vifname root handle 1: prio
+
+    do_without_error iptables -t mangle -D PREROUTING -m physdev --physdev-in \
+        $vifname -j PMYCOLO --index $index
+    do_without_error ip6tables -t mangle -D PREROUTING -m physdev --physdev-in \
+        $vifname -j PMYCOLO --index $index
+    do_without_error arptables -F
+    do_without_error rmmod xt_PMYCOLO
+}
+
+function setup_secondary()
+{
+    do_without_error brctl delif $bridge $vifname
+    do_without_error brctl addbr $forwardbr
+    do_without_error brctl addif $forwardbr $vifname
+    do_without_error brctl addif $forwardbr $forwarddev
+    do_without_error ip link set dev $forwardbr up
+    do_without_error modprobe xt_SECCOLO
+
+    iptables -t mangle -I PREROUTING -m physdev --physdev-in \
+        $vifname -j SECCOLO --index $index
+    ip6tables -t mangle -I PREROUTING -m physdev --physdev-in \
+        $vifname -j SECCOLO --index $index
+}
+
+function teardown_secondary()
+{
+    do_without_error brctl delif $forwardbr $forwarddev
+    do_without_error brctl delif $forwardbr $vifname
+    do_without_error brctl delbr $forwardbr
+    do_without_error brctl addif $bridge $vifname
+
+    do_without_error iptables -t mangle -D PREROUTING -m physdev --physdev-in \
+        $vifname -j SECCOLO --index $index
+    do_without_error ip6tables -t mangle -D PREROUTING -m physdev --physdev-in \
+        $vifname -j SECCOLO --index $index
+    do_without_error rmmod xt_SECCOLO
+}
+
+case "$command" in
+    setup)
+        if [ "$mode" = "primary" ]
+        then
+            setup_primary
+        else
+            setup_secondary
+        fi
+
+        success
+        ;;
+    teardown)
+        if [ "$mode" = "primary" ]
+        then
+            teardown_primary
+        else
+            teardown_secondary
+        fi
+        ;;
+esac
+
+if [ "$mode" = "primary" ]
+then
+    log debug "Successful colo-proxy-setup $command for $vifname." \
+              " vifname: $vifname, index: $index, forwarddev: $forwarddev."
+else
+    log debug "Successful colo-proxy-setup $command for $vifname." \
+              " vifname: $vifname, index: $index, forwarddev: $forwarddev,"\
+              " forwardbr: $forwardbr."
+fi

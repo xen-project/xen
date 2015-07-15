@@ -40,6 +40,11 @@ enum colo_netlink_op {
     COLO_PROXY_RESET, /* UNUSED, will be used for continuous FT */
 };
 
+typedef struct libxl__colo_device_nic {
+    int devid;
+    const char *vif;
+} libxl__colo_device_nic;
+
 typedef struct libxl__colo_qdisk {
     bool setuped;
 } libxl__colo_qdisk;
@@ -70,6 +75,7 @@ struct libxl__colo_restore_state {
     int recv_fd;
     int hvm;
     libxl__colo_callback *callback;
+    char *colo_proxy_script;
 
     /* private, colo restore checkpoint state */
     libxl__domain_create_cb *saved_cb;
@@ -88,6 +94,10 @@ struct libxl__colo_restore_state {
 int init_subkind_qdisk(struct libxl__checkpoint_devices_state *cds);
 
 void cleanup_subkind_qdisk(struct libxl__checkpoint_devices_state *cds);
+
+int init_subkind_colo_nic(struct libxl__checkpoint_devices_state *cds);
+
+void cleanup_subkind_colo_nic(struct libxl__checkpoint_devices_state *cds);
 
 extern void libxl__colo_restore_setup(struct libxl__egc *egc,
                                       libxl__colo_restore_state *crs);
