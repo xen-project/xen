@@ -285,15 +285,9 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         {
             xen_sysctl_meminfo_t meminfo = { 0 };
 
-            if ( ni->num_nodes < num_nodes )
-            {
-                ret = -ENOBUFS;
-                i = num_nodes;
-            }
-            else
-                i = 0;
-
-            for ( ; i < num_nodes; i++ )
+            if ( num_nodes > ni->num_nodes )
+                num_nodes = ni->num_nodes;
+            for ( i = 0; i < num_nodes; ++i )
             {
                 static uint32_t distance[MAX_NUMNODES];
 
@@ -335,7 +329,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         else
             i = num_nodes;
 
-        if ( (!ret || (ret == -ENOBUFS)) && (ni->num_nodes != i) )
+        if ( !ret && (ni->num_nodes != i) )
         {
             ni->num_nodes = i;
             if ( __copy_field_to_guest(u_sysctl, op,

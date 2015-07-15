@@ -515,10 +515,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_meminfo_t);
  *    non-null)
  *
  * OUT:
- *  - If 'num_nodes' is less than the number Xen needs to write, -ENOBUFS shall
- *    be returned and 'num_nodes' updated to reflect the intended number.
- *  - On success, 'num_nodes' shall indicate the number of entries written, which
- *    may be less than the maximum.
+ *  - If 'num_nodes' is less than the number Xen wants to write but either
+ *    handle is not a NULL one, partial data gets returned and 'num_nodes'
+ *    gets updated to reflect the intended number.
+ *  - Otherwise, 'num_nodes' shall indicate the number of entries written, which
+ *    may be less than the input value.
  */
 
 struct xen_sysctl_numainfo {
