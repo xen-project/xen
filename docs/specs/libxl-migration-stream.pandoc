@@ -1,6 +1,8 @@
 % LibXenLight Domain Image Format
 % Andrew Cooper <<andrew.cooper3@citrix.com>>
-% Revision 1
+  Wen Congyang <<wency@cn.fujitsu.com>>
+  Yang Hongyang <<hongyang.yang@easystack.cn>>
+% Revision 2
 
 Introduction
 ============
@@ -119,7 +121,9 @@ type         0x00000000: END
 
              0x00000004: CHECKPOINT_END
 
-             0x00000005 - 0x7FFFFFFF: Reserved for future _mandatory_
+             0x00000005: CHECKPOINT_STATE
+
+             0x00000006 - 0x7FFFFFFF: Reserved for future _mandatory_
              records.
 
              0x80000000 - 0xFFFFFFFF: Reserved for future _optional_
@@ -248,6 +252,57 @@ A checkpoint end record marks the end of a checkpoint in the image.
 
 The end record contains no fields; its body_length is 0.
 
+
+CHECKPOINT\_STATE
+--------------
+
+A checkpoint state record contains the control information for checkpoint. It
+is only used by COLO, more detail please reference README.colo.
+
+     0     1     2     3     4     5     6     7 octet
+    +------------------------+------------------------+
+    | control_id             | padding                |
+    +------------------------+------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+------------     ---------------------------------------------------
+control_id       0x00000000: Secondary VM is out of sync, start a new checkpoint
+                 (Primary -> Secondary)
+
+                 0x00000001: Secondary VM is suspended (Secondary -> Primary)
+
+                 0x00000002: Secondary VM is ready (Secondary -> Primary)
+
+                 0x00000003: Secondary VM is resumed (Secondary -> Primary)
+
+--------------------------------------------------------------------
+
+In COLO, Primary is running in below loop:
+
+1. Suspend primary vm
+    a. Suspend primary vm
+    b. Read _CHECKPOINT\_SVM\_SUSPENDED_ sent by secondary
+2. Checkpoint
+3. Resume primary vm
+    a. Read _CHECKPOINT\_SVM\_READY_ from secondary
+    b. Resume primary vm
+    c. Read _CHECKPOINT\_SVM\_RESUMED_ from secondary
+4. Wait a new checkpoint
+    a. Send _CHECKPOINT\_NEW_ to secondary
+
+While Secondary is running in below loop:
+
+1. Resume secondary vm
+    a. Send _CHECKPOINT\_SVM\_READY_ to primary
+    b. Resume secondary vm
+    c. Send _CHECKPOINT\_SVM\_RESUMED_ to primary
+2. Wait a new checkpoint
+    a. Read _CHECKPOINT\_NEW_ from primary
+3. Suspend secondary vm
+    a. Suspend secondary vm
+    b. Send _CHECKPOINT\_SVM\_SUSPENDED_ to primary
+4. Checkpoint
 
 Future Extensions
 =================
