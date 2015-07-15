@@ -26,6 +26,31 @@ struct libxl__checkpoint_devices_state;
 /* Consistent with the new COLO netlink channel in kernel side */
 #define NETLINK_COLO 28
 
+/* Maximum time(5s) to wait for colo proxy checkpoit */
+#define COLO_PROXY_CHECKPOINT_TIMEOUT 5000000
+
+#define ASYNC_CALL(egc, ao, child, param, func, callback) do {          \
+    int pid = -1;                                                       \
+    STATE_AO_GC(ao);                                                    \
+                                                                        \
+    pid = libxl__ev_child_fork(gc, child, callback);                    \
+    if (pid == -1) {                                                    \
+        LOG(ERROR, "unable to fork");                                   \
+        goto out;                                                       \
+    }                                                                   \
+                                                                        \
+    if (!pid) {                                                         \
+        /* child */                                                     \
+        func(param);                                                    \
+        /* notreached */                                                \
+        abort();                                                        \
+    }                                                                   \
+                                                                        \
+    return;                                                             \
+out:                                                                    \
+    callback(egc, child, -1, 1);                                        \
+} while (0)
+
 enum {
     LIBXL_COLO_SETUPED,
     LIBXL_COLO_SUSPENDED,

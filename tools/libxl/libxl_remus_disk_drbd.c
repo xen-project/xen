@@ -42,38 +42,6 @@ void cleanup_subkind_drbd_disk(libxl__checkpoint_devices_state *cds)
     return;
 }
 
-/*----- helper functions, for async calls -----*/
-static void drbd_async_call(libxl__egc *egc,
-                            libxl__checkpoint_device *dev,
-                            void func(libxl__checkpoint_device *),
-                            libxl__ev_child_callback callback)
-{
-    int pid, rc;
-    libxl__ao_device *aodev = &dev->aodev;
-    STATE_AO_GC(dev->cds->ao);
-
-    /* Fork and call */
-    pid = libxl__ev_child_fork(gc, &aodev->child, callback);
-    if (pid == -1) {
-        LOG(ERROR, "unable to fork");
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
-    if (!pid) {
-        /* child */
-        func(dev);
-        /* notreached */
-        abort();
-    }
-
-    return;
-
-out:
-    aodev->rc = rc;
-    aodev->callback(egc, aodev);
-}
-
 /*----- match(), setup() and teardown() -----*/
 
 /* callbacks */
@@ -213,9 +181,9 @@ static void drbd_preresume_async(libxl__checkpoint_device *dev);
 
 static void drbd_preresume(libxl__egc *egc, libxl__checkpoint_device *dev)
 {
-    STATE_AO_GC(dev->cds->ao);
-
-    drbd_async_call(egc, dev, drbd_preresume_async, checkpoint_async_call_done);
+    ASYNC_CALL(egc, dev->cds->ao, &dev->aodev.child, dev,
+               drbd_preresume_async,
+               checkpoint_async_call_done);
 }
 
 static void drbd_preresume_async(libxl__checkpoint_device *dev)
