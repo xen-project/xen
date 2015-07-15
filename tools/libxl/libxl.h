@@ -657,6 +657,15 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_DOMAIN_CREATE_RESTORE_PARAMS 1
 
 /*
+ * LIBXL_HAVE_DOMAIN_CREATE_RESTORE_SEND_BACK_FD 1
+ *
+ * If this is defined, libxl_domain_create_restore()'s API includes the
+ * send_back_fd param. This is used only with COLO, for the libxl migration
+ * back channel; other callers should pass -1.
+ */
+#define LIBXL_HAVE_DOMAIN_CREATE_RESTORE_SEND_BACK_FD 1
+
+/*
  * LIBXL_HAVE_CREATEINFO_PVH
  * If this is defined, then libxl supports creation of a PVH guest.
  */
@@ -1183,6 +1192,7 @@ int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
                             LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
                                 uint32_t *domid, int restore_fd,
+                                int send_back_fd,
                                 const libxl_domain_restore_params *params,
                                 const libxl_asyncop_how *ao_how,
                                 const libxl_asyncprogress_how *aop_console_how)
@@ -1203,13 +1213,30 @@ int static inline libxl_domain_create_restore_0x040200(
     libxl_domain_restore_params_init(&params);
 
     ret = libxl_domain_create_restore(
-        ctx, d_config, domid, restore_fd, &params, ao_how, aop_console_how);
+        ctx, d_config, domid, restore_fd, -1, &params, ao_how, aop_console_how);
 
     libxl_domain_restore_params_dispose(&params);
     return ret;
 }
 
 #define libxl_domain_create_restore libxl_domain_create_restore_0x040200
+
+#elif defined(LIBXL_API_VERSION) && LIBXL_API_VERSION >= 0x040400 \
+                                 && LIBXL_API_VERSION < 0x040700
+
+int static inline libxl_domain_create_restore_0x040400(
+    libxl_ctx *ctx, libxl_domain_config *d_config,
+    uint32_t *domid, int restore_fd,
+    const libxl_domain_restore_params *params,
+    const libxl_asyncop_how *ao_how,
+    const libxl_asyncprogress_how *aop_console_how)
+    LIBXL_EXTERNAL_CALLERS_ONLY
+{
+    return libxl_domain_create_restore(ctx, d_config, domid, restore_fd,
+                                       -1, params, ao_how, aop_console_how);
+}
+
+#define libxl_domain_create_restore libxl_domain_create_restore_0x040400
 
 #endif
 

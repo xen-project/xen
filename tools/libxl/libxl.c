@@ -834,7 +834,6 @@ out:
 static void remus_failover_cb(libxl__egc *egc,
                               libxl__domain_save_state *dss, int rc);
 
-/* TODO: Explicit Checkpoint acknowledgements via recv_fd. */
 int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
                              uint32_t domid, int send_fd, int recv_fd,
                              const libxl_asyncop_how *ao_how)
@@ -871,7 +870,7 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
     dss->callback = remus_failover_cb;
     dss->domid = domid;
     dss->fd = send_fd;
-    /* TODO do something with recv_fd */
+    dss->recv_fd = recv_fd;
     dss->type = type;
     dss->live = 1;
     dss->debug = 0;

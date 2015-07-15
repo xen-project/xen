@@ -3150,6 +3150,7 @@ struct libxl__domain_save_state {
     uint32_t domid;
     int fd;
     int fdfl; /* original flags on fd */
+    int recv_fd;
     libxl_domain_type type;
     int live;
     int debug;
@@ -3491,6 +3492,7 @@ struct libxl__domain_create_state {
     libxl_domain_config guest_config_saved; /* vanilla config */
     int restore_fd, libxc_fd;
     int restore_fdfl; /* original flags of restore_fd */
+    int send_back_fd;
     libxl_domain_restore_params restore_params;
     uint32_t domid_soft_reset;
     libxl__domain_create_cb *callback;
