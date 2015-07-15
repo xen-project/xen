@@ -23,6 +23,19 @@
 #include <xen/sched.h>
 
 static inline
+int vm_event_init_domain(struct domain *d)
+{
+    /* Not supported on ARM. */
+    return 0;
+}
+
+static inline
+void vm_event_cleanup_domain(struct domain *d)
+{
+    /* Not supported on ARM. */
+}
+
+static inline
 void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v)
 {
     /* Not supported on ARM. */

@@ -22,6 +22,10 @@
 
 #include <xen/sched.h>
 
+int vm_event_init_domain(struct domain *d);
+
+void vm_event_cleanup_domain(struct domain *d);
+
 void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v);
 
 #endif /* __ASM_X86_VM_EVENT_H__ */

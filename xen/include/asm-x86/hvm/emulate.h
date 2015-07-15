@@ -32,13 +32,21 @@ struct hvm_emulate_ctxt {
     struct hvm_trap trap;
 
     uint32_t intr_shadow;
+
+    bool_t set_context;
+};
+
+enum emul_kind {
+    EMUL_KIND_NORMAL,
+    EMUL_KIND_NOWRITE,
+    EMUL_KIND_SET_CONTEXT
 };
 
 int hvm_emulate_one(
     struct hvm_emulate_ctxt *hvmemul_ctxt);
 int hvm_emulate_one_no_write(
     struct hvm_emulate_ctxt *hvmemul_ctxt);
-void hvm_mem_access_emulate_one(bool_t nowrite,
+void hvm_mem_access_emulate_one(enum emul_kind kind,
     unsigned int trapnr,
     unsigned int errcode);
 void hvm_emulate_prepare(

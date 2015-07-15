@@ -1369,49 +1369,49 @@ static void p2m_vm_event_fill_regs(vm_event_request_t *req)
     /* Architecture-specific vmcs/vmcb bits */
     hvm_funcs.save_cpu_ctxt(curr, &ctxt);
 
-    req->regs.x86.rax = regs->eax;
-    req->regs.x86.rcx = regs->ecx;
-    req->regs.x86.rdx = regs->edx;
-    req->regs.x86.rbx = regs->ebx;
-    req->regs.x86.rsp = regs->esp;
-    req->regs.x86.rbp = regs->ebp;
-    req->regs.x86.rsi = regs->esi;
-    req->regs.x86.rdi = regs->edi;
+    req->data.regs.x86.rax = regs->eax;
+    req->data.regs.x86.rcx = regs->ecx;
+    req->data.regs.x86.rdx = regs->edx;
+    req->data.regs.x86.rbx = regs->ebx;
+    req->data.regs.x86.rsp = regs->esp;
+    req->data.regs.x86.rbp = regs->ebp;
+    req->data.regs.x86.rsi = regs->esi;
+    req->data.regs.x86.rdi = regs->edi;
 
-    req->regs.x86.r8  = regs->r8;
-    req->regs.x86.r9  = regs->r9;
-    req->regs.x86.r10 = regs->r10;
-    req->regs.x86.r11 = regs->r11;
-    req->regs.x86.r12 = regs->r12;
-    req->regs.x86.r13 = regs->r13;
-    req->regs.x86.r14 = regs->r14;
-    req->regs.x86.r15 = regs->r15;
+    req->data.regs.x86.r8  = regs->r8;
+    req->data.regs.x86.r9  = regs->r9;
+    req->data.regs.x86.r10 = regs->r10;
+    req->data.regs.x86.r11 = regs->r11;
+    req->data.regs.x86.r12 = regs->r12;
+    req->data.regs.x86.r13 = regs->r13;
+    req->data.regs.x86.r14 = regs->r14;
+    req->data.regs.x86.r15 = regs->r15;
 
-    req->regs.x86.rflags = regs->eflags;
-    req->regs.x86.rip    = regs->eip;
+    req->data.regs.x86.rflags = regs->eflags;
+    req->data.regs.x86.rip    = regs->eip;
 
-    req->regs.x86.dr7 = curr->arch.debugreg[7];
-    req->regs.x86.cr0 = ctxt.cr0;
-    req->regs.x86.cr2 = ctxt.cr2;
-    req->regs.x86.cr3 = ctxt.cr3;
-    req->regs.x86.cr4 = ctxt.cr4;
+    req->data.regs.x86.dr7 = curr->arch.debugreg[7];
+    req->data.regs.x86.cr0 = ctxt.cr0;
+    req->data.regs.x86.cr2 = ctxt.cr2;
+    req->data.regs.x86.cr3 = ctxt.cr3;
+    req->data.regs.x86.cr4 = ctxt.cr4;
 
-    req->regs.x86.sysenter_cs = ctxt.sysenter_cs;
-    req->regs.x86.sysenter_esp = ctxt.sysenter_esp;
-    req->regs.x86.sysenter_eip = ctxt.sysenter_eip;
+    req->data.regs.x86.sysenter_cs = ctxt.sysenter_cs;
+    req->data.regs.x86.sysenter_esp = ctxt.sysenter_esp;
+    req->data.regs.x86.sysenter_eip = ctxt.sysenter_eip;
 
-    req->regs.x86.msr_efer = ctxt.msr_efer;
-    req->regs.x86.msr_star = ctxt.msr_star;
-    req->regs.x86.msr_lstar = ctxt.msr_lstar;
+    req->data.regs.x86.msr_efer = ctxt.msr_efer;
+    req->data.regs.x86.msr_star = ctxt.msr_star;
+    req->data.regs.x86.msr_lstar = ctxt.msr_lstar;
 
     hvm_get_segment_register(curr, x86_seg_fs, &seg);
-    req->regs.x86.fs_base = seg.base;
+    req->data.regs.x86.fs_base = seg.base;
 
     hvm_get_segment_register(curr, x86_seg_gs, &seg);
-    req->regs.x86.gs_base = seg.base;
+    req->data.regs.x86.gs_base = seg.base;
 
     hvm_get_segment_register(curr, x86_seg_cs, &seg);
-    req->regs.x86.cs_arbytes = seg.attr.bytes;
+    req->data.regs.x86.cs_arbytes = seg.attr.bytes;
 }
 
 void p2m_mem_access_emulate_check(struct vcpu *v,
@@ -1466,6 +1466,10 @@ void p2m_mem_access_emulate_check(struct vcpu *v,
         }
 
         v->arch.vm_event.emulate_flags = violation ? rsp->flags : 0;
+
+        if ( (rsp->flags & VM_EVENT_FLAG_SET_EMUL_READ_DATA) &&
+             v->arch.vm_event.emul_read_data )
+            *v->arch.vm_event.emul_read_data = rsp->data.emul_read_data;
     }
 }
 
@@ -1552,9 +1556,17 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
 
     if ( v->arch.vm_event.emulate_flags )
     {
-        hvm_mem_access_emulate_one((v->arch.vm_event.emulate_flags &
-                                    VM_EVENT_FLAG_EMULATE_NOWRITE) != 0,
-                                   TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        enum emul_kind kind = EMUL_KIND_NORMAL;
+
+        if ( v->arch.vm_event.emulate_flags &
+             VM_EVENT_FLAG_SET_EMUL_READ_DATA )
+            kind = EMUL_KIND_SET_CONTEXT;
+        else if ( v->arch.vm_event.emulate_flags &
+                  VM_EVENT_FLAG_EMULATE_NOWRITE )
+            kind = EMUL_KIND_NOWRITE;
+
+        hvm_mem_access_emulate_one(kind, TRAP_invalid_op,
+                                   HVM_DELIVER_NO_ERROR_CODE);
 
         v->arch.vm_event.emulate_flags = 0;
         return 1;

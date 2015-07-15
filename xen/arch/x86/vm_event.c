@@ -23,6 +23,41 @@
 #include <xen/sched.h>
 #include <asm/hvm/hvm.h>
 
+/* Implicitly serialized by the domctl lock. */
+int vm_event_init_domain(struct domain *d)
+{
+    struct vcpu *v;
+
+    for_each_vcpu ( d, v )
+    {
+        if ( v->arch.vm_event.emul_read_data )
+            continue;
+
+        v->arch.vm_event.emul_read_data =
+            xzalloc(struct vm_event_emul_read_data);
+
+        if ( !v->arch.vm_event.emul_read_data )
+            return -ENOMEM;
+    }
+
+    return 0;
+}
+
+/*
+ * Implicitly serialized by the domctl lock,
+ * or on domain cleanup paths only.
+ */
+void vm_event_cleanup_domain(struct domain *d)
+{
+    struct vcpu *v;
+
+    for_each_vcpu ( d, v )
+    {
+        xfree(v->arch.vm_event.emul_read_data);
+        v->arch.vm_event.emul_read_data = NULL;
+    }
+}
+
 void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v)
 {
     if ( !is_hvm_domain(d) || !atomic_read(&v->vm_event_pause_count) )

@@ -530,7 +530,7 @@ int main(int argc, char *argv[])
                 break;
             case VM_EVENT_REASON_SOFTWARE_BREAKPOINT:
                 printf("Breakpoint: rip=%016"PRIx64", gfn=%"PRIx64" (vcpu %d)\n",
-                       req.regs.x86.rip,
+                       req.data.regs.x86.rip,
                        req.u.software_breakpoint.gfn,
                        req.vcpu_id);
 

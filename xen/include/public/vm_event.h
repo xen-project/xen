@@ -44,9 +44,9 @@
  *  paused
  * VCPU_PAUSED in a response signals to unpause the vCPU
  */
-#define VM_EVENT_FLAG_VCPU_PAUSED       (1 << 0)
+#define VM_EVENT_FLAG_VCPU_PAUSED        (1 << 0)
 /* Flags to aid debugging vm_event */
-#define VM_EVENT_FLAG_FOREIGN           (1 << 1)
+#define VM_EVENT_FLAG_FOREIGN            (1 << 1)
 /*
  * The following flags can be set in response to a mem_access event.
  *
@@ -54,17 +54,26 @@
  * This will allow the guest to continue execution without lifting the page
  * access restrictions.
  */
-#define VM_EVENT_FLAG_EMULATE           (1 << 2)
+#define VM_EVENT_FLAG_EMULATE            (1 << 2)
 /*
- * Same as MEM_ACCESS_EMULATE, but with write operations or operations
+ * Same as VM_EVENT_FLAG_EMULATE, but with write operations or operations
  * potentially having side effects (like memory mapped or port I/O) disabled.
  */
-#define VM_EVENT_FLAG_EMULATE_NOWRITE   (1 << 3)
+#define VM_EVENT_FLAG_EMULATE_NOWRITE    (1 << 3)
 /*
  * Toggle singlestepping on vm_event response.
  * Requires the vCPU to be paused already (synchronous events only).
  */
-#define VM_EVENT_FLAG_TOGGLE_SINGLESTEP (1 << 4)
+#define VM_EVENT_FLAG_TOGGLE_SINGLESTEP  (1 << 4)
+/*
+ * Data is being sent back to the hypervisor in the event response, to be
+ * returned by the read function when emulating an instruction.
+ * This flag is only useful when combined with VM_EVENT_FLAG_EMULATE
+ * and takes precedence if combined with VM_EVENT_FLAG_EMULATE_NOWRITE
+ * (i.e. if both VM_EVENT_FLAG_EMULATE_NOWRITE and
+ * VM_EVENT_FLAG_SET_EMUL_READ_DATA are set, only the latter will be honored).
+ */
+#define VM_EVENT_FLAG_SET_EMUL_READ_DATA (1 << 5)
 
 /*
  * Reasons for the vm event request
@@ -194,6 +203,12 @@ struct vm_event_sharing {
     uint32_t _pad;
 };
 
+struct vm_event_emul_read_data {
+    uint32_t size;
+    /* The struct is used in a union with vm_event_regs_x86. */
+    uint8_t  data[sizeof(struct vm_event_regs_x86) - sizeof(uint32_t)];
+};
+
 typedef struct vm_event_st {
     uint32_t version;   /* VM_EVENT_INTERFACE_VERSION */
     uint32_t flags;     /* VM_EVENT_FLAG_* */
@@ -211,8 +226,12 @@ typedef struct vm_event_st {
     } u;
 
     union {
-        struct vm_event_regs_x86 x86;
-    } regs;
+        union {
+            struct vm_event_regs_x86 x86;
+        } regs;
+
+        struct vm_event_emul_read_data emul_read_data;
+    } data;
 } vm_event_request_t, vm_event_response_t;
 
 DEFINE_RING_TYPES(vm_event, vm_event_request_t, vm_event_response_t);

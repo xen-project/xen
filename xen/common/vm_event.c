@@ -64,6 +64,11 @@ static int vm_event_enable(
     vm_event_ring_lock_init(ved);
     vm_event_ring_lock(ved);
 
+    rc = vm_event_init_domain(d);
+
+    if ( rc < 0 )
+        goto err;
+
     rc = prepare_ring_for_helper(d, ring_gfn, &ved->ring_pg_struct,
                                     &ved->ring_page);
     if ( rc < 0 )
@@ -226,6 +231,9 @@ static int vm_event_disable(struct domain *d, struct vm_event_domain *ved)
 
         destroy_ring_for_helper(&ved->ring_page,
                                 ved->ring_pg_struct);
+
+        vm_event_cleanup_domain(d);
+
         vm_event_ring_unlock(ved);
     }
 

@@ -511,6 +511,9 @@ int vcpu_initialise(struct vcpu *v)
 
 void vcpu_destroy(struct vcpu *v)
 {
+    xfree(v->arch.vm_event.emul_read_data);
+    v->arch.vm_event.emul_read_data = NULL;
+
     if ( is_pv_32bit_vcpu(v) )
     {
         free_compat_arg_xlat(v);

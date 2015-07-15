@@ -67,6 +67,23 @@ static int null_write(const struct hvm_io_handler *handler,
     return X86EMUL_OKAY;
 }
 
+static int set_context_data(void *buffer, unsigned int size)
+{
+    struct vcpu *curr = current;
+
+    if ( curr->arch.vm_event.emul_read_data )
+    {
+        unsigned int safe_size =
+            min(size, curr->arch.vm_event.emul_read_data->size);
+
+        memcpy(buffer, curr->arch.vm_event.emul_read_data->data, safe_size);
+        memset(buffer + safe_size, 0, size - safe_size);
+        return X86EMUL_OKAY;
+    }
+
+    return X86EMUL_UNHANDLEABLE;
+}
+
 static const struct hvm_io_ops null_ops = {
     .read = null_read,
     .write = null_write
@@ -771,6 +788,12 @@ static int hvmemul_read(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    struct hvm_emulate_ctxt *hvmemul_ctxt =
+        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+
+    if ( unlikely(hvmemul_ctxt->set_context) )
+        return set_context_data(p_data, bytes);
+
     return __hvmemul_read(
         seg, offset, p_data, bytes, hvm_access_read,
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt));
@@ -963,6 +986,17 @@ static int hvmemul_cmpxchg(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    struct hvm_emulate_ctxt *hvmemul_ctxt =
+        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+
+    if ( unlikely(hvmemul_ctxt->set_context) )
+    {
+        int rc = set_context_data(p_new, bytes);
+
+        if ( rc != X86EMUL_OKAY )
+            return rc;
+    }
+
     /* Fix this in case the guest is really relying on r-m-w atomicity. */
     return hvmemul_write(seg, offset, p_new, bytes, ctxt);
 }
@@ -1005,6 +1039,33 @@ static int hvmemul_rep_ins(
                                !!(ctxt->regs->eflags & X86_EFLAGS_DF), gpa);
 }
 
+static int hvmemul_rep_outs_set_context(
+    enum x86_segment src_seg,
+    unsigned long src_offset,
+    uint16_t dst_port,
+    unsigned int bytes_per_rep,
+    unsigned long *reps,
+    struct x86_emulate_ctxt *ctxt)
+{
+    unsigned int bytes = *reps * bytes_per_rep;
+    char *buf;
+    int rc;
+
+    buf = xmalloc_array(char, bytes);
+
+    if ( buf == NULL )
+        return X86EMUL_UNHANDLEABLE;
+
+    rc = set_context_data(buf, bytes);
+
+    if ( rc == X86EMUL_OKAY )
+        rc = hvmemul_do_pio_buffer(dst_port, bytes, IOREQ_WRITE, buf);
+
+    xfree(buf);
+
+    return rc;
+}
+
 static int hvmemul_rep_outs(
     enum x86_segment src_seg,
     unsigned long src_offset,
@@ -1020,6 +1081,10 @@ static int hvmemul_rep_outs(
     paddr_t gpa;
     p2m_type_t p2mt;
     int rc;
+
+    if ( unlikely(hvmemul_ctxt->set_context) )
+        return hvmemul_rep_outs_set_context(src_seg, src_offset, dst_port,
+                                            bytes_per_rep, reps, ctxt);
 
     rc = hvmemul_virtual_to_linear(
         src_seg, src_offset, bytes_per_rep, reps, hvm_access_read,
@@ -1127,11 +1192,26 @@ static int hvmemul_rep_movs(
     if ( buf == NULL )
         return X86EMUL_UNHANDLEABLE;
 
-    /*
-     * We do a modicum of checking here, just for paranoia's sake and to
-     * definitely avoid copying an unitialised buffer into guest address space.
-     */
-    rc = hvm_copy_from_guest_phys(buf, sgpa, bytes);
+    if ( unlikely(hvmemul_ctxt->set_context) )
+    {
+        rc = set_context_data(buf, bytes);
+
+        if ( rc != X86EMUL_OKAY)
+        {
+            xfree(buf);
+            return rc;
+        }
+
+        rc = HVMCOPY_okay;
+    }
+    else
+        /*
+         * We do a modicum of checking here, just for paranoia's sake and to
+         * definitely avoid copying an unitialised buffer into guest address
+         * space.
+         */
+        rc = hvm_copy_from_guest_phys(buf, sgpa, bytes);
+
     if ( rc == HVMCOPY_okay )
         rc = hvm_copy_to_guest_phys(dgpa, buf, bytes);
 
@@ -1292,7 +1372,14 @@ static int hvmemul_read_io(
     unsigned long *val,
     struct x86_emulate_ctxt *ctxt)
 {
+    struct hvm_emulate_ctxt *hvmemul_ctxt =
+        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+
     *val = 0;
+
+    if ( unlikely(hvmemul_ctxt->set_context) )
+        return set_context_data(val, bytes);
+
     return hvmemul_do_pio_buffer(port, bytes, IOREQ_READ, val);
 }
 
@@ -1677,7 +1764,7 @@ int hvm_emulate_one_no_write(
     return _hvm_emulate_one(hvmemul_ctxt, &hvm_emulate_ops_no_write);
 }
 
-void hvm_mem_access_emulate_one(bool_t nowrite, unsigned int trapnr,
+void hvm_mem_access_emulate_one(enum emul_kind kind, unsigned int trapnr,
     unsigned int errcode)
 {
     struct hvm_emulate_ctxt ctx = {{ 0 }};
@@ -1685,10 +1772,17 @@ void hvm_mem_access_emulate_one(bool_t nowrite, unsigned int trapnr,
 
     hvm_emulate_prepare(&ctx, guest_cpu_user_regs());
 
-    if ( nowrite )
+    switch ( kind )
+    {
+    case EMUL_KIND_NOWRITE:
         rc = hvm_emulate_one_no_write(&ctx);
-    else
+        break;
+    case EMUL_KIND_SET_CONTEXT:
+        ctx.set_context = 1;
+        /* Intentional fall-through. */
+    default:
         rc = hvm_emulate_one(&ctx);
+    }
 
     switch ( rc )
     {
@@ -1722,6 +1816,7 @@ void hvm_emulate_prepare(
     hvmemul_ctxt->ctxt.force_writeback = 1;
     hvmemul_ctxt->seg_reg_accessed = 0;
     hvmemul_ctxt->seg_reg_dirty = 0;
+    hvmemul_ctxt->set_context = 0;
     hvmemul_get_seg_reg(x86_seg_cs, hvmemul_ctxt);
     hvmemul_get_seg_reg(x86_seg_ss, hvmemul_ctxt);
 }
