@@ -2024,6 +2024,9 @@ static void remus_next_checkpoint(libxl__egc *egc, libxl__ev_time *ev,
 
     STATE_AO_GC(dss->ao);
 
+    if (rc == ERROR_TIMEDOUT) /* As intended */
+        rc = 0;
+
     /*
      * Time to checkpoint the guest again. We return 1 to libxc
      * (xc_domain_save.c). in order to continue executing the infinite loop
