@@ -1258,7 +1258,8 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
             case STUBDOM_CONSOLE_LOGGING:
                 name = libxl__sprintf(gc, "qemu-dm-%s",
                                       libxl_domid_to_name(ctx, guest_domid));
-                libxl_create_logfile(ctx, name, &filename);
+                ret = libxl_create_logfile(ctx, name, &filename);
+                if (ret) goto out;
                 console[i].output = libxl__sprintf(gc, "file:%s", filename);
                 free(filename);
                 break;
