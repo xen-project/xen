@@ -831,12 +831,6 @@ out:
     return ptr;
 }
 
-static void libxl__remus_setup(libxl__egc *egc,
-                               libxl__domain_suspend_state *dss);
-static void remus_setup_done(libxl__egc *egc,
-                             libxl__remus_devices_state *rds, int rc);
-static void remus_setup_failed(libxl__egc *egc,
-                               libxl__remus_devices_state *rds, int rc);
 static void remus_failover_cb(libxl__egc *egc,
                               libxl__domain_suspend_state *dss, int rc);
 
@@ -891,75 +885,6 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
 
  out:
     return AO_CREATE_FAIL(rc);
-}
-
-static void libxl__remus_setup(libxl__egc *egc,
-                               libxl__domain_suspend_state *dss)
-{
-    /* Convenience aliases */
-    libxl__remus_devices_state *const rds = &dss->rds;
-    const libxl_domain_remus_info *const info = dss->remus;
-    libxl__srm_save_autogen_callbacks *const callbacks =
-        &dss->sws.shs.callbacks.save.a;
-
-    STATE_AO_GC(dss->ao);
-
-    if (libxl_defbool_val(info->netbuf)) {
-        if (!libxl__netbuffer_enabled(gc)) {
-            LOG(ERROR, "Remus: No support for network buffering");
-            goto out;
-        }
-        rds->device_kind_flags |= (1 << LIBXL__DEVICE_KIND_VIF);
-    }
-
-    if (libxl_defbool_val(info->diskbuf))
-        rds->device_kind_flags |= (1 << LIBXL__DEVICE_KIND_VBD);
-
-    rds->ao = ao;
-    rds->domid = dss->domid;
-    rds->callback = remus_setup_done;
-
-    dss->sws.checkpoint_callback = remus_checkpoint_stream_written;
-
-    callbacks->suspend = libxl__remus_domain_suspend_callback;
-    callbacks->postcopy = libxl__remus_domain_resume_callback;
-    callbacks->checkpoint = libxl__remus_domain_save_checkpoint_callback;
-
-    libxl__remus_devices_setup(egc, rds);
-    return;
-
-out:
-    dss->callback(egc, dss, ERROR_FAIL);
-}
-
-static void remus_setup_done(libxl__egc *egc,
-                             libxl__remus_devices_state *rds, int rc)
-{
-    libxl__domain_suspend_state *dss = CONTAINER_OF(rds, *dss, rds);
-    STATE_AO_GC(dss->ao);
-
-    if (!rc) {
-        libxl__domain_save(egc, dss);
-        return;
-    }
-
-    LOG(ERROR, "Remus: failed to setup device for guest with domid %u, rc %d",
-        dss->domid, rc);
-    rds->callback = remus_setup_failed;
-    libxl__remus_devices_teardown(egc, rds);
-}
-
-static void remus_setup_failed(libxl__egc *egc,
-                               libxl__remus_devices_state *rds, int rc)
-{
-    libxl__domain_suspend_state *dss = CONTAINER_OF(rds, *dss, rds);
-    STATE_AO_GC(dss->ao);
-
-    if (rc)
-        LOG(ERROR, "Remus: failed to teardown device after setup failed"
-            " for guest with domid %u, rc %d", dss->domid, rc);
-
-    dss->callback(egc, dss, rc);
 }
 
 static void remus_failover_cb(libxl__egc *egc,
