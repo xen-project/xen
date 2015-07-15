@@ -883,6 +883,18 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
  */
 #define LIBXL_HAVE_CHECKPOINTED_STREAM 1
 
+/*
+ * ERROR_REMUS_XXX error code only exists from Xen 4.5, Xen 4.6 and it
+ * is changed to ERROR_CHECKPOINT_XXX in Xen 4.7
+ */
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION >= 0x040500 \
+                               && LIBXL_API_VERSION < 0x040700
+#define ERROR_REMUS_DEVOPS_DOES_NOT_MATCH \
+        ERROR_CHECKPOINT_DEVOPS_DOES_NOT_MATCH
+#define ERROR_REMUS_DEVICE_NOT_SUPPORTED \
+        ERROR_CHECKPOINT_DEVICE_NOT_SUPPORTED
+#endif
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);

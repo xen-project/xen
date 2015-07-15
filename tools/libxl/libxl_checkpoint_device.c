@@ -17,9 +17,9 @@
 
 #include "libxl_internal.h"
 
-extern const libxl__remus_device_instance_ops remus_device_nic;
-extern const libxl__remus_device_instance_ops remus_device_drbd_disk;
-static const libxl__remus_device_instance_ops *remus_ops[] = {
+extern const libxl__checkpoint_device_instance_ops remus_device_nic;
+extern const libxl__checkpoint_device_instance_ops remus_device_drbd_disk;
+static const libxl__checkpoint_device_instance_ops *remus_ops[] = {
     &remus_device_nic,
     &remus_device_drbd_disk,
     NULL,
@@ -27,18 +27,18 @@ static const libxl__remus_device_instance_ops *remus_ops[] = {
 
 /*----- helper functions -----*/
 
-static int init_device_subkind(libxl__remus_devices_state *rds)
+static int init_device_subkind(libxl__checkpoint_devices_state *cds)
 {
     /* init device subkind-specific state in the libxl ctx */
     int rc;
-    STATE_AO_GC(rds->ao);
+    STATE_AO_GC(cds->ao);
 
     if (libxl__netbuffer_enabled(gc)) {
-        rc = init_subkind_nic(rds);
+        rc = init_subkind_nic(cds);
         if (rc) goto out;
     }
 
-    rc = init_subkind_drbd_disk(rds);
+    rc = init_subkind_drbd_disk(cds);
     if (rc) goto out;
 
     rc = 0;
@@ -46,15 +46,15 @@ out:
     return rc;
 }
 
-static void cleanup_device_subkind(libxl__remus_devices_state *rds)
+static void cleanup_device_subkind(libxl__checkpoint_devices_state *cds)
 {
     /* cleanup device subkind-specific state in the libxl ctx */
-    STATE_AO_GC(rds->ao);
+    STATE_AO_GC(cds->ao);
 
     if (libxl__netbuffer_enabled(gc))
-        cleanup_subkind_nic(rds);
+        cleanup_subkind_nic(cds);
 
-    cleanup_subkind_drbd_disk(rds);
+    cleanup_subkind_drbd_disk(cds);
 }
 
 /*----- setup() and teardown() -----*/
@@ -70,103 +70,103 @@ static void devices_teardown_cb(libxl__egc *egc,
                                 libxl__multidev *multidev,
                                 int rc);
 
-/* remus device setup and teardown */
+/* checkpoint device setup and teardown */
 
-static libxl__remus_device* remus_device_init(libxl__egc *egc,
-                                              libxl__remus_devices_state *rds,
+static libxl__checkpoint_device* checkpoint_device_init(libxl__egc *egc,
+                                              libxl__checkpoint_devices_state *cds,
                                               libxl__device_kind kind,
                                               void *libxl_dev)
 {
-    libxl__remus_device *dev = NULL;
+    libxl__checkpoint_device *dev = NULL;
 
-    STATE_AO_GC(rds->ao);
+    STATE_AO_GC(cds->ao);
     GCNEW(dev);
     dev->backend_dev = libxl_dev;
     dev->kind = kind;
-    dev->rds = rds;
+    dev->cds = cds;
 
     return dev;
 }
 
-static void remus_devices_setup(libxl__egc *egc,
-                                libxl__remus_devices_state *rds);
+static void checkpoint_devices_setup(libxl__egc *egc,
+                                libxl__checkpoint_devices_state *cds);
 
-void libxl__remus_devices_setup(libxl__egc *egc, libxl__remus_devices_state *rds)
+void libxl__checkpoint_devices_setup(libxl__egc *egc, libxl__checkpoint_devices_state *cds)
 {
     int i, rc;
 
-    STATE_AO_GC(rds->ao);
+    STATE_AO_GC(cds->ao);
 
-    rc = init_device_subkind(rds);
+    rc = init_device_subkind(cds);
     if (rc)
         goto out;
 
-    rds->num_devices = 0;
-    rds->num_nics = 0;
-    rds->num_disks = 0;
+    cds->num_devices = 0;
+    cds->num_nics = 0;
+    cds->num_disks = 0;
 
-    if (rds->device_kind_flags & (1 << LIBXL__DEVICE_KIND_VIF))
-        rds->nics = libxl_device_nic_list(CTX, rds->domid, &rds->num_nics);
+    if (cds->device_kind_flags & (1 << LIBXL__DEVICE_KIND_VIF))
+        cds->nics = libxl_device_nic_list(CTX, cds->domid, &cds->num_nics);
 
-    if (rds->device_kind_flags & (1 << LIBXL__DEVICE_KIND_VBD))
-        rds->disks = libxl_device_disk_list(CTX, rds->domid, &rds->num_disks);
+    if (cds->device_kind_flags & (1 << LIBXL__DEVICE_KIND_VBD))
+        cds->disks = libxl_device_disk_list(CTX, cds->domid, &cds->num_disks);
 
-    if (rds->num_nics == 0 && rds->num_disks == 0)
+    if (cds->num_nics == 0 && cds->num_disks == 0)
         goto out;
 
-    GCNEW_ARRAY(rds->devs, rds->num_nics + rds->num_disks);
+    GCNEW_ARRAY(cds->devs, cds->num_nics + cds->num_disks);
 
-    for (i = 0; i < rds->num_nics; i++) {
-        rds->devs[rds->num_devices++] = remus_device_init(egc, rds,
+    for (i = 0; i < cds->num_nics; i++) {
+        cds->devs[cds->num_devices++] = checkpoint_device_init(egc, cds,
                                                 LIBXL__DEVICE_KIND_VIF,
-                                                &rds->nics[i]);
+                                                &cds->nics[i]);
     }
 
-    for (i = 0; i < rds->num_disks; i++) {
-        rds->devs[rds->num_devices++] = remus_device_init(egc, rds,
+    for (i = 0; i < cds->num_disks; i++) {
+        cds->devs[cds->num_devices++] = checkpoint_device_init(egc, cds,
                                                 LIBXL__DEVICE_KIND_VBD,
-                                                &rds->disks[i]);
+                                                &cds->disks[i]);
     }
 
-    remus_devices_setup(egc, rds);
+    checkpoint_devices_setup(egc, cds);
 
     return;
 
 out:
-    rds->callback(egc, rds, rc);
+    cds->callback(egc, cds, rc);
 }
 
-static void remus_devices_setup(libxl__egc *egc,
-                                libxl__remus_devices_state *rds)
+static void checkpoint_devices_setup(libxl__egc *egc,
+                                libxl__checkpoint_devices_state *cds)
 {
     int i, rc;
 
-    STATE_AO_GC(rds->ao);
+    STATE_AO_GC(cds->ao);
 
-    libxl__multidev_begin(ao, &rds->multidev);
-    rds->multidev.callback = all_devices_setup_cb;
-    for (i = 0; i < rds->num_devices; i++) {
-        libxl__remus_device *dev = rds->devs[i];
+    libxl__multidev_begin(ao, &cds->multidev);
+    cds->multidev.callback = all_devices_setup_cb;
+    for (i = 0; i < cds->num_devices; i++) {
+        libxl__checkpoint_device *dev = cds->devs[i];
         dev->ops_index = -1;
-        libxl__multidev_prepare_with_aodev(&rds->multidev, &dev->aodev);
+        libxl__multidev_prepare_with_aodev(&cds->multidev, &dev->aodev);
 
-        dev->aodev.rc = ERROR_REMUS_DEVICE_NOT_SUPPORTED;
+        dev->aodev.rc = ERROR_CHECKPOINT_DEVICE_NOT_SUPPORTED;
         dev->aodev.callback = device_setup_iterate;
         device_setup_iterate(egc,&dev->aodev);
     }
 
     rc = 0;
-    libxl__multidev_prepared(egc, &rds->multidev, rc);
+    libxl__multidev_prepared(egc, &cds->multidev, rc);
 }
 
 
 static void device_setup_iterate(libxl__egc *egc, libxl__ao_device *aodev)
 {
-    libxl__remus_device *dev = CONTAINER_OF(aodev, *dev, aodev);
+    libxl__checkpoint_device *dev = CONTAINER_OF(aodev, *dev, aodev);
     EGC_GC;
 
-    if (aodev->rc != ERROR_REMUS_DEVICE_NOT_SUPPORTED &&
-        aodev->rc != ERROR_REMUS_DEVOPS_DOES_NOT_MATCH)
+    if (aodev->rc != ERROR_CHECKPOINT_DEVICE_NOT_SUPPORTED &&
+        aodev->rc != ERROR_CHECKPOINT_DEVOPS_DOES_NOT_MATCH)
         /* might be success or disaster */
         goto out;
 
@@ -186,16 +186,16 @@ static void device_setup_iterate(libxl__egc *egc, libxl__ao_device *aodev)
                 domid = disk->backend_domid;
                 devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
             } else {
-                LOG(ERROR,"device kind not handled by remus: %s",
+                LOG(ERROR,"device kind not handled by checkpoint: %s",
                     libxl__device_kind_to_string(dev->kind));
                 aodev->rc = ERROR_FAIL;
                 goto out;
             }
-            LOG(ERROR,"device not handled by remus"
+            LOG(ERROR,"device not handled by checkpoint"
                 " (device=%s:%"PRId32"/%"PRId32")",
                 libxl__device_kind_to_string(dev->kind),
                 domid, devid);
-            aodev->rc = ERROR_REMUS_DEVICE_NOT_SUPPORTED;
+            aodev->rc = ERROR_CHECKPOINT_DEVICE_NOT_SUPPORTED;
             goto out;
         }
     } while (dev->ops->kind != dev->kind);
@@ -216,32 +216,32 @@ static void all_devices_setup_cb(libxl__egc *egc,
     STATE_AO_GC(multidev->ao);
 
     /* Convenience aliases */
-    libxl__remus_devices_state *const rds =
-                            CONTAINER_OF(multidev, *rds, multidev);
+    libxl__checkpoint_devices_state *const cds =
+                            CONTAINER_OF(multidev, *cds, multidev);
 
-    rds->callback(egc, rds, rc);
+    cds->callback(egc, cds, rc);
 }
 
-void libxl__remus_devices_teardown(libxl__egc *egc,
-                                   libxl__remus_devices_state *rds)
+void libxl__checkpoint_devices_teardown(libxl__egc *egc,
+                                   libxl__checkpoint_devices_state *cds)
 {
     int i;
-    libxl__remus_device *dev;
+    libxl__checkpoint_device *dev;
 
-    STATE_AO_GC(rds->ao);
+    STATE_AO_GC(cds->ao);
 
-    libxl__multidev_begin(ao, &rds->multidev);
-    rds->multidev.callback = devices_teardown_cb;
-    for (i = 0; i < rds->num_devices; i++) {
-        dev = rds->devs[i];
+    libxl__multidev_begin(ao, &cds->multidev);
+    cds->multidev.callback = devices_teardown_cb;
+    for (i = 0; i < cds->num_devices; i++) {
+        dev = cds->devs[i];
         if (!dev->ops || !dev->matched)
             continue;
 
-        libxl__multidev_prepare_with_aodev(&rds->multidev, &dev->aodev);
+        libxl__multidev_prepare_with_aodev(&cds->multidev, &dev->aodev);
         dev->ops->teardown(egc,dev);
     }
 
-    libxl__multidev_prepared(egc, &rds->multidev, 0);
+    libxl__multidev_prepared(egc, &cds->multidev, 0);
 }
 
 static void devices_teardown_cb(libxl__egc *egc,
@@ -253,26 +253,26 @@ static void devices_teardown_cb(libxl__egc *egc,
     STATE_AO_GC(multidev->ao);
 
     /* Convenience aliases */
-    libxl__remus_devices_state *const rds =
-                            CONTAINER_OF(multidev, *rds, multidev);
+    libxl__checkpoint_devices_state *const cds =
+                            CONTAINER_OF(multidev, *cds, multidev);
 
     /* clean nic */
-    for (i = 0; i < rds->num_nics; i++)
-        libxl_device_nic_dispose(&rds->nics[i]);
-    free(rds->nics);
-    rds->nics = NULL;
-    rds->num_nics = 0;
+    for (i = 0; i < cds->num_nics; i++)
+        libxl_device_nic_dispose(&cds->nics[i]);
+    free(cds->nics);
+    cds->nics = NULL;
+    cds->num_nics = 0;
 
     /* clean disk */
-    for (i = 0; i < rds->num_disks; i++)
-        libxl_device_disk_dispose(&rds->disks[i]);
-    free(rds->disks);
-    rds->disks = NULL;
-    rds->num_disks = 0;
+    for (i = 0; i < cds->num_disks; i++)
+        libxl_device_disk_dispose(&cds->disks[i]);
+    free(cds->disks);
+    cds->disks = NULL;
+    cds->num_disks = 0;
 
-    cleanup_device_subkind(rds);
+    cleanup_device_subkind(cds);
 
-    rds->callback(egc, rds, rc);
+    cds->callback(egc, cds, rc);
 }
 
 /*----- checkpointing APIs -----*/
@@ -285,33 +285,33 @@ static void devices_checkpoint_cb(libxl__egc *egc,
 
 /* API implementations */
 
-#define define_remus_checkpoint_api(api)                                \
-void libxl__remus_devices_##api(libxl__egc *egc,                        \
-                                libxl__remus_devices_state *rds)        \
+#define define_checkpoint_api(api)                                \
+void libxl__checkpoint_devices_##api(libxl__egc *egc,                        \
+                                libxl__checkpoint_devices_state *cds)        \
 {                                                                       \
     int i;                                                              \
-    libxl__remus_device *dev;                                           \
+    libxl__checkpoint_device *dev;                                           \
                                                                         \
-    STATE_AO_GC(rds->ao);                                               \
+    STATE_AO_GC(cds->ao);                                               \
                                                                         \
-    libxl__multidev_begin(ao, &rds->multidev);                          \
-    rds->multidev.callback = devices_checkpoint_cb;                     \
-    for (i = 0; i < rds->num_devices; i++) {                            \
-        dev = rds->devs[i];                                             \
+    libxl__multidev_begin(ao, &cds->multidev);                          \
+    cds->multidev.callback = devices_checkpoint_cb;                     \
+    for (i = 0; i < cds->num_devices; i++) {                            \
+        dev = cds->devs[i];                                             \
         if (!dev->matched || !dev->ops->api)                            \
             continue;                                                   \
-        libxl__multidev_prepare_with_aodev(&rds->multidev, &dev->aodev);\
+        libxl__multidev_prepare_with_aodev(&cds->multidev, &dev->aodev);\
         dev->ops->api(egc,dev);                                         \
     }                                                                   \
                                                                         \
-    libxl__multidev_prepared(egc, &rds->multidev, 0);                   \
+    libxl__multidev_prepared(egc, &cds->multidev, 0);                   \
 }
 
-define_remus_checkpoint_api(postsuspend);
+define_checkpoint_api(postsuspend);
 
-define_remus_checkpoint_api(preresume);
+define_checkpoint_api(preresume);
 
-define_remus_checkpoint_api(commit);
+define_checkpoint_api(commit);
 
 static void devices_checkpoint_cb(libxl__egc *egc,
                                   libxl__multidev *multidev,
@@ -320,8 +320,8 @@ static void devices_checkpoint_cb(libxl__egc *egc,
     STATE_AO_GC(multidev->ao);
 
     /* Convenience aliases */
-    libxl__remus_devices_state *const rds =
-                            CONTAINER_OF(multidev, *rds, multidev);
+    libxl__checkpoint_devices_state *const cds =
+                            CONTAINER_OF(multidev, *cds, multidev);
 
-    rds->callback(egc, rds, rc);
+    cds->callback(egc, cds, rc);
 }
