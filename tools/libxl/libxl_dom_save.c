@@ -44,7 +44,7 @@ static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch*,
 static void switch_logdirty_done(libxl__egc *egc,
                                  libxl__domain_save_state *dss, int rc);
 
-static void logdirty_init(libxl__logdirty_switch *lds)
+void libxl__logdirty_init(libxl__logdirty_switch *lds)
 {
     lds->cmd_path = 0;
     libxl__ev_xswatch_init(&lds->watch);
@@ -345,7 +345,7 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_save_state *dss)
     }
 
     dss->rc = 0;
-    logdirty_init(&dss->logdirty);
+    libxl__logdirty_init(&dss->logdirty);
     dsps->ao = ao;
     dsps->domid = domid;
     rc = libxl__domain_suspend_init(egc, dsps, type);
