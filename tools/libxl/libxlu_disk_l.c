@@ -13,7 +13,7 @@
 #define FLEX_SCANNER
 #define YY_FLEX_MAJOR_VERSION 2
 #define YY_FLEX_MINOR_VERSION 5
-#define YY_FLEX_SUBMINOR_VERSION 35
+#define YY_FLEX_SUBMINOR_VERSION 39
 #if YY_FLEX_SUBMINOR_VERSION > 0
 #define FLEX_BETA
 #endif
@@ -183,11 +183,17 @@ typedef void* yyscan_t;
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #endif
 
+#ifndef YY_TYPEDEF_YY_SIZE_T
+#define YY_TYPEDEF_YY_SIZE_T
+typedef size_t yy_size_t;
+#endif
+
 #define EOB_ACT_CONTINUE_SCAN 0
 #define EOB_ACT_END_OF_FILE 1
 #define EOB_ACT_LAST_MATCH 2
 
     #define YY_LESS_LINENO(n)
+    #define YY_LINENO_REWIND_TO(ptr)
     
 /* Return all but the first "n" matched characters back to the input stream. */
 #define yyless(n) \
@@ -204,11 +210,6 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 	while ( 0 )
 
 #define unput(c) yyunput( c, yyg->yytext_ptr , yyscanner )
-
-#ifndef YY_TYPEDEF_YY_SIZE_T
-#define YY_TYPEDEF_YY_SIZE_T
-typedef size_t yy_size_t;
-#endif
 
 #ifndef YY_STRUCT_YY_BUFFER_STATE
 #define YY_STRUCT_YY_BUFFER_STATE
@@ -227,7 +228,7 @@ struct yy_buffer_state
 	/* Number of characters read into yy_ch_buf, not including EOB
 	 * characters.
 	 */
-	int yy_n_chars;
+	yy_size_t yy_n_chars;
 
 	/* Whether we "own" the buffer - i.e., we know we created it,
 	 * and can realloc() it to grow it, and should free() it to
@@ -306,7 +307,7 @@ static void xlu__disk_yy_init_buffer (YY_BUFFER_STATE b,FILE *file ,yyscan_t yys
 
 YY_BUFFER_STATE xlu__disk_yy_scan_buffer (char *base,yy_size_t size ,yyscan_t yyscanner );
 YY_BUFFER_STATE xlu__disk_yy_scan_string (yyconst char *yy_str ,yyscan_t yyscanner );
-YY_BUFFER_STATE xlu__disk_yy_scan_bytes (yyconst char *bytes,int len ,yyscan_t yyscanner );
+YY_BUFFER_STATE xlu__disk_yy_scan_bytes (yyconst char *bytes,yy_size_t len ,yyscan_t yyscanner );
 
 void *xlu__disk_yyalloc (yy_size_t ,yyscan_t yyscanner );
 void *xlu__disk_yyrealloc (void *,yy_size_t ,yyscan_t yyscanner );
@@ -336,7 +337,7 @@ void xlu__disk_yyfree (void * ,yyscan_t yyscanner );
 
 #define YY_AT_BOL() (YY_CURRENT_BUFFER_LVALUE->yy_at_bol)
 
-#define xlu__disk_yywrap(n) 1
+#define xlu__disk_yywrap(yyscanner) 1
 #define YY_SKIP_YYWRAP
 
 typedef unsigned char YY_CHAR;
@@ -914,7 +915,7 @@ static int vdev_and_devtype(DiskParseContext *dpc, char *str) {
 #define DPC ((DiskParseContext*)yyextra)
 
 
-#line 918 "libxlu_disk_l.c"
+#line 919 "libxlu_disk_l.c"
 
 #define INITIAL 0
 #define LEXERR 1
@@ -944,8 +945,8 @@ struct yyguts_t
     size_t yy_buffer_stack_max; /**< capacity of stack. */
     YY_BUFFER_STATE * yy_buffer_stack; /**< Stack as an array. */
     char yy_hold_char;
-    int yy_n_chars;
-    int yyleng_r;
+    yy_size_t yy_n_chars;
+    yy_size_t yyleng_r;
     char *yy_c_buf_p;
     int yy_init;
     int yy_start;
@@ -1003,7 +1004,7 @@ FILE *xlu__disk_yyget_out (yyscan_t yyscanner );
 
 void xlu__disk_yyset_out  (FILE * out_str ,yyscan_t yyscanner );
 
-int xlu__disk_yyget_leng (yyscan_t yyscanner );
+yy_size_t xlu__disk_yyget_leng (yyscan_t yyscanner );
 
 char *xlu__disk_yyget_text (yyscan_t yyscanner );
 
@@ -1154,13 +1155,6 @@ YY_DECL
 	register int yy_act;
     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 
-#line 155 "libxlu_disk_l.l"
-
-
- /*----- the scanner rules which do the parsing -----*/
-
-#line 1163 "libxlu_disk_l.c"
-
 	if ( !yyg->yy_init )
 		{
 		yyg->yy_init = 1;
@@ -1193,6 +1187,14 @@ YY_DECL
 		xlu__disk_yy_load_buffer_state(yyscanner );
 		}
 
+	{
+#line 155 "libxlu_disk_l.l"
+
+
+ /*----- the scanner rules which do the parsing -----*/
+
+#line 1197 "libxlu_disk_l.c"
+
 	while ( 1 )		/* loops until end-of-file is reached */
 		{
 		yyg->yy_more_len = 0;
@@ -1219,7 +1221,7 @@ YY_DECL
 yy_match:
 		do
 			{
-			register YY_CHAR yy_c = yy_ec[YY_SC_TO_UI(*yy_cp)];
+			register YY_CHAR yy_c = yy_ec[YY_SC_TO_UI(*yy_cp)] ;
 			while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 				{
 				yy_current_state = (int) yy_def[yy_current_state];
@@ -1502,7 +1504,7 @@ YY_RULE_SETUP
 #line 259 "libxlu_disk_l.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1506 "libxlu_disk_l.c"
+#line 1508 "libxlu_disk_l.c"
 			case YY_STATE_EOF(INITIAL):
 			case YY_STATE_EOF(LEXERR):
 				yyterminate();
@@ -1634,6 +1636,7 @@ YY_FATAL_ERROR( "flex scanner jammed" );
 			"fatal flex scanner internal error--no action found" );
 	} /* end of action switch */
 		} /* end of scanning one token */
+	} /* end of user's declarations */
 } /* end of xlu__disk_yylex */
 
 /* yy_get_next_buffer - try to read in a new buffer
@@ -1690,7 +1693,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 
 	else
 		{
-			int num_to_read =
+			yy_size_t num_to_read =
 			YY_CURRENT_BUFFER_LVALUE->yy_buf_size - number_to_move - 1;
 
 		while ( num_to_read <= 0 )
@@ -1706,7 +1709,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 
 		/* Read in more data. */
 		YY_INPUT( (&YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move]),
-			yyg->yy_n_chars, (size_t) num_to_read );
+			yyg->yy_n_chars, num_to_read );
 
 		YY_CURRENT_BUFFER_LVALUE->yy_n_chars = yyg->yy_n_chars;
 		}
@@ -1798,6 +1801,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 	if ( ! yy_is_jam )
 		*yyg->yy_state_ptr++ = yy_current_state;
 
+	(void)yyg;
 	return yy_is_jam ? 0 : yy_current_state;
 }
 
@@ -1826,7 +1830,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 
 		else
 			{ /* need more input */
-			int offset = yyg->yy_c_buf_p - yyg->yytext_ptr;
+			yy_size_t offset = yyg->yy_c_buf_p - yyg->yytext_ptr;
 			++yyg->yy_c_buf_p;
 
 			switch ( yy_get_next_buffer( yyscanner ) )
@@ -1990,10 +1994,6 @@ static void xlu__disk_yy_load_buffer_state  (yyscan_t yyscanner)
 	xlu__disk_yyfree((void *) b ,yyscanner );
 }
 
-#ifndef __cplusplus
-extern int isatty (int );
-#endif /* __cplusplus */
-    
 /* Initializes or reinitializes a buffer.
  * This function is sometimes called more than once on the same buffer,
  * such as during a xlu__disk_yyrestart() or at EOF.
@@ -2110,7 +2110,7 @@ void xlu__disk_yypop_buffer_state (yyscan_t yyscanner)
  */
 static void xlu__disk_yyensure_buffer_stack (yyscan_t yyscanner)
 {
-	int num_to_alloc;
+	yy_size_t num_to_alloc;
     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 
 	if (!yyg->yy_buffer_stack) {
@@ -2208,12 +2208,12 @@ YY_BUFFER_STATE xlu__disk_yy_scan_string (yyconst char * yystr , yyscan_t yyscan
  * @param yyscanner The scanner object.
  * @return the newly allocated buffer state object.
  */
-YY_BUFFER_STATE xlu__disk_yy_scan_bytes  (yyconst char * yybytes, int  _yybytes_len , yyscan_t yyscanner)
+YY_BUFFER_STATE xlu__disk_yy_scan_bytes  (yyconst char * yybytes, yy_size_t  _yybytes_len , yyscan_t yyscanner)
 {
 	YY_BUFFER_STATE b;
 	char *buf;
 	yy_size_t n;
-	int i;
+	yy_size_t i;
     
 	/* Get memory for full buffer, including space for trailing EOB's. */
 	n = _yybytes_len + 2;
@@ -2323,7 +2323,7 @@ FILE *xlu__disk_yyget_out  (yyscan_t yyscanner)
 /** Get the length of the current token.
  * @param yyscanner The scanner object.
  */
-int xlu__disk_yyget_leng  (yyscan_t yyscanner)
+yy_size_t xlu__disk_yyget_leng  (yyscan_t yyscanner)
 {
     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
     return yyleng;
@@ -2359,7 +2359,7 @@ void xlu__disk_yyset_lineno (int  line_number , yyscan_t yyscanner)
 
         /* lineno is only valid if an input buffer exists. */
         if (! YY_CURRENT_BUFFER )
-           yy_fatal_error( "xlu__disk_yyset_lineno called with no buffer" , yyscanner); 
+           YY_FATAL_ERROR( "xlu__disk_yyset_lineno called with no buffer" );
     
     yylineno = line_number;
 }
@@ -2374,7 +2374,7 @@ void xlu__disk_yyset_column (int  column_no , yyscan_t yyscanner)
 
         /* column is only valid if an input buffer exists. */
         if (! YY_CURRENT_BUFFER )
-           yy_fatal_error( "xlu__disk_yyset_column called with no buffer" , yyscanner); 
+           YY_FATAL_ERROR( "xlu__disk_yyset_column called with no buffer" );
     
     yycolumn = column_no;
 }
@@ -2594,4 +2594,4 @@ void xlu__disk_yyfree (void * ptr , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 259 "libxlu_disk_l.l"
+#line 258 "libxlu_disk_l.l"
