@@ -233,6 +233,11 @@ void libxl__colo_restore_setup(libxl__egc *egc,
     crcs->crs = crs;
     crs->qdisk_setuped = false;
     crs->qdisk_used = false;
+    if (dcs->colo_proxy_script)
+        crs->colo_proxy_script = libxl__strdup(gc, dcs->colo_proxy_script);
+    else
+        crs->colo_proxy_script = GCSPRINTF("%s/colo-proxy-setup",
+                                           libxl__xen_script_dir_path());
 
     /* setup dsps */
     crcs->dsps.ao = ao;

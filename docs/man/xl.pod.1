@@ -458,8 +458,6 @@ Remus support in xl is still in experimental (proof-of-concept) phase.
 Disk replication support is limited to DRBD disks.
 
 COLO support in xl is still in experimental (proof-of-concept) phase.
-There is no support for network, so the guest will confuse its network
-peers at the moment.
 
 =back
 
@@ -482,6 +480,11 @@ and it's used by secondary.
 
 =item B<hidden-disk>    :Primary's modified contents will be buffered in this
 disk, and it's used by secondary.
+
+(b) An example for COLO network configuration: vif =[ '...,forwarddev=xxx,...']
+
+=item B<forwarddev>     :Forward devices for primary and secondary, there are
+directly connected.
 
 Note that the COLO configuration settings should be considered unstable. They
 may change incompatibly in future versions of Xen.

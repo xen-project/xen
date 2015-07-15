@@ -386,6 +386,7 @@ libxl_domain_create_info = Struct("domain_create_info",[
 libxl_domain_restore_params = Struct("domain_restore_params", [
     ("checkpointed_stream", integer),
     ("stream_version", uint32, {'init_val': '1'}),
+    ("colo_proxy_script", string),
     ])
 
 libxl_domain_sched_params = Struct("domain_sched_params",[
