@@ -3444,6 +3444,7 @@ struct libxl__stream_read_state {
     libxl__domain_create_state *dcs;
     int fd;
     bool legacy;
+    bool back_channel;
     void (*completion_callback)(libxl__egc *egc,
                                 libxl__stream_read_state *srs,
                                 int rc);
@@ -3455,6 +3456,7 @@ struct libxl__stream_read_state {
     bool running;
     bool in_checkpoint;
     bool sync_teardown; /* Only used to coordinate shutdown on error path. */
+    bool in_checkpoint_state;
     libxl__save_helper_state shs;
     libxl__conversion_helper_state chs;
 
@@ -3481,6 +3483,8 @@ _hidden void libxl__stream_read_init(libxl__stream_read_state *stream);
 _hidden void libxl__stream_read_start(libxl__egc *egc,
                                       libxl__stream_read_state *stream);
 _hidden void libxl__stream_read_start_checkpoint(libxl__egc *egc,
+                                                 libxl__stream_read_state *stream);
+_hidden void libxl__stream_read_checkpoint_state(libxl__egc *egc,
                                                  libxl__stream_read_state *stream);
 _hidden void libxl__stream_read_abort(libxl__egc *egc,
                                       libxl__stream_read_state *stream, int rc);

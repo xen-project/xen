@@ -1034,6 +1034,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     dcs->srs.dcs = dcs;
     dcs->srs.fd = restore_fd;
     dcs->srs.legacy = (dcs->restore_params.stream_version == 1);
+    dcs->srs.back_channel = false;
     dcs->srs.completion_callback = domcreate_stream_done;
 
     if (restore_fd >= 0) {
