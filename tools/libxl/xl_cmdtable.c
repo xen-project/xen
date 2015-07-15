@@ -500,7 +500,9 @@ struct cmd_spec cmd_table[] = {
       "-b                      Replicate memory checkpoints to /dev/null (blackhole).\n"
       "                        Works only in unsafe mode.\n"
       "-n                      Disable network output buffering. Works only in unsafe mode.\n"
-      "-d                      Disable disk replication. Works only in unsafe mode."
+      "-d                      Disable disk replication. Works only in unsafe mode.\n"
+      "-c                      Enable COLO HA. It is conflict with -i and -b, and memory\n"
+      "                        checkpoint must be disabled"
     },
 #endif
     { "devd",

@@ -447,11 +447,15 @@ Print huge (!) amount of debug during the migration process.
 
 =item B<remus> [I<OPTIONS>] I<domain-id> I<host>
 
-Enable Remus HA for domain. By default B<xl> relies on ssh as a transport
-mechanism between the two hosts.
+Enable Remus HA or COLO HA for domain. By default B<xl> relies on ssh as a
+transport mechanism between the two hosts.
 
 N.B: Remus support in xl is still in experimental (proof-of-concept) phase.
      Disk replication support is limited to DRBD disks.
+
+     COLO support in xl is still in experimental (proof-of-concept) phase.
+     There is no support for network or disk, so the guest will corrupt its
+     disk and confuse its network peers at the moment.
 
 B<OPTIONS>
 
@@ -497,6 +501,11 @@ Disable network output buffering. Requires enabling unsafe mode.
 =item B<-d>
 
 Disable disk replication. Requires enabling unsafe mode.
+
+=item B<-c>
+
+Enable COLO HA. This conflicts with B<-i> and B<-b>, and memory
+checkpoint compression must be disabled.
 
 =back
 

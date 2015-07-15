@@ -848,11 +848,26 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
         goto out;
     }
 
+    /* The caller must set this defbool */
+    if (libxl_defbool_is_default(info->colo)) {
+        LOG(ERROR, "colo mode must be enabled/disabled");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
     libxl_defbool_setdefault(&info->allow_unsafe, false);
     libxl_defbool_setdefault(&info->blackhole, false);
-    libxl_defbool_setdefault(&info->compression, true);
+    libxl_defbool_setdefault(&info->compression,
+                             !libxl_defbool_val(info->colo));
     libxl_defbool_setdefault(&info->netbuf, true);
     libxl_defbool_setdefault(&info->diskbuf, true);
+
+    if (libxl_defbool_val(info->colo) &&
+        libxl_defbool_val(info->compression)) {
+            LOG(ERROR, "cannot use memory checkpoint compression in COLO mode");
+            rc = ERROR_FAIL;
+            goto out;
+    }
 
     if (!libxl_defbool_val(info->allow_unsafe) &&
         (libxl_defbool_val(info->blackhole) ||
@@ -875,7 +890,10 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
     dss->live = 1;
     dss->debug = 0;
     dss->remus = info;
-    dss->checkpointed_stream = LIBXL_CHECKPOINTED_STREAM_REMUS;
+    if (libxl_defbool_val(info->colo))
+        dss->checkpointed_stream = LIBXL_CHECKPOINTED_STREAM_COLO;
+    else
+        dss->checkpointed_stream = LIBXL_CHECKPOINTED_STREAM_REMUS;
 
     assert(info);
 
