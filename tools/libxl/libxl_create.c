@@ -1017,6 +1017,8 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     const int checkpointed_stream = dcs->restore_params.checkpointed_stream;
     libxl__colo_restore_state *const crs = &dcs->crs;
     libxl_domain_build_info *const info = &d_config->b_info;
+    libxl__srm_restore_autogen_callbacks *const callbacks =
+        &dcs->srs.shs.callbacks.restore.a;
 
     if (rc) {
         domcreate_rebuild_done(egc, dcs, rc);
@@ -1044,6 +1046,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     }
 
     /* Restore */
+    callbacks->restore_results = libxl__srm_callout_callback_restore_results;
 
     /* COLO only supports HVM now because it does not work very
      * well with pv drivers:

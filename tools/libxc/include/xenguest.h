@@ -133,6 +133,14 @@ struct restore_callbacks {
      */
     int (*wait_checkpoint)(void* data);
 
+    /*
+     * callback to send store gfn and console gfn to xl
+     * if we want to resume vm before xc_domain_save()
+     * exits.
+     */
+    void (*restore_results)(xen_pfn_t store_gfn, xen_pfn_t console_gfn,
+                            void *data);
+
     /* to be provided as the last argument to each callback function */
     void* data;
 };

@@ -214,6 +214,10 @@ struct xc_sr_context
             struct xc_sr_restore_ops ops;
             struct restore_callbacks *callbacks;
 
+            int send_back_fd;
+            unsigned long p2m_size;
+            xc_hypercall_buffer_t dirty_bitmap_hbuf;
+
             /* From Image Header. */
             uint32_t format_version;
 
@@ -222,13 +226,13 @@ struct xc_sr_context
             uint32_t guest_page_size;
 
             /* Plain VM, or checkpoints over time. */
-            bool checkpointed;
+            int checkpointed;
 
             /* Currently buffering records between a checkpoint */
             bool buffer_all_records;
 
 /*
- * With Remus, we buffer the records sent by the primary at checkpoint,
+ * With Remus/COLO, we buffer the records sent by the primary at checkpoint,
  * in case the primary will fail, we can recover from the last
  * checkpoint state.
  * This should be enough for most of the cases because primary only send
