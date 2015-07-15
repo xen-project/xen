@@ -184,6 +184,8 @@ struct xc_sr_context
     {
         struct /* Save data. */
         {
+            int recv_fd;
+
             struct xc_sr_save_ops ops;
             struct save_callbacks *callbacks;
 
