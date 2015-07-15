@@ -719,7 +719,7 @@ static int __cpuinit gicv3_cpu_init(void)
     /* Set priority mask register */
     WRITE_SYSREG32(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
 
-    /* EOI drops priority too (mode 0) */
+    /* EOI drops priority, DIR deactivates the interrupt (mode 1) */
     WRITE_SYSREG32(GICC_CTLR_EL1_EOImode_drop, ICC_CTLR_EL1);
 
     /* Enable Group1 interrupts */
