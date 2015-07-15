@@ -2895,6 +2895,8 @@ struct libxl__checkpoint_devices_state {
     uint32_t domid;
     libxl__checkpoint_callback *callback;
     int device_kind_flags;
+    /* The ops must be pointer array, and the last ops must be NULL. */
+    const libxl__checkpoint_device_instance_ops **ops;
 
     /*----- private for abstract layer only -----*/
 

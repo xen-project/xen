@@ -18,6 +18,14 @@
 
 #include "libxl_internal.h"
 
+extern const libxl__checkpoint_device_instance_ops remus_device_nic;
+extern const libxl__checkpoint_device_instance_ops remus_device_drbd_disk;
+static const libxl__checkpoint_device_instance_ops *remus_ops[] = {
+    &remus_device_nic,
+    &remus_device_drbd_disk,
+    NULL,
+};
+
 /*-------------------- Remus setup and teardown ---------------------*/
 
 static void remus_setup_done(libxl__egc *egc,
@@ -55,6 +63,7 @@ void libxl__remus_setup(libxl__egc *egc,
     cds->ao = ao;
     cds->domid = dss->domid;
     cds->callback = remus_setup_done;
+    cds->ops = remus_ops;
 
     dss->sws.checkpoint_callback = remus_checkpoint_stream_written;
 
