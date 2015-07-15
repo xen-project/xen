@@ -49,6 +49,13 @@
  *  - if (hvm)
  *      - Emulator context record
  *  - Checkpoint end record
+ *
+ * For back channel stream:
+ * - libxl__stream_write_start()
+ *    - Set up the stream to running state
+ *
+ * - Use libxl__stream_write_checkpoint_state to write the record. When the
+ *   record is written out, call stream->checkpoint_callback() to return.
  */
 
 /* Success/error/cleanup handling. */
@@ -90,6 +97,12 @@ static void write_checkpoint_end_record(libxl__egc *egc,
                                         libxl__stream_write_state *stream);
 static void checkpoint_end_record_done(libxl__egc *egc,
                                        libxl__stream_write_state *stream);
+
+/* checkpoint state */
+static void write_checkpoint_state_done(libxl__egc *egc,
+                                        libxl__stream_write_state *stream);
+static void checkpoint_state_done(libxl__egc *egc,
+                                  libxl__stream_write_state *stream, int rc);
 
 /*----- Helpers -----*/
 
@@ -225,6 +238,17 @@ void libxl__stream_write_start(libxl__egc *egc,
 
     stream->running = true;
 
+    dc->ao        = ao;
+    dc->readfd    = -1;
+    dc->writewhat = "stream header";
+    dc->copywhat  = "save v2 stream";
+    dc->writefd   = stream->fd;
+    dc->maxsz     = -1;
+    dc->callback  = stream_header_done;
+
+    if (stream->back_channel)
+        return;
+
     if (dss->type == LIBXL_DOMAIN_TYPE_HVM) {
         stream->device_model_version =
             libxl__device_model_version_running(gc, dss->domid);
@@ -249,14 +273,6 @@ void libxl__stream_write_start(libxl__egc *egc,
         stream->emu_sub_hdr.index = 0;
     }
 
-    dc->ao        = ao;
-    dc->readfd    = -1;
-    dc->writewhat = "stream header";
-    dc->copywhat  = "save v2 stream";
-    dc->writefd   = stream->fd;
-    dc->maxsz     = -1;
-    dc->callback  = stream_header_done;
-
     rc = libxl__datacopier_start(dc);
     if (rc)
         goto err;
@@ -279,6 +295,7 @@ void libxl__stream_write_start_checkpoint(libxl__egc *egc,
 {
     assert(stream->running);
     assert(!stream->in_checkpoint);
+    assert(!stream->back_channel);
     stream->in_checkpoint = true;
 
     write_emulator_xenstore_record(egc, stream);
@@ -577,6 +594,21 @@ static void stream_complete(libxl__egc *egc,
         return;
     }
 
+    if (stream->in_checkpoint_state) {
+        assert(rc);
+
+        /*
+         * If an error is encountered while in a checkpoint, pass it
+         * back to libxc.  The failure will come back around to us via
+         * 1. normal stream
+         *    libxl__xc_domain_save_done()
+         * 2. back_channel stream
+         *    libxl__stream_write_abort()
+         */
+        checkpoint_state_done(egc, stream, rc);
+        return;
+    }
+
     stream_done(egc, stream, rc);
 }
 
@@ -584,13 +616,24 @@ static void stream_done(libxl__egc *egc,
                         libxl__stream_write_state *stream, int rc)
 {
     assert(stream->running);
+    assert(!stream->in_checkpoint_state);
     stream->running = false;
 
     if (stream->emu_carefd)
         libxl__carefd_close(stream->emu_carefd);
     free(stream->emu_body);
 
-    check_all_finished(egc, stream, rc);
+    if (!stream->back_channel) {
+        /*
+         * 1. In stream_done(), stream->running is set to false, so
+         *    the stream itself is not in use.
+         * 2. Write stream is a back channel stream, this means it
+         *    is only used by secondary(restore side) to send records
+         *    back, so it doesn't have save helper.
+         * So we don't need invoke check_all_finished here
+         */
+         check_all_finished(egc, stream, rc);
+    }
 }
 
 static void checkpoint_done(libxl__egc *egc,
@@ -642,7 +685,44 @@ static void check_all_finished(libxl__egc *egc,
         libxl__save_helper_inuse(&stream->shs))
         return;
 
-    stream->completion_callback(egc, stream, stream->rc);
+    if (stream->completion_callback)
+        /* back channel stream doesn't have completion_callback() */
+        stream->completion_callback(egc, stream, stream->rc);
+}
+
+/*----- checkpoint state -----*/
+
+void libxl__stream_write_checkpoint_state(libxl__egc *egc,
+                                          libxl__stream_write_state *stream,
+                                          libxl_sr_checkpoint_state *srcs)
+{
+    struct libxl__sr_rec_hdr rec;
+
+    assert(stream->running);
+    assert(!stream->in_checkpoint);
+    assert(!stream->in_checkpoint_state);
+    stream->in_checkpoint_state = true;
+
+    FILLZERO(rec);
+    rec.type = REC_TYPE_CHECKPOINT_STATE;
+    rec.length = sizeof(*srcs);
+
+    setup_write(egc, stream, "checkpoint state", &rec,
+                srcs, write_checkpoint_state_done);
+}
+
+static void write_checkpoint_state_done(libxl__egc *egc,
+                                        libxl__stream_write_state *stream)
+{
+    checkpoint_state_done(egc, stream, 0);
+}
+
+static void checkpoint_state_done(libxl__egc *egc,
+                                  libxl__stream_write_state *stream, int rc)
+{
+    assert(stream->in_checkpoint_state);
+    stream->in_checkpoint_state = false;
+    stream->checkpoint_callback(egc, stream, rc);
 }
 
 /*

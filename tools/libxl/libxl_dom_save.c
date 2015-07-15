@@ -405,6 +405,7 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_save_state *dss)
     dss->sws.ao  = dss->ao;
     dss->sws.dss = dss;
     dss->sws.fd  = dss->fd;
+    dss->sws.back_channel = false;
     dss->sws.completion_callback = stream_done;
 
     libxl__stream_write_start(egc, &dss->sws);
