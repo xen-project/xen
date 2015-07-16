@@ -1,0 +1,85 @@
+
+#!/bin/bash
+#
+# xendriverdomain    Script to start services needed in a Xen driver domain
+#
+# NOTE: This initscript is not needed on dom0.
+
+# chkconfig: 2345 70 10
+# description: Starts and stops xen driver domain daemon
+### BEGIN INIT INFO
+# Provides:          xendevd
+# Required-Start:    $syslog $remote_fs
+# Should-Start:
+# Required-Stop:     $syslog $remote_fs
+# Should-Stop:
+# Default-Start:     2 3 5
+# Default-Stop:      0 1 6
+# Short-Description: Start/stop xen driver domain daemon
+# Description:       Starts and stops the daemons neeeded for a xen driver domain
+### END INIT INFO
+
+. @XEN_SCRIPT_DIR@/hotplugpath.sh
+
+xendriverdomain_config=@CONFIG_DIR@/@CONFIG_LEAF_DIR@
+
+test -f $xendriverdomain_config/xendriverdomain && . $xendriverdomain_config/xendriverdomain
+
+XLDEVD_PIDFILE=/var/run/xldevd.pid
+
+# not running in Xen dom0 or domU
+if ! test -d /proc/xen ; then
+	exit 0
+fi
+
+# mount xenfs in dom0 or domU with a pv_ops kernel
+if test "x$1" = xstart && \
+   ! test -f /proc/xen/capabilities && \
+   ! grep '^xenfs ' /proc/mounts >/dev/null;
+then
+	mount -t xenfs xenfs /proc/xen
+fi
+
+# run this script only in domU:
+# no capabilities file in xenlinux domU kernel
+# empty capabilities file in pv_ops domU kernel
+if ! test -f /proc/xen/capabilities || \
+   grep -q "control_d" /proc/xen/capabilities ; then
+	exit 0
+fi
+
+do_start () {
+	echo Starting xl devd...
+	${sbindir}/xl devd --pidfile=$XLDEVD_PIDFILE $XLDEVD_ARGS
+}
+do_stop () {
+        echo Stopping xl devd...
+	if read 2>/dev/null <$XLDEVD_PIDFILE pid; then
+		kill $pid
+		while kill -9 $pid >/dev/null 2>&1; do sleep 0.1; done
+		rm -f $XLDEVD_PIDFILE
+	fi
+}
+
+case "$1" in
+  start)
+	do_start
+	;;
+  stop)
+	do_stop
+	;;
+  reload)
+	echo >&2 'Reload not available; use force-reload'; exit 1
+	;;
+  force-reload|restart)
+        do_stop
+	do_start
+	;;
+  *)
+	# do not advertise unreasonable commands that there is no reason
+	# to use with this device
+	echo $"Usage: $0 {start|stop|restart|force-reload}"
+	exit 1
+esac
+
+exit $?

@@ -133,10 +133,12 @@ tools/flask/utils/flask-set-bool
 tools/flask/utils/flask-label-pci
 tools/hotplug/common/hotplugpath.sh
 tools/hotplug/FreeBSD/rc.d/xencommons
+tools/hotplug/FreeBSD/rc.d/xendriverdomain
 tools/hotplug/Linux/init.d/sysconfig.xencommons
 tools/hotplug/Linux/init.d/xen-watchdog
 tools/hotplug/Linux/init.d/xencommons
 tools/hotplug/Linux/init.d/xendomains
+tools/hotplug/Linux/init.d/xendriverdomain
 tools/hotplug/Linux/systemd/*.conf
 tools/hotplug/Linux/systemd/*.mount
 tools/hotplug/Linux/systemd/*.socket
@@ -146,6 +148,7 @@ tools/hotplug/Linux/xen-backend.rules
 tools/hotplug/Linux/xen-hotplug-common.sh
 tools/hotplug/Linux/xendomains
 tools/hotplug/NetBSD/rc.d/xencommons
+tools/hotplug/NetBSD/rc.d/xendriverdomain
 tools/include/xen/*
 tools/include/xen-xsm/*
 tools/include/xen-foreign/*.(c|h|size)

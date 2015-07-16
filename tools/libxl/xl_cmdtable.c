@@ -506,7 +506,8 @@ struct cmd_spec cmd_table[] = {
       &main_devd, 0, 1,
       "Daemon that listens for devices and launches backends",
       "[options]",
-      "-F                      Run in the foreground",
+      "-F                      Run in the foreground.\n"
+      "-p, --pidfile [FILE]    Write PID to pidfile when daemonizing.",
     },
 #ifdef LIBXL_HAVE_PSR_CMT
     { "psr-hwinfo",

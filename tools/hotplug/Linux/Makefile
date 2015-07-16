@@ -9,6 +9,8 @@ XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 XENCOMMONS_INITD = init.d/xencommons
 XENCOMMONS_SYSCONFIG = init.d/sysconfig.xencommons
 
+XENDRIVERDOMAIN_INITD = init.d/xendriverdomain
+
 # Xen script dir and scripts to go there.
 XEN_SCRIPTS = vif-bridge
 XEN_SCRIPTS += vif-route
@@ -53,6 +55,7 @@ install-initd:
 	$(INSTALL_DATA) $(XENDOMAINS_SYSCONFIG) $(DESTDIR)$(SYSCONFIG_DIR)/xendomains
 	$(INSTALL_PROG) $(XENCOMMONS_INITD) $(DESTDIR)$(INITD_DIR)
 	$(INSTALL_DATA) $(XENCOMMONS_SYSCONFIG) $(DESTDIR)$(SYSCONFIG_DIR)/xencommons
+	$(INSTALL_PROG) $(XENDRIVERDOMAIN_INITD) $(DESTDIR)$(INITD_DIR)
 	$(INSTALL_PROG) init.d/xen-watchdog $(DESTDIR)$(INITD_DIR)
 
 .PHONY: install-scripts

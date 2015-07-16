@@ -8,14 +8,17 @@ AC_CONFIG_SRCDIR([libxl/libxl.c])
 AC_CONFIG_FILES([
 ../config/Tools.mk
 hotplug/FreeBSD/rc.d/xencommons
+hotplug/FreeBSD/rc.d/xendriverdomain
 hotplug/Linux/init.d/sysconfig.xencommons
 hotplug/Linux/init.d/xen-watchdog
 hotplug/Linux/init.d/xencommons
 hotplug/Linux/init.d/xendomains
+hotplug/Linux/init.d/xendriverdomain
 hotplug/Linux/vif-setup
 hotplug/Linux/xen-hotplug-common.sh
 hotplug/Linux/xendomains
 hotplug/NetBSD/rc.d/xencommons
+hotplug/NetBSD/rc.d/xendriverdomain
 libxl/xenlight.pc.in
 libxl/xlutil.pc.in
 ])

@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# PROVIDE: xendriverdomain
+# REQUIRE: DAEMON
+#
+# Should be run in a driver domain, but not in domain 0.
+
+. /etc/rc.subr
+
+DIR=$(dirname "$0")
+. "${DIR}/xen-hotplugpath.sh"
+
+LD_LIBRARY_PATH="${libdir}"
+export LD_LIBRARY_PATH
+
+name="xendriverdomain"
+start_precmd="xendriverdomain_precmd"
+start_cmd="xendriverdomain_startcmd"
+stop_cmd="xendriverdomain_stop"
+extra_commands=""
+
+XLDEVD_PIDFILE="/var/run/xldevd.pid"
+
+xendriverdomain_precmd()
+{
+	:
+}
+
+xendriverdomain_startcmd()
+{
+	printf "Starting xenservices: xl devd."
+
+	${sbindir}/xl devd --pidfile=$XLDEVD_PIDFILE ${XLDEVD_ARGS}
+
+	printf "\n"
+}
+
+xendriverdomain_stop()
+{
+	printf "Stopping xl devd.\n"
+
+	rc_pid=$(check_pidfile ${XLDEVD_PIDFILE} ${sbindir}/xl)
+
+	kill -${sig_stop:-TERM} $rc_pids
+	wait_for_pids $rc_pids
+}
+
+load_rc_config $name
+run_rc_command "$1"

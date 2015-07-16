@@ -6,7 +6,7 @@ XEN_SCRIPTS = vif-bridge
 
 XEN_SCRIPT_DATA =
 
-XEN_RCD_PROG = rc.d/xencommons
+XEN_RCD_PROG = rc.d/xencommons rc.d/xendriverdomain
 
 .PHONY: all
 all:

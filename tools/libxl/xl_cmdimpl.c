@@ -473,7 +473,7 @@ out:
     flush_stream(fh);
 }
 
-static int do_daemonize(char *name)
+static int do_daemonize(char *name, const char *pidfile)
 {
     char *fullname;
     pid_t child1;
@@ -504,6 +504,31 @@ static int do_daemonize(char *name)
     dup2(logfile, 2);
 
     CHK_SYSCALL(daemon(0, 1));
+
+    if (pidfile) {
+        int fd = open(pidfile, O_RDWR | O_CREAT, S_IRUSR|S_IWUSR);
+        char *pid = NULL;
+
+        if (fd == -1) {
+            perror("Unable to open pidfile");
+            exit(1);
+        }
+
+        if (asprintf(&pid, "%ld\n", (long)getpid()) == -1) {
+            perror("Formatting pid");
+            exit(1);
+        }
+
+        if (write(fd, pid, strlen(pid)) < 0) {
+            perror("Writing pid");
+            exit(1);
+        }
+
+        if ( close(fd) < 0 ) {
+            perror("Closing pidfile");
+            exit(1);
+        }
+    }
 
 out:
     return ret;
@@ -2813,7 +2838,7 @@ start:
         char *name;
 
         xasprintf(&name, "xl-%s", d_config.c_info.name);
-        ret = do_daemonize(name);
+        ret = do_daemonize(name, NULL);
         free(name);
         if (ret) {
             ret = (ret == 1) ? domid : ret;
@@ -7982,15 +8007,24 @@ int main_remus(int argc, char **argv)
 int main_devd(int argc, char **argv)
 {
     int ret = 0, opt = 0, daemonize = 1;
+    const char *pidfile = NULL;
+    static const struct option opts[] = {
+        {"pidfile", 1, 0, 'p'},
+        COMMON_LONG_OPTS,
+        {0, 0, 0, 0}
+    };
 
-    SWITCH_FOREACH_OPT(opt, "F", NULL, "devd", 0) {
+    SWITCH_FOREACH_OPT(opt, "Fp:", opts, "devd", 0) {
     case 'F':
         daemonize = 0;
+        break;
+    case 'p':
+        pidfile = optarg;
         break;
     }
 
     if (daemonize) {
-        ret = do_daemonize("xldevd");
+        ret = do_daemonize("xldevd", pidfile);
         if (ret) {
             ret = (ret == 1) ? 0 : ret;
             goto out;
