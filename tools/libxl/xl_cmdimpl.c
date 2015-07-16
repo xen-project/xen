@@ -663,10 +663,12 @@ static void trim(char_predicate_t predicate, const char *input, char **output)
         ;
 
     size_t len_nonnull = after - first;
+    char *result = xmalloc(len_nonnull + 1);
 
-    *output = xmalloc(len_nonnull + 1);
-    memcpy(output, first, len_nonnull);
-    output[len_nonnull] = 0;
+    memcpy(result, first, len_nonnull);
+    result[len_nonnull] = 0;
+
+    *output = result;
 }
 
 static int split_string_into_pair(const char *str,
