@@ -441,7 +441,7 @@ static int stdvga_mem_write(const struct hvm_io_handler *handler,
     };
     struct hvm_ioreq_server *srv;
 
-    if ( !s->cache )
+    if ( !s->cache || !s->stdvga )
         goto done;
 
     /* Intercept mmio write */
@@ -503,9 +503,6 @@ static bool_t stdvga_mem_accept(const struct hvm_io_handler *handler,
 
     spin_lock(&s->lock);
 
-    if ( !s->stdvga )
-        goto reject;
-
     if ( p->dir == IOREQ_WRITE && p->count > 1 )
     {
         /*
@@ -526,7 +523,7 @@ static bool_t stdvga_mem_accept(const struct hvm_io_handler *handler,
 
         goto reject;
     }
-    else if ( p->dir == IOREQ_READ && !s->cache )
+    else if ( p->dir == IOREQ_READ && (!s->cache || !s->stdvga) )
         goto reject;
 
     /* s->lock intentionally held */
