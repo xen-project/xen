@@ -81,6 +81,15 @@ static int __init acpi_register_rmrr_unit(struct acpi_rmrr_unit *rmrr)
     return 0;
 }
 
+static void scope_devices_free(struct dmar_scope *scope)
+{
+    if ( !scope )
+        return;
+
+    scope->devices_cnt = 0;
+    xfree(scope->devices);
+}
+
 static void __init disable_all_dmar_units(void)
 {
     struct acpi_drhd_unit *drhd, *_drhd;
@@ -90,16 +99,19 @@ static void __init disable_all_dmar_units(void)
     list_for_each_entry_safe ( drhd, _drhd, &acpi_drhd_units, list )
     {
         list_del(&drhd->list);
+        scope_devices_free(&drhd->scope);
         xfree(drhd);
     }
     list_for_each_entry_safe ( rmrr, _rmrr, &acpi_rmrr_units, list )
     {
         list_del(&rmrr->list);
+        scope_devices_free(&rmrr->scope);
         xfree(rmrr);
     }
     list_for_each_entry_safe ( atsr, _atsr, &acpi_atsr_units, list )
     {
         list_del(&atsr->list);
+        scope_devices_free(&atsr->scope);
         xfree(atsr);
     }
 }
@@ -318,13 +330,13 @@ static int __init acpi_parse_dev_scope(
     if ( (cnt = scope_device_count(start, end)) < 0 )
         return cnt;
 
-    scope->devices_cnt = cnt;
     if ( cnt > 0 )
     {
         scope->devices = xzalloc_array(u16, cnt);
         if ( !scope->devices )
             return -ENOMEM;
     }
+    scope->devices_cnt = cnt;
 
     while ( start < end )
     {
@@ -427,7 +439,7 @@ static int __init acpi_parse_dev_scope(
 
  out:
     if ( ret )
-        xfree(scope->devices);
+        scope_devices_free(scope);
 
     return ret;
 }
@@ -542,6 +554,7 @@ acpi_parse_one_drhd(struct acpi_dmar_header *header)
                     "  Workaround BIOS bug: ignore the DRHD due to all "
                     "devices under its scope are not PCI discoverable!\n");
 
+                scope_devices_free(&dmaru->scope);
                 iommu_free(dmaru);
                 xfree(dmaru);
             }
@@ -562,9 +575,11 @@ acpi_parse_one_drhd(struct acpi_dmar_header *header)
 out:
     if ( ret )
     {
+        scope_devices_free(&dmaru->scope);
         iommu_free(dmaru);
         xfree(dmaru);
     }
+
     return ret;
 }
 
@@ -658,6 +673,7 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
                 "  Ignore the RMRR (%"PRIx64", %"PRIx64") due to "
                 "devices under its scope are not PCI discoverable!\n",
                 rmrru->base_address, rmrru->end_address);
+            scope_devices_free(&rmrru->scope);
             xfree(rmrru);
         }
         else if ( base_addr > end_addr )
@@ -665,6 +681,7 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
             dprintk(XENLOG_WARNING VTDPREFIX,
                 "  The RMRR (%"PRIx64", %"PRIx64") is incorrect!\n",
                 rmrru->base_address, rmrru->end_address);
+            scope_devices_free(&rmrru->scope);
             xfree(rmrru);
             ret = -EFAULT;
         }
@@ -727,7 +744,10 @@ acpi_parse_one_atsr(struct acpi_dmar_header *header)
     }
 
     if ( ret )
+    {
+        scope_devices_free(&atsru->scope);
         xfree(atsru);
+    }
     else
         acpi_register_atsr_unit(atsru);
     return ret;
