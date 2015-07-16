@@ -88,6 +88,7 @@ static void scope_devices_free(struct dmar_scope *scope)
 
     scope->devices_cnt = 0;
     xfree(scope->devices);
+    scope->devices = NULL;
 }
 
 static void __init disable_all_dmar_units(void)
