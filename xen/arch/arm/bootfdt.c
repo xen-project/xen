@@ -100,6 +100,7 @@ static int __init device_tree_for_each_node(const void *fdt,
           node = fdt_next_node(fdt, node, &depth) )
     {
         const char *name = fdt_get_name(fdt, node, NULL);
+        u32 as, ss;
 
         if ( depth >= DEVICE_TREE_MAX_DEPTH )
         {
@@ -108,14 +109,15 @@ static int __init device_tree_for_each_node(const void *fdt,
             continue;
         }
 
-        address_cells[depth] = device_tree_get_u32(fdt, node, "#address-cells",
-                                depth > 0 ? address_cells[depth-1] : 0);
-        size_cells[depth] = device_tree_get_u32(fdt, node, "#size-cells",
-                                depth > 0 ? size_cells[depth-1] : 0);
+        as = depth > 0 ? address_cells[depth-1] : 0;
+        ss = depth > 0 ? size_cells[depth-1] : 0;
 
+        address_cells[depth] = device_tree_get_u32(fdt, node,
+                                                   "#address-cells", as);
+        size_cells[depth] = device_tree_get_u32(fdt, node,
+                                                "#size-cells", ss);
 
-        ret = func(fdt, node, name, depth,
-                   address_cells[depth-1], size_cells[depth-1], data);
+        ret = func(fdt, node, name, depth, as, ss, data);
         if ( ret != 0 )
             return ret;
     }
