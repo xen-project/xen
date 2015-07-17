@@ -142,6 +142,7 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
 
     libxl__numa_candidate_init(&candidate);
     libxl_bitmap_init(&cpupool_nodemap);
+    libxl_cpupoolinfo_init(&cpupool_info);
 
     /*
      * Extract the cpumap from the cpupool the domain belong to. In fact,
@@ -150,10 +151,10 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
      */
     rc = cpupool = libxl__domain_cpupool(gc, domid);
     if (rc < 0)
-        return rc;
+        goto out;
     rc = libxl_cpupool_info(CTX, &cpupool_info, cpupool);
     if (rc)
-        return rc;
+        goto out;
 
     rc = libxl_domain_need_memory(CTX, info, &memkb);
     if (rc)
