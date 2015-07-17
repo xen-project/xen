@@ -193,7 +193,7 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         goto read_as_zero_32;
     default:
         printk(XENLOG_G_ERR
-               "%pv: vGICR: read r%d offset %#08x\n not found",
+               "%pv: vGICR: unhandled read r%d offset %#08x\n",
                v, dabt.reg, gicr_reg);
         return 0;
     }
@@ -269,7 +269,7 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
         /* RO */
         goto write_ignore_32;
     default:
-        printk(XENLOG_G_ERR "%pv: vGICR: write r%d offset %#08x\n not found",
+        printk(XENLOG_G_ERR "%pv: vGICR: unhandled write r%d offset %#08x\n",
                v, dabt.reg, gicr_reg);
         return 0;
     }
@@ -515,7 +515,7 @@ static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
 
     default:
         printk(XENLOG_G_ERR
-               "%pv: vGICR: SGI: read r%d offset %#08x\n not found",
+               "%pv: vGICR: SGI: unhandled read r%d offset %#08x\n",
                v, dabt.reg, gicr_reg);
         return 0;
     }
@@ -576,7 +576,7 @@ static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
         goto write_ignore_32;
     default:
         printk(XENLOG_G_ERR
-               "%pv: vGICR: SGI: write r%d offset %#08x\n not found",
+               "%pv: vGICR: SGI: unhandled write r%d offset %#08x\n",
                v, dabt.reg, gicr_reg);
         return 0;
     }
