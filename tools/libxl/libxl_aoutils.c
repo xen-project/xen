@@ -188,14 +188,13 @@ void libxl__datacopier_prefixdata(libxl__egc *egc, libxl__datacopier_state *dc,
 
 static int datacopier_pollhup_handled(libxl__egc *egc,
                                       libxl__datacopier_state *dc,
-                                      short revents, int onwrite)
+                                      int fd, short revents, int onwrite)
 {
     STATE_AO_GC(dc->ao);
 
     if (dc->callback_pollhup && (revents & POLLHUP)) {
-        LOG(DEBUG, "received POLLHUP on %s during copy of %s",
-            onwrite ? dc->writewhat : dc->readwhat,
-            dc->copywhat);
+        LOG(DEBUG, "received POLLHUP on fd %d: %s during copy of %s",
+            fd, onwrite ? dc->writewhat : dc->readwhat, dc->copywhat);
         libxl__datacopier_kill(dc);
         dc->callback_pollhup(egc, dc, ERROR_FAIL, onwrite, -1);
         return 1;
@@ -217,13 +216,13 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
     libxl__datacopier_state *dc = CONTAINER_OF(ev, *dc, toread);
     STATE_AO_GC(dc->ao);
 
-    if (datacopier_pollhup_handled(egc, dc, revents, 0))
+    if (datacopier_pollhup_handled(egc, dc, fd, revents, 0))
         return;
 
     if (revents & ~(POLLIN|POLLHUP)) {
-        LOG(ERROR,
-            "unexpected poll event 0x%x (expected POLLIN and/or POLLHUP)"
-            " on %s during copy of %s", revents, dc->readwhat, dc->copywhat);
+        LOG(ERROR, "unexpected poll event 0x%x on fd %d (expected POLLIN "
+            "and/or POLLHUP) reading %s during copy of %s",
+            revents, fd, dc->readwhat, dc->copywhat);
         datacopier_callback(egc, dc, ERROR_FAIL, -1, EIO);
         return;
     }
@@ -286,7 +285,7 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
                     LIBXL__EVENT_DISASTER(egc,
      "unexpected failure polling fd for datacopier eof hup check",
                                   errno, 0);
-                if (datacopier_pollhup_handled(egc, dc, hupchk.revents, 0))
+                if (datacopier_pollhup_handled(egc, dc, fd, hupchk.revents, 0))
                     return;
             }
             libxl__ev_fd_deregister(gc, &dc->toread);
@@ -320,12 +319,13 @@ static void datacopier_writable(libxl__egc *egc, libxl__ev_fd *ev,
     libxl__datacopier_state *dc = CONTAINER_OF(ev, *dc, towrite);
     STATE_AO_GC(dc->ao);
 
-    if (datacopier_pollhup_handled(egc, dc, revents, 1))
+    if (datacopier_pollhup_handled(egc, dc, fd, revents, 1))
         return;
 
     if (revents & ~POLLOUT) {
-        LOG(ERROR, "unexpected poll event 0x%x (should be POLLOUT)"
-            " on %s during copy of %s", revents, dc->writewhat, dc->copywhat);
+        LOG(ERROR, "unexpected poll event 0x%x on fd %d (should be POLLOUT)"
+            " writing %s during copy of %s",
+            revents, fd, dc->writewhat, dc->copywhat);
         datacopier_callback(egc, dc, ERROR_FAIL, -1, EIO);
         return;
     }
