@@ -1923,7 +1923,7 @@ int xc_domain_unbind_msi_irq(
 static int xc_domain_bind_pt_irq_int(
     xc_interface *xch,
     uint32_t domid,
-    uint8_t machine_irq,
+    uint32_t machine_irq,
     uint8_t irq_type,
     uint8_t bus,
     uint8_t device,
@@ -1982,7 +1982,7 @@ int xc_domain_bind_pt_irq(
 static int xc_domain_unbind_pt_irq_int(
     xc_interface *xch,
     uint32_t domid,
-    uint8_t machine_irq,
+    uint32_t machine_irq,
     uint8_t irq_type,
     uint8_t bus,
     uint8_t device,
