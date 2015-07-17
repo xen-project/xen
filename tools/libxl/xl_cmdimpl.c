@@ -8431,7 +8431,7 @@ int main_psr_cat_cbm_set(int argc, char **argv)
     int i, j, len;
 
     static struct option opts[] = {
-        {"socket", required_argument, 0, 's'},
+        {"socket", 1, 0, 's'},
         COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
@@ -8439,7 +8439,7 @@ int main_psr_cat_cbm_set(int argc, char **argv)
     libxl_socket_bitmap_alloc(ctx, &target_map, 0);
     libxl_bitmap_set_none(&target_map);
 
-    SWITCH_FOREACH_OPT(opt, "s:", opts, "psr-cat-cbm-set", 1) {
+    SWITCH_FOREACH_OPT(opt, "s:", opts, "psr-cat-cbm-set", 2) {
     case 's':
         trim(isspace, optarg, &value);
         split_string_into_string_list(value, ",", &socket_list);
