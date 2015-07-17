@@ -387,6 +387,7 @@ static void write_emulator_record(libxl__egc *egc,
     dc->ao            = stream->ao;
     dc->readwhat      = "qemu save file";
     dc->readfd        = readfd;
+    dc->writefd       = -1;
     dc->maxsz         = -1;
     dc->readbuf       = stream->emu_body + sizeof(*ehdr);
     dc->bytes_to_read = rec->length - sizeof(*ehdr);

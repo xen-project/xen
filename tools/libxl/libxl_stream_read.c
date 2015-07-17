@@ -609,6 +609,7 @@ static void write_emulator_blob(libxl__egc *egc,
     dc->ao = stream->ao;
     dc->writewhat = "qemu save file";
     dc->writefd = writefd;
+    dc->readfd = -1;
     dc->maxsz = -1;
     dc->callback = write_emulator_done;
 
