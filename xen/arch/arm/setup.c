@@ -250,7 +250,7 @@ void __init discard_initial_modules(void)
     struct bootmodules *mi = &bootinfo.modules;
     int i;
 
-    for ( i = 0; i <= mi->nr_mods; i++ )
+    for ( i = 0; i < mi->nr_mods; i++ )
     {
         paddr_t s = mi->module[i].start;
         paddr_t e = s + PAGE_ALIGN(mi->module[i].size);
@@ -350,7 +350,7 @@ static paddr_t __init next_module(paddr_t s, paddr_t *end)
     paddr_t lowest = ~(paddr_t)0;
     int i;
 
-    for ( i = 0; i <= mi->nr_mods; i++ )
+    for ( i = 0; i < mi->nr_mods; i++ )
     {
         paddr_t mod_s = mi->module[i].start;
         paddr_t mod_e = mod_s + mi->module[i].size;
