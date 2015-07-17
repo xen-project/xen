@@ -37,7 +37,7 @@ char *xc_read_image(xc_interface *xch,
 
     if ( (kernel_fd = open(filename, O_RDONLY)) < 0 )
     {
-        PERROR("Could not open kernel image");
+        PERROR("Could not open kernel image '%s'", filename);
         goto out;
     }
 
