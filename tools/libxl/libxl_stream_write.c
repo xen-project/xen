@@ -180,7 +180,8 @@ void libxl__stream_write_start(libxl__egc *egc,
 
     dc->ao        = ao;
     dc->readfd    = -1;
-    dc->writewhat = "save/migration stream";
+    dc->writewhat = "stream header";
+    dc->copywhat  = "save v2 stream";
     dc->writefd   = stream->fd;
     dc->maxsz     = -1;
     dc->callback  = stream_header_done;
@@ -386,6 +387,7 @@ static void write_emulator_record(libxl__egc *egc,
     FILLZERO(*dc);
     dc->ao            = stream->ao;
     dc->readwhat      = "qemu save file";
+    dc->copywhat      = "save v2 stream";
     dc->readfd        = readfd;
     dc->writefd       = -1;
     dc->maxsz         = -1;

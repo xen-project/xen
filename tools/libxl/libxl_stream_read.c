@@ -223,9 +223,10 @@ void libxl__stream_read_start(libxl__egc *egc,
     }
     /* stream->fd is now a v2 stream. */
 
-    dc->ao      = stream->ao;
-    dc->readfd  = stream->fd;
-    dc->writefd = -1;
+    dc->ao       = stream->ao;
+    dc->copywhat = "restore v2 stream";
+    dc->readfd   = stream->fd;
+    dc->writefd  = -1;
 
     /* Start reading the stream header. */
     rc = setup_read(stream, "stream header",
@@ -606,12 +607,12 @@ static void write_emulator_blob(libxl__egc *egc,
     }
 
     FILLZERO(*dc);
-    dc->ao = stream->ao;
-    dc->writewhat = "qemu save file";
-    dc->writefd = writefd;
-    dc->readfd = -1;
-    dc->maxsz = -1;
-    dc->callback = write_emulator_done;
+    dc->ao         = stream->ao;
+    dc->writewhat  = "qemu save file";
+    dc->copywhat   = "restore v2 stream";
+    dc->writefd    = writefd;
+    dc->maxsz      = -1;
+    dc->callback   = write_emulator_done;
 
     rc = libxl__datacopier_start(dc);
     if (rc)
