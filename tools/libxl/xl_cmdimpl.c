@@ -6398,11 +6398,6 @@ int main_networkattach(int argc, char **argv)
         /* No options */
     }
 
-    if (argc-optind > 11) {
-        help("network-attach");
-        return 0;
-    }
-
     domid = find_domain(argv[optind]);
 
     config= xlu_cfg_init(stderr, "command line");
