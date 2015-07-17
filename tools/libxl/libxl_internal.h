@@ -608,9 +608,12 @@ _hidden void *libxl__realloc(libxl__gc *gc_opt, void *ptr, size_t new_size) NN1;
 _hidden char *libxl__sprintf(libxl__gc *gc_opt, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3) NN1;
 _hidden char *libxl__vsprintf(libxl__gc *gc, const char *format, va_list ap);
 /* duplicate the string @c (similar to a gc'd strdup(3)). */
-_hidden char *libxl__strdup(libxl__gc *gc_opt, const char *c) NN1;
+_hidden char *libxl__strdup(libxl__gc *gc_opt,
+                            const char *c /* may be NULL */) NN1;
 /* duplicate at most @n bytes of string @c (similar to a gc'd strndup(3)). */
-_hidden char *libxl__strndup(libxl__gc *gc_opt, const char *c, size_t n) NN1;
+_hidden char *libxl__strndup(libxl__gc *gc_opt,
+                             const char *c /* may be NULL */,
+                             size_t n) NN1;
 /* strip the last path component from @s and return as a newly allocated
  * string. (similar to a gc'd dirname(3)). */
 _hidden char *libxl__dirname(libxl__gc *gc_opt, const char *s) NN1;

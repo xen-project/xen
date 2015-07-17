@@ -161,7 +161,11 @@ char *libxl__sprintf(libxl__gc *gc, const char *fmt, ...)
 
 char *libxl__strdup(libxl__gc *gc, const char *c)
 {
-    char *s = strdup(c);
+    char *s;
+
+    if (!c) return NULL;
+
+    s = strdup(c);
 
     if (!s) libxl__alloc_failed(CTX, __func__, strlen(c), 1);
 
@@ -172,7 +176,11 @@ char *libxl__strdup(libxl__gc *gc, const char *c)
 
 char *libxl__strndup(libxl__gc *gc, const char *c, size_t n)
 {
-    char *s = strndup(c, n);
+    char *s;
+
+    if (!c) return NULL;
+
+    s = strndup(c, n);
 
     if (!s) libxl__alloc_failed(CTX, __func__, n, 1);
 
