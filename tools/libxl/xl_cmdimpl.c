@@ -3068,7 +3068,9 @@ static int64_t parse_mem_size_kb(const char *mem)
     return kbytes;
 }
 
-#define COMMON_LONG_OPTS {"help", 0, 0, 'h'}
+/* Must be last in list */
+#define COMMON_LONG_OPTS {"help", 0, 0, 'h'}, \
+                         {0, 0, 0, 0}
 
 /*
  * Callers should use SWITCH_FOREACH_OPT in preference to calling this
@@ -3081,8 +3083,7 @@ static int def_getopt(int argc, char * const argv[],
 {
     int opt;
     const struct option def_options[] = {
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     if (!longopts)
@@ -3348,8 +3349,7 @@ int main_vncviewer(int argc, char **argv)
     static const struct option opts[] = {
         {"autopass", 0, 0, 'a'},
         {"vncviewer-autopass", 0, 0, 'a'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
     uint32_t domid;
     int opt, autopass = 0;
@@ -4482,8 +4482,7 @@ int main_restore(int argc, char **argv)
     static struct option opts[] = {
         {"vncviewer", 0, 0, 'V'},
         {"vncviewer-autopass", 0, 0, 'A'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     SWITCH_FOREACH_OPT(opt, "FcpdeVA", opts, "restore", 1) {
@@ -4615,8 +4614,7 @@ int main_migrate(int argc, char **argv)
     static struct option opts[] = {
         {"debug", 0, 0, 0x100},
         {"live", 0, 0, 0x200},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     SWITCH_FOREACH_OPT(opt, "FC:s:e", opts, "migrate", 2) {
@@ -4738,8 +4736,7 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
     static struct option opts[] = {
         {"all", 0, 0, 'a'},
         {"wait", 0, 0, 'w'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     SWITCH_FOREACH_OPT(opt, "awF", opts, what, 0) {
@@ -4819,8 +4816,7 @@ int main_list(int argc, char **argv)
         {"context", 0, 0, 'Z'},
         {"cpupool", 0, 0, 'c'},
         {"numa", 0, 0, 'n'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     libxl_dominfo info_buf;
@@ -4926,8 +4922,7 @@ int main_create(int argc, char **argv)
         {"defconfig", 1, 0, 'f'},
         {"vncviewer", 0, 0, 'V'},
         {"vncviewer-autopass", 0, 0, 'A'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     dom_info.extra_config = NULL;
@@ -5020,8 +5015,7 @@ int main_config_update(int argc, char **argv)
     int debug = 0;
     static struct option opts[] = {
         {"defconfig", 1, 0, 'f'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     if (argc < 2) {
@@ -5627,8 +5621,7 @@ int main_info(int argc, char **argv)
     int opt;
     static struct option opts[] = {
         {"numa", 0, 0, 'n'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
     int numa = 0;
 
@@ -5966,8 +5959,7 @@ int main_sched_credit(int argc, char **argv)
         {"tslice_ms", 1, 0, 't'},
         {"ratelimit_us", 1, 0, 'r'},
         {"cpupool", 1, 0, 'p'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     SWITCH_FOREACH_OPT(opt, "d:w:c:p:t:r:s", opts, "sched-credit", 0) {
@@ -6082,8 +6074,7 @@ int main_sched_credit2(int argc, char **argv)
         {"domain", 1, 0, 'd'},
         {"weight", 1, 0, 'w'},
         {"cpupool", 1, 0, 'p'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     SWITCH_FOREACH_OPT(opt, "d:w:p:", opts, "sched-credit2", 0) {
@@ -6155,8 +6146,7 @@ int main_sched_rtds(int argc, char **argv)
         {"period", 1, 0, 'p'},
         {"budget", 1, 0, 'b'},
         {"cpupool", 1, 0, 'c'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     SWITCH_FOREACH_OPT(opt, "d:p:b:c:", opts, "sched-rtds", 0) {
@@ -7224,8 +7214,7 @@ int main_cpupoolcreate(int argc, char **argv)
     static struct option opts[] = {
         {"defconfig", 1, 0, 'f'},
         {"dryrun", 0, 0, 'n'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
     int ret;
     char *config_data = 0;
@@ -7425,8 +7414,7 @@ int main_cpupoollist(int argc, char **argv)
     int opt;
     static struct option opts[] = {
         {"cpus", 0, 0, 'c'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
     int opt_cpus = 0;
     const char *pool = NULL;
@@ -8446,8 +8434,7 @@ int main_psr_cat_cbm_set(int argc, char **argv)
 
     static struct option opts[] = {
         {"socket", 1, 0, 's'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     libxl_socket_bitmap_alloc(ctx, &target_map, 0);
@@ -8514,8 +8501,7 @@ int main_psr_hwinfo(int argc, char **argv)
     static struct option opts[] = {
         {"cmt", 0, 0, 'm'},
         {"cat", 0, 0, 'a'},
-        COMMON_LONG_OPTS,
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
 
     SWITCH_FOREACH_OPT(opt, "ma", opts, "psr-hwinfo", 0) {
