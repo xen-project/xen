@@ -3098,14 +3098,15 @@ static int def_getopt(int argc, char * const argv[],
  * Wraps def_getopt into a convenient loop+switch to process all
  * arguments. This macro is intended to be called from main_XXX().
  *
- *   SWITCH_FOREACH_OPT(int *opt, const char *opts,
+ *   SWITCH_FOREACH_OPT(int *opt, "OPTS",
  *                      const struct option *longopts,
  *                      const char *commandname,
  *                      int num_opts_req) { ...
  *
  * opt:               pointer to an int variable, holds the current option
  *                    during processing.
- * opts:              short options, as per getopt_long(3)'s optstring argument.
+ * OPTS:              short options, as per getopt_long(3)'s optstring argument.
+ *                    do not include "h"; will be provided automatically
  * longopts:          long options, as per getopt_long(3)'s longopts argument.
  *                    May be null.
  * commandname:       name of this command, for usage string.
@@ -3149,7 +3150,7 @@ static int def_getopt(int argc, char * const argv[],
  */
 #define SWITCH_FOREACH_OPT(opt, opts, longopts,                         \
                            commandname, num_required_opts)              \
-    while (((opt) = def_getopt(argc, argv, (opts), (longopts),          \
+    while (((opt) = def_getopt(argc, argv, "h" opts, (longopts),          \
                                 (commandname), (num_required_opts))) != -1) \
         switch (opt)
 
@@ -3335,7 +3336,7 @@ int main_vncviewer(int argc, char **argv)
     uint32_t domid;
     int opt, autopass = 0;
 
-    SWITCH_FOREACH_OPT(opt, "ah", opts, "vncviewer", 1) {
+    SWITCH_FOREACH_OPT(opt, "a", opts, "vncviewer", 1) {
     case 'a':
         autopass = 1;
         break;
@@ -4467,7 +4468,7 @@ int main_restore(int argc, char **argv)
         {0, 0, 0, 0}
     };
 
-    SWITCH_FOREACH_OPT(opt, "FhcpdeVA", opts, "restore", 1) {
+    SWITCH_FOREACH_OPT(opt, "FcpdeVA", opts, "restore", 1) {
     case 'c':
         console_autoconnect = 1;
         break;
@@ -4918,7 +4919,7 @@ int main_create(int argc, char **argv)
         argc--; argv++;
     }
 
-    SWITCH_FOREACH_OPT(opt, "Fhnqf:pcdeVA", opts, "create", 0) {
+    SWITCH_FOREACH_OPT(opt, "Fnqf:pcdeVA", opts, "create", 0) {
     case 'f':
         filename = optarg;
         break;
@@ -5022,7 +5023,7 @@ int main_config_update(int argc, char **argv)
         argc--; argv++;
     }
 
-    SWITCH_FOREACH_OPT(opt, "dhqf:", opts, "config_update", 0) {
+    SWITCH_FOREACH_OPT(opt, "dqf:", opts, "config_update", 0) {
     case 'd':
         debug = 1;
         break;
@@ -5613,7 +5614,7 @@ int main_info(int argc, char **argv)
     };
     int numa = 0;
 
-    SWITCH_FOREACH_OPT(opt, "hn", opts, "info", 0) {
+    SWITCH_FOREACH_OPT(opt, "n", opts, "info", 0) {
     case 'n':
         numa = 1;
         break;
@@ -5951,7 +5952,7 @@ int main_sched_credit(int argc, char **argv)
         {0, 0, 0, 0}
     };
 
-    SWITCH_FOREACH_OPT(opt, "d:w:c:p:t:r:hs", opts, "sched-credit", 0) {
+    SWITCH_FOREACH_OPT(opt, "d:w:c:p:t:r:s", opts, "sched-credit", 0) {
     case 'd':
         dom = optarg;
         break;
@@ -6067,7 +6068,7 @@ int main_sched_credit2(int argc, char **argv)
         {0, 0, 0, 0}
     };
 
-    SWITCH_FOREACH_OPT(opt, "d:w:p:h", opts, "sched-credit2", 0) {
+    SWITCH_FOREACH_OPT(opt, "d:w:p:", opts, "sched-credit2", 0) {
     case 'd':
         dom = optarg;
         break;
@@ -6140,7 +6141,7 @@ int main_sched_rtds(int argc, char **argv)
         {0, 0, 0, 0}
     };
 
-    SWITCH_FOREACH_OPT(opt, "d:p:b:c:h", opts, "sched-rtds", 0) {
+    SWITCH_FOREACH_OPT(opt, "d:p:b:c:", opts, "sched-rtds", 0) {
     case 'd':
         dom = optarg;
         break;
@@ -7225,7 +7226,7 @@ int main_cpupoolcreate(int argc, char **argv)
     libxl_cputopology *topology;
     int rc = 1;
 
-    SWITCH_FOREACH_OPT(opt, "hnf:", opts, "cpupool-create", 0) {
+    SWITCH_FOREACH_OPT(opt, "nf:", opts, "cpupool-create", 0) {
     case 'f':
         filename = optarg;
         break;
@@ -7416,7 +7417,7 @@ int main_cpupoollist(int argc, char **argv)
     uint32_t poolid;
     char *name;
 
-    SWITCH_FOREACH_OPT(opt, "hc", opts, "cpupool-list", 0) {
+    SWITCH_FOREACH_OPT(opt, "c", opts, "cpupool-list", 0) {
     case 'c':
         opt_cpus = 1;
         break;
