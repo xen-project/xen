@@ -5409,7 +5409,7 @@ int main_vcpuset(int argc, char **argv)
 {
     static struct option opts[] = {
         {"ignore-host", 0, 0, 'i'},
-        {0, 0, 0, 0}
+        COMMON_LONG_OPTS
     };
     int opt, check_host = 1;
 
