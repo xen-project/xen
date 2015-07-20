@@ -272,8 +272,6 @@ M:	Shriram Rajagopalan <rshriram@cs.ubc.ca>
 M:	Yang Hongyang <yanghy@cn.fujitsu.com>
 S:	Maintained
 F:	docs/README.remus
-F:	tools/libxc/xc_domain_save.c
-F:	tools/libxc/xc_domain_restore.c
 F:	tools/blktap2/drivers/block-remus.c
 F:	tools/blktap2/drivers/hashtable*
 F:	tools/libxl/libxl_remus_*

@@ -396,6 +396,65 @@ static int is_page_exchangable(xc_interface *xch, int domid, xen_pfn_t mfn,
     return 1;
 }
 
+xen_pfn_t *xc_map_m2p(xc_interface *xch,
+                      unsigned long max_mfn,
+                      int prot,
+                      unsigned long *mfn0)
+{
+    privcmd_mmap_entry_t *entries;
+    unsigned long m2p_chunks, m2p_size;
+    xen_pfn_t *m2p;
+    xen_pfn_t *extent_start;
+    int i;
+
+    m2p = NULL;
+    m2p_size   = M2P_SIZE(max_mfn);
+    m2p_chunks = M2P_CHUNKS(max_mfn);
+
+    extent_start = calloc(m2p_chunks, sizeof(xen_pfn_t));
+    if ( !extent_start )
+    {
+        ERROR("failed to allocate space for m2p mfns");
+        goto err0;
+    }
+
+    if ( xc_machphys_mfn_list(xch, m2p_chunks, extent_start) )
+    {
+        PERROR("xc_get_m2p_mfns");
+        goto err1;
+    }
+
+    entries = calloc(m2p_chunks, sizeof(privcmd_mmap_entry_t));
+    if (entries == NULL)
+    {
+        ERROR("failed to allocate space for mmap entries");
+        goto err1;
+    }
+
+    for ( i = 0; i < m2p_chunks; i++ )
+        entries[i].mfn = extent_start[i];
+
+    m2p = xc_map_foreign_ranges(xch, DOMID_XEN,
+			m2p_size, prot, M2P_CHUNK_SIZE,
+			entries, m2p_chunks);
+    if (m2p == NULL)
+    {
+        PERROR("xc_mmap_foreign_ranges failed");
+        goto err2;
+    }
+
+    if (mfn0)
+        *mfn0 = entries[0].mfn;
+
+err2:
+    free(entries);
+err1:
+    free(extent_start);
+
+err0:
+    return m2p;
+}
+
 /* The domain should be suspended when called here */
 int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
 {
