@@ -42,6 +42,7 @@
 #define SYSFS_PCIBACK_DRIVER   "/dev/null"
 #define NETBACK_NIC_NAME       "xnb%u.%d"
 #include <libutil.h>
+#include <sys/endian.h>
 #endif
 
 #ifndef SYSFS_PCIBACK_DRIVER
