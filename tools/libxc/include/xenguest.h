@@ -67,14 +67,6 @@ struct save_callbacks {
     /* Enable qemu-dm logging dirty pages to xen */
     int (*switch_qemu_logdirty)(int domid, unsigned enable, void *data); /* HVM only */
 
-    /* Save toolstack specific data
-     * @param buf the buffer with the data to be saved
-     * @param len the length of the buffer
-     * The callee allocates the buffer, the caller frees it (buffer must
-     * be free'able).
-     */
-    int (*toolstack_save)(uint32_t domid, uint8_t **buf, uint32_t *len, void *data);
-
     /* to be provided as the last argument to each callback function */
     void* data;
 };
@@ -98,10 +90,6 @@ int xc_domain_save2(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_ite
 
 /* callbacks provided by xc_domain_restore */
 struct restore_callbacks {
-    /* callback to restore toolstack specific data */
-    int (*toolstack_restore)(uint32_t domid, const uint8_t *buf,
-            uint32_t size, void* data);
-
     /* A checkpoint record has been found in the stream.
      * returns: */
 #define XGR_CHECKPOINT_ERROR    0 /* Terminate processing */

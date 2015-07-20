@@ -70,7 +70,6 @@ void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
     shs->completion_callback = libxl__xc_domain_restore_done;
     shs->caller_state = dcs;
     shs->need_results = 1;
-    shs->toolstack_data_file = 0;
 
     run_helper(egc, shs, "--restore-domain", restore_fd, 0, 0,
                argnums, ARRAY_SIZE(argnums));
@@ -333,7 +332,6 @@ static void helper_done(libxl__egc *egc, libxl__save_helper_state *shs)
     libxl__carefd_close(shs->pipes[0]);  shs->pipes[0] = 0;
     libxl__carefd_close(shs->pipes[1]);  shs->pipes[1] = 0;
     assert(!libxl__save_helper_inuse(shs));
-    if (shs->toolstack_data_file) fclose(shs->toolstack_data_file);
 
     shs->egc = egc;
     shs->completion_callback(egc, shs->caller_state,

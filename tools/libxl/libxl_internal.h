@@ -2761,7 +2761,6 @@ typedef struct libxl__save_helper_state {
     libxl__ev_fd readable;
     libxl__ev_child child;
     const char *stdin_what, *stdout_what;
-    FILE *toolstack_data_file;
 
     libxl__egc *egc; /* valid only for duration of each event callback;
                       * is here in this struct for the benefit of the

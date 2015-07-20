@@ -219,7 +219,7 @@ type         0x00000000: END
 
              0x0000000A: HVM_PARAMS
 
-             0x0000000B: TOOLSTACK
+             0x0000000B: TOOLSTACK (deprecated)
 
              0x0000000C: X86_PV_VCPU_MSRS
 
@@ -540,16 +540,14 @@ param value      Parameter value.
 
 \clearpage
 
-TOOLSTACK
----------
+TOOLSTACK (deprecated)
+----------------------
+
+> *This record was only present for transitionary purposes during
+>  development.  It is should not be used.*
 
 An opaque blob provided by and supplied to the higher layers of the
 toolstack (e.g., libxl) during save and restore.
-
-> This is only temporary -- the intention is the toolstack takes care
-> of this itself.  This record is only present for early development
-> purposes and will be removed before submissions, along with changes
-> to libxl which cause libxl to handle this data itself.
 
      0     1     2     3     4     5     6     7 octet
     +------------------------+------------------------+
