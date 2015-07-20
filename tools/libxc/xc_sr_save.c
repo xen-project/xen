@@ -474,7 +474,7 @@ static int send_memory_live(struct xc_sr_context *ctx)
     xc_shadow_op_stats_t stats = { 0, ctx->save.p2m_size };
     char *progress_str = NULL;
     unsigned x;
-    int rc = -1;
+    int rc;
 
     rc = update_progress_string(ctx, &progress_str, 0);
     if ( rc )
@@ -526,7 +526,7 @@ static int suspend_and_send_dirty(struct xc_sr_context *ctx)
     xc_interface *xch = ctx->xch;
     xc_shadow_op_stats_t stats = { 0, ctx->save.p2m_size };
     char *progress_str = NULL;
-    int rc = -1;
+    int rc;
     DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
                                     &ctx->save.dirty_bitmap_hbuf);
 
@@ -573,7 +573,7 @@ static int send_memory_verify(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
     xc_shadow_op_stats_t stats = { 0, ctx->save.p2m_size };
-    int rc = -1;
+    int rc;
     struct xc_sr_record rec =
     {
         .type = REC_TYPE_VERIFY,
@@ -613,7 +613,7 @@ static int send_memory_verify(struct xc_sr_context *ctx)
  */
 static int send_domain_memory_live(struct xc_sr_context *ctx)
 {
-    int rc = -1;
+    int rc;
 
     rc = enable_logdirty(ctx);
     if ( rc )
@@ -653,7 +653,7 @@ static int send_domain_memory_checkpointed(struct xc_sr_context *ctx)
 static int send_domain_memory_nonlive(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    int rc = -1;
+    int rc;
 
     rc = suspend_domain(ctx);
     if ( rc )

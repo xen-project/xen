@@ -584,7 +584,7 @@ static void write_emulator_blob(libxl__egc *egc,
     libxl__sr_emulator_hdr *emu_hdr;
     STATE_AO_GC(stream->ao);
     char path[256];
-    int rc = 0, writefd = -1;
+    int rc = 0, writefd;
 
     if (rec->hdr.length < sizeof(*emu_hdr)) {
         rc = ERROR_FAIL;
