@@ -740,7 +740,6 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     if ( checkpointed_stream )
         assert(callbacks->checkpoint);
 
-    IPRINTF("In experimental %s", __func__);
     DPRINTF("fd %d, dom %u, hvm %u, pae %u, superpages %d"
             ", checkpointed_stream %d", io_fd, dom, hvm, pae,
             superpages, checkpointed_stream);

@@ -1,7 +1,7 @@
 % LibXenCtrl Domain Image Format
 % David Vrabel <<david.vrabel@citrix.com>>
   Andrew Cooper <<andrew.cooper3@citrix.com>>
-% Draft G
+% Revision 1
 
 Introduction
 ============
@@ -678,6 +678,9 @@ introduced in Xen 3.0.
 
 Future Extensions
 =================
+
+All changes to this specification should bump the revision number in
+the title block.
 
 All changes to the image or domain headers require the image version
 to be increased.

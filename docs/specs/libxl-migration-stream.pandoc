@@ -1,6 +1,6 @@
 % LibXenLight Domain Image Format
 % Andrew Cooper <<andrew.cooper3@citrix.com>>
-% Draft B
+% Revision 1
 
 Introduction
 ============
@@ -40,8 +40,6 @@ Not Yet Included
 
 The following features are not yet fully specified and will be
 included in a future draft.
-
-* Remus
 
 * ARM
 
@@ -215,3 +213,18 @@ A checkpoint end record marks the end of a checkpoint in the image.
     +-------------------------------------------------+
 
 The end record contains no fields; its body_length is 0.
+
+
+Future Extensions
+=================
+
+All changes to this specification should bump the revision number in
+the title block.
+
+All changes to the header require the header version to be increased.
+
+The format may be extended by adding additional record types.
+
+Extending an existing record type must be done by adding a new record
+type.  This allows old images with the old record to still be
+restored.
