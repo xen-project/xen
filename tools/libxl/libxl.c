@@ -1671,7 +1671,7 @@ static void devices_destroy_cb(libxl__egc *egc,
     rc = libxl__remove_file(gc, libxl__device_model_savefile(gc, domid));
     if (rc < 0) goto out;
     rc = libxl__remove_file(gc,
-             GCSPRINTF(XC_DEVICE_MODEL_RESTORE_FILE".%u", domid));
+             GCSPRINTF(LIBXL_DEVICE_MODEL_RESTORE_FILE".%u", domid));
     if (rc < 0) goto out;
 
     rc = libxl__ev_child_fork(gc, &dis->destroyer, domain_destroy_domid_cb);

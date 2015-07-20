@@ -1102,7 +1102,7 @@ static void domcreate_stream_done(libxl__egc *egc,
 
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         state->saved_state = GCSPRINTF(
-                       XC_DEVICE_MODEL_RESTORE_FILE".%d", domid);
+                       LIBXL_DEVICE_MODEL_RESTORE_FILE".%d", domid);
     }
 
 out:

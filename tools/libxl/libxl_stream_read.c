@@ -593,7 +593,7 @@ static void write_emulator_blob(libxl__egc *egc,
     }
     emu_hdr = rec->body;
 
-    sprintf(path, XC_DEVICE_MODEL_RESTORE_FILE".%u", dcs->guest_domid);
+    sprintf(path, LIBXL_DEVICE_MODEL_RESTORE_FILE".%u", dcs->guest_domid);
 
     assert(stream->emu_carefd == NULL);
     libxl__carefd_begin();
