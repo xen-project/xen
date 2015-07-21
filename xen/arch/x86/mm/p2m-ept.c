@@ -440,8 +440,6 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     rv = 1;
 
 out:
-    unmap_domain_page(table);
-
     if ( needs_sync )
         ept_sync_domain(p2m);
 
@@ -478,6 +476,8 @@ out:
             }
         }
     }
+
+    unmap_domain_page(table);
 
     /* Release the old intermediate tables, if any.  This has to be the
        last thing we do, after the ept_sync_domain() and removal
