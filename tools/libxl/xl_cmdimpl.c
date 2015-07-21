@@ -1076,9 +1076,7 @@ static void parse_vnuma_config(const XLU_Config *config,
     /* Temporary storage for parsed vcpus information to avoid
      * parsing config twice. This array has num_vnuma elements.
      */
-    struct vcpu_range_parsed {
-        unsigned long start, end;
-    } *vcpu_range_parsed;
+    libxl_bitmap *vcpu_parsed;
 
     libxl_physinfo_init(&physinfo);
     if (libxl_get_physinfo(ctx, &physinfo) != 0) {
@@ -1095,7 +1093,14 @@ static void parse_vnuma_config(const XLU_Config *config,
 
     b_info->num_vnuma_nodes = num_vnuma;
     b_info->vnuma_nodes = xcalloc(num_vnuma, sizeof(libxl_vnode_info));
-    vcpu_range_parsed = xcalloc(num_vnuma, sizeof(*vcpu_range_parsed));
+    vcpu_parsed = xcalloc(num_vnuma, sizeof(libxl_bitmap));
+    for (i = 0; i < num_vnuma; i++) {
+        libxl_bitmap_init(&vcpu_parsed[i]);
+        if (libxl_cpu_bitmap_alloc(ctx, &vcpu_parsed[i], b_info->max_vcpus)) {
+            fprintf(stderr, "libxl_node_bitmap_alloc failed.\n");
+            exit(1);
+        }
+    }
 
     for (i = 0; i < b_info->num_vnuma_nodes; i++) {
         libxl_vnode_info *p = &b_info->vnuma_nodes[i];
@@ -1165,12 +1170,14 @@ static void parse_vnuma_config(const XLU_Config *config,
                     split_string_into_string_list(value, ",", &cpu_spec_list);
                     len = libxl_string_list_length(&cpu_spec_list);
 
-                    for (j = 0; j < len; j++)
+                    for (j = 0; j < len; j++) {
                         parse_range(cpu_spec_list[j], &s, &e);
+                        for (; s <= e; s++) {
+                            libxl_bitmap_set(&vcpu_parsed[i], s);
+                            max_vcpus++;
+                        }
+                    }
 
-                    vcpu_range_parsed[i].start = s;
-                    vcpu_range_parsed[i].end   = e;
-                    max_vcpus += (e - s + 1);
                     libxl_string_list_dispose(&cpu_spec_list);
                 } else if (!strcmp("vdistances", option)) {
                     libxl_string_list vdist;
@@ -1209,17 +1216,12 @@ static void parse_vnuma_config(const XLU_Config *config,
 
     for (i = 0; i < b_info->num_vnuma_nodes; i++) {
         libxl_vnode_info *p = &b_info->vnuma_nodes[i];
-        int cpu;
 
-        libxl_cpu_bitmap_alloc(ctx, &p->vcpus, b_info->max_vcpus);
-        libxl_bitmap_set_none(&p->vcpus);
-        for (cpu = vcpu_range_parsed[i].start;
-             cpu <= vcpu_range_parsed[i].end;
-             cpu++)
-            libxl_bitmap_set(&p->vcpus, cpu);
+        libxl_bitmap_copy_alloc(ctx, &p->vcpus, &vcpu_parsed[i]);
+        libxl_bitmap_dispose(&vcpu_parsed[i]);
     }
 
-    free(vcpu_range_parsed);
+    free(vcpu_parsed);
 }
 
 static void parse_config_data(const char *config_source,
