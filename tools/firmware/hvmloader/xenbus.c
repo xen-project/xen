@@ -97,7 +97,7 @@ static void ring_wait(void)
 /* Helper functions: copy data in and out of the ring */
 static void ring_write(const char *data, uint32_t len)
 {
-    uint32_t part;
+    uint32_t part, done = 0;
 
     ASSERT(len <= XENSTORE_PAYLOAD_MAX);
 
@@ -114,16 +114,18 @@ static void ring_write(const char *data, uint32_t len)
         if ( part > len ) 
             part = len;
 
-        memcpy(rings->req + MASK_XENSTORE_IDX(rings->req_prod), data, part);
+        memcpy(rings->req + MASK_XENSTORE_IDX(rings->req_prod),
+               data + done, part);
         barrier(); /* = wmb before prod write, rmb before next cons read */
         rings->req_prod += part;
         len -= part;
+        done += part;
     }
 }
 
 static void ring_read(char *data, uint32_t len)
 {
-    uint32_t part;
+    uint32_t part, done = 0;
 
     ASSERT(len <= XENSTORE_PAYLOAD_MAX);
 
@@ -140,10 +142,12 @@ static void ring_read(char *data, uint32_t len)
         if ( part > len )
             part = len;
 
-        memcpy(data, rings->rsp + MASK_XENSTORE_IDX(rings->rsp_cons), part);
+        memcpy(data + done,
+               rings->rsp + MASK_XENSTORE_IDX(rings->rsp_cons), part);
         barrier(); /* = wmb before cons write, rmb before next prod read */
         rings->rsp_cons += part;
         len -= part;
+        done += part;
     }
 }
 
