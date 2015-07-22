@@ -1697,7 +1697,8 @@ int xc_domain_setdebugging(xc_interface *xch,
 int xc_assign_device(
     xc_interface *xch,
     uint32_t domid,
-    uint32_t machine_sbdf)
+    uint32_t machine_sbdf,
+    uint32_t flag)
 {
     DECLARE_DOMCTL;
 
@@ -1705,6 +1706,7 @@ int xc_assign_device(
     domctl.domain = domid;
     domctl.u.assign_device.dev = XEN_DOMCTL_DEV_PCI;
     domctl.u.assign_device.u.pci.machine_sbdf = machine_sbdf;
+    domctl.u.assign_device.flag = flag;
 
     return do_domctl(xch, &domctl);
 }
@@ -1792,6 +1794,11 @@ int xc_assign_dt_device(
 
     domctl.u.assign_device.dev = XEN_DOMCTL_DEV_DT;
     domctl.u.assign_device.u.dt.size = size;
+    /*
+     * DT doesn't own any RDM so actually DT has nothing to do
+     * for any flag and here just fix that as 0.
+     */
+    domctl.u.assign_device.flag = 0;
     set_xen_guest_handle(domctl.u.assign_device.u.dt.path, path);
 
     rc = do_domctl(xch, &domctl);

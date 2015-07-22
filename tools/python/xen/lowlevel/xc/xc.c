@@ -592,7 +592,8 @@ static int token_value(char *token)
     return strtol(token, NULL, 16);
 }
 
-static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
+static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func,
+                    int *flag)
 {
     char *token;
 
@@ -607,8 +608,17 @@ static int next_bdf(char **str, int *seg, int *bus, int *dev, int *func)
     *dev  = token_value(token);
     token = strchr(token, ',') + 1;
     *func  = token_value(token);
-    token = strchr(token, ',');
-    *str = token ? token + 1 : NULL;
+    token = strchr(token, ',') + 1;
+    if ( token ) {
+        *flag = token_value(token);
+        *str = token + 1;
+    }
+    else
+    {
+        /* O means we take "strict" as our default policy. */
+        *flag = 0;
+        *str = NULL;
+    }
 
     return 1;
 }
@@ -620,14 +630,14 @@ static PyObject *pyxc_test_assign_device(XcObject *self,
     uint32_t dom;
     char *pci_str;
     int32_t sbdf = 0;
-    int seg, bus, dev, func;
+    int seg, bus, dev, func, flag;
 
     static char *kwd_list[] = { "domid", "pci", NULL };
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list,
                                       &dom, &pci_str) )
         return NULL;
 
-    while ( next_bdf(&pci_str, &seg, &bus, &dev, &func) )
+    while ( next_bdf(&pci_str, &seg, &bus, &dev, &func, &flag) )
     {
         sbdf = seg << 16;
         sbdf |= (bus & 0xff) << 8;
@@ -653,21 +663,21 @@ static PyObject *pyxc_assign_device(XcObject *self,
     uint32_t dom;
     char *pci_str;
     int32_t sbdf = 0;
-    int seg, bus, dev, func;
+    int seg, bus, dev, func, flag;
 
     static char *kwd_list[] = { "domid", "pci", NULL };
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list,
                                       &dom, &pci_str) )
         return NULL;
 
-    while ( next_bdf(&pci_str, &seg, &bus, &dev, &func) )
+    while ( next_bdf(&pci_str, &seg, &bus, &dev, &func, &flag) )
     {
         sbdf = seg << 16;
         sbdf |= (bus & 0xff) << 8;
         sbdf |= (dev & 0x1f) << 3;
         sbdf |= (func & 0x7);
 
-        if ( xc_assign_device(self->xc_handle, dom, sbdf) != 0 )
+        if ( xc_assign_device(self->xc_handle, dom, sbdf, flag) != 0 )
         {
             if (errno == ENOSYS)
                 sbdf = -1;
@@ -686,14 +696,14 @@ static PyObject *pyxc_deassign_device(XcObject *self,
     uint32_t dom;
     char *pci_str;
     int32_t sbdf = 0;
-    int seg, bus, dev, func;
+    int seg, bus, dev, func, flag;
 
     static char *kwd_list[] = { "domid", "pci", NULL };
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list,
                                       &dom, &pci_str) )
         return NULL;
 
-    while ( next_bdf(&pci_str, &seg, &bus, &dev, &func) )
+    while ( next_bdf(&pci_str, &seg, &bus, &dev, &func, &flag) )
     {
         sbdf = seg << 16;
         sbdf |= (bus & 0xff) << 8;

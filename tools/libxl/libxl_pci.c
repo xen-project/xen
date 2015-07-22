@@ -894,6 +894,7 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
     FILE *f;
     unsigned long long start, end, flags, size;
     int irq, i, rc, hvm = 0;
+    uint32_t flag = XEN_DOMCTL_DEV_RDM_RELAXED;
 
     if (type == LIBXL_DOMAIN_TYPE_INVALID)
         return ERROR_FAIL;
@@ -987,7 +988,7 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
 
 out:
     if (!libxl_is_stubdom(ctx, domid, NULL)) {
-        rc = xc_assign_device(ctx->xch, domid, pcidev_encode_bdf(pcidev));
+        rc = xc_assign_device(ctx->xch, domid, pcidev_encode_bdf(pcidev), flag);
         if (rc < 0 && (hvm || errno != ENOSYS)) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_assign_device failed");
             return ERROR_FAIL;

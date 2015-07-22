@@ -2067,7 +2067,8 @@ int xc_hvm_destroy_ioreq_server(xc_interface *xch,
 /* HVM guest pass-through */
 int xc_assign_device(xc_interface *xch,
                      uint32_t domid,
-                     uint32_t machine_sbdf);
+                     uint32_t machine_sbdf,
+                     uint32_t flag);
 
 int xc_get_device_group(xc_interface *xch,
                      uint32_t domid,
