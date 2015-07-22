@@ -105,7 +105,11 @@ int build_e820_table(struct e820entry *e820,
                      unsigned int lowmem_reserved_base,
                      unsigned int bios_image_base)
 {
-    unsigned int nr = 0;
+    unsigned int nr = 0, i, j;
+    uint32_t low_mem_end = hvm_info->low_mem_pgend << PAGE_SHIFT;
+    uint32_t add_high_mem = 0;
+    uint64_t high_mem_end = (uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT;
+    uint64_t map_start, map_size, map_end;
 
     if ( !lowmem_reserved_base )
             lowmem_reserved_base = 0xA0000;
@@ -149,13 +153,6 @@ int build_e820_table(struct e820entry *e820,
     e820[nr].type = E820_RESERVED;
     nr++;
 
-    /* Low RAM goes here. Reserve space for special pages. */
-    BUG_ON((hvm_info->low_mem_pgend << PAGE_SHIFT) < (2u << 20));
-    e820[nr].addr = 0x100000;
-    e820[nr].size = (hvm_info->low_mem_pgend << PAGE_SHIFT) - e820[nr].addr;
-    e820[nr].type = E820_RAM;
-    nr++;
-
     /*
      * Explicitly reserve space for special pages.
      * This space starts at RESERVED_MEMBASE an extends to cover various
@@ -191,14 +188,100 @@ int build_e820_table(struct e820entry *e820,
         nr++;
     }
 
+    /* Low RAM goes here. Reserve space for special pages. */
+    BUG_ON(low_mem_end < (2u << 20));
 
-    if ( hvm_info->high_mem_pgend )
+    /*
+     * Construct E820 table according to recorded memory map.
+     *
+     * The memory map created by toolstack may include,
+     *
+     * #1. Low memory region
+     *
+     * Low RAM starts at least from 1M to make sure all standard regions
+     * of the PC memory map, like BIOS, VGA memory-mapped I/O and vgabios,
+     * have enough space.
+     *
+     * #2. Reserved regions if they exist
+     *
+     * #3. High memory region if it exists
+     *
+     * Note we just have one low memory entry and one high mmeory entry if
+     * exists.
+     *
+     * But we may have relocated RAM to allocate sufficient MMIO previously
+     * so low_mem_pgend would be changed over there. And here memory_map[]
+     * records the original low/high memory, so if low_mem_end is less than
+     * the original we need to revise low/high memory range firstly.
+     */
+    for ( i = 0; i < memory_map.nr_map; i++ )
     {
-        e820[nr].addr = ((uint64_t)1 << 32);
-        e820[nr].size =
-            ((uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT) - e820[nr].addr;
-        e820[nr].type = E820_RAM;
+        map_start = memory_map.map[i].addr;
+        map_size = memory_map.map[i].size;
+        map_end = map_start + map_size;
+
+        /* If we need to adjust lowmem. */
+        if ( memory_map.map[i].type == E820_RAM &&
+             low_mem_end > map_start && low_mem_end < map_end )
+        {
+            add_high_mem = map_end - low_mem_end;
+            memory_map.map[i].size = low_mem_end - map_start;
+            break;
+        }
+    }
+
+    /* If we need to adjust highmem. */
+    if ( add_high_mem )
+    {
+        /* Modify the existing highmem region if it exists. */
+        for ( i = 0; i < memory_map.nr_map; i++ )
+        {
+            map_start = memory_map.map[i].addr;
+            map_size = memory_map.map[i].size;
+            map_end = map_start + map_size;
+
+            if ( memory_map.map[i].type == E820_RAM &&
+                 map_start == ((uint64_t)1 << 32))
+            {
+                memory_map.map[i].size += add_high_mem;
+                break;
+            }
+        }
+
+        /* If there was no highmem region, just create one. */
+        if ( i == memory_map.nr_map )
+        {
+            memory_map.map[i].addr = ((uint64_t)1 << 32);
+            memory_map.map[i].size = add_high_mem;
+            memory_map.map[i].type = E820_RAM;
+            memory_map.nr_map++;
+        }
+
+        /* A sanity check if high memory is broken. */
+        BUG_ON( high_mem_end !=
+                memory_map.map[i].addr + memory_map.map[i].size);
+    }
+
+    /* Now fill e820. */
+    for ( i = 0; i < memory_map.nr_map; i++ )
+    {
+        e820[nr] = memory_map.map[i];
         nr++;
+    }
+
+    /* Finally we need to sort all e820 entries. */
+    for ( j = 0; j < nr - 1; j++ )
+    {
+        for ( i = j + 1; i < nr; i++ )
+        {
+            if ( e820[j].addr > e820[i].addr )
+            {
+                struct e820entry tmp = e820[j];
+
+                e820[j] = e820[i];
+                e820[i] = tmp;
+            }
+        }
     }
 
     return nr;
