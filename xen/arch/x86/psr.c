@@ -50,6 +50,8 @@ static unsigned int __read_mostly opt_cos_max = 255;
 static uint64_t rmid_mask;
 static DEFINE_PER_CPU(struct psr_assoc, psr_assoc);
 
+static struct psr_cat_cbm *temp_cos_to_cbm;
+
 static unsigned int get_socket_cpu(unsigned int socket)
 {
     if ( likely(socket < nr_sockets) )
@@ -451,22 +453,15 @@ void psr_domain_free(struct domain *d)
 
 static int cat_cpu_prepare(unsigned int cpu)
 {
-    struct psr_cat_socket_info *info;
-    unsigned int socket;
-
     if ( !cat_socket_info )
         return 0;
 
-    socket = cpu_to_socket(cpu);
-    if ( socket >= nr_sockets )
-        return -ENOSPC;
+    if ( temp_cos_to_cbm == NULL &&
+         (temp_cos_to_cbm = xzalloc_array(struct psr_cat_cbm,
+                                          opt_cos_max + 1UL)) == NULL )
+        return -ENOMEM;
 
-    info = cat_socket_info + socket;
-    if ( info->cos_to_cbm )
-        return 0;
-
-    info->cos_to_cbm = xzalloc_array(struct psr_cat_cbm, opt_cos_max + 1UL);
-    return info->cos_to_cbm ? 0 : -ENOMEM;
+    return 0;
 }
 
 static void cat_cpu_init(void)
@@ -492,6 +487,8 @@ static void cat_cpu_init(void)
         info->cbm_len = (eax & 0x1f) + 1;
         info->cos_max = min(opt_cos_max, edx & 0xffff);
 
+        info->cos_to_cbm = temp_cos_to_cbm;
+        temp_cos_to_cbm = NULL;
         /* cos=0 is reserved as default cbm(all ones). */
         info->cos_to_cbm[0].cbm = (1ull << info->cbm_len) - 1;
 
