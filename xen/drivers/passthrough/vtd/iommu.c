@@ -1839,7 +1839,7 @@ static int rmrr_identity_mapping(struct domain *d, bool_t map,
 
             while ( base_pfn < end_pfn )
             {
-                if ( intel_iommu_unmap_page(d, base_pfn) )
+                if ( clear_identity_p2m_entry(d, base_pfn, 0) )
                     ret = -ENXIO;
                 base_pfn++;
             }
@@ -1855,8 +1855,7 @@ static int rmrr_identity_mapping(struct domain *d, bool_t map,
 
     while ( base_pfn < end_pfn )
     {
-        int err = intel_iommu_map_page(d, base_pfn, base_pfn,
-                                       IOMMUF_readable|IOMMUF_writable);
+        int err = set_identity_p2m_entry(d, base_pfn, p2m_access_rw);
 
         if ( err )
             return err;

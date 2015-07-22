@@ -584,14 +584,16 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
                          p2m->default_access);
 }
 
-void
+int
 guest_physmap_remove_page(struct domain *d, unsigned long gfn,
                           unsigned long mfn, unsigned int page_order)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    int rc;
     gfn_lock(p2m, gfn, page_order);
-    p2m_remove_page(p2m, gfn, mfn, page_order);
+    rc = p2m_remove_page(p2m, gfn, mfn, page_order);
     gfn_unlock(p2m, gfn, page_order);
+    return rc;
 }
 
 int
@@ -896,6 +898,40 @@ int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
                        p2m_access_t access)
 {
     return set_typed_p2m_entry(d, gfn, mfn, p2m_mmio_direct, access);
+}
+
+int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
+                           p2m_access_t p2ma)
+{
+    p2m_type_t p2mt;
+    p2m_access_t a;
+    mfn_t mfn;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    int ret;
+
+    if ( !paging_mode_translate(p2m->domain) )
+        return 0;
+
+    gfn_lock(p2m, gfn, 0);
+
+    mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, 0, NULL);
+
+    if ( p2mt == p2m_invalid || p2mt == p2m_mmio_dm )
+        ret = p2m_set_entry(p2m, gfn, _mfn(gfn), PAGE_ORDER_4K,
+                            p2m_mmio_direct, p2ma);
+    else if ( mfn_x(mfn) == gfn && p2mt == p2m_mmio_direct && a == p2ma )
+        ret = 0;
+    else
+    {
+        ret = -EBUSY;
+        printk(XENLOG_G_WARNING
+               "Cannot setup identity map d%d:%lx,"
+               " gfn already mapped to %lx.\n",
+               d->domain_id, gfn, mfn_x(mfn));
+    }
+
+    gfn_unlock(p2m, gfn, 0);
+    return ret;
 }
 
 /* Returns: 0 for success, -errno for failure */
