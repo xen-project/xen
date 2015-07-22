@@ -445,6 +445,89 @@ int libxl__arch_domain_map_irq(libxl__gc *gc, uint32_t domid, int irq)
 }
 
 /*
+ * Here we're just trying to set these kinds of e820 mappings:
+ *
+ * #1. Low memory region
+ *
+ * Low RAM starts at least from 1M to make sure all standard regions
+ * of the PC memory map, like BIOS, VGA memory-mapped I/O and vgabios,
+ * have enough space.
+ * Note: Those stuffs below 1M are still constructed with multiple
+ * e820 entries by hvmloader. At this point we don't change anything.
+ *
+ * #2. RDM region if it exists
+ *
+ * #3. High memory region if it exists
+ *
+ * Note: these regions are not overlapping since we already check
+ * to adjust them. Please refer to libxl__domain_device_construct_rdm().
+ */
+#define GUEST_LOW_MEM_START_DEFAULT 0x100000
+int libxl__arch_domain_construct_memmap(libxl__gc *gc,
+                                        libxl_domain_config *d_config,
+                                        uint32_t domid,
+                                        struct xc_hvm_build_args *args)
+{
+    int rc = 0;
+    unsigned int nr = 0, i;
+    /* We always own at least one lowmem entry. */
+    unsigned int e820_entries = 1;
+    struct e820entry *e820 = NULL;
+    uint64_t highmem_size =
+                    args->highmem_end ? args->highmem_end - (1ull << 32) : 0;
+
+    /* Add all rdm entries. */
+    for (i = 0; i < d_config->num_rdms; i++)
+        if (d_config->rdms[i].policy != LIBXL_RDM_RESERVE_POLICY_INVALID)
+            e820_entries++;
+
+
+    /* If we should have a highmem range. */
+    if (highmem_size)
+        e820_entries++;
+
+    if (e820_entries >= E820MAX) {
+        LOG(ERROR, "Ooops! Too many entries in the memory map!\n");
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
+    e820 = libxl__malloc(gc, sizeof(struct e820entry) * e820_entries);
+
+    /* Low memory */
+    e820[nr].addr = GUEST_LOW_MEM_START_DEFAULT;
+    e820[nr].size = args->lowmem_end - GUEST_LOW_MEM_START_DEFAULT;
+    e820[nr].type = E820_RAM;
+    nr++;
+
+    /* RDM mapping */
+    for (i = 0; i < d_config->num_rdms; i++) {
+        if (d_config->rdms[i].policy == LIBXL_RDM_RESERVE_POLICY_INVALID)
+            continue;
+
+        e820[nr].addr = d_config->rdms[i].start;
+        e820[nr].size = d_config->rdms[i].size;
+        e820[nr].type = E820_RESERVED;
+        nr++;
+    }
+
+    /* High memory */
+    if (highmem_size) {
+        e820[nr].addr = ((uint64_t)1 << 32);
+        e820[nr].size = highmem_size;
+        e820[nr].type = E820_RAM;
+    }
+
+    if (xc_domain_set_memory_map(CTX->xch, domid, e820, e820_entries) != 0) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+out:
+    return rc;
+}
+
+/*
  * Local variables:
  * mode: C
  * c-basic-offset: 4

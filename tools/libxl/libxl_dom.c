@@ -1012,6 +1012,11 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         goto out;
     }
 
+    if (libxl__arch_domain_construct_memmap(gc, d_config, domid, &args)) {
+        LOG(ERROR, "setting domain memory map failed");
+        goto out;
+    }
+
     ret = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
                                &state->store_mfn, state->console_port,
                                &state->console_mfn, state->store_domid,

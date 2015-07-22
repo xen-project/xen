@@ -55,4 +55,11 @@ int libxl__arch_vnuma_build_vmemrange(libxl__gc *gc,
 _hidden
 int libxl__arch_domain_map_irq(libxl__gc *gc, uint32_t domid, int irq);
 
+/* arch specific to construct memory mapping function */
+_hidden
+int libxl__arch_domain_construct_memmap(libxl__gc *gc,
+                                        libxl_domain_config *d_config,
+                                        uint32_t domid,
+                                        struct xc_hvm_build_args *args);
+
 #endif
