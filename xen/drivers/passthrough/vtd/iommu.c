@@ -2242,11 +2242,9 @@ static int reassign_device_ownership(
     /*
      * If the device belongs to the hardware domain, and it has RMRR, don't
      * remove it from the hardware domain, because BIOS may use RMRR at
-     * booting time. Also account for the special casing of USB below (in
-     * intel_iommu_assign_device()).
+     * booting time.
      */
-    if ( !is_hardware_domain(source) &&
-         !is_usb_device(pdev->seg, pdev->bus, pdev->devfn) )
+    if ( !is_hardware_domain(source) )
     {
         const struct acpi_rmrr_unit *rmrr;
         u16 bdf;
@@ -2299,13 +2297,8 @@ static int intel_iommu_assign_device(
     if ( ret )
         return ret;
 
-    /* FIXME: Because USB RMRR conflicts with guest bios region,
-     * ignore USB RMRR temporarily.
-     */
     seg = pdev->seg;
     bus = pdev->bus;
-    if ( is_usb_device(seg, bus, pdev->devfn) )
-        return 0;
 
     /* Setup rmrr identity mapping */
     for_each_rmrr_device( rmrr, bdf, i )

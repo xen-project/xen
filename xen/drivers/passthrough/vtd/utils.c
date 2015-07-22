@@ -29,13 +29,6 @@
 #include "extern.h"
 #include <asm/io_apic.h>
 
-int is_usb_device(u16 seg, u8 bus, u8 devfn)
-{
-    u16 class = pci_conf_read16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                                PCI_CLASS_DEVICE);
-    return (class == 0xc03);
-}
-
 /* Disable vt-d protected memory registers. */
 void disable_pmr(struct iommu *iommu)
 {

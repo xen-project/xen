@@ -129,7 +129,6 @@ do {                                                \
 
 int vtd_hw_check(void);
 void disable_pmr(struct iommu *iommu);
-int is_usb_device(u16 seg, u8 bus, u8 devfn);
 int is_igd_drhd(struct acpi_drhd_unit *drhd);
 
 #endif /* _DMAR_H_ */
