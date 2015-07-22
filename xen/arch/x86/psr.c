@@ -178,7 +178,7 @@ int psr_alloc_rmid(struct domain *d)
     if ( rmid > psr_cmt->rmid_max )
     {
         d->arch.psr_rmid = 0;
-        return -EUSERS;
+        return -EOVERFLOW;
     }
 
     d->arch.psr_rmid = rmid;
@@ -253,7 +253,7 @@ static struct psr_cat_socket_info *get_cat_socket_info(unsigned int socket)
         return ERR_PTR(-ENODEV);
 
     if ( socket >= nr_sockets )
-        return ERR_PTR(-EBADSLT);
+        return ERR_PTR(-ENOTSOCK);
 
     if ( !test_bit(socket, cat_socket_enable) )
         return ERR_PTR(-ENOENT);
@@ -334,7 +334,7 @@ static int write_l3_cbm(unsigned int socket, unsigned int cos, uint64_t cbm)
         unsigned int cpu = get_socket_cpu(socket);
 
         if ( cpu >= nr_cpu_ids )
-            return -EBADSLT;
+            return -ENOTSOCK;
         on_selected_cpus(cpumask_of(cpu), do_write_l3_cbm, &info, 1);
     }
 
@@ -383,7 +383,7 @@ int psr_set_l3_cbm(struct domain *d, unsigned int socket, uint64_t cbm)
     if ( !found )
     {
         spin_unlock(&info->cbm_lock);
-        return -EUSERS;
+        return -EOVERFLOW;
     }
 
     cos = found - map;

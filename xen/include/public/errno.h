@@ -21,6 +21,12 @@ enum xen_errno {
 /*
  * Values originating from x86 Linux. Please consider using respective
  * values when adding new definitions here.
+ *
+ * The set of identifiers to be added here shouldn't extend beyond what
+ * POSIX mandates (see e.g.
+ * http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/errno.h.html)
+ * with the exception that we support some optional (XSR) values
+ * specified there (but no new ones should be added).
  */
 
 XEN_ERRNO(EPERM,	 1)	/* Operation not permitted */
@@ -54,8 +60,6 @@ XEN_ERRNO(EDEADLK,	35)	/* Resource deadlock would occur */
 XEN_ERRNO(ENAMETOOLONG,	36)	/* File name too long */
 XEN_ERRNO(ENOLCK,	37)	/* No record locks available */
 XEN_ERRNO(ENOSYS,	38)	/* Function not implemented */
-XEN_ERRNO(EBADRQC,	56)	/* Invalid request code */
-XEN_ERRNO(EBADSLT,	57)	/* Invalid slot */
 XEN_ERRNO(ENODATA,	61)	/* No data available */
 XEN_ERRNO(ETIME,	62)	/* Timer expired */
 XEN_ERRNO(EBADMSG,	74)	/* Not a data message */
@@ -64,15 +68,13 @@ XEN_ERRNO(EILSEQ,	84)	/* Illegal byte sequence */
 #ifdef __XEN__ /* Internal only, should never be exposed to the guest. */
 XEN_ERRNO(ERESTART,	85)	/* Interrupted system call should be restarted */
 #endif
-XEN_ERRNO(EUSERS,	87)	/* Too many users */
+XEN_ERRNO(ENOTSOCK,	88)	/* Socket operation on non-socket */
 XEN_ERRNO(EOPNOTSUPP,	95)	/* Operation not supported on transport endpoint */
 XEN_ERRNO(EADDRINUSE,	98)	/* Address already in use */
 XEN_ERRNO(EADDRNOTAVAIL, 99)	/* Cannot assign requested address */
 XEN_ERRNO(ENOBUFS,	105)	/* No buffer space available */
 XEN_ERRNO(EISCONN,	106)	/* Transport endpoint is already connected */
 XEN_ERRNO(ENOTCONN,	107)	/* Transport endpoint is not connected */
-XEN_ERRNO(ESHUTDOWN,	108)	/* Cannot send after transport endpoint shutdown */
-XEN_ERRNO(ETOOMANYREFS,	109)	/* Too many references: cannot splice */
 XEN_ERRNO(ETIMEDOUT,	110)	/* Connection timed out */
 
 #undef XEN_ERRNO
