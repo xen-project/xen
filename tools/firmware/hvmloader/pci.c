@@ -38,6 +38,45 @@ uint64_t pci_hi_mem_start = 0, pci_hi_mem_end = 0;
 enum virtual_vga virtual_vga = VGA_none;
 unsigned long igd_opregion_pgbase = 0;
 
+/* Check if the specified range conflicts with any reserved device memory. */
+static bool check_overlap_all(uint64_t start, uint64_t size)
+{
+    unsigned int i;
+
+    for ( i = 0; i < memory_map.nr_map; i++ )
+    {
+        if ( memory_map.map[i].type == E820_RESERVED &&
+             check_overlap(start, size,
+                           memory_map.map[i].addr,
+                           memory_map.map[i].size) )
+            return true;
+    }
+
+    return false;
+}
+
+/* Find the lowest RMRR ending above base but below 4G. */
+static int find_next_rmrr(uint32_t base)
+{
+    unsigned int i;
+    int next_rmrr = -1;
+    uint64_t end, min_end = 1ULL << 32;
+
+    for ( i = 0; i < memory_map.nr_map ; i++ )
+    {
+        end = memory_map.map[i].addr + memory_map.map[i].size;
+
+        if ( memory_map.map[i].type == E820_RESERVED &&
+             end > base && end <= min_end )
+        {
+            next_rmrr = i;
+            min_end = end;
+        }
+    }
+
+    return next_rmrr;
+}
+
 void pci_setup(void)
 {
     uint8_t is_64bar, using_64bar, bar64_relocate = 0;
@@ -46,6 +85,7 @@ void pci_setup(void)
     uint32_t vga_devfn = 256;
     uint16_t class, vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
+    int next_rmrr;
 
     /* Resources assignable to PCI devices via BARs. */
     struct resource {
@@ -299,6 +339,15 @@ void pci_setup(void)
                     || (((pci_mem_start << 1) >> PAGE_SHIFT)
                         >= hvm_info->low_mem_pgend)) )
             pci_mem_start <<= 1;
+
+        /*
+         * Try to accommodate RMRRs in our MMIO region on a best-effort basis.
+         * If we have RMRRs in the range, then make pci_mem_start just after
+         * hvm_info->low_mem_pgend.
+         */
+        if ( pci_mem_start > (hvm_info->low_mem_pgend << PAGE_SHIFT) &&
+             check_overlap_all(pci_mem_start, pci_mem_end-pci_mem_start) )
+            pci_mem_start = hvm_info->low_mem_pgend << PAGE_SHIFT;
     }
 
     if ( mmio_total > (pci_mem_end - pci_mem_start) )
@@ -351,6 +400,8 @@ void pci_setup(void)
     mem_resource.max = pci_mem_end;
     io_resource.base = 0xc000;
     io_resource.max = 0x10000;
+
+    next_rmrr = find_next_rmrr(pci_mem_start);
 
     /* Assign iomem and ioport resources in descending order of size. */
     for ( i = 0; i < nr_bars; i++ )
@@ -407,6 +458,19 @@ void pci_setup(void)
         }
 
         base = (resource->base  + bar_sz - 1) & ~(uint64_t)(bar_sz - 1);
+
+        /* If we're using mem_resource, check for RMRR conflicts. */
+        while ( resource == &mem_resource &&
+                next_rmrr >= 0 &&
+                check_overlap(base, bar_sz,
+                              memory_map.map[next_rmrr].addr,
+                              memory_map.map[next_rmrr].size) )
+        {
+            base = memory_map.map[next_rmrr].addr + memory_map.map[next_rmrr].size;
+            base = (base + bar_sz - 1) & ~(bar_sz - 1);
+            next_rmrr = find_next_rmrr(base);
+        }
+
         bar_data |= (uint32_t)base;
         bar_data_upper = (uint32_t)(base >> 32);
         base += bar_sz;
