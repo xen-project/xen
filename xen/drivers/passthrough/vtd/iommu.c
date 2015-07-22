@@ -2293,12 +2293,36 @@ static int intel_iommu_assign_device(
     if ( list_empty(&acpi_drhd_units) )
         return -ENODEV;
 
+    seg = pdev->seg;
+    bus = pdev->bus;
+    /*
+     * In rare cases one given rmrr is shared by multiple devices but
+     * obviously this would put the security of a system at risk. So
+     * we should prevent from this sort of device assignment.
+     *
+     * TODO: in the future we can introduce group device assignment
+     * interface to make sure devices sharing RMRR are assigned to the
+     * same domain together.
+     */
+    for_each_rmrr_device( rmrr, bdf, i )
+    {
+        if ( rmrr->segment == seg &&
+             PCI_BUS(bdf) == bus &&
+             PCI_DEVFN2(bdf) == devfn &&
+             rmrr->scope.devices_cnt > 1 )
+        {
+            printk(XENLOG_G_ERR VTDPREFIX
+                   " cannot assign %04x:%02x:%02x.%u"
+                   " with shared RMRR at %"PRIx64" for Dom%d.\n",
+                   seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                   rmrr->base_address, d->domain_id);
+            return -EPERM;
+        }
+    }
+
     ret = reassign_device_ownership(hardware_domain, d, devfn, pdev);
     if ( ret )
         return ret;
-
-    seg = pdev->seg;
-    bus = pdev->bus;
 
     /* Setup rmrr identity mapping */
     for_each_rmrr_device( rmrr, bdf, i )
