@@ -930,12 +930,6 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     int ret, rc = ERROR_FAIL;
     uint64_t mmio_start, lowmem_end, highmem_end;
     libxl_domain_build_info *const info = &d_config->b_info;
-    /*
-     * Currently we fix this as 2G to guarantee how to handle
-     * our rdm policy. But we'll provide a parameter to set
-     * this dynamically.
-     */
-    uint64_t rdm_mem_boundary = 0x80000000;
 
     memset(&args, 0, sizeof(struct xc_hvm_build_args));
     /* The params from the configuration file are in Mb, which are then
@@ -974,7 +968,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     args.mmio_start = mmio_start;
 
     rc = libxl__domain_device_construct_rdm(gc, d_config,
-                                            rdm_mem_boundary,
+                                            info->u.hvm.rdm_mem_boundary_memkb*1024,
                                             &args);
     if (rc) {
         LOG(ERROR, "checking reserved device memory failed");

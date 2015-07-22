@@ -1583,6 +1583,9 @@ static void parse_config_data(const char *config_source,
                     exit(1);
             }
         }
+
+        if (!xlu_cfg_get_long (config, "rdm_mem_boundary", &l, 0))
+            b_info->u.hvm.rdm_mem_boundary_memkb = l * 1024;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
     {

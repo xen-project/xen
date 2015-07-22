@@ -909,6 +909,12 @@ const char *libxl_defbool_to_string(libxl_defbool b);
 #define LIBXL_TIMER_MODE_DEFAULT -1
 #define LIBXL_MEMKB_DEFAULT ~0ULL
 
+/*
+ * We'd like to set a memory boundary to determine if we need to check
+ * any overlap with reserved device memory.
+ */
+#define LIBXL_RDM_MEM_BOUNDARY_MEMKB_DEFAULT (2048 * 1024)
+
 #define LIBXL_MS_VM_GENID_LEN 16
 typedef struct {
     uint8_t bytes[LIBXL_MS_VM_GENID_LEN];

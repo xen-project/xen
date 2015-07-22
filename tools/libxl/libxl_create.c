@@ -54,6 +54,10 @@ void libxl__rdm_setdefault(libxl__gc *gc, libxl_domain_build_info *b_info)
 {
     if (b_info->u.hvm.rdm.policy == LIBXL_RDM_RESERVE_POLICY_INVALID)
         b_info->u.hvm.rdm.policy = LIBXL_RDM_RESERVE_POLICY_RELAXED;
+
+    if (b_info->u.hvm.rdm_mem_boundary_memkb == LIBXL_MEMKB_DEFAULT)
+        b_info->u.hvm.rdm_mem_boundary_memkb =
+                            LIBXL_RDM_MEM_BOUNDARY_MEMKB_DEFAULT;
 }
 
 int libxl__domain_build_info_setdefault(libxl__gc *gc,

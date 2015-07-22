@@ -845,6 +845,28 @@ More information about Xen gfx_passthru feature is available
 on the XenVGAPassthrough L<http://wiki.xen.org/wiki/XenVGAPassthrough>
 wiki page.
 
+=item B<rdm_mem_boundary=MBYTES>
+
+Number of megabytes to set a boundary for checking rdm conflict.
+
+When RDM conflicts with RAM, RDM probably scatter the whole RAM space.
+Especially multiple RDM entries would worsen this to lead a complicated
+memory layout. So here we're trying to figure out a simple solution to
+avoid breaking existing layout. So when a conflict occurs,
+
+    #1. Above a predefined boundary
+        - move lowmem_end below reserved region to solve conflict;
+
+    #2. Below a predefined boundary
+        - Check strict/relaxed policy.
+        "strict" policy leads to fail libxl. Note when both policies
+        are specified on a given region, 'strict' is always preferred.
+        "relaxed" policy issue a warning message and also mask this
+        entry INVALID to indicate we shouldn't expose this entry to
+        hvmloader.
+
+Here the default is 2G.
+
 =item B<dtdev=[ "DTDEV_PATH", "DTDEV_PATH", ... ]>
 
 Specifies the host device tree nodes to passthrough to this guest. Each
