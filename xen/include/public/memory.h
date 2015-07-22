@@ -28,6 +28,7 @@
 #define __XEN_PUBLIC_MEMORY_H__
 
 #include "xen.h"
+#include "physdev.h"
 
 /*
  * Increase or decrease the specified domain's memory reservation. Returns the
@@ -522,6 +523,40 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
  * The zero value is appropiate.
  */
 
+/*
+ * With some legacy devices, certain guest-physical addresses cannot safely
+ * be used for other purposes, e.g. to map guest RAM.  This hypercall
+ * enumerates those regions so the toolstack can avoid using them.
+ */
+#define XENMEM_reserved_device_memory_map   27
+struct xen_reserved_device_memory {
+    xen_pfn_t start_pfn;
+    xen_ulong_t nr_pages;
+};
+typedef struct xen_reserved_device_memory xen_reserved_device_memory_t;
+DEFINE_XEN_GUEST_HANDLE(xen_reserved_device_memory_t);
+
+struct xen_reserved_device_memory_map {
+#define XENMEM_RDM_ALL 1 /* Request all regions (ignore dev union). */
+    /* IN */
+    uint32_t flags;
+    /*
+     * IN/OUT
+     *
+     * Gets set to the required number of entries when too low,
+     * signaled by error code -ERANGE.
+     */
+    unsigned int nr_entries;
+    /* OUT */
+    XEN_GUEST_HANDLE(xen_reserved_device_memory_t) buffer;
+    /* IN */
+    union {
+        struct physdev_pci_device pci;
+    } dev;
+};
+typedef struct xen_reserved_device_memory_map xen_reserved_device_memory_map_t;
+DEFINE_XEN_GUEST_HANDLE(xen_reserved_device_memory_map_t);
+
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 /*
@@ -573,7 +608,7 @@ struct xen_vnuma_topology_info {
 typedef struct xen_vnuma_topology_info xen_vnuma_topology_info_t;
 DEFINE_XEN_GUEST_HANDLE(xen_vnuma_topology_info_t);
 
-/* Next available subop number is 27 */
+/* Next available subop number is 28 */
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 

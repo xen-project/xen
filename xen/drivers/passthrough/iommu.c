@@ -375,6 +375,16 @@ void iommu_crash_shutdown(void)
     iommu_enabled = iommu_intremap = 0;
 }
 
+int iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
+{
+    const struct iommu_ops *ops = iommu_get_ops();
+
+    if ( !iommu_enabled || !ops->get_reserved_device_memory )
+        return 0;
+
+    return ops->get_reserved_device_memory(func, ctxt);
+}
+
 bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature)
 {
     const struct hvm_iommu *hd = domain_hvm_iommu(d);

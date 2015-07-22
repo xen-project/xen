@@ -914,3 +914,30 @@ int platform_supports_x2apic(void)
     unsigned int mask = ACPI_DMAR_INTR_REMAP | ACPI_DMAR_X2APIC_OPT_OUT;
     return cpu_has_x2apic && ((dmar_flags & mask) == ACPI_DMAR_INTR_REMAP);
 }
+
+int intel_iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
+{
+    struct acpi_rmrr_unit *rmrr, *rmrr_cur = NULL;
+    unsigned int i;
+    u16 bdf;
+
+    for_each_rmrr_device ( rmrr, bdf, i )
+    {
+        int rc;
+
+        if ( rmrr == rmrr_cur )
+            continue;
+
+        rc = func(PFN_DOWN(rmrr->base_address),
+                  PFN_UP(rmrr->end_address) - PFN_DOWN(rmrr->base_address),
+                  PCI_SBDF2(rmrr->segment, bdf), ctxt);
+
+        if ( unlikely(rc < 0) )
+            return rc;
+
+        if ( rc )
+            rmrr_cur = rmrr;
+    }
+
+    return 0;
+}

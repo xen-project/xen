@@ -26,6 +26,7 @@
  *  7:3 = slot
  *  2:0 = function
  */
+#define PCI_SEG(sbdf) (((sbdf) >> 16) & 0xffff)
 #define PCI_BUS(bdf)    (((bdf) >> 8) & 0xff)
 #define PCI_SLOT(bdf)   (((bdf) >> 3) & 0x1f)
 #define PCI_FUNC(bdf)   ((bdf) & 0x07)
@@ -33,6 +34,9 @@
 #define PCI_DEVFN2(bdf) ((bdf) & 0xff)
 #define PCI_BDF(b,d,f)  ((((b) & 0xff) << 8) | PCI_DEVFN(d,f))
 #define PCI_BDF2(b,df)  ((((b) & 0xff) << 8) | ((df) & 0xff))
+#define PCI_SBDF(s,b,d,f) ((((s) & 0xffff) << 16) | PCI_BDF(b,d,f))
+#define PCI_SBDF2(s,bdf) ((((s) & 0xffff) << 16) | ((bdf) & 0xffff))
+#define PCI_SBDF3(s,b,df) ((((s) & 0xffff) << 16) | PCI_BDF2(b, df))
 
 struct pci_dev_info {
     bool_t is_extfn;

@@ -748,6 +748,39 @@ static int construct_memop_from_reservation(
     return 0;
 }
 
+#ifdef HAS_PASSTHROUGH
+struct get_reserved_device_memory {
+    struct xen_reserved_device_memory_map map;
+    unsigned int used_entries;
+};
+
+static int get_reserved_device_memory(xen_pfn_t start, xen_ulong_t nr,
+                                      u32 id, void *ctxt)
+{
+    struct get_reserved_device_memory *grdm = ctxt;
+    u32 sbdf = PCI_SBDF3(grdm->map.dev.pci.seg, grdm->map.dev.pci.bus,
+                         grdm->map.dev.pci.devfn);
+
+    if ( !(grdm->map.flags & XENMEM_RDM_ALL) && (sbdf != id) )
+        return 0;
+
+    if ( grdm->used_entries < grdm->map.nr_entries )
+    {
+        struct xen_reserved_device_memory rdm = {
+            .start_pfn = start, .nr_pages = nr
+        };
+
+        if ( __copy_to_guest_offset(grdm->map.buffer, grdm->used_entries,
+                                    &rdm, 1) )
+            return -EFAULT;
+    }
+
+    ++grdm->used_entries;
+
+    return 1;
+}
+#endif
+
 long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d;
@@ -1161,6 +1194,35 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         xfree(tmp.vcpu_to_vnode);
         break;
     }
+
+#ifdef HAS_PASSTHROUGH
+    case XENMEM_reserved_device_memory_map:
+    {
+        struct get_reserved_device_memory grdm;
+
+        if ( unlikely(start_extent) )
+            return -ENOSYS;
+
+        if ( copy_from_guest(&grdm.map, arg, 1) ||
+             !guest_handle_okay(grdm.map.buffer, grdm.map.nr_entries) )
+            return -EFAULT;
+
+        if ( grdm.map.flags & ~XENMEM_RDM_ALL )
+            return -EINVAL;
+
+        grdm.used_entries = 0;
+        rc = iommu_get_reserved_device_memory(get_reserved_device_memory,
+                                              &grdm);
+
+        if ( !rc && grdm.map.nr_entries < grdm.used_entries )
+            rc = -ENOBUFS;
+        grdm.map.nr_entries = grdm.used_entries;
+        if ( __copy_to_guest(arg, &grdm.map, 1) )
+            rc = -EFAULT;
+
+        break;
+    }
+#endif
 
     default:
         rc = arch_memory_op(cmd, arg);

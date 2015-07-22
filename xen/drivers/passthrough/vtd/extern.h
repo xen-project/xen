@@ -75,6 +75,7 @@ int domain_context_mapping_one(struct domain *domain, struct iommu *iommu,
                                u8 bus, u8 devfn, const struct pci_dev *);
 int domain_context_unmap_one(struct domain *domain, struct iommu *iommu,
                              u8 bus, u8 devfn);
+int intel_iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt);
 
 unsigned int io_apic_read_remap_rte(unsigned int apic, unsigned int reg);
 void io_apic_write_remap_rte(unsigned int apic,

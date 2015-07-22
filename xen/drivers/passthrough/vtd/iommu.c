@@ -2490,6 +2490,7 @@ const struct iommu_ops intel_iommu_ops = {
     .crash_shutdown = vtd_crash_shutdown,
     .iotlb_flush = intel_iommu_iotlb_flush,
     .iotlb_flush_all = intel_iommu_iotlb_flush_all,
+    .get_reserved_device_memory = intel_iommu_get_reserved_device_memory,
     .dump_p2m_table = vtd_dump_p2m_table,
 };
 

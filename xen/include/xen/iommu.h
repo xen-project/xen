@@ -125,6 +125,14 @@ int iommu_do_dt_domctl(struct xen_domctl *, struct domain *,
 
 struct page_info;
 
+/*
+ * Any non-zero value returned from callbacks of this type will cause the
+ * function the callback was handed to terminate its iteration. Assigning
+ * meaning of these non-zero values is left to the top level caller /
+ * callback pair.
+ */
+typedef int iommu_grdm_t(xen_pfn_t start, xen_ulong_t nr, u32 id, void *ctxt);
+
 struct iommu_ops {
     int (*init)(struct domain *d);
     void (*hwdom_init)(struct domain *d);
@@ -156,12 +164,14 @@ struct iommu_ops {
     void (*crash_shutdown)(void);
     void (*iotlb_flush)(struct domain *d, unsigned long gfn, unsigned int page_count);
     void (*iotlb_flush_all)(struct domain *d);
+    int (*get_reserved_device_memory)(iommu_grdm_t *, void *);
     void (*dump_p2m_table)(struct domain *d);
 };
 
 void iommu_suspend(void);
 void iommu_resume(void);
 void iommu_crash_shutdown(void);
+int iommu_get_reserved_device_memory(iommu_grdm_t *, void *);
 
 void iommu_share_p2m_table(struct domain *d);
 
