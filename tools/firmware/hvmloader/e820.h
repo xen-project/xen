@@ -15,6 +15,13 @@ struct e820entry {
     uint32_t type;
 } __attribute__((packed));
 
+#define E820MAX	128
+
+struct e820map {
+    unsigned int nr_map;
+    struct e820entry map[E820MAX];
+};
+
 #endif /* __HVMLOADER_E820_H__ */
 
 /*

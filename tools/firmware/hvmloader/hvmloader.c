@@ -262,6 +262,8 @@ int main(void)
 
     init_hypercalls();
 
+    memory_map_setup();
+
     xenbus_setup();
 
     bios = detect_bios();

@@ -23,6 +23,38 @@
 #include "config.h"
 #include "util.h"
 
+struct e820map memory_map;
+
+void memory_map_setup(void)
+{
+    unsigned int nr_entries = E820MAX, i;
+    int rc;
+    uint64_t alloc_addr = RESERVED_MEMORY_DYNAMIC_START;
+    uint64_t alloc_size = RESERVED_MEMORY_DYNAMIC_END - alloc_addr;
+
+    rc = get_mem_mapping_layout(memory_map.map, &nr_entries);
+
+    if ( rc || !nr_entries )
+    {
+        printf("Get guest memory maps[%d] failed. (%d)\n", nr_entries, rc);
+        BUG();
+    }
+
+    memory_map.nr_map = nr_entries;
+
+    for ( i = 0; i < nr_entries; i++ )
+    {
+        if ( memory_map.map[i].type == E820_RESERVED &&
+             check_overlap(alloc_addr, alloc_size,
+                           memory_map.map[i].addr, memory_map.map[i].size) )
+        {
+            printf("Fail to setup memory map due to conflict");
+            printf(" on dynamic reserved memory range.\n");
+            BUG();
+        }
+    }
+}
+
 void dump_e820_table(struct e820entry *e820, unsigned int nr)
 {
     uint64_t last_end = 0, start, end;

@@ -4,8 +4,10 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include <xen/xen.h>
 #include <xen/hvm/hvm_info_table.h>
+#include "e820.h"
 
 #define __STR(...) #__VA_ARGS__
 #define STR(...) __STR(__VA_ARGS__)
@@ -222,6 +224,9 @@ int hvm_param_set(uint32_t index, uint64_t value);
 /* Setup PCI bus */
 void pci_setup(void);
 
+/* Setup memory map  */
+void memory_map_setup(void);
+
 /* Prepare the 32bit BIOS */
 uint32_t rombios_highbios_setup(void);
 
@@ -248,6 +253,13 @@ void perform_tests(void);
 #endif
 
 extern char _start[], _end[];
+
+int get_mem_mapping_layout(struct e820entry entries[],
+                           unsigned int *max_entries);
+
+extern struct e820map memory_map;
+bool check_overlap(uint64_t start, uint64_t size,
+                   uint64_t reserved_start, uint64_t reserved_size);
 
 #endif /* __HVMLOADER_UTIL_H__ */
 
