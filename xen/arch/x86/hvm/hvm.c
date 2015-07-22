@@ -4855,7 +4855,6 @@ static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     switch ( cmd & MEMOP_CMD_MASK )
     {
-    case XENMEM_memory_map:
     case XENMEM_machine_memory_map:
     case XENMEM_machphys_mapping:
         return -ENOSYS;
@@ -4931,7 +4930,6 @@ static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     switch ( cmd & MEMOP_CMD_MASK )
     {
-    case XENMEM_memory_map:
     case XENMEM_machine_memory_map:
     case XENMEM_machphys_mapping:
         return -ENOSYS;

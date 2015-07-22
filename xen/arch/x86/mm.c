@@ -4773,12 +4773,6 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return rc;
         }
 
-        if ( is_hvm_domain(d) )
-        {
-            rcu_unlock_domain(d);
-            return -EPERM;
-        }
-
         e820 = xmalloc_array(e820entry_t, fmap.map.nr_entries);
         if ( e820 == NULL )
         {
