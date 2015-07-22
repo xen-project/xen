@@ -766,7 +766,7 @@ long paging_domctl_continuation(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     if ( op.interface_version != XEN_DOMCTL_INTERFACE_VERSION ||
          op.cmd != XEN_DOMCTL_shadow_op )
-        return -EBADRQC;
+        return -EOPNOTSUPP;
 
     d = rcu_lock_domain_by_id(op.domain);
     if ( d == NULL )

@@ -900,7 +900,7 @@ int vcpu_pause_by_systemcontroller(struct vcpu *v)
         new = old + 1;
 
         if ( new > 255 )
-            return -EUSERS;
+            return -EOVERFLOW;
 
         prev = cmpxchg(&v->controller_pause_count, old, new);
     } while ( prev != old );
@@ -980,7 +980,7 @@ int __domain_pause_by_systemcontroller(struct domain *d,
          * toolstack overflowing d->pause_count with many repeated hypercalls.
          */
         if ( new > 255 )
-            return -EUSERS;
+            return -EOVERFLOW;
 
         prev = cmpxchg(&d->controller_pause_count, old, new);
     } while ( prev != old );
