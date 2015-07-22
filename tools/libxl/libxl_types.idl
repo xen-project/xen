@@ -586,6 +586,12 @@ libxl_device_pci = Struct("device_pci", [
     ("rdm_policy",      libxl_rdm_reserve_policy),
     ])
 
+libxl_device_rdm = Struct("device_rdm", [
+    ("start", uint64),
+    ("size", uint64),
+    ("policy", libxl_rdm_reserve_policy),
+    ])
+
 libxl_device_dtdev = Struct("device_dtdev", [
     ("path", string),
     ])
@@ -616,6 +622,7 @@ libxl_domain_config = Struct("domain_config", [
     ("disks", Array(libxl_device_disk, "num_disks")),
     ("nics", Array(libxl_device_nic, "num_nics")),
     ("pcidevs", Array(libxl_device_pci, "num_pcidevs")),
+    ("rdms", Array(libxl_device_rdm, "num_rdms")),
     ("dtdevs", Array(libxl_device_dtdev, "num_dtdevs")),
     ("vfbs", Array(libxl_device_vfb, "num_vfbs")),
     ("vkbs", Array(libxl_device_vkb, "num_vkbs")),

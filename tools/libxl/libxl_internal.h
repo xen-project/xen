@@ -144,6 +144,9 @@
 #endif
   /* all of these macros preserve errno (saving and restoring) */
 
+/* Convert pfn to physical address space. */
+#define pfn_to_paddr(x) ((uint64_t)(x) << XC_PAGE_SHIFT)
+
 /* logging */
 _hidden void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file /* may be 0 */, int line /* ignored if !file */,
@@ -1079,7 +1082,7 @@ _hidden int libxl__build_post(libxl__gc *gc, uint32_t domid,
 _hidden int libxl__build_pv(libxl__gc *gc, uint32_t domid,
              libxl_domain_build_info *info, libxl__domain_build_state *state);
 _hidden int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
-              libxl_domain_build_info *info,
+              libxl_domain_config *d_config,
               libxl__domain_build_state *state);
 
 _hidden int libxl__qemu_traditional_cmd(libxl__gc *gc, uint32_t domid,
@@ -1585,6 +1588,15 @@ _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
         int nr_vfbs, libxl_device_vfb *vfbs,
         int nr_disks, libxl_device_disk *disks,
         int nr_channels, libxl_device_channel *channels);
+
+/*
+ * This function will fix reserved device memory conflict
+ * according to user's configuration.
+ */
+_hidden int libxl__domain_device_construct_rdm(libxl__gc *gc,
+                                   libxl_domain_config *d_config,
+                                   uint64_t rdm_mem_guard,
+                                   struct xc_hvm_build_args *args);
 
 /*
  * This function will cause the whole libxl process to hang

@@ -92,6 +92,280 @@ const char *libxl__domain_device_model(libxl__gc *gc,
     return dm;
 }
 
+static int
+libxl__xc_device_get_rdm(libxl__gc *gc,
+                         uint32_t flags,
+                         uint16_t seg,
+                         uint8_t bus,
+                         uint8_t devfn,
+                         unsigned int *nr_entries,
+                         struct xen_reserved_device_memory **xrdm)
+{
+    int rc = 0, r;
+
+    /*
+     * We really can't presume how many entries we can get in advance.
+     */
+    *nr_entries = 0;
+    r = xc_reserved_device_memory_map(CTX->xch, flags, seg, bus, devfn,
+                                      NULL, nr_entries);
+    assert(r <= 0);
+    /* "0" means we have no any rdm entry. */
+    if (!r) goto out;
+
+    if (errno != ENOBUFS) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    GCNEW_ARRAY(*xrdm, *nr_entries);
+    r = xc_reserved_device_memory_map(CTX->xch, flags, seg, bus, devfn,
+                                      *xrdm, nr_entries);
+    if (r)
+        rc = ERROR_FAIL;
+
+ out:
+    if (rc) {
+        *nr_entries = 0;
+        *xrdm = NULL;
+        LOG(ERROR, "Could not get reserved device memory maps.\n");
+    }
+    return rc;
+}
+
+/*
+ * Check whether there exists rdm hole in the specified memory range.
+ * Returns true if exists, else returns false.
+ */
+static bool overlaps_rdm(uint64_t start, uint64_t memsize,
+                         uint64_t rdm_start, uint64_t rdm_size)
+{
+    return (start + memsize > rdm_start) && (start < rdm_start + rdm_size);
+}
+
+static void
+add_rdm_entry(libxl__gc *gc, libxl_domain_config *d_config,
+              uint64_t rdm_start, uint64_t rdm_size, int rdm_policy)
+{
+    d_config->rdms = libxl__realloc(NOGC, d_config->rdms,
+                    (d_config->num_rdms+1) * sizeof(libxl_device_rdm));
+
+    d_config->rdms[d_config->num_rdms].start = rdm_start;
+    d_config->rdms[d_config->num_rdms].size = rdm_size;
+    d_config->rdms[d_config->num_rdms].policy = rdm_policy;
+    d_config->num_rdms++;
+}
+
+/*
+ * Check reported RDM regions and handle potential gfn conflicts according
+ * to user preferred policy.
+ *
+ * RDM can reside in address space beyond 4G theoretically, but we never
+ * see this in real world. So in order to avoid breaking highmem layout
+ * we don't solve highmem conflict. Note this means highmem rmrr could
+ * still be supported if no conflict.
+ *
+ * But in the case of lowmem, RDM probably scatter the whole RAM space.
+ * Especially multiple RDM entries would worsen this to lead a complicated
+ * memory layout. And then its hard to extend hvm_info_table{} to work
+ * hvmloader out. So here we're trying to figure out a simple solution to
+ * avoid breaking existing layout. So when a conflict occurs,
+ *
+ * #1. Above a predefined boundary (default 2G)
+ * - Move lowmem_end below reserved region to solve conflict;
+ *
+ * #2. Below a predefined boundary (default 2G)
+ * - Check strict/relaxed policy.
+ * "strict" policy leads to fail libxl.
+ * "relaxed" policy issue a warning message and also mask this entry
+ * INVALID to indicate we shouldn't expose this entry to hvmloader.
+ * Note when both policies are specified on a given region, the per-device
+ * policy should override the global policy.
+ */
+int libxl__domain_device_construct_rdm(libxl__gc *gc,
+                                       libxl_domain_config *d_config,
+                                       uint64_t rdm_mem_boundary,
+                                       struct xc_hvm_build_args *args)
+{
+    int i, j, conflict, rc;
+    struct xen_reserved_device_memory *xrdm = NULL;
+    uint32_t strategy = d_config->b_info.u.hvm.rdm.strategy;
+    uint16_t seg;
+    uint8_t bus, devfn;
+    uint64_t rdm_start, rdm_size;
+    uint64_t highmem_end = args->highmem_end ? args->highmem_end : (1ull<<32);
+
+    /*
+     * We just want to construct RDM once since RDM is specific to the
+     * given platform, so this shouldn't change again.
+     */
+    if (d_config->num_rdms)
+        return 0;
+
+    /* Might not expose rdm. */
+    if (strategy == LIBXL_RDM_RESERVE_STRATEGY_IGNORE &&
+        !d_config->num_pcidevs)
+        return 0;
+
+    /* Query all RDM entries in this platform */
+    if (strategy == LIBXL_RDM_RESERVE_STRATEGY_HOST) {
+        unsigned int nr_entries;
+
+        /* Collect all rdm info if exist. */
+        rc = libxl__xc_device_get_rdm(gc, XENMEM_RDM_ALL,
+                                      0, 0, 0, &nr_entries, &xrdm);
+        if (rc)
+            goto out;
+        if (!nr_entries)
+            return 0;
+
+        assert(xrdm);
+
+        for (i = 0; i < nr_entries; i++)
+        {
+            add_rdm_entry(gc, d_config,
+                          pfn_to_paddr(xrdm[i].start_pfn),
+                          pfn_to_paddr(xrdm[i].nr_pages),
+                          d_config->b_info.u.hvm.rdm.policy);
+        }
+    }
+
+    /* Query RDM entries per-device */
+    for (i = 0; i < d_config->num_pcidevs; i++) {
+        unsigned int nr_entries;
+        bool new = true;
+
+        seg = d_config->pcidevs[i].domain;
+        bus = d_config->pcidevs[i].bus;
+        devfn = PCI_DEVFN(d_config->pcidevs[i].dev,
+                          d_config->pcidevs[i].func);
+        nr_entries = 0;
+        rc = libxl__xc_device_get_rdm(gc, 0,
+                                      seg, bus, devfn, &nr_entries, &xrdm);
+        if (rc)
+            goto out;
+        /* No RDM to associated with this device. */
+        if (!nr_entries)
+            continue;
+
+        assert(xrdm);
+
+        /*
+         * Need to check whether this entry is already saved in the array.
+         * This could come from two cases:
+         *
+         *   - user may configure to get all RDMs in this platform, which
+         *   is already queried before this point
+         *   - or two assigned devices may share one RDM entry
+         *
+         * Different policies may be configured on the same RDM due to
+         * above two cases. But we don't allow to assign such a group
+         * devies right now so it doesn't come true in our case.
+         */
+        for (j = 0; j < d_config->num_rdms; j++) {
+            if (d_config->rdms[j].start == pfn_to_paddr(xrdm[0].start_pfn))
+            {
+                /*
+                 * So the per-device policy always override the global
+                 * policy in this case.
+                 */
+                d_config->rdms[j].policy = d_config->pcidevs[i].rdm_policy;
+                new = false;
+                break;
+            }
+        }
+
+        if (new) {
+            add_rdm_entry(gc, d_config,
+                          pfn_to_paddr(xrdm[0].start_pfn),
+                          pfn_to_paddr(xrdm[0].nr_pages),
+                          d_config->pcidevs[i].rdm_policy);
+        }
+    }
+
+    /*
+     * Next step is to check and avoid potential conflict between RDM
+     * entries and guest RAM. To avoid intrusive impact to existing
+     * memory layout {lowmem, mmio, highmem} which is passed around
+     * various function blocks, below conflicts are not handled which
+     * are rare and handling them would lead to a more scattered
+     * layout:
+     *  - RDM  in highmem area (>4G)
+     *  - RDM lower than a defined memory boundary (e.g. 2G)
+     * Otherwise for conflicts between boundary and 4G, we'll simply
+     * move lowmem end below reserved region to solve conflict.
+     *
+     * If a conflict is detected on a given RDM entry, an error will
+     * be returned if 'strict' policy is specified. Instead, if
+     * 'relaxed' policy specified, this conflict is treated just as a
+     * warning, but we mark this RDM entry as INVALID to indicate that
+     * this entry shouldn't be exposed to hvmloader.
+     *
+     * Firstly we should check the case of rdm < 4G because we may
+     * need to expand highmem_end.
+     */
+    for (i = 0; i < d_config->num_rdms; i++) {
+        rdm_start = d_config->rdms[i].start;
+        rdm_size = d_config->rdms[i].size;
+        conflict = overlaps_rdm(0, args->lowmem_end, rdm_start, rdm_size);
+
+        if (!conflict)
+            continue;
+
+        /* Just check if RDM > our memory boundary. */
+        if (rdm_start > rdm_mem_boundary) {
+            /*
+             * We will move downwards lowmem_end so we have to expand
+             * highmem_end.
+             */
+            highmem_end += (args->lowmem_end - rdm_start);
+            /* Now move downwards lowmem_end. */
+            args->lowmem_end = rdm_start;
+        }
+    }
+
+    /* Sync highmem_end. */
+    args->highmem_end = highmem_end;
+
+    /*
+     * Finally we can take same policy to check lowmem(< 2G) and
+     * highmem adjusted above.
+     */
+    for (i = 0; i < d_config->num_rdms; i++) {
+        rdm_start = d_config->rdms[i].start;
+        rdm_size = d_config->rdms[i].size;
+        /* Does this entry conflict with lowmem? */
+        conflict = overlaps_rdm(0, args->lowmem_end,
+                                rdm_start, rdm_size);
+        /* Does this entry conflict with highmem? */
+        conflict |= overlaps_rdm((1ULL<<32),
+                                 args->highmem_end - (1ULL<<32),
+                                 rdm_start, rdm_size);
+
+        if (!conflict)
+            continue;
+
+        if (d_config->rdms[i].policy == LIBXL_RDM_RESERVE_POLICY_STRICT) {
+            LOG(ERROR, "RDM conflict at 0x%lx.\n", d_config->rdms[i].start);
+            goto out;
+        } else {
+            LOG(WARN, "Ignoring RDM conflict at 0x%lx.\n",
+                      d_config->rdms[i].start);
+
+            /*
+             * Then mask this INVALID to indicate we shouldn't expose this
+             * to hvmloader.
+             */
+            d_config->rdms[i].policy = LIBXL_RDM_RESERVE_POLICY_INVALID;
+        }
+    }
+
+    return 0;
+
+ out:
+    return ERROR_FAIL;
+}
+
 const libxl_vnc_info *libxl__dm_vnc(const libxl_domain_config *guest_config)
 {
     const libxl_vnc_info *vnc = NULL;

@@ -407,7 +407,7 @@ int libxl__domain_build(libxl__gc *gc,
 
     switch (info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        ret = libxl__build_hvm(gc, domid, info, state);
+        ret = libxl__build_hvm(gc, domid, d_config, state);
         if (ret)
             goto out;
 
