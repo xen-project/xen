@@ -1982,6 +1982,14 @@ skip_vfb:
         xlu_cfg_get_defbool(config, "e820_host", &b_info->u.pv.e820_host, 0);
     }
 
+    if (!xlu_cfg_get_string(config, "rdm", &buf, 0)) {
+        libxl_rdm_reserve rdm;
+        if (!xlu_rdm_parse(config, &rdm, buf)) {
+            b_info->u.hvm.rdm.strategy = rdm.strategy;
+            b_info->u.hvm.rdm.policy = rdm.policy;
+        }
+    }
+
     if (!xlu_cfg_get_list (config, "pci", &pcis, 0, 0)) {
         d_config->num_pcidevs = 0;
         d_config->pcidevs = NULL;
@@ -1995,6 +2003,11 @@ skip_vfb:
             pcidev->power_mgmt = pci_power_mgmt;
             pcidev->permissive = pci_permissive;
             pcidev->seize = pci_seize;
+            /*
+             * Like other pci option, the per-device policy always follows
+             * the global policy by default.
+             */
+            pcidev->rdm_policy = b_info->u.hvm.rdm.policy;
             e = xlu_pci_parse_bdf(config, pcidev, buf);
             if (e) {
                 fprintf(stderr,

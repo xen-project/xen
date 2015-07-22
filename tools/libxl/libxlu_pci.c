@@ -42,6 +42,9 @@ static int pcidev_struct_fill(libxl_device_pci *pcidev, unsigned int domain,
 #define STATE_OPTIONS_K 6
 #define STATE_OPTIONS_V 7
 #define STATE_TERMINAL  8
+#define STATE_TYPE      9
+#define STATE_RDM_STRATEGY      10
+#define STATE_RESERVE_POLICY    11
 int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str)
 {
     unsigned state = STATE_DOMAIN;
@@ -143,7 +146,18 @@ int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str
                     pcidev->permissive = atoi(tok);
                 }else if ( !strcmp(optkey, "seize") ) {
                     pcidev->seize = atoi(tok);
-                }else{
+                } else if (!strcmp(optkey, "rdm_policy")) {
+                    if (!strcmp(tok, "strict")) {
+                        pcidev->rdm_policy = LIBXL_RDM_RESERVE_POLICY_STRICT;
+                    } else if (!strcmp(tok, "relaxed")) {
+                        pcidev->rdm_policy = LIBXL_RDM_RESERVE_POLICY_RELAXED;
+                    } else {
+                        XLU__PCI_ERR(cfg, "%s is not an valid PCI RDM property"
+                                          " policy: 'strict' or 'relaxed'.",
+                                     tok);
+                        goto parse_error;
+                    }
+                } else {
                     XLU__PCI_ERR(cfg, "Unknown PCI BDF option: %s", optkey);
                 }
                 tok = ptr + 1;
@@ -160,6 +174,82 @@ int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str
 
     /* Just a pretty way to fill in the values */
     pcidev_struct_fill(pcidev, dom, bus, dev, func, vslot << 3);
+
+    return 0;
+
+parse_error:
+    return ERROR_INVAL;
+}
+
+int xlu_rdm_parse(XLU_Config *cfg, libxl_rdm_reserve *rdm, const char *str)
+{
+    unsigned state = STATE_TYPE;
+    char *buf2, *tok, *ptr, *end;
+
+    if (NULL == (buf2 = ptr = strdup(str)))
+        return ERROR_NOMEM;
+
+    for (tok = ptr, end = ptr + strlen(ptr) + 1; ptr < end; ptr++) {
+        switch(state) {
+        case STATE_TYPE:
+            if (*ptr == '=') {
+                state = STATE_RDM_STRATEGY;
+                *ptr = '\0';
+                if (strcmp(tok, "strategy")) {
+                    XLU__PCI_ERR(cfg, "Unknown RDM state option: %s", tok);
+                    goto parse_error;
+                }
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_RDM_STRATEGY:
+            if (*ptr == '\0' || *ptr == ',') {
+                state = STATE_RESERVE_POLICY;
+                *ptr = '\0';
+                if (!strcmp(tok, "host")) {
+                    rdm->strategy = LIBXL_RDM_RESERVE_STRATEGY_HOST;
+                } else {
+                    XLU__PCI_ERR(cfg, "Unknown RDM strategy option: %s", tok);
+                    goto parse_error;
+                }
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_RESERVE_POLICY:
+            if (*ptr == '=') {
+                state = STATE_OPTIONS_V;
+                *ptr = '\0';
+                if (strcmp(tok, "policy")) {
+                    XLU__PCI_ERR(cfg, "Unknown RDM property value: %s", tok);
+                    goto parse_error;
+                }
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_OPTIONS_V:
+            if (*ptr == ',' || *ptr == '\0') {
+                state = STATE_TERMINAL;
+                *ptr = '\0';
+                if (!strcmp(tok, "strict")) {
+                    rdm->policy = LIBXL_RDM_RESERVE_POLICY_STRICT;
+                } else if (!strcmp(tok, "relaxed")) {
+                    rdm->policy = LIBXL_RDM_RESERVE_POLICY_RELAXED;
+                } else {
+                    XLU__PCI_ERR(cfg, "Unknown RDM property policy value: %s",
+                                 tok);
+                    goto parse_error;
+                }
+                tok = ptr + 1;
+            }
+        default:
+            break;
+        }
+    }
+
+    free(buf2);
+
+    if (tok != ptr || state != STATE_TERMINAL)
+        goto parse_error;
 
     return 0;
 

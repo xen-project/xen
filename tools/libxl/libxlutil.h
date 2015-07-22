@@ -106,6 +106,10 @@ int xlu_disk_parse(XLU_Config *cfg, int nspecs, const char *const *specs,
  */
 int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str);
 
+/*
+ * RDM parsing
+ */
+int xlu_rdm_parse(XLU_Config *cfg, libxl_rdm_reserve *rdm, const char *str);
 
 /*
  * Vif rate parsing.
