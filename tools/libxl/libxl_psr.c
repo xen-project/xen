@@ -31,7 +31,7 @@ static void libxl__psr_log_err_msg(libxl__gc *gc, int err)
     case ESRCH:
         msg = "invalid domain ID";
         break;
-    case EBADSLT:
+    case ENOTSOCK:
         msg = "socket is not supported";
         break;
     case EFAULT:
@@ -59,7 +59,7 @@ static void libxl__psr_cmt_log_err_msg(libxl__gc *gc, int err)
     case ENOENT:
         msg = "CMT is not attached to this domain";
         break;
-    case EUSERS:
+    case EOVERFLOW:
         msg = "no free RMID available";
         break;
     default:
@@ -81,7 +81,7 @@ static void libxl__psr_cat_log_err_msg(libxl__gc *gc, int err)
     case ENOENT:
         msg = "CAT is not enabled on the socket";
         break;
-    case EUSERS:
+    case EOVERFLOW:
         msg = "no free COS available";
         break;
     case EEXIST:

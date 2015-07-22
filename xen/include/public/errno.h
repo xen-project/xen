@@ -65,6 +65,7 @@ XEN_ERRNO(EILSEQ,	84)	/* Illegal byte sequence */
 XEN_ERRNO(ERESTART,	85)	/* Interrupted system call should be restarted */
 #endif
 XEN_ERRNO(EUSERS,	87)	/* Too many users */
+XEN_ERRNO(ENOTSOCK,	88)	/* Socket operation on non-socket */
 XEN_ERRNO(EOPNOTSUPP,	95)	/* Operation not supported on transport endpoint */
 XEN_ERRNO(EADDRINUSE,	98)	/* Address already in use */
 XEN_ERRNO(EADDRNOTAVAIL, 99)	/* Cannot assign requested address */
