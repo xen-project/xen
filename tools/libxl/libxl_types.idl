@@ -77,6 +77,17 @@ libxl_domain_type = Enumeration("domain_type", [
     (2, "PV"),
     ], init_val = "LIBXL_DOMAIN_TYPE_INVALID")
 
+libxl_rdm_reserve_strategy = Enumeration("rdm_reserve_strategy", [
+    (0, "ignore"),
+    (1, "host"),
+    ])
+
+libxl_rdm_reserve_policy = Enumeration("rdm_reserve_policy", [
+    (-1, "invalid"),
+    (0, "strict"),
+    (1, "relaxed"),
+    ], init_val = "LIBXL_RDM_RESERVE_POLICY_INVALID")
+
 libxl_channel_connection = Enumeration("channel_connection", [
     (0, "UNKNOWN"),
     (1, "PTY"),
@@ -387,6 +398,11 @@ libxl_gic_version = Enumeration("gic_version", [
     (0x30, "v3")
     ], init_val = "LIBXL_GIC_VERSION_DEFAULT")
 
+libxl_rdm_reserve = Struct("rdm_reserve", [
+    ("strategy",    libxl_rdm_reserve_strategy),
+    ("policy",      libxl_rdm_reserve_policy),
+    ])
+
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
     ("avail_vcpus",     libxl_bitmap),
@@ -486,6 +502,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        # See libxl_ms_vm_genid_generate()
                                        ("ms_vm_genid",      libxl_ms_vm_genid),
                                        ("serial_list",      libxl_string_list),
+                                       ("rdm", libxl_rdm_reserve),
                                        ])),
                  ("pv", Struct(None, [("kernel", string),
                                       ("slack_memkb", MemKB),
@@ -566,6 +583,7 @@ libxl_device_pci = Struct("device_pci", [
     ("power_mgmt", bool),
     ("permissive", bool),
     ("seize", bool),
+    ("rdm_policy",      libxl_rdm_reserve_policy),
     ])
 
 libxl_device_dtdev = Struct("device_dtdev", [

@@ -1176,6 +1176,8 @@ _hidden int libxl__device_vtpm_setdefault(libxl__gc *gc, libxl_device_vtpm *vtpm
 _hidden int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb);
 _hidden int libxl__device_vkb_setdefault(libxl__gc *gc, libxl_device_vkb *vkb);
 _hidden int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci);
+_hidden void libxl__rdm_setdefault(libxl__gc *gc,
+                                   libxl_domain_build_info *b_info);
 
 _hidden const char *libxl__device_nic_devname(libxl__gc *gc,
                                               uint32_t domid,

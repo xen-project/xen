@@ -50,6 +50,12 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     return 0;
 }
 
+void libxl__rdm_setdefault(libxl__gc *gc, libxl_domain_build_info *b_info)
+{
+    if (b_info->u.hvm.rdm.policy == LIBXL_RDM_RESERVE_POLICY_INVALID)
+        b_info->u.hvm.rdm.policy = LIBXL_RDM_RESERVE_POLICY_RELAXED;
+}
+
 int libxl__domain_build_info_setdefault(libxl__gc *gc,
                                         libxl_domain_build_info *b_info)
 {
@@ -332,6 +338,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
 
         libxl_defbool_setdefault(&b_info->u.hvm.gfx_passthru, false);
 
+        libxl__rdm_setdefault(gc, b_info);
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         libxl_defbool_setdefault(&b_info->u.pv.e820_host, false);

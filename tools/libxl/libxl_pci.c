@@ -988,6 +988,12 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
 
 out:
     if (!libxl_is_stubdom(ctx, domid, NULL)) {
+        if (pcidev->rdm_policy == LIBXL_RDM_RESERVE_POLICY_STRICT) {
+            flag &= ~XEN_DOMCTL_DEV_RDM_RELAXED;
+        } else if (pcidev->rdm_policy != LIBXL_RDM_RESERVE_POLICY_RELAXED) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unknown rdm check flag.");
+            return ERROR_FAIL;
+        }
         rc = xc_assign_device(ctx->xch, domid, pcidev_encode_bdf(pcidev), flag);
         if (rc < 0 && (hvm || errno != ENOSYS)) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_assign_device failed");
@@ -1040,6 +1046,9 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
 
 int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci)
 {
+    /* We'd like to force reserve rdm specific to a device by default.*/
+    if (pci->rdm_policy == LIBXL_RDM_RESERVE_POLICY_INVALID)
+        pci->rdm_policy = LIBXL_RDM_RESERVE_POLICY_STRICT;
     return 0;
 }
 

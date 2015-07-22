@@ -633,6 +633,79 @@ assigned slave device.
 
 =back
 
+=item B<rdm="RDM_RESERVATION_STRING">
+
+(HVM/x86 only) Specifies information about Reserved Device Memory (RDM),
+which is necessary to enable robust device passthrough. One example of RDM
+is reported through ACPI Reserved Memory Region Reporting (RMRR) structure
+on x86 platform.
+
+B<RDM_RESERVE_STRING> has the form C<[KEY=VALUE,KEY=VALUE,...> where:
+
+=over 4
+
+=item B<KEY=VALUE>
+
+Possible B<KEY>s are:
+
+=over 4
+
+=item B<strategy="STRING">
+
+Currently there is only one valid type:
+
+"host" means all reserved device memory on this platform should be checked to
+reserve regions in this VM's guest address space. This global rdm parameter
+allows user to specify reserved regions explicitly, and using "host" includes
+all reserved regions reported on this platform, which is useful when doing
+hotplug.
+
+By default this isn't set so we don't check all rdms. Instead, we just check
+rdm specific to a given device if you're assigning this kind of device. Note
+this option is not recommended unless you can make sure any conflict does exist.
+
+For example, you're trying to set "memory = 2800" to allocate memory to one
+given VM but the platform owns two RDM regions like,
+
+Device A [sbdf_A]: RMRR region_A: base_addr ac6d3000 end_address ac6e6fff
+Device B [sbdf_B]: RMRR region_B: base_addr ad800000 end_address afffffff
+
+In this conflict case,
+
+#1. If B<strategy> is set to "host", for example,
+
+rdm = "strategy=host,policy=strict" or rdm = "strategy=host,policy=relaxed"
+
+It means all conflicts will be handled according to the policy
+introduced by B<policy> as described below.
+
+#2. If B<strategy> is not set at all, but
+
+pci = [ 'sbdf_A, rdm_policy=xxxxx' ]
+
+It means only one conflict of region_A will be handled according to the policy
+introduced by B<rdm_policy="STRING"> as described inside pci options.
+
+=item B<policy="STRING">
+
+Specifies how to deal with conflicts when reserving reserved device
+memory in guest address space.
+
+When that conflict is unsolved,
+
+"strict" means VM can't be created, or the associated device can't be
+attached in the case of hotplug.
+
+"relaxed" allows VM to be created but may cause VM to crash if
+pass-through device accesses RDM. For exampl,e Windows IGD GFX driver
+always accessed RDM regions so it leads to VM crash.
+
+Note this may be overridden by rdm_policy option in PCI device configuration.
+
+=back
+
+=back
+
 =item B<pci=[ "PCI_SPEC_STRING", "PCI_SPEC_STRING", ... ]>
 
 Specifies the host PCI devices to passthrough to this guest. Each B<PCI_SPEC_STRING>
@@ -694,6 +767,14 @@ dom0 without confirmation.  Please use with care.
 (HVM only) Specifies that the VM should be able to program the
 D0-D3hot power management states for the PCI device. False (0) by
 default.
+
+=item B<rdm_policy="STRING">
+
+(HVM/x86 only) This is same as policy option inside the rdm option but
+just specific to a given device. Therefore the default is "relaxed" as
+same as policy option as well.
+
+Note this would override global B<rdm> option.
 
 =back
 

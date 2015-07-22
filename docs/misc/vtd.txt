@@ -111,6 +111,30 @@ in the config file:
 To override for a specific device:
 	pci = [ '01:00.0,msitranslate=0', '03:00.0' ]
 
+RDM, 'reserved device memory', for PCI Device Passthrough
+---------------------------------------------------------
+
+There are some devices the BIOS controls, for e.g. USB devices to perform
+PS2 emulation. The regions of memory used for these devices are marked
+reserved in the e820 map. When we turn on DMA translation, DMA to those
+regions will fail. Hence BIOS uses RMRR to specify these regions along with
+devices that need to access these regions. OS is expected to setup
+identity mappings for these regions for these devices to access these regions.
+
+While creating a VM we should reserve them in advance, and avoid any conflicts.
+So we introduce user configurable parameters to specify RDM resource and
+according policies,
+
+To enable this globally, add "rdm" in the config file:
+
+    rdm = "strategy=host, policy=relaxed"   (default policy is "relaxed")
+
+Or just for a specific device:
+
+    pci = [ '01:00.0,rdm_policy=relaxed', '03:00.0,rdm_policy=strict' ]
+
+For all the options available to RDM, see xl.cfg(5).
+
 
 Caveat on Conventional PCI Device Passthrough
 ---------------------------------------------
