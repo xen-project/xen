@@ -1807,7 +1807,8 @@ static void iommu_set_pgd(struct domain *d)
 }
 
 static int rmrr_identity_mapping(struct domain *d, bool_t map,
-                                 const struct acpi_rmrr_unit *rmrr)
+                                 const struct acpi_rmrr_unit *rmrr,
+                                 u32 flag)
 {
     unsigned long base_pfn = rmrr->base_address >> PAGE_SHIFT_4K;
     unsigned long end_pfn = PAGE_ALIGN_4K(rmrr->end_address) >> PAGE_SHIFT_4K;
@@ -1855,7 +1856,7 @@ static int rmrr_identity_mapping(struct domain *d, bool_t map,
 
     while ( base_pfn < end_pfn )
     {
-        int err = set_identity_p2m_entry(d, base_pfn, p2m_access_rw);
+        int err = set_identity_p2m_entry(d, base_pfn, p2m_access_rw, flag);
 
         if ( err )
             return err;
@@ -1898,7 +1899,13 @@ static int intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
              PCI_BUS(bdf) == pdev->bus &&
              PCI_DEVFN2(bdf) == devfn )
         {
-            ret = rmrr_identity_mapping(pdev->domain, 1, rmrr);
+            /*
+             * iommu_add_device() is only called for the hardware
+             * domain (see xen/drivers/passthrough/pci.c:pci_add_device()).
+             * Since RMRRs are always reserved in the e820 map for the hardware
+             * domain, there shouldn't be a conflict.
+             */
+            ret = rmrr_identity_mapping(pdev->domain, 1, rmrr, 0);
             if ( ret )
                 dprintk(XENLOG_ERR VTDPREFIX, "d%d: RMRR mapping failed\n",
                         pdev->domain->domain_id);
@@ -1939,7 +1946,11 @@ static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
              PCI_DEVFN2(bdf) != devfn )
             continue;
 
-        rmrr_identity_mapping(pdev->domain, 0, rmrr);
+        /*
+         * Any flag is nothing to clear these mappings but here
+         * its always safe and strict to set 0.
+         */
+        rmrr_identity_mapping(pdev->domain, 0, rmrr, 0);
     }
 
     return domain_context_unmap(pdev->domain, devfn, pdev);
@@ -2097,7 +2108,13 @@ static void __hwdom_init setup_hwdom_rmrr(struct domain *d)
     spin_lock(&pcidevs_lock);
     for_each_rmrr_device ( rmrr, bdf, i )
     {
-        ret = rmrr_identity_mapping(d, 1, rmrr);
+        /*
+         * Here means we're add a device to the hardware domain.
+         * Since RMRRs are always reserved in the e820 map for the hardware
+         * domain, there shouldn't be a conflict. So its always safe and
+         * strict to set 0.
+         */
+        ret = rmrr_identity_mapping(d, 1, rmrr, 0);
         if ( ret )
             dprintk(XENLOG_ERR VTDPREFIX,
                      "IOMMU: mapping reserved region failed\n");
@@ -2240,7 +2257,11 @@ static int reassign_device_ownership(
                  PCI_BUS(bdf) == pdev->bus &&
                  PCI_DEVFN2(bdf) == devfn )
             {
-                ret = rmrr_identity_mapping(source, 0, rmrr);
+                /*
+                 * Any RMRR flag is always ignored when remove a device,
+                 * but its always safe and strict to set 0.
+                 */
+                ret = rmrr_identity_mapping(source, 0, rmrr, 0);
                 if ( ret != -ENOENT )
                     return ret;
             }
@@ -2264,7 +2285,7 @@ static int reassign_device_ownership(
 }
 
 static int intel_iommu_assign_device(
-    struct domain *d, u8 devfn, struct pci_dev *pdev)
+    struct domain *d, u8 devfn, struct pci_dev *pdev, u32 flag)
 {
     struct acpi_rmrr_unit *rmrr;
     int ret = 0, i;
@@ -2293,7 +2314,7 @@ static int intel_iommu_assign_device(
              PCI_BUS(bdf) == bus &&
              PCI_DEVFN2(bdf) == devfn )
         {
-            ret = rmrr_identity_mapping(d, 1, rmrr);
+            ret = rmrr_identity_mapping(d, 1, rmrr, flag);
             if ( ret )
             {
                 reassign_device_ownership(d, hardware_domain, devfn, pdev);

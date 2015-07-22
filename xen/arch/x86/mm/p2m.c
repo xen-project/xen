@@ -901,7 +901,7 @@ int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 }
 
 int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
-                           p2m_access_t p2ma)
+                           p2m_access_t p2ma, unsigned int flag)
 {
     p2m_type_t p2mt;
     p2m_access_t a;
@@ -923,7 +923,10 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
         ret = 0;
     else
     {
-        ret = -EBUSY;
+        if ( flag & XEN_DOMCTL_DEV_RDM_RELAXED )
+            ret = 0;
+        else
+            ret = -EBUSY;
         printk(XENLOG_G_WARNING
                "Cannot setup identity map d%d:%lx,"
                " gfn already mapped to %lx.\n",

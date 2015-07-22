@@ -2605,7 +2605,7 @@ static void arm_smmu_destroy_iommu_domain(struct iommu_domain *domain)
 }
 
 static int arm_smmu_assign_dev(struct domain *d, u8 devfn,
-			       struct device *dev)
+			       struct device *dev, u32 flag)
 {
 	struct iommu_domain *domain;
 	struct arm_smmu_xen_domain *xen_domain;
@@ -2709,7 +2709,8 @@ static int arm_smmu_reassign_dev(struct domain *s, struct domain *t,
 		return ret;
 
 	if (t) {
-		ret = arm_smmu_assign_dev(t, devfn, dev);
+		/* No flags are defined for ARM. */
+		ret = arm_smmu_assign_dev(t, devfn, dev, 0);
 		if (ret)
 			return ret;
 	}

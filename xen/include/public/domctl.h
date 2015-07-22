@@ -471,6 +471,9 @@ struct xen_domctl_assign_device {
             XEN_GUEST_HANDLE_64(char) path; /* path to the device tree node */
         } dt;
     } u;
+    /* IN */
+#define XEN_DOMCTL_DEV_RDM_RELAXED      1
+    uint32_t  flag;   /* flag of assigned device */
 };
 typedef struct xen_domctl_assign_device xen_domctl_assign_device_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_assign_device_t);

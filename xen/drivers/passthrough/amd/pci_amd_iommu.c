@@ -394,7 +394,8 @@ static int reassign_device(struct domain *source, struct domain *target,
 }
 
 static int amd_iommu_assign_device(struct domain *d, u8 devfn,
-                                   struct pci_dev *pdev)
+                                   struct pci_dev *pdev,
+                                   u32 flag)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(pdev->seg);
     int bdf = PCI_BDF2(pdev->bus, devfn);

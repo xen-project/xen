@@ -52,7 +52,8 @@ int iommu_assign_dt_device(struct domain *d, struct dt_device_node *dev)
             goto fail;
     }
 
-    rc = hd->platform_ops->assign_device(d, 0, dt_to_dev(dev));
+    /* The flag field doesn't matter to DT device. */
+    rc = hd->platform_ops->assign_device(d, 0, dt_to_dev(dev), 0);
 
     if ( rc )
         goto fail;

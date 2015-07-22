@@ -139,7 +139,7 @@ struct iommu_ops {
     int (*add_device)(u8 devfn, device_t *dev);
     int (*enable_device)(device_t *dev);
     int (*remove_device)(u8 devfn, device_t *dev);
-    int (*assign_device)(struct domain *, u8 devfn, device_t *dev);
+    int (*assign_device)(struct domain *, u8 devfn, device_t *dev, u32 flag);
     int (*reassign_device)(struct domain *s, struct domain *t,
                            u8 devfn, device_t *dev);
 #ifdef HAS_PCI
