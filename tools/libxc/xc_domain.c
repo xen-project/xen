@@ -684,6 +684,42 @@ int xc_domain_set_memory_map(xc_interface *xch,
 
     return rc;
 }
+
+int xc_reserved_device_memory_map(xc_interface *xch,
+                                  uint32_t flags,
+                                  uint16_t seg,
+                                  uint8_t bus,
+                                  uint8_t devfn,
+                                  struct xen_reserved_device_memory entries[],
+                                  uint32_t *max_entries)
+{
+    int rc;
+    struct xen_reserved_device_memory_map xrdmmap = {
+        .flags = flags,
+        .dev.pci.seg = seg,
+        .dev.pci.bus = bus,
+        .dev.pci.devfn = devfn,
+        .nr_entries = *max_entries
+    };
+    DECLARE_HYPERCALL_BOUNCE(entries,
+                             sizeof(struct xen_reserved_device_memory) *
+                             *max_entries, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( xc_hypercall_bounce_pre(xch, entries) )
+        return -1;
+
+    set_xen_guest_handle(xrdmmap.buffer, entries);
+
+    rc = do_memory_op(xch, XENMEM_reserved_device_memory_map,
+                      &xrdmmap, sizeof(xrdmmap));
+
+    xc_hypercall_bounce_post(xch, entries);
+
+    *max_entries = xrdmmap.nr_entries;
+
+    return rc;
+}
+
 int xc_get_machine_memory_map(xc_interface *xch,
                               struct e820entry entries[],
                               uint32_t max_entries)

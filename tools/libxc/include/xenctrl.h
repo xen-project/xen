@@ -1314,6 +1314,14 @@ int xc_domain_set_memory_map(xc_interface *xch,
 int xc_get_machine_memory_map(xc_interface *xch,
                               struct e820entry entries[],
                               uint32_t max_entries);
+
+int xc_reserved_device_memory_map(xc_interface *xch,
+                                  uint32_t flags,
+                                  uint16_t seg,
+                                  uint8_t bus,
+                                  uint8_t devfn,
+                                  struct xen_reserved_device_memory entries[],
+                                  uint32_t *max_entries);
 #endif
 int xc_domain_set_time_offset(xc_interface *xch,
                               uint32_t domid,
