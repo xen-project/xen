@@ -524,10 +524,12 @@ static int do_daemonize(char *name, const char *pidfile)
             exit(1);
         }
 
-        if ( close(fd) < 0 ) {
+        if (close(fd) < 0) {
             perror("Closing pidfile");
             exit(1);
         }
+
+        free(pid);
     }
 
 out:
