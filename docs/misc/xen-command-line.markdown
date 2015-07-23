@@ -242,7 +242,7 @@ the NMI watchdog is also enabled.
 
 > Default: `0` (1/32 of RAM)
 
-Amount of RAM to set aside for the Xenheap.
+Amount of RAM to set aside for the Xenheap. Must be an integer multiple of 32.
 
 By default will use 1/32 of the RAM up to a maximum of 1GB and with a
 minimum of 32M, subject to a suitably aligned and sized contiguous
