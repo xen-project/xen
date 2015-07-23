@@ -8223,11 +8223,14 @@ static int psr_cmt_show(libxl_psr_cmt_type type, uint32_t domid)
     /* Each domain */
     if (domid != INVALID_DOMID) {
         libxl_dominfo dominfo;
+
+        libxl_dominfo_init(&dominfo);
         if (libxl_domain_info(ctx, &dominfo, domid)) {
             fprintf(stderr, "Failed to get domain info for %d\n", domid);
             return -1;
         }
         psr_cmt_print_domain_info(&dominfo, type, nr_sockets);
+        libxl_dominfo_dispose(&dominfo);
     }
     else
     {
