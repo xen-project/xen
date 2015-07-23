@@ -1314,6 +1314,9 @@ int pci_restore_msi_state(struct pci_dev *pdev)
     struct msi_desc *entry, *tmp;
     struct irq_desc *desc;
     struct msi_msg msg;
+    u8 slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);
+    unsigned int type = 0, pos = 0;
+    u16 control = 0;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
 
@@ -1332,8 +1335,6 @@ int pci_restore_msi_state(struct pci_dev *pdev)
     list_for_each_entry_safe( entry, tmp, &pdev->msi_list, list )
     {
         unsigned int i = 0, nr = 1;
-        u16 control = 0;
-        u8 slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);
 
         irq = entry->irq;
         desc = &irq_desc[irq];
@@ -1350,31 +1351,38 @@ int pci_restore_msi_state(struct pci_dev *pdev)
                     pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
                     PCI_FUNC(pdev->devfn), i);
             spin_unlock_irqrestore(&desc->lock, flags);
+            if ( type == PCI_CAP_ID_MSIX )
+                pci_conf_write16(pdev->seg, pdev->bus, slot, func,
+                                 msix_control_reg(pos),
+                                 control & ~PCI_MSIX_FLAGS_ENABLE);
             return -EINVAL;
         }
 
+        ASSERT(!type || type == entry->msi_attrib.type);
+        pos = entry->msi_attrib.pos;
         if ( entry->msi_attrib.type == PCI_CAP_ID_MSI )
         {
             msi_set_enable(pdev, 0);
             nr = entry->msi.nvec;
         }
-        else if ( entry->msi_attrib.type == PCI_CAP_ID_MSIX )
+        else if ( !type && entry->msi_attrib.type == PCI_CAP_ID_MSIX )
         {
             control = pci_conf_read16(pdev->seg, pdev->bus, slot, func,
-                                      msix_control_reg(entry->msi_attrib.pos));
+                                      msix_control_reg(pos));
             pci_conf_write16(pdev->seg, pdev->bus, slot, func,
-                             msix_control_reg(entry->msi_attrib.pos),
+                             msix_control_reg(pos),
                              control | (PCI_MSIX_FLAGS_ENABLE |
                                         PCI_MSIX_FLAGS_MASKALL));
             if ( unlikely(!memory_decoded(pdev)) )
             {
                 spin_unlock_irqrestore(&desc->lock, flags);
                 pci_conf_write16(pdev->seg, pdev->bus, slot, func,
-                                 msix_control_reg(entry->msi_attrib.pos),
+                                 msix_control_reg(pos),
                                  control & ~PCI_MSIX_FLAGS_ENABLE);
                 return -ENXIO;
             }
         }
+        type = entry->msi_attrib.type;
 
         msg = entry->msg;
         write_msi_msg(entry, &msg);
@@ -1398,9 +1406,9 @@ int pci_restore_msi_state(struct pci_dev *pdev)
 
         spin_unlock_irqrestore(&desc->lock, flags);
 
-        if ( entry->msi_attrib.type == PCI_CAP_ID_MSI )
+        if ( type == PCI_CAP_ID_MSI )
         {
-            unsigned int cpos = msi_control_reg(entry->msi_attrib.pos);
+            unsigned int cpos = msi_control_reg(pos);
 
             control = pci_conf_read16(pdev->seg, pdev->bus, slot, func, cpos) &
                       ~PCI_MSI_FLAGS_QSIZE;
@@ -1410,11 +1418,12 @@ int pci_restore_msi_state(struct pci_dev *pdev)
 
             msi_set_enable(pdev, 1);
         }
-        else if ( entry->msi_attrib.type == PCI_CAP_ID_MSIX )
-            pci_conf_write16(pdev->seg, pdev->bus, slot, func,
-                             msix_control_reg(entry->msi_attrib.pos),
-                             control | PCI_MSIX_FLAGS_ENABLE);
     }
+
+    if ( type == PCI_CAP_ID_MSIX )
+        pci_conf_write16(pdev->seg, pdev->bus, slot, func,
+                         msix_control_reg(pos),
+                         control | PCI_MSIX_FLAGS_ENABLE);
 
     return 0;
 }
