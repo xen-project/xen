@@ -4781,8 +4781,10 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
                fallback_trigger);
         }
 
-        if (wait_for_it)
+        if (wait_for_it) {
             wait_for_domain_deaths(deathws, nb_domain - 1 /* not dom 0 */);
+            free(deathws);
+        }
 
         libxl_dominfo_list_free(dominfo, nb_domain);
     } else {
