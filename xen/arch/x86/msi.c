@@ -1303,6 +1303,37 @@ int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
         return 1;
     }
 
+    entry = find_msi_entry(pdev, -1, PCI_CAP_ID_MSI);
+    if ( entry && entry->msi_attrib.maskbit )
+    {
+        uint16_t cntl;
+        uint32_t unused;
+
+        pos = entry->msi_attrib.pos;
+        if ( reg < pos || reg >= entry->msi.mpos + 8 )
+            return 0;
+
+        if ( reg == msi_control_reg(pos) )
+            return size == 2 ? 1 : -EACCES;
+        if ( reg < entry->msi.mpos || reg >= entry->msi.mpos + 4 || size != 4 )
+            return -EACCES;
+
+        cntl = pci_conf_read16(seg, bus, slot, func, msi_control_reg(pos));
+        unused = ~(uint32_t)0 >> (32 - multi_msi_capable(cntl));
+        for ( pos = 0; pos < entry->msi.nvec; ++pos, ++entry )
+        {
+            entry->msi_attrib.guest_masked =
+                *data >> entry->msi_attrib.entry_nr;
+            if ( entry->msi_attrib.host_masked )
+                *data |= 1 << pos;
+            unused &= ~(1 << pos);
+        }
+
+        *data |= unused;
+
+        return 1;
+    }
+
     return 0;
 }
 
