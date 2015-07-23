@@ -4055,7 +4055,7 @@ static pid_t create_migration_child(const char *rune, int *send_fd,
                                         int *recv_fd)
 {
     int sendpipe[2], recvpipe[2];
-    pid_t child = -1;
+    pid_t child;
 
     if (!rune || !send_fd || !recv_fd)
         return -1;
@@ -7794,7 +7794,7 @@ int main_getenforce(int argc, char **argv)
 
 int main_setenforce(int argc, char **argv)
 {
-    int ret, mode = -1;
+    int ret, mode;
     const char *p = NULL;
 
     if (optind >= argc) {

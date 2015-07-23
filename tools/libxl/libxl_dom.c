@@ -1700,7 +1700,7 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss)
 {
     STATE_AO_GC(dss->ao);
     int port;
-    int rc = ERROR_FAIL;
+    int rc;
 
     /* Convenience aliases */
     const uint32_t domid = dss->domid;

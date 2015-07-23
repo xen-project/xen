@@ -47,7 +47,7 @@ static void drbd_async_call(libxl__egc *egc,
                             void func(libxl__remus_device *),
                             libxl__ev_child_callback callback)
 {
-    int pid = -1, rc;
+    int pid, rc;
     libxl__ao_device *aodev = &dev->aodev;
     STATE_AO_GC(dev->rds->ao);
 
