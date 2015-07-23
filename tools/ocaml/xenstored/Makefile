@@ -30,6 +30,8 @@ systemd_OBJS = systemd
 systemd_C_OBJS = systemd_stubs
 OCAML_LIBRARY += systemd
 
+LIBS_systemd += $(LDFLAGS-y)
+
 OBJS = define \
 	stdext \
 	trie \
