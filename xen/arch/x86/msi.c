@@ -843,6 +843,12 @@ static int msix_capability_init(struct pci_dev *dev,
 
     if ( !msix->used_entries )
     {
+        msix->host_maskall = 0;
+        if ( !msix->guest_maskall )
+            control &= ~PCI_MSIX_FLAGS_MASKALL;
+        else
+            control |= PCI_MSIX_FLAGS_MASKALL;
+
         if ( rangeset_add_range(mmio_ro_ranges, msix->table.first,
                                 msix->table.last) )
             WARN();
@@ -1111,6 +1117,34 @@ void pci_cleanup_msi(struct pci_dev *pdev)
 int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
                                  unsigned int size, uint32_t *data)
 {
+    u16 seg = pdev->seg;
+    u8 bus = pdev->bus;
+    u8 slot = PCI_SLOT(pdev->devfn);
+    u8 func = PCI_FUNC(pdev->devfn);
+    struct msi_desc *entry;
+    unsigned int pos;
+
+    if ( pdev->msix )
+    {
+        entry = find_msi_entry(pdev, -1, PCI_CAP_ID_MSIX);
+        pos = entry ? entry->msi_attrib.pos
+                    : pci_find_cap_offset(seg, bus, slot, func,
+                                          PCI_CAP_ID_MSIX);
+        ASSERT(pos);
+
+        if ( reg < pos || reg >= msix_pba_offset_reg(pos) + 4 )
+            return 0;
+
+        if ( reg != msix_control_reg(pos) || size != 2 )
+            return -EACCES;
+
+        pdev->msix->guest_maskall = !!(*data & PCI_MSIX_FLAGS_MASKALL);
+        if ( pdev->msix->host_maskall )
+            *data |= PCI_MSIX_FLAGS_MASKALL;
+
+        return 1;
+    }
+
     return 0;
 }
 
