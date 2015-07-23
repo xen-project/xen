@@ -2781,6 +2781,11 @@ static uint32_t create_domain(struct domain_create *dom_info)
             printf_info_sexp(-1, &d_config, cfg_print_fh);
         } else {
             char *json = libxl_domain_config_to_json(ctx, &d_config);
+            if (!json) {
+                fprintf(stderr,
+                        "Failed to convert domain configuration to JSON\n");
+                exit(1);
+            }
             fputs(json, cfg_print_fh);
             free(json);
             flush_stream(cfg_print_fh);
