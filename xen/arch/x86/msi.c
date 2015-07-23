@@ -1108,6 +1108,12 @@ void pci_cleanup_msi(struct pci_dev *pdev)
     msi_free_irqs(pdev);
 }
 
+int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
+                                 unsigned int size, uint32_t *data)
+{
+    return 0;
+}
+
 int pci_restore_msi_state(struct pci_dev *pdev)
 {
     unsigned long flags;

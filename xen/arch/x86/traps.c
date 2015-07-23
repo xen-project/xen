@@ -1777,8 +1777,8 @@ static bool_t admin_io_okay(unsigned int port, unsigned int bytes,
     return ioports_access_permitted(d, port, port + bytes - 1);
 }
 
-static bool_t pci_cfg_ok(struct domain *currd, bool_t write,
-                         unsigned int start, unsigned int size)
+static bool_t pci_cfg_ok(struct domain *currd, unsigned int start,
+                         unsigned int size, uint32_t *write)
 {
     uint32_t machine_bdf;
 
@@ -1810,8 +1810,12 @@ static bool_t pci_cfg_ok(struct domain *currd, bool_t write,
             start |= CF8_ADDR_HI(currd->arch.pci_cf8);
     }
 
-    return !xsm_pci_config_permission(XSM_HOOK, currd, machine_bdf,
-                                      start, start + size - 1, write);
+    if ( xsm_pci_config_permission(XSM_HOOK, currd, machine_bdf,
+                                   start, start + size - 1, !!write) != 0 )
+         return 0;
+
+    return !write ||
+           pci_conf_write_intercept(0, machine_bdf, start, size, write) >= 0;
 }
 
 uint32_t guest_io_read(unsigned int port, unsigned int bytes,
@@ -1863,7 +1867,7 @@ uint32_t guest_io_read(unsigned int port, unsigned int bytes,
             size = min(bytes, 4 - (port & 3));
             if ( size == 3 )
                 size = 2;
-            if ( pci_cfg_ok(currd, 0, port & 3, size) )
+            if ( pci_cfg_ok(currd, port & 3, size, NULL) )
                 sub_data = pci_conf_read(currd->arch.pci_cf8, port & 3, size);
         }
 
@@ -1934,7 +1938,7 @@ void guest_io_write(unsigned int port, unsigned int bytes, uint32_t data,
             size = min(bytes, 4 - (port & 3));
             if ( size == 3 )
                 size = 2;
-            if ( pci_cfg_ok(currd, 1, port & 3, size) )
+            if ( pci_cfg_ok(currd, port & 3, size, &data) )
                 pci_conf_write(currd->arch.pci_cf8, port & 3, size, data);
         }
 

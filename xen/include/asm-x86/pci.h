@@ -15,4 +15,10 @@ struct arch_pci_dev {
     vmask_t used_vectors;
 };
 
+int pci_conf_write_intercept(unsigned int seg, unsigned int bdf,
+                             unsigned int reg, unsigned int size,
+                             uint32_t *data);
+int pci_msi_conf_write_intercept(struct pci_dev *, unsigned int reg,
+                                 unsigned int size, uint32_t *data);
+
 #endif /* __X86_PCI_H__ */
