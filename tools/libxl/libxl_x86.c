@@ -306,10 +306,16 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     rtc_timeoffset = d_config->b_info.rtc_timeoffset;
     if (libxl_defbool_val(d_config->b_info.localtime)) {
         time_t t;
-        struct tm *tm;
+        struct tm *tm, result;
 
         t = time(NULL);
-        tm = localtime(&t);
+        tm = localtime_r(&t, &result);
+
+        if (!tm) {
+            LOGE(ERROR, "Failed to call localtime_r");
+            ret = ERROR_FAIL;
+            goto out;
+        }
 
         rtc_timeoffset += tm->tm_gmtoff;
     }
@@ -335,6 +341,7 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         }
     }
 
+out:
     return ret;
 }
 
