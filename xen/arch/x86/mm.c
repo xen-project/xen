@@ -734,6 +734,46 @@ static int update_xen_mappings(unsigned long mfn, unsigned long cacheattr)
     return err;
 }
 
+#ifndef NDEBUG
+struct mmio_emul_range_ctxt {
+    const struct domain *d;
+    unsigned long mfn;
+};
+
+static int print_mmio_emul_range(unsigned long s, unsigned long e, void *arg)
+{
+    const struct mmio_emul_range_ctxt *ctxt = arg;
+
+    if ( ctxt->mfn > e )
+        return 0;
+
+    if ( ctxt->mfn >= s )
+    {
+        static DEFINE_SPINLOCK(last_lock);
+        static const struct domain *last_d;
+        static unsigned long last_s = ~0UL, last_e;
+        bool_t print = 0;
+
+        spin_lock(&last_lock);
+        if ( last_d != ctxt->d || last_s != s || last_e != e )
+        {
+            last_d = ctxt->d;
+            last_s = s;
+            last_e = e;
+            print = 1;
+        }
+        spin_unlock(&last_lock);
+
+        if ( print )
+            printk(XENLOG_G_INFO
+                   "d%d: Forcing write emulation on MFNs %lx-%lx\n",
+                   ctxt->d->domain_id, s, e);
+    }
+
+    return 1;
+}
+#endif
+
 int
 get_page_from_l1e(
     l1_pgentry_t l1e, struct domain *l1e_owner, struct domain *pg_owner)
@@ -757,6 +797,11 @@ get_page_from_l1e(
     if ( !mfn_valid(mfn) ||
          (real_pg_owner = page_get_owner_and_reference(page)) == dom_io )
     {
+#ifndef NDEBUG
+        const unsigned long *ro_map;
+        unsigned int seg, bdf;
+#endif
+
         /* Only needed the reference to confirm dom_io ownership. */
         if ( mfn_valid(mfn) )
             put_page(page);
@@ -792,9 +837,20 @@ get_page_from_l1e(
         if ( !(l1f & _PAGE_RW) ||
              !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
             return 0;
-        dprintk(XENLOG_G_WARNING,
-                "d%d: Forcing read-only access to MFN %lx\n",
-                l1e_owner->domain_id, mfn);
+#ifndef NDEBUG
+        if ( !pci_mmcfg_decode(mfn, &seg, &bdf) ||
+             ((ro_map = pci_get_ro_map(seg)) != NULL &&
+              test_bit(bdf, ro_map)) )
+            printk(XENLOG_G_WARNING
+                   "d%d: Forcing read-only access to MFN %lx\n",
+                   l1e_owner->domain_id, mfn);
+        else
+            rangeset_report_ranges(mmio_ro_ranges, 0, ~0UL,
+                                   print_mmio_emul_range,
+                                   &(struct mmio_emul_range_ctxt){
+                                      .d = l1e_owner,
+                                      .mfn = mfn });
+#endif
         return 1;
     }
 
@@ -5145,6 +5201,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
 
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) ||
+         rangeset_contains_singleton(mmio_ro_ranges, l1e_get_pfn(pte)) ||
          !get_page_from_pagenr(l1e_get_pfn(pte), d) )
         goto bail;
 
@@ -5192,6 +5249,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
 struct mmio_ro_emulate_ctxt {
     struct x86_emulate_ctxt ctxt;
     unsigned long cr2;
+    unsigned int seg, bdf;
 };
 
 static int mmio_ro_emulated_read(
@@ -5231,6 +5289,44 @@ static const struct x86_emulate_ops mmio_ro_emulate_ops = {
     .write      = mmio_ro_emulated_write,
 };
 
+static int mmio_intercept_write(
+    enum x86_segment seg,
+    unsigned long offset,
+    void *p_data,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct mmio_ro_emulate_ctxt *mmio_ctxt =
+        container_of(ctxt, struct mmio_ro_emulate_ctxt, ctxt);
+
+    /*
+     * Only allow naturally-aligned stores no wider than 4 bytes to the
+     * original %cr2 address.
+     */
+    if ( ((bytes | offset) & (bytes - 1)) || bytes > 4 ||
+         offset != mmio_ctxt->cr2 )
+    {
+        MEM_LOG("mmio_intercept: bad write (cr2=%lx, addr=%lx, bytes=%u)",
+                mmio_ctxt->cr2, offset, bytes);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    offset &= 0xfff;
+    pci_conf_write_intercept(mmio_ctxt->seg, mmio_ctxt->bdf, offset, bytes,
+                             p_data);
+    pci_mmcfg_write(mmio_ctxt->seg, PCI_BUS(mmio_ctxt->bdf),
+                    PCI_DEVFN2(mmio_ctxt->bdf), offset, bytes,
+                    *(uint32_t *)p_data);
+
+    return X86EMUL_OKAY;
+}
+
+static const struct x86_emulate_ops mmio_intercept_ops = {
+    .read       = mmio_ro_emulated_read,
+    .insn_fetch = ptwr_emulated_read,
+    .write      = mmio_intercept_write,
+};
+
 /* Check if guest is trying to modify a r/o MMIO page. */
 int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
                           struct cpu_user_regs *regs)
@@ -5245,6 +5341,7 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
         .ctxt.swint_emulate = x86_swint_emulate_none,
         .cr2 = addr
     };
+    const unsigned long *ro_map;
     int rc;
 
     /* Attempt to read the PTE that maps the VA being accessed. */
@@ -5269,7 +5366,12 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
     if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
         return 0;
 
-    rc = x86_emulate(&mmio_ro_ctxt.ctxt, &mmio_ro_emulate_ops);
+    if ( pci_mmcfg_decode(mfn, &mmio_ro_ctxt.seg, &mmio_ro_ctxt.bdf) &&
+         ((ro_map = pci_get_ro_map(mmio_ro_ctxt.seg)) == NULL ||
+          !test_bit(mmio_ro_ctxt.bdf, ro_map)) )
+        rc = x86_emulate(&mmio_ro_ctxt.ctxt, &mmio_intercept_ops);
+    else
+        rc = x86_emulate(&mmio_ro_ctxt.ctxt, &mmio_ro_emulate_ops);
 
     return rc != X86EMUL_UNHANDLEABLE ? EXCRET_fault_fixed : 0;
 }

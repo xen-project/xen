@@ -447,7 +447,6 @@ int __init pci_ro_device(int seg, int bus, int devfn)
     }
 
     __set_bit(PCI_BDF2(bus, devfn), pseg->ro_map);
-    arch_pci_ro_device(seg, PCI_BDF2(bus, devfn));
     _pci_hide_device(pdev);
 
     return 0;
