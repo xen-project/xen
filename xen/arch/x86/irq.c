@@ -217,9 +217,9 @@ void destroy_irq(unsigned int irq)
     }
 
     spin_lock_irqsave(&desc->lock, flags);
-    desc->status  |= IRQ_DISABLED;
     desc->status  &= ~IRQ_GUEST;
     desc->handler->shutdown(desc);
+    desc->status |= IRQ_DISABLED;
     action = desc->action;
     desc->action  = NULL;
     desc->msi_desc = NULL;
@@ -995,8 +995,8 @@ void __init release_irq(unsigned int irq, const void *dev_id)
     spin_lock_irqsave(&desc->lock,flags);
     action = desc->action;
     desc->action  = NULL;
-    desc->status |= IRQ_DISABLED;
     desc->handler->shutdown(desc);
+    desc->status |= IRQ_DISABLED;
     spin_unlock_irqrestore(&desc->lock,flags);
 
     /* Wait to make sure it's not being used on another CPU */
@@ -1732,8 +1732,8 @@ static irq_guest_action_t *__pirq_guest_unbind(
     BUG_ON(action->in_flight != 0);
 
     /* Disabling IRQ before releasing the desc_lock avoids an IRQ storm. */
-    desc->status |= IRQ_DISABLED;
     desc->handler->disable(desc);
+    desc->status |= IRQ_DISABLED;
 
     /*
      * Mark any remaining pending EOIs as ready to flush.
