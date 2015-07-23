@@ -7249,6 +7249,9 @@ int main_cpupoolcreate(int argc, char **argv)
         break;
     }
 
+    libxl_bitmap_init(&freemap);
+    libxl_bitmap_init(&cpumap);
+
     while (optind < argc) {
         if ((p = strchr(argv[optind], '='))) {
             string_realloc_append(&extra_config, "\n");
@@ -7410,6 +7413,8 @@ int main_cpupoolcreate(int argc, char **argv)
 out_cfg:
     xlu_cfg_destroy(config);
 out:
+    libxl_bitmap_dispose(&freemap);
+    libxl_bitmap_dispose(&cpumap);
     free(name);
     free(config_data);
     free(extra_config);
