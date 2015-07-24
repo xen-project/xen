@@ -658,7 +658,8 @@ bool_t ept_handle_misconfig(uint64_t gpa)
  */
 static int
 ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn, 
-              unsigned int order, p2m_type_t p2mt, p2m_access_t p2ma)
+              unsigned int order, p2m_type_t p2mt, p2m_access_t p2ma,
+              int sve)
 {
     ept_entry_t *table, *ept_entry = NULL;
     unsigned long gfn_remainder = gfn;
@@ -804,7 +805,11 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         ept_p2m_type_to_flags(p2m, &new_entry, p2mt, p2ma);
     }
 
-    new_entry.suppress_ve = 1;
+    if ( sve != -1 )
+        new_entry.suppress_ve = !!sve;
+    else
+        new_entry.suppress_ve = is_epte_valid(&old_entry) ?
+                                    old_entry.suppress_ve : 1;
 
     rc = atomic_write_ept_entry(ept_entry, new_entry, target);
     if ( unlikely(rc) )
@@ -852,7 +857,8 @@ out:
 /* Read ept p2m entries */
 static mfn_t ept_get_entry(struct p2m_domain *p2m,
                            unsigned long gfn, p2m_type_t *t, p2m_access_t* a,
-                           p2m_query_t q, unsigned int *page_order)
+                           p2m_query_t q, unsigned int *page_order,
+                           bool_t *sve)
 {
     ept_entry_t *table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
     unsigned long gfn_remainder = gfn;
@@ -866,6 +872,8 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
 
     *t = p2m_mmio_dm;
     *a = p2m_access_n;
+    if ( sve )
+        *sve = 1;
 
     /* This pfn is higher than the highest the p2m map currently holds */
     if ( gfn > p2m->max_mapped_pfn )
@@ -931,6 +939,8 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
         else
             *t = ept_entry->sa_p2mt;
         *a = ept_entry->access;
+        if ( sve )
+            *sve = ept_entry->suppress_ve;
 
         mfn = _mfn(ept_entry->mfn);
         if ( i )

@@ -226,17 +226,19 @@ struct p2m_domain {
     /* Pages used to construct the p2m */
     struct page_list_head pages;
 
-    int                (*set_entry   )(struct p2m_domain *p2m,
-                                       unsigned long gfn,
-                                       mfn_t mfn, unsigned int page_order,
-                                       p2m_type_t p2mt,
-                                       p2m_access_t p2ma);
-    mfn_t              (*get_entry   )(struct p2m_domain *p2m,
-                                       unsigned long gfn,
-                                       p2m_type_t *p2mt,
-                                       p2m_access_t *p2ma,
-                                       p2m_query_t q,
-                                       unsigned int *page_order);
+    int                (*set_entry)(struct p2m_domain *p2m,
+                                    unsigned long gfn,
+                                    mfn_t mfn, unsigned int page_order,
+                                    p2m_type_t p2mt,
+                                    p2m_access_t p2ma,
+                                    int sve);
+    mfn_t              (*get_entry)(struct p2m_domain *p2m,
+                                    unsigned long gfn,
+                                    p2m_type_t *p2mt,
+                                    p2m_access_t *p2ma,
+                                    p2m_query_t q,
+                                    unsigned int *page_order,
+                                    bool_t *sve);
     void               (*enable_hardware_log_dirty)(struct p2m_domain *p2m);
     void               (*disable_hardware_log_dirty)(struct p2m_domain *p2m);
     void               (*flush_hardware_cached_dirty)(struct p2m_domain *p2m);
