@@ -346,10 +346,11 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
             continue;
 
         if (d_config->rdms[i].policy == LIBXL_RDM_RESERVE_POLICY_STRICT) {
-            LOG(ERROR, "RDM conflict at 0x%lx.\n", d_config->rdms[i].start);
+            LOG(ERROR, "RDM conflict at 0x%"PRIx64".\n",
+                       d_config->rdms[i].start);
             goto out;
         } else {
-            LOG(WARN, "Ignoring RDM conflict at 0x%lx.\n",
+            LOG(WARN, "Ignoring RDM conflict at 0x%"PRIx64".\n",
                       d_config->rdms[i].start);
 
             /*
