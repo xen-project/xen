@@ -268,6 +268,13 @@ struct p2m_domain {
     /* Highest guest frame that's ever been mapped in the p2m */
     unsigned long max_mapped_pfn;
 
+    /*
+     * Alternate p2m's only: range of gfn's for which underlying
+     * mfn may have duplicate mappings
+     */
+    unsigned long min_remapped_gfn;
+    unsigned long max_remapped_gfn;
+
     /* When releasing shared gfn's in a preemptible manner, recall where
      * to resume the search */
     unsigned long next_shared_gfn_to_relinquish;
@@ -764,6 +771,38 @@ bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx);
 
 /* Check to see if vcpu should be switched to a different p2m. */
 void p2m_altp2m_check(struct vcpu *v, uint16_t idx);
+
+/* Flush all the alternate p2m's for a domain */
+void p2m_flush_altp2m(struct domain *d);
+
+/* Alternate p2m paging */
+bool_t p2m_altp2m_lazy_copy(struct vcpu *v, paddr_t gpa,
+    unsigned long gla, struct npfec npfec, struct p2m_domain **ap2m);
+
+/* Make a specific alternate p2m valid */
+int p2m_init_altp2m_by_id(struct domain *d, unsigned int idx);
+
+/* Find an available alternate p2m and make it valid */
+int p2m_init_next_altp2m(struct domain *d, uint16_t *idx);
+
+/* Make a specific alternate p2m invalid */
+int p2m_destroy_altp2m_by_id(struct domain *d, unsigned int idx);
+
+/* Switch alternate p2m for entire domain */
+int p2m_switch_domain_altp2m_by_id(struct domain *d, unsigned int idx);
+
+/* Set access type for a gfn */
+int p2m_set_altp2m_mem_access(struct domain *d, unsigned int idx,
+                              gfn_t gfn, xenmem_access_t access);
+
+/* Change a gfn->mfn mapping */
+int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
+                          gfn_t old_gfn, gfn_t new_gfn);
+
+/* Propagate a host p2m change to all alternate p2m's */
+void p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
+                                 mfn_t mfn, unsigned int page_order,
+                                 p2m_type_t p2mt, p2m_access_t p2ma);
 
 /*
  * p2m type to IOMMU flags

@@ -2856,10 +2856,11 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     mfn_t mfn;
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
-    struct p2m_domain *p2m;
+    struct p2m_domain *p2m, *hostp2m;
     int rc, fall_through = 0, paged = 0;
     int sharing_enomem = 0;
     vm_event_request_t *req_ptr = NULL;
+    bool_t ap2m_active;
 
     /* On Nested Virtualization, walk the guest page table.
      * If this succeeds, all is fine.
@@ -2919,10 +2920,31 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         goto out;
     }
 
-    p2m = p2m_get_hostp2m(currd);
-    mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 
+    ap2m_active = altp2m_active(currd);
+
+    /*
+     * Take a lock on the host p2m speculatively, to avoid potential
+     * locking order problems later and to handle unshare etc.
+     */
+    hostp2m = p2m_get_hostp2m(currd);
+    mfn = get_gfn_type_access(hostp2m, gfn, &p2mt, &p2ma,
                               P2M_ALLOC | (npfec.write_access ? P2M_UNSHARE : 0),
                               NULL);
+
+    if ( ap2m_active )
+    {
+        if ( p2m_altp2m_lazy_copy(curr, gpa, gla, npfec, &p2m) )
+        {
+            /* entry was lazily copied from host -- retry */
+            __put_gfn(hostp2m, gfn);
+            rc = 1;
+            goto out;
+        }
+
+        mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 0, NULL);
+    }
+    else
+        p2m = hostp2m;
 
     /* Check access permissions first, then handle faults */
     if ( mfn_x(mfn) != INVALID_MFN )
@@ -2963,6 +2985,20 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
 
         if ( violation )
         {
+            /* Should #VE be emulated for this fault? */
+            if ( p2m_is_altp2m(p2m) && !cpu_has_vmx_virt_exceptions )
+            {
+                bool_t sve;
+
+                p2m->get_entry(p2m, gfn, &p2mt, &p2ma, 0, NULL, &sve);
+
+                if ( !sve && altp2m_vcpu_emulate_ve(curr) )
+                {
+                    rc = 1;
+                    goto out_put_gfn;
+                }
+            }
+
             if ( p2m_mem_access_check(gpa, gla, npfec, &req_ptr) )
             {
                 fall_through = 1;
@@ -2982,7 +3018,9 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          (npfec.write_access &&
           (p2m_is_discard_write(p2mt) || (p2mt == p2m_mmio_write_dm))) )
     {
-        put_gfn(currd, gfn);
+        __put_gfn(p2m, gfn);
+        if ( ap2m_active )
+            __put_gfn(hostp2m, gfn);
 
         rc = 0;
         if ( unlikely(is_pvh_domain(currd)) )
@@ -3011,6 +3049,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     /* Spurious fault? PoD and log-dirty also take this path. */
     if ( p2m_is_ram(p2mt) )
     {
+        rc = 1;
         /*
          * Page log dirty is always done with order 0. If this mfn resides in
          * a large page, we do not change other pages type within that large
@@ -3019,9 +3058,17 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         if ( npfec.write_access )
         {
             paging_mark_dirty(currd, mfn_x(mfn));
+            /*
+             * If p2m is really an altp2m, unlock here to avoid lock ordering
+             * violation when the change below is propagated from host p2m.
+             */
+            if ( ap2m_active )
+                __put_gfn(p2m, gfn);
             p2m_change_type_one(currd, gfn, p2m_ram_logdirty, p2m_ram_rw);
+            __put_gfn(ap2m_active ? hostp2m : p2m, gfn);
+
+            goto out;
         }
-        rc = 1;
         goto out_put_gfn;
     }
 
@@ -3031,7 +3078,9 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     rc = fall_through;
 
 out_put_gfn:
-    put_gfn(currd, gfn);
+    __put_gfn(p2m, gfn);
+    if ( ap2m_active )
+        __put_gfn(hostp2m, gfn);
 out:
     /* All of these are delayed until we exit, since we might 
      * sleep on event ring wait queues, and we must not hold
