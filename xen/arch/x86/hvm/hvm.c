@@ -6003,6 +6003,9 @@ static int hvmop_set_param(
                 nestedhvm_vcpu_destroy(v);
         break;
     case HVM_PARAM_ALTP2M:
+        rc = xsm_hvm_param_altp2mhvm(XSM_PRIV, d);
+        if ( rc )
+            break;
         if ( a.value > 1 )
             rc = -EINVAL;
         if ( a.value &&
@@ -6186,6 +6189,9 @@ static int do_altp2m_op(
         rc = -EOPNOTSUPP;
         goto out;
     }
+
+    if ( (rc = xsm_hvm_altp2mhvm_op(XSM_TARGET, d)) )
+        goto out;
 
     switch ( a.cmd )
     {

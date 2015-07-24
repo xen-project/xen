@@ -116,6 +116,8 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, hvm_param);
     set_to_dummy_if_null(ops, hvm_control);
     set_to_dummy_if_null(ops, hvm_param_nested);
+    set_to_dummy_if_null(ops, hvm_param_altp2mhvm);
+    set_to_dummy_if_null(ops, hvm_altp2mhvm_op);
 
     set_to_dummy_if_null(ops, do_xsm_op);
 #ifdef CONFIG_COMPAT

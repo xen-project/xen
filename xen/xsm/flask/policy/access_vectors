@@ -282,6 +282,13 @@ class hvm
     share_mem
 # HVMOP_set_param setting HVM_PARAM_NESTEDHVM
     nested
+# HVMOP_set_param setting HVM_PARAM_ALTP2MHVM
+    altp2mhvm
+# HVMOP_altp2m_set_domain_state HVMOP_altp2m_get_domain_state
+# HVMOP_altp2m_vcpu_enable_notify HVMOP_altp2m_create_p2m
+# HVMOP_altp2m_destroy_p2m HVMOP_altp2m_switch_p2m
+# HVMOP_altp2m_set_mem_access HVMOP_altp2m_change_gfn
+    altp2mhvm_op
 }
 
 # Class event describes event channels.  Interdomain event channels have their
