@@ -168,16 +168,19 @@ static void restore_term(int fd, struct termios *old)
 	tcsetattr(fd, TCSANOW, old);
 }
 
-static int console_loop(int fd, struct xs_handle *xs, char *pty_path)
+static int console_loop(int fd, struct xs_handle *xs, char *pty_path,
+		        bool interactive)
 {
-	int ret, xs_fd = xs_fileno(xs), max_fd;
+	int ret, xs_fd = xs_fileno(xs), max_fd = -1;
 
 	do {
 		fd_set fds;
 
 		FD_ZERO(&fds);
-		FD_SET(STDIN_FILENO, &fds);
-		max_fd = STDIN_FILENO;
+		if (interactive) {
+			FD_SET(STDIN_FILENO, &fds);
+			max_fd = STDIN_FILENO;
+		}
 		FD_SET(xs_fd, &fds);
 		if (xs_fd > max_fd) max_fd = xs_fd;
 		if (fd != -1) FD_SET(fd, &fds);
@@ -284,6 +287,10 @@ int main(int argc, char **argv)
 	struct xs_handle *xs;
 	char *end;
 	console_type type = CONSOLE_INVAL;
+	bool interactive = 0;
+
+	if (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO))
+		interactive = 1;
 
 	while((ch = getopt_long(argc, argv, sopt, lopt, &opt_ind)) != -1) {
 		switch(ch) {
@@ -390,9 +397,11 @@ int main(int argc, char **argv)
 	}
 
 	init_term(spty, &attr);
-	init_term(STDIN_FILENO, &stdin_old_attr);
-	atexit(restore_term_stdin); /* if this fails, oh dear */
-	console_loop(spty, xs, path);
+	if (interactive) {
+		init_term(STDIN_FILENO, &stdin_old_attr);
+		atexit(restore_term_stdin); /* if this fails, oh dear */
+	}
+	console_loop(spty, xs, path, interactive);
 
 	free(path);
 	free(dom_path);
