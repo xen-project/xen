@@ -482,7 +482,8 @@ int p2m_pt_handle_deferred_changes(uint64_t gpa)
 /* Returns: 0 for success, -errno for failure */
 static int
 p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
-                 unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
+                 unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma,
+                 int sve)
 {
     /* XXX -- this might be able to be faster iff current->domain == d */
     void *table;
@@ -494,6 +495,8 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     int rc;
     unsigned int iommu_pte_flags = p2m_get_iommu_flags(p2mt);
     unsigned long old_mfn = 0;
+
+    ASSERT(sve != 0);
 
     if ( tb_init_done )
     {
@@ -689,7 +692,7 @@ static inline p2m_type_t recalc_type(bool_t recalc, p2m_type_t t,
 static mfn_t
 p2m_pt_get_entry(struct p2m_domain *p2m, unsigned long gfn,
                  p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
-                 unsigned int *page_order)
+                 unsigned int *page_order, bool_t *sve)
 {
     mfn_t mfn;
     paddr_t addr = ((paddr_t)gfn) << PAGE_SHIFT;
@@ -700,6 +703,9 @@ p2m_pt_get_entry(struct p2m_domain *p2m, unsigned long gfn,
     bool_t recalc;
 
     ASSERT(paging_mode_translate(p2m->domain));
+
+    if ( sve )
+        *sve = 1;
 
     /* XXX This is for compatibility with the old model, where anything not 
      * XXX marked as RAM was considered to be emulated MMIO space.

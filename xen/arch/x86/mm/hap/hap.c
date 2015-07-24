@@ -459,7 +459,7 @@ void hap_domain_init(struct domain *d)
 int hap_enable(struct domain *d, u32 mode)
 {
     unsigned int old_pages;
-    uint8_t i;
+    unsigned int i;
     int rv = 0;
 
     domain_pause(d);
@@ -498,6 +498,28 @@ int hap_enable(struct domain *d, u32 mode)
            goto out;
     }
 
+    if ( hvm_altp2m_supported() )
+    {
+        /* Init alternate p2m data */
+        if ( (d->arch.altp2m_eptp = alloc_xenheap_page()) == NULL )
+        {
+            rv = -ENOMEM;
+            goto out;
+        }
+
+        for ( i = 0; i < MAX_EPTP; i++ )
+            d->arch.altp2m_eptp[i] = INVALID_MFN;
+
+        for ( i = 0; i < MAX_ALTP2M; i++ )
+        {
+            rv = p2m_alloc_table(d->arch.altp2m_p2m[i]);
+            if ( rv != 0 )
+               goto out;
+        }
+
+        d->arch.altp2m_active = 0;
+    }
+
     /* Now let other users see the new mode */
     d->arch.paging.mode = mode | PG_HAP_enable;
 
@@ -508,7 +530,21 @@ int hap_enable(struct domain *d, u32 mode)
 
 void hap_final_teardown(struct domain *d)
 {
-    uint8_t i;
+    unsigned int i;
+
+    if ( hvm_altp2m_supported() )
+    {
+        d->arch.altp2m_active = 0;
+
+        if ( d->arch.altp2m_eptp )
+        {
+            free_xenheap_page(d->arch.altp2m_eptp);
+            d->arch.altp2m_eptp = NULL;
+        }
+
+        for ( i = 0; i < MAX_ALTP2M; i++ )
+            p2m_teardown(d->arch.altp2m_p2m[i]);
+    }
 
     /* Destroy nestedp2m's first */
     for (i = 0; i < MAX_NESTEDP2M; i++) {

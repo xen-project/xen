@@ -140,6 +140,13 @@ mode during S3 resume.
 
 Permit Xen to use superpages when performing memory management.
 
+### altp2m (Intel)
+> `= <boolean>`
+
+> Default: `false`
+
+Permit multiple copies of host p2m.
+
 ### apic
 > `= bigsmp | default`
 

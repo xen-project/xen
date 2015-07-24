@@ -222,9 +222,10 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY    0x00000200
 #define SECONDARY_EXEC_PAUSE_LOOP_EXITING       0x00000400
 #define SECONDARY_EXEC_ENABLE_INVPCID           0x00001000
-#define SECONDARY_EXEC_ENABLE_VMFUNC            0x00002000
+#define SECONDARY_EXEC_ENABLE_VM_FUNCTIONS      0x00002000
 #define SECONDARY_EXEC_ENABLE_VMCS_SHADOWING    0x00004000
 #define SECONDARY_EXEC_ENABLE_PML               0x00020000
+#define SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS   0x00040000
 extern u32 vmx_secondary_exec_control;
 
 #define VMX_EPT_EXEC_ONLY_SUPPORTED             0x00000001
@@ -285,6 +286,10 @@ extern u32 vmx_secondary_exec_control;
     (vmx_pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT)
 #define cpu_has_vmx_vmcs_shadowing \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VMCS_SHADOWING)
+#define cpu_has_vmx_vmfunc \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VM_FUNCTIONS)
+#define cpu_has_vmx_virt_exceptions \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS)
 #define cpu_has_vmx_pml \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_PML)
 
@@ -315,6 +320,9 @@ extern u64 vmx_basic_msr;
 /* Guest interrupt status */
 #define VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK  0x0FF
 #define VMX_GUEST_INTR_STATUS_SVI_OFFSET        8
+
+/* VMFUNC leaf definitions */
+#define VMX_VMFUNC_EPTP_SWITCHING   (1ULL << 0)
 
 /* VMCS field encodings. */
 #define VMCS_HIGH(x) ((x) | 1)
@@ -350,12 +358,14 @@ enum vmcs_field {
     VIRTUAL_APIC_PAGE_ADDR          = 0x00002012,
     APIC_ACCESS_ADDR                = 0x00002014,
     PI_DESC_ADDR                    = 0x00002016,
-    VMFUNC_CONTROL                  = 0x00002018,
+    VM_FUNCTION_CONTROL             = 0x00002018,
     EPT_POINTER                     = 0x0000201a,
     EOI_EXIT_BITMAP0                = 0x0000201c,
 #define EOI_EXIT_BITMAP(n) (EOI_EXIT_BITMAP0 + (n) * 2) /* n = 0...3 */
+    EPTP_LIST_ADDR                  = 0x00002024,
     VMREAD_BITMAP                   = 0x00002026,
     VMWRITE_BITMAP                  = 0x00002028,
+    VIRT_EXCEPTION_INFO             = 0x0000202a,
     GUEST_PHYSICAL_ADDRESS          = 0x00002400,
     VMCS_LINK_POINTER               = 0x00002800,
     GUEST_IA32_DEBUGCTL             = 0x00002802,

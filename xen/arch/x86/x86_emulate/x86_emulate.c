@@ -3786,6 +3786,7 @@ x86_emulate(
         break;
     }
 
+ no_writeback:
     /* Inject #DB if single-step tracing was enabled at instruction start. */
     if ( (ctxt->regs->eflags & EFLG_TF) && (rc == X86EMUL_OKAY) &&
          (ops->inject_hw_exception != NULL) )
@@ -3816,25 +3817,31 @@ x86_emulate(
         struct segment_register reg;
         unsigned long base, limit, cr0, cr0w;
 
-        if ( modrm == 0xdf ) /* invlpga */
+        switch( modrm )
         {
+        case 0xdf: /* invlpga */
             generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
             fail_if(ops->invlpg == NULL);
             if ( (rc = ops->invlpg(x86_seg_none, truncate_ea(_regs.eax),
                                    ctxt)) )
                 goto done;
-            break;
-        }
-
-        if ( modrm == 0xf9 ) /* rdtscp */
-        {
+            goto no_writeback;
+        case 0xf9: /* rdtscp */ {
             uint64_t tsc_aux;
             fail_if(ops->read_msr == NULL);
             if ( (rc = ops->read_msr(MSR_TSC_AUX, &tsc_aux, ctxt)) != 0 )
                 goto done;
             _regs.ecx = (uint32_t)tsc_aux;
             goto rdtsc;
+        }
+        case 0xd4: /* vmfunc */
+            generate_exception_if(lock_prefix | rep_prefix() | (vex.pfx == vex_66),
+                                  EXC_UD, -1);
+            fail_if(ops->vmfunc == NULL);
+            if ( (rc = ops->vmfunc(ctxt) != X86EMUL_OKAY) )
+                goto done;
+            goto no_writeback;
         }
 
         switch ( modrm_reg & 7 )

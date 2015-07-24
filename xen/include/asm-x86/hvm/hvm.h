@@ -94,6 +94,9 @@ struct hvm_function_table {
     /* Necessary hardware support for PVH mode? */
     int pvh_supported;
 
+    /* Necessary hardware support for alternate p2m's? */
+    bool_t altp2m_supported;
+
     /* Indicate HAP capabilities. */
     int hap_capabilities;
 
@@ -164,6 +167,7 @@ struct hvm_function_table {
     int (*msr_read_intercept)(unsigned int msr, uint64_t *msr_content);
     int (*msr_write_intercept)(unsigned int msr, uint64_t msr_content);
     void (*invlpg_intercept)(unsigned long vaddr);
+    int (*vmfunc_intercept)(struct cpu_user_regs *regs);
     void (*handle_cd)(struct vcpu *v, unsigned long value);
     void (*set_info_guest)(struct vcpu *v);
     void (*set_rdtsc_exiting)(struct vcpu *v, bool_t);
@@ -203,6 +207,12 @@ struct hvm_function_table {
 
     void (*enable_msr_exit_interception)(struct domain *d);
     bool_t (*is_singlestep_supported)(void);
+
+    /* Alternate p2m */
+    void (*altp2m_vcpu_update_p2m)(struct vcpu *v);
+    void (*altp2m_vcpu_update_vmfunc_ve)(struct vcpu *v);
+    bool_t (*altp2m_vcpu_emulate_ve)(struct vcpu *v);
+    int (*altp2m_vcpu_emulate_vmfunc)(struct cpu_user_regs *regs);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -530,12 +540,27 @@ static inline bool_t hvm_is_singlestep_supported(void)
             hvm_funcs.is_singlestep_supported());
 }
 
+/* returns true if hardware supports alternate p2m's */
+static inline bool_t hvm_altp2m_supported(void)
+{
+    return hvm_funcs.altp2m_supported;
+}
+
 #ifndef NDEBUG
 /* Permit use of the Forced Emulation Prefix in HVM guests */
 extern bool_t opt_hvm_fep;
 #else
 #define opt_hvm_fep 0
 #endif
+
+/* updates the current hardware p2m */
+void altp2m_vcpu_update_p2m(struct vcpu *v);
+
+/* updates VMCS fields related to VMFUNC and #VE */
+void altp2m_vcpu_update_vmfunc_ve(struct vcpu *v);
+
+/* emulates #VE */
+bool_t altp2m_vcpu_emulate_ve(struct vcpu *v);
 
 #endif /* __ASM_X86_HVM_HVM_H__ */
 

@@ -412,6 +412,10 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
 
         };
 
+        /* Check for altp2m switch */
+        if ( rsp.flags & VM_EVENT_FLAG_ALTERNATE_P2M )
+            p2m_altp2m_check(v, rsp.altp2m_idx);
+
         if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )
         {
             if ( rsp.flags & VM_EVENT_FLAG_TOGGLE_SINGLESTEP )

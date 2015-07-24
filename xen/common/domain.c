@@ -1010,6 +1010,34 @@ int domain_unpause_by_systemcontroller(struct domain *d)
     return 0;
 }
 
+void domain_pause_except_self(struct domain *d)
+{
+    struct vcpu *v, *curr = current;
+
+    if ( curr->domain == d )
+    {
+        for_each_vcpu( d, v )
+            if ( likely(v != curr) )
+                vcpu_pause(v);
+    }
+    else
+        domain_pause(d);
+}
+
+void domain_unpause_except_self(struct domain *d)
+{
+    struct vcpu *v, *curr = current;
+
+    if ( curr->domain == d )
+    {
+        for_each_vcpu( d, v )
+            if ( likely(v != curr) )
+                vcpu_unpause(v);
+    }
+    else
+        domain_unpause(d);
+}
+
 int vcpu_reset(struct vcpu *v)
 {
     struct domain *d = v->domain;

@@ -8,7 +8,7 @@
 define(`declare_domain_common', `
 	allow $1 $2:grant { query setup };
 	allow $1 $2:mmu { adjust physmap map_read map_write stat pinpage updatemp mmuext_op };
-	allow $1 $2:hvm { getparam setparam };
+	allow $1 $2:hvm { getparam setparam altp2mhvm_op };
 	allow $1 $2:domain2 get_vnumainfo;
 ')
 
@@ -58,7 +58,7 @@ define(`create_domain_common', `
 	allow $1 $2:mmu { map_read map_write adjust memorymap physmap pinpage mmuext_op updatemp };
 	allow $1 $2:grant setup;
 	allow $1 $2:hvm { cacheattr getparam hvmctl irqlevel pciroute sethvmc
-			setparam pcilevel trackdirtyvram nested };
+			setparam pcilevel trackdirtyvram nested altp2mhvm altp2mhvm_op };
 ')
 
 # create_domain(priv, target)

@@ -61,6 +61,7 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/event.h>
 #include <asm/hvm/vmx/vmx.h>
+#include <asm/altp2m.h>
 #include <asm/mtrr.h>
 #include <asm/apic.h>
 #include <public/sched.h>
@@ -95,6 +96,10 @@ boolean_param("hap", opt_hap_enabled);
 bool_t opt_hvm_fep;
 boolean_param("hvm_fep", opt_hvm_fep);
 #endif
+
+/* Xen command-line option to enable altp2m */
+static bool_t __initdata opt_altp2m_enabled = 0;
+boolean_param("altp2m", opt_altp2m_enabled);
 
 static int cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
@@ -161,6 +166,9 @@ static int __init hvm_enable(void)
 
     if ( !fns->pvh_supported )
         printk(XENLOG_INFO "HVM: PVH mode not supported on this platform\n");
+
+    if ( !opt_altp2m_enabled )
+        hvm_funcs.altp2m_supported = 0;
 
     /*
      * Allow direct access to the PC debug ports 0x80 and 0xed (they are
@@ -2455,6 +2463,7 @@ void hvm_vcpu_destroy(struct vcpu *v)
 {
     hvm_all_ioreq_servers_remove_vcpu(v->domain, v);
 
+    altp2m_vcpu_destroy(v);
     nestedhvm_vcpu_destroy(v);
 
     free_compat_arg_xlat(v);
@@ -2847,10 +2856,11 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     mfn_t mfn;
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
-    struct p2m_domain *p2m;
+    struct p2m_domain *p2m, *hostp2m;
     int rc, fall_through = 0, paged = 0;
     int sharing_enomem = 0;
     vm_event_request_t *req_ptr = NULL;
+    bool_t ap2m_active;
 
     /* On Nested Virtualization, walk the guest page table.
      * If this succeeds, all is fine.
@@ -2910,10 +2920,31 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         goto out;
     }
 
-    p2m = p2m_get_hostp2m(currd);
-    mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 
+    ap2m_active = altp2m_active(currd);
+
+    /*
+     * Take a lock on the host p2m speculatively, to avoid potential
+     * locking order problems later and to handle unshare etc.
+     */
+    hostp2m = p2m_get_hostp2m(currd);
+    mfn = get_gfn_type_access(hostp2m, gfn, &p2mt, &p2ma,
                               P2M_ALLOC | (npfec.write_access ? P2M_UNSHARE : 0),
                               NULL);
+
+    if ( ap2m_active )
+    {
+        if ( p2m_altp2m_lazy_copy(curr, gpa, gla, npfec, &p2m) )
+        {
+            /* entry was lazily copied from host -- retry */
+            __put_gfn(hostp2m, gfn);
+            rc = 1;
+            goto out;
+        }
+
+        mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 0, NULL);
+    }
+    else
+        p2m = hostp2m;
 
     /* Check access permissions first, then handle faults */
     if ( mfn_x(mfn) != INVALID_MFN )
@@ -2954,6 +2985,20 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
 
         if ( violation )
         {
+            /* Should #VE be emulated for this fault? */
+            if ( p2m_is_altp2m(p2m) && !cpu_has_vmx_virt_exceptions )
+            {
+                bool_t sve;
+
+                p2m->get_entry(p2m, gfn, &p2mt, &p2ma, 0, NULL, &sve);
+
+                if ( !sve && altp2m_vcpu_emulate_ve(curr) )
+                {
+                    rc = 1;
+                    goto out_put_gfn;
+                }
+            }
+
             if ( p2m_mem_access_check(gpa, gla, npfec, &req_ptr) )
             {
                 fall_through = 1;
@@ -2973,7 +3018,9 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          (npfec.write_access &&
           (p2m_is_discard_write(p2mt) || (p2mt == p2m_mmio_write_dm))) )
     {
-        put_gfn(currd, gfn);
+        __put_gfn(p2m, gfn);
+        if ( ap2m_active )
+            __put_gfn(hostp2m, gfn);
 
         rc = 0;
         if ( unlikely(is_pvh_domain(currd)) )
@@ -3002,6 +3049,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     /* Spurious fault? PoD and log-dirty also take this path. */
     if ( p2m_is_ram(p2mt) )
     {
+        rc = 1;
         /*
          * Page log dirty is always done with order 0. If this mfn resides in
          * a large page, we do not change other pages type within that large
@@ -3010,9 +3058,17 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         if ( npfec.write_access )
         {
             paging_mark_dirty(currd, mfn_x(mfn));
+            /*
+             * If p2m is really an altp2m, unlock here to avoid lock ordering
+             * violation when the change below is propagated from host p2m.
+             */
+            if ( ap2m_active )
+                __put_gfn(p2m, gfn);
             p2m_change_type_one(currd, gfn, p2m_ram_logdirty, p2m_ram_rw);
+            __put_gfn(ap2m_active ? hostp2m : p2m, gfn);
+
+            goto out;
         }
-        rc = 1;
         goto out_put_gfn;
     }
 
@@ -3022,7 +3078,9 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     rc = fall_through;
 
 out_put_gfn:
-    put_gfn(currd, gfn);
+    __put_gfn(p2m, gfn);
+    if ( ap2m_active )
+        __put_gfn(hostp2m, gfn);
 out:
     /* All of these are delayed until we exit, since we might 
      * sleep on event ring wait queues, and we must not hold
@@ -5808,6 +5866,7 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_VIRIDIAN:
     case HVM_PARAM_IOREQ_SERVER_PFN:
     case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+    case HVM_PARAM_ALTP2M:
         if ( value != 0 && a->value != value )
             rc = -EEXIST;
         break;
@@ -5930,6 +5989,9 @@ static int hvmop_set_param(
          */
         if ( cpu_has_svm && !paging_mode_hap(d) && a.value )
             rc = -EINVAL;
+        if ( a.value &&
+             d->arch.hvm_domain.params[HVM_PARAM_ALTP2M] )
+            rc = -EINVAL;
         /* Set up NHVM state for any vcpus that are already up. */
         if ( a.value &&
              !d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
@@ -5939,6 +6001,16 @@ static int hvmop_set_param(
         if ( !a.value || rc )
             for_each_vcpu(d, v)
                 nestedhvm_vcpu_destroy(v);
+        break;
+    case HVM_PARAM_ALTP2M:
+        rc = xsm_hvm_param_altp2mhvm(XSM_PRIV, d);
+        if ( rc )
+            break;
+        if ( a.value > 1 )
+            rc = -EINVAL;
+        if ( a.value &&
+             d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
+            rc = -EINVAL;
         break;
     case HVM_PARAM_BUFIOREQ_EVTCHN:
         rc = -EINVAL;
@@ -6000,6 +6072,7 @@ static int hvm_allow_get_param(struct domain *d,
     case HVM_PARAM_STORE_EVTCHN:
     case HVM_PARAM_CONSOLE_PFN:
     case HVM_PARAM_CONSOLE_EVTCHN:
+    case HVM_PARAM_ALTP2M:
         break;
     /*
      * The following parameters must not be read by the guest
@@ -6075,6 +6148,150 @@ static int hvmop_get_param(
 
  out:
     rcu_unlock_domain(d);
+    return rc;
+}
+
+static int do_altp2m_op(
+    XEN_GUEST_HANDLE_PARAM(void) arg)
+{
+    struct xen_hvm_altp2m_op a;
+    struct domain *d = NULL;
+    int rc = 0;
+
+    if ( !hvm_altp2m_supported() )
+        return -EOPNOTSUPP;
+
+    if ( copy_from_guest(&a, arg, 1) )
+        return -EFAULT;
+
+    if ( a.pad1 || a.pad2 ||
+         (a.version != HVMOP_ALTP2M_INTERFACE_VERSION) ||
+         (a.cmd < HVMOP_altp2m_get_domain_state) ||
+         (a.cmd > HVMOP_altp2m_change_gfn) )
+        return -EINVAL;
+
+    d = (a.cmd != HVMOP_altp2m_vcpu_enable_notify) ?
+        rcu_lock_domain_by_any_id(a.domain) : rcu_lock_current_domain();
+
+    if ( d == NULL )
+        return -ESRCH;
+
+    if ( !is_hvm_domain(d) )
+    {
+        rc = -EOPNOTSUPP;
+        goto out;
+    }
+
+    if ( (a.cmd != HVMOP_altp2m_get_domain_state) &&
+         (a.cmd != HVMOP_altp2m_set_domain_state) &&
+         !d->arch.altp2m_active )
+    {
+        rc = -EOPNOTSUPP;
+        goto out;
+    }
+
+    if ( (rc = xsm_hvm_altp2mhvm_op(XSM_TARGET, d)) )
+        goto out;
+
+    switch ( a.cmd )
+    {
+    case HVMOP_altp2m_get_domain_state:
+        if ( !d->arch.hvm_domain.params[HVM_PARAM_ALTP2M] )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        a.u.domain_state.state = altp2m_active(d);
+        rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+        break;
+
+    case HVMOP_altp2m_set_domain_state:
+    {
+        struct vcpu *v;
+        bool_t ostate;
+
+        if ( !d->arch.hvm_domain.params[HVM_PARAM_ALTP2M] ||
+             nestedhvm_enabled(d) )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        ostate = d->arch.altp2m_active;
+        d->arch.altp2m_active = !!a.u.domain_state.state;
+
+        /* If the alternate p2m state has changed, handle appropriately */
+        if ( d->arch.altp2m_active != ostate &&
+             (ostate || !(rc = p2m_init_altp2m_by_id(d, 0))) )
+        {
+            for_each_vcpu( d, v )
+            {
+                if ( !ostate )
+                    altp2m_vcpu_initialise(v);
+                else
+                    altp2m_vcpu_destroy(v);
+            }
+
+            if ( ostate )
+                p2m_flush_altp2m(d);
+        }
+        break;
+    }
+
+    case HVMOP_altp2m_vcpu_enable_notify:
+    {
+        struct vcpu *curr = current;
+        p2m_type_t p2mt;
+
+        if ( a.u.enable_notify.pad || a.domain != DOMID_SELF ||
+             a.u.enable_notify.vcpu_id != curr->vcpu_id )
+            rc = -EINVAL;
+
+        if ( (gfn_x(vcpu_altp2m(curr).veinfo_gfn) != INVALID_GFN) ||
+             (mfn_x(get_gfn_query_unlocked(curr->domain,
+                    a.u.enable_notify.gfn, &p2mt)) == INVALID_MFN) )
+            return -EINVAL;
+
+        vcpu_altp2m(curr).veinfo_gfn = _gfn(a.u.enable_notify.gfn);
+        altp2m_vcpu_update_vmfunc_ve(curr);
+        break;
+    }
+
+    case HVMOP_altp2m_create_p2m:
+        if ( !(rc = p2m_init_next_altp2m(d, &a.u.view.view)) )
+            rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+        break;
+
+    case HVMOP_altp2m_destroy_p2m:
+        rc = p2m_destroy_altp2m_by_id(d, a.u.view.view);
+        break;
+
+    case HVMOP_altp2m_switch_p2m:
+        rc = p2m_switch_domain_altp2m_by_id(d, a.u.view.view);
+        break;
+
+    case HVMOP_altp2m_set_mem_access:
+        if ( a.u.set_mem_access.pad )
+            rc = -EINVAL;
+        else
+            rc = p2m_set_altp2m_mem_access(d, a.u.set_mem_access.view,
+                    _gfn(a.u.set_mem_access.gfn),
+                    a.u.set_mem_access.hvmmem_access);
+        break;
+
+    case HVMOP_altp2m_change_gfn:
+        if ( a.u.change_gfn.pad1 || a.u.change_gfn.pad2 )
+            rc = -EINVAL;
+        else
+            rc = p2m_change_altp2m_gfn(d, a.u.change_gfn.view,
+                    _gfn(a.u.change_gfn.old_gfn),
+                    _gfn(a.u.change_gfn.new_gfn));
+    }
+
+ out:
+    rcu_unlock_domain(d);
+
     return rc;
 }
 
@@ -6507,6 +6724,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             rc = -EINVAL;
         break;
 
+    case HVMOP_altp2m:
+        rc = do_altp2m_op(arg);
+        break;
+
     default:
     {
         gdprintk(XENLOG_DEBUG, "Bad HVM op %ld.\n", op);
@@ -6558,6 +6779,25 @@ void hvm_toggle_singlestep(struct vcpu *v)
         return;
 
     v->arch.hvm_vcpu.single_step = !v->arch.hvm_vcpu.single_step;
+}
+
+void altp2m_vcpu_update_p2m(struct vcpu *v)
+{
+    if ( hvm_funcs.altp2m_vcpu_update_p2m )
+        hvm_funcs.altp2m_vcpu_update_p2m(v);
+}
+
+void altp2m_vcpu_update_vmfunc_ve(struct vcpu *v)
+{
+    if ( hvm_funcs.altp2m_vcpu_update_vmfunc_ve )
+        hvm_funcs.altp2m_vcpu_update_vmfunc_ve(v);
+}
+
+bool_t altp2m_vcpu_emulate_ve(struct vcpu *v)
+{
+    if ( hvm_funcs.altp2m_vcpu_emulate_ve )
+        return hvm_funcs.altp2m_vcpu_emulate_ve(v);
+    return 0;
 }
 
 /*

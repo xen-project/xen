@@ -1176,6 +1176,16 @@ static int flask_hvm_param_nested(struct domain *d)
     return current_has_perm(d, SECCLASS_HVM, HVM__NESTED);
 }
 
+static int flask_hvm_param_altp2mhvm(struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_HVM, HVM__ALTP2MHVM);
+}
+
+static int flask_hvm_altp2mhvm_op(struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_HVM, HVM__ALTP2MHVM_OP);
+}
+
 static int flask_vm_event_control(struct domain *d, int mode, int op)
 {
     return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__VM_EVENT);
@@ -1687,6 +1697,8 @@ static struct xsm_operations flask_ops = {
     .hvm_param = flask_hvm_param,
     .hvm_control = flask_hvm_param,
     .hvm_param_nested = flask_hvm_param_nested,
+    .hvm_param_altp2mhvm = flask_hvm_param_altp2mhvm,
+    .hvm_altp2mhvm_op = flask_hvm_altp2mhvm_op,
 
     .do_xsm_op = do_flask_op,
     .get_vnumainfo = flask_get_vnumainfo,

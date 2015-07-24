@@ -804,6 +804,11 @@ static inline int domain_pause_by_systemcontroller_nosync(struct domain *d)
 {
     return __domain_pause_by_systemcontroller(d, domain_pause_nosync);
 }
+
+/* domain_pause() but safe against trying to pause current. */
+void domain_pause_except_self(struct domain *d);
+void domain_unpause_except_self(struct domain *d);
+
 void cpu_init(void);
 
 struct scheduler;

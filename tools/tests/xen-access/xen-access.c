@@ -275,6 +275,19 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     return NULL;
 }
 
+static inline
+int control_singlestep(
+    xc_interface *xch,
+    domid_t domain_id,
+    unsigned long vcpu,
+    bool enable)
+{
+    uint32_t op = enable ?
+        XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON : XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF;
+
+    return xc_domain_debug_control(xch, domain_id, op, vcpu);
+}
+
 /*
  * Note that this function is not thread safe.
  */
@@ -317,13 +330,15 @@ static void put_response(vm_event_t *vm_event, vm_event_response_t *rsp)
 
 void usage(char* progname)
 {
-    fprintf(stderr,
-            "Usage: %s [-m] <domain_id> write|exec|breakpoint\n"
+    fprintf(stderr, "Usage: %s [-m] <domain_id> write|exec", progname);
+#if defined(__i386__) || defined(__x86_64__)
+            fprintf(stderr, "|breakpoint|altp2m_write|altp2m_exec");
+#endif
+            fprintf(stderr,
             "\n"
             "Logs first page writes, execs, or breakpoint traps that occur on the domain.\n"
             "\n"
-            "-m requires this program to run, or else the domain may pause\n",
-            progname);
+            "-m requires this program to run, or else the domain may pause\n");
 }
 
 int main(int argc, char *argv[])
@@ -341,6 +356,8 @@ int main(int argc, char *argv[])
     int required = 0;
     int breakpoint = 0;
     int shutting_down = 0;
+    int altp2m = 0;
+    uint16_t altp2m_view_id = 0;
 
     char* progname = argv[0];
     argv++;
@@ -379,10 +396,22 @@ int main(int argc, char *argv[])
         default_access = XENMEM_access_rw;
         after_first_access = XENMEM_access_rwx;
     }
+#if defined(__i386__) || defined(__x86_64__)
     else if ( !strcmp(argv[0], "breakpoint") )
     {
         breakpoint = 1;
     }
+    else if ( !strcmp(argv[0], "altp2m_write") )
+    {
+        default_access = XENMEM_access_rx;
+        altp2m = 1;
+    }
+    else if ( !strcmp(argv[0], "altp2m_exec") )
+    {
+        default_access = XENMEM_access_rw;
+        altp2m = 1;
+    }
+#endif
     else
     {
         usage(argv[0]);
@@ -415,22 +444,73 @@ int main(int argc, char *argv[])
         goto exit;
     }
 
-    /* Set the default access type and convert all pages to it */
-    rc = xc_set_mem_access(xch, domain_id, default_access, ~0ull, 0);
-    if ( rc < 0 )
+    /* With altp2m we just create a new, restricted view of the memory */
+    if ( altp2m )
     {
-        ERROR("Error %d setting default mem access type\n", rc);
-        goto exit;
+        xen_pfn_t gfn = 0;
+        unsigned long perm_set = 0;
+
+        rc = xc_altp2m_set_domain_state( xch, domain_id, 1 );
+        if ( rc < 0 )
+        {
+            ERROR("Error %d enabling altp2m on domain!\n", rc);
+            goto exit;
+        }
+
+        rc = xc_altp2m_create_view( xch, domain_id, default_access, &altp2m_view_id );
+        if ( rc < 0 )
+        {
+            ERROR("Error %d creating altp2m view!\n", rc);
+            goto exit;
+        }
+
+        DPRINTF("altp2m view created with id %u\n", altp2m_view_id);
+        DPRINTF("Setting altp2m mem_access permissions.. ");
+
+        for(; gfn < xenaccess->max_gpfn; ++gfn)
+        {
+            rc = xc_altp2m_set_mem_access( xch, domain_id, altp2m_view_id, gfn,
+                                           default_access);
+            if ( !rc )
+                perm_set++;
+        }
+
+        DPRINTF("done! Permissions set on %lu pages.\n", perm_set);
+
+        rc = xc_altp2m_switch_to_view( xch, domain_id, altp2m_view_id );
+        if ( rc < 0 )
+        {
+            ERROR("Error %d switching to altp2m view!\n", rc);
+            goto exit;
+        }
+
+        rc = xc_monitor_singlestep( xch, domain_id, 1 );
+        if ( rc < 0 )
+        {
+            ERROR("Error %d failed to enable singlestep monitoring!\n", rc);
+            goto exit;
+        }
     }
 
-    rc = xc_set_mem_access(xch, domain_id, default_access, START_PFN,
-                           (xenaccess->max_gpfn - START_PFN) );
-
-    if ( rc < 0 )
+    if ( !altp2m )
     {
-        ERROR("Error %d setting all memory to access type %d\n", rc,
-              default_access);
-        goto exit;
+        /* Set the default access type and convert all pages to it */
+        rc = xc_set_mem_access(xch, domain_id, default_access, ~0ull, 0);
+        if ( rc < 0 )
+        {
+            ERROR("Error %d setting default mem access type\n", rc);
+            goto exit;
+        }
+
+        rc = xc_set_mem_access(xch, domain_id, default_access, START_PFN,
+                               (xenaccess->max_gpfn - START_PFN) );
+
+        if ( rc < 0 )
+        {
+            ERROR("Error %d setting all memory to access type %d\n", rc,
+                  default_access);
+            goto exit;
+        }
     }
 
     if ( breakpoint )
@@ -448,13 +528,29 @@ int main(int argc, char *argv[])
     {
         if ( interrupted )
         {
+            /* Unregister for every event */
             DPRINTF("xenaccess shutting down on signal %d\n", interrupted);
 
-            /* Unregister for every event */
-            rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, ~0ull, 0);
-            rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, START_PFN,
-                                   (xenaccess->max_gpfn - START_PFN) );
-            rc = xc_monitor_software_breakpoint(xch, domain_id, 0);
+            if ( breakpoint )
+                rc = xc_monitor_software_breakpoint(xch, domain_id, 0);
+
+            if ( altp2m )
+            {
+                uint32_t vcpu_id;
+
+                rc = xc_altp2m_switch_to_view( xch, domain_id, 0 );
+                rc = xc_altp2m_destroy_view(xch, domain_id, altp2m_view_id);
+                rc = xc_altp2m_set_domain_state(xch, domain_id, 0);
+                rc = xc_monitor_singlestep(xch, domain_id, 0);
+
+                for ( vcpu_id = 0; vcpu_id<XEN_LEGACY_MAX_VCPUS; vcpu_id++)
+                    rc = control_singlestep(xch, domain_id, vcpu_id, 0);
+
+            } else {
+                rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, ~0ull, 0);
+                rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, START_PFN,
+                                       (xenaccess->max_gpfn - START_PFN) );
+            }
 
             shutting_down = 1;
         }
@@ -500,7 +596,7 @@ int main(int argc, char *argv[])
                 }
 
                 printf("PAGE ACCESS: %c%c%c for GFN %"PRIx64" (offset %06"
-                       PRIx64") gla %016"PRIx64" (valid: %c; fault in gpt: %c; fault with gla: %c) (vcpu %u)\n",
+                       PRIx64") gla %016"PRIx64" (valid: %c; fault in gpt: %c; fault with gla: %c) (vcpu %u, altp2m view %u)\n",
                        (req.u.mem_access.flags & MEM_ACCESS_R) ? 'r' : '-',
                        (req.u.mem_access.flags & MEM_ACCESS_W) ? 'w' : '-',
                        (req.u.mem_access.flags & MEM_ACCESS_X) ? 'x' : '-',
@@ -510,9 +606,20 @@ int main(int argc, char *argv[])
                        (req.u.mem_access.flags & MEM_ACCESS_GLA_VALID) ? 'y' : 'n',
                        (req.u.mem_access.flags & MEM_ACCESS_FAULT_IN_GPT) ? 'y' : 'n',
                        (req.u.mem_access.flags & MEM_ACCESS_FAULT_WITH_GLA) ? 'y': 'n',
-                       req.vcpu_id);
+                       req.vcpu_id,
+                       req.altp2m_idx);
 
-                if ( default_access != after_first_access )
+                if ( altp2m && req.flags & VM_EVENT_FLAG_ALTERNATE_P2M)
+                {
+                    DPRINTF("\tSwitching back to default view!\n");
+
+                    rsp.reason = req.reason;
+                    rsp.flags = req.flags;
+                    rsp.altp2m_idx = 0;
+
+                    control_singlestep(xch, domain_id, rsp.vcpu_id, 1);
+                }
+                else if ( default_access != after_first_access )
                 {
                     rc = xc_set_mem_access(xch, domain_id, after_first_access,
                                            req.u.mem_access.gfn, 1);
@@ -524,7 +631,6 @@ int main(int argc, char *argv[])
                         continue;
                     }
                 }
-
 
                 rsp.u.mem_access.gfn = req.u.mem_access.gfn;
                 break;
@@ -544,6 +650,23 @@ int main(int argc, char *argv[])
                     interrupted = -1;
                     continue;
                 }
+
+                break;
+            case VM_EVENT_REASON_SINGLESTEP:
+                printf("Singlestep: rip=%016"PRIx64", vcpu %d\n",
+                       req.data.regs.x86.rip,
+                       req.vcpu_id);
+
+                if ( altp2m )
+                {
+                    printf("\tSwitching altp2m to view %u!\n", altp2m_view_id);
+
+                    rsp.reason = req.reason;
+                    rsp.flags |= VM_EVENT_FLAG_ALTERNATE_P2M;
+                    rsp.altp2m_idx = altp2m_view_id;
+                }
+
+                control_singlestep(xch, domain_id, req.vcpu_id, 0);
 
                 break;
             default:

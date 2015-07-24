@@ -287,6 +287,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->u.hvm.hpet,               true);
         libxl_defbool_setdefault(&b_info->u.hvm.vpt_align,          true);
         libxl_defbool_setdefault(&b_info->u.hvm.nested_hvm,         false);
+        libxl_defbool_setdefault(&b_info->u.hvm.altp2m,             false);
         libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
         libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
 

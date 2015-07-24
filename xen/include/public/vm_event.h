@@ -79,6 +79,16 @@
   * Currently only useful for MSR, CR0, CR3 and CR4 write events.
   */
 #define VM_EVENT_FLAG_DENY               (1 << 6)
+/*
+ * This flag can be set in a request or a response
+ *
+ * On a request, indicates that the event occurred in the alternate p2m specified by
+ * the altp2m_idx request field.
+ *
+ * On a response, indicates that the VCPU should resume in the alternate p2m specified
+ * by the altp2m_idx response field if possible.
+ */
+#define VM_EVENT_FLAG_ALTERNATE_P2M      (1 << 7)
 
 /*
  * Reasons for the vm event request
@@ -221,6 +231,8 @@ typedef struct vm_event_st {
     uint32_t flags;     /* VM_EVENT_FLAG_* */
     uint32_t reason;    /* VM_EVENT_REASON_* */
     uint32_t vcpu_id;
+    uint16_t altp2m_idx; /* may be used during request and response */
+    uint16_t _pad[3];
 
     union {
         struct vm_event_paging                mem_paging;
