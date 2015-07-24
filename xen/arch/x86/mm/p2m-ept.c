@@ -42,7 +42,8 @@
 #define is_epte_superpage(ept_entry)    ((ept_entry)->sp)
 static inline bool_t is_epte_valid(ept_entry_t *e)
 {
-    return (e->epte != 0 && e->sa_p2mt != p2m_invalid);
+    /* suppress_ve alone is not considered valid, so mask it off */
+    return ((e->epte & ~(1ul << 63)) != 0 && e->sa_p2mt != p2m_invalid);
 }
 
 /* returns : 0 for success, -errno otherwise */
@@ -220,6 +221,8 @@ static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,
 static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
 {
     struct page_info *pg;
+    ept_entry_t *table;
+    unsigned int i;
 
     pg = p2m_alloc_ptp(p2m, 0);
     if ( pg == NULL )
@@ -232,6 +235,15 @@ static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
     ept_entry->r = ept_entry->w = ept_entry->x = 1;
     /* Manually set A bit to avoid overhead of MMU having to write it later. */
     ept_entry->a = 1;
+
+    ept_entry->suppress_ve = 1;
+
+    table = __map_domain_page(pg);
+
+    for ( i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
+        table[i].suppress_ve = 1;
+
+    unmap_domain_page(table);
 
     return 1;
 }
@@ -282,6 +294,7 @@ static int ept_split_super_page(struct p2m_domain *p2m, ept_entry_t *ept_entry,
         epte->sp = (level > 1);
         epte->mfn += i * trunk;
         epte->snp = (iommu_enabled && iommu_snoop);
+        epte->suppress_ve = 1;
 
         ept_p2m_type_to_flags(p2m, epte, epte->sa_p2mt, epte->access);
 
@@ -790,6 +803,8 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
         ept_p2m_type_to_flags(p2m, &new_entry, p2mt, p2ma);
     }
+
+    new_entry.suppress_ve = 1;
 
     rc = atomic_write_ept_entry(ept_entry, new_entry, target);
     if ( unlikely(rc) )
