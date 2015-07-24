@@ -175,6 +175,7 @@ typedef unsigned int p2m_query_t;
 typedef enum {
     p2m_host,
     p2m_nested,
+    p2m_alternate,
 } p2m_class_t;
 
 /* Per-p2m-table state */
@@ -193,7 +194,7 @@ struct p2m_domain {
 
     struct domain     *domain;   /* back pointer to domain */
 
-    p2m_class_t       p2m_class; /* host/nested/? */
+    p2m_class_t       p2m_class; /* host/nested/alternate */
 
     /* Nested p2ms only: nested p2m base value that this p2m shadows.
      * This can be cleared to P2M_BASE_EADDR under the per-p2m lock but
@@ -218,6 +219,9 @@ struct p2m_domain {
      * is responsible for performing the full flush before releasing the
      * host p2m's lock. */
     int                defer_nested_flush;
+
+    /* Alternate p2m: count of vcpu's currently using this p2m. */
+    atomic_t           active_vcpus;
 
     /* Pages used to construct the p2m */
     struct page_list_head pages;
@@ -315,6 +319,11 @@ static inline bool_t p2m_is_hostp2m(const struct p2m_domain *p2m)
 static inline bool_t p2m_is_nestedp2m(const struct p2m_domain *p2m)
 {
     return p2m->p2m_class == p2m_nested;
+}
+
+static inline bool_t p2m_is_altp2m(const struct p2m_domain *p2m)
+{
+    return p2m->p2m_class == p2m_alternate;
 }
 
 #define p2m_get_pagetable(p2m)  ((p2m)->phys_table)
@@ -727,6 +736,29 @@ void p2m_flush_nestedp2m(struct domain *d);
 
 void nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
     l1_pgentry_t *p, l1_pgentry_t new, unsigned int level);
+
+/*
+ * Alternate p2m: shadow p2m tables used for alternate memory views
+ */
+
+/* get current alternate p2m table */
+static inline struct p2m_domain *p2m_get_altp2m(struct vcpu *v)
+{
+    unsigned int index = vcpu_altp2m(v).p2midx;
+
+    if ( index == INVALID_ALTP2M )
+        return NULL;
+
+    BUG_ON(index >= MAX_ALTP2M);
+
+    return v->domain->arch.altp2m_p2m[index];
+}
+
+/* Locate an alternate p2m by its EPTP */
+unsigned int p2m_find_altp2m_by_eptp(struct domain *d, uint64_t eptp);
+
+/* Switch alternate p2m for a single vcpu */
+bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx);
 
 /*
  * p2m type to IOMMU flags

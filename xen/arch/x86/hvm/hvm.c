@@ -61,6 +61,7 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/event.h>
 #include <asm/hvm/vmx/vmx.h>
+#include <asm/altp2m.h>
 #include <asm/mtrr.h>
 #include <asm/apic.h>
 #include <public/sched.h>
@@ -2462,6 +2463,7 @@ void hvm_vcpu_destroy(struct vcpu *v)
 {
     hvm_all_ioreq_servers_remove_vcpu(v->domain, v);
 
+    altp2m_vcpu_destroy(v);
     nestedhvm_vcpu_destroy(v);
 
     free_compat_arg_xlat(v);
@@ -6565,6 +6567,25 @@ void hvm_toggle_singlestep(struct vcpu *v)
         return;
 
     v->arch.hvm_vcpu.single_step = !v->arch.hvm_vcpu.single_step;
+}
+
+void altp2m_vcpu_update_p2m(struct vcpu *v)
+{
+    if ( hvm_funcs.altp2m_vcpu_update_p2m )
+        hvm_funcs.altp2m_vcpu_update_p2m(v);
+}
+
+void altp2m_vcpu_update_vmfunc_ve(struct vcpu *v)
+{
+    if ( hvm_funcs.altp2m_vcpu_update_vmfunc_ve )
+        hvm_funcs.altp2m_vcpu_update_vmfunc_ve(v);
+}
+
+bool_t altp2m_vcpu_emulate_ve(struct vcpu *v)
+{
+    if ( hvm_funcs.altp2m_vcpu_emulate_ve )
+        return hvm_funcs.altp2m_vcpu_emulate_ve(v);
+    return 0;
 }
 
 /*

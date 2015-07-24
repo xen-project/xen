@@ -135,6 +135,13 @@ struct nestedvcpu {
 
 #define vcpu_nestedhvm(v) ((v)->arch.hvm_vcpu.nvcpu)
 
+struct altp2mvcpu {
+    uint16_t    p2midx;         /* alternate p2m index */
+    gfn_t       veinfo_gfn;     /* #VE information page gfn */
+};
+
+#define vcpu_altp2m(v) ((v)->arch.hvm_vcpu.avcpu)
+
 struct hvm_vcpu {
     /* Guest control-register and EFER values, just as the guest sees them. */
     unsigned long       guest_cr[5];
@@ -176,6 +183,8 @@ struct hvm_vcpu {
     struct tasklet      assert_evtchn_irq_tasklet;
 
     struct nestedvcpu   nvcpu;
+
+    struct altp2mvcpu   avcpu;
 
     struct mtrr_state   mtrr;
     u64                 pat_cr;

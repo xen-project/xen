@@ -35,6 +35,7 @@
 #include <asm/hvm/vmx/vmx.h> /* ept_p2m_init() */
 #include <asm/mem_sharing.h>
 #include <asm/hvm/nestedhvm.h>
+#include <asm/altp2m.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <xsm/xsm.h>
 
@@ -183,6 +184,43 @@ static void p2m_teardown_nestedp2m(struct domain *d)
     }
 }
 
+static void p2m_teardown_altp2m(struct domain *d)
+{
+    unsigned int i;
+    struct p2m_domain *p2m;
+
+    for ( i = 0; i < MAX_ALTP2M; i++ )
+    {
+        if ( !d->arch.altp2m_p2m[i] )
+            continue;
+        p2m = d->arch.altp2m_p2m[i];
+        d->arch.altp2m_p2m[i] = NULL;
+        p2m_free_one(p2m);
+    }
+}
+
+static int p2m_init_altp2m(struct domain *d)
+{
+    unsigned int i;
+    struct p2m_domain *p2m;
+
+    mm_lock_init(&d->arch.altp2m_list_lock);
+    for ( i = 0; i < MAX_ALTP2M; i++ )
+    {
+        d->arch.altp2m_p2m[i] = p2m = p2m_init_one(d);
+        if ( p2m == NULL )
+        {
+            p2m_teardown_altp2m(d);
+            return -ENOMEM;
+        }
+        p2m->p2m_class = p2m_alternate;
+        p2m->access_required = 1;
+        _atomic_set(&p2m->active_vcpus, 0);
+    }
+
+    return 0;
+}
+
 int p2m_init(struct domain *d)
 {
     int rc;
@@ -196,7 +234,17 @@ int p2m_init(struct domain *d)
      * (p2m_init runs too early for HVM_PARAM_* options) */
     rc = p2m_init_nestedp2m(d);
     if ( rc )
+    {
         p2m_teardown_hostp2m(d);
+        return rc;
+    }
+
+    rc = p2m_init_altp2m(d);
+    if ( rc )
+    {
+        p2m_teardown_hostp2m(d);
+        p2m_teardown_nestedp2m(d);
+    }
 
     return rc;
 }
@@ -1977,6 +2025,59 @@ int unmap_mmio_regions(struct domain *d,
     }
 
     return err;
+}
+
+unsigned int p2m_find_altp2m_by_eptp(struct domain *d, uint64_t eptp)
+{
+    struct p2m_domain *p2m;
+    struct ept_data *ept;
+    unsigned int i;
+
+    altp2m_list_lock(d);
+
+    for ( i = 0; i < MAX_ALTP2M; i++ )
+    {
+        if ( d->arch.altp2m_eptp[i] == INVALID_MFN )
+            continue;
+
+        p2m = d->arch.altp2m_p2m[i];
+        ept = &p2m->ept;
+
+        if ( eptp == ept_get_eptp(ept) )
+            goto out;
+    }
+
+    i = INVALID_ALTP2M;
+
+ out:
+    altp2m_list_unlock(d);
+    return i;
+}
+
+bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx)
+{
+    struct domain *d = v->domain;
+    bool_t rc = 0;
+
+    if ( idx > MAX_ALTP2M )
+        return rc;
+
+    altp2m_list_lock(d);
+
+    if ( d->arch.altp2m_eptp[idx] != INVALID_MFN )
+    {
+        if ( idx != vcpu_altp2m(v).p2midx )
+        {
+            atomic_dec(&p2m_get_altp2m(v)->active_vcpus);
+            vcpu_altp2m(v).p2midx = idx;
+            atomic_inc(&p2m_get_altp2m(v)->active_vcpus);
+            altp2m_vcpu_update_p2m(v);
+        }
+        rc = 1;
+    }
+
+    altp2m_list_unlock(d);
+    return rc;
 }
 
 /*** Audit ***/

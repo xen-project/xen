@@ -206,6 +206,11 @@ struct hvm_function_table {
 
     void (*enable_msr_exit_interception)(struct domain *d);
     bool_t (*is_singlestep_supported)(void);
+
+    /* Alternate p2m */
+    void (*altp2m_vcpu_update_p2m)(struct vcpu *v);
+    void (*altp2m_vcpu_update_vmfunc_ve)(struct vcpu *v);
+    bool_t (*altp2m_vcpu_emulate_ve)(struct vcpu *v);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -545,6 +550,15 @@ extern bool_t opt_hvm_fep;
 #else
 #define opt_hvm_fep 0
 #endif
+
+/* updates the current hardware p2m */
+void altp2m_vcpu_update_p2m(struct vcpu *v);
+
+/* updates VMCS fields related to VMFUNC and #VE */
+void altp2m_vcpu_update_vmfunc_ve(struct vcpu *v);
+
+/* emulates #VE */
+bool_t altp2m_vcpu_emulate_ve(struct vcpu *v);
 
 #endif /* __ASM_X86_HVM_HVM_H__ */
 
