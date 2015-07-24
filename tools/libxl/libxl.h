@@ -758,6 +758,12 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_BUILDINFO_SERIAL_LIST 1
 
 /*
+ * LIBXL_HAVE_ALTP2M
+ * If this is defined, then libxl supports alternate p2m functionality.
+ */
+#define LIBXL_HAVE_ALTP2M 1
+
+/*
  * LIBXL_HAVE_REMUS
  * If this is defined, then libxl supports remus.
  */

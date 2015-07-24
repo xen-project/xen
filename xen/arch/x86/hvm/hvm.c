@@ -5866,6 +5866,7 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_VIRIDIAN:
     case HVM_PARAM_IOREQ_SERVER_PFN:
     case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
+    case HVM_PARAM_ALTP2M:
         if ( value != 0 && a->value != value )
             rc = -EEXIST;
         break;
@@ -5988,6 +5989,9 @@ static int hvmop_set_param(
          */
         if ( cpu_has_svm && !paging_mode_hap(d) && a.value )
             rc = -EINVAL;
+        if ( a.value &&
+             d->arch.hvm_domain.params[HVM_PARAM_ALTP2M] )
+            rc = -EINVAL;
         /* Set up NHVM state for any vcpus that are already up. */
         if ( a.value &&
              !d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
@@ -5997,6 +6001,13 @@ static int hvmop_set_param(
         if ( !a.value || rc )
             for_each_vcpu(d, v)
                 nestedhvm_vcpu_destroy(v);
+        break;
+    case HVM_PARAM_ALTP2M:
+        if ( a.value > 1 )
+            rc = -EINVAL;
+        if ( a.value &&
+             d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
+            rc = -EINVAL;
         break;
     case HVM_PARAM_BUFIOREQ_EVTCHN:
         rc = -EINVAL;
@@ -6058,6 +6069,7 @@ static int hvm_allow_get_param(struct domain *d,
     case HVM_PARAM_STORE_EVTCHN:
     case HVM_PARAM_CONSOLE_PFN:
     case HVM_PARAM_CONSOLE_EVTCHN:
+    case HVM_PARAM_ALTP2M:
         break;
     /*
      * The following parameters must not be read by the guest
@@ -6178,6 +6190,12 @@ static int do_altp2m_op(
     switch ( a.cmd )
     {
     case HVMOP_altp2m_get_domain_state:
+        if ( !d->arch.hvm_domain.params[HVM_PARAM_ALTP2M] )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
         a.u.domain_state.state = altp2m_active(d);
         rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         break;
@@ -6187,7 +6205,8 @@ static int do_altp2m_op(
         struct vcpu *v;
         bool_t ostate;
 
-        if ( nestedhvm_enabled(d) )
+        if ( !d->arch.hvm_domain.params[HVM_PARAM_ALTP2M] ||
+             nestedhvm_enabled(d) )
         {
             rc = -EINVAL;
             break;
