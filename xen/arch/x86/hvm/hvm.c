@@ -6136,6 +6136,140 @@ static int hvmop_get_param(
     return rc;
 }
 
+static int do_altp2m_op(
+    XEN_GUEST_HANDLE_PARAM(void) arg)
+{
+    struct xen_hvm_altp2m_op a;
+    struct domain *d = NULL;
+    int rc = 0;
+
+    if ( !hvm_altp2m_supported() )
+        return -EOPNOTSUPP;
+
+    if ( copy_from_guest(&a, arg, 1) )
+        return -EFAULT;
+
+    if ( a.pad1 || a.pad2 ||
+         (a.version != HVMOP_ALTP2M_INTERFACE_VERSION) ||
+         (a.cmd < HVMOP_altp2m_get_domain_state) ||
+         (a.cmd > HVMOP_altp2m_change_gfn) )
+        return -EINVAL;
+
+    d = (a.cmd != HVMOP_altp2m_vcpu_enable_notify) ?
+        rcu_lock_domain_by_any_id(a.domain) : rcu_lock_current_domain();
+
+    if ( d == NULL )
+        return -ESRCH;
+
+    if ( !is_hvm_domain(d) )
+    {
+        rc = -EOPNOTSUPP;
+        goto out;
+    }
+
+    if ( (a.cmd != HVMOP_altp2m_get_domain_state) &&
+         (a.cmd != HVMOP_altp2m_set_domain_state) &&
+         !d->arch.altp2m_active )
+    {
+        rc = -EOPNOTSUPP;
+        goto out;
+    }
+
+    switch ( a.cmd )
+    {
+    case HVMOP_altp2m_get_domain_state:
+        a.u.domain_state.state = altp2m_active(d);
+        rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+        break;
+
+    case HVMOP_altp2m_set_domain_state:
+    {
+        struct vcpu *v;
+        bool_t ostate;
+
+        if ( nestedhvm_enabled(d) )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        ostate = d->arch.altp2m_active;
+        d->arch.altp2m_active = !!a.u.domain_state.state;
+
+        /* If the alternate p2m state has changed, handle appropriately */
+        if ( d->arch.altp2m_active != ostate &&
+             (ostate || !(rc = p2m_init_altp2m_by_id(d, 0))) )
+        {
+            for_each_vcpu( d, v )
+            {
+                if ( !ostate )
+                    altp2m_vcpu_initialise(v);
+                else
+                    altp2m_vcpu_destroy(v);
+            }
+
+            if ( ostate )
+                p2m_flush_altp2m(d);
+        }
+        break;
+    }
+
+    case HVMOP_altp2m_vcpu_enable_notify:
+    {
+        struct vcpu *curr = current;
+        p2m_type_t p2mt;
+
+        if ( a.u.enable_notify.pad || a.domain != DOMID_SELF ||
+             a.u.enable_notify.vcpu_id != curr->vcpu_id )
+            rc = -EINVAL;
+
+        if ( (gfn_x(vcpu_altp2m(curr).veinfo_gfn) != INVALID_GFN) ||
+             (mfn_x(get_gfn_query_unlocked(curr->domain,
+                    a.u.enable_notify.gfn, &p2mt)) == INVALID_MFN) )
+            return -EINVAL;
+
+        vcpu_altp2m(curr).veinfo_gfn = _gfn(a.u.enable_notify.gfn);
+        altp2m_vcpu_update_vmfunc_ve(curr);
+        break;
+    }
+
+    case HVMOP_altp2m_create_p2m:
+        if ( !(rc = p2m_init_next_altp2m(d, &a.u.view.view)) )
+            rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+        break;
+
+    case HVMOP_altp2m_destroy_p2m:
+        rc = p2m_destroy_altp2m_by_id(d, a.u.view.view);
+        break;
+
+    case HVMOP_altp2m_switch_p2m:
+        rc = p2m_switch_domain_altp2m_by_id(d, a.u.view.view);
+        break;
+
+    case HVMOP_altp2m_set_mem_access:
+        if ( a.u.set_mem_access.pad )
+            rc = -EINVAL;
+        else
+            rc = p2m_set_altp2m_mem_access(d, a.u.set_mem_access.view,
+                    _gfn(a.u.set_mem_access.gfn),
+                    a.u.set_mem_access.hvmmem_access);
+        break;
+
+    case HVMOP_altp2m_change_gfn:
+        if ( a.u.change_gfn.pad1 || a.u.change_gfn.pad2 )
+            rc = -EINVAL;
+        else
+            rc = p2m_change_altp2m_gfn(d, a.u.change_gfn.view,
+                    _gfn(a.u.change_gfn.old_gfn),
+                    _gfn(a.u.change_gfn.new_gfn));
+    }
+
+ out:
+    rcu_unlock_domain(d);
+
+    return rc;
+}
+
 /*
  * Note that this value is effectively part of the ABI, even if we don't need
  * to make it a formal part of it: A guest suspended for migration in the
@@ -6563,6 +6697,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             hvm_event_guest_request();
         else
             rc = -EINVAL;
+        break;
+
+    case HVMOP_altp2m:
+        rc = do_altp2m_op(arg);
         break;
 
     default:
