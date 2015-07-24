@@ -101,6 +101,8 @@ u32 vmx_secondary_exec_control __read_mostly;
 u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 u64 vmx_ept_vpid_cap __read_mostly;
+u64 vmx_vmfunc __read_mostly;
+bool_t vmx_virt_exception __read_mostly;
 
 const u32 vmx_introspection_force_enabled_msrs[] = {
     MSR_IA32_SYSENTER_EIP,
@@ -140,6 +142,8 @@ static void __init vmx_display_features(void)
     P(cpu_has_vmx_virtual_intr_delivery, "Virtual Interrupt Delivery");
     P(cpu_has_vmx_posted_intr_processing, "Posted Interrupt Processing");
     P(cpu_has_vmx_vmcs_shadowing, "VMCS shadowing");
+    P(cpu_has_vmx_vmfunc, "VM Functions");
+    P(cpu_has_vmx_virt_exceptions, "Virtualisation Exceptions");
     P(cpu_has_vmx_pml, "Page Modification Logging");
 #undef P
 
@@ -185,6 +189,7 @@ static int vmx_init_vmcs_config(void)
     u64 _vmx_misc_cap = 0;
     u32 _vmx_vmexit_control;
     u32 _vmx_vmentry_control;
+    u64 _vmx_vmfunc = 0;
     bool_t mismatch = 0;
 
     rdmsr(MSR_IA32_VMX_BASIC, vmx_basic_msr_low, vmx_basic_msr_high);
@@ -230,7 +235,9 @@ static int vmx_init_vmcs_config(void)
                SECONDARY_EXEC_ENABLE_EPT |
                SECONDARY_EXEC_ENABLE_RDTSCP |
                SECONDARY_EXEC_PAUSE_LOOP_EXITING |
-               SECONDARY_EXEC_ENABLE_INVPCID);
+               SECONDARY_EXEC_ENABLE_INVPCID |
+               SECONDARY_EXEC_ENABLE_VM_FUNCTIONS |
+               SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS);
         rdmsrl(MSR_IA32_VMX_MISC, _vmx_misc_cap);
         if ( _vmx_misc_cap & VMX_MISC_VMWRITE_ALL )
             opt |= SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
@@ -341,6 +348,24 @@ static int vmx_init_vmcs_config(void)
           || !(_vmx_vmexit_control & VM_EXIT_ACK_INTR_ON_EXIT) )
         _vmx_pin_based_exec_control  &= ~ PIN_BASED_POSTED_INTERRUPT;
 
+    /* The IA32_VMX_VMFUNC MSR exists only when VMFUNC is available */
+    if ( _vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VM_FUNCTIONS )
+    {
+        rdmsrl(MSR_IA32_VMX_VMFUNC, _vmx_vmfunc);
+
+        /*
+         * VMFUNC leaf 0 (EPTP switching) must be supported.
+         *
+         * Or we just don't use VMFUNC.
+         */
+        if ( !(_vmx_vmfunc & VMX_VMFUNC_EPTP_SWITCHING) )
+            _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VM_FUNCTIONS;
+    }
+
+    /* Virtualization exceptions are only enabled if VMFUNC is enabled */
+    if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VM_FUNCTIONS) )
+        _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS;
+
     min = 0;
     opt = VM_ENTRY_LOAD_GUEST_PAT | VM_ENTRY_LOAD_BNDCFGS;
     _vmx_vmentry_control = adjust_vmx_controls(
@@ -361,6 +386,9 @@ static int vmx_init_vmcs_config(void)
         vmx_vmentry_control        = _vmx_vmentry_control;
         vmx_basic_msr              = ((u64)vmx_basic_msr_high << 32) |
                                      vmx_basic_msr_low;
+        vmx_vmfunc                 = _vmx_vmfunc;
+        vmx_virt_exception         = !!(_vmx_secondary_exec_control &
+                                       SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS);
         vmx_display_features();
 
         /* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
@@ -397,6 +425,9 @@ static int vmx_init_vmcs_config(void)
         mismatch |= cap_check(
             "EPT and VPID Capability",
             vmx_ept_vpid_cap, _vmx_ept_vpid_cap);
+        mismatch |= cap_check(
+            "VMFUNC Capability",
+            vmx_vmfunc, _vmx_vmfunc);
         if ( cpu_has_vmx_ins_outs_instr_info !=
              !!(vmx_basic_msr_high & (VMX_BASIC_INS_OUT_INFO >> 32)) )
         {
@@ -966,6 +997,11 @@ static int construct_vmcs(struct vcpu *v)
 
     /* Do not enable Monitor Trap Flag unless start single step debug */
     v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
+
+    /* Disable VMFUNC and #VE for now: they may be enabled later by altp2m. */
+    v->arch.hvm_vmx.secondary_exec_control &=
+        ~(SECONDARY_EXEC_ENABLE_VM_FUNCTIONS |
+          SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS);
 
     if ( is_pvh_domain(d) )
     {
@@ -1790,9 +1826,9 @@ void vmcs_dump_vcpu(struct vcpu *v)
         printk("PLE Gap=%08x Window=%08x\n",
                vmr32(PLE_GAP), vmr32(PLE_WINDOW));
     if ( v->arch.hvm_vmx.secondary_exec_control &
-         (SECONDARY_EXEC_ENABLE_VPID | SECONDARY_EXEC_ENABLE_VMFUNC) )
+         (SECONDARY_EXEC_ENABLE_VPID | SECONDARY_EXEC_ENABLE_VM_FUNCTIONS) )
         printk("Virtual processor ID = 0x%04x VMfunc controls = %016lx\n",
-               vmr16(VIRTUAL_PROCESSOR_ID), vmr(VMFUNC_CONTROL));
+               vmr16(VIRTUAL_PROCESSOR_ID), vmr(VM_FUNCTION_CONTROL));
 
     vmx_vmcs_exit(v);
 }

@@ -130,6 +130,7 @@
 #define MSR_IA32_VMX_TRUE_PROCBASED_CTLS        0x48e
 #define MSR_IA32_VMX_TRUE_EXIT_CTLS             0x48f
 #define MSR_IA32_VMX_TRUE_ENTRY_CTLS            0x490
+#define MSR_IA32_VMX_VMFUNC                     0x491
 #define IA32_FEATURE_CONTROL_MSR                0x3a
 #define IA32_FEATURE_CONTROL_MSR_LOCK                     0x0001
 #define IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_INSIDE_SMX  0x0002

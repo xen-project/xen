@@ -282,7 +282,6 @@ static int ept_split_super_page(struct p2m_domain *p2m, ept_entry_t *ept_entry,
         epte->sp = (level > 1);
         epte->mfn += i * trunk;
         epte->snp = (iommu_enabled && iommu_snoop);
-        ASSERT(!epte->avail3);
 
         ept_p2m_type_to_flags(p2m, epte, epte->sa_p2mt, epte->access);
 
