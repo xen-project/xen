@@ -1560,6 +1560,12 @@ void p2m_mem_access_emulate_check(struct vcpu *v,
     }
 }
 
+void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
+{
+    if ( altp2m_active(v->domain) )
+        p2m_switch_vcpu_altp2m_by_id(v, idx);
+}
+
 bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                             struct npfec npfec,
                             vm_event_request_t **req_ptr)
@@ -1567,13 +1573,18 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     struct vcpu *v = current;
     unsigned long gfn = gpa >> PAGE_SHIFT;
     struct domain *d = v->domain;    
-    struct p2m_domain* p2m = p2m_get_hostp2m(d);
+    struct p2m_domain *p2m = NULL;
     mfn_t mfn;
     p2m_type_t p2mt;
     p2m_access_t p2ma;
     vm_event_request_t *req;
     int rc;
     unsigned long eip = guest_cpu_user_regs()->eip;
+
+    if ( altp2m_active(d) )
+        p2m = p2m_get_altp2m(v);
+    if ( !p2m )
+        p2m = p2m_get_hostp2m(d);
 
     /* First, handle rx2rw conversion automatically.
      * These calls to p2m->set_entry() must succeed: we have the gfn
@@ -1689,6 +1700,12 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
         req->vcpu_id = v->vcpu_id;
 
         p2m_vm_event_fill_regs(req);
+
+        if ( altp2m_active(v->domain) )
+        {
+            req->flags |= VM_EVENT_FLAG_ALTERNATE_P2M;
+            req->altp2m_idx = vcpu_altp2m(v).p2midx;
+        }
     }
 
     /* Pause the current VCPU */

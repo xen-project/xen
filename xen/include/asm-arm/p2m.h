@@ -109,6 +109,12 @@ void p2m_mem_access_emulate_check(struct vcpu *v,
     /* Not supported on ARM. */
 }
 
+static inline
+void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
+{
+    /* Not supported on ARM. */
+}
+
 #define p2m_is_foreign(_t)  ((_t) == p2m_map_foreign)
 #define p2m_is_ram(_t)      ((_t) == p2m_ram_rw || (_t) == p2m_ram_ro)
 
