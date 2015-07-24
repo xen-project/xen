@@ -94,6 +94,9 @@ struct hvm_function_table {
     /* Necessary hardware support for PVH mode? */
     int pvh_supported;
 
+    /* Necessary hardware support for alternate p2m's? */
+    bool_t altp2m_supported;
+
     /* Indicate HAP capabilities. */
     int hap_capabilities;
 
@@ -528,6 +531,12 @@ static inline bool_t hvm_is_singlestep_supported(void)
 {
     return (hvm_funcs.is_singlestep_supported &&
             hvm_funcs.is_singlestep_supported());
+}
+
+/* returns true if hardware supports alternate p2m's */
+static inline bool_t hvm_altp2m_supported(void)
+{
+    return hvm_funcs.altp2m_supported;
 }
 
 #ifndef NDEBUG

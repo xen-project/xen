@@ -1847,6 +1847,7 @@ const struct hvm_function_table * __init start_vmx(void)
     if ( cpu_has_vmx_ept && (cpu_has_vmx_pat || opt_force_ept) )
     {
         vmx_function_table.hap_supported = 1;
+        vmx_function_table.altp2m_supported = 1;
 
         vmx_function_table.hap_capabilities = 0;
 

@@ -96,6 +96,10 @@ bool_t opt_hvm_fep;
 boolean_param("hvm_fep", opt_hvm_fep);
 #endif
 
+/* Xen command-line option to enable altp2m */
+static bool_t __initdata opt_altp2m_enabled = 0;
+boolean_param("altp2m", opt_altp2m_enabled);
+
 static int cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
@@ -161,6 +165,9 @@ static int __init hvm_enable(void)
 
     if ( !fns->pvh_supported )
         printk(XENLOG_INFO "HVM: PVH mode not supported on this platform\n");
+
+    if ( !opt_altp2m_enabled )
+        hvm_funcs.altp2m_supported = 0;
 
     /*
      * Allow direct access to the PC debug ports 0x80 and 0xed (they are
