@@ -167,6 +167,7 @@ struct hvm_function_table {
     int (*msr_read_intercept)(unsigned int msr, uint64_t *msr_content);
     int (*msr_write_intercept)(unsigned int msr, uint64_t msr_content);
     void (*invlpg_intercept)(unsigned long vaddr);
+    int (*vmfunc_intercept)(struct cpu_user_regs *regs);
     void (*handle_cd)(struct vcpu *v, unsigned long value);
     void (*set_info_guest)(struct vcpu *v);
     void (*set_rdtsc_exiting)(struct vcpu *v, bool_t);
@@ -211,6 +212,7 @@ struct hvm_function_table {
     void (*altp2m_vcpu_update_p2m)(struct vcpu *v);
     void (*altp2m_vcpu_update_vmfunc_ve)(struct vcpu *v);
     bool_t (*altp2m_vcpu_emulate_ve)(struct vcpu *v);
+    int (*altp2m_vcpu_emulate_vmfunc)(struct cpu_user_regs *regs);
 };
 
 extern struct hvm_function_table hvm_funcs;

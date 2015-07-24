@@ -1593,6 +1593,18 @@ static int hvmemul_invlpg(
     return rc;
 }
 
+static int hvmemul_vmfunc(
+    struct x86_emulate_ctxt *ctxt)
+{
+    int rc;
+
+    rc = hvm_funcs.altp2m_vcpu_emulate_vmfunc(ctxt->regs);
+    if ( rc != X86EMUL_OKAY )
+        hvmemul_inject_hw_exception(TRAP_invalid_op, 0, ctxt);
+
+    return rc;
+}
+
 static const struct x86_emulate_ops hvm_emulate_ops = {
     .read          = hvmemul_read,
     .insn_fetch    = hvmemul_insn_fetch,
@@ -1616,7 +1628,8 @@ static const struct x86_emulate_ops hvm_emulate_ops = {
     .inject_sw_interrupt = hvmemul_inject_sw_interrupt,
     .get_fpu       = hvmemul_get_fpu,
     .put_fpu       = hvmemul_put_fpu,
-    .invlpg        = hvmemul_invlpg
+    .invlpg        = hvmemul_invlpg,
+    .vmfunc        = hvmemul_vmfunc,
 };
 
 static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
@@ -1642,7 +1655,8 @@ static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
     .inject_sw_interrupt = hvmemul_inject_sw_interrupt,
     .get_fpu       = hvmemul_get_fpu,
     .put_fpu       = hvmemul_put_fpu,
-    .invlpg        = hvmemul_invlpg
+    .invlpg        = hvmemul_invlpg,
+    .vmfunc        = hvmemul_vmfunc,
 };
 
 static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,

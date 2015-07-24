@@ -397,6 +397,10 @@ struct x86_emulate_ops
         enum x86_segment seg,
         unsigned long offset,
         struct x86_emulate_ctxt *ctxt);
+
+    /* vmfunc: Emulate VMFUNC via given set of EAX ECX inputs */
+    int (*vmfunc)(
+        struct x86_emulate_ctxt *ctxt);
 };
 
 struct cpu_user_regs;

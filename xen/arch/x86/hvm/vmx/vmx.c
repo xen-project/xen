@@ -82,6 +82,7 @@ static void vmx_fpu_dirty_intercept(void);
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
 static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content);
 static void vmx_invlpg_intercept(unsigned long vaddr);
+static int vmx_vmfunc_intercept(struct cpu_user_regs *regs);
 
 uint8_t __read_mostly posted_intr_vector;
 
@@ -1838,6 +1839,19 @@ static void vmx_vcpu_update_vmfunc_ve(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
+static int vmx_vcpu_emulate_vmfunc(struct cpu_user_regs *regs)
+{
+    int rc = X86EMUL_EXCEPTION;
+    struct vcpu *curr = current;
+
+    if ( !cpu_has_vmx_vmfunc && altp2m_active(curr->domain) &&
+         regs->_eax == 0 &&
+         p2m_switch_vcpu_altp2m_by_id(curr, regs->_ecx) )
+        rc = X86EMUL_OKAY;
+
+    return rc;
+}
+
 static bool_t vmx_vcpu_emulate_ve(struct vcpu *v)
 {
     bool_t rc = 0;
@@ -1906,6 +1920,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .msr_read_intercept   = vmx_msr_read_intercept,
     .msr_write_intercept  = vmx_msr_write_intercept,
     .invlpg_intercept     = vmx_invlpg_intercept,
+    .vmfunc_intercept     = vmx_vmfunc_intercept,
     .handle_cd            = vmx_handle_cd,
     .set_info_guest       = vmx_set_info_guest,
     .set_rdtsc_exiting    = vmx_set_rdtsc_exiting,
@@ -1931,6 +1946,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .altp2m_vcpu_update_p2m = vmx_vcpu_update_eptp,
     .altp2m_vcpu_update_vmfunc_ve = vmx_vcpu_update_vmfunc_ve,
     .altp2m_vcpu_emulate_ve = vmx_vcpu_emulate_ve,
+    .altp2m_vcpu_emulate_vmfunc = vmx_vcpu_emulate_vmfunc,
 };
 
 const struct hvm_function_table * __init start_vmx(void)
@@ -2100,6 +2116,19 @@ static void vmx_invlpg_intercept(unsigned long vaddr)
     HVMTRACE_LONG_2D(INVLPG, /*invlpga=*/ 0, TRC_PAR_LONG(vaddr));
     if ( paging_invlpg(curr, vaddr) && cpu_has_vmx_vpid )
         vpid_sync_vcpu_gva(curr, vaddr);
+}
+
+static int vmx_vmfunc_intercept(struct cpu_user_regs *regs)
+{
+    /*
+     * This handler is a placeholder for future where Xen may
+     * want to handle VMFUNC exits and resume a domain normally without
+     * injecting a #UD to the guest - for example, in a VT-nested
+     * scenario where Xen may want to lazily shadow the alternate
+     * EPTP list.
+     */
+    gdprintk(XENLOG_ERR, "Failed guest VMFUNC execution\n");
+    return X86EMUL_EXCEPTION;
 }
 
 static int vmx_cr_access(unsigned long exit_qualification)
@@ -3257,6 +3286,13 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     case EXIT_REASON_INVVPID:
         if ( nvmx_handle_invvpid(regs) == X86EMUL_OKAY )
+            update_guest_eip();
+        break;
+
+    case EXIT_REASON_VMFUNC:
+        if ( vmx_vmfunc_intercept(regs) != X86EMUL_OKAY )
+            hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        else
             update_guest_eip();
         break;
 
