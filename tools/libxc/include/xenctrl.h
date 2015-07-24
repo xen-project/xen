@@ -2313,6 +2313,28 @@ void xc_tmem_save_done(xc_interface *xch, int dom);
 int xc_tmem_restore(xc_interface *xch, int dom, int fd);
 int xc_tmem_restore_extra(xc_interface *xch, int dom, int fd);
 
+/**
+ * altp2m operations
+ */
+
+int xc_altp2m_get_domain_state(xc_interface *handle, domid_t dom, bool *state);
+int xc_altp2m_set_domain_state(xc_interface *handle, domid_t dom, bool state);
+int xc_altp2m_set_vcpu_enable_notify(xc_interface *handle, domid_t domid,
+                                     uint32_t vcpuid, xen_pfn_t gfn);
+int xc_altp2m_create_view(xc_interface *handle, domid_t domid,
+                          xenmem_access_t default_access, uint16_t *view_id);
+int xc_altp2m_destroy_view(xc_interface *handle, domid_t domid,
+                           uint16_t view_id);
+/* Switch all vCPUs of the domain to the specified altp2m view */
+int xc_altp2m_switch_to_view(xc_interface *handle, domid_t domid,
+                             uint16_t view_id);
+int xc_altp2m_set_mem_access(xc_interface *handle, domid_t domid,
+                             uint16_t view_id, xen_pfn_t gfn,
+                             xenmem_access_t access);
+int xc_altp2m_change_gfn(xc_interface *handle, domid_t domid,
+                         uint16_t view_id, xen_pfn_t old_gfn,
+                         xen_pfn_t new_gfn);
+
 /** 
  * Mem paging operations.
  * Paging is supported only on the x86 architecture in 64 bit mode, with
