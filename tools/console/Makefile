@@ -21,6 +21,7 @@ all: $(BIN)
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(DEPS)
 	$(RM) client/*.o daemon/*.o
+	$(RM) client/_paths.h
 
 .PHONY: distclean
 distclean: clean
@@ -28,8 +29,11 @@ distclean: clean
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_xenconsoled) $(APPEND_LDFLAGS)
 
-xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
+xenconsole: client/_paths.h $(patsubst %.c,%.o,$(wildcard client/*.c))
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_xenconsole) $(APPEND_LDFLAGS)
+
+genpath-target = $(call buildmakevars2header,client/_paths.h)
+$(eval $(genpath-target))
 
 .PHONY: install
 install: $(BIN)

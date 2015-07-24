@@ -18,7 +18,9 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 \*/
 
+#include <sys/file.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <stdio.h>
@@ -40,10 +42,13 @@
 
 #include <xenstore.h>
 #include "xenctrl.h"
+#include "_paths.h"
 
 #define ESCAPE_CHARACTER 0x1d
 
 static volatile sig_atomic_t received_signal = 0;
+static char lockfile[sizeof (XEN_LOCK_DIR "/xenconsole.") + 8] = { 0 };
+static int lockfd = -1;
 
 static void sighandler(int signum)
 {
@@ -267,6 +272,53 @@ static void restore_term_stdin(void)
 	restore_term(STDIN_FILENO, &stdin_old_attr);
 }
 
+/* The following locking strategy is based on that from
+ * libxl__domain_userdata_lock(), with the difference that we want to fail if we
+ * cannot acquire the lock rather than wait indefinitely.
+ */
+static void console_lock(int domid)
+{
+	struct stat stab, fstab;
+	int fd;
+
+	snprintf(lockfile, sizeof lockfile, "%s%d", XEN_LOCK_DIR "/xenconsole.", domid);
+
+	while (true) {
+		fd = open(lockfile, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+		if (fd < 0)
+			err(errno, "Could not open %s", lockfile);
+
+		while (flock(fd, LOCK_EX | LOCK_NB)) {
+			if (errno == EINTR)
+				continue;
+			else
+				err(errno, "Could not lock %s", lockfile);
+		}
+		if (fstat(fd, &fstab))
+			err(errno, "Could not fstat %s", lockfile);
+		if (stat(lockfile, &stab)) {
+			if (errno != ENOENT)
+				err(errno, "Could not stat %s", lockfile);
+		} else {
+			if (stab.st_dev == fstab.st_dev && stab.st_ino == fstab.st_ino)
+				break;
+		}
+
+		close(fd);
+	}
+
+	lockfd = fd;
+	return;
+}
+
+static void console_unlock(void)
+{
+	if (lockfile[0] && lockfd != -1) {
+		unlink(lockfile);
+		close(lockfd);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	struct termios attr;
@@ -381,6 +433,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Can't specify Domain-0\n");
 		exit(EINVAL);
 	}
+
+	console_lock(domid);
+	atexit(console_unlock);
 
 	/* Set a watch on this domain's console pty */
 	if (!xs_watch(xs, path, ""))
