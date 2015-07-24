@@ -650,6 +650,12 @@ int cpu_disable_scheduler(unsigned int cpu)
     if ( c == NULL )
         return ret;
 
+    /*
+     * We'd need the domain RCU lock, but:
+     *  - when we are called from cpupool code, it's acquired there already;
+     *  - when we are called for CPU teardown, we're in stop-machine context,
+     *    so that's not be a problem.
+     */
     for_each_domain_in_cpupool ( d, c )
     {
         for_each_vcpu ( d, v )
@@ -735,7 +741,6 @@ int cpu_disable_scheduler(unsigned int cpu)
                     ret = -EAGAIN;
             }
         }
-        domain_update_node_affinity(d);
     }
 
     return ret;
