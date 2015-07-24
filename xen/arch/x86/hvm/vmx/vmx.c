@@ -56,6 +56,7 @@
 #include <asm/debugger.h>
 #include <asm/apic.h>
 #include <asm/hvm/nestedhvm.h>
+#include <asm/altp2m.h>
 #include <asm/event.h>
 #include <asm/monitor.h>
 #include <public/arch-x86/cpuid.h>
@@ -1770,6 +1771,105 @@ static bool_t vmx_is_singlestep_supported(void)
     return cpu_has_monitor_trap_flag;
 }
 
+static void vmx_vcpu_update_eptp(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    struct p2m_domain *p2m = NULL;
+    struct ept_data *ept;
+
+    if ( altp2m_active(d) )
+        p2m = p2m_get_altp2m(v);
+    if ( !p2m )
+        p2m = p2m_get_hostp2m(d);
+
+    ept = &p2m->ept;
+    ept->asr = pagetable_get_pfn(p2m_get_pagetable(p2m));
+
+    vmx_vmcs_enter(v);
+
+    __vmwrite(EPT_POINTER, ept_get_eptp(ept));
+
+    if ( v->arch.hvm_vmx.secondary_exec_control &
+         SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS )
+        __vmwrite(EPTP_INDEX, vcpu_altp2m(v).p2midx);
+
+    vmx_vmcs_exit(v);
+}
+
+static void vmx_vcpu_update_vmfunc_ve(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    u32 mask = SECONDARY_EXEC_ENABLE_VM_FUNCTIONS;
+
+    if ( !cpu_has_vmx_vmfunc )
+        return;
+
+    if ( cpu_has_vmx_virt_exceptions )
+        mask |= SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS;
+
+    vmx_vmcs_enter(v);
+
+    if ( !d->is_dying && altp2m_active(d) )
+    {
+        v->arch.hvm_vmx.secondary_exec_control |= mask;
+        __vmwrite(VM_FUNCTION_CONTROL, VMX_VMFUNC_EPTP_SWITCHING);
+        __vmwrite(EPTP_LIST_ADDR, virt_to_maddr(d->arch.altp2m_eptp));
+
+        if ( cpu_has_vmx_virt_exceptions )
+        {
+            p2m_type_t t;
+            mfn_t mfn;
+
+            mfn = get_gfn_query_unlocked(d, gfn_x(vcpu_altp2m(v).veinfo_gfn), &t);
+
+            if ( mfn_x(mfn) != INVALID_MFN )
+                __vmwrite(VIRT_EXCEPTION_INFO, mfn_x(mfn) << PAGE_SHIFT);
+            else
+                v->arch.hvm_vmx.secondary_exec_control &=
+                    ~SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS;
+        }
+    }
+    else
+        v->arch.hvm_vmx.secondary_exec_control &= ~mask;
+
+    __vmwrite(SECONDARY_VM_EXEC_CONTROL,
+              v->arch.hvm_vmx.secondary_exec_control);
+
+    vmx_vmcs_exit(v);
+}
+
+static bool_t vmx_vcpu_emulate_ve(struct vcpu *v)
+{
+    bool_t rc = 0;
+    ve_info_t *veinfo = gfn_x(vcpu_altp2m(v).veinfo_gfn) != INVALID_GFN ?
+        hvm_map_guest_frame_rw(gfn_x(vcpu_altp2m(v).veinfo_gfn), 0) : NULL;
+
+    if ( !veinfo )
+        return 0;
+
+    if ( veinfo->semaphore != 0 )
+        goto out;
+
+    rc = 1;
+
+    veinfo->exit_reason = EXIT_REASON_EPT_VIOLATION;
+    veinfo->semaphore = ~0;
+    veinfo->eptp_index = vcpu_altp2m(v).p2midx;
+
+    vmx_vmcs_enter(v);
+    __vmread(EXIT_QUALIFICATION, &veinfo->exit_qualification);
+    __vmread(GUEST_LINEAR_ADDRESS, &veinfo->gla);
+    __vmread(GUEST_PHYSICAL_ADDRESS, &veinfo->gpa);
+    vmx_vmcs_exit(v);
+
+    hvm_inject_hw_exception(TRAP_virtualisation,
+                            HVM_DELIVER_NO_ERROR_CODE);
+
+ out:
+    hvm_unmap_guest_frame(veinfo, 0);
+    return rc;
+}
+
 static struct hvm_function_table __initdata vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -1828,6 +1928,9 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .hypervisor_cpuid_leaf = vmx_hypervisor_cpuid_leaf,
     .enable_msr_exit_interception = vmx_enable_msr_exit_interception,
     .is_singlestep_supported = vmx_is_singlestep_supported,
+    .altp2m_vcpu_update_p2m = vmx_vcpu_update_eptp,
+    .altp2m_vcpu_update_vmfunc_ve = vmx_vcpu_update_vmfunc_ve,
+    .altp2m_vcpu_emulate_ve = vmx_vcpu_emulate_ve,
 };
 
 const struct hvm_function_table * __init start_vmx(void)
@@ -2768,6 +2871,42 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     /* Now enable interrupts so it's safe to take locks. */
     local_irq_enable();
+
+    /*
+     * If the guest has the ability to switch EPTP without an exit,
+     * figure out whether it has done so and update the altp2m data.
+     */
+    if ( altp2m_active(v->domain) &&
+        (v->arch.hvm_vmx.secondary_exec_control &
+        SECONDARY_EXEC_ENABLE_VM_FUNCTIONS) )
+    {
+        unsigned long idx;
+
+        if ( v->arch.hvm_vmx.secondary_exec_control &
+            SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS )
+            __vmread(EPTP_INDEX, &idx);
+        else
+        {
+            unsigned long eptp;
+
+            __vmread(EPT_POINTER, &eptp);
+
+            if ( (idx = p2m_find_altp2m_by_eptp(v->domain, eptp)) ==
+                 INVALID_ALTP2M )
+            {
+                gdprintk(XENLOG_ERR, "EPTP not found in alternate p2m list\n");
+                domain_crash(v->domain);
+            }
+        }
+
+        if ( idx != vcpu_altp2m(v).p2midx )
+        {
+            BUG_ON(idx >= MAX_ALTP2M);
+            atomic_dec(&p2m_get_altp2m(v)->active_vcpus);
+            vcpu_altp2m(v).p2midx = idx;
+            atomic_inc(&p2m_get_altp2m(v)->active_vcpus);
+        }
+    }
 
     /* XXX: This looks ugly, but we need a mechanism to ensure
      * any pending vmresume has really happened
