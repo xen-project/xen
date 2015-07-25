@@ -49,9 +49,10 @@ for inclusion in xen-unstable.
 Please see http://wiki.xen.org/wiki/Xen_Maintenance_Releases for more
 information.
 
-Remember to copy the appropriate stable branch maintainer who will be
-listed in this section of the MAINTAINERS file in the appropriate
-branch.
+Backport requests should be made on the xen-devel@lists.xenproject.org
+list. Remember to copy the appropriate stable branch maintainer who
+will be listed in this section of the MAINTAINERS file in the
+appropriate branch.
 
 	Unstable Subsystem Maintainers
 	==============================
