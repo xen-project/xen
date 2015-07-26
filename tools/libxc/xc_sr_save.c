@@ -84,7 +84,7 @@ static int write_batch(struct xc_sr_context *ctx)
     void **guest_data = NULL;
     void **local_pages = NULL;
     int *errors = NULL, rc = -1;
-    unsigned i, p, nr_pages = 0;
+    unsigned i, p, nr_pages = 0, nr_pages_mapped = 0;
     unsigned nr_pfns = ctx->save.nr_batch_pfns;
     void *page, *orig_page;
     uint64_t *rec_pfns = NULL;
@@ -160,6 +160,7 @@ static int write_batch(struct xc_sr_context *ctx)
             PERROR("Failed to map guest pages");
             goto err;
         }
+        nr_pages_mapped = nr_pages;
 
         for ( i = 0, p = 0; i < nr_pfns; ++i )
         {
@@ -262,7 +263,7 @@ static int write_batch(struct xc_sr_context *ctx)
  err:
     free(rec_pfns);
     if ( guest_mapping )
-        munmap(guest_mapping, nr_pages * PAGE_SIZE);
+        munmap(guest_mapping, nr_pages_mapped * PAGE_SIZE);
     for ( i = 0; local_pages && i < nr_pfns; ++i )
         free(local_pages[i]);
     free(iov);
