@@ -4852,6 +4852,8 @@ int main_list(int argc, char **argv)
         break;
     }
 
+    libxl_dominfo_init(&info_buf);
+
     if (optind >= argc) {
         info = libxl_list_domain(ctx, &nb_domain);
         if (!info) {
@@ -4886,8 +4888,8 @@ int main_list(int argc, char **argv)
 
     if (info_free)
         libxl_dominfo_list_free(info, nb_domain);
-    else
-        libxl_dominfo_dispose(info);
+
+    libxl_dominfo_dispose(&info_buf);
 
     return 0;
 }
