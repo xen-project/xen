@@ -7851,7 +7851,7 @@ int main_setenforce(int argc, char **argv)
 int main_loadpolicy(int argc, char **argv)
 {
     const char *polFName;
-    int polFd = 0;
+    int polFd = -1;
     void *polMemCp = NULL;
     struct stat info;
     int ret;
@@ -7863,7 +7863,7 @@ int main_loadpolicy(int argc, char **argv)
 
     polFName = argv[optind];
     polFd = open(polFName, O_RDONLY);
-    if ( polFd < 0 ) {
+    if (polFd < 0) {
         fprintf(stderr, "Error occurred opening policy file '%s': %s\n",
                 polFName, strerror(errno));
         ret = -1;
@@ -7871,7 +7871,7 @@ int main_loadpolicy(int argc, char **argv)
     }
 
     ret = stat(polFName, &info);
-    if ( ret < 0 ) {
+    if (ret < 0) {
         fprintf(stderr, "Error occurred retrieving information about"
                 "policy file '%s': %s\n", polFName, strerror(errno));
         goto done;
@@ -7903,7 +7903,7 @@ int main_loadpolicy(int argc, char **argv)
 
 done:
     free(polMemCp);
-    if ( polFd > 0 )
+    if (polFd >= 0)
         close(polFd);
 
     return ret;
