@@ -3009,6 +3009,7 @@ struct libxl__stream_write_state {
     int rc;
     bool running;
     bool in_checkpoint;
+    bool sync_teardown;  /* Only used to coordinate shutdown on error path. */
     libxl__save_helper_state shs;
 
     /* Main stream-writing data. */
@@ -3350,6 +3351,7 @@ struct libxl__stream_read_state {
     int rc;
     bool running;
     bool in_checkpoint;
+    bool sync_teardown; /* Only used to coordinate shutdown on error path. */
     libxl__save_helper_state shs;
     libxl__conversion_helper_state chs;
 

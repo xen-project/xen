@@ -176,6 +176,7 @@ void libxl__stream_read_init(libxl__stream_read_state *stream)
     stream->rc = 0;
     stream->running = false;
     stream->in_checkpoint = false;
+    stream->sync_teardown = false;
     libxl__save_helper_init(&stream->shs);
     libxl__conversion_helper_init(&stream->chs);
     FILLZERO(stream->dc);
@@ -760,13 +761,33 @@ static void check_all_finished(libxl__egc *egc,
 {
     STATE_AO_GC(stream->ao);
 
+    /*
+     * In the case of a failure, the _abort()'s below might cancel
+     * synchronously on top of us, or asynchronously at a later point.
+     *
+     * We must avoid the situation where all _abort() cancel
+     * synchronously and the completion_callback() gets called twice;
+     * once by the first error and once by the final stacked abort(),
+     * both of whom will find that all of the tasks have stopped.
+     *
+     * To avoid this problem, any stacked re-entry into this function is
+     * ineligible to fire the completion callback.  The outermost
+     * instance will take care of completing, once the stack has
+     * unwound.
+     */
+    if (stream->sync_teardown)
+        return;
+
     if (!stream->rc && rc) {
         /* First reported failure. Tear everything down. */
         stream->rc = rc;
+        stream->sync_teardown = true;
 
         libxl__stream_read_abort(egc, stream, rc);
         libxl__save_helper_abort(egc, &stream->shs);
         libxl__conversion_helper_abort(egc, &stream->chs, rc);
+
+        stream->sync_teardown = false;
     }
 
     /* Don't fire the callback until all our parallel tasks have stopped. */
