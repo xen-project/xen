@@ -1568,14 +1568,6 @@ static void parse_config_data(const char *config_source,
 
         xlu_cfg_get_defbool(config, "altp2mhvm", &b_info->u.hvm.altp2m, 0);
 
-        if (!libxl_defbool_is_default(b_info->u.hvm.nested_hvm) &&
-            libxl_defbool_val(b_info->u.hvm.nested_hvm) &&
-            !libxl_defbool_is_default(b_info->u.hvm.altp2m) &&
-            libxl_defbool_val(b_info->u.hvm.altp2m)) {
-            fprintf(stderr, "ERROR: nestedhvm and altp2mhvm cannot be used together\n");
-            exit(1);
-        }
-
         xlu_cfg_replace_string(config, "smbios_firmware",
                                &b_info->u.hvm.smbios_firmware, 0);
         xlu_cfg_replace_string(config, "acpi_firmware",

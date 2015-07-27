@@ -883,6 +883,13 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
     }
 
+    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
+        (libxl_defbool_val(d_config->b_info.u.hvm.nested_hvm) &&
+         libxl_defbool_val(d_config->b_info.u.hvm.altp2m))) {
+        LOG(ERROR, "nestedhvm and altp2mhvm cannot be used together");
+        goto error_out;
+    }
+
     for (i = 0; i < d_config->num_disks; i++) {
         ret = libxl__device_disk_setdefault(gc, &d_config->disks[i]);
         if (ret) {
