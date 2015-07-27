@@ -42,23 +42,6 @@ libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
         return LIBXL_DOMAIN_TYPE_PV;
 }
 
-int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid)
-{
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    xc_domaininfo_t info;
-    int ret;
-
-    ret = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
-    if (ret != 1)
-        return -1;
-    if (info.domain != domid)
-        return -1;
-    if (!(info.flags & XEN_DOMINF_shutdown))
-        return -1;
-
-    return (info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask;
-}
-
 int libxl__domain_cpupool(libxl__gc *gc, uint32_t domid)
 {
     xc_domaininfo_t info;
