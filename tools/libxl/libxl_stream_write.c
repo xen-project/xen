@@ -55,7 +55,7 @@ static void stream_success(libxl__egc *egc,
 static void stream_complete(libxl__egc *egc,
                             libxl__stream_write_state *stream, int rc);
 static void stream_done(libxl__egc *egc,
-                        libxl__stream_write_state *stream);
+                        libxl__stream_write_state *stream, int rc);
 static void checkpoint_done(libxl__egc *egc,
                             libxl__stream_write_state *stream,
                             int rc);
@@ -492,13 +492,11 @@ static void stream_complete(libxl__egc *egc,
         return;
     }
 
-    if (!stream->rc)
-        stream->rc = rc;
-    stream_done(egc, stream);
+    stream_done(egc, stream, rc);
 }
 
 static void stream_done(libxl__egc *egc,
-                        libxl__stream_write_state *stream)
+                        libxl__stream_write_state *stream, int rc)
 {
     assert(stream->running);
     stream->running = false;
@@ -507,7 +505,7 @@ static void stream_done(libxl__egc *egc,
         libxl__carefd_close(stream->emu_carefd);
     free(stream->emu_body);
 
-    check_all_finished(egc, stream, stream->rc);
+    check_all_finished(egc, stream, rc);
 }
 
 static void checkpoint_done(libxl__egc *egc,

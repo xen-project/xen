@@ -112,7 +112,7 @@ static void stream_complete(libxl__egc *egc,
 static void checkpoint_done(libxl__egc *egc,
                             libxl__stream_read_state *stream, int rc);
 static void stream_done(libxl__egc *egc,
-                        libxl__stream_read_state *stream);
+                        libxl__stream_read_state *stream, int rc);
 static void conversion_done(libxl__egc *egc,
                             libxl__conversion_helper_state *chs, int rc);
 static void check_all_finished(libxl__egc *egc,
@@ -669,9 +669,7 @@ static void stream_complete(libxl__egc *egc,
         return;
     }
 
-    if (!stream->rc)
-        stream->rc = rc;
-    stream_done(egc, stream);
+    stream_done(egc, stream, rc);
 }
 
 static void checkpoint_done(libxl__egc *egc,
@@ -695,7 +693,7 @@ static void checkpoint_done(libxl__egc *egc,
 }
 
 static void stream_done(libxl__egc *egc,
-                        libxl__stream_read_state *stream)
+                        libxl__stream_read_state *stream, int rc)
 {
     libxl__sr_record_buf *rec, *trec;
 
@@ -720,7 +718,7 @@ static void stream_done(libxl__egc *egc,
     LIBXL_STAILQ_FOREACH_SAFE(rec, &stream->record_queue, entry, trec)
         free_record(rec);
 
-    check_all_finished(egc, stream, stream->rc);
+    check_all_finished(egc, stream, rc);
 }
 
 void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
