@@ -682,6 +682,11 @@ int libxl_domain_info(libxl_ctx *ctx, libxl_dominfo *info_r,
     return 0;
 }
 
+/* Returns:
+ *   0 - success
+ *   ERROR_FAIL + errno == ENOENT - no entry found
+ *   ERROR_$FOO + errno != ENOENT - other failure
+ */
 static int cpupool_info(libxl__gc *gc,
                         libxl_cpupoolinfo *info,
                         uint32_t poolid,
@@ -737,7 +742,8 @@ int libxl_cpupool_info(libxl_ctx *ctx,
 libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx *ctx, int *nb_pool_out)
 {
     GC_INIT(ctx);
-    libxl_cpupoolinfo info, *ptr, *tmp;
+    libxl_cpupoolinfo info, *ptr;
+
     int i;
     uint32_t poolid;
 
@@ -745,24 +751,29 @@ libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx *ctx, int *nb_pool_out)
 
     poolid = 0;
     for (i = 0;; i++) {
-        if (cpupool_info(gc, &info, poolid, false))
+        libxl_cpupoolinfo_init(&info);
+        if (cpupool_info(gc, &info, poolid, false)) {
+            libxl_cpupoolinfo_dispose(&info);
+            if (errno != ENOENT) goto out;
             break;
-        tmp = realloc(ptr, (i + 1) * sizeof(libxl_cpupoolinfo));
-        if (!tmp) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpupool info");
-            libxl_cpupoolinfo_list_free(ptr, i);
-            ptr = NULL;
-            goto out;
         }
-        ptr = tmp;
+
+        ptr = libxl__realloc(NOGC, ptr, (i+1) * sizeof(libxl_cpupoolinfo));
         ptr[i] = info;
         poolid = info.poolid + 1;
+        /* Don't dispose of info because it will be returned to caller */
     }
 
     *nb_pool_out = i;
-out:
+
     GC_FREE;
     return ptr;
+
+out:
+    libxl_cpupoolinfo_list_free(ptr, i);
+    *nb_pool_out = 0;
+    GC_FREE;
+    return NULL;
 }
 
 /* this API call only list VM running on this host. A VM can
