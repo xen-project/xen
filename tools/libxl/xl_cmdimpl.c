@@ -7677,6 +7677,8 @@ int main_cpupoolnumasplit(int argc, char **argv)
         /* No options */
     }
 
+    libxl_dominfo_init(&info);
+
     rc = 1;
 
     libxl_bitmap_init(&cpumap);
@@ -7733,6 +7735,12 @@ int main_cpupoolnumasplit(int argc, char **argv)
         goto out;
     }
     for (c = 0; c < 10; c++) {
+        /* We've called libxl_dominfo_init before the loop and will
+         * call libxl_dominfo_dispose after the loop when we're done
+         * with info.
+         */
+        libxl_dominfo_dispose(&info);
+        libxl_dominfo_init(&info);
         if (libxl_domain_info(ctx, &info, 0)) {
             fprintf(stderr, "error on getting info for Domain-0\n");
             goto out;
@@ -7785,6 +7793,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
 out:
     libxl_cputopology_list_free(topology, n_cpus);
     libxl_bitmap_dispose(&cpumap);
+    libxl_dominfo_dispose(&info);
     free(name);
 
     return rc;
