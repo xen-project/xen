@@ -118,7 +118,7 @@ static void parse_global_config(const char *configfile,
     }
 
     if (!lockfile) {
-        fprintf(stderr, "failed to allocate lockdir\n");
+        fprintf(stderr, "failed to allocate lockfile\n");
         exit(1);
     }
 
