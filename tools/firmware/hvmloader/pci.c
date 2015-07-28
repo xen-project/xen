@@ -383,6 +383,9 @@ void pci_setup(void)
         hvm_info->high_mem_pgend += nr_pages;
     }
 
+    /* Sync memory map[] if necessary. */
+    adjust_memory_map();
+
     high_mem_resource.base = ((uint64_t)hvm_info->high_mem_pgend) << PAGE_SHIFT;
     if ( high_mem_resource.base < 1ull << 32 )
     {

@@ -55,6 +55,54 @@ void memory_map_setup(void)
     }
 }
 
+/*
+ * Sometimes hvmloader may have relocated RAM so low_mem_pgend/high_mem_end
+ * would be changed over there. But memory_map[] just records the
+ * original low/high memory, so we need to sync these entries once
+ * hvmloader modifies low/high memory.
+ */
+void adjust_memory_map(void)
+{
+    uint32_t low_mem_end = hvm_info->low_mem_pgend << PAGE_SHIFT;
+    uint64_t high_mem_end = (uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT;
+    unsigned int i;
+
+    for ( i = 0; i < memory_map.nr_map; i++ )
+    {
+        uint64_t map_start = memory_map.map[i].addr;
+        uint64_t map_size = memory_map.map[i].size;
+        uint64_t map_end = map_start + map_size;
+
+        /* If we need to adjust lowmem. */
+        if ( memory_map.map[i].type == E820_RAM &&
+             low_mem_end > map_start && low_mem_end < map_end )
+        {
+            memory_map.map[i].size = low_mem_end - map_start;
+            continue;
+        }
+
+        /* Modify the existing highmem region if it exists. */
+        if ( memory_map.map[i].type == E820_RAM &&
+             high_mem_end && map_start == ((uint64_t)1 << 32) )
+        {
+            if ( high_mem_end != map_end )
+                memory_map.map[i].size = high_mem_end - map_start;
+            high_mem_end = 0;
+            continue;
+        }
+    }
+
+    /* If there was no highmem region, just create one. */
+    if ( high_mem_end )
+    {
+        memory_map.map[i].addr = ((uint64_t)1 << 32);
+        memory_map.map[i].size =
+                ((uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT) -
+                    memory_map.map[i].addr;
+        memory_map.map[i].type = E820_RAM;
+    }
+}
+
 void dump_e820_table(struct e820entry *e820, unsigned int nr)
 {
     uint64_t last_end = 0, start, end;
@@ -107,9 +155,6 @@ int build_e820_table(struct e820entry *e820,
 {
     unsigned int nr = 0, i, j;
     uint32_t low_mem_end = hvm_info->low_mem_pgend << PAGE_SHIFT;
-    uint32_t add_high_mem = 0;
-    uint64_t high_mem_end = (uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT;
-    uint64_t map_start, map_size, map_end;
 
     if ( !lowmem_reserved_base )
             lowmem_reserved_base = 0xA0000;
@@ -208,61 +253,7 @@ int build_e820_table(struct e820entry *e820,
      *
      * Note we just have one low memory entry and one high mmeory entry if
      * exists.
-     *
-     * But we may have relocated RAM to allocate sufficient MMIO previously
-     * so low_mem_pgend would be changed over there. And here memory_map[]
-     * records the original low/high memory, so if low_mem_end is less than
-     * the original we need to revise low/high memory range firstly.
      */
-    for ( i = 0; i < memory_map.nr_map; i++ )
-    {
-        map_start = memory_map.map[i].addr;
-        map_size = memory_map.map[i].size;
-        map_end = map_start + map_size;
-
-        /* If we need to adjust lowmem. */
-        if ( memory_map.map[i].type == E820_RAM &&
-             low_mem_end > map_start && low_mem_end < map_end )
-        {
-            add_high_mem = map_end - low_mem_end;
-            memory_map.map[i].size = low_mem_end - map_start;
-            break;
-        }
-    }
-
-    /* If we need to adjust highmem. */
-    if ( add_high_mem )
-    {
-        /* Modify the existing highmem region if it exists. */
-        for ( i = 0; i < memory_map.nr_map; i++ )
-        {
-            map_start = memory_map.map[i].addr;
-            map_size = memory_map.map[i].size;
-            map_end = map_start + map_size;
-
-            if ( memory_map.map[i].type == E820_RAM &&
-                 map_start == ((uint64_t)1 << 32))
-            {
-                memory_map.map[i].size += add_high_mem;
-                break;
-            }
-        }
-
-        /* If there was no highmem region, just create one. */
-        if ( i == memory_map.nr_map )
-        {
-            memory_map.map[i].addr = ((uint64_t)1 << 32);
-            memory_map.map[i].size = add_high_mem;
-            memory_map.map[i].type = E820_RAM;
-            memory_map.nr_map++;
-        }
-
-        /* A sanity check if high memory is broken. */
-        BUG_ON( high_mem_end !=
-                memory_map.map[i].addr + memory_map.map[i].size);
-    }
-
-    /* Now fill e820. */
     for ( i = 0; i < memory_map.nr_map; i++ )
     {
         e820[nr] = memory_map.map[i];

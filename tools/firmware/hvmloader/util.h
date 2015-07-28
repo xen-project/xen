@@ -227,6 +227,9 @@ void pci_setup(void);
 /* Setup memory map  */
 void memory_map_setup(void);
 
+/* Sync memory map */
+void adjust_memory_map(void);
+
 /* Prepare the 32bit BIOS */
 uint32_t rombios_highbios_setup(void);
 

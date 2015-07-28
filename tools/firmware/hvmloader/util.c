@@ -432,6 +432,9 @@ void mem_hole_populate_ram(xen_pfn_t mfn, uint32_t nr_mfns)
         if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
             BUG();
     }
+
+    /* Sync memory map[]. */
+    adjust_memory_map();
 }
 
 static uint32_t alloc_up = RESERVED_MEMORY_DYNAMIC_START - 1;
