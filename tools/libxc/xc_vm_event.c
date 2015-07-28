@@ -148,7 +148,7 @@ void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
         }
 
         if ( ring_page )
-            munmap(ring_page, XC_PAGE_SIZE);
+            xenforeignmemory_unmap(xch->fmem, ring_page, 1);
         ring_page = NULL;
 
         errno = saved_errno;

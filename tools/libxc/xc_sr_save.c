@@ -263,7 +263,7 @@ static int write_batch(struct xc_sr_context *ctx)
  err:
     free(rec_pfns);
     if ( guest_mapping )
-        munmap(guest_mapping, nr_pages_mapped * PAGE_SIZE);
+        xenforeignmemory_unmap(xch->fmem, guest_mapping, nr_pages_mapped);
     for ( i = 0; local_pages && i < nr_pfns; ++i )
         free(local_pages[i]);
     free(iov);

@@ -378,7 +378,7 @@ static int process_page_data(struct xc_sr_context *ctx, unsigned count,
 
  err:
     if ( mapping )
-        munmap(mapping, nr_pages * PAGE_SIZE);
+        xenforeignmemory_unmap(xch->fmem, mapping, nr_pages);
 
     free(map_errs);
     free(mfns);

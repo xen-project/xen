@@ -44,8 +44,8 @@ int xenforeignmemory_close(xenforeignmemory_handle *fmem);
 
 /*
  * Maps a range within one domain to a local address range.  Mappings
- * should be unmapped with munmap and should follow the same rules as mmap
- * regarding page alignment.
+ * must be unmapped with xenforeignmemory_unmap and should follow the
+ * same rules as mmap regarding page alignment.
  *
  * prot is as for mmap(2).
  *
@@ -57,6 +57,13 @@ int xenforeignmemory_close(xenforeignmemory_handle *fmem);
 void *xenforeignmemory_map(xenforeignmemory_handle *fmem, uint32_t dom,
                            int prot, const xen_pfn_t *arr, int *err,
                            unsigned int num);
+/*
+ * Unmap a mapping previous created with xenforeignmemory_map().
+ *
+ * Returns 0 on success on failure sets errno and returns -1.
+ */
+int xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
+                           void *addr, unsigned int num);
 
 #endif
 

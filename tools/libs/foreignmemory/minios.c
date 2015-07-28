@@ -51,6 +51,12 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
     return map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);
 }
 
+int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
+                                 void *addr, unsigned int num)
+{
+	return munmap(addr, num << PAGE_SHIFT);
+}
+
 /*
  * Local variables:
  * mode: C
