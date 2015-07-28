@@ -1862,6 +1862,7 @@ void libxl__ao_create_fail(libxl__ao *ao)
 
 libxl__gc *libxl__ao_inprogress_gc(libxl__ao *ao)
 {
+    assert(ao);
     assert(ao->magic == LIBXL__AO_MAGIC);
     assert(!ao->complete);
     return &ao->gc;
