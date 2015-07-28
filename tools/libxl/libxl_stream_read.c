@@ -738,14 +738,22 @@ void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
         goto err;
     }
 
-    /*
-     * Libxc has indicated that it is done with the stream.  Resume reading
-     * libxl records from it.
-     */
-    stream_continue(egc, stream);
-
  err:
     check_all_finished(egc, stream, rc);
+
+    /*
+     * This function is the callback associated with the save helper
+     * task, not the stream task.  We do not know whether the stream is
+     * alive, and check_all_finished() may have torn it down around us.
+     * If the stream is not still alive, we must not continue any work.
+     */
+    if (libxl__stream_read_inuse(stream)) {
+        /*
+         * Libxc has indicated that it is done with the stream.  Resume reading
+         * libxl records from it.
+         */
+        stream_continue(egc, stream);
+    }
 }
 
 static void conversion_done(libxl__egc *egc,

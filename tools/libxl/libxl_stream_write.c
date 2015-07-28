@@ -275,10 +275,17 @@ void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
         goto err;
     }
 
-    write_toolstack_record(egc, stream);
-
  err:
     check_all_finished(egc, stream, rc);
+
+    /*
+     * This function is the callback associated with the save helper
+     * task, not the stream task.  We do not know whether the stream is
+     * alive, and check_all_finished() may have torn it down around us.
+     * If the stream is not still alive, we must not continue any work.
+     */
+    if (libxl__stream_write_inuse(stream))
+        write_toolstack_record(egc, stream);
 }
 
 static void write_toolstack_record(libxl__egc *egc,
