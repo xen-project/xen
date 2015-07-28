@@ -167,17 +167,18 @@ int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str
         }
     }
 
-    free(buf2);
-
     if ( tok != ptr || state != STATE_TERMINAL )
         goto parse_error;
 
     /* Just a pretty way to fill in the values */
     pcidev_struct_fill(pcidev, dom, bus, dev, func, vslot << 3);
 
+    free(buf2);
+
     return 0;
 
 parse_error:
+    free(buf2);
     return ERROR_INVAL;
 }
 
@@ -246,14 +247,15 @@ int xlu_rdm_parse(XLU_Config *cfg, libxl_rdm_reserve *rdm, const char *str)
         }
     }
 
-    free(buf2);
-
     if (tok != ptr || state != STATE_TERMINAL)
         goto parse_error;
+
+    free(buf2);
 
     return 0;
 
 parse_error:
+    free(buf2);
     return ERROR_INVAL;
 }
 
