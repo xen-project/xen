@@ -266,9 +266,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 3e2e51ecc1120bd59537ed19b6bc7066511c7e2e
-# Sun May 24 10:53:44 2015 +0200
-# pcnet: force the buffer access to be in bounds during tx
+QEMU_TRADITIONAL_REVISION ?= 7f057440b31da38196e3398fd1b618fc36ad97d6
+# Wed Jun 3 14:41:27 2015 +0200
+# ide: Clear DRQ after handling all expected accesses
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
