@@ -2463,7 +2463,9 @@ void hvm_vcpu_destroy(struct vcpu *v)
 {
     hvm_all_ioreq_servers_remove_vcpu(v->domain, v);
 
-    altp2m_vcpu_destroy(v);
+    if ( hvm_altp2m_supported() )
+        altp2m_vcpu_destroy(v);
+
     nestedhvm_vcpu_destroy(v);
 
     free_compat_arg_xlat(v);
