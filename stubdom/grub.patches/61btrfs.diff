@@ -66,7 +66,7 @@ diff -up grub-upstream.wip/INSTALL.btrfs grub-upstream.wip/INSTALL
 diff -up /dev/null grub-upstream.wip/stage2/btrfs.h
 --- /dev/null	2009-06-03 06:46:26.160951000 +0000
 +++ grub-upstream.wip/stage2/btrfs.h	2012-03-20 05:07:09.000000000 +0000
-@@ -0,0 +1,1415 @@
+@@ -0,0 +1,1413 @@
 +/* btrfs.h - an extraction from btrfs-progs-0.18/ctree.h into one file
 + *
 + * Copyright (C) 2007 Oracle.  All rights reserved.
@@ -81,9 +81,7 @@ diff -up /dev/null grub-upstream.wip/stage2/btrfs.h
 + * General Public License for more details.
 + *
 + * You should have received a copy of the GNU General Public
-+ * License along with this program; if not, write to the
-+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-+ * Boston, MA 021110-1307, USA.
++ * License along with this program; If not, see <http://www.gnu.org/licenses/>
 + */
 +
 +/* include/asm-i386/types.h */

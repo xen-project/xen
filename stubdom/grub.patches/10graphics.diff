@@ -1164,7 +1164,7 @@ diff -Naur grub-0.97.orig/stage2/cmdline.c grub-0.97/stage2/cmdline.c
 diff -Naur grub-0.97.orig/stage2/graphics.c grub-0.97/stage2/graphics.c
 --- grub-0.97.orig/stage2/graphics.c	1969-12-31 21:00:00.000000000 -0300
 +++ grub-0.97/stage2/graphics.c	2005-06-13 19:13:31.000000000 -0300
-@@ -0,0 +1,585 @@
+@@ -0,0 +1,584 @@
 +/*
 + * graphics.c - graphics mode support for GRUB
 + * Implemented as a terminal type by Jeremy Katz <katzj@redhat.com> based
@@ -1187,8 +1187,7 @@ diff -Naur grub-0.97.orig/stage2/graphics.c grub-0.97/stage2/graphics.c
 + *  GNU General Public License for more details.
 + *
 + *  You should have received a copy of the GNU General Public License
-+ *  along with this program; if not, write to the Free Software
-+ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ *  along with this program; If not, see <http://www.gnu.org/licenses/>
 + */
 +
 +#ifdef SUPPORT_GRAPHICS
@@ -1753,7 +1752,7 @@ diff -Naur grub-0.97.orig/stage2/graphics.c grub-0.97/stage2/graphics.c
 diff -Naur grub-0.97.orig/stage2/graphics.h grub-0.97/stage2/graphics.h
 --- grub-0.97.orig/stage2/graphics.h	1969-12-31 21:00:00.000000000 -0300
 +++ grub-0.97/stage2/graphics.h	2005-06-12 20:56:49.000000000 -0300
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,43 @@
 +/* graphics.h - graphics console interface */
 +/*
 + *  GRUB  --  GRand Unified Bootloader
@@ -1770,8 +1769,7 @@ diff -Naur grub-0.97.orig/stage2/graphics.h grub-0.97/stage2/graphics.h
 + *  GNU General Public License for more details.
 + *
 + *  You should have received a copy of the GNU General Public License
-+ *  along with this program; if not, write to the Free Software
-+ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ *  along with this program; If not, see <http://www.gnu.org/licenses/>
 + */
 +
 +#ifndef GRAPHICS_H
