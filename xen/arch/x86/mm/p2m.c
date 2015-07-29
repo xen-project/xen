@@ -2076,7 +2076,7 @@ bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx)
     struct domain *d = v->domain;
     bool_t rc = 0;
 
-    if ( idx > MAX_ALTP2M )
+    if ( idx >= MAX_ALTP2M )
         return rc;
 
     altp2m_list_lock(d);
