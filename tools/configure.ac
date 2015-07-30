@@ -176,9 +176,14 @@ AC_ARG_WITH([system-qemu],
        [Use system supplied qemu PATH or qemu (taken from $PATH) as qemu-xen
         device model instead of building and installing our own version]),[
     case $withval in
-    yes) qemu_xen=n ; qemu_xen_path=qemu ;;
-    no)  qemu_xen=y ; qemu_xen_path= ;;
-    *)   qemu_xen=n ; qemu_xen_path=$withval ;;
+        yes)
+            qemu_xen=n ; qemu_xen_path="qemu"
+            qemu_xen_systemd="/usr/bin/env $qemu_xen_path" ;;
+        no)
+            qemu_xen=y ;;
+        *)
+            qemu_xen=n ; qemu_xen_path="$withval" ;
+            qemu_xen_systemd="$qemu_xen_path" ;;
     esac
 ],[
     case "$host_cpu" in
@@ -189,10 +194,14 @@ AC_ARG_WITH([system-qemu],
         *) qemu_xen=n;;
     esac
 ])
-AS_IF([test "x$qemu_xen" = "xn"], [
-    AC_DEFINE_UNQUOTED([QEMU_XEN_PATH], ["$qemu_xen_path"], [Qemu Xen path])
+AS_IF([test "x$qemu_xen" = "xy"], [
+    qemu_xen_path="$LIBEXEC_BIN/qemu-system-i386"
+    qemu_xen_systemd="$qemu_xen_path"
 ])
+AC_DEFINE_UNQUOTED([QEMU_XEN_PATH], ["$qemu_xen_path"], [Qemu Xen path])
 AC_SUBST(qemu_xen)
+AC_SUBST(qemu_xen_path)
+AC_SUBST(qemu_xen_systemd)
 
 AC_ARG_WITH([system-seabios],
     AS_HELP_STRING([--with-system-seabios@<:@=PATH@:>@],

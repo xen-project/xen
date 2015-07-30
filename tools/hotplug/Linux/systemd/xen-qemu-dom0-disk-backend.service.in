@@ -11,7 +11,7 @@ Type=simple
 PIDFile=@XEN_RUN_DIR@/qemu-dom0.pid
 ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
 ExecStartPre=/bin/mkdir -p @XEN_RUN_DIR@
-ExecStart=@LIBEXEC_BIN@/qemu-system-i386 -xen-domid 0 \
+ExecStart=@qemu_xen_systemd@ -xen-domid 0 \
 	-xen-attach -name dom0 -nographic -M xenpv -daemonize \
 	-monitor /dev/null -serial /dev/null -parallel /dev/null \
 	-pidfile @XEN_RUN_DIR@/qemu-dom0.pid

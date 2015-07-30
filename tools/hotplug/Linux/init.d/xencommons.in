@@ -98,7 +98,7 @@ do_start () {
 	test -z "$XENCONSOLED_TRACE" || XENCONSOLED_ARGS=" --log=$XENCONSOLED_TRACE"
 	${sbindir}/xenconsoled --pid-file=$XENCONSOLED_PIDFILE $XENCONSOLED_ARGS
 	echo Starting QEMU as disk backend for dom0
-	test -z "$QEMU_XEN" && QEMU_XEN="${LIBEXEC_BIN}/qemu-system-i386"
+	test -z "$QEMU_XEN" && QEMU_XEN="@qemu_xen_path@"
 	$QEMU_XEN -xen-domid 0 -xen-attach -name dom0 -nographic -M xenpv -daemonize \
 		-monitor /dev/null -serial /dev/null -parallel /dev/null \
 		-pidfile $QEMU_PIDFILE

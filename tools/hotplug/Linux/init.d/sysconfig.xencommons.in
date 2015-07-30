@@ -47,4 +47,4 @@ XENSTORED_ARGS=
 #XENBACKENDD_DEBUG=[yes|on|1]
 
 # qemu path
-#QEMU_XEN=@LIBEXEC_BIN@/qemu-system-i386
+#QEMU_XEN=@qemu_xen_path@

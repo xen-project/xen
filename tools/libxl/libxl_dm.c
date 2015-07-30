@@ -36,11 +36,7 @@ const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid)
 
 static const char *qemu_xen_path(libxl__gc *gc)
 {
-#ifdef QEMU_XEN_PATH
     return QEMU_XEN_PATH;
-#else
-    return libxl__abs_path(gc, "qemu-system-i386", libxl__private_bindir_path());
-#endif
 }
 
 static int libxl__create_qemu_logfile(libxl__gc *gc, char *name)

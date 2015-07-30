@@ -700,6 +700,8 @@ PREPEND_INCLUDES
 EXTRA_QEMUU_CONFIGURE_ARGS
 ovmf_path
 seabios_path
+qemu_xen_systemd
+qemu_xen_path
 qemu_xen
 rombios
 qemu_traditional
@@ -4264,9 +4266,14 @@ fi
 if test "${with_system_qemu+set}" = set; then :
   withval=$with_system_qemu;
     case $withval in
-    yes) qemu_xen=n ; qemu_xen_path=qemu ;;
-    no)  qemu_xen=y ; qemu_xen_path= ;;
-    *)   qemu_xen=n ; qemu_xen_path=$withval ;;
+        yes)
+            qemu_xen=n ; qemu_xen_path="qemu"
+            qemu_xen_systemd="/usr/bin/env $qemu_xen_path" ;;
+        no)
+            qemu_xen=y ;;
+        *)
+            qemu_xen=n ; qemu_xen_path="$withval" ;
+            qemu_xen_systemd="$qemu_xen_path" ;;
     esac
 
 else
@@ -4281,15 +4288,19 @@ else
 
 fi
 
-if test "x$qemu_xen" = "xn"; then :
+if test "x$qemu_xen" = "xy"; then :
 
+    qemu_xen_path="$LIBEXEC_BIN/qemu-system-i386"
+    qemu_xen_systemd="$qemu_xen_path"
+
+fi
 
 cat >>confdefs.h <<_ACEOF
 #define QEMU_XEN_PATH "$qemu_xen_path"
 _ACEOF
 
 
-fi
+
 
 
 
