@@ -261,6 +261,9 @@ Specify virtual NUMA configuration with positional arguments. The
 nth B<VNODE_SPEC> in the list specifies the configuration of nth
 virtual node.
 
+Note that virtual NUMA for PV guest is not yet supported, because
+there is an issue with cpuid handling that affects PV virtual NUMA.
+
 Each B<VNODE_SPEC> is a list, which has a form of
 "[VNODE_CONFIG_OPTION,VNODE_CONFIG_OPTION, ... ]"  (without quotes).
 
