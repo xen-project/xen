@@ -20,8 +20,7 @@
  *  other software, or any other product whatsoever.
  * 
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write the Free Software Foundation, Inc., 59
- *  Temple Place - Suite 330, Boston MA 02111-1307, USA.
+ *  with this program; If not, see <http://www.gnu.org/licenses/>.
  * 
  *  Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  *  Mountain View, CA  94043, or:
