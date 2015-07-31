@@ -18,11 +18,18 @@
 
 #define select_idle_routine(x) ((void)0)
 
-static unsigned int probe_intel_cpuid_faulting(void)
+static bool_t __init probe_intel_cpuid_faulting(void)
 {
 	uint64_t x;
-	return !rdmsr_safe(MSR_INTEL_PLATFORM_INFO, x) &&
-		(x & MSR_PLATFORM_INFO_CPUID_FAULTING);
+
+	if (rdmsr_safe(MSR_INTEL_PLATFORM_INFO, x) ||
+	    !(x & MSR_PLATFORM_INFO_CPUID_FAULTING))
+		return 0;
+
+	expected_levelling_cap |= LCAP_faulting;
+	levelling_caps |=  LCAP_faulting;
+	__set_bit(X86_FEATURE_CPUID_FAULTING, boot_cpu_data.x86_capability);
+	return 1;
 }
 
 static DEFINE_PER_CPU(bool_t, cpuid_faulting_enabled);
@@ -44,36 +51,40 @@ void set_cpuid_faulting(bool_t enable)
 }
 
 /*
- * opt_cpuid_mask_ecx/edx: cpuid.1[ecx, edx] feature mask.
- * For example, E8400[Intel Core 2 Duo Processor series] ecx = 0x0008E3FD,
- * edx = 0xBFEBFBFF when executing CPUID.EAX = 1 normally. If you want to
- * 'rev down' to E8400, you can set these values in these Xen boot parameters.
+ * Set caps in expected_levelling_cap, probe a specific masking MSR, and set
+ * caps in levelling_caps if it is found, or clobber the MSR index if missing.
+ * If preset, reads the default value into msr_val.
  */
-static void set_cpuidmask(const struct cpuinfo_x86 *c)
+static uint64_t __init _probe_mask_msr(unsigned int *msr, uint64_t caps)
 {
-	static unsigned int msr_basic, msr_ext, msr_xsave;
-	static enum { not_parsed, no_mask, set_mask } status;
-	u64 msr_val;
+	uint64_t val = 0;
 
-	if (status == no_mask)
-		return;
+	expected_levelling_cap |= caps;
 
-	if (status == set_mask)
-		goto setmask;
+	if (rdmsr_safe(*msr, val) || wrmsr_safe(*msr, val))
+		*msr = 0;
+	else
+		levelling_caps |= caps;
 
-	ASSERT((status == not_parsed) && (c == &boot_cpu_data));
-	status = no_mask;
+	return val;
+}
 
-	if (!~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
-	       opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx &
-	       opt_cpuid_mask_xsave_eax))
-		return;
+/* Indices of the masking MSRs, or 0 if unavailable. */
+static unsigned int __read_mostly msr_basic, __read_mostly msr_ext,
+	__read_mostly msr_xsave;
+
+/*
+ * Probe for the existance of the expected masking MSRs.  They might easily
+ * not be available if Xen is running virtualised.
+ */
+static void __init probe_masking_msrs(void)
+{
+	const struct cpuinfo_x86 *c = &boot_cpu_data;
+	unsigned int exp_msr_basic, exp_msr_ext, exp_msr_xsave;
 
 	/* Only family 6 supports this feature. */
-	if (c->x86 != 6) {
-		printk("No CPUID feature masking support available\n");
+	if (c->x86 != 6)
 		return;
-	}
 
 	switch (c->x86_model) {
 	case 0x17: /* Yorkfield, Wolfdale, Penryn, Harpertown(DP) */
@@ -100,59 +111,121 @@ static void set_cpuidmask(const struct cpuinfo_x86 *c)
 		break;
 	}
 
-	status = set_mask;
+	exp_msr_basic = msr_basic;
+	exp_msr_ext   = msr_ext;
+	exp_msr_xsave = msr_xsave;
 
-	if (~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx)) {
-		if (msr_basic)
-			printk("Writing CPUID feature mask ecx:edx -> %08x:%08x\n",
-			       opt_cpuid_mask_ecx, opt_cpuid_mask_edx);
-		else
-			printk("No CPUID feature mask available\n");
+	if (msr_basic)
+		cpuidmask_defaults._1cd = _probe_mask_msr(&msr_basic, LCAP_1cd);
+
+	if (msr_ext)
+		cpuidmask_defaults.e1cd = _probe_mask_msr(&msr_ext, LCAP_e1cd);
+
+	if (msr_xsave)
+		cpuidmask_defaults.Da1 = _probe_mask_msr(&msr_xsave, LCAP_Da1);
+
+	/*
+	 * Don't bother warning about a mismatch if virtualised.  These MSRs
+	 * are not architectural and almost never virtualised.
+	 */
+	if ((expected_levelling_cap == levelling_caps) ||
+	    cpu_has_hypervisor)
+		return;
+
+	printk(XENLOG_WARNING "Mismatch between expected (%#x) "
+	       "and real (%#x) levelling caps: missing %#x\n",
+	       expected_levelling_cap, levelling_caps,
+	       (expected_levelling_cap ^ levelling_caps) & levelling_caps);
+	printk(XENLOG_WARNING "Fam %#x, model %#x expected (%#x/%#x/%#x), "
+	       "got (%#x/%#x/%#x)\n", c->x86, c->x86_model,
+	       exp_msr_basic, exp_msr_ext, exp_msr_xsave,
+	       msr_basic, msr_ext, msr_xsave);
+	printk(XENLOG_WARNING
+	       "If not running virtualised, please report a bug\n");
+}
+
+/*
+ * Context switch levelling state to the next domain.  A parameter of NULL is
+ * used to context switch to the default host state (by the cpu bringup-code,
+ * crash path, etc).
+ */
+static void intel_ctxt_switch_levelling(const struct domain *nextd)
+{
+	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
+	const struct cpuidmasks *masks = &cpuidmask_defaults;
+
+#define LAZY(msr, field)						\
+	({								\
+		if (unlikely(these_masks->field != masks->field) &&	\
+		    (msr))						\
+		{							\
+			wrmsrl((msr), masks->field);			\
+			these_masks->field = masks->field;		\
+		}							\
+	})
+
+	LAZY(msr_basic, _1cd);
+	LAZY(msr_ext,   e1cd);
+	LAZY(msr_xsave, Da1);
+
+#undef LAZY
+}
+
+/*
+ * opt_cpuid_mask_ecx/edx: cpuid.1[ecx, edx] feature mask.
+ * For example, E8400[Intel Core 2 Duo Processor series] ecx = 0x0008E3FD,
+ * edx = 0xBFEBFBFF when executing CPUID.EAX = 1 normally. If you want to
+ * 'rev down' to E8400, you can set these values in these Xen boot parameters.
+ */
+static void __init noinline intel_init_levelling(void)
+{
+	if (!probe_intel_cpuid_faulting())
+		probe_masking_msrs();
+
+	if (msr_basic) {
+		uint32_t ecx, edx, tmp;
+
+		cpuid(0x00000001, &tmp, &tmp, &ecx, &edx);
+
+		ecx &= opt_cpuid_mask_ecx;
+		edx &= opt_cpuid_mask_edx;
+
+		cpuidmask_defaults._1cd &= ((u64)edx << 32) | ecx;
 	}
-	else
-		msr_basic = 0;
 
-	if (~(opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx)) {
-		if (msr_ext)
-			printk("Writing CPUID extended feature mask ecx:edx -> %08x:%08x\n",
-			       opt_cpuid_mask_ext_ecx, opt_cpuid_mask_ext_edx);
-		else
-			printk("No CPUID extended feature mask available\n");
-	}
-	else
-		msr_ext = 0;
+	if (msr_ext) {
+		uint32_t ecx, edx, tmp;
 
-	if (~opt_cpuid_mask_xsave_eax) {
-		if (msr_xsave)
-			printk("Writing CPUID xsave feature mask eax -> %08x\n",
-			       opt_cpuid_mask_xsave_eax);
-		else
-			printk("No CPUID xsave feature mask available\n");
-	}
-	else
-		msr_xsave = 0;
+		cpuid(0x80000001, &tmp, &tmp, &ecx, &edx);
 
- setmask:
-	if (msr_basic &&
-	    wrmsr_safe(msr_basic,
-		       ((u64)opt_cpuid_mask_edx << 32) | opt_cpuid_mask_ecx)){
-		msr_basic = 0;
-		printk("Failed to set CPUID feature mask\n");
+		ecx &= opt_cpuid_mask_ext_ecx;
+		edx &= opt_cpuid_mask_ext_edx;
+
+		cpuidmask_defaults.e1cd &= ((u64)edx << 32) | ecx;
 	}
 
-	if (msr_ext &&
-	    wrmsr_safe(msr_ext,
-		       ((u64)opt_cpuid_mask_ext_edx << 32) | opt_cpuid_mask_ext_ecx)){
-		msr_ext = 0;
-		printk("Failed to set CPUID extended feature mask\n");
+	if (msr_xsave) {
+		uint32_t eax, tmp;
+
+		cpuid_count(0x0000000d, 1, &eax, &tmp, &tmp, &tmp);
+
+		eax &= opt_cpuid_mask_xsave_eax;
+
+		cpuidmask_defaults.Da1 &= (~0ULL << 32) | eax;
 	}
 
-	if (msr_xsave &&
-	    (rdmsr_safe(msr_xsave, msr_val) ||
-	     wrmsr_safe(msr_xsave,
-			(msr_val & (~0ULL << 32)) | opt_cpuid_mask_xsave_eax))){
-		msr_xsave = 0;
-		printk("Failed to set CPUID xsave feature mask\n");
+	if (opt_cpu_info) {
+		printk(XENLOG_INFO "Levelling caps: %#x\n", levelling_caps);
+
+		if (!cpu_has_cpuid_faulting)
+			printk(XENLOG_INFO
+			       "MSR defaults: 1d 0x%08x, 1c 0x%08x, e1d 0x%08x, "
+			       "e1c 0x%08x, Da1 0x%08x\n",
+			       (uint32_t)(cpuidmask_defaults._1cd >> 32),
+			       (uint32_t)cpuidmask_defaults._1cd,
+			       (uint32_t)(cpuidmask_defaults.e1cd >> 32),
+			       (uint32_t)cpuidmask_defaults.e1cd,
+			       (uint32_t)cpuidmask_defaults.Da1);
 	}
 }
 
@@ -190,22 +263,13 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 	    (boot_cpu_data.x86_mask == 3 || boot_cpu_data.x86_mask == 4))
 		paddr_bits = 36;
 
-	if (c == &boot_cpu_data && c->x86 == 6) {
-		if (probe_intel_cpuid_faulting())
-			__set_bit(X86_FEATURE_CPUID_FAULTING,
-				  c->x86_capability);
-	} else if (boot_cpu_has(X86_FEATURE_CPUID_FAULTING)) {
-		BUG_ON(!probe_intel_cpuid_faulting());
-		__set_bit(X86_FEATURE_CPUID_FAULTING, c->x86_capability);
-	}
+	if (c == &boot_cpu_data)
+		intel_init_levelling();
 
-	if (!cpu_has_cpuid_faulting)
-		set_cpuidmask(c);
-	else if ((c == &boot_cpu_data) &&
-		 (~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
-		    opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx &
-		    opt_cpuid_mask_xsave_eax)))
-		printk("No CPUID feature masking support available\n");
+	if (test_bit(X86_FEATURE_CPUID_FAULTING, boot_cpu_data.x86_capability))
+		__set_bit(X86_FEATURE_CPUID_FAULTING, c->x86_capability);
+
+	intel_ctxt_switch_levelling(NULL);
 }
 
 /*
