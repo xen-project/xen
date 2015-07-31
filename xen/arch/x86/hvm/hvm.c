@@ -411,44 +411,57 @@ bool_t hvm_io_pending(struct vcpu *v)
                           &d->arch.hvm_domain.ioreq_server.list,
                           list_entry )
     {
-        ioreq_t *p = get_ioreq(s, v);
+        struct hvm_ioreq_vcpu *sv;
 
-        if ( p->state != STATE_IOREQ_NONE )
-            return 1;
+        list_for_each_entry ( sv,
+                              &s->ioreq_vcpu_list,
+                              list_entry )
+        {
+            if ( sv->vcpu == v && sv->pending )
+                return 1;
+        }
     }
 
     return 0;
 }
 
-static void hvm_io_assist(ioreq_t *p)
+static void hvm_io_assist(struct hvm_ioreq_vcpu *sv, uint64_t data)
 {
-    struct vcpu *curr = current;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
-
-    p->state = STATE_IOREQ_NONE;
+    struct vcpu *v = sv->vcpu;
+    struct hvm_vcpu_io *vio = &v->arch.hvm_vcpu.hvm_io;
 
     if ( hvm_vcpu_io_need_completion(vio) )
     {
         vio->io_req.state = STATE_IORESP_READY;
-        vio->io_req.data = p->data;
+        vio->io_req.data = data;
     }
     else
         vio->io_req.state = STATE_IOREQ_NONE;
 
-    msix_write_completion(curr);
-    vcpu_end_shutdown_deferral(curr);
+    msix_write_completion(v);
+    vcpu_end_shutdown_deferral(v);
+
+    sv->pending = 0;
 }
 
 static bool_t hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
 {
-    /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
-    while ( p->state != STATE_IOREQ_NONE )
+    while ( sv->pending )
     {
         switch ( p->state )
         {
+        case STATE_IOREQ_NONE:
+            /*
+             * The only reason we should see this case is when an
+             * emulator is dying and it races with an I/O being
+             * requested.
+             */
+            hvm_io_assist(sv, ~0ul);
+            break;
         case STATE_IORESP_READY: /* IORESP_READY -> NONE */
             rmb(); /* see IORESP_READY /then/ read contents of ioreq */
-            hvm_io_assist(p);
+            p->state = STATE_IOREQ_NONE;
+            hvm_io_assist(sv, p->data);
             break;
         case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
         case STATE_IOREQ_INPROCESS:
@@ -458,6 +471,7 @@ static bool_t hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
             break;
         default:
             gdprintk(XENLOG_ERR, "Weird HVM iorequest state %d.\n", p->state);
+            sv->pending = 0;
             domain_crash(sv->vcpu->domain);
             return 0; /* bail */
         }
@@ -488,7 +502,7 @@ void hvm_do_resume(struct vcpu *v)
                               &s->ioreq_vcpu_list,
                               list_entry )
         {
-            if ( sv->vcpu == v )
+            if ( sv->vcpu == v && sv->pending )
             {
                 if ( !hvm_wait_for_io(sv, get_ioreq(s, v)) )
                     return;
@@ -2744,6 +2758,8 @@ int hvm_send_ioreq(struct hvm_ioreq_server *s, ioreq_t *proto_p,
              */
             p->state = STATE_IOREQ_READY;
             notify_via_xen_event_channel(d, port);
+
+            sv->pending = 1;
             return X86EMUL_RETRY;
         }
     }

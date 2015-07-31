@@ -45,6 +45,7 @@ struct hvm_ioreq_vcpu {
     struct list_head list_entry;
     struct vcpu      *vcpu;
     evtchn_port_t    ioreq_evtchn;
+    bool_t           pending;
 };
 
 #define NR_IO_RANGE_TYPES (HVMOP_IO_RANGE_PCI + 1)
