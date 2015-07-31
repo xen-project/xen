@@ -3,6 +3,7 @@
 
 #include <asm/cpufeatureset.h>
 #include <asm/cpuid-autogen.h>
+#include <asm/percpu.h>
 
 #define FSCAPINTS FEATURESET_NR_ENTRIES
 
@@ -18,6 +19,7 @@
 
 #ifndef __ASSEMBLY__
 #include <xen/types.h>
+#include <public/sysctl.h>
 
 extern const uint32_t known_features[FSCAPINTS];
 extern const uint32_t special_features[FSCAPINTS];
@@ -30,6 +32,36 @@ extern uint32_t hvm_featureset[FSCAPINTS];
 void calculate_featuresets(void);
 
 const uint32_t *lookup_deep_deps(uint32_t feature);
+
+/*
+ * Expected levelling capabilities (given cpuid vendor/family information),
+ * and levelling capabilities actually available (given MSR probing).
+ */
+#define LCAP_faulting XEN_SYSCTL_CPU_LEVELCAP_faulting
+#define LCAP_1cd      (XEN_SYSCTL_CPU_LEVELCAP_ecx |        \
+                       XEN_SYSCTL_CPU_LEVELCAP_edx)
+#define LCAP_e1cd     (XEN_SYSCTL_CPU_LEVELCAP_extd_ecx |   \
+                       XEN_SYSCTL_CPU_LEVELCAP_extd_edx)
+#define LCAP_Da1      XEN_SYSCTL_CPU_LEVELCAP_xsave_eax
+#define LCAP_6c       XEN_SYSCTL_CPU_LEVELCAP_thermal_ecx
+#define LCAP_7ab0     (XEN_SYSCTL_CPU_LEVELCAP_l7s0_eax |   \
+                       XEN_SYSCTL_CPU_LEVELCAP_l7s0_ebx)
+extern unsigned int expected_levelling_cap, levelling_caps;
+
+struct cpuidmasks
+{
+    uint64_t _1cd;
+    uint64_t e1cd;
+    uint64_t Da1;
+    uint64_t _6c;
+    uint64_t _7ab0;
+};
+
+/* Per CPU shadows of masking MSR values, for lazy context switching. */
+DECLARE_PER_CPU(struct cpuidmasks, cpuidmasks);
+
+/* Default masking MSR values, calculated at boot. */
+extern struct cpuidmasks cpuidmask_defaults;
 
 #endif /* __ASSEMBLY__ */
 #endif /* !__X86_CPUID_H__ */

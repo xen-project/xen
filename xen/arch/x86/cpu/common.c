@@ -36,6 +36,12 @@ integer_param("cpuid_mask_ext_ecx", opt_cpuid_mask_ext_ecx);
 unsigned int opt_cpuid_mask_ext_edx = ~0u;
 integer_param("cpuid_mask_ext_edx", opt_cpuid_mask_ext_edx);
 
+unsigned int __initdata expected_levelling_cap;
+unsigned int __read_mostly levelling_caps;
+
+DEFINE_PER_CPU(struct cpuidmasks, cpuidmasks);
+struct cpuidmasks __read_mostly cpuidmask_defaults;
+
 const struct cpu_dev *__read_mostly cpu_devs[X86_VENDOR_NUM] = {};
 
 unsigned int paddr_bits __read_mostly = 36;
