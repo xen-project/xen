@@ -4439,20 +4439,15 @@ long set_gdt(struct vcpu *v,
     l1_pgentry_t *pl1e;
     /* NB. There are 512 8-byte entries per GDT page. */
     int i, nr_pages = (entries + 511) / 512;
-    unsigned long *pfns;
 
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
-
-    pfns = xmalloc_array(unsigned long, nr_pages);
-    if ( !pfns )
-        return -ENOMEM;
 
     /* Check the pages in the new GDT. */
     for ( i = 0; i < nr_pages; i++ )
     {
         struct page_info *page;
-        pfns[i] = frames[i];
+
         page = get_page_from_gfn(d, frames[i], NULL, P2M_ALLOC);
         if ( !page )
             goto fail;
@@ -4476,7 +4471,6 @@ long set_gdt(struct vcpu *v,
         l1e_write(&pl1e[i], l1e_from_pfn(frames[i], __PAGE_HYPERVISOR_RW));
     }
 
-    xfree(pfns);
     return 0;
 
  fail:
@@ -4484,7 +4478,6 @@ long set_gdt(struct vcpu *v,
     {
         put_page_and_type(mfn_to_page(frames[i]));
     }
-    xfree(pfns);
     return -EINVAL;
 }
 
