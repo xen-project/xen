@@ -141,7 +141,7 @@ void _spin_lock(spinlock_t *lock)
     while ( tickets.tail != observe_head(&lock->tickets) )
     {
         LOCK_PROFILE_BLOCK;
-        cpu_relax();
+        arch_lock_relax();
     }
     LOCK_PROFILE_GOT;
     preempt_disable();
@@ -170,6 +170,7 @@ void _spin_unlock(spinlock_t *lock)
     preempt_enable();
     LOCK_PROFILE_REL;
     add_sized(&lock->tickets.head, 1);
+    arch_lock_signal();
 }
 
 void _spin_unlock_irq(spinlock_t *lock)
@@ -228,7 +229,7 @@ void _spin_barrier(spinlock_t *lock)
     if ( sample.head != sample.tail )
     {
         while ( observe_head(&lock->tickets) == sample.head )
-            cpu_relax();
+            arch_lock_relax();
 #ifdef LOCK_PROFILE
         if ( lock->profile )
         {
