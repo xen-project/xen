@@ -1091,8 +1091,6 @@ _hidden int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
                                  const char *old_name, const char *new_name,
                                  xs_transaction_t trans);
 
-_hidden int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
-                                     uint32_t size, void *data);
 _hidden int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid);
 
 _hidden const char *libxl__userdata_path(libxl__gc *gc, uint32_t domid,
@@ -3435,8 +3433,6 @@ void libxl__xc_domain_saverestore_async_callback_done(libxl__egc *egc,
 
 _hidden void libxl__domain_suspend_common_switch_qemu_logdirty
                                (int domid, unsigned int enable, void *data);
-_hidden int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
-        uint32_t *len, void *data);
 _hidden int libxl__save_emulator_xenstore_data(libxl__domain_suspend_state *dss,
                                                char **buf, uint32_t *len);
 _hidden int libxl__restore_emulator_xenstore_data

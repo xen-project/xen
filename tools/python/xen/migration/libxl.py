@@ -34,7 +34,6 @@ RH_FORMAT = "II"
 
 REC_TYPE_end                    = 0x00000000
 REC_TYPE_libxc_context          = 0x00000001
-REC_TYPE_xenstore_data          = 0x00000002 # TOOLSTACK COMPAT
 REC_TYPE_emulator_xenstore_data = 0x00000002
 REC_TYPE_emulator_context       = 0x00000003
 REC_TYPE_checkpoint_end         = 0x00000004
