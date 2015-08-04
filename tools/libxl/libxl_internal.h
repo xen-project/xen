@@ -3013,10 +3013,11 @@ struct libxl__stream_write_state {
     libxl__datacopier_state dc;
     sws_record_done_cb record_done_callback;
 
-    /* Only used when constructing an EMULATOR record. */
+    /* Only used when constructing EMULATOR records. */
     libxl__datacopier_state emu_dc;
     libxl__carefd *emu_carefd;
     libxl__sr_rec_hdr emu_rec_hdr;
+    libxl__sr_emulator_hdr emu_sub_hdr;
     void *emu_body;
 };
 

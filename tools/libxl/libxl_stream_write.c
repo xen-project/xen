@@ -38,14 +38,16 @@
  * The main loop for a plain VM writes:
  *  - Stream header
  *  - Libxc record
- *  - Toolstack record
- *  - if (hvm), Qemu record
+ *  - (optional) Emulator xenstore record
+ *  - if (hvm)
+ *      - Emulator context record
  *  - End record
  *
  * For checkpointed stream, there is a second loop which is triggered by a
  * save-helper checkpoint callback.  It writes:
- *  - Toolstack record
- *  - if (hvm), Qemu record
+ *  - (optional) Emulator xenstore record
+ *  - if (hvm)
+ *      - Emulator context record
  *  - Checkpoint end record
  */
 
@@ -69,17 +71,17 @@ static void stream_header_done(libxl__egc *egc,
 static void libxc_header_done(libxl__egc *egc,
                               libxl__stream_write_state *stream);
 /* libxl__xc_domain_save_done() lives here, event-order wise. */
-static void write_toolstack_record(libxl__egc *egc,
-                                   libxl__stream_write_state *stream);
-static void toolstack_record_done(libxl__egc *egc,
-                                  libxl__stream_write_state *stream);
-static void write_emulator_record(libxl__egc *egc,
-                                  libxl__stream_write_state *stream);
-static void emulator_read_done(libxl__egc *egc,
-                               libxl__datacopier_state *dc,
-                               int rc, int onwrite, int errnoval);
-static void emulator_record_done(libxl__egc *egc,
-                                 libxl__stream_write_state *stream);
+static void write_emulator_xenstore_record(libxl__egc *egc,
+                                           libxl__stream_write_state *stream);
+static void emulator_xenstore_record_done(libxl__egc *egc,
+                                          libxl__stream_write_state *stream);
+static void write_emulator_context_record(libxl__egc *egc,
+                                          libxl__stream_write_state *stream);
+static void emulator_context_read_done(libxl__egc *egc,
+                                       libxl__datacopier_state *dc,
+                                       int rc, int onwrite, int errnoval);
+static void emulator_context_record_done(libxl__egc *egc,
+                                         libxl__stream_write_state *stream);
 static void write_end_record(libxl__egc *egc,
                              libxl__stream_write_state *stream);
 
@@ -95,12 +97,14 @@ static void write_done(libxl__egc *egc,
                        libxl__datacopier_state *dc,
                        int rc, int onwrite, int errnoval);
 
-/* Helper to set up reading some data from the stream. */
-static void setup_write(libxl__egc *egc,
-                        libxl__stream_write_state *stream,
-                        const char *what,
-                        libxl__sr_rec_hdr *hdr, void *body,
-                        sws_record_done_cb cb)
+/* Generic helper to set up writing some data to the stream. */
+static void setup_generic_write(libxl__egc *egc,
+                                libxl__stream_write_state *stream,
+                                const char *what,
+                                libxl__sr_rec_hdr *hdr,
+                                libxl__sr_emulator_hdr *emu_hdr,
+                                void *body,
+                                sws_record_done_cb cb)
 {
     static const uint8_t zero_padding[1U << REC_ALIGN_ORDER] = { 0 };
 
@@ -120,13 +124,21 @@ static void setup_write(libxl__egc *egc,
     }
 
     size_t padsz = ROUNDUP(hdr->length, REC_ALIGN_ORDER) - hdr->length;
+    uint32_t length = hdr->length;
 
     /* Insert header */
     libxl__datacopier_prefixdata(egc, dc, hdr, sizeof(*hdr));
 
+    /* Optional emulator sub-header */
+    if (emu_hdr) {
+        assert(length >= sizeof(*emu_hdr));
+        libxl__datacopier_prefixdata(egc, dc, emu_hdr, sizeof(*emu_hdr));
+        length -= sizeof(*emu_hdr);
+    }
+
     /* Optional body */
     if (body)
-        libxl__datacopier_prefixdata(egc, dc, body, hdr->length);
+        libxl__datacopier_prefixdata(egc, dc, body, length);
 
     /* Any required padding */
     if (padsz > 0)
@@ -134,6 +146,30 @@ static void setup_write(libxl__egc *egc,
                                      zero_padding, padsz);
     stream->record_done_callback = cb;
 }
+
+/* Helper to set up writing a regular record to the stream. */
+static void setup_write(libxl__egc *egc,
+                        libxl__stream_write_state *stream,
+                        const char *what,
+                        libxl__sr_rec_hdr *hdr,
+                        void *body,
+                        sws_record_done_cb cb)
+{
+    setup_generic_write(egc, stream, what, hdr, NULL, body, cb);
+}
+
+/* Helper to set up writing a record with an emulator prefix to the stream. */
+static void setup_emulator_write(libxl__egc *egc,
+                                 libxl__stream_write_state *stream,
+                                 const char *what,
+                                 libxl__sr_rec_hdr *hdr,
+                                 libxl__sr_emulator_hdr *emu_hdr,
+                                 void *body,
+                                 sws_record_done_cb cb)
+{
+    setup_generic_write(egc, stream, what, hdr, emu_hdr, body, cb);
+}
+
 
 static void write_done(libxl__egc *egc,
                        libxl__datacopier_state *dc,
@@ -169,6 +205,7 @@ void libxl__stream_write_init(libxl__stream_write_state *stream)
     FILLZERO(stream->emu_dc);
     stream->emu_carefd = NULL;
     FILLZERO(stream->emu_rec_hdr);
+    FILLZERO(stream->emu_sub_hdr);
     stream->emu_body = NULL;
 }
 
@@ -176,6 +213,7 @@ void libxl__stream_write_start(libxl__egc *egc,
                                libxl__stream_write_state *stream)
 {
     libxl__datacopier_state *dc = &stream->dc;
+    libxl__domain_suspend_state *dss = stream->dss;
     STATE_AO_GC(stream->ao);
     struct libxl__sr_hdr hdr;
     int rc = 0;
@@ -183,6 +221,24 @@ void libxl__stream_write_start(libxl__egc *egc,
     libxl__stream_write_init(stream);
 
     stream->running = true;
+
+    if (dss->type == LIBXL_DOMAIN_TYPE_HVM) {
+        switch (libxl__device_model_version_running(gc, dss->domid)) {
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+            stream->emu_sub_hdr.id = EMULATOR_QEMU_TRADITIONAL;
+            break;
+
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+            stream->emu_sub_hdr.id = EMULATOR_QEMU_UPSTREAM;
+            break;
+
+        default:
+            rc = ERROR_FAIL;
+            LOG(ERROR, "Unknown emulator for HVM domain\n");
+            goto err;
+        }
+        stream->emu_sub_hdr.index = 0;
+    }
 
     dc->ao        = ao;
     dc->readfd    = -1;
@@ -216,7 +272,7 @@ void libxl__stream_write_start_checkpoint(libxl__egc *egc,
     assert(!stream->in_checkpoint);
     stream->in_checkpoint = true;
 
-    write_toolstack_record(egc, stream);
+    write_emulator_xenstore_record(egc, stream);
 }
 
 void libxl__stream_write_abort(libxl__egc *egc,
@@ -290,48 +346,47 @@ void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
      * If the stream is not still alive, we must not continue any work.
      */
     if (libxl__stream_write_inuse(stream))
-        write_toolstack_record(egc, stream);
+        write_emulator_xenstore_record(egc, stream);
 }
 
-static void write_toolstack_record(libxl__egc *egc,
-                                   libxl__stream_write_state *stream)
+static void write_emulator_xenstore_record(libxl__egc *egc,
+                                           libxl__stream_write_state *stream)
 {
     libxl__domain_suspend_state *dss = stream->dss;
     STATE_AO_GC(stream->ao);
     struct libxl__sr_rec_hdr rec;
     int rc;
-    uint8_t *toolstack_buf = NULL; /* We must free this. */
-    uint32_t toolstack_len;
+    uint8_t *buf = NULL; /* We must free this. */
+    uint32_t len;
 
-    rc = libxl__toolstack_save(dss->domid, &toolstack_buf,
-                               &toolstack_len, dss);
+    rc = libxl__toolstack_save(dss->domid, &buf, &len, dss);
     if (rc)
         goto err;
 
     FILLZERO(rec);
     rec.type = REC_TYPE_XENSTORE_DATA;
-    rec.length = toolstack_len;
+    rec.length = len;
 
-    setup_write(egc, stream, "toolstack record",
-                &rec, toolstack_buf,
-                toolstack_record_done);
+    setup_write(egc, stream, "emulator xenstore record",
+                &rec, buf,
+                emulator_xenstore_record_done);
 
-    free(toolstack_buf);
+    free(buf);
     return;
 
  err:
     assert(rc);
-    free(toolstack_buf);
+    free(buf);
     stream_complete(egc, stream, rc);
 }
 
-static void toolstack_record_done(libxl__egc *egc,
-                                  libxl__stream_write_state *stream)
+static void emulator_xenstore_record_done(libxl__egc *egc,
+                                          libxl__stream_write_state *stream)
 {
     libxl__domain_suspend_state *dss = stream->dss;
 
     if (dss->type == LIBXL_DOMAIN_TYPE_HVM)
-        write_emulator_record(egc, stream);
+        write_emulator_context_record(egc, stream);
     else {
         if (stream->in_checkpoint)
             write_checkpoint_end_record(egc, stream);
@@ -340,14 +395,13 @@ static void toolstack_record_done(libxl__egc *egc,
     }
 }
 
-static void write_emulator_record(libxl__egc *egc,
-                                  libxl__stream_write_state *stream)
+static void write_emulator_context_record(libxl__egc *egc,
+                                          libxl__stream_write_state *stream)
 {
     libxl__domain_suspend_state *dss = stream->dss;
     libxl__datacopier_state *dc = &stream->emu_dc;
     STATE_AO_GC(stream->ao);
     struct libxl__sr_rec_hdr *rec = &stream->emu_rec_hdr;
-    struct libxl__sr_emulator_hdr *ehdr = NULL;
     struct stat st;
     int rc;
 
@@ -355,7 +409,6 @@ static void write_emulator_record(libxl__egc *egc,
 
     /* Convenience aliases */
     const char *const filename = dss->dm_savefile;
-    const uint32_t domid = dss->domid;
 
     libxl__carefd_begin();
     int readfd = open(filename, O_RDONLY);
@@ -379,23 +432,8 @@ static void write_emulator_record(libxl__egc *egc,
     }
 
     rec->type = REC_TYPE_EMULATOR_CONTEXT;
-    rec->length = st.st_size + sizeof(*ehdr);
-    stream->emu_body = ehdr = libxl__malloc(NOGC, rec->length);
-
-    switch(libxl__device_model_version_running(gc, domid)) {
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-        ehdr->id = EMULATOR_QEMU_TRADITIONAL;
-        break;
-
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-        ehdr->id = EMULATOR_QEMU_UPSTREAM;
-        break;
-
-    default:
-        rc = ERROR_FAIL;
-        goto err;
-    }
-    ehdr->index = 0;
+    rec->length = st.st_size + sizeof(stream->emu_sub_hdr);
+    stream->emu_body = libxl__malloc(NOGC, st.st_size);
 
     FILLZERO(*dc);
     dc->ao            = stream->ao;
@@ -404,9 +442,9 @@ static void write_emulator_record(libxl__egc *egc,
     dc->readfd        = readfd;
     dc->writefd       = -1;
     dc->maxsz         = -1;
-    dc->readbuf       = stream->emu_body + sizeof(*ehdr);
-    dc->bytes_to_read = rec->length - sizeof(*ehdr);
-    dc->callback      = emulator_read_done;
+    dc->readbuf       = stream->emu_body;
+    dc->bytes_to_read = st.st_size;
+    dc->callback      = emulator_context_read_done;
 
     rc = libxl__datacopier_start(dc);
     if (rc)
@@ -419,9 +457,9 @@ static void write_emulator_record(libxl__egc *egc,
     stream_complete(egc, stream, rc);
 }
 
-static void emulator_read_done(libxl__egc *egc,
-                               libxl__datacopier_state *dc,
-                               int rc, int onwrite, int errnoval)
+static void emulator_context_read_done(libxl__egc *egc,
+                                       libxl__datacopier_state *dc,
+                                       int rc, int onwrite, int errnoval)
 {
     libxl__stream_write_state *stream = CONTAINER_OF(dc, *stream, emu_dc);
     STATE_AO_GC(stream->ao);
@@ -434,13 +472,15 @@ static void emulator_read_done(libxl__egc *egc,
     libxl__carefd_close(stream->emu_carefd);
     stream->emu_carefd = NULL;
 
-    setup_write(egc, stream, "emulator record",
-                &stream->emu_rec_hdr, stream->emu_body,
-                emulator_record_done);
+    setup_emulator_write(egc, stream, "emulator record",
+                         &stream->emu_rec_hdr,
+                         &stream->emu_sub_hdr,
+                         stream->emu_body,
+                         emulator_context_record_done);
 }
 
-static void emulator_record_done(libxl__egc *egc,
-                                 libxl__stream_write_state *stream)
+static void emulator_context_record_done(libxl__egc *egc,
+                                         libxl__stream_write_state *stream)
 {
     free(stream->emu_body);
     stream->emu_body = NULL;
