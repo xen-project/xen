@@ -37,7 +37,7 @@ class TestLibxl(unittest.TestCase):
         for fmt, sz in ( (libxl.HDR_FORMAT, 16),
                          (libxl.RH_FORMAT, 8),
 
-                         (libxl.EMULATOR_CONTEXT_FORMAT, 8),
+                         (libxl.EMULATOR_HEADER_FORMAT, 8),
                          ):
             self.assertEqual(calcsize(fmt), sz)
 

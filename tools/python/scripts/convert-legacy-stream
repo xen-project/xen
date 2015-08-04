@@ -174,7 +174,7 @@ def write_libxl_xenstore_data(data):
 
 def write_libxl_emulator_context(blob):
     write_record(libxl.REC_TYPE_emulator_context,
-                 pack(libxl.EMULATOR_CONTEXT_FORMAT,
+                 pack(libxl.EMULATOR_HEADER_FORMAT,
                       libxl.EMULATOR_ID_unknown, 0) + blob)
 
 def rdexact(nr_bytes):

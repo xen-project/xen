@@ -2,12 +2,15 @@
 # -*- coding: utf-8 -*-
 
 """
-Libxc legacy migration streams
+Legacy migration stream information.
 
-Documentation and record structures for legacy migration
+Documentation and record structures for legacy migration, for both libxc
+and libxl.
 """
 
 """
+Libxc:
+
 SAVE/RESTORE/MIGRATE PROTOCOL
 =============================
 
@@ -277,3 +280,36 @@ MAX_BATCH = 1024
 
 # Maximum #VCPUs currently supported for save/restore
 MAX_VCPU_ID = 4095
+
+
+"""
+Libxl:
+
+Legacy "toolstack" record layout:
+
+Version 1:
+  uint32_t version
+  QEMU physmap data:
+    uint32_t count
+    libxl__physmap_info * count
+
+The problem is that libxl__physmap_info was declared as:
+
+struct libxl__physmap_info {
+    uint64_t phys_offset;
+    uint64_t start_addr;
+    uint64_t size;
+    uint32_t namelen;
+    char name[];
+};
+
+Which has 4 bytes of padding at the end in a 64bit build, thus not the
+same between 32 and 64bit builds.
+
+Because of the pointer arithmatic used to construct the record, the 'name' was
+shifted up to start at the padding, leaving the erronious 4 bytes at the end
+of the name string, after the NUL terminator.
+
+Instead, the information described here has been changed to fit in a new
+EMULATOR_XENSTORE_DATA record made of NUL terminated strings.
+"""

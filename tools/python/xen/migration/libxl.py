@@ -10,7 +10,7 @@ verification routines.
 
 import sys
 
-from struct import calcsize, unpack
+from struct import calcsize, unpack, unpack_from
 from xen.migration.verify import StreamError, RecordError, VerifyBase
 from xen.migration.libxc import VerifyLibxc
 
@@ -32,22 +32,23 @@ HDR_OPT_RESZ_MASK = 0xfffc
 # Records
 RH_FORMAT = "II"
 
-REC_TYPE_end              = 0x00000000
-REC_TYPE_libxc_context    = 0x00000001
-REC_TYPE_xenstore_data    = 0x00000002
-REC_TYPE_emulator_context = 0x00000003
-REC_TYPE_checkpoint_end   = 0x00000004
+REC_TYPE_end                    = 0x00000000
+REC_TYPE_libxc_context          = 0x00000001
+REC_TYPE_xenstore_data          = 0x00000002 # TOOLSTACK COMPAT
+REC_TYPE_emulator_xenstore_data = 0x00000002
+REC_TYPE_emulator_context       = 0x00000003
+REC_TYPE_checkpoint_end         = 0x00000004
 
 rec_type_to_str = {
-    REC_TYPE_end              : "End",
-    REC_TYPE_libxc_context    : "Libxc context",
-    REC_TYPE_xenstore_data    : "Xenstore data",
-    REC_TYPE_emulator_context : "Emulator context",
-    REC_TYPE_checkpoint_end   : "Checkpoint end",
+    REC_TYPE_end                    : "End",
+    REC_TYPE_libxc_context          : "Libxc context",
+    REC_TYPE_emulator_xenstore_data : "Emulator xenstore data",
+    REC_TYPE_emulator_context       : "Emulator context",
+    REC_TYPE_checkpoint_end         : "Checkpoint end",
 }
 
-# emulator_context
-EMULATOR_CONTEXT_FORMAT = "II"
+# emulator_* header
+EMULATOR_HEADER_FORMAT = "II"
 
 EMULATOR_ID_unknown       = 0x00000000
 EMULATOR_ID_qemu_trad     = 0x00000001
@@ -155,22 +156,50 @@ class VerifyLibxl(VerifyBase):
         VerifyLibxc(self.info, self.read).verify()
 
 
-    def verify_record_xenstore_data(self, content):
-        """ Xenstore Data record """
-
-        if len(content) == 0:
-            raise RecordError("Xenstore data record with zero length")
-
-
-    def verify_record_emulator_context(self, content):
-        """ Emulator Context record """
-        minsz = calcsize(EMULATOR_CONTEXT_FORMAT)
+    def verify_record_emulator_xenstore_data(self, content):
+        """ Emulator Xenstore Data record """
+        minsz = calcsize(EMULATOR_HEADER_FORMAT)
 
         if len(content) < minsz:
             raise RecordError("Length must be at least %d bytes, got %d"
                               % (minsz, len(content)))
 
-        emu_id, emu_idx = unpack(EMULATOR_CONTEXT_FORMAT, content[:minsz])
+        emu_id, emu_idx = unpack(EMULATOR_HEADER_FORMAT, content[:minsz])
+
+        if emu_id not in emulator_id_to_str:
+            raise RecordError("Unrecognised emulator id 0x%x" % (emu_id, ))
+
+        self.info("Emulator Xenstore Data (%s, idx %d)"
+                  % (emulator_id_to_str[emu_id], emu_idx))
+
+        # Chop off the emulator header
+        content = content[minsz:]
+
+        if len(content):
+
+            if content[-1] != '\x00':
+                raise RecordError("Data not NUL terminated")
+
+            # Split without the final NUL, to get an even number of parts
+            parts = content[:-1].split("\x00")
+
+            if (len(parts) % 2) != 0:
+                raise RecordError("Expected an even number of strings, got %d"
+                                  % (len(parts), ))
+
+            for key, val in zip(parts[0::2], parts[1::2]):
+                self.info("  '%s' = '%s'" % (key, val))
+
+
+    def verify_record_emulator_context(self, content):
+        """ Emulator Context record """
+        minsz = calcsize(EMULATOR_HEADER_FORMAT)
+
+        if len(content) < minsz:
+            raise RecordError("Length must be at least %d bytes, got %d"
+                              % (minsz, len(content)))
+
+        emu_id, emu_idx = unpack(EMULATOR_HEADER_FORMAT, content[:minsz])
 
         if emu_id not in emulator_id_to_str:
             raise RecordError("Unrecognised emulator id 0x%x" % (emu_id, ))
@@ -190,8 +219,8 @@ record_verifiers = {
         VerifyLibxl.verify_record_end,
     REC_TYPE_libxc_context:
         VerifyLibxl.verify_record_libxc_context,
-    REC_TYPE_xenstore_data:
-        VerifyLibxl.verify_record_xenstore_data,
+    REC_TYPE_emulator_xenstore_data:
+        VerifyLibxl.verify_record_emulator_xenstore_data,
     REC_TYPE_emulator_context:
         VerifyLibxl.verify_record_emulator_context,
     REC_TYPE_checkpoint_end:

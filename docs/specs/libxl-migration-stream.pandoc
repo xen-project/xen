@@ -90,8 +90,8 @@ i386, x86_64, or arm host.
 \clearpage
 
 
-Records
-=======
+Record Overview
+===============
 
 A record has a record header, type specific data and a trailing footer.  If
 `length` is not a multiple of 8, the body is padded with zeroes to align the
@@ -113,7 +113,7 @@ type         0x00000000: END
 
              0x00000001: LIBXC_CONTEXT
 
-             0x00000002: XENSTORE_DATA
+             0x00000002: EMULATOR_XENSTORE_DATA
 
              0x00000003: EMULATOR_CONTEXT
 
@@ -134,6 +134,38 @@ padding      0 to 7 octets of zeros to pad the whole record to a multiple
 --------------------------------------------------------------------
 
 \clearpage
+
+Emulator Records
+----------------
+
+Several records are specifically for emulators, and have a common sub header.
+
+     0     1     2     3     4     5     6     7 octet
+    +------------------------+------------------------+
+    | emulator_id            | index                  |
+    +------------------------+------------------------+
+    | record specific data                            |
+    ...
+    +-------------------------------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+------------     ---------------------------------------------------
+emulator_id      0x00000000: Unknown (In the case of a legacy stream)
+
+                 0x00000001: Qemu Traditional
+
+                 0x00000002: Qemu Upstream
+
+                 0x00000003 - 0xFFFFFFFF: Reserved for future emulators.
+
+index            Index of this emulator for the domain.
+--------------------------------------------------------------------
+
+\clearpage
+
+Records
+=======
 
 END
 ----
@@ -163,16 +195,32 @@ The libxc context record contains no fields; its body_length is 0[^1].
 might write into the stream, especially for live migration where the quantity
 of data is partially proportional to the elapsed time.
 
-XENSTORE\_DATA
--------------
+EMULATOR\_XENSTORE\_DATA
+------------------------
 
-A record containing xenstore key/value pairs of data.
+A set of xenstore key/value pairs for a specific emulator associated with the
+domain.
 
      0     1     2     3     4     5     6     7 octet
-    +-------------------------------------------------+
-    | xenstore key/value pairs                        |
+    +------------------------+------------------------+
+    | emulator_id            | index                  |
+    +------------------------+------------------------+
+    | xenstore key/value data                         |
     ...
     +-------------------------------------------------+
+
+Xenstore key/value data are encoded as a packed sequence of (key, value)
+tuples.  Each (key, value) tuple is a packed pair of NUL terminated octets,
+conforming to xenstore protocol character encoding (keys strictly as
+alphanumeric ASCII and `-/_@`, values expected to be human-readable ASCII).
+
+Keys shall be relative to to the device models xenstore tree for the new
+domain.  At the time of writing, keys are relative to the path
+
+> `/local/domain/$dm_domid/device-model/$domid/`
+
+although this path is free to change moving forward, thus should not be
+assumed.
 
 EMULATOR\_CONTEXT
 ----------------
@@ -187,22 +235,8 @@ A context blob for a specific emulator associated with the domain.
     ...
     +-------------------------------------------------+
 
---------------------------------------------------------------------
-Field            Description
-------------     ---------------------------------------------------
-emulator_id      0x00000000: Unknown (In the case of a legacy stream)
-
-                 0x00000001: Qemu Traditional
-
-                 0x00000002: Qemu Upstream
-
-                 0x00000003 - 0xFFFFFFFF: Reserved for future emulators.
-
-index            Index of this emulator for the domain, if multiple
-                 emulators are in use.
-
-emulator_ctx     Emulator context blob.
---------------------------------------------------------------------
+The *emulator_ctx* is a binary blob interpreted by the emulator identified by
+*emulator_id*.  Its format is unspecified.
 
 CHECKPOINT\_END
 ---------------
