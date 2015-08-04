@@ -173,12 +173,18 @@ static void free_record(libxl__sr_record_buf *rec)
 
 void libxl__stream_read_init(libxl__stream_read_state *stream)
 {
+    assert(stream->ao);
+
+    stream->shs.ao = stream->ao;
+    libxl__save_helper_init(&stream->shs);
+
+    stream->chs.ao = stream->ao;
+    libxl__conversion_helper_init(&stream->chs);
+
     stream->rc = 0;
     stream->running = false;
     stream->in_checkpoint = false;
     stream->sync_teardown = false;
-    libxl__save_helper_init(&stream->shs);
-    libxl__conversion_helper_init(&stream->chs);
     FILLZERO(stream->dc);
     FILLZERO(stream->hdr);
     LIBXL_STAILQ_INIT(&stream->record_queue);
@@ -205,7 +211,6 @@ void libxl__stream_read_start(libxl__egc *egc,
         /* Convert the legacy stream. */
         libxl__conversion_helper_state *chs = &stream->chs;
 
-        chs->ao = stream->ao;
         chs->legacy_fd = stream->fd;
         chs->hvm =
             (stream->dcs->guest_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM);

@@ -2945,9 +2945,9 @@ _hidden int libxl__netbuffer_enabled(libxl__gc *gc);
 typedef struct libxl__conversion_helper_state libxl__conversion_helper_state;
 
 struct libxl__conversion_helper_state {
-    /* public */
+    /* Public - Must be filled by caller unless noted. */
     libxl__ao *ao;
-    int legacy_fd;
+    int legacy_fd;             /* fd to read the legacy stream from. */
     bool hvm;                  /* pv or hvm domain? */
     libxl__carefd *v2_carefd;  /* Filled by successful call to
                                 * libxl__convert_legacy_stream().  Caller

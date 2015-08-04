@@ -34,6 +34,8 @@ static void helper_done(libxl__egc *egc,
 
 void libxl__conversion_helper_init(libxl__conversion_helper_state *chs)
 {
+    assert(chs->ao);
+
     chs->v2_carefd = NULL;
     chs->rc = 0;
     libxl__ao_abortable_init(&chs->abrt);

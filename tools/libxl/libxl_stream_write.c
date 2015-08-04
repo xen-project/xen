@@ -155,6 +155,11 @@ static void write_done(libxl__egc *egc,
 
 void libxl__stream_write_init(libxl__stream_write_state *stream)
 {
+    assert(stream->ao);
+
+    stream->shs.ao = stream->ao;
+    libxl__save_helper_init(&stream->shs);
+
     stream->rc = 0;
     stream->running = false;
     stream->in_checkpoint = false;
