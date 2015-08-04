@@ -33,6 +33,47 @@
 #define DEF_MAX_INTELEXT  0x80000008u
 #define DEF_MAX_AMDEXT    0x8000001cu
 
+int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps)
+{
+    DECLARE_SYSCTL;
+    int ret;
+
+    sysctl.cmd = XEN_SYSCTL_get_cpu_levelling_caps;
+    ret = do_sysctl(xch, &sysctl);
+
+    if ( !ret )
+        *caps = sysctl.u.cpu_levelling_caps.caps;
+
+    return ret;
+}
+
+int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,
+                          uint32_t *nr_features, uint32_t *featureset)
+{
+    DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BOUNCE(featureset,
+                             *nr_features * sizeof(*featureset),
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    int ret;
+
+    if ( xc_hypercall_bounce_pre(xch, featureset) )
+        return -1;
+
+    sysctl.cmd = XEN_SYSCTL_get_cpu_featureset;
+    sysctl.u.cpu_featureset.index = index;
+    sysctl.u.cpu_featureset.nr_features = *nr_features;
+    set_xen_guest_handle(sysctl.u.cpu_featureset.features, featureset);
+
+    ret = do_sysctl(xch, &sysctl);
+
+    xc_hypercall_bounce_post(xch, featureset);
+
+    if ( !ret )
+        *nr_features = sysctl.u.cpu_featureset.nr_features;
+
+    return ret;
+}
+
 struct cpuid_domain_info
 {
     enum

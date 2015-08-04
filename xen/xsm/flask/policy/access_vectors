@@ -95,6 +95,8 @@ class xen2
     pmu_use
 # XEN_SYSCTL_get_cpu_levelling_caps
     get_cpu_levelling_caps
+# XEN_SYSCTL_get_cpu_featureset
+    get_cpu_featureset
 }
 
 # Classes domain and domain2 consist of operations that a domain performs on

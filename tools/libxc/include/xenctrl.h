@@ -2618,6 +2618,10 @@ int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
 int xc_psr_cat_get_l3_info(xc_interface *xch, uint32_t socket,
                            uint32_t *cos_max, uint32_t *cbm_len,
                            bool *cdp_enabled);
+
+int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps);
+int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,
+                          uint32_t *nr_features, uint32_t *featureset);
 #endif
 
 /* Compat shims */

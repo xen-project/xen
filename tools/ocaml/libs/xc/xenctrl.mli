@@ -147,6 +147,10 @@ external version_compile_info : handle -> compile_info
 external version_changeset : handle -> string = "stub_xc_version_changeset"
 external version_capabilities : handle -> string
   = "stub_xc_version_capabilities"
+
+type featureset_index = Featureset_raw | Featureset_host | Featureset_pv | Featureset_hvm
+external get_cpu_featureset : handle -> featureset_index -> int64 array = "stub_xc_get_cpu_featureset"
+
 type core_magic = Magic_hvm | Magic_pv
 type core_header = {
   xch_magic : core_magic;

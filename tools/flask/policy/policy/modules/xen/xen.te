@@ -73,6 +73,7 @@ allow dom0_t xen_t:xen2 {
     pmu_ctrl
     get_symbol
     get_cpu_levelling_caps
+    get_cpu_featureset
 };
 
 # Allow dom0 to use all XENVER_ subops and VERSION subops that have checks.

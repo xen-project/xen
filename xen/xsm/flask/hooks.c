@@ -811,6 +811,9 @@ static int flask_sysctl(int cmd)
     case XEN_SYSCTL_get_cpu_levelling_caps:
         return domain_has_xen(current->domain, XEN2__GET_CPU_LEVELLING_CAPS);
 
+    case XEN_SYSCTL_get_cpu_featureset:
+        return domain_has_xen(current->domain, XEN2__GET_CPU_FEATURESET);
+
     default:
         printk("flask_sysctl: Unknown op %d\n", cmd);
         return -EPERM;

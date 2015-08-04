@@ -1207,6 +1207,41 @@ CAMLprim value stub_xc_domain_deassign_device(value xch, value domid, value desc
 	CAMLreturn(Val_unit);
 }
 
+CAMLprim value stub_xc_get_cpu_featureset(value xch, value idx)
+{
+	CAMLparam2(xch, idx);
+	CAMLlocal1(bitmap_val);
+
+	/* Safe, because of the global ocaml lock. */
+	static uint32_t fs_len;
+
+	if (fs_len == 0)
+	{
+		int ret = xc_get_cpu_featureset(_H(xch), 0, &fs_len, NULL);
+
+		if (ret || (fs_len == 0))
+			failwith_xc(_H(xch));
+	}
+
+	{
+		/* To/from hypervisor to retrieve actual featureset */
+		uint32_t fs[fs_len], len = fs_len;
+		unsigned int i;
+
+		int ret = xc_get_cpu_featureset(_H(xch), Int_val(idx), &len, fs);
+
+		if (ret)
+			failwith_xc(_H(xch));
+
+		bitmap_val = caml_alloc(len, 0);
+
+		for (i = 0; i < len; ++i)
+			Store_field(bitmap_val, i, caml_copy_int64(fs[i]));
+	}
+
+	CAMLreturn(bitmap_val);
+}
+
 CAMLprim value stub_xc_watchdog(value xch, value domid, value timeout)
 {
 	CAMLparam3(xch, domid, timeout);
