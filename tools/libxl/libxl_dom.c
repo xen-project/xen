@@ -1151,6 +1151,76 @@ out:
     return ret;
 }
 
+/*
+ * Inspect the buffer between start and end, and return a pointer to the
+ * character following the NUL terminator of start, or NULL if start is not
+ * terminated before end.
+ */
+static const char *next_string(const char *start, const char *end)
+{
+    if (start >= end) return NULL;
+
+    size_t total_len = end - start;
+    size_t len = strnlen(start, total_len);
+
+    if (len == total_len)
+        return NULL;
+    else
+        return start + len + 1;
+}
+
+int libxl__restore_emulator_xenstore_data(libxl__domain_create_state *dcs,
+                                          const char *ptr, uint32_t size)
+{
+    STATE_AO_GC(dcs->ao);
+    const char *next = ptr, *end = ptr + size, *key, *val;
+    int rc;
+
+    const uint32_t domid = dcs->guest_domid;
+    const uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
+    const char *xs_root = libxl__device_model_xs_path(gc, dm_domid, domid, "");
+
+    while (next < end) {
+        key = next;
+        next = next_string(next, end);
+
+        /* Sanitise 'key'. */
+        if (!next) {
+            rc = ERROR_FAIL;
+            LOG(ERROR, "Key in xenstore data not NUL terminated");
+            goto out;
+        }
+        if (key[0] == '\0') {
+            rc = ERROR_FAIL;
+            LOG(ERROR, "empty key found in xenstore data");
+            goto out;
+        }
+        if (key[0] == '/') {
+            rc = ERROR_FAIL;
+            LOG(ERROR, "Key in xenstore data not relative");
+            goto out;
+        }
+
+        val = next;
+        next = next_string(next, end);
+
+        /* Sanitise 'val'. */
+        if (!next) {
+            rc = ERROR_FAIL;
+            LOG(ERROR, "Val in xenstore data not NUL terminated");
+            goto out;
+        }
+
+        libxl__xs_write(gc, XBT_NULL,
+                        GCSPRINTF("%s/%s", xs_root, key), "%s", val);
+    }
+
+    rc = 0;
+
+ out:
+    return rc;
+}
+
 /*==================== Domain suspend (save) ====================*/
 
 static void stream_done(libxl__egc *egc,
@@ -1485,6 +1555,71 @@ int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
     ret = 0;
 out:
     return ret;
+}
+
+/*
+ * Expand the buffer 'buf' of length 'len', to append 'str' including its NUL
+ * terminator.
+ */
+static void append_string(libxl__gc *gc, char **buf, uint32_t *len,
+                          const char *str)
+{
+    size_t extralen = strlen(str) + 1;
+    char *new = libxl__realloc(gc, *buf, *len + extralen);
+
+    *buf = new;
+    memcpy(new + *len, str, extralen);
+    *len += extralen;
+}
+
+int libxl__save_emulator_xenstore_data(libxl__domain_suspend_state *dss,
+                                       char **callee_buf,
+                                       uint32_t *callee_len)
+{
+    STATE_AO_GC(dss->ao);
+    const char *xs_root;
+    char **entries, *buf = NULL;
+    unsigned int nr_entries, i, j, len = 0;
+    int rc;
+
+    const uint32_t domid = dss->domid;
+    const uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
+
+    xs_root = libxl__device_model_xs_path(gc, dm_domid, domid, "");
+
+    entries = libxl__xs_directory(gc, 0, GCSPRINTF("%s/physmap", xs_root),
+                                  &nr_entries);
+    if (!entries || nr_entries == 0) { rc = 0; goto out; }
+
+    for (i = 0; i < nr_entries; ++i) {
+        static const char *const physmap_subkeys[] = {
+            "start_addr", "size", "name"
+        };
+
+        for (j = 0; j < ARRAY_SIZE(physmap_subkeys); ++j) {
+            const char *key = GCSPRINTF("physmap/%s/%s",
+                                        entries[i], physmap_subkeys[j]);
+
+            const char *val =
+                libxl__xs_read(gc, XBT_NULL,
+                               GCSPRINTF("%s/%s", xs_root, key));
+
+            if (!val) { rc = ERROR_FAIL; goto out; }
+
+            append_string(gc, &buf, &len, key);
+            append_string(gc, &buf, &len, val);
+        }
+    }
+
+    rc = 0;
+
+ out:
+    if (!rc) {
+        *callee_buf = buf;
+        *callee_len = len;
+    }
+
+    return rc;
 }
 
 /*----- remus callbacks -----*/

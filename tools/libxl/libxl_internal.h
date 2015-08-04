@@ -3436,6 +3436,10 @@ _hidden void libxl__domain_suspend_common_switch_qemu_logdirty
                                (int domid, unsigned int enable, void *data);
 _hidden int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
         uint32_t *len, void *data);
+_hidden int libxl__save_emulator_xenstore_data(libxl__domain_suspend_state *dss,
+                                               char **buf, uint32_t *len);
+_hidden int libxl__restore_emulator_xenstore_data
+    (libxl__domain_create_state *dcs, const char *ptr, uint32_t size);
 
 
 /* calls libxl__xc_domain_restore_done when done */
