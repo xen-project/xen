@@ -538,14 +538,22 @@ static bool process_record(libxl__egc *egc,
         libxl__xc_domain_restore(egc, dcs, &stream->shs, 0, 0, 0);
         break;
 
-    case REC_TYPE_XENSTORE_DATA:
-        rc = libxl__toolstack_restore(dcs->guest_domid, rec->body,
-                                      rec->hdr.length, &stream->shs);
+    case REC_TYPE_EMULATOR_XENSTORE_DATA:
+        if (rec->hdr.length < sizeof(libxl__sr_emulator_hdr)) {
+            rc = ERROR_FAIL;
+            LOG(ERROR,
+                "Emulator xenstore data record too short to contain header");
+            goto err;
+        }
+
+        rc = libxl__restore_emulator_xenstore_data(dcs,
+            rec->body + sizeof(libxl__sr_emulator_hdr),
+            rec->hdr.length - sizeof(libxl__sr_emulator_hdr));
         if (rc)
             goto err;
 
         /*
-         * libxl__toolstack_restore() is a synchronous function.
+         * libxl__restore_emulator_xenstore_data() is a synchronous function.
          * Request that our caller queues another action for us.
          */
         further_action_needed = true;

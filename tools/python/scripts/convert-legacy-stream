@@ -70,7 +70,7 @@ class VM(object):
 
         # libxl
         self.libxl = fmt == "libxl"
-        self.xenstore = [] # Deferred "toolstack" records
+        self.emu_xenstore = "" # NUL terminated key&val pairs from "toolstack" records
 
 def write_libxc_ihdr():
     stream_write(pack(libxc.IHDR_FORMAT,
@@ -169,8 +169,10 @@ def write_libxl_end():
 def write_libxl_libxc_context():
     write_record(libxl.REC_TYPE_libxc_context, "")
 
-def write_libxl_xenstore_data(data):
-    write_record(libxl.REC_TYPE_xenstore_data, data)
+def write_libxl_emulator_xenstore_data(data):
+    write_record(libxl.REC_TYPE_emulator_xenstore_data,
+                 pack(libxl.EMULATOR_HEADER_FORMAT,
+                      libxl.EMULATOR_ID_unknown, 0) + data)
 
 def write_libxl_emulator_context(blob):
     write_record(libxl.REC_TYPE_emulator_context,
@@ -295,6 +297,57 @@ def read_pv_tail(vm):
 
     write_record(libxc.REC_TYPE_shared_info, shinfo)
     write_record(libxc.REC_TYPE_end, "")
+
+
+def read_libxl_toolstack(vm, data):
+
+    if len(data) < 8:
+        raise StreamError("Overly short libxl toolstack data")
+
+    ver, count = unpack("=II", data[:8])
+    data = data[8:]
+
+    if ver != 1:
+        raise StreamError("Cannot decode libxl toolstack version %u" % (ver, ))
+    info("    Version %u, count %u" % (ver, count))
+
+    for x in range(count):
+
+        if len(data) < 28:
+            raise StreamError("Remaining data too short for physmap header")
+
+        phys, start, size, namelen = unpack("=QQQI", data[:28])
+        data = data[28:]
+
+        if namelen == 0:
+            raise StreamError("No physmap info name")
+
+        # 64bit leaked 4 bytes of padding onto the end of name
+        if twidth == 64:
+            namelen += 4
+
+        if len(data) < namelen:
+            raise StreamError("Remaining data too short for physmap name")
+
+        name = data[:namelen]
+        data = data[namelen:]
+
+        # Strip padding off the end of name
+        if twidth == 64:
+            name = name[:-4]
+
+        if name[-1] != '\x00':
+            raise StreamError("physmap name not NUL terminated")
+
+        root = "physmap/%x" % (phys,)
+        kv = [root + "/start_addr", "%x" % (start, ),
+              root + "/size",       "%x" % (size, ),
+              root + "/name",       name[:-1]]
+
+        for key, val in zip(kv[0::2], kv[1::2]):
+            info("    '%s' = '%s'" % (key, val))
+
+        vm.emu_xenstore += '\x00'.join(kv) + '\x00'
 
 
 def read_chunks(vm):
@@ -441,7 +494,7 @@ def read_chunks(vm):
                 info("  Toolstack Data: sz 0x%x" % (sz, ))
 
                 if vm.libxl:
-                    vm.xenstore.append(data)
+                    read_libxl_toolstack(vm, data)
                 else:
                     info("    Discarding")
 
@@ -544,9 +597,8 @@ def read_legacy_stream(vm):
         else:
             read_hvm_tail(vm)
 
-        if vm.libxl:
-            for rec in vm.xenstore:
-                write_libxl_xenstore_data(rec)
+        if vm.libxl and len(vm.emu_xenstore):
+            write_libxl_emulator_xenstore_data(vm.emu_xenstore)
 
         if not pv and (vm.libxl or qemu):
             read_qemu(vm)

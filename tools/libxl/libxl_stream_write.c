@@ -356,27 +356,30 @@ static void write_emulator_xenstore_record(libxl__egc *egc,
     STATE_AO_GC(stream->ao);
     struct libxl__sr_rec_hdr rec;
     int rc;
-    uint8_t *buf = NULL; /* We must free this. */
-    uint32_t len;
+    char *buf = NULL;
+    uint32_t len = 0;
 
-    rc = libxl__toolstack_save(dss->domid, &buf, &len, dss);
+    rc = libxl__save_emulator_xenstore_data(dss, &buf, &len);
     if (rc)
         goto err;
 
+    /* No record? - All done. */
+    if (len == 0) {
+        emulator_xenstore_record_done(egc, stream);
+        return;
+    }
+
     FILLZERO(rec);
-    rec.type = REC_TYPE_XENSTORE_DATA;
-    rec.length = len;
+    rec.type = REC_TYPE_EMULATOR_XENSTORE_DATA;
+    rec.length = len + sizeof(stream->emu_sub_hdr);
 
-    setup_write(egc, stream, "emulator xenstore record",
-                &rec, buf,
-                emulator_xenstore_record_done);
-
-    free(buf);
+    setup_emulator_write(egc, stream, "emulator xenstore record",
+                         &rec, &stream->emu_sub_hdr, buf,
+                         emulator_xenstore_record_done);
     return;
 
  err:
     assert(rc);
-    free(buf);
     stream_complete(egc, stream, rc);
 }
 
