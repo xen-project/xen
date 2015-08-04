@@ -1921,9 +1921,6 @@ _hidden char *libxl__device_model_xs_path(libxl__gc *gc, uint32_t dm_domid,
                                           uint32_t domid,
                                           const char *format, ...) PRINTF_ATTRIBUTE(4, 5);
 
-/* Check how executes hotplug script currently */
-int libxl__hotplug_settings(libxl__gc *gc, xs_transaction_t t);
-
 /*
  * Calling context and GC for event-generating functions:
  *
