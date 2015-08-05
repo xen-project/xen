@@ -71,6 +71,9 @@ int is_igd_vt_enabled_quirk(void)
 {
     u16 ggc;
 
+    if ( !iommu_igfx )
+        return 0;
+
     if ( !IS_ILK(ioh_id) )
         return 1;
 

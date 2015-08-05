@@ -855,7 +855,7 @@ debug hypervisor only).
 > Default: `new` unless directed-EOI is supported
 
 ### iommu
-> `= List of [ <boolean> | force | required | intremap | qinval | snoop | sharept | dom0-passthrough | dom0-strict | amd-iommu-perdev-intremap | workaround_bios_bug | verbose | debug ]`
+> `= List of [ <boolean> | force | required | intremap | qinval | snoop | sharept | dom0-passthrough | dom0-strict | amd-iommu-perdev-intremap | workaround_bios_bug | igfx | verbose | debug ]`
 
 > Sub-options:
 
@@ -928,6 +928,15 @@ debug hypervisor only).
 >> Causes DRHD entries without any PCI discoverable devices under them to be
 >> ignored (normally IOMMU setup fails if any of the devices listed by a DRHD
 >> entry aren't PCI discoverable).
+
+> `igfx` (VT-d)
+
+> Default: `true`
+
+>> Enable IOMMU for Intel graphics devices. The intended usage of this option
+>> is `no-igfx`, which is similar to Linux `intel_iommu=igfx_off` option used
+>> to workaround graphics issues. If adding `no-igfx` fixes anything, you
+>> should file a bug reporting the problem.
 
 > `verbose`
 

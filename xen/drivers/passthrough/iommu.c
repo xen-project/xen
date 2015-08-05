@@ -46,6 +46,7 @@ bool_t __read_mostly force_iommu;
 bool_t __hwdom_initdata iommu_dom0_strict;
 bool_t __read_mostly iommu_verbose;
 bool_t __read_mostly iommu_workaround_bios_bug;
+bool_t __read_mostly iommu_igfx = 1;
 bool_t __read_mostly iommu_passthrough;
 bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_qinval = 1;
@@ -86,6 +87,8 @@ static void __init parse_iommu_param(char *s)
             force_iommu = val;
         else if ( !strcmp(s, "workaround_bios_bug") )
             iommu_workaround_bios_bug = val;
+        else if ( !strcmp(s, "igfx") )
+            iommu_igfx = val;
         else if ( !strcmp(s, "verbose") )
             iommu_verbose = val;
         else if ( !strcmp(s, "snoop") )
