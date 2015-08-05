@@ -799,12 +799,15 @@ long paging_domctl_continuation(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 /* Call when destroying a domain */
 int paging_teardown(struct domain *d)
 {
-    int rc;
+    int rc, preempted = 0;
 
     if ( hap_enabled(d) )
-        hap_teardown(d);
+        hap_teardown(d, &preempted);
     else
-        shadow_teardown(d);
+        shadow_teardown(d, &preempted);
+
+    if ( preempted )
+        return -ERESTART;
 
     /* clean up log dirty resources. */
     rc = paging_free_log_dirty_bitmap(d, 0);

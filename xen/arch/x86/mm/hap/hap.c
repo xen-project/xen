@@ -551,7 +551,7 @@ void hap_final_teardown(struct domain *d)
     }
 
     if ( d->arch.paging.hap.total_pages != 0 )
-        hap_teardown(d);
+        hap_teardown(d, NULL);
 
     p2m_teardown(p2m_get_hostp2m(d));
     /* Free any memory that the p2m teardown released */
@@ -561,7 +561,7 @@ void hap_final_teardown(struct domain *d)
     paging_unlock(d);
 }
 
-void hap_teardown(struct domain *d)
+void hap_teardown(struct domain *d, int *preempted)
 {
     struct vcpu *v;
     mfn_t mfn;
@@ -589,18 +589,11 @@ void hap_teardown(struct domain *d)
 
     if ( d->arch.paging.hap.total_pages != 0 )
     {
-        HAP_PRINTK("teardown of domain %u starts."
-                      "  pages total = %u, free = %u, p2m=%u\n",
-                      d->domain_id,
-                      d->arch.paging.hap.total_pages,
-                      d->arch.paging.hap.free_pages,
-                      d->arch.paging.hap.p2m_pages);
-        hap_set_allocation(d, 0, NULL);
-        HAP_PRINTK("teardown done."
-                      "  pages total = %u, free = %u, p2m=%u\n",
-                      d->arch.paging.hap.total_pages,
-                      d->arch.paging.hap.free_pages,
-                      d->arch.paging.hap.p2m_pages);
+        hap_set_allocation(d, 0, preempted);
+
+        if ( preempted && *preempted )
+            goto out;
+
         ASSERT(d->arch.paging.hap.total_pages == 0);
     }
 
@@ -609,6 +602,7 @@ void hap_teardown(struct domain *d)
     xfree(d->arch.hvm_domain.dirty_vram);
     d->arch.hvm_domain.dirty_vram = NULL;
 
+out:
     paging_unlock(d);
 }
 

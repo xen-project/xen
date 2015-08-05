@@ -3071,7 +3071,7 @@ int shadow_enable(struct domain *d, u32 mode)
     return rv;
 }
 
-void shadow_teardown(struct domain *d)
+void shadow_teardown(struct domain *d, int *preempted)
 /* Destroy the shadow pagetables of this domain and free its shadow memory.
  * Should only be called for dying domains. */
 {
@@ -3132,23 +3132,16 @@ void shadow_teardown(struct domain *d)
 
     if ( d->arch.paging.shadow.total_pages != 0 )
     {
-        SHADOW_PRINTK("teardown of domain %u starts."
-                       "  Shadow pages total = %u, free = %u, p2m=%u\n",
-                       d->domain_id,
-                       d->arch.paging.shadow.total_pages,
-                       d->arch.paging.shadow.free_pages,
-                       d->arch.paging.shadow.p2m_pages);
         /* Destroy all the shadows and release memory to domheap */
-        sh_set_allocation(d, 0, NULL);
+        sh_set_allocation(d, 0, preempted);
+
+        if ( preempted && *preempted )
+            goto out;
+
         /* Release the hash table back to xenheap */
         if (d->arch.paging.shadow.hash_table)
             shadow_hash_teardown(d);
-        /* Should not have any more memory held */
-        SHADOW_PRINTK("teardown done."
-                       "  Shadow pages total = %u, free = %u, p2m=%u\n",
-                       d->arch.paging.shadow.total_pages,
-                       d->arch.paging.shadow.free_pages,
-                       d->arch.paging.shadow.p2m_pages);
+
         ASSERT(d->arch.paging.shadow.total_pages == 0);
     }
 
@@ -3177,6 +3170,7 @@ void shadow_teardown(struct domain *d)
         d->arch.hvm_domain.dirty_vram = NULL;
     }
 
+out:
     paging_unlock(d);
 
     /* Must be called outside the lock */
@@ -3198,7 +3192,7 @@ void shadow_final_teardown(struct domain *d)
      * It is possible for a domain that never got domain_kill()ed
      * to get here with its shadow allocation intact. */
     if ( d->arch.paging.shadow.total_pages != 0 )
-        shadow_teardown(d);
+        shadow_teardown(d, NULL);
 
     /* It is now safe to pull down the p2m map. */
     p2m_teardown(p2m_get_hostp2m(d));

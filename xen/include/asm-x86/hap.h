@@ -38,7 +38,7 @@ int   hap_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
                  XEN_GUEST_HANDLE_PARAM(void) u_domctl);
 int   hap_enable(struct domain *d, u32 mode);
 void  hap_final_teardown(struct domain *d);
-void  hap_teardown(struct domain *d);
+void  hap_teardown(struct domain *d, int *preempted);
 void  hap_vcpu_init(struct vcpu *v);
 int   hap_track_dirty_vram(struct domain *d,
                            unsigned long begin_pfn,
