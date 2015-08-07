@@ -305,7 +305,9 @@ endif
 ifeq ($(CONFIG_QEMU_TRAD),y)
 	$(MAKE) qemu-xen-traditional-dir-force-update
 endif
+ifeq ($(CONFIG_X86),y)
 	$(MAKE) -C firmware subtree-force-update
+endif
 
 subtree-force-update-all:
 	$(MAKE) qemu-xen-dir-force-update
