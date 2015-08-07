@@ -742,7 +742,7 @@ static int linux_gnttab_munmap(xc_gnttab *xcg, xc_osdep_handle h,
     }
 
     /* Next, unmap the memory. */
-    if ( (rc = munmap(start_address, count * getpagesize())) )
+    if ( (rc = munmap(start_address, count * XC_PAGE_SIZE)) )
         return rc;
 
     /* Finally, unmap the driver slots used to store the grant information. */
