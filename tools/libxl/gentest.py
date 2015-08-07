@@ -33,6 +33,7 @@ def gen_rand_init(ty, v, indent = "    ", parent = None):
         s += "%s = rand()%%8;\n" % (parent + ty.lenvar.name)
         s += "%s = calloc(%s, sizeof(*%s));\n" % \
             (v, parent + ty.lenvar.name, v)
+        s += "assert(%s);\n" % (v, )
         s += "{\n"
         s += "    int i;\n"
         s += "    for (i=0; i<%s; i++)\n" % (parent + ty.lenvar.name)
@@ -98,6 +99,7 @@ if __name__ == '__main__':
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "libxl.h"
 #include "libxl_utils.h"
@@ -106,6 +108,7 @@ static char *rand_str(void)
 {
     int i, sz = rand() % 32;
     char *s = malloc(sz+1);
+    assert(s);
     for (i=0; i<sz; i++)
         s[i] = 'a' + (rand() % 26);
     s[i] = '\\0';
@@ -124,6 +127,7 @@ static void libxl_bitmap_rand_init(libxl_bitmap *bitmap)
     int i;
     bitmap->size = rand() % 16;
     bitmap->map = calloc(bitmap->size, sizeof(*bitmap->map));
+    assert(bitmap->map);
     libxl_for_each_bit(i, *bitmap) {
         if (rand() % 2)
             libxl_bitmap_set(bitmap, i);
@@ -136,6 +140,7 @@ static void libxl_key_value_list_rand_init(libxl_key_value_list *pkvl)
 {
     int i, nr_kvp = rand() % 16;
     libxl_key_value_list kvl = calloc(nr_kvp+1, 2*sizeof(char *));
+    assert(kvl);
 
     for (i = 0; i<2*nr_kvp; i += 2) {
         kvl[i] = rand_str();
@@ -196,6 +201,7 @@ static void libxl_string_list_rand_init(libxl_string_list *p)
 {
     int i, nr = rand() % 16;
     libxl_string_list l = calloc(nr+1, sizeof(char *));
+    assert(l);
 
     for (i = 0; i<nr; i++) {
         l[i] = rand_str();
