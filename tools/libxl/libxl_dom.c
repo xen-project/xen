@@ -766,7 +766,7 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
                                   XC_PAGE_SIZE, PROT_READ | PROT_WRITE,
                                   HVM_INFO_PFN);
     if (va_map == NULL)
-        return -1;
+        return ERROR_FAIL;
 
     va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
     va_hvm->apic_mode = libxl_defbool_val(info->u.hvm.apic);
@@ -912,7 +912,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     struct xc_hvm_build_args args = {};
-    int ret, rc = ERROR_FAIL;
+    int ret, rc;
     uint64_t mmio_start, lowmem_end, highmem_end;
     libxl_domain_build_info *const info = &d_config->b_info;
 
@@ -932,7 +932,9 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         if (max_ram_below_4g < HVM_BELOW_4G_MMIO_START)
             args.mmio_size = info->u.hvm.mmio_hole_memkb << 10;
     }
-    if (libxl__domain_firmware(gc, info, &args)) {
+
+    rc = libxl__domain_firmware(gc, info, &args);
+    if (rc != 0) {
         LOG(ERROR, "initializing domain firmware failed");
         goto out;
     }
@@ -963,15 +965,15 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     if (info->num_vnuma_nodes != 0) {
         int i;
 
-        ret = libxl__vnuma_build_vmemrange_hvm(gc, domid, info, state, &args);
-        if (ret) {
-            LOGEV(ERROR, ret, "hvm build vmemranges failed");
+        rc = libxl__vnuma_build_vmemrange_hvm(gc, domid, info, state, &args);
+        if (rc != 0) {
+            LOG(ERROR, "hvm build vmemranges failed");
             goto out;
         }
-        ret = libxl__vnuma_config_check(gc, info, state);
-        if (ret) goto out;
-        ret = set_vnuma_info(gc, domid, info, state);
-        if (ret) goto out;
+        rc = libxl__vnuma_config_check(gc, info, state);
+        if (rc != 0) goto out;
+        rc = set_vnuma_info(gc, domid, info, state);
+        if (rc != 0) goto out;
 
         args.nr_vmemranges = state->num_vmemranges;
         args.vmemranges = libxl__malloc(gc, sizeof(*args.vmemranges) *
@@ -994,31 +996,34 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     ret = xc_hvm_build(ctx->xch, domid, &args);
     if (ret) {
         LOGEV(ERROR, ret, "hvm building failed");
+        rc = ERROR_FAIL;
         goto out;
     }
 
-    if (libxl__arch_domain_construct_memmap(gc, d_config, domid, &args)) {
+    rc = libxl__arch_domain_construct_memmap(gc, d_config, domid, &args);
+    if (rc != 0) {
         LOG(ERROR, "setting domain memory map failed");
         goto out;
     }
 
-    ret = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
+    rc = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
                                &state->store_mfn, state->console_port,
                                &state->console_mfn, state->store_domid,
                                state->console_domid);
-    if (ret) {
-        LOGEV(ERROR, ret, "hvm build set params failed");
+    if (rc != 0) {
+        LOG(ERROR, "hvm build set params failed");
         goto out;
     }
 
-    ret = hvm_build_set_xs_values(gc, domid, &args);
-    if (ret) {
-        LOG(ERROR, "hvm build set xenstore values failed (ret=%d)", ret);
+    rc = hvm_build_set_xs_values(gc, domid, &args);
+    if (rc != 0) {
+        LOG(ERROR, "hvm build set xenstore values failed");
         goto out;
     }
 
     return 0;
 out:
+    assert(rc != 0);
     return rc;
 }
 
