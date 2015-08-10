@@ -1781,7 +1781,10 @@ static int xs_validate_active_socket(const char *connect_to)
 	return xs_get_sd_fd(connect_to);
 }
 
-static void xen_claim_active_sockets(int **psock, int **pro_sock)
+/* Return true if started by systemd and false if not. Exit with
+ * error if things go wrong.
+ */
+static bool systemd_checkin(int **psock, int **pro_sock)
 {
 	int *sock, *ro_sock;
 	const char *soc_str = xs_daemon_socket();
@@ -1789,7 +1792,11 @@ static void xen_claim_active_sockets(int **psock, int **pro_sock)
 	int n;
 
 	n = sd_listen_fds(0);
-	if (n <= 0) {
+
+	if (n == 0)
+		return false;
+
+	if (n < 0) {
 		sd_notifyf(0, "STATUS=Failed to get any active sockets: %s\n"
 			   "ERRNO=%i",
 			   strerror(errno),
@@ -1816,6 +1823,8 @@ static void xen_claim_active_sockets(int **psock, int **pro_sock)
 
 	talloc_set_destructor(sock, destroy_fd);
 	talloc_set_destructor(ro_sock, destroy_fd);
+
+	return true;
 }
 #endif
 
@@ -1922,13 +1931,16 @@ int priv_domid = 0;
 
 int main(int argc, char *argv[])
 {
-	int opt, *sock, *ro_sock;
+	int opt, *sock = NULL, *ro_sock = NULL;
 	int sock_pollfd_idx = -1, ro_sock_pollfd_idx = -1;
 	bool dofork = true;
 	bool outputpid = false;
 	bool no_domain_init = false;
 	const char *pidfile = NULL;
 	int timeout;
+#if defined(XEN_SYSTEMD_ENABLED)
+	bool systemd;
+#endif
 
 	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:T:RLVW:", options,
 				  NULL)) != -1) {
@@ -1990,10 +2002,11 @@ int main(int argc, char *argv[])
 		barf("%s: No arguments desired", argv[0]);
 
 #if defined(XEN_SYSTEMD_ENABLED)
-	if (sd_booted()) {
+	systemd = systemd_checkin(&sock, &ro_sock);
+	if (systemd) {
 		dofork = false;
 		if (pidfile)
-			barf("%s: PID file not needed on systemd", argv[0]);
+			xprintf("%s: PID file not needed on systemd", argv[0]);
 		pidfile = NULL;
 	}
 #endif
@@ -2020,9 +2033,7 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 
 #if defined(XEN_SYSTEMD_ENABLED)
-	if (sd_booted())
-		xen_claim_active_sockets(&sock, &ro_sock);
-	else
+	if (!systemd)
 #endif
 		init_sockets(&sock, &ro_sock);
 
@@ -2057,7 +2068,7 @@ int main(int argc, char *argv[])
 	xenbus_notify_running();
 
 #if defined(XEN_SYSTEMD_ENABLED)
-	if (sd_booted()) {
+	if (systemd) {
 		sd_notify(1, "READY=1");
 		fprintf(stderr, SD_NOTICE "xenstored is ready\n");
 	}
