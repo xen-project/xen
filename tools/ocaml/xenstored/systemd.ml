@@ -13,5 +13,5 @@
  *)
 
 external sd_listen_fds: string -> Unix.file_descr = "ocaml_sd_listen_fds"
-external sd_booted: unit -> bool = "ocaml_sd_booted"
+external launched_by_systemd: unit -> bool = "ocaml_launched_by_systemd"
 external sd_notify_ready: unit -> unit = "ocaml_sd_notify_ready"

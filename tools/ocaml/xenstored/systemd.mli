@@ -17,8 +17,8 @@
  *  us do sanity checks on the expected sockets *)
 val sd_listen_fds: string -> Unix.file_descr
 
-(** Tells us whether or not systemd support was compiled in *)
-val sd_booted: unit -> bool
+(** Tells us whether the process is launched by systemd *)
+val launched_by_systemd: unit -> bool
 
 (** Tells systemd we're ready *)
 external sd_notify_ready: unit -> unit = "ocaml_sd_notify_ready"

@@ -431,7 +431,7 @@ let _ =
 	while not !quit
 	do
 		try
-                        if Systemd.sd_booted() then
+                        if Systemd.launched_by_systemd() then
                                 Systemd.sd_notify_ready ();
 			main_loop ()
 		with exc ->

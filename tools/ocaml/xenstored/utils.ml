@@ -84,7 +84,7 @@ let create_regular_unix_socket name =
         sock
 
 let create_unix_socket name =
-        if Systemd.sd_booted() then
+        if Systemd.launched_by_systemd() then
                 Systemd.sd_listen_fds name
         else
                 create_regular_unix_socket name

@@ -92,14 +92,14 @@ CAMLprim value ocaml_sd_listen_fds(value connect_to)
 	CAMLreturn(sock_ret);
 }
 
-CAMLprim value ocaml_sd_booted(value ignore)
+CAMLprim value ocaml_launched_by_systemd(value ignore)
 {
 	CAMLparam1(ignore);
 	CAMLlocal1(ret);
 
 	ret = Val_false;
 
-	if (sd_booted())
+	if (sd_listen_fds(0) > 0)
 		ret = Val_true;
 
 	CAMLreturn(ret);
@@ -129,7 +129,7 @@ CAMLprim value ocaml_sd_listen_fds(value connect_to)
 	CAMLreturn(sock_ret);
 }
 
-CAMLprim value ocaml_sd_booted(value ignore)
+CAMLprim value ocaml_launched_by_systemd(value ignore)
 {
 	CAMLparam1(ignore);
 	CAMLlocal1(ret);
