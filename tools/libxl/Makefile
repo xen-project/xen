@@ -5,10 +5,10 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-MAJOR = 4.5
+MAJOR = 4.6
 MINOR = 0
 
-XLUMAJOR = 4.3
+XLUMAJOR = 4.6
 XLUMINOR = 0
 
 CFLAGS += -Werror -Wno-format-zero-length -Wmissing-declarations \
