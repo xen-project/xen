@@ -4866,8 +4866,8 @@ static int libxl__get_memory_target(libxl__gc *gc, uint32_t domid,
         goto out;
     } else if (!static_max) {
         LIBXL__LOG_ERRNO(CTX, LIBXL__LOG_ERROR,
-                         "cannot get target memory info from %s/memory/static-max",
-                         dompath);
+                "cannot get target memory info from %s/memory/static-max",
+                dompath);
         goto out;
     } else {
         target_memkb = strtoul(target, &endptr, 10);
