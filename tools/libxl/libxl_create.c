@@ -1460,7 +1460,7 @@ static void domcreate_attach_dtdev(libxl__egc *egc,
         LOG(DEBUG, "Assign device \"%s\" to dom%u", dtdev->path, domid);
         ret = xc_assign_dt_device(CTX->xch, domid, dtdev->path);
         if (ret < 0) {
-            LOG(ERROR, "xc_assign_dtdevice failed: %d\n", ret);
+            LOG(ERROR, "xc_assign_dtdevice failed: %d", ret);
             goto error_out;
         }
     }

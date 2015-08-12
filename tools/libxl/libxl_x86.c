@@ -494,7 +494,7 @@ int libxl__arch_domain_construct_memmap(libxl__gc *gc,
         e820_entries++;
 
     if (e820_entries >= E820MAX) {
-        LOG(ERROR, "Ooops! Too many entries in the memory map!\n");
+        LOG(ERROR, "Ooops! Too many entries in the memory map!");
         rc = ERROR_INVAL;
         goto out;
     }

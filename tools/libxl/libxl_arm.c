@@ -72,7 +72,7 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
         xc_config->gic_version = XEN_DOMCTL_CONFIG_GIC_V3;
         break;
     default:
-        LOG(ERROR, "Unknown GIC version %d\n",
+        LOG(ERROR, "Unknown GIC version %d",
             d_config->b_info.arch_arm.gic_version);
         return ERROR_FAIL;
     }
@@ -92,7 +92,7 @@ int libxl__arch_domain_save_config(libxl__gc *gc,
         d_config->b_info.arch_arm.gic_version = LIBXL_GIC_VERSION_V3;
         break;
     default:
-        LOG(ERROR, "Unexpected gic version %u\n", xc_config->gic_version);
+        LOG(ERROR, "Unexpected gic version %u", xc_config->gic_version);
         return ERROR_FAIL;
     }
 
@@ -566,7 +566,7 @@ static const struct arch_info *get_arch_info(libxl__gc *gc,
         if (!strcmp(dom->guest_type, info->guest_type))
             return info;
     }
-    LOG(ERROR, "Unable to find arch FDT info for %s\n", dom->guest_type);
+    LOG(ERROR, "Unable to find arch FDT info for %s", dom->guest_type);
     return NULL;
 }
 

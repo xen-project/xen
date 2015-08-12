@@ -699,7 +699,7 @@ static int cpupool_info(libxl__gc *gc,
     if (xcinfo == NULL)
     {
         if (exact || errno != ENOENT)
-            LOGE(ERROR, "failed to get info for cpupool%d\n", poolid);
+            LOGE(ERROR, "failed to get info for cpupool%d", poolid);
         return ERROR_FAIL;
     }
 
@@ -2261,7 +2261,7 @@ int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
     val = libxl__xs_read(gc, XBT_NULL,
           GCSPRINTF("%s/uuid", vtpminfo->backend));
     if(val == NULL) {
-       LOG(ERROR, "%s/uuid does not exist!\n", vtpminfo->backend);
+       LOG(ERROR, "%s/uuid does not exist!", vtpminfo->backend);
        goto err;
     }
     if(libxl_uuid_from_string(&(vtpminfo->uuid), val)) {
@@ -2352,8 +2352,8 @@ int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
             device->backend_kind = LIBXL__DEVICE_KIND_QDISK;
             break;
         default:
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n",
-                       disk->backend);
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "unrecognized disk backend type: %d", disk->backend);
             return ERROR_INVAL;
     }
 
@@ -2495,7 +2495,7 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                     dev = libxl__blktap_devpath(gc, disk->pdev_path,
                                                 disk->format);
                     if (!dev) {
-                        LOG(ERROR, "failed to get blktap devpath for %p\n",
+                        LOG(ERROR, "failed to get blktap devpath for %p",
                             disk->pdev_path);
                         rc = ERROR_FAIL;
                         goto out;
@@ -2519,7 +2519,9 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                 assert(device->backend_kind == LIBXL__DEVICE_KIND_QDISK);
                 break;
             default:
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n", disk->backend);
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                           "unrecognized disk backend type: %d",
+                           disk->backend);
                 rc = ERROR_INVAL;
                 goto out;
         }
@@ -4573,7 +4575,9 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t max_memkb)
 
     mem = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/memory/target", dompath));
     if (!mem) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "cannot get memory info from %s/memory/target\n", dompath);
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                         "cannot get memory info from %s/memory/target",
+                         dompath);
         goto out;
     }
     memorykb = strtoul(mem, &endptr, 10);
@@ -4583,7 +4587,8 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t max_memkb)
     }
 
     if (max_memkb < memorykb) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "memory_static_max must be greater than or or equal to memory_dynamic_max\n");
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                         "memory_static_max must be greater than or or equal to memory_dynamic_max");
         goto out;
     }
     rc = xc_domain_setmaxmem(ctx->xch, domid, max_memkb + LIBXL_MAXMEM_CONSTANT);
@@ -4722,8 +4727,8 @@ retry_transaction:
         goto retry_transaction;
     } else if (!target) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                "cannot get target memory info from %s/memory/target\n",
-                dompath);
+                         "cannot get target memory info from %s/memory/target",
+                         dompath);
         abort_transaction = 1;
         goto out;
     } else {
@@ -4740,8 +4745,8 @@ retry_transaction:
                 "%s/memory/static-max", dompath));
     if (!memmax) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                "cannot get memory info from %s/memory/static-max\n",
-                dompath);
+                         "cannot get memory info from %s/memory/static-max",
+                         dompath);
         abort_transaction = 1;
         goto out;
     }
@@ -4775,8 +4780,8 @@ retry_transaction:
 
     if (!domid && new_target_memkb < LIBXL_MIN_DOM0_MEM) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                "new target %d for dom0 is below the minimum threshold\n",
-                 new_target_memkb);
+                   "new target %d for dom0 is below the minimum threshold",
+                   new_target_memkb);
         abort_transaction = 1;
         goto out;
     }
@@ -4856,13 +4861,13 @@ static int libxl__get_memory_target(libxl__gc *gc, uint32_t domid,
             goto out;
     } else if (!target) {
         LIBXL__LOG_ERRNO(CTX, LIBXL__LOG_ERROR,
-                "cannot get target memory info from %s/memory/target\n",
-                dompath);
+                         "cannot get target memory info from %s/memory/target",
+                         dompath);
         goto out;
     } else if (!static_max) {
         LIBXL__LOG_ERRNO(CTX, LIBXL__LOG_ERROR,
-                "cannot get target memory info from %s/memory/static-max\n",
-                dompath);
+                         "cannot get target memory info from %s/memory/static-max",
+                         dompath);
         goto out;
     } else {
         target_memkb = strtoul(target, &endptr, 10);
@@ -5654,7 +5659,7 @@ int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
     }
     if (scinfo->ratelimit_us > scinfo->tslice_ms*1000) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                   "Ratelimit cannot be greater than timeslice\n");
+                   "Ratelimit cannot be greater than timeslice");
         return ERROR_INVAL;
     }
 

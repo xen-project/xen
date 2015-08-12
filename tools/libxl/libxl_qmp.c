@@ -489,7 +489,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
                 if (o) {
                     rc = qmp_handle_response(gc, qmp, o);
                 } else {
-                    LOG(ERROR, "Parse error of : %s\n", s);
+                    LOG(ERROR, "Parse error of : %s", s);
                     return -1;
                 }
 

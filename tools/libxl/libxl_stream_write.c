@@ -234,7 +234,7 @@ void libxl__stream_write_start(libxl__egc *egc,
 
         default:
             rc = ERROR_FAIL;
-            LOG(ERROR, "Unknown emulator for HVM domain\n");
+            LOG(ERROR, "Unknown emulator for HVM domain");
             goto err;
         }
         stream->emu_sub_hdr.index = 0;

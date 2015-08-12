@@ -340,19 +340,18 @@ _hidden int libxl__init_recursive_mutex(libxl_ctx *ctx, pthread_mutex_t *lock)
     int rc = 0;
 
     if (pthread_mutexattr_init(&attr) != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, 
-                         "Failed to init mutex attributes\n");
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                         "Failed to init mutex attributes");
         return ERROR_FAIL;
     }
     if (pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE) != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, 
-                         "Failed to set mutex attributes\n");
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                         "Failed to set mutex attributes");
         rc = ERROR_FAIL;
         goto out;
     }
     if (pthread_mutex_init(lock, &attr) != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, 
-                         "Failed to init mutex\n");
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Failed to init mutex");
         rc = ERROR_FAIL;
         goto out;
     }

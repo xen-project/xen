@@ -79,7 +79,7 @@ const char *libxl__domain_device_model(libxl__gc *gc,
             break;
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "invalid device model version %d\n",
+                       "invalid device model version %d",
                        info->device_model_version);
             dm = NULL;
             break;
@@ -124,7 +124,7 @@ libxl__xc_device_get_rdm(libxl__gc *gc,
     if (rc) {
         *nr_entries = 0;
         *xrdm = NULL;
-        LOG(ERROR, "Could not get reserved device memory maps.\n");
+        LOG(ERROR, "Could not get reserved device memory maps.");
     }
     return rc;
 }

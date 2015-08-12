@@ -243,7 +243,7 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
     switch (dev->backend_kind) {
     case LIBXL__DEVICE_KIND_VBD:
         if (num_exec != 0) {
-            LOG(DEBUG, "num_exec %d, not running hotplug scripts\n", num_exec);
+            LOG(DEBUG, "num_exec %d, not running hotplug scripts", num_exec);
             rc = 0;
             goto out;
         }
@@ -256,7 +256,7 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
          */
         if ((num_exec > 1) ||
             (libxl_get_stubdom_id(CTX, dev->domid) && num_exec)) {
-            LOG(DEBUG, "num_exec %d, not running hotplug scripts\n", num_exec);
+            LOG(DEBUG, "num_exec %d, not running hotplug scripts", num_exec);
             rc = 0;
             goto out;
         }
