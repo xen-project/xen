@@ -1,6 +1,5 @@
 .hg
 *.orig
-*.rej
 *~
 *.swp
 *.o
