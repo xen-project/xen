@@ -3368,8 +3368,7 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
     }
 
     if ( may_defer && unlikely(currad->monitor.write_ctrlreg_enabled &
-                               monitor_ctrlreg_bitmask(VM_EVENT_X86_CR0)) &&
-         value != old_value )
+                               monitor_ctrlreg_bitmask(VM_EVENT_X86_CR0)) )
     {
         ASSERT(currad->event_write_data != NULL);
 
@@ -3472,8 +3471,7 @@ int hvm_set_cr3(unsigned long value, bool_t may_defer)
     struct arch_domain *currad = &v->domain->arch;
 
     if ( may_defer && unlikely(currad->monitor.write_ctrlreg_enabled &
-                               monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3)) &&
-         value != old )
+                               monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3)) )
     {
         ASSERT(currad->event_write_data != NULL);
 
@@ -3546,8 +3544,7 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
     }
 
     if ( may_defer && unlikely(currad->monitor.write_ctrlreg_enabled &
-                               monitor_ctrlreg_bitmask(VM_EVENT_X86_CR4)) &&
-         value != old_cr )
+                               monitor_ctrlreg_bitmask(VM_EVENT_X86_CR4)) )
     {
         ASSERT(currad->event_write_data != NULL);
 
