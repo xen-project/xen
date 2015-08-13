@@ -1019,6 +1019,38 @@ int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     return rc;
 }
 
+int clear_identity_p2m_entry(struct domain *d, unsigned long gfn)
+{
+    p2m_type_t p2mt;
+    p2m_access_t a;
+    mfn_t mfn;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    int ret;
+
+    if ( !paging_mode_translate(d) )
+        return 0;
+
+    gfn_lock(p2m, gfn, 0);
+
+    mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, 0, NULL, NULL);
+    if ( p2mt == p2m_mmio_direct && mfn_x(mfn) == gfn )
+    {
+        ret = p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), PAGE_ORDER_4K,
+                            p2m_invalid, p2m->default_access);
+        gfn_unlock(p2m, gfn, 0);
+    }
+    else
+    {
+        gfn_unlock(p2m, gfn, 0);
+        printk(XENLOG_G_WARNING
+               "non-identity map d%d:%lx not cleared (mapped to %lx)\n",
+               d->domain_id, gfn, mfn_x(mfn));
+        ret = 0;
+    }
+
+    return ret;
+}
+
 /* Returns: 0 for success, -errno for failure */
 int set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 {
