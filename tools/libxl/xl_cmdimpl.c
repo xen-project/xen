@@ -2627,6 +2627,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
     void *config_data = 0;
     int config_len = 0;
     int restore_fd = -1;
+    int restore_fd_to_close = -1;
     const libxl_asyncprogress_how *autoconnect_console_how;
     struct save_file_header hdr;
 
@@ -2650,6 +2651,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
                 fprintf(stderr, "Can't open restore file: %s\n", strerror(errno));
                 return ERROR_INVAL;
             }
+            restore_fd_to_close = restore_fd;
             rc = libxl_fd_set_cloexec(ctx, restore_fd, 1);
             if (rc) return rc;
         }
@@ -2850,6 +2852,13 @@ start:
         goto error_out;
 
     release_lock();
+
+    if (restore_fd_to_close >= 0) {
+        if (close(restore_fd_to_close))
+            fprintf(stderr, "Failed to close restoring file, fd %d, errno %d\n",
+                    restore_fd_to_close, errno);
+        restore_fd_to_close = -1;
+    }
 
     if (!paused)
         libxl_domain_unpause(ctx, domid);
