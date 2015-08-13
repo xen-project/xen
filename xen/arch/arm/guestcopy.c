@@ -1,10 +1,8 @@
-#include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/domain_page.h>
+#include <xen/mm.h>
 #include <xen/sched.h>
 #include <asm/current.h>
-
-#include <asm/mm.h>
 #include <asm/guest_access.h>
 
 static unsigned long raw_copy_to_guest_helper(void *to, const void *from,

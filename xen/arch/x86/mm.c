@@ -2038,6 +2038,7 @@ void put_page(struct page_info *page)
 struct domain *page_get_owner_and_reference(struct page_info *page)
 {
     unsigned long x, y = page->count_info;
+    struct domain *owner;
 
     do {
         x = y;
@@ -2051,7 +2052,10 @@ struct domain *page_get_owner_and_reference(struct page_info *page)
     }
     while ( (y = cmpxchg(&page->count_info, x, x + 1)) != x );
 
-    return page_get_owner(page);
+    owner = page_get_owner(page);
+    ASSERT(owner);
+
+    return owner;
 }
 
 

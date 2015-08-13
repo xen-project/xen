@@ -45,6 +45,7 @@
 #ifndef __XEN_MM_H__
 #define __XEN_MM_H__
 
+#include <xen/compiler.h>
 #include <xen/types.h>
 #include <xen/list.h>
 #include <xen/spinlock.h>
@@ -77,8 +78,11 @@ TYPE_SAFE(unsigned long, pfn);
 #undef pfn_t
 #endif
 
-struct domain;
 struct page_info;
+
+void put_page(struct page_info *);
+int get_page(struct page_info *, struct domain *);
+struct domain *__must_check page_get_owner_and_reference(struct page_info *);
 
 /* Boot-time allocator. Turns into generic allocator after bootstrap. */
 void init_boot_pages(paddr_t ps, paddr_t pe);

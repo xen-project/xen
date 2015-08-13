@@ -275,10 +275,6 @@ static inline void *page_to_virt(const struct page_info *pg)
     return mfn_to_virt(page_to_mfn(pg));
 }
 
-struct domain *page_get_owner_and_reference(struct page_info *page);
-void put_page(struct page_info *page);
-int  get_page(struct page_info *page, struct domain *domain);
-
 struct page_info *get_page_from_gva(struct domain *d, vaddr_t va,
                                     unsigned long flags);
 
