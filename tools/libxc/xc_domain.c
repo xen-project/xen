@@ -2451,8 +2451,7 @@ int xc_domain_setvnuma(xc_interface *xch,
                              XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     errno = EINVAL;
 
-    if ( nr_vnodes == 0 || nr_vmemranges == 0 ||
-         nr_vmemranges < nr_vnodes || nr_vcpus == 0 )
+    if ( nr_vnodes == 0 || nr_vmemranges == 0 || nr_vcpus == 0 )
         return -1;
 
     if ( !vdistance || !vcpu_to_vnode || !vmemrange || !vnode_to_pnode )
