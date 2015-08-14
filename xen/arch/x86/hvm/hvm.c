@@ -3666,8 +3666,8 @@ int hvm_virtual_to_linear_addr(
 
 /* On non-NULL return, we leave this function holding an additional 
  * ref on the underlying mfn, if any */
-static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable,
-                                   bool_t permanent)
+static void *_hvm_map_guest_frame(unsigned long gfn, bool_t permanent,
+                                  bool_t *writable)
 {
     void *map;
     p2m_type_t p2mt;
@@ -3690,7 +3690,12 @@ static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable,
     }
 
     if ( writable )
-        paging_mark_dirty(d, page_to_mfn(page));
+    {
+        if ( !p2m_is_discard_write(p2mt) )
+            paging_mark_dirty(d, page_to_mfn(page));
+        else
+            *writable = 0;
+    }
 
     if ( !permanent )
         return __map_domain_page(page);
@@ -3702,14 +3707,16 @@ static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable,
     return map;
 }
 
-void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent)
+void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent,
+                             bool_t *writable)
 {
-    return __hvm_map_guest_frame(gfn, 1, permanent);
+    *writable = 1;
+    return _hvm_map_guest_frame(gfn, permanent, writable);
 }
 
 void *hvm_map_guest_frame_ro(unsigned long gfn, bool_t permanent)
 {
-    return __hvm_map_guest_frame(gfn, 0, permanent);
+    return _hvm_map_guest_frame(gfn, permanent, NULL);
 }
 
 void hvm_unmap_guest_frame(void *p, bool_t permanent)
@@ -3729,7 +3736,7 @@ void hvm_unmap_guest_frame(void *p, bool_t permanent)
     put_page(mfn_to_page(mfn));
 }
 
-static void *hvm_map_entry(unsigned long va)
+static void *hvm_map_entry(unsigned long va, bool_t *writable)
 {
     unsigned long gfn;
     uint32_t pfec;
@@ -3752,7 +3759,7 @@ static void *hvm_map_entry(unsigned long va)
     if ( (pfec == PFEC_page_paged) || (pfec == PFEC_page_shared) )
         goto fail;
 
-    v = hvm_map_guest_frame_rw(gfn, 0);
+    v = hvm_map_guest_frame_rw(gfn, 0, writable);
     if ( v == NULL )
         goto fail;
 
@@ -3774,6 +3781,7 @@ static int hvm_load_segment_selector(
     struct segment_register desctab, cs, segr;
     struct desc_struct *pdesc, desc;
     u8 dpl, rpl, cpl;
+    bool_t writable;
     int fault_type = TRAP_invalid_tss;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct vcpu *v = current;
@@ -3810,7 +3818,7 @@ static int hvm_load_segment_selector(
     if ( ((sel & 0xfff8) + 7) > desctab.limit )
         goto fail;
 
-    pdesc = hvm_map_entry(desctab.base + (sel & 0xfff8));
+    pdesc = hvm_map_entry(desctab.base + (sel & 0xfff8), &writable);
     if ( pdesc == NULL )
         goto hvm_map_fail;
 
@@ -3869,6 +3877,7 @@ static int hvm_load_segment_selector(
             break;
         }
     } while ( !(desc.b & 0x100) && /* Ensure Accessed flag is set */
+              writable && /* except if we are to discard writes */
               (cmpxchg(&pdesc->b, desc.b, desc.b | 0x100) != desc.b) );
 
     /* Force the Accessed flag in our local copy. */
@@ -3906,6 +3915,7 @@ void hvm_task_switch(
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct segment_register gdt, tr, prev_tr, segr;
     struct desc_struct *optss_desc = NULL, *nptss_desc = NULL, tss_desc;
+    bool_t otd_writable, ntd_writable;
     unsigned long eflags;
     int exn_raised, rc;
     struct {
@@ -3932,11 +3942,12 @@ void hvm_task_switch(
         goto out;
     }
 
-    optss_desc = hvm_map_entry(gdt.base + (prev_tr.sel & 0xfff8)); 
+    optss_desc = hvm_map_entry(gdt.base + (prev_tr.sel & 0xfff8),
+                               &otd_writable);
     if ( optss_desc == NULL )
         goto out;
 
-    nptss_desc = hvm_map_entry(gdt.base + (tss_sel & 0xfff8)); 
+    nptss_desc = hvm_map_entry(gdt.base + (tss_sel & 0xfff8), &ntd_writable);
     if ( nptss_desc == NULL )
         goto out;
 
@@ -4068,11 +4079,11 @@ void hvm_task_switch(
     v->arch.hvm_vcpu.guest_cr[0] |= X86_CR0_TS;
     hvm_update_guest_cr(v, 0);
 
-    if ( (taskswitch_reason == TSW_iret) ||
-         (taskswitch_reason == TSW_jmp) )
+    if ( (taskswitch_reason == TSW_iret ||
+          taskswitch_reason == TSW_jmp) && otd_writable )
         clear_bit(41, optss_desc); /* clear B flag of old task */
 
-    if ( taskswitch_reason != TSW_iret )
+    if ( taskswitch_reason != TSW_iret && ntd_writable )
         set_bit(41, nptss_desc); /* set B flag of new task */
 
     if ( errcode >= 0 )

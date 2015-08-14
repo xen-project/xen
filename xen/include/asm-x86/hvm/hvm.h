@@ -440,7 +440,8 @@ int hvm_virtual_to_linear_addr(
     unsigned int addr_size,
     unsigned long *linear_addr);
 
-void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent);
+void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent,
+                             bool_t *writable);
 void *hvm_map_guest_frame_ro(unsigned long gfn, bool_t permanent);
 void hvm_unmap_guest_frame(void *p, bool_t permanent);
 

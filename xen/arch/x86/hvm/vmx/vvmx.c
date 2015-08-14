@@ -1618,10 +1618,23 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
 
     if ( nvcpu->nv_vvmcxaddr == VMCX_EADDR )
     {
-        nvcpu->nv_vvmcx = hvm_map_guest_frame_rw(gpa >> PAGE_SHIFT, 1);
-        if ( nvcpu->nv_vvmcx )
-            nvcpu->nv_vvmcxaddr = gpa;
-        if ( !nvcpu->nv_vvmcx ||
+        bool_t writable;
+        void *vvmcx = hvm_map_guest_frame_rw(paddr_to_pfn(gpa), 1, &writable);
+
+        if ( vvmcx )
+        {
+            if ( writable )
+            {
+                nvcpu->nv_vvmcx = vvmcx;
+                nvcpu->nv_vvmcxaddr = gpa;
+            }
+            else
+            {
+                hvm_unmap_guest_frame(vvmcx, 1);
+                vvmcx = NULL;
+            }
+        }
+        if ( !vvmcx ||
              !map_io_bitmap_all(v) ||
              !_map_msr_bitmap(v) )
         {
@@ -1675,13 +1688,10 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
+    BUILD_BUG_ON(X86EMUL_OKAY != VMSUCCEED); /* rc = VMSUCCEED; */
     if ( gpa & 0xfff )
-    {
-        vmreturn(regs, VMFAIL_INVALID);
-        return X86EMUL_OKAY;
-    }
-    
-    if ( gpa == nvcpu->nv_vvmcxaddr ) 
+        rc = VMFAIL_INVALID;
+    else if ( gpa == nvcpu->nv_vvmcxaddr )
     {
         if ( cpu_has_vmx_vmcs_shadowing )
             nvmx_clear_vmcs_pointer(v, nvcpu->nv_vvmcx);
@@ -1692,14 +1702,22 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     else 
     {
         /* Even if this VMCS isn't the current one, we must clear it. */
-        vvmcs = hvm_map_guest_frame_rw(gpa >> PAGE_SHIFT, 0);
+        bool_t writable;
+
+        vvmcs = hvm_map_guest_frame_rw(paddr_to_pfn(gpa), 0, &writable);
         if ( vvmcs ) 
-            clear_vvmcs_launched(&nvmx->launched_list,
-                domain_page_map_to_mfn(vvmcs));
-        hvm_unmap_guest_frame(vvmcs, 0);
+        {
+            if ( writable )
+                clear_vvmcs_launched(&nvmx->launched_list,
+                                     domain_page_map_to_mfn(vvmcs));
+            else
+                rc = VMFAIL_VALID;
+            hvm_unmap_guest_frame(vvmcs, 0);
+        }
     }
 
-    vmreturn(regs, VMSUCCEED);
+    vmreturn(regs, rc);
+
     return X86EMUL_OKAY;
 }
 
