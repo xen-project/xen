@@ -1839,7 +1839,7 @@ static int rmrr_identity_mapping(struct domain *d, bool_t map,
 
             while ( base_pfn < end_pfn )
             {
-                if ( clear_identity_p2m_entry(d, base_pfn, 0) )
+                if ( clear_identity_p2m_entry(d, base_pfn) )
                     ret = -ENXIO;
                 base_pfn++;
             }

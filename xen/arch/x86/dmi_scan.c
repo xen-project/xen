@@ -148,10 +148,11 @@ static int __init dmi_table(paddr_t base, u32 len, int num,
 	data = buf;
 
 	/*
- 	 *	Stop when we see all the items the table claimed to have
- 	 *	OR we run off the end of the table (also happens)
- 	 */
- 
+	 * Stop when we have seen all the items the table claimed to have
+	 * (SMBIOS < 3.0 only) OR we reach an end-of-table marker (SMBIOS
+	 * >= 3.0 only) OR we run off the end of the table (should never
+	 * happen but sometimes does on bogus implementations.)
+	 */
 	while((num < 0 || i < num) && data-buf+sizeof(struct dmi_header)<=len)
 	{
 		dm=(struct dmi_header *)data;
@@ -165,8 +166,16 @@ static int __init dmi_table(paddr_t base, u32 len, int num,
 			data++;
 		if(data-buf<len-1)
 			decode(dm);
-		if (dm->type == DMI_ENTRY_END_OF_TABLE)
-		    break;
+		/*
+		 * 7.45 End-of-Table (Type 127) [SMBIOS reference spec v3.0.0]
+		 * For tables behind a 64-bit entry point, we have no item
+		 * count and no exact table length, so stop on end-of-table
+		 * marker. For tables behind a 32-bit entry point, we have
+		 * seen OEM structures behind the end-of-table marker on
+		 * some systems, so don't trust it.
+		 */
+		if (num < 0 && dm->type == DMI_ENTRY_END_OF_TABLE)
+			break;
 		data+=2;
 		i++;
 	}

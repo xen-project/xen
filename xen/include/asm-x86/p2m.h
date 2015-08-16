@@ -563,9 +563,7 @@ int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 /* Set identity addresses in the p2m table (for pass-through) */
 int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
                            p2m_access_t p2ma, unsigned int flag);
-
-#define clear_identity_p2m_entry(d, gfn, page_order) \
-                        guest_physmap_remove_page(d, gfn, gfn, page_order)
+int clear_identity_p2m_entry(struct domain *d, unsigned long gfn);
 
 /* Add foreign mapping to the guest's p2m table. */
 int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,

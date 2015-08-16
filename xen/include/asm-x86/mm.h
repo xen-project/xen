@@ -352,9 +352,6 @@ const unsigned long *get_platform_badpages(unsigned int *array_size);
 int page_lock(struct page_info *page);
 void page_unlock(struct page_info *page);
 
-struct domain *page_get_owner_and_reference(struct page_info *page);
-void put_page(struct page_info *page);
-int  get_page(struct page_info *page, struct domain *domain);
 void put_page_type(struct page_info *page);
 int  get_page_type(struct page_info *page, unsigned long type);
 int  put_page_type_preemptible(struct page_info *page);

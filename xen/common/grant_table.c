@@ -2244,7 +2244,12 @@ __acquire_grant_for_copy(
     {
         ASSERT(mfn_valid(act->frame));
         *page = mfn_to_page(act->frame);
-        (void)page_get_owner_and_reference(*page);
+        td = page_get_owner_and_reference(*page);
+        /*
+         * act->pin being non-zero should guarantee the page to have a
+         * non-zero refcount and hence a valid owner.
+         */
+        ASSERT(td);
     }
 
     act->pin += readonly ? GNTPIN_hstr_inc : GNTPIN_hstw_inc;
