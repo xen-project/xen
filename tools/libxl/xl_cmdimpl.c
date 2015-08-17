@@ -1188,7 +1188,7 @@ static void parse_vnuma_config(const XLU_Config *config,
                     len = libxl_string_list_length(&vdist);
 
                     for (j = 0; j < len; j++) {
-                        val = parse_ulong(value);
+                        val = parse_ulong(vdist[j]);
                         p->distances[j] = val;
                     }
                     libxl_string_list_dispose(&vdist);
