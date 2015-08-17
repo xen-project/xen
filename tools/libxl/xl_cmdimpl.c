@@ -1175,6 +1175,14 @@ static void parse_vnuma_config(const XLU_Config *config,
                     for (j = 0; j < len; j++) {
                         parse_range(cpu_spec_list[j], &s, &e);
                         for (; s <= e; s++) {
+                            /*
+                             * Note that if we try to set a bit beyond
+                             * the size of bitmap, libxl_bitmap_set
+                             * has no effect. The resulted bitmap
+                             * doesn't reflect what user wants. The
+                             * fallout is dealt with later after
+                             * parsing.
+                             */
                             libxl_bitmap_set(&vcpu_parsed[i], s);
                             max_vcpus++;
                         }
@@ -1202,11 +1210,27 @@ static void parse_vnuma_config(const XLU_Config *config,
     }
 
     /* User has specified maxvcpus= */
-    if (b_info->max_vcpus != 0 &&  b_info->max_vcpus != max_vcpus) {
-        fprintf(stderr, "xl: vnuma vcpus and maxvcpus= mismatch\n");
-        exit(1);
-    } else
+    if (b_info->max_vcpus != 0) {
+        if (b_info->max_vcpus != max_vcpus) {
+            fprintf(stderr, "xl: vnuma vcpus and maxvcpus= mismatch\n");
+            exit(1);
+        }
+    } else {
+        int host_cpus = libxl_get_online_cpus(ctx);
+
+        if (host_cpus < 0) {
+            fprintf(stderr, "Failed to get online cpus\n");
+            exit(1);
+        }
+
+        if (host_cpus < max_vcpus) {
+            fprintf(stderr, "xl: vnuma specifies more vcpus than pcpus, "\
+                    "use maxvcpus= to override this check.\n");
+            exit(1);
+        }
+
         b_info->max_vcpus = max_vcpus;
+    }
 
     /* User has specified maxmem= */
     if (b_info->max_memkb != LIBXL_MEMKB_DEFAULT &&
