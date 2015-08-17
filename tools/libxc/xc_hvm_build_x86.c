@@ -486,7 +486,8 @@ static int setup_guest(xc_interface *xch,
 
                 done = xc_domain_populate_physmap(xch, dom, nr_extents,
                                                   SUPERPAGE_1GB_SHIFT,
-                                                  memflags, sp_extents);
+                                                  new_memflags,
+                                                  sp_extents);
 
                 if ( done > 0 )
                 {
@@ -526,7 +527,8 @@ static int setup_guest(xc_interface *xch,
 
                     done = xc_domain_populate_physmap(xch, dom, nr_extents,
                                                       SUPERPAGE_2MB_SHIFT,
-                                                      memflags, sp_extents);
+                                                      new_memflags,
+                                                      sp_extents);
 
                     if ( done > 0 )
                     {
