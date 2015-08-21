@@ -628,25 +628,31 @@ void __cpuinit mmu_init_secondary_cpu(void)
 }
 
 /* Create Xen's mappings of memory.
- * Base and virt must be 32MB aligned and size a multiple of 32MB.
+ * Mapping_size must be either 2MB or 32MB.
+ * Base and virt must be mapping_size aligned.
+ * Size must be a multiple of mapping_size.
  * second must be a contiguous set of second level page tables
  * covering the region starting at virt_offset. */
-static void __init create_32mb_mappings(lpae_t *second,
-                                        unsigned long virt_offset,
-                                        unsigned long base_mfn,
-                                        unsigned long nr_mfns)
+static void __init create_mappings(lpae_t *second,
+                                   unsigned long virt_offset,
+                                   unsigned long base_mfn,
+                                   unsigned long nr_mfns,
+                                   unsigned int mapping_size)
 {
     unsigned long i, count;
+    const unsigned long granularity = mapping_size >> PAGE_SHIFT;
     lpae_t pte, *p;
 
-    ASSERT(!((virt_offset >> PAGE_SHIFT) % (16 * LPAE_ENTRIES)));
-    ASSERT(!(base_mfn % (16 * LPAE_ENTRIES)));
-    ASSERT(!(nr_mfns % (16 * LPAE_ENTRIES)));
+    ASSERT((mapping_size == MB(2)) || (mapping_size == MB(32)));
+    ASSERT(!((virt_offset >> PAGE_SHIFT) % granularity));
+    ASSERT(!(base_mfn % granularity));
+    ASSERT(!(nr_mfns % granularity));
 
     count = nr_mfns / LPAE_ENTRIES;
     p = second + second_linear_offset(virt_offset);
     pte = mfn_to_xen_entry(base_mfn, WRITEALLOC);
-    pte.pt.contig = 1;  /* These maps are in 16-entry contiguous chunks. */
+    if ( granularity == 16 * LPAE_ENTRIES )
+        pte.pt.contig = 1;  /* These maps are in 16-entry contiguous chunks. */
     for ( i = 0; i < count; i++ )
     {
         write_pte(p + i, pte);
@@ -660,7 +666,7 @@ static void __init create_32mb_mappings(lpae_t *second,
 void __init setup_xenheap_mappings(unsigned long base_mfn,
                                    unsigned long nr_mfns)
 {
-    create_32mb_mappings(xen_second, XENHEAP_VIRT_START, base_mfn, nr_mfns);
+    create_mappings(xen_second, XENHEAP_VIRT_START, base_mfn, nr_mfns, MB(32));
 
     /* Record where the xenheap is, for translation routines. */
     xenheap_virt_end = XENHEAP_VIRT_START + nr_mfns * PAGE_SIZE;
@@ -749,6 +755,7 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     unsigned long nr_pdxs = pfn_to_pdx(nr_pages);
     unsigned long frametable_size = nr_pdxs * sizeof(struct page_info);
     unsigned long base_mfn;
+    const unsigned long mapping_size = frametable_size < MB(32) ? MB(2) : MB(32);
 #ifdef CONFIG_ARM_64
     lpae_t *second, pte;
     unsigned long nr_second, second_base;
@@ -756,9 +763,8 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
 #endif
 
     frametable_base_pdx = pfn_to_pdx(ps >> PAGE_SHIFT);
-
-    /* Round up to 32M boundary */
-    frametable_size = (frametable_size + 0x1ffffff) & ~0x1ffffff;
+    /* Round up to 2M or 32M boundary, as appropriate. */
+    frametable_size = ROUNDUP(frametable_size, mapping_size);
     base_mfn = alloc_boot_pages(frametable_size >> PAGE_SHIFT, 32<<(20-12));
 
 #ifdef CONFIG_ARM_64
@@ -771,9 +777,10 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
         pte.pt.table = 1;
         write_pte(&xen_first[first_table_offset(FRAMETABLE_VIRT_START)+i], pte);
     }
-    create_32mb_mappings(second, 0, base_mfn, frametable_size >> PAGE_SHIFT);
+    create_mappings(second, 0, base_mfn, frametable_size >> PAGE_SHIFT, mapping_size);
 #else
-    create_32mb_mappings(xen_second, FRAMETABLE_VIRT_START, base_mfn, frametable_size >> PAGE_SHIFT);
+    create_mappings(xen_second, FRAMETABLE_VIRT_START,
+                    base_mfn, frametable_size >> PAGE_SHIFT, mapping_size);
 #endif
 
     memset(&frame_table[0], 0, nr_pdxs * sizeof(struct page_info));
