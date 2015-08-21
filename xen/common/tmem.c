@@ -111,7 +111,7 @@ struct tmem_pool {
     atomic_t pgp_count;
     int pgp_count_max;
     long obj_count;  /* atomicity depends on pool_rwlock held for write */
-    long obj_count_max;  
+    long obj_count_max;
     unsigned long objnode_count, objnode_count_max;
     uint64_t sum_life_cycles;
     uint64_t sum_evicted_cycles;
@@ -1089,7 +1089,7 @@ static int shared_pool_quit(struct tmem_pool *pool, domid_t cli_id)
 
     ASSERT(is_shared(pool));
     ASSERT(pool->client != NULL);
-    
+
     ASSERT_WRITELOCK(&tmem_rwlock);
     pool_destroy_objs(pool, cli_id);
     list_for_each_entry(sl,&pool->share_list, share_list)
@@ -1177,7 +1177,7 @@ static struct client *client_create(domid_t cli_id)
     }
     if ( !d->is_dying ) {
         d->tmem_client = client;
-	client->domain = d;
+        client->domain = d;
     }
     rcu_unlock_domain(d);
 
@@ -1226,7 +1226,7 @@ static bool_t client_over_quota(struct client *client)
     int total = _atomic_read(client_weight_total);
 
     ASSERT(client != NULL);
-    if ( (total == 0) || (client->weight == 0) || 
+    if ( (total == 0) || (client->weight == 0) ||
           (client->eph_count == 0) )
         return 0;
     return ( ((global_eph_count*100L) / client->eph_count ) >
@@ -1411,7 +1411,7 @@ static int do_tmem_put_compress(struct tmem_page_descriptor *pgp, xen_pfn_t cmfn
     void *dst, *p;
     size_t size;
     int ret = 0;
-    
+
     ASSERT(pgp != NULL);
     ASSERT(pgp->us.obj != NULL);
     ASSERT_SPINLOCK(&pgp->us.obj->obj_spinlock);
@@ -1556,7 +1556,7 @@ refind:
         {
             /* no puts allowed into a frozen pool (except dup puts) */
             if ( client->frozen )
-	        goto unlock_obj;
+                goto unlock_obj;
         }
     }
     else
@@ -1569,10 +1569,10 @@ refind:
 
         write_lock(&pool->pool_rwlock);
         /*
-	 * Parallel callers may already allocated obj and inserted to obj_rb_root
-	 * before us.
-	 */
-        if (!obj_rb_insert(&pool->obj_rb_root[oid_hash(oidp)], obj))
+         * Parallel callers may already allocated obj and inserted to obj_rb_root
+         * before us.
+         */
+        if ( !obj_rb_insert(&pool->obj_rb_root[oid_hash(oidp)], obj) )
         {
             tmem_free(obj, pool);
             write_unlock(&pool->pool_rwlock);
@@ -1945,7 +1945,7 @@ static int do_tmem_new_pool(domid_t this_cli_id,
                      (client->shared_auth_uuid[i][1] == uuid_hi) )
                     break;
             if ( i == MAX_GLOBAL_SHARED_POOLS )
-	    {
+            {
                 tmem_client_info("Shared auth failed, create non shared pool instead!\n");
                 pool->shared = 0;
                 goto out;
@@ -2107,7 +2107,7 @@ static int tmemc_list_client(struct client *c, tmem_cli_va_param_t buf,
              p->obj_count, p->obj_count_max,
              p->objnode_count, p->objnode_count_max,
              p->good_puts, p->puts,p->dup_puts_flushed, p->dup_puts_replaced,
-             p->no_mem_puts, 
+             p->no_mem_puts,
              p->found_gets, p->gets,
              p->flushs_found, p->flushs, p->flush_objs_found, p->flush_objs);
         if ( sum + n >= len )
@@ -2146,7 +2146,7 @@ static int tmemc_list_shared(tmem_cli_va_param_t buf, int off, uint32_t len,
              p->obj_count, p->obj_count_max,
              p->objnode_count, p->objnode_count_max,
              p->good_puts, p->puts,p->dup_puts_flushed, p->dup_puts_replaced,
-             p->no_mem_puts, 
+             p->no_mem_puts,
              p->found_gets, p->gets,
              p->flushs_found, p->flushs, p->flush_objs_found, p->flush_objs);
         if ( sum + n >= len )
@@ -2456,7 +2456,7 @@ static int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
         /* process the first one */
         pool->cur_pgp = pgp = list_entry((&pool->persistent_page_list)->next,
                          struct tmem_page_descriptor,us.pool_pers_pages);
-    } else if ( list_is_last(&pool->cur_pgp->us.pool_pers_pages, 
+    } else if ( list_is_last(&pool->cur_pgp->us.pool_pers_pages,
                              &pool->persistent_page_list) )
     {
         /* already processed the last one in the list */
@@ -2504,7 +2504,7 @@ static int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_param_t buf,
         pgp = list_entry((&client->persistent_invalidated_list)->next,
                          struct tmem_page_descriptor,client_inv_pages);
         client->cur_pgp = pgp;
-    } else if ( list_is_last(&client->cur_pgp->client_inv_pages, 
+    } else if ( list_is_last(&client->cur_pgp->client_inv_pages,
                              &client->persistent_invalidated_list) )
     {
         client->cur_pgp = NULL;
@@ -2541,7 +2541,7 @@ static int tmemc_restore_put_page(int cli_id, uint32_t pool_id,
     if (bufsize != PAGE_SIZE) {
         tmem_client_err("tmem: %s: invalid parameter bufsize(%d) != (%ld)\n",
                 __func__, bufsize, PAGE_SIZE);
-	return -EINVAL;
+        return -EINVAL;
     }
     return do_tmem_put(pool, oidp, index, 0, buf);
 }
