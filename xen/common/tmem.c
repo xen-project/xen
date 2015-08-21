@@ -916,6 +916,9 @@ static int obj_rb_insert(struct rb_root *root, struct tmem_object_root *obj)
     struct rb_node **new, *parent = NULL;
     struct tmem_object_root *this;
 
+    ASSERT(obj->pool);
+    ASSERT_WRITELOCK(&obj->pool->pool_rwlock);
+
     new = &(root->rb_node);
     while ( *new )
     {
