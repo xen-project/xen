@@ -348,6 +348,43 @@ static int container_fast_forward(const void *data, size_t size_left, size_t *of
     return 0;
 }
 
+/*
+ * The 'final_levels' of patch ids have been obtained empirically.
+ * Refer bug https://bugzilla.suse.com/show_bug.cgi?id=913996 
+ * for details of the issue. The short version is that people
+ * using certain Fam10h systems noticed system hang issues when
+ * trying to update microcode levels beyond the patch IDs below.
+ * From internal discussions, we gathered that OS/hypervisor
+ * cannot reliably perform microcode updates beyond these levels
+ * due to hardware issues. Therefore, we need to abort microcode
+ * update process if we hit any of these levels.
+ */
+static const unsigned int final_levels[] = {
+    0x01000098,
+    0x0100009f,
+    0x010000af
+};
+
+static bool_t check_final_patch_levels(unsigned int cpu)
+{
+    /*
+     * Check the current patch levels on the cpu. If they are equal to
+     * any of the 'final_levels', then we should not update the microcode
+     * patch on the cpu as system will hang otherwise.
+     */
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
+    unsigned int i;
+
+    if ( boot_cpu_data.x86 != 0x10 )
+        return 0;
+
+    for ( i = 0; i < ARRAY_SIZE(final_levels); i++ )
+        if ( uci->cpu_sig.rev == final_levels[i] )
+            return 1;
+
+    return 0;
+}
+
 static int cpu_request_microcode(unsigned int cpu, const void *buf,
                                  size_t bufsize)
 {
@@ -368,6 +405,14 @@ static int cpu_request_microcode(unsigned int cpu, const void *buf,
     {
         printk(KERN_ERR "microcode: Wrong microcode patch file magic\n");
         error = -EINVAL;
+        goto out;
+    }
+
+    if ( check_final_patch_levels(cpu) )
+    {
+        printk(XENLOG_INFO
+               "microcode: Cannot update microcode patch on the cpu as we hit a final level\n");
+        error = -EPERM;
         goto out;
     }
 
