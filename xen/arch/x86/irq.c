@@ -1906,7 +1906,7 @@ int map_domain_pirq(
     if ( !irq_access_permitted(current->domain, irq))
         return -EPERM;
 
-    if ( pirq < 0 || pirq >= d->nr_pirqs || irq < 0 || irq >= nr_irqs )
+    if ( pirq < 0 || pirq >= d->nr_pirqs || irq <= 0 || irq >= nr_irqs )
     {
         dprintk(XENLOG_G_ERR, "dom%d: invalid pirq %d or irq %d\n",
                 d->domain_id, pirq, irq);
@@ -1919,8 +1919,9 @@ int map_domain_pirq(
     if ( (old_irq > 0 && (old_irq != irq) ) ||
          (old_pirq && (old_pirq != pirq)) )
     {
-        dprintk(XENLOG_G_WARNING, "dom%d: pirq %d or irq %d already mapped\n",
-                d->domain_id, pirq, irq);
+        dprintk(XENLOG_G_WARNING,
+                "dom%d: pirq %d or irq %d already mapped (%d,%d)\n",
+                d->domain_id, pirq, irq, old_pirq, old_irq);
         return 0;
     }
 
