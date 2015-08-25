@@ -195,7 +195,7 @@ struct microcode_info {
     char buffer[1];
 };
 
-static void __microcode_fini_cpu(int cpu)
+static void __microcode_fini_cpu(unsigned int cpu)
 {
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
 
@@ -203,14 +203,14 @@ static void __microcode_fini_cpu(int cpu)
     memset(uci, 0, sizeof(*uci));
 }
 
-static void microcode_fini_cpu(int cpu)
+static void microcode_fini_cpu(unsigned int cpu)
 {
     spin_lock(&microcode_mutex);
     __microcode_fini_cpu(cpu);
     spin_unlock(&microcode_mutex);
 }
 
-int microcode_resume_cpu(int cpu)
+int microcode_resume_cpu(unsigned int cpu)
 {
     int err;
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);

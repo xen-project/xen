@@ -90,7 +90,7 @@ struct extended_sigtable {
 /* serialize access to the physical write to MSR 0x79 */
 static DEFINE_SPINLOCK(microcode_update_lock);
 
-static int collect_cpu_info(int cpu_num, struct cpu_signature *csig)
+static int collect_cpu_info(unsigned int cpu_num, struct cpu_signature *csig)
 {
     struct cpuinfo_x86 *c = &cpu_data[cpu_num];
     uint64_t msr_content;
@@ -129,7 +129,7 @@ static int collect_cpu_info(int cpu_num, struct cpu_signature *csig)
 }
 
 static inline int microcode_update_match(
-    int cpu_num, const struct microcode_header_intel *mc_header,
+    unsigned int cpu_num, const struct microcode_header_intel *mc_header,
     int sig, int pf)
 {
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu_num);
@@ -232,7 +232,7 @@ static int microcode_sanity_check(void *mc)
  * return 1 - found update
  * return < 0 - error
  */
-static int get_matching_microcode(const void *mc, int cpu)
+static int get_matching_microcode(const void *mc, unsigned int cpu)
 {
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     const struct microcode_header_intel *mc_header = mc;
@@ -277,12 +277,12 @@ static int get_matching_microcode(const void *mc, int cpu)
     return 1;
 }
 
-static int apply_microcode(int cpu)
+static int apply_microcode(unsigned int cpu)
 {
     unsigned long flags;
     uint64_t msr_content;
     unsigned int val[2];
-    int cpu_num = raw_smp_processor_id();
+    unsigned int cpu_num = raw_smp_processor_id();
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu_num);
 
     /* We should bind the task to the CPU */
@@ -351,7 +351,8 @@ static long get_next_ucode_from_buffer(void **mc, const u8 *buf,
     return offset + total_size;
 }
 
-static int cpu_request_microcode(int cpu, const void *buf, size_t size)
+static int cpu_request_microcode(unsigned int cpu, const void *buf,
+                                 size_t size)
 {
     long offset = 0;
     int error = 0;
@@ -391,7 +392,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
     return error;
 }
 
-static int microcode_resume_match(int cpu, const void *mc)
+static int microcode_resume_match(unsigned int cpu, const void *mc)
 {
     return get_matching_microcode(mc, cpu);
 }

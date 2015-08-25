@@ -570,7 +570,7 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val);
 
 void microcode_set_module(unsigned int);
 int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void), unsigned long len);
-int microcode_resume_cpu(int cpu);
+int microcode_resume_cpu(unsigned int cpu);
 
 enum get_cpu_vendor {
    gcv_host_early,
