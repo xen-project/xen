@@ -177,7 +177,7 @@ AC_ARG_WITH([system-qemu],
         device model instead of building and installing our own version]),[
     case $withval in
         yes)
-            qemu_xen=n ; qemu_xen_path="qemu"
+            qemu_xen=n ; qemu_xen_path="qemu-system-i386"
             qemu_xen_systemd="/usr/bin/env $qemu_xen_path" ;;
         no)
             qemu_xen=y ;;
