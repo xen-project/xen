@@ -30,11 +30,9 @@ LDFLAGS += $(APPEND_LDFLAGS)
 all: xentop
 
 .PHONY: install
-install: xentop xentop.1
+install: xentop
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	$(INSTALL_PROG) xentop $(DESTDIR)$(sbindir)/xentop
-	$(INSTALL_DIR) $(DESTDIR)$(MAN1DIR)
-	$(INSTALL_DATA) xentop.1 $(DESTDIR)$(MAN1DIR)/xentop.1
 
 endif
 

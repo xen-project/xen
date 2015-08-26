@@ -7,10 +7,8 @@ VERSION		:= $(shell $(MAKE) -C $(XEN_ROOT)/xen --no-print-directory xenversion)
 DOC_ARCHES      := arm x86_32 x86_64
 
 # Documentation sources to build
-MAN1SRC-y += $(sort $(shell find man -name 'xl*.pod.1' -print))
-MAN1SRC-y += $(sort $(shell find man -name 'xenstore*.pod.1' -print))
-
-MAN5SRC-y := $(sort $(shell find man -name 'xl*.pod.5' -print))
+MAN1SRC-y := $(sort $(shell find man/ -name '*.pod.1' -print))
+MAN5SRC-y := $(sort $(shell find man/ -name '*.pod.5' -print))
 
 MARKDOWNSRC-y := $(sort $(shell find misc -name '*.markdown' -print))
 

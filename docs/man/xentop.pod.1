@@ -1,0 +1,111 @@
+=head1 NAME
+
+xentop - displays real-time information about a Xen system and domains
+
+=head1 SYNOPSIS
+
+B<xentop> [B<-h>] [B<-V>] [B<-d>SECONDS] [B<-n>] [B<-r>] [B<-v>] [B<-f>]
+[B<-b>] [B<-i>ITERATIONS]
+
+=head1 DESCRIPTION
+
+B<xentop> displays information about the Xen system and domains, in a
+continually-updating manner.  Command-line options and interactive commands
+can change the detail and format of the information displayed by B<xentop>.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-h>, B<--help>
+
+display help and exit
+
+=item B<-V>, B<--version>
+
+output version information and exit
+
+=item B<-d>, B<--delay>=I<SECONDS>
+
+seconds between updates (default 3)
+
+=item B<-n>, B<--networks>
+
+output network information
+
+=item B<-x>, B<--vbds>
+
+output vbd block device data
+
+=item B<-r>, B<--repeat-header>
+
+repeat table header before each domain
+
+=item B<-v>, B<--vcpus>
+
+output VCPU data
+
+=item B<-f>, B<--full-name>
+
+output the full domain name (not truncated)
+
+=item B<-b>, B<--batch>
+
+output data in batch mode (to stdout)
+
+=item B<-i>, B<--iterations>=I<ITERATIONS>
+
+maximum number of iterations xentop should produce before ending
+
+=back
+
+=head1 INTERACTIVE COMMANDS
+
+All interactive commands are case-insensitive.
+
+=over 4
+
+=item B<D>
+
+set delay between updates
+
+=item B<N>
+
+toggle display of network information
+
+=item B<Q>, B<Esc>
+
+quit
+
+=item B<R>
+
+toggle table header before each domain
+
+=item B<S>
+
+cycle sort order
+
+=item B<V>
+
+toggle display of VCPU information
+
+=item B<Arrows>
+
+scroll domain display
+
+=back
+
+=head1 AUTHORS
+
+Written by Judy Fischbach, David Hendricks, and Josh Triplett
+
+=head1 REPORTING BUGS
+
+Report bugs to <xen-devel@lists.xen.org>.
+
+=head1 COPYRIGHT
+
+Copyright 2005  International Business Machines  Corp
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
