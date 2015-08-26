@@ -110,7 +110,6 @@ int xc_tmem_control_oid(xc_interface *xch,
     op.pool_id = pool_id;
     op.u.ctrl.subop = subop;
     op.u.ctrl.cli_id = cli_id;
-    set_xen_guest_handle(op.u.ctrl.buf,buf);
     op.u.ctrl.arg1 = arg1;
     op.u.ctrl.arg2 = arg2;
     op.u.ctrl.oid[0] = oid.oid[0];
