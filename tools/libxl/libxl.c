@@ -6046,7 +6046,7 @@ char *libxl_tmem_list(libxl_ctx *ctx, uint32_t domid, int use_long)
     char _buf[32768];
 
     rc = xc_tmem_control(ctx->xch, -1, TMEMC_LIST, domid, 32768, use_long,
-                         0, _buf);
+                         _buf);
     if (rc < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
             "Can not get tmem list");
@@ -6061,7 +6061,7 @@ int libxl_tmem_freeze(libxl_ctx *ctx, uint32_t domid)
     int rc;
 
     rc = xc_tmem_control(ctx->xch, -1, TMEMC_FREEZE, domid, 0, 0,
-                         0, NULL);
+                         NULL);
     if (rc < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
             "Can not freeze tmem pools");
@@ -6076,7 +6076,7 @@ int libxl_tmem_thaw(libxl_ctx *ctx, uint32_t domid)
     int rc;
 
     rc = xc_tmem_control(ctx->xch, -1, TMEMC_THAW, domid, 0, 0,
-                         0, NULL);
+                         NULL);
     if (rc < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
             "Can not thaw tmem pools");
@@ -6108,7 +6108,7 @@ int libxl_tmem_set(libxl_ctx *ctx, uint32_t domid, char* name, uint32_t set)
             "Invalid set, valid sets are <weight|cap|compress>");
         return ERROR_INVAL;
     }
-    rc = xc_tmem_control(ctx->xch, -1, subop, domid, set, 0, 0, NULL);
+    rc = xc_tmem_control(ctx->xch, -1, subop, domid, set, 0, NULL);
     if (rc < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
             "Can not set tmem %s", name);
@@ -6137,7 +6137,7 @@ int libxl_tmem_freeable(libxl_ctx *ctx)
 {
     int rc;
 
-    rc = xc_tmem_control(ctx->xch, -1, TMEMC_QUERY_FREEABLE_MB, -1, 0, 0, 0, 0);
+    rc = xc_tmem_control(ctx->xch, -1, TMEMC_QUERY_FREEABLE_MB, -1, 0, 0, 0);
     if (rc < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
             "Can not get tmem freeable memory");

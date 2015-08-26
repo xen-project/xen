@@ -51,7 +51,6 @@ int xc_tmem_control(xc_interface *xch,
                     uint32_t cli_id,
                     uint32_t arg1,
                     uint32_t arg2,
-                    uint64_t arg3,
                     void *buf)
 {
     tmem_op_t op;
@@ -64,7 +63,6 @@ int xc_tmem_control(xc_interface *xch,
     op.u.ctrl.cli_id = cli_id;
     op.u.ctrl.arg1 = arg1;
     op.u.ctrl.arg2 = arg2;
-    /* use xc_tmem_control_oid if arg3 is required */
     op.u.ctrl.oid[0] = 0;
     op.u.ctrl.oid[1] = 0;
     op.u.ctrl.oid[2] = 0;
@@ -220,28 +218,28 @@ int xc_tmem_save(xc_interface *xch,
     uint32_t minusone = -1;
     struct tmem_handle *h;
 
-    if ( xc_tmem_control(xch,0,TMEMC_SAVE_BEGIN,dom,live,0,0,NULL) <= 0 )
+    if ( xc_tmem_control(xch,0,TMEMC_SAVE_BEGIN,dom,live,0,NULL) <= 0 )
         return 0;
 
     if ( write_exact(io_fd, &marker, sizeof(marker)) )
         return -1;
-    version = xc_tmem_control(xch,0,TMEMC_SAVE_GET_VERSION,0,0,0,0,NULL);
+    version = xc_tmem_control(xch,0,TMEMC_SAVE_GET_VERSION,0,0,0,NULL);
     if ( write_exact(io_fd, &version, sizeof(version)) )
         return -1;
-    max_pools = xc_tmem_control(xch,0,TMEMC_SAVE_GET_MAXPOOLS,0,0,0,0,NULL);
+    max_pools = xc_tmem_control(xch,0,TMEMC_SAVE_GET_MAXPOOLS,0,0,0,NULL);
     if ( write_exact(io_fd, &max_pools, sizeof(max_pools)) )
         return -1;
     if ( version == -1 || max_pools == -1 )
         return -1;
     if ( write_exact(io_fd, &minusone, sizeof(minusone)) )
         return -1;
-    flags = xc_tmem_control(xch,0,TMEMC_SAVE_GET_CLIENT_FLAGS,dom,0,0,0,NULL);
+    flags = xc_tmem_control(xch,0,TMEMC_SAVE_GET_CLIENT_FLAGS,dom,0,0,NULL);
     if ( write_exact(io_fd, &flags, sizeof(flags)) )
         return -1;
-    weight = xc_tmem_control(xch,0,TMEMC_SAVE_GET_CLIENT_WEIGHT,dom,0,0,0,NULL);
+    weight = xc_tmem_control(xch,0,TMEMC_SAVE_GET_CLIENT_WEIGHT,dom,0,0,NULL);
     if ( write_exact(io_fd, &weight, sizeof(weight)) )
         return -1;
-    cap = xc_tmem_control(xch,0,TMEMC_SAVE_GET_CLIENT_CAP,dom,0,0,0,NULL);
+    cap = xc_tmem_control(xch,0,TMEMC_SAVE_GET_CLIENT_CAP,dom,0,0,NULL);
     if ( write_exact(io_fd, &cap, sizeof(cap)) )
         return -1;
     if ( flags == -1 || weight == -1 || cap == -1 )
@@ -258,14 +256,14 @@ int xc_tmem_save(xc_interface *xch,
         int checksum = 0;
 
         /* get pool id, flags, pagesize, n_pages, uuid */
-        flags = xc_tmem_control(xch,i,TMEMC_SAVE_GET_POOL_FLAGS,dom,0,0,0,NULL);
+        flags = xc_tmem_control(xch,i,TMEMC_SAVE_GET_POOL_FLAGS,dom,0,0,NULL);
         if ( flags != -1 )
         {
             pool_id = i;
-            n_pages = xc_tmem_control(xch,i,TMEMC_SAVE_GET_POOL_NPAGES,dom,0,0,0,NULL);
+            n_pages = xc_tmem_control(xch,i,TMEMC_SAVE_GET_POOL_NPAGES,dom,0,0,NULL);
             if ( !(flags & TMEM_POOL_PERSIST) )
                 n_pages = 0;
-            (void)xc_tmem_control(xch,i,TMEMC_SAVE_GET_POOL_UUID,dom,sizeof(uuid),0,0,&uuid);
+            (void)xc_tmem_control(xch,i,TMEMC_SAVE_GET_POOL_UUID,dom,sizeof(uuid),0,&uuid);
             if ( write_exact(io_fd, &pool_id, sizeof(pool_id)) )
                 return -1;
             if ( write_exact(io_fd, &flags, sizeof(flags)) )
@@ -290,7 +288,7 @@ int xc_tmem_save(xc_interface *xch,
                 int ret;
                 if ( (ret = xc_tmem_control(xch, pool_id,
                                             TMEMC_SAVE_GET_NEXT_PAGE, dom,
-                                            bufsize, 0, 0, buf)) > 0 )
+                                            bufsize, 0, buf)) > 0 )
                 {
                     h = (struct tmem_handle *)buf;
                     if ( write_exact(io_fd, &h->oid, sizeof(h->oid)) )
@@ -335,7 +333,7 @@ int xc_tmem_save_extra(xc_interface *xch, int dom, int io_fd, int field_marker)
     if ( write_exact(io_fd, &marker, sizeof(marker)) )
         return -1;
     while ( xc_tmem_control(xch, 0, TMEMC_SAVE_GET_NEXT_INV, dom,
-                            sizeof(handle),0,0,&handle) > 0 ) {
+                            sizeof(handle),0,&handle) > 0 ) {
         if ( write_exact(io_fd, &handle.pool_id, sizeof(handle.pool_id)) )
             return -1;
         if ( write_exact(io_fd, &handle.oid, sizeof(handle.oid)) )
@@ -357,7 +355,7 @@ int xc_tmem_save_extra(xc_interface *xch, int dom, int io_fd, int field_marker)
 /* only called for live migration */
 void xc_tmem_save_done(xc_interface *xch, int dom)
 {
-    xc_tmem_control(xch,0,TMEMC_SAVE_END,dom,0,0,0,NULL);
+    xc_tmem_control(xch,0,TMEMC_SAVE_END,dom,0,0,NULL);
 }
 
 /* restore routines */
@@ -391,7 +389,7 @@ int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
     uint32_t weight, cap, flags;
     int checksum = 0;
 
-    save_version = xc_tmem_control(xch,0,TMEMC_SAVE_GET_VERSION,dom,0,0,0,NULL);
+    save_version = xc_tmem_control(xch,0,TMEMC_SAVE_GET_VERSION,dom,0,0,NULL);
     if ( save_version == -1 )
         return -1; /* domain doesn't exist */
     if ( read_exact(io_fd, &this_version, sizeof(this_version)) )
@@ -403,23 +401,23 @@ int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
         return -1;
     if ( minusone != -1 )
         return -1;
-    if ( xc_tmem_control(xch,0,TMEMC_RESTORE_BEGIN,dom,0,0,0,NULL) < 0 )
+    if ( xc_tmem_control(xch,0,TMEMC_RESTORE_BEGIN,dom,0,0,NULL) < 0 )
         return -1;
     if ( read_exact(io_fd, &flags, sizeof(flags)) )
         return -1;
     if ( flags & TMEM_CLIENT_COMPRESS )
-        if ( xc_tmem_control(xch,0,TMEMC_SET_COMPRESS,dom,1,0,0,NULL) < 0 )
+        if ( xc_tmem_control(xch,0,TMEMC_SET_COMPRESS,dom,1,0,NULL) < 0 )
             return -1;
     if ( flags & TMEM_CLIENT_FROZEN )
-        if ( xc_tmem_control(xch,0,TMEMC_FREEZE,dom,0,0,0,NULL) < 0 )
+        if ( xc_tmem_control(xch,0,TMEMC_FREEZE,dom,0,0,NULL) < 0 )
             return -1;
     if ( read_exact(io_fd, &weight, sizeof(weight)) )
         return -1;
-    if ( xc_tmem_control(xch,0,TMEMC_SET_WEIGHT,dom,0,0,0,NULL) < 0 )
+    if ( xc_tmem_control(xch,0,TMEMC_SET_WEIGHT,dom,0,0,NULL) < 0 )
         return -1;
     if ( read_exact(io_fd, &cap, sizeof(cap)) )
         return -1;
-    if ( xc_tmem_control(xch,0,TMEMC_SET_CAP,dom,0,0,0,NULL) < 0 )
+    if ( xc_tmem_control(xch,0,TMEMC_SET_CAP,dom,0,0,NULL) < 0 )
         return -1;
     if ( read_exact(io_fd, &minusone, sizeof(minusone)) )
         return -1;
