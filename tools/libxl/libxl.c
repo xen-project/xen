@@ -6045,7 +6045,7 @@ char *libxl_tmem_list(libxl_ctx *ctx, uint32_t domid, int use_long)
     int rc;
     char _buf[32768];
 
-    rc = xc_tmem_control(ctx->xch, -1, TMEMC_LIST, domid, 32768, use_long,
+    rc = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_LIST, domid, 32768, use_long,
                          _buf);
     if (rc < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
@@ -6060,7 +6060,7 @@ int libxl_tmem_freeze(libxl_ctx *ctx, uint32_t domid)
 {
     int rc;
 
-    rc = xc_tmem_control(ctx->xch, -1, TMEMC_FREEZE, domid, 0, 0,
+    rc = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_FREEZE, domid, 0, 0,
                          NULL);
     if (rc < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
@@ -6075,7 +6075,7 @@ int libxl_tmem_thaw(libxl_ctx *ctx, uint32_t domid)
 {
     int rc;
 
-    rc = xc_tmem_control(ctx->xch, -1, TMEMC_THAW, domid, 0, 0,
+    rc = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_THAW, domid, 0, 0,
                          NULL);
     if (rc < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
@@ -6089,11 +6089,11 @@ int libxl_tmem_thaw(libxl_ctx *ctx, uint32_t domid)
 static int32_t tmem_setop_from_string(char *set_name)
 {
     if (!strcmp(set_name, "weight"))
-        return TMEMC_SET_WEIGHT;
+        return XEN_SYSCTL_TMEM_OP_SET_WEIGHT;
     else if (!strcmp(set_name, "cap"))
-        return TMEMC_SET_CAP;
+        return XEN_SYSCTL_TMEM_OP_SET_CAP;
     else if (!strcmp(set_name, "compress"))
-        return TMEMC_SET_COMPRESS;
+        return XEN_SYSCTL_TMEM_OP_SET_COMPRESS;
     else
         return -1;
 }
@@ -6137,7 +6137,7 @@ int libxl_tmem_freeable(libxl_ctx *ctx)
 {
     int rc;
 
-    rc = xc_tmem_control(ctx->xch, -1, TMEMC_QUERY_FREEABLE_MB, -1, 0, 0, 0);
+    rc = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_QUERY_FREEABLE_MB, -1, 0, 0, 0);
     if (rc < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
             "Can not get tmem freeable memory");

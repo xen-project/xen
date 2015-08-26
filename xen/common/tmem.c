@@ -18,6 +18,7 @@
 #include <xen/tmem_xen.h> /* host-specific (eg Xen) code goes here */
 #endif
 
+#include <public/sysctl.h>
 #include <xen/tmem.h>
 #include <xen/rbtree.h>
 #include <xen/radix-tree.h>
@@ -2012,8 +2013,8 @@ fail:
 static int tmemc_freeze_pools(domid_t cli_id, int arg)
 {
     struct client *client;
-    bool_t freeze = (arg == TMEMC_FREEZE) ? 1 : 0;
-    bool_t destroy = (arg == TMEMC_DESTROY) ? 1 : 0;
+    bool_t freeze = (arg == XEN_SYSCTL_TMEM_OP_FREEZE) ? 1 : 0;
+    bool_t destroy = (arg == XEN_SYSCTL_TMEM_OP_DESTROY) ? 1 : 0;
     char *s;
 
     s = destroy ? "destroyed" : ( freeze ? "frozen" : "thawed" );
@@ -2230,7 +2231,7 @@ static int __tmemc_set_var(struct client *client, uint32_t subop, uint32_t arg1)
 
     switch (subop)
     {
-    case TMEMC_SET_WEIGHT:
+    case XEN_SYSCTL_TMEM_OP_SET_WEIGHT:
         old_weight = client->weight;
         client->weight = arg1;
         tmem_client_info("tmem: weight set to %d for %s=%d\n",
@@ -2238,12 +2239,12 @@ static int __tmemc_set_var(struct client *client, uint32_t subop, uint32_t arg1)
         atomic_sub(old_weight,&client_weight_total);
         atomic_add(client->weight,&client_weight_total);
         break;
-    case TMEMC_SET_CAP:
+    case XEN_SYSCTL_TMEM_OP_SET_CAP:
         client->cap = arg1;
         tmem_client_info("tmem: cap set to %d for %s=%d\n",
                         arg1, tmem_cli_id_str, cli_id);
         break;
-    case TMEMC_SET_COMPRESS:
+    case XEN_SYSCTL_TMEM_OP_SET_COMPRESS:
         if ( tmem_dedup_enabled() )
         {
             tmem_client_warn("tmem: compression %s for all %ss, cannot be changed when tmem_dedup is enabled\n",
@@ -2346,7 +2347,7 @@ static int tmemc_save_subop(int cli_id, uint32_t pool_id,
 
     switch(subop)
     {
-    case TMEMC_SAVE_BEGIN:
+    case XEN_SYSCTL_TMEM_OP_SAVE_BEGIN:
         if ( client == NULL )
             return 0;
         for (p = 0; p < MAX_POOLS_PER_DOMAIN; p++)
@@ -2363,33 +2364,33 @@ static int tmemc_save_subop(int cli_id, uint32_t pool_id,
             client->live_migrating = 1;
         rc = 1;
         break;
-    case TMEMC_RESTORE_BEGIN:
+    case XEN_SYSCTL_TMEM_OP_RESTORE_BEGIN:
         if ( client == NULL && (client = client_create(cli_id)) != NULL )
             return 1;
         break;
-    case TMEMC_SAVE_GET_VERSION:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_VERSION:
         rc = TMEM_SPEC_VERSION;
         break;
-    case TMEMC_SAVE_GET_MAXPOOLS:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_MAXPOOLS:
         rc = MAX_POOLS_PER_DOMAIN;
         break;
-    case TMEMC_SAVE_GET_CLIENT_WEIGHT:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_WEIGHT:
         if ( client == NULL )
             break;
         rc = client->weight == -1 ? -2 : client->weight;
         break;
-    case TMEMC_SAVE_GET_CLIENT_CAP:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_CAP:
         if ( client == NULL )
             break;
         rc = client->cap == -1 ? -2 : client->cap;
         break;
-    case TMEMC_SAVE_GET_CLIENT_FLAGS:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_FLAGS:
         if ( client == NULL )
             break;
         rc = (client->compress ? TMEM_CLIENT_COMPRESS : 0 ) |
              (client->was_frozen ? TMEM_CLIENT_FROZEN : 0 );
         break;
-    case TMEMC_SAVE_GET_POOL_FLAGS:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_FLAGS:
          if ( pool == NULL )
              break;
          rc = (pool->persistent ? TMEM_POOL_PERSIST : 0) |
@@ -2397,19 +2398,19 @@ static int tmemc_save_subop(int cli_id, uint32_t pool_id,
               (POOL_PAGESHIFT << TMEM_POOL_PAGESIZE_SHIFT) |
               (TMEM_SPEC_VERSION << TMEM_POOL_VERSION_SHIFT);
         break;
-    case TMEMC_SAVE_GET_POOL_NPAGES:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_NPAGES:
          if ( pool == NULL )
              break;
         rc = _atomic_read(pool->pgp_count);
         break;
-    case TMEMC_SAVE_GET_POOL_UUID:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_UUID:
          if ( pool == NULL )
              break;
         rc = 0;
         if ( copy_to_guest(guest_handle_cast(buf, void), pool->uuid, 2) )
             rc = -EFAULT;
         break;
-    case TMEMC_SAVE_END:
+    case XEN_SYSCTL_TMEM_OP_SAVE_END:
         if ( client == NULL )
             break;
         client->live_migrating = 0;
@@ -2553,77 +2554,75 @@ static int tmemc_restore_flush_page(int cli_id, uint32_t pool_id, struct oid *oi
     return do_tmem_flush_page(pool,oidp,index);
 }
 
-static int do_tmem_control(struct tmem_op *op)
+int tmem_control(struct xen_sysctl_tmem_op *op)
 {
     int ret;
     uint32_t pool_id = op->pool_id;
-    uint32_t subop = op->u.ctrl.subop;
-    struct oid *oidp = (struct oid *)(&op->u.ctrl.oid[0]);
+    uint32_t cmd = op->cmd;
+    struct oid *oidp = (struct oid *)(&op->oid[0]);
 
-    if ( xsm_tmem_control(XSM_PRIV) )
-        return -EPERM;
+    if ( op->pad != 0 )
+        return -EINVAL;
 
-    switch(subop)
+    write_lock(&tmem_rwlock);
+
+    switch (cmd)
     {
-    case TMEMC_THAW:
-    case TMEMC_FREEZE:
-    case TMEMC_DESTROY:
-        ret = tmemc_freeze_pools(op->u.ctrl.cli_id,subop);
+    case XEN_SYSCTL_TMEM_OP_THAW:
+    case XEN_SYSCTL_TMEM_OP_FREEZE:
+    case XEN_SYSCTL_TMEM_OP_DESTROY:
+        ret = tmemc_freeze_pools(op->cli_id, cmd);
         break;
-    case TMEMC_FLUSH:
-        ret = tmemc_flush_mem(op->u.ctrl.cli_id,op->u.ctrl.arg1);
+    case XEN_SYSCTL_TMEM_OP_FLUSH:
+        ret = tmemc_flush_mem(op->cli_id,op->arg1);
         break;
-    case TMEMC_LIST:
-        ret = tmemc_list(op->u.ctrl.cli_id,
-                         guest_handle_cast(op->u.ctrl.buf, char),
-                         op->u.ctrl.arg1,op->u.ctrl.arg2);
+    case XEN_SYSCTL_TMEM_OP_LIST:
+        ret = tmemc_list(op->cli_id,
+                         guest_handle_cast(op->buf, char), op->arg1, op->arg2);
         break;
-    case TMEMC_SET_WEIGHT:
-    case TMEMC_SET_CAP:
-    case TMEMC_SET_COMPRESS:
-        ret = tmemc_set_var(op->u.ctrl.cli_id,subop,op->u.ctrl.arg1);
+    case XEN_SYSCTL_TMEM_OP_SET_WEIGHT:
+    case XEN_SYSCTL_TMEM_OP_SET_CAP:
+    case XEN_SYSCTL_TMEM_OP_SET_COMPRESS:
+        ret = tmemc_set_var(op->cli_id, cmd, op->arg1);
         break;
-    case TMEMC_QUERY_FREEABLE_MB:
+    case XEN_SYSCTL_TMEM_OP_QUERY_FREEABLE_MB:
         ret = tmem_freeable_pages() >> (20 - PAGE_SHIFT);
         break;
-    case TMEMC_SAVE_BEGIN:
-    case TMEMC_RESTORE_BEGIN:
-    case TMEMC_SAVE_GET_VERSION:
-    case TMEMC_SAVE_GET_MAXPOOLS:
-    case TMEMC_SAVE_GET_CLIENT_WEIGHT:
-    case TMEMC_SAVE_GET_CLIENT_CAP:
-    case TMEMC_SAVE_GET_CLIENT_FLAGS:
-    case TMEMC_SAVE_GET_POOL_FLAGS:
-    case TMEMC_SAVE_GET_POOL_NPAGES:
-    case TMEMC_SAVE_GET_POOL_UUID:
-    case TMEMC_SAVE_END:
-        ret = tmemc_save_subop(op->u.ctrl.cli_id,pool_id,subop,
-                               guest_handle_cast(op->u.ctrl.buf, char),
-                               op->u.ctrl.arg1);
+    case XEN_SYSCTL_TMEM_OP_SAVE_BEGIN:
+    case XEN_SYSCTL_TMEM_OP_RESTORE_BEGIN:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_VERSION:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_MAXPOOLS:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_WEIGHT:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_CAP:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_FLAGS:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_FLAGS:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_NPAGES:
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_UUID:
+    case XEN_SYSCTL_TMEM_OP_SAVE_END:
+        ret = tmemc_save_subop(op->cli_id, pool_id, cmd,
+                               guest_handle_cast(op->buf, char), op->arg1);
         break;
-    case TMEMC_SAVE_GET_NEXT_PAGE:
-        ret = tmemc_save_get_next_page(op->u.ctrl.cli_id, pool_id,
-                                       guest_handle_cast(op->u.ctrl.buf, char),
-                                       op->u.ctrl.arg1);
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_PAGE:
+        ret = tmemc_save_get_next_page(op->cli_id, pool_id,
+                                       guest_handle_cast(op->buf, char), op->arg1);
         break;
-    case TMEMC_SAVE_GET_NEXT_INV:
-        ret = tmemc_save_get_next_inv(op->u.ctrl.cli_id,
-                                      guest_handle_cast(op->u.ctrl.buf, char),
-                                      op->u.ctrl.arg1);
+    case XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_INV:
+        ret = tmemc_save_get_next_inv(op->cli_id,
+                                      guest_handle_cast(op->buf, char), op->arg1);
         break;
-    case TMEMC_RESTORE_PUT_PAGE:
-        ret = tmemc_restore_put_page(op->u.ctrl.cli_id,pool_id,
-                                     oidp, op->u.ctrl.arg2,
-                                     guest_handle_cast(op->u.ctrl.buf, char),
-                                     op->u.ctrl.arg1);
+    case XEN_SYSCTL_TMEM_OP_RESTORE_PUT_PAGE:
+        ret = tmemc_restore_put_page(op->cli_id, pool_id, oidp, op->arg2,
+                                     guest_handle_cast(op->buf, char), op->arg1);
         break;
-    case TMEMC_RESTORE_FLUSH_PAGE:
-        ret = tmemc_restore_flush_page(op->u.ctrl.cli_id,pool_id,
-                                       oidp, op->u.ctrl.arg2);
+    case XEN_SYSCTL_TMEM_OP_RESTORE_FLUSH_PAGE:
+        ret = tmemc_restore_flush_page(op->cli_id, pool_id, oidp, op->arg2);
         break;
     default:
         ret = -1;
     }
+
+    write_unlock(&tmem_rwlock);
+
     return ret;
 }
 
@@ -2666,7 +2665,7 @@ long do_tmem_op(tmem_cli_op_t uops)
 
     if ( op.cmd == TMEM_CONTROL )
     {
-        rc = do_tmem_control(&op);
+        rc = -EOPNOTSUPP;
     }
     else if ( op.cmd == TMEM_AUTH )
     {
@@ -2786,7 +2785,7 @@ void tmem_destroy(void *v)
     write_unlock(&tmem_rwlock);
 }
 
-#define MAX_EVICTS 10  /* should be variable or set via TMEMC_ ?? */
+#define MAX_EVICTS 10  /* should be variable or set via XEN_SYSCTL_TMEM_OP_ ?? */
 void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
 {
     struct page_info *pfp;

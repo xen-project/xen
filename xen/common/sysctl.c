@@ -14,6 +14,7 @@
 #include <xen/domain.h>
 #include <xen/event.h>
 #include <xen/domain_page.h>
+#include <xen/tmem.h>
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/iocap.h>
@@ -68,7 +69,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     case XEN_SYSCTL_tbuf_op:
         ret = tb_control(&op->u.tbuf_op);
         break;
-    
+
     case XEN_SYSCTL_sched_id:
         op->u.sched_id.sched_id = sched_id();
         break;
@@ -454,6 +455,10 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         break;
     }
 #endif
+
+    case XEN_SYSCTL_tmem_op:
+        ret = tmem_control(&op->u.tmem_op);
+        break;
 
     default:
         ret = arch_do_sysctl(op, u_sysctl);

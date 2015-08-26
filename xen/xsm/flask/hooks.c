@@ -801,6 +801,9 @@ static int flask_sysctl(int cmd)
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
                                     XEN2__PSR_CAT_OP, NULL);
 
+    case XEN_SYSCTL_tmem_op:
+        return domain_has_xen(current->domain, XEN__TMEM_CONTROL);
+
     default:
         printk("flask_sysctl: Unknown op %d\n", cmd);
         return -EPERM;

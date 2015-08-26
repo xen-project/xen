@@ -297,15 +297,11 @@ static inline int tmem_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
         switch ( cop.cmd )
         {
         case TMEM_NEW_POOL:   u = XLAT_tmem_op_u_creat; break;
-        case TMEM_CONTROL:    u = XLAT_tmem_op_u_ctrl;  break;
         case TMEM_AUTH:       u = XLAT_tmem_op_u_creat; break;
         case TMEM_RESTORE_NEW:u = XLAT_tmem_op_u_creat; break;
         default:              u = XLAT_tmem_op_u_gen ;  break;
         }
-#define XLAT_tmem_op_HNDL_u_ctrl_buf(_d_, _s_) \
-        guest_from_compat_handle((_d_)->u.ctrl.buf, (_s_)->u.ctrl.buf)
         XLAT_tmem_op(op, &cop);
-#undef XLAT_tmem_op_HNDL_u_ctrl_buf
         return 0;
     }
 #endif
