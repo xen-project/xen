@@ -463,14 +463,10 @@ xenstore-stubdom: mini-os-$(XEN_TARGET_ARCH)-xenstore libxc xenstore
 #########
 
 ifeq ($(STUBDOM_SUPPORTED),1)
-install: $(STUBDOMPATH) install-readme $(STUBDOM_INSTALL)
+install: $(STUBDOMPATH) $(STUBDOM_INSTALL)
 else
 install: $(STUBDOMPATH)
 endif
-
-install-readme:
-	$(INSTALL_DIR) $(DESTDIR)$(docdir)
-	$(INSTALL_DATA) README $(DESTDIR)$(docdir)/README.stubdom
 
 install-ioemu: ioemu-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC_BIN)"
