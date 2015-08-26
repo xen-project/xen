@@ -137,7 +137,6 @@ struct xsm_operations {
 
     int (*page_offline)(uint32_t cmd);
     int (*tmem_op)(void);
-    int (*tmem_control)(void);
 
     long (*do_xsm_op) (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op);
 #ifdef CONFIG_COMPAT
@@ -555,11 +554,6 @@ static inline int xsm_page_offline(xsm_default_t def, uint32_t cmd)
 static inline int xsm_tmem_op(xsm_default_t def)
 {
     return xsm_ops->tmem_op();
-}
-
-static inline int xsm_tmem_control(xsm_default_t def)
-{
-    return xsm_ops->tmem_control();
 }
 
 static inline long xsm_do_xsm_op (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
