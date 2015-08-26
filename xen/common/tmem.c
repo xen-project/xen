@@ -1037,6 +1037,9 @@ static int shared_pool_join(struct tmem_pool *pool, struct client *new_client)
         tmem_client_info("adding new %s %d to shared pool owned by %s %d\n",
                     tmem_client_str, new_client->cli_id, tmem_client_str,
                     pool->client->cli_id);
+    else if ( pool->shared_count )
+        tmem_client_info("inter-guest sharing of shared pool %s by client %d\n",
+                         tmem_client_str, pool->client->cli_id);
     ++pool->shared_count;
     return 0;
 }
@@ -1056,7 +1059,10 @@ static void shared_pool_reassign(struct tmem_pool *pool)
     }
     old_client->pools[pool->pool_id] = NULL;
     sl = list_entry(pool->share_list.next, struct share_list, share_list);
-    ASSERT(sl->client != old_client);
+    /*
+     * The sl->client can be old_client if there are multiple shared pools
+     * within an guest.
+     */
     pool->client = new_client = sl->client;
     for (poolid = 0; poolid < MAX_POOLS_PER_DOMAIN; poolid++)
         if (new_client->pools[poolid] == pool)
@@ -1982,6 +1988,8 @@ static int do_tmem_new_pool(domid_t this_cli_id,
         {
             INIT_LIST_HEAD(&pool->share_list);
             pool->shared_count = 0;
+            if ( shared_pool_join(pool, client) )
+                goto fail;
             global_shared_pools[first_unused_s_poolid] = pool;
         }
     }
