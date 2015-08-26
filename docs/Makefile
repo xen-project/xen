@@ -9,6 +9,7 @@ DOC_ARCHES      := arm x86_32 x86_64
 # Documentation sources to build
 MAN1SRC-y := $(sort $(shell find man/ -name '*.pod.1' -print))
 MAN5SRC-y := $(sort $(shell find man/ -name '*.pod.5' -print))
+MAN8SRC-y := $(sort $(shell find man/ -name '*.pod.8' -print))
 
 MARKDOWNSRC-y := $(sort $(shell find misc -name '*.markdown' -print))
 
@@ -19,17 +20,20 @@ PANDOCSRC-y := $(sort $(shell find specs -name '*.pandoc' -print))
 # Documentation targets
 DOC_MAN1 := $(patsubst man/%.pod.1,man1/%.1,$(MAN1SRC-y))
 DOC_MAN5 := $(patsubst man/%.pod.5,man5/%.5,$(MAN5SRC-y))
+DOC_MAN8 := $(patsubst man/%.pod.8,man8/%.8,$(MAN8SRC-y))
 DOC_HTML := $(patsubst %.markdown,html/%.html,$(MARKDOWNSRC-y)) \
             $(patsubst %.pandoc,html/%.html,$(PANDOCSRC-y)) \
             $(patsubst man/%.pod.1,html/man/%.1.html,$(MAN1SRC-y)) \
             $(patsubst man/%.pod.5,html/man/%.5.html,$(MAN5SRC-y)) \
+            $(patsubst man/%.pod.8,html/man/%.8.html,$(MAN8SRC-y)) \
             $(patsubst %.txt,html/%.txt,$(TXTSRC-y)) \
             $(patsubst %,html/hypercall/%/index.html,$(DOC_ARCHES))
 DOC_TXT  := $(patsubst %.txt,txt/%.txt,$(TXTSRC-y)) \
             $(patsubst %.markdown,txt/%.txt,$(MARKDOWNSRC-y)) \
             $(patsubst %.pandoc,txt/%.txt,$(PANDOCSRC-y)) \
             $(patsubst man/%.pod.1,txt/man/%.1.txt,$(MAN1SRC-y)) \
-            $(patsubst man/%.pod.5,txt/man/%.5.txt,$(MAN5SRC-y))
+            $(patsubst man/%.pod.5,txt/man/%.5.txt,$(MAN5SRC-y)) \
+            $(patsubst man/%.pod.8,txt/man/%.8.txt,$(MAN8SRC-y))
 DOC_PDF  := $(patsubst %.markdown,pdf/%.pdf,$(MARKDOWNSRC-y)) \
             $(patsubst %.pandoc,pdf/%.pdf,$(PANDOCSRC-y))
 
@@ -55,7 +59,7 @@ else
 endif
 
 .PHONY: man-pages
-man-pages: $(DOC_MAN1) $(DOC_MAN5)
+man-pages: $(DOC_MAN1) $(DOC_MAN5) $(DOC_MAN8)
 
 .PHONY: pdf
 pdf: $(DOC_PDF)
@@ -75,6 +79,42 @@ distclean: clean
 		autom4te.cache
 
 # Top level install targets
+
+# Metarules for generating manpages.  Run with $(1) substitued for section
+define GENERATE_MANPAGE_RULES
+
+# Real manpages
+man$(1)/%.$(1): man/%.pod.$(1) Makefile
+ifneq ($(POD2MAN),)
+	@$(INSTALL_DIR) $$(@D)
+	$(POD2MAN) --release=$(VERSION) --name=$$* -s $(1) -c "Xen" $$< $$@
+else
+	@echo "pod2man not installed; skipping $$@"
+endif
+
+# HTML manpages
+html/man/%.$(1).html: man/%.pod.$(1) Makefile
+ifneq ($(POD2HTML),)
+	@$(INSTALL_DIR) $$(@D)
+	$(POD2HTML) --infile=$$< --outfile=$$@
+else
+	@echo "pod2html not installed; skipping $$@"
+endif
+
+# Text manpages
+txt/man/%.$(1).txt: man/%.pod.$(1) Makefile
+ifneq ($(POD2TEXT),)
+	@$(INSTALL_DIR) $$(@D)
+	$(POD2TEXT) $$< $$@
+else
+	@echo "pod2text not installed; skipping $$@"
+endif
+
+endef
+
+# Generate manpage rules for each section
+$(foreach i,1 5 8,$(eval $(call GENERATE_MANPAGE_RULES,$(i))))
+
 .PHONY: install-man-pages
 install-man-pages: man-pages
 	$(INSTALL_DIR) $(DESTDIR)$(mandir)
@@ -90,22 +130,6 @@ install-html: html txt figs
 install: install-man-pages install-html
 
 # Individual file build targets
-man1/%.1: man/%.pod.1 Makefile
-ifneq ($(POD2MAN),)
-	@$(INSTALL_DIR) $(@D)
-	$(POD2MAN) --release=$(VERSION) --name=$* -s 1 -c "Xen" $< $@
-else
-	@echo "pod2man not installed; skipping $@"
-endif
-
-man5/%.5: man/%.pod.5 Makefile
-ifneq ($(POD2MAN),)
-	@$(INSTALL_DIR) $(@D)
-	$(POD2MAN) --release=$(VERSION) --name=$* -s 5 -c "Xen" $< $@
-else
-	@echo "pod2man not installed; skipping $@"
-endif
-
 html/index.html: $(DOC_HTML) $(CURDIR)/gen-html-index INDEX
 	$(PERL) -w -- $(CURDIR)/gen-html-index -i INDEX html $(DOC_HTML)
 
@@ -121,21 +145,6 @@ html/%.txt: %.txt
 	@$(INSTALL_DIR) $(@D)
 	$(INSTALL_DATA) $< $@
 
-html/man/%.1.html: man/%.pod.1 Makefile
-ifneq ($(POD2HTML),)
-	@$(INSTALL_DIR) $(@D)
-	$(POD2HTML) --infile=$< --outfile=$@
-else
-	@echo "pod2html not installed; skipping $@"
-endif
-
-html/man/%.5.html: man/%.pod.5 Makefile
-ifneq ($(POD2HTML),)
-	@$(INSTALL_DIR) $(@D)
-	$(POD2HTML) --infile=$< --outfile=$@
-else
-	@echo "pod2html not installed; skipping $@"
-endif
 
 # For non-x86 arches exclude the subarch whole x86 arch.
 $(foreach i,$(filter-out x86_32 x86_64,$(DOC_ARCHES)),html/hypercall/$(i)/index.html): EXTRA_EXCLUDE := -X arch-x86
@@ -159,22 +168,6 @@ txt/%.txt: %.txt
 txt/%.txt: %.markdown
 	@$(INSTALL_DIR) $(@D)
 	$(INSTALL_DATA) $< $@
-
-txt/man/%.1.txt: man/%.pod.1 Makefile
-ifneq ($(POD2TEXT),)
-	@$(INSTALL_DIR) $(@D)
-	$(POD2TEXT) $< $@
-else
-	@echo "pod2text not installed; skipping $@"
-endif
-
-txt/man/%.5.txt: man/%.pod.5 Makefile
-ifneq ($(POD2TEXT),)
-	@$(INSTALL_DIR) $(@D)
-	$(POD2TEXT) $< $@
-else
-	@echo "pod2text not installed; skipping $@"
-endif
 
 pdf/%.pdf: %.markdown
 ifneq ($(PANDOC),)
