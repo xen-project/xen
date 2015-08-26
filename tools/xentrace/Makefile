@@ -11,7 +11,6 @@ BIN      = $(BIN-y)
 SBIN     = xentrace xentrace_setsize
 LIBBIN   = xenctx
 SCRIPTS  = xentrace_format
-MAN8     = $(wildcard *.8)
 
 .PHONY: all
 all: build
@@ -24,14 +23,12 @@ install: build
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	[ -z "$(LIBBIN)" ] || $(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
-	$(INSTALL_DIR) $(DESTDIR)$(MAN8DIR)
 ifneq ($(BIN),)
 	$(INSTALL_PROG) $(BIN) $(DESTDIR)$(bindir)
 endif
 	$(INSTALL_PROG) $(SBIN) $(DESTDIR)$(sbindir)
 	$(INSTALL_PYTHON_PROG) $(SCRIPTS) $(DESTDIR)$(bindir)
 	[ -z "$(LIBBIN)" ] || $(INSTALL_PROG) $(LIBBIN) $(DESTDIR)$(LIBEXEC_BIN)
-	$(INSTALL_DATA) $(MAN8) $(DESTDIR)$(MAN8DIR)
 
 .PHONY: clean
 clean:

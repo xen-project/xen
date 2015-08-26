@@ -1,92 +1,93 @@
-.TH XENTRACE 8 "22 February 2007" "Xen domain 0 utils"
-.SH NAME
-xentrace \- capture Xen trace buffer data
-.SH SYNOPSIS
-.B xentrace
-[
-.I OPTIONS
-] [
-.I FILE
-]
-.SH DESCRIPTION
-.B xentrace
-is used to capture trace buffer data from Xen.  The data is
+=head1 NAME
+
+xentrace - capture Xen trace buffer data
+
+=head1 SYNOPSIS
+
+B<xentrace> [ I<OPTIONS> ] [ I<FILE> ]
+
+=head1 DESCRIPTION
+
+B<xentrace> is used to capture trace buffer data from Xen.  The data is
 output in the following binary format (host endian):
-.PP
+
     CPU(uint) TSC(u64) EVENT(u32) D1 D2 D3 D4 D5 (all u32)
-.PP
+
 Where CPU is the processor number, TSC is the record's timestamp
 (the value of the CPU cycle counter), EVENT is the event ID and
 D1...D5 are the trace data.
 
 Data is dumped onto the standard output (which must not be a TTY) or a
-\fIFILE\fP specified on the command line.
+I<FILE> specified on the command line.
 
 The output should be parsed using the tool xentrace_format, which can
 produce human-readable output in ASCII format.
 
 
-.SS Options
-.TP
-.B -t, --log-thresh=l
-set the threshold number, l, of new records required to trigger a write of
+=head1 OPTIONS
+
+=over 4
+
+=item B<-t> I<l>, B<--log-thresh>=I<l>
+
+set the threshold number, I<l>, of new records required to trigger a write of
 all new records to the output
-.TP
-.B -s, --poll-sleep=p
-set the time, p, (in milliseconds) to sleep between polling the buffers
+
+=item B<-s> I<p>, B<--poll-sleep>=I<p>
+
+set the time, I<p>, (in milliseconds) to sleep between polling the buffers
 for new data.
-.TP
-.B -c, --cpu-mask=[\fIc\fP|\fICPU-LIST\fP|\fIall\fP]
+
+=item B<-c> [I<c>|I<CPU-LIST>|I<all>], B<--cpu-mask>=[I<c>|I<CPU-LIST>|I<all>]
+
 This can be: a hex value (of the form 0xNNNN...), or a set of cpu
-ranges as described below, or the string \fIall\fP. Hex values are limited
+ranges as described below, or the string I<all>. Hex values are limited
 to 32 bits. If not specified, the cpu-mask as set during bootup will be
-constructed. If using the \fICPU-LIST\fP it expects decimal numbers, which
+constructed. If using the I<CPU-LIST> it expects decimal numbers, which
 may be specified as follows:
 
-.RS 4
-.ie n .IP """0-3""" 4
-.el .IP "``0-3''" 4
-.IX Item "0-3"
-Trace only on CPUs 0 through 3
-.ie n .IP """0,2,5-7""" 4
-.el .IP "``0,2,5-7''" 4
-.IX Item "0,2,5-7"
-Trace only on CPUs 0, 2, and 5 through 7.
-.ie n .IP """-3""" 4
-.el .IP "``-3''" 4
-.IX Item "-3"
-Trace only on CPUs 0 through 3
-.ie n .IP """-3,7""" 4
-.el .IP "``-3,7''" 4
-.IX Item "-3,7"
-Trace only on CPUs 0 through 3 and 7
-.ie n .IP """3-""" 4
-.el .IP "``3-''" 4
-.IX Item "-3-"
-Trace only on CPUs 3 up to maximum numbers of CPUs the host has.
-.RE
-.Sp
+  "0-3"
+      Trace only on CPUs 0 through 3
 
-If using \fIall\fP it will use all of the CPUs the host has.
-.TP
-.B -e, --evt-mask=e
+  "0,2,5-7"
+      Trace only on CPUs 0, 2, and 5 through 7
+
+  "-3"
+      Trace only on CPUs 0 through 3
+
+  "-3,7"
+      Trace only on CPUs 0 through 3 and 7
+
+  "3-"
+      Trace only on CPUs 3 up to maximum numbers of CPUs the host has
+
+If using I<all> it will use all of the CPUs the host has.
+
+=item B<-e> I<mask>, B<--evt-mask>=I<mask>
+
 set event capture mask. If not specified the TRC_ALL will be used.
-.TP
-.B -?, --help
+
+=item B<-?>, B<--help>
+
 Give this help list
-.TP
-.B --usage
+
+=item B<--usage>
+
 Give a short usage message
-.TP
-.B -V, --version
+
+=item B<-V>, B<--version>
+
 Print program version
 
-.SS Event Classes (Masks)
+=back
+
+=head2 Event Classes (Masks)
+
 The following event classes (masks) can be used to filter the events being
 gathered by xentrace:
-.PP
-        \fIID\fP                  \fIDescription\fP
-.PP
+
+        ID                  Description
+
         0x0001f000          TRC_GEN
         0x0002f000          TRC_SCHED
         0x0004f000          TRC_DOM0OP
@@ -95,22 +96,23 @@ gathered by xentrace:
         0xfffff000          TRC_ALL
 
 
-.SS Event Subclasses (More Masks)
+=head2 Event Subclasses (More Masks)
+
 The following event subclasses (masks) can also be used to filter the events being
 gathered by xentrace:
-.PP
-        \fIID\fP                  \fIDescription\fP
-.PP
+
+        ID                  Description
+
         0x00081000          TRC_HVM_ENTRYEXIT
         0x00082000          TRC_HVM_HANDLER
 
 
-.SS Events
-.B xentrace
-collects the following events from the trace buffer:
-.PP
-        \fIID\fP                \fIDescription\fP
-.PP
+=head2 Events
+
+B<xentrace> collects the following events from the trace buffer:
+
+        ID                 Description
+
         0x0001f001         TRC_LOST_RECORDS
         0x0002f001         TRC_SCHED_DOM_ADD
         0x0002f002         TRC_SCHED_DOM_REM
@@ -145,8 +147,8 @@ collects the following events from the trace buffer:
         0x0008200D         TRC_HVM_MSR_WRITE
         0x0008200E         TRC_HVM_CPUID
         0x0008200F         TRC_HVM_INTR
-        0x00082010         TRC_HVM_NMI 
-        0x00082011         TRC_HVM_SMI 
+        0x00082010         TRC_HVM_NMI
+        0x00082011         TRC_HVM_SMI
         0x00082012         TRC_HVM_VMMCALL
         0x00082013         TRC_HVM_HLT
         0x00082014         TRC_HVM_INVLPG
@@ -155,10 +157,10 @@ collects the following events from the trace buffer:
         0x0010f002         TRC_MEM_PAGE_GRANT_UNMAP
         0x0010f003         TRC_MEM_PAGE_GRANT_TRANSFER
 
-.PP
+=head1 AUTHOR
 
-.SH AUTHOR
 Mark A. Williamson <mark.a.williamson@intel.com>
 
-.SH "SEE ALSO"
+=head1 SEE ALSO
+
 xentrace_format(1)
