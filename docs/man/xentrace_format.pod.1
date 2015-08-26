@@ -1,20 +1,20 @@
-.TH XENTRACE_FORMAT 1 "11 May 2004" "Xen domain 0 utils"
-.SH NAME
-xentrace_format \- pretty-print Xen trace data
-.SH SYNOPSIS
-.B xentrace_format
-[
-.I DEFS-FILE
-]
-.SH DESCRIPTION
-.B xentrace_format
-parses trace data in \fBxentrace\fP binary format from standard input
-and reformats it according to the rules in a file of definitions
-(\fIDEFS-FILE\fP), printing to standard output.
+=head1 NAME
 
-The rules in \fIDEFS-FILE\fP should have the format shown below:
+xentrace_format - pretty-print Xen trace data
 
-\fIevent_id\fP \fIwhitespace\fP \fIformat\fP
+=head1 SYNOPSIS
+
+B<xentrace_format> [ I<DEFS-FILE> ]
+
+=head1 DESCRIPTION
+
+B<xentrace_format> parses trace data in B<xentrace> binary format from
+standard input and reformats it according to the rules in a file of
+definitions (I<DEFS-FILE>), printing to standard output.
+
+The rules in I<DEFS-FILE> should have the format shown below:
+
+I<event_id> I<whitespace> I<format>
 
 Each rule should start on a new line.
 
@@ -34,11 +34,13 @@ in the file tools/xentrace/formats in the Xen source tree.
 
 Depending on your system and the rate at which trace data is produced,
 this script may not be able to keep up with the output of
-\fBxentrace\fP if it is piped directly.  In these circumstances you
-should have \fBxentrace\fP output to a file for processing off-line.
+B<xentrace> if it is piped directly.  In these circumstances you
+should have B<xentrace> output to a file for processing off-line.
 
-.SH AUTHOR
+=head1 AUTHOR
+
 Mark A. Williamson <mark.a.williamson@intel.com>
 
-.SH "SEE ALSO"
-xentrace(8), xentrace_cpusplit(1)
+=head1 SEE ALSO
+
+xentrace(8)
