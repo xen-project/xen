@@ -81,6 +81,8 @@ const char *xs_domain_dev(void)
 #if defined(__RUMPUSER_XEN__) || defined(__RUMPRUN__)
 	return "/dev/xen/xenbus";
 #elif defined(__linux__)
+	if (access("/dev/xen/xenbus", F_OK) == 0)
+		return "/dev/xen/xenbus";
 	return "/proc/xen/xenbus";
 #elif defined(__NetBSD__)
 	return "/kern/xen/xenbus";
