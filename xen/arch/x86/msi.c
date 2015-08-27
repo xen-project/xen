@@ -716,8 +716,8 @@ static int msi_capability_init(struct pci_dev *dev,
         entry[i].msi_attrib.type = PCI_CAP_ID_MSI;
         entry[i].msi_attrib.is_64 = is_64bit_address(control);
         entry[i].msi_attrib.entry_nr = i;
+        entry[i].msi_attrib.host_masked =
         entry[i].msi_attrib.maskbit = is_mask_bit_support(control);
-        entry[i].msi_attrib.host_masked = 1;
         entry[i].msi_attrib.guest_masked = 0;
         entry[i].msi_attrib.pos = pos;
         if ( entry[i].msi_attrib.maskbit )
