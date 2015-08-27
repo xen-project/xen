@@ -58,20 +58,15 @@ else
 	@echo "fig2dev (transfig) not installed; skipping figs."
 endif
 
-.PHONY: man-pages
-man-pages: $(DOC_MAN1) $(DOC_MAN5) $(DOC_MAN8)
-
 .PHONY: pdf
 pdf: $(DOC_PDF)
 
 .PHONY: clean
-clean:
+clean: clean-man-pages
 	$(MAKE) -C figs clean
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~
 	rm -rf *.ilg *.log *.ind *.toc *.bak *.tmp core
 	rm -rf html txt pdf
-	rm -rf man5
-	rm -rf man1
 
 .PHONY: distclean
 distclean: clean
@@ -79,6 +74,8 @@ distclean: clean
 		autom4te.cache
 
 # Top level install targets
+
+.PHONY: man-pages install-man-pages clean-man-pages
 
 # Metarules for generating manpages.  Run with $(1) substitued for section
 define GENERATE_MANPAGE_RULES
@@ -110,16 +107,30 @@ else
 	@echo "pod2text not installed; skipping $$@"
 endif
 
+# Build
+.PHONY: man$(1)-pages
+man$(1)-pages: $$(DOC_MAN$(1))
+
+# Install
+.PHONY: install-man$(1)-pages
+install-man$(1)-pages: man$(1)-pages
+	$(INSTALL_DIR) $(DESTDIR)$(mandir)
+	cp -r man$(1) $(DESTDIR)$(mandir)
+
+# Clean
+.PHONY: clean-man$(1)-pages
+clean-man$(1)-pages:
+	rm -rf man$(1)
+
+# Link buld/install/clean to toplevel rules
+man-pages: man$(1)-pages
+install-man-pages: install-man$(1)-pages
+clean-man-pages: clean-man$(1)-pages
+
 endef
 
 # Generate manpage rules for each section
 $(foreach i,1 5 8,$(eval $(call GENERATE_MANPAGE_RULES,$(i))))
-
-.PHONY: install-man-pages
-install-man-pages: man-pages
-	$(INSTALL_DIR) $(DESTDIR)$(mandir)
-	cp -R man1 $(DESTDIR)$(mandir)
-	cp -R man5 $(DESTDIR)$(mandir)
 
 .PHONY: install-html
 install-html: html txt figs
