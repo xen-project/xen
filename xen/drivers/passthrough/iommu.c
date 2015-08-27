@@ -411,7 +411,7 @@ static void iommu_dump_p2m_table(unsigned char key)
     ops = iommu_get_ops();
     for_each_domain(d)
     {
-        if ( is_hardware_domain(d) )
+        if ( is_hardware_domain(d) || need_iommu(d) <= 0 )
             continue;
 
         if ( iommu_use_hap_pt(d) )
