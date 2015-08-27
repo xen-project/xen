@@ -19,10 +19,12 @@ include Config.mk
 
 .PHONY: mini-os-dir
 mini-os-dir:
-	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh \
-		$(MINIOS_UPSTREAM_URL) \
-		$(MINIOS_UPSTREAM_REVISION) \
-		$(XEN_ROOT)/extras/mini-os
+	if [ ! -d $(XEN_ROOT)/extras/mini-os ]; then \
+		GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh \
+			$(MINIOS_UPSTREAM_URL) \
+			$(MINIOS_UPSTREAM_REVISION) \
+			$(XEN_ROOT)/extras/mini-os ; \
+	fi
 
 .PHONY: mini-os-dir-force-update
 mini-os-dir-force-update: mini-os-dir
