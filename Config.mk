@@ -266,10 +266,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.6.0-rc1
-# 7f057440b31da38196e3398fd1b618fc36ad97d6
-# Wed Jun 3 14:41:27 2015 +0200
-# ide: Clear DRQ after handling all expected accesses
+QEMU_TRADITIONAL_REVISION ?= 5cdde31eacdd288359746019ad05cac8ed5d9f70
+# Fri Aug 28 15:53:40 2015 +0100
+# HVM: atomically access pointers in bufioreq handling
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
