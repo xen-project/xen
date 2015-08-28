@@ -1768,7 +1768,7 @@ static void vmx_enable_msr_exit_interception(struct domain *d)
 
 static bool_t vmx_is_singlestep_supported(void)
 {
-    return cpu_has_monitor_trap_flag;
+    return !!cpu_has_monitor_trap_flag;
 }
 
 static void vmx_vcpu_update_eptp(struct vcpu *v)
