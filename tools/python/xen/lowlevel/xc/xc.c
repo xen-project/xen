@@ -1210,6 +1210,7 @@ static PyObject *pyxc_getcpuinfo(XcObject *self, PyObject *args, PyObject *kwds)
     for (i = 0; i < nr_cpus; i++) {
         cpuinfo_obj = Py_BuildValue("{s:k}", "idletime", cpuinfo_ptr->idletime);
         PyList_Append(cpuinfo_list_obj, cpuinfo_obj);
+        Py_DECREF(cpuinfo_obj);
         cpuinfo_ptr++;
     }
 
