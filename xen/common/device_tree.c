@@ -1081,11 +1081,11 @@ int dt_for_each_irq_map(const struct dt_device_node *dev,
 
     /* Now look for an interrupt-map */
     imap = dt_get_property(dev, "interrupt-map", &imaplen);
-    /* No interrupt map, check for an interrupt parent */
+    /* No interrupt-map found. Ignore */
     if ( imap == NULL )
     {
         dt_dprintk(" -> no map, ignoring\n");
-        goto fail;
+        return 0;
     }
     imaplen /= sizeof(u32);
 
