@@ -73,6 +73,11 @@
 #define EFROZEN                 1000
 #define EEMPTY                  1001
 
+struct xen_tmem_oid {
+    uint64_t oid[3];
+};
+typedef struct xen_tmem_oid xen_tmem_oid_t;
+DEFINE_XEN_GUEST_HANDLE(xen_tmem_oid_t);
 
 #ifndef __ASSEMBLY__
 #if __XEN_INTERFACE_VERSION__ < 0x00040400
@@ -89,7 +94,11 @@ struct tmem_op {
             uint32_t arg1;
         } creat; /* for cmd == TMEM_NEW_POOL, TMEM_AUTH, TMEM_RESTORE_NEW */
         struct {
+#if __XEN_INTERFACE_VERSION__ < 0x00040600
             uint64_t oid[3];
+#else
+            xen_tmem_oid_t oid;
+#endif
             uint32_t index;
             uint32_t tmem_offset;
             uint32_t pfn_offset;

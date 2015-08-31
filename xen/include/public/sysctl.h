@@ -34,6 +34,7 @@
 #include "xen.h"
 #include "domctl.h"
 #include "physdev.h"
+#include "tmem.h"
 
 #define XEN_SYSCTL_INTERFACE_VERSION 0x0000000C
 
@@ -736,12 +737,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_psr_cat_op_t);
 #define XEN_SYSCTL_TMEM_OP_RESTORE_BEGIN          30
 #define XEN_SYSCTL_TMEM_OP_RESTORE_PUT_PAGE       32
 #define XEN_SYSCTL_TMEM_OP_RESTORE_FLUSH_PAGE     33
-
-struct xen_tmem_oid {
-    uint64_t oid[3];
-};
-typedef struct xen_tmem_oid xen_tmem_oid_t;
-DEFINE_XEN_GUEST_HANDLE(xen_tmem_oid_t);
 
 struct xen_sysctl_tmem_op {
     uint32_t cmd;       /* IN: XEN_SYSCTL_TMEM_OP_* . */

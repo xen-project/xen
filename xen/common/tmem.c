@@ -2719,7 +2719,7 @@ long do_tmem_op(tmem_cli_op_t uops)
             write_unlock(&tmem_rwlock);
             read_lock(&tmem_rwlock);
 
-            oidp = container_of(&op.u.gen.oid[0], struct xen_tmem_oid, oid[0]);
+            oidp = &op.u.gen.oid;
             switch ( op.cmd )
             {
             case TMEM_NEW_POOL:
