@@ -15,7 +15,7 @@
  */
 
 #ifdef __XEN__
-#include <xen/tmem_xen.h> /* host-specific (eg Xen) code goes here */
+#include <xen/tmem_xen.h> /* host-specific (eg Xen) code goes here. */
 #endif
 
 #include <public/sysctl.h>
@@ -27,7 +27,7 @@
 
 #define TMEM_SPEC_VERSION 1
 
-/* global statistics (none need to be locked) */
+/* Global statistics (none need to be locked). */
 static unsigned long total_tmem_ops = 0;
 static unsigned long errored_tmem_ops = 0;
 static unsigned long total_flush_pool = 0;
@@ -69,18 +69,18 @@ struct client {
     bool_t compress;
     bool_t frozen;
     bool_t shared_auth_required;
-    /* for save/restore/migration */
+    /* For save/restore/migration. */
     bool_t live_migrating;
     bool_t was_frozen;
     struct list_head persistent_invalidated_list;
     struct tmem_page_descriptor *cur_pgp;
-    /* statistics collection */
+    /* Statistics collection. */
     unsigned long compress_poor, compress_nomem;
     unsigned long compressed_pages;
     uint64_t compressed_sum_size;
     uint64_t total_cycles;
     unsigned long succ_pers_puts, succ_eph_gets, succ_pers_gets;
-    /* shared pool authentication */
+    /* Shared pool authentication. */
     uint64_t shared_auth_uuid[MAX_GLOBAL_SHARED_POOLS][2];
 };
 
@@ -90,7 +90,7 @@ struct share_list {
 };
 
 #define POOL_PAGESHIFT (PAGE_SHIFT - 12)
-#define OBJ_HASH_BUCKETS 256 /* must be power of two */
+#define OBJ_HASH_BUCKETS 256 /* Must be power of two. */
 #define OBJ_HASH_BUCKETS_MASK (OBJ_HASH_BUCKETS-1)
 
 struct tmem_pool {
@@ -98,19 +98,19 @@ struct tmem_pool {
     bool_t persistent;
     bool_t is_dying;
     struct client *client;
-    uint64_t uuid[2]; /* 0 for private, non-zero for shared */
+    uint64_t uuid[2]; /* 0 for private, non-zero for shared. */
     uint32_t pool_id;
     rwlock_t pool_rwlock;
-    struct rb_root obj_rb_root[OBJ_HASH_BUCKETS]; /* protected by pool_rwlock */
-    struct list_head share_list; /* valid if shared */
-    int shared_count; /* valid if shared */
-    /* for save/restore/migration */
+    struct rb_root obj_rb_root[OBJ_HASH_BUCKETS]; /* Protected by pool_rwlock. */
+    struct list_head share_list; /* Valid if shared. */
+    int shared_count; /* Valid if shared. */
+    /* For save/restore/migration. */
     struct list_head persistent_page_list;
     struct tmem_page_descriptor *cur_pgp;
-    /* statistics collection */
+    /* Statistics collection. */
     atomic_t pgp_count;
     int pgp_count_max;
-    long obj_count;  /* atomicity depends on pool_rwlock held for write */
+    long obj_count;  /* Atomicity depends on pool_rwlock held for write. */
     long obj_count_max;
     unsigned long objnode_count, objnode_count_max;
     uint64_t sum_life_cycles;
@@ -127,10 +127,10 @@ struct tmem_pool {
 
 struct tmem_object_root {
     struct xen_tmem_oid oid;
-    struct rb_node rb_tree_node; /* protected by pool->pool_rwlock */
-    unsigned long objnode_count; /* atomicity depends on obj_spinlock */
-    long pgp_count; /* atomicity depends on obj_spinlock */
-    struct radix_tree_root tree_root; /* tree of pages within object */
+    struct rb_node rb_tree_node; /* Protected by pool->pool_rwlock. */
+    unsigned long objnode_count; /* Atomicity depends on obj_spinlock. */
+    long pgp_count; /* Atomicity depends on obj_spinlock. */
+    struct radix_tree_root tree_root; /* Tree of pages within object. */
     struct tmem_pool *pool;
     domid_t last_client;
     spinlock_t obj_spinlock;
@@ -154,23 +154,23 @@ struct tmem_page_descriptor {
             };
             struct tmem_object_root *obj;
         } us;
-        struct xen_tmem_oid inv_oid;  /* used for invalid list only */
+        struct xen_tmem_oid inv_oid;  /* Used for invalid list only. */
     };
     pagesize_t size; /* 0 == PAGE_SIZE (pfp), -1 == data invalid,
-                    else compressed data (cdata) */
+                    else compressed data (cdata). */
     uint32_t index;
-    /* must hold pcd_tree_rwlocks[firstbyte] to use pcd pointer/siblings */
-    uint16_t firstbyte; /* NON_SHAREABLE->pfp  otherwise->pcd */
-    bool_t eviction_attempted;  /* CHANGE TO lifetimes? (settable) */
+    /* Must hold pcd_tree_rwlocks[firstbyte] to use pcd pointer/siblings. */
+    uint16_t firstbyte; /* NON_SHAREABLE->pfp  otherwise->pcd. */
+    bool_t eviction_attempted;  /* CHANGE TO lifetimes? (settable). */
     struct list_head pcd_siblings;
     union {
-        struct page_info *pfp;  /* page frame pointer */
-        char *cdata; /* compressed data */
-        struct tmem_page_content_descriptor *pcd; /* page dedup */
+        struct page_info *pfp;  /* Page frame pointer. */
+        char *cdata; /* Compressed data. */
+        struct tmem_page_content_descriptor *pcd; /* Page dedup. */
     };
     union {
         uint64_t timestamp;
-        uint32_t pool_id;  /* used for invalid list only */
+        uint32_t pool_id;  /* Used for invalid list only. */
     };
 };
 
@@ -178,21 +178,21 @@ struct tmem_page_descriptor {
 
 struct tmem_page_content_descriptor {
     union {
-        struct page_info *pfp;  /* page frame pointer */
-        char *cdata; /* if compression_enabled */
-        char *tze; /* if !compression_enabled, trailing zeroes eliminated */
+        struct page_info *pfp;  /* Page frame pointer. */
+        char *cdata; /* If compression_enabled. */
+        char *tze; /* If !compression_enabled, trailing zeroes eliminated. */
     };
     struct list_head pgp_list;
     struct rb_node pcd_rb_tree_node;
     uint32_t pgp_ref_count;
-    pagesize_t size; /* if compression_enabled -> 0<size<PAGE_SIZE (*cdata)
+    pagesize_t size; /* If compression_enabled -> 0<size<PAGE_SIZE (*cdata)
                      * else if tze, 0<=size<PAGE_SIZE, rounded up to mult of 8
-                     * else PAGE_SIZE -> *pfp */
+                     * else PAGE_SIZE -> *pfp. */
 };
-struct rb_root pcd_tree_roots[256]; /* choose based on first byte of page */
-rwlock_t pcd_tree_rwlocks[256]; /* poor man's concurrency for now */
+struct rb_root pcd_tree_roots[256]; /* Choose based on first byte of page. */
+rwlock_t pcd_tree_rwlocks[256]; /* Poor man's concurrency for now. */
 
-static LIST_HEAD(global_ephemeral_page_list); /* all pages in ephemeral pools */
+static LIST_HEAD(global_ephemeral_page_list); /* All pages in ephemeral pools. */
 
 static LIST_HEAD(global_client_list);
 
@@ -209,14 +209,14 @@ PAGE_LIST_HEAD(tmem_page_list);
 unsigned long tmem_page_list_pages = 0;
 
 DEFINE_RWLOCK(tmem_rwlock);
-static DEFINE_SPINLOCK(eph_lists_spinlock); /* protects global AND clients */
+static DEFINE_SPINLOCK(eph_lists_spinlock); /* Protects global AND clients. */
 static DEFINE_SPINLOCK(pers_lists_spinlock);
 
 #define ASSERT_SPINLOCK(_l) ASSERT(spin_is_locked(_l))
 #define ASSERT_WRITELOCK(_l) ASSERT(rw_is_write_locked(_l))
 
-/* global counters (should use long_atomic_t access) */
-static long global_eph_count = 0; /* atomicity depends on eph_lists_spinlock */
+/* Global counters (should use long_atomic_t access). */
+static long global_eph_count = 0; /* Atomicity depends on eph_lists_spinlock. */
 static atomic_t global_obj_count = ATOMIC_INIT(0);
 static atomic_t global_pgp_count = ATOMIC_INIT(0);
 static atomic_t global_pcd_count = ATOMIC_INIT(0);
@@ -341,7 +341,7 @@ static int __init tmem_mempool_init(void)
     return tmem_mempool != NULL;
 }
 
-/* persistent pools are per-domain */
+/* Persistent pools are per-domain. */
 static void *tmem_persistent_pool_page_get(unsigned long size)
 {
     struct page_info *pi;
@@ -365,7 +365,7 @@ static void tmem_persistent_pool_page_put(void *page_va)
 }
 
 /*
- * Page content descriptor manipulation routines
+ * Page content descriptor manipulation routines.
  */
 #define NOT_SHAREABLE ((uint16_t)-1UL)
 
@@ -390,8 +390,10 @@ static int pcd_copy_to_client(xen_pfn_t cmfn, struct tmem_page_descriptor *pgp)
     return ret;
 }
 
-/* ensure pgp no longer points to pcd, nor vice-versa */
-/* take pcd rwlock unless have_pcd_rwlock is set, always unlock when done */
+/*
+ * Ensure pgp no longer points to pcd, nor vice-versa.
+ * Take pcd rwlock unless have_pcd_rwlock is set, always unlock when done.
+ */
 static void pcd_disassociate(struct tmem_page_descriptor *pgp, struct tmem_pool *pool, bool_t have_pcd_rwlock)
 {
     struct tmem_page_content_descriptor *pcd = pgp->pcd;
@@ -421,30 +423,30 @@ static void pcd_disassociate(struct tmem_page_descriptor *pgp, struct tmem_pool 
         return;
     }
 
-    /* no more references to this pcd, recycle it and the physical page */
+    /* No more references to this pcd, recycle it and the physical page. */
     ASSERT(list_empty(&pcd->pgp_list));
     pcd->pfp = NULL;
-    /* remove pcd from rbtree */
+    /* Remove pcd from rbtree. */
     rb_erase(&pcd->pcd_rb_tree_node,&pcd_tree_roots[firstbyte]);
-    /* reinit the struct for safety for now */
+    /* Reinit the struct for safety for now. */
     RB_CLEAR_NODE(&pcd->pcd_rb_tree_node);
-    /* now free up the pcd memory */
+    /* Now free up the pcd memory. */
     tmem_free(pcd, NULL);
     atomic_dec_and_assert(global_pcd_count);
     if ( pgp_size != 0 && pcd_size < PAGE_SIZE )
     {
-        /* compressed data */
+        /* Compressed data. */
         tmem_free(pcd_cdata, pool);
         pcd_tot_csize -= pcd_csize;
     }
     else if ( pcd_size != PAGE_SIZE )
     {
-        /* trailing zero data */
+        /* Trailing zero data. */
         pcd_tot_tze_size -= pcd_size;
         if ( pcd_size )
             tmem_free(pcd_tze, pool);
     } else {
-        /* real physical page */
+        /* Real physical page. */
         if ( tmem_tze_enabled() )
             pcd_tot_tze_size -= PAGE_SIZE;
         if ( tmem_compression_enabled() )
@@ -485,48 +487,50 @@ static int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata, pagesize
     }
     write_lock(&pcd_tree_rwlocks[firstbyte]);
 
-    /* look for page match */
+    /* Look for page match. */
     root = &pcd_tree_roots[firstbyte];
     new = &(root->rb_node);
     while ( *new )
     {
         pcd = container_of(*new, struct tmem_page_content_descriptor, pcd_rb_tree_node);
         parent = *new;
-        /* compare new entry and rbtree entry, set cmp accordingly */
+        /* Compare new entry and rbtree entry, set cmp accordingly. */
         if ( cdata != NULL )
         {
             if ( pcd->size < PAGE_SIZE )
-                /* both new entry and rbtree entry are compressed */
+                /* Both new entry and rbtree entry are compressed. */
                 cmp = tmem_pcd_cmp(cdata,csize,pcd->cdata,pcd->size);
             else
-                /* new entry is compressed, rbtree entry is not */
+                /* New entry is compressed, rbtree entry is not. */
                 cmp = -1;
         } else if ( pcd->size < PAGE_SIZE )
-            /* rbtree entry is compressed, rbtree entry is not */
+            /* Rbtree entry is compressed, rbtree entry is not. */
             cmp = 1;
         else if ( tmem_tze_enabled() ) {
             if ( pcd->size < PAGE_SIZE )
-                /* both new entry and rbtree entry are trailing zero */
+                /* Both new entry and rbtree entry are trailing zero. */
                 cmp = tmem_tze_pfp_cmp(pgp->pfp,pfp_size,pcd->tze,pcd->size);
             else
-                /* new entry is trailing zero, rbtree entry is not */
+                /* New entry is trailing zero, rbtree entry is not. */
                 cmp = tmem_tze_pfp_cmp(pgp->pfp,pfp_size,pcd->pfp,PAGE_SIZE);
         } else  {
-            /* both new entry and rbtree entry are full physical pages */
+            /* Both new entry and rbtree entry are full physical pages. */
             ASSERT(pgp->pfp != NULL);
             ASSERT(pcd->pfp != NULL);
             cmp = tmem_page_cmp(pgp->pfp,pcd->pfp);
         }
 
-        /* walk tree or match depending on cmp */
+        /* Walk tree or match depending on cmp. */
         if ( cmp < 0 )
             new = &((*new)->rb_left);
         else if ( cmp > 0 )
             new = &((*new)->rb_right);
         else
         {
-            /* match! if not compressed, free the no-longer-needed page */
-            /* but if compressed, data is assumed static so don't free! */
+            /*
+             * Match! if not compressed, free the no-longer-needed page
+             * but if compressed, data is assumed static so don't free!
+             */
             if ( cdata == NULL )
                 tmem_free_page(pgp->us.obj->pool,pgp->pfp);
             deduped_puts++;
@@ -534,7 +538,7 @@ static int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata, pagesize
         }
     }
 
-    /* exited while loop with no match, so alloc a pcd and put it in the tree */
+    /* Exited while loop with no match, so alloc a pcd and put it in the tree. */
     if ( (pcd = tmem_malloc(sizeof(struct tmem_page_content_descriptor), NULL)) == NULL )
     {
         ret = -ENOMEM;
@@ -548,8 +552,8 @@ static int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata, pagesize
         }
     }
     atomic_inc_and_max(global_pcd_count);
-    RB_CLEAR_NODE(&pcd->pcd_rb_tree_node);  /* is this necessary */
-    INIT_LIST_HEAD(&pcd->pgp_list);  /* is this necessary */
+    RB_CLEAR_NODE(&pcd->pcd_rb_tree_node);  /* Is this necessary? */
+    INIT_LIST_HEAD(&pcd->pgp_list);  /* Is this necessary? */
     pcd->pgp_ref_count = 0;
     if ( cdata != NULL )
     {
@@ -591,7 +595,7 @@ unlock:
 
 /************ PAGE DESCRIPTOR MANIPULATION ROUTINES *******************/
 
-/* allocate a struct tmem_page_descriptor and associate it with an object */
+/* Allocate a struct tmem_page_descriptor and associate it with an object. */
 static struct tmem_page_descriptor *pgp_alloc(struct tmem_object_root *obj)
 {
     struct tmem_page_descriptor *pgp;
@@ -635,7 +639,7 @@ static void pgp_free_data(struct tmem_page_descriptor *pgp, struct tmem_pool *po
     if ( pgp->pfp == NULL )
         return;
     if ( tmem_dedup_enabled() && pgp->firstbyte != NOT_SHAREABLE )
-        pcd_disassociate(pgp,pool,0); /* pgp->size lost */
+        pcd_disassociate(pgp,pool,0); /* pgp->size lost. */
     else if ( pgp_size )
         tmem_free(pgp->cdata, pool);
     else
@@ -683,7 +687,7 @@ static void pgp_free(struct tmem_page_descriptor *pgp)
     __pgp_free(pgp, pool);
 }
 
-/* remove pgp from global/pool/client lists and free it */
+/* Remove pgp from global/pool/client lists and free it. */
 static void pgp_delist_free(struct tmem_page_descriptor *pgp)
 {
     struct client *client;
@@ -695,7 +699,7 @@ static void pgp_delist_free(struct tmem_page_descriptor *pgp)
     client = pgp->us.obj->pool->client;
     ASSERT(client != NULL);
 
-    /* Delist pgp */
+    /* Delist pgp. */
     if ( !is_persistent(pgp->us.obj->pool) )
     {
         spin_lock(&eph_lists_spinlock);
@@ -730,11 +734,11 @@ static void pgp_delist_free(struct tmem_page_descriptor *pgp)
     life = get_cycles() - pgp->timestamp;
     pgp->us.obj->pool->sum_life_cycles += life;
 
-    /* free pgp */
+    /* Free pgp. */
     pgp_free(pgp);
 }
 
-/* called only indirectly by radix_tree_destroy */
+/* Called only indirectly by radix_tree_destroy. */
 static void pgp_destroy(void *v)
 {
     struct tmem_page_descriptor *pgp = (struct tmem_page_descriptor *)v;
@@ -771,7 +775,7 @@ static struct tmem_page_descriptor *pgp_delete_from_obj(struct tmem_object_root 
 
 /************ RADIX TREE NODE MANIPULATION ROUTINES *******************/
 
-/* called only indirectly from radix_tree_insert */
+/* Called only indirectly from radix_tree_insert. */
 static struct radix_tree_node *rtn_alloc(void *arg)
 {
     struct tmem_object_node *objnode;
@@ -790,7 +794,7 @@ static struct radix_tree_node *rtn_alloc(void *arg)
     return &objnode->rtn;
 }
 
-/* called only indirectly from radix_tree_delete/destroy */
+/* Called only indirectly from radix_tree_delete/destroy. */
 static void rtn_free(struct radix_tree_node *rtn, void *arg)
 {
     struct tmem_pool *pool;
@@ -847,7 +851,7 @@ static unsigned oid_hash(struct xen_tmem_oid *oidp)
                      BITS_PER_LONG) & OBJ_HASH_BUCKETS_MASK);
 }
 
-/* searches for object==oid in pool, returns locked object if found */
+/* Searches for object==oid in pool, returns locked object if found. */
 static struct tmem_object_root * obj_find(struct tmem_pool *pool,
                                           struct xen_tmem_oid *oidp)
 {
@@ -862,7 +866,7 @@ restart_find:
         obj = container_of(node, struct tmem_object_root, rb_tree_node);
         switch ( oid_compare(&obj->oid, oidp) )
         {
-            case 0: /* equal */
+            case 0: /* Equal. */
                 if ( !spin_trylock(&obj->obj_spinlock) )
                 {
                     read_unlock(&pool->pool_rwlock);
@@ -881,7 +885,7 @@ restart_find:
     return NULL;
 }
 
-/* free an object that has no more pgps in it */
+/* Free an object that has no more pgps in it. */
 static void obj_free(struct tmem_object_root *obj)
 {
     struct tmem_pool *pool;
@@ -894,7 +898,7 @@ static void obj_free(struct tmem_object_root *obj)
     ASSERT(pool != NULL);
     ASSERT(pool->client != NULL);
     ASSERT_WRITELOCK(&pool->pool_rwlock);
-    if ( obj->tree_root.rnode != NULL ) /* may be a "stump" with no leaves */
+    if ( obj->tree_root.rnode != NULL ) /* May be a "stump" with no leaves. */
         radix_tree_destroy(&obj->tree_root, pgp_destroy);
     ASSERT((long)obj->objnode_count == 0);
     ASSERT(obj->tree_root.rnode == NULL);
@@ -941,8 +945,8 @@ static int obj_rb_insert(struct rb_root *root, struct tmem_object_root *obj)
 }
 
 /*
- * allocate, initialize, and insert an tmem_object_root
- * (should be called only if find failed)
+ * Allocate, initialize, and insert an tmem_object_root
+ * (should be called only if find failed).
  */
 static struct tmem_object_root * obj_alloc(struct tmem_pool *pool,
                                            struct xen_tmem_oid *oidp)
@@ -967,7 +971,7 @@ static struct tmem_object_root * obj_alloc(struct tmem_pool *pool,
     return obj;
 }
 
-/* free an object after destroying any pgps in it */
+/* Free an object after destroying any pgps in it. */
 static void obj_destroy(struct tmem_object_root *obj)
 {
     ASSERT_WRITELOCK(&obj->pool->pool_rwlock);
@@ -975,7 +979,7 @@ static void obj_destroy(struct tmem_object_root *obj)
     obj_free(obj);
 }
 
-/* destroys all objs in a pool, or only if obj->last_client matches cli_id */
+/* Destroys all objs in a pool, or only if obj->last_client matches cli_id. */
 static void pool_destroy_objs(struct tmem_pool *pool, domid_t cli_id)
 {
     struct rb_node *node;
@@ -1047,7 +1051,7 @@ static int shared_pool_join(struct tmem_pool *pool, struct client *new_client)
     return 0;
 }
 
-/* reassign "ownership" of the pool to another client that shares this pool */
+/* Reassign "ownership" of the pool to another client that shares this pool. */
 static void shared_pool_reassign(struct tmem_pool *pool)
 {
     struct share_list *sl;
@@ -1080,8 +1084,10 @@ static void shared_pool_reassign(struct tmem_pool *pool)
     pool->pool_id = poolid;
 }
 
-/* destroy all objects with last_client same as passed cli_id,
-   remove pool's cli_id from list of sharers of this pool */
+/*
+ * Destroy all objects with last_client same as passed cli_id,
+ * remove pool's cli_id from list of sharers of this pool.
+ */
 static int shared_pool_quit(struct tmem_pool *pool, domid_t cli_id)
 {
     struct share_list *sl;
@@ -1116,7 +1122,7 @@ static int shared_pool_quit(struct tmem_pool *pool, domid_t cli_id)
     return -1;
 }
 
-/* flush all data (owned by cli_id) from a pool and, optionally, free it */
+/* Flush all data (owned by cli_id) from a pool and, optionally, free it. */
 static void pool_flush(struct tmem_pool *pool, domid_t cli_id)
 {
     ASSERT(pool != NULL);
@@ -1205,7 +1211,7 @@ static void client_free(struct client *client)
     xfree(client);
 }
 
-/* flush all data from a client and, optionally, free it */
+/* Flush all data from a client and, optionally, free it. */
 static void client_flush(struct client *client)
 {
     int i;
@@ -1307,12 +1313,12 @@ static int tmem_evict(void)
                 goto found;
             }
     }
-     /* global_ephemeral_page_list is empty, so we bail out. */
+     /* Global_ephemeral_page_list is empty, so we bail out. */
     spin_unlock(&eph_lists_spinlock);
     goto out;
 
 found:
-    /* Delist */
+    /* Delist. */
     list_del_init(&pgp->us.client_eph_pages);
     client->eph_count--;
     list_del_init(&pgp->global_eph_pages);
@@ -1336,7 +1342,7 @@ found:
         pcd_disassociate(pgp,pool,1);
     }
 
-    /* pgp already delist, so call pgp_free directly */
+    /* pgp already delist, so call pgp_free directly. */
     pgp_free(pgp);
     if ( obj->pgp_count == 0 )
     {
@@ -1464,8 +1470,8 @@ static int do_tmem_dup_put(struct tmem_page_descriptor *pgp, xen_pfn_t cmfn,
     ASSERT(pool != NULL);
     client = pool->client;
     if ( client->live_migrating )
-        goto failed_dup; /* no dups allowed when migrating */
-    /* can we successfully manipulate pgp to change out the data? */
+        goto failed_dup; /* No dups allowed when migrating. */
+    /* Can we successfully manipulate pgp to change out the data? */
     if ( client->compress && pgp->size != 0 )
     {
         ret = do_tmem_put_compress(pgp, cmfn, clibuf);
@@ -1495,7 +1501,7 @@ copy_uncompressed:
     }
 
 done:
-    /* successfully replaced data, clean up and return success */
+    /* Successfully replaced data, clean up and return success. */
     if ( is_shared(pool) )
         obj->last_client = client->cli_id;
     spin_unlock(&obj->obj_spinlock);
@@ -1510,8 +1516,10 @@ bad_copy:
     goto cleanup;
 
 failed_dup:
-   /* couldn't change out the data, flush the old data and return
-    * -ENOSPC instead of -ENOMEM to differentiate failed _dup_ put */
+    /*
+     * Couldn't change out the data, flush the old data and return
+     * -ENOSPC instead of -ENOMEM to differentiate failed _dup_ put.
+     */
     ret = -ENOSPC;
 cleanup:
     pgpfound = pgp_delete_from_obj(obj, pgp->index);
@@ -1545,7 +1553,7 @@ static int do_tmem_put(struct tmem_pool *pool,
     pool->puts++;
 
 refind:
-    /* does page already exist (dup)?  if so, handle specially */
+    /* Does page already exist (dup)?  if so, handle specially. */
     if ( (obj = obj_find(pool, oidp)) != NULL )
     {
         if ((pgp = pgp_lookup_in_obj(obj, index)) != NULL)
@@ -1554,14 +1562,14 @@ refind:
         }
         else
         {
-            /* no puts allowed into a frozen pool (except dup puts) */
+            /* No puts allowed into a frozen pool (except dup puts). */
             if ( client->frozen )
                 goto unlock_obj;
         }
     }
     else
     {
-        /* no puts allowed into a frozen pool (except dup puts) */
+        /* No puts allowed into a frozen pool (except dup puts). */
         if ( client->frozen )
             return ret;
         if ( (obj = obj_alloc(pool, oidp)) == NULL )
@@ -1584,14 +1592,14 @@ refind:
         write_unlock(&pool->pool_rwlock);
     }
 
-    /* When arrive here, we have a spinlocked obj for use */
+    /* When arrive here, we have a spinlocked obj for use. */
     ASSERT_SPINLOCK(&obj->obj_spinlock);
     if ( (pgp = pgp_alloc(obj)) == NULL )
         goto unlock_obj;
 
     ret = pgp_add_to_obj(obj, index, pgp);
     if ( ret == -ENOMEM  )
-        /* warning, may result in partially built radix tree ("stump") */
+        /* Warning: may result in partially built radix tree ("stump"). */
         goto free_pgp;
 
     pgp->index = index;
@@ -1651,7 +1659,7 @@ insert_page:
         spin_unlock(&eph_lists_spinlock);
     }
     else
-    { /* is_persistent */
+    { /* is_persistent. */
         spin_lock(&pers_lists_spinlock);
         list_add_tail(&pgp->us.pool_pers_pages,
             &pool->persistent_page_list);
@@ -1661,7 +1669,7 @@ insert_page:
     if ( is_shared(pool) )
         obj->last_client = client->cli_id;
 
-    /* free the obj spinlock */
+    /* Free the obj spinlock. */
     spin_unlock(&obj->obj_spinlock);
     pool->good_puts++;
 
@@ -1954,7 +1962,7 @@ static int do_tmem_new_pool(domid_t this_cli_id,
 
         /*
          * Authorize okay, match a global shared pool or use the newly allocated
-         * one
+         * one.
          */
         first_unused_s_poolid = MAX_GLOBAL_SHARED_POOLS;
         for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++ )
@@ -1963,7 +1971,7 @@ static int do_tmem_new_pool(domid_t this_cli_id,
             {
                 if ( shpool->uuid[0] == uuid_lo && shpool->uuid[1] == uuid_hi )
                 {
-                    /* Succ to match a global shared pool */
+                    /* Succ to match a global shared pool. */
                     tmem_client_info("(matches shared pool uuid=%"PRIx64".%"PRIx64") pool_id=%d\n",
                         uuid_hi, uuid_lo, d_poolid);
                     client->pools[d_poolid] = shpool;
@@ -1983,13 +1991,13 @@ static int do_tmem_new_pool(domid_t this_cli_id,
             }
         }
 
-        /* Failed to find a global shard pool slot */
+        /* Failed to find a global shared pool slot. */
         if ( first_unused_s_poolid == MAX_GLOBAL_SHARED_POOLS )
         {
             tmem_client_warn("tmem: failed... no global shared pool slots available\n");
             goto fail;
         }
-        /* Add pool to global shard pool */
+        /* Add pool to global shared pool. */
         else
         {
             INIT_LIST_HEAD(&pool->share_list);
@@ -2011,7 +2019,7 @@ fail:
 
 /************ TMEM CONTROL OPERATIONS ************************************/
 
-/* freeze/thaw all pools belonging to client cli_id (all domains if -1) */
+/* Freeze/thaw all pools belonging to client cli_id (all domains if -1). */
 static int tmemc_freeze_pools(domid_t cli_id, int arg)
 {
     struct client *client;
@@ -2047,7 +2055,7 @@ static int tmemc_flush_mem(domid_t cli_id, uint32_t kb)
            tmem_client_str);
         return -1;
     }
-    /* convert kb to pages, rounding up if necessary */
+    /* Convert kb to pages, rounding up if necessary. */
     npages = (kb + ((1 << (PAGE_SHIFT-10))-1)) >> (PAGE_SHIFT-10);
     flushed_pages = tmem_flush_npages(npages);
     flushed_kb = flushed_pages << (PAGE_SHIFT-10);
@@ -2164,7 +2172,7 @@ static int tmemc_list_global_perf(tmem_cli_va_param_t buf, int off,
     int n = 0, sum = 0;
 
     n = scnprintf(info+n,BSIZE-n,"T=");
-    n--; /* overwrite trailing comma */
+    n--; /* Overwrite trailing comma. */
     n += scnprintf(info+n,BSIZE-n,"\n");
     if ( sum + n >= len )
         return sum;
@@ -2450,16 +2458,16 @@ static int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
         ret = -1;
         goto out;
     }
-    /* note: pool->cur_pgp is the pgp last returned by get_next_page */
+    /* Note: pool->cur_pgp is the pgp last returned by get_next_page. */
     if ( pool->cur_pgp == NULL )
     {
-        /* process the first one */
+        /* Process the first one. */
         pool->cur_pgp = pgp = list_entry((&pool->persistent_page_list)->next,
                          struct tmem_page_descriptor,us.pool_pers_pages);
     } else if ( list_is_last(&pool->cur_pgp->us.pool_pers_pages,
                              &pool->persistent_page_list) )
     {
-        /* already processed the last one in the list */
+        /* Already processed the last one in the list. */
         ret = -1;
         goto out;
     }
@@ -2665,7 +2673,7 @@ long do_tmem_op(tmem_cli_op_t uops)
         return -EFAULT;
     }
 
-    /* Acquire wirte lock for all command at first */
+    /* Acquire write lock for all commands at first. */
     write_lock(&tmem_rwlock);
 
     if ( op.cmd == TMEM_CONTROL )
@@ -2715,7 +2723,7 @@ long do_tmem_op(tmem_cli_op_t uops)
                 rc = -ENODEV;
                 goto out;
             }
-            /* Commands only need read lock */
+            /* Commands that only need read lock. */
             write_unlock(&tmem_rwlock);
             read_lock(&tmem_rwlock);
 
@@ -2767,7 +2775,7 @@ out:
     return rc;
 }
 
-/* this should be called when the host is destroying a client */
+/* This should be called when the host is destroying a client (domain). */
 void tmem_destroy(void *v)
 {
     struct client *client = (struct client *)v;
@@ -2790,7 +2798,7 @@ void tmem_destroy(void *v)
     write_unlock(&tmem_rwlock);
 }
 
-#define MAX_EVICTS 10  /* should be variable or set via XEN_SYSCTL_TMEM_OP_ ?? */
+#define MAX_EVICTS 10  /* Should be variable or set via XEN_SYSCTL_TMEM_OP_ ?? */
 void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
 {
     struct page_info *pfp;
@@ -2832,7 +2840,7 @@ unsigned long tmem_freeable_pages(void)
     return tmem_page_list_pages + _atomic_read(freeable_page_count);
 }
 
-/* called at hypervisor startup */
+/* Called at hypervisor startup. */
 static int __init init_tmem(void)
 {
     int i;
