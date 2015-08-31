@@ -39,6 +39,7 @@ static unsigned node_to_pxm(nodeid_t n);
 static int num_node_memblks;
 static struct node node_memblk_range[NR_NODE_MEMBLKS];
 static nodeid_t memblk_nodeid[NR_NODE_MEMBLKS];
+static __initdata DECLARE_BITMAP(memblk_hotplug, NR_NODE_MEMBLKS);
 
 static inline bool_t node_found(unsigned idx, unsigned pxm)
 {
@@ -126,9 +127,9 @@ static __init int conflicting_memblks(u64 start, u64 end)
 		if (nd->start == nd->end)
 			continue;
 		if (nd->end > start && nd->start < end)
-			return memblk_nodeid[i];
+			return i;
 		if (nd->end == end && nd->start == start)
-			return memblk_nodeid[i];
+			return i;
 	}
 	return -1;
 }
@@ -269,7 +270,6 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 void __init
 acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 {
-	struct node *nd;
 	u64 start, end;
 	unsigned pxm;
 	nodeid_t node;
@@ -304,30 +304,40 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 	}
 	/* It is fine to add this area to the nodes data it will be used later*/
 	i = conflicting_memblks(start, end);
-	if (i == node) {
-		printk(KERN_WARNING
-		"SRAT: Warning: PXM %d (%"PRIx64"-%"PRIx64") overlaps with itself (%"
-		PRIx64"-%"PRIx64")\n", pxm, start, end, nodes[i].start, nodes[i].end);
-	} else if (i >= 0) {
+	if (i < 0)
+		/* everything fine */;
+	else if (memblk_nodeid[i] == node) {
+		bool_t mismatch = !(ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) !=
+		                  !test_bit(i, memblk_hotplug);
+
+		printk("%sSRAT: PXM %u (%"PRIx64"-%"PRIx64") overlaps with itself (%"PRIx64"-%"PRIx64")\n",
+		       mismatch ? KERN_ERR : KERN_WARNING, pxm, start, end,
+		       node_memblk_range[i].start, node_memblk_range[i].end);
+		if (mismatch) {
+			bad_srat();
+			return;
+		}
+	} else {
 		printk(KERN_ERR
-		       "SRAT: PXM %d (%"PRIx64"-%"PRIx64") overlaps with PXM %d (%"
-		       PRIx64"-%"PRIx64")\n", pxm, start, end, node_to_pxm(i),
-			   nodes[i].start, nodes[i].end);
+		       "SRAT: PXM %u (%"PRIx64"-%"PRIx64") overlaps with PXM %u (%"PRIx64"-%"PRIx64")\n",
+		       pxm, start, end, node_to_pxm(memblk_nodeid[i]),
+		       node_memblk_range[i].start, node_memblk_range[i].end);
 		bad_srat();
 		return;
 	}
-	nd = &nodes[node];
-	if (!node_test_and_set(node, memory_nodes_parsed)) {
-		nd->start = start;
-		nd->end = end;
-	} else {
-		if (start < nd->start)
+	if (!(ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE)) {
+		struct node *nd = &nodes[node];
+
+		if (!node_test_and_set(node, memory_nodes_parsed)) {
 			nd->start = start;
-		if (nd->end < end)
 			nd->end = end;
+		} else {
+			if (start < nd->start)
+				nd->start = start;
+			if (nd->end < end)
+				nd->end = end;
+		}
 	}
-	if ((ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) && end > mem_hotplug)
-		mem_hotplug = end;
 	printk(KERN_INFO "SRAT: Node %u PXM %u %"PRIx64"-%"PRIx64"%s\n",
 	       node, pxm, start, end,
 	       ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE ? " (hotplug)" : "");
@@ -335,6 +345,11 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 	node_memblk_range[num_node_memblks].start = start;
 	node_memblk_range[num_node_memblks].end = end;
 	memblk_nodeid[num_node_memblks] = node;
+	if (ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) {
+		__set_bit(num_node_memblks, memblk_hotplug);
+		if (end > mem_hotplug)
+			mem_hotplug = end;
+	}
 	num_node_memblks++;
 }
 
