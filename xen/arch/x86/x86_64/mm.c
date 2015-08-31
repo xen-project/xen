@@ -1376,7 +1376,7 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
         ret = map_pages_to_xen((unsigned long)mfn_to_virt(spfn), spfn,
                                min(epfn, i) - spfn, PAGE_HYPERVISOR);
         if ( ret )
-            return ret;
+            goto destroy_directmap;
     }
     if ( i < epfn )
     {
@@ -1385,7 +1385,7 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
         ret = map_pages_to_xen((unsigned long)mfn_to_virt(i), i,
                                epfn - i, __PAGE_HYPERVISOR_RW);
         if ( ret )
-            return ret;
+            goto destroy_directmap;
     }
 
     old_node_start = NODE_DATA(node)->node_start_pfn;
@@ -1408,7 +1408,6 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
             NODE_DATA(node)->node_spanned_pages = epfn - node_start_pfn(node);
     }
 
-    ret = -EINVAL;
     info.spfn = spfn;
     info.epfn = epfn;
     info.cur = spfn;
@@ -1431,7 +1430,7 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     if ( ret )
         goto destroy_m2p;
 
-    if ( !need_iommu(hardware_domain) )
+    if ( iommu_enabled && !iommu_passthrough && !need_iommu(hardware_domain) )
     {
         for ( i = spfn; i < epfn; i++ )
             if ( iommu_map_page(hardware_domain, i, i, IOMMUF_readable|IOMMUF_writable) )
@@ -1445,9 +1444,8 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     }
 
     /* We can't revert any more */
-    transfer_pages_to_heap(&info);
-
     share_hotadd_m2p_table(&info);
+    transfer_pages_to_heap(&info);
 
     return 0;
 
@@ -1458,13 +1456,13 @@ destroy_m2p:
     max_pdx = pfn_to_pdx(max_page - 1) + 1;
 destroy_frametable:
     cleanup_frame_table(&info);
-    destroy_xen_mappings((unsigned long)mfn_to_virt(spfn),
-                         (unsigned long)mfn_to_virt(epfn));
-
     if ( !orig_online )
         node_set_offline(node);
     NODE_DATA(node)->node_start_pfn = old_node_start;
     NODE_DATA(node)->node_spanned_pages = old_node_span;
+ destroy_directmap:
+    destroy_xen_mappings((unsigned long)mfn_to_virt(spfn),
+                         (unsigned long)mfn_to_virt(epfn));
 
     return ret;
 }
