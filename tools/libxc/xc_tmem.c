@@ -64,9 +64,9 @@ int xc_tmem_control(xc_interface *xch,
     sysctl.u.tmem_op.arg1 = arg1;
     sysctl.u.tmem_op.arg2 = arg2;
     sysctl.u.tmem_op.pad = 0;
-    sysctl.u.tmem_op.oid[0] = 0;
-    sysctl.u.tmem_op.oid[1] = 0;
-    sysctl.u.tmem_op.oid[2] = 0;
+    sysctl.u.tmem_op.oid.oid[0] = 0;
+    sysctl.u.tmem_op.oid.oid[1] = 0;
+    sysctl.u.tmem_op.oid.oid[2] = 0;
 
     if ( cmd == XEN_SYSCTL_TMEM_OP_LIST && arg1 != 0 )
     {
@@ -98,7 +98,7 @@ int xc_tmem_control_oid(xc_interface *xch,
                         uint32_t cli_id,
                         uint32_t arg1,
                         uint32_t arg2,
-                        struct tmem_oid oid,
+                        struct xen_tmem_oid oid,
                         void *buf)
 {
     DECLARE_SYSCTL;
@@ -112,9 +112,7 @@ int xc_tmem_control_oid(xc_interface *xch,
     sysctl.u.tmem_op.arg1 = arg1;
     sysctl.u.tmem_op.arg2 = arg2;
     sysctl.u.tmem_op.pad = 0;
-    sysctl.u.tmem_op.oid[0] = oid.oid[0];
-    sysctl.u.tmem_op.oid[1] = oid.oid[1];
-    sysctl.u.tmem_op.oid[2] = oid.oid[2];
+    sysctl.u.tmem_op.oid = oid;
 
     if ( cmd == XEN_SYSCTL_TMEM_OP_LIST && arg1 != 0 )
     {
@@ -453,7 +451,7 @@ int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
         }
         for ( j = n_pages; j > 0; j-- )
         {
-            struct tmem_oid oid;
+            struct xen_tmem_oid oid;
             uint32_t index;
             int rc;
             if ( read_exact(io_fd, &oid, sizeof(oid)) )
@@ -487,7 +485,7 @@ int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
 int xc_tmem_restore_extra(xc_interface *xch, int dom, int io_fd)
 {
     uint32_t pool_id;
-    struct tmem_oid oid;
+    struct xen_tmem_oid oid;
     uint32_t index;
     int count = 0;
     int checksum = 0;

@@ -737,6 +737,12 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_psr_cat_op_t);
 #define XEN_SYSCTL_TMEM_OP_RESTORE_PUT_PAGE       32
 #define XEN_SYSCTL_TMEM_OP_RESTORE_FLUSH_PAGE     33
 
+struct xen_tmem_oid {
+    uint64_t oid[3];
+};
+typedef struct xen_tmem_oid xen_tmem_oid_t;
+DEFINE_XEN_GUEST_HANDLE(xen_tmem_oid_t);
+
 struct xen_sysctl_tmem_op {
     uint32_t cmd;       /* IN: XEN_SYSCTL_TMEM_OP_* . */
     int32_t pool_id;    /* IN: 0 by default unless _SAVE_*, RESTORE_* .*/
@@ -746,7 +752,7 @@ struct xen_sysctl_tmem_op {
     uint32_t arg1;      /* IN: If not applicable to command use 0. */
     uint32_t arg2;      /* IN: If not applicable to command use 0. */
     uint32_t pad;       /* Padding so structure is the same under 32 and 64. */
-    uint64_t oid[3];    /* IN: If not applicable to command use 0s. */
+    xen_tmem_oid_t oid; /* IN: If not applicable to command use 0s. */
     XEN_GUEST_HANDLE_64(char) buf; /* IN/OUT: Buffer to save and restore ops. */
 };
 typedef struct xen_sysctl_tmem_op xen_sysctl_tmem_op_t;

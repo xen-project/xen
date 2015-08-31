@@ -125,12 +125,8 @@ struct tmem_pool {
 #define is_persistent(_p)  (_p->persistent)
 #define is_shared(_p)      (_p->shared)
 
-struct oid {
-    uint64_t oid[3];
-};
-
 struct tmem_object_root {
-    struct oid oid;
+    struct xen_tmem_oid oid;
     struct rb_node rb_tree_node; /* protected by pool->pool_rwlock */
     unsigned long objnode_count; /* atomicity depends on obj_spinlock */
     long pgp_count; /* atomicity depends on obj_spinlock */
@@ -158,7 +154,7 @@ struct tmem_page_descriptor {
             };
             struct tmem_object_root *obj;
         } us;
-        struct oid inv_oid;  /* used for invalid list only */
+        struct xen_tmem_oid inv_oid;  /* used for invalid list only */
     };
     pagesize_t size; /* 0 == PAGE_SIZE (pfp), -1 == data invalid,
                     else compressed data (cdata) */
@@ -815,7 +811,8 @@ static void rtn_free(struct radix_tree_node *rtn, void *arg)
 
 /************ POOL OBJECT COLLECTION MANIPULATION ROUTINES *******************/
 
-static int oid_compare(struct oid *left, struct oid *right)
+static int oid_compare(struct xen_tmem_oid *left,
+                       struct xen_tmem_oid *right)
 {
     if ( left->oid[2] == right->oid[2] )
     {
@@ -839,19 +836,20 @@ static int oid_compare(struct oid *left, struct oid *right)
         return 1;
 }
 
-static void oid_set_invalid(struct oid *oidp)
+static void oid_set_invalid(struct xen_tmem_oid *oidp)
 {
     oidp->oid[0] = oidp->oid[1] = oidp->oid[2] = -1UL;
 }
 
-static unsigned oid_hash(struct oid *oidp)
+static unsigned oid_hash(struct xen_tmem_oid *oidp)
 {
     return (tmem_hash(oidp->oid[0] ^ oidp->oid[1] ^ oidp->oid[2],
                      BITS_PER_LONG) & OBJ_HASH_BUCKETS_MASK);
 }
 
 /* searches for object==oid in pool, returns locked object if found */
-static struct tmem_object_root * obj_find(struct tmem_pool *pool, struct oid *oidp)
+static struct tmem_object_root * obj_find(struct tmem_pool *pool,
+                                          struct xen_tmem_oid *oidp)
 {
     struct rb_node *node;
     struct tmem_object_root *obj;
@@ -887,7 +885,7 @@ restart_find:
 static void obj_free(struct tmem_object_root *obj)
 {
     struct tmem_pool *pool;
-    struct oid old_oid;
+    struct xen_tmem_oid old_oid;
 
     ASSERT_SPINLOCK(&obj->obj_spinlock);
     ASSERT(obj != NULL);
@@ -946,7 +944,8 @@ static int obj_rb_insert(struct rb_root *root, struct tmem_object_root *obj)
  * allocate, initialize, and insert an tmem_object_root
  * (should be called only if find failed)
  */
-static struct tmem_object_root * obj_alloc(struct tmem_pool *pool, struct oid *oidp)
+static struct tmem_object_root * obj_alloc(struct tmem_pool *pool,
+                                           struct xen_tmem_oid *oidp)
 {
     struct tmem_object_root *obj;
 
@@ -1531,8 +1530,8 @@ cleanup:
 }
 
 static int do_tmem_put(struct tmem_pool *pool,
-              struct oid *oidp, uint32_t index,
-              xen_pfn_t cmfn, tmem_cli_va_param_t clibuf)
+                       struct xen_tmem_oid *oidp, uint32_t index,
+                       xen_pfn_t cmfn, tmem_cli_va_param_t clibuf)
 {
     struct tmem_object_root *obj = NULL;
     struct tmem_page_descriptor *pgp = NULL;
@@ -1696,8 +1695,9 @@ unlock_obj:
     return ret;
 }
 
-static int do_tmem_get(struct tmem_pool *pool, struct oid *oidp, uint32_t index,
-              xen_pfn_t cmfn, tmem_cli_va_param_t clibuf)
+static int do_tmem_get(struct tmem_pool *pool,
+                       struct xen_tmem_oid *oidp, uint32_t index,
+                       xen_pfn_t cmfn, tmem_cli_va_param_t clibuf)
 {
     struct tmem_object_root *obj;
     struct tmem_page_descriptor *pgp;
@@ -1774,7 +1774,8 @@ bad_copy:
     return rc;
 }
 
-static int do_tmem_flush_page(struct tmem_pool *pool, struct oid *oidp, uint32_t index)
+static int do_tmem_flush_page(struct tmem_pool *pool,
+                              struct xen_tmem_oid *oidp, uint32_t index)
 {
     struct tmem_object_root *obj;
     struct tmem_page_descriptor *pgp;
@@ -1807,7 +1808,8 @@ out:
         return 1;
 }
 
-static int do_tmem_flush_object(struct tmem_pool *pool, struct oid *oidp)
+static int do_tmem_flush_object(struct tmem_pool *pool,
+                                struct xen_tmem_oid *oidp)
 {
     struct tmem_object_root *obj;
 
@@ -2432,7 +2434,7 @@ static int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
     struct tmem_pool *pool = (client == NULL || pool_id >= MAX_POOLS_PER_DOMAIN)
                    ? NULL : client->pools[pool_id];
     struct tmem_page_descriptor *pgp;
-    struct oid oid;
+    struct xen_tmem_oid oid;
     int ret = 0;
     struct tmem_handle h;
 
@@ -2525,8 +2527,10 @@ out:
     return ret;
 }
 
-static int tmemc_restore_put_page(int cli_id, uint32_t pool_id, struct oid *oidp,
-                      uint32_t index, tmem_cli_va_param_t buf, uint32_t bufsize)
+static int tmemc_restore_put_page(int cli_id, uint32_t pool_id,
+                                  struct xen_tmem_oid *oidp,
+                                  uint32_t index, tmem_cli_va_param_t buf,
+                                  uint32_t bufsize)
 {
     struct client *client = tmem_client_from_cli_id(cli_id);
     struct tmem_pool *pool = (client == NULL || pool_id >= MAX_POOLS_PER_DOMAIN)
@@ -2542,8 +2546,9 @@ static int tmemc_restore_put_page(int cli_id, uint32_t pool_id, struct oid *oidp
     return do_tmem_put(pool, oidp, index, 0, buf);
 }
 
-static int tmemc_restore_flush_page(int cli_id, uint32_t pool_id, struct oid *oidp,
-                        uint32_t index)
+static int tmemc_restore_flush_page(int cli_id, uint32_t pool_id,
+                                    struct xen_tmem_oid *oidp,
+                                    uint32_t index)
 {
     struct client *client = tmem_client_from_cli_id(cli_id);
     struct tmem_pool *pool = (client == NULL || pool_id >= MAX_POOLS_PER_DOMAIN)
@@ -2559,7 +2564,7 @@ int tmem_control(struct xen_sysctl_tmem_op *op)
     int ret;
     uint32_t pool_id = op->pool_id;
     uint32_t cmd = op->cmd;
-    struct oid *oidp = (struct oid *)(&op->oid[0]);
+    struct xen_tmem_oid *oidp = &op->oid;
 
     if ( op->pad != 0 )
         return -EINVAL;
@@ -2633,7 +2638,7 @@ long do_tmem_op(tmem_cli_op_t uops)
     struct tmem_op op;
     struct client *client = current->domain->tmem_client;
     struct tmem_pool *pool = NULL;
-    struct oid *oidp;
+    struct xen_tmem_oid *oidp;
     int rc = 0;
     bool_t succ_get = 0, succ_put = 0;
     bool_t non_succ_get = 0, non_succ_put = 0;
@@ -2714,7 +2719,7 @@ long do_tmem_op(tmem_cli_op_t uops)
             write_unlock(&tmem_rwlock);
             read_lock(&tmem_rwlock);
 
-            oidp = (struct oid *)&op.u.gen.oid[0];
+            oidp = container_of(&op.u.gen.oid[0], struct xen_tmem_oid, oid[0]);
             switch ( op.cmd )
             {
             case TMEM_NEW_POOL:
