@@ -304,7 +304,7 @@ int xc_tmem_save(xc_interface *xch,
                 } else {
                     /* page list terminator */
                     h = (struct tmem_handle *)buf;
-                    h->oid[0] = h->oid[1] = h->oid[2] = -1L;
+                    h->oid.oid[0] = h->oid.oid[1] = h->oid.oid[2] = -1L;
                     if ( write_exact(io_fd, &h->oid, sizeof(h->oid)) )
                         return -1;
                     break;
@@ -341,8 +341,8 @@ int xc_tmem_save_extra(xc_interface *xch, int dom, int io_fd, int field_marker)
         if ( write_exact(io_fd, &handle.index, sizeof(handle.index)) )
             return -1;
         count++;
-        checksum += handle.pool_id + handle.oid[0] + handle.oid[1] +
-                    handle.oid[2] + handle.index;
+        checksum += handle.pool_id + handle.oid.oid[0] + handle.oid.oid[1] +
+                    handle.oid.oid[2] + handle.index;
     }
     if ( count )
             DPRINTF("needed %d tmem invalidates, check=%d\n",count,checksum);

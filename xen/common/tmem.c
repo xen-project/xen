@@ -2434,7 +2434,7 @@ static int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
     struct tmem_pool *pool = (client == NULL || pool_id >= MAX_POOLS_PER_DOMAIN)
                    ? NULL : client->pools[pool_id];
     struct tmem_page_descriptor *pgp;
-    struct xen_tmem_oid oid;
+    struct xen_tmem_oid *oid;
     int ret = 0;
     struct tmem_handle h;
 
@@ -2466,10 +2466,10 @@ static int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
     pgp = list_entry((&pool->cur_pgp->us.pool_pers_pages)->next,
                          struct tmem_page_descriptor,us.pool_pers_pages);
     pool->cur_pgp = pgp;
-    oid = pgp->us.obj->oid;
+    oid = &pgp->us.obj->oid;
     h.pool_id = pool_id;
-    BUILD_BUG_ON(sizeof(h.oid) != sizeof(oid));
-    memcpy(h.oid, oid.oid, sizeof(h.oid));
+    BUILD_BUG_ON(sizeof(h.oid) != sizeof(*oid));
+    memcpy(&(h.oid), oid, sizeof(h.oid));
     h.index = pgp->index;
     if ( copy_to_guest(guest_handle_cast(buf, void), &h, 1) )
     {
@@ -2477,7 +2477,7 @@ static int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
         goto out;
     }
     guest_handle_add_offset(buf, sizeof(h));
-    ret = do_tmem_get(pool, &oid, pgp->index, 0, buf);
+    ret = do_tmem_get(pool, oid, pgp->index, 0, buf);
 
 out:
     spin_unlock(&pers_lists_spinlock);
@@ -2517,7 +2517,7 @@ static int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_param_t buf,
     }
     h.pool_id = pgp->pool_id;
     BUILD_BUG_ON(sizeof(h.oid) != sizeof(pgp->inv_oid));
-    memcpy(h.oid, pgp->inv_oid.oid, sizeof(h.oid));
+    memcpy(&(h.oid), &(pgp->inv_oid), sizeof(h.oid));
     h.index = pgp->index;
     ret = 1;
     if ( copy_to_guest(guest_handle_cast(buf, void), &h, 1) )

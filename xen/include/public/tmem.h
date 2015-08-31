@@ -109,12 +109,6 @@ struct tmem_op {
 };
 typedef struct tmem_op tmem_op_t;
 DEFINE_XEN_GUEST_HANDLE(tmem_op_t);
-
-struct tmem_handle {
-    uint32_t pool_id;
-    uint32_t index;
-    uint64_t oid[3];
-};
 #endif
 
 #endif /* __XEN_PUBLIC_TMEM_H__ */

@@ -738,6 +738,17 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_psr_cat_op_t);
 #define XEN_SYSCTL_TMEM_OP_RESTORE_PUT_PAGE       32
 #define XEN_SYSCTL_TMEM_OP_RESTORE_FLUSH_PAGE     33
 
+/*
+ * XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_[PAGE|INV] override the 'buf' in
+ * xen_sysctl_tmem_op with this structure - sometimes with an extra
+ * page tackled on.
+ */
+struct tmem_handle {
+    uint32_t pool_id;
+    uint32_t index;
+    xen_tmem_oid_t oid;
+};
+
 struct xen_sysctl_tmem_op {
     uint32_t cmd;       /* IN: XEN_SYSCTL_TMEM_OP_* . */
     int32_t pool_id;    /* IN: 0 by default unless _SAVE_*, RESTORE_* .*/
