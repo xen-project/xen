@@ -25,7 +25,6 @@ static struct acpi_table_slit *__read_mostly acpi_slit;
 
 static nodemask_t memory_nodes_parsed __initdata;
 static nodemask_t processor_nodes_parsed __initdata;
-static nodemask_t nodes_found __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
 
 struct pxm2node {
@@ -61,11 +60,12 @@ nodeid_t pxm_to_node(unsigned pxm)
 	return NUMA_NO_NODE;
 }
 
-__devinit nodeid_t setup_node(unsigned pxm)
+nodeid_t setup_node(unsigned pxm)
 {
 	nodeid_t node;
 	unsigned idx;
 	static bool_t warned;
+	static unsigned nodes_found;
 
 	BUILD_BUG_ON(MAX_NUMNODES >= NUMA_NO_NODE);
 
@@ -85,15 +85,17 @@ __devinit nodeid_t setup_node(unsigned pxm)
 			goto finish;
 
 	if (!warned) {
-		printk(XENLOG_WARNING "More PXMs than available nodes\n");
+		printk(KERN_WARNING "SRAT: Too many proximity domains (%#x)\n",
+		       pxm);
 		warned = 1;
 	}
 
 	return NUMA_NO_NODE;
 
  finish:
-	node = first_unset_node(nodes_found);
-	node_set(node, nodes_found);
+	node = nodes_found++;
+	if (node >= MAX_NUMNODES)
+		return NUMA_NO_NODE;
 	pxm2node[idx].pxm = pxm;
 	pxm2node[idx].node = node;
 
@@ -219,7 +221,6 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
 	pxm = pa->proximity_domain;
 	node = setup_node(pxm);
 	if (node == NUMA_NO_NODE) {
-		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
 		bad_srat();
 		return;
 	}
@@ -254,7 +255,6 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 	}
 	node = setup_node(pxm);
 	if (node == NUMA_NO_NODE) {
-		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
 		bad_srat();
 		return;
 	}
@@ -299,7 +299,6 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 		pxm &= 0xff;
 	node = setup_node(pxm);
 	if (node == NUMA_NO_NODE) {
-		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
 		bad_srat();
 		return;
 	}
@@ -341,7 +340,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 
 /* Sanity check to catch more bad SRATs (they are amazingly common).
    Make sure the PXMs cover all memory. */
-static int nodes_cover_memory(void)
+static int __init nodes_cover_memory(void)
 {
 	int i;
 
