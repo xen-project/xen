@@ -369,7 +369,7 @@ void __init arch_init_memory(void)
 
                     for ( i = 0; i < l3_table_offset(split_va); ++i )
                         l3tab[i] = l3idle[i];
-                    for ( ; i <= L3_PAGETABLE_ENTRIES; ++i )
+                    for ( ; i < L3_PAGETABLE_ENTRIES; ++i )
                         l3tab[i] = l3e_empty();
                     split_l4e = l4e_from_pfn(virt_to_mfn(l3tab),
                                              __PAGE_HYPERVISOR);

@@ -404,13 +404,19 @@ void get_outstanding_claims(uint64_t *free_pages, uint64_t *outstanding_pages)
     spin_unlock(&heap_lock);
 }
 
+static bool_t __read_mostly first_node_initialised;
+#ifndef CONFIG_SEPARATE_XENHEAP
+static unsigned int __read_mostly xenheap_bits;
+#else
+#define xenheap_bits 0
+#endif
+
 static unsigned long init_node_heap(int node, unsigned long mfn,
                                     unsigned long nr, bool_t *use_tail)
 {
     /* First node to be discovered has its heap metadata statically alloced. */
     static heap_by_zone_and_order_t _heap_static;
     static unsigned long avail_static[NR_ZONES];
-    static int first_node_initialised;
     unsigned long needed = (sizeof(**_heap) +
                             sizeof(**avail) * NR_ZONES +
                             PAGE_SIZE - 1) >> PAGE_SHIFT;
@@ -428,14 +434,18 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
     }
 #ifdef DIRECTMAP_VIRT_END
     else if ( *use_tail && nr >= needed &&
-              (mfn + nr) <= (virt_to_mfn(eva - 1) + 1) )
+              (mfn + nr) <= (virt_to_mfn(eva - 1) + 1) &&
+              (!xenheap_bits ||
+               !((mfn + nr - 1) >> (xenheap_bits - PAGE_SHIFT))) )
     {
         _heap[node] = mfn_to_virt(mfn + nr - needed);
         avail[node] = mfn_to_virt(mfn + nr - 1) +
                       PAGE_SIZE - sizeof(**avail) * NR_ZONES;
     }
     else if ( nr >= needed &&
-              (mfn + needed) <= (virt_to_mfn(eva - 1) + 1) )
+              (mfn + needed) <= (virt_to_mfn(eva - 1) + 1) &&
+              (!xenheap_bits ||
+               !((mfn + needed - 1) >> (xenheap_bits - PAGE_SHIFT))) )
     {
         _heap[node] = mfn_to_virt(mfn);
         avail[node] = mfn_to_virt(mfn + needed - 1) +
@@ -1543,11 +1553,13 @@ void free_xenheap_pages(void *v, unsigned int order)
 
 #else
 
-static unsigned int __read_mostly xenheap_bits;
-
 void __init xenheap_max_mfn(unsigned long mfn)
 {
-    xenheap_bits = flsl(mfn) + PAGE_SHIFT;
+    ASSERT(!first_node_initialised);
+    ASSERT(!xenheap_bits);
+    BUILD_BUG_ON(PADDR_BITS >= BITS_PER_LONG);
+    xenheap_bits = min(flsl(mfn + 1) - 1 + PAGE_SHIFT, PADDR_BITS);
+    printk(XENLOG_INFO "Xen heap: %u bits\n", xenheap_bits);
 }
 
 void init_xenheap_pages(paddr_t ps, paddr_t pe)
