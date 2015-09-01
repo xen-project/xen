@@ -957,7 +957,11 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
     int ret;
 
     if ( !paging_mode_translate(p2m->domain) )
-        return 0;
+    {
+        if ( !need_iommu(d) )
+            return 0;
+        return iommu_map_page(d, gfn, gfn, IOMMUF_readable|IOMMUF_writable);
+    }
 
     gfn_lock(p2m, gfn, 0);
 
@@ -1028,7 +1032,11 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn)
     int ret;
 
     if ( !paging_mode_translate(d) )
-        return 0;
+    {
+        if ( !need_iommu(d) )
+            return 0;
+        return iommu_unmap_page(d, gfn);
+    }
 
     gfn_lock(p2m, gfn, 0);
 
