@@ -136,6 +136,21 @@
  */
 
 /*
+ * "feature-multicast-control" advertises the capability to filter ethernet
+ * multicast packets in the backend. To enable use of this capability the
+ * frontend must set "request-multicast-control" before moving into the
+ * connected state.
+ *
+ * If "request-multicast-control" is set then the backend transmit side should
+ * no longer flood multicast packets to the frontend, it should instead drop any
+ * multicast packet that does not match in a filter list. The list is
+ * amended by the frontend by sending dummy transmit requests containing
+ * XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL} extra-info fragments as specified below.
+ * Once enabled by the frontend, the feature cannot be disabled except by
+ * closing and re-connecting to the backend.
+ */
+
+/*
  * This is the 'wire' format for packets:
  *  Request 1: netif_tx_request_t -- NETTXF_* (any flags)
  * [Request 2: netif_extra_info_t] (only if request 1 has NETTXF_extra_info)
@@ -341,14 +356,6 @@ struct netif_extra_info {
 
         /*
          * XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL}:
-         * Backend advertises availability via 'feature-multicast-control'
-         * xenbus node containing value '1'.
-         * Frontend requests this feature by advertising
-         * 'request-multicast-control' xenbus node containing value '1'.
-         * If multicast control is requested then multicast flooding is
-         * disabled and the frontend must explicitly register its interest
-         * in multicast groups using dummy transmit requests containing
-         * MCAST_{ADD,DEL} extra-info fragments.
          */
         struct {
             uint8_t addr[6]; /* Address to add/remove. */
