@@ -801,6 +801,9 @@ static int flask_sysctl(int cmd)
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
                                     XEN2__PSR_CAT_OP, NULL);
 
+    case XEN_SYSCTL_tmem_op:
+        return domain_has_xen(current->domain, XEN__TMEM_CONTROL);
+
     default:
         printk("flask_sysctl: Unknown op %d\n", cmd);
         return -EPERM;
@@ -1127,11 +1130,6 @@ static inline int flask_page_offline(uint32_t cmd)
 static inline int flask_tmem_op(void)
 {
     return domain_has_xen(current->domain, XEN__TMEM_OP);
-}
-
-static inline int flask_tmem_control(void)
-{
-    return domain_has_xen(current->domain, XEN__TMEM_CONTROL);
 }
 
 static int flask_add_to_physmap(struct domain *d1, struct domain *d2)
@@ -1693,7 +1691,6 @@ static struct xsm_operations flask_ops = {
 
     .page_offline = flask_page_offline,
     .tmem_op = flask_tmem_op,
-    .tmem_control = flask_tmem_control,
     .hvm_param = flask_hvm_param,
     .hvm_control = flask_hvm_param,
     .hvm_param_nested = flask_hvm_param_nested,

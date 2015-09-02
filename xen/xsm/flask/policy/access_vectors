@@ -69,7 +69,7 @@ class xen
     cpupool_op
 # tmem hypercall (any access)
     tmem_op
-# TMEM_CONTROL command of tmem hypercall
+# XEN_SYSCTL_tmem_op command of tmem (part of sysctl)
     tmem_control
 # XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_getinfo, XEN_SYSCTL_sched_id
     getscheduler

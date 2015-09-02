@@ -11,9 +11,7 @@
 #include <xen/hypercall.h>
 #include <compat/tmem.h>
 
-#define xen_tmem_op tmem_op
-/*CHECK_tmem_op;*/
-#undef xen_tmem_op
+CHECK_tmem_oid;
 
 /*
  * Local variables:

@@ -1799,36 +1799,35 @@ static PyObject *pyxc_tmem_control(XcObject *self,
     uint32_t cli_id;
     uint32_t arg1;
     uint32_t arg2;
-    uint64_t arg3;
     char *buf;
     char _buffer[32768], *buffer = _buffer;
     int rc;
 
-    static char *kwd_list[] = { "pool_id", "subop", "cli_id", "arg1", "arg2", "arg3", "buf", NULL };
+    static char *kwd_list[] = { "pool_id", "subop", "cli_id", "arg1", "arg2", "buf", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiiiis", kwd_list,
-                        &pool_id, &subop, &cli_id, &arg1, &arg2, &arg3, &buf) )
+                        &pool_id, &subop, &cli_id, &arg1, &arg2, &buf) )
         return NULL;
 
-    if ( (subop == TMEMC_LIST) && (arg1 > 32768) )
+    if ( (subop == XEN_SYSCTL_TMEM_OP_LIST) && (arg1 > 32768) )
         arg1 = 32768;
 
-    if ( (rc = xc_tmem_control(self->xc_handle, pool_id, subop, cli_id, arg1, arg2, arg3, buffer)) < 0 )
+    if ( (rc = xc_tmem_control(self->xc_handle, pool_id, subop, cli_id, arg1, arg2, buffer)) < 0 )
         return Py_BuildValue("i", rc);
 
     switch (subop) {
-        case TMEMC_LIST:
+        case XEN_SYSCTL_TMEM_OP_LIST:
             return Py_BuildValue("s", buffer);
-        case TMEMC_FLUSH:
+        case XEN_SYSCTL_TMEM_OP_FLUSH:
             return Py_BuildValue("i", rc);
-        case TMEMC_QUERY_FREEABLE_MB:
+        case XEN_SYSCTL_TMEM_OP_QUERY_FREEABLE_MB:
             return Py_BuildValue("i", rc);
-        case TMEMC_THAW:
-        case TMEMC_FREEZE:
-        case TMEMC_DESTROY:
-        case TMEMC_SET_WEIGHT:
-        case TMEMC_SET_CAP:
-        case TMEMC_SET_COMPRESS:
+        case XEN_SYSCTL_TMEM_OP_THAW:
+        case XEN_SYSCTL_TMEM_OP_FREEZE:
+        case XEN_SYSCTL_TMEM_OP_DESTROY:
+        case XEN_SYSCTL_TMEM_OP_SET_WEIGHT:
+        case XEN_SYSCTL_TMEM_OP_SET_CAP:
+        case XEN_SYSCTL_TMEM_OP_SET_COMPRESS:
         default:
             break;
     }

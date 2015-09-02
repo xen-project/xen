@@ -149,8 +149,8 @@ void domain_get_tmem_stats(xenstat_handle * handle, xenstat_domain * domain)
 {
 	char buffer[4096];
 
-	if (xc_tmem_control(handle->xc_handle,-1,TMEMC_LIST,domain->id,
-                        sizeof(buffer),-1,-1,buffer) < 0)
+	if (xc_tmem_control(handle->xc_handle,-1,XEN_SYSCTL_TMEM_OP_LIST,domain->id,
+                        sizeof(buffer),-1,buffer) < 0)
 		return;
 	domain->tmem_stats.curr_eph_pages = parse(buffer,"Ec");
 	domain->tmem_stats.succ_eph_gets = parse(buffer,"Ge");
@@ -191,7 +191,7 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	    * handle->page_size;
 
 	rc = xc_tmem_control(handle->xc_handle, -1,
-                         TMEMC_QUERY_FREEABLE_MB, -1, 0, 0, 0, NULL);
+                         XEN_SYSCTL_TMEM_OP_QUERY_FREEABLE_MB, -1, 0, 0, NULL);
 	node->freeable_mb = (rc < 0) ? 0 : rc;
 	/* malloc(0) is not portable, so allocate a single domain.  This will
 	 * be resized below. */
