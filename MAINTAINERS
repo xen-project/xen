@@ -237,7 +237,7 @@ F:	config/MiniOS.mk
 F:	extras/mini-os/
 
 OCAML TOOLS
-M:	David Scott <dave.scott@eu.citrix.com>
+M:	David Scott <dave@recoil.org>
 S:	Supported
 F:	tools/ocaml/
 
