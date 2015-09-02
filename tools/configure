@@ -707,7 +707,6 @@ rombios
 qemu_traditional
 blktap2
 LINUX_BACKEND_MODULES
-debug
 seabios
 ovmf
 xsmpolicy
@@ -798,7 +797,6 @@ enable_ocamltools
 enable_xsmpolicy
 enable_ovmf
 enable_seabios
-enable_debug
 with_linux_backend_modules
 enable_blktap2
 enable_qemu_traditional
@@ -1473,7 +1471,6 @@ Optional Features:
   --disable-xsmpolicy     Disable XSM policy compilation (default is ENABLED)
   --enable-ovmf           Enable OVMF (default is DISABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
-  --disable-debug         Disable debug build of tools (default is ENABLED)
   --enable-blktap2        Enable blktap2, (DEFAULT is on for Linux, otherwise
                           off)
   --enable-qemu-traditional
@@ -4111,29 +4108,6 @@ elif test -z $ax_cv_seabios; then :
 
 fi
 seabios=$ax_cv_seabios
-
-
-
-# Check whether --enable-debug was given.
-if test "${enable_debug+set}" = set; then :
-  enableval=$enable_debug;
-fi
-
-
-if test "x$enable_debug" = "xno"; then :
-
-    ax_cv_debug="n"
-
-elif test "x$enable_debug" = "xyes"; then :
-
-    ax_cv_debug="y"
-
-elif test -z $ax_cv_debug; then :
-
-    ax_cv_debug="y"
-
-fi
-debug=$ax_cv_debug
 
 
 
