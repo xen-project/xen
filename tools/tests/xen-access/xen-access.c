@@ -260,7 +260,7 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
         goto err;
     }
 
-    DPRINTF("max_gpfn = %"PRIx64"\n", xenaccess->max_gpfn);
+    DPRINTF("max_gpfn = %"PRI_xen_pfn"\n", xenaccess->max_gpfn);
 
     return xenaccess;
 
