@@ -665,7 +665,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     xenheap_virt_end = XENHEAP_VIRT_START + ram_end - ram_start;
     xenheap_mfn_start = ram_start >> PAGE_SHIFT;
     xenheap_mfn_end = ram_end >> PAGE_SHIFT;
-    xenheap_max_mfn(xenheap_mfn_end);
 
     /*
      * Need enough mapped pages for copying the DTB.
