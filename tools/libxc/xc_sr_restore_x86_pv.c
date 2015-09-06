@@ -970,7 +970,7 @@ static int x86_pv_localise_page(struct xc_sr_context *ctx,
     }
 
     if ( to_populate && populate_pfns(ctx, to_populate, pfns, NULL) )
-            return -1;
+        return -1;
 
     for ( i = 0; i < (PAGE_SIZE / sizeof(uint64_t)); ++i )
     {
