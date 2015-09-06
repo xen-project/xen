@@ -214,6 +214,9 @@ int populate_pfns(struct xc_sr_context *ctx, unsigned count,
                           types[i] != XEN_DOMCTL_PFINFO_BROKEN))) &&
              !pfn_is_populated(ctx, original_pfns[i]) )
         {
+            rc = pfn_set_populated(ctx, original_pfns[i]);
+            if ( rc )
+                goto err;
             pfns[nr_pfns] = mfns[nr_pfns] = original_pfns[i];
             ++nr_pfns;
         }
@@ -238,9 +241,6 @@ int populate_pfns(struct xc_sr_context *ctx, unsigned count,
                 goto err;
             }
 
-            rc = pfn_set_populated(ctx, pfns[i]);
-            if ( rc )
-                goto err;
             ctx->restore.ops.set_gfn(ctx, pfns[i], mfns[i]);
         }
     }
