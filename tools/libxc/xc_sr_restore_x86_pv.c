@@ -66,7 +66,7 @@ static int expand_p2m(struct xc_sr_context *ctx, unsigned long max_pfn)
     for ( i = (old_end_frame ? old_end_frame + 1 : 0); i <= end_frame; ++i )
         ctx->x86_pv.p2m_pfns[i] = INVALID_MFN;
 
-    DPRINTF("Expanded p2m from %#lx to %#lx", old_max, max_pfn);
+    DPRINTF("Changed max_pfn from %#lx to %#lx", old_max, max_pfn);
     return 0;
 }
 
