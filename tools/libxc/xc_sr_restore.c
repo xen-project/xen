@@ -181,6 +181,7 @@ static int pfn_set_populated(struct xc_sr_context *ctx, xen_pfn_t pfn)
         ctx->restore.max_populated_pfn = new_max;
     }
 
+    assert(!test_bit(pfn, ctx->restore.populated_pfns));
     set_bit(pfn, ctx->restore.populated_pfns);
 
     return 0;
