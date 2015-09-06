@@ -451,7 +451,7 @@ static int update_progress_string(struct xc_sr_context *ctx,
     xc_interface *xch = ctx->xch;
     char *new_str = NULL;
 
-    if ( asprintf(&new_str, "Memory iteration %u of %u",
+    if ( asprintf(&new_str, "Frames iteration %u of %u",
                   iter, ctx->save.max_iterations) == -1 )
     {
         PERROR("Unable to allocate new progress string");
@@ -569,7 +569,7 @@ static int suspend_and_send_dirty(struct xc_sr_context *ctx)
     return rc;
 }
 
-static int send_memory_verify(struct xc_sr_context *ctx)
+static int verify_frames(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
     xc_shadow_op_stats_t stats = { 0, ctx->save.p2m_size };
@@ -586,7 +586,7 @@ static int send_memory_verify(struct xc_sr_context *ctx)
     if ( rc )
         goto out;
 
-    xc_set_progress_prefix(xch, "Memory verify");
+    xc_set_progress_prefix(xch, "Frames verify");
     rc = send_all_pages(ctx);
     if ( rc )
         goto out;
@@ -629,7 +629,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
 
     if ( ctx->save.debug && !ctx->save.checkpointed )
     {
-        rc = send_memory_verify(ctx);
+        rc = verify_frames(ctx);
         if ( rc )
             goto out;
     }
@@ -659,7 +659,7 @@ static int send_domain_memory_nonlive(struct xc_sr_context *ctx)
     if ( rc )
         goto err;
 
-    xc_set_progress_prefix(xch, "Memory");
+    xc_set_progress_prefix(xch, "Frames");
 
     rc = send_all_pages(ctx);
     if ( rc )
