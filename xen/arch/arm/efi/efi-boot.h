@@ -9,6 +9,7 @@
 #include <asm/smp.h>
 
 void noreturn efi_xen_start(void *fdt_ptr, uint32_t fdt_size);
+void __flush_dcache_area(const void *vaddr, unsigned long size);
 
 #define DEVICE_TREE_GUID \
 {0xb1b621d5, 0xf19c, 0x41a5, {0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0}}
@@ -571,6 +572,12 @@ static void __init efi_arch_video_init(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
                                        EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info)
 {
 }
+
+static void efi_arch_flush_dcache_area(const void *vaddr, UINTN size)
+{
+    __flush_dcache_area(vaddr, size);
+}
+
 /*
  * Local variables:
  * mode: C

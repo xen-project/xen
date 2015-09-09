@@ -528,6 +528,8 @@ static bool_t __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
         PrintErrMesg(name, ret);
     }
 
+    efi_arch_flush_dcache_area(file->ptr, file->size);
+
     return 1;
 }
 
