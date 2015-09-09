@@ -24,6 +24,7 @@
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/hvm_xs_strings.h>
 #include <xen/hvm/e820.h>
+#include <xen/errno.h>
 
 libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
 {
@@ -1602,7 +1603,7 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss)
 {
     STATE_AO_GC(dss->ao);
     int port;
-    int rc;
+    int rc, ret;
 
     /* Convenience aliases */
     const uint32_t domid = dss->domid;
@@ -1612,6 +1613,7 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss)
     const libxl_domain_remus_info *const r_info = dss->remus;
     libxl__srm_save_autogen_callbacks *const callbacks =
         &dss->sws.shs.callbacks.save.a;
+    unsigned int nr_vnodes = 0, nr_vmemranges = 0, nr_vcpus = 0;
 
     dss->rc = 0;
     logdirty_init(&dss->logdirty);
@@ -1635,6 +1637,21 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss)
     dss->xcflags = (live ? XCFLAGS_LIVE : 0)
           | (debug ? XCFLAGS_DEBUG : 0)
           | (dss->hvm ? XCFLAGS_HVM : 0);
+
+    /* Disallow saving a guest with vNUMA configured because migration
+     * stream does not preserve node information.
+     *
+     * Reject any domain which has vnuma enabled, even if the
+     * configuration is empty. Only domains which have no vnuma
+     * configuration at all are supported.
+     */
+    ret = xc_domain_getvnuma(CTX->xch, domid, &nr_vnodes, &nr_vmemranges,
+                             &nr_vcpus, NULL, NULL, NULL);
+    if (ret != -1 || errno != XEN_EOPNOTSUPP) {
+        LOG(ERROR, "Cannot save a guest with vNUMA configured");
+        rc = ERROR_FAIL;
+        goto out;
+    }
 
     dss->guest_evtchn.port = -1;
     dss->guest_evtchn_lockfd = -1;
