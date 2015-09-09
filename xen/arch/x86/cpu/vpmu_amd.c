@@ -438,6 +438,8 @@ static void amd_vpmu_destroy(struct vcpu *v)
         amd_vpmu_unset_msr_bitmap(v);
 
     xfree(vpmu->context);
+    vpmu->context = NULL;
+    vpmu->priv_context = NULL;
 
     if ( vpmu_is_set(vpmu, VPMU_RUNNING) )
         release_pmu_ownship(PMU_OWNER_HVM);
