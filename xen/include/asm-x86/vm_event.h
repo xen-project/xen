@@ -22,6 +22,18 @@
 #include <xen/sched.h>
 #include <xen/vm_event.h>
 
+/*
+ * Should we emulate the next matching instruction on VCPU resume
+ * after a vm_event?
+ */
+struct arch_vm_event {
+    uint32_t emulate_flags;
+    unsigned long gpa;
+    unsigned long eip;
+    struct vm_event_emul_read_data emul_read_data;
+    struct monitor_write_data write_data;
+};
+
 int vm_event_init_domain(struct domain *d);
 
 void vm_event_cleanup_domain(struct domain *d);

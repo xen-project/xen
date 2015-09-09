@@ -27,22 +27,14 @@ int vm_event_init_domain(struct domain *d)
 {
     struct vcpu *v;
 
-    if ( !d->arch.event_write_data )
-        d->arch.event_write_data =
-            vzalloc(sizeof(struct monitor_write_data) * d->max_vcpus);
-
-    if ( !d->arch.event_write_data )
-        return -ENOMEM;
-
     for_each_vcpu ( d, v )
     {
-        if ( v->arch.vm_event.emul_read_data )
+        if ( v->arch.vm_event )
             continue;
 
-        v->arch.vm_event.emul_read_data =
-            xzalloc(struct vm_event_emul_read_data);
+        v->arch.vm_event = xzalloc(struct arch_vm_event);
 
-        if ( !v->arch.vm_event.emul_read_data )
+        if ( !v->arch.vm_event )
             return -ENOMEM;
     }
 
@@ -57,13 +49,10 @@ void vm_event_cleanup_domain(struct domain *d)
 {
     struct vcpu *v;
 
-    vfree(d->arch.event_write_data);
-    d->arch.event_write_data = NULL;
-
     for_each_vcpu ( d, v )
     {
-        xfree(v->arch.vm_event.emul_read_data);
-        v->arch.vm_event.emul_read_data = NULL;
+        xfree(v->arch.vm_event);
+        v->arch.vm_event = NULL;
     }
 }
 
@@ -79,10 +68,9 @@ void vm_event_register_write_resume(struct vcpu *v, vm_event_response_t *rsp)
 {
     if ( rsp->flags & VM_EVENT_FLAG_DENY )
     {
-        struct monitor_write_data *w =
-            &v->domain->arch.event_write_data[v->vcpu_id];
+        struct monitor_write_data *w = &v->arch.vm_event->write_data;
 
-        ASSERT(v->domain->arch.event_write_data != NULL);
+        ASSERT(w);
 
         switch ( rsp->reason )
         {

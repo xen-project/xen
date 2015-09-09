@@ -63,6 +63,7 @@
 #include <asm/altp2m.h>
 #include <asm/mtrr.h>
 #include <asm/apic.h>
+#include <asm/vm_event.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <public/version.h>
@@ -541,9 +542,9 @@ void hvm_do_resume(struct vcpu *v)
         break;
     }
 
-    if ( unlikely(d->arch.event_write_data) )
+    if ( unlikely(v->arch.vm_event) )
     {
-        struct monitor_write_data *w = &d->arch.event_write_data[v->vcpu_id];
+        struct monitor_write_data *w = &v->arch.vm_event->write_data;
 
         if ( w->do_write.msr )
         {
@@ -3337,7 +3338,6 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
     struct domain *d = v->domain;
     unsigned long gfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
     struct page_info *page;
-    struct arch_domain *currad = &v->domain->arch;
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
@@ -3367,16 +3367,16 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
         goto gpf;
     }
 
-    if ( may_defer && unlikely(currad->monitor.write_ctrlreg_enabled &
+    if ( may_defer && unlikely(v->domain->arch.monitor.write_ctrlreg_enabled &
                                monitor_ctrlreg_bitmask(VM_EVENT_X86_CR0)) )
     {
-        ASSERT(currad->event_write_data != NULL);
+        ASSERT(v->arch.vm_event);
 
         if ( hvm_event_crX(CR0, value, old_value) )
         {
             /* The actual write will occur in hvm_do_resume(), if permitted. */
-            currad->event_write_data[v->vcpu_id].do_write.cr0 = 1;
-            currad->event_write_data[v->vcpu_id].cr0 = value;
+            v->arch.vm_event->write_data.do_write.cr0 = 1;
+            v->arch.vm_event->write_data.cr0 = value;
 
             return X86EMUL_OKAY;
         }
@@ -3468,18 +3468,17 @@ int hvm_set_cr3(unsigned long value, bool_t may_defer)
     struct vcpu *v = current;
     struct page_info *page;
     unsigned long old = v->arch.hvm_vcpu.guest_cr[3];
-    struct arch_domain *currad = &v->domain->arch;
 
-    if ( may_defer && unlikely(currad->monitor.write_ctrlreg_enabled &
+    if ( may_defer && unlikely(v->domain->arch.monitor.write_ctrlreg_enabled &
                                monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3)) )
     {
-        ASSERT(currad->event_write_data != NULL);
+        ASSERT(v->arch.vm_event);
 
         if ( hvm_event_crX(CR3, value, old) )
         {
             /* The actual write will occur in hvm_do_resume(), if permitted. */
-            currad->event_write_data[v->vcpu_id].do_write.cr3 = 1;
-            currad->event_write_data[v->vcpu_id].cr3 = value;
+            v->arch.vm_event->write_data.do_write.cr3 = 1;
+            v->arch.vm_event->write_data.cr3 = value;
 
             return X86EMUL_OKAY;
         }
@@ -3515,7 +3514,6 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
 {
     struct vcpu *v = current;
     unsigned long old_cr;
-    struct arch_domain *currad = &v->domain->arch;
 
     if ( value & hvm_cr4_guest_reserved_bits(v, 0) )
     {
@@ -3543,16 +3541,16 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
         goto gpf;
     }
 
-    if ( may_defer && unlikely(currad->monitor.write_ctrlreg_enabled &
+    if ( may_defer && unlikely(v->domain->arch.monitor.write_ctrlreg_enabled &
                                monitor_ctrlreg_bitmask(VM_EVENT_X86_CR4)) )
     {
-        ASSERT(currad->event_write_data != NULL);
+        ASSERT(v->arch.vm_event);
 
         if ( hvm_event_crX(CR4, value, old_cr) )
         {
             /* The actual write will occur in hvm_do_resume(), if permitted. */
-            currad->event_write_data[v->vcpu_id].do_write.cr4 = 1;
-            currad->event_write_data[v->vcpu_id].cr4 = value;
+            v->arch.vm_event->write_data.do_write.cr4 = 1;
+            v->arch.vm_event->write_data.cr4 = value;
 
             return X86EMUL_OKAY;
         }
@@ -4752,12 +4750,12 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
 
     if ( may_defer && unlikely(currad->monitor.mov_to_msr_enabled) )
     {
-        ASSERT(currad->event_write_data != NULL);
+        ASSERT(v->arch.vm_event);
 
         /* The actual write will occur in hvm_do_resume() (if permitted). */
-        currad->event_write_data[v->vcpu_id].do_write.msr = 1;
-        currad->event_write_data[v->vcpu_id].msr = msr;
-        currad->event_write_data[v->vcpu_id].value = msr_content;
+        v->arch.vm_event->write_data.do_write.msr = 1;
+        v->arch.vm_event->write_data.msr = msr;
+        v->arch.vm_event->write_data.value = msr_content;
 
         hvm_event_msr(msr, msr_content);
         return X86EMUL_OKAY;

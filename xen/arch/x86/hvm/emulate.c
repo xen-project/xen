@@ -22,6 +22,7 @@
 #include <asm/hvm/trace.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/svm/svm.h>
+#include <asm/vm_event.h>
 
 static void hvmtrace_io_assist(const ioreq_t *p)
 {
@@ -71,12 +72,12 @@ static int set_context_data(void *buffer, unsigned int size)
 {
     struct vcpu *curr = current;
 
-    if ( curr->arch.vm_event.emul_read_data )
+    if ( curr->arch.vm_event )
     {
         unsigned int safe_size =
-            min(size, curr->arch.vm_event.emul_read_data->size);
+            min(size, curr->arch.vm_event->emul_read_data.size);
 
-        memcpy(buffer, curr->arch.vm_event.emul_read_data->data, safe_size);
+        memcpy(buffer, curr->arch.vm_event->emul_read_data.data, safe_size);
         memset(buffer + safe_size, 0, size - safe_size);
         return X86EMUL_OKAY;
     }

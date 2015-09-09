@@ -36,6 +36,7 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/altp2m.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
+#include <asm/vm_event.h>
 #include <xsm/xsm.h>
 
 #include "mm-locks.h"
@@ -1591,11 +1592,10 @@ void p2m_mem_access_emulate_check(struct vcpu *v,
             }
         }
 
-        v->arch.vm_event.emulate_flags = violation ? rsp->flags : 0;
+        v->arch.vm_event->emulate_flags = violation ? rsp->flags : 0;
 
-        if ( (rsp->flags & VM_EVENT_FLAG_SET_EMUL_READ_DATA) &&
-             v->arch.vm_event.emul_read_data )
-            *v->arch.vm_event.emul_read_data = rsp->data.emul_read_data;
+        if ( (rsp->flags & VM_EVENT_FLAG_SET_EMUL_READ_DATA) )
+            v->arch.vm_event->emul_read_data = rsp->data.emul_read_data;
     }
 }
 
@@ -1678,34 +1678,35 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     }
 
     /* The previous vm_event reply does not match the current state. */
-    if ( v->arch.vm_event.gpa != gpa || v->arch.vm_event.eip != eip )
+    if ( unlikely(v->arch.vm_event) &&
+         (v->arch.vm_event->gpa != gpa || v->arch.vm_event->eip != eip) )
     {
         /* Don't emulate the current instruction, send a new vm_event. */
-        v->arch.vm_event.emulate_flags = 0;
+        v->arch.vm_event->emulate_flags = 0;
 
         /*
          * Make sure to mark the current state to match it again against
          * the new vm_event about to be sent.
          */
-        v->arch.vm_event.gpa = gpa;
-        v->arch.vm_event.eip = eip;
+        v->arch.vm_event->gpa = gpa;
+        v->arch.vm_event->eip = eip;
     }
 
-    if ( v->arch.vm_event.emulate_flags )
+    if ( unlikely(v->arch.vm_event) && v->arch.vm_event->emulate_flags )
     {
         enum emul_kind kind = EMUL_KIND_NORMAL;
 
-        if ( v->arch.vm_event.emulate_flags &
+        if ( v->arch.vm_event->emulate_flags &
              VM_EVENT_FLAG_SET_EMUL_READ_DATA )
             kind = EMUL_KIND_SET_CONTEXT;
-        else if ( v->arch.vm_event.emulate_flags &
+        else if ( v->arch.vm_event->emulate_flags &
                   VM_EVENT_FLAG_EMULATE_NOWRITE )
             kind = EMUL_KIND_NOWRITE;
 
         hvm_mem_access_emulate_one(kind, TRAP_invalid_op,
                                    HVM_DELIVER_NO_ERROR_CODE);
 
-        v->arch.vm_event.emulate_flags = 0;
+        v->arch.vm_event->emulate_flags = 0;
         return 1;
     }
 

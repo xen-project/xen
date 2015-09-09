@@ -424,9 +424,6 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.flags = TF_kernel_mode;
 
-    /* By default, do not emulate */
-    v->arch.vm_event.emulate_flags = 0;
-
     rc = mapcache_vcpu_init(v);
     if ( rc )
         return rc;
@@ -511,8 +508,8 @@ int vcpu_initialise(struct vcpu *v)
 
 void vcpu_destroy(struct vcpu *v)
 {
-    xfree(v->arch.vm_event.emul_read_data);
-    v->arch.vm_event.emul_read_data = NULL;
+    xfree(v->arch.vm_event);
+    v->arch.vm_event = NULL;
 
     if ( is_pv_32bit_vcpu(v) )
     {
@@ -668,9 +665,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
 
 void arch_domain_destroy(struct domain *d)
 {
-    vfree(d->arch.event_write_data);
-    d->arch.event_write_data = NULL;
-
     if ( has_hvm_container_domain(d) )
         hvm_domain_destroy(d);
 

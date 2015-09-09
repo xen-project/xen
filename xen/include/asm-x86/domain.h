@@ -385,8 +385,6 @@ struct arch_domain
 
     /* Mem_access emulation control */
     bool_t mem_access_emulate_enabled;
-
-    struct monitor_write_data *event_write_data;
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
@@ -533,16 +531,7 @@ struct arch_vcpu
     /* A secondary copy of the vcpu time info. */
     XEN_GUEST_HANDLE(vcpu_time_info_t) time_info_guest;
 
-    /*
-     * Should we emulate the next matching instruction on VCPU resume
-     * after a vm_event?
-     */
-    struct {
-        uint32_t emulate_flags;
-        unsigned long gpa;
-        unsigned long eip;
-        struct vm_event_emul_read_data *emul_read_data;
-    } vm_event;
+    struct arch_vm_event *vm_event;
 };
 
 smap_check_policy_t smap_policy_change(struct vcpu *v,
