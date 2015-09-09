@@ -290,7 +290,7 @@ int __init acpi_table_parse(char *id, acpi_table_handler handler)
 	if (table) {
 		return handler(table);
 	} else
-		return 1;
+		return -ENODEV;
 }
 
 /* 
@@ -333,7 +333,7 @@ int __init acpi_table_init(void)
 
 	status = acpi_initialize_tables(NULL, ACPI_MAX_TABLES, 0);
 	if (ACPI_FAILURE(status))
-		return 1;
+		return -EINVAL;
 
 	check_multiple_madt();
 	return 0;
