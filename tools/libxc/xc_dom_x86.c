@@ -300,7 +300,8 @@ static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
         pgpfn = (addr - dom->parms.virt_base) >> PAGE_SHIFT_X86;
         l1tab[l1off] =
             pfn_to_paddr(xc_dom_p2m_guest(dom, pgpfn)) | L1_PROT;
-        if ( (addr >= dom->pgtables_seg.vstart) &&
+        if ( (!dom->pvh_enabled)                &&
+             (addr >= dom->pgtables_seg.vstart) &&
              (addr < dom->pgtables_seg.vend) )
             l1tab[l1off] &= ~_PAGE_RW; /* page tables are r/o */
 
@@ -590,31 +591,15 @@ static int vcpu_x86_32(struct xc_dom_image *dom, void *ptr)
 
     DOMPRINTF_CALLED(dom->xch);
 
-    if ( dom->pvh_enabled )
-    {
-        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "%s: PVH not supported for 32bit guests.", __FUNCTION__);
-        return -1;
-    }
-
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));
 
-    ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_32;
-    ctxt->user_regs.es = FLAT_KERNEL_DS_X86_32;
-    ctxt->user_regs.fs = FLAT_KERNEL_DS_X86_32;
-    ctxt->user_regs.gs = FLAT_KERNEL_DS_X86_32;
-    ctxt->user_regs.ss = FLAT_KERNEL_SS_X86_32;
-    ctxt->user_regs.cs = FLAT_KERNEL_CS_X86_32;
     ctxt->user_regs.eip = dom->parms.virt_entry;
     ctxt->user_regs.esp =
         dom->parms.virt_base + (dom->bootstack_pfn + 1) * PAGE_SIZE_X86;
     ctxt->user_regs.esi =
         dom->parms.virt_base + (dom->start_info_pfn) * PAGE_SIZE_X86;
     ctxt->user_regs.eflags = 1 << 9; /* Interrupt Enable */
-
-    ctxt->kernel_ss = ctxt->user_regs.ss;
-    ctxt->kernel_sp = ctxt->user_regs.esp;
 
     ctxt->flags = VGCF_in_kernel_X86_32 | VGCF_online_X86_32;
     if ( dom->parms.pae == 2 /* extended_cr3 */ ||
@@ -625,6 +610,19 @@ static int vcpu_x86_32(struct xc_dom_image *dom, void *ptr)
     ctxt->ctrlreg[3] = xen_pfn_to_cr3_x86_32(cr3_pfn);
     DOMPRINTF("%s: cr3: pfn 0x%" PRIpfn " mfn 0x%" PRIpfn "",
               __FUNCTION__, dom->pgtables_seg.pfn, cr3_pfn);
+
+    if ( dom->pvh_enabled )
+        return 0;
+
+    ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_32;
+    ctxt->user_regs.es = FLAT_KERNEL_DS_X86_32;
+    ctxt->user_regs.fs = FLAT_KERNEL_DS_X86_32;
+    ctxt->user_regs.gs = FLAT_KERNEL_DS_X86_32;
+    ctxt->user_regs.ss = FLAT_KERNEL_SS_X86_32;
+    ctxt->user_regs.cs = FLAT_KERNEL_CS_X86_32;
+
+    ctxt->kernel_ss = ctxt->user_regs.ss;
+    ctxt->kernel_sp = ctxt->user_regs.esp;
 
     return 0;
 }
