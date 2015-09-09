@@ -865,6 +865,7 @@ static void initiate_domain_create(libxl__egc *egc,
      */
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
         d_config->b_info.num_vnuma_nodes) {
+        ret = ERROR_INVAL;
         LOG(ERROR, "PV vNUMA is not yet supported");
         goto error_out;
     }
