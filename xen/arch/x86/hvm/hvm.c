@@ -2425,7 +2425,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     if ( is_pvh_domain(d) )
     {
-        v->arch.hvm_vcpu.hcall_64bit = 1;    /* PVH 32bitfixme. */
         /* This is for hvm_long_mode_enabled(v). */
         v->arch.hvm_vcpu.guest_efer = EFER_LMA | EFER_LME;
         return 0;
@@ -6820,6 +6819,29 @@ bool_t altp2m_vcpu_emulate_ve(struct vcpu *v)
 {
     if ( hvm_funcs.altp2m_vcpu_emulate_ve )
         return hvm_funcs.altp2m_vcpu_emulate_ve(v);
+    return 0;
+}
+
+int hvm_set_mode(struct vcpu *v, int mode)
+{
+
+    switch ( mode )
+    {
+    case 4:
+        v->arch.hvm_vcpu.guest_efer &= ~(EFER_LMA | EFER_LME);
+        break;
+    case 8:
+        v->arch.hvm_vcpu.guest_efer |= (EFER_LMA | EFER_LME);
+        break;
+    default:
+        return -EOPNOTSUPP;
+    }
+
+    hvm_update_guest_efer(v);
+
+    if ( hvm_funcs.set_mode )
+        return hvm_funcs.set_mode(v, mode);
+
     return 0;
 }
 

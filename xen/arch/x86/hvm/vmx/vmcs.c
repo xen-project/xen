@@ -1160,7 +1160,7 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(GUEST_FS_AR_BYTES, 0xc093);
     __vmwrite(GUEST_GS_AR_BYTES, 0xc093);
     if ( is_pvh_domain(d) )
-        /* CS.L == 1, exec, read/write, accessed. PVH 32bitfixme. */
+        /* CS.L == 1, exec, read/write, accessed. */
         __vmwrite(GUEST_CS_AR_BYTES, 0xa09b);
     else
         __vmwrite(GUEST_CS_AR_BYTES, 0xc09b); /* exec/read, accessed */

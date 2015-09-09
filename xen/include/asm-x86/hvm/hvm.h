@@ -206,6 +206,7 @@ struct hvm_function_table {
 
     void (*enable_msr_exit_interception)(struct domain *d);
     bool_t (*is_singlestep_supported)(void);
+    int (*set_mode)(struct vcpu *v, int mode);
 
     /* Alternate p2m */
     void (*altp2m_vcpu_update_p2m)(struct vcpu *v);
@@ -246,6 +247,7 @@ void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc);
 u64 hvm_get_guest_tsc_fixed(struct vcpu *v, u64 at_tsc);
 #define hvm_get_guest_tsc(v) hvm_get_guest_tsc_fixed(v, 0)
 
+int hvm_set_mode(struct vcpu *v, int mode);
 void hvm_init_guest_time(struct domain *d);
 void hvm_set_guest_time(struct vcpu *v, u64 guest_time);
 u64 hvm_get_guest_time_fixed(struct vcpu *v, u64 at_tsc);

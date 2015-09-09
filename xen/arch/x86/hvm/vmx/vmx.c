@@ -1886,6 +1886,24 @@ static bool_t vmx_vcpu_emulate_ve(struct vcpu *v)
     return rc;
 }
 
+static int vmx_set_mode(struct vcpu *v, int mode)
+{
+    unsigned long attr;
+
+    if ( !is_pvh_vcpu(v) )
+        return 0;
+
+    ASSERT((mode == 4) || (mode == 8));
+
+    attr = (mode == 4) ? 0xc09b : 0xa09b;
+
+    vmx_vmcs_enter(v);
+    __vmwrite(GUEST_CS_AR_BYTES, attr);
+    vmx_vmcs_exit(v);
+
+    return 0;
+}
+
 static struct hvm_function_table __initdata vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -1945,6 +1963,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .hypervisor_cpuid_leaf = vmx_hypervisor_cpuid_leaf,
     .enable_msr_exit_interception = vmx_enable_msr_exit_interception,
     .is_singlestep_supported = vmx_is_singlestep_supported,
+    .set_mode = vmx_set_mode,
     .altp2m_vcpu_update_p2m = vmx_vcpu_update_eptp,
     .altp2m_vcpu_update_vmfunc_ve = vmx_vcpu_update_vmfunc_ve,
     .altp2m_vcpu_emulate_ve = vmx_vcpu_emulate_ve,

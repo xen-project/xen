@@ -366,7 +366,11 @@ int switch_native(struct domain *d)
     for_each_vcpu( d, v )
     {
         free_compat_arg_xlat(v);
-        release_compat_l4(v);
+
+        if ( !is_pvh_domain(d) )
+            release_compat_l4(v);
+        else
+            hvm_set_mode(v, 8);
     }
 
     return 0;
@@ -377,25 +381,26 @@ int switch_compat(struct domain *d)
     struct vcpu *v;
     int rc;
 
-    if ( is_pvh_domain(d) )
-    {
-        printk(XENLOG_G_INFO
-               "Xen currently does not support 32bit PVH guests\n");
-        return -EINVAL;
-    }
-
     if ( !may_switch_mode(d) )
         return -EACCES;
     if ( is_pv_32bit_domain(d) )
         return 0;
 
-    d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
+    d->arch.has_32bit_shinfo = 1;
+    if ( is_pv_domain(d) )
+        d->arch.is_32bit_pv = 1;
 
     for_each_vcpu( d, v )
     {
         rc = setup_compat_arg_xlat(v);
         if ( !rc )
-            rc = setup_compat_l4(v);
+        {
+            if ( !is_pvh_domain(d) )
+                rc = setup_compat_l4(v);
+            else
+                rc = hvm_set_mode(v, 4);
+        }
+
         if ( rc )
             goto undo_and_fail;
     }
@@ -410,7 +415,7 @@ int switch_compat(struct domain *d)
     {
         free_compat_arg_xlat(v);
 
-        if ( !pagetable_is_null(v->arch.guest_table) )
+        if ( !is_pvh_domain(d) && !pagetable_is_null(v->arch.guest_table) )
             release_compat_l4(v);
     }
 
