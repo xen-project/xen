@@ -828,7 +828,9 @@ static void core2_vpmu_destroy(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
     xfree(vpmu->context);
+    vpmu->context = NULL;
     xfree(vpmu->priv_context);
+    vpmu->priv_context = NULL;
     if ( has_hvm_container_vcpu(v) && cpu_has_vmx_msr_bitmap )
         core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
     release_pmu_ownship(PMU_OWNER_HVM);
