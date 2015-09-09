@@ -233,7 +233,7 @@ OVMF_UPSTREAM_URL ?= git://xenbits.xen.org/ovmf.git
 QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-4.4-testing.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
-OVMF_UPSTREAM_REVISION ?= 447d264115c476142f884af0be287622cd244423
+OVMF_UPSTREAM_REVISION ?= cb9a7ebabcd6b8a49dc0854b2f9592d732b5afbd
 QEMU_UPSTREAM_REVISION ?= qemu-xen-4.4.3
 SEABIOS_UPSTREAM_TAG ?= rel-1.7.3.1
 # Fri Aug 2 14:12:09 2013 -0400
