@@ -358,7 +358,7 @@ int switch_native(struct domain *d)
 
     if ( !may_switch_mode(d) )
         return -EACCES;
-    if ( !is_pv_32bit_domain(d) )
+    if ( !is_pv_32bit_domain(d) && !is_pvh_32bit_domain(d) )
         return 0;
 
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
@@ -383,7 +383,7 @@ int switch_compat(struct domain *d)
 
     if ( !may_switch_mode(d) )
         return -EACCES;
-    if ( is_pv_32bit_domain(d) )
+    if ( is_pv_32bit_domain(d) || is_pvh_32bit_domain(d) )
         return 0;
 
     d->arch.has_32bit_shinfo = 1;
@@ -771,7 +771,7 @@ int arch_set_info_guest(
 
     /* The context is a compat-mode one if the target domain is compat-mode;
      * we expect the tools to DTRT even in compat-mode callers. */
-    compat = is_pv_32bit_domain(d);
+    compat = is_pv_32bit_domain(d) || is_pvh_32bit_domain(d);
 
 #define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))
     flags = c(flags);
