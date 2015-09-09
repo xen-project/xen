@@ -481,6 +481,7 @@ static void __init parse_video_info(void)
 
 static void __init kexec_reserve_area(struct e820map *e820)
 {
+#ifdef CONFIG_KEXEC
     unsigned long kdump_start = kexec_crash_area.start;
     unsigned long kdump_size  = kexec_crash_area.size;
     static bool_t __initdata is_reserved = 0;
@@ -503,6 +504,7 @@ static void __init kexec_reserve_area(struct e820map *e820)
         printk("Kdump: %luMB (%lukB) at %#lx\n",
                kdump_size >> 20, kdump_size >> 10, kdump_start);
     }
+#endif
 }
 
 static void noinline init_done(void)
@@ -973,6 +975,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             }
         }
 
+#ifdef CONFIG_KEXEC
         /* Don't overlap with modules. */
         e = consider_modules(s, e, PAGE_ALIGN(kexec_crash_area.size),
                              mod, mbi->mods_count, -1);
@@ -981,6 +984,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             e = (e - kexec_crash_area.size) & PAGE_MASK;
             kexec_crash_area.start = e;
         }
+#endif
     }
 
     if ( modules_headroom && !mod->reserved )
@@ -1125,6 +1129,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                          PFN_UP(mod[i].mod_end), PAGE_HYPERVISOR);
     }
 
+#ifdef CONFIG_KEXEC
     if ( kexec_crash_area.size )
     {
         unsigned long s = PFN_DOWN(kexec_crash_area.start);
@@ -1135,6 +1140,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             map_pages_to_xen((unsigned long)__va(kexec_crash_area.start),
                              s, e - s, PAGE_HYPERVISOR);
     }
+#endif
 
     xen_virt_end = ((unsigned long)_end + (1UL << L2_PAGETABLE_SHIFT) - 1) &
                    ~((1UL << L2_PAGETABLE_SHIFT) - 1);

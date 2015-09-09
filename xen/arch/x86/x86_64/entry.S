@@ -723,6 +723,10 @@ ENTRY(exception_table)
         .endr
         .size exception_table, . - exception_table
 
+#ifndef CONFIG_KEXEC
+#define do_kexec_op do_ni_hypercall
+#endif
+
 ENTRY(hypercall_table)
         .quad do_set_trap_table     /*  0 */
         .quad do_mmu_update

@@ -390,6 +390,10 @@ compat_crash_page_fault:
 
 .section .rodata, "a", @progbits
 
+#ifndef CONFIG_KEXEC
+#define compat_kexec_op do_ni_hypercall
+#endif
+
 ENTRY(compat_hypercall_table)
         .quad compat_set_trap_table     /*  0 */
         .quad do_mmu_update
