@@ -3522,11 +3522,19 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
         goto gpf;
     }
 
-    if ( !(value & X86_CR4_PAE) && hvm_long_mode_enabled(v) )
+    if ( !(value & X86_CR4_PAE) )
     {
-        HVM_DBG_LOG(DBG_LEVEL_1, "Guest cleared CR4.PAE while "
-                    "EFER.LMA is set");
-        goto gpf;
+        if ( hvm_long_mode_enabled(v) )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1, "Guest cleared CR4.PAE while "
+                        "EFER.LMA is set");
+            goto gpf;
+        }
+        if ( is_pvh_vcpu(v) )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1, "32-bit PVH guest cleared CR4.PAE");
+            goto gpf;
+        }
     }
 
     old_cr = v->arch.hvm_vcpu.guest_cr[4];
