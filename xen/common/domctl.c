@@ -1049,7 +1049,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         if ( add )
         {
-            printk(XENLOG_G_INFO
+            printk(XENLOG_G_DEBUG
                    "memory_map:add: dom%d gfn=%lx mfn=%lx nr=%lx\n",
                    d->domain_id, gfn, mfn, nr_mfns);
 
@@ -1061,7 +1061,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         }
         else
         {
-            printk(XENLOG_G_INFO
+            printk(XENLOG_G_DEBUG
                    "memory_map:remove: dom%d gfn=%lx mfn=%lx nr=%lx\n",
                    d->domain_id, gfn, mfn, nr_mfns);
 
