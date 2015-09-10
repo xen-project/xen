@@ -2370,9 +2370,14 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
      * pirq and irq mapping. Where the GSI is greater than 256, we assume
      * that dom0 pirq == irq.
      */
-    pirq = (irq >= 256) ? irq : rte.vector;
-    if ( (pirq < 0) || (pirq >= dom0->nr_pirqs) )
-        return -EINVAL;
+    if ( !rte.mask )
+    {
+        pirq = (irq >= 256) ? irq : rte.vector;
+        if ( pirq >= dom0->nr_pirqs )
+            return -EINVAL;
+    }
+    else
+        pirq = -1;
     
     if ( desc->action )
     {
@@ -2407,12 +2412,14 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 
         printk(XENLOG_INFO "allocated vector %02x for irq %d\n", ret, irq);
     }
-    spin_lock(&dom0->event_lock);
-    ret = map_domain_pirq(dom0, pirq, irq,
-            MAP_PIRQ_TYPE_GSI, NULL);
-    spin_unlock(&dom0->event_lock);
-    if ( ret < 0 )
-        return ret;
+    if ( pirq >= 0 )
+    {
+        spin_lock(&dom0->event_lock);
+        ret = map_domain_pirq(dom0, pirq, irq, MAP_PIRQ_TYPE_GSI, NULL);
+        spin_unlock(&dom0->event_lock);
+        if ( ret < 0 )
+            return ret;
+    }
 
     spin_lock_irqsave(&ioapic_lock, flags);
     /* Set the correct irq-handling type. */
