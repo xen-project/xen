@@ -197,18 +197,18 @@ XEN_EXTFILES_URL=http://xenbits.xen.org/xen-extfiles
 # near the place in the Xen Makefiles where the file is used.
 
 ifeq ($(GIT_HTTP),y)
-QEMU_REMOTE=http://xenbits.xen.org/git-http/qemu-xen-4.3-testing.git
+QEMU_REMOTE ?= http://xenbits.xen.org/git-http/qemu-xen-traditional.git
 else
-QEMU_REMOTE=git://xenbits.xen.org/qemu-xen-4.3-testing.git
+QEMU_REMOTE ?= git://xenbits.xen.org/qemu-xen-traditional.git
 endif
 
 ifeq ($(GIT_HTTP),y)
 OVMF_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/ovmf.git
-QEMU_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/qemu-upstream-4.3-testing.git
+QEMU_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/qemu-xen.git
 SEABIOS_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/seabios.git
 else
 OVMF_UPSTREAM_URL ?= git://xenbits.xen.org/ovmf.git
-QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-4.3-testing.git
+QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-xen.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= b0855f925c6e2e0b21fbb03fab4b5fb5b6876871
