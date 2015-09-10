@@ -9318,7 +9318,13 @@ fi
 
 
 else
+
+		if test "x$enable_systemd" = "xyes"; then :
+  as_fn_error $? "Unable to find systemd development library" "$LINENO" 5
+else
   systemd=n
+fi
+
 fi
 
 else
