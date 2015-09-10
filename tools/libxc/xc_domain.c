@@ -2493,6 +2493,15 @@ int xc_domain_setvnuma(xc_interface *xch,
     return rc;
 }
 
+
+int xc_domain_soft_reset(xc_interface *xch,
+                         uint32_t domid)
+{
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_soft_reset;
+    domctl.domain = (domid_t)domid;
+    return do_domctl(xch, &domctl);
+}
 /*
  * Local variables:
  * mode: C
