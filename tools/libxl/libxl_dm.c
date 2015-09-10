@@ -31,7 +31,7 @@ static const char *libxl_tapif_script(libxl__gc *gc)
 
 const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid)
 {
-    return libxl__sprintf(gc, "/var/lib/xen/qemu-save.%d", domid);
+    return libxl__sprintf(gc, LIBXL_DEVICE_MODEL_SAVE_FILE".%d", domid);
 }
 
 static const char *qemu_xen_path(libxl__gc *gc)
