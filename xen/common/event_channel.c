@@ -980,44 +980,28 @@ int evtchn_unmask(unsigned int port)
 }
 
 
-static long evtchn_reset(evtchn_reset_t *r)
+int evtchn_reset(struct domain *d)
 {
-    domid_t dom = r->dom;
-    struct domain *d;
-    int i, rc;
+    unsigned int i;
 
-    d = rcu_lock_domain_by_any_id(dom);
-    if ( d == NULL )
-        return -ESRCH;
-
-    rc = xsm_evtchn_reset(XSM_TARGET, current->domain, d);
-    if ( rc )
-        goto out;
+    if ( d != current->domain && !d->controller_pause_count )
+        return -EINVAL;
 
     for ( i = 0; port_is_valid(d, i); i++ )
         evtchn_close(d, i, 1);
 
     spin_lock(&d->event_lock);
 
-    if ( (dom == DOMID_SELF) && d->evtchn_fifo )
+    if ( d->evtchn_fifo )
     {
-        /*
-         * Guest domain called EVTCHNOP_reset with DOMID_SELF, destroying
-         * FIFO event array and control blocks, resetting evtchn_port_ops to
-         * evtchn_port_ops_2l.
-         */
+        /* Switching back to 2-level ABI. */
         evtchn_fifo_destroy(d);
         evtchn_2l_init(d);
     }
 
     spin_unlock(&d->event_lock);
 
-    rc = 0;
-
-out:
-    rcu_unlock_domain(d);
-
-    return rc;
+    return 0;
 }
 
 static long evtchn_set_priority(const struct evtchn_set_priority *set_priority)
@@ -1142,9 +1126,20 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case EVTCHNOP_reset: {
         struct evtchn_reset reset;
+        struct domain *d;
+
         if ( copy_from_guest(&reset, arg, 1) != 0 )
             return -EFAULT;
-        rc = evtchn_reset(&reset);
+
+        d = rcu_lock_domain_by_any_id(reset.dom);
+        if ( d == NULL )
+            return -ESRCH;
+
+        rc = xsm_evtchn_reset(XSM_TARGET, current->domain, d);
+        if ( !rc )
+            rc = evtchn_reset(d);
+
+        rcu_unlock_domain(d);
         break;
     }
 
