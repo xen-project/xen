@@ -66,6 +66,12 @@ void hwdom_shutdown(u8 reason)
         machine_restart(0);
         break; /* not reached */
 
+    case SHUTDOWN_soft_reset:
+        printk("Hardware domain %d did unsupported soft reset, rebooting.\n",
+               hardware_domain->domain_id);
+        machine_restart(0);
+        break; /* not reached */
+
     default:
         printk("Hardware Dom%u shutdown (unknown reason %u): ",
                hardware_domain->domain_id, reason);
