@@ -202,9 +202,12 @@ static inline lpae_t mfn_to_xen_entry(unsigned long mfn, unsigned attr)
             .ai = attr,
             .ns = 1,              /* Hyp mode is in the non-secure world */
             .user = 1,            /* See below */
+            .ro = 0,              /* Assume read-write */
             .af = 1,              /* No need for access tracking */
             .ng = 1,              /* Makes TLB flushes easier */
+            .contig = 0,          /* Assume non-contiguous */
             .xn = 1,              /* No need to execute outside .text */
+            .avail = 0,           /* Reference count for domheap mapping */
         }};;
     /* Setting the User bit is strange, but the ATS1H[RW] instructions
      * don't seem to work otherwise, and since we never run on Xen
