@@ -110,6 +110,16 @@ static void vcpu_check_shutdown(struct vcpu *v)
     spin_unlock(&d->shutdown_lock);
 }
 
+static void vcpu_info_reset(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+
+    v->vcpu_info = ((v->vcpu_id < XEN_LEGACY_MAX_VCPUS)
+                    ? (vcpu_info_t *)&shared_info(d, vcpu_info[v->vcpu_id])
+                    : &dummy_vcpu_info);
+    v->vcpu_info_mfn = INVALID_MFN;
+}
+
 struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id)
 {
@@ -145,10 +155,7 @@ struct vcpu *alloc_vcpu(
         v->runstate.state = RUNSTATE_offline;        
         v->runstate.state_entry_time = NOW();
         set_bit(_VPF_down, &v->pause_flags);
-        v->vcpu_info = ((vcpu_id < XEN_LEGACY_MAX_VCPUS)
-                        ? (vcpu_info_t *)&shared_info(d, vcpu_info[vcpu_id])
-                        : &dummy_vcpu_info);
-        v->vcpu_info_mfn = INVALID_MFN;
+        vcpu_info_reset(v);
         init_waitqueue_vcpu(v);
     }
 
@@ -1038,6 +1045,34 @@ void domain_unpause_except_self(struct domain *d)
         domain_unpause(d);
 }
 
+int domain_soft_reset(struct domain *d)
+{
+    struct vcpu *v;
+    int rc;
+
+    spin_lock(&d->shutdown_lock);
+    for_each_vcpu ( d, v )
+        if ( !v->paused_for_shutdown )
+        {
+            spin_unlock(&d->shutdown_lock);
+            return -EINVAL;
+        }
+    spin_unlock(&d->shutdown_lock);
+
+    rc = evtchn_reset(d);
+    if ( rc )
+        return rc;
+
+    grant_table_warn_active_grants(d);
+
+    for_each_vcpu ( d, v )
+        unmap_vcpu_info(v);
+
+    domain_resume(d);
+
+    return 0;
+}
+
 int vcpu_reset(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -1149,8 +1184,7 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
 
 /*
  * Unmap the vcpu info page if the guest decided to place it somewhere
- * else.  This is only used from arch_domain_destroy, so there's no
- * need to do anything clever.
+ * else. This is used from arch_domain_destroy and domain_soft_reset.
  */
 void unmap_vcpu_info(struct vcpu *v)
 {
@@ -1163,8 +1197,7 @@ void unmap_vcpu_info(struct vcpu *v)
     unmap_domain_page_global((void *)
                              ((unsigned long)v->vcpu_info & PAGE_MASK));
 
-    v->vcpu_info = &dummy_vcpu_info;
-    v->vcpu_info_mfn = INVALID_MFN;
+    vcpu_info_reset(v);
 
     put_page_and_type(mfn_to_page(mfn));
 }

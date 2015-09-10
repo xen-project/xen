@@ -704,6 +704,15 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         break;
     }
 
+    case XEN_DOMCTL_soft_reset:
+        if ( d == current->domain )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        ret = domain_soft_reset(d);
+        break;
+
     case XEN_DOMCTL_destroydomain:
         ret = domain_kill(d);
         if ( ret == -ERESTART )
