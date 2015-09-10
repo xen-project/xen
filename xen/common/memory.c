@@ -126,22 +126,28 @@ static void populate_physmap(struct memop_args *a)
             if ( is_domain_direct_mapped(d) )
             {
                 mfn = gpfn;
-                if ( !mfn_valid(mfn) )
+
+                for ( j = 0; j < (1U << a->extent_order); j++, mfn++ )
                 {
-                    gdprintk(XENLOG_INFO, "Invalid mfn %#"PRI_xen_pfn"\n",
-                             mfn);
-                    goto out;
+                    if ( !mfn_valid(mfn) )
+                    {
+                        gdprintk(XENLOG_INFO, "Invalid mfn %#"PRI_xen_pfn"\n",
+                                 mfn);
+                        goto out;
+                    }
+
+                    page = mfn_to_page(mfn);
+                    if ( !get_page(page, d) )
+                    {
+                        gdprintk(XENLOG_INFO,
+                                 "mfn %#"PRI_xen_pfn" doesn't belong to the"
+                                 " domain\n", mfn);
+                        goto out;
+                    }
+                    put_page(page);
                 }
 
-                page = mfn_to_page(mfn);
-                if ( !get_page(page, d) )
-                {
-                    gdprintk(XENLOG_INFO,
-                             "mfn %#"PRI_xen_pfn" doesn't belong to the"
-                             " domain\n", mfn);
-                    goto out;
-                }
-                put_page(page);
+                page = mfn_to_page(gpfn);
             }
             else
                 page = alloc_domheap_pages(d, a->extent_order, a->memflags);
