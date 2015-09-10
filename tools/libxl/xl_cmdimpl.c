@@ -2411,15 +2411,12 @@ static void reload_domain_config(uint32_t domid,
     }
 }
 
-/* Returns 1 if domain should be restarted,
- * 2 if domain should be renamed then restarted, or 0
- * Can update r_domid if domain is destroyed etc */
-static int handle_domain_death(uint32_t *r_domid,
-                               libxl_event *event,
-                               libxl_domain_config *d_config)
-
+/* Can update r_domid if domain is destroyed */
+static domain_restart_type handle_domain_death(uint32_t *r_domid,
+                                               libxl_event *event,
+                                               libxl_domain_config *d_config)
 {
-    int restart = 0;
+    domain_restart_type restart = DOMAIN_RESTART_NONE;
     libxl_action_on_shutdown action;
 
     switch (event->u.domain_shutdown.shutdown_reason) {
@@ -2474,12 +2471,12 @@ static int handle_domain_death(uint32_t *r_domid,
 
     case LIBXL_ACTION_ON_SHUTDOWN_RESTART_RENAME:
         reload_domain_config(*r_domid, d_config);
-        restart = 2;
+        restart = DOMAIN_RESTART_RENAME;
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_RESTART:
         reload_domain_config(*r_domid, d_config);
-        restart = 1;
+        restart = DOMAIN_RESTART_NORMAL;
         /* fall-through */
     case LIBXL_ACTION_ON_SHUTDOWN_DESTROY:
         LOG("Domain %d needs to be cleaned up: destroying the domain",
@@ -2946,7 +2943,7 @@ start:
                 event->u.domain_shutdown.shutdown_reason,
                 event->u.domain_shutdown.shutdown_reason);
             switch (handle_domain_death(&domid, event, &d_config)) {
-            case 2:
+            case DOMAIN_RESTART_RENAME:
                 if (!preserve_domain(&domid, event, &d_config)) {
                     /* If we fail then exit leaving the old domain in place. */
                     ret = -1;
@@ -2954,7 +2951,7 @@ start:
                 }
 
                 /* Otherwise fall through and restart. */
-            case 1:
+            case DOMAIN_RESTART_NORMAL:
                 libxl_event_free(ctx, event);
                 libxl_evdisable_domain_death(ctx, deathw);
                 deathw = NULL;
@@ -2990,7 +2987,7 @@ start:
                 sleep(2);
                 goto start;
 
-            case 0:
+            case DOMAIN_RESTART_NONE:
                 LOG("Done. Exiting now");
                 libxl_event_free(ctx, event);
                 ret = 0;
