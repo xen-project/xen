@@ -197,18 +197,18 @@ static inline lpae_t mfn_to_xen_entry(unsigned long mfn, unsigned attr)
     paddr_t pa = ((paddr_t) mfn) << PAGE_SHIFT;
     lpae_t e = (lpae_t) {
         .pt = {
-            .xn = 1,              /* No need to execute outside .text */
-            .ng = 1,              /* Makes TLB flushes easier */
-            .af = 1,              /* No need for access tracking */
+            .valid = 1,           /* Mappings are present */
+            .table = 0,           /* Set to 1 for links and 4k maps */
+            .ai = attr,
             .ns = 1,              /* Hyp mode is in the non-secure world */
             .user = 1,            /* See below */
-            .ai = attr,
-            .table = 0,           /* Set to 1 for links and 4k maps */
-            .valid = 1,           /* Mappings are present */
+            .af = 1,              /* No need for access tracking */
+            .ng = 1,              /* Makes TLB flushes easier */
+            .xn = 1,              /* No need to execute outside .text */
         }};;
     /* Setting the User bit is strange, but the ATS1H[RW] instructions
      * don't seem to work otherwise, and since we never run on Xen
-     * pagetables un User mode it's OK.  If this changes, remember
+     * pagetables in User mode it's OK.  If this changes, remember
      * to update the hard-coded values in head.S too */
 
     switch ( attr )
