@@ -232,6 +232,8 @@ class domain2
 # XEN_DOMCTL_monitor_op
 # XEN_DOMCTL_vm_event_op
     vm_event
+# XEN_DOMCTL_soft_reset
+    soft_reset
 # XENMEM_access_op
     mem_access
 # XENMEM_paging_op
