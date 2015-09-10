@@ -3352,6 +3352,41 @@ gnttab_release_mappings(
     }
 }
 
+void grant_table_warn_active_grants(struct domain *d)
+{
+    struct grant_table *gt = d->grant_table;
+    struct active_grant_entry *act;
+    grant_ref_t ref;
+    unsigned int nr_active = 0;
+
+#define WARN_GRANT_MAX 10
+
+    read_lock(&gt->lock);
+
+    for ( ref = 0; ref != nr_grant_entries(gt); ref++ )
+    {
+        act = active_entry_acquire(gt, ref);
+        if ( !act->pin )
+        {
+            active_entry_release(act);
+            continue;
+        }
+
+        nr_active++;
+        if ( nr_active <= WARN_GRANT_MAX )
+            printk(XENLOG_G_DEBUG "Dom%d has an active grant: GFN: %lx (MFN: %lx)\n",
+                   d->domain_id, act->gfn, act->frame);
+        active_entry_release(act);
+    }
+
+    if ( nr_active > WARN_GRANT_MAX )
+        printk(XENLOG_G_DEBUG "Dom%d has too many (%d) active grants to report\n",
+               d->domain_id, nr_active);
+
+    read_unlock(&gt->lock);
+
+#undef WARN_GRANT_MAX
+}
 
 void
 grant_table_destroy(

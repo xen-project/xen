@@ -89,6 +89,11 @@ void grant_table_destroy(
     struct domain *d);
 void grant_table_init_vcpu(struct vcpu *v);
 
+/*
+ * Check if domain has active grants and log first 10 of them.
+ */
+void grant_table_warn_active_grants(struct domain *d);
+
 /* Domain death release of granted mappings of other domains' memory. */
 void
 gnttab_release_mappings(
