@@ -25,7 +25,6 @@ static struct acpi_table_slit *__read_mostly acpi_slit;
 
 static nodemask_t memory_nodes_parsed __initdata;
 static nodemask_t processor_nodes_parsed __initdata;
-static nodemask_t nodes_found __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
 static u8 __read_mostly pxm2node[256] = { [0 ... 255] = NUMA_NO_NODE };
 
@@ -45,17 +44,25 @@ int pxm_to_node(int pxm)
 	return (signed char)pxm2node[pxm];
 }
 
-__devinit int setup_node(int pxm)
+int setup_node(int pxm)
 {
 	unsigned node = pxm2node[pxm];
-	if (node == 0xff) {
-		if (nodes_weight(nodes_found) >= MAX_NUMNODES)
+
+	if (node == NUMA_NO_NODE) {
+		static bool_t warned;
+		static unsigned nodes_found;
+
+		node = nodes_found++;
+		if (node >= MAX_NUMNODES) {
+			printk(KERN_WARNING
+			       "SRAT: Too many proximity domains (%#x)\n",
+			       pxm);
+			warned = 1;
 			return -1;
-		node = first_unset_node(nodes_found); 
-		node_set(node, nodes_found);
+		}
 		pxm2node[pxm] = node;
 	}
-	return pxm2node[pxm];
+	return node;
 }
 
 int valid_numa_range(u64 start, u64 end, int node)
@@ -176,7 +183,6 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
 	pxm = pa->proximity_domain;
 	node = setup_node(pxm);
 	if (node < 0) {
-		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
 		bad_srat();
 		return;
 	}
@@ -209,7 +215,6 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 	}
 	node = setup_node(pxm);
 	if (node < 0) {
-		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
 		bad_srat();
 		return;
 	}
@@ -253,7 +258,6 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 		pxm &= 0xff;
 	node = setup_node(pxm);
 	if (node < 0) {
-		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
 		bad_srat();
 		return;
 	}
@@ -295,7 +299,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 
 /* Sanity check to catch more bad SRATs (they are amazingly common).
    Make sure the PXMs cover all memory. */
-static int nodes_cover_memory(void)
+static int __init nodes_cover_memory(void)
 {
 	int i;
 
