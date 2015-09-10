@@ -85,7 +85,11 @@ AC_DEFUN([AX_CHECK_SYSTEMD], [
 		AC_DEFINE([HAVE_SYSTEMD], [1], [Systemd available and enabled])
 			systemd=y
 			AX_CHECK_SYSTEMD_LIBS()
-	    ],[systemd=n])
+	    ],[
+		AS_IF([test "x$enable_systemd" = "xyes"],
+			[AC_MSG_ERROR([Unable to find systemd development library])],
+			[systemd=n])
+	    ])
 	],[systemd=n])
 ])
 
