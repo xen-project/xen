@@ -1419,6 +1419,13 @@ static void parse_config_data(const char *config_source,
         exit(1);
     }
 
+    if (xlu_cfg_get_string (config, "on_soft_reset", &buf, 0))
+        buf = "restart";
+    if (!parse_action_on_shutdown(buf, &d_config->on_soft_reset)) {
+        fprintf(stderr, "Unknown on_soft_reset action \"%s\" specified\n", buf);
+        exit(1);
+    }
+
     /* libxl_get_required_shadow_memory() must be called after final values
      * (default or specified) for vcpus and memory are set, because the
      * calculation depends on those values. */
@@ -2430,6 +2437,9 @@ static int handle_domain_death(uint32_t *r_domid,
         break;
     case LIBXL_SHUTDOWN_REASON_WATCHDOG:
         action = d_config->on_watchdog;
+        break;
+    case LIBXL_SHUTDOWN_REASON_SOFT_RESET:
+        action = d_config->on_soft_reset;
         break;
     default:
         LOG("Unknown shutdown reason code %d. Destroying domain.",
@@ -3860,7 +3870,7 @@ static void list_domains(bool verbose, bool context, bool claim, bool numa,
                          bool cpupool, const libxl_dominfo *info, int nb_domain)
 {
     int i;
-    static const char shutdown_reason_letters[]= "-rscw";
+    static const char shutdown_reason_letters[]= "-rscwS";
     libxl_bitmap nodemap;
     libxl_physinfo physinfo;
 

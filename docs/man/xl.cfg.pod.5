@@ -367,6 +367,11 @@ Default is C<destroy>.
 
 Action to take if the domain crashes.  Default is C<destroy>.
 
+=item B<on_soft_reset="ACTION">
+
+Action to take if the domain performs 'soft reset' (e.g. does kexec).
+Default is C<restart>.
+
 =back
 
 =head3 Direct Kernel Boot
