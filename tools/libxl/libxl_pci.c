@@ -543,6 +543,17 @@ static int pciback_dev_is_assigned(libxl__gc *gc, libxl_device_pci *pcidev)
     int rc;
     struct stat st;
 
+    if ( access(SYSFS_PCIBACK_DRIVER, F_OK) < 0 ) {
+        if ( errno == ENOENT ) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "Looks like pciback driver is not loaded");
+        } else {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                             "Can't access "SYSFS_PCIBACK_DRIVER);
+        }
+        return -1;
+    }
+
     spath = libxl__sprintf(gc, SYSFS_PCIBACK_DRIVER"/"PCI_BDF,
                            pcidev->domain, pcidev->bus,
                            pcidev->dev, pcidev->func);
@@ -658,6 +669,7 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     unsigned dom, bus, dev, func;
     char *spath, *driver_path = NULL;
+    int rc;
     struct stat st;
 
     /* Local copy for convenience */
@@ -674,7 +686,11 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
     }
 
     /* Check to see if it's already assigned to pciback */
-    if ( pciback_dev_is_assigned(gc, pcidev) ) {
+    rc = pciback_dev_is_assigned(gc, pcidev);
+    if ( rc < 0 ) {
+        return ERROR_FAIL;
+    }
+    if ( rc ) {
         LIBXL__LOG(ctx, LIBXL__LOG_WARNING, PCI_BDF" already assigned to pciback",
                    dom, bus, dev, func);
         return 0;
@@ -692,11 +708,18 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
     if ( rebind ) {
         if ( driver_path ) {
             pci_assignable_driver_path_write(gc, pcidev, driver_path);
+        } else if ( (driver_path =
+                     pci_assignable_driver_path_read(gc, pcidev)) != NULL ) {
+            LIBXL__LOG(ctx, LIBXL__LOG_INFO,
+                       PCI_BDF" not bound to a driver, will be rebound to %s",
+                       dom, bus, dev, func, driver_path);
         } else {
             LIBXL__LOG(ctx, LIBXL__LOG_WARNING,
                        PCI_BDF" not bound to a driver, will not be rebound.",
                        dom, bus, dev, func);
         }
+    } else {
+        pci_assignable_driver_path_remove(gc, pcidev);
     }
 
     if ( pciback_dev_assign(gc, pcidev) ) {
@@ -717,7 +740,6 @@ static int libxl__device_pci_assignable_remove(libxl__gc *gc,
 
     /* Unbind from pciback */
     if ( (rc=pciback_dev_is_assigned(gc, pcidev)) < 0 ) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Checking if pciback was assigned");
         return ERROR_FAIL;
     } else if ( rc ) {
         pciback_dev_unassign(gc, pcidev);
@@ -741,9 +763,9 @@ static int libxl__device_pci_assignable_remove(libxl__gc *gc,
                                  "Couldn't bind device to %s", driver_path);
                 return -1;
             }
-        }
 
-        pci_assignable_driver_path_remove(gc, pcidev);
+            pci_assignable_driver_path_remove(gc, pcidev);
+        }
     } else {
         if ( rebind ) {
             LIBXL__LOG(ctx, LIBXL__LOG_WARNING,
