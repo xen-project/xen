@@ -1068,9 +1068,13 @@ int domain_soft_reset(struct domain *d)
     for_each_vcpu ( d, v )
         unmap_vcpu_info(v);
 
-    domain_resume(d);
+    rc = arch_domain_soft_reset(d);
+    if ( !rc )
+        domain_resume(d);
+    else
+        domain_crash(d);
 
-    return 0;
+    return rc;
 }
 
 int vcpu_reset(struct vcpu *v)

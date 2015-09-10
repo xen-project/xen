@@ -6877,6 +6877,11 @@ int hvm_set_mode(struct vcpu *v, int mode)
     return 0;
 }
 
+void hvm_domain_soft_reset(struct domain *d)
+{
+    hvm_destroy_all_ioreq_servers(d);
+}
+
 /*
  * Local variables:
  * mode: C

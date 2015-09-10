@@ -655,6 +655,11 @@ void arch_domain_unpause(struct domain *d)
 {
 }
 
+int arch_domain_soft_reset(struct domain *d)
+{
+    return -ENOSYS;
+}
+
 static int is_guest_pv32_psr(uint32_t psr)
 {
     switch (psr & PSR_MODE_MASK)

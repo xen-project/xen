@@ -709,6 +709,87 @@ void arch_domain_unpause(struct domain *d)
         viridian_time_ref_count_thaw(d);
 }
 
+int arch_domain_soft_reset(struct domain *d)
+{
+    struct page_info *page = virt_to_page(d->shared_info), *new_page;
+    int ret = 0;
+    struct domain *owner;
+    unsigned long mfn, gfn;
+    p2m_type_t p2mt;
+    unsigned int i;
+
+    /* Soft reset is supported for HVM/PVH domains only. */
+    if ( !has_hvm_container_domain(d) )
+        return -EINVAL;
+
+    hvm_domain_soft_reset(d);
+
+    spin_lock(&d->event_lock);
+    for ( i = 0; i < d->nr_pirqs ; i++ )
+    {
+        if ( domain_pirq_to_emuirq(d, i) != IRQ_UNBOUND )
+        {
+            ret = unmap_domain_pirq_emuirq(d, i);
+            if ( ret )
+                break;
+        }
+    }
+    spin_unlock(&d->event_lock);
+
+    if ( ret )
+        return ret;
+
+    /*
+     * The shared_info page needs to be replaced with a new page, otherwise we
+     * will get a hole if the domain does XENMAPSPACE_shared_info.
+     */
+
+    owner = page_get_owner_and_reference(page);
+    ASSERT( owner == d );
+
+    mfn = page_to_mfn(page);
+    gfn = mfn_to_gmfn(d, mfn);
+
+    /*
+     * gfn == INVALID_GFN indicates that the shared_info page was never mapped
+     * to the domain's address space and there is nothing to replace.
+     */
+    if ( gfn == INVALID_GFN )
+        goto exit_put_page;
+
+    if ( mfn_x(get_gfn_query(d, gfn, &p2mt)) != mfn )
+    {
+        printk(XENLOG_G_ERR "Failed to get Dom%d's shared_info GFN (%lx)\n",
+               d->domain_id, gfn);
+        ret = -EINVAL;
+        goto exit_put_page;
+    }
+
+    new_page = alloc_domheap_page(d, 0);
+    if ( !new_page )
+    {
+        printk(XENLOG_G_ERR "Failed to alloc a page to replace"
+               " Dom%d's shared_info frame %lx\n", d->domain_id, gfn);
+        ret = -ENOMEM;
+        goto exit_put_gfn;
+    }
+    guest_physmap_remove_page(d, gfn, mfn, PAGE_ORDER_4K);
+
+    ret = guest_physmap_add_page(d, gfn, page_to_mfn(new_page), PAGE_ORDER_4K);
+    if ( ret )
+    {
+        printk(XENLOG_G_ERR "Failed to add a page to replace"
+               " Dom%d's shared_info frame %lx\n", d->domain_id, gfn);
+        free_domheap_page(new_page);
+    }
+ exit_put_gfn:
+    put_gfn(d, gfn);
+ exit_put_page:
+    put_page(page);
+
+    return ret;
+}
+
 /*
  * These are the masks of CR4 bits (subject to hardware availability) which a
  * PV guest may not legitimiately attempt to modify.
