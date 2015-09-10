@@ -975,7 +975,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     setup_max_pdx(raw_max_page);
     if ( highmem_start )
-        xenheap_max_mfn(PFN_DOWN(highmem_start));
+        xenheap_max_mfn(PFN_DOWN(highmem_start - 1));
 
     /*
      * Walk every RAM region and map it in its entirety (on x86/64, at least)
@@ -1156,9 +1156,6 @@ void __init __start_xen(unsigned long mbi_p)
 
     numa_initmem_init(0, raw_max_page);
 
-    end_boot_allocator();
-    system_state = SYS_STATE_boot;
-
     if ( max_page - 1 > virt_to_mfn(HYPERVISOR_VIRT_END - 1) )
     {
         unsigned long limit = virt_to_mfn(HYPERVISOR_VIRT_END - 1);
@@ -1166,6 +1163,8 @@ void __init __start_xen(unsigned long mbi_p)
 
         if ( !highmem_start )
             xenheap_max_mfn(limit);
+
+        end_boot_allocator();
 
         /* Pass the remaining memory to the allocator. */
         for ( i = 0; i < boot_e820.nr_map; i++ )
@@ -1190,6 +1189,10 @@ void __init __start_xen(unsigned long mbi_p)
            opt_tmem = 0;
         }
     }
+    else
+        end_boot_allocator();
+
+    system_state = SYS_STATE_boot;
 
     vm_init();
     vesa_init();
