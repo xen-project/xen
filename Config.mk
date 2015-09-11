@@ -246,9 +246,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.4.3
-# Wed Jun 3 14:41:27 2015 +0200
-# ide: Clear DRQ after handling all expected accesses
+QEMU_TAG ?= 5ae0569d964ad1a6d8dc781e5566d39210a5d063
+# Mon Jun 30 10:07:54 2014 +0200
+# vnc: limit client_cut_text msg payload size
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
