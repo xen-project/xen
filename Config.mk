@@ -266,9 +266,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 5cdde31eacdd288359746019ad05cac8ed5d9f70
-# Fri Aug 28 15:53:40 2015 +0100
-# HVM: atomically access pointers in bufioreq handling
+QEMU_TRADITIONAL_REVISION ?= 1c8d43cbdf0fc01a8f05acfbf55b805a83da34bb
+# Tue Sep 8 15:41:20 2015 +0100
+# Fix build after "ui/vnc: limit client_cut_text msg payload size"
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
