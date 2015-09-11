@@ -249,10 +249,12 @@ static int pmtimer_save(struct domain *d, hvm_domain_context_t *h)
 
     spin_lock(&s->lock);
 
-    /* Update the counter to the guest's current time.  We always save
-     * with the domain paused, so the saved time should be after the
-     * last_gtime, but just in case, make sure we only go forwards */
-    x = ((s->vcpu->arch.hvm_vcpu.guest_time - s->last_gtime) * s->scale) >> 32;
+    /*
+     * Update the counter to the guest's current time.  Make sure it only
+     * goes forwards.
+     */
+    x = (((s->vcpu->arch.hvm_vcpu.guest_time ?: hvm_get_guest_time(s->vcpu)) -
+          s->last_gtime) * s->scale) >> 32;
     if ( x < 1UL<<31 )
         s->pm.tmr_val += x;
     if ( (s->pm.tmr_val & TMR_VAL_MSB) != msb )
