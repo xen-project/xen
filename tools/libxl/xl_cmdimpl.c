@@ -1093,6 +1093,9 @@ static void parse_vnuma_config(const XLU_Config *config,
     if (xlu_cfg_get_list(config, "vnuma", &vnuma, &num_vnuma, 1))
         return;
 
+    if (!num_vnuma)
+        return;
+
     b_info->num_vnuma_nodes = num_vnuma;
     b_info->vnuma_nodes = xcalloc(num_vnuma, sizeof(libxl_vnode_info));
     vcpu_parsed = xcalloc(num_vnuma, sizeof(libxl_bitmap));
