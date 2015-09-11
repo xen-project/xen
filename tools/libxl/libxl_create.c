@@ -1556,6 +1556,7 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
 {
     AO_CREATE(ctx, 0, ao_how);
     libxl__app_domain_create_state *cdcs;
+    int rc;
 
     GCNEW(cdcs);
     cdcs->dcs.ao = ao;
@@ -1563,8 +1564,13 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     libxl_domain_config_init(&cdcs->dcs.guest_config_saved);
     libxl_domain_config_copy(ctx, &cdcs->dcs.guest_config_saved, d_config);
     cdcs->dcs.restore_fd = cdcs->dcs.libxc_fd = restore_fd;
-    if (restore_fd > -1)
+    if (restore_fd > -1) {
         cdcs->dcs.restore_params = *params;
+        rc = libxl__fd_flags_modify_save(gc, cdcs->dcs.restore_fd,
+                                         ~(O_NONBLOCK|O_NDELAY), 0,
+                                         &cdcs->dcs.restore_fdfl);
+        if (rc < 0) goto out_err;
+    }
     cdcs->dcs.callback = domain_create_cb;
     libxl__ao_progress_gethow(&cdcs->dcs.aop_console_how, aop_console_how);
     cdcs->domid_out = domid;
@@ -1572,6 +1578,10 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     initiate_domain_create(egc, &cdcs->dcs);
 
     return AO_INPROGRESS;
+
+ out_err:
+    return AO_CREATE_FAIL(rc);
+
 }
 
 static void domain_create_cb(libxl__egc *egc,
@@ -1579,9 +1589,20 @@ static void domain_create_cb(libxl__egc *egc,
                              int rc, uint32_t domid)
 {
     libxl__app_domain_create_state *cdcs = CONTAINER_OF(dcs, *cdcs, dcs);
+    int flrc;
     STATE_AO_GC(cdcs->dcs.ao);
 
     *cdcs->domid_out = domid;
+
+    if (dcs->restore_fd > -1) {
+        flrc = libxl__fd_flags_restore(gc,
+                dcs->restore_fd, dcs->restore_fdfl);
+        /*
+         * If restore has failed already then report that error not
+         * this one.
+         */
+        if (flrc && !rc) rc = flrc;
+    }
 
     libxl__ao_complete(egc, ao, rc);
 }

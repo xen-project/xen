@@ -952,6 +952,12 @@ static void domain_suspend_cb(libxl__egc *egc,
                               libxl__domain_suspend_state *dss, int rc)
 {
     STATE_AO_GC(dss->ao);
+    int flrc;
+
+    flrc = libxl__fd_flags_restore(gc, dss->fd, dss->fdfl);
+    /* If suspend has failed already then report that error not this one. */
+    if (flrc && !rc) rc = flrc;
+
     libxl__ao_complete(egc,ao,rc);
 
 }
@@ -979,6 +985,11 @@ int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd, int flags,
     dss->type = type;
     dss->live = flags & LIBXL_SUSPEND_LIVE;
     dss->debug = flags & LIBXL_SUSPEND_DEBUG;
+
+    rc = libxl__fd_flags_modify_save(gc, dss->fd,
+                                     ~(O_NONBLOCK|O_NDELAY), 0,
+                                     &dss->fdfl);
+    if (rc < 0) goto out_err;
 
     libxl__domain_save(egc, dss);
     return AO_INPROGRESS;
@@ -6507,6 +6518,60 @@ int libxl_fd_set_cloexec(libxl_ctx *ctx, int fd, int cloexec)
 int libxl_fd_set_nonblock(libxl_ctx *ctx, int fd, int nonblock)
   { return fd_set_flags(ctx,fd, F_GETFL,F_SETFL,"FL", O_NONBLOCK, nonblock); }
 
+int libxl__fd_flags_modify_save(libxl__gc *gc, int fd,
+                                int mask, int val, int *r_oldflags)
+{
+    int rc, ret, fdfl;
+
+    fdfl = fcntl(fd, F_GETFL);
+    if (fdfl < 0) {
+        LOGE(ERROR, "failed to fcntl.F_GETFL for fd %d", fd);
+        rc = ERROR_FAIL;
+        goto out_err;
+    }
+
+    LOG(DEBUG, "fnctl F_GETFL flags for fd %d are %x", fd, fdfl);
+
+    if (r_oldflags)
+        *r_oldflags = fdfl;
+
+    fdfl &= mask;
+    fdfl |= val;
+
+    LOG(DEBUG, "fnctl F_SETFL of fd %d to %x", fd, fdfl);
+
+    ret = fcntl(fd, F_SETFL, fdfl);
+    if (ret < 0) {
+        LOGE(ERROR, "failed to fcntl.F_SETFL for fd %d", fd);
+        rc = ERROR_FAIL;
+        goto out_err;
+    }
+
+    rc = 0;
+
+out_err:
+    return rc;
+}
+
+int libxl__fd_flags_restore(libxl__gc *gc, int fd, int fdfl)
+{
+    int ret, rc;
+
+    LOG(DEBUG, "fnctl F_SETFL of fd %d to %x", fd, fdfl);
+
+    ret = fcntl(fd, F_SETFL, fdfl);
+    if (ret < 0) {
+        LOGE(ERROR, "failed to fcntl.F_SETFL for fd %x", fd);
+        rc = ERROR_FAIL;
+        goto out_err;
+    }
+
+    rc = 0;
+
+out_err:
+    return rc;
+
+}
 
 void libxl_hwcap_copy(libxl_ctx *ctx,libxl_hwcap *dst, libxl_hwcap *src)
 {
