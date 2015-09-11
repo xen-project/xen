@@ -6530,7 +6530,7 @@ int libxl__fd_flags_modify_save(libxl__gc *gc, int fd,
         goto out_err;
     }
 
-    LOG(DEBUG, "fnctl F_GETFL flags for fd %d are %x", fd, fdfl);
+    LOG(DEBUG, "fnctl F_GETFL flags for fd %d are 0x%x", fd, fdfl);
 
     if (r_oldflags)
         *r_oldflags = fdfl;
@@ -6538,7 +6538,7 @@ int libxl__fd_flags_modify_save(libxl__gc *gc, int fd,
     fdfl &= mask;
     fdfl |= val;
 
-    LOG(DEBUG, "fnctl F_SETFL of fd %d to %x", fd, fdfl);
+    LOG(DEBUG, "fnctl F_SETFL of fd %d to 0x%x", fd, fdfl);
 
     ret = fcntl(fd, F_SETFL, fdfl);
     if (ret < 0) {
@@ -6557,11 +6557,11 @@ int libxl__fd_flags_restore(libxl__gc *gc, int fd, int fdfl)
 {
     int ret, rc;
 
-    LOG(DEBUG, "fnctl F_SETFL of fd %d to %x", fd, fdfl);
+    LOG(DEBUG, "fnctl F_SETFL of fd %d to 0x%x", fd, fdfl);
 
     ret = fcntl(fd, F_SETFL, fdfl);
     if (ret < 0) {
-        LOGE(ERROR, "failed to fcntl.F_SETFL for fd %x", fd);
+        LOGE(ERROR, "failed to fcntl.F_SETFL for fd %d", fd);
         rc = ERROR_FAIL;
         goto out_err;
     }
