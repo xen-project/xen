@@ -957,6 +957,48 @@ int xc_dom_update_guest_p2m(struct xc_dom_image *dom)
     return 0;
 }
 
+static int xc_dom_build_ramdisk(struct xc_dom_image *dom)
+{
+    size_t unziplen, ramdisklen;
+    void *ramdiskmap;
+
+    if ( !dom->ramdisk_seg.vstart )
+    {
+        unziplen = xc_dom_check_gzip(dom->xch,
+                                     dom->ramdisk_blob, dom->ramdisk_size);
+        if ( xc_dom_ramdisk_check_size(dom, unziplen) != 0 )
+            unziplen = 0;
+    }
+    else
+        unziplen = 0;
+
+    ramdisklen = unziplen ? unziplen : dom->ramdisk_size;
+
+    if ( xc_dom_alloc_segment(dom, &dom->ramdisk_seg, "ramdisk",
+                              dom->ramdisk_seg.vstart, ramdisklen) != 0 )
+        goto err;
+    ramdiskmap = xc_dom_seg_to_ptr(dom, &dom->ramdisk_seg);
+    if ( ramdiskmap == NULL )
+    {
+        DOMPRINTF("%s: xc_dom_seg_to_ptr(dom, &dom->ramdisk_seg) => NULL",
+                  __FUNCTION__);
+        goto err;
+    }
+    if ( unziplen )
+    {
+        if ( xc_dom_do_gunzip(dom->xch, dom->ramdisk_blob, dom->ramdisk_size,
+                              ramdiskmap, ramdisklen) == -1 )
+            goto err;
+    }
+    else
+        memcpy(ramdiskmap, dom->ramdisk_blob, dom->ramdisk_size);
+
+    return 0;
+
+ err:
+    return -1;
+}
+
 int xc_dom_build_image(struct xc_dom_image *dom)
 {
     unsigned int page_size;
@@ -984,41 +1026,8 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     /* load ramdisk */
     if ( dom->ramdisk_blob )
     {
-        size_t unziplen, ramdisklen;
-        void *ramdiskmap;
-
-        if ( !dom->ramdisk_seg.vstart )
-        {
-            unziplen = xc_dom_check_gzip(dom->xch,
-                                         dom->ramdisk_blob, dom->ramdisk_size);
-            if ( xc_dom_ramdisk_check_size(dom, unziplen) != 0 )
-                unziplen = 0;
-        }
-        else
-            unziplen = 0;
-
-        ramdisklen = unziplen ? unziplen : dom->ramdisk_size;
-
-        if ( xc_dom_alloc_segment(dom, &dom->ramdisk_seg, "ramdisk",
-                                  dom->ramdisk_seg.vstart,
-                                  ramdisklen) != 0 )
+        if ( xc_dom_build_ramdisk(dom) != 0 )
             goto err;
-        ramdiskmap = xc_dom_seg_to_ptr(dom, &dom->ramdisk_seg);
-        if ( ramdiskmap == NULL )
-        {
-            DOMPRINTF("%s: xc_dom_seg_to_ptr(dom, &dom->ramdisk_seg) => NULL",
-                      __FUNCTION__);
-            goto err;
-        }
-        if ( unziplen )
-        {
-            if ( xc_dom_do_gunzip(dom->xch,
-                                  dom->ramdisk_blob, dom->ramdisk_size,
-                                  ramdiskmap, ramdisklen) == -1 )
-                goto err;
-        }
-        else
-            memcpy(ramdiskmap, dom->ramdisk_blob, dom->ramdisk_size);
     }
 
     /* load devicetree */
