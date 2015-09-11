@@ -513,11 +513,13 @@ static const struct hvm_mmio_ops hpet_mmio_ops = {
 static int hpet_save(struct domain *d, hvm_domain_context_t *h)
 {
     HPETState *hp = domain_vhpet(d);
+    struct vcpu *v = pt_global_vcpu_target(d);
     int rc;
     uint64_t guest_time;
 
     write_lock(&hp->lock);
-    guest_time = guest_time_hpet(hp);
+    guest_time = (v->arch.hvm_vcpu.guest_time ?: hvm_get_guest_time(v)) /
+                 STIME_PER_HPET_TICK;
 
     /* Write the proper value into the main counter */
     if ( hpet_enabled(hp) )
