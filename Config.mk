@@ -260,9 +260,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 327319a1e9bb79996e8de4df78ccde25e87692e2
-# Wed Jun 3 14:41:27 2015 +0200
-# ide: Clear DRQ after handling all expected accesses
+QEMU_TRADITIONAL_REVISION ?= dfe880e8d5fdc863ce6bbcdcaebaf918f8689cc0
+# Mon Jun 30 10:07:54 2014 +0200
+# vnc: limit client_cut_text msg payload size
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
