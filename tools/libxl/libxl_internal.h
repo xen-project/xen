@@ -631,6 +631,17 @@ _hidden int libxl__pipe_nonblock(libxl_ctx *ctx, int fds[2]);
  * `not open'.  Ignores any errors.  Sets fds[] to -1. */
 _hidden void libxl__pipe_close(int fds[2]);
 
+/* Change the flags for the file description associated with fd to
+ *    (flags & mask) | val.
+ * If r_oldflags != NULL then sets *r_oldflags to the original set of
+ * flags.
+ */
+_hidden int libxl__fd_flags_modify_save(libxl__gc *gc, int fd,
+                                        int mask, int val, int *r_oldflags);
+/* Restores the flags for the file description associated with fd to
+ * to the previous value (returned by libxl__fd_flags_modify_save)
+ */
+_hidden int libxl__fd_flags_restore(libxl__gc *gc, int fd, int old_flags);
 
 /* Each of these logs errors and returns a libxl error code.
  * They do not mind if path is already removed.
@@ -3050,6 +3061,7 @@ struct libxl__domain_suspend_state {
 
     uint32_t domid;
     int fd;
+    int fdfl; /* original flags on fd */
     libxl_domain_type type;
     int live;
     int debug;
@@ -3391,6 +3403,7 @@ struct libxl__domain_create_state {
     libxl_domain_config *guest_config;
     libxl_domain_config guest_config_saved; /* vanilla config */
     int restore_fd, libxc_fd;
+    int restore_fdfl; /* original flags of restore_fd */
     libxl_domain_restore_params restore_params;
     libxl__domain_create_cb *callback;
     libxl_asyncprogress_how aop_console_how;
