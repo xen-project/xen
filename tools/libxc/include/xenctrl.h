@@ -1287,6 +1287,24 @@ int xc_domain_setvnuma(xc_interface *xch,
                         unsigned int *vdistance,
                         unsigned int *vcpu_to_vnode,
                         unsigned int *vnode_to_pnode);
+/*
+ * Retrieve vnuma configuration
+ * domid: IN, target domid
+ * nr_vnodes: IN/OUT, number of vnodes, not NULL
+ * nr_vmemranges: IN/OUT, number of vmemranges, not NULL
+ * nr_vcpus: IN/OUT, number of vcpus, not NULL
+ * vmemranges: OUT, an array which has length of nr_vmemranges
+ * vdistance: OUT, an array which has length of nr_vnodes * nr_vnodes
+ * vcpu_to_vnode: OUT, an array which has length of nr_vcpus
+ */
+int xc_domain_getvnuma(xc_interface *xch,
+                       uint32_t domid,
+                       uint32_t *nr_vnodes,
+                       uint32_t *nr_vmemranges,
+                       uint32_t *nr_vcpus,
+                       xen_vmemrange_t *vmemrange,
+                       unsigned int *vdistance,
+                       unsigned int *vcpu_to_vnode);
 
 int xc_domain_soft_reset(xc_interface *xch,
                          uint32_t domid);

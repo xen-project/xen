@@ -2493,6 +2493,59 @@ int xc_domain_setvnuma(xc_interface *xch,
     return rc;
 }
 
+int xc_domain_getvnuma(xc_interface *xch,
+                       uint32_t domid,
+                       uint32_t *nr_vnodes,
+                       uint32_t *nr_vmemranges,
+                       uint32_t *nr_vcpus,
+                       xen_vmemrange_t *vmemrange,
+                       unsigned int *vdistance,
+                       unsigned int *vcpu_to_vnode)
+{
+    int rc;
+    DECLARE_HYPERCALL_BOUNCE(vmemrange, sizeof(*vmemrange) * *nr_vmemranges,
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_HYPERCALL_BOUNCE(vdistance, sizeof(*vdistance) *
+                             *nr_vnodes * *nr_vnodes,
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_HYPERCALL_BOUNCE(vcpu_to_vnode, sizeof(*vcpu_to_vnode) * *nr_vcpus,
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    struct xen_vnuma_topology_info vnuma_topo;
+
+    if ( xc_hypercall_bounce_pre(xch, vmemrange)      ||
+         xc_hypercall_bounce_pre(xch, vdistance)      ||
+         xc_hypercall_bounce_pre(xch, vcpu_to_vnode) )
+    {
+        rc = -1;
+        errno = ENOMEM;
+        goto vnumaget_fail;
+    }
+
+    set_xen_guest_handle(vnuma_topo.vmemrange.h, vmemrange);
+    set_xen_guest_handle(vnuma_topo.vdistance.h, vdistance);
+    set_xen_guest_handle(vnuma_topo.vcpu_to_vnode.h, vcpu_to_vnode);
+
+    vnuma_topo.nr_vnodes = *nr_vnodes;
+    vnuma_topo.nr_vcpus = *nr_vcpus;
+    vnuma_topo.nr_vmemranges = *nr_vmemranges;
+    vnuma_topo.domid = domid;
+    vnuma_topo.pad = 0;
+
+    rc = do_memory_op(xch, XENMEM_get_vnumainfo, &vnuma_topo,
+                      sizeof(vnuma_topo));
+
+    *nr_vnodes = vnuma_topo.nr_vnodes;
+    *nr_vcpus = vnuma_topo.nr_vcpus;
+    *nr_vmemranges = vnuma_topo.nr_vmemranges;
+
+ vnumaget_fail:
+    xc_hypercall_bounce_post(xch, vmemrange);
+    xc_hypercall_bounce_post(xch, vdistance);
+    xc_hypercall_bounce_post(xch, vcpu_to_vnode);
+
+    return rc;
+}
 
 int xc_domain_soft_reset(xc_interface *xch,
                          uint32_t domid)
