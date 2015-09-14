@@ -40,6 +40,10 @@
 #define GICD_PIDR5                   (0xFFD4)
 #define GICD_PIDR7                   (0xFFDC)
 
+/* Common between GICD_PIDR2 and GICR_PIDR2 */
+#define GIC_PIDR2_ARCH_MASK         (0xf0)
+#define GIC_PIDR2_ARCH_GICv3        (0x30)
+
 #define GICC_SRE_EL2_SRE             (1UL << 0)
 #define GICC_SRE_EL2_DFB             (1UL << 1)
 #define GICC_SRE_EL2_DIB             (1UL << 2)
@@ -58,14 +62,6 @@
 
 #define GICR_WAKER_ProcessorSleep    (1U << 1)
 #define GICR_WAKER_ChildrenAsleep    (1U << 2)
-
-#define GICD_PIDR2_ARCH_REV_MASK     (0xf0)
-#define GICD_PIDR2_ARCH_REV_SHIFT    (0x4)
-#define GICD_PIDR2_ARCH_GICV3        (0x3)
-
-#define GICR_PIDR2_ARCH_REV_MASK     GICD_PIDR2_ARCH_REV_MASK
-#define GICR_PIDR2_ARCH_REV_SHIFT    GICD_PIDR2_ARCH_REV_SHIFT
-#define GICR_PIDR2_ARCH_GICV3        GICD_PIDR2_ARCH_GICV3
 
 #define GICR_SYNCR_NOT_BUSY          1
 /*
