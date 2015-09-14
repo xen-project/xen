@@ -2297,7 +2297,9 @@ static int intel_iommu_assign_device(
     /*
      * In rare cases one given rmrr is shared by multiple devices but
      * obviously this would put the security of a system at risk. So
-     * we should prevent from this sort of device assignment.
+     * we would prevent from this sort of device assignment. But this
+     * can be permitted if user set
+     *      "pci = [ 'sbdf, rdm_policy=relaxed' ]"
      *
      * TODO: in the future we can introduce group device assignment
      * interface to make sure devices sharing RMRR are assigned to the
@@ -2310,12 +2312,16 @@ static int intel_iommu_assign_device(
              PCI_DEVFN2(bdf) == devfn &&
              rmrr->scope.devices_cnt > 1 )
         {
-            printk(XENLOG_G_ERR VTDPREFIX
-                   " cannot assign %04x:%02x:%02x.%u"
+            bool_t relaxed = !!(flag & XEN_DOMCTL_DEV_RDM_RELAXED);
+
+            printk(XENLOG_G_WARNING VTDPREFIX
+                   " It's %s to assign %04x:%02x:%02x.%u"
                    " with shared RMRR at %"PRIx64" for Dom%d.\n",
+                   relaxed ? "risky" : "disallowed",
                    seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                    rmrr->base_address, d->domain_id);
-            return -EPERM;
+            if ( !relaxed )
+                return -EPERM;
         }
     }
 
