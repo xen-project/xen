@@ -43,6 +43,7 @@
 /* Common between GICD_PIDR2 and GICR_PIDR2 */
 #define GIC_PIDR2_ARCH_MASK         (0xf0)
 #define GIC_PIDR2_ARCH_GICv3        (0x30)
+#define GIC_PIDR2_ARCH_GICv4        (0x40)
 
 #define GICC_SRE_EL2_SRE             (1UL << 0)
 #define GICC_SRE_EL2_DFB             (1UL << 1)
