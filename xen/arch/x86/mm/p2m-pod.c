@@ -107,11 +107,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
      * promise to provide zero pages. So we scrub pages before using.
      */
     for ( i = 0; i < (1 << order); i++ )
-    {
-        char *b = map_domain_page(_mfn(mfn_x(page_to_mfn(page)) + i));
-        clear_page(b);
-        unmap_domain_page(b);
-    }
+        clear_domain_page(_mfn(mfn_x(page_to_mfn(page)) + i));
 
     /* First, take all pages off the domain list */
     lock_page_alloc(p2m);
