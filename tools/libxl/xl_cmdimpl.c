@@ -1730,7 +1730,7 @@ static void parse_config_data(const char *config_source,
                 exit(1);
             }
             ul = strtoul(buf, &ep, 10);
-            if (ep == buf) {
+            if (ep == buf || *ep != '\0') {
                 fprintf(stderr,
                         "xl: Invalid argument parsing irq: %s\n", buf);
                 exit(1);
@@ -1752,6 +1752,8 @@ static void parse_config_data(const char *config_source,
             exit(-1);
         }
         for (i = 0; i < num_iomem; i++) {
+            int used;
+
             buf = xlu_cfg_get_listitem (iomem, i);
             if (!buf) {
                 fprintf(stderr,
@@ -1759,11 +1761,11 @@ static void parse_config_data(const char *config_source,
                 exit(1);
             }
             libxl_iomem_range_init(&b_info->iomem[i]);
-            ret = sscanf(buf, "%" SCNx64",%" SCNx64"@%" SCNx64,
+            ret = sscanf(buf, "%" SCNx64",%" SCNx64"%n@%" SCNx64"%n",
                          &b_info->iomem[i].start,
-                         &b_info->iomem[i].number,
-                         &b_info->iomem[i].gfn);
-            if (ret < 2) {
+                         &b_info->iomem[i].number, &used,
+                         &b_info->iomem[i].gfn, &used);
+            if (ret < 2 || buf[used] != '\0') {
                 fprintf(stderr,
                         "xl: Invalid argument parsing iomem: %s\n", buf);
                 exit(1);
