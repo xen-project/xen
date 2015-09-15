@@ -15,7 +15,7 @@ MARKDOWNSRC-y := $(sort $(shell find misc -name '*.markdown' -print))
 
 TXTSRC-y := $(sort $(shell find misc -name '*.txt' -print))
 
-PANDOCSRC-y := $(sort $(shell find specs -name '*.pandoc' -print))
+PANDOCSRC-y := $(sort $(shell find features/ misc/ specs/ -name '*.pandoc' -print))
 
 # Documentation targets
 DOC_MAN1 := $(patsubst man/%.pod.1,man1/%.1,$(MAN1SRC-y))

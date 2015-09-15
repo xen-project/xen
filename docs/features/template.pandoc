@@ -1,0 +1,75 @@
+% Template for feature documents
+% Revision $N
+
+\clearpage
+
+This is a suggested template for formatting of a Xen feature document in
+tree.
+
+The purpose of this document is to provide a concrete support statement
+for the feature (indicating its security status), as well as brief user
+and technical documentation.
+
+# Basics
+
+A table with an overview of the support status and applicability.
+
+---------------- ----------------------------------------------------
+         Status: e.g. **Supported**/**Tech Preview**/**Experimental**
+
+Architecture(s): e.g. x86, arm
+
+   Component(s): e.g. Hypervisor, toolstack, guest
+
+       Hardware: _where applicable_
+---------------- ----------------------------------------------------
+
+# Overview
+
+A short description the feature, similar to an abstract for a
+paper/presentation.
+
+# User information
+
+Information for a user attempting to use the feature.  Should include
+how to enable the feature (is it enabled by default? If not, how to turn
+it on?), and how to interact with the feature (typically via `xl`).
+
+# Limitations
+
+Information concerning incompatibilities with other features or hardware
+combinations.
+
+# Technical information
+
+Information for a developer or power user.  Should include where to look
+in-tree for detailed documents and code.
+
+# Testing
+
+Information concerning how to properly test changes affecting this feature.
+
+# Areas for improvement
+
+List of enhancements which could be undertaken, e.g. to improve the
+feature itself, or improve interaction with other features.
+
+# Known issues
+
+List of known issues or bugs.  For tech preview or experimental
+features, this section must contain the list of items needing fixing for
+its status to be upgraded.
+
+# References
+
+Relevant external references for this feature.
+
+# History
+
+A table of changes to the document, in chronological order.
+
+------------------------------------------------------------------------
+Date       Revision Version  Notes
+---------- -------- -------- -------------------------------------------
+YYYY-MM-DD N        Xen X.Y  ...
+---------- -------- -------- -------------------------------------------
