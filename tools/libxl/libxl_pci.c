@@ -123,7 +123,7 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
     flexarray_t *back;
     char *num_devs, *be_path;
     int num = 0;
-    xs_transaction_t t;
+    xs_transaction_t t = XBT_NULL;
     libxl__device *device;
     int rc;
     libxl_domain_config d_config;
