@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License along with
  * this program; If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  * Authors: Yunhong Jiang <yunhong.jiang@intel.com>
  *          Haicheng Li <haicheng.li@intel.com>
  *          Xudong Hao <xudong.hao@intel.com>
@@ -217,18 +217,18 @@ static uint64_t bank_addr(int bank, int type)
 
     switch ( type )
     {
-        case MCi_type_CTL:
-        case MCi_type_STATUS:
-        case MCi_type_ADDR:
-        case MCi_type_MISC:
-            addr = MSR_IA32_MC0_CTL + (bank * 4) + type;
-            break;
-        case MCi_type_CTL2:
-            addr = MSR_IA32_MC0_CTL2 + bank;
-            break;
-        default:
-            addr = INVALID_MSR;
-            break;
+    case MCi_type_CTL:
+    case MCi_type_STATUS:
+    case MCi_type_ADDR:
+    case MCi_type_MISC:
+        addr = MSR_IA32_MC0_CTL + (bank * 4) + type;
+        break;
+    case MCi_type_CTL2:
+        addr = MSR_IA32_MC0_CTL2 + bank;
+        break;
+    default:
+        addr = INVALID_MSR;
+        break;
     }
 
     return addr;
@@ -243,7 +243,7 @@ static int add_msr_intpose(xc_interface *xc_handle,
     uint32_t count;
 
     if ( (msr_inj.mcinj_count &&
-         (cpu_nr != msr_inj.mcinj_cpunr || flags != msr_inj.mcinj_flags)) ||
+          (cpu_nr != msr_inj.mcinj_cpunr || flags != msr_inj.mcinj_flags)) ||
          msr_inj.mcinj_count == MC_MSRINJ_MAXMSRS )
     {
         flush_msr_inj(xc_handle);
@@ -282,8 +282,8 @@ static int add_msr_bank_intpose(xc_interface *xc_handle,
 #define mfn_valid(_mfn) (_mfn != MCE_INVALID_MFN)
 #define mfn_to_pfn(_mfn) (live_m2p[(_mfn)])
 static uint64_t guest_mfn(xc_interface *xc_handle,
-                               uint32_t domain,
-                               uint64_t gpfn)
+                          uint32_t domain,
+                          uint64_t gpfn)
 {
     xen_pfn_t *live_m2p = NULL;
     int ret;
@@ -300,8 +300,8 @@ static uint64_t guest_mfn(xc_interface *xc_handle,
         return MCE_INVALID_MFN;
 
     /* Get max gpfn */
-    max_gpfn = do_memory_op(xc_handle, XENMEM_maximum_gpfn, &domain, 
-                               sizeof(domain)) + 1;
+    max_gpfn = do_memory_op(xc_handle, XENMEM_maximum_gpfn, &domain,
+                            sizeof(domain)) + 1;
     if ( max_gpfn <= 0 )
         err(xc_handle, "Failed to get max_gpfn 0x%lx", max_gpfn);
 
@@ -360,8 +360,8 @@ static uint64_t mca_gpfn_to_mfn(xc_interface *xc_handle,
     if ( domain == DOMID_XEN )
         return gfn;
 
-    max_gpfn = do_memory_op(xc_handle, XENMEM_maximum_gpfn, &domain, 
-                               sizeof(domain)) + 1;
+    max_gpfn = do_memory_op(xc_handle, XENMEM_maximum_gpfn, &domain,
+                            sizeof(domain)) + 1;
     if ( max_gpfn <= 0 )
         err(xc_handle, "Failed to get max_gpfn 0x%lx", max_gpfn);
     index = gfn % max_gpfn;
@@ -374,7 +374,7 @@ static int inject_mcg_status(xc_interface *xc_handle,
                              uint64_t val)
 {
     return add_msr_intpose(xc_handle, cpu_nr, MC_MSRINJ_F_INTERPOSE,
-                               MSR_IA32_MCG_STATUS, val);
+                           MSR_IA32_MCG_STATUS, val);
 }
 
 static int inject_mci_status(xc_interface *xc_handle,
@@ -383,25 +383,25 @@ static int inject_mci_status(xc_interface *xc_handle,
                              uint64_t val)
 {
     return add_msr_bank_intpose(xc_handle, cpu_nr, MC_MSRINJ_F_INTERPOSE,
-                                    MCi_type_STATUS, bank, val); 
+                                MCi_type_STATUS, bank, val);
 }
 
 static int inject_mci_misc(xc_interface *xc_handle,
-                             uint32_t cpu_nr,
-                             uint64_t bank,
-                             uint64_t val)
+                           uint32_t cpu_nr,
+                           uint64_t bank,
+                           uint64_t val)
 {
     return add_msr_bank_intpose(xc_handle, cpu_nr, MC_MSRINJ_F_INTERPOSE,
-                                    MCi_type_MISC, bank, val); 
+                                MCi_type_MISC, bank, val);
 }
 
 static int inject_mci_addr(xc_interface *xc_handle,
-                             uint32_t cpu_nr,
-                             uint64_t bank,
-                             uint64_t val)
+                           uint32_t cpu_nr,
+                           uint64_t bank,
+                           uint64_t val)
 {
     return add_msr_bank_intpose(xc_handle, cpu_nr, MC_MSRINJ_F_INTERPOSE,
-                                    MCi_type_ADDR, bank, val); 
+                                MCi_type_ADDR, bank, val);
 }
 
 static int inject(xc_interface *xc_handle, struct mce_info *mce,
@@ -553,7 +553,7 @@ int main(int argc, char *argv[])
             return 0;
         }
     }
-    
+
     if ( domid != DOMID_XEN ) {
         max_gpa = xs_get_dom_mem(domid);
         Lprintf("get domain %d max gpa is: 0x%lx", domid, max_gpa);
@@ -570,7 +570,7 @@ int main(int argc, char *argv[])
         haddr = (mfn << PAGE_SHIFT) | (gaddr & (PAGE_SIZE - 1));
         if ( domid == DOMID_XEN )
             Lprintf("Xen: mfn=0x%lx, haddr=0x%lx", mfn, haddr);
-        else 
+        else
             Lprintf("Dom%d: gaddr=0x%lx, gpfn=0x%lx, mfn=0x%lx, haddr=0x%lx",
                     domid, gaddr, gpfn, mfn, haddr);
         goto out;
@@ -583,7 +583,7 @@ int main(int argc, char *argv[])
 
     inject(xc_handle, &mce_table[type], cpu_nr, domid, gaddr);
 
-out:
+ out:
     xc_interface_close(xc_handle);
     return 0;
 }
