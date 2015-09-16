@@ -238,12 +238,14 @@ static int add_msr_intpose(xc_interface *xc_handle,
                            uint32_t cpu_nr,
                            uint32_t flags,
                            uint64_t msr,
-                           uint64_t val)
+                           uint64_t val,
+                           domid_t domid)
 {
     uint32_t count;
 
     if ( (msr_inj.mcinj_count &&
-          (cpu_nr != msr_inj.mcinj_cpunr || flags != msr_inj.mcinj_flags)) ||
+          (cpu_nr != msr_inj.mcinj_cpunr || flags != msr_inj.mcinj_flags ||
+           domid != msr_inj.mcinj_domid)) ||
          msr_inj.mcinj_count == MC_MSRINJ_MAXMSRS )
     {
         flush_msr_inj(xc_handle);
@@ -255,6 +257,7 @@ static int add_msr_intpose(xc_interface *xc_handle,
     {
         msr_inj.mcinj_cpunr = cpu_nr;
         msr_inj.mcinj_flags = flags;
+        msr_inj.mcinj_domid = domid;
     }
     msr_inj.mcinj_msr[count].reg = msr;
     msr_inj.mcinj_msr[count].value = val;
@@ -268,168 +271,77 @@ static int add_msr_bank_intpose(xc_interface *xc_handle,
                                 uint32_t flags,
                                 uint32_t type,
                                 uint32_t bank,
-                                uint64_t val)
+                                uint64_t val,
+                                domid_t domid)
 {
     uint64_t msr;
 
     msr = bank_addr(bank, type);
     if ( msr == INVALID_MSR )
         return -1;
-    return add_msr_intpose(xc_handle, cpu_nr, flags, msr, val);
-}
-
-#define MCE_INVALID_MFN ~0UL
-#define mfn_valid(_mfn) (_mfn != MCE_INVALID_MFN)
-#define mfn_to_pfn(_mfn) (live_m2p[(_mfn)])
-static uint64_t guest_mfn(xc_interface *xc_handle,
-                          uint32_t domain,
-                          uint64_t gpfn)
-{
-    xen_pfn_t *live_m2p = NULL;
-    int ret;
-    unsigned long hvirt_start;
-    unsigned int pt_levels;
-    uint64_t * pfn_buf = NULL;
-    unsigned long max_mfn = 0; /* max mfn of the whole machine */
-    unsigned long m2p_mfn0;
-    unsigned int guest_width;
-    long max_gpfn,i;
-    uint64_t mfn = MCE_INVALID_MFN;
-
-    if ( domain > DOMID_FIRST_RESERVED )
-        return MCE_INVALID_MFN;
-
-    /* Get max gpfn */
-    max_gpfn = do_memory_op(xc_handle, XENMEM_maximum_gpfn, &domain,
-                            sizeof(domain)) + 1;
-    if ( max_gpfn <= 0 )
-        err(xc_handle, "Failed to get max_gpfn 0x%lx", max_gpfn);
-
-    Lprintf("Maxium gpfn for dom %d is 0x%lx", domain, max_gpfn);
-
-    /* Get max mfn */
-    if ( !get_platform_info(xc_handle, domain,
-                            &max_mfn, &hvirt_start,
-                            &pt_levels, &guest_width) )
-        err(xc_handle, "Failed to get platform information");
-
-    /* Get guest's pfn list */
-    pfn_buf = calloc(max_gpfn, sizeof(uint64_t));
-    if ( !pfn_buf )
-        err(xc_handle, "Failed to alloc pfn buf");
-
-    ret = xc_get_pfn_list(xc_handle, domain, pfn_buf, max_gpfn);
-    if ( ret < 0 ) {
-        free(pfn_buf);
-        err(xc_handle, "Failed to get pfn list %x", ret);
-    }
-
-    /* Now get the m2p table */
-    live_m2p = xc_map_m2p(xc_handle, max_mfn, PROT_READ, &m2p_mfn0);
-    if ( !live_m2p )
-        err(xc_handle, "Failed to map live M2P table");
-
-    /* match the mapping */
-    for ( i = 0; i < max_gpfn; i++ )
-    {
-        uint64_t tmp;
-        tmp = pfn_buf[i];
-
-        if (mfn_valid(tmp) &&  (mfn_to_pfn(tmp) == gpfn))
-        {
-            mfn = tmp;
-            Lprintf("We get the mfn 0x%lx for this injection", mfn);
-            break;
-        }
-    }
-
-    munmap(live_m2p, M2P_SIZE(max_mfn));
-
-    free(pfn_buf);
-    return mfn;
-}
-
-static uint64_t mca_gpfn_to_mfn(xc_interface *xc_handle,
-                                uint32_t domain,
-                                uint64_t gfn)
-{
-    uint64_t index;
-    long max_gpfn;
-
-    /* If domain is xen, means we want pass index directly */
-    if ( domain == DOMID_XEN )
-        return gfn;
-
-    max_gpfn = do_memory_op(xc_handle, XENMEM_maximum_gpfn, &domain,
-                            sizeof(domain)) + 1;
-    if ( max_gpfn <= 0 )
-        err(xc_handle, "Failed to get max_gpfn 0x%lx", max_gpfn);
-    index = gfn % max_gpfn;
-
-    return guest_mfn(xc_handle, domain, index);
+    return add_msr_intpose(xc_handle, cpu_nr, flags, msr, val, domid);
 }
 
 static int inject_mcg_status(xc_interface *xc_handle,
                              uint32_t cpu_nr,
-                             uint64_t val)
+                             uint64_t val,
+                             domid_t domid)
 {
     return add_msr_intpose(xc_handle, cpu_nr, MC_MSRINJ_F_INTERPOSE,
-                           MSR_IA32_MCG_STATUS, val);
+                           MSR_IA32_MCG_STATUS, val, domid);
 }
 
 static int inject_mci_status(xc_interface *xc_handle,
                              uint32_t cpu_nr,
                              uint64_t bank,
-                             uint64_t val)
+                             uint64_t val,
+                             domid_t domid)
 {
     return add_msr_bank_intpose(xc_handle, cpu_nr, MC_MSRINJ_F_INTERPOSE,
-                                MCi_type_STATUS, bank, val);
+                                MCi_type_STATUS, bank, val, domid);
 }
 
 static int inject_mci_misc(xc_interface *xc_handle,
                            uint32_t cpu_nr,
                            uint64_t bank,
-                           uint64_t val)
+                           uint64_t val,
+                           domid_t domid)
 {
     return add_msr_bank_intpose(xc_handle, cpu_nr, MC_MSRINJ_F_INTERPOSE,
-                                MCi_type_MISC, bank, val);
+                                MCi_type_MISC, bank, val, domid);
 }
 
 static int inject_mci_addr(xc_interface *xc_handle,
                            uint32_t cpu_nr,
                            uint64_t bank,
-                           uint64_t val)
+                           uint64_t val,
+                           domid_t domid)
 {
-    return add_msr_bank_intpose(xc_handle, cpu_nr, MC_MSRINJ_F_INTERPOSE,
-                                MCi_type_ADDR, bank, val);
+    return add_msr_bank_intpose(xc_handle, cpu_nr,
+                                MC_MSRINJ_F_INTERPOSE | MC_MSRINJ_F_GPADDR,
+                                MCi_type_ADDR, bank, val, domid);
 }
 
 static int inject(xc_interface *xc_handle, struct mce_info *mce,
                   uint32_t cpu_nr, uint32_t domain, uint64_t gaddr)
 {
-    uint64_t gpfn, mfn, haddr;
     int ret = 0;
 
-    ret = inject_mcg_status(xc_handle, cpu_nr, mce->mcg_stat);
+    ret = inject_mcg_status(xc_handle, cpu_nr, mce->mcg_stat, domain);
     if ( ret )
         err(xc_handle, "Failed to inject MCG_STATUS MSR");
 
     ret = inject_mci_status(xc_handle, cpu_nr,
-                            mce->bank, mce->mci_stat);
+                            mce->bank, mce->mci_stat, domain);
     if ( ret )
         err(xc_handle, "Failed to inject MCi_STATUS MSR");
 
     ret = inject_mci_misc(xc_handle, cpu_nr,
-                          mce->bank, mce->mci_misc);
+                          mce->bank, mce->mci_misc, domain);
     if ( ret )
         err(xc_handle, "Failed to inject MCi_MISC MSR");
 
-    gpfn = gaddr >> PAGE_SHIFT;
-    mfn = mca_gpfn_to_mfn(xc_handle, domain, gpfn);
-    if (!mfn_valid(mfn))
-        err(xc_handle, "The MFN is not valid");
-    haddr = (mfn << PAGE_SHIFT) | (gaddr & (PAGE_SIZE - 1));
-    ret = inject_mci_addr(xc_handle, cpu_nr, mce->bank, haddr);
+    ret = inject_mci_addr(xc_handle, cpu_nr, mce->bank, gaddr, domain);
     if ( ret )
         err(xc_handle, "Failed to inject MCi_ADDR MSR");
 
@@ -507,7 +419,7 @@ int main(int argc, char *argv[])
     uint32_t domid;
     xc_interface *xc_handle;
     int cpu_nr;
-    int64_t gaddr, gpfn, mfn, haddr, max_gpa;
+    uint64_t gaddr, max_gpa;
 
     /* Default Value */
     domid = DOMID_XEN;
@@ -563,16 +475,10 @@ int main(int argc, char *argv[])
     Lprintf("get gaddr of error inject is: 0x%lx", gaddr);
 
     if ( dump ) {
-        gpfn = gaddr >> PAGE_SHIFT;
-        mfn = mca_gpfn_to_mfn(xc_handle, domid, gpfn);
-        if (!mfn_valid(mfn))
-            err(xc_handle, "The MFN is not valid");
-        haddr = (mfn << PAGE_SHIFT) | (gaddr & (PAGE_SIZE - 1));
         if ( domid == DOMID_XEN )
-            Lprintf("Xen: mfn=0x%lx, haddr=0x%lx", mfn, haddr);
+            Lprintf("Xen: gaddr=0x%lx", gaddr);
         else
-            Lprintf("Dom%d: gaddr=0x%lx, gpfn=0x%lx, mfn=0x%lx, haddr=0x%lx",
-                    domid, gaddr, gpfn, mfn, haddr);
+            Lprintf("Dom%d: gaddr=0x%lx", domid, gaddr);
         goto out;
     }
 
