@@ -169,7 +169,6 @@ __start:
         /* Apply relocations to bootstrap trampoline. */
         mov     sym_phys(trampoline_phys),%edx
         mov     $sym_phys(__trampoline_rel_start),%edi
-        mov     %edx,sym_phys(trampoline_phys)
 1:
         mov     (%edi),%eax
         add     %edx,(%edi,%eax)
