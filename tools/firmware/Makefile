@@ -45,6 +45,16 @@ endif
 install: all
 	[ -d $(INST_DIR) ] || $(INSTALL_DIR) $(INST_DIR)
 	[ ! -e $(TARGET) ] || $(INSTALL_DATA) $(TARGET) $(INST_DIR)
+ifeq ($(CONFIG_SEABIOS),y)
+ifeq ($(SEABIOS_PATH),)
+	$(INSTALL_DATA) seabios-dir/out/bios.bin $(INST_DIR)/bios.bin
+endif
+endif
+ifeq ($(CONFIG_OVMF),y)
+ifeq ($(OVMF_PATH),)
+	$(INSTALL_DATA) ovmf-dir/ovmf.bin $(INST_DIR)/ovmf.bin
+endif
+endif
 
 .PHONY: clean
 clean: subdirs-clean
