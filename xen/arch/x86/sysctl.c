@@ -75,7 +75,8 @@ long cpu_down_helper(void *data)
 
 void arch_do_physinfo(xen_sysctl_physinfo_t *pi)
 {
-    memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
+    memcpy(pi->hw_cap, boot_cpu_data.x86_capability,
+           min(sizeof(pi->hw_cap), sizeof(boot_cpu_data.x86_capability)));
     if ( hvm_enabled )
         pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm;
     if ( iommu_enabled )
