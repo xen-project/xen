@@ -182,6 +182,7 @@ tools/misc/xen_cpuperf
 tools/misc/xen-cpuid
 tools/misc/xen-detect
 tools/misc/xen-tmem-list-parse
+tools/misc/xen-xsplice
 tools/misc/xenperf
 tools/misc/xenpm
 tools/misc/xen-hvmctx

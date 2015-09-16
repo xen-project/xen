@@ -32,6 +32,7 @@ INSTALL_SBIN                   += xenlockprof
 INSTALL_SBIN                   += xenperf
 INSTALL_SBIN                   += xenpm
 INSTALL_SBIN                   += xenwatchdogd
+INSTALL_SBIN                   += xen-xsplice
 INSTALL_SBIN += $(INSTALL_SBIN-y)
 
 # Everything to be installed in a private bin/
@@ -101,6 +102,9 @@ xen-mfndump: xen-mfndump.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenevtchn) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(APPEND_LDFLAGS)
 
 xenwatchdogd: xenwatchdogd.o
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
+
+xen-xsplice: xen-xsplice.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
 xen-lowmemd: xen-lowmemd.o
