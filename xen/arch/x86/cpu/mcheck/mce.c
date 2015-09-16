@@ -105,7 +105,7 @@ void x86_mce_callback_register(x86_mce_callback_t cbfunc)
     mc_callback_bank_extended = cbfunc;
 }
 
-/* Machine check recoverable judgement callback handler 
+/* Machine check recoverable judgement callback handler
  * It is used to judge whether an UC error is recoverable by software
  */
 static mce_recoverable_t mc_recoverable_scan = NULL;
@@ -160,9 +160,9 @@ static void mcabank_clear(int banknum)
 }
 
 /* Judging whether to Clear Machine Check error bank callback handler
- * According to Intel latest MCA OS Recovery Writer's Guide, 
+ * According to Intel latest MCA OS Recovery Writer's Guide,
  * whether the error MCA bank needs to be cleared is decided by the mca_source
- * and MCi_status bit value. 
+ * and MCi_status bit value.
  */
 static mce_need_clearbank_t mc_need_clearbank_scan = NULL;
 
@@ -535,7 +535,7 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
         }
         atomic_set(&found_error, 0);
     }
-    mce_barrier_exit(&mce_trap_bar); 
+    mce_barrier_exit(&mce_trap_bar);
 
     /* Clear flags after above fatal check */
     mce_barrier_enter(&mce_trap_bar);
@@ -891,7 +891,7 @@ void x86_mcinfo_dump(struct mc_info *mi)
                "CPU%d: Machine Check Exception: %16"PRIx64"\n",
                mc_global->mc_coreid, mc_global->mc_gstatus);
     } else if (mc_global->mc_flags & MC_FLAG_CMCI) {
-        printk(XENLOG_WARNING "CMCI occurred on CPU %d.\n", 
+        printk(XENLOG_WARNING "CMCI occurred on CPU %d.\n",
                mc_global->mc_coreid);
     } else if (mc_global->mc_flags & MC_FLAG_POLLED) {
         printk(XENLOG_WARNING "POLLED occurred on CPU %d.\n",
