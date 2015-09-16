@@ -331,6 +331,43 @@ When reverting a patch, the hypervisor iterates over each `xsplice_patch_func`
 and the core code copies the data from the undo buffer (private internal copy)
 to `old_addr`.
 
+### Example of .xsplice.funcs
+
+A simple example of what a payload file can be:
+
+<pre>
+/* MUST be in sync with hypervisor. */  
+struct xsplice_patch_func {  
+    const char *name;  
+    void *new_addr;  
+    void *old_addr;  
+    uint32_t new_size;  
+    uint32_t old_size;  
+    uint8_t version;
+    uint8_t pad[31];  
+};  
+
+/* Our replacement function for xen_extra_version. */  
+const char *xen_hello_world(void)  
+{  
+    return "Hello World";  
+}  
+
+static unsigned char patch_this_fnc[] = "xen_extra_version";  
+
+struct xsplice_patch_func xsplice_hello_world = {  
+    .version = XSPLICE_PAYLOAD_VERSION,
+    .name = patch_this_fnc,  
+    .new_addr = xen_hello_world,  
+    .old_addr = (void *)0xffff82d08013963c, /* Extracted from xen-syms. */  
+    .new_size = 13, /* To be be computed by scripts. */  
+    .old_size = 13, /* -----------""---------------  */  
+} __attribute__((__section__(".xsplice.funcs")));  
+
+</pre>
+
+Code must be compiled with -fPIC.
+
 ## Hypercalls
 
 We will employ the sub operations of the system management hypercall (sysctl).

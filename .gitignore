@@ -246,6 +246,8 @@ xen/arch/x86/efi.lds
 xen/arch/x86/efi/check.efi
 xen/arch/x86/efi/disabled
 xen/arch/x86/efi/mkreloc
+xen/arch/x86/test/config.h
+xen/arch/x86/test/xen_hello_world.xsplice
 xen/arch/*/efi/boot.c
 xen/arch/*/efi/compat.c
 xen/arch/*/efi/efi.h

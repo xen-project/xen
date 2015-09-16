@@ -76,6 +76,9 @@ $(TARGET): $(TARGET)-syms $(efi-y) boot/mkelf32
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
 	`$(NM) -nr $(TARGET)-syms | head -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
 
+.PHONY: tests
+tests:
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C test xsplice
 
 ALL_OBJS := $(BASEDIR)/arch/x86/boot/built_in.o $(BASEDIR)/arch/x86/efi/built_in.o $(ALL_OBJS)
 
@@ -179,3 +182,4 @@ clean::
 	rm -f $(BASEDIR)/.xen-syms.[0-9]* boot/.*.d
 	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.o efi/.*.d efi/*.efi efi/disabled efi/mkreloc
 	rm -f boot/reloc.S boot/reloc.lnk boot/reloc.bin
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C test clean
