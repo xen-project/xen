@@ -862,6 +862,42 @@ err:
     return ret;
 }
 
+static int libxl__load_hvm_firmware_module(libxl__gc *gc,
+                                           const char *filename,
+                                           const char *what,
+                                           struct xc_hvm_firmware_module *m)
+{
+    int datalen = 0;
+    void *data = NULL;
+    int r, rc;
+
+    LOG(DEBUG, "Loading %s: %s", what, filename);
+    r = libxl_read_file_contents(CTX, filename, &data, &datalen);
+    if (r) {
+        /*
+         * Print a message only on ENOENT, other errors are logged by the
+         * function libxl_read_file_contents().
+         */
+        if (r == ENOENT)
+            LOGEV(ERROR, r, "failed to read %s file", what);
+        rc =  ERROR_FAIL;
+        goto out;
+    }
+    libxl__ptr_add(gc, data);
+    if (datalen) {
+        /* Only accept non-empty files */
+        m->data = data;
+        m->length = datalen;
+    } else {
+        LOG(ERROR, "file %s for %s is empty", filename, what);
+        rc = ERROR_INVAL;
+        goto out;
+    }
+    rc = 0;
+out:
+    return rc;
+}
+
 static int libxl__domain_firmware(libxl__gc *gc,
                                   libxl_domain_build_info *info,
                                   struct xc_dom_image *dom)
@@ -871,6 +907,7 @@ static int libxl__domain_firmware(libxl__gc *gc,
     int e, rc;
     int datalen = 0;
     void *data;
+    const char *bios_filename = NULL;
 
     if (info->u.hvm.firmware)
         firmware = info->u.hvm.firmware;
@@ -912,6 +949,30 @@ static int libxl__domain_firmware(libxl__gc *gc,
     if (rc != 0) {
         LOGE(ERROR, "xc_dom_{kernel_file/ramdisk_file} failed");
         goto out;
+    }
+
+    if (info->device_model_version == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
+        if (info->u.hvm.system_firmware) {
+            bios_filename = info->u.hvm.system_firmware;
+        } else {
+            switch (info->u.hvm.bios) {
+            case LIBXL_BIOS_TYPE_SEABIOS:
+                bios_filename = libxl__seabios_path();
+                break;
+            case LIBXL_BIOS_TYPE_OVMF:
+                bios_filename = libxl__ovmf_path();
+                break;
+            case LIBXL_BIOS_TYPE_ROMBIOS:
+            default:
+                abort();
+            }
+        }
+    }
+
+    if (bios_filename) {
+        rc = libxl__load_hvm_firmware_module(gc, bios_filename, "BIOS",
+                                             &dom->system_firmware_module);
+        if (rc) goto out;
     }
 
     if (info->u.hvm.smbios_firmware) {

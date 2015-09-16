@@ -35,6 +35,16 @@ const char *libxl__run_dir_path(void)
     return XEN_RUN_DIR;
 }
 
+const char *libxl__seabios_path(void)
+{
+    return SEABIOS_PATH;
+}
+
+const char *libxl__ovmf_path(void)
+{
+    return OVMF_PATH;
+}
+
 /*
  * Local variables:
  * mode: C

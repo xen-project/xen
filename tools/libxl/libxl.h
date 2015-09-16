@@ -950,6 +950,14 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
 #define LIBXL_HAVE_CHECKPOINTED_STREAM 1
 
 /*
+ * LIBXL_HAVE_BUILDINFO_HVM_SYSTEM_FIRMWARE
+ *
+ * libxl_domain_build_info has u.hvm.system_firmware field which can be use
+ * to provide a different firmware blob (like SeaBIOS or OVMF).
+ */
+#define LIBXL_HAVE_BUILDINFO_HVM_SYSTEM_FIRMWARE
+
+/*
  * ERROR_REMUS_XXX error code only exists from Xen 4.5, Xen 4.6 and it
  * is changed to ERROR_CHECKPOINT_XXX in Xen 4.7
  */

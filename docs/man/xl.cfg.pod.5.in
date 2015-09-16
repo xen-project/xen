@@ -1214,6 +1214,15 @@ Requires device_model_version=qemu-xen.
 
 =back
 
+=item B<bios_path_override="PATH">
+
+Override the path to the blob to be used as BIOS. The blob provided here MUST
+be consistent with the B<bios=> which you have specified. You should not
+normally need to specify this option.
+
+This options does not have any effect if using B<bios="rombios"> or
+B<device_model_version="qemu-xen-traditional">.
+
 =item B<pae=BOOLEAN>
 
 Hide or expose the IA32 Physical Address Extensions. These extensions

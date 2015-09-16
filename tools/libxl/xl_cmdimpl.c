@@ -1565,12 +1565,17 @@ static void parse_config_data(const char *config_source,
 
         xlu_cfg_replace_string (config, "firmware_override",
                                 &b_info->u.hvm.firmware, 0);
-        if (!xlu_cfg_get_string(config, "bios", &buf, 0) &&
-            libxl_bios_type_from_string(buf, &b_info->u.hvm.bios)) {
+        xlu_cfg_replace_string (config, "bios_path_override",
+                                &b_info->u.hvm.system_firmware, 0);
+        if (!xlu_cfg_get_string(config, "bios", &buf, 0)) {
+            if (libxl_bios_type_from_string(buf, &b_info->u.hvm.bios)) {
                 fprintf(stderr, "ERROR: invalid value \"%s\" for \"bios\"\n",
                     buf);
                 exit (1);
-        }
+            }
+        } else if (b_info->u.hvm.system_firmware)
+            fprintf(stderr, "WARNING: "
+                    "bios_path_override given without specific bios name\n");
 
         xlu_cfg_get_defbool(config, "pae", &b_info->u.hvm.pae, 0);
         xlu_cfg_get_defbool(config, "apic", &b_info->u.hvm.apic, 0);

@@ -513,6 +513,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("timer_mode",       libxl_timer_mode),
                                        ("nested_hvm",       libxl_defbool),
                                        ("altp2m",           libxl_defbool),
+                                       ("system_firmware",  string),
                                        ("smbios_firmware",  string),
                                        ("acpi_firmware",    string),
                                        ("hdtype",           libxl_hdtype),
