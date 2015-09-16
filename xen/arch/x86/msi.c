@@ -696,6 +696,8 @@ static int msi_capability_init(struct pci_dev *dev,
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     pos = pci_find_cap_offset(seg, bus, slot, func, PCI_CAP_ID_MSI);
+    if ( !pos )
+        return -ENODEV;
     control = pci_conf_read16(seg, bus, slot, func, msi_control_reg(pos));
     maxvec = multi_msi_capable(control);
     if ( nvec > maxvec )
