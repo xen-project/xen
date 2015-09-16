@@ -392,12 +392,15 @@ struct xen_mc_msrinject {
     uint32_t mcinj_cpunr;           /* target processor id */
     uint32_t mcinj_flags;           /* see MC_MSRINJ_F_* below */
     uint32_t mcinj_count;           /* 0 .. count-1 in array are valid */
-    uint32_t _pad0;
+    domid_t  mcinj_domid;           /* valid only if MC_MSRINJ_F_GPADDR is
+                                       present in mcinj_flags */
+    uint16_t _pad0;
     struct mcinfo_msr mcinj_msr[MC_MSRINJ_MAXMSRS];
 };
 
 /* Flags for mcinj_flags above; bits 16-31 are reserved */
 #define MC_MSRINJ_F_INTERPOSE   0x1
+#define MC_MSRINJ_F_GPADDR      0x2
 
 #define XEN_MC_mceinject    5
 struct xen_mc_mceinject {
