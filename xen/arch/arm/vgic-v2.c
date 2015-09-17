@@ -576,10 +576,10 @@ static int vgic_v2_domain_init(struct domain *d)
 
     if ( !platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
         ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase + PAGE_SIZE),
-                               2, paddr_to_pfn(vgic_v2_hw.vbase + PAGE_SIZE));
+                               1, paddr_to_pfn(vgic_v2_hw.vbase + PAGE_SIZE));
     else
         ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase + PAGE_SIZE),
-                               2, paddr_to_pfn(vgic_v2_hw.vbase + SZ_64K));
+                               1, paddr_to_pfn(vgic_v2_hw.vbase + SZ_64K));
 
     if ( ret )
         return ret;
