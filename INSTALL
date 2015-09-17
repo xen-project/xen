@@ -248,6 +248,7 @@ OVMF_UPSTREAM_URL=
 QEMU_UPSTREAM_URL=
 QEMU_TRADITIONAL_URL=
 SEABIOS_UPSTREAM_URL=
+MINIOS_UPSTREAM_URL=
 
 Using additional CFLAGS to build tools which will run in dom0 is
 required when building distro packages. These variables can be used to
