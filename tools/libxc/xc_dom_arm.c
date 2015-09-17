@@ -460,7 +460,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         dom->p2m_host[pfn] = INVALID_P2M_ENTRY;
 
     /* setup initial p2m and allocate guest memory */
-    for ( i = 0; dom->rambank_size[i] && i < GUEST_RAM_BANKS; i++ )
+    for ( i = 0; i < GUEST_RAM_BANKS && dom->rambank_size[i]; i++ )
     {
         if ((rc = populate_guest_memory(dom,
                                         bankbase[i] >> XC_PAGE_SHIFT,
