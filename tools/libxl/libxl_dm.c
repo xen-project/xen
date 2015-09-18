@@ -605,7 +605,15 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
             flexarray_vappend(dm_args, "-net", "none", NULL);
         }
         if (libxl_defbool_val(b_info->u.hvm.gfx_passthru)) {
-            flexarray_append(dm_args, "-gfx_passthru");
+            switch (b_info->u.hvm.gfx_passthru_kind) {
+            case LIBXL_GFX_PASSTHRU_KIND_DEFAULT:
+            case LIBXL_GFX_PASSTHRU_KIND_IGD:
+                flexarray_append(dm_args, "-gfx_passthru");
+                break;
+            default:
+                LOG(ERROR, "unsupported gfx_passthru_kind.");
+                return ERROR_INVAL;
+            }
         }
     } else {
         if (!sdl && !vnc)
@@ -698,6 +706,22 @@ static char *dm_spice_options(libxl__gc *gc,
                              spice->streaming_video);
 
     return opt;
+}
+
+static enum libxl_gfx_passthru_kind
+libxl__detect_gfx_passthru_kind(libxl__gc *gc,
+                                const libxl_domain_config *guest_config)
+{
+    const libxl_domain_build_info *b_info = &guest_config->b_info;
+
+    if (b_info->u.hvm.gfx_passthru_kind != LIBXL_GFX_PASSTHRU_KIND_DEFAULT)
+        return b_info->u.hvm.gfx_passthru_kind;
+
+    if (libxl__is_igd_vga_passthru(gc, guest_config)) {
+        return LIBXL_GFX_PASSTHRU_KIND_IGD;
+    }
+
+    return LIBXL_GFX_PASSTHRU_KIND_DEFAULT;
 }
 
 static int libxl__build_device_model_args_new(libxl__gc *gc,
@@ -1031,9 +1055,6 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, "-net");
             flexarray_append(dm_args, "none");
         }
-        if (libxl_defbool_val(b_info->u.hvm.gfx_passthru)) {
-            flexarray_append(dm_args, "-gfx_passthru");
-        }
     } else {
         if (!sdl && !vnc) {
             flexarray_append(dm_args, "-nographic");
@@ -1078,6 +1099,23 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                                             machinearg, max_ram_below_4g);
             }
         }
+
+        if (libxl_defbool_val(b_info->u.hvm.gfx_passthru)) {
+            enum libxl_gfx_passthru_kind gfx_passthru_kind =
+                            libxl__detect_gfx_passthru_kind(gc, guest_config);
+            switch (gfx_passthru_kind) {
+            case LIBXL_GFX_PASSTHRU_KIND_IGD:
+                machinearg = GCSPRINTF("%s,igd-passthru=on", machinearg);
+                break;
+            case LIBXL_GFX_PASSTHRU_KIND_DEFAULT:
+                LOG(ERROR, "unable to detect required gfx_passthru_kind");
+                return ERROR_FAIL;
+            default:
+                LOG(ERROR, "invalid value for gfx_passthru_kind");
+                return ERROR_INVAL;
+            }
+        }
+
         flexarray_append(dm_args, machinearg);
         for (i = 0; b_info->extra_hvm && b_info->extra_hvm[i] != NULL; i++)
             flexarray_append(dm_args, b_info->extra_hvm[i]);

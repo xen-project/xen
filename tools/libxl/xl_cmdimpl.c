@@ -2297,8 +2297,18 @@ skip_vfb:
         xlu_cfg_replace_string (config, "spice_streaming_video",
                                 &b_info->u.hvm.spice.streaming_video, 0);
         xlu_cfg_get_defbool(config, "nographic", &b_info->u.hvm.nographic, 0);
-        xlu_cfg_get_defbool(config, "gfx_passthru",
-                            &b_info->u.hvm.gfx_passthru, 0);
+        if (!xlu_cfg_get_long(config, "gfx_passthru", &l, 1)) {
+            libxl_defbool_set(&b_info->u.hvm.gfx_passthru, l);
+        } else if (!xlu_cfg_get_string(config, "gfx_passthru", &buf, 0)) {
+            if (libxl_gfx_passthru_kind_from_string(buf,
+                                        &b_info->u.hvm.gfx_passthru_kind)) {
+                fprintf(stderr,
+                        "ERROR: invalid value \"%s\" for \"gfx_passthru\"\n",
+                        buf);
+                exit (1);
+            }
+            libxl_defbool_set(&b_info->u.hvm.gfx_passthru, true);
+        }
         switch (xlu_cfg_get_list_as_string_list(config, "serial",
                                                 &b_info->u.hvm.serial_list,
                                                 1))

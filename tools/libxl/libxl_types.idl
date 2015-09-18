@@ -159,6 +159,11 @@ libxl_tsc_mode = Enumeration("tsc_mode", [
     (3, "native_paravirt"),
     ])
 
+libxl_gfx_passthru_kind = Enumeration("gfx_passthru_kind", [
+    (0, "default"),
+    (1, "igd"),
+    ])
+
 # Consistent with the values defined for HVM_PARAM_TIMER_MODE.
 libxl_timer_mode = Enumeration("timer_mode", [
     (-1, "unknown"),
@@ -490,6 +495,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("spice",            libxl_spice_info),
                                        
                                        ("gfx_passthru",     libxl_defbool),
+                                       ("gfx_passthru_kind", libxl_gfx_passthru_kind),
                                        
                                        ("serial",           string),
                                        ("boot",             string),

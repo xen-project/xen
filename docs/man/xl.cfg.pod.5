@@ -818,7 +818,7 @@ through to this VM. See L<seize|/"seize_boolean"> above.
 devices passed through to this VM. See L<power_mgt|/"power_mgmt_boolean">
 above.
 
-=item B<gfx_passthru=BOOLEAN>
+=item B<gfx_passthru=BOOLEAN|"STRING">
 
 Enable graphics device PCI passthrough. This option makes an assigned
 PCI graphics card become primary graphics card in the VM. The QEMU
@@ -846,9 +846,36 @@ working graphics passthrough. See the XenVGAPassthroughTestedAdapters
 L<http://wiki.xen.org/wiki/XenVGAPassthroughTestedAdapters> wiki page
 for currently supported graphics cards for gfx_passthru.
 
-gfx_passthru is currently only supported with the qemu-xen-traditional
-device-model. Upstream qemu-xen device-model currently does not have
-support for gfx_passthru.
+gfx_passthru is currently supported both with the qemu-xen-traditional
+device-model and upstream qemu-xen device-model.
+
+When given as a boolean the B<gfx_passthru> option either disables gfx
+passthru or enables autodetection.
+
+But when given as a string the B<gfx_passthru> option describes the type
+of device to enable. Note this behavior is only supported with the upstream
+qemu-xen device-model. With qemu-xen-traditional IGD is always assumed
+and other options than autodetect or explicit IGD will result in an error.
+
+Currently, valid options are:
+
+=over 4
+
+=item B<gfx_passthru=0>
+
+Disables graphics device PCI passthrough.
+
+=item B<gfx_passthru=1>, B<gfx_passthru="default">
+
+Enables graphics device PCI passthrough and autodetects the type of device
+which is being used.
+
+=item "igd"
+
+Enables graphics device PCI passthrough but forcing the type of device to
+Intel Graphics Device.
+
+=back
 
 Note that some graphics adapters (AMD/ATI cards, for example) do not
 necessarily require gfx_passthru option, so you can use the normal Xen

@@ -839,6 +839,12 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
  */
 #define LIBXL_HAVE_SRM_V1 1
 
+/*
+ * libxl_domain_build_info has the u.hvm.gfx_passthru_kind field and
+ * the libxl_gfx_passthru_kind enumeration is defined.
+*/
+#define LIBXL_HAVE_GFX_PASSTHRU_KIND
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
