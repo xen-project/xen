@@ -491,6 +491,130 @@ static int sysfs_dev_unbind(libxl__gc *gc, libxl_device_pci *pcidev,
     return 0;
 }
 
+static uint16_t sysfs_dev_get_vendor(libxl__gc *gc, libxl_device_pci *pcidev)
+{
+    char *pci_device_vendor_path =
+            GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/vendor",
+                      pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+    uint16_t read_items;
+    uint16_t pci_device_vendor;
+
+    FILE *f = fopen(pci_device_vendor_path, "r");
+    if (!f) {
+        LOGE(ERROR,
+             "pci device "PCI_BDF" does not have vendor attribute",
+             pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+        return 0xffff;
+    }
+    read_items = fscanf(f, "0x%hx\n", &pci_device_vendor);
+    fclose(f);
+    if (read_items != 1) {
+        LOGE(ERROR,
+             "cannot read vendor of pci device "PCI_BDF,
+             pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+        return 0xffff;
+    }
+
+    return pci_device_vendor;
+}
+
+static uint16_t sysfs_dev_get_device(libxl__gc *gc, libxl_device_pci *pcidev)
+{
+    char *pci_device_device_path =
+            GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/device",
+                      pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+    uint16_t read_items;
+    uint16_t pci_device_device;
+
+    FILE *f = fopen(pci_device_device_path, "r");
+    if (!f) {
+        LOGE(ERROR,
+             "pci device "PCI_BDF" does not have device attribute",
+             pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+        return 0xffff;
+    }
+    read_items = fscanf(f, "0x%hx\n", &pci_device_device);
+    fclose(f);
+    if (read_items != 1) {
+        LOGE(ERROR,
+             "cannot read device of pci device "PCI_BDF,
+             pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+        return 0xffff;
+    }
+
+    return pci_device_device;
+}
+
+typedef struct {
+    uint16_t vendor;
+    uint16_t device;
+} pci_info;
+
+static const pci_info fixup_ids[] = {
+    /* Intel HSW Classic */
+    {0x8086, 0x0402}, /* HSWGT1D, HSWD_w7 */
+    {0x8086, 0x0406}, /* HSWGT1M, HSWM_w7 */
+    {0x8086, 0x0412}, /* HSWGT2D, HSWD_w7 */
+    {0x8086, 0x0416}, /* HSWGT2M, HSWM_w7 */
+    {0x8086, 0x041E}, /* HSWGT15D, HSWD_w7 */
+    /* Intel HSW ULT */
+    {0x8086, 0x0A06}, /* HSWGT1UT, HSWM_w7 */
+    {0x8086, 0x0A16}, /* HSWGT2UT, HSWM_w7 */
+    {0x8086, 0x0A26}, /* HSWGT3UT, HSWM_w7 */
+    {0x8086, 0x0A2E}, /* HSWGT3UT28W, HSWM_w7 */
+    {0x8086, 0x0A1E}, /* HSWGT2UX, HSWM_w7 */
+    {0x8086, 0x0A0E}, /* HSWGT1ULX, HSWM_w7 */
+    /* Intel HSW CRW */
+    {0x8086, 0x0D26}, /* HSWGT3CW, HSWM_w7 */
+    {0x8086, 0x0D22}, /* HSWGT3CWDT, HSWD_w7 */
+    /* Intel HSW Server */
+    {0x8086, 0x041A}, /* HSWSVGT2, HSWD_w7 */
+    /* Intel HSW SRVR */
+    {0x8086, 0x040A}, /* HSWSVGT1, HSWD_w7 */
+    /* Intel BSW */
+    {0x8086, 0x1606}, /* BDWULTGT1, BDWM_w7 */
+    {0x8086, 0x1616}, /* BDWULTGT2, BDWM_w7 */
+    {0x8086, 0x1626}, /* BDWULTGT3, BDWM_w7 */
+    {0x8086, 0x160E}, /* BDWULXGT1, BDWM_w7 */
+    {0x8086, 0x161E}, /* BDWULXGT2, BDWM_w7 */
+    {0x8086, 0x1602}, /* BDWHALOGT1, BDWM_w7 */
+    {0x8086, 0x1612}, /* BDWHALOGT2, BDWM_w7 */
+    {0x8086, 0x1622}, /* BDWHALOGT3, BDWM_w7 */
+    {0x8086, 0x162B}, /* BDWHALO28W, BDWM_w7 */
+    {0x8086, 0x162A}, /* BDWGT3WRKS, BDWM_w7 */
+    {0x8086, 0x162D}, /* BDWGT3SRVR, BDWM_w7 */
+};
+
+/*
+ * Some devices may need some ways to work well. Here like IGD,
+ * we have to pass a specific option to qemu.
+ */
+bool libxl__is_igd_vga_passthru(libxl__gc *gc,
+                                const libxl_domain_config *d_config)
+{
+    unsigned int i, j, num = ARRAY_SIZE(fixup_ids);
+    uint16_t vendor, device, pt_vendor, pt_device;
+
+    for (i = 0 ; i < d_config->num_pcidevs ; i++) {
+        libxl_device_pci *pcidev = &d_config->pcidevs[i];
+        pt_vendor = sysfs_dev_get_vendor(gc, pcidev);
+        pt_device = sysfs_dev_get_device(gc, pcidev);
+
+        if (pt_vendor == 0xffff || pt_device == 0xffff)
+            continue;
+
+        for (j = 0 ; j < num ; j++) {
+            vendor = fixup_ids[j].vendor;
+            device = fixup_ids[j].device;
+
+            if (pt_vendor == vendor &&  pt_device == device)
+                return true;
+        }
+    }
+
+    return false;
+}
+
 /*
  * A brief comment about slots.  I don't know what slots are for; however,
  * I have by experimentation determined:
