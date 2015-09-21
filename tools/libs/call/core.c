@@ -19,7 +19,7 @@
 
 xencall_handle *xencall_open(xentoollog_logger *logger, unsigned open_flags)
 {
-	xencall_handle *xcall = malloc(sizeof(*xcall));
+    xencall_handle *xcall = malloc(sizeof(*xcall));
     int rc;
 
     if (!xcall) return NULL;

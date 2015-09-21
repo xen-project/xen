@@ -294,9 +294,9 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
         err = ioctl(fd, IOCTL_GNTALLOC_SET_UNMAP_NOTIFY, &notify);
     if (err) {
         GSERROR(xgs->logger, "ioctl SET_UNMAP_NOTIFY failed");
-		munmap(area, count * PAGE_SIZE);
-		area = NULL;
-	}
+        munmap(area, count * PAGE_SIZE);
+        area = NULL;
+    }
 
     memcpy(refs, gref_info->gref_ids, count * sizeof(uint32_t));
 

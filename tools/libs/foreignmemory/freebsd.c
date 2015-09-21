@@ -121,7 +121,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
 int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
                                  void *addr, size_t num)
 {
-	return munmap(addr, num << PAGE_SHIFT);
+    return munmap(addr, num << PAGE_SHIFT);
 }
 
 /*

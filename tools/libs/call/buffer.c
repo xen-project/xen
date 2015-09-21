@@ -20,7 +20,7 @@
 #include "private.h"
 
 #define DBGPRINTF(_m...) \
-	xtl_log(xcall->logger, XTL_DEBUG, -1, "xencall:buffer", _m)
+    xtl_log(xcall->logger, XTL_DEBUG, -1, "xencall:buffer", _m)
 
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
@@ -86,7 +86,7 @@ static int cache_free(xencall_handle *xcall, void *p, size_t nr_pages)
     xcall->buffer_current_allocations--;
 
     if ( nr_pages == 1 &&
-	 xcall->buffer_cache_nr < BUFFER_CACHE_SIZE )
+         xcall->buffer_cache_nr < BUFFER_CACHE_SIZE )
     {
         xcall->buffer_cache[xcall->buffer_cache_nr++] = p;
         rc = 1;

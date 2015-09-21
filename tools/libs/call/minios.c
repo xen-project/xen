@@ -50,8 +50,8 @@ int osdep_hypercall(xencall_handle *xcall, privcmd_hypercall_t *hypercall)
     ret = HYPERVISOR_multicall(&call, 1);
 
     if (ret < 0) {
-	errno = -ret;
-	return -1;
+        errno = -ret;
+        return -1;
     }
     if ((long) call.result < 0) {
         errno = - (long) call.result;

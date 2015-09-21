@@ -72,9 +72,9 @@ evtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle * xce, uint3
 
     ret = ioctl(fd, IOCTL_EVTCHN_BIND_UNBOUND_PORT, &bind);
     if (ret == 0)
-	return bind.port;
+        return bind.port;
     else
-	return -1;
+        return -1;
 }
 
 evtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint32_t domid,
@@ -89,9 +89,9 @@ evtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint32_
 
     ret = ioctl(fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
     if (ret == 0)
-	return bind.port;
+        return bind.port;
     else
-	return -1;
+        return -1;
 }
 
 int xenevtchn_unbind(xenevtchn_handle *xce, evtchn_port_t port)
@@ -114,9 +114,9 @@ evtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce, unsigned int v
 
     err = ioctl(fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
     if (err)
-	return -1;
+        return -1;
     else
-	return bind.port;
+        return bind.port;
 }
 
 evtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)

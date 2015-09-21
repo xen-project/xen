@@ -39,7 +39,7 @@ void *compat_mapforeign_batch(xenforeignmem_handle *fmem, uint32_t dom,
 #endif
 
 #define PERROR(_f...) \
-	xtl_log(fmem->logger, XTL_ERROR, errno, "xenforeignmemory", _f)
+    xtl_log(fmem->logger, XTL_ERROR, errno, "xenforeignmemory", _f)
 
 #endif
 

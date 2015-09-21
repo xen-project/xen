@@ -142,7 +142,7 @@ int xengnttab_unmap(xengnttab_handle *xgt, void *start_address, uint32_t count);
  *      of grants.
  */
 int xengnttab_set_max_grants(xengnttab_handle *xgt,
-			     uint32_t count);
+                             uint32_t count);
 
 /*
  * Grant Sharing Interface (allocating and granting pages)
@@ -160,7 +160,7 @@ typedef struct xengntdev_handle xengntshr_handle;
  *
  */
 xengntshr_handle *xengntshr_open(xentoollog_logger *logger,
-			  unsigned open_flags);
+                                 unsigned open_flags);
 
 /*
  * Close a handle previously allocated with xengntshr_open().

@@ -46,16 +46,16 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
 {
     unsigned long pt_prot = 0;
     if (prot & PROT_READ)
-	pt_prot = L1_PROT_RO;
+        pt_prot = L1_PROT_RO;
     if (prot & PROT_WRITE)
-	pt_prot = L1_PROT;
+        pt_prot = L1_PROT;
     return map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);
 }
 
 int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
                                  void *addr, size_t num)
 {
-	return munmap(addr, num << PAGE_SHIFT);
+    return munmap(addr, num << PAGE_SHIFT);
 }
 
 /*

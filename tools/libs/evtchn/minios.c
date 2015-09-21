@@ -103,8 +103,8 @@ int xenevtchn_notify(xenevtchn_handle *xce, evtchn_port_t port)
     ret = notify_remote_via_evtchn(port);
 
     if (ret < 0) {
-	errno = -ret;
-	ret = -1;
+        errno = -ret;
+        ret = -1;
     }
     return ret;
 }
@@ -138,16 +138,16 @@ evtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce, uint32
     assert(get_current() == main_thread);
     port_info = port_alloc(fd);
     if (port_info == NULL)
-	return -1;
+        return -1;
 
     printf("xenevtchn_bind_unbound_port(%d)", domid);
     ret = evtchn_alloc_unbound(domid, evtchn_handler, (void*)(intptr_t)fd, &port);
     printf(" = %d\n", ret);
 
     if (ret < 0) {
-	port_dealloc(port_info);
-	errno = -ret;
-	return -1;
+        port_dealloc(port_info);
+        errno = -ret;
+        return -1;
     }
     port_info->bound = 1;
     port_info->port = port;
@@ -166,16 +166,16 @@ evtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint32_
     assert(get_current() == main_thread);
     port_info = port_alloc(fd);
     if (port_info == NULL)
-	return -1;
+        return -1;
 
     printf("xenevtchn_bind_interdomain(%d, %"PRId32")", domid, remote_port);
     ret = evtchn_bind_interdomain(domid, remote_port, evtchn_handler, (void*)(intptr_t)fd, &local_port);
     printf(" = %d\n", ret);
 
     if (ret < 0) {
-	port_dealloc(port_info);
-	errno = -ret;
-	return -1;
+        port_dealloc(port_info);
+        errno = -ret;
+        return -1;
     }
     port_info->bound = 1;
     port_info->port = local_port;
@@ -208,15 +208,15 @@ evtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce, unsigned int v
     assert(get_current() == main_thread);
     port_info = port_alloc(fd);
     if (port_info == NULL)
-	return -1;
+        return -1;
 
     printf("xenevtchn_bind_virq(%d)", virq);
     port = bind_virq(virq, evtchn_handler, (void*)(intptr_t)fd);
 
     if (port < 0) {
-	port_dealloc(port_info);
-	errno = -port;
-	return -1;
+        port_dealloc(port_info);
+        errno = -port;
+        return -1;
     }
     port_info->bound = 1;
     port_info->port = port;

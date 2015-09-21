@@ -95,5 +95,15 @@ void *osdep_map_foreign_batch(xenforeignmem_handle *fmem, uint32_t dom,
 int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
                                  void *addr, size_t num)
 {
-	return munmap(addr, num*XC_PAGE_SIZE);
+    return munmap(addr, num*XC_PAGE_SIZE);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
