@@ -35,8 +35,7 @@ mini-os-dir-force-update: mini-os-dir
 		$(GIT) reset --hard $(MINIOS_UPSTREAM_REVISION); \
 	fi
 
-SUBARCH := $(subst x86_32,i386,$(XEN_TARGET_ARCH))
-export XEN_TARGET_ARCH SUBARCH
+export XEN_TARGET_ARCH
 export DESTDIR
 
 # build and install everything into the standard system directories
