@@ -205,6 +205,13 @@
 #define LIBXL_HAVE_BUILDINFO_ARM_GIC_VERSION 1
 
 /*
+ * LIBXL_HAVE_SOFT_RESET indicates that libxl supports performing
+ * 'soft reset' for domains and there is 'soft_reset' shutdown reason
+ * in enum libxl_shutdown_reason.
+ */
+#define LIBXL_HAVE_SOFT_RESET 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
@@ -1131,6 +1138,14 @@ int static inline libxl_domain_create_restore_0x040200(
 #define libxl_domain_create_restore libxl_domain_create_restore_0x040200
 
 #endif
+
+int libxl_domain_soft_reset(libxl_ctx *ctx,
+                            libxl_domain_config *d_config,
+                            uint32_t domid,
+                            const libxl_asyncop_how *ao_how,
+                            const libxl_asyncprogress_how
+                            *aop_console_how)
+                            LIBXL_EXTERNAL_CALLERS_ONLY;
 
   /* A progress report will be made via ao_console_how, of type
    * domain_create_console_available, when the domain's primary

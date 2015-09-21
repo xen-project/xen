@@ -111,6 +111,7 @@
 #define STUBDOM_SPECIAL_CONSOLES 3
 #define TAP_DEVICE_SUFFIX "-emu"
 #define DOMID_XS_PATH "domid"
+#define INVALID_DOMID ~0
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
@@ -3226,6 +3227,7 @@ struct libxl__destroy_domid_state {
     /* private to implementation */
     libxl__devices_remove_state drs;
     libxl__ev_child destroyer;
+    bool soft_reset;
 };
 
 struct libxl__domain_destroy_state {
@@ -3240,6 +3242,7 @@ struct libxl__domain_destroy_state {
     int stubdom_finished;
     libxl__destroy_domid_state domain;
     int domain_finished;
+    bool soft_reset;
 };
 
 /*
@@ -3405,6 +3408,7 @@ struct libxl__domain_create_state {
     int restore_fd, libxc_fd;
     int restore_fdfl; /* original flags of restore_fd */
     libxl_domain_restore_params restore_params;
+    uint32_t domid_soft_reset;
     libxl__domain_create_cb *callback;
     libxl_asyncprogress_how aop_console_how;
     /* private to domain_create */

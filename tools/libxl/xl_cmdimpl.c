@@ -133,6 +133,8 @@ static const char *action_on_shutdown_names[] = {
 
     [LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY] = "coredump-destroy",
     [LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_RESTART] = "coredump-restart",
+
+    [LIBXL_ACTION_ON_SHUTDOWN_SOFT_RESET] = "soft-reset",
 };
 
 /* Optional data, in order:
@@ -1423,7 +1425,7 @@ static void parse_config_data(const char *config_source,
     }
 
     if (xlu_cfg_get_string (config, "on_soft_reset", &buf, 0))
-        buf = "restart";
+        buf = "soft-reset";
     if (!parse_action_on_shutdown(buf, &d_config->on_soft_reset)) {
         fprintf(stderr, "Unknown on_soft_reset action \"%s\" specified\n", buf);
         exit(1);
@@ -2490,6 +2492,11 @@ static domain_restart_type handle_domain_death(uint32_t *r_domid,
         *r_domid = INVALID_DOMID;
         break;
 
+    case LIBXL_ACTION_ON_SHUTDOWN_SOFT_RESET:
+        reload_domain_config(*r_domid, d_config);
+        restart = DOMAIN_RESTART_SOFT_RESET;
+        break;
+
     case LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY:
     case LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_RESTART:
         /* Already handled these above. */
@@ -2666,6 +2673,7 @@ static uint32_t create_domain(struct domain_create *dom_info)
     int restore_fd_to_close = -1;
     const libxl_asyncprogress_how *autoconnect_console_how;
     struct save_file_header hdr;
+    uint32_t domid_soft_reset = INVALID_DOMID;
 
     int restoring = (restore_file || (migrate_fd >= 0));
 
@@ -2880,7 +2888,13 @@ start:
          * restore/migrate-receive it again.
          */
         restoring = 0;
-    }else{
+    } else if (domid_soft_reset != INVALID_DOMID) {
+        /* Do soft reset. */
+        ret = libxl_domain_soft_reset(ctx, &d_config, domid_soft_reset,
+                                      0, autoconnect_console_how);
+        domid = domid_soft_reset;
+        domid_soft_reset = INVALID_DOMID;
+    } else {
         ret = libxl_domain_create_new(ctx, &d_config, &domid,
                                       0, autoconnect_console_how);
     }
@@ -2948,8 +2962,13 @@ start:
                 event->u.domain_shutdown.shutdown_reason,
                 event->u.domain_shutdown.shutdown_reason);
             switch (handle_domain_death(&domid, event, &d_config)) {
+            case DOMAIN_RESTART_SOFT_RESET:
+                domid_soft_reset = domid;
+                domid = INVALID_DOMID;
+                /* fall through */
             case DOMAIN_RESTART_RENAME:
-                if (!preserve_domain(&domid, event, &d_config)) {
+                if (domid_soft_reset == INVALID_DOMID &&
+                    !preserve_domain(&domid, event, &d_config)) {
                     /* If we fail then exit leaving the old domain in place. */
                     ret = -1;
                     goto out;

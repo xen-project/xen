@@ -1500,6 +1500,7 @@ void libxl__domain_destroy(libxl__egc *egc, libxl__domain_destroy_state *dds)
         dds->stubdom.ao = ao;
         dds->stubdom.domid = stubdomid;
         dds->stubdom.callback = stubdom_destroy_callback;
+        dds->stubdom.soft_reset = false;
         libxl__destroy_domid(egc, &dds->stubdom);
     } else {
         dds->stubdom_finished = 1;
@@ -1508,6 +1509,7 @@ void libxl__domain_destroy(libxl__egc *egc, libxl__domain_destroy_state *dds)
     dds->domain.ao = ao;
     dds->domain.domid = dds->domid;
     dds->domain.callback = domain_destroy_callback;
+    dds->domain.soft_reset = dds->soft_reset;
     libxl__destroy_domid(egc, &dds->domain);
 }
 
@@ -1688,10 +1690,14 @@ static void devices_destroy_cb(libxl__egc *egc,
 
     /* Clean up qemu-save and qemu-resume files. They are
      * intermediate files created by libxc. Unfortunately they
-     * don't fit in existing userdata scheme very well.
+     * don't fit in existing userdata scheme very well. In soft reset
+     * case we need to keep the file.
      */
-    rc = libxl__remove_file(gc, libxl__device_model_savefile(gc, domid));
-    if (rc < 0) goto out;
+    if (!dis->soft_reset) {
+        rc = libxl__remove_file(gc,
+                                libxl__device_model_savefile(gc, domid));
+        if (rc < 0) goto out;
+    }
     rc = libxl__remove_file(gc,
              GCSPRINTF(LIBXL_DEVICE_MODEL_RESTORE_FILE".%u", domid));
     if (rc < 0) goto out;
@@ -1702,7 +1708,15 @@ static void devices_destroy_cb(libxl__egc *egc,
         ctx->xch = xc_interface_open(ctx->lg,0,0);
         if (!ctx->xch) goto badchild;
 
-        rc = xc_domain_destroy(ctx->xch, domid);
+        if (!dis->soft_reset) {
+            rc = xc_domain_destroy(ctx->xch, domid);
+        } else {
+            rc = xc_domain_pause(ctx->xch, domid);
+            if (rc < 0) goto badchild;
+            rc = xc_domain_soft_reset(ctx->xch, domid);
+            if (rc < 0) goto badchild;
+            rc = xc_domain_unpause(ctx->xch, domid);
+        }
         if (rc < 0) goto badchild;
         _exit(0);
 

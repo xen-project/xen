@@ -351,6 +351,12 @@ destroy the domain.
 write a "coredump" of the domain to F</var/lib/xen/dump/NAME> and then
 restart the domain.
 
+=item B<soft-reset>
+
+Reset all Xen specific interfaces for the Xen-aware HVM domain allowing
+it to reestablish these interfaces and continue executing the domain. PV
+and non-Xen-aware HVM guests are not supported.
+
 =back
 
 The default for C<on_poweroff> is C<destroy>.
@@ -372,7 +378,7 @@ Action to take if the domain crashes.  Default is C<destroy>.
 =item B<on_soft_reset="ACTION">
 
 Action to take if the domain performs 'soft reset' (e.g. does kexec).
-Default is C<restart>.
+Default is C<soft-reset>.
 
 =back
 

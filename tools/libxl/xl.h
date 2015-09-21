@@ -194,6 +194,7 @@ typedef enum {
     DOMAIN_RESTART_NONE = 0,     /* No domain restart */
     DOMAIN_RESTART_NORMAL,       /* Domain should be restarted */
     DOMAIN_RESTART_RENAME,       /* Domain should be renamed and restarted */
+    DOMAIN_RESTART_SOFT_RESET,   /* Soft reset should be performed */
 } domain_restart_type;
 
 extern void printf_info_sexp(int domid, libxl_domain_config *d_config, FILE *fh);
