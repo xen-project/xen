@@ -46,11 +46,9 @@ typedef struct xentoollog_logger xentoollog_logger;
  * which case errno will be set appropriately.
  *
  * Note:
- * After fork a child process must not use any opened xc evtchn
+ * After fork a child process must not use any opened evtchn
  * handle inherited from their parent. They must open a new handle if
- * they want to interact with xc.
- *
- * Before Xen pre-4.1 this function would sometimes report errors with perror.
+ * they want to interact with evtchn.
  */
 /* Currently no flags are defined */
 xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned open_flags);
