@@ -70,6 +70,9 @@
 #define round_up(addr, mask)     ((addr) | (mask))
 #define round_pg_up(addr)  (((addr) + PAGE_SIZE_X86 - 1) & ~(PAGE_SIZE_X86 - 1))
 
+#define HVMLOADER_MODULE_MAX_COUNT 1
+#define HVMLOADER_MODULE_NAME_SIZE 10
+
 struct xc_dom_params {
     unsigned levels;
     xen_vaddr_t vaddr_mask;
@@ -591,6 +594,7 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
     xen_pfn_t special_array[X86_HVM_NR_SPECIAL_PAGES];
     xen_pfn_t ioreq_server_array[NR_IOREQ_SERVER_PAGES];
     xc_interface *xch = dom->xch;
+    size_t start_info_size = sizeof(struct hvm_start_info);
 
     /* Allocate and clear special pages. */
     for ( i = 0; i < X86_HVM_NR_SPECIAL_PAGES; i++ )
@@ -625,8 +629,6 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
 
     if ( !dom->device_model )
     {
-        size_t start_info_size = sizeof(struct hvm_start_info);
-
         if ( dom->cmdline )
         {
             dom->cmdline_size = ROUNDUP(strlen(dom->cmdline) + 1, 8);
@@ -636,17 +638,18 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
         /* Limited to one module. */
         if ( dom->ramdisk_blob )
             start_info_size += sizeof(struct hvm_modlist_entry);
-
-        rc = xc_dom_alloc_segment(dom, &dom->start_info_seg,
-                                  "HVMlite start info", 0, start_info_size);
-        if ( rc != 0 )
-        {
-            DOMPRINTF("Unable to reserve memory for the start info");
-            goto out;
-        }
     }
     else
     {
+        start_info_size +=
+            sizeof(struct hvm_modlist_entry) * HVMLOADER_MODULE_MAX_COUNT;
+        /*
+         * Add extra space to write modules name.
+         * The HVMLOADER_MODULE_NAME_SIZE accounts for NUL byte.
+         */
+        start_info_size +=
+            HVMLOADER_MODULE_NAME_SIZE * HVMLOADER_MODULE_MAX_COUNT;
+
         /*
          * Allocate and clear additional ioreq server pages. The default
          * server will use the IOREQ and BUFIOREQ special pages above.
@@ -671,6 +674,14 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
                          ioreq_server_pfn(0));
         xc_hvm_param_set(xch, domid, HVM_PARAM_NR_IOREQ_SERVER_PAGES,
                          NR_IOREQ_SERVER_PAGES);
+    }
+
+    rc = xc_dom_alloc_segment(dom, &dom->start_info_seg,
+                              "HVM start info", 0, start_info_size);
+    if ( rc != 0 )
+    {
+        DOMPRINTF("Unable to reserve memory for the start info");
+        goto out;
     }
 
     /*
@@ -1690,42 +1701,89 @@ static int alloc_pgtables_hvm(struct xc_dom_image *dom)
     return 0;
 }
 
+/*
+ * The memory layout of the start_info page and the modules, and where the
+ * addresses are stored:
+ *
+ * /----------------------------------\
+ * | struct hvm_start_info            |
+ * +----------------------------------+ <- start_info->modlist_paddr
+ * | struct hvm_modlist_entry[0]      |
+ * +----------------------------------+
+ * | struct hvm_modlist_entry[1]      |
+ * +----------------------------------+ <- modlist[0].cmdline_paddr
+ * | cmdline of module 0              |
+ * | char[HVMLOADER_MODULE_NAME_SIZE] |
+ * +----------------------------------+ <- modlist[1].cmdline_paddr
+ * | cmdline of module 1              |
+ * +----------------------------------+
+ */
+static void add_module_to_list(struct xc_dom_image *dom,
+                               struct xc_hvm_firmware_module *module,
+                               const char *name,
+                               struct hvm_modlist_entry *modlist,
+                               struct hvm_start_info *start_info)
+{
+    uint32_t index = start_info->nr_modules;
+    void *modules_cmdline_start = modlist + HVMLOADER_MODULE_MAX_COUNT;
+    uint64_t modlist_paddr = (dom->start_info_seg.pfn << PAGE_SHIFT) +
+        ((uintptr_t)modlist - (uintptr_t)start_info);
+    uint64_t modules_cmdline_paddr = modlist_paddr +
+        sizeof(struct hvm_modlist_entry) * HVMLOADER_MODULE_MAX_COUNT;
+
+    if ( module->length == 0 )
+        return;
+
+    assert(start_info->nr_modules < HVMLOADER_MODULE_MAX_COUNT);
+    assert(strnlen(name, HVMLOADER_MODULE_NAME_SIZE)
+           < HVMLOADER_MODULE_NAME_SIZE);
+
+    modlist[index].paddr = module->guest_addr_out;
+    modlist[index].size = module->length;
+
+    strncpy(modules_cmdline_start + HVMLOADER_MODULE_NAME_SIZE * index,
+            name, HVMLOADER_MODULE_NAME_SIZE);
+    modlist[index].cmdline_paddr =
+        modules_cmdline_paddr + HVMLOADER_MODULE_NAME_SIZE * index;
+
+    start_info->nr_modules++;
+}
+
 static int bootlate_hvm(struct xc_dom_image *dom)
 {
     uint32_t domid = dom->guest_domid;
     xc_interface *xch = dom->xch;
+    struct hvm_start_info *start_info;
+    size_t start_info_size;
+    struct hvm_modlist_entry *modlist;
+
+    start_info_size = sizeof(*start_info) + dom->cmdline_size;
+    if ( dom->ramdisk_blob )
+        start_info_size += sizeof(struct hvm_modlist_entry);
+
+    if ( start_info_size >
+         dom->start_info_seg.pages << XC_DOM_PAGE_SHIFT(dom) )
+    {
+        DOMPRINTF("Trying to map beyond start_info_seg");
+        return -1;
+    }
+
+    start_info = xc_map_foreign_range(xch, domid, start_info_size,
+                                      PROT_READ | PROT_WRITE,
+                                      dom->start_info_seg.pfn);
+    if ( start_info == NULL )
+    {
+        DOMPRINTF("Unable to map HVM start info page");
+        return -1;
+    }
+
+    modlist = (void*)(start_info + 1) + dom->cmdline_size;
 
     if ( !dom->device_model )
     {
-        struct hvm_start_info *start_info;
-        size_t start_info_size;
-        void *start_page;
-
-        start_info_size = sizeof(*start_info) + dom->cmdline_size;
-        if ( dom->ramdisk_blob )
-            start_info_size += sizeof(struct hvm_modlist_entry);
-
-        if ( start_info_size >
-             dom->start_info_seg.pages << XC_DOM_PAGE_SHIFT(dom) )
-        {
-            DOMPRINTF("Trying to map beyond start_info_seg");
-            return -1;
-        }
-
-        start_page = xc_map_foreign_range(xch, domid, start_info_size,
-                                          PROT_READ | PROT_WRITE,
-                                          dom->start_info_seg.pfn);
-        if ( start_page == NULL )
-        {
-            DOMPRINTF("Unable to map HVM start info page");
-            return -1;
-        }
-
-        start_info = start_page;
-
         if ( dom->cmdline )
         {
-            char *cmdline = start_page + sizeof(*start_info);
+            char *cmdline = (void*)(start_info + 1);
 
             strncpy(cmdline, dom->cmdline, dom->cmdline_size);
             start_info->cmdline_paddr = (dom->start_info_seg.pfn << PAGE_SHIFT) +
@@ -1734,21 +1792,29 @@ static int bootlate_hvm(struct xc_dom_image *dom)
 
         if ( dom->ramdisk_blob )
         {
-            struct hvm_modlist_entry *modlist =
-                start_page + sizeof(*start_info) + dom->cmdline_size;
 
             modlist[0].paddr = dom->ramdisk_seg.vstart - dom->parms.virt_base;
             modlist[0].size = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
-            start_info->modlist_paddr = (dom->start_info_seg.pfn << PAGE_SHIFT) +
-                                ((uintptr_t)modlist - (uintptr_t)start_info);
             start_info->nr_modules = 1;
         }
-
-        start_info->magic = XEN_HVM_START_MAGIC_VALUE;
-
-        munmap(start_page, start_info_size);
     }
     else
+    {
+        add_module_to_list(dom, &dom->system_firmware_module, "firmware",
+                           modlist, start_info);
+    }
+
+    if ( start_info->nr_modules )
+    {
+        start_info->modlist_paddr = (dom->start_info_seg.pfn << PAGE_SHIFT) +
+                            ((uintptr_t)modlist - (uintptr_t)start_info);
+    }
+
+    start_info->magic = XEN_HVM_START_MAGIC_VALUE;
+
+    munmap(start_info, start_info_size);
+
+    if ( dom->device_model )
     {
         void *hvm_info_page;
 

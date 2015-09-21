@@ -209,6 +209,9 @@ struct xc_dom_image {
     /* If unset disables the setup of the IOREQ pages. */
     bool device_model;
 
+    /* BIOS/Firmware passed to HVMLOADER */
+    struct xc_hvm_firmware_module system_firmware_module;
+
     /* Extra ACPI tables passed to HVMLOADER */
     struct xc_hvm_firmware_module acpi_module;
 

@@ -169,6 +169,9 @@ static int modules_init(struct xc_dom_image *dom)
 {
     int rc;
 
+    rc = module_init_one(dom, &dom->system_firmware_module,
+                         "System Firmware module");
+    if ( rc ) goto err;
     rc = module_init_one(dom, &dom->acpi_module, "ACPI module");
     if ( rc ) goto err;
     rc = module_init_one(dom, &dom->smbios_module, "SMBIOS module");
