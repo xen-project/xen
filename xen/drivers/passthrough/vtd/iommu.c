@@ -2314,9 +2314,10 @@ static int intel_iommu_assign_device(
         {
             bool_t relaxed = !!(flag & XEN_DOMCTL_DEV_RDM_RELAXED);
 
-            printk(XENLOG_G_WARNING VTDPREFIX
+            printk(XENLOG_GUEST "%s" VTDPREFIX
                    " It's %s to assign %04x:%02x:%02x.%u"
                    " with shared RMRR at %"PRIx64" for Dom%d.\n",
+                   relaxed ? XENLOG_WARNING : XENLOG_ERR,
                    relaxed ? "risky" : "disallowed",
                    seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                    rmrr->base_address, d->domain_id);
