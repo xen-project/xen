@@ -74,8 +74,8 @@ void *osdep_alloc_hypercall_buffer(xencall_handle *xcall, size_t npages)
     size_t size = npages * XC_PAGE_SIZE;
     void *p;
 
-    p = xc_memalign(xcall, XC_PAGE_SIZE, size);
-    if (!p)
+    ret = posix_memalign(&p, XC_PAGE_SIZE, size);
+    if ( ret != 0 || !p )
         return NULL;
 
     if ( mlock(p, size) < 0 )

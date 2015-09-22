@@ -71,7 +71,7 @@ int osdep_xencall_close(xencall_handle *xcall)
 
 void *osdep_alloc_hypercall_buffer(xencall_handle *xcall, size_t npages)
 {
-    return xc_memalign(xcall, XC_PAGE_SIZE, npages * XC_PAGE_SIZE);
+    return memalign(XC_PAGE_SIZE, npages * XC_PAGE_SIZE);
 }
 
 void osdep_free_hypercall_buffer(xencall_handle *xcall, void *ptr,
