@@ -48,7 +48,6 @@
 #include <asm/cpuidle.h>
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
-#include <asm/fixmap.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/viridian.h>
@@ -270,51 +269,6 @@ struct vcpu *alloc_vcpu_struct(void)
 void free_vcpu_struct(struct vcpu *v)
 {
     free_xenheap_page(v);
-}
-
-static DEFINE_PER_CPU(struct page_info *[
-    PFN_UP(sizeof(struct vcpu_guest_context))], vgc_pages);
-
-struct vcpu_guest_context *alloc_vcpu_guest_context(void)
-{
-    unsigned int i, cpu = smp_processor_id();
-    enum fixed_addresses idx = FIX_VGC_BEGIN -
-        cpu * PFN_UP(sizeof(struct vcpu_guest_context));
-
-    BUG_ON(per_cpu(vgc_pages[0], cpu) != NULL);
-
-    for ( i = 0; i < PFN_UP(sizeof(struct vcpu_guest_context)); ++i )
-    {
-        struct page_info *pg = alloc_domheap_page(current->domain,
-                                                  MEMF_no_owner);
-
-        if ( unlikely(pg == NULL) )
-        {
-            free_vcpu_guest_context(NULL);
-            return NULL;
-        }
-        __set_fixmap(idx - i, page_to_mfn(pg), __PAGE_HYPERVISOR_RW);
-        per_cpu(vgc_pages[i], cpu) = pg;
-    }
-    return (void *)fix_to_virt(idx);
-}
-
-void free_vcpu_guest_context(struct vcpu_guest_context *vgc)
-{
-    unsigned int i, cpu = smp_processor_id();
-    enum fixed_addresses idx = FIX_VGC_BEGIN -
-        cpu * PFN_UP(sizeof(struct vcpu_guest_context));
-
-    BUG_ON(vgc && vgc != (void *)fix_to_virt(idx));
-
-    for ( i = 0; i < PFN_UP(sizeof(struct vcpu_guest_context)); ++i )
-    {
-        if ( !per_cpu(vgc_pages[i], cpu) )
-            continue;
-        clear_fixmap(idx - i);
-        free_domheap_page(per_cpu(vgc_pages[i], cpu));
-        per_cpu(vgc_pages[i], cpu) = NULL;
-    }
 }
 
 static int setup_compat_l4(struct vcpu *v)

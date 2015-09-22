@@ -47,9 +47,6 @@ enum fixed_addresses {
     FIX_COM_END,
     FIX_EHCI_DBGP,
     /* Everything else should go further down. */
-    FIX_VGC_END,
-    FIX_VGC_BEGIN = FIX_VGC_END
-      + PFN_UP(sizeof(struct vcpu_guest_context)) * NR_CPUS - 1,
     FIX_APIC_BASE,
     FIX_IO_APIC_BASE_0,
     FIX_IO_APIC_BASE_END = FIX_IO_APIC_BASE_0 + MAX_IO_APICS-1,

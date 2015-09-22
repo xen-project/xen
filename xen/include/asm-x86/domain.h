@@ -576,6 +576,16 @@ void domain_cpuid(struct domain *d,
 
 #define domain_max_vcpus(d) (is_hvm_domain(d) ? HVM_MAX_VCPUS : MAX_VIRT_CPUS)
 
+static inline struct vcpu_guest_context *alloc_vcpu_guest_context(void)
+{
+    return vmalloc(sizeof(struct vcpu_guest_context));
+}
+
+static inline void free_vcpu_guest_context(struct vcpu_guest_context *vgc)
+{
+    vfree(vgc);
+}
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

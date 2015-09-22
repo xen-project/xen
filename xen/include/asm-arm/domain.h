@@ -300,6 +300,16 @@ static inline register_t vcpuid_to_vaffinity(unsigned int vcpuid)
     return vaff;
 }
 
+static inline struct vcpu_guest_context *alloc_vcpu_guest_context(void)
+{
+    return xmalloc(struct vcpu_guest_context);
+}
+
+static inline void free_vcpu_guest_context(struct vcpu_guest_context *vgc)
+{
+    xfree(vgc);
+}
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

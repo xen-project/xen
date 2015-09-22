@@ -31,12 +31,6 @@ void free_domain_struct(struct domain *d);
 struct vcpu *alloc_vcpu_struct(void);
 void free_vcpu_struct(struct vcpu *v);
 
-/* Allocate/free a vcpu_guest_context structure. */
-#ifndef alloc_vcpu_guest_context
-struct vcpu_guest_context *alloc_vcpu_guest_context(void);
-void free_vcpu_guest_context(struct vcpu_guest_context *);
-#endif
-
 /* Allocate/free a PIRQ structure. */
 #ifndef alloc_pirq_struct
 struct pirq *alloc_pirq_struct(struct domain *);

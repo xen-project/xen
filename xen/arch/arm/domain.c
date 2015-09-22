@@ -466,17 +466,6 @@ void free_vcpu_struct(struct vcpu *v)
     free_xenheap_page(v);
 }
 
-struct vcpu_guest_context *alloc_vcpu_guest_context(void)
-{
-    return xmalloc(struct vcpu_guest_context);
-
-}
-
-void free_vcpu_guest_context(struct vcpu_guest_context *vgc)
-{
-    xfree(vgc);
-}
-
 int vcpu_initialise(struct vcpu *v)
 {
     int rc = 0;
