@@ -31,28 +31,124 @@
 typedef struct xentoollog_logger xentoollog_logger;
 
 /*
+ * PRODUCING AND CONSUMING GRANT REFERENCES
+ * ========================================
+ *
+ * The xengnttab library contains two distinct interfaces, each with
+ * their own distinct handle type and entry points. The represent the
+ * two sides of the grant table interface, producer (gntshr) and
+ * consumer (gnttab).
+ *
+ * The xengnttab_* interfaces take a xengnttab_handle and provide
+ * mechanisms for consuming (i.e. mapping or copying to/from) grant
+ * references provided by a peer.
+ *
+ * The xengntshr_* interfaces take a xengntshr_handle and provide a
+ * mechanism to produce grantable memory and grant references to that
+ * memory, which can be handed to some peer.
+ *
+ * UNMAP NOTIFICATION
+ * ==================
+ *
+ * The xengnt{tab,shr}_*_notify interfaces implement a cooperative
+ * interface which is intended to allow the underlying kernel
+ * interfaces to attempt to notify the peer to perform graceful
+ * teardown upon failure (i.e. crash or exit) of the process on their
+ * end.
+ *
+ * These interfaces operate on a single page only and are intended for
+ * use on the main shared-ring page of a protocol. It is assumed that
+ * on teardown both ends would automatically teardown all grants
+ * associated with the protocol in addition to the shared ring itself.
+ *
+ * Each end is able to optionally nominate a byte offset within the
+ * shared page or an event channel or both. On exit of the process the
+ * underlying kernel driver will zero the byte at the given offset and
+ * signal the event channel.
+ *
+ * The event channel can be the same event channel used for regular
+ * ring progress notifications, or may be a dedicated event channel.
+ *
+ * Both ends may share the same notification byte offset within the
+ * shared page, or may have dedicated "client" and "server" status
+ * bytes.
+ *
+ * Since the byte is cleared on shutdown the protocol must use 0 as
+ * the "closed/dead" status, but is permitted to use any other non-0
+ * values to indicate various other "live" states (waiting for
+ * connection, connected, etc).
+ *
+ * Both ends are permitted to modify (including clear) their
+ * respective status bytes and to signal the event channel themselves
+ * from userspace.
+ *
+ * Depending on the mechanisms which have been registered an
+ * the peer may receive a shutdown notification as:
+ *
+ *   - An event channel notification on a dedicated event channel
+ *   - Observation of the other ends's status byte being cleared
+ *     (whether in response to an explicit notification or in the
+ *     course of normal operation).
+ *
+ * The mechanism should be defined as part of the specific ring
+ * protocol.
+ *
+ * Upon receiving notification of the peer is expected to teardown any
+ * resources (and in particular any grant mappings) in a timely
+ * manner.
+ *
+ * NOTE: this protocol is intended to allow for better error behaviour
+ * and recovery between two cooperating peers. It does not cover the
+ * case of a malicious peer who may continue to hold resources open.
+ */
+
+/*
  * Grant Table Interface (making use of grants from other domains)
  */
 
 typedef struct xengntdev_handle xengnttab_handle;
 
 /*
- * Note:
- * After fork a child process must not use any opened xc gnttab
- * handle inherited from their parent. They must open a new handle if
- * they want to interact with xc.
+ * Returns a handle onto the grant table driver.  Logs errors.
  *
- * Return an fd onto the grant table driver.  Logs errors.
+ * Note: After fork(2) a child process must not use any opened gnttab
+ * handle inherited from their parent, nor access any grant mapped
+ * areas associated with that handle.
+ *
+ * The child must open a new handle if they want to interact with
+ * gnttab.
+ *
+ * Calling exec(2) in a child will safely (and reliably) reclaim any
+ * resources which were allocated via a xengnttab_handle in the parent.
+ *
+ * A child which does not call exec(2) may safely call
+ * xengnttab_close() on a xengnttab_handle inherited from their
+ * parent. This will attempt to reclaim any resources associated with
+ * that handle. Note that in some implementations this reclamation may
+ * not be completely effective, in this case any affected resources
+ * remain allocated.
+ *
+ * Calling xengnttab_close() is the only safe operation on a
+ * xengnttab_handle which has been inherited. xengnttab_unmap() must
+ * not be called under such circumstances.
  */
 xengnttab_handle *xengnttab_open(xentoollog_logger *logger, unsigned open_flags);
 
 /*
- * Close a handle previously allocated with xengnttab_open().
- * Never logs errors.
+ * Close a handle previously allocated with xengnttab_open(),
+ * including unmaping any current grant maps.  Never logs errors.
+ *
+ * Under normal circumstances (i.e. not in the child after a fork)
+ * xengnttab_unmap() should be used on all mappings allocated through
+ * a xengnttab_handle prior to closing the handle in order to free up
+ * resources associated with those mappings.
+ *
+ * This is the only function which may be safely called on a
+ * xengnttab_handle in a child after a fork.
  */
 int xengnttab_close(xengnttab_handle *xgt);
 
-/*
+/**
  * Memory maps a grant reference from one domain to a local address range.
  * Mappings should be unmapped with xengnttab_unmap.  Logs errors.
  *
@@ -71,6 +167,10 @@ void *xengnttab_map_grant_ref(xengnttab_handle *xgt,
  * contiguous local address range. Mappings should be unmapped with
  * xengnttab_unmap.  Logs errors.
  *
+ * On failure (including partial failure) sets errno and returns
+ * NULL. On partial failure no mappings are established (any partial
+ * work is undone).
+ *
  * @parm xgt a handle on an open grant table interface
  * @parm count the number of grant references to be mapped
  * @parm domids an array of @count domain IDs by which the corresponding @refs
@@ -88,6 +188,9 @@ void *xengnttab_map_grant_refs(xengnttab_handle *xgt,
  * Memory maps one or more grant references from one domain to a
  * contiguous local address range. Mappings should be unmapped with
  * xengnttab_unmap.  Logs errors.
+ *
+ * This call is equivalent to calling @xengnttab_map_grant_refs with a
+ * @domids array with every entry set to @domid.
  *
  * @parm xgt a handle on an open grant table interface
  * @parm count the number of grant references to be mapped
@@ -109,6 +212,11 @@ void *xengnttab_map_domain_grant_refs(xengnttab_handle *xgt,
  * unmapped, the byte at the given offset will be zeroed and a wakeup will be
  * sent to the given event channel.  Logs errors.
  *
+ * On failure sets errno and returns NULL.
+ *
+ * If notify_offset or notify_port are requested and cannot be set up
+ * an error will be returned and no mapping will be made.
+ *
  * @parm xgt a handle on an open grant table interface
  * @parm domid the domain to map memory from
  * @parm ref the grant reference ID to map
@@ -124,15 +232,20 @@ void *xengnttab_map_grant_ref_notify(xengnttab_handle *xgt,
                                      uint32_t notify_offset,
                                      evtchn_port_t notify_port);
 
-/*
- * Unmaps the @count pages starting at @start_address, which were mapped by a
- * call to xengnttab_map_grant_ref or xengnttab_map_grant_refs. Never logs.
+/**
+ * Unmaps the @count pages starting at @start_address, which were
+ * mapped by a call to xengnttab_map_grant_ref,
+ * xengnttab_map_grant_refs or xengnttab_map_grant_ref_notify. Never
+ * logs.
+ *
+ * If the mapping was made using xengnttab_map_grant_ref_notify() with
+ * either notify_offset or notify_port then the peer will be notified.
  */
 int xengnttab_unmap(xengnttab_handle *xgt, void *start_address, uint32_t count);
 
-/*
- * Sets the maximum number of grants that may be mapped by the given instance
- * to @count.  Never logs.
+/**
+ * Sets the maximum number of grants that may be mapped by the given
+ * instance to @count.  Never logs.
  *
  * N.B. This function must be called after opening the handle, and before any
  *      other functions are invoked on it.
@@ -142,22 +255,37 @@ int xengnttab_unmap(xengnttab_handle *xgt, void *start_address, uint32_t count);
  *      of grants.
  */
 int xengnttab_set_max_grants(xengnttab_handle *xgt,
-                             uint32_t count);
+                             uint32_t nr_grants);
 
 /*
- * Grant Sharing Interface (allocating and granting pages)
+ * Grant Sharing Interface (allocating and granting pages to others)
  */
 
 typedef struct xengntdev_handle xengntshr_handle;
 
 /*
- * Return an fd onto the grant sharing driver.  Logs errors.
+ * Returns a handle onto the grant sharing driver.  Logs errors.
  *
- * Note:
- * After fork a child process must not use any opened xc gntshr
- * handle inherited from their parent. They must open a new handle if
- * they want to interact with xc.
+ * Note: After fork(2) a child process must not use any opened gntshr
+ * handle inherited from their parent, nor access any grant mapped
+ * areas associated with that handle.
  *
+ * The child must open a new handle if they want to interact with
+ * gntshr.
+ *
+ * Calling exec(2) in a child will safely (and reliably) reclaim any
+ * resources which were allocated via a xengntshr_handle in the
+ * parent.
+ *
+ * A child which does not call exec(2) may safely call
+ * xengntshr_close() on a xengntshr_handle inherited from their
+ * parent. This will attempt to reclaim any resources associated with
+ * that handle. Note that in some implementations this reclamation may
+ * not be completely effective, in this case any affected resources
+ * remain allocated.
+ *
+ * Calling xengntshr_close() is the only safe operation on a
+ * xengntshr_handle which has been inherited.
  */
 xengntshr_handle *xengntshr_open(xentoollog_logger *logger,
                                  unsigned open_flags);
@@ -165,11 +293,26 @@ xengntshr_handle *xengntshr_open(xentoollog_logger *logger,
 /*
  * Close a handle previously allocated with xengntshr_open().
  * Never logs errors.
+ *
+ * Under normal circumstances (i.e. not in the child after a fork)
+ * xengntshr_unmap() should be used on all mappings allocated through
+ * a xengnttab_handle prior to closing the handle in order to free up
+ * resources associated with those mappings.
+ *
+ * xengntshr_close() is the only function which may be safely called
+ * on a xengntshr_handle in a child after a fork. xengntshr_unshare()
+ * must not be called under such circumstances.
  */
 int xengntshr_close(xengntshr_handle *xgs);
 
-/*
- * Creates and shares pages with another domain.
+/**
+ * Allocates and shares pages with another domain.
+ *
+ * On failure sets errno and returns NULL. No allocations will be made.
+ *
+ * This library only provides functionality for sharing memory
+ * allocated via this call, memory from elsewhere (malloc, mmap etc)
+ * cannot be shared here.
  *
  * @parm xgs a handle to an open grant sharing instance
  * @parm domid the domain to share memory with
@@ -181,7 +324,7 @@ int xengntshr_close(xengntshr_handle *xgs);
 void *xengntshr_share_pages(xengntshr_handle *xgs, uint32_t domid,
                             int count, uint32_t *refs, int writable);
 
-/*
+/**
  * Creates and shares a page with another domain, with unmap notification.
  *
  * @parm xgs a handle to an open grant sharing instance
@@ -197,9 +340,13 @@ void *xengntshr_share_page_notify(xengntshr_handle *xgs, uint32_t domid,
                                   uint32_t *ref, int writable,
                                   uint32_t notify_offset,
                                   evtchn_port_t notify_port);
-/*
- * Unmaps the @count pages starting at @start_address, which were mapped by a
- * call to xengntshr_share_*. Never logs.
+
+/**
+ * Unmaps the @count pages starting at @start_address, which were
+ * mapped by a call to xengntshr_share_*. Never logs.
+ *
+ * If the mapping was made using xengntshr_share_page_notify() with
+ * either notify_offset or notify_port then the peer will be notified.
  */
 int xengntshr_unshare(xengntshr_handle *xgs, void *start_address, uint32_t count);
 

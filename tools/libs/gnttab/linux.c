@@ -132,12 +132,14 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
     if (addr == MAP_FAILED && errno == EAGAIN)
     {
         /*
-         * The grant hypercall can return EAGAIN if the granted page is
-         * swapped out. Since the paging daemon may be in the same domain, the
-         * hypercall cannot block without causing a deadlock.
+         * The grant hypercall can return EAGAIN if the granted page
+         * is swapped out. Since the paging daemon may be in the same
+         * domain, the hypercall cannot block without causing a
+         * deadlock.
          *
-         * Because there are no notificaitons when the page is swapped in, wait
-         * a bit before retrying, and hope that the page will arrive eventually.
+         * Because there are no notifications when the page is swapped
+         * in, wait a bit before retrying, and hope that the page will
+         * arrive eventually.
          */
         usleep(1000);
         goto retry;
