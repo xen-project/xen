@@ -174,10 +174,10 @@ static inline void vgic_byte_write(uint32_t *reg, uint32_t var, int offset)
 {
     int byte = offset & 0x3;
 
-    var &= (0xff << (8*byte));
+    var &= 0xff;
 
     *reg &= ~(0xff << (8*byte));
-    *reg |= var;
+    *reg |= (var << (8*byte));
 }
 
 enum gic_sgi_mode;
