@@ -94,7 +94,7 @@ void *osdep_alloc_pages(xencall_handle *xcall, size_t npages)
     p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED, -1, 0);
     if ( p == MAP_FAILED )
     {
-        PERROR("xc_alloc_hypercall_buffer: mmap failed");
+        PERROR("alloc_pages: mmap failed");
         return NULL;
     }
 
@@ -103,7 +103,7 @@ void *osdep_alloc_pages(xencall_handle *xcall, size_t npages)
     rc = madvise(p, npages * PAGE_SIZE, MADV_DONTFORK);
     if ( rc < 0 )
     {
-        PERROR("xc_alloc_hypercall_buffer: madvise failed");
+        PERROR("alloc_pages: madvise failed");
         goto out;
     }
 
