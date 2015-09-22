@@ -463,7 +463,6 @@ static PyObject *pyxc_linux_build(XcObject *self,
     char *image, *ramdisk = NULL, *cmdline = "", *features = NULL;
     int flags = 0;
     int store_evtchn, console_evtchn;
-    int vhpt = 0;
     int superpages = 0;
     unsigned int mem_mb;
     unsigned long store_mfn = 0;
@@ -477,22 +476,19 @@ static PyObject *pyxc_linux_build(XcObject *self,
                                 "console_evtchn", "image",
                                 /* optional */
                                 "ramdisk", "cmdline", "flags",
-                                "features", "vhpt", "superpages", NULL };
+                                "features", "superpages", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiis|ssisii", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiis|ssisi", kwd_list,
                                       &domid, &store_evtchn, &mem_mb,
                                       &console_evtchn, &image,
                                       /* optional */
                                       &ramdisk, &cmdline, &flags,
-                                      &features, &vhpt, &superpages) )
+                                      &features, &superpages) )
         return NULL;
 
     xc_dom_loginit(self->xc_handle);
     if (!(dom = xc_dom_allocate(self->xc_handle, cmdline, features)))
         return pyxc_error_to_exception(self->xc_handle);
-
-    /* for IA64 */
-    dom->vhpt_size_log2 = vhpt;
 
     dom->superpages = superpages;
 

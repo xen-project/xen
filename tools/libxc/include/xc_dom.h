@@ -132,7 +132,6 @@ struct xc_dom_image {
     xen_pfn_t total_pages;
     xen_pfn_t p2m_size;         /* number of pfns covered by p2m */
     struct xc_dom_phys *phys_pages;
-    int realmodearea_log;
 #if defined (__arm__) || defined(__aarch64__)
     xen_pfn_t rambank_size[GUEST_RAM_BANKS];
 #endif
@@ -157,7 +156,6 @@ struct xc_dom_image {
 
     xc_interface *xch;
     domid_t guest_domid;
-    int8_t vhpt_size_log2; /* for IA64 */
     int8_t superpages;
     int claim_enabled; /* 0 by default, 1 enables it */
     int shadow_enabled;
