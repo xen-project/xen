@@ -879,7 +879,13 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
 
     /* This pfn is higher than the highest the p2m map currently holds */
     if ( gfn > p2m->max_mapped_pfn )
+    {
+        for ( i = ept_get_wl(ept); i > 0; --i )
+            if ( (gfn & ~((1UL << (i * EPT_TABLE_ORDER)) - 1)) >
+                 p2m->max_mapped_pfn )
+                break;
         goto out;
+    }
 
     /* Should check if gfn obeys GAW here. */
 
@@ -956,12 +962,12 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
                  ((1 << (i * EPT_TABLE_ORDER)) - 1));
             mfn = _mfn(split_mfn);
         }
-
-        if ( page_order )
-            *page_order = i * EPT_TABLE_ORDER;
     }
 
-out:
+ out:
+    if ( page_order )
+        *page_order = i * EPT_TABLE_ORDER;
+
     unmap_domain_page(table);
     return mfn;
 }
