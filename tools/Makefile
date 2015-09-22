@@ -256,12 +256,16 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		-I$(XEN_ROOT)/tools/libs/toollog/include \
 		-I$(XEN_ROOT)/tools/libs/evtchn/include \
 		-I$(XEN_ROOT)/tools/libs/gnttab/include \
+		-I$(XEN_ROOT)/tools/libs/foreignmemory/include \
 		-I$(XEN_ROOT)/tools/libxc/include \
 		-I$(XEN_ROOT)/tools/xenstore/include \
 		-I$(XEN_ROOT)/tools/xenstore/compat/include \
 		$(EXTRA_CFLAGS_QEMU_XEN)" \
 		--extra-ldflags="-L$(XEN_ROOT)/tools/libxc \
 		-L$(XEN_ROOT)/tools/xenstore \
+		-L$(XEN_ROOT)/tools/libs/evtchn \
+		-L$(XEN_ROOT)/tools/libs/gnttab \
+		-L$(XEN_ROOT)/tools/libs/foreignmemory \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/toollog \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/evtchn \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/gnttab \
