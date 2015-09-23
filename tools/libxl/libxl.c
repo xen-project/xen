@@ -4421,31 +4421,35 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
     libxl__ao *nested_ao = libxl__nested_ao_create(ddomain->ao);
     STATE_AO_GC(nested_ao);
     char *p, *path;
-    const char *sstate;
-    int state, rc, num_devs;
+    const char *sstate, *sonline;
+    int state, online, rc, num_devs;
     libxl__device *dev = NULL;
     libxl__ddomain_device *ddev = NULL;
     libxl__ddomain_guest *dguest = NULL;
     bool free_ao = false;
 
-    /* Check if event_path ends with "state" and truncate it */
-    if (strlen(event_path) < strlen("state"))
-        goto skip;
-
+    /* Check if event_path ends with "state" or "online" and truncate it. */
     path = libxl__strdup(gc, event_path);
-    p = path + strlen(path) - strlen("state") - 1;
-    if (*p != '/')
+    p = strrchr(path, '/');
+    if (p == NULL)
         goto skip;
+    if (strcmp(p, "/state") != 0 && strcmp(p, "/online") != 0)
+        goto skip;
+    /* Truncate the string so it points to the backend directory. */
     *p = '\0';
-    p++;
-    if (strcmp(p, "state") != 0)
-        goto skip;
 
-    /* Check if the state is 1 (XenbusStateInitialising) or greater */
-    rc = libxl__xs_read_checked(gc, XBT_NULL, event_path, &sstate);
+    /* Fetch the value of the state and online nodes. */
+    rc = libxl__xs_read_checked(gc, XBT_NULL, GCSPRINTF("%s/state", path),
+                                &sstate);
     if (rc || !sstate)
         goto skip;
     state = atoi(sstate);
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL, GCSPRINTF("%s/online", path),
+                                &sonline);
+    if (rc || !sonline)
+        goto skip;
+    online = atoi(sonline);
 
     dev = libxl__zalloc(NOGC, sizeof(*dev));
     rc = libxl__parse_backend_path(gc, path, dev);
@@ -4488,7 +4492,7 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
         rc = add_device(egc, nested_ao, dguest, ddev);
         if (rc > 0)
             free_ao = true;
-    } else if (state == XenbusStateClosed) {
+    } else if (state == XenbusStateClosed && online == 0) {
         /*
          * Removal of an active device, remove it from the list and
          * free it's data structures if they are no longer needed.

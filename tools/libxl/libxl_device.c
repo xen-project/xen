@@ -837,16 +837,15 @@ void libxl__initiate_device_remove(libxl__egc *egc,
             goto out;
         }
 
+        rc = libxl__xs_write_checked(gc, t, online_path, "0");
+        if (rc)
+            goto out;
+
         /*
          * Check if device is already in "closed" state, in which case
          * it should not be changed.
          */
          if (state && atoi(state) != XenbusStateClosed) {
-            rc = libxl__xs_write_checked(gc, t, online_path, "0");
-            if (rc) {
-                LOG(ERROR, "unable to write to xenstore path %s", online_path);
-                goto out;
-            }
             rc = libxl__xs_write_checked(gc, t, state_path, GCSPRINTF("%d", XenbusStateClosing));
             if (rc) {
                 LOG(ERROR, "unable to write to xenstore path %s", state_path);
