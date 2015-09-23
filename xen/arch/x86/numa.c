@@ -365,7 +365,7 @@ EXPORT_SYMBOL(node_data);
 static void dump_numa(unsigned char key)
 {
     s_time_t now = NOW();
-    unsigned int i, j;
+    unsigned int i, j, n;
     int err;
     struct domain *d;
     struct page_info *page;
@@ -389,8 +389,26 @@ static void dump_numa(unsigned char key)
                NODE_DATA(i)->node_id);
     }
 
+    j = cpumask_first(&cpu_online_map);
+    n = 0;
     for_each_online_cpu ( i )
-        printk("CPU%d -> NODE%d\n", i, cpu_to_node[i]);
+    {
+        if ( i != j + n || cpu_to_node[j] != cpu_to_node[i] )
+        {
+            if ( n > 1 )
+                printk("CPU%u...%u -> NODE%d\n", j, j + n - 1, cpu_to_node[j]);
+            else
+                printk("CPU%u -> NODE%d\n", j, cpu_to_node[j]);
+            j = i;
+            n = 1;
+        }
+        else
+            ++n;
+    }
+    if ( n > 1 )
+        printk("CPU%u...%u -> NODE%d\n", j, j + n - 1, cpu_to_node[j]);
+    else
+        printk("CPU%u -> NODE%d\n", j, cpu_to_node[j]);
 
     rcu_read_lock(&domlist_read_lock);
 
