@@ -926,11 +926,19 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     P2M_DEBUG("set %d %lx %lx\n", gfn_p2mt, gfn, mfn_x(mfn));
     rc = p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, gfn_p2mt,
                        access);
-    gfn_unlock(p2m, gfn, 0);
     if ( rc )
         gdprintk(XENLOG_ERR,
                  "p2m_set_entry failed! mfn=%08lx rc:%d\n",
                  mfn_x(get_gfn_query_unlocked(p2m->domain, gfn, &ot)), rc);
+    else if ( p2m_is_pod(ot) )
+    {
+        pod_lock(p2m);
+        p2m->pod.entry_count--;
+        BUG_ON(p2m->pod.entry_count < 0);
+        pod_unlock(p2m);
+    }
+    gfn_unlock(p2m, gfn, 0);
+
     return rc;
 }
 
