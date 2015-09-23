@@ -92,7 +92,7 @@ static void increase_reservation(struct memop_args *a)
 static void populate_physmap(struct memop_args *a)
 {
     struct page_info *page;
-    unsigned long i, j;
+    unsigned int i, j;
     xen_pfn_t gpfn, mfn;
     struct domain *d = a->domain;
 
@@ -147,27 +147,31 @@ static void populate_physmap(struct memop_args *a)
                     put_page(page);
                 }
 
-                page = mfn_to_page(gpfn);
+                mfn = gpfn;
+                page = mfn_to_page(mfn);
             }
             else
+            {
                 page = alloc_domheap_pages(d, a->extent_order, a->memflags);
 
-            if ( unlikely(page == NULL) ) 
-            {
-                if ( !opt_tmem || (a->extent_order != 0) )
-                    gdprintk(XENLOG_INFO, "Could not allocate order=%d extent:"
-                             " id=%d memflags=%x (%ld of %d)\n",
-                             a->extent_order, d->domain_id, a->memflags,
-                             i, a->nr_extents);
-                goto out;
+                if ( unlikely(!page) )
+                {
+                    if ( !opt_tmem || a->extent_order )
+                        gdprintk(XENLOG_INFO,
+                                 "Could not allocate order=%u extent: id=%d memflags=%#x (%u of %u)\n",
+                                 a->extent_order, d->domain_id, a->memflags,
+                                 i, a->nr_extents);
+                    goto out;
+                }
+
+                mfn = page_to_mfn(page);
             }
 
-            mfn = page_to_mfn(page);
             guest_physmap_add_page(d, gpfn, mfn, a->extent_order);
 
             if ( !paging_mode_translate(d) )
             {
-                for ( j = 0; j < (1 << a->extent_order); j++ )
+                for ( j = 0; j < (1U << a->extent_order); j++ )
                     set_gpfn_from_mfn(mfn + j, gpfn + j);
 
                 /* Inform the domain of the new page's machine address. */ 
