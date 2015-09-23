@@ -452,9 +452,9 @@ int p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     {
         if ( hap_enabled(d) )
             order = ( (((gfn | mfn_x(mfn) | todo) & ((1ul << PAGE_ORDER_1G) - 1)) == 0) &&
-                      hvm_hap_has_1gb(d) && opt_hap_1gb ) ? PAGE_ORDER_1G :
+                      hap_has_1gb && opt_hap_1gb) ? PAGE_ORDER_1G :
                       ((((gfn | mfn_x(mfn) | todo) & ((1ul << PAGE_ORDER_2M) - 1)) == 0) &&
-                      hvm_hap_has_2mb(d) && opt_hap_2mb) ? PAGE_ORDER_2M : PAGE_ORDER_4K;
+                      hap_has_2mb && opt_hap_2mb) ? PAGE_ORDER_2M : PAGE_ORDER_4K;
         else
             order = 0;
 

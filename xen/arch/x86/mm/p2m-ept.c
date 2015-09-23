@@ -696,8 +696,8 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     if ( ret > 0 )
         needs_sync = sync_on;
 
-    ASSERT((target == 2 && hvm_hap_has_1gb()) ||
-           (target == 1 && hvm_hap_has_2mb()) ||
+    ASSERT((target == 2 && hap_has_1gb) ||
+           (target == 1 && hap_has_2mb) ||
            (target == 0));
     ASSERT(!p2m_is_foreign(p2mt) || target == 0);
 
