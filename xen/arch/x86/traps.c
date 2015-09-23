@@ -935,10 +935,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
             goto unsupported;
         if ( regs->_ecx == 1 )
         {
-            a &= XSTATE_FEATURE_XSAVEOPT |
-                 XSTATE_FEATURE_XSAVEC |
-                 (cpu_has_xgetbv1 ? XSTATE_FEATURE_XGETBV1 : 0) |
-                 (cpu_has_xsaves ? XSTATE_FEATURE_XSAVES : 0);
+            a &= boot_cpu_data.x86_capability[X86_FEATURE_XSAVEOPT / 32];
             if ( !cpu_has_xsaves )
                 b = c = d = 0;
         }

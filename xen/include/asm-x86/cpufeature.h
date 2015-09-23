@@ -57,7 +57,11 @@
 #define X86_FEATURE_3DNOWEXT	(1*32+30) /* AMD 3DNow! extensions */
 #define X86_FEATURE_3DNOW	(1*32+31) /* 3DNow! */
 
-/* *** Available for re-use ***, word 2 */
+/* Intel-defined CPU features, CPUID level 0x0000000D:1 (eax), word 2 */
+#define X86_FEATURE_XSAVEOPT	(2*32+ 0) /* XSAVEOPT instruction. */
+#define X86_FEATURE_XSAVEC	(2*32+ 1) /* XSAVEC/XRSTORC instructions. */
+#define X86_FEATURE_XGETBV1	(2*32+ 2) /* XGETBV with %ecx=1. */
+#define X86_FEATURE_XSAVES	(2*32+ 3) /* XSAVES/XRSTORS instructions. */
 
 /* Other features, Linux-defined mapping, word 3 */
 /* This range is used for feature bits which conflict or are synthesized */
@@ -218,6 +222,11 @@
 #define cpu_has_cpuid_faulting	boot_cpu_has(X86_FEATURE_CPUID_FAULTING)
 
 #define cpu_has_cx16            boot_cpu_has(X86_FEATURE_CX16)
+
+#define cpu_has_xsaveopt	boot_cpu_has(X86_FEATURE_XSAVEOPT)
+#define cpu_has_xsavec		boot_cpu_has(X86_FEATURE_XSAVEC)
+#define cpu_has_xgetbv1		boot_cpu_has(X86_FEATURE_XGETBV1)
+#define cpu_has_xsaves		boot_cpu_has(X86_FEATURE_XSAVES)
 
 enum _cache_type {
     CACHE_TYPE_NULL = 0,

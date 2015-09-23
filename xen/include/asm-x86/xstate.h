@@ -9,16 +9,13 @@
 #define __ASM_XSTATE_H
 
 #include <xen/types.h>
+#include <asm/cpufeature.h>
 
 #define FCW_DEFAULT               0x037f
 #define FCW_RESET                 0x0040
 #define MXCSR_DEFAULT             0x1f80
 
 #define XSTATE_CPUID              0x0000000d
-#define XSTATE_FEATURE_XSAVEOPT   (1 << 0)    /* sub-leaf 1, eax[bit 0] */
-#define XSTATE_FEATURE_XSAVEC     (1 << 1)    /* sub-leaf 1, eax[bit 1] */
-#define XSTATE_FEATURE_XGETBV1    (1 << 2)    /* sub-leaf 1, eax[bit 2] */
-#define XSTATE_FEATURE_XSAVES     (1 << 3)    /* sub-leaf 1, eax[bit 3] */
 
 #define XCR_XFEATURE_ENABLED_MASK 0x00000000  /* index of XCR0 */
 
@@ -43,7 +40,6 @@
 #define XSTATE_LAZY    (XSTATE_ALL & ~XSTATE_NONLAZY)
 
 extern u64 xfeature_mask;
-extern bool_t cpu_has_xsaves, cpu_has_xgetbv1;
 
 /* extended state save area */
 struct __packed __attribute__((aligned (64))) xsave_struct
@@ -91,7 +87,7 @@ int __must_check handle_xsetbv(u32 index, u64 new_bv);
 /* extended state init and cleanup functions */
 void xstate_free_save_area(struct vcpu *v);
 int xstate_alloc_save_area(struct vcpu *v);
-void xstate_init(bool_t bsp);
+void xstate_init(struct cpuinfo_x86 *c);
 unsigned int xstate_ctxt_size(u64 xcr0);
 
 #endif /* __ASM_XSTATE_H */
