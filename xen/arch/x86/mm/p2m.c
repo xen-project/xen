@@ -41,13 +41,10 @@
 
 #include "mm-locks.h"
 
-/* turn on/off 1GB host page table support for hap, default on */
-bool_t __read_mostly opt_hap_1gb = 1;
+/* Turn on/off host superpage page table support for hap, default on. */
+bool_t __initdata opt_hap_1gb = 1, __initdata opt_hap_2mb = 1;
 boolean_param("hap_1gb", opt_hap_1gb);
-
-bool_t __read_mostly opt_hap_2mb = 1;
 boolean_param("hap_2mb", opt_hap_2mb);
-
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page
@@ -451,10 +448,12 @@ int p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     while ( todo )
     {
         if ( hap_enabled(d) )
-            order = ( (((gfn | mfn_x(mfn) | todo) & ((1ul << PAGE_ORDER_1G) - 1)) == 0) &&
-                      hap_has_1gb && opt_hap_1gb) ? PAGE_ORDER_1G :
-                      ((((gfn | mfn_x(mfn) | todo) & ((1ul << PAGE_ORDER_2M) - 1)) == 0) &&
-                      hap_has_2mb && opt_hap_2mb) ? PAGE_ORDER_2M : PAGE_ORDER_4K;
+            order = (!((gfn | mfn_x(mfn) | todo) &
+                       ((1ul << PAGE_ORDER_1G) - 1)) &&
+                     hap_has_1gb) ? PAGE_ORDER_1G :
+                    (!((gfn | mfn_x(mfn) | todo) &
+                       ((1ul << PAGE_ORDER_2M) - 1)) &&
+                     hap_has_2mb) ? PAGE_ORDER_2M : PAGE_ORDER_4K;
         else
             order = 0;
 
