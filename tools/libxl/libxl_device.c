@@ -591,15 +591,15 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 
         if (domid == LIBXL_TOOLSTACK_DOMID) {
             /*
-             * The toolstack domain is in charge for removing both the
-             * frontend and the backend path
+             * The toolstack domain is in charge of removing the
+             * frontend path.
              */
             libxl__xs_path_cleanup(gc, t, fe_path);
-            libxl__xs_path_cleanup(gc, t, be_path);
-        } else if (dev->backend_domid == domid) {
+        }
+        if (dev->backend_domid == domid) {
             /*
-             * The driver domain is in charge for removing what it can
-             * from the backend path
+             * The driver domain is in charge of removing what it can
+             * from the backend path.
              */
             libxl__xs_path_cleanup(gc, t, be_path);
         }
