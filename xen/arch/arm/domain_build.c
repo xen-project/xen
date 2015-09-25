@@ -1226,8 +1226,10 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         return 0;
     }
 
-    /* Replace these nodes with our own. Note that the original may be
-     * used_by DOMID_XEN so this check comes first. */
+    /*
+     * Replace these nodes with our own. Note that the original may be
+     * used_by DOMID_XEN so this check comes first.
+     */
     if ( device_get_class(node) == DEVICE_GIC )
         return make_gic_node(d, kinfo->fdt, node);
     if ( dt_match_node(timer_matches, node) )
@@ -1240,7 +1242,8 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         return 0;
     }
 
-    /* Even if the IOMMU device is not used by Xen, it should not be
+    /*
+     * Even if the IOMMU device is not used by Xen, it should not be
      * passthrough to DOM0
      */
     if ( device_get_class(node) == DEVICE_IOMMU )
