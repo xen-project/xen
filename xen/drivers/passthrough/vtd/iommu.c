@@ -991,10 +991,13 @@ static void dma_msi_unmask(struct irq_desc *desc)
 {
     struct iommu *iommu = desc->action->dev_id;
     unsigned long flags;
+    u32 sts;
 
     /* unmask it */
     spin_lock_irqsave(&iommu->register_lock, flags);
-    dmar_writel(iommu->reg, DMAR_FECTL_REG, 0);
+    sts = dmar_readl(iommu->reg, DMAR_FECTL_REG);
+    sts &= ~DMA_FECTL_IM;
+    dmar_writel(iommu->reg, DMAR_FECTL_REG, sts);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
     iommu->msi.msi_attrib.host_masked = 0;
 }
@@ -1003,10 +1006,13 @@ static void dma_msi_mask(struct irq_desc *desc)
 {
     unsigned long flags;
     struct iommu *iommu = desc->action->dev_id;
+    u32 sts;
 
     /* mask it */
     spin_lock_irqsave(&iommu->register_lock, flags);
-    dmar_writel(iommu->reg, DMAR_FECTL_REG, DMA_FECTL_IM);
+    sts = dmar_readl(iommu->reg, DMAR_FECTL_REG);
+    sts |= DMA_FECTL_IM;
+    dmar_writel(iommu->reg, DMAR_FECTL_REG, sts);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
     iommu->msi.msi_attrib.host_masked = 1;
 }
