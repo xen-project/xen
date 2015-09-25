@@ -260,7 +260,6 @@ struct vcpu
 /* Per-domain lock can be recursively acquired in fault handlers. */
 #define domain_lock(d) spin_lock_recursive(&(d)->domain_lock)
 #define domain_unlock(d) spin_unlock_recursive(&(d)->domain_lock)
-#define domain_is_locked(d) spin_is_locked(&(d)->domain_lock)
 
 /* VM event */
 struct vm_event_domain
@@ -893,8 +892,6 @@ int cpupool_move_domain(struct domain *d, struct cpupool *c);
 int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op);
 void schedule_dump(struct cpupool *c);
 extern void dump_runq(unsigned char key);
-
-#define num_cpupool_cpus(c) cpumask_weight((c)->cpu_valid)
 
 void arch_do_physinfo(xen_sysctl_physinfo_t *pi);
 
