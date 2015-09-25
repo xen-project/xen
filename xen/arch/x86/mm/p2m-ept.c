@@ -1257,15 +1257,9 @@ static void ept_dump_p2m_table(unsigned char key)
     }
 }
 
-static struct keyhandler ept_p2m_table = {
-    .diagnostic = 0,
-    .u.fn = ept_dump_p2m_table,
-    .desc = "dump ept p2m table"
-};
-
 void setup_ept_dump(void)
 {
-    register_keyhandler('D', &ept_p2m_table);
+    register_keyhandler('D', ept_dump_p2m_table, "dump VT-x EPT tables", 0);
 }
 
 /*

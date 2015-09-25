@@ -2047,15 +2047,9 @@ static void dump_softtsc(unsigned char key)
             printk("No domains have emulated TSC\n");
 }
 
-static struct keyhandler dump_softtsc_keyhandler = {
-    .diagnostic = 1,
-    .u.fn = dump_softtsc,
-    .desc = "dump softtsc stats"
-};
-
 static int __init setup_dump_softtsc(void)
 {
-    register_keyhandler('s', &dump_softtsc_keyhandler);
+    register_keyhandler('s', dump_softtsc, "dump softtsc stats", 1);
     return 0;
 }
 __initcall(setup_dump_softtsc);

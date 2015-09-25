@@ -2210,7 +2210,7 @@ int __init intel_vtd_setup(void)
     if ( ret )
         goto error;
 
-    register_keyhandler('V', &dump_iommu_info_keyhandler);
+    register_keyhandler('V', vtd_dump_iommu_info, "dump iommu info", 1);
 
     return 0;
 

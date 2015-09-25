@@ -322,11 +322,6 @@ static void dump_console_ring_key(unsigned char key)
     free_xenheap_pages(buf, order);
 }
 
-static struct keyhandler dump_console_ring_keyhandler = {
-    .u.fn = dump_console_ring_key,
-    .desc = "synchronously dump console ring buffer (dmesg)"
-};
-
 /* CTRL-<switch_char> switches input direction between Xen and DOM0. */
 #define switch_code (opt_conswitch[0]-'a'+1)
 static int __read_mostly xen_rx = 1; /* FALSE => input passed to domain 0. */
@@ -833,7 +828,8 @@ void __init console_endboot(void)
     if ( opt_conswitch[1] == 'x' )
         xen_rx = !xen_rx;
 
-    register_keyhandler('w', &dump_console_ring_keyhandler);
+    register_keyhandler('w', dump_console_ring_key,
+                        "synchronously dump console ring buffer (dmesg)", 0);
 
     /* Serial input is directed to DOM0 by default. */
     switch_serial_input();
@@ -1069,11 +1065,6 @@ static void debugtrace_key(unsigned char key)
     debugtrace_toggle();
 }
 
-static struct keyhandler debugtrace_keyhandler = {
-    .u.fn = debugtrace_key,
-    .desc = "toggle debugtrace to console/buffer"
-};
-
 static int __init debugtrace_init(void)
 {
     int order;
@@ -1095,7 +1086,8 @@ static int __init debugtrace_init(void)
 
     debugtrace_bytes = bytes;
 
-    register_keyhandler('T', &debugtrace_keyhandler);
+    register_keyhandler('T', debugtrace_key,
+                        "toggle debugtrace to console/buffer", 0);
 
     return 0;
 }

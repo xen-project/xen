@@ -374,11 +374,6 @@ static void do_crashdump_trigger(unsigned char key)
     printk(" * no crash kernel loaded!\n");
 }
 
-static struct keyhandler crashdump_trigger_keyhandler = {
-    .u.fn = do_crashdump_trigger,
-    .desc = "trigger a crashdump"
-};
-
 static void setup_note(Elf_Note *n, const char *name, int type, int descsz)
 {
     int l = strlen(name) + 1;
@@ -571,7 +566,7 @@ static int __init kexec_init(void)
     if ( ! crash_notes )
         return -ENOMEM;
 
-    register_keyhandler('C', &crashdump_trigger_keyhandler);
+    register_keyhandler('C', do_crashdump_trigger, "trigger a crashdump", 0);
 
     cpu_callback(&cpu_nfb, CPU_UP_PREPARE, cpu);
     register_cpu_notifier(&cpu_nfb);

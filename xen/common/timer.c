@@ -540,12 +540,6 @@ static void dump_timerq(unsigned char key)
     }
 }
 
-static struct keyhandler dump_timerq_keyhandler = {
-    .diagnostic = 1,
-    .u.fn = dump_timerq,
-    .desc = "dump timer queues"
-};
-
 static void migrate_timers_from_cpu(unsigned int old_cpu)
 {
     unsigned int new_cpu = cpumask_any(&cpu_online_map);
@@ -639,7 +633,7 @@ void __init timer_init(void)
     cpu_callback(&cpu_nfb, CPU_UP_PREPARE, cpu);
     register_cpu_notifier(&cpu_nfb);
 
-    register_keyhandler('a', &dump_timerq_keyhandler);
+    register_keyhandler('a', dump_timerq, "dump timer queues", 1);
 }
 
 /*

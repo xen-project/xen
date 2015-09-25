@@ -29,7 +29,7 @@ extern bool_t rwbf_quirk;
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd);
 void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn);
-extern struct keyhandler dump_iommu_info_keyhandler;
+keyhandler_fn_t vtd_dump_iommu_info;
 
 int enable_qinval(struct iommu *iommu);
 void disable_qinval(struct iommu *iommu);

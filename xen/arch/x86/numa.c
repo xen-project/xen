@@ -501,15 +501,9 @@ static void dump_numa(unsigned char key)
     rcu_read_unlock(&domlist_read_lock);
 }
 
-static struct keyhandler dump_numa_keyhandler = {
-    .diagnostic = 1,
-    .u.fn = dump_numa,
-    .desc = "dump numa info"
-};
-
 static __init int register_numa_trigger(void)
 {
-    register_keyhandler('u', &dump_numa_keyhandler);
+    register_keyhandler('u', dump_numa, "dump NUMA info", 1);
     return 0;
 }
 __initcall(register_numa_trigger);

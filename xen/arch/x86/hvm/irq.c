@@ -527,15 +527,9 @@ static void dump_irq_info(unsigned char key)
     rcu_read_unlock(&domlist_read_lock);
 }
 
-static struct keyhandler dump_irq_info_keyhandler = {
-    .diagnostic = 1,
-    .u.fn = dump_irq_info,
-    .desc = "dump HVM irq info"
-};
-
 static int __init dump_irq_info_key_init(void)
 {
-    register_keyhandler('I', &dump_irq_info_keyhandler);
+    register_keyhandler('I', dump_irq_info, "dump HVM irq info", 1);
     return 0;
 }
 __initcall(dump_irq_info_key_init);

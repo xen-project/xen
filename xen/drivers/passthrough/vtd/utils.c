@@ -177,7 +177,7 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
     } while ( --level );
 }
 
-static void dump_iommu_info(unsigned char key)
+void vtd_dump_iommu_info(unsigned char key)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -290,12 +290,6 @@ static void dump_iommu_info(unsigned char key)
         }
     }
 }
-
-struct keyhandler dump_iommu_info_keyhandler = {
-    .diagnostic = 1,
-    .u.fn = dump_iommu_info,
-    .desc = "dump iommu info"
-};
 
 /*
  * Local variables:

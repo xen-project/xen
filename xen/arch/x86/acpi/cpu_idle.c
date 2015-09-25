@@ -334,15 +334,9 @@ static void dump_cx(unsigned char key)
             print_acpi_power(cpu, processor_powers[cpu]);
 }
 
-static struct keyhandler dump_cx_keyhandler = {
-    .diagnostic = 1,
-    .u.fn = dump_cx,
-    .desc = "dump ACPI Cx structures"
-};
-
 static int __init cpu_idle_key_init(void)
 {
-    register_keyhandler('c', &dump_cx_keyhandler);
+    register_keyhandler('c', dump_cx, "dump ACPI Cx structures", 1);
     return 0;
 }
 __initcall(cpu_idle_key_init);

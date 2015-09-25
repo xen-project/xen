@@ -1590,15 +1590,9 @@ static void dump_msi(unsigned char key)
     }
 }
 
-static struct keyhandler dump_msi_keyhandler = {
-    .diagnostic = 1,
-    .u.fn = dump_msi,
-    .desc = "dump MSI state"
-};
-
 static int __init msi_setup_keyhandler(void)
 {
-    register_keyhandler('M', &dump_msi_keyhandler);
+    register_keyhandler('M', dump_msi, "dump MSI state", 1);
     return 0;
 }
 __initcall(msi_setup_keyhandler);

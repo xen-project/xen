@@ -2316,15 +2316,9 @@ static void dump_irqs(unsigned char key)
     dump_ioapic_irq_info();
 }
 
-static struct keyhandler dump_irqs_keyhandler = {
-    .diagnostic = 1,
-    .u.fn = dump_irqs,
-    .desc = "dump interrupt bindings"
-};
-
 static int __init setup_dump_irqs(void)
 {
-    register_keyhandler('i', &dump_irqs_keyhandler);
+    register_keyhandler('i', dump_irqs, "dump interrupt bindings", 1);
     return 0;
 }
 __initcall(setup_dump_irqs);
