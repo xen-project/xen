@@ -203,6 +203,7 @@ smap_check_policy_t smap_policy_change(struct vcpu *v,
     return old_policy;
 }
 
+#ifndef CONFIG_BIGMEM
 /*
  * The hole may be at or above the 44-bit boundary, so we need to determine
  * the total bit count until reaching 32 significant (not squashed out) bits
@@ -224,10 +225,14 @@ static unsigned int __init noinline _domain_struct_bits(void)
 
     return bits;
 }
+#endif
 
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
+#ifdef CONFIG_BIGMEM
+    const unsigned int bits = 0;
+#else
     /*
      * We pack the PDX of the domain structure into a 32-bit field within
      * the page_info structure. Hence the MEMF_bits() restriction.
@@ -236,6 +241,7 @@ struct domain *alloc_domain_struct(void)
 
     if ( unlikely(!bits) )
          bits = _domain_struct_bits();
+#endif
 
     BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);
     d = alloc_xenheap_pages(0, MEMF_bits(bits));
