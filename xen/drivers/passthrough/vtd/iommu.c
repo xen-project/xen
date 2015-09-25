@@ -2012,6 +2012,7 @@ static int init_vtd_hw(void)
     struct iommu_flush *flush = NULL;
     int ret;
     unsigned long flags;
+    u32 sts;
 
     /*
      * Basic VT-d HW init: set VT-d interrupt, clear VT-d faults.  
@@ -2025,7 +2026,9 @@ static int init_vtd_hw(void)
         clear_fault_bits(iommu);
 
         spin_lock_irqsave(&iommu->register_lock, flags);
-        dmar_writel(iommu->reg, DMAR_FECTL_REG, 0);
+        sts = dmar_readl(iommu->reg, DMAR_FECTL_REG);
+        sts &= ~DMA_FECTL_IM;
+        dmar_writel(iommu->reg, DMAR_FECTL_REG, sts);
         spin_unlock_irqrestore(&iommu->register_lock, flags);
     }
 
