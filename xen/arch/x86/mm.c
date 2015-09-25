@@ -502,12 +502,13 @@ void update_cr3(struct vcpu *v)
     make_cr3(v, cr3_mfn);
 }
 
+static const char __section(".bss.page_aligned") zero_page[PAGE_SIZE];
 
 static void invalidate_shadow_ldt(struct vcpu *v, int flush)
 {
     l1_pgentry_t *pl1e;
-    int i;
-    unsigned long pfn;
+    unsigned int i;
+    unsigned long pfn, zero_pfn = PFN_DOWN(__pa(zero_page));
     struct page_info *page;
 
     BUG_ON(unlikely(in_irq()));
@@ -523,8 +524,9 @@ static void invalidate_shadow_ldt(struct vcpu *v, int flush)
     for ( i = 16; i < 32; i++ )
     {
         pfn = l1e_get_pfn(pl1e[i]);
-        if ( pfn == 0 ) continue;
-        l1e_write(&pl1e[i], l1e_empty());
+        if ( !(l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) || pfn == zero_pfn )
+            continue;
+        l1e_write(&pl1e[i], l1e_from_pfn(zero_pfn, __PAGE_HYPERVISOR_RO));
         page = mfn_to_page(pfn);
         ASSERT_PAGE_IS_TYPE(page, PGT_seg_desc_page);
         ASSERT_PAGE_IS_DOMAIN(page, v->domain);
@@ -4420,16 +4422,17 @@ long do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
 void destroy_gdt(struct vcpu *v)
 {
     l1_pgentry_t *pl1e;
-    int i;
-    unsigned long pfn;
+    unsigned int i;
+    unsigned long pfn, zero_pfn = PFN_DOWN(__pa(zero_page));
 
     v->arch.pv_vcpu.gdt_ents = 0;
     pl1e = gdt_ldt_ptes(v->domain, v);
     for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; i++ )
     {
-        if ( (pfn = l1e_get_pfn(pl1e[i])) != 0 )
+        pfn = l1e_get_pfn(pl1e[i]);
+        if ( (l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) && pfn != zero_pfn )
             put_page_and_type(mfn_to_page(pfn));
-        l1e_write(&pl1e[i], l1e_empty());
+        l1e_write(&pl1e[i], l1e_from_pfn(zero_pfn, __PAGE_HYPERVISOR_RO));
         v->arch.pv_vcpu.gdt_frames[i] = 0;
     }
 }
@@ -4442,7 +4445,7 @@ long set_gdt(struct vcpu *v,
     struct domain *d = v->domain;
     l1_pgentry_t *pl1e;
     /* NB. There are 512 8-byte entries per GDT page. */
-    int i, nr_pages = (entries + 511) / 512;
+    unsigned int i, nr_pages = (entries + 511) / 512;
 
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
