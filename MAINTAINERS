@@ -202,7 +202,7 @@ M:	Jun Nakajima <jun.nakajima@intel.com>
 M:	Kevin Tian <kevin.tian@intel.com>
 S:	Supported
 F:	xen/arch/x86/hvm/vmx/
-F:	xen/arch/x86/mm/hap/p2m-ept.c
+F:	xen/arch/x86/mm/p2m-ept.c
 F:	xen/include/asm-x86/hvm/vmx/
 
 IOMMU VENDOR INDEPENDENT CODE
