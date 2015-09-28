@@ -96,6 +96,9 @@
 /* libutil header file name */
 #undef INCLUDE_LIBUTIL_H
 
+/* OVMF path */
+#undef OVMF_PATH
+
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
 
@@ -116,6 +119,9 @@
 
 /* Qemu Xen path */
 #undef QEMU_XEN_PATH
+
+/* SeaBIOS path */
+#undef SEABIOS_PATH
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS

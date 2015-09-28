@@ -221,6 +221,9 @@ AC_ARG_WITH([system-seabios],
     esac
 ],[])
 AC_SUBST(seabios_path)
+AC_DEFINE_UNQUOTED([SEABIOS_PATH],
+                   ["${seabios_path:-$XENFIRMWAREDIR/bios.bin}"],
+                   [SeaBIOS path])
 
 AC_ARG_WITH([system-ovmf],
     AS_HELP_STRING([--with-system-ovmf@<:@=PATH@:>@],
@@ -232,6 +235,9 @@ AC_ARG_WITH([system-ovmf],
     esac
 ],[])
 AC_SUBST(ovmf_path)
+AC_DEFINE_UNQUOTED([OVMF_PATH],
+                   ["${ovmf_path:-$XENFIRMWAREDIR/ovmf.bin}"],
+                   [OVMF path])
 
 AC_ARG_WITH([extra-qemuu-configure-args],
     AS_HELP_STRING([--with-extra-qemuu-configure-args@<:@="--ARG1 ..."@:>@],

@@ -4451,6 +4451,11 @@ fi
 
 
 
+cat >>confdefs.h <<_ACEOF
+#define SEABIOS_PATH "${seabios_path:-$XENFIRMWAREDIR/bios.bin}"
+_ACEOF
+
+
 
 # Check whether --with-system-ovmf was given.
 if test "${with_system_ovmf+set}" = set; then :
@@ -4462,6 +4467,11 @@ if test "${with_system_ovmf+set}" = set; then :
 
 fi
 
+
+
+cat >>confdefs.h <<_ACEOF
+#define OVMF_PATH "${ovmf_path:-$XENFIRMWAREDIR/ovmf.bin}"
+_ACEOF
 
 
 
