@@ -61,14 +61,14 @@ static char *xc_dom_guest_type(struct xc_dom_image *dom,
     case EM_386:
         switch ( dom->parms.pae )
         {
-        case 3 /* PAEKERN_bimodal */:
+        case XEN_PAE_BIMODAL:
             if ( strstr(dom->xen_caps, "xen-3.0-x86_32p") )
                 return "xen-3.0-x86_32p";
             return "xen-3.0-x86_32";
-        case PAEKERN_extended_cr3:
-        case PAEKERN_yes:
+        case XEN_PAE_EXTCR3:
+        case XEN_PAE_YES:
             return "xen-3.0-x86_32p";
-        case PAEKERN_no:
+        case XEN_PAE_NO:
         default:
             return "xen-3.0-x86_32";
         }

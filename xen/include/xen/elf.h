@@ -34,25 +34,4 @@
 #define ELFNOTE_DESC(_n_) (ELFNOTE_NAME(_n_) + ELFNOTE_ALIGN((_n_)->namesz))
 #define ELFNOTE_NEXT(_n_) ((Elf_Note *)(ELFNOTE_DESC(_n_) + ELFNOTE_ALIGN((_n_)->descsz)))
 
-struct domain_setup_info;
-extern int loadelfimage(struct domain_setup_info *);
-extern int parseelfimage(struct domain_setup_info *);
-
-extern unsigned long long xen_elfnote_numeric(struct domain_setup_info *dsi,
-					      int type, int *defined);
-extern const char *xen_elfnote_string(struct domain_setup_info *dsi, int type);
-
-#ifdef CONFIG_COMPAT
-extern int elf32_sanity_check(const Elf32_Ehdr *ehdr);
-extern int loadelf32image(struct domain_setup_info *);
-extern int parseelf32image(struct domain_setup_info *);
-extern unsigned long long xen_elf32note_numeric(struct domain_setup_info *,
-						int type, int *defined);
-extern const char *xen_elf32note_string(struct domain_setup_info *, int type);
-#endif
-
-#ifdef Elf_Ehdr
-extern int elf_sanity_check(const Elf_Ehdr *ehdr);
-#endif
-
 #endif /* __XEN_ELF_H__ */

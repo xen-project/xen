@@ -172,9 +172,9 @@ elf_errorstatus elf_xen_parse_note(struct elf_binary *elf,
         break;
     case XEN_ELFNOTE_PAE_MODE:
         if ( !strcmp(str, "yes") )
-            parms->pae = 2 /* extended_cr3 */;
+            parms->pae = XEN_PAE_EXTCR3;
         if ( strstr(str, "bimodal") )
-            parms->pae = 3 /* bimodal */;
+            parms->pae = XEN_PAE_BIMODAL;
         break;
     case XEN_ELFNOTE_BSD_SYMTAB:
         if ( !strcmp(str, "yes") )
@@ -317,9 +317,9 @@ elf_errorstatus elf_xen_parse_guest_info(struct elf_binary *elf,
         if ( !strcmp(name, "PAE") )
         {
             if ( !strcmp(value, "yes[extended-cr3]") )
-                parms->pae = 2 /* extended_cr3 */;
+                parms->pae = XEN_PAE_EXTCR3;
             else if ( !strncmp(value, "yes", 3) )
-                parms->pae = 1 /* yes */;
+                parms->pae = XEN_PAE_YES;
         }
         if ( !strcmp(name, "BSD_SYMTAB") )
             parms->bsd_symtab = 1;

@@ -463,29 +463,6 @@ struct domain
     struct vnuma_info *vnuma;
 };
 
-struct domain_setup_info
-{
-    /* Initialised by caller. */
-    unsigned long image_addr;
-    unsigned long image_len;
-    /* Initialised by loader: Public. */
-    unsigned long v_start;
-    unsigned long v_end;
-    unsigned long v_kernstart;
-    unsigned long v_kernend;
-    unsigned long v_kernentry;
-#define PAEKERN_no           0
-#define PAEKERN_yes          1
-#define PAEKERN_extended_cr3 2
-#define PAEKERN_bimodal      3
-    unsigned int  pae_kernel;
-    /* Initialised by loader: Private. */
-    unsigned long elf_paddr_offset;
-    unsigned int  load_symtab;
-    unsigned long symtab_addr;
-    unsigned long symtab_len;
-};
-
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
 extern spinlock_t domlist_update_lock;
 extern rcu_read_lock_t domlist_read_lock;

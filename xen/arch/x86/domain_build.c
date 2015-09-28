@@ -953,8 +953,8 @@ int __init construct_dom0(
     compat32   = 0;
     machine = elf_uval(&elf, elf.ehdr, e_machine);
     printk(" Xen  kernel: 64-bit, lsb, compat32\n");
-    if (elf_32bit(&elf) && parms.pae == PAEKERN_bimodal)
-        parms.pae = PAEKERN_extended_cr3;
+    if (elf_32bit(&elf) && parms.pae == XEN_PAE_BIMODAL)
+        parms.pae = XEN_PAE_EXTCR3;
     if (elf_32bit(&elf) && parms.pae && machine == EM_386)
     {
         compat32 = 1;
@@ -1005,7 +1005,7 @@ int __init construct_dom0(
 
     nr_pages = compute_dom0_nr_pages(d, &parms, initrd_len);
 
-    if ( parms.pae == PAEKERN_extended_cr3 )
+    if ( parms.pae == XEN_PAE_EXTCR3 )
             set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
 
     if ( (parms.virt_hv_start_low != UNSET_ADDR) && elf_32bit(&elf) )

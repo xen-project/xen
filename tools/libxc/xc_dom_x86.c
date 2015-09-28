@@ -249,7 +249,7 @@ static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
     xen_pfn_t pgpfn;
     xen_pfn_t l3mfn = xc_dom_p2m_guest(dom, l3pfn);
 
-    if ( dom->parms.pae == 1 )
+    if ( dom->parms.pae == XEN_PAE_YES )
     {
         if ( l3mfn >= 0x100000 )
             l3mfn = move_l3_below_4G(dom, l3pfn, l3mfn);
@@ -602,8 +602,8 @@ static int vcpu_x86_32(struct xc_dom_image *dom, void *ptr)
     ctxt->user_regs.eflags = 1 << 9; /* Interrupt Enable */
 
     ctxt->flags = VGCF_in_kernel_X86_32 | VGCF_online_X86_32;
-    if ( dom->parms.pae == 2 /* extended_cr3 */ ||
-         dom->parms.pae == 3 /* bimodal */ )
+    if ( dom->parms.pae == XEN_PAE_EXTCR3 ||
+         dom->parms.pae == XEN_PAE_BIMODAL )
         ctxt->vm_assist |= (1UL << VMASST_TYPE_pae_extended_cr3);
 
     cr3_pfn = xc_dom_p2m_guest(dom, dom->pgtables_seg.pfn);

@@ -393,6 +393,13 @@ enum xen_elfnote_type {
     XEN_ENT_STR  = 2
 };
 
+enum xen_pae_type {
+    XEN_PAE_NO      = 0,
+    XEN_PAE_YES     = 1,
+    XEN_PAE_EXTCR3  = 2,
+    XEN_PAE_BIMODAL = 3
+};
+
 struct xen_elfnote {
     enum xen_elfnote_type type;
     const char *name;
@@ -414,7 +421,7 @@ struct elf_dom_parms {
     char guest_ver[16];
     char xen_ver[16];
     char loader[16];
-    int pae; /* some kind of enum apparently */
+    enum xen_pae_type pae;
     bool bsd_symtab;
     uint64_t virt_base;
     uint64_t virt_entry;

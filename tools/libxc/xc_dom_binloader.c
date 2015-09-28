@@ -238,7 +238,7 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
         {
             DOMPRINTF("%s: PAE fixup", __FUNCTION__);
             dom->guest_type = "xen-3.0-x86_32p";
-            dom->parms.pae  = 2;
+            dom->parms.pae  = XEN_PAE_EXTCR3;
         }
         break;
     }

@@ -165,12 +165,6 @@ static inline xen_pfn_t xc_pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m,
 #define MFN_MASK_X86    ((1ULL << (MADDR_BITS_X86 - PAGE_SHIFT_X86)) - 1)
 #define MADDR_MASK_X86  (MFN_MASK_X86 << PAGE_SHIFT_X86)
 
-
-#define PAEKERN_no           0
-#define PAEKERN_yes          1
-#define PAEKERN_extended_cr3 2
-#define PAEKERN_bimodal      3
-
 int pin_table(xc_interface *xch, unsigned int type, unsigned long mfn,
               domid_t dom);
 
