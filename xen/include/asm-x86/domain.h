@@ -386,6 +386,7 @@ struct arch_domain
 
     /* Mem_access emulation control */
     bool_t mem_access_emulate_enabled;
+    bool_t mem_access_emulate_each_rep;
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))

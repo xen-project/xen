@@ -54,6 +54,8 @@ void vm_event_cleanup_domain(struct domain *d)
         xfree(v->arch.vm_event);
         v->arch.vm_event = NULL;
     }
+
+    d->arch.mem_access_emulate_each_rep = 0;
 }
 
 void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v)

@@ -143,3 +143,16 @@ int xc_monitor_guest_request(xc_interface *xch, domid_t domain_id, bool enable,
 
     return do_domctl(xch, &domctl);
 }
+
+int xc_monitor_emulate_each_rep(xc_interface *xch, domid_t domain_id,
+                                bool enable)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_monitor_op;
+    domctl.domain = domain_id;
+    domctl.u.monitor_op.op = XEN_DOMCTL_MONITOR_OP_EMULATE_EACH_REP;
+    domctl.u.monitor_op.event = enable;
+
+    return do_domctl(xch, &domctl);
+}

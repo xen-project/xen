@@ -514,7 +514,7 @@ static int hvmemul_virtual_to_linear(
      * being triggered for repeated writes to a whole page.
      */
     *reps = min_t(unsigned long, *reps,
-                  unlikely(current->domain->arch.mem_access_emulate_enabled)
+                  unlikely(current->domain->arch.mem_access_emulate_each_rep)
                            ? 1 : 4096);
 
     reg = hvmemul_get_seg_reg(seg, hvmemul_ctxt);

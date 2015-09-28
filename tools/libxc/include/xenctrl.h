@@ -2428,6 +2428,18 @@ int xc_monitor_software_breakpoint(xc_interface *xch, domid_t domain_id,
 int xc_monitor_guest_request(xc_interface *xch, domid_t domain_id,
                              bool enable, bool sync);
 
+/**
+ * This function enables / disables emulation for each REP for a
+ * REP-compatible instruction.
+ *
+ * @parm xch a handle to an open hypervisor interface.
+ * @parm domain_id the domain id one wants to get the node affinity of.
+ * @parm enable if 0 optimize when possible, else emulate each REP.
+ * @return 0 on success, -1 on failure.
+ */
+int xc_monitor_emulate_each_rep(xc_interface *xch, domid_t domain_id,
+                                bool enable);
+
 /***
  * Memory sharing operations.
  *

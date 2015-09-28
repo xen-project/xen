@@ -73,9 +73,14 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
     if ( rc )
         return rc;
 
-    if ( mop->op == XEN_DOMCTL_MONITOR_OP_GET_CAPABILITIES )
+    switch ( mop->op )
     {
+    case XEN_DOMCTL_MONITOR_OP_GET_CAPABILITIES:
         mop->event = capabilities;
+        return 0;
+
+    case XEN_DOMCTL_MONITOR_OP_EMULATE_EACH_REP:
+        d->arch.mem_access_emulate_each_rep = !!mop->event;
         return 0;
     }
 
