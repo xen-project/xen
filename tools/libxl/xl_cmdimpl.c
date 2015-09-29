@@ -8221,7 +8221,7 @@ static int psr_cmt_get_mem_bandwidth(uint32_t domid,
 
 static void psr_cmt_print_domain_info(libxl_dominfo *dominfo,
                                       libxl_psr_cmt_type type,
-                                      uint32_t nr_sockets)
+                                      libxl_bitmap *socketmap)
 {
     char *domain_name;
     uint32_t socketid;
@@ -8234,7 +8234,7 @@ static void psr_cmt_print_domain_info(libxl_dominfo *dominfo,
     printf("%-40s %5d", domain_name, dominfo->domid);
     free(domain_name);
 
-    for (socketid = 0; socketid < nr_sockets; socketid++) {
+    libxl_for_each_set_bit(socketid, *socketmap) {
         switch (type) {
         case LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY:
             if (!libxl_psr_cmt_get_sample(ctx, dominfo->domid, type, socketid,
@@ -8257,9 +8257,9 @@ static void psr_cmt_print_domain_info(libxl_dominfo *dominfo,
 
 static int psr_cmt_show(libxl_psr_cmt_type type, uint32_t domid)
 {
-    uint32_t i, socketid, nr_sockets, total_rmid;
+    uint32_t i, socketid, total_rmid;
     uint32_t l3_cache_size;
-    libxl_physinfo info;
+    libxl_bitmap socketmap;
     int rc, nr_domains;
 
     if (!libxl_psr_cmt_enabled(ctx)) {
@@ -8273,41 +8273,39 @@ static int psr_cmt_show(libxl_psr_cmt_type type, uint32_t domid)
         return -1;
     }
 
-    libxl_physinfo_init(&info);
-    rc = libxl_get_physinfo(ctx, &info);
+    libxl_bitmap_init(&socketmap);
+    libxl_socket_bitmap_alloc(ctx, &socketmap, 0);
+    rc = libxl_get_online_socketmap(ctx, &socketmap);
     if (rc < 0) {
-        fprintf(stderr, "Failed getting physinfo, rc: %d\n", rc);
-        libxl_physinfo_dispose(&info);
-        return -1;
+        fprintf(stderr, "Failed getting available sockets, rc: %d\n", rc);
+        goto out;
     }
-    nr_sockets = info.nr_cpus / info.threads_per_core / info.cores_per_socket;
-    libxl_physinfo_dispose(&info);
 
     rc = libxl_psr_cmt_get_total_rmid(ctx, &total_rmid);
     if (rc < 0) {
         fprintf(stderr, "Failed to get max RMID value\n");
-        return -1;
+        goto out;
     }
 
     printf("Total RMID: %d\n", total_rmid);
 
     /* Header */
     printf("%-40s %5s", "Name", "ID");
-    for (socketid = 0; socketid < nr_sockets; socketid++)
+    libxl_for_each_set_bit(socketid, socketmap)
         printf("%14s %d", "Socket", socketid);
     printf("\n");
 
     if (type == LIBXL_PSR_CMT_TYPE_CACHE_OCCUPANCY) {
             /* Total L3 cache size */
             printf("%-46s", "Total L3 Cache Size");
-            for (socketid = 0; socketid < nr_sockets; socketid++) {
+            libxl_for_each_set_bit(socketid, socketmap) {
                 rc = libxl_psr_cmt_get_l3_cache_size(ctx, socketid,
                                                      &l3_cache_size);
                 if (rc < 0) {
                     fprintf(stderr,
                             "Failed to get system l3 cache size for socket:%d\n",
                             socketid);
-                    return -1;
+                    goto out;
                 }
                 printf("%13u KB", l3_cache_size);
             }
@@ -8321,9 +8319,10 @@ static int psr_cmt_show(libxl_psr_cmt_type type, uint32_t domid)
         libxl_dominfo_init(&dominfo);
         if (libxl_domain_info(ctx, &dominfo, domid)) {
             fprintf(stderr, "Failed to get domain info for %d\n", domid);
-            return -1;
+            rc = -1;
+            goto out;
         }
-        psr_cmt_print_domain_info(&dominfo, type, nr_sockets);
+        psr_cmt_print_domain_info(&dominfo, type, &socketmap);
         libxl_dominfo_dispose(&dominfo);
     }
     else
@@ -8331,13 +8330,17 @@ static int psr_cmt_show(libxl_psr_cmt_type type, uint32_t domid)
         libxl_dominfo *list;
         if (!(list = libxl_list_domain(ctx, &nr_domains))) {
             fprintf(stderr, "Failed to get domain info for domain list.\n");
-            return -1;
+            rc = -1;
+            goto out;
         }
         for (i = 0; i < nr_domains; i++)
-            psr_cmt_print_domain_info(list + i, type, nr_sockets);
+            psr_cmt_print_domain_info(list + i, type, &socketmap);
         libxl_dominfo_list_free(list, nr_domains);
     }
-    return 0;
+
+out:
+    libxl_bitmap_dispose(&socketmap);
+    return rc;
 }
 
 int main_psr_cmt_attach(int argc, char **argv)
