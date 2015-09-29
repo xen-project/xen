@@ -668,6 +668,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     uint8_t ipat = 0;
     int need_modify_vtd_table = 1;
     int vtd_pte_present = 0;
+    unsigned int iommu_flags = p2m_get_iommu_flags(p2mt);
     enum { sync_off, sync_on, sync_check } needs_sync = sync_check;
     ept_entry_t old_entry = { .epte = 0 };
     ept_entry_t new_entry = { .epte = 0 };
@@ -798,8 +799,9 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         new_entry.mfn = mfn_x(mfn);
 
         /* Safe to read-then-write because we hold the p2m lock */
-        if ( ept_entry->mfn == new_entry.mfn )
-             need_modify_vtd_table = 0;
+        if ( ept_entry->mfn == new_entry.mfn &&
+             p2m_get_iommu_flags(ept_entry->sa_p2mt) == iommu_flags )
+            need_modify_vtd_table = 0;
 
         ept_p2m_type_to_flags(p2m, &new_entry, p2mt, p2ma);
     }
@@ -830,11 +832,9 @@ out:
             iommu_pte_flush(d, gfn, &ept_entry->epte, order, vtd_pte_present);
         else
         {
-            unsigned int flags = p2m_get_iommu_flags(p2mt);
-
-            if ( flags != 0 )
+            if ( iommu_flags )
                 for ( i = 0; i < (1 << order); i++ )
-                    iommu_map_page(d, gfn + i, mfn_x(mfn) + i, flags);
+                    iommu_map_page(d, gfn + i, mfn_x(mfn) + i, iommu_flags);
             else
                 for ( i = 0; i < (1 << order); i++ )
                     iommu_unmap_page(d, gfn + i);
