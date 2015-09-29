@@ -584,6 +584,25 @@ int dt_n_size_cells(const struct dt_device_node *np);
 int dt_n_addr_cells(const struct dt_device_node *np);
 
 /**
+ * dt_child_n_size_cells - Helper to retrieve the number of cell for the size
+ * @parent: parent of the child to get the value
+ *
+ * This function retrieves for a given device-tree node the number of
+ * cell for the size field of there child
+ */
+int dt_child_n_size_cells(const struct dt_device_node *parent);
+
+/**
+ * dt_child_n_addr_cells - Helper to retrieve the number of cell for the
+ * address
+ * @parent: parent of the child to get the value
+ *
+ * This function retrieves for a given device-tree node the number of
+ * cell for the address field of there child
+ */
+int dt_child_n_addr_cells(const struct dt_device_node *parent);
+
+/**
  * dt_device_is_available - Check if a device is available for use
  *
  * @device: Node to check for availability
@@ -653,6 +672,20 @@ void dt_set_cell(__be32 **cellp, int size, u64 val);
  */
 void dt_set_range(__be32 **cellp, const struct dt_device_node *np,
                   u64 address, u64 size);
+
+/**
+ * dt_child_set_range - Write range into a series of cells
+ *
+ * @cellp: Pointer to cells
+ * @parent: Parent node which contains the encode for the address and the size
+ * @address: Start of range
+ * @size: Size of the range
+ *
+ * Write a range into a series of cells and update cellp to point to the
+ * cell just after.
+ */
+void dt_child_set_range(__be32 **cellp, const struct dt_device_node *parent,
+                        u64 address, u64 size);
 
 /**
  * dt_get_range - Read a range (address/size) from a series of cells

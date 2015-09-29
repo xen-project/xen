@@ -569,7 +569,7 @@ static int make_memory_node(const struct domain *d,
                             const struct kernel_info *kinfo)
 {
     int res, i;
-    int reg_size = dt_n_addr_cells(parent) + dt_n_size_cells(parent);
+    int reg_size = dt_child_n_addr_cells(parent) + dt_child_n_size_cells(parent);
     int nr_cells = reg_size*kinfo->mem.nr_banks;
     __be32 reg[nr_cells];
     __be32 *cells;
@@ -594,7 +594,7 @@ static int make_memory_node(const struct domain *d,
         DPRINT("  Bank %d: %#"PRIx64"->%#"PRIx64"\n",
                 i, start, start + size);
 
-        dt_set_range(&cells, parent, start, size);
+        dt_child_set_range(&cells, parent, start, size);
     }
 
     res = fdt_property(fdt, "reg", reg, sizeof(reg));
@@ -617,8 +617,8 @@ static int make_hypervisor_node(const struct kernel_info *kinfo,
     __be32 *cells;
     int res;
     /* Convenience alias */
-    int addrcells = dt_n_addr_cells(parent);
-    int sizecells = dt_n_size_cells(parent);
+    int addrcells = dt_child_n_addr_cells(parent);
+    int sizecells = dt_child_n_size_cells(parent);
     void *fdt = kinfo->fdt;
 
     DPRINT("Create hypervisor node\n");
@@ -643,7 +643,7 @@ static int make_hypervisor_node(const struct kernel_info *kinfo,
 
     /* reg 0 is grant table space */
     cells = &reg[0];
-    dt_set_range(&cells, parent, kinfo->gnttab_start, kinfo->gnttab_size);
+    dt_child_set_range(&cells, parent, kinfo->gnttab_start, kinfo->gnttab_size);
     res = fdt_property(fdt, "reg", reg,
                        dt_cells_to_size(addrcells + sizecells));
     if ( res )

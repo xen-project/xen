@@ -117,6 +117,13 @@ void dt_set_range(__be32 **cellp, const struct dt_device_node *np,
     dt_set_cell(cellp, dt_n_size_cells(np), size);
 }
 
+void dt_child_set_range(__be32 **cellp, const struct dt_device_node *parent,
+                        u64 address, u64 size)
+{
+    dt_set_cell(cellp, dt_child_n_addr_cells(parent), address);
+    dt_set_cell(cellp, dt_child_n_size_cells(parent), size);
+}
+
 static void __init *unflatten_dt_alloc(unsigned long *mem, unsigned long size,
                                        unsigned long align)
 {
@@ -386,13 +393,15 @@ dt_find_matching_node(struct dt_device_node *from,
     return NULL;
 }
 
-int dt_n_addr_cells(const struct dt_device_node *np)
+static int __dt_n_addr_cells(const struct dt_device_node *np, bool_t parent)
 {
     const __be32 *ip;
 
     do {
-        if ( np->parent )
+        if ( np->parent && !parent )
             np = np->parent;
+        parent = false;
+
         ip = dt_get_property(np, "#address-cells", NULL);
         if ( ip )
             return be32_to_cpup(ip);
@@ -401,19 +410,41 @@ int dt_n_addr_cells(const struct dt_device_node *np)
     return DT_ROOT_NODE_ADDR_CELLS_DEFAULT;
 }
 
-int dt_n_size_cells(const struct dt_device_node *np)
+int __dt_n_size_cells(const struct dt_device_node *np, bool_t parent)
 {
     const __be32 *ip;
 
     do {
-        if ( np->parent )
+        if ( np->parent && !parent )
             np = np->parent;
+        parent = false;
+
         ip = dt_get_property(np, "#size-cells", NULL);
         if ( ip )
             return be32_to_cpup(ip);
     } while ( np->parent );
     /* No #address-cells property for the root node */
     return DT_ROOT_NODE_SIZE_CELLS_DEFAULT;
+}
+
+int dt_n_addr_cells(const struct dt_device_node *np)
+{
+    return __dt_n_addr_cells(np, false);
+}
+
+int dt_n_size_cells(const struct dt_device_node *np)
+{
+    return __dt_n_size_cells(np, false);
+}
+
+int dt_child_n_addr_cells(const struct dt_device_node *parent)
+{
+    return __dt_n_addr_cells(parent, true);
+}
+
+int dt_child_n_size_cells(const struct dt_device_node *parent)
+{
+    return __dt_n_size_cells(parent, true);
 }
 
 /*
