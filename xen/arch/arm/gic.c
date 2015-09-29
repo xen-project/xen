@@ -702,10 +702,12 @@ void __cpuinit init_maintenance_interrupt(void)
 }
 
 int gic_make_hwdom_dt_node(const struct domain *d,
-                           const struct dt_device_node *node,
+                           const struct dt_device_node *gic,
                            void *fdt)
 {
-    return gic_hw_ops->make_hwdom_dt_node(d, node, fdt);
+    ASSERT(gic == dt_interrupt_controller);
+
+    return gic_hw_ops->make_hwdom_dt_node(d, gic, fdt);
 }
 
 /*

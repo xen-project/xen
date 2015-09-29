@@ -562,10 +562,9 @@ static void hip04gic_irq_set_affinity(struct irq_desc *desc, const cpumask_t *cp
 }
 
 static int hip04gic_make_hwdom_dt_node(const struct domain *d,
-                                       const struct dt_device_node *node,
+                                       const struct dt_device_node *gic,
                                        void *fdt)
 {
-    const struct dt_device_node *gic = dt_interrupt_controller;
     const void *compatible;
     u32 len;
     const __be32 *regs;
@@ -598,7 +597,7 @@ static int hip04gic_make_hwdom_dt_node(const struct domain *d,
         return -FDT_ERR_XEN(ENOENT);
     }
 
-    len = dt_cells_to_size(dt_n_addr_cells(node) + dt_n_size_cells(node));
+    len = dt_cells_to_size(dt_n_addr_cells(gic) + dt_n_size_cells(gic));
     len *= 2;
 
     res = fdt_property(fdt, "reg", regs, len);

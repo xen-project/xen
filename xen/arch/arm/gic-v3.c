@@ -1054,10 +1054,9 @@ static void gicv3_irq_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 }
 
 static int gicv3_make_hwdom_dt_node(const struct domain *d,
-                                    const struct dt_device_node *node,
+                                    const struct dt_device_node *gic,
                                     void *fdt)
 {
-    const struct dt_device_node *gic = dt_interrupt_controller;
     const void *compatible = NULL;
     uint32_t len;
     __be32 *new_cells, *tmp;
@@ -1084,7 +1083,7 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
     if ( res )
         return res;
 
-    len = dt_cells_to_size(dt_n_addr_cells(node) + dt_n_size_cells(node));
+    len = dt_cells_to_size(dt_n_addr_cells(gic) + dt_n_size_cells(gic));
     /*
      * GIC has two memory regions: Distributor + rdist regions
      * CPU interface and virtual cpu interfaces accessesed as System registers
@@ -1097,10 +1096,10 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
 
     tmp = new_cells;
 
-    dt_set_range(&tmp, node, d->arch.vgic.dbase, SZ_64K);
+    dt_set_range(&tmp, gic, d->arch.vgic.dbase, SZ_64K);
 
     for ( i = 0; i < d->arch.vgic.nr_regions; i++ )
-        dt_set_range(&tmp, node, d->arch.vgic.rdist_regions[i].base,
+        dt_set_range(&tmp, gic, d->arch.vgic.rdist_regions[i].base,
                      d->arch.vgic.rdist_regions[i].size);
 
     res = fdt_property(fdt, "reg", new_cells, len);
