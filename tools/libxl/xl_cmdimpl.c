@@ -8553,7 +8553,7 @@ int main_psr_cat_cbm_set(int argc, char **argv)
         len = libxl_string_list_length(&socket_list);
         for (i = 0; i < len; i++) {
             parse_range(socket_list[i], &start, &end);
-            for (j = start; j < end; j++)
+            for (j = start; j <= end; j++)
                 libxl_bitmap_set(&target_map, j);
         }
 
