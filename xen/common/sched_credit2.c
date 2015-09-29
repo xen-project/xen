@@ -162,7 +162,7 @@
 #define CSFLAG_runq_migrate_request (1<<__CSFLAG_runq_migrate_request)
 
 
-int opt_migrate_resist=500;
+static unsigned int __read_mostly opt_migrate_resist = 500;
 integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
 
 /*
@@ -185,12 +185,12 @@ integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
  *   to a load of 1.
  */
 #define LOADAVG_GRANULARITY_SHIFT (10)
-int opt_load_window_shift=18;
+static unsigned int __read_mostly opt_load_window_shift = 18;
 #define  LOADAVG_WINDOW_SHIFT_MIN 4
 integer_param("credit2_load_window_shift", opt_load_window_shift);
-int opt_underload_balance_tolerance=0;
+static int __read_mostly opt_underload_balance_tolerance = 0;
 integer_param("credit2_balance_under", opt_underload_balance_tolerance);
-int opt_overload_balance_tolerance=-3;
+static int __read_mostly opt_overload_balance_tolerance = -3;
 integer_param("credit2_balance_over", opt_overload_balance_tolerance);
 
 /*
@@ -227,7 +227,7 @@ struct csched2_private {
     cpumask_t active_queues; /* Queues which may have active cpus */
     struct csched2_runqueue_data rqd[NR_CPUS];
 
-    int load_window_shift;
+    unsigned int load_window_shift;
 };
 
 /*
