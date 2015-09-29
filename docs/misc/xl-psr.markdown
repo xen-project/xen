@@ -14,7 +14,7 @@ tracks cache utilization of memory accesses according to the RMID and reports
 monitored data via a counter register.
 
 For more detailed information please refer to Intel SDM chapter
-"17.14 - Platform Shared Resource Monitoring: Cache Monitoring Technology".
+"Platform Shared Resource Monitoring: Cache Monitoring Technology".
 
 In Xen's implementation, each domain in the system can be assigned a RMID
 independently, while RMID=0 is reserved for monitoring domains that don't
@@ -52,7 +52,7 @@ event type to monitor system total/local memory bandwidth. The same RMID can
 be used to monitor both cache usage and memory bandwidth at the same time.
 
 For more detailed information please refer to Intel SDM chapter
-"17.14 - Platform Shared Resource Monitoring: Cache Monitoring Technology".
+"Overview of Cache Monitoring Technology and Memory Bandwidth Monitoring".
 
 In Xen's implementation, MBM shares the same set of underlying monitoring
 service with CMT and can be used to monitor memory bandwidth on a per domain
@@ -92,7 +92,7 @@ For example, assuming a system with 8 portions and 3 domains:
    access to one quarter each.
 
 For more detailed information please refer to Intel SDM chapter
-"17.15 - Platform Shared Resource Control: Cache Allocation Technology".
+"Platform Shared Resource Control: Cache Allocation Technology".
 
 In Xen's implementation, CBM can be configured with libxl/xl interfaces but
 COS is maintained in hypervisor only. The cache partition granularity is per
