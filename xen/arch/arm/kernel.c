@@ -13,6 +13,8 @@
 #include <asm/byteorder.h>
 #include <asm/setup.h>
 #include <xen/libfdt/libfdt.h>
+#include <xen/gunzip.h>
+#include <xen/vmap.h>
 
 #include "kernel.h"
 
@@ -257,6 +259,73 @@ static int kernel_uimage_probe(struct kernel_info *info,
     return 0;
 }
 
+static __init uint32_t output_length(char *image, unsigned long image_len)
+{
+    return *(uint32_t *)&image[image_len - 4];
+}
+
+static __init int kernel_decompress(struct bootmodule *mod)
+{
+    char *output, *input;
+    char magic[2];
+    int rc;
+    unsigned kernel_order_out;
+    paddr_t output_size;
+    struct page_info *pages;
+    mfn_t mfn;
+    int i;
+    paddr_t addr = mod->start;
+    paddr_t size = mod->size;
+
+    if ( size < 2 )
+        return -EINVAL;
+
+    copy_from_paddr(magic, addr, sizeof(magic));
+
+    /* only gzip is supported */
+    if ( !gzip_check(magic, size) )
+        return -EINVAL;
+
+    input = ioremap_cache(addr, size);
+    if ( input == NULL )
+        return -EFAULT;
+
+    output_size = output_length(input, size);
+    kernel_order_out = get_order_from_bytes(output_size);
+    pages = alloc_domheap_pages(NULL, kernel_order_out, 0);
+    if ( pages == NULL )
+    {
+        iounmap(input);
+        return -ENOMEM;
+    }
+    mfn = _mfn(page_to_mfn(pages));
+    output = __vmap(&mfn, 1 << kernel_order_out, 1, 1, PAGE_HYPERVISOR);
+
+    rc = perform_gunzip(output, input, size);
+    clean_dcache_va_range(output, output_size);
+    iounmap(input);
+    vunmap(output);
+
+    mod->start = page_to_maddr(pages);
+    mod->size = output_size;
+
+    /*
+     * Need to free pages after output_size here because they won't be
+     * freed by discard_initial_modules
+     */
+    i = DIV_ROUND_UP(output_size, PAGE_SIZE);
+    for ( ; i < (1 << kernel_order_out); i++ )
+        free_domheap_page(pages + i);
+
+    /*
+     * Free the original kernel, update the pointers to the
+     * decompressed kernel
+     */
+    dt_unreserved_regions(addr, addr + size, init_domheap_pages, 0);
+
+    return 0;
+}
+
 #ifdef CONFIG_ARM_64
 /*
  * Check if the image is a 64-bit Image.
@@ -444,8 +513,6 @@ int kernel_probe(struct kernel_info *info)
     struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_KERNEL);
     int rc;
 
-    paddr_t start, size;
-
     if ( !mod || !mod->size )
     {
         printk(XENLOG_ERR "Missing kernel boot module?\n");
@@ -453,25 +520,28 @@ int kernel_probe(struct kernel_info *info)
     }
 
     info->kernel_bootmodule = mod;
-    start = mod->start;
-    size = mod->size;
 
-    printk("Loading kernel from boot module @ %"PRIpaddr"\n", start);
+    printk("Loading kernel from boot module @ %"PRIpaddr"\n", mod->start);
 
     info->initrd_bootmodule = boot_module_find_by_kind(BOOTMOD_RAMDISK);
     if ( info->initrd_bootmodule )
         printk("Loading ramdisk from boot module @ %"PRIpaddr"\n",
                info->initrd_bootmodule->start);
 
+    /* if it is a gzip'ed image, 32bit or 64bit, uncompress it */
+    rc = kernel_decompress(mod);
+    if (rc < 0 && rc != -EINVAL)
+        return rc;
+
 #ifdef CONFIG_ARM_64
-    rc = kernel_zimage64_probe(info, start, size);
+    rc = kernel_zimage64_probe(info, mod->start, mod->size);
     if (rc < 0)
 #endif
-        rc = kernel_uimage_probe(info, start, size);
+        rc = kernel_uimage_probe(info, mod->start, mod->size);
     if (rc < 0)
-        rc = kernel_zimage32_probe(info, start, size);
+        rc = kernel_zimage32_probe(info, mod->start, mod->size);
     if (rc < 0)
-        rc = kernel_elf_probe(info, start, size);
+        rc = kernel_elf_probe(info, mod->start, mod->size);
 
     return rc;
 }

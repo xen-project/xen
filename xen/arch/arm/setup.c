@@ -165,7 +165,7 @@ static void __init processor_id(void)
     processor_setup();
 }
 
-static void dt_unreserved_regions(paddr_t s, paddr_t e,
+void dt_unreserved_regions(paddr_t s, paddr_t e,
                                   void (*cb)(paddr_t, paddr_t), int first)
 {
     int i, nr = fdt_num_mem_rsv(device_tree_flattened);

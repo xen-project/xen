@@ -54,6 +54,8 @@ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len);
 int construct_dom0(struct domain *d);
 
 void discard_initial_modules(void);
+void dt_unreserved_regions(paddr_t s, paddr_t e,
+                           void (*cb)(paddr_t, paddr_t), int first);
 
 size_t __init boot_fdt_info(const void *fdt, paddr_t paddr);
 const char __init *boot_fdt_cmdline(const void *fdt);
