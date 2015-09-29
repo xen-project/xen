@@ -266,16 +266,18 @@ static void ept_free_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry, int l
     p2m_free_ptp(p2m, mfn_to_page(ept_entry->mfn));
 }
 
-static int ept_split_super_page(struct p2m_domain *p2m, ept_entry_t *ept_entry,
-                                int level, int target)
+static bool_t ept_split_super_page(struct p2m_domain *p2m,
+                                   ept_entry_t *ept_entry,
+                                   unsigned int level, unsigned int target)
 {
     ept_entry_t new_ept, *table;
     uint64_t trunk;
-    int rv = 1;
+    unsigned int i;
+    bool_t rv = 1;
 
     /* End if the entry is a leaf entry or reaches the target level. */
-    if ( level == 0 || level == target )
-        return rv;
+    if ( level <= target )
+        return 1;
 
     ASSERT(is_epte_superpage(ept_entry));
 
@@ -285,7 +287,7 @@ static int ept_split_super_page(struct p2m_domain *p2m, ept_entry_t *ept_entry,
     table = map_domain_page(_mfn(new_ept.mfn));
     trunk = 1UL << ((level - 1) * EPT_TABLE_ORDER);
 
-    for ( int i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
+    for ( i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
     {
         ept_entry_t *epte = table + i;
 
