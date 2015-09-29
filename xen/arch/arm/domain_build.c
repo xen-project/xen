@@ -1205,6 +1205,13 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         DT_MATCH_TIMER,
         { /* sentinel */ },
     };
+    static const struct dt_device_match reserved_matches[] __initconst =
+    {
+        DT_MATCH_PATH("/psci"),
+        DT_MATCH_PATH("/memory"),
+        DT_MATCH_PATH("/hypervisor"),
+        { /* sentinel */ },
+    };
     struct dt_device_node *child;
     int res;
     const char *name;
@@ -1251,6 +1258,15 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         DPRINT(" IOMMU, skip it\n");
         return 0;
     }
+
+    /*
+     * Xen is using some path for its own purpose. Warn if a node
+     * already exists with the same path.
+     */
+    if ( dt_match_node(reserved_matches, node) )
+        printk(XENLOG_WARNING
+               "WARNING: Path %s is reserved, skip the node as we may re-use the path.\n",
+               path);
 
     res = handle_device(d, node);
     if ( res)
