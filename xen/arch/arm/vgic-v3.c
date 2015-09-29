@@ -1037,13 +1037,13 @@ static int vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
 }
 
 static const struct mmio_handler_ops vgic_rdistr_mmio_handler = {
-    .read_handler  = vgic_v3_rdistr_mmio_read,
-    .write_handler = vgic_v3_rdistr_mmio_write,
+    .read  = vgic_v3_rdistr_mmio_read,
+    .write = vgic_v3_rdistr_mmio_write,
 };
 
 static const struct mmio_handler_ops vgic_distr_mmio_handler = {
-    .read_handler  = vgic_v3_distr_mmio_read,
-    .write_handler = vgic_v3_distr_mmio_write,
+    .read  = vgic_v3_distr_mmio_read,
+    .write = vgic_v3_distr_mmio_write,
 };
 
 static int vgic_v3_get_irq_priority(struct vcpu *v, unsigned int irq)

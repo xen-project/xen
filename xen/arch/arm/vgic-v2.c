@@ -495,8 +495,8 @@ write_ignore:
 }
 
 static const struct mmio_handler_ops vgic_v2_distr_mmio_handler = {
-    .read_handler  = vgic_v2_distr_mmio_read,
-    .write_handler = vgic_v2_distr_mmio_write,
+    .read  = vgic_v2_distr_mmio_read,
+    .write = vgic_v2_distr_mmio_write,
 };
 
 static struct vcpu *vgic_v2_get_target_vcpu(struct vcpu *v, unsigned int irq)

@@ -27,53 +27,61 @@ int handle_mmio(mmio_info_t *info)
 {
     struct vcpu *v = current;
     int i;
-    const struct mmio_handler *mmio_handler = NULL;
-    const struct io_handler *io_handlers = &v->domain->arch.io_handlers;
+    const struct mmio_handler *handler = NULL;
+    const struct vmmio *vmmio = &v->domain->arch.vmmio;
 
-    for ( i = 0; i < io_handlers->num_entries; i++ )
+    for ( i = 0; i < vmmio->num_entries; i++ )
     {
-        mmio_handler = &io_handlers->mmio_handlers[i];
+        handler = &vmmio->handlers[i];
 
-        if ( (info->gpa >= mmio_handler->addr) &&
-             (info->gpa < (mmio_handler->addr + mmio_handler->size)) )
+        if ( (info->gpa >= handler->addr) &&
+             (info->gpa < (handler->addr + handler->size)) )
             break;
     }
 
-    if ( i == io_handlers->num_entries )
+    if ( i == vmmio->num_entries )
         return 0;
 
     if ( info->dabt.write )
-        return mmio_handler->mmio_handler_ops->write_handler(v, info,
-                                                             mmio_handler->priv);
+        return handler->ops->write(v, info, handler->priv);
     else
-        return mmio_handler->mmio_handler_ops->read_handler(v, info,
-                                                            mmio_handler->priv);
+        return handler->ops->read(v, info, handler->priv);
 }
 
 void register_mmio_handler(struct domain *d,
-                           const struct mmio_handler_ops *handle,
+                           const struct mmio_handler_ops *ops,
                            paddr_t addr, paddr_t size, void *priv)
 {
-    struct io_handler *handler = &d->arch.io_handlers;
+    struct vmmio *vmmio = &d->arch.vmmio;
+    struct mmio_handler *handler;
 
-    BUG_ON(handler->num_entries >= MAX_IO_HANDLER);
+    BUG_ON(vmmio->num_entries >= MAX_IO_HANDLER);
 
-    spin_lock(&handler->lock);
+    spin_lock(&vmmio->lock);
 
-    handler->mmio_handlers[handler->num_entries].mmio_handler_ops = handle;
-    handler->mmio_handlers[handler->num_entries].addr = addr;
-    handler->mmio_handlers[handler->num_entries].size = size;
-    handler->mmio_handlers[handler->num_entries].priv = priv;
+    handler = &vmmio->handlers[vmmio->num_entries];
+
+    handler->ops = ops;
+    handler->addr = addr;
+    handler->size = size;
+    handler->priv = priv;
+
+    /*
+     * handle_mmio is not using the lock to avoid contention.
+     * Make sure the other processors see the new handler before
+     * updating the number of entries
+     */
     dsb(ish);
-    handler->num_entries++;
 
-    spin_unlock(&handler->lock);
+    vmmio->num_entries++;
+
+    spin_unlock(&vmmio->lock);
 }
 
 int domain_io_init(struct domain *d)
 {
-   spin_lock_init(&d->arch.io_handlers.lock);
-   d->arch.io_handlers.num_entries = 0;
+   spin_lock_init(&d->arch.vmmio.lock);
+   d->arch.vmmio.num_entries = 0;
 
    return 0;
 }

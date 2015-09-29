@@ -49,8 +49,8 @@ static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info, void *priv);
 static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info, void *priv);
 
 static const struct mmio_handler_ops vuart_mmio_handler = {
-    .read_handler  = vuart_mmio_read,
-    .write_handler = vuart_mmio_write,
+    .read  = vuart_mmio_read,
+    .write = vuart_mmio_write,
 };
 
 int domain_vuart_init(struct domain *d)

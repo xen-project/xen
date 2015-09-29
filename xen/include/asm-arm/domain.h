@@ -55,7 +55,8 @@ struct arch_domain
     struct hvm_domain hvm_domain;
     xen_pfn_t *grant_table_gpfn;
 
-    struct io_handler io_handlers;
+    struct vmmio vmmio;
+
     /* Continuable domain_relinquish_resources(). */
     enum {
         RELMEM_not_started,

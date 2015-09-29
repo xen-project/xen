@@ -37,26 +37,26 @@ typedef int (*mmio_write_t)(struct vcpu *v, mmio_info_t *info, void *priv);
 typedef int (*mmio_check_t)(struct vcpu *v, paddr_t addr);
 
 struct mmio_handler_ops {
-    mmio_read_t read_handler;
-    mmio_write_t write_handler;
+    mmio_read_t read;
+    mmio_write_t write;
 };
 
 struct mmio_handler {
     paddr_t addr;
     paddr_t size;
-    const struct mmio_handler_ops *mmio_handler_ops;
+    const struct mmio_handler_ops *ops;
     void *priv;
 };
 
-struct io_handler {
+struct vmmio {
     int num_entries;
     spinlock_t lock;
-    struct mmio_handler mmio_handlers[MAX_IO_HANDLER];
+    struct mmio_handler handlers[MAX_IO_HANDLER];
 };
 
 extern int handle_mmio(mmio_info_t *info);
 void register_mmio_handler(struct domain *d,
-                           const struct mmio_handler_ops *handle,
+                           const struct mmio_handler_ops *ops,
                            paddr_t addr, paddr_t size, void *priv);
 int domain_io_init(struct domain *d);
 
