@@ -593,55 +593,34 @@ write_ignore_32:
     return 1;
 }
 
-static inline struct vcpu *get_vcpu_from_rdist(paddr_t gpa,
-                                               struct vcpu *v,
-                                               uint32_t *offset)
+static struct vcpu *get_vcpu_from_rdist(struct domain *d,
+    const struct vgic_rdist_region *region,
+    paddr_t gpa, uint32_t *offset)
 {
-    struct domain *d = v->domain;
+    struct vcpu *v;
     uint32_t stride = d->arch.vgic.rdist_stride;
-    paddr_t base;
-    int i, vcpu_id;
-    struct vgic_rdist_region *region;
+    unsigned int vcpu_id;
 
-    *offset = gpa & (stride - 1);
-    base = gpa & ~((paddr_t)stride - 1);
-
-    /* Fast path: the VCPU is trying to access its re-distributor */
-    if ( likely(v->arch.vgic.rdist_base == base) )
-        return v;
-
-    /* Slow path: the VCPU is trying to access another re-distributor */
-
-    /*
-     * Find the region where the re-distributor lives. For this purpose,
-     * we look one region ahead as only MMIO range for redistributors
-     * traps here.
-     * Note: The region has been ordered during the GIC initialization
-     */
-    for ( i = 1; i < d->arch.vgic.nr_regions; i++ )
-    {
-        if ( base < d->arch.vgic.rdist_regions[i].base )
-            break;
-    }
-
-    region = &d->arch.vgic.rdist_regions[i - 1];
-
-    vcpu_id = region->first_cpu + ((base - region->base) / stride);
-
+    vcpu_id = region->first_cpu + ((gpa - region->base) / stride);
     if ( unlikely(vcpu_id >= d->max_vcpus) )
         return NULL;
 
-    return d->vcpu[vcpu_id];
+    v = d->vcpu[vcpu_id];
+
+    *offset = gpa - v->arch.vgic.rdist_base;
+
+    return v;
 }
 
 static int vgic_v3_rdistr_mmio_read(struct vcpu *v, mmio_info_t *info,
                                     void *priv)
 {
     uint32_t offset;
+    const struct vgic_rdist_region *region = priv;
 
     perfc_incr(vgicr_reads);
 
-    v = get_vcpu_from_rdist(info->gpa, v, &offset);
+    v = get_vcpu_from_rdist(v->domain, region, info->gpa, &offset);
     if ( unlikely(!v) )
         return 0;
 
@@ -661,10 +640,11 @@ static int vgic_v3_rdistr_mmio_write(struct vcpu *v, mmio_info_t *info,
                                      void *priv)
 {
     uint32_t offset;
+    const struct vgic_rdist_region *region = priv;
 
     perfc_incr(vgicr_writes);
 
-    v = get_vcpu_from_rdist(info->gpa, v, &offset);
+    v = get_vcpu_from_rdist(v->domain, region, info->gpa, &offset);
     if ( unlikely(!v) )
         return 0;
 
@@ -1212,10 +1192,12 @@ static int vgic_v3_domain_init(struct domain *d)
      * redistributor is targeted.
      */
     for ( i = 0; i < d->arch.vgic.nr_regions; i++ )
+    {
+        struct vgic_rdist_region *region = &d->arch.vgic.rdist_regions[i];
+
         register_mmio_handler(d, &vgic_rdistr_mmio_handler,
-            d->arch.vgic.rdist_regions[i].base,
-            d->arch.vgic.rdist_regions[i].size,
-            NULL);
+                              region->base, region->size, region);
+    }
 
     d->arch.vgic.ctlr = VGICD_CTLR_DEFAULT;
 
