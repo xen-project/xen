@@ -1509,18 +1509,6 @@ monitor types are:
 
 =back
 
-=head1 IGNORED FOR COMPATIBILITY WITH XM
-
-xl is mostly command-line compatible with the old xm utility used with
-the old Python xend.  For compatibility, the following options are
-ignored:
-
-=over 4
-
-=item B<xl migrate --live>
-
-=back
-
 =head2 CACHE ALLOCATION TECHNOLOGY
 
 Intel Broadwell and later server platforms offer capabilities to configure and
@@ -1550,6 +1538,18 @@ Specify the socket to process, otherwise all sockets are processed.
 =item B<psr-cat-show> [I<domain-id>]
 
 Show CAT settings for a certain domain or all domains.
+
+=back
+
+=head1 IGNORED FOR COMPATIBILITY WITH XM
+
+xl is mostly command-line compatible with the old xm utility used with
+the old Python xend.  For compatibility, the following options are
+ignored:
+
+=over 4
+
+=item B<xl migrate --live>
 
 =back
 
