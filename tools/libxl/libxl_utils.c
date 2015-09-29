@@ -886,6 +886,28 @@ int libxl_socket_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *socketmap,
 
 }
 
+int libxl_get_online_socketmap(libxl_ctx *ctx, libxl_bitmap *socketmap)
+{
+    libxl_cputopology *tinfo = NULL;
+    int nr_cpus = 0, i, rc = 0;
+
+    tinfo = libxl_get_cpu_topology(ctx, &nr_cpus);
+    if (tinfo == NULL) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    libxl_bitmap_set_none(socketmap);
+    for (i = 0; i < nr_cpus; i++)
+        if (tinfo[i].socket != XEN_INVALID_SOCKET_ID
+            && !libxl_bitmap_test(socketmap, tinfo[i].socket))
+            libxl_bitmap_set(socketmap, tinfo[i].socket);
+
+ out:
+    libxl_cputopology_list_free(tinfo, nr_cpus);
+    return rc;
+}
+
 int libxl_nodemap_to_cpumap(libxl_ctx *ctx,
                             const libxl_bitmap *nodemap,
                             libxl_bitmap *cpumap)
