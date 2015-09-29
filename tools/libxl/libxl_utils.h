@@ -143,6 +143,8 @@ int libxl_node_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *nodemap,
                             int max_nodes);
 int libxl_socket_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *socketmap,
                               int max_sockets);
+/* Fill socketmap with the CPU topology information on the system. */
+int libxl_get_online_socketmap(libxl_ctx *ctx, libxl_bitmap *socketmap);
 
 /* Populate cpumap with the cpus spanned by the nodes in nodemap */
 int libxl_nodemap_to_cpumap(libxl_ctx *ctx,

@@ -814,11 +814,12 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
 #define LIBXL_HAVE_PCITOPOLOGY 1
 
 /*
- * LIBXL_HAVE_SOCKET_BITMAP_ALLOC
+ * LIBXL_HAVE_SOCKET_BITMAP
  *
- * If this is defined, then libxl_socket_bitmap_alloc exists.
+ * If this is defined, then libxl_socket_bitmap_alloc and
+ * libxl_get_online_socketmap exist.
  */
-#define LIBXL_HAVE_SOCKET_BITMAP_ALLOC 1
+#define LIBXL_HAVE_SOCKET_BITMAP 1
 
 /*
  * LIBXL_HAVE_SRM_V2
