@@ -647,7 +647,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
     if ( iommu_enabled && need_iommu(p2m->domain) )
     {
-        if ( iommu_hap_pt_share )
+        if ( iommu_use_hap_pt(p2m->domain) )
         {
             if ( old_mfn && (old_mfn != mfn_x(mfn)) )
                 amd_iommu_flush_pages(p2m->domain, gfn, page_order);
