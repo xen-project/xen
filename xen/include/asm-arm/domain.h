@@ -102,7 +102,6 @@ struct arch_domain
         struct pending_irq *pending_irqs;
         /* Base address for guest GIC */
         paddr_t dbase; /* Distributor base address */
-        paddr_t cbase; /* CPU base address */
 #ifdef HAS_GICV3
         /* GIC V3 addressing */
         /* List of contiguous occupied by the redistributors */

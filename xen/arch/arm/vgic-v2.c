@@ -548,6 +548,7 @@ static int vgic_v2_vcpu_init(struct vcpu *v)
 static int vgic_v2_domain_init(struct domain *d)
 {
     int i, ret;
+    paddr_t cbase;
 
     /*
      * The hardware domain gets the hardware address.
@@ -556,12 +557,12 @@ static int vgic_v2_domain_init(struct domain *d)
     if ( is_hardware_domain(d) )
     {
         d->arch.vgic.dbase = vgic_v2_hw.dbase;
-        d->arch.vgic.cbase = vgic_v2_hw.cbase;
+        cbase = vgic_v2_hw.cbase;
     }
     else
     {
         d->arch.vgic.dbase = GUEST_GICD_BASE;
-        d->arch.vgic.cbase = GUEST_GICC_BASE;
+        cbase = GUEST_GICC_BASE;
     }
 
     /*
@@ -571,16 +572,16 @@ static int vgic_v2_domain_init(struct domain *d)
      * The second page is always mapped at +4K irrespective of the
      * GIC_64K_STRIDE quirk. The DTB passed to the guest reflects this.
      */
-    ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase), 1,
+    ret = map_mmio_regions(d, paddr_to_pfn(cbase), 1,
                            paddr_to_pfn(vgic_v2_hw.vbase));
     if ( ret )
         return ret;
 
     if ( !platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
-        ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase + PAGE_SIZE),
+        ret = map_mmio_regions(d, paddr_to_pfn(cbase + PAGE_SIZE),
                                1, paddr_to_pfn(vgic_v2_hw.vbase + PAGE_SIZE));
     else
-        ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase + PAGE_SIZE),
+        ret = map_mmio_regions(d, paddr_to_pfn(cbase + PAGE_SIZE),
                                1, paddr_to_pfn(vgic_v2_hw.vbase + SZ_64K));
 
     if ( ret )
