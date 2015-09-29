@@ -800,6 +800,7 @@ libxl_psr_cbm_type = Enumeration("psr_cbm_type", [
     ])
 
 libxl_psr_cat_info = Struct("psr_cat_info", [
+    ("id", uint32),
     ("cos_max", uint32),
     ("cbm_len", uint32),
     ])

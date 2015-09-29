@@ -339,8 +339,11 @@ int libxl_psr_cat_get_l3_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
 {
     GC_INIT(ctx);
     int rc;
-    int i, nr_sockets;
+    int i = 0, socket, nr_sockets;
+    libxl_bitmap socketmap;
     libxl_psr_cat_info *ptr;
+
+    libxl_bitmap_init(&socketmap);
 
     rc = libxl__count_physical_sockets(gc, &nr_sockets);
     if (rc) {
@@ -348,21 +351,31 @@ int libxl_psr_cat_get_l3_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
         goto out;
     }
 
+    libxl_socket_bitmap_alloc(ctx, &socketmap, nr_sockets);
+    rc = libxl_get_online_socketmap(ctx, &socketmap);
+    if (rc < 0) {
+        LOGE(ERROR, "failed to get available sockets");
+        goto out;
+    }
+
     ptr = libxl__malloc(NOGC, nr_sockets * sizeof(libxl_psr_cat_info));
 
-    for (i = 0; i < nr_sockets; i++) {
-        if (xc_psr_cat_get_l3_info(ctx->xch, i, &ptr[i].cos_max,
-                                                &ptr[i].cbm_len)) {
+    libxl_for_each_set_bit(socket, socketmap) {
+        ptr[i].id = socket;
+        if (xc_psr_cat_get_l3_info(ctx->xch, socket, &ptr[i].cos_max,
+                                                     &ptr[i].cbm_len)) {
             libxl__psr_cat_log_err_msg(gc, errno);
             rc = ERROR_FAIL;
             free(ptr);
             goto out;
         }
+        i++;
     }
 
     *info = ptr;
-    *nr = nr_sockets;
+    *nr = i;
 out:
+    libxl_bitmap_dispose(&socketmap);
     GC_FREE;
     return rc;
 }

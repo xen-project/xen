@@ -8413,35 +8413,35 @@ int main_psr_cmt_show(int argc, char **argv)
 static int psr_cat_hwinfo(void)
 {
     int rc;
-    int socketid, nr_sockets;
+    int i, nr;
     uint32_t l3_cache_size;
     libxl_psr_cat_info *info;
 
     printf("Cache Allocation Technology (CAT):\n");
 
-    rc = libxl_psr_cat_get_l3_info(ctx, &info, &nr_sockets);
+    rc = libxl_psr_cat_get_l3_info(ctx, &info, &nr);
     if (rc) {
         fprintf(stderr, "Failed to get cat info\n");
         return rc;
     }
 
-    for (socketid = 0; socketid < nr_sockets; socketid++) {
-        rc = libxl_psr_cmt_get_l3_cache_size(ctx, socketid, &l3_cache_size);
+    for (i = 0; i < nr; i++) {
+        rc = libxl_psr_cmt_get_l3_cache_size(ctx, info[i].id, &l3_cache_size);
         if (rc) {
             fprintf(stderr, "Failed to get l3 cache size for socket:%d\n",
-                    socketid);
+                    info[i].id);
             goto out;
         }
-        printf("%-16s: %u\n", "Socket ID", socketid);
+        printf("%-16s: %u\n", "Socket ID", info[i].id);
         printf("%-16s: %uKB\n", "L3 Cache", l3_cache_size);
-        printf("%-16s: %u\n", "Maximum COS", info->cos_max);
-        printf("%-16s: %u\n", "CBM length", info->cbm_len);
+        printf("%-16s: %u\n", "Maximum COS", info[i].cos_max);
+        printf("%-16s: %u\n", "CBM length", info[i].cbm_len);
         printf("%-16s: %#llx\n", "Default CBM",
-               (1ull << info->cbm_len) - 1);
+               (1ull << info[i].cbm_len) - 1);
     }
 
 out:
-    libxl_psr_cat_info_list_free(info, nr_sockets);
+    libxl_psr_cat_info_list_free(info, nr);
     return rc;
 }
 
@@ -8483,47 +8483,46 @@ static int psr_cat_print_domain_cbm(uint32_t domid, uint32_t socketid)
     return 0;
 }
 
-static int psr_cat_print_socket(uint32_t domid, uint32_t socketid,
-                                libxl_psr_cat_info *info)
+static int psr_cat_print_socket(uint32_t domid, libxl_psr_cat_info *info)
 {
     int rc;
     uint32_t l3_cache_size;
 
-    rc = libxl_psr_cmt_get_l3_cache_size(ctx, socketid, &l3_cache_size);
+    rc = libxl_psr_cmt_get_l3_cache_size(ctx, info->id, &l3_cache_size);
     if (rc) {
         fprintf(stderr, "Failed to get l3 cache size for socket:%d\n",
-                socketid);
+                info->id);
         return -1;
     }
 
-    printf("%-16s: %u\n", "Socket ID", socketid);
+    printf("%-16s: %u\n", "Socket ID", info->id);
     printf("%-16s: %uKB\n", "L3 Cache", l3_cache_size);
     printf("%-16s: %#llx\n", "Default CBM", (1ull << info->cbm_len) - 1);
     printf("%5s%25s%16s\n", "ID", "NAME", "CBM");
 
-    return psr_cat_print_domain_cbm(domid, socketid);
+    return psr_cat_print_domain_cbm(domid, info->id);
 }
 
 static int psr_cat_show(uint32_t domid)
 {
-    int socketid, nr_sockets;
+    int i, nr;
     int rc;
     libxl_psr_cat_info *info;
 
-    rc = libxl_psr_cat_get_l3_info(ctx, &info, &nr_sockets);
+    rc = libxl_psr_cat_get_l3_info(ctx, &info, &nr);
     if (rc) {
         fprintf(stderr, "Failed to get cat info\n");
         return rc;
     }
 
-    for (socketid = 0; socketid < nr_sockets; socketid++) {
-        rc = psr_cat_print_socket(domid, socketid, info + socketid);
+    for (i = 0; i < nr; i++) {
+        rc = psr_cat_print_socket(domid, info + i);
         if (rc)
             goto out;
     }
 
 out:
-    libxl_psr_cat_info_list_free(info, nr_sockets);
+    libxl_psr_cat_info_list_free(info, nr);
     return rc;
 }
 
