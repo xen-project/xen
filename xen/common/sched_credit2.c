@@ -81,10 +81,6 @@
  * Credits are "reset" when the next vcpu in the runqueue is less than
  * or equal to zero.  At that point, everyone's credits are "clipped"
  * to a small value, and a fixed credit is added to everyone.
- *
- * The plan is for all cores that share an L2 will share the same
- * runqueue.  At the moment, there is one global runqueue for all
- * cores.
  */
 
 /*
@@ -191,6 +187,63 @@ static int __read_mostly opt_underload_balance_tolerance = 0;
 integer_param("credit2_balance_under", opt_underload_balance_tolerance);
 static int __read_mostly opt_overload_balance_tolerance = -3;
 integer_param("credit2_balance_over", opt_overload_balance_tolerance);
+
+/*
+ * Runqueue organization.
+ *
+ * The various cpus are to be assigned each one to a runqueue, and we
+ * want that to happen basing on topology. At the moment, it is possible
+ * to choose to arrange runqueues to be:
+ *
+ * - per-core: meaning that there will be one runqueue per each physical
+ *             core of the host. This will happen if the opt_runqueue
+ *             parameter is set to 'core';
+ *
+ * - per-socket: meaning that there will be one runqueue per each physical
+ *               socket (AKA package, which often, but not always, also
+ *               matches a NUMA node) of the host; This will happen if
+ *               the opt_runqueue parameter is set to 'socket';
+ *
+ * - per-node: meaning that there will be one runqueue per each physical
+ *             NUMA node of the host. This will happen if the opt_runqueue
+ *             parameter is set to 'node';
+ *
+ * - global: meaning that there will be only one runqueue to which all the
+ *           (logical) processors of the host belong. This will happen if
+ *           the opt_runqueue parameter is set to 'all'.
+ *
+ * Depending on the value of opt_runqueue, therefore, cpus that are part of
+ * either the same physical core, the same physical socket, the same NUMA
+ * node, or just all of them, will be put together to form runqueues.
+ */
+#define OPT_RUNQUEUE_CORE   0
+#define OPT_RUNQUEUE_SOCKET 1
+#define OPT_RUNQUEUE_NODE   2
+#define OPT_RUNQUEUE_ALL    3
+static const char *const opt_runqueue_str[] = {
+    [OPT_RUNQUEUE_CORE] = "core",
+    [OPT_RUNQUEUE_SOCKET] = "socket",
+    [OPT_RUNQUEUE_NODE] = "node",
+    [OPT_RUNQUEUE_ALL] = "all"
+};
+static int __read_mostly opt_runqueue = OPT_RUNQUEUE_SOCKET;
+
+static void parse_credit2_runqueue(const char *s)
+{
+    unsigned int i;
+
+    for ( i = 0; i < ARRAY_SIZE(opt_runqueue_str); i++ )
+    {
+        if ( !strcmp(s, opt_runqueue_str[i]) )
+        {
+            opt_runqueue = i;
+            return;
+        }
+    }
+
+    printk("WARNING, unrecognized value of credit2_runqueue option!\n");
+}
+custom_param("credit2_runqueue", parse_credit2_runqueue);
 
 /*
  * Per-runqueue data
@@ -1974,6 +2027,22 @@ static void deactivate_runqueue(struct csched2_private *prv, int rqi)
     cpumask_clear_cpu(rqi, &prv->active_queues);
 }
 
+static inline bool_t same_node(unsigned int cpua, unsigned int cpub)
+{
+    return cpu_to_node(cpua) == cpu_to_node(cpub);
+}
+
+static inline bool_t same_socket(unsigned int cpua, unsigned int cpub)
+{
+    return cpu_to_socket(cpua) == cpu_to_socket(cpub);
+}
+
+static inline bool_t same_core(unsigned int cpua, unsigned int cpub)
+{
+    return same_socket(cpua, cpub) &&
+           cpu_to_core(cpua) == cpu_to_core(cpub);
+}
+
 static unsigned int
 cpu_to_runqueue(struct csched2_private *prv, unsigned int cpu)
 {
@@ -2006,7 +2075,10 @@ cpu_to_runqueue(struct csched2_private *prv, unsigned int cpu)
         BUG_ON(cpu_to_socket(cpu) == XEN_INVALID_SOCKET_ID ||
                cpu_to_socket(peer_cpu) == XEN_INVALID_SOCKET_ID);
 
-        if ( cpu_to_socket(cpumask_first(&rqd->active)) == cpu_to_socket(cpu) )
+        if ( opt_runqueue == OPT_RUNQUEUE_ALL ||
+             (opt_runqueue == OPT_RUNQUEUE_CORE && same_core(peer_cpu, cpu)) ||
+             (opt_runqueue == OPT_RUNQUEUE_SOCKET && same_socket(peer_cpu, cpu)) ||
+             (opt_runqueue == OPT_RUNQUEUE_NODE && same_node(peer_cpu, cpu)) )
             break;
     }
 
@@ -2170,6 +2242,7 @@ csched2_init(struct scheduler *ops)
     printk(" load_window_shift: %d\n", opt_load_window_shift);
     printk(" underload_balance_tolerance: %d\n", opt_underload_balance_tolerance);
     printk(" overload_balance_tolerance: %d\n", opt_overload_balance_tolerance);
+    printk(" runqueues arrangement: %s\n", opt_runqueue_str[opt_runqueue]);
 
     if ( opt_load_window_shift < LOADAVG_WINDOW_SHIFT_MIN )
     {
