@@ -45,8 +45,8 @@
 
 #define domain_has_vuart(d) ((d)->arch.vuart.info != NULL)
 
-static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info);
-static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info);
+static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info, void *priv);
+static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info, void *priv);
 
 static const struct mmio_handler_ops vuart_mmio_handler = {
     .read_handler  = vuart_mmio_read,
@@ -70,7 +70,8 @@ int domain_vuart_init(struct domain *d)
 
     register_mmio_handler(d, &vuart_mmio_handler,
                           d->arch.vuart.info->base_addr,
-                          d->arch.vuart.info->size);
+                          d->arch.vuart.info->size,
+                          NULL);
 
     return 0;
 }
@@ -105,7 +106,7 @@ static void vuart_print_char(struct vcpu *v, char c)
     spin_unlock(&uart->lock);
 }
 
-static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info)
+static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info, void *priv)
 {
     struct domain *d = v->domain;
     struct hsr_dabt dabt = info->dabt;
@@ -125,7 +126,7 @@ static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info)
     return 1;
 }
 
-static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info)
+static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info, void *priv)
 {
     struct domain *d = v->domain;
     struct hsr_dabt dabt = info->dabt;

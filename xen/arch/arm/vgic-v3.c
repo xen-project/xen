@@ -634,7 +634,8 @@ static inline struct vcpu *get_vcpu_from_rdist(paddr_t gpa,
     return d->vcpu[vcpu_id];
 }
 
-static int vgic_v3_rdistr_mmio_read(struct vcpu *v, mmio_info_t *info)
+static int vgic_v3_rdistr_mmio_read(struct vcpu *v, mmio_info_t *info,
+                                    void *priv)
 {
     uint32_t offset;
 
@@ -656,7 +657,8 @@ static int vgic_v3_rdistr_mmio_read(struct vcpu *v, mmio_info_t *info)
     return 0;
 }
 
-static int vgic_v3_rdistr_mmio_write(struct vcpu *v, mmio_info_t *info)
+static int vgic_v3_rdistr_mmio_write(struct vcpu *v, mmio_info_t *info,
+                                     void *priv)
 {
     uint32_t offset;
 
@@ -678,7 +680,8 @@ static int vgic_v3_rdistr_mmio_write(struct vcpu *v, mmio_info_t *info)
     return 0;
 }
 
-static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
+static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
+                                   void *priv)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
@@ -835,7 +838,8 @@ read_as_zero:
     return 1;
 }
 
-static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
+static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
+                                    void *priv)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
@@ -1200,7 +1204,7 @@ static int vgic_v3_domain_init(struct domain *d)
 
     /* Register mmio handle for the Distributor */
     register_mmio_handler(d, &vgic_distr_mmio_handler, d->arch.vgic.dbase,
-                          SZ_64K);
+                          SZ_64K, NULL);
 
     /*
      * Register mmio handler per contiguous region occupied by the
@@ -1210,7 +1214,8 @@ static int vgic_v3_domain_init(struct domain *d)
     for ( i = 0; i < d->arch.vgic.nr_regions; i++ )
         register_mmio_handler(d, &vgic_rdistr_mmio_handler,
             d->arch.vgic.rdist_regions[i].base,
-            d->arch.vgic.rdist_regions[i].size);
+            d->arch.vgic.rdist_regions[i].size,
+            NULL);
 
     d->arch.vgic.ctlr = VGICD_CTLR_DEFAULT;
 

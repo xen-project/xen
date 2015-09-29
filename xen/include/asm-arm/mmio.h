@@ -32,8 +32,8 @@ typedef struct
     paddr_t gpa;
 } mmio_info_t;
 
-typedef int (*mmio_read_t)(struct vcpu *v, mmio_info_t *info);
-typedef int (*mmio_write_t)(struct vcpu *v, mmio_info_t *info);
+typedef int (*mmio_read_t)(struct vcpu *v, mmio_info_t *info, void *priv);
+typedef int (*mmio_write_t)(struct vcpu *v, mmio_info_t *info, void *priv);
 typedef int (*mmio_check_t)(struct vcpu *v, paddr_t addr);
 
 struct mmio_handler_ops {
@@ -45,6 +45,7 @@ struct mmio_handler {
     paddr_t addr;
     paddr_t size;
     const struct mmio_handler_ops *mmio_handler_ops;
+    void *priv;
 };
 
 struct io_handler {
@@ -56,7 +57,7 @@ struct io_handler {
 extern int handle_mmio(mmio_info_t *info);
 void register_mmio_handler(struct domain *d,
                            const struct mmio_handler_ops *handle,
-                           paddr_t addr, paddr_t size);
+                           paddr_t addr, paddr_t size, void *priv);
 int domain_io_init(struct domain *d);
 
 #endif  /* __ASM_ARM_MMIO_H__ */

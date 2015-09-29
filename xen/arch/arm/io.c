@@ -27,7 +27,7 @@ int handle_mmio(mmio_info_t *info)
 {
     struct vcpu *v = current;
     int i;
-    const struct mmio_handler *mmio_handler;
+    const struct mmio_handler *mmio_handler = NULL;
     const struct io_handler *io_handlers = &v->domain->arch.io_handlers;
 
     for ( i = 0; i < io_handlers->num_entries; i++ )
@@ -36,19 +36,23 @@ int handle_mmio(mmio_info_t *info)
 
         if ( (info->gpa >= mmio_handler->addr) &&
              (info->gpa < (mmio_handler->addr + mmio_handler->size)) )
-        {
-            return info->dabt.write ?
-                mmio_handler->mmio_handler_ops->write_handler(v, info) :
-                mmio_handler->mmio_handler_ops->read_handler(v, info);
-        }
+            break;
     }
 
-    return 0;
+    if ( i == io_handlers->num_entries )
+        return 0;
+
+    if ( info->dabt.write )
+        return mmio_handler->mmio_handler_ops->write_handler(v, info,
+                                                             mmio_handler->priv);
+    else
+        return mmio_handler->mmio_handler_ops->read_handler(v, info,
+                                                            mmio_handler->priv);
 }
 
 void register_mmio_handler(struct domain *d,
                            const struct mmio_handler_ops *handle,
-                           paddr_t addr, paddr_t size)
+                           paddr_t addr, paddr_t size, void *priv)
 {
     struct io_handler *handler = &d->arch.io_handlers;
 
@@ -59,6 +63,7 @@ void register_mmio_handler(struct domain *d,
     handler->mmio_handlers[handler->num_entries].mmio_handler_ops = handle;
     handler->mmio_handlers[handler->num_entries].addr = addr;
     handler->mmio_handlers[handler->num_entries].size = size;
+    handler->mmio_handlers[handler->num_entries].priv = priv;
     dsb(ish);
     handler->num_entries++;
 

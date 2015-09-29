@@ -50,7 +50,8 @@ void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t vbase)
     vgic_v2_hw.vbase = vbase;
 }
 
-static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
+static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
+                                   void *priv)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
@@ -247,7 +248,8 @@ static int vgic_v2_to_sgi(struct vcpu *v, register_t sgir)
     return vgic_to_sgi(v, sgir, sgi_mode, virq, &target);
 }
 
-static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
+static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
+                                    void *priv)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
@@ -590,7 +592,7 @@ static int vgic_v2_domain_init(struct domain *d)
                sizeof(d->arch.vgic.shared_irqs[i].v2.itargets));
 
     register_mmio_handler(d, &vgic_v2_distr_mmio_handler, d->arch.vgic.dbase,
-                          PAGE_SIZE);
+                          PAGE_SIZE, NULL);
 
     return 0;
 }
