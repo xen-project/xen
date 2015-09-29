@@ -53,7 +53,6 @@
  *  http://wiki.xen.org/wiki/Credit2_Scheduler_Development
  * TODO:
  * + Multiple sockets
- *  - Detect cpu layout and make runqueue map, one per L2 (make_runq_map())
  *  - Simple load balancer / runqueue assignment
  *  - Runqueue load measurement
  *  - Load-based load balancer
@@ -1975,6 +1974,48 @@ static void deactivate_runqueue(struct csched2_private *prv, int rqi)
     cpumask_clear_cpu(rqi, &prv->active_queues);
 }
 
+static unsigned int
+cpu_to_runqueue(struct csched2_private *prv, unsigned int cpu)
+{
+    struct csched2_runqueue_data *rqd;
+    unsigned int rqi;
+
+    for ( rqi = 0; rqi < nr_cpu_ids; rqi++ )
+    {
+        unsigned int peer_cpu;
+
+        /*
+         * As soon as we come across an uninitialized runqueue, use it.
+         * In fact, either:
+         *  - we are initializing the first cpu, and we assign it to
+         *    runqueue 0. This is handy, especially if we are dealing
+         *    with the boot cpu (if credit2 is the default scheduler),
+         *    as we would not be able to use cpu_to_socket() and similar
+         *    helpers anyway (they're result of which is not reliable yet);
+         *  - we have gone through all the active runqueues, and have not
+         *    found anyone whose cpus' topology matches the one we are
+         *    dealing with, so activating a new runqueue is what we want.
+         */
+        if ( prv->rqd[rqi].id == -1 )
+            break;
+
+        rqd = prv->rqd + rqi;
+        BUG_ON(cpumask_empty(&rqd->active));
+
+        peer_cpu = cpumask_first(&rqd->active);
+        BUG_ON(cpu_to_socket(cpu) == XEN_INVALID_SOCKET_ID ||
+               cpu_to_socket(peer_cpu) == XEN_INVALID_SOCKET_ID);
+
+        if ( cpu_to_socket(cpumask_first(&rqd->active)) == cpu_to_socket(cpu) )
+            break;
+    }
+
+    /* We really expect to be able to assign each cpu to a runqueue. */
+    BUG_ON(rqi >= nr_cpu_ids);
+
+    return rqi;
+}
+
 /* Returns the ID of the runqueue the cpu is assigned to. */
 static unsigned
 init_pdata(struct csched2_private *prv, unsigned int cpu)
@@ -1986,21 +2027,7 @@ init_pdata(struct csched2_private *prv, unsigned int cpu)
     ASSERT(!cpumask_test_cpu(cpu, &prv->initialized));
 
     /* Figure out which runqueue to put it in */
-    rqi = 0;
-
-    /* Figure out which runqueue to put it in */
-    /* NB: cpu 0 doesn't get a STARTING callback, so we hard-code it to runqueue 0. */
-    if ( cpu == 0 )
-        rqi = 0;
-    else
-        rqi = cpu_to_socket(cpu);
-
-    if ( rqi == XEN_INVALID_SOCKET_ID )
-    {
-        printk("%s: cpu_to_socket(%d) returned %d!\n",
-               __func__, cpu, rqi);
-        BUG();
-    }
+    rqi = cpu_to_runqueue(prv, cpu);
 
     rqd = prv->rqd + rqi;
 
