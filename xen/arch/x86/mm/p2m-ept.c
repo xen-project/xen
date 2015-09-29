@@ -662,12 +662,12 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 {
     ept_entry_t *table, *ept_entry = NULL;
     unsigned long gfn_remainder = gfn;
-    int i, target = order / EPT_TABLE_ORDER;
+    unsigned int i, target = order / EPT_TABLE_ORDER;
     int ret, rc = 0;
     bool_t direct_mmio = (p2mt == p2m_mmio_direct);
     uint8_t ipat = 0;
-    int need_modify_vtd_table = 1;
-    int vtd_pte_present = 0;
+    bool_t need_modify_vtd_table = 1;
+    bool_t vtd_pte_present = 0;
     unsigned int iommu_flags = p2m_get_iommu_flags(p2mt);
     enum { sync_off, sync_on, sync_check } needs_sync = sync_check;
     ept_entry_t old_entry = { .epte = 0 };
