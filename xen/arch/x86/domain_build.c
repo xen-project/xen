@@ -432,9 +432,9 @@ static __init void pvh_add_mem_mapping(struct domain *d, unsigned long gfn,
         }
 
         if ( rangeset_contains_singleton(mmio_ro_ranges, mfn + i) )
-            a = p2m_access_rx;
+            a = p2m_access_r;
         else
-            a = p2m_access_rwx;
+            a = p2m_access_rw;
 
         if ( (rc = set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i), a)) )
             panic("pvh_add_mem_mapping: gfn:%lx mfn:%lx i:%ld rc:%d\n",
