@@ -171,10 +171,10 @@ struct csched_pcpu {
  * Convenience macro for accessing the per-PCPU cpumask we need for
  * implementing the two steps (soft and hard affinity) balancing logic.
  * It is stored in csched_pcpu so that serialization is not an issue,
- * as there is a csched_pcpu for each PCPU and we always hold the
- * runqueue spin-lock when using this.
+ * as there is a csched_pcpu for each PCPU, and we always hold the
+ * runqueue lock for the proper PCPU when using this.
  */
-#define csched_balance_mask (CSCHED_PCPU(smp_processor_id())->balance_mask)
+#define csched_balance_mask(c) (CSCHED_PCPU(c)->balance_mask)
 
 /*
  * Virtual CPU
@@ -412,9 +412,10 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
 
             /* Are there idlers suitable for new (for this balance step)? */
             csched_balance_cpumask(new->vcpu, balance_step,
-                                   csched_balance_mask);
-            cpumask_and(csched_balance_mask, csched_balance_mask, &idle_mask);
-            new_idlers_empty = cpumask_empty(csched_balance_mask);
+                                   csched_balance_mask(cpu));
+            cpumask_and(csched_balance_mask(cpu),
+                        csched_balance_mask(cpu), &idle_mask);
+            new_idlers_empty = cpumask_empty(csched_balance_mask(cpu));
 
             /*
              * Let's not be too harsh! If there aren't idlers suitable
@@ -1491,8 +1492,9 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
                  && !__vcpu_has_soft_affinity(vc, vc->cpu_hard_affinity) )
                 continue;
 
-            csched_balance_cpumask(vc, balance_step, csched_balance_mask);
-            if ( __csched_vcpu_is_migrateable(vc, cpu, csched_balance_mask) )
+            csched_balance_cpumask(vc, balance_step, csched_balance_mask(cpu));
+            if ( __csched_vcpu_is_migrateable(vc, cpu,
+                                              csched_balance_mask(cpu)) )
             {
                 /* We got a candidate. Grab it! */
                 TRACE_3D(TRC_CSCHED_STOLEN_VCPU, peer_cpu,
