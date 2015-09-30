@@ -339,7 +339,7 @@ int libxl_psr_cat_get_l3_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
 {
     GC_INIT(ctx);
     int rc;
-    int i = 0, socket, nr_sockets;
+    int i = 0, socketid, nr_sockets;
     libxl_bitmap socketmap;
     libxl_psr_cat_info *ptr;
 
@@ -360,10 +360,10 @@ int libxl_psr_cat_get_l3_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
 
     ptr = libxl__malloc(NOGC, nr_sockets * sizeof(libxl_psr_cat_info));
 
-    libxl_for_each_set_bit(socket, socketmap) {
-        ptr[i].id = socket;
-        if (xc_psr_cat_get_l3_info(ctx->xch, socket, &ptr[i].cos_max,
-                                                     &ptr[i].cbm_len)) {
+    libxl_for_each_set_bit(socketid, socketmap) {
+        ptr[i].id = socketid;
+        if (xc_psr_cat_get_l3_info(ctx->xch, socketid, &ptr[i].cos_max,
+                                   &ptr[i].cbm_len)) {
             libxl__psr_cat_log_err_msg(gc, errno);
             rc = ERROR_FAIL;
             free(ptr);
