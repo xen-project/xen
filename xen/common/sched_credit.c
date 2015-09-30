@@ -895,7 +895,7 @@ csched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     svc->pri = is_idle_domain(vc->domain) ?
         CSCHED_PRI_IDLE : CSCHED_PRI_TS_UNDER;
     SCHED_VCPU_STATS_RESET(svc);
-    SCHED_STAT_CRANK(vcpu_init);
+    SCHED_STAT_CRANK(vcpu_alloc);
     return svc;
 }
 
@@ -906,6 +906,8 @@ csched_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 
     if ( !__vcpu_on_runq(svc) && vcpu_runnable(vc) && !vc->is_running )
         __runq_insert(vc->processor, svc);
+
+    SCHED_STAT_CRANK(vcpu_insert);
 }
 
 static void
@@ -926,7 +928,7 @@ csched_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
     struct csched_dom * const sdom = svc->sdom;
     unsigned long flags;
 
-    SCHED_STAT_CRANK(vcpu_destroy);
+    SCHED_STAT_CRANK(vcpu_remove);
 
     if ( test_and_clear_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
     {

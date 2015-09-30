@@ -597,7 +597,7 @@ rt_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     if ( !is_idle_vcpu(vc) )
         svc->budget = RTDS_DEFAULT_BUDGET;
 
-    SCHED_STAT_CRANK(vcpu_init);
+    SCHED_STAT_CRANK(vcpu_alloc);
 
     return svc;
 }
@@ -635,6 +635,8 @@ rt_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 
     /* add rt_vcpu svc to scheduler-specific vcpu list of the dom */
     list_add_tail(&svc->sdom_elem, &svc->sdom->vcpu);
+
+    SCHED_STAT_CRANK(vcpu_insert);
 }
 
 /*
@@ -648,7 +650,7 @@ rt_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
     struct rt_dom * const sdom = svc->sdom;
     spinlock_t *lock;
 
-    SCHED_STAT_CRANK(vcpu_destroy);
+    SCHED_STAT_CRANK(vcpu_remove);
 
     BUG_ON( sdom == NULL );
 

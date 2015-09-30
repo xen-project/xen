@@ -796,7 +796,7 @@ csched2_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
         svc->weight = 0;
     }
 
-    SCHED_STAT_CRANK(vcpu_init);
+    SCHED_STAT_CRANK(vcpu_alloc);
 
     return svc;
 }
@@ -891,6 +891,8 @@ csched2_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
         vcpu_schedule_unlock_irq(lock, vc);
 
         sdom->nr_vcpus++;
+
+        SCHED_STAT_CRANK(vcpu_insert);
     }
 
     CSCHED2_VCPU_CHECK(vc);
@@ -917,7 +919,7 @@ csched2_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
     {
         spinlock_t *lock;
 
-        SCHED_STAT_CRANK(vcpu_destroy);
+        SCHED_STAT_CRANK(vcpu_remove);
 
         /* Remove from runqueue */
         lock = vcpu_schedule_lock_irq(vc);
