@@ -20,6 +20,106 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * In general Xen maintains two pools of memory:
+ *
+ * - Xen heap: Memory which is always mapped (i.e accessible by
+ *             virtual address), via a permanent and contiguous
+ *             "direct mapping". Macros like va() and pa() are valid
+ *             for such memory and it is always permissible to stash
+ *             pointers to Xen heap memory in data structures etc.
+ *
+ *             Xen heap pages are always anonymous (that is, not tied
+ *             or accounted to any particular domain).
+ *
+ * - Dom heap: Memory which must be explicitly mapped, usually
+ *             transiently with map_domain_page(), in order to be
+ *             used. va() and pa() are not valid for such memory. Care
+ *             should be taken when stashing pointers to dom heap
+ *             pages that those mappings are permanent (e.g. vmap() or
+ *             map_domain_page_global()), it is not safe to stash
+ *             transient mappings such as those from map_domain_page()
+ *
+ *             Dom heap pages are often tied to a particular domain,
+ *             but need not be (passing domain==NULL results in an
+ *             anonymous dom heap allocation).
+ *
+ * The exact nature of this split is a (sub)arch decision which can
+ * select one of three main variants:
+ *
+ * CONFIG_SEPARATE_XENHEAP=y
+ *
+ *   The xen heap is maintained as an entirely separate heap.
+ *
+ *   Arch code arranges for some (perhaps small) amount of physical
+ *   memory to be covered by a direct mapping and registers that
+ *   memory as the Xen heap (via init_xenheap_pages()) and the
+ *   remainder as the dom heap.
+ *
+ *   This mode of operation is most commonly used by 32-bit arches
+ *   where the virtual address space is insufficient to map all RAM.
+ *
+ * CONFIG_SEPARATE_XENHEAP=n W/ DIRECT MAP OF ALL RAM
+ *
+ *   All of RAM is covered by a permanent contiguous mapping and there
+ *   is only a single heap.
+ *
+ *   Memory allocated from the Xen heap is flagged (in
+ *   page_info.count_info) with PGC_xen_heap. Memory allocated from
+ *   the Dom heap must still be explicitly mapped before use
+ *   (e.g. with map_domain_page) in particular in common code.
+ *
+ *   xenheap_max_mfn() should not be called by arch code.
+ *
+ *   This mode of operation is most commonly used by 64-bit arches
+ *   which have sufficient free virtual address space to permanently
+ *   map the largest practical amount RAM currently expected on that
+ *   arch.
+ *
+ * CONFIG_SEPARATE_XENHEAP=n W/ DIRECT MAP OF ONLY PARTIAL RAM
+ *
+ *   There is a single heap, but only the beginning (up to some
+ *   threshold) is covered by a permanent contiguous mapping.
+ *
+ *   Memory allocated from the Xen heap is allocated from below the
+ *   threshold and flagged with PGC_xen_heap. Memory allocated from
+ *   the dom heap is allocated from anywhere in the heap (although it
+ *   will prefer to allocate from as high as possible to try and keep
+ *   Xen heap suitable memory available).
+ *
+ *   Arch code must call xenheap_max_mfn() to signal the limit of the
+ *   direct mapping.
+ *
+ *   This mode of operation is most commonly used by 64-bit arches
+ *   which have a restricted amount of virtual address space available
+ *   for a direct map (due to e.g. reservations for other purposes)
+ *   such that it is not possible to map all of RAM on systems with
+ *   the largest practical amount of RAM currently expected on that
+ *   arch.
+ *
+ * Boot Allocator
+ *
+ *   In addition to the two primary pools (xen heap and dom heap) a
+ *   third "boot allocator" is used at start of day. This is a
+ *   simplified allocator which can be used.
+ *
+ *   Typically all memory which is destined to be dom heap memory
+ *   (which is everything in the CONFIG_SEPARATE_XENHEAP=n
+ *   configurations) is first allocated to the boot allocator (with
+ *   init_boot_pages()) and is then handed over to the main dom heap in
+ *   end_boot_allocator().
+ *
+ * "Contiguous" mappings
+ *
+ *   Note that although the above talks about "contiguous" mappings
+ *   some architectures implement a scheme ("PDX compression") to
+ *   compress unused portions of the machine address space (i.e. large
+ *   gaps between distinct banks of memory) in order to avoid creating
+ *   enormous frame tables and direct maps which mostly map
+ *   nothing. Thus a contiguous mapping may still have distinct
+ *   regions within it.
+ */
+
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/types.h>
