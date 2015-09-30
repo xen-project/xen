@@ -97,6 +97,30 @@ void vm_event_register_write_resume(struct vcpu *v, vm_event_response_t *rsp)
     }
 }
 
+void vm_event_set_registers(struct vcpu *v, vm_event_response_t *rsp)
+{
+    v->arch.user_regs.eax = rsp->data.regs.x86.rax;
+    v->arch.user_regs.ebx = rsp->data.regs.x86.rbx;
+    v->arch.user_regs.ecx = rsp->data.regs.x86.rcx;
+    v->arch.user_regs.edx = rsp->data.regs.x86.rdx;
+    v->arch.user_regs.esp = rsp->data.regs.x86.rsp;
+    v->arch.user_regs.ebp = rsp->data.regs.x86.rbp;
+    v->arch.user_regs.esi = rsp->data.regs.x86.rsi;
+    v->arch.user_regs.edi = rsp->data.regs.x86.rdi;
+
+    v->arch.user_regs.r8 = rsp->data.regs.x86.r8;
+    v->arch.user_regs.r9 = rsp->data.regs.x86.r9;
+    v->arch.user_regs.r10 = rsp->data.regs.x86.r10;
+    v->arch.user_regs.r11 = rsp->data.regs.x86.r11;
+    v->arch.user_regs.r12 = rsp->data.regs.x86.r12;
+    v->arch.user_regs.r13 = rsp->data.regs.x86.r13;
+    v->arch.user_regs.r14 = rsp->data.regs.x86.r14;
+    v->arch.user_regs.r15 = rsp->data.regs.x86.r15;
+
+    v->arch.user_regs.eflags = rsp->data.regs.x86.rflags;
+    v->arch.user_regs.eip = rsp->data.regs.x86.rip;
+}
+
 /*
  * Local variables:
  * mode: C

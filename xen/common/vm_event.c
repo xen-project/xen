@@ -417,6 +417,9 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
 
         if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )
         {
+            if ( rsp.flags & VM_EVENT_FLAG_SET_REGISTERS )
+                vm_event_set_registers(v, &rsp);
+
             if ( rsp.flags & VM_EVENT_FLAG_TOGGLE_SINGLESTEP )
                 vm_event_toggle_singlestep(d, v);
 

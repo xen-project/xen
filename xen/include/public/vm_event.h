@@ -89,6 +89,13 @@
  * by the altp2m_idx response field if possible.
  */
 #define VM_EVENT_FLAG_ALTERNATE_P2M      (1 << 7)
+/*
+ * Set the vCPU registers to the values in the  vm_event response.
+ * At the moment x86-only, applies to EAX-EDX, ESP, EBP, ESI, EDI, R8-R15,
+ * EFLAGS, and EIP.
+ * Requires the vCPU to be paused already (synchronous events only).
+ */
+#define VM_EVENT_FLAG_SET_REGISTERS      (1 << 8)
 
 /*
  * Reasons for the vm event request

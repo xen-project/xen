@@ -47,4 +47,10 @@ void vm_event_register_write_resume(struct vcpu *v, vm_event_response_t *rsp)
     /* Not supported on ARM. */
 }
 
+static inline
+void vm_event_set_registers(struct vcpu *v, vm_event_response_t *rsp)
+{
+    /* Not supported on ARM. */
+}
+
 #endif /* __ASM_ARM_VM_EVENT_H__ */
