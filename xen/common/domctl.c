@@ -664,7 +664,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             goto maxvcpu_out;
 
         ret = -ENOMEM;
-        online = cpupool_online_cpumask(d->cpupool);
+        online = cpupool_domain_cpumask(d);
         if ( max > d->max_vcpus )
         {
             struct vcpu **vcpus;
@@ -757,7 +757,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( op->cmd == XEN_DOMCTL_setvcpuaffinity )
         {
             cpumask_var_t new_affinity, old_affinity;
-            cpumask_t *online = cpupool_online_cpumask(v->domain->cpupool);;
+            cpumask_t *online = cpupool_domain_cpumask(v->domain);;
 
             /*
              * We want to be able to restore hard affinity if we are trying

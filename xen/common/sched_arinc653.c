@@ -667,7 +667,7 @@ a653sched_pick_cpu(const struct scheduler *ops, struct vcpu *vc)
      * If present, prefer vc's current processor, else
      * just find the first valid vcpu .
      */
-    online = cpupool_scheduler_cpumask(vc->domain->cpupool);
+    online = cpupool_domain_cpumask(vc->domain);
 
     cpu = cpumask_first(online);
 

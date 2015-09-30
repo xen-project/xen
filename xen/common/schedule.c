@@ -79,7 +79,7 @@ static struct scheduler __read_mostly ops;
 
 #define DOM2OP(_d)    (((_d)->cpupool == NULL) ? &ops : ((_d)->cpupool->sched))
 #define VCPU2OP(_v)   (DOM2OP((_v)->domain))
-#define VCPU2ONLINE(_v) cpupool_online_cpumask((_v)->domain->cpupool)
+#define VCPU2ONLINE(_v) cpupool_domain_cpumask((_v)->domain)
 
 static inline void trace_runstate_change(struct vcpu *v, int new_state)
 {

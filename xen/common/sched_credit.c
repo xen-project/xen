@@ -309,7 +309,7 @@ __runq_remove(struct csched_vcpu *svc)
 static inline int __vcpu_has_soft_affinity(const struct vcpu *vc,
                                            const cpumask_t *mask)
 {
-    return !cpumask_subset(cpupool_online_cpumask(vc->domain->cpupool),
+    return !cpumask_subset(cpupool_domain_cpumask(vc->domain),
                            vc->cpu_soft_affinity) &&
            !cpumask_subset(vc->cpu_hard_affinity, vc->cpu_soft_affinity) &&
            cpumask_intersects(vc->cpu_soft_affinity, mask);
@@ -372,9 +372,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
     ASSERT(cur);
     cpumask_clear(&mask);
 
-    /* cpu is vc->processor, so it must be in a cpupool. */
-    ASSERT(per_cpu(cpupool, cpu) != NULL);
-    online = cpupool_online_cpumask(per_cpu(cpupool, cpu));
+    online = cpupool_domain_cpumask(new->sdom->dom);
     cpumask_and(&idle_mask, prv->idlers, online);
     idlers_empty = cpumask_empty(&idle_mask);
 
@@ -642,7 +640,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
     int balance_step;
 
     /* Store in cpus the mask of online cpus on which the domain can run */
-    online = cpupool_scheduler_cpumask(vc->domain->cpupool);
+    online = cpupool_domain_cpumask(vc->domain);
     cpumask_and(&cpus, vc->cpu_hard_affinity, online);
 
     for_each_csched_balance_step( balance_step )

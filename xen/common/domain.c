@@ -191,7 +191,8 @@ struct vcpu *alloc_vcpu(
     /* Must be called after making new vcpu visible to for_each_vcpu(). */
     vcpu_check_shutdown(v);
 
-    domain_update_node_affinity(d);
+    if ( !is_idle_domain(d) )
+        domain_update_node_affinity(d);
 
     return v;
 }
@@ -444,7 +445,7 @@ void domain_update_node_affinity(struct domain *d)
         return;
     }
 
-    online = cpupool_online_cpumask(d->cpupool);
+    online = cpupool_domain_cpumask(d);
 
     spin_lock(&d->node_affinity_lock);
 

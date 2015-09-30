@@ -182,9 +182,17 @@ struct cpupool
     atomic_t         refcnt;
 };
 
-#define cpupool_scheduler_cpumask(_pool) \
-    (((_pool) == NULL) ? &cpupool_free_cpus : (_pool)->cpu_valid)
 #define cpupool_online_cpumask(_pool) \
     (((_pool) == NULL) ? &cpu_online_map : (_pool)->cpu_valid)
+
+static inline cpumask_t* cpupool_domain_cpumask(struct domain *d)
+{
+    /*
+     * d->cpupool is NULL only for the idle domain, and no one should
+     * be interested in calling this for the idle domain.
+     */
+    ASSERT(d->cpupool != NULL);
+    return d->cpupool->cpu_valid;
+}
 
 #endif /* __XEN_SCHED_IF_H__ */

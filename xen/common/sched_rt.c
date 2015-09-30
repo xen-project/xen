@@ -256,7 +256,7 @@ rt_dump_vcpu(const struct scheduler *ops, const struct rt_vcpu *svc)
      */
     mask = _cpumask_scratch[svc->vcpu->processor];
 
-    cpupool_mask = cpupool_scheduler_cpumask(svc->vcpu->domain->cpupool);
+    cpupool_mask = cpupool_domain_cpumask(svc->vcpu->domain);
     cpumask_and(mask, cpupool_mask, svc->vcpu->cpu_hard_affinity);
     cpulist_scnprintf(keyhandler_scratch, sizeof(keyhandler_scratch), mask);
     printk("[%5d.%-2u] cpu %u, (%"PRI_stime", %"PRI_stime"),"
@@ -673,7 +673,7 @@ rt_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
     cpumask_t *online;
     int cpu;
 
-    online = cpupool_scheduler_cpumask(vc->domain->cpupool);
+    online = cpupool_domain_cpumask(vc->domain);
     cpumask_and(&cpus, online, vc->cpu_hard_affinity);
 
     cpu = cpumask_test_cpu(vc->processor, &cpus)
@@ -753,7 +753,7 @@ __runq_pick(const struct scheduler *ops, const cpumask_t *mask)
         iter_svc = __q_elem(iter);
 
         /* mask cpu_hard_affinity & cpupool & mask */
-        online = cpupool_scheduler_cpumask(iter_svc->vcpu->domain->cpupool);
+        online = cpupool_domain_cpumask(iter_svc->vcpu->domain);
         cpumask_and(&cpu_common, online, iter_svc->vcpu->cpu_hard_affinity);
         cpumask_and(&cpu_common, mask, &cpu_common);
         if ( cpumask_empty(&cpu_common) )
@@ -965,7 +965,7 @@ runq_tickle(const struct scheduler *ops, struct rt_vcpu *new)
     if ( new == NULL || is_idle_vcpu(new->vcpu) )
         return;
 
-    online = cpupool_scheduler_cpumask(new->vcpu->domain->cpupool);
+    online = cpupool_domain_cpumask(new->vcpu->domain);
     cpumask_and(&not_tickled, online, new->vcpu->cpu_hard_affinity);
     cpumask_andnot(&not_tickled, &not_tickled, &prv->tickled);
 
@@ -1078,7 +1078,7 @@ rt_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 
     ASSERT(!list_empty(&prv->sdom));
     sdom = list_entry(prv->sdom.next, struct rt_dom, sdom_elem);
-    online = cpupool_scheduler_cpumask(sdom->dom->cpupool);
+    online = cpupool_domain_cpumask(sdom->dom);
     snext = __runq_pick(ops, online); /* pick snext from ALL valid cpus */
 
     runq_tickle(ops, snext);
@@ -1113,7 +1113,7 @@ rt_context_saved(const struct scheduler *ops, struct vcpu *vc)
 
         ASSERT(!list_empty(&prv->sdom));
         sdom = list_entry(prv->sdom.next, struct rt_dom, sdom_elem);
-        online = cpupool_scheduler_cpumask(sdom->dom->cpupool);
+        online = cpupool_domain_cpumask(sdom->dom);
         snext = __runq_pick(ops, online); /* pick snext from ALL cpus */
 
         runq_tickle(ops, snext);
