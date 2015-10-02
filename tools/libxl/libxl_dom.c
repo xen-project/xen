@@ -737,8 +737,8 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
         state->console_mfn = dom->console_pfn;
         state->store_mfn = dom->xenstore_pfn;
     } else {
-        state->console_mfn = xc_dom_p2m_host(dom, dom->console_pfn);
-        state->store_mfn = xc_dom_p2m_host(dom, dom->xenstore_pfn);
+        state->console_mfn = xc_dom_p2m(dom, dom->console_pfn);
+        state->store_mfn = xc_dom_p2m(dom, dom->xenstore_pfn);
     }
 
     libxl__file_reference_unmap(&state->pv_kernel);

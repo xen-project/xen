@@ -53,7 +53,7 @@ static int setup_hypercall_page(struct xc_dom_image *dom)
                   dom->parms.virt_hypercall, pfn);
     domctl.cmd = XEN_DOMCTL_hypercall_init;
     domctl.domain = dom->guest_domid;
-    domctl.u.hypercall_init.gmfn = xc_dom_p2m_guest(dom, pfn);
+    domctl.u.hypercall_init.gmfn = xc_dom_p2m(dom, pfn);
     rc = do_domctl(dom->xch, &domctl);
     if ( rc != 0 )
         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
@@ -83,7 +83,7 @@ static int clear_page(struct xc_dom_image *dom, xen_pfn_t pfn)
     if ( pfn == 0 )
         return 0;
 
-    dst = xc_dom_p2m_host(dom, pfn);
+    dst = xc_dom_p2m(dom, pfn);
     DOMPRINTF("%s: pfn 0x%" PRIpfn ", mfn 0x%" PRIpfn "",
               __FUNCTION__, pfn, dst);
     rc = xc_clear_domain_page(dom->xch, dom->guest_domid, dst);
@@ -177,7 +177,7 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
     }
 
     for ( i = 0; i < count; i++ )
-        entries[i].mfn = xc_dom_p2m_host(dom, pfn + i);
+        entries[i].mfn = xc_dom_p2m(dom, pfn + i);
 
     ptr = xc_map_foreign_ranges(dom->xch, dom->guest_domid,
                 count << page_shift, PROT_READ | PROT_WRITE, 1 << page_shift,
@@ -434,8 +434,8 @@ int xc_dom_gnttab_init(struct xc_dom_image *dom)
                                       dom->console_domid, dom->xenstore_domid);
     } else {
         return xc_dom_gnttab_seed(dom->xch, dom->guest_domid,
-                                  xc_dom_p2m_host(dom, dom->console_pfn),
-                                  xc_dom_p2m_host(dom, dom->xenstore_pfn),
+                                  xc_dom_p2m(dom, dom->console_pfn),
+                                  xc_dom_p2m(dom, dom->xenstore_pfn),
                                   dom->console_domid, dom->xenstore_domid);
     }
 }

@@ -64,8 +64,8 @@ static int xc_linux_build_internal(struct xc_dom_image *dom,
     if ( (rc = xc_dom_gnttab_init(dom)) != 0)
         goto out;
 
-    *console_mfn = xc_dom_p2m_host(dom, dom->console_pfn);
-    *store_mfn = xc_dom_p2m_host(dom, dom->xenstore_pfn);
+    *console_mfn = xc_dom_p2m(dom, dom->console_pfn);
+    *store_mfn = xc_dom_p2m(dom, dom->xenstore_pfn);
 
  out:
     return rc;

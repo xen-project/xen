@@ -358,9 +358,9 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
 #ifdef __x86_64__
                 MMUEXT_PIN_L4_TABLE,
 #endif
-                xc_dom_p2m_host(dom, dom->pgtables_seg.pfn),
+                xc_dom_p2m(dom, dom->pgtables_seg.pfn),
                 dom->guest_domid)) != 0 ) {
-        grub_printf("pin_table(%lx) returned %d\n", xc_dom_p2m_host(dom,
+        grub_printf("pin_table(%lx) returned %d\n", xc_dom_p2m(dom,
                     dom->pgtables_seg.pfn), rc);
         errnum = ERR_BOOT_FAILURE;
         goto out_remap;

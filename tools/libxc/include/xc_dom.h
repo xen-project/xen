@@ -373,19 +373,9 @@ static inline void *xc_dom_vaddr_to_ptr(struct xc_dom_image *dom,
     return ptr + offset;
 }
 
-static inline xen_pfn_t xc_dom_p2m_host(struct xc_dom_image *dom, xen_pfn_t pfn)
+static inline xen_pfn_t xc_dom_p2m(struct xc_dom_image *dom, xen_pfn_t pfn)
 {
-    if (dom->shadow_enabled)
-        return pfn;
-    if (pfn < dom->rambase_pfn || pfn >= dom->rambase_pfn + dom->total_pages)
-        return INVALID_MFN;
-    return dom->p2m_host[pfn - dom->rambase_pfn];
-}
-
-static inline xen_pfn_t xc_dom_p2m_guest(struct xc_dom_image *dom,
-                                         xen_pfn_t pfn)
-{
-    if (xc_dom_feature_translated(dom))
+    if ( dom->shadow_enabled || xc_dom_feature_translated(dom) )
         return pfn;
     if (pfn < dom->rambase_pfn || pfn >= dom->rambase_pfn + dom->total_pages)
         return INVALID_MFN;
