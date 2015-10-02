@@ -38,7 +38,7 @@ find_free_loopback_dev() {
 }
 
 ##
-# check_sharing device mode
+# check_sharing devtype device mode [inode]
 #
 # Check whether the device requested is already in use.  To use the device in
 # read-only mode, it may be in use in read-only mode, but may not be in use in
@@ -47,19 +47,44 @@ find_free_loopback_dev() {
 #
 # Prints one of
 #
-#    'local': the device may not be used because it is mounted in the current
-#             (i.e. the privileged domain) in a way incompatible with the
-#             requested mode;
-#    'guest': the device may not be used because it already mounted by a guest
-#             in a way incompatible with the requested mode; or
-#    'ok':    the device may be used.
+#    'local $d': the device ($d) may not be used because it is mounted in the
+#                current (i.e. the privileged domain) in a way incompatible
+#                with the requested mode;
+#    'guest $d': the device may not be used because it is already mounted
+#                through device $d by a guest in a way incompatible with the
+#                requested mode; or
+#    'ok':       the device may be used.
 #
 check_sharing()
 {
-  local dev="$1"
-  local mode="$2"
+  local devtype=$1
+  local dev="$2"
+  local mode="$3"
+  local devmm=","
 
-  local devmm=$(device_major_minor "$dev")
+  if [ "$devtype" = "file" ];
+  then
+    local inode="$4"
+
+    shared_list=$(losetup -a |
+          sed -n -e "s@^\([^:]\+\)\(:[[:blank:]]\[0*${dev}\]:${inode}[[:blank:]](.*)\)@\1@p" )
+    for dev in $shared_list
+    do
+      if [ -n "$dev" ]
+      then
+        devmm="${devmm}$(device_major_minor $dev),"
+      fi
+    done
+    # if $devmm is unchanged, file being checked is not a shared loopback device
+    if [ "$devmm" = "," ];
+    then
+      echo 'ok'
+      return
+    fi
+  else
+    devmm=${devmm}$(device_major_minor "$dev")","
+  fi
+
   local file
 
   if [ "$mode" = 'w' ]
@@ -75,9 +100,10 @@ check_sharing()
     then
       local d=$(device_major_minor "$file")
 
-      if [ "$d" = "$devmm" ]
+      # checking for $d in $devmm is best through the [[...]] bashism
+      if [[ "$devmm" == *",$d,"* ]]
       then
-        echo 'local'
+        echo "local $d"
         return
       fi
     fi
@@ -90,13 +116,14 @@ check_sharing()
     do
       d=$(xenstore_read_default "$base_path/$dom/$dev/physical-device" "")
 
-      if [ "$d" = "$devmm" ]
+      # checking for $d in $devmm is best through the [[...]] bashism
+      if [ -n "$d" ] && [[ "$devmm" == *",$d,"* ]]
       then
         if [ "$mode" = 'w' ]
         then
           if ! same_vm $dom
           then
-            echo 'guest'
+            echo "guest $d"
             return
           fi
         else
@@ -107,7 +134,7 @@ check_sharing()
           then
             if ! same_vm $dom
             then
-              echo 'guest'
+              echo "guest $d"
               return
             fi
           fi
@@ -129,6 +156,7 @@ check_device_sharing()
 {
   local dev="$1"
   local mode=$(canonicalise_mode "$2")
+  local type="device"
   local result
 
   if [ "x$mode" = 'x!' ]
@@ -136,33 +164,38 @@ check_device_sharing()
     return 0
   fi
 
-  result=$(check_sharing "$dev" "$mode")
+  result=$(check_sharing "$type" "$dev" "$mode")
 
   if [ "$result" != 'ok' ]
   then
-    do_ebusy "Device $dev is mounted " "$mode" "$result"
+    do_ebusy "Device $dev is mounted " "$mode" "${result%% *}"
   fi
 }
 
 
 ##
-# check_device_sharing file dev mode
+# check_device_sharing file dev mode inode
 #
-# Perform the sharing check for the given file mounted through the given
-# loopback interface, in the given mode.
+# Perform the sharing check for the given file, with its corresponding
+# device, inode and mode. As the file can be mounted multiple times,
+# the inode is passed through to check_sharing for all instances to be
+# checked.
 #
 check_file_sharing()
 {
   local file="$1"
   local dev="$2"
   local mode="$3"
+  local inode="$4"
+  local type="file"
+  local result
 
-  result=$(check_sharing "$dev" "$mode")
+  result=$(check_sharing "$type" "$dev" "$mode" "$inode")
 
   if [ "$result" != 'ok' ]
   then
-    do_ebusy "File $file is loopback-mounted through $dev,
-which is mounted " "$mode" "$result"
+    do_ebusy "File $file is loopback-mounted through ${result#* },
+which is mounted " "$mode" "${result%% *}"
   fi
 }
 
@@ -281,15 +314,7 @@ mount it read-write in a guest domain."
             fatal "Unable to lookup $file: dev: $dev inode: $inode"
           fi
 
-          shared_list=$(losetup -a |
-                sed -n -e "s@^\([^:]\+\)\(:[[:blank:]]\[0*${dev}\]:${inode}[[:blank:]](.*)\)@\1@p" )
-          for dev in $shared_list
-          do
-            if [ -n "$dev" ]
-            then
-              check_file_sharing "$file" "$dev" "$mode"
-            fi
-          done
+          check_file_sharing "$file" "$dev" "$mode" "$inode"
         fi
 
         loopdev=$(losetup -f 2>/dev/null || find_free_loopback_dev)
