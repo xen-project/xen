@@ -1609,7 +1609,7 @@ _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
 _hidden int libxl__domain_device_construct_rdm(libxl__gc *gc,
                                    libxl_domain_config *d_config,
                                    uint64_t rdm_mem_guard,
-                                   struct xc_hvm_build_args *args);
+                                   struct xc_dom_image *dom);
 
 /*
  * This function will cause the whole libxl process to hang
@@ -3773,7 +3773,7 @@ int libxl__vnuma_build_vmemrange_hvm(libxl__gc *gc,
                                      uint32_t domid,
                                      libxl_domain_build_info *b_info,
                                      libxl__domain_build_state *state,
-                                     struct xc_hvm_build_args *args);
+                                     struct xc_dom_image *dom);
 bool libxl__vnuma_configured(const libxl_domain_build_info *b_info);
 
 _hidden int libxl__ms_vm_genid_set(libxl__gc *gc, uint32_t domid,

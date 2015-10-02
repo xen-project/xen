@@ -18,6 +18,8 @@
 #include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
+
+#include <xc_dom.h>
 #include <xen/hvm/e820.h>
 
 static const char *libxl_tapif_script(libxl__gc *gc)
@@ -179,7 +181,7 @@ add_rdm_entry(libxl__gc *gc, libxl_domain_config *d_config,
 int libxl__domain_device_construct_rdm(libxl__gc *gc,
                                        libxl_domain_config *d_config,
                                        uint64_t rdm_mem_boundary,
-                                       struct xc_hvm_build_args *args)
+                                       struct xc_dom_image *dom)
 {
     int i, j, conflict, rc;
     struct xen_reserved_device_memory *xrdm = NULL;
@@ -187,7 +189,7 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
     uint16_t seg;
     uint8_t bus, devfn;
     uint64_t rdm_start, rdm_size;
-    uint64_t highmem_end = args->highmem_end ? args->highmem_end : (1ull<<32);
+    uint64_t highmem_end = dom->highmem_end ? dom->highmem_end : (1ull<<32);
 
     /*
      * We just want to construct RDM once since RDM is specific to the
@@ -301,7 +303,7 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
     for (i = 0; i < d_config->num_rdms; i++) {
         rdm_start = d_config->rdms[i].start;
         rdm_size = d_config->rdms[i].size;
-        conflict = overlaps_rdm(0, args->lowmem_end, rdm_start, rdm_size);
+        conflict = overlaps_rdm(0, dom->lowmem_end, rdm_start, rdm_size);
 
         if (!conflict)
             continue;
@@ -312,14 +314,14 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
              * We will move downwards lowmem_end so we have to expand
              * highmem_end.
              */
-            highmem_end += (args->lowmem_end - rdm_start);
+            highmem_end += (dom->lowmem_end - rdm_start);
             /* Now move downwards lowmem_end. */
-            args->lowmem_end = rdm_start;
+            dom->lowmem_end = rdm_start;
         }
     }
 
     /* Sync highmem_end. */
-    args->highmem_end = highmem_end;
+    dom->highmem_end = highmem_end;
 
     /*
      * Finally we can take same policy to check lowmem(< 2G) and
@@ -329,11 +331,11 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
         rdm_start = d_config->rdms[i].start;
         rdm_size = d_config->rdms[i].size;
         /* Does this entry conflict with lowmem? */
-        conflict = overlaps_rdm(0, args->lowmem_end,
+        conflict = overlaps_rdm(0, dom->lowmem_end,
                                 rdm_start, rdm_size);
         /* Does this entry conflict with highmem? */
         conflict |= overlaps_rdm((1ULL<<32),
-                                 args->highmem_end - (1ULL<<32),
+                                 dom->highmem_end - (1ULL<<32),
                                  rdm_start, rdm_size);
 
         if (!conflict)

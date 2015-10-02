@@ -1,6 +1,8 @@
 #include "libxl_internal.h"
 #include "libxl_arch.h"
 
+#include <xc_dom.h>
+
 int libxl__arch_domain_prepare_config(libxl__gc *gc,
                                       libxl_domain_config *d_config,
                                       xc_domain_configuration_t *xc_config)
@@ -471,7 +473,7 @@ int libxl__arch_domain_map_irq(libxl__gc *gc, uint32_t domid, int irq)
 int libxl__arch_domain_construct_memmap(libxl__gc *gc,
                                         libxl_domain_config *d_config,
                                         uint32_t domid,
-                                        struct xc_hvm_build_args *args)
+                                        struct xc_dom_image *dom)
 {
     int rc = 0;
     unsigned int nr = 0, i;
@@ -479,7 +481,7 @@ int libxl__arch_domain_construct_memmap(libxl__gc *gc,
     unsigned int e820_entries = 1;
     struct e820entry *e820 = NULL;
     uint64_t highmem_size =
-                    args->highmem_end ? args->highmem_end - (1ull << 32) : 0;
+                    dom->highmem_end ? dom->highmem_end - (1ull << 32) : 0;
 
     /* Add all rdm entries. */
     for (i = 0; i < d_config->num_rdms; i++)
@@ -501,7 +503,7 @@ int libxl__arch_domain_construct_memmap(libxl__gc *gc,
 
     /* Low memory */
     e820[nr].addr = GUEST_LOW_MEM_START_DEFAULT;
-    e820[nr].size = args->lowmem_end - GUEST_LOW_MEM_START_DEFAULT;
+    e820[nr].size = dom->lowmem_end - GUEST_LOW_MEM_START_DEFAULT;
     e820[nr].type = E820_RAM;
     nr++;
 

@@ -17,6 +17,8 @@
 #include "libxl_arch.h"
 #include <stdlib.h>
 
+#include <xc_dom.h>
+
 bool libxl__vnuma_configured(const libxl_domain_build_info *b_info)
 {
     return b_info->num_vnuma_nodes != 0;
@@ -252,7 +254,7 @@ int libxl__vnuma_build_vmemrange_hvm(libxl__gc *gc,
                                      uint32_t domid,
                                      libxl_domain_build_info *b_info,
                                      libxl__domain_build_state *state,
-                                     struct xc_hvm_build_args *args)
+                                     struct xc_dom_image *dom)
 {
     uint64_t hole_start, hole_end, next;
     int nid, nr_vmemrange;
@@ -264,10 +266,10 @@ int libxl__vnuma_build_vmemrange_hvm(libxl__gc *gc,
      * Guest physical address space layout:
      * [0, hole_start) [hole_start, hole_end) [hole_end, highmem_end)
      */
-    hole_start = args->lowmem_end < args->mmio_start ?
-        args->lowmem_end : args->mmio_start;
-    hole_end = (args->mmio_start + args->mmio_size) > (1ULL << 32) ?
-        (args->mmio_start + args->mmio_size) : (1ULL << 32);
+    hole_start = dom->lowmem_end < dom->mmio_start ?
+        dom->lowmem_end : dom->mmio_start;
+    hole_end = (dom->mmio_start + dom->mmio_size) > (1ULL << 32) ?
+        (dom->mmio_start + dom->mmio_size) : (1ULL << 32);
 
     assert(state->vmemranges == NULL);
 
