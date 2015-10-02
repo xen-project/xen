@@ -1637,6 +1637,7 @@ _hidden const libxl_vnc_info *libxl__dm_vnc(const libxl_domain_config *g_cfg);
 _hidden char *libxl__abs_path(libxl__gc *gc, const char *s, const char *path);
 
 #define LIBXL__LOG_DEBUG   XTL_DEBUG
+#define LIBXL__LOG_VERBOSE XTL_VERBOSE
 #define LIBXL__LOG_INFO    XTL_INFO
 #define LIBXL__LOG_WARNING XTL_WARN
 #define LIBXL__LOG_ERROR   XTL_ERROR
