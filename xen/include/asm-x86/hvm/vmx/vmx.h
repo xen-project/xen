@@ -262,6 +262,7 @@ extern uint8_t posted_intr_vector;
     (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_1GB)
 #define cpu_has_vmx_ept_2mb                     \
     (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_2MB)
+#define cpu_has_vmx_ept_ad (vmx_ept_vpid_cap & VMX_EPT_AD_BIT)
 #define cpu_has_vmx_ept_invept_single_context   \
     (vmx_ept_vpid_cap & VMX_EPT_INVEPT_SINGLE_CONTEXT)
 
