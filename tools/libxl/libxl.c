@@ -420,14 +420,14 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
         if (rc == ERROR_INVAL) {
             /* no such domain, good */
         } else if (rc != 0) {
-            LOG(ERROR, "unexpected error""checking for existing domain");
+            LOG(ERROR, "unexpected error checking for existing domain");
             goto x_rc;
         } else if (domid_e == domid) {
             /* domain already has this name, ok (but we do still
              * need the rest of the code as we may need to check
              * old_name, for example). */
         } else {
-            LOG(ERROR, "domain with name \"%s\""" already exists.", new_name);
+            LOG(ERROR, "domain with name \"%s\" already exists.", new_name);
             rc = ERROR_INVAL;
             goto x_rc;
         }
@@ -437,14 +437,15 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
         got_old_name = xs_read(ctx->xsh, trans, name_path, &got_old_len);
         if (!got_old_name) {
             LOGEV(ERROR, errno,
-                  "check old name"" for domain %"PRIu32" allegedly named `%s'",
+                  "check old name for domain %"PRIu32" allegedly named `%s'",
                   domid,
                   old_name);
             goto x_fail;
         }
         if (strcmp(old_name, got_old_name)) {
             LOG(ERROR,
-                "domain %"PRIu32" allegedly named ""`%s' is actually named `%s' - racing ?",
+                "domain %"PRIu32" allegedly named "
+                "`%s' is actually named `%s' - racing ?",
                 domid,
                 old_name,
                 got_old_name);
@@ -456,7 +457,8 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
     if (!xs_write(ctx->xsh, trans, name_path,
                   new_name, strlen(new_name))) {
         LOG(ERROR,
-            "failed to write new name `%s'"" for domain %"PRIu32" previously named `%s'",
+            "failed to write new name `%s'"
+            " for domain %"PRIu32" previously named `%s'",
             new_name,
             domid,
             old_name);
@@ -489,14 +491,16 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
             trans = our_trans = 0;
             if (errno != EAGAIN) {
                 LOG(ERROR,
-                    "failed to commit new name `%s'"" for domain %"PRIu32" previously named `%s'",
+                    "failed to commit new name `%s'"
+                    " for domain %"PRIu32" previously named `%s'",
                     new_name,
                     domid,
                     old_name);
                 goto x_fail;
             }
             LOG(DEBUG,
-                "need to retry rename transaction"" for domain %"PRIu32" (name_path=\"%s\", new_name=\"%s\")",
+                "need to retry rename transaction"
+                " for domain %"PRIu32" (name_path=\"%s\", new_name=\"%s\")",
                 domid,
                 name_path,
                 new_name);
@@ -4802,7 +4806,8 @@ retry_transaction:
         new_target_memkb = target_memkb - videoram;
     if (new_target_memkb > memorykb) {
         LOG(ERROR,
-            "memory_dynamic_max must be less than or equal to"" memory_static_max\n");
+            "memory_dynamic_max must be less than or equal to"
+            " memory_static_max\n");
         abort_transaction = 1;
         goto out;
     }

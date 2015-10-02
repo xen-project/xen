@@ -409,13 +409,17 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
           if (got == -1) {                                                \
               if (errno == EINTR) continue;                               \
               if (!ctx) { GC_FREE; return errno; }                        \
-              LOGE(ERROR, "failed to "#rw" %s%s%s", what ? what : "", what ? " from " : "", source);       \
+              LOGE(ERROR, "failed to "#rw" %s%s%s",                       \
+                   what ? what : "", what ? " from " : "", source);       \
               GC_FREE;                                                    \
               return errno;                                               \
           }                                                               \
           if (got == 0) {                                                 \
               if (!ctx) { GC_FREE; return  EPROTO; }                      \
-              LOG(ERROR, zero_is_eof ? "file/stream truncated reading %s%s%s" : "file/stream write returned 0! writing %s%s%s", what ? what : "", what ? " from " : "", source);             \
+              LOG(ERROR, zero_is_eof                                      \
+                  ? "file/stream truncated reading %s%s%s"                \
+                  : "file/stream write returned 0! writing %s%s%s",       \
+                  what ? what : "", what ? " from " : "", source);        \
               GC_FREE;                                                    \
               return EPROTO;                                              \
           }                                                               \
