@@ -618,6 +618,7 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
     }
 
     dom->pvh_enabled = state->pvh_enabled;
+    dom->container_type = XC_DOM_PV_CONTAINER;
 
     LOG(DEBUG, "pv kernel mapped %d path %s", state->pv_kernel.mapped, state->pv_kernel.path);
 

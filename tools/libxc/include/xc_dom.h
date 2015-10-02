@@ -177,6 +177,12 @@ struct xc_dom_image {
     struct xc_dom_arch *arch_hooks;
     /* allocate up to virt_alloc_end */
     int (*allocate) (struct xc_dom_image * dom, xen_vaddr_t up_to);
+
+    /* Container type (HVM or PV). */
+    enum {
+        XC_DOM_PV_CONTAINER,
+        XC_DOM_HVM_CONTAINER,
+    } container_type;
 };
 
 /* --- pluggable kernel loader ------------------------------------- */

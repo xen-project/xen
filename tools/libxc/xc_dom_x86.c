@@ -1069,6 +1069,10 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
 
 int xc_dom_feature_translated(struct xc_dom_image *dom)
 {
+    /* Guests running inside HVM containers are always auto-translated. */
+    if ( dom->container_type == XC_DOM_HVM_CONTAINER )
+        return 1;
+
     return elf_xen_feature_get(XENFEAT_auto_translated_physmap, dom->f_active);
 }
 
