@@ -1352,7 +1352,7 @@ static void load_segments(struct vcpu *n)
                 domain_crash(n->domain);
             }
 
-            if ( test_bit(_VGCF_failsafe_disables_events, &n->arch.vgc_flags) )
+            if ( n->arch.vgc_flags & VGCF_failsafe_disables_events )
                 vcpu_info(n, evtchn_upcall_mask) = 1;
 
             regs->entry_vector |= TRAP_syscall;
@@ -1394,7 +1394,7 @@ static void load_segments(struct vcpu *n)
             domain_crash(n->domain);
         }
 
-        if ( test_bit(_VGCF_failsafe_disables_events, &n->arch.vgc_flags) )
+        if ( n->arch.vgc_flags & VGCF_failsafe_disables_events )
             vcpu_info(n, evtchn_upcall_mask) = 1;
 
         regs->entry_vector |= TRAP_syscall;
