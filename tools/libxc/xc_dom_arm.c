@@ -194,38 +194,6 @@ static int vcpu_arm64(struct xc_dom_image *dom, void *ptr)
 
 /* ------------------------------------------------------------------------ */
 
-static struct xc_dom_arch xc_dom_32 = {
-    .guest_type = "xen-3.0-armv7l",
-    .native_protocol = XEN_IO_PROTO_ABI_ARM,
-    .page_shift = PAGE_SHIFT_ARM,
-    .sizeof_pfn = 8,
-    .alloc_magic_pages = alloc_magic_pages,
-    .count_pgtables = count_pgtables_arm,
-    .setup_pgtables = setup_pgtables_arm,
-    .start_info = start_info_arm,
-    .shared_info = shared_info_arm,
-    .vcpu = vcpu_arm32,
-};
-
-static struct xc_dom_arch xc_dom_64 = {
-    .guest_type = "xen-3.0-aarch64",
-    .native_protocol = XEN_IO_PROTO_ABI_ARM,
-    .page_shift = PAGE_SHIFT_ARM,
-    .sizeof_pfn = 8,
-    .alloc_magic_pages = alloc_magic_pages,
-    .count_pgtables = count_pgtables_arm,
-    .setup_pgtables = setup_pgtables_arm,
-    .start_info = start_info_arm,
-    .shared_info = shared_info_arm,
-    .vcpu = vcpu_arm64,
-};
-
-static void __init register_arch_hooks(void)
-{
-    xc_dom_register_arch_hooks(&xc_dom_32);
-    xc_dom_register_arch_hooks(&xc_dom_64);
-}
-
 static int set_mode(xc_interface *xch, domid_t domid, char *guest_type)
 {
     static const struct {
@@ -384,7 +352,7 @@ out:
     return rc < 0 ? rc : 0;
 }
 
-int arch_setup_meminit(struct xc_dom_image *dom)
+static int meminit(struct xc_dom_image *dom)
 {
     int i, rc;
     xen_pfn_t pfn;
@@ -540,6 +508,42 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
 int xc_dom_feature_translated(struct xc_dom_image *dom)
 {
     return 1;
+}
+
+/* ------------------------------------------------------------------------ */
+
+static struct xc_dom_arch xc_dom_32 = {
+    .guest_type = "xen-3.0-armv7l",
+    .native_protocol = XEN_IO_PROTO_ABI_ARM,
+    .page_shift = PAGE_SHIFT_ARM,
+    .sizeof_pfn = 8,
+    .alloc_magic_pages = alloc_magic_pages,
+    .count_pgtables = count_pgtables_arm,
+    .setup_pgtables = setup_pgtables_arm,
+    .start_info = start_info_arm,
+    .shared_info = shared_info_arm,
+    .vcpu = vcpu_arm32,
+    .meminit = meminit,
+};
+
+static struct xc_dom_arch xc_dom_64 = {
+    .guest_type = "xen-3.0-aarch64",
+    .native_protocol = XEN_IO_PROTO_ABI_ARM,
+    .page_shift = PAGE_SHIFT_ARM,
+    .sizeof_pfn = 8,
+    .alloc_magic_pages = alloc_magic_pages,
+    .count_pgtables = count_pgtables_arm,
+    .setup_pgtables = setup_pgtables_arm,
+    .start_info = start_info_arm,
+    .shared_info = shared_info_arm,
+    .vcpu = vcpu_arm64,
+    .meminit = meminit,
+};
+
+static void __init register_arch_hooks(void)
+{
+    xc_dom_register_arch_hooks(&xc_dom_32);
+    xc_dom_register_arch_hooks(&xc_dom_64);
 }
 
 /*

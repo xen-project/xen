@@ -146,7 +146,7 @@ int xc_dom_boot_mem_init(struct xc_dom_image *dom)
 
     DOMPRINTF_CALLED(dom->xch);
 
-    rc = arch_setup_meminit(dom);
+    rc = dom->arch_hooks->meminit(dom);
     if ( rc != 0 )
     {
         xc_dom_panic(dom->xch, XC_OUT_OF_MEMORY,
