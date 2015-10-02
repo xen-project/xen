@@ -79,7 +79,7 @@ do_multicall(
 
         if ( unlikely(__copy_field_to_guest(call_list, &mcs->call, result)) )
             rc = -EFAULT;
-        else if ( test_bit(_MCSF_call_preempted, &mcs->flags) )
+        else if ( mcs->flags & MCSF_call_preempted )
         {
             /* Translate sub-call continuation to guest layout */
             xlat_multicall_entry(mcs);
