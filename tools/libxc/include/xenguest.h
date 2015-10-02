@@ -205,50 +205,6 @@ struct xc_hvm_firmware_module {
     uint64_t  guest_addr_out;
 };
 
-struct xc_hvm_build_args {
-    uint64_t mem_size;           /* Memory size in bytes. */
-    uint64_t mem_target;         /* Memory target in bytes. */
-    uint64_t mmio_size;          /* Size of the MMIO hole in bytes. */
-    const char *image_file_name; /* File name of the image to load. */
-
-    /* Extra ACPI tables passed to HVMLOADER */
-    struct xc_hvm_firmware_module acpi_module;
-
-    /* Extra SMBIOS structures passed to HVMLOADER */
-    struct xc_hvm_firmware_module smbios_module;
-    /* Whether to use claim hypercall (1 - enable, 0 - disable). */
-    int claim_enabled;
-
-    /* vNUMA information*/
-    xen_vmemrange_t *vmemranges;
-    unsigned int nr_vmemranges;
-    unsigned int *vnode_to_pnode;
-    unsigned int nr_vnodes;
-
-    /* Out parameters  */
-    uint64_t lowmem_end;
-    uint64_t highmem_end;
-    uint64_t mmio_start;
-};
-
-/**
- * Build a HVM domain.
- * @parm xch      libxc context handle.
- * @parm domid    domain ID for the new domain.
- * @parm hvm_args parameters for the new domain.
- *
- * The memory size and image file parameters are required, the rest
- * are optional.
- */
-int xc_hvm_build(xc_interface *xch, uint32_t domid,
-                 struct xc_hvm_build_args *hvm_args);
-
-int xc_hvm_build_target_mem(xc_interface *xch,
-                            uint32_t domid,
-                            int memsize,
-                            int target,
-                            const char *image_name);
-
 /*
  * Sets *lockfd to -1.
  * Has deallocated everything even on error.

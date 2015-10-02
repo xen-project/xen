@@ -187,15 +187,6 @@ unsigned long csum_page(void *page)
     return sum ^ (sum>>32);
 }
 
-__attribute__((weak)) 
-    int xc_hvm_build(xc_interface *xch,
-                     uint32_t domid,
-                     struct xc_hvm_build_args *hvm_args)
-{
-    errno = ENOSYS;
-    return -1;
-}
-
 /*
  * Local variables:
  * mode: C

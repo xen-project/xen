@@ -91,9 +91,7 @@ GUEST_SRCS-y                 += xc_dom_compat_linux.c
 
 GUEST_SRCS-$(CONFIG_X86)     += xc_dom_x86.c
 GUEST_SRCS-$(CONFIG_X86)     += xc_cpuid_x86.c
-GUEST_SRCS-$(CONFIG_X86)     += xc_hvm_build_x86.c
 GUEST_SRCS-$(CONFIG_ARM)     += xc_dom_arm.c
-GUEST_SRCS-$(CONFIG_ARM)     += xc_hvm_build_arm.c
 
 ifeq ($(CONFIG_LIBXC_MINIOS),y)
 GUEST_SRCS-y                 += xc_dom_decompress_unsafe.c

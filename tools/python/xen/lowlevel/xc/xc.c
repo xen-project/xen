@@ -906,77 +906,6 @@ static PyObject *pyxc_dom_suppress_spurious_page_faults(XcObject *self,
 }
 #endif /* __i386__ || __x86_64__ */
 
-static PyObject *pyxc_hvm_build(XcObject *self,
-                                PyObject *args,
-                                PyObject *kwds)
-{
-    uint32_t dom;
-    struct hvm_info_table *va_hvm;
-    uint8_t *va_map, sum;
-    int i;
-    char *image;
-    int memsize, target=-1, vcpus = 1, acpi = 0, apic = 1;
-    PyObject *vcpu_avail_handle = NULL;
-    uint8_t vcpu_avail[(HVM_MAX_VCPUS + 7)/8];
-
-    static char *kwd_list[] = { "domid",
-                                "memsize", "image", "target", "vcpus", 
-                                "vcpu_avail", "acpi", "apic", NULL };
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|iiOii", kwd_list,
-                                      &dom, &memsize, &image, &target, &vcpus,
-                                      &vcpu_avail_handle, &acpi, &apic) )
-        return NULL;
-
-    memset(vcpu_avail, 0, sizeof(vcpu_avail));
-    vcpu_avail[0] = 1;
-    if ( vcpu_avail_handle != NULL )
-    {
-        if ( PyInt_Check(vcpu_avail_handle) )
-        {
-            unsigned long v = PyInt_AsLong(vcpu_avail_handle);
-            for ( i = 0; i < sizeof(long); i++ )
-                vcpu_avail[i] = (uint8_t)(v>>(i*8));
-        }
-        else if ( PyLong_Check(vcpu_avail_handle) )
-        {
-            if ( _PyLong_AsByteArray((PyLongObject *)vcpu_avail_handle,
-                                     (unsigned char *)vcpu_avail,
-                                     sizeof(vcpu_avail), 1, 0) )
-                return NULL;
-        }
-        else
-        {
-            errno = EINVAL;
-            PyErr_SetFromErrno(xc_error_obj);
-            return NULL;
-        }
-    }
-
-    if ( target == -1 )
-        target = memsize;
-
-    if ( xc_hvm_build_target_mem(self->xc_handle, dom, memsize,
-                                 target, image) != 0 )
-        return pyxc_error_to_exception(self->xc_handle);
-
-    /* Fix up the HVM info table. */
-    va_map = xc_map_foreign_range(self->xc_handle, dom, XC_PAGE_SIZE,
-                                  PROT_READ | PROT_WRITE,
-                                  HVM_INFO_PFN);
-    if ( va_map == NULL )
-        return PyErr_SetFromErrno(xc_error_obj);
-    va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
-    va_hvm->apic_mode    = apic;
-    va_hvm->nr_vcpus     = vcpus;
-    memcpy(va_hvm->vcpu_online, vcpu_avail, sizeof(vcpu_avail));
-    for ( i = 0, sum = 0; i < va_hvm->length; i++ )
-        sum += ((uint8_t *)va_hvm)[i];
-    va_hvm->checksum -= sum;
-    munmap(va_map, XC_PAGE_SIZE);
-
-    return Py_BuildValue("{}");
-}
-
 static PyObject *pyxc_gnttab_hvm_seed(XcObject *self,
 				      PyObject *args,
 				      PyObject *kwds)
@@ -2361,16 +2290,6 @@ static PyMethodDef pyxc_methods[] = {
       "Get the bitsize of a guest OS.\n"
       " image   [str]:      Name of kernel image file. May be gzipped.\n"
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"},
-
-    { "hvm_build", 
-      (PyCFunction)pyxc_hvm_build, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Build a new HVM guest OS.\n"
-      " dom     [int]:      Identifier of domain to build into.\n"
-      " image   [str]:      Name of HVM loader image file.\n"
-      " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
-      " vcpu_avail [long, 1]: Which Virtual CPUS available.\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "gnttab_hvm_seed",
       (PyCFunction)pyxc_gnttab_hvm_seed,
