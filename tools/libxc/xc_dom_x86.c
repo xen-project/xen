@@ -584,10 +584,12 @@ static int shared_info_x86_64(struct xc_dom_image *dom, void *ptr)
 
 /* ------------------------------------------------------------------------ */
 
-static int vcpu_x86_32(struct xc_dom_image *dom, void *ptr)
+static int vcpu_x86_32(struct xc_dom_image *dom)
 {
-    vcpu_guest_context_x86_32_t *ctxt = ptr;
+    vcpu_guest_context_any_t any_ctx;
+    vcpu_guest_context_x86_32_t *ctxt = &any_ctx.x32;
     xen_pfn_t cr3_pfn;
+    int rc;
 
     DOMPRINTF_CALLED(dom->xch);
 
@@ -611,26 +613,33 @@ static int vcpu_x86_32(struct xc_dom_image *dom, void *ptr)
     DOMPRINTF("%s: cr3: pfn 0x%" PRIpfn " mfn 0x%" PRIpfn "",
               __FUNCTION__, dom->pgtables_seg.pfn, cr3_pfn);
 
-    if ( dom->pvh_enabled )
-        return 0;
+    if ( !dom->pvh_enabled )
+    {
+        ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_32;
+        ctxt->user_regs.es = FLAT_KERNEL_DS_X86_32;
+        ctxt->user_regs.fs = FLAT_KERNEL_DS_X86_32;
+        ctxt->user_regs.gs = FLAT_KERNEL_DS_X86_32;
+        ctxt->user_regs.ss = FLAT_KERNEL_SS_X86_32;
+        ctxt->user_regs.cs = FLAT_KERNEL_CS_X86_32;
 
-    ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_32;
-    ctxt->user_regs.es = FLAT_KERNEL_DS_X86_32;
-    ctxt->user_regs.fs = FLAT_KERNEL_DS_X86_32;
-    ctxt->user_regs.gs = FLAT_KERNEL_DS_X86_32;
-    ctxt->user_regs.ss = FLAT_KERNEL_SS_X86_32;
-    ctxt->user_regs.cs = FLAT_KERNEL_CS_X86_32;
+        ctxt->kernel_ss = ctxt->user_regs.ss;
+        ctxt->kernel_sp = ctxt->user_regs.esp;
+    }
 
-    ctxt->kernel_ss = ctxt->user_regs.ss;
-    ctxt->kernel_sp = ctxt->user_regs.esp;
+    rc = xc_vcpu_setcontext(dom->xch, dom->guest_domid, 0, &any_ctx);
+    if ( rc != 0 )
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "%s: SETVCPUCONTEXT failed (rc=%d)", __func__, rc);
 
-    return 0;
+    return rc;
 }
 
-static int vcpu_x86_64(struct xc_dom_image *dom, void *ptr)
+static int vcpu_x86_64(struct xc_dom_image *dom)
 {
-    vcpu_guest_context_x86_64_t *ctxt = ptr;
+    vcpu_guest_context_any_t any_ctx;
+    vcpu_guest_context_x86_64_t *ctxt = &any_ctx.x64;
     xen_pfn_t cr3_pfn;
+    int rc;
 
     DOMPRINTF_CALLED(dom->xch);
 
@@ -663,7 +672,12 @@ static int vcpu_x86_64(struct xc_dom_image *dom, void *ptr)
     ctxt->kernel_ss = ctxt->user_regs.ss;
     ctxt->kernel_sp = ctxt->user_regs.esp;
 
-    return 0;
+    rc = xc_vcpu_setcontext(dom->xch, dom->guest_domid, 0, &any_ctx);
+    if ( rc != 0 )
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "%s: SETVCPUCONTEXT failed (rc=%d)", __func__, rc);
+
+    return rc;
 }
 
 /* ------------------------------------------------------------------------ */

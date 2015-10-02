@@ -219,7 +219,7 @@ struct xc_dom_arch {
     /* arch-specific data structs setup */
     int (*start_info) (struct xc_dom_image * dom);
     int (*shared_info) (struct xc_dom_image * dom, void *shared_info);
-    int (*vcpu) (struct xc_dom_image * dom, void *vcpu_ctxt);
+    int (*vcpu) (struct xc_dom_image * dom);
     int (*bootearly) (struct xc_dom_image * dom);
     int (*bootlate) (struct xc_dom_image * dom);
 
