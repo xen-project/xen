@@ -61,7 +61,6 @@ static int libxl__create_qemu_logfile(libxl__gc *gc, char *name)
 const char *libxl__domain_device_model(libxl__gc *gc,
                                        const libxl_domain_build_info *info)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     const char *dm;
 
     if (libxl_defbool_val(info->device_model_stubdomain))
@@ -78,9 +77,8 @@ const char *libxl__domain_device_model(libxl__gc *gc,
             dm = qemu_xen_path(gc);
             break;
         default:
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "invalid device model version %d",
-                       info->device_model_version);
+            LOG(ERROR, "invalid device model version %d",
+                info->device_model_version);
             dm = NULL;
             break;
         }
@@ -666,20 +664,18 @@ static char *dm_spice_options(libxl__gc *gc,
     char *opt;
 
     if (!spice->port && !spice->tls_port) {
-        LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
-                   "at least one of the spiceport or tls_port must be provided");
+        LOG(ERROR,
+            "at least one of the spiceport or tls_port must be provided");
         return NULL;
     }
 
     if (!libxl_defbool_val(spice->disable_ticketing)) {
         if (!spice->passwd) {
-            LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
-                       "spice ticketing is enabled but missing password");
+            LOG(ERROR, "spice ticketing is enabled but missing password");
             return NULL;
         }
         else if (!spice->passwd[0]) {
-            LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
-                               "spice password can't be empty");
+            LOG(ERROR, "spice password can't be empty");
             return NULL;
         }
     }
@@ -731,7 +727,6 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                                         const libxl__domain_build_state *state,
                                         int *dm_state_fd)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     const libxl_domain_create_info *c_info = &guest_config->c_info;
     const libxl_domain_build_info *b_info = &guest_config->b_info;
     const libxl_device_disk *disks = guest_config->disks;
@@ -1140,8 +1135,8 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             const char *pdev_path;
 
             if (dev_number == -1) {
-                LIBXL__LOG(ctx, LIBXL__LOG_WARNING, "unable to determine"
-                           " disk number for %s", disks[i].vdev);
+                LOG(WARN, "unable to determine"" disk number for %s",
+                    disks[i].vdev);
                 continue;
             }
 
@@ -1156,19 +1151,21 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                          disks[i].pdev_path, disk, disks[i].readwrite ? "off" : "on", format, dev_number);
             } else {
                 if (!disks[i].readwrite) {
-                    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "qemu-xen doesn't support read-only disk drivers");
+                    LOG(ERROR,
+                        "qemu-xen doesn't support read-only disk drivers");
                     return ERROR_INVAL;
                 }
 
                 if (disks[i].format == LIBXL_DISK_FORMAT_EMPTY) {
-                    LIBXL__LOG(ctx, LIBXL__LOG_WARNING, "cannot support"
-                               " empty disk format for %s", disks[i].vdev);
+                    LOG(WARN, "cannot support"" empty disk format for %s",
+                        disks[i].vdev);
                     continue;
                 }
 
                 if (format == NULL) {
-                    LIBXL__LOG(ctx, LIBXL__LOG_WARNING, "unable to determine"
-                               " disk image format %s", disks[i].vdev);
+                    LOG(WARN,
+                        "unable to determine"" disk image format %s",
+                        disks[i].vdev);
                     continue;
                 }
 
@@ -1235,8 +1232,6 @@ static int libxl__build_device_model_args(libxl__gc *gc,
 /* dm_state_fd may be NULL iff caller knows we are using old stubdom
  * and therefore will be passing a filename rather than a fd. */
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-
     switch (guest_config->b_info.device_model_version) {
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
         return libxl__build_device_model_args_old(gc, dm,
@@ -1251,8 +1246,8 @@ static int libxl__build_device_model_args(libxl__gc *gc,
                                                   args, envs,
                                                   state, dm_state_fd);
     default:
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unknown device model version %d",
-                         guest_config->b_info.device_model_version);
+        LOGE(ERROR, "unknown device model version %d",
+             guest_config->b_info.device_model_version);
         return ERROR_INVAL;
     }
 }
@@ -1479,9 +1474,7 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
                    "%d", guest_domid);
     ret = xc_domain_set_target(ctx->xch, dm_domid, guest_domid);
     if (ret<0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                         "setting target domain %d -> %d",
-                         dm_domid, guest_domid);
+        LOGE(ERROR, "setting target domain %d -> %d", dm_domid, guest_domid);
         ret = ERROR_FAIL;
         goto out;
     }
@@ -1740,8 +1733,7 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
         goto out;
     }
     if (access(dm, X_OK) < 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                         "device model %s is not executable", dm);
+        LOGE(ERROR, "device model %s is not executable", dm);
         rc = ERROR_FAIL;
         goto out;
     }
@@ -1813,9 +1805,9 @@ retry_transaction:
         }
     }
 
-    LIBXL__LOG(CTX, XTL_DEBUG, "Spawning device-model %s with arguments:", dm);
+    LOG(DEBUG, "Spawning device-model %s with arguments:", dm);
     for (arg = args; *arg; arg++)
-        LIBXL__LOG(CTX, XTL_DEBUG, "  %s", *arg);
+        LOG(DEBUG, "  %s", *arg);
     if (*envs) {
         LOG(DEBUG, "Spawning device-model %s with additional environment:", dm);
         for (arg = envs; *arg; arg += 2)

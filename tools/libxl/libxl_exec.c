@@ -168,7 +168,6 @@ int libxl__xenstore_child_wait_deprecated(libxl__gc *gc,
                                                        void *userdata),
                                  void *check_callback_userdata)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *p;
     unsigned int len;
     int rc = 0;
@@ -181,7 +180,7 @@ int libxl__xenstore_child_wait_deprecated(libxl__gc *gc,
 
     xsh = xs_daemon_open();
     if (xsh == NULL) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Unable to open xenstore connection");
+        LOG(ERROR, "Unable to open xenstore connection");
         goto err;
     }
 
@@ -224,7 +223,7 @@ again:
             }
         }
     }
-    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "%s not ready", what);
+    LOG(ERROR, "%s not ready", what);
 
     xs_unwatch(xsh, path, path);
     xs_daemon_close(xsh);

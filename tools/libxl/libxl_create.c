@@ -102,7 +102,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
                     b_info->device_model_version =
                         LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
                 } else {
-                    LIBXL__LOG_ERRNO(CTX, XTL_ERROR, "qemu-xen access error");
+                    LOGE(ERROR, "qemu-xen access error");
                     return ERROR_FAIL;
                 }
             }
@@ -148,7 +148,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         b_info->device_model_version !=
             LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL &&
         libxl_defbool_val(b_info->device_model_stubdomain)) {
-        LIBXL__LOG(CTX, XTL_ERROR,
+        LOG(ERROR,
             "device model stubdomains require \"qemu-xen-traditional\"");
         return ERROR_INVAL;
     }
@@ -374,9 +374,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         }
         break;
     default:
-        LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
-                   "invalid domain type %s in create info",
-                   libxl_domain_type_to_string(b_info->type));
+        LOG(ERROR, "invalid domain type %s in create info",
+            libxl_domain_type_to_string(b_info->type));
         return ERROR_INVAL;
     }
     return 0;
@@ -522,7 +521,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
     ret = libxl__arch_domain_prepare_config(gc, d_config, xc_config);
     if (ret < 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "fail to get domain config");
+        LOGE(ERROR, "fail to get domain config");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -533,8 +532,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
                                       handle, flags, domid,
                                       xc_config);
         if (ret < 0) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                             "domain creation fail");
+            LOGE(ERROR, "domain creation fail");
             rc = ERROR_FAIL;
             goto out;
         }
@@ -546,7 +544,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
     ret = xc_cpupool_movedomain(ctx->xch, info->poolid, *domid);
     if (ret < 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "domain move fail");
+        LOGE(ERROR, "domain move fail");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -559,7 +557,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
     vm_path = libxl__sprintf(gc, "/vm/%s", uuid_string);
     if (!vm_path) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot allocate create paths");
+        LOG(ERROR, "cannot allocate create paths");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -661,8 +659,7 @@ retry_transaction:
             t = 0;
             goto retry_transaction;
         }
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "domain creation "
-                         "xenstore transaction commit failed");
+        LOGE(ERROR, "domain creation ""xenstore transaction commit failed");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -878,7 +875,7 @@ static void initiate_domain_create(libxl__egc *egc,
 
     ret = libxl__domain_make(gc, d_config, &domid, &state->config);
     if (ret) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot make domain: %d", ret);
+        LOG(ERROR, "cannot make domain: %d", ret);
         dcs->guest_domid = domid;
         ret = ERROR_FAIL;
         goto error_out;
@@ -1141,10 +1138,9 @@ static void domcreate_rebuild_done(libxl__egc *egc,
     /* convenience aliases */
     const uint32_t domid = dcs->guest_domid;
     libxl_domain_config *const d_config = dcs->guest_config;
-    libxl_ctx *const ctx = CTX;
 
     if (ret) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot (re-)build domain: %d", ret);
+        LOG(ERROR, "cannot (re-)build domain: %d", ret);
         ret = ERROR_FAIL;
         goto error_out;
     }
@@ -1335,15 +1331,13 @@ static void domcreate_devmodel_started(libxl__egc *egc,
 {
     libxl__domain_create_state *dcs = CONTAINER_OF(dmss, *dcs, dmss.dm);
     STATE_AO_GC(dmss->spawn.ao);
-    libxl_ctx *ctx = CTX;
     int domid = dcs->guest_domid;
 
     /* convenience aliases */
     libxl_domain_config *const d_config = dcs->guest_config;
 
     if (ret) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                   "device model did not start: %d", ret);
+        LOG(ERROR, "device model did not start: %d", ret);
         goto error_out;
     }
 
@@ -1411,7 +1405,6 @@ static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *multidev,
     libxl__domain_create_state *dcs = CONTAINER_OF(multidev, *dcs, multidev);
     STATE_AO_GC(dcs->ao);
     int i;
-    libxl_ctx *ctx = CTX;
     int domid = dcs->guest_domid;
 
     /* convenience aliases */
@@ -1425,8 +1418,7 @@ static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *multidev,
     for (i = 0; i < d_config->num_pcidevs; i++) {
         ret = libxl__device_pci_add(gc, domid, &d_config->pcidevs[i], 1);
         if (ret < 0) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "libxl_device_pci_add failed: %d", ret);
+            LOG(ERROR, "libxl_device_pci_add failed: %d", ret);
             goto error_out;
         }
     }
@@ -1435,8 +1427,7 @@ static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *multidev,
         ret = libxl__create_pci_backend(gc, domid, d_config->pcidevs,
             d_config->num_pcidevs);
         if (ret < 0) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                "libxl_create_pci_backend failed: %d", ret);
+            LOG(ERROR, "libxl_create_pci_backend failed: %d", ret);
             goto error_out;
         }
     }

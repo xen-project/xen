@@ -336,27 +336,28 @@ _hidden int libxl__mac_is_default(libxl_mac *mac)
 
 _hidden int libxl__init_recursive_mutex(libxl_ctx *ctx, pthread_mutex_t *lock)
 {
+    GC_INIT(ctx);
     pthread_mutexattr_t attr;
     int rc = 0;
 
     if (pthread_mutexattr_init(&attr) != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                         "Failed to init mutex attributes");
-        return ERROR_FAIL;
+        LOGE(ERROR, "Failed to init mutex attributes");
+        rc = ERROR_FAIL;
+        goto out;
     }
     if (pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE) != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                         "Failed to set mutex attributes");
+        LOGE(ERROR, "Failed to set mutex attributes");
         rc = ERROR_FAIL;
         goto out;
     }
     if (pthread_mutex_init(lock, &attr) != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Failed to init mutex");
+        LOGE(ERROR, "Failed to init mutex");
         rc = ERROR_FAIL;
         goto out;
     }
 out:
     pthread_mutexattr_destroy(&attr);
+    GC_FREE;
     return rc;
 }
 
@@ -374,9 +375,7 @@ int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid)
     }
 
     if (libxl_device_model_version_from_string(dm_version, &value) < 0) {
-        libxl_ctx *ctx = libxl__gc_owner(gc);
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                   "fatal: %s contain a wrong value (%s)", path, dm_version);
+        LOG(ERROR, "fatal: %s contain a wrong value (%s)", path, dm_version);
         return -1;
     }
     return value;

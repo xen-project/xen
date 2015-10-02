@@ -216,8 +216,8 @@ static int hvm_set_viridian_features(libxl__gc *gc, uint32_t domid,
 
     libxl_for_each_set_bit(v, info->u.hvm.viridian_enable) {
         if (libxl_bitmap_test(&info->u.hvm.viridian_disable, v)) {
-            LIBXL__LOG(CTX, LIBXL__LOG_ERROR, "%s group both enabled and disabled",
-                       libxl_viridian_enlightenment_to_string(v));
+            LOG(ERROR, "%s group both enabled and disabled",
+                libxl_viridian_enlightenment_to_string(v));
             goto err;
         }
         if (libxl_viridian_enlightenment_to_string(v)) /* check validity */
@@ -231,7 +231,7 @@ static int hvm_set_viridian_features(libxl__gc *gc, uint32_t domid,
     /* The base set is a pre-requisite for all others */
     if (!libxl_bitmap_is_empty(&enlightenments) &&
         !libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_BASE)) {
-        LIBXL__LOG(CTX, LIBXL__LOG_ERROR, "base group not enabled");
+        LOG(ERROR, "base group not enabled");
         goto err;
     }
 
@@ -256,9 +256,7 @@ static int hvm_set_viridian_features(libxl__gc *gc, uint32_t domid,
                          domid,
                          HVM_PARAM_VIRIDIAN,
                          mask) != 0) {
-        LIBXL__LOG_ERRNO(CTX, LIBXL__LOG_ERROR,
-                         "Couldn't set viridian feature mask (0x%"PRIx64")",
-                         mask);
+        LOGE(ERROR, "Couldn't set viridian feature mask (0x%"PRIx64")", mask);
         goto err;
     }
 
@@ -404,7 +402,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
 
     if (xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb +
         LIBXL_MAXMEM_CONSTANT) < 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't set max memory");
+        LOGE(ERROR, "Couldn't set max memory");
         return ERROR_FAIL;
     }
 
@@ -1992,8 +1990,7 @@ err:
     }
 
     if (rc)
-        LIBXL__LOG_ERRNO(CTX, LIBXL__LOG_ERROR, "cannot write/rename %s for %s",
-                 newfilename, filename);
+        LOGE(ERROR, "cannot write/rename %s for %s", newfilename, filename);
 out:
     return rc;
 }
@@ -2045,7 +2042,7 @@ int libxl__userdata_retrieve(libxl__gc *gc, uint32_t domid,
         goto out;
     }
     if (!e && !datalen) {
-        LIBXL__LOG(CTX, LIBXL__LOG_ERROR, "userdata file %s is empty", filename);
+        LOG(ERROR, "userdata file %s is empty", filename);
         if (data_r) assert(!*data_r);
         rc = ERROR_FAIL;
         goto out;

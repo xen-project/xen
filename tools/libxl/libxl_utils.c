@@ -402,28 +402,27 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
                            constdata void *data, ssize_t sz,              \
                            const char *source, const char *what) {        \
       ssize_t got;                                                        \
+      GC_INIT(ctx);                                                       \
                                                                           \
       while (sz > 0) {                                                    \
           got = rw(fd, data, sz);                                         \
           if (got == -1) {                                                \
               if (errno == EINTR) continue;                               \
-              if (!ctx) return errno;                                     \
-              LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to " #rw " %s%s%s", \
-                           what?what:"", what?" from ":"", source);       \
+              if (!ctx) { GC_FREE; return errno; }                        \
+              LOGE(ERROR, "failed to "#rw" %s%s%s", what ? what : "", what ? " from " : "", source);       \
+              GC_FREE;                                                    \
               return errno;                                               \
           }                                                               \
           if (got == 0) {                                                 \
-              if (!ctx) return EPROTO;                                    \
-              LIBXL__LOG(ctx, LIBXL__LOG_ERROR,                                   \
-                     zero_is_eof                                          \
-                     ? "file/stream truncated reading %s%s%s"             \
-                     : "file/stream write returned 0! writing %s%s%s",    \
-                     what?what:"", what?" from ":"", source);             \
+              if (!ctx) { GC_FREE; return  EPROTO; }                      \
+              LOG(ERROR, zero_is_eof ? "file/stream truncated reading %s%s%s" : "file/stream write returned 0! writing %s%s%s", what ? what : "", what ? " from " : "", source);             \
+              GC_FREE;                                                    \
               return EPROTO;                                              \
           }                                                               \
           sz -= got;                                                      \
           data = (char*)data + got;                                       \
       }                                                                   \
+      GC_FREE;                                                            \
       return 0;                                                           \
   }
 
