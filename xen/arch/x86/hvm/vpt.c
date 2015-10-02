@@ -178,7 +178,7 @@ void pt_save_timer(struct vcpu *v)
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
     struct periodic_time *pt;
 
-    if ( test_bit(_VPF_blocked, &v->pause_flags) )
+    if ( v->pause_flags & VPF_blocked )
         return;
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);

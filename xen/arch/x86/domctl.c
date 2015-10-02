@@ -1213,7 +1213,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     c(flags = v->arch.vgc_flags & ~(VGCF_i387_valid|VGCF_in_kernel));
     if ( v->fpu_initialised )
         c(flags |= VGCF_i387_valid);
-    if ( !test_bit(_VPF_down, &v->pause_flags) )
+    if ( !(v->pause_flags & VPF_down) )
         c(flags |= VGCF_online);
     if ( !compat )
     {

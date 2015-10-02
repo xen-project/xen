@@ -1728,7 +1728,7 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     {
         /* We don't need to save state for a vcpu that is down; the restore 
          * code will leave it down if there is nothing saved. */
-        if ( test_bit(_VPF_down, &v->pause_flags) ) 
+        if ( v->pause_flags & VPF_down )
             continue;
 
         /* Architecture-specific vmcs/vmcb bits */
@@ -2512,7 +2512,7 @@ void hvm_vcpu_down(struct vcpu *v)
     /* Any other VCPUs online? ... */
     domain_lock(d);
     for_each_vcpu ( d, v )
-        if ( !test_bit(_VPF_down, &v->pause_flags) )
+        if ( !(v->pause_flags & VPF_down) )
             online_count++;
     domain_unlock(d);
 

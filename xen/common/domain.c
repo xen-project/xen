@@ -1135,7 +1135,7 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
         return -EINVAL;
 
     /* Run this command on yourself or on other offline VCPUS. */
-    if ( (v != current) && !test_bit(_VPF_down, &v->pause_flags) )
+    if ( (v != current) && !(v->pause_flags & VPF_down) )
         return -EINVAL;
 
     page = get_page_from_gfn(d, gfn, NULL, P2M_ALLOC);
@@ -1263,7 +1263,7 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
 
     case VCPUOP_is_up:
-        rc = !test_bit(_VPF_down, &v->pause_flags);
+        rc = !(v->pause_flags & VPF_down);
         break;
 
     case VCPUOP_get_runstate_info:
