@@ -931,7 +931,7 @@ rt_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
     else if ( __vcpu_on_q(svc) )
         __q_remove(svc);
-    else if ( test_bit(__RTDS_delayed_runq_add, &svc->flags) )
+    else if ( svc->flags & RTDS_delayed_runq_add )
         clear_bit(__RTDS_delayed_runq_add, &svc->flags);
 }
 
@@ -1064,7 +1064,7 @@ rt_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
      * the Runqueue/DepletedQ. Instead, we set a flag so that it will be
      * put on the Runqueue/DepletedQ after the context has been saved.
      */
-    if ( unlikely(test_bit(__RTDS_scheduled, &svc->flags)) )
+    if ( unlikely(svc->flags & RTDS_scheduled) )
     {
         set_bit(__RTDS_delayed_runq_add, &svc->flags);
         return;
