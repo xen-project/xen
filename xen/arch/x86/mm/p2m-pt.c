@@ -673,17 +673,13 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             if ( iommu_old_flags )
                 amd_iommu_flush_pages(p2m->domain, gfn, page_order);
         }
+        else if ( iommu_pte_flags )
+            for ( i = 0; i < (1UL << page_order); i++ )
+                iommu_map_page(p2m->domain, gfn + i, mfn_x(mfn) + i,
+                               iommu_pte_flags);
         else
-        {
-            unsigned int flags = p2m_get_iommu_flags(p2mt);
-
-            if ( flags != 0 )
-                for ( i = 0; i < (1UL << page_order); i++ )
-                    iommu_map_page(p2m->domain, gfn+i, mfn_x(mfn)+i, flags);
-            else
-                for ( int i = 0; i < (1UL << page_order); i++ )
-                    iommu_unmap_page(p2m->domain, gfn+i);
-        }
+            for ( i = 0; i < (1UL << page_order); i++ )
+                iommu_unmap_page(p2m->domain, gfn + i);
     }
 
     /*
