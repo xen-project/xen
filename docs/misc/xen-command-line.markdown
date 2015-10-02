@@ -705,19 +705,28 @@ virtualization, to allow the L1 hypervisor to use EPT even if the L0 hypervisor
 does not provide VM\_ENTRY\_LOAD\_GUEST\_PAT.
 
 ### ept (Intel)
-> `= List of ( pml<boolean> )`
+> `= List of ( {no-}pml | {no-}ad )`
+
+Controls EPT related features.
+
+> Sub-options:
+
+> `pml`
 
 > Default: `false`
 
-Controls EPT related features. Currently only Page Modification Logging (PML) is
-the controllable feature as boolean type.
+>> PML is a new hardware feature in Intel's Broadwell Server and further
+>> platforms which reduces hypervisor overhead of log-dirty mechanism by
+>> automatically recording GPAs (guest physical addresses) when guest memory
+>> gets dirty, and therefore significantly reducing number of EPT violation
+>> caused by write protection of guest memory, which is a necessity to
+>> implement log-dirty mechanism before PML.
 
-PML is a new hardware feature in Intel's Broadwell Server and further platforms
-which reduces hypervisor overhead of log-dirty mechanism by automatically
-recording GPAs (guest physical addresses) when guest memory gets dirty, and
-therefore significantly reducing number of EPT violation caused by write
-protection of guest memory, which is a necessity to implement log-dirty
-mechanism before PML.
+> `ad`
+
+> Default: Hardware dependent
+
+>> Have hardware keep accessed/dirty (A/D) bits updated.
 
 ### gdb
 > `= <baud>[/<clock_hz>][,DPS[,<io-base>[,<irq>[,<port-bdf>[,<bridge-bdf>]]]] | pci | amt ] `

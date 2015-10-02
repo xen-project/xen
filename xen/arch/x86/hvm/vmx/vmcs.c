@@ -64,12 +64,14 @@ static unsigned int __read_mostly ple_window = 4096;
 integer_param("ple_window", ple_window);
 
 static bool_t __read_mostly opt_pml_enabled = 0;
+static s8 __read_mostly opt_ept_ad = -1;
 
 /*
  * The 'ept' parameter controls functionalities that depend on, or impact the
  * EPT mechanism. Optional comma separated value may contain:
  *
  *  pml                 Enable PML
+ *  ad                  Use A/D bits
  */
 static void __init parse_ept_param(char *s)
 {
@@ -87,6 +89,8 @@ static void __init parse_ept_param(char *s)
 
         if ( !strcmp(s, "pml") )
             opt_pml_enabled = val;
+        else if ( !strcmp(s, "ad") )
+            opt_ept_ad = val;
 
         s = ss + 1;
     } while ( ss );
@@ -267,6 +271,13 @@ static int vmx_init_vmcs_config(void)
                                         SECONDARY_EXEC_ENABLE_VPID) )
     {
         rdmsrl(MSR_IA32_VMX_EPT_VPID_CAP, _vmx_ept_vpid_cap);
+
+        if ( !opt_ept_ad )
+            _vmx_ept_vpid_cap &= ~VMX_EPT_AD_BIT;
+        else if ( /* Work around Erratum AVR41 on Avoton processors. */
+                  boot_cpu_data.x86 == 6 && boot_cpu_data.x86_model == 0x4d &&
+                  opt_ept_ad < 0 )
+            _vmx_ept_vpid_cap &= ~VMX_EPT_AD_BIT;
 
         /*
          * Additional sanity checking before using EPT:
