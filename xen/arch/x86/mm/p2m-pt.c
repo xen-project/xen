@@ -494,7 +494,18 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     l3_pgentry_t l3e_content;
     int rc;
     unsigned int iommu_pte_flags = p2m_get_iommu_flags(p2mt);
-    unsigned long old_mfn = 0;
+    /*
+     * old_mfn and iommu_old_flags control possible flush/update needs on the
+     * IOMMU: We need to flush when MFN or flags (i.e. permissions) change.
+     * iommu_old_flags being initialized to zero covers the case of the entry
+     * getting replaced being a non-present (leaf or intermediate) one. For
+     * present leaf entries the real value will get calculated below, while
+     * for present intermediate entries ~0 (guaranteed != iommu_pte_flags)
+     * will be used (to cover all cases of what the leaf entries underneath
+     * the intermediate one might be).
+     */
+    unsigned int flags, iommu_old_flags = 0;
+    unsigned long old_mfn = INVALID_MFN;
 
     ASSERT(sve != 0);
 
@@ -543,12 +554,20 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
                                    L3_PAGETABLE_SHIFT - PAGE_SHIFT,
                                    L3_PAGETABLE_ENTRIES);
         ASSERT(p2m_entry);
-        if ( (l1e_get_flags(*p2m_entry) & _PAGE_PRESENT) &&
-             !(l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
+        flags = l1e_get_flags(*p2m_entry);
+        if ( flags & _PAGE_PRESENT )
         {
-            /* We're replacing a non-SP page with a superpage.  Make sure to
-             * handle freeing the table properly. */
-            intermediate_entry = *p2m_entry;
+            if ( flags & _PAGE_PSE )
+            {
+                iommu_old_flags =
+                    p2m_get_iommu_flags(p2m_flags_to_type(flags));
+                old_mfn = l1e_get_pfn(*p2m_entry);
+            }
+            else
+            {
+                iommu_old_flags = ~0;
+                intermediate_entry = *p2m_entry;
+            }
         }
 
         ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
@@ -559,10 +578,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         entry_content.l1 = l3e_content.l3;
 
         if ( entry_content.l1 != 0 )
-        {
             p2m_add_iommu_flags(&entry_content, 0, iommu_pte_flags);
-            old_mfn = l1e_get_pfn(*p2m_entry);
-        }
 
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, entry_content, 3);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
@@ -587,7 +603,10 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
                                    0, L1_PAGETABLE_ENTRIES);
         ASSERT(p2m_entry);
-        
+        iommu_old_flags =
+            p2m_get_iommu_flags(p2m_flags_to_type(l1e_get_flags(*p2m_entry)));
+        old_mfn = l1e_get_pfn(*p2m_entry);
+
         if ( mfn_valid(mfn) || (p2mt == p2m_mmio_direct)
                             || p2m_is_paging(p2mt) )
             entry_content = p2m_l1e_from_pfn(mfn_x(mfn),
@@ -596,10 +615,8 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             entry_content = l1e_empty();
 
         if ( entry_content.l1 != 0 )
-        {
             p2m_add_iommu_flags(&entry_content, 0, iommu_pte_flags);
-            old_mfn = l1e_get_pfn(*p2m_entry);
-        }
+
         /* level 1 entry */
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, entry_content, 1);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
@@ -610,14 +627,20 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
                                    L2_PAGETABLE_SHIFT - PAGE_SHIFT,
                                    L2_PAGETABLE_ENTRIES);
         ASSERT(p2m_entry);
-        
-        /* FIXME: Deal with 4k replaced by 2meg pages */
-        if ( (l1e_get_flags(*p2m_entry) & _PAGE_PRESENT) &&
-             !(l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
+        flags = l1e_get_flags(*p2m_entry);
+        if ( flags & _PAGE_PRESENT )
         {
-            /* We're replacing a non-SP page with a superpage.  Make sure to
-             * handle freeing the table properly. */
-            intermediate_entry = *p2m_entry;
+            if ( flags & _PAGE_PSE )
+            {
+                iommu_old_flags =
+                    p2m_get_iommu_flags(p2m_flags_to_type(flags));
+                old_mfn = l1e_get_pfn(*p2m_entry);
+            }
+            else
+            {
+                iommu_old_flags = ~0;
+                intermediate_entry = *p2m_entry;
+            }
         }
         
         ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
@@ -631,10 +654,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         entry_content.l1 = l2e_content.l2;
 
         if ( entry_content.l1 != 0 )
-        {
             p2m_add_iommu_flags(&entry_content, 0, iommu_pte_flags);
-            old_mfn = l1e_get_pfn(*p2m_entry);
-        }
 
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, entry_content, 2);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
@@ -645,11 +665,12 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
          && (gfn + (1UL << page_order) - 1 > p2m->max_mapped_pfn) )
         p2m->max_mapped_pfn = gfn + (1UL << page_order) - 1;
 
-    if ( iommu_enabled && need_iommu(p2m->domain) )
+    if ( iommu_enabled && need_iommu(p2m->domain) &&
+         (iommu_old_flags != iommu_pte_flags || old_mfn != mfn_x(mfn)) )
     {
         if ( iommu_use_hap_pt(p2m->domain) )
         {
-            if ( old_mfn && (old_mfn != mfn_x(mfn)) )
+            if ( iommu_old_flags )
                 amd_iommu_flush_pages(p2m->domain, gfn, page_order);
         }
         else
