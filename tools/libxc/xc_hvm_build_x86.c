@@ -231,47 +231,26 @@ static int check_mmio_hole(uint64_t start, uint64_t memsize,
         return 1;
 }
 
-static int setup_guest(xc_interface *xch,
-                       uint32_t dom, struct xc_hvm_build_args *args,
-                       char *image, unsigned long image_size)
+static int xc_hvm_populate_memory(xc_interface *xch, uint32_t dom,
+                                  struct xc_hvm_build_args *args,
+                                  xen_pfn_t *page_array)
 {
-    xen_pfn_t *page_array = NULL;
     unsigned long i, vmemid, nr_pages = args->mem_size >> PAGE_SHIFT;
     unsigned long p2m_size;
     unsigned long target_pages = args->mem_target >> PAGE_SHIFT;
-    unsigned long entry_eip, cur_pages, cur_pfn;
-    void *hvm_info_page;
-    uint32_t *ident_pt;
-    struct elf_binary elf;
-    uint64_t v_start, v_end;
-    uint64_t m_start = 0, m_end = 0;
+    unsigned long cur_pages, cur_pfn;
     int rc;
     xen_capabilities_info_t caps;
     unsigned long stat_normal_pages = 0, stat_2mb_pages = 0, 
         stat_1gb_pages = 0;
     unsigned int memflags = 0;
     int claim_enabled = args->claim_enabled;
-    xen_pfn_t special_array[NR_SPECIAL_PAGES];
-    xen_pfn_t ioreq_server_array[NR_IOREQ_SERVER_PAGES];
     uint64_t total_pages;
     xen_vmemrange_t dummy_vmemrange[2];
     unsigned int dummy_vnode_to_pnode[1];
     xen_vmemrange_t *vmemranges;
     unsigned int *vnode_to_pnode;
     unsigned int nr_vmemranges, nr_vnodes;
-
-    memset(&elf, 0, sizeof(elf));
-    if ( elf_init(&elf, image, image_size) != 0 )
-    {
-        PERROR("Could not initialise ELF image");
-        goto error_out;
-    }
-
-    xc_elf_set_logfile(xch, &elf, 1);
-
-    elf_parse_binary(&elf);
-    v_start = 0;
-    v_end = args->mem_size;
 
     if ( nr_pages > target_pages )
         memflags |= XENMEMF_populate_on_demand;
@@ -342,24 +321,6 @@ static int setup_guest(xc_interface *xch,
     if ( xc_version(xch, XENVER_capabilities, &caps) != 0 )
     {
         PERROR("Could not get Xen capabilities");
-        goto error_out;
-    }
-
-    if ( modules_init(args, v_end, &elf, &m_start, &m_end) != 0 )
-    {
-        ERROR("Insufficient space to load modules.");
-        goto error_out;
-    }
-
-    DPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n");
-    DPRINTF("  Loader:   %016"PRIx64"->%016"PRIx64"\n", elf.pstart, elf.pend);
-    DPRINTF("  Modules:  %016"PRIx64"->%016"PRIx64"\n", m_start, m_end);
-    DPRINTF("  TOTAL:    %016"PRIx64"->%016"PRIx64"\n", v_start, v_end);
-    DPRINTF("  ENTRY:    %016"PRIx64"\n", elf_uval(&elf, elf.ehdr, e_entry));
-
-    if ( (page_array = malloc(p2m_size * sizeof(xen_pfn_t))) == NULL )
-    {
-        PERROR("Could not allocate memory.");
         goto error_out;
     }
 
@@ -564,7 +525,54 @@ static int setup_guest(xc_interface *xch,
     DPRINTF("  4KB PAGES: 0x%016lx\n", stat_normal_pages);
     DPRINTF("  2MB PAGES: 0x%016lx\n", stat_2mb_pages);
     DPRINTF("  1GB PAGES: 0x%016lx\n", stat_1gb_pages);
-    
+
+    rc = 0;
+    goto out;
+ error_out:
+    rc = -1;
+ out:
+
+    /* ensure no unclaimed pages are left unused */
+    xc_domain_claim_pages(xch, dom, 0 /* cancels the claim */);
+
+    return rc;
+}
+
+static int xc_hvm_load_image(xc_interface *xch,
+                       uint32_t dom, struct xc_hvm_build_args *args,
+                       xen_pfn_t *page_array)
+{
+    unsigned long entry_eip, image_size;
+    struct elf_binary elf;
+    uint64_t v_start, v_end;
+    uint64_t m_start = 0, m_end = 0;
+    char *image;
+    int rc;
+
+    image = xc_read_image(xch, args->image_file_name, &image_size);
+    if ( image == NULL )
+        return -1;
+
+    memset(&elf, 0, sizeof(elf));
+    if ( elf_init(&elf, image, image_size) != 0 )
+        goto error_out;
+
+    xc_elf_set_logfile(xch, &elf, 1);
+
+    elf_parse_binary(&elf);
+    v_start = 0;
+    v_end = args->mem_size;
+
+    if ( modules_init(args, v_end, &elf, &m_start, &m_end) != 0 )
+    {
+        ERROR("Insufficient space to load modules.");
+        goto error_out;
+    }
+
+    DPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n");
+    DPRINTF("  Loader:   %016"PRIx64"->%016"PRIx64"\n", elf.pstart, elf.pend);
+    DPRINTF("  Modules:  %016"PRIx64"->%016"PRIx64"\n", m_start, m_end);
+
     if ( loadelfimage(xch, &elf, dom, page_array) != 0 )
     {
         PERROR("Could not load ELF image");
@@ -576,6 +584,44 @@ static int setup_guest(xc_interface *xch,
         PERROR("Could not load ACPI modules");
         goto error_out;
     }
+
+    /* Insert JMP <rel32> instruction at address 0x0 to reach entry point. */
+    entry_eip = elf_uval(&elf, elf.ehdr, e_entry);
+    if ( entry_eip != 0 )
+    {
+        char *page0 = xc_map_foreign_range(
+            xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, 0);
+        if ( page0 == NULL )
+            goto error_out;
+        page0[0] = 0xe9;
+        *(uint32_t *)&page0[1] = entry_eip - 5;
+        munmap(page0, PAGE_SIZE);
+    }
+
+    rc = 0;
+    goto out;
+ error_out:
+    rc = -1;
+ out:
+    if ( elf_check_broken(&elf) )
+        ERROR("HVM ELF broken: %s", elf_check_broken(&elf));
+    free(image);
+
+    return rc;
+}
+
+static int xc_hvm_populate_params(xc_interface *xch, uint32_t dom,
+                                  struct xc_hvm_build_args *args)
+{
+    unsigned long i;
+    void *hvm_info_page;
+    uint32_t *ident_pt;
+    uint64_t v_end;
+    int rc;
+    xen_pfn_t special_array[NR_SPECIAL_PAGES];
+    xen_pfn_t ioreq_server_array[NR_IOREQ_SERVER_PAGES];
+
+    v_end = args->mem_size;
 
     if ( (hvm_info_page = xc_map_foreign_range(
               xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
@@ -665,34 +711,12 @@ static int setup_guest(xc_interface *xch,
     xc_hvm_param_set(xch, dom, HVM_PARAM_IDENT_PT,
                      special_pfn(SPECIALPAGE_IDENT_PT) << PAGE_SHIFT);
 
-    /* Insert JMP <rel32> instruction at address 0x0 to reach entry point. */
-    entry_eip = elf_uval(&elf, elf.ehdr, e_entry);
-    if ( entry_eip != 0 )
-    {
-        char *page0 = xc_map_foreign_range(
-            xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, 0);
-        if ( page0 == NULL )
-        {
-            PERROR("Could not map page0");
-            goto error_out;
-        }
-        page0[0] = 0xe9;
-        *(uint32_t *)&page0[1] = entry_eip - 5;
-        munmap(page0, PAGE_SIZE);
-    }
-
     rc = 0;
     goto out;
  error_out:
     rc = -1;
  out:
-    if ( elf_check_broken(&elf) )
-        ERROR("HVM ELF broken: %s", elf_check_broken(&elf));
 
-    /* ensure no unclaimed pages are left unused */
-    xc_domain_claim_pages(xch, dom, 0 /* cancels the claim */);
-
-    free(page_array);
     return rc;
 }
 
@@ -703,9 +727,8 @@ int xc_hvm_build(xc_interface *xch, uint32_t domid,
                  struct xc_hvm_build_args *hvm_args)
 {
     struct xc_hvm_build_args args = *hvm_args;
-    void *image;
-    unsigned long image_size;
-    int sts;
+    xen_pfn_t *parray = NULL;
+    int rc;
 
     if ( domid == 0 )
         return -1;
@@ -716,24 +739,37 @@ int xc_hvm_build(xc_interface *xch, uint32_t domid,
     if ( args.mem_size < (2ull << 20) || args.mem_target < (2ull << 20) )
         return -1;
 
-    image = xc_read_image(xch, args.image_file_name, &image_size);
-    if ( image == NULL )
+    parray = malloc((args.mem_size >> PAGE_SHIFT) * sizeof(xen_pfn_t));
+    if ( parray == NULL )
         return -1;
 
-    sts = setup_guest(xch, domid, &args, image, image_size);
-
-    if (!sts)
+    rc = xc_hvm_populate_memory(xch, domid, &args, parray);
+    if ( rc != 0 )
     {
-        /* Return module load addresses to caller */
-        hvm_args->acpi_module.guest_addr_out = 
-            args.acpi_module.guest_addr_out;
-        hvm_args->smbios_module.guest_addr_out = 
-            args.smbios_module.guest_addr_out;
+        PERROR("xc_hvm_populate_memory failed");
+        goto out;
+    }
+    rc = xc_hvm_load_image(xch, domid, &args, parray);
+    if ( rc != 0 )
+    {
+        PERROR("xc_hvm_load_image failed");
+        goto out;
+    }
+    rc = xc_hvm_populate_params(xch, domid, &args);
+    if ( rc != 0 )
+    {
+        PERROR("xc_hvm_populate_params failed");
+        goto out;
     }
 
-    free(image);
+    /* Return module load addresses to caller */
+    hvm_args->acpi_module.guest_addr_out = args.acpi_module.guest_addr_out;
+    hvm_args->smbios_module.guest_addr_out = args.smbios_module.guest_addr_out;
 
-    return sts;
+out:
+    free(parray);
+
+    return rc;
 }
 
 /* xc_hvm_build_target_mem: 
