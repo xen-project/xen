@@ -1221,11 +1221,10 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
         }
         gotend = &domaininfos[rc];
 
-        LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "[evg=%p:%"PRIu32"]"
-                   " nentries=%d rc=%d %ld..%ld",
-                   evg, evg->domid, nentries, rc,
-                   rc>0 ? (long)domaininfos[0].domain : 0,
-                   rc>0 ? (long)domaininfos[rc-1].domain : 0);
+        LOG(DEBUG, "[evg=%p:%"PRIu32"] nentries=%d rc=%d %ld..%ld",
+            evg, evg->domid, nentries, rc,
+            rc>0 ? (long)domaininfos[0].domain : 0,
+            rc>0 ? (long)domaininfos[rc-1].domain : 0);
 
         for (;;) {
             if (!evg) {
@@ -1233,10 +1232,10 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
                 goto all_reported;
             }
 
-            LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "[evg=%p:%"PRIu32"]"
-                       "   got=domaininfos[%d] got->domain=%ld",
-                       evg, evg->domid, (int)(got - domaininfos),
-                       got < gotend ? (long)got->domain : -1L);
+            LOG(DEBUG, "[evg=%p:%"PRIu32"]"
+                "   got=domaininfos[%d] got->domain=%ld",
+                evg, evg->domid, (int)(got - domaininfos),
+                got < gotend ? (long)got->domain : -1L);
 
             if (!rc) {
                 domain_death_occurred(egc, &evg, "empty list");

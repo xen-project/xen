@@ -97,8 +97,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             if (rc < 0) {
                 /* qemu-xen unavailable, use qemu-xen-traditional */
                 if (errno == ENOENT) {
-                    LIBXL__LOG_ERRNO(CTX, XTL_VERBOSE, "qemu-xen is unavailable"
-                                     ", use qemu-xen-traditional instead");
+                    LOGE(VERBOSE, "qemu-xen is unavailable"
+                         ", use qemu-xen-traditional instead");
                     b_info->device_model_version =
                         LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
                 } else {

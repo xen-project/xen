@@ -91,11 +91,11 @@ static int e820_sanitize(libxl__gc *gc, struct e820entry src[],
     ram_end = e820[idx].addr + e820[idx].size;
     idx ++;
 
-    LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "Memory: %"PRIu64"kB End of RAM: " \
-               "0x%"PRIx64" (PFN) Delta: %"PRIu64"kB, PCI start: %"PRIu64"kB " \
-               "(0x%"PRIx64" PFN), Balloon %"PRIu64"kB\n", (uint64_t)map_limitkb,
-               ram_end >> 12, delta_kb, start_kb ,start >> 12,
-               (uint64_t)balloon_kb);
+    LOG(DEBUG, "Memory: %"PRIu64"kB End of RAM: " \
+        "0x%"PRIx64" (PFN) Delta: %"PRIu64"kB, PCI start: %"PRIu64"kB " \
+        "(0x%"PRIx64" PFN), Balloon %"PRIu64"kB\n", (uint64_t)map_limitkb,
+        ram_end >> 12, delta_kb, start_kb ,start >> 12,
+        (uint64_t)balloon_kb);
 
 
     /* This whole code below is to guard against if the Intel IGD is passed into

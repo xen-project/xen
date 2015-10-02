@@ -768,7 +768,6 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
                                             libxl_device_pci *pcidev,
                                             int rebind)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     unsigned dom, bus, dev, func;
     char *spath, *driver_path = NULL;
     int rc;
@@ -793,16 +792,14 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
         return ERROR_FAIL;
     }
     if ( rc ) {
-        LIBXL__LOG(ctx, LIBXL__LOG_WARNING, PCI_BDF" already assigned to pciback",
-                   dom, bus, dev, func);
+        LOG(WARN, PCI_BDF" already assigned to pciback", dom, bus, dev, func);
         return 0;
     }
 
     /* Check to see if there's already a driver that we need to unbind from */
     if ( sysfs_dev_unbind(gc, pcidev, &driver_path ) ) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                   "Couldn't unbind "PCI_BDF" from driver",
-                   dom, bus, dev, func);
+        LOG(ERROR, "Couldn't unbind "PCI_BDF" from driver",
+            dom, bus, dev, func);
         return ERROR_FAIL;
     }
 
@@ -812,13 +809,11 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
             pci_assignable_driver_path_write(gc, pcidev, driver_path);
         } else if ( (driver_path =
                      pci_assignable_driver_path_read(gc, pcidev)) != NULL ) {
-            LIBXL__LOG(ctx, LIBXL__LOG_INFO,
-                       PCI_BDF" not bound to a driver, will be rebound to %s",
-                       dom, bus, dev, func, driver_path);
+            LOG(INFO, PCI_BDF" not bound to a driver, will be rebound to %s",
+                dom, bus, dev, func, driver_path);
         } else {
-            LIBXL__LOG(ctx, LIBXL__LOG_WARNING,
-                       PCI_BDF" not bound to a driver, will not be rebound.",
-                       dom, bus, dev, func);
+            LOG(WARN, PCI_BDF" not bound to a driver, will not be rebound.",
+                dom, bus, dev, func);
         }
     } else {
         pci_assignable_driver_path_remove(gc, pcidev);
@@ -906,7 +901,6 @@ int libxl_device_pci_assignable_remove(libxl_ctx *ctx, libxl_device_pci *pcidev,
 */
 static int pci_multifunction_check(libxl__gc *gc, libxl_device_pci *pcidev, unsigned int *func_mask)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     struct dirent *de;
     DIR *dir;
 
@@ -935,8 +929,8 @@ static int pci_multifunction_check(libxl__gc *gc, libxl_device_pci *pcidev, unsi
         path = libxl__sprintf(gc, "%s/" PCI_BDF, SYSFS_PCIBACK_DRIVER, dom, bus, dev, func);
         if ( lstat(path, &st) ) {
             if ( errno == ENOENT )
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR, PCI_BDF " is not assigned to pciback driver",
-                       dom, bus, dev, func);
+                LOG(ERROR, PCI_BDF " is not assigned to pciback driver",
+                    dom, bus, dev, func);
             else
                 LOGE(ERROR, "Couldn't lstat %s", path);
             closedir(dir);
@@ -1134,7 +1128,6 @@ out:
 static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned int bus,
                                    unsigned int dev, unsigned int func)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *reset;
     int fd, rc;
 
@@ -1160,7 +1153,9 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
         return rc < 0 ? rc : 0;
     }
     if (errno == ENOENT) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "The kernel doesn't support reset from sysfs for PCI device "PCI_BDF, domain, bus, dev, func);
+        LOG(ERROR,
+            "The kernel doesn't support reset from sysfs for PCI device "PCI_BDF,
+            domain, bus, dev, func);
     } else {
         LOGE(ERROR, "Failed to access reset path %s", reset);
     }
@@ -1214,11 +1209,11 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcide
     if (libxl__domain_type(gc, domid) == LIBXL_DOMAIN_TYPE_HVM) {
         rc = xc_test_assign_device(ctx->xch, domid, pcidev_encode_bdf(pcidev));
         if (rc) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "PCI device %04x:%02x:%02x.%u %s?",
-                       pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func,
-                       errno == ENOSYS ? "cannot be assigned - no IOMMU"
-                                       : "already assigned to a different guest");
+            LOG(ERROR,
+                "PCI device %04x:%02x:%02x.%u %s?",
+                pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func,
+                errno == ENOSYS ? "cannot be assigned - no IOMMU"
+                : "already assigned to a different guest");
             goto out;
         }
     }
@@ -1233,8 +1228,8 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcide
     }
 
     if (!libxl_pcidev_assignable(ctx, pcidev)) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "PCI device %x:%x:%x.%x is not assignable",
-                   pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+        LOG(ERROR, "PCI device %x:%x:%x.%x is not assignable",
+            pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
         rc = ERROR_FAIL;
         goto out;
     }
