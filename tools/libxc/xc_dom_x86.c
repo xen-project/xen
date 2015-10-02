@@ -922,7 +922,9 @@ static int meminit_pv(struct xc_dom_image *dom)
     return rc;
 }
 
-int arch_setup_bootearly(struct xc_dom_image *dom)
+/* ------------------------------------------------------------------------ */
+
+static int bootearly(struct xc_dom_image *dom)
 {
     DOMPRINTF("%s: doing nothing", __FUNCTION__);
     return 0;
@@ -961,7 +963,7 @@ static int map_grant_table_frames(struct xc_dom_image *dom)
     return 0;
 }
 
-int arch_setup_bootlate(struct xc_dom_image *dom)
+static int bootlate_pv(struct xc_dom_image *dom)
 {
     static const struct {
         char *guest;
@@ -1057,6 +1059,8 @@ static struct xc_dom_arch xc_dom_32_pae = {
     .shared_info = shared_info_x86_32,
     .vcpu = vcpu_x86_32,
     .meminit = meminit_pv,
+    .bootearly = bootearly,
+    .bootlate = bootlate_pv,
 };
 
 static struct xc_dom_arch xc_dom_64 = {
@@ -1071,6 +1075,8 @@ static struct xc_dom_arch xc_dom_64 = {
     .shared_info = shared_info_x86_64,
     .vcpu = vcpu_x86_64,
     .meminit = meminit_pv,
+    .bootearly = bootearly,
+    .bootlate = bootlate_pv,
 };
 
 static void __init register_arch_hooks(void)

@@ -208,7 +208,7 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
     DOMPRINTF_CALLED(dom->xch);
 
     /* misc stuff*/
-    if ( (rc = arch_setup_bootearly(dom)) != 0 )
+    if ( (rc = dom->arch_hooks->bootearly(dom)) != 0 )
         return rc;
 
     /* collect some info */
@@ -255,7 +255,7 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
     xc_dom_log_memory_footprint(dom);
 
     /* misc x86 stuff */
-    if ( (rc = arch_setup_bootlate(dom)) != 0 )
+    if ( (rc = dom->arch_hooks->bootlate(dom)) != 0 )
         return rc;
 
     /* let the vm run */

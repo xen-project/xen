@@ -220,6 +220,8 @@ struct xc_dom_arch {
     int (*start_info) (struct xc_dom_image * dom);
     int (*shared_info) (struct xc_dom_image * dom, void *shared_info);
     int (*vcpu) (struct xc_dom_image * dom, void *vcpu_ctxt);
+    int (*bootearly) (struct xc_dom_image * dom);
+    int (*bootlate) (struct xc_dom_image * dom);
 
     /* arch-specific memory initialization. */
     int (*meminit) (struct xc_dom_image * dom);
@@ -398,11 +400,6 @@ static inline xen_pfn_t xc_dom_p2m(struct xc_dom_image *dom, xen_pfn_t pfn)
         return INVALID_MFN;
     return dom->p2m_host[pfn - dom->rambase_pfn];
 }
-
-/* --- arch bits --------------------------------------------------- */
-
-int arch_setup_bootearly(struct xc_dom_image *dom);
-int arch_setup_bootlate(struct xc_dom_image *dom);
 
 /*
  * Local variables:

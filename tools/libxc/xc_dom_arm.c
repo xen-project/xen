@@ -489,13 +489,20 @@ static int meminit(struct xc_dom_image *dom)
     return 0;
 }
 
-int arch_setup_bootearly(struct xc_dom_image *dom)
+int xc_dom_feature_translated(struct xc_dom_image *dom)
+{
+    return 1;
+}
+
+/* ------------------------------------------------------------------------ */
+
+static int bootearly(struct xc_dom_image *dom)
 {
     DOMPRINTF("%s: doing nothing", __FUNCTION__);
     return 0;
 }
 
-int arch_setup_bootlate(struct xc_dom_image *dom)
+static int bootlate(struct xc_dom_image *dom)
 {
     /* XXX
      *   map shared info
@@ -503,11 +510,6 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
      *   setup shared info
      */
     return 0;
-}
-
-int xc_dom_feature_translated(struct xc_dom_image *dom)
-{
-    return 1;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -524,6 +526,8 @@ static struct xc_dom_arch xc_dom_32 = {
     .shared_info = shared_info_arm,
     .vcpu = vcpu_arm32,
     .meminit = meminit,
+    .bootearly = bootearly,
+    .bootlate = bootlate,
 };
 
 static struct xc_dom_arch xc_dom_64 = {
@@ -538,6 +542,8 @@ static struct xc_dom_arch xc_dom_64 = {
     .shared_info = shared_info_arm,
     .vcpu = vcpu_arm64,
     .meminit = meminit,
+    .bootearly = bootearly,
+    .bootlate = bootlate,
 };
 
 static void __init register_arch_hooks(void)
