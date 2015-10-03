@@ -331,9 +331,9 @@ void paging_mark_gfn_dirty(struct domain *d, unsigned long pfn)
     unmap_domain_page(l1);
     if ( changed )
     {
-        PAGING_DEBUG(LOGDIRTY, 
+        PAGING_DEBUG(LOGDIRTY,
                      "marked mfn %" PRI_mfn " (pfn=%lx), dom %d\n",
-                     mfn_x(gmfn), pfn, d->domain_id);
+                     mfn_x(mfn), pfn, d->domain_id);
         d->arch.paging.log_dirty.dirty_count++;
     }
 
