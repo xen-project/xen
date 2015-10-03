@@ -71,6 +71,7 @@ allow dom0_t xen_t:xen2 {
 };
 allow dom0_t xen_t:xen2 {
     pmu_ctrl
+    get_symbol
 };
 allow dom0_t xen_t:mmu memorymap;
 
