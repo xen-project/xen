@@ -418,7 +418,7 @@ __runq_insert(struct list_head *runq, struct csched2_vcpu *svc)
     /* Idle vcpus not allowed on the runqueue anymore */
     BUG_ON(is_idle_vcpu(svc->vcpu));
     BUG_ON(svc->vcpu->is_running);
-    BUG_ON(test_bit(__CSFLAG_scheduled, &svc->flags));
+    BUG_ON(svc->flags & CSFLAG_scheduled);
 
     list_for_each( iter, runq )
     {
@@ -844,7 +844,7 @@ static void
 __runq_deassign(struct csched2_vcpu *svc)
 {
     BUG_ON(__vcpu_on_runq(svc));
-    BUG_ON(test_bit(__CSFLAG_scheduled, &svc->flags));
+    BUG_ON(svc->flags & CSFLAG_scheduled);
 
     list_del_init(&svc->rqd_elem);
     update_max_weight(svc->rqd, 0, svc->weight);
@@ -952,7 +952,7 @@ csched2_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
         update_load(ops, svc->rqd, svc, -1, NOW());
         __runq_remove(svc);
     }
-    else if ( test_bit(__CSFLAG_delayed_runq_add, &svc->flags) )
+    else if ( svc->flags & CSFLAG_delayed_runq_add )
         clear_bit(__CSFLAG_delayed_runq_add, &svc->flags);
 }
 
@@ -988,7 +988,7 @@ csched2_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
     /* If the context hasn't been saved for this vcpu yet, we can't put it on
      * another runqueue.  Instead, we set a flag so that it will be put on the runqueue
      * after the context has been saved. */
-    if ( unlikely (test_bit(__CSFLAG_scheduled, &svc->flags) ) )
+    if ( unlikely(svc->flags & CSFLAG_scheduled) )
     {
         set_bit(__CSFLAG_delayed_runq_add, &svc->flags);
         goto out;
@@ -1204,7 +1204,7 @@ static void migrate(const struct scheduler *ops,
                     struct csched2_runqueue_data *trqd, 
                     s_time_t now)
 {
-    if ( test_bit(__CSFLAG_scheduled, &svc->flags) )
+    if ( svc->flags & CSFLAG_scheduled )
     {
         d2printk("%pv %d-%d a\n", svc->vcpu, svc->rqd->id, trqd->id);
         /* It's running; mark it to migrate. */
@@ -1348,7 +1348,7 @@ retry:
         __update_svc_load(ops, push_svc, 0, now);
 
         /* Skip this one if it's already been flagged to migrate */
-        if ( test_bit(__CSFLAG_runq_migrate_request, &push_svc->flags) )
+        if ( push_svc->flags & CSFLAG_runq_migrate_request )
             continue;
 
         list_for_each( pull_iter, &st.orqd->svc )
@@ -1361,7 +1361,7 @@ retry:
             }
         
             /* Skip this one if it's already been flagged to migrate */
-            if ( test_bit(__CSFLAG_runq_migrate_request, &pull_svc->flags) )
+            if ( pull_svc->flags & CSFLAG_runq_migrate_request )
                 continue;
 
             consider(&st, push_svc, pull_svc);
@@ -1378,7 +1378,7 @@ retry:
         struct csched2_vcpu * pull_svc = list_entry(pull_iter, struct csched2_vcpu, rqd_elem);
         
         /* Skip this one if it's already been flagged to migrate */
-        if ( test_bit(__CSFLAG_runq_migrate_request, &pull_svc->flags) )
+        if ( pull_svc->flags & CSFLAG_runq_migrate_request )
             continue;
 
         /* Consider pull only */
