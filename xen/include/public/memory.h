@@ -520,7 +520,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
 
 /*
  * XENMEM_claim_pages flags - the are no flags at this time.
- * The zero value is appropiate.
+ * The zero value is appropriate.
  */
 
 /*
