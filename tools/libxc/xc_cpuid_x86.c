@@ -33,6 +33,27 @@
 #define DEF_MAX_INTELEXT  0x80000008u
 #define DEF_MAX_AMDEXT    0x8000001cu
 
+struct cpuid_domain_info
+{
+    enum
+    {
+        VENDOR_UNKNOWN,
+        VENDOR_INTEL,
+        VENDOR_AMD,
+    } vendor;
+
+    bool hvm;
+    bool pvh;
+    uint64_t xfeature_mask;
+
+    /* PV-only information. */
+    bool pv64;
+
+    /* HVM-only information. */
+    bool pae;
+    bool nestedhvm;
+};
+
 static void cpuid(const unsigned int *input, unsigned int *regs)
 {
     unsigned int count = (input[1] == XEN_CPUID_INPUT_UNUSED) ? 0 : input[1];
@@ -55,24 +76,75 @@ static void cpuid(const unsigned int *input, unsigned int *regs)
 #endif
 }
 
-/* Get the manufacturer brand name of the host processor. */
-static void xc_cpuid_brand_get(char *str)
+static int get_cpuid_domain_info(xc_interface *xch, domid_t domid,
+                                 struct cpuid_domain_info *info)
 {
-    unsigned int input[2] = { 0, 0 };
-    unsigned int regs[4];
+    struct xen_domctl domctl = {};
+    xc_dominfo_t di;
+    unsigned int in[2] = { 0, ~0U }, regs[4];
+    int rc;
 
-    cpuid(input, regs);
+    cpuid(in, regs);
+    if ( regs[1] == 0x756e6547U &&      /* "GenuineIntel" */
+         regs[2] == 0x6c65746eU &&
+         regs[3] == 0x49656e69U )
+        info->vendor = VENDOR_INTEL;
+    else if ( regs[1] == 0x68747541U && /* "AuthenticAMD" */
+              regs[2] == 0x444d4163U &&
+              regs[3] == 0x69746e65U )
+        info->vendor = VENDOR_AMD;
+    else
+        info->vendor = VENDOR_UNKNOWN;
 
-    *(uint32_t *)(str + 0) = regs[1];
-    *(uint32_t *)(str + 4) = regs[3];
-    *(uint32_t *)(str + 8) = regs[2];
-    str[12] = '\0';
+    if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
+         di.domid != domid )
+        return -ESRCH;
+
+    info->hvm = di.hvm;
+    info->pvh = di.pvh;
+
+    /* Get xstate information. */
+    domctl.cmd = XEN_DOMCTL_getvcpuextstate;
+    domctl.domain = domid;
+    rc = do_domctl(xch, &domctl);
+    if ( rc )
+        return rc;
+
+    info->xfeature_mask = domctl.u.vcpuextstate.xfeature_mask;
+
+    if ( di.hvm )
+    {
+        uint64_t val;
+
+        rc = xc_hvm_param_get(xch, domid, HVM_PARAM_PAE_ENABLED, &val);
+        if ( rc )
+            return rc;
+
+        info->pae = !!val;
+
+        rc = xc_hvm_param_get(xch, domid, HVM_PARAM_NESTEDHVM, &val);
+        if ( rc )
+            return rc;
+
+        info->nestedhvm = !!val;
+    }
+    else
+    {
+        unsigned int width;
+
+        rc = xc_domain_get_guest_width(xch, domid, &width);
+        if ( rc )
+            return rc;
+
+        info->pv64 = (width == 8);
+    }
+
+    return 0;
 }
 
-static void amd_xc_cpuid_policy(
-    xc_interface *xch, domid_t domid,
-    const unsigned int *input, unsigned int *regs,
-    int is_pae, int is_nestedhvm)
+static void amd_xc_cpuid_policy(xc_interface *xch,
+                                const struct cpuid_domain_info *info,
+                                const unsigned int *input, unsigned int *regs)
 {
     switch ( input[0] )
     {
@@ -87,13 +159,13 @@ static void amd_xc_cpuid_policy(
         break;
 
     case 0x80000001: {
-        if ( !is_pae )
+        if ( !info->pae )
             clear_bit(X86_FEATURE_PAE, regs[3]);
 
         /* Filter all other features according to a whitelist. */
         regs[2] &= (bitmaskof(X86_FEATURE_LAHF_LM) |
                     bitmaskof(X86_FEATURE_CMP_LEGACY) |
-                    (is_nestedhvm ? bitmaskof(X86_FEATURE_SVM) : 0) |
+                    (info->nestedhvm ? bitmaskof(X86_FEATURE_SVM) : 0) |
                     bitmaskof(X86_FEATURE_CR8_LEGACY) |
                     bitmaskof(X86_FEATURE_ABM) |
                     bitmaskof(X86_FEATURE_SSE4A) |
@@ -127,7 +199,8 @@ static void amd_xc_cpuid_policy(
         break;
 
     case 0x8000000a: {
-        if (!is_nestedhvm) {
+        if ( !info->nestedhvm )
+        {
             regs[0] = regs[1] = regs[2] = regs[3] = 0;
             break;
         }
@@ -157,16 +230,15 @@ static void amd_xc_cpuid_policy(
     }
 }
 
-static void intel_xc_cpuid_policy(
-    xc_interface *xch, domid_t domid,
-    const unsigned int *input, unsigned int *regs,
-    int is_pae, int is_nestedhvm)
+static void intel_xc_cpuid_policy(xc_interface *xch,
+                                  const struct cpuid_domain_info *info,
+                                  const unsigned int *input, unsigned int *regs)
 {
     switch ( input[0] )
     {
     case 0x00000001:
         /* ECX[5] is availability of VMX */
-        if (is_nestedhvm)
+        if ( info->nestedhvm )
             set_bit(X86_FEATURE_VMXE, regs[2]);
         break;
 
@@ -211,11 +283,11 @@ static void intel_xc_cpuid_policy(
 
 #define XSAVEOPT        (1 << 0)
 /* Configure extended state enumeration leaves (0x0000000D for xsave) */
-static void xc_cpuid_config_xsave(
-    xc_interface *xch, domid_t domid, uint64_t xfeature_mask,
-    const unsigned int *input, unsigned int *regs)
+static void xc_cpuid_config_xsave(xc_interface *xch,
+                                  const struct cpuid_domain_info *info,
+                                  const unsigned int *input, unsigned int *regs)
 {
-    if ( xfeature_mask == 0 )
+    if ( info->xfeature_mask == 0 )
     {
         regs[0] = regs[1] = regs[2] = regs[3] = 0;
         return;
@@ -225,9 +297,9 @@ static void xc_cpuid_config_xsave(
     {
     case 0: 
         /* EAX: low 32bits of xfeature_enabled_mask */
-        regs[0] = xfeature_mask & 0xFFFFFFFF;
+        regs[0] = info->xfeature_mask & 0xFFFFFFFF;
         /* EDX: high 32bits of xfeature_enabled_mask */
-        regs[3] = (xfeature_mask >> 32) & 0xFFFFFFFF;
+        regs[3] = (info->xfeature_mask >> 32) & 0xFFFFFFFF;
         /* ECX: max size required by all HW features */
         {
             unsigned int _input[2] = {0xd, 0x0}, _regs[4];
@@ -250,7 +322,7 @@ static void xc_cpuid_config_xsave(
         regs[1] = regs[2] = regs[3] = 0;
         break;
     case 2 ... 63: /* sub-leaves */
-        if ( !(xfeature_mask & (1ULL << input[1])) )
+        if ( !(info->xfeature_mask & (1ULL << input[1])) )
         {
             regs[0] = regs[1] = regs[2] = regs[3] = 0;
             break;
@@ -261,29 +333,10 @@ static void xc_cpuid_config_xsave(
     }
 }
 
-static void xc_cpuid_hvm_policy(
-    xc_interface *xch, domid_t domid,
-    const unsigned int *input, unsigned int *regs)
+static void xc_cpuid_hvm_policy(xc_interface *xch,
+                                const struct cpuid_domain_info *info,
+                                const unsigned int *input, unsigned int *regs)
 {
-    DECLARE_DOMCTL;
-    char brand[13];
-    uint64_t val;
-    int is_pae, is_nestedhvm;
-    uint64_t xfeature_mask;
-
-    xc_hvm_param_get(xch, domid, HVM_PARAM_PAE_ENABLED, &val);
-    is_pae = !!val;
-
-    /* Detecting Xen's atitude towards XSAVE */
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.cmd = XEN_DOMCTL_getvcpuextstate;
-    domctl.domain = domid;
-    do_domctl(xch, &domctl);
-    xfeature_mask = domctl.u.vcpuextstate.xfeature_mask;
-
-    xc_hvm_param_get(xch, domid, HVM_PARAM_NESTEDHVM, &val);
-    is_nestedhvm = !!val;
-
     switch ( input[0] )
     {
     case 0x00000000:
@@ -311,7 +364,7 @@ static void xc_cpuid_hvm_policy(
                     bitmaskof(X86_FEATURE_AES) |
                     bitmaskof(X86_FEATURE_F16C) |
                     bitmaskof(X86_FEATURE_RDRAND) |
-                    ((xfeature_mask != 0) ?
+                    ((info->xfeature_mask != 0) ?
                      (bitmaskof(X86_FEATURE_AVX) |
                       bitmaskof(X86_FEATURE_XSAVE)) : 0));
 
@@ -346,7 +399,8 @@ static void xc_cpuid_hvm_policy(
         /* We always support MTRR MSRs. */
         regs[3] |= bitmaskof(X86_FEATURE_MTRR);
 
-        if ( !is_pae ) {
+        if ( !info->pae )
+        {
             clear_bit(X86_FEATURE_PAE, regs[3]);
             clear_bit(X86_FEATURE_PSE36, regs[3]);
         }
@@ -373,7 +427,7 @@ static void xc_cpuid_hvm_policy(
         break;
 
     case 0x0000000d:
-        xc_cpuid_config_xsave(xch, domid, xfeature_mask, input, regs);
+        xc_cpuid_config_xsave(xch, info, input, regs);
         break;
 
     case 0x80000000:
@@ -381,7 +435,7 @@ static void xc_cpuid_hvm_policy(
         break;
 
     case 0x80000001:
-        if ( !is_pae )
+        if ( !info->pae )
         {
             clear_bit(X86_FEATURE_LAHF_LM, regs[2]);
             clear_bit(X86_FEATURE_LM, regs[3]);
@@ -422,40 +476,21 @@ static void xc_cpuid_hvm_policy(
         break;
     }
 
-    xc_cpuid_brand_get(brand);
-    if ( strstr(brand, "AMD") )
-        amd_xc_cpuid_policy(xch, domid, input, regs, is_pae, is_nestedhvm);
+    if ( info->vendor == VENDOR_AMD )
+        amd_xc_cpuid_policy(xch, info, input, regs);
     else
-        intel_xc_cpuid_policy(xch, domid, input, regs, is_pae, is_nestedhvm);
-
+        intel_xc_cpuid_policy(xch, info, input, regs);
 }
 
-static void xc_cpuid_pv_policy(
-    xc_interface *xch, domid_t domid,
-    const unsigned int *input, unsigned int *regs, bool pvh)
+static void xc_cpuid_pv_policy(xc_interface *xch,
+                               const struct cpuid_domain_info *info,
+                               const unsigned int *input, unsigned int *regs)
 {
-    DECLARE_DOMCTL;
-    unsigned int guest_width;
-    int guest_64bit;
-    char brand[13];
-    uint64_t xfeature_mask;
-
-    xc_cpuid_brand_get(brand);
-
-    xc_domain_get_guest_width(xch, domid, &guest_width);
-    guest_64bit = (guest_width == 8);
-
-    /* Detecting Xen's atitude towards XSAVE */
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.cmd = XEN_DOMCTL_getvcpuextstate;
-    domctl.domain = domid;
-    do_domctl(xch, &domctl);
-    xfeature_mask = domctl.u.vcpuextstate.xfeature_mask;
-
     if ( (input[0] & 0x7fffffff) == 0x00000001 )
     {
         clear_bit(X86_FEATURE_VME, regs[3]);
-        if ( !pvh ) {
+        if ( !info->pvh )
+        {
             clear_bit(X86_FEATURE_PSE, regs[3]);
             clear_bit(X86_FEATURE_PGE, regs[3]);
         }
@@ -468,7 +503,7 @@ static void xc_cpuid_pv_policy(
     switch ( input[0] )
     {
     case 0x00000001:
-        if ( strstr(brand, "AMD") )
+        if ( info->vendor == VENDOR_AMD )
             clear_bit(X86_FEATURE_SEP, regs[3]);
         clear_bit(X86_FEATURE_DS, regs[3]);
         clear_bit(X86_FEATURE_ACC, regs[3]);
@@ -481,9 +516,9 @@ static void xc_cpuid_pv_policy(
         clear_bit(X86_FEATURE_SMXE, regs[2]);
         clear_bit(X86_FEATURE_EST, regs[2]);
         clear_bit(X86_FEATURE_TM2, regs[2]);
-        if ( !guest_64bit )
+        if ( !info->pv64 )
             clear_bit(X86_FEATURE_CX16, regs[2]);
-        if ( xfeature_mask == 0 )
+        if ( info->xfeature_mask == 0 )
         {
             clear_bit(X86_FEATURE_XSAVE, regs[2]);
             clear_bit(X86_FEATURE_AVX, regs[2]);
@@ -512,22 +547,22 @@ static void xc_cpuid_pv_policy(
         break;
 
     case 0x0000000d:
-        xc_cpuid_config_xsave(xch, domid, xfeature_mask, input, regs);
+        xc_cpuid_config_xsave(xch, info, input, regs);
         break;
 
     case 0x80000001:
-        if ( !guest_64bit )
+        if ( !info->pv64 )
         {
             clear_bit(X86_FEATURE_LM, regs[3]);
             clear_bit(X86_FEATURE_LAHF_LM, regs[2]);
-            if ( !strstr(brand, "AMD") )
+            if ( info->vendor != VENDOR_AMD )
                 clear_bit(X86_FEATURE_SYSCALL, regs[3]);
         }
         else
         {
             set_bit(X86_FEATURE_SYSCALL, regs[3]);
         }
-        if ( !pvh )
+        if ( !info->pvh )
             clear_bit(X86_FEATURE_PAGE1GB, regs[3]);
         clear_bit(X86_FEATURE_RDTSCP, regs[3]);
 
@@ -553,12 +588,10 @@ static void xc_cpuid_pv_policy(
     }
 }
 
-static int xc_cpuid_policy(
-    xc_interface *xch, domid_t domid,
-    const unsigned int *input, unsigned int *regs)
+static int xc_cpuid_policy(xc_interface *xch,
+                           const struct cpuid_domain_info *info,
+                           const unsigned int *input, unsigned int *regs)
 {
-    xc_dominfo_t        info;
-
     /*
      * For hypervisor leaves (0x4000XXXX) only 0x4000xx00.EAX[7:0] bits (max
      * number of leaves) can be set by user. Hypervisor will enforce this so
@@ -570,13 +603,10 @@ static int xc_cpuid_policy(
         return 0;
     }
 
-    if ( xc_domain_getinfo(xch, domid, 1, &info) == 0 )
-        return -EINVAL;
-
-    if ( info.hvm )
-        xc_cpuid_hvm_policy(xch, domid, input, regs);
+    if ( info->hvm )
+        xc_cpuid_hvm_policy(xch, info, input, regs);
     else
-        xc_cpuid_pv_policy(xch, domid, input, regs, info.pvh);
+        xc_cpuid_pv_policy(xch, info, input, regs);
 
     return 0;
 }
@@ -625,19 +655,21 @@ void xc_cpuid_to_str(const unsigned int *regs, char **strs)
 
 int xc_cpuid_apply_policy(xc_interface *xch, domid_t domid)
 {
+    struct cpuid_domain_info info = {};
     unsigned int input[2] = { 0, 0 }, regs[4];
     unsigned int base_max, ext_max;
-    char brand[13];
     int rc;
 
+    rc = get_cpuid_domain_info(xch, domid, &info);
+    if ( rc )
+        return rc;
 
     cpuid(input, regs);
     base_max = (regs[0] <= DEF_MAX_BASE) ? regs[0] : DEF_MAX_BASE;
     input[0] = 0x80000000;
     cpuid(input, regs);
 
-    xc_cpuid_brand_get(brand);
-    if ( strstr(brand, "AMD") )
+    if ( info.vendor == VENDOR_AMD )
         ext_max = (regs[0] <= DEF_MAX_AMDEXT) ? regs[0] : DEF_MAX_AMDEXT;
     else
         ext_max = (regs[0] <= DEF_MAX_INTELEXT) ? regs[0] : DEF_MAX_INTELEXT;
@@ -647,7 +679,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, domid_t domid)
     for ( ; ; )
     {
         cpuid(input, regs);
-        xc_cpuid_policy(xch, domid, input, regs);
+        xc_cpuid_policy(xch, &info, input, regs);
 
         if ( regs[0] || regs[1] || regs[2] || regs[3] )
         {
@@ -766,13 +798,18 @@ int xc_cpuid_set(
 {
     int rc;
     unsigned int i, j, regs[4], polregs[4];
+    struct cpuid_domain_info info = {};
 
     memset(config_transformed, 0, 4 * sizeof(*config_transformed));
+
+    rc = get_cpuid_domain_info(xch, domid, &info);
+    if ( rc )
+        return rc;
 
     cpuid(input, regs);
 
     memcpy(polregs, regs, sizeof(regs));
-    xc_cpuid_policy(xch, domid, input, polregs);
+    xc_cpuid_policy(xch, &info, input, polregs);
 
     for ( i = 0; i < 4; i++ )
     {
