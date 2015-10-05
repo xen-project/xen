@@ -254,7 +254,7 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= cb9a7ebabcd6b8a49dc0854b2f9592d732b5afbd
-QEMU_UPSTREAM_REVISION ?= cc31b41210ed66b07822a8c534053273d249dbe6
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.6.0
 MINIOS_UPSTREAM_REVISION ?= b36bcb370d611ad7f41e8c21d061e6291e088c58
 # Fri Jun 26 11:58:40 2015 +0100
 # Correct printf formatting for tpm_tis message.
@@ -266,7 +266,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 1c8d43cbdf0fc01a8f05acfbf55b805a83da34bb
+QEMU_TRADITIONAL_REVISION ?= xen-4.6.0
 # Tue Sep 8 15:41:20 2015 +0100
 # Fix build after "ui/vnc: limit client_cut_text msg payload size"
 
