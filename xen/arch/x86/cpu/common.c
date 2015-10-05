@@ -239,6 +239,10 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 	if ( cpu_has(c, X86_FEATURE_CLFLSH) )
 		c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
 
+	if ( (c->cpuid_level > CPUID_PM_LEAF) &&
+	     (cpuid_ecx(CPUID_PM_LEAF) & CPUID6_ECX_APERFMPERF_CAPABILITY) )
+		set_bit(X86_FEATURE_APERFMPERF, c->x86_capability);
+
 	/* AMD-defined flags: level 0x80000001 */
 	c->extended_cpuid_level = cpuid_eax(0x80000000);
 	if ( (c->extended_cpuid_level & 0xffff0000) == 0x80000000 ) {

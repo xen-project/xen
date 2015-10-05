@@ -37,7 +37,6 @@
 #include <acpi/acpi.h>
 #include <acpi/cpufreq/cpufreq.h>
 
-#define CPUID_6_ECX_APERFMPERF_CAPABILITY       (0x1)
 #define CPUID_FREQ_VOLT_CAPABILITIES    0x80000007
 #define CPB_CAPABLE             0x00000200
 #define USE_HW_PSTATE           0x00000080
@@ -211,10 +210,10 @@ static int powernow_cpufreq_verify(struct cpufreq_policy *policy)
 static void feature_detect(void *info)
 {
     struct cpufreq_policy *policy = info;
-    unsigned int ecx, edx;
+    unsigned int edx;
 
-    ecx = cpuid_ecx(6);
-    if (ecx & CPUID_6_ECX_APERFMPERF_CAPABILITY) {
+    if ( cpu_has_aperfmperf )
+    {
         policy->aperf_mperf = 1;
         powernow_cpufreq_driver.getavg = get_measured_perf;
     }

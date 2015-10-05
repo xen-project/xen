@@ -73,6 +73,7 @@
 #define X86_FEATURE_XTOPOLOGY    (3*32+13) /* cpu topology enum extensions */
 #define X86_FEATURE_CPUID_FAULTING (3*32+14) /* cpuid faulting */
 #define X86_FEATURE_CLFLUSH_MONITOR (3*32+15) /* clflush reqd with monitor */
+#define X86_FEATURE_APERFMPERF   (3*32+16) /* APERFMPERF */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
 #define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
@@ -169,6 +170,9 @@
 #define CPUID5_ECX_EXTENSIONS_SUPPORTED 0x1
 #define CPUID5_ECX_INTERRUPT_BREAK      0x2
 
+#define CPUID_PM_LEAF                    6
+#define CPUID6_ECX_APERFMPERF_CAPABILITY 0x1
+
 #define cpu_has_vme		0
 #define cpu_has_de		1
 #define cpu_has_pse		1
@@ -194,6 +198,7 @@
 #define cpu_has_page1gb		boot_cpu_has(X86_FEATURE_PAGE1GB)
 #define cpu_has_efer		1
 #define cpu_has_fsgsbase	boot_cpu_has(X86_FEATURE_FSGSBASE)
+#define cpu_has_aperfmperf	boot_cpu_has(X86_FEATURE_APERFMPERF)
 
 #define cpu_has_smep            boot_cpu_has(X86_FEATURE_SMEP)
 #define cpu_has_smap            boot_cpu_has(X86_FEATURE_SMAP)
