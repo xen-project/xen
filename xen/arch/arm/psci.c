@@ -23,6 +23,18 @@
 #include <xen/smp.h>
 #include <asm/psci.h>
 
+/*
+ * While a 64-bit OS can make calls with SMC32 calling conventions, for
+ * some calls it is necessary to use SMC64 to pass or return 64-bit values.
+ * For such calls PSCI_0_2_FN_NATIVE(x) will choose the appropriate
+ * (native-width) function ID.
+ */
+#ifdef CONFIG_ARM_64
+#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN64_##name
+#else
+#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN_##name
+#endif
+
 uint32_t psci_ver;
 
 static uint32_t psci_cpu_on_nr;
@@ -116,7 +128,7 @@ int __init psci_init_0_2(void)
         return -EOPNOTSUPP;
     }
 
-    psci_cpu_on_nr = PSCI_0_2_FN_CPU_ON;
+    psci_cpu_on_nr = PSCI_0_2_FN_NATIVE(CPU_ON);
 
     printk(XENLOG_INFO "Using PSCI-0.2 for SMP bringup\n");
 
