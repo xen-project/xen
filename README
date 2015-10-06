@@ -56,6 +56,9 @@ provided by your OS distributor:
     * GNU gettext
     * 16-bit x86 assembler, loader and compiler (dev86 rpm or bin86 & bcc debs)
     * ACPI ASL compiler (iasl)
+    * Libc multiarch package (e.g. libc6-dev-i386 / glibc-devel.i686).
+      Required when building on a 64-bit platform to build
+      32-bit components which are enabled on a default build.
 
 In addition to the above there are a number of optional build
 prerequisites. Omitting these will cause the related features to be
