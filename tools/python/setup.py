@@ -27,17 +27,8 @@ xs = Extension("xs",
                depends            = [ PATH_XENSTORE + "/libxenstore.so" ],
                sources            = [ "xen/lowlevel/xs/xs.c" ])
 
-xl = Extension("xl",
-               extra_compile_args = extra_compile_args,
-               include_dirs       = [ PATH_XEN, PATH_LIBXL, PATH_LIBXC + "/include", "xen/lowlevel/xl" ],
-               library_dirs       = [ PATH_LIBXL ],
-               libraries          = [ "xenlight" ],
-               depends            = [ PATH_LIBXL + "/libxenlight.so" ],
-               sources            = [ "xen/lowlevel/xl/xl.c", "xen/lowlevel/xl/_pyxl_types.c" ])
-
 plat = os.uname()[0]
 modules = [ xc, xs ]
-#modules.extend([ xl ])
 
 setup(name            = 'xen',
       version         = '3.0',
