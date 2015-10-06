@@ -41,6 +41,8 @@ typedef struct vcpu_info vcpu_info_t;
 
 #endif
 
+extern vcpu_info_t dummy_vcpu_info;
+
 #define shared_info(d, field)      __shared_info(d, (d)->shared_info, field)
 #define vcpu_info(v, field)        __vcpu_info(v, (v)->vcpu_info, field)
 

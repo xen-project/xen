@@ -70,7 +70,7 @@ integer_param("hardware_dom", hardware_domid);
 
 struct vcpu *idle_vcpu[NR_CPUS] __read_mostly;
 
-static vcpu_info_t dummy_vcpu_info;
+vcpu_info_t dummy_vcpu_info;
 
 static void __domain_finalise_shutdown(struct domain *d)
 {

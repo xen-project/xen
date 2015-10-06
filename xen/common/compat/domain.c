@@ -38,6 +38,9 @@ int compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) ar
     {
         struct compat_vcpu_guest_context *cmp_ctxt;
 
+        if ( v->vcpu_info == &dummy_vcpu_info )
+            return -EINVAL;
+
         if ( (cmp_ctxt = xmalloc(struct compat_vcpu_guest_context)) == NULL )
         {
             rc = -ENOMEM;
