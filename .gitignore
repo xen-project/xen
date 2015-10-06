@@ -46,8 +46,7 @@ docs/man5/
 docs/man8/
 docs/pdf/
 docs/txt/
-extras/mini-os
-extras/mini-os-remote
+extras/mini-os*
 install/*
 stubdom/autom4te.cache/
 stubdom/binutils-*
