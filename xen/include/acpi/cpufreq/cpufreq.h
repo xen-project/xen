@@ -41,6 +41,18 @@ struct cpufreq_cpuinfo {
     unsigned int        transition_latency; /* in 10^(-9) s = nanoseconds */
 };
 
+struct perf_limits {
+    bool_t no_turbo;
+    bool_t turbo_disabled;
+    uint32_t turbo_pct;
+    uint32_t max_perf_pct; /* max performance in percentage */
+    uint32_t min_perf_pct; /* min performance in percentage */
+    uint32_t max_perf;
+    uint32_t min_perf;
+    uint32_t max_policy_pct;
+    uint32_t min_policy_pct;
+};
+
 struct cpufreq_policy {
     cpumask_var_t       cpus;          /* affected CPUs */
     unsigned int        shared_type;   /* ANY or ALL affected CPUs
@@ -52,6 +64,7 @@ struct cpufreq_policy {
     unsigned int        max;    /* in kHz */
     unsigned int        cur;    /* in kHz, only needed if cpufreq
                                  * governors are used */
+    struct perf_limits  limits;
     struct cpufreq_governor     *governor;
 
     bool_t              resume; /* flag for cpufreq 1st run
@@ -145,6 +158,7 @@ struct cpufreq_driver {
     char   name[CPUFREQ_NAME_LEN];
     int    (*init)(struct cpufreq_policy *policy);
     int    (*verify)(struct cpufreq_policy *policy);
+    int    (*setpolicy)(struct cpufreq_policy *policy);
     int    (*update)(int cpuid, struct cpufreq_policy *policy);
     int    (*target)(struct cpufreq_policy *policy,
                      unsigned int target_freq,
