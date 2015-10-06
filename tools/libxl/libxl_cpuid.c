@@ -334,7 +334,7 @@ int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
 
 void libxl_cpuid_apply_policy(libxl_ctx *ctx, uint32_t domid)
 {
-    xc_cpuid_apply_policy(ctx->xch, domid);
+    xc_cpuid_apply_policy(ctx->xch, domid, NULL, 0);
 }
 
 void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,

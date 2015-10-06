@@ -1985,7 +1985,9 @@ int xc_cpuid_set(xc_interface *xch,
                  const char **config,
                  char **config_transformed);
 int xc_cpuid_apply_policy(xc_interface *xch,
-                          domid_t domid);
+                          domid_t domid,
+                          uint32_t *featureset,
+                          unsigned int nr_features);
 void xc_cpuid_to_str(const unsigned int *regs,
                      char **strs); /* some strs[] may be NULL if ENOMEM */
 int xc_mca_op(xc_interface *xch, struct xen_mc *mc);

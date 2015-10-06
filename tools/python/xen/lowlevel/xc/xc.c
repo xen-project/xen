@@ -731,7 +731,7 @@ static PyObject *pyxc_dom_set_policy_cpuid(XcObject *self,
     if ( !PyArg_ParseTuple(args, "i", &domid) )
         return NULL;
 
-    if ( xc_cpuid_apply_policy(self->xc_handle, domid) )
+    if ( xc_cpuid_apply_policy(self->xc_handle, domid, NULL, 0) )
         return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);

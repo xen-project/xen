@@ -796,7 +796,7 @@ CAMLprim value stub_xc_domain_cpuid_apply_policy(value xch, value domid)
 #if defined(__i386__) || defined(__x86_64__)
 	int r;
 
-	r = xc_cpuid_apply_policy(_H(xch), _D(domid));
+	r = xc_cpuid_apply_policy(_H(xch), _D(domid), NULL, 0);
 	if (r < 0)
 		failwith_xc(_H(xch));
 #else
