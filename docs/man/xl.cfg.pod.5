@@ -752,14 +752,17 @@ Possible B<KEY>s are:
 
 =item B<permissive=BOOLEAN>
 
-(PV only) By default pciback only allows PV guests to write "known
-safe" values into PCI config space.  But many devices require writes
-to other areas of config space in order to operate properly.  This
-tells the pciback driver to allow all writes to PCI config space of
-this device by this domain.  This option should be enabled with
-caution: it gives the guest much more control over the device, which
-may have security or stability implications.  It is recommended to
-enable this option only for trusted VMs under administrator control.
+By default pciback only allows PV guests to write "known safe" values
+into PCI config space, likewise QEMU (both qemu-xen and
+qemu-traditional) imposes the same contraint on HVM guests. However
+many devices require writes to other areas of config space in order to
+operate properly.  This option tells the backend (pciback or QEMU) to
+allow all writes to PCI config space of this device by this domain.
+
+This option should be enabled with caution: it gives the guest much
+more control over the device, which may have security or stability
+implications.  It is recommended to enable this option only for
+trusted VMs under administrator control.
 
 =item B<msitranslate=BOOLEAN>
 
@@ -798,9 +801,8 @@ Note this would override global B<rdm> option.
 
 =item B<pci_permissive=BOOLEAN>
 
-(PV only) Changes the default value of 'permissive' for all PCI
-devices passed through to this VM. See L<permissive|/"permissive_boolean">
-above.
+Changes the default value of 'permissive' for all PCI devices passed
+through to this VM. See L<permissive|/"permissive_boolean"> above.
 
 =item B<pci_msitranslate=BOOLEAN>
 
