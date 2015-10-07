@@ -255,9 +255,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= cb9a7ebabcd6b8a49dc0854b2f9592d732b5afbd
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= b36bcb370d611ad7f41e8c21d061e6291e088c58
-# Fri Jun 26 11:58:40 2015 +0100
-# Correct printf formatting for tpm_tis message.
+MINIOS_UPSTREAM_REVISION ?= 256035e01a1aa5739e34f245f3b1e9e8ee204210
+# Thu Jul 23 11:08:38 2015 +0100
+# arm: interrupt controller
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 # Tue Mar 17 10:52:16 2015 -0400
