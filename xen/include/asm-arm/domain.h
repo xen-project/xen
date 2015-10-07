@@ -91,7 +91,7 @@ struct arch_domain
          * rank order.
          */
         spinlock_t lock;
-        int ctlr;
+        uint32_t ctlr;
         int nr_spis; /* Number of SPIs */
         unsigned long *allocated_irqs; /* bitmap of IRQs allocated */
         struct vgic_irq_rank *shared_irqs;
