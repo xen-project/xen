@@ -431,6 +431,7 @@ struct elf_dom_parms {
     uint64_t elf_paddr_offset;
     uint32_t f_supported[XENFEAT_NR_SUBMAPS];
     uint32_t f_required[XENFEAT_NR_SUBMAPS];
+    uint32_t phys_entry;
 
     /* calculated */
     uint64_t virt_offset;

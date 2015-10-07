@@ -14,6 +14,7 @@
  */
 
 #include <xen/libelf/libelf.h>
+#include <xenguest.h>
 
 #define INVALID_P2M_ENTRY   ((xen_pfn_t)-1)
 
@@ -183,6 +184,13 @@ struct xc_dom_image {
         XC_DOM_PV_CONTAINER,
         XC_DOM_HVM_CONTAINER,
     } container_type;
+
+    /* HVM specific fields. */
+    /* Extra ACPI tables passed to HVMLOADER */
+    struct xc_hvm_firmware_module acpi_module;
+
+    /* Extra SMBIOS structures passed to HVMLOADER */
+    struct xc_hvm_firmware_module smbios_module;
 };
 
 /* --- pluggable kernel loader ------------------------------------- */
