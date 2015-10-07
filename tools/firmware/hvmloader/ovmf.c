@@ -34,17 +34,11 @@
 #include <xen/hvm/ioreq.h>
 #include <xen/memory.h>
 
-#define ROM_INCLUDE_OVMF
-#include "roms.inc"
-
-#define OVMF_SIZE               (sizeof(ovmf))
 #define OVMF_MAXOFFSET          0x000FFFFFULL
-#define OVMF_BEGIN              (0x100000000ULL - ((OVMF_SIZE + OVMF_MAXOFFSET) & ~OVMF_MAXOFFSET))
-#define OVMF_END                (OVMF_BEGIN + OVMF_SIZE)
+#define OVMF_END                0x100000000ULL
 #define LOWCHUNK_BEGIN          0x000F0000
 #define LOWCHUNK_SIZE           0x00010000
 #define LOWCHUNK_MAXOFFSET      0x0000FFFF
-#define LOWCHUNK_END            (OVMF_BEGIN + OVMF_SIZE)
 #define OVMF_INFO_PHYSICAL_ADDRESS 0x00001000
 
 extern unsigned char dsdt_anycpu_qemu_xen[];
@@ -97,24 +91,31 @@ static void ovmf_load(const struct bios_config *config,
                       void *bios_addr, uint32_t bios_length)
 {
     xen_pfn_t mfn;
-    uint64_t addr = OVMF_BEGIN;
+    uint64_t addr = OVMF_END
+        - ((bios_length + OVMF_MAXOFFSET) & ~OVMF_MAXOFFSET);
+    uint64_t ovmf_end = addr + bios_length;
+
+    ovmf_config.bios_address = addr;
+    ovmf_config.image_size = bios_length;
 
     /* Copy low-reset vector portion. */
-    memcpy((void *) LOWCHUNK_BEGIN, (uint8_t *) config->image
-           + OVMF_SIZE
-           - LOWCHUNK_SIZE,
+    memcpy((void *)LOWCHUNK_BEGIN,
+           (uint8_t *)bios_addr + bios_length - LOWCHUNK_SIZE,
            LOWCHUNK_SIZE);
 
     /* Ensure we have backing page prior to moving FD. */
-    while ( (addr >> PAGE_SHIFT) != (OVMF_END >> PAGE_SHIFT) )
+    while ( (addr >> PAGE_SHIFT) != (ovmf_end >> PAGE_SHIFT) )
     {
         mfn = (uint32_t) (addr >> PAGE_SHIFT);
         addr += PAGE_SIZE;
         mem_hole_populate_ram(mfn, 1);
     }
 
+    /* Check that source and destination does not overlaps. */
+    BUG_ON(addr + bios_length > (unsigned)bios_addr &&
+           addr < (unsigned)bios_addr + bios_length);
     /* Copy FD. */
-    memcpy((void *) OVMF_BEGIN, config->image, OVMF_SIZE);
+    memcpy((void *)ovmf_config.bios_address, bios_addr, bios_length);
 }
 
 static void ovmf_acpi_build_tables(void)
@@ -151,10 +152,6 @@ static void ovmf_setup_e820(void)
 struct bios_config ovmf_config =  {
     .name = "OVMF",
 
-    .image = ovmf,
-    .image_size = sizeof(ovmf),
-
-    .bios_address = OVMF_BEGIN,
     .bios_load = ovmf_load,
 
     .load_roms = 0,

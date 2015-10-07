@@ -43,7 +43,6 @@ endif
 
 CIRRUSVGA_DEBUG ?= n
 
-OVMF_DIR := ../ovmf-dir
 ROMBIOS_DIR := ../rombios
 
 ifeq ($(CONFIG_ROMBIOS),y)
@@ -61,12 +60,6 @@ ROMS :=
 ifeq ($(CONFIG_OVMF),y)
 OBJS += ovmf.o
 CFLAGS += -DENABLE_OVMF
-ifeq ($(OVMF_PATH),)
-	OVMF_ROM := $(OVMF_DIR)/ovmf.bin
-else
-	OVMF_ROM := $(OVMF_PATH)
-endif
-ROMS += $(OVMF_ROM)
 endif
 
 ifeq ($(CONFIG_ROMBIOS),y)
@@ -85,7 +78,7 @@ endif
 all: subdirs-all
 	$(MAKE) hvmloader
 
-ovmf.o rombios.o: roms.inc
+rombios.o: roms.inc
 smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(SMBIOS_REL_DATE)\""
 
 hvmloader: $(OBJS) acpi/acpi.a
@@ -101,12 +94,6 @@ ifneq ($(ROMBIOS_ROM),)
 	sh ./mkhex rombios $(ROMBIOS_ROM) >> $@.new
 	echo "#endif" >> $@.new
 endif
-
-ifneq ($(OVMF_ROM),)
-	echo "#ifdef ROM_INCLUDE_OVMF" >> $@.new
-	sh ./mkhex ovmf $(OVMF_ROM) >> $@.new
-	echo "#endif" >> $@.new	
-endif 
 
 ifneq ($(STDVGA_ROM),)
 	echo "#ifdef ROM_INCLUDE_VGABIOS" >> $@.new
