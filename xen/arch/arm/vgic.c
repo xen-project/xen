@@ -68,6 +68,13 @@ static void vgic_init_pending_irq(struct pending_irq *p, unsigned int virq)
     p->irq = virq;
 }
 
+static void vgic_rank_init(struct vgic_irq_rank *rank, uint8_t index)
+{
+    spin_lock_init(&rank->lock);
+
+    rank->index = index;
+}
+
 int domain_vgic_init(struct domain *d, unsigned int nr_spis)
 {
     int i;
@@ -114,8 +121,8 @@ int domain_vgic_init(struct domain *d, unsigned int nr_spis)
     for (i=0; i<d->arch.vgic.nr_spis; i++)
         vgic_init_pending_irq(&d->arch.vgic.pending_irqs[i], i + 32);
 
-    for (i=0; i<DOMAIN_NR_RANKS(d); i++)
-        spin_lock_init(&d->arch.vgic.shared_irqs[i].lock);
+    for ( i = 0; i < DOMAIN_NR_RANKS(d); i++ )
+        vgic_rank_init(&d->arch.vgic.shared_irqs[i], i + 1);
 
     ret = d->arch.vgic.handler->domain_init(d);
     if ( ret )
@@ -169,7 +176,7 @@ int vcpu_vgic_init(struct vcpu *v)
     if ( v->arch.vgic.private_irqs == NULL )
       return -ENOMEM;
 
-    spin_lock_init(&v->arch.vgic.private_irqs->lock);
+    vgic_rank_init(v->arch.vgic.private_irqs, 0);
 
     v->domain->arch.vgic.handler->vcpu_init(v);
 

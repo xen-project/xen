@@ -288,11 +288,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
         rank->ienable |= r;
-        /* The virtual irq is derived from register offset.
-         * The register difference is word difference. So divide by 2(DABT_WORD)
-         * to get Virtual irq number */
-        vgic_enable_irqs(v, r & (~tr),
-                         (gicd_reg - GICD_ISENABLER) >> DABT_WORD);
+        vgic_enable_irqs(v, r & (~tr), rank->index);
         vgic_unlock_rank(v, rank, flags);
         return 1;
 
@@ -303,11 +299,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
         rank->ienable &= ~r;
-        /* The virtual irq is derived from register offset.
-         * The register difference is word difference. So divide by 2(DABT_WORD)
-         * to get  Virtual irq number */
-        vgic_disable_irqs(v, r & tr,
-                         (gicd_reg - GICD_ICENABLER) >> DABT_WORD);
+        vgic_disable_irqs(v, r & tr, rank->index);
         vgic_unlock_rank(v, rank, flags);
         return 1;
 

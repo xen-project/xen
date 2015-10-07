@@ -386,8 +386,7 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
         vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
         rank->ienable |= r;
-        /* The irq number is extracted from offset. so shift by register size */
-        vgic_enable_irqs(v, r & (~tr), (reg - GICD_ISENABLER) >> DABT_WORD);
+        vgic_enable_irqs(v, r & (~tr), rank->index);
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_ICENABLER ... GICD_ICENABLERN:
@@ -397,8 +396,7 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
         vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
         rank->ienable &= ~r;
-        /* The irq number is extracted from offset. so shift by register size */
-        vgic_disable_irqs(v, r & tr, (reg - GICD_ICENABLER) >> DABT_WORD);
+        vgic_disable_irqs(v, r & tr, rank->index);
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_ISPENDR ... GICD_ISPENDRN:
