@@ -104,11 +104,10 @@ static struct vcpu *vgic_v3_get_target_vcpu(struct vcpu *v, unsigned int irq)
 }
 
 static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
-                                         uint32_t gicr_reg)
+                                         uint32_t gicr_reg,
+                                         register_t *r)
 {
     struct hsr_dabt dabt = info->dabt;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    register_t *r = select_user_reg(regs, dabt.reg);
     uint64_t aff;
 
     switch ( gicr_reg )
@@ -215,11 +214,10 @@ read_as_zero_32:
 }
 
 static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
-                                          uint32_t gicr_reg)
+                                          uint32_t gicr_reg,
+                                          register_t r)
 {
     struct hsr_dabt dabt = info->dabt;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    register_t *r = select_user_reg(regs, dabt.reg);
 
     switch ( gicr_reg )
     {
@@ -276,7 +274,7 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
 bad_width:
     printk(XENLOG_G_ERR
           "%pv: vGICR: bad write width %d r%d=%"PRIregister" offset %#08x\n",
-          v, dabt.size, dabt.reg, *r, gicr_reg);
+          v, dabt.size, dabt.reg, r, gicr_reg);
     domain_crash_synchronous();
     return 0;
 
@@ -290,11 +288,10 @@ write_ignore_32:
 }
 
 static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
-                                            mmio_info_t *info, uint32_t reg)
+                                            mmio_info_t *info, uint32_t reg,
+                                            register_t *r)
 {
     struct hsr_dabt dabt = info->dabt;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    register_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
     unsigned long flags;
 
@@ -369,11 +366,10 @@ read_as_zero:
 }
 
 static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
-                                             mmio_info_t *info, uint32_t reg)
+                                             mmio_info_t *info, uint32_t reg,
+                                             register_t r)
 {
     struct hsr_dabt dabt = info->dabt;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    register_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
     uint32_t tr;
     unsigned long flags;
@@ -389,9 +385,9 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
         if ( rank == NULL ) goto write_ignore;
         vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
-        rank->ienable |= *r;
+        rank->ienable |= r;
         /* The irq number is extracted from offset. so shift by register size */
-        vgic_enable_irqs(v, (*r) & (~tr), (reg - GICD_ISENABLER) >> DABT_WORD);
+        vgic_enable_irqs(v, r & (~tr), (reg - GICD_ISENABLER) >> DABT_WORD);
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_ICENABLER ... GICD_ICENABLERN:
@@ -400,37 +396,37 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
         if ( rank == NULL ) goto write_ignore;
         vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
-        rank->ienable &= ~*r;
+        rank->ienable &= ~r;
         /* The irq number is extracted from offset. so shift by register size */
-        vgic_disable_irqs(v, (*r) & tr, (reg - GICD_ICENABLER) >> DABT_WORD);
+        vgic_disable_irqs(v, r & tr, (reg - GICD_ICENABLER) >> DABT_WORD);
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_ISPENDR ... GICD_ISPENDRN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: %s: unhandled word write %#"PRIregister" to ISPENDR%d\n",
-               v, name, *r, reg - GICD_ISPENDR);
+               v, name, r, reg - GICD_ISPENDR);
         return 0;
 
     case GICD_ICPENDR ... GICD_ICPENDRN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: %s: unhandled word write %#"PRIregister" to ICPENDR%d\n",
-               v, name, *r, reg - GICD_ICPENDR);
+               v, name, r, reg - GICD_ICPENDR);
         return 0;
 
     case GICD_ISACTIVER ... GICD_ISACTIVERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: %s: unhandled word write %#"PRIregister" to ISACTIVER%d\n",
-               v, name, *r, reg - GICD_ISACTIVER);
+               v, name, r, reg - GICD_ISACTIVER);
         return 0;
 
     case GICD_ICACTIVER ... GICD_ICACTIVERN:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: %s: unhandled word write %#"PRIregister" to ICACTIVER%d\n",
-               v, name, *r, reg - GICD_ICACTIVER);
+               v, name, r, reg - GICD_ICACTIVER);
         return 0;
 
     case GICD_IPRIORITYR ... GICD_IPRIORITYRN:
@@ -440,10 +436,10 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
         vgic_lock_rank(v, rank, flags);
         if ( dabt.size == DABT_WORD )
             rank->ipriority[REG_RANK_INDEX(8, reg - GICD_IPRIORITYR,
-                                           DABT_WORD)] = *r;
+                                           DABT_WORD)] = r;
         else
             vgic_byte_write(&rank->ipriority[REG_RANK_INDEX(8,
-                       reg - GICD_IPRIORITYR, DABT_WORD)], *r, reg);
+                       reg - GICD_IPRIORITYR, DABT_WORD)], r, reg);
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_ICFGR: /* Restricted to configure SGIs */
@@ -455,20 +451,20 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
         rank = vgic_rank_offset(v, 2, reg - GICD_ICFGR, DABT_WORD);
         if ( rank == NULL ) goto write_ignore;
         vgic_lock_rank(v, rank, flags);
-        rank->icfg[REG_RANK_INDEX(2, reg - GICD_ICFGR, DABT_WORD)] = *r;
+        rank->icfg[REG_RANK_INDEX(2, reg - GICD_ICFGR, DABT_WORD)] = r;
         vgic_unlock_rank(v, rank, flags);
         return 1;
     default:
         printk(XENLOG_G_ERR
                "%pv: %s: unhandled write r%d=%"PRIregister" offset %#08x\n",
-               v, name, dabt.reg, *r, reg);
+               v, name, dabt.reg, r, reg);
         return 0;
     }
 
 bad_width:
     printk(XENLOG_G_ERR
            "%pv: %s: bad write width %d r%d=%"PRIregister" offset %#08x\n",
-           v, name, dabt.size, dabt.reg, *r, reg);
+           v, name, dabt.size, dabt.reg, r, reg);
     domain_crash_synchronous();
     return 0;
 
@@ -479,11 +475,9 @@ write_ignore:
 }
 
 static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
-                                        uint32_t gicr_reg)
+                                        uint32_t gicr_reg, register_t *r)
 {
     struct hsr_dabt dabt = info->dabt;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    register_t *r = select_user_reg(regs, dabt.reg);
 
     switch ( gicr_reg )
     {
@@ -502,7 +496,7 @@ static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
           * So handle in common with GICD handling
           */
         return __vgic_v3_distr_common_mmio_read("vGICR: SGI", v, info,
-                                                gicr_reg);
+                                                gicr_reg, r);
 
     /* Read the pending status of an SGI is via GICR is not supported */
     case GICR_ISPENDR0:
@@ -533,11 +527,9 @@ read_as_zero:
 }
 
 static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
-                                         uint32_t gicr_reg)
+                                         uint32_t gicr_reg, register_t r)
 {
     struct hsr_dabt dabt = info->dabt;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    register_t *r = select_user_reg(regs, dabt.reg);
 
     switch ( gicr_reg )
     {
@@ -556,19 +548,19 @@ static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
           * So handle common with GICD handling
           */
         return __vgic_v3_distr_common_mmio_write("vGICR: SGI", v,
-                                                 info, gicr_reg);
+                                                 info, gicr_reg, r);
     case GICR_ISPENDR0:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: vGICR: SGI: unhandled word write %#"PRIregister" to ISPENDR0\n",
-               v, *r);
+               v, r);
         return 0;
 
     case GICR_ICPENDR0:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: vGICR: SGI: unhandled word write %#"PRIregister" to ICPENDR0\n",
-               v, *r);
+               v, r);
         return 0;
 
     case GICR_NSACR:
@@ -584,7 +576,7 @@ static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
 bad_width:
     printk(XENLOG_G_ERR
            "%pv: vGICR: SGI: bad write width %d r%d=%"PRIregister" offset %#08x\n",
-           v, dabt.size, dabt.reg, *r, gicr_reg);
+           v, dabt.size, dabt.reg, r, gicr_reg);
     domain_crash_synchronous();
     return 0;
 
@@ -613,7 +605,7 @@ static struct vcpu *get_vcpu_from_rdist(struct domain *d,
 }
 
 static int vgic_v3_rdistr_mmio_read(struct vcpu *v, mmio_info_t *info,
-                                    void *priv)
+                                    register_t *r, void *priv)
 {
     uint32_t offset;
     const struct vgic_rdist_region *region = priv;
@@ -625,9 +617,9 @@ static int vgic_v3_rdistr_mmio_read(struct vcpu *v, mmio_info_t *info,
         return 0;
 
     if ( offset < SZ_64K )
-        return __vgic_v3_rdistr_rd_mmio_read(v, info, offset);
+        return __vgic_v3_rdistr_rd_mmio_read(v, info, offset, r);
     else  if ( (offset >= SZ_64K) && (offset < 2 * SZ_64K) )
-        return vgic_v3_rdistr_sgi_mmio_read(v, info, (offset - SZ_64K));
+        return vgic_v3_rdistr_sgi_mmio_read(v, info, (offset - SZ_64K), r);
     else
         printk(XENLOG_G_WARNING
                "%pv: vGICR: unknown gpa read address %"PRIpaddr"\n",
@@ -637,7 +629,7 @@ static int vgic_v3_rdistr_mmio_read(struct vcpu *v, mmio_info_t *info,
 }
 
 static int vgic_v3_rdistr_mmio_write(struct vcpu *v, mmio_info_t *info,
-                                     void *priv)
+                                     register_t r, void *priv)
 {
     uint32_t offset;
     const struct vgic_rdist_region *region = priv;
@@ -649,9 +641,9 @@ static int vgic_v3_rdistr_mmio_write(struct vcpu *v, mmio_info_t *info,
         return 0;
 
     if ( offset < SZ_64K )
-        return __vgic_v3_rdistr_rd_mmio_write(v, info, offset);
+        return __vgic_v3_rdistr_rd_mmio_write(v, info, offset, r);
     else  if ( (offset >= SZ_64K) && (offset < 2 * SZ_64K) )
-        return vgic_v3_rdistr_sgi_mmio_write(v, info, (offset - SZ_64K));
+        return vgic_v3_rdistr_sgi_mmio_write(v, info, (offset - SZ_64K), r);
     else
         printk(XENLOG_G_WARNING
                "%pv: vGICR: unknown gpa write address %"PRIpaddr"\n",
@@ -661,11 +653,9 @@ static int vgic_v3_rdistr_mmio_write(struct vcpu *v, mmio_info_t *info,
 }
 
 static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
-                                   void *priv)
+                                   register_t *r, void *priv)
 {
     struct hsr_dabt dabt = info->dabt;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    register_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
     unsigned long flags;
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
@@ -728,7 +718,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
          * Above all register are common with GICR and GICD
          * Manage in common
          */
-        return __vgic_v3_distr_common_mmio_read("vGICD", v, info, gicd_reg);
+        return __vgic_v3_distr_common_mmio_read("vGICD", v, info, gicd_reg, r);
     case GICD_IROUTER ... GICD_IROUTER31:
         /* SGI/PPI is RES0 */
         goto read_as_zero_64;
@@ -819,11 +809,9 @@ read_as_zero:
 }
 
 static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
-                                    void *priv)
+                                    register_t r, void *priv)
 {
     struct hsr_dabt dabt = info->dabt;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    register_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
     unsigned long flags;
     uint64_t new_irouter, old_irouter;
@@ -839,7 +827,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
 
         vgic_lock(v);
         /* Only EnableGrp1A can be changed */
-        if ( *r & GICD_CTLR_ENABLE_G1A )
+        if ( r & GICD_CTLR_ENABLE_G1A )
             v->domain->arch.vgic.ctlr |= GICD_CTLR_ENABLE_G1A;
         else
             v->domain->arch.vgic.ctlr &= ~GICD_CTLR_ENABLE_G1A;
@@ -885,7 +873,8 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
     case GICD_ICFGR ... GICD_ICFGRN:
         /* Above registers are common with GICR and GICD
          * Manage in common */
-        return __vgic_v3_distr_common_mmio_write("vGICD", v, info, gicd_reg);
+        return __vgic_v3_distr_common_mmio_write("vGICD", v, info,
+                                                 gicd_reg, r);
     case GICD_IROUTER ... GICD_IROUTER31:
         /* SGI/PPI is RES0 */
         goto write_ignore_64;
@@ -894,7 +883,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         rank = vgic_rank_offset(v, 64, gicd_reg - GICD_IROUTER,
                                 DABT_DOUBLE_WORD);
         if ( rank == NULL ) goto write_ignore;
-        new_irouter = *r;
+        new_irouter = r;
         vgic_lock_rank(v, rank, flags);
 
         old_irouter = rank->v3.irouter[REG_RANK_INDEX(64,
@@ -907,7 +896,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         {
             printk(XENLOG_G_DEBUG
                    "%pv: vGICD: wrong irouter at offset %#08x val %#"PRIregister,
-                   v, gicd_reg, *r);
+                   v, gicd_reg, r);
             vgic_unlock_rank(v, rank, flags);
             /*
              * TODO: Don't inject a fault to the guest when the MPIDR is
@@ -953,14 +942,14 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
     default:
         printk(XENLOG_G_ERR
                "%pv: vGICD: unhandled write r%d=%"PRIregister" offset %#08x\n",
-               v, dabt.reg, *r, gicd_reg);
+               v, dabt.reg, r, gicd_reg);
         return 0;
     }
 
 bad_width:
     printk(XENLOG_G_ERR
            "%pv: vGICD: bad write width %d r%d=%"PRIregister" offset %#08x\n",
-           v, dabt.size, dabt.reg, *r, gicd_reg);
+           v, dabt.size, dabt.reg, r, gicd_reg);
     domain_crash_synchronous();
     return 0;
 

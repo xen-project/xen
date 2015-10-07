@@ -45,8 +45,10 @@
 
 #define domain_has_vuart(d) ((d)->arch.vuart.info != NULL)
 
-static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info, void *priv);
-static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info, void *priv);
+static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info,
+                           register_t *r, void *priv);
+static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info,
+                            register_t r, void *priv);
 
 static const struct mmio_handler_ops vuart_mmio_handler = {
     .read  = vuart_mmio_read,
@@ -106,12 +108,10 @@ static void vuart_print_char(struct vcpu *v, char c)
     spin_unlock(&uart->lock);
 }
 
-static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info, void *priv)
+static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info,
+                           register_t *r, void *priv)
 {
     struct domain *d = v->domain;
-    struct hsr_dabt dabt = info->dabt;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    register_t *r = select_user_reg(regs, dabt.reg);
     paddr_t offset = info->gpa - d->arch.vuart.info->base_addr;
 
     perfc_incr(vuart_reads);
@@ -126,19 +126,17 @@ static int vuart_mmio_read(struct vcpu *v, mmio_info_t *info, void *priv)
     return 1;
 }
 
-static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info, void *priv)
+static int vuart_mmio_write(struct vcpu *v, mmio_info_t *info,
+                            register_t r, void *priv)
 {
     struct domain *d = v->domain;
-    struct hsr_dabt dabt = info->dabt;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    register_t *r = select_user_reg(regs, dabt.reg);
     paddr_t offset = info->gpa - d->arch.vuart.info->base_addr;
 
     perfc_incr(vuart_writes);
 
     if ( offset == d->arch.vuart.info->data_off )
         /* ignore any status bits */
-        vuart_print_char(v, *r & 0xFF);
+        vuart_print_char(v, r & 0xFF);
 
     return 1;
 }

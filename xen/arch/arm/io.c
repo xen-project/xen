@@ -29,6 +29,9 @@ int handle_mmio(mmio_info_t *info)
     int i;
     const struct mmio_handler *handler = NULL;
     const struct vmmio *vmmio = &v->domain->arch.vmmio;
+    struct hsr_dabt dabt = info->dabt;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    register_t *r = select_user_reg(regs, dabt.reg);
 
     for ( i = 0; i < vmmio->num_entries; i++ )
     {
@@ -43,9 +46,9 @@ int handle_mmio(mmio_info_t *info)
         return 0;
 
     if ( info->dabt.write )
-        return handler->ops->write(v, info, handler->priv);
+        return handler->ops->write(v, info, *r, handler->priv);
     else
-        return handler->ops->read(v, info, handler->priv);
+        return handler->ops->read(v, info, r, handler->priv);
 }
 
 void register_mmio_handler(struct domain *d,
