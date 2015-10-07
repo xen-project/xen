@@ -139,8 +139,8 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         if ( rank == NULL) goto read_as_zero;
 
         vgic_lock_rank(v, rank, flags);
-        *r = rank->ipriority[REG_RANK_INDEX(8, gicd_reg - GICD_IPRIORITYR,
-                                            DABT_WORD)];
+        *r = rank->ipriorityr[REG_RANK_INDEX(8, gicd_reg - GICD_IPRIORITYR,
+                                             DABT_WORD)];
         if ( dabt.size == DABT_BYTE )
             *r = vgic_byte_read(*r, gicd_reg);
         vgic_unlock_rank(v, rank, flags);
@@ -405,10 +405,10 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         if ( rank == NULL) goto write_ignore;
         vgic_lock_rank(v, rank, flags);
         if ( dabt.size == DABT_WORD )
-            rank->ipriority[REG_RANK_INDEX(8, gicd_reg - GICD_IPRIORITYR,
-                                           DABT_WORD)] = r;
+            rank->ipriorityr[REG_RANK_INDEX(8, gicd_reg - GICD_IPRIORITYR,
+                                            DABT_WORD)] = r;
         else
-            vgic_byte_write(&rank->ipriority[REG_RANK_INDEX(8,
+            vgic_byte_write(&rank->ipriorityr[REG_RANK_INDEX(8,
                         gicd_reg - GICD_IPRIORITYR, DABT_WORD)], r, gicd_reg);
         vgic_unlock_rank(v, rank, flags);
         return 1;
@@ -514,18 +514,6 @@ static struct vcpu *vgic_v2_get_target_vcpu(struct vcpu *v, unsigned int irq)
     return v_target;
 }
 
-static int vgic_v2_get_irq_priority(struct vcpu *v, unsigned int irq)
-{
-    int priority;
-    struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
-
-    ASSERT(spin_is_locked(&rank->lock));
-    priority = vgic_byte_read(rank->ipriority[REG_RANK_INDEX(8,
-                                              irq, DABT_WORD)], irq & 0x3);
-
-    return priority;
-}
-
 static int vgic_v2_vcpu_init(struct vcpu *v)
 {
     int i;
@@ -597,7 +585,6 @@ static int vgic_v2_domain_init(struct domain *d)
 static const struct vgic_ops vgic_v2_ops = {
     .vcpu_init   = vgic_v2_vcpu_init,
     .domain_init = vgic_v2_domain_init,
-    .get_irq_priority = vgic_v2_get_irq_priority,
     .get_target_vcpu = vgic_v2_get_target_vcpu,
     .max_vcpus = 8,
 };

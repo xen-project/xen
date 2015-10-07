@@ -82,12 +82,25 @@ struct pending_irq
     struct list_head lr_queue;
 };
 
+#define NR_INTERRUPT_PER_RANK   32
+#define INTERRUPT_RANK_MASK (NR_INTERRUPT_PER_RANK - 1)
+
 /* Represents state corresponding to a block of 32 interrupts */
 struct vgic_irq_rank {
     spinlock_t lock; /* Covers access to all other members of this struct */
     uint32_t ienable;
     uint32_t icfg[2];
-    uint32_t ipriority[8];
+
+    /*
+     * Provide efficient access to the priority of an vIRQ while keeping
+     * the emulation simple.
+     * Note, this is working fine as long as Xen is using little endian.
+     */
+    union {
+        uint8_t priority[32];
+        uint32_t ipriorityr[8];
+    };
+
     union {
         struct {
             uint32_t itargets[8];
@@ -114,8 +127,6 @@ struct vgic_ops {
     int (*vcpu_init)(struct vcpu *v);
     /* Domain specific initialization of vGIC */
     int (*domain_init)(struct domain *d);
-    /* Get priority for a given irq stored in vgic structure */
-    int (*get_irq_priority)(struct vcpu *v, unsigned int irq);
     /* Get the target vcpu for a given virq. The rank lock is already taken
      * when calling this. */
     struct vcpu *(*get_target_vcpu)(struct vcpu *v, unsigned int irq);
