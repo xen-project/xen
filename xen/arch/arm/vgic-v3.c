@@ -336,7 +336,7 @@ static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
         *r = rank->ipriority[REG_RANK_INDEX(8, reg - GICD_IPRIORITYR,
                                             DABT_WORD)];
         if ( dabt.size == DABT_BYTE )
-            *r = vgic_byte_read(*r, dabt.sign, reg);
+            *r = vgic_byte_read(*r, reg);
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_ICFGR ... GICD_ICFGRN:
@@ -1042,7 +1042,7 @@ static int vgic_v3_get_irq_priority(struct vcpu *v, unsigned int irq)
 
     ASSERT(spin_is_locked(&rank->lock));
     priority = vgic_byte_read(rank->ipriority[REG_RANK_INDEX(8,
-                                              irq, DABT_WORD)], 0, irq & 0x3);
+                                              irq, DABT_WORD)], irq & 0x3);
 
     return priority;
 }

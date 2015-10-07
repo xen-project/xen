@@ -158,15 +158,13 @@ static inline int REG_RANK_NR(int b, uint32_t n)
     }
 }
 
-static inline uint32_t vgic_byte_read(uint32_t val, int sign, int offset)
+static inline uint32_t vgic_byte_read(uint32_t val, int offset)
 {
     int byte = offset & 0x3;
 
     val = val >> (8*byte);
-    if ( sign && (val & 0x80) )
-        val |= 0xffffff00;
-    else
-        val &= 0x000000ff;
+    val &= 0x000000ff;
+
     return val;
 }
 

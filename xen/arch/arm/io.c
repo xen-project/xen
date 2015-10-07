@@ -23,6 +23,33 @@
 #include <asm/current.h>
 #include <asm/mmio.h>
 
+static int handle_read(const struct mmio_handler *handler, struct vcpu *v,
+                       mmio_info_t *info, register_t *r)
+{
+    uint8_t size = (1 << info->dabt.size) * 8;
+
+    if ( !handler->ops->read(v, info, r, handler->priv) )
+        return 0;
+
+    /*
+     * Sign extend if required.
+     * Note that we expect the read handler to have zeroed the bits
+     * outside the requested access size.
+     */
+    if ( info->dabt.sign && (*r & (1UL << (size - 1)) ))
+    {
+        /*
+         * We are relying on register_t using the same as
+         * an unsigned long in order to keep the 32-bit assembly
+         * code smaller.
+         */
+        BUILD_BUG_ON(sizeof(register_t) != sizeof(unsigned long));
+        *r |= (~0UL) << size;
+    }
+
+    return 1;
+}
+
 int handle_mmio(mmio_info_t *info)
 {
     struct vcpu *v = current;
@@ -48,7 +75,7 @@ int handle_mmio(mmio_info_t *info)
     if ( info->dabt.write )
         return handler->ops->write(v, info, *r, handler->priv);
     else
-        return handler->ops->read(v, info, r, handler->priv);
+        return handle_read(handler, v, info, r);
 }
 
 void register_mmio_handler(struct domain *d,

@@ -129,7 +129,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         *r = rank->v2.itargets[REG_RANK_INDEX(8, gicd_reg - GICD_ITARGETSR,
                                               DABT_WORD)];
         if ( dabt.size == DABT_BYTE )
-            *r = vgic_byte_read(*r, dabt.sign, gicd_reg);
+            *r = vgic_byte_read(*r, gicd_reg);
         vgic_unlock_rank(v, rank, flags);
         return 1;
 
@@ -142,7 +142,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         *r = rank->ipriority[REG_RANK_INDEX(8, gicd_reg - GICD_IPRIORITYR,
                                             DABT_WORD)];
         if ( dabt.size == DABT_BYTE )
-            *r = vgic_byte_read(*r, dabt.sign, gicd_reg);
+            *r = vgic_byte_read(*r, gicd_reg);
         vgic_unlock_rank(v, rank, flags);
         return 1;
 
@@ -377,7 +377,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
 
             new_target = i % 8;
             old_target_mask = vgic_byte_read(rank->v2.itargets[REG_RANK_INDEX(8,
-                                             gicd_reg - GICD_ITARGETSR, DABT_WORD)], 0, i/8);
+                                             gicd_reg - GICD_ITARGETSR, DABT_WORD)], i/8);
             old_target = find_first_bit(&old_target_mask, 8);
 
             if ( new_target != old_target )
@@ -503,7 +503,7 @@ static struct vcpu *vgic_v2_get_target_vcpu(struct vcpu *v, unsigned int irq)
     ASSERT(spin_is_locked(&rank->lock));
 
     target = vgic_byte_read(rank->v2.itargets[REG_RANK_INDEX(8,
-                                              irq, DABT_WORD)], 0, irq & 0x3);
+                                              irq, DABT_WORD)], irq & 0x3);
 
     /* 1-N SPI should be delivered as pending to all the vcpus in the
      * mask, but here we just return the first vcpu for simplicity and
@@ -521,7 +521,7 @@ static int vgic_v2_get_irq_priority(struct vcpu *v, unsigned int irq)
 
     ASSERT(spin_is_locked(&rank->lock));
     priority = vgic_byte_read(rank->ipriority[REG_RANK_INDEX(8,
-                                              irq, DABT_WORD)], 0, irq & 0x3);
+                                              irq, DABT_WORD)], irq & 0x3);
 
     return priority;
 }
