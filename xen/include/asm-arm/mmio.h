@@ -34,7 +34,6 @@ typedef struct
 
 typedef int (*mmio_read_t)(struct vcpu *v, mmio_info_t *info, void *priv);
 typedef int (*mmio_write_t)(struct vcpu *v, mmio_info_t *info, void *priv);
-typedef int (*mmio_check_t)(struct vcpu *v, paddr_t addr);
 
 struct mmio_handler_ops {
     mmio_read_t read;
