@@ -170,32 +170,7 @@ struct cpufreq_driver {
 
 extern struct cpufreq_driver *cpufreq_driver;
 
-static __inline__ 
-int cpufreq_register_driver(struct cpufreq_driver *driver_data)
-{
-    if (!driver_data         || 
-        !driver_data->init   || 
-        !driver_data->exit   || 
-        !driver_data->verify || 
-        !driver_data->target)
-        return -EINVAL;
-
-    if (cpufreq_driver)
-        return -EBUSY;
-
-    cpufreq_driver = driver_data;
-    return 0;
-}
-
-static __inline__ 
-int cpufreq_unregister_driver(struct cpufreq_driver *driver)
-{
-    if (!cpufreq_driver || (driver != cpufreq_driver))
-        return -EINVAL;
-
-    cpufreq_driver = NULL;
-    return 0;
-}
+int cpufreq_register_driver(struct cpufreq_driver *);
 
 static __inline__
 void cpufreq_verify_within_limits(struct cpufreq_policy *policy,

@@ -638,3 +638,18 @@ static int __init cpufreq_presmp_init(void)
 }
 presmp_initcall(cpufreq_presmp_init);
 
+int __init cpufreq_register_driver(struct cpufreq_driver *driver_data)
+{
+   if ( !driver_data || !driver_data->init ||
+        !driver_data->verify || !driver_data->exit ||
+        (!driver_data->target == !driver_data->setpolicy) )
+        return -EINVAL;
+
+    if ( cpufreq_driver )
+        return -EBUSY;
+
+    cpufreq_driver = driver_data;
+
+    register_cpu_notifier(&cpu_nfb);
+    return 0;
+}
