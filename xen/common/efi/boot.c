@@ -613,6 +613,25 @@ static void __init efi_init(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTabl
     StdErr = SystemTable->StdErr ?: StdOut;
 }
 
+static void __init efi_console_set_mode(void)
+{
+    UINTN cols, rows, size;
+    unsigned int best, i;
+
+    for ( i = 0, size = 0, best = StdOut->Mode->Mode;
+          i < StdOut->Mode->MaxMode; ++i )
+    {
+        if ( StdOut->QueryMode(StdOut, i, &cols, &rows) == EFI_SUCCESS &&
+             cols * rows > size )
+        {
+            size = cols * rows;
+            best = i;
+        }
+    }
+    if ( best != StdOut->Mode->Mode )
+        StdOut->SetMode(StdOut, best);
+}
+
 static void __init setup_efi_pci(void)
 {
     EFI_STATUS status;
@@ -797,23 +816,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         }
 
         if ( !base_video )
-        {
-            unsigned int best;
-            UINTN cols, rows, size;
-
-            for ( i = 0, size = 0, best = StdOut->Mode->Mode;
-                  i < StdOut->Mode->MaxMode; ++i )
-            {
-                if ( StdOut->QueryMode(StdOut, i, &cols, &rows) == EFI_SUCCESS &&
-                     cols * rows > size )
-                {
-                    size = cols * rows;
-                    best = i;
-                }
-            }
-            if ( best != StdOut->Mode->Mode )
-                StdOut->SetMode(StdOut, best);
-        }
+            efi_console_set_mode();
     }
 
     PrintStr(L"Xen " __stringify(XEN_VERSION) "." __stringify(XEN_SUBVERSION)
