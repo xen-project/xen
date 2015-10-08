@@ -836,6 +836,29 @@ static void __init setup_efi_pci(void)
     efi_bs->FreePool(handles);
 }
 
+static void __init efi_variables(void)
+{
+    EFI_STATUS status;
+
+    status = (efi_rs->Hdr.Revision >> 16) >= 2 ?
+             efi_rs->QueryVariableInfo(EFI_VARIABLE_NON_VOLATILE |
+                                       EFI_VARIABLE_BOOTSERVICE_ACCESS |
+                                       EFI_VARIABLE_RUNTIME_ACCESS,
+                                       &efi_boot_max_var_store_size,
+                                       &efi_boot_remain_var_store_size,
+                                       &efi_boot_max_var_size) :
+             EFI_INCOMPATIBLE_VERSION;
+    if ( EFI_ERROR(status) )
+    {
+        efi_boot_max_var_store_size = 0;
+        efi_boot_remain_var_store_size = 0;
+        efi_boot_max_var_size = status;
+        PrintStr(L"Warning: Could not query variable store: ");
+        DisplayUint(status, 0);
+        PrintStr(newline);
+    }
+}
+
 static int __init __maybe_unused set_color(u32 mask, int bpp, u8 *pos, u8 *sz)
 {
    if ( bpp < 0 )
@@ -1073,23 +1096,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     setup_efi_pci();
 
     /* Get snapshot of variable store parameters. */
-    status = (efi_rs->Hdr.Revision >> 16) >= 2 ?
-             efi_rs->QueryVariableInfo(EFI_VARIABLE_NON_VOLATILE |
-                                       EFI_VARIABLE_BOOTSERVICE_ACCESS |
-                                       EFI_VARIABLE_RUNTIME_ACCESS,
-                                       &efi_boot_max_var_store_size,
-                                       &efi_boot_remain_var_store_size,
-                                       &efi_boot_max_var_size) :
-             EFI_INCOMPATIBLE_VERSION;
-    if ( EFI_ERROR(status) )
-    {
-        efi_boot_max_var_store_size = 0;
-        efi_boot_remain_var_store_size = 0;
-        efi_boot_max_var_size = status;
-        PrintStr(L"Warning: Could not query variable store: ");
-        DisplayUint(status, 0);
-        PrintStr(newline);
-    }
+    efi_variables();
 
     efi_arch_memory_setup();
 
