@@ -1287,7 +1287,7 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
 }
 
 /**
- * p2m_mem_paging_populate - Tell pager to populete a paged page
+ * p2m_mem_paging_populate - Tell pager to populate a paged page
  * @d: guest domain
  * @gfn: guest page in paging state
  *
