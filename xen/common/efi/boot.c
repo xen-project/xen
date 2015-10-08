@@ -597,6 +597,22 @@ static char *__init get_value(const struct file *cfg, const char *section,
     return NULL;
 }
 
+static void __init efi_init(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+{
+    efi_ih = ImageHandle;
+    efi_bs = SystemTable->BootServices;
+    efi_bs_revision = efi_bs->Hdr.Revision;
+    efi_rs = SystemTable->RuntimeServices;
+    efi_ct = SystemTable->ConfigurationTable;
+    efi_num_ct = SystemTable->NumberOfTableEntries;
+    efi_version = SystemTable->Hdr.Revision;
+    efi_fw_vendor = SystemTable->FirmwareVendor;
+    efi_fw_revision = SystemTable->FirmwareRevision;
+
+    StdOut = SystemTable->ConOut;
+    StdErr = SystemTable->StdErr ?: StdOut;
+}
+
 static void __init setup_efi_pci(void)
 {
     EFI_STATUS status;
@@ -719,18 +735,8 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     char *option_str;
     bool_t use_cfg_file;
 
-    efi_ih = ImageHandle;
-    efi_bs = SystemTable->BootServices;
-    efi_bs_revision = efi_bs->Hdr.Revision;
-    efi_rs = SystemTable->RuntimeServices;
-    efi_ct = SystemTable->ConfigurationTable;
-    efi_num_ct = SystemTable->NumberOfTableEntries;
-    efi_version = SystemTable->Hdr.Revision;
-    efi_fw_vendor = SystemTable->FirmwareVendor;
-    efi_fw_revision = SystemTable->FirmwareRevision;
+    efi_init(ImageHandle, SystemTable);
 
-    StdOut = SystemTable->ConOut;
-    StdErr = SystemTable->StdErr ?: StdOut;
     use_cfg_file = efi_arch_use_config_file(SystemTable);
 
     status = efi_bs->HandleProtocol(ImageHandle, &loaded_image_guid,
