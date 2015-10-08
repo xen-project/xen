@@ -991,10 +991,13 @@ static void dma_msi_unmask(struct irq_desc *desc)
 {
     struct iommu *iommu = desc->action->dev_id;
     unsigned long flags;
+    u32 sts;
 
     /* unmask it */
     spin_lock_irqsave(&iommu->register_lock, flags);
-    dmar_writel(iommu->reg, DMAR_FECTL_REG, 0);
+    sts = dmar_readl(iommu->reg, DMAR_FECTL_REG);
+    sts &= ~DMA_FECTL_IM;
+    dmar_writel(iommu->reg, DMAR_FECTL_REG, sts);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
     iommu->msi.msi_attrib.masked = 0;
 }
@@ -1003,10 +1006,13 @@ static void dma_msi_mask(struct irq_desc *desc)
 {
     unsigned long flags;
     struct iommu *iommu = desc->action->dev_id;
+    u32 sts;
 
     /* mask it */
     spin_lock_irqsave(&iommu->register_lock, flags);
-    dmar_writel(iommu->reg, DMAR_FECTL_REG, DMA_FECTL_IM);
+    sts = dmar_readl(iommu->reg, DMAR_FECTL_REG);
+    sts |= DMA_FECTL_IM;
+    dmar_writel(iommu->reg, DMAR_FECTL_REG, sts);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
     iommu->msi.msi_attrib.masked = 1;
 }
@@ -2002,6 +2008,7 @@ static int init_vtd_hw(void)
     struct iommu_flush *flush = NULL;
     int ret;
     unsigned long flags;
+    u32 sts;
 
     /*
      * Basic VT-d HW init: set VT-d interrupt, clear VT-d faults.  
@@ -2015,7 +2022,9 @@ static int init_vtd_hw(void)
         clear_fault_bits(iommu);
 
         spin_lock_irqsave(&iommu->register_lock, flags);
-        dmar_writel(iommu->reg, DMAR_FECTL_REG, 0);
+        sts = dmar_readl(iommu->reg, DMAR_FECTL_REG);
+        sts &= ~DMA_FECTL_IM;
+        dmar_writel(iommu->reg, DMAR_FECTL_REG, sts);
         spin_unlock_irqrestore(&iommu->register_lock, flags);
     }
 
