@@ -617,14 +617,16 @@ static hw_irq_controller gicv2_guest_irq_type = {
 static int __init gicv2_init(void)
 {
     int res;
-    paddr_t hbase, dbase, cbase, vbase;
+    paddr_t hbase, dbase;
+    paddr_t cbase, csize;
+    paddr_t vbase, vsize;
     const struct dt_device_node *node = gicv2_info.node;
 
     res = dt_device_get_address(node, 0, &dbase, NULL);
     if ( res )
         panic("GICv2: Cannot find a valid address for the distributor");
 
-    res = dt_device_get_address(node, 1, &cbase, NULL);
+    res = dt_device_get_address(node, 1, &cbase, &csize);
     if ( res )
         panic("GICv2: Cannot find a valid address for the CPU");
 
@@ -632,7 +634,7 @@ static int __init gicv2_init(void)
     if ( res )
         panic("GICv2: Cannot find a valid address for the hypervisor");
 
-    res = dt_device_get_address(node, 3, &vbase, NULL);
+    res = dt_device_get_address(node, 3, &vbase, &vsize);
     if ( res )
         panic("GICv2: Cannot find a valid address for the virtual CPU");
 
@@ -641,7 +643,28 @@ static int __init gicv2_init(void)
         panic("GICv2: Cannot find the maintenance IRQ");
     gicv2_info.maintenance_irq = res;
 
-    /* TODO: Add check on distributor, cpu size */
+    /* TODO: Add check on distributor */
+
+    /*
+     * The GICv2 CPU interface should at least be 8KB. Although, most of the DT
+     * don't correctly set it and use the GICv1 CPU interface size (i.e 4KB).
+     * Warn and then fixup.
+     */
+    if ( csize < SZ_8K )
+    {
+        printk(XENLOG_WARNING "GICv2: WARNING: "
+               "The GICC size is too small: %#"PRIx64" expected %#x\n",
+               csize, SZ_8K);
+        csize = SZ_8K;
+    }
+
+    /*
+     * Check if the CPU interface and virtual CPU interface have the
+     * same size.
+     */
+    if ( csize != vsize )
+        panic("GICv2: Sizes of GICC (%#"PRIpaddr") and GICV (%#"PRIpaddr") don't match\n",
+               csize, vsize);
 
     printk("GICv2 initialization:\n"
               "        gic_dist_addr=%"PRIpaddr"\n"

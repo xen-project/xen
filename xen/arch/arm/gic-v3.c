@@ -1143,7 +1143,8 @@ static void __init gicv3_init_v2(const struct dt_device_node *node,
                                  paddr_t dbase)
 {
     int res;
-    paddr_t cbase, vbase;
+    paddr_t cbase;
+    paddr_t vbase, vsize;
 
     /*
      * For GICv3 supporting GICv2, GICC and GICV base address will be
@@ -1155,9 +1156,23 @@ static void __init gicv3_init_v2(const struct dt_device_node *node,
         return;
 
     res = dt_device_get_address(node, 1 + gicv3.rdist_count + 2,
-                                &vbase, NULL);
+                                &vbase, &vsize);
     if ( res )
         return;
+
+    /*
+     * We emulate a vGICv2 using a GIC CPU interface of GUEST_GICC_SIZE.
+     * So only support GICv2 on GICv3 when the virtual CPU interface is
+     * at least GUEST_GICC_SIZE.
+     */
+    if ( vsize < GUEST_GICC_SIZE )
+    {
+        printk(XENLOG_WARNING
+               "GICv3: WARNING: Not enabling support for GICv2 compat mode.\n"
+               "Size of GICV (%#"PRIpaddr") must at least be %#llx.\n",
+               vsize, GUEST_GICC_SIZE);
+        return;
+    }
 
     printk("GICv3 compatible with GICv2 cbase %#"PRIpaddr" vbase %#"PRIpaddr"\n",
            cbase, vbase);
