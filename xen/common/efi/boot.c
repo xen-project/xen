@@ -716,6 +716,39 @@ static UINTN __init efi_find_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
     return gop_mode;
 }
 
+static void __init efi_tables(void)
+{
+    unsigned int i;
+
+    /* Obtain basic table pointers. */
+    for ( i = 0; i < efi_num_ct; ++i )
+    {
+        static EFI_GUID __initdata acpi2_guid = ACPI_20_TABLE_GUID;
+        static EFI_GUID __initdata acpi_guid = ACPI_TABLE_GUID;
+        static EFI_GUID __initdata mps_guid = MPS_TABLE_GUID;
+        static EFI_GUID __initdata smbios_guid = SMBIOS_TABLE_GUID;
+        static EFI_GUID __initdata smbios3_guid = SMBIOS3_TABLE_GUID;
+
+        if ( match_guid(&acpi2_guid, &efi_ct[i].VendorGuid) )
+	       efi.acpi20 = (long)efi_ct[i].VendorTable;
+        if ( match_guid(&acpi_guid, &efi_ct[i].VendorGuid) )
+	       efi.acpi = (long)efi_ct[i].VendorTable;
+        if ( match_guid(&mps_guid, &efi_ct[i].VendorGuid) )
+	       efi.mps = (long)efi_ct[i].VendorTable;
+        if ( match_guid(&smbios_guid, &efi_ct[i].VendorGuid) )
+	       efi.smbios = (long)efi_ct[i].VendorTable;
+        if ( match_guid(&smbios3_guid, &efi_ct[i].VendorGuid) )
+	       efi.smbios3 = (long)efi_ct[i].VendorTable;
+    }
+
+#ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
+    dmi_efi_get_table(efi.smbios != EFI_INVALID_TABLE_ADDR
+                      ? (void *)(long)efi.smbios : NULL,
+                      efi.smbios3 != EFI_INVALID_TABLE_ADDR
+                      ? (void *)(long)efi.smbios3 : NULL);
+#endif
+}
+
 static void __init setup_efi_pci(void)
 {
     EFI_STATUS status;
@@ -1034,33 +1067,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     /* XXX Collect EDID info. */
     efi_arch_cpu();
 
-    /* Obtain basic table pointers. */
-    for ( i = 0; i < efi_num_ct; ++i )
-    {
-        static EFI_GUID __initdata acpi2_guid = ACPI_20_TABLE_GUID;
-        static EFI_GUID __initdata acpi_guid = ACPI_TABLE_GUID;
-        static EFI_GUID __initdata mps_guid = MPS_TABLE_GUID;
-        static EFI_GUID __initdata smbios_guid = SMBIOS_TABLE_GUID;
-        static EFI_GUID __initdata smbios3_guid = SMBIOS3_TABLE_GUID;
-
-        if ( match_guid(&acpi2_guid, &efi_ct[i].VendorGuid) )
-	       efi.acpi20 = (long)efi_ct[i].VendorTable;
-        if ( match_guid(&acpi_guid, &efi_ct[i].VendorGuid) )
-	       efi.acpi = (long)efi_ct[i].VendorTable;
-        if ( match_guid(&mps_guid, &efi_ct[i].VendorGuid) )
-	       efi.mps = (long)efi_ct[i].VendorTable;
-        if ( match_guid(&smbios_guid, &efi_ct[i].VendorGuid) )
-	       efi.smbios = (long)efi_ct[i].VendorTable;
-        if ( match_guid(&smbios3_guid, &efi_ct[i].VendorGuid) )
-	       efi.smbios3 = (long)efi_ct[i].VendorTable;
-    }
-
-#ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
-    dmi_efi_get_table(efi.smbios != EFI_INVALID_TABLE_ADDR
-                      ? (void *)(long)efi.smbios : NULL,
-                      efi.smbios3 != EFI_INVALID_TABLE_ADDR
-                      ? (void *)(long)efi.smbios3 : NULL);
-#endif
+    efi_tables();
 
     /* Collect PCI ROM contents. */
     setup_efi_pci();
