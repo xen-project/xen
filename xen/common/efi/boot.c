@@ -875,6 +875,53 @@ static void __init efi_set_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINTN gop
         efi_arch_video_init(gop, info_size, mode_info);
 }
 
+static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+{
+    EFI_STATUS status;
+    UINTN info_size = 0, map_key;
+    bool_t retry;
+
+    efi_bs->GetMemoryMap(&info_size, NULL, &map_key,
+                         &efi_mdesc_size, &mdesc_ver);
+    info_size += 8 * efi_mdesc_size;
+    efi_memmap = efi_arch_allocate_mmap_buffer(info_size);
+    if ( !efi_memmap )
+        blexit(L"Unable to allocate memory for EFI memory map");
+
+    for ( retry = 0; ; retry = 1 )
+    {
+        efi_memmap_size = info_size;
+        status = SystemTable->BootServices->GetMemoryMap(&efi_memmap_size,
+                                                         efi_memmap, &map_key,
+                                                         &efi_mdesc_size,
+                                                         &mdesc_ver);
+        if ( EFI_ERROR(status) )
+            PrintErrMesg(L"Cannot obtain memory map", status);
+
+        efi_arch_process_memory_map(SystemTable, efi_memmap, efi_memmap_size,
+                                    efi_mdesc_size, mdesc_ver);
+
+        efi_arch_pre_exit_boot();
+
+        status = SystemTable->BootServices->ExitBootServices(ImageHandle,
+                                                             map_key);
+        efi_bs = NULL;
+        if ( status != EFI_INVALID_PARAMETER || retry )
+            break;
+    }
+
+    if ( EFI_ERROR(status) )
+        PrintErrMesg(L"Cannot exit boot services", status);
+
+    /* Adjust pointers into EFI. */
+    efi_ct = (void *)efi_ct + DIRECTMAP_VIRT_START;
+#ifdef USE_SET_VIRTUAL_ADDRESS_MAP
+    efi_rs = (void *)efi_rs + DIRECTMAP_VIRT_START;
+#endif
+    efi_memmap = (void *)efi_memmap + DIRECTMAP_VIRT_START;
+    efi_fw_vendor = (void *)efi_fw_vendor + DIRECTMAP_VIRT_START;
+}
+
 static int __init __maybe_unused set_color(u32 mask, int bpp, u8 *pos, u8 *sz)
 {
    if ( bpp < 0 )
@@ -899,11 +946,11 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_STATUS status;
     unsigned int i, argc;
     CHAR16 **argv, *file_name, *cfg_file_name = NULL, *options = NULL;
-    UINTN map_key, info_size, gop_mode = ~0;
+    UINTN gop_mode = ~0;
     EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
     union string section = { NULL }, name;
-    bool_t base_video = 0, retry;
+    bool_t base_video = 0;
     char *option_str;
     bool_t use_cfg_file;
 
@@ -1118,46 +1165,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     if ( gop )
         efi_set_gop_mode(gop, gop_mode);
 
-    info_size = 0;
-    efi_bs->GetMemoryMap(&info_size, NULL, &map_key,
-                         &efi_mdesc_size, &mdesc_ver);
-    info_size += 8 * efi_mdesc_size;
-    efi_memmap = efi_arch_allocate_mmap_buffer(info_size);
-    if ( !efi_memmap )
-        blexit(L"Unable to allocate memory for EFI memory map");
-
-    for ( retry = 0; ; retry = 1 )
-    {
-        efi_memmap_size = info_size;
-        status = SystemTable->BootServices->GetMemoryMap(&efi_memmap_size,
-                                                         efi_memmap, &map_key,
-                                                         &efi_mdesc_size,
-                                                         &mdesc_ver);
-        if ( EFI_ERROR(status) )
-            PrintErrMesg(L"Cannot obtain memory map", status);
-
-        efi_arch_process_memory_map(SystemTable, efi_memmap, efi_memmap_size,
-                                    efi_mdesc_size, mdesc_ver);
-
-        efi_arch_pre_exit_boot();
-
-        status = SystemTable->BootServices->ExitBootServices(ImageHandle,
-                                                             map_key);
-        efi_bs = NULL;
-        if ( status != EFI_INVALID_PARAMETER || retry )
-            break;
-    }
-
-    if ( EFI_ERROR(status) )
-        PrintErrMesg(L"Cannot exit boot services", status);
-
-    /* Adjust pointers into EFI. */
-    efi_ct = (void *)efi_ct + DIRECTMAP_VIRT_START;
-#ifdef USE_SET_VIRTUAL_ADDRESS_MAP
-    efi_rs = (void *)efi_rs + DIRECTMAP_VIRT_START;
-#endif
-    efi_memmap = (void *)efi_memmap + DIRECTMAP_VIRT_START;
-    efi_fw_vendor = (void *)efi_fw_vendor + DIRECTMAP_VIRT_START;
+    efi_exit_boot(ImageHandle, SystemTable);
 
     efi_arch_post_exit_boot();
     for( ; ; ); /* not reached */
