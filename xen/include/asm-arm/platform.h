@@ -27,12 +27,6 @@ struct platform_desc {
     /* Platform power-off */
     void (*poweroff)(void);
     /*
-     * Platform quirks
-     * Defined has a function because a platform can support multiple
-     * board with different quirk on each
-     */
-    uint32_t (*quirks)(void);
-    /*
      * Platform blacklist devices
      * List of devices which must not pass-through to a guest
      */
@@ -48,9 +42,7 @@ int platform_cpu_up(int cpu);
 #endif
 void platform_reset(void);
 void platform_poweroff(void);
-bool_t platform_has_quirk(uint32_t quirk);
 bool_t platform_device_is_blacklisted(const struct dt_device_node *node);
-unsigned int platform_dom0_evtchn_ppi(void);
 
 #define PLATFORM_START(_name, _namestr)                         \
 static const struct platform_desc  __plat_desc_##_name __used   \
