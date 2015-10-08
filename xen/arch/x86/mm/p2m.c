@@ -774,7 +774,7 @@ set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     omfn = p2m->get_entry(p2m, gfn, &ot, &a, 0, NULL);
     if ( p2m_is_grant(ot) )
     {
-        p2m_unlock(p2m);
+        gfn_unlock(p2m, gfn, 0);
         domain_crash(d);
         return 0;
     }
