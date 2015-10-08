@@ -486,8 +486,9 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     /* XXX -- this might be able to be faster iff current->domain == d */
     void *table;
     unsigned long i, gfn_remainder = gfn;
-    l1_pgentry_t *p2m_entry;
-    l1_pgentry_t entry_content;
+    l1_pgentry_t *p2m_entry, entry_content;
+    /* Intermediate table to free if we're replacing it with a superpage. */
+    l1_pgentry_t intermediate_entry = l1e_empty();
     l2_pgentry_t l2e_content;
     l3_pgentry_t l3e_content;
     int rc;
@@ -535,7 +536,6 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
      */
     if ( page_order == PAGE_ORDER_1G )
     {
-        l1_pgentry_t old_entry = l1e_empty();
         p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
                                    L3_PAGETABLE_SHIFT - PAGE_SHIFT,
                                    L3_PAGETABLE_ENTRIES);
@@ -545,7 +545,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         {
             /* We're replacing a non-SP page with a superpage.  Make sure to
              * handle freeing the table properly. */
-            old_entry = *p2m_entry;
+            intermediate_entry = *p2m_entry;
         }
 
         ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
@@ -563,10 +563,6 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, entry_content, 3);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
-
-        /* Free old intermediate tables if necessary */
-        if ( l1e_get_flags(old_entry) & _PAGE_PRESENT )
-            p2m_free_entry(p2m, &old_entry, page_order);
     }
     else 
     {
@@ -607,7 +603,6 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     }
     else if ( page_order == PAGE_ORDER_2M )
     {
-        l1_pgentry_t old_entry = l1e_empty();
         p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
                                    L2_PAGETABLE_SHIFT - PAGE_SHIFT,
                                    L2_PAGETABLE_ENTRIES);
@@ -619,7 +614,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         {
             /* We're replacing a non-SP page with a superpage.  Make sure to
              * handle freeing the table properly. */
-            old_entry = *p2m_entry;
+            intermediate_entry = *p2m_entry;
         }
         
         ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
@@ -640,10 +635,6 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, entry_content, 2);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
-
-        /* Free old intermediate tables if necessary */
-        if ( l1e_get_flags(old_entry) & _PAGE_PRESENT )
-            p2m_free_entry(p2m, &old_entry, page_order);
     }
 
     /* Track the highest gfn for which we have ever had a valid mapping */
@@ -670,6 +661,14 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
                     iommu_unmap_page(p2m->domain, gfn+i);
         }
     }
+
+    /*
+     * Free old intermediate tables if necessary.  This has to be the
+     * last thing we do, after removal from the IOMMU tables, so as to
+     * avoid a potential use-after-free.
+     */
+    if ( l1e_get_flags(intermediate_entry) & _PAGE_PRESENT )
+        p2m_free_entry(p2m, &intermediate_entry, page_order);
 
  out:
     unmap_domain_page(table);
