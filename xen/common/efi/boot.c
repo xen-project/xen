@@ -632,6 +632,41 @@ static void __init efi_console_set_mode(void)
         StdOut->SetMode(StdOut, best);
 }
 
+static EFI_GRAPHICS_OUTPUT_PROTOCOL __init *efi_get_gop(void)
+{
+    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
+    EFI_HANDLE *handles;
+    EFI_STATUS status;
+    UINTN info_size, size = 0;
+    static EFI_GUID __initdata gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
+    unsigned int i;
+
+    status = efi_bs->LocateHandle(ByProtocol, &gop_guid, NULL, &size, NULL);
+    if ( status == EFI_BUFFER_TOO_SMALL )
+        status = efi_bs->AllocatePool(EfiLoaderData, size, (void **)&handles);
+    if ( !EFI_ERROR(status) )
+        status = efi_bs->LocateHandle(ByProtocol, &gop_guid, NULL, &size,
+                                      handles);
+    if ( EFI_ERROR(status) )
+        size = 0;
+    for ( i = 0; i < size / sizeof(*handles); ++i )
+    {
+        status = efi_bs->HandleProtocol(handles[i], &gop_guid, (void **)&gop);
+        if ( EFI_ERROR(status) )
+            continue;
+        status = gop->QueryMode(gop, gop->Mode->Mode, &info_size, &mode_info);
+        if ( !EFI_ERROR(status) )
+            break;
+    }
+    if ( handles )
+        efi_bs->FreePool(handles);
+    if ( EFI_ERROR(status) )
+        gop = NULL;
+
+    return gop;
+}
+
 static void __init setup_efi_pci(void)
 {
     EFI_STATUS status;
@@ -738,14 +773,12 @@ void EFIAPI __init noreturn
 efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
     static EFI_GUID __initdata loaded_image_guid = LOADED_IMAGE_PROTOCOL;
-    static EFI_GUID __initdata gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
     static EFI_GUID __initdata shim_lock_guid = SHIM_LOCK_PROTOCOL_GUID;
     EFI_LOADED_IMAGE *loaded_image;
     EFI_STATUS status;
     unsigned int i, argc;
     CHAR16 **argv, *file_name, *cfg_file_name = NULL, *options = NULL;
     UINTN map_key, info_size, gop_mode = ~0;
-    EFI_HANDLE *handles = NULL;
     EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
@@ -835,27 +868,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
                                &cols, &rows) == EFI_SUCCESS )
             efi_arch_console_init(cols, rows);
 
-        status = efi_bs->LocateHandle(ByProtocol, &gop_guid, NULL, &size, NULL);
-        if ( status == EFI_BUFFER_TOO_SMALL )
-            status = efi_bs->AllocatePool(EfiLoaderData, size, (void **)&handles);
-        if ( !EFI_ERROR(status) )
-            status = efi_bs->LocateHandle(ByProtocol, &gop_guid, NULL, &size,
-                                          handles);
-        if ( EFI_ERROR(status) )
-            size = 0;
-        for ( i = 0; i < size / sizeof(*handles); ++i )
-        {
-            status = efi_bs->HandleProtocol(handles[i], &gop_guid, (void **)&gop);
-            if ( EFI_ERROR(status) )
-                continue;
-            status = gop->QueryMode(gop, gop->Mode->Mode, &info_size, &mode_info);
-            if ( !EFI_ERROR(status) )
-                break;
-        }
-        if ( handles )
-            efi_bs->FreePool(handles);
-        if ( EFI_ERROR(status) )
-            gop = NULL;
+        gop = efi_get_gop();
 
         /* Get the file system interface. */
         dir_handle = get_parent_handle(loaded_image, &file_name);
