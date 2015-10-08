@@ -215,12 +215,13 @@ AC_ARG_WITH([system-seabios],
     AS_HELP_STRING([--with-system-seabios@<:@=PATH@:>@],
        [Use system supplied seabios PATH instead of building and installing
         our own version]),[
+    # Disable compilation of SeaBIOS.
+    seabios=n
     case $withval in
         no) seabios_path= ;;
         *)  seabios_path=$withval ;;
     esac
 ],[])
-AC_SUBST(seabios_path)
 AC_DEFINE_UNQUOTED([SEABIOS_PATH],
                    ["${seabios_path:-$XENFIRMWAREDIR/bios.bin}"],
                    [SeaBIOS path])
@@ -229,12 +230,13 @@ AC_ARG_WITH([system-ovmf],
     AS_HELP_STRING([--with-system-ovmf@<:@=PATH@:>@],
        [Use system supplied OVMF PATH instead of building and installing
         our own version]),[
+    # Disable compilation of OVMF.
+    ovmf=n
     case $withval in
         no) ovmf_path= ;;
         *)  ovmf_path=$withval ;;
     esac
 ],[])
-AC_SUBST(ovmf_path)
 AC_DEFINE_UNQUOTED([OVMF_PATH],
                    ["${ovmf_path:-$XENFIRMWAREDIR/ovmf.bin}"],
                    [OVMF path])

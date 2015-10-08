@@ -695,8 +695,6 @@ APPEND_INCLUDES
 PREPEND_LIB
 PREPEND_INCLUDES
 EXTRA_QEMUU_CONFIGURE_ARGS
-ovmf_path
-seabios_path
 qemu_xen_systemd
 qemu_xen_path
 qemu_xen
@@ -4442,13 +4440,14 @@ _ACEOF
 # Check whether --with-system-seabios was given.
 if test "${with_system_seabios+set}" = set; then :
   withval=$with_system_seabios;
+    # Disable compilation of SeaBIOS.
+    seabios=n
     case $withval in
         no) seabios_path= ;;
         *)  seabios_path=$withval ;;
     esac
 
 fi
-
 
 
 cat >>confdefs.h <<_ACEOF
@@ -4460,13 +4459,14 @@ _ACEOF
 # Check whether --with-system-ovmf was given.
 if test "${with_system_ovmf+set}" = set; then :
   withval=$with_system_ovmf;
+    # Disable compilation of OVMF.
+    ovmf=n
     case $withval in
         no) ovmf_path= ;;
         *)  ovmf_path=$withval ;;
     esac
 
 fi
-
 
 
 cat >>confdefs.h <<_ACEOF
