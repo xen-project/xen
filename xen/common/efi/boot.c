@@ -859,6 +859,22 @@ static void __init efi_variables(void)
     }
 }
 
+static void __init efi_set_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINTN gop_mode)
+{
+    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
+    EFI_STATUS status;
+    UINTN info_size;
+
+    /* Set graphics mode. */
+    if ( gop_mode < gop->Mode->MaxMode && gop_mode != gop->Mode->Mode )
+        gop->SetMode(gop, gop_mode);
+
+    /* Get graphics and frame buffer info. */
+    status = gop->QueryMode(gop, gop->Mode->Mode, &info_size, &mode_info);
+    if ( !EFI_ERROR(status) )
+        efi_arch_video_init(gop, info_size, mode_info);
+}
+
 static int __init __maybe_unused set_color(u32 mask, int bpp, u8 *pos, u8 *sz)
 {
    if ( bpp < 0 )
@@ -886,7 +902,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     UINTN map_key, info_size, gop_mode = ~0;
     EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
-    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
     union string section = { NULL }, name;
     bool_t base_video = 0, retry;
     char *option_str;
@@ -1101,17 +1116,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     efi_arch_memory_setup();
 
     if ( gop )
-    {
-
-        /* Set graphics mode. */
-        if ( gop_mode < gop->Mode->MaxMode && gop_mode != gop->Mode->Mode )
-            gop->SetMode(gop, gop_mode);
-
-        /* Get graphics and frame buffer info. */
-        status = gop->QueryMode(gop, gop->Mode->Mode, &info_size, &mode_info);
-        if ( !EFI_ERROR(status) )
-            efi_arch_video_init(gop, info_size, mode_info);
-    }
+        efi_set_gop_mode(gop, gop_mode);
 
     info_size = 0;
     efi_bs->GetMemoryMap(&info_size, NULL, &map_key,
