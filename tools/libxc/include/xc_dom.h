@@ -157,7 +157,6 @@ struct xc_dom_image {
 
     xc_interface *xch;
     domid_t guest_domid;
-    int8_t superpages;
     int claim_enabled; /* 0 by default, 1 enables it */
     int shadow_enabled;
 
