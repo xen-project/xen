@@ -1219,6 +1219,7 @@ static int role_read(struct policydb *p, struct hashtab *h, void *fp)
     int rc;
     __le32 buf[3];
     u32 len;
+    u32 ver = p->policyvers;
 
     role = xzalloc(struct role_datum);
     if ( !role )
@@ -1227,7 +1228,7 @@ static int role_read(struct policydb *p, struct hashtab *h, void *fp)
         goto out;
     }
 
-    if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
+    if ( ver >= POLICYDB_VERSION_BOUNDARY )
         rc = next_entry(buf, fp, sizeof(buf[0]) * 3);
     else
         rc = next_entry(buf, fp, sizeof(buf[0]) * 2);
@@ -1237,7 +1238,7 @@ static int role_read(struct policydb *p, struct hashtab *h, void *fp)
 
     len = le32_to_cpu(buf[0]);
     role->value = le32_to_cpu(buf[1]);
-    if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
+    if ( ver >= POLICYDB_VERSION_BOUNDARY )
         role->bounds = le32_to_cpu(buf[2]);
 
     key = xmalloc_array(char, len + 1);
@@ -1289,6 +1290,7 @@ static int type_read(struct policydb *p, struct hashtab *h, void *fp)
     int rc;
     __le32 buf[4];
     u32 len;
+    u32 ver = p->policyvers;
 
     typdatum = xzalloc(struct type_datum);
     if ( !typdatum )
@@ -1297,7 +1299,7 @@ static int type_read(struct policydb *p, struct hashtab *h, void *fp)
         return rc;
     }
 
-    if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
+    if ( ver >= POLICYDB_VERSION_BOUNDARY )
         rc = next_entry(buf, fp, sizeof(buf[0]) * 4);
     else
         rc = next_entry(buf, fp, sizeof(buf[0]) * 3);
@@ -1307,7 +1309,7 @@ static int type_read(struct policydb *p, struct hashtab *h, void *fp)
 
     len = le32_to_cpu(buf[0]);
     typdatum->value = le32_to_cpu(buf[1]);
-    if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
+    if ( ver >= POLICYDB_VERSION_BOUNDARY )
     {
         u32 prop = le32_to_cpu(buf[2]);
 
@@ -1382,6 +1384,7 @@ static int user_read(struct policydb *p, struct hashtab *h, void *fp)
     int rc;
     __le32 buf[3];
     u32 len;
+    u32 ver = p->policyvers;
 
     usrdatum = xzalloc(struct user_datum);
     if ( !usrdatum )
@@ -1390,7 +1393,7 @@ static int user_read(struct policydb *p, struct hashtab *h, void *fp)
         goto out;
     }
 
-    if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
+    if ( ver >= POLICYDB_VERSION_BOUNDARY )
         rc = next_entry(buf, fp, sizeof(buf[0]) * 3);
     else
         rc = next_entry(buf, fp, sizeof(buf[0]) * 2);
@@ -1400,7 +1403,7 @@ static int user_read(struct policydb *p, struct hashtab *h, void *fp)
 
     len = le32_to_cpu(buf[0]);
     usrdatum->value = le32_to_cpu(buf[1]);
-    if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
+    if ( ver >= POLICYDB_VERSION_BOUNDARY )
         usrdatum->bounds = le32_to_cpu(buf[2]);
 
     key = xmalloc_array(char, len + 1);
@@ -1418,7 +1421,7 @@ static int user_read(struct policydb *p, struct hashtab *h, void *fp)
     if ( rc )
         goto bad;
 
-    if ( p->policyvers >= POLICYDB_VERSION_MLS )
+    if ( ver >= POLICYDB_VERSION_MLS )
     {
         rc = mls_read_range_helper(&usrdatum->range, fp);
         if ( rc )
