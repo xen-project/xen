@@ -667,6 +667,55 @@ static EFI_GRAPHICS_OUTPUT_PROTOCOL __init *efi_get_gop(void)
     return gop;
 }
 
+static UINTN __init efi_find_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
+                                      UINTN cols, UINTN rows, UINTN depth)
+{
+    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
+    EFI_STATUS status;
+    UINTN gop_mode = ~0, info_size, size;
+    unsigned int i;
+
+    for ( i = size = 0; i < gop->Mode->MaxMode; ++i )
+    {
+        unsigned int bpp = 0;
+
+        status = gop->QueryMode(gop, i, &info_size, &mode_info);
+        if ( EFI_ERROR(status) )
+            continue;
+        switch ( mode_info->PixelFormat )
+        {
+        case PixelBitMask:
+            bpp = hweight32(mode_info->PixelInformation.RedMask |
+                            mode_info->PixelInformation.GreenMask |
+                            mode_info->PixelInformation.BlueMask);
+            break;
+        case PixelRedGreenBlueReserved8BitPerColor:
+        case PixelBlueGreenRedReserved8BitPerColor:
+            bpp = 24;
+            break;
+        default:
+            continue;
+        }
+        if ( cols == mode_info->HorizontalResolution &&
+             rows == mode_info->VerticalResolution &&
+             (!depth || bpp == depth) )
+        {
+            gop_mode = i;
+            break;
+        }
+        if ( !cols && !rows &&
+             mode_info->HorizontalResolution *
+             mode_info->VerticalResolution > size )
+        {
+            size = mode_info->HorizontalResolution *
+                   mode_info->VerticalResolution;
+            gop_mode = i;
+        }
+    }
+
+    return gop_mode;
+}
+
 static void __init setup_efi_pci(void)
 {
     EFI_STATUS status;
@@ -977,45 +1026,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         dir_handle->Close(dir_handle);
 
         if ( gop && !base_video )
-        {
-            for ( i = size = 0; i < gop->Mode->MaxMode; ++i )
-            {
-                unsigned int bpp = 0;
-
-                status = gop->QueryMode(gop, i, &info_size, &mode_info);
-                if ( EFI_ERROR(status) )
-                    continue;
-                switch ( mode_info->PixelFormat )
-                {
-                case PixelBitMask:
-                    bpp = hweight32(mode_info->PixelInformation.RedMask |
-                                    mode_info->PixelInformation.GreenMask |
-                                    mode_info->PixelInformation.BlueMask);
-                    break;
-                case PixelRedGreenBlueReserved8BitPerColor:
-                case PixelBlueGreenRedReserved8BitPerColor:
-                    bpp = 24;
-                    break;
-                default:
-                    continue;
-                }
-                if ( cols == mode_info->HorizontalResolution &&
-                     rows == mode_info->VerticalResolution &&
-                     (!depth || bpp == depth) )
-                {
-                    gop_mode = i;
-                    break;
-                }
-                if ( !cols && !rows &&
-                     mode_info->HorizontalResolution *
-                     mode_info->VerticalResolution > size )
-                {
-                    size = mode_info->HorizontalResolution *
-                           mode_info->VerticalResolution;
-                    gop_mode = i;
-                }
-            }
-        }
+            gop_mode = efi_find_gop_mode(gop, cols, rows, depth);
     }
 
     efi_arch_edd();
