@@ -68,11 +68,6 @@ static void __init xgene_check_pirq_eoi(void)
               "Please upgrade your firmware to the latest version");
 }
 
-static uint32_t xgene_storm_quirks(void)
-{
-    return PLATFORM_QUIRK_GIC_64K_STRIDE;
-}
-
 static void xgene_storm_reset(void)
 {
     void __iomem *addr;
@@ -122,7 +117,6 @@ PLATFORM_START(xgene_storm, "APM X-GENE STORM")
     .compatible = xgene_storm_dt_compat,
     .init = xgene_storm_init,
     .reset = xgene_storm_reset,
-    .quirks = xgene_storm_quirks,
 PLATFORM_END
 
 /*

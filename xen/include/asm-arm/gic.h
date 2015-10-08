@@ -76,6 +76,7 @@
 #define GICC_HPPIR      (0x0018)
 #define GICC_APR        (0x00D0)
 #define GICC_NSAPR      (0x00E0)
+#define GICC_IIDR       (0x00FC)
 #define GICC_DIR        (0x1000)
 
 #define GICH_HCR        (0x00)

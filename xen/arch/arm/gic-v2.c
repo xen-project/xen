@@ -65,7 +65,7 @@
 /* Global state */
 static struct {
     void __iomem * map_dbase; /* IO mapped Address of distributor registers */
-    void __iomem * map_cbase[2]; /* IO mapped Address of CPU interface registers */
+    void __iomem * map_cbase; /* IO mapped Address of CPU interface registers */
     void __iomem * map_hbase; /* IO Address of virtual interface registers */
     spinlock_t lock;
 } gicv2;
@@ -98,16 +98,12 @@ static inline uint32_t readl_gicd(unsigned int offset)
 
 static inline void writel_gicc(uint32_t val, unsigned int offset)
 {
-    unsigned int page = offset >> PAGE_SHIFT;
-    offset &= ~PAGE_MASK;
-    writel_relaxed(val, gicv2.map_cbase[page] + offset);
+    writel_relaxed(val, gicv2.map_cbase + offset);
 }
 
 static inline uint32_t readl_gicc(unsigned int offset)
 {
-    unsigned int page = offset >> PAGE_SHIFT;
-    offset &= ~PAGE_MASK;
-    return readl_relaxed(gicv2.map_cbase[page] + offset);
+    return readl_relaxed(gicv2.map_cbase + offset);
 }
 
 static inline void writel_gich(uint32_t val, unsigned int offset)
@@ -614,12 +610,31 @@ static hw_irq_controller gicv2_guest_irq_type = {
     .set_affinity = gicv2_irq_set_affinity,
 };
 
+static bool_t gicv2_is_aliased(paddr_t cbase, paddr_t csize)
+{
+    uint32_t val_low, val_high;
+
+    if ( csize != SZ_128K )
+        return false;
+
+    /*
+     * Verify that we have the first 4kB of a GIC400
+     * aliased over the first 64kB by checking the
+     * GICC_IIDR register on both ends.
+     */
+    val_low = readl_gicc(GICC_IIDR);
+    val_high = readl_gicc(GICC_IIDR + 0xf000);
+
+    return ((val_low & 0xfff0fff) == 0x0202043B && val_low == val_high);
+}
+
 static int __init gicv2_init(void)
 {
     int res;
     paddr_t hbase, dbase;
     paddr_t cbase, csize;
     paddr_t vbase, vsize;
+    uint32_t aliased_offset = 0;
     const struct dt_device_node *node = gicv2_info.node;
 
     res = dt_device_get_address(node, 0, &dbase, NULL);
@@ -683,21 +698,33 @@ static int __init gicv2_init(void)
     if ( !gicv2.map_dbase )
         panic("GICv2: Failed to ioremap for GIC distributor\n");
 
-    gicv2.map_cbase[0] = ioremap_nocache(cbase, PAGE_SIZE);
-
-    if ( platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
-        gicv2.map_cbase[1] = ioremap_nocache(cbase + SZ_64K, PAGE_SIZE);
-    else
-        gicv2.map_cbase[1] = ioremap_nocache(cbase + PAGE_SIZE, PAGE_SIZE);
-
-    if ( !gicv2.map_cbase[0] || !gicv2.map_cbase[1] )
+    gicv2.map_cbase = ioremap_nocache(cbase, csize);
+    if ( !gicv2.map_cbase )
         panic("GICv2: Failed to ioremap for GIC CPU interface\n");
+
+    if ( gicv2_is_aliased(cbase, csize) )
+    {
+        /*
+         * Move the base up by 60kB, so that we have a 8kB contiguous
+         * region, which allows us to use GICC_DIR at its
+         * normal offset.
+         * Note the variable cbase is not updated as we need the original
+         * value for the vGICv2 emulation.
+         */
+        aliased_offset = 0xf000;
+
+        gicv2.map_cbase += aliased_offset;
+
+        printk(XENLOG_WARNING
+               "GICv2: Adjusting CPU interface base to %#"PRIx64"\n",
+               cbase + aliased_offset);
+    }
 
     gicv2.map_hbase = ioremap_nocache(hbase, PAGE_SIZE);
     if ( !gicv2.map_hbase )
         panic("GICv2: Failed to ioremap for GIC Virtual interface\n");
 
-    vgic_v2_setup_hw(dbase, cbase, vbase);
+    vgic_v2_setup_hw(dbase, cbase, csize, vbase, aliased_offset);
 
     /* Global settings: interrupt distributor */
     spin_lock_init(&gicv2.lock);

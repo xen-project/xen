@@ -36,18 +36,25 @@ static struct {
     bool_t enabled;
     /* Distributor interface address */
     paddr_t dbase;
-    /* CPU interface address */
+    /* CPU interface address & size */
     paddr_t cbase;
+    paddr_t csize;
     /* Virtual CPU interface address */
     paddr_t vbase;
+
+    /* Offset to add to get an 8kB contiguous region if GIC is aliased */
+    uint32_t aliased_offset;
 } vgic_v2_hw;
 
-void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t vbase)
+void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
+                      paddr_t vbase, uint32_t aliased_offset)
 {
     vgic_v2_hw.enabled = 1;
     vgic_v2_hw.dbase = dbase;
     vgic_v2_hw.cbase = cbase;
+    vgic_v2_hw.csize = csize;
     vgic_v2_hw.vbase = vbase;
+    vgic_v2_hw.aliased_offset = aliased_offset;
 }
 
 static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
@@ -524,7 +531,8 @@ static int vgic_v2_vcpu_init(struct vcpu *v)
 static int vgic_v2_domain_init(struct domain *d)
 {
     int i, ret;
-    paddr_t cbase;
+    paddr_t cbase, csize;
+    paddr_t vbase;
 
     /*
      * The hardware domain gets the hardware address.
@@ -533,33 +541,38 @@ static int vgic_v2_domain_init(struct domain *d)
     if ( is_hardware_domain(d) )
     {
         d->arch.vgic.dbase = vgic_v2_hw.dbase;
+        /*
+         * For the hardware domain, we always map the whole HW CPU
+         * interface region in order to match the device tree (the "reg"
+         * properties is copied as it is).
+         * Note that we assume the size of the CPU interface is always
+         * aligned to PAGE_SIZE.
+         */
         cbase = vgic_v2_hw.cbase;
+        csize = vgic_v2_hw.csize;
+        vbase = vgic_v2_hw.vbase;
     }
     else
     {
         d->arch.vgic.dbase = GUEST_GICD_BASE;
+        /*
+         * The CPU interface exposed to the guest is always 8kB. We may
+         * need to add an offset to the virtual CPU interface base
+         * address when in the GIC is aliased to get a 8kB contiguous
+         * region.
+         */
+        BUILD_BUG_ON(GUEST_GICC_SIZE != SZ_8K);
         cbase = GUEST_GICC_BASE;
+        csize = GUEST_GICC_SIZE;
+        vbase = vgic_v2_hw.vbase + vgic_v2_hw.aliased_offset;
     }
 
     /*
      * Map the gic virtual cpu interface in the gic cpu interface
      * region of the guest.
-     *
-     * The second page is always mapped at +4K irrespective of the
-     * GIC_64K_STRIDE quirk. The DTB passed to the guest reflects this.
      */
-    ret = map_mmio_regions(d, paddr_to_pfn(cbase), 1,
-                           paddr_to_pfn(vgic_v2_hw.vbase));
-    if ( ret )
-        return ret;
-
-    if ( !platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
-        ret = map_mmio_regions(d, paddr_to_pfn(cbase + PAGE_SIZE),
-                               1, paddr_to_pfn(vgic_v2_hw.vbase + PAGE_SIZE));
-    else
-        ret = map_mmio_regions(d, paddr_to_pfn(cbase + PAGE_SIZE),
-                               1, paddr_to_pfn(vgic_v2_hw.vbase + SZ_64K));
-
+    ret = map_mmio_regions(d, paddr_to_pfn(cbase), csize / PAGE_SIZE,
+                           paddr_to_pfn(vbase));
     if ( ret )
         return ret;
 

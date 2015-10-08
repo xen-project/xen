@@ -1143,7 +1143,7 @@ static void __init gicv3_init_v2(const struct dt_device_node *node,
                                  paddr_t dbase)
 {
     int res;
-    paddr_t cbase;
+    paddr_t cbase, csize;
     paddr_t vbase, vsize;
 
     /*
@@ -1151,7 +1151,7 @@ static void __init gicv3_init_v2(const struct dt_device_node *node,
      * provided.
      */
     res = dt_device_get_address(node, 1 + gicv3.rdist_count,
-                                &cbase, NULL);
+                                &cbase, &csize);
     if ( res )
         return;
 
@@ -1177,7 +1177,7 @@ static void __init gicv3_init_v2(const struct dt_device_node *node,
     printk("GICv3 compatible with GICv2 cbase %#"PRIpaddr" vbase %#"PRIpaddr"\n",
            cbase, vbase);
 
-    vgic_v2_setup_hw(dbase, cbase, vbase);
+    vgic_v2_setup_hw(dbase, cbase, csize, vbase, 0);
 }
 
 /* Set up the GIC */

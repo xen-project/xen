@@ -248,7 +248,8 @@ static inline int vgic_allocate_spi(struct domain *d)
 
 extern void vgic_free_virq(struct domain *d, unsigned int virq);
 
-void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t vbase);
+void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
+                      paddr_t vbase, uint32_t aliased_offset);
 
 #ifdef HAS_GICV3
 struct rdist_region;

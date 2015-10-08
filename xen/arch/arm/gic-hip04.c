@@ -631,14 +631,14 @@ static hw_irq_controller hip04gic_guest_irq_type = {
 static int __init hip04gic_init(void)
 {
     int res;
-    paddr_t hbase, dbase, cbase, vbase;
+    paddr_t hbase, dbase, cbase, csize, vbase;
     const struct dt_device_node *node = gicv2_info.node;
 
     res = dt_device_get_address(node, 0, &dbase, NULL);
     if ( res )
         panic("GIC-HIP04: Cannot find a valid address for the distributor");
 
-    res = dt_device_get_address(node, 1, &cbase, NULL);
+    res = dt_device_get_address(node, 1, &cbase, &csize);
     if ( res )
         panic("GIC-HIP04: Cannot find a valid address for the CPU");
 
@@ -675,11 +675,7 @@ static int __init hip04gic_init(void)
         panic("GIC-HIP04: Failed to ioremap for GIC distributor\n");
 
     gicv2.map_cbase[0] = ioremap_nocache(cbase, PAGE_SIZE);
-
-    if ( platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
-        gicv2.map_cbase[1] = ioremap_nocache(cbase + SZ_64K, PAGE_SIZE);
-    else
-        gicv2.map_cbase[1] = ioremap_nocache(cbase + PAGE_SIZE, PAGE_SIZE);
+    gicv2.map_cbase[1] = ioremap_nocache(cbase + PAGE_SIZE, PAGE_SIZE);
 
     if ( !gicv2.map_cbase[0] || !gicv2.map_cbase[1] )
         panic("GIC-HIP04: Failed to ioremap for GIC CPU interface\n");
@@ -688,7 +684,7 @@ static int __init hip04gic_init(void)
     if ( !gicv2.map_hbase )
         panic("GIC-HIP04: Failed to ioremap for GIC Virtual interface\n");
 
-    vgic_v2_setup_hw(dbase, cbase, vbase);
+    vgic_v2_setup_hw(dbase, cbase, csize, vbase, 0);
 
     /* Global settings: interrupt distributor */
     spin_lock_init(&gicv2.lock);
