@@ -346,6 +346,7 @@ F:	drivers/xen/usb*/
 
 VTPM
 M:	Daniel De Graaf <dgdegra@tycho.nsa.gov>
+M:	Quan Xu <quan.xu@intel.com>
 S:	Supported
 F:	extras/mini-os/tpm*
 F:	extras/mini-os/include/tpm*
