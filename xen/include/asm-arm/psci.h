@@ -87,6 +87,19 @@ void do_psci_0_2_system_reset(void);
 #define PSCI_0_2_POWER_STATE_TYPE_MASK      \
                     (0x1 << PSCI_0_2_POWER_STATE_TYPE_SHIFT)
 
+/* PSCI version decoding (independent of PSCI version) */
+#define PSCI_VERSION_MAJOR_SHIFT            16
+#define PSCI_VERSION_MINOR_MASK             \
+        ((1U << PSCI_VERSION_MAJOR_SHIFT) - 1)
+#define PSCI_VERSION_MAJOR_MASK             ~PSCI_VERSION_MINOR_MASK
+#define PSCI_VERSION_MAJOR(ver)             \
+        (((ver) & PSCI_VERSION_MAJOR_MASK) >> PSCI_VERSION_MAJOR_SHIFT)
+#define PSCI_VERSION_MINOR(ver)             \
+        ((ver) & PSCI_VERSION_MINOR_MASK)
+
+#define PSCI_VERSION(major, minor)          \
+    (((major) << PSCI_VERSION_MAJOR_SHIFT) | (minor))
+
 #endif /* __ASM_PSCI_H__ */
 
 /*

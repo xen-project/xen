@@ -109,10 +109,16 @@ int __init psci_init_0_1(void)
 
 int __init psci_init_0_2(void)
 {
+    static const struct dt_device_match psci_ids[] __initconst =
+    {
+        DT_MATCH_COMPATIBLE("arm,psci-0.2"),
+        DT_MATCH_COMPATIBLE("arm,psci-1.0"),
+        { /* sentinel */ },
+    };
     int ret;
     const struct dt_device_node *psci;
 
-    psci = dt_find_compatible_node(NULL, NULL, "arm,psci-0.2");
+    psci = dt_find_matching_node(NULL, psci_ids);
     if ( !psci )
         return -EOPNOTSUPP;
 
@@ -122,15 +128,18 @@ int __init psci_init_0_2(void)
 
     psci_ver = call_smc(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
 
-    if ( psci_ver != XEN_PSCI_V_0_2 )
+    /* For the moment, we only support PSCI 0.2 and PSCI 1.x */
+    if ( psci_ver != PSCI_VERSION(0, 2) && PSCI_VERSION_MAJOR(psci_ver != 1) )
     {
-        printk("Error: PSCI version %#x is not supported.\n", psci_ver);
+        printk("Error: Unrecognized PSCI version %u.%u\n",
+               PSCI_VERSION_MAJOR(psci_ver), PSCI_VERSION_MINOR(psci_ver));
         return -EOPNOTSUPP;
     }
 
     psci_cpu_on_nr = PSCI_0_2_FN_NATIVE(CPU_ON);
 
-    printk(XENLOG_INFO "Using PSCI-0.2 for SMP bringup\n");
+    printk(XENLOG_INFO "Using PSCI-%u.%u for SMP bringup\n",
+           PSCI_VERSION_MAJOR(psci_ver), PSCI_VERSION_MINOR(psci_ver));
 
     return 0;
 }
