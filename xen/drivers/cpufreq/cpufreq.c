@@ -650,6 +650,5 @@ int __init cpufreq_register_driver(struct cpufreq_driver *driver_data)
 
     cpufreq_driver = driver_data;
 
-    register_cpu_notifier(&cpu_nfb);
     return 0;
 }
