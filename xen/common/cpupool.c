@@ -744,7 +744,7 @@ void dump_runq(unsigned char key)
 
     printk("sched_smt_power_savings: %s\n",
             sched_smt_power_savings? "enabled":"disabled");
-    printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now);
+    printk("NOW=%"PRI_stime"\n", now);
 
     print_cpumap("Online Cpus", &cpu_online_map);
     if ( !cpumask_empty(&cpupool_free_cpus) )
