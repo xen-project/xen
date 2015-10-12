@@ -46,13 +46,13 @@ int call_psci_cpu_on(int cpu)
 
 void call_psci_system_off(void)
 {
-    if ( psci_ver > XEN_PSCI_V_0_1 )
+    if ( psci_ver > PSCI_VERSION(0, 1) )
         call_smc(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
 }
 
 void call_psci_system_reset(void)
 {
-    if ( psci_ver > XEN_PSCI_V_0_1 )
+    if ( psci_ver > PSCI_VERSION(0, 1) )
         call_smc(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
 }
 
@@ -100,7 +100,7 @@ int __init psci_init_0_1(void)
         return -ENOENT;
     }
 
-    psci_ver = XEN_PSCI_V_0_1;
+    psci_ver = PSCI_VERSION(0, 1);
 
     printk(XENLOG_INFO "Using PSCI-0.1 for SMP bringup\n");
 

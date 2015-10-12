@@ -41,10 +41,6 @@ register_t do_psci_0_2_migrate_info_up_cpu(void);
 void do_psci_0_2_system_off(void);
 void do_psci_0_2_system_reset(void);
 
-/* PSCI version */
-#define XEN_PSCI_V_0_1 1
-#define XEN_PSCI_V_0_2 2
-
 /* PSCI v0.2 interface */
 #define PSCI_0_2_FN_BASE        0x84000000
 #define PSCI_0_2_FN(n)          (PSCI_0_2_FN_BASE + (n))
