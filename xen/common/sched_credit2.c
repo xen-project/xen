@@ -1933,7 +1933,7 @@ csched2_dump(const struct scheduler *ops)
         struct csched2_dom *sdom;
         sdom = list_entry(iter_sdom, struct csched2_dom, sdom_elem);
 
-        printk("\tDomain: %d w %d v %d\n\t",
+        printk("\tDomain: %d w %d v %d\n",
                sdom->dom->domain_id,
                sdom->weight,
                sdom->nr_vcpus);
