@@ -1769,8 +1769,8 @@ static int xs_get_sd_fd(const char *connect_to)
 
 static int xs_validate_active_socket(const char *connect_to)
 {
-	if ((strcmp("/var/run/xenstored/socket_ro", connect_to) != 0) &&
-	    (strcmp("/var/run/xenstored/socket", connect_to) != 0)) {
+	if ((strcmp(xs_daemon_socket_ro(), connect_to) != 0) &&
+	    (strcmp(xs_daemon_socket(), connect_to) != 0)) {
 		sd_notifyf(0, "STATUS=unexpected socket: %s\n"
 			   "ERRNO=%i",
 			   connect_to,
