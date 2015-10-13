@@ -901,16 +901,17 @@ void acpi_dmar_zap(void)
         write_atomic((uint32_t*)&dmar_table->signature[0], sig);
 }
 
-int platform_supports_intremap(void)
+bool_t platform_supports_intremap(void)
 {
-    unsigned int mask = ACPI_DMAR_INTR_REMAP;
+    const unsigned int mask = ACPI_DMAR_INTR_REMAP;
 
     return (dmar_flags & mask) == ACPI_DMAR_INTR_REMAP;
 }
 
-int platform_supports_x2apic(void)
+bool_t __init platform_supports_x2apic(void)
 {
-    unsigned int mask = ACPI_DMAR_INTR_REMAP | ACPI_DMAR_X2APIC_OPT_OUT;
+    const unsigned int mask = ACPI_DMAR_INTR_REMAP | ACPI_DMAR_X2APIC_OPT_OUT;
+
     return cpu_has_x2apic && ((dmar_flags & mask) == ACPI_DMAR_INTR_REMAP);
 }
 

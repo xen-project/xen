@@ -143,7 +143,7 @@ static void set_hpet_source_id(unsigned int id, struct iremap_entry *ire)
     set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_13_IGNORE_3, hpetid_to_bdf(id));
 }
 
-bool_t iommu_supports_eim(void)
+bool_t __init iommu_supports_eim(void)
 {
     struct acpi_drhd_unit *drhd;
     unsigned int apic;
@@ -832,11 +832,16 @@ int iommu_enable_x2apic_IR(void)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
 
-    if ( !iommu_supports_eim() )
-        return -EOPNOTSUPP;
+    if ( system_state < SYS_STATE_active )
+    {
+        if ( !iommu_supports_eim() )
+            return -EOPNOTSUPP;
 
-    if ( !platform_supports_x2apic() )
-        return -ENXIO;
+        if ( !platform_supports_x2apic() )
+            return -ENXIO;
+    }
+    else if ( !x2apic_enabled )
+        return -EOPNOTSUPP;
 
     for_each_drhd_unit ( drhd )
     {
@@ -888,7 +893,8 @@ void iommu_disable_x2apic_IR(void)
 {
     struct acpi_drhd_unit *drhd;
 
-    if ( !iommu_supports_eim() )
+    /* x2apic_enabled implies iommu_supports_eim(). */
+    if ( !x2apic_enabled )
         return;
 
     for_each_drhd_unit ( drhd )
