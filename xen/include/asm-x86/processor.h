@@ -219,7 +219,6 @@ extern void identify_cpu(struct cpuinfo_x86 *);
 extern void setup_clear_cpu_cap(unsigned int);
 extern void print_cpu_info(unsigned int cpu);
 extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
-extern void dodgy_tsc(void);
 
 extern void detect_extended_topology(struct cpuinfo_x86 *c);
 
@@ -470,10 +469,6 @@ extern idt_entry_t *idt_tables[];
 DECLARE_PER_CPU(struct tss_struct, init_tss);
 
 extern void init_int80_direct_trap(struct vcpu *v);
-
-#define set_int80_direct_trap(_ed)  ((void)0)
-
-extern int gpf_emulate_4gb(struct cpu_user_regs *regs);
 
 extern void write_ptbase(struct vcpu *v);
 

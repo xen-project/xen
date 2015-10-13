@@ -1475,7 +1475,6 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
 {
     unsigned long cr4;
 
-    set_int80_direct_trap(v);
     switch_kernel_stack(v);
 
     cr4 = pv_guest_cr4_to_real_cr4(v);
