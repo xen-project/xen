@@ -27,7 +27,7 @@ int iommu_setup_hpet_msi(struct msi_desc *);
 /* While VT-d specific, this must get declared in a generic header. */
 int adjust_vtd_irq_affinities(void);
 void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte, int order, int present);
-int iommu_supports_eim(void);
+bool_t iommu_supports_eim(void);
 int iommu_enable_x2apic_IR(void);
 void iommu_disable_x2apic_IR(void);
 
