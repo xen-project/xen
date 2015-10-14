@@ -251,7 +251,7 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-xen.git
 QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-traditional.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
-OVMF_UPSTREAM_REVISION ?= cb9a7ebabcd6b8a49dc0854b2f9592d732b5afbd
+OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
 QEMU_UPSTREAM_REVISION ?= qemu-xen-4.5.2
 SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 # Thu May 22 16:59:16 2014 -0400
