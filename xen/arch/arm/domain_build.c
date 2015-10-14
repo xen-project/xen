@@ -415,7 +415,6 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
     dt_for_each_property_node (node, prop)
     {
         const void *prop_data = prop->value;
-        void *new_data = NULL;
         u32 prop_len = prop->length;
 
         /*
@@ -470,8 +469,6 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
         }
 
         res = fdt_property(kinfo->fdt, prop->name, prop_data, prop_len);
-
-        xfree(new_data);
 
         if ( res )
             return res;
