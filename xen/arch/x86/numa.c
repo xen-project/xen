@@ -349,7 +349,7 @@ void __init init_cpu_to_node(void)
         u32 apicid = x86_cpu_to_apicid[i];
         if ( apicid == BAD_APICID )
             continue;
-        node = apicid_to_node[apicid];
+        node = apicid < MAX_LOCAL_APIC ? apicid_to_node[apicid] : NUMA_NO_NODE;
         if ( node == NUMA_NO_NODE || !node_online(node) )
             node = 0;
         numa_set_node(i, node);

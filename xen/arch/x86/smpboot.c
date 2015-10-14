@@ -993,7 +993,8 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
             cpu = node;
             goto out;
         }
-        apicid_to_node[apic_id] = node;
+        if ( apic_id < MAX_LOCAL_APIC )
+             apicid_to_node[apic_id] = node;
     }
 
     /* Physically added CPUs do not have synchronised TSC. */
