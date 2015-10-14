@@ -76,9 +76,9 @@ void acpi_table_print_srat_entry (struct acpi_subtable_header *srat);
 
 /* the following four functions are architecture-dependent */
 void acpi_numa_slit_init (struct acpi_table_slit *slit);
-void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
-void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
-void acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
+void acpi_numa_processor_affinity_init(const struct acpi_srat_cpu_affinity *);
+void acpi_numa_x2apic_affinity_init(const struct acpi_srat_x2apic_cpu_affinity *);
+void acpi_numa_memory_affinity_init(const struct acpi_srat_mem_affinity *);
 void acpi_numa_arch_fixup(void);
 
 #ifdef CONFIG_ACPI_HOTPLUG_CPU
