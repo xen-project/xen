@@ -293,14 +293,40 @@ int psr_get_cat_l3_info(unsigned int socket, uint32_t *cbm_len,
     return 0;
 }
 
-int psr_get_l3_cbm(struct domain *d, unsigned int socket, uint64_t *cbm)
+int psr_get_l3_cbm(struct domain *d, unsigned int socket,
+                   uint64_t *cbm, enum cbm_type type)
 {
     struct psr_cat_socket_info *info = get_cat_socket_info(socket);
+    bool_t cdp_enabled = cdp_is_enabled(socket);
 
     if ( IS_ERR(info) )
         return PTR_ERR(info);
 
-    *cbm = info->cos_to_cbm[d->arch.psr_cos_ids[socket]].cbm;
+    switch ( type )
+    {
+    case PSR_CBM_TYPE_L3:
+        if ( cdp_enabled )
+            return -EXDEV;
+        *cbm = info->cos_to_cbm[d->arch.psr_cos_ids[socket]].cbm;
+        break;
+
+    case PSR_CBM_TYPE_L3_CODE:
+        if ( !cdp_enabled )
+            *cbm = info->cos_to_cbm[d->arch.psr_cos_ids[socket]].cbm;
+        else
+            *cbm = info->cos_to_cbm[d->arch.psr_cos_ids[socket]].code;
+        break;
+
+    case PSR_CBM_TYPE_L3_DATA:
+        if ( !cdp_enabled )
+            *cbm = info->cos_to_cbm[d->arch.psr_cos_ids[socket]].cbm;
+        else
+            *cbm = info->cos_to_cbm[d->arch.psr_cos_ids[socket]].data;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+    }
 
     return 0;
 }
@@ -331,19 +357,34 @@ static bool_t psr_check_cbm(unsigned int cbm_len, uint64_t cbm)
 struct cos_cbm_info
 {
     unsigned int cos;
-    uint64_t cbm;
+    bool_t cdp;
+    uint64_t cbm_code;
+    uint64_t cbm_data;
 };
 
 static void do_write_l3_cbm(void *data)
 {
     struct cos_cbm_info *info = data;
 
-    wrmsrl(MSR_IA32_PSR_L3_MASK(info->cos), info->cbm);
+    if ( info->cdp )
+    {
+        wrmsrl(MSR_IA32_PSR_L3_MASK_CODE(info->cos), info->cbm_code);
+        wrmsrl(MSR_IA32_PSR_L3_MASK_DATA(info->cos), info->cbm_data);
+    }
+    else
+        wrmsrl(MSR_IA32_PSR_L3_MASK(info->cos), info->cbm_code);
 }
 
-static int write_l3_cbm(unsigned int socket, unsigned int cos, uint64_t cbm)
+static int write_l3_cbm(unsigned int socket, unsigned int cos,
+                        uint64_t cbm_code, uint64_t cbm_data, bool_t cdp)
 {
-    struct cos_cbm_info info = { .cos = cos, .cbm = cbm };
+    struct cos_cbm_info info =
+    {
+        .cos = cos,
+        .cbm_code = cbm_code,
+        .cbm_data = cbm_data,
+        .cdp = cdp,
+    };
 
     if ( socket == cpu_to_socket(smp_processor_id()) )
         do_write_l3_cbm(&info);
@@ -359,10 +400,48 @@ static int write_l3_cbm(unsigned int socket, unsigned int cos, uint64_t cbm)
     return 0;
 }
 
-int psr_set_l3_cbm(struct domain *d, unsigned int socket, uint64_t cbm)
+static int find_cos(struct psr_cat_cbm *map, unsigned int cos_max,
+                    uint64_t cbm_code, uint64_t cbm_data, bool_t cdp_enabled)
 {
-    unsigned int old_cos, cos;
-    struct psr_cat_cbm *map, *found = NULL;
+    unsigned int cos;
+
+    for ( cos = 0; cos <= cos_max; cos++ )
+    {
+        if ( (map[cos].ref || cos == 0) &&
+             ((!cdp_enabled && map[cos].cbm == cbm_code) ||
+              (cdp_enabled && map[cos].code == cbm_code &&
+                              map[cos].data == cbm_data)) )
+            return cos;
+    }
+
+    return -ENOENT;
+}
+
+static int pick_avail_cos(struct psr_cat_cbm *map, unsigned int cos_max,
+                          unsigned int old_cos)
+{
+    unsigned int cos;
+
+    /* If old cos is referred only by the domain, then use it. */
+    if ( map[old_cos].ref == 1 && old_cos != 0 )
+        return old_cos;
+
+    /* Find an unused one other than cos0. */
+    for ( cos = 1; cos <= cos_max; cos++ )
+        if ( map[cos].ref == 0 )
+            return cos;
+
+    return -ENOENT;
+}
+
+int psr_set_l3_cbm(struct domain *d, unsigned int socket,
+                   uint64_t cbm, enum cbm_type type)
+{
+    unsigned int old_cos, cos_max;
+    int cos, ret;
+    uint64_t cbm_data, cbm_code;
+    bool_t cdp_enabled = cdp_is_enabled(socket);
+    struct psr_cat_cbm *map;
     struct psr_cat_socket_info *info = get_cat_socket_info(socket);
 
     if ( IS_ERR(info) )
@@ -371,53 +450,71 @@ int psr_set_l3_cbm(struct domain *d, unsigned int socket, uint64_t cbm)
     if ( !psr_check_cbm(info->cbm_len, cbm) )
         return -EINVAL;
 
+    if ( !cdp_enabled && (type == PSR_CBM_TYPE_L3_CODE ||
+                          type == PSR_CBM_TYPE_L3_DATA) )
+        return -ENXIO;
+
+    cos_max = info->cos_max;
     old_cos = d->arch.psr_cos_ids[socket];
     map = info->cos_to_cbm;
 
+    switch ( type )
+    {
+    case PSR_CBM_TYPE_L3:
+        cbm_code = cbm;
+        cbm_data = cbm;
+        break;
+
+    case PSR_CBM_TYPE_L3_CODE:
+        cbm_code = cbm;
+        cbm_data = map[old_cos].data;
+        break;
+
+    case PSR_CBM_TYPE_L3_DATA:
+        cbm_code = map[old_cos].code;
+        cbm_data = cbm;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+    }
+
     spin_lock(&info->cbm_lock);
-
-    for ( cos = 0; cos <= info->cos_max; cos++ )
+    cos = find_cos(map, cos_max, cbm_code, cbm_data, cdp_enabled);
+    if ( cos >= 0 )
     {
-        /* If still not found, then keep unused one. */
-        if ( !found && cos != 0 && map[cos].ref == 0 )
-            found = map + cos;
-        else if ( map[cos].cbm == cbm )
-        {
-            if ( unlikely(cos == old_cos) )
-            {
-                ASSERT(cos == 0 || map[cos].ref != 0);
-                spin_unlock(&info->cbm_lock);
-                return 0;
-            }
-            found = map + cos;
-            break;
-        }
-    }
-
-    /* If old cos is referred only by the domain, then use it. */
-    if ( !found && map[old_cos].ref == 1 )
-        found = map + old_cos;
-
-    if ( !found )
-    {
-        spin_unlock(&info->cbm_lock);
-        return -EOVERFLOW;
-    }
-
-    cos = found - map;
-    if ( found->cbm != cbm )
-    {
-        int ret = write_l3_cbm(socket, cos, cbm);
-
-        if ( ret )
+        if ( cos == old_cos )
         {
             spin_unlock(&info->cbm_lock);
-            return ret;
+            return 0;
         }
-        found->cbm = cbm;
+    }
+    else
+    {
+        cos = pick_avail_cos(map, cos_max, old_cos);
+        if ( cos < 0 )
+        {
+            spin_unlock(&info->cbm_lock);
+            return cos;
+        }
+
+        /* We try to avoid writing MSR. */
+        if ( (cdp_enabled &&
+             (map[cos].code != cbm_code || map[cos].data != cbm_data)) ||
+             (!cdp_enabled && map[cos].cbm != cbm_code) )
+        {
+            ret = write_l3_cbm(socket, cos, cbm_code, cbm_data, cdp_enabled);
+            if ( ret )
+            {
+                spin_unlock(&info->cbm_lock);
+                return ret;
+            }
+            map[cos].code = cbm_code;
+            map[cos].data = cbm_data;
+        }
     }
 
-    found->ref++;
+    map[cos].ref++;
     map[old_cos].ref--;
     spin_unlock(&info->cbm_lock);
 

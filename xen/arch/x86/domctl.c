@@ -1168,12 +1168,40 @@ long arch_do_domctl(
         {
         case XEN_DOMCTL_PSR_CAT_OP_SET_L3_CBM:
             ret = psr_set_l3_cbm(d, domctl->u.psr_cat_op.target,
-                                 domctl->u.psr_cat_op.data);
+                                 domctl->u.psr_cat_op.data,
+                                 PSR_CBM_TYPE_L3);
+            break;
+
+        case XEN_DOMCTL_PSR_CAT_OP_SET_L3_CODE:
+            ret = psr_set_l3_cbm(d, domctl->u.psr_cat_op.target,
+                                 domctl->u.psr_cat_op.data,
+                                 PSR_CBM_TYPE_L3_CODE);
+            break;
+
+        case XEN_DOMCTL_PSR_CAT_OP_SET_L3_DATA:
+            ret = psr_set_l3_cbm(d, domctl->u.psr_cat_op.target,
+                                 domctl->u.psr_cat_op.data,
+                                 PSR_CBM_TYPE_L3_DATA);
             break;
 
         case XEN_DOMCTL_PSR_CAT_OP_GET_L3_CBM:
             ret = psr_get_l3_cbm(d, domctl->u.psr_cat_op.target,
-                                 &domctl->u.psr_cat_op.data);
+                                 &domctl->u.psr_cat_op.data,
+                                 PSR_CBM_TYPE_L3);
+            copyback = 1;
+            break;
+
+        case XEN_DOMCTL_PSR_CAT_OP_GET_L3_CODE:
+            ret = psr_get_l3_cbm(d, domctl->u.psr_cat_op.target,
+                                 &domctl->u.psr_cat_op.data,
+                                 PSR_CBM_TYPE_L3_CODE);
+            copyback = 1;
+            break;
+
+        case XEN_DOMCTL_PSR_CAT_OP_GET_L3_DATA:
+            ret = psr_get_l3_cbm(d, domctl->u.psr_cat_op.target,
+                                 &domctl->u.psr_cat_op.data,
+                                 PSR_CBM_TYPE_L3_DATA);
             copyback = 1;
             break;
 

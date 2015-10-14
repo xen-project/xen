@@ -46,6 +46,12 @@ struct psr_cmt {
     struct psr_cmt_l3 l3;
 };
 
+enum cbm_type {
+    PSR_CBM_TYPE_L3,
+    PSR_CBM_TYPE_L3_CODE,
+    PSR_CBM_TYPE_L3_DATA,
+};
+
 extern struct psr_cmt *psr_cmt;
 
 static inline bool_t psr_cmt_enabled(void)
@@ -59,8 +65,10 @@ void psr_ctxt_switch_to(struct domain *d);
 
 int psr_get_cat_l3_info(unsigned int socket, uint32_t *cbm_len,
                         uint32_t *cos_max, uint32_t *flags);
-int psr_get_l3_cbm(struct domain *d, unsigned int socket, uint64_t *cbm);
-int psr_set_l3_cbm(struct domain *d, unsigned int socket, uint64_t cbm);
+int psr_get_l3_cbm(struct domain *d, unsigned int socket,
+                   uint64_t *cbm, enum cbm_type type);
+int psr_set_l3_cbm(struct domain *d, unsigned int socket,
+                   uint64_t cbm, enum cbm_type type);
 
 int psr_domain_init(struct domain *d);
 void psr_domain_free(struct domain *d);

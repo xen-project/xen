@@ -1057,6 +1057,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_monitor_op_t);
 struct xen_domctl_psr_cat_op {
 #define XEN_DOMCTL_PSR_CAT_OP_SET_L3_CBM     0
 #define XEN_DOMCTL_PSR_CAT_OP_GET_L3_CBM     1
+#define XEN_DOMCTL_PSR_CAT_OP_SET_L3_CODE    2
+#define XEN_DOMCTL_PSR_CAT_OP_SET_L3_DATA    3
+#define XEN_DOMCTL_PSR_CAT_OP_GET_L3_CODE    4
+#define XEN_DOMCTL_PSR_CAT_OP_GET_L3_DATA    5
     uint32_t cmd;       /* IN: XEN_DOMCTL_PSR_CAT_OP_* */
     uint32_t target;    /* IN */
     uint64_t data;      /* IN/OUT */
