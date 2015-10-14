@@ -1189,6 +1189,12 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     drive = libxl__sprintf
                         (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s,cache=writeback",
                          pdev_path, disk, format);
+                else if (strncmp(disks[i].vdev, "xvd", 3) == 0)
+                    /*
+                     * Do not add any emulated disk when PV disk are
+                     * explicitly asked for.
+                     */
+                    continue;
                 else if (disk < 6 && b_info->u.hvm.hdtype == LIBXL_HDTYPE_AHCI) {
                     flexarray_vappend(dm_args, "-drive",
                         GCSPRINTF("file=%s,if=none,id=ahcidisk-%d,format=%s,cache=writeback",
