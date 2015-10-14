@@ -21,9 +21,16 @@
 
 #define PSR_CMT        (1<<0)
 #define PSR_CAT        (1<<1)
+#define PSR_CDP        (1<<2)
 
 struct psr_cat_cbm {
-    uint64_t cbm;
+    union {
+        uint64_t cbm;
+        struct {
+            uint64_t code;
+            uint64_t data;
+        };
+    };
     unsigned int ref;
 };
 
@@ -43,6 +50,7 @@ struct psr_cmt *__read_mostly psr_cmt;
 
 static unsigned long *__read_mostly cat_socket_enable;
 static struct psr_cat_socket_info *__read_mostly cat_socket_info;
+static unsigned long *__read_mostly cdp_socket_enable;
 
 static unsigned int __initdata opt_psr;
 static unsigned int __initdata opt_rmid_max = 255;
@@ -94,6 +102,7 @@ static void __init parse_psr_param(char *s)
 
         parse_psr_bool(s, val_str, "cmt", PSR_CMT);
         parse_psr_bool(s, val_str, "cat", PSR_CAT);
+        parse_psr_bool(s, val_str, "cdp", PSR_CDP);
 
         if ( val_str && !strcmp(s, "rmid_max") )
             opt_rmid_max = simple_strtoul(val_str, NULL, 0);
@@ -261,8 +270,13 @@ static struct psr_cat_socket_info *get_cat_socket_info(unsigned int socket)
     return cat_socket_info + socket;
 }
 
+static inline bool_t cdp_is_enabled(unsigned int socket)
+{
+    return cdp_socket_enable && test_bit(socket, cdp_socket_enable);
+}
+
 int psr_get_cat_l3_info(unsigned int socket, uint32_t *cbm_len,
-                        uint32_t *cos_max)
+                        uint32_t *cos_max, uint32_t *flags)
 {
     struct psr_cat_socket_info *info = get_cat_socket_info(socket);
 
@@ -271,6 +285,10 @@ int psr_get_cat_l3_info(unsigned int socket, uint32_t *cbm_len,
 
     *cbm_len = info->cbm_len;
     *cos_max = info->cos_max;
+
+    *flags = 0;
+    if ( cdp_is_enabled(socket) )
+        *flags |= XEN_SYSCTL_PSR_CAT_L3_CDP;
 
     return 0;
 }
@@ -470,6 +488,7 @@ static void cat_cpu_init(void)
     struct psr_cat_socket_info *info;
     unsigned int socket;
     unsigned int cpu = smp_processor_id();
+    uint64_t val;
     const struct cpuinfo_x86 *c = cpu_data + cpu;
 
     if ( !cpu_has(c, X86_FEATURE_CAT) || c->cpuid_level < PSR_CPUID_LEVEL_CAT )
@@ -495,8 +514,27 @@ static void cat_cpu_init(void)
         spin_lock_init(&info->cbm_lock);
 
         set_bit(socket, cat_socket_enable);
-        printk(XENLOG_INFO "CAT: enabled on socket %u, cos_max:%u, cbm_len:%u\n",
-               socket, info->cos_max, info->cbm_len);
+
+        if ( (ecx & PSR_CAT_CDP_CAPABILITY) && (opt_psr & PSR_CDP) &&
+             cdp_socket_enable && !test_bit(socket, cdp_socket_enable) )
+        {
+            info->cos_to_cbm[0].code = (1ull << info->cbm_len) - 1;
+            info->cos_to_cbm[0].data = (1ull << info->cbm_len) - 1;
+
+            /* We only write mask1 since mask0 is always all ones by default. */
+            wrmsrl(MSR_IA32_PSR_L3_MASK(1), (1ull << info->cbm_len) - 1);
+
+            rdmsrl(MSR_IA32_PSR_L3_QOS_CFG, val);
+            wrmsrl(MSR_IA32_PSR_L3_QOS_CFG, val | (1 << PSR_L3_QOS_CDP_ENABLE_BIT));
+
+            /* Cut half of cos_max when CDP is enabled. */
+            info->cos_max >>= 1;
+
+            set_bit(socket, cdp_socket_enable);
+        }
+        printk(XENLOG_INFO "CAT: enabled on socket %u, cos_max:%u, cbm_len:%u, CDP:%s\n",
+               socket, info->cos_max, info->cbm_len,
+               cdp_is_enabled(socket) ? "on" : "off");
     }
 }
 
@@ -513,6 +551,10 @@ static void cat_cpu_fini(unsigned int cpu)
             xfree(info->cos_to_cbm);
             info->cos_to_cbm = NULL;
         }
+
+        if ( cdp_is_enabled(socket) )
+            clear_bit(socket, cdp_socket_enable);
+
         clear_bit(socket, cat_socket_enable);
     }
 }
@@ -535,6 +577,7 @@ static void __init init_psr_cat(void)
 
     cat_socket_enable = xzalloc_array(unsigned long, BITS_TO_LONGS(nr_sockets));
     cat_socket_info = xzalloc_array(struct psr_cat_socket_info, nr_sockets);
+    cdp_socket_enable = xzalloc_array(unsigned long, BITS_TO_LONGS(nr_sockets));
 
     if ( !cat_socket_enable || !cat_socket_info )
         psr_cat_free();

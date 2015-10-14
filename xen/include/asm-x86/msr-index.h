@@ -328,7 +328,10 @@
 #define MSR_IA32_CMT_EVTSEL		0x00000c8d
 #define MSR_IA32_CMT_CTR		0x00000c8e
 #define MSR_IA32_PSR_ASSOC		0x00000c8f
+#define MSR_IA32_PSR_L3_QOS_CFG	0x00000c81
 #define MSR_IA32_PSR_L3_MASK(n)	(0x00000c90 + (n))
+#define MSR_IA32_PSR_L3_MASK_CODE(n)	(0x00000c90 + (n) * 2 + 1)
+#define MSR_IA32_PSR_L3_MASK_DATA(n)	(0x00000c90 + (n) * 2)
 
 /* Intel Model 6 */
 #define MSR_P6_PERFCTR(n)		(0x000000c1 + (n))

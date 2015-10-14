@@ -27,6 +27,12 @@
 /* L3 Monitoring Features */
 #define PSR_CMT_L3_OCCUPANCY           0x1
 
+/* CDP Capability */
+#define PSR_CAT_CDP_CAPABILITY       (1u << 2)
+
+/* L3 CDP Enable bit*/
+#define PSR_L3_QOS_CDP_ENABLE_BIT       0x0
+
 struct psr_cmt_l3 {
     unsigned int features;
     unsigned int upscaling_factor;
@@ -52,7 +58,7 @@ void psr_free_rmid(struct domain *d);
 void psr_ctxt_switch_to(struct domain *d);
 
 int psr_get_cat_l3_info(unsigned int socket, uint32_t *cbm_len,
-                        uint32_t *cos_max);
+                        uint32_t *cos_max, uint32_t *flags);
 int psr_get_l3_cbm(struct domain *d, unsigned int socket, uint64_t *cbm);
 int psr_set_l3_cbm(struct domain *d, unsigned int socket, uint64_t cbm);
 
