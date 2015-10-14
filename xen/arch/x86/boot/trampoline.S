@@ -98,7 +98,8 @@ trampoline_protmode_entry:
 1:      wrmsr
 .Lskip_efer:
 
-        mov     $0x80050033,%eax /* hi-to-lo: PG,AM,WP,NE,ET,MP,PE */
+        mov     $(X86_CR0_PG | X86_CR0_AM | X86_CR0_WP | X86_CR0_NE |\
+                  X86_CR0_ET | X86_CR0_MP | X86_CR0_PE), %eax
         mov     %eax,%cr0
         jmp     1f
 1:
