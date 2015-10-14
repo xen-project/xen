@@ -1412,10 +1412,10 @@ static void save_segments(struct vcpu *v)
     struct cpu_user_regs *regs = &v->arch.user_regs;
     unsigned int dirty_segment_mask = 0;
 
-    regs->ds = read_segment_register(ds);
-    regs->es = read_segment_register(es);
-    regs->fs = read_segment_register(fs);
-    regs->gs = read_segment_register(gs);
+    regs->ds = read_sreg(ds);
+    regs->es = read_sreg(es);
+    regs->fs = read_sreg(fs);
+    regs->gs = read_sreg(gs);
 
     if ( cpu_has_fsgsbase && !is_pv_32bit_vcpu(v) )
     {

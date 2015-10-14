@@ -1981,8 +1981,6 @@ static inline uint64_t guest_misc_enable(uint64_t val)
     }                                                                       \
     (eip) += sizeof(_x); _x; })
 
-#define read_sreg(regs, sr) read_segment_register(sr)
-
 static int is_cpufreq_controller(struct domain *d)
 {
     return ((cpufreq_controller == FREQCTL_dom0_kernel) &&
@@ -2029,7 +2027,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         goto fail;
 
     /* emulating only opcodes not allowing SS to be default */
-    data_sel = read_sreg(regs, ds);
+    data_sel = read_sreg(ds);
 
     /* Legacy prefixes. */
     for ( i = 0; i < 8; i++, rex == opcode || (rex = 0) )
@@ -2047,17 +2045,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             data_sel = regs->cs;
             continue;
         case 0x3e: /* DS override */
-            data_sel = read_sreg(regs, ds);
+            data_sel = read_sreg(ds);
             continue;
         case 0x26: /* ES override */
-            data_sel = read_sreg(regs, es);
+            data_sel = read_sreg(es);
             continue;
         case 0x64: /* FS override */
-            data_sel = read_sreg(regs, fs);
+            data_sel = read_sreg(fs);
             lm_ovr = lm_seg_fs;
             continue;
         case 0x65: /* GS override */
-            data_sel = read_sreg(regs, gs);
+            data_sel = read_sreg(gs);
             lm_ovr = lm_seg_gs;
             continue;
         case 0x36: /* SS override */
@@ -2104,7 +2102,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
         if ( !(opcode & 2) )
         {
-            data_sel = read_sreg(regs, es);
+            data_sel = read_sreg(es);
             lm_ovr = lm_seg_none;
         }
 
@@ -2912,22 +2910,22 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             ASSERT(opnd_sel);
             continue;
         case 0x3e: /* DS override */
-            opnd_sel = read_sreg(regs, ds);
+            opnd_sel = read_sreg(ds);
             if ( !opnd_sel )
                 opnd_sel = dpl;
             continue;
         case 0x26: /* ES override */
-            opnd_sel = read_sreg(regs, es);
+            opnd_sel = read_sreg(es);
             if ( !opnd_sel )
                 opnd_sel = dpl;
             continue;
         case 0x64: /* FS override */
-            opnd_sel = read_sreg(regs, fs);
+            opnd_sel = read_sreg(fs);
             if ( !opnd_sel )
                 opnd_sel = dpl;
             continue;
         case 0x65: /* GS override */
-            opnd_sel = read_sreg(regs, gs);
+            opnd_sel = read_sreg(gs);
             if ( !opnd_sel )
                 opnd_sel = dpl;
             continue;
@@ -2980,7 +2978,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                             switch ( modrm & 7 )
                             {
                             default:
-                                opnd_sel = read_sreg(regs, ds);
+                                opnd_sel = read_sreg(ds);
                                 break;
                             case 4: case 5:
                                 opnd_sel = regs->ss;
@@ -3008,7 +3006,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                             break;
                         }
                         if ( !opnd_sel )
-                            opnd_sel = read_sreg(regs, ds);
+                            opnd_sel = read_sreg(ds);
                         switch ( modrm & 7 )
                         {
                         case 0: case 2: case 4:

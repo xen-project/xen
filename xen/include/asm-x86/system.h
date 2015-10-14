@@ -5,9 +5,9 @@
 #include <xen/bitops.h>
 #include <asm/processor.h>
 
-#define read_segment_register(name)                             \
-({  u16 __sel;                                                  \
-    asm volatile ( "movw %%" STR(name) ",%0" : "=r" (__sel) );  \
+#define read_sreg(name)                                         \
+({  unsigned int __sel;                                         \
+    asm volatile ( "mov %%" STR(name) ",%0" : "=r" (__sel) );   \
     __sel;                                                      \
 })
 
