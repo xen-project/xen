@@ -810,18 +810,18 @@ static int vcpu_x86_64(struct xc_dom_image *dom)
     DOMPRINTF("%s: cr3: pfn 0x%" PRIpfn " mfn 0x%" PRIpfn "",
               __FUNCTION__, dom->pgtables_seg.pfn, cr3_pfn);
 
-    if ( dom->pvh_enabled )
-        return 0;
+    if ( !dom->pvh_enabled )
+    {
+        ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_64;
+        ctxt->user_regs.es = FLAT_KERNEL_DS_X86_64;
+        ctxt->user_regs.fs = FLAT_KERNEL_DS_X86_64;
+        ctxt->user_regs.gs = FLAT_KERNEL_DS_X86_64;
+        ctxt->user_regs.ss = FLAT_KERNEL_SS_X86_64;
+        ctxt->user_regs.cs = FLAT_KERNEL_CS_X86_64;
 
-    ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_64;
-    ctxt->user_regs.es = FLAT_KERNEL_DS_X86_64;
-    ctxt->user_regs.fs = FLAT_KERNEL_DS_X86_64;
-    ctxt->user_regs.gs = FLAT_KERNEL_DS_X86_64;
-    ctxt->user_regs.ss = FLAT_KERNEL_SS_X86_64;
-    ctxt->user_regs.cs = FLAT_KERNEL_CS_X86_64;
-
-    ctxt->kernel_ss = ctxt->user_regs.ss;
-    ctxt->kernel_sp = ctxt->user_regs.esp;
+        ctxt->kernel_ss = ctxt->user_regs.ss;
+        ctxt->kernel_sp = ctxt->user_regs.esp;
+    }
 
     rc = xc_vcpu_setcontext(dom->xch, dom->guest_domid, 0, &any_ctx);
     if ( rc != 0 )
