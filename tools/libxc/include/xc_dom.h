@@ -187,10 +187,10 @@ struct xc_dom_image {
 
     /* HVM specific fields. */
     xen_pfn_t target_pages;
-    xen_pfn_t mmio_start;
-    xen_pfn_t mmio_size;
-    xen_pfn_t lowmem_end;
-    xen_pfn_t highmem_end;
+    xen_paddr_t mmio_start;
+    xen_paddr_t mmio_size;
+    xen_paddr_t lowmem_end;
+    xen_paddr_t highmem_end;
 
     /* Extra ACPI tables passed to HVMLOADER */
     struct xc_hvm_firmware_module acpi_module;
