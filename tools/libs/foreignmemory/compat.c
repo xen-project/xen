@@ -23,7 +23,7 @@
 
 void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
                                  uint32_t dom, int prot,
-                                 const xen_pfn_t *arr, int *err, unsigned int num)
+                                 const xen_pfn_t *arr, int *err, size_t num)
 {
     xen_pfn_t *pfn;
     unsigned int i;

@@ -115,10 +115,11 @@ static int map_foreign_batch_single(int fd, uint32_t dom,
  * This will keep the request ring full and avoids delays.
  */
 static int retry_paged(int fd, uint32_t dom, void *addr,
-                       const xen_pfn_t *arr, int *err, unsigned int num)
+                       const xen_pfn_t *arr, int *err, size_t num)
 {
     privcmd_mmapbatch_v2_t ioctlx;
-    int rc, paged = 0, i = 0;
+    int rc, paged = 0;
+    size_t i = 0;
 
     do
     {
@@ -134,7 +135,7 @@ static int retry_paged(int fd, uint32_t dom, void *addr,
         /* At least one gfn is still in paging state */
         ioctlx.num = 1;
         ioctlx.dom = dom;
-        ioctlx.addr = (unsigned long)addr + ((unsigned long)i<<PAGE_SHIFT);
+        ioctlx.addr = (unsigned long)addr + (i<<PAGE_SHIFT);
         ioctlx.arr = arr + i;
         ioctlx.err = err + i;
 
@@ -160,15 +161,15 @@ out:
 
 void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
                                  uint32_t dom, int prot,
-                                 const xen_pfn_t *arr, int *err, unsigned int num)
+                                 const xen_pfn_t *arr, int *err, size_t num)
 {
     int fd = fmem->fd;
     privcmd_mmapbatch_v2_t ioctlx;
     void *addr;
-    unsigned int i;
+    size_t i;
     int rc;
 
-    addr = mmap(NULL, (unsigned long)num << PAGE_SHIFT, prot, MAP_SHARED,
+    addr = mmap(NULL, num << PAGE_SHIFT, prot, MAP_SHARED,
                 fd, 0);
     if ( addr == MAP_FAILED )
     {
@@ -212,7 +213,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
             if ( pfn == MAP_FAILED )
             {
                 PERROR("mmap of pfn array failed");
-                (void)munmap(addr, (unsigned long)num << PAGE_SHIFT);
+                (void)munmap(addr, num << PAGE_SHIFT);
                 return NULL;
             }
         }
@@ -245,7 +246,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
                     continue;
                 }
                 rc = map_foreign_batch_single(fd, dom, pfn + i,
-                        (unsigned long)addr + ((unsigned long)i<<PAGE_SHIFT));
+                        (unsigned long)addr + (i<<PAGE_SHIFT));
                 if ( rc < 0 )
                 {
                     rc = -errno;
@@ -274,7 +275,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
         int saved_errno = errno;
 
         PERROR("ioctl failed");
-        (void)munmap(addr, (unsigned long)num << PAGE_SHIFT);
+        (void)munmap(addr, num << PAGE_SHIFT);
         errno = saved_errno;
         return NULL;
     }
@@ -283,9 +284,9 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
 }
 
 int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
-                                 void *addr, unsigned int num)
+                                 void *addr, size_t num)
 {
-    return munmap(addr, (unsigned long)num << PAGE_SHIFT);
+    return munmap(addr, num << PAGE_SHIFT);
 }
 
 /*

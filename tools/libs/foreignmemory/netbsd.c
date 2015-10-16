@@ -95,7 +95,7 @@ void *osdep_map_foreign_batch(xenforeignmem_handle *fmem, uint32_t dom,
 }
 
 int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
-                                 void *addr, unsigned int num)
+                                 void *addr, size_t num)
 {
 	return munmap(addr, num*XC_PAGE_SIZE);
 }

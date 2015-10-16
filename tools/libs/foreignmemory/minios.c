@@ -41,7 +41,7 @@ int osdep_xenforeignmemory_close(xenforeignmemory_handle *fmem)
 
 void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
                                  uint32_t dom, int prot,
-                                 const xen_pfn_t *arr, int *err, unsigned int num)
+                                 const xen_pfn_t *arr, int *err, size_t num)
 {
     unsigned long pt_prot = 0;
     if (prot & PROT_READ)
@@ -52,7 +52,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
 }
 
 int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
-                                 void *addr, unsigned int num)
+                                 void *addr, size_t num)
 {
 	return munmap(addr, num << PAGE_SHIFT);
 }

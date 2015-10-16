@@ -56,14 +56,15 @@ int xenforeignmemory_close(xenforeignmemory_handle *fmem);
  */
 void *xenforeignmemory_map(xenforeignmemory_handle *fmem, uint32_t dom,
                            int prot, const xen_pfn_t *arr, int *err,
-                           unsigned int num);
+                           size_t pages);
+
 /*
  * Unmap a mapping previous created with xenforeignmemory_map().
  *
  * Returns 0 on success on failure sets errno and returns -1.
  */
 int xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
-                           void *addr, unsigned int num);
+                           void *addr, size_t pages);
 
 #endif
 
