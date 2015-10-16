@@ -19,15 +19,12 @@
 
 static void fpu_init(void)
 {
-    unsigned long val;
-    
+    uint32_t val = MXCSR_DEFAULT;
+
     asm volatile ( "fninit" );
-    if ( cpu_has_xmm )
-    {
-        /* load default value into MXCSR control/status register */
-        val = MXCSR_DEFAULT;
-        asm volatile ( "ldmxcsr %0" : : "m" (val) );
-    }
+
+    /* load default value into MXCSR control/status register */
+    asm volatile ( "ldmxcsr %0" : : "m" (val) );
 }
 
 /*******************************/
@@ -122,14 +119,6 @@ static inline void fpu_fxrstor(struct vcpu *v)
     }
 }
 
-/* Restore x87 extended state */
-static inline void fpu_frstor(struct vcpu *v)
-{
-    const char *fpu_ctxt = v->arch.fpu_ctxt;
-
-    asm volatile ( "frstor %0" : : "m" (*fpu_ctxt) );
-}
-
 /*******************************/
 /*      FPU Save Functions     */
 /*******************************/
@@ -206,15 +195,6 @@ static inline void fpu_fxsave(struct vcpu *v)
         fpu_ctxt->x[FPU_WORD_SIZE_OFFSET] = word_size;
 }
 
-/* Save x87 FPU state */
-static inline void fpu_fsave(struct vcpu *v)
-{
-    char *fpu_ctxt = v->arch.fpu_ctxt;
-
-    /* FWAIT is required to make FNSAVE synchronous. */
-    asm volatile ( "fnsave %0 ; fwait" : "=m" (*fpu_ctxt) );
-}
-
 /*******************************/
 /*       VCPU FPU Functions    */
 /*******************************/
@@ -249,12 +229,7 @@ void vcpu_restore_fpu_lazy(struct vcpu *v)
     if ( cpu_has_xsave )
         fpu_xrstor(v, XSTATE_LAZY);
     else if ( v->fpu_initialised )
-    {
-        if ( cpu_has_fxsr )
-            fpu_fxrstor(v);
-        else
-            fpu_frstor(v);
-    }
+        fpu_fxrstor(v);
     else
         fpu_init();
 
@@ -278,10 +253,8 @@ static bool_t _vcpu_save_fpu(struct vcpu *v)
 
     if ( cpu_has_xsave )
         fpu_xsave(v);
-    else if ( cpu_has_fxsr )
-        fpu_fxsave(v);
     else
-        fpu_fsave(v);
+        fpu_fxsave(v);
 
     v->fpu_dirtied = 0;
 

@@ -1295,10 +1295,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     identify_cpu(&boot_cpu_data);
 
-    if ( cpu_has_fxsr )
-        set_in_cr4(X86_CR4_OSFXSR);
-    if ( cpu_has_xmm )
-        set_in_cr4(X86_CR4_OSXMMEXCPT);
+    set_in_cr4(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT);
 
     if ( disable_smep )
         setup_clear_cpu_cap(X86_FEATURE_SMEP);

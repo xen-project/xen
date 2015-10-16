@@ -17,22 +17,15 @@
 /* Byte offset of the stored word size within the FXSAVE area/portion. */
 #define FPU_WORD_SIZE_OFFSET 511
 
-struct ix87_state {
-    struct ix87_env {
-        uint16_t fcw, _res0;
-        uint16_t fsw, _res1;
-        uint16_t ftw, _res2;
-        uint32_t fip;
-        uint16_t fcs;
-        uint16_t fop;
-        uint32_t fdp;
-        uint16_t fds, _res6;
-    } env;
-    struct __packed ix87_reg {
-        uint64_t mantissa;
-        uint16_t exponent:15;
-        uint16_t sign:1;
-    } r[8];
+struct ix87_env {
+    uint16_t fcw, _res0;
+    uint16_t fsw, _res1;
+    uint16_t ftw, _res2;
+    uint32_t fip;
+    uint16_t fcs;
+    uint16_t fop;
+    uint32_t fdp;
+    uint16_t fds, _res6;
 };
 
 void vcpu_restore_fpu_eager(struct vcpu *v);

@@ -184,9 +184,6 @@
 #define cpu_has_sep		boot_cpu_has(X86_FEATURE_SEP)
 #define cpu_has_mtrr		1
 #define cpu_has_mmx		1
-#define cpu_has_fxsr		1
-#define cpu_has_xmm		1
-#define cpu_has_xmm2		1
 #define cpu_has_xmm3		boot_cpu_has(X86_FEATURE_XMM3)
 #define cpu_has_ht		boot_cpu_has(X86_FEATURE_HT)
 #define cpu_has_syscall		1

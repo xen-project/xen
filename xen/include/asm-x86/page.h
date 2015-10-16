@@ -206,13 +206,10 @@ typedef struct { u64 pfn; } pagetable_t;
 #define pagetable_null()        pagetable_from_pfn(0)
 
 void clear_page_sse2(void *);
-#define clear_page(_p)      (cpu_has_xmm2 ?                             \
-                             clear_page_sse2((void *)(_p)) :            \
-                             (void)memset((void *)(_p), 0, PAGE_SIZE))
 void copy_page_sse2(void *, const void *);
-#define copy_page(_t,_f)    (cpu_has_xmm2 ?                             \
-                             copy_page_sse2(_t, _f) :                   \
-                             (void)memcpy(_t, _f, PAGE_SIZE))
+
+#define clear_page(_p)      clear_page_sse2(_p)
+#define copy_page(_t, _f)   copy_page_sse2(_t, _f)
 
 /* Convert between Xen-heap virtual addresses and machine addresses. */
 #define __pa(x)             (virt_to_maddr(x))
