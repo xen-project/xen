@@ -477,6 +477,7 @@ int psr_set_l3_cbm(struct domain *d, unsigned int socket,
 
     default:
         ASSERT_UNREACHABLE();
+        return -EINVAL;
     }
 
     spin_lock(&info->cbm_lock);
