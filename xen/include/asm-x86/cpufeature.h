@@ -174,10 +174,8 @@
 #define CPUID_PM_LEAF                    6
 #define CPUID6_ECX_APERFMPERF_CAPABILITY 0x1
 
-#define cpu_has_vme		0
 #define cpu_has_de		1
 #define cpu_has_pse		1
-#define cpu_has_tsc		1
 #define cpu_has_pge		1
 #define cpu_has_pat		1
 #define cpu_has_apic		boot_cpu_has(X86_FEATURE_APIC)
@@ -186,15 +184,10 @@
 #define cpu_has_mmx		1
 #define cpu_has_xmm3		boot_cpu_has(X86_FEATURE_XMM3)
 #define cpu_has_ht		boot_cpu_has(X86_FEATURE_HT)
-#define cpu_has_syscall		1
 #define cpu_has_mp		1
 #define cpu_has_nx		boot_cpu_has(X86_FEATURE_NX)
-#define cpu_has_k6_mtrr		0
-#define cpu_has_cyrix_arr	0
-#define cpu_has_centaur_mcr	0
 #define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
 #define cpu_has_page1gb		boot_cpu_has(X86_FEATURE_PAGE1GB)
-#define cpu_has_efer		1
 #define cpu_has_fsgsbase	boot_cpu_has(X86_FEATURE_FSGSBASE)
 #define cpu_has_aperfmperf	boot_cpu_has(X86_FEATURE_APERFMPERF)
 

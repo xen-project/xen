@@ -194,8 +194,7 @@ static int enter_state(u32 state)
     /* Restore CR4 and EFER from cached values. */
     cr4 = read_cr4();
     write_cr4(cr4 & ~X86_CR4_MCE);
-    if ( cpu_has_efer )
-        write_efer(read_efer());
+    write_efer(read_efer());
 
     device_power_up();
 

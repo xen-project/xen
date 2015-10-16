@@ -1130,7 +1130,7 @@ static void __devinit setup_APIC_timer(void)
 
 static int __init calibrate_APIC_clock(void)
 {
-    unsigned long long t1 = 0, t2 = 0;
+    unsigned long long t1, t2;
     long tt1, tt2;
     long result;
     int i;
@@ -1157,8 +1157,7 @@ static int __init calibrate_APIC_clock(void)
     /*
      * We wrapped around just now. Let's start:
      */
-    if (cpu_has_tsc)
-        t1 = rdtsc();
+    t1 = rdtsc();
     tt1 = apic_read(APIC_TMCCT);
 
     /*
@@ -1168,8 +1167,7 @@ static int __init calibrate_APIC_clock(void)
         wait_8254_wraparound();
 
     tt2 = apic_read(APIC_TMCCT);
-    if (cpu_has_tsc)
-        t2 = rdtsc();
+    t2 = rdtsc();
 
     /*
      * The APIC bus clock counter is 32 bits only, it
@@ -1181,16 +1179,12 @@ static int __init calibrate_APIC_clock(void)
 
     result = (tt1-tt2)*APIC_DIVISOR/LOOPS;
 
-    if (cpu_has_tsc)
-        apic_printk(APIC_VERBOSE, "..... CPU clock speed is "
-                    "%ld.%04ld MHz.\n",
-                    ((long)(t2-t1)/LOOPS)/(1000000/HZ),
-                    ((long)(t2-t1)/LOOPS)%(1000000/HZ));
+    apic_printk(APIC_VERBOSE, "..... CPU clock speed is %ld.%04ld MHz.\n",
+                ((long)(t2 - t1) / LOOPS) / (1000000 / HZ),
+                ((long)(t2 - t1) / LOOPS) % (1000000 / HZ));
 
-    apic_printk(APIC_VERBOSE, "..... host bus clock speed is "
-                "%ld.%04ld MHz.\n",
-                result/(1000000/HZ),
-                result%(1000000/HZ));
+    apic_printk(APIC_VERBOSE, "..... host bus clock speed is %ld.%04ld MHz.\n",
+                result / (1000000 / HZ), result % (1000000 / HZ));
 
     /* set up multipliers for accurate timer code */
     bus_freq   = result*HZ;

@@ -625,8 +625,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     parse_video_info();
 
-    if ( cpu_has_efer )
-        rdmsrl(MSR_EFER, this_cpu(efer));
+    rdmsrl(MSR_EFER, this_cpu(efer));
     asm volatile ( "mov %%cr4,%0" : "=r" (this_cpu(cr4)) );
 
     /* We initialise the serial devices very early so we can get debugging. */

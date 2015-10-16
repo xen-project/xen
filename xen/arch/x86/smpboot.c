@@ -332,8 +332,7 @@ void start_secondary(void *unused)
     set_processor_id(cpu);
     set_current(idle_vcpu[cpu]);
     this_cpu(curr_vcpu) = idle_vcpu[cpu];
-    if ( cpu_has_efer )
-        rdmsrl(MSR_EFER, this_cpu(efer));
+    rdmsrl(MSR_EFER, this_cpu(efer));
 
     /*
      * Just as during early bootstrap, it is convenient here to disable

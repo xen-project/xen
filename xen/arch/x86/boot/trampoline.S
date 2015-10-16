@@ -86,17 +86,13 @@ trampoline_protmode_entry:
 
         /* Set up EFER (Extended Feature Enable Register). */
         mov     bootsym_rel(cpuid_ext_features,4,%edi)
-        test    $0x20100800,%edi /* SYSCALL/SYSRET, No Execute, Long Mode? */
-        jz      .Lskip_efer
         movl    $MSR_EFER,%ecx
         rdmsr
-        btsl    $_EFER_LME,%eax /* Long Mode      */
-        btsl    $_EFER_SCE,%eax /* SYSCALL/SYSRET */
-        btl     $20,%edi        /* No Execute?    */
+        or      $EFER_LME|EFER_SCE,%eax   /* Long Mode + SYSCALL/SYSRET */
+        bt      $X86_FEATURE_NX % 32,%edi /* No Execute? */
         jnc     1f
         btsl    $_EFER_NX,%eax  /* No Execute     */
 1:      wrmsr
-.Lskip_efer:
 
         mov     $(X86_CR0_PG | X86_CR0_AM | X86_CR0_WP | X86_CR0_NE |\
                   X86_CR0_ET | X86_CR0_MP | X86_CR0_PE), %eax
