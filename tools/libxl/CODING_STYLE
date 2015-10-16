@@ -57,13 +57,14 @@ whenever they are applicable.  For example:
   libxl__log[v]           LOG, LOGE, LOGEV
   libxl__sprintf          GCSPRINTF
   libxl__*alloc et al.    GCNEW, GCNEW_ARRAY, GCREALLOC_ARRAY
-  malloc et al.           GCNEW, GCNEW_ARRAY, GCREALLOC_ARRAY with NOGC
   isalnum etc. directly   CTYPE
   libxl__ctx_[un]lock     CTX_LOCK, CTX_UNLOCK
   gc=...; ao=...;         EGC_GC, AO_GC, STATE_AO_GC
   explicit gc creation    GC_INIT, GC_FREE
   memset(..,0,sizeof..)   FILLZERO
 
+Instead of malloc et al one should (as an exception to the above) use
+libxl__{zalloc,calloc,realloc} etc but passing NOGC.
 
 ERROR HANDLING
 --------------
