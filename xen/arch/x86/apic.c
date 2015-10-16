@@ -872,7 +872,7 @@ static int __init detect_init_APIC (void)
         return -1;
     }
 
-    set_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
+    __set_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
     mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
 
     /* The BIOS may have set up the APIC at some other address */
@@ -1369,7 +1369,7 @@ void pmu_apic_interrupt(struct cpu_user_regs *regs)
 int __init APIC_init_uniprocessor (void)
 {
     if (enable_local_apic < 0)
-        clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
+        __clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 
     if (!smp_found_config && !cpu_has_apic) {
         skip_ioapic_setup = 1;
@@ -1382,7 +1382,6 @@ int __init APIC_init_uniprocessor (void)
     if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
         printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
                boot_cpu_physical_apicid);
-        clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
         skip_ioapic_setup = 1;
         return -1;
     }

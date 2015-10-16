@@ -209,7 +209,7 @@ static void __devinit Intel_errata_workarounds(struct cpuinfo_x86 *c)
 
 	if (c->x86 == 6 && cpu_has_clflush &&
 	    (c->x86_model == 29 || c->x86_model == 46 || c->x86_model == 47))
-		set_bit(X86_FEATURE_CLFLUSH_MONITOR, c->x86_capability);
+		__set_bit(X86_FEATURE_CLFLUSH_MONITOR, c->x86_capability);
 }
 
 
@@ -244,7 +244,7 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 		unsigned eax = cpuid_eax(10);
 		/* Check for version and the number of counters */
 		if ((eax & 0xff) && (((eax>>8) & 0xff) > 1))
-			set_bit(X86_FEATURE_ARCH_PERFMON, c->x86_capability);
+			__set_bit(X86_FEATURE_ARCH_PERFMON, c->x86_capability);
 	}
 
 	if ( !cpu_has(c, X86_FEATURE_XTOPOLOGY) )
@@ -255,10 +255,11 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 
 	if (c == &boot_cpu_data && c->x86 == 6) {
 		if (probe_intel_cpuid_faulting())
-			set_bit(X86_FEATURE_CPUID_FAULTING, c->x86_capability);
+			__set_bit(X86_FEATURE_CPUID_FAULTING,
+				  c->x86_capability);
 	} else if (boot_cpu_has(X86_FEATURE_CPUID_FAULTING)) {
 		BUG_ON(!probe_intel_cpuid_faulting());
-		set_bit(X86_FEATURE_CPUID_FAULTING, c->x86_capability);
+		__set_bit(X86_FEATURE_CPUID_FAULTING, c->x86_capability);
 	}
 
 	if (!cpu_has_cpuid_faulting)
@@ -274,16 +275,16 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 
 	if ((c->x86 == 0xf && c->x86_model >= 0x03) ||
 		(c->x86 == 0x6 && c->x86_model >= 0x0e))
-		set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
+		__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 	if (cpuid_edx(0x80000007) & (1u<<8)) {
-		set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
-		set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
-		set_bit(X86_FEATURE_TSC_RELIABLE, c->x86_capability);
+		__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
+		__set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
+		__set_bit(X86_FEATURE_TSC_RELIABLE, c->x86_capability);
 	}
 	if ( opt_arat &&
 	     ( c->cpuid_level >= 0x00000006 ) &&
 	     ( cpuid_eax(0x00000006) & (1u<<2) ) )
-		set_bit(X86_FEATURE_ARAT, c->x86_capability);
+		__set_bit(X86_FEATURE_ARAT, c->x86_capability);
 }
 
 static const struct cpu_dev intel_cpu_dev = {

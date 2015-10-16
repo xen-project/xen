@@ -312,7 +312,7 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 
         /* Initialize xsave/xrstor features */
 	if ( !use_xsave )
-		clear_bit(X86_FEATURE_XSAVE, boot_cpu_data.x86_capability);
+		__clear_bit(X86_FEATURE_XSAVE, boot_cpu_data.x86_capability);
 
 	if ( cpu_has_xsave )
 		xstate_init(c);
@@ -392,7 +392,7 @@ void __cpuinit detect_extended_topology(struct cpuinfo_x86 *c)
 	if ( ebx == 0 || (LEAFB_SUBTYPE(ecx) != SMT_TYPE) )
 		return;
 
-	set_bit(X86_FEATURE_XTOPOLOGY, c->x86_capability);
+	__set_bit(X86_FEATURE_XTOPOLOGY, c->x86_capability);
 
 	initial_apicid = edx;
 

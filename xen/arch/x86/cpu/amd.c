@@ -442,15 +442,9 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		wrmsrl(MSR_K7_HWCR, value);
 	}
 
-	/*
-	 *	FIXME: We should handle the K5 here. Set up the write
-	 *	range and also turn on MSR 83 bits 4 and 31 (write alloc,
-	 *	no bus pipeline)
-	 */
-
 	/* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
 	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
-	clear_bit(0*32+31, c->x86_capability);
+	__clear_bit(0*32+31, c->x86_capability);
 	
 	if (c->x86 == 0xf && c->x86_model < 0x14
 	    && cpu_has(c, X86_FEATURE_LAHF_LM)) {
@@ -459,7 +453,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		 * revision D (model = 0x14) and later actually support it.
 		 * (AMD Erratum #110, docId: 25759).
 		 */
-		clear_bit(X86_FEATURE_LAHF_LM, c->x86_capability);
+		__clear_bit(X86_FEATURE_LAHF_LM, c->x86_capability);
 		if (!rdmsr_amd_safe(0xc001100d, &l, &h))
 			wrmsr_amd_safe(0xc001100d, l, h & ~1);
 	}
@@ -482,10 +476,11 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	if (c->extended_cpuid_level >= 0x80000007) {
 		c->x86_power = cpuid_edx(0x80000007);
 		if (c->x86_power & (1<<8)) {
-			set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
-			set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
+			__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
+			__set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
 			if (c->x86 != 0x11)
-				set_bit(X86_FEATURE_TSC_RELIABLE, c->x86_capability);
+				__set_bit(X86_FEATURE_TSC_RELIABLE,
+					  c->x86_capability);
 		}
 	}
 
@@ -498,7 +493,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		wrmsr_safe(MSR_K8_EXT_FEATURE_MASK, value);
 		rdmsrl(MSR_K8_EXT_FEATURE_MASK, value);
 		if (value & (1ULL << 54)) {
-			set_bit(X86_FEATURE_TOPOEXT, c->x86_capability);
+			__set_bit(X86_FEATURE_TOPOEXT, c->x86_capability);
 			printk(KERN_INFO "CPU: Re-enabling disabled "
 			       "Topology Extensions Support\n");
 		}
@@ -516,7 +511,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 
 	/* Pointless to use MWAIT on Family10 as it does not deep sleep. */
 	if (c->x86 >= 0x10 && !force_mwait)
-		clear_bit(X86_FEATURE_MWAIT, c->x86_capability);
+		__clear_bit(X86_FEATURE_MWAIT, c->x86_capability);
 
 	if (!cpu_has_amd_erratum(c, AMD_ERRATUM_121))
 		opt_allow_unsafe = 1;
@@ -566,7 +561,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	}
 
 	/* AMD CPUs do not support SYSENTER outside of legacy mode. */
-	clear_bit(X86_FEATURE_SEP, c->x86_capability);
+	__clear_bit(X86_FEATURE_SEP, c->x86_capability);
 
 	if (c->x86 == 0x10) {
 		/* do this for boot cpu */
@@ -592,7 +587,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	 * running in deep C states.
 	 */
 	if ( opt_arat && c->x86 > 0x11 )
-		set_bit(X86_FEATURE_ARAT, c->x86_capability);
+		__set_bit(X86_FEATURE_ARAT, c->x86_capability);
 
 	/*
 	 * Prior to Family 0x14, perf counters are not reset during warm reboot.

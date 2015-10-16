@@ -47,7 +47,7 @@ static void __init init_c3(struct cpuinfo_x86 *c)
 
 	if (c->x86 == 0x6 && c->x86_model >= 0xf) {
 		c->x86_cache_alignment = c->x86_clflush_size * 2;
-		set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
+		__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 	}
 
 	get_model_name(c);
