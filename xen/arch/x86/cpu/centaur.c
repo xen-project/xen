@@ -15,7 +15,7 @@
 #define RNG_ENABLED	(1 << 3)
 #define RNG_ENABLE	(1 << 6)	/* MSR_VIA_RNG */
 
-static void __init init_c3(struct cpuinfo_x86 *c)
+static void init_c3(struct cpuinfo_x86 *c)
 {
 	uint64_t msr_content;
 
@@ -54,7 +54,7 @@ static void __init init_c3(struct cpuinfo_x86 *c)
 	display_cacheinfo(c);
 }
 
-static void __init init_centaur(struct cpuinfo_x86 *c)
+static void init_centaur(struct cpuinfo_x86 *c)
 {
 	if (c->x86 == 6)
 		init_c3(c);
