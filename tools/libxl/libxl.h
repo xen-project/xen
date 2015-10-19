@@ -803,6 +803,13 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
  * If this is defined, the Cache Allocation Technology feature is supported.
  */
 #define LIBXL_HAVE_PSR_CAT 1
+
+/*
+ * LIBXL_HAVE_PSR_CDP
+ *
+ * If this is defined, the Code and Data Prioritization feature is supported.
+ */
+#define LIBXL_HAVE_PSR_CDP 1
 #endif
 
 /*

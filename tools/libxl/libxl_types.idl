@@ -797,10 +797,13 @@ libxl_psr_cmt_type = Enumeration("psr_cmt_type", [
 libxl_psr_cbm_type = Enumeration("psr_cbm_type", [
     (0, "UNKNOWN"),
     (1, "L3_CBM"),
+    (2, "L3_CBM_CODE"),
+    (3, "L3_CBM_DATA"),
     ])
 
 libxl_psr_cat_info = Struct("psr_cat_info", [
     ("id", uint32),
     ("cos_max", uint32),
     ("cbm_len", uint32),
+    ("cdp_enabled", bool),
     ])

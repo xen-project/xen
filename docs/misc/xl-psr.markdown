@@ -127,6 +127,59 @@ Per domain CBM settings can be shown by:
 
 `xl psr-cat-show`
 
+## Code and Data Prioritization (CDP)
+
+Code and Data Prioritization (CDP) Technology is an extension of CAT, which
+is available on Intel Broadwell and later server platforms. CDP enables
+isolation and separate prioritization of code and data fetches to the L3
+cache in a software configurable manner, which can enable workload
+prioritization and tuning of cache capacity to the characteristics of the
+workload. CDP extends Cache Allocation Technology (CAT) by providing
+separate code and data masks per Class of Service (COS).
+
+CDP can be enabled by adding `psr=cdp` to Xen command line.
+
+When CDP is enabled,
+
+ * the CAT masks are re-mapped into interleaved pairs of masks for data or
+   code fetches.
+
+ * the range of COS for CAT is re-indexed, with the lower-half of the COS
+   range available for CDP.
+
+CDP allows the OS or Hypervisor to partition cache allocation in a more
+fine-grained manner. Code cache and data cache can be specified independently.
+With CDP enabled, one COS corresponds to two CBMs (code CBM & data CBM),
+since the sum of CBMs is fixed, that means the number of available COSes
+will reduce by half when CDP is on.
+
+For more detailed information please refer to Intel SDM chapter
+"Platform Shared Resource Control: Cache Allocation Technology".
+
+The xl interfaces are the same with that of CAT. The difference is that
+CBM type can be passed as option to set code CBM or data CBM.
+
+When CDP is enabled, `-c` or `--code` option is available to set code CBM
+for the domain.
+
+When CDP is enabled, `-d` or `--data` option is available to set data CBM
+for the domain.
+
+If neither `-c` nor `-d` option is specified when CDP is on, the same code
+CBM and data CBM will be set for the domain. Passing both `-c` and `-d`
+options is invalid.
+
+Example:
+
+Setting code CBM for a domain:
+`xl psr-cat-cbm-set -c <domid> <cbm>`
+
+Setting data CBM for a domain:
+`xl psr-cat-cbm-set -d <domid> <cbm>`
+
+Setting the same code and data CBM for a domain:
+`xl psr-cat-cbm-set <domid> <cbm>`
+
 ## Reference
 
 [1] Intel SDM

@@ -1518,6 +1518,13 @@ applications. In the Xen implementation, CAT is used to control cache allocation
 on VM basis. To enforce cache on a specific domain, just set capacity bitmasks
 (CBM) for the domain.
 
+Intel Broadwell and later server platforms also offer Code/Data Prioritization
+(CDP) for cache allocations, which support specifying code or data cache for
+applications. CDP is used on a per VM basis in the Xen implementation. To
+specify code or data CBM for the domain, CDP feature must be enabled and CBM
+type options need to be specified when setting CBM, and the type options (code
+and data) are mutually exclusive.
+
 =over 4
 
 =item B<psr-cat-cbm-set> [I<OPTIONS>] I<domain-id> I<cbm>
@@ -1532,6 +1539,14 @@ B<OPTIONS>
 =item B<-s SOCKET>, B<--socket=SOCKET>
 
 Specify the socket to process, otherwise all sockets are processed.
+
+=item B<-c>, B<--code>
+
+Set code CBM when CDP is enabled.
+
+=item B<-d>, B<--data>
+
+Set data CBM when CDP is enabled.
 
 =back
 

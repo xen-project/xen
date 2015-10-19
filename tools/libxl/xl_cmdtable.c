@@ -543,6 +543,8 @@ struct cmd_spec cmd_table[] = {
       "Set cache capacity bitmasks(CBM) for a domain",
       "[options] <Domain> <CBM>",
       "-s <socket>       Specify the socket to process, otherwise all sockets are processed\n"
+      "-c                Set code CBM if CDP is supported\n"
+      "-d                Set data CBM if CDP is supported\n"
     },
     { "psr-cat-show",
       &main_psr_cat_show, 0, 1,

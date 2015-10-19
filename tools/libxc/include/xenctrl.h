@@ -2827,7 +2827,9 @@ enum xc_psr_cmt_type {
 typedef enum xc_psr_cmt_type xc_psr_cmt_type;
 
 enum xc_psr_cat_type {
-    XC_PSR_CAT_L3_CBM = 1,
+    XC_PSR_CAT_L3_CBM      = 1,
+    XC_PSR_CAT_L3_CBM_CODE = 2,
+    XC_PSR_CAT_L3_CBM_DATA = 3,
 };
 typedef enum xc_psr_cat_type xc_psr_cat_type;
 
@@ -2853,7 +2855,8 @@ int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
                                xc_psr_cat_type type, uint32_t target,
                                uint64_t *data);
 int xc_psr_cat_get_l3_info(xc_interface *xch, uint32_t socket,
-                           uint32_t *cos_max, uint32_t *cbm_len);
+                           uint32_t *cos_max, uint32_t *cbm_len,
+                           bool *cdp_enabled);
 #endif
 
 #endif /* XENCTRL_H */

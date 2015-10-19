@@ -260,6 +260,12 @@ int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
     case XC_PSR_CAT_L3_CBM:
         cmd = XEN_DOMCTL_PSR_CAT_OP_SET_L3_CBM;
         break;
+    case XC_PSR_CAT_L3_CBM_CODE:
+        cmd = XEN_DOMCTL_PSR_CAT_OP_SET_L3_CODE;
+        break;
+    case XC_PSR_CAT_L3_CBM_DATA:
+        cmd = XEN_DOMCTL_PSR_CAT_OP_SET_L3_DATA;
+        break;
     default:
         errno = EINVAL;
         return -1;
@@ -287,6 +293,12 @@ int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
     case XC_PSR_CAT_L3_CBM:
         cmd = XEN_DOMCTL_PSR_CAT_OP_GET_L3_CBM;
         break;
+    case XC_PSR_CAT_L3_CBM_CODE:
+        cmd = XEN_DOMCTL_PSR_CAT_OP_GET_L3_CODE;
+        break;
+    case XC_PSR_CAT_L3_CBM_DATA:
+        cmd = XEN_DOMCTL_PSR_CAT_OP_GET_L3_DATA;
+        break;
     default:
         errno = EINVAL;
         return -1;
@@ -306,7 +318,8 @@ int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
 }
 
 int xc_psr_cat_get_l3_info(xc_interface *xch, uint32_t socket,
-                           uint32_t *cos_max, uint32_t *cbm_len)
+                           uint32_t *cos_max, uint32_t *cbm_len,
+                           bool *cdp_enabled)
 {
     int rc;
     DECLARE_SYSCTL;
@@ -320,6 +333,8 @@ int xc_psr_cat_get_l3_info(xc_interface *xch, uint32_t socket,
     {
         *cos_max = sysctl.u.psr_cat_op.u.l3_info.cos_max;
         *cbm_len = sysctl.u.psr_cat_op.u.l3_info.cbm_len;
+        *cdp_enabled = sysctl.u.psr_cat_op.u.l3_info.flags &
+                       XEN_SYSCTL_PSR_CAT_L3_CDP;
     }
 
     return rc;

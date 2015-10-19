@@ -8434,6 +8434,8 @@ static int psr_cat_hwinfo(void)
         }
         printf("%-16s: %u\n", "Socket ID", info[i].id);
         printf("%-16s: %uKB\n", "L3 Cache", l3_cache_size);
+        printf("%-16s: %s\n", "CDP Status",
+               info[i].cdp_enabled ? "Enabled" : "Disabled");
         printf("%-16s: %u\n", "Maximum COS", info[i].cos_max);
         printf("%-16s: %u\n", "CBM length", info[i].cbm_len);
         printf("%-16s: %#llx\n", "Default CBM",
@@ -8445,29 +8447,47 @@ out:
     return rc;
 }
 
-static void psr_cat_print_one_domain_cbm(uint32_t domid, uint32_t socketid)
+static void psr_cat_print_one_domain_cbm_type(uint32_t domid, uint32_t socketid,
+                                              libxl_psr_cbm_type type)
+{
+    uint64_t cbm;
+
+    if (!libxl_psr_cat_get_cbm(ctx, domid, type, socketid, &cbm))
+        printf("%#16"PRIx64, cbm);
+    else
+        printf("%16s", "error");
+}
+
+static void psr_cat_print_one_domain_cbm(uint32_t domid, uint32_t socketid,
+                                         bool cdp_enabled)
 {
     char *domain_name;
-    uint64_t cbm;
 
     domain_name = libxl_domid_to_name(ctx, domid);
     printf("%5d%25s", domid, domain_name);
     free(domain_name);
 
-    if (!libxl_psr_cat_get_cbm(ctx, domid, LIBXL_PSR_CBM_TYPE_L3_CBM,
-                               socketid, &cbm))
-         printf("%#16"PRIx64, cbm);
+    if (!cdp_enabled) {
+        psr_cat_print_one_domain_cbm_type(domid, socketid,
+                                          LIBXL_PSR_CBM_TYPE_L3_CBM);
+    } else {
+        psr_cat_print_one_domain_cbm_type(domid, socketid,
+                                          LIBXL_PSR_CBM_TYPE_L3_CBM_CODE);
+        psr_cat_print_one_domain_cbm_type(domid, socketid,
+                                          LIBXL_PSR_CBM_TYPE_L3_CBM_DATA);
+    }
 
     printf("\n");
 }
 
-static int psr_cat_print_domain_cbm(uint32_t domid, uint32_t socketid)
+static int psr_cat_print_domain_cbm(uint32_t domid, uint32_t socketid,
+                                    bool cdp_enabled)
 {
     int i, nr_domains;
     libxl_dominfo *list;
 
     if (domid != INVALID_DOMID) {
-        psr_cat_print_one_domain_cbm(domid, socketid);
+        psr_cat_print_one_domain_cbm(domid, socketid, cdp_enabled);
         return 0;
     }
 
@@ -8477,7 +8497,7 @@ static int psr_cat_print_domain_cbm(uint32_t domid, uint32_t socketid)
     }
 
     for (i = 0; i < nr_domains; i++)
-        psr_cat_print_one_domain_cbm(list[i].domid, socketid);
+        psr_cat_print_one_domain_cbm(list[i].domid, socketid, cdp_enabled);
     libxl_dominfo_list_free(list, nr_domains);
 
     return 0;
@@ -8498,9 +8518,12 @@ static int psr_cat_print_socket(uint32_t domid, libxl_psr_cat_info *info)
     printf("%-16s: %u\n", "Socket ID", info->id);
     printf("%-16s: %uKB\n", "L3 Cache", l3_cache_size);
     printf("%-16s: %#llx\n", "Default CBM", (1ull << info->cbm_len) - 1);
-    printf("%5s%25s%16s\n", "ID", "NAME", "CBM");
+    if (info->cdp_enabled)
+        printf("%5s%25s%16s%16s\n", "ID", "NAME", "CBM (code)", "CBM (data)");
+    else
+        printf("%5s%25s%16s\n", "ID", "NAME", "CBM");
 
-    return psr_cat_print_domain_cbm(domid, info->id);
+    return psr_cat_print_domain_cbm(domid, info->id, info->cdp_enabled);
 }
 
 static int psr_cat_show(uint32_t domid)
@@ -8529,9 +8552,10 @@ out:
 int main_psr_cat_cbm_set(int argc, char **argv)
 {
     uint32_t domid;
-    libxl_psr_cbm_type type = LIBXL_PSR_CBM_TYPE_L3_CBM;
+    libxl_psr_cbm_type type;
     uint64_t cbm;
     int ret, opt = 0;
+    int opt_data = 0, opt_code = 0;
     libxl_bitmap target_map;
     char *value;
     libxl_string_list socket_list;
@@ -8540,13 +8564,15 @@ int main_psr_cat_cbm_set(int argc, char **argv)
 
     static struct option opts[] = {
         {"socket", 1, 0, 's'},
+        {"data", 0, 0, 'd'},
+        {"code", 0, 0, 'c'},
         COMMON_LONG_OPTS
     };
 
     libxl_socket_bitmap_alloc(ctx, &target_map, 0);
     libxl_bitmap_set_none(&target_map);
 
-    SWITCH_FOREACH_OPT(opt, "s:", opts, "psr-cat-cbm-set", 2) {
+    SWITCH_FOREACH_OPT(opt, "s:cd", opts, "psr-cat-cbm-set", 2) {
     case 's':
         trim(isspace, optarg, &value);
         split_string_into_string_list(value, ",", &socket_list);
@@ -8560,6 +8586,23 @@ int main_psr_cat_cbm_set(int argc, char **argv)
         libxl_string_list_dispose(&socket_list);
         free(value);
         break;
+    case 'd':
+        opt_data = 1;
+        break;
+    case 'c':
+        opt_code = 1;
+        break;
+    }
+
+    if (opt_data && opt_code) {
+        fprintf(stderr, "Cannot handle -c and -d at the same time\n");
+        return -1;
+    } else if (opt_data) {
+        type = LIBXL_PSR_CBM_TYPE_L3_CBM_DATA;
+    } else if (opt_code) {
+        type = LIBXL_PSR_CBM_TYPE_L3_CBM_CODE;
+    } else {
+        type = LIBXL_PSR_CBM_TYPE_L3_CBM;
     }
 
     if (libxl_bitmap_is_empty(&target_map))

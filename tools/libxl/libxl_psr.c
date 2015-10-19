@@ -87,6 +87,9 @@ static void libxl__psr_cat_log_err_msg(libxl__gc *gc, int err)
     case EEXIST:
         msg = "The same CBM is already set to this domain";
         break;
+    case ENXIO:
+        msg = "Unable to set code or data CBM when CDP is disabled";
+        break;
 
     default:
         libxl__psr_log_err_msg(gc, err);
@@ -363,7 +366,7 @@ int libxl_psr_cat_get_l3_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
     libxl_for_each_set_bit(socketid, socketmap) {
         ptr[i].id = socketid;
         if (xc_psr_cat_get_l3_info(ctx->xch, socketid, &ptr[i].cos_max,
-                                   &ptr[i].cbm_len)) {
+                                   &ptr[i].cbm_len, &ptr[i].cdp_enabled)) {
             libxl__psr_cat_log_err_msg(gc, errno);
             rc = ERROR_FAIL;
             free(ptr);
