@@ -849,7 +849,8 @@ int dt_for_each_range(const struct dt_device_node *dev,
     ranges = dt_get_property(dev, "ranges", &rlen);
     if ( ranges == NULL )
     {
-        printk(XENLOG_ERR "DT: no ranges; cannot enumerate\n");
+        printk(XENLOG_ERR "DT: no ranges; cannot enumerate %s\n",
+               dev->full_name);
         return -EINVAL;
     }
     if ( rlen == 0 ) /* Nothing to do */
