@@ -28,6 +28,9 @@
 #include "vnuma.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
+#include <xen/arch-x86/hvm/start_info.h>
+
+const struct hvm_start_info *hvm_start_info;
 
 asm (
     "    .text                       \n"
@@ -46,6 +49,8 @@ asm (
     "    ljmp $"STR(SEL_CODE32)",$1f \n"
     "1:  movl $stack_top,%esp        \n"
     "    movl %esp,%ebp              \n"
+    /* store HVM start info ptr */
+    "    mov  %ebx, hvm_start_info   \n"
     "    call main                   \n"
     /* Relocate real-mode trampoline to 0x0. */
     "    mov  $trampoline_start,%esi \n"
@@ -270,6 +275,7 @@ int main(void)
     memset((void *)HYPERCALL_PHYSICAL_ADDRESS, 0xc3 /* RET */, PAGE_SIZE);
 
     printf("HVM Loader\n");
+    BUG_ON(hvm_start_info->magic != XEN_HVM_START_MAGIC_VALUE);
 
     init_hypercalls();
 

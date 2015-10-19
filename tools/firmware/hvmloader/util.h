@@ -158,6 +158,9 @@ static inline void cpu_relax(void)
 struct hvm_info_table *get_hvm_info_table(void) __attribute__ ((const));
 #define hvm_info (get_hvm_info_table())
 
+/* HVM start info */
+extern const struct hvm_start_info *hvm_start_info;
+
 /* String and memory functions */
 int strcmp(const char *cs, const char *ct);
 int strncmp(const char *s1, const char *s2, uint32_t n);
