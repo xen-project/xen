@@ -121,7 +121,8 @@ static void rombios_load_roms(void)
                option_rom_phys_addr + option_rom_sz - 1);
 }
 
-static void rombios_load(const struct bios_config *config)
+static void rombios_load(const struct bios_config *config,
+                         void *unused_addr, uint32_t unused_size)
 {
     uint32_t bioshigh;
     struct rombios_info *info;

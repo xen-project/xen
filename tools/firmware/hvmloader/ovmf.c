@@ -93,7 +93,8 @@ static void ovmf_finish_bios_info(void)
     info->checksum = -checksum;
 }
 
-static void ovmf_load(const struct bios_config *config)
+static void ovmf_load(const struct bios_config *config,
+                      void *bios_addr, uint32_t bios_length)
 {
     xen_pfn_t mfn;
     uint64_t addr = OVMF_BEGIN;

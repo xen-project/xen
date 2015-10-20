@@ -266,10 +266,56 @@ static void acpi_enable_sci(void)
     BUG_ON(!(pm1a_cnt_val & ACPI_PM1C_SCI_EN));
 }
 
+const struct hvm_modlist_entry *get_module_entry(
+    const struct hvm_start_info *info,
+    const char *name)
+{
+    const struct hvm_modlist_entry *modlist =
+        (struct hvm_modlist_entry *)(uintptr_t)info->modlist_paddr;
+    unsigned int i;
+
+    if ( !modlist ||
+         info->modlist_paddr > UINTPTR_MAX ||
+         (info->modlist_paddr + info->nr_modules * sizeof(*modlist) - 1)
+            > UINTPTR_MAX )
+        return NULL;
+
+    for ( i = 0; i < info->nr_modules; i++ )
+    {
+        char *module_name = (char*)(uintptr_t)modlist[i].cmdline_paddr;
+
+        /* Skip if the module or its cmdline is missing. */
+        if ( !module_name || !modlist[i].paddr )
+            continue;
+
+        /* Skip if the cmdline cannot be read. */
+        if ( modlist[i].cmdline_paddr > UINTPTR_MAX ||
+             (modlist[i].cmdline_paddr + strlen(name)) > UINTPTR_MAX )
+            continue;
+
+        if ( !strcmp(name, module_name) )
+        {
+            if ( modlist[i].paddr > UINTPTR_MAX ||
+                 modlist[i].size > UINTPTR_MAX ||
+                 (modlist[i].paddr + modlist[i].size - 1) > UINTPTR_MAX )
+            {
+                printf("Cannot load \"%s\" from 0x"PRIllx" (0x"PRIllx")\n",
+                       name, PRIllx_arg(modlist[i].paddr),
+                       PRIllx_arg(modlist[i].size));
+                BUG();
+            }
+            return &modlist[i];
+        }
+    }
+
+    return NULL;
+}
+
 int main(void)
 {
     const struct bios_config *bios;
     int acpi_enabled;
+    const struct hvm_modlist_entry *bios_module;
 
     /* Initialise hypercall stubs with RET, rendering them no-ops. */
     memset((void *)HYPERCALL_PHYSICAL_ADDRESS, 0xc3 /* RET */, PAGE_SIZE);
@@ -305,8 +351,17 @@ int main(void)
     }
 
     printf("Loading %s ...\n", bios->name);
-    if ( bios->bios_load )
-        bios->bios_load(bios);
+    bios_module = get_module_entry(hvm_start_info, "firmware");
+    if ( bios_module && bios->bios_load )
+    {
+        uint32_t paddr = bios_module->paddr;
+
+        bios->bios_load(bios, (void*)paddr, bios_module->size);
+    }
+    else if ( bios->bios_load )
+    {
+        bios->bios_load(bios, NULL, 0);
+    }
     else
     {
         BUG_ON(bios->bios_address + bios->image_size >
