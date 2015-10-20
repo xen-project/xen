@@ -45,7 +45,6 @@ CIRRUSVGA_DEBUG ?= n
 
 OVMF_DIR := ../ovmf-dir
 ROMBIOS_DIR := ../rombios
-SEABIOS_DIR := ../seabios-dir
 
 ifeq ($(CONFIG_ROMBIOS),y)
 STDVGA_ROM    := ../vgabios/VGABIOS-lgpl-latest.bin
@@ -80,19 +79,13 @@ endif
 ifeq ($(CONFIG_SEABIOS),y)
 OBJS += seabios.o
 CFLAGS += -DENABLE_SEABIOS
-ifeq ($(SEABIOS_PATH),)
-	SEABIOS_ROM := $(SEABIOS_DIR)/out/bios.bin
-else
-	SEABIOS_ROM := $(SEABIOS_PATH)
-endif
-ROMS += $(SEABIOS_ROM)
 endif
 
 .PHONY: all
 all: subdirs-all
 	$(MAKE) hvmloader
 
-ovmf.o rombios.o seabios.o hvmloader.o: roms.inc
+ovmf.o rombios.o: roms.inc
 smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(SMBIOS_REL_DATE)\""
 
 hvmloader: $(OBJS) acpi/acpi.a
@@ -106,12 +99,6 @@ roms.inc: $(ROMS)
 ifneq ($(ROMBIOS_ROM),)
 	echo "#ifdef ROM_INCLUDE_ROMBIOS" >> $@.new
 	sh ./mkhex rombios $(ROMBIOS_ROM) >> $@.new
-	echo "#endif" >> $@.new
-endif
-
-ifneq ($(SEABIOS_ROM),)
-	echo "#ifdef ROM_INCLUDE_SEABIOS" >> $@.new
-	sh ./mkhex seabios $(SEABIOS_ROM) >> $@.new
 	echo "#endif" >> $@.new
 endif
 
