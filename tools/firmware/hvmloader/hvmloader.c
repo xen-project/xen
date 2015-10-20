@@ -352,22 +352,26 @@ int main(void)
 
     printf("Loading %s ...\n", bios->name);
     bios_module = get_module_entry(hvm_start_info, "firmware");
-    if ( bios_module && bios->bios_load )
+    if ( bios_module )
     {
         uint32_t paddr = bios_module->paddr;
 
         bios->bios_load(bios, (void*)paddr, bios_module->size);
     }
-    else if ( bios->bios_load )
+#ifdef ENABLE_ROMBIOS
+    else if ( bios == &rombios_config )
     {
         bios->bios_load(bios, NULL, 0);
     }
+#endif
     else
     {
-        BUG_ON(bios->bios_address + bios->image_size >
-               HVMLOADER_PHYSICAL_ADDRESS);
-        memcpy((void *)bios->bios_address, bios->image,
-               bios->image_size);
+        /*
+         * If there is no BIOS module supplied and if there is no embeded BIOS
+         * image, then we failed. Only rombios might have an embedded bios blob.
+         */
+        printf("no BIOS ROM image found\n");
+        BUG();
     }
 
     if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
