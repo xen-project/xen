@@ -266,9 +266,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 1c8d43cbdf0fc01a8f05acfbf55b805a83da34bb
-# Tue Sep 8 15:41:20 2015 +0100
-# Fix build after "ui/vnc: limit client_cut_text msg payload size"
+QEMU_TRADITIONAL_REVISION ?= bc00cad75d8bcc3ba696992bec219c21db8406aa
+# Tue Mar 11 10:19:23 2014 +0000
+# block-vvfat: fix resource leaks in read_directory()
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
