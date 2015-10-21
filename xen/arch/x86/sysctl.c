@@ -24,6 +24,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
+#include <asm/smp.h>
 #include <asm/numa.h>
 #include <xen/nodemask.h>
 #include <xen/cpu.h>
