@@ -5,9 +5,6 @@ ifeq ($(CONFIG_RUMP),y)
 XEN_OS              := NetBSDRump
 endif
 
-# A debug build of tools?
-debug               := @debug@
-
 # Tools path
 BISON               := @BISON@
 FLEX                := @FLEX@
