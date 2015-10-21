@@ -486,6 +486,7 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     xs_transaction_t t;
     char **ents;
     int i, rc;
+    int64_t mem_target_fudge;
 
     if (info->num_vnuma_nodes && !info->num_vcpu_soft_affinity) {
         rc = set_vnuma_affinity(gc, domid, info);
@@ -518,11 +519,17 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
         }
     }
 
+    mem_target_fudge =
+        (info->type == LIBXL_DOMAIN_TYPE_HVM &&
+         info->max_memkb > info->target_memkb)
+        ? LIBXL_MAXMEM_CONSTANT : 0;
+
     ents = libxl__calloc(gc, 12 + (info->max_vcpus * 2) + 2, sizeof(char *));
     ents[0] = "memory/static-max";
     ents[1] = GCSPRINTF("%"PRId64, info->max_memkb);
     ents[2] = "memory/target";
-    ents[3] = GCSPRINTF("%"PRId64, info->target_memkb - info->video_memkb);
+    ents[3] = GCSPRINTF("%"PRId64, info->target_memkb - info->video_memkb
+                        - mem_target_fudge);
     ents[4] = "memory/videoram";
     ents[5] = GCSPRINTF("%"PRId64, info->video_memkb);
     ents[6] = "domid";
