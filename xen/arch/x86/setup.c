@@ -200,7 +200,7 @@ void __devinit srat_detect_node(int cpu)
     nodeid_t node;
     u32 apicid = x86_cpu_to_apicid[cpu];
 
-    node = apicid_to_node[apicid];
+    node = apicid < MAX_LOCAL_APIC ? apicid_to_node[apicid] : NUMA_NO_NODE;
     if ( node == NUMA_NO_NODE )
         node = 0;
 
