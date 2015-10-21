@@ -151,10 +151,12 @@ extern void shadow_audit_tables(struct vcpu *v);
  * Macro for dealing with the naming of the internal names of the
  * shadow code's external entry points.
  */
-#define SHADOW_INTERNAL_NAME_HIDDEN(name, guest_levels) \
-    name ## __guest_ ## guest_levels
+#define SHADOW_INTERNAL_NAME_(name, kind, value)        \
+    name ## __ ## kind ## _ ## value
 #define SHADOW_INTERNAL_NAME(name, guest_levels)        \
-    SHADOW_INTERNAL_NAME_HIDDEN(name, guest_levels)
+    SHADOW_INTERNAL_NAME_(name, guest, guest_levels)
+#define SHADOW_SH_NAME(name, shadow_levels)             \
+    SHADOW_INTERNAL_NAME_(name, sh, shadow_levels)
 
 #define GUEST_LEVELS  2
 #include "multi.h"

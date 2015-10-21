@@ -105,13 +105,6 @@ extern void
 SHADOW_INTERNAL_NAME(sh_guest_get_eff_l1e, GUEST_LEVELS)
     (struct vcpu *v, unsigned long va, void *eff_l1e);
 
-extern mfn_t
-SHADOW_INTERNAL_NAME(sh_make_monitor_table, GUEST_LEVELS)
-    (struct vcpu *v);
-extern void
-SHADOW_INTERNAL_NAME(sh_destroy_monitor_table, GUEST_LEVELS)
-    (struct vcpu *v, mfn_t mmfn);
-
 extern const struct paging_mode
 SHADOW_INTERNAL_NAME(sh_paging_mode, GUEST_LEVELS);
 
