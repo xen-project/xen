@@ -73,8 +73,10 @@ typedef enum {
     ft_demand_write = FETCH_TYPE_DEMAND | FETCH_TYPE_WRITE,
 } fetch_type_t;
 
-#ifdef DEBUG_TRACE_DUMP
-static char *fetch_type_names[] = {
+extern const char *const fetch_type_names[];
+
+#if defined(DEBUG_TRACE_DUMP) && CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS
+const char *const fetch_type_names[] = {
     [ft_prefetch]     "prefetch",
     [ft_demand_read]  "demand read",
     [ft_demand_write] "demand write",
