@@ -227,26 +227,25 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS   0x00040000
 extern u32 vmx_secondary_exec_control;
 
-#define VMX_EPT_EXEC_ONLY_SUPPORTED             0x00000001
-#define VMX_EPT_WALK_LENGTH_4_SUPPORTED         0x00000040
-#define VMX_EPT_MEMORY_TYPE_UC                  0x00000100
-#define VMX_EPT_MEMORY_TYPE_WB                  0x00004000
-#define VMX_EPT_SUPERPAGE_2MB                   0x00010000
-#define VMX_EPT_SUPERPAGE_1GB                   0x00020000
-#define VMX_EPT_INVEPT_INSTRUCTION              0x00100000
-#define VMX_EPT_INVEPT_SINGLE_CONTEXT           0x02000000
-#define VMX_EPT_INVEPT_ALL_CONTEXT              0x04000000
-#define VMX_EPT_AD_BIT                          0x00200000
+#define VMX_EPT_EXEC_ONLY_SUPPORTED                         0x00000001
+#define VMX_EPT_WALK_LENGTH_4_SUPPORTED                     0x00000040
+#define VMX_EPT_MEMORY_TYPE_UC                              0x00000100
+#define VMX_EPT_MEMORY_TYPE_WB                              0x00004000
+#define VMX_EPT_SUPERPAGE_2MB                               0x00010000
+#define VMX_EPT_SUPERPAGE_1GB                               0x00020000
+#define VMX_EPT_INVEPT_INSTRUCTION                          0x00100000
+#define VMX_EPT_AD_BIT                                      0x00200000
+#define VMX_EPT_INVEPT_SINGLE_CONTEXT                       0x02000000
+#define VMX_EPT_INVEPT_ALL_CONTEXT                          0x04000000
+#define VMX_VPID_INVVPID_INSTRUCTION                     0x00100000000ULL
+#define VMX_VPID_INVVPID_INDIVIDUAL_ADDR                 0x10000000000ULL
+#define VMX_VPID_INVVPID_SINGLE_CONTEXT                  0x20000000000ULL
+#define VMX_VPID_INVVPID_ALL_CONTEXT                     0x40000000000ULL
+#define VMX_VPID_INVVPID_SINGLE_CONTEXT_RETAINING_GLOBAL 0x80000000000ULL
+extern u64 vmx_ept_vpid_cap;
 
+#define VMX_MISC_CR3_TARGET                     0x01ff0000
 #define VMX_MISC_VMWRITE_ALL                    0x20000000
-
-#define VMX_VPID_INVVPID_INSTRUCTION                        0x100000000ULL
-#define VMX_VPID_INVVPID_INDIVIDUAL_ADDR                    0x10000000000ULL
-#define VMX_VPID_INVVPID_SINGLE_CONTEXT                     0x20000000000ULL
-#define VMX_VPID_INVVPID_ALL_CONTEXT                        0x40000000000ULL
-#define VMX_VPID_INVVPID_SINGLE_CONTEXT_RETAINING_GLOBAL    0x80000000000ULL
-
-#define VMX_MISC_CR3_TARGET             0x1ff0000
 
 #define cpu_has_wbinvd_exiting \
     (vmx_secondary_exec_control & SECONDARY_EXEC_WBINVD_EXITING)
