@@ -170,7 +170,6 @@ void __init
 acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
 {
 	int pxm, node;
-	int apic_id;
 
 	if (srat_disabled())
 		return;
@@ -178,8 +177,13 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
 		bad_srat();
 		return;
 	}
-	if ((pa->flags & ACPI_SRAT_CPU_ENABLED) == 0)
+	if (!(pa->flags & ACPI_SRAT_CPU_ENABLED))
 		return;
+	if (pa->apic_id >= MAX_LOCAL_APIC) {
+		printk(KERN_INFO "SRAT: APIC %08x ignored\n", pa->apic_id);
+		return;
+	}
+
 	pxm = pa->proximity_domain;
 	node = setup_node(pxm);
 	if (node < 0) {
@@ -187,11 +191,11 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
 		return;
 	}
 
-	apic_id = pa->apic_id;
-	apicid_to_node[apic_id] = node;
+	apicid_to_node[pa->apic_id] = node;
+	node_set(node, processor_nodes_parsed);
 	acpi_numa = 1;
-	printk(KERN_INFO "SRAT: PXM %u -> APIC %u -> Node %u\n",
-	       pxm, apic_id, node);
+	printk(KERN_INFO "SRAT: PXM %u -> APIC %08x -> Node %u\n",
+	       pxm, pa->apic_id, node);
 }
 
 /* Callback for Proximity Domain -> LAPIC mapping */
@@ -221,7 +225,7 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 	apicid_to_node[pa->apic_id] = node;
 	node_set(node, processor_nodes_parsed);
 	acpi_numa = 1;
-	printk(KERN_INFO "SRAT: PXM %u -> APIC %u -> Node %u\n",
+	printk(KERN_INFO "SRAT: PXM %u -> APIC %02x -> Node %u\n",
 	       pxm, pa->apic_id, node);
 }
 
