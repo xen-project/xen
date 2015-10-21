@@ -75,7 +75,7 @@ static void svm_inject_extint(struct vcpu *v, int vector)
     vmcb->eventinj = event;
 }
 
-static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
+static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     uint32_t general1_intercepts = vmcb_get_general1_intercepts(vmcb);
@@ -195,7 +195,7 @@ void svm_intr_assist(void)
          */
         if ( unlikely(vmcb->eventinj.fields.v) || intblk )
         {
-            enable_intr_window(v, intack);
+            svm_enable_intr_window(v, intack);
             return;
         }
 
@@ -216,7 +216,7 @@ void svm_intr_assist(void)
     /* Is there another IRQ to queue up behind this one? */
     intack = hvm_vcpu_has_pending_irq(v);
     if ( unlikely(intack.source != hvm_intsrc_none) )
-        enable_intr_window(v, intack);
+        svm_enable_intr_window(v, intack);
 }
 
 /*
