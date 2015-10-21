@@ -1500,7 +1500,7 @@ int vmx_domain_enable_pml(struct domain *d)
     if ( vmx_domain_pml_enabled(d) )
         return 0;
 
-    for_each_vcpu( d, v )
+    for_each_vcpu ( d, v )
         if ( (rc = vmx_vcpu_enable_pml(v)) != 0 )
             goto error;
 
@@ -1509,7 +1509,7 @@ int vmx_domain_enable_pml(struct domain *d)
     return 0;
 
  error:
-    for_each_vcpu( d, v )
+    for_each_vcpu ( d, v )
         if ( vmx_vcpu_pml_enabled(v) )
             vmx_vcpu_disable_pml(v);
     return rc;
@@ -1530,7 +1530,7 @@ void vmx_domain_disable_pml(struct domain *d)
     if ( !vmx_domain_pml_enabled(d) )
         return;
 
-    for_each_vcpu( d, v )
+    for_each_vcpu ( d, v )
         vmx_vcpu_disable_pml(v);
 
     d->arch.hvm_domain.vmx.status &= ~VMX_DOMAIN_PML_ENABLED;
@@ -1549,7 +1549,7 @@ void vmx_domain_flush_pml_buffers(struct domain *d)
     if ( !vmx_domain_pml_enabled(d) )
         return;
 
-    for_each_vcpu( d, v )
+    for_each_vcpu ( d, v )
         vmx_vcpu_flush_pml_buffer(v);
 }
 
