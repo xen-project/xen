@@ -98,13 +98,6 @@ SHADOW_INTERNAL_NAME(sh_audit_l4_table, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl4mfn, mfn_t x);
 #endif
 
-extern void *
-SHADOW_INTERNAL_NAME(sh_guest_map_l1e, GUEST_LEVELS)
-    (struct vcpu *v, unsigned long va, unsigned long *gl1mfn);
-extern void
-SHADOW_INTERNAL_NAME(sh_guest_get_eff_l1e, GUEST_LEVELS)
-    (struct vcpu *v, unsigned long va, void *eff_l1e);
-
 extern const struct paging_mode
 SHADOW_INTERNAL_NAME(sh_paging_mode, GUEST_LEVELS);
 

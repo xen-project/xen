@@ -383,10 +383,6 @@ extern int sh_remove_write_access(struct domain *d, mfn_t readonly_mfn,
 void shadow_write_p2m_entry(struct domain *d, unsigned long gfn,
                             l1_pgentry_t *p, l1_pgentry_t new,
                             unsigned int level);
-int shadow_write_guest_entry(struct vcpu *v, intpte_t *p,
-                             intpte_t new, mfn_t gmfn);
-int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
-                               intpte_t *old, intpte_t new, mfn_t gmfn);
 
 /* Update all the things that are derived from the guest's CR0/CR3/CR4.
  * Called to initialize paging structures if the paging mode

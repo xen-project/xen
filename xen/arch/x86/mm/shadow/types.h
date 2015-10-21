@@ -262,12 +262,6 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 #define sh_rm_write_access_from_sl1p INTERNAL_NAME(sh_rm_write_access_from_sl1p)
 #endif
 
-/* The sh_guest_(map|get)_* functions depends on Xen's paging levels */
-#define sh_guest_map_l1e \
-        SHADOW_INTERNAL_NAME(sh_guest_map_l1e, CONFIG_PAGING_LEVELS)
-#define sh_guest_get_eff_l1e \
-        SHADOW_INTERNAL_NAME(sh_guest_get_eff_l1e, CONFIG_PAGING_LEVELS)
-
 /* sh_make_monitor_table depends only on the number of shadow levels */
 #define sh_make_monitor_table \
         SHADOW_SH_NAME(sh_make_monitor_table, SHADOW_PAGING_LEVELS)

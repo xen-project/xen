@@ -84,7 +84,9 @@ void shadow_vcpu_init(struct vcpu *v)
     }
 #endif
 
-    v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode, 3);
+    v->arch.paging.mode = is_pv_vcpu(v) ?
+                          &SHADOW_INTERNAL_NAME(sh_paging_mode, 4) :
+                          &SHADOW_INTERNAL_NAME(sh_paging_mode, 3);
 }
 
 #if SHADOW_AUDIT
@@ -1126,38 +1128,6 @@ sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
          * unshadow the page. */
         sh_remove_shadows(d, gmfn, 0, 0);
     }
-}
-
-int shadow_write_guest_entry(struct vcpu *v, intpte_t *p,
-                             intpte_t new, mfn_t gmfn)
-/* Write a new value into the guest pagetable, and update the shadows
- * appropriately.  Returns 0 if we page-faulted, 1 for success. */
-{
-    int failed;
-    paging_lock(v->domain);
-    failed = __copy_to_user(p, &new, sizeof(new));
-    if ( failed != sizeof(new) )
-        sh_validate_guest_entry(v, gmfn, p, sizeof(new));
-    paging_unlock(v->domain);
-    return (failed == 0);
-}
-
-int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
-                               intpte_t *old, intpte_t new, mfn_t gmfn)
-/* Cmpxchg a new value into the guest pagetable, and update the shadows
- * appropriately. Returns 0 if we page-faulted, 1 if not.
- * N.B. caller should check the value of "old" to see if the
- * cmpxchg itself was successful. */
-{
-    int failed;
-    intpte_t t = *old;
-    paging_lock(v->domain);
-    failed = cmpxchg_user(p, t, new);
-    if ( t == *old )
-        sh_validate_guest_entry(v, gmfn, p, sizeof(new));
-    *old = t;
-    paging_unlock(v->domain);
-    return (failed == 0);
 }
 
 
@@ -2786,14 +2756,7 @@ static void sh_update_paging_modes(struct vcpu *v)
     if ( v->arch.paging.mode )
         v->arch.paging.mode->shadow.detach_old_tables(v);
 
-    if ( is_pv_domain(d) )
-    {
-        ///
-        /// PV guest
-        ///
-        v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode, 4);
-    }
-    else
+    if ( !is_pv_domain(d) )
     {
         ///
         /// HVM guest
