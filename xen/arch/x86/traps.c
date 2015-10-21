@@ -904,6 +904,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_LWP % 32, &c);
         __clear_bit(X86_FEATURE_NODEID_MSR % 32, &c);
         __clear_bit(X86_FEATURE_TOPOEXT % 32, &c);
+        __clear_bit(X86_FEATURE_MWAITX % 32, &c);
         break;
 
     case 0x00000005: /* MONITOR/MWAIT */
