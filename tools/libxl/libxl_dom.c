@@ -270,6 +270,7 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     xs_transaction_t t;
     char **ents, **hvm_ents;
     int i, rc;
+    int64_t mem_target_fudge;
 
     rc = libxl_domain_sched_params_set(CTX, domid, &info->sched_params);
     if (rc)
@@ -286,11 +287,17 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     if (info->cpuid != NULL)
         libxl_cpuid_set(ctx, domid, info->cpuid);
 
+    mem_target_fudge =
+        (info->type == LIBXL_DOMAIN_TYPE_HVM &&
+         info->max_memkb > info->target_memkb)
+        ? LIBXL_MAXMEM_CONSTANT : 0;
+
     ents = libxl__calloc(gc, 12 + (info->max_vcpus * 2) + 2, sizeof(char *));
     ents[0] = "memory/static-max";
     ents[1] = GCSPRINTF("%"PRId64, info->max_memkb);
     ents[2] = "memory/target";
-    ents[3] = GCSPRINTF("%"PRId64, info->target_memkb - info->video_memkb);
+    ents[3] = GCSPRINTF("%"PRId64, info->target_memkb - info->video_memkb
+                        - mem_target_fudge);
     ents[4] = "memory/videoram";
     ents[5] = GCSPRINTF("%"PRId64, info->video_memkb);
     ents[6] = "domid";
