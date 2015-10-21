@@ -120,7 +120,7 @@ static int get_pty_fd(struct xs_handle *xs, char *path, int seconds)
 					continue;
 				pty_fd = open(pty_path, O_RDWR | O_NOCTTY);
 				if (pty_fd == -1) 
-					warn(errno, "Could not open tty `%s'", 
+					warn("Could not open tty `%s'",
 					    pty_path);
 			}
 			free(pty_path);
