@@ -222,12 +222,8 @@ struct bios_info {
 #ifdef ENABLE_ROMBIOS
     { "rombios", &rombios_config, },
 #endif
-#ifdef ENABLE_SEABIOS
     { "seabios", &seabios_config, },
-#endif
-#ifdef ENABLE_OVMF
     { "ovmf", &ovmf_config, },
-#endif
     { NULL, NULL }
 };
 

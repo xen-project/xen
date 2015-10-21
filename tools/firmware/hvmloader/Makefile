@@ -37,6 +37,7 @@ OBJS  = hvmloader.o mp_tables.o util.o smbios.o
 OBJS += smp.o cacheattr.o xenbus.o vnuma.o
 OBJS += e820.o pci.o pir.o ctype.o
 OBJS += hvm_param.o
+OBJS += ovmf.o seabios.o
 ifeq ($(debug),y)
 OBJS += tests.o
 endif
@@ -57,21 +58,11 @@ endif
 
 ROMS := 
 
-ifeq ($(CONFIG_OVMF),y)
-OBJS += ovmf.o
-CFLAGS += -DENABLE_OVMF
-endif
-
 ifeq ($(CONFIG_ROMBIOS),y)
 OBJS += optionroms.o 32bitbios_support.o rombios.o
 CFLAGS += -DENABLE_ROMBIOS
 ROMBIOS_ROM := $(ROMBIOS_DIR)/BIOS-bochs-latest
 ROMS += $(ROMBIOS_ROM) $(STDVGA_ROM) $(CIRRUSVGA_ROM) $(ETHERBOOT_ROMS)
-endif
-
-ifeq ($(CONFIG_SEABIOS),y)
-OBJS += seabios.o
-CFLAGS += -DENABLE_SEABIOS
 endif
 
 .PHONY: all
