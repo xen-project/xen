@@ -3755,7 +3755,7 @@ retry_transaction:
 
     new_target_memkb -= videoram;
     rc = xc_domain_set_pod_target(ctx->xch, domid,
-            new_target_memkb / 4, NULL, NULL, NULL);
+            (new_target_memkb + LIBXL_MAXMEM_CONSTANT) / 4, NULL, NULL, NULL);
     if (rc != 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                 "xc_domain_set_pod_target domid=%d, memkb=%d "
