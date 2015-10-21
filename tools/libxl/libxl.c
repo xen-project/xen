@@ -4834,7 +4834,7 @@ retry_transaction:
     }
 
     rc = xc_domain_set_pod_target(ctx->xch, domid,
-            new_target_memkb / 4, NULL, NULL, NULL);
+            (new_target_memkb + LIBXL_MAXMEM_CONSTANT) / 4, NULL, NULL, NULL);
     if (rc != 0) {
         LOGE(ERROR,
              "xc_domain_set_pod_target domid=%d, memkb=%d ""failed rc=%d\n",
