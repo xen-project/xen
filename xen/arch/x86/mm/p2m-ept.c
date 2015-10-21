@@ -1129,21 +1129,39 @@ void ept_sync_domain(struct p2m_domain *p2m)
 
 static void ept_enable_pml(struct p2m_domain *p2m)
 {
+    /* Domain must have been paused */
+    ASSERT(atomic_read(&p2m->domain->pause_count));
+
     /*
-     * No need to check if vmx_domain_enable_pml has succeeded or not, as
+     * No need to return whether vmx_domain_enable_pml has succeeded, as
      * ept_p2m_type_to_flags will do the check, and write protection will be
      * used if PML is not enabled.
      */
-    vmx_domain_enable_pml(p2m->domain);
+    if ( vmx_domain_enable_pml(p2m->domain) )
+        return;
+
+    /* Enable EPT A/D bit for PML */
+    p2m->ept.ept_ad = 1;
+    vmx_domain_update_eptp(p2m->domain);
 }
 
 static void ept_disable_pml(struct p2m_domain *p2m)
 {
+    /* Domain must have been paused */
+    ASSERT(atomic_read(&p2m->domain->pause_count));
+
     vmx_domain_disable_pml(p2m->domain);
+
+    /* Disable EPT A/D bit */
+    p2m->ept.ept_ad = 0;
+    vmx_domain_update_eptp(p2m->domain);
 }
 
 static void ept_flush_pml_buffers(struct p2m_domain *p2m)
 {
+    /* Domain must have been paused */
+    ASSERT(atomic_read(&p2m->domain->pause_count));
+
     vmx_domain_flush_pml_buffers(p2m->domain);
 }
 
@@ -1166,8 +1184,6 @@ int ept_p2m_init(struct p2m_domain *p2m)
 
     if ( cpu_has_vmx_pml )
     {
-        /* Enable EPT A/D bits if we are going to use PML. */
-        ept->ept_ad = cpu_has_vmx_pml ? 1 : 0;
         p2m->enable_hardware_log_dirty = ept_enable_pml;
         p2m->disable_hardware_log_dirty = ept_disable_pml;
         p2m->flush_hardware_cached_dirty = ept_flush_pml_buffers;

@@ -1553,6 +1553,30 @@ void vmx_domain_flush_pml_buffers(struct domain *d)
         vmx_vcpu_flush_pml_buffer(v);
 }
 
+static void vmx_vcpu_update_eptp(struct vcpu *v, u64 eptp)
+{
+    vmx_vmcs_enter(v);
+    __vmwrite(EPT_POINTER, eptp);
+    vmx_vmcs_exit(v);
+}
+
+/*
+ * Update EPTP data to VMCS of all vcpus of the domain. Must be called when
+ * domain is paused.
+ */
+void vmx_domain_update_eptp(struct domain *d)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    struct vcpu *v;
+
+    ASSERT(atomic_read(&d->pause_count));
+
+    for_each_vcpu ( d, v )
+        vmx_vcpu_update_eptp(v, ept_get_eptp(&p2m->ept));
+
+    ept_sync_domain(p2m);
+}
+
 int vmx_create_vmcs(struct vcpu *v)
 {
     struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;

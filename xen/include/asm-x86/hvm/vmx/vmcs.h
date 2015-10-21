@@ -517,6 +517,8 @@ int vmx_domain_enable_pml(struct domain *d);
 void vmx_domain_disable_pml(struct domain *d);
 void vmx_domain_flush_pml_buffers(struct domain *d);
 
+void vmx_domain_update_eptp(struct domain *d);
+
 #endif /* ASM_X86_HVM_VMX_VMCS_H__ */
 
 /*
