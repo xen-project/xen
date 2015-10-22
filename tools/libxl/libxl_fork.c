@@ -239,7 +239,7 @@ static void sigchld_handler(int signo)
 
     LIBXL_LIST_FOREACH(notify, &sigchld_users, sigchld_users_entry) {
         int e = libxl__self_pipe_wakeup(notify->sigchld_selfpipe[1]);
-        assert(!e); /* errors are probably EBADF, very bad */
+        if (e) abort(); /* errors are probably EBADF, very bad */
     }
 
     r = pthread_mutex_unlock(&sigchld_defer_mutex);

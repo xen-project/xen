@@ -1564,6 +1564,7 @@ int libxl__pipe_nonblock(libxl_ctx *ctx, int fds[2])
 
 int libxl__self_pipe_wakeup(int fd)
 {
+    /* Called from signal handlers, so needs to be async-signal-safe */
     static const char buf[1] = "";
 
     for (;;) {
@@ -1572,7 +1573,7 @@ int libxl__self_pipe_wakeup(int fd)
         assert(r==-1);
         if (errno == EINTR) continue;
         if (errno == EWOULDBLOCK) return 0;
-        assert(errno);
+        if (!errno) abort();
         return errno;
     }
 }

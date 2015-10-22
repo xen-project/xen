@@ -148,8 +148,11 @@ static void save_signal_handler(int num)
     int esave = errno;
 
     int r = dup2(unwriteable_fd, io_fd);
-    assert(r == io_fd); /* if not we can't write an xtl message because we
-                         * might end up interleaving on our control stream */
+    if (r != io_fd)
+        /* we can't write an xtl message because we might end up
+         * interleaving on our control stream; we can't use stdio
+         * because it's not async-signal-safe */
+        abort();
 
     errno = esave;
 }
