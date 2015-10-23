@@ -51,6 +51,7 @@
 #include <xenstore.h>
 #include <xenctrl.h>
 #include <xenguest.h>
+#include <xc_dom.h>
 
 #include "xentoollog.h"
 

@@ -13,6 +13,9 @@
  * License along with this library; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef _XC_DOM_H
+#define _XC_DOM_H
+
 #include <xen/libelf/libelf.h>
 #include <xenguest.h>
 
@@ -405,6 +408,8 @@ static inline xen_pfn_t xc_dom_p2m(struct xc_dom_image *dom, xen_pfn_t pfn)
         return INVALID_MFN;
     return dom->p2m_host[pfn - dom->rambase_pfn];
 }
+
+#endif /* _XC_DOM_H */
 
 /*
  * Local variables:
