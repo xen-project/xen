@@ -184,10 +184,6 @@ int xc_await_suspend(xc_interface *xch, xc_evtchn *xce, int suspend_evtchn);
 int xc_suspend_evtchn_init_sane(xc_interface *xch, xc_evtchn *xce,
                                 int domid, int port, int *lockfd);
 
-int xc_get_bit_size(xc_interface *xch,
-                    const char *image_name, const char *cmdline,
-                    const char *features, int *type);
-
 int xc_mark_page_online(xc_interface *xch, unsigned long start,
                         unsigned long end, uint32_t *status);
 

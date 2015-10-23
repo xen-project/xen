@@ -34,31 +34,6 @@
 
 /* ------------------------------------------------------------------------ */
 
-int xc_get_bit_size(xc_interface *xch,
-                    const char *image_name, const char *cmdline,
-                    const char *features, int *bit_size)
-{
-    struct xc_dom_image *dom;
-    int rc;
-    *bit_size = 0;
-    dom = xc_dom_allocate(xch, cmdline, features);
-    if (dom == NULL)
-        return -1;
-    if ( (rc = xc_dom_kernel_file(dom, image_name)) != 0 )
-        goto out;
-    if ( (rc = xc_dom_parse_image(dom)) != 0 )
-        goto out;
-    if( dom->guest_type != NULL){
-        if(strstr(dom->guest_type, "x86_64") != NULL)
-            *bit_size = X86_64_B_SIZE; //64bit Guest
-        if(strstr(dom->guest_type, "x86_32") != NULL)
-            *bit_size = X86_32_B_SIZE; //32bit Guest
-    }
- out:
-    xc_dom_release(dom);
-    return rc;
-}
-
 int xc_linux_build(xc_interface *xch, uint32_t domid,
                    unsigned int mem_mb,
                    const char *image_name,

@@ -6,7 +6,6 @@
 
 #include <Python.h>
 #include <xenctrl.h>
-#include <xenguest.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -429,26 +428,6 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     Py_DECREF(cpulist);
     free(cpumap);
     return info_dict;
-}
-
-static PyObject *pyxc_getBitSize(XcObject *self,
-                                    PyObject *args,
-                                    PyObject *kwds)
-{
-    PyObject *info_type;
-    char *image = NULL, *cmdline = "", *features = NULL;
-    int type = 0;
-    static char *kwd_list[] = { "image", "cmdline", "features", NULL };
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "sss", kwd_list,
-                                      &image, &cmdline, &features) )
-        return NULL;
-
-    xc_get_bit_size(self->xc_handle, image, cmdline, features, &type);
-    if (type < 0)
-        return pyxc_error_to_exception(self->xc_handle);
-    info_type = Py_BuildValue("{s:i}",
-                              "type", type);
-    return info_type;
 }
 
 static PyObject *pyxc_hvm_param_get(XcObject *self,
@@ -2181,13 +2160,6 @@ static PyMethodDef pyxc_methods[] = {
       " cpu_time [long]: CPU time consumed, in nanoseconds\n"
       " cpumap   [int]:  Bitmap of CPUs this VCPU can run on\n"
       " cpu      [int]:  CPU that this VCPU is currently bound to\n" },
-
-    {"getBitSize",
-      (PyCFunction)pyxc_getBitSize,
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Get the bitsize of a guest OS.\n"
-      " image   [str]:      Name of kernel image file. May be gzipped.\n"
-      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"},
 
     { "gnttab_hvm_seed",
       (PyCFunction)pyxc_gnttab_hvm_seed,
