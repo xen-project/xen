@@ -3179,6 +3179,7 @@ static int def_getopt(int argc, char * const argv[],
             exit(0);
         }
         fprintf(stderr, "option `%c' not supported.\n", optopt);
+        exit(2);
     }
     if (opt == 'h') {
         help(helpstr);
