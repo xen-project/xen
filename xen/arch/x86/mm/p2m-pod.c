@@ -222,7 +222,7 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
         else
             order = PAGE_ORDER_4K;
     retry:
-        page = alloc_domheap_pages(d, order, PAGE_ORDER_4K);
+        page = alloc_domheap_pages(d, order, 0);
         if ( unlikely(page == NULL) )
         {
             if ( order == PAGE_ORDER_2M )
@@ -471,13 +471,14 @@ p2m_pod_offline_or_broken_replace(struct page_info *p)
 {
     struct domain *d;
     struct p2m_domain *p2m;
+    nodeid_t node = phys_to_nid(page_to_maddr(p));
 
     if ( !(d = page_get_owner(p)) || !(p2m = p2m_get_hostp2m(d)) )
         return;
 
     free_domheap_page(p);
 
-    p = alloc_domheap_page(d, PAGE_ORDER_4K);
+    p = alloc_domheap_page(d, MEMF_node(node));
     if ( unlikely(!p) )
         return;
 
