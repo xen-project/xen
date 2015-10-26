@@ -326,9 +326,9 @@ void xstate_init(struct cpuinfo_x86 *c)
     eax &= (cpufeat_mask(X86_FEATURE_XSAVEOPT) |
             cpufeat_mask(X86_FEATURE_XSAVEC));
 
-    c->x86_capability[X86_FEATURE_XSAVEOPT / 32] = eax;
+    c->x86_capability[cpufeat_word(X86_FEATURE_XSAVEOPT)] = eax;
 
-    BUG_ON(eax != boot_cpu_data.x86_capability[X86_FEATURE_XSAVEOPT / 32]);
+    BUG_ON(eax != boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_XSAVEOPT)]);
 }
 
 static bool_t valid_xcr0(u64 xcr0)

@@ -137,7 +137,7 @@ void ret_from_intr(void);
 #endif
 
 #define CPUINFO_FEATURE_OFFSET(feature)           \
-        ((((feature) >> 3) & ~3) + CPUINFO_features)
+    (CPUINFO_features + (cpufeat_word(feature) * 4))
 
 #else
 

@@ -225,7 +225,7 @@ static void __init noreturn efi_arch_post_exit_boot(void)
     asm volatile("pushq $0\n\tpopfq");
     rdmsrl(MSR_EFER, efer);
     efer |= EFER_SCE;
-    if ( cpuid_ext_features & (1 << (X86_FEATURE_NX & 0x1f)) )
+    if ( cpuid_ext_features & cpufeat_mask(X86_FEATURE_NX) )
         efer |= EFER_NX;
     wrmsrl(MSR_EFER, efer);
     write_cr0(X86_CR0_PE | X86_CR0_MP | X86_CR0_ET | X86_CR0_NE | X86_CR0_WP |

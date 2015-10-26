@@ -202,7 +202,7 @@ static void __init early_cpu_detect(void)
 	c->x86_mask = tfms & 15;
 	cap0 &= ~cleared_caps[0];
 	cap4 &= ~cleared_caps[4];
-	if (cap0 & (1<<19))
+	if (cap0 & cpufeat_mask(X86_FEATURE_CLFLSH))
 		c->x86_cache_alignment = ((misc >> 8) & 0xff) * 8;
 	/* Leaf 0x1 capabilities filled in early for Xen. */
 	c->x86_capability[0] = cap0;
@@ -263,7 +263,7 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 	if ( c->cpuid_level >= 0x00000007 ) {
 		u32 dummy;
 		cpuid_count(0x00000007, 0, &dummy, &ebx, &dummy, &dummy);
-		c->x86_capability[X86_FEATURE_FSGSBASE / 32] = ebx;
+		c->x86_capability[cpufeat_word(X86_FEATURE_FSGSBASE)] = ebx;
 	}
 }
 

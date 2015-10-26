@@ -9,6 +9,8 @@
 #define __ASM_I386_CPUFEATURE_H
 #endif
 
+#include <xen/const.h>
+
 #define NCAPINTS	8	/* N 32-bit words worth of info */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (edx), word 0 */
@@ -160,12 +162,15 @@
 #define X86_FEATURE_ADX		(7*32+19) /* ADCX, ADOX instructions */
 #define X86_FEATURE_SMAP	(7*32+20) /* Supervisor Mode Access Prevention */
 
+#define cpufeat_word(idx)	((idx) / 32)
+#define cpufeat_bit(idx)	((idx) % 32)
+#define cpufeat_mask(idx)	(_AC(1, U) << cpufeat_bit(idx))
+
 #if !defined(__ASSEMBLY__) && !defined(X86_FEATURES_ONLY)
 #include <xen/bitops.h>
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
-#define cpufeat_mask(idx)       (1u << ((idx) & 31))
 
 #define CPUID_MWAIT_LEAF                5
 #define CPUID5_ECX_EXTENSIONS_SUPPORTED 0x1

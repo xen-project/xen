@@ -89,7 +89,7 @@ trampoline_protmode_entry:
         movl    $MSR_EFER,%ecx
         rdmsr
         or      $EFER_LME|EFER_SCE,%eax   /* Long Mode + SYSCALL/SYSRET */
-        bt      $X86_FEATURE_NX % 32,%edi /* No Execute? */
+        bt      $cpufeat_bit(X86_FEATURE_NX),%edi /* No Execute? */
         jnc     1f
         btsl    $_EFER_NX,%eax  /* No Execute     */
 1:      wrmsr

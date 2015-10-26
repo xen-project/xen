@@ -1850,8 +1850,8 @@ static const char * hvm_efer_valid(const struct vcpu *v, uint64_t value,
     }
     else
     {
-        ext1_edx = boot_cpu_data.x86_capability[X86_FEATURE_LM / 32];
-        ext1_ecx = boot_cpu_data.x86_capability[X86_FEATURE_SVM / 32];
+        ext1_edx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_LM)];
+        ext1_ecx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_SVM)];
     }
 
     /*
@@ -1917,9 +1917,9 @@ static unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v,
     }
     else
     {
-        leaf1_edx = boot_cpu_data.x86_capability[X86_FEATURE_VME / 32];
-        leaf1_ecx = boot_cpu_data.x86_capability[X86_FEATURE_PCID / 32];
-        leaf7_0_ebx = boot_cpu_data.x86_capability[X86_FEATURE_FSGSBASE / 32];
+        leaf1_edx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_VME)];
+        leaf1_ecx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_PCID)];
+        leaf7_0_ebx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_FSGSBASE)];
     }
 
     return ~(unsigned long)
