@@ -200,13 +200,13 @@ static void __init early_cpu_detect(void)
 	if (c->x86 >= 0x6)
 		c->x86_model += ((tfms >> 16) & 0xF) << 4;
 	c->x86_mask = tfms & 15;
-	cap0 &= ~cleared_caps[0];
-	cap4 &= ~cleared_caps[4];
+	cap0 &= ~cleared_caps[cpufeat_word(X86_FEATURE_FPU)];
+	cap4 &= ~cleared_caps[cpufeat_word(X86_FEATURE_XMM3)];
 	if (cap0 & cpufeat_mask(X86_FEATURE_CLFLSH))
 		c->x86_cache_alignment = ((misc >> 8) & 0xff) * 8;
 	/* Leaf 0x1 capabilities filled in early for Xen. */
-	c->x86_capability[0] = cap0;
-	c->x86_capability[4] = cap4;
+	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = cap0;
+	c->x86_capability[cpufeat_word(X86_FEATURE_XMM3)] = cap4;
 }
 
 static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
@@ -225,8 +225,8 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 	
 	/* Intel-defined flags: level 0x00000001 */
 	cpuid(0x00000001, &tfms, &ebx, &excap, &capability);
-	c->x86_capability[0] = capability;
-	c->x86_capability[4] = excap;
+	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = capability;
+	c->x86_capability[cpufeat_word(X86_FEATURE_XMM3)] = excap;
 	c->x86 = (tfms >> 8) & 15;
 	c->x86_model = (tfms >> 4) & 15;
 	if (c->x86 == 0xf)
@@ -247,8 +247,10 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 	c->extended_cpuid_level = cpuid_eax(0x80000000);
 	if ( (c->extended_cpuid_level & 0xffff0000) == 0x80000000 ) {
 		if ( c->extended_cpuid_level >= 0x80000001 ) {
-			c->x86_capability[1] = cpuid_edx(0x80000001);
-			c->x86_capability[6] = cpuid_ecx(0x80000001);
+			c->x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]
+				= cpuid_edx(0x80000001);
+			c->x86_capability[cpufeat_word(X86_FEATURE_LAHF_LM)]
+				= cpuid_ecx(0x80000001);
 		}
 		if ( c->extended_cpuid_level >= 0x80000004 )
 			get_model_name(c); /* Default name */

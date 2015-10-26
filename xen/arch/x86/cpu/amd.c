@@ -444,7 +444,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 
 	/* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
 	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
-	__clear_bit(0*32+31, c->x86_capability);
+	__clear_bit(X86_FEATURE_3DNOW_ALT, c->x86_capability);
 	
 	if (c->x86 == 0xf && c->x86_model < 0x14
 	    && cpu_has(c, X86_FEATURE_LAHF_LM)) {

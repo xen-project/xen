@@ -39,10 +39,8 @@ static void init_c3(struct cpuinfo_x86 *c)
 			printk(KERN_INFO "CPU: Enabled h/w RNG\n");
 		}
 
-		/* store Centaur Extended Feature Flags as
-		 * word 5 of the CPU capability bit array
-		 */
-		c->x86_capability[5] = cpuid_edx(0xC0000001);
+		c->x86_capability[cpufeat_word(X86_FEATURE_XSTORE)]
+                    = cpuid_edx(0xC0000001);
 	}
 
 	if (c->x86 == 0x6 && c->x86_model >= 0xf) {

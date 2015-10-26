@@ -495,7 +495,8 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 	processor.mpc_cpufeature = (boot_cpu_data.x86 << 8) |
 				   (boot_cpu_data.x86_model << 4) |
 				   boot_cpu_data.x86_mask;
-	processor.mpc_featureflag = boot_cpu_data.x86_capability[0];
+	processor.mpc_featureflag =
+            boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_FPU)];
 	processor.mpc_reserved[0] = 0;
 	processor.mpc_reserved[1] = 0;
 	for (i = 0; i < 2; i++) {
@@ -799,7 +800,8 @@ int __devinit mp_register_lapic (
 	processor.mpc_cpuflag |= (boot_cpu ? CPU_BOOTPROCESSOR : 0);
 	processor.mpc_cpufeature = (boot_cpu_data.x86 << 8) | 
 		(boot_cpu_data.x86_model << 4) | boot_cpu_data.x86_mask;
-	processor.mpc_featureflag = boot_cpu_data.x86_capability[0];
+	processor.mpc_featureflag
+            = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_FPU)];
 	processor.mpc_reserved[0] = 0;
 	processor.mpc_reserved[1] = 0;
 
