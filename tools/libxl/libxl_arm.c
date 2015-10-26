@@ -195,7 +195,6 @@ static int make_root_properties(libxl__gc *gc,
 }
 
 static int make_chosen_node(libxl__gc *gc, void *fdt, bool ramdisk,
-                            libxl__domain_build_state *state,
                             const libxl_domain_build_info *info)
 {
     int res;
@@ -204,9 +203,8 @@ static int make_chosen_node(libxl__gc *gc, void *fdt, bool ramdisk,
     res = fdt_begin_node(fdt, "chosen");
     if (res) return res;
 
-    if (state->pv_cmdline) {
-        LOG(DEBUG, "/chosen/bootargs = %s", state->pv_cmdline);
-        res = fdt_property_string(fdt, "bootargs", state->pv_cmdline);
+    if (info->cmdline) {
+        res = fdt_property_string(fdt, "bootargs", info->cmdline);
         if (res) return res;
     }
 
@@ -588,7 +586,7 @@ next_resize:
         FDT( fdt_begin_node(fdt, "") );
 
         FDT( make_root_properties(gc, vers, fdt) );
-        FDT( make_chosen_node(gc, fdt, !!dom->ramdisk_blob, state, info) );
+        FDT( make_chosen_node(gc, fdt, !!dom->ramdisk_blob, info) );
         FDT( make_cpus_node(gc, fdt, info->max_vcpus, ainfo) );
         FDT( make_psci_node(gc, fdt) );
 
