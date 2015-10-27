@@ -140,8 +140,8 @@ static void populate_physmap(struct memop_args *a)
                     if ( !get_page(page, d) )
                     {
                         gdprintk(XENLOG_INFO,
-                                 "mfn %#"PRI_xen_pfn" doesn't belong to the"
-                                 " domain\n", mfn);
+                                 "mfn %#"PRI_xen_pfn" doesn't belong to d%d\n",
+                                  mfn, d->domain_id);
                         goto out;
                     }
                     put_page(page);
