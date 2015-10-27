@@ -407,10 +407,10 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
     int res = 0;
     int had_dom0_bootargs = 0;
 
-    const struct bootmodule *mod = kinfo->kernel_bootmodule;
+    const struct bootmodule *kernel = kinfo->kernel_bootmodule;
 
-    if ( mod && mod->cmdline[0] )
-        bootargs = &mod->cmdline[0];
+    if ( kernel && kernel->cmdline[0] )
+        bootargs = &kernel->cmdline[0];
 
     dt_for_each_property_node (node, prop)
     {
@@ -489,7 +489,7 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
 
     if ( dt_node_path_is_equal(node, "/chosen") )
     {
-        const struct bootmodule *mod = kinfo->initrd_bootmodule;
+        const struct bootmodule *initrd = kinfo->initrd_bootmodule;
 
         if ( bootargs )
         {
@@ -503,7 +503,7 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
          * If the bootloader provides an initrd, we must create a placeholder
          * for the initrd properties. The values will be replaced later.
          */
-        if ( mod && mod->size )
+        if ( initrd && initrd->size )
         {
             u64 a = 0;
             res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
