@@ -1907,7 +1907,7 @@ p2m_flush_table(struct p2m_domain *p2m)
 {
     struct page_info *top, *pg;
     struct domain *d = p2m->domain;
-    void *p;
+    mfn_t mfn;
 
     p2m_lock(p2m);
 
@@ -1928,15 +1928,14 @@ p2m_flush_table(struct p2m_domain *p2m)
     p2m->np2m_base = P2M_BASE_EADDR;
     
     /* Zap the top level of the trie */
-    top = mfn_to_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
-    p = __map_domain_page(top);
-    clear_page(p);
-    unmap_domain_page(p);
+    mfn = pagetable_get_mfn(p2m_get_pagetable(p2m));
+    clear_domain_page(mfn);
 
     /* Make sure nobody else is using this p2m table */
     nestedhvm_vmcx_flushtlb(p2m);
 
     /* Free the rest of the trie pages back to the paging pool */
+    top = mfn_to_page(mfn);
     while ( (pg = page_list_remove_head(&p2m->pages)) )
         if ( pg != top ) 
             d->arch.paging.free_page(d, pg);

@@ -79,12 +79,10 @@ static mfn_t paging_new_log_dirty_page(struct domain *d)
 static mfn_t paging_new_log_dirty_leaf(struct domain *d)
 {
     mfn_t mfn = paging_new_log_dirty_page(d);
+
     if ( mfn_valid(mfn) )
-    {
-        void *leaf = map_domain_page(mfn);
-        clear_page(leaf);
-        unmap_domain_page(leaf);
-    }
+        clear_domain_page(mfn);
+
     return mfn;
 }
 

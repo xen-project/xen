@@ -1407,8 +1407,7 @@ mfn_t shadow_alloc(struct domain *d,
     unsigned int pages = shadow_size(shadow_type);
     struct page_list_head tmp_list;
     cpumask_t mask;
-    void *p;
-    int i;
+    unsigned int i;
 
     ASSERT(paging_locked_by_me(d));
     ASSERT(shadow_type != SH_type_none);
@@ -1454,10 +1453,7 @@ mfn_t shadow_alloc(struct domain *d,
             flush_tlb_mask(&mask);
         }
         /* Now safe to clear the page for reuse */
-        p = __map_domain_page(sp);
-        ASSERT(p != NULL);
-        clear_page(p);
-        unmap_domain_page(p);
+        clear_domain_page(page_to_mfn(sp));
         INIT_PAGE_LIST_ENTRY(&sp->list);
         page_list_add(sp, &tmp_list);
         sp->u.sh.type = shadow_type;

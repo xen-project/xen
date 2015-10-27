@@ -68,7 +68,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
     if ( cpu_has_vmx_vmcs_shadowing )
     {
         struct page_info *vmread_bitmap, *vmwrite_bitmap;
-        unsigned long *vr, *vw;
+        unsigned long *vw;
 
         vmread_bitmap = alloc_domheap_page(NULL, 0);
         if ( !vmread_bitmap )
@@ -78,6 +78,8 @@ int nvmx_vcpu_initialise(struct vcpu *v)
         }
         v->arch.hvm_vmx.vmread_bitmap = vmread_bitmap;
 
+        clear_domain_page(_mfn(page_to_mfn(vmread_bitmap)));
+
         vmwrite_bitmap = alloc_domheap_page(NULL, 0);
         if ( !vmwrite_bitmap )
         {
@@ -86,10 +88,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
         }
         v->arch.hvm_vmx.vmwrite_bitmap = vmwrite_bitmap;
 
-        vr = __map_domain_page(vmread_bitmap);
         vw = __map_domain_page(vmwrite_bitmap);
-
-        clear_page(vr);
         clear_page(vw);
 
         /*
@@ -101,7 +100,6 @@ int nvmx_vcpu_initialise(struct vcpu *v)
         set_bit(IO_BITMAP_B, vw);
         set_bit(VMCS_HIGH(IO_BITMAP_B), vw);
 
-        unmap_domain_page(vr);
         unmap_domain_page(vw);
     }
 

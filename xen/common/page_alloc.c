@@ -1959,22 +1959,16 @@ __initcall(pagealloc_keyhandler_init);
 
 void scrub_one_page(struct page_info *pg)
 {
-    void *p;
-
     if ( unlikely(pg->count_info & PGC_broken) )
         return;
 
-    p = __map_domain_page(pg);
-
 #ifndef NDEBUG
     /* Avoid callers relying on allocations returning zeroed pages. */
-    memset(p, 0xc2, PAGE_SIZE);
+    unmap_domain_page(memset(__map_domain_page(pg), 0xc2, PAGE_SIZE));
 #else
     /* For a production build, clear_page() is the fastest way to scrub. */
-    clear_page(p);
+    clear_domain_page(_mfn(page_to_mfn(pg)));
 #endif
-
-    unmap_domain_page(p);
 }
 
 static void dump_heap(unsigned char key)

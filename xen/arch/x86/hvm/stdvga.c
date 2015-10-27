@@ -552,8 +552,7 @@ void stdvga_init(struct domain *d)
 {
     struct hvm_hw_stdvga *s = &d->arch.hvm_domain.stdvga;
     struct page_info *pg;
-    void *p;
-    int i;
+    unsigned int i;
 
     memset(s, 0, sizeof(*s));
     spin_lock_init(&s->lock);
@@ -564,9 +563,7 @@ void stdvga_init(struct domain *d)
         if ( pg == NULL )
             break;
         s->vram_page[i] = pg;
-        p = __map_domain_page(pg);
-        clear_page(p);
-        unmap_domain_page(p);
+        clear_domain_page(_mfn(page_to_mfn(pg)));
     }
 
     if ( i == ARRAY_SIZE(s->vram_page) )
