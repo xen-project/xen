@@ -34,10 +34,6 @@
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vvmx.h>
 
-/* EPT always use 4-level paging structure */
-#define GUEST_PAGING_LEVELS 4
-#include <asm/guest_pt.h>
-
 /* Must reserved bits in all level entries  */
 #define EPT_MUST_RSV_BITS (((1ull << PADDR_BITS) - 1) & \
                            ~((1ull << paddr_bits) - 1))

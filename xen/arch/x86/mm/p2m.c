@@ -2053,6 +2053,44 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
     return hostmode->gva_to_gfn(v, hostp2m, va, pfec);
 }
 
+/*
+ * If the map is non-NULL, we leave this function having
+ * acquired an extra ref on mfn_to_page(*mfn).
+ */
+void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
+                     p2m_type_t *p2mt, p2m_query_t q, uint32_t *rc)
+{
+    struct page_info *page;
+
+    /* Translate the gfn, unsharing if shared. */
+    page = get_page_from_gfn_p2m(p2m->domain, p2m, gfn_x(gfn), p2mt, NULL, q);
+    if ( p2m_is_paging(*p2mt) )
+    {
+        ASSERT(p2m_is_hostp2m(p2m));
+        if ( page )
+            put_page(page);
+        p2m_mem_paging_populate(p2m->domain, gfn_x(gfn));
+        *rc = _PAGE_PAGED;
+        return NULL;
+    }
+    if ( p2m_is_shared(*p2mt) )
+    {
+        if ( page )
+            put_page(page);
+        *rc = _PAGE_SHARED;
+        return NULL;
+    }
+    if ( !page )
+    {
+        *rc |= _PAGE_PRESENT;
+        return NULL;
+    }
+    *mfn = page_to_mfn(page);
+    ASSERT(mfn_valid(*mfn));
+
+    return map_domain_page(*mfn);
+}
+
 int map_mmio_regions(struct domain *d,
                      unsigned long start_gfn,
                      unsigned long nr,
