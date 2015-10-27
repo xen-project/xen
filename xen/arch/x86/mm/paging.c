@@ -29,6 +29,7 @@
 #include <asm/hvm/nestedhvm.h>
 #include <xen/numa.h>
 #include <xsm/xsm.h>
+#include <public/sched.h> /* SHUTDOWN_suspend */
 
 #include "mm-locks.h"
 
@@ -422,6 +423,13 @@ static int paging_log_dirty_op(struct domain *d,
 
     if ( !resuming )
     {
+        /*
+         * Mark dirty all currently write-mapped pages on e.g. the
+         * final iteration of a save operation.
+         */
+        if ( sc->mode & XEN_DOMCTL_SHADOW_LOGDIRTY_FINAL )
+            hvm_mapped_guest_frames_mark_dirty(d);
+
         domain_pause(d);
 
         /*
@@ -744,6 +752,8 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
 
     case XEN_DOMCTL_SHADOW_OP_CLEAN:
     case XEN_DOMCTL_SHADOW_OP_PEEK:
+        if ( sc->mode & ~XEN_DOMCTL_SHADOW_LOGDIRTY_FINAL )
+            return -EINVAL;
         return paging_log_dirty_op(d, sc, resuming);
     }
 

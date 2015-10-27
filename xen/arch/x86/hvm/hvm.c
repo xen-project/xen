@@ -1565,6 +1565,8 @@ int hvm_domain_initialise(struct domain *d)
     INIT_LIST_HEAD(&d->arch.hvm_domain.ioreq_server.list);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
     spin_lock_init(&d->arch.hvm_domain.uc_lock);
+    spin_lock_init(&d->arch.hvm_domain.write_map.lock);
+    INIT_LIST_HEAD(&d->arch.hvm_domain.write_map.list);
 
     hvm_init_cacheattr_region_list(d);
 
@@ -3677,6 +3679,11 @@ int hvm_virtual_to_linear_addr(
     return 1;
 }
 
+struct hvm_write_map {
+    struct list_head list;
+    struct page_info *page;
+};
+
 /* On non-NULL return, we leave this function holding an additional 
  * ref on the underlying mfn, if any */
 static void *_hvm_map_guest_frame(unsigned long gfn, bool_t permanent,
@@ -3704,14 +3711,29 @@ static void *_hvm_map_guest_frame(unsigned long gfn, bool_t permanent,
 
     if ( writable )
     {
-        if ( !p2m_is_discard_write(p2mt) )
-            paging_mark_dirty(d, page_to_mfn(page));
-        else
+        if ( unlikely(p2m_is_discard_write(p2mt)) )
             *writable = 0;
+        else if ( !permanent )
+            paging_mark_dirty(d, page_to_mfn(page));
     }
 
     if ( !permanent )
         return __map_domain_page(page);
+
+    if ( writable && *writable )
+    {
+        struct hvm_write_map *track = xmalloc(struct hvm_write_map);
+
+        if ( !track )
+        {
+            put_page(page);
+            return NULL;
+        }
+        track->page = page;
+        spin_lock(&d->arch.hvm_domain.write_map.lock);
+        list_add_tail(&track->list, &d->arch.hvm_domain.write_map.list);
+        spin_unlock(&d->arch.hvm_domain.write_map.lock);
+    }
 
     map = __map_domain_page_global(page);
     if ( !map )
@@ -3735,18 +3757,45 @@ void *hvm_map_guest_frame_ro(unsigned long gfn, bool_t permanent)
 void hvm_unmap_guest_frame(void *p, bool_t permanent)
 {
     unsigned long mfn;
+    struct page_info *page;
 
     if ( !p )
         return;
 
     mfn = domain_page_map_to_mfn(p);
+    page = mfn_to_page(mfn);
 
     if ( !permanent )
         unmap_domain_page(p);
     else
-        unmap_domain_page_global(p);
+    {
+        struct domain *d = page_get_owner(page);
+        struct hvm_write_map *track;
 
-    put_page(mfn_to_page(mfn));
+        unmap_domain_page_global(p);
+        spin_lock(&d->arch.hvm_domain.write_map.lock);
+        list_for_each_entry(track, &d->arch.hvm_domain.write_map.list, list)
+            if ( track->page == page )
+            {
+                paging_mark_dirty(d, mfn);
+                list_del(&track->list);
+                xfree(track);
+                break;
+            }
+        spin_unlock(&d->arch.hvm_domain.write_map.lock);
+    }
+
+    put_page(page);
+}
+
+void hvm_mapped_guest_frames_mark_dirty(struct domain *d)
+{
+    struct hvm_write_map *track;
+
+    spin_lock(&d->arch.hvm_domain.write_map.lock);
+    list_for_each_entry(track, &d->arch.hvm_domain.write_map.list, list)
+        paging_mark_dirty(d, page_to_mfn(track->page));
+    spin_unlock(&d->arch.hvm_domain.write_map.lock);
 }
 
 static void *hvm_map_entry(unsigned long va, bool_t *writable)

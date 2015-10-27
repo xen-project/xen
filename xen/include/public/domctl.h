@@ -208,6 +208,13 @@ struct xen_domctl_getpageframeinfo3 {
   */
 #define XEN_DOMCTL_SHADOW_ENABLE_EXTERNAL  (1 << 4)
 
+/* Mode flags for XEN_DOMCTL_SHADOW_OP_{CLEAN,PEEK}. */
+ /*
+  * This is the final iteration: Requesting to include pages mapped
+  * writably by the hypervisor in the dirty bitmap.
+  */
+#define XEN_DOMCTL_SHADOW_LOGDIRTY_FINAL   (1 << 0)
+
 struct xen_domctl_shadow_op_stats {
     uint32_t fault_count;
     uint32_t dirty_count;
@@ -219,8 +226,9 @@ struct xen_domctl_shadow_op {
     /* IN variables. */
     uint32_t       op;       /* XEN_DOMCTL_SHADOW_OP_* */
 
-    /* OP_ENABLE */
-    uint32_t       mode;     /* XEN_DOMCTL_SHADOW_ENABLE_* */
+    /* OP_ENABLE: XEN_DOMCTL_SHADOW_ENABLE_* */
+    /* OP_PEAK / OP_CLEAN: XEN_DOMCTL_SHADOW_LOGDIRTY_* */
+    uint32_t       mode;
 
     /* OP_GET_ALLOCATION / OP_SET_ALLOCATION */
     uint32_t       mb;       /* Shadow memory allocation in MB */

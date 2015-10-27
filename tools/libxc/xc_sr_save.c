@@ -537,7 +537,8 @@ static int suspend_and_send_dirty(struct xc_sr_context *ctx)
     if ( xc_shadow_control(
              xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
              HYPERCALL_BUFFER(dirty_bitmap), ctx->save.p2m_size,
-             NULL, 0, &stats) != ctx->save.p2m_size )
+             NULL, XEN_DOMCTL_SHADOW_LOGDIRTY_FINAL, &stats) !=
+         ctx->save.p2m_size )
     {
         PERROR("Failed to retrieve logdirty bitmap");
         rc = -1;

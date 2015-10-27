@@ -145,6 +145,12 @@ struct hvm_domain {
 
     unsigned long *io_bitmap;
 
+    /* List of permanently write-mapped pages. */
+    struct {
+        spinlock_t lock;
+        struct list_head list;
+    } write_map;
+
     union {
         struct vmx_domain vmx;
         struct svm_domain svm;
