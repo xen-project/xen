@@ -32,30 +32,32 @@ asm(".file \"" __OBJECT_FILE__ "\"");
 #include <asm/page.h>
 #include <asm/guest_pt.h>
 
+extern const uint32_t gw_page_flags[];
+#if GUEST_PAGING_LEVELS == CONFIG_PAGING_LEVELS
+const uint32_t gw_page_flags[] = {
+    /* I/F -  Usr Wr */
+    /* 0   0   0   0 */ _PAGE_PRESENT,
+    /* 0   0   0   1 */ _PAGE_PRESENT|_PAGE_RW,
+    /* 0   0   1   0 */ _PAGE_PRESENT|_PAGE_USER,
+    /* 0   0   1   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_USER,
+    /* 0   1   0   0 */ _PAGE_PRESENT,
+    /* 0   1   0   1 */ _PAGE_PRESENT|_PAGE_RW,
+    /* 0   1   1   0 */ _PAGE_PRESENT|_PAGE_USER,
+    /* 0   1   1   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_USER,
+    /* 1   0   0   0 */ _PAGE_PRESENT|_PAGE_NX_BIT,
+    /* 1   0   0   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_NX_BIT,
+    /* 1   0   1   0 */ _PAGE_PRESENT|_PAGE_USER|_PAGE_NX_BIT,
+    /* 1   0   1   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX_BIT,
+    /* 1   1   0   0 */ _PAGE_PRESENT|_PAGE_NX_BIT,
+    /* 1   1   0   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_NX_BIT,
+    /* 1   1   1   0 */ _PAGE_PRESENT|_PAGE_USER|_PAGE_NX_BIT,
+    /* 1   1   1   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX_BIT,
+};
+#endif
 
 /* Flags that are needed in a pagetable entry, with the sense of NX inverted */
 static uint32_t mandatory_flags(struct vcpu *v, uint32_t pfec) 
 {
-    static const uint32_t flags[] = {
-        /* I/F -  Usr Wr */
-        /* 0   0   0   0 */ _PAGE_PRESENT, 
-        /* 0   0   0   1 */ _PAGE_PRESENT|_PAGE_RW,
-        /* 0   0   1   0 */ _PAGE_PRESENT|_PAGE_USER,
-        /* 0   0   1   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_USER,
-        /* 0   1   0   0 */ _PAGE_PRESENT, 
-        /* 0   1   0   1 */ _PAGE_PRESENT|_PAGE_RW,
-        /* 0   1   1   0 */ _PAGE_PRESENT|_PAGE_USER,
-        /* 0   1   1   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_USER,
-        /* 1   0   0   0 */ _PAGE_PRESENT|_PAGE_NX_BIT, 
-        /* 1   0   0   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_NX_BIT,
-        /* 1   0   1   0 */ _PAGE_PRESENT|_PAGE_USER|_PAGE_NX_BIT,
-        /* 1   0   1   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX_BIT,
-        /* 1   1   0   0 */ _PAGE_PRESENT|_PAGE_NX_BIT, 
-        /* 1   1   0   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_NX_BIT,
-        /* 1   1   1   0 */ _PAGE_PRESENT|_PAGE_USER|_PAGE_NX_BIT,
-        /* 1   1   1   1 */ _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX_BIT,
-    };
-
     /* Don't demand not-NX if the CPU wouldn't enforce it. */
     if ( !guest_supports_nx(v) )
         pfec &= ~PFEC_insn_fetch;
@@ -65,7 +67,7 @@ static uint32_t mandatory_flags(struct vcpu *v, uint32_t pfec)
          && !(pfec & PFEC_user_mode) )
         pfec &= ~PFEC_write_access;
 
-    return flags[(pfec & 0x1f) >> 1] | _PAGE_INVALID_BITS;
+    return gw_page_flags[(pfec & 0x1f) >> 1] | _PAGE_INVALID_BITS;
 }
 
 /* Modify a guest pagetable entry to set the Accessed and Dirty bits.
