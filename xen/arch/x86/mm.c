@@ -508,7 +508,6 @@ static void invalidate_shadow_ldt(struct vcpu *v, int flush)
 {
     l1_pgentry_t *pl1e;
     unsigned int i;
-    unsigned long pfn, zero_pfn = PFN_DOWN(__pa(zero_page));
     struct page_info *page;
 
     BUG_ON(unlikely(in_irq()));
@@ -523,11 +522,10 @@ static void invalidate_shadow_ldt(struct vcpu *v, int flush)
 
     for ( i = 16; i < 32; i++ )
     {
-        pfn = l1e_get_pfn(pl1e[i]);
-        if ( !(l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) || pfn == zero_pfn )
+        if ( !(l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) )
             continue;
-        l1e_write(&pl1e[i], l1e_from_pfn(zero_pfn, __PAGE_HYPERVISOR_RO));
-        page = mfn_to_page(pfn);
+        page = l1e_get_page(pl1e[i]);
+        l1e_write(&pl1e[i], l1e_empty());
         ASSERT_PAGE_IS_TYPE(page, PGT_seg_desc_page);
         ASSERT_PAGE_IS_DOMAIN(page, v->domain);
         put_page_and_type(page);
