@@ -42,10 +42,10 @@ ALL_OBJS-y               += $(BASEDIR)/xsm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 ALL_OBJS-$(x86)          += $(BASEDIR)/crypto/built_in.o
 
-CFLAGS += -fno-builtin -fno-common
+CFLAGS += -nostdinc -fno-builtin -fno-common
 CFLAGS += -Werror -Wredundant-decls -Wno-pointer-arith
 CFLAGS += -pipe -g -D__XEN__ -include $(BASEDIR)/include/xen/config.h
-CFLAGS += -nostdinc
+CFLAGS += '-D__OBJECT_FILE__="$@"'
 
 CFLAGS-$(XSM_ENABLE)    += -DXSM_ENABLE
 CFLAGS-$(FLASK_ENABLE)  += -DFLASK_ENABLE
