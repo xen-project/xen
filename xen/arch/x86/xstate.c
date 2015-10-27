@@ -60,6 +60,25 @@ uint64_t get_xcr0(void)
     return this_cpu(xcr0);
 }
 
+/* Cached xss for fast read */
+static DEFINE_PER_CPU(uint64_t, xss);
+
+void set_msr_xss(u64 xss)
+{
+    u64 *this_xss = &this_cpu(xss);
+
+    if ( *this_xss != xss )
+    {
+        wrmsrl(MSR_IA32_XSS, xss);
+        *this_xss = xss;
+    }
+}
+
+uint64_t get_msr_xss(void)
+{
+    return this_cpu(xss);
+}
+
 void xsave(struct vcpu *v, uint64_t mask)
 {
     struct xsave_struct *ptr = v->arch.xsave_area;

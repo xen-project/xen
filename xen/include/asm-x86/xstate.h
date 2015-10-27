@@ -19,8 +19,12 @@
 
 #define XCR_XFEATURE_ENABLED_MASK 0x00000000  /* index of XCR0 */
 
+#define XSAVE_HDR_SIZE            64
+#define XSAVE_SSE_OFFSET          160
 #define XSTATE_YMM_SIZE           256
-#define XSTATE_AREA_MIN_SIZE      (512 + 64)  /* FP/SSE + XSAVE.HEADER */
+#define FXSAVE_SIZE               512
+#define XSAVE_HDR_OFFSET          FXSAVE_SIZE
+#define XSTATE_AREA_MIN_SIZE      (FXSAVE_SIZE + XSAVE_HDR_SIZE)
 
 #define XSTATE_FP      (1ULL << 0)
 #define XSTATE_SSE     (1ULL << 1)
@@ -38,6 +42,7 @@
 #define XSTATE_ALL     (~(1ULL << 63))
 #define XSTATE_NONLAZY (XSTATE_LWP | XSTATE_BNDREGS | XSTATE_BNDCSR)
 #define XSTATE_LAZY    (XSTATE_ALL & ~XSTATE_NONLAZY)
+#define XSTATE_COMPACTION_ENABLED  (1ULL << 63)
 
 extern u64 xfeature_mask;
 
@@ -68,7 +73,8 @@ struct __packed __attribute__((aligned (64))) xsave_struct
 
     struct {
         u64 xstate_bv;
-        u64 reserved[7];
+        u64 xcomp_bv;
+        u64 reserved[6];
     } xsave_hdr;                             /* The 64-byte header */
 
     struct { char x[XSTATE_YMM_SIZE]; } ymm; /* YMM */
@@ -78,6 +84,8 @@ struct __packed __attribute__((aligned (64))) xsave_struct
 /* extended state operations */
 bool_t __must_check set_xcr0(u64 xfeatures);
 uint64_t get_xcr0(void);
+void set_msr_xss(u64 xss);
+uint64_t get_msr_xss(void);
 void xsave(struct vcpu *v, uint64_t mask);
 void xrstor(struct vcpu *v, uint64_t mask);
 bool_t xsave_enabled(const struct vcpu *v);
