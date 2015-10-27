@@ -257,8 +257,17 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
 
     if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
         put_page_and_type(page);
-            
-    if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+
+    /*
+     * With the lack of an IOMMU on some platforms, domains with DMA-capable
+     * device must retrieve the same pfn when the hypercall populate_physmap
+     * is called.
+     *
+     * For this purpose (and to match populate_physmap() behavior), the page
+     * is kept allocated.
+     */
+    if ( !is_domain_direct_mapped(d) &&
+         test_and_clear_bit(_PGC_allocated, &page->count_info) )
         put_page(page);
 
     guest_physmap_remove_page(d, gmfn, mfn, 0);
@@ -307,13 +316,6 @@ static void decrease_reservation(struct memop_args *a)
         /* See if populate-on-demand wants to handle this */
         if ( is_hvm_domain(a->domain)
              && p2m_pod_decrease_reservation(a->domain, gmfn, a->extent_order) )
-            continue;
-
-        /* With the lack for iommu on some ARM platform, domain with DMA-capable
-         * device must retrieve the same pfn when the hypercall
-         * populate_physmap is called.
-         */
-        if ( is_domain_direct_mapped(a->domain) )
             continue;
 
         for ( j = 0; j < (1 << a->extent_order); j++ )
