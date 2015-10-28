@@ -5317,7 +5317,7 @@ int main_vcpulist(int argc, char **argv)
     }
 
     vcpulist(argc - optind, argv + optind);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_vcpupin(int argc, char **argv)
@@ -5333,7 +5333,7 @@ int main_vcpupin(int argc, char **argv)
     long vcpuid;
     const char *vcpu, *hard_str, *soft_str;
     char *endptr;
-    int opt, nb_cpu, nb_vcpu, rc = -1;
+    int opt, nb_cpu, nb_vcpu, rc = EXIT_FAILURE;
 
     libxl_bitmap_init(&cpumap_hard);
     libxl_bitmap_init(&cpumap_soft);
@@ -5408,10 +5408,10 @@ int main_vcpupin(int argc, char **argv)
 
         if (ferror(stdout) || fflush(stdout)) {
             perror("stdout");
-            exit(-1);
+            exit(EXIT_FAILURE);
         }
 
-        rc = 0;
+        rc = EXIT_SUCCESS;
         goto out;
     }
 
@@ -5431,7 +5431,7 @@ int main_vcpupin(int argc, char **argv)
         libxl_vcpuinfo_list_free(vcpuinfo, nb_vcpu);
     }
 
-    rc = 0;
+    rc = EXIT_SUCCESS;
  out:
     libxl_bitmap_dispose(&cpumap_soft);
     libxl_bitmap_dispose(&cpumap_hard);
@@ -5460,8 +5460,7 @@ static int vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
         unsigned int host_cpu = libxl_get_max_cpus(ctx);
         libxl_dominfo dominfo;
 
-        rc = libxl_domain_info(ctx, &dominfo, domid);
-        if (rc)
+        if (libxl_domain_info(ctx, &dominfo, domid))
             return 1;
 
         if (max_vcpus > dominfo.vcpu_online && max_vcpus > host_cpu) {
@@ -5474,8 +5473,7 @@ static int vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
         if (rc)
             return 1;
     }
-    rc = libxl_cpu_bitmap_alloc(ctx, &cpumap, max_vcpus);
-    if (rc) {
+    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, max_vcpus)) {
         fprintf(stderr, "libxl_cpu_bitmap_alloc failed, rc: %d\n", rc);
         return 1;
     }
@@ -5509,7 +5507,10 @@ int main_vcpuset(int argc, char **argv)
         break;
     }
 
-    return vcpuset(find_domain(argv[optind]), argv[optind + 1], check_host);
+    if (vcpuset(find_domain(argv[optind]), argv[optind + 1], check_host))
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
 
 static void output_xeninfo(void)
