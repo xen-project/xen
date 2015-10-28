@@ -5794,18 +5794,15 @@ int main_sharing(int argc, char **argv)
 static int sched_domain_get(libxl_scheduler sched, int domid,
                             libxl_domain_sched_params *scinfo)
 {
-    int rc;
-
-    rc = libxl_domain_sched_params_get(ctx, domid, scinfo);
-    if (rc) {
+    if (libxl_domain_sched_params_get(ctx, domid, scinfo)) {
         fprintf(stderr, "libxl_domain_sched_params_get failed.\n");
-        return rc;
+        return 1;
     }
     if (scinfo->sched != sched) {
         fprintf(stderr, "libxl_domain_sched_params_get returned %s not %s.\n",
                 libxl_scheduler_to_string(scinfo->sched),
                 libxl_scheduler_to_string(sched));
-        return ERROR_INVAL;
+        return 1;
     }
 
     return 0;
@@ -5813,42 +5810,38 @@ static int sched_domain_get(libxl_scheduler sched, int domid,
 
 static int sched_domain_set(int domid, const libxl_domain_sched_params *scinfo)
 {
-    int rc;
-
-    rc = libxl_domain_sched_params_set(ctx, domid, scinfo);
-    if (rc)
+    if (libxl_domain_sched_params_set(ctx, domid, scinfo)) {
         fprintf(stderr, "libxl_domain_sched_params_set failed.\n");
+        return 1;
+    }
 
-    return rc;
+    return 0;
 }
 
 static int sched_credit_params_set(int poolid, libxl_sched_credit_params *scinfo)
 {
-    int rc;
-
-    rc = libxl_sched_credit_params_set(ctx, poolid, scinfo);
-    if (rc)
+    if (libxl_sched_credit_params_set(ctx, poolid, scinfo)) {
         fprintf(stderr, "libxl_sched_credit_params_set failed.\n");
+        return 1;
+    }
 
-    return rc;
+    return 0;
 }
 
 static int sched_credit_params_get(int poolid, libxl_sched_credit_params *scinfo)
 {
-    int rc;
-
-    rc = libxl_sched_credit_params_get(ctx, poolid, scinfo);
-    if (rc)
+    if (libxl_sched_credit_params_get(ctx, poolid, scinfo)) {
         fprintf(stderr, "libxl_sched_credit_params_get failed.\n");
+        return 1;
+    }
 
-    return rc;
+    return 0;
 }
 
 static int sched_credit_domain_output(int domid)
 {
     char *domname;
     libxl_domain_sched_params scinfo;
-    int rc;
 
     if (domid < 0) {
         printf("%-33s %4s %6s %4s\n", "Name", "ID", "Weight", "Cap");
@@ -5856,9 +5849,10 @@ static int sched_credit_domain_output(int domid)
     }
 
     libxl_domain_sched_params_init(&scinfo);
-    rc = sched_domain_get(LIBXL_SCHEDULER_CREDIT, domid, &scinfo);
-    if (rc)
-        return rc;
+    if (sched_domain_get(LIBXL_SCHEDULER_CREDIT, domid, &scinfo)) {
+        libxl_domain_sched_params_dispose(&scinfo);
+        return 1;
+    }
     domname = libxl_domid_to_name(ctx, domid);
     printf("%-33s %4d %6d %4d\n",
         domname,
@@ -5874,11 +5868,9 @@ static int sched_credit_pool_output(uint32_t poolid)
 {
     libxl_sched_credit_params scparam;
     char *poolname;
-    int rc;
 
     poolname = libxl_cpupoolid_to_name(ctx, poolid);
-    rc = sched_credit_params_get(poolid, &scparam);
-    if (rc) {
+    if (sched_credit_params_get(poolid, &scparam)) {
         printf("Cpupool %s: [sched params unavailable]\n",
                poolname);
     } else {
@@ -5896,7 +5888,6 @@ static int sched_credit2_domain_output(
 {
     char *domname;
     libxl_domain_sched_params scinfo;
-    int rc;
 
     if (domid < 0) {
         printf("%-33s %4s %6s\n", "Name", "ID", "Weight");
@@ -5904,9 +5895,10 @@ static int sched_credit2_domain_output(
     }
 
     libxl_domain_sched_params_init(&scinfo);
-    rc = sched_domain_get(LIBXL_SCHEDULER_CREDIT2, domid, &scinfo);
-    if (rc)
-        return rc;
+    if (sched_domain_get(LIBXL_SCHEDULER_CREDIT2, domid, &scinfo)) {
+        libxl_domain_sched_params_dispose(&scinfo);
+        return 1;
+    }
     domname = libxl_domid_to_name(ctx, domid);
     printf("%-33s %4d %6d\n",
         domname,
@@ -5922,7 +5914,6 @@ static int sched_rtds_domain_output(
 {
     char *domname;
     libxl_domain_sched_params scinfo;
-    int rc = 0;
 
     if (domid < 0) {
         printf("%-33s %4s %9s %9s\n", "Name", "ID", "Period", "Budget");
@@ -5930,9 +5921,10 @@ static int sched_rtds_domain_output(
     }
 
     libxl_domain_sched_params_init(&scinfo);
-    rc = sched_domain_get(LIBXL_SCHEDULER_RTDS, domid, &scinfo);
-    if (rc)
-        goto out;
+    if (sched_domain_get(LIBXL_SCHEDULER_RTDS, domid, &scinfo)) {
+        libxl_domain_sched_params_dispose(&scinfo);
+        return 1;
+    }
 
     domname = libxl_domid_to_name(ctx, domid);
     printf("%-33s %4d %9d %9d\n",
@@ -5941,10 +5933,8 @@ static int sched_rtds_domain_output(
         scinfo.period,
         scinfo.budget);
     free(domname);
-
-out:
     libxl_domain_sched_params_dispose(&scinfo);
-    return rc;
+    return 0;
 }
 
 static int sched_rtds_pool_output(uint32_t poolid)
@@ -5982,7 +5972,7 @@ static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
         if (libxl_cpupool_qualifier_to_cpupoolid(ctx, cpupool, &poolid, NULL) ||
             !libxl_cpupoolid_is_valid(ctx, poolid)) {
             fprintf(stderr, "unknown cpupool \'%s\'\n", cpupool);
-            return -ERROR_FAIL;
+            return 1;
         }
     }
 
@@ -5995,7 +5985,7 @@ static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
     if (!poolinfo) {
         fprintf(stderr, "error getting cpupool info\n");
         libxl_dominfo_list_free(info, nb_domain);
-        return -ERROR_NOMEM;
+        return 1;
     }
 
     for (p = 0; !rc && (p < n_pools); p++) {
@@ -6081,16 +6071,16 @@ int main_sched_credit(int argc, char **argv)
     if ((cpupool || opt_s) && (dom || opt_w || opt_c)) {
         fprintf(stderr, "Specifying a cpupool or schedparam is not "
                 "allowed with domain options.\n");
-        return 1;
+        return EXIT_FAILURE;
     }
     if (!dom && (opt_w || opt_c)) {
         fprintf(stderr, "Must specify a domain.\n");
-        return 1;
+        return EXIT_FAILURE;
     }
     if (!opt_s && (opt_t || opt_r)) {
         fprintf(stderr, "Must specify schedparam to set schedule "
                 "parameter values.\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (opt_s) {
@@ -6102,16 +6092,16 @@ int main_sched_credit(int argc, char **argv)
                                                      &poolid, NULL) ||
                 !libxl_cpupoolid_is_valid(ctx, poolid)) {
                 fprintf(stderr, "unknown cpupool \'%s\'\n", cpupool);
-                return -ERROR_FAIL;
+                return EXIT_FAILURE;
             }
         }
 
         if (!opt_t && !opt_r) { /* Output scheduling parameters */
-            return -sched_credit_pool_output(poolid);
+            if (sched_credit_pool_output(poolid))
+                return EXIT_FAILURE;
         } else { /* Set scheduling parameters*/
-            rc = sched_credit_params_get(poolid, &scparam);
-            if (rc)
-                return -rc;
+            if (sched_credit_params_get(poolid, &scparam))
+                return EXIT_FAILURE;
 
             if (opt_t)
                 scparam.tslice_ms = tslice;
@@ -6119,21 +6109,22 @@ int main_sched_credit(int argc, char **argv)
             if (opt_r)
                 scparam.ratelimit_us = ratelimit;
 
-            rc = sched_credit_params_set(poolid, &scparam);
-            if (rc)
-                return -rc;
+            if (sched_credit_params_set(poolid, &scparam))
+                return EXIT_FAILURE;
         }
     } else if (!dom) { /* list all domain's credit scheduler info */
-        return -sched_domain_output(LIBXL_SCHEDULER_CREDIT,
-                                    sched_credit_domain_output,
-                                    sched_credit_pool_output,
-                                    cpupool);
+        if (sched_domain_output(LIBXL_SCHEDULER_CREDIT,
+                                sched_credit_domain_output,
+                                sched_credit_pool_output,
+                                cpupool))
+            return EXIT_FAILURE;
     } else {
         uint32_t domid = find_domain(dom);
 
         if (!opt_w && !opt_c) { /* output credit scheduler info */
             sched_credit_domain_output(-1);
-            return -sched_credit_domain_output(domid);
+            if (sched_credit_domain_output(domid))
+                return EXIT_FAILURE;
         } else { /* set credit scheduler paramaters */
             libxl_domain_sched_params scinfo;
             libxl_domain_sched_params_init(&scinfo);
@@ -6145,11 +6136,11 @@ int main_sched_credit(int argc, char **argv)
             rc = sched_domain_set(domid, &scinfo);
             libxl_domain_sched_params_dispose(&scinfo);
             if (rc)
-                return -rc;
+                return EXIT_FAILURE;
         }
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_sched_credit2(int argc, char **argv)
@@ -6181,24 +6172,26 @@ int main_sched_credit2(int argc, char **argv)
     if (cpupool && (dom || opt_w)) {
         fprintf(stderr, "Specifying a cpupool is not allowed with other "
                 "options.\n");
-        return 1;
+        return EXIT_FAILURE;
     }
     if (!dom && opt_w) {
         fprintf(stderr, "Must specify a domain.\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (!dom) { /* list all domain's credit scheduler info */
-        return -sched_domain_output(LIBXL_SCHEDULER_CREDIT2,
-                                    sched_credit2_domain_output,
-                                    sched_default_pool_output,
-                                    cpupool);
+        if (sched_domain_output(LIBXL_SCHEDULER_CREDIT2,
+                                sched_credit2_domain_output,
+                                sched_default_pool_output,
+                                cpupool))
+            return EXIT_FAILURE;
     } else {
         uint32_t domid = find_domain(dom);
 
         if (!opt_w) { /* output credit2 scheduler info */
             sched_credit2_domain_output(-1);
-            return -sched_credit2_domain_output(domid);
+            if (sched_credit2_domain_output(domid))
+                return EXIT_FAILURE;
         } else { /* set credit2 scheduler paramaters */
             libxl_domain_sched_params scinfo;
             libxl_domain_sched_params_init(&scinfo);
@@ -6208,11 +6201,11 @@ int main_sched_credit2(int argc, char **argv)
             rc = sched_domain_set(domid, &scinfo);
             libxl_domain_sched_params_dispose(&scinfo);
             if (rc)
-                return -rc;
+                return EXIT_FAILURE;
         }
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 /*
@@ -6257,27 +6250,29 @@ int main_sched_rtds(int argc, char **argv)
     if (cpupool && (dom || opt_p || opt_b)) {
         fprintf(stderr, "Specifying a cpupool is not allowed with "
                 "other options.\n");
-        return 1;
+        return EXIT_FAILURE;
     }
     if (!dom && (opt_p || opt_b)) {
         fprintf(stderr, "Must specify a domain.\n");
-        return 1;
+        return EXIT_FAILURE;
     }
     if (opt_p != opt_b) {
         fprintf(stderr, "Must specify period and budget\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (!dom) { /* list all domain's rt scheduler info */
-        return -sched_domain_output(LIBXL_SCHEDULER_RTDS,
-                                    sched_rtds_domain_output,
-                                    sched_rtds_pool_output,
-                                    cpupool);
+        if (sched_domain_output(LIBXL_SCHEDULER_RTDS,
+                                sched_rtds_domain_output,
+                                sched_rtds_pool_output,
+                                cpupool))
+            return EXIT_FAILURE;
     } else {
         uint32_t domid = find_domain(dom);
         if (!opt_p && !opt_b) { /* output rt scheduler info */
             sched_rtds_domain_output(-1);
-            return -sched_rtds_domain_output(domid);
+            if (sched_rtds_domain_output(domid))
+                return EXIT_FAILURE;
         } else { /* set rt scheduler paramaters */
             libxl_domain_sched_params scinfo;
             libxl_domain_sched_params_init(&scinfo);
@@ -6288,11 +6283,11 @@ int main_sched_rtds(int argc, char **argv)
             rc = sched_domain_set(domid, &scinfo);
             libxl_domain_sched_params_dispose(&scinfo);
             if (rc)
-                return -rc;
+                return EXIT_FAILURE;
         }
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_domid(int argc, char **argv)
