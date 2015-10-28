@@ -7315,7 +7315,7 @@ int main_cpupoolcreate(int argc, char **argv)
     libxl_bitmap cpumap;
     libxl_uuid uuid;
     libxl_cputopology *topology;
-    int rc = 1;
+    int rc = EXIT_FAILURE;
 
     SWITCH_FOREACH_OPT(opt, "nf:", opts, "cpupool-create", 0) {
     case 'f':
@@ -7485,7 +7485,7 @@ int main_cpupoolcreate(int argc, char **argv)
         }
     }
     /* We made it! */
-    rc = 0;
+    rc = EXIT_SUCCESS;
    
 out_cfg:
     xlu_cfg_destroy(config);
@@ -7522,14 +7522,14 @@ int main_cpupoollist(int argc, char **argv)
         pool = argv[optind];
         if (libxl_name_to_cpupoolid(ctx, pool, &poolid)) {
             fprintf(stderr, "Pool \'%s\' does not exist\n", pool);
-            return 1;
+            return EXIT_FAILURE;
         }
     }
 
     poolinfo = libxl_list_cpupool(ctx, &n_pools);
     if (!poolinfo) {
         fprintf(stderr, "error getting cpupool info\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     printf("%-19s", "Name");
@@ -7560,7 +7560,7 @@ int main_cpupoollist(int argc, char **argv)
 
     libxl_cpupoolinfo_list_free(poolinfo, n_pools);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_cpupooldestroy(int argc, char **argv)
@@ -7578,13 +7578,13 @@ int main_cpupooldestroy(int argc, char **argv)
     if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
         fprintf(stderr, "unknown cpupool '%s'\n", pool);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (libxl_cpupool_destroy(ctx, poolid))
-        return 1;
+        return EXIT_FAILURE;
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_cpupoolrename(int argc, char **argv)
@@ -7603,17 +7603,17 @@ int main_cpupoolrename(int argc, char **argv)
     if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
         fprintf(stderr, "unknown cpupool '%s'\n", pool);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     new_name = argv[optind];
 
     if (libxl_cpupool_rename(ctx, new_name, poolid)) {
         fprintf(stderr, "Can't rename cpupool '%s'\n", pool);
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_cpupoolcpuadd(int argc, char **argv)
@@ -7622,7 +7622,7 @@ int main_cpupoolcpuadd(int argc, char **argv)
     const char *pool;
     uint32_t poolid;
     libxl_bitmap cpumap;
-    int rc = 1;
+    int rc = EXIT_FAILURE;
 
     SWITCH_FOREACH_OPT(opt, "", NULL, "cpupool-cpu-add", 2) {
         /* No options */
@@ -7631,7 +7631,7 @@ int main_cpupoolcpuadd(int argc, char **argv)
     libxl_bitmap_init(&cpumap);
     if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
         fprintf(stderr, "Unable to allocate cpumap");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     pool = argv[optind++];
@@ -7647,7 +7647,7 @@ int main_cpupoolcpuadd(int argc, char **argv)
     if (libxl_cpupool_cpuadd_cpumap(ctx, poolid, &cpumap))
         fprintf(stderr, "some cpus may not have been added to %s\n", pool);
 
-    rc = 0;
+    rc = EXIT_SUCCESS;
 
 out:
     libxl_bitmap_dispose(&cpumap);
@@ -7660,12 +7660,12 @@ int main_cpupoolcpuremove(int argc, char **argv)
     const char *pool;
     uint32_t poolid;
     libxl_bitmap cpumap;
-    int rc = 1;
+    int rc = EXIT_FAILURE;
 
     libxl_bitmap_init(&cpumap);
     if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
         fprintf(stderr, "Unable to allocate cpumap");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     SWITCH_FOREACH_OPT(opt, "", NULL, "cpupool-cpu-remove", 2) {
@@ -7685,7 +7685,7 @@ int main_cpupoolcpuremove(int argc, char **argv)
     if (libxl_cpupool_cpuremove_cpumap(ctx, poolid, &cpumap))
         fprintf(stderr, "some cpus may not have been removed from %s\n", pool);
 
-    rc = 0;
+    rc = EXIT_SUCCESS;
 
 out:
     libxl_bitmap_dispose(&cpumap);
@@ -7710,19 +7710,19 @@ int main_cpupoolmigrate(int argc, char **argv)
     if (libxl_domain_qualifier_to_domid(ctx, dom, &domid) ||
         !libxl_domid_to_name(ctx, domid)) {
         fprintf(stderr, "unknown domain '%s'\n", dom);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
         !libxl_cpupoolid_is_valid(ctx, poolid)) {
         fprintf(stderr, "unknown cpupool '%s'\n", pool);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (libxl_cpupool_movedomain(ctx, poolid, domid))
-        return 1;
+        return EXIT_FAILURE;
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_cpupoolnumasplit(int argc, char **argv)
@@ -7750,13 +7750,13 @@ int main_cpupoolnumasplit(int argc, char **argv)
 
     libxl_dominfo_init(&info);
 
-    rc = 1;
+    rc = EXIT_FAILURE;
 
     libxl_bitmap_init(&cpumap);
     poolinfo = libxl_list_cpupool(ctx, &n_pools);
     if (!poolinfo) {
         fprintf(stderr, "error getting cpupool info\n");
-        return 1;
+        return EXIT_FAILURE;
     }
     poolid = poolinfo[0].poolid;
     sched = poolinfo[0].sched;
@@ -7764,13 +7764,13 @@ int main_cpupoolnumasplit(int argc, char **argv)
 
     if (n_pools > 1) {
         fprintf(stderr, "splitting not possible, already cpupools in use\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     topology = libxl_get_cpu_topology(ctx, &n_cpus);
     if (topology == NULL) {
         fprintf(stderr, "libxl_get_topologyinfo failed\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
@@ -7859,7 +7859,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         }
     }
 
-    rc = 0;
+    rc = EXIT_SUCCESS;
 
 out:
     libxl_cputopology_list_free(topology, n_cpus);
