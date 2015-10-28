@@ -7,12 +7,7 @@ all: build
 PY_CFLAGS = $(CFLAGS) $(PY_NOOPT_CFLAGS) $(LDFLAGS) $(APPEND_LDFLAGS)
 
 .PHONY: build
-build: genwrap.py $(XEN_ROOT)/tools/libxl/libxl_types.idl \
-		$(XEN_ROOT)/tools/libxl/idl.py
-	PYTHONPATH=$(XEN_ROOT)/tools/libxl $(PYTHON) genwrap.py \
-		$(XEN_ROOT)/tools/libxl/libxl_types.idl \
-		xen/lowlevel/xl/_pyxl_types.h \
-		xen/lowlevel/xl/_pyxl_types.c
+build:
 	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" $(PYTHON) setup.py build
 
 .PHONY: install
