@@ -30,6 +30,13 @@ struct cmd_spec {
     char *cmd_option;
 };
 
+/*
+ * The xl process should always return either EXIT_SUCCESS or
+ * EXIT_FAILURE. main_* functions, implementing the various xl
+ * commands, can be treated as main() as if they are returning
+ * a process exit status and not a function return value.
+ */
+
 int main_vcpulist(int argc, char **argv);
 int main_info(int argc, char **argv);
 int main_sharing(int argc, char **argv);

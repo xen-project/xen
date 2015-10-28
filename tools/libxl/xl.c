@@ -318,7 +318,7 @@ int main(int argc, char **argv)
             break;
         default:
             fprintf(stderr, "unknown global option\n");
-            exit(2);
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -326,13 +326,13 @@ int main(int argc, char **argv)
 
     if (!cmd) {
         help(NULL);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     opterr = 0;
 
     logger = xtl_createlogger_stdiostream(stderr, minmsglevel,
         (progress_use_cr ? XTL_STDIOSTREAM_PROGRESS_USE_CR : 0));
-    if (!logger) exit(1);
+    if (!logger) exit(EXIT_FAILURE);
 
     atexit(xl_ctx_free);
 
@@ -355,16 +355,16 @@ int main(int argc, char **argv)
     if (cspec) {
         if (dryrun_only && !cspec->can_dryrun) {
             fprintf(stderr, "command does not implement -N (dryrun) option\n");
-            ret = 1;
+            ret = EXIT_FAILURE;
             goto xit;
         }
         ret = cspec->cmd_impl(argc, argv);
     } else if (!strcmp(cmd, "help")) {
         help(argv[1]);
-        ret = 0;
+        ret = EXIT_SUCCESS;
     } else {
         fprintf(stderr, "command not implemented\n");
-        ret = 1;
+        ret = EXIT_FAILURE;
     }
 
  xit:
