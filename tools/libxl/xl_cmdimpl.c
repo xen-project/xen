@@ -578,10 +578,10 @@ static void parse_disk_config_multistring(XLU_Config **config,
     }
 
     e = xlu_disk_parse(*config, nspecs, specs, disk);
-    if (e == EINVAL) exit(-1);
+    if (e == EINVAL) exit(EXIT_FAILURE);
     if (e) {
         fprintf(stderr,"xlu_disk_parse failed: %s\n",strerror(errno));
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -597,10 +597,10 @@ static void parse_vif_rate(XLU_Config **config, const char *rate,
     int e;
 
     e = xlu_vif_parse_rate(*config, rate, nic);
-    if (e == EINVAL || e == EOVERFLOW) exit(-1);
+    if (e == EINVAL || e == EOVERFLOW) exit(EXIT_FAILURE);
     if (e) {
         fprintf(stderr,"xlu_vif_parse_rate failed: %s\n",strerror(errno));
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -741,19 +741,19 @@ static int parse_range(const char *str, unsigned long *a, unsigned long *b)
 
     *a = *b = strtoul(str, &endptr, 10);
     if (endptr == str || *a == ULONG_MAX)
-        return ERROR_INVAL;
+        return 1;
 
     if (*endptr == '-') {
         nstr = endptr + 1;
 
         *b = strtoul(nstr, &endptr, 10);
         if (endptr == nstr || *b == ULONG_MAX || *b < *a)
-            return ERROR_INVAL;
+            return 1;
     }
 
     /* Valid value or range so far, but we also don't want junk after that */
     if (*endptr != '\0')
-        return ERROR_INVAL;
+        return 1;
 
     return 0;
 }
@@ -902,7 +902,7 @@ static char *parse_cmdline(XLU_Config *config)
 
     if ((buf || root || extra) && !cmdline) {
         fprintf(stderr, "Failed to allocate memory for cmdline\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     return cmdline;
@@ -946,11 +946,11 @@ static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
             libxl_bitmap_init(&vcpu_affinity_array[j]);
             if (libxl_cpu_bitmap_alloc(ctx, &vcpu_affinity_array[j], 0)) {
                 fprintf(stderr, "Unable to allocate cpumap for vcpu %d\n", j);
-                exit(1);
+                exit(EXIT_FAILURE);
             }
 
             if (cpurange_parse(buf, &vcpu_affinity_array[j]))
-                exit(1);
+                exit(EXIT_FAILURE);
 
             j++;
         }
@@ -963,17 +963,17 @@ static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
         libxl_bitmap_init(&vcpu_affinity_array[0]);
         if (libxl_cpu_bitmap_alloc(ctx, &vcpu_affinity_array[0], 0)) {
             fprintf(stderr, "Unable to allocate cpumap for vcpu 0\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         if (cpurange_parse(buf, &vcpu_affinity_array[0]))
-            exit(1);
+            exit(EXIT_FAILURE);
 
         for (i = 1; i < b_info->max_vcpus; i++) {
             libxl_bitmap_init(&vcpu_affinity_array[i]);
             if (libxl_cpu_bitmap_alloc(ctx, &vcpu_affinity_array[i], 0)) {
                 fprintf(stderr, "Unable to allocate cpumap for vcpu %d\n", i);
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             libxl_bitmap_copy(ctx, &vcpu_affinity_array[i],
                               &vcpu_affinity_array[0]);
@@ -1064,7 +1064,7 @@ static unsigned long parse_ulong(const char *str)
     val = strtoul(str, &endptr, 10);
     if (endptr == str || val == ULONG_MAX) {
         fprintf(stderr, "xl: failed to convert \"%s\" to number\n", str);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     return val;
 }
@@ -1086,7 +1086,7 @@ static void parse_vnuma_config(const XLU_Config *config,
     if (libxl_get_physinfo(ctx, &physinfo) != 0) {
         libxl_physinfo_dispose(&physinfo);
         fprintf(stderr, "libxl_get_physinfo failed\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     nr_nodes = physinfo.nr_nodes;
@@ -1105,7 +1105,7 @@ static void parse_vnuma_config(const XLU_Config *config,
         libxl_bitmap_init(&vcpu_parsed[i]);
         if (libxl_cpu_bitmap_alloc(ctx, &vcpu_parsed[i], b_info->max_vcpus)) {
             fprintf(stderr, "libxl_node_bitmap_alloc failed.\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -1130,7 +1130,7 @@ static void parse_vnuma_config(const XLU_Config *config,
         xlu_cfg_value_get_list(config, vnode_spec, &vnode_config_list, 0);
         if (!vnode_config_list) {
             fprintf(stderr, "xl: cannot get vnode config option list\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         for (conf_count = 0;
@@ -1152,7 +1152,7 @@ static void parse_vnuma_config(const XLU_Config *config,
                                            &value_untrimmed)) {
                     fprintf(stderr, "xl: failed to split \"%s\" into pair\n",
                             buf);
-                    exit(1);
+                    exit(EXIT_FAILURE);
                 }
                 trim(isspace, option_untrimmed, &option);
                 trim(isspace, value_untrimmed, &value);
@@ -1162,7 +1162,7 @@ static void parse_vnuma_config(const XLU_Config *config,
                     if (val >= nr_nodes) {
                         fprintf(stderr,
                                 "xl: invalid pnode number: %lu\n", val);
-                        exit(1);
+                        exit(EXIT_FAILURE);
                     }
                     p->pnode = val;
                     libxl_defbool_set(&b_info->numa_placement, false);
@@ -1218,20 +1218,20 @@ static void parse_vnuma_config(const XLU_Config *config,
     if (b_info->max_vcpus != 0) {
         if (b_info->max_vcpus != max_vcpus) {
             fprintf(stderr, "xl: vnuma vcpus and maxvcpus= mismatch\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     } else {
         int host_cpus = libxl_get_online_cpus(ctx);
 
         if (host_cpus < 0) {
             fprintf(stderr, "Failed to get online cpus\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         if (host_cpus < max_vcpus) {
             fprintf(stderr, "xl: vnuma specifies more vcpus than pcpus, "\
                     "use maxvcpus= to override this check.\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         b_info->max_vcpus = max_vcpus;
@@ -1241,7 +1241,7 @@ static void parse_vnuma_config(const XLU_Config *config,
     if (b_info->max_memkb != LIBXL_MEMKB_DEFAULT &&
         b_info->max_memkb != max_memkb) {
         fprintf(stderr, "xl: maxmem and vnuma memory size mismatch\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     } else
         b_info->max_memkb = max_memkb;
 
