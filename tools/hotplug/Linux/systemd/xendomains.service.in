@@ -5,6 +5,7 @@ After=proc-xen.mount xenstored.service xenconsoled.service xen-init-dom0.service
 After=network-online.target
 After=remote-fs.target
 ConditionPathExists=/proc/xen/capabilities
+Conflicts=libvirtd.service
 
 [Service]
 Type=oneshot
