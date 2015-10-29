@@ -519,8 +519,6 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *
 
     for_each_cpu(i, &mask)
     {
-        struct csched2_vcpu * cur;
-
         /* Already looked at this one above */
         if ( i == cpu )
             continue;
