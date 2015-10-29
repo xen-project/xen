@@ -1158,7 +1158,7 @@ rt_dom_cntl(
         spin_lock_irqsave(&prv->lock, flags);
         list_for_each( iter, &sdom->vcpu )
         {
-            struct rt_vcpu * svc = list_entry(iter, struct rt_vcpu, sdom_elem);
+            svc = list_entry(iter, struct rt_vcpu, sdom_elem);
             svc->period = MICROSECS(op->u.rtds.period); /* transfer to nanosec */
             svc->budget = MICROSECS(op->u.rtds.budget);
         }
