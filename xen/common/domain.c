@@ -1329,7 +1329,6 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case VCPUOP_register_vcpu_info:
     {
-        struct domain *d = v->domain;
         struct vcpu_register_vcpu_info info;
 
         rc = -EFAULT;
