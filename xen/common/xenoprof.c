@@ -239,6 +239,7 @@ static int alloc_xenoprof_struct(
     d->xenoprof->rawbuf = alloc_xenheap_pages(get_order_from_pages(npages), 0);
     if ( d->xenoprof->rawbuf == NULL )
     {
+        xfree(d->xenoprof->vcpu);
         xfree(d->xenoprof);
         d->xenoprof = NULL;
         return -ENOMEM;
@@ -286,6 +287,7 @@ void free_xenoprof_pages(struct domain *d)
         free_xenheap_pages(x->rawbuf, order);
     }
 
+    xfree(x->vcpu);
     xfree(x);
     d->xenoprof = NULL;
 }
