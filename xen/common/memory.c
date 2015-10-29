@@ -961,7 +961,6 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case XENMEM_add_to_physmap_batch:
     {
         struct xen_add_to_physmap_batch xatpb;
-        struct domain *d;
 
         BUILD_BUG_ON((typeof(xatpb.size))-1 >
                      (UINT_MAX >> MEMOP_EXTENT_SHIFT));
@@ -1007,7 +1006,6 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
         struct xen_remove_from_physmap xrfp;
         struct page_info *page;
-        struct domain *d;
 
         if ( unlikely(start_extent) )
             return -ENOSYS;
@@ -1076,7 +1074,6 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case XENMEM_get_vnumainfo:
     {
         struct xen_vnuma_topology_info topology;
-        struct domain *d;
         unsigned int dom_vnodes, dom_vranges, dom_vcpus;
         struct vnuma_info tmp;
 
