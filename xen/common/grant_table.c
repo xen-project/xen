@@ -826,7 +826,6 @@ __gnttab_map_grant_ref(
 
         if ( !act->pin )
         {
-            unsigned long frame;
             unsigned long gfn = rgt->gt_version == 1 ?
                                 shared_entry_v1(rgt, op->ref).frame :
                                 shared_entry_v2(rgt, op->ref).full_page.frame;
