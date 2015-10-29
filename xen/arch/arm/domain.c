@@ -344,8 +344,6 @@ unsigned long hypercall_create_continuation(
 
     if ( test_bit(_MCSF_in_multicall, &mcs->flags) )
     {
-        BUG(); /* XXX multicalls not implemented yet. */
-
         __set_bit(_MCSF_call_preempted, &mcs->flags);
 
         for ( i = 0; *p != '\0'; i++ )
