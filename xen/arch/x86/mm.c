@@ -160,7 +160,10 @@ static void put_superpage(unsigned long mfn);
 static uint32_t base_disallow_mask;
 /* Global bit is allowed to be set on L1 PTEs. Intended for user mappings. */
 #define L1_DISALLOW_MASK ((base_disallow_mask | _PAGE_GNTTAB) & ~_PAGE_GLOBAL)
-#define L2_DISALLOW_MASK (base_disallow_mask & ~_PAGE_PSE)
+
+#define L2_DISALLOW_MASK (unlikely(opt_allow_superpage) \
+                          ? base_disallow_mask & ~_PAGE_PSE \
+                          : base_disallow_mask)
 
 #define l3_disallow_mask(d) (!is_pv_32bit_domain(d) ? \
                              base_disallow_mask : 0xFFFFF198U)
@@ -1839,7 +1842,10 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         }
 
         /* Fast path for identical mapping and presence. */
-        if ( !l2e_has_changed(ol2e, nl2e, _PAGE_PRESENT) )
+        if ( !l2e_has_changed(ol2e, nl2e,
+                              unlikely(opt_allow_superpage)
+                              ? _PAGE_PSE | _PAGE_RW | _PAGE_PRESENT
+                              : _PAGE_PRESENT) )
         {
             adjust_guest_l2e(nl2e, d);
             if ( UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu, preserve_ad) )
