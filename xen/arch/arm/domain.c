@@ -768,8 +768,15 @@ static int relinquish_memory(struct domain *d, struct page_list_head *list)
     {
         /* Grab a reference to the page so it won't disappear from under us. */
         if ( unlikely(!get_page(page, d)) )
-            /* Couldn't get a reference -- someone is freeing this page. */
-            BUG();
+            /*
+             * Couldn't get a reference -- someone is freeing this page and
+             * has already committed to doing so, so no more to do here.
+             *
+             * Note that the page must be left on the list, a list_del
+             * here will clash with the list_del done by the other
+             * party in the race and corrupt the list head.
+             */
+            continue;
 
         if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
             put_page(page);
