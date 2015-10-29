@@ -57,7 +57,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     default:
     {
-        printk("%s: Bad HVM op %ld.\n", __func__, op);
+        gdprintk(XENLOG_DEBUG, "HVMOP op=%lu: not implemented\n", op);
         rc = -ENOSYS;
         break;
     }
