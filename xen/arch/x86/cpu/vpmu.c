@@ -682,8 +682,8 @@ long do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg)
             vpmu_mode = pmu_params.val;
         else if ( vpmu_mode != pmu_params.val )
         {
-            printk(XENLOG_WARNING
-                   "VPMU: Cannot change mode while active VPMUs exist\n");
+            gprintk(XENLOG_WARNING,
+                    "VPMU: Cannot change mode while active VPMUs exist\n");
             ret = -EBUSY;
         }
 
@@ -714,8 +714,8 @@ long do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg)
             vpmu_features = pmu_params.val;
         else
         {
-            printk(XENLOG_WARNING "VPMU: Cannot change features while"
-                                  " active VPMUs exist\n");
+            gprintk(XENLOG_WARNING,
+                    "VPMU: Cannot change features while active VPMUs exist\n");
             ret = -EBUSY;
         }
 
