@@ -449,8 +449,7 @@ void* __init amd_iommu_alloc_intremap_table(void)
 
 int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
 {
-    if ( (!msi_desc->hpet_id != hpet_sbdf.id) ||
-         (hpet_sbdf.iommu == NULL) )
+    if ( msi_desc->hpet_id != hpet_sbdf.id || !hpet_sbdf.iommu )
     {
         AMD_IOMMU_DEBUG("Fail to setup HPET MSI remapping\n");
         return 1;
