@@ -833,6 +833,7 @@ static void complete_domain_destroy(struct rcu_head *head)
 
     xsm_free_security_domain(d);
     free_cpumask_var(d->domain_dirty_cpumask);
+    xfree(d->vcpu);
     free_domain_struct(d);
 
     send_global_virq(VIRQ_DOM_EXC);
