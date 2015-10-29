@@ -8,12 +8,13 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
+#include <xen/sched.h>
 #include <asm/hypercall.h>
 
 
 int do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
-    printk("%s %d cmd=%d: not implemented yet\n", __func__, __LINE__, cmd);
+    gdprintk(XENLOG_DEBUG, "PHYSDEVOP cmd=%d: not implemented\n", cmd);
     return -ENOSYS;
 }
 
