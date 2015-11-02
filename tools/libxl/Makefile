@@ -41,7 +41,7 @@ LDFLAGS += $(PTHREAD_LDFLAGS)
 LIBXL_LIBS += $(PTHREAD_LIBS)
 LIBXL_LIBS += $(LIBXL_LIBS-y)
 
-LIBXLU_LIBS = libxenlight.so
+LIBXLU_LIBS = $(LDLIBS_libxenlight)
 
 LIBXL_OBJS-y = osdeps.o libxl_paths.o libxl_bootloader.o flexarray.o
 ifeq ($(LIBXL_BLKTAP),y)

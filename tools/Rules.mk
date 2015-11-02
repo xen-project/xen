@@ -40,7 +40,7 @@ SHLIB_libxenctrl  = -Wl,-rpath-link=$(XEN_LIBXC)
 
 CFLAGS_libxenguest = -I$(XEN_LIBXC)/include $(CFLAGS_xeninclude)
 LDLIBS_libxenguest = $(XEN_LIBXC)/libxenguest$(libextension)
-SHLIB_libxenguest  = -Wl,-rpath-link=L$(XEN_LIBXC)
+SHLIB_libxenguest  = -Wl,-rpath-link=$(XEN_LIBXC)
 
 CFLAGS_libxenstore = -I$(XEN_XENSTORE)/include $(CFLAGS_xeninclude)
 LDLIBS_libxenstore = $(XEN_XENSTORE)/libxenstore$(libextension)
