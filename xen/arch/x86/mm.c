@@ -3544,7 +3544,7 @@ long do_mmu_update(
     {
         /* Pagetables belong to a foreign domain (PFD). */
         if ( (pt_owner = rcu_lock_domain_by_id(pt_dom - 1)) == NULL )
-            return -EINVAL;
+            return -ESRCH;
 
         if ( pt_owner == d )
             rcu_unlock_domain(pt_owner);
