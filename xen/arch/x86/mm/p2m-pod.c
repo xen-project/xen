@@ -374,11 +374,11 @@ out:
     return ret;
 }
 
-void
-p2m_pod_empty_cache(struct domain *d)
+int p2m_pod_empty_cache(struct domain *d)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     struct page_info *page;
+    unsigned int i;
 
     /* After this barrier no new PoD activities can happen. */
     BUG_ON(!d->is_dying);
@@ -388,8 +388,6 @@ p2m_pod_empty_cache(struct domain *d)
 
     while ( (page = page_list_remove_head(&p2m->pod.super)) )
     {
-        int i;
-            
         for ( i = 0 ; i < SUPERPAGE_PAGES ; i++ )
         {
             BUG_ON(page_get_owner(page + i) != d);
@@ -397,19 +395,27 @@ p2m_pod_empty_cache(struct domain *d)
         }
 
         p2m->pod.count -= SUPERPAGE_PAGES;
+
+        if ( hypercall_preempt_check() )
+            goto out;
     }
 
-    while ( (page = page_list_remove_head(&p2m->pod.single)) )
+    for ( i = 0; (page = page_list_remove_head(&p2m->pod.single)); ++i )
     {
         BUG_ON(page_get_owner(page) != d);
         page_list_add_tail(page, &d->page_list);
 
         p2m->pod.count -= 1;
+
+        if ( i && !(i & 511) && hypercall_preempt_check() )
+            goto out;
     }
 
     BUG_ON(p2m->pod.count != 0);
 
+ out:
     unlock_page_alloc(p2m);
+    return p2m->pod.count ? -ERESTART : 0;
 }
 
 int

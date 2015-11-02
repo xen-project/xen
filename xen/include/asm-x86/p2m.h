@@ -588,7 +588,7 @@ void p2m_pod_dump_data(struct domain *d);
 
 /* Move all pages from the populate-on-demand cache to the domain page_list
  * (usually in preparation for domain destruction) */
-void p2m_pod_empty_cache(struct domain *d);
+int p2m_pod_empty_cache(struct domain *d);
 
 /* Set populate-on-demand cache size so that the total memory allocated to a
  * domain matches target */

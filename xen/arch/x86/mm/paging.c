@@ -824,7 +824,7 @@ int paging_teardown(struct domain *d)
         return rc;
 
     /* Move populate-on-demand cache back to domain_list for destruction */
-    p2m_pod_empty_cache(d);
+    rc = p2m_pod_empty_cache(d);
 
     return rc;
 }
