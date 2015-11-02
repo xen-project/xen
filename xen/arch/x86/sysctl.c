@@ -31,8 +31,6 @@
 #include <xsm/xsm.h>
 #include <asm/psr.h>
 
-#define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
-
 struct l3_cache_info {
     int ret;
     unsigned long size;
