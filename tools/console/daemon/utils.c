@@ -52,10 +52,6 @@ void daemonize(const char *pidfile)
 	int i;
 	char buf[100];
 
-	if (getppid() == 1) {
-		return;
-	}
-
 	if ((pid = fork()) > 0) {
 		exit(0);
 	} else if (pid == -1) {
