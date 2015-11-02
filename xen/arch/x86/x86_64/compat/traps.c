@@ -77,19 +77,28 @@ unsigned int compat_iret(void)
 
     /* Restore EAX (clobbered by hypercall). */
     if ( unlikely(__get_user(regs->_eax, (u32 *)regs->rsp)) )
-        goto exit_and_crash;
+    {
+        domain_crash(v->domain);
+        return 0;
+    }
 
     /* Restore CS and EIP. */
     if ( unlikely(__get_user(regs->_eip, (u32 *)regs->rsp + 1)) ||
         unlikely(__get_user(regs->cs, (u32 *)regs->rsp + 2)) )
-        goto exit_and_crash;
+    {
+        domain_crash(v->domain);
+        return 0;
+    }
 
     /*
      * Fix up and restore EFLAGS. We fix up in a local staging area
      * to avoid firing the BUG_ON(IOPL) check in arch_get_info_guest.
      */
     if ( unlikely(__get_user(eflags, (u32 *)regs->rsp + 3)) )
-        goto exit_and_crash;
+    {
+        domain_crash(v->domain);
+        return 0;
+    }
     regs->_eflags = (eflags & ~X86_EFLAGS_IOPL) | X86_EFLAGS_IF;
 
     if ( unlikely(eflags & X86_EFLAGS_VM) )
@@ -126,7 +135,10 @@ unsigned int compat_iret(void)
             }
         }
         if ( rc )
-            goto exit_and_crash;
+        {
+            domain_crash(v->domain);
+            return 0;
+        }
         regs->_esp = ksp;
         regs->ss = v->arch.pv_vcpu.kernel_ss;
 
@@ -136,21 +148,27 @@ unsigned int compat_iret(void)
         regs->_eflags &= ~(X86_EFLAGS_VM|X86_EFLAGS_RF|
                            X86_EFLAGS_NT|X86_EFLAGS_TF);
         if ( unlikely(__put_user(0, (u32 *)regs->rsp)) )
-            goto exit_and_crash;
+        {
+            domain_crash(v->domain);
+            return 0;
+        }
         regs->_eip = ti->address;
         regs->cs = ti->cs;
     }
     else if ( unlikely(ring_0(regs)) )
-        goto exit_and_crash;
-    else if ( !ring_1(regs) )
     {
-        /* Return to ring 2/3: restore ESP and SS. */
-        if ( __get_user(regs->ss, (u32 *)regs->rsp + 5)
-            || __get_user(regs->_esp, (u32 *)regs->rsp + 4))
-            goto exit_and_crash;
+        domain_crash(v->domain);
+        return 0;
     }
-    else
+    else if ( ring_1(regs) )
         regs->_esp += 16;
+    /* Return to ring 2/3: restore ESP and SS. */
+    else if ( __get_user(regs->ss, (u32 *)regs->rsp + 5) ||
+              __get_user(regs->_esp, (u32 *)regs->rsp + 4) )
+    {
+        domain_crash(v->domain);
+        return 0;
+    }
 
     /* Restore upcall mask from supplied EFLAGS.IF. */
     vcpu_info(v, evtchn_upcall_mask) = !(eflags & X86_EFLAGS_IF);
@@ -162,11 +180,6 @@ unsigned int compat_iret(void)
      * value.
      */
     return regs->_eax;
-
- exit_and_crash:
-    gprintk(XENLOG_ERR, "Fatal IRET error\n");
-    domain_crash(v->domain);
-    return 0;
 }
 
 static long compat_register_guest_callback(
