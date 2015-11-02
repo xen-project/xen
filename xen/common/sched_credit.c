@@ -426,9 +426,10 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
 
             /*
              * If there are no suitable idlers for new, and it's higher
-             * priority than cur, ask the scheduler to migrate cur away.
-             * We have to act like this (instead of just waking some of
-             * the idlers suitable for cur) because cur is running.
+             * priority than cur, check whether we can migrate cur away.
+             * (We have to do it indirectly, via _VPF_migrating, instead
+             * of just tickling any idler suitable for cur) because cur
+             * is running.)
              *
              * If there are suitable idlers for new, no matter priorities,
              * leave cur alone (as it is running and is, likely, cache-hot)
@@ -437,11 +438,18 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
              */
             if ( new_idlers_empty && new->pri > cur->pri )
             {
+                csched_balance_cpumask(cur->vcpu, balance_step,
+                                       csched_balance_mask(cpu));
+                if ( cpumask_intersects(csched_balance_mask(cpu),
+                                        &idle_mask) )
+                {
+                    SCHED_VCPU_STAT_CRANK(cur, kicked_away);
+                    SCHED_VCPU_STAT_CRANK(cur, migrate_r);
+                    SCHED_STAT_CRANK(migrate_kicked_away);
+                    set_bit(_VPF_migrating, &cur->vcpu->pause_flags);
+                }
+                /* Tickle cpu anyway, to let new preempt cur. */
                 SCHED_STAT_CRANK(tickle_idlers_none);
-                SCHED_VCPU_STAT_CRANK(cur, kicked_away);
-                SCHED_VCPU_STAT_CRANK(cur, migrate_r);
-                SCHED_STAT_CRANK(migrate_kicked_away);
-                set_bit(_VPF_migrating, &cur->vcpu->pause_flags);
                 __cpumask_set_cpu(cpu, &mask);
             }
             else if ( !new_idlers_empty )
