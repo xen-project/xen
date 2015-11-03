@@ -110,7 +110,7 @@ UNLIKELY_END(realmode)
         sti
         SAVE_ALL
         call vmx_vmentry_failure
-        ud2
+        BUG  /* vmx_vmentry_failure() shouldn't return. */
 
 ENTRY(vmx_asm_do_vmentry)
         GET_CURRENT(%rbx)

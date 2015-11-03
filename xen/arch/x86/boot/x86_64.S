@@ -34,7 +34,7 @@ ENTRY(__high_start)
         /* Pass off the Multiboot info structure to C land. */
         mov     multiboot_ptr(%rip),%edi
         call    __start_xen
-        ud2     /* Force a panic (invalid opcode). */
+        BUG     /* __start_xen() shouldn't return. */
 
 /*** DESCRIPTOR TABLES ***/
 

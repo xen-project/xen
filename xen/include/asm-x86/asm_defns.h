@@ -324,7 +324,7 @@ static always_inline void stac(void)
         jne   789f
         cmpq  UREGS_r12(%rsp),%r12
         je    987f
-789:    ud2
+789:    BUG   /* Corruption of partial register state. */
         .subsection 0
 #endif
 .endif
