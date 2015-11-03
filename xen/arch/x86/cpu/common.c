@@ -207,6 +207,9 @@ static void __init early_cpu_detect(void)
 	/* Leaf 0x1 capabilities filled in early for Xen. */
 	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = cap0;
 	c->x86_capability[cpufeat_word(X86_FEATURE_XMM3)] = cap4;
+
+	if ( cpuid_eax(0x80000000) >= 0x80000008 )
+		paddr_bits = cpuid_eax(0x80000008) & 0xff;
 }
 
 static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
@@ -254,8 +257,6 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 		}
 		if ( c->extended_cpuid_level >= 0x80000004 )
 			get_model_name(c); /* Default name */
-		if ( c->extended_cpuid_level >= 0x80000008 )
-			paddr_bits = cpuid_eax(0x80000008) & 0xff;
 	}
 
 	/* Might lift BIOS max_leaf=3 limit. */
