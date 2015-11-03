@@ -1,4 +1,5 @@
-#include <xen/config.h>
+asm(".file \"" __FILE__ "\"");
+
 #include <xen/types.h>
 #include <xen/hypercall.h>
 #include <xen/guest_access.h>

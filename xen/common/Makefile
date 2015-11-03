@@ -63,7 +63,7 @@ obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o
 obj-$(xenoprof)    += xenoprof.o
 
-subdir-$(CONFIG_COMPAT) += compat
+obj-$(CONFIG_COMPAT) += $(addprefix compat/,domain.o kernel.o memory.o multicall.o tmem_xen.o xlat.o)
 
 subdir-$(x86_64) += hvm
 

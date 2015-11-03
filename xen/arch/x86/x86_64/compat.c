@@ -2,7 +2,8 @@
  * compat.c
  */
 
-#include <xen/config.h>
+asm(".file \"" __FILE__ "\"");
+
 #include <xen/hypercall.h>
 #include <compat/xen.h>
 #include <compat/physdev.h>
