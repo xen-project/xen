@@ -101,14 +101,15 @@ UNLIKELY_END(realmode)
 
 /*.Lvmx_resume:*/
         VMRESUME
-        sti
-        call vm_resume_fail
-        ud2
+        jmp  .Lvmx_vmentry_fail
 
 .Lvmx_launch:
         VMLAUNCH
+
+.Lvmx_vmentry_fail:
         sti
-        call vm_launch_fail
+        SAVE_ALL
+        call vmx_vmentry_failure
         ud2
 
 ENTRY(vmx_asm_do_vmentry)
