@@ -252,7 +252,7 @@ QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-4.5-testing.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= cb9a7ebabcd6b8a49dc0854b2f9592d732b5afbd
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.5.1
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.5.2
 SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 # Thu May 22 16:59:16 2014 -0400
 # python3 fixes for vgabios and csm builds.
@@ -260,7 +260,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= dfe880e8d5fdc863ce6bbcdcaebaf918f8689cc0
+QEMU_TRADITIONAL_REVISION ?= xen-4.5.2
 # Mon Jun 30 10:07:54 2014 +0200
 # vnc: limit client_cut_text msg payload size
 
