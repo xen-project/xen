@@ -1612,21 +1612,14 @@ void vmx_destroy_vmcs(struct vcpu *v)
     free_xenheap_page(v->arch.hvm_vmx.msr_bitmap);
 }
 
-void vm_launch_fail(void)
+void vmx_vmentry_failure(void)
 {
+    struct vcpu *curr = current;
     unsigned long error;
 
     __vmread(VM_INSTRUCTION_ERROR, &error);
-    printk("<vm_launch_fail> error code %lx\n", error);
-    domain_crash_synchronous();
-}
-
-void vm_resume_fail(void)
-{
-    unsigned long error;
-
-    __vmread(VM_INSTRUCTION_ERROR, &error);
-    printk("<vm_resume_fail> error code %lx\n", error);
+    gprintk(XENLOG_ERR, "VM%s error: %#lx\n",
+            curr->arch.hvm_vmx.launched ? "RESUME" : "LAUNCH", error);
     domain_crash_synchronous();
 }
 

@@ -671,8 +671,7 @@ static int hap_page_fault(struct vcpu *v, unsigned long va,
 {
     struct domain *d = v->domain;
 
-    HAP_ERROR("Intercepted a guest #PF (%u:%u) with HAP enabled.\n",
-              d->domain_id, v->vcpu_id);
+    HAP_ERROR("Intercepted a guest #PF (%pv) with HAP enabled\n", v);
     domain_crash(d);
     return 0;
 }
@@ -692,8 +691,7 @@ static int hap_invlpg(struct vcpu *v, unsigned long va)
         return 1;
     }
 
-    HAP_ERROR("Intercepted a guest INVLPG (%u:%u) with HAP enabled.\n",
-              v->domain->domain_id, v->vcpu_id);
+    HAP_ERROR("Intercepted a guest INVLPG (%pv) with HAP enabled\n", v);
     domain_crash(v->domain);
     return 0;
 }

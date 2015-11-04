@@ -2,7 +2,8 @@
  * platform_hypercall.c
  */
 
-#include <xen/config.h>
+asm(".file \"" __FILE__ "\"");
+
 #include <xen/lib.h>
 #include <compat/platform.h>
 

@@ -86,8 +86,7 @@ AFLAGS-$(clang)         += -no-integrated-as
 ALL_OBJS := $(ALL_OBJS-y)
 
 # Get gcc to generate the dependencies for us.
-CFLAGS-y += -MMD -MF .$(@F).d
-DEPS = .*.d
+CFLAGS-y += -MMD -MF $(@D)/.$(@F).d
 
 CFLAGS += $(CFLAGS-y)
 
@@ -102,6 +101,14 @@ LDFLAGS += $(LDFLAGS_DIRECT)
 LDFLAGS += $(LDFLAGS-y)
 
 include Makefile
+
+DEPS = .*.d
+define gendep
+    ifneq ($(1),$(subst /,:,$(1)))
+        DEPS += $(dir $(1)).$(basename $(notdir $(1))).d
+    endif
+endef
+$(foreach o,$(filter-out %/,$(obj-y)),$(eval $(call gendep,$(o))))
 
 # Ensure each subdirectory has exactly one trailing slash.
 subdir-n := $(patsubst %,%/,$(patsubst %/,%,$(subdir-n) $(subdir-)))

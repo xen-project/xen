@@ -3,7 +3,8 @@
  *
  */
 
-#include <xen/config.h>
+asm(".file \"" __FILE__ "\"");
+
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/domain.h>

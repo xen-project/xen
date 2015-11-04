@@ -547,7 +547,7 @@ exception_with_ints_disabled:
 FATAL_exception_with_ints_disabled:
         movq  %rsp,%rdi
         call  fatal_trap
-        ud2
+        BUG   /* fatal_trap() shouldn't return. */
 
 ENTRY(divide_error)
         pushq $0
@@ -620,7 +620,7 @@ ENTRY(double_fault)
         SAVE_ALL STAC
         movq  %rsp,%rdi
         call  do_double_fault
-        ud2
+        BUG   /* do_double_fault() shouldn't return. */
 
         .pushsection .init.text, "ax", @progbits
 ENTRY(early_page_fault)

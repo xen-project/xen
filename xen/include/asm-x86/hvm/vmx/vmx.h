@@ -281,7 +281,7 @@ extern uint8_t posted_intr_vector;
 #define INVVPID_ALL_CONTEXT                     2
 #define INVVPID_SINGLE_CONTEXT_RETAINING_GLOBAL 3
 
-static inline void __vmptrld(u64 addr)
+static always_inline void __vmptrld(u64 addr)
 {
     asm volatile (
 #ifdef HAVE_GAS_VMX
@@ -289,20 +289,21 @@ static inline void __vmptrld(u64 addr)
 #else
                    VMPTRLD_OPCODE MODRM_EAX_06
 #endif
-                   /* CF==1 or ZF==1 --> crash (ud2) */
+                   /* CF==1 or ZF==1 --> BUG() */
                    UNLIKELY_START(be, vmptrld)
-                   "\tud2\n"
+                   _ASM_BUGFRAME_TEXT(0)
                    UNLIKELY_END_SECTION
                    :
 #ifdef HAVE_GAS_VMX
-                   : "m" (addr)
+                   : "m" (addr),
 #else
-                   : "a" (&addr)
+                   : "a" (&addr),
 #endif
+                     _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0)
                    : "memory");
 }
 
-static inline void __vmpclear(u64 addr)
+static always_inline void __vmpclear(u64 addr)
 {
     asm volatile (
 #ifdef HAVE_GAS_VMX
@@ -310,20 +311,21 @@ static inline void __vmpclear(u64 addr)
 #else
                    VMCLEAR_OPCODE MODRM_EAX_06
 #endif
-                   /* CF==1 or ZF==1 --> crash (ud2) */
+                   /* CF==1 or ZF==1 --> BUG() */
                    UNLIKELY_START(be, vmclear)
-                   "\tud2\n"
+                   _ASM_BUGFRAME_TEXT(0)
                    UNLIKELY_END_SECTION
                    :
 #ifdef HAVE_GAS_VMX
-                   : "m" (addr)
+                   : "m" (addr),
 #else
-                   : "a" (&addr)
+                   : "a" (&addr),
 #endif
+                     _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0)
                    : "memory");
 }
 
-static inline void __vmread(unsigned long field, unsigned long *value)
+static always_inline void __vmread(unsigned long field, unsigned long *value)
 {
     asm volatile (
 #ifdef HAVE_GAS_VMX
@@ -331,20 +333,22 @@ static inline void __vmread(unsigned long field, unsigned long *value)
 #else
                    VMREAD_OPCODE MODRM_EAX_ECX
 #endif
-                   /* CF==1 or ZF==1 --> crash (ud2) */
+                   /* CF==1 or ZF==1 --> BUG() */
                    UNLIKELY_START(be, vmread)
-                   "\tud2\n"
+                   _ASM_BUGFRAME_TEXT(0)
                    UNLIKELY_END_SECTION
 #ifdef HAVE_GAS_VMX
                    : "=rm" (*value)
-                   : "r" (field));
+                   : "r" (field),
 #else
                    : "=c" (*value)
-                   : "a" (field));
+                   : "a" (field),
 #endif
+                     _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0)
+        );
 }
 
-static inline void __vmwrite(unsigned long field, unsigned long value)
+static always_inline void __vmwrite(unsigned long field, unsigned long value)
 {
     asm volatile (
 #ifdef HAVE_GAS_VMX
@@ -352,16 +356,18 @@ static inline void __vmwrite(unsigned long field, unsigned long value)
 #else
                    VMWRITE_OPCODE MODRM_EAX_ECX
 #endif
-                   /* CF==1 or ZF==1 --> crash (ud2) */
+                   /* CF==1 or ZF==1 --> BUG() */
                    UNLIKELY_START(be, vmwrite)
-                   "\tud2\n"
+                   _ASM_BUGFRAME_TEXT(0)
                    UNLIKELY_END_SECTION
-                   : 
+                   :
 #ifdef HAVE_GAS_VMX
-                   : "r" (field) , "rm" (value));
+                   : "r" (field) , "rm" (value),
 #else
-                   : "a" (field) , "c" (value));
+                   : "a" (field) , "c" (value),
 #endif
+                     _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0)
+        );
 }
 
 static inline bool_t __vmread_safe(unsigned long field, unsigned long *value)
@@ -387,7 +393,7 @@ static inline bool_t __vmread_safe(unsigned long field, unsigned long *value)
     return okay;
 }
 
-static inline void __invept(unsigned long type, u64 eptp, u64 gpa)
+static always_inline void __invept(unsigned long type, u64 eptp, u64 gpa)
 {
     struct {
         u64 eptp, gpa;
@@ -407,20 +413,21 @@ static inline void __invept(unsigned long type, u64 eptp, u64 gpa)
 #else
                    INVEPT_OPCODE MODRM_EAX_08
 #endif
-                   /* CF==1 or ZF==1 --> crash (ud2) */
+                   /* CF==1 or ZF==1 --> BUG() */
                    UNLIKELY_START(be, invept)
-                   "\tud2\n"
+                   _ASM_BUGFRAME_TEXT(0)
                    UNLIKELY_END_SECTION
                    :
 #ifdef HAVE_GAS_EPT
-                   : "m" (operand), "r" (type)
+                   : "m" (operand), "r" (type),
 #else
-                   : "a" (&operand), "c" (type)
+                   : "a" (&operand), "c" (type),
 #endif
+                     _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0)
                    : "memory" );
 }
 
-static inline void __invvpid(unsigned long type, u16 vpid, u64 gva)
+static always_inline void __invvpid(unsigned long type, u16 vpid, u64 gva)
 {
     struct __packed {
         u64 vpid:16;
@@ -435,18 +442,19 @@ static inline void __invvpid(unsigned long type, u16 vpid, u64 gva)
 #else
                    INVVPID_OPCODE MODRM_EAX_08
 #endif
-                   /* CF==1 or ZF==1 --> crash (ud2) */
+                   /* CF==1 or ZF==1 --> BUG() */
                    UNLIKELY_START(be, invvpid)
-                   "\tud2\n"
+                   _ASM_BUGFRAME_TEXT(0)
                    UNLIKELY_END_SECTION "\n"
                    "2:"
                    _ASM_EXTABLE(1b, 2b)
                    :
 #ifdef HAVE_GAS_EPT
-                   : "m" (operand), "r" (type)
+                   : "m" (operand), "r" (type),
 #else
-                   : "a" (&operand), "c" (type)
+                   : "a" (&operand), "c" (type),
 #endif
+                     _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0)
                    : "memory" );
 }
 
