@@ -252,13 +252,12 @@ __runq_elem(struct list_head *elem)
 }
 
 static inline void
-__runq_insert(unsigned int cpu, struct csched_vcpu *svc)
+__runq_insert(struct csched_vcpu *svc)
 {
-    const struct list_head * const runq = RUNQ(cpu);
+    const struct list_head * const runq = RUNQ(svc->vcpu->processor);
     struct list_head *iter;
 
     BUG_ON( __vcpu_on_runq(svc) );
-    BUG_ON( cpu != svc->vcpu->processor );
 
     list_for_each( iter, runq )
     {
@@ -913,7 +912,7 @@ csched_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
     struct csched_vcpu *svc = vc->sched_priv;
 
     if ( !__vcpu_on_runq(svc) && vcpu_runnable(vc) && !vc->is_running )
-        __runq_insert(vc->processor, svc);
+        __runq_insert(svc);
 
     SCHED_STAT_CRANK(vcpu_insert);
 }
@@ -1024,7 +1023,7 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
     }
 
     /* Put the VCPU on the runq and tickle CPUs */
-    __runq_insert(cpu, svc);
+    __runq_insert(svc);
     __runq_tickle(cpu, svc);
 }
 
@@ -1689,7 +1688,7 @@ csched_schedule(
      * Select next runnable local VCPU (ie top of local runq)
      */
     if ( vcpu_runnable(current) )
-        __runq_insert(cpu, scurr);
+        __runq_insert(scurr);
     else
         BUG_ON( is_idle_vcpu(current) || list_empty(runq) );
 
