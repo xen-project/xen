@@ -5473,7 +5473,8 @@ static int vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
         if (rc)
             return 1;
     }
-    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, max_vcpus)) {
+    rc = libxl_cpu_bitmap_alloc(ctx, &cpumap, max_vcpus);
+    if (rc) {
         fprintf(stderr, "libxl_cpu_bitmap_alloc failed, rc: %d\n", rc);
         return 1;
     }
