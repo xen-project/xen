@@ -180,7 +180,7 @@ static inline u32 phys_pkg_id(u32 cpuid_apic, int index_msb)
 static void __init early_cpu_detect(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
-	u32 cap4, tfms, cap0, misc;
+	u32 eax, ebx, ecx, edx;
 
 	c->x86_cache_alignment = 32;
 
@@ -192,21 +192,21 @@ static void __init early_cpu_detect(void)
 
 	c->x86_vendor = get_cpu_vendor(c->x86_vendor_id, gcv_host_early);
 
-	cpuid(0x00000001, &tfms, &misc, &cap4, &cap0);
-	c->x86 = (tfms >> 8) & 15;
-	c->x86_model = (tfms >> 4) & 15;
+	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
+	c->x86 = (eax >> 8) & 15;
+	c->x86_model = (eax >> 4) & 15;
 	if (c->x86 == 0xf)
-		c->x86 += (tfms >> 20) & 0xff;
+		c->x86 += (eax >> 20) & 0xff;
 	if (c->x86 >= 0x6)
-		c->x86_model += ((tfms >> 16) & 0xF) << 4;
-	c->x86_mask = tfms & 15;
-	cap0 &= ~cleared_caps[cpufeat_word(X86_FEATURE_FPU)];
-	cap4 &= ~cleared_caps[cpufeat_word(X86_FEATURE_XMM3)];
-	if (cap0 & cpufeat_mask(X86_FEATURE_CLFLSH))
-		c->x86_cache_alignment = ((misc >> 8) & 0xff) * 8;
+		c->x86_model += ((eax >> 16) & 0xF) << 4;
+	c->x86_mask = eax & 15;
+	edx &= ~cleared_caps[cpufeat_word(X86_FEATURE_FPU)];
+	ecx &= ~cleared_caps[cpufeat_word(X86_FEATURE_XMM3)];
+	if (edx & cpufeat_mask(X86_FEATURE_CLFLSH))
+		c->x86_cache_alignment = ((ebx >> 8) & 0xff) * 8;
 	/* Leaf 0x1 capabilities filled in early for Xen. */
-	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = cap0;
-	c->x86_capability[cpufeat_word(X86_FEATURE_XMM3)] = cap4;
+	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = edx;
+	c->x86_capability[cpufeat_word(X86_FEATURE_XMM3)] = ecx;
 
 	if ( cpuid_eax(0x80000000) >= 0x80000008 )
 		paddr_bits = cpuid_eax(0x80000008) & 0xff;
@@ -214,29 +214,29 @@ static void __init early_cpu_detect(void)
 
 static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 {
-	u32 tfms, capability, excap, ebx;
+	u32 eax, ebx, ecx, edx, tmp;
 
 	/* Get vendor name */
 	cpuid(0x00000000, &c->cpuid_level,
 	      (int *)&c->x86_vendor_id[0],
 	      (int *)&c->x86_vendor_id[8],
 	      (int *)&c->x86_vendor_id[4]);
-		
+
 	c->x86_vendor = get_cpu_vendor(c->x86_vendor_id, gcv_host_late);
 	/* Initialize the standard set of capabilities */
 	/* Note that the vendor-specific code below might override */
-	
+
 	/* Intel-defined flags: level 0x00000001 */
-	cpuid(0x00000001, &tfms, &ebx, &excap, &capability);
-	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = capability;
-	c->x86_capability[cpufeat_word(X86_FEATURE_XMM3)] = excap;
-	c->x86 = (tfms >> 8) & 15;
-	c->x86_model = (tfms >> 4) & 15;
+	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
+	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = edx;
+	c->x86_capability[cpufeat_word(X86_FEATURE_XMM3)] = ecx;
+	c->x86 = (eax >> 8) & 15;
+	c->x86_model = (eax >> 4) & 15;
 	if (c->x86 == 0xf)
-		c->x86 += (tfms >> 20) & 0xff;
+		c->x86 += (eax >> 20) & 0xff;
 	if (c->x86 >= 0x6)
-		c->x86_model += ((tfms >> 16) & 0xF) << 4;
-	c->x86_mask = tfms & 15;
+		c->x86_model += ((eax >> 16) & 0xF) << 4;
+	c->x86_mask = eax & 15;
 	c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
 	c->phys_proc_id = c->apicid;
 	if ( cpu_has(c, X86_FEATURE_CLFLSH) )
@@ -249,12 +249,11 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 	/* AMD-defined flags: level 0x80000001 */
 	c->extended_cpuid_level = cpuid_eax(0x80000000);
 	if ( (c->extended_cpuid_level & 0xffff0000) == 0x80000000 ) {
-		if ( c->extended_cpuid_level >= 0x80000001 ) {
-			c->x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]
-				= cpuid_edx(0x80000001);
-			c->x86_capability[cpufeat_word(X86_FEATURE_LAHF_LM)]
-				= cpuid_ecx(0x80000001);
-		}
+		if ( c->extended_cpuid_level >= 0x80000001 )
+			cpuid(0x80000001, &tmp, &tmp,
+			      &c->x86_capability[cpufeat_word(X86_FEATURE_LAHF_LM)],
+			      &c->x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]);
+
 		if ( c->extended_cpuid_level >= 0x80000004 )
 			get_model_name(c); /* Default name */
 	}
@@ -263,11 +262,10 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 	early_intel_workaround(c);
 
 	/* Intel-defined flags: level 0x00000007 */
-	if ( c->cpuid_level >= 0x00000007 ) {
-		u32 dummy;
-		cpuid_count(0x00000007, 0, &dummy, &ebx, &dummy, &dummy);
-		c->x86_capability[cpufeat_word(X86_FEATURE_FSGSBASE)] = ebx;
-	}
+	if ( c->cpuid_level >= 0x00000007 )
+		cpuid_count(0x00000007, 0, &tmp,
+			    &c->x86_capability[cpufeat_word(X86_FEATURE_FSGSBASE)],
+			    &tmp, &tmp);
 }
 
 /*
