@@ -7582,8 +7582,10 @@ int main_cpupooldestroy(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    if (libxl_cpupool_destroy(ctx, poolid))
+    if (libxl_cpupool_destroy(ctx, poolid)) {
+        fprintf(stderr, "Can't destroy cpupool '%s'\n", pool);
         return EXIT_FAILURE;
+    }
 
     return EXIT_SUCCESS;
 }
