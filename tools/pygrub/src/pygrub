@@ -148,6 +148,11 @@ def get_partition_offsets(file):
         else:
             part_offs.append(offset)
 
+    # We thought we had a DOS partition table, but didn't find any
+    # actual valid partition entries. This can happen because an MBR
+    # (e.g. grubs) may contain the same signature.
+    if not part_offs: part_offs = [0]
+
     return part_offs
 
 class GrubLineEditor(curses.textpad.Textbox):
