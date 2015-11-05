@@ -2201,6 +2201,9 @@ skip_vfb:
         xlu_cfg_replace_string(config, "device_model_stubdomain_seclabel",
                                &b_info->device_model_ssid_label, 0);
 
+    xlu_cfg_replace_string(config, "device_model_user",
+                           &b_info->device_model_user, 0);
+
 #define parse_extra_args(type)                                            \
     e = xlu_cfg_get_list_as_string_list(config, "device_model_args"#type, \
                                     &b_info->extra##type, 0);            \

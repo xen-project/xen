@@ -304,6 +304,13 @@ systemctl enable xendomains.service
 systemctl enable xen-watchdog.service
 
 
+QEMU Deprivilege
+================
+It is recommended to run QEMU as non-root.
+See docs/misc/qemu-deprivilege.txt for an explanation on what you need
+to do at installation time to run QEMU as a dedicated user.
+
+
 History of options
 ==================
 

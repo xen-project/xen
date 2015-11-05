@@ -200,6 +200,12 @@
 #define LIBXL_HAVE_DEVICETREE_PASSTHROUGH 1
 
 /*
+ * libxl_domain_build_info has device_model_user to specify the user to
+ * run the device model with. See docs/misc/qemu-deprivilege.txt.
+ */
+#define LIBXL_HAVE_DEVICE_MODEL_USER 1
+
+/*
  * libxl_domain_build_info has the arm.gic_version field.
  */
 #define LIBXL_HAVE_BUILDINFO_ARM_GIC_VERSION 1

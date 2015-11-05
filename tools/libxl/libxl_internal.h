@@ -4018,6 +4018,11 @@ void libxl__bitmap_copy_best_effort(libxl__gc *gc, libxl_bitmap *dptr,
                                     const libxl_bitmap *sptr);
 
 int libxl__count_physical_sockets(libxl__gc *gc, int *sockets);
+
+
+#define LIBXL_QEMU_USER_PREFIX "xen-qemuuser"
+#define LIBXL_QEMU_USER_BASE   LIBXL_QEMU_USER_PREFIX"-domid"
+#define LIBXL_QEMU_USER_SHARED LIBXL_QEMU_USER_PREFIX"-shared"
 #endif
 
 /*

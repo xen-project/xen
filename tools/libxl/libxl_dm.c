@@ -21,6 +21,8 @@
 
 #include <xc_dom.h>
 #include <xen/hvm/e820.h>
+#include <sys/types.h>
+#include <pwd.h>
 
 static const char *libxl_tapif_script(libxl__gc *gc)
 {
@@ -722,6 +724,36 @@ libxl__detect_gfx_passthru_kind(libxl__gc *gc,
     return LIBXL_GFX_PASSTHRU_KIND_DEFAULT;
 }
 
+/* return 1 if the user was found, 0 if it was not, -1 on error */
+static int libxl__dm_runas_helper(libxl__gc *gc, const char *username)
+{
+    struct passwd pwd, *user = NULL;
+    char *buf = NULL;
+    long buf_size;
+    int ret;
+
+    buf_size = sysconf(_SC_GETPW_R_SIZE_MAX);
+    if (buf_size < 0) {
+        LOGE(ERROR, "sysconf(_SC_GETPW_R_SIZE_MAX) returned error %ld",
+                buf_size);
+        return ERROR_FAIL;
+    }
+
+    while (1) {
+        buf = libxl__realloc(gc, buf, buf_size);
+        ret = getpwnam_r(username, &pwd, buf, buf_size, &user);
+        if (ret == ERANGE) {
+            buf_size += 128;
+            continue;
+        }
+        if (ret != 0)
+            return ERROR_FAIL;
+        if (user != NULL)
+            return 1;
+        return 0;
+    }
+}
+
 static int libxl__build_device_model_args_new(libxl__gc *gc,
                                         const char *dm, int guest_domid,
                                         const libxl_domain_config *guest_config,
@@ -740,9 +772,10 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
     const char *keymap = dm_keymap(guest_config);
     char *machinearg;
     flexarray_t *dm_args, *dm_envs;
-    int i, connection, devid;
+    int i, connection, devid, ret;
     uint64_t ram_size;
     const char *path, *chardev;
+    char *user = NULL;
 
     dm_args = flexarray_make(gc, 16, 1);
     dm_envs = flexarray_make(gc, 16, 1);
@@ -1221,6 +1254,38 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             break;
         default:
             break;
+        }
+
+        if (b_info->device_model_user) {
+            user = b_info->device_model_user;
+            goto end_search;
+        }
+
+        user = libxl__sprintf(gc, "%s%d", LIBXL_QEMU_USER_BASE, guest_domid);
+        ret = libxl__dm_runas_helper(gc, user);
+        if (ret < 0)
+            return ret;
+        if (ret > 0)
+            goto end_search;
+
+        user = LIBXL_QEMU_USER_SHARED;
+        ret = libxl__dm_runas_helper(gc, user);
+        if (ret < 0)
+            return ret;
+        if (ret > 0) {
+            LOG(WARN, "Could not find user %s%d, falling back to %s",
+                    LIBXL_QEMU_USER_BASE, guest_domid, LIBXL_QEMU_USER_SHARED);
+            goto end_search;
+        }
+
+        user = NULL;
+        LOG(WARN, "Could not find user %s, starting QEMU as root",
+            LIBXL_QEMU_USER_SHARED);
+
+end_search:
+        if (user != NULL && strcmp(user, "root")) {
+            flexarray_append(dm_args, "-runas");
+            flexarray_append(dm_args, user);
         }
     }
     flexarray_append(dm_args, NULL);
