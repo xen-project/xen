@@ -32,7 +32,6 @@
 #define UART_MCR          0x04    /* Modem control        */
 #define UART_LSR          0x05    /* line status          */
 #define UART_MSR          0x06    /* Modem status         */
-#define UART_SYSC         0x15    /* System configuration register */
 #define UART_USR          0x1f    /* Status register (DW) */
 #define UART_DLL          0x00    /* divisor latch (ls) (DLAB=1) */
 #define UART_DLM          0x01    /* divisor latch (ms) (DLAB=1) */
@@ -125,29 +124,6 @@
 /* Resume retry settings */
 #define RESUME_DELAY      MILLISECS(10)
 #define RESUME_RETRIES    100
-
-/* Enhanced feature register */
-#define UART_OMAP_EFR     0x02
-
-#define UART_OMAP_EFR_ECB 0x10 /* Enhanced control bit */
-
-/* Mode definition register 1 */
-#define UART_OMAP_MDR1    0x08
-
-/*
- * These are the definitions for the MDR1 register
- */
-#define UART_OMAP_MDR1_16X_MODE 0x00 /* UART 16x mode           */
-#define UART_OMAP_MDR1_DISABLE  0x07 /* Disable (default state) */
-
-/* Supplementary control register */
-#define UART_OMAP_SCR     0x10
-
-/* SCR register bitmasks */
-#define OMAP_UART_SCR_RX_TRIG_GRANU1_MASK (1 << 7)
-
-/* System configuration register */
-#define OMAP_UART_SYSC_DEF_CONF 0x0d /* autoidle mode, wakeup is enabled */
 
 #endif /* __XEN_8250_UART_H__ */
 
