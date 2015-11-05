@@ -29,7 +29,9 @@
 #define UART_OMAP_EFR    0x02   /* Enhanced feature register */
 #define UART_OMAP_MDR1   0x08   /* Mode definition register 1 */
 #define UART_OMAP_SCR    0x10   /* Supplementary control register */
+#define UART_OMAP_SSR    0x11   /* Supplementary status register */
 #define UART_OMAP_SYSC   0x15   /* System configuration register */
+#define UART_OMAP_TXFIFO_LVL   0x1A   /* TX FIFO level register */
 
 /* Enhanced feature register */
 #define UART_OMAP_EFR_ECB   0x10   /* Enhanced control bit */
@@ -40,6 +42,9 @@
 
 /* Supplementary control register bitmasks */
 #define UART_OMAP_SCR_RX_TRIG_GRANU1_MASK   (1 << 7)
+
+/* Supplementary status register bitmasks */
+#define UART_OMAP_SSR_TX_FIFO_FULL_MASK   (1 << 0)
 
 /* System configuration register */
 #define UART_OMAP_SYSC_DEF_CONF   0x0d   /* autoidle mode, wakeup is enabled */
@@ -252,11 +257,20 @@ static int omap_uart_tx_ready(struct serial_port *port)
 {
     struct omap_uart *uart = port->uart;
     uint32_t reg;
+    uint8_t cnt;
 
     reg = omap_read(uart, UART_IER);
     omap_write(uart, UART_IER, reg | UART_IER_ETHREI);
 
-    return omap_read(uart, UART_LSR) & UART_LSR_THRE ? uart->fifo_size : 0;
+    /* Check for empty space in TX FIFO */
+    if ( omap_read(uart, UART_OMAP_SSR) & UART_OMAP_SSR_TX_FIFO_FULL_MASK )
+        return 0;
+
+    /* Check number of data bytes stored in TX FIFO */
+    cnt = omap_read(uart, UART_OMAP_TXFIFO_LVL);
+    ASSERT( cnt >= 0 && cnt <= uart->fifo_size );
+
+    return (uart->fifo_size - cnt);
 }
 
 static void omap_uart_putc(struct serial_port *port, char c)
