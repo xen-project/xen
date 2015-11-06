@@ -933,9 +933,10 @@ csched_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
     struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
     struct csched_dom * const sdom = svc->sdom;
-    unsigned long flags;
 
     SCHED_STAT_CRANK(vcpu_remove);
+
+    ASSERT(!__vcpu_on_runq(svc));
 
     if ( test_and_clear_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
     {
@@ -943,18 +944,14 @@ csched_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
         vcpu_unpause(svc->vcpu);
     }
 
-    if ( __vcpu_on_runq(svc) )
-        __runq_remove(svc);
-
-    spin_lock_irqsave(&(prv->lock), flags);
+    spin_lock_irq(&prv->lock);
 
     if ( !list_empty(&svc->active_vcpu_elem) )
         __csched_vcpu_acct_stop_locked(prv, svc);
 
-    spin_unlock_irqrestore(&(prv->lock), flags);
+    spin_unlock_irq(&prv->lock);
 
     BUG_ON( sdom == NULL );
-    BUG_ON( !list_empty(&svc->runq_elem) );
 }
 
 static void
