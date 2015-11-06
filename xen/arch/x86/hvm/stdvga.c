@@ -101,6 +101,37 @@ static void vram_put(struct hvm_hw_stdvga *s, void *p)
     unmap_domain_page(p);
 }
 
+static void stdvga_try_cache_enable(struct hvm_hw_stdvga *s)
+{
+    /*
+     * Caching mode can only be enabled if the the cache has
+     * never been used before. As soon as it is disabled, it will
+     * become out-of-sync with the VGA device model and since no
+     * mechanism exists to acquire current VRAM state from the
+     * device model, re-enabling it would lead to stale data being
+     * seen by the guest.
+     */
+    if ( s->cache != STDVGA_CACHE_UNINITIALIZED )
+        return;
+
+    gdprintk(XENLOG_INFO, "entering caching mode\n");
+    s->cache = STDVGA_CACHE_ENABLED;
+}
+
+static void stdvga_cache_disable(struct hvm_hw_stdvga *s)
+{
+    if ( s->cache != STDVGA_CACHE_ENABLED )
+        return;
+
+    gdprintk(XENLOG_INFO, "leaving caching mode\n");
+    s->cache = STDVGA_CACHE_DISABLED;
+}
+
+static bool_t stdvga_cache_is_enabled(const struct hvm_hw_stdvga *s)
+{
+    return s->cache == STDVGA_CACHE_ENABLED;
+}
+
 static int stdvga_outb(uint64_t addr, uint8_t val)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm_domain.stdvga;
@@ -139,12 +170,8 @@ static int stdvga_outb(uint64_t addr, uint8_t val)
 
     if ( !prev_stdvga && s->stdvga )
     {
-        /*
-         * (Re)start caching of video buffer.
-         * XXX TODO: In case of a restart the cache could be unsynced.
-         */
-        s->cache = 1;
-        gdprintk(XENLOG_INFO, "entering stdvga and caching modes\n");
+        gdprintk(XENLOG_INFO, "entering stdvga mode\n");
+        stdvga_try_cache_enable(s);
     }
     else if ( prev_stdvga && !s->stdvga )
     {
@@ -441,7 +468,7 @@ static int stdvga_mem_write(const struct hvm_io_handler *handler,
     };
     struct hvm_ioreq_server *srv;
 
-    if ( !s->cache || !s->stdvga )
+    if ( !stdvga_cache_is_enabled(s) || !s->stdvga )
         goto done;
 
     /* Intercept mmio write */
@@ -515,15 +542,12 @@ static bool_t stdvga_mem_accept(const struct hvm_io_handler *handler,
          * not active since we can assert, when in stdvga mode, that writes
          * to VRAM have no side effect and thus we can try to buffer them.
          */
-        if ( s->cache )
-        {
-            gdprintk(XENLOG_INFO, "leaving caching mode\n");
-            s->cache = 0;
-        }
+        stdvga_cache_disable(s);
 
         goto reject;
     }
-    else if ( p->dir == IOREQ_READ && (!s->cache || !s->stdvga) )
+    else if ( p->dir == IOREQ_READ &&
+              (!stdvga_cache_is_enabled(s) || !s->stdvga) )
         goto reject;
 
     /* s->lock intentionally held */

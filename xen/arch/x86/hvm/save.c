@@ -73,7 +73,7 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
     d->arch.hvm_domain.sync_tsc = rdtsc();
 
     /* VGA state is not saved/restored, so we nobble the cache. */
-    d->arch.hvm_domain.stdvga.cache = 0;
+    d->arch.hvm_domain.stdvga.cache = STDVGA_CACHE_DISABLED;
 
     return 0;
 }
