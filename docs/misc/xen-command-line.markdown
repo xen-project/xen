@@ -391,11 +391,12 @@ If set, force use of the performance counters for oprofile, rather than detectin
 available support.
 
 ### cpufreq
-> `= dom0-kernel | none | xen[,[powersave|performance|ondemand|userspace][,<maxfreq>][,[<minfreq>][,[verbose]]]]`
+> `= none | {{ <boolean> | xen } [:[powersave|performance|ondemand|userspace][,<maxfreq>][,[<minfreq>][,[verbose]]]]} | dom0-kernel`
 
 > Default: `xen`
 
-Indicate where the responsibility for driving power states lies.
+Indicate where the responsibility for driving power states lies.  Note that the
+choice of `dom0-kernel` is deprecated and not supported by all Dom0 kernels.
 
 * Default governor policy is ondemand.
 * `<maxfreq>` and `<minfreq>` are integers which represent max and min processor frequencies

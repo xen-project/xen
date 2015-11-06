@@ -64,9 +64,14 @@ enum cpufreq_controller cpufreq_controller = FREQCTL_xen;
 
 static void __init setup_cpufreq_option(char *str)
 {
-    char *arg;
+    char *arg = strpbrk(str, ",:");
+    int choice;
 
-    if ( !strcmp(str, "dom0-kernel") )
+    if ( arg )
+        *arg++ = '\0';
+    choice = parse_bool(str);
+
+    if ( choice < 0 && !strcmp(str, "dom0-kernel") )
     {
         xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
         cpufreq_controller = FREQCTL_dom0_kernel;
@@ -74,19 +79,20 @@ static void __init setup_cpufreq_option(char *str)
         return;
     }
 
-    if ( !strcmp(str, "none") )
+    if ( choice == 0 || !strcmp(str, "none") )
     {
         xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
         cpufreq_controller = FREQCTL_none;
         return;
     }
 
-    if ( (arg = strpbrk(str, ",:")) != NULL )
-        *arg++ = '\0';
-
-    if ( !strcmp(str, "xen") )
+    if ( choice > 0 || !strcmp(str, "xen") )
+    {
+        xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
+        cpufreq_controller = FREQCTL_xen;
         if ( arg && *arg )
             cpufreq_cmdline_parse(arg);
+    }
 }
 custom_param("cpufreq", setup_cpufreq_option);
 
