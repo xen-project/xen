@@ -578,6 +578,9 @@ void stdvga_init(struct domain *d)
     struct page_info *pg;
     unsigned int i;
 
+    if ( !has_vvga(d) )
+        return;
+
     memset(s, 0, sizeof(*s));
     spin_lock_init(&s->lock);
     
@@ -614,6 +617,9 @@ void stdvga_deinit(struct domain *d)
 {
     struct hvm_hw_stdvga *s = &d->arch.hvm_domain.stdvga;
     int i;
+
+    if ( !has_vvga(d) )
+        return;
 
     for ( i = 0; i != ARRAY_SIZE(s->vram_page); i++ )
     {
