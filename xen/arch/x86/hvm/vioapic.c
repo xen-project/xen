@@ -365,6 +365,8 @@ void vioapic_irq_positive_edge(struct domain *d, unsigned int irq)
     struct hvm_hw_vioapic *vioapic = domain_vioapic(d);
     union vioapic_redir_entry *ent;
 
+    ASSERT(has_vioapic(d));
+
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "irq %x", irq);
 
     ASSERT(irq < VIOAPIC_NUM_PINS);
@@ -391,6 +393,8 @@ void vioapic_update_EOI(struct domain *d, u8 vector)
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
     union vioapic_redir_entry *ent;
     int gsi;
+
+    ASSERT(has_vioapic(d));
 
     spin_lock(&d->arch.hvm_domain.irq_lock);
 
@@ -424,12 +428,20 @@ void vioapic_update_EOI(struct domain *d, u8 vector)
 static int ioapic_save(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_hw_vioapic *s = domain_vioapic(d);
+
+    if ( !has_vioapic(d) )
+        return 0;
+
     return hvm_save_entry(IOAPIC, 0, h, s);
 }
 
 static int ioapic_load(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_hw_vioapic *s = domain_vioapic(d);
+
+    if ( !has_vioapic(d) )
+        return -ENODEV;
+
     return hvm_load_entry(IOAPIC, h, s);
 }
 
@@ -440,6 +452,9 @@ void vioapic_reset(struct domain *d)
     struct hvm_vioapic *vioapic = d->arch.hvm_domain.vioapic;
     int i;
 
+    if ( !has_vioapic(d) )
+        return;
+
     memset(&vioapic->hvm_hw_vioapic, 0, sizeof(vioapic->hvm_hw_vioapic));
     for ( i = 0; i < VIOAPIC_NUM_PINS; i++ )
         vioapic->hvm_hw_vioapic.redirtbl[i].fields.mask = 1;
@@ -448,6 +463,9 @@ void vioapic_reset(struct domain *d)
 
 int vioapic_init(struct domain *d)
 {
+    if ( !has_vioapic(d) )
+        return 0;
+
     if ( (d->arch.hvm_domain.vioapic == NULL) &&
          ((d->arch.hvm_domain.vioapic = xmalloc(struct hvm_vioapic)) == NULL) )
         return -ENOMEM;
@@ -462,6 +480,9 @@ int vioapic_init(struct domain *d)
 
 void vioapic_deinit(struct domain *d)
 {
+    if ( !has_vioapic(d) )
+        return;
+
     xfree(d->arch.hvm_domain.vioapic);
     d->arch.hvm_domain.vioapic = NULL;
 }
