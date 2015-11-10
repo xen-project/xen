@@ -67,6 +67,10 @@ static void pmt_update_sci(PMTState *s)
 void hvm_acpi_power_button(struct domain *d)
 {
     PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
+
+    if ( !has_vpm(d) )
+        return;
+
     spin_lock(&s->lock);
     s->pm.pm1a_sts |= PWRBTN_STS;
     pmt_update_sci(s);
@@ -76,6 +80,10 @@ void hvm_acpi_power_button(struct domain *d)
 void hvm_acpi_sleep_button(struct domain *d)
 {
     PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
+
+    if ( !has_vpm(d) )
+        return;
+
     spin_lock(&s->lock);
     s->pm.pm1a_sts |= SLPBTN_STS;
     pmt_update_sci(s);
@@ -247,6 +255,9 @@ static int pmtimer_save(struct domain *d, hvm_domain_context_t *h)
     uint32_t x, msb = s->pm.tmr_val & TMR_VAL_MSB;
     int rc;
 
+    if ( !has_vpm(d) )
+        return 0;
+
     spin_lock(&s->lock);
 
     /*
@@ -272,6 +283,9 @@ static int pmtimer_save(struct domain *d, hvm_domain_context_t *h)
 static int pmtimer_load(struct domain *d, hvm_domain_context_t *h)
 {
     PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
+
+    if ( !has_vpm(d) )
+        return -ENODEV;
 
     spin_lock(&s->lock);
 
@@ -300,6 +314,9 @@ HVM_REGISTER_SAVE_RESTORE(PMTIMER, pmtimer_save, pmtimer_load,
 int pmtimer_change_ioport(struct domain *d, unsigned int version)
 {
     unsigned int old_version;
+
+    if ( !has_vpm(d) )
+        return -ENODEV;
 
     /* Check that version is changing. */
     old_version = d->arch.hvm_domain.params[HVM_PARAM_ACPI_IOPORTS_LOCATION];
@@ -330,6 +347,9 @@ void pmtimer_init(struct vcpu *v)
 {
     PMTState *s = &v->domain->arch.hvm_domain.pl_time.vpmt;
 
+    if ( !has_vpm(v->domain) )
+        return;
+
     spin_lock_init(&s->lock);
 
     s->scale = ((uint64_t)FREQUENCE_PMTIMER << 32) / SYSTEM_TIME_HZ;
@@ -350,11 +370,18 @@ void pmtimer_init(struct vcpu *v)
 void pmtimer_deinit(struct domain *d)
 {
     PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
+
+    if ( !has_vpm(d) )
+        return;
+
     kill_timer(&s->timer);
 }
 
 void pmtimer_reset(struct domain *d)
 {
+    if ( !has_vpm(d) )
+        return;
+
     /* Reset the counter. */
     d->arch.hvm_domain.pl_time.vpmt.pm.tmr_val = 0;
 }
