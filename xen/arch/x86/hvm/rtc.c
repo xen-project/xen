@@ -726,6 +726,9 @@ void rtc_migrate_timers(struct vcpu *v)
 {
     RTCState *s = vcpu_vrtc(v);
 
+    if ( !has_vrtc(v->domain) )
+        return;
+
     if ( v->vcpu_id == 0 )
     {
         migrate_timer(&s->update_timer, v->processor);;
@@ -739,6 +742,10 @@ static int rtc_save(struct domain *d, hvm_domain_context_t *h)
 {
     RTCState *s = domain_vrtc(d);
     int rc;
+
+    if ( !has_vrtc(d) )
+        return 0;
+
     spin_lock(&s->lock);
     rc = hvm_save_entry(RTC, 0, h, &s->hw);
     spin_unlock(&s->lock);
@@ -749,6 +756,9 @@ static int rtc_save(struct domain *d, hvm_domain_context_t *h)
 static int rtc_load(struct domain *d, hvm_domain_context_t *h)
 {
     RTCState *s = domain_vrtc(d);
+
+    if ( !has_vrtc(d) )
+        return -ENODEV;
 
     spin_lock(&s->lock);
 
@@ -780,6 +790,9 @@ void rtc_reset(struct domain *d)
 {
     RTCState *s = domain_vrtc(d);
 
+    if ( !has_vrtc(d) )
+        return;
+
     TRACE_0D(TRC_HVM_EMUL_RTC_STOP_TIMER);
     destroy_periodic_time(&s->pt);
     s->period = 0;
@@ -789,6 +802,9 @@ void rtc_reset(struct domain *d)
 void rtc_init(struct domain *d)
 {
     RTCState *s = domain_vrtc(d);
+
+    if ( !has_vrtc(d) )
+        return;
 
     spin_lock_init(&s->lock);
 
@@ -820,6 +836,9 @@ void rtc_deinit(struct domain *d)
 {
     RTCState *s = domain_vrtc(d);
 
+    if ( !has_vrtc(d) )
+        return;
+
     spin_barrier(&s->lock);
 
     TRACE_0D(TRC_HVM_EMUL_RTC_STOP_TIMER);
@@ -832,6 +851,9 @@ void rtc_deinit(struct domain *d)
 void rtc_update_clock(struct domain *d)
 {
     RTCState *s = domain_vrtc(d);
+
+    if ( !has_vrtc(d) )
+        return;
 
     spin_lock(&s->lock);
     s->current_tm = gmtime(get_localtime(d));
