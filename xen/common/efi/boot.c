@@ -635,8 +635,8 @@ static void __init efi_console_set_mode(void)
 static EFI_GRAPHICS_OUTPUT_PROTOCOL __init *efi_get_gop(void)
 {
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
-    EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
-    EFI_HANDLE *handles;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
+    EFI_HANDLE *handles = NULL;
     EFI_STATUS status;
     UINTN info_size, size = 0;
     static EFI_GUID __initdata gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
