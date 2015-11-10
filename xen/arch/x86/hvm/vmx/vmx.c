@@ -1122,18 +1122,12 @@ static void vmx_update_host_cr3(struct vcpu *v)
 
 void vmx_update_debug_state(struct vcpu *v)
 {
-    unsigned long mask;
-
     ASSERT(v == current);
 
-    mask = 1u << TRAP_int3;
-    if ( !cpu_has_monitor_trap_flag )
-        mask |= 1u << TRAP_debug;
-
     if ( v->arch.hvm_vcpu.debug_state_latch )
-        v->arch.hvm_vmx.exception_bitmap |= mask;
+        v->arch.hvm_vmx.exception_bitmap |= 1U << TRAP_int3;
     else
-        v->arch.hvm_vmx.exception_bitmap &= ~mask;
+        v->arch.hvm_vmx.exception_bitmap &= ~(1U << TRAP_int3);
     vmx_update_exception_bitmap(v);
 }
 
@@ -2616,9 +2610,10 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             exit_qualification = __vmread(EXIT_QUALIFICATION);
             HVMTRACE_1D(TRAP_DEBUG, exit_qualification);
             write_debugreg(6, exit_qualification | 0xffff0ff0);
-            if ( !v->domain->debugger_attached || cpu_has_monitor_trap_flag )
-                goto exit_and_crash;
-            domain_pause_for_debugger();
+            if ( !v->domain->debugger_attached )
+                hvm_inject_hw_exception(vector, HVM_DELIVER_NO_ERROR_CODE);
+            else
+                domain_pause_for_debugger();
             break;
         case TRAP_int3: 
         {
@@ -2678,6 +2673,11 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             }
 
             hvm_inject_page_fault(regs->error_code, exit_qualification);
+            break;
+        case TRAP_alignment_check:
+            HVMTRACE_1D(TRAP, vector);
+            hvm_inject_hw_exception(vector,
+                                    __vmread(VM_EXIT_INTR_ERROR_CODE));
             break;
         case TRAP_nmi:
             if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) !=
