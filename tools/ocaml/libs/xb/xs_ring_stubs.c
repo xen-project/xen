@@ -50,7 +50,7 @@ CAMLprim value ml_interface_read(value ml_interface,
 
 	struct xenstore_domain_interface *intf = interface->addr;
 	XENSTORE_RING_IDX cons, prod; /* offsets only */
-	int to_read;
+	int total_data, data;
 	uint32_t connection;
 
 	cons = *(volatile uint32_t*)&intf->req_cons;
@@ -65,19 +65,28 @@ CAMLprim value ml_interface_read(value ml_interface,
 	if ((prod - cons) > XENSTORE_RING_SIZE)
 		caml_failwith("bad connection");
 
-	if (prod == cons) {
+	/* Check for any pending data at all. */
+	total_data = prod - cons;
+	if (total_data == 0) {
+		/* No pending data at all. */
 		result = 0;
 		goto exit;
 	}
-	cons = MASK_XENSTORE_IDX(cons);
-	prod = MASK_XENSTORE_IDX(prod);
-	if (prod > cons)
-		to_read = prod - cons;
-	else
-		to_read = XENSTORE_RING_SIZE - cons;
-	if (to_read < len)
-		len = to_read;
-	memcpy(buffer, intf->req + cons, len);
+	else if (total_data < len)
+		/* Some data - make a partial read. */
+		len = total_data;
+
+	/* Check whether data crosses the end of the ring. */
+	data = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(cons);
+	if (len < data)
+		/* Data within the remaining part of the ring. */
+		memcpy(buffer, intf->req + MASK_XENSTORE_IDX(cons), len);
+	else {
+		/* Data crosses the ring boundary. Read both halves. */
+		memcpy(buffer, intf->req + MASK_XENSTORE_IDX(cons), data);
+		memcpy(buffer + data, intf->req, len - data);
+	}
+
 	xen_mb();
 	intf->req_cons += len;
 	result = len;
@@ -100,7 +109,7 @@ CAMLprim value ml_interface_write(value ml_interface,
 
 	struct xenstore_domain_interface *intf = interface->addr;
 	XENSTORE_RING_IDX cons, prod;
-	int can_write;
+	int total_space, space;
 	uint32_t connection;
 
 	cons = *(volatile uint32_t*)&intf->rsp_cons;
@@ -111,17 +120,32 @@ CAMLprim value ml_interface_write(value ml_interface,
 		caml_raise_constant(*caml_named_value("Xb.Reconnect"));
 
 	xen_mb();
-	if ( (prod - cons) >= XENSTORE_RING_SIZE ) {
+
+	if ((prod - cons) > XENSTORE_RING_SIZE)
+		caml_failwith("bad connection");
+
+	/* Check for space to write the full message. */
+	total_space = XENSTORE_RING_SIZE - (prod - cons);
+	if (total_space == 0) {
+		/* No space at all - exit having done nothing. */
 		result = 0;
 		goto exit;
 	}
-	if (MASK_XENSTORE_IDX(prod) >= MASK_XENSTORE_IDX(cons))
-		can_write = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(prod);
-	else 
-		can_write = MASK_XENSTORE_IDX(cons) - MASK_XENSTORE_IDX(prod);
-	if (can_write < len)
-		len = can_write;
-	memcpy(intf->rsp + MASK_XENSTORE_IDX(prod), buffer, len);
+	else if (total_space < len)
+		/* Some space - make a partial write. */
+		len = total_space;
+
+	/* Check for space until the ring wraps. */
+	space = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(prod);
+	if (len < space)
+		/* Message fits inside the remaining part of the ring. */
+		memcpy(intf->rsp + MASK_XENSTORE_IDX(prod), buffer, len);
+	else {
+		/* Message wraps around the end of the ring. Write both halves. */
+		memcpy(intf->rsp + MASK_XENSTORE_IDX(prod), buffer, space);
+		memcpy(intf->rsp, buffer + space, len - space);
+	}
+
 	xen_mb();
 	intf->rsp_prod += len;
 	result = len;
