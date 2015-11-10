@@ -385,7 +385,10 @@ static inline int hvm_event_pending(struct vcpu *v)
     (X86_CR4_VMXE | X86_CR4_PAE | X86_CR4_MCE))
 
 /* These exceptions must always be intercepted. */
-#define HVM_TRAP_MASK ((1U << TRAP_machine_check) | (1U << TRAP_invalid_op))
+#define HVM_TRAP_MASK ((1U << TRAP_debug)           | \
+                       (1U << TRAP_invalid_op)      | \
+                       (1U << TRAP_alignment_check) | \
+                       (1U << TRAP_machine_check))
 
 /*
  * x86 event types. This enumeration is valid for:
