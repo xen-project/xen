@@ -496,6 +496,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     int i, paging_initialised = 0;
     int rc = -ENOMEM;
 
+    if ( config == NULL && !is_idle_domain(d) )
+        return -EINVAL;
+
     d->arch.s3_integrity = !!(domcr_flags & DOMCRF_s3_integrity);
 
     INIT_LIST_HEAD(&d->arch.pdev_list);
@@ -515,6 +518,30 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         printk(XENLOG_G_WARNING
                "Dom%d may compromise security on this CPU.\n",
                d->domain_id);
+    }
+
+    if ( is_idle_domain(d) )
+    {
+        d->arch.emulation_flags = 0;
+    }
+    else
+    {
+        if ( (config->emulation_flags & ~XEN_X86_EMU_ALL) != 0 )
+        {
+            printk(XENLOG_G_ERR "d%d: Invalid emulation bitmap: %#x\n",
+                   d->domain_id, config->emulation_flags);
+            return -EINVAL;
+        }
+        if ( is_hvm_domain(d) ? (config->emulation_flags != XEN_X86_EMU_ALL)
+                              : (config->emulation_flags != 0) )
+        {
+            printk(XENLOG_G_ERR "d%d: Xen does not allow %s domain creation "
+                   "with the current selection of emulators: %#x\n",
+                   d->domain_id, is_hvm_domain(d) ? "HVM" : "PV",
+                   config->emulation_flags);
+            return -EOPNOTSUPP;
+        }
+        d->arch.emulation_flags = config->emulation_flags;
     }
 
     if ( has_hvm_container_domain(d) )

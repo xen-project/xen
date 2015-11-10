@@ -1474,7 +1474,6 @@ void __init scheduler_init(void)
         sched_ratelimit_us = SCHED_DEFAULT_RATELIMIT_US;
     }
 
-    /* There is no need of arch-specific configuration for an idle domain */
     idle_domain = domain_create(DOMID_IDLE, 0, 0, NULL);
     BUG_ON(IS_ERR(idle_domain));
     idle_domain->vcpu = idle_vcpu;

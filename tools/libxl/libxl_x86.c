@@ -7,7 +7,10 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
                                       libxl_domain_config *d_config,
                                       xc_domain_configuration_t *xc_config)
 {
-    /* No specific configuration right now */
+    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM)
+        xc_config->emulation_flags = XEN_X86_EMU_ALL;
+    else
+        xc_config->emulation_flags = 0;
 
     return 0;
 }

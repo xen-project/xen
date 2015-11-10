@@ -582,6 +582,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         .parity    = 'n',
         .stop_bits = 1
     };
+    struct xen_arch_domainconfig config = { .emulation_flags = 0 };
 
     /* Critical region without IDT or TSS.  Any fault is deadly! */
 
@@ -1390,7 +1391,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
      * x86 doesn't support arch-configuration. So it's fine to pass
      * NULL.
      */
-    dom0 = domain_create(0, domcr_flags, 0, NULL);
+    dom0 = domain_create(0, domcr_flags, 0, &config);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
         panic("Error creating domain 0");
 
