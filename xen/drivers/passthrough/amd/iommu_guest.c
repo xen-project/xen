@@ -887,7 +887,8 @@ int guest_iommu_init(struct domain* d)
     struct guest_iommu *iommu;
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
 
-    if ( !is_hvm_domain(d) || !iommu_enabled || !iommuv2_enabled )
+    if ( !is_hvm_domain(d) || !iommu_enabled || !iommuv2_enabled ||
+         !has_viommu(d) )
         return 0;
 
     iommu = xzalloc(struct guest_iommu);
