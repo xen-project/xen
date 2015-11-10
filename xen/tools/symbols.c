@@ -177,8 +177,8 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 	rc = 0;
 
  skip_tail:
-	if (input_format == fmt_sysv)
-		fgets(str, 500, in); /* discard rest of line */
+	if ((input_format == fmt_sysv) && fgets(str, 500, in) == NULL)
+		/* ignore errors while discarding rest of line */;
 
 	return rc;
 }
