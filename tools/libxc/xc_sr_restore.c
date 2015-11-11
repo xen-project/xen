@@ -341,7 +341,7 @@ static int process_page_data(struct xc_sr_context *ctx, unsigned count,
         if ( map_errs[j] )
         {
             rc = -1;
-            ERROR("Mapping pfn %lx (mfn %lx, type %#x)failed with %d",
+            ERROR("Mapping pfn %#"PRIpfn" (mfn %#"PRIpfn", type %#"PRIx32") failed with %d",
                   pfns[i], mfns[j], types[i], map_errs[j]);
             goto err;
         }
@@ -350,7 +350,7 @@ static int process_page_data(struct xc_sr_context *ctx, unsigned count,
         rc = ctx->restore.ops.localise_page(ctx, types[i], page_data);
         if ( rc )
         {
-            ERROR("Failed to localise pfn %lx (type %#x)",
+            ERROR("Failed to localise pfn %#"PRIpfn" (type %#"PRIx32")",
                   pfns[i], types[i] >> XEN_DOMCTL_PFINFO_LTAB_SHIFT);
             goto err;
         }
@@ -359,7 +359,7 @@ static int process_page_data(struct xc_sr_context *ctx, unsigned count,
         {
             /* Verify mode - compare incoming data to what we already have. */
             if ( memcmp(guest_page, page_data, PAGE_SIZE) )
-                ERROR("verify pfn %lx failed (type %#x)",
+                ERROR("verify pfn %#"PRIpfn" failed (type %#"PRIx32")",
                       pfns[i], types[i] >> XEN_DOMCTL_PFINFO_LTAB_SHIFT);
         }
         else
@@ -432,7 +432,7 @@ static int handle_page_data(struct xc_sr_context *ctx, struct xc_sr_record *rec)
         pfn = pages->pfn[i] & PAGE_DATA_PFN_MASK;
         if ( !ctx->restore.ops.pfn_is_valid(ctx, pfn) )
         {
-            ERROR("pfn %#lx (index %u) outside domain maximum", pfn, i);
+            ERROR("pfn %#"PRIpfn" (index %u) outside domain maximum", pfn, i);
             goto err;
         }
 
@@ -440,7 +440,8 @@ static int handle_page_data(struct xc_sr_context *ctx, struct xc_sr_record *rec)
         if ( ((type >> XEN_DOMCTL_PFINFO_LTAB_SHIFT) >= 5) &&
              ((type >> XEN_DOMCTL_PFINFO_LTAB_SHIFT) <= 8) )
         {
-            ERROR("Invalid type %#x for pfn %#lx (index %u)", type, pfn, i);
+            ERROR("Invalid type %#"PRIx32" for pfn %#"PRIpfn" (index %u)",
+                  type, pfn, i);
             goto err;
         }
         else if ( type < XEN_DOMCTL_PFINFO_BROKEN )
@@ -775,12 +776,12 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             return -1;
     }
 
-    IPRINTF("XenStore: mfn %#lx, dom %d, evt %u",
+    IPRINTF("XenStore: mfn %#"PRIpfn", dom %d, evt %u",
             ctx.restore.xenstore_gfn,
             ctx.restore.xenstore_domid,
             ctx.restore.xenstore_evtchn);
 
-    IPRINTF("Console: mfn %#lx, dom %d, evt %u",
+    IPRINTF("Console: mfn %#"PRIpfn", dom %d, evt %u",
             ctx.restore.console_gfn,
             ctx.restore.console_domid,
             ctx.restore.console_evtchn);

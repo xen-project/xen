@@ -174,7 +174,7 @@ static int write_batch(struct xc_sr_context *ctx)
 
             if ( errors[p] )
             {
-                ERROR("Mapping of pfn %#lx (mfn %#lx) failed %d",
+                ERROR("Mapping of pfn %#"PRIpfn" (mfn %#"PRIpfn") failed %d",
                       ctx->save.batch_pfns[i], mfns[p], errors[p]);
                 goto err;
             }
