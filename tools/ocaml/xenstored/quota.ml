@@ -83,6 +83,6 @@ let add quota diff =
 	Hashtbl.iter (fun id nb -> set_entry quota id (get_entry quota id + nb)) diff.cur
 
 let merge orig_quota mod_quota dest_quota =
-	  Hashtbl.iter (fun id nb -> let diff = nb - (get_entry orig_quota id) in
+	  Hashtbl.iter (fun id nb -> let diff = nb - (try get_entry orig_quota id with Not_found -> 0) in
 				if diff <> 0 then
-					set_entry dest_quota id ((get_entry dest_quota id) + diff)) mod_quota.cur
+					set_entry dest_quota id ((try get_entry dest_quota id with Not_found -> 0) + diff)) mod_quota.cur
