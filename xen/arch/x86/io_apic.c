@@ -958,8 +958,12 @@ static hw_irq_controller ioapic_edge_type;
 #define IOAPIC_EDGE	0
 #define IOAPIC_LEVEL	1
 
-#define SET_DEST(x, y, value) \
-    do { if ( x2apic_enabled ) x = value; else y = value; } while(0)
+#define SET_DEST(ent, mode, val) do { \
+    if (x2apic_enabled) \
+        (ent).dest.dest32 = (val); \
+    else \
+        (ent).dest.mode.mode##_dest = (val); \
+} while (0)
 
 static inline void ioapic_register_intr(int irq, unsigned long trigger)
 {
@@ -1035,8 +1039,7 @@ static void __init setup_IO_APIC_irqs(void)
                 disable_8259A_irq(irq_to_desc(irq));
 
             desc = irq_to_desc(irq);
-            SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
-                     cpu_mask_to_apicid(desc->arch.cpu_mask));
+            SET_DEST(entry, logical, cpu_mask_to_apicid(desc->arch.cpu_mask));
             spin_lock_irqsave(&ioapic_lock, flags);
             __ioapic_write_entry(apic, pin, 0, entry);
             set_native_irq_info(irq, TARGET_CPUS);
@@ -1068,8 +1071,7 @@ static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, in
      */
     entry.dest_mode = INT_DEST_MODE;
     entry.mask = 0;					/* unmask IRQ now */
-    SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
-        cpu_mask_to_apicid(TARGET_CPUS));
+    SET_DEST(entry, logical, cpu_mask_to_apicid(TARGET_CPUS));
     entry.delivery_mode = INT_DELIVERY_MODE;
     entry.polarity = 0;
     entry.trigger = 0;
@@ -1349,8 +1351,7 @@ void disable_IO_APIC(void)
         entry.dest_mode       = 0; /* Physical */
         entry.delivery_mode   = dest_ExtINT; /* ExtInt */
         entry.vector          = 0;
-        SET_DEST(entry.dest.dest32, entry.dest.physical.physical_dest,
-            get_apic_id());
+        SET_DEST(entry, physical, get_apic_id());
 
         /*
          * Add it to the IO-APIC irq-routing table:
@@ -1842,8 +1843,7 @@ static void __init unlock_ExtINT_logic(void)
 
     entry1.dest_mode = 0;			/* physical delivery */
     entry1.mask = 0;			/* unmask IRQ now */
-    SET_DEST(entry1.dest.dest32, entry1.dest.physical.physical_dest,
-        hard_smp_processor_id());
+    SET_DEST(entry1, physical, hard_smp_processor_id());
     entry1.delivery_mode = dest_ExtINT;
     entry1.polarity = entry0.polarity;
     entry1.trigger = 0;
@@ -2237,8 +2237,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
     entry.vector = vector;
 
     cpumask_and(&mask, desc->arch.cpu_mask, TARGET_CPUS);
-    SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
-             cpu_mask_to_apicid(&mask));
+    SET_DEST(entry, logical, cpu_mask_to_apicid(&mask));
 
     apic_printk(APIC_DEBUG, KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry "
 		"(%d-%d -> %#x -> IRQ %d Mode:%i Active:%i)\n", ioapic,
@@ -2431,8 +2430,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     /* Set the vector field to the real vector! */
     rte.vector = desc->arch.vector;
 
-    SET_DEST(rte.dest.dest32, rte.dest.logical.logical_dest,
-             cpu_mask_to_apicid(desc->arch.cpu_mask));
+    SET_DEST(rte, logical, cpu_mask_to_apicid(desc->arch.cpu_mask));
 
     __ioapic_write_entry(apic, pin, 0, rte);
     
