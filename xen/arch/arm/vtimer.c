@@ -29,9 +29,6 @@
 #include <asm/vgic.h>
 #include <asm/regs.h>
 
-extern s_time_t ticks_to_ns(uint64_t ticks);
-extern uint64_t ns_to_ticks(s_time_t ns);
-
 /*
  * Check if regs is allowed access, user_gate is tail end of a
  * CNTKCTL_EL1_ bit name which gates user access
