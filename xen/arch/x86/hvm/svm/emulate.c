@@ -47,12 +47,17 @@ static unsigned int is_prefix(u8 opc)
     return 0;
 }
 
-static unsigned long svm_rip2pointer(struct vcpu *v)
+static unsigned long svm_rip2pointer(struct vcpu *v, unsigned long *limit)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned long p = vmcb->cs.base + guest_cpu_user_regs()->eip;
+    unsigned long p = vmcb->cs.base + vmcb->rip;
+
     if ( !(vmcb->cs.attr.fields.l && hvm_long_mode_enabled(v)) )
+    {
+        *limit = vmcb->cs.limit;
         return (u32)p; /* mask to 32 bits */
+    }
+    *limit = ~0UL;
     return p;
 }
 
@@ -125,11 +130,10 @@ static const u8 *const opc_bytes[INSTR_MAX_COUNT] =
     [INSTR_INVLPGA] = OPCODE_INVLPGA,
 };
 
-static int fetch(struct vcpu *v, u8 *buf, unsigned long addr, int len)
+static bool_t fetch(const struct vmcb_struct *vmcb, u8 *buf,
+                    unsigned long addr, unsigned int len)
 {
-    uint32_t pfec;
-
-    pfec = (vmcb_get_cpl(v->arch.hvm_svm.vmcb) == 3) ? PFEC_user_mode : 0;
+    uint32_t pfec = (vmcb_get_cpl(vmcb) == 3) ? PFEC_user_mode : 0;
 
     switch ( hvm_fetch_from_guest_virt(buf, addr, len, pfec) )
     {
@@ -141,7 +145,7 @@ static int fetch(struct vcpu *v, u8 *buf, unsigned long addr, int len)
     default:
         /* Not OK: fetches from non-RAM pages are not supportable. */
         gdprintk(XENLOG_WARNING, "Bad instruction fetch at %#lx (%#lx)\n",
-                 (unsigned long) guest_cpu_user_regs()->eip, addr);
+                 vmcb->rip, addr);
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
         return 0;
     }
@@ -156,8 +160,8 @@ int __get_instruction_length_from_list(struct vcpu *v,
     enum instruction_index instr = 0;
     u8 buf[MAX_INST_LEN];
     const u8 *opcode = NULL;
-    unsigned long fetch_addr;
-    unsigned int fetch_len;
+    unsigned long fetch_addr, fetch_limit;
+    unsigned int fetch_len, max_len;
 
     if ( (inst_len = svm_nextrip_insn_length(v)) != 0 )
         return inst_len;
@@ -167,21 +171,24 @@ int __get_instruction_length_from_list(struct vcpu *v,
 
     /* Fetch up to the next page break; we'll fetch from the next page
      * later if we have to. */
-    fetch_addr = svm_rip2pointer(v);
-    fetch_len = min_t(unsigned int, MAX_INST_LEN,
+    fetch_addr = svm_rip2pointer(v, &fetch_limit);
+    if ( vmcb->rip > fetch_limit )
+        return 0;
+    max_len = min(fetch_limit - vmcb->rip + 1, MAX_INST_LEN + 0UL);
+    fetch_len = min_t(unsigned int, max_len,
                       PAGE_SIZE - (fetch_addr & ~PAGE_MASK));
-    if ( !fetch(v, buf, fetch_addr, fetch_len) )
+    if ( !fetch(vmcb, buf, fetch_addr, fetch_len) )
         return 0;
 
-    while ( (inst_len < MAX_INST_LEN) && is_prefix(buf[inst_len]) )
+    while ( (inst_len < max_len) && is_prefix(buf[inst_len]) )
     {
         inst_len++;
         if ( inst_len >= fetch_len )
         {
-            if ( !fetch(v, buf + fetch_len, fetch_addr + fetch_len,
-                        MAX_INST_LEN - fetch_len) )
+            if ( !fetch(vmcb, buf + fetch_len, fetch_addr + fetch_len,
+                        max_len - fetch_len) )
                 return 0;
-            fetch_len = MAX_INST_LEN;
+            fetch_len = max_len;
         }
     }
 
@@ -190,15 +197,14 @@ int __get_instruction_length_from_list(struct vcpu *v,
         instr = list[j];
         opcode = opc_bytes[instr];
 
-        for ( i = 0; (i < opcode[0]) && ((inst_len + i) < MAX_INST_LEN); i++ )
+        for ( i = 0; (i < opcode[0]) && ((inst_len + i) < max_len); i++ )
         {
             if ( (inst_len + i) >= fetch_len ) 
-            { 
-                if ( !fetch(v, buf + fetch_len, 
-                            fetch_addr + fetch_len, 
-                            MAX_INST_LEN - fetch_len) ) 
+            {
+                if ( !fetch(vmcb, buf + fetch_len, fetch_addr + fetch_len,
+                            max_len - fetch_len) )
                     return 0;
-                fetch_len = MAX_INST_LEN;
+                fetch_len = max_len;
             }
 
             if ( buf[inst_len+i] != opcode[i+1] )
@@ -216,7 +222,7 @@ int __get_instruction_length_from_list(struct vcpu *v,
 
  done:
     inst_len += opcode[0];
-    ASSERT(inst_len <= MAX_INST_LEN);
+    ASSERT(inst_len <= max_len);
     return inst_len;
 }
 

@@ -551,7 +551,7 @@ static inline void vmcb_set_##_name(struct vmcb_struct *vmcb, _type value)  \
     vmcb->_##_name = value;                                                 \
     vmcb->cleanbits.fields._cleanbit = 0;                                   \
 }                                                                           \
-static inline _type vmcb_get_##_name(struct vmcb_struct *vmcb)              \
+static inline _type vmcb_get_##_name(const struct vmcb_struct *vmcb)        \
 {                                                                           \
     return vmcb->_##_name;                                                  \
 }
