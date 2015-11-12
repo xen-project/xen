@@ -535,62 +535,88 @@ void *xc_dom_pfn_to_ptr_retcount(struct xc_dom_image *dom, xen_pfn_t pfn,
     return phys->ptr;
 }
 
+static int xc_dom_chk_alloc_pages(struct xc_dom_image *dom, char *name,
+                                  xen_pfn_t pages)
+{
+    unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
+
+    if ( pages > dom->total_pages || /* multiple test avoids overflow probs */
+         dom->pfn_alloc_end - dom->rambase_pfn > dom->total_pages ||
+         pages > dom->total_pages - dom->pfn_alloc_end + dom->rambase_pfn )
+    {
+        xc_dom_panic(dom->xch, XC_OUT_OF_MEMORY,
+                     "%s: segment %s too large (0x%"PRIpfn" > "
+                     "0x%"PRIpfn" - 0x%"PRIpfn" pages)", __FUNCTION__, name,
+                     pages, dom->total_pages,
+                     dom->pfn_alloc_end - dom->rambase_pfn);
+        return -1;
+    }
+
+    dom->pfn_alloc_end += pages;
+    dom->virt_alloc_end += pages * page_size;
+
+    return 0;
+}
+
+static int xc_dom_alloc_pad(struct xc_dom_image *dom, xen_vaddr_t boundary)
+{
+    unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
+    xen_pfn_t pages;
+
+    if ( boundary & (page_size - 1) )
+    {
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "%s: segment boundary isn't page aligned (0x%" PRIx64 ")",
+                     __FUNCTION__, boundary);
+        return -1;
+    }
+    if ( boundary < dom->virt_alloc_end )
+    {
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "%s: segment boundary too low (0x%" PRIx64 " < 0x%" PRIx64
+                     ")", __FUNCTION__, boundary, dom->virt_alloc_end);
+        return -1;
+    }
+    pages = (boundary - dom->virt_alloc_end) / page_size;
+
+    return xc_dom_chk_alloc_pages(dom, "padding", pages);
+}
+
 int xc_dom_alloc_segment(struct xc_dom_image *dom,
                          struct xc_dom_seg *seg, char *name,
                          xen_vaddr_t start, xen_vaddr_t size)
 {
     unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
-    xen_pfn_t pages = (size + page_size - 1) / page_size;
-    xen_pfn_t pfn;
+    xen_pfn_t pages;
     void *ptr;
 
-    if ( start == 0 )
-        start = dom->virt_alloc_end;
-
-    if ( start & (page_size - 1) )
-    {
-        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "%s: segment start isn't page aligned (0x%" PRIx64 ")",
-                     __FUNCTION__, start);
+    if ( start && xc_dom_alloc_pad(dom, start) )
         return -1;
-    }
-    if ( start < dom->virt_alloc_end )
-    {
-        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "%s: segment start too low (0x%" PRIx64 " < 0x%" PRIx64
-                     ")", __FUNCTION__, start, dom->virt_alloc_end);
+
+    pages = (size + page_size - 1) / page_size;
+    start = dom->virt_alloc_end;
+
+    seg->pfn = dom->pfn_alloc_end;
+    seg->pages = pages;
+
+    if ( xc_dom_chk_alloc_pages(dom, name, pages) )
         return -1;
-    }
 
-    seg->vstart = start;
-    pfn = (seg->vstart - dom->parms.virt_base) / page_size;
-    seg->pfn = pfn + dom->rambase_pfn;
-
-    if ( pages > dom->total_pages || /* multiple test avoids overflow probs */
-         pfn > dom->total_pages ||
-         pages > dom->total_pages - pfn)
-    {
-        xc_dom_panic(dom->xch, XC_OUT_OF_MEMORY,
-                     "%s: segment %s too large (0x%"PRIpfn" > "
-                     "0x%"PRIpfn" - 0x%"PRIpfn" pages)",
-                     __FUNCTION__, name, pages, dom->total_pages, pfn);
-        return -1;
-    }
-
-    seg->vend = start + pages * page_size;
-    dom->virt_alloc_end = seg->vend;
     if (dom->allocate)
-        dom->allocate(dom, dom->virt_alloc_end);
-
-    DOMPRINTF("%-20s:   %-12s : 0x%" PRIx64 " -> 0x%" PRIx64
-              "  (pfn 0x%" PRIpfn " + 0x%" PRIpfn " pages)",
-              __FUNCTION__, name, seg->vstart, seg->vend, seg->pfn, pages);
+        dom->allocate(dom);
 
     /* map and clear pages */
     ptr = xc_dom_seg_to_ptr(dom, seg);
     if ( ptr == NULL )
         return -1;
     memset(ptr, 0, pages * page_size);
+
+    seg->vstart = start;
+    seg->vend = dom->virt_alloc_end;
+
+    DOMPRINTF("%-20s:   %-12s : 0x%" PRIx64 " -> 0x%" PRIx64
+              "  (pfn 0x%" PRIpfn " + 0x%" PRIpfn " pages)",
+              __FUNCTION__, name, seg->vstart, seg->vend, seg->pfn, pages);
 
     return 0;
 }
@@ -602,10 +628,11 @@ int xc_dom_alloc_page(struct xc_dom_image *dom, char *name)
     xen_pfn_t pfn;
 
     start = dom->virt_alloc_end;
+    pfn = dom->pfn_alloc_end - dom->rambase_pfn;
     dom->virt_alloc_end += page_size;
-    if (dom->allocate)
-        dom->allocate(dom, dom->virt_alloc_end);
-    pfn = (start - dom->parms.virt_base) / page_size;
+    dom->pfn_alloc_end++;
+    if ( dom->allocate )
+        dom->allocate(dom);
 
     DOMPRINTF("%-20s:   %-12s : 0x%" PRIx64 " (pfn 0x%" PRIpfn ")",
               __FUNCTION__, name, start, pfn);
@@ -886,6 +913,7 @@ int xc_dom_parse_image(struct xc_dom_image *dom)
 int xc_dom_rambase_init(struct xc_dom_image *dom, uint64_t rambase)
 {
     dom->rambase_pfn = rambase >> XC_PAGE_SHIFT;
+    dom->pfn_alloc_end = dom->rambase_pfn;
     DOMPRINTF("%s: RAM starts at %"PRI_xen_pfn,
               __FUNCTION__, dom->rambase_pfn);
     return 0;
@@ -1013,6 +1041,8 @@ int xc_dom_build_image(struct xc_dom_image *dom)
         goto err;
     }
     page_size = XC_DOM_PAGE_SIZE(dom);
+    if ( dom->parms.virt_base != UNSET_ADDR )
+        dom->virt_alloc_end = dom->parms.virt_base;
 
     /* load kernel */
     if ( xc_dom_alloc_segment(dom, &dom->kernel_seg, "kernel",
@@ -1067,6 +1097,11 @@ int xc_dom_build_image(struct xc_dom_image *dom)
               __FUNCTION__, dom->virt_alloc_end);
     DOMPRINTF("%-20s: virt_pgtab_end : 0x%" PRIx64 "",
               __FUNCTION__, dom->virt_pgtab_end);
+
+    /* Make sure all memory mapped by initial page tables is available */
+    if ( dom->virt_pgtab_end && xc_dom_alloc_pad(dom, dom->virt_pgtab_end) )
+        return -1;
+
     return 0;
 
  err:

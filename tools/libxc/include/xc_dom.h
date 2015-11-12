@@ -32,6 +32,7 @@ struct xc_dom_seg {
     xen_vaddr_t vstart;
     xen_vaddr_t vend;
     xen_pfn_t pfn;
+    xen_pfn_t pages;
 };
 
 struct xc_dom_mem {
@@ -93,6 +94,7 @@ struct xc_dom_image {
     xen_pfn_t xenstore_pfn;
     xen_pfn_t shared_info_pfn;
     xen_pfn_t bootstack_pfn;
+    xen_pfn_t pfn_alloc_end;
     xen_vaddr_t virt_alloc_end;
     xen_vaddr_t bsd_symtab_start;
 
@@ -178,8 +180,8 @@ struct xc_dom_image {
 
     /* kernel loader */
     struct xc_dom_arch *arch_hooks;
-    /* allocate up to virt_alloc_end */
-    int (*allocate) (struct xc_dom_image * dom, xen_vaddr_t up_to);
+    /* allocate up to pfn_alloc_end */
+    int (*allocate) (struct xc_dom_image * dom);
 
     /* Container type (HVM or PV). */
     enum {
@@ -363,14 +365,11 @@ static inline void *xc_dom_seg_to_ptr_pages(struct xc_dom_image *dom,
                                       struct xc_dom_seg *seg,
                                       xen_pfn_t *pages_out)
 {
-    xen_vaddr_t segsize = seg->vend - seg->vstart;
-    unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
-    xen_pfn_t pages = (segsize + page_size - 1) / page_size;
     void *retval;
 
-    retval = xc_dom_pfn_to_ptr(dom, seg->pfn, pages);
+    retval = xc_dom_pfn_to_ptr(dom, seg->pfn, seg->pages);
 
-    *pages_out = retval ? pages : 0;
+    *pages_out = retval ? seg->pages : 0;
     return retval;
 }
 
