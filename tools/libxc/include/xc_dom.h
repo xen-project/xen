@@ -97,15 +97,7 @@ struct xc_dom_image {
     xen_pfn_t pfn_alloc_end;
     xen_vaddr_t virt_alloc_end;
     xen_vaddr_t bsd_symtab_start;
-
-    /* initial page tables */
-    unsigned int pgtables;
-    unsigned int pg_l4;
-    unsigned int pg_l3;
-    unsigned int pg_l2;
-    unsigned int pg_l1;
     unsigned int alloc_bootstack;
-    unsigned int extra_pages;
     xen_vaddr_t virt_pgtab_end;
 
     /* other state info */

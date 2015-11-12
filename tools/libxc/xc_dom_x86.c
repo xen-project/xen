@@ -69,6 +69,15 @@
 #define round_down(addr, mask)   ((addr) & ~(mask))
 #define round_up(addr, mask)     ((addr) | (mask))
 
+struct xc_dom_image_x86 {
+    /* initial page tables */
+    unsigned int pgtables;
+    unsigned int pg_l4;
+    unsigned int pg_l3;
+    unsigned int pg_l2;
+    unsigned int pg_l1;
+};
+
 /* get guest IO ABI protocol */
 const char *xc_domain_get_native_protocol(xc_interface *xch,
                                           uint32_t domid)
@@ -132,9 +141,9 @@ static int alloc_pgtables(struct xc_dom_image *dom, int pae,
     int pages, extra_pages;
     xen_vaddr_t try_virt_end;
     xen_pfn_t try_pfn_end;
+    struct xc_dom_image_x86 *domx86 = dom->arch_private;
 
     extra_pages = dom->alloc_bootstack ? 1 : 0;
-    extra_pages += dom->extra_pages;
     extra_pages += 128; /* 512kB padding */
     pages = extra_pages;
     for ( ; ; )
@@ -152,29 +161,30 @@ static int alloc_pgtables(struct xc_dom_image *dom, int pae,
             return -ENOMEM;
         }
 
-        dom->pg_l4 =
+        domx86->pg_l4 =
             nr_page_tables(dom, dom->parms.virt_base, try_virt_end, l4_bits);
-        dom->pg_l3 =
+        domx86->pg_l3 =
             nr_page_tables(dom, dom->parms.virt_base, try_virt_end, l3_bits);
-        dom->pg_l2 =
+        domx86->pg_l2 =
             nr_page_tables(dom, dom->parms.virt_base, try_virt_end, l2_bits);
-        dom->pg_l1 =
+        domx86->pg_l1 =
             nr_page_tables(dom, dom->parms.virt_base, try_virt_end, l1_bits);
         if (pae && try_virt_end < 0xc0000000)
         {
             DOMPRINTF("%s: PAE: extra l2 page table for l3#3",
                       __FUNCTION__);
-            dom->pg_l2++;
+            domx86->pg_l2++;
         }
-        dom->pgtables = dom->pg_l4 + dom->pg_l3 + dom->pg_l2 + dom->pg_l1;
-        pages = dom->pgtables + extra_pages;
+        domx86->pgtables = domx86->pg_l4 + domx86->pg_l3 +
+                           domx86->pg_l2 + domx86->pg_l1;
+        pages = domx86->pgtables + extra_pages;
         if ( dom->virt_alloc_end + pages * PAGE_SIZE_X86 <= try_virt_end + 1 )
             break;
     }
     dom->virt_pgtab_end = try_virt_end + 1;
 
     return xc_dom_alloc_segment(dom, &dom->pgtables_seg, "page tables", 0,
-                                dom->pgtables * PAGE_SIZE_X86);
+                                domx86->pgtables * PAGE_SIZE_X86);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -262,9 +272,10 @@ static xen_pfn_t move_l3_below_4G(struct xc_dom_image *dom,
 
 static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
 {
+    struct xc_dom_image_x86 *domx86 = dom->arch_private;
     xen_pfn_t l3pfn = dom->pgtables_seg.pfn;
-    xen_pfn_t l2pfn = l3pfn + dom->pg_l3;
-    xen_pfn_t l1pfn = l2pfn + dom->pg_l2;
+    xen_pfn_t l2pfn = l3pfn + domx86->pg_l3;
+    xen_pfn_t l1pfn = l2pfn + domx86->pg_l2;
     l3_pgentry_64_t *l3tab;
     l2_pgentry_64_t *l2tab = NULL;
     l1_pgentry_64_t *l1tab = NULL;
@@ -373,10 +384,11 @@ static int alloc_pgtables_x86_64(struct xc_dom_image *dom)
 
 static int setup_pgtables_x86_64(struct xc_dom_image *dom)
 {
+    struct xc_dom_image_x86 *domx86 = dom->arch_private;
     xen_pfn_t l4pfn = dom->pgtables_seg.pfn;
-    xen_pfn_t l3pfn = l4pfn + dom->pg_l4;
-    xen_pfn_t l2pfn = l3pfn + dom->pg_l3;
-    xen_pfn_t l1pfn = l2pfn + dom->pg_l2;
+    xen_pfn_t l3pfn = l4pfn + domx86->pg_l4;
+    xen_pfn_t l2pfn = l3pfn + domx86->pg_l3;
+    xen_pfn_t l1pfn = l2pfn + domx86->pg_l2;
     l4_pgentry_64_t *l4tab = xc_dom_pfn_to_ptr(dom, l4pfn, 1);
     l3_pgentry_64_t *l3tab = NULL;
     l2_pgentry_64_t *l2tab = NULL;
@@ -619,6 +631,7 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
 
 static int start_info_x86_32(struct xc_dom_image *dom)
 {
+    struct xc_dom_image_x86 *domx86 = dom->arch_private;
     start_info_x86_32_t *start_info =
         xc_dom_pfn_to_ptr(dom, dom->start_info_pfn, 1);
     xen_pfn_t shinfo =
@@ -639,7 +652,7 @@ static int start_info_x86_32(struct xc_dom_image *dom)
     start_info->nr_pages = dom->total_pages;
     start_info->shared_info = shinfo << PAGE_SHIFT_X86;
     start_info->pt_base = dom->pgtables_seg.vstart;
-    start_info->nr_pt_frames = dom->pgtables;
+    start_info->nr_pt_frames = domx86->pgtables;
     start_info->mfn_list = dom->p2m_seg.vstart;
 
     start_info->flags = dom->flags;
@@ -665,6 +678,7 @@ static int start_info_x86_32(struct xc_dom_image *dom)
 
 static int start_info_x86_64(struct xc_dom_image *dom)
 {
+    struct xc_dom_image_x86 *domx86 = dom->arch_private;
     start_info_x86_64_t *start_info =
         xc_dom_pfn_to_ptr(dom, dom->start_info_pfn, 1);
     xen_pfn_t shinfo =
@@ -685,7 +699,7 @@ static int start_info_x86_64(struct xc_dom_image *dom)
     start_info->nr_pages = dom->total_pages;
     start_info->shared_info = shinfo << PAGE_SHIFT_X86;
     start_info->pt_base = dom->pgtables_seg.vstart;
-    start_info->nr_pt_frames = dom->pgtables;
+    start_info->nr_pt_frames = domx86->pgtables;
     start_info->mfn_list = dom->p2m_seg.vstart;
 
     start_info->flags = dom->flags;
@@ -1650,6 +1664,7 @@ static struct xc_dom_arch xc_dom_32_pae = {
     .native_protocol = XEN_IO_PROTO_ABI_X86_32,
     .page_shift = PAGE_SHIFT_X86,
     .sizeof_pfn = 4,
+    .arch_private_size = sizeof(struct xc_dom_image_x86),
     .alloc_magic_pages = alloc_magic_pages,
     .alloc_pgtables = alloc_pgtables_x86_32_pae,
     .setup_pgtables = setup_pgtables_x86_32_pae,
@@ -1666,6 +1681,7 @@ static struct xc_dom_arch xc_dom_64 = {
     .native_protocol = XEN_IO_PROTO_ABI_X86_64,
     .page_shift = PAGE_SHIFT_X86,
     .sizeof_pfn = 8,
+    .arch_private_size = sizeof(struct xc_dom_image_x86),
     .alloc_magic_pages = alloc_magic_pages,
     .alloc_pgtables = alloc_pgtables_x86_64,
     .setup_pgtables = setup_pgtables_x86_64,
