@@ -3820,7 +3820,7 @@ static void *hvm_map_entry(unsigned long va, bool_t *writable)
      */
     pfec = PFEC_page_present;
     gfn = paging_gva_to_gfn(current, va, &pfec);
-    if ( (pfec == PFEC_page_paged) || (pfec == PFEC_page_shared) )
+    if ( pfec & (PFEC_page_paged | PFEC_page_shared) )
         goto fail;
 
     v = hvm_map_guest_frame_rw(gfn, 0, writable);
@@ -4211,9 +4211,9 @@ static enum hvm_copy_result __hvm_copy(
             gfn = paging_gva_to_gfn(curr, addr, &pfec);
             if ( gfn == INVALID_GFN )
             {
-                if ( pfec == PFEC_page_paged )
+                if ( pfec & PFEC_page_paged )
                     return HVMCOPY_gfn_paged_out;
-                if ( pfec == PFEC_page_shared )
+                if ( pfec & PFEC_page_shared )
                     return HVMCOPY_gfn_shared;
                 if ( flags & HVMCOPY_fault )
                     hvm_inject_page_fault(pfec, addr);
@@ -4326,9 +4326,9 @@ static enum hvm_copy_result __hvm_clear(paddr_t addr, int size)
         gfn = paging_gva_to_gfn(curr, addr, &pfec);
         if ( gfn == INVALID_GFN )
         {
-            if ( pfec == PFEC_page_paged )
+            if ( pfec & PFEC_page_paged )
                 return HVMCOPY_gfn_paged_out;
-            if ( pfec == PFEC_page_shared )
+            if ( pfec & PFEC_page_shared )
                 return HVMCOPY_gfn_shared;
             return HVMCOPY_bad_gva_to_gfn;
         }

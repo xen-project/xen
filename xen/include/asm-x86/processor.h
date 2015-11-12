@@ -140,8 +140,10 @@
 #define PFEC_user_mode      (1U<<2)
 #define PFEC_reserved_bit   (1U<<3)
 #define PFEC_insn_fetch     (1U<<4)
-#define PFEC_page_paged     (1U<<5)
-#define PFEC_page_shared    (1U<<6)
+#define PFEC_prot_key       (1U<<5)
+/* Internally used only flags. */
+#define PFEC_page_paged     (1U<<16)
+#define PFEC_page_shared    (1U<<17)
 
 /* Other exception error code values. */
 #define X86_XEC_EXT         (_AC(1,U) << 0)
