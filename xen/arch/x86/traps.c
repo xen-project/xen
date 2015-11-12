@@ -615,6 +615,9 @@ static void do_trap(struct cpu_user_regs *regs, int use_error_code)
     unsigned int trapnr = regs->entry_vector;
     unsigned long fixup;
 
+    if ( regs->error_code & X86_XEC_EXT )
+        goto hardware_trap;
+
     DEBUGGER_trap_entry(trapnr, regs);
 
     if ( guest_mode(regs) )
@@ -641,6 +644,7 @@ static void do_trap(struct cpu_user_regs *regs, int use_error_code)
         return;
     }
 
+ hardware_trap:
     DEBUGGER_trap_fatal(trapnr, regs);
 
     show_execution_state(regs);
@@ -1262,13 +1266,14 @@ static int handle_gdt_ldt_mapping_fault(
             tb = propagate_page_fault(curr->arch.pv_vcpu.ldt_base + offset,
                                       regs->error_code);
             if ( tb )
-                tb->error_code = ((u16)offset & ~3) | 4;
+                tb->error_code = (offset & ~(X86_XEC_EXT | X86_XEC_IDT)) |
+                                 X86_XEC_TI;
         }
     }
     else
     {
         /* GDT fault: handle the fault as #GP(selector). */
-        regs->error_code = (u16)offset & ~7;
+        regs->error_code = offset & ~(X86_XEC_EXT | X86_XEC_IDT | X86_XEC_TI);
         (void)do_general_protection(regs);
     }
 
@@ -3221,7 +3226,7 @@ void do_general_protection(struct cpu_user_regs *regs)
 
     DEBUGGER_trap_entry(TRAP_gp_fault, regs);
 
-    if ( regs->error_code & 1 )
+    if ( regs->error_code & X86_XEC_EXT )
         goto hardware_gp;
 
     if ( !guest_mode(regs) )
@@ -3240,14 +3245,15 @@ void do_general_protection(struct cpu_user_regs *regs)
      * 
      * Instead, a GPF occurs with the faulting IDT vector in the error code.
      * Bit 1 is set to indicate that an IDT entry caused the fault. Bit 0 is 
-     * clear to indicate that it's a software fault, not hardware.
+     * clear (which got already checked above) to indicate that it's a software
+     * fault, not a hardware one.
      * 
      * NOTE: Vectors 3 and 4 are dealt with from their own handler. This is
      * okay because they can only be triggered by an explicit DPL-checked
      * instruction. The DPL specified by the guest OS for these vectors is NOT
      * CHECKED!!
      */
-    if ( (regs->error_code & 3) == 2 )
+    if ( regs->error_code & X86_XEC_IDT )
     {
         /* This fault must be due to <INT n> instruction. */
         const struct trap_info *ti;
@@ -3289,9 +3295,9 @@ void do_general_protection(struct cpu_user_regs *regs)
         return;
     }
 
+ hardware_gp:
     DEBUGGER_trap_fatal(TRAP_gp_fault, regs);
 
- hardware_gp:
     show_execution_state(regs);
     panic("GENERAL PROTECTION FAULT\n[error_code=%04x]", regs->error_code);
 }

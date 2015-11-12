@@ -143,6 +143,11 @@
 #define PFEC_page_paged     (1U<<5)
 #define PFEC_page_shared    (1U<<6)
 
+/* Other exception error code values. */
+#define X86_XEC_EXT         (_AC(1,U) << 0)
+#define X86_XEC_IDT         (_AC(1,U) << 1)
+#define X86_XEC_TI          (_AC(1,U) << 2)
+
 #define XEN_MINIMAL_CR4 (X86_CR4_PGE | X86_CR4_PAE)
 
 #define XEN_SYSCALL_MASK (X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|    \

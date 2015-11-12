@@ -338,7 +338,7 @@ int80_slow_path:
          * Setup entry vector and error code as if this was a GPF caused by an
          * IDT entry with DPL==0.
          */
-        movl  $((0x80 << 3) | 0x2),UREGS_error_code(%rsp)
+        movl  $((0x80 << 3) | X86_XEC_IDT),UREGS_error_code(%rsp)
         SAVE_PRESERVED
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         /* A GPF wouldn't have incremented the instruction pointer. */
