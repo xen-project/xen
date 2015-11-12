@@ -47,9 +47,6 @@ string_param("clocksource", opt_clocksource);
 unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
 DEFINE_SPINLOCK(rtc_lock);
 unsigned long pit0_ticks;
-static unsigned long wc_sec; /* UTC time at last 'time update'. */
-static unsigned int wc_nsec;
-static DEFINE_SPINLOCK(wc_lock);
 
 struct cpu_time {
     u64 local_tsc_stamp;
@@ -783,10 +780,6 @@ uint64_t tsc_ticks2ns(uint64_t ticks)
     return scale_delta(ticks, &t->tsc_scale);
 }
 
-/* Explicitly OR with 1 just in case version number gets out of sync. */
-#define version_update_begin(v) (((v)+1)|1)
-#define version_update_end(v)   ((v)+1)
-
 static void __update_vcpu_system_time(struct vcpu *v, int force)
 {
     struct cpu_time       *t;
@@ -893,37 +886,6 @@ void force_update_vcpu_system_time(struct vcpu *v)
     __update_vcpu_system_time(v, 1);
 }
 
-void update_domain_wallclock_time(struct domain *d)
-{
-    uint32_t *wc_version;
-    unsigned long sec;
-
-    spin_lock(&wc_lock);
-
-    wc_version = &shared_info(d, wc_version);
-    *wc_version = version_update_begin(*wc_version);
-    wmb();
-
-    sec = wc_sec + d->time_offset_seconds;
-    if ( likely(!has_32bit_shinfo(d)) )
-    {
-        d->shared_info->native.wc_sec    = sec;
-        d->shared_info->native.wc_nsec   = wc_nsec;
-        d->shared_info->native.wc_sec_hi = sec >> 32;
-    }
-    else
-    {
-        d->shared_info->compat.wc_sec         = sec;
-        d->shared_info->compat.wc_nsec        = wc_nsec;
-        d->shared_info->compat.arch.wc_sec_hi = sec >> 32;
-    }
-
-    wmb();
-    *wc_version = version_update_end(*wc_version);
-
-    spin_unlock(&wc_lock);
-}
-
 static void update_domain_rtc(void)
 {
     struct domain *d;
@@ -979,27 +941,6 @@ int cpu_frequency_change(u64 freq)
     }
 
     return 0;
-}
-
-/* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
-void do_settime(unsigned long secs, unsigned int nsecs, u64 system_time_base)
-{
-    u64 x;
-    u32 y;
-    struct domain *d;
-
-    x = SECONDS(secs) + nsecs - system_time_base;
-    y = do_div(x, 1000000000);
-
-    spin_lock(&wc_lock);
-    wc_sec  = x;
-    wc_nsec = y;
-    spin_unlock(&wc_lock);
-
-    rcu_read_lock(&domlist_read_lock);
-    for_each_domain ( d )
-        update_domain_wallclock_time(d);
-    rcu_read_unlock(&domlist_read_lock);
 }
 
 /* Per-CPU communication between rendezvous IRQ and softirq handler. */
@@ -1601,25 +1542,6 @@ void send_timer_event(struct vcpu *v)
     send_guest_vcpu_virq(v, VIRQ_TIMER);
 }
 
-/* Return secs after 00:00:00 localtime, 1 January, 1970. */
-unsigned long get_localtime(struct domain *d)
-{
-    return wc_sec + (wc_nsec + NOW()) / 1000000000ULL 
-        + d->time_offset_seconds;
-}
-
-/* Return microsecs after 00:00:00 localtime, 1 January, 1970. */
-uint64_t get_localtime_us(struct domain *d)
-{
-    return (SECONDS(wc_sec + d->time_offset_seconds) + wc_nsec + NOW())
-           / 1000UL;
-}
-
-unsigned long get_sec(void)
-{
-    return wc_sec + (wc_nsec + NOW()) / 1000000000ULL;
-}
-
 /* "cmos_utc_offset" is the difference between UTC time and CMOS time. */
 static long cmos_utc_offset; /* in seconds */
 
@@ -1628,7 +1550,7 @@ int time_suspend(void)
     if ( smp_processor_id() == 0 )
     {
         cmos_utc_offset = -get_cmos_time();
-        cmos_utc_offset += (wc_sec + (wc_nsec + NOW()) / 1000000000ULL);
+        cmos_utc_offset += get_sec();
         kill_timer(&calibration_timer);
 
         /* Sync platform timer stamps. */
@@ -1706,22 +1628,6 @@ int hwdom_pit_access(struct ioreq *ioreq)
     }
 
     return 0;
-}
-
-struct tm wallclock_time(uint64_t *ns)
-{
-    uint64_t seconds, nsec;
-
-    if ( !wc_sec )
-        return (struct tm) { 0 };
-
-    seconds = NOW() + SECONDS(wc_sec) + wc_nsec;
-    nsec = do_div(seconds, 1000000000);
-
-    if ( ns )
-        *ns = nsec;
-
-    return gmtime(seconds);
 }
 
 /*

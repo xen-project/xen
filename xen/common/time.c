@@ -15,8 +15,12 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/config.h>
+#include <xen/sched.h>
+#include <xen/shared.h>
+#include <xen/spinlock.h>
 #include <xen/time.h>
+#include <asm/div64.h>
+#include <asm/domain.h>
 
 /* Nonzero if YEAR is a leap year (every 4 years,
    except every 100th isn't, and every 400th is).  */
@@ -33,6 +37,10 @@ const unsigned short int __mon_lengths[2][12] = {
 
 #define SECS_PER_HOUR (60 * 60)
 #define SECS_PER_DAY  (SECS_PER_HOUR * 24)
+
+static uint64_t wc_sec; /* UTC time at last 'time update'. */
+static unsigned int wc_nsec;
+static DEFINE_SPINLOCK(wc_lock);
 
 struct tm gmtime(unsigned long t)
 {
@@ -84,4 +92,89 @@ struct tm gmtime(unsigned long t)
     tbuf.tm_isdst = -1;
 
     return tbuf;
+}
+
+void update_domain_wallclock_time(struct domain *d)
+{
+    uint32_t *wc_version;
+    uint64_t sec;
+
+    spin_lock(&wc_lock);
+
+    wc_version = &shared_info(d, wc_version);
+    *wc_version = version_update_begin(*wc_version);
+    wmb();
+
+    sec = wc_sec + d->time_offset_seconds;
+    shared_info(d, wc_sec)    = sec;
+    shared_info(d, wc_nsec)   = wc_nsec;
+#ifdef CONFIG_X86
+    if ( likely(!has_32bit_shinfo(d)) )
+        d->shared_info->native.wc_sec_hi = sec >> 32;
+    else
+        d->shared_info->compat.arch.wc_sec_hi = sec >> 32;
+#else
+    shared_info(d, wc_sec_hi) = sec >> 32;
+#endif
+
+    wmb();
+    *wc_version = version_update_end(*wc_version);
+
+    spin_unlock(&wc_lock);
+}
+
+/* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
+void do_settime(u64 secs, unsigned int nsecs, u64 system_time_base)
+{
+    u64 x;
+    u32 y;
+    struct domain *d;
+
+    x = SECONDS(secs) + nsecs - system_time_base;
+    y = do_div(x, 1000000000);
+
+    spin_lock(&wc_lock);
+    wc_sec  = x;
+    wc_nsec = y;
+    spin_unlock(&wc_lock);
+
+    rcu_read_lock(&domlist_read_lock);
+    for_each_domain ( d )
+        update_domain_wallclock_time(d);
+    rcu_read_unlock(&domlist_read_lock);
+}
+
+/* Return secs after 00:00:00 localtime, 1 January, 1970. */
+unsigned long get_localtime(struct domain *d)
+{
+    return wc_sec + (wc_nsec + NOW()) / 1000000000ULL
+        + d->time_offset_seconds;
+}
+
+/* Return microsecs after 00:00:00 localtime, 1 January, 1970. */
+uint64_t get_localtime_us(struct domain *d)
+{
+    return (SECONDS(wc_sec + d->time_offset_seconds) + wc_nsec + NOW())
+           / 1000UL;
+}
+
+unsigned long get_sec(void)
+{
+    return wc_sec + (wc_nsec + NOW()) / 1000000000ULL;
+}
+
+struct tm wallclock_time(uint64_t *ns)
+{
+    uint64_t seconds, nsec;
+
+    if ( !wc_sec )
+        return (struct tm) { 0 };
+
+    seconds = NOW() + SECONDS(wc_sec) + wc_nsec;
+    nsec = do_div(seconds, 1000000000);
+
+    if ( ns )
+        *ns = nsec;
+
+    return gmtime(seconds);
 }

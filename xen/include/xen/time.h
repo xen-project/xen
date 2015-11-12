@@ -60,11 +60,14 @@ struct tm wallclock_time(uint64_t *ns);
 /* Chosen so (NOW() + delta) wont overflow without an uptime of 200 years */
 #define STIME_DELTA_MAX ((s_time_t)((uint64_t)~0ull>>2))
 
+/* Explicitly OR with 1 just in case version number gets out of sync. */
+#define version_update_begin(v) (((v) + 1) | 1)
+#define version_update_end(v)   ((v) + 1)
 extern void update_vcpu_system_time(struct vcpu *v);
 extern void update_domain_wallclock_time(struct domain *d);
 
 extern void do_settime(
-    unsigned long secs, unsigned int nsecs, u64 system_time_base);
+    u64 secs, unsigned int nsecs, u64 system_time_base);
 
 extern void send_timer_event(struct vcpu *v);
 

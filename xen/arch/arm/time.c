@@ -280,11 +280,6 @@ void domain_set_time_offset(struct domain *d, int64_t time_offset_seconds)
     /* XXX update guest visible wallclock time */
 }
 
-struct tm wallclock_time(uint64_t *ns)
-{
-    return (struct tm) { 0 };
-}
-
 /*
  * Local variables:
  * mode: C
