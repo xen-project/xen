@@ -126,7 +126,7 @@ nr_page_tables(struct xc_dom_image *dom,
     return tables;
 }
 
-static int count_pgtables(struct xc_dom_image *dom, int pae,
+static int alloc_pgtables(struct xc_dom_image *dom, int pae,
                           int l4_bits, int l3_bits, int l2_bits, int l1_bits)
 {
     int pages, extra_pages;
@@ -172,7 +172,9 @@ static int count_pgtables(struct xc_dom_image *dom, int pae,
             break;
     }
     dom->virt_pgtab_end = try_virt_end + 1;
-    return 0;
+
+    return xc_dom_alloc_segment(dom, &dom->pgtables_seg, "page tables", 0,
+                                dom->pgtables * PAGE_SIZE_X86);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -182,9 +184,9 @@ static int count_pgtables(struct xc_dom_image *dom, int pae,
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L3_PROT (_PAGE_PRESENT)
 
-static int count_pgtables_x86_32_pae(struct xc_dom_image *dom)
+static int alloc_pgtables_x86_32_pae(struct xc_dom_image *dom)
 {
-    return count_pgtables(dom, 1, 0, 32,
+    return alloc_pgtables(dom, 1, 0, 32,
                           L3_PAGETABLE_SHIFT_PAE, L2_PAGETABLE_SHIFT_PAE);
 }
 
@@ -355,9 +357,9 @@ pfn_error:
 /* ------------------------------------------------------------------------ */
 /* x86_64 pagetables                                                        */
 
-static int count_pgtables_x86_64(struct xc_dom_image *dom)
+static int alloc_pgtables_x86_64(struct xc_dom_image *dom)
 {
-    return count_pgtables(dom, 0,
+    return alloc_pgtables(dom, 0,
                           L4_PAGETABLE_SHIFT_X86_64 + 9,
                           L4_PAGETABLE_SHIFT_X86_64,
                           L3_PAGETABLE_SHIFT_X86_64,
@@ -1620,6 +1622,12 @@ static int bootlate_pv(struct xc_dom_image *dom)
     return 0;
 }
 
+static int alloc_pgtables_hvm(struct xc_dom_image *dom)
+{
+    DOMPRINTF("%s: doing nothing", __func__);
+    return 0;
+}
+
 static int bootlate_hvm(struct xc_dom_image *dom)
 {
     DOMPRINTF("%s: doing nothing", __func__);
@@ -1643,7 +1651,7 @@ static struct xc_dom_arch xc_dom_32_pae = {
     .page_shift = PAGE_SHIFT_X86,
     .sizeof_pfn = 4,
     .alloc_magic_pages = alloc_magic_pages,
-    .count_pgtables = count_pgtables_x86_32_pae,
+    .alloc_pgtables = alloc_pgtables_x86_32_pae,
     .setup_pgtables = setup_pgtables_x86_32_pae,
     .start_info = start_info_x86_32,
     .shared_info = shared_info_x86_32,
@@ -1659,7 +1667,7 @@ static struct xc_dom_arch xc_dom_64 = {
     .page_shift = PAGE_SHIFT_X86,
     .sizeof_pfn = 8,
     .alloc_magic_pages = alloc_magic_pages,
-    .count_pgtables = count_pgtables_x86_64,
+    .alloc_pgtables = alloc_pgtables_x86_64,
     .setup_pgtables = setup_pgtables_x86_64,
     .start_info = start_info_x86_64,
     .shared_info = shared_info_x86_64,
@@ -1675,7 +1683,7 @@ static struct xc_dom_arch xc_hvm_32 = {
     .page_shift = PAGE_SHIFT_X86,
     .sizeof_pfn = 4,
     .alloc_magic_pages = alloc_magic_pages_hvm,
-    .count_pgtables = NULL,
+    .alloc_pgtables = alloc_pgtables_hvm,
     .setup_pgtables = NULL,
     .start_info = NULL,
     .shared_info = NULL,

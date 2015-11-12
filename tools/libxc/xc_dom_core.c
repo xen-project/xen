@@ -1082,15 +1082,8 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     /* allocate other pages */
     if ( dom->arch_hooks->alloc_magic_pages(dom) != 0 )
         goto err;
-    if ( dom->arch_hooks->count_pgtables )
-    {
-        if ( dom->arch_hooks->count_pgtables(dom) != 0 )
-            goto err;
-        if ( (dom->pgtables > 0) &&
-             (xc_dom_alloc_segment(dom, &dom->pgtables_seg, "page tables", 0,
-                                   dom->pgtables * page_size) != 0) )
-                goto err;
-    }
+    if ( dom->arch_hooks->alloc_pgtables(dom) != 0 )
+        goto err;
     if ( dom->alloc_bootstack )
         dom->bootstack_pfn = xc_dom_alloc_page(dom, "boot stack");
     DOMPRINTF("%-20s: virt_alloc_end : 0x%" PRIx64 "",
