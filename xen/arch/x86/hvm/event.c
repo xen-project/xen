@@ -144,36 +144,59 @@ void hvm_event_guest_request(void)
     }
 }
 
-int hvm_event_int3(unsigned long gla)
+int hvm_event_int3(unsigned long rip)
 {
     int rc = 0;
-    uint32_t pfec = PFEC_page_present;
     struct vcpu *curr = current;
-    vm_event_request_t req = {
-        .reason = VM_EVENT_REASON_SOFTWARE_BREAKPOINT,
-        .vcpu_id = curr->vcpu_id,
-        .u.software_breakpoint.gfn = paging_gva_to_gfn(curr, gla, &pfec)
-    };
 
     if ( curr->domain->arch.monitor.software_breakpoint_enabled )
+    {
+        struct segment_register sreg;
+        uint32_t pfec = PFEC_page_present | PFEC_insn_fetch;
+        vm_event_request_t req = {
+            .reason = VM_EVENT_REASON_SOFTWARE_BREAKPOINT,
+            .vcpu_id = curr->vcpu_id,
+        };
+
+        hvm_get_segment_register(curr, x86_seg_ss, &sreg);
+        if ( sreg.attr.fields.dpl == 3 )
+            pfec |= PFEC_user_mode;
+
+        hvm_get_segment_register(curr, x86_seg_cs, &sreg);
+        req.u.software_breakpoint.gfn = paging_gva_to_gfn(curr,
+                                                          sreg.base + rip,
+                                                          &pfec);
+
         rc = hvm_event_traps(1, &req);
+    }
 
     return rc;
 }
 
-int hvm_event_single_step(unsigned long gla)
+int hvm_event_single_step(unsigned long rip)
 {
     int rc = 0;
-    uint32_t pfec = PFEC_page_present;
     struct vcpu *curr = current;
-    vm_event_request_t req = {
-        .reason = VM_EVENT_REASON_SINGLESTEP,
-        .vcpu_id = curr->vcpu_id,
-        .u.singlestep.gfn = paging_gva_to_gfn(curr, gla, &pfec)
-    };
 
     if ( curr->domain->arch.monitor.singlestep_enabled )
+    {
+        struct segment_register sreg;
+        uint32_t pfec = PFEC_page_present | PFEC_insn_fetch;
+        vm_event_request_t req = {
+            .reason = VM_EVENT_REASON_SINGLESTEP,
+            .vcpu_id = curr->vcpu_id,
+        };
+
+        hvm_get_segment_register(curr, x86_seg_ss, &sreg);
+        if ( sreg.attr.fields.dpl == 3 )
+            pfec |= PFEC_user_mode;
+
+        hvm_get_segment_register(curr, x86_seg_cs, &sreg);
+        req.u.singlestep.gfn = paging_gva_to_gfn(curr, sreg.base + rip,
+                                                 &pfec);
+
         rc = hvm_event_traps(1, &req);
+    }
 
     return rc;
 }

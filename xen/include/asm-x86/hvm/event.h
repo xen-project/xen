@@ -28,8 +28,8 @@ bool_t hvm_event_cr(unsigned int index, unsigned long value,
     hvm_event_cr(VM_EVENT_X86_##what, new, old)
 void hvm_event_msr(unsigned int msr, uint64_t value);
 /* Called for current VCPU: returns -1 if no listener */
-int hvm_event_int3(unsigned long gla);
-int hvm_event_single_step(unsigned long gla);
+int hvm_event_int3(unsigned long rip);
+int hvm_event_single_step(unsigned long rip);
 void hvm_event_guest_request(void);
 
 #endif /* __ASM_X86_HVM_EVENT_H__ */
