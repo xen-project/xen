@@ -159,6 +159,9 @@ static unsigned print_notes(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) st
 		case XEN_ELFNOTE_L1_MFN_VALID:
 			print_l1_mfn_valid_note("L1_MFN_VALID", elf , note);
 			break;
+		case XEN_ELFNOTE_PHYS32_ENTRY:
+			print_numeric_note("PHYS32_ENTRY", elf , note);
+			break;
 		default:
 			printf("unknown note type %#x\n",
 			       (unsigned)elf_uval(elf, note, type));
