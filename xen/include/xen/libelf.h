@@ -423,6 +423,7 @@ struct elf_dom_parms {
     char loader[16];
     enum xen_pae_type pae;
     bool bsd_symtab;
+    bool unmapped_initrd;
     uint64_t virt_base;
     uint64_t virt_entry;
     uint64_t virt_hypercall;

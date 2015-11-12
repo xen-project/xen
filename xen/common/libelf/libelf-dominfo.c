@@ -191,6 +191,9 @@ elf_errorstatus elf_xen_parse_note(struct elf_binary *elf,
     case XEN_ELFNOTE_INIT_P2M:
         parms->p2m_base = val;
         break;
+    case XEN_ELFNOTE_MOD_START_PFN:
+        parms->unmapped_initrd = !!val;
+        break;
     case XEN_ELFNOTE_PADDR_OFFSET:
         parms->elf_paddr_offset = val;
         break;
