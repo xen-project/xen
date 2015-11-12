@@ -777,6 +777,7 @@ struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
     dom->parms.virt_hypercall = UNSET_ADDR;
     dom->parms.virt_hv_start_low = UNSET_ADDR;
     dom->parms.elf_paddr_offset = UNSET_ADDR;
+    dom->parms.p2m_base = UNSET_ADDR;
 
     dom->alloc_malloc += sizeof(*dom);
     return dom;
@@ -1096,7 +1097,11 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     }
 
     /* allocate other pages */
-    if ( dom->arch_hooks->alloc_p2m_list &&
+    if ( !dom->arch_hooks->p2m_base_supported ||
+         dom->parms.p2m_base >= dom->parms.virt_base ||
+         (dom->parms.p2m_base & (XC_DOM_PAGE_SIZE(dom) - 1)) )
+        dom->parms.p2m_base = UNSET_ADDR;
+    if ( dom->arch_hooks->alloc_p2m_list && dom->parms.p2m_base == UNSET_ADDR &&
          dom->arch_hooks->alloc_p2m_list(dom) != 0 )
         goto err;
     if ( dom->arch_hooks->alloc_magic_pages(dom) != 0 )
@@ -1122,6 +1127,14 @@ int xc_dom_build_image(struct xc_dom_image *dom)
         dom->flags |= SIF_MOD_START_PFN;
         dom->initrd_start = dom->ramdisk_seg.pfn;
         dom->initrd_len = page_size * dom->ramdisk_seg.pages;
+    }
+
+    /* Allocate p2m list if outside of initial kernel mapping. */
+    if ( dom->arch_hooks->alloc_p2m_list && dom->parms.p2m_base != UNSET_ADDR )
+    {
+        if ( dom->arch_hooks->alloc_p2m_list(dom) != 0 )
+            goto err;
+        dom->p2m_seg.vstart = dom->parms.p2m_base;
     }
 
     return 0;

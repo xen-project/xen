@@ -69,6 +69,7 @@
 #define bits_to_mask(bits)       (((xen_vaddr_t)1 << (bits))-1)
 #define round_down(addr, mask)   ((addr) & ~(mask))
 #define round_up(addr, mask)     ((addr) | (mask))
+#define round_pg_up(addr)  (((addr) + PAGE_SIZE_X86 - 1) & ~(PAGE_SIZE_X86 - 1))
 
 struct xc_dom_params {
     unsigned levels;
@@ -90,7 +91,7 @@ struct xc_dom_x86_mapping {
 
 struct xc_dom_image_x86 {
     unsigned n_mappings;
-#define MAPPING_MAX 1
+#define MAPPING_MAX 2
     struct xc_dom_x86_mapping maps[MAPPING_MAX];
     struct xc_dom_params *params;
 };
@@ -484,11 +485,8 @@ static int setup_pgtables_x86_64(struct xc_dom_image *dom)
 
 /* ------------------------------------------------------------------------ */
 
-static int alloc_p2m_list(struct xc_dom_image *dom)
+static int alloc_p2m_list(struct xc_dom_image *dom, size_t p2m_alloc_size)
 {
-    size_t p2m_alloc_size = dom->p2m_size * dom->arch_hooks->sizeof_pfn;
-
-    /* allocate phys2mach table */
     if ( xc_dom_alloc_segment(dom, &dom->p2m_seg, "phys2mach",
                               0, p2m_alloc_size) )
         return -1;
@@ -497,6 +495,40 @@ static int alloc_p2m_list(struct xc_dom_image *dom)
         return -1;
 
     return 0;
+}
+
+static int alloc_p2m_list_x86_32(struct xc_dom_image *dom)
+{
+    size_t p2m_alloc_size = dom->p2m_size * dom->arch_hooks->sizeof_pfn;
+
+    p2m_alloc_size = round_pg_up(p2m_alloc_size);
+    return alloc_p2m_list(dom, p2m_alloc_size);
+}
+
+static int alloc_p2m_list_x86_64(struct xc_dom_image *dom)
+{
+    struct xc_dom_image_x86 *domx86 = dom->arch_private;
+    struct xc_dom_x86_mapping *map = domx86->maps + domx86->n_mappings;
+    size_t p2m_alloc_size = dom->p2m_size * dom->arch_hooks->sizeof_pfn;
+    xen_vaddr_t from, to;
+    unsigned lvl;
+
+    p2m_alloc_size = round_pg_up(p2m_alloc_size);
+    if ( dom->parms.p2m_base != UNSET_ADDR )
+    {
+        from = dom->parms.p2m_base;
+        to = from + p2m_alloc_size - 1;
+        if ( count_pgtables(dom, from, to, dom->pfn_alloc_end) )
+            return -1;
+
+        map->area.pfn = dom->pfn_alloc_end;
+        for ( lvl = 0; lvl < 4; lvl++ )
+            map->lvls[lvl].pfn += p2m_alloc_size >> PAGE_SHIFT_X86;
+        domx86->n_mappings++;
+        p2m_alloc_size += map->area.pgtables << PAGE_SHIFT_X86;
+    }
+
+    return alloc_p2m_list(dom, p2m_alloc_size);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -717,6 +749,11 @@ static int start_info_x86_64(struct xc_dom_image *dom)
     start_info->pt_base = dom->pgtables_seg.vstart;
     start_info->nr_pt_frames = domx86->maps[0].area.pgtables;
     start_info->mfn_list = dom->p2m_seg.vstart;
+    if ( dom->parms.p2m_base != UNSET_ADDR )
+    {
+        start_info->first_p2m_pfn = dom->p2m_seg.pfn;
+        start_info->nr_p2m_frames = dom->p2m_seg.pages;
+    }
 
     start_info->flags = dom->flags;
     start_info->store_mfn = xc_dom_p2m(dom, dom->xenstore_pfn);
@@ -1601,7 +1638,10 @@ static int bootlate_pv(struct xc_dom_image *dom)
     if ( !xc_dom_feature_translated(dom) )
     {
         /* paravirtualized guest */
+
+        /* Drop references to all initial page tables before pinning. */
         xc_dom_unmap_one(dom, dom->pgtables_seg.pfn);
+        xc_dom_unmap_one(dom, dom->p2m_seg.pfn);
         rc = pin_table(dom->xch, pgd_type,
                        xc_dom_p2m(dom, dom->pgtables_seg.pfn),
                        dom->guest_domid);
@@ -1680,10 +1720,11 @@ static struct xc_dom_arch xc_dom_32_pae = {
     .native_protocol = XEN_IO_PROTO_ABI_X86_32,
     .page_shift = PAGE_SHIFT_X86,
     .sizeof_pfn = 4,
+    .p2m_base_supported = 0,
     .arch_private_size = sizeof(struct xc_dom_image_x86),
     .alloc_magic_pages = alloc_magic_pages,
     .alloc_pgtables = alloc_pgtables_x86_32_pae,
-    .alloc_p2m_list = alloc_p2m_list,
+    .alloc_p2m_list = alloc_p2m_list_x86_32,
     .setup_pgtables = setup_pgtables_x86_32_pae,
     .start_info = start_info_x86_32,
     .shared_info = shared_info_x86_32,
@@ -1698,10 +1739,11 @@ static struct xc_dom_arch xc_dom_64 = {
     .native_protocol = XEN_IO_PROTO_ABI_X86_64,
     .page_shift = PAGE_SHIFT_X86,
     .sizeof_pfn = 8,
+    .p2m_base_supported = 1,
     .arch_private_size = sizeof(struct xc_dom_image_x86),
     .alloc_magic_pages = alloc_magic_pages,
     .alloc_pgtables = alloc_pgtables_x86_64,
-    .alloc_p2m_list = alloc_p2m_list,
+    .alloc_p2m_list = alloc_p2m_list_x86_64,
     .setup_pgtables = setup_pgtables_x86_64,
     .start_info = start_info_x86_64,
     .shared_info = shared_info_x86_64,

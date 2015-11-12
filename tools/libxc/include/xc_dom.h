@@ -241,6 +241,7 @@ struct xc_dom_arch {
     char *native_protocol;
     int page_shift;
     int sizeof_pfn;
+    int p2m_base_supported;
     int arch_private_size;
 
     struct xc_dom_arch *next;
