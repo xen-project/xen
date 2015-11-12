@@ -97,6 +97,11 @@ struct xc_dom_image {
     xen_pfn_t pfn_alloc_end;
     xen_vaddr_t virt_alloc_end;
     xen_vaddr_t bsd_symtab_start;
+
+    /* initrd parameters as specified in start_info page */
+    unsigned long initrd_start;
+    unsigned long initrd_len;
+
     unsigned int alloc_bootstack;
     xen_vaddr_t virt_pgtab_end;
 

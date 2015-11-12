@@ -1041,6 +1041,7 @@ static int xc_dom_build_ramdisk(struct xc_dom_image *dom)
 int xc_dom_build_image(struct xc_dom_image *dom)
 {
     unsigned int page_size;
+    bool unmapped_initrd;
 
     DOMPRINTF_CALLED(dom->xch);
 
@@ -1064,11 +1065,15 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     if ( dom->kernel_loader->loader(dom) != 0 )
         goto err;
 
-    /* load ramdisk */
-    if ( dom->ramdisk_blob )
+    /* Don't load ramdisk now if no initial mapping required. */
+    unmapped_initrd = dom->parms.unmapped_initrd && !dom->ramdisk_seg.vstart;
+
+    if ( dom->ramdisk_blob && !unmapped_initrd )
     {
         if ( xc_dom_build_ramdisk(dom) != 0 )
             goto err;
+        dom->initrd_start = dom->ramdisk_seg.vstart;
+        dom->initrd_len = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
     }
 
     /* load devicetree */
@@ -1105,6 +1110,16 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     /* Make sure all memory mapped by initial page tables is available */
     if ( dom->virt_pgtab_end && xc_dom_alloc_pad(dom, dom->virt_pgtab_end) )
         return -1;
+
+    /* Load ramdisk if no initial mapping required. */
+    if ( dom->ramdisk_blob && unmapped_initrd )
+    {
+        if ( xc_dom_build_ramdisk(dom) != 0 )
+            goto err;
+        dom->flags |= SIF_MOD_START_PFN;
+        dom->initrd_start = dom->ramdisk_seg.pfn;
+        dom->initrd_len = page_size * dom->ramdisk_seg.pages;
+    }
 
     return 0;
 

@@ -663,8 +663,8 @@ static int start_info_x86_32(struct xc_dom_image *dom)
 
     if ( dom->ramdisk_blob )
     {
-        start_info->mod_start = dom->ramdisk_seg.vstart;
-        start_info->mod_len = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
+        start_info->mod_start = dom->initrd_start;
+        start_info->mod_len = dom->initrd_len;
     }
 
     if ( dom->cmdline )
@@ -710,8 +710,8 @@ static int start_info_x86_64(struct xc_dom_image *dom)
 
     if ( dom->ramdisk_blob )
     {
-        start_info->mod_start = dom->ramdisk_seg.vstart;
-        start_info->mod_len = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
+        start_info->mod_start = dom->initrd_start;
+        start_info->mod_len = dom->initrd_len;
     }
 
     if ( dom->cmdline )
