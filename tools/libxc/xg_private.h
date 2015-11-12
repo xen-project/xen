@@ -62,10 +62,13 @@ unsigned long csum_page (void * page);
 #define _PAGE_PSE       0x080
 #define _PAGE_GLOBAL    0x100
 
-#define L1_PAGETABLE_SHIFT_I386       12
-#define L2_PAGETABLE_SHIFT_I386       22
-#define L1_PAGETABLE_ENTRIES_I386   1024
-#define L2_PAGETABLE_ENTRIES_I386   1024
+#define VIRT_BITS_I386     32
+#define VIRT_BITS_X86_64   48
+
+#define PGTBL_LEVELS_I386       3
+#define PGTBL_LEVELS_X86_64     4
+
+#define PGTBL_LEVEL_SHIFT_X86   9
 
 #define L1_PAGETABLE_SHIFT_PAE        12
 #define L2_PAGETABLE_SHIFT_PAE        21
@@ -83,33 +86,7 @@ unsigned long csum_page (void * page);
 #define L3_PAGETABLE_ENTRIES_X86_64  512
 #define L4_PAGETABLE_ENTRIES_X86_64  512
 
-typedef uint32_t l1_pgentry_32_t;
-typedef uint32_t l2_pgentry_32_t;
-typedef uint64_t l1_pgentry_64_t;
-typedef uint64_t l2_pgentry_64_t;
-typedef uint64_t l3_pgentry_64_t;
-typedef uint64_t l4_pgentry_64_t;
-
-#define l1_table_offset_i386(_a) \
-  (((_a) >> L1_PAGETABLE_SHIFT_I386) & (L1_PAGETABLE_ENTRIES_I386 - 1))
-#define l2_table_offset_i386(_a) \
-  (((_a) >> L2_PAGETABLE_SHIFT_I386) & (L2_PAGETABLE_ENTRIES_I386 - 1))
-
-#define l1_table_offset_pae(_a) \
-  (((_a) >> L1_PAGETABLE_SHIFT_PAE) & (L1_PAGETABLE_ENTRIES_PAE - 1))
-#define l2_table_offset_pae(_a) \
-  (((_a) >> L2_PAGETABLE_SHIFT_PAE) & (L2_PAGETABLE_ENTRIES_PAE - 1))
-#define l3_table_offset_pae(_a) \
-  (((_a) >> L3_PAGETABLE_SHIFT_PAE) & (L3_PAGETABLE_ENTRIES_PAE - 1))
-
-#define l1_table_offset_x86_64(_a) \
-  (((_a) >> L1_PAGETABLE_SHIFT_X86_64) & (L1_PAGETABLE_ENTRIES_X86_64 - 1))
-#define l2_table_offset_x86_64(_a) \
-  (((_a) >> L2_PAGETABLE_SHIFT_X86_64) & (L2_PAGETABLE_ENTRIES_X86_64 - 1))
-#define l3_table_offset_x86_64(_a) \
-  (((_a) >> L3_PAGETABLE_SHIFT_X86_64) & (L3_PAGETABLE_ENTRIES_X86_64 - 1))
-#define l4_table_offset_x86_64(_a) \
-  (((_a) >> L4_PAGETABLE_SHIFT_X86_64) & (L4_PAGETABLE_ENTRIES_X86_64 - 1))
+typedef uint64_t x86_pgentry_t;
 
 #define PAGE_SHIFT_ARM          12
 #define PAGE_SIZE_ARM           (1UL << PAGE_SHIFT_ARM)
