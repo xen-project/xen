@@ -584,6 +584,12 @@ static XSM_INLINE int xsm_mem_sharing(XSM_DEFAULT_ARG struct domain *d)
 }
 #endif
 
+static XSM_INLINE int xsm_platform_op(XSM_DEFAULT_ARG uint32_t op)
+{
+    XSM_ASSERT_ACTION(XSM_PRIV);
+    return xsm_default_action(action, current->domain, NULL);
+}
+
 #ifdef CONFIG_X86
 static XSM_INLINE int xsm_do_mca(XSM_DEFAULT_VOID)
 {
@@ -637,12 +643,6 @@ static XSM_INLINE int xsm_apic(XSM_DEFAULT_ARG struct domain *d, int cmd)
 {
     XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, d, NULL);
-}
-
-static XSM_INLINE int xsm_platform_op(XSM_DEFAULT_ARG uint32_t op)
-{
-    XSM_ASSERT_ACTION(XSM_PRIV);
-    return xsm_default_action(action, current->domain, NULL);
 }
 
 static XSM_INLINE int xsm_machine_memory_map(XSM_DEFAULT_VOID)

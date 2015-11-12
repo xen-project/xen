@@ -1335,6 +1335,75 @@ static int flask_deassign_dtdevice(struct domain *d, const char *dtpath)
 }
 #endif /* HAS_PASSTHROUGH && HAS_DEVICE_TREE */
 
+static int flask_platform_op(uint32_t op)
+{
+    switch ( op )
+    {
+#ifdef CONFIG_X86
+    /* These operations have their own XSM hooks */
+    case XENPF_cpu_online:
+    case XENPF_cpu_offline:
+    case XENPF_cpu_hotadd:
+    case XENPF_mem_hotadd:
+        return 0;
+#endif
+
+    case XENPF_settime32:
+    case XENPF_settime64:
+        return domain_has_xen(current->domain, XEN__SETTIME);
+
+    case XENPF_add_memtype:
+        return domain_has_xen(current->domain, XEN__MTRR_ADD);
+
+    case XENPF_del_memtype:
+        return domain_has_xen(current->domain, XEN__MTRR_DEL);
+
+    case XENPF_read_memtype:
+        return domain_has_xen(current->domain, XEN__MTRR_READ);
+
+    case XENPF_microcode_update:
+        return domain_has_xen(current->domain, XEN__MICROCODE);
+
+    case XENPF_platform_quirk:
+        return domain_has_xen(current->domain, XEN__QUIRK);
+
+    case XENPF_firmware_info:
+        return domain_has_xen(current->domain, XEN__FIRMWARE);
+
+    case XENPF_efi_runtime_call:
+        return domain_has_xen(current->domain, XEN__FIRMWARE);
+
+    case XENPF_enter_acpi_sleep:
+        return domain_has_xen(current->domain, XEN__SLEEP);
+
+    case XENPF_change_freq:
+        return domain_has_xen(current->domain, XEN__FREQUENCY);
+
+    case XENPF_getidletime:
+        return domain_has_xen(current->domain, XEN__GETIDLE);
+
+    case XENPF_set_processor_pminfo:
+    case XENPF_core_parking:
+        return domain_has_xen(current->domain, XEN__PM_OP);
+
+    case XENPF_get_cpu_version:
+    case XENPF_get_cpuinfo:
+        return domain_has_xen(current->domain, XEN__GETCPUINFO);
+
+    case XENPF_resource_op:
+        return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
+                                    XEN2__RESOURCE_OP, NULL);
+
+    case XENPF_get_symbol:
+        return avc_has_perm(domain_sid(current->domain), SECINITSID_XEN,
+                            SECCLASS_XEN2, XEN2__GET_SYMBOL, NULL);
+
+    default:
+        printk("flask_platform_op: Unknown op %d\n", op);
+        return -EPERM;
+    }
+}
+
 #ifdef CONFIG_X86
 static int flask_do_mca(void)
 {
@@ -1471,75 +1540,6 @@ static int flask_apic(struct domain *d, int cmd)
     }
 
     return domain_has_xen(d, perm);
-}
-
-static int flask_platform_op(uint32_t op)
-{
-    switch ( op )
-    {
-#ifdef CONFIG_X86
-    /* These operations have their own XSM hooks */
-    case XENPF_cpu_online:
-    case XENPF_cpu_offline:
-    case XENPF_cpu_hotadd:
-    case XENPF_mem_hotadd:
-        return 0;
-#endif
-
-    case XENPF_settime32:
-    case XENPF_settime64:
-        return domain_has_xen(current->domain, XEN__SETTIME);
-
-    case XENPF_add_memtype:
-        return domain_has_xen(current->domain, XEN__MTRR_ADD);
-
-    case XENPF_del_memtype:
-        return domain_has_xen(current->domain, XEN__MTRR_DEL);
-
-    case XENPF_read_memtype:
-        return domain_has_xen(current->domain, XEN__MTRR_READ);
-
-    case XENPF_microcode_update:
-        return domain_has_xen(current->domain, XEN__MICROCODE);
-
-    case XENPF_platform_quirk:
-        return domain_has_xen(current->domain, XEN__QUIRK);
-
-    case XENPF_firmware_info:
-        return domain_has_xen(current->domain, XEN__FIRMWARE);
-
-    case XENPF_efi_runtime_call:
-        return domain_has_xen(current->domain, XEN__FIRMWARE);
-
-    case XENPF_enter_acpi_sleep:
-        return domain_has_xen(current->domain, XEN__SLEEP);
-
-    case XENPF_change_freq:
-        return domain_has_xen(current->domain, XEN__FREQUENCY);
-
-    case XENPF_getidletime:
-        return domain_has_xen(current->domain, XEN__GETIDLE);
-
-    case XENPF_set_processor_pminfo:
-    case XENPF_core_parking:
-        return domain_has_xen(current->domain, XEN__PM_OP);
-
-    case XENPF_get_cpu_version:
-    case XENPF_get_cpuinfo:
-        return domain_has_xen(current->domain, XEN__GETCPUINFO);
-
-    case XENPF_resource_op:
-        return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
-                                    XEN2__RESOURCE_OP, NULL);
-
-    case XENPF_get_symbol:
-        return avc_has_perm(domain_sid(current->domain), SECINITSID_XEN,
-                            SECCLASS_XEN2, XEN2__GET_SYMBOL, NULL);
-
-    default:
-        printk("flask_platform_op: Unknown op %d\n", op);
-        return -EPERM;
-    }
 }
 
 static int flask_machine_memory_map(void)
@@ -1738,6 +1738,7 @@ static struct xsm_operations flask_ops = {
     .deassign_dtdevice = flask_deassign_dtdevice,
 #endif
 
+    .platform_op = flask_platform_op,
 #ifdef CONFIG_X86
     .do_mca = flask_do_mca,
     .shadow_control = flask_shadow_control,
@@ -1748,7 +1749,6 @@ static struct xsm_operations flask_ops = {
     .hvm_ioreq_server = flask_hvm_ioreq_server,
     .mem_sharing_op = flask_mem_sharing_op,
     .apic = flask_apic,
-    .platform_op = flask_platform_op,
     .machine_memory_map = flask_machine_memory_map,
     .domain_memory_map = flask_domain_memory_map,
     .mmu_update = flask_mmu_update,

@@ -141,6 +141,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, mem_sharing);
 #endif
 
+    set_to_dummy_if_null(ops, platform_op);
 #ifdef CONFIG_X86
     set_to_dummy_if_null(ops, do_mca);
     set_to_dummy_if_null(ops, shadow_control);
@@ -151,7 +152,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, hvm_ioreq_server);
     set_to_dummy_if_null(ops, mem_sharing_op);
     set_to_dummy_if_null(ops, apic);
-    set_to_dummy_if_null(ops, platform_op);
     set_to_dummy_if_null(ops, machine_memory_map);
     set_to_dummy_if_null(ops, domain_memory_map);
     set_to_dummy_if_null(ops, mmu_update);

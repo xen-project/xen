@@ -1233,6 +1233,7 @@ static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL(hvm_op, 2),
     HYPERCALL(grant_table_op, 3),
     HYPERCALL(multicall, 2),
+    HYPERCALL(platform_op, 1),
     HYPERCALL_ARM(vcpu_op, 3),
 };
 

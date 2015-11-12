@@ -23,6 +23,7 @@ obj-y += percpu.o
 obj-y += guestcopy.o
 obj-y += physdev.o
 obj-y += platform.o
+obj-y += platform_hypercall.o
 obj-y += setup.o
 obj-y += bootfdt.o
 obj-y += time.o
