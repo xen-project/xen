@@ -253,7 +253,7 @@ QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-traditional.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
-OVMF_UPSTREAM_REVISION ?= af9785a9ed61daea52b47f0bf448f1f228beee1e
+OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
 QEMU_UPSTREAM_REVISION ?= qemu-xen-4.6.0
 MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.6.0
 # Fri Jun 26 11:58:40 2015 +0100
