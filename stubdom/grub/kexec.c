@@ -272,7 +272,11 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
 #endif
 
     /* equivalent of xc_dom_mem_init */
-    dom->arch_hooks = xc_dom_find_arch_hooks(xc_handle, dom->guest_type);
+    if (xc_dom_set_arch_hooks(dom)) {
+        grub_printf("xc_dom_set_arch_hooks failed\n");
+        errnum = ERR_EXEC_FORMAT;
+        goto out;
+    }
     dom->total_pages = start_info.nr_pages;
 
     /* equivalent of arch_setup_meminit */

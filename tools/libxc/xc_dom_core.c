@@ -710,19 +710,30 @@ void xc_dom_register_arch_hooks(struct xc_dom_arch *hooks)
     first_hook = hooks;
 }
 
-struct xc_dom_arch *xc_dom_find_arch_hooks(xc_interface *xch, char *guest_type)
+int xc_dom_set_arch_hooks(struct xc_dom_image *dom)
 {
     struct xc_dom_arch *hooks = first_hook;
 
     while (  hooks != NULL )
     {
-        if ( !strcmp(hooks->guest_type, guest_type))
-            return hooks;
+        if ( !strcmp(hooks->guest_type, dom->guest_type) )
+        {
+            if ( hooks->arch_private_size )
+            {
+                dom->arch_private = malloc(hooks->arch_private_size);
+                if ( dom->arch_private == NULL )
+                    return -1;
+                memset(dom->arch_private, 0, hooks->arch_private_size);
+                dom->alloc_malloc += hooks->arch_private_size;
+            }
+            dom->arch_hooks = hooks;
+            return 0;
+        }
         hooks = hooks->next;
     }
-    xc_dom_panic(xch, XC_INVALID_KERNEL,
-                 "%s: not found (type %s)", __FUNCTION__, guest_type);
-    return NULL;
+    xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                 "%s: not found (type %s)", __FUNCTION__, dom->guest_type);
+    return -1;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -734,6 +745,7 @@ void xc_dom_release(struct xc_dom_image *dom)
     if ( dom->phys_pages )
         xc_dom_unmap_all(dom);
     xc_dom_free_all(dom);
+    free(dom->arch_private);
     free(dom);
 }
 
@@ -924,8 +936,7 @@ int xc_dom_mem_init(struct xc_dom_image *dom, unsigned int mem_mb)
     unsigned int page_shift;
     xen_pfn_t nr_pages;
 
-    dom->arch_hooks = xc_dom_find_arch_hooks(dom->xch, dom->guest_type);
-    if ( dom->arch_hooks == NULL )
+    if ( xc_dom_set_arch_hooks(dom) )
     {
         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR, "%s: arch hooks not set",
                      __FUNCTION__);

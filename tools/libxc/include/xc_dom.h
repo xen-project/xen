@@ -178,6 +178,9 @@ struct xc_dom_image {
     unsigned int *vnode_to_pnode;
     unsigned int nr_vnodes;
 
+    /* domain type/architecture specific data */
+    void *arch_private;
+
     /* kernel loader */
     struct xc_dom_arch *arch_hooks;
     /* allocate up to pfn_alloc_end */
@@ -240,6 +243,7 @@ struct xc_dom_arch {
     char *native_protocol;
     int page_shift;
     int sizeof_pfn;
+    int arch_private_size;
 
     struct xc_dom_arch *next;
 };
@@ -293,7 +297,7 @@ int xc_dom_devicetree_mem(struct xc_dom_image *dom, const void *mem,
                           size_t memsize);
 
 int xc_dom_parse_image(struct xc_dom_image *dom);
-struct xc_dom_arch *xc_dom_find_arch_hooks(xc_interface *xch, char *guest_type);
+int xc_dom_set_arch_hooks(struct xc_dom_image *dom);
 int xc_dom_build_image(struct xc_dom_image *dom);
 int xc_dom_update_guest_p2m(struct xc_dom_image *dom);
 
