@@ -1096,6 +1096,9 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     }
 
     /* allocate other pages */
+    if ( dom->arch_hooks->alloc_p2m_list &&
+         dom->arch_hooks->alloc_p2m_list(dom) != 0 )
+        goto err;
     if ( dom->arch_hooks->alloc_magic_pages(dom) != 0 )
         goto err;
     if ( dom->arch_hooks->alloc_pgtables(dom) != 0 )

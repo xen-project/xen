@@ -475,7 +475,7 @@ pfn_error:
 
 /* ------------------------------------------------------------------------ */
 
-static int alloc_magic_pages(struct xc_dom_image *dom)
+static int alloc_p2m_list(struct xc_dom_image *dom)
 {
     size_t p2m_alloc_size = dom->p2m_size * dom->arch_hooks->sizeof_pfn;
 
@@ -487,6 +487,13 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
     if ( dom->p2m_guest == NULL )
         return -1;
 
+    return 0;
+}
+
+/* ------------------------------------------------------------------------ */
+
+static int alloc_magic_pages(struct xc_dom_image *dom)
+{
     /* allocate special pages */
     dom->start_info_pfn = xc_dom_alloc_page(dom, "start info");
     dom->xenstore_pfn = xc_dom_alloc_page(dom, "xenstore");
@@ -1667,6 +1674,7 @@ static struct xc_dom_arch xc_dom_32_pae = {
     .arch_private_size = sizeof(struct xc_dom_image_x86),
     .alloc_magic_pages = alloc_magic_pages,
     .alloc_pgtables = alloc_pgtables_x86_32_pae,
+    .alloc_p2m_list = alloc_p2m_list,
     .setup_pgtables = setup_pgtables_x86_32_pae,
     .start_info = start_info_x86_32,
     .shared_info = shared_info_x86_32,
@@ -1684,6 +1692,7 @@ static struct xc_dom_arch xc_dom_64 = {
     .arch_private_size = sizeof(struct xc_dom_image_x86),
     .alloc_magic_pages = alloc_magic_pages,
     .alloc_pgtables = alloc_pgtables_x86_64,
+    .alloc_p2m_list = alloc_p2m_list,
     .setup_pgtables = setup_pgtables_x86_64,
     .start_info = start_info_x86_64,
     .shared_info = shared_info_x86_64,
