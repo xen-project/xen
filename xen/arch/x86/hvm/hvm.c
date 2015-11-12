@@ -92,9 +92,12 @@ unsigned long __section(".bss.page_aligned")
 static bool_t __initdata opt_hap_enabled = 1;
 boolean_param("hap", opt_hap_enabled);
 
-#ifndef opt_hvm_fep
-bool_t opt_hvm_fep;
+#ifndef NDEBUG
+/* Permit use of the Forced Emulation Prefix in HVM guests */
+static bool_t opt_hvm_fep;
 boolean_param("hvm_fep", opt_hvm_fep);
+#else
+#define opt_hvm_fep 0
 #endif
 
 /* Xen command-line option to enable altp2m */
@@ -4928,6 +4931,49 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
 gp_fault:
     hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
+}
+
+void hvm_ud_intercept(struct cpu_user_regs *regs)
+{
+    struct hvm_emulate_ctxt ctxt;
+
+    if ( opt_hvm_fep )
+    {
+        struct vcpu *cur = current;
+        struct segment_register cs;
+        unsigned long addr;
+        char sig[5]; /* ud2; .ascii "xen" */
+
+        hvm_get_segment_register(cur, x86_seg_cs, &cs);
+        if ( hvm_virtual_to_linear_addr(x86_seg_cs, &cs, regs->eip,
+                                        sizeof(sig), hvm_access_insn_fetch,
+                                        (hvm_long_mode_enabled(cur) &&
+                                         cs.attr.fields.l) ? 64 :
+                                        cs.attr.fields.db ? 32 : 16, &addr) &&
+             (hvm_fetch_from_guest_virt_nofault(sig, addr, sizeof(sig),
+                                                0) == HVMCOPY_okay) &&
+             (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
+        {
+            regs->eip += sizeof(sig);
+            regs->eflags &= ~X86_EFLAGS_RF;
+        }
+    }
+
+    hvm_emulate_prepare(&ctxt, regs);
+
+    switch ( hvm_emulate_one(&ctxt) )
+    {
+    case X86EMUL_UNHANDLEABLE:
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        break;
+    case X86EMUL_EXCEPTION:
+        if ( ctxt.exn_pending )
+            hvm_inject_trap(&ctxt.trap);
+        /* fall through */
+    default:
+        hvm_emulate_writeback(&ctxt);
+        break;
+    }
 }
 
 enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)

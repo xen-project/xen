@@ -551,13 +551,6 @@ static inline bool_t hvm_altp2m_supported(void)
     return hvm_funcs.altp2m_supported;
 }
 
-#ifndef NDEBUG
-/* Permit use of the Forced Emulation Prefix in HVM guests */
-extern bool_t opt_hvm_fep;
-#else
-#define opt_hvm_fep 0
-#endif
-
 /* updates the current hardware p2m */
 void altp2m_vcpu_update_p2m(struct vcpu *v);
 

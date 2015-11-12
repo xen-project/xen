@@ -2749,43 +2749,6 @@ void vmx_enter_realmode(struct cpu_user_regs *regs)
     regs->eflags |= (X86_EFLAGS_VM | X86_EFLAGS_IOPL);
 }
 
-static void vmx_vmexit_ud_intercept(struct cpu_user_regs *regs)
-{
-    struct hvm_emulate_ctxt ctxt;
-    int rc;
-
-    if ( opt_hvm_fep )
-    {
-        char sig[5]; /* ud2; .ascii "xen" */
-
-        if ( (hvm_fetch_from_guest_virt_nofault(
-                  sig, regs->eip, sizeof(sig), 0) == HVMCOPY_okay) &&
-             (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
-        {
-            regs->eip += sizeof(sig);
-            regs->eflags &= ~X86_EFLAGS_RF;
-        }
-    }
-
-    hvm_emulate_prepare(&ctxt, regs);
-
-    rc = hvm_emulate_one(&ctxt);
-
-    switch ( rc )
-    {
-    case X86EMUL_UNHANDLEABLE:
-        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
-        break;
-    case X86EMUL_EXCEPTION:
-        if ( ctxt.exn_pending )
-            hvm_inject_trap(&ctxt.trap);
-        /* fall through */
-    default:
-        hvm_emulate_writeback(&ctxt);
-        break;
-    }
-}
-
 static int vmx_handle_eoi_write(void)
 {
     unsigned long exit_qualification;
@@ -3140,7 +3103,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             break;
         case TRAP_invalid_op:
             HVMTRACE_1D(TRAP, vector);
-            vmx_vmexit_ud_intercept(regs);
+            hvm_ud_intercept(regs);
             break;
         default:
             HVMTRACE_1D(TRAP, vector);

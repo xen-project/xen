@@ -2123,43 +2123,6 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
     return;
 }
 
-static void svm_vmexit_ud_intercept(struct cpu_user_regs *regs)
-{
-    struct hvm_emulate_ctxt ctxt;
-    int rc;
-
-    if ( opt_hvm_fep )
-    {
-        char sig[5]; /* ud2; .ascii "xen" */
-
-        if ( (hvm_fetch_from_guest_virt_nofault(
-                  sig, regs->eip, sizeof(sig), 0) == HVMCOPY_okay) &&
-             (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
-        {
-            regs->eip += sizeof(sig);
-            regs->eflags &= ~X86_EFLAGS_RF;
-        }
-    }
-
-    hvm_emulate_prepare(&ctxt, regs);
-
-    rc = hvm_emulate_one(&ctxt);
-
-    switch ( rc )
-    {
-    case X86EMUL_UNHANDLEABLE:
-        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
-        break;
-    case X86EMUL_EXCEPTION:
-        if ( ctxt.exn_pending )
-            hvm_inject_trap(&ctxt.trap);
-        /* fall through */
-    default:
-        hvm_emulate_writeback(&ctxt);
-        break;
-    }
-}
-
 static int svm_is_erratum_383(struct cpu_user_regs *regs)
 {
     uint64_t msr_content;
@@ -2491,7 +2454,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_EXCEPTION_UD:
-        svm_vmexit_ud_intercept(regs);
+        hvm_ud_intercept(regs);
         break;
 
     /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
