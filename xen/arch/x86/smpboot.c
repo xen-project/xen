@@ -1084,7 +1084,7 @@ void __init smp_intr_init(void)
         vector = alloc_hipriority_vector();
         per_cpu(vector_irq, cpu)[vector] = irq;
         irq_to_desc(irq)->arch.vector = vector;
-        cpumask_setall(irq_to_desc(irq)->arch.cpu_mask);
+        cpumask_copy(irq_to_desc(irq)->arch.cpu_mask, &cpu_online_map);
     }
 
     /* Direct IPI vectors. */
