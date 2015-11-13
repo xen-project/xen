@@ -277,13 +277,14 @@ Flag to indicate whether to probe for a CMOS Real Time Clock irrespective of
 ACPI indicating none to be there.
 
 ### com1,com2
-> `= <baud>[/<clock_hz>][,[DPS][,[<io-base>|pci|amt][,[<irq>][,[<port-bdf>][,[<bridge-bdf>]]]]]]`
+> `= <baud>[/<base-baud>][,[DPS][,[<io-base>|pci|amt][,[<irq>][,[<port-bdf>][,[<bridge-bdf>]]]]]]`
 
 Both option `com1` and `com2` follow the same format.
 
 * `<baud>` may be either an integer baud rate, or the string `auto` if
   the bootloader or other earlier firmware has already set it up.
-* Optionally, a clock speed measured in hz can be specified.
+* Optionally, the base baud rate (usually the highest baud rate the
+  device can communicate at) can be specified.
 * `DPS` represents the number of data bits, the parity, and the number
   of stop bits.
   * `D` is an integer between 5 and 8 for the number of data bits.
@@ -730,9 +731,11 @@ Controls EPT related features.
 >> Have hardware keep accessed/dirty (A/D) bits updated.
 
 ### gdb
-> `= <baud>[/<clock_hz>][,DPS[,<io-base>[,<irq>[,<port-bdf>[,<bridge-bdf>]]]] | pci | amt ] `
+> `= com1[H,L] | com2[H,L] | dbgp`
 
-Specify the serial parameters for the GDB stub.
+> Default: ``
+
+Specify which console gdbstub should use. See **console**.
 
 ### gnttab\_max\_frames
 > `= <integer>`

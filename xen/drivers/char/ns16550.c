@@ -33,7 +33,7 @@
 
 /*
  * Configure serial port with a string:
- *   <baud>[/<clock_hz>][,DPS[,<io-base>[,<irq>[,<port-bdf>[,<bridge-bdf>]]]]].
+ *   <baud>[/<base_baud>][,DPS[,<io-base>[,<irq>[,<port-bdf>[,<bridge-bdf>]]]]].
  * The tail of the string can be omitted if platform defaults are sufficient.
  * If the baud rate is pre-configured, perhaps by a bootloader, then 'auto'
  * can be specified in place of a numeric baud rate. Polled mode is specified
@@ -66,10 +66,10 @@ static struct ns16550 {
     bool_t dw_usr_bsy;
 #ifdef HAS_PCI
     /* PCI card parameters. */
-    unsigned int pb_bdf[3]; /* pci bridge BDF */
-    unsigned int ps_bdf[3]; /* pci serial port BDF */
     bool_t pb_bdf_enable;   /* if =1, pb-bdf effective, port behind bridge */
     bool_t ps_bdf_enable;   /* if =1, ps_bdf effective, port on pci card */
+    unsigned int pb_bdf[3]; /* pci bridge BDF */
+    unsigned int ps_bdf[3]; /* pci serial port BDF */
     u32 bar;
     u32 bar64;
     u16 cr;
@@ -345,7 +345,7 @@ static const struct ns16550_config_mmio __initconst uart_config[] =
 
 static void ns16550_delayed_resume(void *data);
 
-static char ns_read_reg(struct ns16550 *uart, int reg)
+static u8 ns_read_reg(struct ns16550 *uart, unsigned int reg)
 {
     void __iomem *addr = uart->remapped_io_base + (reg << uart->reg_shift);
 #ifdef HAS_IOPORTS
@@ -363,7 +363,7 @@ static char ns_read_reg(struct ns16550 *uart, int reg)
     }
 }
 
-static void ns_write_reg(struct ns16550 *uart, int reg, char c)
+static void ns_write_reg(struct ns16550 *uart, unsigned int reg, u8 c)
 {
     void __iomem *addr = uart->remapped_io_base + (reg << uart->reg_shift);
 #ifdef HAS_IOPORTS
@@ -386,7 +386,7 @@ static void ns_write_reg(struct ns16550 *uart, int reg, char c)
 
 static int ns16550_ioport_invalid(struct ns16550 *uart)
 {
-    return (unsigned char)ns_read_reg(uart, UART_IER) == 0xff;
+    return ns_read_reg(uart, UART_IER) == 0xff;
 }
 
 static void ns16550_interrupt(
@@ -399,7 +399,8 @@ static void ns16550_interrupt(
 
     while ( !(ns_read_reg(uart, UART_IIR) & UART_IIR_NOINT) )
     {
-        char lsr = ns_read_reg(uart, UART_LSR);
+        u8 lsr = ns_read_reg(uart, UART_LSR);
+
         if ( (lsr & uart->lsr_mask) == uart->lsr_mask )
             serial_tx_interrupt(port, regs);
         if ( lsr & UART_LSR_DR )
@@ -530,7 +531,12 @@ static void ns16550_setup_preirq(struct ns16550 *uart)
         /* Baud rate already set: read it out from the divisor latch. */
         divisor  = ns_read_reg(uart, UART_DLL);
         divisor |= ns_read_reg(uart, UART_DLM) << 8;
-        uart->baud = uart->clock_hz / (divisor << 4);
+        if ( divisor )
+            uart->baud = uart->clock_hz / (divisor << 4);
+        else
+            printk(XENLOG_ERR
+                   "Automatic baud rate determination was requested,"
+                   " but a baud rate was not set up\n");
     }
     ns_write_reg(uart, UART_LCR, lcr);
 
@@ -945,8 +951,8 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
                     size = len & PCI_BASE_ADDRESS_IO_MASK;
                     size &= -size;
 
-                    /* Not 8 bytes */
-                    if ( size != 0x8 )
+                    /* Not at least 8 bytes */
+                    if ( size < 8 )
                         continue;
 
                     uart->io_base = bar & ~PCI_BASE_ADDRESS_SPACE_IO;
