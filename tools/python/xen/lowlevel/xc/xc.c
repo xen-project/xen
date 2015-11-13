@@ -132,7 +132,7 @@ static PyObject *pyxc_domain_create(XcObject *self,
     }
 
     if ( (ret = xc_domain_create(self->xc_handle, ssidref,
-                                 handle, flags, &dom)) < 0 )
+                                 handle, flags, &dom, NULL)) < 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
     if ( target )

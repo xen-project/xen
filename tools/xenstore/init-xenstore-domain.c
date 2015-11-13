@@ -28,7 +28,7 @@ static int build(xc_interface *xch, int argc, char** argv)
 
 	rv = xc_flask_context_to_sid(xch, argv[3], strlen(argv[3]), &ssid);
 	if (rv) goto err;
-	rv = xc_domain_create(xch, ssid, handle, 0, &domid);
+	rv = xc_domain_create(xch, ssid, handle, 0, &domid, NULL);
 	if (rv) goto err;
 	rv = xc_domain_max_vcpus(xch, domid, 1);
 	if (rv) goto err;

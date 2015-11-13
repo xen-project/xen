@@ -528,9 +528,8 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
     /* Valid domid here means we're soft resetting. */
     if (!libxl_domid_valid_guest(*domid)) {
-        ret = xc_domain_create_config(ctx->xch, info->ssidref,
-                                      handle, flags, domid,
-                                      xc_config);
+        ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid,
+                               xc_config);
         if (ret < 0) {
             LOGE(ERROR, "domain creation fail");
             rc = ERROR_FAIL;

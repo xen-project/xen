@@ -175,7 +175,7 @@ CAMLprim value stub_xc_domain_create(value xch, value ssidref,
 	}
 
 	caml_enter_blocking_section();
-	result = xc_domain_create(_H(xch), c_ssidref, h, c_flags, &domid);
+	result = xc_domain_create(_H(xch), c_ssidref, h, c_flags, &domid, NULL);
 	caml_leave_blocking_section();
 
 	if (result < 0)
