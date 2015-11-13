@@ -1185,12 +1185,6 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                         (gc, "file=%s,if=ide,index=%d,readonly=%s,media=cdrom,format=%s,cache=writeback,id=ide-%i",
                          disks[i].pdev_path, disk, disks[i].readwrite ? "off" : "on", format, dev_number);
             } else {
-                if (!disks[i].readwrite) {
-                    LOG(ERROR,
-                        "qemu-xen doesn't support read-only disk drivers");
-                    return ERROR_INVAL;
-                }
-
                 if (disks[i].format == LIBXL_DISK_FORMAT_EMPTY) {
                     LOG(WARN, "cannot support"" empty disk format for %s",
                         disks[i].vdev);
@@ -1218,29 +1212,38 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                  * For other disks we translate devices 0..3 into
                  * hd[a-d] and ignore the rest.
                  */
-                if (strncmp(disks[i].vdev, "sd", 2) == 0)
+                if (strncmp(disks[i].vdev, "sd", 2) == 0) {
                     drive = libxl__sprintf
-                        (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s,cache=writeback",
-                         pdev_path, disk, format);
-                else if (strncmp(disks[i].vdev, "xvd", 3) == 0)
+                        (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s,readonly=%s,cache=writeback",
+                         pdev_path, disk, format, disks[i].readwrite ? "off" : "on");
+                } else if (strncmp(disks[i].vdev, "xvd", 3) == 0) {
                     /*
                      * Do not add any emulated disk when PV disk are
                      * explicitly asked for.
                      */
                     continue;
-                else if (disk < 6 && b_info->u.hvm.hdtype == LIBXL_HDTYPE_AHCI) {
+                } else if (disk < 6 && b_info->u.hvm.hdtype == LIBXL_HDTYPE_AHCI) {
+                    if (!disks[i].readwrite) {
+                        LOG(ERROR, "qemu-xen doesn't support read-only AHCI disk drivers");
+                        return ERROR_INVAL;
+                    }
                     flexarray_vappend(dm_args, "-drive",
                         GCSPRINTF("file=%s,if=none,id=ahcidisk-%d,format=%s,cache=writeback",
                         pdev_path, disk, format),
                         "-device", GCSPRINTF("ide-hd,bus=ahci0.%d,unit=0,drive=ahcidisk-%d",
                         disk, disk), NULL);
                     continue;
-                } else if (disk < 4)
+                } else if (disk < 4) {
+                    if (!disks[i].readwrite) {
+                        LOG(ERROR, "qemu-xen doesn't support read-only IDE disk drivers");
+                        return ERROR_INVAL;
+                    }
                     drive = libxl__sprintf
                         (gc, "file=%s,if=ide,index=%d,media=disk,format=%s,cache=writeback",
                          pdev_path, disk, format);
-                else
+                } else {
                     continue; /* Do not emulate this disk */
+                }
             }
 
             flexarray_append(dm_args, "-drive");
