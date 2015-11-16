@@ -1039,7 +1039,7 @@ static void __init setup_IO_APIC_irqs(void)
                 disable_8259A_irq(irq_to_desc(irq));
 
             desc = irq_to_desc(irq);
-            SET_DEST(entry, logical, cpu_mask_to_apicid(desc->arch.cpu_mask));
+            SET_DEST(entry, logical, get_apic_id());
             spin_lock_irqsave(&ioapic_lock, flags);
             __ioapic_write_entry(apic, pin, 0, entry);
             set_native_irq_info(irq, TARGET_CPUS);
