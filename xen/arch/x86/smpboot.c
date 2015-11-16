@@ -387,7 +387,7 @@ void start_secondary(void *unused)
      * this lock ensures we don't half assign or remove an irq from a cpu.
      */
     lock_vector_lock();
-    __setup_vector_irq(cpu);
+    setup_vector_irq(cpu);
     cpumask_set_cpu(cpu, &cpu_online_map);
     unlock_vector_lock();
 
@@ -854,7 +854,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
     {
         printk("weird, boot CPU (#%d) not listed by the BIOS.\n",
                boot_cpu_physical_apicid);
-        physid_set(hard_smp_processor_id(), phys_cpu_present_map);
+        physid_set(get_apic_id(), phys_cpu_present_map);
     }
 
     /* If we couldn't find a local APIC, then get out of here now! */

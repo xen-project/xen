@@ -162,13 +162,13 @@ static inline u32 _phys_pkg_id(u32 cpuid_apic, int index_msb)
 /*
  * cpuid returns the value latched in the HW at reset, not the APIC ID
  * register's value.  For any box whose BIOS changes APIC IDs, like
- * clustered APIC systems, we must use hard_smp_processor_id.
+ * clustered APIC systems, we must use get_apic_id().
  *
  * See Intel's IA-32 SW Dev's Manual Vol2 under CPUID.
  */
 static inline u32 phys_pkg_id(u32 cpuid_apic, int index_msb)
 {
-	return _phys_pkg_id(hard_smp_processor_id(), index_msb);
+	return _phys_pkg_id(get_apic_id(), index_msb);
 }
 
 /* Do minimum CPU detection early.

@@ -167,7 +167,7 @@ extern struct irq_desc *irq_desc;
 void lock_vector_lock(void);
 void unlock_vector_lock(void);
 
-void __setup_vector_irq(int cpu);
+void setup_vector_irq(unsigned int cpu);
 
 void move_native_irq(struct irq_desc *);
 void move_masked_irq(struct irq_desc *);

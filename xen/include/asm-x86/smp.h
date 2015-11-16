@@ -54,8 +54,6 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm);
  */
 #define raw_smp_processor_id() (get_processor_id())
 
-int hard_smp_processor_id(void);
-
 void __stop_this_cpu(void);
 
 long cpu_up_helper(void *data);
