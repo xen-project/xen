@@ -255,9 +255,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= 256035e01a1aa5739e34f245f3b1e9e8ee204210
-# Thu Jul 23 11:08:38 2015 +0100
-# arm: interrupt controller
+MINIOS_UPSTREAM_REVISION ?= 22d01aab99180539b38b13ba30f0e1cd62b72147
+# Tue Oct 27 15:43:28 2015 +0000
+# xenbus: notify the other end when necessary
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 # Tue Mar 17 10:52:16 2015 -0400
