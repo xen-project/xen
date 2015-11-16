@@ -1843,7 +1843,7 @@ static void __init unlock_ExtINT_logic(void)
 
     entry1.dest_mode = 0;			/* physical delivery */
     entry1.mask = 0;			/* unmask IRQ now */
-    SET_DEST(entry1, physical, hard_smp_processor_id());
+    SET_DEST(entry1, physical, get_apic_id());
     entry1.delivery_mode = dest_ExtINT;
     entry1.polarity = entry0.polarity;
     entry1.trigger = 0;

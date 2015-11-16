@@ -20,6 +20,7 @@
 
 #include <asm/processor.h>
 #include <asm/system.h>
+#include <asm/apic.h>
 #include <asm/msr.h>
 #include <asm/p2m.h>
 
@@ -980,7 +981,7 @@ static void do_mc_get_cpu_info(void *v)
         cpuid(1, &junk, &ebx, &junk, &junk);
         xcp->mc_clusterid = (ebx >> 24) & 0xff;
     } else
-        xcp->mc_clusterid = hard_smp_processor_id();
+        xcp->mc_clusterid = get_apic_id();
 }
 
 
