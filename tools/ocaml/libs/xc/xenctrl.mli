@@ -61,7 +61,7 @@ type compile_info = {
   compile_domain : string;
   compile_date : string;
 }
-type shutdown_reason = Poweroff | Reboot | Suspend | Crash | Watchdog
+type shutdown_reason = Poweroff | Reboot | Suspend | Crash | Watchdog | Soft_reset
 
 type domain_create_flag = CDF_HVM | CDF_HAP
 
