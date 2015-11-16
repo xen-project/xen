@@ -387,7 +387,7 @@ void start_secondary(void *unused)
      * this lock ensures we don't half assign or remove an irq from a cpu.
      */
     lock_vector_lock();
-    __setup_vector_irq(cpu);
+    setup_vector_irq(cpu);
     cpumask_set_cpu(cpu, &cpu_online_map);
     unlock_vector_lock();
 
