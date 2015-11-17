@@ -442,8 +442,7 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
                 }
                 vncarg = vnc->listen;
             } else {
-                vncarg = GCSPRINTF("%s:%d", vnc->listen,
-                                        vnc->display);
+                vncarg = GCSPRINTF("%s:%d", vnc->listen, vnc->display);
             }
         } else
             vncarg = GCSPRINTF("127.0.0.1:%d", vnc->display);
@@ -517,8 +516,7 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
 
         if (b_info->video_memkb) {
             flexarray_vappend(dm_args, "-videoram",
-                    GCSPRINTF("%d",
-                                   libxl__sizekb_to_mb(b_info->video_memkb)),
+                    GCSPRINTF("%d", libxl__sizekb_to_mb(b_info->video_memkb)),
                     NULL);
         }
 
@@ -683,8 +681,7 @@ static char *dm_spice_options(libxl__gc *gc,
             return NULL;
         }
     }
-    opt = GCSPRINTF("port=%d,tls-port=%d",
-                         spice->port, spice->tls_port);
+    opt = GCSPRINTF("port=%d,tls-port=%d", spice->port, spice->tls_port);
     if (spice->host)
         opt = GCSPRINTF("%s,addr=%s", opt, spice->host);
     if (libxl_defbool_val(spice->disable_ticketing))
@@ -692,18 +689,17 @@ static char *dm_spice_options(libxl__gc *gc,
     else
         opt = GCSPRINTF("%s,password=%s", opt, spice->passwd);
     opt = GCSPRINTF("%s,agent-mouse=%s", opt,
-                         libxl_defbool_val(spice->agent_mouse) ? "on" : "off");
+                    libxl_defbool_val(spice->agent_mouse) ? "on" : "off");
 
     if (!libxl_defbool_val(spice->clipboard_sharing))
         opt = GCSPRINTF("%s,disable-copy-paste", opt);
 
     if (spice->image_compression)
         opt = GCSPRINTF("%s,image-compression=%s", opt,
-                             spice->image_compression);
+                        spice->image_compression);
 
     if (spice->streaming_video)
-        opt = GCSPRINTF("%s,streaming-video=%s", opt,
-                             spice->streaming_video);
+        opt = GCSPRINTF("%s,streaming-video=%s", opt, spice->streaming_video);
 
     return opt;
 }
@@ -860,8 +856,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 }
                 vncarg = vnc->listen;
             } else {
-                vncarg = GCSPRINTF("%s:%d", vnc->listen,
-                                        vnc->display);
+                vncarg = GCSPRINTF("%s:%d", vnc->listen, vnc->display);
             }
         } else
             vncarg = GCSPRINTF("127.0.0.1:%d", vnc->display);
@@ -1029,8 +1024,9 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             if (b_info->u.hvm.spice.usbredirection >= 0 &&
                 b_info->u.hvm.spice.usbredirection < 5) {
                 for (i = 1; i <= b_info->u.hvm.spice.usbredirection; i++)
-                    flexarray_vappend(dm_args, "-chardev", GCSPRINTF(
-                        "spicevmc,name=usbredir,id=usbrc%d", i), "-device",
+                    flexarray_vappend(dm_args, "-chardev",
+                        GCSPRINTF("spicevmc,name=usbredir,id=usbrc%d", i),
+                        "-device",
                         GCSPRINTF("usb-redir,chardev=usbrc%d,"
                         "id=usbrc%d", i, i), NULL);
             } else {
@@ -1052,31 +1048,30 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 nr_set_cpus = libxl_bitmap_count_set(&b_info->avail_vcpus);
 
                 flexarray_append(dm_args, GCSPRINTF("%d,maxcpus=%d",
-                                                         nr_set_cpus,
-                                                         b_info->max_vcpus));
+                                                    nr_set_cpus,
+                                                    b_info->max_vcpus));
             } else
-                flexarray_append(dm_args, GCSPRINTF("%d",
-                                                         b_info->max_vcpus));
+                flexarray_append(dm_args, GCSPRINTF("%d", b_info->max_vcpus));
         }
         for (i = 0; i < num_nics; i++) {
             if (nics[i].nictype == LIBXL_NIC_TYPE_VIF_IOEMU) {
-                char *smac = GCSPRINTF(
-                                LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nics[i].mac));
+                char *smac = GCSPRINTF(LIBXL_MAC_FMT,
+                                       LIBXL_MAC_BYTES(nics[i].mac));
                 const char *ifname = libxl__device_nic_devname(gc,
                                                 guest_domid, nics[i].devid,
                                                 LIBXL_NIC_TYPE_VIF_IOEMU);
                 flexarray_append(dm_args, "-device");
                 flexarray_append(dm_args,
                    GCSPRINTF("%s,id=nic%d,netdev=net%d,mac=%s",
-                                                nics[i].model, nics[i].devid,
-                                                nics[i].devid, smac));
+                             nics[i].model, nics[i].devid,
+                             nics[i].devid, smac));
                 flexarray_append(dm_args, "-netdev");
-                flexarray_append(dm_args, GCSPRINTF(
-                                          "type=tap,id=net%d,ifname=%s,"
-                                          "script=%s,downscript=%s",
-                                          nics[i].devid, ifname,
-                                          libxl_tapif_script(gc),
-                                          libxl_tapif_script(gc)));
+                flexarray_append(dm_args,
+                                 GCSPRINTF("type=tap,id=net%d,ifname=%s,"
+                                           "script=%s,downscript=%s",
+                                           nics[i].devid, ifname,
+                                           libxl_tapif_script(gc),
+                                           libxl_tapif_script(gc)));
                 ioemu_nics++;
             }
         }
@@ -1640,7 +1635,7 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
             char *name;
             case STUBDOM_CONSOLE_LOGGING:
                 name = GCSPRINTF("qemu-dm-%s",
-                                      libxl_domid_to_name(ctx, guest_domid));
+                                 libxl_domid_to_name(ctx, guest_domid));
                 ret = libxl_create_logfile(ctx, name, &filename);
                 if (ret) goto out;
                 console[i].output = GCSPRINTF("file:%s", filename);
@@ -1828,9 +1823,7 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
          * unless we're running qemu-traditional and vNUMA is not
          * configured. */
         libxl__xs_write(gc, XBT_NULL,
-                        GCSPRINTF(
-                                       "%s/hvmloader/allow-memory-relocate",
-                                       path),
+                        GCSPRINTF("%s/hvmloader/allow-memory-relocate", path),
                         "%d",
                         b_info->device_model_version==LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL &&
                         !libxl__vnuma_configured(b_info));

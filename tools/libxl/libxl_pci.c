@@ -327,7 +327,7 @@ static int get_all_assigned_devices(libxl__gc *gc, libxl_device_pci **list, int 
 
             for(j = 0; j < ndev; j++) {
                 devpath = GCSPRINTF("/local/domain/0/backend/pci/%s/0/dev-%u",
-                                        domlist[i], j);
+                                    domlist[i], j);
                 bdf = libxl__xs_read(gc, XBT_NULL, devpath);
                 if ( bdf ) {
                     unsigned dom, bus, dev, func;
@@ -382,7 +382,7 @@ static int sysfs_write_bdf(libxl__gc *gc, const char * sysfs_path,
     }
 
     buf = GCSPRINTF(PCI_BDF, pcidev->domain, pcidev->bus,
-                         pcidev->dev, pcidev->func);
+                    pcidev->dev, pcidev->func);
     rc = write(fd, buf, strlen(buf));
     /* Annoying to have two if's, but we need the errno */
     if (rc < 0)
@@ -667,8 +667,8 @@ static int pciback_dev_is_assigned(libxl__gc *gc, libxl_device_pci *pcidev)
     }
 
     spath = GCSPRINTF(SYSFS_PCIBACK_DRIVER"/"PCI_BDF,
-                           pcidev->domain, pcidev->bus,
-                           pcidev->dev, pcidev->func);
+                      pcidev->domain, pcidev->bus,
+                      pcidev->dev, pcidev->func);
     rc = lstat(spath, &st);
 
     if( rc == 0 )
@@ -729,10 +729,10 @@ static void pci_assignable_driver_path_write(libxl__gc *gc,
     char *path;
 
     path = GCSPRINTF(PCIBACK_INFO_PATH"/"PCI_BDF_XSPATH"/driver_path",
-                          pcidev->domain,
-                          pcidev->bus,
-                          pcidev->dev,
-                          pcidev->func);
+                     pcidev->domain,
+                     pcidev->bus,
+                     pcidev->dev,
+                     pcidev->func);
     if ( libxl__xs_write(gc, XBT_NULL, path, "%s", driver_path) < 0 ) {
         LOGE(WARN, "Write of %s to node %s failed.", driver_path, path);
     }
@@ -758,10 +758,10 @@ static void pci_assignable_driver_path_remove(libxl__gc *gc,
     /* Remove the xenstore entry */
     xs_rm(ctx->xsh, XBT_NULL,
           GCSPRINTF(PCIBACK_INFO_PATH "/" PCI_BDF_XSPATH,
-                         pcidev->domain,
-                         pcidev->bus,
-                         pcidev->dev,
-                         pcidev->func) );
+                    pcidev->domain,
+                    pcidev->bus,
+                    pcidev->dev,
+                    pcidev->func) );
 }
 
 static int libxl__device_pci_assignable_add(libxl__gc *gc,
@@ -1032,7 +1032,7 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
     }
 
     sysfs_path = GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
-                                pcidev->bus, pcidev->dev, pcidev->func);
+                           pcidev->bus, pcidev->dev, pcidev->func);
     f = fopen(sysfs_path, "r");
     start = end = flags = size = 0;
     irq = 0;
@@ -1382,7 +1382,7 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
         assert(type == LIBXL_DOMAIN_TYPE_PV);
 
         char *sysfs_path = GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
-                                         pcidev->bus, pcidev->dev, pcidev->func);
+                                     pcidev->bus, pcidev->dev, pcidev->func);
         FILE *f = fopen(sysfs_path, "r");
         unsigned int start = 0, end = 0, flags = 0, size = 0;
         int irq = 0;
@@ -1418,7 +1418,7 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
         fclose(f);
 skip1:
         sysfs_path = GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/irq", pcidev->domain,
-                                   pcidev->bus, pcidev->dev, pcidev->func);
+                               pcidev->bus, pcidev->dev, pcidev->func);
         f = fopen(sysfs_path, "r");
         if (f == NULL) {
             LOGE(ERROR, "Couldn't open %s", sysfs_path);
@@ -1626,8 +1626,7 @@ int libxl__grant_vga_iomem_permission(libxl__gc *gc, const uint32_t domid,
         libxl_device_pci *pcidev = &d_config->pcidevs[i];
         char *pci_device_class_path =
             GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/class",
-                           pcidev->domain, pcidev->bus, pcidev->dev,
-                           pcidev->func);
+                      pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
         int read_items;
         unsigned long pci_device_class;
 

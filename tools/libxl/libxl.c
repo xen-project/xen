@@ -1374,8 +1374,8 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
     libxl_device_disk *disk = &ev->u.disk_eject.disk;
     
     backend = libxl__xs_read(gc, XBT_NULL,
-                             GCSPRINTF("%.*s/backend",
-                                            (int)strlen(wpath)-6, wpath));
+                             GCSPRINTF("%.*s/backend", (int)strlen(wpath)-6,
+                                       wpath));
 
     sscanf(backend,
             "/local/domain/%d/backend/%" TOSTRING(BACKEND_STRING_SIZE)
@@ -1693,8 +1693,7 @@ static void devices_destroy_cb(libxl__egc *egc,
         LOGE(ERROR, "xs_rm failed for %s", dom_path);
 
     xs_rm(ctx->xsh, XBT_NULL, libxl__xs_libxl_path(gc, domid));
-    xs_rm(ctx->xsh, XBT_NULL, GCSPRINTF(
-                                "/local/domain/%d/hvmloader", domid));
+    xs_rm(ctx->xsh, XBT_NULL, GCSPRINTF( "/local/domain/%d/hvmloader", domid));
 
     /* This is async operation, we already hold CTX lock */
     lock = libxl__lock_domain_userdata(gc, domid);
@@ -1940,13 +1939,13 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
     port = atoi(vnc_port) - 5900;
 
     vnc_listen = libxl__xs_read(gc, XBT_NULL,
-                                GCSPRINTF(
-                            "/local/domain/%d/console/vnc-listen", domid));
+                                GCSPRINTF("/local/domain/%d/console/vnc-listen",
+                                          domid));
 
     if ( autopass )
         vnc_pass = libxl__xs_read(gc, XBT_NULL,
-                                  GCSPRINTF(
-                            "/local/domain/%d/console/vnc-pass", domid));
+                                  GCSPRINTF("/local/domain/%d/console/vnc-pass",
+					    domid));
 
     if ( NULL == vnc_listen )
         vnc_listen = "localhost";
@@ -2746,8 +2745,8 @@ int libxl_vdev_to_device_disk(libxl_ctx *ctx, uint32_t domid,
         goto out;
     }
     path = libxl__xs_read(gc, XBT_NULL,
-                          GCSPRINTF("%s/device/vbd/%d/backend",
-                                         dompath, devid));
+                          GCSPRINTF("%s/device/vbd/%d/backend", dompath,
+                                    devid));
     if (!path)
         goto out;
 
@@ -2772,7 +2771,7 @@ static int libxl__append_disk_list_of_type(libxl__gc *gc,
     int initial_disks = *ndisks;
 
     be_path = GCSPRINTF("%s/backend/%s/%d",
-                             libxl__xs_get_dompath(gc, 0), type, domid);
+                        libxl__xs_get_dompath(gc, 0), type, domid);
     dir = libxl__xs_directory(gc, XBT_NULL, be_path, &n);
     if (dir && n) {
         libxl_device_disk *tmp;
@@ -3364,8 +3363,7 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     }
 
     flexarray_append(back, "mac");
-    flexarray_append(back,GCSPRINTF(
-                                    LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nic->mac)));
+    flexarray_append(back,GCSPRINTF(LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nic->mac)));
     if (nic->ip) {
         flexarray_append(back, "ip");
         flexarray_append(back, libxl__strdup(gc, nic->ip));
@@ -3516,8 +3514,8 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
         goto out;
 
     path = libxl__xs_read(gc, XBT_NULL,
-                          GCSPRINTF("%s/device/vif/%d/backend",
-                                         dompath, devid));
+                          GCSPRINTF("%s/device/vif/%d/backend", dompath,
+                                    devid));
     if (!path)
         goto out;
 
@@ -3542,8 +3540,8 @@ static int libxl__append_nic_list_of_type(libxl__gc *gc,
     libxl_device_nic *pnic = NULL, *pnic_end = NULL;
     int rc;
 
-    be_path = GCSPRINTF("%s/backend/%s/%d",
-                             libxl__xs_get_dompath(gc, 0), type, domid);
+    be_path = GCSPRINTF("%s/backend/%s/%d", libxl__xs_get_dompath(gc, 0),
+                        type, domid);
     dir = libxl__xs_directory(gc, XBT_NULL, be_path, &n);
     if (dir && n) {
         libxl_device_nic *tmp;
@@ -3910,10 +3908,9 @@ int libxl_device_channel_getinfo(libxl_ctx *ctx, uint32_t domid,
     channelinfo->devid = channel->devid;
 
     fe_path = GCSPRINTF("%s/device/console/%d", dompath,
-                             channelinfo->devid + 1);
+                        channelinfo->devid + 1);
     channelinfo->backend = xs_read(ctx->xsh, XBT_NULL,
-                                   GCSPRINTF("%s/backend",
-                                   fe_path), NULL);
+                                   GCSPRINTF("%s/backend", fe_path), NULL);
     if (!channelinfo->backend) {
         GC_FREE;
         return ERROR_FAIL;
@@ -4751,8 +4748,7 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
 
-    target = libxl__xs_read(gc, t, GCSPRINTF(
-                "%s/memory/target", dompath));
+    target = libxl__xs_read(gc, t, GCSPRINTF("%s/memory/target", dompath));
     if (!target && !domid) {
         if (!xs_transaction_end(ctx->xsh, t, 1))
             goto out_no_transaction;
@@ -4775,8 +4771,7 @@ retry_transaction:
             goto out;
         }
     }
-    memmax = libxl__xs_read(gc, t, GCSPRINTF(
-                "%s/memory/static-max", dompath));
+    memmax = libxl__xs_read(gc, t, GCSPRINTF("%s/memory/static-max", dompath));
     if (!memmax) {
         LOGE(ERROR, "cannot get memory info from %s/memory/static-max",
              dompath);
@@ -4791,8 +4786,8 @@ retry_transaction:
         goto out;
     }
 
-    videoram_s = libxl__xs_read(gc, t, GCSPRINTF(
-                "%s/memory/videoram", dompath));
+    videoram_s = libxl__xs_read(gc, t, GCSPRINTF("%s/memory/videoram",
+                                                 dompath));
     videoram = videoram_s ? atoi(videoram_s) : 0;
 
     if (relative) {
@@ -4882,10 +4877,10 @@ static int libxl__get_memory_target(libxl__gc *gc, uint32_t domid,
     char *dompath = libxl__xs_get_dompath(gc, domid);
     uint32_t target_memkb, max_memkb;
 
-    target = libxl__xs_read(gc, XBT_NULL, GCSPRINTF(
-                    "%s/memory/target", dompath));
-    static_max = libxl__xs_read(gc, XBT_NULL, GCSPRINTF(
-                    "%s/memory/static-max", dompath));
+    target = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/memory/target",
+                                                    dompath));
+    static_max = libxl__xs_read(gc, XBT_NULL,
+                    GCSPRINTF("%s/memory/static-max", dompath));
 
     rc = ERROR_FAIL;
     if ((!target || !static_max) && !domid) {
