@@ -6,6 +6,39 @@
                                    (unsigned long)(n),sizeof(*(ptr))))
 
 /*
+ * Atomic 16 bytes compare and exchange.  Compare OLD with MEM, if
+ * identical, store NEW in MEM.  Return the initial value in MEM.
+ * Success is indicated by comparing RETURN with OLD.
+ *
+ * This function can only be called when cpu_has_cx16 is true.
+ */
+
+static always_inline __uint128_t __cmpxchg16b(
+    volatile void *ptr, const __uint128_t *old, const __uint128_t *new)
+{
+    __uint128_t prev;
+    uint64_t new_high = *new >> 64;
+    uint64_t new_low = *new;
+
+    ASSERT(cpu_has_cx16);
+
+    asm volatile ( "lock; cmpxchg16b %1"
+                   : "=A" (prev), "+m" (*__xg(ptr))
+                   : "c" (new_high), "b" (new_low),
+                     "0" (*old) );
+
+    return prev;
+}
+
+#define cmpxchg16b(ptr, o, n) ({                           \
+    volatile void *_p = (ptr);                             \
+    ASSERT(!((unsigned long)_p & 0xf));                    \
+    BUILD_BUG_ON(sizeof(*(o)) != sizeof(__uint128_t));     \
+    BUILD_BUG_ON(sizeof(*(n)) != sizeof(__uint128_t));     \
+    __cmpxchg16b(_p, (void *)(o), (void *)(n));            \
+})
+
+/*
  * This function causes value _o to be changed to _n at location _p.
  * If this access causes a fault then we return 1, otherwise we return 0.
  * If no fault occurs then _o is updated to the value we saw at _p. If this
