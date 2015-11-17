@@ -76,6 +76,15 @@ VALUES are strings and can take the following forms:
                                 should be inferred. It is intended for
                                 display purposes only.
 
+* MAC_ADDRESS -- 6 integers, in hexadecimal form, separated by ':',
+                 specifying an IEEE 802.3 ethernet MAC address.
+* IPV4_ADDRESS -- 4 integers, in decimal form, separated by '.',
+                  specifying an IP version 4 address as described
+                  IETF RFC 791.
+* IPV6_ADDRESS -- Up to 8 integers, in hexadecimal form, separated
+                  by ':', specifying an IP version 6 address as
+                  described in IETF RFC 4291.
+
 Additional TAGS may follow as a comma separated set of the following
 tags enclosed in square brackets.
 
@@ -420,6 +429,33 @@ If the guest sets this path to "0" then it is indicating that it is
 definitely unable to respond immediately and hence the toolstack should
 defer instantiaton to the next VM start. However, if the path is absent
 then the toolstack may attempt the operation.
+
+#### ~/attr/vif/$DEVID/name = STRING [w]
+
+A domain may write its internal 'friendly' name for a network device
+using this path using UTF-8 encoding. A toolstack or UI may use this
+for display purposes. No particular meaning should be inferred from the
+name.
+
+#### ~/attr/vif/$DEVID/mac/$INDEX = MAC_ADDRESS [w]
+
+Paths of this form may be written by the guest to indicate MAC addresses
+it is currently using. These may be multicast or unicast addresses. For
+any of the paths the value of $INDEX is arbitrary.
+The values written are primarily for display purposes and must not be used
+for packet filtering or routing purposes.
+
+#### ~/attr/vif/$DEVID/ipv4/$INDEX = IPV4_ADDRESS [w]
+#### ~/attr/vif/$DEVID/ipv6/$INDEX = IPV6_ADDRESS [w]
+
+Paths of this form may be written by the guest to indicate IP addresses
+in use by the stack bound to the network frontend. For any of the paths
+the value of $INDEX is arbitrary.
+The values written are primarily for display purposes and must not be used
+for packet filtering or routing purposes. A toolstack may attempt to use an
+address written in one of these paths to, for example, establish a VNC
+session to the guest (although clearly some level of trust is placed
+in the value supplied by the guest in this case).
 
 ### Paths private to the toolstack
 
