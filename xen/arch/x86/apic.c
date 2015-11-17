@@ -522,7 +522,7 @@ out:
 
 void setup_local_APIC(void)
 {
-    unsigned long oldvalue, value, ver, maxlvt;
+    unsigned long oldvalue, value, maxlvt;
     int i, j;
 
     /* Pound the ESR really hard over the head with a big hammer - mbligh */
@@ -533,15 +533,12 @@ void setup_local_APIC(void)
         apic_write(APIC_ESR, 0);
     }
 
-    value = apic_read(APIC_LVR);
-    ver = GET_APIC_VERSION(value);
-
     BUILD_BUG_ON((SPURIOUS_APIC_VECTOR & 0x0f) != 0x0f);
 
     /*
      * Double-check whether this APIC is really registered.
      */
-    if (!APIC_INTEGRATED(ver) || !apic_id_registered())
+    if (!apic_id_registered())
         BUG();
 
     /*
@@ -1358,7 +1355,7 @@ int __init APIC_init_uniprocessor (void)
     /*
      * Complain if the BIOS pretends there is one.
      */
-    if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
+    if (!cpu_has_apic) {
         printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
                boot_cpu_physical_apicid);
         skip_ioapic_setup = 1;

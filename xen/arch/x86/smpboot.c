@@ -385,9 +385,6 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
     /*
      * Be paranoid about clearing APIC errors.
      */
-    if ( !APIC_INTEGRATED(apic_version[phys_apicid]) )
-        return -ENODEV;
-
     apic_read_around(APIC_SPIV);
     apic_write(APIC_ESR, 0);
     apic_read(APIC_ESR);
@@ -835,8 +832,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
     }
 
     /* If we couldn't find a local APIC, then get out of here now! */
-    if ( !APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])
-         || !cpu_has_apic )
+    if ( !cpu_has_apic )
     {
         printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
                boot_cpu_physical_apicid);
