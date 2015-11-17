@@ -409,6 +409,18 @@ A domain writable path. Available for arbitrary domain use.
 A domain may write information about installed PV drivers using
 paths of this form.
 
+#### ~/feature/hotplug/vif = ("0"|"1") [w]
+#### ~/feature/hotplug/vbd = ("0"|"1") [w]
+
+By setting these paths to "1" a guest can indicate to a toolstack
+that it is capable of responding immediately to instantiation of,
+respectively, new vif by bringing online a new PV network device or
+a new vbd by bringing online a new PV block device.
+If the guest sets this path to "0" then it is indicating that it is
+definitely unable to respond immediately and hence the toolstack should
+defer instantiaton to the next VM start. However, if the path is absent
+then the toolstack may attempt the operation.
+
 ### Paths private to the toolstack
 
 #### ~/device-model/$DOMID/state [w]
