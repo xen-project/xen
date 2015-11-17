@@ -830,14 +830,11 @@ static int __init check_existence(struct ns16550 *uart)
 
 #ifdef HAS_PCI
 static int __init
-pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
+pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int bar_idx)
 {
-    uint32_t bar, bar_64 = 0, len, len_64;
-    u64 size, mask, orig_base;
+    u64 orig_base = uart->io_base;
     unsigned int b, d, f, nextf, i;
-    u16 vendor, device;
 
-    orig_base = uart->io_base;
     uart->io_base = 0;
     /* NB. Start at bus 1 to avoid AMT: a plug-in card cannot be on bus 0. */
     for ( b = skip_amt ? 1 : 0; b < 0x100; b++ )
@@ -846,6 +843,9 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
         {
             for ( f = 0; f < 8; f = nextf )
             {
+                uint32_t bar, bar_64 = 0, len, len_64;
+                u64 size;
+
                 nextf = (f || (pci_conf_read16(0, b, d, f, PCI_HEADER_TYPE) &
                                0x80)) ? f + 1 : 8;
 
@@ -869,8 +869,8 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
                 /* MMIO based */
                 if ( !(bar & PCI_BASE_ADDRESS_SPACE_IO) )
                 {
-                    vendor = pci_conf_read16(0, b, d, f, PCI_VENDOR_ID);
-                    device = pci_conf_read16(0, b, d, f, PCI_DEVICE_ID);
+                    u16 vendor = pci_conf_read16(0, b, d, f, PCI_VENDOR_ID);
+                    u16 device = pci_conf_read16(0, b, d, f, PCI_DEVICE_ID);
 
                     pci_conf_write32(0, b, d, f,
                                      PCI_BASE_ADDRESS_0 + bar_idx*4, ~0u);
@@ -889,8 +889,8 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
                                     PCI_BASE_ADDRESS_0 + (bar_idx+1)*4);
                         pci_conf_write32(0, b, d, f,
                                     PCI_BASE_ADDRESS_0 + (bar_idx+1)*4, bar_64);
-                        mask = ((u64)~0 << 32) | PCI_BASE_ADDRESS_MEM_MASK;
-                        size = (((u64)len_64 << 32) | len) & mask;
+                        size  = ((u64)~0 << 32) | PCI_BASE_ADDRESS_MEM_MASK;
+                        size &= ((u64)len_64 << 32) | len;
                     }
                     else
                         size = len & PCI_BASE_ADDRESS_MEM_MASK;
