@@ -65,11 +65,6 @@ static const unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
      LVT_MASK
 };
 
-/* Following could belong in apicdef.h */
-#define APIC_SHORT_MASK                  0xc0000
-#define APIC_DEST_NOSHORT                0x0
-#define APIC_DEST_MASK                   0x800
-
 #define vlapic_lvt_vector(vlapic, lvt_type)                     \
     (vlapic_get_reg(vlapic, lvt_type) & APIC_VECTOR_MASK)
 
