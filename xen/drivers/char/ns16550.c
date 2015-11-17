@@ -931,6 +931,8 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int bar_idx)
                         uart->io_base += bar_idx * uart_param[p].uart_offset;
                         if ( uart_param[p].base_baud )
                             uart->clock_hz = uart_param[p].base_baud * 16;
+                        size = max(8U << uart_param[p].reg_shift,
+                                   uart_param[p].uart_offset);
                         /* Set device and MMIO region read only to Dom0 */
                         uart->enable_ro = 1;
                         break;
