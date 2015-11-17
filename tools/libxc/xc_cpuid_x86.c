@@ -22,12 +22,16 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "xc_private.h"
-#include "xc_cpufeature.h"
 #include <xen/hvm/params.h>
 
-#define bitmaskof(idx)      (1u << (idx))
-#define clear_bit(idx, dst) ((dst) &= ~(1u << (idx)))
-#define set_bit(idx, dst)   ((dst) |= (1u << (idx)))
+enum {
+#define XEN_CPUFEATURE(name, value) X86_FEATURE_##name = value,
+#include <xen/arch-x86/cpufeatureset.h>
+};
+
+#define bitmaskof(idx)      (1u << ((idx) & 31))
+#define clear_bit(idx, dst) ((dst) &= ~bitmaskof(idx))
+#define set_bit(idx, dst)   ((dst) |=  bitmaskof(idx))
 
 #define DEF_MAX_BASE 0x0000000du
 #define DEF_MAX_INTELEXT  0x80000008u
@@ -223,7 +227,6 @@ static void amd_xc_cpuid_policy(xc_interface *xch,
                     bitmaskof(X86_FEATURE_LM) |
                     bitmaskof(X86_FEATURE_PAGE1GB) |
                     bitmaskof(X86_FEATURE_SYSCALL) |
-                    bitmaskof(X86_FEATURE_MP) |
                     bitmaskof(X86_FEATURE_MMXEXT) |
                     bitmaskof(X86_FEATURE_FFXSR) |
                     bitmaskof(X86_FEATURE_3DNOW) |
@@ -280,7 +283,7 @@ static void intel_xc_cpuid_policy(xc_interface *xch,
     case 0x00000001:
         /* ECX[5] is availability of VMX */
         if ( info->nestedhvm )
-            set_bit(X86_FEATURE_VMXE, regs[2]);
+            set_bit(X86_FEATURE_VMX, regs[2]);
         break;
 
     case 0x00000004:
@@ -398,7 +401,7 @@ static void xc_cpuid_hvm_policy(xc_interface *xch,
          */
         regs[1] = (regs[1] & 0x0000ffffu) | ((regs[1] & 0x007f0000u) << 1);
 
-        regs[2] &= (bitmaskof(X86_FEATURE_XMM3) |
+        regs[2] &= (bitmaskof(X86_FEATURE_SSE3) |
                     bitmaskof(X86_FEATURE_PCLMULQDQ) |
                     bitmaskof(X86_FEATURE_SSSE3) |
                     bitmaskof(X86_FEATURE_FMA) |
@@ -408,7 +411,7 @@ static void xc_cpuid_hvm_policy(xc_interface *xch,
                     bitmaskof(X86_FEATURE_SSE4_2) |
                     bitmaskof(X86_FEATURE_MOVBE)  |
                     bitmaskof(X86_FEATURE_POPCNT) |
-                    bitmaskof(X86_FEATURE_AES) |
+                    bitmaskof(X86_FEATURE_AESNI) |
                     bitmaskof(X86_FEATURE_F16C) |
                     bitmaskof(X86_FEATURE_RDRAND) |
                     ((info->xfeature_mask != 0) ?
@@ -435,13 +438,13 @@ static void xc_cpuid_hvm_policy(xc_interface *xch,
                     bitmaskof(X86_FEATURE_MCA) |
                     bitmaskof(X86_FEATURE_CMOV) |
                     bitmaskof(X86_FEATURE_PAT) |
-                    bitmaskof(X86_FEATURE_CLFLSH) |
+                    bitmaskof(X86_FEATURE_CLFLUSH) |
                     bitmaskof(X86_FEATURE_PSE36) |
                     bitmaskof(X86_FEATURE_MMX) |
                     bitmaskof(X86_FEATURE_FXSR) |
-                    bitmaskof(X86_FEATURE_XMM) |
-                    bitmaskof(X86_FEATURE_XMM2) |
-                    bitmaskof(X86_FEATURE_HT));
+                    bitmaskof(X86_FEATURE_SSE) |
+                    bitmaskof(X86_FEATURE_SSE2) |
+                    bitmaskof(X86_FEATURE_HTT));
             
         /* We always support MTRR MSRs. */
         regs[3] |= bitmaskof(X86_FEATURE_MTRR);
@@ -560,15 +563,15 @@ static void xc_cpuid_pv_policy(xc_interface *xch,
         if ( info->vendor == VENDOR_AMD )
             clear_bit(X86_FEATURE_SEP, regs[3]);
         clear_bit(X86_FEATURE_DS, regs[3]);
-        clear_bit(X86_FEATURE_ACC, regs[3]);
+        clear_bit(X86_FEATURE_TM1, regs[3]);
         clear_bit(X86_FEATURE_PBE, regs[3]);
 
         clear_bit(X86_FEATURE_DTES64, regs[2]);
-        clear_bit(X86_FEATURE_MWAIT, regs[2]);
+        clear_bit(X86_FEATURE_MONITOR, regs[2]);
         clear_bit(X86_FEATURE_DSCPL, regs[2]);
-        clear_bit(X86_FEATURE_VMXE, regs[2]);
-        clear_bit(X86_FEATURE_SMXE, regs[2]);
-        clear_bit(X86_FEATURE_EST, regs[2]);
+        clear_bit(X86_FEATURE_VMX, regs[2]);
+        clear_bit(X86_FEATURE_SMX, regs[2]);
+        clear_bit(X86_FEATURE_EIST, regs[2]);
         clear_bit(X86_FEATURE_TM2, regs[2]);
         if ( !info->pv64 )
             clear_bit(X86_FEATURE_CX16, regs[2]);
