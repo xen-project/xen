@@ -37,6 +37,8 @@ before regexp expansion:
   the "other" domain. i.e. ~ refers to the domain providing a service
   while $DOMID is the consumer of that service.
 * $UUID -- a UUID in the form xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+* $INDEX -- an integer used as part of a path when listing a set of
+            values. Typically these integers are contiguous.
 
 VALUES are strings and can take the following forms:
 
@@ -51,6 +53,28 @@ VALUES are strings and can take the following forms:
 * (VALUE | VALUE | ... ) -- a set of alternatives. Alternatives are
   separated by a "|" and all the alternatives are enclosed in "(" and
   ")".
+* DISTRIBUTION -- information about a software distribution, comprised
+                  of 3 or 4 space separated UTF-8 strings as follows:
+
+                  VENDOR -- Commonly used vendor short name,
+                            e.g "Citrix" rather than "Citrix Systems
+                            Inc."
+
+                  PRODUCT -- Commonly used product (e.g. driver) name
+                             without version information.
+
+                  If the toolstack needs to match on either of the above
+                  values it should support Unix glob style matching.
+
+                  VERSION -- A version number that will sort properly
+                             under coreutils version sorting (sort -V)
+                             rules.
+
+                  ATTRIBUTES -- Optional human readable text to denote
+                                attributes of the software, e.g. "debug".
+                                This text is freeform and no meaning
+                                should be inferred. It is intended for
+                                display purposes only.
 
 Additional TAGS may follow as a comma separated set of the following
 tags enclosed in square brackets.
@@ -379,6 +403,11 @@ protocol definition.
 #### ~/data/* [w]
 
 A domain writable path. Available for arbitrary domain use.
+
+#### ~/drivers/$INDEX = DISTRIBUTION [w]
+
+A domain may write information about installed PV drivers using
+paths of this form.
 
 ### Paths private to the toolstack
 
