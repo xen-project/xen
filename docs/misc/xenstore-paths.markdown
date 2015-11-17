@@ -178,9 +178,9 @@ will not relocate guest memory.
 
 The BIOS used by this domain.
 
-#### ~/platform/* [HVM,INTERNAL]
+#### ~/platform/* = ("0"|"1") [HVM,INTERNAL]
 
-Various platform properties.
+Various boolean platform properties.
 
 * acpi -- is ACPI enabled for this domain
 * acpi_s3 -- is ACPI S3 support enabled for this domain
@@ -326,6 +326,41 @@ activities. The guest acknowledges a request by writing the empty
 string back to the command node.
 
 The precise protocol is not yet documented.
+
+#### ~/control/feature-poweroff = (""|"0"|"1") [w]
+#### ~/control/feature-reboot = (""|"0"|"1") [w]
+#### ~/control/feature-suspend = (""|"0"|"1") [w]
+
+These may be initialized to "" by the toolstack and may then be set
+to 0 or 1 by a guest to indicate whether it is capable or incapable,
+respectively, of responding to the corresponding command when written
+to ~/control/shutdown.
+A toolstack may then sample the feature- value at the point of issuing
+a PV control command and respond accordingly:
+
+"0" -> the frontend should not be expected to respond, so fail the
+       control operation
+"1" -> the frontend should be expected to respond, so wait for it to
+       do so and maybe fail the control operation after some reasonable
+       timeout.
+""  -> the frontend may or may not respond, so wait for it to do so and
+       then maybe try an alternative control mechanism after some
+       reasonable timeout.
+
+Since a toolstack may not initialize these paths, and the parent
+~/control path is read-only to a guest, a guest should not expect a
+write to succeed. If it fails the guest may log the failure but should
+continue to process the corresponding command when written to
+~/control/shutdown regardless.
+
+#### ~/control/feature-s3 = (""|"0"|"1") [w,HVM]
+#### ~/control/feature-s4 = (""|"0"|"1") [w,HVM]
+
+These purpose of these feature flags is identical to feature-poweroff,
+feature-reboot and feature-suspend above but concern triggering the
+S3 or S4 power states of HVM guests.
+A toolstack may create these values, but should not sample them unless
+the corresponding acpi_ feature flag is set in ~/platform.
 
 #### ~/control/platform-feature-multiprocessor-suspend = (0|1) []
 
