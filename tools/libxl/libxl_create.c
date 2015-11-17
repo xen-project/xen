@@ -421,7 +421,7 @@ int libxl__domain_build(libxl__gc *gc,
         vments[2] = "image/ostype";
         vments[3] = "hvm";
         vments[4] = "start_time";
-        vments[5] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[5] = GCSPRINTF("%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
 
         localents = libxl__calloc(gc, 9, sizeof(char *));
         i = 0;
@@ -438,7 +438,7 @@ int libxl__domain_build(libxl__gc *gc,
             if (max_ram_below_4g <= HVM_BELOW_4G_MMIO_START) {
                 localents[i++] = "platform/mmio_hole_size";
                 localents[i++] =
-                    libxl__sprintf(gc, "%"PRIu64,
+                    GCSPRINTF("%"PRIu64,
                                    info->u.hvm.mmio_hole_memkb << 10);
             }
         }
@@ -458,7 +458,7 @@ int libxl__domain_build(libxl__gc *gc,
         vments[i++] = "image/kernel";
         vments[i++] = (char *) state->pv_kernel.path;
         vments[i++] = "start_time";
-        vments[i++] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[i++] = GCSPRINTF("%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
         if (state->pv_ramdisk.path) {
             vments[i++] = "image/ramdisk";
             vments[i++] = (char *) state->pv_ramdisk.path;
@@ -555,7 +555,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
         goto out;
     }
 
-    vm_path = libxl__sprintf(gc, "/vm/%s", uuid_string);
+    vm_path = GCSPRINTF("/vm/%s", uuid_string);
     if (!vm_path) {
         LOG(ERROR, "cannot allocate create paths");
         rc = ERROR_FAIL;
@@ -591,36 +591,36 @@ retry_transaction:
     xs_rm(ctx->xsh, t, libxl_path);
     libxl__xs_mkdir(gc, t, libxl_path, noperm, ARRAY_SIZE(noperm));
 
-    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
+    xs_write(ctx->xsh, t, GCSPRINTF("%s/vm", dom_path), vm_path, strlen(vm_path));
     rc = libxl__domain_rename(gc, *domid, 0, info->name, t);
     if (rc)
         goto out;
 
     libxl__xs_mkdir(gc, t,
-                    libxl__sprintf(gc, "%s/cpu", dom_path),
+                    GCSPRINTF("%s/cpu", dom_path),
                     roperm, ARRAY_SIZE(roperm));
     libxl__xs_mkdir(gc, t,
-                    libxl__sprintf(gc, "%s/memory", dom_path),
+                    GCSPRINTF("%s/memory", dom_path),
                     roperm, ARRAY_SIZE(roperm));
     libxl__xs_mkdir(gc, t,
-                    libxl__sprintf(gc, "%s/device", dom_path),
+                    GCSPRINTF("%s/device", dom_path),
                     roperm, ARRAY_SIZE(roperm));
     libxl__xs_mkdir(gc, t,
-                    libxl__sprintf(gc, "%s/control", dom_path),
+                    GCSPRINTF("%s/control", dom_path),
                     roperm, ARRAY_SIZE(roperm));
     if (info->type == LIBXL_DOMAIN_TYPE_HVM)
         libxl__xs_mkdir(gc, t,
-                        libxl__sprintf(gc, "%s/hvmloader", dom_path),
+                        GCSPRINTF("%s/hvmloader", dom_path),
                         roperm, ARRAY_SIZE(roperm));
 
     libxl__xs_mkdir(gc, t,
-                    libxl__sprintf(gc, "%s/control/shutdown", dom_path),
+                    GCSPRINTF("%s/control/shutdown", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
     libxl__xs_mkdir(gc, t,
-                    libxl__sprintf(gc, "%s/device/suspend/event-channel", dom_path),
+                    GCSPRINTF("%s/device/suspend/event-channel", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
     libxl__xs_mkdir(gc, t,
-                    libxl__sprintf(gc, "%s/data", dom_path),
+                    GCSPRINTF("%s/data", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
 
     if (libxl_defbool_val(info->driver_domain)) {
@@ -646,14 +646,14 @@ retry_transaction:
     }
     libxl_vminfo_list_free(vm_list, nb_vm);
 
-    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
-    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/name", vm_path), info->name, strlen(info->name));
+    xs_write(ctx->xsh, t, GCSPRINTF("%s/uuid", vm_path), uuid_string, strlen(uuid_string));
+    xs_write(ctx->xsh, t, GCSPRINTF("%s/name", vm_path), info->name, strlen(info->name));
 
     libxl__xs_writev(gc, t, dom_path, info->xsdata);
-    libxl__xs_writev(gc, t, libxl__sprintf(gc, "%s/platform", dom_path), info->platformdata);
+    libxl__xs_writev(gc, t, GCSPRINTF("%s/platform", dom_path), info->platformdata);
 
-    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/control/platform-feature-multiprocessor-suspend", dom_path), "1", 1);
-    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/control/platform-feature-xs_reset_watches", dom_path), "1", 1);
+    xs_write(ctx->xsh, t, GCSPRINTF("%s/control/platform-feature-multiprocessor-suspend", dom_path), "1", 1);
+    xs_write(ctx->xsh, t, GCSPRINTF("%s/control/platform-feature-xs_reset_watches", dom_path), "1", 1);
     if (!xs_transaction_end(ctx->xsh, t, 0)) {
         if (errno == EAGAIN) {
             t = 0;
@@ -677,7 +677,7 @@ static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
     char *path = NULL;
 
     path = libxl__xs_libxl_path(gc, domid);
-    path = libxl__sprintf(gc, "%s/dm-version", path);
+    path = GCSPRINTF("%s/dm-version", path);
     return libxl__xs_write(gc, XBT_NULL, path, "%s",
         libxl_device_model_version_to_string(b_info->device_model_version));
 }
@@ -1081,7 +1081,7 @@ static void domcreate_stream_done(libxl__egc *egc,
         vments[2] = "image/ostype";
         vments[3] = "hvm";
         vments[4] = "start_time";
-        vments[5] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[5] = GCSPRINTF("%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         vments = libxl__calloc(gc, 11, sizeof(char *));
@@ -1091,7 +1091,7 @@ static void domcreate_stream_done(libxl__egc *egc,
         vments[i++] = "image/kernel";
         vments[i++] = (char *) state->pv_kernel.path;
         vments[i++] = "start_time";
-        vments[i++] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[i++] = GCSPRINTF("%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
         if (state->pv_ramdisk.path) {
             vments[i++] = "image/ramdisk";
             vments[i++] = (char *) state->pv_ramdisk.path;

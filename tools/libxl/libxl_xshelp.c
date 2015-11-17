@@ -54,7 +54,7 @@ int libxl__xs_writev_perms(libxl__gc *gc, xs_transaction_t t,
         return 0;
 
     for (i = 0; kvs[i] != NULL; i += 2) {
-        path = libxl__sprintf(gc, "%s/%s", dir, kvs[i]);
+        path = GCSPRINTF("%s/%s", dir, kvs[i]);
         if (path && kvs[i + 1]) {
             int length = strlen(kvs[i + 1]);
             xs_write(ctx->xsh, t, path, kvs[i + 1], length);
@@ -159,7 +159,7 @@ bool libxl__xs_mkdir(libxl__gc *gc, xs_transaction_t t,
 
 char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid)
 {
-    char *s = libxl__sprintf(gc, "/libxl/%i", domid);
+    char *s = GCSPRINTF("/libxl/%i", domid);
     if (!s)
         LOG(ERROR, "cannot allocate create paths");
     return s;

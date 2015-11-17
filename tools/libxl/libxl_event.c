@@ -580,7 +580,7 @@ static void watchfd_callback(libxl__egc *egc, libxl__ev_fd *ev,
 
 static char *watch_token(libxl__gc *gc, int slotnum, uint32_t counterval)
 {
-    return libxl__sprintf(gc, "%d/%"PRIx32, slotnum, counterval);
+    return GCSPRINTF("%d/%"PRIx32, slotnum, counterval);
 }
 
 static void watches_check_fd_deregister(libxl__gc *gc)

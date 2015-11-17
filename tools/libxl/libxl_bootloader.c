@@ -60,15 +60,15 @@ static void make_bootloader_args(libxl__gc *gc, libxl__bootloader_state *bl,
     ARG(bootloader_path);
 
     if (info->kernel)
-        ARG(libxl__sprintf(gc, "--kernel=%s", info->kernel));
+        ARG(GCSPRINTF("--kernel=%s", info->kernel));
     if (info->ramdisk)
-        ARG(libxl__sprintf(gc, "--ramdisk=%s", info->ramdisk));
+        ARG(GCSPRINTF("--ramdisk=%s", info->ramdisk));
     if (info->cmdline && *info->cmdline != '\0')
-        ARG(libxl__sprintf(gc, "--args=%s", info->cmdline));
+        ARG(GCSPRINTF("--args=%s", info->cmdline));
 
-    ARG(libxl__sprintf(gc, "--output=%s", bl->outputpath));
+    ARG(GCSPRINTF("--output=%s", bl->outputpath));
     ARG("--output-format=simple0");
-    ARG(libxl__sprintf(gc, "--output-directory=%s", bl->outputdir));
+    ARG(GCSPRINTF("--output-directory=%s", bl->outputdir));
 
     if (info->u.pv.bootloader_args) {
         char **p = info->u.pv.bootloader_args;

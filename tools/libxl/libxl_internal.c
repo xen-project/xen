@@ -242,7 +242,7 @@ void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
 char *libxl__abs_path(libxl__gc *gc, const char *s, const char *path)
 {
     if (s[0] == '/') return libxl__strdup(gc, s);
-    return libxl__sprintf(gc, "%s/%s", path, s);
+    return GCSPRINTF("%s/%s", path, s);
 }
 
 
@@ -368,7 +368,7 @@ int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid)
     libxl_device_model_version value;
 
     path = libxl__xs_libxl_path(gc, domid);
-    path = libxl__sprintf(gc, "%s/dm-version", path);
+    path = GCSPRINTF("%s/dm-version", path);
     dm_version = libxl__xs_read(gc, XBT_NULL, path);
     if (!dm_version) {
         return LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
