@@ -353,11 +353,11 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         /* 8-bit vcpu mask for this domain */
         BUG_ON(v->domain->max_vcpus > 8);
         target = (1 << v->domain->max_vcpus) - 1;
-        if ( dabt.size == 2 )
-            target = target | (target << 8) | (target << 16) | (target << 24);
+        target = target | (target << 8) | (target << 16) | (target << 24);
+        if ( dabt.size == DABT_WORD )
+            target &= r;
         else
-            target = (target << (8 * (gicd_reg & 0x3)));
-        target &= r;
+            target &= (r << (8 * (gicd_reg & 0x3)));
         /* ignore zero writes */
         if ( !target )
             goto write_ignore;
@@ -381,7 +381,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
 
             if ( new_target != old_target )
             {
-                irq = gicd_reg - GICD_ITARGETSR + (i / 8);
+                irq = (gicd_reg & ~0x3) - GICD_ITARGETSR + (i / 8);
                 v_target = v->domain->vcpu[new_target];
                 v_old = v->domain->vcpu[old_target];
                 vgic_migrate_irq(v_old, v_target, irq);
@@ -393,7 +393,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
                                              DABT_WORD)] = target;
         else
             vgic_byte_write(&rank->v2.itargets[REG_RANK_INDEX(8,
-                      gicd_reg - GICD_ITARGETSR, DABT_WORD)], target, gicd_reg);
+                      gicd_reg - GICD_ITARGETSR, DABT_WORD)], r, gicd_reg);
         vgic_unlock_rank(v, rank, flags);
         return 1;
     }
