@@ -1479,6 +1479,9 @@ static void domcreate_complete(libxl__egc *egc,
     libxl_domain_config *const d_config = dcs->guest_config;
     libxl_domain_config *d_config_saved = &dcs->guest_config_saved;
 
+    libxl__file_reference_unmap(&dcs->build_state.pv_kernel);
+    libxl__file_reference_unmap(&dcs->build_state.pv_ramdisk);
+
     if (!rc && d_config->b_info.exec_ssidref)
         rc = xc_flask_relabel_domain(CTX->xch, dcs->guest_domid, d_config->b_info.exec_ssidref);
 
