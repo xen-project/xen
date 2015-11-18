@@ -61,8 +61,31 @@ void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
 #define NR_BITS_PER_TARGET  (32U / NR_TARGETS_PER_ITARGETSR)
 
 /*
- * Store an ITARGETSR register. This function only deals with ITARGETSR8
- * and onwards.
+ * Fetch an ITARGETSR register based on the offset from ITARGETSR0. Only
+ * one vCPU will be listed for a given vIRQ.
+ *
+ * Note the offset will be aligned to the appropriate boundary.
+ */
+static uint32_t vgic_fetch_itargetsr(struct vgic_irq_rank *rank,
+                                     unsigned int offset)
+{
+    uint32_t reg = 0;
+    unsigned int i;
+
+    ASSERT(spin_is_locked(&rank->lock));
+
+    offset &= INTERRUPT_RANK_MASK;
+    offset &= ~(NR_TARGETS_PER_ITARGETSR - 1);
+
+    for ( i = 0; i < NR_TARGETS_PER_ITARGETSR; i++, offset++ )
+        reg |= (1 << rank->vcpu[offset]) << (i * NR_BITS_PER_TARGET);
+
+    return reg;
+}
+
+/*
+ * Store an ITARGETSR register in a convenient way and migrate the vIRQ
+ * if necessary. This function only deals with ITARGETSR8 and onwards.
  *
  * Note the offset will be aligned to the appropriate boundary.
  */
@@ -70,7 +93,6 @@ static void vgic_store_itargetsr(struct domain *d, struct vgic_irq_rank *rank,
                                  unsigned int offset, uint32_t itargetsr)
 {
     unsigned int i;
-    unsigned int regidx = REG_RANK_INDEX(8, offset, DABT_WORD);
     unsigned int virq;
 
     ASSERT(spin_is_locked(&rank->lock));
@@ -92,7 +114,7 @@ static void vgic_store_itargetsr(struct domain *d, struct vgic_irq_rank *rank,
     for ( i = 0; i < NR_TARGETS_PER_ITARGETSR; i++, offset++, virq++ )
     {
         unsigned int new_target, old_target;
-        uint8_t new_mask, old_mask;
+        uint8_t new_mask;
 
         /*
          * Don't need to mask as we rely on new_mask to fit for only one
@@ -101,7 +123,6 @@ static void vgic_store_itargetsr(struct domain *d, struct vgic_irq_rank *rank,
         BUILD_BUG_ON((sizeof (new_mask) * 8) != NR_BITS_PER_TARGET);
 
         new_mask = itargetsr >> (i * NR_BITS_PER_TARGET);
-        old_mask = vgic_byte_read(rank->v2.itargets[regidx], i);
 
         /*
          * SPIs are using the 1-N model (see 1.4.3 in ARM IHI 0048B).
@@ -111,10 +132,6 @@ static void vgic_store_itargetsr(struct domain *d, struct vgic_irq_rank *rank,
          * in the target list
          */
         new_target = ffs(new_mask);
-        old_target = ffs(old_mask);
-
-        /* The current target should always be valid */
-        ASSERT(old_target && (old_target <= d->max_vcpus));
 
         /*
          * Ignore the write request for this interrupt if the new target
@@ -133,7 +150,8 @@ static void vgic_store_itargetsr(struct domain *d, struct vgic_irq_rank *rank,
 
         /* The vCPU ID always starts from 0 */
         new_target--;
-        old_target--;
+
+        old_target = rank->vcpu[offset];
 
         /* Only migrate the vIRQ if the target vCPU has changed */
         if ( new_target != old_target )
@@ -143,9 +161,7 @@ static void vgic_store_itargetsr(struct domain *d, struct vgic_irq_rank *rank,
                              virq);
         }
 
-        /* Bit corresponding to unimplemented CPU is write-ignore. */
-        new_mask &= (1 << d->max_vcpus) - 1;
-        vgic_byte_write(&rank->v2.itargets[regidx], new_mask, i);
+        rank->vcpu[offset] = new_target;
     }
 }
 
@@ -225,8 +241,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         rank = vgic_rank_offset(v, 8, gicd_reg - GICD_ITARGETSR, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
         vgic_lock_rank(v, rank, flags);
-        *r = rank->v2.itargets[REG_RANK_INDEX(8, gicd_reg - GICD_ITARGETSR,
-                                              DABT_WORD)];
+        *r = vgic_fetch_itargetsr(rank, gicd_reg - GICD_ITARGETSR);
         if ( dabt.size == DABT_BYTE )
             *r = vgic_byte_read(*r, gicd_reg);
         vgic_unlock_rank(v, rank, flags);
@@ -446,9 +461,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
             itargetsr = r;
         else
         {
-            itargetsr = rank->v2.itargets[REG_RANK_INDEX(8,
-                                    gicd_reg - GICD_ITARGETSR,
-                                    DABT_WORD)];
+            itargetsr = vgic_fetch_itargetsr(rank, gicd_reg - GICD_ITARGETSR);
             vgic_byte_write(&itargetsr, r, gicd_reg);
         }
         vgic_store_itargetsr(v->domain, rank, gicd_reg - GICD_ITARGETSR,
@@ -553,43 +566,16 @@ static const struct mmio_handler_ops vgic_v2_distr_mmio_handler = {
     .write = vgic_v2_distr_mmio_write,
 };
 
-static struct vcpu *vgic_v2_get_target_vcpu(struct vcpu *v, unsigned int irq)
-{
-    unsigned long target;
-    struct vcpu *v_target;
-    struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
-    ASSERT(spin_is_locked(&rank->lock));
-
-    target = vgic_byte_read(rank->v2.itargets[REG_RANK_INDEX(8,
-                                              irq, DABT_WORD)], irq & 0x3);
-
-    /* 1-N SPI should be delivered as pending to all the vcpus in the
-     * mask, but here we just return the first vcpu for simplicity and
-     * because it would be too slow to do otherwise. */
-    target = find_first_bit(&target, 8);
-    ASSERT(target >= 0 && target < v->domain->max_vcpus);
-    v_target = v->domain->vcpu[target];
-    return v_target;
-}
-
 static int vgic_v2_vcpu_init(struct vcpu *v)
 {
-    int i;
-
-    /* For SGI and PPI the target is always this CPU */
-    for ( i = 0 ; i < 8 ; i++ )
-        v->arch.vgic.private_irqs->v2.itargets[i] =
-              (1<<(v->vcpu_id+0))
-            | (1<<(v->vcpu_id+8))
-            | (1<<(v->vcpu_id+16))
-            | (1<<(v->vcpu_id+24));
+    /* Nothing specific to initialize for this driver */
 
     return 0;
 }
 
 static int vgic_v2_domain_init(struct domain *d)
 {
-    int i, ret;
+    int ret;
     paddr_t cbase, csize;
     paddr_t vbase;
 
@@ -635,11 +621,6 @@ static int vgic_v2_domain_init(struct domain *d)
     if ( ret )
         return ret;
 
-    /* By default deliver to CPU0 */
-    for ( i = 0; i < DOMAIN_NR_RANKS(d); i++ )
-        memset(d->arch.vgic.shared_irqs[i].v2.itargets, 0x1,
-               sizeof(d->arch.vgic.shared_irqs[i].v2.itargets));
-
     register_mmio_handler(d, &vgic_v2_distr_mmio_handler, d->arch.vgic.dbase,
                           PAGE_SIZE, NULL);
 
@@ -649,7 +630,6 @@ static int vgic_v2_domain_init(struct domain *d)
 static const struct vgic_ops vgic_v2_ops = {
     .vcpu_init   = vgic_v2_vcpu_init,
     .domain_init = vgic_v2_domain_init,
-    .get_target_vcpu = vgic_v2_get_target_vcpu,
     .max_vcpus = 8,
 };
 

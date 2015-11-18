@@ -104,14 +104,11 @@ struct vgic_irq_rank {
         uint32_t ipriorityr[8];
     };
 
-    union {
-        struct {
-            uint32_t itargets[8];
-        }v2;
-        struct {
-            uint64_t irouter[32];
-        }v3;
-    };
+    /*
+     * It's more convenient to store a target VCPU per vIRQ
+     * than the register ITARGETSR/IROUTER itself
+     */
+    uint8_t vcpu[32];
 };
 
 struct sgi_target {
@@ -130,9 +127,6 @@ struct vgic_ops {
     int (*vcpu_init)(struct vcpu *v);
     /* Domain specific initialization of vGIC */
     int (*domain_init)(struct domain *d);
-    /* Get the target vcpu for a given virq. The rank lock is already taken
-     * when calling this. */
-    struct vcpu *(*get_target_vcpu)(struct vcpu *v, unsigned int irq);
     /* vGIC sysreg emulation */
     int (*emulate_sysreg)(struct cpu_user_regs *regs, union hsr hsr);
     /* Maximum number of vCPU supported */
@@ -205,7 +199,7 @@ enum gic_sgi_mode;
 extern int domain_vgic_init(struct domain *d, unsigned int nr_spis);
 extern void domain_vgic_free(struct domain *d);
 extern int vcpu_vgic_init(struct vcpu *v);
-extern struct vcpu *vgic_get_target_vcpu(struct vcpu *v, unsigned int irq);
+extern struct vcpu *vgic_get_target_vcpu(struct vcpu *v, unsigned int virq);
 extern void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int virq);
 extern void vgic_vcpu_inject_spi(struct domain *d, unsigned int virq);
 extern void vgic_clear_pending_irqs(struct vcpu *v);

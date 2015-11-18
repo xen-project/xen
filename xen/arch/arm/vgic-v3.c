@@ -89,18 +89,72 @@ static struct vcpu *vgic_v3_irouter_to_vcpu(struct domain *d, uint64_t irouter)
     return d->vcpu[vcpu_id];
 }
 
-static struct vcpu *vgic_v3_get_target_vcpu(struct vcpu *v, unsigned int irq)
-{
-    struct vcpu *v_target;
-    struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
+#define NR_BYTES_PER_IROUTER 8U
 
+/*
+ * Fetch an IROUTER register based on the offset from IROUTER0. Only one
+ * vCPU will be listed for a given vIRQ.
+ *
+ * Note the offset will be aligned to the appropriate  boundary.
+ */
+static uint64_t vgic_fetch_irouter(struct vgic_irq_rank *rank,
+                                   unsigned int offset)
+{
     ASSERT(spin_is_locked(&rank->lock));
 
-    v_target = vgic_v3_irouter_to_vcpu(v->domain, rank->v3.irouter[irq % 32]);
+    /* There is exactly 1 vIRQ per IROUTER */
+    offset /= NR_BYTES_PER_IROUTER;
 
-    ASSERT(v_target != NULL);
+    /* Get the index in the rank */
+    offset &= INTERRUPT_RANK_MASK;
 
-    return v_target;
+    return vcpuid_to_vaffinity(rank->vcpu[offset]);
+}
+
+/*
+ * Store an IROUTER register in a convenient way and migrate the vIRQ
+ * if necessary. This function only deals with IROUTER32 and onwards.
+ *
+ * Note the offset will be aligned to the appropriate boundary.
+ */
+static void vgic_store_irouter(struct domain *d, struct vgic_irq_rank *rank,
+                               unsigned int offset, uint64_t irouter)
+{
+    struct vcpu *new_vcpu, *old_vcpu;
+    unsigned int virq;
+
+    /* There is 1 vIRQ per IROUTER */
+    virq = offset / NR_BYTES_PER_IROUTER;
+
+    /*
+     * The IROUTER0-31, used for SGIs/PPIs, are reserved and should
+     * never call this function.
+     */
+    ASSERT(virq >= 32);
+
+    /* Get the index in the rank */
+    offset &= virq & INTERRUPT_RANK_MASK;
+
+    new_vcpu = vgic_v3_irouter_to_vcpu(d, irouter);
+    old_vcpu = d->vcpu[rank->vcpu[offset]];
+
+    /*
+     * From the spec (see 8.9.13 in IHI 0069A), any write with an
+     * invalid vCPU will lead to the interrupt being ignored.
+     *
+     * But the current code to inject an IRQ is not able to cope with
+     * invalid vCPU. So for now, just ignore the write.
+     *
+     * TODO: Respect the spec
+     */
+    if ( !new_vcpu )
+        return;
+
+    /* Only migrate the IRQ if the target vCPU has changed */
+    if ( new_vcpu != old_vcpu )
+        vgic_migrate_irq(old_vcpu, new_vcpu, virq);
+
+    rank->vcpu[offset] = new_vcpu->vcpu_id;
 }
 
 static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
@@ -726,8 +780,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
                                 DABT_DOUBLE_WORD);
         if ( rank == NULL ) goto read_as_zero;
         vgic_lock_rank(v, rank, flags);
-        *r = rank->v3.irouter[REG_RANK_INDEX(64,
-                              (gicd_reg - GICD_IROUTER), DABT_DOUBLE_WORD)];
+        *r = vgic_fetch_irouter(rank, gicd_reg - GICD_IROUTER);
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_NSACR ... GICD_NSACRN:
@@ -812,8 +865,6 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
     struct hsr_dabt dabt = info->dabt;
     struct vgic_irq_rank *rank;
     unsigned long flags;
-    uint64_t new_irouter, old_irouter;
-    struct vcpu *old_vcpu, *new_vcpu;
     int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
 
     perfc_incr(vgicd_writes);
@@ -881,32 +932,8 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         rank = vgic_rank_offset(v, 64, gicd_reg - GICD_IROUTER,
                                 DABT_DOUBLE_WORD);
         if ( rank == NULL ) goto write_ignore;
-        new_irouter = r;
         vgic_lock_rank(v, rank, flags);
-
-        old_irouter = rank->v3.irouter[REG_RANK_INDEX(64,
-                                       (gicd_reg - GICD_IROUTER),
-                                       DABT_DOUBLE_WORD)];
-        old_vcpu = vgic_v3_irouter_to_vcpu(v->domain, old_irouter);
-        new_vcpu = vgic_v3_irouter_to_vcpu(v->domain, new_irouter);
-
-        if ( !new_vcpu )
-        {
-            printk(XENLOG_G_DEBUG
-                   "%pv: vGICD: wrong irouter at offset %#08x val %#"PRIregister,
-                   v, gicd_reg, r);
-            vgic_unlock_rank(v, rank, flags);
-            /*
-             * TODO: Don't inject a fault to the guest when the MPIDR is
-             * not valid. From the spec, the interrupt should be
-             * ignored.
-             */
-            return 0;
-        }
-        rank->v3.irouter[REG_RANK_INDEX(64, (gicd_reg - GICD_IROUTER),
-                         DABT_DOUBLE_WORD)] = new_irouter;
-        if ( old_vcpu != new_vcpu )
-            vgic_migrate_irq(old_vcpu, new_vcpu, (gicd_reg - GICD_IROUTER)/8);
+        vgic_store_irouter(v->domain, rank, gicd_reg - GICD_IROUTER, r);
         vgic_unlock_rank(v, rank, flags);
         return 1;
     case GICD_NSACR ... GICD_NSACRN:
@@ -1036,7 +1063,6 @@ static const struct mmio_handler_ops vgic_distr_mmio_handler = {
 static int vgic_v3_vcpu_init(struct vcpu *v)
 {
     int i;
-    uint64_t affinity;
     paddr_t rdist_base;
     struct vgic_rdist_region *region;
     unsigned int last_cpu;
@@ -1044,15 +1070,6 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
     /* Convenient alias */
     struct domain *d = v->domain;
     uint32_t rdist_stride = d->arch.vgic.rdist_stride;
-
-    /* For SGI and PPI the target is always this CPU */
-    affinity = (MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 3) << 32 |
-                MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 2) << 16 |
-                MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 1) << 8  |
-                MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 0));
-
-    for ( i = 0 ; i < 32 ; i++ )
-        v->arch.vgic.private_irqs->v3.irouter[i] = affinity;
 
     /*
      * Find the region where the re-distributor lives. For this purpose,
@@ -1098,7 +1115,7 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
 
 static int vgic_v3_domain_init(struct domain *d)
 {
-    int i, idx;
+    int i;
 
     /*
      * Domain 0 gets the hardware address.
@@ -1150,13 +1167,6 @@ static int vgic_v3_domain_init(struct domain *d)
         d->arch.vgic.rdist_regions[0].first_cpu = 0;
     }
 
-    /* By default deliver to CPU0 */
-    for ( i = 0; i < DOMAIN_NR_RANKS(d); i++ )
-    {
-        for ( idx = 0; idx < 32; idx++ )
-            d->arch.vgic.shared_irqs[i].v3.irouter[idx] = 0;
-    }
-
     /* Register mmio handle for the Distributor */
     register_mmio_handler(d, &vgic_distr_mmio_handler, d->arch.vgic.dbase,
                           SZ_64K, NULL);
@@ -1182,7 +1192,6 @@ static int vgic_v3_domain_init(struct domain *d)
 static const struct vgic_ops v3_ops = {
     .vcpu_init   = vgic_v3_vcpu_init,
     .domain_init = vgic_v3_domain_init,
-    .get_target_vcpu  = vgic_v3_get_target_vcpu,
     .emulate_sysreg  = vgic_v3_emulate_sysreg,
     /*
      * We use both AFF1 and AFF0 in (v)MPIDR. Thus, the max number of CPU
