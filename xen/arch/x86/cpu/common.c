@@ -53,8 +53,22 @@ static unsigned int cleared_caps[NCAPINTS];
 
 void __init setup_clear_cpu_cap(unsigned int cap)
 {
+	const uint32_t *dfs;
+	unsigned int i;
+
+	if (__test_and_set_bit(cap, cleared_caps))
+		return;
+
 	__clear_bit(cap, boot_cpu_data.x86_capability);
-	__set_bit(cap, cleared_caps);
+	dfs = lookup_deep_deps(cap);
+
+	if (!dfs)
+		return;
+
+	for (i = 0; i < FSCAPINTS; ++i) {
+		cleared_caps[i] |= dfs[i];
+		boot_cpu_data.x86_capability[i] &= ~dfs[i];
+	}
 }
 
 static void default_init(struct cpuinfo_x86 * c)
