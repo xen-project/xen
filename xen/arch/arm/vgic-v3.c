@@ -241,13 +241,11 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         *r = vgic_reg32_extract(GICR_SYNCR_NOT_BUSY, info);
         return 1;
 
-    case VREG64(GICR_MOVLPIR):
-        /* WO Read as zero */
-        goto read_as_zero_64;
+    case VREG64(0x0100):
+        goto read_impl_defined;
 
-    case VREG64(GICR_MOVALLR):
-        /* WO Read as zero */
-        goto read_as_zero_64;
+    case VREG64(0x0110):
+        goto read_impl_defined;
 
     case 0xFFD0 ... 0xFFE4:
         /* Implementation defined identification registers */
@@ -348,13 +346,11 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
         /* RO */
         goto write_ignore_32;
 
-    case VREG64(GICR_MOVLPIR):
-        /* LPI is not implemented */
-        goto write_ignore_64;
+    case VREG64(0x0100):
+        goto write_impl_defined;
 
-    case VREG64(GICR_MOVALLR):
-        /* LPI is not implemented */
-        goto write_ignore_64;
+    case VREG64(0x0110):
+        goto write_impl_defined;
 
     case 0xFFD0 ... 0xFFE4:
         /* Implementation defined identification registers */

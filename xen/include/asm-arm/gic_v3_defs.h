@@ -77,8 +77,6 @@
 #define GICR_INVLPIR                 (0x00A0)
 #define GICR_INVALLR                 (0x00B0)
 #define GICR_SYNCR                   (0x00C0)
-#define GICR_MOVLPIR                 (0x100)
-#define GICR_MOVALLR                 (0x0110)
 #define GICR_PIDR2                   GICD_PIDR2
 
 /* GICR for SGI's & PPI's */
