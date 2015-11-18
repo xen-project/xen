@@ -31,17 +31,15 @@
 #include <asm/gic_v3_defs.h>
 #include <asm/vgic.h>
 
-/* GICD_PIDRn register values for ARM implementations */
-#define GICV3_GICD_PIDR0  0x92
-#define GICV3_GICD_PIDR1  0xb4
-#define GICV3_GICD_PIDR2  0x3b
-#define GICV3_GICD_PIDR4  0x04
-
-/* GICR_PIDRn register values for ARM implementations */
-#define GICV3_GICR_PIDR0  0x93
-#define GICV3_GICR_PIDR1  GICV3_GICD_PIDR1
+/*
+ * PIDR2: Only bits[7:4] are not implementation defined. We are
+ * emulating a GICv3 ([7:4] = 0x3).
+ *
+ * We don't emulate a specific registers scheme so implement the others
+ * bits as RES0 as recommended by the spec (see 8.1.13 in ARM IHI 0069A).
+ */
+#define GICV3_GICD_PIDR2  0x30
 #define GICV3_GICR_PIDR2  GICV3_GICD_PIDR2
-#define GICV3_GICR_PIDR4  GICV3_GICD_PIDR4
 
 /*
  * GICD_CTLR default value:
@@ -237,28 +235,20 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
     case GICR_MOVALLR:
         /* WO Read as zero */
         goto read_as_zero_64;
-    case GICR_PIDR0:
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        *r = vgic_reg32_extract(GICV3_GICR_PIDR0, info);
-         return 1;
-    case GICR_PIDR1:
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        *r = vgic_reg32_extract(GICV3_GICR_PIDR1, info);
-         return 1;
+
+    case 0xFFD0 ... 0xFFE4:
+        /* Implementation defined identification registers */
+       goto read_impl_defined;
+
     case GICR_PIDR2:
         if ( dabt.size != DABT_WORD ) goto bad_width;
         *r = vgic_reg32_extract(GICV3_GICR_PIDR2, info);
          return 1;
-    case GICR_PIDR3:
-        /* Manufacture/customer defined */
-        goto read_as_zero_32;
-    case GICR_PIDR4:
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        *r = vgic_reg32_extract(GICV3_GICR_PIDR4, info);
-         return 1;
-    case GICR_PIDR5 ... GICR_PIDR7:
-        /* Reserved0 */
-        goto read_as_zero_32;
+
+    case 0xFFEC ... 0xFFFC:
+         /* Implementation defined identification registers */
+         goto read_impl_defined;
+
     default:
         printk(XENLOG_G_ERR
                "%pv: vGICR: unhandled read r%d offset %#08x\n",
@@ -278,6 +268,13 @@ read_as_zero_64:
 
 read_as_zero_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
+    *r = 0;
+    return 1;
+
+read_impl_defined:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICR: RAZ on implemention defined register offset %#08x\n",
+           v, gicr_reg);
     *r = 0;
     return 1;
 }
@@ -332,9 +329,19 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
     case GICR_MOVALLR:
         /* LPI is not implemented */
         goto write_ignore_64;
-    case GICR_PIDR7... GICR_PIDR0:
+
+    case 0xFFD0 ... 0xFFE4:
+        /* Implementation defined identification registers */
+       goto write_impl_defined;
+
+    case GICR_PIDR2:
         /* RO */
         goto write_ignore_32;
+
+    case 0xFFEC ... 0xFFFC:
+         /* Implementation defined identification registers */
+         goto write_impl_defined;
+
     default:
         printk(XENLOG_G_ERR "%pv: vGICR: unhandled write r%d offset %#08x\n",
                v, dabt.reg, gicr_reg);
@@ -353,6 +360,12 @@ write_ignore_64:
 
 write_ignore_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
+    return 1;
+
+write_impl_defined:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICR: WI on implementation defined register offset %#08x\n",
+           v, gicr_reg);
     return 1;
 }
 
@@ -835,32 +848,21 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
     case GICD_SPENDSGIR ... GICD_SPENDSGIRN:
         /* Replaced with GICR_ISPENDR0. So ignore write */
         goto read_as_zero_32;
-    case GICD_PIDR0:
-        /* GICv3 identification value */
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        *r = vgic_reg32_extract(GICV3_GICD_PIDR0, info);
-        return 1;
-    case GICD_PIDR1:
-        /* GICv3 identification value */
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        *r = vgic_reg32_extract(GICV3_GICD_PIDR1, info);
-        return 1;
+
+    case 0xFFD0 ... 0xFFE4:
+        /* Implementation defined identification registers */
+       goto read_impl_defined;
+
     case GICD_PIDR2:
         /* GICv3 identification value */
         if ( dabt.size != DABT_WORD ) goto bad_width;
         *r = vgic_reg32_extract(GICV3_GICD_PIDR2, info);
         return 1;
-    case GICD_PIDR3:
-        /* GICv3 identification value. Manufacturer/Customer defined */
-        goto read_as_zero_32;
-    case GICD_PIDR4:
-        /* GICv3 identification value */
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        *r = vgic_reg32_extract(GICV3_GICD_PIDR4, info);
-        return 1;
-    case GICD_PIDR5 ... GICD_PIDR7:
-        /* Reserved0 */
-        goto read_as_zero_32;
+
+    case 0xFFEC ... 0xFFFC:
+         /* Implementation defined identification registers */
+         goto read_impl_defined;
+
     case 0x00c:
     case 0x044:
     case 0x04c:
@@ -890,6 +892,13 @@ read_as_zero_32:
     return 1;
 
 read_as_zero:
+    *r = 0;
+    return 1;
+
+read_impl_defined:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICD: RAZ on implemention defined register offset %#08x\n",
+           v, gicd_reg);
     *r = 0;
     return 1;
 }
@@ -996,9 +1005,19 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         /* Replaced with GICR_ISPENDR0. So ignore write */
         if ( dabt.size != DABT_WORD ) goto bad_width;
         return 0;
-    case GICD_PIDR7... GICD_PIDR0:
+
+    case 0xFFD0 ... 0xFFE4:
+        /* Implementation defined identification registers */
+       goto write_impl_defined;
+
+    case GICD_PIDR2:
         /* RO -- write ignore */
         goto write_ignore_32;
+
+    case 0xFFEC ... 0xFFFC:
+         /* Implementation defined identification registers */
+         goto write_impl_defined;
+
     case 0x00c:
     case 0x044:
     case 0x04c:
@@ -1029,6 +1048,12 @@ write_ignore_32:
     return 1;
 
 write_ignore:
+    return 1;
+
+write_impl_defined:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICD: WI on implementation defined register offset %#08x\n",
+           v, gicd_reg);
     return 1;
 }
 
