@@ -57,6 +57,98 @@ void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
     vgic_v2_hw.aliased_offset = aliased_offset;
 }
 
+#define NR_TARGETS_PER_ITARGETSR    4U
+#define NR_BITS_PER_TARGET  (32U / NR_TARGETS_PER_ITARGETSR)
+
+/*
+ * Store an ITARGETSR register. This function only deals with ITARGETSR8
+ * and onwards.
+ *
+ * Note the offset will be aligned to the appropriate boundary.
+ */
+static void vgic_store_itargetsr(struct domain *d, struct vgic_irq_rank *rank,
+                                 unsigned int offset, uint32_t itargetsr)
+{
+    unsigned int i;
+    unsigned int regidx = REG_RANK_INDEX(8, offset, DABT_WORD);
+    unsigned int virq;
+
+    ASSERT(spin_is_locked(&rank->lock));
+
+    /*
+     * The ITARGETSR0-7, used for SGIs/PPIs, are implemented RO in the
+     * emulation and should never call this function.
+     *
+     * They all live in the first rank.
+     */
+    BUILD_BUG_ON(NR_INTERRUPT_PER_RANK != 32);
+    ASSERT(rank->index >= 1);
+
+    offset &= INTERRUPT_RANK_MASK;
+    offset &= ~(NR_TARGETS_PER_ITARGETSR - 1);
+
+    virq = rank->index * NR_INTERRUPT_PER_RANK + offset;
+
+    for ( i = 0; i < NR_TARGETS_PER_ITARGETSR; i++, offset++, virq++ )
+    {
+        unsigned int new_target, old_target;
+        uint8_t new_mask, old_mask;
+
+        /*
+         * Don't need to mask as we rely on new_mask to fit for only one
+         * target.
+         */
+        BUILD_BUG_ON((sizeof (new_mask) * 8) != NR_BITS_PER_TARGET);
+
+        new_mask = itargetsr >> (i * NR_BITS_PER_TARGET);
+        old_mask = vgic_byte_read(rank->v2.itargets[regidx], i);
+
+        /*
+         * SPIs are using the 1-N model (see 1.4.3 in ARM IHI 0048B).
+         * While the interrupt could be set pending to all the vCPUs in
+         * target list, it's not guaranteed by the spec.
+         * For simplicity, always route the vIRQ to the first interrupt
+         * in the target list
+         */
+        new_target = ffs(new_mask);
+        old_target = ffs(old_mask);
+
+        /* The current target should always be valid */
+        ASSERT(old_target && (old_target <= d->max_vcpus));
+
+        /*
+         * Ignore the write request for this interrupt if the new target
+         * is invalid.
+         * XXX: From the spec, if the target list is not valid, the
+         * interrupt should be ignored (i.e not forwarded to the
+         * guest).
+         */
+        if ( !new_target || (new_target > d->max_vcpus) )
+        {
+            gprintk(XENLOG_WARNING,
+                   "No valid vCPU found for vIRQ%u in the target list (%#x). Skip it\n",
+                   virq, new_mask);
+            continue;
+        }
+
+        /* The vCPU ID always starts from 0 */
+        new_target--;
+        old_target--;
+
+        /* Only migrate the vIRQ if the target vCPU has changed */
+        if ( new_target != old_target )
+        {
+            vgic_migrate_irq(d->vcpu[old_target],
+                             d->vcpu[new_target],
+                             virq);
+        }
+
+        /* Bit corresponding to unimplemented CPU is write-ignore. */
+        new_mask &= (1 << d->max_vcpus) - 1;
+        vgic_byte_write(&rank->v2.itargets[regidx], new_mask, i);
+    }
+}
+
 static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
                                    register_t *r, void *priv)
 {
@@ -344,56 +436,23 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
 
     case GICD_ITARGETSR8 ... GICD_ITARGETSRN:
     {
-        /* unsigned long needed for find_next_bit */
-        unsigned long target;
-        int i;
+        uint32_t itargetsr;
+
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 8, gicd_reg - GICD_ITARGETSR, DABT_WORD);
         if ( rank == NULL) goto write_ignore;
-        /* 8-bit vcpu mask for this domain */
-        BUG_ON(v->domain->max_vcpus > 8);
-        target = (1 << v->domain->max_vcpus) - 1;
-        target = target | (target << 8) | (target << 16) | (target << 24);
-        if ( dabt.size == DABT_WORD )
-            target &= r;
-        else
-            target &= (r << (8 * (gicd_reg & 0x3)));
-        /* ignore zero writes */
-        if ( !target )
-            goto write_ignore;
-        /* For word reads ignore writes where any single byte is zero */
-        if ( dabt.size == 2 &&
-            !((target & 0xff) && (target & (0xff << 8)) &&
-             (target & (0xff << 16)) && (target & (0xff << 24))))
-            goto write_ignore;
         vgic_lock_rank(v, rank, flags);
-        i = 0;
-        while ( (i = find_next_bit(&target, 32, i)) < 32 )
-        {
-            unsigned int irq, new_target, old_target;
-            unsigned long old_target_mask;
-            struct vcpu *v_target, *v_old;
-
-            new_target = i % 8;
-            old_target_mask = vgic_byte_read(rank->v2.itargets[REG_RANK_INDEX(8,
-                                             gicd_reg - GICD_ITARGETSR, DABT_WORD)], i/8);
-            old_target = find_first_bit(&old_target_mask, 8);
-
-            if ( new_target != old_target )
-            {
-                irq = (gicd_reg & ~0x3) - GICD_ITARGETSR + (i / 8);
-                v_target = v->domain->vcpu[new_target];
-                v_old = v->domain->vcpu[old_target];
-                vgic_migrate_irq(v_old, v_target, irq);
-            }
-            i += 8 - new_target;
-        }
         if ( dabt.size == DABT_WORD )
-            rank->v2.itargets[REG_RANK_INDEX(8, gicd_reg - GICD_ITARGETSR,
-                                             DABT_WORD)] = target;
+            itargetsr = r;
         else
-            vgic_byte_write(&rank->v2.itargets[REG_RANK_INDEX(8,
-                      gicd_reg - GICD_ITARGETSR, DABT_WORD)], r, gicd_reg);
+        {
+            itargetsr = rank->v2.itargets[REG_RANK_INDEX(8,
+                                    gicd_reg - GICD_ITARGETSR,
+                                    DABT_WORD)];
+            vgic_byte_write(&itargetsr, r, gicd_reg);
+        }
+        vgic_store_itargetsr(v->domain, rank, gicd_reg - GICD_ITARGETSR,
+                             itargetsr);
         vgic_unlock_rank(v, rank, flags);
         return 1;
     }
