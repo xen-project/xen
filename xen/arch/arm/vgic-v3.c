@@ -30,6 +30,7 @@
 #include <asm/mmio.h>
 #include <asm/gic_v3_defs.h>
 #include <asm/vgic.h>
+#include <asm/vgic-emul.h>
 
 /*
  * PIDR2: Only bits[7:4] are not implementation defined. We are
@@ -172,15 +173,16 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
 
     switch ( gicr_reg )
     {
-    case GICR_CTLR:
+    case VREG32(GICR_CTLR):
         /* We have not implemented LPI's, read zero */
         goto read_as_zero_32;
-    case GICR_IIDR:
+
+    case VREG32(GICR_IIDR):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         *r = vgic_reg32_extract(GICV3_GICR_IIDR_VAL, info);
         return 1;
-    case GICR_TYPER:
-    case GICR_TYPER + 4:
+
+    case VREG64(GICR_TYPER):
     {
         uint64_t typer, aff;
 
@@ -199,40 +201,51 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
 
         return 1;
     }
-    case GICR_STATUSR:
+
+    case VREG32(GICR_STATUSR):
         /* Not implemented */
         goto read_as_zero_32;
-    case GICR_WAKER:
+
+    case VREG32(GICR_WAKER):
         /* Power management is not implemented */
         goto read_as_zero_32;
-    case GICR_SETLPIR:
+
+    case VREG64(GICR_SETLPIR):
         /* WO. Read as zero */
         goto read_as_zero_64;
-    case GICR_CLRLPIR:
+
+    case VREG64(GICR_CLRLPIR):
         /* WO. Read as zero */
         goto read_as_zero_64;
-    case GICR_PROPBASER:
+
+    case VREG64(GICR_PROPBASER):
         /* LPI's not implemented */
         goto read_as_zero_64;
-    case GICR_PENDBASER:
+
+    case VREG64(GICR_PENDBASER):
         /* LPI's not implemented */
         goto read_as_zero_64;
-    case GICR_INVLPIR:
+
+    case VREG64(GICR_INVLPIR):
         /* WO. Read as zero */
         goto read_as_zero_64;
-    case GICR_INVALLR:
+
+    case VREG64(GICR_INVALLR):
         /* WO. Read as zero */
         goto read_as_zero_64;
         return 0;
-    case GICR_SYNCR:
+
+    case VREG32(GICR_SYNCR):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         /* RO . But when read it always returns busy bito bit[0] */
         *r = vgic_reg32_extract(GICR_SYNCR_NOT_BUSY, info);
         return 1;
-    case GICR_MOVLPIR:
+
+    case VREG64(GICR_MOVLPIR):
         /* WO Read as zero */
         goto read_as_zero_64;
-    case GICR_MOVALLR:
+
+    case VREG64(GICR_MOVALLR):
         /* WO Read as zero */
         goto read_as_zero_64;
 
@@ -240,7 +253,7 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         /* Implementation defined identification registers */
        goto read_impl_defined;
 
-    case GICR_PIDR2:
+    case VREG32(GICR_PIDR2):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         *r = vgic_reg32_extract(GICV3_GICR_PIDR2, info);
          return 1;
@@ -287,46 +300,59 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
 
     switch ( gicr_reg )
     {
-    case GICR_CTLR:
+    case VREG32(GICR_CTLR):
         /* LPI's not implemented */
         goto write_ignore_32;
-    case GICR_IIDR:
+
+    case VREG32(GICR_IIDR):
         /* RO */
         goto write_ignore_32;
-    case GICR_TYPER:
+
+    case VREG64(GICR_TYPER):
         /* RO */
         goto write_ignore_64;
-    case GICR_STATUSR:
+
+    case VREG32(GICR_STATUSR):
         /* Not implemented */
         goto write_ignore_32;
-    case GICR_WAKER:
+
+    case VREG32(GICR_WAKER):
         /* Power mgmt not implemented */
         goto write_ignore_32;
-    case GICR_SETLPIR:
+
+    case VREG64(GICR_SETLPIR):
         /* LPI is not implemented */
         goto write_ignore_64;
-    case GICR_CLRLPIR:
+
+    case VREG64(GICR_CLRLPIR):
         /* LPI is not implemented */
         goto write_ignore_64;
-    case GICR_PROPBASER:
+
+    case VREG64(GICR_PROPBASER):
         /* LPI is not implemented */
         goto write_ignore_64;
-    case GICR_PENDBASER:
+
+    case VREG64(GICR_PENDBASER):
         /* LPI is not implemented */
         goto write_ignore_64;
-    case GICR_INVLPIR:
+
+    case VREG64(GICR_INVLPIR):
         /* LPI is not implemented */
         goto write_ignore_64;
-    case GICR_INVALLR:
+
+    case VREG64(GICR_INVALLR):
         /* LPI is not implemented */
         goto write_ignore_64;
-    case GICR_SYNCR:
+
+    case VREG32(GICR_SYNCR):
         /* RO */
         goto write_ignore_32;
-    case GICR_MOVLPIR:
+
+    case VREG64(GICR_MOVLPIR):
         /* LPI is not implemented */
         goto write_ignore_64;
-    case GICR_MOVALLR:
+
+    case VREG64(GICR_MOVALLR):
         /* LPI is not implemented */
         goto write_ignore_64;
 
@@ -334,7 +360,7 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
         /* Implementation defined identification registers */
        goto write_impl_defined;
 
-    case GICR_PIDR2:
+    case VREG32(GICR_PIDR2):
         /* RO */
         goto write_ignore_32;
 
@@ -379,11 +405,12 @@ static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
 
     switch ( reg )
     {
-    case GICD_IGROUPR ... GICD_IGROUPRN:
+    case VRANGE32(GICD_IGROUPR, GICD_IGROUPRN):
         /* We do not implement security extensions for guests, read zero */
         if ( dabt.size != DABT_WORD ) goto bad_width;
         goto read_as_zero;
-    case GICD_ISENABLER ... GICD_ISENABLERN:
+
+    case VRANGE32(GICD_ISENABLER, GICD_ISENABLERN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, reg - GICD_ISENABLER, DABT_WORD);
         if ( rank == NULL ) goto read_as_zero;
@@ -391,7 +418,8 @@ static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
         *r = vgic_reg32_extract(rank->ienable, info);
         vgic_unlock_rank(v, rank, flags);
         return 1;
-    case GICD_ICENABLER ... GICD_ICENABLERN:
+
+    case VRANGE32(GICD_ICENABLER, GICD_ICENABLERN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, reg - GICD_ICENABLER, DABT_WORD);
         if ( rank == NULL ) goto read_as_zero;
@@ -399,17 +427,18 @@ static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
         *r = vgic_reg32_extract(rank->ienable, info);
         vgic_unlock_rank(v, rank, flags);
         return 1;
+
     /* Read the pending status of an IRQ via GICD/GICR is not supported */
-    case GICD_ISPENDR ... GICD_ISPENDRN:
-    case GICD_ICPENDR ... GICD_ICPENDRN:
+    case VRANGE32(GICD_ISPENDR, GICD_ISPENDRN):
+    case VRANGE32(GICD_ICPENDR, GICD_ICPENDR):
         goto read_as_zero;
 
     /* Read the active status of an IRQ via GICD/GICR is not supported */
-    case GICD_ISACTIVER ... GICD_ISACTIVERN:
-    case GICD_ICACTIVER ... GICD_ICACTIVERN:
+    case VRANGE32(GICD_ISACTIVER, GICD_ISACTIVER):
+    case VRANGE32(GICD_ICACTIVER, GICD_ICACTIVERN):
         goto read_as_zero;
 
-    case GICD_IPRIORITYR ... GICD_IPRIORITYRN:
+    case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
     {
         uint32_t ipriorityr;
 
@@ -427,7 +456,7 @@ static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
         return 1;
     }
 
-    case GICD_ICFGR ... GICD_ICFGRN:
+    case VRANGE32(GICD_ICFGR, GICD_ICFGRN):
     {
         uint32_t icfgr;
 
@@ -442,6 +471,7 @@ static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
 
         return 1;
     }
+
     default:
         printk(XENLOG_G_ERR
                "%pv: %s: unhandled read r%d offset %#08x\n",
@@ -471,10 +501,11 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
 
     switch ( reg )
     {
-    case GICD_IGROUPR ... GICD_IGROUPRN:
+    case VRANGE32(GICD_IGROUPR, GICD_IGROUPRN):
         /* We do not implement security extensions for guests, write ignore */
         goto write_ignore_32;
-    case GICD_ISENABLER ... GICD_ISENABLERN:
+
+    case VRANGE32(GICD_ISENABLER, GICD_ISENABLERN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, reg - GICD_ISENABLER, DABT_WORD);
         if ( rank == NULL ) goto write_ignore;
@@ -484,7 +515,8 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
         vgic_enable_irqs(v, (rank->ienable) & (~tr), rank->index);
         vgic_unlock_rank(v, rank, flags);
         return 1;
-    case GICD_ICENABLER ... GICD_ICENABLERN:
+
+    case VRANGE32(GICD_ICENABLER, GICD_ICENABLERN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 1, reg - GICD_ICENABLER, DABT_WORD);
         if ( rank == NULL ) goto write_ignore;
@@ -494,35 +526,36 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
         vgic_disable_irqs(v, (~rank->ienable) & tr, rank->index);
         vgic_unlock_rank(v, rank, flags);
         return 1;
-    case GICD_ISPENDR ... GICD_ISPENDRN:
+
+    case VRANGE32(GICD_ISPENDR, GICD_ISPENDRN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: %s: unhandled word write %#"PRIregister" to ISPENDR%d\n",
                v, name, r, reg - GICD_ISPENDR);
         return 0;
 
-    case GICD_ICPENDR ... GICD_ICPENDRN:
+    case VRANGE32(GICD_ICPENDR, GICD_ICPENDRN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: %s: unhandled word write %#"PRIregister" to ICPENDR%d\n",
                v, name, r, reg - GICD_ICPENDR);
         return 0;
 
-    case GICD_ISACTIVER ... GICD_ISACTIVERN:
+    case VRANGE32(GICD_ISACTIVER, GICD_ISACTIVERN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: %s: unhandled word write %#"PRIregister" to ISACTIVER%d\n",
                v, name, r, reg - GICD_ISACTIVER);
         return 0;
 
-    case GICD_ICACTIVER ... GICD_ICACTIVERN:
+    case VRANGE32(GICD_ICACTIVER, GICD_ICACTIVERN):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: %s: unhandled word write %#"PRIregister" to ICACTIVER%d\n",
                v, name, r, reg - GICD_ICACTIVER);
         return 0;
 
-    case GICD_IPRIORITYR ... GICD_IPRIORITYRN:
+    case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
     {
         uint32_t *ipriorityr;
 
@@ -536,9 +569,11 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
         vgic_unlock_rank(v, rank, flags);
         return 1;
     }
-    case GICD_ICFGR: /* Restricted to configure SGIs */
+
+    case VREG32(GICD_ICFGR): /* Restricted to configure SGIs */
         goto write_ignore_32;
-    case GICD_ICFGR + 4 ... GICD_ICFGRN: /* PPI + SPIs */
+
+    case VRANGE32(GICD_ICFGR + 4, GICD_ICFGRN): /* PPI + SPIs */
         /* ICFGR1 for PPI's, which is implementation defined
            if ICFGR1 is programmable or not. We chose to program */
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -578,16 +613,17 @@ static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
 
     switch ( gicr_reg )
     {
-    case GICR_IGRPMODR0:
+    case VREG32(GICR_IGRPMODR0):
         /* We do not implement security extensions for guests, read zero */
         goto read_as_zero_32;
-    case GICR_IGROUPR0:
-    case GICR_ISENABLER0:
-    case GICR_ICENABLER0:
-    case GICR_ISACTIVER0:
-    case GICR_ICACTIVER0:
-    case GICR_IPRIORITYR0...GICR_IPRIORITYR7:
-    case GICR_ICFGR0... GICR_ICFGR1:
+
+    case VREG32(GICR_IGROUPR0):
+    case VREG32(GICR_ISENABLER0):
+    case VREG32(GICR_ICENABLER0):
+    case VREG32(GICR_ISACTIVER0):
+    case VREG32(GICR_ICACTIVER0):
+    case VRANGE32(GICR_IPRIORITYR0, GICR_IPRIORITYR7):
+    case VRANGE32(GICR_ICFGR0, GICR_ICFGR1):
          /*
           * Above registers offset are common with GICD.
           * So handle in common with GICD handling
@@ -596,11 +632,11 @@ static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
                                                 gicr_reg, r);
 
     /* Read the pending status of an SGI is via GICR is not supported */
-    case GICR_ISPENDR0:
-    case GICR_ICPENDR0:
+    case VREG32(GICR_ISPENDR0):
+    case VREG32(GICR_ICPENDR0):
         goto read_as_zero;
 
-    case GICR_NSACR:
+    case VREG32(GICR_NSACR):
         /* We do not implement security extensions for guests, read zero */
         goto read_as_zero_32;
 
@@ -630,39 +666,42 @@ static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
 
     switch ( gicr_reg )
     {
-    case GICR_IGRPMODR0:
+    case VREG32(GICR_IGRPMODR0):
         /* We do not implement security extensions for guests, write ignore */
         goto write_ignore_32;
-    case GICR_IGROUPR0:
-    case GICR_ISENABLER0:
-    case GICR_ICENABLER0:
-    case GICR_ISACTIVER0:
-    case GICR_ICACTIVER0:
-    case GICR_ICFGR1:
-    case GICR_IPRIORITYR0...GICR_IPRIORITYR7:
+
+    case VREG32(GICR_IGROUPR0):
+    case VREG32(GICR_ISENABLER0):
+    case VREG32(GICR_ICENABLER0):
+    case VREG32(GICR_ISACTIVER0):
+    case VREG32(GICR_ICACTIVER0):
+    case VREG32(GICR_ICFGR1):
+    case VRANGE32(GICR_IPRIORITYR0, GICR_IPRIORITYR7):
          /*
           * Above registers offset are common with GICD.
           * So handle common with GICD handling
           */
         return __vgic_v3_distr_common_mmio_write("vGICR: SGI", v,
                                                  info, gicr_reg, r);
-    case GICR_ISPENDR0:
+
+    case VREG32(GICR_ISPENDR0):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: vGICR: SGI: unhandled word write %#"PRIregister" to ISPENDR0\n",
                v, r);
         return 0;
 
-    case GICR_ICPENDR0:
+    case VREG32(GICR_ICPENDR0):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: vGICR: SGI: unhandled word write %#"PRIregister" to ICPENDR0\n",
                v, r);
         return 0;
 
-    case GICR_NSACR:
+    case VREG32(GICR_NSACR):
         /* We do not implement security extensions for guests, write ignore */
         goto write_ignore_32;
+
     default:
         printk(XENLOG_G_ERR
                "%pv: vGICR: SGI: unhandled write r%d offset %#08x\n",
@@ -761,13 +800,14 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
 
     switch ( gicd_reg )
     {
-    case GICD_CTLR:
+    case VREG32(GICD_CTLR):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         vgic_lock(v);
         *r = vgic_reg32_extract(v->domain->arch.vgic.ctlr, info);
         vgic_unlock(v);
         return 1;
-    case GICD_TYPER:
+
+    case VREG32(GICD_TYPER):
     {
         /*
          * Number of interrupt identifier bits supported by the GIC
@@ -792,34 +832,39 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
 
         return 1;
     }
-    case GICD_STATUSR:
+
+    case VREG32(GICD_STATUSR):
         /*
          *  Optional, Not implemented for now.
          *  Update to support guest debugging.
          */
         goto read_as_zero_32;
-    case GICD_IIDR:
+
+    case VREG32(GICD_IIDR):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         *r = vgic_reg32_extract(GICV3_GICD_IIDR_VAL, info);
         return 1;
+
     case 0x020 ... 0x03c:
     case 0xc000 ... 0xffcc:
         /* Implementation defined -- read as zero */
         goto read_as_zero_32;
-    case GICD_IGROUPR ... GICD_IGROUPRN:
-    case GICD_ISENABLER ... GICD_ISENABLERN:
-    case GICD_ICENABLER ... GICD_ICENABLERN:
-    case GICD_ISPENDR ... GICD_ISPENDRN:
-    case GICD_ICPENDR ... GICD_ICPENDRN:
-    case GICD_ISACTIVER ... GICD_ISACTIVERN:
-    case GICD_IPRIORITYR ... GICD_IPRIORITYRN:
-    case GICD_ICFGR ... GICD_ICFGRN:
+
+    case VRANGE32(GICD_IGROUPR, GICD_IGROUPRN):
+    case VRANGE32(GICD_ISENABLER, GICD_ISENABLERN):
+    case VRANGE32(GICD_ICENABLER, GICD_ICENABLERN):
+    case VRANGE32(GICD_ISPENDR, GICD_ISPENDRN):
+    case VRANGE32(GICD_ICPENDR, GICD_ICPENDRN):
+    case VRANGE32(GICD_ISACTIVER, GICD_ISACTIVERN):
+    case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
+    case VRANGE32(GICD_ICFGR, GICD_ICFGRN):
         /*
          * Above all register are common with GICR and GICD
          * Manage in common
          */
         return __vgic_v3_distr_common_mmio_read("vGICD", v, info, gicd_reg, r);
-    case GICD_IROUTER32 ... GICD_IROUTER1019:
+
+    case VRANGE64(GICD_IROUTER32, GICD_IROUTER1019):
     {
         uint64_t irouter;
 
@@ -836,16 +881,19 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         return 1;
     }
 
-    case GICD_NSACR ... GICD_NSACRN:
+    case VRANGE32(GICD_NSACR, GICD_NSACRN):
         /* We do not implement security extensions for guests, read zero */
         goto read_as_zero_32;
-    case GICD_SGIR:
+
+    case VREG32(GICD_SGIR):
         /* Read as ICH_SGIR system register with SRE set. So ignore */
         goto read_as_zero_32;
-    case GICD_CPENDSGIR ... GICD_CPENDSGIRN:
+
+    case VRANGE32(GICD_CPENDSGIR, GICD_CPENDSGIRN):
         /* Replaced with GICR_ICPENDR0. So ignore write */
         goto read_as_zero_32;
-    case GICD_SPENDSGIR ... GICD_SPENDSGIRN:
+
+    case VRANGE32(GICD_SPENDSGIR, GICD_SPENDSGIRN):
         /* Replaced with GICR_ISPENDR0. So ignore write */
         goto read_as_zero_32;
 
@@ -853,7 +901,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         /* Implementation defined identification registers */
        goto read_impl_defined;
 
-    case GICD_PIDR2:
+    case VREG32(GICD_PIDR2):
         /* GICv3 identification value */
         if ( dabt.size != DABT_WORD ) goto bad_width;
         *r = vgic_reg32_extract(GICV3_GICD_PIDR2, info);
@@ -915,7 +963,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
 
     switch ( gicd_reg )
     {
-    case GICD_CTLR:
+    case VREG32(GICD_CTLR):
     {
         uint32_t ctlr = 0;
 
@@ -934,27 +982,35 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
 
         return 1;
     }
-    case GICD_TYPER:
+
+    case VREG32(GICD_TYPER):
         /* RO -- write ignored */
         goto write_ignore_32;
-    case GICD_IIDR:
+
+    case VREG32(GICD_IIDR):
         /* RO -- write ignored */
         goto write_ignore_32;
-    case GICD_STATUSR:
+
+    case VREG32(GICD_STATUSR):
         /* RO -- write ignored */
         goto write_ignore_32;
-    case GICD_SETSPI_NSR:
+
+    case VREG32(GICD_SETSPI_NSR):
         /* Message based SPI is not implemented */
         goto write_ignore_32;
-    case GICD_CLRSPI_NSR:
+
+    case VREG32(GICD_CLRSPI_NSR):
         /* Message based SPI is not implemented */
         goto write_ignore_32;
-    case GICD_SETSPI_SR:
+
+    case VREG32(GICD_SETSPI_SR):
         /* Message based SPI is not implemented */
         goto write_ignore_32;
-    case GICD_CLRSPI_SR:
+
+    case VREG32(GICD_CLRSPI_SR):
         /* Message based SPI is not implemented */
         goto write_ignore_32;
+
     case 0x020 ... 0x03c:
     case 0xc000 ... 0xffcc:
         /* Implementation defined -- write ignored */
@@ -962,20 +1018,22 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
                "%pv: vGICD: WI on implementation defined register offset %#08x\n",
                v, gicd_reg);
         goto write_ignore_32;
-    case GICD_IGROUPR ... GICD_IGROUPRN:
-    case GICD_ISENABLER ... GICD_ISENABLERN:
-    case GICD_ICENABLER ... GICD_ICENABLERN:
-    case GICD_ISPENDR ... GICD_ISPENDRN:
-    case GICD_ICPENDR ... GICD_ICPENDRN:
-    case GICD_ISACTIVER ... GICD_ISACTIVERN:
-    case GICD_ICACTIVER ... GICD_ICACTIVERN:
-    case GICD_IPRIORITYR ... GICD_IPRIORITYRN:
-    case GICD_ICFGR ... GICD_ICFGRN:
+
+    case VRANGE32(GICD_IGROUPR, GICD_IGROUPRN):
+    case VRANGE32(GICD_ISENABLER, GICD_ISENABLERN):
+    case VRANGE32(GICD_ICENABLER, GICD_ICENABLERN):
+    case VRANGE32(GICD_ISPENDR, GICD_ISPENDRN):
+    case VRANGE32(GICD_ICPENDR, GICD_ICPENDRN):
+    case VRANGE32(GICD_ISACTIVER, GICD_ISACTIVERN):
+    case VRANGE32(GICD_ICACTIVER, GICD_ICACTIVERN):
+    case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
+    case VRANGE32(GICD_ICFGR, GICD_ICFGRN):
         /* Above registers are common with GICR and GICD
          * Manage in common */
         return __vgic_v3_distr_common_mmio_write("vGICD", v, info,
                                                  gicd_reg, r);
-    case GICD_IROUTER32 ... GICD_IROUTER1019:
+
+    case VRANGE64(GICD_IROUTER32, GICD_IROUTER1019):
     {
         uint64_t irouter;
 
@@ -991,17 +1049,20 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         return 1;
     }
 
-    case GICD_NSACR ... GICD_NSACRN:
+    case VRANGE32(GICD_NSACR, GICD_NSACRN):
         /* We do not implement security extensions for guests, write ignore */
         goto write_ignore_32;
-    case GICD_SGIR:
+
+    case VREG32(GICD_SGIR):
         /* it is accessed as system register in GICv3 */
         goto write_ignore_32;
-    case GICD_CPENDSGIR ... GICD_CPENDSGIRN:
+
+    case VRANGE32(GICD_CPENDSGIR, GICD_CPENDSGIRN):
         /* Replaced with GICR_ICPENDR0. So ignore write */
         if ( dabt.size != DABT_WORD ) goto bad_width;
         return 0;
-    case GICD_SPENDSGIR ... GICD_SPENDSGIRN:
+
+    case VRANGE32(GICD_SPENDSGIR, GICD_SPENDSGIRN):
         /* Replaced with GICR_ISPENDR0. So ignore write */
         if ( dabt.size != DABT_WORD ) goto bad_width;
         return 0;
@@ -1010,7 +1071,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         /* Implementation defined identification registers */
        goto write_impl_defined;
 
-    case GICD_PIDR2:
+    case VREG32(GICD_PIDR2):
         /* RO -- write ignore */
         goto write_ignore_32;
 
