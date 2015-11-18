@@ -507,10 +507,12 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
 
     case GICD_ICFGR: /* SGIs */
         goto write_ignore_32;
-    case GICD_ICFGR + 1: /* PPIs */
+
+    case GICD_ICFGR1:
         /* It is implementation defined if these are writeable. We chose not */
         goto write_ignore_32;
-    case GICD_ICFGR + 2 ... GICD_ICFGRN: /* SPIs */
+
+    case GICD_ICFGR2 ... GICD_ICFGRN: /* SPIs */
         if ( dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 2, gicd_reg - GICD_ICFGR, DABT_WORD);
         if ( rank == NULL) goto write_ignore;

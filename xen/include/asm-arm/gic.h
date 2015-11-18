@@ -46,6 +46,8 @@
 #define GICD_ITARGETSR8 (0x820)
 #define GICD_ITARGETSRN (0xBF8)
 #define GICD_ICFGR      (0xC00)
+#define GICD_ICFGR1     (0xC04)
+#define GICD_ICFGR2     (0xC08)
 #define GICD_ICFGRN     (0xCFC)
 #define GICD_NSACR      (0xE00)
 #define GICD_NSACRN     (0xEFC)
