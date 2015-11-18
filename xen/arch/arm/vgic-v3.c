@@ -210,6 +210,12 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         /* Power management is not implemented */
         goto read_as_zero_32;
 
+    case 0x0018:
+        goto read_reserved;
+
+    case 0x0020:
+        goto read_impl_defined;
+
     case VREG64(GICR_SETLPIR):
         /* WO. Read as zero */
         goto read_as_zero_64;
@@ -217,6 +223,9 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VREG64(GICR_CLRLPIR):
         /* WO. Read as zero */
         goto read_as_zero_64;
+
+    case 0x0050:
+        goto read_reserved;
 
     case VREG64(GICR_PROPBASER):
         /* LPI's not implemented */
@@ -226,14 +235,23 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         /* LPI's not implemented */
         goto read_as_zero_64;
 
+    case 0x0080:
+        goto read_reserved;
+
     case VREG64(GICR_INVLPIR):
         /* WO. Read as zero */
         goto read_as_zero_64;
+
+    case 0x00A8:
+        goto read_reserved;
 
     case VREG64(GICR_INVALLR):
         /* WO. Read as zero */
         goto read_as_zero_64;
         return 0;
+
+    case 0x00B8:
+        goto read_reserved;
 
     case VREG32(GICR_SYNCR):
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -241,10 +259,22 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         *r = vgic_reg32_extract(GICR_SYNCR_NOT_BUSY, info);
         return 1;
 
+    case 0x00C8:
+        goto read_reserved;
+
     case VREG64(0x0100):
         goto read_impl_defined;
 
+    case 0x0108:
+        goto read_reserved;
+
     case VREG64(0x0110):
+        goto read_impl_defined;
+
+    case 0x0118 ... 0xBFFC:
+        goto read_reserved;
+
+    case 0xC000 ... 0xFFCC:
         goto read_impl_defined;
 
     case 0xFFD0 ... 0xFFE4:
@@ -284,7 +314,14 @@ read_as_zero_32:
 
 read_impl_defined:
     printk(XENLOG_G_DEBUG
-           "%pv: vGICR: RAZ on implemention defined register offset %#08x\n",
+           "%pv: vGICR: RAZ on implementation defined register offset %#08x\n",
+           v, gicr_reg);
+    *r = 0;
+    return 1;
+
+read_reserved:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICR: RAZ on reserved register offset %#08x\n",
            v, gicr_reg);
     *r = 0;
     return 1;
@@ -318,6 +355,12 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
         /* Power mgmt not implemented */
         goto write_ignore_32;
 
+    case 0x0018:
+        goto write_reserved;
+
+    case 0x0020:
+        goto write_impl_defined;
+
     case VREG64(GICR_SETLPIR):
         /* LPI is not implemented */
         goto write_ignore_64;
@@ -325,6 +368,9 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
     case VREG64(GICR_CLRLPIR):
         /* LPI is not implemented */
         goto write_ignore_64;
+
+    case 0x0050:
+        goto write_reserved;
 
     case VREG64(GICR_PROPBASER):
         /* LPI is not implemented */
@@ -334,22 +380,43 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
         /* LPI is not implemented */
         goto write_ignore_64;
 
+    case 0x0080:
+        goto write_reserved;
+
     case VREG64(GICR_INVLPIR):
         /* LPI is not implemented */
         goto write_ignore_64;
+
+    case 0x00A8:
+        goto write_reserved;
 
     case VREG64(GICR_INVALLR):
         /* LPI is not implemented */
         goto write_ignore_64;
 
+    case 0x00B8:
+        goto write_reserved;
+
     case VREG32(GICR_SYNCR):
         /* RO */
         goto write_ignore_32;
 
+    case 0x00C8:
+        goto write_reserved;
+
     case VREG64(0x0100):
         goto write_impl_defined;
 
+    case 0x0108:
+        goto write_reserved;
+
     case VREG64(0x0110):
+        goto write_impl_defined;
+
+    case 0x0118 ... 0xBFFC:
+        goto write_reserved;
+
+    case 0xC000 ... 0xFFCC:
         goto write_impl_defined;
 
     case 0xFFD0 ... 0xFFE4:
@@ -387,6 +454,12 @@ write_ignore_32:
 write_impl_defined:
     printk(XENLOG_G_DEBUG
            "%pv: vGICR: WI on implementation defined register offset %#08x\n",
+           v, gicr_reg);
+    return 1;
+
+write_reserved:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICR: WI on reserved register offset %#08x\n",
            v, gicr_reg);
     return 1;
 }
@@ -609,10 +682,6 @@ static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
 
     switch ( gicr_reg )
     {
-    case VREG32(GICR_IGRPMODR0):
-        /* We do not implement security extensions for guests, read zero */
-        goto read_as_zero_32;
-
     case VREG32(GICR_IGROUPR0):
     case VREG32(GICR_ISENABLER0):
     case VREG32(GICR_ICENABLER0):
@@ -632,9 +701,22 @@ static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VREG32(GICR_ICPENDR0):
         goto read_as_zero;
 
+    case VREG32(GICR_IGRPMODR0):
+        /* We do not implement security extensions for guests, read zero */
+        goto read_as_zero_32;
+
     case VREG32(GICR_NSACR):
         /* We do not implement security extensions for guests, read zero */
         goto read_as_zero_32;
+
+    case 0x0E04 ... 0xBFFC:
+        goto read_reserved;
+
+    case 0xC000 ... 0xFFCC:
+        goto read_impl_defined;
+
+    case 0xFFD0 ... 0xFFFC:
+        goto read_reserved;
 
     default:
         printk(XENLOG_G_ERR
@@ -653,6 +735,21 @@ read_as_zero_32:
 read_as_zero:
     *r = 0;
     return 1;
+
+read_impl_defined:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICR: SGI: RAZ on implementation defined register offset %#08x\n",
+           v, gicr_reg);
+    *r = 0;
+    return 1;
+
+read_reserved:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICR: SGI: RAZ on reserved register offset %#08x\n",
+           v, gicr_reg);
+    *r = 0;
+    return 1;
+
 }
 
 static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
@@ -662,10 +759,6 @@ static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
 
     switch ( gicr_reg )
     {
-    case VREG32(GICR_IGRPMODR0):
-        /* We do not implement security extensions for guests, write ignore */
-        goto write_ignore_32;
-
     case VREG32(GICR_IGROUPR0):
     case VREG32(GICR_ISENABLER0):
     case VREG32(GICR_ICENABLER0):
@@ -693,6 +786,11 @@ static int vgic_v3_rdistr_sgi_mmio_write(struct vcpu *v, mmio_info_t *info,
                "%pv: vGICR: SGI: unhandled word write %#"PRIregister" to ICPENDR0\n",
                v, r);
         return 0;
+
+    case VREG32(GICR_IGRPMODR0):
+        /* We do not implement security extensions for guests, write ignore */
+        goto write_ignore_32;
+
 
     case VREG32(GICR_NSACR):
         /* We do not implement security extensions for guests, write ignore */
@@ -829,6 +927,14 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         return 1;
     }
 
+    case VREG32(GICD_IIDR):
+        if ( dabt.size != DABT_WORD ) goto bad_width;
+        *r = vgic_reg32_extract(GICV3_GICD_IIDR_VAL, info);
+        return 1;
+
+    case VREG32(0x000C):
+        goto read_reserved;
+
     case VREG32(GICD_STATUSR):
         /*
          *  Optional, Not implemented for now.
@@ -836,15 +942,23 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
          */
         goto read_as_zero_32;
 
-    case VREG32(GICD_IIDR):
-        if ( dabt.size != DABT_WORD ) goto bad_width;
-        *r = vgic_reg32_extract(GICV3_GICD_IIDR_VAL, info);
-        return 1;
+    case VRANGE32(0x0014, 0x001C):
+        goto read_reserved;
 
-    case 0x020 ... 0x03c:
-    case 0xc000 ... 0xffcc:
-        /* Implementation defined -- read as zero */
-        goto read_as_zero_32;
+    case VRANGE32(0x0020, 0x003C):
+        goto read_impl_defined;
+
+    case VREG32(0x0044):
+        goto read_reserved;
+
+    case VREG32(0x004C):
+        goto read_reserved;
+
+    case VREG32(0x0054):
+        goto read_reserved;
+
+    case VRANGE32(0x005C, 0x007C):
+        goto read_reserved;
 
     case VRANGE32(GICD_IGROUPR, GICD_IGROUPRN):
     case VRANGE32(GICD_ISENABLER, GICD_ISENABLERN):
@@ -859,6 +973,25 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
          * Manage in common
          */
         return __vgic_v3_distr_common_mmio_read("vGICD", v, info, gicd_reg, r);
+
+    case VRANGE32(GICD_NSACR, GICD_NSACRN):
+        /* We do not implement security extensions for guests, read zero */
+        goto read_as_zero_32;
+
+    case VREG32(GICD_SGIR):
+        /* Read as ICH_SGIR system register with SRE set. So ignore */
+        goto read_as_zero_32;
+
+    case VRANGE32(GICD_CPENDSGIR, GICD_CPENDSGIRN):
+        /* Replaced with GICR_ICPENDR0. So ignore write */
+        goto read_as_zero_32;
+
+    case VRANGE32(GICD_SPENDSGIR, GICD_SPENDSGIRN):
+        /* Replaced with GICR_ISPENDR0. So ignore write */
+        goto read_as_zero_32;
+
+    case VRANGE32(0x0F30, 0x60FC):
+        goto read_reserved;
 
     case VRANGE64(GICD_IROUTER32, GICD_IROUTER1019):
     {
@@ -877,23 +1010,13 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         return 1;
     }
 
-    case VRANGE32(GICD_NSACR, GICD_NSACRN):
-        /* We do not implement security extensions for guests, read zero */
-        goto read_as_zero_32;
+    case VRANGE32(0x7FE0, 0xBFFC):
+        goto read_reserved;
 
-    case VREG32(GICD_SGIR):
-        /* Read as ICH_SGIR system register with SRE set. So ignore */
-        goto read_as_zero_32;
+    case VRANGE32(0xC000, 0xFFCC):
+        goto read_impl_defined;
 
-    case VRANGE32(GICD_CPENDSGIR, GICD_CPENDSGIRN):
-        /* Replaced with GICR_ICPENDR0. So ignore write */
-        goto read_as_zero_32;
-
-    case VRANGE32(GICD_SPENDSGIR, GICD_SPENDSGIRN):
-        /* Replaced with GICR_ISPENDR0. So ignore write */
-        goto read_as_zero_32;
-
-    case 0xFFD0 ... 0xFFE4:
+    case VRANGE32(0xFFD0, 0xFFE4):
         /* Implementation defined identification registers */
        goto read_impl_defined;
 
@@ -903,21 +1026,10 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         *r = vgic_reg32_extract(GICV3_GICD_PIDR2, info);
         return 1;
 
-    case 0xFFEC ... 0xFFFC:
+    case VRANGE32(0xFFEC, 0xFFFC):
          /* Implementation defined identification registers */
          goto read_impl_defined;
 
-    case 0x00c:
-    case 0x044:
-    case 0x04c:
-    case 0x05c ... 0x07c:
-    case 0xf30 ... 0x5fcc:
-    case 0x8000 ... 0xbfcc:
-        /* These are reserved register addresses */
-        printk(XENLOG_G_DEBUG
-               "%pv: vGICD: RAZ on reserved register offset %#08x\n",
-               v, gicd_reg);
-        goto read_as_zero;
     default:
         printk(XENLOG_G_ERR "%pv: vGICD: unhandled read r%d offset %#08x\n",
                v, dabt.reg, gicd_reg);
@@ -941,7 +1053,14 @@ read_as_zero:
 
 read_impl_defined:
     printk(XENLOG_G_DEBUG
-           "%pv: vGICD: RAZ on implemention defined register offset %#08x\n",
+           "%pv: vGICD: RAZ on implementation defined register offset %#08x\n",
+           v, gicd_reg);
+    *r = 0;
+    return 1;
+
+read_reserved:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICD: RAZ on reserved register offset %#08x\n",
            v, gicd_reg);
     *r = 0;
     return 1;
@@ -987,33 +1106,46 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         /* RO -- write ignored */
         goto write_ignore_32;
 
+    case VREG32(0x000C):
+        goto write_reserved;
+
     case VREG32(GICD_STATUSR):
         /* RO -- write ignored */
         goto write_ignore_32;
+
+    case VRANGE32(0x0014, 0x001C):
+        goto write_reserved;
+
+    case VRANGE32(0x0020, 0x003C):
+        goto write_impl_defined;
 
     case VREG32(GICD_SETSPI_NSR):
         /* Message based SPI is not implemented */
         goto write_ignore_32;
 
+    case VREG32(0x0044):
+        goto write_reserved;
+
     case VREG32(GICD_CLRSPI_NSR):
         /* Message based SPI is not implemented */
         goto write_ignore_32;
+
+    case VREG32(0x004C):
+        goto write_reserved;
 
     case VREG32(GICD_SETSPI_SR):
         /* Message based SPI is not implemented */
         goto write_ignore_32;
 
+    case VREG32(0x0054):
+        goto write_reserved;
+
     case VREG32(GICD_CLRSPI_SR):
         /* Message based SPI is not implemented */
         goto write_ignore_32;
 
-    case 0x020 ... 0x03c:
-    case 0xc000 ... 0xffcc:
-        /* Implementation defined -- write ignored */
-        printk(XENLOG_G_DEBUG
-               "%pv: vGICD: WI on implementation defined register offset %#08x\n",
-               v, gicd_reg);
-        goto write_ignore_32;
+    case VRANGE32(0x005C, 0x007C):
+        goto write_reserved;
 
     case VRANGE32(GICD_IGROUPR, GICD_IGROUPRN):
     case VRANGE32(GICD_ISENABLER, GICD_ISENABLERN):
@@ -1028,22 +1160,6 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
          * Manage in common */
         return __vgic_v3_distr_common_mmio_write("vGICD", v, info,
                                                  gicd_reg, r);
-
-    case VRANGE64(GICD_IROUTER32, GICD_IROUTER1019):
-    {
-        uint64_t irouter;
-
-        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
-        rank = vgic_rank_offset(v, 64, gicd_reg - GICD_IROUTER,
-                                DABT_DOUBLE_WORD);
-        if ( rank == NULL ) goto write_ignore;
-        vgic_lock_rank(v, rank, flags);
-        irouter = vgic_fetch_irouter(rank, gicd_reg - GICD_IROUTER);
-        vgic_reg64_update(&irouter, r, info);
-        vgic_store_irouter(v->domain, rank, gicd_reg - GICD_IROUTER, irouter);
-        vgic_unlock_rank(v, rank, flags);
-        return 1;
-    }
 
     case VRANGE32(GICD_NSACR, GICD_NSACRN):
         /* We do not implement security extensions for guests, write ignore */
@@ -1063,7 +1179,32 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         if ( dabt.size != DABT_WORD ) goto bad_width;
         return 0;
 
-    case 0xFFD0 ... 0xFFE4:
+    case VRANGE32(0x0F30, 0x60FC):
+        goto write_reserved;
+
+    case VRANGE64(GICD_IROUTER32, GICD_IROUTER1019):
+    {
+        uint64_t irouter;
+
+        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
+        rank = vgic_rank_offset(v, 64, gicd_reg - GICD_IROUTER,
+                                DABT_DOUBLE_WORD);
+        if ( rank == NULL ) goto write_ignore;
+        vgic_lock_rank(v, rank, flags);
+        irouter = vgic_fetch_irouter(rank, gicd_reg - GICD_IROUTER);
+        vgic_reg64_update(&irouter, r, info);
+        vgic_store_irouter(v->domain, rank, gicd_reg - GICD_IROUTER, irouter);
+        vgic_unlock_rank(v, rank, flags);
+        return 1;
+    }
+
+    case VRANGE32(0x7FE0, 0xBFFC):
+        goto write_reserved;
+
+    case VRANGE32(0xC000, 0xFFCC):
+        goto write_impl_defined;
+
+    case VRANGE32(0xFFD0, 0xFFE4):
         /* Implementation defined identification registers */
        goto write_impl_defined;
 
@@ -1071,21 +1212,10 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         /* RO -- write ignore */
         goto write_ignore_32;
 
-    case 0xFFEC ... 0xFFFC:
+    case VRANGE32(0xFFEC, 0xFFFC):
          /* Implementation defined identification registers */
          goto write_impl_defined;
 
-    case 0x00c:
-    case 0x044:
-    case 0x04c:
-    case 0x05c ... 0x07c:
-    case 0xf30 ... 0x5fcc:
-    case 0x8000 ... 0xbfcc:
-        /* Reserved register addresses */
-        printk(XENLOG_G_DEBUG
-               "%pv: vGICD: write unknown 0x00c 0xfcc  r%d offset %#08x\n",
-               v, dabt.reg, gicd_reg);
-        goto write_ignore;
     default:
         printk(XENLOG_G_ERR
                "%pv: vGICD: unhandled write r%d=%"PRIregister" offset %#08x\n",
@@ -1110,6 +1240,12 @@ write_ignore:
 write_impl_defined:
     printk(XENLOG_G_DEBUG
            "%pv: vGICD: WI on implementation defined register offset %#08x\n",
+           v, gicd_reg);
+    return 1;
+
+write_reserved:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICD: WI on reserved register offset %#08x\n",
            v, gicd_reg);
     return 1;
 }

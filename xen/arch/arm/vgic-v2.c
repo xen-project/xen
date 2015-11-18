@@ -210,9 +210,14 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         *r = vgic_reg32_extract(0x0000043b, info);
         return 1;
 
-    /* Implementation defined -- read as zero */
-    case 0x020 ... 0x03c:
-        goto read_as_zero;
+    case VRANGE32(0x00C, 0x01C):
+        goto read_reserved;
+
+    case VRANGE32(0x020, 0x03C):
+        goto read_impl_defined;
+
+    case VRANGE32(0x040, 0x07C):
+        goto read_reserved;
 
     case VRANGE32(GICD_IGROUPR, GICD_IGROUPRN):
         /* We do not implement security extensions for guests, read zero */
@@ -246,21 +251,6 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VRANGE32(GICD_ICACTIVER, GICD_ICACTIVERN):
         goto read_as_zero;
 
-    case VRANGE32(GICD_ITARGETSR, GICD_ITARGETSRN):
-    {
-        uint32_t itargetsr;
-
-        if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
-        rank = vgic_rank_offset(v, 8, gicd_reg - GICD_ITARGETSR, DABT_WORD);
-        if ( rank == NULL) goto read_as_zero;
-        vgic_lock_rank(v, rank, flags);
-        itargetsr = vgic_fetch_itargetsr(rank, gicd_reg - GICD_ITARGETSR);
-        vgic_unlock_rank(v, rank, flags);
-        *r = vgic_reg32_extract(itargetsr, info);
-
-        return 1;
-    }
-
     case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
     {
         uint32_t ipriorityr;
@@ -279,6 +269,27 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         return 1;
     }
 
+    case VREG32(0x7FC):
+        goto read_reserved;
+
+    case VRANGE32(GICD_ITARGETSR, GICD_ITARGETSRN):
+    {
+        uint32_t itargetsr;
+
+        if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
+        rank = vgic_rank_offset(v, 8, gicd_reg - GICD_ITARGETSR, DABT_WORD);
+        if ( rank == NULL) goto read_as_zero;
+        vgic_lock_rank(v, rank, flags);
+        itargetsr = vgic_fetch_itargetsr(rank, gicd_reg - GICD_ITARGETSR);
+        vgic_unlock_rank(v, rank, flags);
+        *r = vgic_reg32_extract(itargetsr, info);
+
+        return 1;
+    }
+
+    case VREG32(0xBFC):
+        goto read_reserved;
+
     case VRANGE32(GICD_ICFGR, GICD_ICFGRN):
     {
         uint32_t icfgr;
@@ -295,6 +306,9 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         return 1;
     }
 
+    case VRANGE32(0xD00, 0xDFC):
+        goto read_impl_defined;
+
     case VRANGE32(GICD_NSACR, GICD_NSACRN):
         /* We do not implement security extensions for guests, read zero */
         goto read_as_zero_32;
@@ -305,32 +319,27 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         *r = 0xdeadbeef;
         return 1;
 
+    case VRANGE32(0xF04, 0xF0C):
+        goto read_reserved;
+
     /* Setting/Clearing the SGI pending bit via GICD is not supported */
     case VRANGE32(GICD_CPENDSGIR, GICD_CPENDSGIRN):
     case VRANGE32(GICD_SPENDSGIR, GICD_SPENDSGIRN):
         goto read_as_zero;
 
-    /* Implementation defined -- read as zero */
-    case 0xfd0 ... 0xfe4:
-        goto read_as_zero;
+    case VRANGE32(0xF30, 0xFCC):
+        goto read_reserved;
+
+    case VRANGE32(0xFD0, 0xFE4):
+        goto read_impl_defined;
 
     case VREG32(GICD_ICPIDR2):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR "%pv: vGICD: unhandled read from ICPIDR2\n", v);
         return 0;
 
-    /* Implementation defined -- read as zero */
-    case 0xfec ... 0xffc:
-        goto read_as_zero;
-
-    /* Reserved -- read as zero */
-    case 0x00c ... 0x01c:
-    case 0x040 ... 0x07c:
-    case 0x7fc:
-    case 0xbfc:
-    case 0xf04 ... 0xf0c:
-    case 0xf30 ... 0xfcc:
-        goto read_as_zero;
+    case VRANGE32(0xFEC, 0xFFC):
+        goto read_impl_defined;
 
     default:
         printk(XENLOG_G_ERR "%pv: vGICD: unhandled read r%d offset %#08x\n",
@@ -347,6 +356,20 @@ bad_width:
 read_as_zero_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
 read_as_zero:
+    *r = 0;
+    return 1;
+
+read_impl_defined:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICD: RAZ on implemention defined register offset %#08x\n",
+           v, gicd_reg);
+    *r = 0;
+    return 1;
+
+read_reserved:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICD: RAZ on reserved register offset %#08x\n",
+           v, gicd_reg);
     *r = 0;
     return 1;
 }
@@ -414,9 +437,14 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
     case VREG32(GICD_IIDR):
         goto write_ignore_32;
 
-    /* Implementation defined -- write ignored */
-    case 0x020 ... 0x03c:
-        goto write_ignore;
+    case VRANGE32(0x00C, 0x01C):
+        goto write_reserved;
+
+    case VRANGE32(0x020, 0x03C):
+        goto write_impl_defined;
+
+    case VRANGE32(0x040, 0x07C):
+        goto write_reserved;
 
     case VRANGE32(GICD_IGROUPR, GICD_IGROUPRN):
         /* We do not implement security extensions for guests, write ignore */
@@ -472,6 +500,25 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
                v, r, gicd_reg - GICD_ICACTIVER);
         return 0;
 
+    case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
+    {
+        uint32_t *ipriorityr;
+
+        if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
+        rank = vgic_rank_offset(v, 8, gicd_reg - GICD_IPRIORITYR, DABT_WORD);
+        if ( rank == NULL) goto write_ignore;
+        vgic_lock_rank(v, rank, flags);
+        ipriorityr = &rank->ipriorityr[REG_RANK_INDEX(8,
+                                                      gicd_reg - GICD_IPRIORITYR,
+                                                      DABT_WORD)];
+        vgic_reg32_update(ipriorityr, r, info);
+        vgic_unlock_rank(v, rank, flags);
+        return 1;
+    }
+
+    case VREG32(0x7FC):
+        goto write_reserved;
+
     case VRANGE32(GICD_ITARGETSR, GICD_ITARGETSR7):
         /* SGI/PPI target is read only */
         goto write_ignore_32;
@@ -492,21 +539,8 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         return 1;
     }
 
-    case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
-    {
-        uint32_t *ipriorityr;
-
-        if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
-        rank = vgic_rank_offset(v, 8, gicd_reg - GICD_IPRIORITYR, DABT_WORD);
-        if ( rank == NULL) goto write_ignore;
-        vgic_lock_rank(v, rank, flags);
-        ipriorityr = &rank->ipriorityr[REG_RANK_INDEX(8,
-                                                      gicd_reg - GICD_IPRIORITYR,
-                                                      DABT_WORD)];
-        vgic_reg32_update(ipriorityr, r, info);
-        vgic_unlock_rank(v, rank, flags);
-        return 1;
-    }
+    case VREG32(0xBFC):
+        goto write_reserved;
 
     case VREG32(GICD_ICFGR): /* SGIs */
         goto write_ignore_32;
@@ -526,6 +560,9 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         vgic_unlock_rank(v, rank, flags);
         return 1;
 
+    case VRANGE32(0xD00, 0xDFC):
+        goto write_impl_defined;
+
     case VRANGE32(GICD_NSACR, GICD_NSACRN):
         /* We do not implement security extensions for guests, write ignore */
         goto write_ignore_32;
@@ -533,6 +570,9 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
     case VREG32(GICD_SGIR):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         return vgic_v2_to_sgi(v, r);
+
+    case VRANGE32(0xF04, 0xF0C):
+        goto write_reserved;
 
     case VRANGE32(GICD_CPENDSGIR, GICD_CPENDSGIRN):
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
@@ -548,26 +588,19 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
                v, dabt.size ? "word" : "byte", r, gicd_reg - GICD_SPENDSGIR);
         return 0;
 
-    /* Implementation defined -- write ignored */
-    case 0xfd0 ... 0xfe4:
-        goto write_ignore;
+    case VRANGE32(0xF30, 0xFCC):
+        goto write_reserved;
+
+    case VRANGE32(0xFD0, 0xFE4):
+        /* Implementation defined identification registers */
+        goto write_impl_defined;
 
     /* R/O -- write ignore */
     case VREG32(GICD_ICPIDR2):
         goto write_ignore_32;
 
-    /* Implementation defined -- write ignored */
-    case 0xfec ... 0xffc:
-        goto write_ignore;
-
-    /* Reserved -- write ignored */
-    case 0x00c ... 0x01c:
-    case 0x040 ... 0x07c:
-    case 0x7fc:
-    case 0xbfc:
-    case 0xf04 ... 0xf0c:
-    case 0xf30 ... 0xfcc:
-        goto write_ignore;
+    case VRANGE32(0xFEC, 0xFFC):
+        /* Implementation defined identification registers */
 
     default:
         printk(XENLOG_G_ERR
@@ -586,6 +619,18 @@ bad_width:
 write_ignore_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
 write_ignore:
+    return 1;
+
+write_impl_defined:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICD: WI on implementation defined register offset %#08x\n",
+           v, gicd_reg);
+    return 1;
+
+write_reserved:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGICD: WI on implementation defined register offset %#08x\n",
+           v, gicd_reg);
     return 1;
 }
 
