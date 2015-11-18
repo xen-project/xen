@@ -96,7 +96,6 @@
 /* GICR for SGI's & PPI's */
 
 #define GICR_IGROUPR0                (0x0080)
-#define GICR_IGRPMODR0               (0x0F80)
 #define GICR_ISENABLER0              (0x0100)
 #define GICR_ICENABLER0              (0x0180)
 #define GICR_ISPENDR0                (0x0200)
@@ -107,6 +106,7 @@
 #define GICR_IPRIORITYR7             (0x041C)
 #define GICR_ICFGR0                  (0x0C00)
 #define GICR_ICFGR1                  (0x0C04)
+#define GICR_IGRPMODR0               (0x0D00)
 #define GICR_NSACR                   (0x0E00)
 
 #define GICR_TYPER_PLPIS             (1U << 0)
