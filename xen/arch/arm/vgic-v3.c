@@ -248,7 +248,6 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VREG64(GICR_INVALLR):
         /* WO. Read as zero */
         goto read_as_zero_64;
-        return 0;
 
     case 0x00B8:
         goto read_reserved;
