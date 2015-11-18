@@ -259,9 +259,9 @@ MINIOS_UPSTREAM_REVISION ?= 8d84345a20d8a46ea26379c9f19961f6aa3e6e83
 # Fri Nov 20 19:32:42 2015 +0100
 # minios: don't rely on specific page table allocation scheme
 
-SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
-# Tue Mar 17 10:52:16 2015 -0400
-# vgabios: On bda_save_restore() the saved vbe_mode also has flags in it
+SEABIOS_UPSTREAM_REVISION ?= rel-1.9.0
+# Tue Nov 17 09:18:44 2015 -0500
+# docs: Note v1.9.0 release
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
