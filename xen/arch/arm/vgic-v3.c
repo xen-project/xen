@@ -951,13 +951,29 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VRANGE32(0x0020, 0x003C):
         goto read_impl_defined;
 
+    case VREG32(GICD_SETSPI_NSR):
+        /* Message based SPI is not implemented */
+        goto read_reserved;
+
     case VREG32(0x0044):
+        goto read_reserved;
+
+    case VREG32(GICD_CLRSPI_NSR):
+        /* Message based SPI is not implemented */
         goto read_reserved;
 
     case VREG32(0x004C):
         goto read_reserved;
 
+    case VREG32(GICD_SETSPI_SR):
+        /* Message based SPI is not implemented */
+        goto read_reserved;
+
     case VREG32(0x0054):
+        goto read_reserved;
+
+    case VREG32(GICD_CLRSPI_SR):
+        /* Message based SPI is not implemented */
         goto read_reserved;
 
     case VRANGE32(0x005C, 0x007C):
@@ -1125,28 +1141,28 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
 
     case VREG32(GICD_SETSPI_NSR):
         /* Message based SPI is not implemented */
-        goto write_ignore_32;
+        goto write_reserved;
 
     case VREG32(0x0044):
         goto write_reserved;
 
     case VREG32(GICD_CLRSPI_NSR):
         /* Message based SPI is not implemented */
-        goto write_ignore_32;
+        goto write_reserved;
 
     case VREG32(0x004C):
         goto write_reserved;
 
     case VREG32(GICD_SETSPI_SR):
         /* Message based SPI is not implemented */
-        goto write_ignore_32;
+        goto write_reserved;
 
     case VREG32(0x0054):
         goto write_reserved;
 
     case VREG32(GICD_CLRSPI_SR):
         /* Message based SPI is not implemented */
-        goto write_ignore_32;
+        goto write_reserved;
 
     case VRANGE32(0x005C, 0x007C):
         goto write_reserved;
