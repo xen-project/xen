@@ -1349,7 +1349,7 @@ void pmu_apic_interrupt(struct cpu_user_regs *regs)
 int __init APIC_init_uniprocessor (void)
 {
     if (enable_local_apic < 0)
-        __clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
+        setup_clear_cpu_cap(X86_FEATURE_APIC);
 
     if (!smp_found_config && !cpu_has_apic) {
         skip_ioapic_setup = 1;

@@ -533,11 +533,15 @@ unsigned int xstate_ctxt_size(u64 xcr0)
 /* Collect the information of processor's extended state */
 void xstate_init(struct cpuinfo_x86 *c)
 {
+    static bool_t __initdata use_xsave = 1;
+    boolean_param("xsave", use_xsave);
+
     bool_t bsp = c == &boot_cpu_data;
     u32 eax, ebx, ecx, edx;
     u64 feature_mask;
 
-    if ( boot_cpu_data.cpuid_level < XSTATE_CPUID )
+    if ( (bsp && !use_xsave) ||
+         boot_cpu_data.cpuid_level < XSTATE_CPUID )
     {
         BUG_ON(!bsp);
         setup_clear_cpu_cap(X86_FEATURE_XSAVE);

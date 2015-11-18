@@ -16,9 +16,6 @@
 
 #include "cpu.h"
 
-static bool_t use_xsave = 1;
-boolean_param("xsave", use_xsave);
-
 bool_t opt_arat = 1;
 boolean_param("arat", opt_arat);
 
@@ -341,12 +338,6 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	if (this_cpu->c_init)
 		this_cpu->c_init(c);
 
-        /* Initialize xsave/xrstor features */
-	if ( !use_xsave )
-		__clear_bit(X86_FEATURE_XSAVE, boot_cpu_data.x86_capability);
-
-	if ( cpu_has_xsave )
-		xstate_init(c);
 
    	if ( !opt_pku )
 		setup_clear_cpu_cap(X86_FEATURE_PKU);
@@ -369,6 +360,9 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	}
 
 	/* Now the feature flags better reflect actual CPU features! */
+
+	if ( cpu_has_xsave )
+		xstate_init(c);
 
 #ifdef NOISY_CAPS
 	printk(KERN_DEBUG "CPU: After all inits, caps:");
