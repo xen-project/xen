@@ -157,6 +157,15 @@ static void vgic_store_irouter(struct domain *d, struct vgic_irq_rank *rank,
     rank->vcpu[offset] = new_vcpu->vcpu_id;
 }
 
+static inline bool vgic_reg64_check_access(struct hsr_dabt dabt)
+{
+    /*
+     * 64 bits registers can be accessible using 32-bit and 64-bit unless
+     * stated otherwise (See 8.1.3 ARM IHI 0069A).
+     */
+    return ( dabt.size == DABT_DOUBLE_WORD || dabt.size == DABT_WORD );
+}
+
 static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
                                          uint32_t gicr_reg,
                                          register_t *r)
@@ -173,10 +182,11 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         *r = vgic_reg32_extract(GICV3_GICR_IIDR_VAL, info);
         return 1;
     case GICR_TYPER:
+    case GICR_TYPER + 4:
     {
         uint64_t typer, aff;
 
-        if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
+        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
         /* TBD: Update processor id in [23:8] when ITS support is added */
         aff = (MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 3) << 56 |
                MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 2) << 48 |
@@ -262,7 +272,7 @@ bad_width:
     return 0;
 
 read_as_zero_64:
-    if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
+    if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
     *r = 0;
     return 1;
 
@@ -338,7 +348,7 @@ bad_width:
     return 0;
 
 write_ignore_64:
-    if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
+    if ( vgic_reg64_check_access(dabt) ) goto bad_width;
     return 1;
 
 write_ignore_32:
@@ -803,7 +813,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
     {
         uint64_t irouter;
 
-        if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
+        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
         rank = vgic_rank_offset(v, 64, gicd_reg - GICD_IROUTER,
                                 DABT_DOUBLE_WORD);
         if ( rank == NULL ) goto read_as_zero;
@@ -878,7 +888,7 @@ bad_width:
     return 0;
 
 read_as_zero_64:
-    if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
+    if ( vgic_reg64_check_access(dabt) ) goto bad_width;
     *r = 0;
     return 1;
 
@@ -971,7 +981,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
     {
         uint64_t irouter;
 
-        if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
+        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
         rank = vgic_rank_offset(v, 64, gicd_reg - GICD_IROUTER,
                                 DABT_DOUBLE_WORD);
         if ( rank == NULL ) goto write_ignore;
@@ -1030,7 +1040,7 @@ write_ignore_32:
     return 1;
 
 write_ignore_64:
-    if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
+    if ( vgic_reg64_check_access(dabt) ) goto bad_width;
     return 1;
 
 write_ignore:
