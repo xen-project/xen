@@ -806,10 +806,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
          * Manage in common
          */
         return __vgic_v3_distr_common_mmio_read("vGICD", v, info, gicd_reg, r);
-    case GICD_IROUTER ... GICD_IROUTER31:
-        /* SGI/PPI is RES0 */
-        goto read_as_zero_64;
-    case GICD_IROUTER32 ... GICD_IROUTERN:
+    case GICD_IROUTER32 ... GICD_IROUTER1019:
     {
         uint64_t irouter;
 
@@ -886,11 +883,6 @@ bad_width:
            v, dabt.size, dabt.reg, gicd_reg);
     domain_crash_synchronous();
     return 0;
-
-read_as_zero_64:
-    if ( vgic_reg64_check_access(dabt) ) goto bad_width;
-    *r = 0;
-    return 1;
 
 read_as_zero_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -974,10 +966,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
          * Manage in common */
         return __vgic_v3_distr_common_mmio_write("vGICD", v, info,
                                                  gicd_reg, r);
-    case GICD_IROUTER ... GICD_IROUTER31:
-        /* SGI/PPI is RES0 */
-        goto write_ignore_64;
-    case GICD_IROUTER32 ... GICD_IROUTERN:
+    case GICD_IROUTER32 ... GICD_IROUTER1019:
     {
         uint64_t irouter;
 
@@ -1037,10 +1026,6 @@ bad_width:
 
 write_ignore_32:
     if ( dabt.size != DABT_WORD ) goto bad_width;
-    return 1;
-
-write_ignore_64:
-    if ( vgic_reg64_check_access(dabt) ) goto bad_width;
     return 1;
 
 write_ignore:
