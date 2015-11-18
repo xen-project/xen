@@ -451,9 +451,6 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
         state->store_mfn = xc_dom_p2m_host(dom, dom->xenstore_pfn);
     }
 
-    libxl__file_reference_unmap(&state->pv_kernel);
-    libxl__file_reference_unmap(&state->pv_ramdisk);
-
     ret = 0;
 out:
     xc_dom_release(dom);
