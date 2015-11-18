@@ -217,12 +217,12 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         goto read_impl_defined;
 
     case VREG64(GICR_SETLPIR):
-        /* WO. Read as zero */
-        goto read_as_zero_64;
+        /* WO. Read unknown */
+        goto read_unknown;
 
     case VREG64(GICR_CLRLPIR):
-        /* WO. Read as zero */
-        goto read_as_zero_64;
+        /* WO. Read unknown */
+        goto read_unknown;
 
     case 0x0050:
         goto read_reserved;
@@ -239,15 +239,15 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         goto read_reserved;
 
     case VREG64(GICR_INVLPIR):
-        /* WO. Read as zero */
-        goto read_as_zero_64;
+        /* WO. Read unknown */
+        goto read_unknown;
 
     case 0x00A8:
         goto read_reserved;
 
     case VREG64(GICR_INVALLR):
-        /* WO. Read as zero */
-        goto read_as_zero_64;
+        /* WO. Read unknown */
+        goto read_unknown;
 
     case 0x00B8:
         goto read_reserved;
@@ -323,6 +323,10 @@ read_reserved:
            "%pv: vGICR: RAZ on reserved register offset %#08x\n",
            v, gicr_reg);
     *r = 0;
+    return 1;
+
+read_unknown:
+    *r = vgic_reg64_extract(0xdeadbeafdeadbeaf, info);
     return 1;
 }
 
