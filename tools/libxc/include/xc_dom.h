@@ -249,7 +249,7 @@ struct xc_dom_arch {
 void xc_dom_register_arch_hooks(struct xc_dom_arch *hooks);
 
 #define XC_DOM_PAGE_SHIFT(dom)  ((dom)->arch_hooks->page_shift)
-#define XC_DOM_PAGE_SIZE(dom)   (1 << (dom)->arch_hooks->page_shift)
+#define XC_DOM_PAGE_SIZE(dom)   (1LL << (dom)->arch_hooks->page_shift)
 
 /* --- main functions ---------------------------------------------- */
 
