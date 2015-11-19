@@ -556,7 +556,6 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
         r = login_tty(libxl__carefd_fd(bl->ptys[0].slave));
         if (r) { LOGE(ERROR, "login_tty failed"); exit(-1); }
         libxl__exec(gc, -1, -1, -1, bl->args[0], (char **) bl->args, env);
-        exit(-1);
     }
 
     /* parent */

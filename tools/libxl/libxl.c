@@ -1983,7 +1983,6 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
     }
 
     libxl__exec(gc, autopass_fd, -1, -1, args[0], args, NULL);
-    abort();
 
  x_fail:
     GC_FREE;

@@ -1578,7 +1578,7 @@ _hidden int libxl__xenstore_child_wait_deprecated(libxl__gc *gc,
  */
 _hidden  void libxl__exec(libxl__gc *gc, int stdinfd, int stdoutfd,
                           int stderrfd, const char *arg0, char *const args[],
-                          char *const env[]);
+                          char *const env[]) __attribute__((noreturn));
 
 /* from xl_create */
 
