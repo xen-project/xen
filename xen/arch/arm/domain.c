@@ -327,7 +327,7 @@ void hypercall_cancel_continuation(void)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct mc_state *mcs = &current->mc_state;
 
-    if ( test_bit(_MCSF_in_multicall, &mcs->flags) )
+    if ( mcs->flags & MCSF_in_multicall )
     {
         __clear_bit(_MCSF_call_preempted, &mcs->flags);
     }
@@ -352,7 +352,7 @@ unsigned long hypercall_create_continuation(
 
     va_start(args, format);
 
-    if ( test_bit(_MCSF_in_multicall, &mcs->flags) )
+    if ( mcs->flags & MCSF_in_multicall )
     {
         __set_bit(_MCSF_call_preempted, &mcs->flags);
 
