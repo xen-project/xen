@@ -372,7 +372,7 @@ static x86_pgentry_t get_pg_prot_x86(struct xc_dom_image *dom, int l,
     unsigned m;
 
     prot = domx86->params->lvl_prot[l];
-    if ( l > 0 )
+    if ( l > 0 || dom->pvh_enabled )
         return prot;
 
     for ( m = 0; m < domx86->n_mappings; m++ )
