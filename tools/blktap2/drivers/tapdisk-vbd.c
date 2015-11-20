@@ -1555,7 +1555,7 @@ tapdisk_vbd_pull_ring_requests(td_vbd_t *vbd)
 	int idx;
 	RING_IDX rp, rc;
 	td_ring_t *ring;
-	blkif_request_t *req;
+	blkif_request_t req;
 	td_vbd_request_t *vreq;
 
 	ring = &vbd->ring;
@@ -1566,16 +1566,16 @@ tapdisk_vbd_pull_ring_requests(td_vbd_t *vbd)
 	xen_rmb();
 
 	for (rc = ring->fe_ring.req_cons; rc != rp; rc++) {
-		req = RING_GET_REQUEST(&ring->fe_ring, rc);
+		RING_COPY_REQUEST(&ring->fe_ring, rc, &req);
 		++ring->fe_ring.req_cons;
 
-		idx  = req->id;
+		idx  = req.id;
 		vreq = &vbd->request_list[idx];
 
 		ASSERT(list_empty(&vreq->next));
 		ASSERT(vreq->secs_pending == 0);
 
-		memcpy(&vreq->req, req, sizeof(blkif_request_t));
+		memcpy(&vreq->req, &req, sizeof(blkif_request_t));
 		vbd->received++;
 		vreq->vbd = vbd;
 
