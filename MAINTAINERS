@@ -234,6 +234,7 @@ MINI-OS
 M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 S:	Supported
+L:	minios-devel@lists.xenproject.org
 F:	config/MiniOS.mk
 F:	extras/mini-os/
 
