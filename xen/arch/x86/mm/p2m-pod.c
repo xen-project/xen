@@ -528,7 +528,6 @@ p2m_pod_decrease_reservation(struct domain *d,
     if ( unlikely(d->is_dying) )
         goto out_unlock;
 
-recount:
     pod = nonpod = ram = 0;
 
     /* Figure out if we need to steal some freed memory for our cache */
@@ -568,15 +567,20 @@ recount:
         goto out_entry_check;
     }
 
-    /* Try to grab entire superpages if possible.  Since the common case is for drivers
-     * to pass back singleton pages, see if we can take the whole page back and mark the
-     * rest PoD. */
-    if ( steal_for_cache
-         && p2m_pod_zero_check_superpage(p2m, gpfn & ~(SUPERPAGE_PAGES-1)))
+    /*
+     * Try to grab entire superpages if possible.  Since the common case is for
+     * drivers to pass back singleton pages, see if we can take the whole page
+     * back and mark the rest PoD.
+     * No need to do this though if
+     * - order >= SUPERPAGE_ORDER (the loop below will take care of this)
+     * - not all of the pages were RAM (now knowing order < SUPERPAGE_ORDER)
+     */
+    if ( steal_for_cache && order < SUPERPAGE_ORDER && ram == (1 << order) &&
+         p2m_pod_zero_check_superpage(p2m, gpfn & ~(SUPERPAGE_PAGES - 1)) )
     {
-        /* Since order may be arbitrary, we may have taken more or less
-         * than we were actually asked to; so just re-count from scratch */
-        goto recount;
+        pod = 1 << order;
+        ram = nonpod = 0;
+        ASSERT(steal_for_cache == (p2m->pod.entry_count > p2m->pod.count));
     }
 
     /* Process as long as:
