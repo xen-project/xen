@@ -622,16 +622,19 @@ rt_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 {
     struct rt_vcpu *svc = rt_vcpu(vc);
     s_time_t now = NOW();
+    spinlock_t *lock;
 
     /* not addlocate idle vcpu to dom vcpu list */
     if ( is_idle_vcpu(vc) )
         return;
 
+    lock = vcpu_schedule_lock_irq(vc);
     if ( now >= svc->cur_deadline )
         rt_update_deadline(now, svc);
 
     if ( !__vcpu_on_q(svc) && vcpu_runnable(vc) && !vc->is_running )
         __runq_insert(ops, svc);
+    vcpu_schedule_unlock_irq(lock, vc);
 
     /* add rt_vcpu svc to scheduler-specific vcpu list of the dom */
     list_add_tail(&svc->sdom_elem, &svc->sdom->vcpu);

@@ -1487,7 +1487,6 @@ void __init scheduler_init(void)
 
 int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 {
-    unsigned long flags;
     struct vcpu *idle;
     spinlock_t *lock;
     void *ppriv, *ppriv_old, *vpriv, *vpriv_old;
@@ -1508,7 +1507,7 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
         return -ENOMEM;
     }
 
-    lock = pcpu_schedule_lock_irqsave(cpu, &flags);
+    lock = pcpu_schedule_lock_irq(cpu);
 
     SCHED_OP(old_ops, tick_suspend, cpu);
     vpriv_old = idle->sched_priv;
@@ -1517,9 +1516,8 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     ppriv_old = per_cpu(schedule_data, cpu).sched_priv;
     per_cpu(schedule_data, cpu).sched_priv = ppriv;
     SCHED_OP(new_ops, tick_resume, cpu);
-    SCHED_OP(new_ops, insert_vcpu, idle);
 
-    pcpu_schedule_unlock_irqrestore(lock, flags, cpu);
+    pcpu_schedule_unlock_irq(lock, cpu);
 
     SCHED_OP(old_ops, free_vdata, vpriv_old);
     SCHED_OP(old_ops, free_pdata, ppriv_old, cpu);
