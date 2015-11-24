@@ -80,8 +80,18 @@ struct vmx_domain {
 
 struct pi_desc {
     DECLARE_BITMAP(pir, NR_VECTORS);
-    u32 control;
-    u32 rsvd[7];
+    union {
+        struct {
+            u16     on     : 1,  /* bit 256 - Outstanding Notification */
+                    sn     : 1,  /* bit 257 - Suppress Notification */
+                    rsvd_1 : 14; /* bit 271:258 - Reserved */
+            u8      nv;          /* bit 279:272 - Notification Vector */
+            u8      rsvd_2;      /* bit 287:280 - Reserved */
+            u32     ndst;        /* bit 319:288 - Notification Destination */
+        };
+        u64 control;
+    };
+    u32 rsvd[6];
 } __attribute__ ((aligned (64)));
 
 #define ept_get_wl(ept)   ((ept)->ept_wl)
