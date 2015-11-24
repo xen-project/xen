@@ -255,9 +255,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= 8d84345a20d8a46ea26379c9f19961f6aa3e6e83
-# Fri Nov 20 19:32:42 2015 +0100
-# minios: don't rely on specific page table allocation scheme
+MINIOS_UPSTREAM_REVISION ?= bccd90071e863ec22216a000f1a07035e2f226ff
+# Mon Nov 23 16:34:31 2015 +0000
+# Add a .gitignore
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.9.0
 # Tue Nov 17 09:18:44 2015 -0500
