@@ -3,6 +3,7 @@
 
 HAS_IOPORTS := y
 HAS_ACPI := y
+HAS_NUMA := y
 HAS_VGA  := y
 HAS_VIDEO  := y
 HAS_CPUFREQ := y

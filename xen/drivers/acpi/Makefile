@@ -3,7 +3,7 @@ subdir-y += utilities
 subdir-$(x86) += apei
 
 obj-bin-y += tables.init.o
-obj-y += numa.o
+obj-$(HAS_NUMA) += numa.o
 obj-y += osl.o
 obj-y += pmstat.o
 
