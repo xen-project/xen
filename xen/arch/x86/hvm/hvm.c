@@ -2826,7 +2826,7 @@ void hvm_triple_fault(void)
     domain_shutdown(d, reason);
 }
 
-void hvm_inject_trap(struct hvm_trap *trap)
+void hvm_inject_trap(const struct hvm_trap *trap)
 {
     struct vcpu *curr = current;
 

@@ -821,7 +821,7 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
 }
 
 int
-nsvm_vcpu_vmexit_trap(struct vcpu *v, struct hvm_trap *trap)
+nsvm_vcpu_vmexit_trap(struct vcpu *v, const struct hvm_trap *trap)
 {
     ASSERT(vcpu_nestedhvm(v).nv_vvmcx != NULL);
 
