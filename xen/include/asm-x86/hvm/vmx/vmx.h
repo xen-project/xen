@@ -88,6 +88,8 @@ typedef enum {
 #define EPT_EMT_WB              6
 #define EPT_EMT_RSV2            7
 
+#define PI_xAPIC_NDST_MASK      0xFF00
+
 void vmx_asm_vmexit_handler(struct cpu_user_regs);
 void vmx_asm_do_vmentry(void);
 void vmx_intr_assist(void);

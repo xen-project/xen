@@ -39,6 +39,7 @@
 #include <asm/flushtlb.h>
 #include <asm/shadow.h>
 #include <asm/tboot.h>
+#include <asm/apic.h>
 
 static bool_t __read_mostly opt_vpid_enabled = 1;
 boolean_param("vpid", opt_vpid_enabled);
@@ -964,6 +965,24 @@ void virtual_vmcs_vmwrite(const struct vcpu *v, u32 vmcs_encoding, u64 val)
     virtual_vmcs_exit(v);
 }
 
+/*
+ * This function is only called in a vCPU's initialization phase,
+ * so we can update the posted-interrupt descriptor in non-atomic way.
+ */
+static void pi_desc_init(struct vcpu *v)
+{
+    uint32_t dest;
+
+    v->arch.hvm_vmx.pi_desc.nv = posted_intr_vector;
+
+    dest = cpu_physical_id(v->processor);
+
+    if ( x2apic_enabled )
+        v->arch.hvm_vmx.pi_desc.ndst = dest;
+    else
+        v->arch.hvm_vmx.pi_desc.ndst = MASK_INSR(dest, PI_xAPIC_NDST_MASK);
+}
+
 static int construct_vmcs(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -1102,6 +1121,9 @@ static int construct_vmcs(struct vcpu *v)
 
     if ( cpu_has_vmx_posted_intr_processing )
     {
+        if ( iommu_intpost )
+            pi_desc_init(v);
+
         __vmwrite(PI_DESC_ADDR, virt_to_maddr(&v->arch.hvm_vmx.pi_desc));
         __vmwrite(POSTED_INTR_NOTIFICATION_VECTOR, posted_intr_vector);
     }
