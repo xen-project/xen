@@ -160,7 +160,6 @@ struct rt_private {
  */
 struct rt_vcpu {
     struct list_head q_elem;    /* on the runq/depletedq list */
-    struct list_head sdom_elem; /* on the domain VCPU list */
 
     /* Up-pointers */
     struct rt_dom *sdom;
@@ -182,7 +181,6 @@ struct rt_vcpu {
  * Domain
  */
 struct rt_dom {
-    struct list_head vcpu;      /* link its VCPUs */
     struct list_head sdom_elem; /* link list on rt_priv */
     struct domain *dom;         /* pointer to upper domain */
 };
@@ -290,7 +288,7 @@ rt_dump_pcpu(const struct scheduler *ops, int cpu)
 static void
 rt_dump(const struct scheduler *ops)
 {
-    struct list_head *iter_sdom, *iter_svc, *runq, *depletedq, *iter;
+    struct list_head *runq, *depletedq, *iter;
     struct rt_private *prv = rt_priv(ops);
     struct rt_vcpu *svc;
     struct rt_dom *sdom;
@@ -319,14 +317,16 @@ rt_dump(const struct scheduler *ops)
     }
 
     printk("Domain info:\n");
-    list_for_each( iter_sdom, &prv->sdom )
+    list_for_each( iter, &prv->sdom )
     {
-        sdom = list_entry(iter_sdom, struct rt_dom, sdom_elem);
+        struct vcpu *v;
+
+        sdom = list_entry(iter, struct rt_dom, sdom_elem);
         printk("\tdomain: %d\n", sdom->dom->domain_id);
 
-        list_for_each( iter_svc, &sdom->vcpu )
+        for_each_vcpu ( sdom->dom, v )
         {
-            svc = list_entry(iter_svc, struct rt_vcpu, sdom_elem);
+            svc = rt_vcpu(v);
             rt_dump_vcpu(ops, svc);
         }
     }
@@ -527,7 +527,6 @@ rt_alloc_domdata(const struct scheduler *ops, struct domain *dom)
     if ( sdom == NULL )
         return NULL;
 
-    INIT_LIST_HEAD(&sdom->vcpu);
     INIT_LIST_HEAD(&sdom->sdom_elem);
     sdom->dom = dom;
 
@@ -587,7 +586,6 @@ rt_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
         return NULL;
 
     INIT_LIST_HEAD(&svc->q_elem);
-    INIT_LIST_HEAD(&svc->sdom_elem);
     svc->flags = 0U;
     svc->sdom = dd;
     svc->vcpu = vc;
@@ -614,8 +612,7 @@ rt_free_vdata(const struct scheduler *ops, void *priv)
  * This function is called in sched_move_domain() in schedule.c
  * When move a domain to a new cpupool.
  * It inserts vcpus of moving domain to the scheduler's RunQ in
- * dest. cpupool; and insert rt_vcpu svc to scheduler-specific
- * vcpu list of the dom
+ * dest. cpupool.
  */
 static void
 rt_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
@@ -634,15 +631,11 @@ rt_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
         __runq_insert(ops, svc);
     vcpu_schedule_unlock_irq(lock, vc);
 
-    /* add rt_vcpu svc to scheduler-specific vcpu list of the dom */
-    list_add_tail(&svc->sdom_elem, &svc->sdom->vcpu);
-
     SCHED_STAT_CRANK(vcpu_insert);
 }
 
 /*
- * Remove rt_vcpu svc from the old scheduler in source cpupool; and
- * Remove rt_vcpu svc from scheduler-specific vcpu list of the dom
+ * Remove rt_vcpu svc from the old scheduler in source cpupool.
  */
 static void
 rt_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
@@ -659,9 +652,6 @@ rt_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
     if ( __vcpu_on_q(svc) )
         __q_remove(svc);
     vcpu_schedule_unlock_irq(lock, vc);
-
-    if ( !is_idle_vcpu(vc) )
-        list_del_init(&svc->sdom_elem);
 }
 
 /*
@@ -1135,20 +1125,28 @@ rt_dom_cntl(
     struct xen_domctl_scheduler_op *op)
 {
     struct rt_private *prv = rt_priv(ops);
-    struct rt_dom * const sdom = rt_dom(d);
     struct rt_vcpu *svc;
-    struct list_head *iter;
+    struct vcpu *v;
     unsigned long flags;
     int rc = 0;
 
     switch ( op->cmd )
     {
     case XEN_DOMCTL_SCHEDOP_getinfo:
-        spin_lock_irqsave(&prv->lock, flags);
-        svc = list_entry(sdom->vcpu.next, struct rt_vcpu, sdom_elem);
-        op->u.rtds.period = svc->period / MICROSECS(1); /* transfer to us */
-        op->u.rtds.budget = svc->budget / MICROSECS(1);
-        spin_unlock_irqrestore(&prv->lock, flags);
+        if ( d->max_vcpus > 0 )
+        {
+            spin_lock_irqsave(&prv->lock, flags);
+            svc = rt_vcpu(d->vcpu[0]);
+            op->u.rtds.period = svc->period / MICROSECS(1);
+            op->u.rtds.budget = svc->budget / MICROSECS(1);
+            spin_unlock_irqrestore(&prv->lock, flags);
+        }
+        else
+        {
+            /* If we don't have vcpus yet, let's just return the defaults. */
+            op->u.rtds.period = RTDS_DEFAULT_PERIOD;
+            op->u.rtds.budget = RTDS_DEFAULT_BUDGET;
+        }
         break;
     case XEN_DOMCTL_SCHEDOP_putinfo:
         if ( op->u.rtds.period == 0 || op->u.rtds.budget == 0 )
@@ -1157,9 +1155,9 @@ rt_dom_cntl(
             break;
         }
         spin_lock_irqsave(&prv->lock, flags);
-        list_for_each( iter, &sdom->vcpu )
+        for_each_vcpu ( d, v )
         {
-            svc = list_entry(iter, struct rt_vcpu, sdom_elem);
+            svc = rt_vcpu(v);
             svc->period = MICROSECS(op->u.rtds.period); /* transfer to nanosec */
             svc->budget = MICROSECS(op->u.rtds.budget);
         }
