@@ -37,7 +37,6 @@ extern void (*mtrr_hook) (void);
 
 extern void zap_low_mappings(void);
 
-#define MAX_APICID 256
 extern u32 x86_cpu_to_apicid[];
 
 #define cpu_physical_id(cpu)	x86_cpu_to_apicid[cpu]
