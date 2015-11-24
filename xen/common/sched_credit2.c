@@ -234,9 +234,8 @@ struct csched2_private {
  * Virtual CPU
  */
 struct csched2_vcpu {
-    struct list_head rqd_elem;  /* On the runqueue data list */
-    struct list_head sdom_elem; /* On the domain vcpu list */
-    struct list_head runq_elem; /* On the runqueue         */
+    struct list_head rqd_elem;         /* On the runqueue data list  */
+    struct list_head runq_elem;        /* On the runqueue            */
     struct csched2_runqueue_data *rqd; /* Up-pointer to the runqueue */
 
     /* Up-pointers */
@@ -261,7 +260,6 @@ struct csched2_vcpu {
  * Domain
  */
 struct csched2_dom {
-    struct list_head vcpu;
     struct list_head sdom_elem;
     struct domain *dom;
     uint16_t weight;
@@ -770,7 +768,6 @@ csched2_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
         return NULL;
 
     INIT_LIST_HEAD(&svc->rqd_elem);
-    INIT_LIST_HEAD(&svc->sdom_elem);
     INIT_LIST_HEAD(&svc->runq_elem);
 
     svc->sdom = dd;
@@ -874,9 +871,6 @@ csched2_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 
     BUG_ON(is_idle_vcpu(vc));
 
-    /* FIXME: Do we need the private lock here? */
-    list_add_tail(&svc->sdom_elem, &svc->sdom->vcpu);
-
     /* Add vcpu to runqueue of initial processor */
     lock = vcpu_schedule_lock_irq(vc);
 
@@ -920,10 +914,6 @@ csched2_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
         runq_deassign(ops, vc);
 
         vcpu_schedule_unlock_irq(lock, vc);
-
-        /* Remove from sdom list.  Don't need a lock for this, as it's called
-         * syncronously when nothing else can happen. */
-        list_del_init(&svc->sdom_elem);
 
         svc->sdom->nr_vcpus--;
     }
@@ -1441,7 +1431,7 @@ csched2_dom_cntl(
 
         if ( op->u.credit2.weight != 0 )
         {
-            struct list_head *iter;
+            struct vcpu *v;
             int old_weight;
 
             old_weight = sdom->weight;
@@ -1449,9 +1439,9 @@ csched2_dom_cntl(
             sdom->weight = op->u.credit2.weight;
 
             /* Update weights for vcpus, and max_weight for runqueues on which they reside */
-            list_for_each ( iter, &sdom->vcpu )
+            for_each_vcpu ( d, v )
             {
-                struct csched2_vcpu *svc = list_entry(iter, struct csched2_vcpu, sdom_elem);
+                struct csched2_vcpu *svc = CSCHED2_VCPU(v);
 
                 /* NB: Locking order is important here.  Because we grab this lock here, we
                  * must never lock csched2_priv.lock if we're holding a runqueue lock.
@@ -1485,7 +1475,6 @@ csched2_alloc_domdata(const struct scheduler *ops, struct domain *dom)
         return NULL;
 
     /* Initialize credit and weight */
-    INIT_LIST_HEAD(&sdom->vcpu);
     INIT_LIST_HEAD(&sdom->sdom_elem);
     sdom->dom = dom;
     sdom->weight = CSCHED2_DEFAULT_WEIGHT;
@@ -1537,9 +1526,7 @@ csched2_free_domdata(const struct scheduler *ops, void *data)
 static void
 csched2_dom_destroy(const struct scheduler *ops, struct domain *dom)
 {
-    struct csched2_dom *sdom = CSCHED2_DOM(dom);
-
-    BUG_ON(!list_empty(&sdom->vcpu));
+    BUG_ON(CSCHED2_DOM(dom)->nr_vcpus > 0);
 
     csched2_free_domdata(ops, CSCHED2_DOM(dom));
 }
@@ -1879,7 +1866,7 @@ csched2_dump_pcpu(const struct scheduler *ops, int cpu)
 static void
 csched2_dump(const struct scheduler *ops)
 {
-    struct list_head *iter_sdom, *iter_svc;
+    struct list_head *iter_sdom;
     struct csched2_private *prv = CSCHED2_PRIV(ops);
     unsigned long flags;
     int i, loop;
@@ -1924,6 +1911,8 @@ csched2_dump(const struct scheduler *ops)
     list_for_each( iter_sdom, &prv->sdom )
     {
         struct csched2_dom *sdom;
+        struct vcpu *v;
+
         sdom = list_entry(iter_sdom, struct csched2_dom, sdom_elem);
 
         printk("\tDomain: %d w %d v %d\n",
@@ -1931,12 +1920,11 @@ csched2_dump(const struct scheduler *ops)
                sdom->weight,
                sdom->nr_vcpus);
 
-        list_for_each( iter_svc, &sdom->vcpu )
+        for_each_vcpu( sdom->dom, v )
         {
-            struct csched2_vcpu *svc;
+            struct csched2_vcpu * const svc = CSCHED2_VCPU(v);
             spinlock_t *lock;
 
-            svc = list_entry(iter_svc, struct csched2_vcpu, sdom_elem);
             lock = vcpu_schedule_lock(svc->vcpu);
 
             printk("\t%3d: ", ++loop);
