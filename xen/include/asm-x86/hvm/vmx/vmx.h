@@ -101,6 +101,7 @@ void vmx_update_cpu_exec_control(struct vcpu *v);
 void vmx_update_secondary_exec_control(struct vcpu *v);
 
 #define POSTED_INTR_ON  0
+#define POSTED_INTR_SN  1
 static inline int pi_test_and_set_pir(int vector, struct pi_desc *pi_desc)
 {
     return test_and_set_bit(vector, pi_desc->pir);
@@ -121,9 +122,29 @@ static inline int pi_test_and_clear_on(struct pi_desc *pi_desc)
     return test_and_clear_bit(POSTED_INTR_ON, &pi_desc->control);
 }
 
+static inline int pi_test_on(struct pi_desc *pi_desc)
+{
+    return pi_desc->on;
+}
+
 static inline unsigned long pi_get_pir(struct pi_desc *pi_desc, int group)
 {
     return xchg(&pi_desc->pir[group], 0);
+}
+
+static inline int pi_test_sn(struct pi_desc *pi_desc)
+{
+    return pi_desc->sn;
+}
+
+static inline void pi_set_sn(struct pi_desc *pi_desc)
+{
+    set_bit(POSTED_INTR_SN, &pi_desc->control);
+}
+
+static inline void pi_clear_sn(struct pi_desc *pi_desc)
+{
+    clear_bit(POSTED_INTR_SN, &pi_desc->control);
 }
 
 /*
