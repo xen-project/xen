@@ -2156,8 +2156,8 @@ int __init intel_vtd_setup(void)
     }
 
     /* We enable the following features only if they are supported by all VT-d
-     * engines: Snoop Control, DMA passthrough, Queued Invalidation and
-     * Interrupt Remapping.
+     * engines: Snoop Control, DMA passthrough, Queued Invalidation, Interrupt
+     * Remapping, and Posted Interrupt
      */
     for_each_drhd_unit ( drhd )
     {
@@ -2185,6 +2185,14 @@ int __init intel_vtd_setup(void)
         if ( iommu_intremap && !ecap_intr_remap(iommu->ecap) )
             iommu_intremap = 0;
 
+        /*
+         * We cannot use posted interrupt if X86_FEATURE_CX16 is
+         * not supported, since we count on this feature to
+         * atomically update 16-byte IRTE in posted format.
+         */
+        if ( !cap_intr_post(iommu->cap) || !cpu_has_cx16 )
+            iommu_intpost = 0;
+
         if ( !vtd_ept_page_compatible(iommu) )
             iommu_hap_pt_share = 0;
 
@@ -2210,6 +2218,7 @@ int __init intel_vtd_setup(void)
     P(iommu_passthrough, "Dom0 DMA Passthrough");
     P(iommu_qinval, "Queued Invalidation");
     P(iommu_intremap, "Interrupt Remapping");
+    P(iommu_intpost, "Posted Interrupt");
     P(iommu_hap_pt_share, "Shared EPT tables");
 #undef P
 
@@ -2229,6 +2238,7 @@ int __init intel_vtd_setup(void)
     iommu_passthrough = 0;
     iommu_qinval = 0;
     iommu_intremap = 0;
+    iommu_intpost = 0;
     return ret;
 }
 
