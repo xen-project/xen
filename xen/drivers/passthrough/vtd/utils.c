@@ -234,10 +234,9 @@ void vtd_dump_iommu_info(unsigned char key)
                     continue;
                 printk("  %04x:  %x   %x  %04x %08x %02x    %x   %x  %x  %x  %x"
                     "   %x %x\n", i,
-                    (u32)p->hi.svt, (u32)p->hi.sq, (u32)p->hi.sid,
-                    (u32)p->lo.dst, (u32)p->lo.vector, (u32)p->lo.avail,
-                    (u32)p->lo.dlm, (u32)p->lo.tm, (u32)p->lo.rh,
-                    (u32)p->lo.dm, (u32)p->lo.fpd, (u32)p->lo.p);
+                    p->hi.svt, p->hi.sq, p->hi.sid, p->lo.dst, p->lo.vector,
+                    p->lo.avail, p->lo.dlm, p->lo.tm, p->lo.rh, p->lo.dm,
+                    p->lo.fpd, p->lo.p);
                 print_cnt++;
             }
             if ( iremap_entries )
@@ -281,11 +280,10 @@ void vtd_dump_iommu_info(unsigned char key)
 
                 printk("   %02x:  %04x   %x    %x   %x   %x   %x    %x"
                     "    %x     %02x\n", i,
-                    (u32)remap->index_0_14 | ((u32)remap->index_15 << 15),
-                    (u32)remap->format, (u32)remap->mask, (u32)remap->trigger,
-                    (u32)remap->irr, (u32)remap->polarity,
-                    (u32)remap->delivery_status, (u32)remap->delivery_mode,
-                    (u32)remap->vector);
+                    remap->index_0_14 | (remap->index_15 << 15),
+                    remap->format, remap->mask, remap->trigger, remap->irr,
+                    remap->polarity, remap->delivery_status, remap->delivery_mode,
+                    remap->vector);
             }
         }
     }
