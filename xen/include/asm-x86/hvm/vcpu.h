@@ -104,8 +104,8 @@ struct nestedvcpu {
     void *nv_n2vmcx; /* shadow VMCB/VMCS used to run l2 guest */
 
     uint64_t nv_vvmcxaddr; /* l1 guest physical address of nv_vvmcx */
-    uint64_t nv_n1vmcx_pa; /* host physical address of nv_n1vmcx */
-    uint64_t nv_n2vmcx_pa; /* host physical address of nv_n2vmcx */
+    paddr_t nv_n1vmcx_pa; /* host physical address of nv_n1vmcx */
+    paddr_t nv_n2vmcx_pa; /* host physical address of nv_n2vmcx */
 
     /* SVM/VMX arch specific */
     union {

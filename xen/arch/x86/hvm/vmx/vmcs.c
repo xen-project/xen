@@ -119,8 +119,8 @@ const u32 vmx_introspection_force_enabled_msrs[] = {
 const unsigned int vmx_introspection_force_enabled_msrs_size =
     ARRAY_SIZE(vmx_introspection_force_enabled_msrs);
 
-static DEFINE_PER_CPU_READ_MOSTLY(struct vmcs_struct *, vmxon_region);
-static DEFINE_PER_CPU(struct vmcs_struct *, current_vmcs);
+static DEFINE_PER_CPU_READ_MOSTLY(paddr_t, vmxon_region);
+static DEFINE_PER_CPU(paddr_t, current_vmcs);
 static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
 DEFINE_PER_CPU(bool_t, vmxon);
 
@@ -483,25 +483,28 @@ static int vmx_init_vmcs_config(void)
     return 0;
 }
 
-static struct vmcs_struct *vmx_alloc_vmcs(void)
+static paddr_t vmx_alloc_vmcs(void)
 {
+    struct page_info *pg;
     struct vmcs_struct *vmcs;
 
-    if ( (vmcs = alloc_xenheap_page()) == NULL )
+    if ( (pg = alloc_domheap_page(NULL, 0)) == NULL )
     {
         gdprintk(XENLOG_WARNING, "Failed to allocate VMCS.\n");
-        return NULL;
+        return 0;
     }
 
+    vmcs = __map_domain_page(pg);
     clear_page(vmcs);
     vmcs->vmcs_revision_id = vmcs_revision_id;
+    unmap_domain_page(vmcs);
 
-    return vmcs;
+    return page_to_maddr(pg);
 }
 
-static void vmx_free_vmcs(struct vmcs_struct *vmcs)
+static void vmx_free_vmcs(paddr_t pa)
 {
-    free_xenheap_page(vmcs);
+    free_domheap_page(maddr_to_page(pa));
 }
 
 static void __vmx_clear_vmcs(void *info)
@@ -514,7 +517,7 @@ static void __vmx_clear_vmcs(void *info)
 
     if ( arch_vmx->active_cpu == smp_processor_id() )
     {
-        __vmpclear(virt_to_maddr(arch_vmx->vmcs));
+        __vmpclear(arch_vmx->vmcs_pa);
         if ( arch_vmx->vmcs_shadow_maddr )
             __vmpclear(arch_vmx->vmcs_shadow_maddr);
 
@@ -523,8 +526,8 @@ static void __vmx_clear_vmcs(void *info)
 
         list_del(&arch_vmx->active_list);
 
-        if ( arch_vmx->vmcs == this_cpu(current_vmcs) )
-            this_cpu(current_vmcs) = NULL;
+        if ( arch_vmx->vmcs_pa == this_cpu(current_vmcs) )
+            this_cpu(current_vmcs) = 0;
     }
 }
 
@@ -550,8 +553,8 @@ static void vmx_load_vmcs(struct vcpu *v)
 
     ASSERT(v->arch.hvm_vmx.active_cpu == smp_processor_id());
 
-    __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
-    this_cpu(current_vmcs) = v->arch.hvm_vmx.vmcs;
+    __vmptrld(v->arch.hvm_vmx.vmcs_pa);
+    this_cpu(current_vmcs) = v->arch.hvm_vmx.vmcs_pa;
 
     local_irq_restore(flags);
 }
@@ -565,11 +568,11 @@ int vmx_cpu_up_prepare(unsigned int cpu)
     if ( nvmx_cpu_up_prepare(cpu) != 0 )
         printk("CPU%d: Could not allocate virtual VMCS buffer.\n", cpu);
 
-    if ( per_cpu(vmxon_region, cpu) != NULL )
+    if ( per_cpu(vmxon_region, cpu) )
         return 0;
 
     per_cpu(vmxon_region, cpu) = vmx_alloc_vmcs();
-    if ( per_cpu(vmxon_region, cpu) != NULL )
+    if ( per_cpu(vmxon_region, cpu) )
         return 0;
 
     printk("CPU%d: Could not allocate host VMCS\n", cpu);
@@ -580,7 +583,7 @@ int vmx_cpu_up_prepare(unsigned int cpu)
 void vmx_cpu_dead(unsigned int cpu)
 {
     vmx_free_vmcs(per_cpu(vmxon_region, cpu));
-    per_cpu(vmxon_region, cpu) = NULL;
+    per_cpu(vmxon_region, cpu) = 0;
     nvmx_cpu_dead(cpu);
 }
 
@@ -638,7 +641,7 @@ int vmx_cpu_up(void)
     if ( (rc = vmx_cpu_up_prepare(cpu)) != 0 )
         return rc;
 
-    switch ( __vmxon(virt_to_maddr(this_cpu(vmxon_region))) )
+    switch ( __vmxon(this_cpu(vmxon_region)) )
     {
     case -2: /* #UD or #GP */
         if ( bios_locked &&
@@ -710,7 +713,7 @@ bool_t vmx_vmcs_try_enter(struct vcpu *v)
      * vmx_vmcs_enter/exit and scheduling tail critical regions.
      */
     if ( likely(v == current) )
-        return v->arch.hvm_vmx.vmcs == this_cpu(current_vmcs);
+        return v->arch.hvm_vmx.vmcs_pa == this_cpu(current_vmcs);
 
     fv = &this_cpu(foreign_vmcs);
 
@@ -906,17 +909,17 @@ int vmx_check_msr_bitmap(unsigned long *msr_bitmap, u32 msr, int access_type)
 /*
  * Switch VMCS between layer 1 & 2 guest
  */
-void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to)
+void vmx_vmcs_switch(paddr_t from, paddr_t to)
 {
     struct arch_vmx_struct *vmx = &current->arch.hvm_vmx;
     spin_lock(&vmx->vmcs_lock);
 
-    __vmpclear(virt_to_maddr(from));
+    __vmpclear(from);
     if ( vmx->vmcs_shadow_maddr )
         __vmpclear(vmx->vmcs_shadow_maddr);
-    __vmptrld(virt_to_maddr(to));
+    __vmptrld(to);
 
-    vmx->vmcs = to;
+    vmx->vmcs_pa = to;
     vmx->launched = 0;
     this_cpu(current_vmcs) = to;
 
@@ -936,11 +939,11 @@ void virtual_vmcs_enter(void *vvmcs)
 
 void virtual_vmcs_exit(void *vvmcs)
 {
-    struct vmcs_struct *cur = this_cpu(current_vmcs);
+    paddr_t cur = this_cpu(current_vmcs);
 
     __vmpclear(pfn_to_paddr(domain_page_map_to_mfn(vvmcs)));
     if ( cur )
-        __vmptrld(virt_to_maddr(cur));
+        __vmptrld(cur);
 
 }
 
@@ -1582,17 +1585,17 @@ int vmx_create_vmcs(struct vcpu *v)
     struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
     int rc;
 
-    if ( (arch_vmx->vmcs = vmx_alloc_vmcs()) == NULL )
+    if ( (arch_vmx->vmcs_pa = vmx_alloc_vmcs()) == 0 )
         return -ENOMEM;
 
     INIT_LIST_HEAD(&arch_vmx->active_list);
-    __vmpclear(virt_to_maddr(arch_vmx->vmcs));
+    __vmpclear(arch_vmx->vmcs_pa);
     arch_vmx->active_cpu = -1;
     arch_vmx->launched   = 0;
 
     if ( (rc = construct_vmcs(v)) != 0 )
     {
-        vmx_free_vmcs(arch_vmx->vmcs);
+        vmx_free_vmcs(arch_vmx->vmcs_pa);
         return rc;
     }
 
@@ -1605,7 +1608,7 @@ void vmx_destroy_vmcs(struct vcpu *v)
 
     vmx_clear_vmcs(v);
 
-    vmx_free_vmcs(arch_vmx->vmcs);
+    vmx_free_vmcs(arch_vmx->vmcs_pa);
 
     free_xenheap_page(v->arch.hvm_vmx.host_msr_area);
     free_xenheap_page(v->arch.hvm_vmx.msr_area);
@@ -1629,7 +1632,7 @@ void vmx_do_resume(struct vcpu *v)
 
     if ( v->arch.hvm_vmx.active_cpu == smp_processor_id() )
     {
-        if ( v->arch.hvm_vmx.vmcs != this_cpu(current_vmcs) )
+        if ( v->arch.hvm_vmx.vmcs_pa != this_cpu(current_vmcs) )
             vmx_load_vmcs(v);
     }
     else

@@ -56,13 +56,14 @@ int nvmx_vcpu_initialise(struct vcpu *v)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    struct page_info *pg = alloc_domheap_page(NULL, 0);
 
-    nvcpu->nv_n2vmcx = alloc_xenheap_page();
-    if ( !nvcpu->nv_n2vmcx )
+    if ( !pg )
     {
         gdprintk(XENLOG_ERR, "nest: allocation for shadow vmcs failed\n");
         return -ENOMEM;
     }
+    nvcpu->nv_n2vmcx_pa = page_to_maddr(pg);
 
     /* non-root VMREAD/VMWRITE bitmap. */
     if ( cpu_has_vmx_vmcs_shadowing )
@@ -129,13 +130,14 @@ void nvmx_vcpu_destroy(struct vcpu *v)
      * in order to avoid double free of L2 VMCS and the possible memory
      * leak of L1 VMCS page.
      */
-    if ( nvcpu->nv_n1vmcx )
-        v->arch.hvm_vmx.vmcs = nvcpu->nv_n1vmcx;
+    if ( nvcpu->nv_n1vmcx_pa )
+        v->arch.hvm_vmx.vmcs_pa = nvcpu->nv_n1vmcx_pa;
 
-    if ( nvcpu->nv_n2vmcx ) {
-        __vmpclear(virt_to_maddr(nvcpu->nv_n2vmcx));
-        free_xenheap_page(nvcpu->nv_n2vmcx);
-        nvcpu->nv_n2vmcx = NULL;
+    if ( nvcpu->nv_n2vmcx_pa )
+    {
+        __vmpclear(nvcpu->nv_n2vmcx_pa);
+        free_domheap_page(maddr_to_page(nvcpu->nv_n2vmcx_pa));
+        nvcpu->nv_n2vmcx_pa = 0;
     }
 
     /* Must also cope with nvmx_vcpu_initialise() not having got called. */
@@ -726,8 +728,8 @@ static void __clear_current_vvmcs(struct vcpu *v)
 {
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     
-    if ( nvcpu->nv_n2vmcx )
-        __vmpclear(virt_to_maddr(nvcpu->nv_n2vmcx));
+    if ( nvcpu->nv_n2vmcx_pa )
+        __vmpclear(nvcpu->nv_n2vmcx_pa);
 }
 
 static bool_t __must_check _map_msr_bitmap(struct vcpu *v)
@@ -1125,7 +1127,7 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     void *vvmcs = nvcpu->nv_vvmcx;
     unsigned long lm_l1, lm_l2;
 
-    vmx_vmcs_switch(v->arch.hvm_vmx.vmcs, nvcpu->nv_n2vmcx);
+    vmx_vmcs_switch(v->arch.hvm_vmx.vmcs_pa, nvcpu->nv_n2vmcx_pa);
 
     nestedhvm_vcpu_enter_guestmode(v);
     nvcpu->nv_vmentry_pending = 0;
@@ -1335,7 +1337,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
          !(v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
         shadow_to_vvmcs_bulk(v, ARRAY_SIZE(gpdpte_fields), gpdpte_fields);
 
-    vmx_vmcs_switch(v->arch.hvm_vmx.vmcs, nvcpu->nv_n1vmcx);
+    vmx_vmcs_switch(v->arch.hvm_vmx.vmcs_pa, nvcpu->nv_n1vmcx_pa);
 
     nestedhvm_vcpu_exit_guestmode(v);
     nvcpu->nv_vmexit_pending = 0;
@@ -1433,10 +1435,11 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
      * `fork' the host vmcs to shadow_vmcs
      * vmcs_lock is not needed since we are on current
      */
-    nvcpu->nv_n1vmcx = v->arch.hvm_vmx.vmcs;
-    __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
-    memcpy(nvcpu->nv_n2vmcx, v->arch.hvm_vmx.vmcs, PAGE_SIZE);
-    __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    nvcpu->nv_n1vmcx_pa = v->arch.hvm_vmx.vmcs_pa;
+    __vmpclear(v->arch.hvm_vmx.vmcs_pa);
+    copy_domain_page(_mfn(PFN_DOWN(nvcpu->nv_n2vmcx_pa)),
+                     _mfn(PFN_DOWN(v->arch.hvm_vmx.vmcs_pa)));
+    __vmptrld(v->arch.hvm_vmx.vmcs_pa);
     v->arch.hvm_vmx.launched = 0;
     vmreturn(regs, VMSUCCEED);
 
@@ -1888,9 +1891,15 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
      */
     switch (msr) {
     case MSR_IA32_VMX_BASIC:
+    {
+        const struct vmcs_struct *vmcs =
+            map_domain_page(_mfn(PFN_DOWN(v->arch.hvm_vmx.vmcs_pa)));
+
         data = (host_data & (~0ul << 32)) |
-               (v->arch.hvm_vmx.vmcs->vmcs_revision_id & 0x7fffffff);
+               (vmcs->vmcs_revision_id & 0x7fffffff);
+        unmap_domain_page(vmcs);
         break;
+    }
     case MSR_IA32_VMX_PINBASED_CTLS:
     case MSR_IA32_VMX_TRUE_PINBASED_CTLS:
         /* 1-seetings */

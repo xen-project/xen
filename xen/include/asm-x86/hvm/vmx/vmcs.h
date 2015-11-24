@@ -92,8 +92,8 @@ struct pi_desc {
 #define NR_PML_ENTRIES   512
 
 struct arch_vmx_struct {
-    /* Virtual address of VMCS. */
-    struct vmcs_struct  *vmcs;
+    /* Physical address of VMCS. */
+    paddr_t              vmcs_pa;
     /* VMCS shadow machine address. */
     paddr_t             vmcs_shadow_maddr;
 
@@ -488,7 +488,7 @@ void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
 int vmx_read_guest_msr(u32 msr, u64 *val);
 int vmx_write_guest_msr(u32 msr, u64 val);
 int vmx_add_msr(u32 msr, int type);
-void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to);
+void vmx_vmcs_switch(paddr_t from, paddr_t to);
 void vmx_set_eoi_exit_bitmap(struct vcpu *v, u8 vector);
 void vmx_clear_eoi_exit_bitmap(struct vcpu *v, u8 vector);
 int vmx_check_msr_bitmap(unsigned long *msr_bitmap, u32 msr, int access_type);
