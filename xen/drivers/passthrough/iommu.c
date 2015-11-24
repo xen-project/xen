@@ -57,6 +57,14 @@ bool_t __read_mostly iommu_passthrough;
 bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_qinval = 1;
 bool_t __read_mostly iommu_intremap = 1;
+
+/*
+ * In the current implementation of VT-d posted interrupts, in some extreme
+ * cases, the per cpu list which saves the blocked vCPU will be very long,
+ * and this will affect the interrupt latency, so let this feature off by
+ * default until we find a good solution to resolve it.
+ */
+bool_t __read_mostly iommu_intpost;
 bool_t __read_mostly iommu_hap_pt_share = 1;
 bool_t __read_mostly iommu_debug;
 bool_t __read_mostly amd_iommu_perdev_intremap = 1;
@@ -307,6 +315,9 @@ int __init iommu_setup(void)
         panic("Couldn't enable %s and iommu=required/force",
               !iommu_enabled ? "IOMMU" : "Interrupt Remapping");
 
+    if ( !iommu_intremap )
+        iommu_intpost = 0;
+
     if ( !iommu_enabled )
     {
         iommu_snoop = 0;
@@ -374,7 +385,7 @@ void iommu_crash_shutdown(void)
     const struct iommu_ops *ops = iommu_get_ops();
     if ( iommu_enabled )
         ops->crash_shutdown();
-    iommu_enabled = iommu_intremap = 0;
+    iommu_enabled = iommu_intremap = iommu_intpost = 0;
 }
 
 int iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
