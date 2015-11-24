@@ -1506,22 +1506,23 @@ static void vmx_inject_trap(struct hvm_trap *trap)
     struct vcpu *curr = current;
     struct hvm_trap _trap = *trap;
 
-    if ( (_trap.vector == TRAP_page_fault) &&
-         (_trap.type == X86_EVENTTYPE_HW_EXCEPTION) )
-        curr->arch.hvm_vcpu.guest_cr[2] = _trap.cr2;
-
-    if ( nestedhvm_vcpu_in_guestmode(curr) )
-        intr_info = vcpu_2_nvmx(curr).intr.intr_info;
-    else
-        __vmread(VM_ENTRY_INTR_INFO, &intr_info);
-
-    switch ( _trap.vector )
+    switch ( _trap.vector | -(_trap.type == X86_EVENTTYPE_SW_INTERRUPT) )
     {
     case TRAP_debug:
         if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
         {
             __restore_debug_registers(curr);
             write_debugreg(6, read_debugreg(6) | DR_STEP);
+        }
+        if ( !nestedhvm_vcpu_in_guestmode(curr) ||
+             !nvmx_intercepts_exception(curr, TRAP_debug, _trap.error_code) )
+        {
+            unsigned long val;
+
+            __vmread(GUEST_DR7, &val);
+            __vmwrite(GUEST_DR7, val & ~DR_GENERAL_DETECT);
+            __vmread(GUEST_IA32_DEBUGCTL, &val);
+            __vmwrite(GUEST_IA32_DEBUGCTL, val & ~IA32_DEBUGCTLMSR_LBR);
         }
         if ( cpu_has_monitor_trap_flag )
             break;
@@ -1533,7 +1534,18 @@ static void vmx_inject_trap(struct hvm_trap *trap)
             domain_pause_for_debugger();
             return;
         }
+        break;
+
+    case TRAP_page_fault:
+        ASSERT(_trap.type == X86_EVENTTYPE_HW_EXCEPTION);
+        curr->arch.hvm_vcpu.guest_cr[2] = _trap.cr2;
+        break;
     }
+
+    if ( nestedhvm_vcpu_in_guestmode(curr) )
+        intr_info = vcpu_2_nvmx(curr).intr.intr_info;
+    else
+        __vmread(VM_ENTRY_INTR_INFO, &intr_info);
 
     if ( unlikely(intr_info & INTR_INFO_VALID_MASK) &&
          (MASK_EXTR(intr_info, INTR_INFO_INTR_TYPE_MASK) ==
