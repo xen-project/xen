@@ -203,6 +203,9 @@ void vtd_dump_iommu_info(unsigned char key)
             ecap_intr_remap(iommu->ecap) ? "" : "not ",
             (status & DMA_GSTS_IRES) ? " and enabled" : "" );
 
+        printk("  Interrupt Posting: %ssupported.\n",
+               cap_intr_post(iommu->cap) ? "" : "not ");
+
         if ( status & DMA_GSTS_IRES )
         {
             /* Dump interrupt remapping table. */
@@ -213,8 +216,9 @@ void vtd_dump_iommu_info(unsigned char key)
 
             printk("  Interrupt remapping table (nr_entry=%#x. "
                 "Only dump P=1 entries here):\n", nr_entry);
-            printk("       SVT  SQ   SID      DST  V  AVL DLM TM RH DM "
-                   "FPD P\n");
+            printk("R means remapped format, P means posted format.\n");
+            printk("R:       SVT  SQ   SID  V  AVL FPD      DST DLM TM RH DM P\n");
+            printk("P:       SVT  SQ   SID  V  AVL FPD              PDA  URG P\n");
             for ( i = 0; i < nr_entry; i++ )
             {
                 struct iremap_entry *p;
@@ -232,11 +236,21 @@ void vtd_dump_iommu_info(unsigned char key)
 
                 if ( !p->remap.p )
                     continue;
-                printk("  %04x:  %x   %x  %04x %08x %02x    %x   %x  %x  %x  %x"
-                    "   %x %x\n", i,
-                    p->remap.svt, p->remap.sq, p->remap.sid, p->remap.dst,
-                    p->remap.vector, p->remap.avail, p->remap.dlm, p->remap.tm,
-                    p->remap.rh, p->remap.dm, p->remap.fpd, p->remap.p);
+                if ( !p->remap.im )
+                    printk("R:  %04x:  %x   %x  %04x %02x    %x   %x %08x   %x  %x  %x  %x %x\n",
+                           i,
+                           p->remap.svt, p->remap.sq, p->remap.sid,
+                           p->remap.vector, p->remap.avail, p->remap.fpd,
+                           p->remap.dst, p->remap.dlm, p->remap.tm, p->remap.rh,
+                           p->remap.dm, p->remap.p);
+                else
+                    printk("P:  %04x:  %x   %x  %04x %02x    %x   %x %16lx    %x %x\n",
+                           i,
+                           p->post.svt, p->post.sq, p->post.sid, p->post.vector,
+                           p->post.avail, p->post.fpd,
+                           ((u64)p->post.pda_h << 32) | (p->post.pda_l << 6),
+                           p->post.urg, p->post.p);
+
                 print_cnt++;
             }
             if ( iremap_entries )
