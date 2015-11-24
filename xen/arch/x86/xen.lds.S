@@ -220,5 +220,9 @@ SECTIONS
 ASSERT(__image_base__ > XEN_VIRT_START ||
        _end <= XEN_VIRT_END - NR_CPUS * PAGE_SIZE,
        "Xen image overlaps stubs area")
+
+#ifdef CONFIG_KEXEC
 ASSERT(kexec_reloc_size - kexec_reloc <= PAGE_SIZE, "kexec_reloc is too large")
+#endif
+
 ASSERT((cpu0_stack & (STACK_SIZE - 1)) == 0, "cpu0_stack misaligned")
