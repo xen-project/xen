@@ -191,13 +191,13 @@ static int nvmx_intr_intercept(struct vcpu *v, struct hvm_intack intack)
         if ( intack.source == hvm_intsrc_pic ||
                  intack.source == hvm_intsrc_lapic )
         {
-            ctrl = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, PIN_BASED_VM_EXEC_CONTROL);
+            ctrl = get_vvmcs(v, PIN_BASED_VM_EXEC_CONTROL);
             if ( !(ctrl & PIN_BASED_EXT_INTR_MASK) )
                 return 0;
 
             vmx_inject_extint(intack.vector, intack.source);
 
-            ctrl = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, VM_EXIT_CONTROLS);
+            ctrl = get_vvmcs(v, VM_EXIT_CONTROLS);
             if ( ctrl & VM_EXIT_ACK_INTR_ON_EXIT )
             {
                 /* for now, duplicate the ack path in vmx_intr_assist */
