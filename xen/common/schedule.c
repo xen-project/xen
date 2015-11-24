@@ -1485,6 +1485,17 @@ void __init scheduler_init(void)
         BUG();
 }
 
+/*
+ * Move a pCPU outside of the influence of the scheduler of its current
+ * cpupool, or subject it to the scheduler of a new cpupool.
+ *
+ * For the pCPUs that are removed from their cpupool, their scheduler becomes
+ * &ops (the default scheduler, selected at boot, which also services the
+ * default cpupool). However, as these pCPUs are not really part of any pool,
+ * there won't be any scheduling event on them, not even from the default
+ * scheduler. Basically, they will just sit idle until they are explicitly
+ * added back to a cpupool.
+ */
 int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 {
     struct vcpu *idle;
@@ -1492,9 +1503,24 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     void *ppriv, *ppriv_old, *vpriv, *vpriv_old;
     struct scheduler *old_ops = per_cpu(scheduler, cpu);
     struct scheduler *new_ops = (c == NULL) ? &ops : c->sched;
+    struct cpupool *old_pool = per_cpu(cpupool, cpu);
+
+    /*
+     * pCPUs only move from a valid cpupool to free (i.e., out of any pool),
+     * or from free to a valid cpupool. In the former case (which happens when
+     * c is NULL), we want the CPU to have been marked as free already, as
+     * well as to not be valid for the source pool any longer, when we get to
+     * here. In the latter case (which happens when c is a valid cpupool), we
+     * want the CPU to still be marked as free, as well as to not yet be valid
+     * for the destination pool.
+     */
+    ASSERT(c != old_pool && (c != NULL || old_pool != NULL));
+    ASSERT(cpumask_test_cpu(cpu, &cpupool_free_cpus));
+    ASSERT((c == NULL && !cpumask_test_cpu(cpu, old_pool->cpu_valid)) ||
+           (c != NULL && !cpumask_test_cpu(cpu, c->cpu_valid)));
 
     if ( old_ops == new_ops )
-        return 0;
+        goto out;
 
     idle = idle_vcpu[cpu];
     ppriv = SCHED_OP(new_ops, alloc_pdata, cpu);
@@ -1521,6 +1547,9 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 
     SCHED_OP(old_ops, free_vdata, vpriv_old);
     SCHED_OP(old_ops, free_pdata, ppriv_old, cpu);
+
+ out:
+    per_cpu(cpupool, cpu) = c;
 
     return 0;
 }

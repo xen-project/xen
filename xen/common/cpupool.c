@@ -261,19 +261,13 @@ int cpupool_move_domain(struct domain *d, struct cpupool *c)
 static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
 {
     int ret;
-    struct cpupool *old;
     struct domain *d;
 
     if ( (cpupool_moving_cpu == cpu) && (c != cpupool_cpu_moving) )
         return -EBUSY;
-    old = per_cpu(cpupool, cpu);
-    per_cpu(cpupool, cpu) = c;
     ret = schedule_cpu_switch(cpu, c);
     if ( ret )
-    {
-        per_cpu(cpupool, cpu) = old;
         return ret;
-    }
 
     cpumask_clear_cpu(cpu, &cpupool_free_cpus);
     if (cpupool_moving_cpu == cpu)
@@ -326,7 +320,6 @@ static long cpupool_unassign_cpu_helper(void *info)
             cpumask_clear_cpu(cpu, &cpupool_free_cpus);
             goto out;
         }
-        per_cpu(cpupool, cpu) = NULL;
         cpupool_moving_cpu = -1;
         cpupool_put(cpupool_cpu_moving);
         cpupool_cpu_moving = NULL;
