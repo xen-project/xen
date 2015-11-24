@@ -398,54 +398,115 @@ static void intel_xc_cpuid_policy(xc_interface *xch,
     }
 }
 
+/* XSTATE bits in XCR0. */
+#define X86_XCR0_X87    (1ULL <<  0)
+#define X86_XCR0_SSE    (1ULL <<  1)
+#define X86_XCR0_AVX    (1ULL <<  2)
+#define X86_XCR0_BNDREG (1ULL <<  3)
+#define X86_XCR0_BNDCSR (1ULL <<  4)
+#define X86_XCR0_PKRU   (1ULL <<  9)
+#define X86_XCR0_LWP    (1ULL << 62)
+
+#define X86_XSS_MASK    (0) /* No XSS states supported yet. */
+
+/* Per-component subleaf flags. */
+#define XSTATE_XSS      (1ULL <<  0)
+#define XSTATE_ALIGN64  (1ULL <<  1)
+
 /* Configure extended state enumeration leaves (0x0000000D for xsave) */
 static void xc_cpuid_config_xsave(xc_interface *xch,
                                   const struct cpuid_domain_info *info,
                                   const unsigned int *input, unsigned int *regs)
 {
-    if ( info->xfeature_mask == 0 )
+    uint64_t guest_xfeature_mask;
+
+    if ( info->xfeature_mask == 0 ||
+         !test_bit(X86_FEATURE_XSAVE, info->featureset) )
     {
         regs[0] = regs[1] = regs[2] = regs[3] = 0;
         return;
     }
 
+    guest_xfeature_mask = X86_XCR0_SSE | X86_XCR0_X87;
+
+    if ( test_bit(X86_FEATURE_AVX, info->featureset) )
+        guest_xfeature_mask |= X86_XCR0_AVX;
+
+    if ( test_bit(X86_FEATURE_MPX, info->featureset) )
+        guest_xfeature_mask |= X86_XCR0_BNDREG | X86_XCR0_BNDCSR;
+
+    if ( test_bit(X86_FEATURE_PKU, info->featureset) )
+        guest_xfeature_mask |= X86_XCR0_PKRU;
+
+    if ( test_bit(X86_FEATURE_LWP, info->featureset) )
+        guest_xfeature_mask |= X86_XCR0_LWP;
+
+    /*
+     * In the common case, the toolstack will have queried Xen for the maximum
+     * available featureset, and guest_xfeature_mask should not able to be
+     * calculated as being greater than the host limit, info->xfeature_mask.
+     *
+     * Nothing currently prevents a toolstack (or an optimistic user) from
+     * purposefully trying to select a larger-than-available xstate set.
+     *
+     * To avoid the domain dying with an unexpected fault, clamp the
+     * calculated mask to the host limit.  Future development work will remove
+     * this possibility, when Xen fully audits the complete cpuid polcy set
+     * for a domain.
+     */
+    guest_xfeature_mask &= info->xfeature_mask;
+
     switch ( input[1] )
     {
-    case 0: 
+    case 0:
         /* EAX: low 32bits of xfeature_enabled_mask */
-        regs[0] = info->xfeature_mask & 0xFFFFFFFF;
+        regs[0] = guest_xfeature_mask & 0xFFFFFFFF;
         /* EDX: high 32bits of xfeature_enabled_mask */
-        regs[3] = (info->xfeature_mask >> 32) & 0xFFFFFFFF;
+        regs[3] = guest_xfeature_mask >> 32;
         /* ECX: max size required by all HW features */
         {
             unsigned int _input[2] = {0xd, 0x0}, _regs[4];
             regs[2] = 0;
-            for ( _input[1] = 2; _input[1] < 64; _input[1]++ )
+            for ( _input[1] = 2; _input[1] <= 62; _input[1]++ )
             {
                 cpuid(_input, _regs);
                 if ( (_regs[0] + _regs[1]) > regs[2] )
                     regs[2] = _regs[0] + _regs[1];
             }
         }
-        /* EBX: max size required by enabled features. 
-         * This register contains a dynamic value, which varies when a guest 
-         * enables or disables XSTATE features (via xsetbv). The default size 
-         * after reset is 576. */ 
+        /* EBX: max size required by enabled features.
+         * This register contains a dynamic value, which varies when a guest
+         * enables or disables XSTATE features (via xsetbv). The default size
+         * after reset is 576. */
         regs[1] = 512 + 64; /* FP/SSE + XSAVE.HEADER */
         break;
+
     case 1: /* leaf 1 */
         regs[0] = info->featureset[featureword_of(X86_FEATURE_XSAVEOPT)];
-        regs[2] &= info->xfeature_mask;
-        regs[3] = 0;
+        regs[1] = 0;
+
+        if ( test_bit(X86_FEATURE_XSAVES, info->featureset) )
+        {
+            regs[2] = guest_xfeature_mask & X86_XSS_MASK & 0xFFFFFFFF;
+            regs[3] = (guest_xfeature_mask >> 32) & X86_XSS_MASK;
+        }
+        else
+            regs[2] = regs[3] = 0;
         break;
-    case 2 ... 63: /* sub-leaves */
-        if ( !(info->xfeature_mask & (1ULL << input[1])) )
+
+    case 2 ... 62: /* per-component sub-leaves */
+        if ( !(guest_xfeature_mask & (1ULL << input[1])) )
         {
             regs[0] = regs[1] = regs[2] = regs[3] = 0;
             break;
         }
         /* Don't touch EAX, EBX. Also cleanup ECX and EDX */
-        regs[2] = regs[3] = 0;
+        regs[2] &= XSTATE_XSS | XSTATE_ALIGN64;
+        regs[3] = 0;
+        break;
+
+    default:
+        regs[0] = regs[1] = regs[2] = regs[3] = 0;
         break;
     }
 }
