@@ -122,9 +122,9 @@ static u16 hpetid_to_bdf(unsigned int hpet_id)
 static void set_ire_sid(struct iremap_entry *ire,
                         unsigned int svt, unsigned int sq, unsigned int sid)
 {
-    ire->hi.svt = svt;
-    ire->hi.sq = sq;
-    ire->hi.sid = sid;
+    ire->remap.svt = svt;
+    ire->remap.sq = sq;
+    ire->remap.sid = sid;
 }
 
 static void set_ioapic_source_id(int apic_id, struct iremap_entry *ire)
@@ -219,7 +219,7 @@ static unsigned int alloc_remap_entry(struct iommu *iommu, unsigned int nr)
         else
             p = &iremap_entries[i % (1 << IREMAP_ENTRY_ORDER)];
 
-        if ( p->lo_val || p->hi_val ) /* not a free entry */
+        if ( p->val ) /* not a free entry */
             found = 0;
         else if ( ++found == nr )
             break;
@@ -253,7 +253,7 @@ static int remap_entry_to_ioapic_rte(
     GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, index,
                      iremap_entries, iremap_entry);
 
-    if ( iremap_entry->hi_val == 0 && iremap_entry->lo_val == 0 )
+    if ( iremap_entry->val == 0 )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
                 "%s: index (%d) get an empty entry!\n",
@@ -263,13 +263,13 @@ static int remap_entry_to_ioapic_rte(
         return -EFAULT;
     }
 
-    old_rte->vector = iremap_entry->lo.vector;
-    old_rte->delivery_mode = iremap_entry->lo.dlm;
-    old_rte->dest_mode = iremap_entry->lo.dm;
-    old_rte->trigger = iremap_entry->lo.tm;
+    old_rte->vector = iremap_entry->remap.vector;
+    old_rte->delivery_mode = iremap_entry->remap.dlm;
+    old_rte->dest_mode = iremap_entry->remap.dm;
+    old_rte->trigger = iremap_entry->remap.tm;
     old_rte->__reserved_2 = 0;
     old_rte->dest.logical.__reserved_1 = 0;
-    old_rte->dest.logical.logical_dest = iremap_entry->lo.dst >> 8;
+    old_rte->dest.logical.logical_dest = iremap_entry->remap.dst >> 8;
 
     unmap_vtd_domain_page(iremap_entries);
     spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
@@ -317,27 +317,28 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     if ( rte_upper )
     {
         if ( x2apic_enabled )
-            new_ire.lo.dst = value;
+            new_ire.remap.dst = value;
         else
-            new_ire.lo.dst = (value >> 24) << 8;
+            new_ire.remap.dst = (value >> 24) << 8;
     }
     else
     {
         *(((u32 *)&new_rte) + 0) = value;
-        new_ire.lo.fpd = 0;
-        new_ire.lo.dm = new_rte.dest_mode;
-        new_ire.lo.tm = new_rte.trigger;
-        new_ire.lo.dlm = new_rte.delivery_mode;
+        new_ire.remap.fpd = 0;
+        new_ire.remap.dm = new_rte.dest_mode;
+        new_ire.remap.tm = new_rte.trigger;
+        new_ire.remap.dlm = new_rte.delivery_mode;
         /* Hardware require RH = 1 for LPR delivery mode */
-        new_ire.lo.rh = (new_ire.lo.dlm == dest_LowestPrio);
-        new_ire.lo.avail = 0;
-        new_ire.lo.res_1 = 0;
-        new_ire.lo.vector = new_rte.vector;
-        new_ire.lo.res_2 = 0;
+        new_ire.remap.rh = (new_ire.remap.dlm == dest_LowestPrio);
+        new_ire.remap.avail = 0;
+        new_ire.remap.res_1 = 0;
+        new_ire.remap.vector = new_rte.vector;
+        new_ire.remap.res_2 = 0;
 
         set_ioapic_source_id(IO_APIC_ID(apic), &new_ire);
-        new_ire.hi.res_1 = 0;
-        new_ire.lo.p = 1;     /* finally, set present bit */
+        new_ire.remap.res_3 = 0;
+        new_ire.remap.res_4 = 0;
+        new_ire.remap.p = 1;     /* finally, set present bit */
 
         /* now construct new ioapic rte entry */
         remap_rte->vector = new_rte.vector;
@@ -510,7 +511,7 @@ static int remap_entry_to_msi_msg(
     GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, index,
                      iremap_entries, iremap_entry);
 
-    if ( iremap_entry->hi_val == 0 && iremap_entry->lo_val == 0 )
+    if ( iremap_entry->val == 0 )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
                 "%s: index (%d) get an empty entry!\n",
@@ -523,25 +524,25 @@ static int remap_entry_to_msi_msg(
     msg->address_hi = MSI_ADDR_BASE_HI;
     msg->address_lo =
         MSI_ADDR_BASE_LO |
-        ((iremap_entry->lo.dm == 0) ?
+        ((iremap_entry->remap.dm == 0) ?
             MSI_ADDR_DESTMODE_PHYS:
             MSI_ADDR_DESTMODE_LOGIC) |
-        ((iremap_entry->lo.dlm != dest_LowestPrio) ?
+        ((iremap_entry->remap.dlm != dest_LowestPrio) ?
             MSI_ADDR_REDIRECTION_CPU:
             MSI_ADDR_REDIRECTION_LOWPRI);
     if ( x2apic_enabled )
-        msg->dest32 = iremap_entry->lo.dst;
+        msg->dest32 = iremap_entry->remap.dst;
     else
-        msg->dest32 = (iremap_entry->lo.dst >> 8) & 0xff;
+        msg->dest32 = (iremap_entry->remap.dst >> 8) & 0xff;
     msg->address_lo |= MSI_ADDR_DEST_ID(msg->dest32);
 
     msg->data =
         MSI_DATA_TRIGGER_EDGE |
         MSI_DATA_LEVEL_ASSERT |
-        ((iremap_entry->lo.dlm != dest_LowestPrio) ?
+        ((iremap_entry->remap.dlm != dest_LowestPrio) ?
             MSI_DATA_DELIVERY_FIXED:
             MSI_DATA_DELIVERY_LOWPRI) |
-        iremap_entry->lo.vector;
+        iremap_entry->remap.vector;
 
     unmap_vtd_domain_page(iremap_entries);
     spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
@@ -600,29 +601,30 @@ static int msi_msg_to_remap_entry(
     memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
 
     /* Set interrupt remapping table entry */
-    new_ire.lo.fpd = 0;
-    new_ire.lo.dm = (msg->address_lo >> MSI_ADDR_DESTMODE_SHIFT) & 0x1;
-    new_ire.lo.tm = (msg->data >> MSI_DATA_TRIGGER_SHIFT) & 0x1;
-    new_ire.lo.dlm = (msg->data >> MSI_DATA_DELIVERY_MODE_SHIFT) & 0x1;
+    new_ire.remap.fpd = 0;
+    new_ire.remap.dm = (msg->address_lo >> MSI_ADDR_DESTMODE_SHIFT) & 0x1;
+    new_ire.remap.tm = (msg->data >> MSI_DATA_TRIGGER_SHIFT) & 0x1;
+    new_ire.remap.dlm = (msg->data >> MSI_DATA_DELIVERY_MODE_SHIFT) & 0x1;
     /* Hardware require RH = 1 for LPR delivery mode */
-    new_ire.lo.rh = (new_ire.lo.dlm == dest_LowestPrio);
-    new_ire.lo.avail = 0;
-    new_ire.lo.res_1 = 0;
-    new_ire.lo.vector = (msg->data >> MSI_DATA_VECTOR_SHIFT) &
-                        MSI_DATA_VECTOR_MASK;
-    new_ire.lo.res_2 = 0;
+    new_ire.remap.rh = (new_ire.remap.dlm == dest_LowestPrio);
+    new_ire.remap.avail = 0;
+    new_ire.remap.res_1 = 0;
+    new_ire.remap.vector = (msg->data >> MSI_DATA_VECTOR_SHIFT) &
+                            MSI_DATA_VECTOR_MASK;
+    new_ire.remap.res_2 = 0;
     if ( x2apic_enabled )
-        new_ire.lo.dst = msg->dest32;
+        new_ire.remap.dst = msg->dest32;
     else
-        new_ire.lo.dst = ((msg->address_lo >> MSI_ADDR_DEST_ID_SHIFT)
-                          & 0xff) << 8;
+        new_ire.remap.dst = ((msg->address_lo >> MSI_ADDR_DEST_ID_SHIFT)
+                             & 0xff) << 8;
 
     if ( pdev )
         set_msi_source_id(pdev, &new_ire);
     else
         set_hpet_source_id(msi_desc->hpet_id, &new_ire);
-    new_ire.hi.res_1 = 0;
-    new_ire.lo.p = 1;    /* finally, set present bit */
+    new_ire.remap.res_3 = 0;
+    new_ire.remap.res_4 = 0;
+    new_ire.remap.p = 1;    /* finally, set present bit */
 
     /* now construct new MSI/MSI-X rte entry */
     remap_rte = (struct msi_msg_remap_entry *)msg;

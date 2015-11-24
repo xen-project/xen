@@ -230,13 +230,13 @@ void vtd_dump_iommu_info(unsigned char key)
                 else
                     p = &iremap_entries[i % (1 << IREMAP_ENTRY_ORDER)];
 
-                if ( !p->lo.p )
+                if ( !p->remap.p )
                     continue;
                 printk("  %04x:  %x   %x  %04x %08x %02x    %x   %x  %x  %x  %x"
                     "   %x %x\n", i,
-                    p->hi.svt, p->hi.sq, p->hi.sid, p->lo.dst, p->lo.vector,
-                    p->lo.avail, p->lo.dlm, p->lo.tm, p->lo.rh, p->lo.dm,
-                    p->lo.fpd, p->lo.p);
+                    p->remap.svt, p->remap.sq, p->remap.sid, p->remap.dst,
+                    p->remap.vector, p->remap.avail, p->remap.dlm, p->remap.tm,
+                    p->remap.rh, p->remap.dm, p->remap.fpd, p->remap.p);
                 print_cnt++;
             }
             if ( iremap_entries )
