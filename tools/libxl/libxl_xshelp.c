@@ -147,7 +147,7 @@ char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
     return ret;
 }
 
-bool libxl__xs_mkdir(libxl__gc *gc, xs_transaction_t t,
+bool libxl__xs_mknod(libxl__gc *gc, xs_transaction_t t,
                      const char *path, struct xs_permissions *perms,
 			         unsigned int num_perms)
 {

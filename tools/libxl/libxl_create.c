@@ -583,43 +583,43 @@ retry_transaction:
     t = xs_transaction_start(ctx->xsh);
 
     xs_rm(ctx->xsh, t, dom_path);
-    libxl__xs_mkdir(gc, t, dom_path, roperm, ARRAY_SIZE(roperm));
+    libxl__xs_mknod(gc, t, dom_path, roperm, ARRAY_SIZE(roperm));
 
     xs_rm(ctx->xsh, t, vm_path);
-    libxl__xs_mkdir(gc, t, vm_path, roperm, ARRAY_SIZE(roperm));
+    libxl__xs_mknod(gc, t, vm_path, roperm, ARRAY_SIZE(roperm));
 
     xs_rm(ctx->xsh, t, libxl_path);
-    libxl__xs_mkdir(gc, t, libxl_path, noperm, ARRAY_SIZE(noperm));
+    libxl__xs_mknod(gc, t, libxl_path, noperm, ARRAY_SIZE(noperm));
 
     xs_write(ctx->xsh, t, GCSPRINTF("%s/vm", dom_path), vm_path, strlen(vm_path));
     rc = libxl__domain_rename(gc, *domid, 0, info->name, t);
     if (rc)
         goto out;
 
-    libxl__xs_mkdir(gc, t,
+    libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/cpu", dom_path),
                     roperm, ARRAY_SIZE(roperm));
-    libxl__xs_mkdir(gc, t,
+    libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/memory", dom_path),
                     roperm, ARRAY_SIZE(roperm));
-    libxl__xs_mkdir(gc, t,
+    libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/device", dom_path),
                     roperm, ARRAY_SIZE(roperm));
-    libxl__xs_mkdir(gc, t,
+    libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/control", dom_path),
                     roperm, ARRAY_SIZE(roperm));
     if (info->type == LIBXL_DOMAIN_TYPE_HVM)
-        libxl__xs_mkdir(gc, t,
+        libxl__xs_mknod(gc, t,
                         GCSPRINTF("%s/hvmloader", dom_path),
                         roperm, ARRAY_SIZE(roperm));
 
-    libxl__xs_mkdir(gc, t,
+    libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/control/shutdown", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
-    libxl__xs_mkdir(gc, t,
+    libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/device/suspend/event-channel", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
-    libxl__xs_mkdir(gc, t,
+    libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/data", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
 
@@ -628,13 +628,13 @@ retry_transaction:
          * Create a local "libxl" directory for each guest, since we might want
          * to use libxl from inside the guest
          */
-        libxl__xs_mkdir(gc, t, GCSPRINTF("%s/libxl", dom_path), rwperm,
+        libxl__xs_mknod(gc, t, GCSPRINTF("%s/libxl", dom_path), rwperm,
                         ARRAY_SIZE(rwperm));
         /*
          * Create a local "device-model" directory for each guest, since we
          * might want to use Qemu from inside the guest
          */
-        libxl__xs_mkdir(gc, t, GCSPRINTF("%s/device-model", dom_path), rwperm,
+        libxl__xs_mknod(gc, t, GCSPRINTF("%s/device-model", dom_path), rwperm,
                         ARRAY_SIZE(rwperm));
     }
 
