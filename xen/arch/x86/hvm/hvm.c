@@ -2092,6 +2092,9 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
         memcpy(v->arch.xsave_area, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
         xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
+        if ( cpu_has_xsaves || cpu_has_xsavec )
+            xsave_area->xsave_hdr.xcomp_bv = XSTATE_FP_SSE |
+                                             XSTATE_COMPACTION_ENABLED;
     }
     else
         memcpy(v->arch.fpu_ctxt, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
@@ -2161,8 +2164,8 @@ static int hvm_save_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
         ctxt->xfeature_mask = xfeature_mask;
         ctxt->xcr0 = v->arch.xcr0;
         ctxt->xcr0_accum = v->arch.xcr0_accum;
-        memcpy(&ctxt->save_area, v->arch.xsave_area,
-               size - offsetof(struct hvm_hw_cpu_xsave, save_area));
+        expand_xsave_states(v, &ctxt->save_area,
+                            size - offsetof(typeof(*ctxt), save_area));
     }
 
     return 0;
@@ -2261,9 +2264,9 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     v->arch.xcr0_accum = ctxt->xcr0_accum;
     if ( ctxt->xcr0_accum & XSTATE_NONLAZY )
         v->arch.nonlazy_xstate_used = 1;
-    memcpy(v->arch.xsave_area, &ctxt->save_area,
-           min(desc->length, size) - offsetof(struct hvm_hw_cpu_xsave,
-           save_area));
+    compress_xsave_states(v, &ctxt->save_area,
+                          min(desc->length, size) -
+                          offsetof(struct hvm_hw_cpu_xsave,save_area));
 
     return 0;
 }
@@ -5503,7 +5506,12 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     fpu_ctxt->fcw = FCW_RESET;
     fpu_ctxt->mxcsr = MXCSR_DEFAULT;
     if ( v->arch.xsave_area )
+    {
         v->arch.xsave_area->xsave_hdr.xstate_bv = XSTATE_FP;
+        if ( cpu_has_xsaves || cpu_has_xsavec )
+            v->arch.xsave_area->xsave_hdr.xcomp_bv = XSTATE_FP |
+                                                     XSTATE_COMPACTION_ENABLED;
+    }
 
     v->arch.vgc_flags = VGCF_online;
     memset(&v->arch.user_regs, 0, sizeof(v->arch.user_regs));

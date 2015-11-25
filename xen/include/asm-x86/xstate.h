@@ -91,6 +91,8 @@ void xrstor(struct vcpu *v, uint64_t mask);
 bool_t xsave_enabled(const struct vcpu *v);
 int __must_check validate_xstate(u64 xcr0, u64 xcr0_accum, u64 xstate_bv);
 int __must_check handle_xsetbv(u32 index, u64 new_bv);
+void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size);
+void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size);
 
 /* extended state init and cleanup functions */
 void xstate_free_save_area(struct vcpu *v);

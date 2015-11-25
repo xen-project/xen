@@ -910,7 +910,12 @@ int arch_set_info_guest(
     {
         memcpy(v->arch.fpu_ctxt, &c.nat->fpu_ctxt, sizeof(c.nat->fpu_ctxt));
         if ( v->arch.xsave_area )
-             v->arch.xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
+        {
+            v->arch.xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
+            if ( cpu_has_xsaves || cpu_has_xsavec )
+                v->arch.xsave_area->xsave_hdr.xcomp_bv = XSTATE_FP_SSE |
+                                                         XSTATE_COMPACTION_ENABLED;
+        }
     }
 
     if ( !compat )
@@ -1594,6 +1599,9 @@ static void __context_switch(void)
 
             if ( xcr0 != get_xcr0() && !set_xcr0(xcr0) )
                 BUG();
+
+            if ( cpu_has_xsaves && has_hvm_container_vcpu(n) )
+                set_msr_xss(n->arch.hvm_vcpu.msr_xss);
         }
         vcpu_restore_fpu_eager(n);
         n->arch.ctxt_switch_to(n);

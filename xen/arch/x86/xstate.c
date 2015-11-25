@@ -24,6 +24,11 @@ static u32 __read_mostly xsave_cntxt_size;
 /* A 64-bit bitmask of the XSAVE/XRSTOR features supported by processor. */
 u64 __read_mostly xfeature_mask;
 
+static unsigned int *__read_mostly xstate_offsets;
+static unsigned int *__read_mostly xstate_sizes;
+static unsigned int __read_mostly xstate_features;
+static unsigned int __read_mostly xstate_comp_offsets[sizeof(xfeature_mask)*8];
+
 /* Cached xcr0 for fast read */
 static DEFINE_PER_CPU(uint64_t, xcr0);
 
@@ -79,6 +84,161 @@ uint64_t get_msr_xss(void)
     return this_cpu(xss);
 }
 
+static bool_t xsave_area_compressed(const struct xsave_struct *xsave_area)
+{
+     return xsave_area && (xsave_area->xsave_hdr.xcomp_bv
+                           & XSTATE_COMPACTION_ENABLED);
+}
+
+static int setup_xstate_features(bool_t bsp)
+{
+    unsigned int leaf, tmp, eax, ebx;
+
+    if ( bsp )
+    {
+        xstate_features = fls(xfeature_mask);
+        xstate_offsets = xzalloc_array(unsigned int, xstate_features);
+        if ( !xstate_offsets )
+            return -ENOMEM;
+
+        xstate_sizes = xzalloc_array(unsigned int, xstate_features);
+        if ( !xstate_sizes )
+            return -ENOMEM;
+    }
+
+    for ( leaf = 2; leaf < xstate_features; leaf++ )
+    {
+        if ( bsp )
+            cpuid_count(XSTATE_CPUID, leaf, &xstate_sizes[leaf],
+                        &xstate_offsets[leaf], &tmp, &tmp);
+        else
+        {
+            cpuid_count(XSTATE_CPUID, leaf, &eax,
+                        &ebx, &tmp, &tmp);
+            BUG_ON(eax != xstate_sizes[leaf]);
+            BUG_ON(ebx != xstate_offsets[leaf]);
+        }
+    }
+
+    return 0;
+}
+
+static void __init setup_xstate_comp(void)
+{
+    unsigned int i;
+
+    /*
+     * The FP xstates and SSE xstates are legacy states. They are always
+     * in the fixed offsets in the xsave area in either compacted form
+     * or standard form.
+     */
+    xstate_comp_offsets[0] = 0;
+    xstate_comp_offsets[1] = XSAVE_SSE_OFFSET;
+
+    xstate_comp_offsets[2] = FXSAVE_SIZE + XSAVE_HDR_SIZE;
+
+    for ( i = 3; i < xstate_features; i++ )
+    {
+        xstate_comp_offsets[i] = xstate_comp_offsets[i - 1] +
+                                 (((1ul << i) & xfeature_mask)
+                                  ? xstate_sizes[i - 1] : 0);
+        ASSERT(xstate_comp_offsets[i] + xstate_sizes[i] <= xsave_cntxt_size);
+    }
+}
+
+static void *get_xsave_addr(void *xsave, unsigned int xfeature_idx)
+{
+    if ( !((1ul << xfeature_idx) & xfeature_mask) )
+        return NULL;
+
+    return xsave + xstate_comp_offsets[xfeature_idx];
+}
+
+void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
+{
+    struct xsave_struct *xsave = v->arch.xsave_area;
+    u64 xstate_bv = xsave->xsave_hdr.xstate_bv;
+    u64 valid;
+
+    if ( !cpu_has_xsaves && !cpu_has_xsavec )
+    {
+        memcpy(dest, xsave, size);
+        return;
+    }
+
+    ASSERT(xsave_area_compressed(xsave));
+    /*
+     * Copy legacy XSAVE area and XSAVE hdr area.
+     */
+    memcpy(dest, xsave, XSTATE_AREA_MIN_SIZE);
+
+    ((struct xsave_struct *)dest)->xsave_hdr.xcomp_bv =  0;
+
+    /*
+     * Copy each region from the possibly compacted offset to the
+     * non-compacted offset.
+     */
+    valid = xstate_bv & ~XSTATE_FP_SSE;
+    while ( valid )
+    {
+        u64 feature = valid & -valid;
+        unsigned int index = fls(feature) - 1;
+        const void *src = get_xsave_addr(xsave, index);
+
+        if ( src )
+        {
+            ASSERT((xstate_offsets[index] + xstate_sizes[index]) <= size);
+            memcpy(dest + xstate_offsets[index], src, xstate_sizes[index]);
+        }
+
+        valid &= ~feature;
+    }
+}
+
+void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
+{
+    struct xsave_struct *xsave = v->arch.xsave_area;
+    u64 xstate_bv = ((const struct xsave_struct *)src)->xsave_hdr.xstate_bv;
+    u64 valid;
+
+    if ( !cpu_has_xsaves && !cpu_has_xsavec )
+    {
+        memcpy(xsave, src, size);
+        return;
+    }
+
+    ASSERT(!xsave_area_compressed(src));
+    /*
+     * Copy legacy XSAVE area, to avoid complications with CPUID
+     * leaves 0 and 1 in the loop below.
+     */
+    memcpy(xsave, src, FXSAVE_SIZE);
+
+    /* Set XSTATE_BV and XCOMP_BV.  */
+    xsave->xsave_hdr.xstate_bv = xstate_bv;
+    xsave->xsave_hdr.xcomp_bv = v->arch.xcr0_accum | XSTATE_COMPACTION_ENABLED;
+
+    /*
+     * Copy each region from the non-compacted offset to the
+     * possibly compacted offset.
+     */
+    valid = xstate_bv & ~XSTATE_FP_SSE;
+    while ( valid )
+    {
+        u64 feature = valid & -valid;
+        unsigned int index = fls(feature) - 1;
+        void *dest = get_xsave_addr(xsave, index);
+
+        if ( dest )
+        {
+            ASSERT((xstate_offsets[index] + xstate_sizes[index]) <= size);
+            memcpy(dest, src + xstate_offsets[index], xstate_sizes[index]);
+        }
+
+        valid &= ~feature;
+    }
+}
+
 void xsave(struct vcpu *v, uint64_t mask)
 {
     struct xsave_struct *ptr = v->arch.xsave_area;
@@ -91,7 +251,15 @@ void xsave(struct vcpu *v, uint64_t mask)
         typeof(ptr->fpu_sse.fip.sel) fcs = ptr->fpu_sse.fip.sel;
         typeof(ptr->fpu_sse.fdp.sel) fds = ptr->fpu_sse.fdp.sel;
 
-        if ( cpu_has_xsaveopt )
+        if ( cpu_has_xsaves )
+            asm volatile ( ".byte 0x48,0x0f,0xc7,0x2f"
+                           : "=m" (*ptr)
+                           : "a" (lmask), "d" (hmask), "D" (ptr) );
+        else if ( cpu_has_xsavec )
+            asm volatile ( ".byte 0x48,0x0f,0xc7,0x27"
+                           : "=m" (*ptr)
+                           : "a" (lmask), "d" (hmask), "D" (ptr) );
+        else if ( cpu_has_xsaveopt )
         {
             /*
              * xsaveopt may not write the FPU portion even when the respective
@@ -144,7 +312,15 @@ void xsave(struct vcpu *v, uint64_t mask)
     }
     else
     {
-        if ( cpu_has_xsaveopt )
+        if ( cpu_has_xsaves )
+            asm volatile ( ".byte 0x0f,0xc7,0x2f"
+                           : "=m" (*ptr)
+                           : "a" (lmask), "d" (hmask), "D" (ptr) );
+        else if ( cpu_has_xsavec )
+            asm volatile ( ".byte 0x0f,0xc7,0x27"
+                           : "=m" (*ptr)
+                           : "a" (lmask), "d" (hmask), "D" (ptr) );
+        else if ( cpu_has_xsaveopt )
             asm volatile ( ".byte 0x0f,0xae,0x37"
                            : "=m" (*ptr)
                            : "a" (lmask), "d" (hmask), "D" (ptr) );
@@ -197,20 +373,24 @@ void xrstor(struct vcpu *v, uint64_t mask)
     switch ( __builtin_expect(ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET], 8) )
     {
     default:
-        asm volatile ( "1: .byte 0x48,0x0f,0xae,0x2f\n"
-                       XRSTOR_FIXUP
-                       : [ptr] "+&D" (ptr), [lmask_out] "+&a" (lmask)
-                       : [mem] "m" (*ptr), [lmask_in] "g" (lmask),
-                         [hmask] "d" (hmask), [size] "m" (xsave_cntxt_size)
-                       : "ecx" );
+        alternative_io("1: .byte 0x48,0x0f,0xae,0x2f\n"
+                       XRSTOR_FIXUP,
+                       ".byte 0x48,0x0f,0xc7,0x1f\n",
+                       X86_FEATURE_XSAVES,
+                       ASM_OUTPUT2([ptr] "+&D" (ptr), [lmask_out] "+&a" (lmask)),
+                       [mem] "m" (*ptr), [lmask_in] "g" (lmask),
+                       [hmask] "d" (hmask), [size] "m" (xsave_cntxt_size)
+                       : "ecx");
         break;
     case 4: case 2:
-        asm volatile ( "1: .byte 0x0f,0xae,0x2f\n"
-                       XRSTOR_FIXUP
-                       : [ptr] "+&D" (ptr), [lmask_out] "+&a" (lmask)
-                       : [mem] "m" (*ptr), [lmask_in] "g" (lmask),
-                         [hmask] "d" (hmask), [size] "m" (xsave_cntxt_size)
-                       : "ecx" );
+        alternative_io("1: .byte 0x0f,0xae,0x2f\n"
+                       XRSTOR_FIXUP,
+                       ".byte 0x0f,0xc7,0x1f\n",
+                       X86_FEATURE_XSAVES,
+                       ASM_OUTPUT2([ptr] "+&D" (ptr), [lmask_out] "+&a" (lmask)),
+                       [mem] "m" (*ptr), [lmask_in] "g" (lmask),
+                       [hmask] "d" (hmask), [size] "m" (xsave_cntxt_size)
+                       : "ecx");
         break;
     }
 }
@@ -338,11 +518,18 @@ void xstate_init(struct cpuinfo_x86 *c)
 
     /* Mask out features not currently understood by Xen. */
     eax &= (cpufeat_mask(X86_FEATURE_XSAVEOPT) |
-            cpufeat_mask(X86_FEATURE_XSAVEC));
+            cpufeat_mask(X86_FEATURE_XSAVEC) |
+            cpufeat_mask(X86_FEATURE_XGETBV1) |
+            cpufeat_mask(X86_FEATURE_XSAVES));
 
     c->x86_capability[cpufeat_word(X86_FEATURE_XSAVEOPT)] = eax;
 
     BUG_ON(eax != boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_XSAVEOPT)]);
+
+    if ( setup_xstate_features(bsp) && bsp )
+        BUG();
+    if ( bsp && (cpu_has_xsaves || cpu_has_xsavec) )
+        setup_xstate_comp();
 }
 
 static bool_t valid_xcr0(u64 xcr0)

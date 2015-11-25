@@ -897,9 +897,29 @@ long arch_do_domctl(
                 ret = -EFAULT;
 
             offset += sizeof(v->arch.xcr0_accum);
-            if ( !ret && copy_to_guest_offset(evc->buffer, offset,
-                                              (void *)v->arch.xsave_area,
-                                              size - 2 * sizeof(uint64_t)) )
+            if ( !ret && (cpu_has_xsaves || cpu_has_xsavec) )
+            {
+                void *xsave_area;
+
+                xsave_area = xmalloc_bytes(size);
+                if ( !xsave_area )
+                {
+                    ret = -ENOMEM;
+                    vcpu_unpause(v);
+                    goto vcpuextstate_out;
+                }
+
+                expand_xsave_states(v, xsave_area,
+                                    size - 2 * sizeof(uint64_t));
+
+                if ( copy_to_guest_offset(evc->buffer, offset, xsave_area,
+                                          size - 2 * sizeof(uint64_t)) )
+                     ret = -EFAULT;
+                xfree(xsave_area);
+           }
+           else if ( !ret && copy_to_guest_offset(evc->buffer, offset,
+                                                  (void *)v->arch.xsave_area,
+                                                  size - 2 * sizeof(uint64_t)) )
                 ret = -EFAULT;
 
             vcpu_unpause(v);
@@ -955,8 +975,8 @@ long arch_do_domctl(
                 v->arch.xcr0_accum = _xcr0_accum;
                 if ( _xcr0_accum & XSTATE_NONLAZY )
                     v->arch.nonlazy_xstate_used = 1;
-                memcpy(v->arch.xsave_area, _xsave_area,
-                       evc->size - 2 * sizeof(uint64_t));
+                compress_xsave_states(v, _xsave_area,
+                                      evc->size - 2 * sizeof(uint64_t));
                 vcpu_unpause(v);
             }
             else

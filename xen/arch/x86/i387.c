@@ -282,7 +282,11 @@ int vcpu_init_fpu(struct vcpu *v)
         return rc;
 
     if ( v->arch.xsave_area )
+    {
         v->arch.fpu_ctxt = &v->arch.xsave_area->fpu_sse;
+        if ( cpu_has_xsaves || cpu_has_xsavec )
+            v->arch.xsave_area->xsave_hdr.xcomp_bv = XSTATE_COMPACTION_ENABLED;
+    }
     else
     {
         v->arch.fpu_ctxt = _xzalloc(sizeof(v->arch.xsave_area->fpu_sse), 16);

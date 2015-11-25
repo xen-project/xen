@@ -94,6 +94,9 @@ extern void alternative_instructions(void);
 	asm volatile (ALTERNATIVE(oldinstr, newinstr, feature)		\
 		: output : "i" (0), ## input)
 
+/* Use this macro(s) if you need more than one output parameter. */
+#define ASM_OUTPUT2(a...) a
+
 #endif  /*  __ASSEMBLY__  */
 
 #endif /* __X86_ALTERNATIVE_H__ */
