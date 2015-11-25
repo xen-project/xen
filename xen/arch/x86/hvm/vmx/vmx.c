@@ -625,7 +625,7 @@ static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 
 static unsigned int __init vmx_init_msr(void)
 {
-    return !!cpu_has_mpx;
+    return !!cpu_has_mpx + !!cpu_has_xsaves;
 }
 
 static void vmx_save_msr(struct vcpu *v, struct hvm_msr *ctxt)
@@ -640,6 +640,13 @@ static void vmx_save_msr(struct vcpu *v, struct hvm_msr *ctxt)
     }
 
     vmx_vmcs_exit(v);
+
+    if ( cpu_has_xsaves )
+    {
+        ctxt->msr[ctxt->count].val = v->arch.hvm_vcpu.msr_xss;
+        if ( ctxt->msr[ctxt->count].val )
+            ctxt->msr[ctxt->count++].index = MSR_IA32_XSS;
+    }
 }
 
 static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
@@ -656,6 +663,12 @@ static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
         case MSR_IA32_BNDCFGS:
             if ( cpu_has_mpx )
                 __vmwrite(GUEST_BNDCFGS, ctxt->msr[i].val);
+            else
+                err = -ENXIO;
+            break;
+        case MSR_IA32_XSS:
+            if ( cpu_has_xsaves )
+                v->arch.hvm_vcpu.msr_xss = ctxt->msr[i].val;
             else
                 err = -ENXIO;
             break;
@@ -2819,6 +2832,18 @@ static void vmx_idtv_reinject(unsigned long idtv_info)
     }
 }
 
+static void vmx_handle_xsaves(void)
+{
+    gdprintk(XENLOG_ERR, "xsaves should not cause vmexit\n");
+    domain_crash(current->domain);
+}
+
+static void vmx_handle_xrstors(void)
+{
+    gdprintk(XENLOG_ERR, "xrstors should not cause vmexit\n");
+    domain_crash(current->domain);
+}
+
 static int vmx_handle_apic_write(void)
 {
     unsigned long exit_qualification;
@@ -3394,6 +3419,14 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     case EXIT_REASON_PML_FULL:
         vmx_vcpu_flush_pml_buffer(v);
+        break;
+
+    case EXIT_REASON_XSAVES:
+        vmx_handle_xsaves();
+        break;
+
+    case EXIT_REASON_XRSTORS:
+        vmx_handle_xrstors();
         break;
 
     case EXIT_REASON_ACCESS_GDTR_OR_IDTR:

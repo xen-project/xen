@@ -4606,6 +4606,20 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                     *ebx = _eax + _ebx;
             }
         }
+        if ( count == 1 )
+        {
+            if ( cpu_has_xsaves && cpu_has_vmx_xsaves )
+            {
+                *ebx = XSTATE_AREA_MIN_SIZE;
+                if ( v->arch.xcr0 | v->arch.hvm_vcpu.msr_xss )
+                    for ( sub_leaf = 2; sub_leaf < 63; sub_leaf++ )
+                        if ( (v->arch.xcr0 | v->arch.hvm_vcpu.msr_xss) &
+                             (1ULL << sub_leaf) )
+                            *ebx += xstate_sizes[sub_leaf];
+            }
+            else
+                *ebx = *ecx = *edx = 0;
+        }
         break;
 
     case 0x80000001:
@@ -4703,6 +4717,12 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     {
     case MSR_EFER:
         *msr_content = v->arch.hvm_vcpu.guest_efer;
+        break;
+
+    case MSR_IA32_XSS:
+        if ( !cpu_has_xsaves )
+            goto gp_fault;
+        *msr_content = v->arch.hvm_vcpu.msr_xss;
         break;
 
     case MSR_IA32_TSC:
@@ -4835,6 +4855,13 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
     case MSR_EFER:
         if ( hvm_set_efer(msr_content) )
            return X86EMUL_EXCEPTION;
+        break;
+
+    case MSR_IA32_XSS:
+        /* No XSS features currently supported for guests. */
+        if ( !cpu_has_xsaves || msr_content != 0 )
+            goto gp_fault;
+        v->arch.hvm_vcpu.msr_xss = msr_content;
         break;
 
     case MSR_IA32_TSC:

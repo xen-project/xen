@@ -241,7 +241,8 @@ static int vmx_init_vmcs_config(void)
                SECONDARY_EXEC_PAUSE_LOOP_EXITING |
                SECONDARY_EXEC_ENABLE_INVPCID |
                SECONDARY_EXEC_ENABLE_VM_FUNCTIONS |
-               SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS);
+               SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS |
+               SECONDARY_EXEC_XSAVES);
         rdmsrl(MSR_IA32_VMX_MISC, _vmx_misc_cap);
         if ( _vmx_misc_cap & VMX_MISC_VMWRITE_ALL )
             opt |= SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
@@ -1273,6 +1274,8 @@ static int construct_vmcs(struct vcpu *v)
         __vmwrite(HOST_PAT, host_pat);
         __vmwrite(GUEST_PAT, guest_pat);
     }
+    if ( cpu_has_vmx_xsaves )
+        __vmwrite(XSS_EXIT_BITMAP, 0);
 
     vmx_vmcs_exit(v);
 

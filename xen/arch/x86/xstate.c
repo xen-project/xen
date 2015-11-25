@@ -25,7 +25,7 @@ static u32 __read_mostly xsave_cntxt_size;
 u64 __read_mostly xfeature_mask;
 
 static unsigned int *__read_mostly xstate_offsets;
-static unsigned int *__read_mostly xstate_sizes;
+unsigned int *__read_mostly xstate_sizes;
 static unsigned int __read_mostly xstate_features;
 static unsigned int __read_mostly xstate_comp_offsets[sizeof(xfeature_mask)*8];
 

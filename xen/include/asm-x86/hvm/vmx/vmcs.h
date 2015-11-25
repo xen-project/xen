@@ -235,6 +235,7 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_ENABLE_VMCS_SHADOWING    0x00004000
 #define SECONDARY_EXEC_ENABLE_PML               0x00020000
 #define SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS   0x00040000
+#define SECONDARY_EXEC_XSAVES                   0x00100000
 extern u32 vmx_secondary_exec_control;
 
 #define VMX_EPT_EXEC_ONLY_SUPPORTED                         0x00000001
@@ -300,6 +301,8 @@ extern u64 vmx_ept_vpid_cap;
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS)
 #define cpu_has_vmx_pml \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_PML)
+#define cpu_has_vmx_xsaves \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_XSAVES)
 
 #define VMCS_RID_TYPE_MASK              0x80000000
 
@@ -374,6 +377,7 @@ enum vmcs_field {
     VMREAD_BITMAP                   = 0x00002026,
     VMWRITE_BITMAP                  = 0x00002028,
     VIRT_EXCEPTION_INFO             = 0x0000202a,
+    XSS_EXIT_BITMAP                 = 0x0000202c,
     GUEST_PHYSICAL_ADDRESS          = 0x00002400,
     VMCS_LINK_POINTER               = 0x00002800,
     GUEST_IA32_DEBUGCTL             = 0x00002802,

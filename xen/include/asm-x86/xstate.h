@@ -45,6 +45,7 @@
 #define XSTATE_COMPACTION_ENABLED  (1ULL << 63)
 
 extern u64 xfeature_mask;
+extern unsigned int *xstate_sizes;
 
 /* extended state save area */
 struct __packed __attribute__((aligned (64))) xsave_struct
