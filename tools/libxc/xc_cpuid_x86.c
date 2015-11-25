@@ -282,6 +282,9 @@ static void intel_xc_cpuid_policy(xc_interface *xch,
 }
 
 #define XSAVEOPT        (1 << 0)
+#define XSAVEC          (1 << 1)
+#define XGETBV1         (1 << 2)
+#define XSAVES          (1 << 3)
 /* Configure extended state enumeration leaves (0x0000000D for xsave) */
 static void xc_cpuid_config_xsave(xc_interface *xch,
                                   const struct cpuid_domain_info *info,
@@ -318,8 +321,11 @@ static void xc_cpuid_config_xsave(xc_interface *xch,
         regs[1] = 512 + 64; /* FP/SSE + XSAVE.HEADER */
         break;
     case 1: /* leaf 1 */
-        regs[0] &= XSAVEOPT;
-        regs[1] = regs[2] = regs[3] = 0;
+        regs[0] &= (XSAVEOPT | XSAVEC | XGETBV1 | XSAVES);
+        if ( !info->hvm )
+            regs[0] &= ~XSAVES;
+        regs[2] &= info->xfeature_mask;
+        regs[3] = 0;
         break;
     case 2 ... 63: /* sub-leaves */
         if ( !(info->xfeature_mask & (1ULL << input[1])) )
