@@ -226,14 +226,28 @@
  * flags: NETRXF_*
  * status: -ve: NETIF_RSP_*; +ve: Rx'ed pkt size.
  *
+ * NOTE: Historically, to support GSO on the frontend receive side, Linux
+ *       netfront does not make use of the rx response id (because, as
+ *       described below, extra info structures overlay the id field).
+ *       Instead it assumes that responses always appear in the same ring
+ *       slot as their corresponding request. Thus, to maintain
+ *       compatibilty, backends must make sure this is the case.
+ *
  * Extra Info
  * ==========
  *
- * Can be present if initial request has NET{T,R}XF_extra_info, or
- * previous extra request has XEN_NETIF_EXTRA_MORE.
+ * Can be present if initial request or response has NET{T,R}XF_extra_info,
+ * or previous extra request has XEN_NETIF_EXTRA_MORE.
  *
  * The struct therefore needs to fit into either a tx or rx slot and
  * is therefore limited to 8 octets.
+ *
+ * NOTE: Because extra info data overlays the usual request/response
+ *       structures, there is no id information in the opposite direction.
+ *       So, if an extra info overlays an rx response the frontend can
+ *       assume that it is in the same ring slot as the request that was
+ *       consumed to make the slot available, and the backend must ensure
+ *       this assumption is true.
  *
  * extra info (netif_extra_info_t)
  * -------------------------------
