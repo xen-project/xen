@@ -35,6 +35,7 @@ The following local variable names should be used where applicable:
 
   int rc;    /* a libxl error code - and not anything else */
   int r;     /* the return value from a system call (or libxc call) */
+  bool ok;   /* the success return value from a boolean function */
 
   uint32_t domid;
   libxl__gc *gc;

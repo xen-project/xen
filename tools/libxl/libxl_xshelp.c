@@ -147,14 +147,26 @@ char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
     return ret;
 }
 
-bool libxl__xs_mknod(libxl__gc *gc, xs_transaction_t t,
-                     const char *path, struct xs_permissions *perms,
-			         unsigned int num_perms)
+int libxl__xs_mknod(libxl__gc *gc, xs_transaction_t t,
+                    const char *path, struct xs_permissions *perms,
+                    unsigned int num_perms)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    if (!xs_mkdir(ctx->xsh, t, path))
-        return false;
-    return xs_set_permissions(ctx->xsh, t, path, perms, num_perms);
+    bool ok;
+
+    ok = xs_write(ctx->xsh, t, path, "", 0);
+    if (!ok) {
+        LOGE(ERROR, "xenstore write failed: `%s' = ''", path);
+        return ERROR_FAIL;
+    }
+
+    ok = xs_set_permissions(ctx->xsh, t, path, perms, num_perms);
+    if (!ok) {
+        LOGE(ERROR, "xenstore set permissions failed on `%s'", path);
+        return ERROR_FAIL;
+    }
+
+    return 0;
 }
 
 char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid)
