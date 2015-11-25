@@ -85,7 +85,7 @@ DEFINE_XEN_GUEST_HANDLE(evtchn_port_t);
  * is allocated in <dom> and returned as <port>.
  * NOTES:
  *  1. If the caller is unprivileged then <dom> must be DOMID_SELF.
- *  2. <rdom> may be DOMID_SELF, allowing loopback connections.
+ *  2. <remote_dom> may be DOMID_SELF, allowing loopback connections.
  */
 struct evtchn_alloc_unbound {
     /* IN parameters */
