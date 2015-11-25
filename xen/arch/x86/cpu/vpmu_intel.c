@@ -166,10 +166,9 @@ static int core2_get_arch_pmc_count(void)
  */
 static int core2_get_fixed_pmc_count(void)
 {
-    u32 eax;
+    u32 edx = cpuid_edx(0xa);
 
-    eax = cpuid_eax(0xa);
-    return MASK_EXTR(eax, PMU_FIXED_NR_MASK);
+    return MASK_EXTR(edx, PMU_FIXED_NR_MASK);
 }
 
 /* edx bits 5-12: Bit width of fixed-function performance counters  */
