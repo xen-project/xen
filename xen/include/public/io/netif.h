@@ -1,8 +1,8 @@
 /******************************************************************************
  * netif.h
- * 
+ *
  * Unified network-device I/O interface for Xen guest OSes.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -153,8 +153,10 @@
 /*
  * This is the 'wire' format for packets:
  *  Request 1: netif_tx_request_t -- NETTXF_* (any flags)
- * [Request 2: netif_extra_info_t] (only if request 1 has NETTXF_extra_info)
- * [Request 3: netif_extra_info_t] (only if request 2 has XEN_NETIF_EXTRA_MORE)
+ * [Request 2: netif_extra_info_t] (only if request 1 has
+ *                                  NETTXF_extra_info)
+ * [Request 3: netif_extra_info_t] (only if request 2 has
+ *                                  XEN_NETIF_EXTRA_MORE)
  *  Request 4: netif_tx_request_t -- NETTXF_more_data
  *  Request 5: netif_tx_request_t -- NETTXF_more_data
  *  ...
@@ -256,7 +258,7 @@
  *
  *    0     1     2     3     4     5     6     7  octet
  * +-----+-----+-----+-----+-----+-----+-----+-----+
- * |type |flags| type specfic data                 |
+ * |type |flags| type specific data                |
  * +-----+-----+-----+-----+-----+-----+-----+-----+
  * | padding for tx        |
  * +-----+-----+-----+-----+
@@ -264,7 +266,8 @@
  * type: XEN_NETIF_EXTRA_TYPE_*
  * flags: XEN_NETIF_EXTRA_FLAG_*
  * padding for tx: present only in the tx case due to 8 octet limit
- *     from rx case. Not shown in type specific entries below.
+ *                 from rx case. Not shown in type specific entries
+ *                 below.
  *
  * XEN_NETIF_EXTRA_TYPE_GSO:
  *
@@ -275,9 +278,14 @@
  *
  * type: Must be XEN_NETIF_EXTRA_TYPE_GSO
  * flags: XEN_NETIF_EXTRA_FLAG_*
- * size: Maximum payload size of each segment.
- * type: XEN_NETIF_GSO_TYPE_*
- * features: EN_NETIF_GSO_FEAT_*
+ * size: Maximum payload size of each segment. For example,
+ *       for TCP this is just the path MSS.
+ * type: XEN_NETIF_GSO_TYPE_*: This determines the protocol of
+ *       the packet and any extra features required to segment the
+ *       packet properly.
+ * features: EN_NETIF_GSO_FEAT_*: This specifies any extra GSO
+ *           features required to process this packet, such as ECN
+ *           support for TCPv4.
  *
  * XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL}:
  *
@@ -309,11 +317,11 @@
 
 #define XEN_NETIF_MAX_TX_SIZE 0xFFFF
 struct netif_tx_request {
-    grant_ref_t gref;      /* Reference to buffer page */
-    uint16_t offset;       /* Offset within buffer page */
-    uint16_t flags;        /* NETTXF_* */
-    uint16_t id;           /* Echoed in response message. */
-    uint16_t size;         /* Packet size in bytes.       */
+    grant_ref_t gref;
+    uint16_t offset;
+    uint16_t flags;
+    uint16_t id;
+    uint16_t size;
 };
 typedef struct netif_tx_request netif_tx_request_t;
 
@@ -338,43 +346,18 @@ typedef struct netif_tx_request netif_tx_request_t;
  * netif_rx_response_t for compatibility.
  */
 struct netif_extra_info {
-    uint8_t type;  /* XEN_NETIF_EXTRA_TYPE_* */
-    uint8_t flags; /* XEN_NETIF_EXTRA_FLAG_* */
-
+    uint8_t type;
+    uint8_t flags;
     union {
-        /*
-         * XEN_NETIF_EXTRA_TYPE_GSO:
-         */
         struct {
-            /*
-             * Maximum payload size of each segment. For example, for TCP this
-             * is just the path MSS.
-             */
             uint16_t size;
-
-            /*
-             * GSO type. This determines the protocol of the packet and any
-             * extra features required to segment the packet properly.
-             */
-            uint8_t type; /* XEN_NETIF_GSO_TYPE_* */
-
-            /* Future expansion. */
+            uint8_t type;
             uint8_t pad;
-
-            /*
-             * GSO features. This specifies any extra GSO features required
-             * to process this packet, such as ECN support for TCPv4.
-             */
-            uint16_t features; /* XEN_NETIF_GSO_FEAT_* */
+            uint16_t features;
         } gso;
-
-        /*
-         * XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL}:
-         */
         struct {
-            uint8_t addr[6]; /* Address to add/remove. */
+            uint8_t addr[6];
         } mcast;
-
         uint16_t pad[3];
     } u;
 };
@@ -382,14 +365,14 @@ typedef struct netif_extra_info netif_extra_info_t;
 
 struct netif_tx_response {
     uint16_t id;
-    int16_t  status;       /* NETIF_RSP_* */
+    int16_t  status;
 };
 typedef struct netif_tx_response netif_tx_response_t;
 
 struct netif_rx_request {
     uint16_t    id;        /* Echoed in response message.        */
     uint16_t    pad;
-    grant_ref_t gref;      /* Reference to incoming granted frame */
+    grant_ref_t gref;
 };
 typedef struct netif_rx_request netif_rx_request_t;
 
@@ -415,9 +398,9 @@ typedef struct netif_rx_request netif_rx_request_t;
 
 struct netif_rx_response {
     uint16_t id;
-    uint16_t offset;       /* Offset in page of start of received packet  */
-    uint16_t flags;        /* NETRXF_* */
-    int16_t  status;       /* -ve: NETIF_RSP_* ; +ve: Rx'ed pkt size. */
+    uint16_t offset;
+    uint16_t flags;
+    int16_t  status;
 };
 typedef struct netif_rx_response netif_rx_response_t;
 
