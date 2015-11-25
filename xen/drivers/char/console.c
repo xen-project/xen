@@ -620,15 +620,18 @@ static void printk_start_of_line(const char *prefix)
 
 static void vprintk_common(const char *prefix, const char *fmt, va_list args)
 {
+    struct vps {
+        bool_t continued, do_print;
+    }            *state;
+    static DEFINE_PER_CPU(struct vps, state);
     static char   buf[1024];
-    static int    start_of_line = 1, do_print;
-
     char         *p, *q;
     unsigned long flags;
 
     /* console_lock can be acquired recursively from __printk_ratelimit(). */
     local_irq_save(flags);
     spin_lock_recursive(&console_lock);
+    state = &this_cpu(state);
 
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
 
@@ -637,30 +640,30 @@ static void vprintk_common(const char *prefix, const char *fmt, va_list args)
     while ( (q = strchr(p, '\n')) != NULL )
     {
         *q = '\0';
-        if ( start_of_line )
-            do_print = printk_prefix_check(p, &p);
-        if ( do_print )
+        if ( !state->continued )
+            state->do_print = printk_prefix_check(p, &p);
+        if ( state->do_print )
         {
-            if ( start_of_line )
+            if ( !state->continued )
                 printk_start_of_line(prefix);
             __putstr(p);
             __putstr("\n");
         }
-        start_of_line = 1;
+        state->continued = 0;
         p = q + 1;
     }
 
     if ( *p != '\0' )
     {
-        if ( start_of_line )
-            do_print = printk_prefix_check(p, &p);
-        if ( do_print )
+        if ( !state->continued )
+            state->do_print = printk_prefix_check(p, &p);
+        if ( state->do_print )
         {
-            if ( start_of_line )
+            if ( !state->continued )
                 printk_start_of_line(prefix);
             __putstr(p);
         }
-        start_of_line = 0;
+        state->continued = 1;
     }
 
     spin_unlock_recursive(&console_lock);
