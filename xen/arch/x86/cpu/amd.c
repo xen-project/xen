@@ -206,7 +206,9 @@ static void __init noinline probe_masking_msrs(void)
 static void amd_ctxt_switch_levelling(const struct domain *nextd)
 {
 	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
-	const struct cpuidmasks *masks = &cpuidmask_defaults;
+	const struct cpuidmasks *masks =
+		(nextd && is_pv_domain(nextd) && nextd->arch.pv_domain.cpuidmasks)
+		? nextd->arch.pv_domain.cpuidmasks : &cpuidmask_defaults;
 
 #define LAZY(cap, msr, field)						\
 	({								\

@@ -154,7 +154,7 @@ static void __init probe_masking_msrs(void)
 static void intel_ctxt_switch_levelling(const struct domain *nextd)
 {
 	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
-	const struct cpuidmasks *masks = &cpuidmask_defaults;
+	const struct cpuidmasks *masks;
 
 	if (cpu_has_cpuid_faulting) {
 		/*
@@ -177,6 +177,9 @@ static void intel_ctxt_switch_levelling(const struct domain *nextd)
 				   !is_control_domain(nextd));
 		return;
 	}
+
+	masks = (nextd && is_pv_domain(nextd) && nextd->arch.pv_domain.cpuidmasks)
+		? nextd->arch.pv_domain.cpuidmasks : &cpuidmask_defaults;
 
 #define LAZY(msr, field)						\
 	({								\

@@ -577,6 +577,14 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
             goto fail;
         clear_page(d->arch.pv_domain.gdt_ldt_l1tab);
 
+        if ( levelling_caps & ~LCAP_faulting )
+        {
+            d->arch.pv_domain.cpuidmasks = xmalloc(struct cpuidmasks);
+            if ( !d->arch.pv_domain.cpuidmasks )
+                goto fail;
+            *d->arch.pv_domain.cpuidmasks = cpuidmask_defaults;
+        }
+
         rc = create_perdomain_mapping(d, GDT_LDT_VIRT_START,
                                       GDT_LDT_MBYTES << (20 - PAGE_SHIFT),
                                       NULL, NULL);
@@ -672,7 +680,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         paging_final_teardown(d);
     free_perdomain_mappings(d);
     if ( is_pv_domain(d) )
+    {
+        xfree(d->arch.pv_domain.cpuidmasks);
         free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
+    }
     psr_domain_free(d);
     return rc;
 }
@@ -692,7 +703,10 @@ void arch_domain_destroy(struct domain *d)
 
     free_perdomain_mappings(d);
     if ( is_pv_domain(d) )
+    {
         free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
+        xfree(d->arch.pv_domain.cpuidmasks);
+    }
 
     free_xenheap_page(d->shared_info);
     cleanup_domain_irq_mapping(d);

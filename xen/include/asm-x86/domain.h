@@ -252,6 +252,8 @@ struct pv_domain
 
     /* map_domain_page() mapping cache. */
     struct mapcache_domain mapcache;
+
+    struct cpuidmasks *cpuidmasks;
 };
 
 struct monitor_write_data {
