@@ -189,6 +189,9 @@ void machine_crash_shutdown(void)
 
     nmi_shootdown_cpus();
 
+    /* Reset CPUID masking and faulting to the host's default. */
+    ctxt_switch_levelling(NULL);
+
     info = kexec_crash_save_info();
     info->xen_phys_start = xen_phys_start;
     info->dom0_pfn_to_mfn_frame_list_list =

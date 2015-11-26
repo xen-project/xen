@@ -2087,9 +2087,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             load_segments(next);
         }
 
-        set_cpuid_faulting(is_pv_domain(nextd) &&
-                           !is_control_domain(nextd) &&
-                           !is_hardware_domain(nextd));
+        ctxt_switch_levelling(nextd);
     }
 
     context_saved(prev);

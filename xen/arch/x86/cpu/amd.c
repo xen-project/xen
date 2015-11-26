@@ -331,6 +331,9 @@ static void __init noinline amd_init_levelling(void)
 		       (uint32_t)cpuidmask_defaults._7ab0,
 		       (uint32_t)cpuidmask_defaults._6c);
 	}
+
+	if (levelling_caps)
+		ctxt_switch_levelling = amd_ctxt_switch_levelling;
 }
 
 /*

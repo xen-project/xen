@@ -209,7 +209,7 @@ extern struct cpuinfo_x86 boot_cpu_data;
 extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
 
-extern void set_cpuid_faulting(bool_t enable);
+extern void (*ctxt_switch_levelling)(const struct domain *nextd);
 
 extern u64 host_pat;
 extern bool_t opt_cpu_info;

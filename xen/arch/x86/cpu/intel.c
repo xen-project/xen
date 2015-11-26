@@ -32,13 +32,15 @@ static bool_t __init probe_intel_cpuid_faulting(void)
 	return 1;
 }
 
-static DEFINE_PER_CPU(bool_t, cpuid_faulting_enabled);
-void set_cpuid_faulting(bool_t enable)
+static void set_cpuid_faulting(bool_t enable)
 {
+	static DEFINE_PER_CPU(bool_t, cpuid_faulting_enabled);
+	bool_t *this_enabled = &this_cpu(cpuid_faulting_enabled);
 	uint32_t hi, lo;
 
-	if (!cpu_has_cpuid_faulting ||
-	    this_cpu(cpuid_faulting_enabled) == enable )
+	ASSERT(cpu_has_cpuid_faulting);
+
+	if (*this_enabled == enable)
 		return;
 
 	rdmsr(MSR_INTEL_MISC_FEATURES_ENABLES, lo, hi);
@@ -47,7 +49,7 @@ void set_cpuid_faulting(bool_t enable)
 		lo |= MSR_MISC_FEATURES_CPUID_FAULTING;
 	wrmsr(MSR_INTEL_MISC_FEATURES_ENABLES, lo, hi);
 
-	this_cpu(cpuid_faulting_enabled) = enable;
+	*this_enabled = enable;
 }
 
 /*
@@ -154,6 +156,28 @@ static void intel_ctxt_switch_levelling(const struct domain *nextd)
 	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
 	const struct cpuidmasks *masks = &cpuidmask_defaults;
 
+	if (cpu_has_cpuid_faulting) {
+		/*
+		 * We *should* be enabling faulting for the control domain.
+		 *
+		 * Unfortunately, the domain builder (having only ever been a
+		 * PV guest) expects to be able to see host cpuid state in a
+		 * native CPUID instruction, to correctly build a CPUID policy
+		 * for HVM guests (notably the xstate leaves).
+		 *
+		 * This logic is fundimentally broken for HVM toolstack
+		 * domains, and faulting causes PV guests to behave like HVM
+		 * guests from their point of view.
+		 *
+		 * Future development plans will move responsibility for
+		 * generating the maximum full cpuid policy into Xen, at which
+		 * this problem will disappear.
+		 */
+		set_cpuid_faulting(nextd && is_pv_domain(nextd) &&
+				   !is_control_domain(nextd));
+		return;
+	}
+
 #define LAZY(msr, field)						\
 	({								\
 		if (unlikely(these_masks->field != masks->field) &&	\
@@ -227,6 +251,9 @@ static void __init noinline intel_init_levelling(void)
 			       (uint32_t)cpuidmask_defaults.e1cd,
 			       (uint32_t)cpuidmask_defaults.Da1);
 	}
+
+	if (levelling_caps)
+		ctxt_switch_levelling = intel_ctxt_switch_levelling;
 }
 
 static void early_init_intel(struct cpuinfo_x86 *c)

@@ -88,6 +88,13 @@ static const struct cpu_dev default_cpu = {
 };
 static const struct cpu_dev *this_cpu = &default_cpu;
 
+static void default_ctxt_switch_levelling(const struct domain *nextd)
+{
+	/* Nop */
+}
+void (* __read_mostly ctxt_switch_levelling)(const struct domain *nextd) =
+	default_ctxt_switch_levelling;
+
 bool_t opt_cpu_info;
 boolean_param("cpuinfo", opt_cpu_info);
 
