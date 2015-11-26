@@ -1037,7 +1037,9 @@ void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value)
     uint64_t guest_tsc;
     struct vcpu *v = vlapic_vcpu(vlapic);
 
-    /* may need to exclude some other conditions like vlapic->hw.disabled */
+    if ( vlapic_hw_disabled(vlapic) )
+        return;
+
     if ( !vlapic_lvtt_tdt(vlapic) )
     {
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "ignore tsc deadline msr write");
@@ -1113,6 +1115,9 @@ static int __vlapic_accept_pic_intr(struct vcpu *v)
 
 int vlapic_accept_pic_intr(struct vcpu *v)
 {
+    if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
+        return 0;
+
     TRACE_2D(TRC_HVM_EMUL_LAPIC_PIC_INTR,
              (v == v->domain->arch.hvm_domain.i8259_target),
              v ? __vlapic_accept_pic_intr(v) : -1);

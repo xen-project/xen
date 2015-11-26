@@ -1035,6 +1035,7 @@ static void noreturn svm_do_resume(struct vcpu *v)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     bool_t debug_state = v->domain->debugger_attached;
     bool_t vcpu_guestmode = 0;
+    struct vlapic *vlapic = vcpu_vlapic(v);
 
     if ( nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v) )
         vcpu_guestmode = 1;
@@ -1059,14 +1060,14 @@ static void noreturn svm_do_resume(struct vcpu *v)
         hvm_asid_flush_vcpu(v);
     }
 
-    if ( !vcpu_guestmode )
+    if ( !vcpu_guestmode && !vlapic_hw_disabled(vlapic) )
     {
         vintr_t intr;
 
         /* Reflect the vlapic's TPR in the hardware vtpr */
         intr = vmcb_get_vintr(vmcb);
         intr.fields.tpr =
-            (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xFF) >> 4;
+            (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xFF) >> 4;
         vmcb_set_vintr(vmcb, intr);
     }
 
@@ -2258,6 +2259,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     int inst_len, rc;
     vintr_t intr;
     bool_t vcpu_guestmode = 0;
+    struct vlapic *vlapic = vcpu_vlapic(v);
 
     hvm_invalidate_regs_fields(regs);
 
@@ -2275,11 +2277,12 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
      * NB. We need to preserve the low bits of the TPR to make checked builds
      * of Windows work, even though they don't actually do anything.
      */
-    if ( !vcpu_guestmode ) {
+    if ( !vcpu_guestmode && !vlapic_hw_disabled(vlapic) )
+    {
         intr = vmcb_get_vintr(vmcb);
-        vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI,
+        vlapic_set_reg(vlapic, APIC_TASKPRI,
                    ((intr.fields.tpr & 0x0F) << 4) |
-                   (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0x0F));
+                   (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0x0F));
     }
 
     exit_reason = vmcb->exitcode;
@@ -2667,14 +2670,13 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     }
 
   out:
-    if ( vcpu_guestmode )
-        /* Don't clobber TPR of the nested guest. */
+    if ( vcpu_guestmode || vlapic_hw_disabled(vlapic) )
         return;
 
     /* The exit may have updated the TPR: reflect this in the hardware vtpr */
     intr = vmcb_get_vintr(vmcb);
     intr.fields.tpr =
-        (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xFF) >> 4;
+        (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xFF) >> 4;
     vmcb_set_vintr(vmcb, intr);
 }
 
