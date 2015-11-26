@@ -268,7 +268,7 @@ struct hvm_hw_cpu_compat {
     uint32_t error_code;
 };
 
-static inline int _hvm_hw_fix_cpu(void *h) {
+static inline int _hvm_hw_fix_cpu(void *h, uint32_t size) {
 
     union hvm_hw_cpu_union {
         struct hvm_hw_cpu nat;

@@ -60,6 +60,8 @@ void _hvm_read_entry(struct hvm_domain_context *h,
  */
 #define _hvm_load_entry(_x, _h, _dst, _strict) ({                       \
     int r;                                                              \
+    struct hvm_save_descriptor *desc                                    \
+        = (struct hvm_save_descriptor *)&(_h)->data[(_h)->cur];         \
     if ( (r = _hvm_check_entry((_h), HVM_SAVE_CODE(_x),                 \
                HVM_SAVE_LENGTH(_x), (_strict))) == 0 )                  \
         _hvm_read_entry((_h), (_dst), HVM_SAVE_LENGTH(_x));             \
@@ -67,7 +69,7 @@ void _hvm_read_entry(struct hvm_domain_context *h,
              && (r = _hvm_check_entry((_h), HVM_SAVE_CODE(_x),          \
                        HVM_SAVE_LENGTH_COMPAT(_x), (_strict))) == 0 ) { \
         _hvm_read_entry((_h), (_dst), HVM_SAVE_LENGTH_COMPAT(_x));      \
-        r=HVM_SAVE_FIX_COMPAT(_x, (_dst));                              \
+        r = HVM_SAVE_FIX_COMPAT(_x, (_dst), desc->length);              \
     }                                                                   \
     r; })
 
