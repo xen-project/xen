@@ -1466,6 +1466,12 @@ This set incorporates the Partition Reference TSC MSR. This
 enlightenment can improve performance of Windows 7 and Windows
 Server 2008 R2 onwards.
 
+=item B<hcall_remote_tlb_flush>
+
+This set incorporates use of hypercalls for remote TLB flushing.
+This enlightenment may improve performance of Windows guests running
+on hosts with higher levels of (physical) CPU contention.
+
 =item B<defaults>
 
 This is a special value that enables the default set of groups, which

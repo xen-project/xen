@@ -33,9 +33,15 @@
 /* Viridian Hypercall Status Codes. */
 #define HV_STATUS_SUCCESS                       0x0000
 #define HV_STATUS_INVALID_HYPERCALL_CODE        0x0002
+#define HV_STATUS_INVALID_PARAMETER             0x0005
 
-/* Viridian Hypercall Codes and Parameters. */
-#define HvNotifyLongSpinWait    8
+/* Viridian Hypercall Codes. */
+#define HvFlushVirtualAddressSpace 2
+#define HvFlushVirtualAddressList  3
+#define HvNotifyLongSpinWait       8
+
+/* Viridian Hypercall Flags. */
+#define HV_FLUSH_ALL_PROCESSORS 1
 
 /* Viridian CPUID 4000003, Viridian MSR availability. */
 #define CPUID3A_MSR_TIME_REF_COUNT (1 << 1)
@@ -46,8 +52,9 @@
 #define CPUID3A_MSR_FREQ           (1 << 11)
 
 /* Viridian CPUID 4000004, Implementation Recommendations. */
-#define CPUID4A_MSR_BASED_APIC  (1 << 3)
-#define CPUID4A_RELAX_TIMER_INT (1 << 5)
+#define CPUID4A_HCALL_REMOTE_TLB_FLUSH (1 << 2)
+#define CPUID4A_MSR_BASED_APIC         (1 << 3)
+#define CPUID4A_RELAX_TIMER_INT        (1 << 5)
 
 /* Viridian CPUID 4000006, Implementation HW features detected and in use. */
 #define CPUID6A_APIC_OVERLAY    (1 << 0)
@@ -107,6 +114,8 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
              (d->arch.hvm_domain.viridian.guest_os_id.fields.os < 4) )
             break;
         *eax = CPUID4A_RELAX_TIMER_INT;
+        if ( viridian_feature_mask(d) & HVMPV_hcall_remote_tlb_flush )
+            *eax |= CPUID4A_HCALL_REMOTE_TLB_FLUSH;
         if ( !cpu_has_vmx_apic_reg_virt )
             *eax |= CPUID4A_MSR_BASED_APIC;
         *ebx = 2047; /* long spin count */
@@ -512,9 +521,22 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
     return 1;
 }
 
+int viridian_vcpu_init(struct vcpu *v)
+{
+    return alloc_cpumask_var(&v->arch.hvm_vcpu.viridian.flush_cpumask) ?
+           0 : -ENOMEM;
+}
+
+void viridian_vcpu_deinit(struct vcpu *v)
+{
+    free_cpumask_var(v->arch.hvm_vcpu.viridian.flush_cpumask);
+}
+
 int viridian_hypercall(struct cpu_user_regs *regs)
 {
-    int mode = hvm_guest_x86_mode(current);
+    struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
+    int mode = hvm_guest_x86_mode(curr);
     unsigned long input_params_gpa, output_params_gpa;
     uint16_t status = HV_STATUS_SUCCESS;
 
@@ -522,11 +544,12 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         uint64_t raw;
         struct {
             uint16_t call_code;
-            uint16_t rsvd1;
-            unsigned rep_count:12;
-            unsigned rsvd2:4;
-            unsigned rep_start:12;
-            unsigned rsvd3:4;
+            uint16_t fast:1;
+            uint16_t rsvd1:15;
+            uint16_t rep_count:12;
+            uint16_t rsvd2:4;
+            uint16_t rep_start:12;
+            uint16_t rsvd3:4;
         };
     } input;
 
@@ -535,12 +558,12 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         struct {
             uint16_t result;
             uint16_t rsvd1;
-            unsigned rep_complete:12;
-            unsigned rsvd2:20;
+            uint32_t rep_complete:12;
+            uint32_t rsvd2:20;
         };
     } output = { 0 };
 
-    ASSERT(is_viridian_domain(current->domain));
+    ASSERT(is_viridian_domain(currd));
 
     switch ( mode )
     {
@@ -561,10 +584,84 @@ int viridian_hypercall(struct cpu_user_regs *regs)
     switch ( input.call_code )
     {
     case HvNotifyLongSpinWait:
+        /*
+         * See Microsoft Hypervisor Top Level Spec. section 18.5.1.
+         */
         perfc_incr(mshv_call_long_wait);
         do_sched_op(SCHEDOP_yield, guest_handle_from_ptr(NULL, void));
         status = HV_STATUS_SUCCESS;
         break;
+
+    case HvFlushVirtualAddressSpace:
+    case HvFlushVirtualAddressList:
+    {
+        cpumask_t *pcpu_mask;
+        struct vcpu *v;
+        struct {
+            uint64_t address_space;
+            uint64_t flags;
+            uint64_t vcpu_mask;
+        } input_params;
+
+        /*
+         * See Microsoft Hypervisor Top Level Spec. sections 12.4.2
+         * and 12.4.3.
+         */
+        perfc_incr(mshv_flush);
+
+        /* These hypercalls should never use the fast-call convention. */
+        status = HV_STATUS_INVALID_PARAMETER;
+        if ( input.fast )
+            break;
+
+        /* Get input parameters. */
+        if ( hvm_copy_from_guest_phys(&input_params, input_params_gpa,
+                                      sizeof(input_params)) != HVMCOPY_okay )
+            break;
+
+        /*
+         * It is not clear from the spec. if we are supposed to
+         * include current virtual CPU in the set or not in this case,
+         * so err on the safe side.
+         */
+        if ( input_params.flags & HV_FLUSH_ALL_PROCESSORS )
+            input_params.vcpu_mask = ~0ul;
+
+        pcpu_mask = curr->arch.hvm_vcpu.viridian.flush_cpumask;
+        cpumask_clear(pcpu_mask);
+
+        /*
+         * For each specified virtual CPU flush all ASIDs to invalidate
+         * TLB entries the next time it is scheduled and then, if it
+         * is currently running, add its physical CPU to a mask of
+         * those which need to be interrupted to force a flush.
+         */
+        for_each_vcpu ( currd, v )
+        {
+            if ( v->vcpu_id >= (sizeof(input_params.vcpu_mask) * 8) )
+                break;
+
+            if ( !(input_params.vcpu_mask & (1ul << v->vcpu_id)) )
+                continue;
+
+            hvm_asid_flush_vcpu(v);
+            if ( v->is_running )
+                __cpumask_set_cpu(v->processor, pcpu_mask);
+        }
+
+        /*
+         * Since ASIDs have now been flushed it just remains to
+         * force any CPUs currently running target vCPUs out of non-
+         * root mode. It's possible that re-scheduling has taken place
+         * so we may unnecessarily IPI some CPUs.
+         */
+        if ( !cpumask_empty(pcpu_mask) )
+            flush_tlb_mask(pcpu_mask);
+
+        status = HV_STATUS_SUCCESS;
+        break;
+    }
+
     default:
         status = HV_STATUS_INVALID_HYPERCALL_CODE;
         break;

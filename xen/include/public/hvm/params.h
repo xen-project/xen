@@ -98,11 +98,16 @@
 #define _HVMPV_reference_tsc 3
 #define HVMPV_reference_tsc  (1 << _HVMPV_reference_tsc)
 
+/* Use Hypercall for remote TLB flush */
+#define _HVMPV_hcall_remote_tlb_flush 4
+#define HVMPV_hcall_remote_tlb_flush (1 << _HVMPV_hcall_remote_tlb_flush)
+
 #define HVMPV_feature_mask \
-	(HVMPV_base_freq | \
-	 HVMPV_no_freq | \
-	 HVMPV_time_ref_count | \
-	 HVMPV_reference_tsc)
+        (HVMPV_base_freq | \
+         HVMPV_no_freq | \
+         HVMPV_time_ref_count | \
+         HVMPV_reference_tsc | \
+         HVMPV_hcall_remote_tlb_flush)
 
 #endif
 

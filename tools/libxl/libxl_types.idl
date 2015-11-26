@@ -219,6 +219,7 @@ libxl_viridian_enlightenment = Enumeration("viridian_enlightenment", [
     (1, "freq"),
     (2, "time_ref_count"),
     (3, "reference_tsc"),
+    (4, "hcall_remote_tlb_flush"),
     ])
 
 libxl_hdtype = Enumeration("hdtype", [

@@ -251,6 +251,9 @@ static int hvm_set_viridian_features(libxl__gc *gc, uint32_t domid,
     if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_REFERENCE_TSC))
         mask |= HVMPV_reference_tsc;
 
+    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_HCALL_REMOTE_TLB_FLUSH))
+        mask |= HVMPV_hcall_remote_tlb_flush;
+
     if (mask != 0 &&
         xc_hvm_param_set(CTX->xch,
                          domid,
