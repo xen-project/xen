@@ -988,6 +988,9 @@ static void set_x2apic_id(struct vlapic *vlapic)
 
 bool_t vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
 {
+    if ( !has_vlapic(vlapic_domain(vlapic)) )
+        return 0;
+
     if ( (vlapic->hw.apic_base_msr ^ value) & MSR_IA32_APICBASE_ENABLE )
     {
         if ( unlikely(value & MSR_IA32_APICBASE_EXTD) )
@@ -1200,6 +1203,9 @@ void vlapic_reset(struct vlapic *vlapic)
     struct vcpu *v = vlapic_vcpu(vlapic);
     int i;
 
+    if ( !has_vlapic(v->domain) )
+        return;
+
     vlapic_set_reg(vlapic, APIC_ID,  (v->vcpu_id * 2) << 24);
     vlapic_set_reg(vlapic, APIC_LVR, VLAPIC_VERSION);
 
@@ -1265,6 +1271,9 @@ static int lapic_save_hidden(struct domain *d, hvm_domain_context_t *h)
     struct vlapic *s;
     int rc = 0;
 
+    if ( !has_vlapic(d) )
+        return 0;
+
     for_each_vcpu ( d, v )
     {
         s = vcpu_vlapic(v);
@@ -1280,6 +1289,9 @@ static int lapic_save_regs(struct domain *d, hvm_domain_context_t *h)
     struct vcpu *v;
     struct vlapic *s;
     int rc = 0;
+
+    if ( !has_vlapic(d) )
+        return 0;
 
     for_each_vcpu ( d, v )
     {
@@ -1328,7 +1340,10 @@ static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
     uint16_t vcpuid;
     struct vcpu *v;
     struct vlapic *s;
-    
+
+    if ( !has_vlapic(d) )
+        return -ENODEV;
+
     /* Which vlapic to load? */
     vcpuid = hvm_load_instance(h); 
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
@@ -1360,7 +1375,10 @@ static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
     uint16_t vcpuid;
     struct vcpu *v;
     struct vlapic *s;
-    
+
+    if ( !has_vlapic(d) )
+        return -ENODEV;
+
     /* Which vlapic to load? */
     vcpuid = hvm_load_instance(h); 
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
@@ -1399,7 +1417,7 @@ int vlapic_init(struct vcpu *v)
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "%d", v->vcpu_id);
 
-    if ( is_pvh_vcpu(v) )
+    if ( !has_vlapic(v->domain) )
     {
         vlapic->hw.disabled = VLAPIC_HW_DISABLED;
         return 0;
@@ -1451,6 +1469,9 @@ int vlapic_init(struct vcpu *v)
 void vlapic_destroy(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
+
+    if ( !has_vlapic(v->domain) )
+        return;
 
     tasklet_kill(&vlapic->init_sipi.tasklet);
     TRACE_0D(TRC_HVM_EMUL_LAPIC_STOP_TIMER);

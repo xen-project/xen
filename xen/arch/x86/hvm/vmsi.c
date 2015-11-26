@@ -391,6 +391,9 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
     ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
+    if ( !has_vlapic(d) )
+        return -ENODEV;
+
     /*
      * xmalloc() with irq_disabled causes the failure of check_lock() 
      * for xenpool->lock. So we allocate an entry beforehand.
@@ -446,6 +449,9 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
     ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
+    if ( !has_vlapic(d) )
+        return;
+
     irq_desc = pirq_spin_lock_irq_desc(pirq, NULL);
     if ( !irq_desc )
         return;
@@ -482,6 +488,9 @@ found:
 
 void msixtbl_init(struct domain *d)
 {
+    if ( !has_vlapic(d) )
+        return;
+
     INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);
     spin_lock_init(&d->arch.hvm_domain.msixtbl_list_lock);
 
@@ -492,6 +501,9 @@ void msixtbl_pt_cleanup(struct domain *d)
 {
     struct msixtbl_entry *entry, *temp;
     unsigned long flags;
+
+    if ( !has_vlapic(d) )
+        return;
 
     /* msixtbl_list_lock must be acquired with irq_disabled for check_lock() */
     local_irq_save(flags); 

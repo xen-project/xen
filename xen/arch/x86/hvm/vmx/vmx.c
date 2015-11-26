@@ -89,6 +89,9 @@ static int vmx_domain_initialise(struct domain *d)
 {
     int rc;
 
+    if ( !has_vlapic(d) )
+        return 0;
+
     if ( (rc = vmx_alloc_vlapic_mapping(d)) != 0 )
         return rc;
 
@@ -97,6 +100,9 @@ static int vmx_domain_initialise(struct domain *d)
 
 static void vmx_domain_destroy(struct domain *d)
 {
+    if ( !has_vlapic(d) )
+        return;
+
     vmx_free_vlapic_mapping(d);
 }
 

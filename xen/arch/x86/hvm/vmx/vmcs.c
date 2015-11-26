@@ -1035,7 +1035,7 @@ static int construct_vmcs(struct vcpu *v)
         ~(SECONDARY_EXEC_ENABLE_VM_FUNCTIONS |
           SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS);
 
-    if ( is_pvh_domain(d) )
+    if ( !has_vlapic(d) )
     {
         /* Disable virtual apics, TPR */
         v->arch.hvm_vmx.secondary_exec_control &=
@@ -1047,7 +1047,10 @@ static int construct_vmcs(struct vcpu *v)
         /* In turn, disable posted interrupts. */
         __vmwrite(PIN_BASED_VM_EXEC_CONTROL,
                   vmx_pin_based_exec_control & ~PIN_BASED_POSTED_INTERRUPT);
+    }
 
+    if ( is_pvh_domain(d) )
+    {
         /* Unrestricted guest (real mode for EPT) */
         v->arch.hvm_vmx.secondary_exec_control &=
             ~SECONDARY_EXEC_UNRESTRICTED_GUEST;
