@@ -105,7 +105,7 @@ include Makefile
 DEPS = .*.d
 define gendep
     ifneq ($(1),$(subst /,:,$(1)))
-        DEPS += $(dir $(1)).$(basename $(notdir $(1))).d
+        DEPS += $(dir $(1)).$(notdir $(1)).d
     endif
 endef
 $(foreach o,$(filter-out %/,$(obj-y)),$(eval $(call gendep,$(o))))
