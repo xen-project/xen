@@ -125,17 +125,15 @@ static int __init mpf_checksum(unsigned char *mp, int len)
 
 /* Return xen's logical cpu_id of the new added cpu or <0 if error */
 static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
-					 u32 apicidx, bool_t hotplug)
+					 u32 apicid, bool_t hotplug)
 {
- 	int ver, apicid, cpu = 0;
+ 	int ver, cpu = 0;
  	
 	if (!(m->mpc_cpuflag & CPU_ENABLED)) {
 		if (!hotplug)
 			++disabled_cpus;
 		return -EINVAL;
 	}
-
-	apicid = mpc_apic_id(m, apicidx);
 
 	if (m->mpc_cpuflag & CPU_BOOTPROCESSOR) {
 		Dprintk("    Bootup CPU\n");
@@ -340,11 +338,24 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 			{
 				struct mpc_config_processor *m=
 					(struct mpc_config_processor *)mpt;
-				/* ACPI may have already provided this data */
-				if (!acpi_lapic)
-					MP_processor_info(m);
+
 				mpt += sizeof(*m);
 				count += sizeof(*m);
+
+				/* ACPI may have already provided this data. */
+				if (acpi_lapic)
+					break;
+
+				printk("Processor #%02x %u:%u APIC version %u%s\n",
+				       m->mpc_apicid,
+				       MASK_EXTR(m->mpc_cpufeature,
+						 CPU_FAMILY_MASK),
+				       MASK_EXTR(m->mpc_cpufeature,
+						 CPU_MODEL_MASK),
+				       m->mpc_apicver,
+				       m->mpc_cpuflag & CPU_ENABLED
+				       ? "" : " [disabled]");
+				MP_processor_info(m);
 				break;
 			}
 			case MP_BUS:
@@ -781,29 +792,21 @@ int __devinit mp_register_lapic (
 	bool_t			enabled,
 	bool_t			hotplug)
 {
-	struct mpc_config_processor processor;
-	int			boot_cpu = 0;
+	struct mpc_config_processor processor = {
+		.mpc_type = MP_PROCESSOR,
+		/* Note: We don't fill in fields not consumed anywhere. */
+		.mpc_apicid = id,
+		.mpc_apicver = GET_APIC_VERSION(apic_read(APIC_LVR)),
+		.mpc_cpuflag = (enabled ? CPU_ENABLED : 0) |
+			       (id == boot_cpu_physical_apicid ?
+				CPU_BOOTPROCESSOR : 0),
+	};
 	
 	if (MAX_APICS <= id) {
 		printk(KERN_WARNING "Processor #%d invalid (max %d)\n",
 			id, MAX_APICS);
 		return -EINVAL;
 	}
-
-	if (id == boot_cpu_physical_apicid)
-		boot_cpu = 1;
-
-	processor.mpc_type = MP_PROCESSOR;
-	processor.mpc_apicid = id;
-	processor.mpc_apicver = GET_APIC_VERSION(apic_read(APIC_LVR));
-	processor.mpc_cpuflag = (enabled ? CPU_ENABLED : 0);
-	processor.mpc_cpuflag |= (boot_cpu ? CPU_BOOTPROCESSOR : 0);
-	processor.mpc_cpufeature = (boot_cpu_data.x86 << 8) | 
-		(boot_cpu_data.x86_model << 4) | boot_cpu_data.x86_mask;
-	processor.mpc_featureflag
-            = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_FPU)];
-	processor.mpc_reserved[0] = 0;
-	processor.mpc_reserved[1] = 0;
 
 	return MP_processor_info_x(&processor, id, hotplug);
 }
