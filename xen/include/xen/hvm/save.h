@@ -64,7 +64,12 @@ void _hvm_read_entry(struct hvm_domain_context *h,
         = (struct hvm_save_descriptor *)&(_h)->data[(_h)->cur];         \
     if ( (r = _hvm_check_entry((_h), HVM_SAVE_CODE(_x),                 \
                HVM_SAVE_LENGTH(_x), (_strict))) == 0 )                  \
+    {                                                                   \
         _hvm_read_entry((_h), (_dst), HVM_SAVE_LENGTH(_x));             \
+        if ( HVM_SAVE_HAS_COMPAT(_x) &&                                 \
+             desc->length != HVM_SAVE_LENGTH(_x) )                      \
+            r = HVM_SAVE_FIX_COMPAT(_x, (_dst), desc->length);          \
+    }                                                                   \
     else if (HVM_SAVE_HAS_COMPAT(_x)                                    \
              && (r = _hvm_check_entry((_h), HVM_SAVE_CODE(_x),          \
                        HVM_SAVE_LENGTH_COMPAT(_x), (_strict))) == 0 ) { \
