@@ -407,6 +407,11 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
                                                          c->cpu_core_id);
 }
 
+static void early_init_amd(struct cpuinfo_x86 *c)
+{
+	set_cpuidmask(c);
+}
+
 static void init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
@@ -595,14 +600,13 @@ static void init_amd(struct cpuinfo_x86 *c)
 	if ((smp_processor_id() == 1) && !cpu_has(c, X86_FEATURE_ITSC))
 		disable_c1_ramping();
 
-	set_cpuidmask(c);
-
 	check_syscfg_dram_mod_en();
 }
 
 static const struct cpu_dev amd_cpu_dev = {
 	.c_vendor	= "AMD",
 	.c_ident 	= { "AuthenticAMD" },
+	.c_early_init	= early_init_amd,
 	.c_init		= init_amd,
 };
 

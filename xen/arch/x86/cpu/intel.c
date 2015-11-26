@@ -189,6 +189,23 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 	if (boot_cpu_data.x86 == 0xF && boot_cpu_data.x86_model == 3 &&
 	    (boot_cpu_data.x86_mask == 3 || boot_cpu_data.x86_mask == 4))
 		paddr_bits = 36;
+
+	if (c == &boot_cpu_data && c->x86 == 6) {
+		if (probe_intel_cpuid_faulting())
+			__set_bit(X86_FEATURE_CPUID_FAULTING,
+				  c->x86_capability);
+	} else if (boot_cpu_has(X86_FEATURE_CPUID_FAULTING)) {
+		BUG_ON(!probe_intel_cpuid_faulting());
+		__set_bit(X86_FEATURE_CPUID_FAULTING, c->x86_capability);
+	}
+
+	if (!cpu_has_cpuid_faulting)
+		set_cpuidmask(c);
+	else if ((c == &boot_cpu_data) &&
+		 (~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
+		    opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx &
+		    opt_cpuid_mask_xsave_eax)))
+		printk("No CPUID feature masking support available\n");
 }
 
 /*
@@ -257,23 +274,6 @@ static void init_intel(struct cpuinfo_x86 *c)
 		c->x86_max_cores = num_cpu_cores(c);
 		detect_ht(c);
 	}
-
-	if (c == &boot_cpu_data && c->x86 == 6) {
-		if (probe_intel_cpuid_faulting())
-			__set_bit(X86_FEATURE_CPUID_FAULTING,
-				  c->x86_capability);
-	} else if (boot_cpu_has(X86_FEATURE_CPUID_FAULTING)) {
-		BUG_ON(!probe_intel_cpuid_faulting());
-		__set_bit(X86_FEATURE_CPUID_FAULTING, c->x86_capability);
-	}
-
-	if (!cpu_has_cpuid_faulting)
-		set_cpuidmask(c);
-	else if ((c == &boot_cpu_data) &&
-		 (~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
-		    opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx &
-		    opt_cpuid_mask_xsave_eax)))
-		printk("No CPUID feature masking support available\n");
 
 	/* Work around errata */
 	Intel_errata_workarounds(c);
