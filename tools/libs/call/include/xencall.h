@@ -46,6 +46,21 @@ int xencall_close(xencall_handle *xcall);
 
 /*
  * Call hypercalls with varying numbers of arguments.
+ *
+ * On success the return value of the hypercall is the return value of
+ * the xencall function.  On error these functions set errno and
+ * return -1.
+ *
+ * The errno values will be either:
+ * - The Xen hypercall error return (from xen/include/public/errno.h)
+ *   translated into the corresponding local value for that POSIX error.
+ * - An errno value produced by the OS driver or the library
+ *   implementation. Such values may be defined by POSIX or by the OS.
+ *
+ * Note that under some circumstances it will not be possible to tell
+ * whether an error came from Xen or from the OS/library.
+ *
+ * These functions never log.
  */
 int xencall0(xencall_handle *xcall, unsigned int op);
 int xencall1(xencall_handle *xcall, unsigned int op,
