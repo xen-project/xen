@@ -84,6 +84,7 @@
 #define cpu_has_monitor		boot_cpu_has(X86_FEATURE_MONITOR)
 #define cpu_has_eist		boot_cpu_has(X86_FEATURE_EIST)
 #define cpu_has_hypervisor	boot_cpu_has(X86_FEATURE_HYPERVISOR)
+#define cpu_has_cmp_legacy	boot_cpu_has(X86_FEATURE_CMP_LEGACY)
 
 enum _cache_type {
     CACHE_TYPE_NULL = 0,

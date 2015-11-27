@@ -36,6 +36,7 @@
 #include <asm/xstate.h>
 #include <asm/debugger.h>
 #include <asm/psr.h>
+#include <asm/cpuid.h>
 
 static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 {
@@ -87,6 +88,143 @@ static void update_domain_cpuid_info(struct domain *d,
         d->arch.x86_model = (ctl->eax >> 4) & 0xf;
         if ( d->arch.x86 >= 0x6 )
             d->arch.x86_model |= (ctl->eax >> 12) & 0xf0;
+
+        if ( is_pv_domain(d) && ((levelling_caps & LCAP_1cd) == LCAP_1cd) )
+        {
+            uint64_t mask = cpuidmask_defaults._1cd;
+            uint32_t ecx = ctl->ecx & pv_featureset[FEATURESET_1c];
+            uint32_t edx = ctl->edx & pv_featureset[FEATURESET_1d];
+
+            /*
+             * Must expose hosts HTT and X2APIC value so a guest using native
+             * CPUID can correctly interpret other leaves which cannot be
+             * masked.
+             */
+            if ( cpu_has_x2apic )
+                ecx |= cpufeat_mask(X86_FEATURE_X2APIC);
+            if ( cpu_has_htt )
+                edx |= cpufeat_mask(X86_FEATURE_HTT);
+
+            switch ( boot_cpu_data.x86_vendor )
+            {
+            case X86_VENDOR_INTEL:
+                /*
+                 * Intel masking MSRs are documented as AND masks.
+                 * Experimentally, they are applied before OSXSAVE and APIC
+                 * are fast-forwarded from real hardware state.
+                 */
+                mask &= ((uint64_t)edx << 32) | ecx;
+                break;
+
+            case X86_VENDOR_AMD:
+                mask &= ((uint64_t)ecx << 32) | edx;
+
+                /*
+                 * AMD masking MSRs are documented as overrides.
+                 * Experimentally, fast-forwarding of the OSXSAVE and APIC
+                 * bits from real hardware state only occurs if the MSR has
+                 * the respective bits set.
+                 */
+                if ( ecx & cpufeat_mask(X86_FEATURE_XSAVE) )
+                    ecx = cpufeat_mask(X86_FEATURE_OSXSAVE);
+                else
+                    ecx = 0;
+                edx = cpufeat_mask(X86_FEATURE_APIC);
+
+                mask |= ((uint64_t)ecx << 32) | edx;
+                break;
+            }
+
+            d->arch.pv_domain.cpuidmasks->_1cd = mask;
+        }
+        break;
+
+    case 6:
+        if ( is_pv_domain(d) && ((levelling_caps & LCAP_6c) == LCAP_6c) )
+        {
+            uint64_t mask = cpuidmask_defaults._6c;
+
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+                mask &= (~0ULL << 32) | ctl->ecx;
+
+            d->arch.pv_domain.cpuidmasks->_6c = mask;
+        }
+        break;
+
+    case 7:
+        if ( ctl->input[1] != 0 )
+            break;
+
+        if ( is_pv_domain(d) && ((levelling_caps & LCAP_7ab0) == LCAP_7ab0) )
+        {
+            uint64_t mask = cpuidmask_defaults._7ab0;
+            uint32_t eax = ctl->eax;
+            uint32_t ebx = ctl->ebx & pv_featureset[FEATURESET_7b0];
+
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+                mask &= ((uint64_t)eax << 32) | ebx;
+
+            d->arch.pv_domain.cpuidmasks->_7ab0 = mask;
+        }
+        break;
+
+    case 0xd:
+        if ( ctl->input[1] != 1 )
+            break;
+
+        if ( is_pv_domain(d) && ((levelling_caps & LCAP_Da1) == LCAP_Da1) )
+        {
+            uint64_t mask = cpuidmask_defaults.Da1;
+            uint32_t eax = ctl->eax & pv_featureset[FEATURESET_Da1];
+
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+                mask &= (~0ULL << 32) | eax;
+
+            d->arch.pv_domain.cpuidmasks->Da1 = mask;
+        }
+        break;
+
+    case 0x80000001:
+        if ( is_pv_domain(d) && ((levelling_caps & LCAP_e1cd) == LCAP_e1cd) )
+        {
+            uint64_t mask = cpuidmask_defaults.e1cd;
+            uint32_t ecx = ctl->ecx & pv_featureset[FEATURESET_e1c];
+            uint32_t edx = ctl->edx & pv_featureset[FEATURESET_e1d];
+
+            /*
+             * Must expose hosts CMP_LEGACY value so a guest using native
+             * CPUID can correctly interpret other leaves which cannot be
+             * masked.
+             */
+            if ( cpu_has_cmp_legacy )
+                ecx |= cpufeat_mask(X86_FEATURE_CMP_LEGACY);
+
+            /* If not emulating AMD, clear the duplicated features in e1d. */
+            if ( d->arch.x86_vendor != X86_VENDOR_AMD )
+                edx &= ~CPUID_COMMON_1D_FEATURES;
+
+            switch ( boot_cpu_data.x86_vendor )
+            {
+            case X86_VENDOR_INTEL:
+                mask &= ((uint64_t)edx << 32) | ecx;
+                break;
+
+            case X86_VENDOR_AMD:
+                mask &= ((uint64_t)ecx << 32) | edx;
+
+                /*
+                 * Fast-forward bits - Must be set in the masking MSR for
+                 * fast-forwarding to occur in hardware.
+                 */
+                ecx = 0;
+                edx = cpufeat_mask(X86_FEATURE_APIC);
+
+                mask |= ((uint64_t)ecx << 32) | edx;
+                break;
+            }
+
+            d->arch.pv_domain.cpuidmasks->e1cd = mask;
+        }
         break;
     }
 }
