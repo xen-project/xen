@@ -80,10 +80,28 @@ int xenforeignmemory_close(xenforeignmemory_handle *fmem);
  *
  * prot is as for mmap(2).
  *
- * Can partially succeed. When a page cannot be mapped, its respective
- * field in @err is set to the corresponding errno value.
+ * @arr is an array of @pages gfns to be mapped linearly in the local
+ * address range. @err is an (optional) output array used to report
+ * per-page errors, as errno values.
  *
- * Returns NULL if no pages can be mapped.
+ * If @err is given (is non-NULL) then the mapping may partially
+ * succeed and return a valid pointer while also using @err to
+ * indicate the success (0) or failure (errno value) of the individual
+ * pages. The global errno thread local variable is not valid in this
+ * case.
+ *
+ * If @err is not given (is NULL) then on failure to map any page any
+ * successful mappings will be undone and NULL will be returned. errno
+ * will be set to correspond to the first failure (which may not be
+ * the most critical).
+ *
+ * It is also possible to return NULL due to a complete failure,
+ * i.e. failure to even attempt the mapping, in this case the global
+ * errno will have been set and the contents of @err (if given) is
+ * invalid.
+ *
+ * Note that it is also possible to return non-NULL with the contents
+ * of @err indicating failure to map every page.
  */
 void *xenforeignmemory_map(xenforeignmemory_handle *fmem, uint32_t dom,
                            int prot, const xen_pfn_t *arr, int *err,

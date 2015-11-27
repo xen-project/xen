@@ -23,32 +23,12 @@
 void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
                            const xen_pfn_t *arr, int num)
 {
-    void *res;
-    int i, *err;
-
     if (num < 0) {
         errno = EINVAL;
         return NULL;
     }
 
-    err = malloc(num * sizeof(*err));
-    if (!err)
-        return NULL;
-
-    res = xenforeignmemory_map(xch->fmem, dom, prot, arr, err, num);
-    if (res) {
-        for (i = 0; i < num; i++) {
-            if (err[i]) {
-                errno = -err[i];
-                munmap(res, num * PAGE_SIZE);
-                res = NULL;
-                break;
-            }
-        }
-    }
-
-    free(err);
-    return res;
+    return xenforeignmemory_map(xch->fmem, dom, prot, arr, NULL, num);
 }
 
 void *xc_map_foreign_range(xc_interface *xch,
