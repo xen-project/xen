@@ -519,7 +519,7 @@ int xc_flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
     return flush_mmu_updates(xch, mmu);
 }
 
-int do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len)
+long do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len)
 {
     DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(arg, len, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
