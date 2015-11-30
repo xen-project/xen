@@ -226,10 +226,8 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 	/* Initialize the standard set of capabilities */
 	/* Note that the vendor-specific code below might override */
 
-	/* Intel-defined flags: level 0x00000001 */
+	/* Model and family information. */
 	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
-	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = edx;
-	c->x86_capability[cpufeat_word(X86_FEATURE_XMM3)] = ecx;
 	c->x86 = (eax >> 8) & 15;
 	c->x86_model = (eax >> 4) & 15;
 	if (c->x86 == 0xf)
@@ -239,6 +237,16 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 	c->x86_mask = eax & 15;
 	c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
 	c->phys_proc_id = c->apicid;
+
+	if (this_cpu->c_early_init)
+		this_cpu->c_early_init(c);
+
+	/* c_early_init() may have adjusted cpuid levels/features.  Reread. */
+	c->cpuid_level = cpuid_eax(0);
+	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
+	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = edx;
+	c->x86_capability[cpufeat_word(X86_FEATURE_XMM3)] = ecx;
+
 	if ( cpu_has(c, X86_FEATURE_CLFLSH) )
 		c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
 
@@ -257,9 +265,6 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 		if ( c->extended_cpuid_level >= 0x80000004 )
 			get_model_name(c); /* Default name */
 	}
-
-	/* Might lift BIOS max_leaf=3 limit. */
-	early_intel_workaround(c);
 
 	/* Intel-defined flags: level 0x00000007 */
 	if ( c->cpuid_level >= 0x00000007 )

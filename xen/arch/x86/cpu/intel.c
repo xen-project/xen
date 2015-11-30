@@ -156,10 +156,8 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 	}
 }
 
-void __devinit early_intel_workaround(struct cpuinfo_x86 *c)
+static void early_init_intel(struct cpuinfo_x86 *c)
 {
-	if (c->x86_vendor != X86_VENDOR_INTEL)
-		return;
 	/* Netburst reports 64 bytes clflush size, but does IO in 128 bytes */
 	if (c->x86 == 15 && c->x86_cache_alignment == 64)
 		c->x86_cache_alignment = 128;
@@ -290,6 +288,7 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 static const struct cpu_dev intel_cpu_dev = {
 	.c_vendor	= "Intel",
 	.c_ident 	= { "GenuineIntel" },
+	.c_early_init	= early_init_intel,
 	.c_init		= init_intel,
 };
 
