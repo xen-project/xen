@@ -318,7 +318,7 @@ static int process_page_data(struct xc_sr_context *ctx, unsigned count,
 
     mapping = guest_page = xenforeignmemory_map(xch->fmem,
         ctx->domid, PROT_READ | PROT_WRITE,
-        mfns, map_errs, nr_pages);
+        nr_pages, mfns, map_errs);
     if ( !mapping )
     {
         rc = -1;

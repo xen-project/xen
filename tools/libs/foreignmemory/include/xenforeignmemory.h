@@ -104,8 +104,8 @@ int xenforeignmemory_close(xenforeignmemory_handle *fmem);
  * of @err indicating failure to map every page.
  */
 void *xenforeignmemory_map(xenforeignmemory_handle *fmem, uint32_t dom,
-                           int prot, const xen_pfn_t *arr, int *err,
-                           size_t pages);
+                           int prot, size_t pages,
+                           const xen_pfn_t arr[/*pages*/], int err[/*pages*/]);
 
 /*
  * Unmap a mapping previous created with xenforeignmemory_map().

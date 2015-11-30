@@ -22,8 +22,8 @@
 #include "private.h"
 
 void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
-                                 uint32_t dom, int prot,
-                                 const xen_pfn_t *arr, int *err, size_t num)
+                                 uint32_t dom, int prot, size_t num,
+                                 const xen_pfn_t arr[/*num*/], int err[/*num*/])
 {
     xen_pfn_t *pfn;
     unsigned int i;

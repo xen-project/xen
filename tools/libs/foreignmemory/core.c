@@ -64,7 +64,8 @@ int xenforeignmemory_close(xenforeignmemory_handle *fmem)
 
 void *xenforeignmemory_map(xenforeignmemory_handle *fmem,
                            uint32_t dom, int prot,
-                           const xen_pfn_t *arr, int *err, size_t num)
+                           size_t num,
+                           const xen_pfn_t arr[/*num*/], int err[/*num*/])
 {
     void *ret;
     int *err_to_free = NULL;
@@ -75,7 +76,7 @@ void *xenforeignmemory_map(xenforeignmemory_handle *fmem,
     if ( err == NULL )
         return NULL;
 
-    ret = osdep_xenforeignmemory_map(fmem, dom, prot, arr, err, num);
+    ret = osdep_xenforeignmemory_map(fmem, dom, prot, num, arr, err);
 
     if ( ret == 0 && err_to_free )
     {

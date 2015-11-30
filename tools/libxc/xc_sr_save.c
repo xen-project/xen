@@ -154,7 +154,7 @@ static int write_batch(struct xc_sr_context *ctx)
     if ( nr_pages > 0 )
     {
         guest_mapping = xenforeignmemory_map(xch->fmem,
-            ctx->domid, PROT_READ, mfns, errors, nr_pages);
+            ctx->domid, PROT_READ, nr_pages, mfns, errors);
         if ( !guest_mapping )
         {
             PERROR("Failed to map guest pages");

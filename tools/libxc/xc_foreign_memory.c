@@ -28,7 +28,7 @@ void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
         return NULL;
     }
 
-    return xenforeignmemory_map(xch->fmem, dom, prot, arr, NULL, num);
+    return xenforeignmemory_map(xch->fmem, dom, prot, num, arr, NULL);
 }
 
 void *xc_map_foreign_range(xc_interface *xch,
@@ -84,7 +84,7 @@ void *xc_map_foreign_ranges(xc_interface *xch,
 void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
                           const xen_pfn_t *arr, int *err, unsigned int num)
 {
-    return xenforeignmemory_map(xch->fmem, dom, prot, arr, err, num);
+    return xenforeignmemory_map(xch->fmem, dom, prot, num, arr, err);
 }
 
 /*
