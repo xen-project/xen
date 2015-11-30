@@ -283,7 +283,7 @@ int i8259A_suspend(void)
     return 0;
 }
 
-void __devinit init_8259A(int auto_eoi)
+void init_8259A(int auto_eoi)
 {
     unsigned long flags;
 

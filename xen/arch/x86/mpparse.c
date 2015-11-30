@@ -124,8 +124,8 @@ static int __init mpf_checksum(unsigned char *mp, int len)
 }
 
 /* Return xen's logical cpu_id of the new added cpu or <0 if error */
-static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
-					 u32 apicid, bool_t hotplug)
+static int MP_processor_info_x(struct mpc_config_processor *m,
+			       u32 apicid, bool_t hotplug)
 {
  	int ver, cpu = 0;
  	
@@ -190,7 +190,7 @@ static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
 	return cpu;
 }
 
-static int __devinit MP_processor_info(struct mpc_config_processor *m)
+static int MP_processor_info(struct mpc_config_processor *m)
 {
 	return MP_processor_info_x(m, m->mpc_apicid, 0);
 }
@@ -787,7 +787,7 @@ void __init mp_register_lapic_address (
 }
 
 
-int __devinit mp_register_lapic (
+int mp_register_lapic (
 	u32			id,
 	bool_t			enabled,
 	bool_t			hotplug)

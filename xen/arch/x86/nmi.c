@@ -254,14 +254,12 @@ void release_lapic_nmi(void)
         enable_lapic_nmi_watchdog();
 }
 
-#define __pminit __devinit
-
 /*
  * Activate the NMI watchdog via the local APIC.
  * Original code written by Keith Owens.
  */
 
-static void __pminit clear_msr_range(unsigned int base, unsigned int n)
+static void clear_msr_range(unsigned int base, unsigned int n)
 {
     unsigned int i;
 
@@ -279,7 +277,7 @@ static inline void write_watchdog_counter(const char *descr)
     wrmsrl(nmi_perfctr_msr, 0 - count);
 }
 
-static void __pminit setup_k7_watchdog(void)
+static void setup_k7_watchdog(void)
 {
     unsigned int evntsel;
 
@@ -300,7 +298,7 @@ static void __pminit setup_k7_watchdog(void)
     wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
 }
 
-static void __pminit setup_p6_watchdog(unsigned counter)
+static void setup_p6_watchdog(unsigned counter)
 {
     unsigned int evntsel;
 
@@ -321,7 +319,7 @@ static void __pminit setup_p6_watchdog(unsigned counter)
     wrmsr(MSR_P6_EVNTSEL(0), evntsel, 0);
 }
 
-static int __pminit setup_p4_watchdog(void)
+static int setup_p4_watchdog(void)
 {
     uint64_t misc_enable;
 
@@ -359,7 +357,7 @@ static int __pminit setup_p4_watchdog(void)
     return 1;
 }
 
-void __pminit setup_apic_nmi_watchdog(void)
+void setup_apic_nmi_watchdog(void)
 {
     if ( nmi_watchdog == NMI_NONE )
         return;

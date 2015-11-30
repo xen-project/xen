@@ -118,11 +118,9 @@ extern struct kernel_param __setup_start, __setup_end;
 #endif /* __ASSEMBLY__ */
 
 #ifdef CONFIG_HOTPLUG
-#define __devinit
 #define __devexit
 #define __devexitdata
 #else
-#define __devinit __init
 #define __devexit __exit
 #define __devexitdata __exitdata
 #endif

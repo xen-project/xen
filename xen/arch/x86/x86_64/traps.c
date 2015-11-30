@@ -371,7 +371,7 @@ DEFINE_PER_CPU(struct stubs, stubs);
 void lstar_enter(void);
 void cstar_enter(void);
 
-void __devinit subarch_percpu_traps_init(void)
+void subarch_percpu_traps_init(void)
 {
     unsigned long stack_bottom = get_stack_bottom();
     unsigned long stub_va = this_cpu(stubs.addr);

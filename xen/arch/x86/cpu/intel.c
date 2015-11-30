@@ -49,7 +49,7 @@ void set_cpuid_faulting(bool_t enable)
  * edx = 0xBFEBFBFF when executing CPUID.EAX = 1 normally. If you want to
  * 'rev down' to E8400, you can set these values in these Xen boot parameters.
  */
-static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
+static void set_cpuidmask(const struct cpuinfo_x86 *c)
 {
 	static unsigned int msr_basic, msr_ext, msr_xsave;
 	static enum { not_parsed, no_mask, set_mask } status;
@@ -191,7 +191,7 @@ static void early_init_intel(struct cpuinfo_x86 *c)
  * Xeon 7400 erratum AAI65 (and further newer Xeons)
  * MONITOR/MWAIT may have excessive false wakeups
  */
-static void __devinit Intel_errata_workarounds(struct cpuinfo_x86 *c)
+static void Intel_errata_workarounds(struct cpuinfo_x86 *c)
 {
 	unsigned long lo, hi;
 
@@ -214,7 +214,7 @@ static void __devinit Intel_errata_workarounds(struct cpuinfo_x86 *c)
 /*
  * find out the number of processor cores on the die
  */
-static int __devinit num_cpu_cores(struct cpuinfo_x86 *c)
+static int num_cpu_cores(struct cpuinfo_x86 *c)
 {
 	unsigned int eax, ebx, ecx, edx;
 
@@ -229,7 +229,7 @@ static int __devinit num_cpu_cores(struct cpuinfo_x86 *c)
 		return 1;
 }
 
-static void __devinit init_intel(struct cpuinfo_x86 *c)
+static void init_intel(struct cpuinfo_x86 *c)
 {
 	unsigned int l2 = 0;
 

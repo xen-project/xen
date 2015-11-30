@@ -134,7 +134,7 @@ static const struct cpuidmask *__init noinline get_cpuidmask(const char *opt)
  *
  * The processor revision string parameter has precedene.
  */
-static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
+static void set_cpuidmask(const struct cpuinfo_x86 *c)
 {
 	static unsigned int feat_ecx, feat_edx;
 	static unsigned int extfeat_ecx, extfeat_edx;
@@ -383,7 +383,7 @@ static void check_syscfg_dram_mod_en(void)
 	wrmsrl(MSR_K8_SYSCFG, syscfg);
 }
 
-static void __devinit amd_get_topology(struct cpuinfo_x86 *c)
+static void amd_get_topology(struct cpuinfo_x86 *c)
 {
         int cpu;
         unsigned bits;
@@ -424,7 +424,7 @@ static void __devinit amd_get_topology(struct cpuinfo_x86 *c)
                                                          c->cpu_core_id);
 }
 
-static void __devinit init_amd(struct cpuinfo_x86 *c)
+static void init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
 

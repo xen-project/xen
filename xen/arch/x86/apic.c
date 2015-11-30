@@ -521,7 +521,7 @@ out:
         free_ioapic_entries(ioapic_entries);
 }
 
-void __devinit setup_local_APIC(void)
+void setup_local_APIC(void)
 {
     unsigned long oldvalue, value, ver, maxlvt;
     int i, j;
@@ -1087,7 +1087,7 @@ static void __setup_APIC_LVTT(unsigned int clocks)
     apic_write_around(APIC_TMICT, clocks/APIC_DIVISOR);
 }
 
-static void __devinit setup_APIC_timer(void)
+static void setup_APIC_timer(void)
 {
     unsigned long flags;
     local_irq_save(flags);
@@ -1199,7 +1199,7 @@ void __init setup_boot_APIC_clock(void)
     local_irq_restore(flags);
 }
 
-void __devinit setup_secondary_APIC_clock(void)
+void setup_secondary_APIC_clock(void)
 {
     setup_APIC_timer();
 }

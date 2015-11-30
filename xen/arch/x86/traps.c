@@ -3616,7 +3616,7 @@ void load_TR(void)
         : "=m" (old_gdt) : "rm" (TSS_ENTRY << 3), "m" (tss_gdt) : "memory" );
 }
 
-void __devinit percpu_traps_init(void)
+void percpu_traps_init(void)
 {
     subarch_percpu_traps_init();
 
