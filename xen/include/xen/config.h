@@ -84,7 +84,6 @@
 #define mk_unsigned_long(x) x
 #endif /* !__ASSEMBLY__ */
 
-#define fastcall
 #define __cpuinitdata
 #define __cpuinit
 
