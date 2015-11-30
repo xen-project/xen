@@ -23,9 +23,9 @@ struct pci_hostbridge_probe {
 	u32 device;
 };
 
-static u64 __cpuinitdata fam10h_pci_mmconf_base;
+static u64 fam10h_pci_mmconf_base;
 
-static struct pci_hostbridge_probe pci_probes[] __cpuinitdata = {
+static struct pci_hostbridge_probe pci_probes[] = {
 	{ 0, 0x18, PCI_VENDOR_ID_AMD, 0x1200 },
 	{ 0xff, 0, PCI_VENDOR_ID_AMD, 0x1200 },
 };

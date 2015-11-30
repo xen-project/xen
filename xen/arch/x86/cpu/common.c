@@ -16,7 +16,7 @@
 
 #include "cpu.h"
 
-static bool_t __cpuinitdata use_xsave = 1;
+static bool_t use_xsave = 1;
 boolean_param("xsave", use_xsave);
 
 bool_t __devinitdata opt_arat = 1;
@@ -45,7 +45,7 @@ unsigned int paddr_bits __read_mostly = 36;
  */
 u64 host_pat = 0x050100070406;
 
-static unsigned int __cpuinitdata cleared_caps[NCAPINTS];
+static unsigned int cleared_caps[NCAPINTS];
 
 void __init setup_clear_cpu_cap(unsigned int cap)
 {

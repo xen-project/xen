@@ -332,7 +332,7 @@ static void disable_c1_ramping(void)
 	}
 }
 
-int force_mwait __cpuinitdata;
+int force_mwait;
 
 static void disable_c1e(void *unused)
 {

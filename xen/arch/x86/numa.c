@@ -42,7 +42,7 @@ nodeid_t cpu_to_node[NR_CPUS] __read_mostly = {
 /*
  * Keep BIOS's CPU2node information, should not be used for memory allocaion
  */
-nodeid_t apicid_to_node[MAX_LOCAL_APIC] __cpuinitdata = {
+nodeid_t apicid_to_node[MAX_LOCAL_APIC] = {
     [0 ... MAX_LOCAL_APIC-1] = NUMA_NO_NODE
 };
 cpumask_t node_to_cpumask[MAX_NUMNODES] __read_mostly;
