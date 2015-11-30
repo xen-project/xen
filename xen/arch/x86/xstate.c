@@ -334,16 +334,6 @@ void xsave(struct vcpu *v, uint64_t mask)
         ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] = word_size;
 }
 
-#define XRSTOR_FIXUP   ".section .fixup,\"ax\"           \n"    \
-                       "2: mov %[size],%%ecx             \n"    \
-                       "   xor %[lmask_out],%[lmask_out] \n"    \
-                       "   rep stosb                     \n"    \
-                       "   lea %[mem],%[ptr]             \n"    \
-                       "   mov %[lmask_in],%[lmask_out]  \n"    \
-                       "   jmp 1b                        \n"    \
-                       ".previous                        \n"    \
-                       _ASM_EXTABLE(1b, 2b)
-
 void xrstor(struct vcpu *v, uint64_t mask)
 {
     uint32_t hmask = mask >> 32;
@@ -372,29 +362,33 @@ void xrstor(struct vcpu *v, uint64_t mask)
      */
     switch ( __builtin_expect(ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET], 8) )
     {
+#define XRSTOR(pfx) \
+        alternative_io("1: .byte " pfx "0x0f,0xae,0x2f\n" \
+                       "   .section .fixup,\"ax\"\n" \
+                       "2: mov %[size],%%ecx\n" \
+                       "   xor %[lmask_out],%[lmask_out]\n" \
+                       "   rep stosb\n" \
+                       "   lea %[mem],%[ptr]\n" \
+                       "   mov %[lmask_in],%[lmask_out]\n" \
+                       "   jmp 1b\n" \
+                       "   .previous\n" \
+                       _ASM_EXTABLE(1b, 2b), \
+                       ".byte " pfx "0x0f,0xc7,0x1f\n", \
+                       X86_FEATURE_XSAVES, \
+                       ASM_OUTPUT2([ptr] "+&D" (ptr), [lmask_out] "+&a" (lmask)), \
+                       [mem] "m" (*ptr), [lmask_in] "g" (lmask), \
+                       [hmask] "d" (hmask), [size] "m" (xsave_cntxt_size) \
+                       : "ecx")
+
     default:
-        alternative_io("1: .byte 0x48,0x0f,0xae,0x2f\n"
-                       XRSTOR_FIXUP,
-                       ".byte 0x48,0x0f,0xc7,0x1f\n",
-                       X86_FEATURE_XSAVES,
-                       ASM_OUTPUT2([ptr] "+&D" (ptr), [lmask_out] "+&a" (lmask)),
-                       [mem] "m" (*ptr), [lmask_in] "g" (lmask),
-                       [hmask] "d" (hmask), [size] "m" (xsave_cntxt_size)
-                       : "ecx");
+        XRSTOR("0x48,");
         break;
     case 4: case 2:
-        alternative_io("1: .byte 0x0f,0xae,0x2f\n"
-                       XRSTOR_FIXUP,
-                       ".byte 0x0f,0xc7,0x1f\n",
-                       X86_FEATURE_XSAVES,
-                       ASM_OUTPUT2([ptr] "+&D" (ptr), [lmask_out] "+&a" (lmask)),
-                       [mem] "m" (*ptr), [lmask_in] "g" (lmask),
-                       [hmask] "d" (hmask), [size] "m" (xsave_cntxt_size)
-                       : "ecx");
+        XRSTOR("");
         break;
+#undef XRSTOR
     }
 }
-#undef XRSTOR_FIXUP
 
 bool_t xsave_enabled(const struct vcpu *v)
 {
