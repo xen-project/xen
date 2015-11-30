@@ -108,7 +108,7 @@ void (*ioemul_handle_quirk)(
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
 
-static bool_t __devinitdata opt_ler;
+static bool_t opt_ler;
 boolean_param("ler", opt_ler);
 
 #define stack_words_per_line 4

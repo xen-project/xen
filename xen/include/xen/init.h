@@ -119,12 +119,10 @@ extern struct kernel_param __setup_start, __setup_end;
 
 #ifdef CONFIG_HOTPLUG
 #define __devinit
-#define __devinitdata
 #define __devexit
 #define __devexitdata
 #else
 #define __devinit __init
-#define __devinitdata __initdata
 #define __devexit __exit
 #define __devexitdata __exitdata
 #endif

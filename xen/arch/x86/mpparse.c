@@ -61,7 +61,7 @@ unsigned long __read_mostly mp_lapic_addr;
 unsigned int __read_mostly boot_cpu_physical_apicid = BAD_APICID;
 
 /* Internal processor count */
-static unsigned int __devinitdata num_processors;
+static unsigned int num_processors;
 static unsigned int __initdata disabled_cpus;
 
 /* Bitmask of physically existing CPUs */

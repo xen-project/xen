@@ -49,9 +49,9 @@ cpumask_t node_to_cpumask[MAX_NUMNODES] __read_mostly;
 
 nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 
-int numa_off __devinitdata = 0;
+int numa_off = 0;
 
-int acpi_numa __devinitdata;
+int acpi_numa;
 
 int srat_disabled(void)
 {
