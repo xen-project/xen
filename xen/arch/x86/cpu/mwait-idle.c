@@ -477,6 +477,58 @@ static const struct cpuidle_state bdw_cstates[] = {
 	{}
 };
 
+static const struct cpuidle_state skl_cstates[] = {
+	{
+		.name = "C1-SKL",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 2,
+		.target_residency = 2,
+	},
+	{
+		.name = "C1E-SKL",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 10,
+		.target_residency = 20,
+	},
+	{
+		.name = "C3-SKL",
+		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 70,
+		.target_residency = 100,
+	},
+	{
+		.name = "C6-SKL",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 85,
+		.target_residency = 200,
+	},
+	{
+		.name = "C7s-SKL",
+		.flags = MWAIT2flg(0x33) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 124,
+		.target_residency = 800,
+	},
+	{
+		.name = "C8-SKL",
+		.flags = MWAIT2flg(0x40) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 200,
+		.target_residency = 800,
+	},
+	{
+		.name = "C9-SKL",
+		.flags = MWAIT2flg(0x50) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 480,
+		.target_residency = 5000,
+	},
+	{
+		.name = "C10-SKL",
+		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 890,
+		.target_residency = 5000,
+	},
+	{}
+};
+
 static const struct cpuidle_state atom_cstates[] = {
 	{
 		.name = "C1E-ATM",
@@ -683,6 +735,11 @@ static const struct idle_cpu idle_cpu_bdw = {
 	.disable_promotion_to_c1e = 1,
 };
 
+static const struct idle_cpu idle_cpu_skl = {
+	.state_table = skl_cstates,
+	.disable_promotion_to_c1e = 1,
+};
+
 static const struct idle_cpu idle_cpu_avn = {
 	.state_table = avn_cstates,
 	.disable_promotion_to_c1e = 1,
@@ -718,6 +775,8 @@ static const struct x86_cpu_id intel_idle_ids[] __initconst = {
 	ICPU(0x47, bdw),
 	ICPU(0x4f, bdw),
 	ICPU(0x56, bdw),
+	ICPU(0x4e, skl),
+	ICPU(0x5e, skl),
 	{}
 };
 
