@@ -117,14 +117,6 @@ extern struct kernel_param __setup_start, __setup_end;
 
 #endif /* __ASSEMBLY__ */
 
-#ifdef CONFIG_HOTPLUG
-#define __devexit
-#define __devexitdata
-#else
-#define __devexit __exit
-#define __devexitdata __exitdata
-#endif
-
 #ifdef CONFIG_LATE_HWDOM
 #define __hwdom_init
 #define __hwdom_initdata  __read_mostly

@@ -44,9 +44,6 @@
 #define CONFIG_VGA 1
 #define CONFIG_VIDEO 1
 
-#define CONFIG_HOTPLUG 1
-#define CONFIG_HOTPLUG_CPU 1
-
 #define CONFIG_XENOPROF 1
 #define CONFIG_WATCHDOG 1
 
