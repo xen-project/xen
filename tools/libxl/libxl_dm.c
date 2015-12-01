@@ -1535,14 +1535,14 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     }
 
     libxl__write_stub_dmargs(gc, dm_domid, guest_domid, args);
-    libxl__xs_write(gc, XBT_NULL,
-                   GCSPRINTF("%s/image/device-model-domid",
-                                  libxl__xs_get_dompath(gc, guest_domid)),
-                   "%d", dm_domid);
-    libxl__xs_write(gc, XBT_NULL,
-                   GCSPRINTF("%s/target",
-                                  libxl__xs_get_dompath(gc, dm_domid)),
-                   "%d", guest_domid);
+    libxl__xs_printf(gc, XBT_NULL,
+                     GCSPRINTF("%s/image/device-model-domid",
+                               libxl__xs_get_dompath(gc, guest_domid)),
+                     "%d", dm_domid);
+    libxl__xs_printf(gc, XBT_NULL,
+                     GCSPRINTF("%s/target",
+                               libxl__xs_get_dompath(gc, dm_domid)),
+                     "%d", guest_domid);
     ret = xc_domain_set_target(ctx->xch, dm_domid, guest_domid);
     if (ret<0) {
         LOGE(ERROR, "setting target domain %d -> %d", dm_domid, guest_domid);
@@ -1816,17 +1816,17 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         path = xs_get_domain_path(ctx->xsh, domid);
-        libxl__xs_write(gc, XBT_NULL,
-                        GCSPRINTF("%s/hvmloader/bios", path),
-                        "%s", libxl_bios_type_to_string(b_info->u.hvm.bios));
+        libxl__xs_printf(gc, XBT_NULL,
+                         GCSPRINTF("%s/hvmloader/bios", path),
+                         "%s", libxl_bios_type_to_string(b_info->u.hvm.bios));
         /* Disable relocating memory to make the MMIO hole larger
          * unless we're running qemu-traditional and vNUMA is not
          * configured. */
-        libxl__xs_write(gc, XBT_NULL,
-                        GCSPRINTF("%s/hvmloader/allow-memory-relocate", path),
-                        "%d",
-                        b_info->device_model_version==LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL &&
-                        !libxl__vnuma_configured(b_info));
+        libxl__xs_printf(gc, XBT_NULL,
+                         GCSPRINTF("%s/hvmloader/allow-memory-relocate", path),
+                         "%d",
+                         b_info->device_model_version==LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL &&
+                         !libxl__vnuma_configured(b_info));
         free(path);
     }
 
@@ -1836,8 +1836,8 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM &&
         b_info->device_model_version
         == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL)
-        libxl__xs_write(gc, XBT_NULL, GCSPRINTF("%s/disable_pf", path),
-                    "%d", !libxl_defbool_val(b_info->u.hvm.xen_platform_pci));
+        libxl__xs_printf(gc, XBT_NULL, GCSPRINTF("%s/disable_pf", path),
+                         "%d", !libxl_defbool_val(b_info->u.hvm.xen_platform_pci));
 
     logfile_w = libxl__create_qemu_logfile(gc, GCSPRINTF("qemu-dm-%s",
                                                          c_info->name));

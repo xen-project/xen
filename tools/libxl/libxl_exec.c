@@ -144,7 +144,7 @@ int libxl__spawn_record_pid(libxl__gc *gc, libxl__spawn_state *spawn, pid_t pid)
     rc = libxl__ev_child_xenstore_reopen(gc, spawn->what);
     if (rc) goto out;
 
-    r = libxl__xs_write(gc, XBT_NULL, spawn->pidpath, "%d", pid);
+    r = libxl__xs_printf(gc, XBT_NULL, spawn->pidpath, "%d", pid);
     if (r) {
         LOGE(ERROR,
              "write %s = %d: xenstore write failed", spawn->pidpath, pid);

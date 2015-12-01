@@ -77,9 +77,9 @@ int libxl__ms_vm_genid_set(libxl__gc *gc, uint32_t domid,
         rc = ERROR_FAIL;
         goto out;
     }
-    rc = libxl__xs_write(gc, XBT_NULL,
-                         GCSPRINTF("%s/platform/generation-id", dom_path),
-                         "%"PRIu64 ":%" PRIu64, genid[0], genid[1]);
+    rc = libxl__xs_printf(gc, XBT_NULL,
+			  GCSPRINTF("%s/platform/generation-id", dom_path),
+			  "%"PRIu64 ":%" PRIu64, genid[0], genid[1]);
     if (rc < 0)
         goto out;
 

@@ -677,8 +677,8 @@ static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
 
     path = libxl__xs_libxl_path(gc, domid);
     path = GCSPRINTF("%s/dm-version", path);
-    return libxl__xs_write(gc, XBT_NULL, path, "%s",
-        libxl_device_model_version_to_string(b_info->device_model_version));
+    return libxl__xs_printf(gc, XBT_NULL, path, "%s",
+                            libxl_device_model_version_to_string(b_info->device_model_version));
 }
 
 /*----- remus asynchronous checkpoint callback -----*/

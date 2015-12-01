@@ -825,15 +825,15 @@ static int hvm_build_set_xs_values(libxl__gc *gc,
     if (dom->smbios_module.guest_addr_out) {
         path = GCSPRINTF("/local/domain/%d/"HVM_XS_SMBIOS_PT_ADDRESS, domid);
 
-        ret = libxl__xs_write(gc, XBT_NULL, path, "0x%"PRIx64,
-                              dom->smbios_module.guest_addr_out);
+        ret = libxl__xs_printf(gc, XBT_NULL, path, "0x%"PRIx64,
+                               dom->smbios_module.guest_addr_out);
         if (ret)
             goto err;
 
         path = GCSPRINTF("/local/domain/%d/"HVM_XS_SMBIOS_PT_LENGTH, domid);
 
-        ret = libxl__xs_write(gc, XBT_NULL, path, "0x%x",
-                              dom->smbios_module.length);
+        ret = libxl__xs_printf(gc, XBT_NULL, path, "0x%x",
+                               dom->smbios_module.length);
         if (ret)
             goto err;
     }
@@ -841,15 +841,15 @@ static int hvm_build_set_xs_values(libxl__gc *gc,
     if (dom->acpi_module.guest_addr_out) {
         path = GCSPRINTF("/local/domain/%d/"HVM_XS_ACPI_PT_ADDRESS, domid);
 
-        ret = libxl__xs_write(gc, XBT_NULL, path, "0x%"PRIx64,
-                              dom->acpi_module.guest_addr_out);
+        ret = libxl__xs_printf(gc, XBT_NULL, path, "0x%"PRIx64,
+                               dom->acpi_module.guest_addr_out);
         if (ret)
             goto err;
 
         path = GCSPRINTF("/local/domain/%d/"HVM_XS_ACPI_PT_LENGTH, domid);
 
-        ret = libxl__xs_write(gc, XBT_NULL, path, "0x%x",
-                              dom->acpi_module.length);
+        ret = libxl__xs_printf(gc, XBT_NULL, path, "0x%x",
+                               dom->acpi_module.length);
         if (ret)
             goto err;
     }
@@ -1074,7 +1074,7 @@ int libxl__qemu_traditional_cmd(libxl__gc *gc, uint32_t domid,
     char *path = NULL;
     uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
     path = libxl__device_model_xs_path(gc, dm_domid, domid, "/command");
-    return libxl__xs_write(gc, XBT_NULL, path, "%s", cmd);
+    return libxl__xs_printf(gc, XBT_NULL, path, "%s", cmd);
 }
 
 /*
@@ -1137,8 +1137,9 @@ int libxl__restore_emulator_xenstore_data(libxl__domain_create_state *dcs,
             goto out;
         }
 
-        libxl__xs_write(gc, XBT_NULL,
-                        GCSPRINTF("%s/%s", xs_root, key), "%s", val);
+        libxl__xs_printf(gc, XBT_NULL,
+                         GCSPRINTF("%s/%s", xs_root, key),
+                         "%s", val);
     }
 
     rc = 0;

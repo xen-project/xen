@@ -96,8 +96,8 @@ out:
 
 }
 
-int libxl__xs_write(libxl__gc *gc, xs_transaction_t t,
-                    const char *path, const char *fmt, ...)
+int libxl__xs_printf(libxl__gc *gc, xs_transaction_t t,
+                     const char *path, const char *fmt, ...)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *s;

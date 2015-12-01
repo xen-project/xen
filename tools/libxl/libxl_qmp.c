@@ -103,7 +103,7 @@ static int store_serial_port_info(libxl__qmp_handler *qmp,
     path = libxl__xs_get_dompath(gc, qmp->domid);
     path = GCSPRINTF("%s/serial/%d/tty", path, port);
 
-    ret = libxl__xs_write(gc, XBT_NULL, path, "%s", chardev + 4);
+    ret = libxl__xs_printf(gc, XBT_NULL, path, "%s", chardev + 4);
 
     GC_FREE;
     return ret;
@@ -162,7 +162,7 @@ static int qmp_write_domain_console_item(libxl__gc *gc, int domid,
     path = libxl__xs_get_dompath(gc, domid);
     path = GCSPRINTF("%s/console/%s", path, item);
 
-    return libxl__xs_write(gc, XBT_NULL, path, "%s", value);
+    return libxl__xs_printf(gc, XBT_NULL, path, "%s", value);
 }
 
 static int qmp_register_vnc_callback(libxl__qmp_handler *qmp,

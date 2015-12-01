@@ -254,7 +254,7 @@ retry_transaction2:
     xs_rm(ctx->xsh, t, GCSPRINTF("%s/vdev-%d", be_path, i));
     xs_rm(ctx->xsh, t, GCSPRINTF("%s/opts-%d", be_path, i));
     xs_rm(ctx->xsh, t, GCSPRINTF("%s/vdevfn-%d", be_path, i));
-    libxl__xs_write(gc, t, num_devs_path, "%d", num - 1);
+    libxl__xs_printf(gc, t, num_devs_path, "%d", num - 1);
     for (j = i + 1; j < num; j++) {
         tmppath = GCSPRINTF("%s/state-%d", be_path, j);
         tmp = libxl__xs_read(gc, t, tmppath);
@@ -733,7 +733,7 @@ static void pci_assignable_driver_path_write(libxl__gc *gc,
                      pcidev->bus,
                      pcidev->dev,
                      pcidev->func);
-    if ( libxl__xs_write(gc, XBT_NULL, path, "%s", driver_path) < 0 ) {
+    if ( libxl__xs_printf(gc, XBT_NULL, path, "%s", driver_path) < 0 ) {
         LOGE(WARN, "Write of %s to node %s failed.", driver_path, path);
     }
 }
@@ -971,14 +971,14 @@ static int qemu_pci_add_xenstore(libxl__gc *gc, uint32_t domid,
     state = libxl__xs_read(gc, XBT_NULL, path);
     path = libxl__device_model_xs_path(gc, dm_domid, domid, "/parameter");
     if (pcidev->vdevfn) {
-        libxl__xs_write(gc, XBT_NULL, path, PCI_BDF_VDEVFN","PCI_OPTIONS,
-                        pcidev->domain, pcidev->bus, pcidev->dev,
-                        pcidev->func, pcidev->vdevfn, pcidev->msitranslate,
-                        pcidev->power_mgmt);
+        libxl__xs_printf(gc, XBT_NULL, path, PCI_BDF_VDEVFN","PCI_OPTIONS,
+                         pcidev->domain, pcidev->bus, pcidev->dev,
+                         pcidev->func, pcidev->vdevfn, pcidev->msitranslate,
+                         pcidev->power_mgmt);
     } else {
-        libxl__xs_write(gc, XBT_NULL, path, PCI_BDF","PCI_OPTIONS,
-                        pcidev->domain,  pcidev->bus, pcidev->dev,
-                        pcidev->func, pcidev->msitranslate, pcidev->power_mgmt);
+        libxl__xs_printf(gc, XBT_NULL, path, PCI_BDF","PCI_OPTIONS,
+                         pcidev->domain,  pcidev->bus, pcidev->dev,
+                         pcidev->func, pcidev->msitranslate, pcidev->power_mgmt);
     }
 
     libxl__qemu_traditional_cmd(gc, domid, "pci-ins");
@@ -1310,8 +1310,8 @@ static int qemu_pci_remove_xenstore(libxl__gc *gc, uint32_t domid,
     path = libxl__device_model_xs_path(gc, dm_domid, domid, "/state");
     state = libxl__xs_read(gc, XBT_NULL, path);
     path = libxl__device_model_xs_path(gc, dm_domid, domid, "/parameter");
-    libxl__xs_write(gc, XBT_NULL, path, PCI_BDF, pcidev->domain,
-                    pcidev->bus, pcidev->dev, pcidev->func);
+    libxl__xs_printf(gc, XBT_NULL, path, PCI_BDF, pcidev->domain,
+                     pcidev->bus, pcidev->dev, pcidev->func);
 
     /* Remove all functions at once atomically by only signalling
      * device-model for function 0 */

@@ -667,7 +667,7 @@ _hidden int libxl__xs_writev_perms(libxl__gc *gc, xs_transaction_t t,
 _hidden int libxl__xs_writev_atonce(libxl__gc *gc,
                              const char *dir, char **kvs);
 
-_hidden int libxl__xs_write(libxl__gc *gc, xs_transaction_t t,
+_hidden int libxl__xs_printf(libxl__gc *gc, xs_transaction_t t,
                const char *path, const char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
    /* Each fn returns 0 on success.
     * On error: returns -1, sets errno (no logging) */
@@ -702,7 +702,7 @@ int libxl__xs_read_checked(libxl__gc *gc, xs_transaction_t t,
 
 /* Does not include a trailing null.
  * May usefully be combined with GCSPRINTF if the format string
- * behaviour of libxl__xs_write is desirable. */
+ * behaviour of libxl__xs_printf is desirable. */
 int libxl__xs_write_checked(libxl__gc *gc, xs_transaction_t t,
                             const char *path, const char *string);
 

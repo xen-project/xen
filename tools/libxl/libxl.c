@@ -1136,7 +1136,7 @@ int libxl__domain_pvcontrol_write(libxl__gc *gc, xs_transaction_t t,
     if (!shutdown_path)
         return ERROR_FAIL;
 
-    return libxl__xs_write(gc, t, shutdown_path, "%s", cmd);
+    return libxl__xs_printf(gc, t, shutdown_path, "%s", cmd);
 }
 
 static int libxl__domain_pvcontrol(libxl__gc *gc, uint32_t domid,
@@ -1364,7 +1364,7 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
     if (!value || strcmp(value,  "eject"))
         return;
 
-    if (libxl__xs_write(gc, XBT_NULL, wpath, "")) {
+    if (libxl__xs_printf(gc, XBT_NULL, wpath, "")) {
         LIBXL__EVENT_DISASTER(egc, "xs_write failed acknowledging eject",
                               errno, LIBXL_EVENT_TYPE_DISK_EJECT);
         return;
@@ -4696,13 +4696,13 @@ retry_transaction:
         goto out;
 
     if (target == NULL) {
-        libxl__xs_write(gc, t, target_path, "%"PRIu32,
-                (uint32_t) info.current_memkb);
+        libxl__xs_printf(gc, t, target_path, "%"PRIu32,
+                         (uint32_t) info.current_memkb);
         *target_memkb = (uint32_t) info.current_memkb;
     }
     if (staticmax == NULL) {
-        libxl__xs_write(gc, t, max_path, "%"PRIu32,
-                        (uint32_t) info.max_memkb);
+        libxl__xs_printf(gc, t, max_path, "%"PRIu32,
+                         (uint32_t) info.max_memkb);
         *max_memkb = (uint32_t) info.max_memkb;
     }
 
@@ -4839,8 +4839,8 @@ retry_transaction:
         goto out;
     }
 
-    libxl__xs_write(gc, t, GCSPRINTF("%s/memory/target",
-                dompath), "%"PRIu32, new_target_memkb);
+    libxl__xs_printf(gc, t, GCSPRINTF("%s/memory/target", dompath),
+                     "%"PRIu32, new_target_memkb);
     rc = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
     if (rc != 1 || info.domain != domid) {
         abort_transaction = 1;
@@ -4850,8 +4850,8 @@ retry_transaction:
     libxl_dominfo_init(&ptr);
     xcinfo2xlinfo(ctx, &info, &ptr);
     uuid = libxl__uuid2string(gc, ptr.uuid);
-    libxl__xs_write(gc, t, GCSPRINTF("/vm/%s/memory", uuid),
-            "%"PRIu32, new_target_memkb / 1024);
+    libxl__xs_printf(gc, t, GCSPRINTF("/vm/%s/memory", uuid),
+                     "%"PRIu32, new_target_memkb / 1024);
     libxl_dominfo_dispose(&ptr);
 
 out:
@@ -5486,9 +5486,9 @@ static int libxl__set_vcpuonline_xenstore(libxl__gc *gc, uint32_t domid,
 retry_transaction:
     t = xs_transaction_start(CTX->xsh);
     for (i = 0; i <= info->vcpu_max_id; i++)
-        libxl__xs_write(gc, t,
-                       GCSPRINTF("%s/cpu/%u/availability", dompath, i),
-                       "%s", libxl_bitmap_test(cpumap, i) ? "online" : "offline");
+        libxl__xs_printf(gc, t,
+                         GCSPRINTF("%s/cpu/%u/availability", dompath, i),
+                         "%s", libxl_bitmap_test(cpumap, i) ? "online" : "offline");
     if (!xs_transaction_end(CTX->xsh, t, 0)) {
         if (errno == EAGAIN)
             goto retry_transaction;
@@ -5984,7 +5984,8 @@ int libxl_send_sysrq(libxl_ctx *ctx, uint32_t domid, char sysrq)
     GC_INIT(ctx);
     char *dompath = libxl__xs_get_dompath(gc, domid);
 
-    libxl__xs_write(gc, XBT_NULL, GCSPRINTF("%s/control/sysrq", dompath), "%c", sysrq);
+    libxl__xs_printf(gc, XBT_NULL, GCSPRINTF("%s/control/sysrq", dompath),
+                     "%c", sysrq);
 
     GC_FREE;
     return 0;
@@ -6262,12 +6263,12 @@ int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
         t = xs_transaction_start(ctx->xsh);
 
         xs_mkdir(ctx->xsh, t, GCSPRINTF("/local/pool/%d", *poolid));
-        libxl__xs_write(gc, t,
-                        GCSPRINTF("/local/pool/%d/uuid", *poolid),
-                        "%s", uuid_string);
-        libxl__xs_write(gc, t,
-                        GCSPRINTF("/local/pool/%d/name", *poolid),
-                        "%s", name);
+        libxl__xs_printf(gc, t,
+                         GCSPRINTF("/local/pool/%d/uuid", *poolid),
+                         "%s", uuid_string);
+        libxl__xs_printf(gc, t,
+                         GCSPRINTF("/local/pool/%d/name", *poolid),
+                         "%s", name);
 
         if (xs_transaction_end(ctx->xsh, t, 0) || (errno != EAGAIN)) {
             GC_FREE;
@@ -6358,9 +6359,9 @@ int libxl_cpupool_rename(libxl_ctx *ctx, const char *name, uint32_t poolid)
     for (;;) {
         t = xs_transaction_start(ctx->xsh);
 
-        libxl__xs_write(gc, t,
-                        GCSPRINTF("/local/pool/%d/name", poolid),
-                        "%s", name);
+        libxl__xs_printf(gc, t,
+                         GCSPRINTF("/local/pool/%d/name", poolid),
+                         "%s", name);
 
         if (xs_transaction_end(ctx->xsh, t, 0))
             break;

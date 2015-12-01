@@ -485,8 +485,8 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
 
     dom_console_xs_path = GCSPRINTF("%s/console/tty", dompath);
 
-    rc = libxl__xs_write(gc, XBT_NULL, dom_console_xs_path, "%s",
-                         dom_console_slave_tty_path);
+    rc = libxl__xs_printf(gc, XBT_NULL, dom_console_xs_path, "%s",
+                          dom_console_slave_tty_path);
     if (rc) {
         LOGE(ERROR,"xs write console path %s := %s failed",
              dom_console_xs_path, dom_console_slave_tty_path);
