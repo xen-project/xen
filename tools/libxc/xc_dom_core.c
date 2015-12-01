@@ -971,7 +971,7 @@ int xc_dom_update_guest_p2m(struct xc_dom_image *dom)
                   __FUNCTION__, dom->p2m_size);
         p2m_32 = dom->p2m_guest;
         for ( i = 0; i < dom->p2m_size; i++ )
-            if ( dom->p2m_host[i] != INVALID_P2M_ENTRY )
+            if ( dom->p2m_host[i] != INVALID_PFN )
                 p2m_32[i] = dom->p2m_host[i];
             else
                 p2m_32[i] = (uint32_t) - 1;
@@ -981,7 +981,7 @@ int xc_dom_update_guest_p2m(struct xc_dom_image *dom)
                   __FUNCTION__, dom->p2m_size);
         p2m_64 = dom->p2m_guest;
         for ( i = 0; i < dom->p2m_size; i++ )
-            if ( dom->p2m_host[i] != INVALID_P2M_ENTRY )
+            if ( dom->p2m_host[i] != INVALID_PFN )
                 p2m_64[i] = dom->p2m_host[i];
             else
                 p2m_64[i] = (uint64_t) - 1;

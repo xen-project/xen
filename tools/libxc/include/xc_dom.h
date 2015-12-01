@@ -19,7 +19,7 @@
 #include <xen/libelf/libelf.h>
 #include <xenguest.h>
 
-#define INVALID_P2M_ENTRY   ((xen_pfn_t)-1)
+#define INVALID_PFN ((xen_pfn_t)-1)
 
 /* --- typedefs and structs ---------------------------------------- */
 

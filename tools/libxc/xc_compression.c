@@ -217,7 +217,7 @@ char *get_cache_page(comp_ctx *ctx, xen_pfn_t pfn,
 
         /* If the list is full, evict a page from the tail end. */
         item = ctx->page_list_tail;
-        if (item->pfn != INVALID_P2M_ENTRY)
+        if (item->pfn != INVALID_PFN)
             ctx->pfn2cache[item->pfn] = NULL;
 
         item->pfn = pfn;
@@ -278,7 +278,7 @@ void invalidate_cache_page(comp_ctx *ctx, xen_pfn_t pfn)
             ctx->page_list_tail = item;
         }
         ctx->pfn2cache[pfn] = NULL;
-        (ctx->page_list_tail)->pfn = INVALID_P2M_ENTRY;
+        (ctx->page_list_tail)->pfn = INVALID_PFN;
     }
 }
 
@@ -295,7 +295,7 @@ int xc_compression_add_page(xc_interface *xch, comp_ctx *ctx,
     /* pagetable page */
     if (israw)
         invalidate_cache_page(ctx, pfn);
-    ctx->sendbuf_pfns[ctx->pfns_len] = israw ? INVALID_P2M_ENTRY : pfn;
+    ctx->sendbuf_pfns[ctx->pfns_len] = israw ? INVALID_PFN : pfn;
     memcpy(ctx->inputbuf + ctx->pfns_len * XC_PAGE_SIZE, page, XC_PAGE_SIZE);
     ctx->pfns_len++;
 
@@ -329,7 +329,7 @@ int xc_compression_compress_pages(xc_interface *xch, comp_ctx *ctx,
         cache_copy = NULL;
         current_page = ctx->inputbuf + ctx->pfns_index * XC_PAGE_SIZE;
 
-        if (ctx->sendbuf_pfns[ctx->pfns_index] == INVALID_P2M_ENTRY)
+        if (ctx->sendbuf_pfns[ctx->pfns_index] == INVALID_PFN)
             israw = 1;
         else
             cache_copy = get_cache_page(ctx,
@@ -518,7 +518,7 @@ comp_ctx *xc_compression_create_context(xc_interface *xch,
 
     for (i = 0; i < num_cache_pages; i++)
     {
-        ctx->cache[i].pfn = INVALID_P2M_ENTRY;
+        ctx->cache[i].pfn = INVALID_PFN;
         ctx->cache[i].page = ctx->cache_base + i * XC_PAGE_SIZE;
         ctx->cache[i].prev = (i == 0) ? NULL : &(ctx->cache[i - 1]);
         ctx->cache[i].next = ((i+1) == num_cache_pages)? NULL :

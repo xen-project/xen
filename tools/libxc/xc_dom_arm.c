@@ -439,7 +439,7 @@ static int meminit(struct xc_dom_image *dom)
     if ( dom->p2m_host == NULL )
         return -EINVAL;
     for ( pfn = 0; pfn < p2m_size; pfn++ )
-        dom->p2m_host[pfn] = INVALID_P2M_ENTRY;
+        dom->p2m_host[pfn] = INVALID_PFN;
 
     /* setup initial p2m and allocate guest memory */
     for ( i = 0; i < GUEST_RAM_BANKS && dom->rambank_size[i]; i++ )

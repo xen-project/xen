@@ -808,13 +808,13 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
                         gmfn = p2m[i];
                     else
                         gmfn = ((uint64_t *)p2m)[i];
-                    if ( gmfn == INVALID_P2M_ENTRY )
+                    if ( gmfn == INVALID_PFN )
                         continue;
                 }
                 else
                 {
                     gmfn = ((uint32_t *)p2m)[i];
-                    if ( gmfn == (uint32_t)INVALID_P2M_ENTRY )
+                    if ( gmfn == (uint32_t)INVALID_PFN )
                        continue;
                 }
 
