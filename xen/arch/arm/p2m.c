@@ -427,6 +427,8 @@ static int p2m_create_table(struct domain *d, lpae_t *entry,
 
              write_pte(&p[i], pte);
          }
+
+         page->u.inuse.p2m_refcount = LPAE_ENTRIES;
     }
     else
         clear_page(p);
@@ -936,6 +938,20 @@ static int apply_one_level(struct domain *d,
     BUG(); /* Should never get here */
 }
 
+/*
+ * The page is only used by the P2M code which is protected by the p2m->lock.
+ * So we can avoid to use atomic helpers.
+ */
+static void update_reference_mapping(struct page_info *page,
+                                     lpae_t old_entry,
+                                     lpae_t new_entry)
+{
+    if ( p2m_valid(old_entry) && !p2m_valid(new_entry) )
+        page->u.inuse.p2m_refcount--;
+    else if ( !p2m_valid(old_entry) && p2m_valid(new_entry) )
+        page->u.inuse.p2m_refcount++;
+}
+
 static int apply_p2m_changes(struct domain *d,
                      enum p2m_operation op,
                      paddr_t start_gpaddr,
@@ -961,6 +977,8 @@ static int apply_p2m_changes(struct domain *d,
     const bool_t preempt = !is_idle_vcpu(current);
     bool_t flush = false;
     bool_t flush_pt;
+    PAGE_LIST_HEAD(free_pages);
+    struct page_info *pg;
 
     /* Some IOMMU don't support coherent PT walk. When the p2m is
      * shared with the CPU, Xen has to make sure that the PT changes have
@@ -1070,6 +1088,7 @@ static int apply_p2m_changes(struct domain *d,
         {
             unsigned offset = offsets[level];
             lpae_t *entry = &mappings[level][offset];
+            lpae_t old_entry = *entry;
 
             ret = apply_one_level(d, entry,
                                   level, flush_pt, op,
@@ -1078,6 +1097,10 @@ static int apply_p2m_changes(struct domain *d,
                                   mattr, t, a);
             if ( ret < 0 ) { rc = ret ; goto out; }
             count += ret;
+
+            if ( ret != P2M_ONE_PROGRESS_NOP )
+                update_reference_mapping(pages[level], old_entry, *entry);
+
             /* L3 had better have done something! We cannot descend any further */
             BUG_ON(level == 3 && ret == P2M_ONE_DESCEND);
             if ( ret != P2M_ONE_DESCEND ) break;
@@ -1099,6 +1122,45 @@ static int apply_p2m_changes(struct domain *d,
             }
             /* else: next level already valid */
         }
+
+        BUG_ON(level > 3);
+
+        if ( op == REMOVE )
+        {
+            for ( ; level > P2M_ROOT_LEVEL; level-- )
+            {
+                lpae_t old_entry;
+                lpae_t *entry;
+                unsigned int offset;
+
+                pg = pages[level];
+
+                /*
+                 * No need to try the previous level if the current one
+                 * still contains some mappings.
+                 */
+                if ( pg->u.inuse.p2m_refcount )
+                    break;
+
+                offset = offsets[level - 1];
+                entry = &mappings[level - 1][offset];
+                old_entry = *entry;
+
+                page_list_del(pg, &p2m->pages);
+
+                p2m_remove_pte(entry, flush_pt);
+
+                p2m->stats.mappings[level - 1]--;
+                update_reference_mapping(pages[level - 1], old_entry, *entry);
+
+                /*
+                 * We can't free the page now because it may be present
+                 * in the guest TLB. Queue it and free it after the TLB
+                 * has been flushed.
+                 */
+                page_list_add(pg, &free_pages);
+            }
+        }
     }
 
     if ( op == ALLOCATE || op == INSERT )
@@ -1115,6 +1177,9 @@ out:
         flush_tlb_domain(d);
         iommu_iotlb_flush(d, sgfn, egfn - sgfn);
     }
+
+    while ( (pg = page_list_remove_head(&free_pages)) )
+        free_domheap_page(pg);
 
     if ( rc < 0 && ( op == INSERT || op == ALLOCATE ) &&
          addr != start_gpaddr )
