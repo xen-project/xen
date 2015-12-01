@@ -630,7 +630,7 @@ xen_pfn_t xc_dom_alloc_page(struct xc_dom_image *dom, char *name)
     pfn = dom->pfn_alloc_end - dom->rambase_pfn;
 
     if ( xc_dom_chk_alloc_pages(dom, name, 1) )
-        return (xen_pfn_t)-1;
+        return INVALID_PFN;
 
     DOMPRINTF("%-20s:   %-12s : 0x%" PRIx64 " (pfn 0x%" PRIpfn ")",
               __FUNCTION__, name, start, pfn);
@@ -1107,7 +1107,12 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     if ( dom->arch_hooks->alloc_pgtables(dom) != 0 )
         goto err;
     if ( dom->alloc_bootstack )
+    {
         dom->bootstack_pfn = xc_dom_alloc_page(dom, "boot stack");
+        if ( dom->bootstack_pfn == INVALID_PFN )
+            goto err;
+    }
+
     DOMPRINTF("%-20s: virt_alloc_end : 0x%" PRIx64 "",
               __FUNCTION__, dom->virt_alloc_end);
     DOMPRINTF("%-20s: virt_pgtab_end : 0x%" PRIx64 "",

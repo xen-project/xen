@@ -537,10 +537,20 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
 {
     /* allocate special pages */
     dom->start_info_pfn = xc_dom_alloc_page(dom, "start info");
+    if ( dom->start_info_pfn == INVALID_PFN )
+        return -1;
     dom->xenstore_pfn = xc_dom_alloc_page(dom, "xenstore");
+    if ( dom->xenstore_pfn == INVALID_PFN )
+        return -1;
     dom->console_pfn = xc_dom_alloc_page(dom, "console");
+    if ( dom->console_pfn == INVALID_PFN )
+        return -1;
     if ( xc_dom_feature_translated(dom) )
+    {
         dom->shared_info_pfn = xc_dom_alloc_page(dom, "shared info");
+        if ( dom->shared_info_pfn == INVALID_PFN )
+            return -1;
+    }
     dom->alloc_bootstack = 1;
 
     return 0;
