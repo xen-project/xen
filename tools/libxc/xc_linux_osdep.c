@@ -46,7 +46,13 @@
 static xc_osdep_handle linux_privcmd_open(xc_interface *xch)
 {
     int flags, saved_errno;
-    int fd = open("/proc/xen/privcmd", O_RDWR);
+    int fd = open("/dev/xen/privcmd", O_RDWR); /* prefer this newer interface */
+
+    if ( fd == -1 && ( errno == ENOENT || errno == ENXIO || errno == ENODEV ))
+    {
+        /* Fallback to /proc/xen/privcmd */
+        fd = open("/proc/xen/privcmd", O_RDWR);
+    }
 
     if ( fd == -1 )
     {
