@@ -355,7 +355,7 @@ char *xc_dom_strdup(struct xc_dom_image *dom, const char *str);
 
 /* --- alloc memory pool ------------------------------------------- */
 
-int xc_dom_alloc_page(struct xc_dom_image *dom, char *name);
+xen_pfn_t xc_dom_alloc_page(struct xc_dom_image *dom, char *name);
 int xc_dom_alloc_segment(struct xc_dom_image *dom,
                          struct xc_dom_seg *seg, char *name,
                          xen_vaddr_t start, xen_vaddr_t size);

@@ -555,6 +555,9 @@ static int xc_dom_chk_alloc_pages(struct xc_dom_image *dom, char *name,
     dom->pfn_alloc_end += pages;
     dom->virt_alloc_end += pages * page_size;
 
+    if ( dom->allocate )
+        dom->allocate(dom);
+
     return 0;
 }
 
@@ -602,9 +605,6 @@ int xc_dom_alloc_segment(struct xc_dom_image *dom,
     if ( xc_dom_chk_alloc_pages(dom, name, pages) )
         return -1;
 
-    if (dom->allocate)
-        dom->allocate(dom);
-
     /* map and clear pages */
     ptr = xc_dom_seg_to_ptr(dom, seg);
     if ( ptr == NULL )
@@ -621,18 +621,16 @@ int xc_dom_alloc_segment(struct xc_dom_image *dom,
     return 0;
 }
 
-int xc_dom_alloc_page(struct xc_dom_image *dom, char *name)
+xen_pfn_t xc_dom_alloc_page(struct xc_dom_image *dom, char *name)
 {
-    unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
     xen_vaddr_t start;
     xen_pfn_t pfn;
 
     start = dom->virt_alloc_end;
     pfn = dom->pfn_alloc_end - dom->rambase_pfn;
-    dom->virt_alloc_end += page_size;
-    dom->pfn_alloc_end++;
-    if ( dom->allocate )
-        dom->allocate(dom);
+
+    if ( xc_dom_chk_alloc_pages(dom, name, 1) )
+        return (xen_pfn_t)-1;
 
     DOMPRINTF("%-20s:   %-12s : 0x%" PRIx64 " (pfn 0x%" PRIpfn ")",
               __FUNCTION__, name, start, pfn);
