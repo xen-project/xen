@@ -98,9 +98,14 @@ struct xc_dom_image {
     xen_vaddr_t virt_alloc_end;
     xen_vaddr_t bsd_symtab_start;
 
-    /* initrd parameters as specified in start_info page */
-    unsigned long initrd_start;
-    unsigned long initrd_len;
+    /*
+     * initrd parameters as specified in start_info page
+     * Depending on capabilities of the booted kernel this may be a virtual
+     * address or a pfn. Type is neutral and large enough to hold a virtual
+     * address of a 64 bit kernel even with 32 bit toolstack.
+     */
+    uint64_t initrd_start;
+    uint64_t initrd_len;
 
     unsigned int alloc_bootstack;
     xen_vaddr_t virt_pgtab_end;
