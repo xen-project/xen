@@ -73,6 +73,7 @@
 #include <asm/hpet.h>
 #include <asm/vpmu.h>
 #include <public/arch-x86/cpuid.h>
+#include <asm/cpuid.h>
 #include <xsm/xsm.h>
 
 /*
@@ -923,69 +924,162 @@ void pv_cpuid(struct cpu_user_regs *regs)
     else
         cpuid_count(leaf, subleaf, &a, &b, &c, &d);
 
-    if ( (leaf & 0x7fffffff) == 0x00000001 )
-    {
-        /* Modify Feature Information. */
-        if ( !cpu_has_apic )
-            __clear_bit(X86_FEATURE_APIC, &d);
-
-        if ( !is_pvh_domain(currd) )
-        {
-            __clear_bit(X86_FEATURE_PSE, &d);
-            __clear_bit(X86_FEATURE_PGE, &d);
-            __clear_bit(X86_FEATURE_PSE36, &d);
-            __clear_bit(X86_FEATURE_VME, &d);
-        }
-    }
-
     switch ( leaf )
     {
     case 0x00000001:
-        /* Modify Feature Information. */
-        if ( !cpu_has_sep )
-            __clear_bit(X86_FEATURE_SEP, &d);
-        __clear_bit(X86_FEATURE_DS, &d);
-        __clear_bit(X86_FEATURE_TM1, &d);
-        __clear_bit(X86_FEATURE_PBE, &d);
-        if ( is_pvh_domain(currd) )
-            __clear_bit(X86_FEATURE_MTRR, &d);
+        c &= pv_featureset[FEATURESET_1c];
+        d &= pv_featureset[FEATURESET_1d];
 
-        __clear_bit(X86_FEATURE_DTES64 % 32, &c);
-        __clear_bit(X86_FEATURE_MONITOR % 32, &c);
-        __clear_bit(X86_FEATURE_DSCPL % 32, &c);
-        __clear_bit(X86_FEATURE_VMX % 32, &c);
-        __clear_bit(X86_FEATURE_SMX % 32, &c);
-        __clear_bit(X86_FEATURE_TM2 % 32, &c);
         if ( is_pv_32bit_domain(currd) )
-            __clear_bit(X86_FEATURE_CX16 % 32, &c);
-        __clear_bit(X86_FEATURE_XTPR % 32, &c);
-        __clear_bit(X86_FEATURE_PDCM % 32, &c);
-        __clear_bit(X86_FEATURE_PCID % 32, &c);
-        __clear_bit(X86_FEATURE_DCA % 32, &c);
-        if ( !cpu_has_xsave )
+            c &= ~cpufeat_mask(X86_FEATURE_CX16);
+
+        if ( !is_pvh_domain(currd) )
         {
-            __clear_bit(X86_FEATURE_XSAVE % 32, &c);
-            __clear_bit(X86_FEATURE_AVX % 32, &c);
+            /*
+             * Delete the PVH condition when HVMLite formally replaces PVH,
+             * and HVM guests no longer enter a PV codepath.
+             */
+
+            /*
+             * !!! OSXSAVE handling for PV guests is non-architectural !!!
+             *
+             * Architecturally, the correct code here is simply:
+             *
+             *   if ( curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE )
+             *       c |= cpufeat_mask(X86_FEATURE_OSXSAVE);
+             *
+             * However because of bugs in Xen (before c/s bd19080b, Nov 2010,
+             * the XSAVE cpuid flag leaked into guests despite the feature not
+             * being available for use), buggy workarounds where introduced to
+             * Linux (c/s 947ccf9c, also Nov 2010) which relied on the fact
+             * that Xen also incorrectly leaked OSXSAVE into the guest.
+             *
+             * Furthermore, providing architectural OSXSAVE behaviour to a
+             * many Linux PV guests triggered a further kernel bug when the
+             * fpu code observes that XSAVEOPT is available, assumes that
+             * xsave state had been set up for the task, and follows a wild
+             * pointer.
+             *
+             * Older Linux PVOPS kernels however do require architectural
+             * behaviour.  They observe Xen's leaked OSXSAVE and assume they
+             * can already use XSETBV, dying with a #UD because the shadowed
+             * CR4.OSXSAVE is clear.  This behaviour has been adjusted in all
+             * observed cases via stable backports of the above changeset.
+             *
+             * Therefore, the leaking of Xen's OSXSAVE setting has become a
+             * defacto part of the PV ABI and can't reasonably be corrected.
+             *
+             * The following situations and logic now applies:
+             *
+             * - Hardware without CPUID faulting support and native CPUID:
+             *    There is nothing Xen can do here.  The hosts XSAVE flag will
+             *    leak through and Xen's OSXSAVE choice will leak through.
+             *
+             *    In the case that the guest kernel has not set up OSXSAVE, only
+             *    SSE will be set in xcr0, and guest userspace can't do too much
+             *    damage itself.
+             *
+             * - Enlightened CPUID or CPUID faulting available:
+             *    Xen can fully control what is seen here.  Guest kernels need
+             *    to see the leaked OSXSAVE, but guest userspace is given
+             *    architectural behaviour, to reflect the guest kernels
+             *    intentions.
+             */
+            /* OSXSAVE cleared by pv_featureset.  Fast-forward CR4 back in. */
+            if ( (guest_kernel_mode(curr, regs) &&
+                  (read_cr4() & X86_CR4_OSXSAVE)) ||
+                 (curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE) )
+                c |= cpufeat_mask(X86_FEATURE_OSXSAVE);
+
+            /*
+             * At the time of writing, a PV domain is the only viable option
+             * for Dom0.  Several interactions between dom0 and Xen for real
+             * hardware setup have unfortunately been implemented based on
+             * state which incorrectly leaked into dom0.
+             *
+             * These leaks are retained for backwards compatibility, but
+             * restricted to the hardware domains kernel only.
+             */
+            if ( is_hardware_domain(currd) && guest_kernel_mode(curr, regs) )
+            {
+                /*
+                 * MTRR used to unconditionally leak into PV guests.  They
+                 * cannot MTRR infrastructure at all, and shouldn't be able to
+                 * see the feature.
+                 *
+                 * Modern PVOPS Linux self-clobbers the MTRR feature, to avoid
+                 * trying to use the associated MSRs.  Xenolinux-based PV dom0's
+                 * however use the MTRR feature as an indication of the presence
+                 * of the XENPF_{add,del,read}_memtype hypercalls.
+                 */
+                if ( cpu_has_mtrr )
+                    d |= cpufeat_mask(X86_FEATURE_MTRR);
+
+                /*
+                 * MONITOR never leaked into PV guests, as PV guests cannot
+                 * use the MONITOR/MWAIT instructions.  As such, they require
+                 * the feature to not being present in emulated CPUID.
+                 *
+                 * Modern PVOPS Linux try to be cunning and use native CPUID
+                 * to see if the hardware actually supports MONITOR, and by
+                 * extension, deep C states.
+                 *
+                 * If the feature is seen, deep-C state information is
+                 * obtained from the DSDT and handed back to Xen via the
+                 * XENPF_set_processor_pminfo hypercall.
+                 *
+                 * This mechanism is incompatible with an HVM-based hardware
+                 * domain, and also with CPUID Faulting.
+                 *
+                 * Luckily, Xen can be just as 'cunning', and distinguish an
+                 * emulated CPUID from a faulted CPUID by whether a #UD or #GP
+                 * fault is currently being serviced.  Yuck...
+                 */
+                if ( cpu_has_monitor && regs->entry_vector == TRAP_gp_fault )
+                    c |= cpufeat_mask(X86_FEATURE_MONITOR);
+
+                /*
+                 * While MONITOR never leaked into PV guests, EIST always used
+                 * to.
+                 *
+                 * Modern PVOPS will only parse P state information from the
+                 * DSDT and return it to Xen if EIST is seen in the emulated
+                 * CPUID information.
+                 */
+                if ( cpu_has_eist )
+                    c |= cpufeat_mask(X86_FEATURE_EIST);
+            }
         }
-        if ( !cpu_has_apic )
-           __clear_bit(X86_FEATURE_X2APIC % 32, &c);
-        __set_bit(X86_FEATURE_HYPERVISOR % 32, &c);
+
+        c |= cpufeat_mask(X86_FEATURE_HYPERVISOR);
         break;
 
     case 0x00000007:
         if ( subleaf == 0 )
-            b &= (cpufeat_mask(X86_FEATURE_BMI1) |
-                  cpufeat_mask(X86_FEATURE_HLE)  |
-                  cpufeat_mask(X86_FEATURE_AVX2) |
-                  cpufeat_mask(X86_FEATURE_BMI2) |
-                  cpufeat_mask(X86_FEATURE_ERMS) |
-                  cpufeat_mask(X86_FEATURE_RTM)  |
-                  cpufeat_mask(X86_FEATURE_RDSEED)  |
-                  cpufeat_mask(X86_FEATURE_ADX)  |
-                  cpufeat_mask(X86_FEATURE_FSGSBASE));
+        {
+            /* Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view. */
+            b &= (pv_featureset[FEATURESET_7b0] &
+                  ~special_features[FEATURESET_7b0]);
+            b |= (host_featureset[FEATURESET_7b0] &
+                  special_features[FEATURESET_7b0]);
+
+            c &= pv_featureset[FEATURESET_7c0];
+
+            if ( !is_pvh_domain(currd) )
+            {
+                /*
+                 * Delete the PVH condition when HVMLite formally replaces PVH,
+                 * and HVM guests no longer enter a PV codepath.
+                 */
+
+                /* OSPKE cleared by pv_featureset.  Fast-forward CR4 back in. */
+                if ( curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_PKE )
+                    c |= cpufeat_mask(X86_FEATURE_OSPKE);
+            }
+        }
         else
-            b = 0;
-        a = c = d = 0;
+            b = c = 0;
+        a = d = 0;
         break;
 
     case XSTATE_CPUID:
@@ -1008,37 +1102,49 @@ void pv_cpuid(struct cpu_user_regs *regs)
         }
 
         case 1:
-            a &= (boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_XSAVEOPT)] &
-                  ~cpufeat_mask(X86_FEATURE_XSAVES));
+            a &= pv_featureset[FEATURESET_Da1];
             b = c = d = 0;
             break;
         }
         break;
 
     case 0x80000001:
-        /* Modify Feature Information. */
+        c &= pv_featureset[FEATURESET_e1c];
+        d &= pv_featureset[FEATURESET_e1d];
+
+        /* If not emulating AMD, clear the duplicated features in e1d. */
+        if ( currd->arch.x86_vendor != X86_VENDOR_AMD )
+            d &= ~CPUID_COMMON_1D_FEATURES;
+
+        /*
+         * MTRR used to unconditionally leak into PV guests.  They cannot MTRR
+         * infrastructure at all, and shouldn't be able to see the feature.
+         *
+         * Modern PVOPS Linux self-clobbers the MTRR feature, to avoid trying
+         * to use the associated MSRs.  Xenolinux-based PV dom0's however use
+         * the MTRR feature as an indication of the presence of the
+         * XENPF_{add,del,read}_memtype hypercalls.
+         */
+        if ( is_hardware_domain(currd) && guest_kernel_mode(curr, regs) &&
+             cpu_has_mtrr )
+            d |= cpufeat_mask(X86_FEATURE_MTRR);
+
         if ( is_pv_32bit_domain(currd) )
         {
-            __clear_bit(X86_FEATURE_LM % 32, &d);
-            __clear_bit(X86_FEATURE_LAHF_LM % 32, &c);
-        }
-        if ( is_pv_32bit_domain(currd) &&
-             boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
-            __clear_bit(X86_FEATURE_SYSCALL % 32, &d);
-        __clear_bit(X86_FEATURE_PAGE1GB % 32, &d);
-        __clear_bit(X86_FEATURE_RDTSCP % 32, &d);
+            d &= ~cpufeat_mask(X86_FEATURE_LM);
+            c &= ~cpufeat_mask(X86_FEATURE_LAHF_LM);
 
-        __clear_bit(X86_FEATURE_SVM % 32, &c);
-        if ( !cpu_has_apic )
-           __clear_bit(X86_FEATURE_EXTAPIC % 32, &c);
-        __clear_bit(X86_FEATURE_OSVW % 32, &c);
-        __clear_bit(X86_FEATURE_IBS % 32, &c);
-        __clear_bit(X86_FEATURE_SKINIT % 32, &c);
-        __clear_bit(X86_FEATURE_WDT % 32, &c);
-        __clear_bit(X86_FEATURE_LWP % 32, &c);
-        __clear_bit(X86_FEATURE_NODEID_MSR % 32, &c);
-        __clear_bit(X86_FEATURE_TOPOEXT % 32, &c);
-        __clear_bit(X86_FEATURE_MONITORX % 32, &c);
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
+                d &= ~cpufeat_mask(X86_FEATURE_SYSCALL);
+        }
+        break;
+
+    case 0x80000007:
+        d &= pv_featureset[FEATURESET_e7d];
+        break;
+
+    case 0x80000008:
+        b &= pv_featureset[FEATURESET_e8b];
         break;
 
     case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */

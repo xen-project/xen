@@ -72,6 +72,7 @@
 #include <public/memory.h>
 #include <public/vm_event.h>
 #include <public/arch-x86/cpuid.h>
+#include <asm/cpuid.h>
 
 bool_t __read_mostly hvm_enabled;
 
@@ -3358,62 +3359,71 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         /* Fix up VLAPIC details. */
         *ebx &= 0x00FFFFFFu;
         *ebx |= (v->vcpu_id * 2) << 24;
+
+        *ecx &= hvm_featureset[FEATURESET_1c];
+        *edx &= hvm_featureset[FEATURESET_1d];
+
+        /* APIC exposed to guests, but Fast-forward MSR_APIC_BASE.EN back in. */
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-            __clear_bit(X86_FEATURE_APIC & 31, edx);
+            *edx &= ~cpufeat_bit(X86_FEATURE_APIC);
 
-        /* Fix up OSXSAVE. */
-        if ( *ecx & cpufeat_mask(X86_FEATURE_XSAVE) &&
-             (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) )
+        /* OSXSAVE cleared by hvm_featureset.  Fast-forward CR4 back in. */
+        if ( v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE )
             *ecx |= cpufeat_mask(X86_FEATURE_OSXSAVE);
-        else
-            *ecx &= ~cpufeat_mask(X86_FEATURE_OSXSAVE);
 
-        /* Don't expose PCID to non-hap hvm. */
+        /* Don't expose HAP-only features to non-hap guests. */
         if ( !hap_enabled(d) )
+        {
             *ecx &= ~cpufeat_mask(X86_FEATURE_PCID);
 
-        /* Only provide PSE36 when guest runs in 32bit PAE or in long mode */
-        if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
-            *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
+            /*
+             * PSE36 is not supported in shadow mode.  This bit should be
+             * unilaterally cleared.
+             *
+             * However, an unspecified version of Hyper-V from 2011 refuses
+             * to start as the "cpu does not provide required hw features" if
+             * it can't see PSE36.
+             *
+             * As a workaround, leak the toolstack-provided PSE36 value into a
+             * shadow guest if the guest is already using PAE paging (and
+             * won't care about reverting back to PSE paging).  Otherwise,
+             * knoble it, so a 32bit guest doesn't get the impression that it
+             * could try to use PSE36 paging.
+             */
+            if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
+                *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
+        }
         break;
+
     case 0x7:
         if ( count == 0 )
         {
-            if ( !cpu_has_smep )
-                *ebx &= ~cpufeat_mask(X86_FEATURE_SMEP);
+            /* Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view. */
+            *ebx &= (hvm_featureset[FEATURESET_7b0] &
+                     ~special_features[FEATURESET_7b0]);
+            *ebx |= (host_featureset[FEATURESET_7b0] &
+                     special_features[FEATURESET_7b0]);
 
-            if ( !cpu_has_smap )
-                *ebx &= ~cpufeat_mask(X86_FEATURE_SMAP);
+            *ecx &= hvm_featureset[FEATURESET_7c0];
 
-            /* Don't expose MPX to hvm when VMX support is not available. */
-            if ( !(vmx_vmexit_control & VM_EXIT_CLEAR_BNDCFGS) ||
-                 !(vmx_vmentry_control & VM_ENTRY_LOAD_BNDCFGS) )
-                *ebx &= ~cpufeat_mask(X86_FEATURE_MPX);
-
+            /* Don't expose HAP-only features to non-hap guests. */
             if ( !hap_enabled(d) )
             {
-                 /* Don't expose INVPCID to non-hap hvm. */
                  *ebx &= ~cpufeat_mask(X86_FEATURE_INVPCID);
-                 /* X86_FEATURE_PKU is not yet implemented for shadow paging. */
                  *ecx &= ~cpufeat_mask(X86_FEATURE_PKU);
             }
 
-            if ( (*ecx & cpufeat_mask(X86_FEATURE_PKU)) &&
-                 (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PKE) )
+            /* OSPKE cleared by hvm_featureset.  Fast-forward CR4 back in. */
+            if ( v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PKE )
                 *ecx |= cpufeat_mask(X86_FEATURE_OSPKE);
-            else
-                *ecx &= ~cpufeat_mask(X86_FEATURE_OSPKE);
-
-            /* Don't expose PCOMMIT to hvm when VMX support is not available. */
-            if ( !cpu_has_vmx_pcommit )
-                *ebx &= ~cpufeat_mask(X86_FEATURE_PCOMMIT);
         }
-
         break;
+
     case 0xb:
         /* Fix the x2APIC identifier. */
         *edx = v->vcpu_id * 2;
         break;
+
     case 0xd:
         /* EBX value of main leaf 0 depends on enabled xsave features */
         if ( count == 0 && v->arch.xcr0 ) 
@@ -3430,11 +3440,15 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                     *ebx = _eax + _ebx;
             }
         }
+
         if ( count == 1 )
         {
-            uint64_t xfeatures = v->arch.xcr0 | v->arch.hvm_vcpu.msr_xss;
-            if ( cpu_has_xsaves && cpu_has_vmx_xsaves && xfeatures )
+            *eax &= hvm_featureset[FEATURESET_Da1];
+
+            if ( *eax & cpufeat_mask(X86_FEATURE_XSAVES) )
             {
+                uint64_t xfeatures = v->arch.xcr0 | v->arch.hvm_vcpu.msr_xss;
+
                 *ebx = XSTATE_AREA_MIN_SIZE;
                 if ( xfeatures & ~XSTATE_FP_SSE )
                     for ( sub_leaf = 2; sub_leaf < 63; sub_leaf++ )
@@ -3451,20 +3465,42 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         break;
 
     case 0x80000001:
-        /* We expose RDTSCP feature to guest only when
-           tsc_mode == TSC_MODE_DEFAULT and host_tsc_is_safe() returns 1 */
-        if ( d->arch.tsc_mode != TSC_MODE_DEFAULT ||
-             !host_tsc_is_safe() )
-            *edx &= ~cpufeat_mask(X86_FEATURE_RDTSCP);
-        /* Hide 1GB-superpage feature if we can't emulate it. */
-        if (!hvm_pse1gb_supported(d))
+        *ecx &= hvm_featureset[FEATURESET_e1c];
+        *edx &= hvm_featureset[FEATURESET_e1d];
+
+        /* If not emulating AMD, clear the duplicated features in e1d. */
+        if ( d->arch.x86_vendor != X86_VENDOR_AMD )
+            *edx &= ~CPUID_COMMON_1D_FEATURES;
+        /* fast-forward MSR_APIC_BASE.EN if it hasn't already been clobbered. */
+        else if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
+            *edx &= ~cpufeat_bit(X86_FEATURE_APIC);
+
+        /* Don't expose HAP-only features to non-hap guests. */
+        if ( !hap_enabled(d) )
+        {
             *edx &= ~cpufeat_mask(X86_FEATURE_PAGE1GB);
-        /* Only provide PSE36 when guest runs in 32bit PAE or in long mode */
-        if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
-            *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
-        /* Hide data breakpoint extensions if the hardware has no support. */
-        if ( !boot_cpu_has(X86_FEATURE_DBEXT) )
-            *ecx &= ~cpufeat_mask(X86_FEATURE_DBEXT);
+
+            /*
+             * PSE36 is not supported in shadow mode.  This bit should be
+             * unilaterally cleared.
+             *
+             * However, an unspecified version of Hyper-V from 2011 refuses
+             * to start as the "cpu does not provide required hw features" if
+             * it can't see PSE36.
+             *
+             * As a workaround, leak the toolstack-provided PSE36 value into a
+             * shadow guest if the guest is already using PAE paging (and
+             * won't care about reverting back to PSE paging).  Otherwise,
+             * knoble it, so a 32bit guest doesn't get the impression that it
+             * could try to use PSE36 paging.
+             */
+            if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
+                *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
+        }
+        break;
+
+    case 0x80000007:
+        *edx &= hvm_featureset[FEATURESET_e7d];
         break;
 
     case 0x80000008:
@@ -3482,6 +3518,8 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         hvm_cpuid(0x80000001, NULL, NULL, NULL, &_edx);
         *eax = (*eax & ~0xffff00) | (_edx & cpufeat_mask(X86_FEATURE_LM)
                                      ? 0x3000 : 0x2000);
+
+        *ebx &= hvm_featureset[FEATURESET_e8b];
         break;
     }
 }
