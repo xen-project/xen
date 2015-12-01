@@ -1010,7 +1010,7 @@ static int apply_p2m_changes(struct domain *d,
                 if ( (egfn - sgfn) > progress && !(progress & mask) )
                 {
                     rc = progress;
-                    goto tlbflush;
+                    goto out;
                 }
                 break;
             }
@@ -1096,14 +1096,12 @@ static int apply_p2m_changes(struct domain *d,
 
     rc = 0;
 
-tlbflush:
+out:
     if ( flush )
     {
         flush_tlb_domain(d);
         iommu_iotlb_flush(d, sgfn, egfn - sgfn);
     }
-
-out:
 
     if ( rc < 0 && ( op == INSERT || op == ALLOCATE ) &&
          addr != start_gpaddr )
