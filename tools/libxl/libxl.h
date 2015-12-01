@@ -1396,6 +1396,71 @@ void libxl_vtpminfo_list_free(libxl_vtpminfo *, int nr_vtpms);
  *
  *   This function does not interact with the guest and therefore
  *   cannot block on the guest.
+ *
+ * Controllers
+ * -----------
+ *
+ * Most devices are treated individually.  Some classes of device,
+ * however, like USB or SCSI, inherently have the need to have a
+ * hierarchy of different levels, with lower-level devices "attached"
+ * to higher-level ones.  USB for instance has "controllers" at the
+ * top, which have buses, on which are devices, which consist of
+ * multiple interfaces.  SCSI has "hosts" at the top, then buses,
+ * targets, and LUNs.
+ *
+ * In that case, for each <class>, there will be a set of functions
+ * and types for each <level>.  For example, for <class>=usb, there
+ * may be <levels> ctrl (controller) and dev (device), with ctrl being
+ * level 0.
+ *
+ * libxl_device_<class><level0>_<function> will act more or
+ * less like top-level non-bus devices: they will either create or
+ * accept a libxl_devid which will be unique within the
+ * <class><level0> libxl_devid namespace.
+ *
+ * Lower-level devices must have a unique way to be identified.  One
+ * way to do this would be to name it via the name of the next level
+ * up plus an index; for instance, <ctrl devid, port number>.  Another
+ * way would be to have another devid namespace for that level.  This
+ * identifier will be used for queries and removals.
+ *
+ * Lower-level devices will include in their
+ * libxl_device_<class><level> struct a field referring to the unique
+ * index of the level above.  For instance, libxl_device_usbdev might
+ * contain the controller devid.
+ *
+ * In the case where there are multiple different ways to implement a
+ * given device -- for instance, one which is fully PV and one which
+ * uses an emulator -- the controller will contain a field which
+ * specifies what type of implementation is used.  The implementations
+ * of individual devices will be known by the controller to which they
+ * are attached.
+ *
+ * If libxl_device_<class><level>_add receives an empty reference to
+ * the level above, it may return an error.  Or it may (but is not
+ * required to) automatically choose a suitable device in the level
+ * above to which to attach the new device at this level.  It may also
+ * (but is not required to) automatically create a new device at the
+ * level above if no suitable devices exist.  Each class should
+ * document its behavior.
+ *
+ * libxl_device_<class><level>_list will list all devices of <class>
+ * at <level> in the domain.  For example, libxl_device_usbctrl_list
+ * will list all usb controllers; libxl_class_usbdev_list will list
+ * all usb devices across all controllers.
+ *
+ * For each class, the domain config file will contain a single list
+ * for each level.  libxl will first iterate through the list of
+ * top-level devices, then iterate through each level down in turn,
+ * adding devices to devices in the level above.  For instance, there
+ * will be one list for all usb controllers, and one list for all usb
+ * devices.
+ *
+ * If libxl_device_<class><level>_add automatically creates
+ * higher-level devices as necessary, then it is permissible for the
+ * higher-level lists to be empty and the device list to have devices
+ * with the field containing a reference to the higher level device
+ * uninitialized.
  */
 
 /* Disks */
