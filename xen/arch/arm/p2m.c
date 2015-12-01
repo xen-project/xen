@@ -367,6 +367,14 @@ static inline void p2m_write_pte(lpae_t *p, lpae_t pte, bool_t flush_cache)
         clean_dcache(*p);
 }
 
+static inline void p2m_remove_pte(lpae_t *p, bool_t flush_cache)
+{
+    lpae_t pte;
+
+    memset(&pte, 0x00, sizeof(pte));
+    p2m_write_pte(p, pte, flush_cache);
+}
+
 /*
  * Allocate a new page table page and hook it in via the given entry.
  * apply_one_level relies on this returning 0 on success
@@ -839,8 +847,7 @@ static int apply_one_level(struct domain *d,
 
         *flush = true;
 
-        memset(&pte, 0x00, sizeof(pte));
-        p2m_write_pte(entry, pte, flush_cache);
+        p2m_remove_pte(entry, flush_cache);
         p2m_mem_access_radix_set(p2m, paddr_to_pfn(*addr), p2m_access_rwx);
 
         *addr += level_size;
