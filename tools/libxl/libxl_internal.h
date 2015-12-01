@@ -666,9 +666,6 @@ _hidden int libxl__xs_writev_perms(libxl__gc *gc, xs_transaction_t t,
 /* _atonce creates a transaction and writes all keys at once */
 _hidden int libxl__xs_writev_atonce(libxl__gc *gc,
                              const char *dir, char **kvs);
-
-_hidden int libxl__xs_printf(libxl__gc *gc, xs_transaction_t t,
-               const char *path, const char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
    /* Each fn returns 0 on success.
     * On error: returns -1, sets errno (no logging) */
 
@@ -687,6 +684,11 @@ _hidden char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid);
 /* Each of these functions will check that it succeeded; if it
  * fails it logs and returns ERROR_FAIL.
  */
+
+int libxl__xs_vprintf(libxl__gc *gc, xs_transaction_t t,
+                      const char *path, const char *fmt, va_list ap);
+int libxl__xs_printf(libxl__gc *gc, xs_transaction_t t,
+                     const char *path, const char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
 
 /* On success, path will exist and will have an empty value */
 int libxl__xs_mknod(libxl__gc *gc, xs_transaction_t t,
