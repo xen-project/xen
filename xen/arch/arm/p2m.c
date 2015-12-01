@@ -942,6 +942,7 @@ static int apply_p2m_changes(struct domain *d,
     int rc, ret;
     struct p2m_domain *p2m = &d->arch.p2m;
     lpae_t *mappings[4] = { NULL, NULL, NULL, NULL };
+    struct page_info *pages[4] = { NULL, NULL, NULL, NULL };
     paddr_t addr, orig_maddr = maddr;
     unsigned int level = 0;
     unsigned int cur_root_table = ~0;
@@ -964,7 +965,10 @@ static int apply_p2m_changes(struct domain *d,
 
     /* Static mapping. P2M_ROOT_PAGES > 1 are handled below */
     if ( P2M_ROOT_PAGES == 1 )
+    {
         mappings[P2M_ROOT_LEVEL] = __map_domain_page(p2m->root);
+        pages[P2M_ROOT_LEVEL] = p2m->root;
+    }
 
     addr = start_gpaddr;
     while ( addr < end_gpaddr )
@@ -1047,6 +1051,7 @@ static int apply_p2m_changes(struct domain *d,
                     unmap_domain_page(mappings[P2M_ROOT_LEVEL]);
                 mappings[P2M_ROOT_LEVEL] =
                     __map_domain_page(p2m->root + root_table);
+                pages[P2M_ROOT_LEVEL] = p2m->root + root_table;
                 cur_root_table = root_table;
                 /* Any mapping further down is now invalid */
                 for ( i = P2M_ROOT_LEVEL; i < 4; i++ )
@@ -1079,6 +1084,7 @@ static int apply_p2m_changes(struct domain *d,
                 if ( mappings[level+1] )
                     unmap_domain_page(mappings[level+1]);
                 mappings[level+1] = map_domain_page(_mfn(entry->p2m.base));
+                pages[level+1] = mfn_to_page(entry->p2m.base);
                 cur_offset[level] = offset;
                 /* Any mapping further down is now invalid */
                 for ( i = level+1; i < 4; i++ )
