@@ -15,6 +15,9 @@ export XEN_BUILD_HOST	?= $(shell hostname)
 export BASEDIR := $(CURDIR)
 export XEN_ROOT := $(BASEDIR)/..
 
+# Do not use make's built-in rules and variables
+MAKEFLAGS += -rR
+
 EFI_MOUNTPOINT ?= $(BOOT_DIR)/efi
 
 .PHONY: default
