@@ -644,7 +644,6 @@ bool_t ept_handle_misconfig(uint64_t gpa)
     spurious = curr->arch.hvm_vmx.ept_spurious_misconfig;
     rc = resolve_misconfig(p2m, PFN_DOWN(gpa));
     curr->arch.hvm_vmx.ept_spurious_misconfig = 0;
-    ept_sync_domain(p2m);
 
     p2m_unlock(p2m);
 
@@ -671,7 +670,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     bool_t need_modify_vtd_table = 1;
     bool_t vtd_pte_present = 0;
     unsigned int iommu_flags = p2m_get_iommu_flags(p2mt);
-    enum { sync_off, sync_on, sync_check } needs_sync = sync_check;
+    bool_t needs_sync = 1;
     ept_entry_t old_entry = { .epte = 0 };
     ept_entry_t new_entry = { .epte = 0 };
     struct ept_data *ept = &p2m->ept;
@@ -692,12 +691,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     /* Carry out any eventually pending earlier changes first. */
     ret = resolve_misconfig(p2m, gfn);
     if ( ret < 0 )
-    {
-        ept_sync_domain(p2m);
         return ret;
-    }
-    if ( ret > 0 )
-        needs_sync = sync_on;
 
     ASSERT((target == 2 && hap_has_1gb) ||
            (target == 1 && hap_has_2mb) ||
@@ -740,8 +734,8 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         /* We reached the target level. */
 
         /* No need to flush if the old entry wasn't valid */
-        if ( needs_sync == sync_check && !is_epte_present(ept_entry) )
-            needs_sync = sync_off;
+        if ( !is_epte_present(ept_entry) )
+            needs_sync = 0;
 
         /* If we're replacing a non-leaf entry with a leaf entry (1GiB or 2MiB),
          * the intermediate tables will be freed below after the ept flush
@@ -822,7 +816,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         p2m->max_mapped_pfn = gfn + (1UL << order) - 1;
 
 out:
-    if ( needs_sync != sync_off )
+    if ( needs_sync )
         ept_sync_domain(p2m);
 
     /* For host p2m, may need to change VT-d page table.*/
