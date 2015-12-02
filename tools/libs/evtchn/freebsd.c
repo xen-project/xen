@@ -32,7 +32,7 @@
 
 int osdep_evtchn_open(xenevtchn_handle *xce)
 {
-    int fd = open(EVTCHN_DEV, O_RDWR);
+    int fd = open(EVTCHN_DEV, O_RDWR|O_CLOEXEC);
     if ( fd == -1 )
         return -1;
     xce->fd = fd;

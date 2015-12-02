@@ -30,15 +30,21 @@
 
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem)
 {
-    int flags, saved_errno;
-    int fd = open("/dev/xen/privcmd", O_RDWR); /* prefer this newer interface */
+    int fd;
+
+    /* prefer this newer interface */
+    fd = open("/dev/xen/privcmd", O_RDWR|O_CLOEXEC);
 
     if ( fd == -1 && ( errno == ENOENT || errno == ENXIO || errno == ENODEV ))
     {
         /* Fallback to /proc/xen/privcmd */
-        fd = open("/proc/xen/privcmd", O_RDWR);
+        fd = open("/proc/xen/privcmd", O_RDWR|O_CLOEXEC);
     }
 
     if ( fd == -1 )
@@ -47,32 +53,8 @@ int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem)
         return -1;
     }
 
-    /* Although we return the file handle as the 'xc handle' the API
-       does not specify / guarentee that this integer is in fact
-       a file handle. Thus we must take responsiblity to ensure
-       it doesn't propagate (ie leak) outside the process */
-    if ( (flags = fcntl(fd, F_GETFD)) < 0 )
-    {
-        PERROR("Could not get file handle flags");
-        goto error;
-    }
-
-    flags |= FD_CLOEXEC;
-
-    if ( fcntl(fd, F_SETFD, flags) < 0 )
-    {
-        PERROR("Could not set file handle flags");
-        goto error;
-    }
-
     fmem->fd = fd;
     return 0;
-
- error:
-    saved_errno = errno;
-    close(fd);
-    errno = saved_errno;
-    return -1;
 }
 
 int osdep_xenforeignmemory_close(xenforeignmemory_handle *fmem)

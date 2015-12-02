@@ -43,9 +43,13 @@
 #define PAGE_SIZE            (1UL << PAGE_SHIFT)
 #define PAGE_MASK            (~(PAGE_SIZE-1))
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 int osdep_gnttab_open(xengnttab_handle *xgt)
 {
-    int fd = open(DEVXEN "gntdev", O_RDWR);
+    int fd = open(DEVXEN "gntdev", O_RDWR|O_CLOEXEC);
     if ( fd == -1 )
         return -1;
     xgt->fd = fd;

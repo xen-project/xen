@@ -26,15 +26,23 @@
 
 #include "private.h"
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 int osdep_xencall_open(xencall_handle *xcall)
 {
-    int flags, saved_errno;
-    int fd = open("/dev/xen/privcmd", O_RDWR); /* prefer this newer interface */
+    int fd;
+
+    /*
+     * Prefer the newer interface.
+     */
+    fd = open("/dev/xen/privcmd", O_RDWR|O_CLOEXEC);
 
     if ( fd == -1 && ( errno == ENOENT || errno == ENXIO || errno == ENODEV ))
     {
         /* Fallback to /proc/xen/privcmd */
-        fd = open("/proc/xen/privcmd", O_RDWR);
+        fd = open("/proc/xen/privcmd", O_RDWR|O_CLOEXEC);
     }
 
     if ( fd == -1 )
@@ -43,32 +51,8 @@ int osdep_xencall_open(xencall_handle *xcall)
         return -1;
     }
 
-    /* Although we return the file handle as the 'xc handle' the API
-       does not specify / guarentee that this integer is in fact
-       a file handle. Thus we must take responsiblity to ensure
-       it doesn't propagate (ie leak) outside the process */
-    if ( (flags = fcntl(fd, F_GETFD)) < 0 )
-    {
-        PERROR("Could not get file handle flags");
-        goto error;
-    }
-
-    flags |= FD_CLOEXEC;
-
-    if ( fcntl(fd, F_SETFD, flags) < 0 )
-    {
-        PERROR("Could not set file handle flags");
-        goto error;
-    }
-
     xcall->fd = fd;
     return 0;
-
- error:
-    saved_errno = errno;
-    close(fd);
-    errno = saved_errno;
-    return -1;
 }
 
 int osdep_xencall_close(xencall_handle *xcall)

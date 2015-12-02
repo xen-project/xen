@@ -33,34 +33,14 @@
 
 int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem)
 {
-    int flags, saved_errno;
-    int fd = open(PRIVCMD_DEV, O_RDWR);
+    int saved_errno;
+    int fd = open(PRIVCMD_DEV, O_RDWR|O_CLOEXEC);
 
     if ( fd == -1 )
     {
         PERROR("Could not obtain handle on privileged command interface "
                PRIVCMD_DEV);
         return -1;
-    }
-
-    /*
-     * Although we return the file handle as the 'xc handle' the API
-     * does not specify / guarentee that this integer is in fact
-     * a file handle. Thus we must take responsiblity to ensure
-     * it doesn't propagate (ie leak) outside the process.
-     */
-    if ( (flags = fcntl(fd, F_GETFD)) < 0 )
-    {
-        PERROR("Could not get file handle flags");
-        goto error;
-    }
-
-    flags |= FD_CLOEXEC;
-
-    if ( fcntl(fd, F_SETFD, flags) < 0 )
-    {
-        PERROR("Could not set file handle flags");
-        goto error;
     }
 
     fmem->fd = fd;

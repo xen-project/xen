@@ -28,9 +28,13 @@
 
 #include "private.h"
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 int osdep_evtchn_open(xenevtchn_handle *xce)
 {
-    int fd = open("/dev/xen/evtchn", O_RDWR);
+    int fd = open("/dev/xen/evtchn", O_RDWR|O_CLOEXEC);
     if ( fd == -1 )
         return -1;
     xce->fd = fd;
