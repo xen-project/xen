@@ -54,9 +54,11 @@ struct xc_sr_save_ops
                           void **page);
 
     /**
-     * Set up local environment to restore a domain.  This is called before
-     * any records are written to the stream.  (Typically querying running
-     * domain state, setting up mappings etc.)
+     * Set up local environment to save a domain. (Typically querying
+     * running domain state, setting up mappings etc.)
+     *
+     * This is called once before any common setup has occurred, allowing for
+     * guest-specific adjustments to be made to common state.
      */
     int (*setup)(struct xc_sr_context *ctx);
 
@@ -121,8 +123,10 @@ struct xc_sr_restore_ops
     int (*localise_page)(struct xc_sr_context *ctx, uint32_t type, void *page);
 
     /**
-     * Set up local environment to restore a domain.  This is called before
-     * any records are read from the stream.
+     * Set up local environment to restore a domain.
+     *
+     * This is called once before any common setup has occurred, allowing for
+     * guest-specific adjustments to be made to common state.
      */
     int (*setup)(struct xc_sr_context *ctx);
 

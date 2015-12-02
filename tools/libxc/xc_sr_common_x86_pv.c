@@ -68,8 +68,7 @@ uint64_t mfn_to_cr3(struct xc_sr_context *ctx, xen_pfn_t _mfn)
 int x86_pv_domain_info(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    unsigned int guest_width, guest_levels, fpp;
-    xen_pfn_t max_pfn;
+    unsigned int guest_width, guest_levels;
 
     /* Get the domain width */
     if ( xc_domain_get_guest_width(xch, ctx->domid, &guest_width) )
@@ -89,24 +88,8 @@ int x86_pv_domain_info(struct xc_sr_context *ctx)
     }
     ctx->x86_pv.width = guest_width;
     ctx->x86_pv.levels = guest_levels;
-    fpp = PAGE_SIZE / ctx->x86_pv.width;
 
     DPRINTF("%d bits, %d levels", guest_width * 8, guest_levels);
-
-    /* Get the domain's size */
-    if ( xc_domain_maximum_gpfn(xch, ctx->domid, &max_pfn) < 0 )
-    {
-        PERROR("Unable to obtain guests max pfn");
-        return -1;
-    }
-
-    if ( max_pfn > 0 )
-    {
-        ctx->x86_pv.max_pfn = max_pfn;
-        ctx->x86_pv.p2m_frames = (ctx->x86_pv.max_pfn + fpp) / fpp;
-
-        DPRINTF("max_pfn %#lx, p2m_frames %d", max_pfn, ctx->x86_pv.p2m_frames);
-    }
 
     return 0;
 }

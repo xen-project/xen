@@ -677,6 +677,10 @@ static int setup(struct xc_sr_context *ctx)
     DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
                                     &ctx->save.dirty_bitmap_hbuf);
 
+    rc = ctx->save.ops.setup(ctx);
+    if ( rc )
+        goto err;
+
     dirty_bitmap = xc_hypercall_buffer_alloc_pages(
                    xch, dirty_bitmap, NRPAGES(bitmap_size(ctx->save.p2m_size)));
     ctx->save.batch_pfns = malloc(MAX_BATCH_SIZE *
@@ -691,10 +695,6 @@ static int setup(struct xc_sr_context *ctx)
         errno = ENOMEM;
         goto err;
     }
-
-    rc = ctx->save.ops.setup(ctx);
-    if ( rc )
-        goto err;
 
     rc = 0;
 
@@ -824,7 +824,6 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
                    uint32_t max_iters, uint32_t max_factor, uint32_t flags,
                    struct save_callbacks* callbacks, int hvm)
 {
-    xen_pfn_t nr_pfns;
     struct xc_sr_context ctx =
         {
             .xch = xch,
@@ -868,21 +867,6 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
     }
 
     ctx.domid = dom;
-
-    if ( xc_domain_nr_gpfns(xch, dom, &nr_pfns) < 0 )
-    {
-        PERROR("Unable to obtain the guest p2m size");
-        return -1;
-    }
-
-    ctx.save.p2m_size = nr_pfns;
-
-    if ( ctx.save.p2m_size > ~XEN_DOMCTL_PFINFO_LTAB_MASK )
-    {
-        errno = E2BIG;
-        ERROR("Cannot save this big a guest");
-        return -1;
-    }
 
     if ( ctx.dominfo.hvm )
     {

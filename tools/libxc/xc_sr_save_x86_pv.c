@@ -83,8 +83,8 @@ static int map_p2m(struct xc_sr_context *ctx)
      */
     xc_interface *xch = ctx->xch;
     int rc = -1;
-    unsigned x, fpp, fll_entries, fl_entries;
-    xen_pfn_t fll_mfn;
+    unsigned x, saved_x, fpp, fll_entries, fl_entries;
+    xen_pfn_t fll_mfn, saved_mfn, max_pfn;
 
     xen_pfn_t *local_fll = NULL;
     void *guest_fll = NULL;
@@ -94,9 +94,15 @@ static int map_p2m(struct xc_sr_context *ctx)
     void *guest_fl = NULL;
     size_t local_fl_size;
 
+    ctx->x86_pv.max_pfn = GET_FIELD(ctx->x86_pv.shinfo, arch.max_pfn,
+                                    ctx->x86_pv.width) - 1;
     fpp = PAGE_SIZE / ctx->x86_pv.width;
     fll_entries = (ctx->x86_pv.max_pfn / (fpp * fpp)) + 1;
-    fl_entries  = (ctx->x86_pv.max_pfn / fpp) + 1;
+    if ( fll_entries > fpp )
+    {
+        ERROR("max_pfn %#lx too large for p2m tree", ctx->x86_pv.max_pfn);
+        goto err;
+    }
 
     fll_mfn = GET_FIELD(ctx->x86_pv.shinfo, arch.pfn_to_mfn_frame_list_list,
                         ctx->x86_pv.width);
@@ -131,6 +137,8 @@ static int map_p2m(struct xc_sr_context *ctx)
     }
 
     /* Check for bad mfns in frame list list. */
+    saved_mfn = 0;
+    saved_x = 0;
     for ( x = 0; x < fll_entries; ++x )
     {
         if ( local_fll[x] == 0 || local_fll[x] > ctx->x86_pv.max_mfn )
@@ -139,7 +147,34 @@ static int map_p2m(struct xc_sr_context *ctx)
                   local_fll[x], x, fll_entries);
             goto err;
         }
+        if ( local_fll[x] != saved_mfn )
+        {
+            saved_mfn = local_fll[x];
+            saved_x = x;
+        }
     }
+
+    /*
+     * Check for actual lower max_pfn:
+     * If the trailing entries of the frame list list were all the same we can
+     * assume they all reference mid pages all referencing p2m pages with all
+     * invalid entries. Otherwise there would be multiple pfns referencing all
+     * the same mfn which can't work across migration, as this sharing would be
+     * broken by the migration process.
+     * Adjust max_pfn if possible to avoid allocating much larger areas as
+     * needed for p2m and logdirty map.
+     */
+    max_pfn = (saved_x + 1) * fpp * fpp - 1;
+    if ( max_pfn < ctx->x86_pv.max_pfn )
+    {
+        ctx->x86_pv.max_pfn = max_pfn;
+        fll_entries = (ctx->x86_pv.max_pfn / (fpp * fpp)) + 1;
+    }
+    ctx->x86_pv.p2m_frames = (ctx->x86_pv.max_pfn + fpp) / fpp;
+    DPRINTF("max_pfn %#lx, p2m_frames %d", ctx->x86_pv.max_pfn,
+            ctx->x86_pv.p2m_frames);
+    ctx->save.p2m_size = ctx->x86_pv.max_pfn + 1;
+    fl_entries  = (ctx->x86_pv.max_pfn / fpp) + 1;
 
     /* Map the guest mid p2m frames. */
     guest_fl = xc_map_foreign_pages(xch, ctx->domid, PROT_READ,
