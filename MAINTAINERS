@@ -117,6 +117,7 @@ M:	Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 M:	Aravind Gopalakrishnan <Aravind.Gopalakrishnan@amd.com>
 S:	Supported
 F:	xen/arch/x86/hvm/svm/
+F:	xen/arch/x86/cpu/vpmu_amd.c
 
 ARINC653 SCHEDULER
 M:	Josh Whitehead <josh.whitehead@dornerworks.com>
@@ -205,6 +206,7 @@ S:	Supported
 F:	xen/arch/x86/hvm/vmx/
 F:	xen/arch/x86/mm/p2m-ept.c
 F:	xen/include/asm-x86/hvm/vmx/
+F:	xen/arch/x86/cpu/vpmu_intel.c
 
 IOMMU VENDOR INDEPENDENT CODE
 M:	Jan Beulich <jbeulich@suse.com>
