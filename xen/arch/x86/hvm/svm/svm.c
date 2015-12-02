@@ -2612,10 +2612,11 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_XSETBV:
-        if ( (inst_len = __get_instruction_length(current, INSTR_XSETBV))==0 )
-            break;
-        if ( hvm_handle_xsetbv(regs->ecx,
-                               (regs->rdx << 32) | regs->_eax) == 0 )
+        if ( vmcb_get_cpl(vmcb) )
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        else if ( (inst_len = __get_instruction_length(v, INSTR_XSETBV)) &&
+                  hvm_handle_xsetbv(regs->ecx,
+                                    (regs->rdx << 32) | regs->_eax) == 0 )
             __update_guest_eip(regs, inst_len);
         break;
 

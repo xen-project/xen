@@ -3153,22 +3153,15 @@ out:
 
 int hvm_handle_xsetbv(u32 index, u64 new_bv)
 {
-    struct segment_register sreg;
-    struct vcpu *curr = current;
+    int rc;
 
-    hvm_get_segment_register(curr, x86_seg_ss, &sreg);
-    if ( sreg.attr.fields.dpl != 0 )
-        goto err;
+    hvm_event_crX(XCR0, new_bv, current->arch.xcr0);
 
-    hvm_event_crX(XCR0, new_bv, curr->arch.xcr0);
+    rc = handle_xsetbv(index, new_bv);
+    if ( rc )
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
-    if ( handle_xsetbv(index, new_bv) )
-        goto err;
-
-    return 0;
-err:
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
-    return -1;
+    return rc;
 }
 
 int hvm_set_efer(uint64_t value)
