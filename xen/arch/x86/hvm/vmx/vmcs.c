@@ -64,7 +64,7 @@ integer_param("ple_gap", ple_gap);
 static unsigned int __read_mostly ple_window = 4096;
 integer_param("ple_window", ple_window);
 
-static bool_t __read_mostly opt_pml_enabled = 0;
+static bool_t __read_mostly opt_pml_enabled = 1;
 static s8 __read_mostly opt_ept_ad = -1;
 
 /*

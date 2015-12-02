@@ -715,7 +715,7 @@ Controls EPT related features.
 
 > `pml`
 
-> Default: `false`
+> Default: `true`
 
 >> PML is a new hardware feature in Intel's Broadwell Server and further
 >> platforms which reduces hypervisor overhead of log-dirty mechanism by
