@@ -5,7 +5,7 @@ include $(TOPLEVEL)/common.make
 # allow mixed declarations and code
 CFLAGS += -Wno-declaration-after-statement
 
-CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
+CFLAGS += $(CFLAGS_libxentoollog)
 CFLAGS += $(APPEND_CFLAGS)
 OCAMLINCLUDE +=
 
@@ -13,7 +13,7 @@ OBJS = xentoollog
 INTF = xentoollog.cmi
 LIBS = xentoollog.cma xentoollog.cmxa
 
-LIBS_xentoollog = $(LDLIBS_libxenctrl)
+LIBS_xentoollog = $(LDLIBS_libxentoollog)
 
 xentoollog_OBJS = $(OBJS)
 xentoollog_C_OBJS = xentoollog_stubs
@@ -49,7 +49,7 @@ xentoollog.mli: xentoollog.mli.in _xtl_levels.mli.in
 
 libs: $(LIBS)
 
-_xtl_levels.ml.in _xtl_levels.mli.in _xtl_levels.inc: genlevels.py $(XEN_ROOT)/tools/libxc/include/xentoollog.h
+_xtl_levels.ml.in _xtl_levels.mli.in _xtl_levels.inc: genlevels.py $(XEN_ROOT)/tools/libs/toollog/include/xentoollog.h
 	$(PYTHON) genlevels.py _xtl_levels.mli.in _xtl_levels.ml.in _xtl_levels.inc
 
 .PHONY: install

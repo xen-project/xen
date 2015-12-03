@@ -3,7 +3,7 @@
 import sys
 
 def read_levels():
-	f = open('../../../libxc/include/xentoollog.h', 'r')
+	f = open('../../../libs/toollog/include/xentoollog.h', 'r')
 
 	levels = []
 	record = False
