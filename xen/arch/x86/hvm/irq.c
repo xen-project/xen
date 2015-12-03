@@ -330,6 +330,10 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
          (via_type > HVMIRQ_callback_vector) )
         via_type = HVMIRQ_callback_none;
 
+    if ( via_type != HVMIRQ_callback_vector &&
+         (!has_vlapic(d) || !has_vioapic(d) || !has_vpic(d)) )
+        return;
+
     spin_lock(&d->arch.hvm_domain.irq_lock);
 
     /* Tear down old callback via. */
