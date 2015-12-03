@@ -3,8 +3,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS += -Werror
 CFLAGS += $(CFLAGS_libxenctrl)
-# xen-mceinj.c incorrectly use libxc internals
-CFLAGS += -I$(XEN_ROOT)/tools/libxc
 CFLAGS += $(CFLAGS_libxenguest)
 CFLAGS += $(CFLAGS_libxenstore)
 CFLAGS += $(CFLAGS_xeninclude)
