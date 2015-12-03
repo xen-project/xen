@@ -107,7 +107,7 @@ extern void acpi_reserve_bootmem(void);
 
 #define ARCH_HAS_POWER_INIT	1
 
-extern int acpi_numa;
+extern s8 acpi_numa;
 extern int acpi_scan_nodes(u64 start, u64 end);
 #define NR_NODE_MEMBLKS (MAX_NUMNODES*2)
 

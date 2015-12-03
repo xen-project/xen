@@ -332,8 +332,6 @@ static void disable_c1_ramping(void)
 	}
 }
 
-int force_mwait;
-
 static void disable_c1e(void *unused)
 {
 	uint64_t msr_content;
@@ -510,7 +508,7 @@ static void init_amd(struct cpuinfo_x86 *c)
         amd_get_topology(c);
 
 	/* Pointless to use MWAIT on Family10 as it does not deep sleep. */
-	if (c->x86 >= 0x10 && !force_mwait)
+	if (c->x86 == 0x10)
 		__clear_bit(X86_FEATURE_MWAIT, c->x86_capability);
 
 	if (!cpu_has_amd_erratum(c, AMD_ERRATUM_121))
