@@ -34,25 +34,72 @@ INSTALL_SHLIB = : install-shlib-unsupported-fail
 SYMLINK_SHLIB = : symlink-shlib-unsupported-fail
 endif
 
+# Compiling and linking against in tree libraries.
+#
+# In order to compile and link against an in-tree library various
+# cpp/compiler/linker options are required.
+#
+# For example consider a library "libfoo" which itself uses two other
+# libraries:
+#  libbar - whose use is entirely internal to libfoo and not exposed
+#           to users of libfoo at all.
+#  libbaz - whose use is entirely internal to libfoo but libfoo's
+#           public headers include one or more of libbaz's
+#           public headers. Users of libfoo are therefore transitively
+#           using libbaz's header but not linking against libbaz.
+#
+# SHDEPS_libfoo: Flags for linking recursive dependencies of
+#                libfoo. Must contain SHLIB for every library which
+#                libfoo links against. So must contain both
+#                $(SHLIB_libbar) and $(SHLIB_libbaz).
+#
+# SHLIB_libfoo: Flags for recursively linking against libfoo. Must
+#               contains SHDEPS_libfoo and:
+#                   -Wl,-rpath-link=<directory containing libfoo.so>
+#
+# CFLAGS_libfoo: Flags for compiling against libfoo. Must add the
+#                directories containing libfoo's headers to the
+#                include path. Must recursively include
+#                $(CFLAGS_libbaz), to satisfy the transitive inclusion
+#                of the headers but not $(CFLAGS_libbar) since none of
+#                libbar's headers are required to build against
+#                libfoo.
+#
+# LDLIBS_libfoo: Flags for linking against libfoo. Must contain
+#                $(SHDEPS_libfoo) and the path to libfoo.so
+#
+# Consumers of libfoo should include $(CFLAGS_libfoo) and
+# $(LDLIBS_libfoo) in their appropriate directories. They should not
+# include any CFLAGS or LDLIBS relating to libbar or libbaz unless
+# they use those libraries directly (not via libfoo) too.
+#
+# Consumers of libfoo should not directly use $(SHDEPS_libfoo) or
+# $(SHLIB_libfoo)
+
 CFLAGS_libxenctrl = -I$(XEN_LIBXC)/include $(CFLAGS_xeninclude)
+SHDEPS_libxenctrl =
 LDLIBS_libxenctrl = $(XEN_LIBXC)/libxenctrl$(libextension)
 SHLIB_libxenctrl  = -Wl,-rpath-link=$(XEN_LIBXC)
 
 CFLAGS_libxenguest = -I$(XEN_LIBXC)/include $(CFLAGS_xeninclude)
-LDLIBS_libxenguest = $(XEN_LIBXC)/libxenguest$(libextension)
-SHLIB_libxenguest  = -Wl,-rpath-link=$(XEN_LIBXC)
+SHDEPS_libxenguest =
+LDLIBS_libxenguest = $(SHDEPS_libxenguest) $(XEN_LIBXC)/libxenguest$(libextension)
+SHLIB_libxenguest  = $(SHDEPS_libxenguest) -Wl,-rpath-link=$(XEN_LIBXC)
 
 CFLAGS_libxenstore = -I$(XEN_XENSTORE)/include $(CFLAGS_xeninclude)
-LDLIBS_libxenstore = $(XEN_XENSTORE)/libxenstore$(libextension)
-SHLIB_libxenstore  = -Wl,-rpath-link=$(XEN_XENSTORE)
+SHDEPS_libxenstore =
+LDLIBS_libxenstore = $(SHDEPS_libxenguest) $(XEN_XENSTORE)/libxenstore$(libextension)
+SHLIB_libxenstore  = $(SHDEPS_libxenguest) -Wl,-rpath-link=$(XEN_XENSTORE)
 
 CFLAGS_libxenstat  = -I$(XEN_LIBXENSTAT)
-LDLIBS_libxenstat  = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(XEN_LIBXENSTAT)/libxenstat$(libextension)
-SHLIB_libxenstat  = -Wl,-rpath-link=$(XEN_LIBXENSTAT)
+SHDEPS_libxenstat  = $(SHLIB_libxenctrl) $(SHLIB_libxenstore)
+LDLIBS_libxenstat  = $(SHDEPS_libxenstat) $(XEN_LIBXENSTAT)/libxenstat$(libextension)
+SHLIB_libxenstat   = $(SHDEPS_libxenstat) -Wl,-rpath-link=$(XEN_LIBXENSTAT)
 
 CFLAGS_libxenvchan = -I$(XEN_LIBVCHAN)
-LDLIBS_libxenvchan = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(XEN_LIBVCHAN)/libxenvchan$(libextension)
-SHLIB_libxenvchan  = -Wl,-rpath-link=$(XEN_LIBVCHAN)
+SHDEPS_libxenvchan = $(SHLIB_libxenctrl) $(SHLIB_libxenstore)
+LDLIBS_libxenvchan = $(SHDEPS_libxenvchan) $(XEN_LIBVCHAN)/libxenvchan$(libextension)
+SHLIB_libxenvchan  = $(SHDEPS_libxenvchan) -Wl,-rpath-link=$(XEN_LIBVCHAN)
 
 ifeq ($(debug),y)
 # Disable optimizations and enable debugging information for macros
@@ -65,17 +112,20 @@ LIBXL_BLKTAP ?= $(CONFIG_BLKTAP2)
 
 ifeq ($(LIBXL_BLKTAP),y)
 CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_xeninclude)
-LDLIBS_libblktapctl = $(XEN_BLKTAP2)/control/libblktapctl$(libextension)
-SHLIB_libblktapctl  = -Wl,-rpath-link=$(XEN_BLKTAP2)/control
+SHDEPS_libblktapctl =
+LDLIBS_libblktapctl = $(SHDEPS_libblktapctl) $(XEN_BLKTAP2)/control/libblktapctl$(libextension)
+SHLIB_libblktapctl  = $(SHDEPS_libblktapctl) -Wl,-rpath-link=$(XEN_BLKTAP2)/control
 else
 CFLAGS_libblktapctl =
+SHDEPS_libblktapctl =
 LDLIBS_libblktapctl =
 SHLIB_libblktapctl  =
 endif
 
 CFLAGS_libxenlight = -I$(XEN_XENLIGHT) $(CFLAGS_libxenctrl) $(CFLAGS_xeninclude)
-LDLIBS_libxenlight = $(XEN_XENLIGHT)/libxenlight$(libextension) $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libblktapctl)
-SHLIB_libxenlight  = -Wl,-rpath-link=$(XEN_XENLIGHT)
+SHDEPS_libxenlight = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libblktapctl)
+LDLIBS_libxenlight = $(SHDEPS_libxenlight) $(XEN_XENLIGHT)/libxenlight$(libextension)
+SHLIB_libxenlight  = $(SHDEPS_libxenlight) -Wl,-rpath-link=$(XEN_XENLIGHT)
 
 CFLAGS += -D__XEN_TOOLS__
 
