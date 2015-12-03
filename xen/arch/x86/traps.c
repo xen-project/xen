@@ -1812,11 +1812,9 @@ static bool_t pci_cfg_ok(struct domain *currd, unsigned int start,
             start |= CF8_ADDR_HI(currd->arch.pci_cf8);
     }
 
-    if ( xsm_pci_config_permission(XSM_HOOK, currd, machine_bdf,
-                                   start, start + size - 1, !!write) != 0 )
-         return 0;
-
-    return !write ||
+    return !write ?
+           xsm_pci_config_permission(XSM_HOOK, currd, machine_bdf,
+                                     start, start + size - 1, 0) == 0 :
            pci_conf_write_intercept(0, machine_bdf, start, size, write) >= 0;
 }
 
