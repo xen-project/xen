@@ -2,9 +2,7 @@ XEN_ROOT = $(CURDIR)/../../..
 OCAML_TOPLEVEL = $(CURDIR)/..
 include $(OCAML_TOPLEVEL)/common.make
 
-CFLAGS += $(CFLAGS_libxenlight)
 CFLAGS += $(APPEND_CFLAGS)
-LIBS_xenlight = $(LDLIBS_libxenlight)
 
 OCAMLINCLUDE += \
 	-I $(OCAML_TOPLEVEL)/libs/xentoollog \
@@ -16,7 +14,7 @@ PROGRAMS = xtl send_debug_keys list_domains raise_exception dmesg
 
 xtl_LIBS =  \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xentoollog $(OCAML_TOPLEVEL)/libs/xentoollog/xentoollog.cmxa \
-	-cclib $(LDLIBS_libxenctrl)
+	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xl $(OCAML_TOPLEVEL)/libs/xl/xenlight.cmxa
 
 xtl_OBJS = xtl
 
