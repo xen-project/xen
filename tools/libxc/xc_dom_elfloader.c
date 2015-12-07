@@ -56,6 +56,10 @@ static char *xc_dom_guest_type(struct xc_dom_image *dom,
 {
     uint64_t machine = elf_uval(elf, elf->ehdr, e_machine);
 
+    if ( dom->container_type == XC_DOM_HVM_CONTAINER &&
+         dom->parms.phys_entry != UNSET_ADDR )
+        return "hvm-3.0-x86_32";
+
     switch ( machine )
     {
     case EM_386:
