@@ -20,6 +20,8 @@
 #include <xenguest.h>
 
 #define INVALID_PFN ((xen_pfn_t)-1)
+#define X86_HVM_NR_SPECIAL_PAGES    8
+#define X86_HVM_END_SPECIAL_REGION  0xff000u
 
 /* --- typedefs and structs ---------------------------------------- */
 

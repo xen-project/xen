@@ -115,6 +115,12 @@
 #define DOMID_XS_PATH "domid"
 #define INVALID_DOMID ~0
 
+/* Size macros. */
+#define __AC(X,Y)   (X##Y)
+#define _AC(X,Y)    __AC(X,Y)
+#define MB(_mb)     (_AC(_mb, ULL) << 20)
+#define GB(_gb)     (_AC(_gb, ULL) << 30)
+
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
 #define ROUNDUP(_val, _order)                                           \
@@ -1190,7 +1196,8 @@ _hidden int libxl__domain_build_info_setdefault(libxl__gc *gc,
 _hidden int libxl__device_disk_setdefault(libxl__gc *gc,
                                           libxl_device_disk *disk);
 _hidden int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
-                                         uint32_t domid);
+                                         uint32_t domid,
+                                         libxl_domain_build_info *info);
 _hidden int libxl__device_vtpm_setdefault(libxl__gc *gc, libxl_device_vtpm *vtpm);
 _hidden int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb);
 _hidden int libxl__device_vkb_setdefault(libxl__gc *gc, libxl_device_vkb *vkb);

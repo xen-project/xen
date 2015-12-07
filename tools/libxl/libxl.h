@@ -859,6 +859,14 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
 */
 #define LIBXL_HAVE_GFX_PASSTHRU_KIND
 
+/*
+ * LIBXL_HAVE_DEVICE_MODEL_VERSION_NONE
+ *
+ * In the case that LIBXL_HAVE_DEVICE_MODEL_VERSION_NONE is set libxl
+ * allows the creation of HVM guests without a device model.
+ */
+#define LIBXL_HAVE_DEVICE_MODEL_VERSION_NONE 1
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);

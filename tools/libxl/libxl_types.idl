@@ -98,6 +98,7 @@ libxl_device_model_version = Enumeration("device_model_version", [
     (0, "UNKNOWN"),
     (1, "QEMU_XEN_TRADITIONAL"), # Historical qemu-xen device model (qemu-dm)
     (2, "QEMU_XEN"),             # Upstream based qemu-xen device model
+    (3, "NONE"),                 # No device model
     ])
 
 libxl_console_type = Enumeration("console_type", [

@@ -119,6 +119,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
                 b_info->u.hvm.bios = LIBXL_BIOS_TYPE_ROMBIOS; break;
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
                 b_info->u.hvm.bios = LIBXL_BIOS_TYPE_SEABIOS; break;
+            case LIBXL_DEVICE_MODEL_VERSION_NONE:
+                break;
             default:return ERROR_INVAL;
             }
 
@@ -131,6 +133,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
             if (b_info->u.hvm.bios == LIBXL_BIOS_TYPE_ROMBIOS)
                 return ERROR_INVAL;
+            break;
+        case LIBXL_DEVICE_MODEL_VERSION_NONE:
             break;
         default:abort();
         }
@@ -235,6 +239,9 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
                     LOG(WARN, "ignoring videoram other than 4 MB for CIRRUS on QEMU_XEN_TRADITIONAL");
                 break;
             }
+            break;
+        case LIBXL_DEVICE_MODEL_VERSION_NONE:
+            b_info->video_memkb = 0;
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         default:
@@ -920,7 +927,8 @@ static void initiate_domain_create(libxl__egc *egc,
          * called libxl_device_nic_add when domcreate_launch_dm gets called,
          * but qemu needs the nic information to be complete.
          */
-        ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid);
+        ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid,
+                                           &d_config->b_info);
         if (ret) {
             LOG(ERROR, "Unable to set nic defaults for nic %d", i);
             goto error_out;
@@ -1260,6 +1268,12 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         console.backend_domid = state->console_domid;
         libxl__device_console_add(gc, domid, &console, state, &device);
         libxl__device_console_dispose(&console);
+
+        if (d_config->b_info.device_model_version ==
+            LIBXL_DEVICE_MODEL_VERSION_NONE) {
+            domcreate_devmodel_started(egc, &dcs->dmss.dm, 0);
+            return;
+        }
 
         libxl_device_vkb_init(&vkb);
         libxl__device_vkb_add(gc, domid, &vkb);

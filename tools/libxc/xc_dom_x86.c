@@ -58,8 +58,8 @@
 #define SPECIALPAGE_IOREQ    5
 #define SPECIALPAGE_IDENT_PT 6
 #define SPECIALPAGE_CONSOLE  7
-#define NR_SPECIAL_PAGES     8
-#define special_pfn(x) (0xff000u - NR_SPECIAL_PAGES + (x))
+#define special_pfn(x) \
+    (X86_HVM_END_SPECIAL_REGION - X86_HVM_NR_SPECIAL_PAGES + (x))
 
 #define NR_IOREQ_SERVER_PAGES 8
 #define ioreq_server_pfn(x) (special_pfn(0) - NR_IOREQ_SERVER_PAGES + (x))
@@ -589,7 +589,7 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
     void *hvm_info_page;
     uint32_t *ident_pt, domid = dom->guest_domid;
     int rc;
-    xen_pfn_t special_array[NR_SPECIAL_PAGES];
+    xen_pfn_t special_array[X86_HVM_NR_SPECIAL_PAGES];
     xen_pfn_t ioreq_server_array[NR_IOREQ_SERVER_PAGES];
     xc_interface *xch = dom->xch;
 
@@ -604,18 +604,19 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
     }
 
     /* Allocate and clear special pages. */
-    for ( i = 0; i < NR_SPECIAL_PAGES; i++ )
+    for ( i = 0; i < X86_HVM_NR_SPECIAL_PAGES; i++ )
         special_array[i] = special_pfn(i);
 
-    rc = xc_domain_populate_physmap_exact(xch, domid, NR_SPECIAL_PAGES, 0, 0,
-                                          special_array);
+    rc = xc_domain_populate_physmap_exact(xch, domid, X86_HVM_NR_SPECIAL_PAGES,
+                                          0, 0, special_array);
     if ( rc != 0 )
     {
         DOMPRINTF("Could not allocate special pages.");
         goto error_out;
     }
 
-    if ( xc_clear_domain_pages(xch, domid, special_pfn(0), NR_SPECIAL_PAGES) )
+    if ( xc_clear_domain_pages(xch, domid, special_pfn(0),
+                               X86_HVM_NR_SPECIAL_PAGES) )
             goto error_out;
 
     xc_hvm_param_set(xch, domid, HVM_PARAM_STORE_PFN,

@@ -787,21 +787,23 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     uint64_t str_mfn, cons_mfn;
     int i;
 
-    va_map = xc_map_foreign_range(handle, domid,
-                                  XC_PAGE_SIZE, PROT_READ | PROT_WRITE,
-                                  HVM_INFO_PFN);
-    if (va_map == NULL)
-        return ERROR_FAIL;
+    if (info->device_model_version != LIBXL_DEVICE_MODEL_VERSION_NONE) {
+        va_map = xc_map_foreign_range(handle, domid,
+                                      XC_PAGE_SIZE, PROT_READ | PROT_WRITE,
+                                      HVM_INFO_PFN);
+        if (va_map == NULL)
+            return ERROR_FAIL;
 
-    va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
-    va_hvm->apic_mode = libxl_defbool_val(info->u.hvm.apic);
-    va_hvm->nr_vcpus = info->max_vcpus;
-    memset(va_hvm->vcpu_online, 0, sizeof(va_hvm->vcpu_online));
-    memcpy(va_hvm->vcpu_online, info->avail_vcpus.map, info->avail_vcpus.size);
-    for (i = 0, sum = 0; i < va_hvm->length; i++)
-        sum += ((uint8_t *) va_hvm)[i];
-    va_hvm->checksum -= sum;
-    munmap(va_map, XC_PAGE_SIZE);
+        va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
+        va_hvm->apic_mode = libxl_defbool_val(info->u.hvm.apic);
+        va_hvm->nr_vcpus = info->max_vcpus;
+        memset(va_hvm->vcpu_online, 0, sizeof(va_hvm->vcpu_online));
+        memcpy(va_hvm->vcpu_online, info->avail_vcpus.map, info->avail_vcpus.size);
+        for (i = 0, sum = 0; i < va_hvm->length; i++)
+            sum += ((uint8_t *) va_hvm)[i];
+        va_hvm->checksum -= sum;
+        munmap(va_map, XC_PAGE_SIZE);
+    }
 
     xc_hvm_param_get(handle, domid, HVM_PARAM_STORE_PFN, &str_mfn);
     xc_hvm_param_get(handle, domid, HVM_PARAM_CONSOLE_PFN, &cons_mfn);
@@ -867,7 +869,7 @@ static int libxl__domain_firmware(libxl__gc *gc,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     const char *firmware;
-    int e, rc = ERROR_FAIL;
+    int e, rc;
     int datalen = 0;
     void *data;
 
@@ -882,18 +884,34 @@ static int libxl__domain_firmware(libxl__gc *gc,
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
             firmware = "hvmloader";
             break;
+        case LIBXL_DEVICE_MODEL_VERSION_NONE:
+            if (info->kernel == NULL) {
+                LOG(ERROR, "no device model requested without a kernel");
+                rc = ERROR_FAIL;
+                goto out;
+            }
+            break;
         default:
             LOG(ERROR, "invalid device model version %d",
                 info->device_model_version);
-            return ERROR_FAIL;
-            break;
+            rc = ERROR_FAIL;
+            goto out;
         }
     }
 
-    rc = xc_dom_kernel_file(dom, libxl__abs_path(gc, firmware,
+    if (info->kernel != NULL &&
+        info->device_model_version == LIBXL_DEVICE_MODEL_VERSION_NONE) {
+        /* Try to load a kernel instead of the firmware. */
+        rc = xc_dom_kernel_file(dom, info->kernel);
+        if (rc == 0 && info->ramdisk != NULL)
+            rc = xc_dom_ramdisk_file(dom, info->ramdisk);
+    } else {
+        rc = xc_dom_kernel_file(dom, libxl__abs_path(gc, firmware,
                                                  libxl__xenfirmwaredir_path()));
+    }
+
     if (rc != 0) {
-        LOGE(ERROR, "xc_dom_kernel_file failed");
+        LOGE(ERROR, "xc_dom_{kernel_file/ramdisk_file} failed");
         goto out;
     }
 
@@ -904,6 +922,7 @@ static int libxl__domain_firmware(libxl__gc *gc,
         if (e) {
             LOGEV(ERROR, e, "failed to read SMBIOS firmware file %s",
                 info->u.hvm.smbios_firmware);
+            rc = ERROR_FAIL;
             goto out;
         }
         libxl__ptr_add(gc, data);
@@ -921,6 +940,7 @@ static int libxl__domain_firmware(libxl__gc *gc,
         if (e) {
             LOGEV(ERROR, e, "failed to read ACPI firmware file %s",
                 info->u.hvm.acpi_firmware);
+            rc = ERROR_FAIL;
             goto out;
         }
         libxl__ptr_add(gc, data);
@@ -933,6 +953,7 @@ static int libxl__domain_firmware(libxl__gc *gc,
 
     return 0;
 out:
+    assert(rc != 0);
     return rc;
 }
 
@@ -945,10 +966,13 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     uint64_t mmio_start, lowmem_end, highmem_end, mem_size;
     libxl_domain_build_info *const info = &d_config->b_info;
     struct xc_dom_image *dom = NULL;
+    bool device_model =
+        info->device_model_version != LIBXL_DEVICE_MODEL_VERSION_NONE ?
+        true : false;
 
     xc_dom_loginit(ctx->xch);
 
-    dom = xc_dom_allocate(ctx->xch, NULL, NULL);
+    dom = xc_dom_allocate(ctx->xch, info->cmdline, NULL);
     if (!dom) {
         LOGE(ERROR, "xc_dom_allocate failed");
         rc = ERROR_NOMEM;
@@ -981,8 +1005,12 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
 
     if (dom->target_pages == 0)
         dom->target_pages = mem_size >> XC_PAGE_SHIFT;
-    if (dom->mmio_size == 0)
+    if (dom->mmio_size == 0 && device_model)
         dom->mmio_size = HVM_BELOW_4G_MMIO_LENGTH;
+    else if (dom->mmio_size == 0 && !device_model)
+        dom->mmio_size = GB(4) -
+                    ((X86_HVM_END_SPECIAL_REGION - X86_HVM_NR_SPECIAL_PAGES)
+                    << XC_PAGE_SHIFT);
     lowmem_end = mem_size;
     highmem_end = 0;
     mmio_start = (1ull << 32) - dom->mmio_size;
@@ -994,8 +1022,8 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     dom->lowmem_end = lowmem_end;
     dom->highmem_end = highmem_end;
     dom->mmio_start = mmio_start;
-    dom->vga_hole_size = LIBXL_VGA_HOLE_SIZE;
-    dom->device_model = true;
+    dom->vga_hole_size = device_model ? LIBXL_VGA_HOLE_SIZE : 0;
+    dom->device_model = device_model;
 
     rc = libxl__domain_device_construct_rdm(gc, d_config,
                                             info->u.hvm.rdm_mem_boundary_memkb*1024,

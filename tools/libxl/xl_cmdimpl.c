@@ -2186,6 +2186,8 @@ skip_vfb:
         } else if (!strcmp(buf, "qemu-xen")) {
             b_info->device_model_version
                 = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
+        } else if (!strcmp(buf, "none")) {
+            b_info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_NONE;
         } else {
             fprintf(stderr,
                     "Unknown device_model_version \"%s\" specified\n", buf);

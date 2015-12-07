@@ -1789,6 +1789,11 @@ This device-model is the default for Linux dom0.
 Use the device-model based upon the historical Xen fork of Qemu.
 This device-model is still the default for NetBSD dom0.
 
+=item B<none>
+
+Don't use any device model. This requires a kernel capable of booting
+without emulated devices.
+
 =back
 
 It is recommended to accept the default value for new guests.  If
