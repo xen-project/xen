@@ -203,16 +203,16 @@ void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
     fd = open(filename, O_RDONLY);
     if ( fd == -1 ) {
         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "failed to open file: %s",
-                     strerror(errno));
+                     "failed to open file '%s': %s",
+                     filename, strerror(errno));
         goto err;
     }
 
     if ( (lseek(fd, 0, SEEK_SET) == -1) ||
          ((offset = lseek(fd, 0, SEEK_END)) == -1) ) {
         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "failed to seek on file: %s",
-                     strerror(errno));
+                     "failed to seek on file '%s': %s",
+                     filename, strerror(errno));
         goto err;
     }
 
@@ -239,8 +239,8 @@ void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
                            MAP_SHARED, fd, 0);
     if ( block->ptr == MAP_FAILED ) {
         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "failed to mmap file: %s",
-                     strerror(errno));
+                     "failed to mmap file '%s': %s",
+                     filename, strerror(errno));
         goto err;
     }
 
