@@ -43,6 +43,8 @@ int libxl__domain_suspend_device_model(libxl__gc *gc,
         if (ret)
             unlink(filename);
         break;
+    case LIBXL_DEVICE_MODEL_VERSION_NONE:
+        break;
     default:
         return ERROR_INVAL;
     }

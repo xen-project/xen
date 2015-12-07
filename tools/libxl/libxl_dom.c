@@ -1316,6 +1316,9 @@ void libxl__domain_suspend_common_switch_qemu_logdirty
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         domain_suspend_switch_qemu_xen_logdirty(domid, enable, shs);
         break;
+    case LIBXL_DEVICE_MODEL_VERSION_NONE:
+        libxl__xc_domain_saverestore_async_callback_done(egc, shs, 0);
+        break;
     default:
         LOG(ERROR,"logdirty switch failed"
             ", no valid device model version found, abandoning suspend");
