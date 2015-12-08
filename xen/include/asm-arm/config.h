@@ -37,6 +37,10 @@
 
 #define CONFIG_VIDEO 1
 
+#define CONFIG_PAGEALLOC_MAX_ORDER 18
+#define CONFIG_DOMU_MAX_ORDER      9
+#define CONFIG_HWDOM_MAX_ORDER     10
+
 #define OPT_CONSOLE_STR "dtuart"
 
 #ifdef MAX_PHYS_CPUS
