@@ -43,6 +43,19 @@ typedef struct physid_mask physid_mask_t;
 #define physid_isset(physid, map)		test_bit(physid, (map).mask)
 #define physid_test_and_set(physid, map)	test_and_set_bit(physid, (map).mask)
 
+#define first_physid(map)			find_first_bit((map).mask, \
+							       MAX_APICS)
+#define next_physid(id, map)			find_next_bit((map).mask, \
+							      MAX_APICS, (id) + 1)
+#define last_physid(map) ({ \
+	const unsigned long *mask = (map).mask; \
+	unsigned int id, last = MAX_APICS; \
+	for (id = find_first_bit(mask, MAX_APICS); id < MAX_APICS; \
+	     id = find_next_bit(mask, MAX_APICS, (id) + 1)) \
+		last = id; \
+	last; \
+})
+
 #define physids_and(dst, src1, src2)		bitmap_and((dst).mask, (src1).mask, (src2).mask, MAX_APICS)
 #define physids_or(dst, src1, src2)		bitmap_or((dst).mask, (src1).mask, (src2).mask, MAX_APICS)
 #define physids_clear(map)			bitmap_zero((map).mask, MAX_APICS)
