@@ -773,18 +773,41 @@ static int svm_get_guest_pat(struct vcpu *v, u64 *gpat)
     return 1;
 }
 
+static uint64_t scale_tsc(uint64_t host_tsc, uint64_t ratio)
+{
+    uint64_t mult, frac, scaled_host_tsc;
+
+    if ( ratio == DEFAULT_TSC_RATIO )
+        return host_tsc;
+
+    /*
+     * Suppose the most significant 32 bits of host_tsc and ratio are
+     * tsc_h and mult, and the least 32 bits of them are tsc_l and frac,
+     * then
+     *     host_tsc * ratio * 2^-32
+     *     = host_tsc * (mult * 2^32 + frac) * 2^-32
+     *     = host_tsc * mult + (tsc_h * 2^32 + tsc_l) * frac * 2^-32
+     *     = host_tsc * mult + tsc_h * frac + ((tsc_l * frac) >> 32)
+     *
+     * Multiplications in the last two terms are between 32-bit integers,
+     * so both of them can fit in 64-bit integers.
+     *
+     * Because mult is usually less than 10 in practice, it's very rare
+     * that host_tsc * mult can overflow a 64-bit integer.
+     */
+    mult = ratio >> 32;
+    frac = ratio & ((1ULL << 32) - 1);
+    scaled_host_tsc  = host_tsc * mult;
+    scaled_host_tsc += (host_tsc >> 32) * frac;
+    scaled_host_tsc += ((host_tsc & ((1ULL << 32) - 1)) * frac) >> 32;
+
+    return scaled_host_tsc;
+}
+
 static uint64_t svm_get_tsc_offset(uint64_t host_tsc, uint64_t guest_tsc,
     uint64_t ratio)
 {
-    uint64_t offset;
-
-    if (ratio == DEFAULT_TSC_RATIO)
-        return guest_tsc - host_tsc;
-
-    /* calculate hi,lo parts in 64bits to prevent overflow */
-    offset = (((host_tsc >> 32U) * (ratio >> 32U)) << 32U) +
-          (host_tsc & 0xffffffffULL) * (ratio & 0xffffffffULL);
-    return guest_tsc - offset;
+    return guest_tsc - scale_tsc(host_tsc, ratio);
 }
 
 static void svm_set_tsc_offset(struct vcpu *v, u64 offset, u64 at_tsc)
