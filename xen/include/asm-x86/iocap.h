@@ -18,9 +18,4 @@
     (!rangeset_is_empty((d)->iomem_caps) ||             \
      !rangeset_is_empty((d)->arch.ioport_caps))
 
-#define multipage_allocation_permitted(d, order)        \
-    (((order) <= 9) || /* allow 2MB superpages */       \
-     !rangeset_is_empty((d)->iomem_caps) ||             \
-     !rangeset_is_empty((d)->arch.ioport_caps))
-
 #endif /* __X86_IOCAP_H__ */
