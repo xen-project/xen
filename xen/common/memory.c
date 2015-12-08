@@ -378,7 +378,7 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
     PAGE_LIST_HEAD(out_chunk_list);
     unsigned long in_chunk_order, out_chunk_order;
     xen_pfn_t     gpfn, gmfn, mfn;
-    unsigned long i, j, k = 0; /* gcc ... */
+    unsigned long i, j, k;
     unsigned int  memflags = 0;
     long          rc = 0;
     struct domain *d;
@@ -610,11 +610,12 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
  fail:
     /* Reassign any input pages we managed to steal. */
     while ( (page = page_list_remove_head(&in_chunk_list)) )
-    {
-        put_gfn(d, gmfn + k--);
         if ( assign_pages(d, page, 0, MEMF_no_refcount) )
-            BUG();
-    }
+        {
+            BUG_ON(!d->is_dying);
+            if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+                put_page(page);
+        }
 
  dying:
     rcu_unlock_domain(d);
