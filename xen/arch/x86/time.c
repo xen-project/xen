@@ -1878,7 +1878,7 @@ void tsc_set_info(struct domain *d,
         break;
     }
     d->arch.incarnation = incarnation + 1;
-    if ( is_hvm_domain(d) )
+    if ( has_hvm_container_domain(d) )
     {
         hvm_set_rdtsc_exiting(d, d->arch.vtsc);
         if ( d->vcpu && d->vcpu[0] && incarnation == 0 )
