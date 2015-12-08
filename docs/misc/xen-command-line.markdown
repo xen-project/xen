@@ -1032,6 +1032,17 @@ with **crashinfo_maxaddr**.
 Specify the threshold below which Xen will inform dom0 that the quantity of
 free memory is getting low.  Specifying `0` will disable this notification.
 
+### memop-max-order
+> `= [<domU>][,[<ctldom>][,[<hwdom>][,<ptdom>]]]`
+
+> x86 default: `9,18,12,12`
+> ARM default: `9,18,10,10`
+
+Change the maximum order permitted for allocation (or allocation-like)
+requests issued by the various kinds of domains (in this order:
+ordinary DomU, control domain, hardware domain, and - when supported
+by the platform - DomU with pass-through device assigned).
+
 ### max\_cstate
 > `= <integer>`
 

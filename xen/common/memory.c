@@ -43,6 +43,50 @@ struct memop_args {
     int          preempted;  /* Was the hypercall preempted? */
 };
 
+#ifndef CONFIG_CTLDOM_MAX_ORDER
+#define CONFIG_CTLDOM_MAX_ORDER CONFIG_PAGEALLOC_MAX_ORDER
+#endif
+#ifndef CONFIG_PTDOM_MAX_ORDER
+#define CONFIG_PTDOM_MAX_ORDER CONFIG_HWDOM_MAX_ORDER
+#endif
+
+static unsigned int __read_mostly domu_max_order = CONFIG_DOMU_MAX_ORDER;
+static unsigned int __read_mostly ctldom_max_order = CONFIG_CTLDOM_MAX_ORDER;
+static unsigned int __read_mostly hwdom_max_order = CONFIG_HWDOM_MAX_ORDER;
+#ifdef HAS_PASSTHROUGH
+static unsigned int __read_mostly ptdom_max_order = CONFIG_PTDOM_MAX_ORDER;
+#else
+# define ptdom_max_order domu_max_order
+#endif
+static void __init parse_max_order(const char *s)
+{
+    if ( *s != ',' )
+        domu_max_order = simple_strtoul(s, &s, 0);
+    if ( *s == ',' && *++s != ',' )
+        ctldom_max_order = simple_strtoul(s, &s, 0);
+    if ( *s == ',' && *++s != ',' )
+        hwdom_max_order = simple_strtoul(s, &s, 0);
+#ifdef HAS_PASSTHROUGH
+    if ( *s == ',' && *++s != ',' )
+        ptdom_max_order = simple_strtoul(s, &s, 0);
+#endif
+}
+custom_param("memop-max-order", parse_max_order);
+
+static unsigned int max_order(const struct domain *d)
+{
+    unsigned int order = cache_flush_permitted(d) ? domu_max_order
+                                                  : ptdom_max_order;
+
+    if ( is_control_domain(d) && order < ctldom_max_order )
+        order = ctldom_max_order;
+
+    if ( is_hardware_domain(d) && order < hwdom_max_order )
+        order = hwdom_max_order;
+
+    return min(order, MAX_ORDER + 0U);
+}
+
 static void increase_reservation(struct memop_args *a)
 {
     struct page_info *page;
@@ -55,7 +99,7 @@ static void increase_reservation(struct memop_args *a)
                                      a->nr_extents-1) )
         return;
 
-    if ( !multipage_allocation_permitted(current->domain, a->extent_order) )
+    if ( a->extent_order > max_order(current->domain) )
         return;
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
@@ -100,8 +144,8 @@ static void populate_physmap(struct memop_args *a)
                                      a->nr_extents-1) )
         return;
 
-    if ( a->memflags & MEMF_populate_on_demand ? a->extent_order > MAX_ORDER :
-         !multipage_allocation_permitted(current->domain, a->extent_order) )
+    if ( a->extent_order > (a->memflags & MEMF_populate_on_demand ? MAX_ORDER :
+                            max_order(current->domain)) )
         return;
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
@@ -285,7 +329,7 @@ static void decrease_reservation(struct memop_args *a)
 
     if ( !guest_handle_subrange_okay(a->extent_list, a->nr_done,
                                      a->nr_extents-1) ||
-         a->extent_order > MAX_ORDER )
+         a->extent_order > max_order(current->domain) )
         return;
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
@@ -343,13 +387,17 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
     if ( copy_from_guest(&exch, arg, 1) )
         return -EFAULT;
 
+    if ( max(exch.in.extent_order, exch.out.extent_order) >
+         max_order(current->domain) )
+    {
+        rc = -EPERM;
+        goto fail_early;
+    }
+
     /* Various sanity checks. */
     if ( (exch.nr_exchanged > exch.in.nr_extents) ||
          /* Input and output domain identifiers match? */
          (exch.in.domid != exch.out.domid) ||
-         /* Extent orders are sensible? */
-         (exch.in.extent_order > MAX_ORDER) ||
-         (exch.out.extent_order > MAX_ORDER) ||
          /* Sizes of input and output lists do not overflow a long? */
          ((~0UL >> exch.in.extent_order) < exch.in.nr_extents) ||
          ((~0UL >> exch.out.extent_order) < exch.out.nr_extents) ||
@@ -365,16 +413,6 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
          !guest_handle_okay(exch.out.extent_start, exch.out.nr_extents) )
     {
         rc = -EFAULT;
-        goto fail_early;
-    }
-
-    /* Only privileged guests can allocate multi-page contiguous extents. */
-    if ( !multipage_allocation_permitted(current->domain,
-                                         exch.in.extent_order) ||
-         !multipage_allocation_permitted(current->domain,
-                                         exch.out.extent_order) )
-    {
-        rc = -EPERM;
         goto fail_early;
     }
 
