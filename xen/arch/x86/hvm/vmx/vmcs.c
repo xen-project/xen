@@ -934,36 +934,37 @@ void vmx_vmcs_switch(paddr_t from, paddr_t to)
     spin_unlock(&vmx->vmcs_lock);
 }
 
-void virtual_vmcs_enter(const struct vcpu *v)
+void virtual_vmcs_enter(void *vvmcs)
 {
-    __vmptrld(v->arch.hvm_vmx.vmcs_shadow_maddr);
+    __vmptrld(pfn_to_paddr(domain_page_map_to_mfn(vvmcs)));
 }
 
-void virtual_vmcs_exit(const struct vcpu *v)
+void virtual_vmcs_exit(void *vvmcs)
 {
     paddr_t cur = this_cpu(current_vmcs);
 
-    __vmpclear(v->arch.hvm_vmx.vmcs_shadow_maddr);
+    __vmpclear(pfn_to_paddr(domain_page_map_to_mfn(vvmcs)));
     if ( cur )
         __vmptrld(cur);
+
 }
 
-u64 virtual_vmcs_vmread(const struct vcpu *v, u32 vmcs_encoding)
+u64 virtual_vmcs_vmread(void *vvmcs, u32 vmcs_encoding)
 {
     u64 res;
 
-    virtual_vmcs_enter(v);
+    virtual_vmcs_enter(vvmcs);
     __vmread(vmcs_encoding, &res);
-    virtual_vmcs_exit(v);
+    virtual_vmcs_exit(vvmcs);
 
     return res;
 }
 
-void virtual_vmcs_vmwrite(const struct vcpu *v, u32 vmcs_encoding, u64 val)
+void virtual_vmcs_vmwrite(void *vvmcs, u32 vmcs_encoding, u64 val)
 {
-    virtual_vmcs_enter(v);
+    virtual_vmcs_enter(vvmcs);
     __vmwrite(vmcs_encoding, val);
-    virtual_vmcs_exit(v);
+    virtual_vmcs_exit(vvmcs);
 }
 
 /*
