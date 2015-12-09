@@ -246,9 +246,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 5ae0569d964ad1a6d8dc781e5566d39210a5d063
-# Mon Jun 30 10:07:54 2014 +0200
-# vnc: limit client_cut_text msg payload size
+QEMU_TAG ?= 6425f5d8c25a4d6486435278bcccefd8810becf0
+# Wed Dec 9 11:47:35 2015 +0000
+# net: pcnet: add check to validate receive data size(CVE-2015-7504)
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
