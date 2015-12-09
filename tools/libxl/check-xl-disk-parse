@@ -40,7 +40,7 @@ complete () {
     fi
 }
 
-e=255
+e=1
 
 
 #---------- test data ----------
@@ -52,18 +52,10 @@ one $e foo
 
 expected <<END
 disk: {
-    "backend_domid": 0,
-    "backend_domname": null,
     "pdev_path": "/dev/vg/guest-volume",
     "vdev": "hda",
-    "backend": "unknown",
     "format": "raw",
-    "script": null,
-    "removable": 0,
-    "readwrite": 1,
-    "is_cdrom": 0,
-    "direct_io_safe": false,
-    "discard_enable": "True"
+    "readwrite": 1
 }
 
 END
@@ -75,18 +67,11 @@ one 0 raw:/dev/vg/guest-volume,hda,w
 
 expected <<END
 disk: {
-    "backend_domid": 0,
-    "backend_domname": null,
     "pdev_path": "/root/image.iso",
     "vdev": "hdc",
-    "backend": "unknown",
     "format": "raw",
-    "script": null,
     "removable": 1,
-    "readwrite": 0,
-    "is_cdrom": 1,
-    "direct_io_safe": false,
-    "discard_enable": "False"
+    "is_cdrom": 1
 }
 
 END
@@ -99,18 +84,11 @@ one 0 raw:/root/image.iso,hdc:cdrom,ro
 
 expected <<EOF
 disk: {
-    "backend_domid": 0,
-    "backend_domname": null,
     "pdev_path": "/dev/vg/guest-volume",
     "vdev": "xvdb",
     "backend": "phy",
     "format": "raw",
-    "script": null,
-    "removable": 0,
-    "readwrite": 1,
-    "is_cdrom": 0,
-    "direct_io_safe": false,
-    "discard_enable": "True"
+    "readwrite": 1
 }
 
 EOF
@@ -118,18 +96,11 @@ one 0 backendtype=phy,vdev=xvdb,access=w,target=/dev/vg/guest-volume
 
 expected <<EOF
 disk: {
-    "backend_domid": 0,
-    "backend_domname": null,
     "pdev_path": "",
     "vdev": "hdc",
-    "backend": "unknown",
     "format": "empty",
-    "script": null,
     "removable": 1,
-    "readwrite": 0,
-    "is_cdrom": 1,
-    "direct_io_safe": false,
-    "discard_enable": "False"
+    "is_cdrom": 1
 }
 
 EOF
@@ -141,18 +112,10 @@ one 0 ,empty,hdc:cdrom,r
 
 expected <<EOF
 disk: {
-    "backend_domid": 0,
-    "backend_domname": null,
-    "pdev_path": null,
     "vdev": "hdc",
-    "backend": "unknown",
     "format": "empty",
-    "script": null,
     "removable": 1,
-    "readwrite": 0,
-    "is_cdrom": 1,
-    "direct_io_safe": false,
-    "discard_enable": "False"
+    "is_cdrom": 1
 }
 
 EOF
@@ -161,18 +124,11 @@ one 0 vdev=hdc,access=r,devtype=cdrom
 
 expected <<EOF
 disk: {
-    "backend_domid": 0,
-    "backend_domname": null,
     "pdev_path": "iqn.2001-05.com.equallogic:0-8a0906-23fe93404-c82797962054a96d-examplehost",
     "vdev": "xvda",
-    "backend": "unknown",
     "format": "raw",
     "script": "block-iscsi",
-    "removable": 0,
-    "readwrite": 1,
-    "is_cdrom": 0,
-    "direct_io_safe": false,
-    "discard_enable": "True"
+    "readwrite": 1
 }
 
 EOF
@@ -183,18 +139,11 @@ one 0 vdev=xvda,access=w,script=block-iscsi,target=iqn.2001-05.com.equallogic:0-
 
 expected <<EOF
 disk: {
-    "backend_domid": 0,
-    "backend_domname": null,
     "pdev_path": "app01",
     "vdev": "hda",
-    "backend": "unknown",
     "format": "raw",
     "script": "block-drbd",
-    "removable": 0,
-    "readwrite": 1,
-    "is_cdrom": 0,
-    "direct_io_safe": false,
-    "discard_enable": "True"
+    "readwrite": 1
 }
 
 EOF
@@ -205,57 +154,24 @@ one 0 drbd:app01,hda,w
 
 expected <<END
 disk: {
-    "backend_domid": 0,
-    "backend_domname": null,
     "pdev_path": "/some/disk/image.raw",
     "vdev": "hda",
-    "backend": "unknown",
     "format": "raw",
-    "script": null,
-    "removable": 0,
     "readwrite": 1,
-    "is_cdrom": 0,
-    "direct_io_safe": false,
     "discard_enable": "True"
 }
 
 END
-one 0  discard=on  vdev=hda target=/some/disk/image.raw
-one 0  discard=1   vdev=hda target=/some/disk/image.raw
-
-expected <<END
-disk: {
-    "backend_domid": 0,
-    "backend_domname": null,
-    "pdev_path": "/some/disk/image.raw",
-    "vdev": "hda",
-    "backend": "unknown",
-    "format": "raw",
-    "script": null,
-    "removable": 0,
-    "readwrite": 1,
-    "is_cdrom": 0,
-    "direct_io_safe": false,
-    "discard_enable": "False"
-}
-
-END
 one 0  discard vdev=hda target=/some/disk/image.raw
 one 0  discard vdev=hda target=/some/disk/image.raw
 
 expected <<END
 disk: {
-    "backend_domid": 0,
-    "backend_domname": null,
     "pdev_path": "/some/disk/image.iso",
     "vdev": "hda",
-    "backend": "unknown",
     "format": "raw",
-    "script": null,
     "removable": 1,
-    "readwrite": 0,
     "is_cdrom": 1,
-    "direct_io_safe": false,
     "discard_enable": "False"
 }
 
