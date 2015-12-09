@@ -260,9 +260,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.5.2
-# Mon Jun 30 10:07:54 2014 +0200
-# vnc: limit client_cut_text msg payload size
+QEMU_TRADITIONAL_REVISION ?= 3159615c393e0b981e00ecd0e06fcfd44235f2d4
+# Wed Dec 9 11:47:35 2015 +0000
+# net: pcnet: add check to validate receive data size(CVE-2015-7504)
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
