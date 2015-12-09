@@ -266,9 +266,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= bc00cad75d8bcc3ba696992bec219c21db8406aa
-# Tue Mar 11 10:19:23 2014 +0000
-# block-vvfat: fix resource leaks in read_directory()
+QEMU_TRADITIONAL_REVISION ?= aaaf657c8f6106da6d7e97ad0d08ed291cc895c7
+# Wed Dec 9 11:47:35 2015 +0000
+# net: pcnet: add check to validate receive data size(CVE-2015-7504)
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
