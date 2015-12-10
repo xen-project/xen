@@ -32,9 +32,13 @@ GLOBAL(trampoline_realmode_entry)
         lmsw    %ax                       # CR0.PE = 1 (enter protected mode)
         ljmpl   $BOOT_CS32,$bootsym_rel(trampoline_protmode_entry,6)
 
+        .balign 8
+        .word   0
 idt_48: .word   0, 0, 0 # base = limit = 0
+        .word   0
 gdt_48: .word   6*8-1
         .long   bootsym_rel(trampoline_gdt,4)
+
 trampoline_gdt:
         /* 0x0000: unused */
         .quad   0x0000000000000000
@@ -55,6 +59,9 @@ trampoline_gdt:
         .long   trampoline_gdt + BOOT_PSEUDORM_CS + 2 - .
         .long   trampoline_gdt + BOOT_PSEUDORM_DS + 2 - .
         .popsection
+
+GLOBAL(trampoline_misc_enable_off)
+        .quad   0
 
 GLOBAL(cpuid_ext_features)
         .long   0
@@ -83,6 +90,21 @@ trampoline_protmode_entry:
         mov     $sym_phys(idle_pg_table),%eax
         add     bootsym_rel(trampoline_xen_phys_start,4,%eax)
         mov     %eax,%cr3
+
+        /* Adjust IA32_MISC_ENABLE if needed (for NX enabling below). */
+        mov     bootsym_rel(trampoline_misc_enable_off,4,%esi)
+        mov     bootsym_rel(trampoline_misc_enable_off+4,4,%edi)
+        mov     %esi,%eax
+        or      %edi,%eax
+        jz      1f
+        mov     $MSR_IA32_MISC_ENABLE,%ecx
+        rdmsr
+        not     %esi
+        not     %edi
+        and     %esi,%eax
+        and     %edi,%edx
+        wrmsr
+1:
 
         /* Set up EFER (Extended Feature Enable Register). */
         mov     bootsym_rel(cpuid_ext_features,4,%edi)

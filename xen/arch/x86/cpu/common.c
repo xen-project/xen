@@ -256,15 +256,15 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 
 	/* AMD-defined flags: level 0x80000001 */
 	c->extended_cpuid_level = cpuid_eax(0x80000000);
-	if ( (c->extended_cpuid_level & 0xffff0000) == 0x80000000 ) {
-		if ( c->extended_cpuid_level >= 0x80000001 )
-			cpuid(0x80000001, &tmp, &tmp,
-			      &c->x86_capability[cpufeat_word(X86_FEATURE_LAHF_LM)],
-			      &c->x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]);
+	cpuid(0x80000001, &tmp, &tmp,
+	      &c->x86_capability[cpufeat_word(X86_FEATURE_LAHF_LM)],
+	      &c->x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]);
+	if (c == &boot_cpu_data)
+		bootsym(cpuid_ext_features) =
+			c->x86_capability[cpufeat_word(X86_FEATURE_NX)];
 
-		if ( c->extended_cpuid_level >= 0x80000004 )
-			get_model_name(c); /* Default name */
-	}
+	if (c->extended_cpuid_level >= 0x80000004)
+		get_model_name(c); /* Default name */
 
 	/* Intel-defined flags: level 0x00000007 */
 	if ( c->cpuid_level >= 0x00000007 )
