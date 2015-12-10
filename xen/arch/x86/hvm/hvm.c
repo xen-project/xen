@@ -1842,7 +1842,7 @@ static const char * hvm_efer_valid(const struct vcpu *v, uint64_t value,
     {
         unsigned int level;
 
-        ASSERT(v == current);
+        ASSERT(v->domain == current->domain);
         hvm_cpuid(0x80000000, &level, NULL, NULL, NULL);
         if ( level >= 0x80000001 )
         {
@@ -1912,7 +1912,7 @@ static unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v,
     {
         unsigned int level;
 
-        ASSERT(v == current);
+        ASSERT(v->domain == current->domain);
         hvm_cpuid(0, &level, NULL, NULL, NULL);
         if ( level >= 1 )
             hvm_cpuid(1, NULL, NULL, &leaf1_ecx, &leaf1_edx);
