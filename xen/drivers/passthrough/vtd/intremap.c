@@ -910,7 +910,7 @@ static void setup_posted_irte(
     struct iremap_entry *new_ire, const struct iremap_entry *old_ire,
     const struct pi_desc *pi_desc, const uint8_t gvec)
 {
-    memset(new_ire, sizeof(*new_ire), 0);
+    memset(new_ire, 0, sizeof(*new_ire));
 
     /*
      * 'im' filed decides whether the irte is in posted format (with value 1)
