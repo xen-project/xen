@@ -2022,6 +2022,53 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .altp2m_vcpu_emulate_vmfunc = vmx_vcpu_emulate_vmfunc,
 };
 
+/* Handle VT-d posted-interrupt when VCPU is running. */
+static void pi_notification_interrupt(struct cpu_user_regs *regs)
+{
+    ack_APIC_irq();
+    this_cpu(irq_count)++;
+
+    /*
+     * We get here when a vCPU is running in root-mode (such as via hypercall,
+     * or any other reasons which can result in VM-Exit), and before vCPU is
+     * back to non-root, external interrupts from an assigned device happen
+     * and a notification event is delivered to this logical CPU.
+     *
+     * we need to set VCPU_KICK_SOFTIRQ for the current cpu, just like
+     * __vmx_deliver_posted_interrupt(). So the pending interrupt in PIRR will
+     * be synced to vIRR before VM-Exit in time.
+     *
+     * Please refer to the following code fragments from
+     * xen/arch/x86/hvm/vmx/entry.S:
+     *
+     *     .Lvmx_do_vmentry
+     *
+     *      ......
+     *
+     *      point 1
+     *
+     *      cli
+     *      cmp  %ecx,(%rdx,%rax,1)
+     *      jnz  .Lvmx_process_softirqs
+     *
+     *      ......
+     *
+     *      je   .Lvmx_launch
+     *
+     *      ......
+     *
+     *     .Lvmx_process_softirqs:
+     *      sti
+     *      call do_softirq
+     *      jmp  .Lvmx_do_vmentry
+     *
+     * If VT-d engine issues a notification event at point 1 above, it cannot
+     * be delivered to the guest during this VM-entry without raising the
+     * softirq in this notification handler.
+     */
+    raise_softirq(VCPU_KICK_SOFTIRQ);
+}
+
 const struct hvm_function_table * __init start_vmx(void)
 {
     set_in_cr4(X86_CR4_VMXE);
@@ -2059,7 +2106,12 @@ const struct hvm_function_table * __init start_vmx(void)
     }
 
     if ( cpu_has_vmx_posted_intr_processing )
-        alloc_direct_apic_vector(&posted_intr_vector, event_check_interrupt);
+    {
+        if ( iommu_intpost )
+            alloc_direct_apic_vector(&posted_intr_vector, pi_notification_interrupt);
+        else
+            alloc_direct_apic_vector(&posted_intr_vector, event_check_interrupt);
+    }
     else
     {
         vmx_function_table.deliver_posted_intr = NULL;
