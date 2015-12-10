@@ -583,7 +583,7 @@ static void __intel_iommu_iotlb_flush(struct domain *d, unsigned long gfn,
         if ( iommu_domid == -1 )
             continue;
 
-        if ( page_count > 1 || gfn == -1 )
+        if ( page_count != 1 || gfn == INVALID_GFN )
         {
             if ( iommu_flush_iotlb_dsi(iommu, iommu_domid,
                         0, flush_dev_iotlb) )
@@ -592,7 +592,7 @@ static void __intel_iommu_iotlb_flush(struct domain *d, unsigned long gfn,
         else
         {
             if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
-                        (paddr_t)gfn << PAGE_SHIFT_4K, 0,
+                        (paddr_t)gfn << PAGE_SHIFT_4K, PAGE_ORDER_4K,
                         !dma_old_pte_present, flush_dev_iotlb) )
                 iommu_flush_write_buffer(iommu);
         }
@@ -606,7 +606,7 @@ static void intel_iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigne
 
 static void intel_iommu_iotlb_flush_all(struct domain *d)
 {
-    __intel_iommu_iotlb_flush(d, 0, 0, 0);
+    __intel_iommu_iotlb_flush(d, INVALID_GFN, 0, 0);
 }
 
 /* clear one page's page table */
