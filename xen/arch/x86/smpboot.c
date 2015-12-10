@@ -922,7 +922,8 @@ void __cpu_disable(void)
 
     /* It's now safe to remove this processor from the online map */
     cpumask_clear_cpu(cpu, &cpu_online_map);
-    fixup_irqs();
+    fixup_irqs(&cpu_online_map, 1);
+    fixup_eoi();
 
     if ( cpu_disable_scheduler(cpu) )
         BUG();
