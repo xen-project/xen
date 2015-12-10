@@ -1380,6 +1380,27 @@ static int cpu_schedule_up(unsigned int cpu)
 
     if ( idle_vcpu[cpu] == NULL )
         alloc_vcpu(idle_vcpu[0]->domain, cpu, cpu);
+    else
+    {
+        struct vcpu *idle = idle_vcpu[cpu];
+
+        /*
+         * During (ACPI?) suspend the idle vCPU for this pCPU is not freed,
+         * while its scheduler specific data (what is pointed by sched_priv)
+         * is. Also, at this stage of the resume path, we attach the pCPU
+         * to the default scheduler, no matter in what cpupool it was before
+         * suspend. To avoid inconsistency, let's allocate default scheduler
+         * data for the idle vCPU here. If the pCPU was in a different pool
+         * with a different scheduler, it is schedule_cpu_switch(), invoked
+         * later, that will set things up as appropriate.
+         */
+        ASSERT(idle->sched_priv == NULL);
+
+        idle->sched_priv = SCHED_OP(&ops, alloc_vdata, idle,
+                                    idle->domain->sched_priv);
+        if ( idle->sched_priv == NULL )
+            return -ENOMEM;
+    }
     if ( idle_vcpu[cpu] == NULL )
         return -ENOMEM;
 
@@ -1397,6 +1418,10 @@ static void cpu_schedule_down(unsigned int cpu)
 
     if ( sd->sched_priv != NULL )
         SCHED_OP(sched, free_pdata, sd->sched_priv, cpu);
+    SCHED_OP(sched, free_vdata, idle_vcpu[cpu]->sched_priv);
+
+    idle_vcpu[cpu]->sched_priv = NULL;
+    sd->sched_priv = NULL;
 
     kill_timer(&sd->s_timer);
 }
