@@ -733,11 +733,11 @@ static void core2_vpmu_do_cpuid(unsigned int input,
                                 unsigned int *eax, unsigned int *ebx,
                                 unsigned int *ecx, unsigned int *edx)
 {
-    if (input == 0x1)
+    switch ( input )
     {
-        struct vpmu_struct *vpmu = vcpu_vpmu(current);
+    case 0x1:
 
-        if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_DS) )
+        if ( vpmu_is_set(vcpu_vpmu(current), VPMU_CPU_HAS_DS) )
         {
             /* Switch on the 'Debug Store' feature in CPUID.EAX[1]:EDX[21] */
             *edx |= cpufeat_mask(X86_FEATURE_DS);
@@ -746,6 +746,13 @@ static void core2_vpmu_do_cpuid(unsigned int input,
             if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
                 *ecx |= cpufeat_mask(X86_FEATURE_DSCPL);
         }
+        break;
+
+    case 0xa:
+        /* Report at most version 3 since that's all we currently emulate */
+        if ( MASK_EXTR(*eax, PMU_VERSION_MASK) > 3 )
+            *eax = (*eax & ~PMU_VERSION_MASK) | MASK_INSR(3, PMU_VERSION_MASK);
+        break;
     }
 }
 
@@ -955,59 +962,32 @@ int vmx_vpmu_initialise(struct vcpu *v)
 int __init core2_vpmu_init(void)
 {
     u64 caps;
+    unsigned int version = 0;
+
+    if ( current_cpu_data.cpuid_level >= 0xa )
+        version = MASK_EXTR(cpuid_eax(0xa), PMU_VERSION_MASK);
+
+    switch ( version )
+    {
+    case 4:
+        printk(XENLOG_INFO "VPMU: PMU version 4 is not fully supported. "
+               "Emulating version 3\n");
+        /* FALLTHROUGH */
+
+    case 2:
+    case 3:
+        break;
+
+    default:
+        printk(XENLOG_WARNING "VPMU: PMU version %u is not supported\n",
+               version);
+        return -EINVAL;
+    }
 
     if ( current_cpu_data.x86 != 6 )
     {
         printk(XENLOG_WARNING "VPMU: only family 6 is supported\n");
         return -EINVAL;
-    }
-
-    switch ( current_cpu_data.x86_model )
-    {
-        /* Core2: */
-        case 0x0f: /* original 65 nm celeron/pentium/core2/xeon, "Merom"/"Conroe" */
-        case 0x16: /* single-core 65 nm celeron/core2solo "Merom-L"/"Conroe-L" */
-        case 0x17: /* 45 nm celeron/core2/xeon "Penryn"/"Wolfdale" */
-        case 0x1d: /* six-core 45 nm xeon "Dunnington" */
-
-        case 0x2a: /* SandyBridge */
-        case 0x2d: /* SandyBridge, "Romley-EP" */
-
-        /* Nehalem: */
-        case 0x1a: /* 45 nm nehalem, "Bloomfield" */
-        case 0x1e: /* 45 nm nehalem, "Lynnfield", "Clarksfield", "Jasper Forest" */
-        case 0x2e: /* 45 nm nehalem-ex, "Beckton" */
-
-        /* Westmere: */
-        case 0x25: /* 32 nm nehalem, "Clarkdale", "Arrandale" */
-        case 0x2c: /* 32 nm nehalem, "Gulftown", "Westmere-EP" */
-        case 0x2f: /* 32 nm Westmere-EX */
-
-        case 0x3a: /* IvyBridge */
-        case 0x3e: /* IvyBridge EP */
-
-        /* Haswell: */
-        case 0x3c:
-        case 0x3f:
-        case 0x45:
-        case 0x46:
-
-        /* Broadwell */
-        case 0x3d:
-        case 0x4f:
-        case 0x56:
-
-        /* future: */
-        case 0x4e:
-
-        /* next gen Xeon Phi */
-        case 0x57:
-            break;
-
-        default:
-            printk(XENLOG_WARNING "VPMU: Unsupported CPU model %#x\n",
-                   current_cpu_data.x86_model);
-            return -EINVAL;
     }
 
     arch_pmc_cnt = core2_get_arch_pmc_count();
