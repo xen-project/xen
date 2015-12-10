@@ -25,6 +25,7 @@
 #include <asm/hvm/iommu.h>
 #include <asm/hvm/support.h>
 #include <xen/hvm/irq.h>
+#include <asm/io_apic.h>
 
 static DEFINE_PER_CPU(struct list_head, dpci_list);
 
@@ -198,6 +199,108 @@ void free_hvm_irq_dpci(struct hvm_irq_dpci *dpci)
     xfree(dpci);
 }
 
+/*
+ * This routine handles lowest-priority interrupts using vector-hashing
+ * mechanism. As an example, modern Intel CPUs use this method to handle
+ * lowest-priority interrupts.
+ *
+ * Here is the details about the vector-hashing mechanism:
+ * 1. For lowest-priority interrupts, store all the possible destination
+ *    vCPUs in an array.
+ * 2. Use "gvec % max number of destination vCPUs" to find the right
+ *    destination vCPU in the array for the lowest-priority interrupt.
+ */
+static struct vcpu *vector_hashing_dest(const struct domain *d,
+                                        uint32_t dest_id,
+                                        bool_t dest_mode,
+                                        uint8_t gvec)
+
+{
+    unsigned long *dest_vcpu_bitmap;
+    unsigned int dest_vcpus = 0;
+    struct vcpu *v, *dest = NULL;
+    unsigned int i;
+
+    dest_vcpu_bitmap = xzalloc_array(unsigned long,
+                                     BITS_TO_LONGS(d->max_vcpus));
+    if ( !dest_vcpu_bitmap )
+        return NULL;
+
+    for_each_vcpu ( d, v )
+    {
+        if ( !vlapic_match_dest(vcpu_vlapic(v), NULL, APIC_DEST_NOSHORT,
+                                dest_id, dest_mode) )
+            continue;
+
+        __set_bit(v->vcpu_id, dest_vcpu_bitmap);
+        dest_vcpus++;
+    }
+
+    if ( dest_vcpus != 0 )
+    {
+        unsigned int mod = gvec % dest_vcpus;
+        unsigned int idx = 0;
+
+        for ( i = 0; i <= mod; i++ )
+        {
+            idx = find_next_bit(dest_vcpu_bitmap, d->max_vcpus, idx) + 1;
+            BUG_ON(idx >= d->max_vcpus);
+        }
+
+        dest = d->vcpu[idx - 1];
+    }
+
+    xfree(dest_vcpu_bitmap);
+
+    return dest;
+}
+
+/*
+ * The purpose of this routine is to find the right destination vCPU for
+ * an interrupt which will be delivered by VT-d posted-interrupt. There
+ * are several cases as below:
+ *
+ * - For lowest-priority interrupts, use vector-hashing mechanism to find
+ *   the destination.
+ * - Otherwise, for single destination interrupt, it is straightforward to
+ *   find the destination vCPU and return true.
+ * - For multicast/broadcast vCPU, we cannot handle it via interrupt posting,
+ *   so return NULL.
+ */
+static struct vcpu *pi_find_dest_vcpu(const struct domain *d, uint32_t dest_id,
+                                      bool_t dest_mode, uint8_t delivery_mode,
+                                      uint8_t gvec)
+{
+    unsigned int dest_vcpus = 0;
+    struct vcpu *v, *dest = NULL;
+
+    switch ( delivery_mode )
+    {
+    case dest_LowestPrio:
+        return vector_hashing_dest(d, dest_id, dest_mode, gvec);
+    case dest_Fixed:
+        for_each_vcpu ( d, v )
+        {
+            if ( !vlapic_match_dest(vcpu_vlapic(v), NULL, APIC_DEST_NOSHORT,
+                                    dest_id, dest_mode) )
+                continue;
+
+            dest_vcpus++;
+            dest = v;
+        }
+
+        /* For fixed mode, we only handle single-destination interrupts. */
+        if ( dest_vcpus == 1 )
+            return dest;
+
+        break;
+    default:
+        break;
+    }
+
+    return NULL;
+}
+
 int pt_irq_create_bind(
     struct domain *d, xen_domctl_bind_pt_irq_t *pt_irq_bind)
 {
@@ -256,7 +359,7 @@ int pt_irq_create_bind(
     {
     case PT_IRQ_TYPE_MSI:
     {
-        uint8_t dest, dest_mode;
+        uint8_t dest, dest_mode, delivery_mode;
         int dest_vcpu_id;
 
         if ( !(pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) )
@@ -329,11 +432,29 @@ int pt_irq_create_bind(
         /* Calculate dest_vcpu_id for MSI-type pirq migration. */
         dest = pirq_dpci->gmsi.gflags & VMSI_DEST_ID_MASK;
         dest_mode = !!(pirq_dpci->gmsi.gflags & VMSI_DM_MASK);
+        delivery_mode = (pirq_dpci->gmsi.gflags & VMSI_DELIV_MASK) >>
+                         GFLAGS_SHIFT_DELIV_MODE;
+
         dest_vcpu_id = hvm_girq_dest_2_vcpu_id(d, dest, dest_mode);
         pirq_dpci->gmsi.dest_vcpu_id = dest_vcpu_id;
         spin_unlock(&d->event_lock);
         if ( dest_vcpu_id >= 0 )
             hvm_migrate_pirqs(d->vcpu[dest_vcpu_id]);
+
+        /* Use interrupt posting if it is supported. */
+        if ( iommu_intpost )
+        {
+            const struct vcpu *vcpu = pi_find_dest_vcpu(d, dest, dest_mode,
+                                          delivery_mode, pirq_dpci->gmsi.gvec);
+
+            if ( vcpu )
+                pi_update_irte( vcpu, info, pirq_dpci->gmsi.gvec );
+            else
+                dprintk(XENLOG_G_INFO,
+                        "%pv: deliver interrupt in remapping mode,gvec:%02x\n",
+                        vcpu, pirq_dpci->gmsi.gvec);
+        }
+
         break;
     }
 
