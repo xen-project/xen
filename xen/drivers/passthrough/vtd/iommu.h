@@ -323,6 +323,12 @@ struct iremap_entry {
   };
 };
 
+/*
+ * Posted-interrupt descriptor address is 64 bits with 64-byte aligned, only
+ * the upper 26 bits of lest significiant 32 bits is available.
+ */
+#define PDA_LOW_BIT    26
+
 /* Max intr remapping table page order is 8, as max number of IRTEs is 64K */
 #define IREMAP_PAGE_ORDER  8
 

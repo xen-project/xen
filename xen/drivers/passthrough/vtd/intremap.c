@@ -905,3 +905,129 @@ void iommu_disable_x2apic_IR(void)
     for_each_drhd_unit ( drhd )
         disable_qinval(drhd->iommu);
 }
+
+static void setup_posted_irte(
+    struct iremap_entry *new_ire, const struct iremap_entry *old_ire,
+    const struct pi_desc *pi_desc, const uint8_t gvec)
+{
+    memset(new_ire, sizeof(*new_ire), 0);
+
+    /*
+     * 'im' filed decides whether the irte is in posted format (with value 1)
+     * or remapped format (with value 0), if the old irte is in remapped format,
+     * we copy things from remapped part in 'struct iremap_entry', otherwise,
+     * we copy from posted part.
+     */
+    if ( !old_ire->remap.im )
+    {
+        new_ire->post.p = old_ire->remap.p;
+        new_ire->post.fpd = old_ire->remap.fpd;
+        new_ire->post.sid = old_ire->remap.sid;
+        new_ire->post.sq = old_ire->remap.sq;
+        new_ire->post.svt = old_ire->remap.svt;
+    }
+    else
+    {
+        new_ire->post.p = old_ire->post.p;
+        new_ire->post.fpd = old_ire->post.fpd;
+        new_ire->post.sid = old_ire->post.sid;
+        new_ire->post.sq = old_ire->post.sq;
+        new_ire->post.svt = old_ire->post.svt;
+        new_ire->post.urg = old_ire->post.urg;
+    }
+
+    new_ire->post.im = 1;
+    new_ire->post.vector = gvec;
+    new_ire->post.pda_l = virt_to_maddr(pi_desc) >> (32 - PDA_LOW_BIT);
+    new_ire->post.pda_h = virt_to_maddr(pi_desc) >> 32;
+}
+
+/*
+ * This function is used to update the IRTE for posted-interrupt
+ * when guest changes MSI/MSI-X information.
+ */
+int pi_update_irte(const struct vcpu *v, const struct pirq *pirq,
+    const uint8_t gvec)
+{
+    struct irq_desc *desc;
+    const struct msi_desc *msi_desc;
+    int remap_index;
+    int rc = 0;
+    const struct pci_dev *pci_dev;
+    const struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
+    struct ir_ctrl *ir_ctrl;
+    struct iremap_entry *iremap_entries = NULL, *p = NULL;
+    struct iremap_entry new_ire, old_ire;
+    const struct pi_desc *pi_desc = &v->arch.hvm_vmx.pi_desc;
+    __uint128_t ret;
+
+    desc = pirq_spin_lock_irq_desc(pirq, NULL);
+    if ( !desc )
+        return -EINVAL;
+
+    msi_desc = desc->msi_desc;
+    if ( !msi_desc )
+    {
+        rc = -ENODEV;
+        goto unlock_out;
+    }
+
+    pci_dev = msi_desc->dev;
+    if ( !pci_dev )
+    {
+        rc = -ENODEV;
+        goto unlock_out;
+    }
+
+    remap_index = msi_desc->remap_index;
+
+    spin_unlock_irq(&desc->lock);
+
+    ASSERT(spin_is_locked(&pcidevs_lock));
+
+    /*
+     * FIXME: For performance reasons we should store the 'iommu' pointer in
+     * 'struct msi_desc' in some other place, so we don't need to waste
+     * time searching it here.
+     */
+    drhd = acpi_find_matched_drhd_unit(pci_dev);
+    if ( !drhd )
+        return -ENODEV;
+
+    iommu = drhd->iommu;
+    ir_ctrl = iommu_ir_ctrl(iommu);
+    if ( !ir_ctrl )
+        return -ENODEV;
+
+    spin_lock_irq(&ir_ctrl->iremap_lock);
+
+    GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, remap_index, iremap_entries, p);
+
+    old_ire = *p;
+
+    /* Setup/Update interrupt remapping table entry. */
+    setup_posted_irte(&new_ire, &old_ire, pi_desc, gvec);
+    ret = cmpxchg16b(p, &old_ire, &new_ire);
+
+    /*
+     * In the above, we use cmpxchg16 to atomically update the 128-bit IRTE,
+     * and the hardware cannot update the IRTE behind us, so the return value
+     * of cmpxchg16 should be the same as old_ire. This ASSERT validate it.
+     */
+    ASSERT(ret == old_ire.val);
+
+    iommu_flush_cache_entry(p, sizeof(*p));
+    iommu_flush_iec_index(iommu, 0, remap_index);
+
+    unmap_vtd_domain_page(iremap_entries);
+
+    spin_unlock_irq(&ir_ctrl->iremap_lock);
+
+    return 0;
+
+ unlock_out:
+    spin_unlock_irq(&desc->lock);
+
+    return rc;
+}
