@@ -255,9 +255,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= d25773c8afa2f4dbbb466116daeb60159ddd22bd
-# Thu Dec 3 11:23:25 2015 +0000
-# mini-os: Include libxentoollog with libxc
+MINIOS_UPSTREAM_REVISION ?= bccd90071e863ec22216a000f1a07035e2f226ff
+# Mon Nov 23 16:34:31 2015 +0000
+# Add a .gitignore
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.9.0
 # Tue Nov 17 09:18:44 2015 -0500
@@ -266,9 +266,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.9.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 9fad9ed285835caef64bb8dab352e287ad8538c2
-# Thu Dec 3 11:23:16 2015 +0000
-# qemu-xen-traditional: Use xentoollog as a separate library
+QEMU_TRADITIONAL_REVISION ?= 91c15bfaec1764ce2896a393eabee1183afe1130
+# Wed Dec 9 11:47:35 2015 +0000
+# net: pcnet: add check to validate receive data size(CVE-2015-7504)
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.

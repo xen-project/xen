@@ -58,7 +58,6 @@ stubdom/gcc-*
 stubdom/include
 stubdom/ioemu
 stubdom/xenstore
-stubdom/libxentoollog-*
 stubdom/libxc-*
 stubdom/lwip-*
 stubdom/mini-os-*
