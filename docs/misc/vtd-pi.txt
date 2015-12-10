@@ -1,0 +1,336 @@
+Authors: Feng Wu <feng.wu@intel.com>
+
+VT-d Posted-interrupt (PI) design for XEN
+
+Important Definitions
+==================
+VT-d posted-interrupts: posted-interrupts support in root-complex side
+CPU-side posted-interrupts: posted-interrupts support in CPU side
+IRTE: Interrupt Remapping Table Entry
+Posted-interrupt Descriptor Address: the address of the posted-interrupt descriptor
+Virtual Vector: the guest vector of the interrupt
+URG: indicates if the interrupt is urgent
+
+Posted-interrupt descriptor:
+The Posted Interrupt Descriptor hosts the following fields:
+Posted Interrupt Request (PIR): Provide storage for posting (recording) interrupts (one bit
+per vector, for up to 256 vectors).
+
+Outstanding Notification (ON): Indicate if there is a notification event outstanding (not
+processed by processor or software) for this Posted Interrupt Descriptor. When this field is 0,
+hardware modifies it from 0 to 1 when generating a notification event, and the entity receiving
+the notification event (processor or software) resets it as part of posted interrupt processing.
+
+Suppress Notification (SN): Indicate if a notification event is to be suppressed (not
+generated) for non-urgent interrupt requests (interrupts processed through an IRTE with
+URG=0).
+
+Notification Vector (NV): Specify the vector for notification event (interrupt).
+
+Notification Destination (NDST): Specify the physical APIC-ID of the destination logical
+processor for the notification event.
+
+Background
+==========
+With the development of virtualization, there are more and more device
+assignment requirements. However, today when a VM is running with
+assigned devices (such as, NIC), external interrupt handling for the assigned
+devices always needs VMM intervention.
+
+VT-d Posted-interrupt is a more enhanced method to handle interrupts
+in the virtualization environment. Interrupt posting is the process by
+which an interrupt request is recorded in a memory-resident
+posted-interrupt-descriptor structure by the root-complex or software,
+followed by an optional notification event issued to the CPU.
+
+With VT-d Posted-interrupt we can get the following advantages:
+- Direct delivery of external interrupts to running vCPUs without VMM
+intervention
+- Decrease the interrupt migration complexity. On vCPU migration, software
+can atomically co-migrate all interrupts targeting the migrating vCPU. For
+virtual machines with assigned devices, migrating a vCPU across pCPUs
+either incurs the overhead of forwarding interrupts in software (e.g. via VMM
+generated IPIs), or complexity to independently migrate each interrupt targeting
+the vCPU to the new pCPU. However, after enabling VT-d PI, the destination vCPU
+of an external interrupt from assigned devices is stored in the IRTE (i.e.
+Posted-interrupt Descriptor Address), when vCPU is migrated to another pCPU,
+we will set this new pCPU in the 'NDST' field of Posted-interrupt descriptor, this
+make the interrupt migration automatic.
+
+Here is what Xen currently does for external interrupts from assigned devices:
+
+When a VM is running and an external interrupt from an assigned device occurs
+for it. VM-EXIT happens, then:
+
+vmx_do_extint() --> do_IRQ() --> __do_IRQ_guest() --> hvm_do_IRQ_dpci() -->
+raise_softirq_for(pirq_dpci) --> raise_softirq(HVM_DPCI_SOFTIRQ)
+
+softirq HVM_DPCI_SOFTIRQ is bound to dpci_softirq()
+
+dpci_softirq() --> hvm_dirq_assist() --> vmsi_deliver_pirq() --> vmsi_deliver() -->
+vmsi_inj_irq() --> vlapic_set_irq()
+
+vlapic_set_irq() does the following things:
+1. If CPU-side posted-interrupt is supported, call vmx_deliver_posted_intr() to deliver
+the virtual interrupt via posted-interrupt infrastructure.
+2. Else if CPU-side posted-interrupt is not supported, set the related vIRR in vLAPIC
+page and call vcpu_kick() to kick the related vCPU. Before VM-Entry, vmx_intr_assist()
+will help to inject the interrupt to guests.
+
+However, after VT-d PI is supported, when a guest is running in non-root and an
+external interrupt from an assigned device occurs for it. no VM-Exit is needed,
+the guest can handle this totally in non-root mode, thus avoiding all the above
+code flow.
+
+Posted-interrupt Introduction
+========================
+There are two components in the Posted-interrupt architecture:
+Processor Support and Root-Complex Support
+
+- Processor Support
+Posted-interrupt processing is a feature by which a processor processes
+the virtual interrupts by recording them as pending on the virtual-APIC
+page.
+
+Posted-interrupt processing is enabled by setting the process posted
+interrupts VM-execution control. The processing is performed in response
+to the arrival of an interrupt with the posted-interrupt notification vector.
+In response to such an interrupt, the processor processes virtual interrupts
+recorded in a data structure called a posted-interrupt descriptor.
+
+More information about APICv and CPU-side Posted-interrupt, please refer
+to Chapter "APIC VIRTUALIZATION AND VIRTUAL INTERRUPTS", and Section
+"POSTED-INTERRUPT PROCESSING" in the Intel SDM:
+http://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-manual-325462.pdf 
+
+- Root-Complex Support
+Interrupt posting is the process by which an interrupt request (from IOAPIC
+or MSI/MSIx capable sources) is recorded in a memory-resident
+posted-interrupt-descriptor structure by the root-complex, followed by
+an optional notification event issued to the CPU complex. The interrupt
+request arriving at the root-complex carry the identity of the interrupt
+request source and a 'remapping-index'. The remapping-index is used to
+look-up an entry from the memory-resident interrupt-remap-table. Unlike
+interrupt-remapping, the interrupt-remap-table-entry for a posted-interrupt,
+specifies a virtual-vector and a pointer to the posted-interrupt descriptor.
+The virtual-vector specifies the vector of the interrupt to be recorded in
+the posted-interrupt descriptor. The posted-interrupt descriptor hosts storage
+for the virtual-vectors and contains the attributes of the notification event
+(interrupt) to be issued to the CPU complex to inform CPU/software about pending
+interrupts recorded in the posted-interrupt descriptor.
+
+More information about VT-d PI, please refer to
+http://www.intel.com/content/www/us/en/intelligent-systems/intel-technology/vt-directed-io-spec.html 
+
+Design Overview
+==============
+In this design, we will cover the following items:
+1. Add a variable to control whether enable VT-d posted-interrupt or not.
+2. VT-d PI feature detection.
+3. Extend posted-interrupt descriptor structure to cover VT-d PI specific items.
+4. Extend IRTE structure to support VT-d PI.
+5. Introduce a new global vector which is used for waking up the blocked vCPU.
+6. Update IRTE when guest modifies the interrupt configuration (MSI/MSIx configuration).
+7. Update posted-interrupt descriptor during vCPU scheduling.
+8. How to wakeup blocked vCPU when an interrupt is posted for it (wakeup notification handler).
+9. New boot command line for Xen, which controls VT-d PI feature by user.
+10. Multicast/broadcast and lowest priority interrupts consideration.
+
+
+Implementation details
+===================
+- New variable to control VT-d PI
+
+Like variable 'iommu_intremap' for interrupt remapping, it is very straightforward
+to add a new one 'iommu_intpost' for posted-interrupt. 'iommu_intpost' is set
+only when interrupt remapping and VT-d posted-interrupt are both enabled.
+
+- VT-d PI feature detection.
+Bit 59 in VT-d Capability Register is used to report VT-d Posted-interrupt support.
+
+- Extend posted-interrupt descriptor structure to cover VT-d PI specific items.
+Here is the new structure for posted-interrupt descriptor:
+
+struct pi_desc {
+    DECLARE_BITMAP(pir, NR_VECTORS);
+    union {
+        struct
+        {
+        u16 on     : 1,  /* bit 256 - Outstanding Notification */
+            sn     : 1,  /* bit 257 - Suppress Notification */
+            rsvd_1 : 14; /* bit 271:258 - Reserved */
+        u8  nv;          /* bit 279:272 - Notification Vector */
+        u8  rsvd_2;      /* bit 287:280 - Reserved */
+        u32 ndst;        /* bit 319:288 - Notification Destination */
+        };
+        u64 control;
+    };
+    u32 rsvd[6];
+} __attribute__ ((aligned (64)));
+
+- Extend IRTE structure to support VT-d PI.
+
+Here is the new structure for IRTE:
+/* interrupt remap entry */
+struct iremap_entry {
+  union {
+    struct { u64 lo, hi; };
+    struct {
+        u16 p       : 1,
+            fpd     : 1,
+            dm      : 1,
+            rh      : 1,
+            tm      : 1,
+            dlm     : 3,
+            avail   : 4,
+            res_1   : 4;
+        u8  vector;
+        u8  res_2;
+        u32 dst;
+        u16 sid;
+        u16 sq      : 2,
+            svt     : 2,
+            res_3   : 12;
+        u32 res_4   : 32;
+    } remap;
+    struct {
+        u16 p       : 1,
+            fpd     : 1,
+            res_1   : 6,
+            avail   : 4,
+            res_2   : 2,
+            urg     : 1,
+            im      : 1;
+        u8  vector;
+        u8  res_3;
+        u32 res_4   : 6,
+            pda_l   : 26;
+        u16 sid;
+        u16 sq      : 2,
+            svt     : 2,
+            res_5   : 12;
+        u32 pda_h;
+    } post;
+  };
+};
+
+- Introduce a new global vector which is used to wake up the blocked vCPU.
+
+Currently, there is a global vector 'posted_intr_vector', which is used as the
+global notification vector for all vCPUs in the system. This vector is stored in
+VMCS and CPU considers it as a _special_ vector, uses it to notify the related
+pCPU when an interrupt is recorded in the posted-interrupt descriptor.
+
+This existing global vector is a _special_ vector to CPU, CPU handle it in a
+_special_ way compared to normal vectors, please refer to 29.6 in Intel SDM
+http://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-manual-325462.pdf 
+for more information about how CPU handles it.
+
+After having VT-d PI, VT-d engine can issue notification event when the
+assigned devices issue interrupts. We need add a new global vector to
+wakeup the blocked vCPU, please refer to later section in this design for
+how to use this new global vector.
+
+- Update IRTE when guest modifies the interrupt configuration (MSI/MSIx configuration).
+After VT-d PI is introduced, the format of IRTE is changed as follows:
+	Descriptor Address: the address of the posted-interrupt descriptor
+	Virtual Vector: the guest vector of the interrupt
+	URG: indicates if the interrupt is urgent
+	Other fields continue to have the same meaning
+
+'Descriptor Address' tells the destination vCPU of this interrupt, since
+each vCPU has a dedicated posted-interrupt descriptor.
+
+'Virtual Vector' tells the guest vector of the interrupt.
+
+When guest changes the configuration of the interrupts, such as, the
+cpu affinity, or the vector, we need to update the associated IRTE accordingly.
+
+- Update posted-interrupt descriptor during vCPU scheduling
+
+The basic idea here is:
+1. When vCPU is running
+        - Set 'NV' to 'posted_intr_vector'.
+        - Clear 'SN' to accept posted-interrupts.
+        - Set 'NDST' to the pCPU on which the vCPU will be running.
+2. When vCPU is blocked
+        - Set 'NV' to ' pi_wakeup_vector ', so we can wake up the
+          related vCPU when posted-interrupt happens for it.
+          Please refer to the above section about the new global vector.
+        - Clear 'SN' to accept posted-interrupts
+3. When vCPU is preempted or sleeping
+        - Set 'SN' to suppress non-urgent interrupts
+          (Currently, we only support non-urgent interrupts)
+         When vCPU is preempted or sleep, it doesn't need to accept
+         posted-interrupt notification event since we don't change the behavior
+         of scheduler when the interrupt occurs, we still need wait for the next
+         scheduling of the vCPU. When external interrupts from assigned devices occur,
+         the interrupts are recorded in PIR, and will be synced to IRR before VM-Entry.
+        - Set 'NV' to 'posted_intr_vector'.
+
+- How to wakeup blocked vCPU when an interrupt is posted for it (wakeup notification handler).
+
+Here is the scenario for the usage of the new global vector:
+
+1. vCPU0 is running on pCPU0
+2. vCPU0 is blocked and vCPU1 is currently running on pCPU0
+3. An external interrupt from an assigned device occurs for vCPU0, if we
+still use 'posted_intr_vector' as the notification vector for vCPU0, the
+notification event for vCPU0 (the event will go to pCPU1) will be consumed
+by vCPU1 incorrectly (remember this is a special vector to CPU). The worst
+case is that vCPU0 will never be woken up again since the wakeup event
+for it is always consumed by other vCPUs incorrectly. So we need introduce
+another global vector, naming 'pi_wakeup_vector' to wake up the blocked vCPU.
+
+After using 'pi_wakeup_vector' for vCPU0, VT-d engine will issue notification
+event using this new vector. Since this new vector is not a SPECIAL one to CPU,
+it is just a normal vector. To CPU, it just receives an normal external interrupt,
+then we can get control in the handler of this new vector. In this case, hypervisor
+can do something in it, such as wakeup the blocked vCPU.
+
+Here are what we do for the blocked vCPU:
+1. Define a per-cpu list 'pi_blocked_vcpu', which stored the blocked
+vCPU on the pCPU.
+2. When the vCPU is going to block, insert the vCPU
+to the per-cpu list belonging to the pCPU it was running.
+3. When the vCPU is unblocked, remove the vCPU from the related pCPU list.
+
+In the handler of 'pi_wakeup_vector', we do:
+1. Get the physical CPU.
+2. Iterate the list 'pi_blocked_vcpu' of the current pCPU, if 'ON' is set,
+we unblock the associated vCPU.
+
+When the vCPU is blocked, we change the posted-interrupts descriptor and
+put it in the pCPU's blocking list, we don't change the status of posted-
+interrupts descriptor back when the vCPU is unblocked or the blocking
+operation directly returns since there are events to be delivered. Instead,
+we do it exactly before VM-Entry.
+
+- New boot command line for Xen, which controls VT-d PI feature by user.
+
+Like 'intremap' for interrupt remapping, we add a new boot command line
+'intpost' for posted-interrupts.
+
+- Multicast/broadcast and lowest priority interrupts consideration.
+
+With VT-d PI, the destination vCPU information of an external interrupt
+from assigned devices is stored in IRTE, this makes the following
+consideration of the design:
+1. Multicast/broadcast interrupts cannot be posted.
+2. For lowest-priority interrupts, new Intel CPU/Chipset/root-complex
+(starting from Nehalem) ignore TPR value, and instead supported two other
+ways (configurable by BIOS) on how the handle lowest priority interrupts:
+	A) Round robin: In this method, the chipset simply delivers lowest priority
+interrupts in a round-robin manner across all the available logical CPUs. While
+this provides good load balancing, this was not the best thing to do always as
+interrupts from the same device (like NIC) will start running on all the CPUs
+thrashing caches and taking locks. This led to the next scheme.
+	B) Vector hashing: In this method, hardware would apply a hash function
+on the vector value in the interrupt request, and use that hash to pick a logical
+CPU to route the lowest priority interrupt. This way, a given vector always goes
+to the same logical CPU, avoiding the thrashing problem above.
+
+So, gist of above is that, lowest priority interrupts has never been delivered as
+"lowest priority" in physical hardware.
+
+Vector hashing is used in this design.
