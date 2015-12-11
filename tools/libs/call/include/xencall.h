@@ -36,11 +36,39 @@ typedef struct xencall_handle xencall_handle;
 
 /*
  * Return a handle onto the hypercall driver.  Logs errors.
+ * *
+ * Note: After fork(2) a child process must not use any opened
+ * xencall handle inherited from their parent, nor access any
+ * hypercall argument buffers associated with that handle.
+ *
+ * The child must open a new handle if they want to interact with
+ * xencall.
+ *
+ * Calling exec(2) in a child will safely (and reliably) reclaim any
+ * resources which were allocated via a xencall_handle in the parent.
+ *
+ * A child which does not call exec(2) may safely call xencall_close()
+ * on a xencall_handle inherited from their parent. This will attempt
+ * to reclaim any resources associated with that handle. Note that in
+ * some implementations this reclamation may not be completely
+ * effective, in this case any affected resources remain allocated.
+ *
+ * Calling xencall_close() is the only safe operation on a
+ * xencall_handle which has been inherited.
  */
 xencall_handle *xencall_open(xentoollog_logger *logger, unsigned open_flags);
 
 /*
  * Close a handle previously allocated with xencall_open().
+ *
+ * Under normal circumstances (i.e. not in the child after a fork) any
+ * allocated hypercall argument buffers should be freed using the
+ * appropriate xencall_free_*() prior to closing the handle in order
+ * to free up resources associated with those mappings.
+ *
+ * This is the only function which may be safely called on a
+ * xencall_handle in a child after a fork. xencall_free_*() must not
+ * be called under such circumstances.
  */
 int xencall_close(xencall_handle *xcall);
 

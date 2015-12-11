@@ -45,10 +45,25 @@ typedef struct xentoollog_logger xentoollog_logger;
  * Return a handle to the event channel driver, or NULL on failure, in
  * which case errno will be set appropriately.
  *
- * Note:
- * After fork a child process must not use any opened evtchn
- * handle inherited from their parent. They must open a new handle if
- * they want to interact with evtchn.
+ * Note: After fork(2) a child process must not use any opened evtchn
+ * handle inherited from their parent, nor access any grant mapped
+ * areas associated with that handle.
+ *
+ * The child must open a new handle if they want to interact with
+ * evtchn.
+ *
+ * Calling exec(2) in a child will safely (and reliably) reclaim any
+ * allocated resources via a xenevtchn_handle in the parent.
+ *
+ * A child which does not call exec(2) may safely call
+ * xenevtchn_close() on a xenevtchn_handle inherited from their
+ * parent. This will attempt to reclaim any resources associated with
+ * that handle. Note that in some implementations this reclamation may
+ * not be completely effective, in this case any affected resources
+ * remain allocated.
+ *
+ * Calling xenevtchn_close() is the only safe operation on a
+ * xenevtchn_handle which has been inherited.
  */
 /* Currently no flags are defined */
 xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned open_flags);
