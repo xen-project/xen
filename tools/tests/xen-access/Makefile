@@ -7,8 +7,7 @@ CFLAGS += $(CFLAGS_libxenctrl)
 CFLAGS += $(CFLAGS_libxenguest)
 CFLAGS += $(CFLAGS_xeninclude)
 
-TARGETS-y :=
-TARGETS-$(HAS_MEM_ACCESS) := xen-access
+TARGETS-y := xen-access
 TARGETS := $(TARGETS-y)
 
 .PHONY: all
