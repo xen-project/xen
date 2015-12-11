@@ -15,7 +15,12 @@
 /* On stack VCPU state */
 struct cpu_user_regs
 {
-    /*         Aarch64       Aarch32 */
+    /*
+     * The mapping AArch64 <-> AArch32 is based on D1.20.1 in ARM DDI
+     * 0487A.d.
+     *
+     *         AArch64       AArch32
+     */
     __DECL_REG(x0,           r0/*_usr*/);
     __DECL_REG(x1,           r1/*_usr*/);
     __DECL_REG(x2,           r2/*_usr*/);
