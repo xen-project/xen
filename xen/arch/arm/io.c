@@ -26,7 +26,8 @@
 static int handle_read(const struct mmio_handler *handler, struct vcpu *v,
                        mmio_info_t *info, register_t *r)
 {
-    uint8_t size = (1 << info->dabt.size) * 8;
+    const struct hsr_dabt dabt = info->dabt;
+    uint8_t size = (1 << dabt.size) * 8;
 
     if ( !handler->ops->read(v, info, r, handler->priv) )
         return 0;
@@ -36,7 +37,7 @@ static int handle_read(const struct mmio_handler *handler, struct vcpu *v,
      * Note that we expect the read handler to have zeroed the bits
      * outside the requested access size.
      */
-    if ( info->dabt.sign && (*r & (1UL << (size - 1)) ))
+    if ( dabt.sign && (*r & (1UL << (size - 1))) )
     {
         /*
          * We are relying on register_t using the same as
