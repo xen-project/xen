@@ -302,11 +302,39 @@ static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
 }
 
 #ifdef CONFIG_ARM_64
-static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
+typedef int (*vtimer_sysreg32_fn_t)(struct cpu_user_regs *regs, uint32_t *r,
+                                    int read);
+typedef int (*vtimer_sysreg64_fn_t)(struct cpu_user_regs *regs, uint64_t *r,
+                                    int read);
+
+static int vtimer_emulate_sysreg32(struct cpu_user_regs *regs, union hsr hsr,
+                                   vtimer_sysreg32_fn_t fn)
 {
     struct hsr_sysreg sysreg = hsr.sysreg;
     register_t *x = select_user_reg(regs, sysreg.reg);
-    uint32_t r = (uint32_t)*x;
+    uint32_t r = *x;
+    int ret;
+
+    ret = fn(regs, &r, sysreg.read);
+
+    if ( ret && sysreg.read )
+        *x = r;
+
+    return ret;
+}
+
+static int vtimer_emulate_sysreg64(struct cpu_user_regs *regs, union hsr hsr,
+                                   vtimer_sysreg64_fn_t fn)
+{
+    struct hsr_sysreg sysreg = hsr.sysreg;
+    uint64_t *x = select_user_reg(regs, sysreg.reg);
+
+    return fn(regs, x, sysreg.read);
+}
+
+static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
+{
+    struct hsr_sysreg sysreg = hsr.sysreg;
 
     if ( sysreg.read )
         perfc_incr(vtimer_sysreg_reads);
@@ -316,20 +344,11 @@ static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {
     case HSR_SYSREG_CNTP_CTL_EL0:
-        if ( !vtimer_cntp_ctl(regs, &r, sysreg.read) )
-            return 0;
-        if ( sysreg.read )
-            *x = r;
-        return 1;
+        return vtimer_emulate_sysreg32(regs, hsr, vtimer_cntp_ctl);
     case HSR_SYSREG_CNTP_TVAL_EL0:
-        if ( !vtimer_cntp_tval(regs, &r, sysreg.read) )
-            return 0;
-        if ( sysreg.read )
-            *x = r;
-        return 1;
-
+        return vtimer_emulate_sysreg32(regs, hsr, vtimer_cntp_tval);
     case HSR_SYSREG_CNTP_CVAL_EL0:
-        return vtimer_cntp_cval(regs, x, sysreg.read);
+        return vtimer_emulate_sysreg64(regs, hsr, vtimer_cntp_cval);
 
     default:
         return 0;
