@@ -3113,6 +3113,7 @@ struct libxl__domain_save_state {
     libxl_domain_type type;
     int live;
     int debug;
+    int checkpointed_stream;
     const libxl_domain_remus_info *remus;
     /* private */
     int rc;

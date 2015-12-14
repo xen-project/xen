@@ -629,7 +629,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
     if ( rc )
         goto out;
 
-    if ( ctx->save.debug && !ctx->save.checkpointed )
+    if ( ctx->save.debug && ctx->save.checkpointed != MIG_STREAM_NONE )
     {
         rc = verify_frames(ctx);
         if ( rc )
@@ -758,7 +758,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
 
         if ( ctx->save.live )
             rc = send_domain_memory_live(ctx);
-        else if ( ctx->save.checkpointed )
+        else if ( ctx->save.checkpointed != MIG_STREAM_NONE )
             rc = send_domain_memory_checkpointed(ctx);
         else
             rc = send_domain_memory_nonlive(ctx);
@@ -778,7 +778,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
         if ( rc )
             goto err;
 
-        if ( ctx->save.checkpointed )
+        if ( ctx->save.checkpointed != MIG_STREAM_NONE )
         {
             /*
              * We have now completed the initial live portion of the checkpoint
@@ -799,7 +799,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
             if ( rc <= 0 )
                 goto err;
         }
-    } while ( ctx->save.checkpointed );
+    } while ( ctx->save.checkpointed != MIG_STREAM_NONE );
 
     xc_report_progress_single(xch, "End of stream");
 
@@ -829,7 +829,8 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
 
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
                    uint32_t max_iters, uint32_t max_factor, uint32_t flags,
-                   struct save_callbacks* callbacks, int hvm)
+                   struct save_callbacks* callbacks, int hvm,
+                   int checkpointed_stream)
 {
     struct xc_sr_context ctx =
         {
@@ -841,7 +842,11 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
     ctx.save.callbacks = callbacks;
     ctx.save.live  = !!(flags & XCFLAGS_LIVE);
     ctx.save.debug = !!(flags & XCFLAGS_DEBUG);
-    ctx.save.checkpointed = !!(flags & XCFLAGS_CHECKPOINTED);
+    ctx.save.checkpointed = checkpointed_stream;
+
+    /* If altering migration_stream update this assert too. */
+    assert(checkpointed_stream == MIG_STREAM_NONE ||
+           checkpointed_stream == MIG_STREAM_REMUS);
 
     /*
      * TODO: Find some time to better tweak the live migration algorithm.

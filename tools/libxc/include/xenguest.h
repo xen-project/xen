@@ -29,7 +29,6 @@
 #define XCFLAGS_HVM       (1 << 2)
 #define XCFLAGS_STDVGA    (1 << 3)
 #define XCFLAGS_CHECKPOINT_COMPRESS    (1 << 4)
-#define XCFLAGS_CHECKPOINTED    (1 << 5)
 
 #define X86_64_B_SIZE   64 
 #define X86_32_B_SIZE   32
@@ -82,11 +81,14 @@ struct save_callbacks {
  * @parm xch a handle to an open hypervisor interface
  * @parm fd the file descriptor to save a domain to
  * @parm dom the id of the domain
+ * @param checkpointed_stream MIG_STREAM_NONE if the far end of the stream
+ *        doesn't use checkpointing
  * @return 0 on success, -1 on failure
  */
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
-                   struct save_callbacks* callbacks, int hvm);
+                   struct save_callbacks* callbacks, int hvm,
+                   int checkpointed_stream);
 
 /* callbacks provided by xc_domain_restore */
 struct restore_callbacks {

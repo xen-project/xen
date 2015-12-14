@@ -228,6 +228,7 @@ libxl_hdtype = Enumeration("hdtype", [
     (2, "AHCI"),
     ], init_val = "LIBXL_HDTYPE_IDE")
 
+# Consistent with the values defined for migration_stream.
 libxl_checkpointed_stream = Enumeration("checkpointed_stream", [
     (0, "NONE"),
     (1, "REMUS"),

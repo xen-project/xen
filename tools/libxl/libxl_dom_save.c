@@ -338,6 +338,12 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_save_state *dss)
     unsigned int nr_vnodes = 0, nr_vmemranges = 0, nr_vcpus = 0;
     libxl__domain_suspend_state *dsps = &dss->dsps;
 
+    if (dss->checkpointed_stream != LIBXL_CHECKPOINTED_STREAM_NONE && !r_info) {
+        LOG(ERROR, "Migration stream is checkpointed, but there's no "
+                   "checkpoint info!");
+        goto out;
+    }
+
     dss->rc = 0;
     logdirty_init(&dss->logdirty);
     dsps->ao = ao;
@@ -376,14 +382,13 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_save_state *dss)
         goto out;
     }
 
-    if (r_info != NULL) {
+    if (dss->checkpointed_stream == LIBXL_CHECKPOINTED_STREAM_REMUS) {
         dss->interval = r_info->interval;
-        dss->xcflags |= XCFLAGS_CHECKPOINTED;
         if (libxl_defbool_val(r_info->compression))
             dss->xcflags |= XCFLAGS_CHECKPOINT_COMPRESS;
     }
 
-    if (r_info == NULL)
+    if (dss->checkpointed_stream == LIBXL_CHECKPOINTED_STREAM_NONE)
         callbacks->suspend = libxl__domain_suspend_callback;
 
     callbacks->switch_qemu_logdirty = libxl__domain_suspend_common_switch_qemu_logdirty;

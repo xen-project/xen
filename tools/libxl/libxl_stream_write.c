@@ -355,7 +355,7 @@ void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
      * If the stream is not still alive, we must not continue any work.
      */
     if (libxl__stream_write_inuse(stream)) {
-        if (dss->remus)
+        if (dss->checkpointed_stream != LIBXL_CHECKPOINTED_STREAM_NONE)
             /*
              * For remus, if libxl__xc_domain_save_done() completes,
              * there was an error sending data to the secondary.
