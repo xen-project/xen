@@ -173,7 +173,7 @@
     typedef union { type *p; unsigned long q; }                 \
         __guest_handle_ ## name;                                \
     typedef union { type *p; uint64_aligned_t q; }              \
-        __guest_handle_64_ ## name;
+        __guest_handle_64_ ## name
 
 /*
  * XEN_GUEST_HANDLE represents a guest pointer, when passed as a field
