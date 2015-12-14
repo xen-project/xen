@@ -23,7 +23,7 @@
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags,
                    struct save_callbacks* callbacks, int hvm,
-                   xc_migration_stream_t stream_type)
+                   xc_migration_stream_t stream_type, int recv_fd)
 {
     errno = ENOSYS;
     return -1;
@@ -35,7 +35,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned long *console_mfn, domid_t console_domid,
                       unsigned int hvm, unsigned int pae, int superpages,
                       xc_migration_stream_t stream_type,
-                      struct restore_callbacks *callbacks)
+                      struct restore_callbacks *callbacks, int send_back_fd)
 {
     errno = ENOSYS;
     return -1;

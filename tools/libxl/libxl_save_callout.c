@@ -27,7 +27,7 @@
  */
 static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
                        const char *mode_arg,
-                       int stream_fd,
+                       int stream_fd, int back_channel_fd,
                        const int *preserve_fds, int num_preserve_fds,
                        const unsigned long *argnums, int num_argnums);
 
@@ -50,6 +50,7 @@ void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
     /* Convenience aliases */
     const uint32_t domid = dcs->guest_domid;
     const int restore_fd = dcs->libxc_fd;
+    const int send_back_fd = dcs->send_back_fd;
     libxl__domain_build_state *const state = &dcs->build_state;
 
     unsigned cbflags =
@@ -71,7 +72,7 @@ void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
     shs->caller_state = dcs;
     shs->need_results = 1;
 
-    run_helper(egc, shs, "--restore-domain", restore_fd, 0, 0,
+    run_helper(egc, shs, "--restore-domain", restore_fd, send_back_fd, 0, 0,
                argnums, ARRAY_SIZE(argnums));
 }
 
@@ -95,7 +96,7 @@ void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_save_state *dss,
     shs->caller_state = dss;
     shs->need_results = 0;
 
-    run_helper(egc, shs, "--save-domain", dss->fd,
+    run_helper(egc, shs, "--save-domain", dss->fd, dss->recv_fd,
                NULL, 0,
                argnums, ARRAY_SIZE(argnums));
     return;
@@ -141,12 +142,14 @@ static int dup_cloexec(libxl__gc *gc, int fd, const char *what)
  * 1) Path to libxl-save-helper.
  * 2) --[restore|save]-domain.
  * 3) stream file descriptor.
+ * 4) back channel file descriptor.
  * n) save/restore specific parameters.
- * 4) A \0 at the end.
+ * 5) A \0 at the end.
  */
-#define HELPER_NR_ARGS 4
+#define HELPER_NR_ARGS 5
 static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
-                       const char *mode_arg, int stream_fd,
+                       const char *mode_arg,
+                       int stream_fd, int back_channel_fd,
                        const int *preserve_fds, int num_preserve_fds,
                        const unsigned long *argnums, int num_argnums)
 {
@@ -179,6 +182,7 @@ static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
     *arg++ = getenv("LIBXL_SAVE_HELPER") ?: LIBEXEC_BIN "/" "libxl-save-helper";
     *arg++ = mode_arg;
     const char **stream_fd_arg = arg++;
+    const char **back_channel_fd_arg = arg++;
     for (i=0; i<num_argnums; i++)
         *arg++ = GCSPRINTF("%lu", argnums[i]);
     *arg++ = 0;
@@ -205,6 +209,11 @@ static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
     if (!pid) {
         stream_fd = dup_cloexec(gc, stream_fd, "migration stream fd");
         *stream_fd_arg = GCSPRINTF("%d", stream_fd);
+
+        if (back_channel_fd >= 0)
+            back_channel_fd = dup_cloexec(gc, back_channel_fd,
+                                          "migration back channel fd");
+        *back_channel_fd_arg = GCSPRINTF("%d", back_channel_fd);
 
         for (i=0; i<num_preserve_fds; i++)
             if (preserve_fds[i] >= 0) {
