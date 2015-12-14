@@ -794,19 +794,22 @@ void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
      * If the stream is not still alive, we must not continue any work.
      */
     if (libxl__stream_read_inuse(stream)) {
-        if (checkpointed_stream) {
+        switch (checkpointed_stream) {
+        case LIBXL_CHECKPOINTED_STREAM_REMUS:
             /*
              * Failover from primary. Domain state is currently at a
              * consistent checkpoint, complete the stream, and call
              * stream->completion_callback() to resume the guest.
              */
             stream_complete(egc, stream, 0);
-        } else {
+            break;
+        case LIBXL_CHECKPOINTED_STREAM_NONE:
             /*
              * Libxc has indicated that it is done with the stream.
              * Resume reading libxl records from it.
              */
             stream_continue(egc, stream);
+            break;
         }
     }
 }

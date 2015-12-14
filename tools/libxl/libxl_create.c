@@ -1033,9 +1033,13 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     dcs->srs.completion_callback = domcreate_stream_done;
 
     if (restore_fd >= 0) {
-        if (checkpointed_stream)
+        switch (checkpointed_stream) {
+        case LIBXL_CHECKPOINTED_STREAM_REMUS:
             libxl__remus_restore_setup(egc, dcs);
-        libxl__stream_read_start(egc, &dcs->srs);
+            /* fall through */
+        case LIBXL_CHECKPOINTED_STREAM_NONE:
+            libxl__stream_read_start(egc, &dcs->srs);
+        }
         return;
     }
 

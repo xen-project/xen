@@ -228,6 +228,11 @@ libxl_hdtype = Enumeration("hdtype", [
     (2, "AHCI"),
     ], init_val = "LIBXL_HDTYPE_IDE")
 
+libxl_checkpointed_stream = Enumeration("checkpointed_stream", [
+    (0, "NONE"),
+    (1, "REMUS"),
+    ])
+
 #
 # Complex libxl types
 #

@@ -876,6 +876,13 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
  */
 #define LIBXL_HAVE_DEVICE_MODEL_VERSION_NONE 1
 
+/*
+ * LIBXL_HAVE_CHECKPOINTED_STREAM
+ *
+ * If this is defined, then libxl_checkpointed_stream exists.
+ */
+#define LIBXL_HAVE_CHECKPOINTED_STREAM 1
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
