@@ -906,6 +906,16 @@ int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename)
                            NULL, NULL);
 }
 
+int libxl__qmp_restore(libxl__gc *gc, int domid, const char *state_file)
+{
+    libxl__json_object *args = NULL;
+
+    qmp_parameters_add_string(gc, &args, "filename", state_file);
+
+    return qmp_run_command(gc, domid, "xen-load-devices-state", args,
+                           NULL, NULL);
+}
+
 static int qmp_change(libxl__gc *gc, libxl__qmp_handler *qmp,
                       char *device, char *target, char *arg)
 {
