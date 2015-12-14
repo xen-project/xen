@@ -88,7 +88,7 @@ void *osdep_alloc_pages(xencall_handle *xcall, size_t npages)
 {
     size_t size = npages * PAGE_SIZE;
     void *p;
-    int rc, saved_errno;
+    int rc, i, saved_errno;
 
     /* Address returned by mmap is page aligned. */
     p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED, -1, 0);
@@ -105,6 +105,18 @@ void *osdep_alloc_pages(xencall_handle *xcall, size_t npages)
     {
         PERROR("alloc_pages: madvise failed");
         goto out;
+    }
+
+    /*
+     * Touch each page in turn to force them to be un-CoWed, in case a
+     * fork happened in another thread at an inopportune moment
+     * above. The madvise() will prevent any subsequent fork calls from
+     * causing the same problem.
+     */
+    for ( i = 0; i < npages ; i++ )
+    {
+        char *c = (char *)p + (i*PAGE_SIZE);
+        *c = 0;
     }
 
     return p;
