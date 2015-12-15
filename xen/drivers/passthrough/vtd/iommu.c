@@ -415,7 +415,7 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
 {
     struct iommu *iommu = (struct iommu *) _iommu;
     int tlb_offset = ecap_iotlb_offset(iommu->ecap);
-    u64 val = 0, val_iva = 0;
+    u64 val = 0;
     unsigned long flags;
 
     /*
@@ -436,7 +436,6 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     switch ( type )
     {
     case DMA_TLB_GLOBAL_FLUSH:
-        /* global flush doesn't need set IVA_REG */
         val = DMA_TLB_GLOBAL_FLUSH|DMA_TLB_IVT;
         break;
     case DMA_TLB_DSI_FLUSH:
@@ -444,8 +443,6 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
         break;
     case DMA_TLB_PSI_FLUSH:
         val = DMA_TLB_PSI_FLUSH|DMA_TLB_IVT|DMA_TLB_DID(did);
-        /* Note: always flush non-leaf currently */
-        val_iva = size_order | addr;
         break;
     default:
         BUG();
@@ -458,8 +455,11 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     /* Note: Only uses first TLB reg currently */
-    if ( val_iva )
-        dmar_writeq(iommu->reg, tlb_offset, val_iva);
+    if ( type == DMA_TLB_PSI_FLUSH )
+    {
+        /* Note: always flush non-leaf currently. */
+        dmar_writeq(iommu->reg, tlb_offset, size_order | addr);
+    }
     dmar_writeq(iommu->reg, tlb_offset + 8, val);
 
     /* Make sure hardware complete it */
