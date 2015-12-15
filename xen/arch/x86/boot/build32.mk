@@ -16,11 +16,7 @@ CFLAGS := $(filter-out -flto,$(CFLAGS))
 	$(OBJCOPY) -O binary $< $@
 
 %.lnk: %.o
-	$(LD) $(LDFLAGS_DIRECT) -N -Ttext 0 -o $@ $<
-
-%.o: %.c
-	$(CC) $(CFLAGS) -c -fpic $< -o $@
-	$(OBJDUMP) -h $@ | sed -n '/[0-9]/{s,00*,0,g;p;}' |\
+	$(OBJDUMP) -h $< | sed -n '/[0-9]/{s,00*,0,g;p;}' |\
 		while read idx name sz rest; do \
 			case "$$name" in \
 			.data|.data.*|.rodata|.rodata.*|.bss|.bss.*) \
@@ -29,6 +25,10 @@ CFLAGS := $(filter-out -flto,$(CFLAGS))
 				exit $$(expr $$idx + 1);; \
 			esac; \
 		done
+	$(LD) $(LDFLAGS_DIRECT) -N -Ttext 0 -o $@ $<
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c -fpic $< -o $@
 
 reloc.o: reloc.c $(RELOC_DEPS)
 
