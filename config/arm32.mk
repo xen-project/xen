@@ -9,7 +9,6 @@ CONFIG_XEN_INSTALL_SUFFIX :=
 # Explicitly specifiy 32-bit ARM ISA since toolchain default can be -mthumb:
 CFLAGS += -marm
 
-HAS_OMAP := y
 HAS_SCIF := y
 HAS_MEM_ACCESS := y
 
