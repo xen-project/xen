@@ -2820,7 +2820,7 @@ typedef struct libxl__save_helper_state {
 /*
  * The abstract checkpoint device layer exposes a common
  * set of API to [external] libxl for manipulating devices attached to
- * a guest protected by Remus. The device layer also exposes a set of
+ * a guest protected by Remus/COLO. The device layer also exposes a set of
  * [internal] interfaces that every device type must implement.
  *
  * The following API are exposed to libxl:
@@ -2838,7 +2838,7 @@ typedef struct libxl__save_helper_state {
  *  +libxl__checkpoint_devices_commit
  *
  * Each device type needs to implement the interfaces specified in
- * the libxl__checkpoint_device_instance_ops if it wishes to support Remus.
+ * the libxl__checkpoint_device_instance_ops if it wishes to support Remus/COLO.
  *
  * The high-level control flow through the checkpoint device layer is shown
  * below:
@@ -2858,7 +2858,7 @@ typedef struct libxl__checkpoint_device_instance_ops libxl__checkpoint_device_in
 
 /*
  * Interfaces to be implemented by every device subkind that wishes to
- * support Remus. Functions must be implemented unless otherwise
+ * support Remus/COLO. Functions must be implemented unless otherwise
  * stated. Many of these functions are asynchronous. They call
  * dev->aodev.callback when done.  The actual implementations may be
  * synchronous and call dev->aodev.callback directly (as the last
@@ -3177,6 +3177,18 @@ libxl__stream_write_inuse(const libxl__stream_write_state *stream)
     return stream->running;
 }
 
+/*----- colo related state structure -----*/
+typedef struct libxl__colo_save_state libxl__colo_save_state;
+struct libxl__colo_save_state {
+    int send_fd;
+    int recv_fd;
+
+    /* private */
+    libxl__stream_read_state srs;
+    void (*callback)(libxl__egc *, libxl__colo_save_state *, int);
+    bool svm_running;
+};
+
 typedef struct libxl__logdirty_switch {
     /* Set by caller of libxl__domain_common_switch_qemu_logdirty */
     libxl__ao *ao;
@@ -3235,7 +3247,12 @@ struct libxl__domain_save_state {
     int hvm;
     int xcflags;
     libxl__domain_suspend_state dsps;
-    libxl__remus_state rs;
+    union {
+        /* for Remus */
+        libxl__remus_state rs;
+        /* for COLO */
+        libxl__colo_save_state css;
+    };
     libxl__checkpoint_devices_state cds;
     libxl__stream_write_state sws;
     libxl__logdirty_switch logdirty;

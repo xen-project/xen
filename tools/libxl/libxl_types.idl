@@ -810,6 +810,7 @@ libxl_domain_remus_info = Struct("domain_remus_info",[
     ("netbuf",       libxl_defbool),
     ("netbufscript", string),
     ("diskbuf",      libxl_defbool),
+    ("colo",         libxl_defbool)
     ])
 
 libxl_event_type = Enumeration("event_type", [

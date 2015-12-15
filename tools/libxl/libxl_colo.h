@@ -18,6 +18,7 @@
 
 struct libxl__ao;
 struct libxl__egc;
+struct libxl__colo_save_state;
 
 enum {
     LIBXL_COLO_SETUPED,
@@ -52,4 +53,9 @@ extern void libxl__colo_restore_setup(struct libxl__egc *egc,
                                       libxl__colo_restore_state *crs);
 extern void libxl__colo_restore_teardown(struct libxl__egc *egc, void *dcs_void,
                                          int ret, int retval, int errnoval);
+extern void libxl__colo_save_setup(struct libxl__egc *egc,
+                                   struct libxl__colo_save_state *css);
+extern void libxl__colo_save_teardown(struct libxl__egc *egc,
+                                      struct libxl__colo_save_state *css,
+                                      int rc);
 #endif

@@ -68,6 +68,15 @@ struct save_callbacks {
      * 1: take another checkpoint */
     int (*checkpoint)(void* data);
 
+    /*
+     * Called after the checkpoint callback.
+     *
+     * returns:
+     * 0: terminate checkpointing gracefully
+     * 1: take another checkpoint
+     */
+    int (*wait_checkpoint)(void* data);
+
     /* Enable qemu-dm logging dirty pages to xen */
     int (*switch_qemu_logdirty)(int domid, unsigned enable, void *data); /* HVM only */
 

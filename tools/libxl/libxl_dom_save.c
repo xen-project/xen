@@ -438,12 +438,15 @@ static void domain_save_done(libxl__egc *egc,
 
     if (dss->remus) {
         /*
-         * With Remus, if we reach this point, it means either
+         * With Remus/COLO, if we reach this point, it means either
          * backup died or some network error occurred preventing us
          * from sending checkpoints. Teardown the network buffers and
          * release netlink resources.  This is an async op.
          */
-        libxl__remus_teardown(egc, &dss->rs, rc);
+        if (libxl_defbool_val(dss->remus->colo))
+            libxl__colo_save_teardown(egc, &dss->css, rc);
+        else
+            libxl__remus_teardown(egc, &dss->rs, rc);
         return;
     }
 
