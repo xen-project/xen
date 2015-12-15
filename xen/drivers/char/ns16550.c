@@ -348,7 +348,7 @@ static void ns16550_delayed_resume(void *data);
 static u8 ns_read_reg(struct ns16550 *uart, unsigned int reg)
 {
     void __iomem *addr = uart->remapped_io_base + (reg << uart->reg_shift);
-#ifdef HAS_IOPORTS
+#ifdef CONFIG_HAS_IOPORTS
     if ( uart->remapped_io_base == NULL )
         return inb(uart->io_base + reg);
 #endif
@@ -366,7 +366,7 @@ static u8 ns_read_reg(struct ns16550 *uart, unsigned int reg)
 static void ns_write_reg(struct ns16550 *uart, unsigned int reg, u8 c)
 {
     void __iomem *addr = uart->remapped_io_base + (reg << uart->reg_shift);
-#ifdef HAS_IOPORTS
+#ifdef CONFIG_HAS_IOPORTS
     if ( uart->remapped_io_base == NULL )
         return outb(c, uart->io_base + reg);
 #endif
@@ -552,7 +552,7 @@ static void __init ns16550_init_preirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
 
-#ifdef HAS_IOPORTS
+#ifdef CONFIG_HAS_IOPORTS
     /* I/O ports are distinguished by their size (16 bits). */
     if ( uart->io_base >= 0x10000 )
 #endif
@@ -722,7 +722,7 @@ static void ns16550_resume(struct serial_port *port)
 
 static void __init ns16550_endboot(struct serial_port *port)
 {
-#ifdef HAS_IOPORTS
+#ifdef CONFIG_HAS_IOPORTS
     struct ns16550 *uart = port->uart;
     int rv;
 
@@ -786,7 +786,7 @@ static int __init check_existence(struct ns16550 *uart)
 {
     unsigned char status, scratch, scratch2, scratch3;
 
-#ifdef HAS_IOPORTS
+#ifdef CONFIG_HAS_IOPORTS
     /*
      * We can't poke MMIO UARTs until they get I/O remapped later. Assume that
      * if we're getting MMIO UARTs, the arch code knows what it's doing.

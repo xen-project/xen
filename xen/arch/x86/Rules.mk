@@ -1,7 +1,6 @@
 ########################################
 # x86-specific definitions
 
-HAS_IOPORTS := y
 HAS_ACPI := y
 HAS_NUMA := y
 HAS_VGA  := y

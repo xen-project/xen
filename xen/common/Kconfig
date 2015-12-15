@@ -5,4 +5,7 @@ menu "Common Features"
 config HAS_DEVICE_TREE
 	bool
 
+config HAS_IOPORTS
+	bool
+
 endmenu
