@@ -1323,7 +1323,7 @@ int prepare_ring_for_helper(
 
     page = get_page_from_gfn(d, gmfn, &p2mt, P2M_UNSHARE);
 
-#ifdef HAS_MEM_PAGING
+#ifdef CONFIG_HAS_MEM_PAGING
     if ( p2m_is_paging(p2mt) )
     {
         if ( page )

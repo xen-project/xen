@@ -59,7 +59,6 @@ CFLAGS-$(crash_debug)   += -DCRASH_DEBUG
 CFLAGS-$(perfc)         += -DPERF_COUNTERS
 CFLAGS-$(perfc_arrays)  += -DPERF_ARRAYS
 CFLAGS-$(lock_profile)  += -DLOCK_PROFILE
-CFLAGS-$(HAS_MEM_PAGING)  += -DHAS_MEM_PAGING
 CFLAGS-$(HAS_MEM_SHARING) += -DHAS_MEM_SHARING
 CFLAGS-$(frame_pointer) += -fno-omit-frame-pointer -DCONFIG_FRAME_POINTER
 

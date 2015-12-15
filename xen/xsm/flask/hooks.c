@@ -1199,7 +1199,7 @@ static int flask_mem_access(struct domain *d)
 }
 #endif
 
-#ifdef HAS_MEM_PAGING
+#ifdef CONFIG_HAS_MEM_PAGING
 static int flask_mem_paging(struct domain *d)
 {
     return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__MEM_PAGING);
@@ -1709,7 +1709,7 @@ static struct xsm_operations flask_ops = {
     .mem_access = flask_mem_access,
 #endif
 
-#ifdef HAS_MEM_PAGING
+#ifdef CONFIG_HAS_MEM_PAGING
     .mem_paging = flask_mem_paging,
 #endif
 

@@ -403,7 +403,7 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
             break;
 #endif
 
-#ifdef HAS_MEM_PAGING
+#ifdef CONFIG_HAS_MEM_PAGING
         case VM_EVENT_REASON_MEM_PAGING:
             p2m_mem_paging_resume(d, &rsp);
             break;
@@ -502,7 +502,7 @@ int __vm_event_claim_slot(struct domain *d, struct vm_event_domain *ved,
         return vm_event_grab_slot(ved, (current->domain != d));
 }
 
-#ifdef HAS_MEM_PAGING
+#ifdef CONFIG_HAS_MEM_PAGING
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void mem_paging_notification(struct vcpu *v, unsigned int port)
 {
@@ -530,7 +530,7 @@ static void mem_sharing_notification(struct vcpu *v, unsigned int port)
 /* Clean up on domain destruction */
 void vm_event_cleanup(struct domain *d)
 {
-#ifdef HAS_MEM_PAGING
+#ifdef CONFIG_HAS_MEM_PAGING
     if ( d->vm_event->paging.ring_page )
     {
         /* Destroying the wait queue head means waking up all
@@ -592,7 +592,7 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
 
     switch ( vec->mode )
     {
-#ifdef HAS_MEM_PAGING
+#ifdef CONFIG_HAS_MEM_PAGING
     case XEN_DOMCTL_VM_EVENT_OP_PAGING:
     {
         struct vm_event_domain *ved = &d->vm_event->paging;

@@ -156,7 +156,7 @@ struct xsm_operations {
     int (*mem_access) (struct domain *d);
 #endif
 
-#ifdef HAS_MEM_PAGING
+#ifdef CONFIG_HAS_MEM_PAGING
     int (*mem_paging) (struct domain *d);
 #endif
 
@@ -611,7 +611,7 @@ static inline int xsm_mem_access (xsm_default_t def, struct domain *d)
 }
 #endif
 
-#ifdef HAS_MEM_PAGING
+#ifdef CONFIG_HAS_MEM_PAGING
 static inline int xsm_mem_paging (xsm_default_t def, struct domain *d)
 {
     return xsm_ops->mem_paging(d);

@@ -9,6 +9,10 @@ config HAS_DEVICE_TREE
 config HAS_MEM_ACCESS
 	bool
 
+# Select HAS_MEM_PAGING if mem paging is supported
+config HAS_MEM_PAGING
+	bool
+
 # Select HAS_PDX if PDX is supported
 config HAS_PDX
 	bool
