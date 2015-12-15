@@ -313,6 +313,17 @@ static bool_t evtchn_fifo_is_masked(struct domain *d,
     return test_bit(EVTCHN_FIFO_MASKED, word);
 }
 
+static bool_t evtchn_fifo_is_busy(struct domain *d, evtchn_port_t port)
+{
+    event_word_t *word;
+
+    word = evtchn_fifo_word_from_port(d, port);
+    if ( unlikely(!word) )
+        return 0;
+
+    return test_bit(EVTCHN_FIFO_LINKED, word);
+}
+
 static int evtchn_fifo_set_priority(struct domain *d, struct evtchn *evtchn,
                                     unsigned int priority)
 {
@@ -352,6 +363,7 @@ static const struct evtchn_port_ops evtchn_port_ops_fifo =
     .unmask        = evtchn_fifo_unmask,
     .is_pending    = evtchn_fifo_is_pending,
     .is_masked     = evtchn_fifo_is_masked,
+    .is_busy       = evtchn_fifo_is_busy,
     .set_priority  = evtchn_fifo_set_priority,
     .print_state   = evtchn_fifo_print_state,
 };

@@ -171,7 +171,8 @@ static int get_free_port(struct domain *d)
     {
         if ( port > d->max_evtchn_port )
             return -ENOSPC;
-        if ( evtchn_from_port(d, port)->state == ECS_FREE )
+        if ( evtchn_from_port(d, port)->state == ECS_FREE
+             && !evtchn_port_is_busy(d, port) )
             return port;
     }
 
