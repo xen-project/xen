@@ -25,7 +25,7 @@
 #include <public/memory.h>
 #include <asm/p2m.h>
 
-#ifdef HAS_MEM_ACCESS
+#ifdef CONFIG_HAS_MEM_ACCESS
 
 int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg);

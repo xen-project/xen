@@ -1130,7 +1130,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         d->disable_migrate = op->u.disable_migrate.disable;
         break;
 
-#ifdef HAS_MEM_ACCESS
+#ifdef CONFIG_HAS_MEM_ACCESS
     case XEN_DOMCTL_set_access_required:
         if ( unlikely(current->domain == d) )
             ret = -EPERM;

@@ -397,7 +397,7 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
             vm_event_register_write_resume(v, &rsp);
             break;
 
-#ifdef HAS_MEM_ACCESS
+#ifdef CONFIG_HAS_MEM_ACCESS
         case VM_EVENT_REASON_MEM_ACCESS:
             mem_access_resume(v, &rsp);
             break;
