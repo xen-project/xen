@@ -1,4 +1,8 @@
 
 menu "Common Features"
 
+# Select HAS_DEVICE_TREE if device tree is supported
+config HAS_DEVICE_TREE
+	bool
+
 endmenu

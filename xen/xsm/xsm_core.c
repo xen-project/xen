@@ -85,7 +85,7 @@ int __init xsm_multiboot_init(unsigned long *module_map,
 }
 #endif
 
-#ifdef HAS_DEVICE_TREE
+#ifdef CONFIG_HAS_DEVICE_TREE
 int __init xsm_dt_init(void)
 {
     int ret = 0;

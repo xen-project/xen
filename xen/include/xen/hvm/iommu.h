@@ -29,7 +29,7 @@ struct hvm_iommu {
     /* iommu_ops */
     const struct iommu_ops *platform_ops;
 
-#ifdef HAS_DEVICE_TREE
+#ifdef CONFIG_HAS_DEVICE_TREE
     /* List of DT devices assigned to this domain */
     struct list_head dt_devices;
 #endif

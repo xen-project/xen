@@ -121,7 +121,7 @@ struct xsm_operations {
     int (*deassign_device) (struct domain *d, uint32_t machine_bdf);
 #endif
 
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_DEVICE_TREE)
     int (*test_assign_dtdevice) (const char *dtpath);
     int (*assign_dtdevice) (struct domain *d, const char *dtpath);
     int (*deassign_dtdevice) (struct domain *d, const char *dtpath);
@@ -491,7 +491,7 @@ static inline int xsm_deassign_device(xsm_default_t def, struct domain *d, uint3
 }
 #endif /* HAS_PASSTHROUGH && HAS_PCI) */
 
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_DEVICE_TREE)
 static inline int xsm_assign_dtdevice(xsm_default_t def, struct domain *d,
                                       const char *dtpath)
 {
@@ -741,7 +741,7 @@ extern int xsm_multiboot_policy_init(unsigned long *module_map,
                                      void *(*bootstrap_map)(const module_t *));
 #endif
 
-#ifdef HAS_DEVICE_TREE
+#ifdef CONFIG_HAS_DEVICE_TREE
 extern int xsm_dt_init(void);
 extern int xsm_dt_policy_init(void);
 #endif
@@ -765,7 +765,7 @@ static inline int xsm_multiboot_init (unsigned long *module_map,
 }
 #endif
 
-#ifdef HAS_DEVICE_TREE
+#ifdef CONFIG_HAS_DEVICE_TREE
 static inline int xsm_dt_init(void)
 {
     return 0;

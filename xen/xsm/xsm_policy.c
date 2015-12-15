@@ -23,7 +23,7 @@
 #include <xen/multiboot.h>
 #endif
 #include <xen/bitops.h>
-#ifdef HAS_DEVICE_TREE
+#ifdef CONFIG_HAS_DEVICE_TREE
 # include <asm/setup.h>
 # include <xen/device_tree.h>
 #endif
@@ -74,7 +74,7 @@ int __init xsm_multiboot_policy_init(unsigned long *module_map,
 }
 #endif
 
-#ifdef HAS_DEVICE_TREE
+#ifdef CONFIG_HAS_DEVICE_TREE
 int __init xsm_dt_policy_init(void)
 {
     struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_XSM);

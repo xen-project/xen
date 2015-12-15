@@ -16,7 +16,7 @@ struct dev_archdata {
 struct device
 {
     enum device_type type;
-#ifdef HAS_DEVICE_TREE
+#ifdef CONFIG_HAS_DEVICE_TREE
     struct dt_device_node *of_node; /* Used by drivers imported from Linux */
 #endif
     struct dev_archdata archdata;

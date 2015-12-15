@@ -350,7 +350,7 @@ static XSM_INLINE int xsm_deassign_device(XSM_DEFAULT_ARG struct domain *d, uint
 
 #endif /* HAS_PASSTHROUGH && HAS_PCI */
 
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_DEVICE_TREE)
 static XSM_INLINE int xsm_test_assign_dtdevice(XSM_DEFAULT_ARG const char *dtpath)
 {
     XSM_ASSERT_ACTION(XSM_HOOK);

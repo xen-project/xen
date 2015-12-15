@@ -2,7 +2,7 @@ obj-y += bitmap.o
 obj-$(HAS_CORE_PARKING) += core_parking.o
 obj-y += cpu.o
 obj-y += cpupool.o
-obj-$(HAS_DEVICE_TREE) += device_tree.o
+obj-$(CONFIG_HAS_DEVICE_TREE) += device_tree.o
 obj-y += domctl.o
 obj-y += domain.o
 obj-y += event_2l.o
@@ -70,4 +70,4 @@ subdir-$(x86_64) += hvm
 subdir-$(coverage) += gcov
 
 subdir-y += libelf
-subdir-$(HAS_DEVICE_TREE) += libfdt
+subdir-$(CONFIG_HAS_DEVICE_TREE) += libfdt

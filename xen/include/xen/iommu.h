@@ -109,7 +109,7 @@ void iommu_read_msi_from_ire(struct msi_desc *msi_desc, struct msi_msg *msg);
 #define PT_IRQ_TIME_OUT MILLISECS(8)
 #endif /* HAS_PCI */
 
-#ifdef HAS_DEVICE_TREE
+#ifdef CONFIG_HAS_DEVICE_TREE
 #include <xen/device_tree.h>
 
 int iommu_assign_dt_device(struct domain *d, struct dt_device_node *dev);

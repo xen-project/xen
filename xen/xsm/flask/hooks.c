@@ -1279,7 +1279,7 @@ static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)
 }
 #endif /* HAS_PASSTHROUGH && HAS_PCI */
 
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_DEVICE_TREE)
 static int flask_test_assign_dtdevice(const char *dtpath)
 {
     u32 rsid;
@@ -1732,7 +1732,7 @@ static struct xsm_operations flask_ops = {
     .deassign_device = flask_deassign_device,
 #endif
 
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_DEVICE_TREE)
     .test_assign_dtdevice = flask_test_assign_dtdevice,
     .assign_dtdevice = flask_assign_dtdevice,
     .deassign_dtdevice = flask_deassign_dtdevice,

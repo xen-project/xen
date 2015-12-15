@@ -16,6 +16,7 @@ config ARM_64
 
 config ARM
 	def_bool y
+	select HAS_DEVICE_TREE
 	select HAS_PASSTHROUGH
 
 config ARCH_DEFCONFIG
