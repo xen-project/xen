@@ -532,8 +532,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
                    d->domain_id, config->emulation_flags);
             return -EINVAL;
         }
-        if ( is_hvm_domain(d) ? (config->emulation_flags != XEN_X86_EMU_ALL)
-                              : (config->emulation_flags != 0) )
+        if ( config->emulation_flags != 0 &&
+             (!is_hvm_domain(d) || config->emulation_flags != XEN_X86_EMU_ALL) )
         {
             printk(XENLOG_G_ERR "d%d: Xen does not allow %s domain creation "
                    "with the current selection of emulators: %#x\n",
