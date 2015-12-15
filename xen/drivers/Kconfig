@@ -1,5 +1,7 @@
 menu "Device Drivers"
 
+source "drivers/char/Kconfig"
+
 source "drivers/passthrough/Kconfig"
 
 source "drivers/pci/Kconfig"

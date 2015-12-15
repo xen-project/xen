@@ -13,7 +13,6 @@ HAS_PL011 := y
 HAS_EXYNOS4210 := y
 HAS_OMAP := y
 HAS_SCIF := y
-HAS_NS16550 := y
 HAS_MEM_ACCESS := y
 
 # Use only if calling $(LD) directly.

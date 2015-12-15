@@ -7,7 +7,6 @@ HAS_NUMA := y
 HAS_VGA  := y
 HAS_VIDEO  := y
 HAS_CPUFREQ := y
-HAS_NS16550 := y
 HAS_EHCI := y
 HAS_KEXEC := y
 HAS_GDBSX := y
