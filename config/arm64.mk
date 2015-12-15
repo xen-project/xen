@@ -6,7 +6,6 @@ CONFIG_XEN_INSTALL_SUFFIX :=
 
 CFLAGS += #-marm -march= -mcpu= etc
 
-HAS_PL011 := y
 HAS_MEM_ACCESS := y
 HAS_GICV3 := y
 

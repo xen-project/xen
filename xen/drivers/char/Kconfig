@@ -13,3 +13,12 @@ config HAS_CADENCE_UART
 	help
 	  This selects the Xilinx Zynq Cadence UART. If you have a Xilinx Zynq
 	  based board, say Y.
+
+# ARM AMBA PL011 UART support
+config HAS_PL011
+	bool
+	default y
+	depends on ARM
+	help
+	  This selects the ARM(R) AMBA(R) PrimeCell PL011 UART. If you have
+	  an Integrator/PP2, Integrator/CP or Versatile platform, say Y.
