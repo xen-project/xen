@@ -633,7 +633,70 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
     xc_hvm_param_set(xch, domid, HVM_PARAM_SHARING_RING_PFN,
                      special_pfn(SPECIALPAGE_SHARING));
 
-    if ( dom->device_model )
+    if ( !dom->device_model )
+    {
+        struct xc_dom_seg seg;
+        struct hvm_start_info *start_info;
+        char *cmdline;
+        struct hvm_modlist_entry *modlist;
+        void *start_page;
+        size_t cmdline_size = 0;
+        size_t start_info_size = sizeof(*start_info);
+
+        if ( dom->cmdline )
+        {
+            cmdline_size = ROUNDUP(strlen(dom->cmdline) + 1, 8);
+            start_info_size += cmdline_size;
+
+        }
+        if ( dom->ramdisk_blob )
+            start_info_size += sizeof(*modlist); /* Limited to one module. */
+
+        rc = xc_dom_alloc_segment(dom, &seg, "HVMlite start info", 0,
+                                  start_info_size);
+        if ( rc != 0 )
+        {
+            DOMPRINTF("Unable to reserve memory for the start info");
+            goto out;
+        }
+
+        start_page = xc_map_foreign_range(xch, domid, start_info_size,
+                                          PROT_READ | PROT_WRITE,
+                                          seg.pfn);
+        if ( start_page == NULL )
+        {
+            DOMPRINTF("Unable to map HVM start info page");
+            goto error_out;
+        }
+
+        start_info = start_page;
+        cmdline = start_page + sizeof(*start_info);
+        modlist = start_page + sizeof(*start_info) + cmdline_size;
+
+        if ( dom->cmdline )
+        {
+            strncpy(cmdline, dom->cmdline, MAX_GUEST_CMDLINE);
+            cmdline[MAX_GUEST_CMDLINE - 1] = '\0';
+            start_info->cmdline_paddr = (seg.pfn << PAGE_SHIFT) +
+                                ((uintptr_t)cmdline - (uintptr_t)start_info);
+        }
+
+        if ( dom->ramdisk_blob )
+        {
+            modlist[0].paddr = dom->ramdisk_seg.vstart - dom->parms.virt_base;
+            modlist[0].size = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
+            start_info->modlist_paddr = (seg.pfn << PAGE_SHIFT) +
+                                ((uintptr_t)modlist - (uintptr_t)start_info);
+            start_info->nr_modules = 1;
+        }
+
+        start_info->magic = HVM_START_MAGIC_VALUE;
+
+        munmap(start_page, start_info_size);
+
+        dom->start_info_pfn = seg.pfn;
+    }
+    else
     {
         /*
          * Allocate and clear additional ioreq server pages. The default
@@ -1031,6 +1094,9 @@ static int vcpu_hvm(struct xc_dom_image *dom)
 
     /* Set the IP. */
     bsp_ctx.cpu.rip = dom->parms.phys_entry;
+
+    if ( dom->start_info_pfn )
+        bsp_ctx.cpu.rbx = dom->start_info_pfn << PAGE_SHIFT;
 
     /* Set the end descriptor. */
     bsp_ctx.end_d.typecode = HVM_SAVE_CODE(END);
