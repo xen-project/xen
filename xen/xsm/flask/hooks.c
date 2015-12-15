@@ -20,7 +20,7 @@
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/xenoprof.h>
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
 #include <asm/msi.h>
 #endif
 #include <public/xen.h>
@@ -111,7 +111,7 @@ static int get_irq_sid(int irq, u32 *sid, struct avc_audit_data *ad)
         }
         return security_irq_sid(irq, sid);
     }
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     {
         struct irq_desc *desc = irq_to_desc(irq);
         if ( desc->msi_desc && desc->msi_desc->dev ) {
@@ -853,7 +853,7 @@ static int flask_map_domain_pirq (struct domain *d)
 static int flask_map_domain_msi (struct domain *d, int irq, void *data,
                                  u32 *sid, struct avc_audit_data *ad)
 {
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     struct msi_info *msi = data;
 
     u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
@@ -899,7 +899,7 @@ static int flask_unmap_domain_pirq (struct domain *d)
 static int flask_unmap_domain_msi (struct domain *d, int irq, void *data,
                                    u32 *sid, struct avc_audit_data *ad)
 {
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     struct msi_info *msi = data;
     u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
 
@@ -1213,7 +1213,7 @@ static int flask_mem_sharing(struct domain *d)
 }
 #endif
 
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_PCI)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
 static int flask_get_device_group(uint32_t machine_bdf)
 {
     u32 rsid;
@@ -1725,7 +1725,7 @@ static struct xsm_operations flask_ops = {
     .remove_from_physmap = flask_remove_from_physmap,
     .map_gmfn_foreign = flask_map_gmfn_foreign,
 
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_PCI)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
     .get_device_group = flask_get_device_group,
     .test_assign_device = flask_test_assign_device,
     .assign_device = flask_assign_device,

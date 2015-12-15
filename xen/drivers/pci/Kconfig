@@ -1,0 +1,4 @@
+
+# Select HAS_PCI if PCI is supported
+config HAS_PCI
+	bool

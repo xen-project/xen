@@ -353,7 +353,7 @@ int iommu_do_domctl(
     if ( !iommu_enabled )
         return -ENOSYS;
 
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     ret = iommu_do_pci_domctl(domctl, d, u_domctl);
 #endif
 

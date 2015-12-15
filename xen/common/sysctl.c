@@ -401,7 +401,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         break;
 #endif
 
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     case XEN_SYSCTL_pcitopoinfo:
     {
         xen_sysctl_pcitopoinfo_t *ti = &op->u.pcitopoinfo;

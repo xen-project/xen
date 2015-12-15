@@ -16,7 +16,7 @@
 #include <xen/timer.h>
 #include <xen/serial.h>
 #include <xen/iocap.h>
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/pci_ids.h>
@@ -64,7 +64,7 @@ static struct ns16550 {
     unsigned int timeout_ms;
     bool_t intr_works;
     bool_t dw_usr_bsy;
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     /* PCI card parameters. */
     bool_t pb_bdf_enable;   /* if =1, pb-bdf effective, port behind bridge */
     bool_t ps_bdf_enable;   /* if =1, ps_bdf effective, port on pci card */
@@ -97,7 +97,7 @@ struct ns16550_config_param {
 };
 
 
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
 enum {
     param_default = 0,
     param_trumanage,
@@ -475,7 +475,7 @@ static int ns16550_getc(struct serial_port *port, char *pc)
 
 static void pci_serial_early_init(struct ns16550 *uart)
 {
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     if ( !uart->ps_bdf_enable || uart->io_base >= 0x10000 )
         return;
 
@@ -621,7 +621,7 @@ static void __init ns16550_init_postirq(struct serial_port *port)
 
     ns16550_setup_postirq(uart);
 
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     if ( uart->bar || uart->ps_bdf_enable )
     {
         if ( !uart->enable_ro )
@@ -650,7 +650,7 @@ static void ns16550_suspend(struct serial_port *port)
 
     stop_timer(&uart->timer);
 
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     if ( uart->bar )
        uart->cr = pci_conf_read16(0, uart->ps_bdf[0], uart->ps_bdf[1],
                                   uart->ps_bdf[2], PCI_COMMAND);
@@ -659,7 +659,7 @@ static void ns16550_suspend(struct serial_port *port)
 
 static void _ns16550_resume(struct serial_port *port)
 {
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     struct ns16550 *uart = port->uart;
 
     if ( uart->bar )
@@ -797,7 +797,7 @@ static int __init check_existence(struct ns16550 *uart)
     return 1; /* Everything is MMIO */
 #endif
 
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     pci_serial_early_init(uart);
 #endif
 
@@ -828,7 +828,7 @@ static int __init check_existence(struct ns16550 *uart)
     return (status == 0x90);
 }
 
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
 static int __init
 pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int bar_idx)
 {
@@ -1030,7 +1030,7 @@ static void __init ns16550_parse_port_config(
 
     if ( *conf == ',' && *++conf != ',' )
     {
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
         if ( strncmp(conf, "pci", 3) == 0 )
         {
             if ( pci_uart_config(uart, 1/* skip AMT */, uart - ns16550_com) )
@@ -1053,7 +1053,7 @@ static void __init ns16550_parse_port_config(
     if ( *conf == ',' && *++conf != ',' )
         uart->irq = simple_strtol(conf, &conf, 10);
 
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     if ( *conf == ',' && *++conf != ',' )
     {
         conf = parse_pci(conf, NULL, &uart->ps_bdf[0],
@@ -1094,7 +1094,7 @@ static void ns16550_init_common(struct ns16550 *uart)
 {
     uart->clock_hz  = UART_CLOCK_HZ;
 
-#ifdef HAS_PCI
+#ifdef CONFIG_HAS_PCI
     uart->enable_ro = 0;
 #endif
 
