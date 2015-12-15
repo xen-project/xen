@@ -6,7 +6,6 @@
 # 'make clean' before rebuilding.
 #
 
-HAS_VIDEO := y
 HAS_ARM_HDLCD := y
 HAS_PDX := y
 

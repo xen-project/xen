@@ -1,0 +1,4 @@
+
+# Select HAS_VIDEO if video is supported
+config HAS_VIDEO
+	bool

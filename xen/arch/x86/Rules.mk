@@ -3,7 +3,6 @@
 
 HAS_NUMA := y
 HAS_VGA  := y
-HAS_VIDEO  := y
 HAS_CPUFREQ := y
 HAS_EHCI := y
 HAS_KEXEC := y

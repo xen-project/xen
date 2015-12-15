@@ -8,4 +8,6 @@ source "drivers/passthrough/Kconfig"
 
 source "drivers/pci/Kconfig"
 
+source "drivers/video/Kconfig"
+
 endmenu
