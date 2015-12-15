@@ -2,3 +2,8 @@
 # Select HAS_VIDEO if video is supported
 config HAS_VIDEO
 	bool
+
+# Select HAS_VGA if VGA is supported
+config HAS_VGA
+	bool
+	select HAS_VIDEO
