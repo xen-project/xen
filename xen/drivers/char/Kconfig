@@ -4,3 +4,12 @@ config HAS_NS16550
 	default y
 	help
 	  This selects the 16550-series UART support. For most systems, say Y.
+
+# Xilinx Zynq Cadence UART support
+config HAS_CADENCE_UART
+	bool
+	default y
+	depends on ARM_64
+	help
+	  This selects the Xilinx Zynq Cadence UART. If you have a Xilinx Zynq
+	  based board, say Y.
