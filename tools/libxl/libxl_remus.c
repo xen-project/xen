@@ -38,9 +38,10 @@ static void libxl__remus_domain_suspend_callback(void *data);
 static void libxl__remus_domain_resume_callback(void *data);
 static void libxl__remus_domain_save_checkpoint_callback(void *data);
 
-void libxl__remus_setup(libxl__egc *egc,
-                        libxl__domain_save_state *dss)
+void libxl__remus_setup(libxl__egc *egc, libxl__remus_state *rs)
 {
+    libxl__domain_save_state *dss = CONTAINER_OF(rs, *dss, rs);
+
     /* Convenience aliases */
     libxl__checkpoint_devices_state *const cds = &dss->cds;
     const libxl_domain_remus_info *const info = dss->remus;
@@ -64,6 +65,8 @@ void libxl__remus_setup(libxl__egc *egc,
     cds->domid = dss->domid;
     cds->callback = remus_setup_done;
     cds->ops = remus_ops;
+    cds->concrete_data = rs;
+    rs->interval = info->interval;
 
     dss->sws.checkpoint_callback = remus_checkpoint_stream_written;
 
@@ -112,15 +115,20 @@ static void remus_teardown_done(libxl__egc *egc,
                                 libxl__checkpoint_devices_state *cds,
                                 int rc);
 void libxl__remus_teardown(libxl__egc *egc,
-                           libxl__domain_save_state *dss,
+                           libxl__remus_state *rs,
                            int rc)
 {
+    libxl__domain_save_state *dss = CONTAINER_OF(rs, *dss, rs);
+
+    /* Convenience aliases */
+    libxl__checkpoint_devices_state *const cds = &dss->cds;
+
     EGC_GC;
 
     LOG(WARN, "Remus: Domain suspend terminated with rc %d,"
         " teardown Remus devices...", rc);
-    dss->cds.callback = remus_teardown_done;
-    libxl__checkpoint_devices_teardown(egc, &dss->cds);
+    cds->callback = remus_teardown_done;
+    libxl__checkpoint_devices_teardown(egc, cds);
 }
 
 static void remus_teardown_done(libxl__egc *egc,
@@ -294,9 +302,9 @@ static void remus_devices_commit_cb(libxl__egc *egc,
      */
 
     /* Set checkpoint interval timeout */
-    rc = libxl__ev_time_register_rel(ao, &dss->checkpoint_timeout,
+    rc = libxl__ev_time_register_rel(ao, &dss->rs.checkpoint_timeout,
                                      remus_next_checkpoint,
-                                     dss->interval);
+                                     dss->rs.interval);
 
     if (rc)
         goto out;
@@ -312,7 +320,7 @@ static void remus_next_checkpoint(libxl__egc *egc, libxl__ev_time *ev,
                                   int rc)
 {
     libxl__domain_save_state *dss =
-                            CONTAINER_OF(ev, *dss, checkpoint_timeout);
+                            CONTAINER_OF(ev, *dss, rs.checkpoint_timeout);
 
     STATE_AO_GC(dss->ao);
 

@@ -28,10 +28,11 @@ typedef struct libxl__remus_drbd_disk {
 
 int init_subkind_drbd_disk(libxl__checkpoint_devices_state *cds)
 {
+    libxl__remus_state *rs = cds->concrete_data;
     STATE_AO_GC(cds->ao);
 
-    cds->drbd_probe_script = GCSPRINTF("%s/block-drbd-probe",
-                                       libxl__xen_script_dir_path());
+    rs->drbd_probe_script = GCSPRINTF("%s/block-drbd-probe",
+                                      libxl__xen_script_dir_path());
 
     return 0;
 }
@@ -96,6 +97,7 @@ static void match_async_exec(libxl__egc *egc, libxl__checkpoint_device *dev)
     int arraysize, nr = 0, rc;
     const libxl_device_disk *disk = dev->backend_dev;
     libxl__async_exec_state *aes = &dev->aodev.aes;
+    libxl__remus_state *rs = dev->cds->concrete_data;
     STATE_AO_GC(dev->cds->ao);
 
     /* setup env & args */
@@ -107,7 +109,7 @@ static void match_async_exec(libxl__egc *egc, libxl__checkpoint_device *dev)
     arraysize = 3;
     nr = 0;
     GCNEW_ARRAY(aes->args, arraysize);
-    aes->args[nr++] = dev->cds->drbd_probe_script;
+    aes->args[nr++] = rs->drbd_probe_script;
     aes->args[nr++] = disk->pdev_path;
     aes->args[nr++] = NULL;
     assert(nr <= arraysize);
