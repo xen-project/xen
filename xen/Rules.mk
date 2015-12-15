@@ -59,7 +59,6 @@ CFLAGS-$(lock_profile)  += -DLOCK_PROFILE
 CFLAGS-$(HAS_MEM_ACCESS)  += -DHAS_MEM_ACCESS
 CFLAGS-$(HAS_MEM_PAGING)  += -DHAS_MEM_PAGING
 CFLAGS-$(HAS_MEM_SHARING) += -DHAS_MEM_SHARING
-CFLAGS-$(HAS_PDX)       += -DHAS_PDX
 CFLAGS-$(frame_pointer) += -fno-omit-frame-pointer -DCONFIG_FRAME_POINTER
 
 ifneq ($(max_phys_cpus),)

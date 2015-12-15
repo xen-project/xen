@@ -18,6 +18,7 @@ config ARM
 	def_bool y
 	select HAS_DEVICE_TREE
 	select HAS_PASSTHROUGH
+	select HAS_PDX
 	select HAS_VIDEO
 
 config ARCH_DEFCONFIG

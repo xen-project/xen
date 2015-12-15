@@ -7,7 +7,6 @@
 #
 
 HAS_ARM_HDLCD := y
-HAS_PDX := y
 
 CFLAGS += -I$(BASEDIR)/include
 

@@ -4,7 +4,6 @@
 HAS_NUMA := y
 HAS_EHCI := y
 HAS_KEXEC := y
-HAS_PDX := y
 HAS_CORE_PARKING := y
 xenoprof := y
 

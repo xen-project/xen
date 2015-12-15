@@ -10,6 +10,7 @@ config X86
 	select HAS_NS16550
 	select HAS_PASSTHROUGH
 	select HAS_PCI
+	select HAS_PDX
 	select HAS_VGA
 
 config ARCH_DEFCONFIG

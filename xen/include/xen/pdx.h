@@ -1,7 +1,7 @@
 #ifndef __XEN_PDX_H__
 #define __XEN_PDX_H__
 
-#ifdef HAS_PDX
+#ifdef CONFIG_HAS_PDX
 
 extern unsigned long max_pdx;
 extern unsigned long pfn_pdx_bottom_mask, ma_va_bottom_mask;
