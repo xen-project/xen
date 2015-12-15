@@ -7,6 +7,8 @@
 #ifndef __XEN_CONFIG_H__
 #define __XEN_CONFIG_H__
 
+#include <generated/autoconf.h>
+
 #ifndef __ASSEMBLY__
 #include <xen/compiler.h>
 #endif

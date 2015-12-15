@@ -12,6 +12,8 @@ frame_pointer ?= n
 lto           ?= n
 kexec         ?= y
 
+-include $(BASEDIR)/include/config/auto.conf
+
 include $(XEN_ROOT)/Config.mk
 
 # Hardcoded configuration implications and dependencies.

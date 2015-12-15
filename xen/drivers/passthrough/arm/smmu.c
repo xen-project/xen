@@ -196,10 +196,6 @@ static inline int pci_for_each_dma_alias(struct pci_dev *pdev,
 #define PHYS_MASK_SHIFT		PADDR_BITS
 typedef paddr_t phys_addr_t;
 
-#ifdef CONFIG_ARM_64
-# define CONFIG_64BIT
-#endif
-
 #define VA_BITS		0	/* Only used for configuring stage-1 input size */
 
 /* The macro ACCESS_ONCE start to be replaced in Linux in favor of
