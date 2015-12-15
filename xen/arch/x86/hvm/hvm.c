@@ -1833,8 +1833,8 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 }
 
 /* Return a string indicating the error, or NULL for valid. */
-static const char * hvm_efer_valid(const struct vcpu *v, uint64_t value,
-                                   signed int cr0_pg)
+const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
+                           signed int cr0_pg)
 {
     unsigned int ext1_ecx = 0, ext1_edx = 0;
 
@@ -1902,8 +1902,7 @@ static const char * hvm_efer_valid(const struct vcpu *v, uint64_t value,
         X86_CR0_CD | X86_CR0_PG)))
 
 /* These bits in CR4 cannot be set by the guest. */
-static unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v,
-                                                 bool_t restore)
+unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v,bool_t restore)
 {
     unsigned int leaf1_ecx = 0, leaf1_edx = 0;
     unsigned int leaf7_0_ebx = 0, leaf7_0_ecx = 0;
@@ -5108,31 +5107,6 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
 }
 
-static long hvm_vcpu_op(
-    int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
-{
-    long rc;
-
-    switch ( cmd )
-    {
-    case VCPUOP_register_runstate_memory_area:
-    case VCPUOP_get_runstate_info:
-    case VCPUOP_set_periodic_timer:
-    case VCPUOP_stop_periodic_timer:
-    case VCPUOP_set_singleshot_timer:
-    case VCPUOP_stop_singleshot_timer:
-    case VCPUOP_register_vcpu_info:
-    case VCPUOP_register_vcpu_time_memory_area:
-        rc = do_vcpu_op(cmd, vcpuid, arg);
-        break;
-    default:
-        rc = -ENOSYS;
-        break;
-    }
-
-    return rc;
-}
-
 typedef unsigned long hvm_hypercall_t(
     unsigned long, unsigned long, unsigned long, unsigned long, unsigned long,
     unsigned long);
@@ -5166,31 +5140,6 @@ static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     return compat_memory_op(cmd, arg);
 }
 
-static long hvm_vcpu_op_compat32(
-    int cmd, unsigned vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
-{
-    long rc;
-
-    switch ( cmd )
-    {
-    case VCPUOP_register_runstate_memory_area:
-    case VCPUOP_get_runstate_info:
-    case VCPUOP_set_periodic_timer:
-    case VCPUOP_stop_periodic_timer:
-    case VCPUOP_set_singleshot_timer:
-    case VCPUOP_stop_singleshot_timer:
-    case VCPUOP_register_vcpu_info:
-    case VCPUOP_register_vcpu_time_memory_area:
-        rc = compat_vcpu_op(cmd, vcpuid, arg);
-        break;
-    default:
-        rc = -ENOSYS;
-        break;
-    }
-
-    return rc;
-}
-
 static long hvm_physdev_op_compat32(
     int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
@@ -5212,7 +5161,7 @@ static long hvm_physdev_op_compat32(
 static hvm_hypercall_t *const hvm_hypercall64_table[NR_hypercalls] = {
     [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op,
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
-    [ __HYPERVISOR_vcpu_op ] = (hvm_hypercall_t *)hvm_vcpu_op,
+    HYPERCALL(vcpu_op),
     [ __HYPERVISOR_physdev_op ] = (hvm_hypercall_t *)hvm_physdev_op,
     HYPERCALL(xen_version),
     HYPERCALL(console_io),
@@ -5233,7 +5182,7 @@ static hvm_hypercall_t *const hvm_hypercall64_table[NR_hypercalls] = {
 static hvm_hypercall_t *const hvm_hypercall32_table[NR_hypercalls] = {
     [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op_compat32,
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op_compat32,
-    [ __HYPERVISOR_vcpu_op ] = (hvm_hypercall_t *)hvm_vcpu_op_compat32,
+    COMPAT_CALL(vcpu_op),
     [ __HYPERVISOR_physdev_op ] = (hvm_hypercall_t *)hvm_physdev_op_compat32,
     COMPAT_CALL(xen_version),
     HYPERCALL(console_io),

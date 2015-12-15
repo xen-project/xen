@@ -560,6 +560,11 @@ void altp2m_vcpu_update_vmfunc_ve(struct vcpu *v);
 /* emulates #VE */
 bool_t altp2m_vcpu_emulate_ve(struct vcpu *v);
 
+/* Check CR4/EFER values */
+const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
+                           signed int cr0_pg);
+unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v, bool_t restore);
+
 #endif /* __ASM_X86_HVM_HVM_H__ */
 
 /*

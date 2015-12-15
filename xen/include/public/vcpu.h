@@ -41,8 +41,10 @@
  * Initialise a VCPU. Each VCPU can be initialised only once. A 
  * newly-initialised VCPU will not run until it is brought up by VCPUOP_up.
  * 
- * @extra_arg == pointer to vcpu_guest_context structure containing initial
- *               state for the VCPU.
+ * @extra_arg == For PV or ARM guests this is a pointer to a vcpu_guest_context
+ *               structure containing the initial state for the VCPU. For x86
+ *               HVM based guests this is a pointer to a vcpu_hvm_context
+ *               structure.
  */
 #define VCPUOP_initialise            0
 

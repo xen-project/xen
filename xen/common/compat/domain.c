@@ -11,6 +11,7 @@ asm(".file \"" __FILE__ "\"");
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <compat/vcpu.h>
+#include <compat/hvm/hvm_vcpu.h>
 
 #define xen_vcpu_set_periodic_timer vcpu_set_periodic_timer
 CHECK_vcpu_set_periodic_timer;
@@ -23,6 +24,14 @@ CHECK_SIZE_(struct, vcpu_info);
 #define xen_vcpu_register_vcpu_info vcpu_register_vcpu_info
 CHECK_vcpu_register_vcpu_info;
 #undef xen_vcpu_register_vcpu_info
+
+#define xen_vcpu_hvm_context vcpu_hvm_context
+#define xen_vcpu_hvm_x86_32 vcpu_hvm_x86_32
+#define xen_vcpu_hvm_x86_64 vcpu_hvm_x86_64
+CHECK_vcpu_hvm_context;
+#undef xen_vcpu_hvm_x86_64
+#undef xen_vcpu_hvm_x86_32
+#undef xen_vcpu_hvm_context
 
 int compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
@@ -37,33 +46,44 @@ int compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) ar
     {
     case VCPUOP_initialise:
     {
-        struct compat_vcpu_guest_context *cmp_ctxt;
-
         if ( v->vcpu_info == &dummy_vcpu_info )
             return -EINVAL;
 
-        if ( (cmp_ctxt = xmalloc(struct compat_vcpu_guest_context)) == NULL )
+        if ( is_hvm_vcpu(v) )
         {
-            rc = -ENOMEM;
-            break;
-        }
+            struct vcpu_hvm_context ctxt;
 
-        if ( copy_from_guest(cmp_ctxt, arg, 1) )
+            if ( copy_from_guest(&ctxt, arg, 1) )
+                return -EFAULT;
+
+            domain_lock(d);
+            rc = v->is_initialised ? -EEXIST : arch_set_info_hvm_guest(v, &ctxt);
+            domain_unlock(d);
+        }
+        else
         {
-            xfree(cmp_ctxt);
-            rc = -EFAULT;
-            break;
-        }
+            struct compat_vcpu_guest_context *ctxt;
 
-        domain_lock(d);
-        rc = v->is_initialised ? -EEXIST : arch_set_info_guest(v, cmp_ctxt);
-        domain_unlock(d);
+            if ( (ctxt = xmalloc(struct compat_vcpu_guest_context)) == NULL )
+                return -ENOMEM;
+
+            if ( copy_from_guest(ctxt, arg, 1) )
+            {
+                xfree(ctxt);
+                return -EFAULT;
+            }
+
+            domain_lock(d);
+            rc = v->is_initialised ? -EEXIST : arch_set_info_guest(v, ctxt);
+            domain_unlock(d);
+
+            xfree(ctxt);
+        }
 
         if ( rc == -ERESTART )
             rc = hypercall_create_continuation(__HYPERVISOR_vcpu_op, "iuh",
                                                cmd, vcpuid, arg);
 
-        xfree(cmp_ctxt);
         break;
     }
 
