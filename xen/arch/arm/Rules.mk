@@ -32,8 +32,6 @@ ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
 CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
 endif
 
-CFLAGS-$(HAS_GICV3) += -DHAS_GICV3
-
 EARLY_PRINTK := n
 
 ifeq ($(debug),y)

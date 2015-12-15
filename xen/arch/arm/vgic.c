@@ -103,7 +103,7 @@ int domain_vgic_init(struct domain *d, unsigned int nr_spis)
 
     switch ( d->arch.vgic.version )
     {
-#ifdef HAS_GICV3
+#ifdef CONFIG_HAS_GICV3
     case GIC_V3:
         if ( vgic_v3_init(d) )
            return -ENODEV;

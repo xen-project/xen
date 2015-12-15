@@ -6,8 +6,6 @@ CONFIG_XEN_INSTALL_SUFFIX :=
 
 CFLAGS += #-marm -march= -mcpu= etc
 
-HAS_GICV3 := y
-
 # Use only if calling $(LD) directly.
 LDFLAGS_DIRECT += -EL
 

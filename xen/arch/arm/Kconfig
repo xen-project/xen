@@ -13,6 +13,7 @@ config ARM_32
 config ARM_64
 	def_bool y
 	depends on 64BIT
+	select HAS_GICV3
 
 config ARM
 	def_bool y
@@ -29,6 +30,10 @@ config ARCH_DEFCONFIG
 	default "arch/arm/configs/arm64_defconfig" if ARM_64
 
 menu "Architecture Features"
+
+# Select HAS_GICV3 if GICv3 is supported
+config HAS_GICV3
+	bool
 
 endmenu
 
