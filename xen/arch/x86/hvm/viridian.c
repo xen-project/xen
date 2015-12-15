@@ -607,7 +607,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
          * See Microsoft Hypervisor Top Level Spec. sections 12.4.2
          * and 12.4.3.
          */
-        perfc_incr(mshv_flush);
+        perfc_incr(mshv_call_flush);
 
         /* These hypercalls should never use the fast-call convention. */
         status = HV_STATUS_INVALID_PARAMETER;
