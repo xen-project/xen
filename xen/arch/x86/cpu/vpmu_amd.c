@@ -238,7 +238,7 @@ static int amd_vpmu_load(struct vcpu *v, bool_t from_guest)
         bool_t is_running = 0;
         struct xen_pmu_amd_ctxt *guest_ctxt = &vpmu->xenpmu_data->pmu.c.amd;
 
-        ASSERT(!is_hvm_vcpu(v));
+        ASSERT(!has_vlapic(v->domain));
 
         ctxt = vpmu->context;
         ctrl_regs = vpmu_reg_pointer(ctxt, ctrls);
@@ -314,7 +314,7 @@ static int amd_vpmu_save(struct vcpu *v,  bool_t to_guest)
     {
         struct xen_pmu_amd_ctxt *guest_ctxt, *ctxt;
 
-        ASSERT(!is_hvm_vcpu(v));
+        ASSERT(!has_vlapic(v->domain));
         ctxt = vpmu->context;
         guest_ctxt = &vpmu->xenpmu_data->pmu.c.amd;
         memcpy(&guest_ctxt->regs[0], &ctxt->regs[0], regs_sz);
@@ -525,7 +525,7 @@ int svm_vpmu_initialise(struct vcpu *v)
     vpmu->context = ctxt;
     vpmu->priv_context = NULL;
 
-    if ( !is_hvm_vcpu(v) )
+    if ( !has_vlapic(v->domain) )
     {
         /* Copy register offsets to shared area */
         ASSERT(vpmu->xenpmu_data);

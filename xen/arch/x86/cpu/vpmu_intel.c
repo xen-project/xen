@@ -336,7 +336,7 @@ static int core2_vpmu_save(struct vcpu *v, bool_t to_guest)
 
     if ( to_guest )
     {
-        ASSERT(!is_hvm_vcpu(v));
+        ASSERT(!has_vlapic(v->domain));
         memcpy((void *)(&vpmu->xenpmu_data->pmu.c.intel) + regs_off,
                vpmu->context + regs_off, regs_sz);
     }
@@ -441,7 +441,7 @@ static int core2_vpmu_load(struct vcpu *v, bool_t from_guest)
     {
         int ret;
 
-        ASSERT(!is_hvm_vcpu(v));
+        ASSERT(!has_vlapic(v->domain));
 
         memcpy(vpmu->context + regs_off,
                (void *)&v->arch.vpmu.xenpmu_data->pmu.c.intel + regs_off,
@@ -501,7 +501,7 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
     vpmu->context = core2_vpmu_cxt;
     vpmu->priv_context = p;
 
-    if ( !is_hvm_vcpu(v) )
+    if ( !has_vlapic(v->domain) )
     {
         /* Copy fixed/arch register offsets to shared area */
         ASSERT(vpmu->xenpmu_data);

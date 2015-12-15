@@ -148,7 +148,7 @@ static int vmx_vcpu_initialise(struct vcpu *v)
     }
 
     /* PVH's VPMU is initialized via hypercall */
-    if ( is_hvm_vcpu(v) )
+    if ( has_vlapic(v->domain) )
         vpmu_initialise(v);
 
     vmx_install_vlapic_mapping(v);

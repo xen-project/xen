@@ -94,7 +94,7 @@ void vpmu_lvtpc_update(uint32_t val)
     vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR | (val & APIC_LVT_MASKED);
 
     /* Postpone APIC updates for PV(H) guests if PMU interrupt is pending */
-    if ( is_hvm_vcpu(curr) || !vpmu->xenpmu_data ||
+    if ( has_vlapic(curr->domain) || !vpmu->xenpmu_data ||
          !vpmu_is_set(vpmu, VPMU_CACHED) )
         apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
 }
@@ -129,7 +129,7 @@ int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
      * and since do_wr/rdmsr may load VPMU context we should save
      * (and unload) it again.
      */
-    if ( !is_hvm_vcpu(curr) && vpmu->xenpmu_data &&
+    if ( !has_vlapic(curr->domain) && vpmu->xenpmu_data &&
         vpmu_is_set(vpmu, VPMU_CACHED) )
     {
         vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
@@ -184,7 +184,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
         return;
 
     /* PV(H) guest */
-    if ( !is_hvm_vcpu(sampling) || (vpmu_mode & XENPMU_MODE_ALL) )
+    if ( !has_vlapic(sampling->domain) || (vpmu_mode & XENPMU_MODE_ALL) )
     {
         const struct cpu_user_regs *cur_regs;
         uint64_t *flags = &vpmu->xenpmu_data->pmu.pmu_flags;
@@ -411,7 +411,8 @@ int vpmu_load(struct vcpu *v, bool_t from_guest)
 
     /* Only when PMU is counting, we load PMU context immediately. */
     if ( !vpmu_is_set(vpmu, VPMU_RUNNING) ||
-         (!is_hvm_vcpu(vpmu_vcpu(vpmu)) && vpmu_is_set(vpmu, VPMU_CACHED)) )
+         (!has_vlapic(vpmu_vcpu(vpmu)->domain) &&
+         vpmu_is_set(vpmu, VPMU_CACHED)) )
         return 0;
 
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_load )
@@ -637,7 +638,7 @@ long do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg)
     struct xen_pmu_data *xenpmu_data;
     struct vpmu_struct *vpmu;
 
-    if ( !opt_vpmu_enabled )
+    if ( !opt_vpmu_enabled || has_vlapic(current->domain) )
         return -EOPNOTSUPP;
 
     ret = xsm_pmu_op(XSM_OTHER, current->domain, op);
