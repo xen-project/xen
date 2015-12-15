@@ -432,7 +432,6 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
      *   - This can cause system failure upon non-fatal VT-d faults.
      *   - Potential security issue if malicious guest trigger VT-d faults.
      */
-    case 0x0e28: /* Xeon-E5v2 (IvyBridge) */
     case 0x342e: /* Tylersburg chipset (Nehalem / Westmere systems) */
     case 0x3728: /* Xeon C5500/C3500 (JasperForest) */
     case 0x3c28: /* Sandybridge */
