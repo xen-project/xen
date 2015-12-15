@@ -180,16 +180,16 @@ void ret_from_intr(void);
 
 #endif
 
-#define UNLIKELY_START(cond, tag)          \
-        "j" #cond " .Lunlikely%=.tag;\n\t" \
-        UNLIKELY_START_SECTION "\n\t"      \
-        SUBSECTION_LBL(unlikely) "\n"      \
-        ".Lunlikely%=.tag:"
+#define UNLIKELY_START(cond, tag)                   \
+        "j" #cond " .Lunlikely." #tag ".%=;\n\t"   \
+        UNLIKELY_START_SECTION "\n\t"               \
+        SUBSECTION_LBL(unlikely) "\n"               \
+        ".Lunlikely." #tag ".%=:"
 
 #define UNLIKELY_END(tag)                  \
-        "jmp .Llikely%=.tag;\n\t"          \
+        "jmp .Llikely." #tag ".%=;\n\t"    \
         UNLIKELY_END_SECTION "\n"          \
-        ".Llikely%=.tag:"
+        ".Llikely." #tag ".%=:"
 
 #endif
 
