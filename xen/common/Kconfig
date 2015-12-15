@@ -9,11 +9,27 @@ config HAS_DEVICE_TREE
 config HAS_PDX
 	bool
 
+# Select HAS_KEXEC if kexec is supported
+config HAS_KEXEC
+	bool
+
 # Select HAS_GDBSX if GDBSX is supported
 config HAS_GDBSX
 	bool
 
 config HAS_IOPORTS
 	bool
+
+# Enable/Disable kexec support
+config KEXEC
+	bool "kexec support"
+	default y
+	depends on HAS_KEXEC
+	---help---
+	  Allows a running Xen hypervisor to be replaced with another OS
+	  without rebooting. This is primarily used to execute a crash
+	  environment to collect information on a Xen hypervisor or dom0 crash.
+
+	  If unsure, say Y.
 
 endmenu

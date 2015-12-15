@@ -7,6 +7,7 @@ config X86
 	select HAS_CPUFREQ
 	select HAS_GDBSX
 	select HAS_IOPORTS
+	select HAS_KEXEC
 	select HAS_NS16550
 	select HAS_PASSTHROUGH
 	select HAS_PCI

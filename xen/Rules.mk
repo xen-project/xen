@@ -10,7 +10,6 @@ lock_profile  ?= n
 crash_debug   ?= n
 frame_pointer ?= n
 lto           ?= n
-kexec         ?= y
 
 -include $(BASEDIR)/include/config/auto.conf
 
@@ -26,6 +25,10 @@ CFLAGS += -DNDEBUG
 endif
 ifeq ($(perfc_arrays),y)
 perfc := y
+endif
+
+ifneq ($(origin kexec),undefined)
+$(error "You must use 'make menuconfig' to enable/disable kexec now.")
 endif
 
 # Set ARCH/SUBARCH appropriately.
@@ -67,11 +70,6 @@ endif
 ifneq ($(max_phys_irqs),)
 CFLAGS-y                += -DMAX_PHYS_IRQS=$(max_phys_irqs)
 endif
-
-CONFIG_KEXEC-$(HAS_KEXEC) := $(kexec)
-CONFIG_KEXEC              := $(CONFIG_KEXEC-y)
-
-CFLAGS-$(CONFIG_KEXEC)  += -DCONFIG_KEXEC
 
 AFLAGS-y                += -D__ASSEMBLY__ -include $(BASEDIR)/include/xen/config.h
 
