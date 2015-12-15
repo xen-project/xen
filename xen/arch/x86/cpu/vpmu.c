@@ -480,6 +480,8 @@ void vpmu_initialise(struct vcpu *v)
         return; /* Don't bother restoring vpmu_count, VPMU is off forever */
     }
 
+    vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR | APIC_LVT_MASKED;
+
     if ( ret )
         printk(XENLOG_G_WARNING "VPMU: Initialization failed for %pv\n", v);
 
