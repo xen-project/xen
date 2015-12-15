@@ -93,10 +93,24 @@ void ret_from_intr(void);
 
 #ifdef __ASSEMBLY__
 
+#ifdef HAVE_GAS_QUOTED_SYM
+#define SUBSECTION_LBL(tag)                        \
+        .ifndef .L.tag;                            \
+        .equ .L.tag, 1;                            \
+        .equ __stringify(__OBJECT_LABEL__.tag), .; \
+        .endif
+#else
+#define SUBSECTION_LBL(tag)                        \
+        .ifndef __OBJECT_LABEL__.tag;              \
+        __OBJECT_LABEL__.tag:;                     \
+        .endif
+#endif
+
 #define UNLIKELY_START(cond, tag) \
         .Ldispatch.tag:           \
         j##cond .Lunlikely.tag;   \
         .subsection 1;            \
+        SUBSECTION_LBL(unlikely); \
         .Lunlikely.tag:
 
 #define UNLIKELY_DISPATCH_LABEL(tag) \
@@ -141,9 +155,22 @@ void ret_from_intr(void);
 
 #else
 
+#ifdef HAVE_GAS_QUOTED_SYM
+#define SUBSECTION_LBL(tag)                                          \
+        ".ifndef .L." #tag "\n\t"                                    \
+        ".equ .L." #tag ", 1\n\t"                                    \
+        ".equ \"" __stringify(__OBJECT_LABEL__) "." #tag "\", .\n\t" \
+        ".endif"
+#else
+#define SUBSECTION_LBL(tag)                                          \
+        ".ifndef " __stringify(__OBJECT_LABEL__) "." #tag "\n\t"     \
+        __stringify(__OBJECT_LABEL__) "." #tag ":\n\t"               \
+        ".endif"
+#endif
+
 #ifdef __clang__ /* clang's builtin assember can't do .subsection */
 
-#define UNLIKELY_START_SECTION ".pushsection .fixup,\"ax\""
+#define UNLIKELY_START_SECTION ".pushsection .text.unlikely,\"ax\""
 #define UNLIKELY_END_SECTION   ".popsection"
 
 #else
@@ -155,7 +182,8 @@ void ret_from_intr(void);
 
 #define UNLIKELY_START(cond, tag)          \
         "j" #cond " .Lunlikely%=.tag;\n\t" \
-        UNLIKELY_START_SECTION "\n"        \
+        UNLIKELY_START_SECTION "\n\t"      \
+        SUBSECTION_LBL(unlikely) "\n"      \
         ".Lunlikely%=.tag:"
 
 #define UNLIKELY_END(tag)                  \
