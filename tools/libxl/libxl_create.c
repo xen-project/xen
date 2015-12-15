@@ -985,6 +985,23 @@ static void domcreate_console_available(libxl__egc *egc,
                                         dcs->aop_console_how.for_event));
 }
 
+static void libxl__colo_restore_setup_done(libxl__egc *egc,
+                                           libxl__colo_restore_state *crs,
+                                           int rc)
+{
+    libxl__domain_create_state *dcs = CONTAINER_OF(crs, *dcs, crs);
+
+    EGC_GC;
+
+    if (rc) {
+        LOG(ERROR, "colo restore setup fails: %d", rc);
+        domcreate_stream_done(egc, &dcs->srs, rc);
+        return;
+    }
+
+    libxl__stream_read_start(egc, &dcs->srs);
+}
+
 static void domcreate_bootloader_done(libxl__egc *egc,
                                       libxl__bootloader_state *bl,
                                       int rc)
@@ -998,6 +1015,8 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     const int restore_fd = dcs->restore_fd;
     libxl__domain_build_state *const state = &dcs->build_state;
     const int checkpointed_stream = dcs->restore_params.checkpointed_stream;
+    libxl__colo_restore_state *const crs = &dcs->crs;
+    libxl_domain_build_info *const info = &d_config->b_info;
 
     if (rc) {
         domcreate_rebuild_done(egc, dcs, rc);
@@ -1026,6 +1045,22 @@ static void domcreate_bootloader_done(libxl__egc *egc,
 
     /* Restore */
 
+    /* COLO only supports HVM now because it does not work very
+     * well with pv drivers:
+     * 1. We need to resume vm in the slow path. In this case we
+     *    need to disconnect/reconnect backend and frontend. It
+     *    will take too much time and the performance is very slow.
+     * 2. PV disk cannot reuse block replication that is implemented
+     *    in QEMU.
+     */
+    if (info->type != LIBXL_DOMAIN_TYPE_HVM &&
+        checkpointed_stream == LIBXL_CHECKPOINTED_STREAM_COLO) {
+        LOG(ERROR, "COLO only supports HVM, unable to restore domain %d",
+            domid);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
     rc = libxl__build_pre(gc, domid, d_config, state);
     if (rc)
         goto out;
@@ -1039,6 +1074,16 @@ static void domcreate_bootloader_done(libxl__egc *egc,
 
     if (restore_fd >= 0) {
         switch (checkpointed_stream) {
+        case LIBXL_CHECKPOINTED_STREAM_COLO:
+            /* colo restore setup */
+            crs->ao = ao;
+            crs->domid = domid;
+            crs->send_back_fd = dcs->send_back_fd;
+            crs->recv_fd = restore_fd;
+            crs->hvm = (info->type == LIBXL_DOMAIN_TYPE_HVM);
+            crs->callback = libxl__colo_restore_setup_done;
+            libxl__colo_restore_setup(egc, crs);
+            break;
         case LIBXL_CHECKPOINTED_STREAM_REMUS:
             libxl__remus_restore_setup(egc, dcs);
             /* fall through */

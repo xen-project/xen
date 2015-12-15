@@ -68,7 +68,11 @@ void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
     shs->ao = ao;
     shs->domid = domid;
     shs->recv_callback = libxl__srm_callout_received_restore;
-    shs->completion_callback = libxl__xc_domain_restore_done;
+    if (dcs->restore_params.checkpointed_stream ==
+        LIBXL_CHECKPOINTED_STREAM_COLO)
+        shs->completion_callback = libxl__colo_restore_teardown;
+    else
+        shs->completion_callback = libxl__xc_domain_restore_done;
     shs->caller_state = dcs;
     shs->need_results = 1;
 

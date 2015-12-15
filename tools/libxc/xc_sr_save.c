@@ -847,7 +847,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
 
     /* If altering migration_stream update this assert too. */
     assert(stream_type == XC_MIG_STREAM_NONE ||
-           stream_type == XC_MIG_STREAM_REMUS);
+           stream_type == XC_MIG_STREAM_REMUS ||
+           stream_type == XC_MIG_STREAM_COLO);
 
     /*
      * TODO: Find some time to better tweak the live migration algorithm.

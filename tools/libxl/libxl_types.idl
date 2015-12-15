@@ -233,6 +233,7 @@ libxl_hdtype = Enumeration("hdtype", [
 libxl_checkpointed_stream = Enumeration("checkpointed_stream", [
     (0, "NONE"),
     (1, "REMUS"),
+    (2, "COLO"),
     ])
 
 #

@@ -850,6 +850,18 @@ void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
      */
     if (libxl__stream_read_inuse(stream)) {
         switch (checkpointed_stream) {
+        case LIBXL_CHECKPOINTED_STREAM_COLO:
+            if (stream->completion_callback) {
+                /*
+                 * restore, just build the secondary vm, don't close
+                 * the stream
+                 */
+                stream->completion_callback(egc, stream, 0);
+            } else {
+                /* failover, just close the stream */
+                stream_complete(egc, stream, 0);
+            }
+            break;
         case LIBXL_CHECKPOINTED_STREAM_REMUS:
             /*
              * Failover from primary. Domain state is currently at a

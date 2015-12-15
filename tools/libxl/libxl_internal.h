@@ -87,6 +87,8 @@
 #include "_libxl_types_internal.h"
 #include "_libxl_types_internal_json.h"
 
+#include "libxl_colo.h"
+
 #define LIBXL_INIT_TIMEOUT 10
 #define LIBXL_DESTROY_TIMEOUT 10
 #define LIBXL_HOTPLUG_TIMEOUT 40
@@ -3422,12 +3424,6 @@ _hidden int libxl__destroy_qdisk_backend(libxl__gc *gc, uint32_t domid);
 
 /*----- Domain creation -----*/
 
-typedef struct libxl__domain_create_state libxl__domain_create_state;
-
-typedef void libxl__domain_create_cb(libxl__egc *egc,
-                                     libxl__domain_create_state*,
-                                     int rc, uint32_t domid);
-
 /* State for manipulating a libxl migration v2 stream */
 typedef struct libxl__stream_read_state libxl__stream_read_state;
 
@@ -3510,6 +3506,8 @@ struct libxl__domain_create_state {
     /* private to domain_create */
     int guest_domid;
     libxl__domain_build_state build_state;
+    libxl__colo_restore_state crs;
+    libxl__checkpoint_devices_state cds;
     libxl__bootloader_state bl;
     libxl__stub_dm_spawn_state dmss;
         /* If we're not doing stubdom, we use only dmss.dm,
