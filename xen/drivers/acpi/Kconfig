@@ -1,0 +1,4 @@
+
+# Select HAS_ACPI if ACPI is supported
+config HAS_ACPI
+	bool
