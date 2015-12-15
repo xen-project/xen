@@ -2,7 +2,6 @@
 # x86-specific definitions
 
 HAS_NUMA := y
-HAS_EHCI := y
 HAS_CORE_PARKING := y
 xenoprof := y
 

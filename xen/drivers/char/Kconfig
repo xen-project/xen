@@ -49,3 +49,10 @@ config HAS_SCIF
 	help
 	  This selects the SuperH SCI(F) UART. If you have a SuperH based board,
 	  say Y.
+
+# USB EHCI debug port support
+config HAS_EHCI
+	bool
+	help
+	  This selects the USB based EHCI debug port to be used as a UART. If
+	  you have an x86 based system with USB, say Y.
