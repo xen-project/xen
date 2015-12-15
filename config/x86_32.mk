@@ -5,8 +5,6 @@ CONFIG_X86_$(XEN_OS) := y
 CONFIG_MIGRATE := y
 CONFIG_XCUTILS := y
 
-HAS_MEM_SHARING := y
-
 CFLAGS += -m32 -march=i686
 
 # Use only if calling $(LD) directly.

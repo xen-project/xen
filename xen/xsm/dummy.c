@@ -137,7 +137,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, mem_paging);
 #endif
 
-#ifdef HAS_MEM_SHARING
+#ifdef CONFIG_HAS_MEM_SHARING
     set_to_dummy_if_null(ops, mem_sharing);
 #endif
 

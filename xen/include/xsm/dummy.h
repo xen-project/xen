@@ -576,7 +576,7 @@ static XSM_INLINE int xsm_mem_paging(XSM_DEFAULT_ARG struct domain *d)
 }
 #endif
 
-#ifdef HAS_MEM_SHARING
+#ifdef CONFIG_HAS_MEM_SHARING
 static XSM_INLINE int xsm_mem_sharing(XSM_DEFAULT_ARG struct domain *d)
 {
     XSM_ASSERT_ACTION(XSM_DM_PRIV);

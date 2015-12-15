@@ -11,6 +11,7 @@ config X86
 	select HAS_KEXEC
 	select HAS_MEM_ACCESS
 	select HAS_MEM_PAGING
+	select HAS_MEM_SHARING
 	select HAS_NS16550
 	select HAS_PASSTHROUGH
 	select HAS_PCI

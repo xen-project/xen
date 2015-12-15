@@ -13,6 +13,10 @@ config HAS_MEM_ACCESS
 config HAS_MEM_PAGING
 	bool
 
+# Select HAS_MEM_SHARING if mem sharing is supported
+config HAS_MEM_SHARING
+	bool
+
 # Select HAS_PDX if PDX is supported
 config HAS_PDX
 	bool
