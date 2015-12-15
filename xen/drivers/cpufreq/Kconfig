@@ -1,0 +1,4 @@
+
+# Select HAS_CPUFREQ if CPU frequency scaling is supported
+config HAS_CPUFREQ
+	bool

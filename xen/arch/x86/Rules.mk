@@ -2,7 +2,6 @@
 # x86-specific definitions
 
 HAS_NUMA := y
-HAS_CPUFREQ := y
 HAS_EHCI := y
 HAS_KEXEC := y
 HAS_GDBSX := y
