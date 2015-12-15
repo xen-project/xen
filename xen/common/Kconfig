@@ -5,6 +5,10 @@ menu "Common Features"
 config HAS_DEVICE_TREE
 	bool
 
+# Select HAS_GDBSX if GDBSX is supported
+config HAS_GDBSX
+	bool
+
 config HAS_IOPORTS
 	bool
 
