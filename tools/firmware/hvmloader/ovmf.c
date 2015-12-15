@@ -47,8 +47,8 @@
 #define LOWCHUNK_END            (OVMF_BEGIN + OVMF_SIZE)
 #define OVMF_INFO_PHYSICAL_ADDRESS 0x00001000
 
-extern unsigned char dsdt_anycpu[];
-extern int dsdt_anycpu_len;
+extern unsigned char dsdt_anycpu_qemu_xen[];
+extern int dsdt_anycpu_qemu_xen_len;
 
 #define OVMF_INFO_MAX_TABLES 4
 struct ovmf_info {
@@ -119,8 +119,8 @@ static void ovmf_load(const struct bios_config *config)
 static void ovmf_acpi_build_tables(void)
 {
     struct acpi_config config = {
-        .dsdt_anycpu = dsdt_anycpu,
-        .dsdt_anycpu_len = dsdt_anycpu_len,
+        .dsdt_anycpu = dsdt_anycpu_qemu_xen,
+        .dsdt_anycpu_len = dsdt_anycpu_qemu_xen_len,
         .dsdt_15cpu = NULL, 
         .dsdt_15cpu_len = 0
     };
