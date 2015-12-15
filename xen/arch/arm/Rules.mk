@@ -6,8 +6,6 @@
 # 'make clean' before rebuilding.
 #
 
-HAS_ARM_HDLCD := y
-
 CFLAGS += -I$(BASEDIR)/include
 
 $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
