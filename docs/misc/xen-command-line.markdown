@@ -1041,8 +1041,9 @@ feature is switched on on Intel processors supporting this feature.
 Note that if **watchdog** option is also specified vpmu will be turned off.
 
 *Warning:*
-As the BTS virtualisation is not 100% safe and because of the nehalem quirk
-don't use the vpmu flag on production systems with Intel cpus!
+As the virtualisation is not 100% safe, don't use the vpmu flag on
+production systems (see Xen Security Advisory 163,
+http://xenbits.xen.org/xsa/advisory-163.html)!
 
 ### watchdog
 > `= force | <boolean>`
