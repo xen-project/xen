@@ -20,6 +20,13 @@ MAKEFLAGS += -rR
 
 EFI_MOUNTPOINT ?= $(BOOT_DIR)/efi
 
+# Don't break if the build process wasn't called from the top level
+# we need XEN_TARGET_ARCH to generate the proper config
+include $(XEN_ROOT)/Config.mk
+
+# Allow someone to change their config file
+export KCONFIG_CONFIG ?= .config
+
 .PHONY: default
 default: build
 
@@ -91,6 +98,7 @@ _clean: delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C xsm clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C crypto clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) clean
+	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig clean
 	find . \( -name "*.o" -o -name ".*.d" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET).efi $(TARGET)-syms *~ core
 	rm -f include/asm-*/asm-offsets.h
@@ -220,3 +228,16 @@ FORCE:
 
 %/: FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o built_in_bin.o
+
+kconfig := silentoldconfig oldconfig config menuconfig defconfig \
+	nconfig xconfig gconfig savedefconfig listnewconfig olddefconfig
+.PHONY: $(kconfig)
+$(kconfig):
+	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(XEN_TARGET_ARCH) $@
+
+include/config/%.conf: include/config/auto.conf.cmd
+	$(Q)$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(XEN_TARGET_ARCH) silentoldconfig
+
+# Allow people to just run `make` as before and not force them to configure
+$(KCONFIG_CONFIG):
+	$(Q)$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(XEN_TARGET_ARCH) defconfig

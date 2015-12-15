@@ -1,0 +1,31 @@
+# Select 32 or 64 bit
+config 64BIT
+	bool
+	default ARCH != "arm32"
+	help
+	  Say yes to build a 64-bit Xen
+	  Say no to build a 32-bit Xen
+
+config ARM_32
+	def_bool y
+	depends on !64BIT
+
+config ARM_64
+	def_bool y
+	depends on 64BIT
+
+config ARM
+	def_bool y
+
+config ARCH_DEFCONFIG
+	string
+	default "arch/arm/configs/arm32_defconfig" if ARM_32
+	default "arch/arm/configs/arm64_defconfig" if ARM_64
+
+menu "Architecture Features"
+
+endmenu
+
+source "common/Kconfig"
+
+source "drivers/Kconfig"

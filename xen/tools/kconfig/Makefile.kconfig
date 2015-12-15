@@ -1,0 +1,66 @@
+# xen/tools/kconfig
+
+# default rule to do nothing
+all:
+
+# Xen doesn't have a silent build flag
+quiet := silent_
+Q := @
+kecho := :
+
+# eventually you'll want to do out of tree builds
+srctree := $(XEN_ROOT)/xen
+objtree := $(srctree)
+src := tools/kconfig
+obj := $(src)
+KBUILD_SRC :=
+
+# handle functions (most of these lifted from different Linux makefiles
+dot-target = $(dir $@).$(notdir $@)
+depfile = $(subst $(comma),,$(dot-target).d)
+basetarget = $(basename $(notdir $@))
+cmd = $(cmd_$(1))
+if_changed = $(cmd_$(1))
+if_changed_dep = $(cmd_$(1))
+
+define multi_depend
+$(foreach m, $(notdir $1), \
+	$(eval $(obj)/$m: \
+	$(addprefix $(obj)/, $(foreach s, $3, $($(m:%$(strip $2)=%$(s)))))))
+endef
+
+# Set our default defconfig file
+KBUILD_DEFCONFIG := $(ARCH)_defconfig
+
+# provide our shell
+CONFIG_SHELL := $(SHELL)
+
+# provide the host compiler
+HOSTCC := gcc
+HOSTCXX := g++
+
+# force target
+PHONY += FORCE
+
+FORCE:
+
+SRCARCH = $(shell echo $(ARCH) | \
+	sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g')
+export SRCARCH
+
+# include the original Makefile and Makefile.host from Linux
+include $(src)/Makefile
+include $(src)/Makefile.host
+
+# clean up rule
+clean-deps = $(foreach f,$(host-cobjs) $(host-cxxobjs),$(dir $f).$(notdir $f).d)
+clean-shipped = $(patsubst %_shipped,%,$(wildcard $(obj)/*_shipped))
+
+clean:
+	rm -rf $(clean-files)
+	rm -rf $(clean-deps)
+	rm -rf $(host-csingle) $(host-cmulti) $(host-cxxmulti) $(host-cobjs) $(host-cxxobjs)
+	rm -rf $(clean-shipped)
+
+$(obj)/zconf%: $(src)/zconf%_shipped
+	@cp -f $< $@
