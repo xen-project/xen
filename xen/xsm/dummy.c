@@ -89,14 +89,14 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, pci_config_permission);
     set_to_dummy_if_null(ops, get_vnumainfo);
 
-#if defined(HAS_PASSTHROUGH) && defined(HAS_PCI)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_PCI)
     set_to_dummy_if_null(ops, get_device_group);
     set_to_dummy_if_null(ops, test_assign_device);
     set_to_dummy_if_null(ops, assign_device);
     set_to_dummy_if_null(ops, deassign_device);
 #endif
 
-#if defined(HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
     set_to_dummy_if_null(ops, test_assign_dtdevice);
     set_to_dummy_if_null(ops, assign_dtdevice);
     set_to_dummy_if_null(ops, deassign_dtdevice);

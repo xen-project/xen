@@ -8,7 +8,6 @@ HAS_VGA  := y
 HAS_VIDEO  := y
 HAS_CPUFREQ := y
 HAS_PCI := y
-HAS_PASSTHROUGH := y
 HAS_NS16550 := y
 HAS_EHCI := y
 HAS_KEXEC := y

@@ -9,7 +9,6 @@
 HAS_DEVICE_TREE := y
 HAS_VIDEO := y
 HAS_ARM_HDLCD := y
-HAS_PASSTHROUGH := y
 HAS_PDX := y
 
 CFLAGS += -I$(BASEDIR)/include

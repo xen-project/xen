@@ -366,7 +366,7 @@ struct domain
 
     int64_t          time_offset_seconds;
 
-#ifdef HAS_PASSTHROUGH
+#ifdef CONFIG_HAS_PASSTHROUGH
     /* Does this guest need iommu mappings (-1 meaning "being set up")? */
     s8               need_iommu;
 #endif
@@ -839,7 +839,7 @@ void watchdog_domain_destroy(struct domain *d);
 #define has_hvm_container_vcpu(v)   (has_hvm_container_domain((v)->domain))
 #define is_pinned_vcpu(v) ((v)->domain->is_pinned || \
                            cpumask_weight((v)->cpu_hard_affinity) == 1)
-#ifdef HAS_PASSTHROUGH
+#ifdef CONFIG_HAS_PASSTHROUGH
 #define need_iommu(d)    ((d)->need_iommu)
 #else
 #define need_iommu(d)    (0)

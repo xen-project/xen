@@ -588,7 +588,7 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_ioport_permission:
     case XEN_DOMCTL_ioport_mapping:
 #endif
-#ifdef HAS_PASSTHROUGH
+#ifdef CONFIG_HAS_PASSTHROUGH
     /*
      * These have individual XSM hooks
      * (drivers/passthrough/{pci,device_tree.c)
@@ -1213,7 +1213,7 @@ static int flask_mem_sharing(struct domain *d)
 }
 #endif
 
-#if defined(HAS_PASSTHROUGH) && defined(HAS_PCI)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_PCI)
 static int flask_get_device_group(uint32_t machine_bdf)
 {
     u32 rsid;
@@ -1279,7 +1279,7 @@ static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)
 }
 #endif /* HAS_PASSTHROUGH && HAS_PCI */
 
-#if defined(HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
 static int flask_test_assign_dtdevice(const char *dtpath)
 {
     u32 rsid;
@@ -1725,14 +1725,14 @@ static struct xsm_operations flask_ops = {
     .remove_from_physmap = flask_remove_from_physmap,
     .map_gmfn_foreign = flask_map_gmfn_foreign,
 
-#if defined(HAS_PASSTHROUGH) && defined(HAS_PCI)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_PCI)
     .get_device_group = flask_get_device_group,
     .test_assign_device = flask_test_assign_device,
     .assign_device = flask_assign_device,
     .deassign_device = flask_deassign_device,
 #endif
 
-#if defined(HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(HAS_DEVICE_TREE)
     .test_assign_dtdevice = flask_test_assign_dtdevice,
     .assign_dtdevice = flask_assign_dtdevice,
     .deassign_dtdevice = flask_deassign_dtdevice,

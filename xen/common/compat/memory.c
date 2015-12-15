@@ -18,7 +18,7 @@ CHECK_TYPE(domid);
 CHECK_mem_access_op;
 CHECK_vmemrange;
 
-#ifdef HAS_PASSTHROUGH
+#ifdef CONFIG_HAS_PASSTHROUGH
 struct get_reserved_device_memory {
     struct compat_reserved_device_memory_map map;
     unsigned int used_entries;
@@ -340,7 +340,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             break;
         }
 
-#ifdef HAS_PASSTHROUGH
+#ifdef CONFIG_HAS_PASSTHROUGH
         case XENMEM_reserved_device_memory_map:
         {
             struct get_reserved_device_memory grdm;
