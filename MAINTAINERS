@@ -139,11 +139,6 @@ F:	xen/drivers/char/omap-uart.c
 F:	xen/drivers/char/pl011.c
 F:	xen/drivers/passthrough/arm/
 
-HISILICON HIP04 SUPPORT
-M:	Zoltan Kiss <zoltan.kiss@huawei.com>
-S:	Supported
-F:	xen/arch/arm/gic-hip04.c
-
 CPU POOLS
 M:	Juergen Gross <jgross@suse.com>
 M:	Dario Faggioli <dario.faggioli@citrix.com>
@@ -181,10 +176,10 @@ S:	Supported
 F:	xen/arch/x86/debug.c
 F:	tools/debugger/gdbsx/
 
-KDD DEBUGGER
-M:	Tim Deegan <tim@xen.org>
-S:	Odd Fixes
-F:	tools/debugger/kdd/
+HISILICON HIP04 SUPPORT
+M:	Zoltan Kiss <zoltan.kiss@huawei.com>
+S:	Supported
+F:	xen/arch/arm/gic-hip04.c
 
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
 M:	Gang Wei <gang.wei@intel.com>
@@ -218,6 +213,11 @@ X:	xen/drivers/passthrough/vtd/
 X:	xen/drivers/passthrough/device_tree.c
 F:	xen/include/xen/iommu.h
 
+KDD DEBUGGER
+M:	Tim Deegan <tim@xen.org>
+S:	Odd Fixes
+F:	tools/debugger/kdd/
+
 KEXEC
 M:      David Vrabel <david.vrabel@citrix.com>
 S:      Supported
@@ -237,8 +237,8 @@ M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 S:	Supported
 L:	minios-devel@lists.xenproject.org
+T:	git git://xenbits.xen.org/mini-os.git
 F:	config/MiniOS.mk
-F:	extras/mini-os/
 
 OCAML TOOLS
 M:	David Scott <dave@recoil.org>
@@ -264,12 +264,12 @@ F:	xen/include/acpi/cpufreq/
 QEMU-DM
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 S:	Supported
-T:	git git://xenbits.xen.org/qemu-xen-*.git
+T:	git git://xenbits.xen.org/qemu-xen-traditional.git
 
 QEMU UPSTREAM
 M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 S:	Supported
-T:	git git://xenbits.xen.org/qemu-upstream-*.git
+T:	git git://xenbits.xen.org/qemu-xen.git
 
 REMUS
 M:	Shriram Rajagopalan <rshriram@cs.ubc.ca>
@@ -347,6 +347,17 @@ S:	Supported
 T:	hg http://xenbits.xen.org/linux-2.6.18-xen.hg
 F:	drivers/xen/usb*/
 
+VM EVENT AND MEM ACCESS
+M:	Razvan Cojocaru <rcojocaru@bitdefender.com>
+M:	Tamas K Lengyel <tamas@tklengyel.com>
+S:	Supported
+F:	xen/common/vm_event.c
+F:	xen/common/mem_access.c
+F:	xen/arch/x86/hvm/event.c
+F:	xen/arch/x86/monitor.c
+F:	xen/arch/x86/vm_event.c
+F:	tools/tests/xen-access
+
 VTPM
 M:	Daniel De Graaf <dgdegra@tycho.nsa.gov>
 M:	Quan Xu <quan.xu@intel.com>
@@ -387,17 +398,6 @@ X86 SHADOW PAGETABLES
 M:	Tim Deegan <tim@xen.org>
 S:	Maintained
 F:	xen/arch/x86/mm/shadow/
-
-VM EVENT AND MEM ACCESS
-M:	Razvan Cojocaru <rcojocaru@bitdefender.com>
-M:	Tamas K Lengyel <tamas@tklengyel.com>
-S:	Supported
-F:	xen/common/vm_event.c
-F:	xen/common/mem_access.c
-F:	xen/arch/x86/hvm/event.c
-F:	xen/arch/x86/monitor.c
-F:	xen/arch/x86/vm_event.c
-F:	tools/tests/xen-access
 
 XENTRACE
 M:	George Dunlap <george.dunlap@eu.citrix.com>
