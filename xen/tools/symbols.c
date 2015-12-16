@@ -105,15 +105,18 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 
 	sym = strrchr(str, '.');
 	if (strcasecmp(type, "FILE") == 0 ||
-	    (/* GNU nm prior to XXX doesn't produce a type for EFI binaries. */
+	    (/*
+	      * GNU nm prior to binutils commit 552e55ed06 (expected to
+	      * appear in 2.27) doesn't produce a type for EFI binaries.
+	      */
 	     input_format == fmt_sysv && !*type && stype == '?' && sym &&
 	     sym[1] && strchr("cSsoh", sym[1]) && !sym[2])) {
 		/*
-		 * gas prior to XXX outputs symbol table entries resulting
-		 * from .file in reverse order. If we get two consecutive file
-		 * symbols, prefer the first one if that names an object file
-		 * or has a directory component (to cover multiply compiled
-		 * files).
+		 * gas prior to binutils commit fbdf9406b0 (expected to appear
+		 * in 2.27) outputs symbol table entries resulting from .file
+		 * in reverse order. If we get two consecutive file symbols,
+		 * prefer the first one if that names an object file or has a
+		 * directory component (to cover multiply compiled files).
 		 */
 		bool multi = strchr(str, '/') || (sym && sym[1] == 'o');
 
