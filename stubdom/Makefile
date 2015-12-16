@@ -304,6 +304,7 @@ ioemu/linkfarm.stamp:
 endif
 
 mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET)
+	$(MAKE) -C $(XEN_ROOT)/tools/include
 	mkdir -p include/xen && \
           ln -sf $(wildcard $(XEN_ROOT)/xen/include/public/*.h) include/xen && \
           ln -sf $(addprefix $(XEN_ROOT)/xen/include/public/,arch-x86 hvm io xsm) include/xen && \
@@ -341,9 +342,7 @@ $(TARGETS_MINIOS): mini-os-%:
 
 .PHONY: libxc
 libxc: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a libxc-$(XEN_TARGET_ARCH)/libxenguest.a
-libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: cross-zlib
-	$(MAKE) -C $(XEN_ROOT)/tools/include
-	$(MAKE) DESTDIR= -C $(MINI_OS) links
+libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: mk-headers-$(XEN_TARGET_ARCH) cross-zlib
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= CONFIG_LIBXC_MINIOS=y -C libxc-$(XEN_TARGET_ARCH)
 
  libxc-$(XEN_TARGET_ARCH)/libxenguest.a: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a
@@ -386,7 +385,6 @@ c: $(CROSS_ROOT)
 
 .PHONY: vtpm
 vtpm: cross-polarssl cross-tpmemu
-	make -C $(MINI_OS) links
 	XEN_TARGET_ARCH="$(XEN_TARGET_ARCH)" CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
 
 ######
@@ -395,7 +393,6 @@ vtpm: cross-polarssl cross-tpmemu
 
 .PHONY: vtpmmgr
 vtpmmgr: cross-polarssl
-	make -C $(MINI_OS) links
 	XEN_TARGET_ARCH="$(XEN_TARGET_ARCH)" CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
 
 ######
