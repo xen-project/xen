@@ -3,6 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS-y :=
 SUBDIRS-y += include
+SUBDIRS-y += libs
 SUBDIRS-y += libxc
 SUBDIRS-$(FLASK_ENABLE) += flask
 SUBDIRS-y += xenstore
@@ -248,12 +249,14 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		--includedir=$(LIBEXEC_INC) \
 		--source-path=$$source \
 		--extra-cflags="-I$(XEN_ROOT)/tools/include \
+		-I$(XEN_ROOT)/tools/libs/toollog/include \
 		-I$(XEN_ROOT)/tools/libxc/include \
 		-I$(XEN_ROOT)/tools/xenstore/include \
 		-I$(XEN_ROOT)/tools/xenstore/compat/include \
 		$(EXTRA_CFLAGS_QEMU_XEN)" \
 		--extra-ldflags="-L$(XEN_ROOT)/tools/libxc \
 		-L$(XEN_ROOT)/tools/xenstore \
+		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/toollog \
 		$(QEMU_UPSTREAM_RPATH)" \
 		--bindir=$(LIBEXEC_BIN) \
 		--datadir=$(SHAREDIR)/qemu-xen \

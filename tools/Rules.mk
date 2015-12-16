@@ -10,6 +10,7 @@ export _INSTALL := $(INSTALL)
 INSTALL = $(XEN_ROOT)/tools/cross-install
 
 XEN_INCLUDE        = $(XEN_ROOT)/tools/include
+XEN_LIBXENTOOLLOG  = $(XEN_ROOT)/tools/libs/toollog
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 XEN_XENLIGHT       = $(XEN_ROOT)/tools/libxl
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
@@ -76,10 +77,15 @@ endif
 # Consumers of libfoo should not directly use $(SHDEPS_libfoo) or
 # $(SHLIB_libfoo)
 
-CFLAGS_libxenctrl = -I$(XEN_LIBXC)/include $(CFLAGS_xeninclude)
-SHDEPS_libxenctrl =
-LDLIBS_libxenctrl = $(XEN_LIBXC)/libxenctrl$(libextension)
-SHLIB_libxenctrl  = -Wl,-rpath-link=$(XEN_LIBXC)
+CFLAGS_libxentoollog = -I$(XEN_LIBXENTOOLLOG)/include $(CFLAGS_xeninclude)
+SHDEPS_libxentoollog =
+LDLIBS_libxentoollog = $(XEN_LIBXENTOOLLOG)/libxentoollog$(libextension)
+SHLIB_libxentoollog  = -Wl,-rpath-link=$(XEN_LIBXENTOOLLOG)
+
+CFLAGS_libxenctrl = -I$(XEN_LIBXC)/include $(CFLAGS_libxentoollog) $(CFLAGS_xeninclude)
+SHDEPS_libxenctrl = $(SHLIB_libxentoollog)
+LDLIBS_libxenctrl = $(SHDEPS_libxenctrl) $(XEN_LIBXC)/libxenctrl$(libextension)
+SHLIB_libxenctrl  = $(SHDEPS_libxenctrl) -Wl,-rpath-link=$(XEN_LIBXC)
 
 CFLAGS_libxenguest = -I$(XEN_LIBXC)/include $(CFLAGS_xeninclude)
 SHDEPS_libxenguest =

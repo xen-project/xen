@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 # xenpaging.c and file_ops.c incorrectly use libxc internals
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore) $(PTHREAD_CFLAGS) -I$(XEN_ROOT)/tools/libxc
-LDLIBS += $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore) $(PTHREAD_LIBS)
+LDLIBS += $(LDLIBS_libxentoollog) $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore) $(PTHREAD_LIBS)
 LDFLAGS += $(PTHREAD_LDFLAGS)
 
 POLICY    = default

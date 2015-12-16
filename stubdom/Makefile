@@ -314,6 +314,11 @@ mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET)
 	  ln -sf $(wildcard $(XEN_ROOT)/tools/include/xen-foreign/*) include/xen-foreign/ && \
 	  $(MAKE) DESTDIR= -C include/xen-foreign/ && \
 	  ( [ -h include/xen/foreign ] || ln -sf ../xen-foreign include/xen/foreign )
+	mkdir -p libs-$(XEN_TARGET_ARCH)/toollog
+	[ -h libs-$(XEN_TARGET_ARCH)/toollog/Makefile ] || ( cd libs-$(XEN_TARGET_ARCH)/toollog && \
+	  ln -sf $(XEN_ROOT)/tools/libs/toollog/include/*.h . && \
+	  ln -sf $(XEN_ROOT)/tools/libs/toollog/*.c . && \
+	  ln -sf $(XEN_ROOT)/tools/libs/toollog/Makefile . )
 	mkdir -p libxc-$(XEN_TARGET_ARCH)
 	[ -h libxc-$(XEN_TARGET_ARCH)/Makefile ] || ( cd libxc-$(XEN_TARGET_ARCH) && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/*.h . && \
@@ -337,12 +342,21 @@ $(TARGETS_MINIOS): mini-os-%:
 	done
 
 #######
+# libxentoollog
+#######
+
+.PHONY: libxentoollog
+libxentoollog: libs-$(XEN_TARGET_ARCH)/toollog/libxentoollog.a
+libs-$(XEN_TARGET_ARCH)/toollog/libxentoollog.a: mk-headers-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE)
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/toollog
+
+#######
 # libxc
 #######
 
 .PHONY: libxc
 libxc: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a libxc-$(XEN_TARGET_ARCH)/libxenguest.a
-libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: mk-headers-$(XEN_TARGET_ARCH) cross-zlib
+libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: mk-headers-$(XEN_TARGET_ARCH) libxentoollog cross-zlib
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= CONFIG_LIBXC_MINIOS=y -C libxc-$(XEN_TARGET_ARCH)
 
  libxc-$(XEN_TARGET_ARCH)/libxenguest.a: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a
@@ -512,6 +526,11 @@ clean:
 	$(MAKE) -C vtpmmgr clean
 	rm -fr grub-$(XEN_TARGET_ARCH)
 	rm -f $(STUBDOMPATH)
+	[ ! -e libs-$(XEN_TARGET_ARCH)/toollog/Makefile ] || $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/toollog clean
+	[ ! -e libs-$(XEN_TARGET_ARCH)/evtchn/Makefile ] || $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/evtchn clean
+	[ ! -e libs-$(XEN_TARGET_ARCH)/gnttab/Makefile ] || $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/gnttab clean
+	[ ! -e libs-$(XEN_TARGET_ARCH)/call/Makefile ] || $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/call clean
+	[ ! -e libs-$(XEN_TARGET_ARCH)/foreignmemory/Makefile ] || $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/foreignmemory clean
 	[ ! -e libxc-$(XEN_TARGET_ARCH)/Makefile ] || $(MAKE) DESTDIR= -C libxc-$(XEN_TARGET_ARCH) clean
 	-[ ! -d ioemu ] || $(MAKE) DESTDIR= -C ioemu clean
 	-[ ! -d xenstore ] || $(MAKE) DESTDIR= -C xenstore clean
@@ -522,6 +541,7 @@ crossclean: clean
 	rm -fr $(CROSS_ROOT)
 	rm -fr newlib-$(XEN_TARGET_ARCH)
 	rm -fr zlib-$(XEN_TARGET_ARCH) pciutils-$(XEN_TARGET_ARCH)
+	rm -fr libs-$(XEN_TARGET_ARCH)
 	rm -fr libxc-$(XEN_TARGET_ARCH) ioemu xenstore
 	rm -fr gmp-$(XEN_TARGET_ARCH)
 	rm -fr polarssl-$(XEN_TARGET_ARCH)

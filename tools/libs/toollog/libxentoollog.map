@@ -1,0 +1,12 @@
+VERS_1.0 {
+	global:
+		xtl_createlogger_stdiostream;
+		xtl_level_to_string;
+		xtl_log;
+		xtl_logger_destroy;
+		xtl_logv;
+		xtl_progress;
+		xtl_stdiostream_adjust_flags;
+		xtl_stdiostream_set_minlevel;
+	local: *; /* Do not expose anything by default */
+};
