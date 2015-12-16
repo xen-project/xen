@@ -214,6 +214,12 @@ X:	xen/drivers/passthrough/vtd/
 X:	xen/drivers/passthrough/device_tree.c
 F:	xen/include/xen/iommu.h
 
+KCONFIG
+M:	Doug Goldstein <cardoe@cardoe.com>
+S:	Supported
+F:	docs/misc/kconfig{,-language}.txt
+F:	xen/tools/kconfig/
+
 KDD DEBUGGER
 M:	Tim Deegan <tim@xen.org>
 S:	Odd Fixes
