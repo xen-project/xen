@@ -726,7 +726,10 @@ XEN_LIB_STORED
 XEN_LOG_DIR
 XEN_RUN_DIR
 XENFIRMWAREDIR
+LIBEXEC_INC
+LIBEXEC_LIB
 LIBEXEC_BIN
+LIBEXEC
 CONFIG_LEAF_DIR
 FILE_OFFSET_BITS
 OBJEXT
@@ -789,6 +792,7 @@ enable_option_checking
 enable_largefile
 with_initddir
 with_sysconfig_leaf_dir
+with_libexec_leaf_dir
 with_xen_dumpdir
 enable_rpath
 enable_githttp
@@ -1490,6 +1494,8 @@ Optional Packages:
                           options for runlevel scripts and daemons such as
                           xenstored. This should be either "sysconfig" or
                           "default". [sysconfig]
+  --with-libexec-leaf-dir=SUBDIR
+                          Name of subdirectory in libexecdir to use.
   --with-xen-dumpdir=DIR  Path to directory for domU crash dumps.
                           [LOCALSTATEDIR/lib/xen/dump]
   --with-linux-backend-modules="mod1 mod2"
@@ -3887,6 +3893,15 @@ CONFIG_LEAF_DIR=$config_leaf_dir
 
 
 
+# Check whether --with-libexec-leaf-dir was given.
+if test "${with_libexec_leaf_dir+set}" = set; then :
+  withval=$with_libexec_leaf_dir; libexec_subdir=$withval
+else
+  libexec_subdir=$PACKAGE_TARNAME
+fi
+
+
+
 # Check whether --with-xen-dumpdir was given.
 if test "${with_xen_dumpdir+set}" = set; then :
   withval=$with_xen_dumpdir; xen_dumpdir_path=$withval
@@ -3903,11 +3918,16 @@ if test "$libexecdir" = '${exec_prefix}/libexec' ; then
          ;;
     esac
 fi
-libexecdir=`eval echo $libexecdir`
-LIBEXEC_BIN=`eval echo $libexecdir/$PACKAGE_TARNAME/bin`
+LIBEXEC=`eval echo $libexecdir/$libexec_subdir`
 
 
-XENFIRMWAREDIR=`eval echo $libexecdir/$PACKAGE_TARNAME/boot`
+LIBEXEC_BIN=${LIBEXEC}/bin
+
+LIBEXEC_LIB=${LIBEXEC}/lib
+
+LIBEXEC_INC=${LIBEXEC}/include
+
+XENFIRMWAREDIR=${LIBEXEC}/boot
 
 
 XEN_RUN_DIR=$localstatedir/run/xen

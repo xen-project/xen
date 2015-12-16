@@ -62,6 +62,14 @@ AC_ARG_WITH([sysconfig-leaf-dir],
 CONFIG_LEAF_DIR=$config_leaf_dir
 AC_SUBST(CONFIG_LEAF_DIR)
 
+dnl autoconf docs suggest to use a "package name" subdir. We make it
+dnl configurable for the benefit of those who want e.g. xen-X.Y instead.
+AC_ARG_WITH([libexec-leaf-dir],
+    AS_HELP_STRING([--with-libexec-leaf-dir=SUBDIR],
+    [Name of subdirectory in libexecdir to use.]),
+    [libexec_subdir=$withval],
+    [libexec_subdir=$PACKAGE_TARNAME])
+
 AC_ARG_WITH([xen-dumpdir],
     AS_HELP_STRING([--with-xen-dumpdir=DIR],
     [Path to directory for domU crash dumps. [LOCALSTATEDIR/lib/xen/dump]]),
@@ -77,13 +85,17 @@ if test "$libexecdir" = '${exec_prefix}/libexec' ; then
     esac
 fi
 dnl expand exec_prefix or it will endup in substituted variables
-libexecdir=`eval echo $libexecdir`
-dnl autoconf doc suggest to use a "package name" subdir
-dnl This variable will be substituted in various .in files
-LIBEXEC_BIN=`eval echo $libexecdir/$PACKAGE_TARNAME/bin`
-AC_SUBST(LIBEXEC_BIN)
+LIBEXEC=`eval echo $libexecdir/$libexec_subdir`
+AC_SUBST(LIBEXEC)
 
-XENFIRMWAREDIR=`eval echo $libexecdir/$PACKAGE_TARNAME/boot`
+dnl These variables will be substituted in various .in files
+LIBEXEC_BIN=${LIBEXEC}/bin
+AC_SUBST(LIBEXEC_BIN)
+LIBEXEC_LIB=${LIBEXEC}/lib
+AC_SUBST(LIBEXEC_LIB)
+LIBEXEC_INC=${LIBEXEC}/include
+AC_SUBST(LIBEXEC_INC)
+XENFIRMWAREDIR=${LIBEXEC}/boot
 AC_SUBST(XENFIRMWAREDIR)
 
 XEN_RUN_DIR=$localstatedir/run/xen

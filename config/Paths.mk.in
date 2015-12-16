@@ -29,10 +29,10 @@ includedir               := @includedir@
 localstatedir            := @localstatedir@
 sysconfdir               := @sysconfdir@
 
-LIBEXEC                  := $(libexecdir)/$(PACKAGE_TARNAME)
+LIBEXEC                  := @LIBEXEC@
 LIBEXEC_BIN              := @LIBEXEC_BIN@
-LIBEXEC_LIB              := $(LIBEXEC)/lib
-LIBEXEC_INC              := $(LIBEXEC)/include
+LIBEXEC_LIB              := @LIBEXEC_LIB@
+LIBEXEC_INC              := @LIBEXEC_INC@
 
 SHAREDIR                 := @SHAREDIR@
 MAN1DIR                  := $(mandir)/man1
