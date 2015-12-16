@@ -86,14 +86,14 @@ int xenevtchn_notify(xenevtchn_handle *xce, evtchn_port_t port);
  * domain ID, or -1 on failure, in which case errno will be set appropriately.
  */
 evtchn_port_or_error_t
-xenevtchn_bind_unbound_port(xenevtchn_handle *xce, int domid);
+xenevtchn_bind_unbound_port(xenevtchn_handle *xce, uint32_t domid);
 
 /*
  * Returns a new event port bound to the remote port for the given domain ID,
  * or -1 on failure, in which case errno will be set appropriately.
  */
 evtchn_port_or_error_t
-xenevtchn_bind_interdomain(xenevtchn_handle *xce, int domid,
+xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint32_t domid,
                            evtchn_port_t remote_port);
 
 /*
