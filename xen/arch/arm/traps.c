@@ -99,7 +99,7 @@ static int debug_stack_lines = 40;
 integer_param("debug_stack_lines", debug_stack_lines);
 
 
-void __cpuinit init_traps(void)
+void init_traps(void)
 {
     /* Setup Hyp vector base */
     WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);

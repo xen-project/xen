@@ -84,8 +84,6 @@
 #define mk_unsigned_long(x) x
 #endif /* !__ASSEMBLY__ */
 
-#define __cpuinit
-
 #ifdef FLASK_ENABLE
 #define XSM_MAGIC 0xf97cff8c
 /* Maintain statistics on the access vector cache */

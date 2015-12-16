@@ -163,9 +163,9 @@ extern void setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr);
 extern void remove_early_mappings(void);
 /* Allocate and initialise pagetables for a secondary CPU. Sets init_ttbr to the
  * new page table */
-extern int __cpuinit init_secondary_pagetables(int cpu);
+extern int init_secondary_pagetables(int cpu);
 /* Switch secondary CPUS to its own pagetables and finalise MMU setup */
-extern void __cpuinit mmu_init_secondary_cpu(void);
+extern void mmu_init_secondary_cpu(void);
 /* Set up the xenheap: up to 1GB of contiguous, always-mapped memory.
  * Base must be 32MB aligned and size a multiple of 32MB. */
 extern void setup_xenheap_mappings(unsigned long base_mfn, unsigned long nr_mfns);

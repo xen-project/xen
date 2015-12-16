@@ -289,12 +289,12 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
                     (u64)end_pfn << PAGE_SHIFT);
 }
 
-__cpuinit void numa_add_cpu(int cpu)
+void numa_add_cpu(int cpu)
 {
     cpumask_set_cpu(cpu, &node_to_cpumask[cpu_to_node(cpu)]);
 } 
 
-void __cpuinit numa_set_node(int cpu, nodeid_t node)
+void numa_set_node(int cpu, nodeid_t node)
 {
     cpu_to_node[cpu] = node;
 }

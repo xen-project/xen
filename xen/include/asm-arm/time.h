@@ -32,7 +32,7 @@ extern uint32_t timer_dt_clock_frequency;
 unsigned int timer_get_irq(enum timer_ppi ppi);
 
 /* Set up the timer interrupt on this CPU */
-extern void __cpuinit init_timer_interrupt(void);
+extern void init_timer_interrupt(void);
 
 /* Counter value at boot time */
 extern uint64_t boot_count;

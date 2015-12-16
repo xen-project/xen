@@ -620,7 +620,7 @@ int init_secondary_pagetables(int cpu)
 #endif
 
 /* MMU setup for secondary CPUS (which already have paging enabled) */
-void __cpuinit mmu_init_secondary_cpu(void)
+void mmu_init_secondary_cpu(void)
 {
     /* From now on, no mapping may be both writable and executable. */
     WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);

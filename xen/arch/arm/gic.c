@@ -305,7 +305,7 @@ void smp_send_state_dump(unsigned int cpu)
 }
 
 /* Set up the per-CPU parts of the GIC for a secondary CPU */
-void __cpuinit gic_init_secondary_cpu(void)
+void gic_init_secondary_cpu(void)
 {
     gic_hw_ops->secondary_init();
     /* Clear LR mask for secondary cpus */
@@ -695,7 +695,7 @@ void gic_dump_info(struct vcpu *v)
     }
 }
 
-void __cpuinit init_maintenance_interrupt(void)
+void init_maintenance_interrupt(void)
 {
     request_irq(gic_hw_ops->info->maintenance_irq, 0, maintenance_interrupt,
                 "irq-maintenance", NULL);

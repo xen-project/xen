@@ -17,7 +17,7 @@
 
 #include <asm/processor.h>
 
-void __cpuinit identify_cpu(struct cpuinfo_arm *c)
+void identify_cpu(struct cpuinfo_arm *c)
 {
         c->midr.bits = READ_SYSREG32(MIDR_EL1);
         c->mpidr.bits = READ_SYSREG(MPIDR_EL1);

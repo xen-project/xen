@@ -122,7 +122,7 @@ void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
 void p2m_vmid_allocator_init(void);
 
 /* Second stage paging setup, to be called on all CPUs */
-void __cpuinit setup_virt_paging(void);
+void setup_virt_paging(void);
 
 /* Init the datastructures for later use by the p2m code */
 int p2m_init(struct domain *d);

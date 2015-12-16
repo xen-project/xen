@@ -306,7 +306,7 @@ static void __init hip04gic_dist_init(void)
     writel_gicd(GICD_CTL_ENABLE, GICD_CTLR);
 }
 
-static void __cpuinit hip04gic_cpu_init(void)
+static void hip04gic_cpu_init(void)
 {
     int i;
 
@@ -344,7 +344,7 @@ static void hip04gic_cpu_disable(void)
     writel_gicc(0x0, GICC_CTLR);
 }
 
-static void __cpuinit hip04gic_hyp_init(void)
+static void hip04gic_hyp_init(void)
 {
     uint32_t vtr;
     uint8_t nr_lrs;
@@ -354,7 +354,7 @@ static void __cpuinit hip04gic_hyp_init(void)
     gicv2_info.nr_lrs = nr_lrs;
 }
 
-static void __cpuinit hip04gic_hyp_disable(void)
+static void hip04gic_hyp_disable(void)
 {
     writel_gich(0, GICH_HCR);
 }

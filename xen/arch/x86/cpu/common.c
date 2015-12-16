@@ -70,7 +70,7 @@ static const struct cpu_dev *this_cpu = &default_cpu;
 bool_t opt_cpu_info;
 boolean_param("cpuinfo", opt_cpu_info);
 
-int __cpuinit get_model_name(struct cpuinfo_x86 *c)
+int get_model_name(struct cpuinfo_x86 *c)
 {
 	unsigned int *v;
 	char *p, *q;
@@ -100,7 +100,7 @@ int __cpuinit get_model_name(struct cpuinfo_x86 *c)
 }
 
 
-void __cpuinit display_cacheinfo(struct cpuinfo_x86 *c)
+void display_cacheinfo(struct cpuinfo_x86 *c)
 {
 	unsigned int dummy, ecx, edx, l2size;
 
@@ -212,7 +212,7 @@ static void __init early_cpu_detect(void)
 		paddr_bits = cpuid_eax(0x80000008) & 0xff;
 }
 
-static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
+static void generic_identify(struct cpuinfo_x86 *c)
 {
 	u32 eax, ebx, ecx, edx, tmp;
 
@@ -276,7 +276,7 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 /*
  * This does the hard work of actually picking apart the CPU stuff...
  */
-void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
+void identify_cpu(struct cpuinfo_x86 *c)
 {
 	int i;
 
@@ -382,7 +382,7 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
  * Check for extended topology enumeration cpuid leaf 0xb and if it
  * exists, use it for cpu topology detection.
  */
-void __cpuinit detect_extended_topology(struct cpuinfo_x86 *c)
+void detect_extended_topology(struct cpuinfo_x86 *c)
 {
 	unsigned int eax, ebx, ecx, edx, sub_index;
 	unsigned int ht_mask_width, core_plus_mask_width;
@@ -439,7 +439,7 @@ void __cpuinit detect_extended_topology(struct cpuinfo_x86 *c)
 	}
 }
 
-void __cpuinit detect_ht(struct cpuinfo_x86 *c)
+void detect_ht(struct cpuinfo_x86 *c)
 {
 	u32 	eax, ebx, ecx, edx;
 	int 	index_msb, core_bits;
@@ -514,7 +514,7 @@ unsigned int __init apicid_to_socket(unsigned int apicid)
 	return apicid;
 }
 
-void __cpuinit print_cpu_info(unsigned int cpu)
+void print_cpu_info(unsigned int cpu)
 {
 	const struct cpuinfo_x86 *c = cpu_data + cpu;
 	const char *vendor = NULL;
@@ -565,7 +565,7 @@ void __init early_cpu_init(void)
  * - Inserts TSS selector into regular and compat GDTs
  * - Loads GDT, IDT, TR then null LDT
  */
-void __cpuinit load_system_tables(void)
+void load_system_tables(void)
 {
 	unsigned int cpu = smp_processor_id();
 	unsigned long stack_bottom = get_stack_bottom(),
@@ -618,7 +618,7 @@ void __cpuinit load_system_tables(void)
  * and IDT. We reload them nevertheless, this function acts as a
  * 'CPU state barrier', nothing should get across.
  */
-void __cpuinit cpu_init(void)
+void cpu_init(void)
 {
 	int cpu = smp_processor_id();
 

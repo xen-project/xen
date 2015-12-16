@@ -85,7 +85,7 @@ static int __init init_irq_data(void)
     return 0;
 }
 
-static int __cpuinit init_local_irq_data(void)
+static int init_local_irq_data(void)
 {
     int irq;
 
@@ -124,7 +124,7 @@ void __init init_IRQ(void)
     BUG_ON(init_irq_data() < 0);
 }
 
-void __cpuinit init_secondary_IRQ(void)
+void init_secondary_IRQ(void)
 {
     BUG_ON(init_local_irq_data() < 0);
 }

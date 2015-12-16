@@ -104,7 +104,7 @@ int cpuid4_cache_lookup(int index, struct cpuid4_info *this_leaf)
 	return 0;
 }
 
-static int __cpuinit find_num_cache_leaves(void)
+static int find_num_cache_leaves(void)
 {
 	unsigned int		eax, ebx, ecx, edx;
 	union _cpuid4_leaf_eax	cache_eax;
@@ -119,7 +119,7 @@ static int __cpuinit find_num_cache_leaves(void)
 	return i;
 }
 
-unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
+unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
 {
 	unsigned int trace = 0, l1i = 0, l1d = 0, l2 = 0, l3 = 0; /* Cache sizes */
 	unsigned int new_l1d = 0, new_l1i = 0; /* Cache sizes from cpuid(4) */

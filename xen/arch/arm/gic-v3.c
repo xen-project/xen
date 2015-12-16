@@ -676,7 +676,7 @@ static int __init gicv3_populate_rdist(void)
     return -ENODEV;
 }
 
-static int __cpuinit gicv3_cpu_init(void)
+static int gicv3_cpu_init(void)
 {
     int i;
     uint32_t priority;
@@ -737,7 +737,7 @@ static void gicv3_cpu_disable(void)
     isb();
 }
 
-static void __cpuinit gicv3_hyp_init(void)
+static void gicv3_hyp_init(void)
 {
     uint32_t vtr;
 
@@ -768,7 +768,7 @@ static int gicv3_secondary_cpu_init(void)
     return res;
 }
 
-static void __cpuinit gicv3_hyp_disable(void)
+static void gicv3_hyp_disable(void)
 {
     uint32_t hcr;
 

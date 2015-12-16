@@ -137,7 +137,7 @@ out:
 		fam10h_pci_mmconf_base = start;
 }
 
-void __cpuinit fam10h_check_enable_mmcfg(void)
+void fam10h_check_enable_mmcfg(void)
 {
 	u64 val;
 	bool_t print = opt_cpu_info;

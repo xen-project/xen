@@ -264,9 +264,9 @@ smp_prepare_cpus (unsigned int max_cpus)
 }
 
 /* Boot the current CPU */
-void __cpuinit start_secondary(unsigned long boot_phys_offset,
-                               unsigned long fdt_paddr,
-                               unsigned long hwid)
+void start_secondary(unsigned long boot_phys_offset,
+                     unsigned long fdt_paddr,
+                     unsigned long hwid)
 {
     unsigned int cpuid = init_data.cpuid;
 
