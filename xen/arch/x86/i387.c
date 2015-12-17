@@ -17,19 +17,6 @@
 #include <asm/xstate.h>
 #include <asm/asm_defns.h>
 
-static void fpu_init(void)
-{
-    unsigned long val;
-    
-    asm volatile ( "fninit" );
-    if ( cpu_has_xmm )
-    {
-        /* load default value into MXCSR control/status register */
-        val = MXCSR_DEFAULT;
-        asm volatile ( "ldmxcsr %0" : : "m" (val) );
-    }
-}
-
 /*******************************/
 /*     FPU Restore Functions   */
 /*******************************/
@@ -248,15 +235,8 @@ void vcpu_restore_fpu_lazy(struct vcpu *v)
 
     if ( cpu_has_xsave )
         fpu_xrstor(v, XSTATE_LAZY);
-    else if ( v->fpu_initialised )
-    {
-        if ( cpu_has_fxsr )
-            fpu_fxrstor(v);
-        else
-            fpu_frstor(v);
-    }
     else
-        fpu_init();
+        fpu_fxrstor(v);
 
     v->fpu_initialised = 1;
     v->fpu_dirtied = 1;
@@ -317,7 +297,14 @@ int vcpu_init_fpu(struct vcpu *v)
     else
     {
         v->arch.fpu_ctxt = _xzalloc(sizeof(v->arch.xsave_area->fpu_sse), 16);
-        if ( !v->arch.fpu_ctxt )
+        if ( v->arch.fpu_ctxt )
+        {
+            typeof(v->arch.xsave_area->fpu_sse) *fpu_sse = v->arch.fpu_ctxt;
+
+            fpu_sse->fcw = FCW_DEFAULT;
+            fpu_sse->mxcsr = MXCSR_DEFAULT;
+        }
+        else
         {
             rc = -ENOMEM;
             goto done;
