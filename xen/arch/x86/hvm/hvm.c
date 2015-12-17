@@ -400,23 +400,23 @@ bool_t hvm_io_pending(struct vcpu *v)
 
 static bool_t hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
 {
+    unsigned int state;
+
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
-    while ( p->state != STATE_IOREQ_NONE )
+    while ( (state = p->state) != STATE_IOREQ_NONE )
     {
-        switch ( p->state )
+        rmb();
+        switch ( state )
         {
         case STATE_IORESP_READY: /* IORESP_READY -> NONE */
-            rmb(); /* see IORESP_READY /then/ read contents of ioreq */
             hvm_io_assist(p);
             break;
         case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
         case STATE_IOREQ_INPROCESS:
-            wait_on_xen_event_channel(sv->ioreq_evtchn,
-                                      (p->state != STATE_IOREQ_READY) &&
-                                      (p->state != STATE_IOREQ_INPROCESS));
+            wait_on_xen_event_channel(sv->ioreq_evtchn, p->state != state);
             break;
         default:
-            gdprintk(XENLOG_ERR, "Weird HVM iorequest state %d.\n", p->state);
+            gdprintk(XENLOG_ERR, "Weird HVM iorequest state %u\n", state);
             domain_crash(sv->vcpu->domain);
             return 0; /* bail */
         }
