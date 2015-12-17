@@ -918,6 +918,17 @@ int arch_set_info_guest(
                                                          XSTATE_COMPACTION_ENABLED;
         }
     }
+    else if ( v->arch.xsave_area )
+        memset(&v->arch.xsave_area->xsave_hdr, 0,
+               sizeof(v->arch.xsave_area->xsave_hdr));
+    else
+    {
+        typeof(v->arch.xsave_area->fpu_sse) *fpu_sse = v->arch.fpu_ctxt;
+
+        memset(fpu_sse, 0, sizeof(*fpu_sse));
+        fpu_sse->fcw = FCW_DEFAULT;
+        fpu_sse->mxcsr = MXCSR_DEFAULT;
+    }
 
     if ( !compat )
     {
