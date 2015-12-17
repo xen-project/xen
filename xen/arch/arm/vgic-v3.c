@@ -94,7 +94,7 @@ static struct vcpu *vgic_v3_irouter_to_vcpu(struct domain *d, uint64_t irouter)
  * Fetch an IROUTER register based on the offset from IROUTER0. Only one
  * vCPU will be listed for a given vIRQ.
  *
- * Note the offset will be aligned to the appropriate  boundary.
+ * Note the byte offset will be aligned to an IROUTER<n> boundary.
  */
 static uint64_t vgic_fetch_irouter(struct vgic_irq_rank *rank,
                                    unsigned int offset)

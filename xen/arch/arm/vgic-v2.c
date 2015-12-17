@@ -65,7 +65,7 @@ void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
  * Fetch an ITARGETSR register based on the offset from ITARGETSR0. Only
  * one vCPU will be listed for a given vIRQ.
  *
- * Note the offset will be aligned to the appropriate boundary.
+ * Note the byte offset will be aligned to an ITARGETSR<n> boundary.
  */
 static uint32_t vgic_fetch_itargetsr(struct vgic_irq_rank *rank,
                                      unsigned int offset)
@@ -88,7 +88,7 @@ static uint32_t vgic_fetch_itargetsr(struct vgic_irq_rank *rank,
  * Store an ITARGETSR register in a convenient way and migrate the vIRQ
  * if necessary. This function only deals with ITARGETSR8 and onwards.
  *
- * Note the offset will be aligned to the appropriate boundary.
+ * Note the byte offset will be aligned to an ITARGETSR<n> boundary.
  */
 static void vgic_store_itargetsr(struct domain *d, struct vgic_irq_rank *rank,
                                  unsigned int offset, uint32_t itargetsr)
