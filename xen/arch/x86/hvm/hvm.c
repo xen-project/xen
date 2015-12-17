@@ -342,6 +342,7 @@ void hvm_migrate_pirqs(struct vcpu *v)
 void hvm_do_resume(struct vcpu *v)
 {
     ioreq_t *p;
+    unsigned int state;
 
     pt_restore_timer(v);
 
@@ -349,9 +350,10 @@ void hvm_do_resume(struct vcpu *v)
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
     p = get_ioreq(v);
-    while ( p->state != STATE_IOREQ_NONE )
+    while ( (state = p->state) != STATE_IOREQ_NONE )
     {
-        switch ( p->state )
+        rmb();
+        switch ( state )
         {
         case STATE_IORESP_READY: /* IORESP_READY -> NONE */
             hvm_io_assist();
@@ -359,11 +361,10 @@ void hvm_do_resume(struct vcpu *v)
         case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
         case STATE_IOREQ_INPROCESS:
             wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port,
-                                      (p->state != STATE_IOREQ_READY) &&
-                                      (p->state != STATE_IOREQ_INPROCESS));
+                                      p->state != state);
             break;
         default:
-            gdprintk(XENLOG_ERR, "Weird HVM iorequest state %d.\n", p->state);
+            gdprintk(XENLOG_ERR, "Weird HVM iorequest state %u\n", state);
             domain_crash(v->domain);
             return; /* bail */
         }
