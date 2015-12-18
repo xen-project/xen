@@ -260,9 +260,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 3159615c393e0b981e00ecd0e06fcfd44235f2d4
-# Wed Dec 9 11:47:35 2015 +0000
-# net: pcnet: add check to validate receive data size(CVE-2015-7504)
+QEMU_TRADITIONAL_REVISION ?= f9eb9952892716caae2f0960acc1f06132625426
+# Fri Nov 20 10:56:00 2015 -0500
+# blkif: Avoid double access to src->nr_segments
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
