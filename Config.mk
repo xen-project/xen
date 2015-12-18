@@ -224,9 +224,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= d886904dd6875648b33d58bb7d2fe75b45e4ea12
-# Wed Dec 9 11:47:35 2015 +0000
-# net: pcnet: add check to validate receive data size(CVE-2015-7504)
+QEMU_TAG ?= 95872ff9713292f1c859c093feae0a2eaff8f810
+# Fri Nov 20 10:56:00 2015 -0500
+# blkif: Avoid double access to src->nr_segments
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
