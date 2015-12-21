@@ -2571,7 +2571,7 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
                               PCI_SLOT(CF8_BDF(cf8)),
                               PCI_FUNC(CF8_BDF(cf8)));
 
-        type = IOREQ_TYPE_PCI_CONFIG;
+        type = HVMOP_IO_RANGE_PCI;
         addr = ((uint64_t)sbdf << 32) |
                CF8_ADDR_LO(cf8) |
                (p->addr & 3);
@@ -2589,7 +2589,8 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
     }
     else
     {
-        type = p->type;
+        type = (p->type == IOREQ_TYPE_PIO) ?
+                HVMOP_IO_RANGE_PORT : HVMOP_IO_RANGE_MEMORY;
         addr = p->addr;
     }
 
@@ -2605,31 +2606,28 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
         if ( !s->enabled )
             continue;
 
-        BUILD_BUG_ON(IOREQ_TYPE_PIO != HVMOP_IO_RANGE_PORT);
-        BUILD_BUG_ON(IOREQ_TYPE_COPY != HVMOP_IO_RANGE_MEMORY);
-        BUILD_BUG_ON(IOREQ_TYPE_PCI_CONFIG != HVMOP_IO_RANGE_PCI);
         r = s->range[type];
 
         switch ( type )
         {
             unsigned long end;
 
-        case IOREQ_TYPE_PIO:
+        case HVMOP_IO_RANGE_PORT:
             end = addr + p->size - 1;
             if ( rangeset_contains_range(r, addr, end) )
                 return s;
 
             break;
-        case IOREQ_TYPE_COPY:
+        case HVMOP_IO_RANGE_MEMORY:
             end = addr + (p->size * p->count) - 1;
             if ( rangeset_contains_range(r, addr, end) )
                 return s;
 
             break;
-        case IOREQ_TYPE_PCI_CONFIG:
+        case HVMOP_IO_RANGE_PCI:
             if ( rangeset_contains_singleton(r, addr >> 32) )
             {
-                p->type = type;
+                p->type = IOREQ_TYPE_PCI_CONFIG;
                 p->addr = addr;
                 return s;
             }
