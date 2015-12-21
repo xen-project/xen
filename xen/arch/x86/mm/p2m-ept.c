@@ -1089,9 +1089,10 @@ static void ept_memory_type_changed(struct p2m_domain *p2m)
 
 static void __ept_sync_domain(void *info)
 {
-    struct ept_data *ept = &((struct p2m_domain *)info)->ept;
-
-    __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(ept), 0);
+    /*
+     * The invalidation will be done before VMENTER (see
+     * vmx_vmenter_helper()).
+     */
 }
 
 void ept_sync_domain(struct p2m_domain *p2m)
@@ -1108,15 +1109,15 @@ void ept_sync_domain(struct p2m_domain *p2m)
         p2m_flush_nestedp2m(d);
 
     /*
-     * Flush active cpus synchronously. Flush others the next time this domain
-     * is scheduled onto them. We accept the race of other CPUs adding to
-     * the ept_synced mask before on_selected_cpus() reads it, resulting in
-     * unnecessary extra flushes, to avoid allocating a cpumask_t on the stack.
+     * Need to invalidate on all PCPUs because either:
+     *
+     * a) A VCPU has run and some translations may be cached.
+     * b) A VCPU has not run and and the initial invalidation in case
+     *    of an EP4TA reuse is still needed.
      */
-    cpumask_and(ept_get_synced_mask(ept),
-                d->domain_dirty_cpumask, &cpu_online_map);
+    cpumask_setall(ept->invalidate);
 
-    on_selected_cpus(ept_get_synced_mask(ept),
+    on_selected_cpus(d->domain_dirty_cpumask,
                      __ept_sync_domain, p2m, 1);
 }
 
@@ -1182,10 +1183,14 @@ int ept_p2m_init(struct p2m_domain *p2m)
         p2m->flush_hardware_cached_dirty = ept_flush_pml_buffers;
     }
 
-    if ( !zalloc_cpumask_var(&ept->synced_mask) )
+    if ( !zalloc_cpumask_var(&ept->invalidate) )
         return -ENOMEM;
 
-    on_each_cpu(__ept_sync_domain, p2m, 1);
+    /*
+     * Assume an initial invalidation is required, in case an EP4TA is
+     * reused.
+     */
+    cpumask_setall(ept->invalidate);
 
     return 0;
 }
@@ -1193,7 +1198,7 @@ int ept_p2m_init(struct p2m_domain *p2m)
 void ept_p2m_uninit(struct p2m_domain *p2m)
 {
     struct ept_data *ept = &p2m->ept;
-    free_cpumask_var(ept->synced_mask);
+    free_cpumask_var(ept->invalidate);
 }
 
 static void ept_dump_p2m_table(unsigned char key)

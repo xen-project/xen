@@ -67,7 +67,8 @@ struct ept_data {
         };
         u64 eptp;
     };
-    cpumask_var_t synced_mask;
+    /* Set of PCPUs needing an INVEPT before a VMENTER. */
+    cpumask_var_t invalidate;
 };
 
 #define _VMX_DOMAIN_PML_ENABLED    0
@@ -97,7 +98,6 @@ struct pi_desc {
 #define ept_get_wl(ept)   ((ept)->ept_wl)
 #define ept_get_asr(ept)  ((ept)->asr)
 #define ept_get_eptp(ept) ((ept)->eptp)
-#define ept_get_synced_mask(ept) ((ept)->synced_mask)
 
 #define NR_PML_ENTRIES   512
 

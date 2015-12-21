@@ -744,23 +744,11 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
 
 static void vmx_ctxt_switch_to(struct vcpu *v)
 {
-    struct domain *d = v->domain;
     unsigned long old_cr4 = read_cr4(), new_cr4 = mmu_cr4_features;
-    struct ept_data *ept_data = &p2m_get_hostp2m(d)->ept;
 
     /* HOST_CR4 in VMCS is always mmu_cr4_features. Sync CR4 now. */
     if ( old_cr4 != new_cr4 )
         write_cr4(new_cr4);
-
-    if ( paging_mode_hap(d) )
-    {
-        unsigned int cpu = smp_processor_id();
-        /* Test-and-test-and-set this CPU in the EPT-is-synced mask. */
-        if ( !cpumask_test_cpu(cpu, ept_get_synced_mask(ept_data)) &&
-             !cpumask_test_and_set_cpu(cpu,
-                                       ept_get_synced_mask(ept_data)) )
-            __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(ept_data), 0);
-    }
 
     vmx_restore_guest_msrs(v);
     vmx_restore_dr(v);
@@ -3589,6 +3577,18 @@ void vmx_vmenter_helper(const struct cpu_user_regs *regs)
 
     if ( unlikely(need_flush) )
         vpid_sync_all();
+
+    if ( paging_mode_hap(curr->domain) )
+    {
+        struct ept_data *ept = &p2m_get_hostp2m(curr->domain)->ept;
+        unsigned int cpu = smp_processor_id();
+
+        if ( cpumask_test_cpu(cpu, ept->invalidate) )
+        {
+            cpumask_clear_cpu(cpu, ept->invalidate);
+            __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(ept), 0);
+        }
+    }
 
  out:
     HVMTRACE_ND(VMENTRY, 0, 1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
