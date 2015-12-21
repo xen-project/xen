@@ -146,12 +146,15 @@ static void __init setup_xstate_comp(void)
     }
 }
 
-static void *get_xsave_addr(void *xsave, unsigned int xfeature_idx)
+static void *get_xsave_addr(struct xsave_struct *xsave,
+        unsigned int xfeature_idx)
 {
-    if ( !((1ul << xfeature_idx) & xfeature_mask) )
+    if ( !((1ul << xfeature_idx) & xsave->xsave_hdr.xstate_bv) )
         return NULL;
 
-    return xsave + xstate_comp_offsets[xfeature_idx];
+    return (void *)xsave + (xsave_area_compressed(xsave)
+            ? xstate_comp_offsets
+            : xstate_offsets)[xfeature_idx];
 }
 
 void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
