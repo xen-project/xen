@@ -110,4 +110,13 @@ extern int
 arch_compat_vcpu_op(
     int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg);
 
+extern int compat_mmuext_op(
+    XEN_GUEST_HANDLE_PARAM(void) arg,
+    unsigned int count,
+    XEN_GUEST_HANDLE_PARAM(uint) pdone,
+    unsigned int foreigndom);
+
+extern int compat_platform_op(
+    XEN_GUEST_HANDLE_PARAM(void) u_xenpf_op);
+
 #endif /* __ASM_X86_HYPERCALL_H__ */

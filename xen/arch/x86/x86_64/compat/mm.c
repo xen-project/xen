@@ -215,13 +215,15 @@ int compat_update_va_mapping_otherdomain(unsigned long va, u32 lo, u32 hi,
 
 DEFINE_XEN_GUEST_HANDLE(mmuext_op_compat_t);
 
-int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(mmuext_op_compat_t) cmp_uops,
+int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(void) arg,
                      unsigned int count,
                      XEN_GUEST_HANDLE_PARAM(uint) pdone,
                      unsigned int foreigndom)
 {
     unsigned int i, preempt_mask;
     int rc = 0;
+    XEN_GUEST_HANDLE_PARAM(mmuext_op_compat_t) cmp_uops =
+        guest_handle_cast(arg, mmuext_op_compat_t);
     XEN_GUEST_HANDLE_PARAM(mmuext_op_t) nat_ops;
 
     if ( unlikely(count == MMU_UPDATE_PREEMPTED) &&

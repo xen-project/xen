@@ -5173,6 +5173,9 @@ static hvm_hypercall_t *const hvm_hypercall64_table[NR_hypercalls] = {
     HYPERCALL(sysctl),
     HYPERCALL(domctl),
     HYPERCALL(tmem_op),
+    HYPERCALL(platform_op),
+    HYPERCALL(mmuext_op),
+    HYPERCALL(xenpmu_op),
     [ __HYPERVISOR_arch_1 ] = (hvm_hypercall_t *)paging_domctl_continuation
 };
 
@@ -5194,48 +5197,8 @@ static hvm_hypercall_t *const hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(sysctl),
     HYPERCALL(domctl),
     HYPERCALL(tmem_op),
-    [ __HYPERVISOR_arch_1 ] = (hvm_hypercall_t *)paging_domctl_continuation
-};
-
-static hvm_hypercall_t *const pvh_hypercall64_table[NR_hypercalls] = {
-    HYPERCALL(platform_op),
-    HYPERCALL(memory_op),
-    HYPERCALL(xen_version),
-    HYPERCALL(console_io),
-    [ __HYPERVISOR_grant_table_op ]  = (hvm_hypercall_t *)hvm_grant_table_op,
-    HYPERCALL(vcpu_op),
-    HYPERCALL(mmuext_op),
-    HYPERCALL(xsm_op),
-    HYPERCALL(sched_op),
-    HYPERCALL(event_channel_op),
-    [ __HYPERVISOR_physdev_op ]      = (hvm_hypercall_t *)hvm_physdev_op,
-    HYPERCALL(hvm_op),
-    HYPERCALL(sysctl),
-    HYPERCALL(domctl),
-    HYPERCALL(xenpmu_op),
-    [ __HYPERVISOR_arch_1 ] = (hvm_hypercall_t *)paging_domctl_continuation
-};
-
-extern int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(void) cmp_uops,
-                            unsigned int count,
-                            XEN_GUEST_HANDLE_PARAM(uint) pdone,
-                            unsigned int foreigndom);
-static hvm_hypercall_t *const pvh_hypercall32_table[NR_hypercalls] = {
-    HYPERCALL(platform_op),
-    COMPAT_CALL(memory_op),
-    HYPERCALL(xen_version),
-    HYPERCALL(console_io),
-    [ __HYPERVISOR_grant_table_op ]  =
-        (hvm_hypercall_t *)hvm_grant_table_op_compat32,
-    COMPAT_CALL(vcpu_op),
+    COMPAT_CALL(platform_op),
     COMPAT_CALL(mmuext_op),
-    HYPERCALL(xsm_op),
-    COMPAT_CALL(sched_op),
-    HYPERCALL(event_channel_op),
-    [ __HYPERVISOR_physdev_op ] = (hvm_hypercall_t *)hvm_physdev_op_compat32,
-    HYPERCALL(hvm_op),
-    HYPERCALL(sysctl),
-    HYPERCALL(domctl),
     HYPERCALL(xenpmu_op),
     [ __HYPERVISOR_arch_1 ] = (hvm_hypercall_t *)paging_domctl_continuation
 };
@@ -5269,9 +5232,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     if ( (eax & 0x80000000) && is_viridian_domain(currd) )
         return viridian_hypercall(regs);
 
-    if ( (eax >= NR_hypercalls) ||
-         !(is_pvh_domain(currd) ? pvh_hypercall32_table[eax]
-                                : hvm_hypercall32_table[eax]) )
+    if ( (eax >= NR_hypercalls) || !hvm_hypercall32_table[eax] )
     {
         regs->eax = -ENOSYS;
         return HVM_HCALL_completed;
@@ -5305,9 +5266,8 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 #endif
 
         curr->arch.hvm_vcpu.hcall_64bit = 1;
-        regs->rax = (is_pvh_domain(currd)
-                     ? pvh_hypercall64_table
-                     : hvm_hypercall64_table)[eax](rdi, rsi, rdx, r10, r8, r9);
+        regs->rax = hvm_hypercall64_table[eax](rdi, rsi, rdx, r10, r8, r9);
+
         curr->arch.hvm_vcpu.hcall_64bit = 0;
 
 #ifndef NDEBUG
@@ -5351,10 +5311,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         }
 #endif
 
-        regs->_eax = (is_pvh_vcpu(curr)
-                      ? pvh_hypercall32_table
-                      : hvm_hypercall32_table)[eax](ebx, ecx, edx,
-                                                    esi, edi, ebp);
+        regs->_eax = hvm_hypercall32_table[eax](ebx, ecx, edx, esi, edi, ebp);
 
 #ifndef NDEBUG
         if ( !curr->arch.hvm_vcpu.hcall_preempted )

@@ -3008,6 +3008,12 @@ long do_mmuext_op(
     if ( (pg_owner = get_pg_owner(foreigndom)) == NULL )
         return -ESRCH;
 
+    if ( !is_pv_domain(pg_owner) )
+    {
+        put_pg_owner(pg_owner);
+        return -EINVAL;
+    }
+
     rc = xsm_mmuext_op(XSM_TARGET, d, pg_owner);
     if ( rc )
     {
@@ -3028,6 +3034,23 @@ long do_mmuext_op(
             MEM_LOG("Bad __copy_from_guest");
             rc = -EFAULT;
             break;
+        }
+
+        if ( has_hvm_container_domain(d) )
+        {
+            switch ( op.cmd )
+            {
+            case MMUEXT_PIN_L1_TABLE:
+            case MMUEXT_PIN_L2_TABLE:
+            case MMUEXT_PIN_L3_TABLE:
+            case MMUEXT_PIN_L4_TABLE:
+            case MMUEXT_UNPIN_TABLE:
+                break;
+            default:
+                MEM_LOG("Invalid extended pt command %#x", op.cmd);
+                rc = -EOPNOTSUPP;
+                goto done;
+            }
         }
 
         okay = 1;
@@ -3459,6 +3482,7 @@ long do_mmuext_op(
             break;
         }
 
+ done:
         if ( unlikely(!okay) && !rc )
             rc = -EINVAL;
         if ( unlikely(rc) )
