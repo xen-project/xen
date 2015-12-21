@@ -1923,6 +1923,7 @@ unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v,bool_t restore)
         leaf1_edx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_VME)];
         leaf1_ecx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_PCID)];
         leaf7_0_ebx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_FSGSBASE)];
+        leaf7_0_ecx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_PKU)];
     }
 
     return ~(unsigned long)
@@ -1958,7 +1959,9 @@ unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v,bool_t restore)
              (leaf7_0_ebx & cpufeat_mask(X86_FEATURE_SMEP) ?
               X86_CR4_SMEP : 0) |
              (leaf7_0_ebx & cpufeat_mask(X86_FEATURE_SMAP) ?
-              X86_CR4_SMAP : 0));
+              X86_CR4_SMAP : 0) |
+              (leaf7_0_ecx & cpufeat_mask(X86_FEATURE_PKU) ?
+              X86_CR4_PKE : 0));
 }
 
 static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
