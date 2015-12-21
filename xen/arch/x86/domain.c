@@ -231,6 +231,7 @@ static unsigned int __init noinline _domain_struct_bits(void)
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
+    unsigned int order = get_order_from_bytes(sizeof(*d));
 #ifdef CONFIG_BIGMEM
     const unsigned int bits = 0;
 #else
@@ -244,10 +245,18 @@ struct domain *alloc_domain_struct(void)
          bits = _domain_struct_bits();
 #endif
 
+
+#ifndef LOCK_PROFILE
     BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);
-    d = alloc_xenheap_pages(0, MEMF_bits(bits));
+#endif
+    d = alloc_xenheap_pages(order, MEMF_bits(bits));
     if ( d != NULL )
-        clear_page(d);
+    {
+        unsigned int sz;
+
+        for ( sz = 0; sz < (PAGE_SIZE << order); sz += PAGE_SIZE )
+            clear_page((void *)d + sz);
+    }
     return d;
 }
 
