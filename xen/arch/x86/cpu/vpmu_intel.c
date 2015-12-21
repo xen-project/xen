@@ -366,7 +366,8 @@ static inline void __core2_vpmu_load(struct vcpu *v)
     }
 
     wrmsrl(MSR_CORE_PERF_FIXED_CTR_CTRL, core2_vpmu_cxt->fixed_ctrl);
-    wrmsrl(MSR_IA32_DS_AREA, core2_vpmu_cxt->ds_area);
+    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_DS) )
+        wrmsrl(MSR_IA32_DS_AREA, core2_vpmu_cxt->ds_area);
     wrmsrl(MSR_IA32_PEBS_ENABLE, core2_vpmu_cxt->pebs_enable);
 
     if ( !has_hvm_container_vcpu(v) )
@@ -415,8 +416,10 @@ static int core2_vpmu_verify(struct vcpu *v)
             enabled_cntrs |= (1ULL << i);
     }
 
-    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_DS) &&
-         !is_canonical_address(core2_vpmu_cxt->ds_area) )
+    if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_DS) &&
+         !(has_hvm_container_vcpu(v)
+           ? is_canonical_address(core2_vpmu_cxt->ds_area)
+           : __addr_ok(core2_vpmu_cxt->ds_area)) )
         return -EINVAL;
 
     if ( (core2_vpmu_cxt->global_ctrl & enabled_cntrs) ||
@@ -609,7 +612,9 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
     case MSR_IA32_DS_AREA:
         if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_DS) )
         {
-            if ( !is_canonical_address(msr_content) )
+            if ( !(has_hvm_container_vcpu(v)
+                   ? is_canonical_address(msr_content)
+                   : __addr_ok(msr_content)) )
             {
                 gdprintk(XENLOG_WARNING,
                          "Illegal address for IA32_DS_AREA: %#" PRIx64 "x\n",
