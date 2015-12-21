@@ -11,7 +11,7 @@
 
 #include <xen/const.h>
 
-#define NCAPINTS	8	/* N 32-bit words worth of info */
+#define NCAPINTS	9	/* N 32-bit words worth of info */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (edx), word 0 */
 #define X86_FEATURE_FPU		(0*32+ 0) /* Onboard FPU */
@@ -162,6 +162,10 @@
 #define X86_FEATURE_RDSEED	(7*32+18) /* RDSEED instruction */
 #define X86_FEATURE_ADX		(7*32+19) /* ADCX, ADOX instructions */
 #define X86_FEATURE_SMAP	(7*32+20) /* Supervisor Mode Access Prevention */
+
+/* Intel-defined CPU features, CPUID level 0x00000007:0 (ecx), word 8 */
+#define X86_FEATURE_PKU	(8*32+ 3) /* Protection Keys for Userspace */
+#define X86_FEATURE_OSPKE	(8*32+ 4) /* OS Protection Keys Enable */
 
 #define cpufeat_word(idx)	((idx) / 32)
 #define cpufeat_bit(idx)	((idx) % 32)

@@ -1188,6 +1188,16 @@ This option can be specified more than once (up to 8 times at present).
 ### ple\_window
 > `= <integer>`
 
+### pku
+> `= <boolean>`
+
+> Default: `true`
+
+Flag to enable Memory Protection Keys.
+
+The protection-key feature provides an additional mechanism by which IA-32e
+paging controls access to usermode addresses.
+
 ### psr (Intel)
 > `= List of ( cmt:<boolean> | rmid_max:<integer> | cat:<boolean> | cos_max:<integer> | cdp:<boolean> )`
 

@@ -22,6 +22,10 @@ boolean_param("xsave", use_xsave);
 bool_t opt_arat = 1;
 boolean_param("arat", opt_arat);
 
+/* pku: Flag to enable Memory Protection Keys (default on). */
+static bool_t opt_pku = 1;
+boolean_param("pku", opt_pku);
+
 unsigned int opt_cpuid_mask_ecx = ~0u;
 integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
 unsigned int opt_cpuid_mask_edx = ~0u;
@@ -270,7 +274,8 @@ static void generic_identify(struct cpuinfo_x86 *c)
 	if ( c->cpuid_level >= 0x00000007 )
 		cpuid_count(0x00000007, 0, &tmp,
 			    &c->x86_capability[cpufeat_word(X86_FEATURE_FSGSBASE)],
-			    &tmp, &tmp);
+			    &c->x86_capability[cpufeat_word(X86_FEATURE_PKU)],
+			    &tmp);
 }
 
 /*
@@ -322,6 +327,9 @@ void identify_cpu(struct cpuinfo_x86 *c)
 
 	if ( cpu_has_xsave )
 		xstate_init(c);
+
+   	if ( !opt_pku )
+		setup_clear_cpu_cap(X86_FEATURE_PKU);
 
 	/*
 	 * The vendor-specific functions might have changed features.  Now
