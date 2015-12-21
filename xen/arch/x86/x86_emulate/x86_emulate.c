@@ -1444,6 +1444,16 @@ static int inject_swint(enum x86_swint_type type,
     return ops->inject_hw_exception(fault_type, error_code, ctxt);
 }
 
+int x86emul_unhandleable_rw(
+    enum x86_segment seg,
+    unsigned long offset,
+    void *p_data,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
+{
+    return X86EMUL_UNHANDLEABLE;
+}
+
 int
 x86_emulate(
     struct x86_emulate_ctxt *ctxt,

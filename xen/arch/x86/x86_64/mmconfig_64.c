@@ -198,6 +198,16 @@ bool_t pci_mmcfg_decode(unsigned long mfn, unsigned int *seg,
     return 0;
 }
 
+bool_t pci_ro_mmcfg_decode(unsigned long mfn, unsigned int *seg,
+                           unsigned int *bdf)
+{
+    const unsigned long *ro_map;
+
+    return pci_mmcfg_decode(mfn, seg, bdf) &&
+           ((ro_map = pci_get_ro_map(*seg)) == NULL ||
+             !test_bit(*bdf, ro_map));
+}
+
 int __init pci_mmcfg_arch_init(void)
 {
     int i;

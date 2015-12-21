@@ -430,6 +430,9 @@ struct x86_emulate_ctxt
         } flags;
         uint8_t byte;
     } retire;
+
+    /* Caller data that can be used by x86_emulate_ops' routines. */
+    void *data;
 };
 
 struct x86_emulate_stub {
@@ -462,5 +465,14 @@ x86_emulate(
 void *
 decode_register(
     uint8_t modrm_reg, struct cpu_user_regs *regs, int highbyte_regs);
+
+/* Unhandleable read, write or instruction fetch */
+int
+x86emul_unhandleable_rw(
+    enum x86_segment seg,
+    unsigned long offset,
+    void *p_data,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt);
 
 #endif /* __X86_EMULATE_H__ */

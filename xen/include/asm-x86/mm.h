@@ -7,6 +7,7 @@
 #include <xen/spinlock.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <asm/x86_emulate.h>
 
 /*
  * Per-page-frame information.
@@ -488,6 +489,22 @@ void memguard_unguard_range(void *p, unsigned long l);
 
 void memguard_guard_stack(void *p);
 void memguard_unguard_stack(void *p);
+
+struct mmio_ro_emulate_ctxt {
+        unsigned long cr2;
+        unsigned int seg, bdf;
+};
+
+extern int mmio_ro_emulated_write(enum x86_segment seg,
+                                  unsigned long offset,
+                                  void *p_data,
+                                  unsigned int bytes,
+                                  struct x86_emulate_ctxt *ctxt);
+extern int mmcfg_intercept_write(enum x86_segment seg,
+                                 unsigned long offset,
+                                 void *p_data,
+                                 unsigned int bytes,
+                                 struct x86_emulate_ctxt *ctxt);
 
 int  ptwr_do_page_fault(struct vcpu *, unsigned long,
                         struct cpu_user_regs *);
