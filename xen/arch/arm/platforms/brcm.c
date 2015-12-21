@@ -162,7 +162,7 @@ static int brcm_cpu_power_on(int cpu)
 
     if ( timeout == 0 )
     {
-        dprintk(XENLOG_ERR, "CPU%d power enable failed", cpu);
+        dprintk(XENLOG_ERR, "CPU%d power enable failed\n", cpu);
         return -ETIMEDOUT;
     }
 

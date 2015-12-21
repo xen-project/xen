@@ -183,7 +183,7 @@ static int exynos5_cpu_power_up(void __iomem *power, int cpu)
 
         if ( timeout == 0 )
         {
-            dprintk(XENLOG_ERR, "CPU%d power enable failed", cpu);
+            dprintk(XENLOG_ERR, "CPU%d power enable failed\n", cpu);
             return -ETIMEDOUT;
         }
     }
