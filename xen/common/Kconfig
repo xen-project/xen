@@ -1,6 +1,13 @@
 
 menu "Common Features"
 
+config COMPAT
+	bool
+	help
+	  32-bit interface support on 64-bit Xen which is used for both
+	  HVM and PV guests. HVMLoader makes 32-bit hypercalls irrespective
+	  of the destination runmode of the guest.
+
 # Select HAS_DEVICE_TREE if device tree is supported
 config HAS_DEVICE_TREE
 	bool
