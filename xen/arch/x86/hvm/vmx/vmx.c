@@ -2738,7 +2738,10 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         .read_access = !!(qualification & EPT_READ_VIOLATION) ||
                        !!(qualification & EPT_WRITE_VIOLATION),
         .write_access = !!(qualification & EPT_WRITE_VIOLATION),
-        .insn_fetch = !!(qualification & EPT_EXEC_VIOLATION)
+        .insn_fetch = !!(qualification & EPT_EXEC_VIOLATION),
+        .present = !!(qualification & (EPT_EFFECTIVE_READ |
+                                       EPT_EFFECTIVE_WRITE |
+                                       EPT_EFFECTIVE_EXEC))
     };
 
     if ( tb_init_done )

@@ -1491,7 +1491,8 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     struct npfec npfec = {
         .read_access = !(pfec & PFEC_insn_fetch),
         .write_access = !!(pfec & PFEC_write_access),
-        .insn_fetch = !!(pfec & PFEC_insn_fetch)
+        .insn_fetch = !!(pfec & PFEC_insn_fetch),
+        .present = !!(pfec & PFEC_page_present),
     };
 
     /* These bits are mutually exclusive */

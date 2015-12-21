@@ -159,6 +159,7 @@ struct npfec {
     unsigned int read_access:1;
     unsigned int write_access:1;
     unsigned int insn_fetch:1;
+    unsigned int present:1;
     unsigned int gla_valid:1;
     unsigned int kind:2;  /* npfec_kind_t */
 };
