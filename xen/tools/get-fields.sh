@@ -130,9 +130,9 @@ handle_field ()
 		echo " \\"
 		if [ -z "$4" ]
 		then
-			echo -n "$1(_d_)->$3 = (_s_)->$3;"
+			printf %s "$1(_d_)->$3 = (_s_)->$3;"
 		else
-			echo -n "$1XLAT_${2}_HNDL_$(echo $3 | $SED 's,\.,_,g')(_d_, _s_);"
+			printf %s "$1XLAT_${2}_HNDL_$(echo $3 | $SED 's,\.,_,g')(_d_, _s_);"
 		fi
 	elif [ -z "$(echo "$5" | $SED 's,[^{}],,g')" ]
 	then
@@ -142,7 +142,7 @@ for line in sys.stdin.readlines():
     print re.subn(r"\s*(struct|union)\s+(compat_)?(\w+)\s.*", r"\3", line)[0].rstrip()
 ')
 		echo " \\"
-		echo -n "${1}XLAT_$tag(&(_d_)->$3, &(_s_)->$3);"
+		printf %s "${1}XLAT_$tag(&(_d_)->$3, &(_s_)->$3);"
 	else
 		local level=1 kind= fields= id= array= arrlvl=1 array_type= type= token
 		for token in $5
@@ -156,7 +156,7 @@ for line in sys.stdin.readlines():
 					if [ $kind = union ]
 					then
 						echo " \\"
-						echo -n "${1}switch ($(echo $3 | $SED 's,\.,_,g')) {"
+						printf %s "${1}switch ($(echo $3 | $SED 's,\.,_,g')) {"
 					fi
 				fi
 				;;
@@ -168,7 +168,7 @@ for line in sys.stdin.readlines():
 				if [ $level = 1 -a $kind = union ]
 				then
 					echo " \\"
-					echo -n "$1}"
+					printf %s "$1}"
 				fi
 				;;
 			"[")
@@ -223,7 +223,7 @@ for line in sys.stdin.readlines():
 					if [ $kind = union ]
 					then
 						echo " \\"
-						echo -n "${1}case XLAT_${2}_$(echo $3.$id | $SED 's,\.,_,g'):"
+						printf %s "${1}case XLAT_${2}_$(echo $3.$id | $SED 's,\.,_,g'):"
 						handle_field "$1    " $2 $3.$id "$type" "$fields"
 					elif [ -z "$array" -a -z "$array_type" ]
 					then
@@ -239,7 +239,7 @@ for line in sys.stdin.readlines():
 					if [ $kind = union ]
 					then
 						echo " \\"
-						echo -n "$1    break;"
+						printf %s "$1    break;"
 					fi
 				fi
 				;;
@@ -259,7 +259,7 @@ copy_array ()
 {
 	echo " \\"
 	echo "${1}if ((_d_)->$2 != (_s_)->$2) \\"
-	echo -n "$1    memcpy((_d_)->$2, (_s_)->$2, sizeof((_d_)->$2));"
+	printf %s "$1    memcpy((_d_)->$2, (_s_)->$2, sizeof((_d_)->$2));"
 }
 
 handle_array ()
@@ -268,7 +268,7 @@ handle_array ()
 	echo " \\"
 	echo "$1{ \\"
 	echo "$1    unsigned int $i; \\"
-	echo -n "$1    for ($i = 0; $i < "${4%%;*}"; ++$i) {"
+	printf %s "$1    for ($i = 0; $i < "${4%%;*}"; ++$i) {"
 	if [ "$4" = "${4#*;}" ]
 	then
 		handle_field "$1        " $2 $3[$i] "$5" "$6"
@@ -277,13 +277,13 @@ handle_array ()
 	fi
 	echo " \\"
 	echo "$1    } \\"
-	echo -n "$1}"
+	printf %s "$1}"
 }
 
 build_body ()
 {
 	echo
-	echo -n "#define XLAT_$1(_d_, _s_) do {"
+	printf %s "#define XLAT_$1(_d_, _s_) do {"
 	local level=1 fields= id= array= arrlvl=1 array_type= type= token
 	for token in $2
 	do
@@ -389,7 +389,7 @@ check_field ()
 				struct|union)
 					;;
 				[a-zA-Z_]*)
-					echo -n "    CHECK_${n#xen_}"
+					printf %s "    CHECK_${n#xen_}"
 					break
 					;;
 				*)
@@ -400,9 +400,9 @@ check_field ()
 			done
 		elif [ $n = 0 ]
 		then
-			echo -n "    CHECK_FIELD_($1, $2, $3)"
+			printf %s "    CHECK_FIELD_($1, $2, $3)"
 		else
-			echo -n "    CHECK_SUBFIELD_${n}_($1, $2, $(echo $3 | $SED 's!\.!, !g'))"
+			printf %s "    CHECK_SUBFIELD_${n}_($1, $2, $(echo $3 | $SED 's!\.!, !g'))"
 		fi
 	else
 		local level=1 fields= id= token
@@ -446,7 +446,7 @@ build_check ()
 			if [ $level = 1 ]
 			then
 				kind=$token
-				echo -n "    CHECK_SIZE_($kind, $1)"
+				printf %s "    CHECK_SIZE_($kind, $1)"
 			elif [ $level = 2 ]
 			then
 				fields=" "
