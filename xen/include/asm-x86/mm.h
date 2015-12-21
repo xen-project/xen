@@ -276,6 +276,7 @@ extern void share_xen_page_with_guest(
     struct page_info *page, struct domain *d, int readonly);
 extern void share_xen_page_with_privileged_guests(
     struct page_info *page, int readonly);
+extern void free_shared_domheap_page(struct page_info *page);
 
 #define frame_table ((struct page_info *)FRAMETABLE_VIRT_START)
 #define spage_table ((struct spage_info *)SPAGETABLE_VIRT_START)

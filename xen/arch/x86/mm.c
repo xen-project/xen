@@ -454,7 +454,7 @@ void share_xen_page_with_guest(
     /* Only add to the allocation list if the domain isn't dying. */
     if ( !d->is_dying )
     {
-        page->count_info |= PGC_allocated | 1;
+        page->count_info |= PGC_xen_heap | PGC_allocated | 1;
         if ( unlikely(d->xenheap_pages++ == 0) )
             get_knownalive_domain(d);
         page_list_add_tail(page, &d->xenpage_list);
@@ -467,6 +467,17 @@ void share_xen_page_with_privileged_guests(
     struct page_info *page, int readonly)
 {
     share_xen_page_with_guest(page, dom_xen, readonly);
+}
+
+void free_shared_domheap_page(struct page_info *page)
+{
+    if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+        put_page(page);
+    if ( !test_and_clear_bit(_PGC_xen_heap, &page->count_info) )
+        ASSERT_UNREACHABLE();
+    page->u.inuse.type_info = 0;
+    page_set_owner(page, NULL);
+    free_domheap_page(page);
 }
 
 void make_cr3(struct vcpu *v, unsigned long mfn)

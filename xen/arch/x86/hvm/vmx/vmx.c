@@ -2489,18 +2489,21 @@ gp_fault:
 
 static int vmx_alloc_vlapic_mapping(struct domain *d)
 {
-    void *apic_va;
+    struct page_info *pg;
+    unsigned long mfn;
 
     if ( !cpu_has_vmx_virtualize_apic_accesses )
         return 0;
 
-    apic_va = alloc_xenheap_page();
-    if ( apic_va == NULL )
+    pg = alloc_domheap_page(d, MEMF_no_owner);
+    if ( !pg )
         return -ENOMEM;
-    share_xen_page_with_guest(virt_to_page(apic_va), d, XENSHARE_writable);
-    d->arch.hvm_domain.vmx.apic_access_mfn = virt_to_mfn(apic_va);
-    set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE),
-        _mfn(virt_to_mfn(apic_va)), p2m_get_hostp2m(d)->default_access);
+    mfn = page_to_mfn(pg);
+    clear_domain_page(_mfn(mfn));
+    share_xen_page_with_guest(pg, d, XENSHARE_writable);
+    d->arch.hvm_domain.vmx.apic_access_mfn = mfn;
+    set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE), _mfn(mfn),
+                       p2m_get_hostp2m(d)->default_access);
 
     return 0;
 }
@@ -2508,8 +2511,9 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
 static void vmx_free_vlapic_mapping(struct domain *d)
 {
     unsigned long mfn = d->arch.hvm_domain.vmx.apic_access_mfn;
+
     if ( mfn != 0 )
-        free_xenheap_page(mfn_to_virt(mfn));
+        free_shared_domheap_page(mfn_to_page(mfn));
 }
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)
