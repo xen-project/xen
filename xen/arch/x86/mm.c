@@ -2974,7 +2974,7 @@ long do_mmuext_op(
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     struct domain *pg_owner;
-    int okay, rc = put_old_guest_table(curr);
+    int rc = put_old_guest_table(curr);
 
     if ( unlikely(rc) )
     {
@@ -3053,7 +3053,7 @@ long do_mmuext_op(
             }
         }
 
-        okay = 1;
+        rc = 0;
 
         switch ( op.cmd )
         {
@@ -3087,33 +3087,32 @@ long do_mmuext_op(
             page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL, P2M_ALLOC);
             if ( unlikely(!page) )
             {
-                okay = 0;
+                rc = -EINVAL;
                 break;
             }
 
             rc = get_page_type_preemptible(page, type);
-            okay = !rc;
-            if ( unlikely(!okay) )
+            if ( unlikely(rc) )
             {
                 if ( rc == -EINTR )
                     rc = -ERESTART;
                 else if ( rc != -ERESTART )
-                    MEM_LOG("Error while pinning mfn %lx", page_to_mfn(page));
+                    MEM_LOG("Error %d while pinning mfn %lx",
+                            rc, page_to_mfn(page));
                 if ( page != curr->arch.old_guest_table )
                     put_page(page);
                 break;
             }
 
-            if ( (rc = xsm_memory_pin_page(XSM_HOOK, d, pg_owner, page)) != 0 )
-                okay = 0;
-            else if ( unlikely(test_and_set_bit(_PGT_pinned,
-                                                &page->u.inuse.type_info)) )
+            rc = xsm_memory_pin_page(XSM_HOOK, d, pg_owner, page);
+            if ( !rc && unlikely(test_and_set_bit(_PGT_pinned,
+                                                  &page->u.inuse.type_info)) )
             {
                 MEM_LOG("Mfn %lx already pinned", page_to_mfn(page));
-                okay = 0;
+                rc = -EINVAL;
             }
 
-            if ( unlikely(!okay) )
+            if ( unlikely(rc) )
                 goto pin_drop;
 
             /* A page is dirtied when its pin status is set. */
@@ -3150,16 +3149,16 @@ long do_mmuext_op(
             page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL, P2M_ALLOC);
             if ( unlikely(!page) )
             {
-                okay = 0;
                 MEM_LOG("Mfn %lx bad domain", op.arg1.mfn);
+                rc = -EINVAL;
                 break;
             }
 
             if ( !test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
             {
-                okay = 0;
                 put_page(page);
                 MEM_LOG("Mfn %lx not pinned", op.arg1.mfn);
+                rc = -EINVAL;
                 break;
             }
 
@@ -3212,20 +3211,18 @@ long do_mmuext_op(
             if ( op.arg1.mfn != 0 )
             {
                 if ( paging_mode_refcounts(d) )
-                    okay = get_page_from_pagenr(op.arg1.mfn, d);
+                    rc = get_page_from_pagenr(op.arg1.mfn, d) ? 0 : -EINVAL;
                 else
-                {
                     rc = get_page_and_type_from_pagenr(
                         op.arg1.mfn, PGT_root_page_table, d, 0, 1);
-                    okay = !rc;
-                }
-                if ( unlikely(!okay) )
+
+                if ( unlikely(rc) )
                 {
                     if ( rc == -EINTR )
                         rc = -ERESTART;
                     else if ( rc != -ERESTART )
-                        MEM_LOG("Error while installing new mfn %lx",
-                                op.arg1.mfn);
+                        MEM_LOG("Error %d while installing new mfn %lx",
+                                rc, op.arg1.mfn);
                     break;
                 }
                 if ( VM_ASSIST(d, m2p_strict) && !paging_mode_refcounts(d) )
@@ -3248,7 +3245,6 @@ long do_mmuext_op(
                         /* fallthrough */
                     case -ERESTART:
                         curr->arch.old_guest_table = page;
-                        okay = 0;
                         break;
                     default:
                         BUG_ON(rc);
@@ -3258,14 +3254,14 @@ long do_mmuext_op(
 
             break;
         }
-        
+
         case MMUEXT_TLB_FLUSH_LOCAL:
             if ( likely(d == pg_owner) )
                 flush_tlb_local();
             else
                 rc = -EPERM;
             break;
-    
+
         case MMUEXT_INVLPG_LOCAL:
             if ( unlikely(d != pg_owner) )
                 rc = -EPERM;
@@ -3342,7 +3338,7 @@ long do_mmuext_op(
             else
             {
                 MEM_LOG("Non-physdev domain tried to FLUSH_CACHE_GLOBAL");
-                okay = 0;
+                rc = -EINVAL;
             }
             break;
 
@@ -3356,13 +3352,13 @@ long do_mmuext_op(
             else if ( paging_mode_external(d) )
             {
                 MEM_LOG("ignoring SET_LDT hypercall from external domain");
-                okay = 0;
+                rc = -EINVAL;
             }
             else if ( ((ptr & (PAGE_SIZE - 1)) != 0) || !__addr_ok(ptr) ||
                       (ents > 8192) )
             {
-                okay = 0;
                 MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%lx", ptr, ents);
+                rc = -EINVAL;
             }
             else if ( (curr->arch.pv_vcpu.ldt_ents != ents) ||
                       (curr->arch.pv_vcpu.ldt_base != ptr) )
@@ -3385,7 +3381,7 @@ long do_mmuext_op(
                 if ( page )
                     put_page(page);
                 MEM_LOG("Error while clearing mfn %lx", op.arg1.mfn);
-                okay = 0;
+                rc = -EINVAL;
                 break;
             }
 
@@ -3406,15 +3402,16 @@ long do_mmuext_op(
                                          P2M_ALLOC);
             if ( unlikely(!src_page) )
             {
-                okay = 0;
                 MEM_LOG("Error while copying from mfn %lx", op.arg2.src_mfn);
+                rc = -EINVAL;
                 break;
             }
 
             dst_page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL,
                                          P2M_ALLOC);
-            okay = (dst_page && get_page_type(dst_page, PGT_writable_page));
-            if ( unlikely(!okay) )
+            rc = (dst_page &&
+                  get_page_type(dst_page, PGT_writable_page)) ? 0 : -EINVAL;
+            if ( unlikely(rc) )
             {
                 put_page(src_page);
                 if ( dst_page )
@@ -3443,7 +3440,7 @@ long do_mmuext_op(
             else if ( mfn & (L1_PAGETABLE_ENTRIES-1) )
             {
                 MEM_LOG("Unaligned superpage reference mfn %lx", mfn);
-                okay = 0;
+                rc = -EINVAL;
             }
             else if ( !opt_allow_superpage )
             {
@@ -3464,7 +3461,7 @@ long do_mmuext_op(
             else if ( mfn & (L1_PAGETABLE_ENTRIES-1) )
             {
                 MEM_LOG("Unaligned superpage reference mfn %lx", mfn);
-                okay = 0;
+                rc = -EINVAL;
             }
             else if ( !opt_allow_superpage )
             {
@@ -3483,8 +3480,6 @@ long do_mmuext_op(
         }
 
  done:
-        if ( unlikely(!okay) && !rc )
-            rc = -EINVAL;
         if ( unlikely(rc) )
             break;
 
