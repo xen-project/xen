@@ -3216,6 +3216,9 @@ struct libxl__colo_save_state {
     /* private, used by qdisk block replication */
     bool qdisk_used;
     bool qdisk_setuped;
+
+    /* private, used by colo-proxy */
+    libxl__colo_proxy_state cps;
 };
 
 typedef struct libxl__logdirty_switch {
