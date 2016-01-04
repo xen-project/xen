@@ -266,9 +266,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.9.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= a82794b1d5a6da06062a333b1db404e2448345dd
-# Fri Nov 20 10:56:00 2015 -0500
-# blkif: Avoid double access to src->nr_segments
+QEMU_TRADITIONAL_REVISION ?= 569eac99e8ddccd15fe78e8a3af5622afe780e3b
+# Mon Jan 4 15:34:29 2016 +0000
+# MSI-X: avoid array overrun upon MSI-X table writes
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
