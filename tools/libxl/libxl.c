@@ -649,31 +649,30 @@ static void xcinfo2xlinfo(libxl_ctx *ctx,
 
 libxl_dominfo * libxl_list_domain(libxl_ctx *ctx, int *nb_domain_out)
 {
-    libxl_dominfo *ptr;
+    libxl_dominfo *ptr = NULL;
     int i, ret;
     xc_domaininfo_t info[1024];
-    int size = 1024;
+    int size = 0;
+    uint32_t domid = 0;
     GC_INIT(ctx);
 
-    ptr = calloc(size, sizeof(libxl_dominfo));
-    if (!ptr) {
-        LOGE(ERROR, "allocating domain info");
-        GC_FREE;
-        return NULL;
+    while ((ret = xc_domain_getinfolist(ctx->xch, domid, 1024, info)) > 0) {
+        ptr = libxl__realloc(NOGC, ptr, (size + ret) * sizeof(libxl_dominfo));
+        for (i = 0; i < ret; i++) {
+            xcinfo2xlinfo(ctx, &info[i], &ptr[size + i]);
+        }
+        domid = info[ret - 1].domain + 1;
+        size += ret;
     }
 
-    ret = xc_domain_getinfolist(ctx->xch, 0, 1024, info);
-    if (ret<0) {
+    if (ret < 0) {
         LOGE(ERROR, "getting domain info list");
         free(ptr);
         GC_FREE;
         return NULL;
     }
 
-    for (i = 0; i < ret; i++) {
-        xcinfo2xlinfo(ctx, &info[i], &ptr[i]);
-    }
-    *nb_domain_out = ret;
+    *nb_domain_out = size;
     GC_FREE;
     return ptr;
 }
