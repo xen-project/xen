@@ -246,9 +246,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= c51f20baba0bc01e7e3a3a16e72be9a0ed6cb734
-# Fri Nov 20 10:56:00 2015 -0500
-# blkif: Avoid double access to src->nr_segments
+QEMU_TAG ?= 2bbe49494f5e910c6fb49f6800d143cae9eb5758
+# Mon Jan 4 15:34:29 2016 +0000
+# MSI-X: avoid array overrun upon MSI-X table writes
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
