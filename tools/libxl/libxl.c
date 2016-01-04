@@ -799,32 +799,31 @@ out:
 libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm_out)
 {
     GC_INIT(ctx);
+    libxl_dominfo *info;
     libxl_vminfo *ptr = NULL;
-    int idx, i, ret;
-    xc_domaininfo_t info[1024];
+    int idx, i, n_doms;
 
-    ret = xc_domain_getinfolist(ctx->xch, 1, ARRAY_SIZE(info), info);
-    if (ret < 0) {
-        LOGE(ERROR, "getting domain info list");
+    info = libxl_list_domain(ctx, &n_doms);
+    if (!info)
         goto out;
-    }
 
     /*
      * Always make sure to allocate at least one element; if we don't and we
      * request zero, libxl__calloc (might) think its internal call to calloc
      * has failed (if it returns null), if so it would kill our process.
      */
-    ptr = libxl__calloc(NOGC, ret ? ret : 1, sizeof(libxl_vminfo));
+    ptr = libxl__calloc(NOGC, n_doms ? n_doms : 1, sizeof(libxl_vminfo));
 
-    for (idx = i = 0; i < ret; i++) {
-        if (libxl_is_stubdom(ctx, info[i].domain, NULL))
+    for (idx = i = 0; i < n_doms; i++) {
+        if (libxl_is_stubdom(ctx, info[i].domid, NULL))
             continue;
-        memcpy(&(ptr[idx].uuid), info[i].handle, sizeof(xen_domain_handle_t));
-        ptr[idx].domid = info[i].domain;
+        ptr[idx].uuid = info[i].uuid;
+        ptr[idx].domid = info[i].domid;
 
         idx++;
     }
     *nb_vm_out = idx;
+    libxl_dominfo_list_free(info, n_doms);
 
 out:
     GC_FREE;
