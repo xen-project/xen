@@ -179,9 +179,9 @@ typedef struct libxl__evgen_domain_death libxl_evgen_domain_death;
 int libxl_evenable_domain_death(libxl_ctx *ctx, uint32_t domid,
                          libxl_ev_user, libxl_evgen_domain_death **evgen_out);
 void libxl_evdisable_domain_death(libxl_ctx *ctx, libxl_evgen_domain_death*);
-  /* Arranges for the generation of DOMAIN_SHUTDOWN and DOMAIN_DESTROY
+  /* Arranges for the generation of DOMAIN_SHUTDOWN and DOMAIN_DEATH
    * events.  A domain which is destroyed before it shuts down
-   * may generate only a DESTROY event.
+   * may generate only a DEATH event.
    */
 
 typedef struct libxl__evgen_disk_eject libxl_evgen_disk_eject;
