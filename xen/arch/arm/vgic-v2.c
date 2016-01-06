@@ -494,11 +494,10 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         return 0;
 
     case VRANGE32(GICD_ICACTIVER, GICD_ICACTIVERN):
-        if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: vGICD: unhandled word write %#"PRIregister" to ICACTIVER%d\n",
                v, r, gicd_reg - GICD_ICACTIVER);
-        return 0;
+        goto write_ignore_32;
 
     case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
     {
