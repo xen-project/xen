@@ -676,8 +676,7 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
 
         if ( dom->cmdline )
         {
-            strncpy(cmdline, dom->cmdline, MAX_GUEST_CMDLINE);
-            cmdline[MAX_GUEST_CMDLINE - 1] = '\0';
+            strncpy(cmdline, dom->cmdline, cmdline_size);
             start_info->cmdline_paddr = (seg.pfn << PAGE_SHIFT) +
                                 ((uintptr_t)cmdline - (uintptr_t)start_info);
         }
