@@ -4,8 +4,7 @@ subdir-y += genapic
 subdir-y += hvm
 subdir-y += mm
 subdir-y += oprofile
-
-subdir-$(x86_64) += x86_64
+subdir-y += x86_64
 
 obj-bin-y += alternative.init.o
 obj-y += apic.o
@@ -67,8 +66,8 @@ obj-$(crash_debug) += gdbstub.o
 
 x86_emulate.o: x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h
 
-efi-$(x86_64) := $(shell if [ ! -r $(BASEDIR)/include/xen/compile.h -o \
-                                -O $(BASEDIR)/include/xen/compile.h ]; then \
+efi-y := $(shell if [ ! -r $(BASEDIR)/include/xen/compile.h -o \
+                      -O $(BASEDIR)/include/xen/compile.h ]; then \
                          echo '$(TARGET).efi'; fi)
 
 $(TARGET): $(TARGET)-syms $(efi-y) boot/mkelf32

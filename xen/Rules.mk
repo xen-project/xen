@@ -45,7 +45,7 @@ ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/drivers/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/xsm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
-ALL_OBJS-$(x86)          += $(BASEDIR)/crypto/built_in.o
+ALL_OBJS-$(CONFIG_X86)   += $(BASEDIR)/crypto/built_in.o
 
 CFLAGS += -nostdinc -fno-builtin -fno-common
 CFLAGS += -Werror -Wredundant-decls -Wno-pointer-arith

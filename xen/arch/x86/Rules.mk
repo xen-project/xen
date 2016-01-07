@@ -22,10 +22,6 @@ $(call as-insn-check,CFLAGS,CC,".equ \"x\"$$(comma)1", \
                      -U__OBJECT_LABEL__ -DHAVE_GAS_QUOTED_SYM \
                      '-D__OBJECT_LABEL__=$(subst $(BASEDIR)/,,$(CURDIR))/$$@')
 
-x86 := y
-x86_32 := n
-x86_64 := y
-
 shadow-paging ?= y
 bigmem        ?= n
 

@@ -65,7 +65,7 @@ obj-$(xenoprof)    += xenoprof.o
 
 obj-$(CONFIG_COMPAT) += $(addprefix compat/,domain.o kernel.o memory.o multicall.o tmem_xen.o xlat.o)
 
-subdir-$(x86_64) += hvm
+subdir-$(CONFIG_X86) += hvm
 
 subdir-$(coverage) += gcov
 
