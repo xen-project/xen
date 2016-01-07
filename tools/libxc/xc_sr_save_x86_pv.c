@@ -68,6 +68,50 @@ static int copy_mfns_from_guest(const struct xc_sr_context *ctx,
 }
 
 /*
+ * Map the p2m leave pages and build an array of their pfns.
+ */
+static int map_p2m_leaves(struct xc_sr_context *ctx, xen_pfn_t *mfns,
+                          size_t n_mfns)
+{
+    xc_interface *xch = ctx->xch;
+    unsigned x;
+
+    ctx->x86_pv.p2m = xc_map_foreign_pages(xch, ctx->domid, PROT_READ,
+                                           mfns, n_mfns);
+    if ( !ctx->x86_pv.p2m )
+    {
+        PERROR("Failed to map p2m frames");
+        return -1;
+    }
+
+    ctx->save.p2m_size = ctx->x86_pv.max_pfn + 1;
+    ctx->x86_pv.p2m_frames = n_mfns;
+    ctx->x86_pv.p2m_pfns = malloc(n_mfns * sizeof(*mfns));
+    if ( !ctx->x86_pv.p2m_pfns )
+    {
+        ERROR("Cannot allocate %zu bytes for p2m pfns list",
+              n_mfns * sizeof(*mfns));
+        return -1;
+    }
+
+    /* Convert leaf frames from mfns to pfns. */
+    for ( x = 0; x < n_mfns; ++x )
+    {
+        if ( !mfn_in_pseudophysmap(ctx, mfns[x]) )
+        {
+            ERROR("Bad mfn in p2m_frame_list[%u]", x);
+            dump_bad_pseudophysmap_entry(ctx, mfns[x]);
+            errno = ERANGE;
+            return -1;
+        }
+
+        ctx->x86_pv.p2m_pfns[x] = mfn_to_pfn(ctx, mfns[x]);
+    }
+
+    return 0;
+}
+
+/*
  * Walk the guests frame list list and frame list to identify and map the
  * frames making up the guests p2m table.  Construct a list of pfns making up
  * the table.
@@ -173,7 +217,6 @@ static int map_p2m(struct xc_sr_context *ctx)
     ctx->x86_pv.p2m_frames = (ctx->x86_pv.max_pfn + fpp) / fpp;
     DPRINTF("max_pfn %#lx, p2m_frames %d", ctx->x86_pv.max_pfn,
             ctx->x86_pv.p2m_frames);
-    ctx->save.p2m_size = ctx->x86_pv.max_pfn + 1;
     fl_entries  = (ctx->x86_pv.max_pfn / fpp) + 1;
 
     /* Map the guest mid p2m frames. */
@@ -211,38 +254,8 @@ static int map_p2m(struct xc_sr_context *ctx)
     }
 
     /* Map the p2m leaves themselves. */
-    ctx->x86_pv.p2m = xc_map_foreign_pages(xch, ctx->domid, PROT_READ,
-                                           local_fl, fl_entries);
-    if ( !ctx->x86_pv.p2m )
-    {
-        PERROR("Failed to map p2m frames");
-        goto err;
-    }
+    rc = map_p2m_leaves(ctx, local_fl, fl_entries);
 
-    ctx->x86_pv.p2m_frames = fl_entries;
-    ctx->x86_pv.p2m_pfns = malloc(local_fl_size);
-    if ( !ctx->x86_pv.p2m_pfns )
-    {
-        ERROR("Cannot allocate %zu bytes for p2m pfns list",
-              local_fl_size);
-        goto err;
-    }
-
-    /* Convert leaf frames from mfns to pfns. */
-    for ( x = 0; x < fl_entries; ++x )
-    {
-        if ( !mfn_in_pseudophysmap(ctx, local_fl[x]) )
-        {
-            ERROR("Bad mfn in p2m_frame_list[%u]", x);
-            dump_bad_pseudophysmap_entry(ctx, local_fl[x]);
-            errno = ERANGE;
-            goto err;
-        }
-
-        ctx->x86_pv.p2m_pfns[x] = mfn_to_pfn(ctx, local_fl[x]);
-    }
-
-    rc = 0;
 err:
 
     free(local_fl);
