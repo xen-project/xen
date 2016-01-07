@@ -268,7 +268,7 @@ int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
     else if ( sleep->val_b &&
               ((sleep->val_a ^ sleep->val_b) & ACPI_BITMASK_SLEEP_ENABLE) )
     {
-        gdprintk(XENLOG_ERR, "Mismatched pm1a/pm1b setting.");
+        gdprintk(XENLOG_ERR, "Mismatched pm1a/pm1b setting\n");
         return -EINVAL;
     }
 

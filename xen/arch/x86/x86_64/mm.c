@@ -1366,8 +1366,9 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
 
     if ( !valid_numa_range(spfn << PAGE_SHIFT, epfn << PAGE_SHIFT, node) )
     {
-        dprintk(XENLOG_WARNING, "spfn %lx ~ epfn %lx pxm %x node %x"
-            "is not numa valid", spfn, epfn, pxm, node);
+        printk(XENLOG_WARNING
+               "pfn range %lx..%lx PXM %x node %x is not NUMA-valid\n",
+               spfn, epfn, pxm, node);
         return -EINVAL;
     }
 

@@ -2310,13 +2310,14 @@ int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
     return 0;
 }
 
-#define WARN_BOGUS_WRITE(f, a...)                                       \
-    dprintk(XENLOG_INFO, "\n%s: "                                        \
-            "apic=%d, pin=%d, irq=%d\n"                 \
-            "%s: new_entry=%08x\n"                      \
-            "%s: " f, __FUNCTION__, apic, pin, irq,        \
-            __FUNCTION__, *(u32 *)&rte,           \
-            __FUNCTION__ , ##a )
+#define WARN_BOGUS_WRITE(f, a...)                       \
+    dprintk(XENLOG_INFO, "\n"                           \
+            XENLOG_INFO "%s: apic=%d, pin=%d, irq=%d\n" \
+            XENLOG_INFO "%s: new_entry=%08x\n"          \
+            XENLOG_INFO "%s: " f "\n",                  \
+            __func__, apic, pin, irq,                   \
+            __func__, *(u32 *)&rte,                     \
+            __func__, ##a )
 
 int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 {
@@ -2388,7 +2389,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         rte.vector = desc->arch.vector;
         if ( *(u32*)&rte != ret )
             WARN_BOGUS_WRITE("old_entry=%08x pirq=%d\n%s: "
-                             "Attempt to modify IO-APIC pin for in-use IRQ!\n",
+                             "Attempt to modify IO-APIC pin for in-use IRQ!",
                              ret, pirq, __FUNCTION__);
         return 0;
     }
