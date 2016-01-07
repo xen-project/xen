@@ -1,5 +1,5 @@
 % Migration
-% Revision 1
+% Revision 2
 
 \clearpage
 
@@ -95,7 +95,6 @@ scenarios, which will involve starting with VMs from Xen 4.5
 # Areas for improvement
 
 * Arm support
-* Linear P2M support for x86 PV
 * Live looping parameters
 
 # Known issues
@@ -105,7 +104,8 @@ scenarios, which will involve starting with VMs from Xen 4.5
 * x86 HVM with nested-virt (no relevant information included in the
   stream)
 * x86 PV ballooning (P2M marked dirty, target frame not marked)
-* x86 PV P2M structure changes (not noticed, stale mappings used)
+* x86 PV P2M structure changes (not noticed, stale mappings used) for
+  guests not using the linear p2m layout
 
 # References
 
@@ -120,4 +120,5 @@ for Migration v2
 Date       Revision Version  Notes
 ---------- -------- -------- -------------------------------------------
 2015-10-24 1        Xen 4.6  Document written
+2015-12-11 2        Xen 4.7  Support of linear p2m list
 ---------- -------- -------- -------------------------------------------

@@ -59,7 +59,7 @@ int xc_linux_build(xc_interface *xch, uint32_t domid,
          ((rc = xc_dom_ramdisk_file(dom, initrd_name)) != 0) )
         goto out;
 
-    dom->flags = flags;
+    dom->flags |= flags;
     dom->console_evtchn = console_evtchn;
     dom->xenstore_evtchn = store_evtchn;
 

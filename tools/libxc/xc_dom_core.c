@@ -777,6 +777,8 @@ struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
     dom->parms.elf_paddr_offset = UNSET_ADDR;
     dom->parms.p2m_base = UNSET_ADDR;
 
+    dom->flags = SIF_VIRT_P2M_4TOOLS;
+
     dom->alloc_malloc += sizeof(*dom);
     return dom;
 
