@@ -3,6 +3,13 @@
 
 #include "xc_sr_common_x86.h"
 
+/* Virtual address ranges reserved for hypervisor. */
+#define HYPERVISOR_VIRT_START_X86_64 0xFFFF800000000000ULL
+#define HYPERVISOR_VIRT_END_X86_64   0xFFFF87FFFFFFFFFFULL
+
+#define HYPERVISOR_VIRT_START_X86_32 0x00000000F5800000ULL
+#define HYPERVISOR_VIRT_END_X86_32   0x00000000FFFFFFFFULL
+
 /*
  * Convert an mfn to a pfn, given Xen's m2p table.
  *

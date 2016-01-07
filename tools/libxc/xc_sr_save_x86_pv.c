@@ -3,6 +3,12 @@
 
 #include "xc_sr_common_x86_pv.h"
 
+/* Check a 64 bit virtual address for being canonical. */
+static inline bool is_canonical_address(xen_vaddr_t vaddr)
+{
+    return ((int64_t)vaddr >> 47) == ((int64_t)vaddr >> 63);
+}
+
 /*
  * Maps the guests shared info page.
  */
@@ -116,7 +122,7 @@ static int map_p2m_leaves(struct xc_sr_context *ctx, xen_pfn_t *mfns,
  * frames making up the guests p2m table.  Construct a list of pfns making up
  * the table.
  */
-static int map_p2m(struct xc_sr_context *ctx)
+static int map_p2m_tree(struct xc_sr_context *ctx)
 {
     /* Terminology:
      *
@@ -138,8 +144,6 @@ static int map_p2m(struct xc_sr_context *ctx)
     void *guest_fl = NULL;
     size_t local_fl_size;
 
-    ctx->x86_pv.max_pfn = GET_FIELD(ctx->x86_pv.shinfo, arch.max_pfn,
-                                    ctx->x86_pv.width) - 1;
     fpp = PAGE_SIZE / ctx->x86_pv.width;
     fll_entries = (ctx->x86_pv.max_pfn / (fpp * fpp)) + 1;
     if ( fll_entries > fpp )
@@ -267,6 +271,170 @@ err:
         munmap(guest_fll, PAGE_SIZE);
 
     return rc;
+}
+
+/*
+ * Map the guest p2m frames specified via a cr3 value, a virtual address, and
+ * the maximum pfn. PTE entries are 64 bits for both, 32 and 64 bit guests as
+ * in 32 bit case we support PAE guests only.
+ */
+static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
+{
+    xc_interface *xch = ctx->xch;
+    xen_vaddr_t p2m_vaddr, p2m_end, mask, off;
+    xen_pfn_t p2m_mfn, mfn, saved_mfn, max_pfn;
+    uint64_t *ptes;
+    xen_pfn_t *mfns;
+    unsigned fpp, n_pages, level, shift, idx_start, idx_end, idx, saved_idx;
+    int rc = -1;
+
+    p2m_mfn = cr3_to_mfn(ctx, p2m_cr3);
+    assert(p2m_mfn != 0);
+    if ( p2m_mfn > ctx->x86_pv.max_mfn )
+    {
+        ERROR("Bad p2m_cr3 value %#" PRIx64, p2m_cr3);
+        errno = ERANGE;
+        return -1;
+    }
+
+    p2m_vaddr = GET_FIELD(ctx->x86_pv.shinfo, arch.p2m_vaddr,
+                          ctx->x86_pv.width);
+    fpp = PAGE_SIZE / ctx->x86_pv.width;
+    ctx->x86_pv.p2m_frames = ctx->x86_pv.max_pfn / fpp + 1;
+    p2m_end = p2m_vaddr + ctx->x86_pv.p2m_frames * PAGE_SIZE - 1;
+
+    if ( ctx->x86_pv.width == 8 )
+    {
+        mask = 0x0000ffffffffffffULL;
+        if ( !is_canonical_address(p2m_vaddr) ||
+             !is_canonical_address(p2m_end) ||
+             p2m_end < p2m_vaddr ||
+             (p2m_vaddr <= HYPERVISOR_VIRT_END_X86_64 &&
+              p2m_end > HYPERVISOR_VIRT_START_X86_64) )
+        {
+            ERROR("Bad virtual p2m address range %#" PRIx64 "-%#" PRIx64,
+                  p2m_vaddr, p2m_end);
+            errno = ERANGE;
+            return -1;
+        }
+    }
+    else
+    {
+        mask = 0x00000000ffffffffULL;
+        if ( p2m_vaddr > mask || p2m_end > mask || p2m_end < p2m_vaddr ||
+             (p2m_vaddr <= HYPERVISOR_VIRT_END_X86_32 &&
+              p2m_end > HYPERVISOR_VIRT_START_X86_32) )
+        {
+            ERROR("Bad virtual p2m address range %#" PRIx64 "-%#" PRIx64,
+                  p2m_vaddr, p2m_end);
+            errno = ERANGE;
+            return -1;
+        }
+    }
+
+    DPRINTF("p2m list from %#" PRIx64 " to %#" PRIx64 ", root at %#lx",
+            p2m_vaddr, p2m_end, p2m_mfn);
+    DPRINTF("max_pfn %#lx, p2m_frames %d", ctx->x86_pv.max_pfn,
+            ctx->x86_pv.p2m_frames);
+
+    mfns = malloc(sizeof(*mfns));
+    if ( !mfns )
+    {
+        ERROR("Cannot allocate memory for array of %u mfns", 1);
+        goto err;
+    }
+    mfns[0] = p2m_mfn;
+    off = 0;
+    saved_mfn = 0;
+    idx_start = idx_end = saved_idx = 0;
+
+    for ( level = ctx->x86_pv.levels; level > 0; level-- )
+    {
+        n_pages = idx_end - idx_start + 1;
+        ptes = xc_map_foreign_pages(xch, ctx->domid, PROT_READ, mfns, n_pages);
+        if ( !ptes )
+        {
+            PERROR("Failed to map %u page table pages for p2m list", n_pages);
+            goto err;
+        }
+        free(mfns);
+
+        shift = level * 9 + 3;
+        idx_start = ((p2m_vaddr - off) & mask) >> shift;
+        idx_end = ((p2m_end - off) & mask) >> shift;
+        idx = idx_end - idx_start + 1;
+        mfns = malloc(sizeof(*mfns) * idx);
+        if ( !mfns )
+        {
+            ERROR("Cannot allocate memory for array of %u mfns", idx);
+            goto err;
+        }
+
+        for ( idx = idx_start; idx <= idx_end; idx++ )
+        {
+            mfn = pte_to_frame(ptes[idx]);
+            if ( mfn == 0 || mfn > ctx->x86_pv.max_mfn )
+            {
+                ERROR("Bad mfn %#lx during page table walk for vaddr %#" PRIx64 " at level %d of p2m list",
+                      mfn, off + ((xen_vaddr_t)idx << shift), level);
+                errno = ERANGE;
+                goto err;
+            }
+            mfns[idx - idx_start] = mfn;
+
+            /* Maximum pfn check at level 2. Same reasoning as for p2m tree. */
+            if ( level == 2 )
+            {
+                if ( mfn != saved_mfn )
+                {
+                    saved_mfn = mfn;
+                    saved_idx = idx - idx_start;
+                }
+            }
+        }
+
+        if ( level == 2 )
+        {
+            max_pfn = ((xen_pfn_t)saved_idx << 9) * fpp - 1;
+            if ( max_pfn < ctx->x86_pv.max_pfn )
+            {
+                ctx->x86_pv.max_pfn = max_pfn;
+                ctx->x86_pv.p2m_frames = (ctx->x86_pv.max_pfn + fpp) / fpp;
+                p2m_end = p2m_vaddr + ctx->x86_pv.p2m_frames * PAGE_SIZE - 1;
+                idx_end = idx_start + saved_idx;
+            }
+        }
+
+        munmap(ptes, n_pages * PAGE_SIZE);
+        ptes = NULL;
+        off = p2m_vaddr & ((mask >> shift) << shift);
+    }
+
+    /* Map the p2m leaves themselves. */
+    rc = map_p2m_leaves(ctx, mfns, idx_end - idx_start + 1);
+
+err:
+    free(mfns);
+    if ( ptes )
+        munmap(ptes, n_pages * PAGE_SIZE);
+
+    return rc;
+}
+
+/*
+ * Map the guest p2m frames.
+ * Depending on guest support this might either be a virtual mapped linear
+ * list (preferred format) or a 3 level tree linked via mfns.
+ */
+static int map_p2m(struct xc_sr_context *ctx)
+{
+    uint64_t p2m_cr3;
+
+    ctx->x86_pv.max_pfn = GET_FIELD(ctx->x86_pv.shinfo, arch.max_pfn,
+                                    ctx->x86_pv.width) - 1;
+    p2m_cr3 = GET_FIELD(ctx->x86_pv.shinfo, arch.p2m_cr3, ctx->x86_pv.width);
+
+    return p2m_cr3 ? map_p2m_list(ctx, p2m_cr3) : map_p2m_tree(ctx);
 }
 
 /*
@@ -681,8 +849,10 @@ static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
         /* 64bit guests only have Xen mappings in their L4 tables. */
         if ( type == XEN_DOMCTL_PFINFO_L4TAB )
         {
-            xen_first = 256;
-            xen_last = 271;
+            xen_first = (HYPERVISOR_VIRT_START_X86_64 >>
+                         L4_PAGETABLE_SHIFT_X86_64) & 511;
+            xen_last = (HYPERVISOR_VIRT_END_X86_64 >>
+                        L4_PAGETABLE_SHIFT_X86_64) & 511;
         }
     }
     else
@@ -698,21 +868,19 @@ static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
             /* 32bit guests can only use the first 4 entries of their L3 tables.
              * All other are potentially used by Xen. */
             xen_first = 4;
-            xen_last = 512;
+            xen_last = 511;
             break;
 
         case XEN_DOMCTL_PFINFO_L2TAB:
             /* It is hard to spot Xen mappings in a 32bit guest's L2.  Most
              * are normal but only a few will have Xen mappings.
-             *
-             * 428 = (HYPERVISOR_VIRT_START_PAE >> L2_PAGETABLE_SHIFT_PAE)&0x1ff
-             *
-             * ...which is conveniently unavailable to us in a 64bit build.
              */
-            if ( pte_to_frame(src[428]) == ctx->x86_pv.compat_m2p_mfn0 )
+            i = (HYPERVISOR_VIRT_START_X86_32 >> L2_PAGETABLE_SHIFT_PAE) & 511;
+            if ( pte_to_frame(src[i]) == ctx->x86_pv.compat_m2p_mfn0 )
             {
-                xen_first = 428;
-                xen_last = 512;
+                xen_first = i;
+                xen_last = (HYPERVISOR_VIRT_END_X86_32 >>
+                            L2_PAGETABLE_SHIFT_PAE) & 511;
             }
             break;
         }
