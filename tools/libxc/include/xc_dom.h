@@ -71,6 +71,7 @@ struct xc_dom_image {
 
     /* arguments and parameters */
     char *cmdline;
+    size_t cmdline_size;
     uint32_t f_requested[XENFEAT_NR_SUBMAPS];
 
     /* info from (elf) kernel image */
@@ -91,6 +92,7 @@ struct xc_dom_image {
     struct xc_dom_seg p2m_seg;
     struct xc_dom_seg pgtables_seg;
     struct xc_dom_seg devicetree_seg;
+    struct xc_dom_seg start_info_seg; /* HVMlite only */
     xen_pfn_t start_info_pfn;
     xen_pfn_t console_pfn;
     xen_pfn_t xenstore_pfn;

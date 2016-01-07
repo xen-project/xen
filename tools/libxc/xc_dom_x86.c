@@ -586,22 +586,11 @@ static void build_hvm_info(void *hvm_info_page, struct xc_dom_image *dom)
 static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
 {
     unsigned long i;
-    void *hvm_info_page;
     uint32_t *ident_pt, domid = dom->guest_domid;
     int rc;
     xen_pfn_t special_array[X86_HVM_NR_SPECIAL_PAGES];
     xen_pfn_t ioreq_server_array[NR_IOREQ_SERVER_PAGES];
     xc_interface *xch = dom->xch;
-
-    if ( dom->device_model )
-    {
-        if ( (hvm_info_page = xc_map_foreign_range(
-                  xch, domid, PAGE_SIZE, PROT_READ | PROT_WRITE,
-                  HVM_INFO_PFN)) == NULL )
-            goto error_out;
-        build_hvm_info(hvm_info_page, dom);
-        munmap(hvm_info_page, PAGE_SIZE);
-    }
 
     /* Allocate and clear special pages. */
     for ( i = 0; i < X86_HVM_NR_SPECIAL_PAGES; i++ )
@@ -636,65 +625,25 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
 
     if ( !dom->device_model )
     {
-        struct xc_dom_seg seg;
-        struct hvm_start_info *start_info;
-        char *cmdline;
-        struct hvm_modlist_entry *modlist;
-        void *start_page;
-        size_t cmdline_size = 0;
-        size_t start_info_size = sizeof(*start_info);
+        size_t start_info_size = sizeof(struct hvm_start_info);
 
         if ( dom->cmdline )
         {
-            cmdline_size = ROUNDUP(strlen(dom->cmdline) + 1, 8);
-            start_info_size += cmdline_size;
-
+            dom->cmdline_size = ROUNDUP(strlen(dom->cmdline) + 1, 8);
+            start_info_size += dom->cmdline_size;
         }
-        if ( dom->ramdisk_blob )
-            start_info_size += sizeof(*modlist); /* Limited to one module. */
 
-        rc = xc_dom_alloc_segment(dom, &seg, "HVMlite start info", 0,
-                                  start_info_size);
+        /* Limited to one module. */
+        if ( dom->ramdisk_blob )
+            start_info_size += sizeof(struct hvm_modlist_entry);
+
+        rc = xc_dom_alloc_segment(dom, &dom->start_info_seg,
+                                  "HVMlite start info", 0, start_info_size);
         if ( rc != 0 )
         {
             DOMPRINTF("Unable to reserve memory for the start info");
             goto out;
         }
-
-        start_page = xc_map_foreign_range(xch, domid, start_info_size,
-                                          PROT_READ | PROT_WRITE,
-                                          seg.pfn);
-        if ( start_page == NULL )
-        {
-            DOMPRINTF("Unable to map HVM start info page");
-            goto error_out;
-        }
-
-        start_info = start_page;
-        cmdline = start_page + sizeof(*start_info);
-        modlist = start_page + sizeof(*start_info) + cmdline_size;
-
-        if ( dom->cmdline )
-        {
-            strncpy(cmdline, dom->cmdline, cmdline_size);
-            start_info->cmdline_paddr = (seg.pfn << PAGE_SHIFT) +
-                                ((uintptr_t)cmdline - (uintptr_t)start_info);
-        }
-
-        if ( dom->ramdisk_blob )
-        {
-            modlist[0].paddr = dom->ramdisk_seg.vstart - dom->parms.virt_base;
-            modlist[0].size = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
-            start_info->modlist_paddr = (seg.pfn << PAGE_SHIFT) +
-                                ((uintptr_t)modlist - (uintptr_t)start_info);
-            start_info->nr_modules = 1;
-        }
-
-        start_info->magic = HVM_START_MAGIC_VALUE;
-
-        munmap(start_page, start_info_size);
-
-        dom->start_info_pfn = seg.pfn;
     }
     else
     {
@@ -1057,8 +1006,8 @@ static int vcpu_hvm(struct xc_dom_image *dom)
     /* Set the IP. */
     bsp_ctx.cpu.rip = dom->parms.phys_entry;
 
-    if ( dom->start_info_pfn )
-        bsp_ctx.cpu.rbx = dom->start_info_pfn << PAGE_SHIFT;
+    if ( dom->start_info_seg.pfn )
+        bsp_ctx.cpu.rbx = dom->start_info_seg.pfn << PAGE_SHIFT;
 
     /* Set the end descriptor. */
     bsp_ctx.end_d.typecode = HVM_SAVE_CODE(END);
@@ -1745,7 +1694,74 @@ static int alloc_pgtables_hvm(struct xc_dom_image *dom)
 
 static int bootlate_hvm(struct xc_dom_image *dom)
 {
-    DOMPRINTF("%s: doing nothing", __func__);
+    uint32_t domid = dom->guest_domid;
+    xc_interface *xch = dom->xch;
+
+    if ( !dom->device_model )
+    {
+        struct hvm_start_info *start_info;
+        size_t start_info_size;
+        void *start_page;
+
+        start_info_size = sizeof(*start_info) + dom->cmdline_size;
+        if ( dom->ramdisk_blob )
+            start_info_size += sizeof(struct hvm_modlist_entry);
+
+        if ( start_info_size >
+             dom->start_info_seg.pages << XC_DOM_PAGE_SHIFT(dom) )
+        {
+            DOMPRINTF("Trying to map beyond start_info_seg");
+            return -1;
+        }
+
+        start_page = xc_map_foreign_range(xch, domid, start_info_size,
+                                          PROT_READ | PROT_WRITE,
+                                          dom->start_info_seg.pfn);
+        if ( start_page == NULL )
+        {
+            DOMPRINTF("Unable to map HVM start info page");
+            return -1;
+        }
+
+        start_info = start_page;
+
+        if ( dom->cmdline )
+        {
+            char *cmdline = start_page + sizeof(*start_info);
+
+            strncpy(cmdline, dom->cmdline, dom->cmdline_size);
+            start_info->cmdline_paddr = (dom->start_info_seg.pfn << PAGE_SHIFT) +
+                                ((uintptr_t)cmdline - (uintptr_t)start_info);
+        }
+
+        if ( dom->ramdisk_blob )
+        {
+            struct hvm_modlist_entry *modlist =
+                start_page + sizeof(*start_info) + dom->cmdline_size;
+
+            modlist[0].paddr = dom->ramdisk_seg.vstart - dom->parms.virt_base;
+            modlist[0].size = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
+            start_info->modlist_paddr = (dom->start_info_seg.pfn << PAGE_SHIFT) +
+                                ((uintptr_t)modlist - (uintptr_t)start_info);
+            start_info->nr_modules = 1;
+        }
+
+        start_info->magic = HVM_START_MAGIC_VALUE;
+
+        munmap(start_page, start_info_size);
+    }
+    else
+    {
+        void *hvm_info_page;
+
+        if ( (hvm_info_page = xc_map_foreign_range(
+                  xch, domid, PAGE_SIZE, PROT_READ | PROT_WRITE,
+                  HVM_INFO_PFN)) == NULL )
+            return -1;
+        build_hvm_info(hvm_info_page, dom);
+        munmap(hvm_info_page, PAGE_SIZE);
+    }
+
     return 0;
 }
 
