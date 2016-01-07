@@ -264,7 +264,6 @@ static void core2_vpmu_set_msr_bitmap(unsigned long *msr_bitmap)
          clear_bit(msraddr_to_bitpos(MSR_P6_EVNTSEL(i)), msr_bitmap);
 
     clear_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR_CTRL), msr_bitmap);
-    clear_bit(msraddr_to_bitpos(MSR_IA32_PEBS_ENABLE), msr_bitmap);
     clear_bit(msraddr_to_bitpos(MSR_IA32_DS_AREA), msr_bitmap);
 }
 
@@ -296,7 +295,6 @@ static void core2_vpmu_unset_msr_bitmap(unsigned long *msr_bitmap)
         set_bit(msraddr_to_bitpos(MSR_P6_EVNTSEL(i)), msr_bitmap);
 
     set_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR_CTRL), msr_bitmap);
-    set_bit(msraddr_to_bitpos(MSR_IA32_PEBS_ENABLE), msr_bitmap);
     set_bit(msraddr_to_bitpos(MSR_IA32_DS_AREA), msr_bitmap);
 }
 
@@ -368,7 +366,6 @@ static inline void __core2_vpmu_load(struct vcpu *v)
     wrmsrl(MSR_CORE_PERF_FIXED_CTR_CTRL, core2_vpmu_cxt->fixed_ctrl);
     if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_DS) )
         wrmsrl(MSR_IA32_DS_AREA, core2_vpmu_cxt->ds_area);
-    wrmsrl(MSR_IA32_PEBS_ENABLE, core2_vpmu_cxt->pebs_enable);
 
     if ( !has_hvm_container_vcpu(v) )
     {
@@ -393,6 +390,8 @@ static int core2_vpmu_verify(struct vcpu *v)
     if ( core2_vpmu_cxt->global_ovf_ctrl & global_ovf_ctrl_mask )
         return -EINVAL;
     if ( core2_vpmu_cxt->global_ctrl & global_ctrl_mask )
+        return -EINVAL;
+    if ( core2_vpmu_cxt->pebs_enable )
         return -EINVAL;
 
     fixed_ctrl = core2_vpmu_cxt->fixed_ctrl;
@@ -606,10 +605,9 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
                  "MSR_PERF_GLOBAL_STATUS(0x38E)!\n");
         return -EINVAL;
     case MSR_IA32_PEBS_ENABLE:
-        if ( msr_content & 1 )
-            gdprintk(XENLOG_WARNING, "Guest is trying to enable PEBS, "
-                     "which is not supported.\n");
-        core2_vpmu_cxt->pebs_enable = msr_content;
+        if ( msr_content )
+            /* PEBS is reported as unavailable in MSR_IA32_MISC_ENABLE */
+            return -EINVAL;
         return 0;
     case MSR_IA32_DS_AREA:
         if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_DS) )
@@ -733,6 +731,7 @@ static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
         /* Extension for BTS */
         if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
             *msr_content &= ~MSR_IA32_MISC_ENABLE_BTS_UNAVAIL;
+        *msr_content |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
     }
 
     return 0;
