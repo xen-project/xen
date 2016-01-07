@@ -209,6 +209,7 @@ distclean-stubdom:
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom distclean
 endif
+	rm -rf extras/mini-os extras/mini-os-remote
 
 .PHONY: distclean-docs
 distclean-docs:
