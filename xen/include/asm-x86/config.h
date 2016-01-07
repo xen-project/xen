@@ -52,10 +52,6 @@
 
 #define CONFIG_MULTIBOOT 1
 
-#ifdef XSM_ENABLE
-#define CONFIG_LATE_HWDOM 1
-#endif
-
 #define HZ 100
 
 #define OPT_CONSOLE_STR "vga"

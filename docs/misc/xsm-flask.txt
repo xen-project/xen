@@ -172,9 +172,9 @@ Setting up FLASK
 ----------------
 
 Xen must be compiled with XSM and FLASK enabled; by default, the security
-framework is disabled. Edit Config.mk or the .config file to set XSM_ENABLE to
-"y" and running 'make -C xen menuconfig' and enabling FLASK inside 'Common
-Features'; this change requires a make clean and rebuild.
+framework is disabled. Running 'make -C xen menuconfig' and enabling XSM
+and FLASK inside 'Common Features'; this change requires a make clean and
+rebuild.
 
 FLASK uses only one domain configuration parameter (seclabel) defining the
 full security label of the newly created domain. If using the example policy,
