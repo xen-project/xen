@@ -83,6 +83,15 @@ struct xc_sr_save_ops
     int (*end_of_checkpoint)(struct xc_sr_context *ctx);
 
     /**
+     * Check state of guest to decide whether it makes sense to continue
+     * migration.  This is called in each iteration or checkpoint to check
+     * whether all criteria for the migration are still met.  If that's not
+     * the case either migration is cancelled via a bad rc or the situation
+     * is handled, e.g. by sending appropriate records.
+     */
+    int (*check_vm_state)(struct xc_sr_context *ctx);
+
+    /**
      * Clean up the local environment.  Will be called exactly once, either
      * after a successful save, or upon encountering an error.
      */
@@ -279,6 +288,9 @@ struct xc_sr_context
 
             /* Read-only mapping of guests shared info page */
             shared_info_any_t *shinfo;
+
+            /* p2m generation count for verifying validity of local p2m. */
+            uint64_t p2m_generation;
 
             union
             {

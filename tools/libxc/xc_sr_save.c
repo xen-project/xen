@@ -394,7 +394,8 @@ static int send_dirty_pages(struct xc_sr_context *ctx,
         DPRINTF("Bitmap contained more entries than expected...");
 
     xc_report_progress_step(xch, entries, entries);
-    return 0;
+
+    return ctx->save.ops.check_vm_state(ctx);
 }
 
 /*
@@ -748,6 +749,10 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
 
     do {
         rc = ctx->save.ops.start_of_checkpoint(ctx);
+        if ( rc )
+            goto err;
+
+        rc = ctx->save.ops.check_vm_state(ctx);
         if ( rc )
             goto err;
 

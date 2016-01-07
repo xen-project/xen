@@ -175,6 +175,12 @@ static int x86_hvm_start_of_checkpoint(struct xc_sr_context *ctx)
     return 0;
 }
 
+static int x86_hvm_check_vm_state(struct xc_sr_context *ctx)
+{
+    /* no-op */
+    return 0;
+}
+
 static int x86_hvm_end_of_checkpoint(struct xc_sr_context *ctx)
 {
     int rc;
@@ -221,6 +227,7 @@ struct xc_sr_save_ops save_ops_x86_hvm =
     .start_of_stream     = x86_hvm_start_of_stream,
     .start_of_checkpoint = x86_hvm_start_of_checkpoint,
     .end_of_checkpoint   = x86_hvm_end_of_checkpoint,
+    .check_vm_state      = x86_hvm_check_vm_state,
     .cleanup             = x86_hvm_cleanup,
 };
 

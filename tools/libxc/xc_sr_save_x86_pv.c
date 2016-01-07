@@ -274,6 +274,39 @@ err:
 }
 
 /*
+ * Get p2m_generation count.
+ * Returns an error if the generation count has changed since the last call.
+ */
+static int get_p2m_generation(struct xc_sr_context *ctx)
+{
+    uint64_t p2m_generation;
+    int rc;
+
+    p2m_generation = GET_FIELD(ctx->x86_pv.shinfo, arch.p2m_generation,
+                               ctx->x86_pv.width);
+
+    rc = (p2m_generation == ctx->x86_pv.p2m_generation) ? 0 : -1;
+    ctx->x86_pv.p2m_generation = p2m_generation;
+
+    return rc;
+}
+
+static int x86_pv_check_vm_state_p2m_list(struct xc_sr_context *ctx)
+{
+    xc_interface *xch = ctx->xch;
+    int rc;
+
+    if ( !ctx->save.live )
+        return 0;
+
+    rc = get_p2m_generation(ctx);
+    if ( rc )
+        ERROR("p2m generation count changed. Migration aborted.");
+
+    return rc;
+}
+
+/*
  * Map the guest p2m frames specified via a cr3 value, a virtual address, and
  * the maximum pfn. PTE entries are 64 bits for both, 32 and 64 bit guests as
  * in 32 bit case we support PAE guests only.
@@ -296,6 +329,8 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
         errno = ERANGE;
         return -1;
     }
+
+    get_p2m_generation(ctx);
 
     p2m_vaddr = GET_FIELD(ctx->x86_pv.shinfo, arch.p2m_vaddr,
                           ctx->x86_pv.width);
@@ -430,6 +465,7 @@ static int map_p2m(struct xc_sr_context *ctx)
 {
     uint64_t p2m_cr3;
 
+    ctx->x86_pv.p2m_generation = ~0ULL;
     ctx->x86_pv.max_pfn = GET_FIELD(ctx->x86_pv.shinfo, arch.max_pfn,
                                     ctx->x86_pv.width) - 1;
     p2m_cr3 = GET_FIELD(ctx->x86_pv.shinfo, arch.p2m_cr3, ctx->x86_pv.width);
@@ -1069,6 +1105,14 @@ static int x86_pv_end_of_checkpoint(struct xc_sr_context *ctx)
     return 0;
 }
 
+static int x86_pv_check_vm_state(struct xc_sr_context *ctx)
+{
+    if ( ctx->x86_pv.p2m_generation == ~0ULL )
+        return 0;
+
+    return x86_pv_check_vm_state_p2m_list(ctx);
+}
+
 /*
  * save_ops function.  Cleanup.
  */
@@ -1096,6 +1140,7 @@ struct xc_sr_save_ops save_ops_x86_pv =
     .start_of_stream     = x86_pv_start_of_stream,
     .start_of_checkpoint = x86_pv_start_of_checkpoint,
     .end_of_checkpoint   = x86_pv_end_of_checkpoint,
+    .check_vm_state      = x86_pv_check_vm_state,
     .cleanup             = x86_pv_cleanup,
 };
 
