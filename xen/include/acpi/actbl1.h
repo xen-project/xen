@@ -639,7 +639,9 @@ enum acpi_madt_type {
 	ACPI_MADT_TYPE_INTERRUPT_SOURCE = 8,
 	ACPI_MADT_TYPE_LOCAL_X2APIC = 9,
 	ACPI_MADT_TYPE_LOCAL_X2APIC_NMI = 10,
-	ACPI_MADT_TYPE_RESERVED = 11	/* 11 and greater are reserved */
+	ACPI_MADT_TYPE_GENERIC_INTERRUPT = 11,
+	ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR = 12,
+	ACPI_MADT_TYPE_RESERVED = 13	/* 13 and greater are reserved */
 };
 
 /*
@@ -760,11 +762,36 @@ struct acpi_madt_local_x2apic_nmi {
 	u8 reserved[3];
 };
 
+/* 11: Generic Interrupt (ACPI 5.0) */
+
+struct acpi_madt_generic_interrupt {
+	struct acpi_subtable_header header;
+	u16 reserved;		/* Reserved - must be zero */
+	u32 gic_id;
+	u32 uid;
+	u32 flags;
+	u32 parking_version;
+	u32 performance_interrupt;
+	u64 parked_address;
+	u64 base_address;
+};
+
+/* 12: Generic Distributor (ACPI 5.0) */
+
+struct acpi_madt_generic_distributor {
+	struct acpi_subtable_header header;
+	u16 reserved;		/* Reserved - must be zero */
+	u32 gic_id;
+	u64 base_address;
+	u32 global_irq_base;
+	u32 reserved2;		/* Reserved - must be zero */
+};
+
 /*
  * Common flags fields for MADT subtables
  */
 
-/* MADT Local APIC flags (lapic_flags) */
+/* MADT Local APIC flags (lapic_flags) and GIC flags */
 
 #define ACPI_MADT_ENABLED           (1)	/* 00: Processor is usable if set */
 
