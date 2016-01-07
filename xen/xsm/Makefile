@@ -4,4 +4,4 @@ obj-y += xsm_policy.o
 obj-y += dummy.o
 endif
 
-subdir-$(FLASK_ENABLE) += flask
+subdir-$(CONFIG_FLASK) += flask

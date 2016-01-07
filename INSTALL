@@ -278,7 +278,11 @@ PYTHON_PREFIX_ARG=
 The hypervisor may be build with XSM support, which can be changed with
 the following variables.
 XSM_ENABLE=y
-FLASK_ENABLE=y
+
+The hypervisor may be build with Flask support, which can be changed
+by running:
+make -C xen menuconfig
+and enabling Flask in the 'Common Features' menu.
 
 Do a build for coverage.
 coverage=y
