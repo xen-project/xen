@@ -151,21 +151,21 @@
  */
 
 /*
- * This is the 'wire' format for packets:
- *  Request 1: netif_tx_request_t -- NETTXF_* (any flags)
- * [Request 2: netif_extra_info_t] (only if request 1 has
- *                                  NETTXF_extra_info)
- * [Request 3: netif_extra_info_t] (only if request 2 has
- *                                  XEN_NETIF_EXTRA_MORE)
- *  Request 4: netif_tx_request_t -- NETTXF_more_data
- *  Request 5: netif_tx_request_t -- NETTXF_more_data
- *  ...
- *  Request N: netif_tx_request_t -- 0
- */
-
-/*
  * Guest transmit
  * ==============
+ *
+ * This is the 'wire' format for packets:
+ *  Fragment 1: netif_tx_request_t  - flags = NETTXF_*
+ *                                    size = total packet size
+ * [Extra 1: netif_extra_info_t]    - (only if fragment 1 flags include
+ *                                     NETTXF_extra_info)
+ * [Extra N: netif_extra_info_t]    - (only if extra N-1 flags include
+ *                                     XEN_NETIF_EXTRA_MORE)
+ *  ...
+ *  Fragment N: netif_tx_request_t  - (only if fragment N-1 flags include
+ *                                     NETTXF_more_data)
+ *                                    flags = 0
+ *                                    size = fragment size
  *
  * Ring slot size is 12 octets, however not all request/response
  * structs use the full size.
@@ -201,6 +201,19 @@
  *
  * Guest receive
  * =============
+ *
+ * This is the 'wire' format for packets:
+ *  Fragment 1: netif_rx_request_t  - flags = NETRXF_*
+ *                                    size = fragment size
+ * [Extra 1: netif_extra_info_t]    - (only if fragment 1 flags include
+ *                                     NETRXF_extra_info)
+ * [Extra N: netif_extra_info_t]    - (only if extra N-1 flags include
+ *                                     XEN_NETIF_EXTRA_MORE)
+ *  ...
+ *  Fragment N: netif_rx_request_t  - (only if fragment N-1 flags include
+ *                                     NETRXF_more_data)
+ *                                    flags = 0
+ *                                    size = fragment size
  *
  * Ring slot size is 8 octets.
  *
