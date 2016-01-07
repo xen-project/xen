@@ -1792,7 +1792,7 @@ csched_dump_pcpu(const struct scheduler *ops, int cpu)
     struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_pcpu *spc;
     struct csched_vcpu *svc;
-    spinlock_t *lock = lock;
+    spinlock_t *lock;
     unsigned long flags;
     int loop;
 #define cpustr keyhandler_scratch
