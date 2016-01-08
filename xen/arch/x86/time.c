@@ -1749,6 +1749,9 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
                   uint64_t *elapsed_nsec, uint32_t *gtsc_khz,
                   uint32_t *incarnation)
 {
+    bool_t enable_tsc_scaling = has_hvm_container_domain(d) &&
+                                cpu_has_tsc_ratio && !d->arch.vtsc;
+
     *incarnation = d->arch.incarnation;
     *tsc_mode = d->arch.tsc_mode;
 
@@ -1769,7 +1772,7 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
         }
         tsc = rdtsc();
         *elapsed_nsec = scale_delta(tsc, &d->arch.vtsc_to_ns);
-        *gtsc_khz = cpu_khz;
+        *gtsc_khz = enable_tsc_scaling ? d->arch.tsc_khz : cpu_khz;
         break;
     case TSC_MODE_PVRDTSCP:
         if ( d->arch.vtsc )
@@ -1780,9 +1783,10 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
         else
         {
             tsc = rdtsc();
-            *elapsed_nsec = scale_delta(tsc, &d->arch.vtsc_to_ns) -
+            *elapsed_nsec = scale_delta(tsc, &this_cpu(cpu_time).tsc_scale) -
                             d->arch.vtsc_offset;
-            *gtsc_khz = 0; /* ignored by tsc_set_info */
+            *gtsc_khz = enable_tsc_scaling ? d->arch.tsc_khz
+                                           : 0 /* ignored by tsc_set_info */;
         }
         break;
     }
