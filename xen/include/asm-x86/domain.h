@@ -347,9 +347,12 @@ struct arch_domain
     s_time_t vtsc_last;      /* previous TSC value (guarantee monotonicity) */
     spinlock_t vtsc_lock;
     uint64_t vtsc_offset;    /* adjustment for save/restore/migrate */
-    uint32_t tsc_khz;        /* cached khz for certain emulated cases */
-    struct time_scale vtsc_to_ns; /* scaling for certain emulated cases */
-    struct time_scale ns_to_vtsc; /* scaling for certain emulated cases */
+    uint32_t tsc_khz;        /* cached guest khz for certain emulated or
+                                hardware TSC scaling cases */
+    struct time_scale vtsc_to_ns; /* scaling for certain emulated or
+                                     hardware TSC scaling cases */
+    struct time_scale ns_to_vtsc; /* scaling for certain emulated or
+                                     hardware TSC scaling cases */
     uint32_t incarnation;    /* incremented every restore or live migrate
                                 (possibly other cases in the future */
 #if !defined(NDEBUG) || defined(PERF_COUNTERS)
