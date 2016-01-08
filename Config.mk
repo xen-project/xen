@@ -214,6 +214,7 @@ EMBEDDED_EXTRA_CFLAGS += -fno-exceptions
 
 # Enable XSM security module (by default, Flask).
 XSM_ENABLE ?= n
+FLASK_ENABLE ?= $(XSM_ENABLE)
 
 XEN_EXTFILES_URL ?= http://xenbits.xen.org/xen-extfiles
 # All the files at that location were downloaded from elsewhere on

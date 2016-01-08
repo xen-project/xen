@@ -86,7 +86,7 @@
 #define mk_unsigned_long(x) x
 #endif /* !__ASSEMBLY__ */
 
-#ifdef CONFIG_FLASK
+#ifdef FLASK_ENABLE
 #define XSM_MAGIC 0xf97cff8c
 /* Maintain statistics on the access vector cache */
 #define FLASK_AVC_STATS 1

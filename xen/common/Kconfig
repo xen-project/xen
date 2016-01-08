@@ -8,17 +8,6 @@ config COMPAT
 	  HVM and PV guests. HVMLoader makes 32-bit hypercalls irrespective
 	  of the destination runmode of the guest.
 
-config FLASK
-	bool "FLux Advanced Security Kernel support"
-	default n
-	--help---
-	  Enables the FLASK (FLux Advanced Security Kernel) support which
-	  provides a mandatory access control framework by which security
-	  enforcement, isolation, and auditing can be achieved with fine
-	  granular control via a security policy.
-
-	  If unsure, say N.
-
 # Select HAS_DEVICE_TREE if device tree is supported
 config HAS_DEVICE_TREE
 	bool
