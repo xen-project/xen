@@ -10,9 +10,8 @@ config COMPAT
 
 config FLASK
 	bool "FLux Advanced Security Kernel support"
-	default y
-	depends on XSM
-	---help---
+	default n
+	--help---
 	  Enables the FLASK (FLux Advanced Security Kernel) support which
 	  provides a mandatory access control framework by which security
 	  enforcement, isolation, and auditing can be achieved with fine
@@ -62,39 +61,5 @@ config KEXEC
 	  environment to collect information on a Xen hypervisor or dom0 crash.
 
 	  If unsure, say Y.
-
-# Allows "late" initialization of the hardware domain
-config LATE_HWDOM
-	bool "dedicated hardware domain"
-	default n
-	depends on XSM && X86
-	---help---
-	  Allows the creation of a dedicated hardware domain distinct from
-	  domain 0 that manages devices without needing access to other
-	  privileged functionality such as the ability to manage domains.
-	  This requires that the actual domain 0 be a stub domain that
-	  constructs the actual hardware domain instead of initializing the
-	  hardware itself.  Because the hardware domain needs access to
-	  hypercalls not available to unprivileged guests, an XSM policy
-	  is required to properly define the privilege of these domains.
-
-	  This feature does nothing if the "hardware_dom" boot parameter is
-	  not present.  If this feature is being used for security, it should
-	  be combined with an IOMMU in strict mode.
-
-	  If unsure, say N.
-
-# Enable/Disable XSM support
-config XSM
-	bool "Xen Security Modules support"
-	default n
-	---help---
-	  Enables the security framework known as Xen Security Modules which
-	  allows administrators fine-grained control over a Xen domain and
-	  its capabilities by defining permissible interactions between domains,
-	  the hypervisor itself, and related resources such as memory and
-	  devices.
-
-	  If unsure, say N.
 
 endmenu

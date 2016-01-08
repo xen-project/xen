@@ -52,6 +52,7 @@ CFLAGS += -Werror -Wredundant-decls -Wno-pointer-arith
 CFLAGS += -pipe -g -D__XEN__ -include $(BASEDIR)/include/xen/config.h
 CFLAGS += '-D__OBJECT_FILE__="$@"'
 
+CFLAGS-$(XSM_ENABLE)    += -DXSM_ENABLE
 CFLAGS-$(verbose)       += -DVERBOSE
 CFLAGS-$(crash_debug)   += -DCRASH_DEBUG
 CFLAGS-$(perfc)         += -DPERF_COUNTERS

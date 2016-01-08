@@ -110,7 +110,7 @@ struct evtchn
     u8 priority;
     u8 last_priority;
     u16 last_vcpu_id;
-#ifdef CONFIG_XSM
+#ifdef XSM_ENABLE
     union {
 #ifdef XSM_NEED_GENERIC_EVTCHN_SSID
         /*

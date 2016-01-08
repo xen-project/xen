@@ -194,7 +194,7 @@ struct xsm_operations {
 #endif
 };
 
-#ifdef CONFIG_XSM
+#ifdef XSM_ENABLE
 
 extern struct xsm_operations *xsm_ops;
 
@@ -752,7 +752,7 @@ extern int unregister_xsm(struct xsm_operations *ops);
 extern struct xsm_operations dummy_xsm_ops;
 extern void xsm_fixup_ops(struct xsm_operations *ops);
 
-#else /* CONFIG_XSM */
+#else /* XSM_ENABLE */
 
 #include <xsm/dummy.h>
 
@@ -772,6 +772,6 @@ static inline int xsm_dt_init(void)
 }
 #endif
 
-#endif /* CONFIG_XSM */
+#endif /* XSM_ENABLE */
 
 #endif /* __XSM_H */
