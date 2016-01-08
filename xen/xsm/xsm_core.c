@@ -17,7 +17,7 @@
 #include <xen/hypercall.h>
 #include <xsm/xsm.h>
 
-#ifdef XSM_ENABLE
+#ifdef CONFIG_XSM
 
 #define XSM_FRAMEWORK_VERSION    "1.0.0"
 
