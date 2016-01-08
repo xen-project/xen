@@ -316,8 +316,8 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
     xc_interface *xch = ctx->xch;
     xen_vaddr_t p2m_vaddr, p2m_end, mask, off;
     xen_pfn_t p2m_mfn, mfn, saved_mfn, max_pfn;
-    uint64_t *ptes;
-    xen_pfn_t *mfns;
+    uint64_t *ptes = NULL;
+    xen_pfn_t *mfns = NULL;
     unsigned fpp, n_pages, level, shift, idx_start, idx_end, idx, saved_idx;
     int rc = -1;
 
@@ -327,7 +327,7 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
     {
         ERROR("Bad p2m_cr3 value %#" PRIx64, p2m_cr3);
         errno = ERANGE;
-        return -1;
+        goto err;
     }
 
     get_p2m_generation(ctx);
@@ -350,7 +350,7 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
             ERROR("Bad virtual p2m address range %#" PRIx64 "-%#" PRIx64,
                   p2m_vaddr, p2m_end);
             errno = ERANGE;
-            return -1;
+            goto err;
         }
     }
     else
@@ -363,7 +363,7 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
             ERROR("Bad virtual p2m address range %#" PRIx64 "-%#" PRIx64,
                   p2m_vaddr, p2m_end);
             errno = ERANGE;
-            return -1;
+            goto err;
         }
     }
 
