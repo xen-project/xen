@@ -137,6 +137,7 @@
 #define X86_FEATURE_ERMS         9 /* Enhanced REP MOVSB/STOSB */
 #define X86_FEATURE_INVPCID     10 /* Invalidate Process Context ID */
 #define X86_FEATURE_RTM         11 /* Restricted Transactional Memory */
+#define X86_FEATURE_MPX         14 /* Memory Protection Extensions */
 #define X86_FEATURE_RDSEED      18 /* RDSEED instruction */
 #define X86_FEATURE_ADX         19 /* ADCX, ADOX instructions */
 #define X86_FEATURE_SMAP        20 /* Supervisor Mode Access Protection */
