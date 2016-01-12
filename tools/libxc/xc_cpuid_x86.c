@@ -427,6 +427,7 @@ static void xc_cpuid_hvm_policy(xc_interface *xch,
                         bitmaskof(X86_FEATURE_ADX)  |
                         bitmaskof(X86_FEATURE_SMAP) |
                         bitmaskof(X86_FEATURE_FSGSBASE) |
+                        bitmaskof(X86_FEATURE_PCOMMIT) |
                         bitmaskof(X86_FEATURE_CLWB) |
                         bitmaskof(X86_FEATURE_CLFLUSHOPT));
         } else

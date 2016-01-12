@@ -4583,21 +4583,28 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
         break;
     case 0x7:
-        if ( (count == 0) && !cpu_has_smep )
-            *ebx &= ~cpufeat_mask(X86_FEATURE_SMEP);
+        if ( count == 0 )
+        {
+            if ( !cpu_has_smep )
+                *ebx &= ~cpufeat_mask(X86_FEATURE_SMEP);
 
-        if ( (count == 0) && !cpu_has_smap )
-            *ebx &= ~cpufeat_mask(X86_FEATURE_SMAP);
+            if ( !cpu_has_smap )
+                *ebx &= ~cpufeat_mask(X86_FEATURE_SMAP);
 
-        /* Don't expose MPX to hvm when VMX support is not available */
-        if ( (count == 0) &&
-             (!(vmx_vmexit_control & VM_EXIT_CLEAR_BNDCFGS) ||
-              !(vmx_vmentry_control & VM_ENTRY_LOAD_BNDCFGS)) )
-            *ebx &= ~cpufeat_mask(X86_FEATURE_MPX);
+            /* Don't expose MPX to hvm when VMX support is not available */
+            if ( !(vmx_vmexit_control & VM_EXIT_CLEAR_BNDCFGS) ||
+                 !(vmx_vmentry_control & VM_ENTRY_LOAD_BNDCFGS) )
+                *ebx &= ~cpufeat_mask(X86_FEATURE_MPX);
 
-        /* Don't expose INVPCID to non-hap hvm. */
-        if ( (count == 0) && !hap_enabled(d) )
-            *ebx &= ~cpufeat_mask(X86_FEATURE_INVPCID);
+            /* Don't expose INVPCID to non-hap hvm. */
+            if ( !hap_enabled(d) )
+                *ebx &= ~cpufeat_mask(X86_FEATURE_INVPCID);
+
+            /* Don't expose PCOMMIT to hvm when VMX support is not available */
+            if ( !cpu_has_vmx_pcommit )
+                *ebx &= ~cpufeat_mask(X86_FEATURE_PCOMMIT);
+        }
+
         break;
     case 0xb:
         /* Fix the x2APIC identifier. */

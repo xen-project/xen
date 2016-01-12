@@ -1950,6 +1950,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                SECONDARY_EXEC_ENABLE_VPID |
                SECONDARY_EXEC_UNRESTRICTED_GUEST |
                SECONDARY_EXEC_ENABLE_EPT;
+        if ( cpu_has_vmx_pcommit )
+            data |= SECONDARY_EXEC_PCOMMIT;
         data = gen_vmx_msr(data, 0, host_data);
         break;
     case MSR_IA32_VMX_EXIT_CTLS:
@@ -2226,6 +2228,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_VMXON:
     case EXIT_REASON_INVEPT:
     case EXIT_REASON_XSETBV:
+    case EXIT_REASON_PCOMMIT:
         /* inject to L1 */
         nvcpu->nv_vmexit_pending = 1;
         break;
