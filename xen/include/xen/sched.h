@@ -119,7 +119,7 @@ struct evtchn
          */
         void *generic;
 #endif
-#ifdef FLASK_ENABLE
+#ifdef CONFIG_FLASK
         /*
          * Inlining the contents of the structure for FLASK avoids unneeded
          * allocations, and on 64-bit platforms with only FLASK enabled,
