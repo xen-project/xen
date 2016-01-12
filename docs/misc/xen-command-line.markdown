@@ -1476,7 +1476,7 @@ Use Virtual Processor ID support if available.  This prevents the need for TLB
 flushes on VM entry and exit, increasing performance.
 
 ### vpmu
-> `= ( bts )`
+> `= ( <boolean> | { bts | ipc | arch [, ...] } )`
 
 > Default: `off`
 
@@ -1491,6 +1491,19 @@ wrong behaviour (see handle\_pmc\_quirk()).
 
 If 'vpmu=bts' is specified the virtualisation of the Branch Trace Store (BTS)
 feature is switched on on Intel processors supporting this feature.
+
+vpmu=ipc enables performance monitoring, but restricts the counters to the
+most minimum set possible: instructions, cycles, and reference cycles. These
+can be used to calculate instructions per cycle (IPC).
+
+vpmu=arch enables performance monitoring, but restricts the counters to the
+pre-defined architectural events only. These are exposed by cpuid, and listed
+in the Pre-Defined Architectural Performance Events table from the Intel 64
+and IA-32 Architectures Software Developer's Manual, Volume 3B, System
+Programming Guide, Part 2.
+
+If a boolean is not used, combinations of flags are allowed, comma separated.
+For example, vpmu=arch,bts.
 
 Note that if **watchdog** option is also specified vpmu will be turned off.
 

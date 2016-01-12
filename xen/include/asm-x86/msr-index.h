@@ -329,6 +329,7 @@
 
 /* Platform Shared Resource MSRs */
 #define MSR_IA32_CMT_EVTSEL		0x00000c8d
+#define MSR_IA32_CMT_EVTSEL_UE_MASK	0x0000ffff
 #define MSR_IA32_CMT_CTR		0x00000c8e
 #define MSR_IA32_PSR_ASSOC		0x00000c8f
 #define MSR_IA32_PSR_L3_QOS_CFG	0x00000c81

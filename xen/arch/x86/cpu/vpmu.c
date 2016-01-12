@@ -43,34 +43,59 @@ CHECK_pmu_data;
 CHECK_pmu_params;
 
 /*
- * "vpmu" :     vpmu generally enabled
- * "vpmu=off" : vpmu generally disabled
- * "vpmu=bts" : vpmu enabled and Intel BTS feature switched on.
+ * "vpmu" :     vpmu generally enabled (all counters)
+ * "vpmu=off"  : vpmu generally disabled
+ * "vpmu=bts"  : vpmu enabled and Intel BTS feature switched on.
+ * "vpmu=ipc"  : vpmu enabled for IPC counters only (most restrictive)
+ * "vpmu=arch" : vpmu enabled for predef arch counters only (restrictive)
+ * flag combinations are allowed, eg, "vpmu=ipc,bts".
  */
 static unsigned int __read_mostly opt_vpmu_enabled;
 unsigned int __read_mostly vpmu_mode = XENPMU_MODE_OFF;
 unsigned int __read_mostly vpmu_features = 0;
-static void parse_vpmu_param(char *s);
-custom_param("vpmu", parse_vpmu_param);
+static void parse_vpmu_params(char *s);
+custom_param("vpmu", parse_vpmu_params);
 
 static DEFINE_SPINLOCK(vpmu_lock);
 static unsigned vpmu_count;
 
 static DEFINE_PER_CPU(struct vcpu *, last_vcpu);
 
-static void __init parse_vpmu_param(char *s)
+static int parse_vpmu_param(char *s, unsigned int len)
 {
+    if ( !*s || !len )
+        return 0;
+    if ( !strncmp(s, "bts", len) )
+        vpmu_features |= XENPMU_FEATURE_INTEL_BTS;
+    else if ( !strncmp(s, "ipc", len) )
+        vpmu_features |= XENPMU_FEATURE_IPC_ONLY;
+    else if ( !strncmp(s, "arch", len) )
+        vpmu_features |= XENPMU_FEATURE_ARCH_ONLY;
+    else
+        return 1;
+    return 0;
+}
+
+static void __init parse_vpmu_params(char *s)
+{
+    char *sep, *p = s;
+
     switch ( parse_bool(s) )
     {
     case 0:
         break;
     default:
-        if ( !strcmp(s, "bts") )
-            vpmu_features |= XENPMU_FEATURE_INTEL_BTS;
-        else if ( *s )
+        for ( ; ; )
         {
-            printk("VPMU: unknown flag: %s - vpmu disabled!\n", s);
-            break;
+            sep = strchr(p, ',');
+            if ( sep == NULL )
+                sep = strchr(p, 0);
+            if ( parse_vpmu_param(p, sep - p) )
+                goto error;
+            if ( !*sep )
+                /* reached end of flags */
+                break;
+            p = sep + 1;
         }
         /* fall through */
     case 1:
@@ -79,6 +104,10 @@ static void __init parse_vpmu_param(char *s)
         opt_vpmu_enabled = 1;
         break;
     }
+    return;
+
+ error:
+    printk("VPMU: unknown flags: %s - vpmu disabled!\n", s);
 }
 
 void vpmu_lvtpc_update(uint32_t val)
@@ -708,7 +737,9 @@ long do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg)
         break;
 
     case XENPMU_feature_set:
-        if ( pmu_params.val & ~XENPMU_FEATURE_INTEL_BTS )
+        if ( pmu_params.val & ~(XENPMU_FEATURE_INTEL_BTS |
+                                XENPMU_FEATURE_IPC_ONLY |
+                                XENPMU_FEATURE_ARCH_ONLY))
             return -EINVAL;
 
         spin_lock(&vpmu_lock);

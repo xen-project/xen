@@ -605,11 +605,16 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
                  "MSR_PERF_GLOBAL_STATUS(0x38E)!\n");
         return -EINVAL;
     case MSR_IA32_PEBS_ENABLE:
+        if ( vpmu_features & (XENPMU_FEATURE_IPC_ONLY |
+                              XENPMU_FEATURE_ARCH_ONLY) )
+            return -EINVAL;
         if ( msr_content )
             /* PEBS is reported as unavailable in MSR_IA32_MISC_ENABLE */
             return -EINVAL;
         return 0;
     case MSR_IA32_DS_AREA:
+        if ( !(vpmu_features & XENPMU_FEATURE_INTEL_BTS) )
+            return -EINVAL;
         if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_DS) )
         {
             if ( !(has_hvm_container_vcpu(v)
@@ -658,10 +663,50 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         tmp = msr - MSR_P6_EVNTSEL(0);
         if ( tmp >= 0 && tmp < arch_pmc_cnt )
         {
+            bool_t blocked = 0;
+            uint64_t umaskevent = msr_content & MSR_IA32_CMT_EVTSEL_UE_MASK;
             struct xen_pmu_cntr_pair *xen_pmu_cntr_pair =
                 vpmu_reg_pointer(core2_vpmu_cxt, arch_counters);
 
             if ( msr_content & ARCH_CTRL_MASK )
+                return -EINVAL;
+
+            /* PMC filters */
+            if ( vpmu_features & (XENPMU_FEATURE_IPC_ONLY |
+                                  XENPMU_FEATURE_ARCH_ONLY) )
+            {
+                blocked = 1;
+                switch ( umaskevent )
+                {
+                /*
+                 * See the Pre-Defined Architectural Performance Events table
+                 * from the Intel 64 and IA-32 Architectures Software
+                 * Developer's Manual, Volume 3B, System Programming Guide,
+                 * Part 2.
+                 */
+                case 0x003c:	/* UnHalted Core Cycles */
+                case 0x013c:	/* UnHalted Reference Cycles */
+                case 0x00c0:	/* Instructions Retired */
+                    blocked = 0;
+                    break;
+                }
+            }
+
+            if ( vpmu_features & XENPMU_FEATURE_ARCH_ONLY )
+            {
+                /* Additional counters beyond IPC only; blocked already set. */
+                switch ( umaskevent )
+                {
+                case 0x4f2e:	/* Last Level Cache References */
+                case 0x412e:	/* Last Level Cache Misses */
+                case 0x00c4:	/* Branch Instructions Retired */
+                case 0x00c5:	/* All Branch Mispredict Retired */
+                    blocked = 0;
+                    break;
+               }
+            }
+
+            if ( blocked )
                 return -EINVAL;
 
             if ( has_hvm_container_vcpu(v) )
