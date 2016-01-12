@@ -426,7 +426,9 @@ static void xc_cpuid_hvm_policy(xc_interface *xch,
                         bitmaskof(X86_FEATURE_RDSEED)  |
                         bitmaskof(X86_FEATURE_ADX)  |
                         bitmaskof(X86_FEATURE_SMAP) |
-                        bitmaskof(X86_FEATURE_FSGSBASE));
+                        bitmaskof(X86_FEATURE_FSGSBASE) |
+                        bitmaskof(X86_FEATURE_CLWB) |
+                        bitmaskof(X86_FEATURE_CLFLUSHOPT));
         } else
             regs[1] = 0;
         regs[0] = regs[2] = regs[3] = 0;
