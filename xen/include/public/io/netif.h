@@ -154,18 +154,28 @@
  * Guest transmit
  * ==============
  *
- * This is the 'wire' format for packets:
+ * This is the 'wire' format for transmit (frontend -> backend) packets:
+ *
  *  Fragment 1: netif_tx_request_t  - flags = NETTXF_*
  *                                    size = total packet size
  * [Extra 1: netif_extra_info_t]    - (only if fragment 1 flags include
  *                                     NETTXF_extra_info)
+ *  ...
  * [Extra N: netif_extra_info_t]    - (only if extra N-1 flags include
  *                                     XEN_NETIF_EXTRA_MORE)
  *  ...
  *  Fragment N: netif_tx_request_t  - (only if fragment N-1 flags include
- *                                     NETTXF_more_data)
+ *                                     NETTXF_more_data - flags on preceding
+ *                                     extras are not relevent here)
  *                                    flags = 0
  *                                    size = fragment size
+ *
+ * NOTE:
+ *
+ * This format slightly is different from that used for receive
+ * (backend -> frontend) packets. Specifically, in a multi-fragment
+ * packet the actual size of fragment 1 can only be determined by
+ * subtracting the sizes of fragments 2..N from the total packet size.
  *
  * Ring slot size is 12 octets, however not all request/response
  * structs use the full size.
@@ -202,18 +212,28 @@
  * Guest receive
  * =============
  *
- * This is the 'wire' format for packets:
+ * This is the 'wire' format for receive (backend -> frontend) packets:
+ *
  *  Fragment 1: netif_rx_request_t  - flags = NETRXF_*
  *                                    size = fragment size
  * [Extra 1: netif_extra_info_t]    - (only if fragment 1 flags include
  *                                     NETRXF_extra_info)
+ *  ...
  * [Extra N: netif_extra_info_t]    - (only if extra N-1 flags include
  *                                     XEN_NETIF_EXTRA_MORE)
  *  ...
  *  Fragment N: netif_rx_request_t  - (only if fragment N-1 flags include
- *                                     NETRXF_more_data)
+ *                                     NETRXF_more_data - flags on preceding
+ *                                     extras are not relevent here)
  *                                    flags = 0
  *                                    size = fragment size
+ *
+ * NOTE:
+ *
+ * This format slightly is different from that used for transmit
+ * (frontend -> backend) packets. Specifically, in a multi-fragment
+ * packet the size of the packet can only be determined by summing the
+ * sizes of fragments 1..N.
  *
  * Ring slot size is 8 octets.
  *
