@@ -318,6 +318,12 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
         hardware_domain = d;
     }
 
+    if ( domcr_flags & DOMCRF_xs_domain )
+    {
+        d->is_xenstore = 1;
+        d->disable_migrate = 1;
+    }
+
     rangeset_domain_initialise(d);
     init_status |= INIT_rangeset;
 

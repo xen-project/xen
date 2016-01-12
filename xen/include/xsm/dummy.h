@@ -71,6 +71,10 @@ static always_inline int xsm_default_action(
         if ( src->is_privileged )
             return 0;
         return -EPERM;
+    case XSM_XS_PRIV:
+        if ( src->is_xenstore || src->is_privileged )
+            return 0;
+        return -EPERM;
     default:
         LINKER_BUG_ON(1);
         return -EPERM;
@@ -123,6 +127,8 @@ static XSM_INLINE int xsm_domctl(XSM_DEFAULT_ARG struct domain *d, int cmd)
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_unbind_pt_irq:
         return xsm_default_action(XSM_DM_PRIV, current->domain, d);
+    case XEN_DOMCTL_getdomaininfo:
+        return xsm_default_action(XSM_XS_PRIV, current->domain, d);
     default:
         return xsm_default_action(XSM_PRIV, current->domain, d);
     }

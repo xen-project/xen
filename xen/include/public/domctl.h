@@ -63,6 +63,9 @@ struct xen_domctl_createdomain {
  /* Is this a PVH guest (as opposed to an HVM or PV guest)? */
 #define _XEN_DOMCTL_CDF_pvh_guest     4
 #define XEN_DOMCTL_CDF_pvh_guest      (1U<<_XEN_DOMCTL_CDF_pvh_guest)
+ /* Is this a xenstore domain? */
+#define _XEN_DOMCTL_CDF_xs_domain     5
+#define XEN_DOMCTL_CDF_xs_domain      (1U<<_XEN_DOMCTL_CDF_xs_domain)
     uint32_t flags;
     struct xen_arch_domainconfig config;
 };
@@ -97,6 +100,9 @@ struct xen_domctl_getdomaininfo {
 /* domain is PVH */
 #define _XEN_DOMINF_pvh_guest 7
 #define XEN_DOMINF_pvh_guest  (1U<<_XEN_DOMINF_pvh_guest)
+/* domain is a xenstore domain */
+#define _XEN_DOMINF_xs_domain 8
+#define XEN_DOMINF_xs_domain  (1U<<_XEN_DOMINF_xs_domain)
  /* XEN_DOMINF_shutdown guest-supplied code.  */
 #define XEN_DOMINF_shutdownmask 255
 #define XEN_DOMINF_shutdownshift 16

@@ -374,6 +374,8 @@ struct domain
     bool_t           auto_node_affinity;
     /* Is this guest fully privileged (aka dom0)? */
     bool_t           is_privileged;
+    /* Is this a xenstore domain (not dom0)? */
+    bool_t           is_xenstore;
     /* Domain's VCPUs are pinned 1:1 to physical CPUs? */
     bool_t           is_pinned;
     /* Non-migratable and non-restoreable? */
@@ -533,6 +535,9 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
  /* DOMCRF_pvh: Create PV domain in HVM container. */
 #define _DOMCRF_pvh             5
 #define DOMCRF_pvh              (1U<<_DOMCRF_pvh)
+ /* DOMCRF_xs_domain: xenstore domain */
+#define _DOMCRF_xs_domain       6
+#define DOMCRF_xs_domain        (1U<<_DOMCRF_xs_domain)
 
 /*
  * rcu_lock_domain_by_id() is more efficient than get_domain_by_id().

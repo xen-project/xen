@@ -183,10 +183,11 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     info->cpu_time = cpu_time;
 
     info->flags = (info->nr_online_vcpus ? flags : 0) |
-        ((d->is_dying == DOMDYING_dead) ? XEN_DOMINF_dying    : 0) |
-        (d->is_shut_down                ? XEN_DOMINF_shutdown : 0) |
-        (d->controller_pause_count > 0  ? XEN_DOMINF_paused   : 0) |
-        (d->debugger_attached           ? XEN_DOMINF_debugged : 0) |
+        ((d->is_dying == DOMDYING_dead) ? XEN_DOMINF_dying     : 0) |
+        (d->is_shut_down                ? XEN_DOMINF_shutdown  : 0) |
+        (d->controller_pause_count > 0  ? XEN_DOMINF_paused    : 0) |
+        (d->debugger_attached           ? XEN_DOMINF_debugged  : 0) |
+        (d->is_xenstore                 ? XEN_DOMINF_xs_domain : 0) |
         d->shutdown_code << XEN_DOMINF_shutdownshift;
 
     switch ( d->guest_type )
@@ -551,7 +552,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                | XEN_DOMCTL_CDF_pvh_guest
                | XEN_DOMCTL_CDF_hap
                | XEN_DOMCTL_CDF_s3_integrity
-               | XEN_DOMCTL_CDF_oos_off)) )
+               | XEN_DOMCTL_CDF_oos_off
+               | XEN_DOMCTL_CDF_xs_domain)) )
             break;
 
         dom = op->domain;
@@ -593,6 +595,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             domcr_flags |= DOMCRF_s3_integrity;
         if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_oos_off )
             domcr_flags |= DOMCRF_oos_off;
+        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_xs_domain )
+            domcr_flags |= DOMCRF_xs_domain;
 
         d = domain_create(dom, domcr_flags, op->u.createdomain.ssidref,
                           &op->u.createdomain.config);
