@@ -25,6 +25,17 @@ config ARCH_DEFCONFIG
 
 menu "Architecture Features"
 
+config BIGMEM
+	bool "big memory support"
+	default n
+	---help---
+	  Allows Xen to support up to 123Tb of memory.
+
+	  This requires enlarging struct page_info as well as shrinking
+	  the always accessible direct mapped memory range.
+
+	  If unsure, say N.
+
 endmenu
 
 source "common/Kconfig"

@@ -23,7 +23,6 @@ $(call as-insn-check,CFLAGS,CC,".equ \"x\"$$(comma)1", \
                      '-D__OBJECT_LABEL__=$(subst $(BASEDIR)/,,$(CURDIR))/$$@')
 
 shadow-paging ?= y
-bigmem        ?= n
 
 CFLAGS += -mno-red-zone -mno-sse -fpic
 CFLAGS += -fno-asynchronous-unwind-tables
@@ -33,4 +32,3 @@ CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
 endif
 
 CFLAGS-$(shadow-paging) += -DCONFIG_SHADOW_PAGING
-CFLAGS-$(bigmem)        += -DCONFIG_BIGMEM
