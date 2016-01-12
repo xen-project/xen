@@ -151,6 +151,361 @@
  */
 
 /*
+ * Control ring
+ * ============
+ *
+ * Some features, such as toeplitz hashing (detailed below), require a
+ * significant amount of out-of-band data to be passed from frontend to
+ * backend. Use of xenstore is not suitable for large quantities of data
+ * because of quota limitations and so a dedicated 'control ring' is used.
+ * The ability of the backend to use a control ring is advertised by
+ * setting:
+ *
+ * /local/domain/X/backend/<domid>/<vif>/feature-ctrl-ring = "1"
+ *
+ * The frontend provides a control ring to the backend by setting:
+ *
+ * /local/domain/<domid>/device/vif/<vif>/ctrl-ring-ref = <gref>
+ * /local/domain/<domid>/device/vif/<vif>/event-channel-ctrl = <port>
+ *
+ * where <gref> is the grant reference of the shared page used to
+ * implement the control ring and <port> is an event channel to be used
+ * as a mailbox interrupt. These keys must be set before the frontend
+ * moves into the connected state.
+ *
+ * The control ring uses a fixed request/response message size and is
+ * balanced (i.e. one request to one response), so operationally it is much
+ * the same as a transmit or receive ring.
+ * Note that there is no requirement that responses are issued in the same
+ * order as requests.
+ */
+
+/*
+ * Toeplitz hash types
+ * ===================
+ *
+ * For the purposes of the definitions below, 'Packet[]' is an array of
+ * octets containing an IP packet without options, 'Array[X..Y]' means a
+ * sub-array of 'Array' containing bytes X thru Y inclusive, and '+' is
+ * used to indicate concatenation of arrays.
+ */
+
+/*
+ * A hash calculated over an IP version 4 header as follows:
+ *
+ * Buffer[0..8] = Packet[12..15] (source address) +
+ *                Packet[16..19] (destination address)
+ *
+ * Result = ToeplitzHash(Buffer, 8)
+ */
+#define _NETIF_CTRL_TOEPLITZ_HASH_IPV4     0
+#define NETIF_CTRL_TOEPLITZ_HASH_IPV4      (1 << _NETIF_CTRL_TOEPLITZ_HASH_IPV4)
+
+/*
+ * A hash calculated over an IP version 4 header and TCP header as
+ * follows:
+ *
+ * Buffer[0..12] = Packet[12..15] (source address) +
+ *                 Packet[16..19] (destination address) +
+ *                 Packet[20..21] (source port) +
+ *                 Packet[22..23] (destination port)
+ *
+ * Result = ToeplitzHash(Buffer, 12)
+ */
+#define _NETIF_CTRL_TOEPLITZ_HASH_IPV4_TCP 1
+#define NETIF_CTRL_TOEPLITZ_HASH_IPV4_TCP  (1 << _NETIF_CTRL_TOEPLITZ_HASH_IPV4_TCP)
+
+/*
+ * A hash calculated over an IP version 6 header as follows:
+ *
+ * Buffer[0..32] = Packet[8..23]  (source address ) +
+ *                 Packet[24..39] (destination address)
+ *
+ * Result = ToeplitzHash(Buffer, 32)
+ */
+#define _NETIF_CTRL_TOEPLITZ_HASH_IPV6     2
+#define NETIF_CTRL_TOEPLITZ_HASH_IPV6      (1 << _NETIF_CTRL_TOEPLITZ_HASH_IPV4)
+
+/*
+ * A hash calculated over an IP version 6 header and TCP header as
+ * follows:
+ *
+ * Buffer[0..36] = Packet[8..23]  (source address) +
+ *                 Packet[24..39] (destination address) +
+ *                 Packet[40..41] (source port) +
+ *                 Packet[42..43] (destination port)
+ *
+ * Result = ToeplitzHash(Buffer, 36)
+ */
+#define _NETIF_CTRL_TOEPLITZ_HASH_IPV6_TCP 3
+#define NETIF_CTRL_TOEPLITZ_HASH_IPV6_TCP  (1 << _NETIF_CTRL_TOEPLITZ_HASH_IPV4_TCP)
+
+/*
+ * Control requests (netif_ctrl_request_t)
+ * =======================================
+ *
+ * All requests have the following format:
+ *
+ *    0     1     2     3     4     5     6     7  octet
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * |    id     |   type    |         data[0]       |
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * |         data[1]       |         data[2]       |
+ * +-----+-----+-----+-----+-----------------------+
+ *
+ * id: the request identifier, echoed in response.
+ * type: the type of request (see below)
+ * data[]: any data associated with the request (determined by type)
+ */
+
+struct netif_ctrl_request {
+    uint16_t id;
+    uint16_t type;
+
+#define NETIF_CTRL_TYPE_INVALID                    0
+#define NETIF_CTRL_TYPE_GET_TOEPLITZ_FLAGS         1
+#define NETIF_CTRL_TYPE_SET_TOEPLITZ_FLAGS         2
+#define NETIF_CTRL_TYPE_SET_TOEPLITZ_KEY           3
+#define NETIF_CTRL_TYPE_GET_TOEPLITZ_MAPPING_ORDER 4
+#define NETIF_CTRL_TYPE_SET_TOEPLITZ_MAPPING_ORDER 5
+#define NETIF_CTRL_TYPE_SET_TOEPLITZ_MAPPING       6
+
+    uint32_t data[3];
+};
+typedef struct netif_ctrl_request netif_ctrl_request_t;
+
+/*
+ * Control responses (netif_ctrl_response_t)
+ * =========================================
+ *
+ * All responses have the following format:
+ *
+ *    0     1     2     3     4     5     6     7  octet
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * |    id     |   type    |         status        |
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * |         data          |
+ * +-----+-----+-----+-----+
+ *
+ * id: the corresponding request identifier
+ * type: the type of the corresponding request
+ * status: the status of request processing
+ * data: any data associated with the response (determined by type and
+ *       status)
+ */
+
+struct netif_ctrl_response {
+    uint16_t id;
+    uint16_t type;
+    uint32_t status;
+
+#define NETIF_CTRL_STATUS_SUCCESS           0
+#define NETIF_CTRL_STATUS_NOT_SUPPORTED     1
+#define NETIF_CTRL_STATUS_INVALID_PARAMETER 2
+#define NETIF_CTRL_STATUS_BUFFER_OVERFLOW   3
+
+    uint32_t data;
+};
+typedef struct netif_ctrl_response netif_ctrl_response_t;
+
+/*
+ * Control messages
+ * ================
+ *
+ * NETIF_CTRL_TYPE_GET_TOEPLITZ_FLAGS
+ * ----------------------------------
+ *
+ * This is sent by the frontend to query the types of toeplitz
+ * hash supported by the backend.
+ *
+ * Request:
+ *
+ *  type    = NETIF_CTRL_TYPE_GET_TOEPLITZ_FLAGS
+ *  data[0] = 0
+ *  data[1] = 0
+ *  data[2] = 0
+ *
+ * Response:
+ *
+ *  status = NETIF_CTRL_STATUS_NOT_SUPPORTED - Operation not supported
+ *           NETIF_CTRL_STATUS_SUCCESS       - Operation successful
+ *  data   = supported hash types (if operation was successful)
+ *
+ * NETIF_CTRL_TYPE_SET_TOEPLITZ_FLAGS
+ * ----------------------------------
+ *
+ * This is sent by the frontend to set the types of toeplitz hash that
+ * the backend should calculate. (See above for hash type definitions).
+ * Note that the 'maximal' type of hash should always be chosen. For
+ * example, if the frontend sets both IPV4 and IPV4_TCP hash types then
+ * the latter hash type should be calculated for any TCP packet and the
+ * former only calculated for non-TCP packets.
+ *
+ * Request:
+ *
+ *  type    = NETIF_CTRL_TYPE_SET_TOEPLITZ_FLAGS
+ *  data[0] = bitwise OR of NETIF_CTRL_TOEPLITZ_HASH_* values
+ *  data[1] = 0
+ *  data[2] = 0
+ *
+ * Response:
+ *
+ *  status = NETIF_CTRL_STATUS_NOT_SUPPORTED     - Operation not supported
+ *           NETIF_CTRL_STATUS_INVALID_PARAMETER - One or more flag value
+ *                                                 is invalid or
+ *                                                 unsupported
+ *           NETIF_CTRL_STATUS_SUCCESS           - Operation successful
+ *  data   = 0
+ *
+ * NOTE: Setting data[0] to zero disables toeplitz hashing and the backend
+ *       is free to choose how it steers packets to queues (which is the
+ *       default behaviour).
+ *
+ * NETIF_CTRL_TYPE_SET_TOEPLITZ_KEY
+ * --------------------------------
+ *
+ * This is sent by the frontend to set the key of the toeplitz hash that
+ * the backend should calculate. The toeplitz algorithm is illustrated
+ * by the following pseudo-code:
+ *
+ * (Buffer[] and Key[] are treated as shift-registers where the MSB of
+ * Buffer/Key[0] is considered 'left-most' and the LSB of Buffer/Key[N-1]
+ * is the 'right-most').
+ *
+ * Value = 0
+ * For number of bits in Buffer[]
+ *    If (left-most bit of Buffer[] is 1)
+ *        Value ^= left-most 32 bits of Key[]
+ *    Key[] << 1
+ *    Buffer[] << 1
+ *
+ * Request:
+ *
+ *  type    = NETIF_CTRL_TYPE_SET_TOEPLITZ_KEY
+ *  data[0] = grant reference of page containing the key (assumed to
+ *            start at beginning of grant)
+ *  data[1] = size of key in octets
+ *  data[2] = 0
+ *
+ * Response:
+ *
+ *  status = NETIF_CTRL_STATUS_NOT_SUPPORTED     - Operation not supported
+ *           NETIF_CTRL_STATUS_INVALID_PARAMETER - Key size is invalid
+ *           NETIF_CTRL_STATUS_BUFFER_OVERFLOW   - Key size is larger than
+ *                                                 the backend supports
+ *           NETIF_CTRL_STATUS_SUCCESS           - Operation successful
+ *  data   = 0
+ *
+ * NOTE: Any key octets not specified are assumed to be zero (the key
+ *       is assumed to be empty by default) and specifying a new key
+ *       invalidates any previous key, hence specifying a key size of
+ *       zero will clear the key (which ensures that the calculated hash
+ *       will always be zero).
+ *       The maximum size of key is backend specific, but is also limited
+ *       by the single grant reference.
+ *       The grant reference may be read-only and must remain valid until
+ *       the response has been processed.
+ *
+ * NETIF_CTRL_TYPE_GET_TOEPLITZ_MAPPING_ORDER
+ * ------------------------------------------
+ *
+ * This is sent by the frontend to query the maximum order of mapping
+ * table supported by the backend. The order is specified in terms of
+ * table entries i.e. the table may contain up to 2^order entries.
+ *
+ * Request:
+ *
+ *  type    = NETIF_CTRL_TYPE_GET_TOEPLITZ_MAPPING_ORDER
+ *  data[0] = 0
+ *  data[1] = 0
+ *  data[2] = 0
+ *
+ * Response:
+ *
+ *  status = NETIF_CTRL_STATUS_NOT_SUPPORTED - Operation not supported
+ *           NETIF_CTRL_STATUS_SUCCESS       - Operation successful
+ *  data   = maximum order of mapping table (if operation was successful)
+ *
+ * NETIF_CTRL_TYPE_SET_TOEPLITZ_MAPPING_ORDER
+ * ------------------------------------------
+ *
+ * This is sent by the frontend to set the actual order of the mapping
+ * table to be used by the backend. The order is specified in terms of
+ * table entries i.e. the table will contain to 2^order entries.
+ * Any previous table is invalidated by this message and any new table
+ * is assumed to be zero filled. The default order is zero and hence the
+ * default table contains a single entry mapping all hashes to queue-0.
+ *
+ * Request:
+ *
+ *  type    = NETIF_CTRL_TYPE_SET_TOEPLITZ_MAPPING_ORDER
+ *  data[0] = order of mapping table
+ *  data[1] = 0
+ *  data[2] = 0
+ *
+ * Response:
+ *
+ *  status = NETIF_CTRL_STATUS_NOT_SUPPORTED     - Operation not supported
+ *           NETIF_CTRL_STATUS_INVALID_PARAMETER - Table order is invalid
+ *           NETIF_CTRL_STATUS_SUCCESS           - Operation successful
+ *  data   = 0
+ *
+ * NETIF_CTRL_TYPE_SET_TOEPLITZ_MAPPING
+ * ------------------------------------
+ *
+ * This is sent by the frontend to set the content of the table mapping
+ * toeplitz hash value to queue number. The backend should calculate the
+ * hash from the packet header, use it as an index into the table (modulo
+ * the size of the table) and then steer the packet to the queue number
+ * found at that index.
+ *
+ * Request:
+ *
+ *  type    = NETIF_CTRL_TYPE_SET_TOEPLITZ_MAPPING
+ *  data[0] = grant reference of page containing the mapping (sub-)table
+ *            (assumed to start at beginning of grant)
+ *  data[1] = size of (sub-)table in entries
+ *  data[2] = offset, in entries, of sub-table within overall table
+ *
+ * Response:
+ *
+ *  status = NETIF_CTRL_STATUS_NOT_SUPPORTED     - Operation not supported
+ *           NETIF_CTRL_STATUS_INVALID_PARAMETER - Table size or content is
+ *                                                 invalid
+ *           NETIF_CTRL_STATUS_BUFFER_OVERFLOW   - Table size is larger than
+ *                                                 the backend supports
+ *           NETIF_CTRL_STATUS_SUCCESS           - Operation successful
+ *  data   = 0
+ *
+ * NOTE: The overall table has the following format:
+ *
+ *          0     1     2     3     4     5     6     7  octet
+ *       +-----+-----+-----+-----+-----+-----+-----+-----+
+ *       |       mapping[0]      |       mapping[1]      |
+ *       +-----+-----+-----+-----+-----+-----+-----+-----+
+ *       |                       .                       |
+ *       |                       .                       |
+ *       |                       .                       |
+ *       +-----+-----+-----+-----+-----+-----+-----+-----+
+ *       |      mapping[N-2]     |      mapping[N-1]     |
+ *       +-----+-----+-----+-----+-----+-----+-----+-----+
+ *
+ *       where N == 2^order as specified by a
+ *       NETIF_CTRL_TYPE_SET_TOEPLITZ_MAPPING_ORDER message and each
+ *       mapping must specifies a queue between 0 and
+ *       "multi-queue-num-queues" (see above).
+ *       The backend may support a mapping table larger than can be
+ *       mapped by a single grant reference. Thus sub-tables within a
+ *       larger table can be individually set by sending multiple messages
+ *       with differing offset values. Specifying a new sub-table does not
+ *       invalidate any table data outside that range.
+ *       The grant reference may be read-only and must remain valid until
+ *       the response has been processed.
+ */
+
+DEFINE_RING_TYPES(netif_ctrl, struct netif_ctrl_request, struct netif_ctrl_response);
+
+/*
  * Guest transmit
  * ==============
  *
@@ -330,6 +685,23 @@
  * type: Must be XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL}
  * flags: XEN_NETIF_EXTRA_FLAG_*
  * addr: address to add/remove
+ *
+ * XEN_NETIF_EXTRA_TYPE_TOEPLITZ:
+ *
+ * A backend that supports teoplitz hashing is assumed to accept
+ * this type of extra info in transmit packets.
+ * A frontend that enables toeplitz hashing is assumed to accept
+ * this type of extra info in receive packets.
+ *
+ *    0     1     2     3     4     5     6     7  octet
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * |type |flags|htype| pad |LSB ---- value ---- MSB|
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ *
+ * type: Must be XEN_NETIF_EXTRA_TYPE_TOEPLITZ
+ * flags: XEN_NETIF_EXTRA_FLAG_*
+ * htype: Hash type (one of _NETIF_CTRL_TOEPLITZ_HASH_* - see above)
+ * value: Hash value
  */
 
 /* Protocol checksum field is blank in the packet (hardware offload)? */
@@ -363,7 +735,8 @@ typedef struct netif_tx_request netif_tx_request_t;
 #define XEN_NETIF_EXTRA_TYPE_GSO       (1)  /* u.gso */
 #define XEN_NETIF_EXTRA_TYPE_MCAST_ADD (2)  /* u.mcast */
 #define XEN_NETIF_EXTRA_TYPE_MCAST_DEL (3)  /* u.mcast */
-#define XEN_NETIF_EXTRA_TYPE_MAX       (4)
+#define XEN_NETIF_EXTRA_TYPE_TOEPLITZ  (4)  /* u.toeplitz */
+#define XEN_NETIF_EXTRA_TYPE_MAX       (5)
 
 /* netif_extra_info_t flags. */
 #define _XEN_NETIF_EXTRA_FLAG_MORE (0)
@@ -391,6 +764,11 @@ struct netif_extra_info {
         struct {
             uint8_t addr[6];
         } mcast;
+        struct {
+            uint8_t type;
+            uint8_t pad;
+            uint8_t value[4];
+        } toeplitz;
         uint16_t pad[3];
     } u;
 };
