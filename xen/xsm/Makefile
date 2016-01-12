@@ -1,7 +1,5 @@
 obj-y += xsm_core.o
-ifeq ($(XSM_ENABLE),y)
-obj-y += xsm_policy.o
-obj-y += dummy.o
-endif
+obj-$(CONFIG_XSM) += xsm_policy.o
+obj-$(CONFIG_XSM) += dummy.o
 
 subdir-$(CONFIG_FLASK) += flask

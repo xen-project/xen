@@ -27,9 +27,9 @@
 /* DO NOT implement this function; it is supposed to trigger link errors */
 void __xsm_action_mismatch_detected(void);
 
-#ifdef XSM_ENABLE
+#ifdef CONFIG_XSM
 
-/* In XSM_ENABLE builds, this header file is included from xsm/dummy.c, and
+/* In CONFIG_XSM builds, this header file is included from xsm/dummy.c, and
  * contains static (not inline) functions compiled to the dummy XSM module.
  * There is no xsm_default_t argument available, so the value from the assertion
  * is used to initialize the variable.
@@ -39,9 +39,9 @@ void __xsm_action_mismatch_detected(void);
 #define XSM_DEFAULT_VOID void
 #define XSM_ASSERT_ACTION(def) xsm_default_t action = def; (void)action
 
-#else /* XSM_ENABLE */
+#else /* CONFIG_XSM */
 
-/* In !XSM_ENABLE builds, this header file is included from xsm/xsm.h, and
+/* In !CONFIG_XSM builds, this header file is included from xsm/xsm.h, and
  * contains inline functions for each XSM hook. These functions also perform
  * compile-time checks on the xsm_default_t argument to ensure that the behavior
  * of the dummy XSM module is the same as the behavior with XSM disabled.
@@ -51,7 +51,7 @@ void __xsm_action_mismatch_detected(void);
 #define XSM_DEFAULT_VOID xsm_default_t action
 #define XSM_ASSERT_ACTION(def) LINKER_BUG_ON(def != action)
 
-#endif /* XSM_ENABLE */
+#endif /* CONFIG_XSM */
 
 static always_inline int xsm_default_action(
     xsm_default_t action, struct domain *src, struct domain *target)

@@ -275,14 +275,10 @@ Building the python tools may fail unless certain options are passed to
 setup.py. Config.mk contains additional info how to use this variable.
 PYTHON_PREFIX_ARG=
 
-The hypervisor may be build with XSM support, which can be changed with
-the following variables.
-XSM_ENABLE=y
-
-The hypervisor may be build with Flask support, which can be changed
+he hypervisor may be build with XSM/Flask support, which can be changed
 by running:
 make -C xen menuconfig
-and enabling Flask in the 'Common Features' menu.
+and enabling XSM/Flask in the 'Common Features' menu.
 
 Do a build for coverage.
 coverage=y
