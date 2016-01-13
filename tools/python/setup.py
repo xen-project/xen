@@ -17,7 +17,8 @@ xc = Extension("xc",
                include_dirs       = [ PATH_XEN, PATH_LIBXENTOOLLOG + "/include", PATH_LIBXC + "/include", "xen/lowlevel/xc" ],
                library_dirs       = [ PATH_LIBXC ],
                libraries          = [ "xenctrl", "xenguest" ],
-               depends            = [ PATH_LIBXC + "/libxenctrl.so", PATH_LIBXC + "/libxenguest.so",  "-Wl,-rpath-link="+PATH_LIBXENTOOLLOG ],
+               depends            = [ PATH_LIBXC + "/libxenctrl.so", PATH_LIBXC + "/libxenguest.so" ],
+               extra_link_args    = [ "-Wl,-rpath-link="+PATH_LIBXENTOOLLOG ],
                sources            = [ "xen/lowlevel/xc/xc.c" ])
 
 xs = Extension("xs",
