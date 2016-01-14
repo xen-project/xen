@@ -922,9 +922,8 @@ int arch_set_info_guest(
         if ( v->arch.xsave_area )
         {
             v->arch.xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
-            if ( cpu_has_xsaves || cpu_has_xsavec )
-                v->arch.xsave_area->xsave_hdr.xcomp_bv = XSTATE_FP_SSE |
-                                                         XSTATE_COMPACTION_ENABLED;
+            v->arch.xsave_area->xsave_hdr.xcomp_bv =
+                cpu_has_xsaves ? XSTATE_COMPACTION_ENABLED : 0;
         }
     }
     else if ( v->arch.xsave_area )
