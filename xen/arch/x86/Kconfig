@@ -25,6 +25,8 @@ config ARCH_DEFCONFIG
 
 menu "Architecture Features"
 
+source "arch/Kconfig"
+
 config BIGMEM
 	bool "big memory support"
 	default n

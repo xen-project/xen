@@ -31,6 +31,8 @@ config ARCH_DEFCONFIG
 
 menu "Architecture Features"
 
+source "arch/Kconfig"
+
 # Select HAS_GICV3 if GICv3 is supported
 config HAS_GICV3
 	bool

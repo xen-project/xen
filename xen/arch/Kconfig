@@ -1,0 +1,8 @@
+
+config NR_CPUS
+	int "Maximum number of physical CPUs"
+	range 1 4095
+	default "256" if X86
+	default "128" if ARM
+	---help---
+	  Specifies the maximum number of physical CPUs which Xen will support.
