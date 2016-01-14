@@ -82,6 +82,12 @@ static int cpuid(
     return X86EMUL_OKAY;
 }
 
+#define cache_line_size() ({ \
+    unsigned int eax = 1, ebx, ecx = 0, edx; \
+    cpuid(&eax, &ebx, &ecx, &edx, NULL); \
+    edx & (1U << 19) ? (ebx >> 5) & 0x7f8 : 0; \
+})
+
 #define cpu_has_mmx ({ \
     unsigned int eax = 1, ecx = 0, edx; \
     cpuid(&eax, &ecx, &ecx, &edx, NULL); \
@@ -872,6 +878,35 @@ int main(int argc, char **argv)
 #undef put_insn
 #undef set_insn
 #undef check_eip
+
+    j = cache_line_size();
+    snprintf(instr, (char *)res + MMAP_SZ - instr,
+             "Testing clzero (%u-byte line)...", j);
+    printf("%-40s", instr);
+    if ( j >= sizeof(*res) && j <= MMAP_SZ / 4 )
+    {
+        instr[0] = 0x0f; instr[1] = 0x01; instr[2] = 0xfc;
+        regs.eflags = 0x200;
+        regs.eip    = (unsigned long)&instr[0];
+        regs.eax    = (unsigned long)res + MMAP_SZ / 2 + j - 1;
+        memset((void *)res + MMAP_SZ / 4, ~0, 3 * MMAP_SZ / 4);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             (regs.eax != (unsigned long)res + MMAP_SZ / 2 + j - 1) ||
+             (regs.eflags != 0x200) ||
+             (regs.eip != (unsigned long)&instr[3]) ||
+             (res[MMAP_SZ / 2 / sizeof(*res) - 1] != ~0U) ||
+             (res[(MMAP_SZ / 2 + j) / sizeof(*res)] != ~0U) )
+            goto fail;
+        for ( i = 0; i < j; i += sizeof(*res) )
+            if ( res[(MMAP_SZ / 2 + i) / sizeof(*res)] )
+                break;
+        if ( i < j )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
 
     for ( j = 1; j <= 2; j++ )
     {

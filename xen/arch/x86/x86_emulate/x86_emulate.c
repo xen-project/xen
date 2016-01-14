@@ -1069,6 +1069,7 @@ static bool_t vcpu_has(
     return rc == X86EMUL_OKAY;
 }
 
+#define vcpu_has_clflush() vcpu_has(       1, EDX, 19, ctxt, ops)
 #define vcpu_has_lzcnt() vcpu_has(0x80000001, ECX,  5, ctxt, ops)
 #define vcpu_has_bmi1()  vcpu_has(0x00000007, EBX,  3, ctxt, ops)
 
@@ -3851,6 +3852,45 @@ x86_emulate(
             if ( (rc = ops->vmfunc(ctxt) != X86EMUL_OKAY) )
                 goto done;
             goto no_writeback;
+	case 0xfc: /* clzero */ {
+            unsigned int eax = 1, ebx = 0, dummy = 0;
+            unsigned long zero = 0;
+
+            base = ad_bytes == 8 ? _regs.eax :
+                   ad_bytes == 4 ? (uint32_t)_regs.eax : (uint16_t)_regs.eax;
+            limit = 0;
+            if ( vcpu_has_clflush() &&
+                 ops->cpuid(&eax, &ebx, &dummy, &dummy, ctxt) == X86EMUL_OKAY )
+                limit = ((ebx >> 8) & 0xff) * 8;
+            generate_exception_if(limit < sizeof(long) ||
+                                  (limit & (limit - 1)), EXC_UD, -1);
+            base &= ~(limit - 1);
+            if ( override_seg == -1 )
+                override_seg = x86_seg_ds;
+            if ( ops->rep_stos )
+            {
+                unsigned long nr_reps = limit / sizeof(zero);
+
+                rc = ops->rep_stos(&zero, override_seg, base, sizeof(zero),
+                                   &nr_reps, ctxt);
+                if ( rc == X86EMUL_OKAY )
+                {
+                    base += nr_reps * sizeof(zero);
+                    limit -= nr_reps * sizeof(zero);
+                }
+                else if ( rc != X86EMUL_UNHANDLEABLE )
+                    goto done;
+            }
+            while ( limit )
+            {
+                rc = ops->write(override_seg, base, &zero, sizeof(zero), ctxt);
+                if ( rc != X86EMUL_OKAY )
+                    goto done;
+                base += sizeof(zero);
+                limit -= sizeof(zero);
+            }
+            goto no_writeback;
+        }
         }
 
         switch ( modrm_reg & 7 )
