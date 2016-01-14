@@ -92,4 +92,7 @@
 #define FLASK_AVC_STATS 1
 #endif
 
+/* allow existing code to work with Kconfig variable */
+#define NR_CPUS CONFIG_NR_CPUS
+
 #endif /* __XEN_CONFIG_H__ */

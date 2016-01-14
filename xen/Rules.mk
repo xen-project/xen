@@ -59,9 +59,6 @@ CFLAGS-$(perfc_arrays)  += -DPERF_ARRAYS
 CFLAGS-$(lock_profile)  += -DLOCK_PROFILE
 CFLAGS-$(frame_pointer) += -fno-omit-frame-pointer -DCONFIG_FRAME_POINTER
 
-ifneq ($(max_phys_cpus),)
-CFLAGS-y                += -DMAX_PHYS_CPUS=$(max_phys_cpus)
-endif
 ifneq ($(max_phys_irqs),)
 CFLAGS-y                += -DMAX_PHYS_IRQS=$(max_phys_irqs)
 endif

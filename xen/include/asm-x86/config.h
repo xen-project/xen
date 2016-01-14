@@ -56,12 +56,6 @@
 
 #define OPT_CONSOLE_STR "vga"
 
-#ifdef MAX_PHYS_CPUS
-#define NR_CPUS MAX_PHYS_CPUS
-#else
-#define NR_CPUS 256
-#endif
-
 /* Linkage for x86 */
 #define __ALIGN .align 16,0x90
 #define __ALIGN_STR ".align 16,0x90"

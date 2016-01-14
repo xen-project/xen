@@ -45,12 +45,6 @@
 
 #define OPT_CONSOLE_STR "dtuart"
 
-#ifdef MAX_PHYS_CPUS
-#define NR_CPUS MAX_PHYS_CPUS
-#else
-#define NR_CPUS 128
-#endif
-
 #ifdef CONFIG_ARM_64
 #define MAX_VIRT_CPUS 128
 #else
