@@ -6523,29 +6523,29 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
-            goto param_fail2;
+            goto tdv_fail;
 
         if ( a.nr > GB(1) >> PAGE_SHIFT )
-            goto param_fail2;
+            goto tdv_fail;
 
         rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
         if ( rc )
-            goto param_fail2;
+            goto tdv_fail;
 
         rc = -ESRCH;
         if ( d->is_dying )
-            goto param_fail2;
+            goto tdv_fail;
 
         rc = -EINVAL;
         if ( d->vcpu == NULL || d->vcpu[0] == NULL )
-            goto param_fail2;
+            goto tdv_fail;
 
         if ( shadow_mode_enabled(d) )
             rc = shadow_track_dirty_vram(d, a.first_pfn, a.nr, a.dirty_bitmap);
         else
             rc = hap_track_dirty_vram(d, a.first_pfn, a.nr, a.dirty_bitmap);
 
-    param_fail2:
+    tdv_fail:
         rcu_unlock_domain(d);
         break;
     }
@@ -6564,21 +6564,21 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
-            goto param_fail3;
+            goto modmem_fail;
 
         rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
         if ( rc )
-            goto param_fail3;
+            goto modmem_fail;
 
         rc = -EINVAL;
         if ( a.nr < start_iter ||
              ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
              ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
-            goto param_fail3;
+            goto modmem_fail;
 
         rc = 0;
         if ( !paging_mode_log_dirty(d) )
-            goto param_fail3;
+            goto modmem_fail;
 
         while ( a.nr > start_iter )
         {
@@ -6604,7 +6604,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             }
         }
 
-    param_fail3:
+    modmem_fail:
         rcu_unlock_domain(d);
         break;
     }
@@ -6623,11 +6623,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -ESRCH;
 
         rc = xsm_hvm_param(XSM_TARGET, d, op);
-        if ( rc )
-            goto param_fail_getmemtype;
-
-        rc = -EINVAL;
-        if ( is_hvm_domain(d) )
+        if ( unlikely(rc) )
+            /* nothing */;
+        else if ( likely(is_hvm_domain(d)) )
         {
             /* Use get_gfn query as we are interested in the current 
              * type, not in allocating or unsharing. That'll happen 
@@ -6647,10 +6645,12 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 a.mem_type =  HVMMEM_ram_rw;
             else
                 a.mem_type =  HVMMEM_mmio_dm;
-            rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+            if ( __copy_to_guest(arg, &a, 1) )
+                rc = -EFAULT;
         }
+        else
+            rc = -EINVAL;
 
-    param_fail_getmemtype:
         rcu_unlock_domain(d);
         break;
     }
@@ -6677,20 +6677,20 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
-            goto param_fail4;
+            goto setmemtype_fail;
 
         rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
         if ( rc )
-            goto param_fail4;
+            goto setmemtype_fail;
 
         rc = -EINVAL;
         if ( a.nr < start_iter ||
              ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
              ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
-            goto param_fail4;
+            goto setmemtype_fail;
             
         if ( a.hvmmem_type >= ARRAY_SIZE(memtype) )
-            goto param_fail4;
+            goto setmemtype_fail;
 
         while ( a.nr > start_iter )
         {
@@ -6703,39 +6703,39 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 put_gfn(d, pfn);
                 p2m_mem_paging_populate(d, pfn);
                 rc = -EAGAIN;
-                goto param_fail4;
+                goto setmemtype_fail;
             }
             if ( p2m_is_shared(t) )
             {
                 put_gfn(d, pfn);
                 rc = -EAGAIN;
-                goto param_fail4;
+                goto setmemtype_fail;
             }
             if ( !p2m_is_ram(t) &&
                  (!p2m_is_hole(t) || a.hvmmem_type != HVMMEM_mmio_dm) &&
                  (t != p2m_mmio_write_dm || a.hvmmem_type != HVMMEM_ram_rw) )
             {
                 put_gfn(d, pfn);
-                goto param_fail4;
+                goto setmemtype_fail;
             }
 
             rc = p2m_change_type_one(d, pfn, t, memtype[a.hvmmem_type]);
             put_gfn(d, pfn);
             if ( rc )
-                goto param_fail4;
+                goto setmemtype_fail;
 
             /* Check for continuation if it's not the last interation */
             if ( a.nr > ++start_iter && !(start_iter & HVMOP_op_mask) &&
                  hypercall_preempt_check() )
             {
                 rc = -ERESTART;
-                goto param_fail4;
+                goto setmemtype_fail;
             }
         }
 
         rc = 0;
 
-    param_fail4:
+    setmemtype_fail:
         rcu_unlock_domain(d);
         break;
     }
@@ -6753,17 +6753,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -ESRCH;
 
         rc = -EINVAL;
-        if ( !is_hvm_domain(d) || !paging_mode_shadow(d) )
-            goto param_fail7;
+        if ( is_hvm_domain(d) && paging_mode_shadow(d) )
+            rc = xsm_hvm_param(XSM_TARGET, d, op);
+        if ( !rc )
+            pagetable_dying(d, a.gpa);
 
-        rc = xsm_hvm_param(XSM_TARGET, d, op);
-        if ( rc )
-            goto param_fail7;
-
-        rc = 0;
-        pagetable_dying(d, a.gpa);
-
-    param_fail7:
         rcu_unlock_domain(d);
         break;
     }
@@ -6808,15 +6802,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
-            goto param_fail8;
+            goto injtrap_fail;
 
         rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
         if ( rc )
-            goto param_fail8;
+            goto injtrap_fail;
 
         rc = -ENOENT;
         if ( tr.vcpuid >= d->max_vcpus || (v = d->vcpu[tr.vcpuid]) == NULL )
-            goto param_fail8;
+            goto injtrap_fail;
         
         if ( v->arch.hvm_vcpu.inject_trap.vector != -1 )
             rc = -EBUSY;
@@ -6830,7 +6824,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             rc = 0;
         }
 
-    param_fail8:
+    injtrap_fail:
         rcu_unlock_domain(d);
         break;
     }
