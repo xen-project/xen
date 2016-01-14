@@ -47,7 +47,9 @@ DECLARE_HVM_SAVE_TYPE(HEADER, 1, struct hvm_save_header);
 /*
  * Processor
  *
- * Compat: Pre-3.4 didn't have msr_tsc_aux
+ * Compat:
+ *     - Pre-3.4 didn't have msr_tsc_aux
+ *     - Pre-4.7 didn't have fpu_initialised
  */
 
 struct hvm_hw_cpu {
@@ -157,6 +159,10 @@ struct hvm_hw_cpu {
     };
     /* error code for pending event */
     uint32_t error_code;
+
+#define _XEN_X86_FPU_INITIALISED        0
+#define XEN_X86_FPU_INITIALISED         (1U<<_XEN_X86_FPU_INITIALISED)
+    uint32_t flags;
 };
 
 struct hvm_hw_cpu_compat {
@@ -275,12 +281,19 @@ static inline int _hvm_hw_fix_cpu(void *h, uint32_t size) {
         struct hvm_hw_cpu_compat cmp;
     } *ucpu = (union hvm_hw_cpu_union *)h;
 
-    /* If we copy from the end backwards, we should
-     * be able to do the modification in-place */
-    ucpu->nat.error_code = ucpu->cmp.error_code;
-    ucpu->nat.pending_event = ucpu->cmp.pending_event;
-    ucpu->nat.tsc = ucpu->cmp.tsc;
-    ucpu->nat.msr_tsc_aux = 0;
+    if ( size == sizeof(struct hvm_hw_cpu_compat) )
+    {
+        /*
+         * If we copy from the end backwards, we should
+         * be able to do the modification in-place.
+         */
+        ucpu->nat.error_code = ucpu->cmp.error_code;
+        ucpu->nat.pending_event = ucpu->cmp.pending_event;
+        ucpu->nat.tsc = ucpu->cmp.tsc;
+        ucpu->nat.msr_tsc_aux = 0;
+    }
+    /* Mimic the old behaviour by unconditionally setting fpu_initialised. */
+    ucpu->nat.flags = XEN_X86_FPU_INITIALISED;
 
     return 0;
 }

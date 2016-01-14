@@ -1797,9 +1797,15 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         ctxt.ldtr_arbytes = seg.attr.bytes;
 
         if ( v->fpu_initialised )
+        {
             memcpy(ctxt.fpu_regs, v->arch.fpu_ctxt, sizeof(ctxt.fpu_regs));
-        else 
-            memset(ctxt.fpu_regs, 0, sizeof(ctxt.fpu_regs));
+            ctxt.flags = XEN_X86_FPU_INITIALISED;
+        }
+        else
+        {
+             memset(ctxt.fpu_regs, 0, sizeof(ctxt.fpu_regs));
+             ctxt.flags = 0;
+        }
 
         ctxt.rax = v->arch.user_regs.eax;
         ctxt.rbx = v->arch.user_regs.ebx;
@@ -1981,7 +1987,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    if ( hvm_load_entry(CPU, h, &ctxt) != 0 ) 
+    if ( hvm_load_entry_zeroextend(CPU, h, &ctxt) != 0 )
         return -EINVAL;
 
     /* Sanity check some control registers. */
@@ -2006,6 +2012,13 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     {
         printk(XENLOG_G_ERR "%pv: HVM restore: bad EFER %#" PRIx64 " - %s\n",
                v, ctxt.msr_efer, errstr);
+        return -EINVAL;
+    }
+
+    if ( (ctxt.flags & ~XEN_X86_FPU_INITIALISED) != 0 )
+    {
+        gprintk(XENLOG_ERR, "bad flags value in CPU context: %#x\n",
+                ctxt.flags);
         return -EINVAL;
     }
 
@@ -2087,19 +2100,21 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     seg.attr.bytes = ctxt.ldtr_arbytes;
     hvm_set_segment_register(v, x86_seg_ldtr, &seg);
 
-    /* In case xsave-absent save file is restored on a xsave-capable host */
-    if ( cpu_has_xsave && !xsave_enabled(v) )
+    v->fpu_initialised = !!(ctxt.flags & XEN_X86_FPU_INITIALISED);
+    if ( v->fpu_initialised )
     {
-        struct xsave_struct *xsave_area = v->arch.xsave_area;
-
-        memcpy(v->arch.xsave_area, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
-        xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
-        if ( cpu_has_xsaves || cpu_has_xsavec )
-            xsave_area->xsave_hdr.xcomp_bv = XSTATE_FP_SSE |
-                                             XSTATE_COMPACTION_ENABLED;
-    }
-    else
         memcpy(v->arch.fpu_ctxt, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
+        /* In case xsave-absent save file is restored on a xsave-capable host */
+        if ( cpu_has_xsave && !xsave_enabled(v) )
+        {
+            struct xsave_struct *xsave_area = v->arch.xsave_area;
+
+            xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
+            if ( cpu_has_xsaves || cpu_has_xsavec )
+                xsave_area->xsave_hdr.xcomp_bv = XSTATE_FP_SSE |
+                                                 XSTATE_COMPACTION_ENABLED;
+        }
+    }
 
     v->arch.user_regs.eax = ctxt.rax;
     v->arch.user_regs.ebx = ctxt.rbx;
@@ -2127,7 +2142,6 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->arch.debugreg[7] = ctxt.dr7;
 
     v->arch.vgc_flags = VGCF_online;
-    v->fpu_initialised = 1;
 
     /* Auxiliary processors should be woken immediately. */
     v->is_initialised = 1;
