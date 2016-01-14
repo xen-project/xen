@@ -22,6 +22,7 @@
 #include <xen/paging.h>
 #include <asm/hvm/event.h>
 #include <asm/monitor.h>
+#include <asm/altp2m.h>
 #include <public/vm_event.h>
 
 static void hvm_event_fill_regs(vm_event_request_t *req)
@@ -81,6 +82,12 @@ static int hvm_event_traps(uint8_t sync, vm_event_request_t *req)
     {
         req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
         vm_event_vcpu_pause(curr);
+    }
+
+    if ( altp2m_active(currd) )
+    {
+        req->flags |= VM_EVENT_FLAG_ALTERNATE_P2M;
+        req->altp2m_idx = vcpu_altp2m(curr).p2midx;
     }
 
     hvm_event_fill_regs(req);
