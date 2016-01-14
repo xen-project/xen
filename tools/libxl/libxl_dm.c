@@ -730,9 +730,10 @@ static int libxl__dm_runas_helper(libxl__gc *gc, const char *username)
 
     buf_size = sysconf(_SC_GETPW_R_SIZE_MAX);
     if (buf_size < 0) {
-        LOGE(ERROR, "sysconf(_SC_GETPW_R_SIZE_MAX) returned error %ld",
-                buf_size);
-        return ERROR_FAIL;
+        buf_size = 2048;
+        LOG(DEBUG,
+"sysconf(_SC_GETPW_R_SIZE_MAX) failed, setting the initial buffer size to %ld",
+            buf_size);
     }
 
     while (1) {
