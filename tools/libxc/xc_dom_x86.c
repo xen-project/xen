@@ -987,27 +987,6 @@ static int vcpu_hvm(struct xc_dom_image *dom)
         struct hvm_save_descriptor end_d;
         HVM_SAVE_TYPE(END) end;
     } bsp_ctx;
-    /*
-     * The layout of the fpu context structure is the same for
-     * both 32 and 64 bits.
-     */
-    struct {
-        uint16_t fcw;
-        uint16_t fsw;
-        uint8_t ftw;
-        uint8_t rsvd1;
-        uint16_t fop;
-        union {
-            uint64_t addr;
-            struct {
-                uint32_t offs;
-                uint16_t sel;
-                uint16_t rsvd;
-            };
-        } fip, fdp;
-        uint32_t mxcsr;
-        uint32_t mxcsr_mask;
-    } *fpu_ctxt;
     uint8_t *full_ctx = NULL;
     int rc;
 
@@ -1074,23 +1053,6 @@ static int vcpu_hvm(struct xc_dom_image *dom)
 
     /* Set the control registers. */
     bsp_ctx.cpu.cr0 = X86_CR0_PE | X86_CR0_ET;
-
-    /*
-     * XXX: Set initial FPU state.
-     *
-     * This should be removed once Xen is able to know if the
-     * FPU state saved is valid or not, now Xen always sets
-     * fpu_initialised to true regardless of the FPU state.
-     *
-     * The code below mimics the FPU sate after executing
-     * fninit
-     * ldmxcsr 0x1f80
-     */
-    fpu_ctxt = (typeof(fpu_ctxt))bsp_ctx.cpu.fpu_regs;
-
-    fpu_ctxt->fcw = 0x37f;
-    fpu_ctxt->ftw = 0xff;
-    fpu_ctxt->mxcsr = 0x1f80;
 
     /* Set the IP. */
     bsp_ctx.cpu.rip = dom->parms.phys_entry;
