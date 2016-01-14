@@ -206,6 +206,7 @@ static int __init cuart_init(struct dt_device_node *dev, const void *data)
 static const struct dt_device_match cuart_dt_match[] __initconst =
 {
     DT_MATCH_COMPATIBLE("cdns,uart-r1p8"),
+    DT_MATCH_COMPATIBLE("cdns,uart-r1p12"),
     { /* sentinel */ },
 };
 
