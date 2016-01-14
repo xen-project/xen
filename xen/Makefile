@@ -109,7 +109,7 @@ _clean: delete-unfresh-files
 
 .PHONY: _distclean
 _distclean: clean
-	rm -f tags TAGS cscope.files cscope.in.out cscope.out cscope.po.out GTAGS GPATH GRTAGS GSYMS
+	rm -f tags TAGS cscope.files cscope.in.out cscope.out cscope.po.out GTAGS GPATH GRTAGS GSYMS .config
 
 $(TARGET).gz: $(TARGET)
 	gzip -f -9 < $< > $@.new
