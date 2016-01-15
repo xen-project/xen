@@ -628,6 +628,15 @@ retry_transaction:
     libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/data", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
+    libxl__xs_mknod(gc, t,
+                    GCSPRINTF("%s/drivers", dom_path),
+                    rwperm, ARRAY_SIZE(rwperm));
+    libxl__xs_mknod(gc, t,
+                    GCSPRINTF("%s/feature", dom_path),
+                    rwperm, ARRAY_SIZE(rwperm));
+    libxl__xs_mknod(gc, t,
+                    GCSPRINTF("%s/attr", dom_path),
+                    rwperm, ARRAY_SIZE(rwperm));
 
     if (libxl_defbool_val(info->driver_domain)) {
         /*
