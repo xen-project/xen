@@ -5923,6 +5923,7 @@ static void output_xeninfo(void)
     printf("cc_compile_by          : %s\n", info->compile_by);
     printf("cc_compile_domain      : %s\n", info->compile_domain);
     printf("cc_compile_date        : %s\n", info->compile_date);
+    printf("build_id               : %s\n", info->build_id);
 
     return;
 }

@@ -365,6 +365,7 @@ libxl_version_info = Struct("version_info", [
     ("virt_start",        uint64),
     ("pagesize",          integer),
     ("commandline",       string),
+    ("build_id",          string),
     ], dir=DIR_OUT)
 
 libxl_domain_create_info = Struct("domain_create_info",[

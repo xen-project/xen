@@ -247,6 +247,12 @@
 #define LIBXL_HAVE_APIC_ASSIST 1
 
 /*
+ * LIBXL_HAVE_BUILD_ID means that libxl_version_info has the extra
+ * field for the hypervisor build_id.
+ */
+#define LIBXL_HAVE_BUILD_ID 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
