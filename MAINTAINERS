@@ -133,6 +133,7 @@ S:	Supported
 L:	xen-devel@lists.xen.org
 F:	xen/arch/arm/
 F:	xen/include/asm-arm/
+F:	xen/drivers/char/cadence-uart.c
 F:	xen/drivers/char/dt-uart.c
 F:	xen/drivers/char/exynos4210-uart.c
 F:	xen/drivers/char/omap-uart.c
