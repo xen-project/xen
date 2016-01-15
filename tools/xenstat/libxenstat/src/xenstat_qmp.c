@@ -356,18 +356,6 @@ static int qmp_connect(char *path)
 	return s;
 }
 
-/* Get up to 1024 active domains */
-static xc_domaininfo_t *get_domain_ids(xc_interface *xc_handle, int *num_doms)
-{
-	xc_domaininfo_t *dominfo;
-
-	dominfo = calloc(1024, sizeof(xc_domaininfo_t));
-	if (dominfo == NULL)
-		return NULL;
-	*num_doms = xc_domain_getinfolist(xc_handle, 0, 1024, dominfo);
-	return dominfo;
-}
-
 /* Gather the qdisk statistics by querying QMP
    Resources: http://wiki.qemu.org/QMP and qmp-commands.hx from the qemu code
    QMP Syntax for entering command mode. This command must be issued before
@@ -394,48 +382,57 @@ static xc_domaininfo_t *get_domain_ids(xc_interface *xc_handle, int *num_doms)
             }
           }]}
 */
-void read_attributes_qdisk(xenstat_node * node)
+static void read_attributes_qdisk_dom(xenstat_node *node, domid_t domain)
 {
 	char *cmd_mode = "{ \"execute\": \"qmp_capabilities\" }";
 	char *query_blockstats_cmd = "{ \"execute\": \"query-blockstats\" }";
-	xc_domaininfo_t *dominfo = NULL;
 	unsigned char *qmp_stats, *val;
 	char path[80];
-	int i, qfd, num_doms;
+	int qfd;
 
-	dominfo = get_domain_ids(node->handle->xc_handle, &num_doms);
-	if (dominfo == NULL)
+	/* Verify that qdisk disks are used with this VM */
+	snprintf(path, sizeof(path),"/local/domain/0/backend/qdisk/%i", domain);
+	val = xs_read(node->handle->xshandle, XBT_NULL, path, NULL);
+	if (val == NULL)
+		return;
+	free(val);
+
+	/* Connect to this VMs QMP socket */
+	snprintf(path, sizeof(path), "/var/run/xen/qmp-libxenstat-%i", domain);
+	if ((qfd = qmp_connect(path)) < 0)
 		return;
 
-	for (i=0; i<num_doms; i++) {
-		if (dominfo[i].domain <= 0)
-			continue;
-
-		/* Verify that qdisk disks are used with this VM */
-		snprintf(path, sizeof(path),"/local/domain/0/backend/qdisk/%i", dominfo[i].domain);
-		if ((val = xs_read(node->handle->xshandle, XBT_NULL, path, NULL)) == NULL)
-			continue;
-		free(val);
-
-		/* Connect to this VMs QMP socket */
-		snprintf(path, sizeof(path), "/var/run/xen/qmp-libxenstat-%i", dominfo[i].domain);
-		if ((qfd = qmp_connect(path)) < 0) {
-			continue;
-		}
-
-		/* First enable QMP capabilities so that we can query for data */
-		if ((qmp_stats = qmp_query(qfd, cmd_mode)) != NULL) {
+	/* First enable QMP capabilities so that we can query for data */
+	if ((qmp_stats = qmp_query(qfd, cmd_mode)) != NULL) {
+		free(qmp_stats);
+		/* Query QMP for this VMs blockstats */
+		qmp_stats = qmp_query(qfd, query_blockstats_cmd);
+		if (qmp_stats != NULL) {
+			qmp_parse_stats(node, domain, qmp_stats, qfd);
 			free(qmp_stats);
-			/* Query QMP for this VMs blockstats */
-			if ((qmp_stats = qmp_query(qfd, query_blockstats_cmd)) != NULL) {
-				qmp_parse_stats(node, dominfo[i].domain, qmp_stats, qfd);
-				free(qmp_stats);
-			}
 		}
-		close(qfd);
 	}
+	close(qfd);
+}
 
-	free(dominfo);
+void read_attributes_qdisk(xenstat_node * node)
+{
+	xc_domaininfo_t dominfo[1024];
+	int i, num_doms;
+	domid_t next_domid = 0;
+
+	for (;;) {
+		num_doms = xc_domain_getinfolist(node->handle->xc_handle,
+						 next_domid, 1024, dominfo);
+		if (num_doms <= 0)
+			return;
+
+		for (i = 0; i < num_doms; i++)
+			if (dominfo[i].domain > 0)
+				read_attributes_qdisk_dom(node, dominfo[i].domain);
+
+		next_domid = dominfo[num_doms - 1].domain + 1;
+	}
 }
 
 #else /* !HAVE_YAJL_V2 */
