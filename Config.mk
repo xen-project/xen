@@ -255,9 +255,9 @@ MINIOS_UPSTREAM_REVISION ?= d25773c8afa2f4dbbb466116daeb60159ddd22bd
 # Thu Dec 3 11:23:25 2015 +0000
 # mini-os: Include libxentoollog with libxc
 
-SEABIOS_UPSTREAM_REVISION ?= rel-1.9.0
-# Tue Nov 17 09:18:44 2015 -0500
-# docs: Note v1.9.0 release
+SEABIOS_UPSTREAM_REVISION ?= 3403ac4313812752be6e6aac35239ca6888a8cab
+# Mon Dec 28 13:50:41 2015 +0100
+# build: fix typo in buildversion.py
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
