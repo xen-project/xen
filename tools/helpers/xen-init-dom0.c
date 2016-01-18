@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <xenctrl.h>
+#include <xentoollog.h>
 #include <xenstore.h>
 #include <libxl.h>
 
