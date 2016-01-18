@@ -11,7 +11,7 @@
 #include <xenstore.h>
 #include <xen/sys/xenbus_dev.h>
 
-static uint32_t domid = -1;
+static uint32_t domid = ~0;
 
 static int build(xc_interface *xch, int argc, char** argv)
 {
@@ -94,6 +94,8 @@ static int build(xc_interface *xch, int argc, char** argv)
 err:
     if ( dom )
         xc_dom_release(dom);
+    if ( domid != ~0 )
+        xc_domain_destroy(xch, domid);
     close(xs_fd);
     return rv;
 }
