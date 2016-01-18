@@ -4820,7 +4820,7 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
                libxl_evgen_domain_death **, libxl_ev_user, int) =
         do_reboot ? &reboot_domain : &shutdown_domain;
     int opt, i, nb_domain;
-    int wait_for_it = 0, all =0;
+    int wait_for_it = 0, all = 0, nrdeathws = 0;
     int fallback_trigger = 0;
     static struct option opts[] = {
         {"all", 0, 0, 'a'},
@@ -4857,14 +4857,15 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
             deathws = calloc(nb_domain, sizeof(*deathws));
 
         for (i = 0; i<nb_domain; i++) {
-            if (dominfo[i].domid == 0)
+            if (dominfo[i].domid == 0 || dominfo[i].never_stop)
                 continue;
             fn(dominfo[i].domid, deathws ? &deathws[i] : NULL, i,
                fallback_trigger);
+            nrdeathws++;
         }
 
-        if (wait_for_it) {
-            wait_for_domain_deaths(deathws, nb_domain - 1 /* not dom 0 */);
+        if (deathws) {
+            wait_for_domain_deaths(deathws, nrdeathws);
             free(deathws);
         }
 

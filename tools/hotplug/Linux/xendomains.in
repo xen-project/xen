@@ -196,6 +196,15 @@ rdnames()
     done
 }
 
+# get xenstore domain id (or 0 if no xenstore domain)
+get_xsdomid()
+{
+    XS_DOMID=`${bindir}/xenstore-read /tool/xenstored/domid 2>/dev/null`
+    if test $? -ne 0; then
+        XS_DOMID=0
+    fi
+}
+
 LIST_GREP='(domain\|(domid\|(name\|^    {$\|"name":\|"domid":'
 parseln()
 {
@@ -216,12 +225,14 @@ parseln()
 
 is_running()
 {
+    get_xsdomid
     rdname $1
     RC=1
     name=;id=
     while read LN; do
 	parseln "$LN" || continue
 	if test $id = 0; then continue; fi
+	if test $id = $XS_DOMID; then continue; fi
 	case $name in
 	    ($NM)
 		RC=0
@@ -302,10 +313,12 @@ start()
 
 all_zombies()
 {
+    get_xsdomid
     name=;id=
     while read LN; do
 	parseln "$LN" || continue
 	if test $id = 0; then continue; fi
+	if test $id = $XS_DOMID; then continue; fi
 	if test "$state" != "-b---d" -a "$state" != "-----d"; then
 	    return 1;
 	fi
@@ -351,11 +364,13 @@ stop()
     if test "$XENDOMAINS_AUTO_ONLY" = "true"; then
 	rdnames
     fi
+    get_xsdomid
     echo -n "Shutting down Xen domains:"
     name=;id=
     while read LN; do
 	parseln "$LN" || continue
 	if test $id = 0; then continue; fi
+	if test $id = $XS_DOMID; then continue; fi
 	echo -n " $name"
 	if test "$XENDOMAINS_AUTO_ONLY" = "true"; then
 	    eval "
