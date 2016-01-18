@@ -374,6 +374,7 @@ int xc_domain_getinfo(xc_interface *xch,
         info->hvm      = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_hvm_guest);
         info->debugged = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_debugged);
         info->pvh      = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_pvh_guest);
+        info->xenstore = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_xs_domain);
 
         info->shutdown_reason =
             (domctl.u.getdomaininfo.flags>>XEN_DOMINF_shutdownshift) &
