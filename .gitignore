@@ -133,6 +133,7 @@ tools/flask/utils/flask-loadpolicy
 tools/flask/utils/flask-setenforce
 tools/flask/utils/flask-set-bool
 tools/flask/utils/flask-label-pci
+tools/helpers/init-xenstore-domain
 tools/hotplug/common/hotplugpath.sh
 tools/hotplug/FreeBSD/rc.d/xencommons
 tools/hotplug/FreeBSD/rc.d/xendriverdomain
@@ -201,7 +202,6 @@ tools/xenmon/xenbaked
 tools/xenpaging/xenpaging
 tools/xenpmd/xenpmd
 tools/xenstat/xentop/xentop
-tools/xenstore/init-xenstore-domain
 tools/xenstore/xenstore
 tools/xenstore/xenstore-chmod
 tools/xenstore/xenstore-exists

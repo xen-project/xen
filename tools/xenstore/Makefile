@@ -46,10 +46,6 @@ ifeq ($(XENSTORE_XENSTORED),y)
 ALL_TARGETS += xs_tdb_dump xenstored
 endif
 
-ifeq ($(CONFIG_Linux),y)
-ALL_TARGETS += init-xenstore-domain
-endif
-
 ifdef CONFIG_STUBDOM
 CFLAGS += -DNO_SOCKETS=1
 endif
@@ -71,11 +67,6 @@ xenstored_probes.o: xenstored_solaris.o
 
 CFLAGS += -DHAVE_DTRACE=1
 endif
-
-init-xenstore-domain.o: CFLAGS += $(CFLAGS_libxenguest)
-
-init-xenstore-domain: init-xenstore-domain.o $(LIBXENSTORE)
-	$(CC) $^ $(LDFLAGS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) -o $@ $(APPEND_LDFLAGS)
 
 xenstored: $(XENSTORED_OBJS)
 	$(CC) $^ $(LDFLAGS) $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
