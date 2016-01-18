@@ -22,3 +22,7 @@ config DEFCONFIG_LIST
 	string
 	option defconfig_list
 	default "$ARCH_DEFCONFIG"
+
+config EXPERT
+	string
+	option env="XEN_CONFIG_EXPERT"

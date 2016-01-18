@@ -11,6 +11,7 @@ export XEN_DOMAIN	?= $(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) |
 export XEN_BUILD_DATE	?= $(shell LC_ALL=C date)
 export XEN_BUILD_TIME	?= $(shell LC_ALL=C date +%T)
 export XEN_BUILD_HOST	?= $(shell hostname)
+export XEN_CONFIG_EXPERT ?= n
 
 export BASEDIR := $(CURDIR)
 export XEN_ROOT := $(BASEDIR)/..
