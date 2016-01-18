@@ -58,7 +58,7 @@ _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)$(BOOT_DIR)/$(T)$(Z)
 	[ -d "$(D)$(DEBUG_DIR)" ] || $(INSTALL_DIR) $(D)$(DEBUG_DIR)
 	$(INSTALL_DATA) $(TARGET)-syms $(D)$(DEBUG_DIR)/$(T)-syms-$(XEN_FULLVERSION)
-	$(INSTALL_DATA) $(KCONFIG_CONFIG) $(D)$(DEBUG_DIR)/$(T)-$(XEN_FULLVERSION).config
+	$(INSTALL_DATA) $(KCONFIG_CONFIG) $(D)$(BOOT_DIR)/$(T)-$(XEN_FULLVERSION).config
 	if [ -r $(TARGET).efi -a -n '$(EFI_DIR)' ]; then \
 		[ -d $(D)$(EFI_DIR) ] || $(INSTALL_DIR) $(D)$(EFI_DIR); \
 		$(INSTALL_DATA) $(TARGET).efi $(D)$(EFI_DIR)/$(T)-$(XEN_FULLVERSION).efi; \
