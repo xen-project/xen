@@ -13,11 +13,14 @@
 #include <xen/sys/xenbus_dev.h>
 #include <xen-xsm/flask/flask.h>
 
+#include "init-dom-json.h"
+
 static uint32_t domid = ~0;
 static char *kernel;
 static char *ramdisk;
 static char *flask;
 static char *param;
+static char *name = "Xenstore";
 static int memory;
 
 static struct option options[] = {
@@ -26,6 +29,7 @@ static struct option options[] = {
     { "flask", 1, NULL, 'f' },
     { "ramdisk", 1, NULL, 'r' },
     { "param", 1, NULL, 'p' },
+    { "name", 1, NULL, 'n' },
     { NULL, 0, NULL, 0 }
 };
 
@@ -42,7 +46,8 @@ static void usage(void)
 "  --memory <memory size>     size of the domain in MB, mandatory\n"
 "  --flask <flask-label>      optional flask label of the domain\n"
 "  --ramdisk <ramdisk-file>   optional ramdisk file for the domain\n"
-"  --param <cmdline>          optional additional parameters for the domain\n");
+"  --param <cmdline>          optional additional parameters for the domain\n"
+"  --name <name>              name of the domain (default: Xenstore)\n");
 }
 
 static int build(xc_interface *xch)
@@ -216,6 +221,20 @@ static int check_domain(xc_interface *xch)
     return 0;
 }
 
+static void do_xs_write(struct xs_handle *xsh, char *path, char *val)
+{
+    if ( !xs_write(xsh, XBT_NULL, path, val, strlen(val)) )
+        fprintf(stderr, "writing %s to xenstore failed.\n", path);
+}
+
+static void do_xs_write_dom(struct xs_handle *xsh, char *path, char *val)
+{
+    char full_path[64];
+
+    snprintf(full_path, 64, "/local/domain/%d/%s", domid, path);
+    do_xs_write(xsh, full_path, val);
+}
+
 int main(int argc, char** argv)
 {
     int opt;
@@ -242,6 +261,9 @@ int main(int argc, char** argv)
             break;
         case 'p':
             param = optarg;
+            break;
+        case 'n':
+            name = optarg;
             break;
         default:
             usage();
@@ -274,10 +296,24 @@ int main(int argc, char** argv)
     if ( rv )
         return 1;
 
+    rv = gen_stub_json_config(domid);
+    if ( rv )
+        return 3;
+
     xsh = xs_open(0);
-    rv = snprintf(buf, 16, "%d", domid);
-    xs_write(xsh, XBT_NULL, "/tool/xenstored/domid", buf, rv);
-    xs_daemon_close(xsh);
+    if ( !xsh )
+    {
+        fprintf(stderr, "xs_open() failed.\n");
+        return 3;
+    }
+    snprintf(buf, 16, "%d", domid);
+    do_xs_write(xsh, "/tool/xenstored/domid", buf);
+    do_xs_write_dom(xsh, "domid", buf);
+    do_xs_write_dom(xsh, "name", name);
+    snprintf(buf, 16, "%d", memory * 1024);
+    do_xs_write_dom(xsh, "memory/target", buf);
+    do_xs_write_dom(xsh, "memory/static-max", buf);
+    xs_close(xsh);
 
     fd = creat("/var/run/xenstored.pid", 0666);
     if ( fd < 0 )
