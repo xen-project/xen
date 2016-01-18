@@ -509,6 +509,16 @@ The device model version for a domain.
 
 ifb device used by Remus to buffer network output from the associated vif.
 
+### xenstored specific paths
+
+The /tool/xenstored namespace is created by the xenstore daemon or domain
+for the toolstack to obtain e.g. the domain id of a xenstore domain.
+
+#### /tool/xenstored/domid = INTEGER [n,INTERNAL]
+
+Domain Id of the xenstore domain in case xenstore is provided via a
+domain instead of a daemon in dom0.
+
 [BLKIF]: http://xenbits.xen.org/docs/unstable/hypercall/include,public,io,blkif.h.html
 [FBIF]: http://xenbits.xen.org/docs/unstable/hypercall/include,public,io,fbif.h.html
 [HVMPARAMS]: http://xenbits.xen.org/docs/unstable/hypercall/include,public,hvm,params.h.html
