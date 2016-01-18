@@ -246,7 +246,7 @@ int _spin_trylock_recursive(spinlock_t *lock)
     unsigned int cpu = smp_processor_id();
 
     /* Don't allow overflow of recurse_cpu field. */
-    BUILD_BUG_ON(NR_CPUS > 0xfffu);
+    BUILD_BUG_ON(NR_CPUS > SPINLOCK_NO_CPU);
 
     check_lock(&lock->debug);
 
@@ -258,7 +258,7 @@ int _spin_trylock_recursive(spinlock_t *lock)
     }
 
     /* We support only fairly shallow recursion, else the counter overflows. */
-    ASSERT(lock->recurse_cnt < 0xfu);
+    ASSERT(lock->recurse_cnt < SPINLOCK_MAX_RECURSE);
     lock->recurse_cnt++;
 
     return 1;
@@ -275,7 +275,7 @@ void _spin_lock_recursive(spinlock_t *lock)
     }
 
     /* We support only fairly shallow recursion, else the counter overflows. */
-    ASSERT(lock->recurse_cnt < 0xfu);
+    ASSERT(lock->recurse_cnt < SPINLOCK_MAX_RECURSE);
     lock->recurse_cnt++;
 }
 
@@ -283,7 +283,7 @@ void _spin_unlock_recursive(spinlock_t *lock)
 {
     if ( likely(--lock->recurse_cnt == 0) )
     {
-        lock->recurse_cpu = 0xfffu;
+        lock->recurse_cpu = SPINLOCK_NO_CPU;
         spin_unlock(lock);
     }
 }
