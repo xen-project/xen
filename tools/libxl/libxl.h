@@ -560,6 +560,15 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_DOMINFO_OUTSTANDING_MEMKB 1
 
 /*
+ * LIBXL_HAVE_DOMINFO_NEVER_STOP
+ *
+ * If this is defined, libxl_dominfo will contain a flag called never_stop
+ * indicating that the specific domain should never be stopped by the
+ * toolstack.
+ */
+#define LIBXL_HAVE_DOMINFO_NEVER_STOP 1
+
+/*
  * LIBXL_HAVE_QXL
  *
  * If defined, then the libxl_vga_interface_type will contain another value:
