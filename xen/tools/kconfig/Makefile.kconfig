@@ -44,10 +44,6 @@ PHONY += FORCE
 
 FORCE:
 
-SRCARCH = $(shell echo $(ARCH) | \
-	sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g')
-export SRCARCH
-
 # include the original Makefile and Makefile.host from Linux
 include $(src)/Makefile
 include $(src)/Makefile.host

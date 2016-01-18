@@ -20,6 +20,9 @@ MAKEFLAGS += -rR
 
 EFI_MOUNTPOINT ?= $(BOOT_DIR)/efi
 
+ARCH=$(XEN_TARGET_ARCH)
+SRCARCH=$(shell echo $(ARCH) | sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g')
+
 # Don't break if the build process wasn't called from the top level
 # we need XEN_TARGET_ARCH to generate the proper config
 include $(XEN_ROOT)/Config.mk
@@ -101,7 +104,7 @@ _clean: delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C xsm clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C crypto clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) clean
-	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig clean
+	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) clean
 	find . \( -name "*.o" -o -name ".*.d" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET).efi $(TARGET)-syms *~ core
 	rm -f include/asm-*/asm-offsets.h
@@ -236,14 +239,14 @@ kconfig := silentoldconfig oldconfig config menuconfig defconfig \
 	nconfig xconfig gconfig savedefconfig listnewconfig olddefconfig
 .PHONY: $(kconfig)
 $(kconfig):
-	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(XEN_TARGET_ARCH) $@
+	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) $@
 
 include/config/%.conf: include/config/auto.conf.cmd $(KCONFIG_CONFIG)
-	$(Q)$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(XEN_TARGET_ARCH) silentoldconfig
+	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) silentoldconfig
 
 # Allow people to just run `make` as before and not force them to configure
 $(KCONFIG_CONFIG):
-	$(Q)$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(XEN_TARGET_ARCH) defconfig
+	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) defconfig
 
 # Break the dependency chain for the first run
 include/config/auto.conf.cmd: ;
