@@ -210,6 +210,9 @@ acpi_table_parse_entries(char *id,
 	unsigned int count = 0;
 	unsigned long table_end;
 
+	if (acpi_disabled)
+		return -ENODEV;
+
 	if (!handler)
 		return -EINVAL;
 
@@ -278,6 +281,9 @@ acpi_table_parse_madt(enum acpi_madt_type id,
 int __init acpi_table_parse(char *id, acpi_table_handler handler)
 {
 	struct acpi_table_header *table = NULL;
+
+	if (acpi_disabled)
+		return -ENODEV;
 
 	if (!handler)
 		return -EINVAL;
