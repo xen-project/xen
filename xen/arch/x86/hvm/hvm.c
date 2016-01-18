@@ -2487,10 +2487,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
  
         /* Init guest TSC to start from zero. */
         hvm_set_guest_tsc(v, 0);
-
-        /* Can start up without SIPI-SIPI or setvcpucontext domctl. */
-        v->is_initialised = 1;
-        clear_bit(_VPF_down, &v->pause_flags);
     }
 
     return 0;
