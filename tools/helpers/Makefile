@@ -10,7 +10,7 @@ ifeq ($(CONFIG_Linux),y)
 PROGS += init-xenstore-domain
 endif
 
-XEN_INIT_DOM0_OBJS = xen-init-dom0.o
+XEN_INIT_DOM0_OBJS = xen-init-dom0.o init-dom-json.o
 $(XEN_INIT_DOM0_OBJS): CFLAGS += $(CFLAGS_libxentoollog)
 $(XEN_INIT_DOM0_OBJS): CFLAGS += $(CFLAGS_libxenstore)
 $(XEN_INIT_DOM0_OBJS): CFLAGS += $(CFLAGS_libxenlight)
