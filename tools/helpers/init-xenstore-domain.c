@@ -71,7 +71,8 @@ static int build(xc_interface *xch)
     {
         ssid = SECINITSID_DOMU;
     }
-    rv = xc_domain_create(xch, ssid, handle, 0, &domid, NULL);
+    rv = xc_domain_create(xch, ssid, handle, XEN_DOMCTL_CDF_xs_domain,
+                          &domid, NULL);
     if ( rv )
     {
         fprintf(stderr, "xc_domain_create failed\n");
@@ -186,6 +187,28 @@ err:
     return rv;
 }
 
+static int check_domain(xc_interface *xch)
+{
+    xc_dominfo_t info;
+    uint32_t dom;
+    int ret;
+
+    dom = 1;
+    while ( (ret = xc_domain_getinfo(xch, dom, 1, &info)) == 1 )
+    {
+        if ( info.xenstore )
+            return 1;
+        dom = info.domid + 1;
+    }
+    if ( ret < 0 && errno != ESRCH )
+    {
+        fprintf(stderr, "xc_domain_getinfo failed\n");
+        return ret;
+    }
+
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
     int opt;
@@ -229,7 +252,12 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    rv = build(xch);
+    rv = check_domain(xch);
+
+    if ( !rv )
+        rv = build(xch);
+    else if ( rv > 0 )
+        fprintf(stderr, "xenstore domain already present.\n");
 
     xc_interface_close(xch);
 
