@@ -17,6 +17,7 @@ static uint32_t domid = ~0;
 static char *kernel;
 static char *ramdisk;
 static char *flask;
+static char *param;
 static int memory;
 
 static struct option options[] = {
@@ -24,6 +25,7 @@ static struct option options[] = {
     { "memory", 1, NULL, 'm' },
     { "flask", 1, NULL, 'f' },
     { "ramdisk", 1, NULL, 'r' },
+    { "param", 1, NULL, 'p' },
     { NULL, 0, NULL, 0 }
 };
 
@@ -39,7 +41,8 @@ static void usage(void)
 "  --kernel <xenstore-kernel> kernel file of the xenstore domain, mandatory\n"
 "  --memory <memory size>     size of the domain in MB, mandatory\n"
 "  --flask <flask-label>      optional flask label of the domain\n"
-"  --ramdisk <ramdisk-file>   optional ramdisk file for the domain\n");
+"  --ramdisk <ramdisk-file>   optional ramdisk file for the domain\n"
+"  --param <cmdline>          optional additional parameters for the domain\n");
 }
 
 static int build(xc_interface *xch)
@@ -103,7 +106,11 @@ static int build(xc_interface *xch)
         fprintf(stderr, "Xenbus setup ioctl failed\n");
         goto err;
     }
-    snprintf(cmdline, 512, "--event %d --internal-db", rv);
+
+    if ( param )
+        snprintf(cmdline, 512, "--event %d --internal-db %s", rv, param);
+    else
+        snprintf(cmdline, 512, "--event %d --internal-db", rv);
 
     dom = xc_dom_allocate(xch, cmdline, NULL);
     rv = xc_dom_kernel_file(dom, kernel);
@@ -232,6 +239,9 @@ int main(int argc, char** argv)
             break;
         case 'r':
             ramdisk = optarg;
+            break;
+        case 'p':
+            param = optarg;
             break;
         default:
             usage();
