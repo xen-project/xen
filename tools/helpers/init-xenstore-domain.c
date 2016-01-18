@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <getopt.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <xenctrl.h>
@@ -13,16 +14,42 @@
 #include <xen-xsm/flask/flask.h>
 
 static uint32_t domid = ~0;
+static char *kernel;
+static char *ramdisk;
+static char *flask;
+static int memory;
 
-static int build(xc_interface *xch, int argc, char** argv)
+static struct option options[] = {
+    { "kernel", 1, NULL, 'k' },
+    { "memory", 1, NULL, 'm' },
+    { "flask", 1, NULL, 'f' },
+    { "ramdisk", 1, NULL, 'r' },
+    { NULL, 0, NULL, 0 }
+};
+
+static void usage(void)
+{
+    fprintf(stderr,
+"Usage:\n"
+"\n"
+"init-xenstore-domain <options>\n"
+"\n"
+"where options may include:\n"
+"\n"
+"  --kernel <xenstore-kernel> kernel file of the xenstore domain, mandatory\n"
+"  --memory <memory size>     size of the domain in MB, mandatory\n"
+"  --flask <flask-label>      optional flask label of the domain\n"
+"  --ramdisk <ramdisk-file>   optional ramdisk file for the domain\n");
+}
+
+static int build(xc_interface *xch)
 {
     char cmdline[512];
     uint32_t ssid;
     xen_domain_handle_t handle = { 0 };
     int rv, xs_fd;
     struct xc_dom_image *dom = NULL;
-    int maxmem = atoi(argv[2]);
-    int limit_kb = (maxmem + 1) * 1024;
+    int limit_kb = (memory + 1) * 1024;
 
     xs_fd = open("/dev/xen/xenbus_backend", O_RDWR);
     if ( xs_fd == -1 )
@@ -31,11 +58,18 @@ static int build(xc_interface *xch, int argc, char** argv)
         return -1;
     }
 
-    rv = xc_flask_context_to_sid(xch, argv[3], strlen(argv[3]), &ssid);
-    if ( rv )
+    if ( flask )
     {
-        fprintf(stderr, "xc_flask_context_to_sid failed\n");
-        goto err;
+        rv = xc_flask_context_to_sid(xch, flask, strlen(flask), &ssid);
+        if ( rv )
+        {
+            fprintf(stderr, "xc_flask_context_to_sid failed\n");
+            goto err;
+        }
+    }
+    else
+    {
+        ssid = SECINITSID_DOMU;
     }
     rv = xc_domain_create(xch, ssid, handle, 0, &domid, NULL);
     if ( rv )
@@ -71,16 +105,16 @@ static int build(xc_interface *xch, int argc, char** argv)
     snprintf(cmdline, 512, "--event %d --internal-db", rv);
 
     dom = xc_dom_allocate(xch, cmdline, NULL);
-    rv = xc_dom_kernel_file(dom, argv[1]);
+    rv = xc_dom_kernel_file(dom, kernel);
     if ( rv )
     {
         fprintf(stderr, "xc_dom_kernel_file failed\n");
         goto err;
     }
 
-    if ( argc > 4 )
+    if ( ramdisk )
     {
-        rv = xc_dom_ramdisk_file(dom, argv[4]);
+        rv = xc_dom_ramdisk_file(dom, ramdisk);
         if ( rv )
         {
             fprintf(stderr, "xc_dom_ramdisk_file failed\n");
@@ -100,7 +134,7 @@ static int build(xc_interface *xch, int argc, char** argv)
         fprintf(stderr, "xc_dom_parse_image failed\n");
         goto err;
     }
-    rv = xc_dom_mem_init(dom, maxmem);
+    rv = xc_dom_mem_init(dom, memory);
     if ( rv )
     {
         fprintf(stderr, "xc_dom_mem_init failed\n");
@@ -154,16 +188,37 @@ err:
 
 int main(int argc, char** argv)
 {
+    int opt;
     xc_interface *xch;
     struct xs_handle *xsh;
     char buf[16];
     int rv, fd;
 
-    if ( argc < 4 || argc > 5 )
+    while ( (opt = getopt_long(argc, argv, "", options, NULL)) != -1 )
     {
-        fprintf(stderr,
-                "Use: %s <xenstore-kernel> <memory_mb> <flask-label> [<ramdisk-file>]\n",
-            argv[0]);
+        switch ( opt )
+        {
+        case 'k':
+            kernel = optarg;
+            break;
+        case 'm':
+            memory = strtol(optarg, NULL, 10);
+            break;
+        case 'f':
+            flask = optarg;
+            break;
+        case 'r':
+            ramdisk = optarg;
+            break;
+        default:
+            usage();
+            return 2;
+        }
+    }
+
+    if ( optind != argc || !kernel || !memory )
+    {
+        usage();
         return 2;
     }
 
@@ -174,7 +229,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    rv = build(xch, argc, argv);
+    rv = build(xch);
 
     xc_interface_close(xch);
 
