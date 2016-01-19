@@ -493,7 +493,11 @@ static int handle_checkpoint(struct xc_sr_context *ctx)
         break;
 
     case XGR_CHECKPOINT_FAILOVER:
-        rc = BROKEN_CHANNEL;
+        if ( ctx->restore.buffer_all_records )
+            rc = BROKEN_CHANNEL;
+        else
+            /* We don't have a consistent state */
+            rc = -1;
         goto err;
 
     default: /* Other fatal error */
