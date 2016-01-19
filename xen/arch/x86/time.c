@@ -815,10 +815,18 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     }
     else
     {
-        tsc_stamp = t->local_tsc_stamp;
-
-        _u.tsc_to_system_mul = t->tsc_scale.mul_frac;
-        _u.tsc_shift         = (s8)t->tsc_scale.shift;
+        if ( has_hvm_container_domain(d) && cpu_has_tsc_ratio )
+        {
+            tsc_stamp            = hvm_funcs.scale_tsc(v, t->local_tsc_stamp);
+            _u.tsc_to_system_mul = d->arch.vtsc_to_ns.mul_frac;
+            _u.tsc_shift         = d->arch.vtsc_to_ns.shift;
+        }
+        else
+        {
+            tsc_stamp            = t->local_tsc_stamp;
+            _u.tsc_to_system_mul = t->tsc_scale.mul_frac;
+            _u.tsc_shift         = t->tsc_scale.shift;
+        }
     }
 
     _u.tsc_timestamp = tsc_stamp;
