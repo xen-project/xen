@@ -45,6 +45,8 @@ void show_help(void)
             "xenpm command list:\n\n"
             " get-cpuidle-states    [cpuid]       list cpu idle info of CPU <cpuid> or all\n"
             " get-cpufreq-states    [cpuid]       list cpu freq info of CPU <cpuid> or all\n"
+            " get-cpufreq-average   [cpuid]       average cpu frequency since last invocation\n"
+            "                                     for CPU <cpuid> or all\n"
             " get-cpufreq-para      [cpuid]       list cpu freq parameter of CPU <cpuid> or all\n"
             " set-scaling-maxfreq   [cpuid] <HZ>  set max cpu frequency <HZ> on CPU <cpuid>\n"
             "                                     or all CPUs\n"
@@ -341,6 +343,40 @@ void pxstat_func(int argc, char *argv[])
     }
     else
         show_pxstat_by_cpuid(xc_handle, cpuid);
+}
+
+static int show_cpufreq_by_cpuid(xc_interface *xc_handle, int cpuid)
+{
+    int ret = 0;
+    int average_cpufreq;
+
+    ret = get_avgfreq_by_cpuid(xc_handle, cpuid, &average_cpufreq);
+    if ( ret )
+        return ret;
+
+    printf("cpu id               : %d\n", cpuid);
+    printf("average cpu frequency: %d\n", average_cpufreq);
+    printf("\n");
+    return 0;
+}
+
+void cpufreq_func(int argc, char *argv[])
+{
+    int cpuid = -1;
+
+    if ( argc > 0 )
+        parse_cpuid(argv[0], &cpuid);
+
+    if ( cpuid < 0 )
+    {
+        /* show average frequency on all cpus */
+        int i;
+        for ( i = 0; i < max_cpu_nr; i++ )
+            if ( show_cpufreq_by_cpuid(xc_handle, i) == -ENODEV )
+                break;
+    }
+    else
+        show_cpufreq_by_cpuid(xc_handle, cpuid);
 }
 
 static uint64_t usec_start, usec_end;
@@ -1129,6 +1165,7 @@ struct {
     { "help", help_func },
     { "get-cpuidle-states", cxstat_func },
     { "get-cpufreq-states", pxstat_func },
+    { "get-cpufreq-average", cpufreq_func },
     { "start", start_gather_func },
     { "get-cpufreq-para", cpufreq_para_func },
     { "set-scaling-maxfreq", scaling_max_freq_func },
