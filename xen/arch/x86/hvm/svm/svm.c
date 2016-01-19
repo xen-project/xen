@@ -823,19 +823,6 @@ static void svm_set_tsc_offset(struct vcpu *v, u64 offset, u64 at_tsc)
     struct vmcb_struct *n1vmcb, *n2vmcb;
     uint64_t n2_tsc_offset = 0;
     struct domain *d = v->domain;
-    uint64_t host_tsc, guest_tsc;
-
-    guest_tsc = hvm_get_guest_tsc_fixed(v, at_tsc);
-
-    /* Re-adjust the offset value when TSC_RATIO is available */
-    if ( cpu_has_tsc_ratio && !d->arch.vtsc )
-    {
-        if ( at_tsc )
-            host_tsc = at_tsc;
-        else
-            host_tsc = rdtsc();
-        offset = svm_get_tsc_offset(host_tsc, guest_tsc, vcpu_tsc_ratio(v));
-    }
 
     if ( !nestedhvm_enabled(d) ) {
         vmcb_set_tsc_offset(vmcb, offset);
@@ -849,10 +836,13 @@ static void svm_set_tsc_offset(struct vcpu *v, u64 offset, u64 at_tsc)
         struct nestedsvm *svm = &vcpu_nestedsvm(v);
 
         n2_tsc_offset = vmcb_get_tsc_offset(n2vmcb) -
-            vmcb_get_tsc_offset(n1vmcb);
+                        vmcb_get_tsc_offset(n1vmcb);
         if ( svm->ns_tscratio != DEFAULT_TSC_RATIO ) {
+            uint64_t guest_tsc = hvm_get_guest_tsc_fixed(v, at_tsc);
+
             n2_tsc_offset = svm_get_tsc_offset(guest_tsc,
-                guest_tsc + n2_tsc_offset, svm->ns_tscratio);
+                                               guest_tsc + n2_tsc_offset,
+                                               svm->ns_tscratio);
         }
         vmcb_set_tsc_offset(n1vmcb, offset);
     }
