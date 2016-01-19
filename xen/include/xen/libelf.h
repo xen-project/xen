@@ -386,6 +386,7 @@ elf_errorstatus elf_reloc(struct elf_binary *elf);
 /* xc_libelf_dominfo.c                                                      */
 
 #define UNSET_ADDR          ((uint64_t)-1)
+#define UNSET_ADDR32        ((uint32_t)-1)
 
 enum xen_elfnote_type {
     XEN_ENT_NONE = 0,
