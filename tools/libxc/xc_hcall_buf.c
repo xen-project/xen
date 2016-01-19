@@ -198,7 +198,7 @@ int xc__hypercall_bounce_pre(xc_interface *xch, xc_hypercall_buffer_t *b)
         abort();
 
     /*
-     * Do need to bounce a NULL buffer.
+     * Don't need to bounce a NULL buffer.
      */
     if ( b->ubuf == NULL )
     {
