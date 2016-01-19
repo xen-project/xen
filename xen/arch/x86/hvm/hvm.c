@@ -1987,6 +1987,9 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_load_entry_zeroextend(CPU, h, &ctxt) != 0 )
         return -EINVAL;
 
+    if ( ctxt.pad0 != 0 )
+        return -EINVAL;
+
     /* Sanity check some control registers. */
     if ( (ctxt.cr0 & HVM_CR0_GUEST_RESERVED_BITS) ||
          !(ctxt.cr0 & X86_CR0_ET) ||
