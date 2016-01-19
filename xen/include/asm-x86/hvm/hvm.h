@@ -212,6 +212,8 @@ struct hvm_function_table {
     void (*altp2m_vcpu_update_vmfunc_ve)(struct vcpu *v);
     bool_t (*altp2m_vcpu_emulate_ve)(struct vcpu *v);
     int (*altp2m_vcpu_emulate_vmfunc)(struct cpu_user_regs *regs);
+
+    uint64_t (*scale_tsc)(const struct vcpu *v, uint64_t tsc);
 };
 
 extern struct hvm_function_table hvm_funcs;

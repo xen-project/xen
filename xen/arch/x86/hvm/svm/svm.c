@@ -804,6 +804,13 @@ static uint64_t scale_tsc(uint64_t host_tsc, uint64_t ratio)
     return scaled_host_tsc;
 }
 
+static uint64_t svm_scale_tsc(const struct vcpu *v, uint64_t tsc)
+{
+    ASSERT(cpu_has_tsc_ratio && !v->domain->arch.vtsc);
+
+    return scale_tsc(tsc, vcpu_tsc_ratio(v));
+}
+
 static uint64_t svm_get_tsc_offset(uint64_t host_tsc, uint64_t guest_tsc,
     uint64_t ratio)
 {
@@ -2272,6 +2279,8 @@ static struct hvm_function_table __initdata svm_function_table = {
     .nhvm_vmcx_hap_enabled = nsvm_vmcb_hap_enabled,
     .nhvm_intr_blocked = nsvm_intr_blocked,
     .nhvm_hap_walk_L1_p2m = nsvm_hap_walk_L1_p2m,
+
+    .scale_tsc            = svm_scale_tsc,
 };
 
 void svm_vmexit_handler(struct cpu_user_regs *regs)
