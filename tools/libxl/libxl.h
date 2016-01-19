@@ -1215,6 +1215,11 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel,
                         const libxl_asyncop_how *ao_how)
                         LIBXL_EXTERNAL_CALLERS_ONLY;
 
+/*
+ * This function doesn't return unless something has gone wrong with
+ * the replication to the secondary. If this function returns then the
+ * caller should resume the (primary) domain.
+ */
 int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
                              uint32_t domid, int send_fd, int recv_fd,
                              const libxl_asyncop_how *ao_how)

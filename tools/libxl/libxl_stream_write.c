@@ -354,8 +354,18 @@ void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
      * alive, and check_all_finished() may have torn it down around us.
      * If the stream is not still alive, we must not continue any work.
      */
-    if (libxl__stream_write_inuse(stream))
-        write_emulator_xenstore_record(egc, stream);
+    if (libxl__stream_write_inuse(stream)) {
+        if (dss->remus)
+            /*
+             * For remus, if libxl__xc_domain_save_done() completes,
+             * there was an error sending data to the secondary.
+             * Resume the primary ASAP. The caller doesn't care of the
+             * return value (Please refer to libxl__remus_teardown())
+             */
+            stream_complete(egc, stream, 0);
+        else
+            write_emulator_xenstore_record(egc, stream);
+    }
 }
 
 static void write_emulator_xenstore_record(libxl__egc *egc,
