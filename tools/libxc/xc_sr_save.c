@@ -795,7 +795,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
 
             rc = ctx->save.callbacks->checkpoint(ctx->save.callbacks->data);
             if ( rc <= 0 )
-                ctx->save.checkpointed = false;
+                goto err;
         }
     } while ( ctx->save.checkpointed );
 
