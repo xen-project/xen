@@ -791,7 +791,9 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
             if ( rc )
                 goto err;
 
-            ctx->save.callbacks->postcopy(ctx->save.callbacks->data);
+            rc = ctx->save.callbacks->postcopy(ctx->save.callbacks->data);
+            if ( rc <= 0 )
+                goto err;
 
             rc = ctx->save.callbacks->checkpoint(ctx->save.callbacks->data);
             if ( rc <= 0 )
