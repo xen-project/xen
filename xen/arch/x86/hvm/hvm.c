@@ -1732,6 +1732,8 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         if ( v->pause_flags & VPF_down )
             continue;
 
+        memset(&ctxt, 0, sizeof(ctxt));
+
         /* Architecture-specific vmcs/vmcb bits */
         hvm_funcs.save_cpu_ctxt(v, &ctxt);
 
@@ -1797,11 +1799,6 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         {
             memcpy(ctxt.fpu_regs, v->arch.fpu_ctxt, sizeof(ctxt.fpu_regs));
             ctxt.flags = XEN_X86_FPU_INITIALISED;
-        }
-        else
-        {
-             memset(ctxt.fpu_regs, 0, sizeof(ctxt.fpu_regs));
-             ctxt.flags = 0;
         }
 
         ctxt.rax = v->arch.user_regs.eax;
