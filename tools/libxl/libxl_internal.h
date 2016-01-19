@@ -3103,9 +3103,6 @@ struct libxl__domain_suspend_state {
     libxl__logdirty_switch logdirty;
     void (*callback_common_done)(libxl__egc*,
                                  struct libxl__domain_suspend_state*, int ok);
-    /* private for libxl__domain_save_device_model */
-    libxl__save_device_model_cb *save_dm_callback;
-    libxl__datacopier_state save_dm_datacopier;
 };
 
 
@@ -3498,9 +3495,6 @@ static inline bool libxl__save_helper_inuse(const libxl__save_helper_state *shs)
 /* Each time the dm needs to be saved, we must call suspend and then save */
 _hidden int libxl__domain_suspend_device_model(libxl__gc *gc,
                                            libxl__domain_suspend_state *dss);
-_hidden void libxl__domain_save_device_model(libxl__egc *egc,
-                                     libxl__domain_suspend_state *dss,
-                                     libxl__save_device_model_cb *callback);
 
 _hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
 

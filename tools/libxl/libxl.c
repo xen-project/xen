@@ -1550,10 +1550,6 @@ static void stubdom_destroy_callback(libxl__egc *egc,
     dds->stubdom_finished = 1;
     savefile = libxl__device_model_savefile(gc, dis->domid);
     rc = libxl__remove_file(gc, savefile);
-    /*
-     * On suspend libxl__domain_save_device_model will have already
-     * unlinked the save file.
-     */
     if (rc) {
         LOG(ERROR, "failed to remove device-model savefile %s", savefile);
     }
