@@ -239,7 +239,7 @@ paging_fault(unsigned long va, struct cpu_user_regs *regs)
  * or 0 if it's safe not to do so. */
 static inline int paging_invlpg(struct vcpu *v, unsigned long va)
 {
-    return paging_get_hostmode(v)->invlpg(v, va);
+    return is_canonical_address(va) && paging_get_hostmode(v)->invlpg(v, va);
 }
 
 /* Translate a guest virtual address to the frame number that the
