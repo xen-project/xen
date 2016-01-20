@@ -143,10 +143,10 @@ static void set_hpet_source_id(unsigned int id, struct iremap_entry *ire)
     set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_13_IGNORE_3, hpetid_to_bdf(id));
 }
 
-int iommu_supports_eim(void)
+bool_t iommu_supports_eim(void)
 {
     struct acpi_drhd_unit *drhd;
-    int apic;
+    unsigned int apic;
 
     if ( !iommu_qinval || !iommu_intremap || list_empty(&acpi_drhd_units) )
         return 0;
@@ -154,12 +154,12 @@ int iommu_supports_eim(void)
     /* We MUST have a DRHD unit for each IOAPIC. */
     for ( apic = 0; apic < nr_ioapics; apic++ )
         if ( !ioapic_to_drhd(IO_APIC_ID(apic)) )
-    {
+        {
             dprintk(XENLOG_WARNING VTDPREFIX,
                     "There is not a DRHD for IOAPIC %#x (id: %#x)!\n",
                     apic, IO_APIC_ID(apic));
             return 0;
-    }
+        }
 
     for_each_drhd_unit ( drhd )
         if ( !ecap_queued_inval(drhd->iommu->ecap) ||
@@ -833,10 +833,10 @@ int iommu_enable_x2apic_IR(void)
     struct iommu *iommu;
 
     if ( !iommu_supports_eim() )
-        return -1;
+        return -EOPNOTSUPP;
 
     if ( !platform_supports_x2apic() )
-        return -1;
+        return -ENXIO;
 
     for_each_drhd_unit ( drhd )
     {
@@ -861,7 +861,7 @@ int iommu_enable_x2apic_IR(void)
         {
             dprintk(XENLOG_INFO VTDPREFIX,
                     "Failed to enable Queued Invalidation!\n");
-            return -1;
+            return -EIO;
         }
     }
 
@@ -873,7 +873,7 @@ int iommu_enable_x2apic_IR(void)
         {
             dprintk(XENLOG_INFO VTDPREFIX,
                     "Failed to enable Interrupt Remapping!\n");
-            return -1;
+            return -EIO;
         }
     }
 

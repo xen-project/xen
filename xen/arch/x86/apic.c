@@ -943,8 +943,18 @@ void __init x2apic_bsp_setup(void)
     mask_8259A();
     mask_IO_APIC_setup(ioapic_entries);
 
-    if ( iommu_enable_x2apic_IR() )
+    switch ( iommu_enable_x2apic_IR() )
     {
+    case 0:
+        break;
+    case -ENXIO: /* ACPI_DMAR_X2APIC_OPT_OUT set */
+        if ( !x2apic_enabled )
+        {
+            printk("Not enabling x2APIC (upon firmware request)\n");
+            goto restore_out;
+        }
+        /* fall through */
+    default:
         if ( x2apic_enabled )
             panic("Interrupt remapping could not be enabled while "
                   "x2APIC is already enabled by BIOS");
