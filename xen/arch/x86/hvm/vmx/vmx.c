@@ -2414,6 +2414,28 @@ static int vmx_handle_eoi_write(void)
     return 0;
 }
 
+/*
+ * Propagate VM_EXIT_INTR_INFO to VM_ENTRY_INTR_INFO.  Used to mirror an
+ * intercepted exception back to the guest as if Xen hadn't intercepted it.
+ *
+ * It is the callers responsibility to ensure that this function is only used
+ * in the context of an appropriate vmexit.
+ */
+static void vmx_propagate_intr(void)
+{
+    unsigned long intr = __vmread(VM_EXIT_INTR_INFO);
+
+    ASSERT(intr & INTR_INFO_VALID_MASK);
+
+    __vmwrite(VM_ENTRY_INTR_INFO, intr);
+
+    if ( intr & INTR_INFO_DELIVER_CODE_MASK )
+        __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
+                  __vmread(VM_EXIT_INTR_ERROR_CODE));
+
+    __vmwrite(VM_ENTRY_INSTRUCTION_LEN, __vmread(VM_EXIT_INSTRUCTION_LEN));
+}
+
 static void vmx_idtv_reinject(unsigned long idtv_info)
 {
 
@@ -2611,7 +2633,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             HVMTRACE_1D(TRAP_DEBUG, exit_qualification);
             write_debugreg(6, exit_qualification | 0xffff0ff0);
             if ( !v->domain->debugger_attached )
-                hvm_inject_hw_exception(vector, HVM_DELIVER_NO_ERROR_CODE);
+                vmx_propagate_intr();
             else
                 domain_pause_for_debugger();
             break;
@@ -2676,8 +2698,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             break;
         case TRAP_alignment_check:
             HVMTRACE_1D(TRAP, vector);
-            hvm_inject_hw_exception(vector,
-                                    __vmread(VM_EXIT_INTR_ERROR_CODE));
+            vmx_propagate_intr();
             break;
         case TRAP_nmi:
             if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) !=
