@@ -422,10 +422,10 @@ int pt_irq_create_bind(
         spin_unlock(&d->event_lock);
 
         if ( iommu_verbose )
-            dprintk(XENLOG_G_INFO,
-                    "d%d: bind: m_gsi=%u g_gsi=%u dev=%02x.%02x.%u intx=%u\n",
-                    d->domain_id, pirq, guest_gsi, bus,
-                    PCI_SLOT(device), PCI_FUNC(device), intx);
+            printk(XENLOG_G_INFO
+                   "d%d: bind: m_gsi=%u g_gsi=%u dev=%02x.%02x.%u intx=%u\n",
+                   d->domain_id, pirq, guest_gsi, bus,
+                   PCI_SLOT(device), PCI_FUNC(device), intx);
         break;
     }
 
@@ -455,11 +455,11 @@ int pt_irq_destroy_bind(
             unsigned int device = pt_irq_bind->u.pci.device;
             unsigned int intx = pt_irq_bind->u.pci.intx;
 
-            dprintk(XENLOG_G_INFO,
-                    "d%d: unbind: m_gsi=%u g_gsi=%u dev=%02x:%02x.%u intx=%u\n",
-                    d->domain_id, machine_gsi, hvm_pci_intx_gsi(device, intx),
-                    pt_irq_bind->u.pci.bus,
-                    PCI_SLOT(device), PCI_FUNC(device), intx);
+            printk(XENLOG_G_INFO
+                   "d%d: unbind: m_gsi=%u g_gsi=%u dev=%02x:%02x.%u intx=%u\n",
+                   d->domain_id, machine_gsi, hvm_pci_intx_gsi(device, intx),
+                   pt_irq_bind->u.pci.bus,
+                   PCI_SLOT(device), PCI_FUNC(device), intx);
         }
         break;
     case PT_IRQ_TYPE_MSI:
@@ -555,10 +555,10 @@ int pt_irq_destroy_bind(
     {
         unsigned int device = pt_irq_bind->u.pci.device;
 
-        dprintk(XENLOG_G_INFO,
-                "d%d %s unmap: m_irq=%u dev=%02x:%02x.%u intx=%u\n",
-                d->domain_id, what, machine_gsi, pt_irq_bind->u.pci.bus,
-                PCI_SLOT(device), PCI_FUNC(device), pt_irq_bind->u.pci.intx);
+        printk(XENLOG_G_INFO
+               "d%d %s unmap: m_irq=%u dev=%02x:%02x.%u intx=%u\n",
+               d->domain_id, what, machine_gsi, pt_irq_bind->u.pci.bus,
+               PCI_SLOT(device), PCI_FUNC(device), pt_irq_bind->u.pci.intx);
     }
 
     return 0;
