@@ -2566,6 +2566,9 @@ int get_superpage(unsigned long mfn, struct domain *d)
 
     ASSERT(opt_allow_superpage);
 
+    if ( !mfn_valid(mfn | (L1_PAGETABLE_ENTRIES - 1)) )
+        return -EINVAL;
+
     spage = mfn_to_spage(mfn);
     y = spage->type_info;
     do {
@@ -3320,14 +3323,6 @@ long do_mmuext_op(
             unsigned long mfn;
             struct spage_info *spage;
 
-            mfn = op.arg1.mfn;
-            if ( mfn & (L1_PAGETABLE_ENTRIES-1) )
-            {
-                MEM_LOG("Unaligned superpage reference mfn %lx", mfn);
-                okay = 0;
-                break;
-            }
-
             if ( !opt_allow_superpage )
             {
                 MEM_LOG("Superpages disallowed");
@@ -3335,16 +3330,6 @@ long do_mmuext_op(
                 rc = -ENOSYS;
                 break;
             }
-
-            spage = mfn_to_spage(mfn);
-            okay = (mark_superpage(spage, d) >= 0);
-            break;
-        }
-
-        case MMUEXT_UNMARK_SUPER:
-        {
-            unsigned long mfn;
-            struct spage_info *spage;
 
             mfn = op.arg1.mfn;
             if ( mfn & (L1_PAGETABLE_ENTRIES-1) )
@@ -3354,16 +3339,16 @@ long do_mmuext_op(
                 break;
             }
 
-            if ( !opt_allow_superpage )
+            if ( !mfn_valid(mfn | (L1_PAGETABLE_ENTRIES - 1)) )
             {
-                MEM_LOG("Superpages disallowed");
                 okay = 0;
-                rc = -ENOSYS;
                 break;
             }
 
             spage = mfn_to_spage(mfn);
-            okay = (unmark_superpage(spage) >= 0);
+            okay = ((op.cmd == MMUEXT_MARK_SUPER
+                    ? mark_superpage(spage, d)
+                    : unmark_superpage(spage)) >= 0);
             break;
         }
 
