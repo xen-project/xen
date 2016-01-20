@@ -1,7 +1,7 @@
-subdir-$(arm32) += arm32
-subdir-$(arm64) += arm64
+subdir-$(CONFIG_ARM_32) += arm32
+subdir-$(CONFIG_ARM_64) += arm64
 subdir-y += platforms
-subdir-$(arm64) += efi
+subdir-$(CONFIG_ARM_64) += efi
 
 obj-$(EARLY_PRINTK) += early_printk.o
 obj-y += cpu.o
@@ -52,7 +52,7 @@ ALL_OBJS := $(TARGET_SUBARCH)/head.o $(ALL_OBJS)
 
 $(TARGET): $(TARGET)-syms $(TARGET).axf
 	$(OBJCOPY) -O binary -S $< $@
-ifeq (arm64,$(XEN_TARGET_ARCH))
+ifeq ($(CONFIG_ARM_64),y)
 	ln -sf $(notdir $@)  ../../$(notdir $@).efi
 endif
 
