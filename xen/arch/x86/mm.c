@@ -2635,6 +2635,9 @@ int get_superpage(unsigned long mfn, struct domain *d)
 
     ASSERT(opt_allow_superpage);
 
+    if ( !mfn_valid(mfn | (L1_PAGETABLE_ENTRIES - 1)) )
+        return -EINVAL;
+
     spage = mfn_to_spage(mfn);
     y = spage->type_info;
     do {
@@ -3432,42 +3435,26 @@ long do_mmuext_op(
         }
 
         case MMUEXT_MARK_SUPER:
-        {
-            unsigned long mfn = op.arg1.mfn;
-
-            if ( unlikely(d != pg_owner) )
-                rc = -EPERM;
-            else if ( mfn & (L1_PAGETABLE_ENTRIES-1) )
-            {
-                MEM_LOG("Unaligned superpage reference mfn %lx", mfn);
-                rc = -EINVAL;
-            }
-            else if ( !opt_allow_superpage )
-            {
-                MEM_LOG("Superpages disallowed");
-                rc = -ENOSYS;
-            }
-            else
-                rc = mark_superpage(mfn_to_spage(mfn), d);
-            break;
-        }
-
         case MMUEXT_UNMARK_SUPER:
         {
             unsigned long mfn = op.arg1.mfn;
 
-            if ( unlikely(d != pg_owner) )
-                rc = -EPERM;
-            else if ( mfn & (L1_PAGETABLE_ENTRIES-1) )
-            {
-                MEM_LOG("Unaligned superpage reference mfn %lx", mfn);
-                rc = -EINVAL;
-            }
-            else if ( !opt_allow_superpage )
+            if ( !opt_allow_superpage )
             {
                 MEM_LOG("Superpages disallowed");
                 rc = -ENOSYS;
             }
+            else if ( unlikely(d != pg_owner) )
+                rc = -EPERM;
+            else if ( mfn & (L1_PAGETABLE_ENTRIES - 1) )
+            {
+                MEM_LOG("Unaligned superpage reference mfn %lx", mfn);
+                rc = -EINVAL;
+            }
+            else if ( !mfn_valid(mfn | (L1_PAGETABLE_ENTRIES - 1)) )
+                rc = -EINVAL;
+            else if ( op.cmd == MMUEXT_MARK_SUPER )
+                rc = mark_superpage(mfn_to_spage(mfn), d);
             else
                 rc = unmark_superpage(mfn_to_spage(mfn));
             break;
