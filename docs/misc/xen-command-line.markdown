@@ -736,13 +736,18 @@ Specify the serial parameters for the GDB stub.
 ### gnttab\_max\_frames
 > `= <integer>`
 
-Specify the maximum number of frames per grant table operation.
+> Default: `32`
+
+Specify the maximum number of frames which any domain may use as part
+of its grant table.
 
 ### gnttab\_max\_maptrack\_frames
 > `= <integer>`
 
-Specify the maximum number of maptrack frames domain.
-The default value is 8 times **gnttab\_max\_frames**.
+> Default: `8 * gnttab_max_frames`
+
+Specify the maximum number of frames to use as part of a domains
+maptrack array.
 
 ### gnttab\_max\_nr\_frames
 > `= <integer>`
