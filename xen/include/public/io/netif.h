@@ -136,18 +136,28 @@
  */
 
 /*
- * "feature-multicast-control" advertises the capability to filter ethernet
- * multicast packets in the backend. To enable use of this capability the
- * frontend must set "request-multicast-control" before moving into the
- * connected state.
+ * "feature-multicast-control" and "feature-dynamic-multicast-control"
+ * advertise the capability to filter ethernet multicast packets in the
+ * backend. If the frontend wishes to take advantage of this feature then
+ * it may set "request-multicast-control". If the backend only advertises
+ * "feature-multicast-control" then "request-multicast-control" must be set
+ * before the frontend moves into the connected state. The backend will
+ * sample the value on this state transition and any subsequent change in
+ * value will have no effect. However, if the backend also advertises
+ * "feature-dynamic-multicast-control" then "request-multicast-control"
+ * may be set by the frontend at any time. In this case, the backend will
+ * watch the value and re-sample on watch events.
  *
- * If "request-multicast-control" is set then the backend transmit side should
- * no longer flood multicast packets to the frontend, it should instead drop any
- * multicast packet that does not match in a filter list. The list is
- * amended by the frontend by sending dummy transmit requests containing
- * XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL} extra-info fragments as specified below.
- * Once enabled by the frontend, the feature cannot be disabled except by
- * closing and re-connecting to the backend.
+ * If the sampled value of "request-multicast-control" is set then the
+ * backend transmit side should no longer flood multicast packets to the
+ * frontend, it should instead drop any multicast packet that does not
+ * match in a filter list.
+ * The list is amended by the frontend by sending dummy transmit requests
+ * containing XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL} extra-info fragments as
+ * specified below.
+ * Note that the filter list may be amended even if the sampled value of
+ * "request-multicast-control" is not set, however the filter should only
+ * be applied if it is set.
  */
 
 /*
