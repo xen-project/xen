@@ -32,10 +32,10 @@ static int _page_fault(struct vcpu *v, unsigned long va,
     return 0;
 }
 
-static int _invlpg(struct vcpu *v, unsigned long va)
+static bool_t _invlpg(struct vcpu *v, unsigned long va)
 {
     ASSERT_UNREACHABLE();
-    return -EOPNOTSUPP;
+    return 1;
 }
 
 static unsigned long _gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,

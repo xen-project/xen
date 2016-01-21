@@ -4392,8 +4392,7 @@ static int __do_update_va_mapping(
         switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
         {
         case UVMF_LOCAL:
-            if ( !paging_mode_enabled(d) ||
-                 (paging_invlpg(v, va) != 0) ) 
+            if ( !paging_mode_enabled(d) || paging_invlpg(v, va) )
                 flush_tlb_one_local(va);
             break;
         case UVMF_ALL:

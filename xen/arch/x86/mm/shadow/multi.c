@@ -3510,11 +3510,12 @@ propagate:
 }
 
 
-static int
-sh_invlpg(struct vcpu *v, unsigned long va)
-/* Called when the guest requests an invlpg.  Returns 1 if the invlpg
+/*
+ * Called when the guest requests an invlpg.  Returns 1 if the invlpg
  * instruction should be issued on the hardware, or 0 if it's safe not
- * to do so. */
+ * to do so.
+ */
+static bool_t sh_invlpg(struct vcpu *v, unsigned long va)
 {
     mfn_t sl1mfn;
     shadow_l2e_t sl2e;

@@ -104,7 +104,7 @@ struct shadow_paging_mode {
 struct paging_mode {
     int           (*page_fault            )(struct vcpu *v, unsigned long va,
                                             struct cpu_user_regs *regs);
-    int           (*invlpg                )(struct vcpu *v, unsigned long va);
+    bool_t        (*invlpg                )(struct vcpu *v, unsigned long va);
     unsigned long (*gva_to_gfn            )(struct vcpu *v,
                                             struct p2m_domain *p2m,
                                             unsigned long va,
@@ -243,7 +243,7 @@ paging_fault(unsigned long va, struct cpu_user_regs *regs)
 /* Handle invlpg requests on vcpus.
  * Returns 1 if the invlpg instruction should be issued on the hardware,
  * or 0 if it's safe not to do so. */
-static inline int paging_invlpg(struct vcpu *v, unsigned long va)
+static inline bool_t paging_invlpg(struct vcpu *v, unsigned long va)
 {
     return (paging_mode_external(v->domain) ? is_canonical_address(va)
                                             : __addr_ok(va)) &&

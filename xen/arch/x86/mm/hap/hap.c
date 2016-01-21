@@ -680,7 +680,7 @@ static int hap_page_fault(struct vcpu *v, unsigned long va,
  * HAP guests can handle invlpg without needing any action from Xen, so
  * should not be intercepting it.
  */
-static int hap_invlpg(struct vcpu *v, unsigned long va)
+static bool_t hap_invlpg(struct vcpu *v, unsigned long va)
 {
     if (nestedhvm_enabled(v->domain)) {
         /* Emulate INVLPGA:
