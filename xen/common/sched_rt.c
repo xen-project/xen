@@ -1170,7 +1170,7 @@ rt_dom_cntl(
 
 static struct rt_private _rt_priv;
 
-const struct scheduler sched_rtds_def = {
+static const struct scheduler sched_rtds_def = {
     .name           = "SMP RTDS Scheduler",
     .opt_name       = "rtds",
     .sched_id       = XEN_SCHEDULER_RTDS,

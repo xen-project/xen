@@ -64,20 +64,9 @@ static void poll_timer_fn(void *data);
 DEFINE_PER_CPU(struct schedule_data, schedule_data);
 DEFINE_PER_CPU(struct scheduler *, scheduler);
 
-static const struct scheduler *schedulers[] = {
-#ifdef CONFIG_SCHED_CREDIT
-    &sched_credit_def,
-#endif
-#ifdef CONFIG_SCHED_CREDIT2
-    &sched_credit2_def,
-#endif
-#ifdef CONFIG_SCHED_ARINC653
-    &sched_arinc653_def,
-#endif
-#ifdef CONFIG_SCHED_RTDS
-    &sched_rtds_def,
-#endif
-};
+extern const struct scheduler *__start_schedulers_array[], *__end_schedulers_array[];
+#define NUM_SCHEDULERS (__end_schedulers_array - __start_schedulers_array)
+#define schedulers __start_schedulers_array
 
 static struct scheduler __read_mostly ops;
 
@@ -1468,7 +1457,7 @@ void __init scheduler_init(void)
 
     open_softirq(SCHEDULE_SOFTIRQ, schedule);
 
-    for ( i = 0; i < ARRAY_SIZE(schedulers); i++ )
+    for ( i = 0; i < NUM_SCHEDULERS; i++)
     {
         if ( schedulers[i]->global_init && schedulers[i]->global_init() < 0 )
             schedulers[i] = NULL;
@@ -1479,7 +1468,7 @@ void __init scheduler_init(void)
     if ( !ops.name )
     {
         printk("Could not find scheduler: %s\n", opt_sched);
-        for ( i = 0; i < ARRAY_SIZE(schedulers); i++ )
+        for ( i = 0; i < NUM_SCHEDULERS; i++ )
             if ( schedulers[i] )
             {
                 ops = *schedulers[i];
@@ -1599,7 +1588,7 @@ struct scheduler *scheduler_alloc(unsigned int sched_id, int *perr)
     int i;
     struct scheduler *sched;
 
-    for ( i = 0; i < ARRAY_SIZE(schedulers); i++ )
+    for ( i = 0; i < NUM_SCHEDULERS; i++ )
         if ( schedulers[i] && schedulers[i]->sched_id == sched_id )
             goto found;
     *perr = -ENOENT;

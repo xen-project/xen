@@ -2194,7 +2194,7 @@ csched2_deinit(const struct scheduler *ops)
 
 static struct csched2_private _csched2_priv;
 
-const struct scheduler sched_credit2_def = {
+static const struct scheduler sched_credit2_def = {
     .name           = "SMP Credit Scheduler rev2",
     .opt_name       = "credit2",
     .sched_id       = XEN_SCHEDULER_CREDIT2,

@@ -1991,7 +1991,7 @@ static void csched_tick_resume(const struct scheduler *ops, unsigned int cpu)
 
 static struct csched_private _csched_priv;
 
-const struct scheduler sched_credit_def = {
+static const struct scheduler sched_credit_def = {
     .name           = "SMP Credit Scheduler",
     .opt_name       = "credit",
     .sched_id       = XEN_SCHEDULER_CREDIT,
