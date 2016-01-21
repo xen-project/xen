@@ -63,7 +63,6 @@ extern const struct mtrr_ops *mtrr_if;
 extern unsigned int num_var_ranges;
 
 void mtrr_state_warn(void);
-void mtrr_wrmsr(unsigned int msr, uint64_t msr_content);
 
 extern int amd_init_mtrr(void);
 extern int cyrix_init_mtrr(void);
