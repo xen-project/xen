@@ -3348,8 +3348,8 @@ long do_mmuext_op(
 
         case MMUEXT_SET_LDT:
         {
-            unsigned long ptr  = op.arg1.linear_addr;
-            unsigned long ents = op.arg2.nr_ents;
+            unsigned int ents = op.arg2.nr_ents;
+            unsigned long ptr = ents ? op.arg1.linear_addr : 0;
 
             if ( unlikely(d != pg_owner) )
                 rc = -EPERM;
@@ -3361,7 +3361,7 @@ long do_mmuext_op(
             else if ( ((ptr & (PAGE_SIZE - 1)) != 0) || !__addr_ok(ptr) ||
                       (ents > 8192) )
             {
-                MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%lx", ptr, ents);
+                MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%x", ptr, ents);
                 rc = -EINVAL;
             }
             else if ( (curr->arch.pv_vcpu.ldt_ents != ents) ||
