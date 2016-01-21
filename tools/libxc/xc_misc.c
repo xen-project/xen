@@ -99,6 +99,9 @@ xc_cpumap_t xc_cpumap_alloc(xc_interface *xch)
  * byte aligned and so we need byte versions for architectures which do
  * not support misaligned accesses (which is basically everyone
  * but x86, although even on x86 it can be inefficient).
+ *
+ * NOTE: The xc_bitops macros now use byte alignment.
+ * TODO: Clean up the users of this interface.
  */
 #define BITS_PER_CPUMAP(map) (sizeof(*map) * 8)
 #define CPUMAP_ENTRY(cpu, map) ((map))[(cpu) / BITS_PER_CPUMAP(map)]
