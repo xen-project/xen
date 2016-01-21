@@ -128,13 +128,19 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
 void msix_write_completion(struct vcpu *);
 void msixtbl_init(struct domain *d);
 
+enum stdvga_cache_state {
+    STDVGA_CACHE_UNINITIALIZED,
+    STDVGA_CACHE_ENABLED,
+    STDVGA_CACHE_DISABLED
+};
+
 struct hvm_hw_stdvga {
     uint8_t sr_index;
     uint8_t sr[8];
     uint8_t gr_index;
     uint8_t gr[9];
     bool_t stdvga;
-    bool_t cache;
+    enum stdvga_cache_state cache;
     uint32_t latch;
     struct page_info *vram_page[64];  /* shadow of 0xa0000-0xaffff */
     spinlock_t lock;
