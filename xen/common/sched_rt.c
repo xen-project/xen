@@ -1199,3 +1199,5 @@ const struct scheduler sched_rtds_def = {
     .wake           = rt_vcpu_wake,
     .context_saved  = rt_context_saved,
 };
+
+REGISTER_SCHEDULER(sched_rtds_def);

@@ -2027,3 +2027,5 @@ const struct scheduler sched_credit_def = {
     .tick_suspend   = csched_tick_suspend,
     .tick_resume    = csched_tick_resume,
 };
+
+REGISTER_SCHEDULER(sched_credit_def);

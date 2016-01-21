@@ -767,6 +767,8 @@ const struct scheduler sched_arinc653_def = {
     .tick_resume    = NULL,
 };
 
+REGISTER_SCHEDULER(sched_arinc653_def);
+
 /*
  * Local variables:
  * mode: C

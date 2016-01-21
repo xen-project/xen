@@ -2228,3 +2228,5 @@ const struct scheduler sched_credit2_def = {
     .alloc_domdata  = csched2_alloc_domdata,
     .free_domdata   = csched2_free_domdata,
 };
+
+REGISTER_SCHEDULER(sched_credit2_def);
