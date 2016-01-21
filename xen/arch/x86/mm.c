@@ -4604,7 +4604,7 @@ struct memory_map_context
 static int _handle_iomem_range(unsigned long s, unsigned long e,
                                struct memory_map_context *ctxt)
 {
-    if ( s > ctxt->s )
+    if ( s > ctxt->s && !(s >> (paddr_bits - PAGE_SHIFT)) )
     {
         e820entry_t ent;
         XEN_GUEST_HANDLE_PARAM(e820entry_t) buffer_param;
