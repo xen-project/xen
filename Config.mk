@@ -234,7 +234,7 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-xen.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.4.3
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.4.4
 SEABIOS_UPSTREAM_TAG ?= rel-1.7.3.1
 # Fri Aug 2 14:12:09 2013 -0400
 # Fix bug in CBFS file walking with compressed files.
@@ -246,7 +246,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 2bbe49494f5e910c6fb49f6800d143cae9eb5758
+QEMU_TAG ?= xen-4.4.4
 # Mon Jan 4 15:34:29 2016 +0000
 # MSI-X: avoid array overrun upon MSI-X table writes
 
