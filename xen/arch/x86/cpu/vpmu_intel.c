@@ -87,7 +87,7 @@ static unsigned int __read_mostly arch_pmc_cnt, fixed_pmc_cnt;
 /* Masks used for testing whether and MSR is valid */
 #define ARCH_CTRL_MASK  (~((1ull << 32) - 1) | (1ull << 21))
 static uint64_t __read_mostly fixed_ctrl_mask, fixed_counters_mask;
-static uint64_t __read_mostly global_ovf_ctrl_mask;
+static uint64_t __read_mostly global_ovf_ctrl_mask, global_ctrl_mask;
 
 /* Total size of PMU registers block (copied to/from PV(H) guest) */
 static unsigned int __read_mostly regs_sz;
@@ -391,6 +391,8 @@ static int core2_vpmu_verify(struct vcpu *v)
 
     if ( core2_vpmu_cxt->global_ovf_ctrl & global_ovf_ctrl_mask )
         return -EINVAL;
+    if ( core2_vpmu_cxt->global_ctrl & global_ctrl_mask )
+        return -EINVAL;
 
     fixed_ctrl = core2_vpmu_cxt->fixed_ctrl;
     if ( fixed_ctrl & fixed_ctrl_mask )
@@ -622,6 +624,8 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         gdprintk(XENLOG_WARNING, "Guest setting of DTS is ignored.\n");
         return 0;
     case MSR_CORE_PERF_GLOBAL_CTRL:
+        if ( msr_content & global_ctrl_mask )
+            return -EINVAL;
         core2_vpmu_cxt->global_ctrl = msr_content;
         break;
     case MSR_CORE_PERF_FIXED_CTR_CTRL:
@@ -815,7 +819,7 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
         if ( is_pmc_quirk )
             handle_pmc_quirk(msr_content);
         core2_vpmu_cxt->global_status |= msr_content;
-        msr_content = 0xC000000700000000 | ((1 << arch_pmc_cnt) - 1);
+        msr_content = ~global_ovf_ctrl_mask;
         wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, msr_content);
     }
     else
@@ -996,10 +1000,20 @@ int __init core2_vpmu_init(void)
     full_width_write = (caps >> 13) & 1;
 
     fixed_ctrl_mask = ~((1ull << (fixed_pmc_cnt * FIXED_CTR_CTRL_BITS)) - 1);
+    if ( version == 2 )
+        fixed_ctrl_mask |= 0x444;
     fixed_counters_mask = ~((1ull << core2_get_bitwidth_fix_count()) - 1);
+    global_ctrl_mask = ~((((1ULL << fixed_pmc_cnt) - 1) << 32) |
+                         ((1ULL << arch_pmc_cnt) - 1));
     global_ovf_ctrl_mask = ~(0xC000000000000000 |
                              (((1ULL << fixed_pmc_cnt) - 1) << 32) |
                              ((1ULL << arch_pmc_cnt) - 1));
+    if ( version > 2 )
+        /*
+         * Even though we don't support Uncore counters guests should be
+         * able to clear all available overflows.
+         */
+        global_ovf_ctrl_mask &= ~(1ULL << 61);
 
     regs_sz = (sizeof(struct xen_pmu_intel_ctxt) - regs_off) +
               sizeof(uint64_t) * fixed_pmc_cnt +
