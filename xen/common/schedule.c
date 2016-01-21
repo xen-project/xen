@@ -38,8 +38,8 @@
 #include <public/sched.h>
 #include <xsm/xsm.h>
 
-/* opt_sched: scheduler - default to credit */
-static char __initdata opt_sched[10] = "credit";
+/* opt_sched: scheduler - default to configured value */
+static char __initdata opt_sched[10] = CONFIG_SCHED_DEFAULT;
 string_param("sched", opt_sched);
 
 /* if sched_smt_power_savings is set,
@@ -65,10 +65,18 @@ DEFINE_PER_CPU(struct schedule_data, schedule_data);
 DEFINE_PER_CPU(struct scheduler *, scheduler);
 
 static const struct scheduler *schedulers[] = {
+#ifdef CONFIG_SCHED_CREDIT
     &sched_credit_def,
+#endif
+#ifdef CONFIG_SCHED_CREDIT2
     &sched_credit2_def,
+#endif
+#ifdef CONFIG_SCHED_ARINC653
     &sched_arinc653_def,
+#endif
+#ifdef CONFIG_SCHED_RTDS
     &sched_rtds_def,
+#endif
 };
 
 static struct scheduler __read_mostly ops;
