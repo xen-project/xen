@@ -80,6 +80,10 @@ SECTIONS
        __stop___pre_ex_table = .;
 
        *(.data.read_mostly)
+       . = ALIGN(8);
+       __start_schedulers_array = .;
+       *(.data.schedulers)
+       __end_schedulers_array = .;
        *(.data.rel.ro)
        *(.data.rel.ro.*)
   } :text

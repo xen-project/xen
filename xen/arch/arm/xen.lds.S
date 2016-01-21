@@ -57,6 +57,10 @@ SECTIONS
        . = ALIGN(PAGE_SIZE);
        *(.data.page_aligned)
        *(.data)
+       . = ALIGN(8);
+       __start_schedulers_array = .;
+       *(.data.schedulers)
+       __end_schedulers_array = .;
        *(.data.rel)
        *(.data.rel.*)
        CONSTRUCTORS
