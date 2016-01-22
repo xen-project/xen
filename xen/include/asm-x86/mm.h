@@ -584,7 +584,7 @@ typedef struct mm_lock {
 } mm_lock_t;
 
 typedef struct mm_rwlock {
-    rwlock_t           lock;
+    percpu_rwlock_t    lock;
     int                unlock_level;
     int                recurse_count;
     int                locker; /* CPU that holds the write lock */

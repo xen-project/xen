@@ -31,6 +31,8 @@
 DECLARE_PER_CPU(int, mm_lock_level);
 #define __get_lock_level()  (this_cpu(mm_lock_level))
 
+DECLARE_PERCPU_RWLOCK_GLOBAL(p2m_percpu_rwlock);
+
 static inline void mm_lock_init(mm_lock_t *l)
 {
     spin_lock_init(&l->lock);
@@ -99,7 +101,7 @@ static inline void _mm_enforce_order_lock_post(int level, int *unlock_level,
 
 static inline void mm_rwlock_init(mm_rwlock_t *l)
 {
-    rwlock_init(&l->lock);
+    percpu_rwlock_resource_init(&l->lock, p2m_percpu_rwlock);
     l->locker = -1;
     l->locker_function = "nobody";
     l->unlock_level = 0;
@@ -115,7 +117,7 @@ static inline void _mm_write_lock(mm_rwlock_t *l, const char *func, int level)
     if ( !mm_write_locked_by_me(l) )
     {
         __check_lock_level(level);
-        write_lock(&l->lock);
+        percpu_write_lock(p2m_percpu_rwlock, &l->lock);
         l->locker = get_processor_id();
         l->locker_function = func;
         l->unlock_level = __get_lock_level();
@@ -131,20 +133,20 @@ static inline void mm_write_unlock(mm_rwlock_t *l)
     l->locker = -1;
     l->locker_function = "nobody";
     __set_lock_level(l->unlock_level);
-    write_unlock(&l->lock);
+    percpu_write_unlock(p2m_percpu_rwlock, &l->lock);
 }
 
 static inline void _mm_read_lock(mm_rwlock_t *l, int level)
 {
     __check_lock_level(level);
-    read_lock(&l->lock);
+    percpu_read_lock(p2m_percpu_rwlock, &l->lock);
     /* There's nowhere to store the per-CPU unlock level so we can't
      * set the lock level. */
 }
 
 static inline void mm_read_unlock(mm_rwlock_t *l)
 {
-    read_unlock(&l->lock);
+    percpu_read_unlock(p2m_percpu_rwlock, &l->lock);
 }
 
 /* This wrapper uses the line number to express the locking order below */
