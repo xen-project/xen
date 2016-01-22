@@ -47,6 +47,40 @@ static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
     return iop->remain ? -EFAULT : 0;
 }
 
+static void update_domain_cpuid_info(struct domain *d,
+                                     const xen_domctl_cpuid_t *ctl)
+{
+    switch ( ctl->input[0] )
+    {
+    case 0: {
+        union {
+            typeof(boot_cpu_data.x86_vendor_id) str;
+            struct {
+                uint32_t ebx, edx, ecx;
+            } reg;
+        } vendor_id = {
+            .reg = {
+                .ebx = ctl->ebx,
+                .edx = ctl->edx,
+                .ecx = ctl->ecx
+            }
+        };
+
+        d->arch.x86_vendor = get_cpu_vendor(vendor_id.str, gcv_guest);
+        break;
+    }
+
+    case 1:
+        d->arch.x86 = (ctl->eax >> 8) & 0xf;
+        if ( d->arch.x86 == 0xf )
+            d->arch.x86 += (ctl->eax >> 20) & 0xff;
+        d->arch.x86_model = (ctl->eax >> 4) & 0xf;
+        if ( d->arch.x86 >= 0x6 )
+            d->arch.x86_model |= (ctl->eax >> 12) & 0xf0;
+        break;
+    }
+}
+
 #define MAX_IOPORTS 0x10000
 
 long arch_do_domctl(
@@ -698,36 +732,8 @@ long arch_do_domctl(
             ret = -ENOENT;
 
         if ( !ret )
-        {
-            switch ( ctl->input[0] )
-            {
-            case 0: {
-                union {
-                    typeof(boot_cpu_data.x86_vendor_id) str;
-                    struct {
-                        uint32_t ebx, edx, ecx;
-                    } reg;
-                } vendor_id = {
-                    .reg = {
-                        .ebx = ctl->ebx,
-                        .edx = ctl->edx,
-                        .ecx = ctl->ecx
-                    }
-                };
+            update_domain_cpuid_info(d, ctl);
 
-                d->arch.x86_vendor = get_cpu_vendor(vendor_id.str, gcv_guest);
-                break;
-            }
-            case 1:
-                d->arch.x86 = (ctl->eax >> 8) & 0xf;
-                if ( d->arch.x86 == 0xf )
-                    d->arch.x86 += (ctl->eax >> 20) & 0xff;
-                d->arch.x86_model = (ctl->eax >> 4) & 0xf;
-                if ( d->arch.x86 >= 0x6 )
-                    d->arch.x86_model |= (ctl->eax >> 12) & 0xf0;
-                break;
-            }
-        }
         break;
     }
 
