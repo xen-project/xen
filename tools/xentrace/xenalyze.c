@@ -4129,23 +4129,6 @@ void cr3_dump_list(struct cr3_value_struct *head){
     struct cr3_value_struct **qsort_array;
     int i, N=0;
 
-    int cr3_compare_total(const void *_a, const void *_b) {
-        struct cr3_value_struct *a=*(typeof(&a))_a;
-        struct cr3_value_struct *b=*(typeof(&a))_b;
-
-        if(a->total_time.cycles < b->total_time.cycles)
-            return 1;
-        else if(b->total_time.cycles == a->total_time.cycles) {
-            if(a->total_time.count < b->total_time.count)
-                return 1;
-            else if(a->total_time.count == b->total_time.count)
-                return 0;
-            else
-                return -1;
-        } else
-            return -1;
-    }
-
     int cr3_compare_start(const void *_a, const void *_b) {
         struct cr3_value_struct *a=*(typeof(&a))_a;
         struct cr3_value_struct *b=*(typeof(&a))_b;
