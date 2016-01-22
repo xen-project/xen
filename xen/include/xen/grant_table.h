@@ -51,13 +51,15 @@
 /* The maximum size of a grant table. */
 extern unsigned int max_grant_frames;
 
+DECLARE_PERCPU_RWLOCK_GLOBAL(grant_rwlock);
+
 /* Per-domain grant information. */
 struct grant_table {
     /*
      * Lock protecting updates to grant table state (version, active
      * entry list, etc.)
      */
-    rwlock_t              lock;
+    percpu_rwlock_t       lock;
     /* Table size. Number of frames shared with guest */
     unsigned int          nr_grant_frames;
     /* Shared grant table (see include/public/grant_table.h). */
@@ -81,6 +83,26 @@ struct grant_table {
        what version to use yet. */
     unsigned              gt_version;
 };
+
+static inline void grant_read_lock(struct grant_table *gt)
+{
+    percpu_read_lock(grant_rwlock, &gt->lock);
+}
+
+static inline void grant_read_unlock(struct grant_table *gt)
+{
+    percpu_read_unlock(grant_rwlock, &gt->lock);
+}
+
+static inline void grant_write_lock(struct grant_table *gt)
+{
+    percpu_write_lock(grant_rwlock, &gt->lock);
+}
+
+static inline void grant_write_unlock(struct grant_table *gt)
+{
+    percpu_write_unlock(grant_rwlock, &gt->lock);
+}
 
 /* Create/destroy per-domain grant table context. */
 int grant_table_create(

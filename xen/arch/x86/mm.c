@@ -4671,7 +4671,7 @@ int xenmem_add_to_physmap_one(
                 mfn = virt_to_mfn(d->shared_info);
             break;
         case XENMAPSPACE_grant_table:
-            write_lock(&d->grant_table->lock);
+            grant_write_lock(d->grant_table);
 
             if ( d->grant_table->gt_version == 0 )
                 d->grant_table->gt_version = 1;
@@ -4693,7 +4693,7 @@ int xenmem_add_to_physmap_one(
                     mfn = virt_to_mfn(d->grant_table->shared_raw[idx]);
             }
 
-            write_unlock(&d->grant_table->lock);
+            grant_write_unlock(d->grant_table);
             break;
         case XENMAPSPACE_gmfn_range:
         case XENMAPSPACE_gmfn:
