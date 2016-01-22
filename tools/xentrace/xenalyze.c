@@ -2132,10 +2132,14 @@ float weighted_percentile(float * A, /* values */
         } while (I <= J); /* Keep going until our pointers meet or pass */
 
         /* Re-adjust L and R, based on which element we're looking for */
-        if(J_weight<K_weight)
-            L=I; L_weight = I_weight;
-        if(K_weight<I_weight)
-            R=J; R_weight = J_weight;
+        if(J_weight<K_weight) {
+            L=I;
+            L_weight = I_weight;
+        }
+        if(K_weight<I_weight) {
+            R=J;
+            R_weight = J_weight;
+        }
     }
 
     return A[L];
@@ -2211,10 +2215,14 @@ long long self_weighted_percentile(long long * A,
         } while (I <= J); /* Keep going until our pointers meet or pass */
 
         /* Re-adjust L and R, based on which element we're looking for */
-        if(J_weight<K_weight)
-            L=I; L_weight = I_weight;
-        if(K_weight<I_weight)
-            R=J; R_weight = J_weight;
+        if(J_weight<K_weight) {
+            L=I;
+            L_weight = I_weight;
+        }
+        if(K_weight<I_weight) {
+            R=J;
+            R_weight = J_weight;
+        }
     }
 
     return A[L];
