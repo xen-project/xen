@@ -568,6 +568,9 @@ int pv_pit_handler(int port, int data, int write)
         .data = data
     };
 
+    if ( !has_vpit(current->domain) )
+        return ~0;
+
     if ( is_hardware_domain(current->domain) && hwdom_pit_access(&ioreq) )
     {
         /* nothing to do */;
