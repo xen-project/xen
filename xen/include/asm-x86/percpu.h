@@ -20,4 +20,10 @@ void percpu_init_areas(void);
 
 #define DECLARE_PER_CPU(type, name) extern __typeof__(type) per_cpu__##name
 
+#define __get_cpu_ptr(var) \
+    (*RELOC_HIDE(var, get_cpu_info()->per_cpu_offset))
+
+#define per_cpu_ptr(var, cpu)  \
+    (*RELOC_HIDE(var, __per_cpu_offset[cpu]))
+
 #endif /* __X86_PERCPU_H__ */

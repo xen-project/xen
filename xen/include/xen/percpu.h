@@ -16,6 +16,10 @@
 /* Preferred on Xen. Also see arch-defined per_cpu(). */
 #define this_cpu(var)    __get_cpu_var(var)
 
+#define this_cpu_ptr(ptr)    __get_cpu_ptr(ptr)
+
+#define get_per_cpu_var(var)  (per_cpu__##var)
+
 /* Linux compatibility. */
 #define get_cpu_var(var) this_cpu(var)
 #define put_cpu_var(var)
