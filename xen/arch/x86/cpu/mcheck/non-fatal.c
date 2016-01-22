@@ -94,8 +94,8 @@ static int __init init_nonfatal_mce_checker(void)
 	if (mce_disabled || !mce_available(c))
 		return -ENODEV;
 
-    if ( __get_cpu_var(poll_bankmask) == NULL )
-        return -EINVAL;
+	if (__get_cpu_var(poll_bankmask) == NULL)
+		return -EINVAL;
 
 	/*
 	 * Check for non-fatal errors every MCE_RATE s
