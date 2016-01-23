@@ -70,7 +70,7 @@ int __init arch_smp_init(void)
     return 0;
 }
 
-int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
+static int __init dt_arch_cpu_init(int cpu, struct dt_device_node *dn)
 {
     const char *enable_method;
 
@@ -92,6 +92,11 @@ int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
     }
 
     return 0;
+}
+
+int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
+{
+    return dt_arch_cpu_init(cpu, dn);
 }
 
 int __init arch_cpu_up(int cpu)

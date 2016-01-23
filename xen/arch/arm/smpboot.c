@@ -92,7 +92,7 @@ smp_clear_cpu_maps (void)
  * MPIDR values related to logical cpus
  * Code base on Linux arch/arm/kernel/devtree.c
  */
-void __init smp_init_cpus(void)
+static void __init dt_smp_init_cpus(void)
 {
     register_t mpidr;
     struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
@@ -105,16 +105,6 @@ void __init smp_init_cpus(void)
     };
     bool_t bootcpu_valid = 0;
     int rc;
-
-    /* scan the DTB for a PSCI node and set a global variable */
-    psci_init();
-
-    if ( (rc = arch_smp_init()) < 0 )
-    {
-        printk(XENLOG_WARNING "SMP init failed (%d)\n"
-               "Using only 1 CPU\n", rc);
-        return;
-    }
 
     mpidr = boot_cpu_data.mpidr.bits & MPIDR_HWID_MASK;
 
@@ -241,6 +231,23 @@ void __init smp_init_cpus(void)
         cpumask_set_cpu(i, &cpu_possible_map);
         cpu_logical_map(i) = tmp_map[i];
     }
+}
+
+void __init smp_init_cpus(void)
+{
+    int rc;
+
+    /* initialize PSCI and set a global variable */
+    psci_init();
+
+    if ( (rc = arch_smp_init()) < 0 )
+    {
+        printk(XENLOG_WARNING "SMP init failed (%d)\n"
+               "Using only 1 CPU\n", rc);
+        return;
+    }
+
+    dt_smp_init_cpus();
 }
 
 int __init
