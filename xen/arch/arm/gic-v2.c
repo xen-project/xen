@@ -628,13 +628,12 @@ static bool_t gicv2_is_aliased(paddr_t cbase, paddr_t csize)
     return ((val_low & 0xfff0fff) == 0x0202043B && val_low == val_high);
 }
 
-static int __init gicv2_init(void)
+static paddr_t __initdata hbase, dbase, cbase, csize, vbase;
+
+static void __init gicv2_dt_init(void)
 {
     int res;
-    paddr_t hbase, dbase;
-    paddr_t cbase, csize;
-    paddr_t vbase, vsize;
-    uint32_t aliased_offset = 0;
+    paddr_t vsize;
     const struct dt_device_node *node = gicv2_info.node;
 
     res = dt_device_get_address(node, 0, &dbase, NULL);
@@ -680,6 +679,13 @@ static int __init gicv2_init(void)
     if ( csize != vsize )
         panic("GICv2: Sizes of GICC (%#"PRIpaddr") and GICV (%#"PRIpaddr") don't match\n",
                csize, vsize);
+}
+
+static int __init gicv2_init(void)
+{
+    uint32_t aliased_offset = 0;
+
+    gicv2_dt_init();
 
     printk("GICv2 initialization:\n"
               "        gic_dist_addr=%"PRIpaddr"\n"
@@ -765,7 +771,8 @@ const static struct gic_hw_operations gicv2_ops = {
 };
 
 /* Set up the GIC */
-static int __init gicv2_preinit(struct dt_device_node *node, const void *data)
+static int __init gicv2_dt_preinit(struct dt_device_node *node,
+                                   const void *data)
 {
     gicv2_info.hw_version = GIC_V2;
     gicv2_info.node = node;
@@ -783,7 +790,7 @@ static const struct dt_device_match gicv2_dt_match[] __initconst =
 
 DT_DEVICE_START(gicv2, "GICv2", DEVICE_GIC)
         .dt_match = gicv2_dt_match,
-        .init = gicv2_preinit,
+        .init = gicv2_dt_preinit,
 DT_DEVICE_END
 
 /*
