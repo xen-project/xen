@@ -6,5 +6,5 @@ obj-$(CONFIG_HAS_EXYNOS4210) += exynos4210-uart.o
 obj-$(CONFIG_HAS_OMAP) += omap-uart.o
 obj-$(CONFIG_HAS_SCIF) += scif-uart.o
 obj-$(CONFIG_HAS_EHCI) += ehci-dbgp.o
-obj-$(CONFIG_ARM) += dt-uart.o
+obj-$(CONFIG_ARM) += arm-uart.o
 obj-y += serial.o

@@ -1,5 +1,5 @@
 /*
- * xen/drivers/char/dt-uart.c
+ * xen/drivers/char/arm-uart.c
  *
  * Generic uart retrieved via the device tree
  *
