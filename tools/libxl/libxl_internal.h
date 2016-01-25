@@ -2425,8 +2425,8 @@ struct libxl__multidev {
  * provided by qemu) are freed (eg, fds closed) before it shuts down,
  * and no confirmation from a terminating qemu back to the toolstack.
  *
- * This will need to be fixed in Xen 4.3.  In the meantime (Xen 4.2)
- * we implement a bodge.
+ * This will need to be fixed in future Xen versions. In the meantime
+ * (Xen 4.2) we implement a bodge.
  *
  *      WE WANT TO UNPLUG         WE WANT TO SHUT DOWN OR DESTROY
  *                    |                           |
