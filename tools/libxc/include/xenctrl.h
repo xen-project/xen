@@ -2610,6 +2610,67 @@ const uint32_t *xc_get_feature_deep_deps(uint32_t feature);
 
 #endif
 
+int xc_xsplice_upload(xc_interface *xch,
+                      char *name, unsigned char *payload, uint32_t size);
+
+int xc_xsplice_get(xc_interface *xch,
+                   char *name,
+                   xen_xsplice_status_t *status);
+
+/*
+ * The heart of this function is to get an array of xen_xsplice_status_t.
+ *
+ * However it is complex because it has to deal with the hypervisor
+ * returning some of the requested data or data being stale
+ * (another hypercall might alter the list).
+ *
+ * The parameters that the function expects to contain data from
+ * the hypervisor are: 'info', 'name', and 'len'. The 'done' and
+ * 'left' are also updated with the number of entries filled out
+ * and respectively the number of entries left to get from hypervisor.
+ *
+ * It is expected that the caller of this function will take the
+ * 'left' and use the value for 'start'. This way we have an
+ * cursor in the array. Note that the 'info','name', and 'len' will
+ * be updated at the subsequent calls.
+ *
+ * The 'max' is to be provided by the caller with the maximum
+ * number of entries that 'info', 'name', and 'len' arrays can
+ * be filled up with.
+ *
+ * Each entry in the 'name' array is expected to be of XEN_XSPLICE_NAME_SIZE
+ * length.
+ *
+ * Each entry in the 'info' array is expected to be of xen_xsplice_status_t
+ * structure size.
+ *
+ * Each entry in the 'len' array is expected to be of uint32_t size.
+ *
+ * The return value is zero if the hypercall completed successfully.
+ * Note that the return value is _not_ the amount of entries filled
+ * out - that is saved in 'done'.
+ *
+ * If there was an error performing the operation, the return value
+ * will contain an negative -EXX type value. The 'done' and 'left'
+ * will contain the number of entries that had been succesfully
+ * retrieved (if any).
+ */
+int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
+                    xen_xsplice_status_t *info, char *name,
+                    uint32_t *len, unsigned int *done,
+                    unsigned int *left);
+
+/*
+ * The operations are asynchronous and the hypervisor may take a while
+ * to complete them. The `timeout` offers an option to expire the
+ * operation if it could not be completed within the specified time
+ * (in ms). Value of 0 means let hypervisor decide the best timeout.
+ */
+int xc_xsplice_apply(xc_interface *xch, char *name, uint32_t timeout);
+int xc_xsplice_revert(xc_interface *xch, char *name, uint32_t timeout);
+int xc_xsplice_unload(xc_interface *xch, char *name, uint32_t timeout);
+int xc_xsplice_replace(xc_interface *xch, char *name, uint32_t timeout);
+
 /* Compat shims */
 #include "xenctrl_compat.h"
 
