@@ -5580,10 +5580,12 @@ out:
 
 libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx)
 {
-    libxl_scheduler sched, ret;
+    int r, sched;
+
     GC_INIT(ctx);
-    if ((ret = xc_sched_id(ctx->xch, (int *)&sched)) != 0) {
-        LOGE(ERROR, "getting domain info list");
+    r = xc_sched_id(ctx->xch, &sched);
+    if (r != 0) {
+        LOGE(ERROR, "getting current scheduler id");
         return ERROR_FAIL;
         GC_FREE;
     }
