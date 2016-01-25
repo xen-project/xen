@@ -74,7 +74,7 @@ evtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce, uint32
 }
 
 evtchn_port_or_error_t
-xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint_32 domid, evtchn_port_t remote_port)
+xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint32_t domid, evtchn_port_t remote_port)
 {
     int ret, fd = xce->fd;
     struct ioctl_evtchn_bind_interdomain bind;

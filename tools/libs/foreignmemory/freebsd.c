@@ -33,7 +33,6 @@
 
 int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem)
 {
-    int saved_errno;
     int fd = open(PRIVCMD_DEV, O_RDWR|O_CLOEXEC);
 
     if ( fd == -1 )
@@ -45,13 +44,6 @@ int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem)
 
     fmem->fd = fd;
     return 0;
-
- error:
-    saved_errno = errno;
-    close(fd);
-    errno = saved_errno;
-
-    return -1;
 }
 
 int osdep_xenforeignmemory_close(xenforeignmemory_handle *fmem)

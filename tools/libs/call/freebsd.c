@@ -35,7 +35,6 @@
 
 int osdep_xencall_open(xencall_handle *xcall)
 {
-    int saved_errno;
     int fd = open(PRIVCMD_DEV, O_RDWR|O_CLOEXEC);
 
     /*
@@ -53,13 +52,6 @@ int osdep_xencall_open(xencall_handle *xcall)
 
     xcall->fd = fd;
     return 0;
-
- error:
-    saved_errno = errno;
-    close(fd);
-    errno = saved_errno;
-
-    return -1;
 }
 
 int osdep_xencall_close(xencall_handle *xcall)
