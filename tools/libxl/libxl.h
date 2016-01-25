@@ -1716,7 +1716,10 @@ int libxl_domain_get_nodeaffinity(libxl_ctx *ctx, uint32_t domid,
                                   libxl_bitmap *nodemap);
 int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap);
 
-libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx);
+/* A return value less than 0 should be interpreted as a libxl_error, while a
+ * return value greater than or equal to 0 should be interpreted as a
+ * libxl_scheduler. */
+int libxl_get_scheduler(libxl_ctx *ctx);
 
 /* Per-scheduler parameters */
 int libxl_sched_credit_params_get(libxl_ctx *ctx, uint32_t poolid,

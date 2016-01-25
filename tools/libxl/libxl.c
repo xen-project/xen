@@ -5578,7 +5578,7 @@ out:
     return rc;
 }
 
-libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx)
+int libxl_get_scheduler(libxl_ctx *ctx)
 {
     int r, sched;
 
@@ -5586,8 +5586,7 @@ libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx)
     r = xc_sched_id(ctx->xch, &sched);
     if (r != 0) {
         LOGE(ERROR, "getting current scheduler id");
-        return ERROR_FAIL;
-        GC_FREE;
+        sched = ERROR_FAIL;
     }
     GC_FREE;
     return sched;
