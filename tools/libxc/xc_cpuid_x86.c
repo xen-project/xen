@@ -28,6 +28,7 @@ enum {
 #define XEN_CPUFEATURE(name, value) X86_FEATURE_##name = value,
 #include <xen/arch-x86/cpufeatureset.h>
 };
+#include "_xc_cpuid_autogen.h"
 
 #define bitmaskof(idx)      (1u << ((idx) & 31))
 #define clear_bit(idx, dst) ((dst) &= ~bitmaskof(idx))
@@ -76,6 +77,80 @@ int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,
         *nr_features = sysctl.u.cpu_featureset.nr_features;
 
     return ret;
+}
+
+uint32_t xc_get_cpu_featureset_size(void)
+{
+    return FEATURESET_NR_ENTRIES;
+}
+
+const uint32_t *xc_get_static_cpu_featuremask(
+    enum xc_static_cpu_featuremask mask)
+{
+    const static uint32_t known[FEATURESET_NR_ENTRIES] = INIT_KNOWN_FEATURES,
+        special[FEATURESET_NR_ENTRIES] = INIT_SPECIAL_FEATURES,
+        pv[FEATURESET_NR_ENTRIES] = INIT_PV_FEATURES,
+        hvm_shadow[FEATURESET_NR_ENTRIES] = INIT_HVM_SHADOW_FEATURES,
+        hvm_hap[FEATURESET_NR_ENTRIES] = INIT_HVM_HAP_FEATURES,
+        deep_features[FEATURESET_NR_ENTRIES] = INIT_DEEP_FEATURES;
+
+    XC_BUILD_BUG_ON(ARRAY_SIZE(known) != FEATURESET_NR_ENTRIES);
+    XC_BUILD_BUG_ON(ARRAY_SIZE(special) != FEATURESET_NR_ENTRIES);
+    XC_BUILD_BUG_ON(ARRAY_SIZE(pv) != FEATURESET_NR_ENTRIES);
+    XC_BUILD_BUG_ON(ARRAY_SIZE(hvm_shadow) != FEATURESET_NR_ENTRIES);
+    XC_BUILD_BUG_ON(ARRAY_SIZE(hvm_hap) != FEATURESET_NR_ENTRIES);
+    XC_BUILD_BUG_ON(ARRAY_SIZE(deep_features) != FEATURESET_NR_ENTRIES);
+
+    switch ( mask )
+    {
+    case XC_FEATUREMASK_KNOWN:
+        return known;
+
+    case XC_FEATUREMASK_SPECIAL:
+        return special;
+
+    case XC_FEATUREMASK_PV:
+        return pv;
+
+    case XC_FEATUREMASK_HVM_SHADOW:
+        return hvm_shadow;
+
+    case XC_FEATUREMASK_HVM_HAP:
+        return hvm_hap;
+
+    case XC_FEATUREMASK_DEEP_FEATURES:
+        return deep_features;
+
+    default:
+        return NULL;
+    }
+}
+
+const uint32_t *xc_get_feature_deep_deps(uint32_t feature)
+{
+    static const struct {
+        uint32_t feature;
+        uint32_t fs[FEATURESET_NR_ENTRIES];
+    } deep_deps[] = INIT_DEEP_DEPS;
+
+    unsigned int start = 0, end = ARRAY_SIZE(deep_deps);
+
+    XC_BUILD_BUG_ON(ARRAY_SIZE(deep_deps) != NR_DEEP_DEPS);
+
+    /* deep_deps[] is sorted.  Perform a binary search. */
+    while ( start < end )
+    {
+        unsigned int mid = start + ((end - start) / 2);
+
+        if ( deep_deps[mid].feature > feature )
+            end = mid;
+        else if ( deep_deps[mid].feature < feature )
+            start = mid + 1;
+        else
+            return deep_deps[mid].fs;
+    }
+
+    return NULL;
 }
 
 struct cpuid_domain_info

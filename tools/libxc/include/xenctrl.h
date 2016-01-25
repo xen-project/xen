@@ -2622,6 +2622,20 @@ int xc_psr_cat_get_l3_info(xc_interface *xch, uint32_t socket,
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps);
 int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,
                           uint32_t *nr_features, uint32_t *featureset);
+
+uint32_t xc_get_cpu_featureset_size(void);
+
+enum xc_static_cpu_featuremask {
+    XC_FEATUREMASK_KNOWN,
+    XC_FEATUREMASK_SPECIAL,
+    XC_FEATUREMASK_PV,
+    XC_FEATUREMASK_HVM_SHADOW,
+    XC_FEATUREMASK_HVM_HAP,
+    XC_FEATUREMASK_DEEP_FEATURES,
+};
+const uint32_t *xc_get_static_cpu_featuremask(enum xc_static_cpu_featuremask);
+const uint32_t *xc_get_feature_deep_deps(uint32_t feature);
+
 #endif
 
 /* Compat shims */
