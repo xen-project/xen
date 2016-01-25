@@ -38,7 +38,7 @@
  * User not using xc_suspend_* / xc_await_suspent may not want to
  * include the full libxenevtchn API here.
  */
-typedef struct xenevtchn_handle xenevtchn_handle;
+struct xenevtchn_handle;
 
 /* callbacks provided by xc_domain_save */
 struct save_callbacks {
@@ -167,18 +167,22 @@ struct xc_hvm_firmware_module {
  * Sets *lockfd to -1.
  * Has deallocated everything even on error.
  */
-int xc_suspend_evtchn_release(xc_interface *xch, xenevtchn_handle *xce, int domid, int suspend_evtchn, int *lockfd);
+int xc_suspend_evtchn_release(xc_interface *xch,
+                              struct xenevtchn_handle *xce,
+                              int domid, int suspend_evtchn, int *lockfd);
 
 /**
  * This function eats the initial notification.
  * xce must not be used for anything else
  * See xc_suspend_evtchn_init_sane re lockfd.
  */
-int xc_suspend_evtchn_init_exclusive(xc_interface *xch, xenevtchn_handle *xce,
+int xc_suspend_evtchn_init_exclusive(xc_interface *xch,
+                                     struct xenevtchn_handle *xce,
                                      int domid, int port, int *lockfd);
 
 /* xce must not be used for anything else */
-int xc_await_suspend(xc_interface *xch, xenevtchn_handle *xce, int suspend_evtchn);
+int xc_await_suspend(xc_interface *xch, struct xenevtchn_handle *xce,
+                     int suspend_evtchn);
 
 /**
  * The port will be signaled immediately after this call
@@ -187,7 +191,8 @@ int xc_await_suspend(xc_interface *xch, xenevtchn_handle *xce, int suspend_evtch
  * and fed to xc_suspend_evtchn_release.  (On error *lockfd is
  * undefined and xc_suspend_evtchn_release is not allowed.)
  */
-int xc_suspend_evtchn_init_sane(xc_interface *xch, xenevtchn_handle *xce,
+int xc_suspend_evtchn_init_sane(xc_interface *xch,
+                                struct xenevtchn_handle *xce,
                                 int domid, int port, int *lockfd);
 
 int xc_mark_page_online(xc_interface *xch, unsigned long start,
