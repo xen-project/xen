@@ -28,7 +28,7 @@
 #include <xen/event_channel.h>
 
 /* Callers who don't care don't need to #include <xentoollog.h> */
-typedef struct xentoollog_logger xentoollog_logger;
+struct xentoollog_logger;
 
 /*
  * PRODUCING AND CONSUMING GRANT REFERENCES
@@ -132,7 +132,8 @@ typedef struct xengntdev_handle xengnttab_handle;
  * xengnttab_handle which has been inherited. xengnttab_unmap() must
  * not be called under such circumstances.
  */
-xengnttab_handle *xengnttab_open(xentoollog_logger *logger, unsigned open_flags);
+xengnttab_handle *xengnttab_open(struct xentoollog_logger *logger,
+                                 unsigned open_flags);
 
 /*
  * Close a handle previously allocated with xengnttab_open(),
@@ -287,7 +288,7 @@ typedef struct xengntdev_handle xengntshr_handle;
  * Calling xengntshr_close() is the only safe operation on a
  * xengntshr_handle which has been inherited.
  */
-xengntshr_handle *xengntshr_open(xentoollog_logger *logger,
+xengntshr_handle *xengntshr_open(struct xentoollog_logger *logger,
                                  unsigned open_flags);
 
 /*

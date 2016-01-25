@@ -33,7 +33,7 @@ typedef int evtchn_port_or_error_t;
 typedef struct xenevtchn_handle xenevtchn_handle;
 
 /* Callers who don't care don't need to #include <xentoollog.h> */
-typedef struct xentoollog_logger xentoollog_logger;
+struct xentoollog_logger;
 
 /*
  * EVENT CHANNEL FUNCTIONS
@@ -66,7 +66,8 @@ typedef struct xentoollog_logger xentoollog_logger;
  * xenevtchn_handle which has been inherited.
  */
 /* Currently no flags are defined */
-xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned open_flags);
+xenevtchn_handle *xenevtchn_open(struct xentoollog_logger *logger,
+                                 unsigned open_flags);
 
 /*
  * Close a handle previously allocated with xenevtchn_open().

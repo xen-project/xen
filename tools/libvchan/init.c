@@ -212,7 +212,8 @@ static int init_gnt_cli(struct libxenvchan *ctrl, int domain, uint32_t ring_ref)
 	goto out;
 }
 
-static int init_evt_srv(struct libxenvchan *ctrl, int domain, xentoollog_logger *logger)
+static int init_evt_srv(struct libxenvchan *ctrl, int domain,
+                        struct xentoollog_logger *logger)
 {
 	evtchn_port_or_error_t port;
 
@@ -293,7 +294,9 @@ static int min_order(size_t siz)
 	return rv;
 }
 
-struct libxenvchan *libxenvchan_server_init(xentoollog_logger *logger, int domain, const char* xs_path, size_t left_min, size_t right_min)
+struct libxenvchan *libxenvchan_server_init(struct xentoollog_logger *logger,
+                                            int domain, const char* xs_path,
+                                            size_t left_min, size_t right_min)
 {
 	struct libxenvchan *ctrl;
 	int ring_ref;
@@ -342,7 +345,8 @@ out:
 	return 0;
 }
 
-static int init_evt_cli(struct libxenvchan *ctrl, int domain, xentoollog_logger *logger)
+static int init_evt_cli(struct libxenvchan *ctrl, int domain,
+                        struct xentoollog_logger *logger)
 {
 	evtchn_port_or_error_t port;
 
@@ -372,7 +376,8 @@ fail:
 }
 
 
-struct libxenvchan *libxenvchan_client_init(xentoollog_logger *logger, int domain, const char* xs_path)
+struct libxenvchan *libxenvchan_client_init(struct xentoollog_logger *logger,
+                                            int domain, const char* xs_path)
 {
 	struct libxenvchan *ctrl = malloc(sizeof(struct libxenvchan));
 	struct xs_handle *xs = NULL;

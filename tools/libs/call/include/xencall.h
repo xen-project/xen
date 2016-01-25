@@ -26,7 +26,7 @@
 #include <stddef.h>
 
 /* Callers who don't care don't need to #include <xentoollog.h> */
-typedef struct xentoollog_logger xentoollog_logger;
+struct xentoollog_logger;
 
 typedef struct xencall_handle xencall_handle;
 
@@ -56,7 +56,8 @@ typedef struct xencall_handle xencall_handle;
  * Calling xencall_close() is the only safe operation on a
  * xencall_handle which has been inherited.
  */
-xencall_handle *xencall_open(xentoollog_logger *logger, unsigned open_flags);
+xencall_handle *xencall_open(struct xentoollog_logger *logger,
+                             unsigned open_flags);
 
 /*
  * Close a handle previously allocated with xencall_open().

@@ -47,6 +47,9 @@
 #include <xenevtchn.h>
 #include <xengnttab.h>
 
+/* Callers who don't care don't need to #include <xentoollog.h> */
+struct xentoollog_logger;
+
 struct libxenvchan_ring {
 	/* Pointer into the shared page. Offsets into buffer. */
 	struct ring_shared* shr;
@@ -93,7 +96,9 @@ struct libxenvchan {
  * @param recv_min The minimum size (in bytes) of the receive ring (right)
  * @return The structure, or NULL in case of an error
  */
-struct libxenvchan *libxenvchan_server_init(xentoollog_logger *logger, int domain, const char* xs_path, size_t read_min, size_t write_min);
+struct libxenvchan *libxenvchan_server_init(struct xentoollog_logger *logger,
+                                            int domain, const char* xs_path,
+                                            size_t read_min, size_t write_min);
 /**
  * Connect to an existing vchan. Note: you can reconnect to an existing vchan
  * safely, however no locking is performed, so you must prevent multiple clients
@@ -104,7 +109,8 @@ struct libxenvchan *libxenvchan_server_init(xentoollog_logger *logger, int domai
  * @param xs_path Base xenstore path for storing ring/event data
  * @return The structure, or NULL in case of an error
  */
-struct libxenvchan *libxenvchan_client_init(xentoollog_logger *logger, int domain, const char* xs_path);
+struct libxenvchan *libxenvchan_client_init(struct xentoollog_logger *logger,
+                                            int domain, const char* xs_path);
 /**
  * Close a vchan. This deallocates the vchan and attempts to free its
  * resources. The other side is notified of the close, but can still read any

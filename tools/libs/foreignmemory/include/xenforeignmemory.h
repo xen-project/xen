@@ -27,7 +27,7 @@
 #include <xen/xen.h>
 
 /* Callers who don't care don't need to #include <xentoollog.h> */
-typedef struct xentoollog_logger xentoollog_logger;
+struct xentoollog_logger;
 
 typedef struct xenforeignmemory_handle xenforeignmemory_handle;
 
@@ -55,7 +55,7 @@ typedef struct xenforeignmemory_handle xenforeignmemory_handle;
  * Calling xenforeignmemory_close() is the only safe operation on a
  * xenforeignmemory_handle which has been inherited.
  */
-xenforeignmemory_handle *xenforeignmemory_open(xentoollog_logger *logger,
+xenforeignmemory_handle *xenforeignmemory_open(struct xentoollog_logger *logger,
                                                unsigned open_flags);
 
 /*
