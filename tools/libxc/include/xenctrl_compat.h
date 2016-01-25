@@ -57,15 +57,15 @@ xc_evtchn *xc_evtchn_open(xentoollog_logger *logger,
 int xc_evtchn_close(xc_evtchn *xce);
 int xc_evtchn_fd(xc_evtchn *xce);
 int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port);
-evtchn_port_or_error_t
+xc_evtchn_port_or_error_t
 xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid);
-evtchn_port_or_error_t
+xc_evtchn_port_or_error_t
 xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
                            evtchn_port_t remote_port);
-evtchn_port_or_error_t
+xc_evtchn_port_or_error_t
 xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq);
 int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port);
-evtchn_port_or_error_t
+xc_evtchn_port_or_error_t
 xc_evtchn_pending(xc_evtchn *xce);
 int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port);
 

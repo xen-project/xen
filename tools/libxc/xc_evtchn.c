@@ -43,7 +43,7 @@ static int do_evtchn_op(xc_interface *xch, int cmd, void *arg,
     return ret;
 }
 
-evtchn_port_or_error_t
+xc_evtchn_port_or_error_t
 xc_evtchn_alloc_unbound(xc_interface *xch,
                         uint32_t dom,
                         uint32_t remote_dom)
