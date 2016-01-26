@@ -30,8 +30,10 @@
 int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                          libxl_domain_create_info *c_info)
 {
-    if (!c_info->type)
+    if (!c_info->type) {
+        LOG(ERROR, "domain type unspecified");
         return ERROR_INVAL;
+    }
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         libxl_defbool_setdefault(&c_info->hap, true);
@@ -66,8 +68,10 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     int i;
 
     if (b_info->type != LIBXL_DOMAIN_TYPE_HVM &&
-        b_info->type != LIBXL_DOMAIN_TYPE_PV)
+        b_info->type != LIBXL_DOMAIN_TYPE_PV) {
+        LOG(ERROR, "invalid domain type");
         return ERROR_INVAL;
+    }
 
     libxl_defbool_setdefault(&b_info->device_model_stubdomain, false);
 
@@ -97,8 +101,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             if (rc < 0) {
                 /* qemu-xen unavailable, use qemu-xen-traditional */
                 if (errno == ENOENT) {
-                    LOGE(VERBOSE, "qemu-xen is unavailable"
-                         ", use qemu-xen-traditional instead");
+                    LOGE(INFO, "qemu-xen is unavailable"
+                         ", using qemu-xen-traditional instead");
                     b_info->device_model_version =
                         LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
                 } else {
@@ -121,18 +125,24 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
                 b_info->u.hvm.bios = LIBXL_BIOS_TYPE_SEABIOS; break;
             case LIBXL_DEVICE_MODEL_VERSION_NONE:
                 break;
-            default:return ERROR_INVAL;
+            default:
+                LOG(ERROR, "unknown device model version");
+                return ERROR_INVAL;
             }
 
         /* Enforce BIOS<->Device Model version relationship */
         switch (b_info->device_model_version) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-            if (b_info->u.hvm.bios != LIBXL_BIOS_TYPE_ROMBIOS)
+            if (b_info->u.hvm.bios != LIBXL_BIOS_TYPE_ROMBIOS) {
+                LOG(ERROR, "qemu-xen-traditional requires bios=rombios.");
                 return ERROR_INVAL;
+            }
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-            if (b_info->u.hvm.bios == LIBXL_BIOS_TYPE_ROMBIOS)
+            if (b_info->u.hvm.bios == LIBXL_BIOS_TYPE_ROMBIOS) {
+                LOG(ERROR, "qemu-xen does not support bios=rombios.");
                 return ERROR_INVAL;
+            }
             break;
         case LIBXL_DEVICE_MODEL_VERSION_NONE:
             break;
@@ -160,19 +170,25 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     if (!b_info->max_vcpus)
         b_info->max_vcpus = 1;
     if (!b_info->avail_vcpus.size) {
-        if (libxl_cpu_bitmap_alloc(CTX, &b_info->avail_vcpus, 1))
+        if (libxl_cpu_bitmap_alloc(CTX, &b_info->avail_vcpus, 1)) {
+            LOG(ERROR, "unable to allocate avail_vcpus bitmap");
             return ERROR_FAIL;
+        }
         libxl_bitmap_set(&b_info->avail_vcpus, 0);
-    } else if (b_info->avail_vcpus.size > HVM_MAX_VCPUS)
+    } else if (b_info->avail_vcpus.size > HVM_MAX_VCPUS) {
+        LOG(ERROR, "avail_vcpus bitmap contains too many VCPUS");
         return ERROR_FAIL;
+    }
 
     /* In libxl internals, we want to deal with vcpu_hard_affinity only! */
     if (b_info->cpumap.size && !b_info->num_vcpu_hard_affinity) {
         b_info->vcpu_hard_affinity = libxl__calloc(gc, b_info->max_vcpus,
                                                    sizeof(libxl_bitmap));
         for (i = 0; i < b_info->max_vcpus; i++) {
-            if (libxl_cpu_bitmap_alloc(CTX, &b_info->vcpu_hard_affinity[i], 0))
+            if (libxl_cpu_bitmap_alloc(CTX, &b_info->vcpu_hard_affinity[i], 0)) {
+                LOG(ERROR, "failed to allocate vcpu hard affinity bitmap");
                 return ERROR_FAIL;
+            }
             libxl_bitmap_copy(CTX, &b_info->vcpu_hard_affinity[i],
                               &b_info->cpumap);
         }
@@ -318,18 +334,14 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             return ERROR_INVAL;
         }
 
-        if (!b_info->u.hvm.boot) {
-            b_info->u.hvm.boot = strdup("cda");
-            if (!b_info->u.hvm.boot) return ERROR_NOMEM;
-        }
+        if (!b_info->u.hvm.boot)
+            b_info->u.hvm.boot = libxl__strdup(NOGC, "cda");
 
         libxl_defbool_setdefault(&b_info->u.hvm.vnc.enable, true);
         if (libxl_defbool_val(b_info->u.hvm.vnc.enable)) {
             libxl_defbool_setdefault(&b_info->u.hvm.vnc.findunused, true);
-            if (!b_info->u.hvm.vnc.listen) {
-                b_info->u.hvm.vnc.listen = strdup("127.0.0.1");
-                if (!b_info->u.hvm.vnc.listen) return ERROR_NOMEM;
-            }
+            if (!b_info->u.hvm.vnc.listen)
+                b_info->u.hvm.vnc.listen = libxl__strdup(NOGC, "127.0.0.1");
         }
 
         libxl_defbool_setdefault(&b_info->u.hvm.sdl.enable, false);
