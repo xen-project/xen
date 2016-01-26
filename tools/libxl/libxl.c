@@ -5258,6 +5258,7 @@ libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr)
 
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 {
+    GC_INIT(ctx);
     union {
         xen_extraversion_t xen_extra;
         xen_compile_info_t xen_cc;
@@ -5270,26 +5271,26 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
     libxl_version_info *info = &ctx->version_info;
 
     if (info->xen_version_extra != NULL)
-        return info;
+        goto out;
 
     xen_version = xc_version(ctx->xch, XENVER_version, NULL);
     info->xen_version_major = xen_version >> 16;
     info->xen_version_minor = xen_version & 0xFF;
 
     xc_version(ctx->xch, XENVER_extraversion, &u.xen_extra);
-    info->xen_version_extra = strdup(u.xen_extra);
+    info->xen_version_extra = libxl__strdup(NOGC, u.xen_extra);
 
     xc_version(ctx->xch, XENVER_compile_info, &u.xen_cc);
-    info->compiler = strdup(u.xen_cc.compiler);
-    info->compile_by = strdup(u.xen_cc.compile_by);
-    info->compile_domain = strdup(u.xen_cc.compile_domain);
-    info->compile_date = strdup(u.xen_cc.compile_date);
+    info->compiler = libxl__strdup(NOGC, u.xen_cc.compiler);
+    info->compile_by = libxl__strdup(NOGC, u.xen_cc.compile_by);
+    info->compile_domain = libxl__strdup(NOGC, u.xen_cc.compile_domain);
+    info->compile_date = libxl__strdup(NOGC, u.xen_cc.compile_date);
 
     xc_version(ctx->xch, XENVER_capabilities, &u.xen_caps);
-    info->capabilities = strdup(u.xen_caps);
+    info->capabilities = libxl__strdup(NOGC, u.xen_caps);
 
     xc_version(ctx->xch, XENVER_changeset, &u.xen_chgset);
-    info->changeset = strdup(u.xen_chgset);
+    info->changeset = libxl__strdup(NOGC, u.xen_chgset);
 
     xc_version(ctx->xch, XENVER_platform_parameters, &u.p_parms);
     info->virt_start = u.p_parms.virt_start;
@@ -5297,8 +5298,10 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
     info->pagesize = xc_version(ctx->xch, XENVER_pagesize, NULL);
 
     xc_version(ctx->xch, XENVER_commandline, &u.xen_commandline);
-    info->commandline = strdup(u.xen_commandline);
+    info->commandline = libxl__strdup(NOGC, u.xen_commandline);
 
+ out:
+    GC_FREE;
     return info;
 }
 
