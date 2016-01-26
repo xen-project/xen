@@ -119,13 +119,22 @@ void libxl__save_helper_init(libxl__save_helper_state *shs)
 
 /*----- helper execution -----*/
 
+/*
+ * Both save and restore share four parameters:
+ * 1) Path to libxl-save-helper.
+ * 2) --[restore|save]-domain.
+ * 3) stream file descriptor.
+ * n) save/restore specific parameters.
+ * 4) A \0 at the end.
+ */
+#define HELPER_NR_ARGS 4
 static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
                        const char *mode_arg, int stream_fd,
                        const int *preserve_fds, int num_preserve_fds,
                        const unsigned long *argnums, int num_argnums)
 {
     STATE_AO_GC(shs->ao);
-    const char *args[4 + num_argnums];
+    const char *args[HELPER_NR_ARGS + num_argnums];
     const char **arg = args;
     int i, rc;
 
