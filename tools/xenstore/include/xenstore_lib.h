@@ -19,6 +19,7 @@
 #ifndef XENSTORE_LIB_H
 #define XENSTORE_LIB_H
 
+#include <stddef.h>
 #include <stdbool.h>
 #include <limits.h>
 #include <errno.h>
