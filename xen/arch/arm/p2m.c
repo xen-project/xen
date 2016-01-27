@@ -468,6 +468,8 @@ static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
 #undef ACCESS
     };
 
+    ASSERT(spin_is_locked(&p2m->lock));
+
     /* If no setting was ever set, just return rwx. */
     if ( !p2m->mem_access_enabled )
     {
@@ -490,7 +492,7 @@ static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
          * No setting was found in the Radix tree. Check if the
          * entry exists in the page-tables.
          */
-        paddr_t maddr = p2m_lookup(d, gfn_x(gfn) << PAGE_SHIFT, NULL);
+        paddr_t maddr = __p2m_lookup(d, gfn_x(gfn) << PAGE_SHIFT, NULL);
         if ( INVALID_PADDR == maddr )
             return -ESRCH;
 
