@@ -2867,11 +2867,13 @@ start:
     if (rc < 0)
         goto error_out;
 
-    ret = freemem(domid, &d_config.b_info);
-    if (ret < 0) {
-        fprintf(stderr, "failed to free memory for the domain\n");
-        ret = ERROR_FAIL;
-        goto error_out;
+    if (domid_soft_reset == INVALID_DOMID) {
+        ret = freemem(domid, &d_config.b_info);
+        if (ret < 0) {
+            fprintf(stderr, "failed to free memory for the domain\n");
+            ret = ERROR_FAIL;
+            goto error_out;
+        }
     }
 
     libxl_asyncprogress_how autoconnect_console_how_buf;
