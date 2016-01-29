@@ -8,7 +8,7 @@
 
 #ifndef NDEBUG
 struct lock_debug {
-    int irq_safe; /* +1: IRQ-safe; 0: not IRQ-safe; -1: don't know yet */
+    s16 irq_safe; /* +1: IRQ-safe; 0: not IRQ-safe; -1: don't know yet */
 };
 #define _LOCK_DEBUG { -1 }
 void spin_debug_enable(void);
