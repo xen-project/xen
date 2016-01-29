@@ -1074,7 +1074,10 @@ int domain_soft_reset(struct domain *d)
     grant_table_warn_active_grants(d);
 
     for_each_vcpu ( d, v )
+    {
+        set_xen_guest_handle(runstate_guest(v), NULL);
         unmap_vcpu_info(v);
+    }
 
     rc = arch_domain_soft_reset(d);
     if ( !rc )
