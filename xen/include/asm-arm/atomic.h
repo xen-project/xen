@@ -138,14 +138,6 @@ static inline void _atomic_set(atomic_t *v, int i)
 # error "unknown ARM variant"
 #endif
 
-static inline atomic_t atomic_compareandswap(
-    atomic_t old, atomic_t new, atomic_t *v)
-{
-    atomic_t rc;
-    rc.counter = __cmpxchg(&v->counter, old.counter, new.counter, sizeof(int));
-    return rc;
-}
-
 #endif /* __ARCH_ARM_ATOMIC__ */
 /*
  * Local variables:

@@ -135,6 +135,10 @@ static inline void _atomic_set(atomic_t *v, int i)
     v->counter = i;
 }
 
+static inline int atomic_cmpxchg(atomic_t *v, int old, int new)
+{
+    return cmpxchg(&v->counter, old, new);
+}
 
 /**
  * atomic_add - add integer to atomic variable
@@ -149,6 +153,18 @@ static inline void atomic_add(int i, atomic_t *v)
         "lock; addl %1,%0"
         : "=m" (*(volatile int *)&v->counter)
         : "ir" (i), "m" (*(volatile int *)&v->counter) );
+}
+
+/**
+ * atomic_add_return - add integer and return
+ * @i: integer value to add
+ * @v: pointer of type atomic_t
+ *
+ * Atomically adds @i to @v and returns @i + @v
+ */
+static inline int atomic_add_return(int i, atomic_t *v)
+{
+    return i + arch_fetch_and_add(&v->counter, i);
 }
 
 /**
@@ -270,14 +286,6 @@ static inline int atomic_add_negative(int i, atomic_t *v)
         : "=m" (*(volatile int *)&v->counter), "=qm" (c)
         : "ir" (i), "m" (*(volatile int *)&v->counter) : "memory" );
     return c;
-}
-
-static inline atomic_t atomic_compareandswap(
-    atomic_t old, atomic_t new, atomic_t *v)
-{
-    atomic_t rc;
-    rc.counter = __cmpxchg(&v->counter, old.counter, new.counter, sizeof(int));
-    return rc;
 }
 
 #endif /* __ARCH_X86_ATOMIC__ */

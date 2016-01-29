@@ -483,16 +483,15 @@ extern struct vcpu *idle_vcpu[NR_CPUS];
  */
 static always_inline int get_domain(struct domain *d)
 {
-    atomic_t old, new, seen = d->refcnt;
+    int old, seen = atomic_read(&d->refcnt);
     do
     {
         old = seen;
-        if ( unlikely(_atomic_read(old) & DOMAIN_DESTROYED) )
+        if ( unlikely(old & DOMAIN_DESTROYED) )
             return 0;
-        _atomic_set(&new, _atomic_read(old) + 1);
-        seen = atomic_compareandswap(old, new, &d->refcnt);
+        seen = atomic_cmpxchg(&d->refcnt, old, old + 1);
     }
-    while ( unlikely(_atomic_read(seen) != _atomic_read(old)) );
+    while ( unlikely(seen != old) );
     return 1;
 }
 

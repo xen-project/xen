@@ -857,14 +857,11 @@ static void complete_domain_destroy(struct rcu_head *head)
 void domain_destroy(struct domain *d)
 {
     struct domain **pd;
-    atomic_t old = ATOMIC_INIT(0);
-    atomic_t new = ATOMIC_INIT(DOMAIN_DESTROYED);
 
     BUG_ON(!d->is_dying);
 
     /* May be already destroyed, or get_domain() can race us. */
-    old = atomic_compareandswap(old, new, &d->refcnt);
-    if ( _atomic_read(old) != 0 )
+    if ( atomic_cmpxchg(&d->refcnt, 0, DOMAIN_DESTROYED) != 0 )
         return;
 
     cpupool_rm_domain(d);
