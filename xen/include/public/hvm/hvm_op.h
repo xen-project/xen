@@ -333,6 +333,7 @@ struct xen_hvm_io_range {
 # define HVMOP_IO_RANGE_PORT   0 /* I/O port range */
 # define HVMOP_IO_RANGE_MEMORY 1 /* MMIO range */
 # define HVMOP_IO_RANGE_PCI    2 /* PCI segment/bus/dev/func range */
+# define HVMOP_IO_RANGE_WP_MEM 3 /* Write-protected ram range */
     uint64_aligned_t start, end; /* IN - inclusive start and end of range */
 };
 typedef struct xen_hvm_io_range xen_hvm_io_range_t;

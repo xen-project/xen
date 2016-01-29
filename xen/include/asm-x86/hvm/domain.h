@@ -48,7 +48,7 @@ struct hvm_ioreq_vcpu {
     bool_t           pending;
 };
 
-#define NR_IO_RANGE_TYPES (HVMOP_IO_RANGE_PCI + 1)
+#define NR_IO_RANGE_TYPES (HVMOP_IO_RANGE_WP_MEM + 1)
 #define MAX_NR_IO_RANGES  256
 
 struct hvm_ioreq_server {

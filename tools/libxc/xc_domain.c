@@ -1523,6 +1523,61 @@ int xc_hvm_unmap_io_range_from_ioreq_server(xc_interface *xch, domid_t domid,
     return rc;
 }
 
+int xc_hvm_map_wp_mem_range_to_ioreq_server(xc_interface *xch,
+                                            domid_t domid,
+                                            ioservid_t id,
+                                            xen_pfn_t start,
+                                            xen_pfn_t end)
+{
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_io_range_t, arg);
+    int rc;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
+
+    arg->domid = domid;
+    arg->id = id;
+    arg->type = HVMOP_IO_RANGE_WP_MEM;
+    arg->start = start;
+    arg->end = end;
+
+    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op,
+                  HVMOP_map_io_range_to_ioreq_server,
+                  HYPERCALL_BUFFER_AS_ARG(arg));
+
+    xc_hypercall_buffer_free(xch, arg);
+    return rc;
+}
+
+int xc_hvm_unmap_wp_mem_range_from_ioreq_server(xc_interface *xch,
+                                                domid_t domid,
+                                                ioservid_t id,
+                                                xen_pfn_t start,
+                                                xen_pfn_t end)
+{
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_io_range_t, arg);
+    int rc;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
+
+    arg->domid = domid;
+    arg->id = id;
+    arg->type = HVMOP_IO_RANGE_WP_MEM;
+    arg->start = start;
+    arg->end = end;
+
+    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op,
+                  HVMOP_unmap_io_range_from_ioreq_server,
+                  HYPERCALL_BUFFER_AS_ARG(arg));
+
+    xc_hypercall_buffer_free(xch, arg);
+    return rc;
+
+}
+
 int xc_hvm_map_pcidev_to_ioreq_server(xc_interface *xch, domid_t domid,
                                       ioservid_t id, uint16_t segment,
                                       uint8_t bus, uint8_t device,

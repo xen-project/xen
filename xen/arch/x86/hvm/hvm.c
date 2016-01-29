@@ -932,6 +932,9 @@ static void hvm_ioreq_server_free_rangesets(struct hvm_ioreq_server *s,
         rangeset_destroy(s->range[i]);
 }
 
+const char *const io_range_name[NR_IO_RANGE_TYPES] =
+                                {"port", "mmio", "pci", "wp-mem"};
+
 static int hvm_ioreq_server_alloc_rangesets(struct hvm_ioreq_server *s, 
                                             bool_t is_default)
 {
@@ -946,10 +949,7 @@ static int hvm_ioreq_server_alloc_rangesets(struct hvm_ioreq_server *s,
         char *name;
 
         rc = asprintf(&name, "ioreq_server %d %s", s->id,
-                      (i == HVMOP_IO_RANGE_PORT) ? "port" :
-                      (i == HVMOP_IO_RANGE_MEMORY) ? "memory" :
-                      (i == HVMOP_IO_RANGE_PCI) ? "pci" :
-                      "");
+                      (i < NR_IO_RANGE_TYPES) ? io_range_name[i] : "");
         if ( rc )
             goto fail;
 
@@ -1267,6 +1267,7 @@ static int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
             case HVMOP_IO_RANGE_PORT:
             case HVMOP_IO_RANGE_MEMORY:
             case HVMOP_IO_RANGE_PCI:
+            case HVMOP_IO_RANGE_WP_MEM:
                 r = s->range[type];
                 break;
 
@@ -1318,6 +1319,7 @@ static int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
             case HVMOP_IO_RANGE_PORT:
             case HVMOP_IO_RANGE_MEMORY:
             case HVMOP_IO_RANGE_PCI:
+            case HVMOP_IO_RANGE_WP_MEM:
                 r = s->range[type];
                 break;
 
@@ -2601,6 +2603,18 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
         type = (p->type == IOREQ_TYPE_PIO) ?
                 HVMOP_IO_RANGE_PORT : HVMOP_IO_RANGE_MEMORY;
         addr = p->addr;
+        if ( type == HVMOP_IO_RANGE_MEMORY )
+        {
+            p2m_type_t p2mt;
+            struct page_info *ram_page;
+
+            ram_page = get_page_from_gfn(d, PFN_DOWN(p->addr), &p2mt, 0);
+            if ( p2mt == p2m_mmio_write_dm )
+                type = HVMOP_IO_RANGE_WP_MEM;
+
+            if ( ram_page )
+                put_page(ram_page);
+        }
     }
 
     list_for_each_entry ( s,
@@ -2640,6 +2654,11 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
                 p->addr = addr;
                 return s;
             }
+
+            break;
+        case HVMOP_IO_RANGE_WP_MEM:
+            if ( rangeset_contains_singleton(r, PFN_DOWN(addr)) )
+                return s;
 
             break;
         }
