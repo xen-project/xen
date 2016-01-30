@@ -144,6 +144,140 @@ def crunch_numbers(state):
     state.hvm_shadow = featureset_to_uint32s(state.raw_hvm_shadow, nr_entries)
     state.hvm_hap = featureset_to_uint32s(state.raw_hvm_hap, nr_entries)
 
+    #
+    # Feature dependency information.
+    #
+    # !!! WARNING !!!
+    #
+    # A lot of this information is derived from the written text of vendors
+    # software manuals, rather than directly from a statement.  As such, it
+    # does contain guesswork and assumptions, and may not accurately match
+    # hardware implementations.
+    #
+    # It is however designed to create an end result for a guest which does
+    # plausibly match real hardware.
+    #
+    # !!! WARNING !!!
+    #
+    # The format of this dictionary is that the feature in the key is a direct
+    # prerequisite of each feature in the value.
+    #
+    # The first consideration is about which functionality is physically built
+    # on top of other features.  The second consideration, which is more
+    # subjective, is whether real hardware would ever be found supporting
+    # feature X but not Y.
+    #
+    deps = {
+        # FPU is taken to mean support for the x87 regisers as well as the
+        # instructions.  MMX is documented to alias the %MM registers over the
+        # x87 %ST registers in hardware.
+        FPU: [MMX],
+
+        # The PSE36 feature indicates that reserved bits in a PSE superpage
+        # may be used as extra physical address bits.
+        PSE: [PSE36],
+
+        # Entering Long Mode requires that %CR4.PAE is set.  The NX pagetable
+        # bit is only representable in the 64bit PTE format offered by PAE.
+        PAE: [LM, NX],
+
+        # APIC is special, but X2APIC does depend on APIC being available in
+        # the first place.
+        APIC: [X2APIC],
+
+        # AMD built MMXExtentions and 3DNow as extentions to MMX.
+        MMX: [MMXEXT, _3DNOW],
+
+        # The FXSAVE/FXRSTOR instructions were introduced into hardware before
+        # SSE, which is why they behave differently based on %CR4.OSFXSAVE and
+        # have their own feature bit.  AMD however introduce the Fast FXSR
+        # feature as an optimisation.
+        FXSR: [FFXSR, SSE],
+
+        # SSE is taken to mean support for the %XMM registers as well as the
+        # instructions.  Several futher instruction sets are built on core
+        # %XMM support, without specific inter-dependencies.
+        SSE: [SSE2, SSE3, SSSE3, SSE4A,
+              AESNI, SHA],
+
+        # SSE2 was re-specified as core instructions for 64bit.
+        SSE2: [LM],
+
+        # SSE4.1 explicitly depends on SSE3 and SSSE3
+        SSE3: [SSE4_1],
+        SSSE3: [SSE4_1],
+
+        # SSE4.2 explicitly depends on SSE4.1
+        SSE4_1: [SSE4_2],
+
+        # AMD specify no relationship between POPCNT and SSE4.2.  Intel
+        # document that SSE4.2 should be checked for before checking for
+        # POPCNT.  However, it has its own feature bit, and operates on GPRs
+        # rather than %XMM state, so doesn't inherently depend on SSE.
+        # Therefore, we do not specify a dependency between SSE4_2 and POPCNT.
+        #
+        # SSE4_2: [POPCNT]
+
+        # The INVPCID instruction depends on PCID infrastructure being
+        # available.
+        PCID: [INVPCID],
+
+        # XSAVE is an extra set of instructions for state management, but
+        # doesn't constitue new state itself.  Some of the dependent features
+        # are instructions built on top of base XSAVE, while others are new
+        # instruction groups which are specified to require XSAVE for state
+        # management.
+        XSAVE: [XSAVEOPT, XSAVEC, XGETBV1, XSAVES,
+                AVX, MPX, PKU, LWP],
+
+        # AVX is taken to mean hardware support for VEX encoded instructions,
+        # 256bit registers, and the instructions themselves.  Each of these
+        # subsequent instruction groups may only be VEX encoded.
+        AVX: [FMA, FMA4, F16C, AVX2, XOP],
+
+        # CX16 is only encodable in Long Mode.  LAHF_LM indicates that the
+        # SAHF/LAHF instructions are reintroduced in Long Mode.  1GB
+        # superpages, PCID and PKU are only available in 4 level paging.
+        LM: [CX16, PCID, LAHF_LM, PAGE1GB, PKU],
+
+        # AMD K6-2+ and K6-III processors shipped with 3DNow+, beyond the
+        # standard 3DNow in the earlier K6 processors.
+        _3DNOW: [_3DNOWEXT],
+    }
+
+    deep_features = tuple(sorted(deps.keys()))
+    state.deep_deps = {}
+
+    for feat in deep_features:
+
+        seen = [feat]
+        to_process = list(deps[feat])
+
+        while len(to_process):
+
+            # To debug, uncomment the following lines:
+            # def repl(l):
+            #     return "[" + ", ".join((state.names[x] for x in l)) + "]"
+            # print >>sys.stderr, "Feature %s, seen %s, to_process %s " % \
+            #     (state.names[feat], repl(seen), repl(to_process))
+
+            f = to_process.pop(0)
+
+            if f in seen:
+                raise Fail("ERROR: Cycle found with %s when processing %s"
+                           % (state.names[f], state.names[feat]))
+
+            seen.append(f)
+            to_process = list(set(to_process + deps.get(f, [])))
+
+        state.deep_deps[feat] = seen[1:]
+
+    state.deep_features = featureset_to_uint32s(deps.keys(), nr_entries)
+    state.nr_deep_deps = len(state.deep_deps.keys())
+
+    for k, v in state.deep_deps.iteritems():
+        state.deep_deps[k] = featureset_to_uint32s(v, nr_entries)
+
 
 def write_results(state):
     state.output.write(
@@ -161,15 +295,21 @@ def write_results(state):
 
 #define CPUID_COMMON_1D_FEATURES %s
 
-#define INIT_KNOWN_FEATURES { \\\n%s\n} 
+#define INIT_KNOWN_FEATURES { \\\n%s\n}
 
-#define INIT_SPECIAL_FEATURES { \\\n%s\n} 
+#define INIT_SPECIAL_FEATURES { \\\n%s\n}
 
-#define INIT_PV_FEATURES { \\\n%s\n} 
+#define INIT_PV_FEATURES { \\\n%s\n}
 
-#define INIT_HVM_SHADOW_FEATURES { \\\n%s\n} 
+#define INIT_HVM_SHADOW_FEATURES { \\\n%s\n}
 
-#define INIT_HVM_HAP_FEATURES { \\\n%s\n} 
+#define INIT_HVM_HAP_FEATURES { \\\n%s\n}
+
+#define NR_DEEP_DEPS %sU
+
+#define INIT_DEEP_FEATURES { \\\n%s\n}
+
+#define INIT_DEEP_DEPS { \\
 """ % (state.nr_entries,
        state.common_1d,
        format_uint32s(state.known, 4),
@@ -177,10 +317,20 @@ def write_results(state):
        format_uint32s(state.pv, 4),
        format_uint32s(state.hvm_shadow, 4),
        format_uint32s(state.hvm_hap, 4),
+       state.nr_deep_deps,
+       format_uint32s(state.deep_features, 4),
        ))
 
+    for dep in sorted(state.deep_deps.keys()):
+        state.output.write(
+            "    { %#xU, /* %s */ { \\\n%s\n    }, }, \\\n"
+            % (dep, state.names[dep],
+               format_uint32s(state.deep_deps[dep], 8)
+           ))
+
     state.output.write(
-"""
+"""}
+
 #endif /* __XEN_X86__FEATURESET_DATA__ */
 """)
 

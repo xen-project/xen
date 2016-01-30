@@ -11,6 +11,7 @@ const uint32_t special_features[] = INIT_SPECIAL_FEATURES;
 static const uint32_t __initconst pv_featuremask[] = INIT_PV_FEATURES;
 static const uint32_t __initconst hvm_shadow_featuremask[] = INIT_HVM_SHADOW_FEATURES;
 static const uint32_t __initconst hvm_hap_featuremask[] = INIT_HVM_HAP_FEATURES;
+static const uint32_t __initconst deep_features[] = INIT_DEEP_FEATURES;
 
 uint32_t __read_mostly raw_featureset[FSCAPINTS];
 uint32_t __read_mostly pv_featureset[FSCAPINTS];
@@ -18,12 +19,36 @@ uint32_t __read_mostly hvm_featureset[FSCAPINTS];
 
 static void __init sanitise_featureset(uint32_t *fs)
 {
+    /* for_each_set_bit() uses unsigned longs.  Extend with zeroes. */
+    uint32_t disabled_features[
+        ROUNDUP(FSCAPINTS, sizeof(unsigned long)/sizeof(uint32_t))] = {};
     unsigned int i;
 
     for ( i = 0; i < FSCAPINTS; ++i )
     {
         /* Clamp to known mask. */
         fs[i] &= known_features[i];
+
+        /*
+         * Identify which features with deep dependencies have been
+         * disabled.
+         */
+        disabled_features[i] = ~fs[i] & deep_features[i];
+    }
+
+    for_each_set_bit(i, (void *)disabled_features,
+                     sizeof(disabled_features) * 8)
+    {
+        const uint32_t *dfs = lookup_deep_deps(i);
+        unsigned int j;
+
+        ASSERT(dfs); /* deep_features[] should guarentee this. */
+
+        for ( j = 0; j < FSCAPINTS; ++j )
+        {
+            fs[j] &= ~dfs[j];
+            disabled_features[j] &= ~dfs[j];
+        }
     }
 
     /*
@@ -164,6 +189,36 @@ void __init calculate_featuresets(void)
     calculate_hvm_featureset();
 }
 
+const uint32_t * __init lookup_deep_deps(uint32_t feature)
+{
+    static const struct {
+        uint32_t feature;
+        uint32_t fs[FSCAPINTS];
+    } deep_deps[] __initconst = INIT_DEEP_DEPS;
+    unsigned int start = 0, end = ARRAY_SIZE(deep_deps);
+
+    BUILD_BUG_ON(ARRAY_SIZE(deep_deps) != NR_DEEP_DEPS);
+
+    /* Fast early exit. */
+    if ( !test_bit(feature, deep_features) )
+        return NULL;
+
+    /* deep_deps[] is sorted.  Perform a binary search. */
+    while ( start < end )
+    {
+        unsigned int mid = start + ((end - start) / 2);
+
+        if ( deep_deps[mid].feature > feature )
+            end = mid;
+        else if ( deep_deps[mid].feature < feature )
+            start = mid + 1;
+        else
+            return deep_deps[mid].fs;
+    }
+
+    return NULL;
+}
+
 static void __init __maybe_unused build_assertions(void)
 {
     BUILD_BUG_ON(ARRAY_SIZE(known_features) != FSCAPINTS);
@@ -171,6 +226,7 @@ static void __init __maybe_unused build_assertions(void)
     BUILD_BUG_ON(ARRAY_SIZE(pv_featuremask) != FSCAPINTS);
     BUILD_BUG_ON(ARRAY_SIZE(hvm_shadow_featuremask) != FSCAPINTS);
     BUILD_BUG_ON(ARRAY_SIZE(hvm_hap_featuremask) != FSCAPINTS);
+    BUILD_BUG_ON(ARRAY_SIZE(deep_features) != FSCAPINTS);
 }
 
 /*

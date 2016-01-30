@@ -29,6 +29,8 @@ extern uint32_t hvm_featureset[FSCAPINTS];
 
 void calculate_featuresets(void);
 
+const uint32_t *lookup_deep_deps(uint32_t feature);
+
 #endif /* __ASSEMBLY__ */
 #endif /* !__X86_CPUID_H__ */
 
