@@ -923,15 +923,13 @@ int arch_set_info_guest(
     {
         memcpy(v->arch.fpu_ctxt, &c.nat->fpu_ctxt, sizeof(c.nat->fpu_ctxt));
         if ( v->arch.xsave_area )
-        {
             v->arch.xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
-            v->arch.xsave_area->xsave_hdr.xcomp_bv =
-                cpu_has_xsaves ? XSTATE_COMPACTION_ENABLED : 0;
-        }
     }
     else if ( v->arch.xsave_area )
-        memset(&v->arch.xsave_area->xsave_hdr, 0,
-               sizeof(v->arch.xsave_area->xsave_hdr));
+    {
+        v->arch.xsave_area->xsave_hdr.xstate_bv = 0;
+        v->arch.xsave_area->fpu_sse.mxcsr = MXCSR_DEFAULT;
+    }
     else
     {
         typeof(v->arch.xsave_area->fpu_sse) *fpu_sse = v->arch.fpu_ctxt;
@@ -940,6 +938,14 @@ int arch_set_info_guest(
         fpu_sse->fcw = FCW_DEFAULT;
         fpu_sse->mxcsr = MXCSR_DEFAULT;
     }
+    if ( cpu_has_xsaves )
+    {
+        ASSERT(v->arch.xsave_area);
+        v->arch.xsave_area->xsave_hdr.xcomp_bv = XSTATE_COMPACTION_ENABLED |
+            v->arch.xsave_area->xsave_hdr.xstate_bv;
+    }
+    else if ( v->arch.xsave_area )
+        v->arch.xsave_area->xsave_hdr.xcomp_bv = 0;
 
     if ( !compat )
     {

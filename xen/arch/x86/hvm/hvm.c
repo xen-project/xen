@@ -1973,6 +1973,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     struct hvm_hw_cpu ctxt;
     struct segment_register seg;
     const char *errstr;
+    struct xsave_struct *xsave_area;
 
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
@@ -2099,20 +2100,24 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     seg.attr.bytes = ctxt.ldtr_arbytes;
     hvm_set_segment_register(v, x86_seg_ldtr, &seg);
 
+    /* Cover xsave-absent save file restoration on xsave-capable host. */
+    xsave_area = xsave_enabled(v) ? NULL : v->arch.xsave_area;
+
     v->fpu_initialised = !!(ctxt.flags & XEN_X86_FPU_INITIALISED);
     if ( v->fpu_initialised )
     {
         memcpy(v->arch.fpu_ctxt, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
-        /* In case xsave-absent save file is restored on a xsave-capable host */
-        if ( cpu_has_xsave && !xsave_enabled(v) )
-        {
-            struct xsave_struct *xsave_area = v->arch.xsave_area;
-
+        if ( xsave_area )
             xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
-            xsave_area->xsave_hdr.xcomp_bv =
-                cpu_has_xsaves ? XSTATE_COMPACTION_ENABLED : 0;
-        }
     }
+    else if ( xsave_area )
+    {
+        xsave_area->xsave_hdr.xstate_bv = 0;
+        xsave_area->fpu_sse.mxcsr = MXCSR_DEFAULT;
+    }
+    if ( cpu_has_xsaves && xsave_area )
+        xsave_area->xsave_hdr.xcomp_bv = XSTATE_COMPACTION_ENABLED |
+            xsave_area->xsave_hdr.xstate_bv;
 
     v->arch.user_regs.eax = ctxt.rax;
     v->arch.user_regs.ebx = ctxt.rbx;
@@ -5487,8 +5492,8 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     if ( v->arch.xsave_area )
     {
         v->arch.xsave_area->xsave_hdr.xstate_bv = XSTATE_FP;
-        v->arch.xsave_area->xsave_hdr.xcomp_bv =
-            cpu_has_xsaves ? XSTATE_COMPACTION_ENABLED : 0;
+        v->arch.xsave_area->xsave_hdr.xcomp_bv = cpu_has_xsaves
+            ? XSTATE_COMPACTION_ENABLED | XSTATE_FP : 0;
     }
 
     v->arch.vgc_flags = VGCF_online;
