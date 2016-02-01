@@ -163,4 +163,6 @@ void hvm_acpi_sleep_button(struct domain *d);
 void save_rest_processor_state(void);
 void restore_rest_processor_state(void);
 
+#define ACPI_MAP_MEM_ATTR	PAGE_HYPERVISOR_NOCACHE
+
 #endif /*__X86_ASM_ACPI_H*/
