@@ -48,9 +48,9 @@ extern u64 xfeature_mask;
 extern unsigned int *xstate_sizes;
 
 /* extended state save area */
-struct __packed __attribute__((aligned (64))) xsave_struct
+struct __attribute__((aligned (64))) xsave_struct
 {
-    union {                                  /* FPU/MMX, SSE */
+    union __attribute__((aligned(16))) {     /* FPU/MMX, SSE */
         char x[512];
         struct {
             uint16_t fcw;

@@ -277,7 +277,9 @@ int vcpu_init_fpu(struct vcpu *v)
     }
     else
     {
-        v->arch.fpu_ctxt = _xzalloc(sizeof(v->arch.xsave_area->fpu_sse), 16);
+        BUILD_BUG_ON(__alignof(v->arch.xsave_area->fpu_sse) < 16);
+        v->arch.fpu_ctxt = _xzalloc(sizeof(v->arch.xsave_area->fpu_sse),
+                                    __alignof(v->arch.xsave_area->fpu_sse));
         if ( v->arch.fpu_ctxt )
         {
             typeof(v->arch.xsave_area->fpu_sse) *fpu_sse = v->arch.fpu_ctxt;
