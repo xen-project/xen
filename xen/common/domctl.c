@@ -709,7 +709,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     }
 
     case XEN_DOMCTL_soft_reset:
-        if ( d == current->domain )
+        if ( d == current->domain ) /* no domain_pause() */
         {
             ret = -EINVAL;
             break;
@@ -1136,11 +1136,15 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
 #ifdef CONFIG_HAS_MEM_ACCESS
     case XEN_DOMCTL_set_access_required:
-        if ( unlikely(current->domain == d) )
+        if ( unlikely(current->domain == d) ) /* no domain_pause() */
             ret = -EPERM;
         else
+        {
+            domain_pause(d);
             p2m_get_hostp2m(d)->access_required =
                 op->u.access_required.access_required;
+            domain_unpause(d);
+        }
         break;
 #endif
 
@@ -1175,10 +1179,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     }
 
     case XEN_DOMCTL_monitor_op:
-        ret = -EPERM;
-        if ( current->domain == d )
-            break;
-
         ret = monitor_domctl(d, &op->u.monitor_op);
         if ( !ret )
             copyback = 1;

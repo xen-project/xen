@@ -69,6 +69,9 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
     struct arch_domain *ad = &d->arch;
     uint32_t capabilities = get_capabilities(d);
 
+    if ( current->domain == d ) /* no domain_pause() */
+        return -EPERM;
+
     rc = xsm_vm_event_control(XSM_PRIV, d, mop->op, mop->event);
     if ( rc )
         return rc;
@@ -80,7 +83,9 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
         return 0;
 
     case XEN_DOMCTL_MONITOR_OP_EMULATE_EACH_REP:
-        d->arch.mem_access_emulate_each_rep = !!mop->event;
+        domain_pause(d);
+        ad->mem_access_emulate_each_rep = !!mop->event;
+        domain_unpause(d);
         return 0;
     }
 
@@ -109,6 +114,8 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
         if ( rc )
             return rc;
 
+        domain_pause(d);
+
         if ( mop->u.mov_to_cr.sync )
             ad->monitor.write_ctrlreg_sync |= ctrlreg_bitmask;
         else
@@ -119,19 +126,17 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
         else
             ad->monitor.write_ctrlreg_onchangeonly &= ~ctrlreg_bitmask;
 
-        domain_pause(d);
-
         if ( !status )
             ad->monitor.write_ctrlreg_enabled |= ctrlreg_bitmask;
         else
             ad->monitor.write_ctrlreg_enabled &= ~ctrlreg_bitmask;
 
-        domain_unpause(d);
-
         if ( mop->u.mov_to_cr.index == VM_EVENT_X86_CR3 )
             /* Latches new CR3 mask through CR0 code */
             for_each_vcpu ( d, v )
                 hvm_update_guest_cr(v, 0);
+
+        domain_unpause(d);
 
         break;
     }
@@ -145,16 +150,18 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
             return rc;
 
         if ( mop->op == XEN_DOMCTL_MONITOR_OP_ENABLE &&
-             mop->u.mov_to_msr.extended_capture )
-        {
-            if ( hvm_enable_msr_exit_interception(d) )
-                ad->monitor.mov_to_msr_extended = 1;
-            else
-                return -EOPNOTSUPP;
-        } else
-            ad->monitor.mov_to_msr_extended = 0;
+             mop->u.mov_to_msr.extended_capture &&
+             !hvm_enable_msr_exit_interception(d) )
+            return -EOPNOTSUPP;
 
         domain_pause(d);
+
+        if ( mop->op == XEN_DOMCTL_MONITOR_OP_ENABLE &&
+             mop->u.mov_to_msr.extended_capture )
+                ad->monitor.mov_to_msr_extended = 1;
+        else
+            ad->monitor.mov_to_msr_extended = 0;
+
         ad->monitor.mov_to_msr_enabled = !status;
         domain_unpause(d);
         break;
@@ -196,9 +203,8 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
         if ( rc )
             return rc;
 
-        ad->monitor.guest_request_sync = mop->u.guest_request.sync;
-
         domain_pause(d);
+        ad->monitor.guest_request_sync = mop->u.guest_request.sync;
         ad->monitor.guest_request_enabled = !status;
         domain_unpause(d);
         break;
