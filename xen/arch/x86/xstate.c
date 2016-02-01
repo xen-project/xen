@@ -29,6 +29,8 @@ unsigned int *__read_mostly xstate_sizes;
 static unsigned int __read_mostly xstate_features;
 static unsigned int __read_mostly xstate_comp_offsets[sizeof(xfeature_mask)*8];
 
+static uint32_t __read_mostly mxcsr_mask = 0x0000ffbf;
+
 /* Cached xcr0 for fast read */
 static DEFINE_PER_CPU(uint64_t, xcr0);
 
@@ -342,6 +344,7 @@ void xrstor(struct vcpu *v, uint64_t mask)
     uint32_t hmask = mask >> 32;
     uint32_t lmask = mask;
     struct xsave_struct *ptr = v->arch.xsave_area;
+    unsigned int faults, prev_faults;
 
     /*
      * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
@@ -361,35 +364,84 @@ void xrstor(struct vcpu *v, uint64_t mask)
     /*
      * XRSTOR can fault if passed a corrupted data block. We handle this
      * possibility, which may occur if the block was passed to us by control
-     * tools or through VCPUOP_initialise, by silently clearing the block.
+     * tools or through VCPUOP_initialise, by silently adjusting state.
      */
-    switch ( __builtin_expect(ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET], 8) )
+    for ( prev_faults = faults = 0; ; prev_faults = faults )
     {
+        switch ( __builtin_expect(ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET], 8) )
+        {
 #define XRSTOR(pfx) \
         alternative_io("1: .byte " pfx "0x0f,0xae,0x2f\n" \
+                       "3:\n" \
                        "   .section .fixup,\"ax\"\n" \
-                       "2: mov %[size],%%ecx\n" \
-                       "   xor %[lmask_out],%[lmask_out]\n" \
-                       "   rep stosb\n" \
-                       "   lea %[mem],%[ptr]\n" \
-                       "   mov %[lmask_in],%[lmask_out]\n" \
-                       "   jmp 1b\n" \
+                       "2: inc%z[faults] %[faults]\n" \
+                       "   jmp 3b\n" \
                        "   .previous\n" \
                        _ASM_EXTABLE(1b, 2b), \
                        ".byte " pfx "0x0f,0xc7,0x1f\n", \
                        X86_FEATURE_XSAVES, \
-                       ASM_OUTPUT2([ptr] "+&D" (ptr), [lmask_out] "+&a" (lmask)), \
-                       [mem] "m" (*ptr), [lmask_in] "g" (lmask), \
-                       [hmask] "d" (hmask), [size] "m" (xsave_cntxt_size) \
-                       : "ecx")
+                       ASM_OUTPUT2([mem] "+m" (*ptr), [faults] "+g" (faults)), \
+                       [lmask] "a" (lmask), [hmask] "d" (hmask), \
+                       [ptr] "D" (ptr))
 
-    default:
-        XRSTOR("0x48,");
-        break;
-    case 4: case 2:
-        XRSTOR("");
-        break;
+        default:
+            XRSTOR("0x48,");
+            break;
+        case 4: case 2:
+            XRSTOR("");
+            break;
 #undef XRSTOR
+        }
+        if ( likely(faults == prev_faults) )
+            break;
+#ifndef NDEBUG
+        gprintk(XENLOG_WARNING, "fault#%u: mxcsr=%08x\n",
+                faults, ptr->fpu_sse.mxcsr);
+        gprintk(XENLOG_WARNING, "xs=%016lx xc=%016lx\n",
+                ptr->xsave_hdr.xstate_bv, ptr->xsave_hdr.xcomp_bv);
+        gprintk(XENLOG_WARNING, "r0=%016lx r1=%016lx\n",
+                ptr->xsave_hdr.reserved[0], ptr->xsave_hdr.reserved[1]);
+        gprintk(XENLOG_WARNING, "r2=%016lx r3=%016lx\n",
+                ptr->xsave_hdr.reserved[2], ptr->xsave_hdr.reserved[3]);
+        gprintk(XENLOG_WARNING, "r4=%016lx r5=%016lx\n",
+                ptr->xsave_hdr.reserved[4], ptr->xsave_hdr.reserved[5]);
+#endif
+        switch ( faults )
+        {
+        case 1: /* Stage 1: Reset state to be loaded. */
+            ptr->xsave_hdr.xstate_bv &= ~mask;
+            /*
+             * Also try to eliminate fault reasons, even if this shouldn't be
+             * needed here (other code should ensure the sanity of the data).
+             */
+            if ( ((mask & XSTATE_SSE) ||
+                  ((mask & XSTATE_YMM) &&
+                   !(ptr->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED))) )
+                ptr->fpu_sse.mxcsr &= mxcsr_mask;
+            if ( cpu_has_xsaves || cpu_has_xsavec )
+            {
+                ptr->xsave_hdr.xcomp_bv &= this_cpu(xcr0) | this_cpu(xss);
+                ptr->xsave_hdr.xstate_bv &= ptr->xsave_hdr.xcomp_bv;
+                ptr->xsave_hdr.xcomp_bv |= XSTATE_COMPACTION_ENABLED;
+            }
+            else
+            {
+                ptr->xsave_hdr.xstate_bv &= this_cpu(xcr0);
+                ptr->xsave_hdr.xcomp_bv = 0;
+            }
+            memset(ptr->xsave_hdr.reserved, 0, sizeof(ptr->xsave_hdr.reserved));
+            continue;
+
+        case 2: /* Stage 2: Reset all state. */
+            ptr->fpu_sse.mxcsr = MXCSR_DEFAULT;
+            ptr->xsave_hdr.xstate_bv = 0;
+            ptr->xsave_hdr.xcomp_bv = cpu_has_xsaves
+                                      ? XSTATE_COMPACTION_ENABLED : 0;
+            continue;
+        }
+
+        domain_crash(current->domain);
+        return;
     }
 }
 
@@ -496,6 +548,8 @@ void xstate_init(struct cpuinfo_x86 *c)
 
     if ( bsp )
     {
+        static typeof(current->arch.xsave_area->fpu_sse) __initdata ctxt;
+
         xfeature_mask = feature_mask;
         /*
          * xsave_cntxt_size is the max size required by enabled features.
@@ -504,6 +558,10 @@ void xstate_init(struct cpuinfo_x86 *c)
         xsave_cntxt_size = _xstate_ctxt_size(feature_mask);
         printk("%s: using cntxt_size: %#x and states: %#"PRIx64"\n",
             __func__, xsave_cntxt_size, xfeature_mask);
+
+        asm ( "fxsave %0" : "=m" (ctxt) );
+        if ( ctxt.mxcsr_mask )
+            mxcsr_mask = ctxt.mxcsr_mask;
     }
     else
     {
