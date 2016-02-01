@@ -362,7 +362,7 @@ F:	xen/common/vm_event.c
 F:	xen/common/mem_access.c
 F:	xen/arch/x86/hvm/event.c
 F:	xen/arch/x86/monitor.c
-F:	xen/arch/x86/vm_event.c
+F:	xen/arch/*/vm_event.c
 F:	tools/tests/xen-access
 
 VTPM
