@@ -2190,6 +2190,19 @@ static int hvm_save_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
+/*
+ * Structure layout conformity checks, documenting correctness of the cast in
+ * the invocation of validate_xstate() below.
+ * Leverage CONFIG_COMPAT machinery to perform this.
+ */
+#define xen_xsave_hdr xsave_hdr
+#define compat_xsave_hdr hvm_hw_cpu_xsave_hdr
+CHECK_FIELD_(struct, xsave_hdr, xstate_bv);
+CHECK_FIELD_(struct, xsave_hdr, xcomp_bv);
+CHECK_FIELD_(struct, xsave_hdr, reserved);
+#undef compat_xsave_hdr
+#undef xen_xsave_hdr
+
 static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
 {
     unsigned int vcpuid, size;
@@ -2245,7 +2258,7 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     h->cur += desc->length;
 
     err = validate_xstate(ctxt->xcr0, ctxt->xcr0_accum,
-                          ctxt->save_area.xsave_hdr.xstate_bv);
+                          (const void *)&ctxt->save_area.xsave_hdr);
     if ( err )
     {
         printk(XENLOG_G_WARNING

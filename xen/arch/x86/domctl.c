@@ -964,7 +964,7 @@ long arch_do_domctl(
             {
                 if ( evc->size >= 2 * sizeof(uint64_t) + XSTATE_AREA_MIN_SIZE )
                     ret = validate_xstate(_xcr0, _xcr0_accum,
-                                          _xsave_area->xsave_hdr.xstate_bv);
+                                          &_xsave_area->xsave_hdr);
             }
             else if ( !_xcr0 )
                 ret = 0;

@@ -564,12 +564,11 @@ struct hvm_hw_cpu_xsave {
     struct {
         struct { char x[512]; } fpu_sse;
 
-        struct {
+        struct hvm_hw_cpu_xsave_hdr {
             uint64_t xstate_bv;         /* Updated by XRSTOR */
-            uint64_t reserved[7];
+            uint64_t xcomp_bv;          /* Updated by XRSTOR{C,S} */
+            uint64_t reserved[6];
         } xsave_hdr;                    /* The 64-byte header */
-
-        struct { char x[0]; } ymm;    /* YMM */
     } save_area;
 };
 

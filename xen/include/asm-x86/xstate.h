@@ -72,14 +72,13 @@ struct __attribute__((aligned (64))) xsave_struct
         };
     } fpu_sse;
 
-    struct {
+    struct xsave_hdr {
         u64 xstate_bv;
         u64 xcomp_bv;
         u64 reserved[6];
     } xsave_hdr;                             /* The 64-byte header */
 
-    struct { char x[XSTATE_YMM_SIZE]; } ymm; /* YMM */
-    char   data[];                           /* Future new states */
+    char data[];                             /* Variable layout states */
 };
 
 /* extended state operations */
@@ -90,7 +89,8 @@ uint64_t get_msr_xss(void);
 void xsave(struct vcpu *v, uint64_t mask);
 void xrstor(struct vcpu *v, uint64_t mask);
 bool_t xsave_enabled(const struct vcpu *v);
-int __must_check validate_xstate(u64 xcr0, u64 xcr0_accum, u64 xstate_bv);
+int __must_check validate_xstate(u64 xcr0, u64 xcr0_accum,
+                                 const struct xsave_hdr *);
 int __must_check handle_xsetbv(u32 index, u64 new_bv);
 void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size);
 void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size);

@@ -613,16 +613,23 @@ static bool_t valid_xcr0(u64 xcr0)
     return !(xcr0 & XSTATE_BNDREGS) == !(xcr0 & XSTATE_BNDCSR);
 }
 
-int validate_xstate(u64 xcr0, u64 xcr0_accum, u64 xstate_bv)
+int validate_xstate(u64 xcr0, u64 xcr0_accum, const struct xsave_hdr *hdr)
 {
-    if ( (xstate_bv & ~xcr0_accum) ||
+    unsigned int i;
+
+    if ( (hdr->xstate_bv & ~xcr0_accum) ||
          (xcr0 & ~xcr0_accum) ||
          !valid_xcr0(xcr0) ||
          !valid_xcr0(xcr0_accum) )
         return -EINVAL;
 
-    if ( xcr0_accum & ~xfeature_mask )
+    if ( (xcr0_accum & ~xfeature_mask) ||
+         hdr->xcomp_bv )
         return -EOPNOTSUPP;
+
+    for ( i = 0; i < ARRAY_SIZE(hdr->reserved); ++i )
+        if ( hdr->reserved[i] )
+            return -EIO;
 
     return 0;
 }
