@@ -51,6 +51,7 @@ void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
 #ifdef XC_WANT_COMPAT_EVTCHN_API
 
 typedef struct xenevtchn_handle xc_evtchn;
+typedef xc_evtchn_port_or_error_t evtchn_port_or_error_t;
 
 xc_evtchn *xc_evtchn_open(xentoollog_logger *logger,
                              unsigned open_flags);
