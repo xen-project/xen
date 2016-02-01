@@ -27,6 +27,24 @@ menu "Architecture Features"
 
 source "arch/Kconfig"
 
+config SHADOW_PAGING
+        bool "Shadow Paging"
+        default y
+        ---help---
+
+          Shadow paging is a software alternative to hardware paging support
+          (Intel EPT, AMD NPT).
+
+          It is required for:
+            * Running HVM guests on hardware lacking hardware paging support
+              (First-generation Intel VT-x or AMD SVM).
+            * Live migration of PV guests.
+
+          Under a small number of specific workloads, shadow paging may be
+          deliberately used as a performance optimisation.
+
+          If unsure, say Y.
+
 config BIGMEM
 	bool "big memory support"
 	default n
