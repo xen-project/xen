@@ -26,10 +26,9 @@
 #include <xen/event.h>
 #include <xen/trace.h>
 
-#define domain_vhpet(x) (&(x)->arch.hvm_domain.pl_time.vhpet)
+#define domain_vhpet(x) (&(x)->arch.hvm_domain.pl_time->vhpet)
 #define vcpu_vhpet(x)   (domain_vhpet((x)->domain))
-#define vhpet_domain(x) (container_of((x), struct domain, \
-                                      arch.hvm_domain.pl_time.vhpet))
+#define vhpet_domain(x) (container_of(x, struct pl_time, vhpet)->domain)
 #define vhpet_vcpu(x)   (pt_global_vcpu_target(vhpet_domain(x)))
 
 #define HPET_BASE_ADDRESS   0xfed00000ULL

@@ -66,7 +66,7 @@ static void pmt_update_sci(PMTState *s)
 
 void hvm_acpi_power_button(struct domain *d)
 {
-    PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
+    PMTState *s = &d->arch.hvm_domain.pl_time->vpmt;
 
     if ( !has_vpm(d) )
         return;
@@ -79,7 +79,7 @@ void hvm_acpi_power_button(struct domain *d)
 
 void hvm_acpi_sleep_button(struct domain *d)
 {
-    PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
+    PMTState *s = &d->arch.hvm_domain.pl_time->vpmt;
 
     if ( !has_vpm(d) )
         return;
@@ -152,7 +152,7 @@ static int handle_evt_io(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct vcpu *v = current;
-    PMTState *s = &v->domain->arch.hvm_domain.pl_time.vpmt;
+    PMTState *s = &v->domain->arch.hvm_domain.pl_time->vpmt;
     uint32_t addr, data, byte;
     int i;
 
@@ -215,7 +215,7 @@ static int handle_pmt_io(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct vcpu *v = current;
-    PMTState *s = &v->domain->arch.hvm_domain.pl_time.vpmt;
+    PMTState *s = &v->domain->arch.hvm_domain.pl_time->vpmt;
 
     if ( bytes != 4 )
     {
@@ -251,7 +251,7 @@ static int handle_pmt_io(
 
 static int pmtimer_save(struct domain *d, hvm_domain_context_t *h)
 {
-    PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
+    PMTState *s = &d->arch.hvm_domain.pl_time->vpmt;
     uint32_t x, msb = s->pm.tmr_val & TMR_VAL_MSB;
     int rc;
 
@@ -282,7 +282,7 @@ static int pmtimer_save(struct domain *d, hvm_domain_context_t *h)
 
 static int pmtimer_load(struct domain *d, hvm_domain_context_t *h)
 {
-    PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
+    PMTState *s = &d->arch.hvm_domain.pl_time->vpmt;
 
     if ( !has_vpm(d) )
         return -ENODEV;
@@ -345,7 +345,7 @@ int pmtimer_change_ioport(struct domain *d, unsigned int version)
 
 void pmtimer_init(struct vcpu *v)
 {
-    PMTState *s = &v->domain->arch.hvm_domain.pl_time.vpmt;
+    PMTState *s = &v->domain->arch.hvm_domain.pl_time->vpmt;
 
     if ( !has_vpm(v->domain) )
         return;
@@ -369,7 +369,7 @@ void pmtimer_init(struct vcpu *v)
 
 void pmtimer_deinit(struct domain *d)
 {
-    PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
+    PMTState *s = &d->arch.hvm_domain.pl_time->vpmt;
 
     if ( !has_vpm(d) )
         return;
@@ -383,5 +383,5 @@ void pmtimer_reset(struct domain *d)
         return;
 
     /* Reset the counter. */
-    d->arch.hvm_domain.pl_time.vpmt.pm.tmr_val = 0;
+    d->arch.hvm_domain.pl_time->vpmt.pm.tmr_val = 0;
 }

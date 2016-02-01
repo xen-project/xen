@@ -38,10 +38,9 @@
 #define MIN_PER_HOUR    60
 #define HOUR_PER_DAY    24
 
-#define domain_vrtc(x) (&(x)->arch.hvm_domain.pl_time.vrtc)
+#define domain_vrtc(x) (&(x)->arch.hvm_domain.pl_time->vrtc)
 #define vcpu_vrtc(x)   (domain_vrtc((x)->domain))
-#define vrtc_domain(x) (container_of((x), struct domain, \
-                                     arch.hvm_domain.pl_time.vrtc))
+#define vrtc_domain(x) (container_of(x, struct pl_time, vrtc)->domain)
 #define vrtc_vcpu(x)   (pt_global_vcpu_target(vrtc_domain(x)))
 #define epoch_year     1900
 #define get_year(x)    (x + epoch_year)

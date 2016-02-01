@@ -91,7 +91,7 @@ struct hvm_domain {
     /* Cached CF8 for guest PCI config cycles */
     uint32_t                pci_cf8;
 
-    struct pl_time         pl_time;
+    struct pl_time         *pl_time;
 
     struct hvm_io_handler *io_handler;
     unsigned int          io_handler_count;

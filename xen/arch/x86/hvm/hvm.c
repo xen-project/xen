@@ -1576,12 +1576,17 @@ int hvm_domain_initialise(struct domain *d)
     if ( rc != 0 )
         goto fail0;
 
+    d->arch.hvm_domain.pl_time = xzalloc(struct pl_time);
     d->arch.hvm_domain.params = xzalloc_array(uint64_t, HVM_NR_PARAMS);
     d->arch.hvm_domain.io_handler = xzalloc_array(struct hvm_io_handler,
                                                   NR_IO_HANDLERS);
     rc = -ENOMEM;
-    if ( !d->arch.hvm_domain.params || !d->arch.hvm_domain.io_handler )
+    if ( !d->arch.hvm_domain.pl_time ||
+         !d->arch.hvm_domain.params  || !d->arch.hvm_domain.io_handler )
         goto fail1;
+
+    /* need link to containing domain */
+    d->arch.hvm_domain.pl_time->domain = d;
 
     /* Set the default IO Bitmap. */
     if ( is_hardware_domain(d) )
@@ -1639,6 +1644,7 @@ int hvm_domain_initialise(struct domain *d)
         xfree(d->arch.hvm_domain.io_bitmap);
     xfree(d->arch.hvm_domain.io_handler);
     xfree(d->arch.hvm_domain.params);
+    xfree(d->arch.hvm_domain.pl_time);
  fail0:
     hvm_destroy_cacheattr_region_list(d);
     return rc;
@@ -1669,6 +1675,7 @@ void hvm_domain_destroy(struct domain *d)
 {
     xfree(d->arch.hvm_domain.io_handler);
     xfree(d->arch.hvm_domain.params);
+    xfree(d->arch.hvm_domain.pl_time);
 
     hvm_destroy_cacheattr_region_list(d);
 

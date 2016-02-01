@@ -139,6 +139,7 @@ struct pl_time {    /* platform time */
     /* Ensures monotonicity in appropriate timer modes. */
     uint64_t last_guest_time;
     spinlock_t pl_time_lock;
+    struct domain *domain;
 };
 
 void pt_save_timer(struct vcpu *v);

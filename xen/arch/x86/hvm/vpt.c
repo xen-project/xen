@@ -28,7 +28,7 @@
 
 void hvm_init_guest_time(struct domain *d)
 {
-    struct pl_time *pl = &d->arch.hvm_domain.pl_time;
+    struct pl_time *pl = d->arch.hvm_domain.pl_time;
 
     spin_lock_init(&pl->pl_time_lock);
     pl->stime_offset = -(u64)get_s_time();
@@ -37,7 +37,7 @@ void hvm_init_guest_time(struct domain *d)
 
 u64 hvm_get_guest_time_fixed(struct vcpu *v, u64 at_tsc)
 {
-    struct pl_time *pl = &v->domain->arch.hvm_domain.pl_time;
+    struct pl_time *pl = v->domain->arch.hvm_domain.pl_time;
     u64 now;
 
     /* Called from device models shared with PV guests. Be careful. */
@@ -505,7 +505,7 @@ void pt_adjust_global_vcpu_target(struct vcpu *v)
     pt_adjust_vcpu(&vpit->pt0, v);
     spin_unlock(&vpit->lock);
 
-    pl_time = &v->domain->arch.hvm_domain.pl_time;
+    pl_time = v->domain->arch.hvm_domain.pl_time;
 
     spin_lock(&pl_time->vrtc.lock);
     pt_adjust_vcpu(&pl_time->vrtc.pt, v);
@@ -540,9 +540,9 @@ void pt_may_unmask_irq(struct domain *d, struct periodic_time *vlapic_pt)
     if ( d )
     {
         pt_resume(&d->arch.vpit.pt0);
-        pt_resume(&d->arch.hvm_domain.pl_time.vrtc.pt);
+        pt_resume(&d->arch.hvm_domain.pl_time->vrtc.pt);
         for ( i = 0; i < HPET_TIMER_NUM; i++ )
-            pt_resume(&d->arch.hvm_domain.pl_time.vhpet.pt[i]);
+            pt_resume(&d->arch.hvm_domain.pl_time->vhpet.pt[i]);
     }
 
     if ( vlapic_pt )
