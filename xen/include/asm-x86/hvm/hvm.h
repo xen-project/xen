@@ -28,6 +28,13 @@
 #include <public/hvm/ioreq.h>
 #include <xen/mm.h>
 
+#ifndef NDEBUG
+/* Permit use of the Forced Emulation Prefix in HVM guests */
+extern bool_t opt_hvm_fep;
+#else
+#define opt_hvm_fep 0
+#endif
+
 /* Interrupt acknowledgement sources. */
 enum hvm_intsrc {
     hvm_intsrc_none,
@@ -135,6 +142,8 @@ struct hvm_function_table {
      */
     void (*update_guest_cr)(struct vcpu *v, unsigned int cr);
     void (*update_guest_efer)(struct vcpu *v);
+
+    void (*update_guest_vendor)(struct vcpu *v);
 
     int  (*get_guest_pat)(struct vcpu *v, u64 *);
     int  (*set_guest_pat)(struct vcpu *v, u64);
@@ -316,6 +325,11 @@ static inline void hvm_update_guest_efer(struct vcpu *v)
     hvm_funcs.update_guest_efer(v);
 }
 
+static inline void hvm_update_guest_vendor(struct vcpu *v)
+{
+    hvm_funcs.update_guest_vendor(v);
+}
+
 /*
  * Called to ensure than all guest-specific mappings in a tagged TLB are 
  * flushed; does *not* flush Xen's TLB entries, and on processors without a 
@@ -387,7 +401,6 @@ static inline int hvm_event_pending(struct vcpu *v)
 
 /* These exceptions must always be intercepted. */
 #define HVM_TRAP_MASK ((1U << TRAP_debug)           | \
-                       (1U << TRAP_invalid_op)      | \
                        (1U << TRAP_alignment_check) | \
                        (1U << TRAP_machine_check))
 

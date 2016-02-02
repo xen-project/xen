@@ -65,8 +65,18 @@ static void update_domain_cpuid_info(struct domain *d,
                 .ecx = ctl->ecx
             }
         };
+        int old_vendor = d->arch.x86_vendor;
 
         d->arch.x86_vendor = get_cpu_vendor(vendor_id.str, gcv_guest);
+
+        if ( is_hvm_domain(d) && (d->arch.x86_vendor != old_vendor) )
+        {
+            struct vcpu *v;
+
+            for_each_vcpu( d, v )
+                hvm_update_guest_vendor(v);
+        }
+
         break;
     }
 
@@ -707,6 +717,12 @@ long arch_do_domctl(
         xen_domctl_cpuid_t *ctl = &domctl->u.cpuid;
         cpuid_input_t *cpuid, *unused = NULL;
 
+        if ( d == currd ) /* no domain_pause() */
+        {
+            ret = -EINVAL;
+            break;
+        }
+
         for ( i = 0; i < MAX_CPUID_INPUT; i++ )
         {
             cpuid = &d->arch.cpuids[i];
@@ -724,6 +740,8 @@ long arch_do_domctl(
                 break;
         }
 
+        domain_pause(d);
+
         if ( i < MAX_CPUID_INPUT )
             *cpuid = *ctl;
         else if ( unused )
@@ -734,6 +752,7 @@ long arch_do_domctl(
         if ( !ret )
             update_domain_cpuid_info(d, ctl);
 
+        domain_unpause(d);
         break;
     }
 

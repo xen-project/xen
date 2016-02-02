@@ -93,12 +93,10 @@ unsigned long __section(".bss.page_aligned")
 static bool_t __initdata opt_hap_enabled = 1;
 boolean_param("hap", opt_hap_enabled);
 
-#ifndef NDEBUG
+#ifndef opt_hvm_fep
 /* Permit use of the Forced Emulation Prefix in HVM guests */
-static bool_t opt_hvm_fep;
+bool_t opt_hvm_fep;
 boolean_param("hvm_fep", opt_hvm_fep);
-#else
-#define opt_hvm_fep 0
 #endif
 
 /* Xen command-line option to enable altp2m */
@@ -2512,6 +2510,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
         /* Init guest TSC to start from zero. */
         hvm_set_guest_tsc(v, 0);
     }
+
+    hvm_update_guest_vendor(v);
 
     return 0;
 

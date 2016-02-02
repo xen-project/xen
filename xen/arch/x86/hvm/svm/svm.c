@@ -597,6 +597,21 @@ static void svm_update_guest_efer(struct vcpu *v)
     vmcb_set_efer(vmcb, new_efer);
 }
 
+static void svm_update_guest_vendor(struct vcpu *v)
+{
+    struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
+    struct vmcb_struct *vmcb = arch_svm->vmcb;
+    u32 bitmap = vmcb_get_exception_intercepts(vmcb);
+
+    if ( opt_hvm_fep ||
+         (v->domain->arch.x86_vendor != boot_cpu_data.x86_vendor) )
+        bitmap |= (1U << TRAP_invalid_op);
+    else
+        bitmap &= ~(1U << TRAP_invalid_op);
+
+    vmcb_set_exception_intercepts(vmcb, bitmap);
+}
+
 static void svm_sync_vmcb(struct vcpu *v)
 {
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
@@ -2245,6 +2260,7 @@ static struct hvm_function_table __initdata svm_function_table = {
     .get_shadow_gs_base   = svm_get_shadow_gs_base,
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,
+    .update_guest_vendor  = svm_update_guest_vendor,
     .set_guest_pat        = svm_set_guest_pat,
     .get_guest_pat        = svm_get_guest_pat,
     .set_tsc_offset       = svm_set_tsc_offset,
