@@ -139,7 +139,18 @@ int nmi_active;
 
 static void __init wait_for_nmis(void *p)
 {
-    mdelay((10*1000)/nmi_hz); /* wait 10 ticks */
+    unsigned int cpu = smp_processor_id();
+    unsigned int start_count = nmi_count(cpu);
+    unsigned long ticks = 10 * 1000 * cpu_khz / nmi_hz;
+    unsigned long s, e;
+
+    s = rdtsc();
+    do {
+        cpu_relax();
+        if ( nmi_count(cpu) >= start_count + 2 )
+            break;
+        e = rdtsc();
+    } while( e - s < ticks );
 }
 
 int __init check_nmi_watchdog (void)
@@ -156,15 +167,16 @@ int __init check_nmi_watchdog (void)
     for_each_online_cpu ( cpu )
         prev_nmi_count[cpu] = nmi_count(cpu);
 
-    /* Wait for 10 ticks.  Busy-wait on all CPUs: the LAPIC counter that
-     * the NMI watchdog uses only runs while the core's not halted */
-    if ( nmi_watchdog == NMI_LOCAL_APIC )
-        smp_call_function(wait_for_nmis, NULL, 0);
-    wait_for_nmis(NULL);
+    /*
+     * Wait at most 10 ticks for 2 watchdog NMIs on each CPU.
+     * Busy-wait on all CPUs: the LAPIC counter that the NMI watchdog
+     * uses only runs while the core's not halted
+     */
+    on_selected_cpus(&cpu_online_map, wait_for_nmis, NULL, 1);
 
     for_each_online_cpu ( cpu )
     {
-        if ( nmi_count(cpu) - prev_nmi_count[cpu] <= 5 )
+        if ( nmi_count(cpu) - prev_nmi_count[cpu] < 2 )
         {
             printk(" %d", cpu);
             ok = 0;
