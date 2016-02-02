@@ -177,11 +177,6 @@ S:	Supported
 F:	xen/arch/x86/debug.c
 F:	tools/debugger/gdbsx/
 
-HISILICON HIP04 SUPPORT
-M:	Zoltan Kiss <zoltan.kiss@huawei.com>
-S:	Supported
-F:	xen/arch/arm/gic-hip04.c
-
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
 M:	Gang Wei <gang.wei@intel.com>
 M:	Shane Wang <shane.wang@intel.com>

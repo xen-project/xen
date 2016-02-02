@@ -37,7 +37,6 @@ the name of the machine:
   - dra7: printk with 8250 on DRA7 platform
   - exynos5250: printk with the second UART
   - fastmodel: printk on ARM Fastmodel software emulators
-  - hip04-d01: printk with 8250 on HiSilicon Hip-04 D01
   - juno: printk with pl011 on Juno platform
   - lager: printk with SCIF0 on Renesas R-Car H2 processors
   - midway: printk with the pl011 on Calxeda Midway processors
