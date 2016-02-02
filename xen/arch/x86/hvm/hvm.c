@@ -1672,8 +1672,10 @@ void hvm_domain_relinquish_resources(struct domain *d)
 void hvm_domain_destroy(struct domain *d)
 {
     xfree(d->arch.hvm_domain.io_handler);
+    d->arch.hvm_domain.io_handler = NULL;
+
     xfree(d->arch.hvm_domain.params);
-    xfree(d->arch.hvm_domain.pl_time);
+    d->arch.hvm_domain.params = NULL;
 
     hvm_destroy_cacheattr_region_list(d);
 
@@ -1684,6 +1686,9 @@ void hvm_domain_destroy(struct domain *d)
     rtc_deinit(d);
     stdvga_deinit(d);
     vioapic_deinit(d);
+
+    xfree(d->arch.hvm_domain.pl_time);
+    d->arch.hvm_domain.pl_time = NULL;
 }
 
 static int hvm_save_tsc_adjust(struct domain *d, hvm_domain_context_t *h)
