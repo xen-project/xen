@@ -1101,6 +1101,7 @@ csched_sys_cntl(const struct scheduler *ops,
     int rc = -EINVAL;
     xen_sysctl_credit_schedule_t *params = &sc->u.sched_credit;
     struct csched_private *prv = CSCHED_PRIV(ops);
+    unsigned long flags;
 
     switch ( sc->cmd )
     {
@@ -1112,8 +1113,12 @@ csched_sys_cntl(const struct scheduler *ops,
                     || params->ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN))
             || MICROSECS(params->ratelimit_us) > MILLISECS(params->tslice_ms) )
                 goto out;
+
+        spin_lock_irqsave(&prv->lock, flags);
         __csched_set_tslice(prv, params->tslice_ms);
         prv->ratelimit_us = params->ratelimit_us;
+        spin_unlock_irqrestore(&prv->lock, flags);
+
         /* FALLTHRU */
     case XEN_SYSCTL_SCHEDOP_getinfo:
         params->tslice_ms = prv->tslice_ms;
