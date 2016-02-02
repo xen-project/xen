@@ -5560,6 +5560,7 @@ int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
     case LIBXL_DOMAIN_TYPE_HVM:
         switch (libxl__device_model_version_running(gc, domid)) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+        case LIBXL_DEVICE_MODEL_VERSION_NONE:
             rc = libxl__set_vcpuonline_xenstore(gc, domid, cpumap, &info);
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
