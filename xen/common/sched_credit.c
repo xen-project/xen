@@ -1092,6 +1092,7 @@ __csched_set_tslice(struct csched_private *prv, unsigned timeslice)
         prv->ticks_per_tslice = 1;
     prv->tick_period_us = prv->tslice_ms * 1000 / prv->ticks_per_tslice;
     prv->credits_per_tslice = CSCHED_CREDITS_PER_MSEC * prv->tslice_ms;
+    prv->credit = prv->credits_per_tslice * prv->ncpus;
 }
 
 static int
