@@ -27,6 +27,7 @@ xenforeignmemory_handle *xenforeignmemory_open(xentoollog_logger *logger,
 
     if (!fmem) return NULL;
 
+    fmem->fd = -1;
     fmem->logger = logger;
     fmem->logger_tofree = NULL;
 

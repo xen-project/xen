@@ -24,6 +24,8 @@ xencall_handle *xencall_open(xentoollog_logger *logger, unsigned open_flags)
 
     if (!xcall) return NULL;
 
+    xcall->fd = -1;
+
     xcall->flags = open_flags;
     xcall->buffer_cache_nr = 0;
 
