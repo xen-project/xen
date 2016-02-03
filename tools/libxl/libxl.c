@@ -6739,12 +6739,12 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
             LOG(ERROR, "fail to get memory target for domain %d", domid);
             goto out;
         }
-        /* Target memory in xenstore is different from what user has
-         * asked for. The difference is video_memkb. See
-         * libxl_set_memory_target.
+
+        /* libxl__get_targetmem_fudge() calculates the difference from
+         * what is in xenstore to what we have in the domain build info.
          */
         d_config->b_info.target_memkb = target_memkb +
-            d_config->b_info.video_memkb;
+            libxl__get_targetmem_fudge(gc, &d_config->b_info);
 
         d_config->b_info.max_memkb = max_memkb;
     }
