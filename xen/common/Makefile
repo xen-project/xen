@@ -30,6 +30,7 @@ obj-y += rangeset.o
 obj-y += radix-tree.o
 obj-y += rbtree.o
 obj-y += rcupdate.o
+obj-y += rwlock.o
 obj-$(CONFIG_SCHED_ARINC653) += sched_arinc653.o
 obj-$(CONFIG_SCHED_CREDIT) += sched_credit.o
 obj-$(CONFIG_SCHED_CREDIT2) += sched_credit2.o

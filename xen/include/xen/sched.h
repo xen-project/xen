@@ -4,6 +4,7 @@
 
 #include <xen/types.h>
 #include <xen/spinlock.h>
+#include <xen/rwlock.h>
 #include <xen/shared.h>
 #include <xen/timer.h>
 #include <xen/rangeset.h>

@@ -23,6 +23,7 @@
 #include <xen/types.h>
 #include <xen/domain_page.h>
 #include <xen/spinlock.h>
+#include <xen/rwlock.h>
 #include <xen/mm.h>
 #include <xen/grant_table.h>
 #include <xen/sched.h>

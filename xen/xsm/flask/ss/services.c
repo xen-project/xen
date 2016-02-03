@@ -40,6 +40,7 @@
 #include <xen/xmalloc.h>
 #include <xen/string.h>
 #include <xen/spinlock.h>
+#include <xen/rwlock.h>
 #include <xen/errno.h>
 #include "flask.h"
 #include "avc.h"
