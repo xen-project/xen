@@ -3943,6 +3943,21 @@ static inline void libxl__update_config_vtpm(libxl__gc *gc,
     libxl_uuid_copy(CTX, &dst->uuid, &src->uuid);
 }
 
+/* Target memory in xenstore is different from what user has
+ * asked for. The difference is video_memkb + (possible) fudge.
+ * See libxl_set_memory_target.
+ */
+static inline
+uint64_t libxl__get_targetmem_fudge(libxl__gc *gc,
+                                    const libxl_domain_build_info *info)
+{
+    int64_t mem_target_fudge = (info->type == LIBXL_DOMAIN_TYPE_HVM &&
+                                info->max_memkb > info->target_memkb)
+                                ? LIBXL_MAXMEM_CONSTANT : 0;
+
+    return info->video_memkb + mem_target_fudge;
+}
+
 /* Macros used to compare device identifier. Returns true if the two
  * devices have same identifier. */
 #define COMPARE_DEVID(a, b) ((a)->devid == (b)->devid)
