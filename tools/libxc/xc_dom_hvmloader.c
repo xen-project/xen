@@ -257,7 +257,7 @@ static elf_errorstatus xc_dom_load_hvm_kernel(struct xc_dom_image *dom)
     if ( rc < 0 )
     {
         DOMPRINTF("%s: failed to load elf binary", __func__);
-        return rc;
+        goto error;
     }
 
     munmap(elf->dest_base, elf->dest_size);
@@ -267,14 +267,14 @@ static elf_errorstatus xc_dom_load_hvm_kernel(struct xc_dom_image *dom)
     if ( rc != 0 )
     {
         DOMPRINTF("%s: insufficient space to load modules.", __func__);
-        return rc;
+        goto error;
     }
 
     rc = loadmodules(dom, m_start, m_end, dom->guest_domid);
     if ( rc != 0 )
     {
         DOMPRINTF("%s: unable to load modules.", __func__);
-        return rc;
+        goto error;
     }
 
     dom->parms.phys_entry = elf_uval(elf, elf->ehdr, e_entry);
