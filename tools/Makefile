@@ -184,28 +184,25 @@ qemu-xen-traditional-dir-force-update: qemu-xen-traditional-dir-find
 		$(GIT) reset --hard $(QEMU_TRADITIONAL_REVISION); \
 	fi
 
-subdir-all-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
+qemu-traditional-recurse = \
 	set -e; \
 		$(buildmakevars2shellvars); \
 		export CONFIG_BLKTAP1=n; \
 		cd qemu-xen-traditional-dir; \
-		$(QEMU_ROOT)/xen-setup \
-		$(IOEMU_EXTRA_LDFLAGS) \
-		--cpu=$(IOEMU_CPU_ARCH) \
-		$(IOEMU_CONFIGURE_CROSS); \
-		$(MAKE) all
+		$(1)
 
-subdir-install-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
-	set -e; \
-		$(buildmakevars2shellvars); \
-		export CONFIG_BLKTAP1=n; \
-		cd qemu-xen-traditional-dir; \
+subdir-all-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
+	$(call qemu-traditional-recurse,\
 		$(QEMU_ROOT)/xen-setup \
 		--extra-cflags="$(EXTRA_CFLAGS_QEMU_TRADITIONAL)" \
 		$(IOEMU_EXTRA_LDFLAGS) \
 		--cpu=$(IOEMU_CPU_ARCH) \
 		$(IOEMU_CONFIGURE_CROSS); \
-		$(MAKE) install
+		$(MAKE) all \
+	)
+
+subdir-install-qemu-xen-traditional-dir: subdir-all-qemu-xen-traditional-dir
+	$(call qemu-traditional-recurse,$(MAKE) install)
 
 subdir-clean-qemu-xen-traditional-dir:
 	set -e; if test -d qemu-xen-traditional-dir/.; then \
