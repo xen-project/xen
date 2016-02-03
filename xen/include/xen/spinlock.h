@@ -152,17 +152,6 @@ typedef struct spinlock {
 
 #define spin_lock_init(l) (*(l) = (spinlock_t)SPIN_LOCK_UNLOCKED)
 
-typedef struct {
-    volatile uint32_t lock;
-    struct lock_debug debug;
-} rwlock_t;
-
-#define RW_WRITE_FLAG (1u<<31)
-
-#define RW_LOCK_UNLOCKED { 0, _LOCK_DEBUG }
-#define DEFINE_RWLOCK(l) rwlock_t l = RW_LOCK_UNLOCKED
-#define rwlock_init(l) (*(l) = (rwlock_t)RW_LOCK_UNLOCKED)
-
 void _spin_lock(spinlock_t *lock);
 void _spin_lock_irq(spinlock_t *lock);
 unsigned long _spin_lock_irqsave(spinlock_t *lock);
@@ -178,27 +167,6 @@ void _spin_barrier(spinlock_t *lock);
 int _spin_trylock_recursive(spinlock_t *lock);
 void _spin_lock_recursive(spinlock_t *lock);
 void _spin_unlock_recursive(spinlock_t *lock);
-
-void _read_lock(rwlock_t *lock);
-void _read_lock_irq(rwlock_t *lock);
-unsigned long _read_lock_irqsave(rwlock_t *lock);
-
-void _read_unlock(rwlock_t *lock);
-void _read_unlock_irq(rwlock_t *lock);
-void _read_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
-int _read_trylock(rwlock_t *lock);
-
-void _write_lock(rwlock_t *lock);
-void _write_lock_irq(rwlock_t *lock);
-unsigned long _write_lock_irqsave(rwlock_t *lock);
-int _write_trylock(rwlock_t *lock);
-
-void _write_unlock(rwlock_t *lock);
-void _write_unlock_irq(rwlock_t *lock);
-void _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
-
-int _rw_is_locked(rwlock_t *lock);
-int _rw_is_write_locked(rwlock_t *lock);
 
 #define spin_lock(l)                  _spin_lock(l)
 #define spin_lock_irq(l)              _spin_lock_irq(l)

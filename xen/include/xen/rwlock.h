@@ -3,6 +3,188 @@
 
 #include <xen/spinlock.h>
 
+#include <asm/atomic.h>
+#include <asm/system.h>
+
+typedef struct {
+    atomic_t cnts;
+    spinlock_t lock;
+} rwlock_t;
+
+#define    RW_LOCK_UNLOCKED {           \
+    .cnts = ATOMIC_INIT(0),             \
+    .lock = SPIN_LOCK_UNLOCKED          \
+}
+
+#define DEFINE_RWLOCK(l) rwlock_t l = RW_LOCK_UNLOCKED
+#define rwlock_init(l) (*(l) = (rwlock_t)RW_LOCK_UNLOCKED)
+
+/*
+ * Writer states & reader shift and bias.
+ *
+ * Writer field is 8 bit to allow for potential optimisation, see
+ * _write_unlock().
+ */
+#define    _QW_WAITING  1               /* A writer is waiting     */
+#define    _QW_LOCKED   0xff            /* A writer holds the lock */
+#define    _QW_WMASK    0xff            /* Writer mask.*/
+#define    _QR_SHIFT    8               /* Reader count shift      */
+#define    _QR_BIAS     (1U << _QR_SHIFT)
+
+void queue_read_lock_slowpath(rwlock_t *lock);
+void queue_write_lock_slowpath(rwlock_t *lock);
+
+/*
+ * _read_trylock - try to acquire read lock of a queue rwlock.
+ * @lock : Pointer to queue rwlock structure.
+ * Return: 1 if lock acquired, 0 if failed.
+ */
+static inline int _read_trylock(rwlock_t *lock)
+{
+    u32 cnts;
+
+    cnts = atomic_read(&lock->cnts);
+    if ( likely(!(cnts & _QW_WMASK)) )
+    {
+        cnts = (u32)atomic_add_return(_QR_BIAS, &lock->cnts);
+        if ( likely(!(cnts & _QW_WMASK)) )
+            return 1;
+        atomic_sub(_QR_BIAS, &lock->cnts);
+    }
+    return 0;
+}
+
+/*
+ * _read_lock - acquire read lock of a queue rwlock.
+ * @lock: Pointer to queue rwlock structure.
+ */
+static inline void _read_lock(rwlock_t *lock)
+{
+    u32 cnts;
+
+    cnts = atomic_add_return(_QR_BIAS, &lock->cnts);
+    if ( likely(!(cnts & _QW_WMASK)) )
+        return;
+
+    /* The slowpath will decrement the reader count, if necessary. */
+    queue_read_lock_slowpath(lock);
+}
+
+static inline void _read_lock_irq(rwlock_t *lock)
+{
+    ASSERT(local_irq_is_enabled());
+    local_irq_disable();
+    _read_lock(lock);
+}
+
+static inline unsigned long _read_lock_irqsave(rwlock_t *lock)
+{
+    unsigned long flags;
+    local_irq_save(flags);
+    _read_lock(lock);
+    return flags;
+}
+
+/*
+ * _read_unlock - release read lock of a queue rwlock.
+ * @lock : Pointer to queue rwlock structure.
+ */
+static inline void _read_unlock(rwlock_t *lock)
+{
+    /*
+     * Atomically decrement the reader count
+     */
+    atomic_sub(_QR_BIAS, &lock->cnts);
+}
+
+static inline void _read_unlock_irq(rwlock_t *lock)
+{
+    _read_unlock(lock);
+    local_irq_enable();
+}
+
+static inline void _read_unlock_irqrestore(rwlock_t *lock, unsigned long flags)
+{
+    _read_unlock(lock);
+    local_irq_restore(flags);
+}
+
+static inline int _rw_is_locked(rwlock_t *lock)
+{
+    return atomic_read(&lock->cnts);
+}
+
+/*
+ * queue_write_lock - acquire write lock of a queue rwlock.
+ * @lock : Pointer to queue rwlock structure.
+ */
+static inline void _write_lock(rwlock_t *lock)
+{
+    /* Optimize for the unfair lock case where the fair flag is 0. */
+    if ( atomic_cmpxchg(&lock->cnts, 0, _QW_LOCKED) == 0 )
+        return;
+
+    queue_write_lock_slowpath(lock);
+}
+
+static inline void _write_lock_irq(rwlock_t *lock)
+{
+    ASSERT(local_irq_is_enabled());
+    local_irq_disable();
+    _write_lock(lock);
+}
+
+static inline unsigned long _write_lock_irqsave(rwlock_t *lock)
+{
+    unsigned long flags;
+
+    local_irq_save(flags);
+    _write_lock(lock);
+    return flags;
+}
+
+/*
+ * queue_write_trylock - try to acquire write lock of a queue rwlock.
+ * @lock : Pointer to queue rwlock structure.
+ * Return: 1 if lock acquired, 0 if failed.
+ */
+static inline int _write_trylock(rwlock_t *lock)
+{
+    u32 cnts;
+
+    cnts = atomic_read(&lock->cnts);
+    if ( unlikely(cnts) )
+        return 0;
+
+    return likely(atomic_cmpxchg(&lock->cnts, 0, _QW_LOCKED) == 0);
+}
+
+static inline void _write_unlock(rwlock_t *lock)
+{
+    /*
+     * If the writer field is atomic, it can be cleared directly.
+     * Otherwise, an atomic subtraction will be used to clear it.
+     */
+    atomic_sub(_QW_LOCKED, &lock->cnts);
+}
+
+static inline void _write_unlock_irq(rwlock_t *lock)
+{
+    _write_unlock(lock);
+    local_irq_enable();
+}
+
+static inline void _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags)
+{
+    _write_unlock(lock);
+    local_irq_restore(flags);
+}
+
+static inline int _rw_is_write_locked(rwlock_t *lock)
+{
+    return (atomic_read(&lock->cnts) & _QW_WMASK) == _QW_LOCKED;
+}
+
 #define read_lock(l)                  _read_lock(l)
 #define read_lock_irq(l)              _read_lock_irq(l)
 #define read_lock_irqsave(l, f)                                 \
