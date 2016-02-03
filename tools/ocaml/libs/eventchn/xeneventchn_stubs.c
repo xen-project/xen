@@ -21,7 +21,6 @@
 #include <errno.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
-#include <xen/sysctl.h>
 #include <xen/xen.h>
 #include <xen/sys/evtchn.h>
 #include <xenevtchn.h>

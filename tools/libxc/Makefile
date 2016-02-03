@@ -105,6 +105,7 @@ endif
 
 CFLAGS   += -Werror -Wmissing-prototypes
 CFLAGS   += -I. -I./include $(CFLAGS_xeninclude)
+CFLAGS   += -D__XEN_TOOLS__
 
 # Needed for posix_fadvise64() in xc_linux.c
 CFLAGS-$(CONFIG_Linux) += -D_GNU_SOURCE

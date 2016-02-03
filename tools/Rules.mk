@@ -108,7 +108,9 @@ CFLAGS_libxenforeignmemory = -I$(XEN_LIBXENFOREIGNMEMORY)/include $(CFLAGS_xenin
 LDLIBS_libxenforeignmemory = $(XEN_LIBXENFOREIGNMEMORY)/libxenforeignmemory$(libextension)
 SHLIB_libxenforeignmemory  = -Wl,-rpath-link=$(XEN_LIBXENFOREIGNMEMORY)
 
-CFLAGS_libxenctrl = -I$(XEN_LIBXC)/include $(CFLAGS_libxentoollog) $(CFLAGS_libxenforeignmemory) $(CFLAGS_xeninclude)
+# code which compiles against libxenctrl get __XEN_TOOLS__ and
+# therefore sees the unstable hypercall interfaces.
+CFLAGS_libxenctrl = -I$(XEN_LIBXC)/include $(CFLAGS_libxentoollog) $(CFLAGS_libxenforeignmemory) $(CFLAGS_xeninclude) -D__XEN_TOOLS__
 SHDEPS_libxenctrl = $(SHLIB_libxentoollog) $(SHLIB_libxenevtchn) $(SHLIB_libxengnttab) $(SHLIB_libxengntshr) $(SHLIB_libxencall) $(SHLIB_libxenforeignmemory)
 LDLIBS_libxenctrl = $(SHDEPS_libxenctrl) $(XEN_LIBXC)/libxenctrl$(libextension)
 SHLIB_libxenctrl  = $(SHDEPS_libxenctrl) -Wl,-rpath-link=$(XEN_LIBXC)
@@ -159,7 +161,7 @@ SHDEPS_libxenlight = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libblktapc
 LDLIBS_libxenlight = $(SHDEPS_libxenlight) $(XEN_XENLIGHT)/libxenlight$(libextension)
 SHLIB_libxenlight  = $(SHDEPS_libxenlight) -Wl,-rpath-link=$(XEN_XENLIGHT)
 
-CFLAGS += -D__XEN_TOOLS__
+CFLAGS += -D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__
 
 # Get gcc to generate the dependencies for us.
 CFLAGS += -MMD -MF .$(if $(filter-out .,$(@D)),$(subst /,@,$(@D))@)$(@F).d

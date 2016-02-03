@@ -194,7 +194,7 @@ qemu-traditional-recurse = \
 subdir-all-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
 	$(call qemu-traditional-recurse,\
 		$(QEMU_ROOT)/xen-setup \
-		--extra-cflags="$(EXTRA_CFLAGS_QEMU_TRADITIONAL)" \
+		--extra-cflags="-D__XEN_TOOLS__ $(EXTRA_CFLAGS_QEMU_TRADITIONAL)" \
 		$(IOEMU_EXTRA_LDFLAGS) \
 		--cpu=$(IOEMU_CPU_ARCH) \
 		$(IOEMU_CONFIGURE_CROSS); \

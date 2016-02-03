@@ -31,7 +31,7 @@ SMBIOS_REL_DATE ?= $(shell date +%m/%d/%Y)
 CFLAGS += $(CFLAGS_xeninclude)
 
 # We mustn't use tools-only public interfaces.
-CFLAGS += -U__XEN_TOOLS__ -D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__
+CFLAGS += -D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__
 
 OBJS  = hvmloader.o mp_tables.o util.o smbios.o 
 OBJS += smp.o cacheattr.o xenbus.o vnuma.o
