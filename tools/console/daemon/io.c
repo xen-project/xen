@@ -1053,7 +1053,7 @@ void handle_io(void)
 						 POLLIN|POLLPRI);
 
 		if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0)
-			return;
+			break;
 		now = ((long long)ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
 
 		/* Re-calculate any event counter allowances & unblock
