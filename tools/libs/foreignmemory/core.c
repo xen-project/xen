@@ -78,7 +78,7 @@ void *xenforeignmemory_map(xenforeignmemory_handle *fmem,
 
     ret = osdep_xenforeignmemory_map(fmem, dom, prot, num, arr, err);
 
-    if ( ret == 0 && err_to_free )
+    if ( ret && err_to_free )
     {
         int i;
 
