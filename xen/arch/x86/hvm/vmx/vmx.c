@@ -1379,12 +1379,13 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         if ( !hvm_paging_enabled(v) )
         {
             /*
-             * SMEP/SMAP is disabled if CPU is in non-paging mode in hardware.
-             * However Xen always uses paging mode to emulate guest non-paging
-             * mode. To emulate this behavior, SMEP/SMAP needs to be manually
-             * disabled when guest VCPU is in non-paging mode.
+             * SMEP/SMAP/PKU is disabled if CPU is in non-paging mode in
+             * hardware. However Xen always uses paging mode to emulate guest
+             * non-paging mode. To emulate this behavior, SMEP/SMAP/PKU needs
+             * to be manually disabled when guest VCPU is in non-paging mode.
              */
-            v->arch.hvm_vcpu.hw_cr[4] &= ~(X86_CR4_SMEP | X86_CR4_SMAP);
+            v->arch.hvm_vcpu.hw_cr[4] &=
+                ~(X86_CR4_SMEP | X86_CR4_SMAP | X86_CR4_PKE);
         }
         __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
         break;
