@@ -46,18 +46,28 @@ extern void alternative_instructions(void);
 #define ALTINSTR_REPLACEMENT(newinstr, feature, number) /* replacement */     \
         b_replacement(number)":\n\t" newinstr "\n" e_replacement(number) ":\n\t"
 
+#define ALTERNATIVE_N(newinstr, feature, number)	\
+	".pushsection .altinstructions,\"a\"\n"		\
+	ALTINSTR_ENTRY(feature, number)			\
+	".section .discard,\"a\",@progbits\n"		\
+	DISCARD_ENTRY(number)				\
+	".section .altinstr_replacement, \"ax\"\n"	\
+	ALTINSTR_REPLACEMENT(newinstr, feature, number)	\
+	".popsection\n"
+
 /* alternative assembly primitive: */
-#define ALTERNATIVE(oldinstr, newinstr, feature)                        \
-        OLDINSTR(oldinstr)                                              \
-        ".pushsection .altinstructions,\"a\"\n"                         \
-        ALTINSTR_ENTRY(feature, 1)                                      \
-        ".popsection\n"                                                 \
-        ".pushsection .discard,\"aw\",@progbits\n"                      \
-        DISCARD_ENTRY(1)                                                \
-        ".popsection\n"                                                 \
-        ".pushsection .altinstr_replacement, \"ax\"\n"                  \
-        ALTINSTR_REPLACEMENT(newinstr, feature, 1)                      \
-        ".popsection"
+#define ALTERNATIVE(oldinstr, newinstr, feature)			  \
+	OLDINSTR(oldinstr)						  \
+	ALTERNATIVE_N(newinstr, feature, 1)
+
+#define ALTERNATIVE_2(oldinstr, newinstr1, feature1, newinstr2, feature2) \
+	ALTERNATIVE(oldinstr, newinstr1, feature1)			  \
+	ALTERNATIVE_N(newinstr2, feature2, 2)
+
+#define ALTERNATIVE_3(oldinstr, newinstr1, feature1, newinstr2, feature2, \
+		      newinstr3, feature3)				  \
+	ALTERNATIVE_2(oldinstr, newinstr1, feature1, newinstr2, feature2) \
+	ALTERNATIVE_N(newinstr3, feature3, 3)
 
 /*
  * Alternative instructions for different CPU types or capabilities.
@@ -92,6 +102,37 @@ extern void alternative_instructions(void);
 #define alternative_io(oldinstr, newinstr, feature, output, input...)	\
 	asm volatile (ALTERNATIVE(oldinstr, newinstr, feature)		\
 		      : output : input)
+
+/*
+ * This is similar to alternative_io. But it has two features and
+ * respective instructions.
+ *
+ * If CPU has feature2, newinstr2 is used.
+ * Otherwise, if CPU has feature1, newinstr1 is used.
+ * Otherwise, oldinstr is used.
+ */
+#define alternative_io_2(oldinstr, newinstr1, feature1, newinstr2,	\
+			 feature2, output, input...)			\
+	asm volatile(ALTERNATIVE_2(oldinstr, newinstr1, feature1,	\
+				   newinstr2, feature2)			\
+		     : output : input)
+
+/*
+ * This is similar to alternative_io. But it has three features and
+ * respective instructions.
+ *
+ * If CPU has feature3, newinstr3 is used.
+ * Otherwise, if CPU has feature2, newinstr2 is used.
+ * Otherwise, if CPU has feature1, newinstr1 is used.
+ * Otherwise, oldinstr is used.
+ */
+#define alternative_io_3(oldinstr, newinstr1, feature1, newinstr2,	\
+			 feature2, newinstr3, feature3, output,		\
+			 input...)					\
+	asm volatile(ALTERNATIVE_3(oldinstr, newinstr1, feature1,	\
+				   newinstr2, feature2, newinstr3,	\
+				   feature3)				\
+		     : output : input)
 
 /* Use this macro(s) if you need more than one output parameter. */
 #define ASM_OUTPUT2(a...) a
