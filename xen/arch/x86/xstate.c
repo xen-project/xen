@@ -250,27 +250,29 @@ void xsave(struct vcpu *v, uint64_t mask)
     uint32_t hmask = mask >> 32;
     uint32_t lmask = mask;
     int word_size = mask & XSTATE_FP ? (cpu_has_fpu_sel ? 8 : 0) : -1;
+#define XSAVE(pfx) \
+        alternative_io_3(".byte " pfx "0x0f,0xae,0x27\n", /* xsave */ \
+                         ".byte " pfx "0x0f,0xae,0x37\n", /* xsaveopt */ \
+                         X86_FEATURE_XSAVEOPT, \
+                         ".byte " pfx "0x0f,0xc7,0x27\n", /* xsavec */ \
+                         X86_FEATURE_XSAVEC, \
+                         ".byte " pfx "0x0f,0xc7,0x2f\n", /* xsaves */ \
+                         X86_FEATURE_XSAVES, \
+                         "=m" (*ptr), \
+                         "a" (lmask), "d" (hmask), "D" (ptr))
 
     if ( word_size <= 0 || !is_pv_32bit_vcpu(v) )
     {
         typeof(ptr->fpu_sse.fip.sel) fcs = ptr->fpu_sse.fip.sel;
         typeof(ptr->fpu_sse.fdp.sel) fds = ptr->fpu_sse.fdp.sel;
 
-        if ( cpu_has_xsaves )
-            asm volatile ( ".byte 0x48,0x0f,0xc7,0x2f"
-                           : "=m" (*ptr)
-                           : "a" (lmask), "d" (hmask), "D" (ptr) );
-        else if ( cpu_has_xsavec )
-            asm volatile ( ".byte 0x48,0x0f,0xc7,0x27"
-                           : "=m" (*ptr)
-                           : "a" (lmask), "d" (hmask), "D" (ptr) );
-        else if ( cpu_has_xsaveopt )
+        if ( cpu_has_xsaveopt || cpu_has_xsaves )
         {
             /*
-             * xsaveopt may not write the FPU portion even when the respective
-             * mask bit is set. For the check further down to work we hence
-             * need to put the save image back into the state that it was in
-             * right after the previous xsaveopt.
+             * XSAVEOPT/XSAVES may not write the FPU portion even when the
+             * respective mask bit is set. For the check further down to work
+             * we hence need to put the save image back into the state that
+             * it was in right after the previous XSAVEOPT.
              */
             if ( word_size > 0 &&
                  (ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] == 4 ||
@@ -279,14 +281,9 @@ void xsave(struct vcpu *v, uint64_t mask)
                 ptr->fpu_sse.fip.sel = 0;
                 ptr->fpu_sse.fdp.sel = 0;
             }
-            asm volatile ( ".byte 0x48,0x0f,0xae,0x37"
-                           : "=m" (*ptr)
-                           : "a" (lmask), "d" (hmask), "D" (ptr) );
         }
-        else
-            asm volatile ( ".byte 0x48,0x0f,0xae,0x27"
-                           : "=m" (*ptr)
-                           : "a" (lmask), "d" (hmask), "D" (ptr) );
+
+        XSAVE("0x48,");
 
         if ( !(mask & ptr->xsave_hdr.xstate_bv & XSTATE_FP) ||
              /*
@@ -296,7 +293,7 @@ void xsave(struct vcpu *v, uint64_t mask)
              (!(ptr->fpu_sse.fsw & 0x0080) &&
               boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
         {
-            if ( cpu_has_xsaveopt && word_size > 0 )
+            if ( (cpu_has_xsaveopt || cpu_has_xsaves) && word_size > 0 )
             {
                 ptr->fpu_sse.fip.sel = fcs;
                 ptr->fpu_sse.fdp.sel = fds;
@@ -317,24 +314,10 @@ void xsave(struct vcpu *v, uint64_t mask)
     }
     else
     {
-        if ( cpu_has_xsaves )
-            asm volatile ( ".byte 0x0f,0xc7,0x2f"
-                           : "=m" (*ptr)
-                           : "a" (lmask), "d" (hmask), "D" (ptr) );
-        else if ( cpu_has_xsavec )
-            asm volatile ( ".byte 0x0f,0xc7,0x27"
-                           : "=m" (*ptr)
-                           : "a" (lmask), "d" (hmask), "D" (ptr) );
-        else if ( cpu_has_xsaveopt )
-            asm volatile ( ".byte 0x0f,0xae,0x37"
-                           : "=m" (*ptr)
-                           : "a" (lmask), "d" (hmask), "D" (ptr) );
-        else
-            asm volatile ( ".byte 0x0f,0xae,0x27"
-                           : "=m" (*ptr)
-                           : "a" (lmask), "d" (hmask), "D" (ptr) );
+        XSAVE("");
         word_size = 4;
     }
+#undef XSAVE
     if ( word_size >= 0 )
         ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] = word_size;
 }
