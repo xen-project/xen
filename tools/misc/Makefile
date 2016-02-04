@@ -10,6 +10,7 @@ CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(CFLAGS_libxenstore)
 
 # Everything to be installed in regular bin/
+INSTALL_BIN-$(CONFIG_X86)      += xen-cpuid
 INSTALL_BIN-$(CONFIG_X86)      += xen-detect
 INSTALL_BIN                    += xencons
 INSTALL_BIN                    += xencov_split
@@ -67,6 +68,9 @@ clean:
 
 .PHONY: distclean
 distclean: clean
+
+xen-cpuid: xen-cpuid.o
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(APPEND_LDFLAGS)
 
 xen-hvmctx: xen-hvmctx.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
