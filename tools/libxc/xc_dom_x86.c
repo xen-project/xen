@@ -1412,8 +1412,15 @@ static int meminit_hvm(struct xc_dom_image *dom)
      * ensure that we can be preempted and hence dom0 remains responsive.
      */
     if ( dom->device_model )
+    {
         rc = xc_domain_populate_physmap_exact(
             xch, domid, 0xa0, 0, memflags, &dom->p2m_host[0x00]);
+        if ( rc != 0 )
+        {
+            DOMPRINTF("Could not populate low memory (< 0xA0).\n");
+            goto error_out;
+        }
+    }
 
     stat_normal_pages = 0;
     for ( vmemid = 0; vmemid < nr_vmemranges; vmemid++ )
@@ -1440,6 +1447,7 @@ static int meminit_hvm(struct xc_dom_image *dom)
         else
             cur_pages = vmemranges[vmemid].start >> PAGE_SHIFT;
 
+        rc = 0;
         while ( (rc == 0) && (end_pages > cur_pages) )
         {
             /* Clip count to maximum 1GB extent. */
