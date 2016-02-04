@@ -371,9 +371,24 @@ config FAST_SYMBOL_LOOKUP
 
 	  If unsure, say Y.
 
+config ENFORCE_UNIQUE_SYMBOLS
+	bool "Enforce unique symbols"
+	default y
+	depends on LIVEPATCH
+	---help---
+	  Multiple symbols with the same name aren't generally a problem
+	  unless livepatching is to be used.
+
+	  Livepatch loading involves resolving relocations against symbol
+	  names, and attempting to a duplicate symbol in a livepatch will
+	  result in incorrect livepatch application.
+
+	  This option should be used to ensure that a build of Xen can have a
+	  livepatch build and apply correctly.
+
 config SUPPRESS_DUPLICATE_SYMBOL_WARNINGS
-	bool "Suppress duplicate symbol warnings" if !LIVEPATCH
-	default y if !LIVEPATCH
+	bool "Suppress duplicate symbol warnings" if !ENFORCE_UNIQUE_SYMBOLS
+	default y if !ENFORCE_UNIQUE_SYMBOLS
 	---help---
 	  Multiple symbols with the same name aren't generally a problem
 	  unless Live patching is to be used, so these warnings can be
