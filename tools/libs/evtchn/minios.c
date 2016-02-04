@@ -128,7 +128,7 @@ static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     wake_up(&event_queue);
 }
 
-evtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce, uint32_t domid)
+xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce, uint32_t domid)
 {
     int fd = xce->fd;
     struct evtchn_port_info *port_info;
@@ -155,7 +155,7 @@ evtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce, uint32
     return port;
 }
 
-evtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint32_t domid,
+xenevtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint32_t domid,
                                                   evtchn_port_t remote_port)
 {
     int fd = xce->fd;
@@ -199,7 +199,7 @@ int xenevtchn_unbind(xenevtchn_handle *xce, evtchn_port_t port)
     return -1;
 }
 
-evtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce, unsigned int virq)
+xenevtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce, unsigned int virq)
 {
     int fd = xce->fd;
     struct evtchn_port_info *port_info;
@@ -224,7 +224,7 @@ evtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce, unsigned int v
     return port;
 }
 
-evtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)
+xenevtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)
 {
     int fd = xce->fd;
     struct evtchn_port_info *port_info;

@@ -62,7 +62,7 @@ int xenevtchn_notify(xenevtchn_handle *xce, evtchn_port_t port)
     return ioctl(fd, IOCTL_EVTCHN_NOTIFY, &notify);
 }
 
-evtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle * xce, uint32_t domid)
+xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle * xce, uint32_t domid)
 {
     int fd = xce->fd;
     struct ioctl_evtchn_bind_unbound_port bind;
@@ -77,7 +77,7 @@ evtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle * xce, uint3
         return -1;
 }
 
-evtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint32_t domid,
+xenevtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce, uint32_t domid,
                                                   evtchn_port_t remote_port)
 {
     int fd = xce->fd;
@@ -104,7 +104,7 @@ int xenevtchn_unbind(xenevtchn_handle *xce, evtchn_port_t port)
     return ioctl(fd, IOCTL_EVTCHN_UNBIND, &unbind);
 }
 
-evtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce, unsigned int virq)
+xenevtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce, unsigned int virq)
 {
     int fd = xce->fd;
     struct ioctl_evtchn_bind_virq bind;
@@ -119,7 +119,7 @@ evtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce, unsigned int v
         return bind.port;
 }
 
-evtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)
+xenevtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)
 {
     int fd = xce->fd;
     evtchn_port_t port;

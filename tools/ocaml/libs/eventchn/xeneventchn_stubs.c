@@ -81,7 +81,7 @@ CAMLprim value stub_eventchn_bind_interdomain(value xce, value domid,
 {
 	CAMLparam3(xce, domid, remote_port);
 	CAMLlocal1(port);
-	evtchn_port_or_error_t rc;
+	xenevtchn_port_or_error_t rc;
 
 	rc = xenevtchn_bind_interdomain(_H(xce), Int_val(domid), Int_val(remote_port));
 	if (rc == -1)
@@ -95,7 +95,7 @@ CAMLprim value stub_eventchn_bind_dom_exc_virq(value xce)
 {
 	CAMLparam1(xce);
 	CAMLlocal1(port);
-	evtchn_port_or_error_t rc;
+	xenevtchn_port_or_error_t rc;
 
 	rc = xenevtchn_bind_virq(_H(xce), VIRQ_DOM_EXC);
 	if (rc == -1)
@@ -121,7 +121,7 @@ CAMLprim value stub_eventchn_pending(value xce)
 {
 	CAMLparam1(xce);
 	CAMLlocal1(result);
-	evtchn_port_or_error_t port;
+	xenevtchn_port_or_error_t port;
 
 	port = xenevtchn_pending(_H(xce));
 	if (port == -1)

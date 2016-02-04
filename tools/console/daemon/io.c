@@ -101,8 +101,8 @@ struct domain {
 	struct domain *next;
 	char *conspath;
 	int ring_ref;
-	evtchn_port_or_error_t local_port;
-	evtchn_port_or_error_t remote_port;
+	xenevtchn_port_or_error_t local_port;
+	xenevtchn_port_or_error_t remote_port;
 	xenevtchn_handle *xce_handle;
 	int xce_pollfd_idx;
 	struct xencons_interface *interface;
@@ -868,7 +868,7 @@ static void handle_tty_write(struct domain *dom)
 
 static void handle_ring_read(struct domain *dom)
 {
-	evtchn_port_or_error_t port;
+	xenevtchn_port_or_error_t port;
 
 	if (dom->is_dead)
 		return;
@@ -914,7 +914,7 @@ static void handle_hv_logs(xenevtchn_handle *xce_handle, bool force)
 	char *bufptr = buffer;
 	unsigned int size;
 	static uint32_t index = 0;
-	evtchn_port_or_error_t port = -1;
+	xenevtchn_port_or_error_t port = -1;
 
 	if (!force && ((port = xenevtchn_pending(xce_handle)) == -1))
 		return;
@@ -1005,7 +1005,7 @@ static void reset_fds(void)
 void handle_io(void)
 {
 	int ret;
-	evtchn_port_or_error_t log_hv_evtchn = -1;
+	xenevtchn_port_or_error_t log_hv_evtchn = -1;
 	int xce_pollfd_idx = -1;
 	int xs_pollfd_idx = -1;
 	xenevtchn_handle *xce_handle = NULL;

@@ -719,7 +719,7 @@ static void evtchn_fd_callback(libxl__egc *egc, libxl__ev_fd *ev,
     EGC_GC;
     libxl__ev_evtchn *evev;
     int rc;
-    evtchn_port_or_error_t port;
+    xenevtchn_port_or_error_t port;
 
     rc = evtchn_revents_check(egc, revents);
     if (rc) return;

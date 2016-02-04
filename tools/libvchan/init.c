@@ -215,7 +215,7 @@ static int init_gnt_cli(struct libxenvchan *ctrl, int domain, uint32_t ring_ref)
 static int init_evt_srv(struct libxenvchan *ctrl, int domain,
                         struct xentoollog_logger *logger)
 {
-	evtchn_port_or_error_t port;
+	xenevtchn_port_or_error_t port;
 
 	ctrl->event = xenevtchn_open(logger, 0);
 	if (!ctrl->event)
@@ -348,7 +348,7 @@ out:
 static int init_evt_cli(struct libxenvchan *ctrl, int domain,
                         struct xentoollog_logger *logger)
 {
-	evtchn_port_or_error_t port;
+	xenevtchn_port_or_error_t port;
 
 	ctrl->event = xenevtchn_open(logger, 0);
 	if (!ctrl->event)
