@@ -173,8 +173,8 @@ common_start:
         beq   hyp
 
         /* OK, we're boned. */
-        PRINT("- Xen must be entered in NS Hyp mode -\r\n" \
-              "- Please update the bootloader -\r\n")
+        PRINT("- Xen must be entered in NS Hyp mode -\r\n")
+        PRINT("- Please update the bootloader -\r\n")
         b     fail
 
 hyp:    PRINT("- Xen starting in Hyp mode -\r\n")
