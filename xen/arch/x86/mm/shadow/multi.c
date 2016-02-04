@@ -3669,6 +3669,12 @@ sh_gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
             pfec[0] &= ~PFEC_page_present;
         if ( missing & _PAGE_INVALID_BITS )
             pfec[0] |= PFEC_reserved_bit;
+        /*
+         * SDM Intel 64 Volume 3, Chapter Paging, PAGE-FAULT EXCEPTIONS:
+         * The PFEC_insn_fetch flag is set only when NX or SMEP are enabled.
+         */
+        if ( is_hvm_vcpu(v) && !hvm_nx_enabled(v) && !hvm_smep_enabled(v) )
+            pfec[0] &= ~PFEC_insn_fetch;
         return INVALID_GFN;
     }
     gfn = guest_walk_to_gfn(&gw);

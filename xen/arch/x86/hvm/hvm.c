@@ -4487,11 +4487,9 @@ enum hvm_copy_result hvm_copy_from_guest_virt(
 enum hvm_copy_result hvm_fetch_from_guest_virt(
     void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    if ( hvm_nx_enabled(current) || hvm_smep_enabled(current) )
-        pfec |= PFEC_insn_fetch;
     return __hvm_copy(buf, vaddr, size,
                       HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_virt,
-                      PFEC_page_present | pfec);
+                      PFEC_page_present | PFEC_insn_fetch | pfec);
 }
 
 enum hvm_copy_result hvm_copy_to_guest_virt_nofault(
@@ -4513,11 +4511,9 @@ enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
 enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
     void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    if ( hvm_nx_enabled(current) || hvm_smep_enabled(current) )
-        pfec |= PFEC_insn_fetch;
     return __hvm_copy(buf, vaddr, size,
                       HVMCOPY_from_guest | HVMCOPY_no_fault | HVMCOPY_virt,
-                      PFEC_page_present | pfec);
+                      PFEC_page_present | PFEC_insn_fetch | pfec);
 }
 
 unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)

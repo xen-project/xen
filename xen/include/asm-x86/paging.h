@@ -255,7 +255,11 @@ static inline bool_t paging_invlpg(struct vcpu *v, unsigned long va)
  * tables don't map this address for this kind of access.
  * pfec[0] is used to determine which kind of access this is when
  * walking the tables.  The caller should set the PFEC_page_present bit
- * in pfec[0]; in the failure case, that bit will be cleared if appropriate. */
+ * in pfec[0]; in the failure case, that bit will be cleared if appropriate.
+ *
+ * SDM Intel 64 Volume 3, Chapter Paging, PAGE-FAULT EXCEPTIONS:
+ * The PFEC_insn_fetch flag is set only when NX or SMEP are enabled.
+ */
 unsigned long paging_gva_to_gfn(struct vcpu *v,
                                 unsigned long va,
                                 uint32_t *pfec);
