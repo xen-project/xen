@@ -25,6 +25,9 @@
 /* xen_ulong_t is always 64 bits */
 #define BITS_PER_XEN_ULONG 64
 
+/* And ELF files are also 64-bit. */
+#define ELFSIZE 64
+
 #define CONFIG_PAGING_ASSISTANCE 1
 
 #define CONFIG_PAGING_LEVELS 3
