@@ -537,16 +537,10 @@ int main(int argc, char *argv[])
 
             if ( altp2m )
             {
-                uint32_t vcpu_id;
-
                 rc = xc_altp2m_switch_to_view( xch, domain_id, 0 );
                 rc = xc_altp2m_destroy_view(xch, domain_id, altp2m_view_id);
                 rc = xc_altp2m_set_domain_state(xch, domain_id, 0);
                 rc = xc_monitor_singlestep(xch, domain_id, 0);
-
-                for ( vcpu_id = 0; vcpu_id<XEN_LEGACY_MAX_VCPUS; vcpu_id++)
-                    rc = control_singlestep(xch, domain_id, vcpu_id, 0);
-
             } else {
                 rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, ~0ull, 0);
                 rc = xc_set_mem_access(xch, domain_id, XENMEM_access_rwx, START_PFN,
@@ -570,8 +564,6 @@ int main(int argc, char *argv[])
 
         while ( RING_HAS_UNCONSUMED_REQUESTS(&xenaccess->vm_event.back_ring) )
         {
-            xenmem_access_t access;
-
             get_request(&xenaccess->vm_event, &req);
 
             if ( req.version != VM_EVENT_INTERFACE_VERSION )
@@ -584,16 +576,25 @@ int main(int argc, char *argv[])
             memset( &rsp, 0, sizeof (rsp) );
             rsp.version = VM_EVENT_INTERFACE_VERSION;
             rsp.vcpu_id = req.vcpu_id;
-            rsp.flags = req.flags;
+            rsp.flags = (req.flags & VM_EVENT_FLAG_VCPU_PAUSED);
+            rsp.reason = req.reason;
 
             switch (req.reason) {
             case VM_EVENT_REASON_MEM_ACCESS:
-                rc = xc_get_mem_access(xch, domain_id, req.u.mem_access.gfn, &access);
-                if (rc < 0)
+                if ( !shutting_down )
                 {
-                    ERROR("Error %d getting mem_access event\n", rc);
-                    interrupted = -1;
-                    continue;
+                    /*
+                     * This serves no other purpose here then demonstrating the use of the API.
+                     * At shutdown we have already reset all the permissions so really no use getting it again.
+                     */
+                    xenmem_access_t access;
+                    rc = xc_get_mem_access(xch, domain_id, req.u.mem_access.gfn, &access);
+                    if (rc < 0)
+                    {
+                        ERROR("Error %d getting mem_access event\n", rc);
+                        interrupted = -1;
+                        continue;
+                    }
                 }
 
                 printf("PAGE ACCESS: %c%c%c for GFN %"PRIx64" (offset %06"
@@ -614,11 +615,8 @@ int main(int argc, char *argv[])
                 {
                     DPRINTF("\tSwitching back to default view!\n");
 
-                    rsp.reason = req.reason;
-                    rsp.flags = req.flags;
+                    rsp.flags |= VM_EVENT_FLAG_TOGGLE_SINGLESTEP;
                     rsp.altp2m_idx = 0;
-
-                    control_singlestep(xch, domain_id, rsp.vcpu_id, 1);
                 }
                 else if ( default_access != after_first_access )
                 {
@@ -633,7 +631,7 @@ int main(int argc, char *argv[])
                     }
                 }
 
-                rsp.u.mem_access.gfn = req.u.mem_access.gfn;
+                rsp.u.mem_access = req.u.mem_access;
                 break;
             case VM_EVENT_REASON_SOFTWARE_BREAKPOINT:
                 printf("Breakpoint: rip=%016"PRIx64", gfn=%"PRIx64" (vcpu %d)\n",
@@ -662,12 +660,11 @@ int main(int argc, char *argv[])
                 {
                     printf("\tSwitching altp2m to view %u!\n", altp2m_view_id);
 
-                    rsp.reason = req.reason;
                     rsp.flags |= VM_EVENT_FLAG_ALTERNATE_P2M;
                     rsp.altp2m_idx = altp2m_view_id;
                 }
 
-                control_singlestep(xch, domain_id, req.vcpu_id, 0);
+                rsp.flags |= VM_EVENT_FLAG_TOGGLE_SINGLESTEP;
 
                 break;
             default:
@@ -694,6 +691,13 @@ int main(int argc, char *argv[])
     DPRINTF("xenaccess shut down on signal %d\n", interrupted);
 
 exit:
+    if ( altp2m )
+    {
+        uint32_t vcpu_id;
+        for ( vcpu_id = 0; vcpu_id<XEN_LEGACY_MAX_VCPUS; vcpu_id++)
+            rc = control_singlestep(xch, domain_id, vcpu_id, 0);
+    }
+
     /* Tear down domain xenaccess */
     rc1 = xenaccess_teardown(xch, xenaccess);
     if ( rc1 != 0 )
