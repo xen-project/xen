@@ -43,6 +43,19 @@
 0x00022005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:picked_cpu    [ dom:vcpu = 0x%(1)04x%(2)04x, cpu = %(3)d ]
 0x00022006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:tickle        [ cpu = %(1)d ]
 
+0x00022201  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tick
+0x00022202  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_pos       [ dom:vcpu = 0x%(1)08x, pos = %(2)d]
+0x00022203  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit burn    [ dom:vcpu = 0x%(1)08x, credit = %(2)d, delta = %(3)d ]
+0x00022204  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit_add
+0x00022205  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tickle_check   [ dom:vcpu = 0x%(1)08x, credit = %(2)d ]
+0x00022206  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tickle         [ cpu = %(1)d ]
+0x00022207  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit_reset   [ dom:vcpu = 0x%(1)08x, cr_start = %(2)d, cr_end = %(3)d, mult = %(4)d ]
+0x00022208  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:sched_tasklet
+0x00022209  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:update_load
+0x0002220a  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_assign    [ dom:vcpu = 0x%(1)08x, rq_id = %(2)d ]
+0x0002220b  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:updt_vcpu_load [ dom:vcpu = 0x%(1)08x, avgload = %(2)d ]
+0x0002220c  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:updt_runq_load [ rq_load[4]:rq_avgload[28] = 0x%(1)08x, rq_id[4]:b_avgload[28] = 0x%(2)08x ]
+
 0x00081001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMENTRY
 0x00081002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMEXIT      [ exitcode = 0x%(1)08x, rIP  = 0x%(2)08x ]
 0x00081102  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMEXIT      [ exitcode = 0x%(1)08x, rIP  = 0x%(3)08x%(2)08x ]
