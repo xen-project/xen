@@ -7722,6 +7722,107 @@ void sched_process(struct pcpu_info *p)
                        ri->dump_header, r->cpu);
             }
             break;
+        /* CREDIT 2 (TRC_CSCHED2_xxx) */
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 1): /* TICK              */
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 4): /* CREDIT_ADD        */
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 9): /* UPDATE_LOAD       */
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 2): /* RUNQ_POS          */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16, pos;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:runq_insert d%uv%u, position %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->pos);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 3): /* CREDIT_BURN       */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16, credit;
+                    int delta;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:burn_credits d%uv%u, credit = %u, delta = %d\n",
+                       ri->dump_header, r->domid, r->vcpuid,
+                       r->credit, r->delta);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 5): /* TICKLE_CHECK      */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16;
+                    unsigned int credit;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:tickle_check d%uv%u, credit = %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->credit);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 6): /* TICKLE            */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int cpu:16;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:runq_tickle cpu %u\n",
+                       ri->dump_header, r->cpu);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 7):  /* CREDIT_RESET     */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16;
+                    unsigned int credit_start, credit_end;
+                    unsigned int multiplier;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:reset_credits d%uv%u, "
+                       "credit_start = %u, credit_end = %u, mult = %u\n",
+                       ri->dump_header, r->domid, r->vcpuid,
+                       r->credit_start, r->credit_end, r->multiplier);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 8):  /* SCHED_TASKLET    */
+            if(opt.dump_all)
+                printf(" %s csched2:sched_tasklet\n", ri->dump_header);
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 10): /* RUNQ_ASSIGN      */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16;
+                    unsigned int rqi;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:runq_assign d%uv%u on rq# %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->rqi);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 11): /* UPDATE_VCPU_LOAD */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16;
+                    unsigned int avgload;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:update_vcpu_load d%uv%u, avg_load = %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->avgload);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 12): /* UPDATE_RUNQ_LOAD */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int rq_load:4, rq_avgload:28;
+                    unsigned int rq_id:4, b_avgload:28;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:update_rq_load rq# %u, load = %u, "
+                       "avgload = %u, b_avgload = %u\n",
+                       ri->dump_header, r->rq_id, r->rq_load,
+                       r->rq_avgload, r->b_avgload);
+            }
+            break;
         default:
             process_generic(ri);
         }
