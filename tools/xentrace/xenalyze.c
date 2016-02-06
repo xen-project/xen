@@ -7668,6 +7668,63 @@ void sched_process(struct pcpu_info *p)
         default:
             process_generic(&p->ri);
         }
+    } else if(ri->evt.sub == 2) {
+        /* TRC_SCHED_CLASS */
+        switch(ri->event)
+        {
+        /* CREDIT (TRC_CSCHED_xxx) */
+        case TRC_SCHED_CLASS_EVT(CSCHED, 1): /* SCHED_TASKLET */
+            if(opt.dump_all)
+                printf(" %s csched:sched_tasklet\n", ri->dump_header);
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED, 2): /* ACCOUNT_START */
+        case TRC_SCHED_CLASS_EVT(CSCHED, 3): /* ACCOUNT_STOP  */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int domid, vcpuid, actv_cnt;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched:acct_%s d%uv%u, active_vcpus %u\n",
+                       ri->dump_header,
+                       ri->event == TRC_SCHED_CLASS_EVT(CSCHED, 2) ?
+                       "start" : "stop",
+                       r->domid, r->vcpuid,
+                       r->actv_cnt);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED, 4): /* STOLEN_VCPU   */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int peer_cpu, domid, vcpuid;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched:stolen_vcpu d%uv%u from cpu %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->peer_cpu);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED, 5): /* PICKED_CPU    */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int domid, vcpuid, cpu;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched:pick_cpu %u for d%uv%u\n",
+                       ri->dump_header, r->cpu, r->domid, r->vcpuid);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED, 6): /* TICKLE        */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int cpu;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched:runq_tickle, cpu %u\n",
+                       ri->dump_header, r->cpu);
+            }
+            break;
+        default:
+            process_generic(ri);
+        }
     } else {
         UPDATE_VOLUME(p, sched_verbose, ri->size);
         process_generic(&p->ri);
