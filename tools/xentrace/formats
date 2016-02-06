@@ -36,6 +36,13 @@
 0x0002800f  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  switch_infnext    [ new_domid = 0x%(1)08x, time = %(2)d, r_time = %(3)d ]
 0x00028010  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_shutdown_code [ dom:vcpu = 0x%(1)04x%(2)04x, reason = 0x%(3)08x ]
 
+0x00022001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:sched_tasklet
+0x00022002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:account_start [ dom:vcpu = 0x%(1)04x%(2)04x, active = %(3)d ]
+0x00022003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:account_stop  [ dom:vcpu = 0x%(1)04x%(2)04x, active = %(3)d ]
+0x00022004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:stolen_vcpu   [ dom:vcpu = 0x%(2)04x%(3)04x, from = %(1)d ]
+0x00022005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:picked_cpu    [ dom:vcpu = 0x%(1)04x%(2)04x, cpu = %(3)d ]
+0x00022006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:tickle        [ cpu = %(1)d ]
+
 0x00081001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMENTRY
 0x00081002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMEXIT      [ exitcode = 0x%(1)08x, rIP  = 0x%(2)08x ]
 0x00081102  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMEXIT      [ exitcode = 0x%(1)08x, rIP  = 0x%(3)08x%(2)08x ]
