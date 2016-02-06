@@ -19,22 +19,22 @@
 0x00021311  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  offline_to_runnable [ dom:vcpu = 0x%(1)08x ]
 0x00021321  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  offline_to_blocked  [ dom:vcpu = 0x%(1)08x ]
 
-0x00028001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_add_domain  [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00028002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_rem_domain  [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00028003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_sleep      [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00028004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_wake       [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00028005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_yield          [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00028006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_block          [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00022006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_block          [ dom:vcpu = 0x%(1)08x, domid = 0x%(2)08x ]
-0x00028007  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_shutdown	  [ domid = 0x%(1)08x, edomid = 0x%(2)08x, reason = 0x%(3)08x ]
+0x00028001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_add_domain  [ domid = 0x%(1)08x ]
+0x00028002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_rem_domain  [ domid = 0x%(1)08x ]
+0x00028003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_sleep      [ dom:vcpu = 0x%(1)04x%(2)04x ]
+0x00028004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_wake       [ dom:vcpu = 0x%(1)04x%(2)04x ]
+0x00028005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_yield          [ dom:vcpu = 0x%(1)04x%(2)04x ]
+0x00028006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_block          [ dom:vcpu = 0x%(1)04x%(2)04x ]
+0x00028007  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_shutdown	  [ dom:vcpu = 0x%(1)04x%(2)04x, reason = 0x%(3)08x ]
 0x00028008  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_ctl
 0x00028009  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_adjdom      [ domid = 0x%(1)08x ]
-0x0002800a  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  __enter_scheduler [ prev<domid:edomid> = 0x%(1)08x : 0x%(2)08x, next<domid:edomid> = 0x%(3)08x : 0x%(4)08x ]
+0x0002800a  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  __enter_scheduler [ prev<dom:vcpu> = 0x%(1)04x%(2)04x, next<dom:vcpu> = 0x%(3)04x%(4)04x ]
 0x0002800b  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  s_timer_fn
 0x0002800c  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  t_timer_fn
 0x0002800d  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  dom_timer_fn
 0x0002800e  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  switch_infprev    [ old_domid = 0x%(1)08x, runtime = %(2)d ]
 0x0002800f  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  switch_infnext    [ new_domid = 0x%(1)08x, time = %(2)d, r_time = %(3)d ]
+0x00028010  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_shutdown_code [ dom:vcpu = 0x%(1)04x%(2)04x, reason = 0x%(3)08x ]
 
 0x00081001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMENTRY
 0x00081002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMEXIT      [ exitcode = 0x%(1)08x, rIP  = 0x%(2)08x ]
