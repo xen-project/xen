@@ -6035,9 +6035,11 @@ int main_sched_credit(int argc, char **argv)
 {
     const char *dom = NULL;
     const char *cpupool = NULL;
-    int weight = 256, cap = 0, opt_w = 0, opt_c = 0;
-    int opt_s = 0;
-    int tslice = 0, opt_t = 0, ratelimit = 0, opt_r = 0;
+    int weight = 256, cap = 0;
+    int tslice = 0, ratelimit = 0;
+    bool opt_w = false, opt_c = false;
+    bool opt_t = false, opt_r = false;
+    bool opt_s = false;
     int opt, rc;
     static struct option opts[] = {
         {"domain", 1, 0, 'd'},
@@ -6056,22 +6058,22 @@ int main_sched_credit(int argc, char **argv)
         break;
     case 'w':
         weight = strtol(optarg, NULL, 10);
-        opt_w = 1;
+        opt_w = true;
         break;
     case 'c':
         cap = strtol(optarg, NULL, 10);
-        opt_c = 1;
+        opt_c = true;
         break;
     case 't':
         tslice = strtol(optarg, NULL, 10);
-        opt_t = 1;
+        opt_t = true;
         break;
     case 'r':
         ratelimit = strtol(optarg, NULL, 10);
-        opt_r = 1;
+        opt_r = true;
         break;
     case 's':
-        opt_s = 1;
+        opt_s = true;
         break;
     case 'p':
         cpupool = optarg;
@@ -6157,7 +6159,8 @@ int main_sched_credit2(int argc, char **argv)
 {
     const char *dom = NULL;
     const char *cpupool = NULL;
-    int weight = 256, opt_w = 0;
+    int weight = 256;
+    bool opt_w = false;
     int opt, rc;
     static struct option opts[] = {
         {"domain", 1, 0, 'd'},
@@ -6172,7 +6175,7 @@ int main_sched_credit2(int argc, char **argv)
         break;
     case 'w':
         weight = strtol(optarg, NULL, 10);
-        opt_w = 1;
+        opt_w = true;
         break;
     case 'p':
         cpupool = optarg;
@@ -6246,11 +6249,11 @@ int main_sched_rtds(int argc, char **argv)
         break;
     case 'p':
         period = strtol(optarg, NULL, 10);
-        opt_p = 1;
+        opt_p = true;
         break;
     case 'b':
         budget = strtol(optarg, NULL, 10);
-        opt_b = 1;
+        opt_b = true;
         break;
     case 'c':
         cpupool = optarg;
