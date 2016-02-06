@@ -7823,6 +7823,58 @@ void sched_process(struct pcpu_info *p)
                        r->rq_avgload, r->b_avgload);
             }
             break;
+        /* RTDS (TRC_RTDS_xxx) */
+        case TRC_SCHED_CLASS_EVT(RTDS, 1): /* TICKLE           */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int cpu:16;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s rtds:runq_tickle cpu %u\n",
+                       ri->dump_header, r->cpu);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(RTDS, 2): /* RUNQ_PICK        */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16;
+                    uint64_t cur_dl, cur_bg;
+                } __attribute__((packed)) *r = (typeof(r))ri->d;
+
+                printf(" %s rtds:runq_pick d%uv%u, deadline = %"PRIu64", "
+                       "budget = %"PRIu64"\n", ri->dump_header,
+                       r->domid, r->vcpuid, r->cur_dl, r->cur_bg);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(RTDS, 3): /* BUDGET_BURN      */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16;
+                    uint64_t cur_bg;
+                    int delta;
+                } __attribute__((packed)) *r = (typeof(r))ri->d;
+
+                printf(" %s rtds:burn_budget d%uv%u, budget = %"PRIu64", "
+                       "delta = %d\n", ri->dump_header, r->domid,
+                       r->vcpuid, r->cur_bg, r->delta);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(RTDS, 4): /* BUDGET_REPLENISH */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16;
+                    uint64_t cur_dl, cur_bg;
+                } __attribute__((packed)) *r = (typeof(r))ri->d;
+
+                printf(" %s rtds:repl_budget d%uv%u, deadline = %"PRIu64", "
+                       "budget = %"PRIu64"\n", ri->dump_header,
+                       r->domid, r->vcpuid, r->cur_dl, r->cur_bg);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(RTDS, 5): /* SCHED_TASKLET    */
+            if(opt.dump_all)
+                printf(" %s rtds:sched_tasklet\n", ri->dump_header);
+            break;
         default:
             process_generic(ri);
         }
