@@ -86,10 +86,11 @@ struct kernel_param {
     void *var;
 };
 
-extern struct kernel_param __setup_start, __setup_end;
+extern const struct kernel_param __setup_start[], __setup_end[];
 
-#define __setup_str static __initdata __attribute__((__aligned__(1))) char
-#define __kparam static __initsetup \
+#define __setup_str static const  __initconstrel \
+    __attribute__((__aligned__(1))) char
+#define __kparam static const __initsetup \
     __attribute__((__aligned__(sizeof(void *)))) struct kernel_param
 
 #define custom_param(_name, _var) \

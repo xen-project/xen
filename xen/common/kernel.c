@@ -27,7 +27,7 @@ int tainted;
 xen_commandline_t saved_cmdline;
 
 static void __init assign_integer_param(
-    struct kernel_param *param, uint64_t val)
+    const struct kernel_param *param, uint64_t val)
 {
     switch ( param->len )
     {
@@ -52,7 +52,7 @@ void __init cmdline_parse(const char *cmdline)
 {
     char opt[100], *optval, *optkey, *q;
     const char *p = cmdline;
-    struct kernel_param *param;
+    const struct kernel_param *param;
     int bool_assert;
 
     if ( cmdline == NULL )
@@ -96,7 +96,7 @@ void __init cmdline_parse(const char *cmdline)
         if ( !bool_assert )
             optkey += 3;
 
-        for ( param = &__setup_start; param < &__setup_end; param++ )
+        for ( param = __setup_start; param < __setup_end; param++ )
         {
             if ( strcmp(param->name, optkey) )
             {

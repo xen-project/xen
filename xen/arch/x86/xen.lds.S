@@ -152,6 +152,12 @@ SECTIONS
        *(.init.rodata)
        *(.init.rodata.rel)
        *(.init.rodata.str*)
+
+       . = ALIGN(POINTER_ALIGN);
+       __setup_start = .;
+       *(.init.setup)
+       __setup_end = .;
+
        *(.init.data)
        *(.init.data.rel)
        *(.init.data.rel.*)
@@ -178,11 +184,6 @@ SECTIONS
        __ctors_end = .;
   } :text
   . = ALIGN(32);
-  .init.setup : {
-       __setup_start = .;
-       *(.init.setup)
-       __setup_end = .;
-  } :text
   .initcall.init : {
        __initcall_start = .;
        *(.initcallpresmp.init)
