@@ -164,7 +164,7 @@ static int count_pgtables(struct xc_dom_image *dom, xen_vaddr_t from,
 
     for ( l = domx86->params->levels - 1; l >= 0; l-- )
     {
-        map->lvls[l].pfn = pfn + map->area.pgtables;
+        map->lvls[l].pfn = dom->pfn_alloc_end + map->area.pgtables;
         if ( l == domx86->params->levels - 1 )
         {
             /* Top level page table in first mapping only. */
@@ -238,8 +238,7 @@ static int alloc_pgtables(struct xc_dom_image *dom)
         try_virt_end = round_up(dom->virt_alloc_end + pages * PAGE_SIZE_X86,
                                 bits_to_mask(22)); /* 4MB alignment */
 
-        if ( count_pgtables(dom, dom->parms.virt_base, try_virt_end,
-                            dom->pfn_alloc_end) )
+        if ( count_pgtables(dom, dom->parms.virt_base, try_virt_end, 0) )
             return -1;
 
         pages = map->area.pgtables + extra_pages;
