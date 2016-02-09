@@ -259,10 +259,10 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     struct sh_emulate_ctxt *sh_ctxt =
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     struct vcpu *v = current;
-    unsigned long addr, old[2], new[2];
+    unsigned long addr, old, new;
     int rc;
 
-    if ( !is_x86_user_segment(seg) )
+    if ( !is_x86_user_segment(seg) || bytes > sizeof(long) )
         return X86EMUL_UNHANDLEABLE;
 
     rc = hvm_translate_linear_addr(
@@ -270,15 +270,12 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     if ( rc )
         return rc;
 
-    old[0] = new[0] = 0;
-    memcpy(old, p_old, bytes);
-    memcpy(new, p_new, bytes);
+    old = new = 0;
+    memcpy(&old, p_old, bytes);
+    memcpy(&new, p_new, bytes);
 
-    if ( bytes <= sizeof(long) )
-        return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
-            v, addr, old[0], new[0], bytes, sh_ctxt);
-
-    return X86EMUL_UNHANDLEABLE;
+    return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
+               v, addr, old, new, bytes, sh_ctxt);
 }
 
 static const struct x86_emulate_ops hvm_shadow_emulator_ops = {
@@ -335,21 +332,18 @@ pv_emulate_cmpxchg(enum x86_segment seg,
 {
     struct sh_emulate_ctxt *sh_ctxt =
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
-    unsigned long old[2], new[2];
+    unsigned long old, new;
     struct vcpu *v = current;
 
-    if ( !is_x86_user_segment(seg) )
+    if ( !is_x86_user_segment(seg) || bytes > sizeof(long) )
         return X86EMUL_UNHANDLEABLE;
 
-    old[0] = new[0] = 0;
-    memcpy(old, p_old, bytes);
-    memcpy(new, p_new, bytes);
+    old = new = 0;
+    memcpy(&old, p_old, bytes);
+    memcpy(&new, p_new, bytes);
 
-    if ( bytes <= sizeof(long) )
-        return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
-            v, offset, old[0], new[0], bytes, sh_ctxt);
-
-    return X86EMUL_UNHANDLEABLE;
+    return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
+               v, offset, old, new, bytes, sh_ctxt);
 }
 
 static const struct x86_emulate_ops pv_shadow_emulator_ops = {
