@@ -552,6 +552,23 @@ void hvm_do_resume(struct vcpu *v)
     {
         struct monitor_write_data *w = &v->arch.vm_event->write_data;
 
+        if ( v->arch.vm_event->emulate_flags )
+        {
+            enum emul_kind kind = EMUL_KIND_NORMAL;
+
+            if ( v->arch.vm_event->emulate_flags &
+                 VM_EVENT_FLAG_SET_EMUL_READ_DATA )
+                kind = EMUL_KIND_SET_CONTEXT;
+            else if ( v->arch.vm_event->emulate_flags &
+                      VM_EVENT_FLAG_EMULATE_NOWRITE )
+                kind = EMUL_KIND_NOWRITE;
+
+            hvm_mem_access_emulate_one(kind, TRAP_invalid_op,
+                                       HVM_DELIVER_NO_ERROR_CODE);
+
+            v->arch.vm_event->emulate_flags = 0;
+        }
+
         if ( w->do_write.msr )
         {
             hvm_msr_write_intercept(w->msr, w->value, 0);

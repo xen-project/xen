@@ -1639,7 +1639,6 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     p2m_access_t p2ma;
     vm_event_request_t *req;
     int rc;
-    unsigned long eip = guest_cpu_user_regs()->eip;
 
     if ( altp2m_active(d) )
         p2m = p2m_get_altp2m(v);
@@ -1696,39 +1695,6 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
             gfn_unlock(p2m, gfn, 0);
             return 1;
         }
-    }
-
-    /* The previous vm_event reply does not match the current state. */
-    if ( unlikely(v->arch.vm_event) &&
-         (v->arch.vm_event->gpa != gpa || v->arch.vm_event->eip != eip) )
-    {
-        /* Don't emulate the current instruction, send a new vm_event. */
-        v->arch.vm_event->emulate_flags = 0;
-
-        /*
-         * Make sure to mark the current state to match it again against
-         * the new vm_event about to be sent.
-         */
-        v->arch.vm_event->gpa = gpa;
-        v->arch.vm_event->eip = eip;
-    }
-
-    if ( unlikely(v->arch.vm_event) && v->arch.vm_event->emulate_flags )
-    {
-        enum emul_kind kind = EMUL_KIND_NORMAL;
-
-        if ( v->arch.vm_event->emulate_flags &
-             VM_EVENT_FLAG_SET_EMUL_READ_DATA )
-            kind = EMUL_KIND_SET_CONTEXT;
-        else if ( v->arch.vm_event->emulate_flags &
-                  VM_EVENT_FLAG_EMULATE_NOWRITE )
-            kind = EMUL_KIND_NOWRITE;
-
-        hvm_mem_access_emulate_one(kind, TRAP_invalid_op,
-                                   HVM_DELIVER_NO_ERROR_CODE);
-
-        v->arch.vm_event->emulate_flags = 0;
-        return 1;
     }
 
     *req_ptr = NULL;

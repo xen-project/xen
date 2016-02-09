@@ -28,8 +28,6 @@
  */
 struct arch_vm_event {
     uint32_t emulate_flags;
-    unsigned long gpa;
-    unsigned long eip;
     struct vm_event_emul_read_data emul_read_data;
     struct monitor_write_data write_data;
 };
