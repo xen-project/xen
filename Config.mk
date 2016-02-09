@@ -254,7 +254,7 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.6.0
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.6.1
 MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.6.0
 # Fri Jun 26 11:58:40 2015 +0100
 # Correct printf formatting for tpm_tis message.
@@ -266,7 +266,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 7457f4beae2583a106a4176949514e81248fc22d
+QEMU_TRADITIONAL_REVISION ?= xen-4.6.1
 # Mon Jan 4 15:34:29 2016 +0000
 # MSI-X: avoid array overrun upon MSI-X table writes
 
