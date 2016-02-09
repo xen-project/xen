@@ -29,3 +29,7 @@ adduser --no-create-home --system xen-qemuuser-shared
 
 3) root
 As a last resort, libxl will start QEMU as root.
+
+
+Please note that running QEMU as non-root causes migration and PCI
+passthrough not to work properly.
