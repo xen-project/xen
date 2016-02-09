@@ -687,7 +687,8 @@ static bool_t hap_invlpg(struct vcpu *v, unsigned long va)
          * Must perform the flush right now or an other vcpu may
          * use it when we use the next VMRUN emulation, otherwise.
          */
-        p2m_flush(v, vcpu_nestedhvm(v).nv_p2m);
+        if ( vcpu_nestedhvm(v).nv_p2m )
+            p2m_flush(v, vcpu_nestedhvm(v).nv_p2m);
         return 1;
     }
 
