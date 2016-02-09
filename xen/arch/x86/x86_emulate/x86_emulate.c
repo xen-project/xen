@@ -3972,7 +3972,6 @@ x86_emulate(
         uint64_t msr_content;
         struct segment_register cs, ss;
 
-        generate_exception_if(in_realmode(ctxt, ops), EXC_UD, -1);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
 
         /* Inject #UD if syscall/sysret are disabled. */
@@ -4218,7 +4217,6 @@ x86_emulate(
         int lm;
 
         generate_exception_if(mode_ring0(), EXC_GP, 0);
-        generate_exception_if(in_realmode(ctxt, ops), EXC_GP, 0);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
 
         fail_if(ops->read_msr == NULL);
@@ -4267,7 +4265,6 @@ x86_emulate(
         bool_t user64 = !!(rex_prefix & REX_W);
 
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
-        generate_exception_if(in_realmode(ctxt, ops), EXC_GP, 0);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
 
         fail_if(ops->read_msr == NULL);
