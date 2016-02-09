@@ -24,6 +24,7 @@ typedef void (keyhandler_fn_t)(unsigned char key);
  *
  * Called in hardirq context with interrupts disabled.
  */
+struct cpu_user_regs;
 typedef void (irq_keyhandler_fn_t)(unsigned char key,
                                    struct cpu_user_regs *regs);
 
