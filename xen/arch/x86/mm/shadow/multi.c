@@ -369,15 +369,14 @@ static void sh_audit_gw(struct vcpu *v, walk_t *gw)
 #endif /* audit code */
 
 
-#if (CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS)
 /*
  * Write a new value into the guest pagetable, and update the shadows
  * appropriately.  Returns 0 if we page-faulted, 1 for success.
  */
-static int
-sh_write_guest_entry(struct vcpu *v, guest_intpte_t *p,
-                     guest_intpte_t new, mfn_t gmfn)
+static bool_t
+sh_write_guest_entry(struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn)
 {
+#if CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS
     int failed;
 
     paging_lock(v->domain);
@@ -387,6 +386,9 @@ sh_write_guest_entry(struct vcpu *v, guest_intpte_t *p,
     paging_unlock(v->domain);
 
     return !failed;
+#else
+    return 0;
+#endif
 }
 
 /*
@@ -395,10 +397,11 @@ sh_write_guest_entry(struct vcpu *v, guest_intpte_t *p,
  * N.B. caller should check the value of "old" to see if the cmpxchg itself
  * was successful.
  */
-static int
-sh_cmpxchg_guest_entry(struct vcpu *v, guest_intpte_t *p,
-                       guest_intpte_t *old, guest_intpte_t new, mfn_t gmfn)
+static bool_t
+sh_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p, intpte_t *old,
+                       intpte_t new, mfn_t gmfn)
 {
+#if CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS
     int failed;
     guest_intpte_t t = *old;
 
@@ -410,8 +413,10 @@ sh_cmpxchg_guest_entry(struct vcpu *v, guest_intpte_t *p,
     paging_unlock(v->domain);
 
     return !failed;
+#else
+    return 0;
+#endif
 }
-#endif /* CONFIG == GUEST (== SHADOW) */
 
 /**************************************************************************/
 /* Functions to compute the correct index into a shadow page, given an
@@ -5194,14 +5199,12 @@ const struct paging_mode sh_paging_mode = {
     .update_cr3                    = sh_update_cr3,
     .update_paging_modes           = shadow_update_paging_modes,
     .write_p2m_entry               = shadow_write_p2m_entry,
-#if CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS
-    .write_guest_entry             = sh_write_guest_entry,
-    .cmpxchg_guest_entry           = sh_cmpxchg_guest_entry,
-#endif
     .guest_levels                  = GUEST_PAGING_LEVELS,
     .shadow.detach_old_tables      = sh_detach_old_tables,
     .shadow.x86_emulate_write      = sh_x86_emulate_write,
     .shadow.x86_emulate_cmpxchg    = sh_x86_emulate_cmpxchg,
+    .shadow.write_guest_entry      = sh_write_guest_entry,
+    .shadow.cmpxchg_guest_entry    = sh_cmpxchg_guest_entry,
     .shadow.make_monitor_table     = sh_make_monitor_table,
     .shadow.destroy_monitor_table  = sh_destroy_monitor_table,
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
