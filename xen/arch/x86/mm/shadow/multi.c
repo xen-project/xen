@@ -370,44 +370,6 @@ static void sh_audit_gw(struct vcpu *v, walk_t *gw)
 
 
 #if (CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS)
-static void *
-sh_guest_map_l1e(struct vcpu *v, unsigned long addr,
-                  unsigned long *gl1mfn)
-{
-    void *pl1e = NULL;
-    walk_t gw;
-
-    ASSERT(shadow_mode_translate(v->domain));
-
-    // XXX -- this is expensive, but it's easy to cobble together...
-    // FIXME!
-
-    if ( sh_walk_guest_tables(v, addr, &gw, PFEC_page_present) == 0
-         && mfn_valid(gw.l1mfn) )
-    {
-        if ( gl1mfn )
-            *gl1mfn = mfn_x(gw.l1mfn);
-        pl1e = map_domain_page(gw.l1mfn) +
-            (guest_l1_table_offset(addr) * sizeof(guest_l1e_t));
-    }
-
-    return pl1e;
-}
-
-static void
-sh_guest_get_eff_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
-{
-    walk_t gw;
-
-    ASSERT(shadow_mode_translate(v->domain));
-
-    // XXX -- this is expensive, but it's easy to cobble together...
-    // FIXME!
-
-    (void) sh_walk_guest_tables(v, addr, &gw, PFEC_page_present);
-    *(guest_l1e_t *)eff_l1e = gw.l1e;
-}
-
 /*
  * Write a new value into the guest pagetable, and update the shadows
  * appropriately.  Returns 0 if we page-faulted, 1 for success.
@@ -5235,8 +5197,6 @@ const struct paging_mode sh_paging_mode = {
 #if CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS
     .write_guest_entry             = sh_write_guest_entry,
     .cmpxchg_guest_entry           = sh_cmpxchg_guest_entry,
-    .guest_map_l1e                 = sh_guest_map_l1e,
-    .guest_get_eff_l1e             = sh_guest_get_eff_l1e,
 #endif
     .guest_levels                  = GUEST_PAGING_LEVELS,
     .shadow.detach_old_tables      = sh_detach_old_tables,

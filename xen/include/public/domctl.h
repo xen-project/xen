@@ -190,8 +190,11 @@ struct xen_domctl_getpageframeinfo3 {
 #define XEN_DOMCTL_SHADOW_OP_ENABLE_TEST       1
  /* Equiv. to ENABLE with mode flag ENABLE_LOG_DIRTY. */
 #define XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY   2
- /* Equiv. to ENABLE with mode flags ENABLE_REFCOUNT and ENABLE_TRANSLATE. */
+ /*
+  * No longer supported, was equiv. to ENABLE with mode flags
+  * ENABLE_REFCOUNT and ENABLE_TRANSLATE:
 #define XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE  3
+  */
 
 /* Mode flags for XEN_DOMCTL_SHADOW_OP_ENABLE. */
  /*

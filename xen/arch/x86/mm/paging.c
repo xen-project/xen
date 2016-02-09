@@ -844,6 +844,15 @@ void paging_final_teardown(struct domain *d)
  * creation. */
 int paging_enable(struct domain *d, u32 mode)
 {
+    switch ( mode & (PG_external | PG_translate) )
+    {
+    case 0:
+    case PG_external | PG_translate:
+        break;
+    default:
+        return -EINVAL;
+    }
+
     if ( hap_enabled(d) )
         return hap_enable(d, mode | PG_HAP_enable);
     else

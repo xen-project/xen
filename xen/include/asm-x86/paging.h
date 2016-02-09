@@ -124,10 +124,7 @@ struct paging_mode {
     int           (*cmpxchg_guest_entry   )(struct vcpu *v, intpte_t *p,
                                             intpte_t *old, intpte_t new,
                                             mfn_t gmfn);
-    void *        (*guest_map_l1e         )(struct vcpu *v, unsigned long va,
-                                            unsigned long *gl1mfn);
-    void          (*guest_get_eff_l1e     )(struct vcpu *v, unsigned long va,
-                                            void *eff_l1e);
+
     unsigned int guest_levels;
 
     /* paging support extension */
@@ -354,80 +351,6 @@ void pagetable_dying(struct domain *d, paddr_t gpa);
 /* Print paging-assistance info to the console */
 void paging_dump_domain_info(struct domain *d);
 void paging_dump_vcpu_info(struct vcpu *v);
-
-
-/*****************************************************************************
- * Access to the guest pagetables */
-
-/* Get a mapping of a PV guest's l1e for this virtual address. */
-static inline l1_pgentry_t *
-guest_map_l1e(struct vcpu *v, unsigned long addr, unsigned long *gl1mfn)
-{
-    l2_pgentry_t l2e;
-
-    if ( unlikely(!__addr_ok(addr)) )
-        return NULL;
-
-    if ( unlikely(paging_mode_translate(v->domain)) )
-        return paging_get_hostmode(v)->guest_map_l1e(v, addr, gl1mfn);
-
-    /* Find this l1e and its enclosing l1mfn in the linear map */
-    if ( __copy_from_user(&l2e,
-                          &__linear_l2_table[l2_linear_offset(addr)],
-                          sizeof(l2_pgentry_t)) != 0 )
-        return NULL;
-    /* Check flags that it will be safe to read the l1e */
-    if ( (l2e_get_flags(l2e) & (_PAGE_PRESENT | _PAGE_PSE)) 
-         != _PAGE_PRESENT )
-        return NULL;
-    *gl1mfn = l2e_get_pfn(l2e);
-    return (l1_pgentry_t *)map_domain_page(_mfn(*gl1mfn)) + l1_table_offset(addr);
-}
-
-/* Pull down the mapping we got from guest_map_l1e() */
-static inline void
-guest_unmap_l1e(struct vcpu *v, void *p)
-{
-    unmap_domain_page(p);
-}
-
-/* Read the guest's l1e that maps this address. */
-static inline void
-guest_get_eff_l1e(struct vcpu *v, unsigned long addr, l1_pgentry_t *eff_l1e)
-{
-    if ( unlikely(!__addr_ok(addr)) )
-    {
-        *eff_l1e = l1e_empty();
-        return;
-    }
-
-    if ( likely(!paging_mode_translate(v->domain)) )
-    {
-        ASSERT(!paging_mode_external(v->domain));
-        if ( __copy_from_user(eff_l1e,
-                              &__linear_l1_table[l1_linear_offset(addr)],
-                              sizeof(l1_pgentry_t)) != 0 )
-            *eff_l1e = l1e_empty();
-        return;
-    }
-        
-    paging_get_hostmode(v)->guest_get_eff_l1e(v, addr, eff_l1e);
-}
-
-/* Read the guest's l1e that maps this address, from the kernel-mode
- * pagetables. */
-static inline void
-guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
-{
-    int user_mode = !(v->arch.flags & TF_kernel_mode);
-#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
-
-    TOGGLE_MODE();
-    guest_get_eff_l1e(v, addr, eff_l1e);
-    TOGGLE_MODE();
-}
-
-
 
 #endif /* XEN_PAGING_H */
 

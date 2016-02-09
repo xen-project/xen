@@ -2921,8 +2921,7 @@ int shadow_enable(struct domain *d, u32 mode)
 
     /* Sanity check the arguments */
     if ( shadow_mode_enabled(d) ||
-         ((mode & PG_translate) && !(mode & PG_refcounts)) ||
-         ((mode & PG_external) && !(mode & PG_translate)) )
+         ((mode & PG_translate) && !(mode & PG_refcounts)) )
     {
         rv = -EINVAL;
         goto out_unlocked;
@@ -3668,11 +3667,8 @@ int shadow_domctl(struct domain *d,
     case XEN_DOMCTL_SHADOW_OP_ENABLE_TEST:
         return shadow_test_enable(d);
 
-    case XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE:
-        return shadow_enable(d, PG_refcounts|PG_translate);
-
     case XEN_DOMCTL_SHADOW_OP_ENABLE:
-        return shadow_enable(d, sc->mode << PG_mode_shift);
+        return paging_enable(d, sc->mode << PG_mode_shift);
 
     case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:
         sc->mb = shadow_get_allocation(d);

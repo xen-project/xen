@@ -516,6 +516,67 @@ void update_cr3(struct vcpu *v)
     make_cr3(v, cr3_mfn);
 }
 
+/* Get a mapping of a PV guest's l1e for this virtual address. */
+static l1_pgentry_t *guest_map_l1e(unsigned long addr, unsigned long *gl1mfn)
+{
+    l2_pgentry_t l2e;
+
+    ASSERT(!paging_mode_translate(current->domain));
+    ASSERT(!paging_mode_external(current->domain));
+
+    if ( unlikely(!__addr_ok(addr)) )
+        return NULL;
+
+    /* Find this l1e and its enclosing l1mfn in the linear map. */
+    if ( __copy_from_user(&l2e,
+                          &__linear_l2_table[l2_linear_offset(addr)],
+                          sizeof(l2_pgentry_t)) )
+        return NULL;
+
+    /* Check flags that it will be safe to read the l1e. */
+    if ( (l2e_get_flags(l2e) & (_PAGE_PRESENT | _PAGE_PSE)) != _PAGE_PRESENT )
+        return NULL;
+
+    *gl1mfn = l2e_get_pfn(l2e);
+
+    return (l1_pgentry_t *)map_domain_page(_mfn(*gl1mfn)) +
+           l1_table_offset(addr);
+}
+
+/* Pull down the mapping we got from guest_map_l1e(). */
+static inline void guest_unmap_l1e(void *p)
+{
+    unmap_domain_page(p);
+}
+
+/* Read a PV guest's l1e that maps this virtual address. */
+static inline void guest_get_eff_l1e(unsigned long addr, l1_pgentry_t *eff_l1e)
+{
+    ASSERT(!paging_mode_translate(current->domain));
+    ASSERT(!paging_mode_external(current->domain));
+
+    if ( unlikely(!__addr_ok(addr)) ||
+         __copy_from_user(eff_l1e,
+                          &__linear_l1_table[l1_linear_offset(addr)],
+                          sizeof(l1_pgentry_t)) )
+        *eff_l1e = l1e_empty();
+}
+
+/*
+ * Read the guest's l1e that maps this address, from the kernel-mode
+ * page tables.
+ */
+static inline void guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr,
+                                          void *eff_l1e)
+{
+    bool_t user_mode = !(v->arch.flags & TF_kernel_mode);
+#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
+
+    TOGGLE_MODE();
+    guest_get_eff_l1e(addr, eff_l1e);
+    TOGGLE_MODE();
+}
+
 static const char __section(".bss.page_aligned") zero_page[PAGE_SIZE];
 
 static void invalidate_shadow_ldt(struct vcpu *v, int flush)
@@ -3985,7 +4046,7 @@ static int create_grant_va_mapping(
     
     adjust_guest_l1e(nl1e, d);
 
-    pl1e = guest_map_l1e(v, va, &gl1mfn);
+    pl1e = guest_map_l1e(va, &gl1mfn);
     if ( !pl1e )
     {
         MEM_LOG("Could not find L1 PTE for address %lx", va);
@@ -3994,7 +4055,7 @@ static int create_grant_va_mapping(
 
     if ( !get_page_from_pagenr(gl1mfn, current->domain) )
     {
-        guest_unmap_l1e(v, pl1e);
+        guest_unmap_l1e(pl1e);
         return GNTST_general_error;
     }
 
@@ -4002,7 +4063,7 @@ static int create_grant_va_mapping(
     if ( !page_lock(l1pg) )
     {
         put_page(l1pg);
-        guest_unmap_l1e(v, pl1e);
+        guest_unmap_l1e(pl1e);
         return GNTST_general_error;
     }
 
@@ -4010,7 +4071,7 @@ static int create_grant_va_mapping(
     {
         page_unlock(l1pg);
         put_page(l1pg);
-        guest_unmap_l1e(v, pl1e);
+        guest_unmap_l1e(pl1e);
         return GNTST_general_error;
     }
 
@@ -4019,7 +4080,7 @@ static int create_grant_va_mapping(
 
     page_unlock(l1pg);
     put_page(l1pg);
-    guest_unmap_l1e(v, pl1e);
+    guest_unmap_l1e(pl1e);
 
     if ( okay && !paging_mode_refcounts(d) )
         put_page_from_l1e(ol1e, d);
@@ -4035,7 +4096,7 @@ static int replace_grant_va_mapping(
     struct page_info *l1pg;
     int rc = 0;
     
-    pl1e = guest_map_l1e(v, addr, &gl1mfn);
+    pl1e = guest_map_l1e(addr, &gl1mfn);
     if ( !pl1e )
     {
         MEM_LOG("Could not find L1 PTE for address %lx", addr);
@@ -4085,7 +4146,7 @@ static int replace_grant_va_mapping(
     page_unlock(l1pg);
     put_page(l1pg);
  out:
-    guest_unmap_l1e(v, pl1e);
+    guest_unmap_l1e(pl1e);
     return rc;
 }
 
@@ -4197,7 +4258,7 @@ int replace_grant_host_mapping(
     if ( !new_addr )
         return destroy_grant_va_mapping(addr, frame, curr);
 
-    pl1e = guest_map_l1e(curr, new_addr, &gl1mfn);
+    pl1e = guest_map_l1e(new_addr, &gl1mfn);
     if ( !pl1e )
     {
         MEM_LOG("Could not find L1 PTE for address %lx",
@@ -4207,7 +4268,7 @@ int replace_grant_host_mapping(
 
     if ( !get_page_from_pagenr(gl1mfn, current->domain) )
     {
-        guest_unmap_l1e(curr, pl1e);
+        guest_unmap_l1e(pl1e);
         return GNTST_general_error;
     }
 
@@ -4215,7 +4276,7 @@ int replace_grant_host_mapping(
     if ( !page_lock(l1pg) )
     {
         put_page(l1pg);
-        guest_unmap_l1e(curr, pl1e);
+        guest_unmap_l1e(pl1e);
         return GNTST_general_error;
     }
 
@@ -4223,7 +4284,7 @@ int replace_grant_host_mapping(
     {
         page_unlock(l1pg);
         put_page(l1pg);
-        guest_unmap_l1e(curr, pl1e);
+        guest_unmap_l1e(pl1e);
         return GNTST_general_error;
     }
 
@@ -4235,13 +4296,13 @@ int replace_grant_host_mapping(
         page_unlock(l1pg);
         put_page(l1pg);
         MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
-        guest_unmap_l1e(curr, pl1e);
+        guest_unmap_l1e(pl1e);
         return GNTST_general_error;
     }
 
     page_unlock(l1pg);
     put_page(l1pg);
-    guest_unmap_l1e(curr, pl1e);
+    guest_unmap_l1e(pl1e);
 
     rc = replace_grant_va_mapping(addr, frame, ol1e, curr);
     if ( rc && !paging_mode_refcounts(curr->domain) )
@@ -4359,7 +4420,7 @@ static int __do_update_va_mapping(
         return rc;
 
     rc = -EINVAL;
-    pl1e = guest_map_l1e(v, va, &gl1mfn);
+    pl1e = guest_map_l1e(va, &gl1mfn);
     if ( unlikely(!pl1e || !get_page_from_pagenr(gl1mfn, d)) )
         goto out;
 
@@ -4384,7 +4445,7 @@ static int __do_update_va_mapping(
 
  out:
     if ( pl1e )
-        guest_unmap_l1e(v, pl1e);
+        guest_unmap_l1e(pl1e);
 
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
@@ -5229,7 +5290,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     int rc;
 
     /* Attempt to read the PTE that maps the VA being accessed. */
-    guest_get_eff_l1e(v, addr, &pte);
+    guest_get_eff_l1e(addr, &pte);
 
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) ||
@@ -5359,7 +5420,7 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
     int rc;
 
     /* Attempt to read the PTE that maps the VA being accessed. */
-    guest_get_eff_l1e(v, addr, &pte);
+    guest_get_eff_l1e(addr, &pte);
 
     /* We are looking only for read-only mappings of MMIO pages. */
     if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) )
