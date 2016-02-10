@@ -504,7 +504,7 @@ int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
     if ( xc_map_domain_meminfo(xch, domid, &minfo) )
     {
         PERROR("Could not map domain's memory information\n");
-        return -1;
+        goto failed;
     }
 
     /* For translation macros */
