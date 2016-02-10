@@ -3689,7 +3689,7 @@ void __init init_idt_traps(void)
     this_cpu(compat_gdt_table) = boot_cpu_compat_gdt_table;
 }
 
-extern void (*__initconst autogen_entrypoints[NR_VECTORS])(void);
+extern void (*const autogen_entrypoints[NR_VECTORS])(void);
 void __init trap_init(void)
 {
     unsigned int vector;
