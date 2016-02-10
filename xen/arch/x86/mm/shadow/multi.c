@@ -436,6 +436,7 @@ sh_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p, intpte_t *old,
  * space.)
  */
 
+#if GUEST_PAGING_LEVELS == 2
 /* From one page of a multi-page shadow, find the next one */
 static inline mfn_t sh_next_page(mfn_t smfn)
 {
@@ -454,6 +455,7 @@ static inline mfn_t sh_next_page(mfn_t smfn)
     ASSERT(!next->u.sh.head);
     return page_to_mfn(next);
 }
+#endif
 
 static inline u32
 guest_index(void *ptr)

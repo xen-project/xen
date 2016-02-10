@@ -134,14 +134,16 @@
 #define CHECK_NAME_(k, n, tag) __check ## tag ## k ## _ ## n
 
 #define CHECK_TYPE(name) \
-static inline int CHECK_NAME(name, T)(xen_ ## name ## _t *x, \
-                                      compat_ ## name ## _t *c) \
+static inline int __maybe_unused \
+CHECK_NAME(name, T)(xen_ ## name ## _t *x, \
+                    compat_ ## name ## _t *c) \
 { \
     return x == c; \
 }
 #define CHECK_TYPE_(k, n) \
-static inline int CHECK_NAME_(k, n, T)(k xen_ ## n *x, \
-                                       k compat_ ## n *c) \
+static inline int __maybe_unused \
+CHECK_NAME_(k, n, T)(k xen_ ## n *x, \
+                     k compat_ ## n *c) \
 { \
     return x == c; \
 }
@@ -154,14 +156,14 @@ static inline int CHECK_NAME_(k, n, T)(k xen_ ## n *x, \
                                           sizeof(k compat_ ## n)) * 2]
 
 #define CHECK_FIELD_COMMON(name, t, f) \
-static inline int name(xen_ ## t ## _t *x, compat_ ## t ## _t *c) \
+static inline int __maybe_unused name(xen_ ## t ## _t *x, compat_ ## t ## _t *c) \
 { \
     BUILD_BUG_ON(offsetof(xen_ ## t ## _t, f) != \
                  offsetof(compat_ ## t ## _t, f)); \
     return &x->f == &c->f; \
 }
 #define CHECK_FIELD_COMMON_(k, name, n, f) \
-static inline int name(k xen_ ## n *x, k compat_ ## n *c) \
+static inline int __maybe_unused name(k xen_ ## n *x, k compat_ ## n *c) \
 { \
     BUILD_BUG_ON(offsetof(k xen_ ## n, f) != \
                  offsetof(k compat_ ## n, f)); \

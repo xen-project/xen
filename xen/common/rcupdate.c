@@ -141,12 +141,6 @@ static inline int rcu_batch_before(long a, long b)
     return (a - b) < 0;
 }
 
-/* Is batch a after batch b ? */
-static inline int rcu_batch_after(long a, long b)
-{
-    return (a - b) > 0;
-}
-
 static void force_quiescent_state(struct rcu_data *rdp,
                                   struct rcu_ctrlblk *rcp)
 {
