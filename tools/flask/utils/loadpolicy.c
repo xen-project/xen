@@ -115,7 +115,7 @@ done:
         if ( ret < 0 )
             fprintf(stderr, "Unable to unmap policy memory: %s\n", strerror(errno));
     }
-    if ( polFd )
+    if ( polFd >= 0 )
         close(polFd);
     if ( xch )
         xc_interface_close(xch);
