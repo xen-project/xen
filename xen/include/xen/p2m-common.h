@@ -49,7 +49,8 @@ int unmap_mmio_regions(struct domain *d,
  * If gfn == INVALID_GFN, sets the default access type.
  */
 long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
-                        uint32_t start, uint32_t mask, xenmem_access_t access);
+                        uint32_t start, uint32_t mask, xenmem_access_t access,
+                        unsigned int altp2m_idx);
 
 /*
  * Get access type for a gfn.

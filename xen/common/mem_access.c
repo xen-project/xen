@@ -67,7 +67,7 @@ int mem_access_memop(unsigned long cmd,
             break;
 
         rc = p2m_set_mem_access(d, _gfn(mao.pfn), mao.nr, start_iter,
-                                MEMOP_CMD_MASK, mao.access);
+                                MEMOP_CMD_MASK, mao.access, 0);
         if ( rc > 0 )
         {
             ASSERT(!(rc & MEMOP_CMD_MASK));

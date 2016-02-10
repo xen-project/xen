@@ -808,10 +808,6 @@ int p2m_destroy_altp2m_by_id(struct domain *d, unsigned int idx);
 /* Switch alternate p2m for entire domain */
 int p2m_switch_domain_altp2m_by_id(struct domain *d, unsigned int idx);
 
-/* Set access type for a gfn */
-int p2m_set_altp2m_mem_access(struct domain *d, unsigned int idx,
-                              gfn_t gfn, xenmem_access_t access);
-
 /* Change a gfn->mfn mapping */
 int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
                           gfn_t old_gfn, gfn_t new_gfn);
