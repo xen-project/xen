@@ -353,11 +353,12 @@ void xrstor(struct vcpu *v, uint64_t mask)
     {
         switch ( __builtin_expect(ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET], 8) )
         {
+            BUILD_BUG_ON(sizeof(faults) != 4); /* Clang doesn't support %z in asm. */
 #define XRSTOR(pfx) \
         alternative_io("1: .byte " pfx "0x0f,0xae,0x2f\n" \
                        "3:\n" \
                        "   .section .fixup,\"ax\"\n" \
-                       "2: inc%z[faults] %[faults]\n" \
+                       "2: incl %[faults]\n" \
                        "   jmp 3b\n" \
                        "   .previous\n" \
                        _ASM_EXTABLE(1b, 2b), \
