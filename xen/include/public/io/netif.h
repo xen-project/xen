@@ -234,7 +234,7 @@
  * Result = ToeplitzHash(Buffer, 32)
  */
 #define _NETIF_CTRL_TOEPLITZ_HASH_IPV6     2
-#define NETIF_CTRL_TOEPLITZ_HASH_IPV6      (1 << _NETIF_CTRL_TOEPLITZ_HASH_IPV4)
+#define NETIF_CTRL_TOEPLITZ_HASH_IPV6      (1 << _NETIF_CTRL_TOEPLITZ_HASH_IPV6)
 
 /*
  * A hash calculated over an IP version 6 header and TCP header as
@@ -248,7 +248,7 @@
  * Result = ToeplitzHash(Buffer, 36)
  */
 #define _NETIF_CTRL_TOEPLITZ_HASH_IPV6_TCP 3
-#define NETIF_CTRL_TOEPLITZ_HASH_IPV6_TCP  (1 << _NETIF_CTRL_TOEPLITZ_HASH_IPV4_TCP)
+#define NETIF_CTRL_TOEPLITZ_HASH_IPV6_TCP  (1 << _NETIF_CTRL_TOEPLITZ_HASH_IPV6_TCP)
 
 /*
  * Control requests (netif_ctrl_request_t)
