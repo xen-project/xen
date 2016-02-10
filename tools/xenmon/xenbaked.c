@@ -689,6 +689,7 @@ static void alloc_qos_data(int ncpu)
         cpu_qos_data[n] = new_qos;
     }
     free(dummy);
+    close(qos_fd);
     new_qos = NULL;
 }
 
