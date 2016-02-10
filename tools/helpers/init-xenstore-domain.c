@@ -172,9 +172,6 @@ static int build(xc_interface *xch)
         goto err;
     }
 
-    xc_dom_release(dom);
-    dom = NULL;
-
     rv = xc_domain_set_virq_handler(xch, domid, VIRQ_DOM_EXC);
     if ( rv )
     {
@@ -188,14 +185,18 @@ static int build(xc_interface *xch)
         goto err;
     }
 
-    return 0;
+    rv = 0;
 
 err:
     if ( dom )
         xc_dom_release(dom);
-    if ( domid != ~0 )
+    if ( xs_fd >= 0 )
+        close(xs_fd);
+
+    /* if we failed then destroy the domain */
+    if ( rv && domid != ~0 )
         xc_domain_destroy(xch, domid);
-    close(xs_fd);
+
     return rv;
 }
 
