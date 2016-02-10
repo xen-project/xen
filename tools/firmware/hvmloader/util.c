@@ -478,7 +478,7 @@ void *scratch_alloc(uint32_t size, uint32_t align)
     if ( align < 16 )
         align = 16;
 
-    s = (scratch_start + align - 1) & ~(align - 1);
+    s = (scratch_start + align) & ~(align - 1);
     e = s + size - 1;
 
     BUG_ON(e < s);
