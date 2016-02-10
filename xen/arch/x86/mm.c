@@ -577,7 +577,7 @@ static inline void guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr,
     TOGGLE_MODE();
 }
 
-static const char __section(".bss.page_aligned") zero_page[PAGE_SIZE];
+static const char __section(".bss.page_aligned.const") zero_page[PAGE_SIZE];
 
 static void invalidate_shadow_ldt(struct vcpu *v, int flush)
 {

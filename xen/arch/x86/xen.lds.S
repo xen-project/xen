@@ -170,7 +170,7 @@ SECTIONS
        __bss_start = .;
        *(.bss.stack_aligned)
        . = ALIGN(PAGE_SIZE);
-       *(.bss.page_aligned)
+       *(.bss.page_aligned*)
        *(.bss)
        . = ALIGN(SMP_CACHE_BYTES);
        __per_cpu_start = .;
