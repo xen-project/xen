@@ -1421,7 +1421,6 @@ static int flask_shadow_control(struct domain *d, uint32_t op)
         break;
     case XEN_DOMCTL_SHADOW_OP_ENABLE:
     case XEN_DOMCTL_SHADOW_OP_ENABLE_TEST:
-    case XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE:
     case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:
     case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION:
         perm = SHADOW__ENABLE;
