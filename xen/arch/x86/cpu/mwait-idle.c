@@ -70,8 +70,8 @@
 # define pr_debug(fmt...)
 #endif
 
-static __initdata bool_t no_mwait_idle;
-invbool_param("mwait-idle", no_mwait_idle);
+static __initdata bool_t opt_mwait_idle = 1;
+boolean_param("mwait-idle", opt_mwait_idle);
 
 static unsigned int mwait_substates;
 
@@ -832,7 +832,7 @@ static int __init mwait_idle_probe(void)
 	    !mwait_substates)
 		return -ENODEV;
 
-	if (!max_cstate || no_mwait_idle) {
+	if (!max_cstate || !opt_mwait_idle) {
 		pr_debug(PREFIX "disabled\n");
 		return -EPERM;
 	}
