@@ -109,17 +109,7 @@
 #define X86_FEATURE_RDRAND 	(4*32+30) /* Digital Random Number Generator */
 #define X86_FEATURE_HYPERVISOR	(4*32+31) /* Running under some hypervisor */
 
-/* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
-#define X86_FEATURE_XSTORE	(5*32+ 2) /* on-CPU RNG present (xstore insn) */
-#define X86_FEATURE_XSTORE_EN	(5*32+ 3) /* on-CPU RNG enabled */
-#define X86_FEATURE_XCRYPT	(5*32+ 6) /* on-CPU crypto (xcrypt insn) */
-#define X86_FEATURE_XCRYPT_EN	(5*32+ 7) /* on-CPU crypto enabled */
-#define X86_FEATURE_ACE2	(5*32+ 8) /* Advanced Cryptography Engine v2 */
-#define X86_FEATURE_ACE2_EN	(5*32+ 9) /* ACE v2 enabled */
-#define X86_FEATURE_PHE		(5*32+ 10) /* PadLock Hash Engine */
-#define X86_FEATURE_PHE_EN	(5*32+ 11) /* PHE enabled */
-#define X86_FEATURE_PMM		(5*32+ 12) /* PadLock Montgomery Multiplier */
-#define X86_FEATURE_PMM_EN	(5*32+ 13) /* PMM enabled */
+/* UNUSED, word 5 */
 
 /* More extended AMD flags: CPUID level 0x80000001, ecx, word 6 */
 #define X86_FEATURE_LAHF_LM     (6*32+ 0) /* LAHF/SAHF in long mode */

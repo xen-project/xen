@@ -38,9 +38,6 @@ static void init_c3(struct cpuinfo_x86 *c)
 			wrmsrl(MSR_VIA_RNG, msr_content | RNG_ENABLE);
 			printk(KERN_INFO "CPU: Enabled h/w RNG\n");
 		}
-
-		c->x86_capability[cpufeat_word(X86_FEATURE_XSTORE)]
-                    = cpuid_edx(0xC0000001);
 	}
 
 	if (c->x86 == 0x6 && c->x86_model >= 0xf) {
