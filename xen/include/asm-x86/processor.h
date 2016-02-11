@@ -191,7 +191,6 @@ struct cpuinfo_x86 {
     char x86_model_id[64];
     int  x86_cache_size; /* in KB - valid for CPUS which support this call  */
     int  x86_cache_alignment;    /* In bytes */
-    int  x86_power;
     __u32 x86_max_cores; /* cpuid returned max cores value */
     __u32 booted_cores;  /* number of cores as seen by OS */
     __u32 x86_num_siblings; /* cpuid logical cpus per chip value */

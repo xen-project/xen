@@ -475,8 +475,7 @@ static void init_amd(struct cpuinfo_x86 *c)
 	}
 
 	if (c->extended_cpuid_level >= 0x80000007) {
-		c->x86_power = cpuid_edx(0x80000007);
-		if (c->x86_power & (1<<8)) {
+		if (cpuid_edx(0x80000007) & (1<<8)) {
 			__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 			__set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
 			if (c->x86 != 0x11)
