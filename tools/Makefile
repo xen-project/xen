@@ -228,7 +228,7 @@ qemu-xen-dir-force-update: qemu-xen-dir-find
 	fi
 
 ifeq ($(debug),y)
-QEMU_XEN_ENABLE_DEBUG := --enable-debug --enable-trace-backend=stderr
+QEMU_XEN_ENABLE_DEBUG := --enable-debug
 else
 QEMU_XEN_ENABLE_DEBUG :=
 endif
@@ -240,8 +240,14 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		source=.; \
 	fi; \
 	cd qemu-xen-dir; \
+	if $$source/scripts/tracetool.py --check-backend --backend stderr ; then \
+		enable_trace_backend='--enable-trace-backend=stderr'; \
+	else \
+		enable_trace_backend='' ; \
+	fi ; \
 	$$source/configure --enable-xen --target-list=i386-softmmu \
 		$(QEMU_XEN_ENABLE_DEBUG) \
+		$$enable_trace_backend \
 		--prefix=$(LIBEXEC) \
 		--libdir=$(LIBEXEC_LIB) \
 		--includedir=$(LIBEXEC_INC) \
