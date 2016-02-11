@@ -45,7 +45,6 @@
 #define X86_FEATURE_ACC		(0*32+29) /* Automatic clock control */
 #define X86_FEATURE_IA64	(0*32+30) /* IA-64 processor */
 #define X86_FEATURE_PBE		(0*32+31) /* Pending Break Enable */
-#define X86_FEATURE_3DNOW_ALT	(0*32+31) /* AMD nonstandard 3DNow (Aliases PBE) */
 
 /* AMD-defined CPU features, CPUID level 0x80000001, word 1 */
 /* Don't duplicate feature flags which are redundant with Intel! */
