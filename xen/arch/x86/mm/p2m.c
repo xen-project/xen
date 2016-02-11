@@ -900,48 +900,64 @@ void p2m_change_type_range(struct domain *d,
     p2m_unlock(p2m);
 }
 
-/* Returns: 0 for success, -errno for failure */
+/*
+ * Returns:
+ *    0              for success
+ *    -errno         for failure
+ *    1 + new order  for caller to retry with smaller order (guaranteed
+ *                   to be smaller than order passed in)
+ */
 static int set_typed_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
-                               p2m_type_t gfn_p2mt, p2m_access_t access)
+                               unsigned int order, p2m_type_t gfn_p2mt,
+                               p2m_access_t access)
 {
     int rc = 0;
     p2m_access_t a;
     p2m_type_t ot;
     mfn_t omfn;
+    unsigned int cur_order = 0;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     if ( !paging_mode_translate(d) )
         return -EIO;
 
-    gfn_lock(p2m, gfn, 0);
-    omfn = p2m->get_entry(p2m, gfn, &ot, &a, 0, NULL, NULL);
+    gfn_lock(p2m, gfn, order);
+    omfn = p2m->get_entry(p2m, gfn, &ot, &a, 0, &cur_order, NULL);
+    if ( cur_order < order )
+    {
+        gfn_unlock(p2m, gfn, order);
+        return cur_order + 1;
+    }
     if ( p2m_is_grant(ot) || p2m_is_foreign(ot) )
     {
-        gfn_unlock(p2m, gfn, 0);
+        gfn_unlock(p2m, gfn, order);
         domain_crash(d);
         return -ENOENT;
     }
     else if ( p2m_is_ram(ot) )
     {
-        ASSERT(mfn_valid(omfn));
-        set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
+        unsigned long i;
+
+        for ( i = 0; i < (1UL << order); ++i )
+        {
+            ASSERT(mfn_valid(_mfn(mfn_x(omfn) + i)));
+            set_gpfn_from_mfn(mfn_x(omfn) + i, INVALID_M2P_ENTRY);
+        }
     }
 
     P2M_DEBUG("set %d %lx %lx\n", gfn_p2mt, gfn, mfn_x(mfn));
-    rc = p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, gfn_p2mt,
-                       access);
+    rc = p2m_set_entry(p2m, gfn, mfn, order, gfn_p2mt, access);
     if ( rc )
-        gdprintk(XENLOG_ERR,
-                 "p2m_set_entry failed! mfn=%08lx rc:%d\n",
-                 mfn_x(get_gfn_query_unlocked(p2m->domain, gfn, &ot)), rc);
+        gdprintk(XENLOG_ERR, "p2m_set_entry: %#lx:%u -> %d (0x%"PRI_mfn")\n",
+                 gfn, order, rc, mfn_x(mfn));
     else if ( p2m_is_pod(ot) )
     {
         pod_lock(p2m);
-        p2m->pod.entry_count--;
+        p2m->pod.entry_count -= 1UL << order;
         BUG_ON(p2m->pod.entry_count < 0);
         pod_unlock(p2m);
     }
-    gfn_unlock(p2m, gfn, 0);
+    gfn_unlock(p2m, gfn, order);
 
     return rc;
 }
@@ -950,14 +966,19 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 static int set_foreign_p2m_entry(struct domain *d, unsigned long gfn,
                                  mfn_t mfn)
 {
-    return set_typed_p2m_entry(d, gfn, mfn, p2m_map_foreign,
+    return set_typed_p2m_entry(d, gfn, mfn, PAGE_ORDER_4K, p2m_map_foreign,
                                p2m_get_hostp2m(d)->default_access);
 }
 
 int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
-                       p2m_access_t access)
+                       unsigned int order, p2m_access_t access)
 {
-    return set_typed_p2m_entry(d, gfn, mfn, p2m_mmio_direct, access);
+    if ( order > PAGE_ORDER_4K &&
+         rangeset_overlaps_range(mmio_ro_ranges, mfn_x(mfn),
+                                 mfn_x(mfn) + (1UL << order) - 1) )
+        return PAGE_ORDER_4K + 1;
+
+    return set_typed_p2m_entry(d, gfn, mfn, order, p2m_mmio_direct, access);
 }
 
 int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
@@ -1010,20 +1031,33 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
     return ret;
 }
 
-/* Returns: 0 for success, -errno for failure */
-int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+/*
+ * Returns:
+ *    0        for success
+ *    -errno   for failure
+ *    order+1  for caller to retry with order (guaranteed smaller than
+ *             the order value passed in)
+ */
+int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
+                         unsigned int order)
 {
     int rc = -EINVAL;
     mfn_t actual_mfn;
     p2m_access_t a;
     p2m_type_t t;
+    unsigned int cur_order = 0;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     if ( !paging_mode_translate(d) )
         return -EIO;
 
-    gfn_lock(p2m, gfn, 0);
-    actual_mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL, NULL);
+    gfn_lock(p2m, gfn, order);
+    actual_mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, &cur_order, NULL);
+    if ( cur_order < order )
+    {
+        rc = cur_order + 1;
+        goto out;
+    }
 
     /* Do not use mfn_valid() here as it will usually fail for MMIO pages. */
     if ( (INVALID_MFN == mfn_x(actual_mfn)) || (t != p2m_mmio_direct) )
@@ -1036,11 +1070,11 @@ int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
         gdprintk(XENLOG_WARNING,
                  "no mapping between mfn %08lx and gfn %08lx\n",
                  mfn_x(mfn), gfn);
-    rc = p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), PAGE_ORDER_4K, p2m_invalid,
+    rc = p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), order, p2m_invalid,
                        p2m->default_access);
 
  out:
-    gfn_unlock(p2m, gfn, 0);
+    gfn_unlock(p2m, gfn, order);
 
     return rc;
 }
@@ -2131,6 +2165,37 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
     return map_domain_page(*mfn);
 }
 
+static unsigned int mmio_order(const struct domain *d,
+                               unsigned long start_fn, unsigned long nr)
+{
+    /*
+     * Note that the !iommu_use_hap_pt() here has three effects:
+     * - cover iommu_{,un}map_page() not having an "order" input yet,
+     * - exclude shadow mode (which doesn't support large MMIO mappings),
+     * - exclude PV guests, should execution reach this code for such.
+     * So be careful when altering this.
+     */
+    if ( !need_iommu(d) || !iommu_use_hap_pt(d) ||
+         (start_fn & ((1UL << PAGE_ORDER_2M) - 1)) || !(nr >> PAGE_ORDER_2M) )
+        return PAGE_ORDER_4K;
+
+    if ( 0 /*
+            * Don't use 1Gb pages, to limit the iteration count in
+            * set_typed_p2m_entry() when it needs to zap M2P entries
+            * for a RAM range.
+            */ &&
+         !(start_fn & ((1UL << PAGE_ORDER_1G) - 1)) && (nr >> PAGE_ORDER_1G) &&
+         hap_has_1gb )
+        return PAGE_ORDER_1G;
+
+    if ( hap_has_2mb )
+        return PAGE_ORDER_2M;
+
+    return PAGE_ORDER_4K;
+}
+
+#define MAP_MMIO_MAX_ITER 64 /* pretty arbitrary */
+
 int map_mmio_regions(struct domain *d,
                      unsigned long start_gfn,
                      unsigned long nr,
@@ -2138,22 +2203,29 @@ int map_mmio_regions(struct domain *d,
 {
     int ret = 0;
     unsigned long i;
+    unsigned int iter, order;
 
     if ( !paging_mode_translate(d) )
         return 0;
 
-    for ( i = 0; !ret && i < nr; i++ )
+    for ( iter = i = 0; i < nr && iter < MAP_MMIO_MAX_ITER;
+          i += 1UL << order, ++iter )
     {
-        ret = set_mmio_p2m_entry(d, start_gfn + i, _mfn(mfn + i),
-                                 p2m_get_hostp2m(d)->default_access);
-        if ( ret )
+        /* OR'ing gfn and mfn values will return an order suitable to both. */
+        for ( order = mmio_order(d, (start_gfn + i) | (mfn + i), nr - i); ;
+              order = ret - 1 )
         {
-            unmap_mmio_regions(d, start_gfn, i, mfn);
-            break;
+            ret = set_mmio_p2m_entry(d, start_gfn + i, _mfn(mfn + i), order,
+                                     p2m_get_hostp2m(d)->default_access);
+            if ( ret <= 0 )
+                break;
+            ASSERT(ret <= order);
         }
+        if ( ret < 0 )
+            break;
     }
 
-    return ret;
+    return i == nr ? 0 : i ?: ret;
 }
 
 int unmap_mmio_regions(struct domain *d,
@@ -2161,20 +2233,30 @@ int unmap_mmio_regions(struct domain *d,
                        unsigned long nr,
                        unsigned long mfn)
 {
-    int err = 0;
+    int ret = 0;
     unsigned long i;
+    unsigned int iter, order;
 
     if ( !paging_mode_translate(d) )
         return 0;
 
-    for ( i = 0; i < nr; i++ )
+    for ( iter = i = 0; i < nr && iter < MAP_MMIO_MAX_ITER;
+          i += 1UL << order, ++iter )
     {
-        int ret = clear_mmio_p2m_entry(d, start_gfn + i, _mfn(mfn + i));
-        if ( ret )
-            err = ret;
+        /* OR'ing gfn and mfn values will return an order suitable to both. */
+        for ( order = mmio_order(d, (start_gfn + i) | (mfn + i), nr - i); ;
+              order = ret - 1 )
+        {
+            ret = clear_mmio_p2m_entry(d, start_gfn + i, _mfn(mfn + i), order);
+            if ( ret <= 0 )
+                break;
+            ASSERT(ret <= order);
+        }
+        if ( ret < 0 )
+            break;
     }
 
-    return err;
+    return i == nr ? 0 : i ?: ret;
 }
 
 unsigned int p2m_find_altp2m_by_eptp(struct domain *d, uint64_t eptp)

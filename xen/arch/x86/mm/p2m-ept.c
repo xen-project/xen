@@ -136,6 +136,7 @@ static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,
             entry->r = entry->x = 1;
             entry->w = !rangeset_contains_singleton(mmio_ro_ranges,
                                                     entry->mfn);
+            ASSERT(entry->w || !is_epte_superpage(entry));
             entry->a = !!cpu_has_vmx_ept_ad;
             entry->d = entry->w && cpu_has_vmx_ept_ad;
             break;
