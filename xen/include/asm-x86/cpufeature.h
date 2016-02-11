@@ -152,6 +152,7 @@
 #define X86_FEATURE_ADX		(7*32+19) /* ADCX, ADOX instructions */
 #define X86_FEATURE_SMAP	(7*32+20) /* Supervisor Mode Access Prevention */
 #define X86_FEATURE_PCOMMIT	(7*32+22) /* PCOMMIT instruction */
+#define X86_FEATURE_CLFLUSHOPT	(7*32+23) /* CLFLUSHOPT instruction */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0 (ecx), word 8 */
 #define X86_FEATURE_PKU	(8*32+ 3) /* Protection Keys for Userspace */

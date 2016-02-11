@@ -139,10 +139,12 @@ void flush_area_local(const void *va, unsigned int flags)
              c->x86_clflush_size && c->x86_cache_size && sz &&
              ((sz >> 10) < c->x86_cache_size) )
         {
-            va = (const void *)((unsigned long)va & ~(sz - 1));
+            alternative(ASM_NOP3, "sfence", X86_FEATURE_CLFLUSHOPT);
             for ( i = 0; i < sz; i += c->x86_clflush_size )
-                 asm volatile ( "clflush %0"
-                                : : "m" (((const char *)va)[i]) );
+                 alternative_input("rex clflush %0",
+                                   "data16 clflush %0",
+                                   X86_FEATURE_CLFLUSHOPT,
+                                   "m" (((const char *)va)[i]));
         }
         else
         {
