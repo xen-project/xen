@@ -91,7 +91,6 @@ static const char *__init mtrr_attrib_to_str(mtrr_type x)
 {
 	static const char __initconst strings[MTRR_NUM_TYPES][16] =
 	{
-		[0 ... MTRR_NUM_TYPES - 1] = "?",
 		[MTRR_TYPE_UNCACHABLE]     = "uncachable",
 		[MTRR_TYPE_WRCOMB]         = "write-combining",
 		[MTRR_TYPE_WRTHROUGH]      = "write-through",
@@ -99,7 +98,7 @@ static const char *__init mtrr_attrib_to_str(mtrr_type x)
 		[MTRR_TYPE_WRBACK]         = "write-back",
 	};
 
-	return x < MTRR_NUM_TYPES ? strings[x] : "?";
+	return x < MTRR_NUM_TYPES ? (strings[x] ?: "?") : "?";
 }
 
 static unsigned int __initdata last_fixed_start;
