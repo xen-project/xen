@@ -11,17 +11,17 @@
 
 /* Family 0Fh, Revision C */
 #define AMD_FEATURES_K8_REV_C_ECX  0
-#define AMD_FEATURES_K8_REV_C_EDX (					    \
-	cpufeat_mask(X86_FEATURE_FPU)   | cpufeat_mask(X86_FEATURE_VME)   | \
-	cpufeat_mask(X86_FEATURE_DE)    | cpufeat_mask(X86_FEATURE_PSE)   | \
-	cpufeat_mask(X86_FEATURE_TSC)   | cpufeat_mask(X86_FEATURE_MSR)   | \
-	cpufeat_mask(X86_FEATURE_PAE)   | cpufeat_mask(X86_FEATURE_MCE)   | \
-	cpufeat_mask(X86_FEATURE_CX8)   | cpufeat_mask(X86_FEATURE_APIC)  | \
-	cpufeat_mask(X86_FEATURE_SEP)   | cpufeat_mask(X86_FEATURE_MTRR)  | \
-	cpufeat_mask(X86_FEATURE_PGE)   | cpufeat_mask(X86_FEATURE_MCA)   | \
-	cpufeat_mask(X86_FEATURE_CMOV)  | cpufeat_mask(X86_FEATURE_PAT)   | \
-	cpufeat_mask(X86_FEATURE_PSE36) | cpufeat_mask(X86_FEATURE_CLFLSH)| \
-	cpufeat_mask(X86_FEATURE_MMX)   | cpufeat_mask(X86_FEATURE_FXSR)  | \
+#define AMD_FEATURES_K8_REV_C_EDX (					     \
+	cpufeat_mask(X86_FEATURE_FPU)   | cpufeat_mask(X86_FEATURE_VME)    | \
+	cpufeat_mask(X86_FEATURE_DE)    | cpufeat_mask(X86_FEATURE_PSE)    | \
+	cpufeat_mask(X86_FEATURE_TSC)   | cpufeat_mask(X86_FEATURE_MSR)    | \
+	cpufeat_mask(X86_FEATURE_PAE)   | cpufeat_mask(X86_FEATURE_MCE)    | \
+	cpufeat_mask(X86_FEATURE_CX8)   | cpufeat_mask(X86_FEATURE_APIC)   | \
+	cpufeat_mask(X86_FEATURE_SEP)   | cpufeat_mask(X86_FEATURE_MTRR)   | \
+	cpufeat_mask(X86_FEATURE_PGE)   | cpufeat_mask(X86_FEATURE_MCA)    | \
+	cpufeat_mask(X86_FEATURE_CMOV)  | cpufeat_mask(X86_FEATURE_PAT)    | \
+	cpufeat_mask(X86_FEATURE_PSE36) | cpufeat_mask(X86_FEATURE_CLFLUSH)| \
+	cpufeat_mask(X86_FEATURE_MMX)   | cpufeat_mask(X86_FEATURE_FXSR)   | \
 	cpufeat_mask(X86_FEATURE_XMM)   | cpufeat_mask(X86_FEATURE_XMM2))
 #define AMD_EXTFEATURES_K8_REV_C_ECX  0
 #define AMD_EXTFEATURES_K8_REV_C_EDX  (					       \
